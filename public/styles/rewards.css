@@ -207,6 +207,9 @@
 /* Umbruch statt Quetschen - Begruendung an `.modal-panel__footer`
  * (layout.css, #872). */
 .rw-standing__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; }
+/* Taschengeld (#1734): zwei Handlungen nebeneinander (Abheben + Einzahlen,
+ * Buchen + Plan) - die Punktestandzeile hat nur eine und braucht keinen Abstand. */
+.rw-money .rw-standing__actions { gap: var(--space-2); align-items: center; }
 
 /* --------------------------------------------------------
    Eltern-Ersteinrichtung
@@ -619,6 +622,14 @@
   .rw-standing__id { grid-area: id; }
   .rw-standing__actions { grid-area: actions; }
   .rw-standing__progress { grid-area: progress; }
+  /* Taschengeld (#1734): ZWEI Handlungen passen neben Name und Betrag nicht in
+   * 375px - gemessen blieb vom Namen "E." und der Betrag lief unter den Knopf.
+   * Die Handlungen bekommen ihre eigene Zeile, auf der Textkante. */
+  .rw-money {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "id" "progress" "actions";
+  }
+  .rw-money .rw-standing__actions { justify-content: flex-start; }
   /* Die offene Anfrage: Avatar und Titel in EINER Zeile, die Knoepfe darunter
    * auf der Textkante - `flex-wrap` stellte den Avatar allein ueber den Titel. */
   .rw-pending {

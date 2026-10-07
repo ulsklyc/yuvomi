@@ -9,6 +9,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Rewards can hold pocket money: a money balance per child, credited on a schedule, paid out on
+  request** (#1734, from D#916, asked by @trinitrion). The parents are the bank: they set an amount
+  per week or per month and the day it is due, the child sees its balance, asks to withdraw a free
+  amount or to pay something in (birthday money handed over for safekeeping), and the balance
+  changes when a parent confirms - that confirmation is the moment the cash changes hands, so the
+  number always matches what the parents hold. Parents can also book a credit or a deduction
+  directly. It lives in Rewards and not in Budget because everything it needs is already there - a
+  ledger, a request one person files and another decides - and a budget account has no owner; a
+  payout creates no budget entry. Money and points are two balances that never meet: there is no
+  conversion, and no point total changes when money is booked. Only the child and the
+  administrators see a money balance and its history - not the siblings, not a wall tablet, and a
+  scoped API token only under the same rule; that is narrower than points, which everybody with
+  the module sees. There is no overdraft: a withdrawal above the balance is refused when it is
+  asked for and checked again when it is approved, and if the money is gone by then the request
+  stays open so a parent can credit first. A withdrawal always waits for a parent, also in a
+  household that has switched approval off for rewards. Due dates missed while the server was off
+  are booked afterwards, each exactly once; a paused plan books nothing and does not catch up when
+  it is resumed; the plan of a deactivated account is paused. A monthly plan on the 31st pays on
+  the last day of a shorter month and returns to the 31st. Parents open an account for a
+  member - no plan and no amount needed, the child then sees it with a balance of zero and can ask
+  to pay in - and can close it again once it is empty. An account keeps the currency the
+  household used on the day it was opened, written on every entry: if the household later switches
+  its currency, an existing balance, its plan and its open requests stay what they were (1.00 EUR
+  does not turn into 100 yen), a new account takes the new currency, and an emptied one does
+  after it was closed and opened again. When a child's account is deactivated, what was due until that
+  day is booked first, then its open requests are cancelled and its plan paused; what is left on it stays visible to the administrators, marked as
+  former, and can only be paid out. Two edges to know: an account closed and opened again on a day
+  its plan was due is not credited for that day a second time, and the history of a closed account
+  is kept but shown through the API only. No interest, no
+  savings goals, no second currency per child. With read access to Rewards the balance stays
+  visible and the requests are gone, as with redeeming. For API clients: `GET /api/v1/rewards/money`,
+  `GET /api/v1/rewards/money/ledger`, `POST /api/v1/rewards/money/entries`,
+  `POST /api/v1/rewards/money/accounts`, `DELETE /api/v1/rewards/money/accounts/{userId}`,
+  `PUT`/`DELETE /api/v1/rewards/money/plans/{userId}`; a request is `POST /api/v1/rewards/redemptions`
+  with `kind: "withdrawal"` or `"deposit"` and a decimal-string `amount`, and rows of
+  `GET /api/v1/rewards/redemptions` now carry `kind`. Existing fields keep their meaning: that list
+  answers reward requests only unless `?kind=money`, `withdrawal`, `deposit` or `all` asks for more,
+  `pendingCount` and the tile's `pending` still count reward requests, with money requests next to
+  them in `moneyPendingCount` and `moneyPending`, and `GET /api/v1/rewards/ledger` stays the points
+  history (migration 236).
+
 - **Recurring shared expenses have a place in the app: a group lists them, and they can be
   created, edited, paused, resumed and deleted there** (#1647). Until now the app showed a
   recurring expense nowhere. One that the hourly run had paused because it could not be booked

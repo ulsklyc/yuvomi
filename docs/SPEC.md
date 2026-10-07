@@ -492,6 +492,8 @@ in between counting and writing.
 | status | TEXT | pending / fulfilled / rejected / cancelled |
 | note | TEXT | optional member note |
 | decision_reason | TEXT | nullable, migration v221 - machine-readable reason for an automatic decision (`out_of_stock`); `NULL` = decided by hand |
+| kind | TEXT | NOT NULL DEFAULT `reward`, CHECK `reward` / `withdrawal` / `deposit` (#1734) - `reward` is a catalogue redemption and every row from before; the other two are pocket money requests with a free amount in `cost` (minor units), no `catalog_id`, and the kind itself as the `reward_name` marker |
+| currency | TEXT | nullable, CHECK: set exactly when `kind` is not `reward` (#1734) - the ISO 4217 code of the account the money request belongs to |
 | requested_by / decided_by | INTEGER | FK → Users (SET NULL) |
 | decided_at | TEXT | ISO timestamp, nullable |
 
@@ -507,6 +509,126 @@ in between counting and writing.
 | redemption_id | INTEGER | FK → Reward Redemptions (SET NULL), nullable |
 | series_id | INTEGER | nullable, no FK (migration v230, #1603) - on an `earn` row the series it was earned in (`tasks.recurrence_series_id`, or the task's own id); the once-a-day cap reads it |
 | reverses_id | INTEGER | nullable, no FK (migration v230, #1607) - on a task `reversal` the id of the `earn` row it takes back |
+| unit | TEXT | NOT NULL DEFAULT `points`, CHECK `points` / `money` (#1734) - what `delta` counts; every row from before is points |
+| currency | TEXT | nullable, CHECK: set exactly when `unit` is `money` (#1734) - the ISO 4217 code the amount is in |
+| allowance_date | TEXT | nullable (#1734) - on a scheduled pocket money credit the due date it was booked for; partial UNIQUE `(user_id, allowance_date) WHERE allowance_date IS NOT NULL` |
+| created_by | INTEGER | FK → Users (SET NULL) |
+
+**Pocket money (#1734, from D#916, migration v236).** A money balance per child that lives on this
+ledger and not in Budget: a budget account has no owner, Budget has no "this child and the parents,
+not the siblings", and it has no request that one person files and another decides - the ledger,
+the request, the approval and the reversal all exist here already ([DECISIONS.md](DECISIONS.md),
+entry 6). A payout creates no budget entry.
+
+- **Two balances that never meet.** `unit` says what a row counts. A child's points and a child's
+  money are two sums over the same table, and there is no conversion in either direction. Money is an
+  `INTEGER` in minor units (decimals per ISO 4217, as in split expenses) **with its currency code on
+  the row**. **Every sum over `delta` needs the unit filter**, which is why
+  the sum exists in one place that throws without a unit (`ledgerBalanceSql()` and `ledgerBalance()`
+  in `server/services/rewards.js`): the standings, `/rewards/participants`, the Overview tile and its
+  "recently earned" list, the cover check of a redemption and the net of a task all read points only.
+  `GET /rewards/ledger` is the points history and carries no money row.
+- **An account is a row, and the row carries its one currency.** `reward_money_accounts` below says
+  that a member has a pocket money account and in which currency: the household currency
+  (`sync_config.currency`, read through `server/utils/household-currency.js`) of the day it was
+  opened. Administrators open one explicitly (`POST /rewards/money/accounts`, no plan and no entry
+  needed), and a first plan or a first credit opens it along the way. A later change of the
+  household currency leaves the account alone: balance, plan and open requests keep reading and
+  booking in the account's currency, 1.00 EUR does not become 100 yen, and an account opened
+  afterwards takes the new currency. **The currency changes only by closing and reopening**, and
+  only an empty account can be closed (no plan, balance zero, no open request -
+  `isMoneyAccountEmpty()` in `server/services/reward-money.js`); an account with a balance never
+  changes, because converting would mean inventing a rate. The code also stands on every money
+  entry, every money request and the plan, as split expenses do it, so a row says what it is in
+  even after its account was closed and reopened in another currency; the old rows sum to zero in
+  their code, which keeps the one sum over all money rows the balance. The CHECKs tie that column
+  to the unit; that a row carries the currency of ITS account is checked by the write layer inside
+  the transaction of every booking (`postMoney()`), and a booking, request or plan that names
+  another code is refused with `currency_mismatch`. Every money object in the API carries
+  `currency` and `minor_unit`, and the page formats and parses from those.
+- **No new ledger `type`.** Changing the `CHECK` on `type` means rebuilding the table, and a rebuild
+  drops its five indexes. A scheduled credit is a `bonus`, a payout a `redeem`, a parent's booking a
+  `bonus` or an `adjust`, each with `unit = 'money'`. Both columns come by `ALTER TABLE ADD COLUMN`.
+- **Who has an account.** Whoever has a row in `reward_money_accounts`, independent of
+  `reward_participants`: a household can give pocket money without running the points system, and
+  the other way round. Parents open it; only household members can have one, and none is opened for
+  a deactivated member. The child sees an opened account at once, with balance zero, and can file
+  a deposit request on it.
+- **Who sees it.** The child and the administrators - not the siblings, not the wall tablet. That is
+  narrower than points, which everybody with the module sees, so the rule sits in every read query
+  and not in the client: `moneyVisibleSql()` in `server/services/reward-money.js` is the one WHERE
+  fragment behind `GET /rewards/money`, `GET /rewards/money/ledger`, the money rows of
+  `GET /rewards/redemptions`, the pending count of `GET /rewards/overview` and the single row
+  `PATCH /rewards/redemptions/{id}` reads - somebody else's money request answers 404 there, like
+  an id that does not exist, instead of confirming itself through 403 or 409. A scoped API token
+  falls under it through its subject and role. The Overview tile carries no money at all.
+- **Fields that existed keep their meaning.** `GET /rewards/redemptions` without `kind` answers
+  reward requests only, as before; money requests come with `?kind=money`, `withdrawal`, `deposit`
+  or `all`. `pendingCount` of the overview and `pending` of the Overview tile stay the count of
+  reward requests; money requests are counted next to them in `moneyPendingCount` and
+  `moneyPending` (every one for an approver, the own ones for a child, none otherwise). The page,
+  the tile, the Today sheet and the navigation badge add the two.
+- **Requests.** Withdrawal and deposit use the redemption mechanism (`POST /rewards/redemptions`
+  with `kind`, decided through `PATCH /rewards/redemptions/{id}`), with one difference: **nothing is
+  booked when the request is filed.** The confirmation is the moment the cash changes hands, so the
+  balance always matches the cash the parents hold - and for the same reason a money request always
+  waits for an administrator; `rewards_require_approval` does not reach it. Rejecting and cancelling
+  book nothing, because nothing was reserved. **No overdraft:** a withdrawal above the balance is
+  refused when it is filed and checked again when it is approved, inside the transaction of the
+  booking; if the balance no longer covers it, the request stays pending (409,
+  `insufficient_funds`) so the parents can credit first. A parent books directly, in both
+  directions, through `POST /rewards/money/entries`. A wall tablet shares the request route with
+  redemptions and is refused explicitly.
+- **The plan.** `reward_allowances` below, one row per child, in the shape of `recurring_expenses`
+  so the step goes through the same arithmetic (`addInterval()` in `server/utils/interval-date.js`):
+  weekly is seven days, monthly clamps to the end of the month and lifts back to the anchor day
+  (31 -> 28/29 -> 31, #1721). An hourly run (`server/services/reward-money-scheduler.js`, also
+  shortly after start) books every due date up to today in the household timezone. **Missed dates
+  are booked afterwards**, each with the date it was due as `allowance_date`; the unique index over
+  member and date is the idempotence, so a run that fires twice, or a plan deleted and created again
+  on the same day, books once - which also means that an account closed and reopened on a due date
+  does not get that date credited a second time by its new plan. The run is the one money writer
+  beside `postMoney()` and makes the same check: a plan whose currency is not its account's is
+  paused, not booked. Changing a plan books what is due first, with the plan as it was, in
+  the same transaction - a new amount or anchor day never reaches back; leaving `paused` out keeps
+  the stored state. A single amount is capped at 10^12 minor units whatever the currency, and a
+  credit that would take the balance past the exact integers is refused. A paused plan books nothing and **skips** its missed dates when it is
+  resumed.
+- **A deactivated child is only paid out.** Where the state changes (`deactivate()` in
+  `server/services/user-removal.js`) the open money requests are cancelled with
+  `decision_reason = 'account_deactivated'` and the plan is paused; the hourly run does the same for
+  accounts that were deactivated before this rule existed (`closeFormerMoney()`). While a balance is
+  left, administrators - and nobody else - still see the account, marked `former`, and may only
+  book it down, never below zero. A credit, the approval of an old open request, and changing or
+  resuming the plan are refused with `account_deactivated`. At balance zero the account leaves the
+  list. A reactivated account is a member's account again; its plan stays paused until an
+  administrator resumes it, and what was cancelled stays cancelled. For removal this means: money
+  entries are a trace, so an account that has any is deactivated rather than deleted; a plan alone
+  is a setting and goes with the account, and so does an account row that was opened and never used.
+  Deactivating books what was due up to that day first and pauses then, as a plan change does. Known
+  edges, left as they are: a former account at balance zero keeps its account row and its paused
+  plan with no way to them in the interface, and the money history of a closed account is reachable
+  through the API only (`GET /rewards/money/ledger`).
+
+**Reward Money Accounts** - one row per member who has a pocket money account (#1734).
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| user_id | INTEGER | FK → Users (CASCADE delete), NOT NULL, UNIQUE |
+| currency | TEXT | NOT NULL - ISO 4217 code, set when the account is opened and never changed |
+| created_by | INTEGER | FK → Users (SET NULL) |
+
+**Reward Allowances** - the pocket money plan, one row per member (#1734).
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| user_id | INTEGER | FK → Users (CASCADE delete), NOT NULL, UNIQUE |
+| amount_minor | INTEGER | NOT NULL, > 0 - minor units of `currency` |
+| currency | TEXT | NOT NULL - the ISO 4217 code of the account; never changes while the plan exists |
+| frequency | TEXT | `weekly` / `monthly` |
+| anchor_day | INTEGER | NOT NULL, 1-31 - monthly: day of the month; weekly: weekday, 1 = Monday to 7 = Sunday |
+| next_run_date | TEXT | NOT NULL, YYYY-MM-DD - the next due date |
+| paused_at | TEXT | nullable ISO timestamp |
 | created_by | INTEGER | FK → Users (SET NULL) |
 
 ### Shopping Lists
@@ -5278,6 +5400,24 @@ gone. The data model, including why the balance is always derived from the ledge
   of anybody's progress bar. If the last unit goes while a request is still open, approving it
   rejects it instead, with the reason recorded on the row and the points returned; the page says so in
   the reader's language, because the server sends the reason as a code and not as a sentence.
+- **Pocket money (#1734):** a section of its own on the Overview, above the point balances and only
+  when there is something to show: a child sees its own account, an administrator every account, a
+  wall tablet none (the tablet does not even ask). A row carries the balance in the account's own
+  currency (which is not necessarily the one the household uses today) and the plan in one sentence ("5.00 per week · next credit: 9 October"); tapping it opens
+  the money history. The child's own row offers **Withdraw** and **Pay in**, both of which file a
+  request and say so in the dialog; an administrator's rows offer **Book** (credit or debit) and the
+  plan. "Set up pocket money" opens an account for a member who has none - an account alone, no plan
+  and no amount needed; the plan is added from the row afterwards. An empty account (no plan,
+  balance zero, nothing open) carries a close action, and the server decides what counts as empty. Money requests stand
+  in the same pending list as reward requests, with the amount as money and the balance next to it
+  for whoever decides. The account of a deactivated child with money left stays in the
+  administrators' list with the "Former" badge and one action, deducting; it has no plan dialog and
+  no credit. With `rewards: read` the balance, the plan and the open requests stay and
+  every one of these actions goes. Amounts are typed in the region's notation and checked by the
+  shared money helpers (`public/utils/money.js`); which currency and how many decimals an amount has
+  comes from the money object itself (`currency`, `minor_unit` per ISO 4217), never from `Intl`, whose display convention shows HUF, IDR, COP,
+  IRR and PYG without the two decimals they are stored with. A plan row belongs to the account and
+  goes with it; money entries are a trace, so an account that has any is deactivated, not deleted.
 - **Context FAB:** creates a reward on the Catalog tab and grants a bonus on the Ledger tab, both
   admin-only; on the Overview tab, and for members, it is hidden — the module's create actions are
   parent actions.

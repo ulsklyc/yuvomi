@@ -24,6 +24,10 @@ import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import { renderPageColumns } from '/utils/page-layout.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { isRedeemable, nextRewardGoal } from '/utils/reward-goal.js';
+import {
+  formatMoney, amountPlaceholder, amountExample, amountInputProblem,
+  amountToInput, currencyFractionDigits, toDecimalString,
+} from '/utils/money.js';
 
 const TABS = ['overview', 'catalog', 'ledger'];
 
@@ -40,6 +44,8 @@ let state = {
   prevBalances: new Map(), // für Count-up: Salden vor dem letzten Neuladen
   /** Fuer wen dieses Wandtablett einloesen darf (#1209) - leer fuer jeden Menschen. */
   displayPeople: [],
+  /** Taschengeld (#1734): { currency, minor_unit, accounts, candidates }; null = unbekannt. */
+  money: null,
 };
 
 function prefersReducedMotion() {
@@ -197,11 +203,27 @@ async function loadOverview() {
     state.displayPeople = people.data ?? [];
   }
   if (isAdmin()) {
-    const r = await api.get('/rewards/redemptions?status=pending');
+    // `kind=all`: ohne die Angabe liefert die Route nur Praemien-Anfragen (#1734).
+    const r = await api.get('/rewards/redemptions?status=pending&kind=all');
     state.redemptions = r.data || [];
   } else {
-    const r = await api.get('/rewards/redemptions');
+    const r = await api.get('/rewards/redemptions?kind=all');
     state.redemptions = (r.data || []).filter((x) => x.user_id === state.overview.me && x.status === 'pending');
+  }
+}
+
+/* TASCHENGELD (#1734). Die Antwort ist schon gefiltert: ein Kind bekommt
+ * hoechstens sein eigenes Konto, Eltern alle, ein Wandtablett keins. Die Seite
+ * zeigt, was ankommt, und filtert nichts nach - was ein Geschwisterkind nicht
+ * sehen soll, geht gar nicht erst ueber die Leitung. Am Tablett wird nicht
+ * einmal gefragt. Scheitert die Abfrage, bleibt `null` und der Abschnitt
+ * entfaellt: eine leere Liste hiesse "es gibt kein Taschengeld". */
+async function loadMoney() {
+  if (actingAsDisplay()) { state.money = null; return; }
+  try {
+    state.money = (await api.get('/rewards/money')).data;
+  } catch {
+    state.money = null;
   }
 }
 
@@ -342,7 +364,7 @@ async function renderCurrentTab(container, { direction = null } = {}) {
   }
   const tab = state.tab;
   try {
-    if (tab === 'overview') await Promise.all([loadOverview(), loadRecentLedger()]);
+    if (tab === 'overview') await Promise.all([loadOverview(), loadRecentLedger(), loadMoney()]);
     else if (tab === 'catalog') await Promise.all([loadCatalog(), loadOverview()]);
     else await Promise.all([loadLedger(), loadOverview()]);
     if (seq !== renderSeq) return;
@@ -508,13 +530,24 @@ function renderPendingPanel() {
       ? `<p class="rw-pending__meta">${esc(t('rewards.pendingBalanceBelowZero', { points: fmtPoints(bal) }))}</p>`
       : '';
   };
+  /* EINE GELD-ANFRAGE STEHT IN DERSELBEN LISTE (#1734): Abhebung oder
+   * Einzahlung, mit Betrag statt Punkten. Wer entscheidet, liest daneben das
+   * Guthaben - die Freigabe ist der Moment, in dem das Bargeld den Besitzer
+   * wechselt. */
+  const title = (r) => (isMoneyRequest(r)
+    ? esc(t(r.kind === 'deposit' ? 'rewards.money.ledgerDeposit' : 'rewards.money.ledgerWithdrawal'))
+    : `${esc(r.reward_icon ? `${r.reward_icon} ` : '')}${esc(r.reward_name)}`);
+  const amount = (r) => (isMoneyRequest(r) ? fmtMoney(r.cost, r) : pointsLabel(r.cost));
+  const moneyBalance = (r) => (isMoneyRequest(r) && isAdmin() && r.user_balance != null
+    ? `<p class="rw-pending__meta">${esc(t('rewards.money.title'))}: ${esc(fmtMoney(r.user_balance, r))}</p>`
+    : '');
   const rows = state.redemptions.map((r) => `
     <li class="rw-pending" data-redemption="${r.id}">
       ${avatar(r, 32)}
       <div class="rw-pending__text">
-        <p class="rw-pending__title">${esc(r.reward_icon ? `${r.reward_icon} ` : '')}${esc(r.reward_name)}</p>
-        <p class="rw-pending__meta">${esc(isAdmin() ? r.user_name : '')}${isAdmin() ? ' · ' : ''}${esc(pointsLabel(r.cost))}${r.note ? ` · „${esc(r.note)}“` : ''}</p>
-        ${belowZero(r)}
+        <p class="rw-pending__title">${title(r)}</p>
+        <p class="rw-pending__meta">${esc(isAdmin() ? r.user_name : '')}${isAdmin() ? ' · ' : ''}${esc(amount(r))}${r.note ? ` · „${esc(r.note)}“` : ''}</p>
+        ${isMoneyRequest(r) ? moneyBalance(r) : belowZero(r)}
       </div>
       ${/* DIE LISTE BLEIBT, DIE KNOEPFE GEHEN. Dass eine Anfrage offen ist, ist
             eine Auskunft und gehoert auch dem, der sie nicht entscheiden darf -
@@ -559,7 +592,7 @@ function renderOverview(el) {
      * selbst (Liste bleibt, Knoepfe gehen). */
     el.insertAdjacentHTML('beforeend',
       `<div class="rewards-content__inner">${renderPageColumns({
-        main: `${renderPendingPanel()}${emptyState('trophy', t('rewards.emptyOverviewTitle'), isAdmin() ? t('rewards.emptyOverviewAdmin') : t('rewards.emptyOverviewMember'), action)}`,
+        main: `${renderPendingPanel()}${renderMoneySection()}${emptyState('trophy', t('rewards.emptyOverviewTitle'), isAdmin() ? t('rewards.emptyOverviewAdmin') : t('rewards.emptyOverviewMember'), action)}`,
         rail: renderRecentLedger(),
       })}</div>`);
     wireOverview(el);
@@ -576,6 +609,7 @@ function renderOverview(el) {
         main: `
       ${renderSetupHints()}
       ${renderPendingPanel()}
+      ${renderMoneySection()}
       <section class="rw-section">
         <div class="rw-section__head">
           <h2 class="rw-section__title u-section-title">${esc(t('rewards.standings'))}</h2>
@@ -608,6 +642,7 @@ function wireOverview(el) {
   el.querySelectorAll('[data-setup]').forEach((btn) => {
     btn.addEventListener('click', () => handleSetupStep(btn.dataset.setup));
   });
+  wireMoney(el);
 }
 
 function handleSetupStep(action) {
@@ -953,7 +988,16 @@ async function openRedeemModal(memberId, presetItemId = null) {
 async function decideRedemption(id, action, btn) {
   if (readOnly()) return;
   const gefragt = action === 'reject' || action === 'cancel';
-  if (gefragt) {
+  // Eine Geld-Anfrage hat nichts reserviert (#1734): der Satz "die Punkte
+  // werden zurueckgebucht" waere bei ihr falsch.
+  const geld = isMoneyRequest(state.redemptions.find((r) => r.id === id));
+  if (gefragt && geld) {
+    const ok = await confirmModal(
+      action === 'reject' ? t('rewards.money.confirmReject') : t('rewards.money.confirmCancel'),
+      { confirmLabel: action === 'reject' ? t('rewards.reject') : t('common.cancel') },
+    );
+    if (!ok) return;
+  } else if (gefragt) {
     // Kein `danger`: der Server bucht die reservierten Punkte per `reversal`
     // zurück (routes/rewards.js), es geht also kein Guthaben verloren. Die
     // Anfrage bleibt als entschieden stehen und lässt sich neu stellen, solange
@@ -990,9 +1034,15 @@ async function decideRedemption(id, action, btn) {
     // kennt. Die Liste muss danach neu geladen werden - sonst stuende die
     // Anfrage hier weiter als offen, obwohl sie es nicht mehr ist.
     const vergriffen = err?.data?.reason === 'out_of_stock';
-    await confirmModal(vergriffen ? t('rewards.outOfStock') : (err?.message || t('common.error')),
-      { confirmLabel: t('rewards.gotIt') });
-    if (vergriffen) {
+    // Reicht das Guthaben bei der Freigabe nicht mehr, bleibt die Anfrage
+    // offen (#1734) - gebucht ist nichts, neu zu laden gibt es nichts.
+    const ohneDeckung = err?.data?.reason === 'insufficient_funds';
+    await confirmModal(vergriffen ? t('rewards.outOfStock')
+      : ohneDeckung ? t('rewards.money.insufficientOnApprove') : (err?.message || t('common.error')),
+    { confirmLabel: t('rewards.gotIt') });
+    // Auch ohne Deckung neu laden: das Guthaben neben der Anfrage ist der
+    // Stand von vor der Absage - also genau der, der sie nicht mehr erklaert.
+    if (vergriffen || ohneDeckung) {
       await refreshActiveTab();
       refocusAfterRender();
     }
@@ -1249,6 +1299,621 @@ async function openMemberDetail(memberId) {
 }
 
 // --------------------------------------------------------
+// Taschengeld (#1734)
+// --------------------------------------------------------
+
+/*
+ * EIN GELD-SALDO JE KIND, GETRENNT VON DEN PUNKTEN. Es gibt keinen Umtausch,
+ * und der Abschnitt steht deshalb als eigener ueber den Punktestaenden: zwei
+ * Zahlen, die nichts miteinander zu tun haben, in zwei Listen.
+ *
+ * WER HIER WAS SIEHT, ENTSCHEIDET DER SERVER (`moneyVisibleSql()` in
+ * server/services/reward-money.js): das Kind sein Konto, Eltern alle. Diese
+ * Seite haelt nur die HANDLUNGEN zurueck - bei `rewards: read` bleibt der Stand
+ * stehen und die Knoepfe gehen, wie ueberall im Modul.
+ */
+
+function isMoneyRequest(row) {
+  return !!row && row.kind != null && row.kind !== 'reward';
+}
+
+/*
+ * JEDES GELDOBJEKT NENNT SEINE WAEHRUNG SELBST (#1734). Ein Konto rechnet in
+ * der Waehrung, in der es eroeffnet wurde - nicht in der, die der Haushalt
+ * heute fuehrt. Konto, Plan, Anfrage und Buchung kommen deshalb mit `currency`
+ * und `minor_unit` vom Server, und jeder Helfer darunter nimmt das Objekt als
+ * `ctx`. Ohne `ctx` (ein Konto, das es noch nicht gibt) gilt die Waehrung des
+ * Haushalts aus `state.money` - darin wird ein neues eroeffnet.
+ */
+function moneyCtx(ctx) {
+  return ctx?.currency ? ctx : state.money;
+}
+
+function moneyCurrencyCode(ctx) {
+  return moneyCtx(ctx)?.currency || 'EUR';
+}
+
+/*
+ * DIE NACHKOMMASTELLEN KOMMEN VOM SERVER, NIE AUS `Intl` (Review zu #1745).
+ *
+ * Der Server speichert Geld in den Stellen nach ISO 4217 und sagt sie in
+ * `minor_unit` an. `Intl` (und damit `currencyFractionDigits()` und
+ * `centsToAmountInput()`) liefert die ANZEIGE-Konvention des CLDR, und die
+ * weicht ab: COP, HUF, IDR, IRR und PYG zeigt der CLDR ohne Nachkommastellen,
+ * ISO gibt ihnen zwei. Die Vorbelegung des Plan-Dialogs rechnete mit `Intl` -
+ * ein Plan ueber 5000 Ft (gespeichert 500000) stand als "500000" im Feld, und
+ * jedes Speichern, auch nur zum Pausieren, verhundertfachte das Taschengeld.
+ * Jede Rechnung zwischen kleinsten Einheiten und einem Feld geht deshalb durch
+ * `moneyDigits()`; `Intl` waehlt nur noch Trenner und Ziffern.
+ */
+function moneyDigits(ctx) {
+  const unit = moneyCtx(ctx)?.minor_unit;
+  return Number.isInteger(unit) ? unit : currencyFractionDigits(moneyCurrencyCode(ctx));
+}
+
+/** Kleinste Einheiten als Betrag in der Waehrung des Geldobjekts `ctx` ("77,31 EUR"). */
+function fmtMoney(minor, ctx) {
+  return formatMoney(Number(minor || 0) / 10 ** moneyDigits(ctx), moneyCurrencyCode(ctx));
+}
+
+/**
+ * Kleinste Einheiten als Punkt-Dezimaltext ("500000" bei zwei Stellen ->
+ * "5000.00"), ueber den Text gerechnet und nicht ueber eine Division.
+ */
+function minorToDecimal(minor, ctx) {
+  const digits = moneyDigits(ctx);
+  const text = String(Math.abs(Math.trunc(Number(minor) || 0))).padStart(digits + 1, '0');
+  return digits ? `${text.slice(0, -digits)}.${text.slice(-digits)}` : text;
+}
+
+/**
+ * Kleinste Einheiten als Wert fuer das Betragsfeld, in der Schreibweise der
+ * Region. Glatte Betraege einer Waehrung, die die Region ohne Nachkommastellen
+ * schreibt, stehen ohne da ("5000" Ft, nicht "5000,00"); alles andere behaelt
+ * seine Stellen, damit kein Betrag beim Oeffnen ein anderer wird.
+ */
+function minorToAmountInput(minor, ctx) {
+  const currency = moneyCurrencyCode(ctx);
+  let decimal = minorToDecimal(minor, ctx);
+  if (currencyFractionDigits(currency) === 0 && /\.0+$/.test(decimal)) decimal = decimal.replace(/\.0+$/, '');
+  return amountToInput(decimal, currency);
+}
+
+function moneyAccounts() {
+  return state.money?.accounts || [];
+}
+
+function moneyAccount(userId) {
+  return moneyAccounts().find((a) => a.id === userId) || null;
+}
+
+/** Der Plan in einem Satz - oder dass es keinen gibt. */
+function moneyPlanLine(plan) {
+  if (!plan) return t('rewards.money.noPlan');
+  const amount = fmtMoney(plan.amount_minor, plan);
+  const rhythm = t(plan.frequency === 'weekly' ? 'rewards.money.planWeekly' : 'rewards.money.planMonthly', { amount });
+  if (plan.paused) return `${rhythm} · ${t('rewards.money.planPaused')}`;
+  return `${rhythm} · ${t('rewards.money.nextCredit', { date: formatDate(plan.next_run_date) })}`;
+}
+
+function renderMoneyRow(account) {
+  const mine = account.id === state.overview?.me;
+  const manage = isAdmin() && !readOnly();
+  // Eltern buchen direkt und pflegen den Plan; das Kind stellt Anfragen. Wer
+  // beides waere (ein Elternteil mit eigenem Konto), bucht.
+  // EIN EHEMALIGES KONTO (deaktiviert, mit Restguthaben) wird nur noch
+  // ausgezahlt: eine Handlung, kein Plan. Der Server schickt es nur Eltern.
+  const actions = manage && account.former ? `
+        <div class="rw-standing__actions">
+          <button class="btn btn--secondary btn--sm" type="button" data-money-book="${account.id}">
+            <i data-lucide="banknote" aria-hidden="true"></i>${esc(t('rewards.money.debit'))}
+          </button>
+        </div>`
+    : manage ? `
+        <div class="rw-standing__actions">
+          <button class="btn btn--secondary btn--sm" type="button" data-money-book="${account.id}">
+            <i data-lucide="banknote" aria-hidden="true"></i>${esc(t('rewards.money.book'))}
+          </button>
+          ${rowActionHtml({ icon: 'calendar-clock', label: `${t('rewards.money.planTitle')}: ${account.display_name}`, attrs: { 'data-money-plan': account.id } })}
+          ${/* Schliessen nur, wo der Server sagt, dass nichts mehr daran haengt
+                (kein Plan, Saldo null, nichts offen) - sonst wiese er es ab. */ ''}
+          ${account.closable ? rowActionHtml({ icon: 'x', label: `${t('rewards.money.closeAccount')}: ${account.display_name}`, attrs: { 'data-money-close': account.id } }) : ''}
+        </div>`
+    : (mine && !account.former && !readOnly()) ? `
+        <div class="rw-standing__actions">
+          <button class="btn btn--secondary btn--sm" type="button" data-money-request="withdrawal" data-member="${account.id}"
+                  ${account.balance_minor > 0 ? '' : 'disabled'}>
+            <i data-lucide="arrow-up-from-line" aria-hidden="true"></i>${esc(t('rewards.money.withdraw'))}
+          </button>
+          <button class="btn btn--ghost btn--sm" type="button" data-money-request="deposit" data-member="${account.id}">
+            <i data-lucide="arrow-down-to-line" aria-hidden="true"></i>${esc(t('rewards.money.deposit'))}
+          </button>
+        </div>` : '';
+  return `
+    <li class="list-row rw-standing rw-money">
+      <button class="rw-standing__id" type="button" data-money-member="${account.id}"
+              aria-label="${esc(`${account.display_name}, ${fmtMoney(account.balance_minor, account)}. ${t('rewards.openDetails')}`)}">
+        ${avatar(account, 40)}
+        <span class="rw-standing__idtext">
+          <span class="rw-standing__name">${esc(account.display_name)}${account.former ? ` <span class="rw-tag">${esc(t('settings.memberFormerBadge'))}</span>` : ''}</span>
+          <span class="rw-standing__points"><strong>${esc(fmtMoney(account.balance_minor, account))}</strong></span>
+        </span>
+      </button>
+      <div class="rw-standing__progress">
+        <p class="rw-progress__label${account.plan && !account.plan.paused ? '' : ' rw-progress__label--muted'}">${esc(moneyPlanLine(account.plan))}</p>
+      </div>
+      ${actions}
+    </li>`;
+}
+
+function renderMoneySection() {
+  if (!state.money) return '';
+  const accounts = moneyAccounts();
+  const manage = isAdmin() && !readOnly();
+  const canOpen = manage && (state.money.candidates || []).length > 0;
+  // Ohne Konto und ohne die Moeglichkeit, eines zu eroeffnen, gibt es nichts
+  // zu zeigen - auch keine Ueberschrift ueber einer leeren Liste.
+  if (!accounts.length && !canOpen) return '';
+  const setUp = canOpen ? `
+          <button class="btn btn--ghost btn--sm rw-money-setup" type="button"><i data-lucide="piggy-bank" aria-hidden="true"></i>${esc(t('rewards.money.setUp'))}</button>` : '';
+  return `
+      <section class="rw-section rw-money-section">
+        <div class="rw-section__head">
+          <h2 class="rw-section__title u-section-title">${esc(t('rewards.money.title'))}</h2>
+          ${setUp}
+        </div>
+        ${accounts.length ? `<ul class="row-carrier rw-standings">${accounts.map(renderMoneyRow).join('')}</ul>` : ''}
+      </section>`;
+}
+
+function wireMoney(el) {
+  el.querySelector('.rw-money-setup')?.addEventListener('click', () => openMoneyAccountModal());
+  el.querySelectorAll('[data-money-close]').forEach((btn) => {
+    btn.addEventListener('click', () => closeMoneyAccount(moneyAccount(Number(btn.dataset.moneyClose))));
+  });
+  el.querySelectorAll('[data-money-member]').forEach((btn) => {
+    btn.addEventListener('click', () => openMoneyDetail(Number(btn.dataset.moneyMember)));
+  });
+  el.querySelectorAll('[data-money-request]').forEach((btn) => {
+    btn.addEventListener('click', () => openMoneyRequestModal(btn.dataset.moneyRequest, Number(btn.dataset.member)));
+  });
+  el.querySelectorAll('[data-money-book]').forEach((btn) => {
+    btn.addEventListener('click', () => openMoneyBookModal(Number(btn.dataset.moneyBook)));
+  });
+  el.querySelectorAll('[data-money-plan]').forEach((btn) => {
+    btn.addEventListener('click', () => openMoneyPlanModal(Number(btn.dataset.moneyPlan)));
+  });
+}
+
+/** Der Satz zu einem Grund aus amountInputProblem() - dieselben Texte wie in den geteilten Ausgaben. */
+function moneyAmountProblemText(problem, ctx) {
+  const currency = moneyCurrencyCode(ctx);
+  if (problem === 'grouped') return t('common.amountGrouped', { example: amountExample(currency) });
+  if (problem === 'invalid') return t('common.amountInvalid', { example: amountExample(currency) });
+  if (problem === 'notPositive') return t('common.amountNotPositive');
+  // Der kleinste Schritt nach den Stellen des SERVERS, nicht nach `Intl`.
+  const digits = moneyDigits(ctx);
+  const step = getNumberFormat({ minimumFractionDigits: digits, maximumFractionDigits: digits }).format(1 / 10 ** digits);
+  return t('common.amountPrecisionRequired', { currency, step });
+}
+
+/**
+ * Warum der Text im Betragsfeld nicht gesendet werden kann - oder `null`.
+ * Gruppierung, Schreibweise und Vorzeichen prueft `amountInputProblem()`; wie
+ * viele Nachkommastellen erlaubt sind, sagt der Server (`moneyDigits()`).
+ */
+function moneyAmountProblem(text, ctx) {
+  const problem = amountInputProblem(text, moneyCurrencyCode(ctx), { required: true });
+  if (problem && problem !== 'precision') return problem;
+  const fraction = toDecimalString(text).split('.')[1] || '';
+  return fraction.length > moneyDigits(ctx) ? 'precision' : null;
+}
+
+/**
+ * Liest das Betragsfeld. Gibt den Dezimaltext zurueck, den der Server
+ * erwartet ("12.50"), oder `null` - dann steht der Grund schon im Fehlerfeld.
+ */
+function readMoneyAmount(input, errEl, ctx) {
+  const problem = moneyAmountProblem(input.value, ctx);
+  if (problem) {
+    errEl.textContent = moneyAmountProblemText(problem, ctx);
+    errEl.hidden = false;
+    input.setAttribute('aria-invalid', 'true');
+    return null;
+  }
+  input.removeAttribute('aria-invalid');
+  return toDecimalString(input.value);
+}
+
+function moneyAmountField(id, value = '', ctx = undefined) {
+  return `
+        <div class="form-group">
+          <label class="label" for="${id}">${esc(t('rewards.money.amount'))} (${esc(moneyCurrencyCode(ctx))})${REQUIRED_MARK}</label>
+          <input class="input" id="${id}" inputmode="decimal" autocomplete="off" required
+                 value="${esc(value)}" placeholder="${esc(amountPlaceholder(moneyCurrencyCode(ctx)))}">
+        </div>`;
+}
+
+/** Der Betrag eines Dezimaltexts in kleinsten Einheiten - nur fuer den Vergleich mit dem Guthaben. */
+function decimalToMinor(decimal, ctx) {
+  return Math.round(Number(decimal) * 10 ** moneyDigits(ctx));
+}
+
+/* ABHEBEN ODER EINZAHLEN: EINE ANFRAGE, KEINE BUCHUNG. Sie geht ueber
+ * denselben Weg wie das Einloesen einer Praemie (`POST /rewards/redemptions`)
+ * und wartet immer auf die Eltern. Der Dialog sagt das, bevor das Kind tippt -
+ * sonst sieht ein unveraendertes Guthaben nach dem Absenden wie ein Fehler aus. */
+function openMoneyRequestModal(kind, memberId) {
+  if (readOnly()) return;
+  const account = moneyAccount(memberId);
+  if (!account) return;
+  const withdrawal = kind === 'withdrawal';
+  openModal({
+    title: t(withdrawal ? 'rewards.money.withdraw' : 'rewards.money.deposit'),
+    content: `
+      <form id="rw-money-request-form" novalidate>
+        <div class="rw-redeem-summary">
+          <div class="rw-redeem-summary__row"><span>${esc(t('rewards.money.title'))}</span><strong>${esc(fmtMoney(account.balance_minor, account))}</strong></div>
+        </div>
+        ${moneyAmountField('rw-money-amount', '', account)}
+        <div class="form-group">
+          <label class="label" for="rw-money-note">${esc(t('rewards.noteOptional'))}</label>
+          <input class="input" id="rw-money-note" maxlength="500">
+        </div>
+        <p class="rw-hint">${esc(t('rewards.money.requestHint'))}</p>
+        <div id="rw-money-error" class="form-error" role="alert" hidden></div>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          <button type="submit" class="btn btn--primary" id="rw-money-submit">${esc(t('rewards.requestAction'))}</button>
+        </div>
+      </form>`,
+    onSave: (panel) => {
+      const errEl = panel.querySelector('#rw-money-error');
+      const submit = panel.querySelector('#rw-money-submit');
+      const input = panel.querySelector('#rw-money-amount');
+      panel.querySelector('#rw-money-request-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errEl.hidden = true;
+        const amount = readMoneyAmount(input, errEl, account);
+        if (amount == null) return;
+        // Der Server prueft die Deckung (zweimal); hier steht nur der fruehe Satz.
+        if (withdrawal && decimalToMinor(amount, account) > account.balance_minor) {
+          errEl.textContent = t('rewards.money.insufficient'); errEl.hidden = false; return;
+        }
+        submit.disabled = true;
+        try {
+          await api.post('/rewards/redemptions', {
+            kind, amount, note: panel.querySelector('#rw-money-note').value.trim() || undefined,
+          });
+          await closeModal({ force: true });
+          toast(t('rewards.toastRequested'));
+          await refreshActiveTab();
+          refocusAfterRender();
+        } catch (err) {
+          errEl.textContent = err?.data?.reason === 'insufficient_funds'
+            ? t('rewards.money.insufficient') : (err?.message || t('common.error'));
+          errEl.hidden = false;
+          submit.disabled = false;
+        }
+      });
+    },
+  });
+}
+
+/* ELTERN BUCHEN DIREKT, in beide Richtungen - ohne Anfrage. */
+function openMoneyBookModal(memberId) {
+  if (readOnly() || !isAdmin()) return;
+  const account = moneyAccount(memberId);
+  if (!account) return;
+  openModal({
+    // Ein ehemaliges Konto wird nur noch ausgezahlt: der Dialog bietet die
+    // Gutschrift gar nicht erst an (der Server wiese sie ab).
+    title: `${t(account.former ? 'rewards.money.debit' : 'rewards.money.book')} · ${account.display_name}`,
+    content: `
+      <form id="rw-money-book-form" novalidate>
+        <div class="rw-redeem-summary">
+          <div class="rw-redeem-summary__row"><span>${esc(t('rewards.money.title'))}</span><strong>${esc(fmtMoney(account.balance_minor, account))}</strong></div>
+        </div>
+        ${account.former ? '<input type="hidden" id="rw-money-direction" value="debit">' : `
+        <div class="form-group">
+          <label class="label" for="rw-money-direction">${esc(t('rewards.money.book'))}</label>
+          <select class="input" id="rw-money-direction">
+            <option value="credit">${esc(t('rewards.money.credit'))}</option>
+            <option value="debit">${esc(t('rewards.money.debit'))}</option>
+          </select>
+        </div>`}
+        ${moneyAmountField('rw-money-amount', '', account)}
+        <div class="form-group">
+          <label class="label" for="rw-money-reason">${esc(t('rewards.reasonOptional'))}</label>
+          <input class="input" id="rw-money-reason" maxlength="200">
+        </div>
+        <div id="rw-money-error" class="form-error" role="alert" hidden></div>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          <button type="submit" class="btn btn--primary" id="rw-money-submit">${esc(t('common.save'))}</button>
+        </div>
+      </form>`,
+    onSave: (panel) => {
+      const errEl = panel.querySelector('#rw-money-error');
+      const submit = panel.querySelector('#rw-money-submit');
+      const input = panel.querySelector('#rw-money-amount');
+      panel.querySelector('#rw-money-book-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errEl.hidden = true;
+        const amount = readMoneyAmount(input, errEl, account);
+        if (amount == null) return;
+        submit.disabled = true;
+        try {
+          await api.post('/rewards/money/entries', {
+            user_id: account.id, amount,
+            direction: panel.querySelector('#rw-money-direction').value,
+            reason: panel.querySelector('#rw-money-reason').value.trim() || undefined,
+          });
+          await closeModal({ force: true });
+          toast(t('rewards.toastSaved'));
+          await refreshActiveTab();
+          refocusAfterRender();
+        } catch (err) {
+          errEl.textContent = err?.data?.reason === 'insufficient_funds'
+            ? t('rewards.money.insufficient') : (err?.message || t('common.error'));
+          errEl.hidden = false;
+          submit.disabled = false;
+        }
+      });
+    },
+  });
+}
+
+/** Wochentagsnamen in der Sprache der Oberflaeche, 1 = Montag bis 7 = Sonntag. */
+function weekdayOptions(selected) {
+  const names = new Intl.DateTimeFormat(getLocale(), { weekday: 'long', timeZone: 'UTC' });
+  // Der 1. Januar 2024 war ein Montag.
+  return [1, 2, 3, 4, 5, 6, 7].map((day) => {
+    const label = names.format(new Date(Date.UTC(2024, 0, day)));
+    return `<option value="${day}" ${day === selected ? 'selected' : ''}>${esc(label)}</option>`;
+  }).join('');
+}
+
+/* DER PLAN: Betrag, Rhythmus und der Tag, den die Eltern waehlen. Ohne
+ * `memberId` eroeffnet der Dialog ein Konto - dann steht die Person zur Wahl,
+ * aus den Mitgliedern, die noch keins haben. */
+function openMoneyPlanModal(memberId) {
+  if (readOnly() || !isAdmin()) return;
+  // Ein Plan gehoert zu einem Konto, das es gibt: eroeffnet wird es ueber
+  // "Konto eroeffnen" (`openMoneyAccountModal`), nicht mehr ueber diesen Dialog.
+  const account = moneyAccount(memberId);
+  // Ein ehemaliges Konto behaelt seinen Plan pausiert - kein Dialog dafuer.
+  if (!account || account.former) return;
+  const plan = account.plan || null;
+  // In welcher Waehrung dieser Plan rechnet: in seiner eigenen, sonst in der
+  // des Kontos.
+  const planCtx = plan || account;
+  const frequency = plan?.frequency || 'weekly';
+  const weekday = plan?.frequency === 'weekly' ? plan.anchor_day : 1;
+  const monthDay = plan?.frequency === 'monthly' ? plan.anchor_day : 1;
+  const days = Array.from({ length: 31 }, (_, i) => i + 1)
+    .map((day) => `<option value="${day}" ${day === monthDay ? 'selected' : ''}>${day}</option>`).join('');
+  openModal({
+    title: `${t('rewards.money.planTitle')} · ${account.display_name}`,
+    content: `
+      <form id="rw-plan-form" novalidate>
+        ${moneyAmountField('rw-money-amount', plan ? minorToAmountInput(plan.amount_minor, plan) : '', planCtx)}
+        <div class="form-group">
+          <label class="label" for="rw-plan-frequency">${esc(t('rewards.money.frequency'))}</label>
+          <select class="input" id="rw-plan-frequency">
+            <option value="weekly" ${frequency === 'weekly' ? 'selected' : ''}>${esc(t('rewards.money.weekly'))}</option>
+            <option value="monthly" ${frequency === 'monthly' ? 'selected' : ''}>${esc(t('rewards.money.monthly'))}</option>
+          </select>
+        </div>
+        <div class="form-group" id="rw-plan-weekday-group">
+          <label class="label" for="rw-plan-weekday">${esc(t('rewards.money.weekday'))}</label>
+          <select class="input" id="rw-plan-weekday">${weekdayOptions(weekday)}</select>
+        </div>
+        <div class="form-group" id="rw-plan-monthday-group">
+          <label class="label" for="rw-plan-monthday">${esc(t('rewards.money.dayOfMonth'))}</label>
+          <select class="input" id="rw-plan-monthday">${days}</select>
+          <p class="rw-hint">${esc(t('rewards.money.dayOfMonthHint'))}</p>
+        </div>
+        <label class="rw-switch">
+          <input type="checkbox" id="rw-plan-paused" ${plan?.paused ? 'checked' : ''}>
+          <span>${esc(t('rewards.money.pausePlan'))}</span>
+        </label>
+        <div id="rw-money-error" class="form-error" role="alert" hidden></div>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          ${plan ? `<button type="button" class="btn btn--ghost" id="rw-plan-remove">${esc(t('rewards.money.removePlan'))}</button>` : ''}
+          <button type="submit" class="btn btn--primary" id="rw-money-submit">${esc(t('common.save'))}</button>
+        </div>
+      </form>`,
+    onSave: (panel) => {
+      const errEl = panel.querySelector('#rw-money-error');
+      const submit = panel.querySelector('#rw-money-submit');
+      const freqEl = panel.querySelector('#rw-plan-frequency');
+      const syncAnchor = () => {
+        const weekly = freqEl.value === 'weekly';
+        panel.querySelector('#rw-plan-weekday-group').hidden = !weekly;
+        panel.querySelector('#rw-plan-monthday-group').hidden = weekly;
+      };
+      freqEl.addEventListener('change', syncAnchor);
+      syncAnchor();
+
+      // Kein `danger`: der Plan laesst sich neu anlegen, Guthaben und Verlauf
+      // bleiben. Rot behauptete eine Endgueltigkeit, die das Beenden nicht hat.
+      panel.querySelector('#rw-plan-remove')?.addEventListener('click', async () => {
+        const ok = await confirmOverModal(t('rewards.money.confirmRemovePlan', { name: account.display_name }),
+          { confirmLabel: t('rewards.money.removePlan'), detail: t('rewards.money.removePlanDetail') });
+        if (!ok) return;
+        await removeMoneyPlan(account);
+      });
+
+      panel.querySelector('#rw-plan-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errEl.hidden = true;
+        const amount = readMoneyAmount(panel.querySelector('#rw-money-amount'), errEl, planCtx);
+        if (amount == null) return;
+        const weekly = freqEl.value === 'weekly';
+        submit.disabled = true;
+        try {
+          await api.put(`/rewards/money/plans/${account.id}`, {
+            amount,
+            frequency: freqEl.value,
+            anchor_day: Number(panel.querySelector(weekly ? '#rw-plan-weekday' : '#rw-plan-monthday').value),
+            paused: panel.querySelector('#rw-plan-paused').checked,
+          });
+          await closeModal({ force: true });
+          toast(t('rewards.toastSaved'));
+          await refreshActiveTab();
+          refocusAfterRender();
+        } catch (err) {
+          errEl.textContent = err?.message || t('common.error'); errEl.hidden = false; submit.disabled = false;
+        }
+      });
+    },
+  });
+}
+
+/* KONTO EROEFFNEN - ohne Plan und ohne Buchung. Bis hierher entstand ein Konto
+ * in der Oberflaeche nur ueber einen Plan (notfalls einen pausierten). Jetzt
+ * waehlen die Eltern ein Mitglied, das noch keines hat; das Kind sieht sein
+ * Konto danach mit Saldo null und kann eine Einzahlung anfragen. Plan und
+ * Buchung haengen danach an der Zeile. */
+function openMoneyAccountModal() {
+  if (readOnly() || !isAdmin()) return;
+  const candidates = state.money?.candidates || [];
+  if (!candidates.length) return;
+  openModal({
+    title: t('rewards.money.setUp'),
+    content: `
+      <form id="rw-account-form" novalidate>
+        <div class="form-group">
+          <label class="label" for="rw-account-member">${esc(t('rewards.member'))}</label>
+          <select class="input" id="rw-account-member">
+            ${candidates.map((m) => `<option value="${m.id}">${esc(m.display_name)}</option>`).join('')}
+          </select>
+        </div>
+        <div id="rw-money-error" class="form-error" role="alert" hidden></div>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          <button type="submit" class="btn btn--primary" id="rw-money-submit">${esc(t('rewards.money.openAccount'))}</button>
+        </div>
+      </form>`,
+    onSave: (panel) => {
+      const errEl = panel.querySelector('#rw-money-error');
+      const submit = panel.querySelector('#rw-money-submit');
+      panel.querySelector('#rw-account-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errEl.hidden = true;
+        submit.disabled = true;
+        try {
+          await api.post('/rewards/money/accounts', { user_id: Number(panel.querySelector('#rw-account-member').value) });
+          await closeModal({ force: true });
+          toast(t('rewards.toastSaved'));
+          await refreshActiveTab();
+          refocusAfterRender();
+        } catch (err) {
+          errEl.textContent = err?.message || t('common.error'); errEl.hidden = false; submit.disabled = false;
+        }
+      });
+    },
+  });
+}
+
+/* KONTO SCHLIESSEN. Nur ein leeres Konto traegt den Knopf; ob es leer ist, hat
+ * der Server gesagt (`closable`) und prueft er beim Schliessen noch einmal -
+ * dazwischen kann eine Anfrage eingegangen sein. Kein `danger`: der Verlauf
+ * bleibt, und das Konto laesst sich neu eroeffnen. */
+async function closeMoneyAccount(account) {
+  if (readOnly() || !isAdmin() || !account) return;
+  const ok = await confirmModal(t('rewards.money.confirmCloseAccount', { name: account.display_name }),
+    { confirmLabel: t('rewards.money.closeAccount'), detail: t('rewards.money.closeAccountDetail') });
+  if (!ok) return;
+  try {
+    await api.delete(`/rewards/money/accounts/${account.id}`);
+    toast(t('rewards.toastSaved'), 'default');
+  } catch (err) {
+    await confirmModal(err?.data?.reason === 'money_account_not_empty'
+      ? t('rewards.money.accountNotEmpty') : (err?.message || t('common.error')),
+    { confirmLabel: t('rewards.gotIt') });
+  }
+  await refreshActiveTab();
+  refocusAfterRender();
+}
+
+/* PLAN BEENDEN. Die Rueckfrage hat das Formular schon geschlossen, wenn dieser
+ * Aufruf laeuft: scheitert das Loeschen, gibt es kein Fehlerfeld mehr, in dem
+ * es stehen koennte. Ohne `catch` war das eine unbehandelte Rejection - der
+ * Plan stand weiter da, und niemand erfuhr, warum (Review zu #1745). Die
+ * Meldung kommt als Dialog wie bei den Nachbarn, und die Liste wird in beiden
+ * Faellen neu geladen: sie zeigt, was jetzt gilt. */
+async function removeMoneyPlan(account) {
+  try {
+    await api.delete(`/rewards/money/plans/${account.id}`);
+    toast(t('rewards.toastSaved'), 'default');
+  } catch (err) {
+    await confirmModal(err?.message || t('common.error'), { confirmLabel: t('rewards.gotIt') });
+  }
+  await refreshActiveTab();
+  refocusAfterRender();
+}
+
+const MONEY_LEDGER_ICON = {
+  allowance: 'calendar-clock', deposit: 'arrow-down-to-line', withdrawal: 'arrow-up-from-line',
+  credit: 'banknote', debit: 'sliders-horizontal',
+};
+
+/** Was eine Geldbuchung war - aus ihren Feldern gelesen, nicht aus einem Freitext. */
+function moneyRowKind(row) {
+  if (row.allowance_date) return 'allowance';
+  if (row.request_kind === 'deposit') return 'deposit';
+  if (row.request_kind === 'withdrawal' || row.type === 'redeem') return 'withdrawal';
+  return row.delta >= 0 ? 'credit' : 'debit';
+}
+
+function moneyRowLabel(kind) {
+  if (kind === 'allowance') return t('rewards.money.title');
+  if (kind === 'deposit') return t('rewards.money.ledgerDeposit');
+  if (kind === 'withdrawal') return t('rewards.money.ledgerWithdrawal');
+  return t(kind === 'credit' ? 'rewards.money.ledgerCredit' : 'rewards.money.ledgerDebit');
+}
+
+function moneyLedgerRowHtml(row) {
+  const kind = moneyRowKind(row);
+  const positive = row.delta > 0;
+  // Eine Gutschrift nach Plan nennt den Termin, fuer den sie gilt - nachgebucht
+  // traegt sie sonst nur den Tag, an dem der Server wieder lief.
+  const when = formatDate(kind === 'allowance' ? row.allowance_date : row.created_at);
+  return `<li class="list-row rw-ledger-row rw-ledger-row--compact">
+      <span class="rw-ledger-row__icon rw-ledger-row__icon--${positive ? 'bonus' : 'redeem'}"><i data-lucide="${MONEY_LEDGER_ICON[kind]}" aria-hidden="true"></i></span>
+      <div class="list-row__main">
+        <p class="list-row__name rw-ledger-row__reason">${esc(moneyRowLabel(kind))}</p>
+        <p class="list-row__meta rw-ledger-row__meta">${esc(when)}${row.reason ? ` · ${esc(row.reason)}` : ''}</p>
+      </div>
+      <span class="rw-delta ${positive ? 'rw-delta--pos' : 'rw-delta--neg'}">${positive ? '+' : '−'}${esc(fmtMoney(Math.abs(row.delta), row))}</span>
+    </li>`;
+}
+
+async function openMoneyDetail(memberId) {
+  const account = moneyAccount(memberId);
+  if (!account) return;
+  let ledger = [];
+  try {
+    ledger = (await api.get(`/rewards/money/ledger?user_id=${memberId}&limit=20`)).data || [];
+  } catch { /* Historie optional */ }
+  const rows = ledger.length
+    ? ledger.map(moneyLedgerRowHtml).join('')
+    : `<li class="list-row rw-ledger-row rw-ledger-row--compact"><p class="list-row__meta rw-ledger-row__meta">${esc(t('rewards.emptyLedgerTitle'))}</p></li>`;
+  openModal({
+    title: `${t('rewards.money.title')} · ${account.display_name}`,
+    content: `
+      <div class="rw-detail-head">
+        ${avatar(account, 52)}
+        <div>
+          <p class="rw-detail-points"><strong>${esc(fmtMoney(account.balance_minor, account))}</strong></p>
+          <p class="rw-detail-hint">${esc(moneyPlanLine(account.plan))}</p>
+        </div>
+      </div>
+      <ul class="rw-ledger rw-ledger--compact row-divided">${rows}</ul>`,
+    onSave: (panel) => icons(panel),
+  });
+}
+
+// --------------------------------------------------------
 // Refresh + Entry
 // --------------------------------------------------------
 
@@ -1269,6 +1934,10 @@ export const __test = {
   renderCatalog, renderLedger, renderOverview, handleSetupStep,
   // #1607: der Verlaufssatz einer Gegenbuchung.
   ledgerReason,
+  // #1734: Taschengeld.
+  renderMoneySection, renderMoneyRow, moneyLedgerRowHtml, moneyRowKind, moneyPlanLine, fmtMoney,
+  minorToAmountInput, moneyAmountProblem, decimalToMinor, removeMoneyPlan, decideRedemption, openMoneyPlanModal, openMoneyBookModal,
+  openMoneyAccountModal, closeMoneyAccount,
 };
 
 export async function render(container, { user } = {}) {

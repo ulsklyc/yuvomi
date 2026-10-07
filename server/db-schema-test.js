@@ -1454,6 +1454,50 @@ const MIGRATIONS_SQL = {
     ALTER TABLE meals ADD COLUMN cook_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
     ALTER TABLE meal_recurrence_templates ADD COLUMN cook_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
   `,
+  // Taschengeld (#1734): `unit` an jeder Ledger-Zeile, `kind` an jeder Anfrage
+  // und der Plan je Person. Jede Summe ueber das Ledger liest `unit`
+  // (`ledgerBalanceSql()`). DIE BELOHNUNGSTABELLEN SELBST (v70) STEHEN NICHT IN
+  // DIESEM SPIEGEL: die Belohnungs-Suiten fahren die echten Migrationen ueber
+  // server/db.js. Wer die Tabellen einmal von Hand baut, haengt diesen Eintrag
+  // an - allein laeuft er nicht.
+  236: `
+    ALTER TABLE reward_ledger ADD COLUMN unit TEXT NOT NULL DEFAULT 'points'
+      CHECK(unit IN ('points', 'money'));
+    ALTER TABLE reward_ledger ADD COLUMN allowance_date TEXT;
+    ALTER TABLE reward_ledger ADD COLUMN currency TEXT
+      CHECK((unit = 'money') = (currency IS NOT NULL));
+    CREATE UNIQUE INDEX uniq_reward_allowance_credit
+      ON reward_ledger(user_id, allowance_date) WHERE allowance_date IS NOT NULL;
+
+    ALTER TABLE reward_redemptions ADD COLUMN kind TEXT NOT NULL DEFAULT 'reward'
+      CHECK(kind IN ('reward', 'withdrawal', 'deposit'));
+    ALTER TABLE reward_redemptions ADD COLUMN currency TEXT
+      CHECK((kind = 'reward') = (currency IS NULL));
+
+    CREATE TABLE reward_money_accounts (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+      currency   TEXT    NOT NULL,
+      created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      updated_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    );
+
+    CREATE TABLE reward_allowances (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id       INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+      amount_minor  INTEGER NOT NULL CHECK(amount_minor > 0),
+      currency      TEXT    NOT NULL,
+      frequency     TEXT    NOT NULL CHECK(frequency IN ('weekly', 'monthly')),
+      anchor_day    INTEGER NOT NULL CHECK(anchor_day BETWEEN 1 AND 31),
+      next_run_date TEXT    NOT NULL,
+      paused_at     TEXT,
+      created_by    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      updated_at    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    );
+    CREATE INDEX idx_reward_allowances_next_run ON reward_allowances(next_run_date, paused_at);
+  `,
 };
 
 export { MIGRATIONS_SQL };

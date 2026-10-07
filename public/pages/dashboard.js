@@ -2388,7 +2388,7 @@ function metricTileFor(id, data, currency, sheetSpeaks = new Set()) {
       // Die Zahl offener Freigaben steht an GENAU EINER Stelle: im
       // Belohnungen-Widget (dann filtert `shown` diese Kachel weg), sonst im
       // Heute-Blatt, und nur wenn keines von beiden sie traegt, hier.
-      const pending = r.view === 'approver' ? Number(r.pending) || 0 : 0;
+      const pending = r.view === 'approver' ? (Number(r.pending) || 0) + (Number(r.moneyPending) || 0) : 0;
       if (!pending || sheetSpeaks.has('approvals')) return null;
       return {
         id, route, icon: widgetIcon('rewards'), label: t('nav.rewards'),
@@ -2726,7 +2726,9 @@ function renderRewardsSelf(me, rewards, spans) {
             </li>`).join('')}
         </ul>
       </div>` : '';
-  const pending = Number(rewards.pending) || 0;
+  // Praemien- und Geld-Anfragen (#1734) zusammen: der Server fuehrt sie
+  // getrennt, die Kachel sagt, wie viele warten.
+  const pending = (Number(rewards.pending) || 0) + (Number(rewards.moneyPending) || 0);
   return `
     <div class="widget__body rewards-widget rewards-widget--self">
       <div class="rewards-self">
@@ -2760,7 +2762,7 @@ function renderRewardsFamily(members, rewards, spans) {
         </span>
       </li>`).join('');
   const more = sorted.length - shown.length;
-  const pending = rewards.view === 'approver' ? Number(rewards.pending) || 0 : 0;
+  const pending = rewards.view === 'approver' ? (Number(rewards.pending) || 0) + (Number(rewards.moneyPending) || 0) : 0;
   return `
     <div class="widget__body rewards-widget">
       <ul class="rewards-widget__members">${rows}</ul>

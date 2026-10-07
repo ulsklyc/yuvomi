@@ -12,9 +12,60 @@ import { seriesRootOf } from './task-completions.js';
 import { householdTimeZone, todayKey, utcToWall } from '../utils/timezone.js';
 
 const REWARD_TX = `
-  INSERT INTO reward_ledger (user_id, delta, type, reason, task_id, redemption_id, created_by)
-  VALUES (@user_id, @delta, @type, @reason, @task_id, @redemption_id, @created_by)
+  INSERT INTO reward_ledger (user_id, delta, type, reason, task_id, redemption_id, created_by, unit, currency)
+  VALUES (@user_id, @delta, @type, @reason, @task_id, @redemption_id, @created_by, @unit, @currency)
 `;
+
+/*
+ * WAS EINE LEDGER-ZEILE ZAEHLT (#1734).
+ *
+ * Seit es Taschengeld gibt, liegen im selben Ledger zwei Zahlen, die sich nie
+ * begegnen duerfen: Punkte und Geld (ganze kleinste Einheiten der
+ * Haushaltswaehrung). Ein Kind mit beidem hat ZWEI Salden, und es gibt keinen
+ * Umtausch zwischen ihnen.
+ *
+ * DIE SUMME STEHT DESHALB NUR HIER, UND SIE GEHT NICHT OHNE EINHEIT. Bis #1734
+ * schrieb jede Route ihr eigenes `SUM(delta)` - vier Stellen, von denen keine
+ * eine Einheit kannte. Eine einzige, die den Filter vergisst, zaehlt Cent als
+ * Punkte. `ledgerBalanceSql()` und `ledgerBalance()` werfen ohne gueltige
+ * Einheit, statt still alles zu summieren: der Fehler soll beim ersten Aufruf
+ * auffallen und nicht in einem Kontostand.
+ */
+export const LEDGER_UNITS = Object.freeze(['points', 'money']);
+
+function checkedUnit(unit) {
+  if (!LEDGER_UNITS.includes(unit)) {
+    throw new Error(`ledger unit must be one of ${LEDGER_UNITS.join(', ')}.`);
+  }
+  return unit;
+}
+
+/**
+ * Der Saldo einer Person als SQL-Ausdruck, fuer Listen mit einer Zeile je
+ * Person. `userExpr` ist ein Spaltenausdruck aus dem Code (`u.id`), nie eine
+ * Eingabe.
+ *
+ * @param {'points'|'money'} unit
+ * @param {string} userExpr
+ */
+export function ledgerBalanceSql(unit, userExpr) {
+  const u = checkedUnit(unit);
+  if (!/^[a-z_]+\.[a-z_]+$/.test(String(userExpr))) throw new Error('userExpr must be a qualified column.');
+  return `COALESCE((SELECT SUM(bal.delta) FROM reward_ledger bal WHERE bal.user_id = ${userExpr} AND bal.unit = '${u}'), 0)`;
+}
+
+/**
+ * Der Saldo einer Person in EINER Einheit (Summe ihrer Ledger-Buchungen).
+ *
+ * @param {object} d
+ * @param {number} userId
+ * @param {'points'|'money'} unit
+ */
+export function ledgerBalance(d, userId, unit) {
+  const row = d.prepare('SELECT COALESCE(SUM(delta), 0) AS bal FROM reward_ledger WHERE user_id = ? AND unit = ?')
+    .get(userId, checkedUnit(unit));
+  return row?.bal ?? 0;
+}
 
 /*
  * STUECKZAHL JE PRAEMIE, UND VERBRAUCHT IST SIE BEI DER ERFUELLUNG (#1310).
@@ -52,10 +103,9 @@ export function activeCatalog(d) {
   `).all();
 }
 
-/** Aktueller Punktestand eines Mitglieds (Summe aller Ledger-Buchungen). */
+/** Aktueller PUNKTEstand eines Mitglieds. Geld zaehlt nicht mit (`ledgerBalance`). */
 export function getBalance(d, userId) {
-  const row = d.prepare('SELECT COALESCE(SUM(delta), 0) AS bal FROM reward_ledger WHERE user_id = ?').get(userId);
-  return row?.bal ?? 0;
+  return ledgerBalance(d, userId, 'points');
 }
 
 /*
@@ -146,7 +196,7 @@ export function rewardTargets(d, taskId, actingUserId, doneByUserId = null) {
  */
 const TASK_NET = `
   SELECT COALESCE(SUM(delta), 0) AS net FROM reward_ledger
-  WHERE task_id = ? AND user_id = ? AND type IN ('earn', 'reversal')
+  WHERE task_id = ? AND user_id = ? AND type IN ('earn', 'reversal') AND unit = 'points'
 `;
 
 /*
@@ -282,7 +332,7 @@ export function reverseTaskEarnings(d, taskId, actingUserId = null) {
     const open = d.prepare(`
       SELECT user_id, SUM(delta) AS net, MAX(CASE WHEN type = 'earn' THEN id END) AS earn_id
       FROM reward_ledger
-      WHERE task_id = ? AND type IN ('earn', 'reversal')
+      WHERE task_id = ? AND type IN ('earn', 'reversal') AND unit = 'points'
       GROUP BY user_id
       HAVING SUM(delta) > 0
     `).all(taskId);
@@ -306,9 +356,21 @@ export function syncTaskRewards(d, taskId, oldStatus, newStatus, actingUserId, d
   else if (wasDone && !isDone) reverseTaskEarnings(d, taskId, actingUserId);
 }
 
-/** Freie Buchung (Bonus/Korrektur/Reversal) — vom Route-Handler genutzt. */
-export function postLedger(d, { userId, delta, type, reason = null, taskId = null, redemptionId = null, createdBy = null }) {
+/**
+ * Freie Buchung (Bonus/Korrektur/Reversal) - vom Route-Handler genutzt.
+ * Ohne `unit` sind es Punkte, wie jede Buchung von vor #1734.
+ */
+export function postLedger(d, { userId, delta, type, reason = null, taskId = null, redemptionId = null, createdBy = null, unit = 'points', currency = null }) {
+  // Eine Geldzeile traegt ihren Waehrungscode, eine Punktezeile keinen - das
+  // Schema lehnt beides andere ab. Geld bucht `postMoney()` in
+  // server/services/reward-money.js: dort steht die Regel, dass ein Konto bei
+  // seiner EINEN Waehrung bleibt.
+  if ((checkedUnit(unit) === 'money') !== (currency != null)) {
+    throw new Error('a money entry carries a currency, a points entry none.');
+  }
   return d.prepare(REWARD_TX).run({
+    unit,
+    currency,
     user_id: userId,
     delta,
     type,

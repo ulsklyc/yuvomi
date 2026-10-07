@@ -109,6 +109,10 @@ const PREDICATE_EXPORT = 'householdMemberSql';
  */
 const ALLOWLIST = [
   {
+    file: 'server/services/reward-money.js', site: 'listFormerMoneyAccounts', lists: 1, deactivated: 'shown',
+    reason: 'Pocket money left on a deactivated account (#1734): shown to administrators only, marked as former, so the remaining balance can be paid out instead of sitting on an account no list shows. The members themselves come from listMoneyAccounts, which is on the predicate. Empty for every other reader without asking the database.',
+  },
+  {
     file: 'server/auth.js', site: 'othersCanRead', lists: 1, deactivated: 'excluded',
     reason: 'Protective controls, not a list of people: visibility, lock and shares must stay while any other account can read a module, housekeeping staff included. Shows no one; returns module keys only.',
   },
@@ -1117,7 +1121,7 @@ test('every allowlisted list says what it does with a deactivated account, and d
  * nein - dann gehoert die Liste auf das Praedikat.
  */
 test('the allowlist stays short and every entry names a reason', () => {
-  assert.ok(ALLOWLIST.length <= 17, 'a long allowlist is a second predicate - move lists onto the predicate instead');
+  assert.ok(ALLOWLIST.length <= 18, 'a long allowlist is a second predicate - move lists onto the predicate instead');
   for (const entry of ALLOWLIST) {
     assert.ok(entry.reason && entry.reason.length > 20, `${entry.file} :: ${entry.site} needs a reason`);
   }

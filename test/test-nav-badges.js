@@ -299,6 +299,11 @@ test('die offene Belohnungsanfrage sieht nur ein Elternteil', () => {
   // mit Arbeit, hinter der fuer es nichts steht.
   assert.equal(moduleCountsFrom(DASHBOARD, { isAdmin: true }).rewards, 2);
   assert.equal(moduleCountsFrom(DASHBOARD, { isAdmin: false }).rewards, 0);
+  // Geld-Anfragen (#1734) fuehrt der Server in einem eigenen Feld; das Zeichen
+  // am Modul zaehlt beide, und weiter nur fuer Eltern.
+  const mitGeld = { ...DASHBOARD, rewards: { pending: 2, moneyPending: 3 } };
+  assert.equal(moduleCountsFrom(mitGeld, { isAdmin: true }).rewards, 5);
+  assert.equal(moduleCountsFrom(mitGeld, { isAdmin: false }).rewards, 0);
 });
 
 test('die Kuechenkachel traegt den Einkauf nur, wenn er offensteht', () => {
