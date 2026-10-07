@@ -109,27 +109,22 @@ this list.
 
 - Goals: define a target and see progress first, the version that links to everything later
   (#777).
-- Recurring tasks with rotating assignees, built properly rather than worked around (#842).
-- An owner on a calendar connection, so a member's own calendar can stay theirs (#739).
-- Google contacts over CardDAV, a different shape from the calendar one (#843).
 - Several OIDC providers from one file: a path variable names a provider file, each provider
   gets a short name chosen by the operator, and identity is looked up by that name plus `sub`
   rather than by `sub` alone. The four existing variables stay and become the first provider.
   The shape is settled, the work is not scheduled (#848).
-- Show the time during the photo screensaver, following the wall mode's own clock settings rather
-  than gaining a switch of its own (#885).
-- Full-bleed screensaver photos as an opt-in, with `contain` staying the default, because `cover`
-  crops a portrait photo hard on a landscape panel (#885).
-- Start the screensaver from the interface; `preview()` already exists, the open question is only
-  where the button belongs (#885).
 - An optional target level on a stock item, used for the handover to the shopping list when it is
   set and falling back to the minimum when it is not: restocking to the minimum leaves the household
   low again after one tap (#1077).
-- A picture on a reward, kept with the redemption the way its name and symbol already are, so old
-  redemptions do not start showing the wrong thing (#1118).
 - Themes: the font half, after the colour half has shipped (#972).
 - A module index for third-party modules, the one open request in #746.
 
 Already tickets, since 2 September 2026: bank export import with a saved mapping (#1000),
 per-month budget plans (#1001), the health change feed (#1002), a price on a shopping item
 (#1003).
+
+Since 7 October 2026: rotating assignees (#1763), an owner on a calendar connection (#1761),
+Google contacts over CardDAV (#1764), the screensaver's clock, full-bleed photos and manual start
+(#1766), a picture on a reward (#1755) - and, from threads that were never on this list, the week
+in day blocks (#1757), a care grant that ends on its own (#1762) and the calendar feed of the meal
+plan (#1759).

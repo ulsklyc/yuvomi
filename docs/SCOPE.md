@@ -216,6 +216,26 @@ deletions cannot be learned at all. Tracked as #1002.
   [DECISIONS.md](DECISIONS.md)), and a fingerprint in the notes field, because `description` is a
   mirrored field and would travel as visible text with every edit. *Opens with:* a return path that
   knows which calendar an event came from.
+- **Address lookup for a calendar location** (#1047) is *not this way* rather than *not at all*.
+  The request had two halves. The map half shipped in v2.66.0 (#1110): an action on the event that
+  opens its location in a map, built on the device from the location text, so nothing is sent
+  anywhere until somebody taps it. The other half - type "Sydney Opera House" and get the address
+  suggested - means sending what is being typed to somebody's geocoder, once per keystroke. That
+  is the case of #656 in section 3 in a sharper form: where a family goes is not less sensitive
+  than what it eats, and in an app whose promise is that nothing leaves the machine, a lookup
+  against a public endpoint cannot be the default, however clearly it is labelled. So a lookup
+  that works out of the box is declined.
+
+  There is a second reason that has nothing to do with privacy. `location` is free text and a
+  sync surface: it is written to and read from ICS and CalDAV (`ics-export.js`, `ics-parser.js`,
+  `caldav-sync.js`, `caldav-outbound.js` and `apple-calendar.js` under `server/services/`). A
+  resolved address that replaced what somebody typed would not stay local, it would travel to
+  every calendar that mirrors the event - and the field holds "Zoom", "Kitchen" and "Room 3B" as
+  often as it holds an address.
+
+  *Opens with:* a geocoder URL the household configures itself - its own Nominatim, for example -
+  that is off unless set, with nothing sent while it is unset. That shape is settled, the work is
+  not scheduled; the person who asked said a self-hosted lookup would be enough for them.
 - **A training log** (#1733) - exercises with sets and repetitions, weights over time, saved
   routines such as "Push day" - is *not here*. Yuvomi coordinates what several people in one home
   have to settle together; a training log is one person's tool, with a data model as large as one
