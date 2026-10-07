@@ -26,6 +26,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 globalThis.HTMLElement = globalThis.HTMLElement ?? class {};
 globalThis.customElements = globalThis.customElements ?? { define() {}, get() {} };
@@ -854,4 +855,112 @@ test('E13: die Aufgaben reichen ihren Filterknopf als Anker herein', async () =>
     assert.equal(btn.attrs['aria-expanded'], 'true', 'am Knopf #tasks-filter-btn');
     assert.deepEqual(env.modals, []);
   });
+});
+
+// ---------------------------------------------------------------------------
+// R17: die neue Aufgabe kommt an
+// ---------------------------------------------------------------------------
+// Nach dem Anlegen zeichnete die Liste hart neu; die Zeile stand irgendwo, bei
+// einer langen Liste unter dem Falz, in einer zugeklappten Gruppe gar nicht,
+// und rechts blieb die vorher gewaehlte Aufgabe stehen.
+
+function revealEnv({ rowFor = () => true } = {}) {
+  const env = { expanded: [], scrolled: [], selected: [] };
+  const row = { dataset: { swipeId: '9' }, scrollIntoView: (opts) => env.scrolled.push(opts) };
+  env.row = row;
+  env.container = {
+    querySelector: () => null,
+    querySelectorAll: (sel) => (sel === '#task-list .swipe-row' && rowFor() ? [row] : []),
+  };
+  env.md = { split: true, isSplit() { return this.split; }, select: (id, opts) => env.selected.push([id, opts]) };
+  return env;
+}
+
+async function withReveal(fn) {
+  const prev = { expand: globalThis.__expandIn, tasks: tasks.state.tasks, search: tasks.state.searchQuery, collapsed: tasks.state.collapsedGroups };
+  baseState();
+  tasks.state.tasks = [
+    { id: 1, title: 'Alt', category: 'haushalt', status: 'open', priority: 'none', tags: [] },
+    { id: 9, title: 'Neu', category: 'haushalt', status: 'open', priority: 'none', tags: [] },
+  ];
+  tasks.state.searchQuery = '';
+  tasks.state.collapsedGroups = new Set();
+  try { return await fn(); } finally {
+    globalThis.__expandIn = prev.expand;
+    tasks.state.tasks = prev.tasks;
+    tasks.state.searchQuery = prev.search;
+    tasks.state.collapsedGroups = prev.collapsed;
+    tasks.useTaskMd(null);
+  }
+}
+
+test('R17: die neue Aufgabe zieht ein, rollt ins Bild und ist in der Spaltenform ausgewaehlt', async () => {
+  await withReveal(() => {
+    const env = revealEnv();
+    globalThis.__expandIn = (el) => env.expanded.push(el);
+    tasks.useTaskMd(env.md);
+    assert.equal(tasks.revealCreatedTask(env.container, 9), true);
+    assert.deepEqual(env.expanded, [env.row], 'die Zeile tritt mit der Listenbewegung ein (expandIn)');
+    assert.deepEqual(env.scrolled, [{ block: 'nearest' }], 'und rollt ins Bild');
+    assert.deepEqual(env.selected, [['9', { history: 'push' }]], 'die Detailspalte zeigt die neue Aufgabe');
+  });
+});
+
+test('R17: mobil (keine Spalte) wird nichts ausgewaehlt - Zeile und Bild folgen trotzdem', async () => {
+  await withReveal(() => {
+    const env = revealEnv();
+    globalThis.__expandIn = (el) => env.expanded.push(el);
+    env.md.split = false;
+    tasks.useTaskMd(env.md);
+    assert.equal(tasks.revealCreatedTask(env.container, 9), true);
+    assert.equal(env.expanded.length, 1);
+    assert.equal(env.scrolled.length, 1);
+    assert.deepEqual(env.selected, []);
+  });
+});
+
+test('R17: eine zugeklappte Gruppe geht fuer ihre neue Aufgabe auf', async () => {
+  await withReveal(() => {
+    tasks.state.collapsedGroups = new Set(['category:haushalt']);
+    // Die Zeile steht erst im Bestand der Liste, wenn die Gruppe offen ist.
+    const env = revealEnv({ rowFor: () => !tasks.state.collapsedGroups.has('category:haushalt') });
+    tasks.useTaskMd(env.md);
+    assert.equal(tasks.revealCreatedTask(env.container, 9), true);
+    assert.equal(tasks.state.collapsedGroups.has('category:haushalt'), false, 'die Gruppe ist offen');
+    assert.equal(env.selected.length, 1);
+  });
+});
+
+test('R17: erreicht die neue Aufgabe die Ansicht nicht (Filter, Brett, fremde Seite), bleibt es beim Toast', async () => {
+  await withReveal(() => {
+    const env = revealEnv();
+    tasks.useTaskMd(env.md);
+    // Was der Server-Filter ausschliesst, steht gar nicht im Bestand; die Suche filtert hier.
+    tasks.state.searchQuery = 'zahnarzt';
+    assert.equal(tasks.revealCreatedTask(env.container, 9), false, 'die Suche schliesst sie aus');
+    tasks.state.searchQuery = '';
+    assert.equal(tasks.revealCreatedTask(env.container, 77), false, 'nicht im (gefilterten) Bestand');
+    tasks.state.viewMode = 'kanban';
+    assert.equal(tasks.revealCreatedTask(env.container, 9), false, 'das Brett hat keine Zeilen');
+    tasks.state.viewMode = 'list';
+    assert.equal(tasks.revealCreatedTask(null, 9), false, 'ohne Container steht diese Seite nicht');
+    assert.deepEqual(env.selected, []);
+    assert.deepEqual(env.scrolled, []);
+  });
+});
+
+test('R17: das Formular ruft die Ankunft nur nach dem ANLEGEN, nach dem Neuzeichnen', () => {
+  const src = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
+  const start = src.indexOf('async function handleFormSubmit(');
+  const body = src.slice(start, src.indexOf('\n}\n', start));
+  const redraw = body.lastIndexOf('await onChanged();');
+  const tail = body.slice(redraw);
+  assert.ok(redraw > 0);
+  // Erst die Liste, dann - nur ohne taskId (Anlegen) - die neue Zeile; und die
+  // erst, wenn der Dialog zu ist und seinen History-Marker zurueckgegeben hat:
+  // sonst schriebe die Auswahl `?open=` auf den Marker-Eintrag.
+  assert.match(tail, /if \(!taskId && savedTaskId\) \{\s*whenModalClosed\(\)\s*\.then\(\(\) => whenHistorySettled\(\)\)\s*\.then\(\(\) => revealCreatedTask\(container, savedTaskId\)\);/);
+  // Ins Bild VOR dem Einziehen: danach ist die Zeile 0px hoch.
+  const fn = src.slice(src.indexOf('function revealCreatedTask('), src.indexOf('\n}\n', src.indexOf('function revealCreatedTask(')));
+  assert.ok(fn.indexOf("row.scrollIntoView?.({ block: 'nearest' });") < fn.indexOf('expandIn(row);'));
 });

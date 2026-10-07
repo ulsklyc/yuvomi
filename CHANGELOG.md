@@ -201,6 +201,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A new task shows up where you can see it.** After adding a task the list simply redrew: the
+  new row sat somewhere between the others - below the fold in a long list, hidden in a
+  collapsed group - and the detail column kept showing the previous task. The new row now
+  scrolls into view and slides in, its group opens if it was collapsed, and on a desktop the
+  detail column shows the task you just added.
+
 - **Inventory: a deleted item no longer stays in the address.** Deleting the selected item could
   leave `?open=<id>` in the address bar, so a reload showed "not found". The detail row for the
   warranty is now labelled "Warranty" and names the duration and the end date; it used to carry

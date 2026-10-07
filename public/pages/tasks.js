@@ -6,7 +6,8 @@
 
 import { api } from '/api.js';
 import { renderRRuleFields, bindRRuleEvents, getRRuleValues } from '/rrule-ui.js';
-import { openModal as openSharedModal, closeModal, wireBlurValidation, validateAll, btnSuccess, btnError, btnLoading, promptModal, confirmModal, advancedSection, refocusAfterRender } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, whenModalClosed, wireBlurValidation, validateAll, btnSuccess, btnError, btnLoading, promptModal, confirmModal, advancedSection, refocusAfterRender } from '/components/modal.js';
+import { whenHistorySettled } from '/utils/overlay-history.js';
 import { stagger, vibrate, scheduleUndoableDelete, animationSettled, collapseOut, expandIn, wireScrollFade } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { t, getLocale, formatDate, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
@@ -1628,6 +1629,48 @@ async function reloadWithRowMotion(container, taskId, { holdUntil = 0 } = {}) {
 }
 
 /**
+ * DIE NEUE AUFGABE KOMMT AN (Critique R17). Nach dem Anlegen zeichnete die
+ * Liste hart neu: die Zeile stand irgendwo zwischen den anderen - bei einer
+ * langen Liste unter dem Falz, in einer zugeklappten Gruppe gar nicht - und
+ * rechts blieb die vorher gewaehlte Aufgabe stehen. Man sah einen Toast und
+ * suchte. Jetzt: die Gruppe der neuen Aufgabe geht auf, ihre Zeile zieht mit
+ * der Listenbewegung ein (`expandIn`, wie nach einem Statuswechsel), rollt ins
+ * Bild und ist in der Spaltenform ausgewaehlt - die Detailspalte zeigt, was
+ * man gerade angelegt hat.
+ *
+ * Nichts davon, wenn die Aufgabe die Ansicht nicht erreicht (ein Filter
+ * schliesst sie aus, das Brett statt der Liste, eine fremde Seite ohne
+ * Container): dann bleibt es beim Toast.
+ *
+ * @returns {boolean} ob die Zeile in der Liste steht
+ */
+function revealCreatedTask(container, taskId) {
+  if (!container || taskId == null || state.viewMode !== 'list') return false;
+  const task = filteredTasks().find((entry) => String(entry.id) === String(taskId));
+  if (!task) return false;
+  let row = taskRowEl(container, taskId);
+  if (!row) {
+    // Die Gruppe ist eingeklappt: die Aufgabe, die man eben angelegt hat, ist
+    // ein Grund, sie zu oeffnen (und der Zustand bleibt, wie beim Tipp auf den Kopf).
+    const group = groupBy([task], state.groupMode)[0];
+    if (!group || !isGroupCollapsed(state.groupMode, group.id)) return false;
+    toggleGroup(state.groupMode, group.id);
+    renderTaskList(container);
+    row = taskRowEl(container, taskId);
+    if (!row) return false;
+  }
+  // ERST ins Bild, dann einziehen: die Zeile hat jetzt ihre volle Hoehe. Nach
+  // dem Start von expandIn ist sie 0px hoch, und `nearest` holte nur ihre
+  // Oberkante an den Rand - der Rest zoege unter dem Falz auf.
+  row.scrollIntoView?.({ block: 'nearest' });
+  expandIn(row);
+  // Wie ein Klick auf die Zeile: ein Eintrag in der History, Zurueck fuehrt
+  // zur vorher gewaehlten Aufgabe.
+  if (taskMd?.isSplit()) taskMd.select(String(taskId), { history: 'push' });
+  return true;
+}
+
+/**
  * Vergebene Tags nachladen (#586). Nur nach dem Speichern nötig, nicht bei jedem
  * Filterwechsel - die Liste ändert sich ausschließlich durch Bearbeiten.
  * Scheitert der Aufruf, bleibt die alte Liste stehen: veraltete Vorschläge sind
@@ -2615,6 +2658,18 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
     // sofort in Filterleiste und Vorschlägen stehen (#586).
     await refreshTags();
     await onChanged();
+    // Angelegt, nicht bearbeitet: die neue Zeile zeigen (siehe revealCreatedTask).
+    // ERST WENN DER DIALOG WEG IST und die History wieder der Seite gehoert:
+    // er schliesst 700ms nach dem Haken und gibt dabei seinen Marker per
+    // `history.back()` zurueck. Eine Auswahl davor schriebe `?open=` auf den
+    // Marker-Eintrag, und das `back()` truege die alte Adresse wieder herein
+    // (gemessen: rechts die neue Aufgabe, in der Adresse die alte). Und die
+    // Zeile zieht so ein, wenn man sie sieht, nicht hinter dem Dialog.
+    if (!taskId && savedTaskId) {
+      whenModalClosed()
+        .then(() => whenHistorySettled())
+        .then(() => revealCreatedTask(container, savedTaskId));
+    }
   } catch (err) {
     resetSubmit(err.message);
     btnError(submitBtn);
@@ -5778,6 +5833,8 @@ export const __test = {
   groupBy, groupKey, formatDueDate, normalizeFilterSet, taskQuery, state,
   // E13: am Desktop haengen die Filter als Popover am Knopf (utils/filter-sheet.js).
   openTaskFilters,
+  // R17: die neue Aufgabe kommt an (Gruppe auf, Zeile zieht ein, rollt ins Bild, ausgewaehlt).
+  revealCreatedTask, toggleGroup,
   // Die Quittung nach dem Abhaken (#1603), je Weg am laufenden Aufruf: Haken
   // und Wisch teilen sich eine, die Personenwahl und das Brett haben je ihre.
   acknowledgeStatusToggle, completeTaskFor, runColumnMove,
