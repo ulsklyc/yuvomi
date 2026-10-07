@@ -33,9 +33,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   household used on the day it was opened, written on every entry: if the household later switches
   its currency, an existing balance, its plan and its open requests stay what they were (1.00 EUR
   does not turn into 100 yen), a new account takes the new currency, and an emptied one does
-  after it was closed and opened again. When a child's account is deactivated, its open requests are
-  cancelled and its plan paused; what is left on it stays visible to the administrators, marked as
-  former, and can only be paid out. No interest, no
+  after it was closed and opened again. When a child's account is deactivated, what was due until that
+  day is booked first, then its open requests are cancelled and its plan paused; what is left on it stays visible to the administrators, marked as
+  former, and can only be paid out. Two edges to know: an account closed and opened again on a day
+  its plan was due is not credited for that day a second time, and the history of a closed account
+  is kept but shown through the API only. No interest, no
   savings goals, no second currency per child. With read access to Rewards the balance stays
   visible and the requests are gone, as with redeeming. For API clients: `GET /api/v1/rewards/money`,
   `GET /api/v1/rewards/money/ledger`, `POST /api/v1/rewards/money/entries`,

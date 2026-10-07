@@ -295,6 +295,23 @@ test('Kennzahlkachel: das Kind sieht den eigenen Stand, niemand einen Spitzenrei
     'die Kachel kuert keinen Spitzenreiter');
 });
 
+test('Kennzahlkachel: offene Geld-Anfragen zaehlen mit - aber nur fuer den, der freigibt', () => {
+  global.window = { yuvomi: null };
+  const base = { budget: { entryCount: 3, balance: 100, income: 200 }, birthdays: [], pinnedNotes: [], health: {}, housekeeping: {} };
+  const tile = (rewards) => selectMetricTiles({ ...base, rewards }, 'EUR', new Set()).find((t) => t.id === 'rewards');
+  // Eltern: Praemien- und Geld-Anfragen zusammen, auch wenn nur Geld offen ist.
+  const both = tile({ view: 'approver', me: 1, standings: [leo(60), emma(30)], catalog: [KINO], pending: 1, moneyPending: 2 });
+  assert.match(both.value.replace(/&quot;/g, '"'), /dashboard\.rewardsPending\{"count":3\}/);
+  const onlyMoney = tile({ view: 'approver', me: 1, standings: [leo(60), emma(30)], catalog: [KINO], pending: 0, moneyPending: 1 });
+  assert.match(onlyMoney.value.replace(/&quot;/g, '"'), /dashboard\.rewardsPending\{"count":1\}/);
+  // Wer nicht freigibt, bekommt aus dem eigenen Geld-Zaehler keine Freigabe-Kachel:
+  // das Kind seine Punkte, die Sicht `family` (seit sie den eigenen Zaehler traegt) nichts.
+  const kid = tile({ view: 'self', me: 7, standings: [emma(45)], catalog: [KINO], pending: 0, moneyPending: 2 });
+  assert.doesNotMatch(`${kid?.value} ${kid?.note}`, /rewardsPending/);
+  const family = tile({ view: 'family', me: 99, standings: [emma(30), leo(60)], catalog: [KINO], pending: 0, moneyPending: 2 });
+  assert.ok(!family || !/rewardsPending/.test(`${family.value} ${family.note}`), 'die eigene Bitte ist keine Freigabe');
+});
+
 test('Verdrahtung: das Widget bekommt seine Groesse, und das Ziel kommt aus EINER Regel', () => {
   const dash = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
   assert.ok(/rewards:\s*\(size\)\s*=>\s*renderRewardsWidget\(data\.rewards \?\? \{\}, size\)/.test(dash),

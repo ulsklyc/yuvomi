@@ -465,7 +465,11 @@ router.get('/redemptions', (req, res) => {
       const money = row.kind !== 'reward';
       const key = `${money ? 'money' : 'points'}:${row.user_id}`;
       if (!balanceByUser.has(key)) balanceByUser.set(key, money ? moneyBalance(d, row.user_id) : getBalance(d, row.user_id));
-      row.user_balance = balanceByUser.get(key);
+      // An einer ENTSCHIEDENEN Geld-Anfrage steht kein Saldo: nach Schliessen
+      // und Neueroeffnen ist der heutige Saldo in der heutigen Kontowaehrung,
+      // die Zeile aber in ihrer alten - Yen neben "EUR" (Review zu #1745). Den
+      // Saldo braucht, wer entscheidet, also nur an einer offenen.
+      row.user_balance = money && row.status !== 'pending' ? null : balanceByUser.get(key);
       // Eine Geld-Anfrage sagt, in welchen Stellen ihr Betrag steht (#1734).
       row.minor_unit = money ? minorUnit(row.currency) : null;
     }

@@ -30,6 +30,7 @@ import { getOccurrences as getWasteOccurrences } from '../services/waste-store.j
 import { scheduleData } from '../services/schedule.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { activeCatalog, ledgerBalanceSql } from '../services/rewards.js';
+import { moneyParams, moneyReader, moneyVisibleSql } from '../services/reward-money.js';
 import { MEAL_COOK_COLUMNS_SQL, MEAL_COOK_JOIN_SQL } from '../services/meal-cook.js';
 import { clampEventLimit } from '../../public/utils/dashboard-event-limit.js';
 
@@ -859,16 +860,24 @@ router.get('/', (req, res) => {
     // stehen daneben in `moneyPending`, damit ein Client, der das alte Feld
     // liest, nichts anderes darin findet. Wer was zaehlt, sagen die Zweige: wer
     // freigibt, ist Admin und darf jede lesen; wer selbst sammelt, zaehlt nur
-    // die eigenen; die Sicht `family` (Wandtablett, Grosseltern) bekommt 0. Ein
-    // Geschwisterkind erfaehrt so nicht, dass jemand Geld abheben will. Geld
-    // selbst zeigt die Kachel nicht - weder Saldo noch Buchung.
+    // die eigenen; die Sicht `family` (Wandtablett, Grosseltern) bekommt bei den
+    // Praemien 0. Geld selbst zeigt die Kachel nicht - weder Saldo noch Buchung.
     const countPending = (kindSql) => (view === 'approver'
       ? d.prepare(`SELECT COUNT(*) AS n FROM reward_redemptions WHERE status = 'pending' AND ${kindSql}`).get().n
       : view === 'self'
         ? d.prepare(`SELECT COUNT(*) AS n FROM reward_redemptions WHERE status = 'pending' AND user_id = ? AND ${kindSql}`).get(userId).n
         : 0);
     const pending = countPending("kind = 'reward'");
-    const moneyPending = countPending("kind != 'reward'");
+    // DER EIGENE GELD-ZAEHLER HAENGT NICHT AN DER PUNKTE-TEILNAHME. Ein Kind mit
+    // Taschengeldkonto, das keine Punkte sammelt, faellt in die Sicht `family`
+    // und bekam hier 0, obwohl seine Einzahlung offen war (Review zu #1745).
+    // Gezaehlt wird ueber dasselbe Praedikat wie an den Geld-Routen: Admins
+    // alle, ein Mitglied die eigenen, ein Display keine.
+    const reader = moneyReader(req);
+    const moneyPending = d.prepare(`
+      SELECT COUNT(*) AS n FROM reward_redemptions r
+      WHERE r.status = 'pending' AND r.kind != 'reward' AND ${moneyVisibleSql(reader, 'r.user_id')}
+    `).get(moneyParams(reader)).n;
     // Wer selbst sammelt, sieht seine letzten Gutschriften - verdient oder
     // geschenkt. Einloesungen und Rueckbuchungen sind kein "verdient".
     //

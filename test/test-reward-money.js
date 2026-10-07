@@ -27,6 +27,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import Database from 'better-sqlite3-multiple-ciphers';
 
 import { rewardMoneyHousehold } from './reward-money-harness.js';
 
@@ -1055,6 +1059,71 @@ test('die Migration auf Bestand: jede Zeile ist Punkte, die Salden stehen, die f
   assert.throws(() => conn.exec("INSERT INTO reward_redemptions (user_id, reward_name, cost, currency) VALUES (1, 'Eis', 5, 'EUR')"), /CHECK/, 'Praemien-Anfrage mit Code');
   assert.equal(conn.prepare("SELECT SUM(delta) AS bal FROM reward_ledger WHERE user_id = 1 AND unit = 'points'").get().bal, 15, 'und die Punkte stehen, wie sie waren');
   conn.close();
+});
+
+test('das echte migrate() mit dem ausgelieferten Treiber, auf einer Datei im Stand davor mit Bestand', () => {
+  // Der Test darueber faehrt das SQL auf node:sqlite gegen ein handgebautes
+  // Schema. Hier laeuft der Weg, den eine Installation beim Update geht: die
+  // echten Migrationen bis davor, Bestand, dann `migrate()` mit dem Treiber,
+  // der ausgeliefert wird.
+  const V = dbmod.MIGRATIONS.find((m) => /pocket money/.test(m.description));
+  const file = new Database(join(mkdtempSync(join(tmpdir(), 'yuvomi-reward-money-mig-')), 'db.sqlite'));
+  try {
+    file.pragma('foreign_keys = ON');
+    dbmod.migrate(file, dbmod.MIGRATIONS.filter((m) => m.version < V.version));
+    assert.ok(!file.prepare('PRAGMA table_info(reward_ledger)').all().some((c) => c.name === 'unit'), 'Vorbedingung: der Stand davor');
+
+    const user = (name) => Number(file.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES (?, ?, 'x', 'member')").run(name, name).lastInsertRowid);
+    const a = user('anna');
+    const b = user('ben');
+    const eis = Number(file.prepare("INSERT INTO reward_catalog (name, cost) VALUES ('Eis', 10)").run().lastInsertRowid);
+    // Einloesungen in drei Zustaenden, mit den Buchungen, die sie hinterlassen.
+    const redemption = (uid, status) => Number(file.prepare(
+      "INSERT INTO reward_redemptions (user_id, catalog_id, reward_name, cost, status) VALUES (?, ?, 'Eis', 10, ?)",
+    ).run(uid, eis, status).lastInsertRowid);
+    const ledger = file.prepare('INSERT INTO reward_ledger (user_id, delta, type, reason, redemption_id) VALUES (?, ?, ?, ?, ?)');
+    ledger.run(a, 50, 'earn', 'Zimmer', null);
+    ledger.run(a, 5, 'bonus', null, null);
+    const open = redemption(a, 'pending'); ledger.run(a, -10, 'redeem', 'Eis', open);
+    const done = redemption(a, 'fulfilled'); ledger.run(a, -10, 'redeem', 'Eis', done);
+    const no = redemption(b, 'rejected'); ledger.run(b, -10, 'redeem', 'Eis', no); ledger.run(b, 10, 'reversal', 'Eis', no);
+    ledger.run(b, -3, 'adjust', null, null);
+    const sums = () => file.prepare('SELECT user_id, SUM(delta) AS bal FROM reward_ledger GROUP BY user_id ORDER BY user_id').all();
+    const before = { sums: sums(), ledger: file.prepare('SELECT COUNT(*) AS n FROM reward_ledger').get().n, redemptions: file.prepare('SELECT id, status FROM reward_redemptions ORDER BY id').all() };
+    assert.deepEqual(before.sums, [{ user_id: a, bal: 35 }, { user_id: b, bal: -3 }]);
+
+    dbmod.migrate(file, dbmod.MIGRATIONS.filter((m) => m.version <= V.version));
+
+    assert.equal(file.pragma('integrity_check', { simple: true }), 'ok');
+    assert.deepEqual(file.pragma('foreign_key_check'), []);
+    assert.equal(file.prepare('SELECT MAX(version) AS v FROM schema_migrations').get().v, V.version);
+    assert.deepEqual(sums(), before.sums, 'kein Saldo hat sich bewegt');
+    assert.equal(file.prepare('SELECT COUNT(*) AS n FROM reward_ledger').get().n, before.ledger);
+    assert.deepEqual(file.prepare('SELECT DISTINCT unit, currency, allowance_date FROM reward_ledger').all(), [{ unit: 'points', currency: null, allowance_date: null }]);
+    assert.deepEqual(file.prepare('SELECT DISTINCT kind, currency FROM reward_redemptions').all(), [{ kind: 'reward', currency: null }]);
+    assert.deepEqual(file.prepare('SELECT id, status FROM reward_redemptions ORDER BY id').all(), before.redemptions, 'jede Einloesung in ihrem Zustand');
+    assert.equal(file.prepare('SELECT COUNT(*) AS n FROM reward_money_accounts').get().n, 0);
+    assert.equal(file.prepare('SELECT COUNT(*) AS n FROM reward_allowances').get().n, 0);
+    const indexes = file.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'reward_ledger' AND name NOT LIKE 'sqlite_%'").all().map((r) => r.name).sort();
+    assert.deepEqual(indexes, ['idx_reward_ledger_redemption', 'idx_reward_ledger_reverses', 'idx_reward_ledger_series', 'idx_reward_ledger_task', 'idx_reward_ledger_user', 'uniq_reward_allowance_credit']);
+
+    // Beide CHECKs lehnen die falschen Formen ab - mit dem ausgelieferten Treiber.
+    const refuses = (sql, ...args) => assert.throws(() => file.prepare(sql).run(...args), /CHECK constraint failed/, sql);
+    refuses("INSERT INTO reward_ledger (user_id, delta, type, unit) VALUES (?, 1, 'bonus', 'money')", a);
+    refuses("INSERT INTO reward_ledger (user_id, delta, type, currency) VALUES (?, 1, 'bonus', 'EUR')", a);
+    refuses("INSERT INTO reward_ledger (user_id, delta, type, unit) VALUES (?, 1, 'bonus', 'cents')", a);
+    refuses("INSERT INTO reward_redemptions (user_id, reward_name, cost, kind) VALUES (?, 'deposit', 1, 'deposit')", a);
+    refuses("INSERT INTO reward_redemptions (user_id, reward_name, cost, currency) VALUES (?, 'Eis', 1, 'EUR')", a);
+    // Und die richtigen gehen.
+    file.prepare("INSERT INTO reward_money_accounts (user_id, currency) VALUES (?, 'EUR')").run(a);
+    file.prepare("INSERT INTO reward_ledger (user_id, delta, type, unit, currency) VALUES (?, 100, 'bonus', 'money', 'EUR')").run(a);
+    file.prepare("INSERT INTO reward_redemptions (user_id, reward_name, cost, kind, currency) VALUES (?, 'deposit', 100, 'deposit', 'EUR')").run(a);
+    assert.equal(rewards.ledgerBalance(file, a, 'points'), 35, 'der Punktestand liest das Geld nicht mit');
+    assert.equal(rewards.ledgerBalance(file, a, 'money'), 100);
+    assert.deepEqual(file.pragma('foreign_key_check'), []);
+  } finally {
+    file.close();
+  }
 });
 
 test('die laufende Datenbank traegt dasselbe: Spalten, Index, Plan-Tabelle', () => {

@@ -586,7 +586,10 @@ entry 6). A payout creates no budget entry.
   shortly after start) books every due date up to today in the household timezone. **Missed dates
   are booked afterwards**, each with the date it was due as `allowance_date`; the unique index over
   member and date is the idempotence, so a run that fires twice, or a plan deleted and created again
-  on the same day, books once. Changing a plan books what is due first, with the plan as it was, in
+  on the same day, books once - which also means that an account closed and reopened on a due date
+  does not get that date credited a second time by its new plan. The run is the one money writer
+  beside `postMoney()` and makes the same check: a plan whose currency is not its account's is
+  paused, not booked. Changing a plan books what is due first, with the plan as it was, in
   the same transaction - a new amount or anchor day never reaches back; leaving `paused` out keeps
   the stored state. A single amount is capped at 10^12 minor units whatever the currency, and a
   credit that would take the balance past the exact integers is refused. A paused plan books nothing and **skips** its missed dates when it is
@@ -602,6 +605,10 @@ entry 6). A payout creates no budget entry.
   administrator resumes it, and what was cancelled stays cancelled. For removal this means: money
   entries are a trace, so an account that has any is deactivated rather than deleted; a plan alone
   is a setting and goes with the account, and so does an account row that was opened and never used.
+  Deactivating books what was due up to that day first and pauses then, as a plan change does. Known
+  edges, left as they are: a former account at balance zero keeps its account row and its paused
+  plan with no way to them in the interface, and the money history of a closed account is reachable
+  through the API only (`GET /rewards/money/ledger`).
 
 **Reward Money Accounts** - one row per member who has a pocket money account (#1734).
 

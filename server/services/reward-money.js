@@ -23,14 +23,14 @@
  * Lesen und Schreiben kommt kein anderer Request dazwischen.
  */
 
-import { activeAccountSql, householdMemberSql, isActiveAccount, isHouseholdMember, memberOrderSql, memberPositionSql } from './household-members.js';
+import { activeAccountSql, deactivatedAtColumnSql, householdMemberSql, isActiveAccount, isHouseholdMember, memberOrderSql, memberPositionSql } from './household-members.js';
 import { ledgerBalance, ledgerBalanceSql, postLedger } from './rewards.js';
 import { minorUnit, parseMoneyToMinor } from './split-expenses.js';
 import { isDisplayRequest } from './display-acting.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { addInterval, dateKey, liftToAnchorDay, nextRunNotBefore, parseDateKey } from '../utils/interval-date.js';
 import { householdCurrency } from '../utils/household-currency.js';
-import { todayKey } from '../utils/timezone.js';
+import { householdTimeZone, todayKey, utcToWall } from '../utils/timezone.js';
 
 export const MONEY_KINDS = Object.freeze(['withdrawal', 'deposit']);
 export const ALLOWANCE_FREQUENCIES = Object.freeze(['weekly', 'monthly']);
@@ -327,7 +327,26 @@ export function isFormerMoneyAccount(d, userId) {
  * wechselt (`deactivate()` in server/services/user-removal.js), und vom Lauf
  * fuer Konten, die schon vorher deaktiviert waren.
  */
-export function closeFormerMoney(d, userId) {
+/** Der Haushaltstag, an dem dieses Konto deaktiviert wurde - oder `null`, wenn es das nicht ist. */
+function formerSince(d, userId) {
+  // Die Spalte nennt nur server/services/account-state.js beim Namen (Guard in
+  // test:user-traces-guard); gelesen wird der eine Wert der einen Zeile.
+  const row = d.prepare(`SELECT ${deactivatedAtColumnSql('u')} FROM users u WHERE u.id = ?`).get(userId);
+  const stamp = row ? Object.values(row)[0] : null;
+  if (!stamp) return null;
+  return utcToWall(stamp, householdTimeZone(d))?.date ?? null;
+}
+
+export function closeFormerMoney(d, userId, { today = todayKey(d) } = {}) {
+  // ERST BUCHEN, WAS FAELLIG WAR, DANN PAUSIEREN - dieselbe Reihenfolge wie in
+  // `savePlan()`. Ohne das liess das Deaktivieren die Termine fallen, die
+  // zwischen dem letzten Lauf und diesem Moment lagen: Geld, das dem Kind nach
+  // der eigenen Regel zusteht und in der Auszahlung fehlte (Review zu #1745).
+  // Gebucht wird bis zum Tag des Deaktivierens, nicht bis heute: ein Konto,
+  // das der Lauf erst Wochen spaeter aufraeumt, sammelt die Wochen danach nicht.
+  const plan = d.prepare('SELECT * FROM reward_allowances WHERE user_id = ? AND paused_at IS NULL').get(userId);
+  const since = plan ? formerSince(d, userId) : null;
+  if (plan && since) creditDueDates(d, plan, since < today ? since : today);
   const cancelled = d.prepare(`
     UPDATE reward_redemptions
     SET status = 'cancelled', decision_reason = 'account_deactivated', decided_by = NULL,
@@ -582,9 +601,35 @@ const CREDIT_SQL = `
  */
 function creditPlan(d, plan, today) {
   if (!isHouseholdMember(plan.user_id, { db: d })) {
-    closeFormerMoney(d, plan.user_id);
+    closeFormerMoney(d, plan.user_id, { today });
     return { credited: 0, paused: true };
   }
+  return creditDueDates(d, plan, today);
+}
+
+/*
+ * Die faelligen Termine eines Plans bis einschliesslich `until` buchen und ihn
+ * weiterruecken - ohne die Frage, ob die Person noch Mitglied ist (die stellt
+ * der Aufrufer).
+ *
+ * DIES IST DER EINE GELDSCHREIBER NEBEN `postMoney()`, und er traegt dieselbe
+ * Pruefung: die Waehrung des PLANS muss die des KONTOS sein. Der Saldo ist
+ * EINE Summe ueber alle Geldzeilen; dass alte Waehrungen sich darin zu null
+ * summieren, haelt nur, solange keine Zeile in einer fremden Waehrung auf ein
+ * Konto faellt. Eine Planzeile, die das behauptet (von Hand verdreht, aus einer
+ * Wiederherstellung), wird NICHT gebucht, sondern pausiert - 800 EUR auf einem
+ * Yen-Konto waeren 800 Yen im Saldo (Review zu #1745).
+ */
+function creditDueDates(d, plan, until) {
+  if (accountCurrency(d, plan.user_id) !== plan.currency) {
+    d.prepare(`
+      UPDATE reward_allowances
+      SET paused_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+      WHERE id = ? AND paused_at IS NULL
+    `).run(plan.id);
+    return { credited: 0, paused: true, mismatch: true };
+  }
+  const today = until;
   const credit = d.prepare(CREDIT_SQL);
   const anchor = stepAnchor(plan);
   let date = plan.next_run_date;
@@ -637,7 +682,7 @@ export function creditDueAllowances(d, { now = new Date(), today = todayKey(d, n
   `).all();
   for (const row of stranded) {
     try {
-      d.transaction(() => closeFormerMoney(d, row.user_id))();
+      d.transaction(() => closeFormerMoney(d, row.user_id, { today }))();
     } catch (err) {
       result.failed += 1;
       onError?.({ id: null, user_id: row.user_id }, err);
@@ -648,6 +693,9 @@ export function creditDueAllowances(d, { now = new Date(), today = todayKey(d, n
       const out = d.transaction(() => creditPlan(d, plan, today))();
       result.credited += out.credited;
       if (out.paused) result.paused += 1;
+      // Ein Plan in fremder Waehrung ist pausiert und wird gemeldet - einmal,
+      // weil er danach nicht mehr faellig wird.
+      if (out.mismatch) onError?.(plan, new Error(`Allowance plan ${plan.id} is in ${plan.currency}, its account is not; the plan was paused.`));
     } catch (err) {
       result.failed += 1;
       onError?.(plan, err);
