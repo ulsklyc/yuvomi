@@ -1906,6 +1906,7 @@
         "installModuleErrorBusy": "Pemasangan lain sedang berjalan. Tunggu sampai selesai.",
         "installModuleErrorNotWritable": "Folder modul di server hanya bisa dibaca.",
         "installModuleErrorNotAModule": "Di server, ID modul ini dipakai oleh berkas atau tautan, bukan folder modul. Hapus dulu di sana.",
+        "installModuleErrorNotWebInstalled": "Modul ini disalin ke server secara manual dan tidak diganti dari sini. Hapus dulu foldernya di server, lalu instal lagi.",
         "installModuleErrorSessionRequired": "Ini hanya bisa dilakukan saat Anda masuk di browser, bukan dengan token API.",
         "installModuleErrorWebInstallDisabled": "Memasang dan menghapus modul dari Pengaturan dimatikan di server ini (MODULES_ALLOW_WEB_INSTALL).",
         "installModuleErrorTooManyAttempts": "Terlalu banyak pemasangan dalam waktu singkat. Tunggu beberapa menit.",

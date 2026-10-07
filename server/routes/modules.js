@@ -246,7 +246,17 @@ router.patch('/:id', requireAdmin, async (req, res) => {
   } catch (err) {
     const status = err.status || 500;
     if (status >= 500) log.error('Module update failed:', err);
-    res.status(status).json({ error: err.message || 'Module update failed.', code: status });
+    // A 5xx without a reason is a raw filesystem or database error, and its
+    // message names the absolute path it failed on (EACCES on the temp file
+    // under modules/): a fixed sentence instead. With a reason the service
+    // wrote the sentence itself (409 `busy`, 503 `not_writable`) and the page
+    // picks its text by the reason.
+    const known = Boolean(err.reason) || status < 500;
+    res.status(status).json({
+      error: known && err.message ? err.message : 'Module update failed.',
+      code: status,
+      ...(err.reason ? { reason: err.reason } : {}),
+    });
   }
 });
 

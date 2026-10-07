@@ -1865,6 +1865,7 @@
         "installModuleErrorBusy": "Már fut egy másik telepítés. Várd meg, amíg befejeződik.",
         "installModuleErrorNotWritable": "A szerveren lévő modulmappa csak olvasható.",
         "installModuleErrorNotAModule": "A szerveren a modul azonosítóját egy fájl vagy hivatkozás foglalja el modulmappa helyett. Előbb távolítsd el ott.",
+        "installModuleErrorNotWebInstalled": "Ezt a modult kézzel másolták a szerverre, és innen nem cserélhető le. Előbb távolítsd el a mappáját a szerveren, majd telepítsd újra.",
         "installModuleErrorSessionRequired": "Ez csak böngészőben bejelentkezve lehetséges, API-tokennel nem.",
         "installModuleErrorWebInstallDisabled": "A modulok telepítése és törlése a beállításokból ezen a szerveren ki van kapcsolva (MODULES_ALLOW_WEB_INSTALL).",
         "installModuleErrorTooManyAttempts": "Túl sok telepítés rövid idő alatt. Várj néhány percet.",

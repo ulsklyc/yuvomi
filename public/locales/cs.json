@@ -1972,6 +1972,7 @@
         "installModuleErrorBusy": "Už probíhá jiná instalace. Počkejte, až skončí.",
         "installModuleErrorNotWritable": "Složka modulů na serveru je jen pro čtení.",
         "installModuleErrorNotAModule": "Na serveru zabírá ID tohoto modulu soubor nebo odkaz místo složky modulu. Nejprve ho tam odstraňte.",
+        "installModuleErrorNotWebInstalled": "Tento modul byl na server zkopírován ručně a odsud se nenahrazuje. Nejprve odstraňte jeho složku na serveru a pak ho nainstalujte znovu.",
         "installModuleErrorSessionRequired": "To jde jen při přihlášení v prohlížeči, ne s tokenem API.",
         "installModuleErrorWebInstallDisabled": "Instalace a mazání modulů z nastavení je na tomto serveru vypnuté (MODULES_ALLOW_WEB_INSTALL).",
         "installModuleErrorTooManyAttempts": "Příliš mnoho instalací v krátké době. Počkejte několik minut.",

@@ -68,25 +68,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Custom modules can be installed from Settings, from GitHub or as a ZIP file, where the operator
   allows it.** Until now a third-party module reached Yuvomi only as a folder copied into `modules/`
-  on the server, which on most installations means a shell, a file share or `docker cp`. The new
-  page Settings → Modules → Add custom module (admin only) takes the address of a public GitHub
-  repository (a release, a branch, a folder inside it) or an uploaded `.zip` of up to 20 MB, finds
-  the module by its `module.json`, copies only that folder and only browser file types, and names
-  it after the manifest id. **The feature is off unless `MODULES_ALLOW_WEB_INSTALL=true` is set**
-  (next to `MODULES_DIR` in `.env`, the Unraid template, the Portainer stack and the installer):
-  a module is JavaScript that runs with the session of every member who opens it, so installing one
-  is the same act as copying files onto the server, and that is a choice for whoever runs it.
-  Without the variable the page shows the manual way, as it does for a read-only modules folder or
-  one that an update would wipe (Umbrel, a container without a volume on `/app/modules`).
-  A new module arrives **disabled** and stays so until an admin approves it in Active modules from
-  a browser session; API tokens can switch a module off but not on, and neither install nor delete.
-  The approval travels with the folder, in `.yuvomi-install.json`, so restoring an older database
-  cannot switch on what nobody has looked at. Every replacement, from GitHub or from a ZIP file,
-  arrives disabled again. Active modules shows each third-party module's id, version, source,
-  install date and who installed it, and offers delete only for modules installed from here; a
-  folder copied by hand is removed on the server, as it was placed. Nothing from an archive runs
-  on the server, no dependency was added, and copying a folder into `modules/` works as before.
-  Limits, the archive checks and the API are in `MODULES.md` under "Installing From Settings".
+  on the server. The new page Settings → Modules → Add custom module (admin only) takes the address
+  of a public GitHub repository or an uploaded `.zip` and installs the module from it. **The feature
+  is off unless the operator sets `MODULES_ALLOW_WEB_INSTALL`**: a module is JavaScript that runs
+  with the session of every member who opens it, so installing one is the operator's choice. A
+  module installed this way arrives disabled until an admin approves it in Active modules from a
+  browser session, and the web interface removes or replaces only what it installed. Limits, checks
+  and the API are in `MODULES.md` under "Installing From Settings".
 
 ### Changed
 

@@ -2066,6 +2066,7 @@
         "installModuleErrorBusy": "Trwa już inna instalacja. Poczekaj, aż się zakończy.",
         "installModuleErrorNotWritable": "Folder modułów na serwerze jest tylko do odczytu.",
         "installModuleErrorNotAModule": "Na serwerze ID tego modułu zajmuje plik lub dowiązanie zamiast folderu modułu. Najpierw usuń je tam.",
+        "installModuleErrorNotWebInstalled": "Ten moduł skopiowano na serwer ręcznie i nie jest zastępowany stąd. Najpierw usuń jego folder na serwerze, a potem zainstaluj go ponownie.",
         "installModuleErrorSessionRequired": "To jest możliwe tylko po zalogowaniu w przeglądarce, nie za pomocą tokenu API.",
         "installModuleErrorWebInstallDisabled": "Instalowanie i usuwanie modułów z ustawień jest na tym serwerze wyłączone (MODULES_ALLOW_WEB_INSTALL).",
         "installModuleErrorTooManyAttempts": "Za dużo instalacji w krótkim czasie. Poczekaj kilka minut.",

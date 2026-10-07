@@ -25,7 +25,7 @@ import {
 import { MODULE_ICON, moduleIconHTML } from '/nav-icons.js';
 import { moduleAccentVar } from '/utils/module-accent.js';
 import { moduleDisplayLabel } from '/utils/extension-i18n.js';
-import { installErrorText } from '/settings/module-install-errors.js';
+import { deleteErrorText, installErrorText } from '/settings/module-install-errors.js';
 
 /**
  * Blatt: Einstellungen -> Module -> Aktive Module (adminOnly)
@@ -51,9 +51,11 @@ import { installErrorText } from '/settings/module-install-errors.js';
  * Einstellungen installiert werden (modules-install.js), kommen sie
  * ausgeschaltet an; ihre Zeile traegt deshalb Details (Kennung, Version,
  * Quelle, Installationszeitpunkt, wer installiert hat, Ordner) und - nur bei
- * einem Modul, das die Oberflaeche selbst installiert hat - einen
- * Loeschen-Knopf. Einen von Hand kopierten Ordner loescht der Server nicht
- * (Review zu PR #1671: er kann ein Checkout mit offener Arbeit sein).
+ * einem Modul, das die Oberflaeche selbst installiert hat, und nur solange
+ * der Server das Loeschen auch annimmt - einen Loeschen-Knopf. Einen von Hand
+ * kopierten Ordner loescht der Server nicht (Review zu PR #1671: er kann ein
+ * Checkout mit offener Arbeit sein), und mit ausgeschaltetem
+ * MODULES_ALLOW_WEB_INSTALL lehnt er jedes Loeschen ab (deleteOffered).
  */
 
 const INSTALL_MODULE_PATH = '/settings/modules/install';
@@ -75,19 +77,42 @@ function hasInstallRecord(module) {
 }
 
 /**
- * Ob die Zeile eines Drittmoduls einen Loeschen-Knopf bekommt: eine gueltige
- * Kennung UND ein Installationsdatensatz. Die Oberflaeche loescht nur, was
- * sie selbst installiert hat; einen von Hand kopierten Ordner lehnt DELETE
- * mit 409 `not_web_installed` ab, und einen Knopf, der nur scheitern kann,
- * gibt es nicht. Die Details sagen stattdessen "Auf den Server kopiert".
+ * Ob ein Drittmodul von sich aus loeschbar ist: eine gueltige Kennung UND ein
+ * Installationsdatensatz. Die Oberflaeche loescht nur, was sie selbst
+ * installiert hat; einen von Hand kopierten Ordner lehnt DELETE mit 409
+ * `not_web_installed` ab (seit Review Runde 4 auch jedes Ersetzen ueber die
+ * Install-Routen), und einen Knopf, der nur scheitern kann, gibt es nicht.
+ * Die Details sagen stattdessen "Auf den Server kopiert". Ob der Server das
+ * Loeschen gerade ueberhaupt annimmt, entscheidet dazu deleteOffered().
  */
 export function isDeletableModule(module) {
   return isDeletableModuleId(module?.id) && hasInstallRecord(module);
 }
 
-/** Zeilen in derselben Reihenfolge und Gruppierung wie die Navigation - nur ohne Sortierung. */
-function buildRows(preferences, thirdPartyModules) {
+/**
+ * Ob der Server ein Loeschen aus den Einstellungen gerade annimmt - aus
+ * GET /modules/install/info, derselben Antwort, nach der das Install-Blatt
+ * seine Knoepfe richtet (Review Runde 4 zu PR #1671): mit nicht gesetztem
+ * MODULES_ALLOW_WEB_INSTALL (`webInstall: false`, der Normalfall, und der
+ * Zustand, nachdem ein Betreiber den Schalter wieder zurueckgenommen hat)
+ * endet jeder Klick in 403 `module_web_install_disabled`, bei einem
+ * schreibgeschuetzten Ordner (`writable: false`) in 503. Nur ein sicheres
+ * `webInstall: true` zaehlt; eine fehlende oder gescheiterte Antwort (`null`,
+ * aelterer Server) heisst "unbekannt" und damit: kein Knopf. `persistent`
+ * spielt hier keine Rolle - loeschen geht auch im Container-Layer.
+ */
+export function deleteOffered(info) {
+  return info?.webInstall === true && info?.writable !== false;
+}
+
+/**
+ * Zeilen in derselben Reihenfolge und Gruppierung wie die Navigation - nur
+ * ohne Sortierung. `info` ist die Antwort von GET /modules/install/info oder
+ * null.
+ */
+function buildRows(preferences, thirdPartyModules, info) {
   const disabled = new Set(Array.isArray(preferences.disabled_modules) ? preferences.disabled_modules : []);
+  const offerDelete = deleteOffered(info);
   const rows = [];
 
   for (const module of BUILT_IN_MODULES) {
@@ -133,7 +158,7 @@ function buildRows(preferences, thirdPartyModules) {
       toggleDisabled: module.status === 'error',
       hasError: module.status === 'error',
       accent: module.accent,
-      deletable: isDeletableModule(module),
+      deletable: offerDelete && isDeletableModule(module),
     });
   }
 
@@ -192,8 +217,9 @@ function rowHtml(row) {
     </div>` : '';
 
   // Loeschen gibt es nur fuer Drittmodule, die von hier aus installiert wurden
-  // (isDeletableModule): eingebaute sind Teil der App, von Hand kopierte
-  // gehoeren dem Server.
+  // (isDeletableModule), und nur solange der Server es annimmt
+  // (deleteOffered): eingebaute sind Teil der App, von Hand kopierte gehoeren
+  // dem Server.
   const deletable = row.type === 'third-party' && row.deletable === true;
   const deleteAction = deletable ? rowActionHtml({
     icon: 'trash-2',
@@ -414,7 +440,13 @@ function bindEvents(container, user) {
         window.yuvomi?.showToast(t('settings.thirdPartyModulesSaved'), 'success');
       }, () => render(container, { user }));
     } catch (error) {
-      window.yuvomi?.showToast(error.message ?? t('common.errorGeneric'), 'danger');
+      // Einschalten kann mit einem `reason` scheitern, den die Install-Saetze
+      // schon kennen (Review Runde 4 zu PR #1671): 409 `busy`, solange eine
+      // Installation oder ein Loeschen laeuft (die Freigabe nimmt dieselbe
+      // Sperre), 503 `not_writable`, wenn der Datensatz im Modulordner nicht
+      // geschrieben werden kann, 403 `module_session_required` fuer ein Token.
+      // Ohne reason bleibt es beim Servertext.
+      window.yuvomi?.showToast(error?.data?.reason ? installErrorText(error) : (error?.message ?? t('common.errorGeneric')), 'danger');
     }
   });
 
@@ -490,10 +522,11 @@ async function deleteThirdPartyModule(container, user, button) {
     await api.delete(`/modules/${encodeURIComponent(id)}`);
   } catch (error) {
     release();
-    // Dieselbe Abbildung wie beim Installieren: not_found, not_a_module,
-    // not_web_installed, module_session_required und module_web_install_disabled
-    // sagen dem Admin etwas, der Servertext nur auf Englisch.
-    window.yuvomi?.showToast(error?.data?.reason ? installErrorText(error) : (error?.message || t('common.errorGeneric')), 'danger');
+    // Dieselbe Abbildung wie beim Installieren, bis auf den Satz zu
+    // not_web_installed: not_found, not_a_module, not_web_installed,
+    // module_session_required und module_web_install_disabled sagen dem Admin
+    // etwas, der Servertext nur auf Englisch.
+    window.yuvomi?.showToast(error?.data?.reason ? deleteErrorText(error) : (error?.message || t('common.errorGeneric')), 'danger');
     return;
   }
   try {
@@ -521,24 +554,30 @@ async function renderActiveModules(container, user) {
 
   let preferences = {};
   let thirdPartyModules = [];
+  // Die Antwort von GET /modules/install/info (Admin-Route, Admin-Blatt) oder
+  // null: sie entscheidet, ob Loeschen-Knoepfe stehen (deleteOffered). Ein
+  // Fehler dort ist kein Ladefehler des Blatts - nur kein Knopf.
+  let installInfo = null;
   // Der Leerzustand "noch kein eigenes Modul" nur nach einer ERFOLGREICHEN,
   // leeren Antwort - ein Ladefehler ist kein leerer Bestand (utils/empty-state.js).
   let modulesLoaded = false;
   try {
-    const [prefs, modules] = await Promise.all([
+    const [prefs, modules, info] = await Promise.all([
       getPreferences(),
       api.get('/modules?admin=1').then((res) => res?.data ?? []).catch(() => null),
+      api.get('/modules/install/info').then((res) => res?.data ?? null).catch(() => null),
     ]);
     preferences = prefs ?? {};
     modulesLoaded = Array.isArray(modules);
     thirdPartyModules = modulesLoaded ? modules : [];
+    installInfo = info;
   } catch (error) {
     container.insertAdjacentHTML('beforeend',
       `<p class="form-error" role="alert">${esc(error.message ?? t('common.errorGeneric'))}</p>`);
     return;
   }
 
-  const rows = buildRows(preferences, thirdPartyModules);
+  const rows = buildRows(preferences, thirdPartyModules, installInfo);
 
   container.insertAdjacentHTML('beforeend', `
     <section class="settings-section">

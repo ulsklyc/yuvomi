@@ -1865,6 +1865,7 @@
         "installModuleErrorBusy": "Một lần cài đặt khác đang chạy. Hãy đợi đến khi xong.",
         "installModuleErrorNotWritable": "Thư mục mô-đun trên máy chủ chỉ đọc.",
         "installModuleErrorNotAModule": "Trên máy chủ, ID của mô-đun này đang bị một tệp hoặc liên kết chiếm thay vì thư mục mô-đun. Hãy xóa nó trên máy chủ trước.",
+        "installModuleErrorNotWebInstalled": "Mô-đun này được sao chép thủ công lên máy chủ và không được thay thế từ đây. Hãy xóa thư mục của nó trên máy chủ trước, rồi cài đặt lại.",
         "installModuleErrorSessionRequired": "Chỉ làm được khi bạn đăng nhập trong trình duyệt, không dùng được với mã thông báo API.",
         "installModuleErrorWebInstallDisabled": "Việc cài và xóa mô-đun từ phần Cài đặt đang tắt trên máy chủ này (MODULES_ALLOW_WEB_INSTALL).",
         "installModuleErrorTooManyAttempts": "Quá nhiều lần cài đặt trong thời gian ngắn. Hãy đợi vài phút.",

@@ -2441,6 +2441,7 @@
         "installModuleErrorBusy": "Une autre installation est en cours. Attendez qu’elle se termine.",
         "installModuleErrorNotWritable": "Le dossier des modules sur le serveur est en lecture seule.",
         "installModuleErrorNotAModule": "Sur le serveur, l’ID de ce module est occupé par un fichier ou un lien au lieu d’un dossier de module. Supprimez-le d’abord sur le serveur.",
+        "installModuleErrorNotWebInstalled": "Ce module a été copié à la main sur le serveur et n’est pas remplacé d’ici. Supprimez d’abord son dossier sur le serveur, puis installez-le à nouveau.",
         "installModuleErrorSessionRequired": "Ce n’est possible que connecté dans le navigateur, pas avec un jeton d’API.",
         "installModuleErrorWebInstallDisabled": "L’installation et la suppression de modules depuis les Paramètres sont désactivées sur ce serveur (MODULES_ALLOW_WEB_INSTALL).",
         "installModuleErrorTooManyAttempts": "Trop d’installations en peu de temps. Patientez quelques minutes.",

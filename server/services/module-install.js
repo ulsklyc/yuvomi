@@ -14,8 +14,9 @@
  * lands DISABLED: the install record in the folder says `approved: false` until an
  * admin switches the module on in a browser session (modules.js setModuleEnabled).
  * The record travels with the folder, so a restored or fresh database cannot turn
- * on what nobody looked at. The web interface deletes only folders that carry such
- * a record; a hand-copied folder is the operator's and stays.
+ * on what nobody looked at. The web interface removes or replaces only folders that
+ * carry such a record; a hand-copied folder is the operator's and stays, whether
+ * the request is a delete or a replace (both end in `rm -r` of the old files).
  * Nothing from the archive is ever executed on the server; it is only written to disk
  * and validated as data by the same code the loader uses.
  *
@@ -37,6 +38,8 @@ import { MODULE_ID_RE } from './module-capabilities.js';
 import {
   MODULES_DIR,
   INSTALL_META_FILE,
+  NOT_WRITABLE_CODES,
+  acquireInstallLock,
   listModules,
   loadModuleDir,
   readInstallMeta,
@@ -107,8 +110,9 @@ const REASON_STATUS = {
   // the route before anything here runs; they are not InstallError reasons.
   exists: 409,
   busy: 409,
-  // Delete: the folder has no install record, so the web did not put it there
-  // and will not take it away (deleteModule).
+  // Delete AND replace: the folder has no install record, so the web did not
+  // put it there and neither takes it away (deleteModule) nor swaps it out
+  // (installFilesUnlocked) - a replace removes the old files just the same.
   not_web_installed: 409,
   too_large: 413,
   too_many_entries: 413,
@@ -160,22 +164,21 @@ export function __setInstallFsOpsForTests(overrides = {}) {
 }
 
 // ── Lock ────────────────────────────────────────────────────────────────────
-// One install or delete at a time. A second one is refused instead of queued:
-// two admins replacing the same module at once would otherwise race on the
-// backup folder, and the second would silently overwrite the first.
-let busy = false;
-
+// One install or delete at a time; a second one is refused instead of queued.
+// The flag itself lives in modules.js (acquireInstallLock), because the
+// approval written by setModuleEnabled() takes the same lock: a replace must
+// not land between its read of the record and its rewrite.
 export function withInstallLock(fn) {
-  if (busy) {
+  const release = acquireInstallLock();
+  if (!release) {
     return Promise.reject(new InstallError('busy', 'Another module install or delete is in progress. Try again in a moment.'));
   }
-  busy = true;
-  return Promise.resolve().then(fn).finally(() => { busy = false; });
+  return Promise.resolve().then(fn).finally(release);
 }
 
 // ── Writability ─────────────────────────────────────────────────────────────
-
-const NOT_WRITABLE_CODES = new Set(['EACCES', 'EPERM', 'EROFS']);
+// NOT_WRITABLE_CODES comes from modules.js: the approval there answers the
+// same 503 for the same codes.
 
 export async function assertWritable() {
   try {
@@ -626,6 +629,18 @@ export async function installFilesUnlocked(files, opts = {}) {
       if (existing.isSymbolicLink() || !existing.isDirectory()) {
         throw new InstallError('not_a_module',
           `modules/${id} exists but is not a regular module folder. Remove it on the server first.`, {}, 409);
+      }
+      // The replace door is the delete door. Moving the old folder aside and
+      // removing the backup is `rm -r` with one step in between, and a folder
+      // without an install record was copied by hand: it can be a working
+      // checkout with uncommitted work, and nothing here can tell. Refused for
+      // the same reason as in deleteModule, and BEFORE the overwrite question,
+      // so the page never asks "replace?" for something it would then refuse.
+      // An unreadable record counts as none here too (readInstallMeta gives
+      // null): only the server can fix it, and readModule says so.
+      if (!(await readInstallMeta(target))) {
+        throw new InstallError('not_web_installed',
+          `modules/${id} was copied to the server by hand and is not replaced from Settings. Remove the folder on the server first, then install again.`);
       }
       if (!opts.overwrite) {
         const current = await readExistingManifest(target);

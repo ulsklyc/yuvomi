@@ -273,6 +273,19 @@ test('das Archiv aus der Review (2000 Eintraege x 510 Segmente, 4 MB) wird in un
   assert.ok(heapGrowth < 64, `Heap wuchs um ${heapGrowth.toFixed(1)} MB - die Praefixmenge wurde gebaut`);
 });
 
+// Runde 4: validateEntryName las ZIP_LIMITS.maxDepth, die Praefixschranke
+// lim.maxDepth - ein Aufrufer mit eigenen limits bekam zwei Tiefen. Heute
+// reicht nur ein Test limits durch; die eine Zahl soll es trotzdem sein.
+test('maxDepth aus den uebergebenen limits gilt schon in validateEntryName, nicht erst an der Praefixschranke', () => {
+  const three = 'a/b/c.js';
+  assert.throws(() => readZipArchive(makeZip([{ name: three, data: 'x' }]), { maxDepth: 2 }),
+    (e) => e.code === 'unsafe_path' && /more than 2 folders deep/.test(e.message));
+  assert.equal(readZipArchive(makeZip([{ name: 'a/b.js', data: 'x' }]), { maxDepth: 2 }).files.length, 1, 'zwei Segmente gehen durch');
+  assert.throws(() => validateEntryName(three, 2), (e) => e.code === 'unsafe_path' && /2 folders deep/.test(e.message));
+  assert.deepEqual(validateEntryName(three), { path: three, isDir: false }, 'ohne Angabe gilt ZIP_LIMITS.maxDepth');
+  assert.equal(readZipArchive(makeZip([{ name: three, data: 'x' }])).files.length, 1);
+});
+
 test('Nicht-ASCII-Name ohne UTF-8-Flag → unsafe_path; mit Flag ok', () => {
   rejectsWith('unsafe_path', makeZip([{ name: 'x', rawName: Buffer.from([0xe9, 0x2e, 0x6a, 0x73]), flags: 0, data: 'x' }]));
   // Ungueltiges UTF-8 trotz Flag ist ebenso unsicher.

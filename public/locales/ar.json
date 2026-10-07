@@ -2708,6 +2708,7 @@
         "installModuleErrorBusy": "هناك عملية تثبيت أخرى جارية. انتظر حتى تنتهي.",
         "installModuleErrorNotWritable": "مجلد الوحدات على الخادم للقراءة فقط.",
         "installModuleErrorNotAModule": "على الخادم، يشغل ملف أو رابط معرّف هذه الوحدة بدلًا من مجلد وحدة. احذفه هناك أولًا.",
+        "installModuleErrorNotWebInstalled": "نُسخت هذه الوحدة إلى الخادم يدويًا ولا تُستبدل من هنا. احذف مجلدها على الخادم أولًا، ثم ثبّتها من جديد.",
         "installModuleErrorSessionRequired": "لا يمكن ذلك إلا عند تسجيل الدخول في المتصفح، وليس باستخدام رمز API.",
         "installModuleErrorWebInstallDisabled": "تثبيت الوحدات أو حذفها من الإعدادات معطّل على هذا الخادم (MODULES_ALLOW_WEB_INSTALL).",
         "installModuleErrorTooManyAttempts": "عدد كبير من عمليات التثبيت في وقت قصير. انتظر بضع دقائق.",

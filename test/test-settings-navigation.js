@@ -3815,20 +3815,33 @@ test('Eigenes Modul hinzufuegen: adminOnly, am Ende, Fehler je reason lokalisier
     ['ref_not_found', 'installModuleErrorRefNotFound'],
     ['not_a_module', 'installModuleErrorNotAModule'],
     ['module_session_required', 'installModuleErrorSessionRequired'],
-    // Review Runde 3: der Schalter des Betreibers (403) und das Loeschen eines
-    // von Hand kopierten Ordners (409) haben ihren eigenen Satz.
+    // Review Runde 3: der Schalter des Betreibers (403) hat seinen eigenen
+    // Satz. Runde 4: ein von Hand kopierter Ordner (409 not_web_installed)
+    // wird auch nicht mehr ERSETZT - beim Installieren sagt der Satz "Ordner
+    // entfernen, dann neu installieren", beim Loeschen nur "Ordner entfernen".
     ['module_web_install_disabled', 'installModuleErrorWebInstallDisabled'],
-    ['not_web_installed', 'moduleDeleteErrorNotWebInstalled'],
+    ['not_web_installed', 'installModuleErrorNotWebInstalled'],
     ['unsupported_encoding', 'installModuleErrorUnsupportedEncoding'],
     ['not_found', 'moduleDeleteErrorNotFound'],
     ['bad_id', 'moduleDeleteErrorBadId'],
   ]) {
     assert.equal(installErrorText({ status: 400, data: { reason, error: 'English' } }), `settings.${key}`, reason);
   }
-  // Der Loeschen-Toast in Aktive Module nutzt dieselbe Abbildung.
+  const { deleteErrorText } = await import('/settings/module-install-errors.js');
+  assert.equal(deleteErrorText({ status: 409, data: { reason: 'not_web_installed', error: 'English' } }),
+    'settings.moduleDeleteErrorNotWebInstalled', 'beim Loeschen der Satz ohne "dann neu installieren"');
+  for (const reason of ['not_found', 'bad_id', 'not_a_module', 'busy', 'module_web_install_disabled']) {
+    assert.equal(deleteErrorText({ status: 400, data: { reason, error: 'English' } }),
+      installErrorText({ status: 400, data: { reason, error: 'English' } }), `${reason}: sonst dieselbe Abbildung`);
+  }
+  assert.equal(deleteErrorText({ status: 400, data: { reason: 'new_thing', error: 'Server says' } }), 'Server says');
+  // Der Loeschen-Toast in Aktive Module nutzt die Loeschen-Abbildung, der
+  // Schalter-Toast die Install-Abbildung (PATCH enabled:true kann 409 busy und
+  // 503 not_writable nennen, Review Runde 4).
   const activeSrc = await readFile(new URL('../public/settings/pages/modules-active.js', import.meta.url), 'utf8');
-  assert.match(activeSrc, /import \{ installErrorText \} from '\/settings\/module-install-errors\.js'/);
-  assert.match(activeSrc, /showToast\(error\?\.data\?\.reason \? installErrorText\(error\)/);
+  assert.match(activeSrc, /import \{ deleteErrorText, installErrorText \} from '\/settings\/module-install-errors\.js'/);
+  assert.match(activeSrc, /showToast\(error\?\.data\?\.reason \? deleteErrorText\(error\)/, 'Loeschen-Toast');
+  assert.match(activeSrc, /showToast\(error\?\.data\?\.reason \? installErrorText\(error\)/, 'Schalter-Toast');
   assert.equal(installErrorText({ status: 400, data: { reason: 'new_thing', error: 'Server says' } }), 'Server says',
     'ein unbekannter reason faellt auf den Servertext zurueck');
   assert.equal(installErrorText({}), 'settings.installModuleErrorGeneric');
@@ -3941,7 +3954,7 @@ test('Eigenes Modul: Fokus, veraltete Kandidaten, ein Fehler, Persistenz-Hinweis
   assert.doesNotMatch(activeSrc, /moduleDetailError/, 'der Fehler steht in der Zeile, nicht noch einmal in den Details');
 
   // Loeschen nur fuer Kennungen, die DELETE auch annimmt (sonst 400 bad_id).
-  const { isDeletableModuleId, isDeletableModule, installedByText } = await import('/settings/pages/modules-active.js');
+  const { isDeletableModuleId, isDeletableModule, deleteOffered, installedByText } = await import('/settings/pages/modules-active.js');
   assert.equal(isDeletableModuleId('solar-panel'), true);
   for (const bad of ['Bad_ID', 'ab', '-lead', 'trail-', 'a'.repeat(65), '', null, undefined]) {
     assert.equal(isDeletableModuleId(bad), false, String(bad));
@@ -3958,9 +3971,28 @@ test('Eigenes Modul: Fokus, veraltete Kandidaten, ein Fehler, Persistenz-Hinweis
   assert.equal(isDeletableModule({ id: 'solar-panel', install: 'yes' }), false, 'ein Datensatz ist ein Objekt');
   assert.equal(isDeletableModule({ id: 'Bad_ID', install: record }), false, 'die Kennung zaehlt weiterhin');
   assert.equal(isDeletableModule(null), false);
+
+  // Review Runde 4: ... UND nur, solange der Server das Loeschen annimmt. Mit
+  // nicht gesetztem MODULES_ALLOW_WEB_INSTALL (der Normalfall) endete jeder
+  // Klick in 403 module_web_install_disabled; das Blatt liest deshalb wie das
+  // Install-Blatt GET /modules/install/info. Nur ein sicheres webInstall:true
+  // zaehlt, writable:false sperrt, unbekannt (null, aelterer Server) heisst
+  // kein Knopf; persistent spielt keine Rolle.
+  assert.equal(deleteOffered({ webInstall: true, writable: true, persistent: true }), true);
+  assert.equal(deleteOffered({ webInstall: true, writable: null, persistent: false }), true, 'persistent und unbekanntes writable sperren nicht');
+  assert.equal(deleteOffered({ webInstall: true }), true);
+  assert.equal(deleteOffered({ webInstall: true, writable: false }), false, 'schreibgeschuetzt: 503');
+  assert.equal(deleteOffered({ webInstall: false, writable: true }), false, 'Schalter aus: 403');
+  assert.equal(deleteOffered({ writable: true }), false, 'ohne webInstall (aelterer Server): unbekannt');
+  assert.equal(deleteOffered({ webInstall: 'true' }), false, 'nur ein echtes true');
+  assert.equal(deleteOffered(null), false);
+  assert.equal(deleteOffered(undefined), false);
   // Und die Zeile nimmt genau diese Entscheidung, nicht die Kennung allein.
   const activeFlat = activeSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
-  assert.match(activeFlat, /deletable: isDeletableModule\(module\)/, 'buildRows entscheidet je Modul');
+  assert.match(activeFlat, /api\.get\('\/modules\/install\/info'\)\.then\([^\n]*\)\.catch\(\(\) => null\)/,
+    'das Blatt liest /modules/install/info, und ein Fehler dort ist kein Ladefehler des Blatts');
+  assert.match(activeFlat, /const offerDelete = deleteOffered\(info\)/, 'buildRows fragt den Server-Stand einmal');
+  assert.match(activeFlat, /deletable: offerDelete && isDeletableModule\(module\)/, 'buildRows entscheidet je Modul');
   assert.match(activeFlat, /row\.type === 'third-party' && row\.deletable === true/, 'rowHtml fragt nur die Entscheidung');
 
   // Details "Installiert von": der Name aus der Admin-Liste; null ist ein

@@ -1906,6 +1906,7 @@
         "installModuleErrorBusy": "یک نصب دیگر در حال انجام است. صبر کنید تا تمام شود.",
         "installModuleErrorNotWritable": "پوشه ماژول‌ها روی سرور فقط خواندنی است.",
         "installModuleErrorNotAModule": "روی سرور، شناسه این ماژول را یک فایل یا پیوند گرفته است، نه یک پوشه ماژول. ابتدا آن را آنجا حذف کنید.",
+        "installModuleErrorNotWebInstalled": "این ماژول دستی روی سرور کپی شده است و از اینجا جایگزین نمی‌شود. ابتدا پوشه آن را روی سرور حذف کنید و سپس دوباره نصب کنید.",
         "installModuleErrorSessionRequired": "این کار فقط وقتی ممکن است که در مرورگر وارد شده باشید، نه با توکن API.",
         "installModuleErrorWebInstallDisabled": "نصب و حذف ماژول‌ها از تنظیمات روی این سرور خاموش است (MODULES_ALLOW_WEB_INSTALL).",
         "installModuleErrorTooManyAttempts": "تعداد نصب‌ها در زمان کوتاه بیش از حد است. چند دقیقه صبر کنید.",

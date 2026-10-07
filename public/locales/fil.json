@@ -1906,6 +1906,7 @@
         "installModuleErrorBusy": "May ibang installation na tumatakbo. Hintaying matapos ito.",
         "installModuleErrorNotWritable": "Read-only ang folder ng mga module sa server.",
         "installModuleErrorNotAModule": "Sa server, isang file o link ang may ID ng module na ito sa halip na isang folder ng module. Alisin muna ito roon.",
+        "installModuleErrorNotWebInstalled": "Kinopya nang mano-mano sa server ang module na ito at hindi ito pinapalitan mula rito. Alisin muna ang folder nito sa server, pagkatapos ay i-install muli.",
         "installModuleErrorSessionRequired": "Magagawa lang ito kapag naka-sign in ka sa browser, hindi gamit ang API token.",
         "installModuleErrorWebInstallDisabled": "Naka-off sa server na ito ang pag-install at pagtanggal ng mga module mula sa Mga Setting (MODULES_ALLOW_WEB_INSTALL).",
         "installModuleErrorTooManyAttempts": "Sobrang daming installation sa maikling oras. Maghintay ng ilang minuto.",

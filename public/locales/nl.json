@@ -1865,6 +1865,7 @@
         "installModuleErrorBusy": "Er loopt al een andere installatie. Wacht tot die klaar is.",
         "installModuleErrorNotWritable": "De modulemap op de server is alleen-lezen.",
         "installModuleErrorNotAModule": "Op de server wordt de ID van deze module ingenomen door een bestand of link in plaats van een modulemap. Verwijder die daar eerst.",
+        "installModuleErrorNotWebInstalled": "Deze module is met de hand naar de server gekopieerd en wordt hiervandaan niet vervangen. Verwijder eerst de map op de server en installeer daarna opnieuw.",
         "installModuleErrorSessionRequired": "Dit kan alleen als je in de browser bent aangemeld, niet met een API-token.",
         "installModuleErrorWebInstallDisabled": "Modules installeren en verwijderen vanuit Instellingen staat op deze server uit (MODULES_ALLOW_WEB_INSTALL).",
         "installModuleErrorTooManyAttempts": "Te veel installaties in korte tijd. Wacht een paar minuten.",

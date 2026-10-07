@@ -15,7 +15,10 @@
  * Antworten des Servers, die eine Rueckfrage brauchen, laufen hier wieder in
  * denselben Ablauf: 409 `exists` fragt, ob ersetzt werden soll, und schickt
  * dann mit `overwrite`; 422 `multiple` zeigt die gefundenen Module zur Wahl
- * und schickt dann mit `path`.
+ * und schickt dann mit `path`. `exists` kommt nur fuer einen Ordner MIT
+ * Installationsdatensatz; einen von Hand kopierten ersetzt der Server nicht
+ * (409 `not_web_installed`, Review Runde 4 zu PR #1671), und das Blatt zeigt
+ * dann den Satz dazu (installErrorText) statt der Ersetzen-Rueckfrage.
  */
 
 import { api } from '/api.js';

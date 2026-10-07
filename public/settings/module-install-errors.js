@@ -47,23 +47,32 @@ const REASON_KEYS = Object.freeze({
   // der Satz faengt eine Seite, die vor dem Umschalten geladen wurde.
   'module_session_required':'settings.installModuleErrorSessionRequired',
   'module_web_install_disabled':'settings.installModuleErrorWebInstallDisabled',
-  // Nur beim Loeschen (modules-active.js nutzt dieselbe Abbildung). `bad_id`
-  // und `not_web_installed` bietet die Seite gar nicht erst an
+  // `not_web_installed` kommt seit Review Runde 4 von BEIDEN Install-Routen:
+  // modules/<id> liegt schon da, traegt aber keinen Installationsdatensatz
+  // (von Hand kopiert, vielleicht ein Checkout mit offener Arbeit) - der
+  // Server ersetzt ihn nicht (409, ohne `existing`), und das Blatt zeigt
+  // diesen Satz statt der Ersetzen-Rueckfrage. Der Satz hier sagt, was zu tun
+  // ist, um doch zu installieren; den Loeschen-Toast siehe DELETE_REASON_KEYS.
+  not_web_installed: 'settings.installModuleErrorNotWebInstalled',
+  // Nur beim Loeschen (modules-active.js, deleteErrorText). `bad_id` und
+  // `not_web_installed` bietet die Seite gar nicht erst an
   // (isDeletableModule); kommen sie doch, etwa von einer aelteren offenen
   // Seite, sollen sie lesbar sein.
   not_found: 'settings.moduleDeleteErrorNotFound',
   bad_id: 'settings.moduleDeleteErrorBadId',
-  not_web_installed: 'settings.moduleDeleteErrorNotWebInstalled',
 });
 
 /**
- * Meldung zu einem fehlgeschlagenen Installieren oder Loeschen. Bekannte
- * `reason` lokalisiert; `bad_manifest` nennt dazu den Grund des Loaders
- * (englisch, aber konkret: welches Feld fehlt). Unbekanntes faellt auf den
- * Servertext zurueck, dann auf den allgemeinen Satz. Exportiert fuer die Tests
- * und fuer den Loeschen-Toast in modules-active.js.
+ * Dieselben Gruende beim Loeschen, bis auf einen: `not_web_installed` heisst
+ * dort "entferne den Ordner auf dem Server", nicht "... und installiere dann
+ * neu". Literaler Schluessel aus demselben Grund wie oben.
  */
-export function installErrorText(error) {
+const DELETE_REASON_KEYS = Object.freeze({
+  ...REASON_KEYS,
+  not_web_installed: 'settings.moduleDeleteErrorNotWebInstalled',
+});
+
+function errorText(error, keys) {
   const reason = error?.data?.reason;
   const serverText = typeof error?.data?.error === 'string' ? error.data.error : '';
   if (reason === 'bad_manifest') {
@@ -79,9 +88,26 @@ export function installErrorText(error) {
       return t('settings.installModuleErrorRateLimitedUntil', { time: formatTime(resetAt) });
     }
   }
-  if (REASON_KEYS[reason]) return t(REASON_KEYS[reason]);
+  if (keys[reason]) return t(keys[reason]);
   // Ein 429 ohne bekannten reason (ein Proxy davor, ein aelterer Server) ist
   // trotzdem "zu oft" - nicht "fehlgeschlagen".
   if (error?.status === 429) return t('settings.installModuleErrorTooManyAttempts');
   return serverText || error?.message || t('settings.installModuleErrorGeneric');
+}
+
+/**
+ * Meldung zu einem fehlgeschlagenen Installieren (und zum Umschalten in
+ * "Aktive Module": PATCH enabled:true kann `busy` und `not_writable` nennen,
+ * dieselben Saetze wie beim Installieren). Bekannte `reason` lokalisiert;
+ * `bad_manifest` nennt dazu den Grund des Loaders (englisch, aber konkret:
+ * welches Feld fehlt). Unbekanntes faellt auf den Servertext zurueck, dann auf
+ * den allgemeinen Satz. Exportiert fuer die Tests und fuer modules-active.js.
+ */
+export function installErrorText(error) {
+  return errorText(error, REASON_KEYS);
+}
+
+/** Meldung zu einem fehlgeschlagenen Loeschen (Toast in "Aktive Module"). */
+export function deleteErrorText(error) {
+  return errorText(error, DELETE_REASON_KEYS);
 }

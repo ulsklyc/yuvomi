@@ -180,7 +180,7 @@ function decodeName(bytes, flags) {
  * leave the extraction folder or mean something special to a filesystem.
  * Returns `{ path, isDir }`.
  */
-export function validateEntryName(rawName) {
+export function validateEntryName(rawName, maxDepth = ZIP_LIMITS.maxDepth) {
   const unsafe = (why) => new ZipError('unsafe_path', `Unsafe path in archive (${why}): ${JSON.stringify(rawName).slice(0, 120)}`);
   const name = rawName.replace(/\\/g, '/');
   if (!name) throw unsafe('empty name');
@@ -198,8 +198,10 @@ export function validateEntryName(rawName) {
   const segments = body.split('/');
   // Before the per-segment checks and long before the prefix set in
   // readZipArchive: a name this deep is refused at the first entry that
-  // carries one, with nothing allocated for it.
-  if (segments.length > ZIP_LIMITS.maxDepth) throw unsafe(`more than ${ZIP_LIMITS.maxDepth} folders deep`);
+  // carries one, with nothing allocated for it. The depth is the caller's
+  // (readZipArchive passes its merged limits), so a reader with its own
+  // `limits` refuses here at the same depth it bounds the prefix set with.
+  if (segments.length > maxDepth) throw unsafe(`more than ${maxDepth} folders deep`);
   for (const seg of segments) {
     if (seg === '' || seg === '.' || seg === '..') throw unsafe('empty or relative segment');
     if (seg.length > 255) throw unsafe('segment too long');
@@ -285,7 +287,7 @@ export function readZipArchive(buffer, limits = {}) {
     if (diskStart !== 0) throw new ZipError('corrupt', 'Multi-part (split) archives are not supported.');
 
     const rawName = decodeName(buffer.subarray(p + 46, p + 46 + nameLen), flags);
-    const { path: name, isDir } = validateEntryName(rawName);
+    const { path: name, isDir } = validateEntryName(rawName, lim.maxDepth);
 
     if (flags & (FLAG_ENCRYPTED | FLAG_STRONG_ENCRYPTION)) {
       throw new ZipError('encrypted', `Encrypted archive entries are not supported: ${name}`);

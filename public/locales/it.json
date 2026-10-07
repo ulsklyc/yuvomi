@@ -2441,6 +2441,7 @@
         "installModuleErrorBusy": "È già in corso un’altra installazione. Attendi che finisca.",
         "installModuleErrorNotWritable": "La cartella dei moduli sul server è di sola lettura.",
         "installModuleErrorNotAModule": "Sul server l’ID di questo modulo è occupato da un file o da un collegamento invece che da una cartella di modulo. Rimuovilo prima lì.",
+        "installModuleErrorNotWebInstalled": "Questo modulo è stato copiato a mano sul server e non viene sostituito da qui. Rimuovi prima la sua cartella sul server, poi installalo di nuovo.",
         "installModuleErrorSessionRequired": "È possibile solo con l’accesso dal browser, non con un token API.",
         "installModuleErrorWebInstallDisabled": "Installare ed eliminare moduli dalle Impostazioni è disattivato su questo server (MODULES_ALLOW_WEB_INSTALL).",
         "installModuleErrorTooManyAttempts": "Troppe installazioni in poco tempo. Attendi qualche minuto.",

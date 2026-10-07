@@ -2441,6 +2441,7 @@
         "installModuleErrorBusy": "एक और इंस्टॉलेशन चल रहा है। उसके पूरा होने तक प्रतीक्षा करें।",
         "installModuleErrorNotWritable": "सर्वर पर मॉड्यूल फ़ोल्डर केवल पढ़ने योग्य है।",
         "installModuleErrorNotAModule": "सर्वर पर इस मॉड्यूल की ID किसी मॉड्यूल फ़ोल्डर के बजाय एक फ़ाइल या लिंक के पास है। पहले उसे वहाँ से हटाएँ।",
+        "installModuleErrorNotWebInstalled": "यह मॉड्यूल हाथ से सर्वर पर कॉपी किया गया था और यहाँ से बदला नहीं जाता। पहले सर्वर पर इसका फ़ोल्डर हटाएँ, फिर दोबारा इंस्टॉल करें।",
         "installModuleErrorSessionRequired": "यह केवल ब्राउज़र में साइन इन रहने पर संभव है, API टोकन से नहीं।",
         "installModuleErrorWebInstallDisabled": "इस सर्वर पर सेटिंग्स से मॉड्यूल इंस्टॉल करना और हटाना बंद है (MODULES_ALLOW_WEB_INSTALL)।",
         "installModuleErrorTooManyAttempts": "कम समय में बहुत अधिक इंस्टॉलेशन। कुछ मिनट प्रतीक्षा करें।",

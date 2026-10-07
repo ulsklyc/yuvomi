@@ -1865,6 +1865,7 @@
         "installModuleErrorBusy": "Another installation is running. Wait until it has finished.",
         "installModuleErrorNotWritable": "The modules folder on the server is read-only.",
         "installModuleErrorNotAModule": "On the server, this module's ID is taken by a file or link instead of a module folder. Remove it there first.",
+        "installModuleErrorNotWebInstalled": "This module was copied to the server by hand and is not replaced from here. Remove its folder on the server first, then install again.",
         "installModuleErrorSessionRequired": "This only works while you are signed in in the browser, not with an API token.",
         "installModuleErrorWebInstallDisabled": "Installing and deleting modules from Settings is switched off on this server (MODULES_ALLOW_WEB_INSTALL).",
         "installModuleErrorTooManyAttempts": "Too many installations in a short time. Wait a few minutes.",

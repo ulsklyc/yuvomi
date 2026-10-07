@@ -886,8 +886,9 @@ const REASONS_PASSED_THROUGH = new Map([
   // Stellen ausgeschrieben, 409 - eine 403 baut sie nie.
   ['routes/budget/helpers.js: first.reason', { sites: 1, at403: [], why: '400 oder 409' }],
   ['routes/budget/loans.js: derived.reason', { sites: 1, at403: [], why: 'Vorschau: 200 mit ok: false' }],
-  ['routes/modules.js: err.reason', { sites: 1, at403: [],
+  ['routes/modules.js: err.reason', { sites: 2, at403: [],
     why: 'sendInstallError: InstallError traegt nur 400-429 und 502/503 (REASON_STATUS in services/module-install.js); '
+      + 'PATCH /:id: setModuleEnabled setzt nur busy (409) und not_writable (503); '
       + 'die beiden 403 der Modul-Installation (module_web_install_disabled, module_session_required) schickt die Route als Literal, vor dem Body' }],
   ['services/document-deletion-lock.js: err.reason', { sites: 1, at403: [], why: 'feste 409' }],
   ['middleware/error-handler.js: err.reason', { sites: 1, at403: [], why: 'feste 503' }],

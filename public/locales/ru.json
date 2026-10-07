@@ -2619,6 +2619,7 @@
         "installModuleErrorBusy": "Уже идёт другая установка. Дождитесь её окончания.",
         "installModuleErrorNotWritable": "Папка модулей на сервере доступна только для чтения.",
         "installModuleErrorNotAModule": "На сервере ID этого модуля занят файлом или ссылкой, а не папкой модуля. Сначала удалите его на сервере.",
+        "installModuleErrorNotWebInstalled": "Этот модуль был скопирован на сервер вручную и отсюда не заменяется. Сначала удалите его папку на сервере, затем установите заново.",
         "installModuleErrorSessionRequired": "Это возможно только при входе через браузер, а не с API-токеном.",
         "installModuleErrorWebInstallDisabled": "Установка и удаление модулей из настроек на этом сервере отключены (MODULES_ALLOW_WEB_INSTALL).",
         "installModuleErrorTooManyAttempts": "Слишком много установок за короткое время. Подождите несколько минут.",

@@ -2441,6 +2441,7 @@
         "installModuleErrorBusy": "Ya hay otra instalación en curso. Espera a que termine.",
         "installModuleErrorNotWritable": "La carpeta de módulos del servidor es de solo lectura.",
         "installModuleErrorNotAModule": "En el servidor, el ID de este módulo lo ocupa un archivo o un enlace en lugar de una carpeta de módulo. Elimínalo allí primero.",
+        "installModuleErrorNotWebInstalled": "Este módulo se copió a mano en el servidor y no se reemplaza desde aquí. Elimina primero su carpeta en el servidor y luego instálalo de nuevo.",
         "installModuleErrorSessionRequired": "Esto solo es posible con la sesión iniciada en el navegador, no con un token de API.",
         "installModuleErrorWebInstallDisabled": "Instalar y eliminar módulos desde Ajustes está desactivado en este servidor (MODULES_ALLOW_WEB_INSTALL).",
         "installModuleErrorTooManyAttempts": "Demasiadas instalaciones en poco tiempo. Espera unos minutos.",

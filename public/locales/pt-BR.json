@@ -2440,6 +2440,7 @@
         "installModuleErrorBusy": "Outra instalação já está em andamento. Aguarde até terminar.",
         "installModuleErrorNotWritable": "A pasta de módulos no servidor é somente leitura.",
         "installModuleErrorNotAModule": "No servidor, o ID deste módulo está ocupado por um arquivo ou link em vez de uma pasta de módulo. Remova-o lá primeiro.",
+        "installModuleErrorNotWebInstalled": "Este módulo foi copiado manualmente para o servidor e não é substituído por aqui. Remova primeiro a pasta dele no servidor e depois instale de novo.",
         "installModuleErrorSessionRequired": "Isso só é possível com login no navegador, não com um token de API.",
         "installModuleErrorWebInstallDisabled": "Instalar e excluir módulos pelas Configurações está desativado neste servidor (MODULES_ALLOW_WEB_INSTALL).",
         "installModuleErrorTooManyAttempts": "Instalações demais em pouco tempo. Aguarde alguns minutos.",

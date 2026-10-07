@@ -2441,6 +2441,7 @@
         "installModuleErrorBusy": "Başka bir yükleme sürüyor. Bitmesini bekleyin.",
         "installModuleErrorNotWritable": "Sunucudaki modül klasörü salt okunur.",
         "installModuleErrorNotAModule": "Sunucuda bu modülün kimliğini bir modül klasörü yerine bir dosya veya bağlantı kullanıyor. Önce orada kaldırın.",
+        "installModuleErrorNotWebInstalled": "Bu modül sunucuya elle kopyalanmış ve buradan değiştirilmez. Önce klasörünü sunucuda kaldırın, sonra yeniden kurun.",
         "installModuleErrorSessionRequired": "Bu yalnızca tarayıcıda oturum açıkken yapılabilir, API belirteciyle yapılamaz.",
         "installModuleErrorWebInstallDisabled": "Bu sunucuda Ayarlardan modül yükleme ve silme kapalı (MODULES_ALLOW_WEB_INSTALL).",
         "installModuleErrorTooManyAttempts": "Kısa sürede çok fazla yükleme yapıldı. Birkaç dakika bekleyin.",

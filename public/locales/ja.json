@@ -2441,6 +2441,7 @@
         "installModuleErrorBusy": "別のインストールが実行中です。終わるまでお待ちください。",
         "installModuleErrorNotWritable": "サーバーのモジュールフォルダーは読み取り専用です。",
         "installModuleErrorNotAModule": "サーバー上で、このモジュールの ID はモジュールフォルダーではなくファイルまたはリンクに使われています。先にサーバー上で削除してください。",
+        "installModuleErrorNotWebInstalled": "このモジュールは手動でサーバーにコピーされたもので、ここからは置き換えられません。先にサーバー上でフォルダーを削除してから、もう一度インストールしてください。",
         "installModuleErrorSessionRequired": "この操作はブラウザーでサインインしている場合のみ可能で、API トークンではできません。",
         "installModuleErrorWebInstallDisabled": "このサーバーでは設定からのモジュールのインストールと削除がオフになっています（MODULES_ALLOW_WEB_INSTALL）。",
         "installModuleErrorTooManyAttempts": "短時間にインストールが多すぎます。数分お待ちください。",

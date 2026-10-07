@@ -268,8 +268,9 @@ async function pathExists(filePath) {
 // Wer ein Modul ueber die Einstellungen installiert hat, legt diese Datei in den
 // Modulordner (server/services/module-install.js). Sie nennt Quelle und
 // Zeitpunkt - und sie traegt den PRUEFSTAND des Moduls (DECISIONS.md, 12):
-// `approved: false` schreibt jede Installation und jedes Ersetzen, `true` setzt
-// erst ein Admin aus einer Browser-Sitzung (setModuleEnabled). Der Stand wohnt
+// `approved: false` schreibt jede Installation, jedes Ersetzen und das
+// Ausschalten, `true` setzt erst ein Admin aus einer Browser-Sitzung
+// (setModuleEnabled) - "ein Admin hat diese Fassung eingeschaltet". Der Stand wohnt
 // in der Datei und nicht in der Datenbank, weil kein Backup `modules/` enthaelt:
 // eine zurueckgespielte Datenbank oder eine frische ueber einem behaltenen
 // Modulordner darf kein Modul einschalten, das nie jemand angesehen hat.
@@ -281,6 +282,50 @@ async function pathExists(filePath) {
 export const INSTALL_META_FILE = '.yuvomi-install.json';
 const INSTALL_META_MAX_BYTES = 4096;
 const INSTALL_SOURCES = new Set(['zip', 'github']);
+
+// Was das Dateisystem sagt, wenn der Server in den Ordner nicht schreiben darf.
+// EINE Liste fuer die Installation (module-install.js assertWritable) und die
+// Freigabe hier: beide antworten damit 503 `not_writable`, nie eine rohe
+// Meldung mit dem absoluten Pfad der Temp-Datei.
+export const NOT_WRITABLE_CODES = new Set(['EACCES', 'EPERM', 'EROFS']);
+
+// Test-Haken wie in module-install.js: ein schreibgeschuetzter Modulordner
+// laesst sich nicht auf jedem System herstellen (chmod auf Ordnern ist unter
+// Windows wirkungslos). Tests tauschen die Primitive statt des Dateisystems.
+const fsOps = {
+  writeFile: (p, data, opts) => fs.writeFile(p, data, opts),
+};
+
+export function __setModulesFsOpsForTests(overrides = {}) {
+  const previous = { ...fsOps };
+  Object.assign(fsOps, overrides);
+  return () => Object.assign(fsOps, previous);
+}
+
+// ── Installationssperre ──────────────────────────────────────────────────────
+// Eine Installation, ein Loeschen ODER eine Freigabe zu einer Zeit; eine
+// zweite wird abgewiesen statt eingereiht. Zwei Admins, die dasselbe Modul
+// zugleich ersetzen, liefen sonst auf den Sicherungsordner auf, und der
+// zweite ueberschriebe den ersten stillschweigend. Die Sperre wohnt HIER und
+// nicht in module-install.js, weil auch die Freigabe (setModuleEnabled) sie
+// nehmen muss: sie liest die Liste und schreibt dann `approved: true` in die
+// Datei, die in dem Moment im Ordner liegt - landete ein Ersetzen dazwischen,
+// bekaeme die neue Fassung die Freigabe, die der alten galt, und niemand
+// haette sie angesehen. module-install.js importiert von hier; umgekehrt
+// waere es ein Kreis.
+let installBusy = false;
+
+/** Nimmt die Sperre. Gibt die Freigabe-Funktion zurueck, oder null, wenn sie vergeben ist. */
+export function acquireInstallLock() {
+  if (installBusy) return null;
+  installBusy = true;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    installBusy = false;
+  };
+}
 
 /**
  * Die geprueften Felder der Datei, samt `installedBy` (Nutzer-Id). Fuer den
@@ -338,7 +383,7 @@ export async function writeInstallApproval(basePath, approved) {
   if (!raw || typeof raw !== 'object') throw new Error('install record is not an object.');
   raw.approved = approved === true;
   const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
-  await fs.writeFile(tmp, JSON.stringify(raw, null, 2), { flag: 'wx', mode: 0o644 });
+  await fsOps.writeFile(tmp, JSON.stringify(raw, null, 2), { flag: 'wx', mode: 0o644 });
   try {
     await fs.rename(tmp, file);
   } catch (err) {
@@ -501,7 +546,25 @@ async function setModuleEnabled(id, enabled) {
     err.status = 400;
     throw err;
   }
+  // Nur das Einschalten nimmt die Sperre: es liest die Liste und schreibt dann
+  // in die Datei im Ordner, und dazwischen darf kein Ersetzen landen (siehe
+  // acquireInstallLock). Ausschalten nimmt Code weg und wartet auf nichts -
+  // auch nicht auf einen GitHub-Download, der bis zu 30 s dauern kann.
+  const release = enabled ? acquireInstallLock() : null;
+  if (enabled && !release) {
+    const err = new Error('Another module install or delete is in progress. Try again in a moment.');
+    err.status = 409;
+    err.reason = 'busy';
+    throw err;
+  }
+  try {
+    return await applyModuleEnabled(id, enabled);
+  } finally {
+    release?.();
+  }
+}
 
+async function applyModuleEnabled(id, enabled) {
   const modules = await listModules({ admin: true });
   const target = modules.find((module) => module.id === id);
   if (!target) {
@@ -515,19 +578,45 @@ async function setModuleEnabled(id, enabled) {
     throw err;
   }
 
-  // Einschalten ist die Freigabe: ein installiertes Modul bekommt sie in seine
-  // Datei geschrieben, BEVOR die Sperrliste faellt - scheitert das Schreiben,
-  // bleibt es aus. Ausschalten laesst die Freigabe stehen und nimmt nur die
-  // Sperrliste: wer ein geprueftes Modul spaeter wieder einschaltet, prueft
-  // nicht neu. Erst eine Installation oder ein Ersetzen setzt die Freigabe
-  // zurueck (module-install.js).
+  // `approved` heisst: ein Admin hat DIESE Fassung eingeschaltet. Einschalten
+  // schreibt es in die Datei, BEVOR die Sperrliste faellt - scheitert das
+  // Schreiben, bleibt das Modul aus. Ausschalten geht den umgekehrten Weg:
+  // erst die Sperrliste (sie allein entscheidet schon), dann `approved: false`
+  // in die Datei, damit auch "aus" mit dem Ordner reist - eine zurueckgespielte
+  // Datenbank schaltete sonst wieder ein, was der Admin abgeschaltet hatte.
+  // Dieses zweite Schreiben ist Zugabe: Ausschalten nimmt Code weg und darf
+  // nie daran scheitern, dass der Ordner schreibgeschuetzt ist (log.warn).
+  // Eine Installation oder ein Ersetzen setzt die Freigabe ebenfalls zurueck
+  // (module-install.js).
   if (enabled && target.install && !target.install.approved) {
-    await writeInstallApproval(path.join(MODULES_DIR, id), true);
+    try {
+      await writeInstallApproval(path.join(MODULES_DIR, id), true);
+    } catch (err) {
+      // Ein schreibgeschuetzter Modulordner ist der eine Fall, den der Admin
+      // selbst einordnen kann: 503 wie bei der Installation, mit Grund. Alles
+      // andere (die Datei ist zwischen Lesen und Schreiben verschwunden) bleibt
+      // ein 500 - die Route schickt dann einen festen Satz, nie err.message,
+      // denn die nennt den absoluten Pfad der Temp-Datei.
+      if (NOT_WRITABLE_CODES.has(err?.code)) {
+        const refused = new Error(`The folder modules/${id} on the server is not writable, so the approval cannot be recorded. Make it writable for the server, then try again.`);
+        refused.status = 503;
+        refused.reason = 'not_writable';
+        throw refused;
+      }
+      throw err;
+    }
   }
   const disabled = new Set(parseDisabledModules());
   if (enabled) disabled.delete(id);
   else disabled.add(id);
   setDisabledModules([...disabled]);
+  if (!enabled && target.install?.approved) {
+    try {
+      await writeInstallApproval(path.join(MODULES_DIR, id), false);
+    } catch (err) {
+      log.warn(`Module ${id} is off, but its install record still says approved (could not write it):`, err?.message);
+    }
+  }
   return (await listModules({ admin: true })).find((module) => module.id === id);
 }
 

@@ -2441,6 +2441,7 @@
         "installModuleErrorBusy": "En annan installation pågår redan. Vänta tills den är klar.",
         "installModuleErrorNotWritable": "Modulmappen på servern är skrivskyddad.",
         "installModuleErrorNotAModule": "På servern upptas modulens ID av en fil eller länk i stället för en modulmapp. Ta bort den där först.",
+        "installModuleErrorNotWebInstalled": "Den här modulen kopierades till servern för hand och ersätts inte härifrån. Ta bort mappen på servern först och installera sedan på nytt.",
         "installModuleErrorSessionRequired": "Det går bara när du är inloggad i webbläsaren, inte med en API-token.",
         "installModuleErrorWebInstallDisabled": "Installation och borttagning av moduler från inställningarna är avstängd på den här servern (MODULES_ALLOW_WEB_INSTALL).",
         "installModuleErrorTooManyAttempts": "För många installationer på kort tid. Vänta några minuter.",

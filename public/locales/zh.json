@@ -2441,6 +2441,7 @@
         "installModuleErrorBusy": "另一个安装正在进行中。请等待其完成。",
         "installModuleErrorNotWritable": "服务器上的模块文件夹是只读的。",
         "installModuleErrorNotAModule": "服务器上此模块的 ID 被一个文件或链接占用，而不是模块文件夹。请先在服务器上将其删除。",
+        "installModuleErrorNotWebInstalled": "此模块是手动复制到服务器上的，不能从这里替换。请先在服务器上删除其文件夹，然后重新安装。",
         "installModuleErrorSessionRequired": "只有在浏览器中登录时才能执行此操作，API 令牌不行。",
         "installModuleErrorWebInstallDisabled": "此服务器已关闭从设置安装和删除模块（MODULES_ALLOW_WEB_INSTALL）。",
         "installModuleErrorTooManyAttempts": "短时间内安装次数过多。请等待几分钟。",

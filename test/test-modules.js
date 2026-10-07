@@ -575,14 +575,33 @@ test('Einschalten schreibt die Freigabe in die Datei; eine leere Datenbank danac
   // Datenbank "zurueckgespielt": die Sperrliste ist weg - das Modul bleibt an.
   clearDisabledConfig();
   assert.equal((await find('record-mod')).enabled, true, 'die Freigabe ueberlebt die Datenbank');
-  // Ausschalten nimmt nur die Sperrliste, die Freigabe bleibt; wieder
-  // einschalten prueft nicht neu.
+  // Runde 4: Ausschalten setzt die Sperrliste UND schreibt `approved: false`
+  // zurueck - `approved` heisst "ein Admin hat diese Fassung eingeschaltet",
+  // und "aus" soll den Ordner ebenso begleiten wie "an": eine zurueckgespielte
+  // Datenbank schaltete sonst wieder ein, was der Admin abgeschaltet hatte.
   const off = await call('PATCH', '/record-mod', { actor: ADM, body: { enabled: false } });
   assert.equal(off.body.data.enabled, false);
-  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).approved, true, 'ausschalten ist keine Rueckgabe der Freigabe');
+  assert.equal(off.body.data.install.approved, false);
+  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).approved, false, 'ausschalten nimmt die Freigabe zurueck');
   assert.deepEqual(disabledConfig(), ['record-mod']);
+  clearDisabledConfig();
+  assert.equal((await find('record-mod')).enabled, false, 'leere Datenbank: das Aus ueberlebt in der Datei');
   assert.equal((await call('PATCH', '/record-mod', { actor: ADM, body: { enabled: true } })).body.data.enabled, true);
+  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).approved, true, 'wieder einschalten ist eine neue Freigabe');
   assert.deepEqual(disabledConfig(), []);
+  // Ein Ordner, den der Server nicht schreiben kann: aus geht trotzdem - die
+  // Sperrliste reicht, und Code wegnehmen darf nie an der Datei scheitern.
+  const restore = svc.__setModulesFsOpsForTests({
+    writeFile: async () => { throw Object.assign(new Error('read-only'), { code: 'EROFS' }); },
+  });
+  try {
+    const ro = await call('PATCH', '/record-mod', { actor: ADM, body: { enabled: false } });
+    assert.equal(ro.status, 200, JSON.stringify(ro.body));
+    assert.equal(ro.body.data.enabled, false, 'aus ueber die Sperrliste');
+    assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).approved, true, 'die Datei blieb, wie sie war (nur gewarnt)');
+  } finally {
+    restore();
+  }
   fs.rmSync(path.join(MODULES_DIR, 'record-mod'), { recursive: true, force: true });
 });
 
@@ -608,6 +627,54 @@ test('readInstallRecord/readInstallMeta/writeInstallApproval: Felder, Grenzen, A
   assert.equal(after.installedBy, '42', 'die Datei wird umgeschrieben, nicht neu erfunden');
   assert.deepEqual(fs.readdirSync(dir), ['.yuvomi-install.json'], 'die Temp-Datei ist nach dem rename weg');
   await assert.rejects(svc.writeInstallApproval(path.join(MODULES_DIR, 'nope-mod'), true), 'ohne Datei kein Umschreiben');
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+// Runde 4 der Review (#1671): kann die Freigabe nicht geschrieben werden, weil
+// der Modulordner schreibgeschuetzt ist, antwortet die Route 503 not_writable -
+// nicht 500 mit der rohen Meldung, die den absoluten Serverpfad der Temp-Datei
+// nennt. Jeder andere Fehler bleibt 500, aber mit festem Satz. Simuliert ueber
+// den writeFile-Haken: chmod auf Ordnern ist unter Windows wirkungslos.
+test('Freigabe nicht schreibbar → 503 not_writable ohne Serverpfad; anderer Fehler → 500 mit festem Satz', async () => {
+  const dir = path.join(MODULES_DIR, 'ro-record-mod');
+  writeModule('ro-record-mod', { id: 'ro-record-mod', entry: 'index.js' }, { 'index.js': '', '.yuvomi-install.json': installRecord() });
+  const failWith = (code) => svc.__setModulesFsOpsForTests({
+    writeFile: async (p) => { throw Object.assign(new Error(`${code}: permission denied, open '${p}'`), { code }); },
+  });
+  for (const code of ['EACCES', 'EPERM', 'EROFS']) {
+    const restore = failWith(code);
+    try {
+      const r = await call('PATCH', '/ro-record-mod', { actor: ADM, body: { enabled: true } });
+      assert.equal(r.status, 503, `${code}: ${JSON.stringify(r.body)}`);
+      assert.equal(r.body.reason, 'not_writable', code);
+      assert.equal(r.body.code, 503);
+      assert.ok(!r.body.error.includes(MODULES_DIR), `${code}: der Serverpfad steht in der Antwort`);
+      assert.ok(!r.body.error.includes(code), `${code}: der rohe Fehlercode steht in der Antwort`);
+      assert.match(r.body.error, /modules\/ro-record-mod/, 'der relative Ordner darf genannt werden');
+      // Direkt am Service: status und reason am Fehler.
+      await assert.rejects(svc.setModuleEnabled('ro-record-mod', true), (e) => e.status === 503 && e.reason === 'not_writable');
+    } finally {
+      restore();
+    }
+  }
+  assert.equal(JSON.parse(fs.readFileSync(path.join(dir, '.yuvomi-install.json'), 'utf8')).approved, false, 'nichts freigegeben');
+  assert.equal((await find('ro-record-mod')).enabled, false, 'und das Modul bleibt aus');
+  assert.deepEqual(fs.readdirSync(dir).filter((n) => n.endsWith('.tmp')), [], 'keine Temp-Datei bleibt liegen');
+  // Ein anderer Fehler (die Datei ist zwischen Lesen und Schreiben weg): 500
+  // mit festem Satz, ohne reason, ohne Pfad.
+  const restore = failWith('ENOENT');
+  try {
+    const r = await call('PATCH', '/ro-record-mod', { actor: ADM, body: { enabled: true } });
+    assert.equal(r.status, 500, JSON.stringify(r.body));
+    assert.deepEqual(r.body, { error: 'Module update failed.', code: 500 });
+  } finally {
+    restore();
+  }
+  assert.equal((await find('ro-record-mod')).enabled, false);
+  // Ohne Haken geht es, und die Freigabe steht in der Datei.
+  const ok = await call('PATCH', '/ro-record-mod', { actor: ADM, body: { enabled: true } });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal(JSON.parse(fs.readFileSync(path.join(dir, '.yuvomi-install.json'), 'utf8')).approved, true);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 

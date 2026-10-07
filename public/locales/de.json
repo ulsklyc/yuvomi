@@ -1906,6 +1906,7 @@
         "installModuleErrorBusy": "Gerade läuft schon eine Installation. Warte, bis sie fertig ist.",
         "installModuleErrorNotWritable": "Der Modulordner auf dem Server ist schreibgeschützt.",
         "installModuleErrorNotAModule": "Auf dem Server belegt eine Datei oder ein Link die Kennung dieses Moduls, kein Modulordner. Entferne sie dort zuerst.",
+        "installModuleErrorNotWebInstalled": "Dieses Modul wurde von Hand auf den Server kopiert und wird von hier aus nicht ersetzt. Entferne den Ordner dort zuerst und installiere das Modul dann neu.",
         "installModuleErrorSessionRequired": "Das geht nur, wenn du im Browser angemeldet bist, nicht mit einem API-Token.",
         "installModuleErrorWebInstallDisabled": "Module aus den Einstellungen zu installieren oder zu löschen ist auf diesem Server ausgeschaltet (MODULES_ALLOW_WEB_INSTALL).",
         "installModuleErrorTooManyAttempts": "Zu viele Installationen in kurzer Zeit. Warte ein paar Minuten.",

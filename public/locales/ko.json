@@ -1906,6 +1906,7 @@
         "installModuleErrorBusy": "다른 설치가 진행 중입니다. 끝날 때까지 기다리세요.",
         "installModuleErrorNotWritable": "서버의 모듈 폴더가 읽기 전용입니다.",
         "installModuleErrorNotAModule": "서버에서 이 모듈의 ID를 모듈 폴더가 아닌 파일이나 링크가 차지하고 있습니다. 먼저 서버에서 제거하세요.",
+        "installModuleErrorNotWebInstalled": "이 모듈은 서버에 직접 복사된 것이라 여기서는 교체되지 않습니다. 먼저 서버에서 폴더를 삭제한 다음 다시 설치하세요.",
         "installModuleErrorSessionRequired": "이 작업은 브라우저에서 로그인한 경우에만 할 수 있으며 API 토큰으로는 할 수 없습니다.",
         "installModuleErrorWebInstallDisabled": "이 서버에서는 설정에서 모듈을 설치하거나 삭제하는 기능이 꺼져 있습니다(MODULES_ALLOW_WEB_INSTALL).",
         "installModuleErrorTooManyAttempts": "짧은 시간에 설치가 너무 많습니다. 몇 분 기다리세요.",

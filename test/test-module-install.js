@@ -38,6 +38,19 @@
  *            Loeschen nur mit Installationsdatei (409 not_web_installed),
  *            Archiv mit zu tiefen Pfaden → 400, Kandidaten-Manifest ueber 64 KiB,
  *            reservierte Windows-Namen als id, installedByName in der Admin-Liste
+ *          - Runde 4: auch das ERSETZEN eines Ordners ohne Installationsdatei ist
+ *            verweigert (409 not_web_installed, ZIP und GitHub, mit und ohne
+ *            overwrite, nie `exists`; nichts angefasst, nichts liegen geblieben).
+ *            Eine vorhandene, aber unlesbare Datei zaehlt wie keine - fuer Loeschen
+ *            UND Ersetzen; richten laesst sie sich nur auf dem Server, und so
+ *            meldet readModule sie auch. Der Rollback-Fall nimmt deshalb ein
+ *            installiertes Modul: sein alter Ordner kommt samt Freigabe zurueck.
+ *            Dazu: Einschalten unter der Installationssperre (waehrend einer
+ *            Installation 409 busy, Ausschalten per Token weiter 200; waehrend
+ *            der Freigabe ist eine Installation busy) und die VORGABE des
+ *            Schalters: ein frischer Import je Wert (ungesetzt, yes, "TRUE ",
+ *            leer, false, 0 → aus; true, 1, " 1 " → an) haelt fest, dass die
+ *            Umgebung gelesen wird und nicht eine Konstante.
  *
  *        Kein Netz: der GitHub-Transport ist ein Fake (__setGithubRequestForTests /
  *        createGithubInstaller({ request })). MODULES_DIR zeigt auf einen
@@ -228,7 +241,9 @@ test('ein frisch installiertes Modul liefert seinen Einstieg erst nach dem Einsc
 
   await call('PATCH', '/gate-mod', { json: { enabled: false } });
   assert.equal((await call('GET', '/assets/gate-mod/index.js', { actor: MEM })).status, 404, 'wieder aus: wieder 404');
-  assert.equal(recordOf('gate-mod').approved, true, 'ausschalten nimmt die Freigabe nicht zurueck');
+  // Runde 4: "aus" reist mit dem Ordner wie "an" - die Datei sagt es auch.
+  assert.equal(recordOf('gate-mod').approved, false, 'ausschalten nimmt die Freigabe zurueck');
+  assert.equal(modulesSvc.isModuleDisabled('gate-mod'), true, 'und die Sperrliste traegt es ebenfalls');
 });
 
 // Die Freigabe reist mit dem Ordner: ein Backup enthaelt modules/ nicht, und
@@ -561,14 +576,17 @@ test('DELETE /:id ohne Installationsdatei → 409 not_web_installed, der Ordner 
   // "nicht von hier".
   fs.writeFileSync(path.join(dir, '.yuvomi-install.json'), '{ kaputt');
   assert.equal((await call('DELETE', '/hand-copied-mod')).body.reason, 'not_web_installed');
-  // Ein Ersetzen aus den Einstellungen legt die Datei an - danach darf die
-  // Weboberflaeche den Ordner auch wieder entfernen.
+  // Runde 4: ein Ersetzen aus den Einstellungen legt die Datei NICHT an - es
+  // ist dieselbe Tuer wie das Loeschen (der alte Ordner wird beiseite benannt
+  // und dann entfernt) und wird ebenso verweigert; der Arbeitsstand bleibt.
   fs.rmSync(path.join(dir, '.yuvomi-install.json'));
   const replaced = await postZip(makeZip(moduleFiles('hand-copied-mod')), '?overwrite=1');
-  assert.equal(replaced.status, 201, JSON.stringify(replaced.body));
-  assert.ok(!fs.existsSync(path.join(dir, 'work')), 'der alte Inhalt ist durch das Ersetzen weg (der Admin hat es bestaetigt)');
-  assert.equal((await call('DELETE', '/hand-copied-mod')).status, 200);
-  assert.ok(!fs.existsSync(dir));
+  assert.equal(replaced.status, 409, JSON.stringify(replaced.body));
+  assert.equal(replaced.body.reason, 'not_web_installed');
+  assert.equal(fs.readFileSync(path.join(dir, 'work', 'uncommitted.js'), 'utf8'), 'precious', 'nichts angefasst');
+  assert.ok(!fs.existsSync(path.join(dir, '.yuvomi-install.json')), 'und keine Datei angelegt');
+  assert.deepEqual(stagingLeftovers(), []);
+  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 // ── Schreibbarkeit, Sperre, Gates, Grenzen ──────────────────────────────────
@@ -1006,7 +1024,7 @@ test('PATCH enabled:true nur per Sitzung (Token → 403 module_session_required)
   const off = await call('PATCH', '/switch-mod', { actor: token, json: { enabled: false } });
   assert.equal(off.status, 200, 'ausschalten per Token bleibt erlaubt');
   assert.equal(off.body.data.enabled, false);
-  assert.equal(recordOf('switch-mod').approved, true, 'und laesst die Freigabe stehen');
+  assert.equal(recordOf('switch-mod').approved, false, 'und schreibt das Aus auch in die Datei (Runde 4)');
   // Ein ungueltiger Body wird weiter vor der Sitzungsfrage abgewiesen.
   assert.equal((await call('PATCH', '/switch-mod', { actor: token, json: { enabled: 'yes' } })).status, 400);
 });
@@ -1099,22 +1117,63 @@ test('Ersetzen aus jeder Quelle setzt die Freigabe zurueck: ZIP→GitHub, gleich
   assert.equal(off.body.data.install.approved, false);
 
   // Von Hand kopiert (keine Datei, eingeschaltet ueber die leere Sperrliste):
-  // nach dem Ersetzen gibt es eine Datei, und sie sagt aus.
+  // Runde 4 - die Weboberflaeche ersetzt es NICHT. Die Tuer des Ersetzens ist
+  // die des Loeschens: beiseite benennen und die Sicherung entfernen ist
+  // `rm -r` mit einem Schritt dazwischen, und ein Arbeitsstand mit nicht
+  // eingecheckten Aenderungen waere weg. 409 not_web_installed mit und ohne
+  // overwrite (nie `exists` - die Seite stellte sonst die Ersetzen-Frage),
+  // ueber ZIP und GitHub; nichts angefasst, keine Datei angelegt, nichts
+  // liegen geblieben, und das Modul laeuft weiter wie zuvor.
   const dir = path.join(MODULES_DIR, 'hand-mod');
-  fs.mkdirSync(dir, { recursive: true });
+  fs.mkdirSync(path.join(dir, '.git'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'module.json'), JSON.stringify({ id: 'hand-mod', entry: 'index.js' }));
   fs.writeFileSync(path.join(dir, 'index.js'), '');
+  fs.writeFileSync(path.join(dir, '.git', 'HEAD'), 'ref: refs/heads/work');
+  fs.writeFileSync(path.join(dir, 'uncommitted.js'), 'precious');
   assert.equal((await adminListed('hand-mod')).enabled, true, 'von Hand kopiert: an wie bisher');
-  const hand = await postZip(makeZip(moduleFiles('hand-mod')), '?overwrite=1');
-  assert.equal(hand.status, 201, JSON.stringify(hand.body));
-  assert.equal(hand.body.data.enabled, false);
-  assert.equal(hand.body.data.install.approved, false);
+  const handZip = makeZip(moduleFiles('hand-mod', { version: '2.0.0' }));
+  for (const query of ['?overwrite=1', '']) {
+    const hand = await postZip(handZip, query);
+    assert.equal(hand.status, 409, `${query}: ${JSON.stringify(hand.body)}`);
+    assert.equal(hand.body.reason, 'not_web_installed', query);
+    assert.equal(hand.body.code, 409);
+    assert.equal(hand.body.existing, undefined, 'kein existing: die Seite stellt sonst die Ersetzen-Frage');
+    assert.match(hand.body.error, /on the server first/);
+    assert.ok(!hand.body.error.includes(MODULES_DIR), 'kein Serverpfad in der Antwort');
+  }
+  github.__setGithubRequestForTests(async (url) => (url.endsWith('/zipball/main')
+    ? fakeResponse(200, { body: makeZip(moduleFiles('hand-mod', { prefix: 'o-hand-1/', version: '2.0.0' })) })
+    : fakeResponse(404)));
+  try {
+    for (const overwrite of [true, false]) {
+      const gh = await call('POST', '/install/github', { json: { url: 'o/hand', ref: 'main', overwrite } });
+      assert.equal(gh.status, 409, JSON.stringify(gh.body));
+      assert.equal(gh.body.reason, 'not_web_installed', `GitHub, overwrite=${overwrite}`);
+      assert.equal(gh.body.existing, undefined);
+    }
+  } finally {
+    github.__setGithubRequestForTests(null);
+  }
+  assert.equal(fs.readFileSync(path.join(dir, 'uncommitted.js'), 'utf8'), 'precious', 'nichts angefasst');
+  assert.equal(fs.readFileSync(path.join(dir, '.git', 'HEAD'), 'utf8'), 'ref: refs/heads/work');
+  assert.ok(!fs.existsSync(path.join(dir, '.yuvomi-install.json')), 'keine Datei angelegt');
+  assert.deepEqual(stagingLeftovers(), [], 'weder Staging noch Sicherung bleiben liegen');
+  assert.equal((await adminListed('hand-mod')).enabled, true, 'und laeuft weiter wie zuvor');
+  assert.equal((await adminListed('hand-mod')).version, '', 'die alte Fassung, nicht 2.0.0');
+  // Eine vorhandene, aber unlesbare Datei zaehlt wie keine - fuer Loeschen
+  // und Ersetzen gleichermassen. Richten laesst sie sich nur auf dem Server,
+  // und so meldet readModule sie auch (als Fehler mit demselben Rat).
+  fs.writeFileSync(path.join(dir, '.yuvomi-install.json'), '{ kaputt');
+  assert.equal((await postZip(handZip, '?overwrite=1')).body.reason, 'not_web_installed');
+  assert.equal((await call('DELETE', '/hand-mod')).body.reason, 'not_web_installed');
+  assert.equal(fs.readFileSync(path.join(dir, 'uncommitted.js'), 'utf8'), 'precious');
+  fs.rmSync(dir, { recursive: true, force: true });
 
-  // Scheitert der Tausch, steht der alte Ordner samt seinem alten Stand wieder
-  // da: hier ohne Datei, also an - ohne dass jemand einen Schalter zurueckdrehen
-  // musste.
-  fs.rmSync(path.join(dir, '.yuvomi-install.json'));
-  assert.equal((await adminListed('hand-mod')).enabled, true);
+  // Scheitert der Tausch eines INSTALLIERTEN Moduls, steht der alte Ordner
+  // samt seiner eigenen Datei wieder da: freigegeben wie vorher, ohne dass
+  // jemand einen Schalter zurueckdrehen musste.
+  assert.equal((await postZip(makeZip(moduleFiles('roll-mod', { version: '1.0.0' })))).status, 201);
+  await modulesSvc.setModuleEnabled('roll-mod', true);
   const restore = install.__setInstallFsOpsForTests({
     rename: async (from, to) => {
       if (path.basename(path.dirname(from)).startsWith('.install-')) throw Object.assign(new Error('simulated EIO'), { code: 'EIO' });
@@ -1122,13 +1181,15 @@ test('Ersetzen aus jeder Quelle setzt die Freigabe zurueck: ZIP→GitHub, gleich
     },
   });
   try {
-    await assert.rejects(install.installFromZip(makeZip(moduleFiles('hand-mod')), { overwrite: true }), /EIO/);
+    await assert.rejects(install.installFromZip(makeZip(moduleFiles('roll-mod', { version: '2.0.0' })), { overwrite: true }), /EIO/);
   } finally {
     restore();
   }
-  assert.ok(!fs.existsSync(path.join(dir, '.yuvomi-install.json')), 'der alte Ordner ist zurueck, ohne Datei');
-  assert.equal((await adminListed('hand-mod')).enabled, true, 'und damit an wie vorher');
-  assert.equal(modulesSvc.isModuleDisabled('hand-mod'), false);
+  assert.equal(recordOf('roll-mod').approved, true, 'der alte Ordner ist zurueck, mit seiner Freigabe');
+  assert.equal((await adminListed('roll-mod')).enabled, true, 'und damit an wie vorher');
+  assert.equal((await adminListed('roll-mod')).version, '1.0.0');
+  assert.equal(modulesSvc.isModuleDisabled('roll-mod'), false);
+  assert.deepEqual(stagingLeftovers(), []);
 });
 
 test('path="" waehlt das Modul an der Wurzel, neben einem verschachtelten (ZIP und GitHub)', async () => {
@@ -1447,6 +1508,92 @@ test('reservierte Windows-Geraetenamen als id → 400 bad_manifest (N1)', async 
   for (const id of ['console', 'com10', 'con-mod']) {
     assert.equal((await postZip(makeZip(moduleFiles(id)))).status, 201, id);
   }
+});
+
+// ── Review Runde 4 ──────────────────────────────────────────────────────────
+
+// Die Freigabe liest die Liste und schreibt dann in die Datei, die in dem
+// Moment im Ordner liegt. Ein Ersetzen dazwischen (ein GitHub-Download haelt
+// die Sperre bis zu 30 s) bekaeme die Freigabe fuer eine Fassung, die niemand
+// angesehen hat - also nimmt das Einschalten dieselbe Sperre.
+test('Einschalten unter der Installationssperre: waehrend einer Installation 409 busy, Ausschalten per Token weiter 200', async () => {
+  assert.equal((await postZip(makeZip(moduleFiles('lock-mod')))).status, 201);
+  let release;
+  const held = install.withInstallLock(() => new Promise((r) => { release = r; }));
+  try {
+    const on = await call('PATCH', '/lock-mod', { json: { enabled: true } });
+    assert.equal(on.status, 409, JSON.stringify(on.body));
+    assert.equal(on.body.reason, 'busy');
+    assert.equal(on.body.code, 409);
+    assert.match(on.body.error, /in progress/);
+    assert.equal(recordOf('lock-mod').approved, false, 'nichts freigegeben');
+    assert.equal((await adminListed('lock-mod')).enabled, false);
+    // Direkt am Service: status und reason am Fehler, kein InstallError noetig.
+    await assert.rejects(modulesSvc.setModuleEnabled('lock-mod', true), (e) => e.status === 409 && e.reason === 'busy');
+    const token = { id: 7781, role: 'admin', method: 'api_token' };
+    const off = await call('PATCH', '/lock-mod', { actor: token, json: { enabled: false } });
+    assert.equal(off.status, 200, 'ausschalten wartet auf keine Sperre');
+  } finally {
+    release();
+    await held;
+  }
+  const on = await call('PATCH', '/lock-mod', { json: { enabled: true } });
+  assert.equal(on.status, 200, JSON.stringify(on.body));
+  assert.equal(recordOf('lock-mod').approved, true, 'nach der Freigabe der Sperre geht es');
+
+  // Umgekehrt haelt die Freigabe die Sperre: eine Installation, die waehrend
+  // des Schreibens kommt, bekommt busy - und die Freigabe landet danach.
+  assert.equal((await postZip(makeZip(moduleFiles('lock-two-mod')))).status, 201);
+  let entered;
+  let openGate;
+  const enteredP = new Promise((r) => { entered = r; });
+  const gate = new Promise((r) => { openGate = r; });
+  const restore = modulesSvc.__setModulesFsOpsForTests({
+    writeFile: async (p, data, opts) => { entered(); await gate; return fs.promises.writeFile(p, data, opts); },
+  });
+  try {
+    const approving = call('PATCH', '/lock-two-mod', { json: { enabled: true } });
+    await enteredP;
+    await assert.rejects(install.installFromZip(makeZip(moduleFiles('lock-three-mod'))), (e) => e.reason === 'busy');
+    openGate();
+    const done = await approving;
+    assert.equal(done.status, 200, JSON.stringify(done.body));
+  } finally {
+    restore();
+  }
+  assert.equal(recordOf('lock-two-mod').approved, true);
+  assert.ok(!fs.existsSync(path.join(MODULES_DIR, 'lock-three-mod')), 'die abgewiesene Installation hat nichts hinterlassen');
+  assert.equal((await postZip(makeZip(moduleFiles('lock-three-mod')))).status, 201, 'die Sperre ist wieder frei');
+});
+
+// Nichts hielt die Vorgabe fest: mit `let webInstallEnabled = true` statt des
+// Lesens der Umgebung blieben beide Suiten gruen, weil diese Suite die
+// Variable vor dem Import setzt und der Aus-Fall den Test-Haken nimmt. Ein
+// frischer Import je Wert (Query an der URL, wie test-backup-webdav.js) liest
+// die Umgebung wirklich neu - das ist die erste Zeile unter "What counts as
+// undoing it" in DECISIONS.md 12.
+test('die Vorgabe des Schalters ist AUS: ungesetzt, yes, "TRUE ", leer, false, 0 → aus; true, 1, " 1 " → an', async () => {
+  const saved = process.env.MODULES_ALLOW_WEB_INSTALL;
+  let n = 0;
+  const freshImport = async (value) => {
+    if (value === undefined) delete process.env.MODULES_ALLOW_WEB_INSTALL;
+    else process.env.MODULES_ALLOW_WEB_INSTALL = value;
+    n += 1;
+    const mod = await import(`../server/services/module-install.js?case=${n}`);
+    return mod.isWebInstallEnabled();
+  };
+  try {
+    for (const value of [undefined, 'yes', 'TRUE ', '', 'false', '0']) {
+      assert.equal(await freshImport(value), false, `${JSON.stringify(value)} oeffnet den Schalter nicht`);
+    }
+    for (const value of ['true', '1', ' 1 ']) {
+      assert.equal(await freshImport(value), true, `${JSON.stringify(value)} oeffnet ihn`);
+    }
+  } finally {
+    if (saved === undefined) delete process.env.MODULES_ALLOW_WEB_INSTALL;
+    else process.env.MODULES_ALLOW_WEB_INSTALL = saved;
+  }
+  assert.equal(install.isWebInstallEnabled(), true, 'die Instanz der Suite ist davon unberuehrt');
 });
 
 test('Admin-Liste nennt, wer installiert hat (installedByName); geloeschtes Konto → null (N3)', async () => {
