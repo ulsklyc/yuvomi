@@ -2340,7 +2340,7 @@ Kontakten und Vorrat (Port erst bei y179), und unter der Glas-Kapsel lief nie In
    Titelzeile, Zeile 2 entfaellt (`page-toolbar--title-tools`, layout.css; in
    `renderPageHeader` die Option `titleTools`). Traeger: Kontakte, Geburtstage, Entsorgung,
    Einstellungen-Wurzel, Notizen, Dokumente, Gesundheit (seit R16 Schritt 3: das Werkzeug
-   des Kopfs ist dort der CSV-Export, Kopf 65px; im Bereich weicht es Rueckweg und Person). Gemessen 390px: Kopf 114 -> 65px; erste Zeile Kontakte y 218 -> 169,
+   des Kopfs ist dort der CSV-Export, Kopf 65px; im Bereich weicht es Rueckweg und Person) und seit R17 das Inventar (Suche + Werkzeugmenue; Kopf 114 -> 65px, in einer Kategorie mit Rueckweg-Zeile 154 -> 113px, erste Zeile y 186 -> 137). Gemessen 390px: Kopf 114 -> 65px; erste Zeile Kontakte y 218 -> 169,
    Geburtstage 179 -> 77 (dazu entfiel der Dauerhinweis, der wortgleich im Dialog steht),
    Entsorgung 164 -> 115. Der Titel gibt nach (Basis 0, Ellipse - „Recogida de basura"
    kuerzt), die Knoepfe nie. Der Kopf ist damit EINZEILIG: keine Lead-Zone, nichts dockt an

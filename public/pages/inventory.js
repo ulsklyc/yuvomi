@@ -2375,7 +2375,11 @@ export async function render(container, { signal } = {}) {
   // headSealIcon), das jedes andere Modul schon automatisch zeigt - Icon +
   // Name, direkt vor dem Titel, aus derselben Quelle wie der Sidebar-Eintrag.
   const toolbar = document.createElement('div');
-  toolbar.className = 'page-toolbar page-toolbar--narrow page-toolbar--wrap inventory-toolbar';
+  // Werkzeuge in der Titelzeile (DESIGN.md, Kopfregel mobil 1a; Critique R17):
+  // Such-Icon und Werkzeugmenue sind zwei Icon-Knoepfe und keine eigene Zeile
+  // wert - mobil stand der Kopf dreizeilig (114px, in einer Kategorie 154px)
+  // neben Dokumente und Gesundheit mit 65px.
+  toolbar.className = 'page-toolbar page-toolbar--narrow page-toolbar--wrap page-toolbar--title-tools inventory-toolbar';
   // Kopfregel mobil (DESIGN.md, 2026-09-26): Lagerorte und Kategorien sind
   // Verwaltung, nicht Ansicht - sie stehen im EINEN Werkzeugmenue mit Icon UND
   // Text statt als zwei unbeschriftete Icons in einer eigenen Kopfzeile. Die

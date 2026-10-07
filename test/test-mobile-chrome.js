@@ -290,7 +290,7 @@ test('R17 Z1: die Variante steht nur im Markup der Module, die DESIGN.md nennt',
 // Messarbeit (Handoff/Messmatrix), nicht dieser Guard.
 const TITLE_TOOLS = 'page-toolbar--title-tools';
 const TITLE_TOOLS_MODULES = [
-  'pages/birthdays.js', 'pages/contacts.js', 'pages/documents.js', 'pages/health.js', 'pages/notes.js', 'pages/waste.js', 'settings/shell.js',
+  'pages/birthdays.js', 'pages/contacts.js', 'pages/documents.js', 'pages/health.js', 'pages/inventory.js', 'pages/notes.js', 'pages/waste.js', 'settings/shell.js',
 ];
 
 test('R16: Werkzeuge in der Titelzeile - nur markiert, nur mobil, nie neben einer Bar-Zeile', () => {

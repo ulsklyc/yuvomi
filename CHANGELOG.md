@@ -36,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Inventory on a phone: search and tools sit in the title row.** The head took three rows there
+  (114 px, 154 px inside a category) for a title and two icon buttons, while Documents and Health
+  next to it need one. It is one row now, and the first entry starts 49 px higher.
+
 - **Shared expenses: the figures at the top are those of the group you are looking at.** They
   used to add up all groups, so "You owe 196.14" stood right above the group's own "Linda owes
   Alex 24.14" - two numbers for what looked like one question. "You are owed" and "You owe" now
