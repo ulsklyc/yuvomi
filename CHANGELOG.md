@@ -41,6 +41,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in the same slot, and the board offered no way to scroll there. A row is now as tall as its
   tallest card, and the board scrolls vertically when the week does not fit.
 
+- **Housekeeping: the tab bar no longer jumps when you open "Reports".** On a phone the month
+  stepper pushed itself between the title and the tabs, so the bar moved 52 px down under your
+  finger on that one tab. The tabs now sit in the same place on all four, and the month stepper
+  stands below them, above the figures it selects - on every screen size.
+
 ## [2.74.0] - 2026-10-07
 
 ### Added

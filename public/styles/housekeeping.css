@@ -242,17 +242,36 @@
   margin: 0;
 }
 
-/* Monats-Stepper des Berichte-Tabs (#1137) im Center-Slot des Kopfs
- * (#housekeeping-period, Critique 2026-09-26): Pfeil, Monat, Pfeil, dahinter
+/* Monats-Stepper des Berichte-Tabs (#1137): Pfeil, Monat, Pfeil, dahinter
  * der Reset - dieselbe Reihenfolge und dieselben Masse wie Budget
- * (.budget-nav__label, .budget-nav__today). Umbruch, Zeile und Position kommen
- * aus der Shell (`.page-toolbar--wrap`, `.page-toolbar--period`).
+ * (.budget-nav__label, .budget-nav__today).
  *
- * `[hidden]` durchsetzen: `.page-toolbar__center` setzt `display: flex` mit
- * hoeherer Spezifitaet als das UA-`[hidden]` - der leere Slot stand sonst auf
- * den anderen Tabs als Luecke im Kopf. */
+ * EINE ZEILE UNTER DEN REITERN, NICHT IM KOPF (Critique R17). Im Center-Slot
+ * des Kopfs schob er sich mobil zwischen Titel und Reiter: die Leiste sprang
+ * auf "Berichte" von y=53 auf y=105. Die Zeile steht zwischen Kopf und Inhalt
+ * (#housekeeping-period, Begruendung in renderShell()) und traegt dasselbe
+ * Seitenpolster wie der Inhalt darunter; dessen `padding-top` ist der Abstand
+ * zu den Kennzahlen.
+ *
+ * `[hidden]` durchsetzen: `display: flex` schlaegt das UA-`[hidden]` - die
+ * leere Zeile stuende sonst auf den anderen Reitern als Luecke ueber dem
+ * Inhalt. */
+.housekeeping-period {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--page-inline-pad) 0;
+}
+
 .housekeeping-period[hidden] {
   display: none;
+}
+
+/* Die Pfeile bringen ihre Luft in der Trefferflaeche mit; mit dem vollen
+ * Inhaltspolster darunter stuende der Monat naeher an den Reitern als an den
+ * Kennzahlen, die er beschreibt. */
+.housekeeping-period:not([hidden]) + .housekeeping-content {
+  padding-top: var(--space-2);
 }
 
 .housekeeping-month-nav__label {
@@ -278,8 +297,8 @@
 }
 
 /* EINE TITELZEILE, EINE HOEHE. Am Desktop traegt die Titelzeile je Tab etwas
- * anderes: die angedockte Kopf-Pille (Aufgaben, Personal), den Stepper
- * (Berichte) oder nur den Titel (Uebersicht). Gemessen 116 / 129 / 133px Kopf
+ * anderes: die angedockte Kopf-Pille (Aufgaben, Personal) oder nur den Titel
+ * (Uebersicht, Berichte). Gemessen 116 / 129 / 133px Kopf
  * - der Inhalt ruckte bei jedem Tabwechsel. Der Aktions-Slot haelt die Zeile
  * deshalb auf der Hoehe eines Kopf-Bedienelements, auch wenn er leer ist.
  * Nur mit angedocktem Knopf (ab 1024px, dockFabIntoToolbar in router.js):
@@ -943,8 +962,8 @@
     flex-direction: column;
   }
 
-  /* Der Kopf-Stepper hat mobil seine eigene Zeile (.page-toolbar--wrap) und
-   * steht dort mittig wie im Budget, nicht an den Titel gedrueckt. */
+  /* Schmal fuellt der Stepper seine Zeile: die Pfeile stehen an den Kanten,
+   * der Monat mittig dazwischen. */
   .housekeeping-period {
     justify-content: center;
   }
