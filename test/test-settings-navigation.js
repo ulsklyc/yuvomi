@@ -3264,3 +3264,34 @@ test('settings sidebar: the active link is revealed below the sticky search, not
     globalThis.getComputedStyle = previous;
   }
 });
+
+test('R17: die gruppierte Zeile - Label links, Bedienelement rechts, der Hinweis ausserhalb des Labels', async () => {
+  const { settingRowHtml, settingSwitchRowHtml } = await import('../public/settings/components.js');
+  const row = settingRowHtml({
+    label: 'Zeit <zone>', labelFor: 'tz', description: 'Gilt & wirkt', descriptionId: 'tz-hint',
+    control: '<select id="tz"></select>', extra: '<div id="tz-error" hidden></div>',
+  });
+  assert.match(row, /^<div class="settings-setting-row"><div class="settings-setting-row__copy"><label class="settings-setting-row__label" for="tz">Zeit &lt;zone&gt;<\/label>/);
+  assert.match(row, /<p class="settings-setting-row__description" id="tz-hint">Gilt &amp; wirkt<\/p><div id="tz-error" hidden><\/div><\/div><div class="settings-setting-row__control"><select id="tz"><\/select><\/div><\/div>$/);
+  assert.match(settingRowHtml({ label: 'x', labelId: 'l', stacked: true }), /^<div class="settings-setting-row settings-setting-row--stacked"><div class="settings-setting-row__copy"><span class="settings-setting-row__label" id="l">x<\/span>/,
+    'ohne `labelFor` kein <label>: eine Gruppe (Segment, Chips) wird ueber aria-labelledby benannt');
+
+  const sw = settingSwitchRowHtml({ label: 'Push', checked: true, description: 'Nur hier', descriptionId: 'p-hint', attrs: { id: 'p' } });
+  assert.match(sw, /^<div class="settings-setting-row settings-setting-row--switch"><label class="toggle-row toggle-row--switch">/);
+  assert.match(sw, /<input type="checkbox" role="switch" id="p" aria-describedby="p-hint" checked>/, 'der Hinweis ist dem Schalter zugeordnet');
+  assert.match(sw, /<\/label><p class="settings-setting-row__description" id="p-hint">Nur hier<\/p><\/div>$/,
+    'der Hinweis steht NACH dem Label - im Label laese ein Screenreader ihn als Teil des Namens');
+
+  // Zweispaltig in jeder Breite, mindestens ein Fingerziel hoch.
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const base = rules.find((r) => r.selector.trim() === '.settings-group > .settings-setting-row' && !r.at.length);
+  assert.match(base?.body ?? '', /grid-template-columns:\s*minmax\(0, 1fr\) auto/);
+  assert.match(base?.body ?? '', /min-height:\s*var\(--target-lg\)/, 'die Zeile ist mobil ein Fingerziel hoch');
+  const narrowed = rules.filter((r) => r.at.length && /\.settings-group\b[^,{]*\.settings-setting-row\b/.test(r.selector)
+    && /grid-template-columns/.test(r.body));
+  assert.deepEqual(narrowed.map((r) => r.selector), [],
+    'keine Breitenabfrage stapelt die Zeile wieder: gestapelt war ein Auswahlfeld mit "5 Minuten" mobil vollbreit');
+  const control = rules.find((r) => r.selector.trim() === '.settings-group .settings-setting-row__control' && !r.at.length);
+  assert.match(control?.body ?? '', /max-inline-size:\s*50cqi/, 'das Bedienelement nimmt hoechstens die halbe Zeile, das Label bricht um');
+});

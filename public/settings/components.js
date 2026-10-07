@@ -176,6 +176,81 @@ export function createToggleRow(options) {
   return host.firstElementChild;
 }
 
+/**
+ * DIE GRUPPIERTE ZEILE ALS MARKUP (Critique 2026-10-07, R17 E9).
+ *
+ * Bis dahin trug in den Einstellungen jede Option ihre eigene Karte: das Blatt
+ * Darstellung zeigte zehn Einstellungen in acht Karten (1650px, drei davon im
+ * ersten Bild), waehrend "Aktive Module" daneben laengst die Form hatte, die
+ * Apples Einstellungen fuehren - EIN Traeger je Abschnitt, darin Zeilen mit
+ * dem Label links und dem Bedienelement rechts. Diese zwei Helfer sind die
+ * Zeile dazu; der Traeger ist `<div class="row-carrier settings-group">`, ein
+ * Hinweis fuer die ganze Gruppe steht als `.settings-group__footer` darunter
+ * auf dem Grund.
+ *
+ * `createSettingRow()` darunter baut dieselbe Zeile als Knoten; die Blaetter
+ * schreiben ihr Markup als Zeichenkette, also gibt es sie auch so. Texte
+ * (`label`, `description`) laufen durch `esc()`; `control` und `extra` sind
+ * Markup des Aufrufers.
+ *
+ * @param {object} options
+ * @param {string} options.label
+ * @param {string|null} [options.labelFor]  id des Bedienelements - dann ist das Label ein `<label for>`
+ * @param {string|null} [options.labelId]   id am Label, fuer `aria-labelledby` einer Gruppe
+ * @param {string} [options.description]    Sekundaerzeile: ein Hinweis, der nur DIESE Zeile betrifft
+ * @param {string|null} [options.descriptionId]
+ * @param {string} [options.control]        Markup des Bedienelements
+ * @param {string} [options.extra]          Markup unter dem Text (Fehlerzeile, verborgener Zusatzhinweis)
+ * @param {boolean} [options.stacked]       Bedienelement UNTER dem Text: Segmente und Chip-Gruppen, die neben einem Label nicht stehen koennen
+ */
+export function settingRowHtml({
+  label,
+  labelFor = null,
+  labelId = null,
+  description = '',
+  descriptionId = null,
+  control = '',
+  extra = '',
+  stacked = false,
+  className = '',
+  attrs = {},
+}) {
+  const rowClass = ['settings-setting-row', stacked ? 'settings-setting-row--stacked' : '', className]
+    .filter(Boolean).join(' ');
+  const labelHtml = labelFor
+    ? `<label class="settings-setting-row__label"${attrsHtml({ id: labelId, for: labelFor })}>${esc(String(label ?? ''))}</label>`
+    : `<span class="settings-setting-row__label"${attrsHtml({ id: labelId })}>${esc(String(label ?? ''))}</span>`;
+  const descriptionHtml = description
+    ? `<p class="settings-setting-row__description"${attrsHtml({ id: descriptionId })}>${esc(String(description))}</p>`
+    : '';
+  return `<div class="${rowClass}"${attrsHtml(attrs)}>`
+    + `<div class="settings-setting-row__copy">${labelHtml}${descriptionHtml}${extra}</div>`
+    + `<div class="settings-setting-row__control">${control}</div>`
+    + '</div>';
+}
+
+/**
+ * Die Schalterzeile einer Gruppe: `toggleRowHtml({ control: 'switch' })` bleibt
+ * das Label und damit die Trefferflaeche der ganzen Zeile; die Sekundaerzeile
+ * steht DARUNTER und ausserhalb des Labels, sonst laese ein Screenreader den
+ * Hinweis als Teil des Namens. Verknuepft wird sie ueber `aria-describedby`.
+ *
+ * Nimmt dieselben Optionen wie `toggleRowHtml()`, dazu `description`,
+ * `descriptionId` und `extra`.
+ */
+export function settingSwitchRowHtml({ description = '', descriptionId = null, extra = '', rowAttrs = {}, ...toggle }) {
+  const attrs = { ...(toggle.attrs ?? {}) };
+  if (description && descriptionId && !attrs['aria-describedby']) attrs['aria-describedby'] = descriptionId;
+  const descriptionHtml = description
+    ? `<p class="settings-setting-row__description"${attrsHtml({ id: descriptionId })}>${esc(String(description))}</p>`
+    : '';
+  return `<div class="settings-setting-row settings-setting-row--switch"${attrsHtml(rowAttrs)}>`
+    + toggleRowHtml({ ...toggle, control: 'switch', attrs })
+    + descriptionHtml
+    + extra
+    + '</div>';
+}
+
 export function createSettingRow({ label, description, control }) {
   const rowId = `settings-setting-row-${++settingRowIdCounter}`;
   const formControl = control?.matches?.('input, select, textarea, button')

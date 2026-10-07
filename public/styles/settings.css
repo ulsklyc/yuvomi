@@ -604,6 +604,12 @@
   text-decoration: none;
 }
 
+/* Bis die Abschnitte stehen, haelt die Zeile nur ihren Platz (shell.js,
+ * syncJumpLabels): die Marken heissen wie die Ueberschriften darunter. */
+.settings-sheet-jump--pending {
+  visibility: hidden;
+}
+
 /* MOBIL STEHEN DIE MARKEN FUER DIE BESCHREIBUNG (R16, Gesamtpruefung). Beides
  * zaehlt auf, was im Blatt steht; zusammen schoben sie den ersten Schalter des
  * Kalender-Blatts von y=517 auf 580 - der eine Messwert der Critique, der
@@ -757,6 +763,193 @@
 
 .settings-setting-row__control {
   min-width: 0;
+}
+
+/* --------------------------------------------------------
+   Gruppierte Zeilen (Critique 2026-10-07, R17 E9)
+
+   EIN Traeger je Abschnitt statt einer Karte je Option - die Form, die
+   "Aktive Module" schon hatte. Flaeche, Radius, Schatten und die Haarlinien
+   zwischen den Zeilen kommen aus `.row-carrier` (list-row.css); hier steht
+   nur die Zeile: Label links, Bedienelement rechts, ein Hinweis nur zu dieser
+   Zeile als Sekundaerzeile unter dem Label, ein Hinweis zur ganzen Gruppe als
+   Fusszeile darunter auf dem Grund (wie Apples Gruppenfuss).
+
+   Die Zeile bleibt in JEDER Breite zweispaltig: gestapelt war ein Auswahlfeld
+   mit dem Wert "5 Minuten" mobil 326px breit. Lange Labels brechen um, das
+   Bedienelement behaelt seine Breite und ist bei der halben Traegerbreite
+   gedeckelt (`cqi` - der Traeger ist ein Container, list-row.css).
+   -------------------------------------------------------- */
+.settings-group {
+  /* Das Blatt steht schon im Lesemass (.settings-shell__content). */
+  max-width: none;
+  margin-bottom: var(--space-3);
+}
+
+.settings-group > .settings-setting-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-1) var(--space-4);
+  min-height: var(--target-lg);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 0;
+}
+
+/* DIE SEKUNDAERZEILE LAEUFT UNTER BEIDEN SPALTEN. In der Label-Spalte allein
+ * stand ein Hinweis mobil auf 160px und machte die Zeile bis 304px hoch
+ * (gemessen am ersten Wurf); der Textblock gibt seine Kinder deshalb ans
+ * Raster der Zeile ab: Label und Bedienelement in Zeile 1, alles Weitere
+ * (Hinweis, Fehlerzeile) darunter ueber die volle Breite. */
+.settings-group > .settings-setting-row:not(.settings-setting-row--stacked) > .settings-setting-row__copy {
+  display: contents;
+}
+
+.settings-group > .settings-setting-row > .settings-setting-row__copy > * {
+  grid-column: 1 / -1;
+}
+
+.settings-group > .settings-setting-row:not(.settings-setting-row--stacked) > .settings-setting-row__copy > .settings-setting-row__label {
+  grid-area: 1 / 1;
+  align-self: center;
+}
+
+.settings-group > .settings-setting-row:not(.settings-setting-row--stacked) > .settings-setting-row__control {
+  grid-area: 1 / 2;
+}
+
+.settings-group .settings-setting-row__label {
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
+  /* Neben einem Bedienelement bleibt dem Label mobil die halbe Zeile: ein
+   * langes Wort trennt an der Silbe, statt das Bedienelement zu quetschen. */
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+}
+
+.settings-group .settings-setting-row__description {
+  max-width: 50ch;
+  padding-bottom: var(--space-1);
+}
+
+.settings-group .settings-setting-row__control {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  max-inline-size: 50cqi;
+}
+
+.settings-group .settings-setting-row__control > select.form-input {
+  inline-size: auto;
+  max-inline-size: 100%;
+  text-overflow: ellipsis;
+}
+
+/* Ein Kurzfeld (Zahl) traegt die Breite seines Werts, nicht die der Zeile. Es
+ * steht in seinem eigenen <form>, damit Enter es absendet. */
+.settings-row-form {
+  display: contents;
+}
+
+.settings-group .settings-setting-row__control input.form-input[type="number"] {
+  inline-size: 6rem;
+  max-inline-size: 100%;
+  text-align: end;
+}
+
+/* Fehlerzeile und verborgene Zusatzhinweise einer Zeile stehen im Textblock. */
+.settings-group .settings-setting-row__copy > .form-error,
+.settings-group .settings-setting-row__copy > .form-hint {
+  margin: 0;
+}
+
+/* Ein Wert ohne Bedienelement (Nur-lesen: "Automatisch (Europe/Berlin)"). */
+.settings-setting-row__value {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  text-align: end;
+}
+
+/* Was ein Blatt NACHTRAEGLICH an die Zeile haengt (der Zonen-Hinweis an der
+ * Zeitzone, #1607), nimmt die ganze Breite unter Text und Bedienelement. */
+.settings-group > .settings-setting-row > :not(.settings-setting-row__copy):not(.settings-setting-row__control):not(.toggle-row) {
+  grid-column: 1 / -1;
+}
+
+/* GESTAPELT: ein Segment oder eine Chip-Gruppe steht neben keinem Label - bei
+ * 390px braucht das Design-Segment allein 300px. Das Bedienelement nimmt die
+ * Zeile unter dem Text. */
+.settings-group > .settings-setting-row--stacked {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  padding-block: var(--space-3);
+}
+
+.settings-group > .settings-setting-row--stacked > .settings-setting-row__control {
+  display: block;
+  max-inline-size: none;
+}
+
+/* Eine Zeile, deren Bedienelement fuer sich spricht (das Design-Segment unter
+ * der Abschnittsueberschrift "Design"): der Textblock ist leer. */
+.settings-group .settings-setting-row__copy:empty {
+  display: none;
+}
+
+/* DIE SCHALTERZEILE: `label.toggle-row` IST die Zeile (Trefferflaeche ueber die
+ * ganze Breite), ihr Polster wird das der Gruppe. Die Sekundaerzeile steht
+ * darunter und haelt die Spalte des Schalters frei. */
+.settings-group > .settings-setting-row--switch {
+  display: block;
+  padding: 0;
+}
+
+.settings-group > .settings-setting-row--switch > .toggle-row {
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  border-radius: 0;
+}
+
+.settings-group .toggle-row--switch .toggle-row__label {
+  font-size: var(--text-base);
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+}
+
+.settings-group > .settings-setting-row--switch > .settings-setting-row__description,
+.settings-group > .settings-setting-row--switch > .form-hint,
+.settings-group > .settings-setting-row--switch > .form-error {
+  margin: calc(-1 * var(--space-1)) 0 0;
+  padding: 0 var(--space-4) var(--space-3);
+}
+
+/* Der Fokusring der Schalterzeile laege sonst unter dem Beschnitt des Traegers. */
+.settings-group > .settings-setting-row--switch > .toggle-row--switch:has(input:focus-visible) {
+  outline-offset: calc(-1 * var(--focus-ring-width));
+}
+
+/* Vorspann und Zwischentitel einer Gruppe stehen wie ihr Fuss auf dem Grund,
+ * in der Flucht des Zeilentexts. */
+.settings-page .settings-group__lead {
+  margin: 0 var(--space-4) var(--space-3);
+}
+
+.settings-group__title {
+  margin: var(--space-4) var(--space-4) var(--space-2);
+}
+
+/* DER GRUPPENFUSS: auf dem Grund, in der Flucht des Zeilentexts. */
+.settings-page .settings-group__footer {
+  margin: 0 var(--space-4) var(--space-5);
+}
+
+.settings-group + .settings-group__footer {
+  margin-top: calc(-1 * var(--space-1));
+}
+
+.settings-group__footer + .settings-group__footer {
+  margin-top: calc(-1 * var(--space-3));
 }
 
 .settings-disclosure {
@@ -1907,56 +2100,17 @@
    deren Regeln in einem Modul-Stylesheet wohnen, ist nur dort eine Form. */
 
 /* --------------------------------------------------------
-   Preset-Pillen (Multi-Select-Checkboxen, z. B. Standard-Erinnerungen)
-   Kompakter, wrap-fähiger Ersatz für gestapelte Checkbox-Zeilen.
+   Chip-Gruppe einer Zeile (Mehrfachauswahl, z. B. Standard-Erinnerungen)
+
+   Die Chips sind die geteilten `.filter-chip` mit `aria-pressed`
+   (filter-chip.css). Bis R17 stand hier eine eigene Pille mit einer
+   16px-Checkbox darin (`.reminder-preset`) - neben `role="switch"`-Schaltern
+   eine zweite Form fuer "an/aus" (Critique 2026-10-07, E9).
    -------------------------------------------------------- */
-.reminder-preset-group {
+.settings-chip-group {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
-  margin-top: var(--space-2);
-}
-
-.reminder-preset {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: var(--target-base);
-  padding: var(--space-2) var(--space-3);
-  border: var(--space-px) solid var(--color-border);
-  border-radius: var(--radius-full);
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  transition: border-color var(--transition-fast),
-              background-color var(--transition-fast),
-              color var(--transition-fast);
-}
-
-.reminder-preset:hover {
-  border-color: var(--color-border-strong);
-}
-
-.reminder-preset:focus-within {
-  outline: var(--focus-ring-width) solid var(--focus-ring-color);
-  outline-offset: var(--focus-ring-offset);
-}
-
-/* Aktiver Zustand über :has(); die native Checkbox (accent-color) bleibt als
-   Fallback sichtbar, falls :has() nicht unterstützt wird. */
-.reminder-preset:has(input:checked) {
-  border-color: var(--color-accent);
-  background-color: var(--color-accent-light);
-  color: var(--color-text-primary);
-}
-
-.reminder-preset input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--color-accent);
-  cursor: pointer;
-  flex-shrink: 0;
 }
 
 /* --------------------------------------------------------
@@ -3590,6 +3744,21 @@
   margin: var(--space-3) 0 0;
   padding: 0;
   list-style: none;
+}
+
+/* In der Gruppe (R17, E9) ist die Liste eine eigene Zeile: die Haarlinie des
+ * Traegers trennt sie vom Schalter, also kein eigener Abstand und keine Linie
+ * ueber dem ersten Mitglied; ohne Mitglieder gibt es die Zeile nicht. */
+.settings-2fa__row > .settings-2fa__members {
+  margin: 0;
+}
+
+.settings-2fa__row .settings-2fa__member:first-child {
+  border-top: 0;
+}
+
+.settings-group > .settings-2fa__row:has(> .settings-2fa__members:empty) {
+  display: none;
 }
 
 .settings-2fa__member {
