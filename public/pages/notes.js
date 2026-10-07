@@ -1014,7 +1014,13 @@ function openNoteModal({ mode, note = null }) {
         // Im Lese-Modus steht rechts "Bearbeiten" als Primaerknopf: sonst war
         // "Loeschen" die einzige und damit lauteste Fussaktion (Critique
         // 2026-09-26) - die zerstoerende Handlung als Hauptweg.
+        // Der Umschalter verschwindet in der Leseansicht (notes.css, EIN Weg
+        // zum Bearbeiten). Stand der Fokus auf seinem Reiter "Lesen", fiele
+        // er mit dem Reiter auf <body> - er geht auf den Knopf, der jetzt
+        // der Weg zurueck ist.
+        const focusWasOnSwitch = view === 'read' && modeSwitch?.contains(document.activeElement);
         syncFooter(view);
+        if (focusWasOnSwitch) (panel.querySelector('#note-modal-edit') ?? readPane).focus();
         modeTabs.forEach((b) => {
           const on = b.dataset.view === view;
           b.classList.toggle('sub-tab--active', on);

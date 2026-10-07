@@ -236,7 +236,10 @@ test('Essensplan bei `read`: die Karte oeffnet die Leseansicht und traegt keine 
   }
 
   const voll = await withAccess(SCHREIBEN, () => kachel());
-  for (const erwartet of ['edit-meal', 'delete-meal', 'transfer-meal', 'add-meal']) {
+  // `delete-meal` stand hier bis R18 (2026-10-07): die Karte traegt keinen
+  // Papierkorb mehr, Loeschen lebt im Dialog (deleteMeal, unten geprueft).
+  assert.doesNotMatch(voll, /delete-meal/, 'die Karte traegt auch mit Schreibrecht keinen Papierkorb');
+  for (const erwartet of ['edit-meal', 'transfer-meal', 'add-meal']) {
     assert.match(voll, new RegExp(`data-action="${erwartet}"`), `Gegenfall: ${erwartet} steht mit Schreibrecht da`);
   }
   assert.match(voll, /meal-card__drag/, 'Gegenfall: der Ziehgriff');
@@ -424,12 +427,16 @@ test('Essensplan bei `read`: Loeschen blendet nichts aus und oeffnet kein Rueckg
   }));
   const wege = {
     'deleteMeal direkt': () => meals.deleteMeal(11),
-    'stehen gebliebener Papierkorb': () => meals.onGridClick(klick('delete-meal', { mealId: '11' })),
   };
   for (const [name, weg] of Object.entries(wege)) {
     assert.deepEqual(await loeschen(LESEN, weg), { fenster: 0, ausgeblendet: false }, name);
     assert.deepEqual(await loeschen(SCHREIBEN, weg), { fenster: 1, ausgeblendet: true }, `Gegenfall ${name}`);
   }
+  // Ein stehen gebliebener Papierkorb der Karte loest seit R18 (2026-10-07)
+  // GAR NICHTS mehr aus - das Board kennt die Aktion nicht mehr, mit keinem Recht.
+  const stale = () => meals.onGridClick(klick('delete-meal', { mealId: '11' }));
+  assert.deepEqual(await loeschen(LESEN, stale), { fenster: 0, ausgeblendet: false });
+  assert.deepEqual(await loeschen(SCHREIBEN, stale), { fenster: 0, ausgeblendet: false }, 'delete-meal ist keine Board-Aktion mehr');
 });
 
 test('Essensplan: der offene Editor speichert nichts mehr, wenn das Recht inzwischen fehlt', async () => {

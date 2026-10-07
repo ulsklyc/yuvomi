@@ -1764,6 +1764,16 @@ function renderThumbSlot(doc, className) {
   return `<div class="${className} document-thumb"${local}>${renderDocIconSlot(doc)}</div>`;
 }
 
+/* IN DER LISTE STEHT DAS KATEGORIE-GLYPH, KEINE VORSCHAU (R18, 2026-10-07).
+ * Die Zeile zeigte dieselbe Vorschau wie die Karte, auf 42px: von einem Blatt
+ * blieb ein weisses Quadrat mit grauem Rauschen, neunmal untereinander. In
+ * der Liste liest man am Zeichen, WAS es ist (Medizin, Schule, Finanzen) -
+ * das Bild gehoert der Rasteransicht und dem Betrachter. Die Zeile laedt
+ * damit auch keine Vorschauen mehr. */
+function renderRowGlyph(doc) {
+  return `<div class="document-row__icon"><i data-lucide="${CATEGORY_ICONS[doc.category] || 'file'}" aria-hidden="true"></i></div>`;
+}
+
 /* HANDSCHRIFT DES MODULS (Critique 2026-09-25, Entscheidung 2): ein lokales
  * Bild zeigt sich selbst, ein lokales PDF seine erste Seite. Geladen wird erst,
  * wenn der Rahmen in die Naehe des Blicks kommt; was diese Seite schon einmal
@@ -2021,7 +2031,7 @@ function renderListItem(doc) {
   const selected = state.selectMode && state.selected.has(doc.id);
   return `
     <article class="list-row document-row${selected ? ' is-selected' : ''}" data-id="${doc.id}">
-      ${state.selectMode && mayManage(doc) ? renderSelectBox(doc) : renderThumbSlot(doc, 'document-row__icon')}
+      ${state.selectMode && mayManage(doc) ? renderSelectBox(doc) : renderRowGlyph(doc)}
       <div class="list-row__main document-row__body">
         <h2 class="list-row__name document-row__title">${esc(doc.name)}</h2>
         <div class="list-row__meta document-row__meta">${renderMeta(doc, { showSize: false })}</div>
@@ -3773,6 +3783,8 @@ function openDocumentViewer(doc) {
   }
 }
 
+const PDF_EMBED_FRAGMENT = '#toolbar=0&navpanes=0&view=FitH';
+
 function renderViewerContent(doc, previewUrl, downloadUrl) {
   const kind = previewKind(doc.mime_type);
   if (kind === 'pdf') {
@@ -3781,7 +3793,16 @@ function renderViewerContent(doc, previewUrl, downloadUrl) {
       // PDF-Viewers in sandboxed Frames und zeigt stattdessen "This page was blocked by Chrome".
       // Die Auslieferung erfolgt same-origin als application/pdf mit nosniff, daher keine
       // Skriptausführung im Frame.
-      return `<iframe class="document-viewer__pdf" src="${previewUrl}" title="${esc(doc.name)}"></iframe>`;
+      //
+      // OHNE DIE FREMDE WERKZEUGLEISTE (R18, 2026-10-07): der eingebaute
+      // Betrachter von Chromium und Firefox liest die PDF-Open-Parameter im
+      // Fragment. `toolbar=0` nimmt seine Leiste (zweite Kopfzeile mit Zoom,
+      // Druck, Download in fremder Optik unter der eigenen), `navpanes=0` die
+      // Seitenleiste, `view=FitH` passt die Seite in die Breite. Safari kennt
+      // sie nicht - der Rueckfall ist der Stand davor. Zoom und Druck bleiben
+      // ueber "In neuem Tab oeffnen" (dort MIT Leiste: die Adresse traegt das
+      // Fragment nicht) und den Download der eigenen Leiste.
+      return `<iframe class="document-viewer__pdf" src="${previewUrl}${PDF_EMBED_FRAGMENT}" title="${esc(doc.name)}"></iframe>`;
     }
     // Mobile Browser (iOS Safari, Android Chrome) rendern PDFs in <iframe>/<embed> nicht inline.
     // Platzhalter; das eigentliche Rendern via pdf.js läuft asynchron im onSave-Hook.

@@ -1270,11 +1270,12 @@ function renderSlot(date, type, mealsForDay, dayCol, typeRow) {
             data-meal-id="${meal.id}"
             aria-label="${esc(t('common.toShoppingListNamed', { title: meal.title }))}"
           ><i data-lucide="shopping-cart" class="icon-md" aria-hidden="true"></i></button>` : ''}
-          ${ro ? '' : `<button class="meal-card__action-btn meal-card__action-btn--delete"
-            data-action="delete-meal"
-            data-meal-id="${meal.id}"
-            aria-label="${esc(t('meals.deleteMealNamed', { title: meal.title }))}"
-          ><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i></button>`}
+${/* KEIN PAPIERKORB AUF DER KARTE (Entscheidung 2026-10-07, benannte
+               Ausnahme vom Mehr-Knopf): 27 Karten trugen als einziges
+               wiederkehrendes Zeichen einen Papierkorb. Loeschen lebt im
+               Dialog der Mahlzeit, links im Fuss - einen Tipp auf die Karte
+               entfernt und mobil seit R8 der einzige Weg. Ein Mehr-Knopf mit
+               einem Eintrag waere dieselbe Dichte fuer denselben Weg. */ ''}
         </div>
       </div>
     `;
@@ -1418,11 +1419,6 @@ async function onGridClick(e) {
     const mealId = parseInt(btn.dataset.mealId, 10);
     const meal   = state.meals.find((m) => m.id === mealId);
     if (meal) openMealModal({ mode: 'edit', meal, date: meal.date, mealType: meal.meal_type });
-    return;
-  }
-
-  if (action === 'delete-meal') {
-    await deleteMeal(parseInt(btn.dataset.mealId, 10));
     return;
   }
 

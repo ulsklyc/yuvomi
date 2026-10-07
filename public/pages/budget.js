@@ -31,7 +31,7 @@ import { formatMoney, formatSignedAmount, amountPlaceholder, amountStep, amountM
 import { budgetCategoryLabel } from '/utils/category-labels.js';
 import { trendMarkup, leadCardClass } from '/utils/metric-card.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
-import { rowActionHtml } from '/utils/row-action.js';
+import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
 import { metricGlanceHtml, wireMetricGlance, glanceLeadClass } from '/utils/metric-glance.js';
 import { intervalUnitLabel } from '/rrule-ui.js';
 import { appendCurrencyOptions } from '/settings/currency.js';
@@ -2652,13 +2652,19 @@ function renderLoanPaymentEntry(loan, payment) {
       </div>
       <div class="budget-entry__amount budget-entry__amount--${flow}">${amountText}</div>
       ${readOnly() ? '' : `<div class="list-row__actions">
-        ${entry ? `
-        <button type="button" class="row-action" data-action="loan-payment-edit" data-loan-id="${loan.id}" data-payment-id="${payment.id}" data-entry-id="${entry.id}" aria-label="${esc(editName)}">
-          <i data-lucide="pencil" class="icon-md" aria-hidden="true"></i>
-        </button>` : ''}
-        <button type="button" class="row-action row-action--danger" data-action="loan-payment-delete" data-loan-id="${loan.id}" data-payment-id="${payment.id}" data-entry-id="${entry?.id ?? ''}" aria-label="${esc(deleteName)}">
-          <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
-        </button>
+        ${/* EIN MEHR-KNOPF (Entscheidung 2026-10-07): je Tilgungszeile standen
+             Stift und Papierkorb. Die Eintraege tragen dieselben data-Attribute
+             wie die Knoepfe vorher - wireLoanPaymentActions bindet sie unveraendert. */ ''}
+        ${rowMenuHtml({
+          id: `loan-payment-menu-${payment.id}`,
+          label: t('common.moreActionsNamed', { name: `${rowTitle} · ${installment}` }),
+          items: [
+            entry ? { action: 'loan-payment-edit', icon: 'pencil', label: t('common.edit'),
+              attrs: { 'data-loan-id': loan.id, 'data-payment-id': payment.id, 'data-entry-id': entry.id } } : null,
+            { action: 'loan-payment-delete', icon: 'trash-2', label: t('common.delete'), danger: true,
+              attrs: { 'data-loan-id': loan.id, 'data-payment-id': payment.id, 'data-entry-id': entry?.id ?? '' } },
+          ],
+        })}
       </div>`}
     </div>
   `;

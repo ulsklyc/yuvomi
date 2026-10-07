@@ -469,20 +469,10 @@
 
 .schedule-warnings p { margin: 0; }
 
-.schedule-override-actions {
-  display: flex;
-  gap: var(--space-2);
-  flex: 0 0 auto;
-}
-
-@media (max-width: 639px) {
-  .schedule-override-actions {
-    flex: 1 0 100%;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin-top: var(--space-2);
-  }
-}
+/* Hier stand `.schedule-override-actions`: zwei Textkapseln je Zeile, unter
+ * 640px als eigene zweite Zeile. Seit R18 (2026-10-07) traegt jede Listenzeile
+ * EINEN Mehr-Knopf (utils/row-action.js, `rowMenuHtml`), der in der Zeile
+ * bleibt - die Geometrie kommt aus `.row-actions` (layout.css). */
 
 .schedule-statistics,
 .schedule-stat-sections,

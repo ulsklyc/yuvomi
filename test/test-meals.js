@@ -1615,9 +1615,12 @@ test('Critique 2026-09-26: die Anlege-Knoepfe nennen ihren Tag, sieben Tage sind
 
 test('Critique 2026-09-26: die Kartenaktionen tragen mobil die Stufe der Zeilenaktionen, nicht 12px', () => {
   const html = mealsUi.renderSlot('2026-09-21', { key: 'dinner', label: 'Abendessen' },
-    [{ id: 9, date: '2026-09-21', meal_type: 'dinner', title: 'Suppe', ingredients: [] }], 2, 2);
+    [{ id: 9, date: '2026-09-21', meal_type: 'dinner', title: 'Suppe', ingredients: [{ id: 1, name: 'Lauch', on_shopping_list: 0 }] }], 2, 2);
   const actions = html.slice(html.indexOf('class="meal-card__actions"'), html.indexOf('meal-slot__add-more-btn'));
-  assert(/data-lucide="trash-2"/.test(actions), 'kein Loeschen-Zeichen in der Aktionsleiste gefunden - der Test liest die Karte nicht mehr');
+  // Probe, dass der Test die Karte liest: seit R18 (2026-10-07) traegt sie
+  // keinen Papierkorb mehr - das wiederkehrende Zeichen der Leiste ist der
+  // Einkaufswagen (die Mahlzeit hier hat Zutaten).
+  assert(/data-lucide="shopping-cart"/.test(actions), 'kein Kartenaktions-Zeichen in der Aktionsleiste gefunden - der Test liest die Karte nicht mehr');
   assert(!/class="icon-sm"/.test(actions), 'ein Kartenaktions-Zeichen steht noch auf --icon-sm (12px)');
   const css = readFileSync(new URL('../public/styles/meals.css', import.meta.url), 'utf8');
   const touch = [...eachRule(css)].find((r) => r.selector.trim() === '.meal-card__action-btn svg'
@@ -1682,8 +1685,11 @@ test('R9 M6: die Mahlzeit-Zeile traegt den Typ als Vorsatz, der Papierkorb ist m
   const title = html.match(/<span class="meal-card__title">([\s\S]*?)<\/span>\s*(?:<span class="meal-card__meta"|<\/button>)/)?.[1] ?? '';
   assert(/^<span class="meal-card__type">Abendessen<\/span><span class="meal-card__title-text">Spaghetti &lt;Bolognese&gt;<\/span>/.test(title),
     `der Typ muss als Vorsatz VOR dem Namen im Titel stehen (ein Textfluss, eine Klammer), gefunden: ${title}`);
-  assert(/class="meal-card__action-btn meal-card__action-btn--delete"\s+data-action="delete-meal"/.test(html),
-    'der Papierkorb braucht seine Kennklasse - mobil verlaesst er die Zeile');
+  // R18 (2026-10-07, benannte Ausnahme vom Mehr-Knopf): die Karte traegt auf
+  // KEINER Breite mehr einen Papierkorb. Bis dahin verliess er nur mobil die
+  // Zeile; jetzt ist der Dialogfuss ueberall der Weg (unten geprueft).
+  assert(!/delete-meal|data-lucide="trash-2"/.test(html),
+    'die Mahlzeit-Karte traegt keinen Papierkorb - Loeschen lebt im Dialog der Mahlzeit');
   const grid = mealsSource.slice(mealsSource.indexOf('function renderWeekGrid('), mealsSource.indexOf('function renderSlot('));
   const header = grid.match(/<div class="day-header[\s\S]*?<\/div>/)?.[0] ?? '';
   assert(/<button class="day-add"/.test(header), 'der Tagesknopf steht im Tageskopf, nicht als 48px-Kachel unter dem Tag');
@@ -1708,7 +1714,9 @@ test('R9 M6: meals.css - ein Traeger je Tag, Haarlinie nur zwischen belegten Slo
   assert(/display:\s*inline/.test(body('.meal-card__type')), 'der Vorsatz steht mobil im Fluss des Titels');
   assert(/display:\s*none/.test(body('.meal-card__type', (r) => !r.at.length)), 'ausserhalb der schmalen Fassung nennt das Slot-Label den Typ - kein zweiter');
   assert(/line-clamp:\s*2/.test(body('.meal-card__title')), 'Vorsatz und Name teilen EINE Zwei-Zeilen-Klammer');
-  assert(/display:\s*none/.test(body('.meal-card__action-btn--delete')), 'der Papierkorb verlaesst mobil die Zeile (nicht neben dem Griff)');
+  // Der Papierkorb verliess hier mobil die Zeile; seit R18 gibt es ihn auf der
+  // Karte gar nicht mehr (Markup-Test oben), und die Regel dazu ist entfallen.
+  assert(!rules.some((r) => /meal-card__action-btn--delete/.test(r.selector)), 'keine Regel mehr fuer einen Papierkorb, den die Karte nicht traegt');
   const drag = body('.meal-card__drag');
   assert(/order:\s*1/.test(drag), 'der Griff steht am Zeilenende');
   assert(/min-width:\s*var\(--space-8\)/.test(drag), 'der Griff ist klein (32px), keine eigene 48px-Flaeche');

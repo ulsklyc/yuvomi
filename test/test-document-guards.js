@@ -4733,7 +4733,9 @@ async function openExistingNoteEditor(page, noteId) {
   await page.click(`.note-card[data-id="${noteId}"] .note-card__open`);
   await page.waitForSelector('#note-content');
   await new Promise((resolve) => setTimeout(resolve, 300));
-  await page.click('.note-mode-switch [data-view="edit"]');
+  // Seit R18 (2026-10-07) fuehrt aus der Leseansicht EIN Weg in den Editor:
+  // der Primaerknopf im Fuss. Der Umschalter steht erst im Editor.
+  await page.click('#note-modal-edit');
   await page.waitForSelector('#note-pane-edit:not([hidden])');
 }
 
@@ -4910,7 +4912,7 @@ test('Sonde 21 - Notiz-Kategorien behalten Fokus, Gruppenrolle und Reader-Icons'
     await page.waitForSelector('.note-modal[data-view="read"]');
     const readTurns = [];
     for (let turn = 0; turn < 2; turn += 1) {
-      await page.click('.note-mode-switch [data-view="edit"]');
+      await page.click('#note-modal-edit');
       await page.click('.note-mode-switch [data-view="read"]');
       readTurns.push(await page.evaluate(() => ({
         icons: document.querySelectorAll('.note-read__categories svg').length,
@@ -4938,7 +4940,7 @@ test('Sonde 21 - Notiz-Kategorien behalten Fokus, Gruppenrolle und Reader-Icons'
 
     // Escape belongs to the open combobox first, then to the containing modal.
     // With a dirty search field the second press must reach the discard guard.
-    await page.click('.note-mode-switch [data-view="edit"]');
+    await page.click('#note-modal-edit');
     await new Promise((resolve) => setTimeout(resolve, 100));
     await page.focus('#note-category-search');
     await page.type('#note-category-search', third.name);

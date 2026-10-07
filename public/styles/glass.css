@@ -481,10 +481,9 @@ textarea.form-input {
 /* ================================================================
  * 15. Modal-Inputs
  * ================================================================ */
-.modal-panel .form-input,
-.modal-panel .input {
-  background-color: var(--color-surface-2);
-}
+/* Hier stand bis R18 (2026-10-07) eine zweite Feldfuellung fuer den Dialog
+ * (--color-surface-2, im Dark #0F0E0D). Es gibt EINE Feldhaut:
+ * --color-field-bg, Abschnitt 31. */
 
 /* ================================================================
  * 16. Accessibility — Phase 2
@@ -794,7 +793,7 @@ html.navigating .app-content *::after {
 .form-input,
 select.form-input,
 textarea.form-input {
-  background-color: var(--color-surface-work);
+  background-color: var(--color-field-bg);
 }
 
 /* ================================================================

@@ -1318,8 +1318,15 @@
   }
 }
 
+/* DIE SPALTE IST EINE MULDE, DIE KARTEN LIEGEN DARAUF (R18, 2026-10-07).
+ * Sie stand auf --color-surface-2: hell #FBFAF7 unter weissen Karten, 1,04:1 -
+ * Karte und Spalte waren gleich hell, die Karten hielt nur ihr Schatten.
+ * --color-board-well (tokens.css) ist hell die Stufe der Mulde (#EDEAE3,
+ * Karte 1,20:1 darueber) und dunkel die Stufe unter der Buehne (#0F0E0D,
+ * Karte 1,32:1 darueber) - in beiden Themes liegt die Karte HELLER als ihr
+ * Grund. */
 .kanban-col {
-  background-color: var(--color-surface-2);
+  background-color: var(--color-board-well);
   border-radius: var(--radius-md);
   display: flex;
   flex-direction: column;
@@ -1705,7 +1712,11 @@
   text-align: center;
   min-height: 64px;
   padding: var(--space-3);
-  border: var(--space-px) dashed var(--color-border);
+  /* IN RUHE OHNE STRICHRAHMEN (R18): die leere Spalte ist schon eine Mulde -
+   * ein gestrichelter Kasten darin war ein Kasten im Kasten und las sich als
+   * Ablageziel, auch wenn niemand zog. Die Kante steht transparent (kein
+   * Sprung), und erst der laufende Zug faerbt sie (Regel darunter). */
+  border: var(--space-px) dashed transparent;
   border-radius: var(--radius-sm);
   color: var(--color-text-tertiary);
   font-size: var(--text-sm);

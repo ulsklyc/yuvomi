@@ -12,7 +12,7 @@ import { stagger, vibrate, scheduleUndoableDelete, acknowledgeCheck, collapseOut
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { t, getLocale, formatDate, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
-import { rowActionHtml } from '/utils/row-action.js';
+import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
 import { renderMarkdownToolbar, wireMarkdownToolbar } from '/utils/markdown-toolbar.js';
 import { refresh as refreshReminders } from '/reminders.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
@@ -640,22 +640,26 @@ function renderTaskCard(task, opts = {}) {
         ${/* Bleibt auch mit vorhandenen Unteraufgaben: bis D#1017 verschwand der
               Einstieg nach der ersten, und der zweite Einstieg lag am Ende der
               eingeklappten Liste - gelesen als "nur eine Unteraufgabe je Aufgabe". */ ''}
-        ${!selecting && canEdit && !archived && !task.parent_task_id ? `
-        <button type="button" class="row-action task-card__inline-action" data-action="add-subtask" data-parent="${task.id}"
-                aria-label="${esc(t('tasks.subtaskAddNamed', { title: task.title }))}" title="${t('tasks.subtaskAdd')}">
-          <i data-lucide="list-plus" class="icon-md" aria-hidden="true"></i>
-        </button>` : ''}
-        ${!selecting && canEdit ? `
-        <button type="button" class="row-action task-card__inline-action" data-action="edit-task" data-id="${task.id}"
-                aria-label="${esc(t('common.editNamed', { name: task.title }))}">
-          <i data-lucide="pencil" class="icon-md" aria-hidden="true"></i>
-        </button>
-        <button type="button" class="row-action task-card__inline-action"
-                data-action="${archived ? 'unarchive-task' : 'archive-task'}" data-id="${task.id}"
-                aria-label="${esc(t(archived ? 'tasks.unarchiveNamed' : 'tasks.archiveNamed', { title: task.title }))}"
-                title="${archived ? t('tasks.unarchiveButton') : t('tasks.archiveButton')}">
-          <i data-lucide="${archived ? 'archive-restore' : 'archive'}" class="icon-md" aria-hidden="true"></i>
-        </button>` : ''}
+        ${/* EIN MEHR-KNOPF (Entscheidung 2026-10-07, utils/row-action.js): die
+              Zeile trug drei Dauer-Aktionen (Unteraufgabe, Stift, Archiv)
+              neben Haken und Avataren. Der Tipp auf den Titel oeffnet die
+              Aufgabe; Bearbeiten, Unteraufgabe und Archivieren sind Eintraege
+              mit Wort. Die Eintraege tragen dieselben data-Attribute wie die
+              Knoepfe vorher - der delegierte Handler liest sie unveraendert. */ ''}
+        ${!selecting && canEdit ? rowMenuHtml({
+          id: `task-menu-${task.id}`,
+          label: t('common.moreActionsNamed', { name: task.title }),
+          className: 'task-card__inline-action',
+          items: [
+            { action: 'edit-task', id: task.id, icon: 'pencil', label: t('common.edit') },
+            !archived && !task.parent_task_id
+              ? { action: 'add-subtask', icon: 'list-plus', label: t('tasks.subtaskAdd'), attrs: { 'data-parent': task.id } }
+              : null,
+            { action: archived ? 'unarchive-task' : 'archive-task', id: task.id,
+              icon: archived ? 'archive-restore' : 'archive',
+              label: archived ? t('tasks.unarchiveButton') : t('tasks.archiveButton') },
+          ],
+        }) : ''}
       </div>
 
       ${progress !== null ? `

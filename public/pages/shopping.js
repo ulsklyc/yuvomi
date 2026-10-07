@@ -19,6 +19,7 @@ import { mayImportMealPlan, mayTransferShoppingToPantry } from '/utils/kitchen-t
 import { mayWritePath } from '/utils/module-access.js';
 import { mountEmptyState, mountLoadError } from '/utils/empty-state.js';
 import { pageToolsMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
+import { rowMenuHtml } from '/utils/row-action.js';
 import '/components/category-manager.js';
 import { findPageFab } from '/utils/fab.js';
 import { setBulkPill, clearBulkPill, bulkPillLayer } from '/utils/bulk-pill.js';
@@ -1408,19 +1409,19 @@ function renderItem(item) {
                   title="${t('shopping.reorderHandleHint')}">
             <i data-lucide="grip-vertical" class="icon-md" aria-hidden="true"></i>
           </button>
-          <button class="row-action" data-action="item-details" data-id="${item.id}"
-                  aria-label="${t('shopping.detailsLabel', { name: esc(item.name) })}">
-            <i data-lucide="pencil" class="icon-md" aria-hidden="true"></i>
-          </button>
-          <button class="row-action row-action--danger" data-action="delete-item" data-id="${item.id}"
-                  aria-label="${t('shopping.deleteItemLabel', { name: esc(item.name) })}">
-            ${/* trash-2 statt x: das Kreuz heisst app-weit „Schliessen"
-                 (Modals, Chips), Loeschen traegt ueberall den Papierkorb
-                 (Aufgaben, Geburtstage, Mahlzeiten). Der Einkauf war die eine
-                 Zeile, die fuer dieselbe Tat ein anderes Zeichen sprach
-                 (Critique 2026-08-27, P3). */ ''}
-            <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
-          </button>`}
+${/* ZWEI SICHTBAR, DER REST IM MEHR-KNOPF (Entscheidung 2026-10-07,
+               utils/row-action.js): Stift und Papierkorb standen in jeder der
+               23 Zeilen - drei Dauer-Aktionen neben dem Haken. Bearbeiten und
+               Loeschen sind jetzt Eintraege mit Wort; Loeschen bleibt
+               widerrufbar (Undo-Toast) und per Wischen erreichbar. */ ''}
+          ${rowMenuHtml({
+            id: `shopping-item-menu-${item.id}`,
+            label: t('common.moreActionsNamed', { name: item.name }),
+            items: [
+              { action: 'item-details', id: item.id, icon: 'pencil', label: t('common.edit') },
+              { action: 'delete-item', id: item.id, icon: 'trash-2', label: t('common.delete'), danger: true },
+            ],
+          })}`}
         </div>
       </div>
     </div>`;

@@ -7065,6 +7065,14 @@ p.field-hint--warn[hidden] {
  * bleiben unangetastet (Umbenennen aller ~308 Fundstellen kostet mehr Review
  * als es traegt) - neuer Code schreibt `.form-input`.
  * -------------------------------------------------------- */
+/* DIE EINE FELDHAUT (R18, 2026-10-07; Rechnung an --color-field-bg in
+ * tokens.css). Kante 1 px auf dem 3:1-Minimum, die Fuellung traegt, und jedes
+ * einzeilige Feld ist gleich hoch: bis dahin war ein `input` 42,5px (Polster +
+ * Zeilenhoehe 1,47 + 1,5px-Kante lagen UEBER der Mindesthoehe) und ein `select`
+ * daneben 40px (native Zeilenhoehe). Mit der engen Zeilenhoehe bleibt der
+ * Inhalt unter der Mindesthoehe, also bestimmt sie allein: 48px am Finger,
+ * 40px an der Maus - fuer input und select dieselbe Zahl. Ein mehrzeiliges
+ * Feld (textarea) behaelt die Lesezeile. */
 .input,
 .form-input {
   width: 100%;
@@ -7072,12 +7080,18 @@ p.field-hint--warn[hidden] {
   box-sizing: border-box;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
-  border: 1.5px solid var(--color-border-control);
-  background-color: var(--color-surface);
+  border: 1px solid var(--color-border-control);
+  background-color: var(--color-field-bg);
   color: var(--color-text-primary);
   font-size: var(--text-base);
+  line-height: var(--line-height-snug);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
   min-height: var(--target-lg);
+}
+
+textarea.input,
+textarea.form-input {
+  line-height: var(--line-height-base);
 }
 
 @media (min-width: 1024px) {
@@ -7088,15 +7102,49 @@ p.field-hint--warn[hidden] {
   }
 }
 
-/* Ein Select rendert sein Chevron INNERHALB der Box, rechtsbündig. Mit dem
- * Feld-Padding von 12px läuft ein langer Optionstext darunter und wird
- * mittendrin gekappt („Nächstes Fälligkei|"). Das Polster ist deshalb kein
- * Modul-Detail, sondern gehört zum Feldkanon - app-weit, damit es nicht in
- * jedem Modul neu entdeckt werden muss. */
-select.input,
-select.form-input {
+/* DIE AUSWAHL TRAEGT IHR EIGENES ZEICHEN. Das native Chevron sass am Rand der
+ * Box, je Browser anders gezeichnet und im Dark hell auf Fast-Schwarz. Mit
+ * `appearance: none` bleibt nur die Haut des Feldes; das Zeichen ist
+ * --field-chevron (Lucide chevron-down, tokens.css), 16px, mit dem
+ * Feld-Polster vom Rand eingerueckt. Das AUSWAHLBLATT bleibt das native - die
+ * Regel nimmt dem Feld nur sein Kleid. Das Polster am Ende haelt einen langen
+ * Optionstext vor dem Zeichen ("Naechstes Faelligkei|" lief sonst darunter).
+ *
+ * RTL: `background-position` kennt keine logische Seite, deshalb der
+ * Zwilling - das Polster ist logisch und wandert von selbst.
+ *
+ * `[multiple]` und `[size]` sind Listen, keine Aufklapper: sie behalten ihr
+ * natives Bild. */
+select.input:not([multiple]):not([size]),
+select.form-input:not([multiple]):not([size]) {
+  -webkit-appearance: none;
+  appearance: none;
   padding-inline-end: var(--space-8);
   text-overflow: ellipsis;
+  background-image: var(--field-chevron);
+  background-repeat: no-repeat;
+  background-position: right var(--space-3) center;
+  background-size: var(--icon-md) var(--icon-md);
+}
+
+[dir="rtl"] select.input:not([multiple]):not([size]),
+[dir="rtl"] select.form-input:not([multiple]):not([size]) {
+  background-position: left var(--space-3) center;
+}
+
+/* ZAHLFELDER OHNE SPIN-PFEILE. Die zwei nativen Pfeile sind 7px hoch, liegen
+ * in jedem Browser anders, nehmen dem Wert am Ende der Zeile den Platz und
+ * verstellen ihn beim Scrollen ueber dem Feld. Tastatur (Pfeil hoch/runter)
+ * und Zifferntastatur (inputmode) bleiben. */
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .input:focus,

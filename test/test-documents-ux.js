@@ -1094,9 +1094,15 @@ test('die Dokumentenseite haengt die Vorschauen an das Seitenleben', () => {
   assert.match(wiring, /_thumbs\.load\(doc\)/);
   const list = page.slice(page.indexOf('function renderDocuments('), page.indexOf('function visibleFolderRows('));
   assert.match(list, /wireLocalThumbs\(list\)/);
-  // Zeile und Karte tragen denselben Rahmen; nur Kandidaten melden sich an.
-  assert.match(page, /renderThumbSlot\(doc, 'document-row__icon'\)/);
+  // Die Karte traegt die Vorschau; nur Kandidaten melden sich an. Die ZEILE
+  // zeigt seit R18 (2026-10-07) das Kategorie-Glyph statt einer 42px-Vorschau
+  // und meldet deshalb kein Bild mehr an.
   assert.match(page, /renderThumbSlot\(doc, 'document-card__media'\)/);
+  assert.doesNotMatch(page, /renderThumbSlot\(doc, 'document-row__icon'\)/, 'die Zeile laedt keine Vorschau');
+  const rowGlyph = page.slice(page.indexOf('function renderRowGlyph('), page.indexOf('function renderRowGlyph(') + 300);
+  assert.match(rowGlyph, /class="document-row__icon"><i data-lucide="\$\{CATEGORY_ICONS\[doc\.category\] \|\| 'file'\}"/,
+    'die Zeile traegt das Zeichen ihrer Kategorie');
+  assert.doesNotMatch(rowGlyph, /data-local-thumb|document-thumb/, 'und keinen Vorschau-Rahmen');
   assert.match(page, /const local = documentThumbKind\(doc\) \? ' data-local-thumb' : ''/);
 });
 
@@ -1109,7 +1115,7 @@ test('der Paperless-Pfad bleibt, wie er war', () => {
   assert.match(slot, /data-thumb="clickable"/);
 });
 
-test('die Rasterkarte traegt eine feste Vorschauflaeche, das Bild fuellt sie ohne Verzerrung', () => {
+test('die Rasterkarte traegt eine feste Vorschauflaeche, das Blatt liegt GANZ und unverzerrt darin', () => {
   const rules = [...eachRule(css)];
   const top = rules.filter((rule) => rule.at.length === 0);
   const media = top.find((rule) => rule.selector === '.document-card__media');
@@ -1117,11 +1123,26 @@ test('die Rasterkarte traegt eine feste Vorschauflaeche, das Bild fuellt sie ohn
   assert.match(media.body, /aspect-ratio:\s*\d+\s*\/\s*\d+/, 'feste Form: ein spaet ankommendes Bild schiebt nichts');
   assert.match(media.body, /border-radius:\s*var\(--radius-/);
   assert.match(media.body, /background:\s*var\(--color-/);
+  // R18 (2026-10-07): das Bild ist ein BLATT auf der Mulde - ganz (contain,
+  // eigene Masse), mit Schatten am Blattrand, im Dark gedaempft. Bis dahin
+  // `cover` mit einer Haarlinie als ::after ueber dem Ausschnitt.
   const img = top.find((rule) => rule.selector === '.document-thumb__img');
-  assert.match(img.body, /object-fit:\s*cover/);
-  const frame = top.find((rule) => rule.selector === '.document-thumb--ready::after');
-  assert.ok(frame, 'der Rahmen liegt ueber dem Bild');
-  assert.match(frame.body, /var\(--color-border-subtle\)/);
+  assert.match(img.body, /object-fit:\s*contain/, 'das ganze Blatt, kein Ausschnitt');
+  assert.doesNotMatch(img.body, /object-fit:\s*cover|position:\s*absolute/);
+  assert.match(img.body, /max-width:\s*100%/);
+  assert.match(img.body, /max-height:\s*100%/);
+  assert.match(img.body, /width:\s*auto/, 'eigene Masse: der Schatten sitzt am Blatt, nicht am Rahmen');
+  assert.match(img.body, /box-shadow:\s*var\(--shadow-sm\)/);
+  assert.match(img.body, /opacity:\s*var\(--media-sheet-opacity\)/, 'im Dark scheint die Mulde durch das Weiss');
+  assert.doesNotMatch(img.body, /(?:^|;)\s*filter\s*:/, 'kein filter: .app-content * setzt ihn per !important zurueck');
+  assert.match(media.body, /background:\s*var\(--color-fill-well\)/, 'der Rahmen ist eine Mulde');
+  assert.match(media.body, /padding:\s*var\(--space-3\)/, 'das Blatt liegt mit Rand in der Mulde');
+  const tokens = read('../public/styles/tokens.css');
+  assert.match(tokens, /--_media-sheet-opacity:\s*1;/);
+  assert.equal((tokens.match(/--_media-sheet-opacity:\s*0\.82;/g) ?? []).length, 2, 'beide Dark-Bloecke daempfen das Blatt');
+  // Das Einblenden endet auf der Deckkraft des Blatts, nicht auf 1.
+  const kf = css.slice(css.indexOf('@keyframes document-thumb-in'), css.indexOf('@keyframes document-thumb-in') + 120);
+  assert.doesNotMatch(kf, /to\s*\{\s*opacity:\s*1/, 'ein festes Ende auf 1 hoebe die Daempfung im Dark nach dem Einblenden auf');
   // Einblenden nur ohne abbestellte Bewegung, und nur frisch angekommene Bilder.
   const fade = rules.filter((rule) => /animation:\s*document-thumb-in/.test(rule.body));
   assert.ok(fade.length > 0, 'Einblend-Regel fehlt');
@@ -1190,10 +1211,15 @@ test('das Raster hat mobil zwei Spalten und bei 1280px drei statt zwei', () => {
   assert.match(grid.body, /gap:\s*var\(--space-4\)/);
 });
 
-test('die Karte ist kompakt: 4:3-Vorschau, Titel zweizeilig, Meta einzeilig, kein Mindest-Leerraum', () => {
+test('die Karte: Blatt-Rahmen 3:4, Titel zweizeilig, Meta einzeilig, kein Mindest-Leerraum, nicht gestreckt', () => {
   const rules = topRules(css);
   const media = rules.find((rule) => rule.selector === '.document-card__media');
-  assert.match(media.body, /aspect-ratio:\s*4\s*\/\s*3/, 'ehrliche feste Form, flacher als 16/10 zu hoch war es nicht - 4:3 ist der Kanon-Rahmen');
+  // R18 (2026-10-07): der Rahmen ist hochkant wie das Blatt, das ganz darin
+  // liegt (vorher 4:3 mit dem oberen Drittel als Ausschnitt).
+  assert.match(media.body, /aspect-ratio:\s*3\s*\/\s*4/, 'feste Form, hochkant wie ein Blatt');
+  // Und die Karten einer Reihe strecken sich nicht mehr: die Aktionszeile
+  // schliesst an den Text an, statt unter einem Loch zu stehen.
+  assert.match(rules.find((rule) => rule.selector === '.documents-list--grid').body, /align-items:\s*start/);
   const title = rules.find((rule) => rule.selector === '.document-card__title');
   assert.ok(title, '.document-card__title fehlt als eigene Regel');
   assert.match(title.body, /-webkit-line-clamp:\s*2/);
@@ -1254,10 +1280,10 @@ test('die Karte hebt sich beim Hover wie jede interaktive Karte - leise und nie 
   assert.doesNotMatch(base.body, /background/);
   assert.ok(hover.some((rule) => rule.at.some((at) => /prefers-reduced-motion:\s*reduce/.test(at))
     && /transform:\s*none/.test(rule.body)), 'reduzierte Bewegung: keine Anhebung');
-  // Der Zoom bleibt der kleinen Zeilenkachel; auf der grossen Vorschau schnitte er den Briefkopf an.
-  const zoom = [...eachRule(css)].filter((rule) => /scale\(1\.06\)/.test(rule.body));
-  assert.ok(zoom.length > 0);
-  for (const rule of zoom) assert.match(rule.selector, /^\.document-row__icon\.document-thumb--ready:hover/);
+  // Kein Zoom mehr, nirgends: er gehoerte der 42px-Vorschau der Zeile, und die
+  // traegt seit R18 (2026-10-07) das Kategorie-Glyph.
+  const zoom = [...eachRule(css)].filter((rule) => /scale\(1\.0[1-9]\)/.test(rule.body));
+  assert.deepEqual(zoom.map((rule) => rule.selector), []);
 });
 
 test('Speicher-Badges sind Ortsetiketten: neutral, Kapsel, unterschieden durch Glyphe und Text', () => {
@@ -1923,4 +1949,22 @@ test('der Betrachter ist schmal vollflaechig, und der Meta-Block klappt hinter d
   assert.match(viewer, /classList\.toggle\('document-viewer--info-open', open\)/);
   // Der Hinweis bleibt im Markup: SPEC.md (D#1014) sagt ihn zu.
   assert.match(viewer, /class="document-viewer__note"/);
+});
+
+// --------------------------------------------------------
+// R18 (2026-10-07): Betrachter ohne fremde Werkzeugleiste, Luft unter der Filterleiste
+
+test('R18: der PDF-Betrachter am Desktop blendet die Leiste des Browsers aus, der neue Tab behaelt sie', () => {
+  assert.match(page, /const PDF_EMBED_FRAGMENT = '#toolbar=0&navpanes=0&view=FitH';/);
+  const viewer = page.slice(page.indexOf('function renderViewerContent('), page.indexOf('function renderViewerContent(') + 2200);
+  assert.match(viewer, /<iframe class="document-viewer__pdf" src="\$\{previewUrl\}\$\{PDF_EMBED_FRAGMENT\}"/,
+    'das Fragment haengt an der Adresse des eingebetteten Betrachters');
+  // "In neuem Tab oeffnen" traegt die nackte Adresse - dort bleiben Zoom und Druck des Browsers.
+  assert.match(page, /rowActionHtml\(\{ icon: 'external-link', href: previewUrl,/);
+  assert.equal((page.match(/PDF_EMBED_FRAGMENT/g) ?? []).length, 2, 'das Fragment steht nur am iframe, an keinem Link');
+});
+
+test('R18: zwischen Filterleiste und Inhalt steht Luft', () => {
+  const layout = topRules(css).find((rule) => rule.selector === '.documents-browser-layout');
+  assert.match(layout.body, /padding-top:\s*var\(--space-4\)/, 'Ordnerspalte und erste Kartenreihe beginnen nicht auf der Trennlinie');
 });

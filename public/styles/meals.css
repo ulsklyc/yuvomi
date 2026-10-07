@@ -676,9 +676,12 @@
   inset: -8px;
 }
 
+/* Der Hover der Basisregel war rot, weil sie den Papierkorb trug. Seit R18
+ * (2026-10-07) steht kein Loeschen mehr auf der Karte (meals.js, benannte
+ * Ausnahme) - die Basis hellt auf wie jede Zeilenaktion. */
 .meal-card__action-btn:hover {
-  color: var(--color-danger);
-  background-color: var(--color-surface-2);
+  color: var(--color-text-primary);
+  background-color: var(--color-surface-hover);
 }
 
 /* Der Transfer trägt den MODUL-AKZENT, im Ruhezustand und auf Hover.
@@ -950,15 +953,6 @@
     line-clamp: 2;
   }
 
-  /* DER PAPIERKORB VERLAESST DIE ZEILE. Er stand 48px direkt neben dem Griff:
-   * ein verrutschter Zug war ein Loeschen (A4, Persona Casey). Loeschen lebt
-   * mobil im Dialog der Mahlzeit - links im Fuss seit R8, derselbe Weg
-   * (`deleteMeal`: Serienabfrage, Rueckgaengig) -, und der Dialog ist einen
-   * Tipp auf die Zeile entfernt. */
-  .meal-card__action-btn--delete {
-    display: none;
-  }
-
   /* DER GRIFF IST KLEIN UND STEHT AM ENDE. Er bleibt der einzige Ort mit
    * `touch-action: none` (#1317, oben) und nimmt weiter die volle Zeilenhoehe
    * als Greifzone - nur die Breite gibt er ab, wie `.list-row__drag`: die
@@ -1090,12 +1084,24 @@
   width: 100%;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
-  /* Feldkante nach dem Input-Kanon (DESIGN.md: 1.5px --color-border-control),
+  /* Feldkante nach dem Input-Kanon (DESIGN.md: 1px --color-border-control),
    * nicht im Modul-Akzent - die Akzentkante gehörte zur abgelösten Welt. */
-  border: 1.5px solid var(--color-border-control);
-  background-color: var(--color-surface);
+  border: 1px solid var(--color-border-control);
+  background-color: var(--color-field-bg);
+  -webkit-appearance: none;
+  appearance: none;
+  padding-inline-end: var(--space-8);
+  text-overflow: ellipsis;
+  background-image: var(--field-chevron);
+  background-repeat: no-repeat;
+  background-position: right var(--space-3) center;
+  background-size: var(--icon-md) var(--icon-md);
   color: var(--color-text-primary);
   font-size: var(--type-body);
+}
+
+[dir="rtl"] .shopping-transfer__select {
+  background-position: left var(--space-3) center;
 }
 
 .shopping-transfer__btn {

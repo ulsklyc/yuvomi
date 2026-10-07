@@ -45,8 +45,12 @@ test('Einkaufslisten-Zeilen toggeln nur außerhalb interaktiver Controls', () =>
   // im Laden (Ziel 358px statt 48px). Zurueckgenommen; DESIGN.md "Was eine
   // Zeile tut" fuehrt die Abhak-Liste des Einkaufs als die eine Ausnahme.
   const rowSrc = source.match(/function renderItem\(item\)[\s\S]*?\n\}/)?.[0] ?? '';
-  assert(/class="row-action" data-action="item-details"[\s\S]{0,200}data-lucide="pencil"/.test(rowSrc),
-    'der Stift bleibt der Bearbeiten-Weg der Einkaufszeile');
+  // Seit R18 (Entscheidung 2026-10-07, "zwei sichtbar, Rest im Mehr-Knopf")
+  // steht Bearbeiten als Eintrag mit Stift im Mehr-Knopf der Zeile. Die Zusage
+  // dieses Tests bleibt dieselbe: die ZEILE behaelt einen eigenen
+  // Bearbeiten-Weg, und der Tipp auf die Zeile hakt ab.
+  assert(/rowMenuHtml\(\{[\s\S]{0,400}action: 'item-details', id: item\.id, icon: 'pencil'/.test(rowSrc),
+    'Bearbeiten bleibt ein eigener Weg der Einkaufszeile (Eintrag im Mehr-Knopf)');
   assert(!/list-row__main--interactive/.test(rowSrc),
     'der Zeilenkoerper ist kein Oeffnen-Knopf: der Tipp auf die Zeile hakt ab');
   assert(/await toggleShoppingItem\(Number\(row\.dataset\.itemId\)/.test(source),

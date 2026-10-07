@@ -776,8 +776,12 @@ function drawSources(host) {
   }
   if (!state.sources.length) {
     host.replaceChildren();
+    // EIN VOLLER LEERZUSTAND JE SEITE (R18, 2026-10-07): die Seite fuehrt ihn
+    // oben ("Noch nichts geplant" bzw. das Onboarding der Abfallarten). Die
+    // Importquellen sind ein Nebenabschnitt mit eigenem Kopf und sagen es in
+    // einem Satz - der Knopf darunter bleibt der Weg, den der Satz nennt.
     host.insertAdjacentHTML('beforeend', emptyStateHTML({
-      title: t('waste.emptySourcesTitle'),
+      compact: true,
       description: t('waste.emptySourcesDescription'),
       // Der Leerzustand NANNTE den Weg schon, ohne ihn anzubieten: seine
       // Beschreibung lautet woertlich „Importiere eine ICS-Datei deiner
@@ -788,7 +792,8 @@ function drawSources(host) {
       // etwas anderes tut als sein eigener Text ankuendigt, ist schlimmer als
       // gar keiner.
       // Nur-lesen: derselbe Riegel wie beim Abfallart-Leerzustand darueber.
-      action: readOnly() ? null : { label: t('waste.importFileAction'), icon: 'upload', attrs: { id: 'waste-empty-add-source' } },
+      // Sekundaer: der Primaerknopf der Seite ist der FAB ("Termin").
+      action: readOnly() ? null : { label: t('waste.importFileAction'), icon: 'upload', tone: 'secondary', attrs: { id: 'waste-empty-add-source' } },
     }));
     host.querySelector('#waste-empty-add-source')?.addEventListener('click', () => openImportWizard());
     if (window.lucide) window.lucide.createIcons({ el: host });

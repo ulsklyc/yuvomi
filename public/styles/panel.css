@@ -258,7 +258,7 @@
 
 @media (hover: hover) {
   .metric-card--tile:hover {
-    background-color: var(--color-surface-elevated-hover);
+    background-color: color-mix(in srgb, var(--color-text-primary) var(--tint-wash), var(--color-fill-well));
   }
 }
 
@@ -912,7 +912,7 @@ svg.chart {
  * Variante --select: die Karte wählt zusätzlich aus
  *
  * Ein <button>, der eine Metrik AUSWÄHLT (Vitalwerte) oder zu ihr NAVIGIERT
- * (Gesundheits-Übersicht). Auswahl und Hover sprechen über einen Innenring,
+ * (Gesundheits-Übersicht). Die Auswahl spricht über einen Innenring,
  * damit sich das Layout nicht verschiebt. Die Trend-Farbe bleibt in dieser
  * Variante Sekundärtext (betterWhen = null in utils/metric-card.js): „hoch"
  * ist je nach Metrik gut ODER schlecht (Gewichtsabnahme, SpO₂), die Richtung
@@ -926,11 +926,39 @@ svg.chart {
   transition: box-shadow var(--transition-fast);
 }
 
-.metric-card--select:hover {
-  box-shadow: inset 0 0 0 1px var(--module-accent, var(--color-accent));
+/* HOVER ADDIERT, DER RING BLEIBT DER AUSWAHL (R18, 2026-10-07).
+ *
+ * Bis dahin ERSETZTE der Hover den Kartenschatten durch einen 1px-Innenring
+ * im Modulton - dieselbe Sprache wie die Auswahl (2px), nur duenner: unter dem
+ * Zeiger sah jede Karte gewaehlt aus und verlor zugleich ihre Tiefe. Jetzt
+ * hebt der Hover den Schatten eine Stufe (die Karte kommt dem Zeiger
+ * entgegen), und der Ring im Modulton sagt nur noch "gewaehlt" - ueber dem
+ * Schatten, den die Karte behaelt. Nur fuer echte Zeiger (Schritt 4).
+ *
+ * In der Variante --inset (Kachel IN einer Karte, kein Schatten) gibt es
+ * nichts zu heben: dort zeichnet der Hover eine NEUTRALE Haarlinie
+ * (--color-border-strong). Sie ist nicht die Auswahl - die ist 2px im
+ * Modulton. Eine dunklere Mulde schied aus: 8 % Tinte senken den
+ * Sekundaertext darauf hell von 5,04 auf rund 4,3:1. */
+@media (hover: hover) {
+  .metric-card--select:hover {
+    box-shadow: var(--shadow-md);
+  }
+
+  .metric-card--select.is-active:hover {
+    box-shadow: inset 0 0 0 2px var(--module-accent, var(--color-accent)), var(--shadow-md);
+  }
+
+  .metric-card--inset.metric-card--select:hover {
+    box-shadow: inset 0 0 0 1px var(--color-border-strong);
+  }
 }
 
 .metric-card--select.is-active {
+  box-shadow: inset 0 0 0 2px var(--module-accent, var(--color-accent)), var(--shadow-sm);
+}
+
+.metric-card--inset.metric-card--select.is-active {
   box-shadow: inset 0 0 0 2px var(--module-accent, var(--color-accent));
 }
 

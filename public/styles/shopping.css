@@ -380,18 +380,22 @@
    * auf der opaken Arbeitsfläche 1.03:1 gegen den Grund - die schwächste
    * Feldkante der ganzen App und als Glas auf einer Arbeitsfläche zusätzlich
    * gegen die Hausregel „Glas bleibt der Shell" (Critique 2026-07-29). */
-  border: 1.5px solid var(--color-border-control);
-  background-color: var(--color-surface);
+  border: 1px solid var(--color-border-control);
+  background-color: var(--color-field-bg);
   color: var(--color-text-primary);
   font-size: var(--text-base);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
   min-height: var(--target-base);
 }
 
+/* DER FOKUS IST DIE EINE STIMME (R18, 2026-10-07): die drei Felder der
+ * Schnellzeile zogen ihren Fokus aus dem Kuechenton (Orange) - der einzige
+ * Fokusring der App, der nicht violett war. Modultoene gehoeren an Siegel und
+ * Daten, nicht an den Zustand eines Bedienelements. */
 .quick-add__input:focus {
   outline: none;
-  border-color: var(--module-accent, var(--color-accent));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-shadow), transparent);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) var(--tint-shadow), transparent);
 }
 
 /* Nur `min-height`, keine `height` (#1372). Die Zeile ist ein Grid mit
@@ -408,8 +412,8 @@
   min-width: 0;
   padding: var(--space-2);
   border-radius: var(--radius-sm);
-  border: 1.5px solid var(--color-border-control);
-  background-color: var(--color-surface);
+  border: 1px solid var(--color-border-control);
+  background-color: var(--color-field-bg);
   color: var(--color-text-primary);
   font-size: var(--text-base);
   font-variant-numeric: tabular-nums;
@@ -422,8 +426,8 @@
  * 1.5px-Border-Farbwechsel war als Fokus-Indikator zu schwach. */
 .quick-add__qty:focus {
   outline: none;
-  border-color: var(--module-accent, var(--color-accent));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-shadow), transparent);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) var(--tint-shadow), transparent);
 }
 
 .quick-add__cat {
@@ -432,8 +436,8 @@
   max-width: none;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
-  border: 1.5px solid var(--color-border-control);
-  background-color: var(--color-surface);
+  border: 1px solid var(--color-border-control);
+  background-color: var(--color-field-bg);
   color: var(--color-text-secondary);
   font-size: var(--text-base);
   /* Eine eigene, laengere Kategorie endet sichtbar vor dem Chevron statt
@@ -441,12 +445,24 @@
   text-overflow: ellipsis;
   cursor: pointer;
   min-height: var(--target-base);
+  /* Das Zeichen der Auswahl wie am Feldkanon (select.form-input, layout.css). */
+  -webkit-appearance: none;
+  appearance: none;
+  padding-inline-end: var(--space-8);
+  background-image: var(--field-chevron);
+  background-repeat: no-repeat;
+  background-position: right var(--space-3) center;
+  background-size: var(--icon-md) var(--icon-md);
+}
+
+[dir="rtl"] .quick-add__cat {
+  background-position: left var(--space-3) center;
 }
 
 .quick-add__cat:focus {
   outline: none;
-  border-color: var(--module-accent, var(--color-accent));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-shadow), transparent);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) var(--tint-shadow), transparent);
 }
 
 @media (min-width: 1024px) {
@@ -859,7 +875,32 @@
  * Die Aufgabenzeile hat denselben Fall am selben Tag anders herum gelöst - dort
  * standen die Etiketten schon in der Metazeile und liessen sie umbrechen. Beide
  * tragen jetzt EINES davon und fassen den Rest als „+N" zusammen. */
+/* DIE MENGE STEHT IN DER NAMENSZEILE (R18, 2026-10-07).
+ *
+ * Name ueber Menge waren zwei Textzeilen in einer 48px-Zeile: 21 + 2 + 18px
+ * Text auf 48px, die Unterlaengen der Menge sassen auf der Haarlinie. Jetzt ist
+ * die Textspalte eine Flex-Zeile, die umbrechen DARF: der Name waechst und
+ * schiebt Etikett und Menge an die rechte Kante der Spalte, wo die Mengen als
+ * Spalte tabellarischer Ziffern untereinander stehen.
+ *
+ * DER NAME WIRD DABEI NICHT WIEDER GEKAPPT (P0 "Broc...", Critique
+ * 2026-07-30): passen Name und Menge nicht nebeneinander, faellt die MENGE in
+ * die zweite Zeile - der heutige Stand als Rueckfall -, und ein Name, der
+ * allein zu lang ist, bricht weiter um (`overflow-wrap` aus .list-row__name).
+ * Flexbox bricht nach der hypothetischen Breite um, also nach der vollen
+ * Namenslaenge: der Name schrumpft nie, solange die Menge noch ausweichen kann. */
+.shopping-item .list-row__main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  align-content: center;
+  column-gap: var(--space-3);
+  row-gap: var(--space-0h);
+}
+
 .shopping-item .list-row__meta {
+  flex: 0 1 auto;
+  max-width: 100%;
   display: flex;
   align-items: center;
   /* 4px, nicht 8: zwischen Text und einer Pille mit eigener Fläche liest sich
@@ -879,6 +920,10 @@
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
   white-space: nowrap;
+  /* Die Menge ist das letzte Glied: ihre rechte Kante ist die der Spalte, das
+   * Etikett steht davor (im Markup steht sie zuerst - so liest der
+   * Screenreader "Name, Menge, Etikett"). */
+  order: 1;
 }
 
 /* DAS ETIKETT IST EINE FRAGE DER BREITE, NICHT DES GERÄTS - dieselbe Regel und

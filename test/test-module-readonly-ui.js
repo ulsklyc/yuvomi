@@ -4907,8 +4907,12 @@ test('Kanon R5: Geburtstagszeile nennt die Person an Bearbeiten und Loeschen', (
       id: 5, name: 'Oma Ingrid', birth_date: '1955-03-01', next_birthday: '2027-03-01',
       days_until: 156, age_next: 72,
     });
-    assert.match(html, /class="row-action" data-action="edit" aria-label="common\.editNamed\{&quot;name&quot;:&quot;Oma Ingrid&quot;\}"/);
-    assert.match(html, /class="row-action row-action--danger" data-action="delete" aria-label="common\.deleteNamed\{&quot;name&quot;:&quot;Oma Ingrid&quot;\}"/);
+    // Seit R18 (2026-10-07) traegt die Zeile EINEN Mehr-Knopf; er nennt die
+    // Person, Bearbeiten und Loeschen sind seine Eintraege mit Wort.
+    assert.match(html, /class="row-action row-action--more popover-menu__trigger"[^>]*aria-label="common\.moreActionsNamed\{&quot;name&quot;:&quot;Oma Ingrid&quot;\}"/);
+    assert.match(html, /role="menuitem"\s+class="popover-menu__item"\s+data-action="edit" data-id="5">/);
+    assert.match(html, /role="menuitem"\s+class="popover-menu__item popover-menu__item--danger"\s+data-action="delete" data-id="5">/);
+    assert.equal((html.match(/class="row-action[\s"]/g) ?? []).length, 1, 'kein Stift und kein Papierkorb daneben');
   });
 });
 
@@ -4940,9 +4944,13 @@ test('Kanon R5: Aufgabenkarte nennt die Aufgabe an Bearbeiten, Ablegen und Teila
   withAccess({ tasks: 'write' }, () => {
     const html = tasks.renderTaskCard(aufgabe({ title: 'Muell rausbringen' }));
     const titel = '\\{&quot;title&quot;:&quot;Muell rausbringen&quot;\\}';
-    assert.match(html, new RegExp(`class="row-action task-card__inline-action" data-action="edit-task"[^>]*aria-label="common\\.editNamed\\{&quot;name&quot;:&quot;Muell rausbringen&quot;\\}"`));
-    assert.match(html, new RegExp(`data-action="archive-task"[^>]*aria-label="tasks\\.archiveNamed${titel}"`));
-    assert.match(html, new RegExp(`data-action="add-subtask"[^>]*aria-label="tasks\\.subtaskAddNamed${titel}"`));
+    // Seit R18 (2026-10-07) traegt die Karte EINEN Mehr-Knopf; er nennt die
+    // Aufgabe, die drei Handlungen sind seine Eintraege mit Wort.
+    void titel;
+    assert.match(html, /class="row-action row-action--more task-card__inline-action popover-menu__trigger"[^>]*aria-label="common\.moreActionsNamed\{&quot;name&quot;:&quot;Muell rausbringen&quot;\}"/);
+    assert.match(html, /class="popover-menu__item"\s+data-action="edit-task" data-id="7">[\s\S]{0,160}common\.edit</);
+    assert.match(html, /class="popover-menu__item"\s+data-action="add-subtask" data-parent="7">[\s\S]{0,160}tasks\.subtaskAdd</);
+    assert.match(html, /class="popover-menu__item"\s+data-action="archive-task" data-id="7">[\s\S]{0,160}tasks\.archiveButton</);
   });
 });
 

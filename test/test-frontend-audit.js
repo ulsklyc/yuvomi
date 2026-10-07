@@ -6227,8 +6227,16 @@ test('phase 3 high-frequency controls use tokenized touch targets', () => {
   // dadurch strenger, aber an einer anderen Stelle. Deshalb hier auf die
   // Komponente geprüft statt auf die entfallenen Modul-Klassen.
   const shoppingPage = read('../public/pages/shopping.js');
-  assert.match(shoppingPage, /class="row-action"\s+data-action="item-details"/);
-  assert.match(shoppingPage, /class="row-action row-action--danger"\s+data-action="delete-item"/);
+  // Seit R18 (2026-10-07, "zwei sichtbar, Rest im Mehr-Knopf") stehen
+  // Bearbeiten und Loeschen als Eintraege im Mehr-Knopf der Zeile. Der Knopf
+  // ist selbst eine `.row-action` (rowMenuHtml), die Trefferflaeche also
+  // dieselbe; geprueft wird, dass beide Handlungen dort ankommen.
+  const itemMenu = shoppingPage.slice(shoppingPage.indexOf('id: `shopping-item-menu-${item.id}`'));
+  assert.match(shoppingPage, /rowMenuHtml\(\{\s*id: `shopping-item-menu-\$\{item\.id\}`/);
+  assert.match(itemMenu.slice(0, 600), /action: 'item-details', id: item\.id/);
+  assert.match(itemMenu.slice(0, 600), /action: 'delete-item', id: item\.id[^}]*danger: true/);
+  assert.match(read('../public/utils/row-action.js'), /triggerClass: \['row-action', 'row-action--more', extra\]/,
+    'der Mehr-Knopf traegt die geteilte .row-action (48px)');
   assert.match(layout, /\.row-action\s*\{[\s\S]*?width:\s*var\(--target-lg\)/);
   assert.match(layout, /\.row-action\s*\{[\s\S]*?height:\s*var\(--target-lg\)/);
   assert.match(notes, /\.note-card__pin[\s\S]*width:\s*var\(--target-base\)/);
@@ -7363,7 +7371,10 @@ test('phase 7 Budget row actions stay touch-safe on mobile', () => {
   assert.match(actionRule, /width:\s*var\(--target-lg\)/, 'Row action buttons should use the large touch target width');
   assert.match(actionRule, /height:\s*var\(--target-lg\)/, 'Row action buttons should use the large touch target height');
   assert.doesNotMatch(actionRule, /opacity:\s*0/, 'Row actions stay visible without hover (touch-safe)');
-  assert.match(source, /class="row-action row-action--danger"/, 'Budget delete uses the shared danger row action');
+  // Seit R18 (2026-10-07) steht das Loeschen einer Tilgung im Mehr-Knopf der
+  // Zeile (rowMenuHtml), als Eintrag mit Wort und `danger: true`.
+  assert.match(source, /rowMenuHtml\(\{\s*id: `loan-payment-menu-\$\{payment\.id\}`[\s\S]{0,900}action: 'loan-payment-delete'[^\n]*danger: true/,
+    'Budget delete lives in the shared row menu as a danger entry');
   assert.doesNotMatch(source, /data-lucide="(?:plus|trash-2|pencil)"\s+style=/, 'Budget Lucide actions should use icon utility classes');
 });
 
@@ -16991,11 +17002,18 @@ test('jede auf Touch ausgeblendete Karten-Aktion hat einen Weg in der Leseansich
   //    (`${archived ? 'unarchive-task' : 'archive-task'}`), deshalb wird der
   //    Attributwert nach Literalen abgesucht statt als eines genommen - ein
   //    Muster, das nur nackte Werte kennt, uebersaehe genau die zwei.
+  //    Seit R18 (2026-10-07) sind die drei Knoepfe EIN Mehr-Knopf: sein
+  //    Ausloeser traegt weiter `task-card__inline-action` (und verschwindet
+  //    damit unter 640px samt Menue), die Handlungen stehen als `action:` in
+  //    den Eintraegen von `rowMenuHtml`. Gelesen wird der ganze Aufruf.
+  const menuStart = page.indexOf('rowMenuHtml({\n          id: `task-menu-${task.id}`');
+  assert.ok(menuStart > -1, 'der Mehr-Knopf der Aufgabenzeile (rowMenuHtml, task-menu-) ist nicht mehr auffindbar');
+  const menu = page.slice(menuStart, page.indexOf('}) : \'\'}', menuStart));
+  assert.match(menu, /className: 'task-card__inline-action'/,
+    'der Mehr-Knopf traegt die Klasse, die tasks.css unter 640px ausblendet - sonst prueft der Guard eine Luecke, die es nicht gibt');
   const actions = new Set(
-    [...page.matchAll(/task-card__inline-action[^>]*?data-action="([^"]+)"/g)]
-      .flatMap((m) => (m[1].includes('${')
-        ? [...m[1].matchAll(/'([a-z][a-z-]*)'/g)].map((lit) => lit[1])
-        : [m[1]])),
+    [...menu.matchAll(/action:\s*([^,\n]+)/g)]
+      .flatMap((m) => [...m[1].matchAll(/'([a-z][a-z-]*)'/g)].map((lit) => lit[1])),
   );
   assert.ok(actions.size >= 3,
     `nur ${actions.size} Inline-Aktionen gefunden - das Muster im Guard passt nicht mehr `
@@ -20444,4 +20462,191 @@ test('R17 E8: in den Einstellungen steht der Primaerknopf als Letzter in einer A
   assert.ok(rows >= 15, `der Scanner findet die Aktionszeilen (${rows})`);
   assert.deepEqual(notLast, [], 'der Primaerknopf steht im Markup zuletzt - Nebenaktionen davor, wie im Dialogfuss');
   assert.deepEqual(naked, [], 'ein Speichern-Knopf steht in `.settings-form-actions`, nicht nackt in der Formularspalte');
+});
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * R18: eine Feldhaut (Entscheidung Ulas 2026-10-07)
+ *
+ * Bis dahin: zwei Fuellungen (Seite, Dialog), 1,5-px-Kante, im Dark ein
+ * Fast-Schwarz (#0F0E0D) mit heller Kante (4,51:1), `select` nativ und 2,5px
+ * niedriger als `input`, der Fokus der Einkaufs-Schnellzeile im Kuechenton.
+ * Der Guard haelt jede dieser Zusagen an der Regel fest, die sie traegt.
+ * ──────────────────────────────────────────────────────────────────────────── */
+test('R18: eine Feldhaut - 1px auf dem 3:1-Minimum, eine Fuellung, eigenes Auswahl-Zeichen', () => {
+  const styles = new URL('../public/styles/', import.meta.url);
+  const sheets = readdirSync(styles).filter((entry) => entry.endsWith('.css') && entry !== 'tokens.css')
+    .map((file) => ({ file, rules: [...eachRule(readFileSync(new URL(file, styles), 'utf8'))] }));
+  const all = sheets.flatMap(({ file, rules }) => rules.map((rule) => ({ ...rule, file })));
+  const parts = (rule) => rule.selector.split(',').map((s) => s.trim().replace(/\s+/g, ' '));
+
+  // 1. Keine Feldkante ist breiter als 1px (ausser im Kontrastmodus, der sie
+  //    bewusst verstaerkt).
+  const wide = all.filter((rule) => !rule.at.some((a) => /prefers-contrast/.test(a))
+    && /border(?:-width)?\s*:[^;]*\b(?:1\.5|2)px[^;]*var\(--color-border-control\)/.test(rule.body))
+    .map((rule) => `${rule.file}: ${rule.selector.trim()}`);
+  assert.deepEqual(wide, [], 'Feldkanten sind 1px (--color-border-control); die 1,5px gehoerten zur doppelt kodierten Haut.');
+
+  // 2. Die kanonische Regel traegt Kante, Fuellung und die enge Zeile.
+  const base = all.find((rule) => rule.file === 'layout.css' && rule.at.length === 0
+    && parts(rule).includes('.form-input') && parts(rule).includes('.input') && /min-height/.test(rule.body));
+  assert.ok(base, 'die Feldregel `.input, .form-input` (layout.css) wurde nicht gefunden');
+  assert.match(base.body, /border:\s*1px solid var\(--color-border-control\)/);
+  assert.match(base.body, /background-color:\s*var\(--color-field-bg\)/);
+  assert.match(base.body, /line-height:\s*var\(--line-height-snug\)/,
+    'die enge Zeile haelt den Inhalt unter der Mindesthoehe - sonst ist ein input wieder hoeher als ein select');
+
+  // 3. Niemand faerbt das kanonische Feld mit einer zweiten Flaeche um.
+  const FIELD_PART = /(?:^|\s)(?:select|textarea)?\.(?:input|form-input)$/;
+  const refill = all.filter((rule) => parts(rule).some((p) => FIELD_PART.test(p))
+    && [...rule.body.matchAll(/(?:^|;)\s*background(?:-color)?\s*:\s*([^;]+)/g)]
+      .some((m) => /var\(--color-surface(?:-2|-work|-raised)?\)/.test(m[1])))
+    .map((rule) => `${rule.file}: ${rule.selector.trim()}`);
+  assert.deepEqual(refill, [], 'eine Regel gibt dem Feld eine eigene Flaeche statt --color-field-bg (zweite Feldhaut).');
+
+  // 4. Die Zahlen: dunkel ist das Feld eine Mulde UEBER der Karte (nicht das
+  //    Fast-Schwarz darunter), und die Kante steht am Minimum - nicht darunter
+  //    und nicht weit darueber.
+  const { light, dark } = themeTokenMaps();
+  const hex = (name, map) => resolveColor(name, map);
+  const lum = (h) => relLum([1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)));
+  assert.ok(lum(hex('--color-field-bg', dark)) > lum(hex('--color-surface', dark)),
+    `dunkel: das Feld (${hex('--color-field-bg', dark)}) muss heller sein als die Karte (${hex('--color-surface', dark)}) - eine Mulde, kein Loch`);
+  assert.ok(contrastRatio(hex('--color-text-placeholder', dark), hex('--color-field-bg', dark)) >= 4.5,
+    'dunkel: der Platzhalter haelt 4,5:1 auf der Feldmulde');
+  assert.ok(contrastRatio(hex('--color-text-placeholder', light), hex('--color-field-bg', light)) >= 4.5,
+    'hell: der Platzhalter haelt 4,5:1 auf der Feldflaeche');
+  const GROUNDS = ['--color-surface', '--color-surface-work', '--color-surface-raised', '--color-bg'];
+  for (const [theme, map] of [['light', light], ['dark', dark]]) {
+    const worst = Math.min(...GROUNDS.map((g) => contrastRatio(hex('--color-border-control', map), hex(g, map))));
+    assert.ok(worst >= 3, `${theme}: die Feldkante faellt auf ${worst.toFixed(2)}:1`);
+    assert.ok(worst <= 3.3, `${theme}: die Feldkante steht mit ${worst.toFixed(2)}:1 ueber dem Minimum - "leiser" heisst am knappsten Grund hoechstens 3,3:1`);
+  }
+
+  // 5. Die Auswahl: eigenes Zeichen, natives Blatt, RTL-Zwilling.
+  const select = all.find((rule) => rule.file === 'layout.css' && parts(rule).some((p) => /^select\.form-input\b/.test(p))
+    && /appearance:\s*none/.test(rule.body));
+  assert.ok(select, 'select.form-input traegt `appearance: none`');
+  assert.match(select.body, /background-image:\s*var\(--field-chevron\)/);
+  assert.match(select.body, /padding-inline-end:\s*var\(--space-8\)/, 'der Optionstext endet vor dem Zeichen');
+  assert.ok(parts(select).every((p) => /:not\(\[multiple\]\):not\(\[size\]\)/.test(p)), 'Listen-selects behalten ihr natives Bild');
+  assert.ok(all.some((rule) => rule.file === 'layout.css' && parts(rule).some((p) => /^\[dir="rtl"\] select\.form-input/.test(p))
+    && /background-position:\s*left/.test(rule.body)), 'das Zeichen wechselt in RTL die Seite');
+  const tokens = read('../public/styles/tokens.css');
+  assert.equal((tokens.match(/--_field-chevron:\s*url\(/g) ?? []).length, 3,
+    'das Zeichen hat einen hellen Wert und einen Zwilling in BEIDEN Dark-Bloecken');
+
+  // 6. Zahlfelder ohne Spin-Pfeile.
+  assert.ok(all.some((rule) => rule.file === 'layout.css' && /input\[type="number"\]::-webkit-inner-spin-button/.test(rule.selector)
+    && /appearance:\s*none/.test(rule.body)), 'Zahlfelder zeigen keine nativen Spin-Pfeile (WebKit/Blink)');
+  assert.ok(all.some((rule) => rule.file === 'layout.css' && rule.selector.trim() === 'input[type="number"]'
+    && /-moz-appearance:\s*textfield/.test(rule.body)), 'Zahlfelder zeigen keine nativen Spin-Pfeile (Firefox)');
+
+  // 7. Der Fokus eines Feldes ist die eine Stimme, nie ein Modulton.
+  const tonedFocus = all.filter((rule) => parts(rule).some((p) => /(?:__input|__qty|__cat|\.input|\.form-input|__select)(?::focus(?:-visible)?)$/.test(p))
+    && /var\(--module-/.test(rule.body))
+    .map((rule) => `${rule.file}: ${rule.selector.trim()}`);
+  assert.deepEqual(tonedFocus, [], 'ein Feld faerbt seinen Fokus mit einem Modulton - der Fokus ist violett (--color-accent).');
+});
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * R18: kleine Formen (2026-10-07)
+ *
+ * Fuenf Befunde, je an der Regel festgemacht, die sie behebt. Jeder Fall war
+ * gegen den Stand davor rot.
+ * ──────────────────────────────────────────────────────────────────────────── */
+const r18Rules = (file) => [...eachRule(read(`../public/styles/${file}`))];
+const r18Parts = (rule) => rule.selector.split(',').map((s) => s.trim().replace(/\s+/g, ' '));
+
+test('R18: die Einkaufszeile fuehrt die Menge in der Namenszeile und kappt den Namen nicht', () => {
+  const rules = r18Rules('shopping.css');
+  const main = rules.find((rule) => rule.at.length === 0 && r18Parts(rule).includes('.shopping-item .list-row__main'));
+  assert.ok(main, '.shopping-item .list-row__main fehlt');
+  assert.match(main.body, /display:\s*flex/);
+  assert.match(main.body, /flex-wrap:\s*wrap/, 'passt die Menge nicht neben den Namen, faellt SIE in die zweite Zeile - der Name schrumpft nicht');
+  assert.match(main.body, /align-items:\s*baseline/, 'Name und Menge stehen auf einer Grundlinie');
+  const qty = rules.find((rule) => rule.at.length === 0 && rule.selector.trim() === '.shopping-item__quantity');
+  assert.match(qty.body, /font-variant-numeric:\s*tabular-nums/);
+  assert.match(qty.body, /order:\s*1/, 'die Menge schliesst die Zeile rechts ab, das Etikett steht davor');
+  // Der P0 "Broc..." (Critique 2026-07-30): keine Regel kappt den Artikelnamen.
+  const cut = rules.filter((rule) => r18Parts(rule).some((p) => /\.shopping-item(?:--[\w-]+)? .*\.list-row__name$|\.shopping-item \.list-row__name$/.test(p))
+    && /text-overflow:\s*ellipsis|white-space:\s*nowrap|line-clamp/.test(rule.body));
+  assert.deepEqual(cut.map((rule) => rule.selector.trim()), [], 'der Artikelname bricht um, er wird nicht gekappt');
+});
+
+test('R18: die Leseansicht einer Notiz ist der Dialogkoerper in Zettelfarbe, mit EINEM Weg zum Bearbeiten', () => {
+  const rules = r18Rules('notes.css');
+  const view = rules.find((rule) => rule.at.length === 0 && rule.selector.trim() === '.note-read-view');
+  assert.ok(view, '.note-read-view fehlt');
+  assert.doesNotMatch(view.body, /(?:^|;)\s*border(?:-[\w-]+)?\s*:/, 'kein Kasten: die roetliche Kante ueber dem roten "Loeschen" las sich als Fehlermeldung');
+  assert.doesNotMatch(view.body, /border-radius/);
+  assert.match(view.body, /margin:\s*calc\(-1 \* var\(--space-4\)\)/, 'die Ansicht zieht sich ueber die Polsterung des Dialogkoerpers');
+  assert.match(cssRuleBody(read('../public/styles/layout.css'), '.modal-panel__body'), /padding:\s*var\(--space-4\)/,
+    'die Polsterung des Dialogkoerpers ist der Wert, den die Leseansicht ausgleicht');
+  assert.match(view.body, /background:\s*color-mix\(in srgb, var\(--note-color, transparent\) var\(--tint-surface\), transparent\)/,
+    'dieselbe Toenung wie vorher - die Kontrastrechnung der Zettelfarben gilt weiter');
+  assert.ok(rules.some((rule) => rule.selector.trim() === '.note-modal[data-view="read"] .note-mode-switch'
+    && /display:\s*none/.test(rule.body)), 'in der Leseansicht steht nur der Primaerknopf "Bearbeiten", nicht zusaetzlich der Reiter');
+  const page = read('../public/pages/notes.js');
+  const setView = page.slice(page.indexOf('function setView('), page.indexOf('// Haken im Lesemodus'));
+  assert.match(setView, /modeSwitch\?\.contains\(document\.activeElement\)/,
+    'verschwindet der Umschalter unter dem Fokus, uebernimmt ihn der Bearbeiten-Knopf');
+  assert.match(setView, /panel\.querySelector\('#note-modal-edit'\) \?\? readPane\)\.focus\(\)/);
+});
+
+test('R18: ein voller Leerzustand je Seite - Nebenabschnitte tragen die kompakte Form', () => {
+  const schedule = read('../public/pages/schedule.js');
+  for (const fn of ['emptyCustomFieldsState', 'emptyOverrideState', 'emptyExtraShiftsState']) {
+    const start = schedule.indexOf(`function ${fn}(`);
+    assert.ok(start > -1, `${fn} fehlt`);
+    const body = schedule.slice(start, schedule.indexOf('\n}\n', start));
+    assert.match(body, /compact:\s*true/, `${fn}: Nebenabschnitt, kompakte Form`);
+    assert.doesNotMatch(body, /\btitle:/, `${fn}: der Abschnittskopf nennt den Kontext, kein zweiter Titel`);
+    assert.doesNotMatch(body, /\bicon:\s*'calendar-clock'/, `${fn}: kein zweites Zeichen`);
+  }
+  // Der Hauptabschnitt der Planung behaelt den vollen Leerzustand.
+  const pattern = schedule.slice(schedule.indexOf('function emptyPatternState('), schedule.indexOf('function emptyShiftTypesState('));
+  assert.match(pattern, /title: t\('schedule\.emptyPatternsTitle'\)/);
+  assert.doesNotMatch(pattern, /compact:\s*true/);
+  const waste = read('../public/pages/waste.js');
+  const sources = waste.slice(waste.indexOf('function drawSources('), waste.indexOf('function drawSources(') + 1800);
+  assert.match(sources, /compact:\s*true,\s*description: t\('waste\.emptySourcesDescription'\)/, 'Importquellen: Nebenabschnitt, kompakt');
+  assert.match(sources, /tone: 'secondary'/, 'der Knopf darunter konkurriert nicht mit dem Primaerknopf der Seite');
+  const upcoming = waste.slice(waste.indexOf('function drawUpcoming('), waste.indexOf('function drawUpcoming(') + 700);
+  assert.match(upcoming, /title: t\('waste\.emptyUpcomingTitle'\)/, 'der volle Leerzustand der Seite bleibt oben');
+});
+
+test('R18: die Brettspalte ist eine Mulde unter den Karten, die leere Spalte traegt keinen Strichrahmen', () => {
+  const rules = r18Rules('tasks.css');
+  const col = rules.find((rule) => rule.at.length === 0 && rule.selector.trim() === '.kanban-col');
+  assert.match(col.body, /background-color:\s*var\(--color-board-well\)/);
+  const card = rules.find((rule) => rule.at.length === 0 && rule.selector.trim() === '.kanban-card');
+  assert.match(card.body, /background-color:\s*var\(--color-surface\)/);
+  const { light, dark } = themeTokenMaps();
+  const lumOf = (h) => relLum(hexToRgb(h));
+  for (const [theme, map] of [['light', light], ['dark', dark]]) {
+    const well = resolveColor('--color-board-well', map);
+    const surface = resolveColor('--color-surface', map);
+    assert.ok(lumOf(surface) > lumOf(well), `${theme}: die Karte (${surface}) muss HELLER sein als die Spalte (${well})`);
+    assert.ok(contrastRatio(surface, well) >= 1.15, `${theme}: Karte gegen Spalte nur ${contrastRatio(surface, well).toFixed(2)}:1`);
+    assert.ok(contrastRatio(resolveColor('--color-text-tertiary', map), well) >= 4.5, `${theme}: der Hinweis der leeren Spalte haelt 4,5:1`);
+  }
+  const empty = rules.find((rule) => rule.at.length === 0 && rule.selector.trim() === '.kanban-col__empty');
+  assert.match(empty.body, /border:\s*var\(--space-px\) dashed transparent/, 'in Ruhe keine sichtbare Kante');
+  assert.ok(rules.some((rule) => rule.selector.trim() === '.kanban-board:has(.sortable-chosen) .kanban-col__empty'
+    && /border-color:\s*var\(--module-accent/.test(rule.body)), 'erst der laufende Zug zeichnet das Ablageziel');
+});
+
+test('R18: der Hover einer waehlbaren Kennzahlkarte addiert - der Ring gehoert der Auswahl', () => {
+  const rules = r18Rules('panel.css');
+  const hover = rules.filter((rule) => r18Parts(rule).some((p) => /^\.metric-card--select(?:\.is-active)?:hover$/.test(p)));
+  assert.ok(hover.length >= 2, 'Hover-Regeln der waehlbaren Karte nicht gefunden');
+  for (const rule of hover) {
+    assert.ok(rule.at.some((a) => /hover:\s*hover/.test(a)), `${rule.selector.trim()}: nur fuer echte Zeiger`);
+    assert.match(rule.body, /var\(--shadow-md\)/, 'der Hover hebt den Schatten');
+  }
+  const plain = hover.find((rule) => r18Parts(rule).includes('.metric-card--select:hover'));
+  assert.doesNotMatch(plain.body, /inset/, 'kein Innenring im Hover: er saehe aus wie die Auswahl');
+  const active = rules.find((rule) => rule.at.length === 0 && rule.selector.trim() === '.metric-card--select.is-active');
+  assert.match(active.body, /inset 0 0 0 2px var\(--module-accent, var\(--color-accent\)\), var\(--shadow-sm\)/,
+    'die Auswahl traegt den Ring UEBER dem Schatten, den die Karte behaelt');
 });

@@ -5,7 +5,7 @@ import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { t, formatDate, parseDateInput, isDateInputValid, getLocale, formatUnit } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
-import { rowActionHtml } from '/utils/row-action.js';
+import { rowMenuHtml } from '/utils/row-action.js';
 import { readRowHtml, readRowHintHtml } from '/utils/read-row.js';
 import { pageToolsMenuHtml, pageToolsActionEl, installPopoverMenus } from '/utils/popover-menu.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -442,8 +442,18 @@ export function birthdayItemHtml(birthday) {
       <button type="button" class="list-row__main list-row__main--interactive" data-open="${birthday.id}" data-md-focus>${hauptspalte}${ro ? readRowHintHtml() : ''}</button>
       ${ro ? '' : `
       <div class="row-actions birthday-item__actions">
-        ${rowActionHtml({ icon: 'pencil', action: 'edit', label: t('common.editNamed', { name: birthday.name }), attrs: { 'data-id': birthday.id } })}
-        ${rowActionHtml({ icon: 'trash-2', tone: 'danger', action: 'delete', label: t('common.deleteNamed', { name: birthday.name }), attrs: { 'data-id': birthday.id } })}
+${/* EIN MEHR-KNOPF (Entscheidung 2026-10-07, utils/row-action.js): der
+             Tipp auf die Zeile oeffnet den Editor schon, Stift und Papierkorb
+             standen trotzdem in jeder Zeile. Beide sind jetzt Eintraege mit
+             Wort; Wischen bleibt der Zusatzweg. */ ''}
+        ${rowMenuHtml({
+          id: `birthday-menu-${birthday.id}`,
+          label: t('common.moreActionsNamed', { name: birthday.name }),
+          items: [
+            { action: 'edit', id: birthday.id, icon: 'pencil', label: t('common.edit') },
+            { action: 'delete', id: birthday.id, icon: 'trash-2', label: t('common.delete'), danger: true },
+          ],
+        })}
       </div>`}
     </article>
     </div>`;

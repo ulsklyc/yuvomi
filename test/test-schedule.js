@@ -1010,7 +1010,9 @@ test('the Overrides section groups consecutive same-type days and edits/deletes 
   assert.match(schedulePage, /function overrideGroups\(overrides = state\.overrides\)/);
   assert.match(schedulePage, /function rangeDifference\(oldFrom, oldTo, newFrom, newTo\)/);
   assert.match(schedulePage, /data-form="override-edit"/);
-  assert.match(schedulePage, /data-action="delete-override-range"/);
+  // Seit R18 (2026-10-07) ein Eintrag im Mehr-Knopf der Zeile (editDeleteMenu),
+  // mit denselben data-Attributen, die action() liest.
+  assert.match(schedulePage, /remove: \{ action: 'delete-override-range', attrs: \{ 'data-from': group\.from, 'data-to': group\.to, 'data-user-id': group\.user_id \} \}/);
   assert.match(schedulePage, /overrideGroups\(\)\.find\(/);
   const editBranch = schedulePage.slice(schedulePage.indexOf("form.dataset.form === 'override-edit'"), schedulePage.indexOf('await reloadAfterWrite();', schedulePage.indexOf("form.dataset.form === 'override-edit'")));
   // confirmOverModal(), not confirmModal(): the create/edit form is still open
@@ -1432,8 +1434,9 @@ test('the Extra shifts section groups consecutive same-type days and edits/delet
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
   assert.match(schedulePage, /function extraGroups\(extras = state\.extras\)/);
   assert.match(schedulePage, /data-form="extra-edit-range"/);
-  assert.match(schedulePage, /data-action="edit-extra-range"/);
-  assert.match(schedulePage, /data-action="delete-extra-range"/);
+  // Seit R18 (2026-10-07) Eintraege im Mehr-Knopf der Zeile (editDeleteMenu).
+  assert.match(schedulePage, /edit: \{ action: 'edit-extra-range', attrs: \{ 'data-ids': group\.ids\.join\(','\) \} \}/);
+  assert.match(schedulePage, /remove: \{ action: 'delete-extra-range', attrs: \{ 'data-ids': group\.ids\.join\(','\), 'data-user-id': group\.user_id, 'data-from': group\.from, 'data-to': group\.to \} \}/);
   assert.match(schedulePage, /extraGroups\(\)\.find\(/);
   assert.doesNotMatch(schedulePage, /function openExtraEditModal\(/, 'the single-row edit modal is fully replaced by the group modal');
   assert.doesNotMatch(schedulePage, /data-action="edit-extra"/, 'no single-row edit action should remain');

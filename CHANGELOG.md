@@ -9,6 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Fields are quieter and all look alike.** A field used to be drawn twice - a fill plus a
+  heavy outline - and in dark mode it was a near-black box with a bright edge. Fields now have
+  one skin everywhere: a thin outline that still meets the contrast needed to find it, on a fill
+  that carries it; in dark mode the field is a soft well instead of a black hole. Dropdowns are
+  as tall as the text fields beside them and show the same small arrow on every browser, number
+  fields no longer show the tiny up/down arrows, and the quick-add row of the shopping list
+  focuses in violet like every other field.
+- **Rows show fewer buttons.** Lists no longer carry a pencil and a bin on every line. Editing,
+  deleting and anything further sit behind one "more" button per row that is always visible and
+  names what it does in words. This applies to shopping items, birthdays, tasks, loan payments
+  and the five lists of the shift planner, where "Edit" and a red-outlined "Delete" stood on
+  every row. Deleting stays undoable or asks first, exactly as before, and swiping still works.
+  Meal cards no longer show a bin at all: open the meal to delete it.
+- **Shopping rows are one line.** The amount now stands at the end of the line with the name
+  instead of underneath it, so amounts line up in a column and the list shows more at once. A
+  long name still wraps instead of being cut off.
+- **Documents look like documents.** The preview shows the whole page as a sheet on a quiet
+  background instead of the cropped top of a white rectangle, and in dark mode it is no longer
+  the brightest thing on the screen. Cards are as tall as their content, with their buttons
+  right below the text, and there is room between the filter bar and the first row. The list
+  view shows the category symbol instead of a preview too small to read. On a desktop, opening a
+  PDF no longer shows the browser's own toolbar inside the viewer; "Open in new tab" and
+  "Download" remain the way to zoom and print (Safari keeps its toolbar).
+- **Reading a note looks like the note.** The text stood in a tinted box with a coloured edge,
+  which above the red "Delete" read like an error message. The whole reading view now takes the
+  colour of the note. "Edit" is one button instead of a button and a tab.
+- **One empty-state message per page.** Waste collection and the shift planner stacked two or
+  three large "nothing here yet" blocks. The main section keeps its message; the sections below
+  say it in one line with their button.
+- **The task board has depth.** Columns were as bright as the cards on them; they are now a
+  recessed lane with the cards lying on top, and an empty column no longer shows a dashed box.
+- **Hovering a figure tile no longer looks like selecting it.** The tile lifts slightly; the
+  coloured ring is kept for the selected one.
 - **Each money screen has one number that leads.** On a phone the largest thing on every budget
   tab was the word "Budget"; the balance stood beside it in small type. Now one figure per tab
   carries the screen: the balance in the overview, net worth in accounts, the remaining debt in

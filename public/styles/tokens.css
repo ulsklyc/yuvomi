@@ -263,6 +263,61 @@
    * --color-text-secondary (tertiaer faellt hell auf 4.27:1). */
   --color-fill-field:         var(--neutral-200);
 
+  /* DIE EINE FELDHAUT (R18, Entscheidung Ulas 2026-10-07: "leiser - 1 px, auf
+   * das 3:1-Minimum, die Fuellung traegt"). Bis dahin gab es zwei Fuellungen
+   * (--color-surface-work auf der Seite, --color-surface-2 im Dialog) und eine
+   * 1,5-px-Kante. Im Dark war --color-surface-2 das Fast-Schwarz #0F0E0D mit
+   * der hellen Kante #948E85 darum (4,51:1 gegen den Dialog #2B2825): ein
+   * Drahtgitter, in dem die Kante lauter war als der Inhalt.
+   *
+   * Hell bleibt die Arbeitsflaeche (Weiss): sie traegt auf der Buehne (1,12:1)
+   * und im Glas des Dialogs. Dunkel ist das Feld eine MULDE in der Stufe von
+   * --color-fill-well (#37332E): 1,17:1 UEBER dem Dialog und der Karte
+   * (#2B2825), 1,42:1 ueber der Buehne; Text darauf primaer 11,3:1, sekundaer
+   * 5,69:1, Platzhalter (tertiaer) 5,01:1.
+   *
+   * Die Kante ist 1 px in --color-border-control. Gerechnet gegen die UMGEBUNG
+   * (WCAG 1.4.11, die Grenze des Bedienelements gegen das, was daneben liegt):
+   *   hell   #8C8880: 3,53 auf Weiss, 3,38 auf -raised/-2, 3,18 auf der Buehne
+   *   dunkel #857F76: 3,69 auf -surface, 3,16 auf -raised, 4,47 auf der Buehne
+   * Hell steht das Token seit #1230 auf dem Minimum (3,18). Dunkel lag es mit
+   * der Rampenstufe #948E85 bei 3,86 bis 5,46 - die Dark-Bloecke setzen es
+   * deshalb selbst (#857F76; #807A71 fiele auf -raised auf 2,95).
+   *
+   * --field-chevron ist das Zeichen eines select mit appearance: none - der
+   * Lucide-Pfad chevron-down als Bild, weil ein select kein Pseudo-Element
+   * traegt, an dem eine Maske haengen koennte. Die Farbe steht deshalb IM Bild
+   * und hat einen Dark-Zwilling: hell #63615B (6,19:1 auf Weiss), dunkel
+   * #B4AEA5 (5,69:1 auf der Mulde, 6,66:1 auf -surface) - das Zeichen traegt
+   * die 3:1 als Erkennungsmerkmal auch dort, wo die Auswahl selbst keine Kante
+   * hat (die randlose Auswahl der Formularzeile, .form-row in layout.css).
+   * Guard: test-frontend-audit.js, "R18: eine Feldhaut". */
+  --_color-field-bg:          var(--_color-surface-work);
+  --color-field-bg:           var(--_color-field-bg);
+
+  /* DAS BLATT IN DER VORSCHAU (R18, 2026-10-07; documents.css
+   * `.document-thumb__img`). Ein gescanntes Dokument ist reinweiss. Hell liegt
+   * es voll auf der Mulde; dunkel scheint die Mulde (#37332E) zu 18 % durch:
+   * Weiss wird #DBDAD9 (L 0,70) und liegt damit unter der Primaertinte
+   * #F5F3ED (L 0,89) - das Blatt ist nicht mehr die hellste Flaeche des
+   * Bildschirms. Schwarzer Text darauf haelt 15,0:1 (statt 21). */
+  --_media-sheet-opacity:     1;
+  --media-sheet-opacity:      var(--_media-sheet-opacity);
+
+  /* DIE MULDE EINER BRETTSPALTE (R18, 2026-10-07; tasks.css `.kanban-col`).
+   * Eine Spalte steht auf der BUEHNE und traegt Karten (--color-surface) - sie
+   * braucht eine Stufe, die in beiden Themes UNTER der Karte liegt. Der
+   * Inset-Well (--color-fill-well) kann das nur hell: dunkel ist er #37332E
+   * und damit heller als die Karte (#2B2825), die Karten laegen als Loecher
+   * darin. Hell deshalb die Stufe des Wells (#EDEAE3: Karte 1,20:1 darueber,
+   * Buehne 1,08:1 darueber), dunkel die Stufe unter der Buehne (#0F0E0D:
+   * Karte 1,32:1 darueber, Buehne 1,09:1 darueber). Text auf der Spalte:
+   * sekundaer 5,15 / 8,76, tertiaer 4,69 / 7,71:1. */
+  --_color-board-well:        var(--_neutral-150);
+  --color-board-well:         var(--_color-board-well);
+  --_field-chevron:           url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2363615B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  --field-chevron:            var(--_field-chevron);
+
   /* DIE ZEILENLISTEN-REGEL (HIG-Rollout Runde 3, 2026-08-06).
    * Die Kasten-in-Kasten-Regel sagt, wie eine Zeile INNEN aussieht. Diese hier
    * sagt, worauf sie liegt - drei Vokabulare koexistierten (Zeile-in-Karte,
@@ -2151,6 +2206,12 @@
     --color-border-subtle: #3E3933;  /* Trenner, ruhige Kartenkante */
     --color-border:        #47423B;  /* Standardkante (Karten, Gruppen); Feldkanten: --color-border-control */
     --color-border-strong: #6F6A61;  /* Hover, betonte Rahmen (~2.7:1) */
+    /* Feldkante und Feldmulde (R18, Rechnung im :root-Block bei --color-field-bg). */
+    --color-border-control: #857F76;
+    --_color-field-bg:      #37332E;  /* = Stufe von --color-fill-well */
+    --_media-sheet-opacity: 0.82;
+    --_color-board-well:    #0F0E0D;  /* = --_neutral-50, unter der Buehne */
+    --_field-chevron:       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23B4AEA5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     /* Bahn des ausgeschalteten Schalters (#1572, Werte im :root-Block). Als Hex,
      * nicht als var(): die Naht zum Installer-Fallback vergleicht Wert fuer Wert. */
     --_color-switch-off:   #948E85;  /* = --_neutral-500 */
@@ -2423,6 +2484,12 @@
     --color-border-subtle: #3E3933;
     --color-border:        #47423B;
     --color-border-strong: #6F6A61;
+    /* Feldkante und Feldmulde (R18, Rechnung im :root-Block bei --color-field-bg). */
+    --color-border-control: #857F76;
+    --_color-field-bg:      #37332E;  /* = Stufe von --color-fill-well */
+    --_media-sheet-opacity: 0.82;
+    --_color-board-well:    #0F0E0D;  /* = --_neutral-50, unter der Buehne */
+    --_field-chevron:       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23B4AEA5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     --_color-switch-off:   #948E85;  /* = --_neutral-500 */
     /* Der Segmentdaumen: eine Stufe UEBER der Bahn (#37332E), Begruendung im :root-Block. */
     --_seg-active-bg:      #443E37;  /* = --_neutral-250 */

@@ -211,6 +211,9 @@
   align-items: start;
   gap: var(--space-4);
   padding-inline: var(--page-inline-pad);
+  /* Luft unter der Filterleiste (R18, 2026-10-07): Ordnerspalte und erste
+   * Kartenreihe begannen auf der Trennlinie der Leiste (gemessen 0px). */
+  padding-top: var(--space-4);
   /* Nur der eigene Abstand: Tab-Leiste und FAB rechnet die Shell als
    * Nachlauf (`--shell-tail`, layout.css, Kopfregel mobil 2026-09-26). */
   padding-bottom: var(--space-8);
@@ -708,6 +711,13 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(200px, calc(50% - var(--space-4) / 2)), 1fr));
   gap: var(--space-4);
+  /* KEINE GESTRECKTEN KARTEN (R18, 2026-10-07). Mit `stretch` wuchs jede Karte
+   * auf die hoechste ihrer Reihe, und weil der Textblock die Dehnung aufnahm,
+   * stand die Aktionszeile bis zu 54px unter der letzten Meta-Zeile in einem
+   * Loch. Jede Karte ist jetzt so hoch wie ihr Inhalt, die Leiste schliesst
+   * direkt an den Text an; die Oberkanten und die Vorschauen (feste Form)
+   * halten die Reihe. */
+  align-items: start;
 }
 
 /* Lade-Zustand: Grid/Flex aufheben, damit die geteilte Skeleton-Liste
@@ -791,8 +801,27 @@
   height: 22px;
 }
 
-/* DMS-Thumbnail-Vorschau (Issue #533): das geladene Bild überlagert den
-   Kategorie-Glyph im Icon-Slot. Schlägt das Laden fehl, bleibt der Glyph. */
+/* DIE VORSCHAU IST EIN BLATT AUF EINER MULDE (R18, 2026-10-07).
+ *
+ * Bis dahin fuellte das Bild einen 4:3-Rahmen per `object-fit: cover`: von
+ * einem A4-Blatt blieb das obere Drittel, ein weisses Rechteck mit sechs
+ * Zeilen Text, das in der weissen Karte nur eine Haarlinie vom Grund trennte -
+ * und im Dark die hellste Flaeche des Bildschirms war.
+ *
+ * Jetzt: der Rahmen ist hochkant (3:4, nahe am Blatt 1:1,41) und eine Mulde
+ * (--color-fill-well); das Bild liegt GANZ darin - `width/height: auto` mit
+ * `max-*: 100%` gibt dem <img> genau die Masse der Seite, also sitzt der
+ * Schatten am Blattrand und nicht am Rahmen (`object-fit: contain` bleibt als
+ * Rueckfall fuer ein Bild ohne eigene Masse). Ein Querformat (Foto, Kassenbon)
+ * steht ebenso ganz, mit Mulde darueber und darunter.
+ *
+ * DARK: --media-sheet-opacity (tokens.css) laesst die Mulde durch das Blatt
+ * scheinen - Weiss wird zu rund #DBD9D6 und ist nicht mehr heller als der
+ * Text daneben. Kein `filter`: `.app-content *` setzt ihn per !important
+ * zurueck (glass.css, Scroll-Performance #166).
+ *
+ * DMS-Vorschauen (#533) und lokale (document-thumbs.js) teilen die Regel.
+ * Schlaegt das Laden fehl, bleibt der Kategorie-Glyph stehen. */
 .document-thumb {
   position: relative;
   overflow: hidden;
@@ -805,63 +834,29 @@
 }
 
 .document-thumb__img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  background: var(--color-surface-2);
-  transition: transform var(--transition-base);
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: var(--radius-2xs);
+  box-shadow: var(--shadow-sm);
+  opacity: var(--media-sheet-opacity);
 }
 
-/* Die ganze Zeile ist bereits Klick-Ziel (cursor: pointer). Sobald ein Thumbnail
-   geladen ist, quittiert die kleine Kachel den Hover mit einem sanften Zoom - eine
-   kleine Bestätigung, dass diese Vorschau das Dokument öffnet. NUR die 42px-Kachel
-   der Zeile: auf der grossen Kartenvorschau schnitt derselbe Zoom den Briefkopf an,
-   und die Karte meldet den Hover schon mit ihrer Anhebung (Critique 2026-09-25). */
-.document-row__icon.document-thumb--ready:hover .document-thumb__img {
-  transform: scale(1.06);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .document-thumb__img {
-    transition: none;
-  }
-  .document-row__icon.document-thumb--ready:hover .document-thumb__img {
-    transform: none;
-  }
-}
-
-/* DIE VORSCHAU IST EIN AUSSCHNITT, KEIN ZERRBILD (Critique 2026-09-25,
- * Entscheidung 2). Jede Datei steht in einem Rahmen fester Form und fuellt ihn
- * per object-fit: cover - geschnitten, nie gestaucht (DESIGN.md, media-thumb).
- * Oben verankert, weil der Kopf eines Dokuments es erkennbar macht: Briefkopf,
- * Titel, Absender. Der Rahmen liegt als ::after UEBER dem Bild, sonst
- * verschwaende ein weisses Blatt im hellen Modus randlos in der weissen Karte. */
-.document-thumb--ready .document-thumb__img {
-  object-position: top center;
-}
-
-.document-thumb--ready::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  box-shadow: inset 0 0 0 1px var(--color-border-subtle);
-  pointer-events: none;
-}
-
-/* Die Rasterkarte traegt die grosse Vorschau oben. JEDE Karte hat den Rahmen,
- * auch ohne Bild (dann mit der Kategorie-Glyphe): eine Reihe bleibt eine Reihe,
- * und ein Bild, das erst beim Scrollen ankommt, schiebt nichts mehr zur Seite.
- * 4:3 statt 16:10 (Critique 2026-09-25): mit zwei bis drei Spalten ist die
- * Karte schmal, und der obere Ausschnitt eines Blatts (Briefkopf, Titel) liest
- * sich in einem etwas hoeheren Rahmen besser als in einem Breitbild. */
+/* Die Rasterkarte traegt die Vorschau oben. JEDE Karte hat den Rahmen, auch
+ * ohne Bild (dann mit der Kategorie-Glyphe): eine Reihe bleibt eine Reihe, und
+ * ein Bild, das erst beim Scrollen ankommt, schiebt nichts mehr zur Seite.
+ * Gemessen 1440px, vier Spalten: Rahmen 179 x 239px, Blatt 152 x 215px,
+ * Karte 394-414px (vorher 309px mit dem 4:3-Ausschnitt) - der Preis des
+ * ganzen Blatts sind rund 90px je Reihe; die dichte Sicht ist die Liste. */
 .document-card__media {
   display: flex;
   align-items: center;
   justify-content: center;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 3 / 4;
+  padding: var(--space-3);
   border-radius: var(--radius-sm);
   color: var(--color-text-tertiary);
   background: var(--color-fill-well);
@@ -880,9 +875,10 @@
   }
 }
 
+/* Nur der Anfang: das Ende ist die Deckkraft des Blatts selbst
+ * (--media-sheet-opacity), im Dark unter 1. */
 @keyframes document-thumb-in {
   from { opacity: 0; }
-  to { opacity: 1; }
 }
 
 .document-card__body {

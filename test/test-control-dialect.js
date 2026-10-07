@@ -187,6 +187,128 @@ export function scanRowAction(src) {
 }
 
 /**
+ * Zeilenaktionen: HOECHSTENS ZWEI sichtbar, der Rest im Mehr-Knopf
+ * (Entscheidung Ulas 2026-10-07, DESIGN.md "Zeilenaktionen"; ersetzt die alte
+ * ignore.md-Lesart "alles sichtbar").
+ *
+ * Gezaehlt wird je AKTIONSZONE: aufeinander folgende Zeilenaktionen im
+ * Quelltext, zwischen denen kein Container endet (`</div>`, `</li>`,
+ * `</article>`, `</tr>`, `</td>`, Ende eines Template-Literals). Eine Zone ist
+ * damit genau das, was in einer Zeile nebeneinander steht.
+ * NICHT gezaehlt, je mit Grund:
+ *  - der Mehr-Knopf selbst (`rowMenuHtml`, `row-action--more`,
+ *    `popover-menu__trigger`, `aria-haspopup`, Icon ellipsis/more-*): er ist
+ *    der eine Ort fuer alles Weitere;
+ *  - der Zieh-Griff (`list-row__drag`, `__handle`, Icon grip-*) und sein
+ *    Tastaturpfad, das Auf/Ab-Paar der Verwalter (Icon chevron-up/-down,
+ *    arrow-up/-down): Umsortieren ist eine Geste an der Zeile, keine Aktion
+ *    ueber ihren Inhalt.
+ */
+const MORE_ICONS = /^(?:ellipsis|ellipsis-vertical|more-horizontal|more-vertical)$/;
+const REORDER_ICONS = /^(?:grip-vertical|grip-horizontal|grip|chevron-up|chevron-down|arrow-up|arrow-down)$/;
+const ZONE_END = /<\/(?:div|li|article|tr|td|header|section|ul)>|`\s*[;,)]/g;
+
+/** Der Text eines Aufrufs `name({ ... })` ab `openIdx` (Index der Klammer), klammerbalanciert. */
+function callText(src, openIdx) {
+  let depth = 0;
+  for (let i = openIdx; i < src.length && i < openIdx + 2500; i += 1) {
+    if (src[i] === '(') depth += 1;
+    else if (src[i] === ')') { depth -= 1; if (depth === 0) return src.slice(openIdx, i + 1); }
+  }
+  return src.slice(openIdx, openIdx + 400);
+}
+
+function rowActionsOf(src) {
+  const out = [];
+  for (const c of templateControls(src)) {
+    if (!/\brow-action\b/.test(c.cls)) continue;
+    const more = /\brow-action--more\b|\bpopover-menu__trigger\b/.test(c.cls) || /aria-haspopup/.test(c.attrs) || MORE_ICONS.test(c.icon);
+    const reorder = /\blist-row__drag\b|__handle\b/.test(c.cls) || REORDER_ICONS.test(c.icon);
+    out.push({ index: c.index, kind: more ? 'more' : reorder ? 'reorder' : 'action', what: c.icon || c.cls,
+      danger: /\brow-action--danger\b/.test(c.cls) || /^trash/.test(c.icon) });
+  }
+  const call = /\b(rowActionHtml|rowActionEl|rowMenuHtml)\(/g;
+  let m;
+  while ((m = call.exec(src))) {
+    if (inComment(src, m.index)) continue;
+    if (/(?:function|import)\s+$/.test(src.slice(Math.max(0, m.index - 12), m.index))) continue;
+    const text = callText(src, m.index + m[1].length);
+    const icon = (text.match(/\bicon:\s*['"]([\w-]+)['"]/) || [])[1] ?? '';
+    const more = m[1] === 'rowMenuHtml' || MORE_ICONS.test(icon) || /aria-haspopup|__menu\b|menu__trigger/.test(text);
+    const reorder = REORDER_ICONS.test(icon) || /list-row__drag|__handle\b/.test(text);
+    out.push({ index: m.index, kind: more ? 'more' : reorder ? 'reorder' : 'action', what: icon || m[1],
+      danger: m[1] !== 'rowMenuHtml' && (/\btone:\s*['"]danger['"]/.test(text) || /^trash/.test(icon)) });
+  }
+  return out.sort((a, b) => a.index - b.index);
+}
+
+export function scanRowActionCount(src) {
+  const ends = [...src.matchAll(ZONE_END)].map((m) => m.index);
+  const found = [];
+  let zone = [];
+  let e = 0;
+  const flush = () => {
+    const visible = zone.filter((a) => a.kind === 'action');
+    if (visible.length > 2) {
+      found.push({ line: lineOf(src, zone[0].index), what: `${visible.length} sichtbare Zeilenaktionen (${visible.map((a) => a.what).join(', ')})` });
+    }
+    zone = [];
+  };
+  for (const action of rowActionsOf(src)) {
+    let crossed = false;
+    while (e < ends.length && ends[e] < action.index) { e += 1; crossed = true; }
+    if (crossed) flush();
+    zone.push(action);
+  }
+  flush();
+  return found;
+}
+
+/**
+ * Der zweite Satz der Regel: ALLES DESTRUKTIVE steht im Mehr-Knopf. Ein
+ * dauerhaft sichtbarer Papierkorb (`row-action--danger`, `tone: 'danger'`,
+ * Icon trash*) ist ein Fund. Das ist ein RATCHET mit Bestand: die Kette vom
+ * 2026-10-07 hat die im Auftrag genannten Listen umgestellt, die uebrigen
+ * Zeilen mit Stift + Papierkorb stehen in PENDING und werden nur weniger.
+ */
+export function scanRowDangerVisible(src) {
+  return rowActionsOf(src)
+    .filter((a) => a.kind === 'action' && a.danger)
+    .map((a) => ({ line: lineOf(src, a.index), what: `sichtbar destruktiv (${a.what})` }));
+}
+
+/**
+ * Keine Textkapsel als Zeilenaktion: ein beschrifteter `.btn`, der in einer
+ * LISTENZEILE Bearbeiten/Loeschen anbietet (der Schichtplan trug fuenf Listen
+ * mit "Bearbeiten" und einem rot umrandeten "Loeschen" je Zeile). Die Zeile
+ * erkennt der Scanner am Markup daneben: steht im selben Baustein (bis 300
+ * Zeichen davor, 1500 danach und hoechstens bis zum Ende der Funktion - die
+ * Aktionen werden vor der Zeile gebaut, in die sie eingesetzt werden) ein
+ * Element mit der Klasse `list-row`, ist der Knopf eine Zeilenaktion. Ein
+ * Knopf in einem Dialogfuss oder einer Formular-Aktionszeile bleibt, was er ist.
+ */
+export function scanRowTextCapsule(src) {
+  const found = [];
+  for (const c of templateControls(src)) {
+    if (!/\bbtn\b/.test(c.cls) || c.iconOnly) continue;
+    if (!ROW_VERBS.test(c.action)) continue;
+    // Der Baustein endet am Ende seiner Funktion (schliessende Klammer in
+    // Spalte 0) - eine Zeile der NAECHSTEN Funktion macht den Knopf nicht zur
+    // Zeilenaktion.
+    const before = src.slice(Math.max(0, c.index - 300), c.index);
+    const fnEnd = src.slice(c.index, c.index + 1500).search(/\n\}\n/);
+    const after = src.slice(c.index, c.index + (fnEnd === -1 ? 1500 : fnEnd));
+    // Ein Knopf, dessen naechster Behaelter davor ein Dialogfuss oder eine
+    // Formular-Aktionszeile ist, gehoert dem Dialog.
+    const holder = [...before.matchAll(/<(?:div|span|footer)\b[^>]*class="([^"]*)"/g)].pop()?.[1] ?? '';
+    if (/footer|form-actions/.test(holder)) continue;
+    if (!/class="list-row(?:"|\s)/.test(before + after)) continue;
+    found.push({ line: lineOf(src, c.index), what: `${c.cls} [${c.action}]` });
+  }
+  return found;
+}
+
+/**
  * Punkt 1b: eine `.row-action`, deren Name das Objekt nicht nennt - `aria-label`
  * ist genau EIN `t('key')` ohne Parameter und sonst nichts. Zwoelf Zeilen, die
  * alle "Anrufen" heissen, sind fuer einen Screenreader eine Zeile (Persona Sam).
@@ -678,6 +800,67 @@ test('Scanner: row-action faengt Eigenbau-Zeilenaktionen (Template und DOM) und 
   assert.deepEqual(scanRowAction(good), []);
 });
 
+test('Scanner: row-action-count zaehlt je Zone und laesst Mehr-Knopf, Griff und Auf/Ab aus', () => {
+  const bad = `
+    <div class="list-row__actions">
+      <button class="row-action list-row__drag" aria-label="\${a}"><i data-lucide="grip-vertical"></i></button>
+      <button class="row-action" data-action="copy" aria-label="\${a}"><i data-lucide="copy"></i></button>
+      <button class="row-action" data-action="item-details" aria-label="\${a}"><i data-lucide="pencil"></i></button>
+      <button class="row-action row-action--danger" data-action="delete-item" aria-label="\${a}"><i data-lucide="trash-2"></i></button>
+    </div>
+    <div class="row-actions">
+      \${rowActionHtml({ icon: 'eye', label: a })}
+      \${rowActionHtml({ icon: 'download', label: a })}
+      \${rowActionHtml({ icon: 'share-2', label: a })}
+    </div>`;
+  assert.equal(scanRowActionCount(bad).length, 2);
+  const good = `
+    <div class="list-row__actions">
+      <button class="row-action list-row__drag" aria-label="\${a}"><i data-lucide="grip-vertical"></i></button>
+      \${rowMenuHtml({ id, label, items: [{ action: 'edit' }, { action: 'delete' }] })}
+    </div>
+    <div class="row-actions">
+      \${rowActionHtml({ icon: 'chevron-up', label: a })}
+      \${rowActionHtml({ icon: 'chevron-down', label: a })}
+      \${rowActionHtml({ icon: 'pencil', label: a })}
+      \${rowActionHtml({ icon: 'trash-2', label: a })}
+    </div>
+    <div class="row-actions">
+      \${rowActionHtml({ icon: 'eye', label: a })}
+      \${rowActionHtml({ icon: 'download', label: a })}
+      \${rowActionHtml({ icon: 'more-vertical', label: a, attrs: { 'aria-haspopup': 'menu' } })}
+    </div>
+    <div class="row-actions">\${rowActionHtml({ icon: 'pencil', label: a })}\${rowActionHtml({ icon: 'trash-2', label: a })}</div>
+    <div class="row-actions">\${rowActionHtml({ icon: 'phone', label: a })}</div>`;
+  assert.deepEqual(scanRowActionCount(good), []);
+});
+
+test('Scanner: row-danger-visible faengt den sichtbaren Papierkorb und laesst den Menue-Eintrag durch', () => {
+  const bad = `
+    <button class="row-action row-action--danger" data-action="delete-item" aria-label="\${a}"><i data-lucide="trash-2"></i></button>
+    \${rowActionHtml({ icon: 'trash-2', tone: 'danger', label: a })}`;
+  assert.equal(scanRowDangerVisible(bad).length, 2);
+  const good = `
+    \${rowActionHtml({ icon: 'pencil', label: a })}
+    \${rowMenuHtml({ id, label, items: [{ action: 'delete', icon: 'trash-2', danger: true }] })}`;
+  assert.deepEqual(scanRowDangerVisible(good), []);
+});
+
+test('Scanner: row-text-capsule faengt die beschriftete Kapsel in einer Listenzeile und laesst den Dialogfuss durch', () => {
+  const bad = `
+    const actions = '<span><button type="button" class="btn btn--secondary" data-action="edit-shift-type">' + esc(t('common.edit')) + '</button>'
+      + '<button type="button" class="btn btn--danger-outline" data-action="delete-shift">' + esc(t('schedule.delete')) + '</button></span>';
+    return '<div class="list-row schedule-type-row">' + actions + '</div>';`;
+  assert.equal(scanRowTextCapsule(bad).length, 2);
+  const good = `
+    <div class="modal-panel__footer">
+      <button type="button" class="btn btn--danger-outline" data-action="delete-entry"><i data-lucide="trash-2"></i>\${t('common.delete')}</button>
+    </div>
+    <div class="list-row x">\${rowMenuHtml({ id, label, items })}</div>
+    <div class="list-row y"><button class="btn btn--secondary" data-action="quick-start">\${t('a')}</button></div>`;
+  assert.deepEqual(scanRowTextCapsule(good), []);
+});
+
 test('Scanner: row-action-name faengt den nackten Namen und laesst den Namen mit Objekt durch', () => {
   const bad = `
     <a class="row-action" href="tel:1" aria-label="\${t('contacts.call')}"><i data-lucide="phone"></i></a>
@@ -974,6 +1157,43 @@ test('Zeilenaktionen sind dauerhaft sichtbar: keine Regel blendet einen Aktions-
 const PENDING = {
   'row-action': {},
   'row-action-name': {},
+  // R18 (2026-10-07): Einkauf, Geburtstage, Schichtplan (fuenf Listen),
+  // Darlehenstilgungen und Aufgaben sind umgestellt; der Essensplan traegt
+  // keinen Papierkorb mehr. Ab hier ist jede neue Zone mit mehr als zwei
+  // sichtbaren Zeilenaktionen und jede Textkapsel in einer Zeile rot.
+  'row-action-count': {
+    // BENANNTE AUSNAHME, keine Altlast: die Leiste im KOPF DES
+    // DOKUMENTBETRACHTERS (In neuem Tab, Bearbeiten, Teilen, Herunterladen).
+    // Sie ist die Werkzeugleiste eines geoeffneten Dokuments, keine Zeile
+    // einer Liste - ihre Knoepfe leiht sie sich nur von `.row-action`. Die
+    // Regel "zwei sichtbar" gilt der Wiederholung je Zeile; diese Leiste
+    // steht einmal.
+    'public/pages/documents.js': 1,
+  },
+  'row-text-capsule': {},
+  // BESTAND 2026-10-07 (R18), nur nach UNTEN: Zeilen, die ihren Papierkorb
+  // noch dauerhaft zeigen. Die Kette hat die im Auftrag genannten Listen
+  // umgestellt (Einkauf, Geburtstage, Schichtplan, Darlehen, Aufgaben,
+  // Essensplan); diese hier sind die uebrigen - Verwalter-Dialoge
+  // (Kategorien, Etiketten, Abo-Kategorien), Formularzeilen (Zutat entfernen),
+  // Kommentare, Einstellungslisten. Wer eine anfasst, zieht sie auf
+  // `rowMenuHtml()` um und senkt die Zahl.
+  'row-danger-visible': {
+    'public/components/category-manager.js': 1,
+    'public/components/tag-manager.js': 1,
+    'public/components/task-detail.js': 1,
+    'public/pages/contacts.js': 1,
+    'public/pages/health-fasting.js': 1,
+    'public/pages/health.js': 2,
+    'public/pages/housekeeping.js': 1,
+    'public/pages/notes.js': 1,
+    'public/pages/subscriptions.js': 1,
+    'public/pages/tasks.js': 1,
+    'public/settings/pages/admin-api.js': 1,
+    'public/settings/pages/admin-family.js': 2,
+    'public/settings/pages/personal-calendar-subscriptions.js': 1,
+    'public/utils/ingredient-row.js': 1,
+  },
   'search-field': {},
   'list-rows': {
     // Die drei Selektoren von `.list-rows` selbst. Kein Markup rendert die
@@ -1019,6 +1239,9 @@ const HEAD_SEARCH = headSearchClasses(JS);
 const RULES = {
   'row-action': { files: JS, scan: (s) => scanRowAction(s), canon: '`.row-action` / `.row-action--danger` (utils/row-action.js `rowActionHtml`)' },
   'row-action-name': { files: JS, scan: (s) => scanRowActionName(s), canon: 'aria-label mit Objekt, z. B. `t(\'common.deleteNamed\', { name })`' },
+  'row-action-count': { files: JS, scan: (s) => scanRowActionCount(s), canon: 'hoechstens zwei sichtbare `.row-action` je Zeile, der Rest in `rowMenuHtml()` (utils/row-action.js)' },
+  'row-text-capsule': { files: JS, scan: (s) => scanRowTextCapsule(s), canon: 'Bearbeiten/Loeschen einer Listenzeile = `rowMenuHtml()`, keine beschriftete `.btn`-Kapsel' },
+  'row-danger-visible': { files: JS, scan: (s) => scanRowDangerVisible(s), canon: 'Loeschen einer Zeile = Eintrag in `rowMenuHtml()` (`danger: true`), kein sichtbarer Papierkorb' },
   'search-field': { files: JS, scan: (s) => scanSearchField(s), canon: '`renderPageSearch()` aus utils/page-search.js (gefuellte Kapsel)' },
   'list-rows': { files: [...JS, ...CSS], scan: (s, f) => (f.endsWith('.css') ? scanListRowsCss(s) : scanListRowsJs(s)), canon: '`.row-carrier` (list-row.css)' },
   'floating-fab': { files: JS, scan: (s) => scanFloatingFab(s), canon: '`page-fab` mit `dockLabel` (utils/fab.js)' },
