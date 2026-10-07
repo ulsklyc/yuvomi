@@ -23,6 +23,7 @@ import {
   memberOrderSql, memberPositionSql,
 } from './services/household-members.js';
 import { RemovalRefused, removeUser } from './services/user-removal.js';
+import { cleanupHermesProfile } from './services/hermes-profile-cleanup.js';
 import {
   DISPLAY_COOKIE, DISPLAY_SCOPES, authenticateDisplayDevice, displayCookieIdentity, displayCookieOptions,
   displayMayRead, displayTokenFromRequest, isDisplayAccount, markDisplayCookieRefreshed,
@@ -3701,7 +3702,7 @@ router.patch('/me/password', requireAuth, csrfMiddleware, async (req, res) => {
  * Die Antwort bleibt 200 `{ ok: true }` und sagt zusaetzlich, was geschah.
  * Response: { ok: true, outcome: 'deactivated'|'deleted', traces: [{ table, column, rows }] }
  */
-router.delete('/users/:id', requireAuth, requireAdmin, csrfMiddleware, (req, res) => {
+router.delete('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req, res) => {
   try {
     const userId = parseInt(req.params.id, 10);
 
@@ -3717,18 +3718,25 @@ router.delete('/users/:id', requireAuth, requireAdmin, csrfMiddleware, (req, res
 
     // Synchron bis zum Ende: Entscheidung, die beiden Administrator-Riegel und
     // jedes Schreiben laufen in EINER Transaktion, ohne `await` dazwischen.
+    const refusal = () => {
+      const adminError = assertAdminWouldRemain(userId, 'member');
+      if (adminError) return new RemovalRefused(adminError, 'last_admin');
+      const ssoAdminError = assertSsoAdminWouldRemain(userId, null);
+      if (ssoAdminError) return new RemovalRefused(ssoAdminError, 'last_sso_admin');
+      return null;
+    };
+    // Fail before changing Yuvomi state when the configured Hermes lifecycle
+    // cannot remove its matching personal profile. The removal function repeats
+    // the guards inside its transaction to protect against a concurrent change.
+    const preflightRefusal = refusal();
+    if (preflightRefusal) throw preflightRefusal;
+    await cleanupHermesProfile(userId);
     const result = removeUser(db.get(), userId, {
       // Beide Riegel gelten fuer beide Ausgaenge: auch ein deaktiviertes Konto
       // ist kein Administrator mehr (`member` bzw. `null` = keine Rolle uebrig).
       // Der zweite ist der dritte Weg, auf dem der letzte SSO-Administrator
       // verschwinden kann (#847).
-      refuse: () => {
-        const adminError = assertAdminWouldRemain(userId, 'member');
-        if (adminError) return new RemovalRefused(adminError, 'last_admin');
-        const ssoAdminError = assertSsoAdminWouldRemain(userId, null);
-        if (ssoAdminError) return new RemovalRefused(ssoAdminError, 'last_sso_admin');
-        return null;
-      },
+      refuse: refusal,
     });
 
     if (result.outcome === 'not_found') {
