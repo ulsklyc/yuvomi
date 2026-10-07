@@ -959,6 +959,8 @@ test('Klick neben das Popover schliesst es und loest darunter nichts aus', async
     }
     setAttribute(k, v) { this.attrs[k] = String(v); }
     getAttribute(k) { return this.attrs[k] ?? null; }
+    // R18: das geschlossene Popover gibt seine Kennung sofort frei (leavePopover).
+    removeAttribute(k) { delete this.attrs[k]; if (k === 'id') this.id = ''; }
     appendChild(c) { if (c && typeof c === 'object') c.parent = this; this.children.push(c); return c; }
     append(...cs) { cs.forEach((c) => this.appendChild(c)); }
     replaceChild(next, prev) { const i = this.children.indexOf(prev); this.children[i] = next; next.parent = this; }

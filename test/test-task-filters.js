@@ -1035,7 +1035,10 @@ test('R17: das Formular ruft die Ankunft nur nach dem ANLEGEN, nach dem Neuzeich
   // Erst die Liste, dann - nur ohne taskId (Anlegen) - die neue Zeile; und die
   // erst, wenn der Dialog zu ist und seinen History-Marker zurueckgegeben hat:
   // sonst schriebe die Auswahl `?open=` auf den Marker-Eintrag.
-  assert.match(tail, /if \(!taskId && savedTaskId\) \{\s*whenModalClosed\(\)\s*\.then\(\(\) => whenHistorySettled\(\)\)\s*\.then\(\(\) => revealCreatedTask\(container, savedTaskId\)\);/);
+  // R18: der Dialog schliesst schon VOR dem Neuzeichnen - die Reihenfolge der
+  // Enthuellung bleibt, und nach ihr zieht der Fokus nach (sie kann die Gruppe
+  // aufklappen und die Liste noch einmal zeichnen).
+  assert.match(tail, /if \(!taskId && savedTaskId\) \{\s*whenModalClosed\(\)\s*\.then\(\(\) => whenHistorySettled\(\)\)\s*\.then\(\(\) => \{\s*(?:\/\/[^\n]*\n\s*)*revealCreatedTask\(container, savedTaskId\);\s*refocusAfterRender\(\);\s*\}\);/);
   // Ins Bild VOR dem Einziehen: danach ist die Zeile 0px hoch.
   const fn = src.slice(src.indexOf('function revealCreatedTask('), src.indexOf('\n}\n', src.indexOf('function revealCreatedTask(')));
   assert.ok(fn.indexOf("row.scrollIntoView?.({ block: 'nearest' });") < fn.indexOf('expandIn(row);'));

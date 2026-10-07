@@ -24,6 +24,7 @@ import {
   focusFirstField, updateHeaderAction, rememberFocus, restoreFocusAfterClose,
 } from '/components/modal.js';
 import { pushOverlay, dropOverlay } from '/utils/overlay-history.js';
+import { durationToken } from '/utils/ux.js';
 import { detailPaneHeaderEl } from '/utils/master-detail.js';
 
 // Ab dieser Breite ist ein Popover am Auslöser die bessere Präsentation: Der
@@ -617,6 +618,25 @@ function positionPopover(popover, anchor) {
 
   popover.style.top = `${Math.min(Math.max(POPOVER_MARGIN, top), maxTop)}px`;
   popover.style.left = `${left}px`;
+  // Der Ausgang nimmt die Karte zum Anker hin zurueck (detail-view.css): der
+  // Ursprung ist die Kante am Anker, waagerecht dessen Anfang - in px
+  // gerechnet wie die Position selbst, also ohne physische Seite im Blatt.
+  popover.style.transformOrigin = `${Math.round(Math.min(Math.max(0, rect.left - left), popRect.width))}px ${fitsBelow ? '0' : '100%'}`;
+}
+
+/**
+ * Nimmt ein geschlossenes Popover aus dem Baum - NACH seinem Ausgang
+ * (Critique R18: es war in einem Frame weg). Der Zustand ist beim Aufruf schon
+ * geschlossen (Marker, Fokus, `onClose`); hier geht nur noch das Bild. Die
+ * Kennung faellt sofort: das naechste Popover traegt sie, und zwei Knoten mit
+ * `#detail-view-popover` faende jede Abfrage den falschen.
+ */
+function leavePopover(el) {
+  el.removeAttribute('id');
+  el.setAttribute('aria-hidden', 'true');
+  el.inert = true;
+  el.classList.add('detail-popover--closing');
+  setTimeout(() => el.remove(), durationToken('--duration-xs', 120) + 40);
 }
 
 function openAsPopover(opts) {
@@ -932,7 +952,7 @@ export function closeDetailView({ force = false, fokus = true } = {}) {
     const { el, teardown, onClose, overlayToken, merker } = activePopover;
     activePopover = null;
     teardown();
-    el.remove();
+    leavePopover(el);
     dropOverlay(overlayToken);
     if (typeof onClose === 'function') onClose();
     // Hier wurde AN modal.js VORBEI geschlossen. Der Fokus geht an den Ausloeser

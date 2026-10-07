@@ -396,6 +396,22 @@
   animation: detail-pane-enter var(--duration-sm) var(--ease-out);
 }
 
+/* DER AUSGANG (Critique R18): die Karte blendete ein und war beim Schliessen
+ * in einem Frame weg. Jetzt die Grammatik des Popover-Menues: sie blendet aus
+ * und nimmt 4 % zurueck, zum Anker hin (`transform-origin` setzt
+ * positionPopover in detail-view.js), kuerzer als die Einfahrt und ohne noch
+ * einen Zeiger zu nehmen. detail-view.js nimmt den Knoten danach aus dem Baum.
+ * ZWEI KLASSEN IM SELEKTOR: der Ausgang muss die Einfahrt schlagen, gleich wo
+ * er steht (test:motion, Guard 1). */
+@keyframes detail-popover-out {
+  to { opacity: 0; transform: scale(0.96); }
+}
+
+.detail-popover.detail-popover--closing {
+  animation: detail-popover-out var(--duration-xs) var(--ease-out) forwards;
+  pointer-events: none;
+}
+
 /* Nur die Zeilen scrollen; Titel und Fußzeile bleiben stehen. Dieselbe
  * Aufteilung, die .modal-panel im Sheet-Modus ohnehin hat. */
 .detail-popover > .detail-view {
@@ -428,6 +444,12 @@
   .detail-popover,
   .detail-pane--enter {
     animation: none;
+  }
+
+  /* Ohne Bewegung ist der Ausgang ein Schnitt: die Karte ist sofort weg. */
+  .detail-popover.detail-popover--closing {
+    animation: none;
+    opacity: 0;
   }
 
   .modal-panel--resizing {

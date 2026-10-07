@@ -39,6 +39,9 @@ const TOOLBAR_NAME = 'page-toolbar';
 /** Klasse an <html>, unter der Seitenleiste und Kapsel ihren Namen tragen. */
 const SWAPPING_CLASS = 'page-swapping';
 
+/** Klasse an <html> fuer die Dauer eines Theme-Wechsels (kein Chrome-Name). */
+const THEME_CLASS = 'theme-swapping';
+
 /** Pfad, von dem der laufende Seitenwechsel kommt - null beim Kaltstart. */
 let _from = null;
 /** Zaehlt die Wechsel; nur der juengste raeumt den Kopfnamen ab. */
@@ -137,4 +140,40 @@ export async function swapPage(update, { content, from = null, animate = true } 
   // Wirft, wenn `update` wirft - der Router faengt es in seinem catch.
   await transition.updateCallbackDone;
   return { transition: true, finished };
+}
+
+
+/**
+ * Fuehrt einen GEWAEHLTEN Theme-Wechsel aus - als Blende ueber die Wurzel, wo
+ * der Browser sie kann (Critique R18: hell <-> dunkel schlug in einem Frame um,
+ * jede Flaeche einzeln).
+ *
+ * Kein Name, kein Chrome, das steht: das ganze Dokument blendet vom alten ins
+ * neue Bild, in der Dauer der Seitenblende (`::view-transition-*(root)` in
+ * layout.css). `page-swapping` bleibt aus - die Leisten wechseln ihre Farbe
+ * mit und duerfen nicht als lebendes Bild ueber einem alten Grund stehen.
+ *
+ * NUR FUER DIE WAHL IN DEN EINSTELLUNGEN. Der Nachtwechsel des Wandmodus
+ * (utils/wall-mode.js) schaltet ohne Blende: dort schaut niemand hin, und eine
+ * Blende an einem Wandtablett ist eine Bewegung ohne Anlass.
+ *
+ * `update` laeuft genau einmal. Ohne API, im verdeckten Tab und unter
+ * reduzierter Bewegung synchron (ein Fehler daraus kommt beim Aufrufer an),
+ * sonst im Callback der Transition.
+ *
+ * @param {() => void} update  setzt das Theme
+ * @returns {Promise<void>} aufgeloest, wenn die Blende durch ist
+ */
+export function swapTheme(update) {
+  if (!canViewTransition()) {
+    update();
+    return Promise.resolve();
+  }
+  const root = document.documentElement;
+  root?.classList.add(THEME_CLASS);
+  const transition = document.startViewTransition(update);
+  transition.ready?.catch?.(() => {});
+  return Promise.resolve(transition.finished)
+    .catch(() => {})
+    .finally(() => root?.classList.remove(THEME_CLASS));
 }

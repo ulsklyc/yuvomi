@@ -1223,6 +1223,38 @@ das Verhaeltnis haelt.
   Knoten und ihre Auswahl-Kapsel gleitet zum Ziel. Ohne API eine reine Blende, nie Versatz
   oder Feder auf Inhalt. Ausgaenge (Sheet, Dialog, Overlay) laufen auf jeder Breite und
   schlagen ihre Einfahrt per Spezifitaet, nicht per Ladereihenfolge (Guard `test:motion`).
+  Seit R18 traegt die KAPSEL den Namen `nav-bottom` selbst (nicht ihr Elternknoten: der wurde
+  zur Backdrop Root, das Glas fiel fuer die Dauer der Blende aus), ihre Pille und der
+  schwebende FAB haben eigene Namen und stehen. `fab-in` ist die Ankunft EINES FAB, nicht jeder
+  Seite: es spielt nur, wenn die Vorseite keinen hatte (`html.fab-steady`). Unter der Blende
+  staffelt keine Liste (`stagger` schweigt waehrend `html.page-swapping`).
+- **Bewegung haengt an der Beruehrung, nicht am Zustand (R18):** eine Zustandsklasse
+  (`--checked`, `--done`, `.is-*`) traegt Aussehen, nie eine `animation` - sie spielte bei jedem
+  Neuzeichnen auf Zeilen, die niemand beruehrt hat. Die Quittung eines Hakens startet der
+  Handler: `acknowledgeCheck(el, { checked })` in `utils/ux.js`, ein Ueberschwinger
+  (1 - 1,16 - 1 in `--duration-md`), beim Zuruecknehmen ein Nachgeben (1 - 0,9 - 1 in
+  `--duration-sm`). Wer danach neu zeichnet, wartet auf ihr Promise. Guard: `test:motion`
+  (`STATE_ANIMATION_EXCEPTIONS`, zwei benannte Stellen am Large Title).
+- **Drill-down hat eine Richtung (R18):** wo eine Ebene die andere ERSETZT (Einstellungen ohne
+  Seitenleiste: Uebersicht <-> Blatt; Gesundheit schmal: Uebersicht <-> Bereich), laeuft der
+  Wechsel ueber `swapContent` mit `direction` +1 hinein, -1 zurueck. Das ist die benannte
+  Ausnahme zur Regel "Seiteninhalt blendet nur": die gilt dem Tab-Wechsel zwischen
+  Geschwistern. Neben einer Seitenleiste bzw. in der Split-Ansicht bleibt es bei der Blende.
+- **Druck und Hover (R18):** Zeilen und Karten, die als Ganzes ein Ziel sind, teilen EINEN
+  Press-Baustein (`list-row.css`): `--color-surface-hover`, hinein `--duration-2xs`, heraus die
+  Dauer der Ruhe-Regel. Ein Knopf in der Zeile drueckt die Zeile nicht mit, eine gezogene
+  Wischzeile sieht nicht gedrueckt aus, zurueckgenommene Zeilen behalten ihre Flaeche. Die
+  Hover-Flaechen der geteilten Bausteine stehen unter `@media (hover: hover)` - auf Touch klebt
+  `:hover` nach dem Tipp; fuer alle uebrigen haelt `test:motion` einen Ratchet.
+- **Blatt-Geste zu Ende gefuehrt (R18):** der Tipp- und Esc-Ausgang bleibt der kurze Hub. Nach
+  einer Zieh-Geste faehrt das Blatt von der Lage des Fingers aus dem Bild
+  (`utils/sheet-drag.js`, Web Animations API auf `translate`): Dauer = Reststrecke /
+  Loslass-Tempo, geklemmt zwischen `--duration-xs` und `--duration-md`. Unter der Schwelle
+  federt es mit derselben Rechnung zurueck (hoechstens `--duration-lg`). Die Abdunklung des
+  Mehr-Blatts folgt dem Zug (`--sheet-pull` am Backdrop, nur `opacity`); am Dialog-Sheet nicht -
+  dort ist das Overlay zugleich Elternknoten der Tafel.
+- **Theme-Wechsel (R18):** die Wahl in den Einstellungen blendet ueber die Wurzel
+  (`swapTheme`, 200ms). Der Nachtwechsel des Wandmodus schaltet ohne Blende.
 - **Scroll-Affordanz:** horizontal scrollende Leisten (Chip-Reihen, Filterzeilen) tragen
   eine Fade-Mask an der ueberlaufenden Kante (`has-fade-start`/`has-fade-end`, gesetzt von
   `wireScrollFade`) und 24px `scroll-padding-inline`, damit das erste sichtbare Element nicht

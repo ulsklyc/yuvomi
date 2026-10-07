@@ -31,7 +31,7 @@ import { numberLocaleFor } from '/settings/region-presets.js';
 import { setDisplayTimeZone, zonedDateKey } from '/utils/timezone.js';
 import { rememberZonePrefs, forgetZonePrefs, noteZoneDecision } from '/utils/household-zone-hint.js';
 import { isKitchenRoute, getLastKitchenRoute } from '/utils/kitchen-tabs.js';
-import { swapPage } from '/utils/view-transition.js';
+import { swapPage, swapTheme } from '/utils/view-transition.js';
 import { moduleAccentToken, moduleAccentVar } from '/utils/module-accent.js';
 import { brandMarkSvg } from '/utils/brand-mark.js';
 import { getLastHealthRoute, HEALTH_ROUTES } from '/utils/health-tabs.js';
@@ -1522,6 +1522,11 @@ async function renderPage(route, previousPath = null, scrollTarget = 0) {
     // also keinen leeren Frame mehr dazwischen. Die Daten wartet er NICHT ab:
     // das Bild stuende sonst fuer die Dauer eines Abrufs.
     const swap = () => {
+      // ZUERST festhalten, ob die alte Seite einen FAB hatte - schwebend in der
+      // Ebene oder (Desktop) angedockt in ihrem Kopf, der mit dem Inhalt gleich
+      // faellt: der naechste poppt dann nicht neu herein, und die Kapsel haelt
+      // seine Reserve (holdFabAcrossSwap).
+      holdFabAcrossSwap();
       // Alter Inhalt ist jetzt weg - altes Stylesheet kann entfernt werden
       pageWrapper = document.createElement('div');
       pageWrapper.className = 'page-transition';
@@ -1544,9 +1549,6 @@ async function renderPage(route, previousPath = null, scrollTarget = 0) {
       // Inhalt weg - er bliebe über der neuen Seite stehen, bis diese adoptiert.
       // Hier und nicht eine Zeile höher: der Scroll-Reset gehört unmittelbar an
       // den Inhaltstausch (Guard in test-mobile-scroll-layout.js).
-      // Vorher festhalten, OB einer stand: der naechste poppt dann nicht neu
-      // herein, und die Kapsel haelt seine Reserve (holdFabAcrossSwap).
-      holdFabAcrossSwap();
       clearPageFab();
       // Dieselbe Begründung, dieselbe Schicht: die Sammelaktions-Pille gehört zur
       // Teilmenge EINER Liste und darf nicht über der nächsten Seite stehen
@@ -4913,21 +4915,27 @@ window.yuvomi = {
     return fab;
   },
   applyTheme: (value) => {
-    if (value === 'dark') {
-      document.documentElement.setAttribute('data-theme', 'dark');
-    } else if (value === 'light') {
-      document.documentElement.setAttribute('data-theme', 'light');
-    } else {
-      document.documentElement.removeAttribute('data-theme');
-    }
-    // Der Modul-Akzent liegt als aufgelöste Farbe im Inline-Style von <html> und
-    // folgt der CSS-Kaskade daher NICHT. Ohne dieses Nachziehen behielte die
-    // ganze Shell (Buttons, Fokusringe, FAB, aktive Nav-Pille) den Akzent des
-    // vorherigen Themes. Begründung an applyModuleAccentForRoute.
-    applyModuleAccentForRoute(currentRoute());
-    // Die Statusbar im Standalone-Modus trägt dieselbe eingefrorene
-    // Momentaufnahme, siehe refreshThemeColorForTheme.
-    refreshThemeColorForTheme();
+    // DER GEWAEHLTE WECHSEL BLENDET (Critique R18): alles Sichtbare laeuft im
+    // Callback von swapTheme - als Blende ueber die Wurzel, wo der Browser sie
+    // kann, sonst synchron wie bisher. Der Nachtwechsel des Wandmodus ruft
+    // diese Funktion nie (utils/wall-mode.js) und bleibt ohne Blende.
+    swapTheme(() => {
+      if (value === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      } else if (value === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+      // Der Modul-Akzent liegt als aufgelöste Farbe im Inline-Style von <html> und
+      // folgt der CSS-Kaskade daher NICHT. Ohne dieses Nachziehen behielte die
+      // ganze Shell (Buttons, Fokusringe, FAB, aktive Nav-Pille) den Akzent des
+      // vorherigen Themes. Begründung an applyModuleAccentForRoute.
+      applyModuleAccentForRoute(currentRoute());
+      // Die Statusbar im Standalone-Modus trägt dieselbe eingefrorene
+      // Momentaufnahme, siehe refreshThemeColorForTheme.
+      refreshThemeColorForTheme();
+    });
     // Persistenz zuletzt und fehlertolerant: ein werfendes localStorage (Safari
     // Privatmodus, Quota) darf das sichtbare Anwenden nicht abbrechen. Vorher
     // stand diese Zeile zuerst - warf sie, fiel der Aufrufer in den

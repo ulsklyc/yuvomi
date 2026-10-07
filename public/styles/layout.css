@@ -7490,7 +7490,11 @@ textarea::placeholder {
   gap: var(--space-3);
   padding: var(--space-12) var(--space-6);
   text-align: center;
-  animation: empty-state-in var(--duration-2xl) var(--ease-out) both;
+  /* 250ms, und der Knopf kommt MIT dem Zustand (Critique R18): hier standen
+   * 400ms, und `.empty-state__cta` fuhr danach noch einmal 300ms mit 300ms
+   * Verzoegerung ein - der Weg aus dem Leerzustand war erst nach 600ms da. Im
+   * Arbeitsfluss dauert nichts ueber 300ms (DESIGN.md, Motion). */
+  animation: empty-state-in var(--duration-lg) var(--ease-out) both;
   /* Immer oben ansetzen, nie in der Restfläche zentriert.
    *
    * In einem Grid-Elternteil mit `align-content: start` (Rezepte, Vorrat) saß der
@@ -7509,7 +7513,6 @@ textarea::placeholder {
 
 @media (prefers-reduced-motion: reduce) {
   .empty-state { animation: none; }
-  .empty-state__cta { animation: none; }
 }
 
 .empty-state__icon {
@@ -7564,7 +7567,6 @@ textarea::placeholder {
 
 .empty-state__cta {
   margin-top: var(--space-2);
-  animation: list-item-in var(--duration-xl) var(--ease-out) var(--duration-xl) both;
 }
 
 /* Zwei Wege aus demselben Zustand (Dokumente: „Suche löschen" neben „Filter

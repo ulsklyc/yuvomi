@@ -59,9 +59,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   behind the content the whole time the app was open, and the content covered them completely.
   They are gone, together with a gradient that was covered the same way. Nothing looks
   different; the browser has four large layers less to carry.
+- **"New task" closes right away.** After saving, the dialog showed a check mark for about
+  three quarters of a second before it closed. It now closes with the save, and the new task
+  pulls open in the list: visible after about 0.2 seconds instead of 0.9.
+- **Rows and cards answer a tap.** List rows, task cards, the cards on the overview and the rows
+  in the settings now show that they are being pressed, instead of doing nothing until the next
+  screen arrives.
+- **A sheet you flick away travels out of the screen.** Dragging a sheet down and letting go made
+  it dissolve where the finger had left it. It now leaves the screen from there, as fast as the
+  flick was; let go too early and it springs back just as briskly. Behind the "More" sheet the
+  dimming fades with the pull.
+- **Going one level deeper has a direction.** On a phone, opening a settings page or a health
+  area slides in from the side you are heading to, and going back comes from the other; both
+  used to cut or only fade. Switching between light and dark fades instead of flipping, the
+  blood pressure and weight curves draw themselves once, and a few menus that appeared or
+  vanished in one frame now fade.
 
 ### Fixed
 
+- **Checked items no longer twitch when the list changes.** Adding or deleting an item in the
+  shopping list, or opening a group, replayed the little "checked" animation on every item that
+  had been ticked off long ago. It now plays once, on the box you touch - also when you take a
+  tick back - and has become calmer. The same applies to tasks, subtasks, the housekeeping
+  list and checklists in notes.
+- **The tab bar keeps its glass while you change pages.** On a phone the bar at the bottom went
+  see-through for a moment on every tab change, and the round "+" button popped in again each
+  time. Both now stand still while the page underneath changes; the "+" only arrives with an
+  entrance when the page before had none.
+- **A tapped row no longer stays highlighted on a phone.** After a tap, list rows, task cards and
+  the cards on the overview kept the look they have under a mouse pointer until something else
+  was tapped.
 - **The first visit no longer reloads itself and empties the login form.** One to four seconds
   after the very first load the page reloaded, and whatever had been typed into the login form
   was gone. The reload was meant for an update of the app, but it also fired when the app was

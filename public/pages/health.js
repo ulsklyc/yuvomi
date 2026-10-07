@@ -15,7 +15,7 @@ import { api } from '/api.js';
 import { t, formatDate, formatMonthYear, formatTime, getLocale, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { CHART, chartScales, chartGridMarkup, chartXLabelsMarkup, chartX, chartY, niceDomain, chartTimePositions, chartTimeLabelsMarkup } from '/utils/chart.js';
-import { scheduleUndoableDelete, expandIn } from '/utils/ux.js';
+import { scheduleUndoableDelete, expandIn, drawChartOnce } from '/utils/ux.js';
 import { swapContent } from '/utils/content-swap.js';
 import { toLocalDateKey, parseLocalDateKey, addLocalDays, todayKey} from '/utils/date.js';
 import { zonedDateKey } from '/utils/timezone.js';
@@ -1690,6 +1690,12 @@ function renderDetail() {
     </div>
     ${recentMeasurementsMarkup(metric)}`);
   if (window.lucide) window.lucide.createIcons({ el: host });
+  // DIE KURVE ZEICHNET SICH EINMAL EIN (Critique R18): die Vitaldiagramme
+  // standen fertig da, waehrend die Berichte im Budget sich einzeichnen. Einmal
+  // je Messgroesse und Sitzung - wer den Zeitraum blaettert, vergleicht und
+  // wartet nicht noch einmal 300ms (drawChartOnce, utils/ux.js). Raster und
+  // Achse stehen; der Beschnitt haengt an der Gruppe aus Flaeche und Kurven.
+  drawChartOnce(`health-vitals-${metric.type}`, { lines: host.querySelector('.health-chart__lines') });
 
   host.querySelectorAll('[data-step]').forEach((btn) =>
     btn.addEventListener('click', () => {
@@ -1860,6 +1866,7 @@ function renderVitalSheet(host) {
   host.replaceChildren();
   host.insertAdjacentHTML('beforeend', vitalSheetMarkup(metric));
   if (window.lucide) window.lucide.createIcons({ el: host });
+  drawChartOnce(`health-vital-sheet-${metric.type}`, { lines: host.querySelector('.health-chart__lines') });
   wireTablistKeys(host);
   attachSegmentIndicator(host.querySelector('.health-vital-sheet__ranges'), { key: 'health-vital-sheet-range' });
 
@@ -1998,8 +2005,10 @@ function chartMarkup(metric, series, geo = CHART) {
     <svg class="chart health-chart" viewBox="0 0 ${W} ${H}" role="img"${ratio}
          aria-label="${esc(t(metric.labelKey))}">
       ${grid}
-      ${area}
-      ${seriesSvg}
+      <g class="health-chart__lines">
+        ${area}
+        ${seriesSvg}
+      </g>
       ${xLabels}
     </svg>
     ${table}

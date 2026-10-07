@@ -1727,8 +1727,12 @@ test('R18: der FAB steht ueber den Wechsel, poppt nur ohne Vorgaenger, und seine
   const router = stripComments(publicSource('router.js'));
   const swap = router.slice(router.indexOf('const swap = () => {'), router.indexOf('await swapPage(swap,'));
   assert.ok(swap.length > 300, 'Vorbedingung: der Tausch-Callback ist gefunden');
-  // VOR dem Abraeumen gefragt - danach gibt es den alten FAB nicht mehr.
-  assert.ok(swap.indexOf('holdFabAcrossSwap(') >= 0 && swap.indexOf('holdFabAcrossSwap(') < swap.indexOf('clearPageFab();'), 'der Vorgaenger wird vor clearPageFab() festgehalten');
+  // VOR dem Tausch gefragt - danach gibt es den alten FAB nicht mehr: der
+  // schwebende faellt mit clearPageFab(), der im Kopf angedockte (Desktop)
+  // schon mit `content.replaceChildren()`. (Im Browser gesehen: an der zweiten
+  // Stelle gefragt, poppte die Kapsel "+ Neu" am Desktop weiter bei jedem Wechsel.)
+  const held = swap.indexOf('holdFabAcrossSwap(');
+  assert.ok(held >= 0 && held < swap.indexOf('content.replaceChildren(pageWrapper)') && held < swap.indexOf('clearPageFab();'), 'der Vorgaenger wird vor dem Inhaltstausch festgehalten');
   const hold = router.slice(router.indexOf('function holdFabAcrossSwap('), router.indexOf('function holdFabAcrossSwap(') + 700);
   assert.match(hold, /classList\.toggle\('fab-steady', /, 'fab-in nur ohne Vorgaenger');
   assert.match(hold, /classList\.toggle\('fab-holding', /, 'die Reserve der Kapsel haelt');
@@ -1956,4 +1960,109 @@ test('Blatt-Geste: Verdrahtung - das Mehr-Blatt reicht seinen Backdrop durch, de
   // Und er mutiert das DOM nicht im touchend: Marke und Versatz fallen im rAF.
   const end = src.slice(src.indexOf('const end = (e) => {'), src.indexOf("sheet.addEventListener('touchend', end);"));
   assert.match(end, /raf\(\(\) => settle\(/);
+});
+
+// --------------------------------------------------------------------------
+// R18, Bewegung: KLEINE HARTE KANTEN.
+// --------------------------------------------------------------------------
+test('R18: das Backdrop des FAB-Menues blendet ein und aus - und liegt in Ruhe weiter nicht im Baum (#166)', () => {
+  const base = ruleBodies('dashboard.css', '.fab-backdrop').join(';');
+  // #166: kein dauerhaft fixiertes Vollbild-Overlay - in Ruhe `display: none`.
+  assert.match(base, /display:\s*none/);
+  assert.match(base, /opacity:\s*0/);
+  const transitions = [...base.matchAll(/transition:\s*([^;]+)/g)].map((m) => m[1]);
+  assert.equal(transitions.length, 2, 'zwei Deklarationen: die erste ist der Rueckfall ohne allow-discrete');
+  assert.doesNotMatch(transitions[0], /allow-discrete/);
+  assert.match(transitions[1], /opacity var\(--duration-xs\) var\(--ease-out\),\s*display var\(--duration-xs\) allow-discrete/, 'der Ausgang haelt es fuer seine Dauer im Baum');
+  const open = ruleBodies('dashboard.css', '.fab-backdrop--visible').join(';');
+  assert.match(open, /display:\s*block/);
+  assert.match(open, /opacity:\s*1/);
+  assert.match(open, /opacity var\(--duration-md\) var\(--ease-out\)/, 'die Einfahrt ist laenger als der Ausgang');
+  assert.match(css('dashboard.css'), /@starting-style \{\s*\.fab-backdrop--visible \{\s*opacity: 0;/);
+});
+
+test('R18: das Detail-Popover hat einen Ausgang - in der Grammatik des Popover-Menues', () => {
+  const rules = animationRules();
+  const exit = winner(rules, ['detail-popover', 'detail-popover--closing'], 1024);
+  assert.ok(exit?.has.includes('detail-popover--closing'), 'der Ausgang schlaegt die Einfahrt');
+  assert.match(exit.value, /^detail-popover-out var\(--duration-xs\) var\(--ease-out\) forwards$/);
+  const out = keyframesBody('detail-popover-out');
+  assert.match(out, /opacity:\s*0/);
+  assert.match(out, /transform:\s*scale\(0\.96\)/, 'nimmt die 4 % zurueck wie das Menue');
+  // Die Einfahrt bleibt die Blende: die Karte wird im selben Takt VERMESSEN
+  // (positionPopover), und eine Startskalierung verfaelschte ihre Masse um 4 %.
+  const enter = ruleBodies('detail-view.css', '.detail-popover').join(';');
+  assert.match(enter, /animation:\s*detail-pane-enter var\(--duration-sm\) var\(--ease-out\)/, 'Einfahrt (150ms) laenger als der Ausgang (120ms)');
+  assert.match(ruleBodies('detail-view.css', '.detail-popover.detail-popover--closing').join(';'), /pointer-events:\s*none/, 'der Ausgang nimmt keinen Zeiger mehr');
+  // Der Ursprung kommt mit der Position aus JS - die Karte waechst vom Anker aus.
+  const dv = publicSource('components/detail-view.js');
+  assert.match(dv, /popover\.style\.transformOrigin = /);
+  // Schliessen: Zustand sofort (Marker, Fokus, onClose), der Knoten geht nach dem Ausgang.
+  const close = dv.slice(dv.indexOf('export function closeDetailView('), dv.indexOf('export function closeDetailView(') + 1800);
+  assert.match(close, /leavePopover\(el\);/);
+  assert.doesNotMatch(stripComments(close), /^\s*el\.remove\(\);/m, 'ein sofortiges remove() schnitte den Ausgang ab');
+  const leave = dv.slice(dv.indexOf('function leavePopover('), dv.indexOf('function leavePopover(') + 900);
+  assert.match(leave, /el\.removeAttribute\('id'\);/, 'die Kennung ist sofort frei - das naechste Popover traegt sie');
+  assert.match(leave, /setTimeout\(\(\) => el\.remove\(\), durationToken\('--duration-xs', 120\) \+ 40\);/);
+});
+
+test('R18: der Leerzustand bleibt in der 300-ms-Regel - keine Verzoegerung am Knopf', () => {
+  const tokens = css('tokens.css');
+  const ms = (name) => Number(tokens.match(new RegExp(`${name}:\\s*(\\d+)ms`))?.[1]);
+  const items = motionItems().filter((m) => !m.reduced && /^\.empty-state(?:__[\w-]+)?$/.test(m.selector) && m.kind === 'animation' && m.item !== 'none');
+  assert.ok(items.some((m) => m.selector === '.empty-state'), 'Vorbedingung: der Leerzustand blendet weiter ein');
+  for (const m of items) {
+    const durations = [...m.item.matchAll(/var\((--duration-[\w-]+)\)/g)].map((d) => ms(d[1]));
+    assert.ok(durations.length >= 1, `${m.selector}: Dauer aus einem Token`);
+    assert.ok(durations.reduce((a, b) => a + b, 0) <= 300, `${m.selector}: ${m.item} - Dauer plus Verzoegerung ueber 300ms`);
+  }
+});
+
+test('R18: die Vitalwert-Kurven zeichnen sich einmal ein (drawChartOnce), Raster und Achse stehen', () => {
+  const health = pageSource('health');
+  assert.match(health, /import \{[^}]*\bdrawChartOnce\b[^}]*\} from '\/utils\/ux\.js';/);
+  const chart = health.slice(health.indexOf('function chartMarkup(metric, series'), health.indexOf('// Erfassungs-Modal'));
+  assert.match(chart, /\$\{grid\}\s*<g class="health-chart__lines">\s*\$\{area\}\s*\$\{seriesSvg\}\s*<\/g>\s*\$\{xLabels\}/, 'Flaeche und Kurven in EINER Gruppe - an ihr haengt der Beschnitt');
+  assert.match(health, /drawChartOnce\(`health-vitals-\$\{metric\.type\}`, \{ lines: host\.querySelector\('\.health-chart__lines'\) \}\);/, 'einmal je Messgroesse und Sitzung');
+});
+
+test('R18: der Theme-Wechsel blendet ueber die Wurzel - nur der gewaehlte, nicht der Nachtwechsel der Wand', async () => {
+  const router = publicSource('router.js');
+  const apply = router.slice(router.indexOf('applyTheme: (value) => {'), router.indexOf('applyTheme: (value) => {') + 2600);
+  assert.match(apply, /swapTheme\(\(\) => \{/, 'der sichtbare Wechsel laeuft im Callback');
+  assert.doesNotMatch(publicSource('utils/wall-mode.js').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''), /swapTheme|startViewTransition/, 'die Wand schaltet nachts ohne Blende');
+
+  const { swapTheme } = await import('../public/utils/view-transition.js');
+  // Mit API: der Tausch laeuft im Callback, die Klasse steht fuer die Dauer.
+  const env = stubDocument();
+  const classes = new Set();
+  env.doc.documentElement = { classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c), contains: (c) => classes.has(c) } };
+  globalThis.document = env.doc;
+  globalThis.matchMedia = () => ({ matches: false });
+  try {
+    let ran = 0;
+    const done = swapTheme(() => { ran += 1; assert.equal(classes.has('theme-swapping'), true); });
+    assert.equal(ran, 0, 'erst das alte Bild, dann der Tausch');
+    await Promise.resolve(); await Promise.resolve();
+    assert.equal(ran, 1);
+    assert.equal(classes.has('page-swapping'), false, 'kein Seitenwechsel: die Chrome-Namen bleiben aus');
+    env.finish();
+    await done;
+    assert.equal(classes.has('theme-swapping'), false);
+  } finally { delete globalThis.document; delete globalThis.matchMedia; }
+  // Ohne API, verdeckt oder unter reduzierter Bewegung: direkt und synchron.
+  for (const [name, e, reduce] of [['ohne API', stubDocument({ api: false }), false], ['verdeckt', stubDocument({ visibility: 'hidden' }), false], ['reduzierte Bewegung', stubDocument(), true]]) {
+    globalThis.document = e.doc;
+    globalThis.matchMedia = () => ({ matches: reduce });
+    try {
+      let ran = 0;
+      swapTheme(() => { ran += 1; });
+      assert.equal(ran, 1, `${name}: synchron`);
+      assert.deepEqual(e.log, [], `${name}: keine Transition`);
+    } finally { delete globalThis.document; delete globalThis.matchMedia; }
+  }
+  // Ein werfender Tausch (localStorage im Privatmodus) kommt beim Aufrufer an.
+  globalThis.document = stubDocument({ api: false }).doc;
+  globalThis.matchMedia = () => ({ matches: false });
+  try { assert.throws(() => swapTheme(() => { throw new Error('quota'); }), /quota/); } finally { delete globalThis.document; delete globalThis.matchMedia; }
 });

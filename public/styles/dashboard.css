@@ -2101,11 +2101,34 @@ svg.weather-forecast__icon {
    * und Modal bleibt die Reihenfolge, die die Gruppe selbst hat. */
   z-index: -1;
   pointer-events: none;
+  /* EIN- UND AUSGANG (Critique R18): das Backdrop sprang in einem Frame, samt
+   * seinem Blur (glass.css). Jetzt das Muster des Popover-Menues: `display`
+   * geht diskret mit (`allow-discrete`), `@starting-style` gibt der Einfahrt
+   * ihren Start. In RUHE bleibt es `display: none` - #166 gilt weiter, es liegt
+   * nur fuer die Dauer des Ausgangs (--duration-xs) noch im Baum.
+   * ZWEI DEKLARATIONEN: ein Browser ohne `allow-discrete` verwirft die zweite
+   * und behaelt die erste - dort schliesst es hart wie bisher. */
+  opacity: 0;
+  transition: opacity var(--duration-xs) var(--ease-out);
+  transition:
+    opacity var(--duration-xs) var(--ease-out),
+    display var(--duration-xs) allow-discrete;
 }
 
 .fab-backdrop--visible {
   display: block;
+  opacity: 1;
   pointer-events: auto;
+  transition: opacity var(--duration-md) var(--ease-out);
+  transition:
+    opacity var(--duration-md) var(--ease-out),
+    display var(--duration-md) allow-discrete;
+}
+
+@starting-style {
+  .fab-backdrop--visible {
+    opacity: 0;
+  }
 }
 
 .fab-actions--visible {
