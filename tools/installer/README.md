@@ -54,7 +54,7 @@ dedicated `podman-compose.yml` (SELinux `:Z` labels).
      - **Security keys** - `SESSION_SECRET` and `DB_ENCRYPTION_KEY` (pre-filled
        on a fresh install; existing keys are kept, see below)
      - **Weather** - Open-Meteo coordinates (no API key). They apply until a
-       household location is saved in the app (Settings → Household → Integrations), which
+       household location is saved in the app (Settings → Household → Photos and weather), which
        then takes precedence
      - **Calendar** - Google Calendar, Outlook (Microsoft Graph) and Apple iCloud
        CalDAV, the last one marked *legacy*: the `.env` holds exactly one iCloud

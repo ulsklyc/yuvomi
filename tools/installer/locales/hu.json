@@ -53,7 +53,7 @@
     "title": "Időjárás widget",
     "subtitle": "Élő időjárás a műszerfalon — ingyenes, fiók és API kulcs nélkül.",
     "enable": "Időjárás widget engedélyezése",
-    "appHint": "Ezek az értékek addig érvényesek, amíg az alkalmazásban (Beállítások → Háztartás → Integrációk) nem mentenek el háztartási helyet.",
+    "appHint": "Ezek az értékek addig érvényesek, amíg az alkalmazásban (Beállítások → Háztartás → Fotók és időjárás) nem mentenek el háztartási helyet.",
     "latLabel": "Szélesség",
     "lonLabel": "Hosszúság",
     "coordHint": "Koordináták keresése az openstreetmap.org vagy a Google Maps segítségével.",

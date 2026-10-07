@@ -53,7 +53,7 @@
     "title": "Widget cuaca",
     "subtitle": "Cuaca langsung di dasbor — gratis, tanpa akun, tanpa kunci API.",
     "enable": "Aktifkan widget cuaca",
-    "appHint": "Nilai ini berlaku sampai lokasi rumah tangga disimpan di aplikasi, di Pengaturan → Rumah tangga → Integrasi.",
+    "appHint": "Nilai ini berlaku sampai lokasi rumah tangga disimpan di aplikasi, di Pengaturan → Rumah tangga → Foto dan cuaca.",
     "latLabel": "Lintang",
     "lonLabel": "Bujur",
     "coordHint": "Cari koordinat di openstreetmap.org atau Google Maps.",

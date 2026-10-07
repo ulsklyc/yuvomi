@@ -53,7 +53,7 @@
     "title": "Wetter-Widget",
     "subtitle": "Live-Wetter auf dem Dashboard - kostenlos, kein Account, kein API-Schlüssel.",
     "enable": "Wetter-Widget aktivieren",
-    "appHint": "Diese Werte gelten, bis in der App unter Einstellungen → Haushalt → Integrationen ein eigener Haushalts-Standort gespeichert wird.",
+    "appHint": "Diese Werte gelten, bis in der App unter Einstellungen → Haushalt → Fotos und Wetter ein eigener Haushalts-Standort gespeichert wird.",
     "latLabel": "Breitengrad",
     "lonLabel": "Längengrad",
     "coordHint": "Koordinaten auf openstreetmap.org oder Google Maps suchen.",

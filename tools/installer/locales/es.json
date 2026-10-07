@@ -53,7 +53,7 @@
     "title": "Widget de clima",
     "subtitle": "Clima en vivo en el panel — gratis, sin cuenta, sin clave API.",
     "enable": "Activar widget de clima",
-    "appHint": "Estos valores se aplican hasta que se guarde una ubicación del hogar en la app, en Ajustes → Hogar → Integraciones.",
+    "appHint": "Estos valores se aplican hasta que se guarde una ubicación del hogar en la app, en Ajustes → Hogar → Fotos y tiempo.",
     "latLabel": "Latitud",
     "lonLabel": "Longitud",
     "coordHint": "Encuentra coordenadas en openstreetmap.org o Google Maps.",

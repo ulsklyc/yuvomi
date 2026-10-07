@@ -53,7 +53,7 @@
     "title": "Widget de tempo",
     "subtitle": "Tempo em tempo real no painel — gratuito, sem conta, sem chave API.",
     "enable": "Ativar widget de tempo",
-    "appHint": "Esses valores valem até que uma localização da casa seja salva no app, em Configurações → Casa → Integrações.",
+    "appHint": "Esses valores valem até que uma localização da casa seja salva no app, em Configurações → Casa → Fotos e meteorologia.",
     "latLabel": "Latitude",
     "lonLabel": "Longitude",
     "coordHint": "Encontre coordenadas em openstreetmap.org ou Google Maps.",

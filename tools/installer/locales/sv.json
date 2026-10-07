@@ -53,7 +53,7 @@
     "title": "Väder-widget",
     "subtitle": "Liveväder på instrumentpanelen — gratis, inget konto, ingen API-nyckel.",
     "enable": "Aktivera väder-widget",
-    "appHint": "De här värdena gäller tills en plats för hushållet sparas i appen under Inställningar → Hushåll → Integrationer.",
+    "appHint": "De här värdena gäller tills en plats för hushållet sparas i appen under Inställningar → Hushåll → Foton och väder.",
     "latLabel": "Latitud",
     "lonLabel": "Longitud",
     "coordHint": "Hitta koordinater på openstreetmap.org eller Google Maps.",

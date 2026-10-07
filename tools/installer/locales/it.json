@@ -53,7 +53,7 @@
     "title": "Widget Meteo",
     "subtitle": "Meteo in tempo reale nella dashboard — gratuito, senza account, senza chiave API.",
     "enable": "Attiva widget meteo",
-    "appHint": "Questi valori valgono finché nell’app non viene salvata una posizione della famiglia, in Impostazioni → Famiglia → Integrazioni.",
+    "appHint": "Questi valori valgono finché nell’app non viene salvata una posizione della famiglia, in Impostazioni → Famiglia → Foto e meteo.",
     "latLabel": "Latitudine",
     "lonLabel": "Longitudine",
     "coordHint": "Trova le coordinate su openstreetmap.org o Google Maps.",

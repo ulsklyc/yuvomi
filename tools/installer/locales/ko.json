@@ -53,7 +53,7 @@
     "title": "날씨 위젯",
     "subtitle": "대시보드의 실시간 날씨 — 무료, 계정 불필요, API 키 불필요.",
     "enable": "날씨 위젯 활성화",
-    "appHint": "앱의 설정 → 가정 → 연동에서 가정 위치를 저장하기 전까지 이 값이 적용됩니다.",
+    "appHint": "앱의 설정 → 가정 → 사진 및 날씨에서 가정 위치를 저장하기 전까지 이 값이 적용됩니다.",
     "latLabel": "위도",
     "lonLabel": "경도",
     "coordHint": "좌표는 openstreetmap.org 또는 Google 지도에서 찾으세요.",

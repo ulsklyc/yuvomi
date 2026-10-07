@@ -53,7 +53,7 @@
     "title": "Weer-widget",
     "subtitle": "Live weer op het dashboard — gratis, geen account, geen API-sleutel.",
     "enable": "Weer-widget inschakelen",
-    "appHint": "Deze waarden gelden totdat in de app onder Instellingen → Huishouden → Integraties een locatie voor het huishouden is opgeslagen.",
+    "appHint": "Deze waarden gelden totdat in de app onder Instellingen → Huishouden → Foto's en weer een locatie voor het huishouden is opgeslagen.",
     "latLabel": "Breedtegraad",
     "lonLabel": "Lengtegraad",
     "coordHint": "Vind coördinaten op openstreetmap.org of Google Maps.",

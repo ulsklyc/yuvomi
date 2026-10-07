@@ -53,7 +53,7 @@
     "title": "Weather Widget",
     "subtitle": "Live weather on the dashboard - free, no account, no API key.",
     "enable": "Enable weather widget",
-    "appHint": "These values apply until a household location is saved in the app under Settings → Household → Integrations.",
+    "appHint": "These values apply until a household location is saved in the app under Settings → Household → Photos and weather.",
     "latLabel": "Latitude",
     "lonLabel": "Longitude",
     "coordHint": "Find coordinates on openstreetmap.org or Google Maps.",

@@ -103,7 +103,7 @@ Betreiber daraus resultieren.
 | ICS-Kalender-Abos | `server/services/ics-subscription.js` | nur wenn ein Nutzer einen Feed abonniert | abhängig vom Feed-Anbieter | nein (siehe 2.15) |
 | Outlook-Push (Microsoft Graph) | `server/services/outlook-calendar.js` | nur wenn alle `MS_*` gesetzt sind **und** ein Konto per OAuth verbunden wurde | USA/Microsoft; DPF-Status prüfen | für private Microsoft-Konten **nicht abschließbar** (siehe 2.16) |
 | Feiertage/Schulferien (OpenHolidays) | `server/services/holidays.js` | nur wenn ein Admin ein Feiertagsland wählt und eine Feiertags-Ebene aktiv ist | Anbieter-Standort selbst prüfen | nein (siehe 2.17) |
-| Immich-Bildschirmschoner | `server/routes/screensaver.js` | nur wenn `IMMICH_URL` und `IMMICH_API_KEY` gesetzt oder unter Einstellungen → Haushalt → Integrationen → Immich eingetragen sind | i. d. R. selbst gehostet | i. d. R. nein (siehe 2.18) |
+| Immich-Bildschirmschoner | `server/routes/screensaver.js` | nur wenn `IMMICH_URL` und `IMMICH_API_KEY` gesetzt oder unter Einstellungen → Haushalt → Fotos und Wetter → Immich eingetragen sind | i. d. R. selbst gehostet | i. d. R. nein (siehe 2.18) |
 | Abfall-Modul: ICS-URL-Quellen | `server/services/waste-url-source.js` | nur wenn im Abfall-Modul eine ICS-URL als Quelle abonniert wird | abhängig vom Feed-Anbieter | nein (siehe 2.19) |
 
 ### 2.1 Open-Meteo (Wetter-Standard)
@@ -582,7 +582,7 @@ Konfiguration so, dass du auf einen EU-Provider umstellen könntest.
 ### 2.18 Immich-Bildschirmschoner
 
 - **Code-Stellen:** `server/routes/screensaver.js`, Einstellungsseite
-  Einstellungen → Haushalt → Integrationen → Immich.
+  Einstellungen → Haushalt → Fotos und Wetter → Immich.
 - **Aktiv nur, wenn:** eine Immich-URL und ein API-Schlüssel gesetzt sind -
   per `IMMICH_URL`/`IMMICH_API_KEY` (optional `IMMICH_SCREENSAVER_ALBUM_ID`;
   Env-Werte haben Vorrang) oder in der Einstellungsseite.

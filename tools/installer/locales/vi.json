@@ -53,7 +53,7 @@
     "title": "Widget thời tiết",
     "subtitle": "Thời tiết trực tiếp trên bảng điều khiển — miễn phí, không cần tài khoản, không cần API key.",
     "enable": "Bật widget thời tiết",
-    "appHint": "Các giá trị này có hiệu lực cho đến khi vị trí của gia đình được lưu trong ứng dụng, tại Cài đặt → Gia đình → Tích hợp.",
+    "appHint": "Các giá trị này có hiệu lực cho đến khi vị trí của gia đình được lưu trong ứng dụng, tại Cài đặt → Gia đình → Ảnh và thời tiết.",
     "latLabel": "Vĩ độ",
     "lonLabel": "Kinh độ",
     "coordHint": "Tìm tọa độ trên openstreetmap.org hoặc Google Maps.",

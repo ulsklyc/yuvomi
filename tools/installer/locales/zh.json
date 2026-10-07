@@ -53,7 +53,7 @@
     "title": "天气小组件",
     "subtitle": "在仪表板上显示实时天气——免费、无需账户、无需 API 密钥。",
     "enable": "启用天气小组件",
-    "appHint": "这些值会一直生效，直到在应用的 设置 → 家庭 → 集成 中保存了家庭位置。",
+    "appHint": "这些值会一直生效，直到在应用的 设置 → 家庭 → 照片和天气 中保存了家庭位置。",
     "latLabel": "纬度",
     "lonLabel": "经度",
     "coordHint": "在openstreetmap.org或Google地图上查找坐标。",

@@ -53,7 +53,7 @@
     "title": "Hava Durumu Widget",
     "subtitle": "Panelde canlı hava durumu — ücretsiz, hesap yok, API anahtarı yok.",
     "enable": "Hava durumu widget'ını etkinleştir",
-    "appHint": "Bu değerler, uygulamada Ayarlar → Ev → Entegrasyonlar altından bir ev konumu kaydedilene kadar geçerlidir.",
+    "appHint": "Bu değerler, uygulamada Ayarlar → Ev → Fotoğraflar ve hava durumu altından bir ev konumu kaydedilene kadar geçerlidir.",
     "latLabel": "Enlem",
     "lonLabel": "Boylam",
     "coordHint": "Koordinatları openstreetmap.org veya Google Maps'te bulun.",

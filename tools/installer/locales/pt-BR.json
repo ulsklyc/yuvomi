@@ -53,7 +53,7 @@
     "title": "Widget de clima",
     "subtitle": "Previsão do tempo em tempo real no painel - gratuito, sem necessidade de conta ou chave de API.",
     "enable": "Ativar widget de clima",
-    "appHint": "Esses valores valem até que uma localização da casa seja salva no app, em Configurações → Casa → Integrações.",
+    "appHint": "Esses valores valem até que uma localização da casa seja salva no app, em Configurações → Casa → Fotos e clima.",
     "latLabel": "Latitude",
     "lonLabel": "Longitude",
     "coordHint": "Encontre as coordenadas no openstreetmap.org ou no Google Maps.",

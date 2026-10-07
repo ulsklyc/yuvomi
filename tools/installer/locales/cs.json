@@ -53,7 +53,7 @@
     "title": "Widget počasí",
     "subtitle": "Živé počasí na nástěnce — zdarma, bez účtu, bez API klíče.",
     "enable": "Povolit widget počasí",
-    "appHint": "Tyto hodnoty platí, dokud se v aplikaci v Nastavení → Domácnost → Integrace neuloží poloha domácnosti.",
+    "appHint": "Tyto hodnoty platí, dokud se v aplikaci v Nastavení → Domácnost → Fotky a počasí neuloží poloha domácnosti.",
     "latLabel": "Zeměpisná šířka",
     "lonLabel": "Zeměpisná délka",
     "coordHint": "Souřadnice najdete na openstreetmap.org nebo Google Maps.",

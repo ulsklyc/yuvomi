@@ -661,7 +661,7 @@ optional `DB_ENCRYPTION_KEY`.
 
 ### Immich Photo Screensaver (Optional)
 
-Connect a self-hosted Immich server under **Settings → Household → Integrations → Immich** to show random
+Connect a self-hosted Immich server under **Settings → Household → Photos and weather → Immich** to show random
 photos after five minutes without activity; each device can choose its own delay under **Settings → Account →
 Appearance**. The administration page can test the connection and
 open an immediate preview. An optional album UUID limits the selection; otherwise Yuvomi uses the
@@ -841,7 +841,7 @@ Drive token state without revoking shared Google credentials.
 
 ### Weather (Optional)
 
-The weather widget defaults to **Open-Meteo** — free, ECMWF-backed, and requiring **no API key**. Just set your coordinates (find them on [openstreetmap.org](https://www.openstreetmap.org) or Google Maps). You can also configure this in-app under **Settings → Household → Integrations → Household weather** (admin only), which takes precedence over the environment variables and acts as the household default. While no location is saved there, that page names the weather configured through the environment variables and shows its location and units read-only; removing a saved location hands over to the environment variables again. Any user can additionally set their own personal location under **Settings → Account → My Weather**, which overrides the household default just for their own dashboard widget.
+The weather widget defaults to **Open-Meteo** — free, ECMWF-backed, and requiring **no API key**. Just set your coordinates (find them on [openstreetmap.org](https://www.openstreetmap.org) or Google Maps). You can also configure this in-app under **Settings → Household → Photos and weather → Household weather** (admin only), which takes precedence over the environment variables and acts as the household default. While no location is saved there, that page names the weather configured through the environment variables and shows its location and units read-only; removing a saved location hands over to the environment variables again. Any user can additionally set their own personal location under **Settings → Account → My Weather**, which overrides the household default just for their own dashboard widget.
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|

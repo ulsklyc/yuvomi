@@ -53,7 +53,7 @@
     "title": "Widget pogodowy",
     "subtitle": "Pogoda na żywo na pulpicie — bezpłatnie, bez konta, bez klucza API.",
     "enable": "Włącz widget pogodowy",
-    "appHint": "Te wartości obowiązują, dopóki w aplikacji nie zostanie zapisana lokalizacja domu: Ustawienia → Dom → Integracje.",
+    "appHint": "Te wartości obowiązują, dopóki w aplikacji nie zostanie zapisana lokalizacja domu: Ustawienia → Dom → Zdjęcia i pogoda.",
     "latLabel": "Szerokość geograficzna",
     "lonLabel": "Długość geograficzna",
     "coordHint": "Znajdź współrzędne na openstreetmap.org lub Google Maps.",

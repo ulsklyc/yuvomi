@@ -53,7 +53,7 @@
     "title": "Widget Météo",
     "subtitle": "Météo en direct sur le tableau de bord — gratuit, sans compte, sans clé API.",
     "enable": "Activer le widget météo",
-    "appHint": "Ces valeurs s’appliquent jusqu’à ce qu’un emplacement du foyer soit enregistré dans l’app, sous Paramètres → Foyer → Intégrations.",
+    "appHint": "Ces valeurs s’appliquent jusqu’à ce qu’un emplacement du foyer soit enregistré dans l’app, sous Paramètres → Foyer → Photos et météo.",
     "latLabel": "Latitude",
     "lonLabel": "Longitude",
     "coordHint": "Trouvez vos coordonnées sur openstreetmap.org ou Google Maps.",

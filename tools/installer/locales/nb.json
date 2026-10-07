@@ -53,7 +53,7 @@
     "title": "Vær-widget",
     "subtitle": "Live vær på dashbordet - gratis, ingen konto, ingen API-nøkkel.",
     "enable": "Aktiver vær-widget",
-    "appHint": "Disse verdiene gjelder til en posisjon for husholdningen lagres i appen under Innstillinger → Husholdning → Integrasjoner.",
+    "appHint": "Disse verdiene gjelder til en posisjon for husholdningen lagres i appen under Innstillinger → Husholdning → Bilder og vær.",
     "latLabel": "Breddegrad",
     "lonLabel": "Lengdegrad",
     "coordHint": "Finn koordinater på openstreetmap.org eller Google Maps.",
