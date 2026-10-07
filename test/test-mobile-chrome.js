@@ -241,6 +241,13 @@ test('E13: das Filter-Popover hat kein Overlay und keine Unschaerfe, aber Ein- u
   const sheet = read('../public/utils/filter-sheet.js');
   assert.match(sheet, /export function filtersAsPopover\(/);
   assert.match(sheet, /setAttribute\('popover', 'auto'\)/, 'Esc und Tipp daneben schliessen (Browser)');
+  // Das Popover haengt an document.body und ueberlebt den Seitentausch: ein
+  // Wechsel ohne Zeigerereignis (Zurueck des Browsers) liess es ueber der
+  // Zielseite stehen. Der Router raeumt es im synchronen Teil des Wechsels ab.
+  assert.match(sheet, /export function dismissFilterPopovers\(\)\s*\{[\s\S]*?getElementById\(id\)\?\.remove\(\)/);
+  const router = read('../public/router.js').replace(/\/\/.*$/gm, '');
+  const swap = router.slice(router.indexOf('const swap = () => {'), router.indexOf('style.cleanup();'));
+  assert.match(swap, /dismissFilterPopovers\(\);/, 'der Seitenwechsel raeumt offene Filter-Popover ab');
 });
 
 // R14 P12 (Re-Critique 2026-09-28, A1 P3-2): im Desktop-Kopf standen zwei

@@ -22,6 +22,7 @@ import { createNavigate } from '/utils/router-navigate.js';
 import { pageMountTarget } from '/utils/page-mount.js';
 import { friendlyError } from '/utils/friendly-error.js';
 import { BULK_PILL_LAYER, clearBulkPill } from '/utils/bulk-pill.js';
+import { dismissFilterPopovers } from '/utils/filter-sheet.js';
 import { watchToastPlacement } from '/utils/toast-placement.js';
 import { COMPOSITION_MODES } from '/utils/page-layout.js';
 import { init as initReminders, stop as stopReminders } from '/reminders.js';
@@ -1508,6 +1509,9 @@ async function renderPage(route, previousPath = null, scrollTarget = 0) {
       // bleiben. Sie hat kein Gegenstück zu adoptPageFab() - wer sie braucht,
       // setzt sie beim Rendern.
       clearBulkPill();
+      // Und die Filter-Popover (Aufgaben, Kalender): sie haengen an
+      // `document.body` und schliessen nur per Light-Dismiss von selbst.
+      dismissFilterPopovers();
       style.cleanup();
       // Lebenszyklus-Vertrag (#976): der Router besitzt EIN AbortController je
       // Seitenaufbau und bricht ihn hier ab, wo die Route ersetzt wird. Die

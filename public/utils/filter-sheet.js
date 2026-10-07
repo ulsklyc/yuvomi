@@ -232,6 +232,22 @@ export function filtersAsPopover() {
   return globalThis.window?.matchMedia?.(FILTER_POPOVER_QUERY)?.matches === true;
 }
 
+/**
+ * Offene Filter-Popover abraeumen - fuer den Seitenwechsel (router.js).
+ *
+ * Sie haengen an `document.body` und ueberleben den Tausch des Seiteninhalts.
+ * Ein Klick auf ein Nav-Ziel schliesst sie per Light-Dismiss, ein Wechsel ohne
+ * Zeigerereignis (Zurueck des Browsers, Tastenkuerzel, programmatisch) nicht:
+ * das Popover stuende ueber der Zielseite, mit Handlern auf einen abgehaengten
+ * Container. Entfernt wird der Knoten selbst, nicht nur `hidePopover()` - der
+ * Abbau im `toggle` laeuft erst nach der Ausgangsdauer.
+ */
+export function dismissFilterPopovers() {
+  for (const id of [FILTER_POPOVER_ID, 'cal-filters-popover']) {
+    document.getElementById(id)?.remove();
+  }
+}
+
 function openFilterPopover({ title, content, anchor }) {
   document.getElementById(FILTER_POPOVER_ID)?.remove();
   const pop = document.createElement('div');
