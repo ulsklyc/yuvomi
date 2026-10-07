@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.74.0] - 2026-10-07
-
 ### Added
 
 - **Recurring shared expenses have a place in the app: a group lists them, and they can be
@@ -35,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `reason: "next_run_not_after_last_booking"`; `GET /api/v1/split-expenses/groups/{id}/recurring` additionally returns
   `payer_name`, `participants`, `splits`, `blocked_reason`, `can_edit`, `missed_count` and
   `resume_date`; activity types `recurring_edited` and `recurring_deleted`. No migration.
+
+## [2.74.0] - 2026-10-07
+
+### Added
 
 - **The Singapore dollar is a currency a household can pick, and Singapore is a region** (#1697,
   from D#982). SGD was missing from the list the household setting, subscriptions and shared
