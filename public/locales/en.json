@@ -5843,6 +5843,7 @@
         "splitExpenses": "Expense",
         "waste": "Pickup",
         "wasteType": "Waste type",
+        "wasteSchedule": "Schedule",
         "housekeepingWorker": "Housekeeper",
         "healthVitals": "Measurement",
         "healthCycle": "Period",

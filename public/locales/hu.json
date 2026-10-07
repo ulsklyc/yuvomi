@@ -5843,6 +5843,7 @@
         "splitExpenses": "Kiadás",
         "waste": "Elszállítás",
         "wasteType": "Hulladéktípus",
+        "wasteSchedule": "Ütemezés",
         "housekeepingWorker": "Háztartási alkalmazott",
         "healthVitals": "Mérés",
         "healthCycle": "Menstruáció",

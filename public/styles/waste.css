@@ -572,6 +572,12 @@
   display: none;
 }
 
+/* Ohne Abfallart gibt es nichts, wofuer man eine Einzelabholung eintraegt
+   (waste.js, fabIntent): im Onboarding fehlt auch dieser Eintrag. */
+.waste-page--onboarding #waste-page-menu [data-action="add-pickup"] {
+  display: none;
+}
+
 .waste-onboarding {
   display: flex;
   flex-direction: column;

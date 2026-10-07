@@ -5843,6 +5843,7 @@
         "splitExpenses": "Gider",
         "waste": "Alım",
         "wasteType": "Atık türü",
+        "wasteSchedule": "Program",
         "housekeepingWorker": "Yardımcı",
         "healthVitals": "Ölçüm",
         "healthCycle": "Adet",

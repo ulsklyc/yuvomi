@@ -5136,7 +5136,12 @@ resolution: see [Waste Types](#waste-types-migration-v197-1063) and the sections
   "Add waste type" button, and type, schedule, source and pickup rows share one trailing overflow menu
   with named entries (#1146). A type's colour comes from a curated palette instead of a free colour
   picker, which had accepted a white or black icon that vanished against one of the two themes; an
-  existing colour outside the palette is kept, not overwritten.
+  existing colour outside the palette is kept, not overwritten. **The primary button (FAB, docked
+  in the header on a desktop) adds the recurring schedule** once an active waste type exists - its
+  dialog then carries a waste-type select, preset to the first type without a schedule; without a
+  type the button adds one. The one-off pickup is an entry of the header's overflow menu. A pickup
+  row reads weekday, date and distance ("Fri, 09/10/2026 · 2 days", `pickupWhenLabel()`), and a
+  type without a schedule names its next pickup when one exists instead of "No schedule yet".
 - **Dashboard widget:** see the Waste entry under Dashboard → Widgets.
 - **Calendar layer:** device-local and off by default (`yuvomi:calendar:layer:waste`), with the
   per-type list described under [Waste in Calendar](#waste-in-calendar-per-type-visibility-1063-phase-10).

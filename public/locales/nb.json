@@ -5843,6 +5843,7 @@
         "splitExpenses": "Utgift",
         "waste": "Henting",
         "wasteType": "Avfallstype",
+        "wasteSchedule": "Tidsplan",
         "housekeepingWorker": "Vaskehjelp",
         "healthVitals": "Måling",
         "healthCycle": "Periode",

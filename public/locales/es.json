@@ -5843,6 +5843,7 @@
         "splitExpenses": "Gasto",
         "waste": "Recogida",
         "wasteType": "Tipo de residuo",
+        "wasteSchedule": "Horario",
         "housekeepingWorker": "Persona de limpieza",
         "healthVitals": "Medición",
         "healthCycle": "Periodo",

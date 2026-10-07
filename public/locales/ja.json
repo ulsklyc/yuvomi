@@ -5843,6 +5843,7 @@
         "splitExpenses": "支出",
         "waste": "収集",
         "wasteType": "ごみの種類",
+        "wasteSchedule": "スケジュール",
         "housekeepingWorker": "ハウスキーパー",
         "healthVitals": "測定値",
         "healthCycle": "生理",

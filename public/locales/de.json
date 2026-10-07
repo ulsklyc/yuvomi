@@ -5843,6 +5843,7 @@
         "splitExpenses": "Ausgabe",
         "waste": "Abholung",
         "wasteType": "Abfallart",
+        "wasteSchedule": "Termin",
         "housekeepingWorker": "Haushaltshilfe",
         "healthVitals": "Messwert",
         "healthCycle": "Periode",

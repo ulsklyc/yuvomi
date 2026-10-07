@@ -5843,6 +5843,7 @@
         "splitExpenses": "支出",
         "waste": "收运",
         "wasteType": "垃圾类型",
+        "wasteSchedule": "计划",
         "housekeepingWorker": "家政人员",
         "healthVitals": "测量值",
         "healthCycle": "月经",

@@ -6143,6 +6143,7 @@
         "splitExpenses": "Расход",
         "waste": "Вывоз",
         "wasteType": "Вид отходов",
+        "wasteSchedule": "График",
         "housekeepingWorker": "Помощник",
         "healthVitals": "Измерение",
         "healthCycle": "Менструация",

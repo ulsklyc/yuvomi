@@ -5843,6 +5843,7 @@
         "splitExpenses": "지출",
         "waste": "수거",
         "wasteType": "쓰레기 종류",
+        "wasteSchedule": "일정",
         "housekeepingWorker": "가사 도우미",
         "healthVitals": "측정값",
         "healthCycle": "생리",

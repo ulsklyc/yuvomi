@@ -12,7 +12,7 @@
  */
 
 import { api } from '/api.js';
-import { t, formatDate } from '/i18n.js';
+import { t, formatDate, getLocale } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { todayKey, addLocalDays, parseLocalDateKey, toLocalDateKey } from '/utils/date.js';
 import { openModal, closeModal, confirmModal, confirmOverModal, btnLoading, refocusAfterRender } from '/components/modal.js';
@@ -28,6 +28,7 @@ import { isNavModuleReadOnly } from '/permissions.js';
 import { createPageController } from '/utils/page-lifecycle.js';
 import { USER_COLORS } from '/utils/color.js';
 import { redrawList } from '/utils/list-motion.js';
+import { daysBetweenDateKeys, countdownPhrase } from '/utils/countdown.js';
 
 const UPCOMING_WINDOW_DAYS = 90;
 const WEEKDAY_CODES = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
@@ -215,6 +216,29 @@ function readOnly() {
 // per Devtools wiederbelebte Schaltflaeche findet denselben Riegel).
 const READ_SAFE_ACTIONS = new Set(['open-source', 'toggle-upcoming-rest']);
 
+/**
+ * Pure: wann eine Abholung ist, so wie man danach fragt (Critique R17, E2):
+ * Wochentag, Datum und der Abstand - "Fr, 09.10.2026 · 2 Tage". Bis R17 stand
+ * dort nur "09.10.2026": ob das diese oder naechste Woche ist und an welchem
+ * Tag die Tonne raus muss, rechnete man selbst.
+ *
+ * Der Abstand ist die Stufung der Uebersicht (countdownPhrase(): Heute, Morgen,
+ * n Tage, ca. n Wochen), gerechnet auf den KEYS der Haushaltszone; der
+ * Wochentag kommt aus dem UTC-Mittag des Keys mit `timeZone: 'UTC'` - beides
+ * sieht nie eine Browserzone. Ein vergangener Tag traegt keinen Abstand.
+ */
+function pickupWhenLabel(dateKey, today = todayKey()) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateKey ?? ''));
+  if (!match) return formatDate(dateKey);
+  const noon = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12));
+  const weekday = new Intl.DateTimeFormat(getLocale(), { weekday: 'short', timeZone: 'UTC' }).format(noon);
+  const date = `${weekday}, ${formatDate(dateKey)}`;
+  const days = daysBetweenDateKeys(today, dateKey);
+  if (days === null || days < 0) return date;
+  const phrase = countdownPhrase(days);
+  return `${date} · ${t(phrase.key, phrase.count === undefined ? undefined : { count: phrase.count })}`;
+}
+
 function occurrenceRowHtml(occurrence) {
   const hasScheduleOrigin = occurrence.origins.some((o) => o.kind === 'schedule');
   const oneOff = occurrence.origins.find((o) => o.kind === 'one_off');
@@ -295,7 +319,7 @@ function occurrenceRowHtml(occurrence) {
         <i data-lucide="${esc(occurrence.type_icon || 'trash-2')}" style="color:${esc(occurrence.type_color || '')}" aria-hidden="true"></i>
         <span class="list-row__body">
           <span class="list-row__name">${esc(occurrence.type_name ?? '')}</span>
-          <span class="list-row__meta">${esc(formatDate(occurrence.date_key))} ${originBadges(occurrence)}</span>
+          <span class="list-row__meta">${esc(pickupWhenLabel(occurrence.date_key))} ${originBadges(occurrence)}</span>
         </span>
       </div>
       ${actions}
@@ -437,7 +461,7 @@ function scheduleRowHtml(schedule) {
           <span class="list-row__name">${esc(recurrenceSummary(schedule))}</span>
           <span class="list-row__meta">
             ${schedule.active ? '' : `<span class="waste-badge waste-badge--paused">${esc(t('waste.pausedBadge'))}</span>`}
-            ${next ? esc(t('waste.nextPickupLabel')) + ': ' + esc(formatDate(next.date_key)) : esc(t('waste.noUpcomingPickup'))}
+            ${next ? esc(t('waste.nextPickupLabel')) + ': ' + esc(pickupWhenLabel(next.date_key)) : esc(t('waste.noUpcomingPickup'))}
           </span>
         </span>
       </div>
@@ -451,6 +475,18 @@ function scheduleRowHtml(schedule) {
           </div>
         </div>`}
     </div>`;
+}
+
+/**
+ * Pure: was unter einer Abfallart OHNE wiederkehrenden Termin steht. "Noch
+ * kein Termin" stimmt nur, wenn auch keine Abholung dieser Art ansteht - eine
+ * Einzelabholung oder eine eingelesene stand bis R17 zwei Zeilen daneben in
+ * "Naechste Abholungen", und die Karte widersprach ihr. Dann nennt die Zeile
+ * diese Abholung.
+ */
+function typeWithoutScheduleLine(typeId, occurrences = state.occurrences) {
+  const next = occurrences.find((occ) => occ.type_id === typeId);
+  return next ? `${t('waste.nextPickupLabel')}: ${pickupWhenLabel(next.date_key)}` : t('waste.noSchedulesYet');
 }
 
 function typeCardHtml(type, index, total) {
@@ -493,7 +529,7 @@ function typeCardHtml(type, index, total) {
           </div>`}
       </div>
       <div class="waste-schedule-list">
-        ${schedules.length ? schedules.map(scheduleRowHtml).join('') : `<p class="waste-schedule-list__empty">${esc(t('waste.noSchedulesYet'))}</p>`}
+        ${schedules.length ? schedules.map(scheduleRowHtml).join('') : `<p class="waste-schedule-list__empty">${esc(typeWithoutScheduleLine(type.id))}</p>`}
       </div>
     </div>`;
 }
@@ -526,16 +562,32 @@ function sectionVisibility(s) {
 }
 
 /**
- * Pure: was der FAB anlegt. Ohne aktive Abfallart laesst sich keine Abholung
+ * Pure: was der FAB anlegt. Ohne aktive Abfallart laesst sich kein Termin
  * eintragen - der FAB hiess trotzdem "Abholung" und leitete per Toast in den
  * Abfallart-Dialog um (der Toast legte sich dabei ueber dessen Namensfeld).
  * Jetzt nennt er, was er tut.
+ *
+ * MIT ABFALLART LEGT ER DEN WIEDERKEHRENDEN TERMIN AN (Entscheidung R17, E2).
+ * Bis R17 die Einzelabholung - die seltenste Handlung des Moduls als
+ * Primaerknopf, waehrend der Termin, um den es geht ("jeden zweiten Freitag"),
+ * nur im Drei-Punkte-Menue einer Abfallart stand. Die Einzelabholung steht
+ * jetzt im Werkzeugmenue des Kopfs (renderPage()).
  */
 function fabIntent(s) {
   const hasActiveType = s.types.some((type) => !type.archived);
   return hasActiveType
-    ? { creates: 'pickup', labelKey: 'waste.addPickup', dockLabelKey: 'newLabel.waste' }
+    ? { creates: 'schedule', labelKey: 'waste.addSchedule', dockLabelKey: 'newLabel.wasteSchedule' }
     : { creates: 'type', labelKey: 'waste.addType', dockLabelKey: 'newLabel.wasteType' };
+}
+
+/**
+ * Pure: welche Abfallart der Termin-Dialog vorschlaegt, wenn er vom
+ * Primaerknopf kommt: die erste aktive OHNE Termin (dort fehlt er), sonst die
+ * erste aktive.
+ */
+function defaultScheduleType(types = state.types, schedules = state.schedules) {
+  const active = types.filter((type) => !type.archived);
+  return active.find((type) => !schedules.some((schedule) => schedule.type_id === type.id)) ?? active[0] ?? null;
 }
 
 function presetLabel(preset) {
@@ -603,7 +655,7 @@ function applyPageMode() {
       onClick: () => {
         if (readOnly()) return;
         if (fabIntent(state).creates === 'type') openTypeModal();
-        else openPickupModal();
+        else openScheduleModal(null);
       },
     });
   }
@@ -1061,12 +1113,23 @@ function weekdayPickerHtml(selected) {
     </label>`).join('')}</div>`;
 }
 
+/* `type` ist die Abfallart der Zeile, aus der der Dialog kommt. Vom
+ * Primaerknopf kommt er OHNE (null): dann waehlt man die Abfallart im Dialog,
+ * vorbelegt ueber defaultScheduleType(). */
 function openScheduleModal(type, schedule = null) {
   const isEdit = !!schedule;
+  const pickType = !type;
+  const suggested = pickType ? defaultScheduleType() : null;
+  const typeField = pickType ? `
+    <div class="form-group">
+      <label class="form-label" for="wsm-type">${t('waste.typeSelectLabel')}</label>
+      <select class="form-input" id="wsm-type">${state.types.filter((t2) => !t2.archived)
+        .map((t2) => `<option value="${t2.id}"${suggested?.id === t2.id ? ' selected' : ''}>${esc(t2.name)}</option>`).join('')}</select>
+    </div>` : '';
   const kind = schedule?.recurrence_kind ?? 'weekly';
   const isOrdinal = kind === 'monthly_ordinal_weekday';
 
-  const content = `
+  const content = `${typeField}
     <div class="form-group">
       <label class="form-label" for="wsm-kind">${t('waste.recurrenceKindLabel')}</label>
       <select class="form-input" id="wsm-kind">
@@ -1177,7 +1240,10 @@ function openScheduleModal(type, schedule = null) {
         const interval = Number(panel.querySelector('#wsm-interval').value) || 1;
         const active = panel.querySelector('#wsm-active').checked;
 
-        const body = { type_id: type.id, recurrence_kind: kindValue, anchor_date: anchor, interval, valid_until: validUntil, active };
+        const typeSelect = panel.querySelector('#wsm-type');
+        if (typeSelect && !typeSelect.value) { typeSelect.focus(); return; }
+        const typeId = typeSelect ? Number(typeSelect.value) : type.id;
+        const body = { type_id: typeId, recurrence_kind: kindValue, anchor_date: anchor, interval, valid_until: validUntil, active };
         if (kindValue === 'weekly') {
           body.weekdays = [...panel.querySelectorAll('input[name="weekday"]:checked')].map((el) => el.value);
         } else if (kindValue === 'monthly_ordinal_weekday') {
@@ -2056,6 +2122,12 @@ function renderPage() {
             // zum Eintrag seines Menues. Ab 768px steht der Knopf, und der
             // Eintrag ist ausgeblendet - es bleibt je Breite EIN Weg.
             { action: 'add-type', label: t('waste.addType'), icon: 'plus' },
+            // Die Einzelabholung ist die Ausnahme zum Termin, den der
+            // Primaerknopf anlegt (Entscheidung R17, E2) - ein Werkzeug, kein
+            // Hauptweg. Der Kopf entsteht VOR dem Laden und wird danach nicht
+            // neu gebaut: der Eintrag steht deshalb immer im Markup, und
+            // waste.css nimmt ihn im Onboarding (keine Abfallart) heraus.
+            { action: 'add-pickup', label: t('waste.addPickup'), icon: 'calendar-plus' },
             { action: 'open-import', label: t('waste.importFileAction'), icon: 'upload' },
             { action: 'open-url-source', label: t('waste.addUrlSourceAction'), icon: 'link' },
             { action: 'open-reminder-settings', label: t('waste.reminderSettingsAction'), icon: 'bell' },
@@ -2086,7 +2158,7 @@ function renderPage() {
       }),
     }),
     trailing: `
-      <button class="page-fab" id="waste-fab-new-pickup" aria-label="${esc(t('waste.addPickup'))}" data-dock-label="${t('newLabel.waste')}">
+      <button class="page-fab" id="waste-fab-new-pickup" aria-label="${esc(t('waste.addSchedule'))}" data-dock-label="${t('newLabel.wasteSchedule')}">
         <i data-lucide="plus" class="icon-xl" aria-hidden="true"></i>
       </button>`,
   }));
@@ -2201,6 +2273,11 @@ function bindEvents() {
       openReminderSettingsModal();
     } else if (kind === 'add-type') {
       openTypeModal();
+    } else if (kind === 'add-pickup') {
+      // Nur archivierte Abfallarten: der Dialog haette nichts zu waehlen -
+      // derselbe Weg, den der Primaerknopf dann nimmt (fabIntent()).
+      if (fabIntent(state).creates === 'type') openTypeModal();
+      else openPickupModal();
     } else if (kind === 'create-preset-type') {
       createPresetType(action.dataset.preset, action);
     }
@@ -2314,6 +2391,9 @@ export async function render(container, { signal: routeSignal = null } = {}) {
 }
 
 export const __test = {
+  // R17/E2: wann eine Abholung ist, was unter einer Abfallart ohne Termin
+  // steht, und welche Abfallart der Termin-Dialog des Primaerknopfs vorschlaegt.
+  pickupWhenLabel, typeWithoutScheduleLine, defaultScheduleType, occurrenceRowHtml,
   findScheduleOrigin, parseDeepLinkParams, deepLinkSelectors, recurrenceSummary, originBadges,
   defaultLabelDecision, unresolvedBlockingDiagnostics, buildMappingDecisions, sourceHealthBadgeInfo,
   splitUpcomingByType, deepLinkNeedsExpand, nearestOrdinalAnchorDateKey,
