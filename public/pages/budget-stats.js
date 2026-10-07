@@ -200,7 +200,7 @@ function renderBodyContent(body) {
     <div class="budget-stats__export"></div>
   `);
   renderTrendChart();
-  watchTrendBreakpoint(panel);
+  watchTrendBreakpoint(view.root);
   renderCatBars();
   renderDonut();
   renderExport();

@@ -4831,7 +4831,15 @@ test('R17: der Verlauf zeichnet neu, wenn das Fenster die Schwelle kreuzt; ein M
   assert.match(watch, /addEventListener\('change', onChange\)/);
   assert.match(watch, /if \(!panel\.isConnected\) \{\s*mql\.removeEventListener\('change', onChange\)/, 'meldet sich ab, wenn das Panel weg ist');
   assert.match(watch, /trendWatch\?\.mql\.removeEventListener/, 'ein Lauscher, nicht einer je Aufbau');
-  assert.match(stats, /renderTrendChart\(\);\s*watchTrendBreakpoint\(panel\);/);
+  assert.match(stats, /renderTrendChart\(\);\s*watchTrendBreakpoint\(view\.root\);/);
+  // Der Aufruf steht in renderBodyContent(body): dort gibt es KEIN `panel`.
+  // Die erste Fassung uebergab es trotzdem - ein ReferenceError bei jedem
+  // Aufbau mit Daten, nach dem Balken, Donut und Export nicht mehr liefen
+  // (Review an #1767; der Textvergleich des Aufrufs allein sah das nicht).
+  const bodyStart = stats.indexOf('function renderBodyContent(body)');
+  const bodyFn = stats.slice(bodyStart, stats.indexOf('\nfunction ', bodyStart + 10));
+  assert.ok(bodyStart !== -1 && bodyFn.length > 0, 'renderBodyContent nicht gefunden');
+  assert.doesNotMatch(bodyFn.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, ''), /\bpanel\b/, 'kein `panel` im Rumpf von renderBodyContent');
 
   const menu = read('../public/utils/popover-menu.js');
   const toggle = menu.slice(menu.indexOf('function onToggle(event)'));
