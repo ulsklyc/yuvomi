@@ -32,6 +32,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for every tile of this kind: budget, health, housekeeping, inventory and the overview.
 - **The small trend lines in the vitals tiles are visible.** They were grey hairlines; they now
   carry the colour of the health area with a soft fill, and the latest reading is marked.
+- **Opening an event, a task or a birthday shows what matters first.** The reading view listed
+  everything as rows of equal weight, people as a comma-separated line, under a thin colour
+  strip. An event now opens with its time in words ("Today, 20:00 - 22:00") beside a dot in the
+  calendar colour and the people as avatars with names. A task opens with its due date and its
+  people, and "Done" is the one main button. A birthday opens with the picture, "turns 41" and
+  "in 26 days". The popover on a desktop carries the title in the same size as the sheet on a
+  phone.
+- **The agenda names its days in words.** "Today - Thursday, 8 October" and "Saturday, 10
+  October" instead of "08.10.2026 Thursday".
 - **Numbers no longer jump sideways.** On the overview, times, amounts and counters now use
   digits of equal width everywhere, not only in some tiles.
 - **The app starts faster on a slow connection.** Before the overview asked for its data, the

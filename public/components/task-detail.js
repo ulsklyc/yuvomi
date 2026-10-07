@@ -31,7 +31,7 @@
 
 import { api } from '/api.js';
 import { t, formatDate, formatTime } from '/i18n.js';
-import { openDetailView, closeDetailView, visibilityRow, assignedRow } from '/components/detail-view.js';
+import { openDetailView, closeDetailView, visibilityRow } from '/components/detail-view.js';
 import { closeModal, btnLoading, refocusAfterRender } from '/components/modal.js';
 import { recurrenceRow } from '/rrule-ui.js';
 import { scheduleUndoableDelete, acknowledgeCheck } from '/utils/ux.js';
@@ -173,11 +173,15 @@ export async function addSubtask(parentId, title, { onChanged = () => {} } = {})
 // keine Durchgangsstation. Es steht nur nicht mehr im Weg.
 const STATUS_ACTIONS = {
   open: [
-    { id: 'task-detail-finish', status: 'done',        labelKey: 'tasks.detailFinish', icon: 'check',      variant: 'secondary' },
+    // ERLEDIGEN IST DIE HAUPTAKTION (Critique R18, 2026-10-07). Der haeufigste
+    // Grund, eine Aufgabe zu oeffnen, ist sie abzuhaken - und der Knopf dafuer
+    // stand als einer von vier gleich leisen im Fuss. Er ist jetzt der EINE
+    // Primaerknopf des Blatts (Bearbeiten steht hier im Kopf, nicht im Fuss).
+    { id: 'task-detail-finish', status: 'done',        labelKey: 'tasks.detailFinish', icon: 'check',      variant: 'primary' },
     { id: 'task-detail-start',  status: 'in_progress', labelKey: 'tasks.detailStart',  icon: 'circle-dot', variant: 'ghost' },
   ],
   in_progress: [
-    { id: 'task-detail-finish', status: 'done',        labelKey: 'tasks.detailFinish', icon: 'check',      variant: 'secondary' },
+    { id: 'task-detail-finish', status: 'done',        labelKey: 'tasks.detailFinish', icon: 'check',      variant: 'primary' },
   ],
   done: [
     { id: 'task-detail-reopen', status: 'open',        labelKey: 'tasks.detailReopen', icon: 'rotate-ccw', variant: 'secondary' },
@@ -867,8 +871,22 @@ function taskReminderSummary(reminders) {
     .join(', ');
 }
 
-function renderTaskDetail(task, reminders = [], ctx) {
+/**
+ * Der Kopf der Aufgaben-Leseansicht (components/detail-view.js
+ * `detailHeadEl`): wann sie faellig ist, in den Worten der Liste ("Heute
+ * faellig", "Ueberfaellig · 11.08."), und wer sie hat - als Avatare mit Namen.
+ */
+function taskDetailHead(task) {
   const due = formatDueDate(task.due_date, task.due_time, task.status === 'done' || isArchived(task));
+  return {
+    subtitle: due?.label ?? '',
+    subtitleLabel: t('tasks.dueDateLabel'),
+    people: task.assigned_users ?? [],
+    peopleLabel: t('tasks.assignedLabel'),
+  };
+}
+
+function renderTaskDetail(task, reminders = [], ctx) {
 
   return [
     { icon: 'circle-dot', label: t('tasks.statusLabel'), value: STATUS_LABELS()[task.status] ?? task.status },
@@ -879,11 +897,11 @@ function renderTaskDetail(task, reminders = [], ctx) {
     // Nur wenn gesetzt - eine Zeile "nicht gesperrt" an jeder Aufgabe waere
     // Rauschen. Die leere `value` blendet die Zeile aus (#830).
     { icon: 'lock', label: t('tasks.lockedLabel'), value: task.locked ? t('tasks.lockedDetail') : '' },
-    { icon: 'clock', label: t('tasks.dueDateLabel'), value: due?.label ?? '' },
+    // FAELLIGKEIT und PERSONEN stehen seit R18 im Kopf (taskDetailHead): "Heute
+    // faellig" als die eine Angabe ueber den Zeilen, die Personen als Avatare.
     { icon: 'calendar-clock', label: t('tasks.startDateLabel'), value: task.start_date ? formatDate(task.start_date) : '' },
     recurrenceRow(task.recurrence_rule, { fromCompletion: !!task.recurrence_from_completion }),
     { icon: 'folder', label: t('tasks.categoryLabel'), value: task.category && task.category !== FALLBACK_CATEGORY ? catLabel(task.category, ctx.categories) : '' },
-    assignedRow(task.assigned_users, t('tasks.assignedLabel')),
     { icon: 'award', label: t('tasks.pointsLabel'), value: task.points ? String(task.points) : '' },
     { icon: 'tag', label: t('tasks.tagsLabel'), node: tagChipsNode(task.tags) },
     { icon: 'list-checks', label: t('tasks.subtasksLabel'), node: subtaskListNode(task, ctx) },
@@ -1156,6 +1174,7 @@ export function openTaskDetail({
     title: task.title,
     key: `task:${task.id}`,
     size: 'lg',
+    head: taskDetailHead(task),
     // DIE DETAILSPALTE (Liste + Detail, utils/master-detail.js): dieselbe
     // Ansicht, nur in der rechten Spalte statt im Sheet. Bearbeiten fuehrt dort
     // ins eigene Formular-Modal (`edit.standalone`), weil die Spalte ein

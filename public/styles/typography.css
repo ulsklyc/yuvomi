@@ -150,6 +150,10 @@
 /* Die Reichweite eines Einstellungsblatts ("Fuer mich" / "Fuer den Haushalt")
  * gliedert Abschnitte, also traegt sie deren Stufe - siehe die Stufenleiter
  * weiter unten (R16). */
+/* Der Titel des Lese-Popovers traegt die Stufe des Blatts und der
+ * Detailspalte (`.modal-panel__title`, Title 3): derselbe Termin stand im
+ * Popover in 17px und im Blatt in 20px (Critique R18). */
+.detail-popover__title,
 .settings-scope__title,
 .settings-navigation-panel__title,
 .split-group-name,
@@ -242,7 +246,6 @@
  * Card-/Item-Titel
  * ------------------------------------------------------------------------ */
 .u-card-title,
-.detail-popover__title,
 .budget-loan-card__title,
 .document-card__title,
 .document-row__title,

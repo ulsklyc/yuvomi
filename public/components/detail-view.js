@@ -8,7 +8,7 @@
  *                 i18n.js (t), detail-view.css
  *
  * API:
- *   openDetailView({ title, accentColor, anchor, pane, sections, actions, edit, size, onClose })
+ *   openDetailView({ title, accentColor, head, anchor, pane, sections, actions, edit, size, onClose })
  *   closeDetailView({ force, fokus }) → Promise<void>
  *
  * Drei Präsentationen, eine Aufrufer-API: mit `pane` (die Detailspalte aus
@@ -26,6 +26,8 @@ import {
 import { pushOverlay, dropOverlay } from '/utils/overlay-history.js';
 import { durationToken } from '/utils/ux.js';
 import { detailPaneHeaderEl } from '/utils/master-detail.js';
+import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
+import { initials } from '/utils/initials.js';
 
 // Ab dieser Breite ist ein Popover am Auslöser die bessere Präsentation: Der
 // Auslöser bleibt sichtbar, der Weg ist kurz. Darunter deckt ein 320px-Kärtchen
@@ -186,15 +188,148 @@ export function assignedRow(users, label, fallbackName = '') {
 }
 
 /**
- * Der Lese-Körper: optionaler Farbstreifen plus die sichtbaren Metazeilen.
+ * DER KOPF DER LESEANSICHT (Critique R18, 2026-10-07).
+ *
+ * Termin, Aufgabe und Geburtstag oeffneten als Liste von Schluessel-Wert-
+ * Zeilen: WANN stand in derselben Groesse wie "Sichtbarkeit", die Personen als
+ * Kommatext, darueber eine frei stehende 2px-Farblinie. Die Kontakte hatten
+ * die Antwort schon (Monogramm und Schnellaktionen ueber den Zeilen,
+ * contacts.js `contactCardEl`) - als Karte, die das Modul nach dem Oeffnen
+ * selbst in den Baum haengt. Dieser Kopf ist dasselbe Muster als Teil der
+ * API: was eine Entitaet AUSMACHT, steht ueber den Zeilen, die sie beschreiben.
+ *
+ * Der TITEL bleibt, wo er ist (Kopfzeile des Blatts, des Popovers, der
+ * Spalte) - der Kopf wiederholt ihn nicht. Er traegt, jeweils optional:
+ *   - `media`    ein grosses Bild oder Monogramm (Geburtstag)
+ *   - `dot`      einen Farbpunkt vor der Unterzeile (Kalenderfarbe); er loest
+ *                den Farbstreifen ab, der ohne Bezug ueber dem Blatt hing
+ *   - `subtitle` die eine Angabe, nach der man die Ansicht oeffnet, in Worten
+ *                ("Heute, 20:00 - 22:00", "Heute faellig"); `subtitleLabel`
+ *                nennt sie Screenreadern beim Namen ("Wann"), wie es die
+ *                Zeile tat, die sie abloest
+ *   - `facts`    hoechstens zwei Kennzahlen ("wird 41", "in 26 Tagen")
+ *   - `people`   Personen als Avatar mit Namen statt als Kommatext
+ *
+ * Alles entsteht ueber die DOM-API (textContent, Attribute) - wie der Rest
+ * dieser Komponente, kein Markup-String. Ohne einen einzigen Teil entsteht
+ * kein Kopf.
+ *
+ * @param {{media?: HTMLElement, dot?: string, subtitle?: string, subtitleLabel?: string, facts?: string[],
+ *   people?: Array<{display_name?: string, color?: string, avatar_data?: string}>, peopleLabel?: string}} [head]
+ * @returns {HTMLElement|null}
+ */
+export function detailHeadEl(head) {
+  if (!head) return null;
+  const subtitle = typeof head.subtitle === 'string' ? head.subtitle.trim() : '';
+  const facts = (head.facts ?? []).filter((fact) => typeof fact === 'string' && fact.trim()).slice(0, 2);
+  const people = (head.people ?? []).filter((person) => person?.display_name);
+  const media = head.media instanceof HTMLElement ? head.media : null;
+  if (!subtitle && !facts.length && !people.length && !media) return null;
+
+  const el = document.createElement('div');
+  el.className = media ? 'detail-head detail-head--media' : 'detail-head';
+
+  if (media) {
+    const frame = document.createElement('div');
+    frame.className = 'detail-head__media';
+    frame.appendChild(media);
+    el.appendChild(frame);
+  }
+
+  if (subtitle) {
+    const line = document.createElement('p');
+    line.className = 'detail-head__subtitle';
+    if (head.dot) {
+      const dot = document.createElement('span');
+      dot.className = 'detail-head__dot';
+      dot.style.setProperty('--detail-accent', head.dot);
+      dot.setAttribute('aria-hidden', 'true');
+      line.appendChild(dot);
+    }
+    if (head.subtitleLabel) {
+      const label = document.createElement('span');
+      label.className = 'sr-only';
+      label.textContent = `${head.subtitleLabel}: `;
+      line.appendChild(label);
+    }
+    const text = document.createElement('span');
+    text.textContent = subtitle;
+    line.appendChild(text);
+    el.appendChild(line);
+  }
+
+  if (facts.length) {
+    const row = document.createElement('p');
+    row.className = 'detail-head__facts';
+    facts.forEach((fact) => {
+      const item = document.createElement('span');
+      item.className = 'detail-head__fact';
+      item.textContent = fact;
+      row.appendChild(item);
+    });
+    el.appendChild(row);
+  }
+
+  if (people.length) {
+    const list = document.createElement('ul');
+    list.className = 'detail-head__people';
+    if (head.peopleLabel) list.setAttribute('aria-label', head.peopleLabel);
+    people.forEach((person) => {
+      const item = document.createElement('li');
+      item.className = 'detail-head__person';
+      const avatar = personAvatarEl(person);
+      const name = document.createElement('span');
+      name.className = 'detail-head__name';
+      name.textContent = person.display_name;
+      item.append(avatar, name);
+      list.appendChild(item);
+    });
+    el.appendChild(list);
+  }
+  return el;
+}
+
+/**
+ * Die Scheibe einer Person: ihr Bild, sonst ihre Initialen auf ihrer
+ * Identitaetsfarbe (dieselbe wie im Avatar-Stapel der Listen,
+ * user-multi-select.js). Schmuck neben dem Namen, der daneben steht - deshalb
+ * `aria-hidden` und ein leeres `alt`.
+ */
+function personAvatarEl(person) {
+  const avatar = document.createElement('span');
+  avatar.className = 'detail-head__avatar';
+  avatar.setAttribute('aria-hidden', 'true');
+  if (person.avatar_data) {
+    const img = document.createElement('img');
+    img.src = person.avatar_data;
+    img.alt = '';
+    img.loading = 'lazy';
+    avatar.appendChild(img);
+    return avatar;
+  }
+  const color = person.color ?? AVATAR_FALLBACK_COLOR;
+  avatar.style.setProperty('background-color', color);
+  avatar.style.setProperty('color', getReadableTextColor(color));
+  avatar.textContent = initials(person.display_name);
+  return avatar;
+}
+
+/**
+ * Der Lese-Körper: optionaler Kopf (`head`, siehe detailHeadEl) oder
+ * Farbstreifen, dann die sichtbaren Metazeilen.
  * Zeilen ohne Inhalt fallen weg, statt als leere Zeile dazustehen - eine
  * Detailansicht zeigt, was da ist, und schweigt über den Rest.
  */
-function detailBodyEl({ accentColor, sections = [] }) {
+function detailBodyEl({ accentColor, head, sections = [] }) {
   const view = document.createElement('div');
   view.className = 'detail-view';
 
-  if (accentColor) {
+  const headEl = detailHeadEl(head);
+  if (headEl) view.appendChild(headEl);
+
+  // Mit einem Farbpunkt im Kopf entfaellt der Streifen: dieselbe Farbe stuende
+  // sonst zweimal da, einmal davon ohne Bezug.
+  if (accentColor && !(headEl && head.dot)) {
     const accent = document.createElement('div');
     accent.className = 'detail-view__accent';
     accent.style.setProperty('--detail-accent', accentColor);
@@ -845,6 +980,8 @@ function openInPane(opts, token) {
  * @param {Object} opts
  * @param {string} opts.title            - Kopfzeile (Titel der Entität)
  * @param {string} [opts.accentColor]    - Farbstreifen oben (Kalenderfarbe o. Ä.)
+ * @param {Object} [opts.head]           - Kopf ueber den Zeilen: { media?, dot?, subtitle?, subtitleLabel?, facts?, people?, peopleLabel? },
+ *                                         siehe detailHeadEl. Mit `dot` entfaellt der Farbstreifen.
  * @param {HTMLElement} [opts.anchor]    - Auslöser; ab 768px wird daran verankert
  * @param {HTMLElement} [opts.pane]      - Koerper der Detailspalte (Liste + Detail); hat Vorrang
  * @param {Array}  [opts.sections]       - Metazeilen, siehe detailRowEl

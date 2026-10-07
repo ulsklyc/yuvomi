@@ -1225,24 +1225,39 @@ function birthdayPaneSections(birthday) {
     else if (days === 1) ageNote = t('birthdays.ageNoteTomorrow', { age: birthday.next_age });
     else ageNote = t('birthdays.ageNoteDays', { days, age: birthday.next_age });
   }
-  const hasPhoto = Boolean(birthday.photo_data || (birthday.family_user_id && birthday.family_avatar_data));
-  let photo = null;
-  if (hasPhoto) {
-    photo = document.createElement('div');
-    photo.className = 'birthday-pane__photo';
-    photo.insertAdjacentHTML('beforeend', photoAvatar(birthday, 'birthday-avatar--pane'));
-  }
   const nameDay = nameDayReadText(birthday.name_day);
   const nameDayNext = nameDay && Number.isInteger(birthday.name_day_days_until)
     ? `${nameDay} · ${countdownLabel(birthday.name_day_days_until)}` : nameDay;
   return [
-    { label: t('birthdays.photoLabel'), node: photo },
+    // Das Bild steht seit R18 im Kopf (birthdayDetailHead), gross und immer -
+    // auch als Monogramm, wo kein Foto hinterlegt ist.
     { icon: 'party-popper', label: birthday.next_birthday ? formatDate(birthday.next_birthday) : '', value: ageNote },
     { icon: 'cake', label: t('birthdays.birthDateLabel'), value: birthday.birth_date ? formatDate(birthday.birth_date) : '' },
     { icon: 'calendar-heart', label: t('birthdays.nameDay'), value: nameDayNext },
     { icon: 'align-left', label: t('birthdays.notesLabel'), value: birthday.notes || '', multiline: true },
     { icon: 'bell', label: t('reminders.offsetLabel'), value: reminderReadText(birthday) },
   ];
+}
+
+/**
+ * Der Kopf der Geburtstags-Leseansicht (components/detail-view.js
+ * `detailHeadEl`, Critique R18): das Bild gross, darunter die zwei Angaben,
+ * derentwegen man nachsieht - wie alt und wann. Dieselben Worte wie die
+ * Kachel der Uebersicht ("wird 41", "in 26 Tagen": `birthdays.turnsAge`,
+ * `countdownLabel`), keine neuen Texte.
+ */
+function birthdayDetailHead(birthday) {
+  const media = document.createElement('div');
+  media.className = 'birthday-pane__photo';
+  media.insertAdjacentHTML('beforeend', photoAvatar(birthday, 'birthday-avatar--pane'));
+  const days = birthday.days_until;
+  return {
+    media,
+    facts: [
+      birthday.next_age != null ? t('birthdays.turnsAge', { age: birthday.next_age }) : '',
+      Number.isInteger(days) ? countdownLabel(days) : '',
+    ],
+  };
 }
 
 /** Zeichnet den Geburtstag in die Spalte; `false` = gibt es nicht (mehr). */
@@ -1253,7 +1268,7 @@ function renderBirthdayPane(id, body) {
   openDetailView({
     title: birthday.name,
     key: `birthday:${birthday.id}`,
-    accentColor: 'var(--module-birthdays)',
+    head: birthdayDetailHead(birthday),
     pane: body,
     sections: birthdayPaneSections(birthday),
     // Nur-lesen: kein Loeschen, kein Bearbeiten - der Zustand bleibt lesbar.
@@ -1300,7 +1315,7 @@ function openBirthdaySheet(birthday) {
   openDetailView({
     title: birthday.name,
     key: `birthday:${birthday.id}`,
-    accentColor: 'var(--module-birthdays)',
+    head: birthdayDetailHead(birthday),
     size: 'md',
     sections: birthdayPaneSections(birthday),
     actions: [{
@@ -1418,5 +1433,5 @@ export const __test = {
   onListClick, openBirthdayModal,
   birthdayPreviewHtml,
   // R10 L5: die Detailspalte.
-  birthdayPaneSections, renderBirthdayPane,
+  birthdayPaneSections, birthdayDetailHead, renderBirthdayPane,
 };

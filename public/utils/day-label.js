@@ -48,6 +48,39 @@ export function historyDayLabel(dayKey) {
   }).format(proxy);
 }
 
+/**
+ * Der Tag in Worten, fuer Koepfe: "Heute", "Morgen", "Gestern" - sonst der
+ * Wochentag mit Datum ("Samstag, 24. Oktober"), mit Jahr nur, wenn es nicht
+ * das laufende ist (Critique R18, 2026-10-07).
+ *
+ * Das Geschwister von `historyDayLabel` (das nur zurueckblickt) fuer Flaechen,
+ * die nach vorn UND zurueck zeigen: der Kopf der Termin-Leseansicht und die
+ * Tageskoepfe der Agenda. Dieselben drei Fallen wie dort: Arithmetik auf dem
+ * KEY, der Key roh an die Formatierer, der Wochentag ueber den Proxy.
+ *
+ * @param {string} dayKey  'YYYY-MM-DD' der Anzeigezone
+ * @returns {{ relative: string, full: string }}  `relative` ist '' ausserhalb
+ *          von gestern/heute/morgen; `full` nennt immer Wochentag und Datum.
+ */
+export function dayHeading(dayKey) {
+  const today = todayKey();
+  let relative = '';
+  if (dayKey === today) relative = t('common.today');
+  else if (dayKey === addLocalDays(today, 1)) relative = t('common.tomorrow');
+  else if (dayKey === addLocalDays(today, -1)) relative = t('common.yesterday');
+  const proxy = zonedUTCProxy(`${dayKey}T12:00:00`);
+  if (!proxy) return { relative, full: formatDate(dayKey) };
+  const options = { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' };
+  if (String(dayKey).slice(0, 4) !== today.slice(0, 4)) options.year = 'numeric';
+  return { relative, full: new Intl.DateTimeFormat(getLocale(), options).format(proxy) };
+}
+
+/** `dayHeading` als ein Wort: das relative, sonst das volle. */
+export function dayHeadingLabel(dayKey) {
+  const { relative, full } = dayHeading(dayKey);
+  return relative || full;
+}
+
 // Relatives Datumslabel: „Heute"/„Morgen", sonst das locale-formatierte Datum.
 // Eigene Funktion, damit Aufrufer nur den Datumsteil brauchen, ohne ein
 // zusammengesetztes „Datum, Zeit" per Komma zu zerschneiden (locale-fragil:

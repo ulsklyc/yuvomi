@@ -31,6 +31,142 @@
   flex-shrink: 0;
 }
 
+/* --------------------------------------------------------
+ * Der Kopf (detail-view.js `detailHeadEl`, Critique R18)
+ *
+ * Was die Entitaet AUSMACHT, steht ueber den Zeilen, die sie beschreiben: die
+ * Zeit in Worten, die Personen als Avatar mit Namen, beim Geburtstag das Bild
+ * und zwei Kennzahlen. Der Titel selbst bleibt in der Kopfzeile seines Rahmens
+ * (Blatt, Popover, Spalte) - alle drei tragen ihn in Title 3.
+ *
+ * Die Unterzeile steht eine Stufe ueber den Zeilenwerten (Subheadline in
+ * Primaertinte gegen Caption-Label und Wert darunter): sie ist die Antwort,
+ * derentwegen man die Ansicht oeffnet. Eine Haarlinie trennt Kopf und Zeilen -
+ * dieselbe wie zwischen Zeilen eines Traegers, keine neue Flaeche.
+ * -------------------------------------------------------- */
+.detail-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding-block-end: var(--space-3);
+  border-block-end: var(--space-px) solid var(--color-border-subtle);
+}
+
+.detail-head__subtitle {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--type-secondary);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-snug);
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+  overflow-wrap: anywhere;
+}
+
+/* Der Farbpunkt: die Kalenderfarbe als Zeichen am Text statt als Streifen ueber
+ * dem Blatt. Er sitzt auf der Mittellinie der ersten Zeile (die Unterzeile
+ * richtet an der Grundlinie aus, der Punkt hebt sich um seine halbe Hoehe). */
+.detail-head__dot {
+  flex: 0 0 auto;
+  inline-size: var(--space-2h);
+  block-size: var(--space-2h);
+  border-radius: var(--radius-full);
+  background-color: var(--detail-accent, var(--active-module-accent, var(--color-accent)));
+  transform: translateY(var(--space-px));
+}
+
+/* Hoechstens zwei Kennzahlen, als ganze Woerter ("wird 41", "in 26 Tagen"):
+ * die Zahl laesst sich nicht aus dem Satz ihrer Sprache loesen. Title 3,
+ * tabellarisch; eine Haarlinie zwischen beiden. */
+.detail-head__facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  font-size: var(--type-section-title);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.detail-head__fact + .detail-head__fact {
+  padding-inline-start: var(--space-3);
+  border-inline-start: var(--space-px) solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.detail-head__people {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.detail-head__person {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--type-secondary);
+  color: var(--color-text-primary);
+}
+
+/* 24px-Scheibe mit 11px-Initialen (Caption 2, die kleinste Textrolle): das
+ * Verhaeltnis von 0,46 liegt unter der Lesbarkeitsgrenze des Avatar-Stapels
+ * (<= 0,55, user-multi-select.js). Farbe und Tinte setzt die Komponente aus
+ * der Identitaetsfarbe der Person. */
+.detail-head__avatar {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--space-6);
+  block-size: var(--space-6);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  font-size: var(--type-micro);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+}
+
+.detail-head__avatar img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+.detail-head__name {
+  min-width: 0;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+  overflow-wrap: anywhere;
+}
+
+/* Mit Bild: mittig gestapelt wie eine Kontaktkarte - Bild, dann die Kennzahlen. */
+.detail-head--media {
+  align-items: center;
+  text-align: center;
+}
+
+.detail-head--media .detail-head__facts,
+.detail-head--media .detail-head__people {
+  justify-content: center;
+}
+
+.detail-head__media {
+  display: flex;
+  justify-content: center;
+}
+
 .detail-view__rows {
   display: flex;
   flex-direction: column;
@@ -420,9 +556,9 @@
   min-height: 0;
 }
 
+/* Groesse und Gewicht kommen aus der Rollenschicht (typography.css): Title 3,
+ * wie der Titel des Blatts und der Spalte (R18, vorher 17px). */
 .detail-popover__title {
-  font-size: var(--type-card-title);
-  font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
   text-wrap: balance;
 }

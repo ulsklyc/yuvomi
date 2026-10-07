@@ -3832,6 +3832,20 @@ Angabe braeuchte einen zweiten Timer, nur damit sie sich selbst aktuell haelt.
   was der Kopf nicht nennt ("1.", "16.", "31." unter "Oktober 2026"). Das Diagramm liegt auf
   einem Traeger wie die Listen daneben (`.budget-stats__card`). Ein Ring traegt seine Summe in
   der Mitte (zwei Zeilen, tabellarisch); der beschreibende Satz bleibt als `sr-only` im Baum.
+- **Do** einer Leseansicht einen KOPF geben, wo eine Angabe die Entitaet ausmacht
+  (`openDetailView({ head })`, components/detail-view.js `detailHeadEl`): die Zeit in Worten
+  ("Heute, 20:00 - 22:00", aus `dayHeadingLabel`), die Faelligkeit in den Worten der Liste,
+  beim Geburtstag das Bild gross und zwei Kennzahlen ("wird 41", "in 26 Tagen"). Personen stehen
+  dort als Avatar mit Namen, nie als Kommatext. Der Titel bleibt in der Kopfzeile seines
+  Rahmens (Blatt, Popover, Spalte - alle drei Title 3); der Kopf wiederholt ihn nicht. Ein
+  Farbpunkt vor der Unterzeile loest den frei stehenden Farbstreifen ab (`head.dot`). Was im
+  Kopf steht, steht nicht noch einmal als Zeile darunter; Screenreader hoeren das Label der
+  abgeloesten Zeile weiter (`subtitleLabel`). In der Aufgabe ist "Erledigen" der EINE
+  Primaerknopf des Fusses.
+- **Do** einen Tageskopf in Worten setzen: "Heute", "Morgen", "Gestern" fuehren, dahinter
+  Wochentag und Datum; die anderen Tage nennen nur diese ("Samstag, 24. Oktober", mit Jahr nur
+  ausserhalb des laufenden). Quelle ist `dayHeading()` in utils/day-label.js (Arithmetik auf
+  dem Key, kein Date aus dem Key).
 - **Do** einen STAND in Textfarbe setzen (Kontostand, Nettovermoegen), nur das Minus rot.
   Gruen bleibt Veraenderungen und Einnahmen vorbehalten: es sagt "es ist mehr geworden", und
   ein Stand ist weder gut noch schlecht.

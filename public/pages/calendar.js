@@ -61,6 +61,7 @@ import { renderSkeletonList } from '/utils/skeleton.js';
 import { findPageFab } from '/utils/fab.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { nowFields, todayKey, wallTimeToInstantMs, zonedDateKey, zonedTimeKey } from '/utils/timezone.js';
+import { dayHeading, dayHeadingLabel } from '/utils/day-label.js';
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
 import { emptyStateHTML, emptyHintHTML, mountLoadError } from '/utils/empty-state.js';
 import { moduleAccess } from '/permissions.js';
@@ -4974,8 +4975,7 @@ function renderDayRail() {
       ${groups.length ? groups.map((group) => `
         <div class="agenda-day">
           <h3 class="agenda-day__header ${group.date === state.today ? 'agenda-day__header--today' : ''}">
-            <span class="agenda-day__date">${formatDate(group.date)}</span>
-            <span class="agenda-day__weekday">${DAY_NAMES_LONG()[new Date(group.date + 'T00:00:00').getDay()]}</span>
+            ${agendaDayHeadHtml(group.date)}
           </h3>
           ${dayGroupHtml(group)}
         </div>`).join('') : `<p class="agenda-day__empty">${t('calendar.agendaEmpty')}</p>`}
@@ -5202,6 +5202,23 @@ function mountAgendaDetail(container) {
   });
 }
 
+/**
+ * DER TAGESKOPF DER AGENDA IN WORTEN (Critique R18, 2026-10-07). Dort stand
+ * "08.10.2026 Donnerstag" - das Datum als Zahl vor seinem Wochentag, und
+ * "heute" nur als Farbe. Jetzt fuehrt das relative Wort, wo es eines gibt
+ * ("Heute", "Morgen", "Gestern"), dahinter Wochentag und Datum; die anderen
+ * Tage nennen nur diese ("Samstag, 24. Oktober"). Aus `dayHeading`
+ * (utils/day-label.js): Arithmetik auf dem Key, kein Date aus dem Key.
+ * Die beiden Spannen behalten ihre Klassen - vorn steht, was fuehrt.
+ */
+function agendaDayHeadHtml(dayKey) {
+  const { relative, full } = dayHeading(dayKey);
+  return relative
+    ? `<span class="agenda-day__date">${esc(relative)}</span>
+              <span class="agenda-day__weekday">${esc(full)}</span>`
+    : `<span class="agenda-day__date">${esc(full)}</span>`;
+}
+
 function renderAgendaView(container) {
   const { from, to } = getAgendaRange(state.cursor);
   const days = Array.from({ length: 31 }, (_, i) => addDays(from, i));
@@ -5240,8 +5257,7 @@ function renderAgendaView(container) {
             <!-- Tageskopf als echte Ueberschrift (Critique 2026-08-10):
                  /calendar hatte genau EIN h-Element im ganzen Dokument. -->
             <h2 class="agenda-day__header ${group.date === state.today ? 'agenda-day__header--today' : ''}">
-              <span class="agenda-day__date">${formatDate(group.date)}</span>
-              <span class="agenda-day__weekday">${DAY_NAMES_LONG()[new Date(group.date + 'T00:00:00').getDay()]}</span>
+              ${agendaDayHeadHtml(group.date)}
             </h2>
             ${dayGroupHtml(group)}
             ${dayGroupIsEmpty(group) ? `<p class="agenda-day__empty">${t('calendar.agendaDayEmpty')}</p>` : ''}
@@ -6072,6 +6088,9 @@ export const __test = {
   validDateParam,
   hasAttachment,
   attachmentUrls,
+  eventWhenRelative,
+  eventDetailHead,
+  agendaDayHeadHtml,
   agendaEventAriaLabel,
   calendarRepeatIconHtml,
   monthDayAriaLabel,
@@ -6356,6 +6375,39 @@ function eventWhenText(ev) {
 }
 
 /**
+ * WANN, IN WORTEN (Critique R18, 2026-10-07). Der Kopf der Leseansicht sagt,
+ * was ein Mensch sagt: "Heute, 20:00 - 22:00 Uhr", "Morgen · Ganztägig",
+ * "Samstag, 24. Oktober, 10:00 - 11:30 Uhr". Die Zeile "Wann: 08.10.2026
+ * 20:00 - 22:00 Uhr" darunter entfaellt dafuer - dieselbe Auskunft, einmal.
+ *
+ * Nur der EINTAEGIGE Termin wird relativ: bei einer Spanne ueber mehrere Tage
+ * sind Anfang und Ende gleich wichtig, und "Heute - 10.10.2026" mischte zwei
+ * Schreibweisen. Dort bleibt die Fassung von `eventWhenText`.
+ */
+function eventWhenRelative(ev) {
+  if (isMultiDayEvent(ev)) return eventWhenText(ev);
+  const day = dayHeadingLabel(localDate(ev.start_datetime));
+  if (ev.all_day) return `${day} · ${t('calendar.allDay')}`;
+  return `${day}, ${timeSpanText(ev.start_datetime, ev.end_datetime)}`;
+}
+
+/**
+ * Der Kopf der Termin-Leseansicht (components/detail-view.js `detailHeadEl`):
+ * Farbpunkt des Kalenders, die Zeit in Worten, die Personen als Avatare. Ein
+ * frei eingetragener Name ohne Konto (`assigned_name`) hat kein Bild und
+ * bleibt deshalb eine Zeile (`renderEventDetail`).
+ */
+function eventDetailHead(ev) {
+  return {
+    dot: resolveEventBackground(ev),
+    subtitle: eventWhenRelative(ev),
+    subtitleLabel: t('calendar.detailWhen'),
+    people: ev.assigned_users ?? [],
+    peopleLabel: t('calendar.assignedLabel'),
+  };
+}
+
+/**
  * Die Kartensuche zu einem Ortstext, oder '' wenn es nichts zu suchen gibt.
  *
  * Über `fmtLocation`, damit eine ICS-escapte, mehrzeilige Adresse als eine
@@ -6399,10 +6451,12 @@ function mapRowAction(ev) {
 function renderEventDetail(ev, reminders = []) {
   return [
     { icon: 'calendar', label: t('calendar.detailCalendar'), node: calendarChipNode(ev) },
-    { icon: 'clock', label: t('calendar.detailWhen'), value: eventWhenText(ev) },
+    // WANN und WER stehen seit R18 im Kopf (eventDetailHead): die Zeit in
+    // Worten, die Personen als Avatare. Eine Zeile bleibt nur fuer den frei
+    // eingetragenen Namen ohne Konto - er hat kein Bild fuer den Kopf.
     recurrenceRow(ev.recurrence_rule),
     { icon: 'map-pin', label: t('calendar.locationLabel'), value: ev.location ? fmtLocation(ev.location) : '', action: mapRowAction(ev) },
-    assignedRow(ev.assigned_users, t('calendar.assignedLabel'), ev.assigned_name || ''),
+    ev.assigned_users?.length ? null : assignedRow([], t('calendar.assignedLabel'), ev.assigned_name || ''),
     {
       icon: 'bell',
       label: reminders.length > 1 ? t('reminders.sectionTitlePlural') : t('reminders.sectionTitle'),
@@ -6497,7 +6551,8 @@ async function openEventDetail(ev, anchor = null, { pane = null } = {}) {
 
   const view = openDetailView({
     title: ev.title,
-    accentColor: resolveEventBackground(ev),
+    // Kopf statt Farbstreifen (R18): Farbpunkt, Zeit in Worten, Personen.
+    head: eventDetailHead(ev),
     anchor,
     // Die Detailspalte der Agenda (Liste + Detail): dieselbe Ansicht, rechts
     // neben der Liste statt als Popover. Bearbeiten steht dort im Kopf und

@@ -174,18 +174,28 @@ test('Liste + Detail: jede Zeile ist fuer den Baustein waehlbar, der Hauptknopf 
   assert.match(html, /<button type="button" class="list-row__main list-row__main--interactive" data-open="4" data-md-focus>/);
 });
 
-test('Liste + Detail: die Spalte nennt wann und wie alt, Datum, Notiz - und ein Bild nur, wenn es eins gibt', async () => {
+test('Liste + Detail: die Spalte nennt wann und wie alt, Datum, Notiz - und fuehrt Bild und Kennzahlen im Kopf (R18)', async () => {
   const { installMiniDom } = await import('./mini-dom.js');
   const restore = installMiniDom();
   try {
     const rows = birthdays.__test.birthdayPaneSections(BD);
     const byLabel = Object.fromEntries(rows.map((r) => [r.label, r]));
-    assert.equal(byLabel['birthdays.photoLabel'].node, null, 'ohne Bild keine Initialen-Scheibe als „Profilbild"');
-    assert.match(rows[1].value, /birthdays\.ageNoteDays/, 'die Auskunft, die die Zeile nur knapp traegt');
+    // Seit R18 steht das Bild im KOPF der Ansicht (birthdayDetailHead), nicht
+    // mehr als Zeile "Profilbild". Die Zeile gab es ohne Bild nicht, weil eine
+    // Initialen-Scheibe kein Profilbild ist; der Kopf behauptet das nicht - er
+    // zeigt die Person, als Bild oder als Monogramm wie die Kontaktkarte.
+    assert.equal(byLabel['birthdays.photoLabel'], undefined, 'keine Zeile „Profilbild" mehr');
+    assert.match(rows[0].value, /birthdays\.ageNoteDays/, 'die Auskunft, die die Zeile nur knapp traegt');
+    const head = birthdays.__test.birthdayDetailHead(BD);
+    assert.ok(head.media, 'der Kopf fuehrt immer ein Bild oder Monogramm');
+    assert.deepEqual(head.facts, ['birthdays.turnsAge{"age":41}', 'birthdays.inDays{"count":36}'], 'dieselben Worte wie die Kachel der Uebersicht: wie alt, wann');
+    assert.deepEqual(birthdays.__test.birthdayDetailHead({ ...BD, next_age: null, days_until: 0 }).facts, ['', 'common.today'],
+      'ohne Geburtsjahr kein Alter; heute heisst heute');
     assert.ok(byLabel['birthdays.birthDateLabel'].value, 'Geburtsdatum');
     assert.equal(byLabel['birthdays.notesLabel'].value, 'Bruder in Hamburg');
-    const withPhoto = birthdays.__test.birthdayPaneSections({ ...BD, photo_data: 'data:image/png;base64,AA' });
-    assert.ok(withPhoto[0].node, 'mit Bild steht es oben');
+    const src = readFileSync(new URL('../public/pages/birthdays.js', import.meta.url), 'utf8');
+    assert.equal(src.match(/head: birthdayDetailHead\(birthday\),/g)?.length, 2, 'Spalte und Blatt fuehren denselben Kopf');
+    assert.doesNotMatch(src, /accentColor: 'var\(--module-birthdays\)'/, 'kein frei stehender Farbstreifen mehr');
   } finally { restore(); }
   assert.equal(birthdays.__test.renderBirthdayPane('999', null), false, 'unbekannte ID: Leerzustand (Rueckgabe-Vertrag)');
 });

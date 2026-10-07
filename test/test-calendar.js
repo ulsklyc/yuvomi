@@ -794,6 +794,48 @@ test('eventWhenText: mehrtägiges Zeit-Event nennt Enddatum und Enduhrzeit', () 
   assert(whenRange(text).to === '2026-09-12 2026-09-12T11:00', `Enddatum steht vor der Uhrzeit: ${text}`);
 });
 
+// R18: der Kopf der Leseansicht nennt die Zeit in Worten. Relativ wird nur der
+// EINTAEGIGE Termin; eine Spanne behaelt die Fassung von eventWhenText.
+// (`test()` dieser Datei wartet nicht - die Importe stehen deshalb davor.)
+const { dayHeading, dayHeadingLabel } = await import('/utils/day-label.js');
+const { todayKey: headToday } = await import('/utils/timezone.js');
+const { addLocalDays: headAddDays } = await import('/utils/date.js');
+test('eventWhenRelative: der eintägige Termin nennt den Tag in Worten, die Spanne bleibt absolut', () => {
+  const { eventWhenRelative, eventDetailHead, agendaDayHeadHtml } = calendarHelpers;
+  const addLocalDays = headAddDays;
+  const today = headToday();
+  const tomorrow = addLocalDays(today, 1);
+  const far = addLocalDays(today, 16);
+  assert(dayHeadingLabel(today) === 'common.today', `heute: ${dayHeadingLabel(today)}`);
+  assert(dayHeadingLabel(tomorrow) === 'common.tomorrow', `morgen: ${dayHeadingLabel(tomorrow)}`);
+  assert(dayHeadingLabel(addLocalDays(today, -1)) === 'common.yesterday', 'gestern');
+  assert(!/common\./.test(dayHeadingLabel(far)) && dayHeadingLabel(far) === dayHeading(far).full, `sonst Wochentag mit Datum: ${dayHeadingLabel(far)}`);
+  assert(dayHeading(today).full && dayHeading(today).full !== 'common.today', 'auch heute kennt seinen Wochentag mit Datum');
+
+  const timed = eventWhenRelative({ start_datetime: `${today}T20:00`, end_datetime: `${today}T22:00`, all_day: 0 });
+  assert(timed.startsWith('common.today, calendar.dayRangeLabel'), `"Heute, 20:00 - 22:00": ${timed}`);
+  assert(whenRange(timed).from === `${today}T20:00` && whenRange(timed).to === `${today}T22:00`, timed);
+  assert(!timed.startsWith(today), 'kein Tagesschluessel vorn - der Tag steht in Worten');
+  const allDay = eventWhenRelative({ start_datetime: tomorrow, end_datetime: tomorrow, all_day: 1 });
+  assert(allDay === 'common.tomorrow · calendar.allDay', `ganztaegig: ${allDay}`);
+  const span = { start_datetime: `${today}T14:00`, end_datetime: `${addLocalDays(today, 2)}T11:00`, all_day: 0 };
+  assert(eventWhenRelative(span) === eventWhenText(span), 'ueber mehrere Tage bleibt die absolute Spanne');
+
+  // Der Kopf: Farbpunkt, Zeit, Personen - und "Wann" fuer Screenreader.
+  const head = eventDetailHead({ start_datetime: `${today}T20:00`, end_datetime: `${today}T22:00`, all_day: 0, color: '#00668F', assigned_users: [{ display_name: 'Emma' }] });
+  assert(head.subtitle === timed && head.subtitleLabel === 'calendar.detailWhen', JSON.stringify(head));
+  assert(typeof head.dot === 'string' && head.dot.length > 0, 'der Punkt traegt die Kalenderfarbe');
+  assert(head.people.length === 1 && head.peopleLabel === 'calendar.assignedLabel', 'Personen als Avatare');
+
+  // Agenda: das relative Wort fuehrt, dahinter Wochentag und Datum.
+  const heute = agendaDayHeadHtml(today);
+  assert(/<span class="agenda-day__date">common\.today<\/span>\s*<span class="agenda-day__weekday">[^<]+<\/span>/.test(heute), `"Heute - Donnerstag, 8. Oktober": ${heute}`);
+  assert(heute.includes(dayHeading(today).full), 'der volle Tag steht dahinter');
+  const spaeter = agendaDayHeadHtml(far);
+  assert(spaeter === `<span class="agenda-day__date">${dayHeading(far).full}</span>`, `ohne relatives Wort nur der volle Tag: ${spaeter}`);
+  assert(!/\d{4}-\d{2}-\d{2}|\d{2}\.\d{2}\.\d{4}/.test(spaeter), 'kein Zahlendatum mehr im Tageskopf');
+});
+
 test('eventWhenText: Zeit-Event bis 00:00 des Folgetags bleibt eintägig', () => {
   const text = eventWhenText({ start_datetime: '2026-09-10T21:00', end_datetime: '2026-09-11T00:00', all_day: 0 });
   assert(whenRange(text).to === '2026-09-11T00:00', `21:00-24:00 gehört dem Abend (#804): ${text}`);

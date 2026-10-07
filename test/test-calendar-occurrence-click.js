@@ -31,6 +31,7 @@ globalThis.ResizeObserver = globalThis.ResizeObserver ?? class { observe() {} di
 
 const { __test: calendar } = await import('../public/pages/calendar.js');
 const { scopeQuestion, settles } = await import('./calendar-scope-question.js');
+const { dayHeadingLabel } = await import('../public/utils/day-label.js');
 
 const SERIES_ID = 77;
 // Der 14. ist der Randtag: das Ladefenster reicht einen Tag vor die sichtbare
@@ -157,11 +158,19 @@ function chipsOf(html, className) {
   return chips;
 }
 
-/** Der Tag, den die geoeffnete Detailansicht in ihrer Wann-Zeile nennt. */
+/**
+ * Der Tag, den die geoeffnete Detailansicht nennt. Seit R18 steht WANN im Kopf
+ * und in Worten (`dayHeadingLabel`: "Heute", sonst Wochentag mit Datum) statt
+ * als Zeile mit Tagesschluessel - gesucht wird deshalb der Tag der Reihe,
+ * dessen Wort die Unterzeile anfuehrt. Jeder Tag hat sein eigenes Wort.
+ */
 function shownDay(options) {
-  const when = options.sections.find((row) => row.label === 'calendar.detailWhen');
-  assert.ok(when, 'die Detailansicht hat keine Wann-Zeile');
-  return /\d{4}-\d{2}-\d{2}/.exec(String(when.value))?.[0];
+  const when = options.head?.subtitle;
+  assert.ok(when, 'die Detailansicht nennt im Kopf nicht, wann der Termin ist');
+  assert.equal(options.head.subtitleLabel, 'calendar.detailWhen', 'Screenreader hoeren weiter "Wann"');
+  const hits = DAYS.filter((day) => String(when).startsWith(dayHeadingLabel(day)));
+  assert.equal(hits.length, 1, `"${when}" nennt genau einen Tag der Reihe (${hits.join(', ')})`);
+  return hits[0];
 }
 
 /** Klickt einen Chip ueber den Listener der Ansicht; liefert die geoeffnete Detailansicht. */

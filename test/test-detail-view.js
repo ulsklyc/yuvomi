@@ -372,7 +372,19 @@ test('die Termin-Detailansicht zeigt, was das alte Popup verschwieg', async () =
   assert.match(fn, /recurrenceRow\(ev\.recurrence_rule\)/, 'Wiederholung im Klartext');
   assert.match(fn, /reminderSummary\(/, 'Erinnerungen im Klartext');
   assert.match(fn, /visibilityRow\(ev\.visibility\)/, 'Sichtbarkeit');
-  assert.match(fn, /assignedRow\(ev\.assigned_users/, 'Zugewiesene über die geteilte Zeile');
+  // Seit R18 stehen WANN und WER im Kopf (eventDetailHead); die geteilte Zeile
+  // bleibt fuer den frei eingetragenen Namen ohne Konto.
+  assert.match(fn, /ev\.assigned_users\?\.length \? null : assignedRow\(\[\], t\('calendar\.assignedLabel'\), ev\.assigned_name \|\| ''\)/,
+    'ein freier Name ohne Konto bleibt eine Zeile');
+  assert.doesNotMatch(fn, /calendar\.detailWhen/, 'die Wann-Zeile ist in den Kopf gewandert');
+  const head = src.slice(src.indexOf('function eventDetailHead'), src.indexOf('function eventMapUrl'));
+  assert.match(head, /dot: resolveEventBackground\(ev\)/, 'Farbpunkt statt Farbstreifen');
+  assert.match(head, /subtitle: eventWhenRelative\(ev\)/, 'die Zeit in Worten');
+  assert.match(head, /subtitleLabel: t\('calendar\.detailWhen'\)/, 'Screenreader hoeren weiter "Wann"');
+  assert.match(head, /people: ev\.assigned_users \?\? \[\]/, 'Personen als Avatare');
+  const open = src.slice(src.indexOf('async function openEventDetail'));
+  assert.match(open, /head: eventDetailHead\(ev\),/);
+  assert.doesNotMatch(open.slice(0, open.indexOf('sections: renderEventDetail')), /accentColor:/, 'kein frei stehender Farbstreifen mehr');
 });
 
 test('der Ort öffnet sich als ausdrückliche Aktion in einer Karte, nicht als Link auf dem Text (#1110)', async () => {
@@ -647,7 +659,8 @@ test('der Status lässt sich aus der Detailansicht weiterschalten', async () => 
 test('die Aufgaben-Detailansicht führt die Leseinformationen der Karte', async () => {
   const src = await taskDetailJs();
   const fn = src.slice(src.indexOf('function renderTaskDetail'), src.indexOf('export function openTaskDetail'));
-  for (const key of ['tasks.statusLabel', 'tasks.priorityLabel', 'tasks.dueDateLabel', 'tasks.startDateLabel',
+  // Seit R18 stehen Faelligkeit und Personen im Kopf (taskDetailHead).
+  for (const key of ['tasks.statusLabel', 'tasks.priorityLabel', 'tasks.startDateLabel',
     'tasks.categoryLabel', 'tasks.pointsLabel', 'tasks.tagsLabel',
     'tasks.subtasksLabel', 'tasks.documentsLabel', 'tasks.descriptionLabel']) {
     assert.match(fn, new RegExp(reLiteral(key)), `${key} fehlt in der Detailansicht`);
@@ -656,7 +669,107 @@ test('die Aufgaben-Detailansicht führt die Leseinformationen der Karte', async 
   // bleibt aber die geteilte - deshalb offen bis zur Klammer statt exakt.
   assert.match(fn, /recurrenceRow\(task\.recurrence_rule[),]/, 'Wiederholung über die geteilte Zeile');
   assert.match(fn, /visibilityRow\(task\.visibility\)/, 'Sichtbarkeit über die geteilte Zeile');
-  assert.match(fn, /assignedRow\(task\.assigned_users/, 'Zugewiesene über die geteilte Zeile');
+  const head = src.slice(src.indexOf('function taskDetailHead'), src.indexOf('function renderTaskDetail'));
+  assert.match(head, /subtitle: due\?\.label \?\? ''/, 'die Faelligkeit in den Worten der Liste');
+  assert.match(head, /subtitleLabel: t\('tasks\.dueDateLabel'\)/);
+  assert.match(head, /people: task\.assigned_users \?\? \[\]/, 'Zugewiesene als Avatare im Kopf');
+  assert.match(src, /head: taskDetailHead\(task\),/);
+  // Erledigen ist die Hauptaktion: der EINE Primaerknopf im Fuss.
+  const steps = src.slice(src.indexOf('const STATUS_ACTIONS = {'), src.indexOf('/** Prioritätsbadge'));
+  assert.equal(steps.match(/id: 'task-detail-finish'[^}]*variant: 'primary'/g)?.length, 2, 'offen und in Arbeit');
+  assert.equal(steps.match(/variant: 'primary'/g)?.length, 2, 'nur Erledigen ist primaer');
+});
+
+/* DETAILANSICHTEN MIT KOPF (Critique R18, 2026-10-07). Termin, Aufgabe und
+ * Geburtstag oeffneten als Schluessel-Wert-Zeilen, Personen als Kommatext,
+ * darueber eine frei stehende 2px-Farblinie. Gemessen wird der laufende
+ * Renderer in einem kleinen Schein-DOM, nicht sein Quelltext. */
+test('R18: der Kopf der Leseansicht - Unterzeile mit Farbpunkt, Kennzahlen, Personen als Avatare', async () => {
+  const { register } = await import('node:module');
+  register('./test-browser-loader.mjs', import.meta.url);
+  class El {
+    constructor(tag) {
+      this.tagName = tag.toUpperCase(); this.children = []; this.attrs = {}; this.className = ''; this.textContent = '';
+      this.styles = {}; this.style = { setProperty: (k, v) => { this.styles[k] = v; } };
+      this.classList = { add: (c) => { this.className = `${this.className} ${c}`.trim(); } };
+      this.dataset = {};
+    }
+    setAttribute(k, v) { this.attrs[k] = String(v); }
+    appendChild(c) { this.children.push(c); return c; }
+    append(...cs) { cs.forEach((c) => this.children.push(c)); }
+    find(cls) {
+      if (String(this.className).split(/\s+/).includes(cls)) return this;
+      for (const c of this.children) { const hit = c.find?.(cls); if (hit) return hit; }
+      return null;
+    }
+    all(cls, out = []) {
+      if (String(this.className).split(/\s+/).includes(cls)) out.push(this);
+      for (const c of this.children) c.all?.(cls, out);
+      return out;
+    }
+    get text() { return this.textContent + this.children.map((c) => c.text ?? '').join(''); }
+  }
+  const saved = {};
+  for (const k of ['document', 'HTMLElement']) saved[k] = Object.getOwnPropertyDescriptor(globalThis, k);
+  Object.assign(globalThis, { document: { createElement: (tag) => new El(tag) }, HTMLElement: El });
+  try {
+    const { detailHeadEl } = await import('../public/components/detail-view.js');
+    assert.equal(detailHeadEl(undefined), null);
+    assert.equal(detailHeadEl({ dot: '#00668F', subtitle: '  ', people: [], facts: [''] }), null, 'ohne einen Teil entsteht kein Kopf - auch kein Punkt allein');
+
+    // Termin: Farbpunkt, Zeit in Worten (Screenreadern beim Namen genannt), Personen.
+    const termin = detailHeadEl({
+      dot: '#00668F', subtitle: 'Heute, 20:00 - 22:00', subtitleLabel: 'Wann',
+      people: [{ display_name: 'Emma <b>Johnson</b>', color: '#CE2A63' }, { display_name: 'Leo', avatar_data: 'data:image/png;base64,AA' }, { color: '#000000' }],
+      peopleLabel: 'Zugewiesen',
+    });
+    assert.equal(termin.className, 'detail-head');
+    const line = termin.find('detail-head__subtitle');
+    assert.equal(line.find('detail-head__dot').styles['--detail-accent'], '#00668F', 'der Punkt traegt die Kalenderfarbe');
+    assert.equal(line.find('detail-head__dot').attrs['aria-hidden'], 'true');
+    assert.equal(line.text, 'Wann: Heute, 20:00 - 22:00');
+    assert.equal(line.find('sr-only').textContent, 'Wann: ', 'das Label ist nur fuer Screenreader');
+    const people = termin.find('detail-head__people');
+    assert.equal(people.tagName, 'UL');
+    assert.equal(people.attrs['aria-label'], 'Zugewiesen');
+    const persons = people.all('detail-head__person');
+    assert.equal(persons.length, 2, 'eine Person ohne Namen steht nicht da');
+    assert.equal(persons[0].find('detail-head__name').textContent, 'Emma <b>Johnson</b>', 'der Name ist Text, kein Markup');
+    const scheibe = persons[0].find('detail-head__avatar');
+    assert.equal(scheibe.attrs['aria-hidden'], 'true', 'die Scheibe ist Schmuck neben dem Namen');
+    assert.equal(scheibe.styles['background-color'], '#CE2A63', 'Identitaetsfarbe der Person');
+    assert.ok(scheibe.styles.color, 'mit lesbarer Tinte darauf');
+    assert.match(scheibe.textContent, /^E/, 'Initialen');
+    const bild = persons[1].find('detail-head__avatar').children[0];
+    assert.equal(bild.tagName, 'IMG');
+    assert.equal(bild.alt, '', 'das Bild wiederholt den Namen nicht');
+
+    // Geburtstag: Bild gross, hoechstens zwei Kennzahlen.
+    const media = new El('div');
+    const geburtstag = detailHeadEl({ media, facts: ['wird 41', '', 'in 26 Tagen', 'zu viel'] });
+    assert.equal(geburtstag.className, 'detail-head detail-head--media');
+    assert.equal(geburtstag.find('detail-head__media').children[0], media);
+    assert.deepEqual(geburtstag.all('detail-head__fact').map((f) => f.textContent), ['wird 41', 'in 26 Tagen']);
+    assert.equal(geburtstag.find('detail-head__subtitle'), null);
+  } finally {
+    for (const [k, d] of Object.entries(saved)) {
+      if (d) Object.defineProperty(globalThis, k, d); else delete globalThis[k];
+    }
+  }
+
+  // Der Koerper: mit Farbpunkt im Kopf entfaellt der Farbstreifen; der Kopf steht vor den Zeilen.
+  const src = await detailJs();
+  const bodyFn = src.slice(src.indexOf('function detailBodyEl('), src.indexOf('function detailGroupEl('));
+  assert.match(bodyFn, /const headEl = detailHeadEl\(head\);\s*if \(headEl\) view\.appendChild\(headEl\);/);
+  assert.match(bodyFn, /if \(accentColor && !\(headEl && head\.dot\)\)/, 'dieselbe Farbe stuende sonst zweimal da');
+  assert.ok(bodyFn.indexOf('detailHeadEl(head)') < bodyFn.indexOf("rows.className = 'detail-view__rows'"));
+  // Popover, Blatt und Spalte tragen den Titel in Title 3.
+  const typo = await read('public/styles/typography.css');
+  const { eachRule } = await import('./css-rules.js');
+  const role = [...eachRule(typo)].filter((r) => r.selector.split(',').some((s) => s.trim() === '.detail-popover__title'));
+  assert.equal(role.length, 1, 'das Popover hat genau EINE Rolle in der Rollenschicht');
+  assert.match(role[0].body, /font-size:\s*var\(--type-section-title\)/, 'derselbe Termin trug im Popover 17px und im Blatt 20px');
+  assert.doesNotMatch(await detailCss(), /\.detail-popover__title \{[^}]*font-size/, 'die Groesse steht in der Rollenschicht, nicht am Bauteil');
 });
 
 // Die Zeilen, die beide Module wortgleich bauten, wohnen jetzt an einer Stelle.
