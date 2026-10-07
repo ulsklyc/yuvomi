@@ -1074,7 +1074,7 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     // Filter), entsteht auch kein zweiter Weg zur selben Handlung.
     const foldMenu = capped ? toolbar.querySelector('[data-collapse-fold-menu][popovertarget]') : null;
     if (foldMenu && foldMenu.getAttribute('popovertarget') === panel.id) {
-      clearDockFoldItems(panel);
+      clearDockFoldItems(panel, foldMenu);
       if (e.newState === 'open' && toolbar.classList.contains('is-collapsed')) {
         fillDockFoldItems(panel, [...toolbar.querySelectorAll('[data-collapse-fold]')]
           .filter((el) => el.getClientRects().length === 0));
@@ -1082,8 +1082,9 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
       return;
     }
     const actions = toolbar.querySelector(':scope > .page-toolbar__actions');
-    if (!actions || dockFoldMenu(actions)?.panel !== panel) return;
-    clearDockFoldItems(panel);
+    const menu = actions ? dockFoldMenu(actions) : null;
+    if (menu?.panel !== panel) return;
+    clearDockFoldItems(panel, menu.trigger);
     if (e.newState === 'open'
       && toolbar.classList.contains('page-toolbar--dock-fold')
       && toolbar.classList.contains('is-docked')) {
@@ -1174,7 +1175,18 @@ function dockFoldLabel(btn) {
     .replace(/\s+/g, ' ').trim();
 }
 
-function clearDockFoldItems(panel) {
+function clearDockFoldItems(panel, trigger = null) {
+  // DER FOKUS GEHT VOR DEM ABBAU ZUM AUSLOESER. Das Menue schliesst, sobald
+  // ein Eintrag gewaehlt ist, und der Stellvertreter faellt hier aus dem DOM,
+  // BEVOR die Popover-API den Fokus zurueckgibt - sie gibt ihn nur zurueck,
+  // solange er noch im Panel steht. Ohne diesen Schritt landete er nach
+  // "Heute" auf dem Dokument (R17 Schritt 5, Kalender; genauso bei der
+  // Faltung der Aufgaben). Oeffnet das Original danach selbst etwas (Suche,
+  // Filter), nimmt es den Fokus wie immer mit.
+  const active = document.activeElement;
+  if (trigger && active?.parentElement === panel && active.classList?.contains('page-toolbar__fold-item')) {
+    trigger.focus?.({ preventScroll: true });
+  }
   panel.querySelectorAll(':scope > .page-toolbar__fold-item').forEach((el) => el.remove());
 }
 

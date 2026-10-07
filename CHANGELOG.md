@@ -253,6 +253,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Tasks on a phone: after picking a folded entry from the tools menu, the keyboard focus is
+  back on the menu button.** With the header docked, view switch and filter move into the "..."
+  menu; choosing one of them there left the focus on the page instead of on the button the menu
+  was opened from.
+
 - **Budget: two small headings set right.** On the overview "Planned" and "Booked" were as large
   as the heading "Transactions" right above them; they are now one step smaller. In split
   expenses on a desktop the note "simplified debts" broke over two lines beside "Settle up"; it

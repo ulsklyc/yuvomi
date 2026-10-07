@@ -989,6 +989,7 @@ function dockStub({ withMenu = true, tabBar = false, padTop = 0, barTop = 57 } =
     addEventListener(type, fn) { (this.handlers[type] ??= []).push(fn); }
     removeEventListener(type, fn) { this.handlers[type] = (this.handlers[type] ?? []).filter((f) => f !== fn); }
     click() { this.clicks += 1; for (const fn of this.handlers.click ?? []) fn({ target: this }); }
+    focus() { this.focused = (this.focused ?? 0) + 1; global.document.activeElement = this; }
     getClientRects() { return this.visible() ? [this.rect] : []; }
     getBoundingClientRect() {
       const r = this.visible() ? this.rect : { top: 0, bottom: 0, left: 0, width: 0 };
@@ -1094,8 +1095,21 @@ test('M9: im Werkzeugmenue stehen die gefalteten Kontrollen, ein Eintrag klickt 
     assert.equal(s.panel.children.indexOf(items[0]), 0, 'oben im Menue');
     items[1].click();
     assert.equal(s.kanban.clicks, 1, 'der Eintrag loest die Aktion des Originals aus, keine zweite Kopie');
+    // R17 Schritt 8: der gewaehlte Stellvertreter traegt den Fokus, wenn das
+    // Menue schliesst - und faellt dabei aus dem DOM. Der Fokus muss VORHER
+    // zum Ausloeser, sonst gibt ihn die Popover-API an niemanden zurueck.
+    const trigger = s.actions.querySelector(':scope > .page-tools-btn[popovertarget]');
+    items[1].focus();
     s.toggleMenu('closed');
     assert.equal(s.panel.children.filter((c) => c.classes.has('page-toolbar__fold-item')).length, 0, 'geschlossen: Stellvertreter wieder weg');
+    assert.equal(global.document.activeElement, trigger, 'der Fokus steht am Ausloeser, nicht auf einem abgehaengten Eintrag');
+
+    // Stand der Fokus woanders (Maus neben das Menue), bleibt er dort.
+    s.toggleMenu('open');
+    s.filter.focus();
+    const before = trigger.focused;
+    s.toggleMenu('closed');
+    assert.equal(trigger.focused, before, 'ohne Fokus auf einem Stellvertreter wird nichts umgesetzt');
 
     s.toolbar.classList.remove('is-docked');
     s.toggleMenu('open');
