@@ -30,6 +30,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of which a device uses one. Only German, the language the app falls back to, is stored in
   advance now; the language of the device is stored the first time it is used and stays
   available offline. A language that was never used on a device needs a connection once.
+- **An update transfers only the files that changed.** After every release the app fetched all
+  of its roughly 300 files again. It now asks the server which of them differ and loads only
+  those; the server answers from the content of each file, so a changed file always arrives and
+  an unchanged one never does, also after a new image was installed.
+- **The app's files travel smaller.** The server compresses each script, stylesheet and language
+  file once at the highest Brotli level and keeps the result in memory, instead of compressing
+  at a low level on every request: 4.9 MB instead of 5.9 MB for all of them, about 5 MB of
+  memory, and some 25 seconds of background work on one core spread over the first requests
+  after a start. The files themselves are unchanged. `STATIC_BROTLI=off` restores the previous
+  behaviour.
 
 ### Fixed
 

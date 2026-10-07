@@ -164,6 +164,7 @@ const INTENTIONALLY_NOT_IN_INSTALLER = {
 
   // Betriebs-Feinjustage, keine Installationsentscheidung.
   LOG_LEVEL: 'Betriebs-Feinjustage.',
+  STATIC_BROTLI: 'Betriebs-Feinjustage.',
   ENABLE_API_DOCS: 'Betriebs-Feinjustage.',
   MCP_INTERNAL_BASE_URL: 'Betriebs-Feinjustage.',
   RATE_LIMIT_WINDOW_MS: 'Betriebs-Feinjustage.',

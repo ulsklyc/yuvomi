@@ -439,12 +439,23 @@ const _bypassInit = (async () => {
 
 // --------------------------------------------------------
 // Install: App-Shell + Seiten-Module vorab cachen
-// cache: 'reload' umgeht den HTTP-Cache → immer frische Dateien
+//
+// `no-cache` HEISST REVALIDIEREN, NICHT "OHNE CACHE" (Entscheidung 2026-10-07,
+// Critique R18). Bis dahin stand hier `cache: 'reload'`: jedes Release holte
+// alle rund 300 Dateien neu, auch die, die sich nicht geaendert hatten. Mit
+// `no-cache` fragt der Browser fuer jede Datei mit ihrem ETag nach, und der
+// Server antwortet fuer eine unveraenderte mit 304 ohne Rumpf.
+//
+// DAS IST NUR SICHER, WEIL DER ETAG AUS DEM INHALT KOMMT
+// (server/utils/static-assets.js). Ein ETag aus Groesse und Aenderungszeit, wie
+// express.static ihn sonst bildet, bliebe bei einer gleich langen Aenderung mit
+// gleicher Zeit stehen - und der neue Cache bekaeme die alte Datei. Eine
+// geaenderte Datei MUSS neu kommen; `test:static-assets` haelt genau das.
 // --------------------------------------------------------
 self.addEventListener('install', (event) => {
-  const freshShell   = APP_SHELL.map((url)    => new Request(url, { cache: 'reload' }));
-  const freshModules = PAGE_MODULES.map((url) => new Request(url, { cache: 'reload' }));
-  const freshLocales = PRECACHED_LOCALES.map((url) => new Request(url, { cache: 'reload' }));
+  const freshShell   = APP_SHELL.map((url)    => new Request(url, { cache: 'no-cache' }));
+  const freshModules = PAGE_MODULES.map((url) => new Request(url, { cache: 'no-cache' }));
+  const freshLocales = PRECACHED_LOCALES.map((url) => new Request(url, { cache: 'no-cache' }));
   event.waitUntil(
     Promise.all([
       caches.open(SHELL_CACHE).then((c) => c.addAll(freshShell)),

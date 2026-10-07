@@ -104,6 +104,7 @@ import { sessionModuleAccessRequirement, tokenAccessRequirement, tokenAllows } f
 import { moduleAccessVerdict, MODULE_ACCESS_DENIED, MODULE_ACCESS_READ_ONLY } from './permissions.js';
 import { BODY_LIMIT, MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from './utils/upload-limit.js';
 import { createServiceWorkerResponseLoader } from './utils/service-worker.js';
+import { createStaticAssets } from './utils/static-assets.js';
 
 const log     = createLogger('Server');
 const logSync = createLogger('Sync');
@@ -257,35 +258,60 @@ app.get('/sw.js', (_req, res) => {
   res.send(response.body);
 });
 
-app.use(express.static(path.join(import.meta.dirname, '..', 'public'), {
+const PUBLIC_DIR = path.join(import.meta.dirname, '..', 'public');
+
+/**
+ * Header jeder Datei aus public/ - EINE Funktion fuer beide Wege, auf denen sie
+ * das Haus verlaesst: express.static und die Brotli-Fassung aus dem Speicher
+ * (utils/static-assets.js). Sonst traegt dieselbe Adresse je nach Weg ein
+ * anderes Cache-Control.
+ */
+function setStaticHeaders(res, filePath, stat) {
+  const ext = path.extname(filePath).toLowerCase();
+  const isPwaIcon = /\/icons\/(icon-|apple-touch-icon|favicon)/.test(filePath);
+  if (isPwaIcon) {
+    // PWA-Icons müssen bei Deployments sofort aktualisiert werden
+    res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+  } else if (['.png', '.jpg', '.jpeg', '.ico', '.svg', '.webp', '.woff2', '.woff'].includes(ext)) {
+    res.setHeader('Cache-Control', 'public, max-age=2592000, immutable'); // 30 Tage
+  } else {
+    // HTML, JS, CSS, JSON und manifest immer revalidieren.
+    res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+  }
+  // manifest.json: korrekter MIME-Type für PWA-Erkennung durch Chrome/Android
+  if (filePath.endsWith('manifest.json')) {
+    res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
+  }
+  // .mjs (z. B. gevendorte pdf.js-Module + Worker) müssen als JS-Modul ausgeliefert
+  // werden; nicht jede `send`-Version mappt die Endung, sonst schlägt der Modul-Import fehl.
+  if (ext === '.mjs') {
+    res.setHeader('Content-Type', 'text/javascript; charset=utf-8');
+  }
+  // ETag aus dem Inhalt statt aus Groesse und Aenderungszeit (Begruendung in
+  // utils/static-assets.js): der Service Worker revalidiert beim Precache und
+  // verlaesst sich darauf, dass ein gleicher ETag gleichen Inhalt heisst.
+  // Scheitert das Lesen, setzt express.static seinen eigenen wie bisher.
+  try {
+    res.setHeader('ETag', staticAssets.etagFor(filePath, stat));
+  } catch { /* siehe oben */ }
+}
+
+// STATIC_BROTLI=off schaltet nur die vorkomprimierte Auslieferung ab; die
+// compression()-Middleware oben uebernimmt dann jede Anfrage wie vor R18.
+const staticAssets = createStaticAssets(PUBLIC_DIR, {
+  brotli: String(process.env.STATIC_BROTLI || '').trim().toLowerCase() !== 'off',
+  setHeaders: setStaticHeaders,
+});
+app.use(staticAssets.middleware);
+
+app.use(express.static(PUBLIC_DIR, {
   etag: true,
   lastModified: true,
   // Kein automatischer Trailing-Slash-Redirect für Verzeichnisse (z. B. /settings →
   // /settings/), sonst kollidiert das public/settings/-Verzeichnis mit der SPA-Route
   // /settings und der Client-Router landet beim Hard-Load auf dem Dashboard.
   redirect: false,
-  setHeaders(res, filePath) {
-    const ext = path.extname(filePath).toLowerCase();
-    const isPwaIcon = /\/icons\/(icon-|apple-touch-icon|favicon)/.test(filePath);
-    if (isPwaIcon) {
-      // PWA-Icons müssen bei Deployments sofort aktualisiert werden
-      res.setHeader('Cache-Control', 'no-cache, must-revalidate');
-    } else if (['.png', '.jpg', '.jpeg', '.ico', '.svg', '.webp', '.woff2', '.woff'].includes(ext)) {
-      res.setHeader('Cache-Control', 'public, max-age=2592000, immutable'); // 30 Tage
-    } else {
-      // HTML, JS, CSS, JSON und manifest immer revalidieren.
-      res.setHeader('Cache-Control', 'no-cache, must-revalidate');
-    }
-    // manifest.json: korrekter MIME-Type für PWA-Erkennung durch Chrome/Android
-    if (filePath.endsWith('manifest.json')) {
-      res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
-    }
-    // .mjs (z. B. gevendorte pdf.js-Module + Worker) müssen als JS-Modul ausgeliefert
-    // werden; nicht jede `send`-Version mappt die Endung, sonst schlägt der Modul-Import fehl.
-    if (ext === '.mjs') {
-      res.setHeader('Content-Type', 'text/javascript; charset=utf-8');
-    }
-  },
+  setHeaders: setStaticHeaders,
 }));
 
 // Globaler API-Rate-Limiter auf alle /api/-Endpunkte (Definition siehe oben).
