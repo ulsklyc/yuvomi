@@ -181,9 +181,11 @@
     color var(--transition-fast);
 }
 
-.settings-shell__navigation-link:hover {
-  background: var(--color-surface-hover);
-  color: var(--color-text-primary);
+@media (hover: hover) {
+  .settings-shell__navigation-link:hover {
+    background: var(--color-surface-hover);
+    color: var(--color-text-primary);
+  }
 }
 
 .settings-shell__navigation-link--active {
@@ -294,8 +296,11 @@
   border-top: var(--space-px) solid var(--color-border-subtle);
 }
 
-.settings-overview__row:hover {
-  background: var(--color-surface-hover);
+/* Nur am echten Zeiger (R18); den Druck quittiert der Press-Baustein (list-row.css). */
+@media (hover: hover) {
+  .settings-overview__row:hover {
+    background: var(--color-surface-hover);
+  }
 }
 
 .settings-overview__row-mark {

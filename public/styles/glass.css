@@ -807,13 +807,17 @@ textarea.form-input {
   background-color: var(--color-surface-work);
 }
 
-.tasks-page .task-card:hover {
-  background-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-state), var(--color-surface-raised));
-}
+/* Nur am echten Zeiger (R18): auf Touch klebte die Toenung nach dem Tipp an
+ * der Zeile. Den Druck quittiert der Press-Baustein in list-row.css. */
+@media (hover: hover) {
+  .tasks-page .task-card:hover {
+    background-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-state), var(--color-surface-raised));
+  }
 
-.shopping-page .shopping-item:hover {
-  background-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-state), var(--color-surface-raised));
-  border-radius: var(--radius-sm);
+  .shopping-page .shopping-item:hover {
+    background-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-state), var(--color-surface-raised));
+    border-radius: var(--radius-sm);
+  }
 }
 
 .contacts-page .contact-item:hover {

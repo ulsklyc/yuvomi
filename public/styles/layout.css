@@ -5645,9 +5645,12 @@ p.field-hint--warn[hidden] {
     background-color var(--transition-fast);
 }
 
-.card--interactive:hover {
-  transform: translateY(-3px) scale(1.002);
-  box-shadow: var(--shadow-lg);
+/* Nur am echten Zeiger (R18): auf Touch blieb die Karte nach dem Tipp angehoben. */
+@media (hover: hover) {
+  .card--interactive:hover {
+    transform: translateY(-3px) scale(1.002);
+    box-shadow: var(--shadow-lg);
+  }
 }
 
 .card--interactive:active {

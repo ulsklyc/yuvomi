@@ -398,8 +398,11 @@
   transition: background-color var(--transition-fast);
 }
 
-.task-card:hover {
-  background-color: var(--color-surface-hover);
+/* Nur am echten Zeiger (R18) - der Druck kommt vom Press-Baustein in list-row.css. */
+@media (hover: hover) {
+  .task-card:hover {
+    background-color: var(--color-surface-hover);
+  }
 }
 
 /* Erledigt und abgelegt (#688) treten über das Zurücknehmen-Muster zurück

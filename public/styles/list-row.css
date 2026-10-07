@@ -312,8 +312,79 @@
   flex-wrap: nowrap;
 }
 
-.list-row:hover {
+/* HOVER NUR AN EINEM ECHTEN ZEIGER (Critique R18, Bewegung). Auf einem
+ * Touch-Geraet bleibt `:hover` nach dem Tipp am Element haengen, bis woanders
+ * getippt wird: die Zeile sah nach dem Loslassen weiter "beruehrt" aus.
+ * Gemessen waren es rund 250 `:hover`-Regeln, 5 davon geschuetzt; die
+ * geteilten Bausteine stehen jetzt unter der Abfrage, fuer den Rest haelt
+ * test:motion einen Ratchet. */
+@media (hover: hover) {
+  .list-row:hover {
+    background-color: var(--color-surface-hover);
+  }
+}
+
+/* --------------------------------------------------------
+ * DER PRESS-BAUSTEIN: Zeilen und Karten quittieren den Druck
+ *
+ * Gemessen (R18): keine `:active`-Regel an Listenzeilen, Aufgabenkarten,
+ * Heute-Karten, Einstellungszeilen - ein Tipp zeigte nichts, bis die Antwort
+ * kam. EINE Regel fuer alle, statt einer je Modul:
+ *
+ * WER DRIN STEHT, ist als Ganzes ein Ziel. `.list-row` allein nicht: viele
+ * Zeilen sind Traeger (Punktebuch, Einnahmen, Abholungen), an denen nur die
+ * Knoepfe darin etwas tun - eine gedrueckte Flaeche verspraeche dort eine
+ * Handlung, die es nicht gibt. Deshalb die Zeile als Link oder Knopf, die
+ * Auswahlzeile von Liste + Detail (`data-md-id`), der antippbare Hauptteil
+ * (`.list-row__main--interactive`) und die Einkaufszeile, die als Ganzes
+ * abhakt. Karten mit eigenem Druckbild (`.card--interactive`,
+ * `.metric-card--tile`, `.more-item`: sie skalieren) bleiben bei ihrem.
+ *
+ * DIE FLAECHE ist `--color-surface-hover` - die eine neutrale Zustandsstufe
+ * ueber `--color-surface`, deren Kontraste schon gehalten sind (Tertiaertext
+ * darauf hell 4,69:1, dunkel 5,01:1; die Flaeche selbst 1,20:1 bzw. 1,17:1
+ * gegen ihren Grund). Geprueft und verworfen: Tinte aus der Toenungsskala auf
+ * `transparent` - 12 % riss den Tertiaertext hell auf 4,41:1, 8 % auf der
+ * Buehne auf 4,33:1 und dunkel auf erhoehtem Grund auf 3,96:1. Auf Touch gibt
+ * es keinen Hover, dort IST das der Druck; am Zeiger loest er die Modul-
+ * Toenung des Hovers fuer den Moment durch die neutrale Flaeche ab.
+ *
+ * HINEIN 80ms (`--duration-2xs`), HERAUS die Dauer der Ruhe-Regel
+ * (`--transition-fast`, 150ms): der Druck antwortet sofort, das Loslassen
+ * klingt aus. Keine Bewegung - reduzierte Bewegung braucht keinen Zweig.
+ *
+ * DREI AUSNAHMEN IM SELEKTOR:
+ * - `:active` gilt auch fuer jeden Vorfahren des gedrueckten Elements. Ein
+ *   Knopf IN der Zeile (Haken, Loeschen, Griff) druecke die Zeile sonst mit.
+ *   Der Zeilentitel (`.u-row-title`) ist ausgenommen: er IST die Handlung der
+ *   Zeile (Aufgabe oeffnen).
+ * - Eine gezogene Wischzeile (`.swipe-row--swiping`, utils/swipe-row.js) sieht
+ *   nicht gedrueckt aus - der Finger schiebt, er tippt nicht.
+ * - Zurueckgenommene Zeilen (erledigt, abgehakt, abgelegt, pausiert) behalten
+ *   ihre Flaeche auch unter dem Druck - dieselbe Entscheidung wie fuer Hover
+ *   (#1230: "die zurueckgenommene Flaeche bleibt unter dem Zeiger stehen").
+ *   Der Baustein hat (0,4,1) und schluege jede Zustandsregel.
+ * Ohne `:has()` (untere Browser-Stufe) faellt die ganze Regel weg: kein
+ * Druckbild, sonst nichts.
+ * -------------------------------------------------------- */
+:is(
+  a.list-row,
+  button.list-row,
+  .list-row[role="button"],
+  .list-row[data-md-id],
+  .list-row__main--interactive,
+  .shopping-item:not(.shopping-item--static),
+  .task-card,
+  .today-cockpit-card[data-route],
+  .today-cockpit-card--group,
+  .today-cockpit__more--link,
+  .quick-link-tile,
+  .widget__link,
+  .settings-shell__navigation-link,
+  .settings-overview__row
+):active:not(:has(:is(a, button, input, select, textarea, label, summary, [role="button"], [role="checkbox"], [role="switch"]):not(.u-row-title):active)):not(.swipe-row--swiping *):not([class*="--done"], [class*="--checked"], [class*="--archived"], [class*="--paused"], [class*="--inactive"], [class*="--completed"]) {
   background-color: var(--color-surface-hover);
+  transition-duration: var(--duration-2xs);
 }
 
 /* --------------------------------------------------------

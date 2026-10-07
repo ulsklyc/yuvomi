@@ -1560,3 +1560,103 @@ test('R18: Drill-down gleitet mit Richtung - hinein +1, zurueck -1, ueber swapCo
   // Kein Doppel: das Blatt, das hereingleitet, traegt nicht zusaetzlich die Blattwechsel-Blende.
   assert.match(publicSource('settings/shell.js'), /const swapping = Boolean\(content\.querySelector\(':scope > \.settings-leaf'\)\);/);
 });
+
+// --------------------------------------------------------------------------
+// R18, Bewegung: ZEILEN UND KARTEN QUITTIEREN DEN TIPP, UND HOVER KLEBT NICHT.
+//
+// Gemessen: keine `:active`-Regel an Listenzeilen, Aufgabenkarten, Heute-
+// Karten, Einstellungszeilen; rund 250 `:hover`-Regeln, davon 5 unter
+// `@media (hover: hover)`. Auf einem Touch-Geraet bleibt `:hover` nach dem
+// Tipp am Element haengen, bis woanders getippt wird - die Zeile sah nach dem
+// Loslassen weiter "beruehrt" aus und hatte waehrenddessen nichts gezeigt.
+//
+// Die Regel fuer die GETEILTEN Bausteine (nicht fuer alle 250 Stellen):
+//   - ihre Hover-Flaeche steht unter `@media (hover: hover)`;
+//   - sie tragen ein `:active` - ueber den einen Press-Baustein in
+//     list-row.css oder (Karten mit eigenem Druckbild) ueber eine eigene Regel.
+// Fuer den Rest gilt ein Ratchet: die Zahl der ungeschuetzten `:hover`-Regeln
+// darf nicht steigen.
+// --------------------------------------------------------------------------
+const SHARED_PRESSABLE = [
+  // [Selektor des Bausteins, Selektor im Press-Baustein | 'own' fuer eine eigene :active-Regel]
+  ['.list-row', 'a.list-row'],
+  ['.task-card', '.task-card'],
+  ['.tasks-page .task-card', '.task-card'],
+  ['.shopping-page .shopping-item', '.shopping-item:not(.shopping-item--static)'],
+  ['.today-cockpit-card[data-route]', '.today-cockpit-card[data-route]'],
+  ['.today-cockpit-card--group', '.today-cockpit-card--group'],
+  ['.today-cockpit__more--link', '.today-cockpit__more--link'],
+  ['.quick-link-tile', '.quick-link-tile'],
+  ['.widget__link', '.widget__link'],
+  ['.settings-shell__navigation-link', '.settings-shell__navigation-link'],
+  ['.settings-overview__row', '.settings-overview__row'],
+  ['.metric-card--tile', 'own'],
+  ['.card--interactive', 'own'],
+  ['.more-item', 'own'],
+];
+/** Hoechststand der `:hover`-Regeln ausserhalb von `@media (hover: hover)`. Nur senken. */
+const UNGUARDED_HOVER_MAX = 240;
+
+function hoverRules() {
+  const out = [];
+  for (const file of allSheets) {
+    for (const rule of eachRule(css(file))) {
+      if (!/:hover/.test(rule.selector)) continue;
+      out.push({ file, selectors: selectorList(rule.selector), guarded: rule.at.some((a) => /\(hover:\s*hover\)/.test(a)) });
+    }
+  }
+  return out;
+}
+
+function pressRule() {
+  return [...eachRule(css('list-row.css'))].find((r) => /^:is\(/.test(r.selector.trim()) && /:active/.test(r.selector) && /--duration-2xs/.test(r.body));
+}
+
+test('R18: geteilte Zeilen und Karten tragen Hover nur unter (hover: hover) und quittieren den Druck', () => {
+  const hovers = hoverRules();
+  const press = pressRule();
+  assert.ok(press, 'der Press-Baustein in list-row.css fehlt');
+  const pressSelectors = selectorList(press.selector.trim().replace(/^:is\(/, '').replace(/\):active[\s\S]*$/, ''));
+  const failures = [];
+  for (const [base, via] of SHARED_PRESSABLE) {
+    const own = hovers.filter((h) => h.selectors.includes(`${base}:hover`));
+    if (!own.length) failures.push(`${base}: keine Hover-Regel mehr - Eintrag streichen`);
+    for (const h of own) if (!h.guarded) failures.push(`${h.file}: ${base}:hover steht ausserhalb von @media (hover: hover)`);
+    if (via === 'own') {
+      const leaf = base.split(/\s+/).pop();
+      const has = allSheets.some((file) => [...eachRule(css(file))].some((r) => selectorList(r.selector).some((s) => s.replace(/\s+/g, ' ') === `${leaf}:active`)));
+      if (!has) failures.push(`${base}: keine eigene :active-Regel`);
+    } else if (!pressSelectors.includes(via)) {
+      failures.push(`${base}: ${via} fehlt im Press-Baustein`);
+    }
+  }
+  assert.deepEqual(failures, [], failures.join('\n'));
+});
+
+test('R18: der Press-Baustein - vorhandene Zustandsflaeche, hinein 80ms, nie unter dem Wisch und nie fuer ein inneres Ziel', () => {
+  const press = pressRule();
+  assert.match(press.body, /background-color:\s*var\(--color-surface-hover\)/, 'die vorhandene neutrale Zustandsstufe - ihre Kontraste sind gehalten, keine neue Zahl');
+  assert.match(press.body, /transition-duration:\s*var\(--duration-2xs\)/, 'hinein schnell; heraus gilt die Dauer der Ruhe-Regel');
+  assert.match(press.selector, /:not\(\.swipe-row--swiping \*\)/, 'eine gezogene Wischzeile sieht nicht gedrueckt aus');
+  assert.match(press.selector, /:not\(:has\(:is\([^)]*button[^)]*\):not\(\.u-row-title\):active\)\)/, 'ein Knopf IN der Zeile drueckt die Zeile nicht mit - ausser ihr Titel');
+  // Zurueckgenommene Zeilen behalten ihre Flaeche (#1230) - der Baustein schluege sie sonst mit (0,4,1).
+  for (const word of ['done', 'checked', 'archived', 'paused', 'inactive', 'completed']) {
+    assert.ok(press.selector.includes(`[class*="--${word}"]`), `--${word} ist nicht vom Druckbild ausgenommen`);
+  }
+  // Heraus langsamer: die Bausteine tragen in Ruhe eine laengere Dauer.
+  const out = ruleBodies('list-row.css', '.list-row').join(';');
+  assert.match(out, /transition:\s*background-color var\(--transition-fast\)/);
+  const tokens = css('tokens.css');
+  const ms = (name) => Number(tokens.match(new RegExp(`${name}:\\s*(\\d+)ms`))?.[1]);
+  assert.ok(ms('--duration-2xs') < ms('--duration-sm'), 'Druck schneller als Loslassen');
+  // Keine Bewegung: reduzierte Bewegung braucht keinen eigenen Zweig.
+  assert.doesNotMatch(press.body, /transform|scale|translate/);
+});
+
+test('R18: die Zahl der ungeschuetzten :hover-Regeln steigt nicht (Ratchet)', () => {
+  const open = hoverRules().filter((h) => !h.guarded);
+  assert.ok(open.length <= UNGUARDED_HOVER_MAX,
+    `${open.length} :hover-Regeln ausserhalb von @media (hover: hover), erlaubt sind ${UNGUARDED_HOVER_MAX}. Neue Hover-Flaechen gehoeren unter (hover: hover) - auf Touch klebt :hover nach dem Tipp.`);
+  // Wer aufraeumt, senkt die Zahl mit: ein zu hoher Deckel liesse neue Stellen durch.
+  assert.ok(open.length >= UNGUARDED_HOVER_MAX - 3, `nur noch ${open.length} ungeschuetzt - UNGUARDED_HOVER_MAX auf ${open.length} senken`);
+});

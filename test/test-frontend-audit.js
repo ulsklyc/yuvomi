@@ -8492,6 +8492,20 @@ test('die abgehakte Einkaufszeile nimmt sich ueber Textfarben zurueck, nicht ueb
 const RECEDED_STATE = /--(?:done|checked|archived|inactive|completed|disabled|paused|exists|pending|settled|ended|expired|cancelled|canceled|dismissed|resolved|redeemed|fulfilled)(?![\w-])|\.is-inactive(?![\w-])/;
 const RECEDED_EXEMPT = /:disabled|\[disabled\]|sortable-/;
 
+/** Selektorliste an den Kommas der obersten Ebene trennen - nicht in Klammern. */
+function splitSelectorList(selector) {
+  const parts = [];
+  let depth = 0;
+  let cur = '';
+  for (const ch of selector) {
+    if (ch === '(' || ch === '[') depth += 1;
+    if (ch === ')' || ch === ']') depth -= 1;
+    if (ch === ',' && depth === 0) { parts.push(cur.trim()); cur = ''; } else cur += ch;
+  }
+  if (cur.trim()) parts.push(cur.trim());
+  return parts;
+}
+
 test('zurueckgenommene Karten und Zeilen dimmen nicht ueber opacity, und ihre Textfarben halten 4.5:1', () => {
   const { light, dark } = themeTokenMaps();
   const STATE = RECEDED_STATE;
@@ -8633,7 +8647,12 @@ test('keine spezifischere Regel ueberschreibt eine zurueckgenommene Zustandsrege
   for (const file of readdirSync(styles).filter((entry) => entry.endsWith('.css') && entry !== 'tokens.css')) {
     let index = 0;
     for (const rule of eachRule(readFileSync(new URL(file, styles), 'utf8'))) {
-      for (const part of rule.selector.split(',').map((s) => s.trim())) {
+      // Auf oberster Ebene trennen (R18): ein Komma IN `:is(...)`/`:not(...)`
+      // trennt keine Selektoren. Der Press-Baustein (list-row.css) ist eine
+      // `:is()`-Liste; zerlegt las der Guard jedes Glied als eigene Regel OHNE
+      // sein `:active` und meldete acht Ueberschreibungen, die es nicht gibt.
+      // Dass der Baustein zurueckgenommene Zeilen ausnimmt, haelt test:motion.
+      for (const part of splitSelectorList(rule.selector)) {
         rules.push({ file, index, part, at: rule.at, body: rule.body, props: propsOf(rule.body), spec: specificity(part), last: lastCompound(part) });
         for (const cls of part.match(/\.[a-z][\w-]*/gi) ?? []) cssClasses.add(cls.slice(1));
       }

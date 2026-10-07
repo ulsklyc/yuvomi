@@ -256,8 +256,10 @@
   transition: background-color var(--transition-fast), transform var(--duration-xs) var(--ease-out);
 }
 
-.metric-card--tile:hover {
-  background-color: var(--color-surface-elevated-hover);
+@media (hover: hover) {
+  .metric-card--tile:hover {
+    background-color: var(--color-surface-elevated-hover);
+  }
 }
 
 .metric-card--tile:active {

@@ -418,10 +418,13 @@
   inset: calc(-1 * var(--space-2)) 0;
 }
 
-.widget__link:hover {
-  opacity: 1;
-  color: var(--widget-accent, var(--color-accent));
-  background-color: color-mix(in srgb, var(--widget-accent, var(--color-accent)) var(--tint-state), transparent);
+/* Nur am echten Zeiger (R18) - auf Touch blieb "Alle" nach dem Tipp getoent. */
+@media (hover: hover) {
+  .widget__link:hover {
+    opacity: 1;
+    color: var(--widget-accent, var(--color-accent));
+    background-color: color-mix(in srgb, var(--widget-accent, var(--color-accent)) var(--tint-state), transparent);
+  }
 }
 
 .widget__badge {
@@ -2579,9 +2582,16 @@ svg.weather-forecast__icon {
  * links zeigt es); ein neutraler Hover warf diese Auskunft im Moment der
  * Beruehrung weg. --tint-state (12%) ist die Skalenstufe fuer genau das:
  * „Zustand auf einer ungetoenten Flaeche". */
-.today-cockpit-card[data-route]:hover,
 .today-cockpit-card[data-route]:focus-visible {
   background: color-mix(in srgb, var(--today-card-accent) var(--tint-state), var(--color-surface));
+}
+
+/* Der Zeiger-Zwilling steht fuer sich unter (hover: hover) (R18): auf Touch
+ * klebte er nach dem Tipp. Der Fokus oben bleibt in jeder Eingabeart. */
+@media (hover: hover) {
+  .today-cockpit-card[data-route]:hover {
+    background: color-mix(in srgb, var(--today-card-accent) var(--tint-state), var(--color-surface));
+  }
 }
 
 /* Der Träger clippt per overflow:hidden (Radius-Schnitt der Zeilenliste) -
@@ -2674,10 +2684,16 @@ svg.weather-forecast__icon {
   transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
-.today-cockpit__more--link:hover,
 .today-cockpit__more--link:focus-visible {
   background: color-mix(in srgb, var(--color-text-primary) var(--tint-state), var(--color-surface));
   color: var(--color-text-primary);
+}
+
+@media (hover: hover) {
+  .today-cockpit__more--link:hover {
+    background: color-mix(in srgb, var(--color-text-primary) var(--tint-state), var(--color-surface));
+    color: var(--color-text-primary);
+  }
 }
 
 .today-cockpit__more--link:focus-visible {
@@ -2711,9 +2727,14 @@ button.today-cockpit__more--link {
  * Sie ist ein Aufklapp-Knopf ohne Route, zeigt aber dieselbe Beruehrung wie
  * jede Zeile mit Ziel - im Ton ihres Raums. Am Ende stehen die gestapelten
  * Avatare und das Chevron, wo sonst die Zeit steht. */
-.today-cockpit-card--group:hover,
 .today-cockpit-card--group:focus-visible {
   background: color-mix(in srgb, var(--today-card-accent) var(--tint-state), var(--color-surface));
+}
+
+@media (hover: hover) {
+  .today-cockpit-card--group:hover {
+    background: color-mix(in srgb, var(--today-card-accent) var(--tint-state), var(--color-surface));
+  }
 }
 
 .today-cockpit-card--group:focus-visible {
@@ -6246,8 +6267,11 @@ button.today-cockpit__more--link {
   transition: background var(--transition-fast);
 }
 
-.quick-link-tile:hover,
 .quick-link-tile:focus-visible { background: var(--color-surface-hover); }
+
+@media (hover: hover) {
+  .quick-link-tile:hover { background: var(--color-surface-hover); }
+}
 
 .quick-link-tile__face {
   display: grid;
