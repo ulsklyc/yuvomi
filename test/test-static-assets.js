@@ -17,15 +17,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { brotliDecompressSync } from 'node:zlib';
 import { createContext, runInContext } from 'node:vm';
 import express from 'express';
 import compression from 'compression';
 import { createStaticAssets, COMPRESSIBLE_EXTENSIONS } from '../server/utils/static-assets.js';
+import { tempDir } from './tmp-dir.js';
 
 const PUBLIC_DIR = path.join(import.meta.dirname, '..', 'public');
 const FIXED_TIME = new Date('2026-01-01T00:00:00Z');
@@ -69,7 +69,7 @@ async function serve(root, { brotli = true, compress } = {}) {
 }
 
 function fixture() {
-  const dir = mkdtempSync(path.join(tmpdir(), 'yuvomi-static-'));
+  const dir = tempDir('yuvomi-static-');
   const write = (name, content) => {
     const file = path.join(dir, name);
     mkdirSync(path.dirname(file), { recursive: true });
