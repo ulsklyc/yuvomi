@@ -5837,7 +5837,20 @@ function closeCalendarSearch({ restoreView = true } = {}) {
   toggle?.classList.remove('cal-toolbar__search-btn--active');
 
   if (restoreView) renderView();
-  toggle?.focus();
+  headerToolFocusTarget(toggle)?.focus();
+}
+
+/**
+ * Wohin der Fokus zurueckgeht, wenn ein Werkzeug des Kopfs fertig ist. Sonst
+ * das Werkzeug selbst - eingeklappt am Telefon (R17) ist es aber ins
+ * Ansichtsmenue gefaltet und nicht im Bild: `focus()` auf ein `display: none`
+ * tut nichts, und der Fokus fiele nach Esc in der Suche auf das Dokument.
+ * Dann geht er an den Knopf, ueber den das Werkzeug erreicht wurde.
+ */
+function headerToolFocusTarget(tool) {
+  if (!tool) return null;
+  if (tool.getClientRects().length > 0) return tool;
+  return tool.closest('.cal-toolbar')?.querySelector('[data-collapse-fold-menu]') ?? tool;
 }
 
 async function runCalendarSearch(raw) {
@@ -6006,6 +6019,8 @@ async function openFoundEvent(ev) {
 }
 
 export const __test = {
+  // R17 Schritt 8: der Fokus nach der Suche, wenn ihr Knopf gefaltet ist.
+  closeSearchForTest(container) { _container = container; searchActive = true; closeCalendarSearch({ restoreView: false }); },
   // #1504: der Wechsel ueber die Telefonschwelle, gemessen am echten Renderer.
   onPhoneQueryChange,
   setContainerForTest(container) { _container = container; },

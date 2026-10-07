@@ -156,3 +156,25 @@ test('Gleiches Fenster: der Wechsel zeichnet neu, ohne nachzuladen', async () =>
     assert.deepEqual(requests, [], 'mitten in der Woche deckt das geladene Fenster die drei Tage schon');
   });
 });
+
+// R17 Schritt 8: eingeklappt (Telefon) faltet die Suche ins Ansichtsmenue. Ihr
+// Knopf ist dann `display: none` - `focus()` darauf tut nichts, und nach Esc in
+// der Suche stand der Fokus auf dem Dokument. Er geht an den Menue-Knopf.
+test('Suche schliessen: der Fokus geht an den Suchknopf, gefaltet an das Ansichtsmenue', () => {
+  const stage = (visible) => {
+    const focused = [];
+    const menu = { focus: () => focused.push('menu') };
+    const toolbar = { querySelector: (sel) => (sel === '[data-collapse-fold-menu]' ? menu : null) };
+    const toggle = {
+      setAttribute() {}, removeAttribute() {}, classList: { remove() {} },
+      getClientRects: () => (visible ? [{}] : []),
+      closest: (sel) => (sel === '.cal-toolbar' ? toolbar : null),
+      focus: () => focused.push('search'),
+    };
+    const container = { querySelector: (sel) => (sel === '#cal-search' ? toggle : null) };
+    calendar.closeSearchForTest(container);
+    return focused;
+  };
+  assert.deepEqual(stage(true), ['search'], 'sichtbar: zurueck an den Knopf der Suche');
+  assert.deepEqual(stage(false), ['menu'], 'gefaltet: an den Knopf, ueber den die Suche erreicht wurde');
+});
