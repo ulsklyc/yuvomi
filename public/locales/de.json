@@ -1688,7 +1688,6 @@
         "periodNoteAccounts": "Alle Konten, Stand heute",
         "periodNoteSubscriptions": "Alle laufenden Abos",
         "periodNoteLoans": "Alle Darlehen",
-        "periodNoteSplit": "Alle Gruppen",
         "statsRangeLabel": "Zeitraum",
         "statsOtherCategories": "Sonstige",
         "trendDelta": "{{amount}} ggü. {{month}}",

@@ -1674,7 +1674,6 @@
         "periodNoteAccounts": "所有账户（截至今天）",
         "periodNoteSubscriptions": "所有有效订阅",
         "periodNoteLoans": "所有贷款",
-        "periodNoteSplit": "所有群组",
         "statsRangeLabel": "时间范围",
         "statsOtherCategories": "其他",
         "trendDelta": "较 {{month}} {{amount}}",

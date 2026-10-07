@@ -1896,7 +1896,6 @@
         "periodNoteAccounts": "جميع الحسابات، حتى اليوم",
         "periodNoteSubscriptions": "جميع الاشتراكات النشطة",
         "periodNoteLoans": "جميع القروض",
-        "periodNoteSplit": "جميع المجموعات",
         "statsRangeLabel": "الفترة",
         "statsOtherCategories": "أخرى",
         "trendDelta": "{{amount}} مقارنة بـ {{month}}",

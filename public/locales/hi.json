@@ -1674,7 +1674,6 @@
         "periodNoteAccounts": "सभी खाते, आज तक",
         "periodNoteSubscriptions": "सभी सक्रिय सदस्यताएँ",
         "periodNoteLoans": "सभी ऋण",
-        "periodNoteSplit": "सभी समूह",
         "statsRangeLabel": "अवधि",
         "statsOtherCategories": "अन्य",
         "trendDelta": "{{month}} की तुलना में {{amount}}",

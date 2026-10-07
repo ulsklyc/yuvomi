@@ -1674,7 +1674,6 @@
         "periodNoteAccounts": "すべての口座（本日時点）",
         "periodNoteSubscriptions": "すべての有効なサブスク",
         "periodNoteLoans": "すべてのローン",
-        "periodNoteSplit": "すべてのグループ",
         "statsRangeLabel": "期間",
         "statsOtherCategories": "その他",
         "trendDelta": "{{month}} 比 {{amount}}",

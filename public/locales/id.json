@@ -1688,7 +1688,6 @@
         "periodNoteAccounts": "Semua akun, per hari ini",
         "periodNoteSubscriptions": "Semua langganan aktif",
         "periodNoteLoans": "Semua pinjaman",
-        "periodNoteSplit": "Semua grup",
         "statsRangeLabel": "Periode",
         "statsOtherCategories": "Lainnya",
         "trendDelta": "{{amount}} dibanding {{month}}",

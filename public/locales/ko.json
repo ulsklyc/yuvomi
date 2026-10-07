@@ -1688,7 +1688,6 @@
         "periodNoteAccounts": "모든 계좌, 오늘 기준",
         "periodNoteSubscriptions": "모든 활성 구독",
         "periodNoteLoans": "모든 대출",
-        "periodNoteSplit": "모든 그룹",
         "statsRangeLabel": "기간",
         "statsOtherCategories": "기타",
         "trendDelta": "{{month}} 대비 {{amount}}",

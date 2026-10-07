@@ -1836,7 +1836,6 @@
         "periodNoteAccounts": "Wszystkie konta, stan na dziś",
         "periodNoteSubscriptions": "Wszystkie aktywne subskrypcje",
         "periodNoteLoans": "Wszystkie pożyczki",
-        "periodNoteSplit": "Wszystkie grupy",
         "statsRangeLabel": "Okres",
         "statsOtherCategories": "Pozostałe",
         "trendDelta": "{{amount}} wzgl. {{month}}",

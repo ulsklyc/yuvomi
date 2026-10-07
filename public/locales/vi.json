@@ -1674,7 +1674,6 @@
         "periodNoteAccounts": "Tất cả tài khoản, tính đến hôm nay",
         "periodNoteSubscriptions": "Tất cả gói đăng ký đang hoạt động",
         "periodNoteLoans": "Tất cả khoản vay",
-        "periodNoteSplit": "Tất cả nhóm",
         "statsRangeLabel": "Khoảng thời gian",
         "statsOtherCategories": "Khác",
         "trendDelta": "{{amount}} so với {{month}}",

@@ -344,6 +344,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   question. Their state now counts, in every dialog. The participants sheet of Rewards saves
   each tick at once and therefore still closes without asking (#1775).
 
+- **Budget, split expenses: the header no longer says "All groups" above the numbers of one
+  group.** Since the figures at the top of the tab show the selected group, the note in the
+  header claimed the opposite of what stood below it. It is gone on this tab; the total over all
+  groups keeps its label in the group list, and the selected group its own heading.
+
 ## [2.74.0] - 2026-10-07
 
 ### Added

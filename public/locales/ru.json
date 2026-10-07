@@ -1822,7 +1822,6 @@
         "periodNoteAccounts": "Все счета, на сегодня",
         "periodNoteSubscriptions": "Все активные подписки",
         "periodNoteLoans": "Все займы",
-        "periodNoteSplit": "Все группы",
         "statsRangeLabel": "Период",
         "statsOtherCategories": "Прочее",
         "trendDelta": "{{amount}} к {{month}}",

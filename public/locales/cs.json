@@ -1748,7 +1748,6 @@
         "periodNoteAccounts": "Všechny účty, stav k dnešku",
         "periodNoteSubscriptions": "Všechna aktivní předplatná",
         "periodNoteLoans": "Všechny půjčky",
-        "periodNoteSplit": "Všechny skupiny",
         "statsRangeLabel": "Období",
         "statsOtherCategories": "Ostatní",
         "trendDelta": "{{amount}} oproti {{month}}",

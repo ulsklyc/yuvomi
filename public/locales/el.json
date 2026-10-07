@@ -1674,7 +1674,6 @@
         "periodNoteAccounts": "Όλοι οι λογαριασμοί, σήμερα",
         "periodNoteSubscriptions": "Όλες οι ενεργές συνδρομές",
         "periodNoteLoans": "Όλα τα δάνεια",
-        "periodNoteSplit": "Όλες οι ομάδες",
         "statsRangeLabel": "Περίοδος",
         "statsOtherCategories": "Λοιπά",
         "trendDelta": "{{amount}} έναντι {{month}}",

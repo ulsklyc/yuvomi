@@ -307,7 +307,14 @@ const TAB_CAPS = {
   // gedockt, oeffnet den Ausgaben-Dialog der Unterseite (openNewSplitExpense).
   // Im Archiv blendet syncAddAction() ihn aus - die Regel dafuer fragt die
   // Unterseite selbst (canAddSplitExpense).
-  'split-expenses': { month: false, note: 'budget.periodNoteSplit',         add: 'splitExpenses.addExpense', label: 'newLabel.splitExpenses' },
+  //
+  // OHNE KOPFNOTIZ, als einziger Reiter ohne Stepper (#1775). Hier stand "Alle
+  // Gruppen" - direkt ueber Kennzahlen, die seit R17 der GEWAEHLTEN Gruppe
+  // gehoeren. Die Summe aller Gruppen traegt ihr Etikett in der Gruppenwahl
+  // (split-expenses.js, renderGroupsTotal), die gewaehlte Gruppe ihre eigene
+  // Ueberschrift; ein dritter Satz im Kopf koennte nur einem von beiden
+  // widersprechen. Der Slot haelt seine Hoehe (budget.css, .budget-nav__month).
+  'split-expenses': { month: false, add: 'splitExpenses.addExpense', label: 'newLabel.splitExpenses' },
 };
 
 // Sentinel für „keine eigene Farbe" im Kontofarb-Wähler: der echte Wert ist der

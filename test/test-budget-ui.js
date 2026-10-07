@@ -90,7 +90,21 @@ test('der Kopf-Slot bleibt auf jedem Tab besetzt', () => {
   for (const entry of table[0].matchAll(/'([a-z-]+)':\s*\{([^}]*)\}/g)) {
     const [, id, caps] = entry;
     if (/month:\s*true/.test(caps)) continue;
+    // EINE Ausnahme, mit Grund (#1775, Punkt 7): die Aufteilung. Ihr Kopf
+    // sagte "Alle Gruppen", direkt darunter stehen seit R17 die Kennzahlen der
+    // GEWAEHLTEN Gruppe - die Notiz behauptete das Falsche. Was fuer den
+    // ganzen Reiter gilt, laesst sich dort in keinem Satz sagen: die Summe
+    // aller Gruppen traegt ihr eigenes Etikett in der Gruppenwahl, die
+    // gewaehlte Gruppe ihre Ueberschrift.
+    if (id === 'split-expenses') {
+      assert.doesNotMatch(caps, /note:/, 'die Aufteilung traegt keine Kopfnotiz mehr - sie widersprach den Zahlen darunter');
+      continue;
+    }
     assert.match(caps, /note:\s*'budget\.periodNote/, `'${id}' hat weder Stepper noch Kontexttext`);
+  }
+  // Der Satz ist damit tot und steht in keiner Sprache mehr.
+  for (const file of readdirSync(new URL('../public/locales/', import.meta.url)).filter((f) => f.endsWith('.json'))) {
+    assert.doesNotMatch(read(`../public/locales/${file}`), /"periodNoteSplit"/, `${file} traegt den toten Schluessel noch`);
   }
   // Und der Kontexttext wird auch wirklich geschaltet.
   assert.match(budget, /note\.hidden = !caps\.note/);

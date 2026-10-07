@@ -1674,7 +1674,6 @@
         "periodNoteAccounts": "Todas as contas, até hoje",
         "periodNoteSubscriptions": "Todas as assinaturas ativas",
         "periodNoteLoans": "Todos os empréstimos",
-        "periodNoteSplit": "Todos os grupos",
         "statsRangeLabel": "Período",
         "statsOtherCategories": "Outros",
         "trendDelta": "{{amount}} face a {{month}}",
