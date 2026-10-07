@@ -2144,7 +2144,7 @@ function rewardsSheet() {
   };
 }
 
-test('R17 E8: das Punktefeld der Belohnungen speichert per Knopf im Kartenfuss, nicht beim Verlassen', async () => {
+test('Belohnungen: das Punktefeld speichert wie die Schalter - ohne eigenen Knopf, beim Verlassen (H12)', async () => {
   const { render } = await import('/settings/pages/modules-rewards.js');
   const { resetPreferencesCache } = await import('/settings/preferences-cache.js');
   const puts = [];
@@ -2161,41 +2161,89 @@ test('R17 E8: das Punktefeld der Belohnungen speichert per Knopf im Kartenfuss, 
     await render(sheet, { user: { role: 'admin' } });
     const form = sheet.html.match(/<form\b[^>]*id="rewards-default-points-form"[\s\S]*?<\/form>/)?.[0] ?? '';
     assert.match(form, /id="rewards-default-points"/, 'Reichweite: das Punktefeld steht im Formular');
-    // Bis R17 speicherte das Feld beim Verlassen (H12) - das Zahlfeld der
-    // "Uebersicht" daneben per Knopf. E8: Zahlfelder per Knopf, ueberall gleich.
-    assert.match(form, /<div class="settings-form-actions">\s*<button type="submit" class="btn btn--primary">common\.save<\/button>\s*<\/div>\s*<\/form>/,
-      'der Speichern-Knopf steht als letzte Zeile im Formular, in der Aktionszeile des Kartenfusses');
+    assert.doesNotMatch(form, /type="submit"/, 'kein Speichern-Knopf nur fuer dieses Feld');
 
     const input = sheet.el('rewards-default-points');
     const error = sheet.el('rewards-default-points-error');
-    const formEl = sheet.el('rewards-default-points-form');
-    input.value = '5';
-    await input.fire('blur');
-    assert.deepEqual(puts, [], 'das Verlassen des Feldes schreibt nichts mehr');
-
     input.value = '-3';
-    await formEl.fire('submit');
+    await input.fire('blur');
     assert.deepEqual(puts, [], 'ein ungueltiger Wert wird nicht geschrieben');
     assert.equal(error.hidden, false, 'sondern benannt');
     assert.equal(input.getAttribute('aria-invalid'), 'true');
 
     input.value = '5';
-    await formEl.fire('submit');
-    assert.deepEqual(puts, [['/preferences', { tasks_default_points: 5 }]], 'der Knopf (und Enter) speichert');
+    await input.fire('blur');
+    assert.deepEqual(puts, [['/preferences', { tasks_default_points: 5 }]], 'beim Verlassen gespeichert');
     assert.equal(error.hidden, true, 'und der Fehler ist weg');
     assert.equal(input.getAttribute('aria-invalid'), null);
     assert.ok(toasts.some(([key]) => key === 'settings.rewardsDefaultPointsSaved'), `mit Rueckmeldung: ${JSON.stringify(toasts)}`);
 
-    await formEl.fire('submit');
+    await input.fire('blur');
     assert.equal(puts.length, 1, 'derselbe Wert ein zweites Mal ist kein neuer Schreibzugriff');
 
     input.value = '7';
-    await formEl.fire('submit');
-    assert.deepEqual(puts.at(-1), ['/preferences', { tasks_default_points: 7 }]);
+    await sheet.el('rewards-default-points-form').fire('submit');
+    assert.deepEqual(puts.at(-1), ['/preferences', { tasks_default_points: 7 }], 'Enter speichert ebenso');
 
     input.value = '9';
     await input.fire('keydown', { key: 'Escape' });
     assert.equal(input.value, '7', 'Escape nimmt die ungespeicherte Eingabe zurueck');
+  } finally {
+    delete globalThis.__apiStub;
+    globalThis.window = prevWindow;
+    resetPreferencesCache();
+  }
+});
+
+// R17 Schritt 5: dieselbe Regel auf dem Blatt "Uebersicht". Das eine Zahlfeld
+// (Nachfrist fuer Countdowns) hatte einen eigenen Speichern-Knopf - ein
+// einzelnes Kurzfeld speichert beim Verlassen und mit Enter, mit derselben
+// Quittung wie das Punktefeld der Belohnungen.
+test('Uebersicht: die Nachfrist speichert beim Verlassen und mit Enter - ohne eigenen Knopf', async () => {
+  const { render } = await import('/settings/pages/modules-countdowns.js');
+  const { resetPreferencesCache } = await import('/settings/preferences-cache.js');
+  const puts = [];
+  const toasts = [];
+  const prevWindow = globalThis.window;
+  globalThis.window = { yuvomi: { showToast: (...args) => toasts.push(args) } };
+  globalThis.__apiStub = {
+    get: async () => ({ data: { countdown_grace_days: 7, disabled_modules: [] } }),
+    put: async (url, body) => { puts.push([url, body]); return { data: body }; },
+  };
+  resetPreferencesCache();
+  try {
+    const sheet = rewardsSheet();
+    await render(sheet, { user: { role: 'admin' } });
+    const form = sheet.html.match(/<form\b[^>]*id="countdown-grace-days-form"[\s\S]*?<\/form>/)?.[0] ?? '';
+    assert.match(form, /id="countdown-grace-days"/, 'Reichweite: das Feld steht im Formular');
+    assert.doesNotMatch(form, /type="submit"|settings-form-actions/, 'kein Speichern-Knopf nur fuer dieses Feld');
+
+    const input = sheet.el('countdown-grace-days');
+    const error = sheet.el('countdown-grace-days-error');
+    input.value = '';
+    await input.fire('blur');
+    assert.deepEqual(puts, [], 'ein geleertes Feld wird nicht als 0 geschrieben (#1027)');
+    assert.equal(error.hidden, false, 'sondern benannt');
+    assert.equal(input.getAttribute('aria-invalid'), 'true');
+
+    input.value = '14';
+    await input.fire('blur');
+    assert.deepEqual(puts, [['/preferences', { countdown_grace_days: 14 }]], 'beim Verlassen gespeichert');
+    assert.equal(error.hidden, true);
+    assert.equal(input.getAttribute('aria-invalid'), null);
+    assert.equal(input.readOnly, false, 'das Feld ist nach dem Speichern wieder frei');
+    assert.ok(toasts.some(([key]) => key === 'settings.countdownGraceDaysSaved'), `mit Rueckmeldung: ${JSON.stringify(toasts)}`);
+
+    await input.fire('blur');
+    assert.equal(puts.length, 1, 'derselbe Wert ein zweites Mal ist kein neuer Schreibzugriff');
+
+    input.value = '3';
+    await sheet.el('countdown-grace-days-form').fire('submit');
+    assert.deepEqual(puts.at(-1), ['/preferences', { countdown_grace_days: 3 }], 'Enter speichert ebenso');
+
+    input.value = '30';
+    await input.fire('keydown', { key: 'Escape' });
+    assert.equal(input.value, '3', 'Escape nimmt die ungespeicherte Eingabe zurueck');
   } finally {
     delete globalThis.__apiStub;
     globalThis.window = prevWindow;

@@ -27,18 +27,21 @@ function renderPage(container, preferences) {
       <div class="settings-card">
         <h2 class="settings-card__title">${t('settings.countdownGraceDaysTitle')}</h2>
         <p class="form-hint">${t('settings.countdownGraceDaysHint')}</p>
+        <!-- EIN EINZELNES KURZFELD SPEICHERT BEIM VERLASSEN (H12 vom 27.09.,
+             R17 Schritt 5): dieselbe Antwort wie das Punktefeld der Belohnungen
+             - beim Verlassen und mit Enter, quittiert per Toast. Ein eigener
+             Speichern-Knopf fuer EIN Zahlfeld gab derselben Frage in zwei
+             Blaettern zwei Antworten. Blaetter mit echten Formularen (Konto,
+             Passwort, CalDAV, SMTP) behalten den Knopf rechts im Kartenfuss. -->
         <form class="settings-form settings-form--compact" id="countdown-grace-days-form" novalidate autocomplete="off">
           <div class="form-group">
             <label class="form-label" for="countdown-grace-days">${t('settings.countdownGraceDaysLabel')}</label>
             <input class="form-input" type="number" id="countdown-grace-days" inputmode="numeric"
                    min="0" max="${MAX_COUNTDOWN_GRACE_DAYS}" step="1"
-                   aria-describedby="countdown-grace-days-error"
+                   enterkeyhint="done" aria-describedby="countdown-grace-days-error"
                    value="${Number.isFinite(preferences.countdown_grace_days) ? preferences.countdown_grace_days : DEFAULT_GRACE_DAYS}">
           </div>
           <div id="countdown-grace-days-error" class="form-error" role="alert" hidden></div>
-          <div class="settings-form-actions">
-            <button type="submit" class="btn btn--primary">${t('common.save')}</button>
-          </div>
         </form>
       </div>
     </section>
@@ -46,35 +49,51 @@ function renderPage(container, preferences) {
 }
 
 /**
- * Nachfrist für abgelaufene Countdowns (#969) - kein Instant-Save, dieselbe
- * Form wie rewards-default-points (modules-rewards.js): eine Eingabe, die erst
- * mit einem bewussten Abschluss zaehlt, statt bei jedem Tastendruck zu senden.
+ * Nachfrist für abgelaufene Countdowns (#969). Speichert wie das Punktefeld der
+ * Belohnungen (modules-rewards.js, H12) ohne eigenen Knopf: beim Verlassen des
+ * Feldes und mit Enter. Nicht bei jedem `change` - an Zahlenfeldern feuert er
+ * für jeden Pfeilschritt, und `0` ist hier nicht folgenlos (jeder überfällige
+ * Countdown verschwände sofort). Escape nimmt eine noch nicht gespeicherte
+ * Eingabe zurück.
  */
-function bindEvents(container, preferences) {
+export function bindGraceDays(container, preferences) {
   const form = container.querySelector('#countdown-grace-days-form');
   const input = container.querySelector('#countdown-grace-days');
   const errorEl = container.querySelector('#countdown-grace-days-error');
   if (!form || !input) return;
 
   let persisted = Number.isFinite(preferences.countdown_grace_days) ? preferences.countdown_grace_days : DEFAULT_GRACE_DAYS;
+  let saving = false;
 
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
+  const showError = (message) => {
+    errorEl.textContent = message;
+    errorEl.hidden = false;
+    input.setAttribute('aria-invalid', 'true');
+  };
+  const clearError = () => {
     errorEl.hidden = true;
+    input.removeAttribute('aria-invalid');
+  };
 
-    const next = parseGraceDaysInput(input.value);
+  async function commit() {
+    if (saving) return;
+    const next = parseGraceDaysInput(input.value ?? '');
     if (next === null) {
-      errorEl.textContent = t('settings.countdownGraceDaysInvalid', { max: MAX_COUNTDOWN_GRACE_DAYS });
-      errorEl.hidden = false;
+      showError(t('settings.countdownGraceDaysInvalid', { max: MAX_COUNTDOWN_GRACE_DAYS }));
       return;
     }
-    if (next === persisted) return;
+    clearError();
+    if (next === persisted) {
+      input.value = String(next);
+      return;
+    }
 
-    // Feld mitsperren, nicht nur den Button: sonst überschreibt der Erfolgspfad
-    // eine Eingabe, die während des laufenden Requests getippt wurde.
-    const submitBtn = form.querySelector('button[type="submit"]');
-    submitBtn.disabled = true;
-    input.disabled = true;
+    // Feld sperren, solange der Request läuft - sonst überschreibt der
+    // Erfolgspfad eine Eingabe, die währenddessen getippt wurde. `readOnly`
+    // statt `disabled`: ein deaktiviertes Feld verliert nach Enter den Fokus.
+    saving = true;
+    input.readOnly = true;
+    input.setAttribute('aria-busy', 'true');
     const previous = persisted;
     try {
       await savePreferences({ countdown_grace_days: next });
@@ -84,12 +103,25 @@ function bindEvents(container, preferences) {
       window.yuvomi?.showToast(t('settings.countdownGraceDaysSaved'), 'success');
     } catch (error) {
       input.value = String(previous); // Rollback
-      errorEl.textContent = error.message || t('common.errorGeneric');
-      errorEl.hidden = false;
+      showError(error.message || t('common.errorGeneric'));
     } finally {
-      if (submitBtn.isConnected) submitBtn.disabled = false;
-      if (input.isConnected) input.disabled = false;
+      saving = false;
+      input.readOnly = false;
+      input.removeAttribute('aria-busy');
     }
+  }
+
+  // Die Handler geben das Versprechen zurück: dem Browser ist es gleich, ein
+  // Test kann so auf den ganzen Speichervorgang warten.
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    return commit();
+  });
+  input.addEventListener('blur', () => commit());
+  input.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || saving) return;
+    input.value = String(persisted);
+    clearError();
   });
 }
 
@@ -97,5 +129,5 @@ export async function render(container, { user }) {
   void user;
   const preferences = await getPreferences();
   renderPage(container, preferences);
-  bindEvents(container, preferences);
+  bindGraceDays(container, preferences);
 }

@@ -37,11 +37,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Settings save the same way on every page.** Switches and selections take effect at once; a
-  text or number field is saved with a button, and that button now sits at the right end of the
-  card's footer everywhere - it was left-aligned on most cards and stretched across the whole
+  form is saved with a button, and that button now sits at the right end of the card's footer
+  everywhere - it was left-aligned on most cards and stretched across the whole
   card for "Save password" (612 px, now 162). Where a card has more actions (test, remove), Save
-  comes last. The default points for new tasks (Rewards) are saved with a button or Enter like
-  the grace period on the overview page, no longer when the field is left.
+  comes last. A single number field on its own - the default points for new tasks (Rewards) and
+  the grace period for countdowns (Overview) - is saved when you leave it or press Enter, with a
+  confirmation; the grace period had a Save button of its own until now.
 - **Dialogs share one set of fields.** The shared-expense dialogs (expense, recurring expense,
   payment, group, member) now use the labels of a budget entry - smaller and quieter - mark
   required fields with the star, and show the amount in the large amount field. The waste

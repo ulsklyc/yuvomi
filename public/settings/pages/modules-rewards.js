@@ -29,12 +29,10 @@ function renderPage(container, preferences) {
       <div class="settings-card">
         <h2 class="settings-card__title">${t('settings.rewardsDefaultPointsTitle')}</h2>
         <p class="form-hint">${t('settings.rewardsDefaultPointsHint')}</p>
-        <!-- EIN SPEICHERMUSTER IN ALLEN BLAETTERN (R17, E8): Schalter und
-             Auswahl wirken sofort, ein Text- oder Zahlfeld speichert per Knopf
-             rechts im Kartenfuss (und mit Enter). Dasselbe Feld auf dem Blatt
-             "Uebersicht" (Nachfrist) hatte den Knopf, dieses hier speicherte
-             seit der Re-Critique 2026-09-27 beim Verlassen - zwei Antworten
-             auf dieselbe Frage. Die Entscheidung E8 nimmt jene zurueck. -->
+        <!-- EIN SPEICHERMODELL AUF DER SEITE (Re-Critique 2026-09-27, A7 P2-8):
+             die Schalter daneben speichern sofort, also tut es das Zahlenfeld
+             auch - beim Verlassen und mit Enter. Ein eigener Speichern-Knopf nur
+             fuer dieses Feld liess offen, ob die Schalter ihn auch brauchen. -->
         <form class="settings-form settings-form--compact" id="rewards-default-points-form" novalidate autocomplete="off">
           <div class="form-group">
             <label class="form-label" for="rewards-default-points">${t('settings.rewardsDefaultPointsLabel')}</label>
@@ -45,9 +43,6 @@ function renderPage(container, preferences) {
             <p class="settings-card-description" id="rewards-default-points-off-hint">${t('settings.rewardsDefaultPointsOffHint')}</p>
           </div>
           <div id="rewards-default-points-error" class="form-error" role="alert" hidden></div>
-          <div class="settings-form-actions">
-            <button type="submit" class="btn btn--primary">${t('common.save')}</button>
-          </div>
         </form>
       </div>
     </section>
@@ -73,10 +68,11 @@ function bindEvents(container, preferences) {
 }
 
 /**
- * Standard-Punkte für neue Aufgaben (#578). Speichert per Knopf im Kartenfuß
- * und mit Enter (R17, E8: Zahlfelder per Knopf, in jedem Blatt gleich) - nicht
- * mehr beim Verlassen des Feldes. Die Rückfrage, ob bestehende Aufgaben
- * mitgezogen werden, folgt dem gespeicherten Wert wie bisher.
+ * Standard-Punkte für neue Aufgaben (#578). Speichert wie die Schalter der
+ * Seite ohne eigenen Knopf: beim Verlassen des Feldes und mit Enter
+ * (Re-Critique 2026-09-27, H12). Die Rückfrage, ob bestehende Aufgaben
+ * mitgezogen werden, folgt dem gespeicherten Wert wie bisher - der Abschluss
+ * der Eingabe ist jetzt das Verlassen des Feldes statt eines Klicks.
  *
  * Nicht bei jedem `change`: an Zahlenfeldern feuert er auch für jeden
  * Pfeilschritt, und jeder Zwischenwert wäre ein Schreibzugriff samt Rückfrage.
@@ -149,6 +145,7 @@ export function bindDefaultPoints(container, preferences) {
     event.preventDefault();
     return commit();
   });
+  input.addEventListener('blur', () => commit());
   input.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape' || saving) return;
     input.value = String(persisted);
