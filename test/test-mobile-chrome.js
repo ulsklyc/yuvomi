@@ -264,6 +264,46 @@ test('R17 Z1: nur der markierte Zeitraum-Kopf loest seine Bar-Zeile in die Titel
     `Werkzeuge in Zeile 1 nur im markierten Zeitraum-Kopf (.${PERIOD_TITLE}, DESIGN.md „Variante: Zeitraum-Kopf")`);
 });
 
+// R17 Schritt 5 (Critique 2026-10-07, A1 P1): der Kalenderkopf mass mobil
+// eingeklappt dieselben 117px wie ausgeklappt - Titel und Siegel gingen, die
+// Zeile blieb. Eingeklappt steht der Stepper jetzt in Zeile 1 vor dem Menue;
+// Suche, Filter und "Heute" falten ins Menue (gemessen 390x844: 117 -> 65px).
+test('R17: der Kalenderkopf ist eingeklappt EINE Zeile, und was weicht, kommt im Menue wieder', () => {
+  const calendarCss = read('../public/styles/calendar.css');
+  const collapsed = rules(calendarCss).filter((r) => /\.cal-toolbar\.page-toolbar--capped\.is-collapsed/.test(r.selector));
+  assert.ok(collapsed.length >= 2, 'calendar.css traegt die Regeln fuer den eingeklappten Kopf');
+  for (const r of collapsed) {
+    assert.ok(r.at.some((a) => /max-width:\s*639px/.test(a)),
+      `"${r.selector}" gilt nur, wo das Ansichtsmenue steht (unter 640px) - darueber gibt es kein Menue, in das gefaltet wird`);
+    assert.match(r.selector, /\.page-toolbar--period-title/, 'nur im markierten Zeitraum-Kopf');
+  }
+  const center = collapsed.find((r) => /> \.page-toolbar__center$/.test(r.selector));
+  assert.equal(center && decl(center.body, 'order'), '0', 'der Zeitraum rueckt in Zeile 1, vor die Werkzeuge');
+  assert.match(center.body, /flex:\s*1 1 0/, 'und nimmt den Rest der Zeile statt einer eigenen');
+  const hidden = collapsed.find((r) => decl(r.body, 'display') === 'none');
+  assert.ok(hidden, 'die gefalteten Werkzeuge blenden eingeklappt aus');
+  for (const part of hidden.selector.split(',')) {
+    assert.match(part, /\[data-collapse-fold\]/, `"${part.trim()}" blendet nur aus, was als faltbar markiert ist`);
+  }
+  assert.match(hidden.selector, /\.cal-toolbar__filter-btn\[data-collapse-fold\]:not\(\.page-filter-btn--active\)/,
+    'ein aktiver Filter bleibt mit seiner Zahl stehen (Kopfregel 3)');
+
+  const calendarJs = read('../public/pages/calendar.js');
+  assert.match(calendarJs, /id="cal-views-menu"[^>]*data-collapse-fold-menu/, 'das Ansichtsmenue nimmt die gefalteten Werkzeuge auf');
+  assert.match(calendarJs, /id="cal-search"[^>]*data-collapse-fold/, 'die Suche ist markiert');
+  assert.match(calendarJs, /'#cal-filters'\)\.setAttribute\('data-collapse-fold'/, 'der Filter ist markiert');
+  assert.match(calendarJs, /id: 'cal-today'[\s\S]{0,200}'data-collapse-fold': true/, '"Heute" ist markiert');
+
+  const ux = read('../public/utils/ux.js');
+  const branch = ux.match(/const foldMenu = capped \?[\s\S]*?\n    \}\n/)?.[0] ?? '';
+  assert.match(branch, /\[data-collapse-fold-menu\]\[popovertarget\]/, 'der Kopf findet das markierte Menue');
+  assert.match(branch, /classList\.contains\('is-collapsed'\)/, 'Stellvertreter nur eingeklappt');
+  assert.match(branch, /getClientRects\(\)\.length === 0/,
+    'und nur fuer das, was gerade nicht zu sehen ist - sonst stuende dieselbe Handlung zweimal da');
+  assert.match(ux, /btn\.disabled \|\| btn\.inert/, 'ein inerter Reset ("Heute" im laufenden Zeitraum) ist kein Eintrag');
+  assert.match(ux, /reserve \+ shorter/, 'die Reserve-Regel rechnet mit der AUSGEKLAPPTEN Hoehe, sonst pendelt eine knappe Liste');
+});
+
 test('R17 Z1: die Variante steht nur im Markup der Module, die DESIGN.md nennt', () => {
   const pub = new URL('../public/', import.meta.url);
   const carriers = [];

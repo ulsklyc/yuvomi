@@ -2512,6 +2512,23 @@ und nur unter dieser Klasse loest calendar.css die Bar-Zeile auf (`display: cont
 aufloest, und laesst sie nur mit der Klasse durch; die Klasse selbst nur in den Modulen,
 die dieser Absatz nennt. Ein zweites Modul mit Zeitraum-Titel kommt hier dazu, nicht in
 eine Ausnahmekarte.
+**Eingeklappt ist der Zeitraum-Kopf EINE Zeile (R17 Schritt 5, Critique 2026-10-07 A1 P1).**
+Gemessen 390x844 mass er ausgeklappt wie eingeklappt 117px: Titel und Siegel gingen, aber die
+Werkzeuge hielten Zeile 1 offen (drei Icons neben 206px Leerraum) und der Stepper blieb in
+Zeile 2. Eingeklappt rueckt der Stepper jetzt in Zeile 1 vor das Menue: 117 -> 65px, Port
+719 -> 771px, in Woche, Tag und Agenda (der Monat scrollt nicht und klappt nie ein). Suche,
+Filter und "Heute" falten dafuer ins Ansichtsmenue - als Eintraege mit demselben Namen, die das
+Original klicken (`data-collapse-fold` am Werkzeug, `data-collapse-fold-menu` am Menue; die
+Stellvertreter baut `wireCollapsingHeader` beim Oeffnen, wie bei der Faltung der scrollenden
+Koepfe). Das Label bekommt so 194px ("07.10. - 06.11.2026" braucht 172; mit allen dreien
+blieben 68). Ein AKTIVER Filter faltet nicht, seine Zahl bleibt (Regel 3), dann kuerzt das
+Label; "Heute" ist nur ein Eintrag, wenn ein anderer Zeitraum offen ist. Nur unter 640px -
+darueber gibt es kein Menue, in das gefaltet wird. Die Reserve-Regel des Kopfs rechnet seither
+mit der ausgeklappten Hoehe (sonst pendelt eine Liste, deren Reserve zwischen Schwelle und
+Schwelle + 52px liegt). **Das Budget bleibt zweizeilig (117px in jedem Zustand):** Zeile 1
+traegt Titel und Monat ohne freien Platz, Zeile 2 sieben Reiter (550px in 358px, scrollend) -
+Reiter und Stepper passen nicht in eine Zeile, und eine Reiterleiste faltet nicht in ein Menue
+(Werkzeugzeilen-Regel). `test:mobile-chrome` haelt die Kalender-Regeln.
 
 Pruefebene: **Struktur** (`test:mobile-chrome` - Kapsel ausser Fluss, `--nav-tail` im
 Nachlauf, keine klebende Chipreihe, kein `sticky; bottom: 0`, Icon-Form im Wrapper, die

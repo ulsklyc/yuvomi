@@ -36,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **On a phone the calendar header shrinks to one row when you scroll.** Collapsed it measured
+  the same 117 px as open - the title left, but its row stayed for three icons. The period
+  stepper now moves up into that row (65 px, 52 px more for the week, day and agenda). Search,
+  filter and "Today" move into the view menu meanwhile; an active filter keeps its button and
+  count.
 - **Settings save the same way on every page.** Switches and selections take effect at once; a
   form is saved with a button, and that button now sits at the right end of the card's footer
   everywhere - it was left-aligned on most cards and stretched across the whole

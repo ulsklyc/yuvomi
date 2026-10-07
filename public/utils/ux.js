@@ -650,6 +650,8 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
   let lead = 0;
   // Hoehe einer Faltzeile (siehe `foldRow` in update), ohne ihre Linie.
   let foldH = 0;
+  // Hoehe des Kopfs bei der letzten AUSGEKLAPPTEN Messung (siehe onInnerScroll).
+  let openH = 0;
   let dockTitle = null;
   let headSeal = null;
   // Die Kinder der Lead-Zone, die im Band-Modus angedockt ausblenden.
@@ -747,9 +749,18 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     // mit einem aufgeklappten Rezept: 166px ausgeklappt, 102px gefaltet) beim
     // naechsten Scroll-Ereignis wieder aus - und dann wieder ein. Der
     // berechnete Rand gilt auch mitten in der Bewegung.
+    // Dasselbe gilt fuer einen gedeckelten Kopf, der eingeklappt wirklich
+    // kuerzer ist (Kalender mobil seit R17: 117 -> 65px): der Port ist dann um
+    // die Differenz hoeher und die Reserve um genau so viel kleiner. Gegen die
+    // eingeklappte Reserve gemessen, pendelte eine Liste, deren Reserve
+    // zwischen Schwelle und Schwelle + Differenz liegt. `openH` ist die Hoehe
+    // der letzten ausgeklappten Messung.
+    const shorter = !fold && toolbar.classList.contains('is-collapsed') && openH > 0
+      ? Math.max(0, openH - toolbar.getBoundingClientRect().height)
+      : 0;
     const unfolded = fold
       ? reserve - Math.min(0, parseFloat(getComputedStyle(toolbar).marginBlockEnd) || 0)
-      : reserve;
+      : reserve + shorter;
     if (unfolded < (fold ? foldH : lead) + 48) {
       toolbar.classList.remove(...states);
       return;
@@ -786,6 +797,7 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
         && c.getBoundingClientRect().height > 0,
     );
     const tb = toolbar.getBoundingClientRect();
+    openH = tb.height;
     const padTop = parseFloat(getComputedStyle(toolbar).paddingBlockStart) || 0;
     // WAS EINE ZEILE IST, ENTSCHEIDET DIE ÜBERLAPPUNG, NICHT DIE OBERKANTE.
     // Ein Vergleich der `top`-Werte hält jeden vertikalen Versatz für einen
@@ -1050,6 +1062,23 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
   const onMenuToggle = (e) => {
     const panel = e.target;
     if (!(panel instanceof Element) || !panel.matches('.popover-menu')) return;
+    // DIE GEDECKELTE FALTUNG (R17 Schritt 5, Kalender). Ein eingeklappter Kopf
+    // der gedeckelten Architektur darf Werkzeuge abgeben, wenn sein Menue sie
+    // aufnimmt: das Modul markiert sie (`data-collapse-fold`) und das Menue
+    // (`data-collapse-fold-menu`), sein Stylesheet blendet sie eingeklappt
+    // aus. Hier entstehen - wie bei der Faltung der scrollenden Koepfe - nur
+    // die Stellvertreter, und nur fuer das, was gerade WIRKLICH nicht zu
+    // sehen ist: wo das Stylesheet nichts ausblendet (breiter Kopf, aktiver
+    // Filter), entsteht auch kein zweiter Weg zur selben Handlung.
+    const foldMenu = capped ? toolbar.querySelector('[data-collapse-fold-menu][popovertarget]') : null;
+    if (foldMenu && foldMenu.getAttribute('popovertarget') === panel.id) {
+      clearDockFoldItems(panel);
+      if (e.newState === 'open' && toolbar.classList.contains('is-collapsed')) {
+        fillDockFoldItems(panel, [...toolbar.querySelectorAll('[data-collapse-fold]')]
+          .filter((el) => el.getClientRects().length === 0));
+      }
+      return;
+    }
     const actions = toolbar.querySelector(':scope > .page-toolbar__actions');
     if (!actions || dockFoldMenu(actions)?.panel !== panel) return;
     clearDockFoldItems(panel);
@@ -1165,14 +1194,21 @@ function fillDockFoldItems(panel, controls) {
     const choice = !single && buttons.some((b) => b.hasAttribute('aria-pressed')
       || ['radio', 'tab', 'menuitemradio'].includes(b.getAttribute('role')));
     for (const btn of buttons) {
-      if (btn.disabled || !dockFoldLabel(btn)) continue;
+      // `inert` wie `disabled`: ein Reset, der gerade nichts zuruecksetzt
+      // ("Heute" im laufenden Zeitraum), ist kein Eintrag.
+      if (btn.disabled || btn.inert || !dockFoldLabel(btn)) continue;
       const item = document.createElement('button');
       item.type = 'button';
       item.className = 'popover-menu__item page-toolbar__fold-item';
       const on = ['aria-pressed', 'aria-checked', 'aria-selected'].some((a) => btn.getAttribute(a) === 'true');
       item.setAttribute('role', choice ? 'menuitemradio' : 'menuitem');
       if (choice) item.setAttribute('aria-checked', String(on));
-      const glyph = btn.querySelector('svg')?.cloneNode(true);
+      // Ein Knopf, der nur Text traegt ("Heute"), nennt sein Zeichen selbst
+      // (`data-fold-icon`, Lucide-Name in PascalCase) - sonst stuende er im
+      // Menue als einziger ohne Zeichen und um dessen Breite versetzt.
+      const named = btn.dataset?.foldIcon ? window.lucide?.icons?.[btn.dataset.foldIcon] : null;
+      const glyph = btn.querySelector('svg')?.cloneNode(true)
+        ?? (named ? window.lucide.createElement(named) : null);
       if (glyph) {
         glyph.setAttribute('class', 'icon-md');
         glyph.setAttribute('aria-hidden', 'true');

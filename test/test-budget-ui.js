@@ -2123,9 +2123,13 @@ test('Budgetkopf traegt page-toolbar--period: eingeklappt verlaesst der Titel da
   assert(title && /clip-path:\s*inset\(50%\)/.test(title.body) && /position:\s*absolute/.test(title.body),
     'die geteilte Regel muss den eingeklappten Titel aus dem Fluss nehmen und klippen');
   assert(title.at.some((a) => /max-width:\s*1023px/.test(a)), 'nur unterhalb der Desktop-Breite');
+  // Keine zweite, kalendereigene Kopie DIESER Regel: der Kalender darf seinen
+  // eingeklappten Kopf ordnen (seit R17 rueckt dort der Stepper in Zeile 1),
+  // aber Titel und Siegel nimmt allein die geteilte Regel aus dem Bild.
   const calendarCss = read('../public/styles/calendar.css');
-  assert.doesNotMatch(calendarCss.replace(/\/\*[\s\S]*?\*\//g, ''), /\.cal-toolbar\.page-toolbar--capped\.is-collapsed/,
-    'keine zweite, kalendereigene Kopie der Regel');
+  const copies = [...eachRule(calendarCss)].filter((r) => /\.is-collapsed/.test(r.selector)
+    && (/\.page-toolbar__title|\.module-seal--head/.test(r.selector) || /clip-path\s*:/.test(r.body)));
+  assert.deepEqual(copies.map((r) => r.selector.trim()), [], 'keine zweite, kalendereigene Kopie der Regel');
 });
 
 /* ZWEI SKALEN (Critique 2026-09-25, P2): eine gemeinsame Skala liess das

@@ -307,6 +307,36 @@
     order: 2;
     flex-basis: 100%;
   }
+
+  /* EINGEKLAPPT EINE ZEILE (R17 Schritt 5, Critique 2026-10-07 A1 P1).
+   *
+   * Gemessen 390x844: der Kopf mass ausgeklappt 117px und eingeklappt 117px.
+   * Titel und Siegel verliessen das Bild, aber Zeile 1 blieb stehen - drei
+   * Icons bei x 222-374 neben 206px Leerraum -, und der Zeitraum behielt
+   * Zeile 2. Jetzt rueckt der Stepper in die frei gewordene Zeile, vor das
+   * Menue: 117 -> 65px, wie Notizen, Kontakte und Gesundheit.
+   *
+   * WAS DAFUER WEICHT: Suche, Filter und "Heute" falten ins Menue - als
+   * Eintraege mit demselben Namen, die das Original klicken
+   * (`data-collapse-fold`, wireCollapsingHeader). Das Label braucht die
+   * Breite: mit allen dreien blieben ihm 68px, "07.10. - 06.11.2026" misst
+   * 172px. So bekommt es 194px. Ein AKTIVER Filter faltet nicht - die Zahl
+   * am Knopf ist die Zusage der Kopfregel (aktive Filter bleiben sichtbar),
+   * dann kuerzt das Label (142px, Ellipse).
+   *
+   * Nur unter 640px: darueber waehlt das Segment die Ansicht, das Menue ist
+   * unsichtbar, und ohne Menue faltet nichts. */
+  .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed > .page-toolbar__center {
+    order: 0;
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__search-btn[data-collapse-fold],
+  .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__filter-btn[data-collapse-fold]:not(.page-filter-btn--active),
+  .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__today[data-collapse-fold] {
+    display: none;
+  }
 }
 
 /* DIE TITELZEILE KLAPPT GANZ EIN - die Regel steht seit der Budget-Critique

@@ -3833,13 +3833,23 @@ html.fab-anim-done .page-fab {
  * mit Vor/Zurueck beim Scrollen weiter „wo bin ich", die Tab-Leiste darunter
  * den Modulnamen - der Large Title hat eingeklappt nichts mehr zu sagen, was
  * nicht schon dasteht. Fiel er nur auf den Inline-Schnitt, blieb er auf seiner
- * eigenen Zeile, weil der Zeitraum mobil die ganze Zeile fuellt: der Kollaps
- * sparte im Kalender 5-14px, im Budget 14px (170 -> 156px).
+ * eigenen Zeile, weil der Zeitraum mobil die ganze Zeile fuellt.
  *
  * Eingeklappt verlaesst der Titel deshalb das Bild, nicht den Baum: das <h1>
  * bleibt die Seitenueberschrift fuer Screenreader, geclippt wie `.sr-only`.
  * Das Siegel geht mit. Koepfe ohne Zeitraum (Notizen, Kontakte) behalten den
- * Inline-Schnitt - bei ihnen verankert nichts anderes die Seite. */
+ * Inline-Schnitt - bei ihnen verankert nichts anderes die Seite.
+ *
+ * WAS DAS HEUTE SPART (gemessen 390x844, R17 Schritt 5 - hier standen
+ * "5-14px" und "Budget 170 -> 156px" aus der Zeit der drei Kopfzeilen):
+ * - Kalender: die Regel allein sparte seit R17 Z1 NICHTS (117 -> 117px) - die
+ *   Werkzeuge stehen dort in der Titelzeile und hielten sie offen. Erst
+ *   calendar.css holt eingeklappt den Stepper in diese Zeile: 117 -> 65px.
+ * - Budget: die Regel greift nicht mehr. Seit R16 teilt der Stepper die
+ *   Titelzeile (`--period-inline`, unten), der Titel bleibt im Inline-Schnitt
+ *   und der Kopf misst in jedem Zustand 117px - Zeile 1 traegt Titel und
+ *   Monat (0px frei), Zeile 2 die sieben Reiter (550px in 358px, scrollend).
+ *   Reiter und Stepper passen nicht in eine Zeile; der Kopf bleibt zweizeilig. */
 @media (max-width: 1023px) {
   .page-toolbar--period.page-toolbar--capped.is-collapsed > .page-toolbar__title {
     position: absolute;
