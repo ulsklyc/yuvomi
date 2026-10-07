@@ -41,7 +41,7 @@ import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { confirmModal } from '/components/modal.js';
-import { createInlineError, toggleRowHtml } from '/settings/components.js';
+import { createInlineError, settingSwitchRowHtml, toggleRowHtml } from '/settings/components.js';
 
 function showToast(message, tone = 'default') {
   window.yuvomi?.showToast(message, tone);
@@ -157,22 +157,22 @@ function wasteFeedTypeRowsHtml(types, selectedIds) {
 function extrasHtml(part, data, types) {
   if (part === 'calendar') {
     return `
-    <div class="form-group">
-      ${toggleRowHtml({
-        control: 'switch',
-        label: t('settings.feedExportShowAssignees'),
-        checked: !!data.showAssignees,
-        attrs: { id: 'feed-show-assignees', 'aria-describedby': 'feed-show-assignees-hint' },
-      })}
-      <p class="form-hint" id="feed-show-assignees-hint">${t('settings.feedExportShowAssigneesHint')}</p>
-    </div>`;
+    ${settingSwitchRowHtml({
+      label: t('settings.feedExportShowAssignees'),
+      checked: !!data.showAssignees,
+      description: t('settings.feedExportShowAssigneesHint'),
+      descriptionId: 'feed-show-assignees-hint',
+      attrs: { id: 'feed-show-assignees', 'aria-describedby': 'feed-show-assignees-hint' },
+    })}`;
   }
   if (part === 'waste' && types.length) {
     return `
-    <div class="form-group">
-      <span class="form-label">${t('settings.wasteFeedTypesLabel')}</span>
-      <p class="form-hint">${t('settings.wasteFeedTypesHint')}</p>
-      <div id="waste-feed-types">${wasteFeedTypeRowsHtml(types, data.type_ids)}</div>
+    <div class="settings-setting-row settings-setting-row--stacked">
+      <div class="settings-setting-row__copy">
+        <span class="settings-setting-row__label">${t('settings.wasteFeedTypesLabel')}</span>
+        <p class="settings-setting-row__description">${t('settings.wasteFeedTypesHint')}</p>
+      </div>
+      <div class="settings-setting-row__control" id="waste-feed-types">${wasteFeedTypeRowsHtml(types, data.type_ids)}</div>
     </div>`;
   }
   return '';
@@ -183,26 +183,33 @@ function renderFeed(host, part, feed, data, types) {
   const urlId = `${part}-feed-url`;
   host.replaceChildren();
   host.insertAdjacentHTML('beforeend', `
-    <div class="settings-card">
-      ${toggleRowHtml({
-        control: 'switch',
+    <!-- EIN TRAEGER, ZEILEN STATT KARTE (R17, E9): abgeschaltet ist der Feed
+         genau ein Schalter - dafuer stand eine ganze Karte. Eingeschaltet
+         kommen Adresse, Zusaetze und Handlungen als weitere Zeilen dazu. -->
+    <div class="row-carrier settings-group">
+      ${settingSwitchRowHtml({
         label: feed.text.title(),
         checked: on,
+        description: feed.text.description(),
+        descriptionId: `${part}-feed-description`,
         attrs: { 'data-feed-switch': part, 'aria-describedby': `${part}-feed-description` },
       })}
-      <p class="settings-card-description" id="${part}-feed-description">${feed.text.description()}</p>
       ${on ? `
-      <div class="form-group">
-        <label class="form-label" for="${urlId}">${feed.text.urlLabel()}</label>
-        <input id="${urlId}" class="form-input" type="text" readonly value="${esc(data.url)}">
-        <p class="form-hint">${feed.text.hint()}</p>
+      <div class="settings-setting-row settings-setting-row--stacked">
+        <div class="settings-setting-row__copy">
+          <label class="settings-setting-row__label" for="${urlId}">${feed.text.urlLabel()}</label>
+        </div>
+        <div class="settings-setting-row__control">
+          <input id="${urlId}" class="form-input" type="text" readonly value="${esc(data.url)}" aria-describedby="${urlId}-hint">
+          <p class="form-hint" id="${urlId}-hint">${feed.text.hint()}</p>
+          <div class="settings-form-actions">
+            <button type="button" class="btn btn--secondary" data-feed-copy>${feed.text.copy()}</button>
+            <a class="btn btn--secondary" href="${esc(data.url.replace(/^https?:\/\//i, 'webcal://'))}">${feed.text.subscribe()}</a>
+            <button type="button" class="btn btn--secondary" data-feed-regen>${feed.text.regenerate()}</button>
+          </div>
+        </div>
       </div>
-      ${extrasHtml(part, data, types)}
-      <div class="settings-form-actions">
-        <button type="button" class="btn btn--secondary" data-feed-copy>${feed.text.copy()}</button>
-        <a class="btn btn--secondary" href="${esc(data.url.replace(/^https?:\/\//i, 'webcal://'))}">${feed.text.subscribe()}</a>
-        <button type="button" class="btn btn--secondary" data-feed-regen>${feed.text.regenerate()}</button>
-      </div>` : ''}
+      ${extrasHtml(part, data, types)}` : ''}
     </div>
   `);
 }

@@ -2,7 +2,7 @@ import { api } from '/api.js';
 import { formatDate, formatTime, getLocale, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { weekStartIndex, weekdayOrder } from '/utils/date.js';
-import { bindInstantSwitch, toggleRowHtml } from '/settings/components.js';
+import { bindInstantSwitch, settingRowHtml, toggleRowHtml } from '/settings/components.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
@@ -65,46 +65,50 @@ function renderPage(container, preferences) {
   container.insertAdjacentHTML('beforeend', `
     <section class="settings-section">
       <h2 class="settings-section__title">${t('settings.calendarSectionEvents')}</h2>
-      <div class="settings-card">
-        <h3 class="settings-card__title">${t('settings.calendarDurationTitle')}</h3>
-        <p class="settings-card-description">${t('settings.calendarDurationDescription')}</p>
-
-        <div class="form-group">
-          <label class="form-label" for="calendar-default-duration">${t('settings.calendarDurationLabel')}</label>
-          <select class="form-input" id="calendar-default-duration">
+      <!-- Zeilen statt je einer Karte (R17, E9). Die Zeile heisst wie die
+           fruehere Karte ("Standard-Termindauer", der Suchtreffer); das Feld
+           darin hiess nur "Dauer". -->
+      <div class="row-carrier settings-group">
+        ${settingRowHtml({
+          label: t('settings.calendarDurationTitle'),
+          labelFor: 'calendar-default-duration',
+          description: t('settings.calendarDurationDescription'),
+          descriptionId: 'calendar-default-duration-hint',
+          control: `<select class="form-input" id="calendar-default-duration" aria-describedby="calendar-default-duration-hint">
             ${DURATION_OPTIONS.map((m) => `<option value="${m}"${m === currentDuration ? ' selected' : ''}>${esc(durationOptionLabel(m))}</option>`).join('')}
-          </select>
-        </div>
-
-        <p class="form-hint">
-          ${t('settings.calendarPersonalDefaultsHint')}
-          <a href="${PERSONAL_CALENDAR_PATH}" id="calendar-personal-link">${t('settings.pageCalendarDefaults')}</a>
-        </p>
+          </select>`,
+        })}
       </div>
+      <p class="form-hint settings-group__footer">
+        ${t('settings.calendarPersonalDefaultsHint')}
+        <a href="${PERSONAL_CALENDAR_PATH}" id="calendar-personal-link">${t('settings.pageCalendarDefaults')}</a>
+      </p>
     </section>
 
     <section class="settings-section">
       <h2 class="settings-section__title">${t('settings.calendarSectionView')}</h2>
-      <div class="settings-card">
-        <h3 class="settings-card__title">${t('settings.weekStartTitle')}</h3>
-        <p class="settings-card-description">${t('settings.weekStartDescription')}</p>
-
+      <div class="row-carrier settings-group">
         <!-- Das Segment der Shell (.segmented, panel.css), wie das Theme -
              genau einer von drei Werten gilt. -->
-        <div class="segmented settings-segmented" id="week-start-toggle" role="radiogroup" aria-label="${t('settings.weekStartTitle')}">
-          ${WEEK_START_OPTIONS.map((o) => {
-            const on = o.value === currentWeekStart;
-            return `
-            <button type="button" class="segmented__item${on ? ' is-active' : ''}" role="radio"
-              data-tab-id="${o.value}" aria-checked="${on}" tabindex="${on ? '0' : '-1'}">
-              ${t(o.labelKey)}
-            </button>`;
-          }).join('')}
-        </div>
-
-        <div class="week-start-preview" id="week-start-preview" aria-hidden="true">
-          ${weekStartPreviewHtml(currentWeekStart)}
-        </div>
+        ${settingRowHtml({
+          stacked: true,
+          label: t('settings.weekStartTitle'),
+          labelId: 'week-start-label',
+          description: t('settings.weekStartDescription'),
+          control: `<div class="segmented settings-segmented" id="week-start-toggle" role="radiogroup" aria-labelledby="week-start-label">
+            ${WEEK_START_OPTIONS.map((o) => {
+              const on = o.value === currentWeekStart;
+              return `
+              <button type="button" class="segmented__item${on ? ' is-active' : ''}" role="radio"
+                data-tab-id="${o.value}" aria-checked="${on}" tabindex="${on ? '0' : '-1'}">
+                ${t(o.labelKey)}
+              </button>`;
+            }).join('')}
+          </div>
+          <div class="week-start-preview" id="week-start-preview" aria-hidden="true">
+            ${weekStartPreviewHtml(currentWeekStart)}
+          </div>`,
+        })}
       </div>
     </section>
 

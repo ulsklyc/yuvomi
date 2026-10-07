@@ -2,7 +2,7 @@ import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { buildSyncTargetOptions } from '/utils/sync-target.js';
-import { toggleRowHtml } from '/settings/components.js';
+import { settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
 
 /**
@@ -36,9 +36,8 @@ function debounce(fn, ms) {
 }
 
 export function collectDefaultReminders(box) {
-  return [...box.querySelectorAll('.js-default-reminder')]
-    .filter((el) => el.checked)
-    .map((el) => Number(el.value))
+  return [...box.querySelectorAll('.js-default-reminder[aria-pressed="true"]')]
+    .map((el) => Number(el.dataset.value))
     .sort((a, b) => a - b);
 }
 
@@ -71,14 +70,14 @@ function syncTargetFieldHtml(options, current) {
   }
   if (openGroup) html += '</optgroup>';
 
-  return `
-        <div class="form-group">
-          <label class="form-label" for="calendar-default-target">${t('settings.calendarDefaultTargetLabel')}</label>
-          <select id="calendar-default-target" class="form-input">${html}</select>
-          <p class="form-hint">${t('settings.calendarDefaultTargetHint')}</p>
-          <p class="form-hint" id="calendar-default-target-outlook-hint"${current.startsWith('outlook:') ? '' : ' hidden'}>${t('settings.outlookPushHint')}</p>
-        </div>
-  `;
+  return settingRowHtml({
+    label: t('settings.calendarDefaultTargetLabel'),
+    labelFor: 'calendar-default-target',
+    description: t('settings.calendarDefaultTargetHint'),
+    descriptionId: 'calendar-default-target-hint',
+    extra: `<p class="form-hint" id="calendar-default-target-outlook-hint"${current.startsWith('outlook:') ? '' : ' hidden'}>${t('settings.outlookPushHint')}</p>`,
+    control: `<select id="calendar-default-target" class="form-input" aria-describedby="calendar-default-target-hint calendar-default-target-outlook-hint">${html}</select>`,
+  });
 }
 
 function renderPage(container, preferences, syncTargets = null) {
@@ -102,42 +101,50 @@ function renderPage(container, preferences, syncTargets = null) {
   const targetField = targetOptions.length > 1
     ? syncTargetFieldHtml(targetOptions, currentTarget)
     : '';
-  const checkboxes = DEFAULT_REMINDER_OPTIONS.map((option) => `
-    <label class="reminder-preset">
-      <input type="checkbox" class="js-default-reminder" value="${option.value}"${selected.has(option.value) ? ' checked' : ''}>
-      <span>${esc(t(option.labelKey))}</span>
-    </label>`).join('');
+  // DER CHIP DES KANONS (R17, E9): bis dahin eine 16px-Checkbox in einer
+  // eigenen Pille (`.reminder-preset`), direkt neben `role="switch"`-Schaltern -
+  // zwei Formen fuer "an/aus" in einer Karte. Jetzt `.filter-chip` mit
+  // `aria-pressed`, wie die Wochentage der Entsorgung (R17, E6).
+  const chips = DEFAULT_REMINDER_OPTIONS.map((option) => {
+    const on = selected.has(option.value);
+    return `<button type="button" class="filter-chip js-default-reminder${on ? ' filter-chip--active' : ''}"
+      data-value="${option.value}" aria-pressed="${on}">${esc(t(option.labelKey))}</button>`;
+  }).join('');
 
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <section class="settings-section">
-      <h2 class="settings-section__title">${t('settings.calendarSectionEvents')}</h2>
-      <div class="settings-card">
-        <h3 class="settings-card__title">${t('settings.calendarDefaultsTitle')}</h3>
-        <p class="settings-card-description">${t('settings.calendarDefaultsDescription')}</p>
-
-        <div class="form-group">
-          ${toggleRowHtml({
-            control: 'switch',
-            label: t('settings.calendarAssignMeLabel'),
-            checked: assignMe,
-            attrs: { id: 'calendar-default-assign-me' },
-          })}
-        </div>
-
+      <!-- "Termin-Vorgaben", nicht mehr "Termine" (R17, E9): so hiess auch der
+           Abschnitt des Haushalts weiter unten - zweimal dieselbe Ueberschrift
+           in einem Blatt. Der Name ist der des Abschnitts in Registry, Suche
+           und Verweisen (ein Abschnitt, ein Name; #1524). -->
+      <h2 class="settings-section__title">${t('settings.pageCalendarDefaults')}</h2>
+      <div class="row-carrier settings-group">
+        ${settingSwitchRowHtml({
+          label: t('settings.calendarAssignMeLabel'),
+          checked: assignMe,
+          attrs: { id: 'calendar-default-assign-me' },
+        })}
 ${targetField}
-        <div class="form-group">
-          <span class="form-label" id="calendar-default-reminders-label">${t('settings.calendarDefaultRemindersLabel')}</span>
-          <p class="settings-card-description">${t('settings.calendarDefaultRemindersHint')}</p>
-          <div id="calendar-default-reminders" class="reminder-preset-group" role="group" aria-labelledby="calendar-default-reminders-label">
-            ${checkboxes}
-          </div>
-        </div>
-
-        <p class="form-hint">${t('settings.calendarDefaultsScopeHint')}</p>
+        ${settingRowHtml({
+          stacked: true,
+          label: t('settings.calendarDefaultRemindersLabel'),
+          labelId: 'calendar-default-reminders-label',
+          description: t('settings.calendarDefaultRemindersHint'),
+          control: `<div id="calendar-default-reminders" class="settings-chip-group" role="group" aria-labelledby="calendar-default-reminders-label">
+            ${chips}
+          </div>`,
+        })}
       </div>
+      <p class="form-hint settings-group__footer">${t('settings.calendarDefaultsScopeHint')}</p>
     </section>
   `);
+}
+
+/** Zustand eines Erinnerungs-Chips: `aria-pressed` und die Aktiv-Form zusammen. */
+function setReminderChip(chip, on) {
+  chip.setAttribute('aria-pressed', String(on));
+  chip.classList.toggle('filter-chip--active', on);
 }
 
 // Instant-Save: ein einzelner Wert braucht keinen separaten Speichern-Button.
@@ -201,17 +208,18 @@ function bindEvents(container) {
     } catch (error) {
       const keep = new Set(persisted);
       remindersBox.querySelectorAll('.js-default-reminder').forEach((el) => {
-        el.checked = keep.has(Number(el.value));
+        setReminderChip(el, keep.has(Number(el.dataset.value)));
       });
       window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
     }
   }, 500);
 
-  remindersBox.addEventListener('change', (event) => {
+  remindersBox.addEventListener('click', (event) => {
     const box = event.target.closest('.js-default-reminder');
     if (!box) return;
+    setReminderChip(box, box.getAttribute('aria-pressed') !== 'true');
     if (collectDefaultReminders(remindersBox).length > MAX_DEFAULT_REMINDERS) {
-      box.checked = false; // Cap: die gerade gesetzte Auswahl zurücknehmen
+      setReminderChip(box, false); // Cap: die gerade gesetzte Auswahl zurücknehmen
       window.yuvomi?.showToast(t('settings.calendarDefaultRemindersMax', { count: MAX_DEFAULT_REMINDERS }), 'warning');
       return;
     }

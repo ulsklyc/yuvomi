@@ -383,12 +383,13 @@ export function scanFooterIconDelete(src) {
  * Grenze wie bei den Filterblaettern, Entscheidung 2026-09-26):
  *  - `api-token-scopes__cell`: Lesen/Schreiben je Modul in der Scope-Matrix
  *    eines API-Tokens (admin-api.js);
- *  - `reminder-preset`: Standard-Erinnerungen als Mehrfachauswahl-Chips
- *    (personal-calendar.js);
+ *  - (bis R17 auch `reminder-preset`: die Standard-Erinnerungen sind seit E9
+ *    `.filter-chip` mit `aria-pressed` und brauchen keine Ausnahme mehr - eine
+ *    16px-Checkbox in einer Pille faellt wieder auf;)
  *  - `backfill-moved__`: Auswahl der verschobenen Termine im Nachtrag-Dialog
  *    samt "alle" (sync-calendar.js).
  */
-const SETTINGS_SELECTION = /class="(?:[^"]*\s)?(?:api-token-scopes__cell|reminder-preset|backfill-moved__[\w-]+)(?:\s[^"]*)?"[^<]*$/;
+const SETTINGS_SELECTION = /class="(?:[^"]*\s)?(?:api-token-scopes__cell|backfill-moved__[\w-]+)(?:\s[^"]*)?"[^<]*$/;
 export function scanSettingsCheckbox(src, file) {
   const found = [];
   if (!file.startsWith('public/settings/') || file === 'public/settings/components.js') return found;
@@ -760,7 +761,7 @@ test('Scanner: settings-checkbox gilt nur in den Einstellungen und laesst den Sc
   // Die Auswahl-Ausnahme gilt nur fuer die Checkbox IN ihrem Label - die rohe
   // Checkbox danach zaehlt wieder.
   assert.deepEqual(scanSettingsCheckbox(src, 'public/settings/pages/x.js').map((f) => f.what),
-    ["toggleRowHtml ohne control: 'switch'", 'id="raw"', 'id="raw-after-selection"']);
+    ["toggleRowHtml ohne control: 'switch'", 'id="raw"', 'class="js-default-reminder"', 'id="raw-after-selection"']);
   assert.deepEqual(scanSettingsCheckbox(src, 'public/pages/calendar.js'), []);
 });
 

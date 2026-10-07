@@ -2964,7 +2964,9 @@ test('R14: jeder Export steht im Blatt seines Moduls', async () => {
 test('R14: ein Feed ist ein Schalter, kein Primaerknopf', async () => {
   const src = await readFile(new URL('../public/settings/pages/personal-feeds.js', import.meta.url), 'utf8');
   assert.doesNotMatch(src, /btn--primary/, 'kein "Feed aktivieren" als Primaerknopf');
-  assert.match(src, /control: 'switch',\s*label: feed\.text\.title\(\)/, 'An/Aus ist ein Schalter mit dem Namen des Feeds');
+  // Seit R17 (E9) die Schalterzeile der Gruppe; `settingSwitchRowHtml` setzt
+  // `control: 'switch'` selbst (test:control-dialect prueft das Ergebnis).
+  assert.match(src, /settingSwitchRowHtml\(\{\s*label: feed\.text\.title\(\)/, 'An/Aus ist ein Schalter mit dem Namen des Feeds');
   assert.match(src, /container\.dataset\?\.part/, 'der Abschnitt sagt, welcher Feed');
   assert.match(src, /!next && !await feed\.confirmDisable\(\)/, 'Ausschalten fragt nach wie der fruehere Knopf');
 });
@@ -3265,6 +3267,78 @@ test('settings sidebar: the active link is revealed below the sticky search, not
   }
 });
 
+// R17 (E9): jeder Abschnitt der Registry als Programm gerendert - beurteilt wird das Markup.
+function sheetProbeContainer(part) {
+  let html = '';
+  let longest = '';
+  return {
+    dataset: part ? { part } : {},
+    isConnected: true,
+    // Ein Abschnitt, der NACH dem Zeichnen an einer Attrappe scheitert, ersetzt
+    // sein Markup durch den Fehlerzustand - beurteilt wird der laengste Stand.
+    get html() { return longest; },
+    replaceChildren() { html = ''; },
+    insertAdjacentHTML(_pos, markup) { html += markup; if (html.length > longest.length) longest = html; },
+    appendChild() {}, append() {}, addEventListener() {},
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    closest: () => null,
+  };
+}
+
+/** Jeder Abschnitt der Registry, als Programm gerendert: id -> Markup. Einmal je Lauf. */
+let sheetProbe = null;
+function probeSheets() {
+  sheetProbe ??= (async () => {
+    const { SETTINGS_SECTIONS } = await import('../public/settings/registry.js');
+    const { resetPreferencesCache } = await import('/settings/preferences-cache.js');
+    const prev = { window: globalThis.window, document: globalThis.document, api: globalThis.__apiStub };
+    const storage = { getItem: () => null, setItem() {}, removeItem() {} };
+    globalThis.window = {
+      yuvomi: { showToast() {}, isModuleDisabled: () => false },
+      matchMedia: () => ({ matches: false, addEventListener() {} }),
+      addEventListener() {},
+      location: { origin: 'http://localhost', protocol: 'https:', pathname: '/settings' },
+      localStorage: storage,
+    };
+    globalThis.document = fakeDocument();
+    globalThis.__apiStub = {
+      // Ein Feed ist ohne Adresse AUS (ein Schalter); Listen sind leer.
+      get: async (url) => {
+        if (/feed/.test(url)) return { data: null };
+        if (/^\/modules/.test(url)) return { data: [] };
+        return { data: {} };
+      },
+      put: async (_url, body) => ({ data: body }),
+      post: async () => ({ data: {} }),
+      patch: async () => ({ data: {} }),
+      delete: async () => ({ data: {} }),
+    };
+    resetPreferencesCache();
+    const rendered = new Map();
+    try {
+      for (const section of SETTINGS_SECTIONS) {
+        const host = sheetProbeContainer(section.props?.part);
+        try {
+          const module = await section.loader();
+          await module.render(host, { user: { id: 1, role: 'admin', is_admin: true }, query: new URLSearchParams() });
+        } catch {
+          // Nach dem Zeichnen an einer Attrappe gescheitert: das Markup steht.
+        }
+        rendered.set(section.id, host.html.replace(/<!--[\s\S]*?-->/g, ''));
+      }
+    } finally {
+      globalThis.window = prev.window;
+      globalThis.document = prev.document;
+      globalThis.__apiStub = prev.api;
+      resetPreferencesCache();
+    }
+    return rendered;
+  })();
+  return sheetProbe;
+}
+
+
 test('R17: die gruppierte Zeile - Label links, Bedienelement rechts, der Hinweis ausserhalb des Labels', async () => {
   const { settingRowHtml, settingSwitchRowHtml } = await import('../public/settings/components.js');
   const row = settingRowHtml({
@@ -3294,4 +3368,52 @@ test('R17: die gruppierte Zeile - Label links, Bedienelement rechts, der Hinweis
     'keine Breitenabfrage stapelt die Zeile wieder: gestapelt war ein Auswahlfeld mit "5 Minuten" mobil vollbreit');
   const control = rules.find((r) => r.selector.trim() === '.settings-group .settings-setting-row__control' && !r.at.length);
   assert.match(control?.body ?? '', /max-inline-size:\s*50cqi/, 'das Bedienelement nimmt hoechstens die halbe Zeile, das Label bricht um');
+});
+
+test('R17: keine Abschnittsueberschrift steht in einem Blatt zweimal ("Termine", "Zyklus")', async () => {
+  const { SETTINGS_SECTIONS } = await import('../public/settings/registry.js');
+  const rendered = await probeSheets();
+  const bySheet = new Map();
+  for (const section of SETTINGS_SECTIONS) {
+    const titles = [...(rendered.get(section.id) ?? '').matchAll(/class="settings-section__title"[^>]*>([^<]*)</g)].map((m) => m[1].trim());
+    bySheet.set(section.sheetId, [...(bySheet.get(section.sheetId) ?? []), ...titles]);
+  }
+  const doubled = [];
+  let seen = 0;
+  for (const [sheetId, titles] of bySheet) {
+    seen += titles.length;
+    for (const title of new Set(titles)) {
+      if (titles.filter((entry) => entry === title).length > 1) doubled.push(`${sheetId}: "${title}"`);
+    }
+  }
+  assert.ok(seen >= 20, `nur ${seen} Abschnittsueberschriften gesehen`);
+  assert.deepEqual(doubled, [], 'zwei gleiche Ueberschriften auf einer Ebene: die Sprungmarke und der Screenreader koennen sie nicht unterscheiden');
+});
+
+test('R17: die Sprungmarken heissen wie die Ueberschriften der Abschnitte, nicht wie die Registry', async () => {
+  const shell = await readFile(new URL('../public/settings/shell.js', import.meta.url), 'utf8');
+  const fn = shell.slice(shell.indexOf('function syncJumpLabels('), shell.indexOf('async function renderSheetSection('));
+  assert.match(fn, /host\?\.querySelector\('\.settings-section__title, \.settings-navigation-panel__title'\)/,
+    'gelesen wird die erste sichtbare Abschnittsueberschrift im Traeger');
+  assert.match(fn, /link\.textContent = text/);
+  assert.match(shell, /link\.dataset\.jumpSection = target\.id/, 'die Marke weiss, zu welchem Traeger sie gehoert');
+  const section = shell.slice(shell.indexOf('async function renderSheetSection('), shell.indexOf('async function renderLeafContent('));
+  assert.match(section, /await module\.render\(host, \{ user, query \}\);[\s\S]*?syncJumpLabels\(host\.closest\?\.\('\.settings-leaf'\)\)/,
+    'jeder fertige Abschnitt zieht seine Marke nach, auch nach der Wartefrist');
+  const leaf = shell.slice(shell.indexOf('async function renderLeafContent('), shell.indexOf('function levelScopedHeadings('));
+  assert.match(leaf, /await awaitSections\([\s\S]*?\);[\s\S]*?jump\?\.classList\.remove\('settings-sheet-jump--pending'\)/,
+    'nach der Frist stehen die Marken in jedem Fall');
+});
+
+test('R17: die Standard-Erinnerungen sind Chips des Kanons mit aria-pressed, keine Checkbox in einer Pille', async () => {
+  const rendered = await probeSheets();
+  const html = rendered.get('personal-calendar') ?? '';
+  const chips = [...html.matchAll(/<button type="button" class="filter-chip js-default-reminder[^"]*"\s+data-value="(\d+)" aria-pressed="(true|false)">/g)];
+  assert.ok(chips.length >= 5, `nur ${chips.length} Erinnerungs-Chips im gerenderten Abschnitt`);
+  assert.doesNotMatch(html, /reminder-preset/);
+  assert.equal([...html.matchAll(/<input\b[^>]*type="checkbox"/g)].length, 1, 'die einzige Checkbox ist der Schalter "mir zuweisen"');
+  const src = await readFile(new URL('../public/settings/pages/personal-calendar.js', import.meta.url), 'utf8');
+  assert.match(src, /chip\.setAttribute\('aria-pressed', String\(on\)\);\s*chip\.classList\.toggle\('filter-chip--active', on\)/,
+    'Zustand und Aktiv-Form wechseln zusammen');
+  assert.match(src, /querySelectorAll\('\.js-default-reminder\[aria-pressed="true"\]'\)/, 'gelesen wird der Zustand, den der Chip ansagt');
 });
