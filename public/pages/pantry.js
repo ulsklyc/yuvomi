@@ -1463,7 +1463,7 @@ function openItemModal(mode, item = null) {
         <input id="pantry-name" class="form-input" type="text" required
                placeholder="${esc(t('pantry.namePlaceholder'))}">
       </div>
-      <div class="pantry-form-row">
+      <div class="form-pair">
         <div class="form-group">
           <label class="form-label" for="pantry-quantity">${esc(t('pantry.quantityLabel'))}</label>
           <input id="pantry-quantity" class="form-input" type="number" min="0" step="any" inputmode="decimal">
@@ -1473,7 +1473,7 @@ function openItemModal(mode, item = null) {
           <select id="pantry-unit" class="form-input">${unitOptions}</select>
         </div>
       </div>
-      <div class="pantry-form-row">
+      <div class="form-pair">
         <div class="form-group">
           <label class="form-label" for="pantry-location">${esc(t('pantry.locationLabel'))}</label>
           <select id="pantry-location" class="form-input">${locationOptions}</select>

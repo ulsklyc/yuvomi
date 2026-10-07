@@ -8,7 +8,7 @@ import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModa
 import { renderDocumentAttachField, bindDocumentAttachField, attachmentLinksNode } from '/components/document-attach.js';
 import { openDetailView } from '/components/detail-view.js';
 import { t, formatDate, getLocale, getNumberFormat, dateInputPlaceholder, parseDateInput, isDateInputValid } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
@@ -1422,7 +1422,7 @@ function groupMemberCheckboxes(selectedIds = null, splitValues = {}) {
         <input type="checkbox" name="participants" value="${id}" ${checked ? 'checked' : ''}>
         <span>${esc(member.display_name)}</span>
       </label>
-      <input class="input split-split-value" name="split_value_${id}" inputmode="decimal" aria-label="${esc(member.display_name)} ${t('splitExpenses.splitValue')}" placeholder="" value="${esc(value)}">
+      <input class="form-input split-split-value" name="split_value_${id}" inputmode="decimal" aria-label="${esc(member.display_name)} ${t('splitExpenses.splitValue')}" placeholder="" value="${esc(value)}">
     </div>
   `;
   }).join('');
@@ -1665,7 +1665,7 @@ function renderGroupDefaults(group) {
     <fieldset class="split-defaults">
       <legend>${t('splitExpenses.defaultSplit')}</legend>
       <p class="form-hint">${t('splitExpenses.defaultSplitHint')}</p>
-      <label>${t('splitExpenses.splitMethod')}<select class="input" name="default_split_method">
+      <label class="form-field"><span class="form-label">${t('splitExpenses.splitMethod')}</span><select class="form-input" name="default_split_method">
         ${opt('equal', t('splitExpenses.splitEqual'))}
         ${opt('percentage', t('splitExpenses.splitPercentage'))}
         ${opt('shares', t('splitExpenses.splitShares'))}
@@ -1675,7 +1675,7 @@ function renderGroupDefaults(group) {
         return `
         <div class="split-participant-row" data-default-row="${id}">
           <span>${esc(member.display_name)}</span>
-          <input class="input split-default-value" name="default_value_${id}" inputmode="decimal" aria-label="${esc(member.display_name)} ${t('splitExpenses.splitValue')}" value="${esc(values[id] ?? '')}">
+          <input class="form-input split-default-value" name="default_value_${id}" inputmode="decimal" aria-label="${esc(member.display_name)} ${t('splitExpenses.splitValue')}" value="${esc(values[id] ?? '')}">
         </div>`;
       }).join('')}
       <p class="form-hint" id="split-default-hint" role="status"></p>
@@ -1818,10 +1818,10 @@ async function openGroupModal(group = null) {
     title: isEdit ? t('splitExpenses.editGroup') : t('splitExpenses.addGroup'),
     content: `
       <form id="split-group-form" class="split-form">
-        <label>${t('splitExpenses.name')}<input class="input" name="name" required maxlength="200" value="${esc(group?.name || '')}"></label>
-        <label>${t('splitExpenses.description')}<textarea class="input" name="description" rows="3" maxlength="5000">${esc(group?.description || '')}</textarea></label>
-        <label>${t('splitExpenses.type')}<select class="input" name="type">${state.meta.group_types.map((type) => `<option value="${type}" ${type === group?.type ? 'selected' : ''}>${t(`splitExpenses.groupType.${type}`)}</option>`).join('')}</select></label>
-        <label>${t('splitExpenses.currency')}<select class="input" name="default_currency">${state.meta.currencies.map((c) => `<option value="${c}" ${c === (group?.default_currency || currency) ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
+        <label class="form-field"><span class="form-label">${t('splitExpenses.name')}${REQUIRED_MARK}</span><input class="form-input" name="name" required maxlength="200" value="${esc(group?.name || '')}"></label>
+        <label class="form-field"><span class="form-label">${t('splitExpenses.description')}</span><textarea class="form-input" name="description" rows="3" maxlength="5000">${esc(group?.description || '')}</textarea></label>
+        <label class="form-field"><span class="form-label">${t('splitExpenses.type')}</span><select class="form-input" name="type">${state.meta.group_types.map((type) => `<option value="${type}" ${type === group?.type ? 'selected' : ''}>${t(`splitExpenses.groupType.${type}`)}</option>`).join('')}</select></label>
+        <label class="form-field"><span class="form-label">${t('splitExpenses.currency')}</span><select class="form-input" name="default_currency">${state.meta.currencies.map((c) => `<option value="${c}" ${c === (group?.default_currency || currency) ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
         ${isEdit ? renderGroupMemberEditor(candidates) : ''}
         ${isEdit ? renderGroupDefaults(group) : ''}
         <div class="modal-panel__footer modal-panel__footer--plain">
@@ -1939,17 +1939,17 @@ function openExpenseModal(expense = null, prefill = null) {
     title: isEdit ? t('splitExpenses.editExpense') : t('splitExpenses.addExpense'),
     content: `
       <form id="split-expense-form" class="split-form">
-        <label>${t('splitExpenses.titleLabel')}<input class="input" name="title" required maxlength="200" value="${esc(expense?.title || '')}"></label>
+        <label class="form-field"><span class="form-label">${t('splitExpenses.titleLabel')}${REQUIRED_MARK}</span><input class="form-input" name="title" required maxlength="200" value="${esc(expense?.title || '')}"></label>
         <div class="split-form-row">
-          <label>${t('splitExpenses.amount')}<input class="input" name="amount" inputmode="decimal" placeholder="${amountPlaceholder(isEdit ? expense.currency : group.default_currency)}" required aria-describedby="split-amount-reason" value="${esc(amountToInput(expense?.amount || '', expense?.currency || group.default_currency))}"></label>
-          <label>${t('splitExpenses.paidBy')}<select class="input" name="payer_id">${memberOptions(isEdit ? expense.payer_id : state.user?.id)}</select></label>
+          <label class="form-field"><span class="form-label">${t('splitExpenses.amount')}${REQUIRED_MARK}</span><input class="form-input budget-amount-input" name="amount" inputmode="decimal" placeholder="${amountPlaceholder(isEdit ? expense.currency : group.default_currency)}" required aria-describedby="split-amount-reason" value="${esc(amountToInput(expense?.amount || '', expense?.currency || group.default_currency))}"></label>
+          <label class="form-field"><span class="form-label">${t('splitExpenses.paidBy')}</span><select class="form-input" name="payer_id">${memberOptions(isEdit ? expense.payer_id : state.user?.id)}</select></label>
         </div>
         <p class="form-hint form-hint--danger" id="split-amount-reason" role="status" hidden></p>
         <div class="split-form-row">
-          <label>${t('splitExpenses.currency')}<select class="input" name="currency">${state.meta.currencies.map((c) => `<option value="${c}" ${c === (expense?.currency || group.default_currency) ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
-          <label>${t('splitExpenses.date')}<yuvomi-datepicker name="expense_date" type="date" value="${esc(expense?.expense_date || today)}"></yuvomi-datepicker></label>
+          <label class="form-field"><span class="form-label">${t('splitExpenses.currency')}</span><select class="form-input" name="currency">${state.meta.currencies.map((c) => `<option value="${c}" ${c === (expense?.currency || group.default_currency) ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
+          <label class="form-field"><span class="form-label">${t('splitExpenses.date')}</span><yuvomi-datepicker name="expense_date" type="date" value="${esc(expense?.expense_date || today)}"></yuvomi-datepicker></label>
         </div>
-        <label>${t('splitExpenses.splitMethod')}<select class="input" name="split_method">
+        <label class="form-field"><span class="form-label">${t('splitExpenses.splitMethod')}</span><select class="form-input" name="split_method">
           ${methodOption('equal', t('splitExpenses.splitEqual'))}
           ${methodOption('percentage', t('splitExpenses.splitPercentage'))}
           ${methodOption('exact', t('splitExpenses.splitExact'))}
@@ -1957,7 +1957,7 @@ function openExpenseModal(expense = null, prefill = null) {
         </select></label>
         <p class="form-hint" id="split-method-hint">${t(`splitExpenses.splitHint.${method}`)}</p>
         <fieldset class="split-participants"><legend>${t('splitExpenses.participants')}</legend>${groupMemberCheckboxes(selectedIds, splitValues)}</fieldset>
-        <label>${t('splitExpenses.notes')}<textarea class="input" name="description" rows="3" maxlength="5000">${esc(expense?.description || '')}</textarea></label>
+        <label class="form-field"><span class="form-label">${t('splitExpenses.notes')}</span><textarea class="form-input" name="description" rows="3" maxlength="5000">${esc(expense?.description || '')}</textarea></label>
         ${renderDocumentAttachField({
           attachments: isEdit ? (expense.attachments || []) : [],
           label: t('splitExpenses.receiptsLabel'),
@@ -2185,20 +2185,20 @@ function openRecurringModal(recurring = null) {
     content: `
       <form id="split-recurring-form" class="split-form">
         ${stateText ? `<p class="form-hint field-hint--warn" role="status"><i data-lucide="circle-pause" aria-hidden="true"></i><span>${esc(stateText)}</span></p>` : ''}
-        <label>${t('splitExpenses.titleLabel')}<input class="input" name="title" required maxlength="200" value="${esc(recurring?.title || '')}"></label>
+        <label class="form-field"><span class="form-label">${t('splitExpenses.titleLabel')}${REQUIRED_MARK}</span><input class="form-input" name="title" required maxlength="200" value="${esc(recurring?.title || '')}"></label>
         <div class="split-form-row">
-          <label>${t('splitExpenses.amount')}<input class="input" name="amount" inputmode="decimal" placeholder="${amountPlaceholder(currency)}" required aria-describedby="split-amount-reason" value="${esc(amountToInput(recurring?.amount || '', currency))}"></label>
-          <label>${t('splitExpenses.paidBy')}<select class="input" name="payer_id">${formerPayer}${memberOptions(isEdit ? recurring.payer_id : state.user?.id)}</select></label>
+          <label class="form-field"><span class="form-label">${t('splitExpenses.amount')}${REQUIRED_MARK}</span><input class="form-input budget-amount-input" name="amount" inputmode="decimal" placeholder="${amountPlaceholder(currency)}" required aria-describedby="split-amount-reason" value="${esc(amountToInput(recurring?.amount || '', currency))}"></label>
+          <label class="form-field"><span class="form-label">${t('splitExpenses.paidBy')}</span><select class="form-input" name="payer_id">${formerPayer}${memberOptions(isEdit ? recurring.payer_id : state.user?.id)}</select></label>
         </div>
         <p class="form-hint form-hint--danger" id="split-amount-reason" role="status" hidden></p>
         <div class="split-form-row">
-          <label>${t('splitExpenses.currency')}<select class="input" name="currency">${state.meta.currencies.map((c) => option(c, c, currency)).join('')}</select></label>
-          <label>${t('budget.recurringIntervalLabel')}<select class="input" name="frequency">
+          <label class="form-field"><span class="form-label">${t('splitExpenses.currency')}</span><select class="form-input" name="currency">${state.meta.currencies.map((c) => option(c, c, currency)).join('')}</select></label>
+          <label class="form-field"><span class="form-label">${t('budget.recurringIntervalLabel')}</span><select class="form-input" name="frequency">
             ${['weekly', 'monthly', 'yearly'].map((f) => option(f, frequencyLabel(f), frequency)).join('')}
           </select></label>
         </div>
-        <label>${t('splitExpenses.recurring.nextDate')}<yuvomi-datepicker name="next_run_date" type="date" value="${esc(recurring?.next_run_date || todayKey())}"></yuvomi-datepicker></label>
-        <label>${t('splitExpenses.splitMethod')}<select class="input" name="split_method">
+        <label class="form-field"><span class="form-label">${t('splitExpenses.recurring.nextDate')}</span><yuvomi-datepicker name="next_run_date" type="date" value="${esc(recurring?.next_run_date || todayKey())}"></yuvomi-datepicker></label>
+        <label class="form-field"><span class="form-label">${t('splitExpenses.splitMethod')}</span><select class="form-input" name="split_method">
           ${option('equal', t('splitExpenses.splitEqual'), method)}
           ${option('percentage', t('splitExpenses.splitPercentage'), method)}
           ${option('exact', t('splitExpenses.splitExact'), method)}
@@ -2206,7 +2206,7 @@ function openRecurringModal(recurring = null) {
         </select></label>
         <p class="form-hint" id="split-method-hint">${t(`splitExpenses.splitHint.${method}`)}</p>
         <fieldset class="split-participants"><legend>${t('splitExpenses.participants')}</legend>${groupMemberCheckboxes(selectedIds, splitValues)}</fieldset>
-        <label>${t('splitExpenses.notes')}<textarea class="input" name="description" rows="3" maxlength="5000">${esc(recurring?.description || '')}</textarea></label>
+        <label class="form-field"><span class="form-label">${t('splitExpenses.notes')}</span><textarea class="form-input" name="description" rows="3" maxlength="5000">${esc(recurring?.description || '')}</textarea></label>
         ${isEdit ? `<p class="form-hint">${t('splitExpenses.recurring.editHint')}</p>` : ''}
         <div class="modal-panel__footer modal-panel__footer--plain">
           ${isEdit ? `<button class="btn btn--danger-outline" type="button" id="split-delete-recurring" style="margin-inline-end:auto">
@@ -2369,15 +2369,15 @@ function openSettlementModal() {
     content: `
       <form id="split-settlement-form" class="split-form">
         <div class="split-form-row">
-          <label>${t('splitExpenses.payer')}<select class="input" name="payer_id">${memberOptions(debt?.from_user_id ?? state.user?.id)}</select></label>
-          <label>${t('splitExpenses.payee')}<select class="input" name="payee_id">${memberOptions(debt?.to_user_id)}</select></label>
+          <label class="form-field"><span class="form-label">${t('splitExpenses.payer')}</span><select class="form-input" name="payer_id">${memberOptions(debt?.from_user_id ?? state.user?.id)}</select></label>
+          <label class="form-field"><span class="form-label">${t('splitExpenses.payee')}</span><select class="form-input" name="payee_id">${memberOptions(debt?.to_user_id)}</select></label>
         </div>
         <p class="form-hint field-hint--warn" id="split-settlement-same" role="status" hidden><i data-lucide="alert-triangle" aria-hidden="true"></i><span>${t('splitExpenses.settlementSamePerson')}</span></p>
         <div class="split-form-row">
-          <label>${t('splitExpenses.amount')}<input class="input" name="amount" inputmode="decimal" placeholder="${amountPlaceholder(debt?.currency || group.default_currency)}" required value="${debt ? esc(amountToInput(debt.amount, debt.currency)) : ''}"></label>
-          <label>${t('splitExpenses.currency')}<select class="input" name="currency">${state.meta.currencies.map((c) => `<option value="${c}" ${c === (debt?.currency || group.default_currency) ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
+          <label class="form-field"><span class="form-label">${t('splitExpenses.amount')}${REQUIRED_MARK}</span><input class="form-input budget-amount-input" name="amount" inputmode="decimal" placeholder="${amountPlaceholder(debt?.currency || group.default_currency)}" required value="${debt ? esc(amountToInput(debt.amount, debt.currency)) : ''}"></label>
+          <label class="form-field"><span class="form-label">${t('splitExpenses.currency')}</span><select class="form-input" name="currency">${state.meta.currencies.map((c) => `<option value="${c}" ${c === (debt?.currency || group.default_currency) ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
         </div>
-        <label>${t('splitExpenses.notes')}<textarea class="input" name="notes" rows="3" maxlength="5000"></textarea></label>
+        <label class="form-field"><span class="form-label">${t('splitExpenses.notes')}</span><textarea class="form-input" name="notes" rows="3" maxlength="5000"></textarea></label>
         ${renderDocumentAttachField({
           label: t('splitExpenses.proofLabel'),
           hint: t('splitExpenses.proofHint'),
@@ -2460,8 +2460,8 @@ async function openMemberModal() {
     title: t('splitExpenses.addMember'),
     content: `
       <form id="split-member-form" class="split-form">
-        <label>${t('splitExpenses.member')}<select class="input" name="member_ref">${memberCandidateOptions(candidates)}</select></label>
-        <label>${t('splitExpenses.role')}<select class="input" name="role"><option value="guest">${t('splitExpenses.roleGuest')}</option><option value="admin">${t('splitExpenses.roleAdmin')}</option></select></label>
+        <label class="form-field"><span class="form-label">${t('splitExpenses.member')}</span><select class="form-input" name="member_ref">${memberCandidateOptions(candidates)}</select></label>
+        <label class="form-field"><span class="form-label">${t('splitExpenses.role')}</span><select class="form-input" name="role"><option value="guest">${t('splitExpenses.roleGuest')}</option><option value="admin">${t('splitExpenses.roleAdmin')}</option></select></label>
         <div class="modal-panel__footer modal-panel__footer--plain">
           <button class="btn btn--secondary" type="button" id="split-new-guest" style="margin-inline-end:auto">${t('splitExpenses.createGuest')}</button>
           <div class="split-form__footer-actions">
@@ -2499,14 +2499,14 @@ function openGuestModal() {
     title: t('splitExpenses.createGuest'),
     content: `
       <form id="split-guest-form" class="split-form">
-        <label>${t('splitExpenses.displayName')}<input class="input" name="display_name" required maxlength="128"></label>
-        <label>${t('splitExpenses.usernameOptional')}<input class="input" name="username" autocomplete="off" maxlength="64"></label>
-        <label>${t('splitExpenses.temporaryPassword')}<input class="input" name="password" type="password" minlength="8" required autocomplete="new-password"></label>
+        <label class="form-field"><span class="form-label">${t('splitExpenses.displayName')}${REQUIRED_MARK}</span><input class="form-input" name="display_name" required maxlength="128"></label>
+        <label class="form-field"><span class="form-label">${t('splitExpenses.usernameOptional')}</span><input class="form-input" name="username" autocomplete="off" maxlength="64"></label>
+        <label class="form-field"><span class="form-label">${t('splitExpenses.temporaryPassword')}${REQUIRED_MARK}</span><input class="form-input" name="password" type="password" minlength="8" required autocomplete="new-password"></label>
         <div class="split-form-row">
-          <label>${t('splitExpenses.phone')}<input class="input" name="phone" type="tel" autocomplete="tel"></label>
-          <label>${t('splitExpenses.email')}<input class="input" name="email" type="email" autocomplete="email"></label>
+          <label class="form-field"><span class="form-label">${t('splitExpenses.phone')}</span><input class="form-input" name="phone" type="tel" autocomplete="tel"></label>
+          <label class="form-field"><span class="form-label">${t('splitExpenses.email')}</span><input class="form-input" name="email" type="email" autocomplete="email"></label>
         </div>
-        <label>${t('splitExpenses.birthDate')}<input class="input" name="birth_date" type="text" placeholder="${dateInputPlaceholder()}" inputmode="numeric"></label>
+        <label class="form-field"><span class="form-label">${t('splitExpenses.birthDate')}</span><input class="form-input" name="birth_date" type="text" placeholder="${dateInputPlaceholder()}" inputmode="numeric"></label>
         <p class="form-hint">${t('splitExpenses.guestSyncHint')}</p>
         <div class="modal-panel__footer modal-panel__footer--plain">
           <button class="btn btn--secondary" type="button" id="split-cancel-guest">${t('common.cancel')}</button>

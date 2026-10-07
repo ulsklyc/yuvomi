@@ -260,25 +260,9 @@
   color: var(--color-text-tertiary);
 }
 
-/* Zwei-Spalten-Formularzeile fuer das Item-Formular (Anlegen/Bearbeiten).
- * Repliziert .pantry-form-row (pantry.css) 1:1, weil inventory.css und
- * pantry.css sich beim Routenwechsel gegenseitig ausschliessen - nur das
- * hier aktive Stylesheet wird geladen, .pantry-form-row waere auf
- * /inventory also nie wirksam. */
-.inventory-form-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-  gap: var(--space-3);
-}
-
-/* [hidden] hat gegenueber display:grid zu geringe Spezifitaet - explizit
- * uebersteuern (gleiches Muster wie .inventory-filters[hidden] oben). Ohne
- * diese Regel steht die Kilometerstand-Gruppe bei JEDER Kategorie im
- * Formular, obwohl `hidden` gesetzt ist, und saveItem() verwirft das
- * Getippte still, weil es odometerRaw an categoryTracksOdometer() klemmt. */
-.inventory-form-row[hidden] {
-  display: none;
-}
+/* Zwei-Spalten-Formularzeile des Item-Formulars: `.form-pair.form-pair--wide`
+ * in layout.css (R17, E6), samt der `[hidden]`-Regel fuer die
+ * Kilometerstand-Gruppe - vorher eine 1:1-Kopie der Vorratsregel. */
 
 /* Vier Zustaende eines Gegenstands, und sie tragen ihren Ton in der SCHRIFT
  * (Skalen-Regel, zweiter Zweig - wie die Vorratsmeldung). Vorher lag unter

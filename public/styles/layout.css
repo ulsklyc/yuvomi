@@ -5752,6 +5752,33 @@ p.field-hint--warn[hidden] {
   margin-bottom: 0;
 }
 
+/* ZWEI FELDER NEBENEINANDER, GETEILT (R17, E6). Menge/Einheit, Ort/Kategorie:
+ * `auto-fit` misst das Modal, nicht das Fenster, und faellt einspaltig, sobald
+ * die Untergrenze je Spalte nicht mehr passt. Die Regel stand als
+ * `.pantry-form-row` in pantry.css und 1:1 kopiert als `.inventory-form-row`
+ * in inventory.css - und der Artikel-Dialog des EINKAUFS benutzte die
+ * Vorratsklasse, deren Blatt dort nie geladen ist: Menge und Kategorie, Preis
+ * und Laden standen untereinander, der Dialog war mobil 752px lang. Eine
+ * geteilte Klasse gehoert in ein Blatt, das index.html verlinkt (dieselbe
+ * Lehre wie `.form-hint`).
+ * 8rem: im 364px-Sheet (innen 332) passen zwei Spalten (2 x 128 + 12).
+ * `--wide` (11rem) fuer Felder, die schmaler nicht lesbar sind - die
+ * Datumsfelder des Inventars; dort bleibt das Sheet einspaltig wie bisher. */
+.form-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--form-pair-min, 8rem), 1fr));
+  gap: var(--space-3);
+}
+
+.form-pair--wide {
+  --form-pair-min: 11rem;
+}
+
+/* `hidden` verliert gegen `display: grid` (Kilometerstand im Inventar). */
+.form-pair[hidden] {
+  display: none;
+}
+
 /* Gleich hohe Karten/Boxen in Modal-Grids */
 .modal-panel__body .grid {
   align-items: stretch;

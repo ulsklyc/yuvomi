@@ -36,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Dialogs share one set of fields.** The shared-expense dialogs (expense, recurring expense,
+  payment, group, member) now use the labels of a budget entry - smaller and quieter - mark
+  required fields with the star, and show the amount in the large amount field. The waste
+  schedule dialog picks weekdays with chips instead of seven small checkboxes, and "Active" is a
+  switch. The loan dialog opens in the 520 px panel instead of the 400 px one.
 - **Tapping a row opens its details - also for birthdays on a phone and in the shopping list.**
   A birthday opened straight into the edit form with the keyboard up; it now opens a read sheet
   (next date and age, birth date, name day, note, reminder) with Delete at the start of the footer
@@ -135,6 +140,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Editing a shopping item: quantity and category, price and store stand side by side again.**
+  The dialog used a layout class whose stylesheet is only loaded in the pantry, so each pair fell
+  into two full-width rows and the dialog was 748 px long on a phone; it is 563 px now and fits
+  without scrolling.
 - **Arrow keys in the date picker move one day again after changing the month.** Every month
   change added another key listener to the grid of days: after two changes an arrow key jumped
   three days and Page Down three months. The keys are now bound once per opened picker.

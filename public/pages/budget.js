@@ -4739,7 +4739,10 @@ function openLoanModal(loan = null) {
   openSharedModal({
     title: isEdit ? t('budget.editLoan') : t('budget.newLoan'),
     content,
-    size: 'sm',
+    // 520 statt 400 (R17, E6): achtzehn Felder, darunter Zweierreihen - im
+    // 400er-Blatt (innen 366) fielen die Paare einspaltig und der Dialog
+    // wurde ein Formularstapel.
+    size: 'md',
     onSave(panel) {
       wireLoanFormFields(panel);
       panel.querySelector('#lm-cancel').addEventListener('click', closeModal);

@@ -949,3 +949,28 @@ test('Onboarding-CSS: Abholungen, Quellen, Abschnittstitel und Kopfknopf treten 
   ]) assert.ok(hidden.includes(sel), `${sel} fehlt`);
   assert.match(WASTE_CODE, /classList\.toggle\('waste-page--onboarding', isOnboarding\(state\)\)/);
 });
+
+// R17 (E6), Critique 2026-10-07 (A3 P1): der Termin-Dialog trug sieben rohe
+// 13x13-Checkboxen in 31px-Labels und "Aktiv" als Checkbox statt als Schalter.
+test('R17 E6: Wochentage sind Chips mit Zustand, "Aktiv" ist ein Schalter', () => {
+  const html = __test.weekdayPickerHtml('MO,TH');
+  const chips = [...html.matchAll(/<button type="button" class="([^"]*)" data-weekday="(\w+)"\s+aria-pressed="(true|false)">/g)];
+  assert.equal(chips.length, 7, 'sieben Chips, je Wochentag einer');
+  assert.ok(chips.every((m) => m[1].split(' ').includes('filter-chip')), 'der Chip des Kanons');
+  assert.deepEqual(chips.filter((m) => m[3] === 'true').map((m) => m[2]), ['MO', 'TH'], 'der Zustand steht in aria-pressed');
+  assert.deepEqual(chips.filter((m) => m[1].includes('filter-chip--active')).map((m) => m[2]), ['MO', 'TH'], 'und im Bild');
+  assert.doesNotMatch(html, /type="checkbox"/, 'keine rohe Checkbox mehr');
+  assert.match(html, /role="group" aria-labelledby="wsm-weekdays-label"/, 'die Gruppe hat einen Namen');
+  assert.match(html, /<input type="hidden" name="weekdays" value="MO,TH">/, 'der Stand steht fuer den Verwerfen-Schutz in einem Feld');
+
+  // Lesen: genau die gedrueckten Chips, in Wochenreihenfolge.
+  const pressed = [{ dataset: { weekday: 'MO' } }, { dataset: { weekday: 'TH' } }];
+  const root = { querySelectorAll: (sel) => (/\[aria-pressed="true"\]/.test(sel) ? pressed : []) };
+  assert.deepEqual(__test.weekdayPickerValue(root), ['MO', 'TH']);
+
+  const modal = WASTE_SRC.slice(WASTE_SRC.indexOf('function openScheduleModal(type, schedule = null) {'), WASTE_SRC.indexOf('function openPickupModal('));
+  assert.match(modal, /<label class="toggle">\s*<input type="checkbox" id="wsm-active"[^>]*>\s*<span class="toggle__track"><\/span>/,
+    '"Aktiv" traegt die Schalter-Bahn');
+  assert.match(modal, /body\.weekdays = weekdayPickerValue\(panel\)/, 'der Speicherweg liest die Chips');
+  assert.match(modal, /wireWeekdayPicker\(panel\)/, 'und die Chips sind verdrahtet');
+});

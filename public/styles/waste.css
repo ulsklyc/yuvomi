@@ -289,15 +289,12 @@
   gap: var(--space-2);
 }
 
-.waste-weekday-option {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-size: var(--text-sm);
+/* Die Wochentage sind `.filter-chip` (R17, E6) - die eigene Kaestchen-Pille
+ * `.waste-weekday-option` mit ihrer 13px-Checkbox ist fort. "Di" allein waere 40px breit:
+ * die Mindestbreite haelt jedes Ziel auf der Treffergroesse. */
+.waste-weekday-picker .filter-chip {
+  min-width: var(--target-base);
+  justify-content: center;
 }
 
 .waste-icon-picker {

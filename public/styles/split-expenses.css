@@ -715,7 +715,11 @@ button.split-expense:hover {
   gap: var(--space-3);
 }
 
-.split-form label,
+/* Die Felder tragen seit R17 (E6) den Kanon-Feldsatz (`.form-field` >
+ * `.form-label` + `.form-input`, layout.css): Label 14px sekundaer statt
+ * 16px primaer, Pflicht-Stern, Betrag als `.budget-amount-input`. Diese Regel
+ * gilt nur noch den Haken-Zeilen und den Gruppen. */
+.split-form .split-check,
 .split-participants,
 .split-defaults {
   display: flex;
@@ -727,6 +731,14 @@ button.split-expense:hover {
 
 .split-form-row > label {
   flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Der Betrag ist 48px hoch (`.budget-amount-input`); sein Nachbar in der
+ * Zeile (Bezahlt von, Waehrung) haelt dieselbe Hoehe, sonst stehen am Zeiger
+ * 48 neben 40px und die Labels auf zwei Linien. */
+.split-form-row:has(.budget-amount-input) .form-input {
+  min-height: var(--target-lg);
 }
 
 /* Abbrechen und Speichern bleiben ein Paar, wenn der Dialogfuss umbricht

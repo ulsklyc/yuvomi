@@ -532,8 +532,8 @@ function overtimeInfo(entries, weeklyHours = DEFAULT_WEEKLY_HOURS) {
 function reminderOffsetField(selectedMinutes) {
   const active = selectedMinutes != null;
   const nameId = toggleNameId();
-  return '<div class="form-field schedule-active-field"><span class="label" id="' + nameId + '">' + esc(t('schedule.extraReminderOffset')) + '</span><label class="toggle"><input name="reminder_enabled" type="checkbox" aria-labelledby="' + nameId + '"' + (active ? ' checked' : '') + '><span class="toggle__track"></span></label></div>'
-    + '<select class="input" name="reminder_offset_minutes" aria-labelledby="' + nameId + '"' + (active ? '' : ' disabled') + '>' + reminderOffsetOptions(selectedMinutes) + '</select>';
+  return '<div class="form-field schedule-active-field"><span class="form-label" id="' + nameId + '">' + esc(t('schedule.extraReminderOffset')) + '</span><label class="toggle"><input name="reminder_enabled" type="checkbox" aria-labelledby="' + nameId + '"' + (active ? ' checked' : '') + '><span class="toggle__track"></span></label></div>'
+    + '<select class="form-input" name="reminder_offset_minutes" aria-labelledby="' + nameId + '"' + (active ? '' : ' disabled') + '>' + reminderOffsetOptions(selectedMinutes) + '</select>';
 }
 
 function statisticsSummary() {
@@ -836,7 +836,7 @@ function formField(label, control, className = '') {
     if (!own) html = control.slice(0, match.index) + '<' + match[1] + ' id="' + id + '"' + control.slice(match.index + 1 + match[1].length);
     forAttr = ' for="' + id + '"';
   }
-  return '<div class="form-field ' + className + '"><label class="label"' + forAttr + '>' + esc(label) + '</label>' + html + '</div>';
+  return '<div class="form-field ' + className + '"><label class="form-label"' + forAttr + '>' + esc(label) + '</label>' + html + '</div>';
 }
 
 // Ein Schalter, dessen sichtbarer Name NEBEN seinem <label class="toggle">
@@ -847,9 +847,9 @@ function toggleNameId() {
 
 function shiftFields(type = {}) {
   return [
-    formField(t('schedule.name'), '<input class="input" required name="name" maxlength="200" value="' + esc(type.name ?? '') + '">'),
-    formField(t('schedule.shortCode'), '<input class="input" name="short_code" maxlength="12" value="' + esc(type.short_code ?? '') + '">'),
-    formField(t('schedule.color'), '<input class="input form-input--color" required name="color" type="color" value="' + esc(type.color ?? SHIFT_COLOR_FALLBACK) + '">', 'schedule-color-field'),
+    formField(t('schedule.name'), '<input class="form-input" required name="name" maxlength="200" value="' + esc(type.name ?? '') + '">'),
+    formField(t('schedule.shortCode'), '<input class="form-input" name="short_code" maxlength="12" value="' + esc(type.short_code ?? '') + '">'),
+    formField(t('schedule.color'), '<input class="form-input form-input--color" required name="color" type="color" value="' + esc(type.color ?? SHIFT_COLOR_FALLBACK) + '">', 'schedule-color-field'),
     formField(t('schedule.icon'), '<button type="button" class="btn btn--secondary schedule-icon-picker" data-action="pick-shift-icon">'
       + (type.icon ? '<i data-lucide="' + esc(type.icon) + '" aria-hidden="true"></i>' : '<i data-lucide="image-off" aria-hidden="true"></i>')
       + '<span>' + esc(t('schedule.chooseIcon')) + '</span></button>'
@@ -890,10 +890,10 @@ function patternFields(pattern = {}) {
   const hasWindow = Boolean(pattern.valid_from || pattern.valid_until);
   const activeNameId = toggleNameId();
   return [
-    formField(t('schedule.name'), '<input class="input" required name="name" maxlength="200" value="' + esc(pattern.name ?? '') + '">'),
+    formField(t('schedule.name'), '<input class="form-input" required name="name" maxlength="200" value="' + esc(pattern.name ?? '') + '">'),
     formField(t('schedule.anchorDate'), '<yuvomi-datepicker required name="anchor_date" type="date" label="' + esc(t('schedule.anchorDate')) + '" value="' + esc(pattern.anchor_date ?? todayKey()) + '"></yuvomi-datepicker>'),
-    formField(t('schedule.cycleLength'), '<input class="input" required name="cycle_length" type="number" min="1" max="366" value="' + esc(String(pattern.cycle_length ?? 7)) + '">'),
-    '<div class="form-field schedule-active-field"><span class="label" id="' + activeNameId + '">' + esc(t('schedule.active')) + '</span><label class="toggle"><input name="is_active" type="checkbox" aria-labelledby="' + activeNameId + '"' + active + '><span class="toggle__track"></span></label></div>',
+    formField(t('schedule.cycleLength'), '<input class="form-input" required name="cycle_length" type="number" min="1" max="366" value="' + esc(String(pattern.cycle_length ?? 7)) + '">'),
+    '<div class="form-field schedule-active-field"><span class="form-label" id="' + activeNameId + '">' + esc(t('schedule.active')) + '</span><label class="toggle"><input name="is_active" type="checkbox" aria-labelledby="' + activeNameId + '"' + active + '><span class="toggle__track"></span></label></div>',
     advancedSection([
       formField(t('schedule.validFrom'), '<yuvomi-datepicker name="valid_from" type="date" label="' + esc(t('schedule.validFrom')) + '" value="' + esc(pattern.valid_from ?? '') + '"></yuvomi-datepicker>'),
       formField(t('schedule.validUntil'), '<yuvomi-datepicker name="valid_until" type="date" label="' + esc(t('schedule.validUntil')) + '" value="' + esc(pattern.valid_until ?? '') + '"></yuvomi-datepicker>'),
@@ -943,7 +943,7 @@ function shiftTypeFieldsEditor(type) {
   const rows = type.fields.map(shiftTypeFieldRow).join('');
   const picker = available.length
     ? '<div class="schedule-type-field-add">'
-      + '<select class="input" data-field-picker="' + type.id + '">' + available.map((field) => option(field.id, field.name)).join('') + '</select>'
+      + '<select class="form-input" data-field-picker="' + type.id + '">' + available.map((field) => option(field.id, field.name)).join('') + '</select>'
       + '<button type="button" class="btn btn--secondary" data-action="add-type-field" data-id="' + type.id + '">' + esc(t('common.add')) + '</button>'
       + '</div>' : '';
   const body = '<div class="schedule-type-fields-rows" data-type-fields-rows="' + type.id + '">'
@@ -1008,7 +1008,7 @@ function dayRowFieldsHtml(shiftTypeId, fieldValues = {}, writable = true) {
   if (!type?.fields.length) return '';
   const disabledAttr = writable ? '' : ' disabled';
   return '<div class="schedule-day-row-fields" data-day-row-fields>' + type.fields.map((field) =>
-    formField(field.name, '<input class="input" data-field-value="' + field.id + '" maxlength="500" value="' + esc(fieldValues[field.id] ?? '') + '"' + disabledAttr + '>')
+    formField(field.name, '<input class="form-input" data-field-value="' + field.id + '" maxlength="500" value="' + esc(fieldValues[field.id] ?? '') + '"' + disabledAttr + '>')
   ).join('') + '</div>';
 }
 
@@ -1016,7 +1016,7 @@ function dayRowHtml(position, shiftTypeId, writable, fieldValues = {}) {
   const remove = writable ? rowActionHtml({ icon: 'x', action: 'remove-pattern-day-row', label: t('schedule.removeCycleDayShift', { day: position + 1 }) }) : '';
   const disabledAttr = writable ? '' : ' disabled';
   return '<div class="schedule-day-row" data-day-row>'
-    + '<div class="schedule-day-row__main"><select class="input" data-day="' + position + '"' + disabledAttr + '>' + typeOptions(shiftTypeId) + '</select>' + remove + '</div>'
+    + '<div class="schedule-day-row__main"><select class="form-input" data-day="' + position + '"' + disabledAttr + '>' + typeOptions(shiftTypeId) + '</select>' + remove + '</div>'
     + dayRowFieldsHtml(shiftTypeId, fieldValues, writable)
     + '</div>';
 }
@@ -1041,7 +1041,7 @@ function dayGroupHtml(position, classes, writable, { anchor, cycleLength, validF
   const rows = (classes ?? [{ shiftTypeId: null, fieldValues: {} }]).map((day) => dayRowHtml(position, day.shiftTypeId, writable, day.fieldValues)).join('');
   const add = writable ? '<button type="button" class="btn btn--secondary" data-action="add-pattern-day-row" data-position="' + position + '">' + esc(t('common.add')) + '</button>' : '';
   const label = cycleDayHeaderLabel(anchor, cycleLength, validFrom, validUntil, position + 1);
-  return '<div class="form-field schedule-day-group" data-day-group="' + position + '"><span class="label" data-day-group-label>' + esc(label) + '</span><div class="schedule-day-rows">' + rows + '</div>' + add + '</div>';
+  return '<div class="form-field schedule-day-group" data-day-group="' + position + '"><span class="form-label" data-day-group-label>' + esc(label) + '</span><div class="schedule-day-rows">' + rows + '</div>' + add + '</div>';
 }
 
 function patternDaysEditorHtml(pattern, writable) {
@@ -1288,8 +1288,8 @@ function renderStatistics() {
   if (summary.freeDays) countItems.push({ type: { name: t('schedule.freeDays'), short_code: '', color: 'var(--color-text-secondary)' }, count: summary.freeDays, minutes: 0, hasHours: false });
   const hourItems = summary.values.filter((item) => item.hasHours);
   const controls = range === 'months'
-    ? formField(t('schedule.monthFrom'), '<input class="input" required type="month" name="month_from" value="' + esc(statistics.monthFrom || monthKey()) + '">')
-      + formField(t('schedule.monthTo'), '<input class="input" required type="month" name="month_to" value="' + esc(statistics.monthTo || monthKey()) + '">')
+    ? formField(t('schedule.monthFrom'), '<input class="form-input" required type="month" name="month_from" value="' + esc(statistics.monthFrom || monthKey()) + '">')
+      + formField(t('schedule.monthTo'), '<input class="form-input" required type="month" name="month_to" value="' + esc(statistics.monthTo || monthKey()) + '">')
     : range === 'custom'
       // S-06: "Valid from/until" ist Muster-Vokabular (patternFields() oben) -
       // ein Berichtszeitraum ist kein Gueltigkeitsfenster. rangeFrom/rangeTo
@@ -1342,8 +1342,8 @@ function renderStatistics() {
     // Uebersicht/Kalender/Dashboard-Kachel brauchen genau das, absichtlich
     // haushaltweit) - diese Auswahl versteckt nur die bequeme Auswertungs-
     // Zusammenfassung fuer fremde Konten, sie sperrt keine Rohdaten.
-    + formField(t('schedule.owner'), '<select class="input" required name="user_id">' + userOptions(canManageOthers ? selectedUser : currentUserId) + '</select>')
-    + '<div class="form-field schedule-stat-range"><span class="label">' + esc(t('schedule.statisticsRange')) + '</span><div class="segmented schedule-stat-range__choices" role="group" aria-label="' + esc(t('schedule.statisticsRange')) + '">'
+    + formField(t('schedule.owner'), '<select class="form-input" required name="user_id">' + userOptions(canManageOthers ? selectedUser : currentUserId) + '</select>')
+    + '<div class="form-field schedule-stat-range"><span class="form-label">' + esc(t('schedule.statisticsRange')) + '</span><div class="segmented schedule-stat-range__choices" role="group" aria-label="' + esc(t('schedule.statisticsRange')) + '">'
     + STATISTICS_RANGES.map(([value, label]) => '<button type="button" class="segmented__item' + (range === value ? ' is-active' : '') + '" data-action="statistics-range" data-range="' + value + '" aria-pressed="' + (range === value ? 'true' : 'false') + '">' + esc(t(label)) + '</button>').join('')
     + '</div>'
     // R9 M11: dieselbe Wahl als Auswahlfeld fuer ein schmales Feld. Drei
@@ -1352,7 +1352,7 @@ function renderStatistics() {
     // Formen sichtbar ist, entscheidet die Breite des Felds (schedule.css,
     // Container `schedule-stat-range`), nicht das Fenster - die unsichtbare ist
     // `display: none` und damit auch fuer Screenreader weg.
-    + '<select class="input schedule-stat-range__select" name="statistics_range" aria-label="' + esc(t('schedule.statisticsRange')) + '">'
+    + '<select class="form-input schedule-stat-range__select" name="statistics_range" aria-label="' + esc(t('schedule.statisticsRange')) + '">'
     + STATISTICS_RANGES.map(([value, label]) => '<option value="' + value + '"' + (range === value ? ' selected' : '') + '>' + esc(t(label)) + '</option>').join('')
     + '</select></div>' + (controls ? '<div class="schedule-stat-dates">' + controls + '</div>' : '')
     + '<div class="schedule-stat-filter-actions"><button class="btn btn--primary">' + esc(t('schedule.applyStatistics')) + '</button>'
@@ -2148,11 +2148,11 @@ function openOverrideEditModal(group) {
     + '<input type="hidden" name="user_id" value="' + esc(String(group.user_id)) + '">'
     + '<input type="hidden" name="original_from" value="' + esc(group.from) + '">'
     + '<input type="hidden" name="original_to" value="' + esc(group.to) + '">'
-    + formField(t('schedule.owner'), '<input class="input" readonly value="' + esc(userName(group.user_id)) + '">')
+    + formField(t('schedule.owner'), '<input class="form-input" readonly value="' + esc(userName(group.user_id)) + '">')
     + formField(t('schedule.rangeFrom'), '<yuvomi-datepicker required name="from" type="date" label="' + esc(t('schedule.rangeFrom')) + '" value="' + esc(group.from) + '"></yuvomi-datepicker>')
     + formField(t('schedule.rangeTo'), '<yuvomi-datepicker required name="to" type="date" label="' + esc(t('schedule.rangeTo')) + '" value="' + esc(group.to) + '"></yuvomi-datepicker>')
-    + formField(t('schedule.shiftType'), '<select class="input" name="shift_type_id">' + typeOptions(type?.id ?? null) + '</select>')
-    + formField(t('schedule.note'), '<input class="input" name="note" maxlength="5000" value="' + esc(group.note ?? '') + '">')
+    + formField(t('schedule.shiftType'), '<select class="form-input" name="shift_type_id">' + typeOptions(type?.id ?? null) + '</select>')
+    + formField(t('schedule.note'), '<input class="form-input" name="note" maxlength="5000" value="' + esc(group.note ?? '') + '">')
     + dayRowFieldsHtml(type?.id ?? null, group.field_values)
     + '<div class="modal-panel__footer modal-panel__footer--plain"><button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.cancel')) + '</button><button type="submit" class="btn btn--primary">' + esc(t('schedule.save')) + '</button></div></form>';
   openModal({
@@ -2205,11 +2205,11 @@ function openExtraGroupEditModal(group) {
   const content = '<form id="schedule-create-form" class="form-stack schedule-modal-form" data-form="extra-edit-range">'
     + '<input type="hidden" name="ids" value="' + esc(group.ids.join(',')) + '">'
     + '<input type="hidden" name="user_id" value="' + esc(String(group.user_id)) + '">'
-    + formField(t('schedule.owner'), '<input class="input" readonly value="' + esc(userName(group.user_id)) + '">')
+    + formField(t('schedule.owner'), '<input class="form-input" readonly value="' + esc(userName(group.user_id)) + '">')
     + formField(t('schedule.rangeFrom'), '<yuvomi-datepicker required name="from" type="date" label="' + esc(t('schedule.rangeFrom')) + '" value="' + esc(group.from) + '"></yuvomi-datepicker>')
     + formField(t('schedule.rangeTo'), '<yuvomi-datepicker required name="to" type="date" label="' + esc(t('schedule.rangeTo')) + '" value="' + esc(group.to) + '"></yuvomi-datepicker>')
-    + formField(t('schedule.shiftType'), '<select class="input" required name="shift_type_id">' + typeOptions(group.shift_type_id, false) + '</select>')
-    + formField(t('schedule.note'), '<input class="input" name="note" maxlength="5000" value="' + esc(group.note ?? '') + '">')
+    + formField(t('schedule.shiftType'), '<select class="form-input" required name="shift_type_id">' + typeOptions(group.shift_type_id, false) + '</select>')
+    + formField(t('schedule.note'), '<input class="form-input" name="note" maxlength="5000" value="' + esc(group.note ?? '') + '">')
     + reminderOffsetField(group.reminder_offset_minutes)
     + dayRowFieldsHtml(group.shift_type_id, group.field_values)
     + '<div class="modal-panel__footer modal-panel__footer--plain"><button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.cancel')) + '</button><button type="submit" class="btn btn--primary">' + esc(t('schedule.save')) + '</button></div></form>';
@@ -2234,7 +2234,7 @@ function openScheduleCreateModal(view, { mode = 'pattern' } = {}) {
   if (view === 'shifts') {
     title = t('schedule.createShiftType');
     content = '<form id="schedule-create-form" class="form-stack schedule-modal-form" data-form="shift-create">'
-      + formField(t('schedule.preset'), '<select class="input" name="shift_preset">' + shiftPresetOptions() + '</select>')
+      + formField(t('schedule.preset'), '<select class="form-input" name="shift_preset">' + shiftPresetOptions() + '</select>')
       + shiftFields()
       + '<div class="modal-panel__footer modal-panel__footer--plain"><button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.cancel')) + '</button><button type="submit" class="btn btn--primary">' + esc(t('common.add')) + '</button></div></form>';
   } else if (view === 'patterns') {
@@ -2254,7 +2254,7 @@ function openScheduleCreateModal(view, { mode = 'pattern' } = {}) {
     title = t('schedule.addEntry');
     const modes = [['pattern', 'schedule.pattern'], ['replace', 'schedule.override'], ['add', 'schedule.extraBadgeLabel']];
     content = '<form id="schedule-create-form" class="form-stack schedule-modal-form" data-form="pattern-create">'
-      + formField(t('schedule.owner'), '<select class="input" required name="user_id">' + userOptions(selectedOwner()) + '</select>')
+      + formField(t('schedule.owner'), '<select class="form-input" required name="user_id">' + userOptions(selectedOwner()) + '</select>')
       // data-dirty-ignore (S-14): merely switching the segmented Pattern/
       // Override/Extra control rewrites this hidden value - without the
       // opt-out, modal.js's dirty guard read that as a real change and
@@ -2278,13 +2278,13 @@ function openScheduleCreateModal(view, { mode = 'pattern' } = {}) {
       + '<fieldset data-field="one-time-shared"' + (mode === 'pattern' ? ' hidden disabled' : '') + '>'
       + formField(t('schedule.rangeFrom'), '<yuvomi-datepicker name="range_from" type="date" label="' + esc(t('schedule.rangeFrom')) + '" value="' + esc(todayKey()) + '"></yuvomi-datepicker>')
       + formField(t('schedule.rangeTo'), '<yuvomi-datepicker name="range_to" type="date" label="' + esc(t('schedule.rangeTo')) + '" value="' + esc(todayKey()) + '"></yuvomi-datepicker>')
-      + formField(t('schedule.note'), '<input class="input" name="note" maxlength="5000">')
+      + formField(t('schedule.note'), '<input class="form-input" name="note" maxlength="5000">')
       + '</fieldset>'
       // Zwei Auswahlfelder, nicht eins: ein Override darf frei sein (NULL,
       // schedule_overrides.shift_type_id ist nullable), ein Extra nicht
       // (schedule_extra_shifts.shift_type_id ist NOT NULL) - deshalb traegt
       // nur die Ersetzen-Variante die Option "Freier Tag".
-      + '<fieldset data-field="mode-replace"' + (mode === 'replace' ? '' : ' hidden disabled') + '>' + formField(t('schedule.shiftType'), '<select class="input" name="shift_type_id">' + typeOptions(null) + '</select>') + '</fieldset>'
+      + '<fieldset data-field="mode-replace"' + (mode === 'replace' ? '' : ' hidden disabled') + '>' + formField(t('schedule.shiftType'), '<select class="form-input" name="shift_type_id">' + typeOptions(null) + '</select>') + '</fieldset>'
       // Anders als "Ersetzen" (dessen freier Tag defaultet, also nie eigene
       // Felder traegt) waehlt ein natives <select> ohne `includeFree` und ohne
       // explizit markierte Auswahl (typeOptions(null, false)) schon selbst den
@@ -2304,7 +2304,7 @@ function openScheduleCreateModal(view, { mode = 'pattern' } = {}) {
       // (updateAddModeAvailability() unten) - kein einziger Weg mehr zu einem
       // Absenden ohne Typ.
       + '<fieldset data-field="mode-add"' + (mode === 'add' ? '' : ' hidden disabled') + '>' + (state.types.length
-        ? formField(t('schedule.shiftType'), '<select class="input" required name="shift_type_id">' + typeOptions(null, false) + '</select>')
+        ? formField(t('schedule.shiftType'), '<select class="form-input" required name="shift_type_id">' + typeOptions(null, false) + '</select>')
         : '<p class="form-hint schedule-no-types-hint">' + esc(t('schedule.noShiftTypesHint')) + '</p>')
       + reminderOffsetField(null) + dayRowFieldsHtml(state.types[0]?.id ?? null) + '</fieldset>'
       + '<div class="modal-panel__footer modal-panel__footer--plain"><button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.cancel')) + '</button><button type="submit" class="btn btn--primary" data-role="save-entry">' + esc(t('common.add')) + '</button></div></form>';
@@ -2541,7 +2541,7 @@ function openCustomFieldModal(field = null) {
     title: isEdit ? t('schedule.editCustomField') : t('schedule.createCustomField'),
     size: 'sm',
     content: '<form id="schedule-custom-field-form" class="form-stack schedule-modal-form">'
-      + formField(t('schedule.fieldName'), '<input class="input" required name="name" maxlength="100" value="' + esc(field?.name ?? '') + '">')
+      + formField(t('schedule.fieldName'), '<input class="form-input" required name="name" maxlength="100" value="' + esc(field?.name ?? '') + '">')
       + '<div class="modal-panel__footer modal-panel__footer--plain"><button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.cancel')) + '</button><button type="submit" class="btn btn--primary">' + esc(t(isEdit ? 'schedule.save' : 'common.add')) + '</button></div></form>',
     onSave: (modal) => {
       modal.querySelector('#schedule-custom-field-form')?.addEventListener('submit', (event) => saveCustomField(event, field?.id ?? null));
@@ -2721,7 +2721,7 @@ async function saveShiftTypeEdit(event) {
 function openPatternEditModal(pattern) {
   const writable = canWrite(pattern.user_id);
   const content = '<form id="schedule-edit-form" class="form-stack schedule-modal-form" data-form="pattern-update" data-id="' + pattern.id + '">'
-    + formField(t('schedule.owner'), '<input class="input" readonly value="' + esc(userName(pattern.user_id)) + '">')
+    + formField(t('schedule.owner'), '<input class="form-input" readonly value="' + esc(userName(pattern.user_id)) + '">')
     + '<fieldset class="schedule-pattern-fields" data-field="pattern-fields"' + (writable ? '' : ' disabled') + '>' + patternFields(pattern) + '</fieldset>'
     + patternDaysEditorHtml(pattern, writable)
     + '<div class="modal-panel__footer modal-panel__footer--plain"><button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t(writable ? 'common.cancel' : 'common.close')) + '</button>'

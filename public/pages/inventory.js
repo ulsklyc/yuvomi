@@ -1940,7 +1940,7 @@ function buildItemForm({ mode, item = null }) {
         <label class="form-label" for="inv-name">${esc(t('common.nameLabel'))}${REQUIRED_MARK}</label>
         <input id="inv-name" class="form-input" type="text" required placeholder="${esc(t('inventory.namePlaceholder'))}">
       </div>
-      <div class="inventory-form-row">
+      <div class="form-pair form-pair--wide">
         <div class="form-group">
           <label class="form-label" for="inv-category">${esc(t('inventory.categoryLabel'))}</label>
           <select id="inv-category" class="form-input">${categoryOptions}</select>
@@ -1950,7 +1950,7 @@ function buildItemForm({ mode, item = null }) {
           <select id="inv-location" class="form-input">${locationOptions.join('')}</select>
         </div>
       </div>
-      <div class="inventory-form-row">
+      <div class="form-pair form-pair--wide">
         <div class="form-group">
           <label class="form-label" for="inv-purchase-date">${esc(t('inventory.purchaseDateLabel'))}</label>
           <yuvomi-datepicker id="inv-purchase-date" type="date"
@@ -2001,7 +2001,7 @@ function buildItemForm({ mode, item = null }) {
             </div>
           </div>
         </div>
-        <div class="inventory-form-row">
+        <div class="form-pair form-pair--wide">
           <div class="form-group">
             <label class="form-label" for="inv-brand">${esc(t('inventory.brandLabel'))}</label>
             <input id="inv-brand" class="form-input" type="text">
@@ -2011,7 +2011,7 @@ function buildItemForm({ mode, item = null }) {
             <input id="inv-model" class="form-input" type="text">
           </div>
         </div>
-        <div class="inventory-form-row">
+        <div class="form-pair form-pair--wide">
           <div class="form-group">
             <label class="form-label" for="inv-serial">${esc(t('inventory.serialNumberLabel'))}</label>
             <input id="inv-serial" class="form-input" type="text">
@@ -2027,7 +2027,7 @@ function buildItemForm({ mode, item = null }) {
             <p class="form-hint">${esc(t('inventory.accountUsernameHint'))}</p>
           </div>
         </div>
-        <div class="inventory-form-row">
+        <div class="form-pair form-pair--wide">
           <div class="form-group">
             <label class="form-label" for="inv-warranty">${esc(t('inventory.warrantyMonthsLabel'))}</label>
             <input id="inv-warranty" class="form-input" type="number" min="0" max="600" step="1" inputmode="numeric">
@@ -2038,7 +2038,7 @@ function buildItemForm({ mode, item = null }) {
             <select id="inv-condition" class="form-input">${conditionOptions}</select>
           </div>
         </div>
-        <div class="inventory-form-row" id="inv-odometer-group" ${categoryTracksOdometer(isEdit ? item.category : 'other') ? '' : 'hidden'}>
+        <div class="form-pair form-pair--wide" id="inv-odometer-group" ${categoryTracksOdometer(isEdit ? item.category : 'other') ? '' : 'hidden'}>
           <div class="form-group">
             <label class="form-label" for="inv-odometer">${esc(t('inventory.odometerLabel'))}</label>
             <input id="inv-odometer" class="form-input" type="number" min="0" step="1" inputmode="numeric">

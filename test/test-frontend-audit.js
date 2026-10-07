@@ -20047,3 +20047,89 @@ test('R17 E12: der Rundgang beschreibt die untere Leiste, die es gibt - in jeder
   }
   assert.deepEqual(offenders, []);
 });
+
+// ── R17, E6: die Zwei-Felder-Zeile ist EINE geteilte Regel ──────────────────
+// Critique 2026-10-07 (A4 P2): der Artikel-Dialog des Einkaufs benutzte
+// `.pantry-form-row`, die nur in pantry.css stand - das Blatt ist im Einkauf
+// nicht geladen, also `display: block`, Menge/Kategorie und Preis/Laden
+// untereinander, Dialog 752px lang. inventory.css trug dieselbe Regel als
+// Kopie, "weil sich die Blaetter gegenseitig ausschliessen".
+test('R17 E6: die Zwei-Felder-Zeile steht einmal in layout.css, kein Modulblatt kopiert sie', () => {
+  const layout = [...eachRule(read('../public/styles/layout.css'))];
+  const pair = layout.find((r) => r.selector.trim() === '.form-pair' && !r.at.length);
+  assert.match(pair?.body ?? '', /grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(/, '.form-pair ist das auto-fit-Raster');
+  assert.ok(layout.some((r) => r.selector.trim() === '.form-pair[hidden]' && /display:\s*none/.test(r.body)),
+    '`hidden` muss gegen `display: grid` gewinnen (Kilometerstand im Inventar)');
+  assert.match(read('../public/index.html'), /styles\/layout\.css/, 'layout.css laedt auf jeder Seite');
+
+  const copies = [];
+  for (const file of readdirSync(new URL('../public/styles/', import.meta.url)).filter((f) => f.endsWith('.css') && f !== 'layout.css')) {
+    for (const rule of eachRule(read(`../public/styles/${file}`))) {
+      if (/form-row\s*$/.test(rule.selector.trim()) && /repeat\(auto-fit,\s*minmax\(/.test(rule.body)) copies.push(`${file}: ${rule.selector.trim()}`);
+    }
+  }
+  assert.deepEqual(copies, [], 'eine geteilte Klasse gehoert in ein Blatt, das index.html verlinkt - keine Kopie je Modul');
+
+  // Die drei Formulare, die sie brauchen, tragen sie - am gerenderten Attribut.
+  for (const [page, min] of [['shopping', 2], ['pantry', 2], ['inventory', 6]]) {
+    const src = withoutCommentsKeepingLines(read(`../public/pages/${page}.js`));
+    const rows = [...src.matchAll(/class="([^"]*)"/g)].filter((m) => m[1].split(/\s+/).includes('form-pair'));
+    assert.ok(rows.length >= min, `${page}.js: ${rows.length} Zwei-Felder-Zeilen mit .form-pair`);
+    assert.doesNotMatch(src, /class="[^"]*\b(?:pantry|inventory)-form-row\b/, `${page}.js traegt keine Modulklasse fuer die Zeile mehr`);
+  }
+});
+
+// ── R17, E6: EIN Feldsatz in Dialogen ───────────────────────────────────────
+// Critique 2026-10-07 (A5 P2, A2 P2): die Dialoge der Aufteilung schrieben
+// `<label>Text<input class="input">` (Label 16px primaer, Betrag 42px/16/500,
+// kein Pflicht-Stern trotz `required`) neben dem Budget-Eintrag mit
+// `.form-label` 14px sekundaer, `.budget-amount-input` 48px/20/600 und Stern.
+// `.input`/`.label` sind Aliasse derselben Regel (layout.css); kanonisch ist
+// `.form-input`/`.form-label`. Umgestellt sind Aufteilung und Schichtplan -
+// die uebrigen Dateien stehen als Arbeitsvorrat in ALIAS_PENDING, und die
+// Liste darf nur schrumpfen.
+const ALIAS_PENDING = new Set([
+  '../public/pages/health.js', '../public/pages/tasks.js', '../public/pages/documents.js',
+  '../public/pages/rewards.js', '../public/pages/calendar.js', '../public/pages/setup.js',
+  '../public/pages/join.js', '../public/pages/login.js', '../public/pages/reset-password.js',
+  '../public/pages/forgot-password.js', '../public/components/user-multi-select.js',
+  '../public/components/tag-manager.js', '../public/settings/pages/admin-email.js',
+  '../public/settings/pages/modules-health.js',
+]);
+
+test('R17 E6: Dialog-Markup traegt `.form-label`/`.form-input`, nicht die Alias-Klassen', () => {
+  assert.deepEqual(aliasFieldClasses('<label class="label" for="x">a</label><input class="input wide">'), ['label', 'input wide'],
+    'Gegenfall: der Scanner sieht die Alias-Klassen');
+  assert.deepEqual(aliasFieldClasses('<span class="form-label">a</span><input class="form-input input-group__field">'), [],
+    'und nur sie - kein Treffer auf Namen, die das Wort nur enthalten');
+  const offenders = [];
+  const cleared = [];
+  for (const path of DIALOG_SOURCES) {
+    const count = aliasFieldClasses(dialogSource(path)).length;
+    if (count && !ALIAS_PENDING.has(path)) offenders.push(`${path}: ${count}`);
+    if (!count && ALIAS_PENDING.has(path)) cleared.push(path);
+  }
+  assert.deepEqual(offenders, [], 'neuer Code schreibt `.form-input`/`.form-label`');
+  assert.deepEqual(cleared, [], 'umgestellt - dann raus aus ALIAS_PENDING, sonst wird die Liste eine Allowlist');
+});
+
+test('R17 E6: die Dialoge der Aufteilung tragen Label, Stern und Betrag des Budget-Eintrags', () => {
+  const src = dialogSource('../public/pages/split-expenses.js');
+  assert.doesNotMatch(src, /<label>\$\{t\(/, 'kein nacktes <label>Text<input> mehr');
+  const fields = [...src.matchAll(/<label class="form-field">([\s\S]*?)<\/label>/g)].map((m) => m[1]);
+  assert.ok(fields.length >= 30, `die Felder der Dialoge (${fields.length})`);
+  const controlOf = (field) => field.slice(field.indexOf('</span>'));
+  const tagOf = (field) => controlOf(field).match(/<(?:input|select|textarea|yuvomi-datepicker)\b[^>]*>/)?.[0] ?? '';
+  for (const field of fields) {
+    assert.match(field, /^<span class="form-label">\$\{t\('[^']+'\)\}/, `das Label ist .form-label: ${field.slice(0, 80)}`);
+    const required = /\srequired(?=[\s>])/.test(tagOf(field));
+    const star = field.slice(0, field.indexOf('</span>')).includes('${REQUIRED_MARK}');
+    assert.equal(star, required, `Stern genau am Pflichtfeld: ${field.slice(0, 90)}`);
+  }
+  const amounts = fields.filter((field) => /name="amount"/.test(tagOf(field)));
+  assert.equal(amounts.length, 3, 'Ausgabe, Serie und Zahlung haben je ein Betragsfeld');
+  for (const field of amounts) {
+    assert.match(tagOf(field), /class="form-input budget-amount-input"/, 'der Betrag ist 48px/20/600 wie im Budget-Eintrag');
+  }
+  assert.match(read('../public/styles/budget.css'), /\.budget-amount-input\s*\{[^}]*font-size:\s*var\(--text-xl\)/);
+});

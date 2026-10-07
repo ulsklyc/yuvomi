@@ -592,9 +592,13 @@ test('der Bearbeiten-Dialog zeigt die Menge eines noch entprellten Schritts - au
 // Zeile, der Koerper lief 1053px bei 591px sichtbar.
 test('Vorrats-Sheet: Menge und Einheit stehen mobil nebeneinander', async () => {
   const { eachRule } = await import('./css-rules.js');
-  const css = readFileSync(new URL('../public/styles/pantry.css', import.meta.url), 'utf8');
-  const row = [...eachRule(css)].find((r) => r.selector.trim() === '.pantry-form-row' && !r.at.length);
-  const min = /minmax\((\d+(?:\.\d+)?)rem,\s*1fr\)/.exec(row?.body ?? '');
+  // Seit R17 (E6) steht die Zeile geteilt in layout.css (`.form-pair`); die
+  // Untergrenze ist der Rueckfallwert der Variable, die `--wide` anhebt.
+  const css = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const row = [...eachRule(css)].find((r) => r.selector.trim() === '.form-pair' && !r.at.length);
+  const min = /minmax\(var\(--form-pair-min,\s*(\d+(?:\.\d+)?)rem\),\s*1fr\)/.exec(row?.body ?? '');
+  const page = readFileSync(new URL('../public/pages/pantry.js', import.meta.url), 'utf8');
+  assert.match(page, /<div class="form-pair">/, 'das Vorrats-Formular nutzt die geteilte Zeile');
   assert.ok(min, 'die Zeile bleibt ein auto-fit-Raster mit rem-Untergrenze');
   // Sheet 364px, Innenabstand 2x16, Luecke 12: zwei Spalten brauchen 2*min*16 + 12 <= 332.
   assert.ok(2 * Number(min[1]) * 16 + 12 <= 332, `minmax(${min[1]}rem) passt im 364px-Sheet nicht zweispaltig`);

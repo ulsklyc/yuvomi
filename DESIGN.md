@@ -2026,6 +2026,18 @@ nur das gerenderte Dokument sieht, ob eine Liste ueberhaupt verdrahtet ist.
   Kanonisch fuer neuen Code ist `.form-input` - der Name, den `.form-group`/`.form-field`/
   `.form-label` schon fuehren. Bestand bleibt unangetastet, Umbenennen aller Fundstellen ist
   keine Migration wert.
+- **Zwei Felder nebeneinander:** `.form-pair` (layout.css, R17 E6) - `auto-fit` mit 8rem
+  Untergrenze, misst das Modal; `--wide` (11rem) fuer Datumsfelder (Inventar). Bis R17 stand die
+  Regel als `.pantry-form-row` in pantry.css und kopiert als `.inventory-form-row`; der
+  Artikel-Dialog des Einkaufs benutzte die Vorratsklasse, deren Blatt dort nicht laedt (Dialog
+  mobil 748 -> 563px). Kein Modulblatt kopiert die Zeile (`test:frontend-audit`).
+- **Feldsatz in Dialogen (R17, E6):** `<label class="form-field">` mit `.form-label` (14px
+  sekundaer) + `.form-input`; Pflichtfeld = `${REQUIRED_MARK}` am Label; ein Geldbetrag traegt
+  `.budget-amount-input` (48px/20/600), sein Nachbar in der Zeile dieselbe Hoehe. Die Dialoge der
+  Aufteilung folgen dem seit R17 (vorher `<label>Text<input class="input">`, Label 16px primaer,
+  Betrag 42px/16/500, kein Stern), der Schichtplan schreibt die Kanon-Klassen. Wochentage sind
+  `.filter-chip` mit `aria-pressed`, ein Boolean im Dialog ist `.toggle` (Termin der Entsorgung).
+  Die uebrigen Dateien mit `.input`/`.label` fuehrt `ALIAS_PENDING` in `test:frontend-audit`.
 - **Hinweiszeile:** `.form-hint` (14px, Sekundaertext, Tonlagen `--success`/`--danger`) steht
   in layout.css, weil fast jedes Modul sie benutzt - bis 2026-09-24 lebte sie in settings.css
   und renderte ueberall sonst als 16px-Koerpertext. Eine geteilte Klasse gehoert in ein Blatt,

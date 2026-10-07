@@ -147,7 +147,7 @@
 }
 
 .schedule-form > .form-field,
-.schedule-form .input,
+.schedule-form .form-input,
 .schedule-actions > .btn {
   min-width: 0;
   max-width: 100%;
@@ -263,7 +263,7 @@
   align-items: center;
 }
 
-.schedule-day-row__main .input {
+.schedule-day-row__main .form-input {
   flex: 1;
   min-width: 0;
 }
@@ -318,7 +318,7 @@
   margin-bottom: var(--space-2);
 }
 
-.schedule-type-field-add .input {
+.schedule-type-field-add .form-input {
   flex: 1;
   min-width: 0;
 }
@@ -608,7 +608,7 @@
 
 /* Eine Stundenzahl ist drei Ziffern breit, nicht die ganze Karte: das Feld
  * lief am Desktop 1116px weit (Re-Critique 2026-09-27, A2 P1). */
-.schedule-reminder-settings__row--hours .input {
+.schedule-reminder-settings__row--hours .form-input {
   inline-size: 10ch;
   flex: 0 0 auto;
 }
@@ -696,8 +696,8 @@
     grid-column: auto;
   }
 
-  .schedule-stat-filters > :first-child > .label,
-  .schedule-stat-range > .label {
+  .schedule-stat-filters > :first-child > .form-label,
+  .schedule-stat-range > .form-label {
     position: absolute;
     width: 1px;
     height: 1px;

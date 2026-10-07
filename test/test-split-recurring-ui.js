@@ -644,7 +644,7 @@ test('Ein ausgetretener Zahler bleibt vorbelegt und gekennzeichnet; gespeichert 
   const zahlerWeg = serie(52, { payer_id: 9, payer_name: 'Zoe <b>', blocked_reason: 'not_a_member' });
   await buehne({ recurring: [zahlerWeg] }, async (spur) => {
     const { panel, felder, setze } = offenerDialog(spur, zahlerWeg);
-    const auswahl = spur.dialoge[0].content.match(/<select class="input" name="payer_id">([\s\S]*?)<\/select>/)[1];
+    const auswahl = spur.dialoge[0].content.match(/<select class="form-input" name="payer_id">([\s\S]*?)<\/select>/)[1];
     assert.match(auswahl, /^<option value="9" selected>Zoe &lt;b&gt; \(settings\.memberFormerBadge\)<\/option>/, 'er steht zuerst und ist gewaehlt');
     assert.equal((auswahl.match(/ selected/g) ?? []).length, 1, 'kein Mitglied ist daneben vorgewaehlt');
 

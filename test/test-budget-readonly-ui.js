@@ -1446,6 +1446,8 @@ test('Darlehen: der Bericht zeigt jeden Wert des Darlehens-Dialogs, den Karte un
       'budget.loanNotesLabel': [[/Sondertilgung &lt;jaehrlich&gt;<\/textarea>/], /^Sondertilgung <jaehrlich>$/],
     };
     const editor = withAccess({ budget: 'write' }, () => modalOptionen(() => budget.openLoanModal(loan)));
+    // R17 (E6): achtzehn Felder gehoeren ins 520er-Panel, nicht ins 400er-Blatt.
+    assert.equal(editor.size, 'md', 'der Darlehen-Dialog oeffnet im 520px-Panel');
     const html = budget.loanReportDetails(loan);
     jederWert(werte, editor.content, berichtKacheln(html), 'Darlehen');
     assert.match(html, /Sondertilgung &lt;jaehrlich&gt;/, 'die Notiz geht durch esc()');

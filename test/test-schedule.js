@@ -2292,9 +2292,9 @@ test('a read-only Schedule member can still save their own reminder offset and w
 
 test('the Statistics owner select is self-only for non-admins, full list for admins (S-13)', () => {
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
-  assert.match(schedulePage, /formField\(t\('schedule\.owner'\), '<select class="input" required name="user_id">' \+ userOptions\(canManageOthers \? selectedUser : currentUserId\) \+ '<\/select>'\)/);
+  assert.match(schedulePage, /formField\(t\('schedule\.owner'\), '<select class="form-input" required name="user_id">' \+ userOptions\(canManageOthers \? selectedUser : currentUserId\) \+ '<\/select>'\)/);
   // Must NOT be the raw, unfiltered state.users list anymore (the original finding).
-  assert.ok(!schedulePage.includes("formField(t('schedule.owner'), '<select class=\"input\" required name=\"user_id\">' + state.users.map"));
+  assert.ok(!schedulePage.includes("formField(t('schedule.owner'), '<select class=\"form-input\" required name=\"user_id\">' + state.users.map"));
 });
 
 test('the shift-type preset picker groups presets by template, respecting the household template toggles (S-22)', () => {
@@ -2477,7 +2477,7 @@ test('statistics range: a narrow field shows a select with the same choices inst
 
   // Both forms render from ONE list and switch through ONE setter.
   const render = schedulePage.slice(schedulePage.indexOf('function renderStatistics('), schedulePage.indexOf('function emptyPatternState('));
-  assert.match(render, /class="input schedule-stat-range__select"[^>]*aria-label="' \+ esc\(t\('schedule\.statisticsRange'\)\)/);
+  assert.match(render, /class="form-input schedule-stat-range__select"[^>]*aria-label="' \+ esc\(t\('schedule\.statisticsRange'\)\)/);
   assert.equal((render.match(/STATISTICS_RANGES\.map\(/g) ?? []).length, 2, 'segment and select must both be built from STATISTICS_RANGES');
 });
 
@@ -2604,12 +2604,12 @@ test('jedes Feld der Schichtplan-Dialoge hat einen zugaenglichen Namen (A2 P1-1)
   globalThis.__advancedSection = (inner) => inner;
   try {
     const html = [
-      __test.formField('Vorlage', '<select class="input" name="shift_preset"><option>x</option></select>'),
+      __test.formField('Vorlage', '<select class="form-input" name="shift_preset"><option>x</option></select>'),
       __test.shiftFields({}),
       __test.patternFields({}),
       __test.reminderOffsetField(null),
-      __test.formField('Raum', '<input class="input" data-field-value="3" data-id="9" maxlength="500" value="">'),
-      __test.formField('Notiz', '<textarea class="input" name="note"></textarea>'),
+      __test.formField('Raum', '<input class="form-input" data-field-value="3" data-id="9" maxlength="500" value="">'),
+      __test.formField('Notiz', '<textarea class="form-input" name="note"></textarea>'),
     ].join('');
     const ids = new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
     const labelled = new Set([...html.matchAll(/<label\b[^>]*\sfor="([^"]+)"/g)].map((m) => m[1]));
@@ -2787,6 +2787,6 @@ test('R16: Vergleich und Auswertung tragen mobil zwei Bedienzeilen', async () =>
   const narrow = at(/max-width:\s*639px/);
   assert.match(body(narrow, '.schedule-stat-filters'), /grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/,
     'Person und Zeitraum stehen nebeneinander');
-  const labels = narrow.find((r) => r.selector.includes('.schedule-stat-range > .label'));
+  const labels = narrow.find((r) => r.selector.includes('.schedule-stat-range > .form-label'));
   assert.match(labels?.body ?? '', /clip-path:\s*inset\(50%\)/, 'die Feld-Labels bleiben im Baum');
 });

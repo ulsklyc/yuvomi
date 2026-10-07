@@ -1106,13 +1106,39 @@ function openTypeModal(type = null) {
 // Schedule modal
 // -------------------------------------------------------------------------
 
+/* Wochentage als Chips (R17, E6): bis dahin sieben rohe 13x13-Checkboxen in
+ * 31px hohen Labels. Jetzt der Chip des Kanons (`.filter-chip`, `aria-pressed`)
+ * in einer benannten Gruppe; der gewaehlte Stand steht zusaetzlich in einem
+ * versteckten Feld, damit der Verwerfen-Schutz des Dialogs die Aenderung sieht.
+ * `weekdayPickerValue()` liest die Chips, `wireWeekdayPicker()` schaltet sie. */
 function weekdayPickerHtml(selected) {
   const set = new Set(String(selected ?? '').split(',').filter(Boolean));
-  return `<div class="waste-weekday-picker">${WEEKDAY_CODES.map((code) => `
-    <label class="waste-weekday-option">
-      <input type="checkbox" name="weekday" value="${code}"${set.has(code) ? ' checked' : ''}>
-      <span>${esc(t(WEEKDAY_LABEL_KEYS[code]))}</span>
-    </label>`).join('')}</div>`;
+  const chosen = WEEKDAY_CODES.filter((code) => set.has(code));
+  return `<div class="waste-weekday-picker" role="group" aria-labelledby="wsm-weekdays-label">${WEEKDAY_CODES.map((code) => `
+    <button type="button" class="filter-chip${set.has(code) ? ' filter-chip--active' : ''}" data-weekday="${code}"
+            aria-pressed="${set.has(code) ? 'true' : 'false'}">${esc(t(WEEKDAY_LABEL_KEYS[code]))}</button>`).join('')}
+    <input type="hidden" name="weekdays" value="${chosen.join(',')}"></div>`;
+}
+
+function weekdayPickerValue(root) {
+  return [...root.querySelectorAll('.waste-weekday-picker [data-weekday][aria-pressed="true"]')]
+    .map((el) => el.dataset.weekday);
+}
+
+function wireWeekdayPicker(root) {
+  const picker = root.querySelector('.waste-weekday-picker');
+  picker?.addEventListener('click', (event) => {
+    const chip = event.target.closest('[data-weekday]');
+    if (!chip) return;
+    const on = chip.getAttribute('aria-pressed') !== 'true';
+    chip.setAttribute('aria-pressed', on ? 'true' : 'false');
+    chip.classList.toggle('filter-chip--active', on);
+    const hidden = picker.querySelector('input[name="weekdays"]');
+    if (hidden) {
+      hidden.value = weekdayPickerValue(root).join(',');
+      hidden.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  });
 }
 
 /* `type` ist die Abfallart der Zeile, aus der der Dialog kommt. Vom
@@ -1141,7 +1167,7 @@ function openScheduleModal(type, schedule = null) {
       </select>
     </div>
     <div class="form-group" id="wsm-weekly-fields" ${kind === 'weekly' ? '' : 'hidden'}>
-      <label class="form-label">${t('waste.weekdaysLabel')}</label>
+      <span class="form-label" id="wsm-weekdays-label">${t('waste.weekdaysLabel')}</span>
       ${weekdayPickerHtml(schedule?.weekdays)}
     </div>
     <div class="form-group" id="wsm-monthly-fields" ${kind === 'monthly_fixed_day' ? '' : 'hidden'}>
@@ -1175,8 +1201,9 @@ function openScheduleModal(type, schedule = null) {
       <yuvomi-datepicker id="wsm-valid-until" name="valid_until" type="date" value="${esc(schedule?.valid_until ?? '')}"></yuvomi-datepicker>
     </div>
     <div class="form-group">
-      <label class="form-check">
+      <label class="toggle">
         <input type="checkbox" id="wsm-active"${schedule?.active === 0 ? '' : ' checked'}>
+        <span class="toggle__track"></span>
         <span>${t('waste.activeLabel')}</span>
       </label>
     </div>
@@ -1195,6 +1222,7 @@ function openScheduleModal(type, schedule = null) {
     onSave(panel) {
       panel.querySelector('#wsm-cancel').addEventListener('click', () => closeModal());
 
+      wireWeekdayPicker(panel);
       const kindSelect = panel.querySelector('#wsm-kind');
       const weeklyFields = panel.querySelector('#wsm-weekly-fields');
       const monthlyFields = panel.querySelector('#wsm-monthly-fields');
@@ -1247,7 +1275,7 @@ function openScheduleModal(type, schedule = null) {
         const typeId = typeSelect ? Number(typeSelect.value) : type.id;
         const body = { type_id: typeId, recurrence_kind: kindValue, anchor_date: anchor, interval, valid_until: validUntil, active };
         if (kindValue === 'weekly') {
-          body.weekdays = [...panel.querySelectorAll('input[name="weekday"]:checked')].map((el) => el.value);
+          body.weekdays = weekdayPickerValue(panel);
         } else if (kindValue === 'monthly_ordinal_weekday') {
           body.month_day = Number(ordinalPositionSelect.value);
           body.weekdays = ordinalWeekdaySelect.value;
@@ -2396,6 +2424,8 @@ export const __test = {
   // R17/E2: wann eine Abholung ist, was unter einer Abfallart ohne Termin
   // steht, und welche Abfallart der Termin-Dialog des Primaerknopfs vorschlaegt.
   pickupWhenLabel, typeWithoutScheduleLine, defaultScheduleType, occurrenceRowHtml,
+  // R17/E6: die Wochentage des Termin-Dialogs als Chips.
+  weekdayPickerHtml, weekdayPickerValue,
   findScheduleOrigin, parseDeepLinkParams, deepLinkSelectors, recurrenceSummary, originBadges,
   defaultLabelDecision, unresolvedBlockingDiagnostics, buildMappingDecisions, sourceHealthBadgeInfo,
   splitUpcomingByType, deepLinkNeedsExpand, nearestOrdinalAnchorDateKey,

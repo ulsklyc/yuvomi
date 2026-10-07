@@ -2144,7 +2144,7 @@ function openItemDetails(itemId, container) {
           <input class="form-input" type="text" id="item-details-name" required
                  value="${esc(item.name)}">
         </div>
-        <div class="pantry-form-row">
+        <div class="form-pair">
           <div class="form-group">
             <label class="form-label" for="item-details-qty">${t('shopping.itemQtyLabel')}</label>
             <input class="form-input" type="text" id="item-details-qty"
@@ -2167,7 +2167,7 @@ function openItemDetails(itemId, container) {
             * geoeffnet wird - nachtragen statt unterbrechen.
             *
             * Betont bei einem abgehakten Artikel: dann ist die Frage aktuell. */ ''}
-        <div class="pantry-form-row">
+        <div class="form-pair">
           <div class="form-group">
             <label class="form-label" for="item-details-price">${t('shopping.priceLabel')}</label>
             <input class="form-input" type="text" id="item-details-price" inputmode="decimal"
