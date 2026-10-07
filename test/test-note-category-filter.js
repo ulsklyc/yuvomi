@@ -348,10 +348,13 @@ test('notes UI keeps the approved category filter and editor contracts', () => {
     'all visible household categories must remain usable without management permission');
   assert.match(source, /renderNoteReadHtml\(note\.content, \{ live: true, categories:/);
   assert.match(source, /sr-only[^\n]*categoryScopeLabel/);
-  assert.match(source, /function renderNotesAndFilters\(\)[\s\S]*renderFilters\(\);[\s\S]*renderGrid\(\);/);
+  // Seit R17 (Listenbewegung) reicht die Funktion `{ motion }` an das Raster
+  // durch - die Regel ist die Reihenfolge Filter vor Raster, nicht die Klammer.
+  assert.match(source.match(/function renderNotesAndFilters\([^)]*\) \{[\s\S]*?\n\}/)?.[0] || '',
+    /renderFilters\(\);[\s\S]*renderGrid\(/);
   assert.match(source, /state\.filterCategoryIds\s*=\s*pruneMissingNoteCategoryIds\(/,
     'a fresh category catalog must discard filters deleted in another session');
-  assert.ok((source.match(/renderNotesAndFilters\(\);/g) || []).length >= 5,
+  assert.ok((source.match(/renderNotesAndFilters\((?:\{ motion: true \})?\);/g) || []).length >= 5,
     'initial load, save, reload, delete and undo must all refresh occupied category chips');
   assert.match(source.match(/async function reloadNotes\(\)[\s\S]*?\n\}/)?.[0] || '', /renderNotesAndFilters\(\)/);
   assert.match(css, /\.notes-filters[\s\S]*overflow-x:\s*auto/);
