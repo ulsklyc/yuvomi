@@ -22,14 +22,32 @@
  *    im Weg einer Anfrage: die erste Anfrage nach einer Datei geht wie bisher
  *    durch compression(), stoesst die Kompression im Hintergrund an (zlib
  *    rechnet im Threadpool, eine Datei nach der anderen), und jede weitere
- *    bekommt die fertige Fassung. Der Speicher waechst hoechstens um die 4,89 MB.
+ *    bekommt die fertige Fassung.
  *
  * Beides haengt an (Aenderungszeit, Groesse) der Datei: aendert sie sich im
  * laufenden Betrieb, werden Hash und Fassung neu gebildet.
+ *
+ * 3. DER SPEICHER HAT EINE GRENZE, UND SEIN SCHLUESSEL IST DIE DATEI. Diese
+ *    Dateien sind ohne Anmeldung abrufbar; was hier je Anfrage waechst, waechst
+ *    fuer jeden im Netz. Zuerst war der Schluessel der Pfad aus der Adresse und
+ *    die Obergrenze nur ein Satz im Kommentar ("hoechstens die 4,89 MB"). Ein
+ *    Pfad ist aber keine Datei: auf einem Dateisystem ohne Gross-/Klein-
+ *    schreibung sind /app.js, /App.js und /APP.JS dieselbe, und jeder Symlink
+ *    ist ein zweiter Name. Jede Schreibweise bekam einen eigenen Eintrag, einen
+ *    eigenen Hash-Lauf, einen Platz in der Schlange (bis 1,9 s Rechenzeit) und
+ *    eine eigene Kopie im Speicher - unbegrenzt. Deshalb:
+ *      - Schluessel ist der AUFGELOESTE Pfad (realpath). Der muss unter dem
+ *        aufgeloesten Wurzelverzeichnis liegen; ein Link nach draussen wird
+ *        hier weder gemerkt noch komprimiert.
+ *      - Zwei harte Grenzen, die nicht von einer Annahme ueber public/ leben:
+ *        MAX_STORED_BYTES fuer die Summe der Brotli-Fassungen (darueber liefert
+ *        compression() wie bisher) und MAX_ENTRIES fuer die gemerkten Dateien
+ *        (der aelteste Eintrag geht zuerst).
+ *    Guard: test:static-assets, Abschnitt 2b - gegen die Fassung davor rot.
  */
 
 import { createHash } from 'node:crypto';
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync, realpathSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { brotliCompress, constants as zlib } from 'node:zlib';
 
@@ -44,6 +62,15 @@ const MIN_BYTES = 1024;
 const BROTLI_QUALITY = 11;
 
 /**
+ * Obergrenzen des Speichers (siehe Kopf, Punkt 3). Die Textdateien unter
+ * public/ wiegen in Stufe 11 rund 4,9 MB und sind rund 330; beide Grenzen
+ * liegen eine Groessenordnung darueber und sind trotzdem klein gegen den
+ * Prozess. Sie sollen im Normalbetrieb nie greifen.
+ */
+const MAX_STORED_BYTES = 64 * 1024 * 1024;
+const MAX_ENTRIES = 4096;
+
+/**
  * @param {string} root - Verzeichnis, aus dem express.static ausliefert
  * @param {object} [options]
  * @param {boolean} [options.brotli=true] - `false` laesst nur den Inhalts-ETag
@@ -52,23 +79,71 @@ const BROTLI_QUALITY = 11;
  *   Content-Type sollen fuer beide Wege aus EINER Stelle kommen
  * @param {(buffer: Buffer, options: object, cb: Function) => void} [options.compress]
  *   fuer Tests austauschbar
+ * @param {number} [options.maxBytes] - Summe der Brotli-Fassungen im Speicher
+ * @param {number} [options.maxEntries] - Zahl der gemerkten Dateien
  */
-export function createStaticAssets(root, { brotli = true, setHeaders = () => {}, compress = brotliCompress } = {}) {
+export function createStaticAssets(root, {
+  brotli = true,
+  setHeaders = () => {},
+  compress = brotliCompress,
+  maxBytes = MAX_STORED_BYTES,
+  maxEntries = MAX_ENTRIES,
+} = {}) {
   const rootDir = path.resolve(root);
-  /** @type {Map<string, { mtimeMs: number, size: number, etag: string, br: Buffer|null, queued: boolean }>} */
+  // Auch die Wurzel aufloesen: unter macOS ist /tmp selbst ein Link, und der
+  // Vergleich unten muss zwei aufgeloeste Pfade nebeneinanderhalten.
+  const rootReal = realPath(rootDir) ?? rootDir;
+  /**
+   * Schluessel: der aufgeloeste Pfad der Datei, nie der aus der Adresse.
+   * @type {Map<string, { mtimeMs: number, size: number, etag: string, br: Buffer|null, queued: boolean, declined: boolean }>}
+   */
   const entries = new Map();
   const queue = [];
   let working = false;
+  let storedBytes = 0;
 
-  /** Der Eintrag zur Datei in ihrem JETZIGEN Stand; liest sie beim ersten Mal. */
-  function entryFor(filePath, stat) {
-    const known = entries.get(filePath);
+  function realPath(filePath) {
+    try {
+      return realpathSync.native(filePath);
+    } catch {
+      return null;
+    }
+  }
+
+  /** Der eine Name der Datei - oder null, wenn sie nicht unter der Wurzel liegt. */
+  function canonical(filePath) {
+    const real = realPath(filePath);
+    if (!real) return null;
+    if (real !== rootReal && !real.startsWith(rootReal + path.sep)) return null;
+    return real;
+  }
+
+  // Schwach (W/): derselbe ETag steht an der unkomprimierten und an jeder
+  // komprimierten Fassung, und die sind nicht bytegleich.
+  const hashOf = (filePath) => `W/"${createHash('sha1').update(readFileSync(filePath)).digest('base64url')}"`;
+
+  function forget(key) {
+    const entry = entries.get(key);
+    if (!entry) return;
+    if (entry.br) storedBytes -= entry.br.length;
+    entries.delete(key);
+  }
+
+  /**
+   * Der Eintrag zur Datei in ihrem JETZIGEN Stand; liest sie beim ersten Mal.
+   * `key` ist ein Ergebnis von canonical().
+   */
+  function entryFor(key, stat) {
+    const known = entries.get(key);
     if (known && known.mtimeMs === stat.mtimeMs && known.size === stat.size) return known;
-    const hash = createHash('sha1').update(readFileSync(filePath)).digest('base64url');
-    // Schwach (W/): derselbe ETag steht an der unkomprimierten und an jeder
-    // komprimierten Fassung, und die sind nicht bytegleich.
-    const entry = { mtimeMs: stat.mtimeMs, size: stat.size, etag: `W/"${hash}"`, br: null, queued: false };
-    entries.set(filePath, entry);
+    // Die Datei hat sich geaendert: die alte Fassung zaehlt nicht weiter.
+    forget(key);
+    const entry = { mtimeMs: stat.mtimeMs, size: stat.size, etag: hashOf(key), br: null, queued: false, declined: false };
+    entries.set(key, entry);
+    // Eine Map haelt die Einfuegereihenfolge: der erste Schluessel ist der
+    // aelteste. Steht er noch in der Schlange, verwirft compressNext() sein
+    // Ergebnis, weil der Eintrag nicht mehr der gemerkte ist.
+    while (entries.size > maxEntries) forget(entries.keys().next().value);
     return entry;
   }
 
@@ -99,14 +174,22 @@ export function createStaticAssets(root, { brotli = true, setHeaders = () => {},
       // Nur uebernehmen, wenn es noch der Stand ist, der gelesen wurde, und
       // wenn es sich lohnt. Ein Fehler laesst die Datei bei compression().
       if (!err && entries.get(filePath) === entry && source.length === entry.size && result.length < source.length) {
-        entry.br = result;
+        if (storedBytes + result.length <= maxBytes) {
+          entry.br = result;
+          storedBytes += result.length;
+        } else {
+          // Voll. Die Datei bleibt bei compression() und wird nicht bei jeder
+          // Anfrage wieder gerechnet - sonst waere die Grenze nur eine fuer
+          // den Speicher und keine fuer die Rechenzeit.
+          entry.declined = true;
+        }
       }
       compressNext();
     });
   }
 
   function schedule(filePath, entry) {
-    if (entry.queued || entry.br) return;
+    if (entry.queued || entry.br || entry.declined) return;
     entry.queued = true;
     queue.push({ filePath, entry });
     compressNext();
@@ -133,7 +216,11 @@ export function createStaticAssets(root, { brotli = true, setHeaders = () => {},
      * danach, ob die Anfrage damit frisch ist (304).
      */
     etagFor(filePath, stat) {
-      return entryFor(filePath, stat ?? statSync(filePath)).etag;
+      const key = canonical(filePath);
+      // Ein Link nach draussen (express.static folgt ihm) bekommt seinen
+      // Inhalts-ETag, wird aber nicht gemerkt: der Speicher gehoert public/.
+      if (!key) return hashOf(filePath);
+      return entryFor(key, stat ?? statSync(key)).etag;
     },
 
     /**
@@ -158,9 +245,11 @@ export function createStaticAssets(root, { brotli = true, setHeaders = () => {},
       }
       if (!stat.isFile() || stat.size < MIN_BYTES) return next();
 
-      const entry = entryFor(filePath, stat);
+      const key = canonical(filePath);
+      if (!key) return next();
+      const entry = entryFor(key, stat);
       if (!entry.br) {
-        schedule(filePath, entry);
+        schedule(key, entry);
         return next();
       }
 

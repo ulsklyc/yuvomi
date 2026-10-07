@@ -17,7 +17,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { brotliDecompressSync } from 'node:zlib';
@@ -31,14 +31,14 @@ const PUBLIC_DIR = path.join(import.meta.dirname, '..', 'public');
 const FIXED_TIME = new Date('2026-01-01T00:00:00Z');
 
 /** Ein Server wie in server/index.js: compression(), die Speicher-Fassung, express.static. */
-async function serve(root, { brotli = true, compress } = {}) {
+async function serve(root, { brotli = true, compress, limits } = {}) {
   const app = express();
   app.use(compression());
   const setHeaders = (res, filePath, stat) => {
     res.setHeader('Cache-Control', 'no-cache, must-revalidate');
     res.setHeader('ETag', assets.etagFor(filePath, stat));
   };
-  const assets = createStaticAssets(root, { brotli, setHeaders, ...(compress ? { compress } : {}) });
+  const assets = createStaticAssets(root, { brotli, setHeaders, ...(compress ? { compress } : {}), ...(limits ?? {}) });
   app.use(assets.middleware);
   app.use(express.static(root, { etag: true, lastModified: true, redirect: false, setHeaders }));
   const server = await new Promise((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
@@ -319,6 +319,96 @@ test('files are compressed one after the other, not all at once', async (t) => {
   await srv.compressed();
   assert.equal(most, 1, 'der Threadpool gehoert auch dem Rest des Servers');
   assert.equal(srv.assets.stats().files, 3);
+});
+
+// --------------------------------------------------------
+// 2b. Der Speicher hat eine Grenze, und ein Pfad ist keine Datei
+// --------------------------------------------------------
+// Statische Dateien sind ohne Anmeldung abrufbar. Solange der Schluessel der
+// Pfad aus der Adresse war, bekam jede SCHREIBWEISE derselben Datei einen
+// eigenen Eintrag samt eigener Brotli-Fassung: auf einem Dateisystem ohne
+// Gross-/Kleinschreibung /app.js, /App.js, /APP.JS, ueberall jeder Symlink.
+// "Hoechstens so viel wie public/ wiegt" galt damit nur als Annahme. Der Test
+// nimmt Symlinks, weil die auch auf dem Linux der CI zwei Namen fuer eine
+// Datei sind.
+
+test('many names for one file are one stored version, compressed once', async (t) => {
+  const fx = fixture();
+  fx.write('app.js', SCRIPT);
+  const names = ['/app.js'];
+  for (let i = 0; i < 5; i += 1) {
+    symlinkSync(path.join(fx.dir, 'app.js'), path.join(fx.dir, `alias-${i}.js`));
+    names.push(`/alias-${i}.js`);
+  }
+  let runs = 0;
+  const compress = (buffer, _options, cb) => { runs += 1; setTimeout(() => cb(null, buffer.subarray(0, 10)), 5); };
+  const srv = await serve(fx.dir, { compress });
+  t.after(async () => { await srv.close(); fx.cleanup(); });
+
+  for (const name of names) await srv.request(name, { 'accept-encoding': 'br' });
+  await srv.compressed();
+  for (const name of names) {
+    const res = await srv.request(name, { 'accept-encoding': 'br' });
+    assert.equal(res.status, 200, name);
+    assert.equal(res.headers.etag, sha(Buffer.from(SCRIPT)), name);
+  }
+  assert.equal(runs, 1, 'eine Datei wird einmal komprimiert, egal unter wie vielen Namen');
+  assert.deepEqual(srv.assets.stats(), { files: 1, bytes: 10, pending: 0 });
+});
+
+test('a link that leaves the folder is never read into memory', async (t) => {
+  const fx = fixture();
+  const outside = fixture();
+  const secret = outside.write('outside.js', SCRIPT);
+  symlinkSync(secret, path.join(fx.dir, 'leak.js'));
+  let runs = 0;
+  const compress = (buffer, _options, cb) => { runs += 1; cb(null, buffer.subarray(0, 10)); };
+  const srv = await serve(fx.dir, { compress });
+  t.after(async () => { await srv.close(); fx.cleanup(); outside.cleanup(); });
+
+  await srv.request('/leak.js', { 'accept-encoding': 'br' });
+  await srv.compressed();
+  assert.equal(runs, 0);
+  assert.equal(srv.assets.stats().files, 0);
+});
+
+test('the stored versions stop at the byte limit - beyond it compression() serves', async (t) => {
+  const fx = fixture();
+  for (const name of ['a.js', 'b.js', 'c.js']) fx.write(name, SCRIPT + name);
+  const compress = (buffer, _options, cb) => setTimeout(() => cb(null, buffer.subarray(0, 10)), 5);
+  const srv = await serve(fx.dir, { compress, limits: { maxBytes: 20 } });
+  t.after(async () => { await srv.close(); fx.cleanup(); });
+
+  for (const name of ['/a.js', '/b.js', '/c.js']) {
+    await srv.request(name, { 'accept-encoding': 'br' });
+    await srv.compressed();
+  }
+  assert.deepEqual(srv.assets.stats(), { files: 2, bytes: 20, pending: 0 });
+  // Die dritte kommt weiter an, nur eben wie vorher durch compression() -
+  // und sie wird nicht bei jeder Anfrage wieder in die Schlange gestellt.
+  const res = await srv.request('/c.js', { 'accept-encoding': 'br' });
+  assert.equal(res.status, 200);
+  assert.equal(brotliDecompressSync(res.body).toString(), SCRIPT + 'c.js');
+  assert.equal(srv.assets.stats().pending, 0);
+});
+
+test('the number of remembered files is limited, the oldest goes first', async (t) => {
+  const fx = fixture();
+  for (const name of ['a.js', 'b.js', 'c.js']) fx.write(name, SCRIPT + name);
+  const compress = (buffer, _options, cb) => setTimeout(() => cb(null, buffer.subarray(0, 10)), 5);
+  const srv = await serve(fx.dir, { compress, limits: { maxEntries: 2 } });
+  t.after(async () => { await srv.close(); fx.cleanup(); });
+
+  for (const name of ['/a.js', '/b.js', '/c.js']) {
+    await srv.request(name, { 'accept-encoding': 'br' });
+    await srv.compressed();
+  }
+  const stats = srv.assets.stats();
+  assert.equal(stats.files, 2);
+  assert.equal(stats.bytes, 20, 'die Bytes des verdraengten Eintrags zaehlen nicht weiter');
+  // Der ETag bleibt der Inhalts-Hash, auch fuer die verdraengte Datei.
+  const res = await srv.request('/a.js');
+  assert.equal(res.headers.etag, sha(Buffer.from(SCRIPT + 'a.js')));
 });
 
 // --------------------------------------------------------
