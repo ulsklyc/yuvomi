@@ -596,7 +596,8 @@ test('Rezepte bei `read`: das Detail zeigt, was sonst nur im Formular stand', as
   assert.match(lesend.html, /recipe-card__meal-types/, 'die Mahlzeiten stehen da, auch wenn alle gelten');
   assert.equal((lesend.html.match(/meal-type-badge--/g) ?? []).length, 4);
   assert.match(lesend.html, /recipe-detail__ingredient-category">Backwaren</, 'die Einkaufskategorie je Zutat');
-  assert.match(lesend.html, /250 g · Mehl/);
+  // Seit R18 steht die Menge in ihrer eigenen Spalte vor dem Namen (eigener Test unten).
+  assert.match(lesend.html, /<span class="recipe-detail__ingredient-quantity">250 g<\/span><span class="recipe-detail__ingredient-name">Mehl/);
   assert.match(lesend.html, /Teig ruhen lassen/);
   // Der Mini-DOM schreibt `href` nicht ins Markup; der Link ist am Text zu erkennen.
   assert.match(lesend.html, /<a class="btn btn--ghost">.*recipes\.openLink/, 'der Link ist Lesen und bleibt');
@@ -803,4 +804,36 @@ test('Rezepte: die Vorrats-Zuordnung braucht Kueche UND Vorrat, wie der Server',
     '`meals: read` + `pantry: write`: der Zustand bleibt, der Knopf endete im 403');
   assert.deepEqual(await zeichen({ meals: 'write', shopping: 'write', pantry: 'read' }), { tag: 'span', aktion: null, sammel: false });
   assert.deepEqual(await zeichen(LESEN), { tag: 'span', aktion: null, sammel: false });
+});
+
+/* ZUTATENMENGEN ALS EIGENE SPALTE (Critique R18, 2026-10-07): "200 g · Mehl"
+ * stand in einem Text, jede Zeile begann woanders. */
+test('R18: die Menge einer Zutat steht in ihrer eigenen rechtsbuendigen Spalte', async () => {
+  const el = new MiniElement('div');
+  const r = { id: 31, title: 'Brot', source: 'native', has_own_image: false, meal_types: ['dinner'], ingredients: [{ name: 'Mehl', quantity: '200 g' }, { name: 'Salz' }] };
+  await withAccess(SCHREIBEN, () => mitRezepten([r], () => { recipes.fillRecipeDetail(el, r); }));
+  const find = (node, cls, out = []) => {
+    if (node?.className === cls) out.push(node);
+    for (const child of node?.childNodes ?? []) find(child, cls, out);
+    return out;
+  };
+  const rows = find(el, 'recipe-detail__ingredient');
+  assert.equal(rows.length, 2);
+  const [menge, name] = rows[0].childNodes;
+  assert.equal(menge.className, 'recipe-detail__ingredient-quantity');
+  assert.equal(menge.textContent, '200 g');
+  assert.equal(name.className, 'recipe-detail__ingredient-name');
+  assert.equal(name.textContent, 'Mehl', 'der Name steht allein - nicht mehr "200 g · Mehl"');
+  assert.equal(rows[1].childNodes[0].className, 'recipe-detail__ingredient-quantity', 'ohne Menge bleibt die Zelle stehen, damit der Name seine Spalte haelt');
+  assert.equal(rows[1].childNodes[0].textContent, '');
+  const { eachRule } = await import('./css-rules.js');
+  const css = (await import('node:fs')).readFileSync(new URL('../public/styles/recipes.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const body = (sel, at = (r) => r.at.length === 0) => rules.filter((r) => r.selector.trim() === sel && at(r)).map((r) => r.body).join(';');
+  assert.match(body('.recipe-detail__ingredient-quantity'), /text-align:\s*end/, 'rechtsbuendig');
+  assert.match(body('.recipe-detail__ingredient'), /font-variant-numeric:\s*tabular-nums/, 'tabellarisch');
+  assert.match(body('.recipe-detail__ingredient'), /grid-template-columns:\s*minmax\(var\(--space-12\), max-content\) minmax\(0, 1fr\) fit-content\(45%\)/);
+  const sub = (r) => r.at.some((a) => /@supports\s*\(grid-template-columns:\s*subgrid\)/.test(a));
+  assert.match(body('.recipe-detail__ingredient', sub), /grid-template-columns:\s*subgrid/, 'mit Subgrid teilt die Liste EINE Mengenspalte');
+  assert.match(body('.recipe-detail__ingredients', sub), /grid-template-columns:\s*max-content minmax\(0, 1fr\) fit-content\(45%\)/);
 });

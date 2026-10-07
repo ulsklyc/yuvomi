@@ -39,6 +39,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   people, and "Done" is the one main button. A birthday opens with the picture, "turns 41" and
   "in 26 days". The popover on a desktop carries the title in the same size as the sheet on a
   phone.
+- **A recipe without a picture opens with a head of its own.** Its details began with a list of
+  ingredients and nothing that said "recipe". They now open with a flat band in the kitchen
+  colour that carries the sign of the meal the recipe is for. Recipes with a picture keep it,
+  and the list stays as it is.
+- **Ingredient amounts line up.** "200 g", "1 tbsp" and "2" stood inside the same text as the
+  ingredient, so every line started somewhere else. Amounts now have their own right-aligned
+  column in front of the names.
 - **The agenda names its days in words.** "Today - Thursday, 8 October" and "Saturday, 10
   October" instead of "08.10.2026 Thursday".
 - **Numbers no longer jump sideways.** On the overview, times, amounts and counters now use

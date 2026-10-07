@@ -382,6 +382,49 @@
   object-fit: cover;
 }
 
+/* OHNE BILD: EIN FLACHES BAND IM KUECHENTON (Critique R18, 2026-10-07;
+ * utils/recipe-thumb.js `recipeBandEl`). Der Satz oben gilt weiter - kein
+ * 3:2-Rahmen und kein grauer Block, der ein fehlendes Foto anzeigt. Das Band
+ * ist eine Zeile hoch (64px), behauptet kein Bild und traegt das Zeichen der
+ * ersten Mahlzeit: ein Kopf, der "Rezept" sagt, ehe die Zutaten beginnen.
+ * Dieselbe Breite und Rundung wie das Kopfbild, damit ein Rezept mit und eines
+ * ohne Bild an derselben Kante beginnen.
+ *
+ * DIE FLAECHE IST GETOENT, DAS ZEICHEN STEHT IM VOLLTON-SIEGEL. Flaeche und
+ * Zeichen im selben blassen Ton waeren "zweimal blass" (Skalen-Regel,
+ * DESIGN.md Colors; Guard in test-frontend-audit). Also die Bauart des
+ * Modulsiegels: Scheibe im Vollton, Zeichen in --color-ink-on-vivid.
+ * Gerechnet: Zeichen auf Siegel hell #FFFFFF auf #C2410C = 5,18:1, dunkel
+ * #0A0A0C auf #FB923C = 8,74:1; Siegel auf Band (--tint-surface, 16 %) hell
+ * 4,10:1, dunkel 4,82:1 (Grafik braucht 3:1). Das Band gegen die
+ * Kartenflaeche 1,26:1 bzw. 1,34:1 - eine Toenung, keine Kante. */
+.recipe-detail__band {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  block-size: var(--space-16);
+  width: 100%;
+  max-width: 30rem;
+  border-radius: var(--radius-md);
+  background-color: color-mix(in srgb, var(--module-recipes) var(--tint-surface), var(--color-surface));
+}
+
+.recipe-detail__band-seal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--space-10);
+  block-size: var(--space-10);
+  border-radius: var(--radius-full);
+  background-color: var(--module-recipes);
+  color: var(--color-ink-on-vivid);
+}
+
+.recipe-detail__band-icon {
+  width: var(--icon-lg);
+  height: var(--icon-lg);
+}
+
 .recipe-detail__ingredients {
   margin: 0;
   padding: 0;
@@ -410,14 +453,44 @@
   font-size: var(--type-body);
   color: var(--color-text-primary);
   font-variant-numeric: tabular-nums;
-  /* Zutat links, Vorrats-Zuordnung rechts, und bei 320px untereinander statt
-   * abgeschnitten: ein Vorratsname ist so lang, wie der Haushalt ihn getippt
-   * hat. */
-  display: flex;
-  flex-wrap: wrap;
+  /* DREI SPALTEN: Menge - Zutat - Vorrats-Zuordnung (Critique R18). Die Menge
+   * steht rechtsbuendig in ihrer eigenen Spalte, die Zuordnung am Zeilenende.
+   * Rueckfall ohne Subgrid: jede Zeile misst ihre Mengenspalte selbst, mit
+   * einer Mindestbreite, in die "200 g" und "1 EL" passen - gleich breit,
+   * solange keine Menge laenger ist. Die Zuordnung darf umbrechen: ein
+   * Vorratsname ist so lang, wie der Haushalt ihn getippt hat. */
+  display: grid;
+  grid-template-columns: minmax(var(--space-12), max-content) minmax(0, 1fr) fit-content(45%);
   align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-1) var(--space-2);
+  gap: var(--space-1) var(--space-3);
+}
+
+.recipe-detail__ingredient-quantity {
+  text-align: end;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.recipe-detail__ingredient-name {
+  min-width: 0;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+  overflow-wrap: break-word;
+}
+
+/* Mit Subgrid teilt sich die ganze Liste EINE Mengenspalte: sie ist so breit
+ * wie die laengste Menge des Rezepts, und jede Zeile endet an derselben Kante
+ * (Chrome 117, Firefox 71, Safari 16). */
+@supports (grid-template-columns: subgrid) {
+  .recipe-detail__ingredients {
+    grid-template-columns: max-content minmax(0, 1fr) fit-content(45%);
+    column-gap: var(--space-3);
+  }
+
+  .recipe-detail__ingredient {
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+  }
 }
 
 /* Die Einkaufskategorie einer Zutat. Sie steht sonst nur im Formular; bei

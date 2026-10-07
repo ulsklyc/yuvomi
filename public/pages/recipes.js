@@ -21,7 +21,7 @@ import { renderSkeletonList } from '/utils/skeleton.js';
 import { mountEmptyState, mountLoadError } from '/utils/empty-state.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { mealTypeList, ensureMealTypeNames } from '/utils/meal-types.js';
-import { recipeThumbEl, recipeHeroEl } from '/utils/recipe-thumb.js';
+import { recipeThumbEl, recipeHeroEl, recipeBandEl } from '/utils/recipe-thumb.js';
 import { navModuleAccess } from '/permissions.js';
 import { mountMasterDetail, splitViewDetailHtml, detailPaneHeaderEl } from '/utils/master-detail.js';
 import { mayWritePath } from '/utils/module-access.js';
@@ -1021,13 +1021,20 @@ function buildRecipeList() {
  * Detailspalte (Liste + Detail), damit beide nie auseinanderlaufen.
  */
 function fillRecipeDetail(detail, recipe) {
-  // Das eigene Bild als Kopf des Details (R16) - ohne Bild kein Element, also
-  // auch kein Platzhalterblock (utils/recipe-thumb.js).
-  const hero = recipeHeroEl({ recipeId: recipe.id, hasOwnImage: recipe.has_own_image });
-  if (hero) detail.appendChild(hero);
-
   const ingredients = recipe.ingredients ?? [];
   const mealTypes = normalizeRecipeMealTypes(recipe.meal_types);
+  // Das eigene Bild als Kopf des Details (R16) - ohne Bild kein Platzhalterblock
+  // (utils/recipe-thumb.js). Seit R18 tritt an seine Stelle ein flaches Band im
+  // Kuechenton mit dem Zeichen der ersten Mahlzeit, zu der das Rezept passt -
+  // auch dann, wenn das Bild beim Laden scheitert. Die Liste bleibt ohne.
+  // Das Zeichen der Mahlzeit nur, wo sie unterscheidet: gilt das Rezept fuer
+  // alle vier (oder fuer keine), waere "Fruehstueck" ueber einem Curry eine
+  // Falschaussage - dann steht das Besteck der Kueche.
+  const slots = mealTypeList();
+  const distinct = mealTypes.length > 0 && mealTypes.length < slots.length;
+  const band = () => recipeBandEl({ icon: distinct ? slots.find((option) => mealTypes.includes(option.key))?.icon : undefined });
+  detail.appendChild(recipeHeroEl({ recipeId: recipe.id, hasOwnImage: recipe.has_own_image, fallback: band }) ?? band());
+
   // Chips nur, wenn sie unterscheiden: gilt ein Rezept für alle Mahlzeiten,
   // ist die volle Chip-Reihe reine Ornamentik (Audit A1-21). Das
   // Herkunfts-Badge sitzt jetzt schon in der Zeilenüberschrift (immer sichtbar,
@@ -1157,7 +1164,16 @@ function ingredientsSectionEl(recipe) {
     item.className = 'recipe-detail__ingredient';
     const label = document.createElement('span');
     label.className = 'recipe-detail__ingredient-name';
-    label.textContent = ing.quantity ? `${ing.quantity} · ${ing.name}` : ing.name;
+    // DIE MENGE HAT IHRE EIGENE SPALTE (Critique R18): rechtsbuendig und in
+    // gleich breiten Ziffern vor dem Namen, sodass "200 g", "1 EL" und "2"
+    // an EINER Kante enden und die Namen an einer beginnen. Vorher stand sie
+    // im selben Text ("200 g · Mehl") - jede Zeile begann woanders. Die Zelle
+    // steht auch ohne Menge da (leer), damit der Name seine Spalte haelt.
+    const quantity = document.createElement('span');
+    quantity.className = 'recipe-detail__ingredient-quantity';
+    quantity.textContent = ing.quantity ?? '';
+    item.appendChild(quantity);
+    label.textContent = ing.name;
     item.appendChild(label);
     // Die Einkaufskategorie steht sonst NUR im Formular. Bei `read` deshalb
     // hier, wo der Tipp landet (Regel 9) - als Text, nicht als Auswahl.

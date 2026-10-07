@@ -97,9 +97,11 @@ export function recipeThumbEl({ recipeId, hasImage, hasOwnImage, className, icon
  * @param {number}  opts.recipeId
  * @param {boolean} opts.hasOwnImage
  * @param {string}  [opts.className]  Klasse des Rahmens; das Bild traegt `<klasse>-img`.
+ * @param {() => HTMLElement|null} [opts.fallback]  was an die Stelle des Rahmens tritt,
+ *        wenn das Bild beim Laden scheitert (R18: das Band, `recipeBandEl`)
  * @returns {HTMLElement|null}
  */
-export function recipeHeroEl({ recipeId, hasOwnImage, className = 'recipe-detail__hero' }) {
+export function recipeHeroEl({ recipeId, hasOwnImage, className = 'recipe-detail__hero', fallback = null }) {
   if (!recipeId || !hasOwnImage) return null;
   const frame = document.createElement('div');
   frame.className = className;
@@ -109,9 +111,48 @@ export function recipeHeroEl({ recipeId, hasOwnImage, className = 'recipe-detail
   img.alt = '';
   img.loading = 'lazy';
   img.decoding = 'async';
-  img.addEventListener('error', () => { frame.remove(); }, { once: true });
+  img.addEventListener('error', () => {
+    const next = typeof fallback === 'function' ? fallback() : null;
+    if (!next) { frame.remove(); return; }
+    frame.replaceWith(next);
+    if (window.lucide) window.lucide.createIcons({ el: next });
+  }, { once: true });
   frame.appendChild(img);
   return frame;
+}
+
+/**
+ * DER KOPF EINES REZEPTS OHNE BILD (Critique R18, 2026-10-07; Entscheidung
+ * Ulas 07.10.). Das Detail eines bildlosen Rezepts begann mit Chips und einer
+ * Zutatenliste - nichts sagte "Rezept". Der R16-Satz oben bleibt wahr: KEIN
+ * Platzhalter, also kein grauer 3:2-Block, der ein fehlendes Foto anzeigt.
+ * Dieses Band behauptet kein Bild: es ist flach (eine Zeile hoch), traegt den
+ * Kuechenton und das Zeichen der ersten Mahlzeit, zu der das Rezept passt -
+ * ein Kopf, kein Rahmen. Die LISTE bleibt ohne ihn.
+ *
+ * Das Zeichen sitzt in einem VOLLTON-SIEGEL auf der getoenten Flaeche (wie das
+ * Modulsiegel): Flaeche UND Zeichen im selben blassen Ton waeren die
+ * zurueckgenommene Fassung, die die Skalen-Regel verbietet (DESIGN.md, Colors).
+ *
+ * Schmuck: der Name steht in der Zeile, die Mahlzeiten als Chips darunter.
+ *
+ * @param {object} opts
+ * @param {string} [opts.icon]       Lucide-Name des Mahlzeit-Zeichens
+ * @param {string} [opts.className]  Klasse des Bands; das Siegel traegt `<klasse>-seal`, das Zeichen `<klasse>-icon`
+ * @returns {HTMLElement}
+ */
+export function recipeBandEl({ icon = 'utensils', className = 'recipe-detail__band' } = {}) {
+  const band = document.createElement('div');
+  band.className = className;
+  band.setAttribute('aria-hidden', 'true');
+  const seal = document.createElement('span');
+  seal.className = `${className}-seal`;
+  const sign = document.createElement('i');
+  sign.className = `${className}-icon`;
+  sign.dataset.lucide = icon;
+  seal.appendChild(sign);
+  band.appendChild(seal);
+  return band;
 }
 
 /**
