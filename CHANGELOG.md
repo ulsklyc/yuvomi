@@ -34,6 +34,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `payer_name`, `participants`, `splits`, `blocked_reason`, `can_edit`, `missed_count` and
   `resume_date`; activity types `recurring_edited` and `recurring_deleted`. No migration.
 
+### Fixed
+
+- **The meal plan's week board no longer cuts its cards off on a short window.** At a window
+  height of 650 px every planned meal lost its lower edge, including the "+" for a second meal
+  in the same slot, and the board offered no way to scroll there. A row is now as tall as its
+  tallest card, and the board scrolls vertically when the week does not fit.
+
 ## [2.74.0] - 2026-10-07
 
 ### Added

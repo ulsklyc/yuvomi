@@ -369,7 +369,16 @@
   flex-direction: column;
   align-items: stretch;
   text-align: left;
-  overflow: hidden;
+  /* KEIN `overflow: hidden` AM SLOT (Critique R17). Der Slot schnitt ab, was
+   * seine Zeile nicht trug: gemessen bei 1366x650 waren 27 von 27 belegten
+   * Slots 100px hoch bei 139-161px Inhalt, das "+" jeder Karte unsichtbar
+   * (die Zeilenhoehe selbst richtet `grid-auto-rows` am Wochenraster). Den
+   * Radius beschneidet, wer eine eigene Flaeche an die Slot-Ecke malt
+   * (`.meal-slot__add-more-btn` unten), nicht der Slot.
+   * `min-width: 0` haelt, was der Beschnitt nebenbei tat: ohne ihn meldet
+   * der Slot seine Inhaltsbreite als Mindestbreite und drueckt die Spalten
+   * des Tablet-Rasters auseinander (gemessen bei 768: 834px in 736px). */
+  min-width: 0;
   transition: border-color var(--transition-fast);
 }
 
@@ -482,6 +491,10 @@
   /* 28px lagen unter --target-md; der Button ist auf Desktop der Weg, eine
    * zweite Mahlzeit in denselben Slot zu legen (Critique 2026-07-29). */
   min-height: var(--target-md);
+  /* Die Hover-Flaeche endet an den unteren Slot-Ecken; seit der Slot nicht
+   * mehr beschneidet, traegt der Knopf deren Radius selbst. */
+  border-end-start-radius: inherit;
+  border-end-end-radius: inherit;
   /* Dauerhaft sichtbar, auch mit Zeiger (Re-Critique 2026-09-27, D7): eine
    * Aktion, die erst beim Ueberfahren erscheint, findet auf Tablet und
    * Trackpad niemand (ignore.md sanktioniert sichtbare Zeilenaktionen). Ruhig
@@ -1337,6 +1350,15 @@
      * Scrollports: gemessen 96px Tageskopf fuer 21px Text und 128px je leerem
      * Slot statt seiner 72px Mindesthoehe. */
     align-content: start;
+    /* DIE ZEILE IST SO HOCH WIE IHR INHALT (Critique R17). Der Slot traegt
+     * `min-height: 72px`, und eine `auto`-Zeile nimmt bei einem Item mit
+     * festem `min-height` genau diesen Wert als Untergrenze, nicht die
+     * Inhaltshoehe. Was darueber liegt, bekam die Zeile nur, solange der
+     * Scrollport Platz uebrig hatte: bei 650px Fensterhoehe 102px je Zeile
+     * fuer 139-161px Karte, und weil nichts ueberlief, gab es auch keinen
+     * Scrollweg. Mit `min-content` waechst die Zeile mit der hoechsten Karte
+     * und das Raster scrollt in seinem Scrollport. */
+    grid-auto-rows: min-content;
     overflow-x: auto;
     scroll-snap-type: x proximity;
     scroll-padding-left: calc(var(--meal-gutter-width) + var(--space-2));

@@ -16545,6 +16545,49 @@ test('der schmale Zustand der Kueche steht hinter seinem Bauteil', () => {
 });
 
 /* ────────────────────────────────────────────────────────────────────────────
+ * DAS WOCHENRASTER SCHNEIDET KEINE KARTE AB (Critique R17)
+ *
+ * Gemessen bei 1366x650: 27 von 27 belegten Slots 100px hoch bei 139-161px
+ * Inhalt, das "+" jeder Karte unsichtbar, und das Raster hatte keinen
+ * Scrollweg dorthin. Zwei Ursachen, die sich gegenseitig verdeckten:
+ *
+ * 1. Die Zeilen waren `auto`. Der Slot traegt `min-height`, und eine
+ *    `auto`-Zeile nimmt dann DIESEN Wert als Untergrenze statt der
+ *    Inhaltshoehe; den Rest bekam sie nur aus uebriger Scrollport-Hoehe.
+ * 2. Der Slot beschnitt seinen Ueberlauf - deshalb lief nichts ueber, und
+ *    ohne Ueberlauf scrollt nichts.
+ *
+ * Der Guard haelt beide Enden: die Zeilenregel am Raster und dass keine
+ * Regel, deren Subjekt der Slot ist, wieder beschneidet.
+ * ──────────────────────────────────────────────────────────────────────────── */
+test('das Wochenraster der Kueche schneidet keine Karte ab', () => {
+  const css = read('../public/styles/meals.css');
+  let autoRows = null;
+  const clipping = [];
+  for (const { selector, body, at } of eachRule(css)) {
+    const sels = String(selector).split(',').map((s) => s.trim());
+    if (sels.includes('.week-grid') && at.some((a) => /min-width:\s*1024px/.test(a))) {
+      const m = /grid-auto-rows\s*:\s*([^;]+)/.exec(body);
+      if (m) autoRows = m[1].trim();
+    }
+    // Subjekt = letzter zusammengesetzter Selektor. `.meal-slot__type-label`
+    // (sr-only am Board) ist ein anderes Bauteil und bleibt aussen vor.
+    const subjectIsSlot = sels.some((s) => /\.meal-slot(?![\w-]|__)(?:--[\w-]+)?(?::[\w-]+(?:\([^)]*\))?)*$/.test(s.split(/[\s>+~]+/).pop()));
+    if (!subjectIsSlot) continue;
+    for (const m of body.matchAll(/(?:^|;)\s*(overflow(?:-[xy])?)\s*:\s*([^;]+)/g)) {
+      if (/\b(?:hidden|clip)\b/.test(m[2])) clipping.push(`${selector.trim()} { ${m[1]}: ${m[2].trim()} }`);
+    }
+  }
+  assert.ok(autoRows && /^(?:min-content|max-content)$/.test(autoRows),
+    `.week-grid (ab 1024px) braucht grid-auto-rows: min-content, gefunden: ${autoRows} - `
+    + 'mit auto-Zeilen ist der Slot nur so hoch wie sein min-height plus Resthoehe, '
+    + 'und bei 650px Fensterhoehe waren alle 27 Karten abgeschnitten');
+  assert.deepEqual(clipping, [],
+    'der Slot beschneidet wieder seinen Inhalt - der Radius-Beschnitt gehoert an das '
+    + 'Kind, das eine Flaeche an die Ecke malt (.meal-slot__add-more-btn)');
+});
+
+/* ────────────────────────────────────────────────────────────────────────────
  * WER EINEN WEG SCHLIESST, MUSS DEN ERSATZWEG NACHWEISEN (#925)
  *
  * tasks.css blendet `.task-card__inline-action` unter 640px aus - mit guter
