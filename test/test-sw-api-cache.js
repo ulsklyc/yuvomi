@@ -120,7 +120,7 @@ function loadSw({ fetchImpl } = {}) {
     fetch: (...a) => ctl.fetchImpl(...a),
     Request: MockRequest, Response: MockResponse, Headers: MockHeaders,
     URL, Date, Promise, JSON, Number, String, Object, Array, Math, Map, Set,
-    parseInt, console,
+    parseInt, console, Symbol, setTimeout, clearTimeout,
   };
   sandbox.globalThis = sandbox;
   runInContext(SRC, createContext(sandbox));

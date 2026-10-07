@@ -7,6 +7,8 @@
  * behauptete bis 2026-08-31 "Cache-First" für Shell und Seitenmodule):
  *   Navigation + APP_SHELL + PAGE_MODULES + Locales: Network-First mit dem
  *        Precache (install) als Offline-Fallback - frisch, solange Netz da ist.
+ *        Antwortet das Netz nicht binnen NETWORK_FIRST_DEADLINE_MS, kommt der
+ *        Cache-Treffer; die Netzantwort fuellt den Cache trotzdem nach.
  *   ASSETS (Bilder, Icons) und der Rest-Fallback: Cache-First, lazily gecacht,
  *        bei SW-Update geleert
  *   API: Network-First für eine Read-only-GET-Whitelist (Kalender, Tasks, …)
@@ -509,15 +511,15 @@ self.addEventListener('fetch', (event) => {
   // damit bypassCacheUntil korrekt gesetzt ist bevor wir entscheiden.
   if (!_bypassInitDone) {
     event.respondWith(
-      _bypassInit.then(() => dispatchFetch(request, url))
+      _bypassInit.then(() => dispatchFetch(request, url, event))
     );
     return;
   }
 
-  event.respondWith(dispatchFetch(request, url));
+  event.respondWith(dispatchFetch(request, url, event));
 });
 
-function dispatchFetch(request, url) {
+function dispatchFetch(request, url, event) {
   // Nach SW-Update: direkt vom Netz, kein SW-Cache, kein HTTP-Cache.
   // Gilt für ALLE Requests (JS, CSS, Images, HTML) im Bypass-Fenster.
   if (Date.now() < bypassCacheUntil) {
@@ -539,11 +541,11 @@ function dispatchFetch(request, url) {
   }
 
   if (request.mode === 'navigate') {
-    return networkFirst(request, SHELL_CACHE);
+    return networkFirst(request, SHELL_CACHE, event);
   }
 
   if (url.pathname.startsWith('/locales/')) {
-    return networkFirst(request, LOCALES_CACHE);
+    return networkFirst(request, LOCALES_CACHE, event);
   }
 
   // Lazy geladene Seiten-Module liegen in PAGES_CACHE. Neben /pages/ gehören dazu
@@ -559,11 +561,11 @@ function dispatchFetch(request, url) {
     url.pathname.startsWith('/settings/') ||
     PAGE_MODULE_SET.has(url.pathname)
   ) {
-    return networkFirst(request, PAGES_CACHE);
+    return networkFirst(request, PAGES_CACHE, event);
   }
 
   if (url.origin === self.location.origin && isMutableAppResource(url.pathname)) {
-    return networkFirst(request, SHELL_CACHE);
+    return networkFirst(request, SHELL_CACHE, event);
   }
 
   if (isAsset(url.pathname) && url.origin === self.location.origin) {
@@ -574,17 +576,97 @@ function dispatchFetch(request, url) {
 }
 
 // --------------------------------------------------------
-// Strategie: Network-First (für Navigation Requests)
+// Strategie: Network-First mit Frist (Navigation, Shell, Seitenmodule,
+// Stylesheets, Locales)
+//
+// EIN NETZ, DAS NICHT "OFFLINE" MELDET, ABER NICHT ANTWORTET (Critique R18).
+// Bis dahin wartete jede dieser Anfragen, bis `fetch` von selbst aufgab - im
+// Zug, im Aufzug, am Rand des WLAN haengt der Start dann minutenlang, obwohl
+// alles im Cache liegt. Jetzt laeuft das Netz gegen eine Frist:
+//
+//   - antwortet es rechtzeitig, gilt seine Antwort (Network-First bleibt die
+//     Strategie, siehe Dateikopf);
+//   - laeuft die Frist ab und es gibt einen Cache-Treffer fuer GENAU diese
+//     Anfrage, kommt der. Das Netz laeuft weiter und legt seine Antwort in den
+//     Cache - der naechste Abruf hat sie;
+//   - ohne Treffer wird weiter aufs Netz gewartet, wie vorher.
+//
+// DIE FRIST KOSTET EINMAL, NICHT JE DATEI. Die Shell ist ein Modulgraph: der
+// Browser erfaehrt die naechste Ebene erst aus der vorigen, und mit einer Frist
+// je Anfrage wartete ein Start an jeder Ebene erneut 1,5 s (gemessen mit
+// angehaltenem Server: nach 9 s noch kein Router). Reisst eine Anfrage die
+// Frist, gilt das Netz deshalb fuer SLOW_NETWORK_WINDOW_MS als langsam: wer in
+// dieser Zeit einen Cache-Treffer hat, bekommt ihn sofort, und das Netz fuellt
+// im Hintergrund nach. Danach wird wieder gemessen. Das haelt auch zusammen,
+// was zusammengehoert: nach dem ersten Treffer aus dem Cache kommt der Rest
+// des Starts aus demselben Cache statt halb vom Netz.
+//
+// DER TREFFER IST DIE ANFRAGE SELBST - mit einer Ausnahme: eine Navigation auf
+// eine Route der App. Der Server beantwortet jede davon mit `index.html`
+// (SPA-Fallback in server/index.js), im Cache liegt aber nur, was schon einmal
+// als Dokument geladen wurde; ein Neuladen auf `/tasks` wartete sonst weiter
+// aufs Netz (gemessen). Was KEINE Route der App ist, bekommt den Ersatz nur
+// beim Ausfall (catch unten), nie nach der Frist: eine Navigation auf einen
+// Feed oder eine Datei bekaeme sonst nach 1,5 s die App-Shell statt ihrer
+// Antwort. Die Grenze zieht isAppRouteNavigation().
+//
+// DAS BYPASS-FENSTER NACH EINEM SW-UPDATE LAEUFT NICHT HIER DURCH
+// (dispatchFetch): dort gilt keine Frist, alles kommt frisch vom Netz. Und der
+// Mischzustand aus #616 bleibt, was er war: zwischen einem Server-Update und
+// der Uebernahme durch den neuen Worker kann eine Seite alte und neue Dateien
+// sehen - vorher, wenn einzelne Abrufe ausfielen, jetzt auch, wenn einzelne die
+// Frist reissen. Dafuer gibt es den Reload in importPage() (router.js) und, fuer
+// eine Shell, die gar nicht erst startet, den in sw-register.js.
 // --------------------------------------------------------
-async function networkFirst(request, cacheName) {
+const NETWORK_FIRST_DEADLINE_MS = 1500;
+const SLOW_NETWORK_WINDOW_MS = 10000;
+const DEADLINE_PASSED = Symbol('deadline');
+let slowNetworkUntil = 0;
+
+async function networkFirst(request, cacheName, event) {
   const cache = await caches.open(cacheName);
 
-  try {
-    const response = await fetch(request);
+  // Das Ablegen haelt die Antwort nicht auf, wird aber gemerkt: nach der Frist
+  // muss der Worker so lange leben, bis es durch ist.
+  let stored = Promise.resolve();
+  const network = fetch(request).then((response) => {
     if (response.ok && response.type === 'basic') {
-      cache.put(request, response.clone());
+      stored = Promise.resolve(cache.put(request, response.clone())).catch(() => {});
     }
     return response;
+  });
+
+  // Das Netz laeuft weiter und fuellt den Cache nach. `waitUntil` haelt den
+  // Worker dafuer am Leben; ein spaeter Fehler ist dann keiner mehr.
+  const serveCached = (cached) => {
+    const refill = network.then(() => stored, () => {});
+    if (event && typeof event.waitUntil === 'function') event.waitUntil(refill);
+    return cached;
+  };
+
+  const cachedCopy = async () => (
+    await cache.match(request)
+      || (isAppRouteNavigation(request) ? cache.match('/index.html') : undefined)
+  );
+
+  let timer;
+  try {
+    if (Date.now() < slowNetworkUntil) {
+      const cached = await cachedCopy();
+      if (cached) return serveCached(cached);
+    }
+
+    const deadline = new Promise((resolve) => {
+      timer = setTimeout(() => resolve(DEADLINE_PASSED), NETWORK_FIRST_DEADLINE_MS);
+    });
+    const first = await Promise.race([network, deadline]);
+    if (first !== DEADLINE_PASSED) return first;
+
+    const cached = await cachedCopy();
+    if (!cached) return await network;
+
+    slowNetworkUntil = Date.now() + SLOW_NETWORK_WINDOW_MS;
+    return serveCached(cached);
   } catch {
     const cached = await cache.match(request);
     if (cached) return cached;
@@ -599,6 +681,8 @@ async function networkFirst(request, cacheName) {
       status: 503,
       headers: { 'Content-Type': 'text/plain; charset=utf-8' },
     });
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -657,6 +741,19 @@ async function cacheFirst(request, cacheName) {
 // --------------------------------------------------------
 function isAsset(pathname) {
   return /\.(png|jpg|jpeg|ico|svg|webp|woff2?|gif)$/i.test(pathname);
+}
+
+/**
+ * Ist das eine Navigation auf eine Route der App - also eine, die der Server
+ * mit `index.html` beantwortet? Die App-Routen kennt der Worker nicht, wohl
+ * aber, was KEINE ist: alles mit Dateiendung, die Feeds und der MCP-Endpunkt
+ * (`/api/` erreicht diese Stelle gar nicht erst).
+ */
+function isAppRouteNavigation(request) {
+  if (request.mode !== 'navigate') return false;
+  const { pathname } = new URL(request.url);
+  if (pathname.startsWith('/feed/') || pathname === '/mcp' || pathname.startsWith('/mcp/')) return false;
+  return !/\.[a-z0-9]+$/i.test(pathname);
 }
 
 function isMutableAppResource(pathname) {

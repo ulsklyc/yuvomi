@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   had arrived. These now go out together; who may see what is decided as before. Measured on the
   same throttled phone: the last answer arrived 747 ms after the first health request instead of
   1119 ms.
+- **A weak connection no longer holds up the start.** With a network that is neither offline nor
+  answering - on a train, in a lift, at the edge of the Wi-Fi - the app waited for it although
+  everything it needed was already stored on the device. It now waits 1.5 seconds once, then
+  uses the stored copies and picks up the fresh ones in the background for the next start.
+  Measured with a server that accepts connections and never answers: the app's own files were
+  loaded after 1.6 seconds instead of never. Signing in and loading data still need the network.
 
 ### Fixed
 

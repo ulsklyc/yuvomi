@@ -178,7 +178,7 @@
     "test:i18n-ko-particles": "node --test test/test-i18n-ko-particles.js",
     "test:i18n-translated": "node --test test/test-i18n-translated.js",
     "test:lang-init": "node --test test/test-lang-init.js",
-    "test:sw-api-cache": "node --test test/test-sw-api-cache.js test/test-service-worker-build-revision.js",
+    "test:sw-api-cache": "node --test test/test-sw-api-cache.js test/test-service-worker-build-revision.js test/test-sw-network-first.js",
     "test:sw-precache": "node --test test/test-sw-precache.js",
     "test:modal-utils": "node --loader ./test/test-browser-loader.mjs test/test-modal-utils.js",
     "test:modal-dead-time": "node --loader ./test/test-browser-loader.mjs --test test/test-modal-dead-time.js",
