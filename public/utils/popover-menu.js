@@ -215,7 +215,14 @@ function onToggle(event) {
   // `aria-expanded` gehoert dem Trigger, und die Popover-API pflegt es nicht:
   // sie kennt nur `popovertarget`, kein ARIA. Ohne diese Zeile meldet der
   // Screenreader ein Menue, das nie aufgeht.
+  // ALLE Ausloeser zuruecksetzen, nur der sichtbare meldet "offen": wechselt
+  // die Breite bei offenem Menue, ist beim Schliessen ein ANDERER sichtbar als
+  // beim Oeffnen - der erste bliebe sonst auf "true" stehen und meldete nach
+  // dem Zurueckwechseln ein geschlossenes Menue als offen.
   const trigger = triggerOf(panel.id);
+  if (typeof document.querySelectorAll === 'function') {
+    for (const el of document.querySelectorAll(`[popovertarget="${panel.id}"]`)) el.setAttribute('aria-expanded', 'false');
+  }
   trigger?.setAttribute('aria-expanded', String(event.newState === 'open'));
 
   if (event.newState !== 'open') { panel.style.opacity = ''; panel.style.transform = ''; return; }
