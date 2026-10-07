@@ -3899,6 +3899,29 @@
             "home": "Hem",
             "general": "Allmänt"
         },
+        "recurring": {
+            "empty": "Inga återkommande utgifter.",
+            "add": "Lägg till återkommande utgift",
+            "edit": "Redigera återkommande utgift",
+            "nextDate": "Nästa datum",
+            "paused": "Pausad",
+            "pause": "Pausa",
+            "resume": "Återuppta",
+            "reason": {
+                "split_invalid": "Fördelningen kan inte bokföras.",
+                "not_a_member": "Betalaren eller en deltagare är inte längre med i gruppen."
+            },
+            "missedQuestion": "Datum passerade under pausen",
+            "missedSkip": "Fortsätt från {{date}}",
+            "missedBook": "Bokför missade datum från {{date}}",
+            "missedDetail": "{{count}} datum har missats sedan {{date}}.",
+            "missedDetail_one": "{{count}} datum har missats sedan {{date}}.",
+            "deleteConfirm": "Ta bort denna återkommande utgift?",
+            "deleteConfirmDetail": "Inga nya utgifter skapas. Redan bokförda utgifter finns kvar.",
+            "show": "Visa",
+            "editHint": "Ändringar gäller från nästa datum. Redan bokförda utgifter förblir oförändrade.",
+            "dateBooked": "Datum till och med {{date}} är redan bokförda. Nästa datum måste vara senare."
+        },
         "activityType": {
             "group_created": "Grupp skapad",
             "group_updated": "Grupp uppdaterad",
@@ -3917,6 +3940,8 @@
             "recurring_auto_paused": "Återkommande utgift pausad automatiskt: den kunde inte bokföras",
             "recurring_resumed": "Återkommande utgift återupptagen",
             "recurring_generated": "Återkommande utgift skapades",
+            "recurring_edited": "Återkommande utgift ändrad",
+            "recurring_deleted": "Återkommande utgift borttagen",
             "payment_reversed": "Betalning återförd",
             "ledger_restored": "Bokföring återställd",
             "ledger_removed": "Bokföring borttagen"

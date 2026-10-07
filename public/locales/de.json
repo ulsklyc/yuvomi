@@ -3899,6 +3899,29 @@
             "home": "Zuhause",
             "general": "Allgemein"
         },
+        "recurring": {
+            "empty": "Keine wiederkehrenden Ausgaben.",
+            "add": "Wiederkehrende Ausgabe hinzufügen",
+            "edit": "Wiederkehrende Ausgabe bearbeiten",
+            "nextDate": "Nächster Termin",
+            "paused": "Pausiert",
+            "pause": "Pausieren",
+            "resume": "Fortsetzen",
+            "reason": {
+                "split_invalid": "Die Aufteilung lässt sich nicht buchen.",
+                "not_a_member": "Zahler oder Teilnehmende gehören nicht mehr zur Gruppe."
+            },
+            "missedQuestion": "Während der Pause wurden Termine versäumt",
+            "missedSkip": "Ab {{date}} fortsetzen",
+            "missedBook": "Ab {{date}} nachbuchen",
+            "missedDetail": "Seit dem {{date}} wurden {{count}} Termine versäumt.",
+            "missedDetail_one": "Seit dem {{date}} wurde {{count}} Termin versäumt.",
+            "deleteConfirm": "Diese wiederkehrende Ausgabe löschen?",
+            "deleteConfirmDetail": "Es entstehen keine neuen Ausgaben mehr. Bereits gebuchte Ausgaben bleiben erhalten.",
+            "show": "Anzeigen",
+            "editHint": "Änderungen gelten ab dem nächsten Termin. Bereits gebuchte Ausgaben bleiben unverändert.",
+            "dateBooked": "Bis {{date}} ist bereits gebucht. Der nächste Termin muss danach liegen."
+        },
         "activityType": {
             "group_created": "Gruppe erstellt",
             "group_updated": "Gruppe aktualisiert",
@@ -3917,6 +3940,8 @@
             "recurring_auto_paused": "Wiederkehrende Ausgabe automatisch pausiert: nicht buchbar",
             "recurring_resumed": "Wiederkehrende Ausgabe fortgesetzt",
             "recurring_generated": "Wiederkehrende Ausgabe erzeugt",
+            "recurring_edited": "Wiederkehrende Ausgabe bearbeitet",
+            "recurring_deleted": "Wiederkehrende Ausgabe gelöscht",
             "payment_reversed": "Zahlung storniert",
             "ledger_restored": "Buchung wiederhergestellt",
             "ledger_removed": "Buchung entfernt"

@@ -3899,6 +3899,29 @@
             "home": "Casa",
             "general": "Generale"
         },
+        "recurring": {
+            "empty": "Nessuna spesa ricorrente.",
+            "add": "Aggiungi spesa ricorrente",
+            "edit": "Modifica spesa ricorrente",
+            "nextDate": "Prossima scadenza",
+            "paused": "In pausa",
+            "pause": "Sospendi",
+            "resume": "Riprendi",
+            "reason": {
+                "split_invalid": "La ripartizione non può essere registrata.",
+                "not_a_member": "Chi paga o un partecipante non fa più parte del gruppo."
+            },
+            "missedQuestion": "Durante la pausa sono state saltate delle scadenze",
+            "missedSkip": "Riprendi dal {{date}}",
+            "missedBook": "Recupera dal {{date}}",
+            "missedDetail": "Dal {{date}} sono state saltate {{count}} scadenze.",
+            "missedDetail_one": "Dal {{date}} è stata saltata {{count}} scadenza.",
+            "deleteConfirm": "Eliminare questa spesa ricorrente?",
+            "deleteConfirmDetail": "Non verranno create nuove spese. Le spese già registrate restano.",
+            "show": "Mostra",
+            "editHint": "Le modifiche valgono dalla prossima scadenza. Le spese già registrate restano invariate.",
+            "dateBooked": "Le scadenze fino al {{date}} sono già registrate. La prossima scadenza deve essere successiva."
+        },
         "activityType": {
             "group_created": "Gruppo creato",
             "group_updated": "Gruppo aggiornato",
@@ -3917,6 +3940,8 @@
             "recurring_auto_paused": "Spesa ricorrente sospesa automaticamente: non è stato possibile registrarla",
             "recurring_resumed": "Spesa ricorrente ripresa",
             "recurring_generated": "Spesa ricorrente generata",
+            "recurring_edited": "Spesa ricorrente modificata",
+            "recurring_deleted": "Spesa ricorrente eliminata",
             "payment_reversed": "Pagamento stornato",
             "ledger_restored": "Registrazione ripristinata",
             "ledger_removed": "Registrazione rimossa"

@@ -392,9 +392,12 @@
   grid-column: 2;
 }
 
+/* Die Ausgaben stehen links neben ALLEN Abschnitten der rechten Spalte - seit
+ * #1647 drei (Salden, Wiederkehrend, Verlauf). Reichte die Spanne nur ueber
+ * zwei, schoebe eine lange Ausgabenliste den Verlauf unter ihr Ende. */
 .split-content-grid > .split-section:nth-child(2) {
   grid-column: 1;
-  grid-row: 1 / span 2;
+  grid-row: 1 / span 3;
 }
 
 .split-section-head {
@@ -487,7 +490,8 @@ button.split-expense:hover {
   text-decoration: line-through;
 }
 
-.split-activity-item span.split-activity-reversed {
+.split-activity-item span.split-activity-reversed,
+.split-expense__body span.split-recurring__state {
   align-self: flex-start;
   padding: var(--space-0h) var(--space-2);
   border-radius: var(--radius-full);
@@ -502,9 +506,50 @@ button.split-expense:hover {
   outline: none;
 }
 
-.split-activity-more {
+.split-activity-more,
+.split-recurring-add {
   display: flex;
   margin: var(--space-2) auto 0;
+}
+
+/* Wiederkehrende Ausgaben (#1647). Die Zeile ist die Ausgabenzeile, daneben
+ * steht - nur wo gehandelt werden darf - der Umschalter Pausieren/Fortsetzen.
+ * Zwei Knoepfe nebeneinander statt eines im anderen: die Trennlinie und der
+ * rechte Rand wandern deshalb von der Zeile an ihren Rahmen. "Pausiert" ist ein
+ * Zeichen in der Form von "Storniert" und steht bei jedem Recht; der Grund,
+ * warum eine Serie nicht bucht, ist eine Warnung und kein Fehler der Eingabe. */
+.split-recurring-row {
+  display: flex;
+  align-items: center;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.split-recurring-row:first-child {
+  border-top: 0;
+}
+
+.split-recurring-row > button.split-expense {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  border-top: 0;
+}
+
+.split-recurring-toggle {
+  flex: 0 0 auto;
+  margin-inline-end: var(--space-3);
+}
+
+/* Die Frage beim Fortsetzen (#1647): zwei Antworten, jede mit ihrem Datum im
+ * Text. Ein Knopf kuerzt sonst nicht und bricht nicht um - hier muss die ganze
+ * Antwort lesbar sein, auch bei 375px, also bricht sie um. */
+.split-resume-choices .btn {
+  white-space: normal;
+  text-align: center;
+}
+
+.split-expense__body span.split-recurring__reason {
+  color: var(--color-warning);
 }
 
 .split-activity-dot {
@@ -746,6 +791,12 @@ button.split-expense:hover {
 @container split-main (max-width: 639px) {
   .split-content-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Schmal teilt sich die Serienzeile die Breite mit Betrag und Umschalter;
+   * die Kategorie-Marke weicht, damit "Naechster Termin" auf einer Zeile steht. */
+  .split-recurring-row .split-expense__icon {
+    display: none;
   }
 
   .split-content-grid > .split-section,

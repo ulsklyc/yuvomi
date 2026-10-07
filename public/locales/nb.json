@@ -3899,6 +3899,29 @@
             "home": "Hjem",
             "general": "Generelt"
         },
+        "recurring": {
+            "empty": "Ingen gjentakende utgifter.",
+            "add": "Legg til gjentakende utgift",
+            "edit": "Rediger gjentakende utgift",
+            "nextDate": "Neste dato",
+            "paused": "Pausert",
+            "pause": "Sett på pause",
+            "resume": "Gjenoppta",
+            "reason": {
+                "split_invalid": "Fordelingen kan ikke bokføres.",
+                "not_a_member": "Betaleren eller en deltaker er ikke lenger med i gruppen."
+            },
+            "missedQuestion": "Datoer gikk tapt under pausen",
+            "missedSkip": "Fortsett fra {{date}}",
+            "missedBook": "Bokfør tapte datoer fra {{date}}",
+            "missedDetail": "{{count}} datoer er gått tapt siden {{date}}.",
+            "missedDetail_one": "{{count}} dato er gått tapt siden {{date}}.",
+            "deleteConfirm": "Slette denne gjentakende utgiften?",
+            "deleteConfirmDetail": "Det opprettes ingen nye utgifter. Utgifter som allerede er bokført, beholdes.",
+            "show": "Vis",
+            "editHint": "Endringer gjelder fra neste dato. Utgifter som allerede er bokført, forblir uendret.",
+            "dateBooked": "Datoer til og med {{date}} er allerede bokført. Neste dato må være senere."
+        },
         "activityType": {
             "group_created": "Gruppe opprettet",
             "group_updated": "Gruppe oppdatert",
@@ -3917,6 +3940,8 @@
             "recurring_auto_paused": "Gjentakende utgift satt på pause automatisk: den kunne ikke bokføres",
             "recurring_resumed": "Gjentakende utgift gjenopptatt",
             "recurring_generated": "Gjentakende utgift generert",
+            "recurring_edited": "Gjentakende utgift redigert",
+            "recurring_deleted": "Gjentakende utgift slettet",
             "payment_reversed": "Betaling reversert",
             "ledger_restored": "Booking gjenopprettet",
             "ledger_removed": "Booking fjernet"

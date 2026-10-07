@@ -4232,6 +4232,32 @@
             "home": "منزل",
             "general": "عام"
         },
+        "recurring": {
+            "empty": "لا توجد مصاريف متكررة.",
+            "add": "إضافة مصروف متكرر",
+            "edit": "تعديل المصروف المتكرر",
+            "nextDate": "الموعد التالي",
+            "paused": "متوقف مؤقتًا",
+            "pause": "إيقاف مؤقت",
+            "resume": "استئناف",
+            "reason": {
+                "split_invalid": "لا يمكن تسجيل هذا التقسيم.",
+                "not_a_member": "الدافع أو أحد المشاركين لم يعد في المجموعة."
+            },
+            "missedQuestion": "فاتت مواعيد أثناء الإيقاف المؤقت",
+            "missedSkip": "المتابعة من {{date}}",
+            "missedBook": "تسجيل ما فات منذ {{date}}",
+            "missedDetail": "فات {{count}} موعد منذ {{date}}.",
+            "missedDetail_one": "فات موعد واحد ({{count}}) منذ {{date}}.",
+            "missedDetail_few": "فاتت {{count}} مواعيد منذ {{date}}.",
+            "missedDetail_two": "فات موعدان ({{count}}) منذ {{date}}.",
+            "missedDetail_many": "فات {{count}} موعدًا منذ {{date}}.",
+            "deleteConfirm": "حذف هذا المصروف المتكرر؟",
+            "deleteConfirmDetail": "لن تُنشأ مصاريف جديدة. المصاريف المسجلة سابقًا تبقى كما هي.",
+            "show": "عرض",
+            "editHint": "تسري التغييرات من الموعد التالي. المصاريف المسجلة سابقًا تبقى دون تغيير.",
+            "dateBooked": "تم تسجيل المواعيد حتى {{date}}. يجب أن يكون الموعد التالي بعد ذلك."
+        },
         "activityType": {
             "group_created": "تم إنشاء المجموعة",
             "group_updated": "تم تحديث المجموعة",
@@ -4250,6 +4276,8 @@
             "recurring_auto_paused": "تم إيقاف المصروف المتكرر تلقائيًا: تعذّر تسجيله",
             "recurring_resumed": "تم استئناف المصروف المتكرر",
             "recurring_generated": "تم توليد مصروف متكرر",
+            "recurring_edited": "تم تعديل المصروف المتكرر",
+            "recurring_deleted": "تم حذف المصروف المتكرر",
             "payment_reversed": "تم عكس الدفع",
             "ledger_restored": "تمت استعادة القيد",
             "ledger_removed": "تمت إزالة القيد"

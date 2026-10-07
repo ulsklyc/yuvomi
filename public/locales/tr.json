@@ -3899,6 +3899,29 @@
             "home": "Ev",
             "general": "Genel"
         },
+        "recurring": {
+            "empty": "Tekrarlanan gider yok.",
+            "add": "Tekrarlanan gider ekle",
+            "edit": "Tekrarlanan gideri düzenle",
+            "nextDate": "Sonraki tarih",
+            "paused": "Duraklatıldı",
+            "pause": "Duraklat",
+            "resume": "Sürdür",
+            "reason": {
+                "split_invalid": "Bu paylaşım kaydedilemiyor.",
+                "not_a_member": "Ödeyen veya bir katılımcı artık grupta değil."
+            },
+            "missedQuestion": "Duraklatma sırasında bazı tarihler geçti",
+            "missedSkip": "{{date}} tarihinden devam et",
+            "missedBook": "{{date}} tarihinden itibaren kaçanları kaydet",
+            "missedDetail": "{{date}} tarihinden beri {{count}} tarih kaçırıldı.",
+            "missedDetail_one": "{{date}} tarihinden beri {{count}} tarih kaçırıldı.",
+            "deleteConfirm": "Bu tekrarlanan gider silinsin mi?",
+            "deleteConfirmDetail": "Artık yeni gider oluşturulmaz. Kaydedilmiş giderler kalır.",
+            "show": "Göster",
+            "editHint": "Değişiklikler sonraki tarihten itibaren geçerlidir. Kaydedilmiş giderler değişmez.",
+            "dateBooked": "{{date}} tarihine kadar olanlar zaten kaydedildi. Sonraki tarih daha ileri olmalı."
+        },
         "activityType": {
             "group_created": "Grup oluşturuldu",
             "group_updated": "Grup güncellendi",
@@ -3917,6 +3940,8 @@
             "recurring_auto_paused": "Tekrarlanan gider otomatik olarak duraklatıldı: kaydedilemedi",
             "recurring_resumed": "Tekrarlanan gider sürdürüldü",
             "recurring_generated": "Tekrarlanan gider üretildi",
+            "recurring_edited": "Tekrarlanan gider düzenlendi",
+            "recurring_deleted": "Tekrarlanan gider silindi",
             "payment_reversed": "Ödeme iptal edildi",
             "ledger_restored": "Kayıt geri yüklendi",
             "ledger_removed": "Kayıt kaldırıldı"

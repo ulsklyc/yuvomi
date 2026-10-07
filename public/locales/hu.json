@@ -3899,6 +3899,29 @@
             "home": "Otthon",
             "general": "Általános"
         },
+        "recurring": {
+            "empty": "Nincs ismétlődő költség.",
+            "add": "Ismétlődő költség hozzáadása",
+            "edit": "Ismétlődő költség szerkesztése",
+            "nextDate": "Következő időpont",
+            "paused": "Szüneteltetve",
+            "pause": "Szüneteltetés",
+            "resume": "Folytatás",
+            "reason": {
+                "split_invalid": "A felosztás nem könyvelhető.",
+                "not_a_member": "A fizető vagy az egyik résztvevő már nem tagja a csoportnak."
+            },
+            "missedQuestion": "A szünet alatt időpontok maradtak ki",
+            "missedSkip": "Folytatás ettől: {{date}}",
+            "missedBook": "Utólagos könyvelés ettől: {{date}}",
+            "missedDetail": "{{date}} óta {{count}} időpont maradt ki.",
+            "missedDetail_one": "{{date}} óta {{count}} időpont maradt ki.",
+            "deleteConfirm": "Törli ezt az ismétlődő költséget?",
+            "deleteConfirmDetail": "Új költség nem jön létre. A már lekönyvelt költségek megmaradnak.",
+            "show": "Megjelenítés",
+            "editHint": "A módosítások a következő időponttól érvényesek. A már lekönyvelt költségek változatlanok maradnak.",
+            "dateBooked": "A(z) {{date}} dátumig már megtörtént a könyvelés. A következő időpontnak későbbinek kell lennie."
+        },
         "activityType": {
             "group_created": "Csoport létrehozva",
             "group_updated": "Csoport frissítve",
@@ -3917,6 +3940,8 @@
             "recurring_auto_paused": "Ismétlődő költség automatikusan szüneteltetve: nem lehetett lekönyvelni",
             "recurring_resumed": "Ismétlődő költség folytatva",
             "recurring_generated": "Ismétlődő költség generálva",
+            "recurring_edited": "Ismétlődő költség szerkesztve",
+            "recurring_deleted": "Ismétlődő költség törölve",
             "payment_reversed": "Fizetés sztornózva",
             "ledger_restored": "Könyvelés visszaállítva",
             "ledger_removed": "Könyvelés eltávolítva"

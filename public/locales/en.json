@@ -3899,6 +3899,29 @@
             "home": "Home",
             "general": "General"
         },
+        "recurring": {
+            "empty": "No recurring expenses.",
+            "add": "Add recurring expense",
+            "edit": "Edit recurring expense",
+            "nextDate": "Next date",
+            "paused": "Paused",
+            "pause": "Pause",
+            "resume": "Resume",
+            "reason": {
+                "split_invalid": "The split cannot be booked.",
+                "not_a_member": "The payer or a participant is no longer in the group."
+            },
+            "missedQuestion": "Dates were missed during the pause",
+            "missedSkip": "Continue from {{date}}",
+            "missedBook": "Book missed dates from {{date}}",
+            "missedDetail": "{{count}} dates have been missed since {{date}}.",
+            "missedDetail_one": "{{count}} date has been missed since {{date}}.",
+            "deleteConfirm": "Delete this recurring expense?",
+            "deleteConfirmDetail": "No new expenses will be created. Expenses already booked are kept.",
+            "show": "Show",
+            "editHint": "Changes apply from the next date. Expenses already booked stay as they are.",
+            "dateBooked": "Dates up to {{date}} are already booked. The next date must be later."
+        },
         "activityType": {
             "group_created": "Group created",
             "group_updated": "Group updated",
@@ -3917,6 +3940,8 @@
             "recurring_auto_paused": "Recurring expense paused automatically: it could not be booked",
             "recurring_resumed": "Recurring expense resumed",
             "recurring_generated": "Recurring expense generated",
+            "recurring_edited": "Recurring expense edited",
+            "recurring_deleted": "Recurring expense deleted",
             "payment_reversed": "Payment reversed",
             "ledger_restored": "Booking restored",
             "ledger_removed": "Booking removed"

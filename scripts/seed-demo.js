@@ -1171,11 +1171,15 @@ insertExpenseComment.run(dinnerExpenseId, alexId,  L('Agreed. Next time we book 
 db.prepare(`
   INSERT INTO recurring_expenses (group_id, title, description, amount_minor, currency, payer_id, category,
                                   split_method, split_snapshot, frequency, next_run_date, anchor_day, created_by)
-  VALUES (?, ?, ?, ?, 'EUR', ?, 'housing', 'equal', ?, 'monthly', ?, 1, ?)
+  VALUES (?, ?, ?, ?, 'EUR', ?, 'rent', 'equal', ?, 'monthly', ?, 1, ?)
 `).run(
   houseGroup, L('Rent share', 'Mietanteil'), L('Split 50/50 each month', 'Jeden Monat hälftig geteilt'),
   145000, alexId,
-  JSON.stringify([{ user_id: alexId, amount_minor: 72500 }, { user_id: lindaId, amount_minor: 72500 }]),
+  // Die Form, die die Route speichert und der Buchungslauf liest (`splitSnapshot`):
+  // Beteiligte + Eingabe je Person. Hier stand eine Liste fertiger Anteile -
+  // der Lauf haette die Serie als `split_invalid` pausiert, und die Liste der
+  // Serien (#1647) zeigt das jetzt an.
+  JSON.stringify({ participants: [alexId, lindaId], splits: [] }),
   thisMonthDate(1) > daysFromNow(0) ? thisMonthDate(1) : `${thisMonthKey(1)}-01`,
   alexId,
 );

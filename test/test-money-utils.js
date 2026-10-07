@@ -315,7 +315,10 @@ test('amountInputProblem: der Grund, warum ein Betrag nicht speicherbar ist (#16
 test('jeder Speicherweg der Aufteilung verlangt einen Betrag', async () => {
   const { readFileSync } = await import('node:fs');
   const quelle = readFileSync(new URL('../public/pages/split-expenses.js', import.meta.url), 'utf8');
-  const aufrufe = quelle.match(/if \(rejectSplitAmount\([\s\S]*?\)\) return;/g) ?? [];
+  // Seit #1647 liegen die Aufrufe fuer Betrag und Genau-Anteile in
+  // rejectSplitAmounts(), das Ausgabe und Serie teilen - dort heisst der
+  // Abbruch `return true;`.
+  const aufrufe = quelle.match(/if \(rejectSplitAmount\([\s\S]*?\)\) return(?: true)?;/g) ?? [];
   assert.equal(aufrufe.length >= 3, true, 'Aufrufe von rejectSplitAmount gefunden');
   for (const aufruf of aufrufe) assert.match(aufruf, /required: true/, aufruf);
 });

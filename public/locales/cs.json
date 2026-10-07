@@ -3536,6 +3536,30 @@
             "home": "Domov",
             "general": "Obecné"
         },
+        "recurring": {
+            "empty": "Žádné opakující se výdaje.",
+            "add": "Přidat opakující se výdaj",
+            "edit": "Upravit opakující se výdaj",
+            "nextDate": "Další termín",
+            "paused": "Pozastaveno",
+            "pause": "Pozastavit",
+            "resume": "Pokračovat",
+            "reason": {
+                "split_invalid": "Rozdělení nelze zaúčtovat.",
+                "not_a_member": "Plátce nebo některý účastník už není ve skupině."
+            },
+            "missedQuestion": "Během pozastavení uplynuly některé termíny",
+            "missedSkip": "Pokračovat od {{date}}",
+            "missedBook": "Doúčtovat od {{date}}",
+            "missedDetail": "Od {{date}} bylo zmeškáno {{count}} termínů.",
+            "missedDetail_one": "Od {{date}} byl zmeškán {{count}} termín.",
+            "missedDetail_few": "Od {{date}} byly zmeškány {{count}} termíny.",
+            "deleteConfirm": "Smazat tento opakující se výdaj?",
+            "deleteConfirmDetail": "Nové výdaje už nevzniknou. Již zaúčtované výdaje zůstanou zachovány.",
+            "show": "Zobrazit",
+            "editHint": "Změny platí od dalšího termínu. Již zaúčtované výdaje zůstávají beze změny.",
+            "dateBooked": "Termíny do {{date}} jsou již zaúčtovány. Další termín musí být pozdější."
+        },
         "activityType": {
             "group_created": "Skupina vytvořena",
             "group_updated": "Skupina aktualizována",
@@ -3554,6 +3578,8 @@
             "recurring_auto_paused": "Opakující se výdaj automaticky pozastaven: nešlo jej zaúčtovat",
             "recurring_resumed": "Opakující se výdaj obnoven",
             "recurring_generated": "Opakující se výdaj vygenerován",
+            "recurring_edited": "Opakující se výdaj upraven",
+            "recurring_deleted": "Opakující se výdaj smazán",
             "payment_reversed": "Platba stornována",
             "ledger_restored": "Zaúčtování obnoveno",
             "ledger_removed": "Zaúčtování odstraněno"

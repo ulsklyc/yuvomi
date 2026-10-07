@@ -4121,6 +4121,31 @@
             "home": "Dom",
             "general": "Ogólne"
         },
+        "recurring": {
+            "empty": "Brak cyklicznych wydatków.",
+            "add": "Dodaj cykliczny wydatek",
+            "edit": "Edytuj cykliczny wydatek",
+            "nextDate": "Następny termin",
+            "paused": "Wstrzymany",
+            "pause": "Wstrzymaj",
+            "resume": "Wznów",
+            "reason": {
+                "split_invalid": "Podziału nie można zaksięgować.",
+                "not_a_member": "Płacący lub jeden z uczestników nie należy już do grupy."
+            },
+            "missedQuestion": "Podczas wstrzymania minęły terminy",
+            "missedSkip": "Kontynuuj od {{date}}",
+            "missedBook": "Zaksięguj pominięte od {{date}}",
+            "missedDetail": "Od {{date}} pominięto {{count}} terminu.",
+            "missedDetail_one": "Od {{date}} pominięto {{count}} termin.",
+            "missedDetail_few": "Od {{date}} pominięto {{count}} terminy.",
+            "missedDetail_many": "Od {{date}} pominięto {{count}} terminów.",
+            "deleteConfirm": "Usunąć ten cykliczny wydatek?",
+            "deleteConfirmDetail": "Nowe wydatki nie będą już tworzone. Zaksięgowane wydatki pozostaną.",
+            "show": "Pokaż",
+            "editHint": "Zmiany obowiązują od następnego terminu. Zaksięgowane wydatki pozostają bez zmian.",
+            "dateBooked": "Terminy do {{date}} są już zaksięgowane. Następny termin musi być późniejszy."
+        },
         "activityType": {
             "group_created": "Grupa utworzona",
             "group_updated": "Grupa zaktualizowana",
@@ -4139,6 +4164,8 @@
             "recurring_auto_paused": "Cykliczny wydatek wstrzymany automatycznie: nie udało się go zaksięgować",
             "recurring_resumed": "Cykliczny wydatek wznowiony",
             "recurring_generated": "Cykliczny wydatek wygenerowany",
+            "recurring_edited": "Cykliczny wydatek edytowany",
+            "recurring_deleted": "Cykliczny wydatek usunięty",
             "payment_reversed": "Płatność stornowana",
             "ledger_restored": "Księgowanie przywrócone",
             "ledger_removed": "Księgowanie usunięte"

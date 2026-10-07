@@ -5,7 +5,8 @@ import { op, jsonBody, idParam, DOCUMENT_LINKS_READ_NOTE } from '../helpers.js';
 const AMOUNT_NOTE = 'Amounts are decimal strings with a dot (`"12.50"`, not a number), with at most the currency\'s decimal places, and must be greater than zero: `0`, `-0` and negative values are answered with `400`.';
 const EXACT_SPLIT_NOTE = 'With `split_method: "exact"`, every participant needs a `splits[].amount` under the same rule, and the shares must add up to the expense amount.';
 const RECURRING_SPLIT_NOTE = 'The split is checked when the recurring expense is created, by the same rule as a single expense: `payer_id` and every entry of `participants` must be members of the group, `exact` amounts must add up to the amount, `percentage` values to 100, and `shares` must be positive integers. Anything else is answered with `400` and nothing is stored.';
-const RECURRING_ANCHOR_NOTE = 'Every recurring expense carries `anchor_day`, the day of the month it is meant for (1-31), taken from the first `next_run_date` when it is created; it cannot be set directly. Monthly and yearly steps clamp to the last day of a shorter month and return to the anchor where the month has it: a series on the 31st books on 28 or 29 February and on 31 March, a yearly one from 29 February books on 28 February and on 29 February again in a leap year. Weekly series step by seven days.';
+const RECURRING_VIEW_NOTE = 'Active ones first, then by `next_run_date`. Besides its columns every recurring expense carries: `payer_name`; `participants` and `splits`, the stored split as input (what `split_snapshot` holds; a legacy snapshot that is a list of finished shares gives its people as `participants`); `blocked_reason`, why the hourly run would pause it on its next date (`split_invalid`: the stored split cannot be booked, `not_a_member`: the payer or a participant is no longer a member of the group) or null, measured against the current state with the run\'s own check; `can_edit`, whether the caller may update, delete, pause and resume it (group owner/admin or whoever created it); and, on a paused one, `missed_count` and `resume_date`: how many dates a resume without `missed: "book"` skips and the date it lands on (0 and null while it is active).';
+const RECURRING_ANCHOR_NOTE = 'Every recurring expense carries `anchor_day`, the day of the month it is meant for (1-31), taken from the first `next_run_date` when it is created and again whenever an update changes `next_run_date` or `frequency`; it cannot be set directly. Monthly and yearly steps clamp to the last day of a shorter month and return to the anchor where the month has it: a series on the 31st books on 28 or 29 February and on 31 March, a yearly one from 29 February books on 28 February and on 29 February again in a leap year. Weekly series step by seven days.';
 
 const apiError = (description) => ({
   description,
@@ -172,7 +173,7 @@ export function splitexpensesPaths() {
       }),
     },
     '/api/v1/split-expenses/groups/{id}/recurring': {
-      get: op({ summary: 'List recurring expenses in group', description: RECURRING_ANCHOR_NOTE, tag: 'SplitExpenses', params: [idParam()] }),
+      get: op({ summary: 'List recurring expenses in group', description: `${RECURRING_VIEW_NOTE} ${RECURRING_ANCHOR_NOTE}`, tag: 'SplitExpenses', params: [idParam()] }),
       post: op({ summary: 'Create recurring expense in group', description: `${AMOUNT_NOTE} ${EXACT_SPLIT_NOTE} ${RECURRING_SPLIT_NOTE} ${RECURRING_ANCHOR_NOTE}`, tag: 'SplitExpenses', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/split-expenses/expenses/{id}': {
@@ -187,6 +188,34 @@ export function splitexpensesPaths() {
     },
     '/api/v1/split-expenses/expenses/{id}/comments': {
       post: op({ summary: 'Add expense comment', tag: 'SplitExpenses', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+    },
+    '/api/v1/split-expenses/recurring/{id}': {
+      put: op({
+        summary: 'Update recurring expense',
+        description: `Allowed for group owners/admins and for whoever created it. A partial update: every field the call omits stays as it is - title, amount, currency, payer, category, description, rhythm, date, split method, participants and \`splits\`. Send \`description\` as \`null\` or \`""\` to clear it. The resulting recurring expense as a whole runs through the same check as creating one, and a refused update changes nothing: changing only the amount of an \`exact\` split is answered with \`400\` because the stored shares no longer add up. ${AMOUNT_NOTE} ${EXACT_SPLIT_NOTE} ${RECURRING_SPLIT_NOTE} Without \`currency\` an \`amount\` is read in the currency of the recurring expense. A date that was already booked cannot be triggered again: a \`next_run_date\` that differs from the stored one must lie after the last date booked from this recurring expense (the latest \`expense_date\` of its expenses, deleted ones included); otherwise the answer is \`400\` with \`reason: "next_run_not_after_last_booking"\` and \`last_booked\`. Clients that show an edit form should send only the fields the user changed, so a form opened before the last run does not send its old date back. Expenses already booked keep their values; the next date is booked with the new ones. \`anchor_day\` follows \`next_run_date\` only when the call changes the date or the frequency, so saving a series from the 31st while it stands on 28 February leaves it on the 31st. \`paused_at\` is not touched: a paused recurring expense stays paused until it is resumed. Writes a \`recurring_edited\` activity entry with title and amount. The response has the shape of the list.`,
+        tag: 'SplitExpenses',
+        params: [idParam()],
+        stateChanging: true,
+        requestBody: jsonBody(null),
+        responses: {
+          200: { description: 'The recurring expense after the update' },
+          400: apiError('Refused by the check that also guards creation, or `next_run_date` is not after the last booked date (`reason: "next_run_not_after_last_booking"`, `last_booked`); nothing was changed'),
+          403: apiError('Neither group owner/admin nor the creator'),
+          404: apiError('Unknown recurring expense, or its group is not accessible to the caller'),
+        },
+      }),
+      delete: op({
+        summary: 'Delete recurring expense',
+        description: 'Allowed for group owners/admins and for whoever created it. Removes the recurring expense; no further dates are booked. Expenses already booked from it stay untouched, with their shares, ledger entries and `recurring_rule_id`. Writes a `recurring_deleted` activity entry with title and amount.',
+        tag: 'SplitExpenses',
+        params: [idParam()],
+        stateChanging: true,
+        responses: {
+          200: { description: '`{ ok: true }`' },
+          403: apiError('Neither group owner/admin nor the creator'),
+          404: apiError('Unknown recurring expense, or its group is not accessible to the caller'),
+        },
+      }),
     },
     '/api/v1/split-expenses/recurring/{id}/pause': {
       post: op({

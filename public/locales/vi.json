@@ -3899,6 +3899,29 @@
             "home": "Nhà",
             "general": "Chung"
         },
+        "recurring": {
+            "empty": "Không có chi phí định kỳ.",
+            "add": "Thêm chi phí định kỳ",
+            "edit": "Sửa chi phí định kỳ",
+            "nextDate": "Ngày tiếp theo",
+            "paused": "Đã tạm dừng",
+            "pause": "Tạm dừng",
+            "resume": "Tiếp tục",
+            "reason": {
+                "split_invalid": "Không thể ghi nhận cách chia này.",
+                "not_a_member": "Người trả hoặc một người tham gia không còn trong nhóm."
+            },
+            "missedQuestion": "Một số ngày đã bị bỏ lỡ trong lúc tạm dừng",
+            "missedSkip": "Tiếp tục từ {{date}}",
+            "missedBook": "Ghi bù từ {{date}}",
+            "missedDetail": "Đã bỏ lỡ {{count}} ngày kể từ {{date}}.",
+            "missedDetail_one": "Đã bỏ lỡ {{count}} ngày kể từ {{date}}.",
+            "deleteConfirm": "Xóa chi phí định kỳ này?",
+            "deleteConfirmDetail": "Sẽ không tạo thêm chi phí mới. Các chi phí đã ghi nhận được giữ lại.",
+            "show": "Hiển thị",
+            "editHint": "Thay đổi áp dụng từ ngày tiếp theo. Các chi phí đã ghi nhận không thay đổi.",
+            "dateBooked": "Các ngày đến {{date}} đã được ghi nhận. Ngày tiếp theo phải sau đó."
+        },
         "activityType": {
             "group_created": "Nhóm đã tạo",
             "group_updated": "Nhóm đã cập nhật",
@@ -3917,6 +3940,8 @@
             "recurring_auto_paused": "Chi phí định kỳ tự động tạm dừng: không thể ghi nhận",
             "recurring_resumed": "Chi phí định kỳ được tiếp tục",
             "recurring_generated": "Chi phí định kỳ được phát sinh",
+            "recurring_edited": "Chi phí định kỳ đã sửa",
+            "recurring_deleted": "Chi phí định kỳ bị xóa",
             "payment_reversed": "Đã hoàn tác thanh toán",
             "ledger_restored": "Đã khôi phục bút toán",
             "ledger_removed": "Đã xóa bút toán"
