@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.74.0] - 2026-10-07
+
 ### Added
 
 - **Recurring shared expenses have a place in the app: a group lists them, and they can be
