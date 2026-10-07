@@ -1,9 +1,57 @@
 /**
  * Modul: Service Worker Registrierung
  * Zweck: Ausgelagert aus index.html um CSP-Inline-Script-Verletzung zu vermeiden.
- *        Handhabt nahtlose Updates via controllerchange.
+ *        Meldet Updates via controllerchange an den Router.
  * Abhängigkeiten: keine
  */
+
+/**
+ * EIN UPDATE IST DER WECHSEL VON EINEM ALTEN AUF EINEN NEUEN CONTROLLER.
+ *
+ * `controllerchange` feuert auch beim allerersten Besuch: der frisch
+ * installierte Worker uebernimmt die Seite (`skipWaiting` + `clients.claim()`
+ * in sw.js), und vorher gab es keinen. Bis R18 lud die Seite dann nach 200 ms
+ * neu - gemessen 1,0 bis 4,5 s nach dem Start, mitten ins Anmeldeformular,
+ * dessen Eingabe damit weg war. Ein Erstinstall ist kein Update: es gibt keine
+ * alte Shell, gegen die eine neue Seite gebunden werden koennte.
+ *
+ * WAS BEI EINEM UPDATE GESCHIEHT, ENTSCHEIDET DER ROUTER (utils/app-update.js),
+ * nicht diese Datei: nur er weiss, ob gerade ein Dialog offen ist, eine Seite
+ * ungespeicherte Arbeit haelt oder jemand tippt. Diese Datei meldet das Update
+ * nur. Sie kann vor dem Router fertig sein, deshalb merkt sie es sich: wer sich
+ * spaeter anmeldet, erfaehrt es sofort.
+ */
+let updatePending = false;
+const updateListeners = new Set();
+
+/**
+ * Meldet einen Empfaenger fuer "ein neuer Service Worker hat uebernommen" an.
+ * War das Update schon da, wird er sofort gerufen.
+ * @param {() => void} fn
+ * @returns {() => void} Abmeldung
+ */
+export function onServiceWorkerUpdate(fn) {
+  updateListeners.add(fn);
+  if (updatePending) fn();
+  return () => updateListeners.delete(fn);
+}
+
+/**
+ * So lange wartet ein Update auf einen Empfaenger, bevor diese Datei selbst neu
+ * laedt. Der Empfaenger ist der Router; meldet er sich nicht, ist er nicht
+ * geladen (Ladefehler, kaputte Shell) - dann gibt es auch niemanden, den ein
+ * Reload unterbraeche, und er ist der einzige Weg, auf dem eine reparierte
+ * Version die Seite von selbst erreicht.
+ */
+export const UPDATE_ORPHAN_RELOAD_MS = 10000;
+
+/**
+ * Wartezeit vor einem Reload nach `controllerchange`. Auf iOS-Standalone fuehrt
+ * ein sofortiger Reload zu Timing-Problemen (leere Seite, verlorene Cookies):
+ * der neue Worker soll vollstaendig aktiviert sein und `clients.claim()`
+ * abgeschlossen haben. utils/app-update.js haelt dieselbe Frist ein.
+ */
+export const UPDATE_RELOAD_DELAY_MS = 200;
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
@@ -14,17 +62,22 @@ if ('serviceWorker' in navigator) {
       });
   });
 
-  // SW-Update: Auf iOS-PWA fuehrt ein sofortiger Reload bei controllerchange
-  // zu Timing-Problemen (leere Seite, verlorene Cookies). Stattdessen nur
-  // nachladen wenn die Seite gerade nicht mitten im Initialisieren ist.
-  let refreshing = false;
+  // Stand beim Laden DIESES Dokuments. Danach traegt jeder Wechsel den
+  // Vorgaenger selbst bei: nach dem Erstinstall ist die Seite kontrolliert,
+  // der naechste Wechsel also ein echtes Update.
+  let controlled = Boolean(navigator.serviceWorker.controller);
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (refreshing) return;
-    refreshing = true;
-    // Kurz warten damit der neue SW vollstaendig aktiviert ist und
-    // clients.claim() abgeschlossen hat, bevor die Seite neu laedt.
-    // Auf iOS-Standalone verhindert das den "leere Seite"-Bug.
-    setTimeout(() => window.location.reload(), 200);
+    const hadController = controlled;
+    controlled = true;
+    if (!hadController || updatePending) return;
+    updatePending = true;
+    if (updateListeners.size) {
+      updateListeners.forEach((fn) => fn());
+      return;
+    }
+    setTimeout(() => {
+      if (!updateListeners.size) window.location.reload();
+    }, UPDATE_ORPHAN_RELOAD_MS);
   });
 
   const refreshSw = () => {

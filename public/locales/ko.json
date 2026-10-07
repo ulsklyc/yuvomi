@@ -44,7 +44,7 @@
         "unexpectedError": "예기치 못한 오류가 발생했습니다.",
         "errorDetails": "기술 세부 정보",
         "errorGeneric": "오류가 발생했습니다.",
-        "updateAvailable": "업데이트가 있습니다 - 새로고침 중..",
+        "updateAvailable": "업데이트가 있습니다 - 최신 버전을 사용하려면 페이지를 새로고침하세요.",
         "titleRequired": "제목은 필수입니다",
         "nameLabel": "이름",
         "nameRequired": "이름은 필수입니다",

@@ -7,8 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The app starts faster on a slow connection.** Before the overview asked for its data, the
+  start made five requests one after the other, two of them twice. What does not depend on each
+  other now runs at the same time, and the second copy is served from the first. Measured on a
+  throttled phone (4x CPU, "Fast 4G"), three runs each: the overview asked for its data after
+  747-775 ms instead of 1297-1333 ms, and the greeting appeared after 980-1007 ms instead of
+  1535-1576 ms.
+
 ### Fixed
 
+- **The first visit no longer reloads itself and empties the login form.** One to four seconds
+  after the very first load the page reloaded, and whatever had been typed into the login form
+  was gone. The reload was meant for an update of the app, but it also fired when the app was
+  installed in the browser for the first time.
+- **An update of the app no longer interrupts what you are doing.** When a new version arrived,
+  the page reloaded 200 ms later - with a dialog open, a half-filled form or an unsaved overview
+  layout. Now it reloads right away only when nothing is open and nobody is typing. Otherwise a
+  notice with a "Reload" button appears, and the new version loads with the next page change or
+  when the app goes to the background. The notice says the same in every language; in German,
+  Persian, Indonesian, Korean and Polish it used to announce a reload that was already over.
 - **Overview on a desktop: opening "New" no longer tips the button over.** The plus turns into
   a cross by rotating - and it was the whole button that rotated, label included, so the capsule
   stood diagonally at 45 degrees and turned grey while its menu was open. Only the icon turns

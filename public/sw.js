@@ -97,6 +97,7 @@ const APP_SHELL = [
   // Seitenmodul träfe sonst auf die alte Fassung (#616). Sortierung wie im
   // Dateisystem; Fetch-Routing für diese Pfade → SHELL_CACHE (isMutableAppResource).
   '/nav-icons.js',
+  '/utils/app-update.js',
   '/permissions.js',
   // Der Router laedt ihn als Seiteneffekt (`import '/components/datepicker.js'`),
   // also gehoert er in die Shell, nicht zu den Seitenmodulen. Der
@@ -226,6 +227,7 @@ const APP_SHELL = [
   '/utils/sheet-drag.js',
   '/utils/shopping-categories.js',
   '/utils/skeleton.js',
+  '/utils/start-handoff.js',
   '/utils/sub-tabs.js',
   '/utils/swipe-row.js',
   '/utils/sync-target.js',

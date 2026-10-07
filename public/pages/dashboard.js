@@ -6220,7 +6220,10 @@ export async function render(container, { user, signal: routeSignal = null } = {
     const [dashRes, weatherRes, prefsRes, remindersRes] = await Promise.all([
       api.get(layoutHintQuery('/dashboard')),
       api.get(`/weather?lang=${encodeURIComponent(getLocale())}`).catch(() => ({ data: null })),
-      api.get('/preferences').catch(() => ({ data: {} })),
+      // Beim Start hat der Router dieselbe Antwort schon unterwegs und reicht
+      // sie herein (utils/start-handoff.js) - sonst zwei `/preferences` je
+      // Kaltstart. Danach gibt es nichts mehr abzuholen, und die Seite fragt selbst.
+      (window.yuvomi?.takeStartPreferences?.() ?? api.get('/preferences')).catch(() => ({ data: {} })),
       loadPendingReminders(),
     ]);
     // Ueberholt oder verlassen, waehrend die Antworten unterwegs waren (#977):

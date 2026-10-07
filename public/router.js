@@ -4,11 +4,11 @@
  * Abhängigkeiten: api.js
  */
 
-import { api, auth } from '/api.js';
+import { api, auth, isAbortError } from '/api.js';
 import { canAccessNavModule, navModuleAccess, setExtensionNavMap } from '/permissions.js';
 import { setExtensionModules, selectThirdPartyModuleList } from '/utils/extension-widgets.js';
 import { initExtensionI18n, moduleDisplayLabel, reloadExtensionLocales } from '/utils/extension-i18n.js';
-import { clearApiCache } from '/sw-register.js';
+import { clearApiCache, onServiceWorkerUpdate, UPDATE_RELOAD_DELAY_MS } from '/sw-register.js';
 import { forgetLayoutHint } from '/utils/dashboard-layout-hint.js';
 import { initI18n, getLocale, t, formatDate, formatTime } from '/i18n.js';
 import { esc } from '/utils/html.js';
@@ -45,10 +45,12 @@ import { renderSkeletonList } from '/utils/skeleton.js';
 import { wirePaletteCombobox } from '/utils/palette-combobox.js';
 import { triggerPageFab } from '/utils/fab.js';
 import { hasLeaveGuard, mayLeave } from '/utils/leave-guard.js';
+import { createUpdateFlow, isUserBusy } from '/utils/app-update.js';
+import { createStartHandoff } from '/utils/start-handoff.js';
 import { wireSheetDrag } from '/utils/sheet-drag.js';
 import {
   handleBackNavigation, closeAllOverlays, consumeOverlayMarker,
-  pushOverlay, dropOverlay, attachOverlay, whenHistorySettled,
+  pushOverlay, dropOverlay, attachOverlay, whenHistorySettled, hasOpenOverlay,
 } from '/utils/overlay-history.js';
 import {
   applyNavBadges, setNavBadge, resetNavBadges, navBadgeRoutes,
@@ -637,6 +639,14 @@ function createFocusTrap(container) {
   };
 }
 
+// Was der Start schon angefragt hat, reicht er weiter (utils/start-handoff.js):
+// `/auth/me` an den Auth-Guard, `/version` an syncPreferencesOnce(), das
+// laufende `/preferences` an die Seite, die gleich zeichnet.
+const startHandoff = createStartHandoff({
+  auth,
+  dispatchExpired: () => window.dispatchEvent(new CustomEvent('auth:expired')),
+});
+
 /**
  * Navigiert zu einem Pfad und rendert die entsprechende Seite. Die Funktion
  * selbst steht in utils/router-navigate.js (#1657), damit Tests sie importieren
@@ -648,79 +658,109 @@ const navigate = createNavigate(routerState, {
   ROUTES, allRoutes, unknownPathDetour, publicPathDetour, detourPaths, canAccessNavModule,
   location, history, window, document,
   hasLeaveGuard, mayLeave, whenHistorySettled, consumeOverlayMarker,
-  auth, syncPreferencesOnce, startThirdPartyModulePolling, loadReminderStyles, initReminders, initPush,
+  auth: startHandoff.auth, syncPreferencesOnce, startThirdPartyModulePolling, loadReminderStyles, initReminders, initPush,
   rememberScrollPosition, scrollPositionFor, renderPage, adoptPageFab, updateNav, topLevelSection,
   syncWallMode, applyModuleAccentForRoute, updateThemeColorForRoute, updateBranding,
   focusMainContentAfterNavigation, showToast, t,
 });
 
+/**
+ * Laedt, was jede Sitzung vor ihrer ersten Seite braucht: Praeferenzen,
+ * Versionsangaben, Erweiterungsmodule.
+ *
+ * DIE DREI LAUFEN GLEICHZEITIG (Critique R18). Sie hingen nie voneinander ab,
+ * liefen aber nacheinander: am gedrosselten Telefon (CPU 4x, Fast 4G) drei
+ * Rundreisen von je rund 175 ms, bevor die Uebersicht ihre Daten ueberhaupt
+ * anfragte. Was BLEIBT, ist die Reihenfolge nach aussen: navigate() wartet auf
+ * alle drei, bevor es die Route aufloest - die Erweiterungsrouten aus
+ * `/modules` und die abgeschalteten Module aus `/preferences` muessen dann
+ * stehen (takeDetour, Modul-Guard).
+ */
 async function syncPreferencesOnce() {
   if (routerState._preferencesLoaded) return;
   routerState._preferencesLoaded = true;
-  try {
-    const res = await api.get('/preferences');
-    const dateFormat = res?.data?.date_format;
-    if (dateFormat) {
-      localStorage.setItem('yuvomi-date-format', dateFormat);
-    }
-    const timeFormat = res?.data?.time_format;
-    if (timeFormat) {
-      localStorage.setItem('yuvomi-time-format', timeFormat);
-    }
-    // Die Haushaltszone in die Anzeige spiegeln (#829 Teil 3). Bewusst
-    // `timezone` und nicht `timezone_effective`: letzteres ist nie leer und
-    // traegt ohne Einstellung die `TZ` des Containers - ein Compose-Schalter,
-    // der nichts darueber aussagt, wo dieser Haushalt lebt. Ohne getroffene
-    // Wahl bleibt die Anzeige also beim Browser, so wie bisher.
-    setDisplayTimeZone(res?.data?.timezone ?? null);
-    // Der Zonen-Hinweis der Uebersicht (#1607) liest genau diese Antwort: sie
-    // ist da, bevor die erste Seite zeichnet, also steht er schon neben dem
-    // Skelett und schiebt nichts nach.
-    rememberZonePrefs(res?.data);
-    // Region als Formatier-Locale für Zahlen/Währung spiegeln (z. B. de-CH →
-    // 123'456.78). getFormatLocale() in i18n.js liest diesen Wert.
-    const numberLocale = numberLocaleFor({
-      region: res?.data?.region,
-      currency: res?.data?.currency,
-      date_format: res?.data?.date_format,
-      time_format: res?.data?.time_format,
-    });
-    if (numberLocale) {
-      localStorage.setItem('yuvomi-number-locale', numberLocale);
-    } else {
-      localStorage.removeItem('yuvomi-number-locale');
-    }
-    if (res?.data?.app_name) {
-      setAppName(res.data.app_name);
-      updateBranding();
-    }
-    if (Array.isArray(res?.data?.disabled_modules)) {
-      routerState._disabledModules = new Set(res.data.disabled_modules);
-    }
-    if (Array.isArray(res?.data?.hidden_modules)) {
-      _hiddenModules = new Set(res.data.hidden_modules);
-    }
-    if (Array.isArray(res?.data?.module_order)) {
-      _moduleOrder = res.data.module_order;
-    }
-    if (Array.isArray(res?.data?.mobile_nav_order)) {
-      _mobileNavOrder = res.data.mobile_nav_order;
-    }
-  } catch {
+  // Wessen Sitzung ist das? Eine Antwort, die nach einem Sitzungsende eintrifft
+  // (401 auf einem der Nachbarn -> auth:expired -> forgetSessionState), darf
+  // nichts mehr setzen: sonst erbte das naechste Mitglied am selben Geraet die
+  // ausgeblendeten Module. Nacheinander konnte das nicht passieren, gleichzeitig
+  // schon.
+  const session = routerState.currentUser;
+  const sameSession = () => routerState.currentUser === session;
+
+  const preferences = api.get('/preferences');
+  // Die Uebersicht braucht dieselbe Antwort fuer ihre Kacheln und holte sie ein
+  // zweites Mal (gemessen: zweimal `/preferences` je Kaltstart).
+  startHandoff.holdPreferences(preferences);
+  const preferencesApplied = preferences
+    .then((res) => { if (sameSession()) applyStartPreferences(res); })
     // Non-critical. The settings page can refresh this later.
-  }
-  try {
-    const res = await api.get('/version');
-    if (res?.version) setAppVersion(res.version);
-    if (res?.app_name) setAppName(res.app_name);
-    // Die Upload-Grenze kommt vom Server, damit Hinweis und Pruefung im Browser
-    // dieselbe Zahl nennen wie er (#806).
-    setMaxUploadBytes(res?.max_upload_bytes);
-    updateBranding();
-  } catch {
+    .catch(() => {});
+
+  // Die Versionsangaben NACH den Praeferenzen anwenden, wie bisher: beide
+  // tragen `app_name`, und die Reihenfolge soll nicht vom Netz abhaengen.
+  const versionApplied = Promise.all([startHandoff.takeVersion() ?? api.get('/version'), preferencesApplied])
+    .then(([res]) => {
+      if (res?.version) setAppVersion(res.version);
+      if (res?.app_name) setAppName(res.app_name);
+      // Die Upload-Grenze kommt vom Server, damit Hinweis und Pruefung im Browser
+      // dieselbe Zahl nennen wie er (#806).
+      setMaxUploadBytes(res?.max_upload_bytes);
+      updateBranding();
+    })
     // Non-critical. The login page and settings page can refresh branding later.
+    .catch(() => {});
+
+  await Promise.all([preferencesApplied, versionApplied, syncThirdPartyModules()]);
+}
+
+function applyStartPreferences(res) {
+  const dateFormat = res?.data?.date_format;
+  if (dateFormat) {
+    localStorage.setItem('yuvomi-date-format', dateFormat);
   }
-  await syncThirdPartyModules();
+  const timeFormat = res?.data?.time_format;
+  if (timeFormat) {
+    localStorage.setItem('yuvomi-time-format', timeFormat);
+  }
+  // Die Haushaltszone in die Anzeige spiegeln (#829 Teil 3). Bewusst
+  // `timezone` und nicht `timezone_effective`: letzteres ist nie leer und
+  // traegt ohne Einstellung die `TZ` des Containers - ein Compose-Schalter,
+  // der nichts darueber aussagt, wo dieser Haushalt lebt. Ohne getroffene
+  // Wahl bleibt die Anzeige also beim Browser, so wie bisher.
+  setDisplayTimeZone(res?.data?.timezone ?? null);
+  // Der Zonen-Hinweis der Uebersicht (#1607) liest genau diese Antwort: sie
+  // ist da, bevor die erste Seite zeichnet, also steht er schon neben dem
+  // Skelett und schiebt nichts nach.
+  rememberZonePrefs(res?.data);
+  // Region als Formatier-Locale für Zahlen/Währung spiegeln (z. B. de-CH →
+  // 123'456.78). getFormatLocale() in i18n.js liest diesen Wert.
+  const numberLocale = numberLocaleFor({
+    region: res?.data?.region,
+    currency: res?.data?.currency,
+    date_format: res?.data?.date_format,
+    time_format: res?.data?.time_format,
+  });
+  if (numberLocale) {
+    localStorage.setItem('yuvomi-number-locale', numberLocale);
+  } else {
+    localStorage.removeItem('yuvomi-number-locale');
+  }
+  if (res?.data?.app_name) {
+    setAppName(res.data.app_name);
+    updateBranding();
+  }
+  if (Array.isArray(res?.data?.disabled_modules)) {
+    routerState._disabledModules = new Set(res.data.disabled_modules);
+  }
+  if (Array.isArray(res?.data?.hidden_modules)) {
+    _hiddenModules = new Set(res.data.hidden_modules);
+  }
+  if (Array.isArray(res?.data?.module_order)) {
+    _moduleOrder = res.data.module_order;
+  }
+  if (Array.isArray(res?.data?.mobile_nav_order)) {
+    _mobileNavOrder = res.data.mobile_nav_order;
+  }
 }
 
 async function syncThirdPartyModules() {
@@ -1642,6 +1682,9 @@ async function renderPage(route, previousPath = null, scrollTarget = 0) {
     // die Seite ist dann nur noch per Reload verlassbar. Erst wenn noch keine
     // Shell steht (Auth-Seiten, früher Fehler), ist #app der richtige Ort.
     renderError(document.getElementById('main-content') ?? app, err);
+  } finally {
+    // Die Uebergabe gilt der Seite, die DIESER Start zeichnet (utils/start-handoff.js).
+    startHandoff.expirePage();
   }
 }
 
@@ -4359,26 +4402,44 @@ window.addEventListener('error', (e) => {
 window.addEventListener('unhandledrejection', (e) => {
   // Auth-Fehler werden bereits von auth:expired behandelt
   if (e.reason?.status === 401) return;
+  // Ein Abruf, den sein Aufrufer selbst abgebrochen hat (`api.get(path,
+  // { signal })`), ist kein Fehler und bekommt weder Toast noch Konsolenzeile.
+  if (isAbortError(e.reason)) {
+    e.preventDefault();
+    return;
+  }
   console.error('[Yuvomi] Unbehandeltes Promise-Rejection:', e.reason);
   showToast(friendlyError(e.reason), 'danger');
   e.preventDefault(); // Konsolenfehler unterdrücken (bereits geloggt)
 });
 
-// SW-Update: neue Version im Hintergrund installiert → Toast anzeigen
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.addEventListener('message', (e) => {
-    if (e.data?.type === 'SW_UPDATED') {
-      // Ab hier keine Seitenmodule mehr nachladen. Früher wurde an dieser Stelle
-      // der Modul-Cache dieses Routers geleert, damit die nächste Navigation
-      // frische Module lädt - wirkungslos: geleert wurde nur die eigene Map,
-      // während die Modul-Map des Dokuments die alten Abhängigkeiten weiter
-      // auflöst. Genau daraus entstand der Mischzustand aus #616.
-      shellStale = true;
-      showToast(t('common.updateAvailable'), 'default', 8000);
-      setTimeout(() => location.reload(), 8000);
-    }
-  });
-}
+// SW-Update: EIN Weg (utils/app-update.js). sw-register.js meldet den Wechsel
+// von einem alten auf einen neuen Controller, hier wird die Shell als alt
+// markiert und neu geladen, sobald es niemanden unterbricht.
+//
+// Ab `onStale` keine Seitenmodule mehr nachladen. Früher wurde an dieser Stelle
+// der Modul-Cache dieses Routers geleert, damit die nächste Navigation frische
+// Module lädt - wirkungslos: geleert wurde nur die eigene Map, während die
+// Modul-Map des Dokuments die alten Abhängigkeiten weiter auflöst. Genau
+// daraus entstand der Mischzustand aus #616.
+//
+// Die Nachricht `SW_UPDATED` des Workers liest hier niemand mehr: sie kommt
+// auch beim Erstinstall, und ihr Hinweis kündigte 8 s lang einen Reload an,
+// den sw-register.js längst nach 200 ms gefahren hatte (Critique R18). Der
+// Worker schickt sie weiter, für Shells bis v2.75, die beim Update noch laufen.
+const updateFlow = createUpdateFlow({
+  document,
+  isBusy: () => isUserBusy({ document, hasLeaveGuard, hasOpenOverlay }),
+  reload: reloadOnce,
+  onStale: () => { shellStale = true; },
+  // Der Knopf lädt ohne Schleifenbremse: wer ihn drückt, hat entschieden.
+  notify: () => showToast(t('common.updateAvailable'), 'default', 8000, {
+    label: t('common.reload'),
+    onClick: () => location.reload(),
+  }),
+  delayMs: UPDATE_RELOAD_DELAY_MS,
+});
+onServiceWorkerUpdate(() => updateFlow.announce());
 
 // Browser zurück/vor
 //
@@ -4750,17 +4811,35 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
       refreshThemeColorForTheme();
     });
 
+    // GLEICHZEITIG MIT DEN SPRACHDATEIEN (Critique R18): `/version`, die
+    // Sitzungsfrage und das Seitenmodul haengen weder von der Sprache noch
+    // voneinander ab. Vorher lief alles nacheinander - am gedrosselten Telefon
+    // fuenf Rundreisen, rund 870 ms, bevor die Uebersicht ihre Daten anfragte.
+    // Die Sitzungsfrage nur fuer eine Adresse, die eine Sitzung verlangt: die
+    // Anmeldeseite hat nie `/auth/me` gefragt und tut es weiter nicht.
+    const version = api.get('/version');
+    const startRoute = ROUTES.find((r) => r.path === location.pathname);
+    if (!startRoute || startRoute.requiresAuth) {
+      startHandoff.askSession();
+    }
+    // Nur ein Hinweis an den Browser (modulepreload): ausgefuehrt wird nichts,
+    // und nach einem angekuendigten Update unterlaesst prefetchRoute() ihn (#616).
+    prefetchRoute(location.pathname);
+
     await initI18n();
     initExtensionI18n();
     try {
-      const v = await api.get('/version');
+      const v = await version;
       routerState._setupRequired = v?.setup_required === true;
       if (v?.version) setAppVersion(v.version);
       if (v?.app_name) setAppName(v.app_name);
+      startHandoff.holdVersion(v);
     } catch {
       routerState._setupRequired = false; // Fail-safe: kein Setup erzwingen
     }
-    navigate(location.pathname, false);
+    // Was die erste Navigation nicht abgeholt hat, verfaellt mit ihr: eine
+    // spaetere Anmeldung faende sonst die Antwort einer frueheren Sitzung vor.
+    navigate(location.pathname, false).finally(() => startHandoff.expireStart());
   } catch (err) {
     console.error('[Router] Initialisierung fehlgeschlagen:', err);
     // renderError ersetzt den Inhalt von #app und nimmt den Ladebildschirm mit.
@@ -4793,6 +4872,9 @@ window.yuvomi = {
   // Die Uebersichtsseite reicht ihre `/dashboard`-Antwort herein, statt sie ein
   // zweites Mal holen zu lassen. Begruendung an `primeModuleCountsFrom`.
   primeModuleCountsFrom,
+  // Umgekehrt reicht der Router der Seite sein `/preferences` des Starts.
+  // Begruendung in utils/start-handoff.js.
+  takeStartPreferences: () => startHandoff.takePreferences(),
   // Fuer eine Seite, die sich SELBST neu aufbaut, ohne dass der Router
   // navigiert - die Uebersicht beim Betreten und Verlassen des Wand-Modus, nach
   // „erneut versuchen" oder einer Aenderung aus einer Kachel. renderPage()
