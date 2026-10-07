@@ -603,6 +603,9 @@ function bindEvents(container, user) {
   bindScreensaverIdleSelect(container.querySelector('#screensaver-idle-select'));
 
   const localeSelect = container.querySelector('#locale-select');
+  // Die Auswahl, die wirklich gilt (auch "System") - dorthin geht ein
+  // gescheiterter Wechsel zurueck.
+  const appliedLocaleChoice = localeSelect?.value;
   localeSelect?.addEventListener('change', async () => {
     const errorElement = container.querySelector('#locale-error');
     clearError(errorElement);
@@ -616,8 +619,13 @@ function bindEvents(container, user) {
       const locale = localeSelect.value;
       await setLocale(locale);
       await render(container, { user });
-    } catch (error) {
-      showError(errorElement, error.message);
+    } catch {
+      // Die Sprachdatei kam nicht (offline, und dieses Geraet hat die Sprache
+      // nie geladen). setLocale() hat dann nichts umgestellt - die Auswahl geht
+      // zurueck auf die Sprache, die wirklich gilt, und die Zeile sagt warum.
+      // Vorher stand hier der Parserfehler der Offline-Seite im Wortlaut.
+      localeSelect.value = appliedLocaleChoice;
+      showError(errorElement, t('common.errorOffline'));
     } finally {
       if (localeSelect.isConnected) localeSelect.disabled = false;
     }

@@ -460,7 +460,12 @@ test('settings information-architecture keys exist in every locale', () => {
   assertKeysExistInEveryLocale([...keys]);
 });
 
-test('service worker precaches every supported locale file', () => {
+test('service worker knows every supported locale file', () => {
+  // Seit R18 (Entscheidung 2026-10-07) ist APP_LOCALES die ZULASSUNG, nicht mehr
+  // die Precache-Liste: vorab gecacht wird nur die Rueckfallsprache
+  // (PRECACHED_LOCALES), jede andere beim ersten Abruf oder auf Zuruf der Seite
+  // (CACHE_LOCALE) - und der Worker nimmt nur an, was in APP_LOCALES steht.
+  // Gelesen wird deshalb der Block dieser einen Liste, nicht jedes Literal der Datei.
   const i18n = read('../public/i18n.js');
   const sw = read('../public/sw.js');
   const supportedLocales = [...i18n.match(/SUPPORTED_LOCALES\s*=\s*\[([^\]]+)\]/)?.[1].matchAll(/'([^']+)'/g)].map((match) => match[1]);
@@ -468,10 +473,12 @@ test('service worker precaches every supported locale file', () => {
     .filter((file) => file.endsWith('.json'))
     .map((file) => file.replace(/\.json$/, ''))
     .sort();
-  const precachedLocales = [...sw.matchAll(/'\/locales\/([^']+)\.json'/g)].map((match) => match[1]).sort();
+  const appLocalesBlock = sw.match(/const APP_LOCALES = \[([\s\S]*?)\];/)?.[1] ?? '';
+  const knownLocales = [...appLocalesBlock.matchAll(/'\/locales\/([^']+)\.json'/g)].map((match) => match[1]).sort();
 
   assert.deepEqual(supportedLocales.sort(), localeFiles, 'SUPPORTED_LOCALES must match public/locales/*.json');
-  assert.deepEqual(precachedLocales, supportedLocales.sort(), 'Service worker APP_LOCALES must precache every supported locale');
+  assert.deepEqual(knownLocales, supportedLocales.sort(), 'Service worker APP_LOCALES must list every supported locale');
+  assert.match(sw, /const PRECACHED_LOCALES = \['\/locales\/de\.json'\];/, 'the fallback locale is precached');
 });
 
 test('service worker release caches track package and deployment revisions and include the early locale bootstrap', () => {

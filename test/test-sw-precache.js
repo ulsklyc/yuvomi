@@ -76,7 +76,7 @@ function loadSwLists() {
   sandbox.self.self = sandbox.self;
   const ctx = createContext(sandbox);
   const lists = runInContext(
-    `${SRC}\n;({ APP_SHELL, PAGE_MODULES, APP_LOCALES, PAGE_MODULE_SET, API_CACHE_WHITELIST })`,
+    `${SRC}\n;({ APP_SHELL, PAGE_MODULES, APP_LOCALES, PRECACHED_LOCALES, PAGE_MODULE_SET, API_CACHE_WHITELIST })`,
     ctx,
   );
   // In Host-Collections umkopieren: Arrays aus der Sandbox tragen deren
@@ -85,12 +85,13 @@ function loadSwLists() {
     APP_SHELL: Array.from(lists.APP_SHELL),
     PAGE_MODULES: Array.from(lists.PAGE_MODULES),
     APP_LOCALES: Array.from(lists.APP_LOCALES),
+    PRECACHED_LOCALES: Array.from(lists.PRECACHED_LOCALES),
     PAGE_MODULE_SET: new Set(Array.from(lists.PAGE_MODULE_SET)),
     API_CACHE_WHITELIST: Array.from(lists.API_CACHE_WHITELIST),
   };
 }
 
-const { APP_SHELL, PAGE_MODULES, APP_LOCALES, PAGE_MODULE_SET, API_CACHE_WHITELIST } = loadSwLists();
+const { APP_SHELL, PAGE_MODULES, APP_LOCALES, PRECACHED_LOCALES, PAGE_MODULE_SET, API_CACHE_WHITELIST } = loadSwLists();
 
 /**
  * Importe einer Datei (statisch UND dynamisch), als absolute Pfade.
@@ -324,18 +325,32 @@ test('keine Doppeleinträge zwischen den Precache-Listen', () => {
   assert.deepEqual([...new Set(dupes)], [], `Mehrfach precacht: ${dupes.join(', ')}`);
 });
 
-test('jede Locale-Datei ist precacht', () => {
+test('jede Locale-Datei ist dem Worker bekannt', () => {
   // i18n.js holt die Sprache per fetch('/locales/<code>.json'), nicht per
-  // Import - der Modulgraph-Guard oben sieht die Dateien deshalb nie. Fehlt
-  // eine hier, faellt die Sprache offline still auf den Default zurueck,
-  // waehrend sie online tadellos laedt. pt-BR (#1437) kam mit Datei und
-  // Eintrag in SUPPORTED_LOCALES, aber ohne Zeile in APP_LOCALES.
+  // Import - der Modulgraph-Guard oben sieht die Dateien deshalb nie. Seit R18
+  // ist APP_LOCALES nicht mehr die Precache-Liste, sondern die ZULASSUNG: der
+  // Worker cacht auf Zuruf der Seite (CACHE_LOCALE) nur, was hier steht. Fehlt
+  // eine Sprache, bleibt sie offline weg, waehrend sie online tadellos laedt.
+  // pt-BR (#1437) kam mit Datei und Eintrag in SUPPORTED_LOCALES, aber ohne
+  // Zeile in APP_LOCALES.
   const files = readdirSync(new URL('../public/locales/', import.meta.url))
     .filter((file) => file.endsWith('.json'))
     .map((file) => `/locales/${file}`)
     .sort();
   assert.deepEqual([...APP_LOCALES].sort(), files,
     'APP_LOCALES in public/sw.js deckt sich nicht mit public/locales/*.json');
+});
+
+test('vorab gecacht wird nur die Rueckfallsprache von i18n.js', () => {
+  // Entscheidung 2026-10-07: nicht mehr alle 26 Sprachdateien je Release. Die
+  // Rueckfallsprache MUSS vorab da sein - auf sie faellt i18n.js zurueck, wenn
+  // die eigene Sprache offline fehlt. Gelesen aus i18n.js, nicht hier behauptet.
+  const i18n = readFileSync(new URL('../public/i18n.js', import.meta.url), 'utf8');
+  const fallback = i18n.match(/const DEFAULT_LOCALE = '([\w-]+)';/)?.[1];
+  assert.ok(fallback, 'DEFAULT_LOCALE in public/i18n.js nicht gefunden');
+  assert.deepEqual(PRECACHED_LOCALES, [`/locales/${fallback}.json`]);
+  assert.ok(PRECACHED_LOCALES.every((path) => APP_LOCALES.includes(path)));
+  assert.match(SRC, /const freshLocales = PRECACHED_LOCALES\.map\(/, 'install cacht PRECACHED_LOCALES, nicht APP_LOCALES');
 });
 
 test('jedes Settings-Blatt der Registry ist precacht', () => {

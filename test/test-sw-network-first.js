@@ -51,17 +51,24 @@ const keyOf = (req) => {
 };
 
 class MockCache {
-  constructor() { this.store = new Map(); }
+  constructor(fetchImpl) { this.store = new Map(); this.fetchImpl = fetchImpl; this.added = []; }
   async put(req, res) { this.store.set(keyOf(req), res); }
   async match(req) { return this.store.get(keyOf(req)); }
   async delete(req) { return this.store.delete(keyOf(req)); }
-  async addAll() {}
+  // Wie im Browser: holen, und nur eine gelungene Antwort ablegen.
+  async add(req) {
+    this.added.push(req);
+    const res = await this.fetchImpl(req);
+    if (!res.ok) throw new TypeError('bad response');
+    this.store.set(keyOf(req), res);
+  }
+  async addAll(reqs) { for (const req of reqs) await this.add(req); }
 }
 
 class MockCacheStorage {
-  constructor() { this.caches = new Map(); }
+  constructor(fetchImpl) { this.caches = new Map(); this.fetchImpl = fetchImpl; }
   async open(name) {
-    if (!this.caches.has(name)) this.caches.set(name, new MockCache());
+    if (!this.caches.has(name)) this.caches.set(name, new MockCache(this.fetchImpl));
     return this.caches.get(name);
   }
   async keys() { return [...this.caches.keys()]; }
@@ -83,7 +90,7 @@ function heldFetch() {
 }
 
 function loadSw(fetchImpl) {
-  const cacheStorage = new MockCacheStorage();
+  const cacheStorage = new MockCacheStorage((...a) => fetchImpl(...a));
   const listeners = {};
   const timers = [];
   // Die Uhr des Workers: echte Zeit plus ein Versatz, den der Test vorstellt.
@@ -111,6 +118,16 @@ function loadSw(fetchImpl) {
     advanceClock(ms) { clockOffset += ms; },
     /** Laesst jede noch offene Frist ablaufen. */
     expireDeadlines() { timers.splice(0).forEach((timer) => { if (!timer.cleared) timer.fn(); }); },
+    async install() {
+      let waited;
+      listeners.install[0]({ waitUntil(p) { waited = p; } });
+      await waited;
+    },
+    async message(data) {
+      let waited = Promise.resolve();
+      listeners.message[0]({ data, waitUntil(p) { waited = p; } });
+      await waited;
+    },
     /** Ein Worker-Update: activate setzt das Bypass-Fenster. */
     async activate() {
       let waited;
@@ -346,4 +363,73 @@ test('the deadline is the documented order of magnitude', () => {
   // auszugeben waere dort eine falsche Auskunft.
   const apiFn = src.slice(src.indexOf('async function networkFirstApi('), src.indexOf('async function cacheFirst('));
   assert.doesNotMatch(apiFn, /NETWORK_FIRST_DEADLINE_MS|setTimeout/);
+});
+
+// --------------------------------------------------------
+// Sprachdateien: vorab nur die Rueckfallsprache, der Rest auf Zuruf (R18)
+// --------------------------------------------------------
+
+const LOCALES = 'yuvomi-locales-';
+
+async function cacheNamed(env, prefix) {
+  const name = (await env.caches.keys()).find((n) => n.startsWith(prefix));
+  return name ? env.caches.open(name) : null;
+}
+
+test('install precaches one locale file, not all of them', async () => {
+  const env = loadSw(async () => new MockResponse('file'));
+  await env.install();
+
+  const locales = await cacheNamed(env, LOCALES);
+  assert.deepEqual(locales.added.map((req) => req.url), ['/locales/de.json']);
+});
+
+test('CACHE_LOCALE stores the language the page names', async () => {
+  const fetched = [];
+  const env = loadSw(async (req) => { fetched.push(req); return new MockResponse('fr-file'); });
+
+  await env.message({ type: 'CACHE_LOCALE', locale: 'fr' });
+
+  const locales = await cacheNamed(env, LOCALES);
+  assert.equal((await locales.match('/locales/fr.json')).body, 'fr-file');
+  assert.equal(fetched[0].cache, 'no-cache', 'revalidieren statt neu holen');
+});
+
+test('CACHE_LOCALE leaves a language alone that is already cached', async () => {
+  const fetched = [];
+  const env = loadSw(async (req) => { fetched.push(req); return new MockResponse('new'); });
+  await seed(env, LOCALES, '/locales/fr.json', 'old');
+
+  await env.message({ type: 'CACHE_LOCALE', locale: 'fr' });
+
+  assert.equal(fetched.length, 0, 'der gewoehnliche Abruf haelt die Datei frisch, nicht diese Nachricht');
+});
+
+test('CACHE_LOCALE only accepts languages the app ships', async () => {
+  for (const locale of ['xx', '../index', 'de/../../sw', '', undefined, 'fr.json']) {
+    const fetched = [];
+    const env = loadSw(async (req) => { fetched.push(req); return new MockResponse('x'); });
+    await env.message({ type: 'CACHE_LOCALE', locale });
+    assert.equal(fetched.length, 0, `${locale}: nichts holen, was nicht in APP_LOCALES steht`);
+  }
+});
+
+test('CACHE_LOCALE while offline fails quietly', async () => {
+  const env = loadSw(() => Promise.reject(new TypeError('Failed to fetch')));
+  await env.message({ type: 'CACHE_LOCALE', locale: 'fr' });
+  const locales = await cacheNamed(env, LOCALES);
+  assert.equal(await locales.match('/locales/fr.json'), undefined);
+});
+
+test('a locale request while offline and never cached gets the offline page, not a language file', async () => {
+  // Das ist der Stand, mit dem i18n.js rechnen muss: Status 200, aber HTML.
+  // `resp.ok` allein beweist also keine Sprachdatei - erst das gelesene JSON.
+  // Dass ein Wechsel daran scheitert, OHNE etwas umzustellen, haelt
+  // test-i18n-switch.js mit genau so einer Antwort.
+  const env = loadSw(() => Promise.reject(new TypeError('Failed to fetch')));
+  await seed(env, SHELL, '/offline.html', 'offline-page');
+  const { result } = env.fetchEvent('/locales/it.json');
+  const response = await within(result);
+  assert.equal(response.body, 'offline-page');
+  assert.equal(response.ok, true);
 });

@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   uses the stored copies and picks up the fresh ones in the background for the next start.
   Measured with a server that accepts connections and never answers: the app's own files were
   loaded after 1.6 seconds instead of never. Signing in and loading data still need the network.
+- **An update no longer downloads every language.** Each release fetched all 26 language files,
+  of which a device uses one. Only German, the language the app falls back to, is stored in
+  advance now; the language of the device is stored the first time it is used and stays
+  available offline. A language that was never used on a device needs a connection once.
 
 ### Fixed
 
@@ -39,6 +43,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   notice with a "Reload" button appears, and the new version loads with the next page change or
   when the app goes to the background. The notice says the same in every language; in German,
   Persian, Indonesian, Korean and Polish it used to announce a reload that was already over.
+- **Switching the language without a connection no longer leaves the app half switched.** If the
+  language file could not be loaded, texts stayed in the old language while numbers and dates
+  followed the new one, the setting showed a parser error, and the next start fell back to
+  German without a word. A switch that cannot load its file now changes nothing: the selection
+  returns to the language in use and the line below says that there is no connection.
 - **Overview on a desktop: opening "New" no longer tips the button over.** The plus turns into
   a cross by rotating - and it was the whole button that rotated, label included, so the capsule
   stood diagonally at 45 degrees and turned grey while its menu was open. Only the icon turns

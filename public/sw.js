@@ -267,6 +267,11 @@ const APP_SHELL = [
   '/icons/icon-maskable-512.png',
 ];
 
+// Jede Sprache, die die App kennt. NICHT die Precache-Liste: vorab gecacht
+// wird nur PRECACHED_LOCALES, der Rest kommt beim ersten Abruf in denselben
+// Cache (LOCALES_CACHE). Die Liste hier ist die Zulassung dafuer - der Worker
+// cacht auf Zuruf (CACHE_LOCALE) nur, was in ihr steht. Jede Datei unter
+// public/locales/ gehoert hinein (`test:sw-precache`).
 const APP_LOCALES = [
   '/locales/ar.json',
   '/locales/cs.json',
@@ -295,6 +300,16 @@ const APP_LOCALES = [
   '/locales/vi.json',
   '/locales/zh.json',
 ];
+const APP_LOCALE_SET = new Set(APP_LOCALES);
+
+// VORAB NUR DIE RUECKFALLSPRACHE (Entscheidung 2026-10-07, Critique R18). Bis
+// dahin holte jedes Release alle 26 Sprachdateien, von denen ein Geraet eine
+// benutzt. `de` ist die Sprache, auf die i18n.js zurueckfaellt, und muss
+// offline immer da sein. Die Sprache DIESES Geraets kennt der Worker nicht von
+// selbst - die Seite nennt sie ihm (CACHE_LOCALE, gesendet von i18n.js beim
+// Start, beim Sprachwechsel und wenn ein neuer Worker uebernimmt), und jeder
+// gewoehnliche Abruf legt sie ohnehin ab (networkFirst).
+const PRECACHED_LOCALES = ['/locales/de.json'];
 
 // Seiten-Module: lazy geladen, aber vorab gecacht für Offline.
 // waste.js fehlt hier BEWUSST (Round-3-Review, #1063): wie housekeeping.js
@@ -429,7 +444,7 @@ const _bypassInit = (async () => {
 self.addEventListener('install', (event) => {
   const freshShell   = APP_SHELL.map((url)    => new Request(url, { cache: 'reload' }));
   const freshModules = PAGE_MODULES.map((url) => new Request(url, { cache: 'reload' }));
-  const freshLocales = APP_LOCALES.map((url) => new Request(url, { cache: 'reload' }));
+  const freshLocales = PRECACHED_LOCALES.map((url) => new Request(url, { cache: 'reload' }));
   event.waitUntil(
     Promise.all([
       caches.open(SHELL_CACHE).then((c) => c.addAll(freshShell)),
@@ -780,6 +795,23 @@ function isCacheableApiGet(pathname) {
 // Nachrichten vom Client: API-Cache leeren (Logout/Session-Ende)
 // --------------------------------------------------------
 self.addEventListener('message', (event) => {
+  // Die Seite nennt die Sprache dieses Geraets (i18n.js), damit sie offline da
+  // ist, auch wenn ihr Abruf am Worker vorbeiging: beim Erstbesuch (noch kein
+  // Controller) und im Bypass-Fenster nach einem Update (dort wird nichts
+  // abgelegt). Nur zugelassene Dateien, und nur, wenn sie noch fehlt.
+  if (event.data && event.data.type === 'CACHE_LOCALE') {
+    const path = `/locales/${event.data.locale}.json`;
+    if (!APP_LOCALE_SET.has(path)) return;
+    event.waitUntil(
+      caches.open(LOCALES_CACHE)
+        .then(async (cache) => {
+          if (await cache.match(path)) return;
+          await cache.add(new Request(path, { cache: 'no-cache' }));
+        })
+        .catch(() => { /* offline oder Speicher voll: beim naechsten Abruf */ }),
+    );
+    return;
+  }
   if (event.data && event.data.type === 'CLEAR_API_CACHE') {
     // QUITTIEREN, WENN DER ABSENDER EINEN PORT MITSCHICKT. Ohne Rueckmeldung
     // weiss die Seite nie, wann der Cache wirklich weg ist, und ein sofortiges
