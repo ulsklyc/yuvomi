@@ -137,7 +137,9 @@ function renderPage(container) {
             <p class="form-hint">${esc(t('settings.displayDeviceNameHint'))}</p>
           </div>
           <div id="display-error" class="form-error" role="alert" hidden></div>
-          <button type="submit" class="btn btn--primary">${esc(t('settings.displayCreate'))}</button>
+          <div class="settings-form-actions">
+            <button type="submit" class="btn btn--primary">${esc(t('settings.displayCreate'))}</button>
+          </div>
         </form>
       </div>
     </section>

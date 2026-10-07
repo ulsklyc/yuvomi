@@ -218,8 +218,8 @@ function renderTwoFactorSetup(card, setup) {
       </div>
       <div id="two-factor-error" class="form-error" role="alert" hidden></div>
       <div class="settings-form-actions">
-        <button type="submit" class="btn btn--primary">${t('settings.twoFactorConfirm')}</button>
         <button type="button" class="btn btn--secondary" id="two-factor-cancel">${t('common.cancel')}</button>
+        <button type="submit" class="btn btn--primary">${t('settings.twoFactorConfirm')}</button>
       </div>
     </form>
   `);
@@ -302,8 +302,8 @@ function askForCode(card, texts, onConfirm, onCancel) {
       </div>
       <div id="two-factor-error" class="form-error" role="alert" hidden></div>
       <div class="settings-form-actions">
-        <button type="submit" class="btn ${texts.danger ? 'btn--danger' : 'btn--primary'}">${esc(texts.confirm)}</button>
         <button type="button" class="btn btn--secondary" id="two-factor-cancel">${t('common.cancel')}</button>
+        <button type="submit" class="btn ${texts.danger ? 'btn--danger' : 'btn--primary'}">${esc(texts.confirm)}</button>
       </div>
     </form>
   `);
@@ -550,7 +550,9 @@ function renderPage(container, user, refreshFailed, accessNotice, oidcState, oid
             <input class="form-input" type="password" id="confirm-password" autocomplete="new-password" minlength="8" aria-describedby="password-error" required>
           </div>
           <div id="password-error" class="form-error" role="alert" hidden></div>
-          <button type="submit" class="btn btn--primary">${t('settings.savePassword')}</button>
+          <div class="settings-form-actions">
+            <button type="submit" class="btn btn--primary">${t('settings.savePassword')}</button>
+          </div>
         </form>
       </div>
 

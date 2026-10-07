@@ -248,9 +248,9 @@ function renderChannelList(container, channels, providers = DEFAULT_PROVIDERS) {
           <p class="form-hint notification-email-not-ready${notReady ? '' : ' settings-card--hidden'}">${t('settings.notificationChannelEmailNotConfigured')}</p>
         </div>
         <div class="settings-form-actions">
-          <button type="submit" class="btn btn--primary">${t('settings.notificationChannelSave')}</button>
           ${channel.id ? `<button type="button" class="btn btn--secondary" data-action="test">${t('settings.notificationChannelTest')}</button>` : ''}
           ${channel.id ? `<button type="button" class="btn btn--danger" data-action="delete">${t('settings.notificationChannelDelete')}</button>` : ''}
+          <button type="submit" class="btn btn--primary">${t('settings.notificationChannelSave')}</button>
         </div>
       </form>
     `);

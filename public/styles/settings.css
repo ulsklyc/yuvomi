@@ -1336,6 +1336,19 @@
   flex-wrap: wrap;
 }
 
+/* DER SPEICHERN-KNOPF SITZT RECHTS IM KARTENFUSS (R17, E8). Gemessen standen
+ * drei Plaetze nebeneinander: 99px linksbuendig (die meisten Karten), 612px
+ * vollbreit ("Passwort speichern" - der Knopf lag nackt in der Flex-Spalte
+ * des Formulars) und rechts klebend im Blatt "Rechte" (`.perm-actions`). Eine
+ * Aktionszeile mit Primaerknopf schliesst jetzt rechts ab, der Primaerknopf
+ * steht im MARKUP zuletzt (Tab-Folge = Bild, kein `order`), Nebenaktionen
+ * davor - dieselbe Ordnung wie im Dialogfuss. Eine Zeile nur aus
+ * Nebenaktionen (Test senden, Export) bleibt am Anfang: sie schliesst nichts
+ * ab. */
+.settings-form-actions:has(> .btn--primary) {
+  justify-content: flex-end;
+}
+
 /* Feldgruppe innerhalb eines Formulars (z. B. Kontaktdaten im Konto-Blatt).
    Der native Rahmen fällt weg; die Legende muss sich von den Feld-Labels
    abheben, sonst liest man gleichrangige Beschriftungen statt einer Gruppe. */

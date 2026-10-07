@@ -20133,3 +20133,46 @@ test('R17 E6: die Dialoge der Aufteilung tragen Label, Stern und Betrag des Budg
   }
   assert.match(read('../public/styles/budget.css'), /\.budget-amount-input\s*\{[^}]*font-size:\s*var\(--text-xl\)/);
 });
+
+// ── R17, E8: EIN Speichermuster in den Einstellungen ────────────────────────
+// Critique 2026-10-07 (A7 P1): drei Knopfplaetze - 99px linksbuendig, 612px
+// vollbreit ("Passwort speichern"), rechts klebend ("Rechte"). Die Regel:
+// Schalter und Auswahl wirken sofort; ein Text- oder Zahlfeld speichert per
+// Knopf, und der sitzt rechts im Kartenfuss, im Markup als Letzter.
+test('R17 E8: in den Einstellungen steht der Primaerknopf als Letzter in einer Aktionszeile, und sie schliesst rechts ab', () => {
+  const rules = [...eachRule(read('../public/styles/settings.css'))];
+  const right = rules.find((r) => r.selector.trim() === '.settings-form-actions:has(> .btn--primary)');
+  assert.match(right?.body ?? '', /justify-content:\s*flex-end/, 'die Aktionszeile mit Primaerknopf schliesst rechts ab');
+  const sticky = rules.find((r) => r.selector.trim() === '.perm-actions' && !r.at.length);
+  assert.match(sticky?.body ?? '', /justify-content:\s*flex-end/, 'auch die klebende Zeile der Rechte steht rechts');
+
+  const notLast = [];
+  const naked = [];
+  let rows = 0;
+  for (const path of walkJsFiles('../public/settings/')) {
+    const src = dialogSource(path);
+    for (const m of src.matchAll(/<div class="settings-form-actions[^"]*"[^>]*>/g)) {
+      const end = src.indexOf('</div>', m.index);
+      const buttons = [...src.slice(m.index, end).matchAll(/<(?:button|a)\b[^>]*class="([^"]*)"/g)].map((b) => b[1]);
+      const primary = buttons.findIndex((cls) => /\bbtn--primary\b/.test(cls));
+      if (primary < 0) continue;
+      rows += 1;
+      if (primary !== buttons.length - 1) notLast.push(`${path}:${src.slice(0, m.index).split('\n').length}`);
+    }
+    // Ein absendender Primaerknopf direkt im Formular (ohne Aktionszeile) ist
+    // ein Flex-Kind der Formularspalte und streckt sich auf volle Breite.
+    for (const m of src.matchAll(/<form\b[^>]*class="[^"]*\bsettings-form\b[\s\S]*?<\/form>/g)) {
+      const form = m[0];
+      for (const b of form.matchAll(/<button\b[^>]*type="submit"[^>]*>/g)) {
+        const before = form.slice(0, b.index);
+        const open = before.lastIndexOf('<div class="settings-form-actions');
+        const footer = before.lastIndexOf('<div class="modal-panel__footer');
+        const wrap = Math.max(open, footer);
+        if (wrap < 0 || before.indexOf('</div>', wrap) >= 0) naked.push(`${path}:${src.slice(0, m.index + b.index).split('\n').length}`);
+      }
+    }
+  }
+  assert.ok(rows >= 15, `der Scanner findet die Aktionszeilen (${rows})`);
+  assert.deepEqual(notLast, [], 'der Primaerknopf steht im Markup zuletzt - Nebenaktionen davor, wie im Dialogfuss');
+  assert.deepEqual(naked, [], 'ein Speichern-Knopf steht in `.settings-form-actions`, nicht nackt in der Formularspalte');
+});

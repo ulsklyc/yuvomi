@@ -83,8 +83,8 @@ function renderPage(container) {
             </div>
             <div id="ics-add-error" class="form-error" role="alert" hidden></div>
             <div class="settings-form-actions">
-              <button type="submit" class="btn btn--primary" id="ics-submit-btn">${t('settings.ics.actions.submit')}</button>
               <button type="button" class="btn btn--secondary" id="ics-cancel-btn">${t('settings.ics.actions.cancel')}</button>
+              <button type="submit" class="btn btn--primary" id="ics-submit-btn">${t('settings.ics.actions.submit')}</button>
             </div>
           </form>
         </div>

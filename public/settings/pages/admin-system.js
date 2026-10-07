@@ -57,8 +57,8 @@ function renderPage(container) {
           </div>
           <div id="app-name-error" class="form-error" role="alert" hidden></div>
           <div class="settings-form-actions">
-            <button type="submit" class="btn btn--primary">${t('common.save')}</button>
             <button type="button" class="btn btn--secondary" id="app-name-reset-btn">${t('common.reset')}</button>
+            <button type="submit" class="btn btn--primary">${t('common.save')}</button>
           </div>
         </form>
       </div>

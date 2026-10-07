@@ -99,10 +99,10 @@ function renderPage(container, preferences) {
           <p class="form-hint">${t('settings.householdWeatherOverrideHint')}</p>
           <div id="weather-form-error" class="form-error" role="alert" hidden></div>
           <div class="settings-form-actions">
-            <button type="submit" class="btn btn--primary">${t('settings.weatherSave')}</button>
             ${canRemoveStoredWeather(weatherSource) ? `
               <button type="button" class="btn btn--danger" id="weather-remove-btn">${t('settings.weatherRemove')}</button>
             ` : ''}
+            <button type="submit" class="btn btn--primary">${t('settings.weatherSave')}</button>
           </div>
         </form>
       </div>

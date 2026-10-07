@@ -36,9 +36,9 @@ function renderForm(container, cfg) {
           </div>
           <div id="immich-error"></div>
           <div class="settings-form-actions">
-            <button class="btn btn--primary" type="submit">${esc(t('common.save'))}</button>
             <button class="btn btn--secondary" id="immich-test" type="button">${esc(t('settings.dmsTestBtn'))}</button>
             <button class="btn btn--secondary" id="immich-preview" type="button">${esc(t('settings.immichPreview'))}</button>
+            <button class="btn btn--primary" type="submit">${esc(t('common.save'))}</button>
           </div>
         </form>
       </div>

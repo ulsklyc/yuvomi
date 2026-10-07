@@ -84,8 +84,8 @@ export async function render(container, { user } = {}) {
           </div>
           <div id="email-notice"></div>
           <div class="settings-form-actions">
-            <button type="submit" class="btn btn--primary" id="email-save">${esc(t('email.save'))}</button>
             <button type="button" class="btn btn--secondary" id="email-test">${esc(t('email.test'))}</button>
+            <button type="submit" class="btn btn--primary" id="email-save">${esc(t('email.save'))}</button>
           </div>
         </form>
       </div>

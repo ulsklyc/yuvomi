@@ -210,7 +210,9 @@ function renderPage(container, scopeKeys = CORE_SCOPE_MODULE_KEYS) {
             <p class="form-hint">${t('settings.apiTokenCreatedHint')}</p>
           </div>
           <div id="api-token-error" class="form-error" role="alert" hidden></div>
-          <button type="submit" class="btn btn--primary">${t('settings.apiTokenCreate')}</button>
+          <div class="settings-form-actions">
+            <button type="submit" class="btn btn--primary">${t('settings.apiTokenCreate')}</button>
+          </div>
         </form>
       </div>
     </section>

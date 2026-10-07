@@ -2144,7 +2144,7 @@ function rewardsSheet() {
   };
 }
 
-test('Belohnungen: das Punktefeld speichert wie die Schalter - ohne eigenen Knopf, beim Verlassen (H12)', async () => {
+test('R17 E8: das Punktefeld der Belohnungen speichert per Knopf im Kartenfuss, nicht beim Verlassen', async () => {
   const { render } = await import('/settings/pages/modules-rewards.js');
   const { resetPreferencesCache } = await import('/settings/preferences-cache.js');
   const puts = [];
@@ -2161,29 +2161,37 @@ test('Belohnungen: das Punktefeld speichert wie die Schalter - ohne eigenen Knop
     await render(sheet, { user: { role: 'admin' } });
     const form = sheet.html.match(/<form\b[^>]*id="rewards-default-points-form"[\s\S]*?<\/form>/)?.[0] ?? '';
     assert.match(form, /id="rewards-default-points"/, 'Reichweite: das Punktefeld steht im Formular');
-    assert.doesNotMatch(form, /type="submit"/, 'kein Speichern-Knopf nur fuer dieses Feld');
+    // Bis R17 speicherte das Feld beim Verlassen (H12) - das Zahlfeld der
+    // "Uebersicht" daneben per Knopf. E8: Zahlfelder per Knopf, ueberall gleich.
+    assert.match(form, /<div class="settings-form-actions">\s*<button type="submit" class="btn btn--primary">common\.save<\/button>\s*<\/div>\s*<\/form>/,
+      'der Speichern-Knopf steht als letzte Zeile im Formular, in der Aktionszeile des Kartenfusses');
 
     const input = sheet.el('rewards-default-points');
     const error = sheet.el('rewards-default-points-error');
-    input.value = '-3';
+    const formEl = sheet.el('rewards-default-points-form');
+    input.value = '5';
     await input.fire('blur');
+    assert.deepEqual(puts, [], 'das Verlassen des Feldes schreibt nichts mehr');
+
+    input.value = '-3';
+    await formEl.fire('submit');
     assert.deepEqual(puts, [], 'ein ungueltiger Wert wird nicht geschrieben');
     assert.equal(error.hidden, false, 'sondern benannt');
     assert.equal(input.getAttribute('aria-invalid'), 'true');
 
     input.value = '5';
-    await input.fire('blur');
-    assert.deepEqual(puts, [['/preferences', { tasks_default_points: 5 }]], 'beim Verlassen gespeichert');
+    await formEl.fire('submit');
+    assert.deepEqual(puts, [['/preferences', { tasks_default_points: 5 }]], 'der Knopf (und Enter) speichert');
     assert.equal(error.hidden, true, 'und der Fehler ist weg');
     assert.equal(input.getAttribute('aria-invalid'), null);
     assert.ok(toasts.some(([key]) => key === 'settings.rewardsDefaultPointsSaved'), `mit Rueckmeldung: ${JSON.stringify(toasts)}`);
 
-    await input.fire('blur');
+    await formEl.fire('submit');
     assert.equal(puts.length, 1, 'derselbe Wert ein zweites Mal ist kein neuer Schreibzugriff');
 
     input.value = '7';
-    await sheet.el('rewards-default-points-form').fire('submit');
-    assert.deepEqual(puts.at(-1), ['/preferences', { tasks_default_points: 7 }], 'Enter speichert ebenso');
+    await formEl.fire('submit');
+    assert.deepEqual(puts.at(-1), ['/preferences', { tasks_default_points: 7 }]);
 
     input.value = '9';
     await input.fire('keydown', { key: 'Escape' });
