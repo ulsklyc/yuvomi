@@ -27,10 +27,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3-multiple-ciphers';
+
+import { tempDir } from './tmp-dir.js';
 
 import { rewardMoneyHousehold } from './reward-money-harness.js';
 
@@ -1067,7 +1067,7 @@ test('das echte migrate() mit dem ausgelieferten Treiber, auf einer Datei im Sta
   // echten Migrationen bis davor, Bestand, dann `migrate()` mit dem Treiber,
   // der ausgeliefert wird.
   const V = dbmod.MIGRATIONS.find((m) => /pocket money/.test(m.description));
-  const file = new Database(join(mkdtempSync(join(tmpdir(), 'yuvomi-reward-money-mig-')), 'db.sqlite'));
+  const file = new Database(join(tempDir('yuvomi-reward-money-mig-'), 'db.sqlite'));
   try {
     file.pragma('foreign_keys = ON');
     dbmod.migrate(file, dbmod.MIGRATIONS.filter((m) => m.version < V.version));
