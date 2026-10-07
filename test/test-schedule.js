@@ -1047,6 +1047,103 @@ test('saving a multi-day "replace" range parks the form through the confirmation
   assert.match(replaceBranch, /confirmOverModal\([\s\S]*closeOnConfirm:\s*false/, 'a failed /schedule/overrides/fill must find the form still parked, not already closed by the confirmation itself');
 });
 
+/* #1775: ein im Schichtart-Dialog entferntes Feld liess sich im selben Dialog
+ * nicht wieder anhaengen - "Entfernen" loeschte nur die Zeile, und waren alle
+ * Felder angehaengt, gab es gar keine Auswahl. Gefahren wird die echte
+ * editorAction() an einem Formular aus Attrappen, die genau die DOM-Flaeche
+ * tragen, die sie anfasst; die Auswahl schreibt ihr Markup mit. */
+test('#1775: ein entferntes eigenes Feld kehrt in die Auswahl des Schichtart-Dialogs zurueck', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const state = __test.scheduleState();
+  const savedFields = state.customFields;
+  const savedWindow = globalThis.window;
+  state.customFields = [{ id: 11, name: 'Station' }, { id: 12, name: 'Fahrzeug' }, { id: 13, name: 'Partner' }];
+  globalThis.window = { ...(savedWindow ?? {}), lucide: undefined };
+  try {
+    // Pure: waehlbar ist, was keine Zeile hat - Ids als Zahl oder Text.
+    assert.deepEqual(__test.availableTypeFields(state.customFields, ['11', 13]).map((f) => f.id), [12]);
+
+    // Markup: die Auswahl steht IMMER da, ohne waehlbares Feld verborgen.
+    const all = __test.shiftTypeFieldsEditor({ id: 5, fields: state.customFields.map((f) => ({ ...f, show_in_overlay: 0 })) });
+    assert.match(all, /<div class="schedule-type-field-add" data-field-add hidden><select class="form-input" data-field-picker="5"><\/select>/,
+      'alle Felder angehaengt: die Auswahl ist da, leer und verborgen');
+    const some = __test.shiftTypeFieldsEditor({ id: 5, fields: [{ id: 11, name: 'Station', show_in_overlay: 0 }] });
+    assert.match(some, /<div class="schedule-type-field-add" data-field-add><select[^>]*><option value="12">Fahrzeug<\/option><option value="13">Partner<\/option><\/select>/);
+
+    // Das Formular: drei Zeilen, leere verborgene Auswahl.
+    const wrapper = { hidden: true, toggleAttribute(name, on) { if (name === 'hidden') this.hidden = on; } };
+    const picker = {
+      html: '', value: '',
+      replaceChildren() { this.html = ''; },
+      insertAdjacentHTML(_pos, html) {
+        this.html += html;
+        const options = [...html.matchAll(/<option value="(\d+)"( selected)?>/g)];
+        this.value = (options.find((m) => m[2]) ?? options[0])?.[1] ?? '';
+      },
+      closest: (sel) => (sel === '[data-field-add]' ? wrapper : null),
+    };
+    const rows = [];
+    const container = {
+      inserted: [],
+      get children() { return rows.length ? rows : this.inserted.filter((html) => html.includes('u-meta')); },
+      get lastElementChild() { return rows.at(-1) ?? null; },
+      querySelector: () => null,
+      insertAdjacentHTML(_pos, html) {
+        this.inserted.push(html);
+        const id = /data-custom-field-id="(\d+)"/.exec(html)?.[1];
+        if (id) rows.push(makeRow(id));
+      },
+      parentElement: {},
+    };
+    const form = {
+      querySelector: (sel) => (sel === '[data-field-picker]' ? picker : sel === '[data-type-fields-rows]' ? container : null),
+      querySelectorAll: (sel) => (sel === '[data-type-field-row]' ? [...rows] : []),
+    };
+    function makeRow(id) {
+      const row = {
+        dataset: { customFieldId: String(id) },
+        focused: 0,
+        remove() { rows.splice(rows.indexOf(row), 1); },
+        closest: (sel) => (sel === '[data-type-fields-rows]' ? container : null),
+        querySelector: (sel) => (sel === '[data-action="remove-type-field"]' ? { focus: () => { row.focused += 1; } } : null),
+      };
+      return row;
+    }
+    const removeButton = (row) => ({ dataset: { action: 'remove-type-field' },
+      closest: (sel) => (sel === '[data-type-field-row]' ? row : sel === 'form' ? form : null) });
+    const addButton = { dataset: { action: 'add-type-field' },
+      closest: (sel) => (sel === 'form' ? form : sel === '[hidden]' ? (wrapper.hidden ? wrapper : null) : null) };
+    for (const id of [11, 12, 13]) rows.push(makeRow(id));
+
+    // Entfernen: das Feld steht wieder zur Wahl, die Auswahl wird sichtbar.
+    __test.editorAction(removeButton(rows[1]));
+    assert.deepEqual(rows.map((r) => r.dataset.customFieldId), ['11', '13']);
+    assert.equal(picker.html, '<option value="12">Fahrzeug</option>', 'das entfernte Feld ist zurueck in der Auswahl');
+    assert.equal(wrapper.hidden, false, 'und die Auswahl ist sichtbar - vorher gab es sie gar nicht');
+
+    // Noch eines: die Auswahl folgt der Reihenfolge der Feldliste.
+    __test.editorAction(removeButton(rows[0]));
+    assert.match(picker.html, /^<option value="11"[^>]*>Station<\/option><option value="12"[^>]*>Fahrzeug<\/option>$/);
+    assert.equal(picker.value, '12', 'die getroffene Wahl bleibt stehen');
+
+    // Wieder anhaengen: Zeile da, Feld aus der Auswahl.
+    __test.editorAction(addButton);
+    assert.deepEqual(rows.map((r) => r.dataset.customFieldId), ['13', '12']);
+    assert.equal(picker.html, '<option value="11">Station</option>');
+    assert.equal(wrapper.hidden, false);
+
+    // Das letzte: die Auswahl ist leer und verborgen, der Fokus geht auf die neue Zeile.
+    __test.editorAction(addButton);
+    assert.deepEqual(rows.map((r) => r.dataset.customFieldId), ['13', '12', '11']);
+    assert.equal(picker.html, '');
+    assert.equal(wrapper.hidden, true);
+    assert.equal(rows.at(-1).focused, 1, 'der Knopf, der eben noch den Fokus hatte, ist verborgen');
+  } finally {
+    state.customFields = savedFields;
+    globalThis.window = savedWindow;
+  }
+});
+
 // Real behaviour instead of a name-in-source check (PR #930 review): a text
 // guard stays green if overrideGroups() is renamed or gutted to return [].
 // Both functions now take their input as a parameter (overrideGroups(overrides),

@@ -937,19 +937,47 @@ function shiftTypeFieldRow(field) {
 // lokale Aenderungen (hinzufuegen/entfernen/umsortieren/Overlay-Haken), die
 // das EINE "Speichern" des Dialogs mitschreibt (saveShiftTypeEdit()). Bis R17
 // trug der Abschnitt einen zweiten Speichern-Knopf neben dem der Angaben.
+/** Pure: die Felder des Haushalts, die an dieser Schichtart (noch) nicht haengen. */
+function availableTypeFields(customFields, attachedIds) {
+  const taken = new Set([...attachedIds].map(Number));
+  return customFields.filter((field) => !taken.has(Number(field.id)));
+}
+
 function shiftTypeFieldsEditor(type) {
-  const attachedIds = new Set(type.fields.map((field) => field.id));
-  const available = state.customFields.filter((field) => !attachedIds.has(field.id));
+  const available = availableTypeFields(state.customFields, type.fields.map((field) => field.id));
   const rows = type.fields.map(shiftTypeFieldRow).join('');
-  const picker = available.length
-    ? '<div class="schedule-type-field-add">'
+  // DIE AUSWAHL STEHT IMMER IM MARKUP (#1775), ohne waehlbares Feld nur
+  // `hidden`. Vorher fehlte sie ganz, wenn alle Felder angehaengt waren - ein
+  // versehentlich entferntes Feld liess sich im selben Dialog nicht wieder
+  // anhaengen, weil es nichts gab, wohin es haette zurueckkehren koennen.
+  // syncTypeFieldPicker() fuehrt sie nach jedem Anhaengen und Entfernen nach.
+  const picker = '<div class="schedule-type-field-add" data-field-add' + (available.length ? '' : ' hidden') + '>'
       + '<select class="form-input" data-field-picker="' + type.id + '">' + available.map((field) => option(field.id, field.name)).join('') + '</select>'
       + '<button type="button" class="btn btn--secondary" data-action="add-type-field" data-id="' + type.id + '">' + esc(t('common.add')) + '</button>'
-      + '</div>' : '';
+      + '</div>';
   const body = '<div class="schedule-type-fields-rows" data-type-fields-rows="' + type.id + '">'
     + (rows || '<p class="u-meta">' + esc(t('schedule.noFieldsAttached')) + '</p>') + '</div>'
     + picker;
   return advancedSection(body, { label: t('schedule.attachedFields'), open: type.fields.length > 0 });
+}
+
+/**
+ * Zieht die Feld-Auswahl im Schichtart-Dialog auf den Stand der Zeilen nach:
+ * waehlbar ist jedes Feld des Haushalts, das gerade KEINE Zeile hat, in der
+ * Reihenfolge der Feldliste. Eine Quelle fuer beide Richtungen - ein
+ * angehaengtes Feld verlaesst die Auswahl, ein entferntes kehrt zurueck
+ * (#1775: vorher loeschte "Entfernen" nur die Zeile). Ohne waehlbares Feld
+ * ist die Auswahl `hidden`.
+ */
+function syncTypeFieldPicker(scope) {
+  const picker = scope?.querySelector('[data-field-picker]');
+  if (!picker) return;
+  const attached = [...scope.querySelectorAll('[data-type-field-row]')].map((row) => row.dataset.customFieldId);
+  const available = availableTypeFields(state.customFields, attached);
+  const keep = String(picker.value ?? '');
+  picker.replaceChildren();
+  picker.insertAdjacentHTML('beforeend', available.map((field) => option(field.id, field.name, String(field.id) === keep)).join(''));
+  picker.closest('[data-field-add]')?.toggleAttribute('hidden', available.length === 0);
 }
 
 // Ein Feld gehoert dem Haushalt, nicht einer Person - definiert einmal, an
@@ -2594,15 +2622,21 @@ function editorAction(button) {
     if (!field) return;
     container.querySelector('.u-meta')?.remove();
     container.insertAdjacentHTML('beforeend', shiftTypeFieldRow({ ...field, show_in_overlay: false }));
-    picker.querySelector(`option[value="${field.id}"]`)?.remove();
+    syncTypeFieldPicker(scope);
     window.lucide?.createIcons({ el: container.parentElement });
+    // War das das letzte waehlbare Feld, ist die Auswahl samt diesem Knopf
+    // jetzt verborgen - der Fokus geht auf die neue Zeile statt ins Leere.
+    if (button.closest('[hidden]')) container.lastElementChild?.querySelector('[data-action="remove-type-field"]')?.focus();
     return;
   }
   if (kind === 'remove-type-field') {
     const row = button.closest('[data-type-field-row]');
     const container = row?.closest('[data-type-fields-rows]');
+    const scope = button.closest('form');
     row?.remove();
     if (container && !container.children.length) container.insertAdjacentHTML('beforeend', '<p class="u-meta">' + esc(t('schedule.noFieldsAttached')) + '</p>');
+    // Das entfernte Feld kehrt in die Auswahl zurueck (#1775).
+    syncTypeFieldPicker(scope);
     return;
   }
   // Tastaturbedienbarer Reorder-Pfad neben dem Ziehen ueber makeSortable()
@@ -3259,4 +3293,4 @@ export async function update({ path } = {}) {
 // bereits pur bzw. nehmen ihre Eingabe jetzt als Parameter statt sie fest aus
 // `state` zu lesen - ein Test kann so echte Tage hineingeben und das Ergebnis
 // pruefen, statt nur zu belegen, dass der Funktionsname im Quelltext steht.
-export const __test = { shiftTypeRow, patternRow, patternDaysEditorHtml, patternSaveOrder, initialOverviewSelection, renderOverview, renderToday, overviewLaneHeader, planningPanel, scheduleFabIntent, renderStatistics, patternFields, formField, shiftFields, reminderOffsetField, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, patternsInMemberOrder, rangeDifference, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };
+export const __test = { availableTypeFields, shiftTypeFieldsEditor, syncTypeFieldPicker, editorAction, shiftTypeRow, patternRow, patternDaysEditorHtml, patternSaveOrder, initialOverviewSelection, renderOverview, renderToday, overviewLaneHeader, planningPanel, scheduleFabIntent, renderStatistics, patternFields, formField, shiftFields, reminderOffsetField, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, patternsInMemberOrder, rangeDifference, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };

@@ -324,6 +324,12 @@
   margin-bottom: var(--space-2);
 }
 
+/* Ohne waehlbares Feld ist die Auswahl `hidden` (schedule.js,
+   syncTypeFieldPicker) - `display: flex` oben schluege das Attribut sonst. */
+.schedule-type-field-add[hidden] {
+  display: none;
+}
+
 .schedule-type-field-add .form-input {
   flex: 1;
   min-width: 0;

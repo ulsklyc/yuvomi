@@ -332,6 +332,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   closed and opened again. It is now placed again on every change of the window, and closes when
   the window gets narrower than the width from which the filters open as a popover (#1775).
 
+- **Shift types: a field removed in the dialog can be attached again without leaving it.** Removing
+  an attached field only deleted its row; it did not come back to the list of fields to add, and
+  with every field attached there was no such list at all - undoing a slip meant cancelling the
+  dialog and losing the other edits. A removed field now returns to the list at once (#1775).
+
 ## [2.74.0] - 2026-10-07
 
 ### Added
