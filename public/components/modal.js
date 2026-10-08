@@ -18,6 +18,8 @@
  *   mountFooter(panel)             → hebt eine neu gerenderte Fußzeile ans Panel
  *   decorateFooterDelete(footer)   → erkennt Löschen im Fuß (mobil Icon-Knopf)
  *   refreshDirtySnapshot()         → Dirty-Basis auf den jetzigen Stand setzen
+ *   swapFieldsKeepingDirtyBase(panel, swap) → Felder im offenen Formular
+ *                                    tauschen, ohne dass der Tausch als Eingabe zählt
  *   focusFirstField(panel)         → Fokus nach dem Pane-Wechsel, touch-bewusst
  *   updateHeaderAction(panel, …)   → Beschriftung/Handler des Kopf-Buttons tauschen
  */
@@ -418,10 +420,13 @@ export function focusFirstField(panel) {
 // fieldsets: a real field that starts disabled/hidden (e.g. a conditional
 // fieldset a mode enables) must still count once it holds typed content.
 function serializeForm(container) {
-  const inputs = container.querySelectorAll(
+  return formFields(container).map(serializeField).join('&');
+}
+
+function formFields(container) {
+  return Array.from(container.querySelectorAll(
     'input:not([type="file"]):not([data-dirty-ignore]), select:not([data-dirty-ignore]), textarea:not([data-dirty-ignore])'
-  );
-  return Array.from(inputs).map(serializeField).join('&');
+  ));
 }
 
 // EIN HAKEN IST SEIN ZUSTAND, NICHT SEIN WERT (#1775). Eine Checkbox traegt
@@ -440,12 +445,14 @@ function isFormDirty(container) {
   // Ein Ansichtsblatt hat nichts Ungespeichertes - siehe _dirtyGuardEnabled.
   if (!_dirtyGuardEnabled) return false;
   if (_initialFormSnapshot === null) return false;
-  return serializeForm(container) !== _initialFormSnapshot;
+  return serializeForm(container) !== _initialFormSnapshot.join('&');
 }
 
+// Die Basis steht JE FELD da, nicht als ein Text: nur so laesst sich spaeter
+// sagen, welcher Eintrag zu welchem Feld gehoert (swapFieldsKeepingDirtyBase).
 function _snapshotNow() {
   if (!activeOverlay) return;
-  _initialFormSnapshot = serializeForm(activeOverlay.querySelector('.modal-panel') ?? activeOverlay);
+  _initialFormSnapshot = formFields(activeOverlay.querySelector('.modal-panel') ?? activeOverlay).map(serializeField);
 }
 
 /**
@@ -464,6 +471,41 @@ export function refreshDirtySnapshot() {
   _snapshotNow();
   if (_initialFormTimeout) clearTimeout(_initialFormTimeout);
   _initialFormTimeout = setTimeout(_snapshotNow, 150);
+}
+
+/**
+ * Tauscht Felder im offenen Formular, ohne dass der Tausch als Eingabe zaehlt
+ * (#1784).
+ *
+ * Wer einem offenen Dialog Felder NACHREICHT (eine Auswahl, deren Optionen erst
+ * jetzt geladen sind), veraendert, was `serializeForm` liest - und das
+ * Schliessen fragt "Aenderungen verwerfen?", obwohl niemand etwas angefasst
+ * hat. `refreshDirtySnapshot()` waere hier die falsche Antwort: es friert den
+ * JETZIGEN Stand ein und damit auch, was der Nutzer inzwischen getippt hat -
+ * das Schliessen ginge ohne Frage durch, und die Eingabe waere still weg.
+ *
+ * Deshalb je Feld: was den Tausch UEBERLEBT, behaelt seinen Eintrag aus der
+ * Basis (eine getippte Eingabe bleibt eine Aenderung, und wer sie zuruecknimmt,
+ * ist wieder sauber); was der Tausch NEU bringt, geht mit dem Stand in die
+ * Basis, den `swap` ihm gegeben hat; was er entfernt, faellt heraus.
+ *
+ * `swap` laeuft synchron und IMMER - auch ohne Basis (Ansichtsblatt, Dialog
+ * unter einer Rueckfrage geparkt). Dann bleibt die Basis, wie sie ist.
+ *
+ * @param {Element} panel - das `.modal-panel`, das `onSave` bekommen hat
+ * @param {() => void} swap - der Tausch samt allem, was die neuen Felder
+ *   programmatisch setzt (Vorauswahl), bevor der Nutzer sie zu sehen bekommt
+ */
+export function swapFieldsKeepingDirtyBase(panel, swap) {
+  const own = Boolean(activeOverlay) && (activeOverlay.querySelector('.modal-panel') ?? activeOverlay) === panel;
+  const base = own ? _initialFormSnapshot : null;
+  const before = base ? formFields(panel) : null;
+  swap();
+  // Passt die Basis nicht zu den Feldern (ein anderer Umbau seit dem Snapshot),
+  // ist nicht zu sagen, welcher Eintrag wem gehoert - sie bleibt stehen.
+  if (!base || base.length !== before.length) return;
+  const slot = new Map(before.map((el, i) => [el, i]));
+  _initialFormSnapshot = formFields(panel).map((el) => (slot.has(el) ? base[slot.get(el)] : serializeField(el)));
 }
 
 // --------------------------------------------------------
@@ -555,7 +597,7 @@ function _suspendActiveModal() {
     // hier: das gleich folgende openModal löscht den ausstehenden Timer, und ein
     // null-Snapshot schaltet isFormDirty() für die restliche Lebensdauer des
     // Formulars ab - der Dirty-Guard wäre danach still tot.
-    snapshot: _initialFormSnapshot ?? (panel ? serializeForm(panel) : null),
+    snapshot: _initialFormSnapshot ?? (panel ? formFields(panel).map(serializeField) : null),
     // Mit demselben Grund wie der Snapshot daneben: der Dialog, der sich gleich
     // darüberlegt, läuft selbst durch openModal() und setzt den Wächter dabei
     // auf seinen Standardwert. Ohne dieses Merken käme ein geparktes
@@ -2008,6 +2050,19 @@ export const askOverModal = createAskOverModal();
 /** Nur fuer Tests: Gesten und Bestaetigungen ohne echtes Panel treiben. */
 export const __test = {
   serializeForm,
+  // #1784: die Dirty-Basis als Programm - ein Overlay ohne openModal() zum
+  // offenen Formular erklaeren (Basis sofort, ohne den 150-ms-Nachlauf), den
+  // Waechter fragen und wieder aufraeumen.
+  isFormDirty,
+  adoptOverlayForTest(overlay) {
+    activeOverlay = overlay;
+    _dirtyGuardEnabled = true;
+    _snapshotNow();
+  },
+  releaseOverlayForTest() {
+    activeOverlay = null;
+    _initialFormSnapshot = null;
+  },
   wireSheetSwipe: _wireSheetSwipe,
   createConfirmOverModal,
   createAskOverModal,

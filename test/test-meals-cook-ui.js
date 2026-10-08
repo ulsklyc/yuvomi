@@ -771,3 +771,157 @@ test('Stylesheets: die Koch-Zeichen schrumpfen nicht, und der Avatar der Kachel 
 
   assert.ok(regel('meals.css', '.meal-read__cook'), '.meal-read__cook hat eine Regel in meals.css');
 });
+
+// -------------------------------------------------------------------------
+// #1784: die nachgereichte Koch-Auswahl ist keine Eingabe
+// -------------------------------------------------------------------------
+
+/* GEMESSEN AM ECHTEN WAECHTER. Scheiterte der erste Abruf der Mitglieder,
+ * reicht openMealModal() die Auswahl nach, sobald sie da ist - und tauscht
+ * dafuer Felder im offenen Dialog. Der Waechter des Dialogs (components/
+ * modal.js) verglich danach neue Felder gegen die Basis vom Oeffnen und fragte
+ * "Aenderungen verwerfen?", obwohl niemand etwas angefasst hatte.
+ *
+ * Der Loader stubt modal.js fuer die Seite; hier haengt ueber seinen Haken die
+ * ECHTE Funktion, und gefragt wird der echte isFormDirty(). Die Felder der
+ * Attrappe entstehen aus dem ECHTEN Markup (Dialoginhalt und cookPickerHtml()
+ * ueber die echte Personenauswahl), und die Antwort auf `/family/members`
+ * kommt, wann der Test es sagt. */
+const echtesModal = await import('../public/components/modal.js');
+
+/** Die Koch-Checkboxen eines Markups als Felder, wie der Waechter sie liest. */
+function kochFelder(html) {
+  return [...String(html).matchAll(/<input type="checkbox" class="([^"]*)" value="([^"]*)"([^>]*)>/g)]
+    .filter((m) => /data-ms-input="meal_cook"/.test(m[3]))
+    .map((m) => ({
+      type: 'checkbox', name: '', id: '', value: m[2], checked: /(^|\s)checked(\s|$)/.test(m[3]),
+      classList: { contains: (name) => m[1].split(/\s+/).includes(name) },
+    }));
+}
+
+/** Der offene Dialog: ein Titelfeld, das bleibt, und die Koch-Auswahl, die getauscht wird. */
+function dialogAttrappe(content) {
+  const knoten = () => ({
+    value: '', checked: false, hidden: false, dataset: {}, style: {},
+    addEventListener() {}, setAttribute() {}, removeAttribute() {}, replaceChildren() {}, insertAdjacentHTML() {},
+    appendChild() {}, querySelector: () => null, querySelectorAll: () => [], focus() {},
+  });
+  const titel = { type: 'text', id: 'modal-title', name: '', value: '' };
+  let koch = kochFelder(content);
+  let nachgereicht = null;
+  const auswahl = {
+    insertAdjacentHTML(position, html) {
+      assert.equal(position, 'afterend');
+      nachgereicht = kochFelder(html);
+    },
+    remove() { koch = nachgereicht; },
+  };
+  const panel = {
+    dataset: {},
+    querySelector: (sel) => (sel === '.meal-modal__cook' ? auswahl : knoten()),
+    querySelectorAll: (sel) => {
+      if (sel.startsWith('input:not(')) return [titel, ...koch];
+      if (sel === '[data-ms-input="meal_cook"]') return koch;
+      return [];
+    },
+  };
+  return { panel, titel, koch: () => koch };
+}
+
+/**
+ * Den Dialog oeffnen, waehrend die Mitglieder fehlen, und die Antwort erst auf
+ * Zuruf liefern. `fn` bekommt den Waechter (`schmutzig()`), die Felder und
+ * `antworte()`.
+ */
+async function mitNachgereichterAuswahl(opts, fn) {
+  const hakenZuvor = globalThis.__swapFieldsKeepingDirtyBase;
+  const apiZuvor = globalThis.__apiStub;
+  globalThis.__swapFieldsKeepingDirtyBase = echtesModal.swapFieldsKeepingDirtyBase;
+  let liefere = null;
+  globalThis.__apiStub = {
+    get: (path) => (path === '/family/members'
+      ? new Promise((resolve) => { liefere = () => resolve({ data: MITGLIEDER }); })
+      : Promise.resolve({ data: [] })),
+  };
+  try {
+    await withAccess(SCHREIBEN, () => mitPlan({ members: [] }, async () => {
+      const [dialog] = await modalMitschnitt(() => meals.openMealModal(opts));
+      assert.ok(dialog, 'Vorbedingung: der Editor ist aufgegangen');
+      const attrappe = dialogAttrappe(dialog.content);
+      const { panel } = attrappe;
+      echtesModal.__test.adoptOverlayForTest({ querySelector: (sel) => (sel === '.modal-panel' ? panel : null) });
+      dialog.onSave(panel);
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.equal(typeof liefere, 'function', 'Vorbedingung: der Dialog holt die Mitglieder nach');
+      const antworte = async () => {
+        liefere();
+        await new Promise((resolve) => setImmediate(resolve));
+      };
+      await fn({ ...attrappe, antworte, schmutzig: () => echtesModal.__test.isFormDirty(panel) });
+    }));
+  } finally {
+    echtesModal.__test.releaseOverlayForTest();
+    globalThis.__swapFieldsKeepingDirtyBase = hakenZuvor;
+    globalThis.__apiStub = apiZuvor;
+  }
+}
+
+const NEU = { mode: 'create', date: '2026-10-07', mealType: 'lunch' };
+const zeichen = (felder) => felder.map((f) => `${f.value || 'niemand'}:${f.checked ? 1 : 0}`);
+
+test('#1784: die nachgereichte Koch-Auswahl macht den unberuehrten Dialog nicht schmutzig', async () => {
+  await mitNachgereichterAuswahl(NEU, async ({ koch, antworte, schmutzig }) => {
+    assert.deepEqual(zeichen(koch()), ['niemand:1'], 'Vorbedingung: ohne Mitglieder gibt es nur "Niemand"');
+    assert.equal(schmutzig(), false, 'Vorbedingung: frisch geoeffnet ist der Dialog sauber');
+    await antworte();
+    assert.deepEqual(zeichen(koch()), ['niemand:1', '1:0', '2:0'], 'Vorbedingung: die Auswahl ist getauscht');
+    assert.equal(schmutzig(), false, 'der Tausch ist keine Eingabe - das Schliessen fragt nicht');
+    // Gegenfall: eine Wahl in der NEUEN Auswahl ist eine Aenderung, und wer sie
+    // zuruecknimmt, ist wieder sauber - die neuen Felder zaehlen also mit.
+    const [niemand, anna] = koch();
+    anna.checked = true; niemand.checked = false;
+    assert.equal(schmutzig(), true);
+    anna.checked = false; niemand.checked = true;
+    assert.equal(schmutzig(), false);
+  });
+});
+
+test('#1784: was vor dem Tausch getippt wurde, bleibt eine Aenderung - und nur das', async () => {
+  await mitNachgereichterAuswahl(NEU, async ({ titel, koch, antworte, schmutzig }) => {
+    titel.value = 'Linsensuppe';
+    assert.equal(schmutzig(), true, 'Vorbedingung: der getippte Titel ist eine Aenderung');
+    await antworte();
+    assert.equal(koch().length, 3, 'Vorbedingung: die Auswahl ist getauscht');
+    assert.equal(schmutzig(), true, 'der Tausch friert die Eingabe nicht als Ausgangsstand ein');
+    titel.value = '';
+    assert.equal(schmutzig(), false, 'ohne die Eingabe ist der Dialog sauber - der Tausch selbst zaehlt nicht');
+  });
+});
+
+test('#1784: beim Bearbeiten bleibt der gespeicherte Koch gewaehlt, und der Dialog sauber', async () => {
+  const meal = mitBen();
+  const opts = { mode: 'edit', meal, date: meal.date, mealType: meal.meal_type };
+  await mitNachgereichterAuswahl(opts, async ({ koch, antworte, schmutzig }) => {
+    assert.deepEqual(zeichen(koch()), ['niemand:0', '2:1'], 'Vorbedingung: wer schon kocht, steht auch ohne Liste da');
+    await antworte();
+    assert.deepEqual(zeichen(koch()), ['niemand:0', '1:0', '2:1']);
+    assert.equal(schmutzig(), false);
+  });
+});
+
+// Die geteilte Funktion fuer sich: ohne eigene Basis tauscht sie nur.
+test('#1784: swapFieldsKeepingDirtyBase tauscht immer, auch ohne offenes Formular', () => {
+  let getauscht = 0;
+  echtesModal.swapFieldsKeepingDirtyBase({ querySelectorAll: () => [] }, () => { getauscht += 1; });
+  assert.equal(getauscht, 1, 'ohne offenes Modal');
+  const feld = { type: 'text', id: 'a', name: '', value: '' };
+  const panel = { querySelectorAll: () => [feld] };
+  echtesModal.__test.adoptOverlayForTest({ querySelector: () => panel });
+  try {
+    echtesModal.swapFieldsKeepingDirtyBase({ querySelectorAll: () => [] }, () => { getauscht += 1; feld.value = 'x'; });
+    assert.equal(getauscht, 2, 'fuer ein fremdes Panel (der Dialog darunter ist geparkt)');
+    assert.equal(echtesModal.__test.isFormDirty(panel), true, 'und die Basis des offenen Formulars bleibt, wie sie war');
+  } finally {
+    echtesModal.__test.releaseOverlayForTest();
+  }
+});

@@ -207,6 +207,14 @@ const STUBS = {
     };
     export const mountFooter = () => null;
     export const refreshDirtySnapshot = () => {};
+    // Der Tausch selbst muss laufen, genau einmal und synchron. Wer die
+    // Dirty-Basis dahinter messen will, haengt die ECHTE Funktion aus
+    // components/modal.js an globalThis.__swapFieldsKeepingDirtyBase.
+    export const swapFieldsKeepingDirtyBase = (panel, swap) => (
+      typeof globalThis.__swapFieldsKeepingDirtyBase === 'function'
+        ? globalThis.__swapFieldsKeepingDirtyBase(panel, swap)
+        : swap()
+    );
     export const captureModalContext = () => globalThis.__modalContextId?.() ?? 'test-modal-context';
     export const isModalContextCurrent = (context) => (
       globalThis.__modalContextId?.() === undefined
