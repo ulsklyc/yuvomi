@@ -971,7 +971,10 @@ function shiftTypeFieldsEditor(type) {
   // anhaengen, weil es nichts gab, wohin es haette zurueckkehren koennen.
   // syncTypeFieldPicker() fuehrt sie nach jedem Anhaengen und Entfernen nach.
   const picker = '<div class="schedule-type-field-add" data-field-add' + (available.length ? '' : ' hidden') + '>'
-      + '<select class="form-input" data-field-picker="' + type.id + '">' + available.map((field) => option(field.id, field.name)).join('') + '</select>'
+      // Kein sichtbares Label: die Abschnittsueberschrift steht direkt darueber.
+      // Ohne Namen sagt ein Screenreader nur "Kombinationsfeld" und den Namen
+      // des ersten Feldes als Wert (#1782).
+      + '<select class="form-input" data-field-picker="' + type.id + '" aria-label="' + esc(t('schedule.fieldPickerLabel')) + '">' + available.map((field) => option(field.id, field.name)).join('') + '</select>'
       + '<button type="button" class="btn btn--secondary" data-action="add-type-field" data-id="' + type.id + '">' + esc(t('common.add')) + '</button>'
       + '</div>';
   const body = '<div class="schedule-type-fields-rows" data-type-fields-rows="' + type.id + '">'

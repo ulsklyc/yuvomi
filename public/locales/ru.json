@@ -6236,6 +6236,7 @@
         "attachedFields": "Свои поля",
         "showInOverlay": "Показывать в календаре",
         "noFieldsAttached": "Нет привязанных своих полей.",
+        "fieldPickerLabel": "Поле для привязки",
         "moveUp": "Переместить вверх",
         "moveDown": "Переместить вниз",
         "createOverride": "Добавить исключение",

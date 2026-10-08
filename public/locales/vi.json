@@ -5932,6 +5932,7 @@
         "attachedFields": "Trường tùy chỉnh",
         "showInOverlay": "Hiện trên lịch",
         "noFieldsAttached": "Không có trường tùy chỉnh nào được gắn.",
+        "fieldPickerLabel": "Trường cần gắn",
         "moveUp": "Di chuyển lên",
         "moveDown": "Di chuyển xuống",
         "createOverride": "Thêm ngoại lệ",

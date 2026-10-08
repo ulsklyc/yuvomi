@@ -5932,6 +5932,7 @@
         "attachedFields": "Anpassade fält",
         "showInOverlay": "Visa i kalendern",
         "noFieldsAttached": "Inga anpassade fält kopplade.",
+        "fieldPickerLabel": "Fält att koppla",
         "moveUp": "Flytta upp",
         "moveDown": "Flytta ned",
         "createOverride": "Lägg till undantag",

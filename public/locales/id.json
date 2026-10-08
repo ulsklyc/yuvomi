@@ -5932,6 +5932,7 @@
         "attachedFields": "Bidang khusus",
         "showInOverlay": "Tampilkan di kalender",
         "noFieldsAttached": "Tidak ada bidang khusus yang dikaitkan.",
+        "fieldPickerLabel": "Bidang yang akan dikaitkan",
         "moveUp": "Ke atas",
         "moveDown": "Ke bawah",
         "createOverride": "Tambah pengecualian",

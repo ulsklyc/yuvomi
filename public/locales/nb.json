@@ -5932,6 +5932,7 @@
         "attachedFields": "Tilpassede felt",
         "showInOverlay": "Vis i kalender",
         "noFieldsAttached": "Ingen tilpassede felt koblet til.",
+        "fieldPickerLabel": "Felt som skal kobles til",
         "moveUp": "Flytt opp",
         "moveDown": "Flytt ned",
         "createOverride": "Legg til overstyring",

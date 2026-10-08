@@ -5932,6 +5932,7 @@
         "attachedFields": "فیلدهای سفارشی",
         "showInOverlay": "نمایش در تقویم",
         "noFieldsAttached": "هیچ فیلد سفارشی پیوند نشده است.",
+        "fieldPickerLabel": "فیلد برای پیوند",
         "moveUp": "بالا",
         "moveDown": "پایین",
         "createOverride": "افزودن استثنا",

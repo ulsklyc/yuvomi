@@ -5932,6 +5932,7 @@
         "attachedFields": "自定义字段",
         "showInOverlay": "在日历中显示",
         "noFieldsAttached": "未关联任何自定义字段。",
+        "fieldPickerLabel": "要关联的字段",
         "moveUp": "上移",
         "moveDown": "下移",
         "createOverride": "添加例外",

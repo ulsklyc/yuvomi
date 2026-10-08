@@ -1049,6 +1049,36 @@ test('saving a multi-day "replace" range parks the form through the confirmation
   assert.match(replaceBranch, /confirmOverModal\([\s\S]*closeOnConfirm:\s*false/, 'a failed /schedule/overrides/fill must find the form still parked, not already closed by the confirmation itself');
 });
 
+/* #1782: die Feld-Auswahl im Schichtart-Dialog hatte keinen Namen - kein Label,
+ * kein aria-label, kein aria-labelledby. Ein Screenreader sagte
+ * "Kombinationsfeld" und den Namen des ersten Feldes. Gelesen wird das Markup,
+ * das die echte shiftTypeFieldsEditor() schreibt, in beiden Zustaenden der
+ * Auswahl. */
+test('#1782: die Feld-Auswahl im Schichtart-Dialog traegt einen zugaenglichen Namen', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const state = __test.scheduleState();
+  const savedFields = state.customFields;
+  state.customFields = [{ id: 11, name: 'Station' }, { id: 12, name: 'Fahrzeug' }];
+  try {
+    const editors = {
+      'mit waehlbarem Feld': __test.shiftTypeFieldsEditor({ id: 5, fields: [{ id: 11, name: 'Station', show_in_overlay: 0 }] }),
+      'leer und verborgen': __test.shiftTypeFieldsEditor({ id: 5, fields: state.customFields.map((f) => ({ ...f, show_in_overlay: 0 })) }),
+    };
+    for (const [label, html] of Object.entries(editors)) {
+      const selects = html.match(/<select\b[^>]*data-field-picker[^>]*>/g) ?? [];
+      assert.equal(selects.length, 1, `${label}: genau eine Feld-Auswahl`);
+      // Der Test-Stub von t() gibt den Schluessel zurueck: der Name kommt aus den Locales.
+      assert.match(selects[0], / aria-label="schedule\.fieldPickerLabel"/, `${label}: die Auswahl hat keinen zugaenglichen Namen`);
+    }
+    // Der Schluessel hat in der Referenzsprache einen Text, der nicht der Schluessel ist.
+    const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
+    assert.equal(typeof de.schedule.fieldPickerLabel, 'string');
+    assert.ok(de.schedule.fieldPickerLabel.trim().length > 0);
+  } finally {
+    state.customFields = savedFields;
+  }
+});
+
 /* #1775: ein im Schichtart-Dialog entferntes Feld liess sich im selben Dialog
  * nicht wieder anhaengen - "Entfernen" loeschte nur die Zeile, und waren alle
  * Felder angehaengt, gab es gar keine Auswahl. Gefahren wird die echte
@@ -1067,7 +1097,7 @@ test('#1775: ein entferntes eigenes Feld kehrt in die Auswahl des Schichtart-Dia
 
     // Markup: die Auswahl steht IMMER da, ohne waehlbares Feld verborgen.
     const all = __test.shiftTypeFieldsEditor({ id: 5, fields: state.customFields.map((f) => ({ ...f, show_in_overlay: 0 })) });
-    assert.match(all, /<div class="schedule-type-field-add" data-field-add hidden><select class="form-input" data-field-picker="5"><\/select>/,
+    assert.match(all, /<div class="schedule-type-field-add" data-field-add hidden><select class="form-input" data-field-picker="5"[^>]*><\/select>/,
       'alle Felder angehaengt: die Auswahl ist da, leer und verborgen');
     const some = __test.shiftTypeFieldsEditor({ id: 5, fields: [{ id: 11, name: 'Station', show_in_overlay: 0 }] });
     assert.match(some, /<div class="schedule-type-field-add" data-field-add><select[^>]*><option value="12">Fahrzeug<\/option><option value="13">Partner<\/option><\/select>/);

@@ -5932,6 +5932,7 @@
         "attachedFields": "Campos personalizados",
         "showInOverlay": "Mostrar en el calendario",
         "noFieldsAttached": "No hay campos personalizados asociados.",
+        "fieldPickerLabel": "Campo que asociar",
         "moveUp": "Mover arriba",
         "moveDown": "Mover abajo",
         "createOverride": "Añadir excepción",

@@ -5932,6 +5932,7 @@
         "attachedFields": "Eigene Felder",
         "showInOverlay": "Im Kalender anzeigen",
         "noFieldsAttached": "Keine eigenen Felder angehängt.",
+        "fieldPickerLabel": "Feld zum Anhängen",
         "moveUp": "Nach oben",
         "moveDown": "Nach unten",
         "createOverride": "Ausnahme hinzufügen",

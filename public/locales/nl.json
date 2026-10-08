@@ -5932,6 +5932,7 @@
         "attachedFields": "Aangepaste velden",
         "showInOverlay": "Tonen in kalender",
         "noFieldsAttached": "Geen aangepaste velden gekoppeld.",
+        "fieldPickerLabel": "Veld om te koppelen",
         "moveUp": "Omhoog verplaatsen",
         "moveDown": "Omlaag verplaatsen",
         "createOverride": "Uitzondering toevoegen",

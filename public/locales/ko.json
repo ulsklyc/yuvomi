@@ -5932,6 +5932,7 @@
         "attachedFields": "사용자 지정 필드",
         "showInOverlay": "캘린더에 표시",
         "noFieldsAttached": "연결된 사용자 지정 필드가 없습니다.",
+        "fieldPickerLabel": "연결할 필드",
         "moveUp": "위로",
         "moveDown": "아래로",
         "createOverride": "예외 추가",

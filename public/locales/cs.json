@@ -6089,6 +6089,7 @@
         "attachedFields": "Vlastní pole",
         "showInOverlay": "Zobrazit v kalendáři",
         "noFieldsAttached": "Nejsou přiřazena žádná vlastní pole.",
+        "fieldPickerLabel": "Pole k přiřazení",
         "moveUp": "Přesunout nahoru",
         "moveDown": "Přesunout dolů",
         "createOverride": "Přidat výjimku",

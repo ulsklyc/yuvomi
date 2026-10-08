@@ -6388,6 +6388,7 @@
         "attachedFields": "الحقول المخصصة",
         "showInOverlay": "إظهار في التقويم",
         "noFieldsAttached": "لا توجد حقول مخصصة مرفقة.",
+        "fieldPickerLabel": "الحقل المراد إرفاقه",
         "moveUp": "نقل لأعلى",
         "moveDown": "نقل لأسفل",
         "createOverride": "إضافة استثناء",

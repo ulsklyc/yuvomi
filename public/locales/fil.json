@@ -5932,6 +5932,7 @@
         "attachedFields": "Custom na field",
         "showInOverlay": "Ipakita sa kalendaryo",
         "noFieldsAttached": "Walang nakakabit na custom na field.",
+        "fieldPickerLabel": "Field na ikakabit",
         "moveUp": "Ilipat pataas",
         "moveDown": "Ilipat pababa",
         "createOverride": "Magdagdag ng eksepsiyon",

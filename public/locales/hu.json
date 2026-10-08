@@ -5932,6 +5932,7 @@
         "attachedFields": "Egyéni mezők",
         "showInOverlay": "Megjelenítés a naptárban",
         "noFieldsAttached": "Nincs hozzárendelt egyéni mező.",
+        "fieldPickerLabel": "Hozzárendelendő mező",
         "moveUp": "Feljebb mozgatás",
         "moveDown": "Lejjebb mozgatás",
         "createOverride": "Kivétel hozzáadása",

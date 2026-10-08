@@ -173,6 +173,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the tile. A narrow tile shows the value one step smaller, the narrowest one also a smaller
   unit, and on a very small phone the vitals page shows one tile per line instead of two that are
   too narrow. Tiles in budget, housekeeping and inventory are unchanged.
+- **Screen readers name the field picker in the shift type dialog.** Under "Custom fields" the
+  dropdown next to "Add" had no name, so it was announced as an unnamed combo box with the first
+  field as its value. It is now announced as "Field to attach". Nothing changes on screen.
 - **The first visit no longer reloads itself and empties the login form.** One to four seconds
   after the very first load the page reloaded, and whatever had been typed into the login form
   was gone. The reload was meant for an update of the app, but it also fired when the app was

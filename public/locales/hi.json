@@ -5932,6 +5932,7 @@
         "attachedFields": "कस्टम फ़ील्ड",
         "showInOverlay": "कैलेंडर में दिखाएँ",
         "noFieldsAttached": "कोई कस्टम फ़ील्ड नहीं जोड़ी गई है।",
+        "fieldPickerLabel": "जोड़ने के लिए फ़ील्ड",
         "moveUp": "ऊपर ले जाएँ",
         "moveDown": "नीचे ले जाएँ",
         "createOverride": "अपवाद जोड़ें",

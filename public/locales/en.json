@@ -5932,6 +5932,7 @@
         "attachedFields": "Custom fields",
         "showInOverlay": "Show on calendar",
         "noFieldsAttached": "No custom fields attached.",
+        "fieldPickerLabel": "Field to attach",
         "moveUp": "Move up",
         "moveDown": "Move down",
         "createOverride": "Add override",

@@ -5932,6 +5932,7 @@
         "attachedFields": "Özel alanlar",
         "showInOverlay": "Takvimde göster",
         "noFieldsAttached": "Bağlı özel alan yok.",
+        "fieldPickerLabel": "Bağlanacak alan",
         "moveUp": "Yukarı taşı",
         "moveDown": "Aşağı taşı",
         "createOverride": "İstisna ekle",
