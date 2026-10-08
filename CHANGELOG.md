@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Rows show fewer buttons.** Lists no longer carry a pencil and a bin on every line. Editing,
+  deleting and anything further sit behind one "more" button per row that is always visible and
+  names what it does in words. This applies to shopping items, birthdays, tasks, loan payments
+  and the five lists of the shift planner, where "Edit" and a red-outlined "Delete" stood on
+  every row. Deleting stays undoable or asks first, exactly as before, and swiping still works.
+  Meal cards no longer show a bin at all: open the meal to delete it.
+- **Shopping rows are one line.** The amount now stands at the end of the line with the name
+  instead of underneath it, so amounts line up in a column and the list shows more at once. A
+  long name still wraps instead of being cut off.
 - **Fields are quieter and all look alike.** A field used to be drawn twice - a fill plus a
   heavy outline - and in dark mode it was a near-black box with a bright edge. Fields now have
   one skin everywhere: a thin outline that still meets the contrast needed to find it, on a fill
@@ -23,16 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   boxes named "Systolic", "Diastolic" and "Pulse", none with a unit. It is now written the way
   it is said: "120 / 80 mmHg", with the pulse on the line below, each with an example value and
   its unit. Type, time and visibility stand as rows with the label on the left and the value on
-  the right; the note keeps its own field. Screen readers still announce every part by name.
-- **Rows show fewer buttons.** Lists no longer carry a pencil and a bin on every line. Editing,
-  deleting and anything further sit behind one "more" button per row that is always visible and
-  names what it does in words. This applies to shopping items, birthdays, tasks, loan payments
-  and the five lists of the shift planner, where "Edit" and a red-outlined "Delete" stood on
-  every row. Deleting stays undoable or asks first, exactly as before, and swiping still works.
-  Meal cards no longer show a bin at all: open the meal to delete it.
-- **Shopping rows are one line.** The amount now stands at the end of the line with the name
-  instead of underneath it, so amounts line up in a column and the list shows more at once. A
-  long name still wraps instead of being cut off.
+  the right; the note keeps its own field. Screen readers still announce every part by name, and
+  in right-to-left languages the reading keeps its order.
 - **Documents look like documents.** The preview shows the whole page as a sheet on a quiet
   background instead of the cropped top of a white rectangle, and in dark mode it is no longer
   the brightest thing on the screen. Cards are as tall as their content, with their buttons
@@ -48,31 +49,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   say it in one line with their button.
 - **The task board has depth.** Columns were as bright as the cards on them; they are now a
   recessed lane with the cards lying on top, and an empty column no longer shows a dashed box.
-- **Hovering a figure tile no longer looks like selecting it.** The tile lifts slightly; the
-  coloured ring is kept for the selected one.
-- **Each money screen has one number that leads.** On a phone the largest thing on every budget
-  tab was the word "Budget"; the balance stood beside it in small type. Now one figure per tab
-  carries the screen: the balance in the overview, net worth in accounts, the remaining debt in
-  loans, the monthly cost in subscriptions. Income and expenses stand as a quiet line below it.
-  On a desktop the same figure leads its column and the others step back. Long amounts and long
-  currency signs take a smaller size instead of breaking.
-- **The budget trend reads at a glance.** The area under income is tinted, today carries a dot
-  with both values, and what has not happened yet is dotted - for both lines, where expenses
-  used to be dashed as well. "Today" no longer sits on a grid line, the axis says "1.", "16.",
-  "31." instead of three full dates under a header that names the month, and three grid lines
-  replace up to seven. Trend and ring now sit on a card like the lists beside them.
-- **The spending ring shows its total in the middle.** The sentence next to it ("7 segments,
-  largest: ...") is still read out by screen readers.
-- **Account balances are no longer green.** Nearly every balance and the net worth above them
-  were green merely for being above zero. A balance now stands in the text colour and only a
-  negative one is red; green is kept for income and for changes.
-- **Figure tiles line up.** In the vitals row the dates stood at three different heights and
-  "116/74" pushed "mmHg" onto its own line. Label, value, trend line and date now share the same
-  four rows across a row of tiles, value and unit share a baseline, and labels are written
-  normally instead of in spaced capitals, so a long one such as oxygen saturation fits on one line. This holds
-  for every tile of this kind: budget, health, housekeeping, inventory and the overview.
-- **The small trend lines in the vitals tiles are visible.** They were grey hairlines; they now
-  carry the colour of the health area with a soft fill, and the latest reading is marked.
 - **Opening an event, a task or a birthday shows what matters first.** The reading view listed
   everything as rows of equal weight, people as a comma-separated line, under a thin colour
   strip. An event now opens with its time in words ("Today, 20:00 - 22:00") beside a dot in the
@@ -89,6 +65,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   column in front of the names.
 - **The agenda names its days in words.** "Today - Thursday, 8 October" and "Saturday, 10
   October" instead of "08.10.2026 Thursday".
+- **Each money screen has one number that leads.** On a phone the largest thing on every budget
+  tab was the word "Budget"; the balance stood beside it in small type. Now one figure per tab
+  carries the screen: the balance in the overview, net worth in accounts, the remaining debt in
+  loans, the monthly cost in subscriptions. Income and expenses stand as a quiet line below it.
+  On a desktop the same figure leads its column and the others step back. Long amounts and long
+  currency signs take a smaller size instead of breaking.
+- **The budget trend reads at a glance.** The area under income is tinted, today carries a dot
+  with both values, and what has not happened yet is dotted - for both lines, where expenses
+  used to be dashed as well. "Today" no longer sits on a grid line, the axis says "1.", "16.",
+  "31." instead of three full dates under a header that names the month, and three grid lines
+  replace up to seven. Trend and ring now sit on a card like the lists beside them.
+- **The spending ring shows its total in the middle.** The sentence next to it ("7 segments,
+  largest: ...") is still read out by screen readers.
+- **Account balances are no longer green.** Nearly every balance and the net worth above them
+  were green merely for being above zero. A balance now stands in the text colour and only a
+  negative one is red; green is kept for income and for changes.
+- **Figure tiles line up.** In the vitals row the dates stood at three different heights. Label,
+  value, trend line and date now share the same four rows across a row of tiles, value and unit
+  share a baseline, and labels are written normally instead of in spaced capitals, so a long one
+  such as oxygen saturation fits on one line. On the vitals page "116/74 mmHg" stands on one
+  line; in the narrower tiles of the health overview the unit still moves below the value. This
+  holds for every tile of this kind: budget, health, housekeeping, inventory and the overview.
+- **The small trend lines in the vitals tiles are visible.** They were grey hairlines; they now
+  carry the colour of the health area with a soft fill, and the latest reading is marked.
+- **Hovering a figure tile no longer looks like selecting it.** The tile lifts slightly; the
+  coloured ring is kept for the selected one.
 - **The week of activity is easier to read.** Bars have a round top and a flat foot, today's
   bar stands in full colour with its value while the other days step back, and three grid
   lines replace five. On a phone the chart is taller, and the weekdays no longer run into the
@@ -97,12 +99,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sizes one pixel apart; their content now reads on four steps.
 - **Numbers no longer jump sideways.** On the overview, times, amounts and counters now use
   digits of equal width everywhere, not only in some tiles.
+- **Everything that floats has one shape, and the sidebar floats too.** Dialogs, the "More"
+  sheet and the search palette had tighter corners (16 px) than the event popover and the
+  toasts (26 px); they now share the larger radius, with fields, tiles and menu rows rounded to
+  match, and catch a fine line of light at the top. The dialog header is no longer a grey strip
+  above a white body. On a desktop the sidebar is a glass panel 8 px off the window edge instead
+  of a full-height bar; the content keeps its width. Light glass takes the warm tone of the
+  page instead of a cool white, and the icon wells in the sidebar are visible in the light
+  theme (they were 1.007:1 against the bar).
+- **Login, setup, invitation and password reset have a place.** The form stood as a small card
+  on a plain page. It is now a glass panel in front of a still field of soft light in the
+  colours of the Yuvomi mark, which also stands behind the loading screen. Everything on these
+  pages sits on the panel, where text keeps its contrast (label 5.4:1 light, 6.2:1 dark, in the
+  worst spot); with "reduce transparency" or "increase contrast" the light is off and the panel
+  is solid. A form taller than the window can now be scrolled by hand - on a small phone or in
+  landscape its lower end could only be reached with the Tab key.
+- **The app no longer animates a backdrop nobody could see.** Four blurred colour fields drifted
+  behind the content the whole time the app was open, and the content covered them completely.
+  They are gone, together with a gradient that was covered the same way. Nothing looks
+  different; the browser has four large layers less to carry.
+- **Rows and cards answer a tap.** List rows, task cards, the cards on the overview and the rows
+  in the settings now show that they are being pressed, instead of doing nothing until the next
+  screen arrives.
+- **"New task" closes right away.** After saving, the dialog showed a check mark for about
+  three quarters of a second before it closed. It now closes with the save, and the new task
+  pulls open in the list: visible after about 0.2 seconds instead of 0.9.
+- **A sheet you flick away travels out of the screen.** Dragging a sheet down and letting go made
+  it dissolve where the finger had left it. It now leaves the screen from there, as fast as the
+  flick was; let go too early and it springs back just as briskly. Behind the "More" sheet the
+  dimming fades with the pull.
+- **Going one level deeper has a direction.** On a phone, opening a settings page or a health
+  area slides in from the side you are heading to, and going back comes from the other; both
+  used to cut or only fade. Switching between light and dark fades instead of flipping, the
+  blood pressure and weight curves draw themselves once, and a few menus that appeared or
+  vanished in one frame now fade.
 - **The app starts faster on a slow connection.** Before the overview asked for its data, the
   start made five requests one after the other, two of them twice. What does not depend on each
   other now runs at the same time, and the second copy is served from the first. Measured on a
-  throttled phone (4x CPU, "Fast 4G"), three runs each: the overview asked for its data after
-  747-775 ms instead of 1297-1333 ms, and the greeting appeared after 980-1007 ms instead of
-  1535-1576 ms.
+  throttled phone (4x CPU, "Fast 4G"), three runs each, before and after: the overview asked for
+  its data after about 0.8 seconds instead of 1.3, and the greeting appeared after about 1.0
+  seconds instead of 1.5.
 - **Health loads in three steps instead of six.** The overview asked for vitals and medication,
   then for the cycle history, then for the cycle settings, each only after the previous answer
   had arrived. These now go out together; who may see what is decided as before. Measured on the
@@ -128,55 +164,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   memory, and some 25 seconds of background work on one core spread over the first requests
   after a start. The files themselves are unchanged. `STATIC_BROTLI=off` restores the previous
   behaviour.
-- **Everything that floats has one shape, and the sidebar floats too.** Dialogs, the "More"
-  sheet and the search palette had tighter corners (16 px) than the event popover and the
-  toasts (26 px); they now share the larger radius, with fields, tiles and menu rows rounded to
-  match, and catch a fine line of light at the top. The dialog header is no longer a grey strip
-  above a white body. On a desktop the sidebar is a glass panel 8 px off the window edge instead
-  of a full-height bar; the content keeps its width. Light glass takes the warm tone of the
-  page instead of a cool white, and the icon wells in the sidebar are visible in the light
-  theme (they were 1.007:1 against the bar).
-- **Login, setup, invitation and password reset have a place.** The form stood as a small card
-  on a plain page. It is now a glass panel in front of a still field of soft light in the
-  colours of the Yuvomi mark, which also stands behind the loading screen. Everything on these
-  pages sits on the panel, where text keeps its contrast (label 5.4:1 light, 6.2:1 dark, in the
-  worst spot); with "reduce transparency" or "increase contrast" the light is off and the panel
-  is solid. A form taller than the window can now be scrolled by hand - on a small phone or in
-  landscape its lower end could only be reached with the Tab key.
-- **The app no longer animates a backdrop nobody could see.** Four blurred colour fields drifted
-  behind the content the whole time the app was open, and the content covered them completely.
-  They are gone, together with a gradient that was covered the same way. Nothing looks
-  different; the browser has four large layers less to carry.
-- **"New task" closes right away.** After saving, the dialog showed a check mark for about
-  three quarters of a second before it closed. It now closes with the save, and the new task
-  pulls open in the list: visible after about 0.2 seconds instead of 0.9.
-- **Rows and cards answer a tap.** List rows, task cards, the cards on the overview and the rows
-  in the settings now show that they are being pressed, instead of doing nothing until the next
-  screen arrives.
-- **A sheet you flick away travels out of the screen.** Dragging a sheet down and letting go made
-  it dissolve where the finger had left it. It now leaves the screen from there, as fast as the
-  flick was; let go too early and it springs back just as briskly. Behind the "More" sheet the
-  dimming fades with the pull.
-- **Going one level deeper has a direction.** On a phone, opening a settings page or a health
-  area slides in from the side you are heading to, and going back comes from the other; both
-  used to cut or only fade. Switching between light and dark fades instead of flipping, the
-  blood pressure and weight curves draw themselves once, and a few menus that appeared or
-  vanished in one frame now fade.
 
 ### Fixed
 
-- **Checked items no longer twitch when the list changes.** Adding or deleting an item in the
-  shopping list, or opening a group, replayed the little "checked" animation on every item that
-  had been ticked off long ago. It now plays once, on the box you touch - also when you take a
-  tick back - and has become calmer. The same applies to tasks, subtasks, the housekeeping
-  list and checklists in notes.
-- **The tab bar keeps its glass while you change pages.** On a phone the bar at the bottom went
-  see-through for a moment on every tab change, and the round "+" button popped in again each
-  time. Both now stand still while the page underneath changes; the "+" only arrives with an
-  entrance when the page before had none.
-- **A tapped row no longer stays highlighted on a phone.** After a tap, list rows, task cards and
-  the cards on the overview kept the look they have under a mouse pointer until something else
-  was tapped.
 - **The first visit no longer reloads itself and empties the login form.** One to four seconds
   after the very first load the page reloaded, and whatever had been typed into the login form
   was gone. The reload was meant for an update of the app, but it also fired when the app was
@@ -192,34 +182,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   followed the new one, the setting showed a parser error, and the next start fell back to
   German without a word. A switch that cannot load its file now changes nothing: the selection
   returns to the language in use and the line below says that there is no connection.
-- **Overview on a desktop: opening "New" no longer tips the button over.** The plus turns into
-  a cross by rotating - and it was the whole button that rotated, label included, so the capsule
-  stood diagonally at 45 degrees and turned grey while its menu was open. Only the icon turns
-  now, and the capsule keeps its colour. The round button on a phone looks as before.
-- **The budget tile on the overview wears the budget colour.** Its mark was violet, the colour of
-  the overview itself, because the colour was derived from the tile's link and that link carries
-  a `?tab=` part. The fasting tile, which had no colour of its own either, now wears the health
-  colour like the other health tiles.
-- **Swiping a row shows its whole label at the point where the swipe takes effect.** Icon and
-  word sat in the middle of a panel half the row wide, while the action triggers after 80 px -
-  at that moment a phone showed "Che" and half a tick. They now stand inside the strip the swipe
-  uncovers, on both sides and in right-to-left languages, in every list that swipes.
-- **A required field no longer complains before anything was entered.** In "New event" the title
-  showed "This field is required." on the first Tab or when reaching for the date picker, and
-  everything below it jumped down by a line. An untouched empty field now stays quiet until the
-  form is submitted or until something was typed into it and removed again, and the message
-  slides in instead of pushing the form. This applies to every dialog that marks required fields
-  (events, tasks, meals, recipes, pantry, inventory, contact sync).
-- **Dark theme: the selected segment and the switch knob are the lighter surface again.** The
-  selected tab of a segmented control was darker than its track and read as a dent, and the knob
-  of a switch was a dark dot on a light rail. The thumb now sits one step above its track
-  (module-coloured labels on it keep at least 4.5:1), and the knob is white in both themes; a
-  switch that is on uses the same violet as a primary button, so the knob stands at 5.7:1 instead
-  of 2.7:1.
-- **The login pages show the Yuvomi mark as it is.** In the dark theme the mark on login,
-  invitation and password reset was three dark dots on a lilac tile, and the circles filled less
-  than a third of it. Sidebar and login pages now draw the same mark - the gradient tile with
-  the three light circles of the app icon - and it no longer changes with the theme.
 - **Health on a phone no longer jumps while it loads** (cause of #1770). The block above the list
   of areas - person, "Due today", "Quick add" - appeared only once its data had arrived and
   pushed the list down by almost 500 px, under the finger; each row then grew again when its
@@ -227,6 +189,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   final shape, and the rows have their two-line height from the start. Measured layout shift at
   390x844: 0.58 before, below 0.01 after. The areas themselves load with a placeholder in the
   shape of their content instead of the word "Loading".
+- **A required field no longer complains before anything was entered.** In "New event" the title
+  showed "This field is required." on the first Tab or when reaching for the date picker, and
+  everything below it jumped down by a line. An untouched empty field now stays quiet until the
+  form is submitted or until something was typed into it and removed again, and the message
+  slides in instead of pushing the form. This applies to every dialog that marks required fields
+  (events, tasks, meals, recipes, pantry, inventory, contact sync).
+- **Checked items no longer twitch when the list changes.** Adding or deleting an item in the
+  shopping list, or opening a group, replayed the little "checked" animation on every item that
+  had been ticked off long ago. It now plays once, on the box you touch - also when you take a
+  tick back - and has become calmer. The same applies to tasks, subtasks, the housekeeping
+  list and checklists in notes.
+- **The tab bar keeps its glass while you change pages.** On a phone the bar at the bottom went
+  see-through for a moment on every tab change, and the round "+" button popped in again each
+  time. Both now stand still while the page underneath changes; the "+" only arrives with an
+  entrance when the page before had none.
+- **A tapped row no longer stays highlighted on a phone.** After a tap, list rows, task cards and
+  the cards on the overview kept the look they have under a mouse pointer until something else
+  was tapped.
+- **Overview on a desktop: opening "New" no longer tips the button over.** The plus turns into
+  a cross by rotating - and it was the whole button that rotated, label included, so the capsule
+  stood diagonally at 45 degrees and turned grey while its menu was open. Only the icon turns
+  now, and the capsule keeps its colour. The round button on a phone looks as before.
+- **Swiping a row shows its whole label at the point where the swipe takes effect.** Icon and
+  word sat in the middle of a panel half the row wide, while the action triggers after 80 px -
+  at that moment a phone showed "Che" and half a tick. They now stand inside the strip the swipe
+  uncovers, on both sides and in right-to-left languages, in every list that swipes.
+- **Dark theme: the selected segment and the switch knob are the lighter surface again.** The
+  selected tab of a segmented control was darker than its track and read as a dent, and the knob
+  of a switch was a dark dot on a light rail. The thumb now sits one step above its track
+  (module-coloured labels on it keep at least 4.5:1), and the knob is white in both themes; a
+  switch that is on uses the same violet as a primary button, so the knob stands at 5.7:1 instead
+  of 2.7:1.
+- **The budget tile on the overview wears the budget colour.** Its mark was violet, the colour of
+  the overview itself, because the colour was derived from the tile's link and that link carries
+  a `?tab=` part. The fasting tile, which had no colour of its own either, now wears the health
+  colour like the other health tiles.
+- **The login pages show the Yuvomi mark as it is.** In the dark theme the mark on login,
+  invitation and password reset was three dark dots on a lilac tile, and the circles filled less
+  than a third of it. Sidebar and login pages now draw the same mark - the gradient tile with
+  the three light circles of the app icon - and it no longer changes with the theme.
 - **A confirmation without an explanation has no empty gap.** Dialogs such as "Log out of this
   device?" showed an empty band between two hairlines, between the question and its buttons.
 
