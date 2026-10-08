@@ -756,24 +756,32 @@
  * zusammengesetzte Blutdruck ("116/74" plus "mmHg", gemessen 146px, "180/110"
  * 164px) passt nicht in die 124-164px Innenbreite - "mmHg" fiel unter den Wert.
  *
- * Deshalb ist hier zusaetzlich die KACHEL ein Container. Das geht in diesen
- * Rastern, weil ihre Spuren eine feste Mindestbreite haben und nicht von der
- * intrinsischen Breite der Kachel leben (der Grund, aus dem `.metric-card`
- * selbst keiner sein darf, siehe `.metric-grid`). Eigener Name, damit die
+ * Deshalb fragen Wert und Einheit hier zusaetzlich ihre eigene Zeile: die
+ * WERTZEILE (`.metric-card__body`) ist ein Container. Sie ist so breit wie das
+ * Innere der Kachel (Kachel minus Polster und Kante, hier 26px), und das ist
+ * genau der Platz, den Wert und Einheit haben. Eigener Name, damit die
  * Reihen-Abfragen (`metric-grid`) weiter die Reihe treffen.
  *
- * GEMESSEN an "180/110 mmHg". Die Abfrage misst die INNENBREITE der Kachel
- * (Content-Box: Kachel minus Polster und Kante, hier 26px), und das ist auch
- * der Platz, den die Zeile hat:
+ * NICHT DIE KACHEL SELBST. Der erste Wurf stellte den Container an
+ * `.metric-card`: Size-Containment bringt Layout-Containment mit, und ein
+ * Element mit Layout-Containment ist kein Subgrid mehr. `grid-template-rows`
+ * rechnete zu `none`, die vier geteilten Zeilen von oben waren weg - gemessen
+ * in einer 760px-Reihe mit gemischten Kacheln: Werte auf 31/44/31/31 statt
+ * 44/44/44/44, die Datumszeilen entsprechend versetzt. Die Wertzeile ist ein
+ * Blatt im Raster der Kachel und nimmt niemandem etwas; ihre Hoehe kommt
+ * weiter aus ihrem Inhalt (`inline-size` begrenzt nur die Breite).
+ *
+ * GEMESSEN an "180/110 mmHg":
  *   Title 1 (28px) braucht 164px,
  *   Title 2 (22px) braucht 137px,
  *   Title 3 (20px) mit Einheit in Caption 1 braucht 122px - die schmalste
  *   Kachel (150px Mindestspur) hat 124px.
  * Die Schwellen liegen je 4px darueber, weil die Systemschrift je Plattform
- * etwas anders laeuft. Die erste Stufe gilt nur, wo die Reihe noch Title 1 vergibt (ueber 600px):
- * sie soll senken, nie eine schon kleinere Stufe der Reihe wieder anheben.
- * Title 3 bleibt die Untergrenze des Werts; darunter gibt die Einheit nach. */
-.metric-rows > .metric-card {
+ * etwas anders laeuft. Die erste Stufe gilt nur, wo die Reihe noch Title 1
+ * vergibt (ueber 600px): sie soll senken, nie eine schon kleinere Stufe der
+ * Reihe wieder anheben. Title 3 bleibt die Untergrenze des Werts; darunter
+ * gibt die Einheit nach. */
+.metric-rows > .metric-card > .metric-card__body {
   container: metric-tile / inline-size;
 }
 

@@ -6,7 +6,10 @@
  *        gemessen vor dem Fix stand "mmHg" bei 624-1100px Reihenbreite in jeder
  *        150-172px breiten Kachel unter "116/74" (Wert in 28px), und bei 320px
  *        Fensterbreite in der 138px-Kachel der Vitalwerte-Seite ebenso.
- *        Seitdem ist die Kachel selbst ein Container (`metric-tile`).
+ *        Seitdem ist die Wertzeile jeder Kachel ein Container (`metric-tile`
+ *        an `.metric-card__body`). Nicht die Kachel: als Container ist sie
+ *        kein Subgrid mehr, und die geteilten Zeilen aus R18 (#1794) fallen weg -
+ *        das haelt die Probe mit den gemischten Kacheln.
  * Ausfuehren: npm run test:metric-tile-fit-browser (haengt an test:document-guards)
  *
  * WARUM IM BROWSER. Wie breit "116/74" in Title 1 steht und ob eine Flex-Zeile
@@ -37,20 +40,36 @@ const VALUES = [
   ['36,6', '°C'], ['7:30', 'Std.'], ['108', 'mg/dL'], ['82,4', 'kg'],
 ];
 
-function tile(extraClass, [value, unit]) {
+/* Die Trendlinie, wie `sparklineMarkup()` sie schreibt (ohne den Verlauf). */
+const SPARK = '<svg class="metric-card__spark" viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true"><polyline points="3,20 50,8 97,14" fill="none" stroke-width="1.5" /></svg>';
+/* Ein Label, das in jeder Kachel unter ~250px zwei Zeilen braucht. */
+const LONG_LABEL = 'Sauerstoffsättigung im Blut';
+
+function tile(extraClass, [value, unit], { label = 'Blutdruck', spark = false } = {}) {
   return `<button type="button" class="metric-card metric-card--select${extraClass}">
-    <span class="metric-card__head"><i class="metric-card__icon" aria-hidden="true"></i><span class="metric-card__label">Blutdruck</span></span>
+    <span class="metric-card__head"><i class="metric-card__icon" aria-hidden="true"></i><span class="metric-card__label">${label}</span></span>
     <span class="metric-card__body"><span class="metric-card__value">${value}</span> <span class="metric-card__unit">${unit}</span></span>
+    ${spark ? SPARK : ''}
     <span class="metric-card__meta"><span>03.10.</span></span>
   </button>`;
 }
+
+/* GEMISCHTE KACHELN, wie die Seite sie hat: mit und ohne Trendlinie, ein- und
+ * zweizeiliges Label. Acht gleiche Kacheln sind von selbst gleich hoch und
+ * sagen nichts ueber die geteilten Zeilen aus `.metric-rows`. Die Uebersicht
+ * fuehrt keine Trendlinien (`overviewVitalCardMarkup()`), die Vitalwerte-Seite
+ * schon (`cardMarkup()`). */
+const mixed = (extraClass, { sparks }) => VALUES.map((v, i) => tile(extraClass, v, {
+  label: i % 4 === 1 ? LONG_LABEL : 'Blutdruck',
+  spark: sparks && i % 2 === 0,
+})).join('');
 
 const PAGE = `<!doctype html><html lang="de"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 ${SHEETS.map((name) => `<link rel="stylesheet" href="${pathToFileURL(join(ROOT, 'public/styles', `${name}.css`)).href}">`).join('\n')}
 </head><body>
-<div id="host-overview"><div class="health-overview__vitals-grid metric-rows">${VALUES.map((v) => tile(' metric-card--inset', v)).join('')}</div></div>
-<div id="host-vitals"><div class="health-vitals__cards metric-rows">${VALUES.map((v) => tile('', v)).join('')}</div></div>
+<div id="host-overview"><div class="health-overview__vitals-grid metric-rows">${mixed(' metric-card--inset', { sparks: false })}</div></div>
+<div id="host-vitals"><div class="health-vitals__cards metric-rows">${mixed('', { sparks: true })}</div></div>
 <div id="host-plain"><div class="metric-grid"><article class="metric-card"><div class="metric-card__label">Einnahmen</div><div class="metric-card__value">24.503,00 €</div></article><article class="metric-card"><div class="metric-card__label">Ausgaben</div><div class="metric-card__value">1.200,00 €</div></article><article class="metric-card"><div class="metric-card__label">Saldo</div><div class="metric-card__value">23.303,00 €</div></article></div></div>
 </body></html>`;
 
@@ -133,6 +152,9 @@ test('die Sonde misst das Markup, das health.js schreibt', () => {
   assert.ok(source.includes('class="health-vitals__cards metric-rows"'), 'das Raster der Vitalwerte-Seite heisst anders');
   assert.ok(source.includes('class="health-overview__vitals-grid metric-rows"'), 'das Raster der Uebersicht heisst anders');
   assert.ok(source.includes('metric-card metric-card--select metric-card--inset'), 'die Kachel der Uebersicht ist nicht mehr --inset');
+  // Die Trendlinie steht zwischen Wert und Meta, nur auf der Vitalwerte-Seite.
+  assert.ok(source.includes('<svg class="metric-card__spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">'), 'die Trendlinie ist anders gebaut');
+  assert.equal(source.split("${latest ? sparklineMarkup(series.points, 'value_num', metric) : ''}").length - 1, 1, 'genau ein Kachelbauer fuehrt die Trendlinie');
 });
 
 test('die Sonde erkennt einen Umbruch: eine zu schmale Kachel faellt auf', async () => {
@@ -214,9 +236,11 @@ test('die uebrigen Kennzahlkarten sind keine Container und behalten ihre Stufen'
   }
 });
 
-test('die Kacheln einer Zeile bleiben gleich hoch und fuehren ihr Datum auf einer Linie', async () => {
-  // Die Kachel ist jetzt ein Container (inline-size). Das darf ihr die Hoehe
-  // und die geteilten Zeilen aus `.metric-rows` nicht nehmen.
+test('gemischte Kacheln einer Zeile teilen ihre vier Zeilen: Wert und Datum stehen je auf einer Linie', async (t) => {
+  // R18 (#1794): Kopf - Wert - Trendlinie - Meta liegen ueber Subgrid in
+  // gemeinsamen Zeilen. Ein Container AUF DER KACHEL nimmt ihr das (Layout-
+  // Containment schaltet Subgrid ab): gemessen standen die Werte dann auf
+  // 31/44/31/31 und die Datumszeilen auf 84/75/62/84 statt je auf einer Linie.
   const page = await browser.newPage();
   try {
     await page.setViewport({ width: 1280, height: 900 });
@@ -224,18 +248,54 @@ test('die Kacheln einer Zeile bleiben gleich hoch und fuehren ihr Datum auf eine
     for (const hostId of ['host-overview', 'host-vitals']) {
       const cards = await page.evaluate((hostId) => {
         const host = document.getElementById(hostId);
-        host.style.width = '900px';
-        return [...host.querySelectorAll('.metric-card')].map((card) => {
-          const c = card.getBoundingClientRect();
-          return { top: Math.round(c.top), height: Math.round(c.height), meta: Math.round(card.querySelector('.metric-card__meta').getBoundingClientRect().top) };
-        });
+        host.style.width = '760px';
+        const origin = host.getBoundingClientRect().top;
+        const top = (el) => Math.round((el.getBoundingClientRect().top - origin) * 10) / 10;
+        return [...host.querySelectorAll('.metric-card')].map((card) => ({
+          top: top(card),
+          height: Math.round(card.getBoundingClientRect().height * 10) / 10,
+          rows: getComputedStyle(card).gridTemplateRows,
+          labelHeight: Math.round(card.querySelector('.metric-card__label').getBoundingClientRect().height),
+          spark: Boolean(card.querySelector('.metric-card__spark')),
+          body: top(card.querySelector('.metric-card__body')),
+          meta: top(card.querySelector('.metric-card__meta')),
+        }));
       }, hostId);
-      const firstRow = cards.filter((c) => c.top === cards[0].top);
-      assert.ok(firstRow.length >= 4, `${hostId}: bei 900px stehen mindestens vier Kacheln in der ersten Zeile`);
-      assert.ok(firstRow[0].height >= 60, `${hostId}: die Kachel ist ${firstRow[0].height}px hoch - zusammengefallen`);
-      assert.equal(new Set(firstRow.map((c) => c.height)).size, 1, `${hostId}: ungleiche Hoehen`);
-      assert.equal(new Set(firstRow.map((c) => c.meta)).size, 1, `${hostId}: die Datumszeilen stehen auf verschiedenen Hoehen`);
+      const row = cards.filter((c) => c.top === cards[0].top);
+      const show = (key) => row.map((c) => c[key]).join('/');
+      t.diagnostic(`${hostId}: Wert ${show('body')}, Datum ${show('meta')}, Hoehe ${show('height')}, Label ${show('labelHeight')}`);
+
+      // Vorbedingungen: die Zeile IST gemischt - sonst misst der Test nichts.
+      assert.equal(row.length, 4, `${hostId}: bei 760px stehen vier Kacheln in der ersten Zeile (${row.length})`);
+      assert.ok(new Set(row.map((c) => c.labelHeight)).size > 1, `${hostId}: kein Label bricht um (${show('labelHeight')})`);
+      if (hostId === 'host-vitals') {
+        assert.deepEqual(row.map((c) => c.spark), [true, false, true, false], 'Vitalwerte: jede zweite Kachel fuehrt eine Trendlinie');
+      }
+
+      assert.equal(new Set(row.map((c) => c.body)).size, 1, `${hostId}: die Werte stehen auf verschiedenen Hoehen (${show('body')})`);
+      assert.equal(new Set(row.map((c) => c.meta)).size, 1, `${hostId}: die Datumszeilen stehen auf verschiedenen Hoehen (${show('meta')})`);
+      assert.equal(new Set(row.map((c) => c.height)).size, 1, `${hostId}: ungleiche Hoehen (${show('height')})`);
+      assert.ok(row[0].height >= 60, `${hostId}: die Kachel ist ${row[0].height}px hoch - zusammengefallen`);
+      // Die Ursache hinter den Linien: ohne Subgrid halten sie nur, solange nichts umbricht.
+      // Chrome rechnet `subgrid` samt leerer Liniennamen aus ("subgrid [] [] [] [] []"), ohne Subgrid zu `none`.
+      assert.ok(row.every((c) => /^subgrid\b/.test(c.rows)), `${hostId}: die Kachel ist kein Subgrid mehr (grid-template-rows: ${show('rows')})`);
     }
+  } finally {
+    await page.close();
+  }
+});
+
+test('der Container ist die Wertzeile, nicht die Kachel', async () => {
+  const page = await browser.newPage();
+  try {
+    await page.setViewport({ width: 1280, height: 900 });
+    await page.goto(url);
+    const types = await page.evaluate(() => {
+      const card = document.querySelector('#host-vitals .metric-card');
+      const body = card.querySelector('.metric-card__body');
+      return { card: getComputedStyle(card).containerType, body: getComputedStyle(body).containerType, name: getComputedStyle(body).containerName };
+    });
+    assert.deepEqual(types, { card: 'normal', body: 'inline-size', name: 'metric-tile' });
   } finally {
     await page.close();
   }
