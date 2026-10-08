@@ -4115,6 +4115,9 @@ function restoreAssignedToMe() {
 }
 
 function persistAssignedToMe() {
+  // Am Display nie schreiben: der Filter ist dort nie gesetzt, das erste Laden
+  // schriebe '0' ueber die Wahl des Menschen, die oben stehen bleiben soll.
+  if (actingAsDisplay()) return;
   try { localStorage.setItem(ASSIGNED_TO_ME_KEY, isAssignedToMe() ? '1' : '0'); } catch {}
 }
 
@@ -5925,7 +5928,7 @@ export const __test = {
   renderTaskCard, wireSwipeGestures,
   // #1808: ein Display hat kein „mir" - der gespeicherte Schalter wird dort
   // beim Lesen uebergangen.
-  restoreAssignedToMe,
+  restoreAssignedToMe, persistAssignedToMe,
   // Der Aufgaben-Dialog als Markup: welche Felder er zeigt und wen er anbietet.
   renderModalContent,
   // Der Erinnerungs-Abschnitt einzeln, weil er einen Zustand zu BENENNEN hat,

@@ -1072,6 +1072,15 @@ test('am Display: kein Schalter „Mir zugewiesen", und ein gespeicherter Wert w
     assert.deepEqual(tasks.state.filters.assigned_to, [], 'der gespeicherte Wert filtert nicht auf das Display-Konto');
     assert.equal(tasks.taskQuery().includes('assigned_to'), false, 'und die Abfrage traegt keine Person');
     assert.equal(store.get(KEY), '1', 'der Speicher bleibt stehen - die Wahl gehoert dem Menschen an diesem Geraet');
+    // Der Bestandsabruf schreibt den Schalter bei jedem Laden zurueck. Am Display
+    // ist er nie gesetzt - ohne Riegel stuende nach dem ersten Laden '0' im Speicher.
+    tasks.persistAssignedToMe();
+    assert.equal(store.get(KEY), '1', 'auch das Zurueckschreiben beim Laden laesst die Wahl des Menschen stehen');
+    // Gegenstueck: beim Menschen schreibt derselbe Aufruf weiter.
+    baseState();
+    tasks.state.user = { id: 1 };
+    tasks.persistAssignedToMe();
+    assert.equal(store.get(KEY), '0', 'der Mensch ohne Filter schreibt seine Abwahl');
   } finally {
     tasks.state.user = vorher;
     store.clear();
