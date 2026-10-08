@@ -1461,7 +1461,7 @@
 
 .budget-loan-card__amounts span,
 .budget-loan-card__meta,
-.budget-loan-card__footer > span {
+.budget-loan-card__dates > span {
   display: block;
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
@@ -1845,6 +1845,42 @@
 
 .budget-list-header__title {
   color: var(--color-text-primary);
+}
+
+/* Die Statuszeile der Darlehens-Sortierung ist dieselbe leise Zeile, nur als
+ * Knopf: ein Tipp oeffnet das Sortiermenue. Zielflaeche wie
+ * .section-title-link - volle Hoehe, ohne die Zeile hoeher zu machen. */
+.budget-loans__sort-note {
+  display: flex;
+  align-items: center;
+  min-height: var(--target-base);
+  margin-block: calc((var(--target-base) - 1lh) / -2);
+  margin-inline: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.budget-list-header__filter + .budget-loans__sort-note {
+  margin-top: calc((var(--target-base) - 1lh) / -2 + var(--space-0h));
+}
+
+.budget-loans__sort-note:hover {
+  color: var(--color-text-primary);
+}
+
+.budget-loans__sort-note:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Gruppentitel zwischen den Karten (Geld-Sortierung mit beiden Richtungen):
+ * etwas Luft nach oben, ausser am Anfang der Liste. */
+.budget-loans__group:not(:first-child) {
+  margin-top: var(--space-3);
 }
 
 /* SUCHE IM HAUPTBUCH (Re-Critique 2026-09-27, C6). Das geteilte Feld
