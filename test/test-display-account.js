@@ -431,8 +431,10 @@ test('das Display liest die Aufgaben je Person fuer die Wand - nur die haushalts
   const onDisplay = await titlesFor(asDisplay(displayToken));
   assert.ok(onDisplay.includes('Wand: fuer alle'));
   assert.ok(!onDisplay.includes('Wand: nur Zugewiesene'));
-  // Und dieselbe Liste aus der Sitzung der zugewiesenen Person selbst.
-  assert.deepEqual(await titlesFor(admin), onDisplay, 'die Wand zeigt jedem dasselbe');
+  // Und dieselbe Liste aus der Sitzung der zugewiesenen Person selbst. Das
+  // gilt fuer dieselbe Anfrage: eine Kategorie-Auswahl (`tasks_category`)
+  // schraenkt die Liste fuer den ein, der sie mitschickt.
+  assert.deepEqual(await titlesFor(admin), onDisplay, 'ohne Filter liefert dieselbe Anfrage jedem dieselbe Liste');
 });
 
 // --------------------------------------------------------

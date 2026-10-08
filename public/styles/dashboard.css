@@ -6228,7 +6228,9 @@ button.today-cockpit__more--link {
 [data-wall-night] .wall-row__title,
 [data-wall-night] .wall-weather__temp,
 [data-wall-night] .wall-weather__range-high,
-[data-wall-night] .wall-weather__day-high {
+[data-wall-night] .wall-weather__day-high,
+[data-wall-night] .wall-who__task,
+[data-wall-night] .wall-who__list--tasks .wall-who__name {
   color: var(--color-text-secondary);
 }
 
@@ -6237,9 +6239,20 @@ button.today-cockpit__more--link {
 [data-wall-night] .clock-widget--wall .clock-widget__date,
 [data-wall-night] .wall-who__name,
 [data-wall-night] .wall-weather__desc,
-[data-wall-night] .wall-weather__day-label {
+[data-wall-night] .wall-weather__day-label,
+[data-wall-night] .wall-who__task--done,
+[data-wall-night] .wall-who__task--more,
+[data-wall-night] .wall-who__task-check,
+[data-wall-night] .wall-who__count--done {
   color: var(--color-text-tertiary);
 }
+
+/* Die Aufgaben unter den Gesichtern (#1817) gehen mit: der offene Titel und
+ * der Name darueber eine Stufe zurueck (oben), Erledigtes und die Zaehlzeile
+ * eine weitere - und der Haken gibt sein Gruen ab wie das Wetterzeichen sein
+ * Bernstein, am Titel wie an der Marke des Gesichts. Die Reihenfolge der
+ * beiden Regeln oben traegt die Stufen: `--done` und `--more` stehen in der
+ * spaeteren und gewinnen gegen `.wall-who__task`. */
 
 /* NACHTS GIBT DIE WAND IHRE FARBE AB, und der Wetterton macht da keine
  * Ausnahme. Der Nachtmodus senkt jede Stimme dieser Flaeche um eine Stufe,

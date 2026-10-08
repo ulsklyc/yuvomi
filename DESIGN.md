@@ -3722,7 +3722,8 @@ Spaltenbreite; ab fuenf Personen drei Spalten). Weil die Wand nicht scrollt, ste
 `fitWallWho` eine Leiter von Budgets hinab, bis das Bild passt: erst weichen die Haken, auf der
 ganzen Flaeche, dann die offenen Titel; was nicht passt, ist eine Zahl ("+2 weitere"), und die
 letzte Stufe ist die Reihe der Gesichter wie zuvor. Gemessen bei 1280x800: vier Personen tragen
-drei Zeilen, sechs tragen zwei.
+drei Zeilen, sechs tragen zwei. Nachts geht die Liste mit der Wand: offener Titel und Name eine
+Stufe zurueck, Erledigtes und Zaehlzeile eine weitere, und der Haken gibt sein Gruen ab.
 
 **Nachtabsenkung nach UHRZEIT, nicht nach Farbmodus.** Zwischen 22 und 6 Uhr traegt die Wurzel
 `data-wall-night` und der dunkle Grund wird erzwungen, auch bei hellem Theme: das Problem im

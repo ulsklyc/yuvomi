@@ -18,8 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   what is left and what is finished. The wall still does not scroll: it shows as many lines as
   the screen has room for and says "+2 more" for the rest. When space runs short, finished tasks
   give way first. Someone who has finished everything keeps their ticked tasks until the next
-  day. Only tasks the whole household may see appear; a task set to "Assignees only" stays off
-  the wall, whoever is signed in on the device.
+  day. Under the faces only tasks the whole household may see appear: a task set to "Assignees
+  only" is not listed there, whoever is signed in on the device. (The day's programme beside it
+  is unchanged and still shows what the signed-in person may see.)
 
 ### Changed
 

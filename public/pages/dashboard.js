@@ -5641,18 +5641,98 @@ function fitWallWho(root, data, { now = new Date(), reset = false } = {}) {
   };
   let step = 0;
   if (reset && !place(0)) return -1;
+  const heights = [wall.scrollHeight];
   while (step < WALL_WHO_LADDER.length - 1 && overflows()) {
     step += 1;
     if (!place(step)) break;
+    heights[step] = wall.scrollHeight;
   }
-  // Laeuft die Flaeche auch OHNE Titel ueber, sind nicht die Titel der Grund:
-  // jemand hat den Modus auf einem Telefon erwischt, und dort scrollt die Wand
-  // ohnehin (der Fuss klebt, #1559). Dann nimmt das Kuerzen nur Auskunft weg.
-  if (step === WALL_WHO_LADDER.length - 1 && overflows()) {
-    step = 0;
+  if (!overflows()) return step;
+
+  // AUCH OHNE TITEL ZU HOCH: dann sind nicht die Titel der Grund, und die
+  // Leiter darf nicht blind auf ihrer letzten Stufe stehen bleiben.
+  //
+  // Auf dem TELEFON (alles gestapelt) scrollt die Wand ohnehin, der Fuss klebt
+  // (#1559) - dort nimmt das Kuerzen nur Auskunft weg, also steht alles da.
+  //
+  // UEBERALL SONST gilt: so viele Titel, wie NICHTS KOSTEN. Auf einem Tablett,
+  // das dem Programm links nicht reicht (1024x768: 45px zu hoch, mit oder ohne
+  // Titel), oder im Hochformat, wo das Wetter neben den Gesichtern die Hoehe
+  // bestimmt, ist die Flaeche auf mehreren Stufen gleich hoch. Gewaehlt wird
+  // die reichste davon - die Flaeche wird dadurch nicht hoeher, als sie ohne
+  // Titel waere. Hier stand zuerst „laeuft auf der letzten Stufe noch ueber,
+  // also alles zurueck": das holte auf solchen Tabletts die volle Liste und
+  // schob Fuss und Ausgang weit aus dem Bild.
+  if (wallIsStacked(wall)) {
     place(0);
+    return 0;
   }
-  return step;
+  const lowest = Math.min(...heights);
+  const free = heights.findIndex((height) => height <= lowest + 1);
+  if (free !== step) place(free);
+  return free;
+}
+
+/**
+ * Ist die Wand ganz gestapelt - Buehne UND Nebenraum je eine Spalte? Das ist
+ * das Telefon. Ein Hochformat-Tablett stapelt nur die Buehne und stellt „Wer"
+ * und Wetter nebeneinander; es ist keine Flaeche, die scrollen soll.
+ */
+function wallIsStacked(wall) {
+  const single = (selector) => {
+    const element = wall?.querySelector?.(selector);
+    const columns = element ? globalThis.getComputedStyle?.(element)?.gridTemplateColumns : null;
+    // Ohne Antwort (kein Layout) gilt nichts als gestapelt: der vorsichtige
+    // Irrtum ist die kuerzere Liste, nicht die volle.
+    return typeof columns === 'string' && columns.trim() !== '' && columns.trim().split(/\s+/).length < 2;
+  };
+  return single('.wall__stage') && single('.wall__aside');
+}
+
+/**
+ * Das Einpassen der Wand an EINER Stelle verdrahtet (#1817).
+ *
+ * `show` passt die frisch gebaute Flaeche ein und merkt sie sich; der
+ * `resize`-Hoerer passt die gemerkte Flaeche neu ein - von der obersten Stufe
+ * aus, damit ein groesseres Fenster auch wieder MEHR zeigt (Drehen des
+ * Tabletts, Tastatur, Vollbild). Er haengt am Signal der Seite und faellt mit
+ * ihr; pro Bild laeuft er hoechstens einmal.
+ */
+function createWallFit(win, signal) {
+  let shown = null;
+  let frame = 0;
+  win.addEventListener('resize', () => {
+    if (!shown || frame) return;
+    frame = win.requestAnimationFrame(() => {
+      frame = 0;
+      if (shown) fitWallWho(shown.shell, shown.data, { reset: true });
+    });
+  }, { signal, passive: true });
+  signal.addEventListener('abort', () => {
+    win.cancelAnimationFrame(frame);
+    shown = null;
+  }, { once: true });
+  return {
+    show(shell, data) {
+      shown = { shell, data };
+      return fitWallWho(shell, data);
+    },
+  };
+}
+
+/**
+ * Baut die Wand in die Schale: Flaeche, Zeichen, Bedienung, Einpassen. EINE
+ * Funktion, damit kein Schritt davon am Aufrufer vergessen werden kann - das
+ * Einpassen stand zuerst als lose Zeile in `rebuildDashboard`, und kein Test
+ * merkte, wenn sie fehlte.
+ */
+function rebuildWall(container, shell, { data, weather, failed, updatedAt, rerender, signal, fit }) {
+  setHtml(shell, renderWallSurface(data, weather, { failed, updatedAt }));
+  if (globalThis.window?.lucide) globalThis.window.lucide.createIcons({ el: shell });
+  wireWallSurface(container, rerender, signal);
+  // Die Titel unter den Gesichtern folgen dem Platz: nach jedem Aufbau von der
+  // obersten Stufe hinab.
+  return fit.show(shell, data);
 }
 
 /**
@@ -7101,18 +7181,8 @@ export async function render(container, { user, signal: routeSignal = null } = {
   let renderedCustomizing = null;
   signal.addEventListener('abort', () => disposeFastingClock(), { once: true });
   signal.addEventListener('abort', () => disposeNoteCategories(), { once: true });
-  // Der Neuzuschnitt der Wand auf ein veraendertes Fenster (#1817). Er haengt
-  // einmal am Fenster und ruft, was der letzte Aufbau hinterlegt hat.
-  let wallRefit = null;
-  let wallRefitFrame = 0;
-  window.addEventListener('resize', () => {
-    if (!wallRefit || wallRefitFrame) return;
-    wallRefitFrame = requestAnimationFrame(() => {
-      wallRefitFrame = 0;
-      wallRefit?.();
-    });
-  }, { signal, passive: true });
-  signal.addEventListener('abort', () => cancelAnimationFrame(wallRefitFrame), { once: true });
+  // Das Einpassen der Wand auf Aufbau und Fenstergroesse (#1817).
+  const wallFit = createWallFit(window, signal);
   function rebuildDashboard(cfg) {
     // Der eine Engpass fuer jeden verspaeteten Neuaufbau (#977): eine Antwort,
     // die nach dem Verlassen der Seite oder nach dem naechsten render()
@@ -7124,14 +7194,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
     const shell = container.querySelector('#dashboard-shell');
     if (!shell) return;
     if (wallMode) {
-      setHtml(shell, renderWallSurface(data, weather, { failed: loadFailed, updatedAt: lastLoadedAt }));
-      if (window.lucide) window.lucide.createIcons({ el: shell });
-      wireWallSurface(container, rerender, signal);
-      // Die Titel unter den Gesichtern folgen dem Platz (#1817): nach jedem
-      // Aufbau von der obersten Stufe hinab, und wieder, wenn das Fenster sich
-      // aendert (Drehen des Tablets, Tastatur, Vollbild).
-      fitWallWho(shell, data);
-      wallRefit = () => fitWallWho(shell, data, { reset: true });
+      rebuildWall(container, shell, {
+        data, weather, failed: loadFailed, updatedAt: lastLoadedAt, rerender, signal, fit: wallFit,
+      });
       return;
     }
     if (loadFailed) {
@@ -7494,7 +7559,7 @@ async function loadScheduleSlice(day) {
   };
 }
 
-export const __test = { customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill };
+export const __test = { customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -
