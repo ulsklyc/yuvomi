@@ -225,12 +225,38 @@ test('somebody who gets busy during the delay is not reloaded either', () => {
 });
 
 test('going to the background reloads once nobody is busy any more', () => {
-  const { flow, state, document } = setupFlow({ busy: true });
+  const { flow, state, document, runTimers } = setupFlow({ busy: true });
   flow.announce();
+  runTimers(); // die iOS-Frist ist um
   state.busy = false;
   document.hide();
 
   assert.equal(state.reloads, 1);
+});
+
+// Die Frist nach dem Wechsel des Workers gilt JEDEM Reload-Weg (Codex zu
+// #1794): wer in den ersten 200 ms die App wechselt, loeste sonst genau den
+// sofortigen Reload aus, den die Frist auf iOS-Standalone verhindern soll
+// (leere Seite, verlorene Cookies).
+test('going to the background inside the iOS delay does not reload early - the delay does', () => {
+  const { flow, state, document, runTimers } = setupFlow();
+  flow.announce();
+  document.hide();
+  assert.equal(state.reloads, 0, 'nicht vor der Frist, auch nicht im Hintergrund');
+
+  runTimers();
+  assert.equal(state.reloads, 1, 'die Frist laedt neu, genau einmal');
+});
+
+test('busy at the takeover, free and hidden inside the delay: the reload waits for the delay', () => {
+  const { flow, state, document, runTimers } = setupFlow({ busy: true });
+  flow.announce();
+  state.busy = false;
+  document.hide();
+  assert.equal(state.reloads, 0);
+
+  runTimers();
+  assert.equal(state.reloads, 1, 'im Hintergrund und frei: nach der Frist wird neu geladen');
 });
 
 test('going to the background with an open form keeps the form', () => {

@@ -773,13 +773,16 @@ function isAsset(pathname) {
 /**
  * Ist das eine Navigation auf eine Route der App - also eine, die der Server
  * mit `index.html` beantwortet? Die App-Routen kennt der Worker nicht, wohl
- * aber, was KEINE ist: alles mit Dateiendung, die Feeds und der MCP-Endpunkt
- * (`/api/` erreicht diese Stelle gar nicht erst).
+ * aber, was KEINE ist: alles mit Dateiendung, die Feeds, der MCP-Endpunkt und
+ * die API-Dokumentation `/docs` (eigene Server-Route, server/index.js; ein
+ * langsamer Server gaebe dem Admin sonst die Shell statt der Dokumentation).
+ * `/api/` erreicht diese Stelle gar nicht erst.
  */
 function isAppRouteNavigation(request) {
   if (request.mode !== 'navigate') return false;
   const { pathname } = new URL(request.url);
   if (pathname.startsWith('/feed/') || pathname === '/mcp' || pathname.startsWith('/mcp/')) return false;
+  if (pathname === '/docs' || pathname.startsWith('/docs/')) return false;
   return !/\.[a-z0-9]+$/i.test(pathname);
 }
 

@@ -89,6 +89,11 @@ export function createUpdateFlow({
 }) {
   let stale = false;
   let notified = false;
+  // Ist die iOS-Frist nach der Uebernahme um? Sie gilt JEDEM Reload-Weg, nicht
+  // nur dem ersten: wer in den ersten Millisekunden die App wechselt, loeste
+  // sonst genau den sofortigen Reload aus, den die Frist verhindern soll
+  // (sw-register.js: leere Seite, verlorene Cookies auf iOS-Standalone).
+  let settled = false;
 
   const notifyOnce = () => {
     if (notified) return;
@@ -103,7 +108,7 @@ export function createUpdateFlow({
   };
 
   document.addEventListener('visibilitychange', () => {
-    if (stale && document.visibilityState === 'hidden' && !isBusy()) reload();
+    if (stale && settled && document.visibilityState === 'hidden' && !isBusy()) reload();
   });
 
   return {
@@ -114,11 +119,21 @@ export function createUpdateFlow({
       onStale();
       if (isBusy()) {
         notifyOnce();
+        // Kein Reload jetzt - aber ab dem Ende der Frist darf der Hintergrund
+        // einen ausloesen. Wer bis dahin schon frei UND im Hintergrund ist,
+        // wird dann neu geladen; ein sichtbarer Nutzer behaelt den Hinweis.
+        later(() => {
+          settled = true;
+          if (document.visibilityState === 'hidden' && !isBusy()) reload();
+        }, delayMs);
         return;
       }
       // Erst nach der Frist entscheiden: in ihr kann jemand einen Dialog
       // geoeffnet oder zu tippen begonnen haben.
-      later(reloadOrNotify, delayMs);
+      later(() => {
+        settled = true;
+        reloadOrNotify();
+      }, delayMs);
     },
     isStale: () => stale,
   };

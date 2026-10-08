@@ -309,7 +309,8 @@ test('a navigation to an app route gets the cached shell after the deadline, als
 });
 
 test('what is not an app route never gets the shell before the network has actually failed', async () => {
-  for (const path of ['/feed/calendar/abc.ics', '/openapi.json', '/manifest.webmanifest', '/mcp', '/modules/x/page.html']) {
+  // `/docs` ist die API-Dokumentation des Servers, keine Route der App (Codex zu #1794).
+  for (const path of ['/feed/calendar/abc.ics', '/openapi.json', '/manifest.webmanifest', '/mcp', '/modules/x/page.html', '/docs', '/docs/']) {
     const net = heldFetch();
     const env = loadSw(net.impl);
     await seed(env, SHELL, '/index.html', 'shell');

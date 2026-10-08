@@ -4834,6 +4834,13 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
     // Die Sitzungsfrage nur fuer eine Adresse, die eine Sitzung verlangt: die
     // Anmeldeseite hat nie `/auth/me` gefragt und tut es weiter nicht.
     const version = api.get('/version');
+    // Der Abnehmer steht SOFORT: zwischen hier und dem Warten auf die Antwort
+    // weiter unten liegt das Warten auf die Sprachdateien. Scheitert `/version` in dieser Zeit, haette
+    // das Versprechen sonst keinen - der Browser meldet `unhandledrejection`,
+    // und der globale Behandler zeigt einen roten Toast fuer einen Abruf, den
+    // der catch unten ausdruecklich als unkritisch behandelt. Wer spaeter auf
+    // die Antwort wartet, sieht den Fehler trotzdem.
+    version.catch(() => {});
     const startRoute = ROUTES.find((r) => r.path === location.pathname);
     if (!startRoute || startRoute.requiresAuth) {
       startHandoff.askSession();

@@ -142,6 +142,35 @@ test('the start asks /version and the session before waiting for anything', () =
   assert.match(init, /navigate\(location\.pathname, false\)\.finally\(\(\) => startHandoff\.expireStart\(\)\)/);
 });
 
+// Zwischen `api.get('/version')` und `await version` liegt `await initI18n()`.
+// Scheitert `/version` in dieser Zeit, hat das Versprechen noch keinen
+// Abnehmer: der Browser meldet `unhandledrejection`, und der globale Behandler
+// zeigt einen roten Toast fuer einen Abruf, den der catch darunter ausdruecklich
+// als unkritisch behandelt (Codex zu #1794).
+test('a failing /version has a taker before anything is awaited', async () => {
+  const router = read('../public/router.js');
+  const init = router.slice(router.indexOf('// Initialisierung\n'));
+  const asked = init.indexOf("const version = api.get('/version')");
+  const waited = init.indexOf('await initI18n()');
+  const taken = init.indexOf('version.catch(');
+  assert.ok(asked > 0 && waited > asked);
+  assert.ok(taken > asked && taken < waited, 'der Abnehmer steht zwischen Anfrage und erstem await');
+
+  // Dass ein spaet angehaengter Abnehmer NICHT reicht, am echten Laufzeitverhalten:
+  const seen = [];
+  const onUnhandled = (reason) => { seen.push(reason); };
+  process.on('unhandledRejection', onUnhandled);
+  try {
+    const guarded = Promise.reject(new Error('offline'));
+    guarded.catch(() => {});
+    await new Promise((resolve) => setImmediate(resolve));
+    await assert.rejects(guarded, /offline/, 'das spaetere await sieht den Fehler weiter');
+  } finally {
+    process.off('unhandledRejection', onUnhandled);
+  }
+  assert.deepEqual(seen, []);
+});
+
 test('syncPreferencesOnce runs its three requests side by side and navigate waits for all of them', () => {
   const router = read('../public/router.js');
   const body = router.slice(router.indexOf('async function syncPreferencesOnce() {'), router.indexOf('function applyStartPreferences('));
