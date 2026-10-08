@@ -1473,6 +1473,7 @@
         "loanSortStart": "आरंभ तिथि के अनुसार",
         "loanSortRate": "सबसे ऊँची ब्याज दर पहले",
         "loanSortBalance": "सबसे कम शेष मूलधन पहले",
+        "loanSortActive": "क्रम: {{sort}}",
         "loanPaidStatus": "चुकाया गया",
         "markLoanPaid": "भुगतान दर्ज करें",
         "loanBorrowerLabel": "व्यक्ति",

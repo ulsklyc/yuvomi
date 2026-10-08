@@ -24,7 +24,7 @@ const miniDomAbraeumen = installMiniDom();
 const { setPermissions, clearPermissions } = await import('../public/permissions.js');
 const { __test: budget } = await import('../public/pages/budget.js');
 const {
-  LOAN_SORTS, DEFAULT_LOAN_SORT, normalizeLoanSort, sortLoans, loanSortRate, loanSortBalance,
+  LOAN_SORTS, DEFAULT_LOAN_SORT, normalizeLoanSort, sortLoans, groupLoans, loanGroup, loanSortRate, loanSortBalance,
 } = await import('../public/utils/loan-order.js');
 
 function withAccess(modules, fn) {
@@ -138,6 +138,40 @@ test('getilgte Darlehen stehen in jeder Sortierung hinten, unter sich wie vom Se
   assert.deepEqual(ids(sortLoans(frisch, 'balance')), [6, 5]);
 });
 
+test('Geld-Sortierungen: aufgenommene zuerst, verliehene als Gruppe dahinter, getilgte ganz hinten', () => {
+  const liste = [
+    darlehen(1, { direction: 'lent', interest: zins(9), remaining_principal: 50 }),
+    darlehen(2, { direction: 'borrowed', interest: zins(2), remaining_principal: 7000 }),
+    darlehen(3, { direction: 'lent', interest: zins(1), remaining_principal: 900 }),
+    darlehen(4, { direction: 'borrowed', interest: zins(5), remaining_principal: 3000 }),
+    darlehen(5, { direction: 'borrowed', status: 'paid', is_settled: true, interest: zins(8), remaining_principal: 0 }),
+    darlehen(6, { direction: undefined, interest: zins(4), remaining_principal: 10 }), // Spalten-Default: verliehen
+  ];
+  // Ohne die Gruppe fuehrte das verliehene 9-%-Darlehen die Zinsliste an und
+  // das verliehene mit 10 Rest die Restschuldliste.
+  assert.deepEqual(ids(sortLoans(liste, 'rate')), [4, 2, 1, 6, 3, 5]);
+  assert.deepEqual(ids(sortLoans(liste, 'balance')), [4, 2, 6, 1, 3, 5]);
+  assert.deepEqual(ids(sortLoans(liste, 'start')), [1, 2, 3, 4, 5, 6], '"Nach Beginn" bleibt die Reihenfolge des Servers');
+  assert.deepEqual(liste.map(loanGroup), ['lent', 'borrowed', 'lent', 'borrowed', 'paid', 'lent']);
+});
+
+test('groupLoans: Gruppen nur in einer Geld-Sortierung UND nur, wenn beide Richtungen laufen', () => {
+  const beide = [
+    darlehen(1, { direction: 'lent', interest: zins(9) }),
+    darlehen(2, { direction: 'borrowed', interest: zins(2) }),
+    darlehen(3, { direction: 'borrowed', status: 'paid', is_settled: true }),
+  ];
+  assert.equal(groupLoans(beide, 'start'), null);
+  assert.deepEqual(groupLoans(beide, 'rate').map((g) => [g.id, ids(g.loans)]), [['borrowed', [2]], ['lent', [1]], ['paid', [3]]]);
+  assert.deepEqual(groupLoans(beide.slice(0, 2), 'balance').map((g) => g.id), ['borrowed', 'lent'], 'ohne getilgte kein dritter Kopf');
+  // Eine Richtung allein braucht keine Trennung - auch nicht mit getilgten dahinter.
+  assert.equal(groupLoans([beide[1], beide[2]], 'rate'), null);
+  assert.equal(groupLoans([beide[0]], 'balance'), null);
+  // Ein getilgtes verliehenes neben laufenden aufgenommenen ist KEINE zweite Richtung.
+  assert.equal(groupLoans([beide[1], darlehen(4, { direction: 'lent', status: 'paid', is_settled: true })], 'rate'), null);
+  assert.equal(groupLoans([], 'rate'), null);
+});
+
 // -------------------------------------------------------------------------
 // Die Seite
 // -------------------------------------------------------------------------
@@ -166,10 +200,46 @@ test('die Karten stehen in der gewaehlten Reihenfolge', () => {
   withAccess({ budget: 'write' }, () => {
     assert.deepEqual(seite('start').karten, [1, 2, 3]);
     assert.deepEqual(seite('rate').karten, [2, 1, 3]);
-    assert.deepEqual(seite('balance').karten, [3, 2, 1]);
-    assert.deepEqual(seite('balance', 'all').karten, [3, 2, 1, 4], 'das getilgte bleibt hinten');
+    assert.deepEqual(seite('balance').karten, [2, 1, 3], 'das verliehene (kleinste Restschuld) steht hinter den aufgenommenen');
+    assert.deepEqual(seite('balance', 'all').karten, [2, 1, 3, 4], 'das getilgte bleibt hinten');
     assert.deepEqual(seite('rate', 'all').karten, [2, 1, 3, 4]);
   });
+});
+
+test('Gruppentitel stehen nur da, wo die Liste getrennt ist - und an der richtigen Stelle', () => {
+  withAccess({ budget: 'write' }, () => {
+    assert.doesNotMatch(seite('start', 'all').html, /data-loan-group=/, '"Nach Beginn" hat keine Gruppen');
+    const folge = (html) => [...html.matchAll(/data-loan-group="([a-z]+)"|<article class="budget-loan-card" data-loan-id="(\d+)"/g)]
+      .map((m) => m[1] ?? Number(m[2]));
+    assert.deepEqual(folge(seite('rate').html), ['borrowed', 2, 1, 'lent', 3]);
+    assert.deepEqual(folge(seite('balance', 'all').html), ['borrowed', 2, 1, 'lent', 3, 'paid', 4]);
+    const { html } = seite('rate');
+    assert.match(html, /<h3 class="list-group__title budget-loans__group" data-loan-group="borrowed">budget\.loanDirectionBorrowedBadge<\/h3>/);
+    assert.match(html, /data-loan-group="lent">budget\.loanDirectionLentBadge</);
+  });
+  // Nur eine Richtung: keine Koepfe, auch in einer Geld-Sortierung.
+  const vorher = { ...budget.state };
+  Object.assign(budget.state, {
+    loans: { loans: BESTAND.filter((l) => l.direction === 'borrowed'), summary: {} },
+    loanSort: 'rate', loanStatusFilter: 'all', loanFilterId: null,
+  });
+  try {
+    withAccess({ budget: 'write' }, () => assert.doesNotMatch(budget.renderLoansPage(), /data-loan-group=/));
+  } finally { Object.assign(budget.state, vorher); }
+});
+
+test('die Statuszeile nennt die Sortierung nur, wenn sie von der Voreinstellung abweicht', () => {
+  for (const recht of ['write', 'read']) {
+    withAccess({ budget: recht }, () => {
+      assert.doesNotMatch(seite('start').html, /budget-loan-sort-note|budget\.loanSortActive/, 'im Normalfall steht nichts da');
+      for (const [wahl, key] of [['rate', 'budget.loanSortRate'], ['balance', 'budget.loanSortBalance']]) {
+        const { html } = seite(wahl);
+        const knopf = html.match(/<button type="button" class="budget-list-header__filter budget-loans__sort-note" id="budget-loan-sort-note"\s+aria-haspopup="menu" aria-controls="budget-loan-tools-menu">([^<]*)<\/button>/);
+        assert.ok(knopf, `${wahl}: die Zeile ist ein echter Knopf`);
+        assert.ok(knopf[1].includes('budget.loanSortActive') && knopf[1].includes(key), `${wahl}: ${knopf[1]}`);
+      }
+    });
+  }
 });
 
 test('das Menue nennt jede Sortierung und hakt genau die gewaehlte', () => {
@@ -223,18 +293,24 @@ function mitSpeicher(inhalt, fn) {
  * Koerper, und was wireLoansPage() an das Menue haengt, landet in `klick`.
  */
 function reiter() {
-  const lauf = { html: '', klick: null, fokus: 0 };
+  const lauf = { html: '', klick: null, zeilenKlick: null, fokus: 0, geoeffnet: 0 };
   const body = {
     replaceChildren() { lauf.html = ''; },
     insertAdjacentHTML(_pos, markup) { lauf.html += markup; },
     setAttribute() {}, querySelector: () => null, querySelectorAll: () => [],
   };
-  const menue = { addEventListener(typ, fn) { if (typ === 'click') lauf.klick = fn; } };
+  const menue = {
+    addEventListener(typ, fn) { if (typ === 'click') lauf.klick = fn; },
+    showPopover() { lauf.geoeffnet += 1; },
+  };
+  // Die Statuszeile gibt es nur, wenn das gezeichnete Markup sie enthaelt.
+  const zeile = { addEventListener(typ, fn) { if (typ === 'click') lauf.zeilenKlick = fn; } };
   const knopf = { focus() { lauf.fokus += 1; } };
   const container = {
-    querySelector: (sel) => ({
-      '#budget-body': body, '#budget-loan-tools-menu': menue, '.budget-loan-tools': knopf,
-    }[sel] ?? null),
+    querySelector: (sel) => {
+      if (sel === '#budget-loan-sort-note') return lauf.html.includes('id="budget-loan-sort-note"') ? zeile : null;
+      return { '#budget-body': body, '#budget-loan-tools-menu': menue, '.budget-loan-tools': knopf }[sel] ?? null;
+    },
     querySelectorAll: () => [],
     classList: { toggle() {} },
   };
@@ -275,12 +351,33 @@ test('ein Klick auf den Menue-Eintrag ordnet um, merkt die Wahl und gibt den Fok
   }));
 });
 
+test('ein Tipp auf die Statuszeile oeffnet das Sortiermenue', () => {
+  mitSpeicher({}, () => mitBestand({ loanSort: 'start' }, () => {
+    const lauf = reiter();
+    lauf.zeichnen();
+    assert.equal(lauf.zeilenKlick, null, 'in der Voreinstellung gibt es keine Zeile und keinen Handler');
+  }));
+  mitSpeicher({}, () => mitBestand({ loanSort: 'rate' }, () => {
+    const lauf = reiter();
+    lauf.zeichnen();
+    assert.equal(typeof lauf.zeilenKlick, 'function', 'an der Zeile haengt ein Klick-Handler');
+    assert.equal(lauf.geoeffnet, 0);
+    lauf.zeilenKlick({});
+    assert.equal(lauf.geoeffnet, 1, 'das Menue ist geoeffnet');
+    // Zurueck zur Voreinstellung: die Zeile verschwindet mit dem Neuzeichnen.
+    const eintrag = { dataset: { loanSort: 'start' } };
+    lauf.klick({ target: { closest: (sel) => (sel === '[data-loan-sort]' ? eintrag : null) } });
+    assert.doesNotMatch(lauf.html, /budget-loan-sort-note/);
+  }));
+});
+
 test('ein gemerkter Wert bestimmt die Reihenfolge beim ersten Zeichnen', () => {
   mitSpeicher({ 'yuvomi:budget:loan-sort': 'balance' }, () => mitBestand({ loanSort: null }, () => {
     const lauf = reiter();
     lauf.zeichnen();
-    assert.deepEqual(lauf.karten(), [3, 2, 1]);
+    assert.deepEqual(lauf.karten(), [2, 1, 3]);
     assert.match(lauf.html, /aria-checked="true" class="popover-menu__item" data-loan-sort="balance"/);
+    assert.match(lauf.html, /id="budget-loan-sort-note"/, 'und die Statuszeile sagt es');
   }));
   // Gegenstueck: ohne Wert und mit einem fremden Wert gilt die Voreinstellung.
   for (const inhalt of [{}, { 'yuvomi:budget:loan-sort': 'recommended' }]) {
@@ -320,7 +417,7 @@ test('die Ratenliste haelt ihre Reihenfolge, wenn die Darlehen umsortiert werden
 // -------------------------------------------------------------------------
 
 test('kein Wort der Sortierung raet zu etwas (#935: Sortieren ist Rechnen, Umschichten ist Beratung)', () => {
-  const KEYS = ['loanSortLabel', 'loanSortStart', 'loanSortRate', 'loanSortBalance', 'loanProjectedEnd'];
+  const KEYS = ['loanSortLabel', 'loanSortStart', 'loanSortRate', 'loanSortBalance', 'loanSortActive', 'loanProjectedEnd'];
   const RAT = /empf|recommend|sollte|should|advice|advis|ratsam|optimal|best\b|beste|zuerst tilgen|pay off first|strateg|avalanche|snowball|lawine|schneeball/i;
   const dir = new URL('../public/locales/', import.meta.url);
   const dateien = readdirSync(dir).filter((f) => f.endsWith('.json'));
@@ -334,6 +431,7 @@ test('kein Wort der Sortierung raet zu etwas (#935: Sortieren ist Rechnen, Umsch
       }
     }
     assert.match(budgetKeys.loanProjectedEnd, /\{\{month\}\}/, `${datei}: der Monat muss im Satz stehen`);
+    assert.match(budgetKeys.loanSortActive, /\{\{sort\}\}/, `${datei}: die Sortierung muss in der Zeile stehen`);
   }
 });
 

@@ -1473,6 +1473,7 @@
         "loanSortStart": "Por fecha de inicio",
         "loanSortRate": "Mayor tipo de interés primero",
         "loanSortBalance": "Menor capital pendiente primero",
+        "loanSortActive": "Orden: {{sort}}",
         "loanPaidStatus": "Pagado",
         "markLoanPaid": "Marcar pagado",
         "loanBorrowerLabel": "Persona",

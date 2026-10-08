@@ -18,6 +18,12 @@
  * Getilgte Darlehen stehen in JEDER Sortierung hinter den laufenden, unter sich
  * in der Reihenfolge des Servers: ihre Restschuld ist 0, und ohne diese Regel
  * fuehrten sie die Liste "kleinste Restschuld zuerst" an.
+ *
+ * In den beiden Geld-Sortierungen stehen AUFGENOMMENE Darlehen zuerst und
+ * VERLIEHENE als eigene Gruppe dahinter, jede in sich nach demselben Schluessel
+ * (Entscheidung Ulas, 2026-10-08): der Zinssatz einer Schuld und der eines
+ * verliehenen Betrags beantworten verschiedene Fragen. "Nach Beginn" bleibt
+ * die Reihenfolge des Servers, ohne Gruppen.
  */
 
 /** Die waehlbaren Sortierungen; 'start' ist die Reihenfolge des Servers. */
@@ -47,6 +53,17 @@ function isOpen(loan) {
   return loan?.status !== 'paid' && !loan?.is_settled;
 }
 
+/** Die Gruppen der Geld-Sortierungen, in Lesereihenfolge. */
+export const LOAN_GROUPS = ['borrowed', 'lent', 'paid'];
+
+/** @returns {'borrowed'|'lent'|'paid'} Gruppe eines Darlehens in einer Geld-Sortierung. */
+export function loanGroup(loan) {
+  if (!isOpen(loan)) return 'paid';
+  // Spalten-Default ist 'lent' (#638): alles, was nicht ausdruecklich
+  // aufgenommen ist, zaehlt als verliehen - wie isBorrowedLoan() der Seite.
+  return loan?.direction === 'borrowed' ? 'borrowed' : 'lent';
+}
+
 /**
  * @param {object[]} loans Darlehen in der Reihenfolge des Servers
  * @param {string} sort    'start' | 'rate' | 'balance'
@@ -63,11 +80,31 @@ export function sortLoans(loans, sort) {
   return list
     .map((loan, index) => ({ loan, index }))
     .sort((a, b) => {
-      const openA = isOpen(a.loan);
-      const openB = isOpen(b.loan);
-      if (openA !== openB) return openA ? -1 : 1;
-      if (!openA) return a.index - b.index;
+      const groupA = LOAN_GROUPS.indexOf(loanGroup(a.loan));
+      const groupB = LOAN_GROUPS.indexOf(loanGroup(b.loan));
+      if (groupA !== groupB) return groupA - groupB;
+      if (!isOpen(a.loan)) return a.index - b.index;
       return compare(a.loan, b.loan) || a.index - b.index;
     })
     .map(({ loan }) => loan);
+}
+
+/**
+ * Die sortierte Liste in ihren Gruppen - oder `null`, wenn sie keine sichtbare
+ * Trennung braucht: bei "Nach Beginn" und solange unter den LAUFENDEN Darlehen
+ * nur eine Richtung vorkommt. Getilgte bekommen nur dann einen eigenen Kopf,
+ * wenn die Liste ohnehin getrennt ist; sonst stuenden sie unter "Verliehen".
+ *
+ * @param {object[]} loans Darlehen in der Reihenfolge des Servers
+ * @param {string} sort    'start' | 'rate' | 'balance'
+ * @returns {Array<{ id: 'borrowed'|'lent'|'paid', loans: object[] }>|null}
+ */
+export function groupLoans(loans, sort) {
+  if (normalizeLoanSort(sort) === 'start') return null;
+  const sorted = sortLoans(loans, sort);
+  const groups = LOAN_GROUPS
+    .map((id) => ({ id, loans: sorted.filter((loan) => loanGroup(loan) === id) }))
+    .filter((group) => group.loans.length);
+  const directions = groups.filter((group) => group.id !== 'paid').length;
+  return directions > 1 ? groups : null;
 }

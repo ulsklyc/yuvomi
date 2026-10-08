@@ -1473,6 +1473,7 @@
         "loanSortStart": "開始日順",
         "loanSortRate": "金利の高い順",
         "loanSortBalance": "残債の少ない順",
+        "loanSortActive": "並び替え：{{sort}}",
         "loanPaidStatus": "完済",
         "markLoanPaid": "返済済みにする",
         "loanBorrowerLabel": "相手",

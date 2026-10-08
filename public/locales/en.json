@@ -1473,6 +1473,7 @@
         "loanSortStart": "By start date",
         "loanSortRate": "Highest interest rate first",
         "loanSortBalance": "Smallest balance first",
+        "loanSortActive": "Sort: {{sort}}",
         "loanPaidStatus": "Paid",
         "markLoanPaid": "Mark paid",
         "loanBorrowerLabel": "Borrower",

@@ -1547,6 +1547,7 @@
         "loanSortStart": "Podle začátku",
         "loanSortRate": "Nejvyšší úroková sazba první",
         "loanSortBalance": "Nejnižší zbývající jistina první",
+        "loanSortActive": "Řazení: {{sort}}",
         "loanPaidStatus": "Zaplaceno",
         "markLoanPaid": "Označit jako zaplacené",
         "loanBorrowerLabel": "Osoba",

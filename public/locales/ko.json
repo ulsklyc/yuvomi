@@ -1487,6 +1487,7 @@
         "loanSortStart": "시작일순",
         "loanSortRate": "금리 높은 순",
         "loanSortBalance": "잔여 원금 적은 순",
+        "loanSortActive": "정렬: {{sort}}",
         "loanPaidStatus": "상환 완료",
         "markLoanPaid": "상환 완료로 표시",
         "loanBorrowerLabel": "대상",

@@ -1473,6 +1473,7 @@
         "loanSortStart": "Op startdatum",
         "loanSortRate": "Hoogste rente eerst",
         "loanSortBalance": "Kleinste restschuld eerst",
+        "loanSortActive": "Sortering: {{sort}}",
         "loanPaidStatus": "Betaald",
         "markLoanPaid": "Als betaald markeren",
         "loanBorrowerLabel": "Lener",

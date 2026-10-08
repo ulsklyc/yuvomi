@@ -1473,6 +1473,7 @@
         "loanSortStart": "Kezdés szerint",
         "loanSortRate": "Legmagasabb kamatláb elöl",
         "loanSortBalance": "Legkisebb tőketartozás elöl",
+        "loanSortActive": "Rendezés: {{sort}}",
         "loanPaidStatus": "Fizetve",
         "markLoanPaid": "Jelölés fizetettként",
         "loanBorrowerLabel": "Kölcsönkérő",

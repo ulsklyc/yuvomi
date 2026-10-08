@@ -16,7 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   loans tab has a sort menu: highest rate first, smallest balance first, or by start as before.
   Each loan now also names the month it is projected to end, which follows the payments you
   actually booked and counts from today if instalments have not been recorded up to date. A loan in another currency is compared at its stored rate, a loan without
-  interest counts as 0 %, and paid-off loans stay at the end. The order is a calculation to read:
+  interest counts as 0 %, and paid-off loans stay at the end. In these two orders the loans you
+  took out come first and the money you lent follows as its own group. While the list is not in
+  its default order, a line above it says which order applies; tap it to change. The order is a calculation to read:
   Yuvomi does not suggest which loan to pay first and does not move payments between loans.
 
 ### Changed

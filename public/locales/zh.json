@@ -1473,6 +1473,7 @@
         "loanSortStart": "按开始日期",
         "loanSortRate": "利率最高的在前",
         "loanSortBalance": "剩余本金最少的在前",
+        "loanSortActive": "排序：{{sort}}",
         "loanPaidStatus": "已还清",
         "markLoanPaid": "标记已还",
         "loanBorrowerLabel": "借款人",

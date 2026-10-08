@@ -1487,6 +1487,7 @@
         "loanSortStart": "Ayon sa petsa ng simula",
         "loanSortRate": "Pinakamataas na interes muna",
         "loanSortBalance": "Pinakamaliit na balanse muna",
+        "loanSortActive": "Pag-uuri: {{sort}}",
         "loanPaidStatus": "Bayad na",
         "markLoanPaid": "Markahang bayad na",
         "loanBorrowerLabel": "Nangutang",

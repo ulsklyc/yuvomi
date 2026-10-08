@@ -31,7 +31,7 @@ import { formatMoney, formatSignedAmount, amountPlaceholder, amountStep, amountM
 import { budgetCategoryLabel } from '/utils/category-labels.js';
 import { trendMarkup, leadCardClass } from '/utils/metric-card.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
-import { LOAN_SORTS, normalizeLoanSort, sortLoans } from '/utils/loan-order.js';
+import { LOAN_SORTS, DEFAULT_LOAN_SORT, normalizeLoanSort, sortLoans, groupLoans } from '/utils/loan-order.js';
 import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
 import { metricGlanceHtml, wireMetricGlance, glanceLeadClass } from '/utils/metric-glance.js';
 import { intervalUnitLabel } from '/rrule-ui.js';
@@ -2583,6 +2583,7 @@ function renderLoansDashboard() {
           <!-- Die Summenzeile („2 aktiv · 175.444,93 € offen") ist entfallen:
                sie wiederholte die Karte RESTSCHULD direkt darunter (R14 P1). -->
           ${state.loanFilterId ? `<div class="budget-list-header__filter">${esc(activeLoanLabel())}</div>` : ''}
+          ${loanSortNoteHtml()}
         </div>
         <div class="panel-head__actions">
           ${state.loanFilterId ? `
@@ -2627,7 +2628,7 @@ function renderLoansDashboard() {
       })}</p>` : ''}
       ${visibleLoans.length ? `
         <div class="budget-loans__list">
-          ${visibleLoans.map(renderLoanCard).join('')}
+          ${loanListHtml(visibleLoans)}
         </div>
       ` : `
         <div class="budget-loans__empty">${t('budget.loansEmpty')}</div>
@@ -2658,6 +2659,42 @@ function loanSort() {
     state.loanSort = normalizeLoanSort(stored);
   }
   return state.loanSort;
+}
+
+// Die Koepfe der Gruppen tragen die Woerter, die schon an Karte und Filter
+// stehen - dieselbe Sache heisst auf der Seite nicht zweimal verschieden.
+const LOAN_GROUP_LABELS = {
+  borrowed: 'budget.loanDirectionBorrowedBadge',
+  lent: 'budget.loanDirectionLentBadge',
+  paid: 'budget.loanStatusPaid',
+};
+
+/**
+ * Die Karten der Liste. In einer Geld-Sortierung mit beiden Richtungen stehen
+ * sie in Gruppen (aufgenommen, verliehen, bezahlt) unter einem Gruppentitel
+ * (`.list-group__title`, DESIGN.md "Ueberschrift ueber Inhalt"); sonst ohne.
+ * `visibleLoans` ist schon sortiert, gruppiert wird dieselbe Menge.
+ */
+function loanListHtml(visibleLoans) {
+  const groups = groupLoans(visibleLoans, loanSort());
+  if (!groups) return visibleLoans.map(renderLoanCard).join('');
+  return groups.map((group) => `
+          <h3 class="list-group__title budget-loans__group" data-loan-group="${group.id}">${esc(t(LOAN_GROUP_LABELS[group.id]))}</h3>
+          ${group.loans.map(renderLoanCard).join('')}`).join('');
+}
+
+/**
+ * Die Statuszeile der Sortierung (Entscheidung Ulas, 2026-10-08): die Wahl
+ * wird gemerkt, also steht die Liste nach einer Woche evtl. anders da als
+ * erwartet - dann sagt die Zeile, wonach. In der Voreinstellung steht nichts.
+ * Dieselbe leise Zeile wie der Darlehens-Filter darueber, als echter Knopf:
+ * ein Tipp oeffnet das Sortiermenue (wireLoansPage).
+ */
+function loanSortNoteHtml() {
+  const sort = loanSort();
+  if (sort === DEFAULT_LOAN_SORT) return '';
+  return `<button type="button" class="budget-list-header__filter budget-loans__sort-note" id="budget-loan-sort-note"
+                  aria-haspopup="menu" aria-controls="budget-loan-tools-menu">${esc(t('budget.loanSortActive', { sort: t(LOAN_SORT_LABELS[sort]) }))}</button>`;
 }
 
 const LOAN_SORT_LABELS = {
@@ -2875,6 +2912,12 @@ function wireLoansPage() {
       renderBody();
       refocusSegmented('.budget-loans__filters');
     },
+  });
+  // Die Statuszeile oeffnet dasselbe Menue wie der Mehr-Knopf. Kein zweites
+  // `popovertarget`: das Menue richtet sich am ERSTEN sichtbaren Ausloeser aus
+  // (popover-menu.js triggerOf) und haenge sonst immer an der Zeile.
+  _container.querySelector('#budget-loan-sort-note')?.addEventListener('click', () => {
+    _container.querySelector('#budget-loan-tools-menu')?.showPopover?.();
   });
   _container.querySelector('#budget-loan-tools-menu')?.addEventListener('click', (e) => {
     const item = e.target.closest('[data-loan-sort]');

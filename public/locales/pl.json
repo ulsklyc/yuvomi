@@ -1635,6 +1635,7 @@
         "loanSortStart": "Według daty rozpoczęcia",
         "loanSortRate": "Najwyższe oprocentowanie najpierw",
         "loanSortBalance": "Najmniejszy pozostały kapitał najpierw",
+        "loanSortActive": "Sortowanie: {{sort}}",
         "loanPaidStatus": "Zapłacona",
         "markLoanPaid": "Oznacz jako zapłaconą",
         "loanBorrowerLabel": "Osoba",

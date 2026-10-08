@@ -1621,6 +1621,7 @@
         "loanSortStart": "По дате начала",
         "loanSortRate": "Сначала самая высокая ставка",
         "loanSortBalance": "Сначала наименьший остаток долга",
+        "loanSortActive": "Сортировка: {{sort}}",
         "loanPaidStatus": "Оплачено",
         "markLoanPaid": "Отметить оплату",
         "loanBorrowerLabel": "Человек",

@@ -1695,6 +1695,7 @@
         "loanSortStart": "حسب تاريخ البدء",
         "loanSortRate": "أعلى معدل فائدة أولاً",
         "loanSortBalance": "أصغر رصيد متبقٍ أولاً",
+        "loanSortActive": "الترتيب: {{sort}}",
         "loanPaidStatus": "مدفوع",
         "markLoanPaid": "تسجيل الدفع",
         "loanBorrowerLabel": "الشخص",
