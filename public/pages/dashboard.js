@@ -255,6 +255,63 @@ function overviewEventTime(event, span) {
   return formatTime(event.start_datetime);
 }
 
+/**
+ * Der Name des Kalenders, zu dem ein Termin gehoert - oder leer (#1698).
+ *
+ * `source_calendar_name` VOR `cal_name`, dieselbe Reihenfolge wie im
+ * Kalendermodul (calendar.js): `cal_name` kommt ueber die Verknuepfung des
+ * schon synchronisierten Termins und fehlt, solange ein neu angelegter Termin
+ * noch auf seinen Upload wartet; waehrend eines ausstehenden Umzugs nennt er
+ * noch den alten Kalender. `source_calendar_name` nennt in beiden Faellen das
+ * Ziel, das der Mensch gewaehlt hat.
+ */
+function eventCalendarName(event) {
+  return String(event?.source_calendar_name ?? '').trim() || String(event?.cal_name ?? '').trim();
+}
+
+/**
+ * Das Ende eines Termins fuer die WAND (#1698, D#988), fertig formatiert -
+ * oder leer, wenn die Zeile beim Beginn allein bleibt. Die Wand schreibt es
+ * hinter die Zeitangabe, die `overviewEventTime` liefert: Beginn UND Ende.
+ *
+ * „Frueh 6:00" sagt, wann die Schicht anfaengt; an der Wand will man wissen,
+ * wann sie vorbei ist. Wo `overviewEventTime` schon etwas anderes als den
+ * Beginn nennt („bis 12:00", „Ganztaegig"), bleibt es dabei - das Ende steht
+ * dort schon, oder es gibt keins.
+ *
+ * KEINE SPANNE OHNE ECHTES ENDE: fehlt es, liegt es nicht nach dem Beginn, oder
+ * liegt es einen ganzen Tag oder mehr danach, bleibt der Beginn allein. „22:00
+ * - 06:00" liest jeder als die Nacht; „18:00 - 12:00" fuer eine Reise bis
+ * uebermorgen laese sich wie ein Fehler.
+ *
+ * „EIN TAG ODER MEHR" IST EINE FRAGE AN DIE WANDUHR, NICHT AN DIE STOPPUHR.
+ * Verglichen werden die Stempel des Haushalts: das Ende gegen den Beginn am
+ * Folgetag zur selben Uhrzeit. Hier standen zuerst Millisekunden
+ * (`new Date(end) - new Date(start) >= 24 h`), und das war zweimal falsch: in
+ * der Nacht der Zeitumstellung hat der Tag 23 Stunden, Samstag 22:00 bis
+ * Sonntag 22:00 las sich als „22:00 - 22:00"; und `new Date('…T22:00')` liest
+ * die Ziffern in der Zone des GERAETS, die Antwort hing also am Tablett statt
+ * am Haushalt (dieselbe Falle wie #1534).
+ *
+ * Der Bindestrich ist dieselbe Form wie bei den Schichten des Blatts
+ * (utils/today-sheet.js).
+ */
+function wallEventEnd(event, span) {
+  if (span.until || span.allDay) return '';
+  const end = String(event?.end_datetime || '');
+  // Ein Ende ohne Uhrzeit ('YYYY-MM-DD') ist kein Ende einer Spanne. Der
+  // Riegel steht HIER und nicht im Stempel: `householdStamp('2026-09-25')`
+  // liest Mitternacht, und aus „18:00 bis zum 25." wuerde „18:00 - 00:00" -
+  // eine Uhrzeit, die niemand eingetragen hat.
+  if (end.length <= 10) return '';
+  const startStamp = householdStamp(String(event?.start_datetime || ''));
+  const endStamp = householdStamp(end);
+  if (!startStamp || !endStamp || endStamp <= startStamp) return '';
+  const dayLater = `${addLocalDays(startStamp.slice(0, 10), 1)}${startStamp.slice(10)}`;
+  if (endStamp >= dayLater) return '';
+  return formatTime(end);
+}
+
 function getAppName() {
   return localStorage.getItem(APP_NAME_STORAGE_KEY) || 'Yuvomi';
 }
@@ -1125,7 +1182,15 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
         sortKey: time || '00:01',
         timeLabel: overviewEventTime(event, span),
         title: event.title,
-        sub: t('dashboard.todayEvent'),
+        // Die Herkunft statt des Wortes „Termin" (#1698): der Name des
+        // Kalenders, im Heute-Blatt wie an der Wand. „Frueh" ist erst mit
+        // „Niklas Arbeitskalender" darunter eine Auskunft. Ein Termin, der nur
+        // in Yuvomi lebt, hat keinen Kalendernamen - er behaelt das Wort.
+        sub: eventCalendarName(event) || t('dashboard.todayEvent'),
+        // Das ENDE bleibt der Wand vorbehalten (entschieden in #1698): es reist
+        // neben `timeLabel` mit, und nur `renderWallRow` schreibt es dahinter.
+        // Das Blatt nennt weiter den Beginn allein.
+        wallTimeEnd: wallEventEnd(event, span),
         icon: 'calendar',
         tone: 'event',
         route: calendarEventRoute(event),
@@ -5359,15 +5424,23 @@ const WALL_ROW_CAP = 4;
 
 /** Eine Programmzeile als reiner Text - kein href, kein data-route, kein Modal. */
 function renderWallRow(row) {
+  // Der Termin nennt an der Wand, hinter dem Beginn, sein Ende (#1698). Es
+  // steht in einem eigenen Element, weil es auf einer Flaeche unter
+  // Tablettbreite weicht (dashboard.css): dort naehme „9:30 PM - 11:30 PM" dem
+  // Titel mehr als die halbe Zeile.
+  const sub = row.sub;
+  const end = row.timeLabel && row.wallTimeEnd
+    ? `<span class="wall-row__time-end"> - ${esc(row.wallTimeEnd)}</span>`
+    : '';
   const time = row.timeLabel
-    ? `<span class="wall-row__time${row.overdue ? ' wall-row__time--overdue' : ''}">${esc(row.timeLabel)}</span>`
+    ? `<span class="wall-row__time${row.overdue ? ' wall-row__time--overdue' : ''}">${esc(row.timeLabel)}${end}</span>`
     : '';
   return `
     <li class="wall-row wall-row--${esc(row.tone)}">
       <span class="module-seal wall-row__seal">${moduleIconHTML(row.icon)}</span>
       <span class="wall-row__body">
         <span class="wall-row__title">${esc(row.title)}</span>
-        <span class="wall-row__sub">${esc(row.sub)}</span>
+        <span class="wall-row__sub">${esc(sub)}</span>
       </span>
       ${time}
     </li>`;
