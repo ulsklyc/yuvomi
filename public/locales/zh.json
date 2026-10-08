@@ -4198,6 +4198,8 @@
         "intervalLabel": "每",
         "nextPaymentLabel": "下次付款",
         "reminderDaysLabel": "提醒天数",
+        "reminderEnabledLabel": "付款提醒",
+        "noReminder": "无提醒",
         "categoryLabel": "类别",
         "paymentMethodLabel": "付款方式",
         "websiteLabel": "网站",

@@ -4198,6 +4198,8 @@
         "intervalLabel": "Cada",
         "nextPaymentLabel": "Próximo pago",
         "reminderDaysLabel": "Días de recordatorio",
+        "reminderEnabledLabel": "Recordatorio de pago",
+        "noReminder": "Sin recordatorio",
         "categoryLabel": "Categoría",
         "paymentMethodLabel": "Método de pago",
         "websiteLabel": "Sitio web",

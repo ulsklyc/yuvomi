@@ -48,7 +48,7 @@ function syncReminder(subscription) {
   database.prepare(`
     DELETE FROM reminders WHERE entity_type = 'subscription' AND entity_id = ?
   `).run(subscription.id);
-  if (!subscription.enabled) return;
+  if (!subscription.enabled || !subscription.reminder_enabled) return;
   database.prepare(`
     INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
     VALUES ('subscription', ?, ?, ?)
@@ -83,6 +83,7 @@ function decorate(row) {
   return {
     ...row,
     enabled: Boolean(row.enabled),
+    reminder_enabled: Boolean(row.reminder_enabled),
     status: subscriptionStatus(row),
     occurrences_remaining: occurrencesRemaining(row),
   };
@@ -230,6 +231,7 @@ function validatePayload(body, { partial = false } = {}) {
     }
   }
   if (body.enabled !== undefined && typeof body.enabled !== 'boolean') errors.push('Enabled must be a boolean.');
+  if (body.reminder_enabled !== undefined && typeof body.reminder_enabled !== 'boolean') errors.push('Reminder enabled must be a boolean.');
   if (body.end_type !== undefined && !END_TYPES.includes(String(body.end_type))) errors.push('End type is invalid.');
   return { errors, currency, cycleInterval, reminderDays };
 }
@@ -243,6 +245,7 @@ async function subscriptionsWithConversions(rows, baseCurrency, refresh = false)
       return {
         ...row,
         enabled: Boolean(row.enabled),
+        reminder_enabled: Boolean(row.reminder_enabled),
         status: subscriptionStatus(row),
         occurrences_remaining: occurrencesRemaining(row),
         monthly_native: Number(nativeMonthly.toFixed(2)),
@@ -628,14 +631,15 @@ router.post('/', async (req, res) => {
     const result = db.get().prepare(`
       INSERT INTO budget_subscriptions
         (name, description, amount, currency, billing_cycle, cycle_interval, next_payment_date,
-         category_id, payment_method_id, reminder_days, enabled, website_url, logo_data,
+         category_id, payment_method_id, reminder_days, reminder_enabled, enabled, website_url, logo_data,
          brand_color, notes, account_username, created_by, owner_id, visibility,
          end_type, end_date, occurrence_count)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       req.body.name.trim(), req.body.description?.trim() || null, Number(req.body.amount), validated.currency,
       req.body.billing_cycle, validated.cycleInterval, req.body.next_payment_date,
       req.body.category_id || null, req.body.payment_method_id || null, validated.reminderDays,
+      req.body.reminder_enabled === false ? 0 : 1,
       req.body.enabled === false ? 0 : 1, req.body.website_url?.trim() || null, req.body.logo_data || null,
       req.body.brand_color || null, req.body.notes?.trim() || null,
       req.body.account_username?.trim() || null, me, me, visibility,
@@ -685,7 +689,7 @@ router.put('/:id', async (req, res) => {
     db.get().prepare(`
       UPDATE budget_subscriptions SET
         name = ?, description = ?, amount = ?, currency = ?, billing_cycle = ?, cycle_interval = ?,
-        next_payment_date = ?, category_id = ?, payment_method_id = ?, reminder_days = ?, enabled = ?,
+        next_payment_date = ?, category_id = ?, payment_method_id = ?, reminder_days = ?, reminder_enabled = ?, enabled = ?,
         website_url = ?, logo_data = ?, brand_color = ?, notes = ?, account_username = ?, visibility = ?,
         end_type = ?, end_date = ?, occurrence_count = ?, completed_at = ?
       WHERE id = ?
@@ -695,7 +699,8 @@ router.put('/:id', async (req, res) => {
       value('billing_cycle', current.billing_cycle), validated.cycleInterval || current.cycle_interval,
       nextPaymentDate, value('category_id', current.category_id) || null,
       value('payment_method_id', current.payment_method_id) || null,
-      validated.reminderDays ?? current.reminder_days, nextEnabled,
+      validated.reminderDays ?? current.reminder_days,
+      value('reminder_enabled', Boolean(current.reminder_enabled)) ? 1 : 0, nextEnabled,
       value('website_url', current.website_url)?.trim() || null, value('logo_data', current.logo_data) || null,
       value('brand_color', current.brand_color) || null, value('notes', current.notes)?.trim() || null,
       value('account_username', current.account_username)?.trim() || null, nextVisibility,

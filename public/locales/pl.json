@@ -4432,6 +4432,8 @@
         "intervalLabel": "Co",
         "nextPaymentLabel": "Następna płatność",
         "reminderDaysLabel": "Dni przypomnienia",
+        "reminderEnabledLabel": "Przypomnienie o płatności",
+        "noReminder": "Brak przypomnienia",
         "categoryLabel": "Kategoria",
         "paymentMethodLabel": "Metoda płatności",
         "websiteLabel": "Strona internetowa",

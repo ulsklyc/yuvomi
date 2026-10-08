@@ -4198,6 +4198,8 @@
         "intervalLabel": "Setiap",
         "nextPaymentLabel": "Pembayaran berikutnya",
         "reminderDaysLabel": "Hari pengingat",
+        "reminderEnabledLabel": "Pengingat pembayaran",
+        "noReminder": "Tanpa pengingat",
         "categoryLabel": "Kategori",
         "paymentMethodLabel": "Metode pembayaran",
         "websiteLabel": "Situs web",

@@ -2011,7 +2011,8 @@ Recurring service and payment records shown in Budget → Subscriptions.
 | next_payment_date | TEXT | DATE, NOT NULL |
 | category_id | INTEGER | FK → Subscription Categories (SET NULL) |
 | payment_method_id | INTEGER | FK → Subscription Payment Methods (SET NULL) |
-| reminder_days | INTEGER | Days before renewal, 0–365 |
+| reminder_days | INTEGER | Days before renewal, 0-365; zero means the payment date |
+| reminder_enabled | INTEGER | Payment reminder switch, 0/1, default 1 (migration v237). Off removes the reminder on create, edit and renewal without changing subscription status or budget costs |
 | enabled | INTEGER | 0/1; disabled records are retained but excluded from totals and reminders |
 | end_type | TEXT | NOT NULL DEFAULT `never` — `never` \| `on_date` \| `after_count` (migration v107) |
 | end_date | TEXT | DATE, required when `end_type = on_date`; must not precede `next_payment_date` |

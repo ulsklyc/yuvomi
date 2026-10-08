@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Payment reminders can be turned off for each subscription** (#1708, from D#1226). Turn off the reminder
+  in the subscription dialog while keeping the subscription active and its cost in the budget.
+  Editing or renewing it keeps the reminder off. Existing subscriptions keep reminders enabled.
+
 ### Changed
 
 - **Rows show fewer buttons.** Lists no longer carry a pencil and a bin on every line. Editing,

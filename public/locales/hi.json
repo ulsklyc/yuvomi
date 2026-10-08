@@ -4198,6 +4198,8 @@
         "intervalLabel": "हर",
         "nextPaymentLabel": "अगला भुगतान",
         "reminderDaysLabel": "रिमाइंडर दिन",
+        "reminderEnabledLabel": "भुगतान का रिमाइंडर",
+        "noReminder": "कोई रिमाइंडर नहीं",
         "categoryLabel": "श्रेणी",
         "paymentMethodLabel": "भुगतान विधि",
         "websiteLabel": "वेबसाइट",

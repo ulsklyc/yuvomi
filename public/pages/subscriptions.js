@@ -27,6 +27,7 @@ import { openDetailView } from '/components/detail-view.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
+import { toggleRowHtml } from '/settings/components.js';
 import { leadCardClass } from '/utils/metric-card.js';
 
 // Auslastung, ab der ein Budget „knapp" ist - dieselbe Zahl wie im Plan
@@ -928,7 +929,7 @@ function renderCard(subscription) {
             <span class="subscription-card__due${overdue ? ' subscription-card__due--overdue' : ''}"><i data-lucide="${overdue ? 'triangle-alert' : 'calendar-clock'}" aria-hidden="true"></i><span>${formatDate(subscription.next_payment_date)} ·</span> <span>${dueLabel(subscription)}</span></span>
             <span class="subscription-card__meta-cycle">${cycleLabel(subscription)}</span>
             <span class="subscription-card__meta-extra">${esc(rowPaymentMethodLabel(subscription))}</span>
-            <span class="subscription-card__meta-extra"><i data-lucide="bell" aria-hidden="true"></i>${t('subscriptions.reminderMeta', { count: subscription.reminder_days })}</span>
+            <span class="subscription-card__meta-extra"><i data-lucide="${subscription.reminder_enabled === false ? 'bell-off' : 'bell'}" aria-hidden="true"></i>${subscription.reminder_enabled === false ? t('subscriptions.noReminder') : t('subscriptions.reminderMeta', { count: subscription.reminder_days })}</span>
             ${endInfo ? `<span><i data-lucide="${endInfo.icon}" aria-hidden="true"></i>${esc(endInfo.text)}</span>` : ''}
           </span>
         </span>
@@ -1198,8 +1199,8 @@ function subscriptionReadSections(subscription) {
     { icon: 'repeat-2', label: t('subscriptions.billingCycleLabel'), value: cycleLabel(subscription) },
     { icon: 'calendar-clock', label: t('subscriptions.detailNextPaymentLabel'),
       value: subscription.next_payment_date ? `${formatDate(subscription.next_payment_date)} · ${dueLabel(subscription)}` : '' },
-    { icon: 'bell', label: t('subscriptions.reminderDaysLabel'),
-      value: t('subscriptions.reminderMeta', { count: subscription.reminder_days }) },
+    { icon: subscription.reminder_enabled === false ? 'bell-off' : 'bell', label: t('subscriptions.reminderDaysLabel'),
+      value: subscription.reminder_enabled === false ? t('subscriptions.noReminder') : t('subscriptions.reminderMeta', { count: subscription.reminder_days }) },
     { icon: endInfo?.icon || 'calendar-x', label: t('subscriptions.endLabel'), value: endInfo?.text || '' },
     { icon: 'tags', label: t('subscriptions.categoryLabel'), value: subscription.category_id ? rowCategoryLabel(subscription) : '' },
     { icon: 'wallet-cards', label: t('subscriptions.paymentMethodLabel'),
@@ -1372,6 +1373,11 @@ export function openSubscriptionModal(subscription = null) {
 
       <section class="subscription-form__section">
         <h3><i data-lucide="calendar-clock" aria-hidden="true"></i>${t('subscriptions.renewalDetails')}</h3>
+        ${toggleRowHtml({
+          label: t('subscriptions.reminderEnabledLabel'), control: 'switch',
+          checked: subscription?.reminder_enabled !== false,
+          attrs: { id: 'subscription-reminder-enabled' },
+        })}
         <div class="form-grid-2">
           <div class="form-group">
             <label class="form-label" for="subscription-next-date">${t('subscriptions.nextPaymentLabel')}${REQUIRED_MARK}</label>
@@ -1380,7 +1386,7 @@ export function openSubscriptionModal(subscription = null) {
           </div>
           <div class="form-group">
             <label class="form-label" for="subscription-reminder">${t('subscriptions.reminderDaysLabel')}</label>
-            <input class="form-input" id="subscription-reminder" type="number" min="0" max="365" step="1" value="${subscription?.reminder_days ?? 3}">
+            <input class="form-input" id="subscription-reminder" type="number" min="0" max="365" step="1" value="${subscription?.reminder_days ?? 3}"${subscription?.reminder_enabled === false ? ' disabled' : ''}>
           </div>
         </div>
         <div class="form-group">
@@ -1440,6 +1446,10 @@ export function openSubscriptionModal(subscription = null) {
       wireCombobox(panel, 'subscription-cycle');
       wireCombobox(panel, 'subscription-category');
       wireCombobox(panel, 'subscription-method');
+      const reminderEnabled = panel.querySelector('#subscription-reminder-enabled');
+      reminderEnabled.addEventListener('change', () => {
+        panel.querySelector('#subscription-reminder').disabled = !reminderEnabled.checked;
+      });
       // Ende-Bedingung (#594): das passende Zusatzfeld ein-/ausblenden.
       const endTypeSelect = panel.querySelector('#subscription-end-type');
       endTypeSelect.value = subscription?.end_type || 'never';
@@ -1573,6 +1583,7 @@ async function saveSubscription(panel, existing, searchedLogoData = null) {
       cycle_interval: Number(panel.querySelector('#subscription-interval').value),
       next_payment_date: parseDateInput(dateInput.value),
       reminder_days: Number(panel.querySelector('#subscription-reminder').value),
+      reminder_enabled: panel.querySelector('#subscription-reminder-enabled').checked,
       category_id: Number(panel.querySelector('#subscription-category').value) || null,
       payment_method_id: Number(panel.querySelector('#subscription-method').value) || null,
       website_url: existing?.website_url || null,
@@ -2033,5 +2044,5 @@ function openMetadataModal() {
 export const __test = {
   readOnly, READ_SAFE_ACTIONS, renderCard, renderEmpty, renderSummary, state, toolsMenuHtml, activeFilters,
   renderBreakdown, renderAreaChart,
-  subscriptionReadSections, openSubscriptionModal,
+  subscriptionReadSections, openSubscriptionModal, saveSubscription,
 };

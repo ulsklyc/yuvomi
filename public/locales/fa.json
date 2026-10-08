@@ -4198,6 +4198,8 @@
         "intervalLabel": "هر",
         "nextPaymentLabel": "پرداخت بعدی",
         "reminderDaysLabel": "روزهای یادآوری",
+        "reminderEnabledLabel": "یادآوری پرداخت",
+        "noReminder": "بدون یادآور",
         "categoryLabel": "دسته",
         "paymentMethodLabel": "روش پرداخت",
         "websiteLabel": "وب‌سایت",

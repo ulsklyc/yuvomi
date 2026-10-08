@@ -101,8 +101,8 @@ export function budgetPaths() {
       get: op({ summary: 'Get budget statistics for week, month, or year', tag: 'Budget' }),
     },
     '/api/v1/budget/subscriptions': {
-      get: op({ summary: 'List subscriptions with normalized costs and analytics', tag: 'Budget', description: 'The `by_category` and `by_payment_method` breakdowns group by ROW, not by display text: each entry is `{ id, name, label_key, amount }`. `id` is `null` for the catch-all bucket of subscriptions without a category or payment method, and `name`/`label_key` are then `null` too - the caller supplies the wording. A seeded row carries `label_key` (an i18n key such as `subscriptions.paymentMethodCreditCard`) and a `name` of its original English wording; a row the household created or renamed carries only `name`. Resolve as `label_key ? t(label_key) : name`. Subscription objects carry the same pair denormalized as `category_label_key` / `category_name` and `payment_method_label_key` / `payment_method_name`.' }),
-      post: op({ summary: 'Create subscription', tag: 'Budget', stateChanging: true, requestBody: jsonBody(null) }),
+      get: op({ summary: 'List subscriptions with normalized costs and analytics', tag: 'Budget', description: 'The `by_category` and `by_payment_method` breakdowns group by ROW, not by display text: each entry is `{ id, name, label_key, amount }`. `id` is `null` for the catch-all bucket of subscriptions without a category or payment method, and `name`/`label_key` are then `null` too - the caller supplies the wording. A seeded row carries `label_key` (an i18n key such as `subscriptions.paymentMethodCreditCard`) and a `name` of its original English wording; a row the household created or renamed carries only `name`. Resolve as `label_key ? t(label_key) : name`. Subscription objects include boolean `reminder_enabled` (default true). When false, no payment reminder is scheduled, including after edits and renewals; subscription status and costs are unaffected. `reminder_days: 0` still means a reminder on the payment date when enabled. Subscription objects carry the same pair denormalized as `category_label_key` / `category_name` and `payment_method_label_key` / `payment_method_name`.' }),
+      post: op({ summary: 'Create subscription', description: 'Optional boolean `reminder_enabled` defaults to true. Set false to create an active subscription without a payment reminder. `reminder_days` remains a lead time of 0-365 days; zero means the payment date.', tag: 'Budget', stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/budget/subscriptions/meta': {
       get: op({ summary: 'Get subscription categories, payment methods, and billing cycles', tag: 'Budget', description: 'Categories and payment methods each carry `label_key` (an i18n key) when they are one of the seeded defaults and `null` once the household renamed them - resolve as `label_key ? t(label_key) : name`.' }),
@@ -132,10 +132,10 @@ export function budgetPaths() {
       post: op({ summary: 'Find selectable logo options from a website URL or service name', tag: 'Budget', stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/budget/subscriptions/{id}/renew': {
-      post: op({ summary: 'Advance a subscription to its next renewal date, or complete it when its end condition is reached', tag: 'Budget', params: [idParam()], stateChanging: true }),
+      post: op({ summary: 'Advance a subscription to its next renewal date, or complete it when its end condition is reached', description: 'Preserves `reminder_enabled`. A renewed subscription with reminders disabled has no reminder row.', tag: 'Budget', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/budget/subscriptions/{id}': {
-      put: op({ summary: 'Update subscription', tag: 'Budget', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      put: op({ summary: 'Update subscription', description: 'Optional boolean `reminder_enabled`: false removes the payment reminder; true schedules it using `reminder_days`. Omitting the field preserves its current value. Changing it does not pause the subscription or remove its budget expense.', tag: 'Budget', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
       delete: op({ summary: 'Delete subscription', tag: 'Budget', params: [idParam()], stateChanging: true }),
     },
   };

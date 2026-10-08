@@ -66,6 +66,19 @@ try {
     ['example.com'],
   );
 
+  // Upgrading an existing subscription preserves its reminder by default.
+  const { DatabaseSync } = await import('node:sqlite');
+  const legacy = new DatabaseSync(':memory:');
+  try {
+    legacy.exec("CREATE TABLE budget_subscriptions (id INTEGER PRIMARY KEY, reminder_days INTEGER); INSERT INTO budget_subscriptions VALUES (1, 0), (2, 5);");
+    legacy.exec(db.MIGRATIONS.find(row => row.description === 'Subscriptions: optional payment reminder (#1708, from D#1226)').up);
+    assert.deepEqual(legacy.prepare('SELECT * FROM budget_subscriptions ORDER BY id').all().map(row => ({ ...row })), [
+      { id: 1, reminder_days: 0, reminder_enabled: 1 },
+      { id: 2, reminder_days: 5, reminder_enabled: 1 },
+    ]);
+    assert.throws(() => legacy.prepare('UPDATE budget_subscriptions SET reminder_enabled = 2').run(), /CHECK constraint failed/);
+  } finally { legacy.close(); }
+
   const database = db.get();
   const tables = database.prepare(`
     SELECT name FROM sqlite_master
@@ -139,6 +152,7 @@ try {
     const created = (await createResponse.json()).data;
     assert.equal(created.name, 'Video service');
     assert.equal(created.enabled, true);
+    assert.equal(created.reminder_enabled, true, 'older clients keep reminders enabled');
     assert.ok(created.budget_entry_id);
     const linkedExpense = database.prepare('SELECT * FROM budget_entries WHERE id = ?').get(created.budget_entry_id);
     assert.equal(linkedExpense.title, 'Video service');
@@ -479,6 +493,52 @@ try {
       (await jsonReq('PUT', `/${accountId}`, { account_username: 'x'.repeat(200) })).status, 200,
       'genau 200 Zeichen sind erlaubt',
     );
+
+    // The reminder switch is independent of subscription status and budget costs.
+    const reminderCount = (id) => database.prepare(
+      "SELECT COUNT(*) AS n FROM reminders WHERE entity_type = 'subscription' AND entity_id = ?",
+    ).get(id).n;
+    const quiet = await jsonReq('POST', '', {
+      name: 'Quiet subscription', amount: 12, currency: 'EUR', billing_cycle: 'monthly',
+      next_payment_date: '2026-08-10', reminder_enabled: false, reminder_days: 0,
+    });
+    assert.equal(quiet.status, 201);
+    const quietId = quiet.body.data.id;
+    assert.equal(quiet.body.data.reminder_enabled, false);
+    assert.equal(quiet.body.data.enabled, true);
+    assert.ok(quiet.body.data.budget_entry_id);
+    assert.equal(reminderCount(quietId), 0, 'creating with reminders off schedules nothing');
+    const quietEdit = await jsonReq('PUT', '/' + quietId, { amount: 15 });
+    assert.equal(quietEdit.status, 200);
+    assert.equal(quietEdit.body.data.reminder_enabled, false);
+    assert.equal(reminderCount(quietId), 0, 'an edit without the field preserves the off switch');
+    const quietRenew = await jsonReq('POST', '/' + quietId + '/renew', {});
+    assert.equal(quietRenew.status, 200);
+    assert.equal(quietRenew.body.data.reminder_enabled, false);
+    assert.equal(quietRenew.body.data.enabled, true);
+    assert.equal(quietRenew.body.data.next_payment_date, '2026-09-10');
+    assert.notEqual(quietRenew.body.data.budget_entry_id, quietEdit.body.data.budget_entry_id);
+    assert.equal(reminderCount(quietId), 0, 'renewal does not recreate a disabled reminder');
+    const quietListed = (await jsonReq('GET', '')).body.data.subscriptions.find(row => row.id === quietId);
+    assert.equal(quietListed.reminder_enabled, false, 'list API returns a boolean');
+    assert.equal(quietListed.monthly_native, 15, 'reminders off still count towards costs');
+    const loud = await jsonReq('PUT', '/' + quietId, { reminder_enabled: true });
+    assert.equal(loud.status, 200);
+    assert.equal(loud.body.data.reminder_enabled, true);
+    assert.equal(reminderCount(quietId), 1);
+    assert.equal(database.prepare("SELECT remind_at FROM reminders WHERE entity_type = 'subscription' AND entity_id = ?").get(quietId).remind_at,
+      '2026-09-10T09:00', 'zero days means due-day, not off');
+    assert.equal((await jsonReq('PUT', '/' + quietId, { reminder_enabled: false })).status, 200);
+    assert.equal(reminderCount(quietId), 0, 'turning the switch off removes an existing reminder');
+    for (const invalid of [0, 1, 'false', null]) {
+      assert.equal((await jsonReq('PUT', '/' + quietId, { reminder_enabled: invalid })).status, 400);
+      assert.equal((await jsonReq('POST', '', {
+        name: 'Invalid reminder', amount: 1, currency: 'EUR', billing_cycle: 'monthly',
+        next_payment_date: '2026-08-10', reminder_enabled: invalid,
+      })).status, 400);
+    }
+    assert.equal(reminderCount(quietId), 0);
+    assert.equal((await jsonReq('DELETE', '/' + quietId)).status, 204);
 
     const removedNotificationsResponse = await fetch(`${baseUrl}/notification-agents`);
     assert.equal(removedNotificationsResponse.status, 404);

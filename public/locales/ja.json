@@ -4198,6 +4198,8 @@
         "intervalLabel": "毎",
         "nextPaymentLabel": "次回支払い",
         "reminderDaysLabel": "リマインダー日数",
+        "reminderEnabledLabel": "支払いのリマインダー",
+        "noReminder": "リマインダーなし",
         "categoryLabel": "カテゴリ",
         "paymentMethodLabel": "支払い方法",
         "websiteLabel": "ウェブサイト",

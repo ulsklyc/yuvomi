@@ -4198,6 +4198,8 @@
         "intervalLabel": "매",
         "nextPaymentLabel": "다음 결제",
         "reminderDaysLabel": "알림 일수",
+        "reminderEnabledLabel": "결제 알림",
+        "noReminder": "알림 없음",
         "categoryLabel": "카테고리",
         "paymentMethodLabel": "결제 수단",
         "websiteLabel": "웹사이트",
