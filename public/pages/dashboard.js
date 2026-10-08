@@ -40,7 +40,7 @@ import {
   WIDGET_SIZE_PRESETS, WIDGET_SIZE_OPTIONS,
   COCKPIT_COVERED_WIDGETS,
   nearestPreset, sameWidgetConfig, suggestGridHoleFill, rowFillSpans,
-  dashboardQuery, dashboardQueryFiltersCounts,
+  dashboardQuery, dashboardQueryFiltersCounts, normalizeShoppingListSelection,
 } from '/utils/dashboard-widgets.js';
 import { EVENT_LIMIT_STEPS, EVENT_LIMIT_DEFAULT, clampEventLimit } from '/utils/dashboard-event-limit.js';
 import {
@@ -479,7 +479,7 @@ function maybeHintCustomize(container) {
 // die geteilten Ausgaben haengen am Budget-Modul (server/scopes.js).
 const MODULE_FOR_WIDGET = { tasks: 'tasks', calendar: 'calendar', shopping: 'shopping', meals: 'meals', notes: 'notes', birthdays: 'birthdays', budget: 'budget', 'split-expenses': 'budget', rewards: 'rewards', health: 'health', cycle: 'health', fasting: 'health', nutrition: 'health', housekeeping: 'housekeeping', schedule: 'schedule', waste: 'waste', pantry: 'pantry' };
 
-const WIDGETS_WITH_OPTIONS = new Set(['calendar', 'tasks', 'notes', 'waste']);
+const WIDGETS_WITH_OPTIONS = new Set(['calendar', 'tasks', 'notes', 'waste', 'shopping']);
 
 const _extensionWidgetModules = new Map();
 
@@ -4300,6 +4300,21 @@ async function loadWasteTypes() {
   return wasteTypesCache;
 }
 
+/**
+ * Die Einkaufslisten fuer den Optionen-Dialog (#1818). Bewusst OHNE Cache und
+ * mit `null` im Fehlerfall, wie bei den Notiz-Kategorien: eine eben angelegte
+ * Liste muss waehlbar sein, und ein Dialog ohne Katalog darf eine bestehende
+ * Auswahl nicht als "nichts gewaehlt" speichern.
+ */
+async function loadShoppingLists(getLists = (path) => api.get(path)) {
+  try {
+    const res = await getLists('/shopping');
+    return Array.isArray(res?.data) ? res.data : null;
+  } catch {
+    return null;
+  }
+}
+
 async function loadNoteCategories(getCategories = (path) => api.get(path)) {
   try {
     const res = await getCategories('/notes/categories');
@@ -4382,7 +4397,7 @@ async function openExtensionWidgetOptions(id, meta, current = {}) {
 }
 
 /** Der Optionen-Dialog eines Widgets. Aufloesen mit den neuen Optionen oder null. */
-async function openWidgetOptions(id, current = {}, { loadNotes = loadNoteCategories } = {}) {
+async function openWidgetOptions(id, current = {}, { loadNotes = loadNoteCategories, loadLists = loadShoppingLists } = {}) {
   const extMeta = getExtensionWidgetMeta(id);
   if (extMeta?.optionsSchema) return openExtensionWidgetOptions(id, extMeta, current);
 
@@ -4398,6 +4413,14 @@ async function openWidgetOptions(id, current = {}, { loadNotes = loadNoteCategor
     window.yuvomi?.showToast(t('dashboard.loadError'), 'danger');
     return null;
   }
+  const shoppingLists = id === 'shopping' ? await loadLists() : [];
+  if (shoppingLists === null) {
+    window.yuvomi?.showToast(t('dashboard.loadError'), 'danger');
+    return null;
+  }
+  // Angehakt ist, was gespeichert UND noch da ist: eine geloeschte Liste hat
+  // keine Zeile mehr und faellt mit dem naechsten Speichern aus der Auswahl.
+  const pickedLists = new Set(normalizeShoppingListSelection(options.lists));
 
   const body = id === 'calendar'
     ? `
@@ -4440,6 +4463,17 @@ async function openWidgetOptions(id, current = {}, { loadNotes = loadNoteCategor
                  ${(options.types ?? []).includes(wt.id) ? 'checked' : ''}>
           <span>${esc(wt.name)}</span>
         </label>`).join('') : `<p class="widget-options__hint">${t('dashboard.optionWasteTypesEmpty')}</p>`}
+      </fieldset>`
+    : id === 'shopping' ? `
+      <fieldset class="form-group widget-options__group">
+        <legend class="form-label">${t('dashboard.optionShoppingLists')}</legend>
+        <p class="widget-options__hint">${t('dashboard.optionShoppingListsHint')}</p>
+        ${shoppingLists.length ? shoppingLists.map((list) => `
+        <label class="widget-options__choice">
+          <input type="checkbox" name="shopping-list" value="${esc(String(list.id))}"
+                 ${pickedLists.has(Number(list.id)) ? 'checked' : ''}>
+          <span>${esc(list.name)}</span>
+        </label>`).join('') : `<p class="widget-options__hint">${t('dashboard.noShoppingLists')}</p>`}
       </fieldset>`
     : id === 'tasks' ? `
       <fieldset class="form-group widget-options__group">
@@ -4508,6 +4542,13 @@ async function openWidgetOptions(id, current = {}, { loadNotes = loadNoteCategor
             // heisst „alle" - eine seltene Abholung darf nie stillschweigend
             // verschwinden, nur weil niemand den Dialog geoeffnet hat.
             if (picked.length) next.types = picked;
+          } else if (id === 'shopping') {
+            // Keine Auswahl heisst „alle Listen" und wird nicht gespeichert -
+            // das Verhalten von vor der Option (#1818).
+            const picked = normalizeShoppingListSelection(
+              [...panel.querySelectorAll('input[name="shopping-list"]:checked')].map((el) => el.value),
+            );
+            if (picked.length) next.lists = picked;
           } else if (id === 'tasks') {
             const picked = [...panel.querySelectorAll('input[name="task-category"]:checked')].map((el) => el.value);
             // Keine Auswahl heisst „alle" - eine leere Liste als Filter waere
@@ -4848,7 +4889,10 @@ function renderShoppingLists(lists, openTotal = null, openListTotal = null) {
   // `shoppingOpenLists` zaehlen ueber alle (listTotal). Ohne sie bleibt es bei
   // der Summe der geladenen Listen.
   const totalOpen = listTotal(openTotal, lists.reduce((sum, l) => sum + l.open_count, 0));
-  const moreLists = listTotal(openListTotal, lists.length) - lists.length;
+  // "+n weitere Listen" zaehlt Listen MIT OFFENEM. Mit einer Auswahl (#1818)
+  // kann eine gezeigte Liste leer sein - sie zaehlt dann auf keiner Seite mit.
+  const shownWithOpen = lists.filter((l) => l.open_count > 0).length;
+  const moreLists = listTotal(openListTotal, shownWithOpen) - shownWithOpen;
 
   const listsHtml = lists.map((list) => {
     const progress = list.total_count > 0
@@ -4885,6 +4929,9 @@ function renderShoppingLists(lists, openTotal = null, openListTotal = null) {
         <div class="shopping-widget-list__items">
           ${itemsHtml}
           ${moreCount > 0 ? `<div class="shopping-widget-item shopping-widget-item--more">${t('dashboard.shoppingMore', { count: moreCount })}</div>` : ''}
+          ${/* Eine AUSGEWAEHLTE Liste steht auch ohne Offenes da (#1818): die
+                Zeile bleibt der Weg zu ihr und sagt, warum sie leer ist. */ ''}
+          ${list.open_count === 0 ? `<div class="shopping-widget-item shopping-widget-item--more">${esc(t('dashboard.shoppingListNothingOpen'))}</div>` : ''}
         </div>
       </div>
     `;

@@ -202,6 +202,21 @@ function weekEventFields(event) {
   };
 }
 
+/**
+ * `?shopping_list=` als Liste von Listen-Ids (#1818): einzeln oder mehrfach
+ * angegeben, nur positive ganze Zahlen, ohne Doppelte, hoechstens 50 - dieselbe
+ * Form und Grenze wie `notes_category` und wie die gespeicherten Optionen
+ * (preferences.js). Alles andere faellt weg, nie ein Fehler.
+ */
+export function normalizeShoppingListFilter(raw) {
+  if (raw === undefined || raw === null) return [];
+  return [...new Set(
+    (Array.isArray(raw) ? raw : [raw])
+      .filter((value) => typeof value === 'string' && /^[1-9]\d{0,14}$/.test(value))
+      .map(Number),
+  )].slice(0, 50);
+}
+
 const router = express.Router();
 
 /**
@@ -477,11 +492,45 @@ router.get('/', (req, res) => {
     result.overdueTaskCount = null;
   }
 
+  /* WELCHE EINKAUFSLISTEN DIE KACHEL ZEIGT (#1818, aus D#1624). `shopping_list`
+   * nennt eine Auswahl von Listen-Ids; ohne den Parameter bleibt alles, wie es
+   * war. Wie die anderen Kachel-Optionen wirkt die Auswahl VOR der Deckelung
+   * und auf Liste UND Zahlen - eine Kachel, die eine Liste zeigt und ueber
+   * allen "23" zaehlt, widerspraeche sich.
+   *
+   * GEPRUEFT WIRD GEGEN DIE TABELLE, nicht nur die Form. Eine Liste, die es
+   * nicht (mehr) gibt, faellt aus der Auswahl; bleibt KEINE uebrig, gilt die
+   * Anfrage als ungefiltert - derselbe Satz wie bei den anderen Kacheln: keine
+   * Auswahl heisst "alle". So macht eine geloeschte Liste in einer gespeicherten
+   * Anordnung die Kachel weder leer noch kaputt, und Unsinn (`abc`, `-1`, eine
+   * erfundene Id) antwortet wie gar kein Parameter. Listen-Ids sind
+   * AUTOINCREMENT, eine geloeschte Id kehrt nie als andere Liste zurueck.
+   *
+   * RECHTE: Einkaufslisten haben keine Zeilen-Sichtbarkeit, das Modul ist ganz
+   * sichtbar oder gar nicht. Die Auswahl wird deshalb NUR gelesen, wenn das
+   * Modul fuer diese Person offen ist - sonst bleibt es bei der leeren Fassung
+   * von oben, was immer der Parameter nennt. */
+  let shoppingSelection = null;
+  if (allows('shopping')) try {
+    const wanted = normalizeShoppingListFilter(req.query.shopping_list);
+    if (wanted.length) {
+      const existing = d.prepare(
+        `SELECT id FROM shopping_lists WHERE id IN (${wanted.map(() => '?').join(', ')})`,
+      ).all(...wanted).map((row) => row.id);
+      if (existing.length) shoppingSelection = existing;
+    }
+  } catch (err) {
+    log.error('shopping selection error:', err.message);
+  }
+  const shoppingMarks = shoppingSelection ? shoppingSelection.map(() => '?').join(', ') : '';
+  const shoppingBinds = shoppingSelection ?? [];
+
   if (allows('shopping')) try {
     const row = d.prepare(`
       SELECT COUNT(*) AS items, COUNT(DISTINCT si.list_id) AS lists
       FROM shopping_items si WHERE si.is_checked = 0
-    `).get();
+      ${shoppingSelection ? `AND si.list_id IN (${shoppingMarks})` : ''}
+    `).get(...shoppingBinds);
     result.shoppingOpenCount = row.items;
     result.shoppingOpenLists = row.lists;
   } catch (err) {
@@ -572,16 +621,24 @@ router.get('/', (req, res) => {
   }
 
   // Einkaufslisten mit offenen Artikeln (max. 3 Listen, je bis zu 6 offene Items)
+  //
+  // MIT EINER AUSWAHL (#1818) stehen die gewaehlten Listen da, AUCH OHNE
+  // OFFENES: wer eine Liste auf die Uebersicht holt, will sie antippen, um
+  // den ersten Artikel einzutragen - genau dann waere sie sonst verschwunden.
+  // Listen mit Offenem zuerst, damit der Deckel von drei keine volle Liste
+  // hinter einer leeren versteckt; darin wie bisher die zuletzt geaenderte.
   if (allows('shopping')) try {
     const lists = d.prepare(`
       SELECT sl.id, sl.name,
         (SELECT COUNT(*) FROM shopping_items si WHERE si.list_id = sl.id AND si.is_checked = 0) AS open_count,
         (SELECT COUNT(*) FROM shopping_items si WHERE si.list_id = sl.id) AS total_count
       FROM shopping_lists sl
-      WHERE (SELECT COUNT(*) FROM shopping_items si WHERE si.list_id = sl.id AND si.is_checked = 0) > 0
-      ORDER BY sl.updated_at DESC
+      WHERE ${shoppingSelection
+        ? `sl.id IN (${shoppingMarks})`
+        : '(SELECT COUNT(*) FROM shopping_items si WHERE si.list_id = sl.id AND si.is_checked = 0) > 0'}
+      ORDER BY (open_count > 0) DESC, sl.updated_at DESC
       LIMIT 3
-    `).all();
+    `).all(...shoppingBinds);
 
     for (const list of lists) {
       list.items = d.prepare(`

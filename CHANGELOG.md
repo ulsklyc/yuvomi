@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Payment reminders can be turned off for each subscription** (#1708, from D#1226). Turn off the reminder
   in the subscription dialog while keeping the subscription active and its cost in the budget.
   Editing or renewing it keeps the reminder off. Existing subscriptions keep reminders enabled.
+- **Choose which shopping lists the overview shows** (#1818, from D#1624). The shopping tile now
+  has options in "Customize": tick the lists you want on it. With nothing ticked it shows every
+  list with open items, as before. A list you picked stays on the tile even when everything on it
+  is bought, so it is one tap away when you want to add the first item. The choice is yours alone
+  and does not change what anyone else in the household sees.
 
 ### Changed
 

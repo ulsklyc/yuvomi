@@ -433,6 +433,20 @@ export function sameWidgetConfig(a, b) {
  * @param {object[]} config normalisierte Widget-Konfiguration
  * @returns {string} '/dashboard' oder '/dashboard?…'
  */
+/**
+ * Die gespeicherte Listen-Auswahl der Einkaufs-Kachel als Ids (#1818):
+ * positive ganze Zahlen, ohne Doppelte. Was sonst im Layout steht (ein
+ * Fremdwert, ein String aus aelterem Stand), faellt weg - dieselbe Form, die
+ * die Route aus `?shopping_list=` liest.
+ *
+ * @param {unknown} value `options.lists`
+ * @returns {number[]}
+ */
+export function normalizeShoppingListSelection(value) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.map(Number).filter((id) => Number.isInteger(id) && id > 0))];
+}
+
 export function dashboardQuery(config) {
   const params = new URLSearchParams();
   const optionsOf = (id) => (Array.isArray(config) ? config.find((w) => w.id === id)?.options : null) ?? {};
@@ -447,6 +461,15 @@ export function dashboardQuery(config) {
   if (eventLimit !== EVENT_LIMIT_DEFAULT) params.set('events_limit', String(eventLimit));
   for (const key of optionsOf('tasks').categories ?? []) params.append('tasks_category', key);
   for (const id of optionsOf('notes').categories ?? []) params.append('notes_category', String(id));
+  // Die Listen-Auswahl der Einkaufs-Kachel (#1818) reist nur, solange die
+  // Kachel SICHTBAR ist. Die Auswahl filtert auf dem Server auch die Zahlen;
+  // ist die Kachel ausgeblendet, spricht das Heute-Blatt fuer den Einkauf
+  // ("n offen"), und das zaehlt ueber alle Listen - eine vergessene Auswahl
+  // einer versteckten Kachel darf diese Zahl nicht still verkleinern.
+  const shoppingTile = Array.isArray(config) ? config.find((w) => w.id === 'shopping') : null;
+  if (shoppingTile?.visible) {
+    for (const id of normalizeShoppingListSelection(shoppingTile.options?.lists)) params.append('shopping_list', String(id));
+  }
   const query = params.toString();
   return query ? `/dashboard?${query}` : '/dashboard';
 }
