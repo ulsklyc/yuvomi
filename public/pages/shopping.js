@@ -5,7 +5,7 @@
  */
 
 import { api } from '/api.js';
-import { stagger, vibrate, scheduleUndoableDelete, collapseOut, expandIn, acknowledgeCheck } from '/utils/ux.js';
+import { stagger, vibrate, scheduleUndoableDelete, collapseOut, expandIn, acknowledgeCheck, durationToken } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { flipSnapshot, flipPlay } from '/utils/flip.js';
 import { t } from '/i18n.js';
@@ -113,13 +113,16 @@ function byRank(a, b) {
  * zurueckkommt - die Zeile wandert dann an Ort und Stelle, ohne Neuaufbau.
  *
  * Gelesen wird `checkedOf`, also die eigene Absicht vor dem Serverstand: die
- * Zeile steht dort, wo ihr Haken sie zeigt.
+ * Zeile steht dort, wo ihr Haken sie zeigt - ausser sie WARTET noch auf die
+ * Pause (`heldRows`, siehe `holdPlacement`): dann steht sie, wo sie beim
+ * Antippen stand, auch ueber einen Neuaufbau der Liste hinweg.
  */
 function listSections(items) {
   const all = groupItemsByCategory(items);
   const position = new Map(all.map(([cat], idx) => [cat, idx]));
-  const groups = all.map(([cat, members]) => [cat, members.filter((i) => !checkedOf(i)).sort(byRank)]);
-  const ticked = items.filter((i) => checkedOf(i))
+  const inTicked = (i) => (heldRows.has(i.id) ? heldRows.get(i.id) : Boolean(checkedOf(i)));
+  const groups = all.map(([cat, members]) => [cat, members.filter((i) => !inTicked(i)).sort(byRank)]);
+  const ticked = items.filter(inTicked)
     .sort((a, b) => position.get(categoryOf(a)) - position.get(categoryOf(b)) || byRank(a, b));
   return { groups, ticked };
 }
@@ -134,7 +137,7 @@ function placementOf(items, id) {
   const item = items.find((i) => i.id === id);
   if (!item) return null;
   const { groups, ticked } = listSections(items);
-  const isTicked = Boolean(checkedOf(item));
+  const isTicked = ticked.includes(item);
   const category = categoryOf(item);
   const members = isTicked ? ticked : (groups.find(([cat]) => cat === category)?.[1] ?? []);
   return {
@@ -655,7 +658,7 @@ function checkOf(container, id) {
   return container.querySelector(`.swipe-row[data-swipe-id="${id}"] .item-check`);
 }
 
-async function toggleShoppingItem(id, checked, container) {
+async function toggleShoppingItem(id, checked, container, { settleNow = false } = {}) {
   // Dritte Linie hinter Markup und Handler-Riegel: auch ein Aufruf, den ein
   // Rechtewechsel ueberholt hat, schickt nichts.
   if (readOnly()) return;
@@ -681,6 +684,8 @@ async function toggleShoppingItem(id, checked, container) {
   // ihre eigene Buchung.
   const delta = (newVal ? 1 : 0) - (item?.is_checked ? 1 : 0);
 
+  // Wo die Zeile JETZT steht - vor der neuen Absicht gelesen (siehe holdPlacement).
+  const shownTicked = Boolean(item && checkedOf(item));
   const seq = ++_checkSeq;
   intents.set(id, { value: newVal, seq, listId, delta });
   // HAPTIK IM MOMENT DES TIPPS (Critique 2026-10-05, R16). Sie stand nach der
@@ -696,9 +701,11 @@ async function toggleShoppingItem(id, checked, container) {
     // abgehakten Zeilen. `updateItemRow` selbst quittiert nichts: es laeuft
     // auch fuer fremde Aenderungen und beim Zuruecksetzen nach einem Fehler.
     acknowledgeCheck(checkOf(container, id), { checked: newVal === 1 });
-    // Die Zeile zieht um, sobald der Haken gesehen wurde (#1816) - als
-    // einzelner Knoten, die Liste um sie herum bleibt stehen.
-    schedulePlacement(container, id);
+    // Die Zeile zieht um, sobald man innehaelt (#1816) - als einzelner Knoten,
+    // die Liste um sie herum bleibt stehen. Das Zurueckholen ueber das
+    // Eingabefeld wartet nicht: dort ist der Umzug selbst die Quittung.
+    if (settleNow) settleItemPlacements(container, [id]);
+    else holdPlacement(container, id, shownTicked);
     // userChecked NUR beim Abhaken selbst (#1039): das Zurueckholen eines
     // Artikels eroeffnet keinen neuen Feedback-Batch.
     updateCheckedActions(container, { userChecked: newVal === 1 });
@@ -752,9 +759,9 @@ async function toggleShoppingItem(id, checked, container) {
       const current = state.items.find((i) => i.id === id);
       if (current) {
         updateItemRow(container, current);
-        // Der Haken ist zurueck, also auch die Zeile - sofort, es gibt nichts
-        // mehr zu quittieren.
-        settleItemPlacement(container, id);
+        // Der Haken ist zurueck, also auch die Zeile - aber nicht unter dem
+        // Finger: laeuft gerade eine Pause, wartet sie mit.
+        placeOrHold(container, id);
         updateCheckedActions(container);
       }
       renderTabs(container);
@@ -1383,7 +1390,7 @@ function renderItems() {
  *
  * DER ZAEHLSTAND GEHOERT ZUM NAMEN DES KNOPFS (`aria-labelledby` auf Wort und
  * Zahl): zugeklappt ist die Zahl alles, was der Abschnitt ueber seinen Inhalt
- * sagt. Sie steht als eigener Knoten da, weil `settleItemPlacement` sie beim
+ * sagt. Sie steht als eigener Knoten da, weil `syncGroupChrome` sie beim
  * Wandern einer Zeile fortschreibt.
  *
  * Steht auch leer im DOM (`hidden`): der erste abgehakte Artikel braucht
@@ -1577,36 +1584,46 @@ function sameName(a, b) {
   return String(a ?? '').trim().toLowerCase() === String(b ?? '').trim().toLowerCase();
 }
 
-/** Der abgehakte Artikel dieses Namens auf der OFFENEN Liste, sonst undefined. */
+/**
+ * Der abgehakte Artikel dieses Namens auf der OFFENEN Liste, sonst undefined.
+ *
+ * NUR, WENN DER BESTAND DIESER LISTE GEHOERT. Nach einem Listenwechsel traegt
+ * `state.items` bis zum Ende des Ladens noch die verlassene Liste
+ * (`_itemsListId`); ein Treffer dort holte einen Artikel auf einem Zettel
+ * zurueck, den niemand mehr ansieht, und auf dem offenen entstuende nichts.
+ * Dann gilt der Name als neu und wird auf der offenen Liste angelegt.
+ */
 function tickedItemNamed(name) {
   if (!String(name ?? '').trim()) return undefined;
-  return listSections(state.items).ticked.find((i) => sameName(i.name, name));
+  if (_itemsListId !== state.activeListId) return undefined;
+  return state.items
+    .filter((i) => checkedOf(i) && sameName(i.name, name))
+    .sort((a, b) => byRank(a, b))[0];
 }
 
 /**
  * Holt eine abgehakte Zeile zurueck, statt eine zweite gleichen Namens
  * anzulegen (#1816). Der Haken faellt ueber denselben Weg wie ein Tipp auf die
- * Zeile (`toggleShoppingItem`: Absicht, Zaehler, Fehlerbild); Menge und
- * Kategorie folgen dem Formular, wenn es dort anders steht.
+ * Zeile (`toggleShoppingItem`: Absicht, Zaehler, Fehlerbild).
+ *
+ * WAS DAS FORMULAR SAGT, UEBERSCHREIBT; WAS ES NICHT SAGT, BLEIBT. Eine
+ * getippte Menge ersetzt die der Zeile, ein leeres Mengenfeld laesst sie
+ * stehen. Die Kategorie reist nur mit, wenn sie im Formular GEWAEHLT wurde
+ * (`category` ist sonst undefined): das Auswahlfeld zeigt immer irgendeinen
+ * Wert, und eine Zeile, deren Kategorie es dort gar nicht (mehr) gibt, wuerde
+ * sonst still auf den zufaellig angezeigten umgeschrieben.
  *
  * @returns {Promise<boolean>} ob die Zeile wieder offen ist
  */
 async function reviveTickedItem(container, item, { quantity, category }) {
   const id = item.id;
-  // Der optimistische Teil laeuft bis zum ersten `await` synchron durch: die
-  // Zeile ist danach offen und zieht ohne Wartezeit um - hier quittiert der
-  // Umzug selbst, was eben abgeschickt wurde.
-  const unticked = toggleShoppingItem(id, 1, container);
-  clearTimeout(placementTimers.get(id));
-  placementTimers.delete(id);
-  settleItemPlacement(container, id);
-  await unticked;
+  await toggleShoppingItem(id, 1, container, { settleNow: true });
 
   const current = state.items.find((i) => i.id === id);
   if (!current || checkedOf(current)) return false;
 
   const changes = {};
-  if ((quantity ?? null) !== (current.quantity ?? null)) changes.quantity = quantity ?? null;
+  if (quantity && quantity !== (current.quantity ?? null)) changes.quantity = quantity;
   if (category && category !== current.category) changes.category = category;
   if (!Object.keys(changes).length) return true;
   try {
@@ -1638,21 +1655,23 @@ function applyAutocompleteSuggestion(container, el) {
   const catSelect = container.querySelector('#item-cat-select');
   if (!nameInput) return;
 
+  // Was hier ins Kategoriefeld kommt, hat niemand gewaehlt (siehe reviveTickedItem).
+  quickAddCategoryChosen = false;
+
   // STEHT DER NAME ABGEHAKT AUF DIESER LISTE, MEINT DIE WAHL DIESE ZEILE (#1816).
   // Das Formular zeigt dann IHRE Werte, nicht die des juengsten Namensvetters
-  // auf irgendeiner Liste: was beim Absenden zurueckkommt, soll dastehen. Der
-  // Merker haengt am Feld und faellt mit dem naechsten getippten Zeichen.
+  // auf irgendeiner Liste: was beim Absenden zurueckkommt, soll dastehen. Ein
+  // Merker ist dafuer nicht noetig - das Absenden gleicht den Namen selbst ab,
+  // gewaehlt oder getippt.
   const ticked = tickedItemNamed(el.dataset.name);
   if (ticked) {
     nameInput.value = ticked.name;
-    nameInput.dataset.reviveId = String(ticked.id);
     if (catSelect && [...catSelect.options].some((o) => o.value === ticked.category)) {
       catSelect.value = ticked.category;
     }
     if (qtyInput && ticked.quantity) qtyInput.value = ticked.quantity;
     return;
   }
-  delete nameInput.dataset.reviveId;
 
   nameInput.value = el.dataset.name ?? '';
   if (catSelect && el.dataset.category
@@ -1673,8 +1692,6 @@ function wireAutocomplete(container) {
 
   input.addEventListener('input', () => {
     clearTimeout(autocompleteTimeout);
-    // Getippt heisst: nicht mehr die gewaehlte Zeile (siehe applyAutocompleteSuggestion).
-    delete input.dataset.reviveId;
     const q = input.value.trim();
     if (q.length < 1) { dropdown.hidden = true; return; }
 
@@ -1867,23 +1884,19 @@ function syncQuickAddDisclosure(container, open) {
  * @param {HTMLSelectElement} catSelect
  */
 function resetQuickAddCategory(catSelect) {
+  quickAddCategoryChosen = false;
   if ([...catSelect.options].some((o) => o.value === DEFAULT_CATEGORY_NAME)) {
     catSelect.value = DEFAULT_CATEGORY_NAME;
   }
 }
 
 /**
- * Die Zeile, die das Absenden zurueckholt - oder nichts. Dreifach gefragt,
- * weil zwischen Wahl und Absenden Zeit liegt: der Merker steht noch am Feld,
- * der Artikel ist noch abgehakt auf der offenen Liste, und der Name im Feld
- * ist noch seiner.
+ * Hat jemand die Kategorie im Eingabefeld GEWAEHLT? Das Feld zeigt immer einen
+ * Wert - den Standard, oder was ein Vorschlag hineingesetzt hat. Nur eine
+ * Wahl von Hand ist eine Aussage ueber den Artikel; sie faellt mit jedem
+ * Zuruecksetzen und jeder Uebernahme aus einem Vorschlag.
  */
-function reviveCandidate(nameInput, name) {
-  const id = Number(nameInput?.dataset?.reviveId);
-  if (!id) return undefined;
-  const item = state.items.find((i) => i.id === id);
-  return item && checkedOf(item) && sameName(item.name, name) ? item : undefined;
-}
+let quickAddCategoryChosen = false;
 
 function wireQuickAdd(container) {
   const form = container.querySelector('#quick-add-form');
@@ -1900,8 +1913,16 @@ function wireQuickAdd(container) {
     findPageFab('fab-new-item')?.focus();
   });
 
+  container.querySelector('#item-cat-select')?.addEventListener?.('change', () => { quickAddCategoryChosen = true; });
+
+  // EIN ABSENDEN ZUR ZEIT. Enter zweimal schnell hintereinander schickte sonst
+  // zweimal: das erste holt die abgehakte Zeile zurueck, das zweite findet sie
+  // schon offen und legt eine zweite an.
+  let submitting = false;
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (submitting) return;
     const nameInput = container.querySelector('#item-name-input');
     const qtyInput  = container.querySelector('#item-qty-input');
     const catSelect = container.querySelector('#item-cat-select');
@@ -1912,12 +1933,20 @@ function wireQuickAdd(container) {
 
     if (!name) { nameInput.focus(); return; }
 
+    submitting = true;
     try {
-      // Aus dem Vorschlag gewaehlt und noch immer abgehakt auf dieser Liste:
-      // die Zeile kommt zurueck (#1816). Jeder andere Name wird angelegt.
-      const revive = reviveCandidate(nameInput, name);
+      // Steht der Name abgehakt auf dieser Liste, kommt DIESE Zeile zurueck
+      // (#1816) - gewaehlt aus dem Vorschlag oder von Hand getippt, verglichen
+      // wie der Vorschlag sucht. Jeder andere Name wird angelegt.
+      const revive = tickedItemNamed(name);
       if (revive) {
-        if (!await reviveTickedItem(container, revive, { quantity, category })) return;
+        const back = await reviveTickedItem(container, revive, {
+          quantity, category: quickAddCategoryChosen ? category : undefined,
+        });
+        if (!back) return;
+        // Die Zeile taucht irgendwo in der Liste auf, nicht unter dem Feld:
+        // ein Satz sagt, was aus der Eingabe geworden ist.
+        window.yuvomi.showToast(t('shopping.itemBackToast', { name: revive.name }), 'info');
       } else {
         const data = await api.post(`/shopping/${state.activeListId}/items`, { name, quantity, category });
         acknowledgeOwnChange(data);
@@ -1927,7 +1956,6 @@ function wireQuickAdd(container) {
         updateListCounter(state.activeListId, 1, 0);
         renderTabs(container);
       }
-      delete nameInput.dataset.reviveId;
       nameInput.value = '';
       qtyInput.value  = '';
       resetQuickAddCategory(catSelect);
@@ -1938,6 +1966,8 @@ function wireQuickAdd(container) {
       nameInput.addEventListener('animationend', () => nameInput.classList.remove('quick-add__input--flash'), { once: true });
     } catch (err) {
       window.yuvomi.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+    } finally {
+      submitting = false;
     }
   });
 }
@@ -2016,8 +2046,11 @@ function announceItemMove(container, row) {
 
 /** Kategorien mit laufender Sicherung: Name -> { again: boolean }. */
 const orderRuns = new Map();
-/** Je Kategorie die abgehakten Artikel beim letzten Zug (#1816): sie stehen im
- *  Abschnitt am Listenende und gehoeren trotzdem in die Anfrage. */
+/** Je Kategorie ALLE ihre Artikel beim letzten Zug (#1816). Was davon nicht im
+ *  Traeger steht, haengt die Anfrage hinten an - das Abgehakte im Abschnitt am
+ *  Listenende, aber auch eine eben zurueckgeholte Zeile, die dort noch auf die
+ *  Pause wartet. Deshalb kein Filter auf den Haken: der Rest ist "nicht im
+ *  Traeger", nicht "abgehakt". */
 const tickedTails = new Map();
 
 /**
@@ -2092,11 +2125,10 @@ function persistItemOrder(groupEl, container, movedRow) {
   refreshHandleLabels(groupEl.querySelector('.row-carrier'));
   announceItemMove(container, movedRow);
 
-  // Der Rest der Kategorie wird JETZT gelesen, beim Zug, solange der Bestand
-  // zu dieser Liste gehoert - der Lauf selbst kann einen Listenwechsel
-  // ueberdauern.
+  // Die Kategorie wird JETZT gelesen, beim Zug, solange der Bestand zu dieser
+  // Liste gehoert - der Lauf selbst kann einen Listenwechsel ueberdauern.
   tickedTails.set(category, state.items
-    .filter((i) => categoryOf(i) === category && checkedOf(i))
+    .filter((i) => categoryOf(i) === category)
     .map((i) => i.id));
 
   const running = orderRuns.get(category);
@@ -2229,25 +2261,77 @@ function wireSwipeGestures(container) {
 // --------------------------------------------------------
 
 /**
- * Wie lange eine frisch angetippte Zeile stehen bleibt, bevor sie umzieht
- * (#1816). Lang genug, um den Haken zu sehen und einen Fehlgriff an derselben
- * Stelle zurueckzunehmen; kurz genug, dass die Liste beim Einkaufen sichtbar
- * kuerzer wird. Eine Zeit und keine Animation: sie gilt auch unter
- * reduzierter Bewegung - dort entfaellt nur das Zusammenklappen danach.
+ * DIE PAUSE (#1816, Entscheidung 2026-10-08): abgehakte Zeilen ziehen erst um,
+ * wenn man INNEHAELT - alle zusammen, nicht jede fuer sich.
+ *
+ * Mit einer Frist je Zeile (so stand es zuerst, 600 ms) verschob jede Zeile die
+ * Liste, waehrend der Finger schon zur naechsten unterwegs war: gemessen lag
+ * 750 ms nach dem ersten Haken die dritte Zeile dort, wo der Haken der zweiten
+ * gewesen war. Das ist der Sprung, den #276 abgeschafft hatte. Jetzt gibt es
+ * EINE Uhr: jeder eigene Haken (setzen wie zuruecknehmen) stellt sie fuer alle
+ * wartenden Zeilen neu, und erst wenn sie ablaeuft, ziehen sie gemeinsam um.
+ *
+ * DIE DAUER ist das Dreifache des laengsten Bewegungsschritts
+ * (`--duration-2xl`, 400 ms -> 1,2 s). Eine eigene Zeit gibt die Skala nicht
+ * her, und sie muss LAENGER sein als der Abstand zweier Haken beim Abarbeiten
+ * einer Liste, sonst ist sie keine Pause: 600 ms waren kuerzer als der Weg
+ * des Fingers zur naechsten Zeile, 1,2 s sind es nicht mehr, und die Liste
+ * wird trotzdem noch im selben Atemzug kuerzer. Eine Zeit und keine
+ * Animation: sie gilt auch unter reduzierter Bewegung - dort entfaellt nur das
+ * Gleiten danach.
  */
-const TICK_SETTLE_MS = 600;
-let TICK_SETTLE_MS_OVERRIDE = null; // nur fuer Tests, siehe __test unten
-/** Laufende Wartezeiten je Artikel: ein zweiter Tipp ersetzt die erste. */
-const placementTimers = new Map();
+const SETTLE_PAUSE_STEPS = 3;
+let SETTLE_PAUSE_MS_OVERRIDE = null; // nur fuer Tests, siehe __test unten
+function settlePauseMs() {
+  return SETTLE_PAUSE_MS_OVERRIDE ?? SETTLE_PAUSE_STEPS * durationToken('--duration-2xl', 400);
+}
 
-function schedulePlacement(container, id) {
-  clearTimeout(placementTimers.get(id));
-  placementTimers.set(id, setTimeout(() => {
-    placementTimers.delete(id);
-    // Die Seite kann in der Wartezeit verlassen worden sein.
-    if (container?.isConnected === false) return;
-    settleItemPlacement(container, id);
-  }, TICK_SETTLE_MS_OVERRIDE ?? TICK_SETTLE_MS));
+/**
+ * Wartende Zeilen: Id -> steht sie gerade im Abschnitt „Abgehakt"? Der Wert
+ * haelt fest, WO die Zeile wartet - `listSections` liest ihn, damit auch ein
+ * Neuaufbau der Liste (jemand fuegt einen Artikel hinzu) sie nicht vorzeitig
+ * umstellt.
+ */
+const heldRows = new Map();
+let settleTimer = null;
+let settleContainer = null;
+
+/** Eine Zeile wartet auf die Pause, und die Uhr beginnt fuer alle neu. */
+function holdPlacement(container, id, shownTicked) {
+  if (!heldRows.has(id)) heldRows.set(id, shownTicked);
+  clearTimeout(settleTimer);
+  settleContainer = container;
+  settleTimer = setTimeout(flushPlacements, settlePauseMs());
+}
+
+/**
+ * Ein Umzug, den nicht der eigene Finger ausgeloest hat (Live-Auffrischung,
+ * abgelehnter Schreibvorgang): sofort, solange hier niemand tippt - sonst
+ * reiht er sich in die laufende Pause ein, OHNE sie zu verlaengern.
+ */
+function placeOrHold(container, id) {
+  if (settleTimer == null) { settleItemPlacements(container, [id]); return; }
+  if (heldRows.has(id)) return;
+  const row = container?.querySelector?.('#items-list')?.querySelector?.(`.swipe-row[data-swipe-id="${id}"]`);
+  if (row) heldRows.set(id, Boolean(row.closest('.item-ticked')));
+}
+
+/** Die Pause ist um: alles, was gewartet hat, zieht zusammen um. */
+function flushPlacements() {
+  const container = settleContainer;
+  const ids = [...heldRows.keys()];
+  resetPlacementHold();
+  // Die Seite kann in der Wartezeit verlassen worden sein.
+  if (!container || container.isConnected === false) return;
+  settleItemPlacements(container, ids);
+}
+
+/** Die Pause verwerfen - beim Listenwechsel und beim Seitenaufbau. */
+function resetPlacementHold() {
+  clearTimeout(settleTimer);
+  settleTimer = null;
+  settleContainer = null;
+  heldRows.clear();
 }
 
 /** Zaehlstaende und Sichtbarkeit der Gruppen nach einem Umzug fortschreiben. */
@@ -2260,14 +2344,50 @@ function syncGroupChrome(listEl) {
   });
 }
 
+/** Steht das Element im Bild - weder selbst noch ueber einen Vorfahren `hidden`? */
+function shown(el) {
+  return Boolean(el) && !el.closest('[hidden]');
+}
+
 /**
- * Stellt die Zeile eines Artikels dorthin, wo ihr Haken sie zeigt (#1816):
- * abgehakt in den Abschnitt am Listenende, offen in ihre Kategorie.
+ * Wer den Fokus bekommt, wenn die Zeile mit dem Fokus umzieht: die naechste
+ * Zeile derselben ZONE, sonst die vorige. Die Zone der offenen Artikel ist die
+ * ganze Liste in Lesereihenfolge, ueber Kategoriegrenzen hinweg - wer die
+ * letzte Zeile von „Obst" abhakt, hakt bei „Milch" weiter und landet nicht am
+ * Listenende. Die Zone des Abschnitts „Abgehakt" sind seine Zeilen. Zeilen, die
+ * im selben Zug mit umziehen, zaehlen nicht.
+ */
+function focusSuccessor(listEl, row, moving) {
+  const zone = row.closest('.item-ticked')
+    ? Array.from(row.parentElement.querySelectorAll(':scope > .swipe-row'))
+    : Array.from(listEl.querySelectorAll('.item-category:not([hidden]) > .row-carrier:not([hidden]) > .swipe-row'));
+  const idx = zone.indexOf(row);
+  const stays = (r) => !moving.has(r);
+  const next = zone.slice(idx + 1).find(stays) ?? zone.slice(0, Math.max(idx, 0)).reverse().find(stays);
+  return next?.querySelector('button.item-check') ?? null;
+}
+
+/**
+ * Der Rueckfall, wenn die Zone leer ist: der Haken der umgezogenen Zeile
+ * selbst, dort wo sie jetzt steht; ist ihr Traeger zugeklappt, der Kopf ihrer
+ * Gruppe. Der Fokus faellt nie auf `body` - ein verschobener Knoten verliert
+ * ihn, und ein Kopf, der mit der letzten Zeile verschwindet, ist kein Ziel.
+ */
+function focusFallback(row) {
+  const own = row.querySelector('button.item-check');
+  if (shown(own)) return own;
+  const head = row.closest('.list-group')?.querySelector('.list-group__toggle');
+  return shown(head) ? head : null;
+}
+
+/**
+ * Stellt Zeilen dorthin, wo ihr Haken sie zeigt (#1816): abgehakt in den
+ * Abschnitt am Listenende, offen in ihre Kategorie.
  *
- * EIN ABGLEICH, KEINE BEWEGUNG "VON A NACH B": gefragt wird nur, wo die Zeile
+ * EIN ABGLEICH, KEINE BEWEGUNG "VON A NACH B": gefragt wird nur, wo eine Zeile
  * hingehoert, und steht sie dort schon, passiert nichts. Deshalb darf jeder
- * rufen, der den Haken geaendert hat - der eigene Tipp nach seiner Wartezeit,
- * eine Live-Auffrischung, das Zuruecksetzen nach einem Fehler -, in beliebiger
+ * rufen, der einen Haken geaendert hat - die abgelaufene Pause, eine
+ * Live-Auffrischung, das Zuruecksetzen nach einem Fehler -, in beliebiger
  * Reihenfolge und beliebig oft.
  *
  * DIE ZEILE WANDERT ALS KNOTEN. Ein Neuaufbau der Liste verwuerfe die
@@ -2276,14 +2396,15 @@ function syncGroupChrome(listEl) {
  * der Seite. Fehlt das Ziel (die Liste wurde anders gebaut als erwartet),
  * bleibt der Neuaufbau als Rueckfall.
  *
- * DER FOKUS BLEIBT IN DER LISTE: lag er in der Zeile, geht er auf den Haken der
- * naechsten (sonst der vorigen) - wer mit der Tastatur abhakt, hakt weiter ab.
- * Ist die Gruppe damit leer, nimmt ihn der Kopf des Abschnitts.
+ * ALLE ZUSAMMEN: die Zeilen klappen gleichzeitig zu und ziehen in EINEM
+ * Schritt um - die Liste rueckt einmal zusammen, nicht je Zeile.
+ *
+ * DER FOKUS BLEIBT IN DER LISTE, siehe `focusSuccessor` und `focusFallback`.
  */
-function settleItemPlacement(container, id, { animate = true } = {}) {
+function settleItemPlacements(container, ids, { animate = true } = {}) {
   const listEl = container?.querySelector?.('#items-list');
   if (!listEl?.querySelector) return;
-  const find = () => {
+  const locate = (id) => {
     const row  = listEl.querySelector(`.swipe-row[data-swipe-id="${id}"]`);
     const plan = placementOf(state.items, id);
     if (!row || !plan) return null;
@@ -2292,46 +2413,48 @@ function settleItemPlacement(container, id, { animate = true } = {}) {
       : Array.from(listEl.querySelectorAll('.item-category')).find((g) => g.dataset.category === plan.category);
     return { row, plan, to: groupEl?.querySelector('.row-carrier') ?? null };
   };
+  const due = () => ids.map(locate).filter((m) => m && m.to !== m.row.parentElement);
 
-  const first = find();
-  if (!first) return;
-  if (!first.to) { updateItemsList(container); return; }
-  if (first.to === first.row.parentElement) return;
+  const first = due();
+  if (!first.length) return;
+  if (first.some((m) => !m.to)) { updateItemsList(container); return; }
+  const leaving = first.map((m) => m.row);
 
   const move = () => {
-    // Neu gefragt: waehrend des Zusammenklappens kann der Haken zurueckgenommen
+    for (const row of leaving) {
+      row.getAnimations?.().forEach((anim) => anim.cancel());
+      row.style.overflow = '';
+    }
+    // Neu gefragt: waehrend des Zusammenklappens kann ein Haken zurueckgenommen
     // oder die Liste neu gebaut worden sein.
-    const now = find();
-    if (!now) return;
-    const { row, plan, to } = now;
-    row.getAnimations?.().forEach((anim) => anim.cancel());
-    row.style.overflow = '';
-    if (!to) { updateItemsList(container); return; }
-    const from = row.parentElement;
-    if (to === from) return;
+    const moves = due();
+    if (!moves.length) return;
+    if (moves.some((m) => !m.to)) { updateItemsList(container); return; }
 
-    const hadFocus = row.contains(document.activeElement);
-    const neighbour = row.nextElementSibling ?? row.previousElementSibling;
+    const moving  = new Set(moves.map((m) => m.row));
+    const focused = moves.find((m) => m.row.contains(document.activeElement))?.row ?? null;
+    // VOR dem Umzug gelesen: danach steht die Zeile in einer anderen Zone.
+    const successor = focused ? focusSuccessor(listEl, focused, moving) : null;
 
-    const before = plan.following
-      .map((nextId) => to.querySelector(`:scope > .swipe-row[data-swipe-id="${nextId}"]`))
-      .find(Boolean) ?? null;
-    to.insertBefore(row, before);
+    const carriers = new Set();
+    for (const { row, plan, to } of moves) {
+      carriers.add(row.parentElement).add(to);
+      const before = plan.following
+        .map((nextId) => to.querySelector(`:scope > .swipe-row[data-swipe-id="${nextId}"]`))
+        .find(Boolean) ?? null;
+      to.insertBefore(row, before);
+    }
 
     syncGroupChrome(listEl);
-    refreshHandleLabels(from);
-    refreshHandleLabels(to);
+    carriers.forEach((carrier) => refreshHandleLabels(carrier));
 
-    if (hadFocus) {
-      const next = neighbour?.querySelector('button.item-check')
-        ?? listEl.querySelector('.item-ticked:not([hidden]) [data-ticked-toggle]');
-      next?.focus({ preventScroll: true });
-    }
-    if (animate && !to.hidden) expandIn(row);
+    if (focused) (shown(successor) ? successor : focusFallback(focused))?.focus({ preventScroll: true });
+    if (animate) for (const { row, to } of moves) if (!to.hidden) expandIn(row);
   };
 
   // Aus einem zugeklappten Traeger gibt es nichts zusammenzuklappen.
-  if (animate && !first.row.parentElement.hidden) collapseOut(first.row).then(move);
+  const closing = animate ? leaving.filter((row) => !row.parentElement.hidden).map((row) => collapseOut(row)) : [];
+  if (closing.length) Promise.all(closing).then(move);
   else move();
 }
 
@@ -2339,7 +2462,7 @@ function settleItemPlacement(container, id, { animate = true } = {}) {
  * Aktualisiert nur die DOM-Zeile eines einzelnen Artikels (Checked-Status),
  * ohne die gesamte Liste neu aufzubauen - so bleibt die Scroll-Position des
  * Listen-Containers erhalten (Issue #276). Wohin die Zeile danach gehoert,
- * entscheidet `settleItemPlacement`.
+ * entscheidet `settleItemPlacements`.
  */
 function updateItemRow(container, item) {
   const row = container.querySelector(`.swipe-row[data-swipe-id="${item.id}"]`);
@@ -3380,6 +3503,8 @@ async function switchList(listId, container) {
   // neue nicht treffen (#1039).
   resetPillMachine();
   clearBulkPill();
+  // Die Pause gehoert den Zeilen der alten Liste (#1816).
+  resetPlacementHold();
   state.activeListId = listId;
   state.collapsedCategories = loadCollapsedCategories(state.currentUserId, listId);
   state.tickedOpen = loadTickedOpen(state.currentUserId, listId);
@@ -3438,10 +3563,11 @@ function acknowledgeOwnChange(response) {
  *
  * Zwei Faelle, und sie sind mit Absicht verschieden gross. Hat sich nur der
  * Abgehakt-Zustand bewegt - der haeufige Fall, zwei Leute im selben Laden -,
- * wird die Zeile an Ort und Stelle umgefaerbt, wie beim eigenen Antippen: kein
- * Neuaufbau, keine Einblend-Animation, die Scroll-Position bleibt (#276), und
- * die Reihenfolge auch - Abgehaktes sortiert sich beim naechsten Aufbau ans
- * Ende, nicht unter dem Finger weg. Ist ein Artikel dazugekommen, verschwunden,
+ * wird die Zeile umgefaerbt und als Knoten umgestellt, wie beim eigenen
+ * Antippen: kein Neuaufbau, keine Einblend-Animation, die Scroll-Position
+ * bleibt (#276). Abgehaktes zieht in den Abschnitt am Listenende (#1816) -
+ * sofort, solange hier niemand tippt, sonst mit der laufenden Pause
+ * (`placeOrHold`), nicht unter dem Finger weg. Ist ein Artikel dazugekommen, verschwunden,
  * umbenannt oder umsortiert, wird die Liste neu gebaut; das ist der Fall, den
  * die Animation meint. Umsortiert heisst: sein `sort_order` hat sich bewegt -
  * die Reihenfolge der ANTWORT allein nicht, denn die aendert sich schon mit
@@ -3548,9 +3674,10 @@ async function refreshFromFeed(container, listId, signal) {
   }
   for (const item of plan.changed) {
     updateItemRow(container, item);
-    // Fremdes Abhaken zieht die Zeile sofort um: die Wartezeit gehoert dem
-    // eigenen Tipp, der seine Quittung sehen soll.
-    settleItemPlacement(container, item.id);
+    // Fremdes Abhaken zieht die Zeile sofort um - solange hier niemand
+    // tippt. Laeuft eine eigene Pause, wartet es mit ihr: eine Zeile, die
+    // jemand anderes bewegt, verschiebt die Liste genauso unter dem Finger.
+    placeOrHold(container, item.id);
   }
   if (plan.changed.length) updateCheckedActions(container);
 }
@@ -4030,6 +4157,10 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // Ein Seitenaufbau ist immer ein neuer Batch fuer die Sammelaktions-Pille -
   // eine Frist der vorherigen Seite darf diese hier nicht treffen (#1039).
   resetPillMachine();
+  // Ebenso die Pause der wartenden Zeilen (#1816): sie faellt mit dem Aufbau
+  // und mit dem Verlassen der Seite.
+  resetPlacementHold();
+  routeSignal?.addEventListener?.('abort', resetPlacementHold, { once: true });
   // VOR dem Laden: die erste Laufnummern-Abfrage laeuft neben dem Laden der
   // Seite. Die Reihenfolge der beiden Antworten ist damit NICHT entschieden -
   // und muss es nicht sein: die Artikel-Antwort traegt ihre Laufnummer, und
@@ -4237,11 +4368,19 @@ export const __test = {
   tickedOpenStorageKey,
   toggleTickedSection,
   tickedItemNamed,
-  reviveCandidate,
   reviveTickedItem,
+  holdPlacement,
+  placeOrHold,
+  heldRows,
+  resetPlacementHold,
+  settleItemPlacements,
+  switchList,
+  setItemsListForTest: (listId) => { _itemsListId = listId; },
   wireQuickAdd,
+  wireAutocomplete,
   persistItemOrder,
-  setTickSettleMsForTest: (ms) => { TICK_SETTLE_MS_OVERRIDE = ms; },
+  setSettlePauseMsForTest: (ms) => { SETTLE_PAUSE_MS_OVERRIDE = ms; },
+  settlePauseMs,
   // Quick-Add-Kategorie-Rueckfall (#548, Review #1165): als eigene Funktion
   // exportiert, damit der Test das VERHALTEN treibt statt den Quelltext zu
   // durchsuchen - die Textprobe blieb auch gruen, wenn der Zweig tot war.

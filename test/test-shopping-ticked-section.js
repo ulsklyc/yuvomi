@@ -15,10 +15,9 @@
  * Vorschlag ueber das Absenden bis zur Anfrage, die hinausgeht.
  *
  * WAS HIER NICHT GEMESSEN WIRD: der Umzug des Knotens selbst
- * (`settleItemPlacement`: eine Zeile wechselt den Traeger, Zaehlstaende und
- * Fokus ziehen mit). Der Loader hat kein DOM mit Selektoren; ein Nachbau, der
- * genau die erwarteten Abfragen beantwortet, haette nur sich selbst geprueft.
- * Das ist im Browser angesehen.
+ * (`settleItemPlacements`: Zeilen wechseln den Traeger, Zaehlstaende und Fokus
+ * ziehen mit, die gemeinsame Pause). Der Loader hat kein DOM mit Selektoren;
+ * das faehrt test-shopping-ticked-browser.js mit der echten Seite in Chromium.
  *
  * Ausführen: npm run test:shopping-ticked-section
  */
@@ -30,7 +29,8 @@ globalThis.customElements = globalThis.customElements ?? { define() {}, get() {}
 
 const { installMiniDom } = await import('./mini-dom.js');
 installMiniDom();
-globalThis.window.yuvomi = { showToast() {}, ...globalThis.window.yuvomi };
+const toasts = [];
+globalThis.window.yuvomi = { ...globalThis.window.yuvomi, showToast: (text, kind) => { toasts.push([text, kind]); } };
 globalThis.document.getElementById = () => null;
 
 function makeMemoryStorage() {
@@ -63,13 +63,17 @@ function zustand(items, patch = {}) {
   shopping.resetPillMachine();
   // Keine Wartezeit vor dem Umzug: ohne Liste im Container tut er hier nichts,
   // aber die Suite soll nicht auf seine Uhr warten.
-  shopping.setTickSettleMsForTest(0);
+  shopping.setSettlePauseMsForTest(0);
+  shopping.resetPlacementHold();
+  toasts.length = 0;
   globalThis.localStorage.clear();
   Object.assign(shopping.state, {
     lists: [{ ...LISTE }], activeList: LISTE, activeListId: LISTE.id, items,
     categories: CATEGORIES, stores: [], currency: 'EUR', currentUserId: 7,
     listsError: null, itemsError: null, collapsedCategories: new Set(), tickedOpen: false,
   }, patch);
+  // Der Bestand gehoert der offenen Liste - das verlangt das Zurueckholen.
+  shopping.setItemsListForTest(shopping.state.activeListId);
 }
 
 const nullContainer = () => ({ querySelector: () => null, querySelectorAll: () => [], isConnected: true });
@@ -115,13 +119,17 @@ function gruppen(html) {
 // -------------------------------------------------------------------------
 
 test('listSections: Abgehaktes verlaesst seine Kategorie und steht in EINEM Abschnitt', () => {
+  // Der Quark (Milch) hat die KLEINERE Id und den kleineren Rang als die Birne
+  // (Obst), und steht im Bestand vor ihr: nur die Kategorieposition stellt die
+  // Birne nach vorn.
   zustand([
-    item(1, 'Apfel', 'Obst'), item(2, 'Birne', 'Obst', { is_checked: 1 }),
-    item(3, 'Quark', 'Milch', { is_checked: 1 }), item(4, 'Butter', 'Milch'),
+    item(2, 'Quark', 'Milch', { is_checked: 1, sort_order: 1 }), item(4, 'Butter', 'Milch'),
+    item(1, 'Apfel', 'Obst'), item(3, 'Birne', 'Obst', { is_checked: 1, sort_order: 9 }),
+    item(5, 'Kiwi', 'Obst', { is_checked: 1, sort_order: 2 }),
   ]);
   const { groups, ticked } = shopping.listSections(shopping.state.items);
   assert.deepEqual(groups.map(([cat, members]) => [cat, members.map((i) => i.id)]), [['Obst', [1]], ['Milch', [4]]]);
-  assert.deepEqual(ticked.map((i) => i.id), [2, 3], 'in Gang-Reihenfolge der Kategorien');
+  assert.deepEqual(ticked.map((i) => i.id), [5, 3, 2], 'erst die Kategorie in Gang-Reihenfolge, darin der Rang');
 });
 
 test('listSections: eine Kategorie ohne offenen Artikel bleibt stehen - ihr Traeger wird fuer den Rueckweg gebraucht', () => {
@@ -255,11 +263,15 @@ test('toggleTickedSection: klappt auf, meldet es am Knopf und merkt es sich; der
 // Umsortieren: die Route verlangt die GANZE Kategorie
 // -------------------------------------------------------------------------
 
-test('Umsortieren nennt auch die abgehakten Artikel der Kategorie, die nicht mehr in ihrem Traeger stehen', async () => {
+test('Umsortieren nennt jeden Artikel der Kategorie, der nicht in ihrem Traeger steht - abgehakt oder noch unterwegs', async () => {
   zustand([
     item(1, 'Apfel', 'Obst'), item(3, 'Kiwi', 'Obst'),
     item(2, 'Birne', 'Obst', { is_checked: 1 }), item(9, 'Quark', 'Milch', { is_checked: 1 }),
+    // Eben zurueckgeholt (die Absicht sagt "offen"), die Zeile wartet aber noch
+    // im Abschnitt auf die Pause: weder im Traeger noch abgehakt.
+    item(6, 'Mango', 'Obst', { is_checked: 1 }),
   ]);
+  shopping.intents.set(6, { value: 0, seq: 1, listId: 5, delta: -1 });
   // Der Traeger von Obst nach dem Zug: Kiwi vor Apfel. Die Birne steht im Abschnitt.
   const zeile = (id) => ({ dataset: { swipeId: String(id) }, querySelector: () => null });
   const rowsEl = {
@@ -273,21 +285,94 @@ test('Umsortieren nennt auch die abgehakten Artikel der Kategorie, die nicht meh
   }, { 'PATCH /shopping/5/items/reorder': { data: shopping.state.items } });
 
   assert.equal(liste.length, 1);
-  assert.deepEqual(liste[0].body, { category: 'Obst', order: [3, 1, 2] },
-    'ohne die Birne antwortet die Route mit 400 ("order muss alle Artikel der Kategorie enthalten")');
+  assert.deepEqual(liste[0].body, { category: 'Obst', order: [3, 1, 2, 6] },
+    'ohne Birne ODER Mango antwortet die Route mit 400 ("order muss alle Artikel der Kategorie enthalten")');
 });
 
 // -------------------------------------------------------------------------
-// Der Rueckweg ueber den Vorschlag
+// Wartende Zeilen
 // -------------------------------------------------------------------------
 
-function formular({ cat = 'Obst' } = {}) {
+test('Eine wartende Zeile steht in der Aufteilung dort, wo sie wartet - auch ueber einen Neuaufbau', async () => {
+  zustand([item(1, 'Apfel', 'Obst'), item(2, 'Birne', 'Obst')]);
+  shopping.setSettlePauseMsForTest(10_000);
+  await aufrufe(async () => {
+    await shopping.toggleShoppingItem(1, 0, nullContainer());
+  }, { 'PATCH /shopping/items/1': { data: null } });
+
+  assert.equal(shopping.checkedOf(shopping.state.items[0]), 1, 'der Haken ist gesetzt');
+  assert.deepEqual([...shopping.heldRows], [[1, false]], 'die Zeile wartet in ihrer Kategorie');
+  const [obst, abgehakt] = gruppen(shopping.renderItems());
+  assert.deepEqual(zeilenIds(obst.html), [1, 2], 'ein Neuaufbau in der Pause laesst sie stehen');
+  assert.deepEqual(zeilenIds(abgehakt.html), []);
+
+  shopping.resetPlacementHold();
+  const danach = gruppen(shopping.renderItems());
+  assert.deepEqual(zeilenIds(danach[0].html), [2]);
+  assert.deepEqual(zeilenIds(danach.at(-1).html), [1]);
+});
+
+test('Ein Listenwechsel verwirft die Pause der alten Liste', async () => {
+  zustand([item(1, 'Apfel', 'Obst')]);
+  shopping.setSettlePauseMsForTest(10_000);
+  await aufrufe(async () => {
+    await shopping.toggleShoppingItem(1, 0, nullContainer());
+    assert.equal(shopping.heldRows.size, 1);
+    await shopping.switchList(5, nullContainer());
+  }, { 'PATCH /shopping/items/1': { data: null } });
+  assert.equal(shopping.heldRows.size, 0);
+});
+
+test('Die Pause ist laenger als der Weg zur naechsten Zeile: das Dreifache des laengsten Bewegungsschritts', () => {
+  shopping.setSettlePauseMsForTest(null);
+  assert.equal(shopping.settlePauseMs(), 1200);
+});
+
+// -------------------------------------------------------------------------
+// Verdrahtung
+// -------------------------------------------------------------------------
+
+test('Der Klick auf den Kopf von "Abgehakt" ist verdrahtet - und bei `read` ebenso', async () => {
+  zustand([item(2, 'Birne', 'Obst', { is_checked: 1 })]);
   const listeners = {};
-  const name = {
-    value: '', dataset: {}, focus() {}, classList: { add() {}, remove() {} }, addEventListener() {},
+  const root = { dataset: {}, addEventListener(type, fn, opts) { if (!opts?.capture) (listeners[type] ??= []).push(fn); } };
+  shopping.wireListContentEvents({ querySelector: (sel) => (sel === '.shopping-page' ? root : null), querySelectorAll: () => [] });
+
+  const rowsEl = { hidden: true, style: {} };
+  const button = {
+    setAttribute() {},
+    closest: (sel) => (sel === '.list-group' ? { querySelector: (q) => (q === '.row-carrier' ? rowsEl : null) } : null),
+    querySelector: () => null,
   };
+  const klick = { target: { closest: (sel) => (sel === '[data-ticked-toggle]' ? button : null) } };
+  assert.equal(listeners.click?.length, 1, 'ein Klick-Verteiler haengt an der Seite');
+  await listeners.click[0](klick);
+  assert.equal(shopping.state.tickedOpen, true);
+  assert.equal(rowsEl.hidden, false);
+});
+
+test('Der Klappzustand wird beim Listenwechsel geladen', async () => {
+  zustand([]);
+  shopping.saveTickedOpen(7, 6, true);
+  await aufrufe(() => shopping.switchList(6, nullContainer()));
+  assert.equal(shopping.state.tickedOpen, true, 'Liste 6 war offen gemerkt');
+  await aufrufe(() => shopping.switchList(5, nullContainer()));
+  assert.equal(shopping.state.tickedOpen, false, 'Liste 5 nicht');
+});
+
+// -------------------------------------------------------------------------
+// Der Rueckweg: gewaehlt oder getippt
+// -------------------------------------------------------------------------
+
+function formular({ cat = 'Sonstiges', options = [...CATEGORIES.map((c) => c.name), 'Sonstiges'] } = {}) {
+  const listeners = {};
+  const catListeners = {};
+  const name = { value: '', focus() {}, classList: { add() {}, remove() {} }, addEventListener() {} };
   const qty = { value: '' };
-  const catSelect = { value: cat, options: CATEGORIES.map((c) => ({ value: c.name })) };
+  const catSelect = {
+    value: cat, options: options.map((value) => ({ value })),
+    addEventListener(type, fn) { catListeners[type] = fn; },
+  };
   const form = {
     addEventListener(type, fn) { (listeners[type] ??= []).push(fn); },
     querySelector: () => null,
@@ -297,27 +382,29 @@ function formular({ cat = 'Obst' } = {}) {
     name, qty, catSelect,
     container: { querySelector: (sel) => els[sel] ?? null, querySelectorAll: () => [], isConnected: true },
     absenden: () => Promise.all((listeners.submit ?? []).map((fn) => fn({ preventDefault() {} }))),
+    /** Die Kategorie von Hand waehlen, wie es das Feld meldet. */
+    waehleKategorie(value) { catSelect.value = value; catListeners.change?.(); },
   };
 }
 
-test('Vorschlag fuer einen abgehakten Artikel dieser Liste: das Formular zeigt SEINE Werte und merkt sich die Zeile', () => {
+const wege = (liste) => liste.map((a) => `${a.method} ${a.path}`);
+
+test('Vorschlag fuer einen abgehakten Artikel dieser Liste: das Formular zeigt SEINE Werte', () => {
   zustand([item(2, 'Karotten', 'Milch', { is_checked: 1, quantity: '1 kg' })]);
   const f = formular();
   // Der Vorschlag traegt die Werte des juengsten Namensvetters irgendeiner Liste.
   shopping.applyAutocompleteSuggestion(f.container, { dataset: { name: 'karotten', category: 'Obst', quantity: '500 g' } });
   assert.equal(f.name.value, 'Karotten');
-  assert.equal(f.name.dataset.reviveId, '2');
   assert.equal(f.catSelect.value, 'Milch');
   assert.equal(f.qty.value, '1 kg');
 });
 
-test('Vorschlag fuer einen Namen, der hier nicht abgehakt steht: wie bisher, ohne Merker', () => {
+test('Vorschlag fuer einen Namen, der hier nicht abgehakt steht: wie bisher', () => {
   zustand([item(2, 'Karotten', 'Obst')]); // offen, nicht abgehakt
   const f = formular({ cat: 'Milch' });
-  f.name.dataset.reviveId = '7'; // Rest einer frueheren Wahl
   shopping.applyAutocompleteSuggestion(f.container, { dataset: { name: 'Karotten', category: 'Obst', quantity: '500 g' } });
   assert.equal(f.name.value, 'Karotten');
-  assert.equal(f.name.dataset.reviveId, undefined);
+  assert.equal(f.catSelect.value, 'Obst');
   assert.equal(f.qty.value, '500 g');
 });
 
@@ -330,63 +417,213 @@ test('Absenden nach der Wahl: die abgehakte Zeile kommt zurueck, es entsteht KEI
 
   const liste = await aufrufe(() => f.absenden(), { 'PATCH /shopping/items/2': { data: null } });
 
-  assert.deepEqual(liste.map((a) => `${a.method} ${a.path}`), ['PATCH /shopping/items/2']);
+  assert.deepEqual(wege(liste), ['PATCH /shopping/items/2']);
   assert.deepEqual(liste[0].body, { is_checked: 0 });
   assert.equal(shopping.state.items.length, 1, 'eine Zeile dieses Namens, nicht zwei');
   assert.equal(shopping.checkedOf(shopping.state.items[0]), 0);
   assert.equal(shopping.state.lists[0].item_checked, 0, 'der Zaehler im Reiter folgt');
   assert.equal(shopping.state.lists[0].item_total, 1);
   assert.equal(f.name.value, '', 'das Feld ist frei fuer den naechsten Artikel');
-  assert.equal(f.name.dataset.reviveId, undefined);
+  assert.equal(shopping.heldRows.size, 0, 'das Zurueckholen wartet nicht auf die Pause');
 });
 
-test('Absenden nach der Wahl mit geaenderter Menge: der Haken faellt, dann folgt die Menge', async () => {
+test('Ein von Hand getippter Name wird ebenso abgeglichen - ohne Gross-/Kleinschreibung, getrimmt', async () => {
   zustand([item(2, 'Karotten', 'Obst', { is_checked: 1, quantity: '1 kg' })]);
   const f = formular();
   shopping.wireQuickAdd(f.container);
-  shopping.applyAutocompleteSuggestion(f.container, { dataset: { name: 'Karotten', category: 'Obst', quantity: '' } });
+  f.name.value = '  karOTTen ';
+
+  const liste = await aufrufe(() => f.absenden(), { 'PATCH /shopping/items/2': { data: null } });
+  assert.deepEqual(wege(liste), ['PATCH /shopping/items/2'], 'kein POST: es bleibt bei einer Zeile');
+  assert.deepEqual(liste[0].body, { is_checked: 0 }, 'leere Felder lassen die Werte der Zeile stehen');
+  assert.equal(shopping.state.items[0].quantity, '1 kg');
+});
+
+test('Die Rueckmeldung nennt den Artikel, mit seinem Namen von der Zeile und genau einmal maskiert', async () => {
+  zustand([item(2, 'Tee <grün> & Co', 'Obst', { is_checked: 1 })]);
+  const f = formular();
+  shopping.wireQuickAdd(f.container);
+  f.name.value = 'tee <grün> & co';
+  await aufrufe(() => f.absenden(), { 'PATCH /shopping/items/2': { data: null } });
+  // Der Loader-Stub von t() haengt die Parameter an den Schluessel. Der Toast
+  // setzt seinen Text ueber textContent (utils/toast-show.js): ein esc() hier
+  // stuende als "&lt;gruen&gt;" auf dem Schirm.
+  assert.deepEqual(toasts, [['shopping.itemBackToast{"name":"Tee <grün> & Co"}', 'info']]);
+});
+
+test('Getippte Menge ueberschreibt, eine NICHT gewaehlte Kategorie schreibt nichts', async () => {
+  zustand([item(2, 'Karotten', 'Milch', { is_checked: 1, quantity: '1 kg' })]);
+  const f = formular({ cat: 'Sonstiges' }); // das Feld zeigt seinen Standard
+  shopping.wireQuickAdd(f.container);
+  f.name.value = 'Karotten';
   f.qty.value = '2 kg';
 
   const liste = await aufrufe(() => f.absenden(), {
-    'PATCH /shopping/items/2': { data: item(2, 'Karotten', 'Obst', { is_checked: 0, quantity: '2 kg' }) },
+    'PATCH /shopping/items/2': { data: item(2, 'Karotten', 'Milch', { is_checked: 0, quantity: '2 kg' }) },
   });
-  assert.deepEqual(liste.map((a) => a.body), [{ is_checked: 0 }, { quantity: '2 kg' }]);
+  assert.deepEqual(liste.map((a) => a.body), [{ is_checked: 0 }, { quantity: '2 kg' }],
+    'die Kategorie "Sonstiges" hat niemand gewaehlt - die Zeile bleibt unter Milch');
+  assert.equal(shopping.state.items[0].category, 'Milch');
   assert.equal(shopping.state.items[0].quantity, '2 kg');
+});
+
+test('Eine Zeile mit einer Kategorie, die es in der Auswahl nicht gibt, wird nicht still umgeschrieben', async () => {
+  zustand([item(2, 'Karotten', 'Altbestand', { is_checked: 1 })]);
+  const f = formular({ cat: 'Sonstiges' });
+  shopping.wireQuickAdd(f.container);
+  // Die Wahl aus dem Vorschlag kann die Kategorie nicht ins Feld setzen.
+  shopping.applyAutocompleteSuggestion(f.container, { dataset: { name: 'Karotten', category: 'Altbestand', quantity: '' } });
+  assert.equal(f.catSelect.value, 'Sonstiges');
+
+  const liste = await aufrufe(() => f.absenden(), { 'PATCH /shopping/items/2': { data: null } });
+  assert.deepEqual(liste.map((a) => a.body), [{ is_checked: 0 }]);
+  assert.equal(shopping.state.items[0].category, 'Altbestand');
+});
+
+test('Eine von Hand GEWAEHLTE Kategorie wird geschrieben, und die Liste baut neu', async () => {
+  zustand([item(2, 'Karotten', 'Obst', { is_checked: 1 })]);
+  const f = formular();
+  shopping.wireQuickAdd(f.container);
+  shopping.applyAutocompleteSuggestion(f.container, { dataset: { name: 'Karotten', category: 'Obst', quantity: '' } });
+  f.waehleKategorie('Milch');
+
+  // Der Neuaufbau leert den Listen-Knoten und fuellt ihn neu - der Umzug einer
+  // einzelnen Zeile fragt ihn nur ab.
+  let neubau = 0;
+  const liste5 = {
+    dataset: {}, replaceChildren() { neubau += 1; }, insertAdjacentHTML() {},
+    querySelector: () => null, querySelectorAll: () => [], addEventListener() {},
+  };
+  const base = f.container.querySelector;
+  f.container.querySelector = (sel) => (sel === '#items-list' ? liste5 : base(sel));
+
+  const liste = await aufrufe(() => f.absenden(), {
+    // Die Antwort traegt einen ALTEN Haken (sie wurde vor dem ersten PATCH gelesen).
+    'PATCH /shopping/items/2': { data: item(2, 'Karotten', 'Milch', { is_checked: 1 }) },
+  });
+  assert.deepEqual(liste.map((a) => a.body), [{ is_checked: 0 }, { category: 'Milch' }]);
+  assert.equal(shopping.state.items[0].category, 'Milch');
+  assert.equal(shopping.state.items[0].is_checked, 0, 'die Antwort des zweiten PATCH dreht den bestaetigten Haken nicht zurueck');
+  assert.equal(neubau, 1, 'ein Kategoriewechsel gruppiert neu (updateItemsList), genau einmal');
+});
+
+test('Die Wahl der Kategorie gilt fuer EIN Absenden: danach ist das Feld wieder ungewaehlt', async () => {
+  zustand([item(2, 'Karotten', 'Obst', { is_checked: 1 }), item(3, 'Lauch', 'Obst', { is_checked: 1 })]);
+  const f = formular();
+  shopping.wireQuickAdd(f.container);
+  f.name.value = 'Karotten';
+  f.waehleKategorie('Milch');
+  await aufrufe(() => f.absenden(), { 'PATCH /shopping/items/2': { data: item(2, 'Karotten', 'Milch', { is_checked: 0 }) } });
+
+  f.name.value = 'Lauch';
+  f.catSelect.value = 'Milch'; // steht noch da, gewaehlt hat es fuer den Lauch niemand
+  const liste = await aufrufe(() => f.absenden(), { 'PATCH /shopping/items/3': { data: null } });
+  assert.deepEqual(liste.map((a) => a.body), [{ is_checked: 0 }]);
 });
 
 test('Ein Name, der nicht auf der Liste steht, wird wie bisher angelegt', async () => {
   zustand([item(2, 'Karotten', 'Obst', { is_checked: 1 })]);
   const f = formular();
   shopping.wireQuickAdd(f.container);
-  shopping.applyAutocompleteSuggestion(f.container, { dataset: { name: 'Lauch', category: 'Obst', quantity: '' } });
+  f.name.value = 'Karottensaft';
 
   const liste = await aufrufe(() => f.absenden(), {
-    'POST /shopping/5/items': { data: item(3, 'Lauch', 'Obst') },
+    'POST /shopping/5/items': { data: item(3, 'Karottensaft', 'Sonstiges') },
   });
-  assert.deepEqual(liste.map((a) => `${a.method} ${a.path}`), ['POST /shopping/5/items']);
+  assert.deepEqual(wege(liste), ['POST /shopping/5/items']);
   assert.deepEqual(shopping.state.items.map((i) => i.id), [2, 3]);
+  assert.deepEqual(toasts, []);
 });
 
-test('Der Merker gilt nur, solange Name und Haken noch stimmen', () => {
+test('Ein Name, der OFFEN auf der Liste steht, wird wie bisher ein zweites Mal angelegt', async () => {
+  zustand([item(2, 'Karotten', 'Obst')]);
+  const f = formular();
+  shopping.wireQuickAdd(f.container);
+  f.name.value = 'Karotten';
+  const liste = await aufrufe(() => f.absenden(), { 'POST /shopping/5/items': { data: item(3, 'Karotten', 'Sonstiges') } });
+  assert.deepEqual(wege(liste), ['POST /shopping/5/items']);
+});
+
+test('Waehrend eines Listenwechsels traegt der Bestand noch die alte Liste: der Name gilt als neu und geht an die OFFENE', async () => {
+  // state.items gehoert noch Liste 5, offen ist schon Liste 6 (switchList hat
+  // activeListId gesetzt, loadItems laeuft noch).
   zustand([item(2, 'Karotten', 'Obst', { is_checked: 1 })]);
-  const feld = { dataset: { reviveId: '2' } };
-  assert.equal(shopping.reviveCandidate(feld, 'karotten ')?.id, 2, 'Gross-/Kleinschreibung egal, wie der Vorschlag sucht');
-  assert.equal(shopping.reviveCandidate(feld, 'Karottensaft'), undefined, 'der Name im Feld ist ein anderer geworden');
-  assert.equal(shopping.reviveCandidate({ dataset: {} }, 'Karotten'), undefined, 'getippt, nicht gewaehlt');
-  // Jemand anderes hat die Zeile inzwischen zurueckgeholt.
-  shopping.state.items[0].is_checked = 0;
-  assert.equal(shopping.reviveCandidate(feld, 'Karotten'), undefined);
+  shopping.state.activeListId = 6;
+  assert.equal(shopping.tickedItemNamed('Karotten'), undefined);
+
+  const f = formular();
+  shopping.wireQuickAdd(f.container);
+  f.name.value = 'Karotten';
+  const liste = await aufrufe(() => f.absenden(), {
+    'POST /shopping/6/items': { data: item(9, 'Karotten', 'Sonstiges', { list_id: 6 }) },
+  });
+  assert.deepEqual(wege(liste), ['POST /shopping/6/items'], 'kein PATCH auf einen Artikel der verlassenen Liste');
+  assert.equal(shopping.checkedOf(shopping.state.items.find((i) => i.id === 2)), 1, 'der alte bleibt abgehakt');
 });
 
-test('Scheitert das Zurueckholen, bleibt das Formular stehen und nichts wird angelegt', async () => {
+test('Zweimal Enter: das zweite Absenden wartet nicht hinter dem ersten her, es faellt', async () => {
   zustand([item(2, 'Karotten', 'Obst', { is_checked: 1 })]);
   const f = formular();
   shopping.wireQuickAdd(f.container);
-  shopping.applyAutocompleteSuggestion(f.container, { dataset: { name: 'Karotten', category: 'Obst', quantity: '' } });
+  f.name.value = 'Karotten';
+
+  const liste = await aufrufe(async () => {
+    const erstes = f.absenden();
+    const zweites = f.absenden(); // der PATCH des ersten ist noch unterwegs
+    await Promise.all([erstes, zweites]);
+  }, {
+    'PATCH /shopping/items/2': { data: null },
+    'POST /shopping/5/items': { data: item(3, 'Karotten', 'Sonstiges') },
+  });
+  assert.deepEqual(wege(liste), ['PATCH /shopping/items/2'], 'PATCH + POST waeren zwei offene Zeilen');
+  assert.equal(shopping.state.items.length, 1);
+});
+
+test('Scheitert das Zurueckholen, bleibt das Formular stehen, nichts wird angelegt, und das naechste Absenden geht wieder', async () => {
+  zustand([item(2, 'Karotten', 'Obst', { is_checked: 1 })]);
+  const f = formular();
+  shopping.wireQuickAdd(f.container);
+  f.name.value = 'Karotten';
 
   const fehler = Object.assign(new Error('403'), { data: { error: 'Nein.' } });
   const liste = await aufrufe(() => f.absenden(), { 'PATCH /shopping/items/2': fehler });
   assert.deepEqual(liste.map((a) => a.method), ['PATCH']);
   assert.equal(shopping.checkedOf(shopping.state.items[0]), 1, 'der Haken steht wieder');
   assert.equal(f.name.value, 'Karotten', 'die Eingabe geht nicht verloren');
+  assert.deepEqual(toasts, [['Nein.', 'danger']], 'keine Erfolgsmeldung');
+
+  const nochmal = await aufrufe(() => f.absenden(), { 'PATCH /shopping/items/2': { data: null } });
+  assert.deepEqual(wege(nochmal), ['PATCH /shopping/items/2'], 'die Sperre faellt auch nach einem Fehlschlag');
+});
+
+// -------------------------------------------------------------------------
+// Das Dropdown
+// -------------------------------------------------------------------------
+
+test('Das Dropdown markiert Namen, die abgehakt auf der offenen Liste stehen - und nur die', async () => {
+  zustand([item(2, 'Karotten', 'Obst', { is_checked: 1 }), item(3, 'Kartoffeln', 'Obst')]);
+  const listeners = {};
+  let html = '';
+  const input = { value: 'kar', addEventListener(type, fn) { listeners[type] = fn; } };
+  const dropdown = {
+    hidden: true,
+    replaceChildren() { html = ''; },
+    insertAdjacentHTML(_pos, markup) { html += markup; },
+    querySelectorAll: () => [],
+  };
+  const els = { '#item-name-input': input, '#autocomplete-dropdown': dropdown };
+  shopping.wireAutocomplete({ querySelector: (sel) => els[sel] ?? null });
+
+  await aufrufe(async () => {
+    listeners.input();
+    await new Promise((r) => setTimeout(r, 260)); // die Entprellung der Abfrage
+  }, { 'GET /shopping/suggestions?q=kar': { data: [
+    { name: 'Karotten', category: 'Obst', quantity: null },
+    { name: 'Kartoffeln', category: 'Obst', quantity: null },
+  ] } });
+
+  const zeilen = html.split('<div class="autocomplete-item"').slice(1);
+  assert.equal(zeilen.length, 2);
+  assert.match(zeilen[0], /data-name="Karotten"[\s\S]*autocomplete-item__state">shopping\.itemStateChecked</);
+  assert.doesNotMatch(zeilen[1], /autocomplete-item__state/, 'Kartoffeln stehen offen auf der Liste');
 });

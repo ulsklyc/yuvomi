@@ -839,6 +839,7 @@
         "duplicateError": "Не удалось дублировать список.",
         "itemStateChecked": "отмечено",
         "tickedSection": "Отмечено",
+        "itemBackToast": "«{{name}}» снова в списке.",
         "itemStateOpen": "не отмечено"
     },
     "meals": {

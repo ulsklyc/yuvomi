@@ -780,6 +780,7 @@
         "duplicateError": "Seznam se nepodařilo duplikovat.",
         "itemStateChecked": "odškrtnuto",
         "tickedSection": "Odškrtnuto",
+        "itemBackToast": "Položka „{{name}}“ je zpět na seznamu.",
         "itemStateOpen": "neodškrtnuto"
     },
     "meals": {

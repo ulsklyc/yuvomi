@@ -721,6 +721,7 @@
         "duplicateError": "Không thể nhân bản danh sách.",
         "itemStateChecked": "đã đánh dấu",
         "tickedSection": "Đã đánh dấu",
+        "itemBackToast": "“{{name}}” đã trở lại danh sách.",
         "itemStateOpen": "chưa đánh dấu"
     },
     "meals": {

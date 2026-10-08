@@ -721,6 +721,7 @@
         "duplicateError": "सूची डुप्लीकेट नहीं की जा सकी।",
         "itemStateChecked": "टिक किया गया",
         "tickedSection": "टिक किए गए",
+        "itemBackToast": "“{{name}}” फिर से सूची में है।",
         "itemStateOpen": "टिक नहीं किया गया"
     },
     "meals": {

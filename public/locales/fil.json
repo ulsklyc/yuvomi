@@ -735,6 +735,7 @@
         "duplicateError": "Hindi ma-duplicate ang listahan.",
         "itemStateChecked": "naka-check",
         "tickedSection": "Mga naka-check",
+        "itemBackToast": "Nasa listahan na ulit ang \"{{name}}\".",
         "itemStateOpen": "hindi pa naka-check"
     },
     "meals": {

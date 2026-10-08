@@ -721,6 +721,7 @@
         "duplicateError": "A listát nem sikerult duplikálni.",
         "itemStateChecked": "kipipálva",
         "tickedSection": "Kipipálva",
+        "itemBackToast": "„{{name}}” újra a listán van.",
         "itemStateOpen": "nincs kipipálva"
     },
     "meals": {

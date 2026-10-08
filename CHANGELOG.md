@@ -12,13 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Payment reminders can be turned off for each subscription** (#1708, from D#1226). Turn off the reminder
   in the subscription dialog while keeping the subscription active and its cost in the budget.
   Editing or renewing it keeps the reminder off. Existing subscriptions keep reminders enabled.
-- **Ticked shopping items collect in one section at the end of the list** (#1816, from D#1624).
-  Ticking an item moves it out of its category into "Ticked off", a collapsed section at the
+- **Checked-off shopping items collect in one section at the end of the list** (#1816, from D#1624).
+  Ticking an item moves it out of its category into "Checked off", a collapsed section at the
   bottom that shows how many items it holds. The items stay on the list, and the list above gets
-  shorter as you shop. Whether the section is open is remembered per person and per list.
-  Picking a suggestion that is ticked off on the open list brings that row back with its amount
-  and category instead of adding a second one - the dropdown marks those names. A name that is
-  not on the list is added as before.
+  shorter as you shop. Nothing moves while you are still ticking: the rows wait until you pause
+  for a moment and then move together. Whether the section is open is remembered per person and
+  per list. Adding a name that is checked off on the open list - picked from the suggestions or
+  typed - brings that row back instead of adding a second one, and a short note says so; an
+  amount you typed replaces the row's, an empty field keeps it. A name that is not checked off
+  on the list is added as before.
 
 ### Changed
 

@@ -721,6 +721,7 @@
         "duplicateError": "No se pudo duplicar la lista.",
         "itemStateChecked": "marcado",
         "tickedSection": "Marcados",
+        "itemBackToast": "«{{name}}» vuelve a estar en la lista.",
         "itemStateOpen": "sin marcar"
     },
     "meals": {

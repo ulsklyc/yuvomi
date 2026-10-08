@@ -650,6 +650,18 @@
   display: none;
 }
 
+/* DER KOPF VON „ABGEHAKT" IST EIN VOLLES ZIEL (#1816, DESIGN.md: --target-base).
+ * Der geteilte Gruppenkopf ist so hoch wie seine Schrift, 24px, und im engen
+ * Rhythmus dieser Seite (12px darueber, 4px darunter) ist kein Platz, die
+ * Treffflaeche unsichtbar zu vergroessern, ohne in die Zeilen der Nachbarn zu
+ * reichen - ein Tipp an den Rand einer Zeile klappte dann eine Gruppe zu.
+ * Dieser Kopf waechst deshalb selbst. Der Raum, den er dabei gewinnt, steht
+ * ueber ihm: der Abschnitt ist keine weitere Kategorie, sondern das Ende der
+ * Liste, und rueckt von ihr ab. */
+.shopping-page .item-ticked .list-group__toggle {
+  min-height: var(--target-base);
+}
+
 /* ZWEI SPALTEN AM DESKTOP (Re-Critique 2026-09-27, A4 P1 / R10 L4).
  *
  * Gemessen bei 1440x900: die Liste stand auf dem Lesemass 252-972, rechts
