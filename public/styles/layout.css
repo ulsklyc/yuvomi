@@ -7175,20 +7175,32 @@ input[type="number"]::-webkit-outer-spin-button {
  *   Schrift  sekundaer. Der Wert bleibt lesbar - das ist der Grund, ein Feld
  *            zu sperren statt es zu entfernen: gemessen 6,19:1 hell und
  *            6,66:1 dunkel im Dialog, und nicht unter 4,5:1 auf einem der
- *            Gruende, auf denen Felder stehen. Der Platzhalter bleibt
- *            tertiaer, ein gesperrter Wert ist also kein Platzhalter.
+ *            Gruende, auf denen Felder stehen.
+ *   Platzhalter  keiner. Er ist tertiaer, und sekundaer gegen tertiaer sind
+ *            1,10:1 (hell) / 1,14:1 (dunkel) - das sieht niemand. Ein leeres
+ *            gesperrtes Anteilsfeld des Ausgleichs zeigte so ein graues "30",
+ *            das sich wie ein gesperrter WERT 30 las. Ein Platzhalter ist
+ *            eine Eingabehilfe, und einzugeben gibt es hier nichts: was in
+ *            einem gesperrten Feld steht, ist immer sein Wert.
+ *   Zeichen  eine gesperrte Auswahl legt ihren Pfeil ab (--field-chevron).
+ *            Er ist ein Bild, das die Regel nicht umfaerben kann, und ohne
+ *            Chromes Deckung stuende er in voller Staerke da - das eine
+ *            Merkmal "laesst sich oeffnen" an einem Feld, das es nicht tut.
  *
  * `-webkit-text-fill-color` und `opacity` nehmen WebKit seine eigene
  * Daempfung: Safari faerbt gesperrte Felder ueber die Fuellfarbe und senkt am
  * iPhone die Deckung zusaetzlich - beides laege UNTER der Rechnung hier.
  *
- * Hover und Fokus braucht die Regel nicht abzuschalten: ein gesperrtes Feld
- * nimmt keinen Fokus, und die Feldhaut hat keinen Hover.
+ * Die Feldhaut hat keinen Hover. FOKUS braucht die Regel nicht abzuschalten,
+ * auch nicht fuer ein Feld, das IM Fokus gesperrt wird (Login sperrt das
+ * Passwortfeld bei Enter, Einstellungen die gerade geaenderte Auswahl): in
+ * Chrome gemessen verliert es den Fokus mit dem naechsten Frame -
+ * `document.activeElement` wird `body`, `:focus` passt nicht mehr,
+ * Akzentkante und Ring (glass.css) fallen weg. In Safari nicht gemessen.
  *
  * WER SCHON ETWAS EIGENES SAGT: die randlose Auswahl der Formularzeile
  * (`.form-row__control > select`, weiter unten) hat weder Kante noch Flaeche
- * und steht in Ruhe schon sekundaer - sie nimmt gesperrt tertiaer und legt ihr
- * Zeichen ab. Schalter und Knoepfe tragen keinen Wert und dimmen weiter ueber
+ * und steht in Ruhe schon sekundaer - sie nimmt gesperrt tertiaer. Schalter und Knoepfe tragen keinen Wert und dimmen weiter ueber
  * die Deckung. `readonly` ist KEIN gesperrtes Feld (kopierbar, fokussierbar)
  * und bleibt unberuehrt.
  * Guard: test-frontend-audit.js, "ein gesperrtes Feld sieht gesperrt aus". */
@@ -7200,6 +7212,19 @@ input[type="number"]::-webkit-outer-spin-button {
   -webkit-text-fill-color: currentColor;
   opacity: 1;
   cursor: not-allowed;
+}
+
+.input:disabled::placeholder,
+.form-input:disabled::placeholder {
+  color: transparent;
+}
+
+/* Dieselbe Kette wie an der Regel, die das Zeichen setzt - sonst gewinnt
+ * deren Spezifitaet und der Pfeil bleibt stehen. Das Polster bleibt, das Feld
+ * springt also nicht. */
+select.input:not([multiple]):not([size]):disabled,
+select.form-input:not([multiple]):not([size]):disabled {
+  background-image: none;
 }
 
 /* Mehr Kontrast: die Kartenkante auf blankem Grund waere dort fast nichts
@@ -7596,19 +7621,24 @@ textarea::placeholder {
   color: var(--color-text-primary);
 }
 
-/* Gesperrt legt die randlose Auswahl ihr ZEICHEN ab. Sie hat weder Kante noch
- * Flaeche, an denen die allgemeine Regel (`.form-input:disabled`, oben) etwas
- * zuruecknehmen koennte, und ihr Wert steht in Ruhe schon sekundaer: die eine
- * Stufe auf tertiaer (hell #63615B zu #6B675F) sieht niemand. Was sie bis
- * 2026-10-08 sichtbar daempfte, war Chromes eigene `opacity: 0.7` an
- * `select:disabled` - eine Browser-Vorgabe, die den Wert hell auf rund 3:1
- * drueckte und die die allgemeine Regel jetzt aufhebt. Das Zeichen ist laut
- * dem Kommentar oben das Erkennungsmerkmal "bedienbar"; faellt es weg, bleibt
- * ein Wert am Zeilenende, der sich liest und nicht oeffnen laesst. Das Polster
- * bleibt, die Zeile springt also nicht. */
+/* Die randlose Auswahl hat weder Kante noch Flaeche, an denen die allgemeine
+ * Regel (`.form-input:disabled`, oben) etwas zuruecknehmen koennte, und ihr
+ * Wert steht in Ruhe schon sekundaer. Was sie bis 2026-10-08 sichtbar
+ * daempfte, war Chromes eigene `opacity: 0.7` an `select:disabled` - eine
+ * Browser-Vorgabe, die den Wert hell auf rund 3:1 drueckte und die die
+ * allgemeine Regel jetzt aufhebt. Ihr Zeichen legt sie wie jede gesperrte
+ * Auswahl ab (allgemeine Regel); es ist laut dem Kommentar oben ihr einziges
+ * Merkmal "bedienbar", und ohne es bleibt ein Wert am Zeilenende, der sich
+ * liest und nicht oeffnen laesst. HIER steht nur, was sie zusaetzlich braucht:
+ * die Stufe auf tertiaer (die eine Stufe allein sieht niemand - hell #63615B
+ * zu #6B675F -, sie begleitet das fehlende Zeichen) und der Zeiger, den ihre
+ * Ruheregel auf `pointer` stellt. Tertiaer ist die Farbe des Platzhalters;
+ * ein gesperrtes Feld zeigt aber keinen, die Verwechslung gibt es hier nicht.
+ * Die Einheiten-Auswahl im zusammengesetzten Feld (`.form-composite >
+ * select`, weiter unten) ist dieselbe randlose Auswahl und steht mit drin. */
 .form-row__control > select.form-input:disabled,
-.form-row__control > select.input:disabled {
-  background-image: none;
+.form-row__control > select.input:disabled,
+.form-composite > select.form-input:disabled {
   color: var(--color-text-tertiary);
   cursor: not-allowed;
 }
@@ -7666,8 +7696,10 @@ textarea::placeholder {
   color: var(--color-text-primary);
 }
 
-/* Gesperrt wie die randlose Auswahl darueber: eine Stufe leiser, und das
- * Zeichen dimmt der Datepicker selbst (`[disabled] .ydp__trigger`). */
+/* Gesperrt wie die randlose Auswahl darueber, aus demselben Grund: in Ruhe
+ * schon sekundaer, ohne Kante und Flaeche. Eine Stufe leiser, und das Zeichen
+ * dimmt der Datepicker selbst (`.ydp__trigger:disabled`). Tertiaer ist hier
+ * kein Platzhalter - der ist im gesperrten Feld unsichtbar. */
 .form-row__control > yuvomi-datepicker .ydp__input:disabled {
   color: var(--color-text-tertiary);
 }

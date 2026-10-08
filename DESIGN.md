@@ -2116,9 +2116,17 @@ nur das gerenderte Dokument sieht, ob eine Liste ueberhaupt verdrahtet ist.
   dem bedienbaren Element), der Wert steht in `--color-text-secondary` und bleibt lesbar
   (gemessen 6,19:1 hell, 6,66:1 dunkel im Dialog) - nie `--color-text-disabled`, nie ueber
   `opacity` (Deckung multipliziert den Kontrast herunter, wie bei `--color-surface-receded`).
-  Zeiger `not-allowed`. Unter `prefers-contrast: more` geht die Kante auf
-  `--color-text-secondary`. Die randlose Auswahl der Formularzeile hat weder Kante noch
-  Flaeche: sie nimmt Tertiaer und legt ihr Zeichen ab. Schalter und Knoepfe tragen keinen
+  Die Regel hebt die Daempfung des Browsers ausdruecklich auf (`opacity: 1` gegen Chromes
+  0,7 an `select:disabled`, `-webkit-text-fill-color: currentColor` gegen WebKits
+  Fuellfarbe), sonst gilt der gerechnete Kontrast nicht. Zeiger `not-allowed`. **Kein
+  Platzhalter:** `:disabled::placeholder` ist `transparent` - sekundaer gegen tertiaer sind
+  1,10 / 1,14:1, ein leeres gesperrtes Feld laese sich sonst als gefuelltes. **Kein
+  Zeichen:** JEDE gesperrte Auswahl legt `--field-chevron` ab (das Bild laesst sich nicht
+  umfaerben); der Kalenderknopf des Datepickers dimmt ueber `.ydp__trigger:disabled`, also
+  auch im gesperrten `fieldset`. Unter `prefers-contrast: more` geht die Kante auf
+  `--color-text-secondary`. Die randlosen Auswahlen (Formularzeile, Einheit im
+  zusammengesetzten Feld) haben weder Kante noch Flaeche und stehen in Ruhe schon
+  sekundaer: sie nehmen zusaetzlich Tertiaer. Schalter und Knoepfe tragen keinen
   Wert und dimmen weiter ueber die Deckung. `readonly` ist kein gesperrtes Feld und sieht
   aus wie ein bedienbares (Ausnahme: `.input--fixed`, der von der Einladung vorgegebene Wert).
 - **Feldkanon:** ein `select` traegt `appearance: none` und sein eigenes Zeichen

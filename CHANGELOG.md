@@ -172,9 +172,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   did. Text, number and date fields, dropdowns and text areas now all show it the same way,
   everywhere in the app: the fill goes, the outline turns quiet and the value steps back to grey
   while staying easy to read. Settings and the reminder section used to fade such fields, which
-  made the value hard to read in light mode, and a locked date was close to invisible in dark
-  mode; both now follow the one look. A locked choice in a settings-style row drops its small
-  arrow, so it reads as a value rather than something to open.
+  made the value hard to read in light mode, and a locked date was close to invisible in both
+  modes; both now follow the one look. A locked dropdown drops its small arrow, so it reads as a
+  value rather than something to open, and a locked field no longer shows its example text: an
+  empty locked share in a split expense showed a grey "30" that looked like a value of 30. The
+  calendar button of a locked date also steps back when a whole group of fields is locked, not
+  only when the date itself is.
 - **A shopping list on the overview opens that list.** The shopping tile shows up to three lists,
   the most recently changed first, but tapping any of them opened the shopping page on its first
   list - tap "Drugstore" and you got "Weekly shop". Each row now opens its own list, by tap, click
