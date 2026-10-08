@@ -25,6 +25,13 @@ export function dashboardPaths() {
             schema: { type: 'array', items: { type: 'string' }, maxItems: 50 },
           },
           {
+            name: 'audience',
+            in: 'query',
+            required: false,
+            description: '`household` asks for the version for a shared surface (wall mode): every task and appointment slice then carries only what the whole household may see - tasks and appointments with visibility `all`, appointments from ICS subscriptions only from shared ones - whoever the caller is, creator and assignees included. `events_scope=mine` is ignored with it. The parameter only narrows the response, so it needs no scope of its own. Anything else means the personal version.',
+            schema: { type: 'string', enum: ['household'] },
+          },
+          {
             name: 'events_scope',
             in: 'query',
             required: false,

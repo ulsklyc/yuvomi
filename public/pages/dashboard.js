@@ -40,7 +40,7 @@ import {
   WIDGET_SIZE_PRESETS, WIDGET_SIZE_OPTIONS,
   COCKPIT_COVERED_WIDGETS,
   nearestPreset, sameWidgetConfig, suggestGridHoleFill, rowFillSpans,
-  dashboardQuery, dashboardQueryFiltersCounts,
+  dashboardQuery, dashboardQueryFiltersCounts, dashboardRequest,
 } from '/utils/dashboard-widgets.js';
 import { EVENT_LIMIT_STEPS, EVENT_LIMIT_DEFAULT, clampEventLimit } from '/utils/dashboard-event-limit.js';
 import {
@@ -6493,6 +6493,11 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // dann gibt es auch nichts zurueckzusetzen (#827).
   let followsDefault = true;
   const canPublish = user?.role === 'admin';
+  // Die Wand fragt die Haushaltsfassung der Uebersicht ab (#1817,
+  // `dashboardRequest`). JEDER Abruf dieser Seite geht hier durch - auch der
+  // stille Refresh, sonst stuende nach einer Viertelstunde wieder die
+  // persoenliche Fassung an der Wand.
+  const overviewRequest = (query) => dashboardRequest(query, { wall: wallMode });
   let isCustomizing = false;
   let currency     = 'EUR';
   let visibleMealTypes = MEAL_ORDER;
@@ -6504,7 +6509,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
   let lastLoadedAt = null;
   try {
     const [dashRes, weatherRes, prefsRes, remindersRes] = await Promise.all([
-      api.get(layoutHintQuery('/dashboard')),
+      api.get(overviewRequest(layoutHintQuery('/dashboard'))),
       api.get(`/weather?lang=${encodeURIComponent(getLocale())}`).catch(() => ({ data: null })),
       // Beim Start hat der Router dieselbe Antwort schon unterwegs und reicht
       // sie herein (utils/start-handoff.js) - sonst zwei `/preferences` je
@@ -6526,7 +6531,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
      * keine Zahl, und mit ihr als „gefiltert" holte der Router die Antwort bei
      * jedem Kaltstart ein zweites Mal (`dashboardQueryFiltersCounts`). */
     window.yuvomi?.primeModuleCountsFrom?.(dashRes, {
-      filtered: dashboardQueryFiltersCounts(layoutHintQuery('/dashboard')),
+      filtered: dashboardQueryFiltersCounts(overviewRequest(layoutHintQuery('/dashboard'))),
     });
     // Geburtstags-Termine tragen serverseitig einen sprachneutralen Titel
     // („Birthday: <Name>"); anhand von birthday_name in die aktive Sprache
@@ -6552,7 +6557,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
      * die ohne Optionen. */
     if (dashboardQuery(widgetConfig) !== layoutHintQuery('/dashboard')) {
       try {
-        const filtered = await api.get(dashboardQuery(widgetConfig));
+        const filtered = await api.get(overviewRequest(dashboardQuery(widgetConfig)));
         if (signal.aborted) return;
         localizeEventLists(filtered);
         data = filtered;
@@ -6661,7 +6666,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
   async function reloadIfQueryChanged(previousQuery) {
     if (dashboardQuery(widgetConfig) === previousQuery) return;
     try {
-      const fresh = await api.get(dashboardQuery(widgetConfig));
+      const fresh = await api.get(overviewRequest(dashboardQuery(widgetConfig)));
       localizeEventLists(fresh);
       fresh.cycle = data.cycle;
       fresh.schedule = data.schedule;
@@ -7373,7 +7378,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     if (isCustomizing || loadFailed || refreshInFlight) return;
     refreshInFlight = true;
     try {
-      const fresh = await api.get(dashboardQuery(widgetConfig));
+      const fresh = await api.get(overviewRequest(dashboardQuery(widgetConfig)));
       if (signal.aborted) return;
       localizeEventLists(fresh);
       // Der owner-only Zyklus-Slice reist unveraendert mit: /dashboard

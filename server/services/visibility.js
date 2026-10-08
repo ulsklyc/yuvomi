@@ -65,3 +65,33 @@ export function icsSubscriptionVisibleWhere(alias, bind = '?') {
     )
   )`;
 }
+
+/**
+ * WHERE-Fragmente fuer eine GETEILTE FLAECHE (die Wand, #1817).
+ *
+ * Die beiden Fragmente oben fragen „was darf DIESE PERSON sehen" - sie lassen
+ * durch, was die Person selbst angelegt hat oder was ihr zugewiesen ist. Eine
+ * Wand ist keine Person: sie haengt in der Kueche, und wer sie aus seiner
+ * Sitzung oeffnet, stellt nicht seinen Bildschirm an die Wand, sondern den des
+ * Haushalts. Dort gilt deshalb die engere Frage „was darf JEDER sehen", und sie
+ * hat keinen Betrachter - die Fragmente nehmen keinen Bind.
+ *
+ * Beide sind Teilmengen ihrer Geschwister oben: was hier durchgeht, saehe jeder
+ * Betrachter ohnehin. Die Fassung gibt also nie etwas frei.
+ *
+ * @param {string} alias Tabellen-Alias der Aufgaben/Termine
+ * @returns {string} SQL-Fragment (ohne fuehrendes AND, ohne Bind)
+ */
+export function householdVisibleWhere(alias) {
+  return `${alias}.visibility = 'all'`;
+}
+
+/** Wie `icsSubscriptionVisibleWhere`, ohne den Zweig „oder das Abo gehoert mir". */
+export function icsSubscriptionSharedWhere(alias) {
+  return `(
+    ${alias}.external_source <> 'ics'
+    OR ${alias}.subscription_id IN (
+      SELECT id FROM ics_subscriptions WHERE shared = 1
+    )
+  )`;
+}

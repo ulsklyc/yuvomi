@@ -11,7 +11,9 @@ import {
   SOURCE_CALENDAR_COLUMNS, SOURCE_CALENDAR_JOIN,
 } from './calendar-events.js';
 import { resolveEventRows } from './calendar-occurrence-overrides.js';
-import { icsSubscriptionVisibleWhere, visibilityWhere } from './visibility.js';
+import {
+  householdVisibleWhere, icsSubscriptionSharedWhere, icsSubscriptionVisibleWhere, visibilityWhere,
+} from './visibility.js';
 import { birthdaysSwitchedOff, notBirthdayEventSql } from './household-modules.js';
 import {
   householdTimeZone, localToUTC, shiftDateKey, storedToInstantMs, todayKey,
@@ -164,14 +166,38 @@ function birthdayFilter(d, wantsBirthdays) {
 }
 
 /**
+ * Wer liest: eine Person oder eine geteilte Flaeche (#1817).
+ *
+ * Ein Termin traegt ZWEI Sichtbarkeitsachsen, und beide gehoeren an jeden
+ * Leser: die Stufe der Zeile (`visibility`: all | assignees | private, dazu
+ * Urheber und Zugewiesene) und das ICS-Abo, aus dem er stammt (`shared`, sonst
+ * nur fuer den, der es angelegt hat). CalDAV- und Google-Kalender haben keine
+ * eigene Achse: ihre Termine tragen die Stufe der Zeile.
+ *
+ * Fuer eine Person gelten die Fragmente mit Betrachter. Fuer die Wand
+ * (`household`) gilt, was jeder sehen darf - Stufe `all` und geteiltes Abo -,
+ * ohne Betrachter: auch der Urheber eines privaten Termins sieht ihn dort
+ * nicht, weil nicht er hinsieht, sondern die Kueche.
+ */
+function eventAudience(userId, household) {
+  return household
+    ? { where: `${icsSubscriptionSharedWhere('e')}\n    AND ${householdVisibleWhere('e')}`, params: [] }
+    : {
+      where: `${icsSubscriptionVisibleWhere('e')}\n    AND ${visibilityWhere('e', 'event_assignments', 'event_id')}`,
+      params: [userId, userId, userId],
+    };
+}
+
+/**
  * Loads upcoming calendar rows for the dashboard, calendar route, and MCP.
  * windowDays defaults to the dashboard's 90 days; null keeps the future open.
  * Each series contributes at most limit eligible occurrences before merging.
  */
 export function getUpcomingEvents(d, {
   userId = null, limit = 5, windowDays = 90, fromToday = false, assignedTo = null,
-  includeBirthdays: wantsBirthdays = true, now = new Date(), keepEndedToday = 0,
+  includeBirthdays: wantsBirthdays = true, now = new Date(), keepEndedToday = 0, household = false,
 } = {}) {
+  const audience = eventAudience(userId, household);
   const { includeBirthdays, birthdaySql } = birthdayFilter(d, wantsBirthdays);
   const tz      = householdTimeZone(d);
   const nowDate = todayKey(d, now);
@@ -231,10 +257,9 @@ export function getUpcomingEvents(d, {
       OR
       (e.recurrence_rule IS NOT NULL AND DATE(e.start_datetime) <= ?)
     )
-    AND ${icsSubscriptionVisibleWhere('e')}
-    AND ${visibilityWhere('e', 'event_assignments', 'event_id')}${birthdaySql}
+    AND ${audience.where}${birthdaySql}
     ORDER BY e.start_datetime ASC
-  `).all(...singleParams, future, userId, userId, userId);
+  `).all(...singleParams, future, ...audience.params);
 
   const startInstant = (event) => storedToInstantMs(
     event.all_day ? event.start_datetime.slice(0, 10) : event.start_datetime,
@@ -365,8 +390,9 @@ export function getUpcomingEvents(d, {
  * @returns {object[]} aufgeloeste Zeilen, nach Beginn sortiert
  */
 export function getEventsOverlappingDays(d, {
-  userId = null, fromKey, days, assignedTo = null, includeBirthdays: wantsBirthdays = true, limit = 300,
+  userId = null, fromKey, days, assignedTo = null, includeBirthdays: wantsBirthdays = true, limit = 300, household = false,
 } = {}) {
+  const audience = eventAudience(userId, household);
   const { includeBirthdays, birthdaySql } = birthdayFilter(d, wantsBirthdays);
   const tz = householdTimeZone(d);
   const toKey = shiftDateKey(fromKey, days);          // exklusiv
@@ -406,10 +432,9 @@ export function getEventsOverlappingDays(d, {
       OR
       (e.recurrence_rule IS NOT NULL AND DATE(e.start_datetime) <= ?)
     )
-    AND ${icsSubscriptionVisibleWhere('e')}
-    AND ${visibilityWhere('e', 'event_assignments', 'event_id')}${birthdaySql}
+    AND ${audience.where}${birthdaySql}
     ORDER BY e.start_datetime ASC
-  `).all(sqlTo, sqlFrom, sqlTo, userId, userId, userId);
+  `).all(sqlTo, sqlFrom, sqlTo, ...audience.params);
 
   const isAllDay = (event) => Boolean(event.all_day) || !String(event.start_datetime).includes('T');
   const overlaps = (event) => {

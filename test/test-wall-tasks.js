@@ -18,6 +18,14 @@
  *           die der OFFENEN; und der Abstieg laeuft als Programm gegen eine
  *           Attrappe, deren Hoehe an der Zahl der Zeilen haengt.
  *
+ *        6. GETEILTE FLAECHE (`audience=household`): die ganze Antwort fuer die
+ *           Wand traegt nur, was der ganze Haushalt sehen darf - Aufgaben UND
+ *           Termine, beide Sichtbarkeitsachsen der Termine (Stufe der Zeile,
+ *           ICS-Abo), in jeder Scheibe, auch aus der Sitzung der Person, der
+ *           die Zeile gehoert. Ohne den Parameter bleibt die Antwort
+ *           persoenlich. Und die gebaute Wand zeigt davon an keiner Stelle
+ *           etwas.
+ *
  * Ausfuehren: npm run test:wall-tasks
  */
 import test, { mock } from 'node:test';
@@ -668,4 +676,141 @@ test('Nacht: die Aufgaben unter den Gesichtern senken sich mit, der Haken gibt s
   assert.deepEqual(nightColour('.wall-who__task-check'), ['var(--color-text-tertiary)'], 'der Haken am Titel traegt nachts kein Gruen');
   assert.deepEqual(nightColour('.wall-who__count--done'), ['var(--color-text-tertiary)'], 'der Haken am Gesicht auch nicht');
   assert.deepEqual(nightColour('.wall-who__task'), ['var(--color-text-secondary)'], 'der offene Titel geht eine Stufe zurueck');
+});
+
+// --------------------------------------------------------------------------
+// 6. Die Wand ist eine geteilte Flaeche: `audience=household`
+// --------------------------------------------------------------------------
+
+const { dashboardRequest } = await import('../public/utils/dashboard-widgets.js');
+const tzClient = await import('/utils/timezone.js');
+
+async function overview(userId, query = '') {
+  viewer = userId;
+  const res = await fetch(`${base}/${query}`);
+  assert.equal(res.status, 200);
+  return res.json();
+}
+
+function addEvent(title, { start = '2026-10-08T18:00', end = '2026-10-08T19:00', visibility = 'all', createdBy = ANNA, assignees = [], subscription = null } = {}) {
+  const id = Number(db.prepare(`
+    INSERT INTO calendar_events (title, start_datetime, end_datetime, all_day, visibility, created_by, subscription_id, external_source)
+    VALUES (?, ?, ?, 0, ?, ?, ?, ?)
+  `).run(title, start, end, visibility, createdBy, subscription, subscription ? 'ics' : 'local').lastInsertRowid);
+  for (const userId of assignees) db.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(id, userId);
+  return id;
+}
+function addSubscription(name, { shared, createdBy }) {
+  return Number(db.prepare('INSERT INTO ics_subscriptions (name, url, shared, created_by) VALUES (?, ?, ?, ?)')
+    .run(name, `https://example.invalid/${randomUUID()}.ics`, shared ? 1 : 0, createdBy).lastInsertRowid);
+}
+function seedSharedSurface() {
+  db.prepare('DELETE FROM calendar_events').run();
+  db.prepare('DELETE FROM ics_subscriptions').run();
+  addTask('Aufgabe fuer alle', BEN);
+  addTask('Aufgabe nur Zugewiesene', BEN, { visibility: 'assignees', createdBy: BEN });
+  addTask('Aufgabe privat', BEN, { visibility: 'private', createdBy: BEN });
+  addTask('Erledigt nur Zugewiesene', BEN, { visibility: 'assignees', createdBy: BEN, status: 'done' });
+  addEvent('Termin fuer alle', { assignees: [ANNA] });
+  addEvent('Termin nur Zugewiesene', { visibility: 'assignees', createdBy: BEN, assignees: [BEN] });
+  addEvent('Termin privat', { visibility: 'private', createdBy: BEN });
+  addEvent('Aus Bens eigenem Abo', { subscription: addSubscription('Bens Dienstplan', { shared: false, createdBy: BEN }), createdBy: BEN });
+  addEvent('Aus dem geteilten Abo', { subscription: addSubscription('Schulferien', { shared: true, createdBy: BEN }), createdBy: BEN });
+}
+const PRIVATE_TITLES = ['Aufgabe nur Zugewiesene', 'Aufgabe privat', 'Erledigt nur Zugewiesene',
+  'Termin nur Zugewiesene', 'Termin privat', 'Aus Bens eigenem Abo'];
+const eventTitles = (list) => (list ?? []).map((event) => event.title).sort();
+
+test('Geteilte Flaeche: ohne den Parameter bleibt die Uebersicht persoenlich', withClock(NOON_BERLIN, 'Europe/Berlin', async () => {
+  seedSharedSurface();
+  const mine = await overview(BEN);
+  assert.deepEqual(titles(mine.urgentTasks).sort(), ['Aufgabe fuer alle', 'Aufgabe nur Zugewiesene', 'Aufgabe privat']);
+  assert.deepEqual(eventTitles(mine.upcomingEvents),
+    ['Aus Bens eigenem Abo', 'Aus dem geteilten Abo', 'Termin fuer alle', 'Termin nur Zugewiesene', 'Termin privat']);
+  assert.equal(mine.openTaskCount, 3);
+  assert.equal(mine.tasksDoneToday, 1);
+}));
+
+test('Geteilte Flaeche: die Haushaltsfassung traegt in KEINER Scheibe etwas Eingeschraenktes - auch nicht fuer die Besitzerin', withClock(NOON_BERLIN, 'Europe/Berlin', async () => {
+  seedSharedSurface();
+  for (const who of [BEN, ANNA]) {
+    const wall = await overview(who, '?audience=household');
+    const label = who === BEN ? 'Sitzung des Besitzers' : 'Sitzung eines anderen Mitglieds';
+    assert.deepEqual(titles(wall.urgentTasks), ['Aufgabe fuer alle'], label);
+    assert.equal(wall.openTaskCount, 1, label);
+    assert.equal(wall.overdueTaskCount, 0, label);
+    assert.equal(wall.tasksDoneToday, 0, label);
+    assert.deepEqual(wall.memberTodayTasks, [{ user_id: BEN, open_count: 1 }], label);
+    assert.deepEqual(eventTitles(wall.upcomingEvents), ['Aus dem geteilten Abo', 'Termin fuer alle'], label);
+    assert.deepEqual(eventTitles(wall.weekEvents), ['Aus dem geteilten Abo', 'Termin fuer alle'], label);
+    assert.deepEqual(eventTitles(wall.familyEvents), ['Termin fuer alle'], `${label}: Ben ist an der Wand nicht ueber seinen Termin dran`);
+    const text = JSON.stringify([wall.urgentTasks, wall.upcomingEvents, wall.weekEvents, wall.familyEvents, wall.wallTasks]);
+    for (const title of PRIVATE_TITLES) assert.ok(!text.includes(title), `${label}: „${title}" reist nicht mit`);
+  }
+}));
+
+test('Geteilte Flaeche: beide Fassungen sagen jedem Mitglied dasselbe', withClock(NOON_BERLIN, 'Europe/Berlin', async () => {
+  seedSharedSurface();
+  const pick = (body) => [titles(body.urgentTasks), eventTitles(body.upcomingEvents), body.openTaskCount, body.wallTasks];
+  assert.deepEqual(pick(await overview(BEN, '?audience=household')), pick(await overview(CLEO, '?audience=household')));
+}));
+
+test('Geteilte Flaeche: „nur meine" gilt an der Wand nicht - sie ist niemandes', withClock(NOON_BERLIN, 'Europe/Berlin', async () => {
+  seedSharedSurface();
+  const personal = await overview(BEN, '?events_scope=mine');
+  assert.deepEqual(eventTitles(personal.upcomingEvents), ['Termin nur Zugewiesene'], 'Vorbedingung: persoenlich greift die Auswahl');
+  const wall = await overview(BEN, '?events_scope=mine&audience=household');
+  assert.deepEqual(eventTitles(wall.upcomingEvents), ['Aus dem geteilten Abo', 'Termin fuer alle']);
+}));
+
+test('Geteilte Flaeche: die gebaute Wand zeigt nichts davon, und wer nur darueber dran waere, steht nicht unter den Gesichtern', async () => {
+  let wall;
+  let personal;
+  await withClock(NOON_BERLIN, 'Europe/Berlin', async () => {
+    db.prepare('DELETE FROM calendar_events').run();
+    db.prepare('DELETE FROM ics_subscriptions').run();
+    // Ben ist NUR ueber Eingeschraenktes dran, Cleo ueber etwas fuer alle.
+    addTask('Geheime Aufgabe', BEN, { visibility: 'assignees', createdBy: BEN });
+    addEvent('Geheimer Termin', { visibility: 'assignees', createdBy: BEN, assignees: [BEN] });
+    addTask('Tisch decken', CLEO);
+    wall = await overview(BEN, '?audience=household');
+    personal = await overview(BEN);
+  })();
+  await onWall(() => {
+    mock.timers.enable({ apis: ['Date'], now: new Date(NOON_BERLIN) });
+    tzClient.setDisplayTimeZone('Europe/Berlin');
+    try {
+      const now = new Date();
+      const before = dash.renderWallSurface(personal, null, { now });
+      assert.ok(before.includes('Geheime Aufgabe') && before.includes('Geheimer Termin'),
+        'Reichweite: aus der persoenlichen Antwort gebaut, stuende beides an der Wand');
+      const html = dash.renderWallSurface(wall, null, { now });
+      assert.match(html, /Tisch decken/, 'Reichweite: die Wand ist gebaut und zeigt, was alle sehen duerfen');
+      assert.ok(!html.includes('Geheime Aufgabe'), 'die eingeschraenkte Aufgabe steht an keiner Stelle der Wand');
+      assert.ok(!html.includes('Geheimer Termin'), 'der eingeschraenkte Termin auch nicht');
+      const who = (/<section class="wall__who"[\s\S]*?<\/section>/.exec(html) || [''])[0];
+      assert.match(who, /Cleo/);
+      assert.ok(!who.includes('Ben'), 'wer nur ueber Eingeschraenktes dran waere, erscheint nicht unter den Gesichtern');
+    } finally {
+      tzClient.setDisplayTimeZone(null);
+      mock.timers.reset();
+    }
+  })();
+});
+
+test('Geteilte Flaeche: die Wand fragt die Haushaltsfassung ab, die Uebersicht nicht', async () => {
+  assert.equal(dashboardRequest('/dashboard', { wall: true }), '/dashboard?audience=household');
+  assert.equal(dashboardRequest('/dashboard?tasks_category=school', { wall: true }), '/dashboard?tasks_category=school&audience=household');
+  assert.equal(dashboardRequest('/dashboard?events_scope=mine', { wall: false }), '/dashboard?events_scope=mine');
+  assert.equal(dashboardRequest('/dashboard'), '/dashboard');
+  // JEDER Abruf der Seite geht durch diese eine Stelle - auch der stille
+  // Refresh, sonst stuende nach einer Viertelstunde wieder die persoenliche
+  // Fassung an der Wand.
+  const { readFileSync } = await import('node:fs');
+  const page = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
+  const calls = [...page.matchAll(/api\.get\(([^\n]*(?:dashboardQuery|layoutHintQuery)[^\n]*)/g)].map((m) => m[1]);
+  assert.ok(calls.length >= 4, `nur ${calls.length} Abrufe der Uebersicht gefunden - misst der Leser noch?`);
+  const bare = calls.filter((call) => !call.startsWith('overviewRequest('));
+  assert.deepEqual(bare, [], 'Abruf der Uebersicht an `overviewRequest` vorbei');
+  assert.match(page, /const overviewRequest = \(query\) => dashboardRequest\(query, \{ wall: wallMode \}\);/);
 });
