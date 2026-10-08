@@ -747,6 +747,54 @@
   }
 }
 
+/* WERT UND EINHEIT FRAGEN DIE KACHEL, NICHT NUR DIE REIHE (#1799).
+ *
+ * Die Stufenleiter des Werts oben fragt die Breite der REIHE und rechnet mit
+ * einer festen Kartenzahl. Diese Raster fuellen sich selbst (`auto-fit` /
+ * `auto-fill` mit 150 bzw. 160px Mindestspur): eine 900px breite Reihe traegt
+ * dann fuenf Kacheln zu 160-190px, der Wert bleibt bei Title 1, und der
+ * zusammengesetzte Blutdruck ("116/74" plus "mmHg", gemessen 146px, "180/110"
+ * 164px) passt nicht in die 124-164px Innenbreite - "mmHg" fiel unter den Wert.
+ *
+ * Deshalb ist hier zusaetzlich die KACHEL ein Container. Das geht in diesen
+ * Rastern, weil ihre Spuren eine feste Mindestbreite haben und nicht von der
+ * intrinsischen Breite der Kachel leben (der Grund, aus dem `.metric-card`
+ * selbst keiner sein darf, siehe `.metric-grid`). Eigener Name, damit die
+ * Reihen-Abfragen (`metric-grid`) weiter die Reihe treffen.
+ *
+ * GEMESSEN an "180/110 mmHg". Die Abfrage misst die INNENBREITE der Kachel
+ * (Content-Box: Kachel minus Polster und Kante, hier 26px), und das ist auch
+ * der Platz, den die Zeile hat:
+ *   Title 1 (28px) braucht 164px,
+ *   Title 2 (22px) braucht 137px,
+ *   Title 3 (20px) mit Einheit in Caption 1 braucht 122px - die schmalste
+ *   Kachel (150px Mindestspur) hat 124px.
+ * Die Schwellen liegen je 4px darueber, weil die Systemschrift je Plattform
+ * etwas anders laeuft. Die erste Stufe gilt nur, wo die Reihe noch Title 1 vergibt (ueber 600px):
+ * sie soll senken, nie eine schon kleinere Stufe der Reihe wieder anheben.
+ * Title 3 bleibt die Untergrenze des Werts; darunter gibt die Einheit nach. */
+.metric-rows > .metric-card {
+  container: metric-tile / inline-size;
+}
+
+@container metric-grid (width > 600px) {
+  @container metric-tile (width < 168px) {
+    .metric-rows .metric-card__value {
+      font-size: var(--text-2xl);
+    }
+  }
+}
+
+@container metric-tile (width < 141px) {
+  .metric-rows .metric-card__value {
+    font-size: var(--text-xl);
+  }
+
+  .metric-rows .metric-card__unit {
+    font-size: var(--text-xs);
+  }
+}
+
 /* --------------------------------------------------------
  * Die Auswertungsflaeche: Gitter und Achse
  *

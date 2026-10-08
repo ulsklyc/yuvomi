@@ -3868,7 +3868,10 @@ Angabe braeuchte einen zweiten Timer, nur damit sie sich selbst aktuell haelt.
   Fehlt ein Teil, bleibt seine Zeile leer, statt die naechste hochzuziehen; mit Subgrid teilen
   die Karten einer Rasterzeile dieselben vier Zeilenhoehen, ohne bleibt der Rueckfall mit
   festen Zeilen. Wert und Einheit stehen auf einer Grundlinie - dafuer meldet sich das Raster
-  als `metric-grid`-Container.
+  als `metric-grid`-Container. Fuellt sich das Raster selbst (`auto-fit`/`auto-fill`), sagt
+  die Breite der Reihe nichts ueber die Kachel: dort ist zusaetzlich die KACHEL ein Container
+  (`metric-tile`) und senkt den Wert auf Title 2, in der schmalsten auf Title 3 mit der
+  Einheit in Caption 1 (#1799, gemessen an "180/110 mmHg"; `test:metric-tile-fit-browser`).
 - **Do** eine Trendlinie in der Kennzahlkarte im MODULTON zeichnen, 1,5px mit einem Hauch
   Flaeche darunter (14 % auf 0), den letzten Punkt in Label-Farbe mit Ring in Kartenflaeche
   (`.metric-card__spark`). Kein Erfolgs- oder Gefahrenton: bei Vitalwerten ist "hoch" je nach

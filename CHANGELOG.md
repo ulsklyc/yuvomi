@@ -167,6 +167,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Blood pressure and its unit stay on one line in the health tiles.** In a narrow tile "mmHg"
+  dropped below "116/74". The size of the value used to follow the width of the whole row of
+  tiles, which says little where the row fills itself with as many tiles as fit; it now follows
+  the tile. A narrow tile shows the value one step smaller, the narrowest one also a smaller
+  unit, and on a very small phone the vitals page shows one tile per line instead of two that are
+  too narrow. Tiles in budget, housekeeping and inventory are unchanged.
 - **The first visit no longer reloads itself and empties the login form.** One to four seconds
   after the very first load the page reloaded, and whatever had been typed into the login form
   was gone. The reload was meant for an update of the app, but it also fired when the app was

@@ -1837,8 +1837,12 @@ button.health-med-card:hover {
    * mobil 4px neben die eigene Tab-Leiste — genau der Versatz, den #577
    * beseitigt. Der Gutter kommt aus dem geteilten Token. */
 
+  /* Zwei Spalten, solange jede 150px bekommt, sonst eine (#1799). Mit festem
+   * `repeat(2, 1fr)` fiel die Kachel bei 320px Fensterbreite auf 138px, und
+   * darin steht kein Blutdruck mehr neben seiner Einheit (panel.css,
+   * `metric-tile`). Das `max()` haelt es bei hoechstens zwei Spalten. */
   .health-vitals__cards {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(max(150px, calc((100% - var(--space-3)) / 2)), 1fr));
   }
 
   .health-meds__list {
