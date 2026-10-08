@@ -1515,7 +1515,9 @@ test('R18: der Aufgaben-Dialog schliesst mit dem Speichern - die aufziehende Zei
   assert.ok(save.length > 500, 'Vorbedingung: der Speicherpfad ist gefunden');
   assert.doesNotMatch(save, /btnSuccess\(/, 'kein Haken im Knopf eines Dialogs, der schliesst');
   assert.doesNotMatch(save, /setTimeout\(\(\) => closeModal/, 'kein verzoegertes Schliessen');
-  assert.match(save, /closeModal\(\{ force: true \}\);\s*await refreshTags\(\);\s*await onChanged\(\);/, 'schliessen, dann neu zeichnen');
+  // Das Neuzeichnen steht in einem eigenen try: sein Fehler gehoert auf die
+  // Seite, nicht an den geschlossenen Dialog (Review zu #1794, Test weiter unten).
+  assert.match(save, /closeModal\(\{ force: true \}\);\s*try \{\s*await refreshTags\(\);\s*await onChanged\(\);/, 'schliessen, dann neu zeichnen');
   // Die Reihenfolge der Enthuellung bleibt: erst der Dialog weg, dann die
   // History wieder bei der Seite, dann die Zeile (sonst traegt `back()` die
   // alte Adresse wieder herein).
@@ -2066,4 +2068,27 @@ test('R18: der Theme-Wechsel blendet ueber die Wurzel - nur der gewaehlte, nicht
   globalThis.document = stubDocument({ api: false }).doc;
   globalThis.matchMedia = () => ({ matches: false });
   try { assert.throws(() => swapTheme(() => { throw new Error('quota'); }), /quota/); } finally { delete globalThis.document; delete globalThis.matchMedia; }
+});
+
+// --------------------------------------------------------
+// Der Dialog ist zu - ein Fehler danach braucht einen Ort, den man sieht
+// --------------------------------------------------------
+// Seit "Neue Aufgabe" sofort schliesst, laeuft das Neuladen der Liste NACH dem
+// Schliessen. Scheitert es, fing es der aeussere catch und schrieb die Meldung
+// an Knopf und Fehlerzeile eines Dialogs, den es nicht mehr gibt: oben stand
+// der gruene Toast "angelegt", die Liste blieb alt, und niemand erfuhr es
+// (Codex zu #1794). Gespeichert IST die Aufgabe - deshalb eine Meldung auf der
+// Seite und kein zweiter Versuch am Formular.
+test('tasks: a failing reload after the dialog closed is reported on the page, not on the closed dialog', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
+  const submit = src.slice(src.indexOf('async function handleFormSubmit('));
+  const closed = submit.indexOf('closeModal({ force: true });');
+  assert.ok(closed > 0, 'der Dialog schliesst vor dem Neuladen');
+  const after = submit.slice(closed, submit.indexOf('\n  } catch (err) {\n    resetSubmit(err.message);', closed));
+  const reload = after.match(/try \{\s*await refreshTags\(\);\s*await onChanged\(\);[\s\S]*?\n    \} catch \((\w+)\) \{([\s\S]*?)\n    \}/);
+  assert.ok(reload, 'das Neuladen nach dem Schliessen hat einen eigenen catch');
+  assert.match(reload[2], /showToast\([\s\S]*?'danger'\)/, 'der Fehler steht als Toast auf der Seite');
+  assert.doesNotMatch(reload[2], /resetSubmit|btnError/, 'nicht an Bedienelementen des geschlossenen Dialogs');
+  assert.match(reload[2], /return;/, 'ohne frische Liste wird keine neue Zeile gesucht');
 });

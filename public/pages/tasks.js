@@ -2665,11 +2665,23 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
     closeModal({ force: true });
     // Erst die Tag-Liste, dann neu zeichnen: ein gerade vergebener Tag soll
     // sofort in Filterleiste und Vorschlägen stehen (#586).
-    await refreshTags();
-    await onChanged();
-    // Der Dialog ist jetzt VOR dem Neuzeichnen zu: sein Fokus-Rueckweg (der
-    // Stift der bearbeiteten Zeile) wird mit der Liste ersetzt.
-    refocusAfterRender();
+    //
+    // EIGENER catch: der Dialog ist zu. Der aeussere schreibt an Knopf und
+    // Fehlerzeile des Formulars - die gibt es hier nicht mehr, und oben steht
+    // schon der gruene Toast. Scheitert das Neuladen, ist die Aufgabe trotzdem
+    // gespeichert; die Liste ist nur alt, und das muss man auf der Seite lesen.
+    try {
+      await refreshTags();
+      await onChanged();
+      // Der Dialog ist jetzt VOR dem Neuzeichnen zu: sein Fokus-Rueckweg (der
+      // Stift der bearbeiteten Zeile) wird mit der Liste ersetzt. Im selben
+      // Block wie das Neuzeichnen: ohne neue Liste steht das alte Ziel noch.
+      refocusAfterRender();
+    } catch (err) {
+      console.error('[Tasks] reload after save failed:', err);
+      window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+      return;
+    }
     // Angelegt, nicht bearbeitet: die neue Zeile zeigen (siehe revealCreatedTask).
     // ERST WENN DER DIALOG WEG IST und die History wieder der Seite gehoert:
     // er gibt beim Schliessen seinen Marker per `history.back()` zurueck. Eine Auswahl davor schriebe `?open=` auf den
