@@ -567,7 +567,12 @@ function functionBody(source, signature) {
 test('die Seite reicht dem Zahlenspeicher die Antwort nach der geteilten Regel, nicht nach „hat Parameter"', () => {
   const call = /primeModuleCountsFrom\?\.\(dashRes, \{\s*filtered: ([^\n]+?),?\s*\}\)/.exec(pageSource);
   assert.ok(call, 'der Aufruf von primeModuleCountsFrom ist nicht mehr zu finden');
-  assert.equal(call[1], "dashboardQueryFiltersCounts(layoutHintQuery('/dashboard'))");
+  // Gefragt wird nach dem Pfad, der WIRKLICH abgerufen wurde: seit #1817 haengt
+  // die Wand `audience=household` an (`overviewRequest`), und deren Zahlen sind
+  // die des Haushalts, nicht die der Person - sie duerfen nie in den Speicher
+  // der Navigations-Badges. Dass die Regel sie als gefiltert wertet, misst
+  // test:wall-tasks.
+  assert.equal(call[1], "dashboardQueryFiltersCounts(overviewRequest(layoutHintQuery('/dashboard')))");
 });
 
 test('„Als Vorgabe fuer alle" holt die Antwort neu, wenn sich die Abfrage geaendert hat', () => {

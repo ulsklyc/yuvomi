@@ -682,7 +682,7 @@ test('Nacht: die Aufgaben unter den Gesichtern senken sich mit, der Haken gibt s
 // 6. Die Wand ist eine geteilte Flaeche: `audience=household`
 // --------------------------------------------------------------------------
 
-const { dashboardRequest } = await import('../public/utils/dashboard-widgets.js');
+const { dashboardRequest, dashboardQueryFiltersCounts } = await import('../public/utils/dashboard-widgets.js');
 const tzClient = await import('/utils/timezone.js');
 
 async function overview(userId, query = '') {
@@ -803,6 +803,11 @@ test('Geteilte Flaeche: die Wand fragt die Haushaltsfassung ab, die Uebersicht n
   assert.equal(dashboardRequest('/dashboard?tasks_category=school', { wall: true }), '/dashboard?tasks_category=school&audience=household');
   assert.equal(dashboardRequest('/dashboard?events_scope=mine', { wall: false }), '/dashboard?events_scope=mine');
   assert.equal(dashboardRequest('/dashboard'), '/dashboard');
+  // Die Zahlen der Haushaltsfassung sind nicht die der Person: sie gelten dem
+  // Speicher der Navigations-Badges als gefiltert und werden dort nie angenommen.
+  assert.equal(dashboardQueryFiltersCounts(dashboardRequest('/dashboard', { wall: true })), true);
+  assert.equal(dashboardQueryFiltersCounts(dashboardRequest('/dashboard?events_limit=8', { wall: true })), true);
+  assert.equal(dashboardQueryFiltersCounts(dashboardRequest('/dashboard', { wall: false })), false);
   // JEDER Abruf der Seite geht durch diese eine Stelle - auch der stille
   // Refresh, sonst stuende nach einer Viertelstunde wieder die persoenliche
   // Fassung an der Wand.
