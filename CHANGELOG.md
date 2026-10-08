@@ -167,6 +167,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Starting on an older Node.js 22 says what is wrong instead of dying silently** (reported in
+  #1728). Without Docker, Yuvomi claimed to run on any Node.js 22, but before 22.14 the
+  server stopped right at startup without a single line of output, and so did the demo seed
+  script. The required version is now stated correctly as Node.js 22.14 or newer, and an older
+  one gets a one-line message that names the running version, what is needed, and that updating
+  Node.js fixes it. The Docker image ships its own Node.js 24 and was never affected.
 - **A wall tablet no longer offers to rearrange the overview or to search** (#1808). A paired
   display showed the "Customise" button, let you rearrange the tiles, and answered "Done" with
   "Token scope does not permit this operation." - a display changes no settings, and that

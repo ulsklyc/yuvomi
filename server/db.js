@@ -17,7 +17,7 @@
  *   unverschlüsselte Datenbank wird dabei einmalig migriert.
  */
 
-import Database from 'better-sqlite3-multiple-ciphers';
+import Database from './utils/sqlite-driver.js';
 import path from 'path';
 import os from 'node:os';
 import fs from 'node:fs/promises';
