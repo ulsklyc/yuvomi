@@ -911,19 +911,22 @@ const bodyEl = () => _container.querySelector('#budget-body');
 
 // `swap: false` setzt der Wisch, der sein eigenes Hereingleiten mitbringt
 // (utils/period-swipe.js) - kein zweiter Uebergang darueber.
+// Liefert, ob der Schritt GEZEICHNET hat: ein ueberholter laesst das alte
+// Panel stehen, und der Wisch darf es dann nicht hereingleiten lassen.
 async function stepPeriod(dir, { swap = true } = {}) {
   if (state.activeTab === 'reports') {
     state.reportAnchor = stepAnchor(state.reportAnchor, state.range, dir);
     if (swap) swapPeriod(bodyEl(), dir, renderBody);
     else renderBody();
-    return;
+    return true;
   }
   // Vom ANGEFRAGTEN Monat aus: ein zweiter Klick, waehrend der erste laedt,
   // fuehrt einen Monat weiter als dieser, nicht noch einmal zum selben (#1781).
   // Ein ueberholter Schritt blendet nichts ein - das tut der, der ihn ueberholt hat.
-  if (!await loadMonth(addMonths(requestedMonth(), dir))) return;
+  if (!await loadMonth(addMonths(requestedMonth(), dir))) return false;
   if (swap) swapPeriod(bodyEl(), dir, () => { renderBody(); updateLabel(); });
   else { renderBody(); updateLabel(); }
+  return true;
 }
 
 /** "Aktuell": zurueck zum laufenden Zeitraum des Reiters. */
@@ -948,6 +951,35 @@ async function jumpToCurrentPeriod() {
   const back = m < from ? -1 : 1;
   if (!await loadMonth(m)) return;
   swapPeriod(bodyEl(), back, () => { renderBody(); updateLabel(); });
+}
+
+/**
+ * Reiterwechsel. Eine Zeitachse ueber den Wechsel hinweg: der Monat aus dem
+ * Budget-Tab wird zum Anker der Berichte und umgekehrt. Vorher hielt
+ * budget-stats.js einen eigenen Anker, sodass ein im Budget gewaehlter Maerz in
+ * den Berichten weiter als Juli erschien (Critique 2026-07-30, P1).
+ *
+ * GEMESSEN AM ANGEFRAGTEN MONAT (#1781). Wer "weiter" tippt und in die Berichte
+ * wechselt, bevor der Monat da ist, nahm sonst den noch GEZEIGTEN als Anker mit
+ * - und der Rueckweg lud genau den und nahm den Schritt zurueck.
+ */
+async function changeTab(id, { direction = 0 } = {}) {
+  const prev = state.activeTab;
+  state.activeTab = id;
+  writeTabToUrl(id);
+  if (id === 'reports' && prev !== 'reports') {
+    state.reportAnchor = anchorForMonth(requestedMonth());
+  }
+  // Nur der Reiterwechsel blendet (in Schrittrichtung der Leiste) - ein
+  // Neuaufbau desselben Reiters (Filter, Speichern) nicht.
+  swapContent(_container.querySelector('#budget-body'), renderBody, { direction });
+  if (prev === 'reports' && id !== 'reports') {
+    const ym = state.reportAnchor.slice(0, 7);
+    if (ym !== requestedMonth()) {
+      await loadMonth(ym);
+      if (state.activeTab === id) renderBody();
+    }
+  }
 }
 
 function wireNav() {
@@ -1014,28 +1046,7 @@ function wireNav() {
   // Tab (sub-tab--active/aria/tabindex); renderBody übernimmt nur noch den Inhalt.
   _tablist = wireTablist(_container.querySelector('.budget-tabs'), {
     activeId: state.activeTab,
-    onChange: async (id, { direction = 0 } = {}) => {
-      const prev = state.activeTab;
-      state.activeTab = id;
-      writeTabToUrl(id);
-      // Eine Zeitachse über den Tabwechsel hinweg: der Monat aus dem Budget-Tab
-      // wird zum Anker der Berichte und umgekehrt. Vorher hielt budget-stats.js
-      // einen eigenen Anker, sodass ein im Budget gewählter März in den Berichten
-      // weiter als Juli erschien (Critique 2026-07-30, P1).
-      if (id === 'reports' && prev !== 'reports') {
-        state.reportAnchor = anchorForMonth(state.month);
-      }
-      // Nur der Reiterwechsel blendet (in Schrittrichtung der Leiste) - ein
-      // Neuaufbau desselben Reiters (Filter, Speichern) nicht.
-      swapContent(_container.querySelector('#budget-body'), renderBody, { direction });
-      if (prev === 'reports' && id !== 'reports') {
-        const ym = state.reportAnchor.slice(0, 7);
-        if (ym !== state.month) {
-          await loadMonth(ym);
-          if (state.activeTab === id) renderBody();
-        }
-      }
-    },
+    onChange: changeTab,
   });
   // Edge-Fade + Aktiver-Tab-in-Sicht übernimmt jetzt wireTablist zentral
   // (Audit A2-18: gleiche Affordanz für Budget, Haushaltshilfe, Rewards).
@@ -2061,7 +2072,7 @@ function entryRows(list, { fullDate = false, rowClass = '' } = {}) {
     const amountText = amountByRole(e.amount, 'flow').text;
     /* DER MONAT STEHT ÜBER DER LISTE, NICHT IN JEDER ZEILE.
      *
-     * Die Liste ist per Konstruktion EIN Monat - `loadMonth(state.month)` holt
+     * Die Liste ist per Konstruktion EIN Monat - loadMonth() holt
      * sie, der Monatsschritter im Kopf benennt ihn, und der CSV-Link daneben
      * trägt denselben Monat als Parameter. „19.08.2026" wiederholte ihn 23 Mal
      * und das Jahr dazu; „19.08." sagt in der Zeile dasselbe.
@@ -5438,6 +5449,7 @@ export const __test = {
   loadMonth,
   stepPeriod,
   jumpToCurrentPeriod,
+  changeTab,
   renderBodyForTest(container) {
     _container = container;
     renderBody();
