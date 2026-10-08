@@ -2696,7 +2696,10 @@ test('Wand-Modus: „Wer heute dran ist" zählt den ganzen Tag, nicht nur die si
     // Abschnitt nur die gezeigten Zeilen, verschwände sie aus der Antwort.
     const spaet = { id: 42, display_name: 'Mia Muster', avatar_color: '#CE2A63' };
     const tasks = wallTasks(8, { assignTo: (i) => (i === 7 ? spaet : null) });
-    const html = __test.renderWallSurface({ urgentTasks: tasks, users: [spaet] }, null, {});
+    // Die Zahl kommt seit #1817 aus `wallTasks` (ungekappt, haushaltssichtbar),
+    // nicht mehr aus den Aufgabenzeilen des Programms.
+    const wallTasksOfDay = [{ user_id: 42, open_count: 1, done_count: 0, open: [{ id: 8, title: 'Aufgabe 8' }], done: [] }];
+    const html = __test.renderWallSurface({ urgentTasks: tasks, wallTasks: wallTasksOfDay, users: [spaet] }, null, {});
     nodeAssert.match(html, /wall-who__member/, 'Reichweite: der Abschnitt wurde gebaut');
     nodeAssert.match(html, /Mia/, 'wer hinter dem Deckel steht, steht trotzdem in der Antwort');
     nodeAssert.match(html, /wall-who__count/, 'die Zahl beantwortet „wie viel"');

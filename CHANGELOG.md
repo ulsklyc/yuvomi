@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Payment reminders can be turned off for each subscription** (#1708, from D#1226). Turn off the reminder
   in the subscription dialog while keeping the subscription active and its cost in the budget.
   Editing or renewing it keeps the reminder off. Existing subscriptions keep reminders enabled.
+- **Wall mode names today's tasks under each person** (#1817, from D#1604). "Who's up today"
+  used to show a face and a number. It now lists each person's open tasks for today by title, and
+  below them, dimmed and with a checkmark, what they have already done today - so a glance shows
+  what is left and what is finished. The wall still does not scroll: it shows as many lines as
+  the screen has room for and says "+2 more" for the rest. When space runs short, finished tasks
+  give way first. Someone who has finished everything keeps their ticked tasks until the next
+  day. Only tasks the whole household may see appear; a task set to "Assignees only" stays off
+  the wall, whoever is signed in on the device.
 
 ### Changed
 

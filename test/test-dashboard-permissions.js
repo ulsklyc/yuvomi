@@ -344,6 +344,7 @@ test('Aufgaben auf `none`: weder Liste noch Zählstände noch die Pro-Mitglied-L
   const body = await dashboardAs(KID);
   assert.deepEqual(body.urgentTasks, []);
   assert.deepEqual(body.memberTodayTasks, [], 'die Pro-Mitglied-Aggregation ist dieselbe Aufgabenmenge, nur gezählt');
+  assert.deepEqual(body.wallTasks, [], 'und die Titel je Mitglied fuer die Wand (#1817) erst recht');
   assert.equal(body.openTaskCount, 0);
   assert.equal(body.overdueTaskCount, 0);
   assert.equal(body.tasksDoneToday, 0);

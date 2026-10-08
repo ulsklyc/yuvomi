@@ -211,6 +211,8 @@
         "wallWhoCount": "{{count}} Einträge heute",
         "wallWhoCount_one": "1 Eintrag heute",
         "wallWhoNone": "Heute ist niemand eingeteilt",
+        "wallWhoDoneMore": "+{{count}} erledigt",
+        "wallWhoDoneMore_one": "+{{count}} erledigt",
         "wallExit": "Wand-Modus beenden",
         "wallEnter": "Wand-Modus starten",
         "wallTimerLabel": "Küchentimer",

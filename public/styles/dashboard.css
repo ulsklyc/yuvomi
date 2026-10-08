@@ -5661,9 +5661,10 @@ button.today-cockpit__more--link {
 }
 
 /* ── Wer heute dran ist ── */
-/* Gesichter, nicht Namenszeilen. Die Zahl am Rand sagt, wie viel von heute
- * jemanden angeht; WAS es ist, steht links im Programm und wird hier bewusst
- * nicht wiederholt. */
+/* Gesichter, darunter die Aufgaben von heute beim Namen (#1817). Die Zahl am
+ * Rand sagt, was noch offen ist. Ohne Titel - niemand hat eine Aufgabe, oder
+ * die Flaeche hat keinen Platz dafuer (`fitWallWho`) - bleibt es bei der
+ * Reihe von Gesichtern. */
 .wall-who__list {
   list-style: none;
   margin: 0;
@@ -5734,6 +5735,113 @@ button.today-cockpit__more--link {
   white-space: nowrap;
   font-size: var(--wall-row-sub);
   color: var(--color-text-secondary);
+}
+
+/* MIT TITELN wird aus der Reihe von Gesichtern ein Raster von Personen: das
+ * Gesicht mit dem Namen daneben als Kopf, darunter die Zeilen in voller
+ * Spaltenbreite. Ein Titel ist laenger als ein Vorname - unter einem 48px-
+ * Gesicht in einer 72px-Spalte stuende „Spuelma…".
+ *
+ * HOECHSTENS ZWEI NEBENEINANDER, und keine schmaler als drei Gesichter breit.
+ * `auto-fill` allein stellte auf einem grossen Schirm drei schmale Spalten
+ * hin und schnitt „Pack sports bag for t…" ab, waehrend die vierte Person
+ * allein in der zweiten Reihe stand (gemessen 1920x1080). Der Platz gehoert
+ * den Titeln, nicht einer dritten Spalte. */
+.wall-who__list--tasks {
+  --wall-who-cols: 2;
+  --wall-who-min: calc(var(--space-16) * 3);
+  --wall-who-gap: var(--space-5);
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(max(var(--wall-who-min), (100% - (var(--wall-who-cols) - 1) * var(--wall-who-gap)) / var(--wall-who-cols)), 1fr)
+  );
+  gap: var(--space-4) var(--wall-who-gap);
+  align-items: start;
+}
+
+/* Ab fuenf Personen drei nebeneinander: zwei Spalten ergaeben drei Reihen, und
+ * auf 1280x800 bliebe dann unter keinem Gesicht mehr Platz fuer einen Titel
+ * (gemessen: 214px fuer die Liste, drei Koepfe allein brauchen 176px). Eine
+ * schmalere Spalte, die den Anfang jeder Aufgabe nennt, sagt mehr als sechs
+ * Gesichter ohne ein Wort. Gezaehlt wird am Traeger (`:has`), wie beim
+ * Programm. */
+.wall-who__list--tasks:has(> :nth-child(5)) {
+  --wall-who-cols: 3;
+  --wall-who-min: calc(var(--space-16) * 2);
+  --wall-who-gap: var(--space-4);
+}
+
+.wall-who__list--tasks .wall-who__member {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  text-align: start;
+}
+
+.wall-who__list--tasks .wall-who__name {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.wall-who__tasks {
+  grid-column: 1 / -1;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0h);
+  min-width: 0;
+}
+
+/* EINE ZEILE JE AUFGABE, wie im Programm: ein Umbruch kostete die Hoehe einer
+ * weiteren Aufgabe, und die Zeilenzahl ist hier das knappe Gut. */
+.wall-who__task {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1h);
+  min-width: 0;
+  white-space: nowrap;
+  font-size: var(--wall-row-sub);
+  line-height: var(--line-height-snug);
+  color: var(--color-text-primary);
+}
+
+/* Erledigtes tritt zurueck, bleibt aber lesbar: Sekundaerfarbe statt
+ * Deckkraft, damit der Kontrast auf der Buehne der einer Unterzeile ist. Der
+ * Haken traegt den Zustand, kein Durchstreichen - durchgestrichene Schrift
+ * liest auf zwei Metern niemand. */
+.wall-who__task--done {
+  color: var(--color-text-secondary);
+}
+
+.wall-who__task-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wall-who__task-check {
+  flex: none;
+  width: 1em;
+  height: 1em;
+  color: var(--color-success-ink);
+}
+
+.wall-who__task--more {
+  color: var(--color-text-tertiary);
+}
+
+/* Alles erledigt: die Marke am Gesicht traegt den Haken statt einer Zahl. */
+.wall-who__count--done {
+  min-height: var(--space-8);
+  color: var(--color-success-ink);
+}
+
+.wall-who__count--done svg {
+  width: 1em;
+  height: 1em;
 }
 
 .wall-who__more,

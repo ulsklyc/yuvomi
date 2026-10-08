@@ -211,6 +211,8 @@
         "wallWhoCount": "{{count}} entri hari ini",
         "wallWhoCount_one": "1 entri hari ini",
         "wallWhoNone": "Hari ini belum ada yang ditugaskan",
+        "wallWhoDoneMore": "+{{count}} selesai",
+        "wallWhoDoneMore_one": "+{{count}} selesai",
         "wallExit": "Keluar dari mode dinding",
         "wallEnter": "Mulai mode dinding",
         "wallTimerLabel": "Pengatur waktu dapur",

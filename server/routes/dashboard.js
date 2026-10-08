@@ -71,7 +71,7 @@ const DENIED_PAYLOAD = Object.freeze({
   calendar: () => ({ upcomingEvents: [], familyEvents: [], weekEvents: [], ...emptyBirthdays() }),
   tasks: () => ({
     urgentTasks: [], openTaskCount: 0, overdueTaskCount: 0,
-    memberTodayTasks: [], tasksDoneToday: 0,
+    memberTodayTasks: [], tasksDoneToday: 0, wallTasks: [],
   }),
   meals: () => ({ todayMeals: [] }),
   notes: () => ({ pinnedNotes: [], pinnedNotesCount: 0, notesTotal: 0 }),
@@ -202,6 +202,89 @@ function weekEventFields(event) {
   };
 }
 
+/** So viele Titel je Mitglied und Zustand reisen mit; die Zahlen daneben sind ungekappt. */
+const WALL_TASKS_PER_MEMBER = 6;
+
+/**
+ * Die Aufgaben von heute je Mitglied, MIT TITEL, fuer die Wand (#1817).
+ *
+ * WARUM EINE EIGENE LESUNG. `urgentTasks` ist haushaltsweit auf fuenf gekappt -
+ * daraus laesst sich nicht lesen, was unter einer einzelnen Person steht.
+ * `memberTodayTasks` ist ungekappt, traegt aber nur eine Zahl.
+ *
+ * NUR `visibility = 'all'`, UND DAS IST NICHT DIE BETRACHTER-REGEL. Jede andere
+ * Aufgabenabfrage dieser Route haengt `visibilityWhere(..., '@me')` an: sie
+ * zeigt, was die angemeldete Person sehen darf. Ein Wandtablett ist keine
+ * Person - es haengt in der Kueche, und der Wandmodus laesst sich aus jeder
+ * Sitzung oeffnen. Eine Aufgabe auf "nur Zugewiesene" oder privat steht deshalb
+ * auf keiner Wand, auch nicht, wenn die Wand aus der Sitzung der zugewiesenen
+ * Person geoeffnet wurde. `'all'` ist eine Teilmenge dessen, was jeder
+ * Betrachter ohnehin sieht; die Lesung gibt also nichts frei, was der
+ * Betrachter nicht schon hat, und ein gekoppeltes Display erreicht sie nur
+ * ueber `dashboard:read` + `tasks:read` wie den Rest der Antwort.
+ *
+ * "HEUTE" FUER EINE PERSON: offen ist, was heute oder frueher faellig ist -
+ * dieselbe Menge, die `memberTodayTasks` zaehlt und die das Programm links als
+ * "ueberfaellig" fuehrt. Erledigt ist, was heute faellig war, und dazu, was
+ * ueberfaellig war und HEUTE abgehakt wurde: sonst verschwaende eine Aufgabe
+ * von gestern beim Abhaken von der Wand, statt ihren Haken zu bekommen. Der Tag
+ * einer Erledigung ist der des HAUSHALTS (`completed_at` ist ein UTC-Zeitpunkt).
+ * Mit dem Tageswechsel faellt beides von selbst heraus.
+ *
+ * MEHRERE ZUGEWIESENE: die Aufgabe steht unter jeder von ihnen, wie
+ * `memberTodayTasks` sie zaehlt.
+ *
+ * @returns {{user_id: number, open_count: number, done_count: number,
+ *            open: {id: number, title: string, due_date: string}[],
+ *            done: {id: number, title: string}[]}[]}
+ */
+function wallTasksByMember(d, { today, zone, now, categoryAnd = '', categoryBinds = {} }) {
+  // Grobe Vorauswahl in SQL (48 Stunden decken jede Zone), der Tag selbst wird
+  // unten in der Haushaltszone entschieden.
+  const since = new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString();
+  const rows = d.prepare(`
+    SELECT ta.user_id AS user_id, t.id, t.title, t.status, t.due_date, tc.completed_at
+    FROM tasks t
+    JOIN task_assignments ta ON ta.task_id = t.id
+    LEFT JOIN task_completions tc ON tc.task_id = t.id
+    WHERE t.archived_at IS NULL
+      AND t.visibility = 'all'
+      AND t.due_date IS NOT NULL AND t.due_date <= @today
+      AND ${taskScopeWhere('t', { bind: '@today' })}${categoryAnd}
+      AND (t.status != 'done' OR t.due_date = @today OR tc.completed_at >= @since)
+    ORDER BY
+      t.due_date ASC,
+      t.due_time IS NULL ASC, t.due_time ASC,
+      CASE t.priority
+        WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2
+        WHEN 'low' THEN 3 ELSE 4
+      END ASC,
+      t.id ASC
+  `).all({ today, since, ...categoryBinds });
+
+  const byMember = new Map();
+  for (const row of rows) {
+    const isDone = row.status === 'done';
+    if (isDone && row.due_date !== today
+      && utcToWall(row.completed_at, zone)?.date !== today) continue;
+    let entry = byMember.get(row.user_id);
+    if (!entry) {
+      entry = { user_id: row.user_id, open_count: 0, done_count: 0, open: [], done: [] };
+      byMember.set(row.user_id, entry);
+    }
+    if (isDone) {
+      entry.done_count += 1;
+      if (entry.done.length < WALL_TASKS_PER_MEMBER) entry.done.push({ id: row.id, title: row.title });
+    } else {
+      entry.open_count += 1;
+      if (entry.open.length < WALL_TASKS_PER_MEMBER) {
+        entry.open.push({ id: row.id, title: row.title, due_date: row.due_date });
+      }
+    }
+  }
+  return [...byMember.values()];
+}
+
 const router = express.Router();
 
 /**
@@ -220,6 +303,7 @@ const router = express.Router();
  *   users:          User[],            // Alle User (für Avatar-Farben)
  *   memberTodayTasks: {user_id, open_count}[], // Heute fällige/überfällige offene Aufgaben je Mitglied
  *   tasksDoneToday: number,            // Heute fällige, bereits erledigte Aufgaben
+ *   wallTasks:      {user_id, open_count, done_count, open: {id,title,due_date}[], done: {id,title}[]}[], // Haushaltssichtbare Aufgaben von heute je Mitglied (#1817)
  *   countdowns:     Countdown[]        // Als Countdown markierte Termine + Aufgaben (#647)
  *   quicklinks:      QuickLink[]        // Haushaltslinks der Kachelreihe (#469)
  * }
@@ -1104,6 +1188,20 @@ router.get('/', (req, res) => {
   } catch (err) {
     log.error('memberTodayTasks error:', err.message);
     result.memberTodayTasks = [];
+  }
+
+  // Die Wand nennt die Aufgaben beim Namen (#1817), siehe `wallTasksByMember`.
+  if (allows('tasks')) try {
+    result.wallTasks = wallTasksByMember(d, {
+      today: todayLocalKey,
+      zone: householdTimeZone(d),
+      now,
+      categoryAnd: taskCategoryAnd,
+      categoryBinds: taskCategoryBinds,
+    });
+  } catch (err) {
+    log.error('wallTasks error:', err.message);
+    result.wallTasks = [];
   }
 
   // „Alles erledigt"-Zustand des Tagesprogramms: nur mit der Zahl heute fälliger,

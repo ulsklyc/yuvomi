@@ -300,13 +300,13 @@ test('Wandtablett, "Wer heute dran ist": der Koch der heutigen Mahlzeit zaehlt m
   }));
   const ANNA_WAND = { id: 1, display_name: 'Anna Beispiel', avatar_color: '#FF9500', avatar_data: null };
   const BEN_WAND = { id: 2, display_name: 'Ben Beispiel', avatar_color: '#34C759', avatar_data: null };
-  const wer = (todayMeals, urgentTasks = []) => {
+  const wer = (todayMeals, urgentTasks = [], wallTasks = []) => {
     // Ohne App-Huelle, wie test-dashboard.js die Wand rendert: `window.yuvomi`
     // traegt hier nur den Toast-Stub, keine Modul-Abfrage.
     const zuvor = globalThis.window.yuvomi;
     globalThis.window.yuvomi = null;
     try {
-      const html = dashboard.renderWallSurface({ todayMeals, urgentTasks, users: [ANNA_WAND, BEN_WAND] }, null, {});
+      const html = dashboard.renderWallSurface({ todayMeals, urgentTasks, wallTasks, users: [ANNA_WAND, BEN_WAND] }, null, {});
       return abschnitt(html, 'class="wall__who"', '</section>');
     } finally {
       globalThis.window.yuvomi = zuvor;
@@ -324,8 +324,10 @@ test('Wandtablett, "Wer heute dran ist": der Koch der heutigen Mahlzeit zaehlt m
 
     // Kochen zaehlt NEBEN einer Aufgabe, nicht statt ihrer.
     const aufgabe = { id: 5, title: 'Muell', status: 'open', due_date: toLocalDateKey(new Date()), due_time: '08:00', assigned_users: [{ id: 2, display_name: 'Ben Beispiel', color: '#34C759' }] };
-    const beides = wer(heute({ cook_user_id: 2, cook_name: 'Ben Beispiel', cook_color: '#34C759' }), [aufgabe]);
-    const ohneKochen = wer(heute(), [aufgabe]);
+    // Die Aufgaben einer Person zaehlt die Wand seit #1817 aus `wallTasks`.
+    const anDerWand = [{ user_id: 2, open_count: 1, done_count: 0, open: [{ id: 5, title: 'Muell' }], done: [] }];
+    const beides = wer(heute({ cook_user_id: 2, cook_name: 'Ben Beispiel', cook_color: '#34C759' }), [aufgabe], anDerWand);
+    const ohneKochen = wer(heute(), [aufgabe], anDerWand);
     assert.deepEqual(mitglieder(ohneKochen), ['Ben:1'], 'Vorbedingung: die Aufgabe allein zaehlt eins');
     assert.deepEqual(mitglieder(beides), ['Ben:2'], 'Aufgabe und Kochen sind zwei Dinge');
 

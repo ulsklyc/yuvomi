@@ -197,6 +197,8 @@
         "wallWhoCount": "{{count}} καταχωρίσεις σήμερα",
         "wallWhoCount_one": "1 καταχώριση σήμερα",
         "wallWhoNone": "Σήμερα δεν έχει ανατεθεί σε κανέναν",
+        "wallWhoDoneMore": "+{{count}} ολοκληρωμένες",
+        "wallWhoDoneMore_one": "+{{count}} ολοκληρωμένη",
         "wallExit": "Έξοδος από τη λειτουργία τοίχου",
         "wallEnter": "Έναρξη λειτουργίας τοίχου",
         "wallTimerLabel": "Χρονόμετρο κουζίνας",
