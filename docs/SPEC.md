@@ -2391,7 +2391,12 @@ Without it the list grew by one dead row per re-pairing.
 `dashboardDefaults()` in `server/routes/preferences.js`), and only when neither is set the shipped
 default. Of that layout it reads only the modules of its scopes: a tile whose module is gated in
 `GET /dashboard` arrives in its empty form (`DENIED_PAYLOAD`). Three parts of the answer carry no
-module gate and arrive filled for a display as for anyone - `users`, `countdowns` and `quicklinks`. Tile options travel as query
+module gate and arrive filled for a display as for anyone - `users`, `countdowns` and `quicklinks`.
+The areas a display shows are its read scopes without the overview itself: calendar, tasks, rewards
+and weather (`DISPLAY_AREA_MODULES`, derived from `DISPLAY_SCOPES`). `GET /api/v1/displays` returns
+that list as `area_modules` beside `data`, and the hint under Settings > Wall tablets names exactly
+these areas from it - with the names the API token page uses for the same scope modules, joined by
+`Intl.ListFormat` in the app language - so there is no second list in the browser to fall behind. Tile options travel as query
 parameters from that default, and one of them is personal: `events_scope=mine` means "assigned to the
 caller". No event is ever assigned to a display account, so `GET /dashboard` reads the option as
 "all" for `authMethod === 'display'` - at the reader, not when the default is saved, because the same

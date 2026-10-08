@@ -1062,6 +1062,57 @@ test('"Mir zugewiesen" in der Vorgabe des Haushalts leert das Tablett nicht (#18
   assert.deepEqual(probe(wand.body, 'weekEvents'), ['Scope Alle', 'Scope Mila'], 'und der Wochenstreifen ebenso');
 });
 
+test('der Hinweis in den Einstellungen nennt genau die Bereiche, die ein Display liest (#1808)', async () => {
+  // EINE QUELLE: der Browser bekommt die Liste mit `GET /displays` und setzt
+  // die Namen daraus zusammen. Diese Liste hier ist die ZWEITE Fassung, und sie
+  // steht absichtlich als Literal da: kommt ein Scope dazu oder faellt einer
+  // weg, wird dieser Fall rot und fragt, ob docs/SPEC.md (Display Accounts) und
+  // der CHANGELOG die neue Menge nennen. Der Hinweis selbst zieht von allein nach.
+  const BEREICHE = ['calendar', 'tasks', 'rewards', 'weather'];
+  const { DISPLAY_AREA_MODULES } = await import('../server/display-scopes.js');
+
+  const liste = await admin('GET', '/displays');
+  assert.equal(liste.status, 200);
+  assert.deepEqual(liste.body.area_modules, BEREICHE, 'die Route liefert die Bereiche neben der Liste');
+  assert.deepEqual([...DISPLAY_AREA_MODULES], BEREICHE);
+  // Aus den Scopes abgeleitet, nicht daneben gepflegt: jedes Lesemodul ausser
+  // der Uebersicht selbst, und nichts sonst.
+  assert.deepEqual(
+    DISPLAY_SCOPES.filter((s) => s.endsWith(':read')).map((s) => s.split(':')[0]).filter((k) => k !== 'dashboard'),
+    BEREICHE,
+  );
+  assert.ok(DISPLAY_SCOPES.includes('dashboard:read'), 'Vorbedingung: die Uebersicht ist ein Scope - und wird trotzdem nicht aufgezaehlt');
+
+  // UND GEGEN DIE RECHTEAUFLOESUNG (server/permissions.js, Display-Zweig): was
+  // ein gekoppeltes Geraet dort als lesbares Modul bekommt, steht im Hinweis.
+  const created = await admin('POST', '/displays', { display_name: 'Bereichsprobe' });
+  const issued = await admin('POST', `/displays/${created.body.data.id}/pairing-code`, {});
+  const display = asDisplay((await pair(issued.body.data.code)).token);
+  const me = await display('GET', '/auth/me');
+  const module = me.body?.permissions?.modules;
+  assert.ok(module, `Vorbedingung: das Display bekommt seine Modulrechte - ${JSON.stringify(me.body).slice(0, 200)}`);
+  const lesbar = Object.keys(module).filter((key) => module[key] !== 'none');
+  assert.ok(lesbar.length > 0, 'Vorbedingung: mindestens ein Modul ist lesbar');
+  for (const key of lesbar) assert.ok(BEREICHE.includes(key), `${key} ist am Display lesbar, fehlt aber im Hinweis`);
+  for (const key of BEREICHE) {
+    assert.ok(!(key in module) || module[key] !== 'none', `${key} steht im Hinweis, ist am Display aber gesperrt`);
+  }
+
+  // Jeder Bereich hat in JEDER Sprache einen Namen, und der Satz traegt den
+  // Platzhalter - sonst stuende ein Schluessel oder ein Satz ohne Inhalt da.
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const dir = new URL('../public/locales/', import.meta.url);
+  const dateien = readdirSync(dir).filter((f) => f.endsWith('.json'));
+  assert.ok(dateien.length >= 26);
+  for (const datei of dateien) {
+    const settings = JSON.parse(readFileSync(new URL(datei, dir), 'utf8')).settings;
+    assert.match(settings.displaysAreasHint ?? '', /\{\{areas\}\}/, `${datei}: displaysAreasHint ohne {{areas}}`);
+    for (const key of BEREICHE) {
+      assert.ok(settings.apiTokenScopeModules?.[key], `${datei}: kein Name fuer ${key}`);
+    }
+  }
+});
+
 test('der Katalog beschreibt den Rumpf der Kopplung', async () => {
   // Ohne Schema laesst `op()` den Rumpf ganz weg - ein erzeugter Client haette
   // kein Argument fuer den Code, und die Route antwortet dann mit 400.

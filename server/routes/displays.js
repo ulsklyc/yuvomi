@@ -26,6 +26,7 @@ import { createLogger } from '../logger.js';
 import { requireAdmin } from '../middleware/require-admin.js';
 import { householdMemberSql, memberOrderSql, memberPositionSql } from '../services/household-members.js';
 import { resolvePermissions } from '../permissions.js';
+import { DISPLAY_AREA_MODULES } from '../display-scopes.js';
 import { isEnrolled } from '../services/rewards.js';
 import { CURRENT_ONBOARDING_VERSION, LEGACY_SESSION_COOKIE, SESSION_COOKIE } from '../auth.js';
 import {
@@ -249,7 +250,9 @@ router.get('/', (_req, res) => {
       ...row,
       devices: listDisplayDevices(row.id),
     }));
-    return res.json({ data });
+    // `area_modules` steht NEBEN der Liste, nicht in jedem Eintrag: es ist eine
+    // Tatsache ueber Displays, nicht ueber dieses eine (#1808).
+    return res.json({ data, area_modules: DISPLAY_AREA_MODULES });
   } catch (err) {
     log.error('GET / error:', err);
     return res.status(500).json({ error: 'Internal server error.', code: 500 });
