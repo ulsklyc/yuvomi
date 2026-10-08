@@ -180,7 +180,19 @@ app.use((req, _res, next) => {
   next();
 });
 app.use('/api/v1/reminders', remindersModule.default);
-const server = http.createServer(app);
+// Jede Antwort schliesst ihre Verbindung. Diese Suite baut je Fall eine frische
+// Datenbank ueber die volle Migrationskette - synchron, und die Zustelllaeufe
+// dazwischen sind reine Microtasks. Zwischen zwei Requests vergehen so Sekunden,
+// in denen die Ereignisschleife nie in ihre Timer-Phase kommt. Eine offen
+// gehaltene Verbindung ueberlebt dabei ihr Keep-Alive (5 s), ohne dass Server
+// oder `fetch` es bemerken; der naechste Request geht auf die alte Socket, im
+// selben Umlauf feuert der ueberfaellige Server-Timer und reisst sie ab:
+// `fetch failed` / `ECONNRESET`, je nach Rechnerlast (gemessen 08.10.2026).
+// Ohne Wiederverwendung gibt es keinen Timer, der ueberfaellig werden kann.
+const server = http.createServer((req, res) => {
+  res.setHeader('Connection', 'close');
+  app(req, res);
+});
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 const base = `http://127.0.0.1:${server.address().port}/api/v1/reminders`;
 test.after(() => server.close());
@@ -194,7 +206,7 @@ async function call(database, userId, method, path, body) {
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const text = await res.text();
-  return { status: res.status, body: text ? JSON.parse(text) : null };
+  return { status: res.status, body: text ? JSON.parse(text) : null, connection: res.headers.get('connection') };
 }
 
 const post = (database, userId, type, id) =>
@@ -230,6 +242,26 @@ const SETTABLE = ['task', 'event', 'subscription', 'inventory_item', 'inventory_
 test('jede setzbare Herkunft steht in reminder-targets.js', () => {
   assert.deepEqual([...remindersModule.SETTABLE_ENTITY_TYPES].sort(), [...TARGET_ENTITY_TYPES].sort());
   assert.deepEqual([...SETTABLE].sort(), [...TARGET_ENTITY_TYPES].sort(), 'die Liste dieser Suite ist veraltet');
+});
+
+test('Harness: der Testserver haelt keine Verbindung offen', async () => {
+  // Gezaehlt werden die Sockets, nicht nur der Header: drei Requests
+  // nacheinander muessen drei Verbindungen sein. Eine wiederverwendete macht
+  // die Suite lastabhaengig rot (Kommentar am Server oben).
+  const database = freshDb();
+  const me = freshUser(database);
+  let sockets = 0;
+  const count = () => { sockets += 1; };
+  server.on('connection', count);
+  try {
+    for (let i = 0; i < 3; i += 1) {
+      assert.equal((await call(database, me, 'GET', '/pending')).connection, 'close');
+    }
+  } finally {
+    server.off('connection', count);
+  }
+  assert.equal(sockets, 3, 'ein Request lief ueber eine wiederverwendete Verbindung');
+  database.close();
 });
 
 // --------------------------------------------------------------------------
