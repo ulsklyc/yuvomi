@@ -720,6 +720,8 @@
         "duplicateSubmit": "Duplicate",
         "duplicateError": "The list could not be duplicated.",
         "itemStateChecked": "checked off",
+        "tickedSection": "Checked off",
+        "itemBackToast": "\"{{name}}\" is back on the list.",
         "itemStateOpen": "not checked off"
     },
     "meals": {

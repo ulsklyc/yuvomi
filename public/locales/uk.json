@@ -838,6 +838,8 @@
         "duplicateSubmit": "Дублювати",
         "duplicateError": "Не вдалося дублювати список.",
         "itemStateChecked": "позначено",
+        "tickedSection": "Позначено",
+        "itemBackToast": "«{{name}}» знову в списку.",
         "itemStateOpen": "не позначено"
     },
     "meals": {

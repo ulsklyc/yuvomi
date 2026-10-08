@@ -734,6 +734,8 @@
         "duplicateSubmit": "Duplizieren",
         "duplicateError": "Die Liste konnte nicht dupliziert werden.",
         "itemStateChecked": "abgehakt",
+        "tickedSection": "Abgehakt",
+        "itemBackToast": "„{{name}}“ ist wieder auf der Liste.",
         "itemStateOpen": "offen"
     },
     "meals": {

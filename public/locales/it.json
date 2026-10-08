@@ -720,6 +720,8 @@
         "duplicateSubmit": "Duplica",
         "duplicateError": "Impossibile duplicare la lista.",
         "itemStateChecked": "spuntato",
+        "tickedSection": "Spuntati",
+        "itemBackToast": "«{{name}}» è di nuovo nella lista.",
         "itemStateOpen": "non spuntato"
     },
     "meals": {

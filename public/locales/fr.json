@@ -720,6 +720,8 @@
         "duplicateSubmit": "Dupliquer",
         "duplicateError": "La liste n'a pas pu être dupliquée.",
         "itemStateChecked": "coché",
+        "tickedSection": "Cochés",
+        "itemBackToast": "« {{name}} » est de nouveau sur la liste.",
         "itemStateOpen": "non coché"
     },
     "meals": {

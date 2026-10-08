@@ -720,6 +720,8 @@
         "duplicateSubmit": "Kopyala",
         "duplicateError": "Liste kopyalanamadı.",
         "itemStateChecked": "işaretlendi",
+        "tickedSection": "İşaretlenenler",
+        "itemBackToast": "„{{name}}” yeniden listede.",
         "itemStateOpen": "işaretlenmedi"
     },
     "meals": {

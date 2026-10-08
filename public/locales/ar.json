@@ -897,6 +897,8 @@
         "duplicateSubmit": "تكرار",
         "duplicateError": "تعذّر تكرار القائمة.",
         "itemStateChecked": "تم التأشير",
+        "tickedSection": "تم التأشير عليها",
+        "itemBackToast": "عاد «{{name}}» إلى القائمة.",
         "itemStateOpen": "لم يُؤشَّر عليه"
     },
     "meals": {

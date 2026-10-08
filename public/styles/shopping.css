@@ -529,6 +529,21 @@
   transition: background-color var(--transition-fast);
 }
 
+/* „Abgehakt" hinter einem Vorschlag, der auf dieser Liste schon steht (#1816):
+ * der Name fuehrt, der Zustand tritt zurueck und bleibt am Zeilenende. */
+.autocomplete-item:has(> .autocomplete-item__state) {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.autocomplete-item__state {
+  flex: none;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
 .autocomplete-item:hover,
 .autocomplete-item--active {
   background-color: var(--color-accent-light);
@@ -624,6 +639,27 @@
 
 .shopping-page .list-group {
   gap: var(--space-1);
+}
+
+/* EINE GRUPPE OHNE ZEILEN STEHT IM DOM UND NICHT IM BILD (#1816). Abgehaktes
+ * wandert in den Abschnitt am Listenende; die Kategorie, die dabei leer wird,
+ * behaelt ihren Traeger fuer den Rueckweg, und der Abschnitt selbst wartet
+ * leer auf den ersten Haken. `.list-group` setzt `display: grid` und schluege
+ * das UA-`[hidden]` (test:hidden-cascade). */
+.shopping-page .list-group[hidden] {
+  display: none;
+}
+
+/* DER KOPF VON „ABGEHAKT" IST EIN VOLLES ZIEL (#1816, DESIGN.md: --target-base).
+ * Der geteilte Gruppenkopf ist so hoch wie seine Schrift, 24px, und im engen
+ * Rhythmus dieser Seite (12px darueber, 4px darunter) ist kein Platz, die
+ * Treffflaeche unsichtbar zu vergroessern, ohne in die Zeilen der Nachbarn zu
+ * reichen - ein Tipp an den Rand einer Zeile klappte dann eine Gruppe zu.
+ * Dieser Kopf waechst deshalb selbst. Der Raum, den er dabei gewinnt, steht
+ * ueber ihm: der Abschnitt ist keine weitere Kategorie, sondern das Ende der
+ * Liste, und rueckt von ihr ab. */
+.shopping-page .item-ticked .list-group__toggle {
+  min-height: var(--target-base);
 }
 
 /* ZWEI SPALTEN AM DESKTOP (Re-Critique 2026-09-27, A4 P1 / R10 L4).

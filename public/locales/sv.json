@@ -720,6 +720,8 @@
         "duplicateSubmit": "Duplicera",
         "duplicateError": "Listan kunde inte dupliceras.",
         "itemStateChecked": "avbockad",
+        "tickedSection": "Avbockat",
+        "itemBackToast": "”{{name}}” är tillbaka på listan.",
         "itemStateOpen": "inte avbockad"
     },
     "meals": {

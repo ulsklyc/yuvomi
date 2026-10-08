@@ -734,6 +734,8 @@
         "duplicateSubmit": "Duplikat",
         "duplicateError": "Daftar tidak dapat diduplikat.",
         "itemStateChecked": "dicentang",
+        "tickedSection": "Sudah dicentang",
+        "itemBackToast": "\"{{name}}\" kembali ada di daftar.",
         "itemStateOpen": "belum dicentang"
     },
     "meals": {

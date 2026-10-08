@@ -720,6 +720,8 @@
         "duplicateSubmit": "Duplicar",
         "duplicateError": "Não foi possível duplicar a lista.",
         "itemStateChecked": "marcado",
+        "tickedSection": "Marcados",
+        "itemBackToast": "«{{name}}» está de volta na lista.",
         "itemStateOpen": "não marcado"
     },
     "meals": {

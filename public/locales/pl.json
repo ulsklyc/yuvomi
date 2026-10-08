@@ -852,6 +852,8 @@
         "duplicateSubmit": "Duplikuj",
         "duplicateError": "Nie udało się zduplikować listy.",
         "itemStateChecked": "odhaczone",
+        "tickedSection": "Odhaczone",
+        "itemBackToast": "„{{name}}” jest znowu na liście.",
         "itemStateOpen": "nieodhaczone"
     },
     "meals": {

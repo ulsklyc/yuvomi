@@ -720,6 +720,8 @@
         "duplicateSubmit": "Dupliceren",
         "duplicateError": "De lijst kon niet worden gedupliceerd.",
         "itemStateChecked": "afgevinkt",
+        "tickedSection": "Afgevinkt",
+        "itemBackToast": "„{{name}}” staat weer op de lijst.",
         "itemStateOpen": "niet afgevinkt"
     },
     "meals": {

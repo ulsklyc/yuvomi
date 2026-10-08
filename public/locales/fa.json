@@ -734,6 +734,8 @@
         "duplicateSubmit": "کپی",
         "duplicateError": "کپی کردن فهرست ممکن نشد.",
         "itemStateChecked": "تیک خورده",
+        "tickedSection": "تیک‌خورده‌ها",
+        "itemBackToast": "«{{name}}» دوباره در فهرست است.",
         "itemStateOpen": "تیک نخورده"
     },
     "meals": {

@@ -720,6 +720,8 @@
         "duplicateSubmit": "Dupliser",
         "duplicateError": "Listen kunne ikke dupleres.",
         "itemStateChecked": "avkrysset",
+        "tickedSection": "Avkrysset",
+        "itemBackToast": "«{{name}}» er tilbake på listen.",
         "itemStateOpen": "ikke avkrysset"
     },
     "meals": {
