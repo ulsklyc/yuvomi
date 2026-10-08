@@ -527,14 +527,19 @@ test('#1534: Geraet und Haushalt in derselben Zone - unveraendert',
 // 5. Die Wand nennt Kalender und Spanne eines Termins (#1698, D#988)
 // --------------------------------------------------------------------------
 
+function wallRowTime(row) {
+  const m = /<span class="wall-row__time[^"]*">([^<]*)(?:<span class="wall-row__time-end">([^<]*)<\/span>)?<\/span>/.exec(row);
+  return m ? `${m[1]}${m[2] ?? ''}` : null;
+}
+
 function wallRows(events, { tasks = [], tone = 'event' } = {}) {
   const html = dash.renderWallSurface({ upcomingEvents: events, urgentTasks: tasks, users: [] }, null, { now: new Date() });
   return [...html.matchAll(new RegExp(`<li class="wall-row wall-row--${tone}">([\\s\\S]*?)</li>`, 'g'))].map(([, row]) => ({
     title: (/wall-row__title">([^<]*)</.exec(row) || [])[1],
     sub: (/wall-row__sub">([^<]*)</.exec(row) || [])[1],
-    // Die ganze Zeitangabe, wie sie zu lesen ist: Beginn und, in einem eigenen
-    // Element, das Ende.
-    time: (/<span class="wall-row__time[^>]*>([\s\S]*?)<\/span>\s*$/.exec(row.trim()) || [])[1]?.replace(/<[^>]+>/g, '') ?? null,
+    // Die ganze Zeitangabe, wie sie zu lesen ist: der Beginn und, in einem
+    // eigenen Element dahinter, das Ende.
+    time: wallRowTime(row),
   }));
 }
 
@@ -622,6 +627,20 @@ test('#1698: die Unterzeile des Blatts bleibt eine Zeile, die Zustandskarte darf
   assert.match(state?.body ?? '', /white-space:\s*normal/);
 });
 
+test('#1698: der Kalendername ist der des gewaehlten Ziels - `source_calendar_name` vor `cal_name`', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  // Wie im Kalendermodul: ein neu angelegter Termin wartet noch auf seinen
+  // Upload (`cal_name` fehlt), ein umziehender nennt in `cal_name` noch den
+  // alten Kalender.
+  const events = [
+    ev(1, 'Wartet auf Upload', '2026-09-24T14:00', '2026-09-24T15:00', { source_calendar_name: 'Arbeit' }),
+    ev(2, 'Zieht um', '2026-09-24T15:00', '2026-09-24T16:00', { cal_name: 'Alt', source_calendar_name: 'Neu' }),
+    ev(3, 'Nur verknuepft', '2026-09-24T16:00', '2026-09-24T17:00', { cal_name: 'Familie', source_calendar_name: '  ' }),
+  ];
+  const rows = dash.buildTodayProgram({ upcomingEvents: events }, { includeTasks: false, includeMeals: false, now: new Date() }).rows;
+  assert.deepEqual(rows.map((row) => row.sub), ['Arbeit', 'Neu', 'Familie']);
+  assert.deepEqual(wallRows(events).map((row) => row.sub), ['Arbeit', 'Neu', 'Familie']);
+}));
+
 // --- Nachzug aus dem Review von #1826 ---
 
 // Samstag, 27.03.2027, 10:00 in Berlin - in der Nacht darauf springt die Uhr
@@ -677,8 +696,15 @@ test('#1698 Wand: ganztaegig bleibt ganztaegig, auch mit Uhrzeit im Wert; ein En
     const by = Object.fromEntries(wallRows([
       ev(1, 'Ganztags mit Uhrzeit', '2026-09-24T00:00', '2026-09-24T23:59', { all_day: 1 }),
       ev(2, 'Ende nur als Datum', '2026-09-24T15:00', '2026-09-24'),
+      // Ein Datum am FOLGETAG liest als Stempel Mitternacht - „15:30 - 00:00"
+      // waere eine Uhrzeit, die niemand eingetragen hat.
+      ev(3, 'Ende als Datum von morgen', '2026-09-24T15:30', '2026-09-25'),
     ]).map((row) => [row.title, row.time]));
-    assert.deepEqual(by, { 'Ganztags mit Uhrzeit': 'dashboard.allDay', 'Ende nur als Datum': '2026-09-24T15:00' });
+    assert.deepEqual(by, {
+      'Ganztags mit Uhrzeit': 'dashboard.allDay',
+      'Ende nur als Datum': '2026-09-24T15:00',
+      'Ende als Datum von morgen': '2026-09-24T15:30',
+    });
   }));
 
 test('#1698 Wand: Beginn UND Ende gehen durch den echten Formatierer (12-Stunden-Format)',

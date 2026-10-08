@@ -256,6 +256,20 @@ function overviewEventTime(event, span) {
 }
 
 /**
+ * Der Name des Kalenders, zu dem ein Termin gehoert - oder leer (#1698).
+ *
+ * `source_calendar_name` VOR `cal_name`, dieselbe Reihenfolge wie im
+ * Kalendermodul (calendar.js): `cal_name` kommt ueber die Verknuepfung des
+ * schon synchronisierten Termins und fehlt, solange ein neu angelegter Termin
+ * noch auf seinen Upload wartet; waehrend eines ausstehenden Umzugs nennt er
+ * noch den alten Kalender. `source_calendar_name` nennt in beiden Faellen das
+ * Ziel, das der Mensch gewaehlt hat.
+ */
+function eventCalendarName(event) {
+  return String(event?.source_calendar_name ?? '').trim() || String(event?.cal_name ?? '').trim();
+}
+
+/**
  * Das Ende eines Termins fuer die WAND (#1698, D#988), fertig formatiert -
  * oder leer, wenn die Zeile beim Beginn allein bleibt. Die Wand schreibt es
  * hinter die Zeitangabe, die `overviewEventTime` liefert: Beginn UND Ende.
@@ -285,8 +299,12 @@ function overviewEventTime(event, span) {
 function wallEventEnd(event, span) {
   if (span.until || span.allDay) return '';
   const end = String(event?.end_datetime || '');
+  // Ein Ende ohne Uhrzeit ('YYYY-MM-DD') ist kein Ende einer Spanne. Der
+  // Riegel steht HIER und nicht im Stempel: `householdStamp('2026-09-25')`
+  // liest Mitternacht, und aus „18:00 bis zum 25." wuerde „18:00 - 00:00" -
+  // eine Uhrzeit, die niemand eingetragen hat.
+  if (end.length <= 10) return '';
   const startStamp = householdStamp(String(event?.start_datetime || ''));
-  // Ein Ende ohne Uhrzeit ('YYYY-MM-DD') ergibt keinen Stempel und damit keine Spanne.
   const endStamp = householdStamp(end);
   if (!startStamp || !endStamp || endStamp <= startStamp) return '';
   const dayLater = `${addLocalDays(startStamp.slice(0, 10), 1)}${startStamp.slice(10)}`;
@@ -1168,7 +1186,7 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
         // Kalenders, im Heute-Blatt wie an der Wand. „Frueh" ist erst mit
         // „Niklas Arbeitskalender" darunter eine Auskunft. Ein Termin, der nur
         // in Yuvomi lebt, hat keinen Kalendernamen - er behaelt das Wort.
-        sub: String(event.cal_name ?? '').trim() || t('dashboard.todayEvent'),
+        sub: eventCalendarName(event) || t('dashboard.todayEvent'),
         // Das ENDE bleibt der Wand vorbehalten (entschieden in #1698): es reist
         // neben `timeLabel` mit, und nur `renderWallRow` schreibt es dahinter.
         // Das Blatt nennt weiter den Beginn allein.
