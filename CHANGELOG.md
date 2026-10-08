@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Wall mode shows which calendar an appointment comes from, and when it ends** (#1698, from
+  D#988). Every appointment in the day's programme carried the same word underneath, "Event".
+  It now shows the name of its calendar there, so "Early" reads as the shift from the work
+  calendar, and the time shows start and end ("6:00 - 14:00") instead of the start alone. An
+  appointment that lives in Yuvomi only keeps the word "Event". All-day appointments and ones
+  carried over from yesterday read as before.
 - **Rows show fewer buttons.** Lists no longer carry a pencil and a bin on every line. Editing,
   deleting and anything further sit behind one "more" button per row that is always visible and
   names what it does in words. This applies to shopping items, birthdays, tasks, loan payments

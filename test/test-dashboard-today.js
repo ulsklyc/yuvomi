@@ -519,3 +519,67 @@ test('#1534: Geraet und Haushalt in derselben Zone - unveraendert',
     assert.deepEqual(rows.map((row) => [row.title, tz.zonedTimeKey(todayUntil(row)), row.sortKey]),
       [['Frueh', '06:15', '06:15'], ['Muell', '18:00', '18:00'], ['Spaet', '23:30', '23:30']]);
   })));
+
+// --------------------------------------------------------------------------
+// 5. Die Wand nennt Kalender und Spanne eines Termins (#1698, D#988)
+// --------------------------------------------------------------------------
+
+function wallRows(events) {
+  const html = dash.renderWallSurface({ upcomingEvents: events, urgentTasks: [], users: [] }, null, { now: new Date() });
+  return [...html.matchAll(/<li class="wall-row wall-row--event">([\s\S]*?)<\/li>/g)].map(([, row]) => ({
+    title: (/wall-row__title">([^<]*)</.exec(row) || [])[1],
+    sub: (/wall-row__sub">([^<]*)</.exec(row) || [])[1],
+    time: (/wall-row__time[^>]*>([^<]*)</.exec(row) || [])[1] ?? null,
+  }));
+}
+
+test('#1698 Wand: der Kalendername ersetzt „Termin", und die Zeit nennt Beginn und Ende', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  const rows = wallRows([
+    ev(1, 'Frueh', '2026-09-24T14:00', '2026-09-24T22:00', { cal_name: 'Niklas Arbeitskalender' }),
+  ]);
+  assert.deepEqual(rows, [{ title: 'Frueh', sub: 'Niklas Arbeitskalender', time: '2026-09-24T14:00 - 2026-09-24T22:00' }]);
+}));
+
+test('#1698 Wand: ohne Kalendernamen bleibt das Wort, und der Name laeuft durch esc()', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  const rows = wallRows([
+    ev(1, 'Nur in Yuvomi', '2026-09-24T14:00', '2026-09-24T15:00'),
+    ev(2, 'Leer', '2026-09-24T15:00', '2026-09-24T16:00', { cal_name: '   ' }),
+    ev(3, 'Boese', '2026-09-24T16:00', '2026-09-24T17:00', { cal_name: '<img src=x>' }),
+  ]);
+  assert.deepEqual(rows.map((row) => row.sub), ['dashboard.todayEvent', 'dashboard.todayEvent', '&lt;img src=x&gt;']);
+}));
+
+test('#1698 Wand: eine Spanne nur mit echtem Ende am selben Tag oder in der Nacht', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  // Zwei Aufrufe: die Wand zeigt hoechstens WALL_ROW_CAP Zeilen.
+  const by = Object.fromEntries([
+    ...wallRows([
+      ev(1, 'Ohne Ende', '2026-09-24T14:00', null),
+      ev(2, 'Ende gleich Beginn', '2026-09-24T15:00', '2026-09-24T15:00'),
+      ev(3, 'Nachtschicht', '2026-09-24T22:00', '2026-09-25T06:00'),
+    ]),
+    ...wallRows([
+      ev(4, 'Reise ab heute', '2026-09-24T18:00', '2026-09-26T12:00'),
+      ev(5, 'Ganztags', '2026-09-24', '2026-09-24', { all_day: 1 }),
+      ev(6, 'Seit gestern', '2026-09-23T20:00', '2026-09-24T12:00'),
+    ]),
+  ].map((row) => [row.title, row.time]));
+  assert.deepEqual(by, {
+    'Ohne Ende': '2026-09-24T14:00',
+    'Ende gleich Beginn': '2026-09-24T15:00',
+    Nachtschicht: '2026-09-24T22:00 - 2026-09-25T06:00',
+    'Reise ab heute': '2026-09-24T18:00',
+    Ganztags: 'dashboard.allDay',
+    'Seit gestern': 'dashboard.todayUntil{&quot;time&quot;:&quot;2026-09-24T12:00&quot;}',
+  });
+}));
+
+test('#1698: das Heute-Blatt der Uebersicht bleibt, wie es war - die Frage ist offen', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  const events = [ev(1, 'Frueh', '2026-09-24T14:00', '2026-09-24T22:00', { cal_name: 'Niklas Arbeitskalender' })];
+  const [row] = dash.buildTodayProgram({ upcomingEvents: events }, { includeTasks: false, includeMeals: false, now: new Date() }).rows;
+  assert.equal(row.sub, 'dashboard.todayEvent');
+  assert.equal(row.timeLabel, '2026-09-24T14:00');
+  const sheet = dash.renderTodayCockpit({ upcomingEvents: events, urgentTasks: [], users: [] }, []);
+  assert.match(sheet, /Frueh/, 'Reichweite: das Blatt zeigt den Termin');
+  assert.ok(!sheet.includes('Niklas Arbeitskalender'), 'das Blatt nennt den Kalender (noch) nicht');
+  assert.ok(!sheet.includes('2026-09-24T22:00'), 'und kein Ende');
+}));
