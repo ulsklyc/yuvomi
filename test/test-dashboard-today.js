@@ -17,6 +17,9 @@
  *        4. „Heute bis HH:MM" (#1534): die Faelligkeit einer Aufgabe wurde
  *           in der Zone des Geraets gelesen und dann in die des Haushalts
  *           umgerechnet - hier mit Prozesszone != Haushaltszone.
+ *        5. Die Wand-Fassung der Terminzeile (#1698): Kalendername statt
+ *           „Termin", Beginn UND Ende nur mit echtem Ende unter 24 Stunden,
+ *           und das Heute-Blatt der Uebersicht bleibt, wie es war.
  *
  * Ausfuehren: npm run test:dashboard-today
  */
