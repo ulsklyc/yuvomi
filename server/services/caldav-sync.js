@@ -787,6 +787,19 @@ function countAccountEvents(accountId) {
 // YIELD_EVERY verarbeiteten Objekten kurz an den Event-Loop zurückgegeben.
 const YIELD_EVERY = 50;
 
+/**
+ * Lokale Termine, die auf ihren Upload in dieses Konto warten. EINE Auswahl für
+ * zwei Fragesteller: der Upload nimmt seine Termine daraus, und der Abruf
+ * übernimmt ein schon oben liegendes eigenes Objekt nur für einen Termin, der
+ * hier steht (adoptOwnEventUpload).
+ */
+function localUploadsOf(accountId) {
+  return db.get().prepare(`
+    SELECT * FROM calendar_events
+    WHERE external_source = 'local' AND target_caldav_account_id = ?
+  `).all(accountId);
+}
+
 /** Echter tsdav-Client für einen Account; in Tests durch eine Factory ersetzbar. */
 const defaultClientFactory = createCalDAVClient;
 
@@ -1094,7 +1107,16 @@ async function runSync({ createClient } = {}) {
               // als geändert vorgemerkt, der Zweig darunter lässt sie stehen
               // und der Outbound dieses Laufs trägt den lokalen Stand hinauf.
               if (!existing && obj.url
-                  && outbound.adoptOwnEventUpload({ source: 'caldav', uid: ev.uid, objectUrl: obj.url, calRefId })) {
+                  && outbound.adoptOwnEventUpload({
+                    source: 'caldav', uid: ev.uid, objectUrl: obj.url, calRefId,
+                    calendarUrl: selCal.calendar_url,
+                    // Nur ein Termin, der auf den Upload in GENAU diesen
+                    // Kalender dieses Kontos wartet - die UID kommt vom
+                    // Server und weist nichts aus.
+                    isWaitingHere: (eventId) => localUploadsOf(account.id).some(
+                      (e) => e.id === eventId && e.target_caldav_calendar_url === selCal.calendar_url
+                    ),
+                  })) {
                 existing = selExistingEvent.get(ev.uid);
               }
 
@@ -1231,10 +1253,7 @@ async function runSync({ createClient } = {}) {
       }
 
       // Outbound sync: Yuvomi → CalDAV (events with target_caldav_account_id)
-      const localEvents = db.get().prepare(`
-        SELECT * FROM calendar_events
-        WHERE external_source = 'local' AND target_caldav_account_id = ?
-      `).all(account.id);
+      const localEvents = localUploadsOf(account.id);
 
       // Einmal je Lauf: die Zone, an der naive Zeiten haengen (#938).
       const householdZone = householdTimeZone(db.get());

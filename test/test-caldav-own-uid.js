@@ -42,7 +42,7 @@ const dbmod = await import('../server/db.js');
 const db = dbmod.get();
 const {
   installationId, ownUid, legacyOwnUid, parseOwnUid, isOwnUidOfRow, ownUploadRowId,
-  sqlIsOwnEventUidOfRow, sqlLooksLikeOwnEventUid,
+  sqlIsOwnEventUidOfRow, sqlLooksLikeOwnEventUid, findObjectWithUid,
 } = await import('../server/utils/own-uid.js');
 const todoOutbound  = await import('../server/services/caldav-todo-outbound.js');
 const remindersSync = await import('../server/services/caldav-reminders-sync.js');
@@ -449,6 +449,506 @@ for (const [label, way] of Object.entries(WAYS)) {
     assert.equal(rows().length, 1);
   });
 }
+
+// ── Die UID kommt vom Server und ist kein Ausweis ───────────────────────────────
+//
+// Die Installationskennung steht in jeder UID auf jedem Server, mit dem je
+// synchronisiert wurde. Wer in eine Collection schreiben darf - der Server
+// selbst, oder jemand, mit dem sie geteilt ist -, kann dort ein Objekt mit einer
+// UID im Muster dieser Installation und einer beliebigen Zeilen-Id ablegen.
+// Übernähme der Abruf daraufhin "die lokale Zeile mit dieser Id", bände er eine
+// fremde Zeile an dieses Konto, merkte sie als geändert vor, und ihr Inhalt
+// ginge mit dem nächsten Outbound auf diesen Server.
+
+const snapshot = (table, id) => {
+  const row = { ...db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id) };
+  delete row.updated_at;
+  return row;
+};
+
+/** Legt in `plantUrl` ein Objekt ab, dessen UID auf die lokale Zeile `id` zeigt. */
+function plant(way, plantUrl, id) {
+  const uid = ownUid(way.kind, id, db);
+  dav.putObject(plantUrl, `${uid}.ics`, ics(way.component, uid, 'Planted'));
+  return uid;
+}
+
+/** Was nach jedem untergeschobenen Objekt gelten muss. */
+function assertNotExfiltrated(way, plantUrl, uid) {
+  const plantPath = new URL(plantUrl).pathname;
+  assert.match(dav.getObject(plantUrl, `${uid}.ics`).data, /SUMMARY:Planted/,
+    'das untergeschobene Objekt wurde mit dem lokalen Stand überschrieben');
+  const leaked = dav.requests.filter((r) => r.path.startsWith(plantPath) && r.body.includes('Geheim'));
+  assert.equal(leaked.length, 0, `der Inhalt der Zeile ging an ${plantPath}: ${leaked.map((r) => r.method).join(', ')}`);
+  // Das Objekt ist ein Eintrag wie jeder andere auf dem Server: ein Import.
+  assert.equal(db.prepare(`SELECT COUNT(*) AS n FROM ${way.table} WHERE ${way.titleColumn} = 'Planted'`).get().n, 1,
+    'das untergeschobene Objekt wurde nicht als eigene Zeile importiert');
+}
+
+async function runAll(way) {
+  await way.sync();
+  await way.push();
+  await way.sync();
+}
+
+/**
+ * Der eine Lauf, in dem die Zeile noch auf ihren Upload wartet - für die Fälle,
+ * in denen sie danach rechtmässig woanders gespiegelt ist. Ein weiterer Abruf
+ * träfe dann auf ZWEI Objekte mit derselben UID in einem Konto, und was der
+ * Abruf daraus macht, ist eine ältere Regel als die Übernahme (er liest die UID
+ * als Identität über die Collections des Kontos hinweg).
+ */
+async function runOnce(way) {
+  await way.sync();
+  await way.push();
+}
+
+test('Aufgabe ohne Upload-Ziel: ein untergeschobenes Objekt mit ihrer UID übernimmt sie nicht', async () => {
+  reset();
+  const way = WAYS.Aufgabe;
+  const url = way.setup();
+  const id = Number(db.prepare(`
+    INSERT INTO tasks (title, description, created_by, assigned_to, visibility)
+    VALUES ('Geheim', 'Geheim: nur für mich', 1, 1, 'private')
+  `).run().lastInsertRowid);
+  const before = snapshot('tasks', id);
+  const uid = plant(way, url, id);
+
+  await runAll(way);
+
+  assert.deepEqual(snapshot('tasks', id), before, 'eine Aufgabe, die nie hochgeladen werden sollte, wurde angefasst');
+  assert.equal(dav.requests.filter((r) => r.body.includes('Geheim')).length, 0, 'ihr Inhalt hat den Server erreicht');
+  assertNotExfiltrated(way, url, uid);
+});
+
+test('Aufgabe für eine ANDERE Liste: das Objekt in dieser Liste übernimmt sie nicht', async () => {
+  reset();
+  const way = WAYS.Aufgabe;
+  const url = way.setup();
+  const other = dav.addCollection('todo2', { name: 'Privat', components: ['VTODO'] });
+  db.prepare(`
+    INSERT INTO caldav_reminder_selection (account_id, list_url, list_name, target_module, enabled)
+    VALUES (?, ?, 'Privat', 'tasks', 1)
+  `).run(accountId, other);
+  const id = way.create(other, 'Geheim');
+  const uid = plant(way, url, id);
+
+  await runOnce(way);
+
+  // Sie geht dorthin, wohin sie sollte - und nur dorthin.
+  const now = snapshot('tasks', id);
+  assert.equal(now.external_object_url, `${other}${uid}.ics`, 'die Aufgabe wurde an die falsche Liste gebunden');
+  assert.match(dav.getObject(other, `${uid}.ics`).data, /SUMMARY:Geheim/);
+  assertNotExfiltrated(way, url, uid);
+});
+
+test('Aufgabe für ein ANDERES Konto: das Objekt in der Liste dieses Kontos übernimmt sie nicht', async () => {
+  reset();
+  const way = WAYS.Aufgabe;
+  const url = way.setup();
+  const otherAccount = Number(db.prepare(`
+    INSERT INTO caldav_accounts (name, caldav_url, username, password) VALUES ('Zweites', ?, 'u2', 'p2')
+  `).run(dav.url).lastInsertRowid);
+  const id = Number(db.prepare(`
+    INSERT INTO tasks (title, created_by, target_caldav_account_id, target_caldav_list_url) VALUES ('Geheim', 1, ?, ?)
+  `).run(otherAccount, url).lastInsertRowid);
+  const uid = plant(way, url, id);
+
+  await runAll(way);
+
+  const now = snapshot('tasks', id);
+  assert.equal(now.external_source, 'local', 'die Aufgabe eines anderen Kontos wurde an dieses gebunden');
+  assert.equal(now.external_account_id, null);
+  assertNotExfiltrated(way, url, uid);
+});
+
+test('Einkaufsartikel einer NICHT zugeordneten Liste: das Objekt übernimmt ihn nicht', async () => {
+  reset();
+  const way = WAYS.Einkaufsartikel;
+  const url = way.setup();
+  const privateList = db.prepare("INSERT INTO shopping_lists (name, created_by) VALUES ('Privat', 1) RETURNING id").get().id;
+  const id = Number(db.prepare(
+    "INSERT INTO shopping_items (list_id, name, notes) VALUES (?, 'Geheim', 'Geheim: Geschenk')"
+  ).run(privateList).lastInsertRowid);
+  const before = snapshot('shopping_items', id);
+  const uid = plant(way, url, id);
+
+  await runAll(way);
+
+  assert.deepEqual(snapshot('shopping_items', id), before, 'ein Artikel einer nicht gespiegelten Liste wurde angefasst');
+  assert.equal(dav.requests.filter((r) => r.body.includes('Geheim')).length, 0, 'sein Inhalt hat den Server erreicht');
+  assertNotExfiltrated(way, url, uid);
+});
+
+test('Termin ohne Upload-Ziel: ein untergeschobenes Objekt mit seiner UID übernimmt ihn nicht', async () => {
+  reset();
+  const way = WAYS.Termin;
+  const url = way.setup();
+  const id = Number(db.prepare(`
+    INSERT INTO calendar_events (title, description, start_datetime, end_datetime, all_day, created_by, assigned_to, external_source, visibility)
+    VALUES ('Geheim', 'Geheim: Arzt', '2035-03-10T09:00', '2035-03-10T10:00', 0, 1, 1, 'local', 'private')
+  `).run().lastInsertRowid);
+  const before = snapshot('calendar_events', id);
+  const uid = plant(way, url, id);
+
+  await runAll(way);
+
+  assert.deepEqual(snapshot('calendar_events', id), before, 'ein Termin, der nie hochgeladen werden sollte, wurde angefasst');
+  assert.equal(dav.requests.filter((r) => r.body.includes('Geheim')).length, 0, 'sein Inhalt hat den Server erreicht');
+  assertNotExfiltrated(way, url, uid);
+});
+
+test('Termin für einen ANDEREN Kalender: das Objekt in diesem Kalender übernimmt ihn nicht', async () => {
+  reset();
+  const way = WAYS.Termin;
+  const url = way.setup();
+  const other = dav.addCollection('private', { name: 'Privat', components: ['VEVENT'] });
+  db.prepare(`
+    INSERT INTO caldav_calendar_selection (account_id, calendar_url, calendar_name, calendar_color, enabled)
+    VALUES (?, ?, 'Privat', '#4A90E2', 1)
+  `).run(accountId, other);
+  const id = way.create(other, 'Geheim');
+  const uid = plant(way, url, id);
+
+  await runOnce(way);
+
+  const now = snapshot('calendar_events', id);
+  assert.equal(now.external_object_url, `${other}${uid}.ics`, 'der Termin wurde an den falschen Kalender gebunden');
+  assert.match(dav.getObject(other, `${uid}.ics`).data, /SUMMARY:Geheim/);
+  assertNotExfiltrated(way, url, uid);
+});
+
+test('Termin für ein ANDERES Konto: das Objekt im Kalender dieses Kontos übernimmt ihn nicht', async () => {
+  reset();
+  const way = WAYS.Termin;
+  const url = way.setup();
+  const otherAccount = Number(db.prepare(`
+    INSERT INTO caldav_accounts (name, caldav_url, username, password) VALUES ('Zweites', ?, 'u2', 'p2')
+  `).run(dav.url).lastInsertRowid);
+  const id = Number(db.prepare(`
+    INSERT INTO calendar_events
+      (title, start_datetime, end_datetime, all_day, created_by, external_source,
+       target_caldav_account_id, target_caldav_calendar_url)
+    VALUES ('Geheim', '2035-03-10T09:00', '2035-03-10T10:00', 0, 1, 'local', ?, ?)
+  `).run(otherAccount, url).lastInsertRowid);
+  const before = snapshot('calendar_events', id);
+  const uid = plant(way, url, id);
+
+  await runAll(way);
+
+  // Das zweite Konto hat keinen Kalender ausgewählt, sein Lauf fasst nichts an.
+  assert.deepEqual(snapshot('calendar_events', id), before, 'der Termin eines anderen Kontos wurde an dieses gebunden');
+  assertNotExfiltrated(way, url, uid);
+});
+
+test('iCloud-Termin: ein Objekt in einem ANDEREN als dem Upload-Kalender übernimmt ihn nicht', async () => {
+  reset();
+  const way = WAYS['iCloud-Termin'];
+  const first = way.setup();
+  // Uploads gehen in den ERSTEN Kalender; das Objekt liegt im zweiten.
+  const second = dav.addCollection('shared', { name: 'Geteilt', components: ['VEVENT'] });
+  const id = way.create(first, 'Geheim');
+  const uid = plant(way, second, id);
+
+  await runOnce(way);
+
+  const now = snapshot('calendar_events', id);
+  assert.equal(now.external_object_url, `${first}${uid}.ics`, 'der Termin wurde an den Kalender des untergeschobenen Objekts gebunden');
+  assertNotExfiltrated(way, second, uid);
+});
+
+for (const [label, way] of Object.entries(WAYS)) {
+  const { row, rows, names } = helpers(way);
+
+  test(`${label}: am eigenen Namen liegt ein Objekt mit FREMDER UID - nicht übernommen, nicht überschrieben`, async () => {
+    reset();
+    const url = way.setup();
+    const id  = way.create(url, 'Geheim');
+    const uid = ownUid(way.kind, id, db);
+    // Der Dateiname ist unserer, die UID im Objekt nicht: aus dem Namen allein
+    // darf niemand schliessen, dass das unser Upload ist.
+    dav.putObject(url, `${uid}.ics`, ics(way.component, 'somebody-else@test', 'Fremd'));
+
+    await way.blindUpload();
+    assert.ok(dav.seen('PUT').some((r) => r.status === 412), 'der Upload traf nicht auf das Objekt');
+    await runAll(way);
+
+    assert.match(dav.getObject(url, `${uid}.ics`).data, /SUMMARY:Fremd/, 'das fremde Objekt wurde überschrieben');
+    assert.match(dav.getObject(url, `${uid}.ics`).data, /UID:somebody-else@test/);
+    assert.equal(row(id).external_source, 'local', 'die Zeile wurde an ein fremdes Objekt gebunden');
+    assert.deepEqual(names(url), [`${uid}.ics`]);
+  });
+
+  test(`${label}: beim Übernehmen überschreibt der Serverinhalt nichts`, async () => {
+    reset();
+    const url = way.setup();
+    const id  = way.create(url, 'Alt');
+    if (way.table !== 'shopping_items') {
+      db.prepare(`UPDATE ${way.table} SET visibility = 'private', assigned_to = 1, description = 'lokal' WHERE id = ?`).run(id);
+    } else {
+      db.prepare("UPDATE shopping_items SET notes = 'lokal', quantity = '3' WHERE id = ?").run(id);
+    }
+    const uid = ownUid(way.kind, id, db);
+
+    dav.refuse({ method: 'PUT', status: 500, commit: true, once: true });
+    await way.upload();
+    assert.equal(row(id).external_source, 'local');
+    // Zwischen dem verlorenen PUT und dem Abruf hat jemand das Objekt auf dem
+    // Server verändert.
+    dav.putObject(url, `${uid}.ics`, ics(way.component, uid, 'Manipuliert'));
+    const before = snapshot(way.table, id);
+
+    // Abruf (übernimmt) und Outbound. Verglichen wird VOR dem nächsten Abruf:
+    // der liest das eben hochgeladene Objekt zurück und schreibt dabei die
+    // Zeiten in der Schreibweise des Servers - das tut er nach jedem Upload.
+    await way.sync();
+    await way.push();
+
+    const after = snapshot(way.table, id);
+    const SYNC_COLUMNS = [
+      'external_source', 'external_uid', 'external_calendar_id', 'external_account_id', 'external_object_url',
+      'calendar_ref_id', 'outbound_dirty', 'outbound_attempts', 'target_caldav_account_id', 'target_caldav_list_url',
+      'color_modified',
+    ];
+    for (const column of SYNC_COLUMNS) { delete before[column]; delete after[column]; }
+    assert.deepEqual(after, before, 'der Inhalt vom Server hat lokale Felder überschrieben');
+    assert.equal(row(id).external_source, way.source);
+    await way.sync();
+    assert.equal(rows().length, 1);
+    assert.equal(row(id)[way.titleColumn], 'Alt');
+    assert.match(dav.getObject(url, `${uid}.ics`).data, /SUMMARY:Alt/, 'der lokale Stand ging nicht hinauf');
+  });
+}
+
+// ── Nur eine UNGESPIEGELTE Zeile wird übernommen ────────────────────────────────
+//
+// Der Regelfall jeder Bestandsinstallation: ihre hochgeladenen Einträge liegen
+// unter dem ALTEN Muster auf dem Server. Ein Objekt im neuen Muster mit der Id
+// einer solchen Zeile findet der Abruf deshalb nicht als "schon vorhanden" und
+// fragt die Übernahme. Ginge sie durch, hinge die Zeile danach am
+// untergeschobenen Objekt, ihr eigenes bliebe verwaist zurück, und ihr Inhalt
+// ginge an die Adresse, die der Server genannt hat.
+
+for (const [label, way] of Object.entries(WAYS)) {
+  const { row } = helpers(way);
+
+  test(`${label}: eine schon gespiegelte Zeile wird von einem Objekt mit ihrer Id nicht umgebunden`, async () => {
+    reset();
+    const url = way.setup();
+    const id = way.createMirrored(url, 'pending', 'Geheim', `${url}pending.ics`);
+    const legacy = legacyOwnUid(way.kind, id);
+    const { url: objectUrl } = dav.putObject(url, `${legacy}.ics`, ics(way.component, legacy, 'Geheim'));
+    db.prepare(`UPDATE ${way.table} SET ${way.uidColumn} = ?, external_object_url = ? WHERE id = ?`).run(legacy, objectUrl, id);
+    // So steht ein vor dem Wechsel hochgeladener Termin da: gespiegelt, und die
+    // Zielspalten nennen weiter den Kalender, in den er ging.
+    if (way === WAYS.Termin) {
+      db.prepare('UPDATE calendar_events SET target_caldav_account_id = ?, target_caldav_calendar_url = ? WHERE id = ?')
+        .run(accountId, url, id);
+    }
+    const uid = plant(way, url, id);
+
+    await runAll(way);
+
+    const now = row(id);
+    assert.equal(now[way.uidColumn], legacy, 'die gespiegelte Zeile wurde an das untergeschobene Objekt gebunden');
+    assert.equal(now.external_object_url, objectUrl);
+    assert.equal(now.outbound_dirty, 0, 'die gespiegelte Zeile wurde als geändert vorgemerkt');
+    assert.match(dav.getObject(url, `${legacy}.ics`).data, /SUMMARY:Geheim/);
+    assertNotExfiltrated(way, url, uid);
+  });
+}
+
+test('Einkaufsartikel einer ANDERS zugeordneten Liste: das Objekt in dieser Liste übernimmt ihn nicht', async () => {
+  reset();
+  const way = WAYS.Einkaufsartikel;
+  const url = way.setup();
+  const other = dav.addCollection('shop2', { name: 'Privat', components: ['VTODO'] });
+  const privateList = db.prepare("INSERT INTO shopping_lists (name, created_by) VALUES ('Privat', 1) RETURNING id").get().id;
+  db.prepare(`
+    INSERT INTO caldav_reminder_selection (account_id, list_url, list_name, target_module, enabled, target_list_id)
+    VALUES (?, ?, 'Privat', 'shopping', 1, ?)
+  `).run(accountId, other, privateList);
+  const id = Number(db.prepare("INSERT INTO shopping_items (list_id, name) VALUES (?, 'Geheim')").run(privateList).lastInsertRowid);
+  const uid = plant(way, url, id);
+
+  await runOnce(way);
+
+  const now = snapshot('shopping_items', id);
+  assert.equal(now.external_object_url, `${other}${uid}.ics`, 'der Artikel wurde an die falsche Liste gebunden');
+  assert.equal(now.list_id, privateList);
+  assert.match(dav.getObject(other, `${uid}.ics`).data, /SUMMARY:Geheim/);
+  assertNotExfiltrated(way, url, uid);
+});
+
+// ── Die Übernahme selbst, Bedingung für Bedingung ───────────────────────────────
+//
+// Dieselben Regeln ohne Server dazwischen: jede Ablehnung steht neben dem Aufruf,
+// der sich nur in dieser einen Angabe unterscheidet und DURCHGEHT. Ohne diese
+// Gegenprobe könnte ein Fall aus einem ganz anderen Grund abgelehnt worden sein.
+
+test('adoptOwnUpload (Aufgabe): nur lokal, nur dieses Konto, nur diese Liste, nur die eigene Adresse und UID', () => {
+  reset();
+  const way = WAYS.Aufgabe;
+  const list = way.setup();
+  const otherList = `${dav.url}cal/elsewhere/`;
+  const otherAccount = Number(db.prepare(`
+    INSERT INTO caldav_accounts (name, caldav_url, username, password) VALUES ('Zweites', ?, 'u2', 'p2')
+  `).run(dav.url).lastInsertRowid);
+  const id = way.create(list, 'Geheim');
+  const uid = ownUid('task', id, db);
+  const good = [uid, accountId, `${list}${uid}.ics`, { listUrl: list }];
+  const before = snapshot('tasks', id);
+  const refused = (why, ...args) => {
+    assert.equal(todoOutbound.adoptOwnUpload('tasks', ...args), false, why);
+    assert.deepEqual(snapshot('tasks', id), before, `${why} - und die Zeile wurde trotzdem angefasst`);
+  };
+
+  refused('ein anderes Konto', uid, otherAccount, good[2], good[3]);
+  refused('eine andere Liste', uid, accountId, `${otherList}${uid}.ics`, { listUrl: otherList });
+  refused('das Objekt liegt nicht in der abgerufenen Liste', uid, accountId, `${otherList}${uid}.ics`, good[3]);
+  refused('das Objekt liegt auf einem anderen Host', uid, accountId,
+    `http://evil.example${new URL(list).pathname}${uid}.ics`, good[3]);
+  refused('ohne Angabe der Liste', uid, accountId, good[2], {});
+  refused('ohne Angabe der Liste', uid, accountId, good[2]);
+  refused('eine UID, die wir so nie erzeugen', uid.replace(`-${id}-`, `-0${id}-`), accountId,
+    `${list}${uid.replace(`-${id}-`, `-0${id}-`)}.ics`, good[3]);
+  refused('das alte Muster', legacyOwnUid('task', id), accountId, `${list}${legacyOwnUid('task', id)}.ics`, good[3]);
+  refused('die falsche Art', ownUid('item', id, db), accountId, `${list}${ownUid('item', id, db)}.ics`, good[3]);
+
+  // Schon gespiegelt (an ein anderes Konto), die Zielspalten stehen aber noch:
+  // allein `external_source` hält die Übernahme auf.
+  db.prepare(`
+    UPDATE tasks SET external_source = 'caldav', external_uid = 'theirs@test', external_account_id = ?,
+                     external_object_url = ? WHERE id = ?
+  `).run(otherAccount, `${otherList}theirs.ics`, id);
+  const mirrored = snapshot('tasks', id);
+  assert.equal(todoOutbound.adoptOwnUpload('tasks', ...good), false, 'eine gespiegelte Zeile wurde übernommen');
+  assert.deepEqual(snapshot('tasks', id), mirrored);
+
+  // Die Gegenprobe: dieselbe Zeile, wieder lokal, dieselben Angaben.
+  db.prepare(`
+    UPDATE tasks SET external_source = 'local', external_uid = NULL, external_account_id = NULL,
+                     external_object_url = NULL WHERE id = ?
+  `).run(id);
+  assert.equal(todoOutbound.adoptOwnUpload('tasks', ...good), true, 'die wartende Zeile wurde nicht übernommen');
+  const now = snapshot('tasks', id);
+  assert.equal(now.external_source, 'caldav');
+  assert.equal(now.external_account_id, accountId);
+  assert.equal(now.external_object_url, good[2]);
+  assert.equal(now.outbound_dirty, 1);
+  assert.equal(now.title, 'Geheim');
+});
+
+test('adoptOwnUpload (Einkauf): nur lokal, nur die zugeordnete Liste, nur die eigene Adresse', () => {
+  reset();
+  const way = WAYS.Einkaufsartikel;
+  const list = way.setup();
+  const otherList = `${dav.url}cal/elsewhere/`;
+  const unmapped = db.prepare("INSERT INTO shopping_lists (name, created_by) VALUES ('Privat', 1) RETURNING id").get().id;
+  const id = way.create(list, 'Geheim');
+  const uid = ownUid('item', id, db);
+  const good = [uid, accountId, `${list}${uid}.ics`, { listUrl: list, targetListId: way.listId }];
+  const before = snapshot('shopping_items', id);
+  const refused = (why, ...args) => {
+    assert.equal(todoOutbound.adoptOwnUpload('shopping', ...args), false, why);
+    assert.deepEqual(snapshot('shopping_items', id), before, `${why} - und die Zeile wurde trotzdem angefasst`);
+  };
+
+  refused('eine andere Yuvomi-Liste', uid, accountId, good[2], { listUrl: list, targetListId: unmapped });
+  refused('ohne zugeordnete Yuvomi-Liste', uid, accountId, good[2], { listUrl: list });
+  refused('das Objekt liegt nicht in der abgerufenen Liste', uid, accountId, `${otherList}${uid}.ics`, good[3]);
+
+  db.prepare("UPDATE shopping_items SET external_source = 'caldav', external_uid = 'theirs@test' WHERE id = ?").run(id);
+  const mirrored = snapshot('shopping_items', id);
+  assert.equal(todoOutbound.adoptOwnUpload('shopping', ...good), false, 'ein gespiegelter Artikel wurde übernommen');
+  assert.deepEqual(snapshot('shopping_items', id), mirrored);
+
+  db.prepare("UPDATE shopping_items SET external_source = 'local', external_uid = NULL WHERE id = ?").run(id);
+  assert.equal(todoOutbound.adoptOwnUpload('shopping', ...good), true, 'der wartende Artikel wurde nicht übernommen');
+  assert.equal(snapshot('shopping_items', id).external_object_url, good[2]);
+});
+
+test('adoptOwnEventUpload: nur lokal, nur wenn der Aufrufer das Warten bestätigt, nur die eigene Adresse und UID', () => {
+  reset();
+  const way = WAYS.Termin;
+  const cal = way.setup();
+  const otherCal = `${dav.url}cal/elsewhere/`;
+  const id = way.create(cal, 'Geheim');
+  const uid = ownUid('event', id, db);
+  const asked = [];
+  const good = {
+    source: 'caldav', uid, objectUrl: `${cal}${uid}.ics`, calendarUrl: cal, calRefId: way.refId,
+    isWaitingHere: (eventId) => { asked.push(eventId); return true; },
+  };
+  const before = snapshot('calendar_events', id);
+  const refused = (why, change) => {
+    assert.equal(outbound.adoptOwnEventUpload({ ...good, ...change }), false, why);
+    assert.deepEqual(snapshot('calendar_events', id), before, `${why} - und der Termin wurde trotzdem angefasst`);
+  };
+
+  refused('der Aufrufer bestätigt das Warten nicht', { isWaitingHere: () => false });
+  refused('ohne Prüfung des Aufrufers', { isWaitingHere: undefined });
+  refused('ohne Angabe des Kalenders', { calendarUrl: undefined });
+  refused('das Objekt liegt nicht im abgerufenen Kalender', { objectUrl: `${otherCal}${uid}.ics` });
+  refused('das Objekt liegt auf einem anderen Host', { objectUrl: `http://evil.example${new URL(cal).pathname}${uid}.ics` });
+  const zero = uid.replace(`-${id}-`, `-0${id}-`);
+  refused('eine UID, die wir so nie erzeugen', { uid: zero, objectUrl: `${cal}${zero}.ics` });
+  const legacy = legacyOwnUid('event', id);
+  refused('das alte Muster', { uid: legacy, objectUrl: `${cal}${legacy}.ics` });
+
+  // Schon gespiegelt: auch ein Aufrufer, der fälschlich "wartet hier" sagt,
+  // bekommt die Zeile nicht.
+  db.prepare("UPDATE calendar_events SET external_source = 'caldav', external_calendar_id = 'theirs@test' WHERE id = ?").run(id);
+  const mirrored = snapshot('calendar_events', id);
+  assert.equal(outbound.adoptOwnEventUpload(good), false, 'ein gespiegelter Termin wurde übernommen');
+  assert.deepEqual(snapshot('calendar_events', id), mirrored);
+
+  db.prepare("UPDATE calendar_events SET external_source = 'local', external_calendar_id = NULL WHERE id = ?").run(id);
+  asked.length = 0;
+  assert.equal(outbound.adoptOwnEventUpload(good), true, 'der wartende Termin wurde nicht übernommen');
+  assert.deepEqual(asked, [id], 'gefragt wurde nicht nach der Zeile aus der UID');
+  const now = snapshot('calendar_events', id);
+  assert.equal(now.external_source, 'caldav');
+  assert.equal(now.external_object_url, good.objectUrl);
+  assert.equal(now.outbound_dirty, 1);
+  assert.equal(now.title, 'Geheim');
+});
+
+test('412: gelesen wird das Objekt an genau dieser Adresse, und gemerkt wird nur sie', async () => {
+  const collection = 'https://dav.example/cal/todo/';
+  const uid = ownUid('task', 7, db);
+  const objectUrl = `${collection}${uid}.ics`;
+  const asked = [];
+  const answering = (objects) => ({
+    fetchCalendarObjects: async (params) => { asked.push(params); return objects; },
+  });
+  const find = (objects) => findObjectWithUid(answering(objects), collection, objectUrl, uid);
+  const ours = ics('VTODO', uid, 'Unseres');
+
+  // Der Server schickt ein Objekt mit, nach dem nicht gefragt war. Es trägt
+  // unsere UID - aber es liegt nicht unter dem Namen, der vergeben ist.
+  assert.equal(await find([{ url: `${collection}somewhere-else.ics`, etag: '"1"', data: ours }]), null,
+    'ein Objekt an anderer Adresse galt als das unter dem vergebenen Namen');
+  assert.equal(await find([{ url: `https://dav.example/cal/shared/${uid}.ics`, etag: '"1"', data: ours }]), null,
+    'ein Objekt in einer anderen Collection galt als das unter dem vergebenen Namen');
+  assert.equal(await find([{ url: objectUrl, etag: '"1"', data: ics('VTODO', 'somebody-else@test', 'Fremd') }]), null,
+    'ein Objekt mit fremder UID galt als unseres');
+  assert.equal(await find([]), null);
+  assert.equal(await find(undefined), null);
+
+  // Dieselbe Adresse in der Schreibweise des Servers (`@` als `%40`).
+  const encoded = `${collection}${uid.replace('@', '%40')}.ics`;
+  assert.notEqual(encoded, objectUrl);
+  assert.deepEqual(await find([{ url: encoded, etag: '"2"', data: ours }]), { url: objectUrl, etag: '"2"', data: ours },
+    'die Adresse aus der Antwort wurde übernommen statt der angefragten');
+  // Gefaltete UID-Zeile und fremde Objekte davor.
+  const folded = ours.replace(`UID:${uid}`, `UID:${uid.slice(0, 10)}\r\n ${uid.slice(10)}`);
+  assert.equal((await find([
+    { url: `${collection}neighbour.ics`, etag: '"0"', data: ics('VTODO', 'neighbour@test', 'Nachbar') },
+    { url: objectUrl, etag: '"3"', data: folded },
+  ])).etag, '"3"');
+  assert.deepEqual(asked.at(-1), { calendar: { url: collection }, objectUrls: [objectUrl] });
+});
 
 // ── Umzug ohne Kalenderliste: unbekannt ist nicht verschwunden ──────────────────
 

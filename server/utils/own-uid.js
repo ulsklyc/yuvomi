@@ -31,6 +31,15 @@
 // Upload dieser lokalen Zeile"), gilt nur das neue Muster mit der eigenen
 // Kennung - eine alte UID kann von einer früheren Installation stammen.
 //
+// KEIN AUSWEIS. Die Installationskennung ist ein Namensraum, kein Geheimnis:
+// sie steht in jeder UID auf jedem Server, mit dem je synchronisiert wurde,
+// und jeder, der dort schreiben darf, kann eine UID in diesem Muster bauen.
+// Eine UID aus einer Serverantwort sagt deshalb nur, WELCHE Zeile gemeint sein
+// könnte (`ownUploadRowId`). Ob mit dieser Zeile etwas geschieht, entscheidet
+// der Aufrufer am lokalen Stand - die Zeile muss von sich aus auf den Upload an
+// genau diese Stelle warten (`adoptOwnUpload`, `adoptOwnEventUpload`). Nichts
+// hier darf als Berechtigungsprüfung gelesen werden.
+//
 // Ohne Import von db.js: die Verbindung wird übergeben, damit kein Helfer hier
 // beim Laden die Datenbank anfasst.
 // --------------------------------------------------------
@@ -115,8 +124,12 @@ export function isOwnUidOfRow(uid, kind, id) {
 }
 
 /**
- * Zeilen-Id, deren Upload dieses Objekt ist - oder null. Übernehmen: nur das
- * neue Muster mit der Kennung DIESER Installation.
+ * Zeilen-Id, deren Upload dieses Objekt SEIN KÖNNTE - oder null. Nur das neue
+ * Muster mit der Kennung DIESER Installation.
+ *
+ * Ein Hinweis, kein Beleg: die UID stammt vom Server. Der Aufrufer muss am
+ * lokalen Stand prüfen, dass die Zeile auf den Upload an diese Stelle wartet,
+ * bevor er sie anfasst.
  */
 export function ownUploadRowId(uid, kind, database) {
   const parsed = parseOwnUid(uid);
@@ -145,12 +158,27 @@ export function sqlLooksLikeOwnEventUid(column) {
         OR ${column} LIKE 'yuvomi-event-%@${DOMAIN}%')`;
 }
 
+/** Derselbe Pfad, gleich ob der Server `@` als `%40` zurückgibt. */
+function samePath(a, b) {
+  const pathOf = (url) => {
+    try { return decodeURIComponent(new URL(url).pathname); } catch { return null; }
+  };
+  const path = pathOf(a);
+  return path !== null && path === pathOf(b);
+}
+
 /**
  * Liegt an dieser Adresse ein Objekt mit dieser UID? Die Antwort auf ein 412
  * beim Anlegen: der Name ist vergeben - von uns?
  *
  * Geprüft wird die UID im Objekt, nicht nur die Adresse: der Dateiname ist
- * Konvention, die UID ist die Identität.
+ * Konvention, die UID ist die Identität. Und geprüft wird das Objekt an GENAU
+ * dieser Adresse: tsdav reicht bei einem Multiget jede Antwort durch, auch
+ * eine, nach der nicht gefragt war. Ein Objekt mit unserer UID an anderer
+ * Stelle sagt nichts darüber, was unter dem vergebenen Namen liegt.
+ *
+ * Die zurückgegebene Adresse ist immer die angefragte, nie eine vom Server
+ * genannte - auf sie wird danach geschrieben.
  *
  * @returns {Promise<{url: string, etag: string|undefined, data: string}|null>}
  */
@@ -160,9 +188,10 @@ export async function findObjectWithUid(client, collectionUrl, objectUrl, uid) {
     objectUrls: [objectUrl],
   });
   for (const obj of objects || []) {
+    if (obj?.url && !samePath(obj.url, objectUrl)) continue;
     const lines = String(obj?.data ?? '').replace(/\r\n/g, '\n').replace(/\n[ \t]/g, '').split('\n');
     if (lines.some((line) => line.trim() === `UID:${uid}`)) {
-      return { url: obj.url || objectUrl, etag: obj.etag, data: obj.data };
+      return { url: objectUrl, etag: obj.etag, data: obj.data };
     }
   }
   return null;

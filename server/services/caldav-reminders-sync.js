@@ -537,8 +537,12 @@ async function runSync({ createClient: makeClient } = {}) {
               // Der eigene Upload, dessen Antwort verloren ging: die Zeile ist
               // noch lokal, das Objekt liegt schon hier. In die bestehende
               // Zeile übernehmen statt eine zweite anzulegen; ihr lokaler
-              // Stand geht mit dem Outbound dieses Laufs hinauf.
-              if (obj.url && todoOutbound.adoptOwnUpload(module, todo.uid, account.id, obj.url)) {
+              // Stand geht mit dem Outbound dieses Laufs hinauf. Nur für eine
+              // Zeile, die auf den Upload in GENAU diese Liste wartet - die
+              // UID kommt vom Server und weist nichts aus (adoptOwnUpload).
+              if (obj.url && todoOutbound.adoptOwnUpload(module, todo.uid, account.id, obj.url, {
+                listUrl: sel.list_url, targetListId: sel.target_list_id,
+              })) {
                 totalItems++;
                 continue;
               }

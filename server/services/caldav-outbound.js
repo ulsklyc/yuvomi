@@ -368,7 +368,7 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
             const copy = await findObjectWithUid(client, collectionUrl, objectUrl, event.external_calendar_id);
             if (!copy) throw err;
             await client.updateCalendarObject({
-              calendarObject: { url: copy.url, etag: copy.etag, data: patched },
+              calendarObject: { url: objectUrl, etag: copy.etag, data: patched },
             });
           }
           // Erst nach erfolgreichem Anlegen löschen: scheitert das Löschen, steht

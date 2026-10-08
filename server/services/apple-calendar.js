@@ -423,7 +423,14 @@ async function runSync({ makeClient } = {}) {
           // Der eigene Upload, dessen Antwort verloren ging: in die noch lokale
           // Zeile übernehmen statt eine zweite anzulegen (wie im CalDAV-Sync).
           if (!existing && obj.url
-              && outbound.adoptOwnEventUpload({ source: 'apple', uid: ev.uid, objectUrl: obj.url, calRefId })) {
+              && outbound.adoptOwnEventUpload({
+                source: 'apple', uid: ev.uid, objectUrl: obj.url, calRefId, calendarUrl: cal.url,
+                // Nur ein Termin, den der Upload unten in GENAU diesen Kalender
+                // schicken würde (den ersten) - die UID kommt vom Server und
+                // weist nichts aus.
+                isWaitingHere: (eventId) => cal.url === syncCalendars[0].url
+                  && collectLocalOutboundEvents(db.get()).some((e) => e.id === eventId),
+              })) {
             existing = selExisting.get(ev.uid);
           }
 

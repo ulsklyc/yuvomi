@@ -411,16 +411,54 @@ export function todoUidFor(module, id) {
  * mit der UID dieser Installation, dessen Zeile noch lokal ist: der PUT kam an,
  * die Antwort nicht. Ohne das legte der Abruf eine ZWEITE Zeile an.
  *
+ * DIE UID KOMMT VOM SERVER UND IST KEIN AUSWEIS. Die Installationskennung
+ * steht in jeder UID auf jedem Server, mit dem je synchronisiert wurde; wer
+ * auf eine Collection schreiben darf, kann ein Objekt mit einer UID im Muster
+ * dieser Installation und einer beliebigen Zeilen-Id hinlegen. Übernähme der
+ * Abruf daraufhin einfach "die lokale Zeile mit dieser Id", würde eine fremde
+ * Zeile - die private Aufgabe eines anderen Mitglieds, eine ohne jedes Ziel,
+ * eine für ein anderes Konto - an dieses Konto gebunden, als geändert
+ * vorgemerkt, und ihr Inhalt ginge mit dem nächsten Outbound auf diesen Server.
+ *
+ * Die UID benennt deshalb nur, WELCHE Zeile gemeint sein könnte. Ob sie
+ * übernommen wird, entscheidet allein der lokale Stand: die Zeile muss genau
+ * JETZT auf ihren Upload in genau DIESE Liste dieses Kontos warten - dieselbe
+ * Auswahl, aus der der Upload selbst seine Zeilen nimmt (`pendingCreations`,
+ * `pendingShoppingCreations`). Dann erfährt der Server nichts, was er nicht
+ * ohnehin im selben Lauf per PUT bekäme. Alles andere bleibt ein gewöhnlicher
+ * Import als neue Zeile; eine bestehende wird nicht angefasst.
+ *
  * Endzustand wie nach dem 412 in `uploadNewTodo`: gespiegelt und als geändert
  * vorgemerkt, damit der lokale Stand hinaufgeht - über den Inhalt auf dem
- * Server wird nicht geraten.
+ * Server wird nicht geraten, und er überschreibt hier nichts (Sichtbarkeit,
+ * Zuweisung und alle Felder bleiben die lokalen).
  *
+ * @param {string} module
+ * @param {string} uid          UID aus dem Serverobjekt
+ * @param {number} accountId    Konto, dessen Liste gerade abgerufen wird
+ * @param {string} objectUrl    Adresse des Objekts laut Server
+ * @param {{listUrl: string, targetListId?: number|null}} where
+ *        die Liste, in der das Objekt liegt, und (Einkauf) die ihr zugeordnete
+ *        Yuvomi-Liste
  * @returns {boolean} true, wenn eine Zeile übernommen wurde
  */
-export function adoptOwnUpload(module, uid, accountId, objectUrl) {
+export function adoptOwnUpload(module, uid, accountId, objectUrl, { listUrl, targetListId = null } = {}) {
   const def = moduleDef(module);
   const rowId = ownUploadRowId(uid, uidKind(module), db.get());
-  if (!rowId || !objectUrl) return false;
+  if (!rowId || !objectUrl || !listUrl) return false;
+  // Exakt die UID, die wir für diese Zeile erzeugen würden.
+  if (uid !== todoUidFor(module, rowId)) return false;
+  // Das Objekt liegt in der Liste, die gerade abgerufen wird - nicht an einer
+  // Adresse, die der Server frei gewählt hat.
+  if (!sameCollection(collectionUrlOf(objectUrl) || '', listUrl)) return false;
+
+  const waitingHere = module === 'shopping'
+    ? !!targetListId && pendingShoppingCreations(targetListId).some((row) => row.id === rowId)
+    : pendingCreations(accountId, module).some(
+      (row) => row.id === rowId && sameCollection(row.target_caldav_list_url, listUrl)
+    );
+  if (!waitingHere) return false;
+
   const adopted = db.get().prepare(`
     UPDATE ${def.table}
        SET external_source     = 'caldav',
@@ -612,7 +650,7 @@ async function uploadNewTodo(client, collection, module, row, accountId) {
   const ics = buildTodoICS(module, row, uid);
   if (!ics) return false;
 
-  let objectUrl = `${String(collection.url).replace(/\/?$/, '/')}${uid}.ics`;
+  const objectUrl = `${String(collection.url).replace(/\/?$/, '/')}${uid}.ics`;
   // Der Name ist vergeben (412) und das Objekt trägt unsere UID: ein früherer
   // PUT kam an, seine Antwort nicht. Übernehmen und den lokalen Stand als
   // Änderung vormerken, statt zu raten, was dort liegt.
@@ -625,9 +663,10 @@ async function uploadNewTodo(client, collection, module, row, accountId) {
     });
   } catch (err) {
     if (err?.status !== 412) throw err;
-    const found = await findObjectWithUid(client, collection.url, objectUrl, uid);
-    if (!found) throw err;
-    objectUrl = found.url;
+    // Die UID wird im Objekt GELESEN, nicht aus dem Dateinamen geschlossen;
+    // liegt dort etwas anderes, bleibt es unangetastet und die Zeile lokal.
+    // Gemerkt wird die eigene, berechnete Adresse, nicht eine vom Server genannte.
+    if (!(await findObjectWithUid(client, collection.url, objectUrl, uid))) throw err;
     adopted = true;
     log.info(`${def.table} row ${row.id} is already on the server as ${uid}, adopting it.`);
   }

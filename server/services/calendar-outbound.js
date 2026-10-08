@@ -24,6 +24,7 @@ import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { runExternalJob } from '../utils/restore-state.js';
 import { ownUid, ownUploadRowId, findObjectWithUid } from '../utils/own-uid.js';
+import { collectionUrlOf } from '../utils/caldav-client.js';
 
 const log = createLogger('CalendarOutbound');
 
@@ -539,9 +540,11 @@ export async function uploadNewEvent(client, calendar, uid, ics) {
     return { objectUrl, adopted: false };
   } catch (err) {
     if (err?.status !== 412) throw err;
-    const found = await findObjectWithUid(client, collectionUrl, objectUrl, uid);
-    if (!found) throw err;
-    return { objectUrl: found.url, adopted: true };
+    // Die UID wird im Objekt GELESEN, nicht aus dem Dateinamen geschlossen;
+    // liegt dort etwas anderes, bleibt es unangetastet und der Termin lokal.
+    // Gemerkt wird die eigene, berechnete Adresse, nicht eine vom Server genannte.
+    if (!(await findObjectWithUid(client, collectionUrl, objectUrl, uid))) throw err;
+    return { objectUrl, adopted: true };
   }
 }
 
@@ -581,11 +584,41 @@ export function markEventUploaded(eventId, { source, uid, objectUrl, calRefId, a
  * nicht. In die bestehende Zeile übernehmen, statt eine zweite anzulegen.
  * Endzustand wie nach dem 412 im Upload: gespiegelt und als geändert vorgemerkt.
  *
+ * DIE UID KOMMT VOM SERVER UND IST KEIN AUSWEIS. Die Installationskennung
+ * steht in jeder UID auf jedem Server, mit dem je synchronisiert wurde; wer in
+ * einen Kalender schreiben darf, kann ein Objekt mit einer UID im Muster
+ * dieser Installation und einer beliebigen Zeilen-Id hinlegen. Die UID benennt
+ * deshalb nur, WELCHER Termin gemeint sein könnte. Übernommen wird er allein
+ * nach dem lokalen Stand: `isWaitingHere` muss bestätigen, dass genau dieser
+ * Termin JETZT auf seinen Upload in genau DIESEN Kalender wartet - aus
+ * derselben Auswahl, aus der der Upload seine Termine nimmt. Dann erfährt der
+ * Server nichts, was er nicht im selben Lauf per PUT bekäme. Sonst würde ein
+ * fremder, privater oder für ein anderes Konto bestimmter Termin an diesen
+ * Kalender gebunden und sein Inhalt mit dem nächsten Outbound hinaufgetragen.
+ *
+ * Der Serverinhalt überschreibt beim Übernehmen nichts: Felder, Sichtbarkeit
+ * und Zuweisung bleiben die lokalen.
+ *
+ * @param {object}   p
+ * @param {string}   p.source          'caldav' | 'apple'
+ * @param {string}   p.uid             UID aus dem Serverobjekt
+ * @param {string}   p.objectUrl       Adresse des Objekts laut Server
+ * @param {string}   p.calendarUrl     Kalender, der gerade abgerufen wird
+ * @param {number}   p.calRefId
+ * @param {(eventId: number) => boolean} p.isWaitingHere
  * @returns {boolean} true, wenn eine Zeile übernommen wurde
  */
-export function adoptOwnEventUpload({ source, uid, objectUrl, calRefId }) {
+export function adoptOwnEventUpload({ source, uid, objectUrl, calendarUrl, calRefId, isWaitingHere }) {
   const eventId = ownUploadRowId(uid, 'event', db.get());
-  if (!eventId || !objectUrl) return false;
+  if (!eventId || !objectUrl || !calendarUrl || typeof isWaitingHere !== 'function') return false;
+  // Exakt die UID, die wir für diesen Termin erzeugen würden.
+  if (uid !== eventUidFor(eventId)) return false;
+  // Das Objekt liegt in dem Kalender, der gerade abgerufen wird - nicht an
+  // einer Adresse, die der Server frei gewählt hat.
+  const trim = (url) => String(url || '').replace(/\/+$/, '');
+  if (trim(collectionUrlOf(objectUrl)) !== trim(calendarUrl)) return false;
+  if (!isWaitingHere(eventId)) return false;
+
   const adopted = markEventUploaded(eventId, {
     source, uid, objectUrl, calRefId, adopted: true, onlyIfLocal: true,
   });

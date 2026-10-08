@@ -1512,10 +1512,26 @@ The UID of a row never changes between attempts.
 - With the installation in the name, `412` on an upload means "this is ours": the earlier PUT
   arrived and only its answer was lost. The object is adopted - the row becomes a mirror and is
   marked `outbound_dirty`, so the local state goes up as a change; nothing is guessed about what
-  the server holds.
+  the server holds. The UID is read from the object at exactly the refused address
+  (`findObjectWithUid`), not concluded from the file name, and the address that is stored is the
+  computed one, never one the server named. An object with a different UID under that name stays
+  untouched and the row stays local.
 - The inbound run does the same from the other side: an object whose UID names this installation
   and a row that is still local is adopted into that row instead of being imported as a second
   one. Both orders end in the same state.
+- **The installation identifier is a namespace, not a credential.** It is in every UID on every
+  server ever synced with, and whoever may write to a collection can build a UID in this pattern
+  with any row id. A UID from a server answer therefore only names which row *could* be meant
+  (`ownUploadRowId`). Whether the row is adopted is decided on local state alone
+  (`adoptOwnUpload`, `adoptOwnEventUpload`): the row must be unmirrored
+  (`external_source = 'local'`) and must right now be waiting for its upload to exactly this
+  account and exactly this collection - the same selection the upload itself takes its rows from
+  (a task's `target_caldav_account_id` + `target_caldav_list_url`, a shopping item's list
+  mapped to the list being fetched, an event's `target_caldav_account_id` +
+  `target_caldav_calendar_url`, for iCloud the first calendar) - and the object must lie in the
+  collection being fetched. Then the server learns nothing it would not get by PUT in the same
+  run. Everything else is an ordinary import as a new row; the named row is not touched, and
+  adopting never copies server content into it.
 - **Existing mirrors keep their UID.** Nothing is renamed on the server. Where the code only
   *recognises* an upload of its own (default assignee, colour repair, inheriting a task series'
   target) both patterns count; *adopting* needs the new pattern with this installation's
