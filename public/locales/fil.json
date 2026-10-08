@@ -6006,6 +6006,7 @@
         "fillRange": "Punan ang saklaw",
         "rangeFrom": "Mula",
         "rangeTo": "Hanggang",
+        "rangeOrderError": "Hindi maaaring mas maaga sa petsa ng simula ang petsa ng pagtatapos.",
         "fillRangeConfirmTitle": "Punan ang saklaw na ito?",
         "fillRangeConfirmDetail": "Itatakda nito ang {{type}} para sa bawat araw mula {{from}} hanggang {{to}} at papalitan ang mga umiiral na entry sa saklaw na iyon.",
         "statistics": "Mga estadistika",

@@ -6006,6 +6006,7 @@
         "fillRange": "Időszak kitöltése",
         "rangeFrom": "Ettől",
         "rangeTo": "Eddig",
+        "rangeOrderError": "A befejezés dátuma nem lehet a kezdés dátuma előtt.",
         "fillRangeConfirmTitle": "Kitölti ezt az időszakot?",
         "fillRangeConfirmDetail": "Ez {{from}} és {{to}} között minden napra {{type}} értéket állít be, és felülírja az időszak meglévő bejegyzéseit.",
         "statistics": "Statisztika",

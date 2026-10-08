@@ -6006,6 +6006,7 @@
         "fillRange": "Fyll område",
         "rangeFrom": "Fra",
         "rangeTo": "Til",
+        "rangeOrderError": "Sluttdatoen kan ikke være før startdatoen.",
         "fillRangeConfirmTitle": "Fyll dette datoområdet?",
         "fillRangeConfirmDetail": "Dette setter {{type}} for hver dag fra {{from}} til {{to}}, og erstatter alle eksisterende oppføringer i det området.",
         "statistics": "Statistikk",

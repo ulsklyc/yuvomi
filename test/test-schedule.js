@@ -2941,3 +2941,182 @@ test('R16: Vergleich und Auswertung tragen mobil zwei Bedienzeilen', async () =>
   const labels = narrow.find((r) => r.selector.includes('.schedule-stat-range > .form-label'));
   assert.match(labels?.body ?? '', /clip-path:\s*inset\(50%\)/, 'die Feld-Labels bleiben im Baum');
 });
+
+/* #1777: "Bis" folgte "Von" nicht, und die Absage des Servers stand englisch
+ * im Toast. Drei Dinge, jedes am laufenden Code:
+ *   (1) der Server gibt der Absage einen `reason` mit, der Satz bleibt;
+ *   (2) "Bis" zieht mit, sobald "Von" es ueberholt - gefahren wird die echte
+ *       wireRangeFollow() an Feld-Attrappen, die `change` melden wie der
+ *       Datepicker;
+ *   (3) die Pruefung des Dialogs: die echte saveCreatedSchedule() mit Von nach
+ *       Bis meldet den Fehler AM FELD "Bis" und sendet nichts. */
+test('#1777: a reversed range is refused with reason range_reversed, the sentence stays', async () => {
+  const fill = await call('POST', '/overrides/fill', { as: ALICE, body: { user_id: ALICE.id, from: '2027-03-10', to: '2027-03-01', shift_type_id: null } });
+  assert.deepEqual(fill, { status: 400, body: { error: 'from must be before to.', code: 400, reason: 'range_reversed' } });
+  const clear = await call('DELETE', `/overrides?user_id=${ALICE.id}&from=2027-04-10&to=2027-04-01`, { as: ALICE });
+  assert.deepEqual(clear, { status: 400, body: { error: 'from must be before to.', code: 400, reason: 'range_reversed' } });
+  const list = await call('GET', '/overrides?from=2027-04-10&to=2027-04-01', { as: ALICE });
+  assert.equal(list.body.reason, 'range_reversed');
+  const entries = await call('GET', '/entries?from=2027-04-10&to=2027-04-01', { as: ALICE });
+  assert.deepEqual(entries, { status: 400, body: { error: 'from must be before to.', code: 400, reason: 'range_reversed' } });
+
+  // Mit einem zweiten Fehler im selben Satz bleibt der reason - am Wortlaut hinge er nicht mehr.
+  const two = await call('POST', '/overrides/fill', { as: ADMIN, body: { user_id: 99999, from: '2027-03-10', to: '2027-03-01', shift_type_id: null } });
+  assert.equal(two.status, 400);
+  assert.equal(two.body.error, 'from must be before to. user_id does not exist.');
+  assert.equal(two.body.reason, 'range_reversed');
+
+  // Gegenproben: ein fremdes Konto ist eine 403 ohne diesen reason, und eine
+  // andere 400 traegt ihn nicht.
+  const foreign = await call('POST', '/overrides/fill', { as: ALICE, body: { user_id: BOB.id, from: '2027-03-10', to: '2027-03-01', shift_type_id: null } });
+  assert.equal(foreign.status, 403);
+  assert.equal('reason' in foreign.body, false);
+  const other = await call('GET', '/entries?from=not-a-date&to=2027-04-01', { as: ALICE });
+  assert.equal(other.status, 400);
+  assert.equal('reason' in other.body, false);
+
+  // Die Oberflaeche liest den reason der ECHTEN Antwort, nicht den Satz.
+  const { __test } = await import('../public/pages/schedule.js');
+  assert.equal(__test.scheduleErrorMessage({ data: fill.body }), 'schedule.rangeOrderError');
+  assert.equal(__test.scheduleErrorMessage({ data: two.body }), 'schedule.rangeOrderError');
+});
+
+/** Feld-Attrappe mit genau der Flaeche, die der Datepicker den Dialogen bietet. */
+function rangeFieldStub(name, value) {
+  const listeners = new Map();
+  return {
+    name, value,
+    addEventListener(type, fn) { listeners.set(type, [...(listeners.get(type) ?? []), fn]); },
+    /** Wie `_emit()` im Datepicker: der Wert steht, dann kommt `change`. */
+    pick(next) { this.value = next; for (const fn of listeners.get('change') ?? []) fn({ currentTarget: this, target: this }); },
+  };
+}
+
+function rangeFormStub(fields, extra = {}) {
+  return {
+    ...extra,
+    fields,
+    querySelector(selector) {
+      const name = /^\[name="([^"]+)"\]$/.exec(selector)?.[1];
+      return fields.find((field) => field.name === name) ?? null;
+    },
+    querySelectorAll() { return []; },
+  };
+}
+
+test('#1777: "Bis" folgt "Von", sobald "Von" daran vorbeizieht - in beiden Feldpaaren', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  assert.equal(typeof __test.wireRangeFollow, 'function', 'kein Dialog verdrahtet Von und Bis miteinander');
+  for (const [fromName, toName] of [['range_from', 'range_to'], ['from', 'to']]) {
+    const from = rangeFieldStub(fromName, '2026-10-07');
+    const to = rangeFieldStub(toName, '2026-10-07');
+    __test.wireRangeFollow(rangeFormStub([from, to]));
+
+    from.pick('2026-10-08');
+    assert.equal(to.value, '2026-10-08', `${toName} zieht mit`);
+
+    // Gegenproben: ein frueheres "Von" laesst "Bis" stehen (der Zeitraum wird
+    // laenger), und "Bis" selbst zu verschieben bewegt "Von" nie.
+    from.pick('2026-10-01');
+    assert.equal(to.value, '2026-10-08', 'ein frueheres Von verlaengert den Zeitraum');
+    to.pick('2026-10-20');
+    assert.equal(from.value, '2026-10-01');
+    from.pick('2026-11-02');
+    assert.equal(to.value, '2026-11-02', 'ueber die Monatsgrenze');
+    // Ein geleertes "Von" raeumt "Bis" nicht ab.
+    from.pick('');
+    assert.equal(to.value, '2026-11-02');
+  }
+  // Ein Formular ohne Zeitraum (Schichtart anlegen) wirft nicht.
+  assert.doesNotThrow(() => __test.wireRangeFollow(rangeFormStub([rangeFieldStub('name', 'Frueh')])));
+});
+
+test('#1777: jeder Dialog mit Von und Bis verdrahtet das Mitziehen', () => {
+  // Die Funktion oben misst das Verhalten; hier steht, dass die drei Dialoge
+  // sie auch RUFEN - je einmal, direkt vor dem Verdrahten des Sendens.
+  const page = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const forms = page.split("form?.addEventListener('submit', saveCreatedSchedule);").length - 1;
+  const wired = page.split("wireRangeFollow(form);\n      form?.addEventListener('submit', saveCreatedSchedule);").length - 1;
+  assert.equal(forms, 3, 'drei Dialoge senden ueber saveCreatedSchedule()');
+  assert.equal(wired, forms);
+});
+
+test('#1777: Von nach Bis meldet der Dialog am Feld "Bis" und sendet nichts', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  assert.equal(typeof __test.saveCreatedSchedule, 'function', 'saveCreatedSchedule() ist fuer den Test nicht erreichbar');
+  const saved = {
+    FormData: globalThis.FormData, api: globalThis.__apiStub, report: globalThis.__reportFieldError,
+    confirm: globalThis.__confirmOverModal, close: globalThis.__closeModal, window: globalThis.window,
+  };
+  const sent = [];
+  const reported = [];
+  const toasts = [];
+  // Was ein echtes FormData aus dem Formular laese: die Felder, die nicht `disabled` sind.
+  globalThis.FormData = class {
+    constructor(form) { this.form = form; }
+    * [Symbol.iterator]() { for (const field of this.form.fields) if (!field.disabled) yield [field.name, field.value]; }
+  };
+  const record = (method) => async (path, body) => { sent.push([method, path, body]); return { data: {} }; };
+  globalThis.__apiStub = { post: record('POST'), put: record('PUT'), delete: record('DELETE'), get: async () => ({ data: [] }) };
+  globalThis.__reportFieldError = (field, message) => reported.push([field?.name, message]);
+  globalThis.__confirmOverModal = async () => true;
+  globalThis.__closeModal = async () => true;
+  globalThis.window = { ...(saved.window ?? {}), yuvomi: { showToast: (text, kind) => toasts.push([text, kind]) } };
+
+  const submit = async (kind, fields) => {
+    sent.length = 0; reported.length = 0; toasts.length = 0;
+    const form = rangeFormStub(fields, { dataset: { form: kind }, elements: { reminder_enabled: { checked: false }, is_active: { checked: true } } });
+    await __test.saveCreatedSchedule({ preventDefault() {}, currentTarget: form });
+    return { sent: [...sent], reported: [...reported], toasts: [...toasts] };
+  };
+  const field = (name, value, disabled = false) => ({ ...rangeFieldStub(name, value), disabled });
+
+  try {
+    // Der Fall aus dem Ticket: Zusatzschicht, Von 08.10., Bis noch 07.10.
+    const extra = await submit('pattern-create', [
+      field('mode', 'add'), field('user_id', '1'), field('shift_type_id', '1'), field('note', ''),
+      field('range_from', '2026-10-08'), field('range_to', '2026-10-07'),
+    ]);
+    assert.deepEqual(extra.sent, [], 'nichts geht an den Server');
+    assert.deepEqual(extra.reported, [['range_to', 'schedule.rangeOrderError']], 'die Meldung steht am Feld "Bis"');
+    assert.deepEqual(extra.toasts, [], 'und es gibt keinen Toast');
+
+    // Dieselbe Pruefung im Modus "Abweichung" und in beiden Bearbeiten-Dialogen.
+    const replace = await submit('pattern-create', [
+      field('mode', 'replace'), field('user_id', '1'), field('shift_type_id', ''), field('note', ''),
+      field('range_from', '2026-10-08'), field('range_to', '2026-10-07'),
+    ]);
+    assert.deepEqual([replace.reported, replace.sent], [[['range_to', 'schedule.rangeOrderError']], []]);
+    for (const kind of ['override-edit', 'extra-edit-range']) {
+      const edit = await submit(kind, [
+        field('user_id', '1'), field('shift_type_id', '1'), field('note', ''), field('ids', '7'),
+        field('original_from', '2026-10-01'), field('original_to', '2026-10-03'),
+        field('from', '2026-10-08'), field('to', '2026-10-07'),
+      ]);
+      assert.deepEqual([edit.reported, edit.sent], [[['to', 'schedule.rangeOrderError']], []], kind);
+    }
+
+    // GEGENPROBEN - die Pruefung haelt nichts auf, was gehen soll.
+    // Ein richtiger Zeitraum geht raus, ohne Meldung am Feld.
+    const ok = await submit('pattern-create', [
+      field('mode', 'add'), field('user_id', '1'), field('shift_type_id', '1'), field('note', ''),
+      field('range_from', '2026-10-07'), field('range_to', '2026-10-08'),
+    ]);
+    assert.deepEqual(ok.reported, []);
+    assert.equal(ok.sent[0]?.[1], '/schedule/extras/fill');
+    assert.deepEqual([ok.sent[0][2].from, ok.sent[0][2].to], ['2026-10-07', '2026-10-08']);
+    // Im Modus "Muster" ist das Feldpaar `disabled`: was dort steht, zaehlt nicht.
+    const pattern = await submit('pattern-create', [
+      field('mode', 'pattern'), field('user_id', '1'), field('name', 'Woche'), field('cycle_length', '7'), field('anchor_date', '2026-10-05'),
+      field('range_from', '2026-10-08', true), field('range_to', '2026-10-07', true),
+    ]);
+    assert.deepEqual(pattern.reported, []);
+  } finally {
+    globalThis.FormData = saved.FormData;
+    globalThis.__apiStub = saved.api;
+    globalThis.__reportFieldError = saved.report;
+    globalThis.__confirmOverModal = saved.confirm;
+    globalThis.__closeModal = saved.close;
+    globalThis.window = saved.window;
+  }
+});

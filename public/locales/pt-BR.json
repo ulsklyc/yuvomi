@@ -5830,6 +5830,7 @@
         "fillRange": "Preencher período",
         "rangeFrom": "De",
         "rangeTo": "Até",
+        "rangeOrderError": "A data de término não pode ser anterior à de início.",
         "fillRangeConfirmTitle": "Preencher este período?",
         "fillRangeConfirmDetail": "Isso definirá {{type}} para todos os dias de {{from}} a {{to}}, substituindo os lançamentos existentes no intervalo.",
         "statistics": "Estatísticas",

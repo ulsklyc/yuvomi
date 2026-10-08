@@ -6006,6 +6006,7 @@
         "fillRange": "Fill range",
         "rangeFrom": "From",
         "rangeTo": "To",
+        "rangeOrderError": "The end date can't be before the start date.",
         "fillRangeConfirmTitle": "Fill this date range?",
         "fillRangeConfirmDetail": "This sets {{type}} for every day from {{from}} to {{to}}, replacing any existing entries in that range.",
         "statistics": "Statistics",

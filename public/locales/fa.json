@@ -6006,6 +6006,7 @@
         "fillRange": "پر کردن بازه",
         "rangeFrom": "از",
         "rangeTo": "تا",
+        "rangeOrderError": "تاریخ پایان نباید پیش از تاریخ شروع باشد.",
         "fillRangeConfirmTitle": "این بازه پر شود؟",
         "fillRangeConfirmDetail": "این کار {{type}} را برای هر روز از {{from}} تا {{to}} تنظیم می‌کند و ورودی‌های موجود در آن بازه را جایگزین می‌کند.",
         "statistics": "آمار",

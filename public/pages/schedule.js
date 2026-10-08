@@ -260,9 +260,67 @@ const SCHEDULE_SERVER_ERROR_MESSAGES = {
   'Shift type is in use.': () => t('schedule.typeInUse'),
 };
 
+// Wo der Server einen `reason` mitgibt, zaehlt der und nicht der Wortlaut
+// (wie die Budget-Routen seit #1693/#1694): ein Satz mit mehreren Fehlern
+// ("from must be before to. user_id does not exist.") trifft keinen Eintrag
+// der Liste oben, sein reason schon.
+const SCHEDULE_SERVER_REASON_MESSAGES = {
+  range_reversed: () => t('schedule.rangeOrderError'),
+};
+
 function scheduleErrorMessage(error) {
+  const byReason = SCHEDULE_SERVER_REASON_MESSAGES[error?.data?.reason]?.();
+  if (byReason) return byReason;
   const raw = error?.data?.error ?? error?.message;
   return (raw && SCHEDULE_SERVER_ERROR_MESSAGES[raw]?.()) ?? raw ?? t('common.errorGeneric');
+}
+
+/* VON UND BIS EINES ZEITRAUMS (#1777).
+ *
+ * Drei Dialoge fragen einen Zeitraum ab: "Eintrag hinzufuegen" (range_from /
+ * range_to, fuer Abweichung UND Zusatzschicht dasselbe Feldpaar) und die
+ * beiden Bearbeiten-Dialoge (from / to). In keinem folgte "Bis", wenn "Von"
+ * daran vorbeizog: Von 08.10., Bis blieb 07.10., der Server sagte 400 und der
+ * Toast zeigte seinen englischen Satz.
+ *
+ * Zwei Haelften, beide noetig: (1) "Bis" zieht mit, sobald "Von" es ueberholt -
+ * das ist der haeufige Weg, und er hinterlaesst einen Einzeltag, den Normalfall
+ * dieser Dialoge. (2) Wer "Bis" danach selbst vor "Von" setzt, bekommt die
+ * Absage AM FELD, bevor etwas gesendet wird. Datumsschluessel (YYYY-MM-DD)
+ * vergleichen sich als Text richtig. */
+const RANGE_FIELD_PAIRS = [['range_from', 'range_to'], ['from', 'to']];
+
+function rangeFields(form) {
+  for (const [fromName, toName] of RANGE_FIELD_PAIRS) {
+    const from = form?.querySelector('[name="' + fromName + '"]');
+    const to = form?.querySelector('[name="' + toName + '"]');
+    if (from && to) return { from, to, fromName, toName };
+  }
+  return null;
+}
+
+const rangeReversed = (from, to) => Boolean(from && to && from > to);
+
+/** "Bis" folgt "Von". Der Datepicker meldet `change` an sich selbst. */
+function wireRangeFollow(form) {
+  const fields = rangeFields(form);
+  if (!fields) return;
+  fields.from.addEventListener('change', () => {
+    if (rangeReversed(fields.from.value, fields.to.value)) fields.to.value = fields.from.value;
+  });
+}
+
+/**
+ * Die Pruefung des Dialogs vor dem Senden: true, wenn der Zeitraum verkehrt
+ * herum steht - dann traegt "Bis" die Meldung und nichts geht raus. Gelesen
+ * wird, was das Formular SENDEN wuerde (`data`): im Modus "Muster" ist das
+ * Feldpaar `disabled` und fehlt dort.
+ */
+function reportReversedRange(form, data) {
+  const fields = rangeFields(form);
+  if (!fields || !rangeReversed(data?.[fields.fromName], data?.[fields.toName])) return false;
+  reportFieldError(fields.to, t('schedule.rangeOrderError'));
+  return true;
 }
 
 async function load() {
@@ -2236,6 +2294,7 @@ function openOverrideEditModal(group) {
     onSave: (modal) => {
       const form = modal.querySelector('#schedule-create-form');
       wireOccurrenceFieldReactivity(form);
+      wireRangeFollow(form);
       form?.addEventListener('submit', saveCreatedSchedule);
     },
   });
@@ -2297,6 +2356,7 @@ function openExtraGroupEditModal(group) {
         form.querySelector('[name="reminder_offset_minutes"]').disabled = !event.currentTarget.checked;
       });
       wireOccurrenceFieldReactivity(form);
+      wireRangeFollow(form);
       form?.addEventListener('submit', saveCreatedSchedule);
     },
   });
@@ -2440,6 +2500,7 @@ function openScheduleCreateModal(view, { mode = 'pattern' } = {}) {
         form.querySelector('[name="reminder_offset_minutes"]').disabled = !event.currentTarget.checked;
       });
       wireOccurrenceFieldReactivity(form);
+      wireRangeFollow(form);
       form?.addEventListener('submit', saveCreatedSchedule);
     },
   });
@@ -2464,6 +2525,7 @@ async function saveCreatedSchedule(event) {
   event.preventDefault();
   const form = event.currentTarget;
   const data = formData(form);
+  if (reportReversedRange(form, data)) return;
   try {
     if (form.dataset.form === 'shift-create') await api.post('/schedule/shift-types', data);
     if (form.dataset.form === 'pattern-create') {
@@ -3346,4 +3408,4 @@ export async function update({ path } = {}) {
 // bereits pur bzw. nehmen ihre Eingabe jetzt als Parameter statt sie fest aus
 // `state` zu lesen - ein Test kann so echte Tage hineingeben und das Ergebnis
 // pruefen, statt nur zu belegen, dass der Funktionsname im Quelltext steht.
-export const __test = { availableTypeFields, shiftTypeFieldsEditor, syncTypeFieldPicker, editorAction, shiftTypeRow, patternRow, patternDaysEditorHtml, patternSaveOrder, initialOverviewSelection, renderOverview, renderToday, overviewLaneHeader, planningPanel, scheduleFabIntent, renderStatistics, patternFields, formField, shiftFields, reminderOffsetField, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, patternsInMemberOrder, rangeDifference, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };
+export const __test = { availableTypeFields, shiftTypeFieldsEditor, syncTypeFieldPicker, editorAction, shiftTypeRow, patternRow, patternDaysEditorHtml, patternSaveOrder, initialOverviewSelection, renderOverview, renderToday, overviewLaneHeader, planningPanel, scheduleFabIntent, renderStatistics, patternFields, formField, shiftFields, reminderOffsetField, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, patternsInMemberOrder, rangeDifference, wireRangeFollow, reportReversedRange, saveCreatedSchedule, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };

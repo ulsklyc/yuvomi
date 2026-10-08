@@ -6006,6 +6006,7 @@
         "fillRange": "期間を埋める",
         "rangeFrom": "開始",
         "rangeTo": "終了",
+        "rangeOrderError": "終了日を開始日より前にはできません。",
         "fillRangeConfirmTitle": "この期間を埋めますか？",
         "fillRangeConfirmDetail": "{{from}} から {{to}} までの毎日に {{type}} を設定し、その期間の既存の登録を置き換えます。",
         "statistics": "集計",

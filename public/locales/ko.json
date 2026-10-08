@@ -6006,6 +6006,7 @@
         "fillRange": "기간 채우기",
         "rangeFrom": "시작",
         "rangeTo": "종료",
+        "rangeOrderError": "종료일은 시작일보다 앞설 수 없습니다.",
         "fillRangeConfirmTitle": "이 기간을 채울까요?",
         "fillRangeConfirmDetail": "{{from}}부터 {{to}}까지 매일 {{type}}(으)로 설정하고 해당 기간의 기존 항목을 대체합니다.",
         "statistics": "통계",

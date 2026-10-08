@@ -6465,6 +6465,7 @@
         "fillRange": "تعبئة الفترة",
         "rangeFrom": "من",
         "rangeTo": "إلى",
+        "rangeOrderError": "لا يمكن أن يسبق تاريخ الانتهاء تاريخ البدء.",
         "fillRangeConfirmTitle": "ملء هذه الفترة؟",
         "fillRangeConfirmDetail": "سيؤدي هذا إلى تعيين {{type}} لكل يوم من {{from}} إلى {{to}} واستبدال الإدخالات الموجودة في تلك الفترة.",
         "statistics": "الإحصاءات",

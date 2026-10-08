@@ -6006,6 +6006,7 @@
         "fillRange": "Aralığı doldur",
         "rangeFrom": "Başlangıç",
         "rangeTo": "Bitiş",
+        "rangeOrderError": "Bitiş tarihi başlangıç tarihinden önce olamaz.",
         "fillRangeConfirmTitle": "Bu aralık doldurulsun mu?",
         "fillRangeConfirmDetail": "{{from}} ile {{to}} arasındaki her gün için {{type}} ayarlanır ve bu aralıktaki mevcut kayıtlar değiştirilir.",
         "statistics": "İstatistikler",

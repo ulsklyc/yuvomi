@@ -204,3 +204,23 @@ test('a member API token sent next to an admin session may not add an extra to s
     database.prepare('DELETE FROM schedule_extra_shifts WHERE user_id = ? AND date_key = ?').run(BOB.id, '2031-02-03');
   }
 });
+
+// #1777: the refusal carries a `reason` the interface translates by; the
+// English sentence stays what it was for API clients.
+test('#1777: a reversed range of extras is refused with reason range_reversed', async () => {
+  const fill = await call('POST', '/extras/fill', { as: ALICE, body: { user_id: ALICE.id, from: '2033-10-08', to: '2033-10-07', shift_type_id: typeId } });
+  assert.deepEqual(fill, { status: 400, body: { error: 'from must be before to.', code: 400, reason: 'range_reversed' } });
+  const list = await call('GET', '/extras?from=2033-10-08&to=2033-10-07', { as: ALICE });
+  assert.deepEqual(list, { status: 400, body: { error: 'from must be before to.', code: 400, reason: 'range_reversed' } });
+
+  // Counterproofs: someone else's schedule is a 403 without this reason, and
+  // another 400 does not carry it.
+  const foreign = await call('POST', '/extras/fill', { as: ALICE, body: { user_id: BOB.id, from: '2033-10-08', to: '2033-10-07', shift_type_id: typeId } });
+  assert.equal(foreign.status, 403);
+  assert.equal('reason' in foreign.body, false);
+  const other = await call('POST', '/extras/fill', { as: ALICE, body: { user_id: ALICE.id, from: '2033-10-07', to: '2033-10-08', shift_type_id: 999999 } });
+  assert.equal(other.status, 400);
+  assert.equal('reason' in other.body, false);
+  const stored = database.prepare("SELECT COUNT(*) AS n FROM schedule_extra_shifts WHERE date_key IN ('2033-10-07', '2033-10-08')").get();
+  assert.equal(stored.n, 0, 'none of the refused requests wrote a row');
+});

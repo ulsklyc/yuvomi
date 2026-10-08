@@ -6312,6 +6312,7 @@
         "fillRange": "Заповнити період",
         "rangeFrom": "З",
         "rangeTo": "По",
+        "rangeOrderError": "Дата завершення не може бути раніше дати початку.",
         "fillRangeConfirmTitle": "Заповнити цей період?",
         "fillRangeConfirmDetail": "Для кожного дня з {{from}} по {{to}} буде встановлено {{type}}, наявні записи в цьому періоді буде замінено.",
         "statistics": "Статистика",

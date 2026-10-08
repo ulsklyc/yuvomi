@@ -6006,6 +6006,7 @@
         "fillRange": "Periode invullen",
         "rangeFrom": "Van",
         "rangeTo": "Tot",
+        "rangeOrderError": "De einddatum mag niet vóór de startdatum liggen.",
         "fillRangeConfirmTitle": "Deze periode vullen?",
         "fillRangeConfirmDetail": "Dit stelt {{type}} in voor elke dag van {{from}} tot {{to}} en vervangt bestaande items in die periode.",
         "statistics": "Statistieken",

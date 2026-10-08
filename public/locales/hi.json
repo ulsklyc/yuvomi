@@ -6006,6 +6006,7 @@
         "fillRange": "अवधि भरें",
         "rangeFrom": "से",
         "rangeTo": "तक",
+        "rangeOrderError": "समाप्ति तिथि आरंभ तिथि से पहले नहीं हो सकती।",
         "fillRangeConfirmTitle": "यह अवधि भरें?",
         "fillRangeConfirmDetail": "इससे {{from}} से {{to}} तक हर दिन के लिए {{type}} सेट होगा और उस अवधि की मौजूदा प्रविष्टियाँ बदल जाएँगी।",
         "statistics": "आँकड़े",

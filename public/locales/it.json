@@ -6006,6 +6006,7 @@
         "fillRange": "Riempi il periodo",
         "rangeFrom": "Dal",
         "rangeTo": "Al",
+        "rangeOrderError": "La data di fine non può essere precedente alla data di inizio.",
         "fillRangeConfirmTitle": "Riempire questo periodo?",
         "fillRangeConfirmDetail": "Imposta {{type}} per ogni giorno dal {{from}} al {{to}}, sostituendo le voci esistenti in quel periodo.",
         "statistics": "Statistiche",

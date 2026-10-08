@@ -6006,6 +6006,7 @@
         "fillRange": "Preencher o período",
         "rangeFrom": "De",
         "rangeTo": "Até",
+        "rangeOrderError": "A data de término não pode ser anterior à de início.",
         "fillRangeConfirmTitle": "Preencher este período?",
         "fillRangeConfirmDetail": "Isto define {{type}} para cada dia de {{from}} a {{to}} e substitui as entradas existentes nesse período.",
         "statistics": "Estatísticas",

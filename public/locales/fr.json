@@ -6006,6 +6006,7 @@
         "fillRange": "Remplir la période",
         "rangeFrom": "Du",
         "rangeTo": "Au",
+        "rangeOrderError": "La date de fin ne peut pas précéder la date de début.",
         "fillRangeConfirmTitle": "Remplir cette période ?",
         "fillRangeConfirmDetail": "Cela définit {{type}} pour chaque jour du {{from}} au {{to}} et remplace les entrées existantes de cette période.",
         "statistics": "Statistiques",

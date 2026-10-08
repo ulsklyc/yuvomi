@@ -6164,6 +6164,7 @@
         "fillRange": "Vyplnit období",
         "rangeFrom": "Od",
         "rangeTo": "Do",
+        "rangeOrderError": "Datum konce nesmí být před datem začátku.",
         "fillRangeConfirmTitle": "Vyplnit toto období?",
         "fillRangeConfirmDetail": "Nastaví {{type}} pro každý den od {{from}} do {{to}} a nahradí stávající záznamy v tomto období.",
         "statistics": "Statistika",

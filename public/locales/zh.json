@@ -6006,6 +6006,7 @@
         "fillRange": "填充时间段",
         "rangeFrom": "从",
         "rangeTo": "到",
+        "rangeOrderError": "结束日期不能早于开始日期。",
         "fillRangeConfirmTitle": "填充此时间段？",
         "fillRangeConfirmDetail": "这会将 {{from}} 到 {{to}} 的每一天设为 {{type}}，并替换该时间段内的现有记录。",
         "statistics": "统计",

@@ -22,14 +22,15 @@ import { isAdminRequest } from '../middleware/require-admin.js';
 import { dateKeysInRange } from '../services/schedule.js';
 import { daysBetweenDateKeys } from '../utils/timezone.js';
 import { syncScheduleRemindersForUser } from '../services/schedule-reminders.js';
-import { validateFieldValues, replaceFieldValues, fieldValuesFor, rejectedScheduleOwner } from './schedule.js';
+import { validateFieldValues, replaceFieldValues, fieldValuesFor, rejectedScheduleOwner, RANGE_REVERSED_MESSAGE, rangeReason } from './schedule.js';
 import { nonMemberMessage } from '../services/household-members.js';
 import { createLogger } from '../logger.js';
 
 const router = express.Router();
 const log = createLogger('Schedule');
 const actorId = (req) => req.authUserId || req.session?.userId;
-const fail = (res, code, error) => res.status(code).json({ error, code });
+// `reason` fuer "Von liegt nach Bis": siehe rangeReason() in routes/schedule.js (#1777).
+const fail = (res, code, error) => res.status(code).json({ error, code, ...(code === 400 ? rangeReason(String(error)) : {}) });
 const userExists = (value) => !!db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(value);
 const typeExists = (value) => !!db.get().prepare('SELECT 1 FROM schedule_shift_types WHERE id = ?').get(value);
 const mineOrAdmin = (req, userId) => isAdminRequest(req) || actorId(req) === userId;
@@ -60,7 +61,7 @@ const MAX_FILL_DAYS = 100;
 
 router.get('/', (req, res) => {
   const user = req.query.user_id == null ? null : id(req.query.user_id, 'user_id'); const from = date(req.query.from, 'from'); const to = date(req.query.to, 'to');
-  const errors = collectErrors([user, from, to].filter(Boolean)); if (from.value && to.value && from.value > to.value) errors.push('from must be before to.');
+  const errors = collectErrors([user, from, to].filter(Boolean)); if (from.value && to.value && from.value > to.value) errors.push(RANGE_REVERSED_MESSAGE);
   if (errors.length) return fail(res, 400, errors.join(' ')); if (user && !userExists(user.value)) return fail(res, 404, 'User not found.');
   const where = []; const args = []; if (user) { where.push('user_id=?'); args.push(user.value); } if (from.value) { where.push('date_key>=?'); args.push(from.value); } if (to.value) { where.push('date_key<=?'); args.push(to.value); }
   const rows = db.get().prepare(`SELECT * FROM schedule_extra_shifts${where.length ? ` WHERE ${where.join(' AND ')}` : ''} ORDER BY user_id,date_key`).all(...args);
@@ -100,12 +101,12 @@ router.post('/fill', (req, res) => {
   const fields = validateFieldValues(req.body?.field_values, typeId.value ?? null);
   const errors = collectErrors([user, from, to, typeId, note, offset].filter(Boolean));
   if (fields.error) errors.push(fields.error);
-  if (from.value && to.value && from.value > to.value) errors.push('from must be before to.');
+  if (from.value && to.value && from.value > to.value) errors.push(RANGE_REVERSED_MESSAGE);
   if (user.value && !userExists(user.value)) errors.push('user_id does not exist.');
   else if (user.value && rejectedScheduleOwner(user.value)) errors.push(nonMemberMessage([user.value]));
   if (typeId.value && !typeExists(typeId.value)) errors.push('shift_type_id does not exist.');
   if (!mineOrAdmin(req, user.value)) errors.push('Forbidden.');
-  if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400 });
+  if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400, ...rangeReason(errors) });
   const span = daysBetweenDateKeys(from.value, to.value);
   if (span === null || span + 1 > MAX_FILL_DAYS) {
     return fail(res, 400, `The range must not exceed ${MAX_FILL_DAYS} days.`);

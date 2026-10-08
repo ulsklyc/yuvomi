@@ -6006,6 +6006,7 @@
         "fillRange": "Điền khoảng thời gian",
         "rangeFrom": "Từ",
         "rangeTo": "Đến",
+        "rangeOrderError": "Ngày kết thúc không thể trước ngày bắt đầu.",
         "fillRangeConfirmTitle": "Điền khoảng thời gian này?",
         "fillRangeConfirmDetail": "Thao tác này đặt {{type}} cho mỗi ngày từ {{from}} đến {{to}} và thay thế các mục hiện có trong khoảng đó.",
         "statistics": "Thống kê",

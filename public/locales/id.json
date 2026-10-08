@@ -6006,6 +6006,7 @@
         "fillRange": "Isi rentang",
         "rangeFrom": "Dari",
         "rangeTo": "Sampai",
+        "rangeOrderError": "Tanggal selesai tidak boleh sebelum tanggal mulai.",
         "fillRangeConfirmTitle": "Isi rentang tanggal ini?",
         "fillRangeConfirmDetail": "Ini mengatur {{type}} untuk setiap hari dari {{from}} sampai {{to}} dan menggantikan entri yang ada dalam rentang tersebut.",
         "statistics": "Statistik",

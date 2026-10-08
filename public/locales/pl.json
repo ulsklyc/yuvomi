@@ -6312,6 +6312,7 @@
         "fillRange": "Wypełnij okres",
         "rangeFrom": "Od",
         "rangeTo": "Do",
+        "rangeOrderError": "Data zakończenia nie może być wcześniejsza niż data rozpoczęcia.",
         "fillRangeConfirmTitle": "Wypełnić ten okres?",
         "fillRangeConfirmDetail": "To ustawia {{type}} na każdy dzień od {{from}} do {{to}} i zastępuje istniejące wpisy w tym okresie.",
         "statistics": "Statystyki",

@@ -6006,6 +6006,7 @@
         "fillRange": "Fyll perioden",
         "rangeFrom": "Från",
         "rangeTo": "Till",
+        "rangeOrderError": "Slutdatumet får inte vara före startdatumet.",
         "fillRangeConfirmTitle": "Fylla den här perioden?",
         "fillRangeConfirmDetail": "Det sätter {{type}} för varje dag från {{from}} till {{to}} och ersätter befintliga poster i perioden.",
         "statistics": "Statistik",

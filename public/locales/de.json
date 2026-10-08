@@ -6006,6 +6006,7 @@
         "fillRange": "Zeitraum ausfüllen",
         "rangeFrom": "Von",
         "rangeTo": "Bis",
+        "rangeOrderError": "Das Enddatum darf nicht vor dem Startdatum liegen.",
         "fillRangeConfirmTitle": "Diesen Zeitraum füllen?",
         "fillRangeConfirmDetail": "Das setzt {{type}} für jeden Tag von {{from}} bis {{to}} und ersetzt vorhandene Einträge in diesem Zeitraum.",
         "statistics": "Auswertung",
