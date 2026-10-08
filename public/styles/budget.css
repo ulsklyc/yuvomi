@@ -1256,6 +1256,27 @@
   padding: var(--space-2) var(--space-4);
 }
 
+button.budget-bar-row {
+  min-block-size: var(--target-base);
+  background: transparent;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.budget-bar-row.is-category-selected {
+  background: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-state), var(--color-surface));
+  color: var(--color-text-primary);
+}
+
+.budget-subcategory-breakdown {
+  width: 100%;
+  margin-block-end: var(--space-2);
+}
+
+.budget-subcategory-breakdown-row {
+  width: 100%;
+  margin-block-start: var(--space-3);
+}
+
 .budget-bar-row__label  { grid-area: 1 / 1; }
 .budget-bar-row__amount { grid-area: 1 / 2; }
 .budget-bar-row__track  { grid-area: 2 / 1 / 3 / 3; }
@@ -1277,6 +1298,7 @@
   color: var(--color-text-secondary);
   overflow-wrap: anywhere;
   hyphens: auto;
+  text-align: start;
 }
 
 /* Ab hier ist Platz fuer alle drei nebeneinander: 168px fassen jeden der neun
@@ -1304,6 +1326,7 @@
 }
 
 .budget-bar-row__fill {
+  display: block;
   width: 100%;
   height: 100%;
   border-radius: var(--radius-full);
