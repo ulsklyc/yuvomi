@@ -302,7 +302,23 @@ const staticAssets = createStaticAssets(PUBLIC_DIR, {
   brotli: String(process.env.STATIC_BROTLI || '').trim().toLowerCase() !== 'off',
   setHeaders: setStaticHeaders,
 });
-app.use(staticAssets.middleware);
+// Die Bremse vor dem Speicher (Begruendung in utils/static-assets.js, Punkt 3).
+// Grosszuegig: ein kalter Start holt rund 125 Dateien, der Precache eines neuen
+// Workers rund 310, und hinter einem Router teilen sich alle Geraete eines
+// Haushalts EINE Adresse - fuenf Telefone, die nach einem Release gleichzeitig
+// aktualisieren, bleiben darunter. Wer darueber liegt, verliert nur die
+// vorkomprimierte Fassung, nie die Datei.
+const staticStoreLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 3000,
+  standardHeaders: false,
+  legacyHeaders: false,
+  handler: staticAssets.overLimit,
+});
+// Benannt: der Guard ueber die globalen Middlewares (test:restore-gate-routes)
+// fuehrt jede mit Namen und Begruendung, und rateLimit() liefert eine namenlose.
+Object.defineProperty(staticStoreLimiter, 'name', { value: 'staticStoreLimiter' });
+app.use(staticStoreLimiter, staticAssets.middleware);
 
 app.use(express.static(PUBLIC_DIR, {
   etag: true,

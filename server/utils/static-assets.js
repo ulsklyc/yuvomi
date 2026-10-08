@@ -43,6 +43,12 @@
  *        MAX_STORED_BYTES fuer die Summe der Brotli-Fassungen (darueber liefert
  *        compression() wie bisher) und MAX_ENTRIES fuer die gemerkten Dateien
  *        (der aelteste Eintrag geht zuerst).
+ *      - Eine Bremse je Absender VOR dem Speicher (server/index.js): der Weg
+ *        liest je Anfrage das Dateisystem (stat, realpath, beim ersten Mal die
+ *        ganze Datei fuer den Hash). Ueber der Grenze wird NICHT abgewiesen -
+ *        ein 429 auf ein Stylesheet zerlegte die App -, sondern nur am
+ *        Speicher vorbeigefuehrt (`overLimit`): die Datei kommt dann wie vor
+ *        R18 durch express.static und compression().
  *    Guard: test:static-assets, Abschnitt 2b - gegen die Fassung davor rot.
  */
 
@@ -69,6 +75,9 @@ const BROTLI_QUALITY = 11;
  */
 const MAX_STORED_BYTES = 64 * 1024 * 1024;
 const MAX_ENTRIES = 4096;
+
+/** Merker an der Anfrage: die Bremse hat sie am Speicher vorbeigeschickt. */
+const BYPASS = Symbol('static-assets.bypass');
 
 /**
  * @param {string} root - Verzeichnis, aus dem express.static ausliefert
@@ -203,9 +212,12 @@ export function createStaticAssets(root, {
     } catch {
       return null;
     }
-    if (decoded.includes('\0') || decoded.split('/').some((segment) => segment.startsWith('.'))) return null;
-    const filePath = path.join(rootDir, decoded);
-    if (filePath !== rootDir && !filePath.startsWith(rootDir + path.sep)) return null;
+    if (decoded.includes('\0') || decoded.split(/[\\/]/).some((segment) => segment.startsWith('.'))) return null;
+    // Erst normalisieren, dann pruefen, dann benutzen - in dieser Reihenfolge
+    // und als eigene Zeile, damit die Pruefung die ist, die jeder Leser (und
+    // jeder Pfad-Analysator) als solche erkennt.
+    const filePath = path.resolve(rootDir, `.${path.sep}${decoded}`);
+    if (!filePath.startsWith(rootDir + path.sep)) return null;
     return filePath;
   }
 
@@ -230,6 +242,7 @@ export function createStaticAssets(root, {
     // Benannt: der Guard ueber die globalen Middlewares (test:restore-gate-routes)
     // fuehrt jede mit Namen und Begruendung.
     middleware: function serveCompressedStatic(req, res, next) {
+      if (req[BYPASS]) return next();
       if (!brotli || (req.method !== 'GET' && req.method !== 'HEAD')) return next();
       // Teilabrufe rechnen in Bytes der unkomprimierten Datei.
       if (req.headers.range) return next();
@@ -263,6 +276,15 @@ export function createStaticAssets(root, {
       res.setHeader('Content-Length', entry.br.length);
       if (req.method === 'HEAD') return res.end();
       return res.end(entry.br);
+    },
+
+    /**
+     * `handler` der Bremse vor dem Speicher: ueber der Grenze kein 429, die
+     * Anfrage geht nur am Speicher vorbei (siehe Kopf, Punkt 3).
+     */
+    overLimit(req, _res, next) {
+      req[BYPASS] = true;
+      next();
     },
 
     /** Fuer Tests und die Messung: was liegt im Speicher? */

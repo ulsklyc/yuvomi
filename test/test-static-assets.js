@@ -24,6 +24,7 @@ import { brotliDecompressSync } from 'node:zlib';
 import { createContext, runInContext } from 'node:vm';
 import express from 'express';
 import compression from 'compression';
+import rateLimit from 'express-rate-limit';
 import { createStaticAssets, COMPRESSIBLE_EXTENSIONS } from '../server/utils/static-assets.js';
 import { tempDir } from './tmp-dir.js';
 
@@ -39,7 +40,15 @@ async function serve(root, { brotli = true, compress, limits } = {}) {
     res.setHeader('ETag', assets.etagFor(filePath, stat));
   };
   const assets = createStaticAssets(root, { brotli, setHeaders, ...(compress ? { compress } : {}), ...(limits ?? {}) });
-  app.use(assets.middleware);
+  // Wie in server/index.js: eine Bremse VOR dem Speicher, die ueber der Grenze
+  // nicht abweist, sondern nur am Speicher vorbeifuehrt.
+  app.use(rateLimit({
+    windowMs: 60_000,
+    max: limits?.requestsPerMinute ?? 100_000,
+    standardHeaders: false,
+    legacyHeaders: false,
+    handler: assets.overLimit,
+  }), assets.middleware);
   app.use(express.static(root, { etag: true, lastModified: true, redirect: false, setHeaders }));
   const server = await new Promise((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
   const { port } = server.address();
@@ -411,6 +420,55 @@ test('the number of remembered files is limited, the oldest goes first', async (
   assert.equal(res.headers.etag, sha(Buffer.from(SCRIPT + 'a.js')));
 });
 
+test('over the request limit a client loses the store, never the file', async (t) => {
+  const fx = fixture();
+  for (const name of ['a.js', 'b.js']) fx.write(name, SCRIPT + name);
+  let runs = 0;
+  const compress = (buffer, _options, cb) => { runs += 1; setTimeout(() => cb(null, buffer.subarray(0, 10)), 5); };
+  const srv = await serve(fx.dir, { compress, limits: { requestsPerMinute: 1 } });
+  t.after(async () => { await srv.close(); fx.cleanup(); });
+
+  // Die erste Anfrage liegt in der Grenze: sie stoesst die Kompression an.
+  await srv.request('/a.js', { 'accept-encoding': 'br' });
+  await srv.compressed();
+  assert.equal(runs, 1);
+
+  // Jede weitere liegt darueber: sie bekommt ihre Datei wie vor R18 durch
+  // express.static und compression() - 200, richtiger Inhalt, richtiger ETag -,
+  // aber sie liest nichts in den Speicher und stellt nichts in die Schlange.
+  const res = await srv.request('/b.js', { 'accept-encoding': 'br' });
+  assert.equal(res.status, 200);
+  assert.equal(brotliDecompressSync(res.body).toString(), SCRIPT + 'b.js');
+  assert.equal(res.headers.etag, sha(Buffer.from(SCRIPT + 'b.js')));
+  assert.equal(runs, 1, 'ueber der Grenze wird nichts komprimiert');
+  assert.equal(srv.assets.stats().pending, 0);
+
+  // Auch die schon gespeicherte Fassung kommt dann nicht aus dem Speicher.
+  const again = await srv.request('/a.js', { 'accept-encoding': 'br' });
+  assert.equal(again.status, 200);
+  assert.equal(brotliDecompressSync(again.body).toString(), SCRIPT + 'a.js');
+});
+
+test('the path from the address never leaves the folder, however it is spelled', async (t) => {
+  const fx = fixture();
+  const outside = fixture();
+  fx.write('app.js', SCRIPT);
+  outside.write('secret.js', SCRIPT + 'secret');
+  let runs = 0;
+  const compress = (buffer, _options, cb) => { runs += 1; cb(null, buffer.subarray(0, 10)); };
+  const srv = await serve(fx.dir, { compress });
+  t.after(async () => { await srv.close(); fx.cleanup(); outside.cleanup(); });
+
+  const escape = `/..%2f${path.basename(outside.dir)}/secret.js`;
+  for (const urlPath of [escape, `/%2e%2e/${path.basename(outside.dir)}/secret.js`, '/app.js%00.css', '/.hidden.js']) {
+    const res = await srv.request(urlPath, { 'accept-encoding': 'br' });
+    assert.notEqual(res.status, 200, urlPath);
+  }
+  await srv.compressed();
+  assert.equal(runs, 0);
+  assert.equal(srv.assets.stats().files, 0);
+});
+
 // --------------------------------------------------------
 // 3. Die echte App: jede Precache-Datei, und die Verdrahtung
 // --------------------------------------------------------
@@ -458,10 +516,14 @@ test('the worker revalidates its precache, and the server serves both ways from 
   const index = readFileSync(path.join(import.meta.dirname, '..', 'server', 'index.js'), 'utf8');
   assert.match(index, /res\.setHeader\('ETag', staticAssets\.etagFor\(filePath, stat\)\);/);
   assert.match(index, /createStaticAssets\(PUBLIC_DIR, \{[\s\S]*?setHeaders: setStaticHeaders,\s*\}\);/);
-  assert.match(index, /app\.use\(staticAssets\.middleware\);\s*\n\s*app\.use\(express\.static\(PUBLIC_DIR, \{[\s\S]*?setHeaders: setStaticHeaders,/,
-    'die Speicher-Fassung steht VOR express.static und teilt dessen Header');
+  assert.match(index, /app\.use\(staticStoreLimiter, staticAssets\.middleware\);\s*\n\s*app\.use\(express\.static\(PUBLIC_DIR, \{[\s\S]*?setHeaders: setStaticHeaders,/,
+    'die Speicher-Fassung steht VOR express.static, hinter ihrer Bremse, und teilt dessen Header');
+  // Die Bremse fuehrt ueber der Grenze am Speicher vorbei, statt abzuweisen:
+  // ein 429 auf ein Stylesheet oder ein Modul zerlegte die App.
+  assert.match(index, /const staticStoreLimiter = rateLimit\(\{[\s\S]*?handler: staticAssets\.overLimit,\s*\}\);/);
+  assert.doesNotMatch(index, /app\.use\(staticAssets\.middleware\)/, 'nie ohne die Bremse davor');
   assert.match(index, /process\.env\.STATIC_BROTLI/);
-  assert.ok(index.indexOf('app.use(compression());') < index.indexOf('app.use(staticAssets.middleware);'),
+  assert.ok(index.indexOf('app.use(compression());') < index.indexOf('app.use(staticStoreLimiter, staticAssets.middleware);'),
     'compression() bleibt davor - es uebernimmt alles, was nicht aus dem Speicher kommt');
 });
 

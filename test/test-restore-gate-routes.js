@@ -59,6 +59,7 @@ const GLOBAL_MIDDLEWARE_ALLOWLIST = new Map([
   ['sessionMiddleware', 'Store liefert bei geschlossener Verbindung keine Sitzung (`get`) und setzt `touch`/`set` aus (server/auth.js, #1431)'],
   ['serveStatic', 'statische Dateien aus public/'],
   ['serveCompressedStatic', 'dieselben Dateien aus public/ als Brotli-Fassung aus dem Speicher (R18), keine Datenbank'],
+  ['staticStoreLimiter', 'Bremse je Absender vor dem Brotli-Speicher, Zaehler im Prozess, keine Datenbank; ueber der Grenze kein 429, nur am Speicher vorbei'],
   ['errorHandler', 'globaler Fehlerbehandler, keine Datenbank'],
 ]);
 
