@@ -110,6 +110,74 @@ test('Einkauf: Badge nennt alle offenen Artikel, weitere Listen werden genannt',
   assert.equal(badgeOf(__test.renderShoppingLists(lists)), '8', 'ohne Gesamtzahl: die geladenen Listen');
 });
 
+// Refs #1818: die Kachel zeigt die zuletzt geaenderte Liste zuerst, die
+// Einkaufsseite oeffnet ohne `?list=` die aelteste. Jede Zeile trug nur
+// `/shopping` - der Tipp auf "Drogerie" oeffnete den Wocheneinkauf. Gemessen
+// wird der ganze Weg: die gerenderte Zeile durch die echte Verdrahtung
+// (`wireLinks`), Klick und Tastatur, bis zu dem Pfad, den der Router bekommt.
+test('Einkauf: jede Listenzeile fuehrt zu IHRER Liste, per Klick und per Tastatur', () => {
+  const lists = [
+    { id: 7, name: 'Drogerie', open_count: 1, total_count: 1, items: [{ id: 70, name: 'Zahnpasta' }] },
+    { id: 3, name: 'Baumarkt & "Garten"', open_count: 2, total_count: 4, items: [{ id: 30, name: 'Duebel' }] },
+    { id: 1, name: 'Wocheneinkauf', open_count: 8, total_count: 10, items: [{ id: 10, name: 'Milch' }] },
+  ];
+  const html = __test.renderShoppingLists(lists, 23, 5);
+
+  // Die gerenderten Elemente mit `data-route`, in Dokumentreihenfolge, als das,
+  // was `querySelectorAll('[data-route]')` im Browser liefert.
+  const unesc = (v) => v.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  const elements = [...html.matchAll(/<([a-z]+)\b([^>]*\bdata-route="([^"]*)"[^>]*)>/g)].map((m) => {
+    const listeners = {};
+    return {
+      tagName: m[1].toUpperCase(),
+      id: '',
+      isListRow: /class="shopping-widget-list"/.test(m[2]),
+      attrs: m[2],
+      dataset: { route: unesc(m[3]) },
+      closest: () => null,
+      addEventListener: (type, fn) => { (listeners[type] ??= []).push(fn); },
+      fire: (type, event) => (listeners[type] ?? []).forEach((fn) => fn(event)),
+    };
+  });
+  const rows = elements.filter((el) => el.isListRow);
+  assert.equal(rows.length, 3, 'Reichweite: drei Listenzeilen stehen im Markup');
+  for (const row of rows) {
+    assert.match(row.attrs, /role="button"/, 'die Zeile bleibt per Tastatur erreichbar');
+    assert.match(row.attrs, /tabindex="0"/);
+  }
+
+  const visited = [];
+  const hadWindow = 'window' in globalThis;
+  const prevWindow = globalThis.window;
+  globalThis.window = { yuvomi: { navigate: (path) => { visited.push(path); } } };
+  try {
+    __test.wireLinks({ querySelectorAll: (sel) => (sel === '[data-route]' ? elements : []) }, () => {});
+    const key = (k) => ({ key: k, preventDefault() {}, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, button: 0 });
+    rows.forEach((row, i) => {
+      // Was die Einkaufsseite aus der Adresse liest (shopping.js): `?list=`.
+      const target = () => {
+        const url = new URL(visited.at(-1), 'http://yuvomi.test');
+        return [url.pathname, url.searchParams.get('list')];
+      };
+      row.fire('click', key(''));
+      assert.deepEqual(target(), ['/shopping', String(lists[i].id)], `Klick auf "${lists[i].name}"`);
+      row.fire('keydown', key('Enter'));
+      assert.deepEqual(target(), ['/shopping', String(lists[i].id)], `Enter auf "${lists[i].name}"`);
+      row.fire('keydown', key(' '));
+      assert.deepEqual(target(), ['/shopping', String(lists[i].id)], `Leertaste auf "${lists[i].name}"`);
+    });
+    assert.equal(visited.length, 9, 'jede Geste hat genau einmal navigiert');
+
+    // Der Kachelkopf zaehlt ueber alle Listen und bleibt ein Sammelverweis.
+    const header = elements.find((el) => /widget__link/.test(el.attrs));
+    assert.ok(header, 'Reichweite: der Kachelkopf ist verlinkt');
+    assert.equal(header.dataset.route, '/shopping');
+  } finally {
+    if (hadWindow) globalThis.window = prevWindow;
+    else delete globalThis.window;
+  }
+});
+
 test('der Aufrufer reicht die Gesamtzahlen aus der Antwort an die Kacheln durch', () => {
   // Der Renderer allein beweist nichts, wenn niemand ihm die Zahl gibt.
   const prevWindow = global.window;

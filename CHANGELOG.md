@@ -167,6 +167,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A shopping list on the overview opens that list.** The shopping tile shows up to three lists,
+  the most recently changed first, but tapping any of them opened the shopping page on its first
+  list - tap "Drugstore" and you got "Weekly shop". Each row now opens its own list, by tap, click
+  and keyboard. The "All" link in the tile header still opens the shopping page as before.
 - **Starting on an older Node.js 22 says what is wrong instead of dying silently** (reported in
   #1728). Without Docker, Yuvomi claimed to run on any Node.js 22, but before 22.14 the
   server stopped right at startup without a single line of output, and so did the demo seed

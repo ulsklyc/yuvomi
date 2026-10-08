@@ -4865,8 +4865,16 @@ function renderShoppingLists(lists, openTotal = null, openListTotal = null) {
 
     const moreCount = list.open_count - list.items.length;
 
+    // JEDE ZEILE MEINT EINE LISTE, also fuehrt sie auch dorthin. Ein blankes
+    // `/shopping` oeffnet die erste Liste der Einkaufsseite (die aelteste),
+    // waehrend die Kachel die zuletzt geaenderte zuerst zeigt - der Tipp auf
+    // "Drogerie" landete im Wocheneinkauf. Der Kachelkopf bleibt beim blanken
+    // Pfad: er zaehlt ueber alle Listen. Eine inzwischen geloeschte id faellt
+    // auf der Einkaufsseite auf die erste Liste zurueck.
+    const listRoute = `/shopping?list=${encodeURIComponent(String(list.id))}`;
+
     return `
-      <div class="shopping-widget-list" data-route="/shopping" role="button" tabindex="0">
+      <div class="shopping-widget-list" data-route="${esc(listRoute)}" role="button" tabindex="0">
         <div class="shopping-widget-list__header">
           <span class="shopping-widget-list__name">${esc(list.name)}</span>
           <span class="shopping-widget-list__count">${list.total_count - list.open_count}/${list.total_count}</span>
@@ -7350,7 +7358,7 @@ function wireWeatherRefresh(container, onUpdated = null, signal) {
 // Test-Tor fuer die Klarheits-Runde (test/test-dashboard-clarity.js): eigene
 // Zeile statt Verlaengerung der langen `__test`-Liste oben, damit parallele
 // Aenderungen an beiden nicht in derselben Zeile kollidieren.
-Object.assign(__test, { renderUpcomingEvents, renderShoppingLists, renderDashboardLayout });
+Object.assign(__test, { renderUpcomingEvents, renderShoppingLists, renderDashboardLayout, wireLinks });
 
 // Test-Tor fuer die Uebersichts-Bugs vom 2026-09-29 (#1449, #1451-#1457).
 Object.assign(__test, { renderBudgetWidget });
