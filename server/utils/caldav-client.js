@@ -20,7 +20,146 @@ export async function createCalDAVClient(account) {
     authMethod:         'Basic',
     defaultAccountType: 'caldav',
   });
-  return withCalendarObjectUrlFilter(client);
+  return withHttpRefusalsAsErrors(withCalendarObjectUrlFilter(client));
+}
+
+/**
+ * tsdav-Client für ein carddav_accounts-Konto. Eigene Factory, weil der
+ * Kontakte-Sync dieselbe Regel braucht wie der Kalender: eine abgelehnte
+ * Adressbuch-Liste ist kein leeres Konto (siehe `withHttpRefusalsAsErrors`).
+ *
+ * @param {{carddav_url: string, username: string, password: string}} account
+ * @returns {Promise<object>} tsdav-Client
+ */
+export async function createCardDAVClient(account) {
+  const { createDAVClient } = await import('tsdav');
+  const client = await createDAVClient({
+    serverUrl:          account.carddav_url,
+    credentials:        { username: account.username, password: account.password },
+    authMethod:         'Basic',
+    defaultAccountType: 'carddav',
+  });
+  return withHttpRefusalsAsErrors(client);
+}
+
+/**
+ * Eine Absage des Servers, als Fehler. `status` ist das Feld, das
+ * `classifyOutboundError` (calendar-outbound.js) liest; `code` bleibt bewusst
+ * leer, denn das liest die Einordnung zuerst und dort stehen bei Netzfehlern
+ * Zeichenketten wie `ECONNREFUSED`.
+ */
+export class DavHttpError extends Error {
+  /**
+   * @param {string} operation  Name des tsdav-Aufrufs
+   * @param {string} [url]      betroffene Ressource
+   * @param {object} [response] Antwort des Servers, soweit es eine gab
+   * @param {string} [what]     was an der Antwort nicht stimmt
+   */
+  constructor(operation, url, response, what = 'was refused by the server') {
+    const status = response?.status;
+    const text   = response?.statusText ? ` ${response.statusText}` : '';
+    super(status ? `${operation} ${what}: HTTP ${status}${text}` : `${operation} ${what}`);
+    this.name       = 'DavHttpError';
+    this.status     = status;
+    this.statusText = response?.statusText;
+    this.operation  = operation;
+    this.url        = url ?? response?.url;
+  }
+}
+
+/** Schreibende Aufrufe, deren Antwort tsdav ungeprüft durchreicht. */
+const WRITE_OPERATIONS = ['createCalendarObject', 'updateCalendarObject', 'deleteCalendarObject'];
+/** Auflistungen, die tsdav aus EINEM PROPFIND auf die Home-Collection baut. */
+const LISTING_OPERATIONS = ['fetchCalendars', 'fetchAddressBooks'];
+
+/**
+ * Macht aus einer HTTP-Absage einen Fehler - an der einen Stelle, durch die
+ * jeder Aufrufer geht.
+ *
+ * tsdav wirft bei einer Absage nur auf einem Teil seiner Wege (gemessen an
+ * 2.3.4 gegen einen lokalen Server, 403/404/412/500/503/507):
+ *
+ * - `createCalendarObject`, `updateCalendarObject`, `deleteCalendarObject`
+ *   reichen die `Response` von `fetch` durch und LÖSEN AUF, mit `ok: false`.
+ *   Kein Aufrufer las das Feld. Ein abgelehnter PUT galt als hochgeladen, die
+ *   Zeile wurde zum Spiegel eines Objekts, das es nicht gibt, und der nächste
+ *   Abruf räumte sie als "auf dem Server gelöscht" weg. Ein abgelehnter DELETE
+ *   verwarf den Tombstone, der nächste Abruf holte den Eintrag zurück. Die
+ *   Wiederholungslogik (`outboundFailureAction`) sah nur Netzfehler.
+ * - `fetchCalendars` und `fetchAddressBooks` lösen mit `[]` auf: der PROPFIND
+ *   auf die Home-Collection kommt als einzelner Eintrag ohne `resourcetype`
+ *   zurück und fällt durch den Filter. "Abgelehnt" und "es gibt keine" sind
+ *   dann dasselbe, und die Sync-Läufe schalten jede ausgewählte Liste ab, die
+ *   sie in der Antwort nicht finden.
+ * - `fetchCalendarObjects` und `fetchVCards` werfen selbst (`collectionQuery`).
+ *
+ * Geprüft wird auf den BELEGTEN Erfolg (`ok === true`), nicht auf die belegte
+ * Absage: ändert tsdav die Rückgabeform, soll das hier laut werden statt
+ * wieder als Erfolg durchzugehen.
+ *
+ * Bei den Auflistungen zählt nur die ERSTE Anfrage des Aufrufs, der PROPFIND
+ * auf die Home-Collection. Danach fragt tsdav je Collection ihr
+ * `supported-report-set` ab und behandelt eine Absage dort selbst als "keine
+ * Angabe"; eine einzelne störrische Collection soll nicht die ganze Liste
+ * kippen. Mitgelesen wird über den `fetch`-Parameter des einzelnen Aufrufs,
+ * also ohne geteilten Zustand am Client.
+ */
+export function withHttpRefusalsAsErrors(client) {
+  const overrides = {};
+
+  for (const name of WRITE_OPERATIONS) {
+    if (typeof client[name] !== 'function') continue;
+    const call = client[name].bind(client);
+    overrides[name] = async (params = {}) => {
+      const response = await call(params);
+      if (response?.ok !== true) {
+        throw new DavHttpError(name, params?.calendarObject?.url ?? params?.calendar?.url, response);
+      }
+      return response;
+    };
+  }
+
+  for (const name of LISTING_OPERATIONS) {
+    if (typeof client[name] !== 'function') continue;
+    const call = client[name].bind(client);
+    overrides[name] = async (params = {}) => {
+      const baseFetch = params?.fetch ?? globalThis.fetch;
+      let first = null;
+      const recordingFetch = async (...args) => {
+        const pending = baseFetch(...args);
+        // Nur die erste Anfrage: sie ist die Auflistung selbst.
+        if (first === null) first = pending;
+        return pending;
+      };
+      const result = await call({ ...params, fetch: recordingFetch });
+      const response = await first;
+      if (response && !isMultistatus(response)) {
+        throw new DavHttpError(
+          name, response.url, response,
+          response.ok ? 'got an answer that is not a WebDAV listing' : undefined
+        );
+      }
+      return result;
+    };
+  }
+
+  return Object.create(Object.getPrototypeOf(client), {
+    ...Object.getOwnPropertyDescriptors(client),
+    ...Object.fromEntries(Object.entries(overrides).map(([name, value]) => [
+      name, { value, writable: true, enumerable: true, configurable: true },
+    ])),
+  });
+}
+
+/**
+ * Trägt die Antwort eine Auflistung? Ein PROPFIND antwortet mit einem
+ * XML-Multistatus. Alles andere - eine Absage, aber auch die mit 200
+ * ausgelieferte Anmeldeseite eines vorgeschalteten Proxys - liest tsdav als
+ * einen einzelnen Eintrag ohne Eigenschaften, also als leere Liste.
+ */
+function isMultistatus(response) {
+  if (!response.ok) return false;
+  return String(response.headers?.get?.('content-type') ?? '').toLowerCase().includes('xml');
 }
 
 /**

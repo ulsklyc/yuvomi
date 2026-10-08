@@ -13,6 +13,7 @@ import { composeDisplayName, normalizeNameParts } from '../../public/utils/conta
 import { toE164, defaultCountryFromConfig } from '../utils/phone.js';
 import { mayChangeContactEmails } from './contact-identity.js';
 import { sameCredentialOrigin } from '../utils/credential-origin.js';
+import { createCardDAVClient } from '../utils/caldav-client.js';
 
 // --------------------------------------------------------
 // Helper Functions
@@ -394,13 +395,7 @@ async function testConnection(cardavUrl, username, password) {
   }
 
   try {
-    const { createDAVClient } = await import('tsdav');
-    const client = await createDAVClient({
-      serverUrl: cardavUrl,
-      credentials: { username, password },
-      authMethod: 'Basic',
-      defaultAccountType: 'carddav',
-    });
+    const client = await createCardDAVClient({ carddav_url: cardavUrl, username, password });
 
     const addressbooks = await client.fetchAddressBooks();
     if (!addressbooks.length) {
@@ -837,13 +832,7 @@ async function syncAccount(accountId) {
     log.info(`Syncing CardDAV account ${accountId} ("${account.name}")...`);
 
     // Create tsdav client
-    const { createDAVClient } = await import('tsdav');
-    const client = await createDAVClient({
-      serverUrl: account.carddav_url,
-      credentials: { username: account.username, password: account.password },
-      authMethod: 'Basic',
-      defaultAccountType: 'carddav',
-    });
+    const client = await createCardDAVClient(account);
 
     // Get enabled addressbooks for this account
     const enabledAddressbooks = db.get().prepare(`
@@ -1021,13 +1010,7 @@ async function syncAddressbook(accountId, addressbookUrl, client = null, serverA
 
     // Create client if not provided
     if (!client) {
-      const { createDAVClient } = await import('tsdav');
-      client = await createDAVClient({
-        serverUrl: account.carddav_url,
-        credentials: { username: account.username, password: account.password },
-        authMethod: 'Basic',
-        defaultAccountType: 'carddav',
-      });
+      client = await createCardDAVClient(account);
     }
 
     // Find addressbook if not provided

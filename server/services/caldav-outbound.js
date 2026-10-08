@@ -222,6 +222,10 @@ export async function flushAccount(client, source, { deletions, updates, needsCa
       const cals = await client.fetchCalendars();
       calendarsByUrl = new Map((cals || []).map((c) => [c.url, c]));
     } catch (err) {
+      // null, nicht leer: eine gescheiterte Auflistung weiss nicht, welche
+      // Kalender es gibt. Mit einer leeren Liste gälte jedes Umzugsziel als
+      // verschwunden, und der wartende Umzug würde verworfen.
+      calendarsByUrl = null;
       log.warn(`Could not list calendars for the immediate attempt: ${err.message}`);
     }
   }
@@ -285,6 +289,8 @@ export async function processPendingDeletions(client, source, objectIndex, ownCa
  * Schiebt lokal bearbeitete, bereits synchronisierte Termine zum Server.
  * Ein Wechsel des Zielkalenders wird als Anlegen im Ziel + Löschen in der Quelle
  * ausgeführt: CalDAV kennt kein Verschieben.
+ * @param {Map|null} [calendarsByUrl] Kalender-URL → Collection; `null`, wenn die
+ *                                    Auflistung gescheitert ist (Umzüge warten dann)
  * @returns {Promise<number>} erfolgreich verarbeitete Termine
  */
 export async function processPendingUpdates(client, source, objectIndex, calendarsByUrl = new Map()) {
@@ -327,6 +333,9 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
     // ── Wechsel des Zielkalenders: anlegen im Ziel, löschen in der Quelle ──────
     const moveTo = event.outbound_move_to;
     if (moveTo && moveTo !== known.calendarUrl) {
+      // Kalenderliste unbekannt (Auflistung gescheitert): der Umzug bleibt
+      // vorgemerkt, der Sync-Lauf entscheidet mit einer echten Liste.
+      if (calendarsByUrl === null) continue;
       const destCal = calendarsByUrl.get(moveTo);
       if (!destCal) {
         log.warn(`[${label(source)}] Destination calendar ${moveTo} is not available, keeping event ${event.id} where it is.`);
@@ -349,7 +358,11 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
           try {
             await client.deleteCalendarObject({ calendarObject: { url, etag: known.etag } });
           } catch (err) {
-            log.error(`[${label(source)}] Event ${event.id} was copied to ${moveTo} but could not be removed from its old calendar:`, err.message);
+            // Eine Absage kommt seit dem Wrapper in caldav-client.js hier an.
+            // 404/410 heisst: die Quelle ist schon weg, der Umzug ist vollzogen.
+            if (outbound.classifyOutboundError(err) !== 'settled') {
+              log.error(`[${label(source)}] Event ${event.id} was copied to ${moveTo} but could not be removed from its old calendar:`, err.message);
+            }
           }
           // Während der beiden awaits lokal entfernt. Hat der Nutzer gelöscht, gilt
           // der Tombstone der Route nur der Quelle; die Kopie im Ziel bliebe stehen,

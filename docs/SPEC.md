@@ -1452,6 +1452,32 @@ scheduled sync and a second scheduled tick wait for each other, and a burst of w
 pass is followed by one catch-up pass rather than one per write. It covers Google, CalDAV, iCloud
 and the CalDAV reminder lists behind Tasks and Shopping.
 
+**A refusal from the server is a failure, not a result.** The CalDAV library (tsdav) does not throw
+on every HTTP refusal: `createCalendarObject`, `updateCalendarObject` and `deleteCalendarObject`
+resolve with the raw response (`ok: false`), and `fetchCalendars` / `fetchAddressBooks` resolve with
+an empty list when the listing request itself is refused. `withHttpRefusalsAsErrors()` in
+`server/utils/caldav-client.js` turns both into an error carrying the HTTP `status`, at the one
+place every CalDAV and CardDAV client is built, so the rules above apply to refusals exactly as
+they do to network errors:
+
+- A refused **upload** leaves the event, task or shopping item local and waiting; it is never
+  marked as mirrored. An upload has no attempt limit and is tried again on every run.
+- A refused **change** or **deletion** keeps its marker (`outbound_dirty`, tombstone) and counts as
+  a failed attempt: `404`/`410` settle it (the object is gone), `400` gives up at once, everything
+  else - `403`, `412` (stale ETag; the next run reads the fresh one), `5xx`, `507` - is retried and
+  given up after five attempts.
+- A **move** whose copy is refused in the destination leaves the source untouched.
+- A refused **listing** aborts the run for that account. It is not read as "the account has no
+  calendars", so no calendar, reminder list or address book is disabled by it, no pending upload
+  loses its target, and a pending move waits for a run that knows the calendar list. Only the
+  listing request itself counts; a single collection refusing its `supported-report-set` lookup
+  does not fail the list. A `200` that is not a WebDAV listing (the sign-in page of a proxy in
+  front of the server) counts as a refusal too.
+
+Before this, a refused upload was stamped as mirrored and the next inbound run pruned the row as
+"deleted on the server"; a refused change was dropped and overwritten by the next inbound run; a
+refused deletion dropped its tombstone and the entry came back.
+
 ### CalDAV Reminder Selection
 Per-account reminder-list selection for CalDAV accounts. Apple Reminders lists are CalDAV
 collections whose supported components include `VTODO`, so any CalDAV server serving `VTODO`

@@ -173,6 +173,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A calendar or reminder server that says no is no longer taken for a yes.** When a CalDAV
+  server refused a request - a calendar or list shared read-only, a full account, a server that
+  was briefly overloaded, or an entry somebody else had just changed - Yuvomi booked the request
+  as done. An event, task or shopping item created here and refused by the server was then removed
+  from Yuvomi by the next sync, as if it had been deleted on the server. An edit that the server
+  refused was undone by the next sync. Something deleted here came back. And moving an event into
+  a calendar that refused it deleted the event from its old calendar, so it was gone on both
+  sides. Now a refused entry stays in Yuvomi exactly as you left it and is sent again with the
+  next sync; changes and deletions are retried up to five times, as they always were after a
+  network error. A server that briefly refused to list your calendars, reminder lists or address
+  books also used to get all of them switched off in the sync settings; they now stay on. This
+  affects CalDAV accounts (Nextcloud, Radicale, Baikal, Synology and others), iCloud calendars
+  and CardDAV address books. The update cannot bring back entries that were already removed this
+  way, and a calendar or list that was switched off has to be switched on again in the sync
+  settings.
 - **A locked field looks locked.** A field you cannot change looked exactly like one you can -
   same text, same fill, same outline; only the mouse pointer gave it away, and on a phone nothing
   did. Text, number and date fields, dropdowns and text areas now all show it the same way,
