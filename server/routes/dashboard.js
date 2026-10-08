@@ -274,7 +274,12 @@ router.get('/', (req, res) => {
     )
   `).join('');
   // `mine` ist die Auslegung des Kalendermoduls: zugewiesen an mich.
-  const eventsAssignedTo = req.query.events_scope === 'mine' ? userId : null;
+  // EIN DISPLAY HAT KEIN "MIR" (#1808): es folgt der Vorgabe des Haushalts, sein
+  // Browser schickt deren Option mit, und dem Display-Konto weist nie jemand
+  // einen Termin zu (#1207) - das Tablett stuende leer da. Gelesen wird die
+  // Option deshalb HIER als "alle", statt sie beim Speichern der Vorgabe zu
+  // streichen: dieselbe Vorgabe gilt auch fuer Mitglieder, und dort stimmt sie.
+  const eventsAssignedTo = req.query.events_scope === 'mine' && req.authMethod !== 'display' ? userId : null;
   /* GEBURTSTAGE IM TERMIN-WIDGET (#927). Wer sie auf der Uebersicht schon als
    * eigene Kachel stehen hat, las sie zweimal - einmal bei den Geburtstagen,
    * einmal zwischen den naechsten Terminen. Abwaehlbar ist deshalb der EINE

@@ -181,6 +181,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A wall tablet shows events again when the household overview is set to "Assigned to me"** (#1808).
+  A paired display follows the household default of the overview. If that default had the calendar
+  tile set to "Assigned to me", the tablet looked for events assigned to the tablet itself and
+  showed none - in the event list and in the week strip; tasks and the other tiles were not
+  affected. On a display the option now means all events; for members it works as before. The
+  hint under Settings > Wall tablets now says where a tablet takes its overview from and names
+  what it shows: calendar, tasks, rewards and weather.
 - **A wall tablet no longer ends up with an empty calendar or task list from "Assigned to me"** (#1808).
   That switch is remembered per browser. If someone had turned it on while signed in on the device
   that later became the wall tablet, the tablet kept filtering on itself and showed nothing - in
