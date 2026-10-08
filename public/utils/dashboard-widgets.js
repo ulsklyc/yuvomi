@@ -461,15 +461,11 @@ export function dashboardQuery(config) {
   if (eventLimit !== EVENT_LIMIT_DEFAULT) params.set('events_limit', String(eventLimit));
   for (const key of optionsOf('tasks').categories ?? []) params.append('tasks_category', key);
   for (const id of optionsOf('notes').categories ?? []) params.append('notes_category', String(id));
-  // Die Listen-Auswahl der Einkaufs-Kachel (#1818) reist nur, solange die
-  // Kachel SICHTBAR ist. Die Auswahl filtert auf dem Server auch die Zahlen;
-  // ist die Kachel ausgeblendet, spricht das Heute-Blatt fuer den Einkauf
-  // ("n offen"), und das zaehlt ueber alle Listen - eine vergessene Auswahl
-  // einer versteckten Kachel darf diese Zahl nicht still verkleinern.
-  const shoppingTile = Array.isArray(config) ? config.find((w) => w.id === 'shopping') : null;
-  if (shoppingTile?.visible) {
-    for (const id of normalizeShoppingListSelection(shoppingTile.options?.lists)) params.append('shopping_list', String(id));
-  }
+  // Die Listen-Auswahl der Einkaufs-Kachel (#1818). Sie reist wie jede andere
+  // Option, ob die Kachel sichtbar ist oder nicht: die Route legt die Auswahl
+  // in ein eigenes Feld (`shoppingTile`) und laesst alles andere unberuehrt,
+  // also haengt keine Zahl ausserhalb der Kachel an ihr.
+  for (const id of normalizeShoppingListSelection(optionsOf('shopping').lists)) params.append('shopping_list', String(id));
   const query = params.toString();
   return query ? `/dashboard?${query}` : '/dashboard';
 }
@@ -484,11 +480,15 @@ export function dashboardQuery(config) {
  * gewaehlter Stufe als gefiltert, und der Router holte anderthalb Sekunden
  * spaeter dieselbe Aggregation ein zweites Mal, bei jedem Kaltstart.
  *
+ * `shopping_list` (#1818) steht aus demselben Grund hier: die Auswahl fuellt
+ * ein eigenes Feld der Antwort (`shoppingTile`) und laesst `shoppingOpenCount`
+ * unberuehrt - die Zahl, die Navigation und Kuechen-Kachel lesen.
+ *
  * ALLOWLIST: was hier nicht steht, gilt als Filter. Ein neuer Parameter kostet
  * so hoechstens den zweiten Abruf, nie eine falsche Zahl. `events_scope` und
  * `events_birthdays` stehen bewusst nicht hier - sie waren vor #1680 schon
  * „gefiltert", und ob sie es bleiben, ist nicht Sache dieser Aenderung. */
-const COUNT_NEUTRAL_PARAMS = new Set(['events_limit']);
+const COUNT_NEUTRAL_PARAMS = new Set(['events_limit', 'shopping_list']);
 
 /**
  * @param {string} query Pfad der Uebersichts-Abfrage ('/dashboard' oder '/dashboard?…')

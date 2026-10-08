@@ -1025,8 +1025,16 @@ function buildTodayHighlights(data) {
   });
   const nextEvent = todayEvents[0] ?? null;
 
+  // DIE ZAHL DES SERVERS, wo es sie gibt (#1818): `shoppingLists` traegt
+  // hoechstens drei Listen, die Summe ihrer `open_count` war bei vier Listen
+  // schon zu klein (gemessen 13 gegen 14). `shoppingOpenCount` zaehlt ueber
+  // alle Listen; ohne ihn (aelterer Server, Abfrage gescheitert: `null`)
+  // bleibt die Summe der geladenen Listen.
+  const serverOpenCount = data?.shoppingOpenCount;
   const openShoppingCount = shoppingItems.length
     ? shoppingItems.filter((item) => !item.is_checked).length
+    : typeof serverOpenCount === 'number' && Number.isFinite(serverOpenCount)
+    ? serverOpenCount
     : shoppingLists.reduce((sum, list) => {
         if (Number.isFinite(Number(list.open_count))) return sum + Number(list.open_count);
         if (Number.isFinite(Number(list.openCount))) return sum + Number(list.openCount);
@@ -4725,7 +4733,7 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
     family: () => renderFamilyWidget(data.users ?? [], data, { manageHref: familyManage }),
     meals: () => renderTodayMeals(data.todayMeals ?? [], visibleMealTypes, data.users),
     notes: (size) => renderPinnedNotes(data.pinnedNotes ?? [], size, data.notesTotal),
-    shopping: () => renderShoppingLists(data.shoppingLists ?? [], data.shoppingOpenCount, data.shoppingOpenLists),
+    shopping: () => renderShoppingTile(data),
     // Hier ankommen heisst eingerichtet (`isWidgetModuleEnabled`); fehlt das
     // Wetter trotzdem, sagt die Kachel es, statt zu verschwinden.
     weather: () => (weather ? renderWeatherWidget(weather) : renderWeatherUnavailable()),
@@ -4873,7 +4881,22 @@ function renderWidgetError(id) {
 // Shopping-Widget
 // --------------------------------------------------------
 
-function renderShoppingLists(lists, openTotal = null, openListTotal = null) {
+/**
+ * Was die Einkaufs-Kachel aus der Antwort liest (#1818). Mit einer Auswahl
+ * liefert die Route `shoppingTile` - die gewaehlten Listen, die offenen Artikel
+ * darin und wie viele gewaehlte Listen es gibt. Ohne Auswahl (oder wenn das
+ * Feld fehlt) gelten die Felder, die auch das Heute-Blatt und die Wand lesen.
+ * Die Kachel ist der EINZIGE Leser von `shoppingTile`.
+ */
+function renderShoppingTile(data) {
+  const tile = data?.shoppingTile;
+  if (tile && Array.isArray(tile.lists)) {
+    return renderShoppingLists(tile.lists, tile.openCount, tile.listCount);
+  }
+  return renderShoppingLists(data?.shoppingLists ?? [], data?.shoppingOpenCount, data?.shoppingOpenLists);
+}
+
+function renderShoppingLists(lists, openTotal = null, listTotalCount = null) {
   if (!lists.length) {
     return `<div class="widget widget--shopping">
       ${widgetHeader('shopping', t('nav.shopping'), 0, '/shopping')}
@@ -4885,14 +4908,17 @@ function renderShoppingLists(lists, openTotal = null, openListTotal = null) {
     </div>`;
   }
 
-  // Der Server liefert hoechstens drei Listen; `shoppingOpenCount` und
-  // `shoppingOpenLists` zaehlen ueber alle (listTotal). Ohne sie bleibt es bei
-  // der Summe der geladenen Listen.
+  // Der Server liefert hoechstens drei Listen und zaehlt daneben, woraus sie
+  // geschnitten sind (listTotal): ohne Auswahl ueber alle Listen mit Offenem
+  // (`shoppingOpenCount`, `shoppingOpenLists`), mit Auswahl ueber die
+  // gewaehlten (`shoppingTile.openCount`, `.listCount`). Ohne die Zahlen
+  // bleibt es bei der Summe der geladenen Listen.
   const totalOpen = listTotal(openTotal, lists.reduce((sum, l) => sum + l.open_count, 0));
-  // "+n weitere Listen" zaehlt Listen MIT OFFENEM. Mit einer Auswahl (#1818)
-  // kann eine gezeigte Liste leer sein - sie zaehlt dann auf keiner Seite mit.
-  const shownWithOpen = lists.filter((l) => l.open_count > 0).length;
-  const moreLists = listTotal(openListTotal, shownWithOpen) - shownWithOpen;
+  // "+n weitere Listen" nennt, was der Deckel abschneidet. OHNE Auswahl sind
+  // das Listen mit Offenem, und jede gezeigte hat welches. MIT Auswahl (#1818)
+  // ist es JEDE gewaehlte Liste, auch eine fertig gekaufte: "eine gewaehlte
+  // Liste bleibt stehen" haelt nur, wenn die abgeschnittene als "+1" da ist.
+  const moreLists = listTotal(listTotalCount, lists.length) - lists.length;
 
   const listsHtml = lists.map((list) => {
     const progress = list.total_count > 0
@@ -4913,7 +4939,8 @@ function renderShoppingLists(lists, openTotal = null, openListTotal = null) {
     // `/shopping` oeffnet die erste Liste der Einkaufsseite (die aelteste),
     // waehrend die Kachel die zuletzt geaenderte zuerst zeigt - der Tipp auf
     // "Drogerie" landete im Wocheneinkauf. Der Kachelkopf bleibt beim blanken
-    // Pfad: er zaehlt ueber alle Listen. Eine inzwischen geloeschte id faellt
+    // Pfad: er zaehlt ueber mehrere Listen (alle, oder die gewaehlten) und ist
+    // der Sammelverweis. Eine inzwischen geloeschte id faellt
     // auf der Einkaufsseite auf die erste Liste zurueck.
     const listRoute = `/shopping?list=${encodeURIComponent(String(list.id))}`;
 
@@ -7405,7 +7432,7 @@ function wireWeatherRefresh(container, onUpdated = null, signal) {
 // Test-Tor fuer die Klarheits-Runde (test/test-dashboard-clarity.js): eigene
 // Zeile statt Verlaengerung der langen `__test`-Liste oben, damit parallele
 // Aenderungen an beiden nicht in derselben Zeile kollidieren.
-Object.assign(__test, { renderUpcomingEvents, renderShoppingLists, renderDashboardLayout, wireLinks });
+Object.assign(__test, { renderUpcomingEvents, renderShoppingLists, renderShoppingTile, loadShoppingLists, renderDashboardLayout, wireLinks });
 
 // Test-Tor fuer die Uebersichts-Bugs vom 2026-09-29 (#1449, #1451-#1457).
 Object.assign(__test, { renderBudgetWidget });

@@ -5,18 +5,24 @@
  *        der Kachel "alle Listen" (nichts gespeichert, Verhalten wie zuvor) oder
  *        eine Auswahl bestimmter Listen, je Person. Geprueft wird der ganze Weg:
  *
- *        1. Route: `shopping_list` waehlt VOR dem Deckel und zaehlt in der
- *           Auswahl; ohne Parameter ist die Antwort wie zuvor. Eine gewaehlte
- *           Liste steht auch ohne Offenes da. Geloeschte und erfundene Ids
- *           fallen weg; bleibt keine uebrig, antwortet die Route wie ohne
- *           Parameter - nie leer, nie ein Fehler. Wer Einkauf nicht sehen darf,
- *           bekommt die leere Fassung, was immer der Parameter nennt.
+ *        1. Route: `shopping_list` fuellt ein EIGENES Feld (`shoppingTile`):
+ *           die gewaehlten Listen vor dem Deckel, die offenen Artikel darin und
+ *           die Zahl der gewaehlten Listen. Die geteilten Felder
+ *           (`shoppingLists`, `shoppingOpenCount`, `shoppingOpenLists`) bleiben
+ *           ungefiltert - die Auswahl gilt NUR der Kachel. Eine gewaehlte Liste
+ *           steht auch ohne Offenes da. Geloeschte und erfundene Ids fallen
+ *           weg; bleibt keine uebrig, antwortet die Route wie ohne Parameter -
+ *           nie leer, nie ein Fehler. Wer Einkauf nicht sehen darf, bekommt die
+ *           leere Fassung, was immer der Parameter nennt.
  *        2. Ablage: die Auswahl geht durch `PUT /preferences`, gehoert der
  *           Person und reist mit der Haushaltsvorgabe.
- *        3. Browser: die Anfrage traegt die Auswahl nur bei sichtbarer Kachel
- *           und gilt als Filter der Zahlen; der Dialog zeigt die Listen, hakt
- *           die gespeicherten an und speichert nur eine echte Auswahl; die
- *           Kachel zeichnet eine leere gewaehlte Liste, ohne sich zu verzaehlen.
+ *        3. Browser: die Anfrage traegt die Auswahl, der Parameter aendert
+ *           keine Zahl der Navigation; der Dialog zeigt die Listen, hakt die
+ *           gespeicherten an, speichert nur eine echte Auswahl, und sein echter
+ *           Lader laesst bei einem Fehler die Auswahl stehen; die Kachel nennt
+ *           eine abgeschnittene gewaehlte Liste als "+1".
+ *        4. Heute-Blatt und Wand: mit gesetzter Auswahl dieselbe Zahl wie
+ *           ohne, und zwar die des Servers ueber alle Listen.
  *
  * Ausfuehren: npm run test:dashboard-shopping-selection
  */
@@ -123,7 +129,12 @@ const FEST = addList('Fest', '2026-10-05T08:00:00Z', 0, 4);
 
 const names = (body) => body.shoppingLists.map((list) => list.name);
 const numbers = (body) => [body.shoppingOpenCount, body.shoppingOpenLists];
+/** Die Fassung der Kachel: Namen, offene Artikel in der Auswahl, gewaehlte Listen. */
+const tileNames = (body) => body.shoppingTile?.lists.map((list) => list.name) ?? null;
+const tileNumbers = (body) => (body.shoppingTile ? [body.shoppingTile.openCount, body.shoppingTile.listCount] : null);
 const query = (...ids) => `/?${ids.map((id) => `shopping_list=${id}`).join('&')}`;
+/** Was jeder ANDERE Leser sieht: die drei geteilten Felder, ganz. */
+const shared = (body) => JSON.stringify([body.shoppingLists, body.shoppingOpenCount, body.shoppingOpenLists]);
 
 // --------------------------------------------------------------------------
 // 1. Die Route
@@ -134,49 +145,70 @@ test('ohne shopping_list bleibt die Antwort wie zuvor: drei Listen mit Offenem, 
   assert.deepEqual(names(body), ['Drogerie', 'Baumarkt', 'Wocheneinkauf']);
   assert.deepEqual(numbers(body), [14, 4], 'gezaehlt wird ueber alle Listen');
   assert.ok(!names(body).includes('Fest'), 'eine ganz abgehakte Liste steht ohne Auswahl nicht da');
+  assert.equal('shoppingTile' in body, false, 'ohne Auswahl gibt es keine eigene Kachel-Fassung');
 });
 
-test('mit Auswahl stehen nur die gewaehlten Listen da - auch wenn eine andere juenger ist', async () => {
+test('mit Auswahl traegt die Kachel-Fassung nur die gewaehlten Listen - auch wenn eine andere juenger ist', async () => {
   const body = await getJson(query(GARTEN, WOCHE));
   // Garten ist die aelteste der vier und stand ohne Auswahl hinter dem Deckel.
-  assert.deepEqual(names(body), ['Wocheneinkauf', 'Garten']);
-  assert.deepEqual(numbers(body), [9, 2], 'und die Zahlen zaehlen in der Auswahl');
-  assert.deepEqual(body.shoppingLists[0].items.length, 6, 'der Deckel von sechs Artikeln bleibt');
+  assert.deepEqual(tileNames(body), ['Wocheneinkauf', 'Garten']);
+  assert.deepEqual(tileNumbers(body), [9, 2], 'und die Zahlen der Kachel zaehlen in der Auswahl');
+  assert.deepEqual(body.shoppingTile.lists[0].items.length, 6, 'der Deckel von sechs Artikeln bleibt');
+});
+
+test('die Auswahl gilt NUR der Kachel: was Wand, Heute-Blatt und Navigation lesen, bleibt ungefiltert', async () => {
+  // Der Fehler der ersten Fassung: die Auswahl filterte `shoppingLists` und
+  // `shoppingOpenCount`. Das Wandtablet eines Haushalts, dessen Vorgabe eine
+  // Liste waehlt, zeigte "1 offen" bei vierzehn - und mit nur der fertig
+  // gekauften Liste verschwand die Zeile ganz.
+  const plain = await getJson('/');
+  for (const path of [query(GARTEN), query(FEST), query(GARTEN, WOCHE), query(FEST, GARTEN, WOCHE, BAUMARKT, DROGERIE)]) {
+    const body = await getJson(path);
+    assert.equal(shared(body), shared(plain), `${path}: die geteilten Felder sind die der ungefilterten Antwort`);
+    assert.deepEqual(numbers(body), [14, 4], path);
+  }
 });
 
 test('eine einzelne Liste: der Parameter als einzelner Wert', async () => {
   const body = await getJson(query(GARTEN));
-  assert.deepEqual(names(body), ['Garten']);
-  assert.deepEqual(numbers(body), [1, 1]);
+  assert.deepEqual(tileNames(body), ['Garten']);
+  assert.deepEqual(tileNumbers(body), [1, 1]);
 });
 
 test('eine gewaehlte Liste ohne Offenes bleibt stehen, hinter denen mit Offenem', async () => {
   // "Fest" ist die juengste Liste - ohne die Regel "Offenes zuerst" stuende
   // sie vorn und draengte am Deckel eine volle Liste hinaus.
   const body = await getJson(query(FEST, GARTEN));
-  assert.deepEqual(names(body), ['Garten', 'Fest']);
-  const fest = body.shoppingLists.find((list) => list.name === 'Fest');
+  assert.deepEqual(tileNames(body), ['Garten', 'Fest']);
+  const fest = body.shoppingTile.lists.find((list) => list.name === 'Fest');
   assert.deepEqual([fest.open_count, fest.total_count, fest.items.length], [0, 4, 0]);
-  assert.deepEqual(numbers(body), [1, 1], 'gezaehlt werden offene Artikel und Listen MIT Offenem');
+  assert.deepEqual(tileNumbers(body), [1, 2], 'ein offener Artikel, ZWEI gewaehlte Listen - auch die leere zaehlt als Liste');
 
   const only = await getJson(query(FEST));
-  assert.deepEqual(names(only), ['Fest'], 'auch allein: die Kachel ist nicht leer');
-  assert.deepEqual(numbers(only), [0, 0]);
+  assert.deepEqual(tileNames(only), ['Fest'], 'auch allein: die Kachel ist nicht leer');
+  assert.deepEqual(tileNumbers(only), [0, 1]);
 });
 
-test('der Deckel von drei Listen bleibt: vier gewaehlte, Offenes zuerst', async () => {
-  const body = await getJson(query(FEST, GARTEN, WOCHE, BAUMARKT, DROGERIE));
-  assert.deepEqual(names(body), ['Drogerie', 'Baumarkt', 'Wocheneinkauf']);
-  assert.deepEqual(numbers(body), [14, 4]);
+test('der Deckel von drei Listen bleibt, und JEDE gewaehlte Liste zaehlt - auch die abgeschnittene ohne Offenes', async () => {
+  // Vier gewaehlt, drei mit Offenem, eine fertig gekauft: drei stehen da, und
+  // `listCount` sagt vier - daraus macht die Kachel "+1 weitere Liste". Zaehlte
+  // die Route nur Listen mit Offenem, fehlte "Fest" stumm.
+  const four = await getJson(query(FEST, GARTEN, WOCHE, BAUMARKT));
+  assert.deepEqual(tileNames(four), ['Baumarkt', 'Wocheneinkauf', 'Garten']);
+  assert.deepEqual(tileNumbers(four), [11, 4]);
+
+  const five = await getJson(query(FEST, GARTEN, WOCHE, BAUMARKT, DROGERIE));
+  assert.deepEqual(tileNames(five), ['Drogerie', 'Baumarkt', 'Wocheneinkauf']);
+  assert.deepEqual(tileNumbers(five), [14, 5]);
 });
 
 test('eine geloeschte Liste in der Auswahl faellt weg, die uebrigen bleiben', async () => {
   const gone = addList('Wird geloescht', '2026-10-06T08:00:00Z', 2);
-  assert.deepEqual(names(await getJson(query(gone, GARTEN))), ['Wird geloescht', 'Garten']);
+  assert.deepEqual(tileNames(await getJson(query(gone, GARTEN))), ['Wird geloescht', 'Garten']);
   db.prepare('DELETE FROM shopping_lists WHERE id = ?').run(gone);
   const body = await getJson(query(gone, GARTEN));
-  assert.deepEqual(names(body), ['Garten']);
-  assert.deepEqual(numbers(body), [1, 1]);
+  assert.deepEqual(tileNames(body), ['Garten']);
+  assert.deepEqual(tileNumbers(body), [1, 1], 'die geloeschte zaehlt auch nicht als "+1"');
 });
 
 test('ist JEDE gewaehlte Liste geloescht, antwortet die Route wie ohne Auswahl - nie leer', async () => {
@@ -184,8 +216,8 @@ test('ist JEDE gewaehlte Liste geloescht, antwortet die Route wie ohne Auswahl -
   db.prepare('DELETE FROM shopping_lists WHERE id = ?').run(gone);
   const plain = await getJson('/');
   const body = await getJson(query(gone));
-  assert.deepEqual(names(body), names(plain));
-  assert.deepEqual(numbers(body), numbers(plain));
+  assert.equal('shoppingTile' in body, false, 'keine Kachel-Fassung: die Kachel zeigt alle Listen');
+  assert.equal(shared(body), shared(plain));
   assert.deepEqual(names(body), ['Drogerie', 'Baumarkt', 'Wocheneinkauf']);
 });
 
@@ -201,11 +233,11 @@ test('was keine Id ist oder keine Liste nennt, antwortet wie kein Parameter - ni
   ];
   for (const raw of outside) {
     const body = await getJson(`/?${raw}`);
-    assert.deepEqual(names(body), names(plain), raw);
-    assert.deepEqual(numbers(body), numbers(plain), raw);
+    assert.equal('shoppingTile' in body, false, raw);
+    assert.equal(shared(body), shared(plain), raw);
   }
   // Unsinn NEBEN einer echten Id: die echte gilt.
-  assert.deepEqual(names(await getJson(`/?shopping_list=abc&shopping_list=${GARTEN}&shopping_list=999999`)), ['Garten']);
+  assert.deepEqual(tileNames(await getJson(`/?shopping_list=abc&shopping_list=${GARTEN}&shopping_list=999999`)), ['Garten']);
 });
 
 test('normalizeShoppingListFilter: positive ganze Zahlen, ohne Doppelte, hoechstens 50', () => {
@@ -227,7 +259,7 @@ test('wer Einkauf nicht sehen darf, bekommt die leere Fassung - mit und ohne Aus
   try {
     // Gegenprobe ohne Sperre: Leo sieht die gewaehlte Liste - sonst sagte die
     // leere Antwort unten nichts ueber die Sperre.
-    assert.deepEqual(names(await getJson(query(GARTEN))), ['Garten']);
+    assert.deepEqual(tileNames(await getJson(query(GARTEN))), ['Garten']);
     lock();
     assert.equal(resolvePermissions(db, db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(LEO)).modules.shopping, 'none',
       'Vorbedingung: der Einkauf ist fuer Leo gesperrt');
@@ -235,6 +267,7 @@ test('wer Einkauf nicht sehen darf, bekommt die leere Fassung - mit und ohne Aus
       const body = await getJson(path);
       assert.deepEqual(body.shoppingLists, [], path);
       assert.deepEqual(numbers(body), [0, 0], path);
+      assert.equal('shoppingTile' in body, false, `${path}: auch keine Kachel-Fassung`);
       assert.ok(!JSON.stringify(body).includes('Garten'), `${path}: kein Listenname in der Antwort`);
     }
   } finally {
@@ -283,13 +316,14 @@ test('die Auswahl ueberlebt das Speichern, gehoert der Person und aendert nichts
     assert.deepEqual(shoppingOptions(mine), { lists: [GARTEN, WOCHE] });
     assert.equal(widgets.dashboardQuery(mine), `/dashboard?shopping_list=${GARTEN}&shopping_list=${WOCHE}`);
     // Der ganze Weg: gespeicherte Anordnung -> Anfrage -> Antwort.
-    assert.deepEqual(names(await getJson(widgets.dashboardQuery(mine).replace('/dashboard', '/'))), ['Wocheneinkauf', 'Garten']);
+    assert.deepEqual(tileNames(await getJson(widgets.dashboardQuery(mine).replace('/dashboard', '/'))), ['Wocheneinkauf', 'Garten']);
 
     currentUser = LEO;
     const theirs = (await readPrefs()).dashboard_widgets;
     assert.deepEqual(theirs, [], 'Leos Anordnung bleibt unberuehrt');
-    assert.deepEqual(names(await getJson(widgets.dashboardQuery(theirs).replace('/dashboard', '/'))),
-      ['Drogerie', 'Baumarkt', 'Wocheneinkauf'], 'und Leo sieht weiter alle Listen');
+    const leo = await getJson(widgets.dashboardQuery(theirs).replace('/dashboard', '/'));
+    assert.equal(tileNames(leo), null, 'und Leo hat keine Kachel-Fassung');
+    assert.deepEqual(names(leo), ['Drogerie', 'Baumarkt', 'Wocheneinkauf'], 'er sieht weiter alle Listen');
   } finally {
     currentUser = ADMIN;
     clearDashboardPreferences();
@@ -315,7 +349,7 @@ test('die Vorgabe des Haushalts traegt die Auswahl, eine eigene Anordnung loest 
 // 3. Der Browser: Anfrage, Dialog, Kachel
 // --------------------------------------------------------------------------
 
-test('dashboardQuery: die Auswahl reist als wiederholter Parameter, und nur bei sichtbarer Kachel', () => {
+test('dashboardQuery: die Auswahl reist als wiederholter Parameter, wie jede andere Option', () => {
   const q = (options, visible) => widgets.dashboardQuery(shoppingTile(options, visible));
   assert.equal(q(undefined), '/dashboard');
   assert.equal(q({ lists: [] }), '/dashboard', 'keine Auswahl heisst alle und steht in keiner Anfrage');
@@ -323,17 +357,22 @@ test('dashboardQuery: die Auswahl reist als wiederholter Parameter, und nur bei 
   assert.equal(q({ lists: [7, 3] }), '/dashboard?shopping_list=7&shopping_list=3');
   assert.equal(q({ lists: ['7', 7, 'abc', 0, -2, 1.5, null] }), '/dashboard?shopping_list=7', 'Fremdwerte im Layout werden nicht zur Anfrage');
   assert.equal(q({ lists: 'alle' }), '/dashboard');
-  // Ausgeblendet spricht das Heute-Blatt fuer den Einkauf und zaehlt ueber alle
-  // Listen: die Auswahl einer versteckten Kachel darf diese Zahl nicht kuerzen.
-  assert.equal(q({ lists: [7] }, false), '/dashboard');
+  // Keine Sichtbarkeits-Bedingung im Browser: die Route haelt die Auswahl von
+  // allem ausser der Kachel fern, also braucht hier niemand daran zu denken.
+  assert.equal(q({ lists: [7] }, false), '/dashboard?shopping_list=7');
 });
 
-test('die Auswahl gilt als Filter der Zahlen: die Navigation holt ihre eigenen', () => {
-  // `shoppingOpenCount` speist die Badge der Navigation. Mit Auswahl ist es
-  // eine andere Zahl - die Allowlist der zahl-neutralen Parameter darf den
-  // Parameter NICHT enthalten, sonst zeigte die Navigation die gefilterte.
-  assert.equal(widgets.dashboardQueryFiltersCounts('/dashboard?shopping_list=7'), true);
-  assert.equal(widgets.dashboardQueryFiltersCounts('/dashboard'), false);
+test('die Auswahl filtert keine Zahl der Navigation: kein zweiter Abruf, und die Badge zaehlt alle Listen', async () => {
+  // Die Antwort der Seite gilt fuer die Navigation als ungefiltert ...
+  assert.equal(widgets.dashboardQueryFiltersCounts('/dashboard?shopping_list=7'), false);
+  assert.equal(widgets.dashboardQueryFiltersCounts('/dashboard?shopping_list=7&events_limit=8'), false);
+  // (Reichweite: ein echter Filter daneben bleibt einer.)
+  assert.equal(widgets.dashboardQueryFiltersCounts('/dashboard?shopping_list=7&tasks_category=x'), true);
+  // ... und sie IST es: die Zahl, die die Badge liest, ist mit Auswahl dieselbe.
+  const plain = await getJson('/');
+  const picked = await getJson(query(GARTEN));
+  assert.equal(picked.shoppingOpenCount, 14);
+  assert.equal(picked.shoppingOpenCount, plain.shoppingOpenCount);
 });
 
 const { __test: dash } = await import('../public/pages/dashboard.js');
@@ -424,6 +463,55 @@ test('Dialog: ohne Listen sagt er das, statt eine leere Gruppe zu zeigen', async
   assert.deepEqual(saved, {});
 });
 
+/** Der Dialog mit dem ECHTEN Lader: nur die Netzschicht (`api.get`) ist ersetzt. */
+async function openWithRealLoader(current, get) {
+  const prev = { stub: globalThis.__apiStub, open: globalThis.__openModal, close: globalThis.__closeModal, window: globalThis.window };
+  const calls = [];
+  const toasts = [];
+  let opened = false;
+  globalThis.__apiStub = { get: (...args) => { calls.push(args); return get(...args); } };
+  globalThis.__openModal = () => { opened = true; };
+  globalThis.__closeModal = () => true;
+  globalThis.window = { yuvomi: { showToast: (message, type) => toasts.push([message, type]) } };
+  try {
+    const pending = dash.openWidgetOptions('shopping', current);
+    // Geht der Dialog auf, wartet er auf Speichern oder Schliessen; die Probe
+    // braucht dann nur, DASS er aufging.
+    const result = await Promise.race([pending, new Promise((resolve) => setTimeout(() => resolve('offen'), 20))]);
+    return { result, calls, toasts, opened };
+  } finally {
+    globalThis.__apiStub = prev.stub;
+    globalThis.__openModal = prev.open;
+    globalThis.__closeModal = prev.close;
+    globalThis.window = prev.window;
+  }
+}
+
+test('Lader: der Dialog holt die Listen von /shopping, und ein Fehler loescht die gespeicherte Auswahl nicht', async () => {
+  // Jeder Dialogtest oben reicht `loadLists` herein - der echte Lader lief nie.
+  // Sein Vertrag: `null` bei einem Fehler. Lieferte er `[]`, ginge der Dialog
+  // ohne Zeilen auf, und Speichern schriebe `{}`: die Auswahl waere still fort.
+  const failed = await openWithRealLoader({ lists: [7] }, async () => { throw new Error('offline'); });
+  assert.deepEqual(failed.calls, [['/shopping']], 'der Pfad der Einkaufslisten');
+  assert.equal(failed.opened, false, 'ohne Katalog geht der Dialog nicht auf');
+  assert.equal(failed.result, null, '`null` heisst fuer den Aufrufer: Optionen stehen lassen');
+  assert.deepEqual(failed.toasts, [['dashboard.loadError', 'danger']]);
+
+  // Eine Antwort ohne Liste (kaputte Form) ist ebenfalls kein leerer Katalog.
+  const odd = await openWithRealLoader({ lists: [7] }, async () => ({ data: null }));
+  assert.deepEqual([odd.opened, odd.result], [false, null]);
+
+  // Und mit Katalog geht er auf - auch mit einem leeren (das ist eine Antwort).
+  assert.equal((await openWithRealLoader({ lists: [7] }, async () => ({ data: [{ id: 7, name: 'Drogerie' }] }))).opened, true);
+  assert.equal((await openWithRealLoader({}, async () => ({ data: [] }))).opened, true);
+
+  // Der Aufrufer nimmt `null` als "nichts aendern" - sonst wuerde er `undefined` speichern.
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
+  const wiring = src.slice(src.indexOf("container.querySelectorAll('[data-widget-options]')"));
+  assert.match(wiring.slice(0, 600), /const next = await openWidgetOptions\(id, current\);\n\s+if \(next === null\) return;/);
+});
+
 test('Dialog: scheitert der Katalog, geht er nicht auf und die Auswahl bleibt', async () => {
   // `null` heisst fuer den Aufrufer "nichts aendern". Ein Dialog ohne Katalog
   // haette beim Speichern `{}` geliefert und die Auswahl still geloescht.
@@ -438,21 +526,90 @@ test('Kachel: eine gewaehlte Liste ohne Offenes sagt, dass nichts offen ist, und
     { id: 3, name: 'Garten', open_count: 1, total_count: 1, items: [{ id: 30, name: 'Erde' }] },
     { id: 5, name: 'Fest', open_count: 0, total_count: 4, items: [] },
   ];
-  const html = dash.renderShoppingLists(lists, 1, 1);
+  const html = dash.renderShoppingTile({ shoppingTile: { lists, openCount: 1, listCount: 2 }, shoppingLists: [], shoppingOpenCount: 14, shoppingOpenLists: 4 });
   const rows = html.split('class="shopping-widget-list"').slice(1);
   assert.equal(rows.length, 2);
   assert.ok(!/shoppingListNothingOpen/.test(rows[0]), 'eine Liste mit Offenem traegt den Satz nicht');
   assert.match(rows[1], /dashboard\.shoppingListNothingOpen/);
   assert.match(rows[1], />4\/4</, 'der Zaehler der Zeile sagt weiter erledigt/gesamt');
   assert.match(html, /data-route="\/shopping\?list=5"/, 'die leere Liste ist einen Tipp entfernt');
-  // Die leere gezeigte Liste zaehlt nicht als "weitere Liste" - der Server
-  // zaehlt nur Listen mit Offenem, und die eine ist schon gezeigt.
+  assert.match(html, /widget__badge[^>]*>1</, 'die Badge zaehlt in der Auswahl, nicht die 14 des Haushalts');
+  // Beide gewaehlten Listen stehen da: nichts ist abgeschnitten.
   assert.ok(!/shoppingMoreLists/.test(html));
   assert.ok(!/widget__empty/.test(html), 'kein Leerzustand: die Kachel zeigt ihre Auswahl');
 });
 
-test('Kachel: ohne Auswahl bleibt "+n weitere Listen" wie zuvor', () => {
+test('Kachel: eine gewaehlte Liste, die der Deckel abschneidet, ist als "+1 weitere Liste" da - auch ohne Offenes', async () => {
+  // Der ganze Weg, von der Route bis zur Kachel. Vier gewaehlt, drei mit
+  // Offenem, "Fest" fertig gekauft: drei Zeilen und "+1". Mit der Zaehlung
+  // "nur Listen mit Offenem" (3 - 3 = 0) fehlte "Fest" stumm, obwohl Hinweis
+  // und CHANGELOG sagen, eine gewaehlte Liste bleibe stehen.
+  const four = await getJson(query(FEST, GARTEN, WOCHE, BAUMARKT));
+  const html = dash.renderShoppingTile(four);
+  assert.equal(html.split('class="shopping-widget-list"').length - 1, 3);
+  assert.ok(!html.includes('>Fest<'), 'Vorbedingung: die fertig gekaufte Liste ist abgeschnitten');
+  assert.match(html, /dashboard\.shoppingMoreLists\{&quot;count&quot;:1\}/);
+
+  // Zwei gewaehlt, beide gezeigt (eine davon leer): kein "+n".
+  assert.ok(!/shoppingMoreLists/.test(dash.renderShoppingTile(await getJson(query(FEST, GARTEN)))));
+  // Fuenf gewaehlt: "+2".
+  assert.match(dash.renderShoppingTile(await getJson(query(FEST, GARTEN, WOCHE, BAUMARKT, DROGERIE))), /shoppingMoreLists\{&quot;count&quot;:2\}/);
+});
+
+test('Kachel: ohne Auswahl liest sie die geteilten Felder, und "+n weitere Listen" bleibt wie zuvor', async () => {
   const lists = [1, 2, 3].map((id) => ({ id, name: `L${id}`, open_count: 2, total_count: 2, items: [] }));
   assert.match(dash.renderShoppingLists(lists, 14, 5), /dashboard\.shoppingMoreLists\{&quot;count&quot;:2\}/);
   assert.ok(!/shoppingMoreLists/.test(dash.renderShoppingLists(lists, 6, 3)));
+  // Durch die echte Antwort: vier Listen mit Offenem, drei gezeigt, "+1", Badge 14.
+  const html = dash.renderShoppingTile(await getJson('/'));
+  assert.match(html, /shoppingMoreLists\{&quot;count&quot;:1\}/);
+  assert.match(html, /widget__badge[^>]*>14</);
+});
+
+// --------------------------------------------------------------------------
+// 4. Was die Auswahl NICHT anfasst: Heute-Blatt und Wand
+// --------------------------------------------------------------------------
+
+/** Die Einkaufszeile des Blatts, wie Heute-Blatt (Layout ohne Kachel) und Wand (immer leeres Layout) sie bauen. */
+async function sheetShoppingRow(data, cap) {
+  const { setPermissions, clearPermissions } = await import('../public/permissions.js');
+  const prevWindow = globalThis.window;
+  globalThis.window = { yuvomi: { isModuleDisabled: () => false }, matchMedia: () => ({ matches: false }) };
+  setPermissions({ admin: true, modules: {}, widgets: {}, capabilities: {} });
+  try {
+    const model = dash.buildTodayCockpitModel(data, [], { cap, groupOverdue: false });
+    let row = null;
+    JSON.stringify(model, (_key, value) => { if (value && value.kind === 'shopping') row = value; return value; });
+    return row;
+  } finally {
+    clearPermissions();
+    globalThis.window = prevWindow;
+  }
+}
+
+test('Heute-Blatt und Wand zaehlen ueber ALLE Listen - auch wenn die Kachel eine Auswahl traegt', async () => {
+  // Das Kuechentablett, das einer Haushaltsvorgabe mit Auswahl folgt: die Wand
+  // baut ihr Blatt mit leerem Layout auf denselben Daten, dort spricht der
+  // Einkauf also immer. Mit der ersten Fassung: "1" bei einer gewaehlten
+  // Liste, und mit nur der fertig gekauften verschwand die Zeile.
+  for (const cap of [dash.PROGRAM_ROW_CAP, dash.WALL_ROW_CAP]) {
+    for (const path of ['/', query(GARTEN), query(FEST), query(GARTEN, WOCHE)]) {
+      const row = await sheetShoppingRow(await getJson(path), cap);
+      assert.ok(row, `${path}: die Einkaufszeile steht da`);
+      assert.equal(row.title, 'dashboard.todayShoppingCount{"count":14}', `${path} (Deckel ${cap})`);
+    }
+  }
+});
+
+test('das Heute-Blatt liest die Zahl des Servers, nicht die Summe der drei gelieferten Listen', async () => {
+  // Bestand vor #1818: `shoppingLists` traegt hoechstens drei Listen, das Blatt
+  // summierte deren `open_count` - 13 bei vierzehn offenen in vier Listen.
+  const plain = await getJson('/');
+  assert.equal(plain.shoppingLists.reduce((sum, list) => sum + list.open_count, 0), 13, 'Vorbedingung: die Summe der drei ist kleiner');
+  assert.equal(dash.buildTodayHighlights(plain).openShoppingCount, 14);
+  // Ohne die Zahl (aelterer Server) oder nach gescheiterter Abfrage (`null`) bleibt die Summe.
+  assert.equal(dash.buildTodayHighlights({ shoppingLists: plain.shoppingLists }).openShoppingCount, 13);
+  assert.equal(dash.buildTodayHighlights({ shoppingLists: plain.shoppingLists, shoppingOpenCount: null }).openShoppingCount, 13);
+  // Null offen ist eine Zahl, kein Fehlen.
+  assert.equal(dash.buildTodayHighlights({ shoppingLists: plain.shoppingLists, shoppingOpenCount: 0 }).openShoppingCount, 0);
 });

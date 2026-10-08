@@ -15,8 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Choose which shopping lists the overview shows** (#1818, from D#1624). The shopping tile now
   has options in "Customize": tick the lists you want on it. With nothing ticked it shows every
   list with open items, as before. A list you picked stays on the tile even when everything on it
-  is bought, so it is one tap away when you want to add the first item. The choice is yours alone
-  and does not change what anyone else in the household sees.
+  is bought, so it is one tap away when you want to add the first item. The tile shows up to
+  three lists; a further one you picked is named as "+1 more list". The choice is yours alone,
+  does not change what anyone else in the household sees, and only applies to the tile: the
+  today sheet, the wall and the menu keep counting every list.
 
 ### Changed
 
@@ -189,6 +191,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   empty locked share in a split expense showed a grey "30" that looked like a value of 30. The
   calendar button of a locked date also steps back when a whole group of fields is locked, not
   only when the date itself is.
+- **"n open" for shopping counts every list.** With more than three lists that still had open
+  items, the today sheet and the wall added up only three of them and showed a smaller number
+  than the shopping page.
 - **A shopping list on the overview opens that list.** The shopping tile shows up to three lists,
   the most recently changed first, but tapping any of them opened the shopping page on its first
   list - tap "Drugstore" and you got "Weekly shop". Each row now opens its own list, by tap, click

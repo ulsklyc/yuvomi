@@ -42,7 +42,7 @@ export function dashboardPaths() {
             name: 'shopping_list',
             in: 'query',
             required: false,
-            description: 'Limit the shopping tile to these lists. Repeatable positive list IDs, deduplicated and capped at 50. With a selection `shoppingLists` holds the selected lists - also those without open items, lists with open items first - and `shoppingOpenCount` / `shoppingOpenLists` count within the selection. IDs of lists that do not exist are dropped; when none of the IDs exists, or the value is not an ID, the request answers like one without the parameter. Omitted or empty means every list with open items. A caller without access to shopping gets the empty shopping payload either way.',
+            description: 'Which lists the shopping tile shows. Repeatable positive list IDs, deduplicated and capped at 50. The selection applies to the tile only: with it the response carries an extra field `shoppingTile` = `{ lists, openCount, listCount }` - the selected lists (at most three, also those without open items, lists with open items first, each with up to six open items), the open items within the selection, and how many selected lists exist. `shoppingLists`, `shoppingOpenCount` and `shoppingOpenLists` are never affected and keep counting across all lists. IDs of lists that do not exist are dropped; when none of the IDs exists, or the value is not an ID, the request answers like one without the parameter and `shoppingTile` is absent. A caller without access to shopping gets the empty shopping payload and no `shoppingTile`.',
             schema: { type: 'array', items: { type: 'integer', minimum: 1 }, maxItems: 50 },
             style: 'form',
             explode: true,

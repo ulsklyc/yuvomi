@@ -494,9 +494,22 @@ router.get('/', (req, res) => {
 
   /* WELCHE EINKAUFSLISTEN DIE KACHEL ZEIGT (#1818, aus D#1624). `shopping_list`
    * nennt eine Auswahl von Listen-Ids; ohne den Parameter bleibt alles, wie es
-   * war. Wie die anderen Kachel-Optionen wirkt die Auswahl VOR der Deckelung
-   * und auf Liste UND Zahlen - eine Kachel, die eine Liste zeigt und ueber
-   * allen "23" zaehlt, widerspraeche sich.
+   * war.
+   *
+   * DIE AUSWAHL GILT NUR DER KACHEL, und zwar an der Quelle: sie fuellt ein
+   * EIGENES Feld der Antwort (`shoppingTile`) und laesst `shoppingLists`,
+   * `shoppingOpenCount` und `shoppingOpenLists` unberuehrt. Anders als bei
+   * Aufgaben und Notizen, wo eine Auswahl die ganze Uebersicht meint: der
+   * Einkauf spricht ausserhalb der Kachel als ZAHL ("n offen" im Heute-Blatt,
+   * an der Wand, in der Navigation), und die liest dieselben Daten. Die erste
+   * Fassung filterte die geteilten Felder - das Wandtablet eines Haushalts,
+   * dessen Vorgabe eine Liste waehlt, zeigte "1 offen" bei vierzehn. Kein
+   * Leser der ungefilterten Felder haengt jetzt von einer Kachel-Option ab,
+   * und der Parameter aendert keine Zahl der Navigation.
+   *
+   * In der Kachel wirkt die Auswahl VOR der Deckelung und auf Liste UND Zahl:
+   * eine Kachel, die eine Liste zeigt und ueber allen "23" zaehlt,
+   * widerspraeche sich.
    *
    * GEPRUEFT WIRD GEGEN DIE TABELLE, nicht nur die Form. Eine Liste, die es
    * nicht (mehr) gibt, faellt aus der Auswahl; bleibt KEINE uebrig, gilt die
@@ -529,8 +542,7 @@ router.get('/', (req, res) => {
     const row = d.prepare(`
       SELECT COUNT(*) AS items, COUNT(DISTINCT si.list_id) AS lists
       FROM shopping_items si WHERE si.is_checked = 0
-      ${shoppingSelection ? `AND si.list_id IN (${shoppingMarks})` : ''}
-    `).get(...shoppingBinds);
+    `).get();
     result.shoppingOpenCount = row.items;
     result.shoppingOpenLists = row.lists;
   } catch (err) {
@@ -620,39 +632,63 @@ router.get('/', (req, res) => {
     result.notesTotal = 0;
   }
 
-  // Einkaufslisten mit offenen Artikeln (max. 3 Listen, je bis zu 6 offene Items)
-  //
-  // MIT EINER AUSWAHL (#1818) stehen die gewaehlten Listen da, AUCH OHNE
-  // OFFENES: wer eine Liste auf die Uebersicht holt, will sie antippen, um
-  // den ersten Artikel einzutragen - genau dann waere sie sonst verschwunden.
-  // Listen mit Offenem zuerst, damit der Deckel von drei keine volle Liste
-  // hinter einer leeren versteckt; darin wie bisher die zuletzt geaenderte.
+  // Einkaufslisten mit offenen Artikeln (max. 3 Listen, je bis zu 6 offene Items).
+  // Immer ueber ALLE Listen - was ausserhalb der Kachel vom Einkauf spricht,
+  // liest dieses Feld und die beiden Zaehler oben.
+  const shoppingItemsOf = (listId) => d.prepare(`
+    SELECT id, name, quantity, is_checked
+    FROM shopping_items
+    WHERE list_id = ? AND is_checked = 0
+    ORDER BY id ASC
+    LIMIT 6
+  `).all(listId);
   if (allows('shopping')) try {
     const lists = d.prepare(`
       SELECT sl.id, sl.name,
         (SELECT COUNT(*) FROM shopping_items si WHERE si.list_id = sl.id AND si.is_checked = 0) AS open_count,
         (SELECT COUNT(*) FROM shopping_items si WHERE si.list_id = sl.id) AS total_count
       FROM shopping_lists sl
-      WHERE ${shoppingSelection
-        ? `sl.id IN (${shoppingMarks})`
-        : '(SELECT COUNT(*) FROM shopping_items si WHERE si.list_id = sl.id AND si.is_checked = 0) > 0'}
-      ORDER BY (open_count > 0) DESC, sl.updated_at DESC
+      WHERE (SELECT COUNT(*) FROM shopping_items si WHERE si.list_id = sl.id AND si.is_checked = 0) > 0
+      ORDER BY sl.updated_at DESC
       LIMIT 3
-    `).all(...shoppingBinds);
-
-    for (const list of lists) {
-      list.items = d.prepare(`
-        SELECT id, name, quantity, is_checked
-        FROM shopping_items
-        WHERE list_id = ? AND is_checked = 0
-        ORDER BY id ASC
-        LIMIT 6
-      `).all(list.id);
-    }
+    `).all();
+    for (const list of lists) list.items = shoppingItemsOf(list.id);
     result.shoppingLists = lists;
   } catch (err) {
     log.error('shoppingLists error:', err.message);
     result.shoppingLists = [];
+  }
+
+  // DIE FASSUNG DER KACHEL (#1818), nur bei einer Auswahl. Die gewaehlten
+  // Listen stehen da, AUCH OHNE OFFENES: wer eine Liste auf die Uebersicht
+  // holt, will sie antippen, um den ersten Artikel einzutragen - genau dann
+  // waere sie sonst verschwunden. Listen mit Offenem zuerst, damit der Deckel
+  // von drei keine volle Liste hinter einer leeren versteckt; darin wie bisher
+  // die zuletzt geaenderte.
+  //
+  // `listCount` zaehlt JEDE gewaehlte Liste, die es gibt - auch die ohne
+  // Offenes. Daraus rechnet die Kachel "+n weitere Listen": eine gewaehlte
+  // Liste, die der Deckel abschneidet, ist so als "+1" da und fehlt nie stumm.
+  //
+  // Scheitert die Abfrage, fehlt das Feld, und die Kachel zeigt alle Listen.
+  if (shoppingSelection) try {
+    const lists = d.prepare(`
+      SELECT sl.id, sl.name,
+        (SELECT COUNT(*) FROM shopping_items si WHERE si.list_id = sl.id AND si.is_checked = 0) AS open_count,
+        (SELECT COUNT(*) FROM shopping_items si WHERE si.list_id = sl.id) AS total_count
+      FROM shopping_lists sl
+      WHERE sl.id IN (${shoppingMarks})
+      ORDER BY (open_count > 0) DESC, sl.updated_at DESC
+      LIMIT 3
+    `).all(...shoppingBinds);
+    for (const list of lists) list.items = shoppingItemsOf(list.id);
+    const openCount = d.prepare(`
+      SELECT COUNT(*) AS items FROM shopping_items si
+      WHERE si.is_checked = 0 AND si.list_id IN (${shoppingMarks})
+    `).get(...shoppingBinds).items;
+    result.shoppingTile = { lists, openCount, listCount: shoppingSelection.length };
+  } catch (err) {
+    log.error('shoppingTile error:', err.message);
   }
 
   // Alle User (für Avatar-Farben in Widgets)
