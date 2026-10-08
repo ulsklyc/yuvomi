@@ -1043,3 +1043,37 @@ test('R17: das Formular ruft die Ankunft nur nach dem ANLEGEN, nach dem Neuzeich
   const fn = src.slice(src.indexOf('function revealCreatedTask('), src.indexOf('\n}\n', src.indexOf('function revealCreatedTask(')));
   assert.ok(fn.indexOf("row.scrollIntoView?.({ block: 'nearest' });") < fn.indexOf('expandIn(row);'));
 });
+
+// --------------------------------------------------------
+// #1808: ein Wandtablett hat kein „mir"
+// --------------------------------------------------------
+test('am Display: kein Schalter „Mir zugewiesen", und ein gespeicherter Wert wird uebergangen (#1808)', () => {
+  // Im Browser gemessen: der Schluessel liegt im Geraetespeicher, ueberlebt das
+  // Koppeln, und die Seite fragte danach `assigned_to=<Display-Id>` - eine leere
+  // Liste bei fuenfzehn offenen Aufgaben.
+  const KEY = 'yuvomi:taskAssignedToMe';
+  const vorher = tasks.state.user;
+  const showHtml = () => tasks.filterSheetGroups().find((g) => g.heading === 'tasks.filterGroupShow')?.html ?? '';
+  try {
+    // DER MENSCH ZUERST - sonst waeren beide Abwesenheiten unten auch dann
+    // gruen, wenn der Schalter oder das Wiederherstellen ganz verschwunden ist.
+    baseState();
+    tasks.state.user = { id: 1 };
+    store.set(KEY, '1');
+    assert.match(showHtml(), /data-filter-mine/, 'der Mensch behaelt den Schalter');
+    tasks.restoreAssignedToMe();
+    assert.deepEqual(tasks.state.filters.assigned_to, ['1'], 'und seine gespeicherte Wahl gilt');
+
+    baseState({ currentUserId: 9 });
+    tasks.state.user = { id: 9, access_scope: 'display' };
+    store.set(KEY, '1');
+    assert.doesNotMatch(showHtml(), /data-filter-mine/, 'am Display wird der Schalter nicht angeboten');
+    tasks.restoreAssignedToMe();
+    assert.deepEqual(tasks.state.filters.assigned_to, [], 'der gespeicherte Wert filtert nicht auf das Display-Konto');
+    assert.equal(tasks.taskQuery().includes('assigned_to'), false, 'und die Abfrage traegt keine Person');
+    assert.equal(store.get(KEY), '1', 'der Speicher bleibt stehen - die Wahl gehoert dem Menschen an diesem Geraet');
+  } finally {
+    tasks.state.user = vorher;
+    store.clear();
+  }
+});

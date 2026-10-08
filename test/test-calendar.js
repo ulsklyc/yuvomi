@@ -5651,6 +5651,54 @@ test('seriesEndConflict: neue Serie, geaenderte Regel und unveraenderte Bestands
 });
 
 // --------------------------------------------------------
+// #1808: ein Wandtablett hat kein „mir"
+// --------------------------------------------------------
+test('am Display wird ein gespeichertes „Mir zugewiesen" uebergangen (#1808)', () => {
+  // Im Browser gemessen: der Schluessel im Geraetespeicher ueberlebt das
+  // Koppeln, und der Kalender eines Displays blieb damit leer - ohne Schalter
+  // im Blatt, der ihn wieder ausgestellt haette.
+  const KEY = 'yuvomi:calendar:assignedToMe';
+  const basis = { events: FILTER_TERMINE, users: NUTZER, people: new Set(), hiddenSources: new Map(), layerBirthdays: true };
+  const tagMit = (user) => mitSpeicher({ [KEY]: '1' }, (daten) => {
+    const assignedToMe = calendarHelpers.restoreAssignedToMe(user);
+    const ids = mitFilterzustand({ ...basis, user, currentUserId: user.id, assignedToMe }, tagesIds);
+    return { ids, gespeichert: daten.get(KEY) };
+  });
+
+  const mensch = tagMit({ id: 1 });
+  assert(mensch.ids === '1', `Gegenfall: der Mensch sieht mit gespeicherter Wahl nur seine Termine, war ${mensch.ids}`);
+
+  const wand = tagMit({ id: 9, access_scope: 'display' });
+  assert(wand.ids === '1,2,3,4', `das Display sieht alle Termine, war "${wand.ids}"`);
+  assert(wand.gespeichert === '1', 'der Speicher bleibt stehen - die Wahl gehoert dem Menschen an diesem Geraet');
+});
+
+test('am Display bietet das Filterblatt „Mir zugewiesen" nicht an (#1808)', () => {
+  const blatt = (user) => {
+    let opened = null;
+    const prevOpen = globalThis.__openModal;
+    const prevDoc = globalThis.document;
+    const hadWindow = 'window' in globalThis;
+    const prevWindow = globalThis.window;
+    globalThis.__openModal = (opts) => { opened = opts; };
+    globalThis.document = { ...(prevDoc ?? {}), querySelector: () => null };
+    globalThis.window = { matchMedia: () => ({ matches: false }) };
+    try {
+      mitFilterzustand({ users: NUTZER, user, currentUserId: user.id, assignedToMe: false, people: new Set(), hiddenSources: new Map() },
+        () => calendarHelpers.openCalendarFilters());
+    } finally {
+      globalThis.__openModal = prevOpen;
+      globalThis.document = prevDoc;
+      if (hadWindow) globalThis.window = prevWindow; else delete globalThis.window;
+    }
+    assert(opened, 'das Filterblatt oeffnet kein Modal');
+    return opened.content;
+  };
+  assert(/data-filter-mine/.test(blatt({ id: 1 })), 'Gegenfall: der Mensch behaelt den Schalter');
+  assert(!/data-filter-mine/.test(blatt({ id: 9, access_scope: 'display' })), 'am Display steht der Schalter nicht im Blatt');
+});
+
+// --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
 const { failed } = await finish();
