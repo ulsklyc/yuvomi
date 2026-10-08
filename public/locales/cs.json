@@ -3006,7 +3006,7 @@
         "sheetRewardsDescription": "Nastavte schvalování a výchozí body pro nové úkoly.",
         "sheetHealthDescription": "Vaše zobrazení, karta cyklu a druhy prevence.",
         "displaysTitle": "Nástěnné tablety",
-        "displaysHint": "Nástěnný tablet dostane vlastní účet, který může používat jen toto zařízení. Není členem rodiny, nepřihlašuje se a vidí jen to, co je viditelné pro domácnost.",
+        "displaysHint": "Nástěnný tablet dostane vlastní účet, který může používat jen toto zařízení. Není členem rodiny, nepřihlašuje se a vidí jen to, co je viditelné pro domácnost. Jeho přehled se řídí výchozím rozvržením domácnosti, a pokud není nastaveno, standardním rozvržením, a zobrazuje jen oblasti, které nástěnný tablet smí číst.",
         "displayDeviceNameLabel": "Název tabletu",
         "displayDeviceNameHint": "Například „Kuchyně“ nebo „Chodba“ - slouží jen k rozlišení v tomto seznamu.",
         "displayCreate": "Přidat nástěnný tablet",

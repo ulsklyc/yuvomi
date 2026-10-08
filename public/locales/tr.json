@@ -2911,7 +2911,7 @@
         "sheetRewardsDescription": "Yeni görevler için onayları ve varsayılan puanları ayarla.",
         "sheetHealthDescription": "Kendi görünümlerin, döngü sekmesi ve önleme türleri.",
         "displaysTitle": "Duvar tabletleri",
-        "displaysHint": "Duvar tableti, yalnızca bu cihazın kullanabileceği kendi hesabını alır. Aile üyesi değildir, oturum açmaz ve yalnızca ev halkına görünen şeyleri görür.",
+        "displaysHint": "Duvar tableti, yalnızca bu cihazın kullanabileceği kendi hesabını alır. Aile üyesi değildir, oturum açmaz ve yalnızca ev halkına görünen şeyleri görür. Genel bakışı hane varsayılanını, ayarlanmamışsa standart düzeni izler ve yalnızca duvar tabletinin okuyabildiği alanları gösterir.",
         "displayDeviceNameLabel": "Tabletin adı",
         "displayDeviceNameHint": "Örneğin “Mutfak” veya “Koridor” - yalnızca bu listede ayırt etmek için.",
         "displayCreate": "Duvar tableti ekle",

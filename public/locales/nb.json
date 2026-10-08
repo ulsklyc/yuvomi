@@ -2911,7 +2911,7 @@
         "sheetRewardsDescription": "Sett godkjenninger og standardpoeng for nye oppgaver.",
         "sheetHealthDescription": "Dine egne visninger, syklusfanen og forebyggelsestypene.",
         "displaysTitle": "Veggtabletter",
-        "displaysHint": "En veggtablet får sin egen konto som kun denne enheten kan bruke. Den er ikke et familiemedlem, den logger ikke inn, og den ser bare det som er synlig for husholdningen.",
+        "displaysHint": "En veggtablet får sin egen konto som kun denne enheten kan bruke. Den er ikke et familiemedlem, den logger ikke inn, og den ser bare det som er synlig for husholdningen. Oversikten følger husstandens standard, eller standardoppsettet hvis ingen er satt, og viser bare de områdene en veggtablet kan lese.",
         "displayDeviceNameLabel": "Tabletnavn",
         "displayDeviceNameHint": "For eksempel «Kjøkken» eller «Gang» - kun for å skille dem fra hverandre i denne listen.",
         "displayCreate": "Legg til veggtablet",

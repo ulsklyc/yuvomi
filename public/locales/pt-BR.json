@@ -2910,7 +2910,7 @@
         "sheetRewardsDescription": "Defina aprovações e pontos padrão para novas tarefas.",
         "sheetHealthDescription": "Suas próprias visualizações, a aba do ciclo e os tipos de prevenção.",
         "displaysTitle": "Tablets de parede",
-        "displaysHint": "Um tablet de parede recebe uma conta própria que só este dispositivo pode usar. Não é um membro da família, não faz login e vê apenas o que está visível para a casa.",
+        "displaysHint": "Um tablet de parede recebe uma conta própria que só este dispositivo pode usar. Não é um membro da família, não faz login e vê apenas o que está visível para a casa. A visão geral dele segue o padrão da casa ou, se não houver um, o layout padrão do app, e mostra apenas as áreas que um tablet de parede pode ler.",
         "displayDeviceNameLabel": "Nome do tablet",
         "displayDeviceNameHint": "Por exemplo “Cozinha” ou “Corredor” - serve apenas para os distinguir nesta lista.",
         "displayCreate": "Adicionar tablet de parede",

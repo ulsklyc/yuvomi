@@ -2925,7 +2925,7 @@
         "sheetRewardsDescription": "새 할 일의 승인과 기본 포인트를 설정합니다.",
         "sheetHealthDescription": "내 보기, 주기 탭, 예방 종류.",
         "displaysTitle": "벽면 태블릿",
-        "displaysHint": "벽면 태블릿에는 이 기기만 사용할 수 있는 전용 계정이 생깁니다. 가족 구성원이 아니며 로그인하지 않고, 가구에 공개된 내용만 볼 수 있습니다.",
+        "displaysHint": "벽면 태블릿에는 이 기기만 사용할 수 있는 전용 계정이 생깁니다. 가족 구성원이 아니며 로그인하지 않고, 가구에 공개된 내용만 볼 수 있습니다. 개요는 가정 기본값을 따르고, 기본값이 없으면 표준 배치를 따르며, 벽면 태블릿이 읽을 수 있는 영역만 표시합니다.",
         "displayDeviceNameLabel": "태블릿 이름",
         "displayDeviceNameHint": "예를 들어 “주방”이나 “현관” - 이 목록에서 구분하기 위한 용도입니다.",
         "displayCreate": "벽면 태블릿 추가",

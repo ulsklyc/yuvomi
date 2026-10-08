@@ -173,6 +173,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A wall tablet no longer goes blank when the household overview shows "Assigned to me"** (#1808).
+  A paired display follows the household default of the overview. If that default had the calendar
+  tile set to "Assigned to me", the tablet looked for events assigned to the tablet itself and
+  showed none - in the tile and in the week strip. On a display the option now means all events;
+  for members it works as before. The hint under Settings > Displays now says where a tablet
+  takes its overview from.
 - **A locked field looks locked.** A field you cannot change looked exactly like one you can -
   same text, same fill, same outline; only the mouse pointer gave it away, and on a phone nothing
   did. Text, number and date fields, dropdowns and text areas now all show it the same way,

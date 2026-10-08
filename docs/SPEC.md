@@ -2385,6 +2385,15 @@ A revoked device can be removed afterwards (D#1672): `POST /api/v1/displays/:id/
 deletes its row, and a device that is still paired answers 409 with `reason: "display_device_active"`.
 Without it the list grew by one dead row per re-pairing.
 
+**Where a display takes its overview from (#1808).** A display stores no layout of its own
+(`PUT /preferences` is not among its write routes), so it follows the household default
+(`dashboard_widgets_default`) and, when none is set, the shipped default; of that layout it reads only
+the modules of its scopes, every other tile arrives in its empty form. Tile options travel as query
+parameters from that default, and one of them is personal: `events_scope=mine` means "assigned to the
+caller". No event is ever assigned to a display account, so `GET /dashboard` reads the option as
+"all" for `authMethod === 'display'` - at the reader, not when the default is saved, because the same
+default is right for the members who follow it.
+
 **What a display does, not only what it sees (#1209, decided in #913).** A paired display may act,
 on behalf of a person chosen on the device, for exactly two things: tick a task off, and request a
 redemption. Nothing else - no creating, editing or deleting, and no settings.

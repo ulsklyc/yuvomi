@@ -2911,7 +2911,7 @@
         "sheetRewardsDescription": "Set approvals and default points for new tasks.",
         "sheetHealthDescription": "Your own views, the cycle tab and the prevention types.",
         "displaysTitle": "Wall tablets",
-        "displaysHint": "A wall tablet gets its own account that only this device can use. It is not a family member, it does not sign in, and it only sees what is visible to the household.",
+        "displaysHint": "A wall tablet gets its own account that only this device can use. It is not a family member, it does not sign in, and it only sees what is visible to the household. Its overview follows the household default, or the standard layout if none is set, and shows only the areas a wall tablet may read.",
         "displayDeviceNameLabel": "Tablet name",
         "displayDeviceNameHint": "For example “Kitchen” or “Hallway” - only to tell them apart in this list.",
         "displayCreate": "Add wall tablet",

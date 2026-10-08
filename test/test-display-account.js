@@ -1002,6 +1002,50 @@ test('ein Display speichert keine Anordnung und folgt der Vorgabe des Haushalts 
   }
 });
 
+test('"Mir zugewiesen" in der Vorgabe des Haushalts leert das Tablett nicht (#1808)', async () => {
+  // Ein Display folgt der Vorgabe des Haushalts, und sein Browser schickt deren
+  // Kachel-Optionen als Query mit (dashboardQuery). `events_scope=mine` hiess
+  // am Server "dem AUFRUFER zugewiesen" - auf einem Tablett also dem
+  // Display-Konto, dem nie jemand einen Termin zuweist (#1207). Die Auswahl
+  // wirkt auf die ganze Uebersicht, also war nicht nur die Kachel leer.
+  const created = await admin('POST', '/displays', { display_name: 'Terminprobe' });
+  const issued = await admin('POST', `/displays/${created.body.data.id}/pairing-code`, {});
+  const display = asDisplay((await pair(issued.body.data.code)).token);
+
+  const neu = await admin('POST', '/auth/users', {
+    username: 'mila', display_name: 'Mila', password: 'milapass12345', role: 'member',
+  });
+  assert.equal(neu.status, 201, `Mitglied anlegen: ${JSON.stringify(neu.body)}`);
+  const milaId = neu.body.user?.id ?? neu.body.data?.id;
+  const mila = as(await login('mila', 'milapass12345'));
+
+  // Zwei Tage voraus: sicher Zukunft, sicher im Wochenfenster, in jeder Zone.
+  const start = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19);
+  const fuerMila = await admin('POST', '/calendar', { title: 'Scope Mila', start_datetime: start, assigned_to: [milaId] });
+  assert.equal(fuerMila.status, 201, JSON.stringify(fuerMila.body));
+  const fuerAlle = await admin('POST', '/calendar', { title: 'Scope Alle', start_datetime: start });
+  assert.equal(fuerAlle.status, 201, JSON.stringify(fuerAlle.body));
+
+  const probe = (body, key) => body[key].map((e) => e.title).filter((title) => title.startsWith('Scope ')).sort();
+
+  // Vorbedingung: ohne die Option sieht das Tablett beide - sonst waere "leer"
+  // unten eine Sperre oder ein Fenster, nicht der Filter.
+  const offen = await display('GET', '/dashboard');
+  assert.deepEqual(probe(offen.body, 'upcomingEvents'), ['Scope Alle', 'Scope Mila']);
+
+  // GEGENFALL: fuer ein Mitglied bleibt `mine` die Auslegung des Kalenders.
+  const eigene = await mila('GET', '/dashboard?events_scope=mine');
+  assert.deepEqual(probe(eigene.body, 'upcomingEvents'), ['Scope Mila'], 'ein Mitglied sieht mit "mine" nur die eigenen');
+  assert.deepEqual(probe(eigene.body, 'weekEvents'), ['Scope Mila']);
+
+  // Der Fall selbst, so wie ihn das Tablett stellt.
+  const wand = await display('GET', '/dashboard?events_scope=mine');
+  assert.equal(wand.status, 200);
+  assert.deepEqual(probe(wand.body, 'upcomingEvents'), ['Scope Alle', 'Scope Mila'],
+    'ein Display hat kein "mir": die Option gilt dort als "alle"');
+  assert.deepEqual(probe(wand.body, 'weekEvents'), ['Scope Alle', 'Scope Mila'], 'und der Wochenstreifen ebenso');
+});
+
 test('der Katalog beschreibt den Rumpf der Kopplung', async () => {
   // Ohne Schema laesst `op()` den Rumpf ganz weg - ein erzeugter Client haette
   // kein Argument fuer den Code, und die Route antwortet dann mit 400.
