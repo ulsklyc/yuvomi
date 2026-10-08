@@ -12,33 +12,40 @@
 
 const FALLBACK_CATEGORY = 'Sonstiges';
 
-// Deutsche und englische Stichworte, da Provider-Instanzen in beiden Sprachen
-// befüllt sein können. Reihenfolge ist irrelevant, die erste Übereinstimmung zählt.
+// Deutsche, englische und norwegische Stichworte, da Provider-Instanzen in
+// diesen Sprachen befüllt sein können. Reihenfolge ist irrelevant, die erste
+// Übereinstimmung zählt.
 const KEYWORDS = {
   'Obst & Gemüse': [
     'apple', 'apfel', 'banana', 'banane', 'tomato', 'tomate', 'onion', 'zwiebel',
     'garlic', 'knoblauch', 'potato', 'kartoffel', 'carrot', 'karotte', 'lemon',
     'zitrone', 'lime', 'pepper', 'paprika', 'lettuce', 'salat', 'spinach', 'spinat',
     'cucumber', 'gurke', 'vegetable', 'gemüse', 'fruit', 'obst', 'herb', 'kräuter',
-    'basil', 'basilikum', 'parsley', 'petersilie', 'mushroom', 'pilz',
+    'basil', 'basilikum', 'parsley', 'petersilie', 'mushroom', 'pilz', 'løk', 'rødløk',
+    'vårløk', 'hvitløk', 'potet', 'poteter', 'gulrot', 'gulrøtter', 'tomat', 'tomater',
+    'agurk', 'brokkoli', 'blomkål', 'kål', 'purre', 'sopp', 'sitron', 'eple', 'epler',
+    'banan', 'bananer', 'frukt', 'grønnsaker','persille', 'koriander', 'ingefær'
   ],
   'Backwaren': [
     'flour', 'mehl', 'bread', 'brot', 'baking powder', 'backpulver', 'yeast',
-    'hefe', 'bun', 'brötchen', 'tortilla', 'noodle', 'nudel', 'pasta',
+    'hefe', 'bun', 'brötchen', 'tortilla', 'noodle', 'nudel', 'pasta', 'mel',
+    'hvetemel', 'brød', 'rundstykker', 'gjær', 'bakepulver', 'nudler', 'spaghetti'
   ],
   'Milchprodukte': [
     'milk', 'milch', 'cheese', 'käse', 'butter', 'cream', 'sahne', 'yogurt',
-    'joghurt', 'egg', 'ei', 'eier',
+    'joghurt', 'egg', 'ei', 'eier', 'melk', 'lettmelk', 'helmelk', 'ost',
+    'smør', 'fløte', 'matfløte', 'kremfløte', 'rømme', 'yoghurt'
   ],
   'Fleisch & Fisch': [
     'chicken', 'hähnchen', 'huhn', 'beef', 'rind', 'pork', 'schwein', 'fish',
     'fisch', 'salmon', 'lachs', 'shrimp', 'garnele', 'bacon', 'speck', 'sausage',
-    'wurst', 'meat', 'fleisch',
+    'wurst', 'meat', 'fleisch', 'kylling', 'kyllingfilet', 'kjøtt', 'kjøttdeig',
+    'svinekjøtt', 'storfe', 'fisk', 'laks', 'torsk', 'reker', 'pølse', 'pølser', 'skinke'
   ],
-  'Tiefkühl': ['frozen', 'tiefkühl', 'tiefgefroren', 'ice cream', 'eis'],
-  'Getränke': ['juice', 'saft', 'wine', 'wein', 'beer', 'bier', 'water', 'wasser', 'soda', 'cola'],
-  'Haushalt': ['foil', 'folie', 'napkin', 'serviette', 'detergent', 'waschmittel'],
-  'Drogerie': ['soap', 'seife', 'shampoo', 'toothpaste', 'zahnpasta'],
+  'Tiefkühl': ['frozen', 'tiefkühl', 'tiefgefroren', 'ice cream', 'eis', 'frossen', 'frosne', 'fryst'],
+  'Getränke': ['juice', 'saft', 'wine', 'wein', 'beer', 'bier', 'water', 'wasser', 'soda', 'cola', 'vin', 'øl', 'vann', 'brus'],
+  'Haushalt': ['foil', 'folie', 'napkin', 'serviette', 'detergent', 'waschmittel', 'aluminiumsfolie', 'servietter', 'vaskemiddel', 'oppvaskmiddel'],
+  'Drogerie': ['soap', 'seife', 'shampoo', 'toothpaste', 'zahnpasta', 'såpe', 'sjampo', 'tannkrem'],
 };
 
 function escapeRegex(text) {
