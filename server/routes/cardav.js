@@ -46,6 +46,22 @@ function fail(res, status, errorCode, devMessage) {
 }
 
 /**
+ * Der Server des Nutzers hat abgelehnt oder war nicht erreichbar - das ist kein
+ * interner Fehler, und "Internal error" sagt dem Nutzer nichts über ein falsches
+ * Passwort oder ein nur lesbares Konto. `testConnection` stellt genau diesen
+ * Fällen `CardDAV connection failed:` voran; die Meldung wird durchgereicht,
+ * wie es die CalDAV- und iCloud-Routen tun. Alles andere bleibt ein 500.
+ *
+ * @returns {boolean} true, wenn geantwortet wurde
+ */
+function failIfConnection(res, err) {
+  const message = String(err?.message ?? '');
+  if (!message.startsWith('CardDAV connection failed')) return false;
+  fail(res, 502, 'connection_failed', message);
+  return true;
+}
+
+/**
  * GET /api/v1/contacts/cardav/accounts
  * Liste aller CardDAV Accounts.
  * Response: { data: Account[] }
@@ -85,6 +101,7 @@ router.post('/accounts', async (req, res) => {
     res.status(201).json({ data: result });
   } catch (err) {
     log.error('Error adding CardDAV account:', err);
+    if (failIfConnection(res, err)) return;
     fail(res, 500, 'internal', 'Internal error');
   }
 });
@@ -182,6 +199,7 @@ router.post('/accounts/:id/test', async (req, res) => {
     res.json({ data: result });
   } catch (err) {
     log.error('Error testing CardDAV connection:', err);
+    if (failIfConnection(res, err)) return;
     fail(res, 500, 'internal', 'Internal error');
   }
 });

@@ -10,6 +10,7 @@ import { visibilityWhere } from './visibility.js';
 // aendert sich an den Dokumentrechten nichts - nichts wird `family`, enger
 // oder privat, keine Freigabe faellt weg (applyDocumentAccess, `grantAssignees`).
 const FOLLOW_ASSIGNMENT = Object.freeze({ grantAssigneesOnly: true });
+import { sqlIsOwnEventUidOfRow } from '../utils/own-uid.js';
 import { remindAtCompareKey, remindAtUtcSql } from '../utils/reminder-schedule.js';
 
 // --------------------------------------------------------
@@ -79,7 +80,7 @@ export function assignDefaultToEvent(d, eventId, userId) {
 // (external_source, calendar_ref_id) auf einen lokal angelegten Termin, sobald er
 // im Kalender liegt. Er hinterlässt aber eine Spur, die kein Import trägt -
 // Google und CalDAV behalten ihr gewähltes Ziel (target_*), Apple und CalDAV
-// laden unter der UID 'oikos-<id>@oikos.local' hoch. Ein importierter Termin,
+// laden unter einer eigenen UID hoch (altes und neues Muster: own-uid.js). Ein importierter Termin,
 // den jemand in Yuvomi in einen anderen Kalender verschoben hat, trägt ebenfalls
 // ein Ziel und bleibt damit aussen vor: an ihm hat schon eine Hand gearbeitet.
 //
@@ -111,7 +112,7 @@ export function assignDefaultToEvent(d, eventId, userId) {
 const NOT_PUSHED_OUTBOUND = `
   e.target_google_calendar_id IS NULL
     AND e.target_caldav_calendar_url IS NULL
-    AND COALESCE(e.external_calendar_id, '') <> ('oikos-' || e.id || '@oikos.local')
+    AND NOT ${sqlIsOwnEventUidOfRow('e.external_calendar_id', 'e.id')}
     AND NOT (e.external_source = 'google' AND e.created_at < COALESCE(
       (SELECT applied_at FROM schema_migrations WHERE version = 47), ''))
 `;
