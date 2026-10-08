@@ -5386,6 +5386,8 @@
         "importNewTypeNameRequiredError": "Voer een naam in voor de nieuwe afvalsoort.",
         "importDefaultSourceName": "Geïmporteerd bestand",
         "importCommittedToast": "Import toegepast: {{added}} toegevoegd, {{changed}} gewijzigd, {{removed}} verwijderd.",
+        "importPreviewChangedError": "De kalender is gewijzigd sinds het voorbeeld. Start de import opnieuw.",
+        "importSourceChangedError": "Deze bron is intussen gewijzigd. Start de import opnieuw.",
         "sourcesSectionTitle": "Importbronnen",
         "sourceNameLabel": "Naam",
         "sourceCoverageLabel": "Dekking",

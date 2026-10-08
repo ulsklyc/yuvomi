@@ -50,23 +50,32 @@ export function computeDigest(icsText) {
 }
 
 /**
- * sha256 of what a preview actually SHOWS a reviewer (candidates/labels/diagnostics), not of the
- * raw bytes behind it. Used as the commit concurrency guard: two fetches of the same underlying
- * feed that differ only in volatile bytes irrelevant to the parsed result (a request-time DTSTAMP,
- * incidental whitespace, ...) still produce the same review digest, so a URL source doesn't get
- * stuck refusing every commit with "content changed since you last previewed it" purely because it
- * was fetched twice. A genuine content change - a different candidate, label, or diagnostic - does
- * change the digest, so the guard still does its real job.
+ * sha256 of what a preview actually SHOWS a reviewer, not of the raw bytes behind it and not of the
+ * feed's own bookkeeping. Used as the commit concurrency guard.
+ *
+ * What a reviewer sees and decides on is: which label falls on which day and how often, how many
+ * pickups each label has, and the diagnostics. That is what goes in. What stays out:
+ *  - volatile bytes that never reach the parsed result (a request-time DTSTAMP, whitespace);
+ *  - the event UID, and with it `identity_key` and a diagnostic's `event_key` (#1795). A UID is
+ *    the feed's name for an event, not a fact about the pickup, and some providers mint a new one
+ *    for every event on every request (limburg.net: a PHP uniqid()). A URL source's preview and
+ *    commit each fetch the feed on their own, so a digest over UIDs never matched itself there
+ *    and every commit was refused as "content changed since you last previewed it".
+ *
+ * The lines are a sorted LIST, not a set: two events on the same day with the same label are two
+ * lines, so a file that gains or loses a duplicate still changes the digest. A genuine change - a
+ * different day, label, count or diagnostic - changes it for an uploaded file exactly as before;
+ * two inputs with the same digest lead to the same pickups on the same days.
  */
 export function computeReviewDigest({ candidates, labels, diagnostics }) {
   const candidateLines = candidates
-    .map((c) => `${c.identity_key}|${c.normalized_label}|${c.date_key}`)
+    .map((c) => `${c.normalized_label}|${c.date_key}`)
     .sort();
   const labelLines = labels
     .map((l) => `${l.normalized_label}|${l.original_label}|${l.count}`)
     .sort();
   const diagnosticLines = diagnostics
-    .map((d) => `${d.severity}|${d.code}|${d.event_key ?? ''}|${d.count ?? ''}|${d.message ?? ''}`)
+    .map((d) => `${d.severity}|${d.code}|${d.name ?? ''}|${d.count ?? ''}`)
     .sort();
   const canonical = JSON.stringify({ candidates: candidateLines, labels: labelLines, diagnostics: diagnosticLines });
   return crypto.createHash('sha256').update(canonical, 'utf8').digest('hex');

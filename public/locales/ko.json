@@ -5386,6 +5386,8 @@
         "importNewTypeNameRequiredError": "새 쓰레기 종류의 이름을 입력해 주세요.",
         "importDefaultSourceName": "가져온 파일",
         "importCommittedToast": "가져오기가 적용되었습니다: {{added}}개 추가, {{changed}}개 변경, {{removed}}개 삭제.",
+        "importPreviewChangedError": "미리보기 이후 캘린더가 변경되었습니다. 가져오기를 다시 시작해 주세요.",
+        "importSourceChangedError": "그 사이에 이 소스가 변경되었습니다. 가져오기를 다시 시작해 주세요.",
         "sourcesSectionTitle": "가져오기 소스",
         "sourceNameLabel": "이름",
         "sourceCoverageLabel": "적용 범위",

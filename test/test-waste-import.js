@@ -343,3 +343,40 @@ test('a VEVENT with more than one CATEGORIES tag uses only the first as the labe
   assert.equal(preview.labels.length, 1);
   assert.equal(preview.labels[0].original_label, 'Restmüll');
 });
+
+// -------------------------------------------------------------------------
+// The review digest (#1795): what the reviewer saw, nothing the feed merely
+// calls it.
+// -------------------------------------------------------------------------
+
+function digestOf(events) {
+  return buildImportPreview(vcalendar(events), { today: TODAY }).digest;
+}
+
+const pickup = (uid, label, date, extra = '') => `BEGIN:VEVENT\r\nUID:${uid}\r\nSUMMARY:${label}\r\nDTSTART;VALUE=DATE:${date}${extra}\r\nEND:VEVENT`;
+
+test('review digest: the same pickups under other UIDs and another DTSTAMP are the same review', () => {
+  const first = digestOf([pickup('6ac76c366edf8', 'Huisvuil', '20260701', '\r\nDTSTAMP:20261008T121102Z'), pickup('6ac76c366ee0c', 'Pmd', '20260701', '\r\nDTSTAMP:20261008T121102Z')]);
+  const second = digestOf([pickup('6ac76c3931190', 'Huisvuil', '20260701', '\r\nDTSTAMP:20261008T121105Z'), pickup('6ac76c393119e', 'Pmd', '20260701', '\r\nDTSTAMP:20261008T121105Z')]);
+  assert.equal(first, second);
+});
+
+test('review digest: every change a reviewer would see still changes it - a day, a label, one pickup more, a duplicate, a diagnostic', () => {
+  const base = [pickup('a', 'Huisvuil', '20260701'), pickup('b', 'Pmd', '20260701')];
+  const baseDigest = digestOf(base);
+  const variants = {
+    'another day': [pickup('a', 'Huisvuil', '20260702'), pickup('b', 'Pmd', '20260701')],
+    'another label': [pickup('a', 'Huisvuil', '20260701'), pickup('b', 'Glas', '20260701')],
+    'the labels swapped between two days': [pickup('a', 'Pmd', '20260701'), pickup('b', 'Huisvuil', '20260701'), pickup('c', 'Pmd', '20260708')],
+    'one pickup more': [...base, pickup('c', 'Pmd', '20260715')],
+    'a second pickup of the same label on the same day': [...base, pickup('c', 'Pmd', '20260701')],
+    'a cancelled entry': [...base, pickup('c', 'Pmd', '20260715', '\r\nSTATUS:CANCELLED')],
+    'an event that blocks': [...base, pickup('c', 'Pmd', '20260715', '\r\nRRULE:FREQ=WEEKLY')],
+  };
+  const seen = new Map([[baseDigest, 'the base']]);
+  for (const [name, events] of Object.entries(variants)) {
+    const digest = digestOf(events);
+    assert.ok(!seen.has(digest), `"${name}" has the same digest as "${seen.get(digest)}"`);
+    seen.set(digest, name);
+  }
+});

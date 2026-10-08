@@ -5779,6 +5779,8 @@
         "importNewTypeNameRequiredError": "يرجى إدخال اسم للنوع الجديد من النفايات.",
         "importDefaultSourceName": "ملف مستورد",
         "importCommittedToast": "تم تطبيق الاستيراد: تمت إضافة {{added}}، وتغيير {{changed}}، وإزالة {{removed}}.",
+        "importPreviewChangedError": "تغيّر التقويم منذ المعاينة. يُرجى بدء الاستيراد من جديد.",
+        "importSourceChangedError": "تغيّر هذا المصدر في هذه الأثناء. يُرجى بدء الاستيراد من جديد.",
         "sourcesSectionTitle": "مصادر الاستيراد",
         "sourceNameLabel": "الاسم",
         "sourceCoverageLabel": "النطاق الزمني",

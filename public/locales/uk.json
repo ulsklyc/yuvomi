@@ -5648,6 +5648,8 @@
         "importNewTypeNameRequiredError": "Введіть назву для нового виду сміття.",
         "importDefaultSourceName": "Імпортований файл",
         "importCommittedToast": "Імпорт застосовано: додано {{added}}, змінено {{changed}}, видалено {{removed}}.",
+        "importPreviewChangedError": "Календар змінився після перегляду. Запусти імпорт знову.",
+        "importSourceChangedError": "Це джерело тим часом змінилося. Запусти імпорт знову.",
         "sourcesSectionTitle": "Джерела імпорту",
         "sourceNameLabel": "Назва",
         "sourceCoverageLabel": "Охоплення",

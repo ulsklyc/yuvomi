@@ -5386,6 +5386,8 @@
         "importNewTypeNameRequiredError": "Vennligst skriv inn et navn for den nye avfallstypen.",
         "importDefaultSourceName": "Importert fil",
         "importCommittedToast": "Import utført: {{added}} lagt til, {{changed}} endret, {{removed}} fjernet.",
+        "importPreviewChangedError": "Kalenderen er endret siden forhåndsvisningen. Start importen på nytt.",
+        "importSourceChangedError": "Denne kilden er endret i mellomtiden. Start importen på nytt.",
         "sourcesSectionTitle": "Importkilder",
         "sourceNameLabel": "Navn",
         "sourceCoverageLabel": "Dekning",

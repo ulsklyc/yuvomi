@@ -5386,6 +5386,8 @@
         "importNewTypeNameRequiredError": "请输入新垃圾类型的名称。",
         "importDefaultSourceName": "已导入的文件",
         "importCommittedToast": "导入已应用：新增 {{added}} 项，变更 {{changed}} 项，移除 {{removed}} 项。",
+        "importPreviewChangedError": "日历在预览后已发生变化。请重新开始导入。",
+        "importSourceChangedError": "此来源在此期间已发生变化。请重新开始导入。",
         "sourcesSectionTitle": "导入来源",
         "sourceNameLabel": "名称",
         "sourceCoverageLabel": "覆盖范围",
