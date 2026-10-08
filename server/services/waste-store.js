@@ -822,6 +822,16 @@ export function commitImport(d, {
     // after all is matched in pass 1 again from the next import on. Rows are
     // handed out one per candidate (a queue per type and day), so two pickups
     // of one type on one day stay two rows.
+    //
+    // The TYPE is half of the key on purpose: a row of another type on the
+    // same day is another pickup, never a partner. And within one type and
+    // day the wording decides before the position does: two labels mapped to
+    // one type ("Rest 2w", "Rest 4w") on the same day are told apart by their
+    // summary, so a provider that merely lists them in another order does not
+    // cross the rows and get two "changes" reported. Hence two rounds - first
+    // every candidate that finds a row with its own summary, and only then
+    // the rest in order. One round with a mere preference would let an
+    // earlier candidate without a namesake take the row a later one matches.
     const orphanRowsByFact = new Map();
     for (const row of existingRows) {
       if (nextIdentities.has(row.identity_key)) continue;
@@ -832,9 +842,16 @@ export function commitImport(d, {
     const rekeyStmt = d.prepare(`
       UPDATE waste_imported_pickups SET identity_key = ?, external_uid = ?, original_summary = ?, tz_note = ? WHERE id = ?
     `);
+    const orphansFor = (c) => orphanRowsByFact.get(`${resolvedTypeIdByLabel.get(c.normalized_label)}|${c.date_key}`) ?? [];
+    const rowByCandidate = new Map();
+    for (const c of unmatchedCandidates) {
+      const orphans = orphansFor(c);
+      const namesake = orphans.findIndex((row) => row.original_summary === c.original_summary);
+      if (namesake !== -1) rowByCandidate.set(c, orphans.splice(namesake, 1)[0]);
+    }
     for (const c of unmatchedCandidates) {
       const typeId = resolvedTypeIdByLabel.get(c.normalized_label);
-      const row = orphanRowsByFact.get(`${typeId}|${c.date_key}`)?.shift();
+      const row = rowByCandidate.get(c) ?? orphansFor(c).shift();
       if (!row) {
         insertStmt.run(resolvedSourceId, typeId, c.identity_key, c.external_uid, c.original_summary, c.date_key, c.tz_note);
         added++;

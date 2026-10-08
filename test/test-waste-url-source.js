@@ -554,6 +554,164 @@ test('#1795 refresh: the same pickups under new UIDs are the same pickups - noth
   }
 });
 
+/**
+ * A feed for the pairing tests below: `feeds(call)` returns the `[summary, yyyymmdd]`
+ * pairs of that request, and every request gets UIDs of its own.
+ */
+function feedPerCall(feeds) {
+  let call = 0;
+  return (req, res) => {
+    call += 1;
+    const events = feeds(call).map(([summary, date], index) => (
+      `BEGIN:VEVENT\r\nUID:pair${call}x${index}\r\nDTSTART;VALUE=DATE:${date}\r\nSUMMARY:${summary}\r\nEND:VEVENT\r\n`
+    )).join('');
+    res.writeHead(200);
+    res.end(`BEGIN:VCALENDAR\r\nVERSION:2.0\r\n${events}END:VCALENDAR\r\n`);
+  };
+}
+
+/** Creates a URL source (fetch 1) and applies the reviewed first commit on a fetch of its own (fetch 2). */
+async function createAndCommit(url, name, mappingDecisions) {
+  const created = await createUrlSource(get(), { name, url, refreshIntervalMinutes: 1440, userId: ALICE });
+  assert.equal(created.outcome, 'needs_mapping');
+  store.commitImport(get(), {
+    sourceId: created.source.id,
+    name,
+    icsText: await (await fetch(url)).text(),
+    mappingDecisions,
+    expectedVersion: created.source.version,
+    previewDigest: created.preview.digest,
+    userId: ALICE,
+  });
+  return created.source.id;
+}
+
+function pickupRows(sourceId) {
+  return get().prepare('SELECT id, type_id, date_key, original_summary FROM waste_imported_pickups WHERE source_id = ? ORDER BY id').all(sourceId);
+}
+
+test('#1795 refresh: a row of ANOTHER type on the same day is no partner - it is removed and the new type added', async () => {
+  const huisvuil = seedType({ name: 'Huisvuil' });
+  const pmd = seedType({ name: 'Pmd' });
+  const gft = seedType({ name: 'Gft' });
+  // Fetches 1 and 2: Huisvuil + Pmd on 13 Jan. Fetch 3 maps the new label,
+  // fetch 4 (the refresh) brings Huisvuil + Gft on 13 Jan.
+  const { server, url } = await startServer(feedPerCall((call) => (
+    call <= 2 ? [['Huisvuil', '20260113'], ['Pmd', '20260113']] : [['Huisvuil', '20260113'], ['Gft', '20260113']]
+  )));
+  try {
+    const sourceId = await createAndCommit(url('/cal.ics'), 'Type-half source', [
+      { normalized_label: 'huisvuil', type_id: huisvuil.id },
+      { normalized_label: 'pmd', type_id: pmd.id },
+    ]);
+    const before = pickupRows(sourceId);
+    const pmdRow = before.find((r) => r.type_id === pmd.id);
+    const huisvuilRow = before.find((r) => r.type_id === huisvuil.id);
+    // "Gft" is a label this source has no decision for yet - remember one, the
+    // way the mapping sheet of a source does, so the refresh may auto-commit.
+    get().prepare('INSERT INTO waste_source_mappings (source_id, original_label, normalized_label, type_id, ignored) VALUES (?, ?, ?, ?, 0)')
+      .run(sourceId, 'Gft', 'gft', gft.id);
+
+    const refreshed = await refreshUrlSource(get(), sourceId);
+    assert.equal(refreshed.outcome, 'committed');
+    assert.deepEqual(
+      { added: refreshed.diff.added, changed: refreshed.diff.changed, removed: refreshed.diff.removed },
+      { added: 1, changed: 0, removed: 1 },
+    );
+    const after = pickupRows(sourceId);
+    assert.ok(!after.some((r) => r.id === pmdRow.id), 'the Pmd row is gone, not handed to Gft');
+    assert.ok(after.some((r) => r.id === huisvuilRow.id && r.type_id === huisvuil.id), 'the Huisvuil row stays');
+    assert.deepEqual(after.map((r) => r.type_id).sort(), [huisvuil.id, gft.id].sort());
+    assert.ok(!after.some((r) => r.type_id === pmd.id));
+  } finally {
+    server.close();
+  }
+});
+
+test('#1795 refresh: two labels on one type and day are paired by their wording, not by their position in the feed', async () => {
+  const rest = seedType({ name: 'Restafval' });
+  const both = [['Rest 2w', '20260210'], ['Rest 4w', '20260210']];
+  // Fetches 1 and 2 in one order, fetch 3 (the refresh) in the other. Fetch 4
+  // drops "Rest 2w" for "Rest 6w" and lists the newcomer FIRST: it has no
+  // namesake and must not take the row "Rest 4w" matches.
+  const { server, url } = await startServer(feedPerCall((call) => {
+    if (call <= 2) return both;
+    if (call === 3) return [both[1], both[0]];
+    return [['Rest 6w', '20260210'], both[1]];
+  }));
+  try {
+    const sourceId = await createAndCommit(url('/cal.ics'), 'Two-labels-one-type source', [
+      { normalized_label: 'rest 2w', type_id: rest.id },
+      { normalized_label: 'rest 4w', type_id: rest.id },
+    ]);
+    const before = pickupRows(sourceId);
+    assert.equal(before.length, 2);
+
+    const reordered = await refreshUrlSource(get(), sourceId);
+    assert.equal(reordered.outcome, 'committed');
+    assert.deepEqual(
+      { added: reordered.diff.added, changed: reordered.diff.changed, removed: reordered.diff.removed },
+      { added: 0, changed: 0, removed: 0 },
+      'the same two pickups in another order are no change',
+    );
+    assert.deepEqual(pickupRows(sourceId).map((r) => [r.id, r.original_summary]), before.map((r) => [r.id, r.original_summary]));
+
+    get().prepare('INSERT INTO waste_source_mappings (source_id, original_label, normalized_label, type_id, ignored) VALUES (?, ?, ?, ?, 0)')
+      .run(sourceId, 'Rest 6w', 'rest 6w', rest.id);
+    const renamed = await refreshUrlSource(get(), sourceId);
+    assert.equal(renamed.outcome, 'committed');
+    assert.deepEqual(
+      { added: renamed.diff.added, changed: renamed.diff.changed, removed: renamed.diff.removed },
+      { added: 0, changed: 1, removed: 0 },
+      'one pickup was reworded, the other is untouched',
+    );
+    const fourWeekly = before.find((r) => r.original_summary === 'Rest 4w');
+    assert.equal(pickupRows(sourceId).find((r) => r.id === fourWeekly.id).original_summary, 'Rest 4w');
+  } finally {
+    server.close();
+  }
+});
+
+test('commitImport: a writer that lands between the version check and the write is refused as source_changed, and nothing of the loser is kept', async () => {
+  const type = seedType({ name: 'Papier' });
+  const { server, url } = await startServer(feedPerCall(() => [['Papier', '20260410']]));
+  try {
+    const sourceId = await createAndCommit(url('/cal.ics'), 'Compare-and-swap source', [{ normalized_label: 'papier', type_id: type.id }]);
+    const source = store.getSource(get(), sourceId);
+    // The check outside the transaction passes (the version is still the one
+    // previewed); the rival bumps it right before the transaction body runs.
+    // Only the handle is wrapped - the statements are the real ones.
+    const real = get();
+    const racing = new Proxy(real, {
+      get(target, prop) {
+        if (prop === 'transaction') {
+          return (fn) => {
+            const run = target.transaction(fn);
+            return (...args) => {
+              target.prepare('UPDATE waste_sources SET version = version + 1 WHERE id = ?').run(sourceId);
+              return run(...args);
+            };
+          };
+        }
+        const value = target[prop];
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+    assert.throws(() => store.commitImport(racing, {
+      sourceId,
+      name: 'Renamed by the loser',
+      icsText: 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:loser\r\nDTSTART;VALUE=DATE:20260417\r\nSUMMARY:Papier\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n',
+      mappingDecisions: [{ normalized_label: 'papier', type_id: type.id }],
+      expectedVersion: source.version,
+      userId: ALICE,
+    }), (err) => err.name === 'WasteConflictError' && err.reason === 'source_changed');
+    assert.equal(store.getSource(get(), sourceId).name, 'Compare-and-swap source');
+    assert.deepEqual(pickupRows(sourceId).map((r) => r.date_key), ['2026-04-10']);
+  } finally {
+    server.close();
+  }
+});
+
 test('#1795 refresh: a pickup that really left the feed is still removed, and a new one added, next to the re-keyed rest', async () => {
   const type = seedType({ name: 'Gft' });
   let call = 0;

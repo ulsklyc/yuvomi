@@ -19,7 +19,7 @@ export function wasteErrorResponse(res, err) {
     return true;
   }
   if (err instanceof WasteConflictError) {
-    // `reason` is the stable code a client translates (public/pages/waste.js#wasteErrorText);
+    // `reason` is the stable code a client translates (public/pages/waste.js#importErrorText);
     // `error` stays the English sentence for logs and API consumers.
     res.status(409).json({ error: err.message, code: 409, ...(err.reason && { reason: err.reason }) });
     return true;
