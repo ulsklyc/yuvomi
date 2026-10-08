@@ -87,6 +87,40 @@ export function focusAlreadyInPage(main, active) {
 }
 
 /**
+ * Fokus nach einer Navigation: einen Frame nach dem Aufbau auf `<main>`.
+ *
+ * Die Funktion steht HIER und nicht in router.js, damit sie als Programm
+ * laeuft (router.js laesst sich nicht importieren): der Router reicht nur noch
+ * seine Browser-Teile herein. Zwei Faelle lassen den Fokus, wo er ist, und
+ * beide werden IM Frame gefragt, nicht davor - dazwischen liegt genau die
+ * Zeit, in der jemand in die Seite tabbt oder die Seite einen Dialog oeffnet:
+ *
+ * - er liegt schon in der neuen Seite (focusAlreadyInPage);
+ * - ein Overlay ist offen. Eine Navigation schliesst alle Overlays; steht nach
+ *   dem Aufbau eines im Register, hat die NEUE Seite es geoeffnet (`?open=`
+ *   bei Notizen, Kontakten, Geburtstagen, Aufgaben). Das Overlay liegt
+ *   ausserhalb von `<main>` und haelt den Fokus selbst - `main.focus()` zoege
+ *   ihn hinter den offenen Dialog, und Tab liefe durch die Seite dahinter.
+ *
+ * Alles andere - der Link in Seitenleiste oder Tableiste, `<body>`, ein
+ * Element der alten Seite - gibt den Fokus an `<main>` ab. Das ist der Zweck
+ * der Funktion und darf mit den beiden Ausnahmen nicht verloren gehen.
+ *
+ * @param {string} path
+ * @param {{document: Document, requestAnimationFrame: (cb: () => void) => unknown, hasOpenOverlay: () => boolean}} env
+ */
+export function focusMainAfterNavigation(path, { document, requestAnimationFrame, hasOpenOverlay }) {
+  if (path === '/login' || path === '/setup') return;
+  const main = document.getElementById('main-content');
+  if (!main || typeof main.focus !== 'function') return;
+  requestAnimationFrame(() => {
+    if (hasOpenOverlay()) return;
+    if (focusAlreadyInPage(main, document.activeElement)) return;
+    main.focus({ preventScroll: true });
+  });
+}
+
+/**
  * @param {object} state - der geteilte Zustand, Felder wie in NAVIGATE_STATE
  * @param {object} deps - Abhaengigkeiten, Namen wie in NAVIGATE_DEPS
  * @returns {(path: string, userOrPushState?: object|boolean, pushState?: boolean) => Promise<void>}

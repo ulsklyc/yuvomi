@@ -253,18 +253,6 @@ test('#1821 Einkauf im Heute-Blatt: eine einzige Liste mit Offenem ist das Ziel,
   assert.equal(row(two), '/shopping', 'Schlusszeile, zwei Listen');
 }));
 
-test('#1821 Geburtstage: `?open=` gilt auch unter der Spaltenschwelle', async () => {
-  // Der Baustein selbst ist in test:master-detail gemessen (deepLinkNarrow
-  // oeffnet `openNarrow`); hier steht, dass die Seite ihn einschaltet - ohne
-  // den Schalter landete die Geburtstagszeile am Telefon auf der Liste.
-  const { readFileSync } = await import('node:fs');
-  const src = readFileSync(new URL('../public/pages/birthdays.js', import.meta.url), 'utf8');
-  const mount = src.slice(src.indexOf('_md = mountMasterDetail({'));
-  const call = mount.slice(0, mount.indexOf('\n  });'));
-  assert.match(call.replace(/^\s*\/\/.*$/gm, ''), /^\s*deepLinkNarrow: true,$/m);
-  assert.match(call, /openNarrow:/);
-});
-
 // --------------------------------------------------------
 // #1821: eine Zeile mit Query im Ziel waermt ihr Modul vor
 // --------------------------------------------------------
@@ -293,29 +281,102 @@ test('#1821 Prefetch: die Query faellt auch von `data-route` ab', async () => {
   assert.doesNotMatch(body, /dataset\.route\)/, 'kein zweiter Weg mit der rohen Route');
 });
 
-test('#1821 Fokus: der Router holt niemanden auf <main> zurueck, der schon in der Seite steht', async () => {
-  const { focusAlreadyInPage } = await import('../public/utils/router-navigate.js');
-  const row = {};
-  const navLink = {};
-  const main = { contains: (el) => el === row || el === main };
-  assert.equal(focusAlreadyInPage(main, row), true, 'eine Zeile der neuen Seite behaelt den Fokus');
-  // Der Normalfall der Navigation bleibt: vom Link in der Seitenleiste, von
-  // <body> (die alte Zeile ist mit ihrer Seite verschwunden) und von <main>
-  // selbst geht der Fokus auf <main>.
-  assert.equal(focusAlreadyInPage(main, navLink), false);
-  assert.equal(focusAlreadyInPage(main, null), false);
-  assert.equal(focusAlreadyInPage(main, main), false);
-  assert.equal(focusAlreadyInPage(null, row), false);
+test('#1821 Suche: ein Geburtstags-Treffer fuehrt zu SEINEM Anlass', async () => {
+  const { SEARCH_SECTIONS } = await import('../public/utils/search-sections.js');
+  const route = (bucket, item) => SEARCH_SECTIONS.find((s) => s.bucket === bucket).route(item, {});
+  assert.equal(route('birthdays', { id: 4 }), '/birthdays?open=4');
+  // Derselbe Parameter wie bei den Nachbarn mit Tiefenlink.
+  assert.equal(route('notes', { id: 4 }), '/notes?open=4');
+  assert.equal(route('contacts', { id: 4 }), '/contacts?open=4');
+});
 
-  // Der Aufrufer fragt IM Frame, nicht davor: zwischen Aufbau und Frame liegt
-  // genau die Zeit, in der jemand in die Seite tabbt.
+// --------------------------------------------------------
+// #1821: wohin der Router den Fokus nach einer Navigation legt
+// --------------------------------------------------------
+
+/** Die echte Funktion des Routers, mit einem Dokument, das nur den Fokus kennt. */
+async function navigateFocus({ path = '/', active, overlayOpen = false, inMain = [], atFrame = null }) {
+  const { focusMainAfterNavigation } = await import('../public/utils/router-navigate.js');
+  const frames = [];
+  const focused = [];
+  const doc = { activeElement: active };
+  const main = {
+    contains: (el) => el === main || inMain.includes(el),
+    focus(options) { focused.push(options); doc.activeElement = main; },
+  };
+  doc.getElementById = (id) => (id === 'main-content' ? main : null);
+  let overlay = overlayOpen;
+  focusMainAfterNavigation(path, {
+    document: doc,
+    requestAnimationFrame: (cb) => { frames.push(cb); },
+    hasOpenOverlay: () => overlay,
+  });
+  const queued = frames.length;
+  const focusedBeforeFrame = focused.length;
+  // Zwischen Aufbau und Frame: jemand tabbt in die Seite, die Seite oeffnet einen Dialog.
+  atFrame?.({ doc, main, openOverlay: () => { overlay = true; } });
+  frames.forEach((cb) => cb());
+  return { queued, focusedBeforeFrame, focused, activeIsMain: doc.activeElement === main, active: doc.activeElement };
+}
+
+test('#1821 Router-Fokus: nach einer Navigation aus Seitenleiste oder Tableiste bekommt <main> den Fokus', async () => {
+  // Der Zweck der Funktion - und der Rueckschritt, der mit den Ausnahmen unten
+  // nicht passieren darf: der Fokus bliebe auf dem Link, der die Seite oeffnete.
+  const navLink = { name: 'nav' };
+  const fromNav = await navigateFocus({ active: navLink });
+  assert.equal(fromNav.queued, 1, 'genau ein Frame');
+  assert.equal(fromNav.focusedBeforeFrame, 0, 'gefragt und fokussiert wird IM Frame, nicht davor');
+  assert.deepEqual(fromNav.focused, [{ preventScroll: true }]);
+  assert.equal(fromNav.activeIsMain, true);
+
+  // Die Zeile der ALTEN Seite ist mit ihr verschwunden: der Fokus liegt auf <body>.
+  const body = { name: 'body' };
+  assert.equal((await navigateFocus({ active: body })).activeIsMain, true);
+  assert.equal((await navigateFocus({ active: null })).activeIsMain, true);
+  // Ein Element ausserhalb von <main>, das kein Overlay ist (Suchfeld der Shell).
+  assert.equal((await navigateFocus({ active: { name: 'shell-search' } })).activeIsMain, true);
+});
+
+test('#1821 Router-Fokus: wer schon auf einer Zeile der neuen Seite steht, bleibt dort', async () => {
+  const row = { name: 'row' };
+  // Schon beim Aufruf dort ...
+  const there = await navigateFocus({ active: { name: 'nav' }, inMain: [row], atFrame: ({ doc }) => { doc.activeElement = row; } });
+  assert.deepEqual(there.focused, [], '<main> zieht den Fokus nicht von der Zeile ab');
+  assert.equal(there.active, row);
+  // ... und <main> selbst zaehlt nicht als "in der Seite".
+  const onMain = await navigateFocus({ active: null, atFrame: ({ doc, main }) => { doc.activeElement = main; } });
+  assert.equal(onMain.focused.length, 1);
+});
+
+test('#1821 Router-Fokus: ein Dialog, den die neue Seite oeffnet, behaelt den Fokus', async () => {
+  // `/notes?open=5` im verdeckten Tab: der Dialog nimmt den Fokus, der Frame
+  // des Routers ruht bis zum Zeigen des Tabs. Das Overlay liegt AUSSERHALB von
+  // <main> - `main.focus()` zoege den Fokus hinter den offenen Dialog.
+  const dialogButton = { name: 'dialog-close' };
+  const opened = await navigateFocus({
+    active: { name: 'nav' },
+    atFrame: ({ doc, openOverlay }) => { openOverlay(); doc.activeElement = dialogButton; },
+  });
+  assert.deepEqual(opened.focused, []);
+  assert.equal(opened.active, dialogButton);
+  // Auch wenn der Dialog den Fokus (noch) nicht hat: hinter ihn gehoert er nicht.
+  const pending = await navigateFocus({ active: { name: 'body' }, overlayOpen: true });
+  assert.deepEqual(pending.focused, []);
+});
+
+test('#1821 Router-Fokus: Anmeldung und Einrichtung bleiben unberuehrt, und der Router ruft genau diese Funktion', async () => {
+  assert.equal((await navigateFocus({ path: '/login', active: null })).queued, 0);
+  assert.equal((await navigateFocus({ path: '/setup', active: null })).queued, 0);
+
+  // router.js laesst sich nicht importieren; sein Anteil ist das Hereinreichen.
   const { readFileSync } = await import('node:fs');
   const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
   const fn = router.slice(router.indexOf('function focusMainContentAfterNavigation('));
-  const frame = fn.slice(fn.indexOf('requestAnimationFrame('), fn.indexOf('\n}\n'));
-  const guard = frame.indexOf('if (focusAlreadyInPage(main, document.activeElement)) return;');
-  const focus = frame.indexOf('main.focus(');
-  assert.ok(guard > 0 && focus > guard, 'die Frage steht im Frame und vor dem Fokus');
+  const body = fn.slice(0, fn.indexOf('\n}\n') + 2).replace(/\s+/g, ' ');
+  assert.equal(body,
+    'function focusMainContentAfterNavigation(path) { focusMainAfterNavigation(path, { document, requestAnimationFrame: (cb) => requestAnimationFrame(cb), hasOpenOverlay, }); }',
+    'der Router fuegt keine eigene Bedingung hinzu - jede Regel steht in der gemessenen Funktion');
+  assert.match(router, /focusMainContentAfterNavigation, showToast, t,/, 'und reicht sie an navigate() weiter');
 });
 
 // --------------------------------------------------------
@@ -377,6 +438,12 @@ test('#1821 Fokus: eine Zeile nennt sich ueber Ziel, Kachel und Stelle', () => {
     const card = fakeEl({ attrs: { 'data-route': '/notes?open=5' } });
     const body = fakeEl({ classes: ['note-item__body'], ancestors: { '[data-route]': card } });
     assert.equal(__test.focusKeyOf(body).selector, '[data-route="/notes?open=5"] .note-item__body');
+    // Die Stelle zaehlt das KIND, nicht die Zeile: liegt der Fokus auf dem
+    // zweiten Treffer des Kind-Selektors, ist es der zweite - die Zeile selbst
+    // steht in dieser Trefferliste gar nicht.
+    const otherBody = {};
+    card.closest = ((orig) => (sel) => (sel === '#dashboard-shell' ? { querySelectorAll: () => [otherBody, body] } : orig(sel)))(card.closest);
+    assert.equal(__test.focusKeyOf(body).index, 1);
 
     // Eine Aufgabenzeile fuehrt nirgendhin, sie oeffnet ein Objekt.
     const task = fakeEl({ attrs: { 'data-task-id': '31' } });
@@ -396,17 +463,100 @@ test('#1821 Fokus: eine Zeile nennt sich ueber Ziel, Kachel und Stelle', () => {
   }
 });
 
-test('#1821 Fokus: der Neuaufbau loest den Zeilenschluessel an seiner STELLE ein, ohne zu scrollen', async () => {
-  // Der Aufrufer liegt im Abschluss von render() und laesst sich nicht rufen;
-  // gelesen wird, dass er die Stelle und `preventScroll` des Schluessels nutzt -
-  // ein Schluessel, den niemand einloest, waere toter Code.
+/**
+ * Eine Flaeche fuer captureRebuildFocus/restoreFocusAfterRebuild: `nodes` sind
+ * die Elemente, die `selector` jeweils trifft - wie der Neuaufbau sie liefert.
+ */
+function fakeSurface(nodes) {
+  const log = [];
+  const make = (name, extra = {}) => ({ name, disabled: false, focus(options) { log.push([name, options]); }, ...extra });
+  const table = Object.fromEntries(Object.entries(nodes).map(([selector, list]) => [selector,
+    list.map((entry) => (typeof entry === 'string' ? make(entry) : make(entry.name, entry)))]));
+  return {
+    log,
+    table,
+    querySelector: (selector) => table[selector]?.[0] ?? null,
+    querySelectorAll: (selector) => table[selector] ?? [],
+  };
+}
+
+test('#1821 Fokus: der Neuaufbau gibt der Zeile den Fokus zurueck - an ihrer Stelle, ohne zu scrollen', () => {
+  const hadCss = 'CSS' in globalThis;
+  const prevCss = globalThis.CSS;
+  globalThis.CSS = { escape: (v) => String(v) };
+  try {
+    // VORHER: die dritte Schichtplan-Zeile hat den Fokus.
+    const body = {};
+    const rowsBefore = [{}, {}, null];
+    const row = fakeEl({ attrs: { 'data-route': '/schedule/patterns' } });
+    rowsBefore[2] = row;
+    const shellBefore = { contains: (el) => el === row, querySelectorAll: () => rowsBefore };
+    row.closest = ((orig) => (sel) => (sel === '#dashboard-shell' ? shellBefore : orig(sel)))(row.closest);
+    const before = __test.captureRebuildFocus(shellBefore, row, body);
+    assert.equal(before.had, true);
+    assert.deepEqual(before.key, { selector: '[data-route="/schedule/patterns"]', index: 2, preventScroll: true },
+      'die Erfassung gibt den Zeilenschluessel weiter');
+
+    // NACHHER: neue Elemente, derselbe Selektor. Die dritte bekommt den Fokus.
+    const after = fakeSurface({ '[data-route="/schedule/patterns"]': ['erste', 'zweite', 'dritte'] });
+    const got = __test.restoreFocusAfterRebuild(after, [before.key]);
+    assert.equal(got?.name, 'dritte');
+    assert.deepEqual(after.log, [['dritte', { preventScroll: true }]]);
+
+    // Die Zeile gibt es nach dem Neuaufbau nicht mehr (eine weniger): kein Fokus, kein Wurf.
+    const fewer = fakeSurface({ '[data-route="/schedule/patterns"]': ['erste', 'zweite'] });
+    assert.equal(__test.restoreFocusAfterRebuild(fewer, [before.key]), null);
+    assert.deepEqual(fewer.log, []);
+  } finally {
+    if (hadCss) globalThis.CSS = prevCss; else delete globalThis.CSS;
+  }
+});
+
+test('#1821 Fokus: ausserhalb der Flaeche oder auf <body> wird nichts erfasst', () => {
+  const body = {};
+  const outside = fakeEl({ attrs: { id: 'nav-link' } });
+  const shell = { contains: () => false };
+  assert.deepEqual(__test.captureRebuildFocus(shell, outside, body), { key: null, had: false });
+  assert.deepEqual(__test.captureRebuildFocus({ contains: () => true }, body, body), { key: null, had: false });
+  assert.deepEqual(__test.captureRebuildFocus({ contains: () => true }, null, body), { key: null, had: false });
+  // In der Flaeche, aber ohne Identitaet: Fokus war da, einen Schluessel gibt es nicht.
+  assert.deepEqual(__test.captureRebuildFocus({ contains: () => true }, fakeEl({ classes: ['widget__title'] }), body), { key: null, had: true });
+});
+
+test('#1821 Fokus: Selektor-Kandidaten des Anpassen-Modus gelten weiter - erster Treffer, mit Scrollen, in Reihenfolge', () => {
+  // Was vor #1821 galt: Ids und Bearbeiten-Knoepfe sind Selektoren. Ihr Fokus
+  // darf scrollen (die Geste hat ihn ausgeloest), und es gilt der ERSTE Treffer.
+  const surface = fakeSurface({
+    '#dashboard-customize-cancel': ['abbrechen'],
+    '#dashboard-customize-btn': ['anpassen'],
+    '[data-widget-hide="notes"]': ['ausblenden-a', 'ausblenden-b'],
+    '#gesperrt': [{ name: 'gesperrt', disabled: true }],
+  });
+  assert.equal(__test.restoreFocusAfterRebuild(surface, ['[data-widget-hide="notes"]', '#dashboard-customize-btn']).name, 'ausblenden-a');
+  assert.deepEqual(surface.log.at(-1), ['ausblenden-a', undefined], 'ohne preventScroll');
+  // Der erste Kandidat fehlt nach dem Aufbau: der naechste ist dran.
+  assert.equal(__test.restoreFocusAfterRebuild(surface, [null, '#gibt-es-nicht', '#dashboard-customize-cancel', '#dashboard-customize-btn']).name, 'abbrechen');
+  // Ein gesperrter Knopf wird uebersprungen.
+  assert.equal(__test.restoreFocusAfterRebuild(surface, ['#gesperrt', '#dashboard-customize-btn']).name, 'anpassen');
+  assert.equal(__test.restoreFocusAfterRebuild(surface, []), null);
+  assert.equal(__test.restoreFocusAfterRebuild(surface, null), null);
+  assert.equal(surface.log.length, 3);
+});
+
+test('#1821 Fokus: der Neuaufbau der Seite ruft Erfassen und Wiederfokus, um das setHtml herum', async () => {
+  // rebuildDashboard() lebt im Abschluss von render() und laesst sich nicht
+  // rufen. Was die beiden Funktionen TUN, messen die Tests darueber; hier steht
+  // nur, dass der Abschluss sie in dieser Reihenfolge und mit diesen Werten ruft.
   const { readFileSync } = await import('node:fs');
   const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
-  const loop = src.slice(src.indexOf('for (const candidate of candidates)'));
-  const body = loop.slice(0, loop.indexOf('playTileFlip('));
-  assert.match(body, /querySelectorAll\(candidate\.selector\)\[candidate\.index\]/);
-  assert.match(body, /preventScroll: candidate\.preventScroll/);
-  assert.match(src, /if \(!attr\) return rowFocusKeyOf\(el\);/);
+  const fn = src.slice(src.indexOf('  function rebuildDashboard(cfg) {'));
+  const body = fn.slice(0, fn.indexOf('\n  }\n')).split('\n').filter((line) => !/^\s*(\/\/|\/?\*)/.test(line)).join('\n');
+  const capture = body.indexOf('const { key: keepFocus, had: hadFocus } = captureRebuildFocus(shell, document.activeElement, document.body);');
+  const paint = body.indexOf('setHtml(shell, `\n      <section class="dashboard-masthead');
+  const restore = body.search(/^ {4}restoreFocusAfterRebuild\(container, \[\n {6}keepFocus,\n {6}\.\.\.\(focusAfterRebuild \?\? \[\]\),\n {6}\.\.\.\(hadFocus && modeChanged \? \['#dashboard-customize-btn'\] : \[\]\),\n {4}\]\);$/m);
+  assert.ok(capture > 0, 'erfasst wird vor dem Aufbau');
+  assert.ok(paint > capture, 'dann wird gebaut');
+  assert.ok(restore > paint, 'und danach wieder fokussiert: eigener Schluessel, Nachfolger der Geste, Anpassen-Knopf');
 });
 
 test('der Aufrufer reicht die Gesamtzahlen aus der Antwort an die Kacheln durch', () => {

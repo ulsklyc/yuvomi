@@ -824,6 +824,40 @@ function renderCategoryEditor(selectedIds = []) {
 }
 
 /**
+ * Loest `?open=<id>` ein (#1821): die Suche und die Notizzeile der Uebersicht
+ * nennen EINE Notiz, also geht sie auf - derselbe Weg wie der Tipp auf ihre
+ * Karte (Leseansicht zuerst, bei Nur-lesen nur sie). Bis hierher las diese
+ * Seite den Parameter nie: der Treffer landete auf der Liste.
+ *
+ * Gesucht wird in ALLEN geladenen Notizen, nicht in der gefilterten Ansicht -
+ * ein gemerkter Filter darf den Link nicht verschlucken. Eine Notiz, die es
+ * nicht (mehr) gibt oder die diese Person nicht sieht, steht nicht in der
+ * Antwort: dann bleibt die Liste, ohne Fehler.
+ *
+ * Der Parameter verlaesst danach die Adresse. Die Notiz wohnt in einem Dialog,
+ * nicht in einer Spalte - bliebe er stehen, schluege sie bei jedem Zurueck auf
+ * diese Seite und bei jedem Neuladen wieder auf. Die uebrigen Parameter und
+ * der Anker bleiben, wie sie sind.
+ *
+ * Nur Ziffern gelten als Id: `5e0` und `0x5` sind fuer `Number()` auch 5,
+ * gemeint ist damit keine Notiz.
+ */
+function openNoteFromQuery(loc = window.location, hist = window.history) {
+  const params = new URLSearchParams(loc.search ?? '');
+  const raw = params.get('open');
+  if (raw === null) return false;
+  params.delete('open');
+  const rest = params.toString();
+  const path = `${loc.pathname}${rest ? `?${rest}` : ''}${loc.hash ?? ''}`;
+  if (typeof hist?.replaceState === 'function') hist.replaceState({ ...(hist.state ?? {}), path }, '', path);
+  if (!/^\d+$/.test(raw)) return false;
+  const note = state.notes.find((n) => n.id === Number(raw));
+  if (!note) return false;
+  openNoteModal({ mode: 'edit', note });
+  return true;
+}
+
+/**
  * Der Zettel bei `notes: read`: Leseansicht, sonst nichts.
  *
  * Warum ein eigener Dialog und nicht der bestehende mit abgeschalteten Teilen:
@@ -838,36 +872,6 @@ function renderCategoryEditor(selectedIds = []) {
  * Nur-lesen-Fall auf `true`: der Schalter entscheidet nur, OB die Optionen
  * mitgehen, welche es sind, entscheidet das Recht.
  */
-/**
- * Loest `?open=<id>` ein (#1821): die Suche und die Notizzeile der Uebersicht
- * nennen EINE Notiz, also geht sie auf - derselbe Weg wie der Tipp auf ihre
- * Karte (Leseansicht zuerst, bei Nur-lesen nur sie). Bis hierher las diese
- * Seite den Parameter nie: der Treffer landete auf der Liste.
- *
- * Gesucht wird in ALLEN geladenen Notizen, nicht in der gefilterten Ansicht -
- * ein gemerkter Filter darf den Link nicht verschlucken. Eine Notiz, die es
- * nicht (mehr) gibt oder die diese Person nicht sieht, steht nicht in der
- * Antwort: dann bleibt die Liste, ohne Fehler.
- *
- * Der Parameter verlaesst danach die Adresse. Die Notiz wohnt in einem Dialog,
- * nicht in einer Spalte - bliebe er stehen, schluege sie bei jedem Zurueck auf
- * diese Seite und bei jedem Neuladen wieder auf.
- */
-function openNoteFromQuery(loc = window.location, hist = window.history) {
-  const params = new URLSearchParams(loc.search ?? '');
-  const raw = params.get('open');
-  if (raw === null) return false;
-  params.delete('open');
-  const rest = params.toString();
-  const path = `${loc.pathname}${rest ? `?${rest}` : ''}`;
-  if (typeof hist?.replaceState === 'function') hist.replaceState({ ...(hist.state ?? {}), path }, '', path);
-  if (!/^\d+$/.test(raw)) return false;
-  const note = state.notes.find((n) => n.id === Number(raw));
-  if (!note) return false;
-  openNoteModal({ mode: 'edit', note });
-  return true;
-}
-
 function openNoteReadModal(note) {
   openSharedModal({
     title: note.title && note.title.trim() ? note.title : t('notes.viewNote'),

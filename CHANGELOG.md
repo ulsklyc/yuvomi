@@ -186,13 +186,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only when the date itself is.
 - **A row on the overview opens what it shows** (#1821). A note on the overview opened the notes
   page instead of the note, and so did a note found through search: the notes page now opens the
-  note it is asked for. A birthday row opens that birthday, on the phone as well. A bin without
+  note it is asked for. A birthday row opens that birthday, on the phone as well, and so does a
+  birthday found through search. A bin without
   an upcoming pickup leads to that bin, and "n open" for shopping in the today sheet opens the
   list when only one list has open items.
 - **The keyboard focus stays on an overview row.** When the overview refreshed quietly - on
   coming back to the tab, every quarter of an hour, at a day boundary - the focused row lost the
   focus and Enter did nothing. Tabbing into a row in the instant after the page appeared could
-  lose it the same way. Both keep the focus now.
+  lose it the same way. Both keep the focus now, and a dialog that a link opens directly keeps
+  it too.
 - **Overview rows that lead to one item open as fast as the others.** A row for an event, a
   shopping list or a pantry filter did not preload the page behind it on hover or press, so its
   first tap was slower than on any other row.

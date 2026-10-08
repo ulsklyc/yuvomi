@@ -4160,6 +4160,43 @@ function rowFocusKeyOf(el) {
   return { selector, index, preventScroll: true };
 }
 
+/**
+ * VOR dem Neuaufbau: wer hat den Fokus, und unter welchem Schluessel findet
+ * man ihn danach wieder? Nur ein Element IN der Flaeche zaehlt - ein Dialog
+ * oder die Navigation behalten ihren Fokus ohnehin.
+ *
+ * @returns {{key: (string|object|null), had: boolean}}
+ */
+function captureRebuildFocus(shell, active, body) {
+  const had = Boolean(active) && active !== body && Boolean(shell?.contains(active));
+  return { key: had ? focusKeyOf(active) : null, had };
+}
+
+/**
+ * NACH dem Neuaufbau: der erste Kandidat, den es gibt und der bedienbar ist,
+ * bekommt den Fokus. Ein Kandidat ist ein Selektor (erster Treffer gilt: Ids,
+ * Bearbeiten-Knoepfe, der Nachfolger, den eine Geste nennt) oder der Schluessel
+ * einer Inhaltszeile mit Selektor UND Stelle (rowFocusKeyOf) - der kommt ohne
+ * Scrollen zurueck, weil der stille Neuaufbau niemanden zu einer Zeile holen
+ * darf, von der er weggescrollt hat.
+ *
+ * @returns {Element|null} das fokussierte Element
+ */
+function restoreFocusAfterRebuild(container, candidates) {
+  for (const candidate of (candidates ?? []).filter(Boolean)) {
+    const isRow = typeof candidate !== 'string';
+    const el = isRow
+      ? container.querySelectorAll(candidate.selector)[candidate.index]
+      : container.querySelector(candidate);
+    if (el && !el.disabled) {
+      if (isRow) el.focus({ preventScroll: candidate.preventScroll });
+      else el.focus();
+      return el;
+    }
+  }
+  return null;
+}
+
 /* EINE ANSAGE-REGION, DIE DEN NEUAUFBAU UEBERLEBT.
  *
  * Eine Live-Region wird nur gehoert, wenn es sie schon gab, bevor ihr Text sich
@@ -7008,11 +7045,8 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // nicht fuer die Zeile.
     const weatherCardShown = cfg.some((w) => w.id === 'weather' && w.visible) && isWidgetModuleEnabled('weather');
     // Wer hatte den Fokus? Nach dem setHtml gibt es sein Element nicht mehr
-    // (siehe focusKeyOf / restoreFocusAfterRebuild).
-    const focused = document.activeElement;
-    const keepFocus = focused && focused !== document.body && shell.contains(focused)
-      ? focusKeyOf(focused) : null;
-    const hadFocus = !!focused && focused !== document.body && shell.contains(focused);
+    // (captureRebuildFocus / restoreFocusAfterRebuild).
+    const { key: keepFocus, had: hadFocus } = captureRebuildFocus(shell, document.activeElement, document.body);
     const modeChanged = renderedCustomizing !== null && renderedCustomizing !== isCustomizing;
     // Nur eine Geste IM Anpassen-Modus gleitet (playTileFlip): beim Betreten
     // und Verlassen wachsen und schwinden die Bearbeiten-Leisten aller Kacheln,
@@ -7098,23 +7132,12 @@ export async function render(container, { user, signal: routeSignal = null } = {
      * als Nachfolger nennt (Ausblenden -> Nachbarkachel), und wenn die Geste den
      * Modus gewechselt hat (Speichern, Abbrechen), der Anpassen-Knopf, der ihn
      * wieder oeffnet. */
-    const candidates = [
+    restoreFocusAfterRebuild(container, [
       keepFocus,
       ...(focusAfterRebuild ?? []),
       ...(hadFocus && modeChanged ? ['#dashboard-customize-btn'] : []),
-    ].filter(Boolean);
+    ]);
     focusAfterRebuild = null;
-    for (const candidate of candidates) {
-      // Eine Zeile nennt sich mit Selektor UND Stelle (rowFocusKeyOf), alles
-      // andere mit einem Selektor, dessen erster Treffer gilt.
-      const el = typeof candidate === 'string'
-        ? container.querySelector(candidate)
-        : container.querySelectorAll(candidate.selector)[candidate.index];
-      if (el && !el.disabled) {
-        el.focus(typeof candidate === 'string' ? undefined : { preventScroll: candidate.preventScroll });
-        break;
-      }
-    }
     playTileFlip(shell, tileRectsBefore);
     playGridShift(shell, gridTopBefore);
   }
@@ -7349,7 +7372,7 @@ async function loadScheduleSlice(day) {
   };
 }
 
-export const __test = { customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, focusKeyOf, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill };
+export const __test = { customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -

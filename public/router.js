@@ -18,7 +18,7 @@ import { wireScrollFade, wireCollapsingHeader, watchNavCapsuleHeight } from '/ut
 import { TOAST_SURFACES } from '/utils/toast-surface.js';
 import { showToast } from '/utils/toast-show.js';
 import { unknownPathDetour, publicPathDetour, detourPaths } from '/utils/unknown-route.js';
-import { createNavigate, prefetchPathOf, focusAlreadyInPage } from '/utils/router-navigate.js';
+import { createNavigate, prefetchPathOf, focusMainAfterNavigation } from '/utils/router-navigate.js';
 import { pageMountTarget } from '/utils/page-mount.js';
 import { friendlyError } from '/utils/friendly-error.js';
 import { BULK_PILL_LAYER, clearBulkPill } from '/utils/bulk-pill.js';
@@ -595,14 +595,13 @@ function returnFocus(target) {
   }
 }
 
+// Die Regel selbst steht in utils/router-navigate.js und laeuft dort als
+// Programm im Test (#1821); hier kommen nur die Browser-Teile dazu.
 function focusMainContentAfterNavigation(path) {
-  if (path === '/login' || path === '/setup') return;
-  const main = document.getElementById('main-content');
-  if (!main || typeof main.focus !== 'function') return;
-  requestAnimationFrame(() => {
-    // Wer schon in der neuen Seite steht, bleibt dort (#1821).
-    if (focusAlreadyInPage(main, document.activeElement)) return;
-    main.focus({ preventScroll: true });
+  focusMainAfterNavigation(path, {
+    document,
+    requestAnimationFrame: (cb) => requestAnimationFrame(cb),
+    hasOpenOverlay,
   });
 }
 
