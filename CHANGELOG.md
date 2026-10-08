@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Move a shopping item to another list** (#1700, from D#998). The edit dialog has a list
-  selector beside the category. The item moves as it is - name, amount, category, note, link,
+  selector under amount and category when there is more than one list. The item moves as it is - name, amount, category, note, link,
   price and shop - and lands at the end of its category on the other list, so nothing has to be
   typed again. On lists mirrored from a CalDAV server the entry is removed from the old list
   there and created in the new one, and moving it to a list that is not mirrored removes it on

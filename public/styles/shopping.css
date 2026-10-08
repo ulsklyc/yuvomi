@@ -974,6 +974,14 @@
 }
 
 /* Klickbare Link-Vorschau im Detail-Drawer. */
+/* Die Listen-Zeile im Bearbeiten-Dialog (#1700) steht zwischen Feldgruppen,
+ * die ihren Abstand selbst mitbringen (`.form-group`, --space-4 darunter). Der
+ * Traeger der Formularzeile hat keinen - ohne diesen stiesse "Preis" direkt
+ * an sie an. */
+.item-details-form .form-rows {
+  margin-block-end: var(--space-4);
+}
+
 .item-details__link-wrap:not(:empty) {
   margin-top: var(--space-2);
 }

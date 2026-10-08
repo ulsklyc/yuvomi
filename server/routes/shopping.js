@@ -68,6 +68,23 @@ function pushToCalDAV(what) {
   flushOutbound().catch((err) => log.warn(`${what} vorgemerkt, Sofortversuch fehlgeschlagen:`, err.message));
 }
 
+/**
+ * Eine Id aus dem Anfragekoerper: eine positive Ganzzahl, als Zahl oder als
+ * reine Ziffernfolge - sonst null.
+ *
+ * `Number()` allein ist dafuer zu grosszuegig: es liest auch " 4 ", "0x4",
+ * "4.0" und "4e0" als 4. Bei einem Umzug (#1700) hiesse das, ein Artikel
+ * wandert auf Liste 4, obwohl niemand "4" geschickt hat. Der Typ wird zuerst
+ * gefragt: `true`, ein Array oder ein Objekt sind keine Ids, auch wenn
+ * `Number()` aus manchen eine Zahl macht.
+ */
+function bodyId(raw) {
+  if (typeof raw === 'number') return Number.isSafeInteger(raw) && raw > 0 ? raw : null;
+  if (typeof raw !== 'string' || !/^[1-9][0-9]*$/.test(raw)) return null;
+  const n = Number(raw);
+  return Number.isSafeInteger(n) ? n : null;
+}
+
 /** Alle Kategorien aus DB laden (nach sort_order sortiert). */
 function loadCategories() {
   return db.get().prepare('SELECT * FROM shopping_categories ORDER BY sort_order ASC').all();
@@ -560,8 +577,8 @@ router.patch('/items/:itemId', (req, res) => {
       const roh = req.body.store_id;
       if (roh === null || roh === '') storeId = null;
       else {
-        const n = Number(roh);
-        if (!Number.isInteger(n) || n <= 0) {
+        const n = bodyId(roh);
+        if (n === null) {
           return res.status(400).json({ error: 'store_id muss eine Laden-ID sein.', code: 400 });
         }
         // Ein unbekannter Laden wird abgelehnt statt still verworfen: anders als
@@ -585,9 +602,8 @@ router.patch('/items/:itemId', (req, res) => {
     // damit jede Liste des Haushalts.
     let targetListId = item.list_id;
     if (req.body.list_id !== undefined && req.body.list_id !== null) {
-      const n = Number(req.body.list_id);
-      const kind = typeof req.body.list_id;
-      if ((kind !== 'number' && kind !== 'string') || !Number.isInteger(n) || n <= 0) {
+      const n = bodyId(req.body.list_id);
+      if (n === null) {
         return res.status(400).json({ error: 'list_id muss eine Listen-ID sein.', code: 400 });
       }
       if (n !== item.list_id && !db.get().prepare('SELECT 1 FROM shopping_lists WHERE id = ?').get(n)) {

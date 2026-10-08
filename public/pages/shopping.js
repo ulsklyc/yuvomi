@@ -10,6 +10,7 @@ import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { flipSnapshot, flipPlay } from '/utils/flip.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { formRowsHtml, formRowHtml } from '/utils/form-row.js';
 import { readRowHtml, readDetailsLabel } from '/utils/read-row.js';
 import { promptModal, openModal, closeModal, confirmModal, reportFieldError, refocusAfterRender } from '/components/modal.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
@@ -2151,34 +2152,23 @@ function openItemDetails(itemId, container) {
       </a>`;
   };
 
-  // DIE LISTE STEHT NEBEN DER KATEGORIE (#1700): beide sagen, WO der Artikel
-  // steht - auf welchem Zettel und in welchem Gang. Kein eigener
-  // "Verschieben"-Weg und kein Ziehen: der Dialog ist ohnehin der Ort, an dem
-  // man einen Artikel umhängt. Mit nur einer Liste gibt es nichts zu wählen,
-  // und das Feld fehlt; die Menge teilt sich die Zeile dann wie bisher mit der
-  // Kategorie.
+  // DIE LISTE IST EINE EIGENE FORMULARZEILE (#1700, Entscheidung 2026-10-08),
+  // unter Menge und Kategorie - die beiden bleiben nebeneinander, wie sie
+  // waren, und der Dialog sieht mit einer Liste genauso aus wie mit fuenf,
+  // nur ohne diese Zeile: mit einer Liste gibt es nichts zu waehlen. Sie
+  // spricht die Zielform des Hauses (utils/form-row.js, DESIGN.md
+  // "Formularzeile"): Etikett links, der Wert rechts als randlose Auswahl.
+  // Kein eigener "Verschieben"-Weg und kein Ziehen: der Dialog ist ohnehin der
+  // Ort, an dem man einen Artikel umhaengt.
   const fromListId = state.activeListId;
-  const canMove = state.lists.length > 1;
-  const qtyField = `
-          <div class="form-group">
-            <label class="form-label" for="item-details-qty">${t('shopping.itemQtyLabel')}</label>
-            <input class="form-input" type="text" id="item-details-qty"
-                   placeholder="${t('shopping.itemQtyPlaceholder')}" value="${esc(item.quantity || '')}">
-          </div>`;
-  const catField = `
-          <div class="form-group">
-            <label class="form-label" for="item-details-cat">${t('shopping.categoryLabel')}</label>
-            <select class="form-input" id="item-details-cat">
-              ${state.categories.map((c) => `<option value="${esc(c.name)}" ${c.name === item.category ? 'selected' : ''}>${esc(categoryLabel(c.name))}</option>`).join('')}
-            </select>
-          </div>`;
-  const listField = `
-          <div class="form-group">
-            <label class="form-label" for="item-details-list">${t('shopping.itemListLabel')}</label>
-            <select class="form-input" id="item-details-list">
+  const listRow = state.lists.length > 1 ? formRowsHtml(formRowHtml({
+    label: t('shopping.itemListLabel'),
+    labelFor: 'item-details-list',
+    field: true,
+    control: `<select class="form-input" id="item-details-list">
               ${state.lists.map((l) => `<option value="${l.id}" ${l.id === fromListId ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}
-            </select>
-          </div>`;
+            </select>`,
+  })) : '';
 
   openModal({
     title: t('common.editItem'),
@@ -2190,10 +2180,20 @@ function openItemDetails(itemId, container) {
           <input class="form-input" type="text" id="item-details-name" required
                  value="${esc(item.name)}">
         </div>
-        ${canMove ? `${qtyField}
-        <div class="form-pair">${catField}${listField}
-        </div>` : `<div class="form-pair">${qtyField}${catField}
-        </div>`}
+        <div class="form-pair">
+          <div class="form-group">
+            <label class="form-label" for="item-details-qty">${t('shopping.itemQtyLabel')}</label>
+            <input class="form-input" type="text" id="item-details-qty"
+                   placeholder="${t('shopping.itemQtyPlaceholder')}" value="${esc(item.quantity || '')}">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="item-details-cat">${t('shopping.categoryLabel')}</label>
+            <select class="form-input" id="item-details-cat">
+              ${state.categories.map((c) => `<option value="${esc(c.name)}" ${c.name === item.category ? 'selected' : ''}>${esc(categoryLabel(c.name))}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        ${listRow}
         ${/* PREIS UND LADEN (#1003).
             *
             * NICHT ALS ZWANGSDIALOG BEIM ABHAKEN. Das Ticket sagt "erfasst,
@@ -2805,8 +2805,13 @@ function updateListCounter(listId, totalDelta, checkedDelta) {
 function itemMovedAway(container, moved, fromListId) {
   const before = state.items.find((i) => i.id === moved.id);
   const shownChecked = before ? Boolean(checkedOf(before)) : Boolean(moved.is_checked);
-  const offen = intents.get(moved.id);
-  if (offen) offen.delta = 0;
+  // DIE ABSICHT GEHT MIT DEM ARTIKEL. Sie haengt an der Liste, von der er kam
+  // (`intent.listId`), und nur eine Ladeantwort DIESER Liste kann sie erfuellen
+  // (`settleIntents`) - dort steht er aber nie wieder. Bliebe sie liegen,
+  // ueberlagerte sie den Artikel auf seiner neuen Liste fuer immer: jemand
+  // nimmt den Haken zurueck, und dieses Geraet zeigt ihn weiter abgehakt. Ihre
+  // Buchung ist mit dem Abzug der ANZEIGE unten abgegolten.
+  intents.delete(moved.id);
 
   updateListCounter(fromListId, -1, shownChecked ? -1 : 0);
   updateListCounter(moved.list_id, 1, moved.is_checked ? 1 : 0);

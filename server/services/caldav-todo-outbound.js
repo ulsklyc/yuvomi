@@ -14,8 +14,11 @@
 // nicht durchgeht, bleibt vorgemerkt und läuft im nächsten Sync mit
 // (at-least-once).
 //
-// Ein Umzug zwischen Listen fehlt weiterhin bewusst: eine Aufgabe gehört zu der
-// Liste, aus der sie kam.
+// Ein Umzug zwischen Listen fehlt für AUFGABEN weiterhin bewusst: eine Aufgabe
+// gehört zu der Liste, aus der sie kam. Ein Einkaufsartikel kann seit #1700 die
+// Liste wechseln (`releaseShoppingMirror`): das alte Objekt wird zur Löschung
+// vorgemerkt, die Zeile wird lokal, und eine gespiegelte Zielliste legt sie
+// über den gewöhnlichen Upload-Weg neu an.
 //
 // Das Anlegen dagegen gibt es seit #695. Die alte Begründung ("ohne Zielwahl
 // gäbe es keine Liste, in die es gehörte") stimmte nicht mehr: die Zielwahl gibt

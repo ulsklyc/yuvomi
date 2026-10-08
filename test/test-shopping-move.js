@@ -230,6 +230,56 @@ test('Keine Listen-ID: 400 statt eines stillen Nicht-Umzugs', async () => {
   assert.equal(row(item.id).list_id, a);
 });
 
+test('Nur eine echte Id zieht um: was Number() als die Zielliste LESEN wuerde, ist keine', async () => {
+  reset();
+  const a = list('A');
+  const b = list('B');
+  const item = localItem(a);
+  // Jeder dieser Werte ergibt unter Number() genau die Id der Zielliste - ein
+  // Test mit Werten, die ohnehin NaN sind, misst den Riegel nicht. Das Array
+  // und (bei Liste 1) `true` treffen die Typfrage, die uebrigen die Schreibweise.
+  const verkleidet = [` ${b} `, `${b}.0`, `${b}e0`, `0x${b.toString(16)}`, `+${b}`, `0${b}`, [b], [String(b)]];
+  for (const wert of verkleidet) {
+    assert.equal(Number(wert), b, `die Probe taugt nur, wenn Number(${JSON.stringify(wert)}) die Liste trifft`);
+    const r = await call('PATCH', `/items/${item.id}`, { list_id: wert });
+    assert.equal(r.status, 400, `list_id ${JSON.stringify(wert)}`);
+    assert.equal(row(item.id).list_id, a, `list_id ${JSON.stringify(wert)} hat den Artikel bewegt`);
+  }
+  // Gegenfall: Zahl und reine Ziffernfolge gelten.
+  assert.equal((await call('PATCH', `/items/${item.id}`, { list_id: String(b) })).status, 200);
+  assert.equal(row(item.id).list_id, b);
+  assert.equal((await call('PATCH', `/items/${item.id}`, { list_id: a })).status, 200);
+  assert.equal(row(item.id).list_id, a);
+});
+
+test('`true` ist keine Liste, auch wenn es die Liste 1 gibt', async () => {
+  reset();
+  // Number(true) ist 1: die Typfrage ist nur dort messbar, wo es Liste 1 gibt.
+  db.prepare('DELETE FROM sqlite_sequence WHERE name = ?').run('shopping_lists');
+  const eins = list('Eins');
+  assert.equal(eins, 1, 'die Probe braucht eine Liste mit der Id 1');
+  const a = list('A');
+  const item = localItem(a);
+  const r = await call('PATCH', `/items/${item.id}`, { list_id: true });
+  assert.equal(r.status, 400);
+  assert.equal(row(item.id).list_id, a);
+});
+
+test('Der Laden nimmt dieselbe Pruefung: eine verkleidete Id ist kein Laden', async () => {
+  reset();
+  const a = list('A');
+  const item = localItem(a);
+  const store = Number(db.prepare('INSERT INTO shopping_stores (name, created_by) VALUES (?, ?)').run(`Markt ${Date.now()}`, U).lastInsertRowid);
+  for (const wert of [` ${store} `, `${store}.0`, `0x${store.toString(16)}`, [store]]) {
+    assert.equal(Number(wert), store);
+    const r = await call('PATCH', `/items/${item.id}`, { store_id: wert });
+    assert.equal(r.status, 400, `store_id ${JSON.stringify(wert)}`);
+  }
+  assert.equal(row(item.id).store_id, null);
+  assert.equal((await call('PATCH', `/items/${item.id}`, { store_id: String(store) })).status, 200);
+  assert.equal(row(item.id).store_id, store);
+});
+
 test('Die eigene Liste oder gar keine: kein Umzug, der Rang bleibt', async () => {
   reset();
   const a = list('A');
@@ -262,6 +312,9 @@ test('Gespiegelt -> gespiegelt: in der alten Collection entfernt, in der neuen a
   mirror(acc, URL_B, b);
   const item = mirroredItem(a, acc, { name: 'Milch', notes: 'fettarm' });
   setItemTags(db, item.id, ['Bio']);
+  // Eine Bearbeitung wartete noch auf ihren Push, zweimal gescheitert: beides
+  // gehoert dem alten Objekt und darf nicht mit auf die neue Liste.
+  db.prepare('UPDATE shopping_items SET outbound_dirty = 1, outbound_attempts = 2 WHERE id = ?').run(item.id);
 
   const r = await call('PATCH', `/items/${item.id}`, { list_id: b });
   assert.equal(r.status, 200);
@@ -272,8 +325,9 @@ test('Gespiegelt -> gespiegelt: in der alten Collection entfernt, in der neuen a
   assert.deepEqual(tombstones.map((t) => [t.uid, t.object_url]), [['todo-1@test', `${URL_A}todo-1.ics`]]);
   const moved = row(item.id);
   assert.deepEqual(
-    [moved.list_id, moved.external_source, moved.external_uid, moved.external_account_id, moved.external_object_url, moved.outbound_dirty],
-    [b, 'local', null, null, null, 0],
+    [moved.list_id, moved.external_source, moved.external_uid, moved.external_account_id, moved.external_object_url,
+      moved.outbound_dirty, moved.outbound_attempts],
+    [b, 'local', null, null, null, 0, 0],
   );
   assert.equal(moved.notes, 'fettarm');
   assert.deepEqual(loadItemTags(db, item.id), [], 'die Etiketten des alten Objekts gehen mit ihm');
@@ -376,4 +430,82 @@ test('Umzug waehrend eines laufenden Uploads: das eben angelegte Objekt bleibt k
     'die Zeile zeigt von der neuen Liste nicht auf ein Objekt der alten');
   assert.deepEqual(pendingDeletions(acc, 'shopping').map((t) => [t.uid, t.object_url]), [[uid, `${URL_A}${uid}.ics`]],
     'und das Objekt, das es jetzt in der alten Collection gibt, ist zur Loeschung vorgemerkt');
+});
+
+// --------------------------------------------------------------------------
+// Alles oder nichts, und der Anstoss danach
+// --------------------------------------------------------------------------
+
+test('Scheitert der Umzug, ist auch das Loesen vom Server nicht geschehen', async () => {
+  reset();
+  const acc = account();
+  const a = list('Alt');
+  const b = list('Neu');
+  mirror(acc, URL_A, a);
+  const item = mirroredItem(a, acc, { name: 'Milch' });
+  setItemTags(db, item.id, ['Bio']);
+
+  // Der Umzug selbst scheitert in der Datenbank - NACH dem Loesen.
+  db.exec(`CREATE TEMP TRIGGER probe_move_fails BEFORE UPDATE OF list_id ON shopping_items
+           WHEN NEW.list_id = ${b} BEGIN SELECT RAISE(ABORT, 'probe'); END`);
+  let status;
+  try {
+    status = (await call('PATCH', `/items/${item.id}`, { list_id: b })).status;
+  } finally {
+    db.exec('DROP TRIGGER probe_move_fails');
+  }
+  assert.equal(status, 500);
+
+  const after = row(item.id);
+  assert.deepEqual(
+    [after.list_id, after.external_source, after.external_uid, after.external_object_url],
+    [a, 'caldav', 'todo-1@test', `${URL_A}todo-1.ics`],
+    'der Artikel steht unveraendert als Spiegel auf seiner Liste',
+  );
+  assert.equal(pendingDeletions(acc, 'shopping').length, 0, 'kein Tombstone fuer ein Objekt, das bleiben soll');
+  assert.deepEqual(loadItemTags(db, item.id), ['Bio'], 'und seine Etiketten sind noch da');
+});
+
+/** Liest mit, was der Sofortversuch der Route ueber sich sagt. */
+async function sofortversuch(fn) {
+  const zeilen = [];
+  const zuvor = console.warn;
+  console.warn = (...args) => { zeilen.push(args.map(String).join(' ')); };
+  try {
+    await fn();
+    // Der Versuch laeuft NACH der Antwort und ohne await.
+    for (let i = 0; i < 40 && !zeilen.some((z) => z.includes('Immediate outbound attempt failed')); i++) {
+      await new Promise((r) => setTimeout(r, 50));
+    }
+  } finally {
+    console.warn = zuvor;
+  }
+  return zeilen.filter((z) => z.includes('Immediate outbound attempt failed'));
+}
+
+test('Nach einem Umzug auf eine gespiegelte Liste stoesst die Route den Upload selbst an', async () => {
+  reset();
+  const acc = account();
+  const c = list('Nur hier');
+  const b = list('Neu');
+  mirror(acc, URL_B, b);
+  const item = localItem(c, { name: 'Salz' });
+
+  // Kein gespiegeltes Feld aendert sich, es gibt keinen Tombstone: ohne den
+  // eigenen Anstoss wartete der Artikel bis zum naechsten Sync-Lauf. Das Konto
+  // zeigt auf 127.0.0.1, der Versuch scheitert also - und sagt es.
+  const versuche = await sofortversuch(() => call('PATCH', `/items/${item.id}`, { list_id: b }));
+  assert.equal(versuche.length, 1, 'genau ein Sofortversuch');
+  assert.match(versuche[0], new RegExp(`Account ${acc}`));
+});
+
+test('Gegenfall: ein Speichern ohne Umzug stoesst nichts an', async () => {
+  reset();
+  const acc = account();
+  const c = list('Nur hier');
+  const b = list('Neu');
+  mirror(acc, URL_B, b);
+  const item = localItem(c, { name: 'Salz' });
+  const versuche = await sofortversuch(() => call('PATCH', `/items/${item.id}`, { quantity: '2' }));
+  assert.deepEqual(versuche, []);
 });
