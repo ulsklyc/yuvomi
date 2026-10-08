@@ -20755,6 +20755,29 @@ test('R18: ein voller Leerzustand je Seite - Nebenabschnitte tragen die kompakte
   assert.match(sources, /tone: 'secondary'/, 'der Knopf darunter konkurriert nicht mit dem Primaerknopf der Seite');
   const upcoming = waste.slice(waste.indexOf('function drawUpcoming('), waste.indexOf('function drawUpcoming(') + 700);
   assert.match(upcoming, /title: t\('waste\.emptyUpcomingTitle'\)/, 'der volle Leerzustand der Seite bleibt oben');
+
+  // Ein kompakter Leerzustand hat keinen Titel - also auch keinen Text dafuer.
+  // Die vier `...Title` dieser Abschnitte blieben nach der Umstellung in allen
+  // Sprachdateien stehen (Schritt 7): Text ohne Leser, den jede Uebersetzung
+  // weiter pflegt. Gelesen wird die REGEL, nicht eine Liste: zu jeder
+  // `...Description` eines kompakten Zustands darf die Schwester `...Title`
+  // in keiner Sprachdatei mehr stehen.
+  const compactKeys = [];
+  for (const source of [schedule, waste]) {
+    for (const m of source.matchAll(/compact:\s*true,\s*description: t\('(\w+)\.(\w+)Description'\)/g)) {
+      compactKeys.push([m[1], `${m[2]}Title`]);
+    }
+  }
+  assert.ok(compactKeys.length >= 4, `Nur ${compactKeys.length} kompakte Leerzustaende gefunden - der Scan greift nicht mehr.`);
+  const locales = new URL('../public/locales/', import.meta.url);
+  const orphaned = [];
+  for (const file of readdirSync(locales).filter((entry) => entry.endsWith('.json'))) {
+    const dict = JSON.parse(readFileSync(new URL(file, locales), 'utf8'));
+    for (const [ns, key] of compactKeys) {
+      if (dict[ns] && Object.hasOwn(dict[ns], key)) orphaned.push(`${file}: ${ns}.${key}`);
+    }
+  }
+  assert.deepEqual(orphaned, [], 'Ein kompakter Leerzustand traegt keinen Titel - der Schluessel dazu hat keinen Leser mehr.');
 });
 
 test('R18: die Brettspalte ist eine Mulde unter den Karten, die leere Spalte traegt keinen Strichrahmen', () => {
