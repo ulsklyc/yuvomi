@@ -960,6 +960,48 @@ test('ein Display sieht von /preferences nur den Darstellungsteil', async () => 
   }
 });
 
+test('ein Display speichert keine Anordnung und folgt der Vorgabe des Haushalts (#1808)', async () => {
+  // Der gemeldete Weg: am Tablett die Uebersicht umordnen und "Fertig" tippen
+  // ist `PUT /preferences` mit `dashboard_widgets`. Die Absage ist die Regel
+  // (ein Display aendert keine Einstellungen, DISPLAY_WRITE_ROUTES), der Fehler
+  // lag an der Oberflaeche, die den Weg anbot (test:dashboard-a11y).
+  const created = await admin('POST', '/displays', { display_name: 'Anordnungsprobe' });
+  const issued = await admin('POST', `/displays/${created.body.data.id}/pairing-code`, {});
+  const display = asDisplay((await pair(issued.body.data.code)).token);
+
+  const vorher = (await display('GET', '/preferences')).body.data.dashboard_widgets;
+  assert.ok(Array.isArray(vorher), 'Vorbedingung: das Tablett bekommt eine Anordnung');
+  // Eine Anordnung, die es so vorher nicht gab - damit "folgt der Vorgabe"
+  // unten nicht dasselbe ist wie "hat sich nicht bewegt".
+  const umgeordnet = [
+    { id: 'calendar', visible: true, order: 0, size: '2x1' },
+    { id: 'tasks', visible: true, order: 1, size: '1x1' },
+  ];
+  assert.notDeepEqual(vorher.map((w) => w.id), umgeordnet.map((w) => w.id));
+
+  const eigene = await display('PUT', '/preferences', { dashboard_widgets: umgeordnet, dashboard_today_glance: false });
+  assert.equal(eigene.status, 403, 'das Tablett schreibt keine Einstellungen');
+  assert.deepEqual((await display('GET', '/preferences')).body.data.dashboard_widgets, vorher,
+    'und es ist auch nichts geschrieben worden');
+  // Die Suche im selben Kopf ist derselbe Fall.
+  assert.equal((await display('GET', '/search?q=milch')).status, 403);
+
+  // DER WEG, DER GEHT: ein Administrator setzt die Vorgabe des Haushalts, und
+  // das Tablett folgt ihr, weil es nie etwas Eigenes gespeichert hat.
+  const gesetzt = await admin('PUT', '/preferences', { dashboard_widgets_default: umgeordnet });
+  assert.equal(gesetzt.status, 200);
+  try {
+    const danach = (await display('GET', '/preferences')).body.data.dashboard_widgets;
+    assert.deepEqual(danach.map((w) => w.id), umgeordnet.map((w) => w.id),
+      'das Tablett zeigt die Vorgabe des Haushalts');
+    assert.notDeepEqual(danach.map((w) => w.id), vorher.map((w) => w.id), 'und nicht mehr den alten Stand');
+  } finally {
+    // Die Vorgabe gilt fuer jedes Konto ohne eigene Anordnung, also auch fuer
+    // die Faelle nach diesem.
+    await admin('PUT', '/preferences', { dashboard_widgets_default: null });
+  }
+});
+
 test('der Katalog beschreibt den Rumpf der Kopplung', async () => {
   // Ohne Schema laesst `op()` den Rumpf ganz weg - ein erzeugter Client haette
   // kein Argument fuer den Code, und die Route antwortet dann mit 400.
