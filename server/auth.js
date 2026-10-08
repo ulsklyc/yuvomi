@@ -1312,10 +1312,13 @@ function ssoLinkCandidates(database, address, { excludeUserId = null } = {}) {
  *   haben.
  * Rückgabe dann `{ refused, accountIds }` statt einer users-Zeile.
  *
- * Ausnahme: `OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM=true` — Opt-in für IdPs, die
- * den Claim zwar weglassen, aber nur verifizierte Adressen ausgeben (z. B. ältere
- * Authentik-Deployments). Nur setzen, wenn der IdP vollständig unter eigener
- * Kontrolle steht und keine unverifizierten E-Mails zulässt.
+ * Ausnahme: `OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM=true` - Opt-in für IdPs, die
+ * den Claim zwar weglassen, aber nur verifizierte Adressen ausgeben. Nur setzen,
+ * wenn der IdP vollständig unter eigener Kontrolle steht und keine
+ * unverifizierten E-Mails zulässt. Das Opt-in deckt NUR den fehlenden Claim: ein
+ * ausdrückliches `email_verified: false` verknüpft nie. Authentik ist dafür kein
+ * Beispiel - sein Standard-Mapping sendete bis 2025.10 `true` und sendet seither
+ * `false`, weggelassen hat es den Claim nicht (#1780).
  *
  * Mit `OIDC_ALLOW_SIGNUP=false` entfällt ausschließlich der letzte Schritt, das
  * Anlegen (#654); die Rückgabe ist dann `null`. Erkennen und Verknüpfen laufen

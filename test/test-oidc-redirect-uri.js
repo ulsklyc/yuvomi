@@ -73,6 +73,8 @@ globalThis.fetch = async (input, init) => {
 
 const dbmod = await import('../server/db.js');
 const { router: authRouter, sessionMiddleware } = await import('../server/auth.js');
+const { getConfig, exchangeAuthorizationCode } = await import('../server/services/oidc.js');
+const oidcClient = await import('openid-client');
 const database = dbmod.get();
 
 const MEMBER = Number(database.prepare(`
@@ -233,7 +235,12 @@ test('gilt der Wert des Laufs, nicht der Variable zum Zeitpunkt des Rueckwegs', 
   assert.equal(tokenRequests[0]?.get('redirect_uri'), atStart);
 });
 
-test('zwei gleichzeitige Anmeldungen tauschen je mit der eigenen redirect_uri', async () => {
+// Misst, dass der Wert an der SITZUNG haengt: zwei Rueckwege warten zugleich am
+// Token-Endpunkt. Verschraenkt sind sie dabei NICHT - mit `client_secret_basic`
+// liegen zwischen dem Festhalten des Werts und dem `fetch` nur Mikrotasks, die
+// zweite Anfrage kommt nie dazwischen. Dass der Wert je AUFRUF reist und nicht
+// ueber geteilten Zustand, belegt erst der naechste Test.
+test('zwei Rueckwege, die zugleich am Token-Endpunkt warten, tragen je die redirect_uri ihrer Sitzung', async () => {
   const first = 'https://Eins.test:443/api/v1/auth/oidc/callback';
   const second = 'https://Zwei.test:443/api/v1/auth/oidc/callback';
   const flowA = await startFlow(first);
@@ -255,6 +262,54 @@ test('zwei gleichzeitige Anmeldungen tauschen je mit der eigenen redirect_uri', 
 
   const sent = Object.fromEntries(tokenRequests.map((body) => [body.get('code'), body.get('redirect_uri')]));
   assert.deepEqual(sent, { 'code-eins': first, 'code-zwei': second });
+});
+
+test('verschraenkte Tausche: der Wert reist je Aufruf, nicht ueber geteilten Zustand', async () => {
+  // Tausch A haelt seinen Wert schon fest und wartet VOR dem Bau der
+  // Token-Anfrage, waehrend Tausch B seinen eigenen festhaelt und ganz
+  // durchlaeuft. Im ausgelieferten Ablauf gibt es diese Pause nicht (siehe
+  // oben); sie entsteht, sobald die Client-Authentifizierung wirklich wartet
+  // (private_key_jwt, DPoP) oder die Bibliothek dort einen Schritt einfuegt.
+  // Ein Wert in einer Modulvariable statt im AsyncLocalStorage schickte dann
+  // fuer A die redirect_uri von B hinaus - gefahren als Gegenprobe.
+  //
+  // Echt sind `exchangeAuthorizationCode`, der `fetch`-Haken aus `getConfig()`
+  // und `openid-client`; eigen ist nur die Client-Authentifizierung, eine
+  // Funktion, wie die Bibliothek sie als `ClientAuth` vorsieht.
+  const first = 'https://Eins.test:443/api/v1/auth/oidc/callback';
+  const second = 'https://Zwei.test:443/api/v1/auth/oidc/callback';
+
+  let aEntered;
+  const aIsWaiting = new Promise((resolve) => { aEntered = resolve; });
+  let releaseA;
+  const aMayGo = new Promise((resolve) => { releaseA = resolve; });
+  const waitingAuth = async (_as, _client, body) => {
+    if (body.get('code') !== 'code-eins') return;
+    aEntered();
+    await aMayGo;
+  };
+
+  const shipped = await getConfig();
+  const config = new oidcClient.Configuration(shipped.serverMetadata(), 'yuvomi-client', undefined, waitingAuth);
+  config[oidcClient.customFetch] = shipped[oidcClient.customFetch];
+  assert.equal(typeof config[oidcClient.customFetch], 'function', 'Vorbedingung: der Haken der ausgelieferten Configuration geht mit');
+
+  const exchange = (redirectUri, code) => exchangeAuthorizationCode(config, {
+    redirectUri,
+    query: `?code=${code}&state=s`,
+    checks: { expectedState: 's', expectedNonce: 'n', pkceCodeVerifier: 'v'.repeat(43) },
+  }).catch((err) => err);
+
+  const a = exchange(first, 'code-eins');
+  await aIsWaiting;
+  assert.equal(tokenRequests.length, 0, 'Vorbedingung: A wartet vor seiner Token-Anfrage');
+  await exchange(second, 'code-zwei');
+  assert.equal(tokenRequests.length, 1, 'Vorbedingung: B ist ganz durchgelaufen, waehrend A wartet');
+  releaseA();
+  await a;
+
+  const sent = Object.fromEntries(tokenRequests.map((body) => [body.get('code'), body.get('redirect_uri')]));
+  assert.deepEqual(sent, { 'code-zwei': second, 'code-eins': first });
 });
 
 test('ein Lauf ohne festgehaltene redirect_uri wird abgewiesen, nicht mit einem geratenen Wert getauscht', async () => {
