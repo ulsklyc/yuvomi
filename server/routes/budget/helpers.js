@@ -688,6 +688,15 @@ export function validateSubcategory(category, subcategory) {
   return row ? subcategory : null;
 }
 
+/** Ganze Monate von `from` bis `to` (beide YYYY-MM); 0, wenn eines fehlt. */
+export function monthsBetween(from, to) {
+  const re = /^(\d{4})-(0[1-9]|1[0-2])$/;
+  const a = re.exec(String(from ?? ''));
+  const b = re.exec(String(to ?? ''));
+  if (!a || !b) return 0;
+  return (Number(b[1]) - Number(a[1])) * 12 + (Number(b[2]) - Number(a[2]));
+}
+
 export function addMonths(ym, n) {
   const [y, m] = ym.split('-').map(Number);
   const d = new Date(y, m - 1 + n, 1);
@@ -837,7 +846,13 @@ export function loanSummaryRow(loan, baseCurrency = budgetCurrency(), today = to
   // nicht der Durchschnitt total_amount/installment_count (die letzte Rate ist
   // kleiner). Sonst weicht der gebuchte Ratenbetrag von der angezeigten Monatsrate
   // ab. Die letzte Rate wird im Zahlungs-Default ohnehin über remaining_amount getrued.
-  const interest = loanInterestSummary(loan, payments);
+  // Wo der VERTRAG heute steht (#1706): die Rate, die im laufenden Monat des
+  // Haushalts faellig ist, mindestens die naechste ungebuchte. Wer Raten nicht
+  // nachgetragen hat, steht im Vertrag trotzdem dort, wo der Kalender ihn
+  // hinstellt - die Zinsbindung endet nicht spaeter, weil Buchungen fehlen.
+  const currentMonth = String(today ?? '').slice(0, 7);
+  const lagMonths = Math.max(0, monthsBetween(addMonths(loan.start_month, paidInstallments), currentMonth));
+  const interest = loanInterestSummary(loan, payments, paidInstallments + 1 + lagMonths);
   const installmentAmount = interest ? interest.monthly_payment : cents(loan.total_amount / loan.installment_count);
   // Restschuld: das noch offene Kapital, seit #954 aus den gebuchten Beträgen
   // nachgerechnet statt an der Planposition abgelesen. remainingAmount oben ist
@@ -868,8 +883,11 @@ export function loanSummaryRow(loan, baseCurrency = budgetCurrency(), today = to
   // hat kein Enddatum - die Planzahl wuerde dort eines behaupten.
   const forecastInstallments = forecastRemainingInstallments(loan, interest, paidInstallments);
   const installmentsToGo = interest ? forecastInstallments : remainingInstallments;
+  // Gezaehlt wird ab dem spaeteren von naechster Faelligkeit und laufendem
+  // Monat: ein laufendes Darlehen mit Buchungsrueckstand endet nicht in der
+  // Vergangenheit. Die ungebuchten Raten stehen noch aus, also ab heute.
   const projectedEndMonth = nextDueMonth && installmentsToGo > 0
-    ? addMonths(nextDueMonth, installmentsToGo - 1)
+    ? addMonths(nextDueMonth, lagMonths + installmentsToGo - 1)
     : null;
 
   return {
@@ -911,7 +929,7 @@ export function loanSummaryRow(loan, baseCurrency = budgetCurrency(), today = to
 // payments steuert nur remaining_principal: die Restschuld folgt seit #954 den
 // gebuchten Beträgen (Sondertilgung senkt sie, Minderzahlung nicht), alle
 // anderen Kennzahlen bleiben planbasiert und vom Zahlungsfortschritt unabhängig.
-export function loanInterestSummary(loan, payments = []) {
+export function loanInterestSummary(loan, payments = [], currentInstallment = payments.length + 1) {
   if (!loan.interest_mode || loan.interest_mode === 'none' || loan.principal == null) return null;
   const calc = computeLoanSchedule({
     principal: loan.principal,
@@ -938,15 +956,16 @@ export function loanInterestSummary(loan, payments = []) {
       fixedPeriodMonths: loan.fixed_period_months,
       followupRate: loan.followup_rate,
     }, payments),
-    // Der Satz der NAECHSTEN Rate (#1706): nach ihm sortiert die Darlehensliste.
-    // Waehrend der Zinsbindung der feste, danach der Anschlusssatz - dieselbe
-    // Phasenregel, mit der Restschuld und Restlaufzeit rechnen.
+    // Der Satz, der HEUTE gilt (#1706): nach ihm sortiert die Darlehensliste.
+    // Es ist der Satz der Rate, die im laufenden Monat faellig ist (mindestens
+    // der naechsten ungebuchten) - waehrend der Zinsbindung der feste, danach
+    // der Anschlusssatz, nach derselben Phasenregel wie der Tilgungsplan.
     current_rate: rateForInstallment({
       fixedRate: loan.fixed_rate,
       interestMode: loan.interest_mode,
       fixedPeriodMonths: loan.fixed_period_months,
       followupRate: loan.followup_rate,
-    }, payments.length + 1),
+    }, currentInstallment),
     remaining_after_binding: calc.remainingAfterBinding,
     binding_end_month: loan.fixed_period_months ? addMonths(loan.start_month, loan.fixed_period_months) : null,
   };

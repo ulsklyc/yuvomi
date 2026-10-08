@@ -12,7 +12,7 @@
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 process.env.DB_PATH = ':memory:';
 
-import test from 'node:test';
+import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { readFileSync } from 'node:fs';
@@ -1092,93 +1092,182 @@ test('#1656: jede Absage des Darlehens-Formulars traegt ihren Grund, der Satz bl
 // #1706: die Zahlen, nach denen die Darlehensliste sortiert und die sie zeigt
 // --------------------------------------------------------
 
-test('#1706: current_rate ist der Satz der NAECHSTEN Rate - fest in der Bindung, danach der Anschlusssatz', async () => {
+/** Stellt die Uhr: beide Zahlen fragen nach dem laufenden Monat des Haushalts. */
+async function beiUhr(iso, fn) {
+  mock.timers.enable({ apis: ['Date'], now: new Date(iso) });
+  try { return await fn(); } finally { mock.timers.reset(); }
+}
+const leeren = () => {
   setMode('shared');
   setBudgetCurrency('EUR');
   db.prepare('DELETE FROM budget_loans').run();
-  const body = {
-    borrower: 'Bank', title: 'Haus', start_month: '2020-01', direction: 'borrowed',
-    interest_mode: 'fixed_then_variable', principal: 100000,
-    fixed_rate: 2, initial_repayment_rate: 6, fixed_period_months: 2, followup_rate: 5,
-  };
-  const made = await call('POST', '/loans', { as: AA, body });
-  assert.equal(made.status, 201);
-  const id = made.body.data.id;
-  assert.equal(made.body.data.interest.current_rate, 2, 'Rate 1 liegt in der Bindung');
+};
+const monatPlus = (start, offset) => {
+  const [y, m] = start.split('-').map(Number);
+  const total = y * 12 + (m - 1) + offset;
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`;
+};
+const ZWEI_PHASEN = {
+  borrower: 'Bank', title: 'Haus', direction: 'borrowed',
+  interest_mode: 'fixed_then_variable', principal: 100000,
+  fixed_rate: 2, initial_repayment_rate: 6, followup_rate: 5,
+};
 
-  for (const paid_date of ['2020-01-01', '2020-02-01']) {
-    assert.equal((await call('POST', `/loans/${id}/payments`, { as: AA, body: { paid_date } })).status, 201);
-  }
-  const after = (await call('GET', '/loans', { as: AA })).body.data.loans.find((l) => l.id === id);
-  assert.equal(after.next_installment_number, 3);
-  assert.equal(after.interest.current_rate, 5, 'Rate 3 ist die erste nach der Bindung');
+test('#1706: current_rate ist der Satz der NAECHSTEN Rate - fest in der Bindung, danach der Anschlusssatz', async () => {
+  leeren();
+  await beiUhr('2020-01-15T12:00:00Z', async () => {
+    const made = await call('POST', '/loans', { as: AA, body: { ...ZWEI_PHASEN, start_month: '2020-01', fixed_period_months: 2 } });
+    assert.equal(made.status, 201);
+    const id = made.body.data.id;
+    assert.equal(made.body.data.interest.current_rate, 2, 'Rate 1 liegt in der Bindung');
+
+    for (const paid_date of ['2020-01-01', '2020-02-01']) {
+      assert.equal((await call('POST', `/loans/${id}/payments`, { as: AA, body: { paid_date } })).status, 201);
+    }
+    const after = (await call('GET', '/loans', { as: AA })).body.data.loans.find((l) => l.id === id);
+    assert.equal(after.next_installment_number, 3);
+    assert.equal(after.interest.current_rate, 5, 'Rate 3 ist die erste nach der Bindung');
+  });
+});
+
+test('#1706: current_rate bei Buchungsrueckstand - die Bindung endet am Kalender, nicht an der Zahl der Buchungen', async () => {
+  leeren();
+  // Start 2020-01, 24 Monate Bindung, 10 Raten gebucht. Nach den Buchungen
+  // stuende die naechste Rate (Nr. 11) noch in der Bindung.
+  const body = { ...ZWEI_PHASEN, start_month: '2020-01', fixed_period_months: 24, paid_installments: 10 };
+  const id = (await beiUhr('2020-11-10T12:00:00Z', async () => {
+    const made = await call('POST', '/loans', { as: AA, body });
+    assert.equal(made.status, 201);
+    assert.equal(made.body.data.paid_installments, 10);
+    assert.equal(made.body.data.interest.current_rate, 2, 'im Takt: Rate 11 ist im November 2020 faellig, in der Bindung');
+    return made.body.data.id;
+  }));
+  const lesen = async () => (await call('GET', '/loans', { as: AA })).body.data.loans.find((l) => l.id === id);
+  await beiUhr('2021-12-10T12:00:00Z', async () => {
+    assert.equal((await lesen()).interest.current_rate, 2, 'Dezember 2021 ist Rate 24, die letzte der Bindung');
+  });
+  await beiUhr('2022-01-10T12:00:00Z', async () => {
+    assert.equal((await lesen()).interest.current_rate, 5, 'Januar 2022 ist Rate 25 - die Bindung ist vorbei');
+  });
+  await beiUhr('2026-10-08T12:00:00Z', async () => {
+    const loan = await lesen();
+    assert.equal(loan.next_installment_number, 11, 'gebucht bleibt gebucht');
+    assert.equal(loan.interest.current_rate, 5);
+  });
 });
 
 test('#1706: projected_end_month folgt den gebuchten Zahlungen, nicht dem Plan', async () => {
-  setMode('shared');
-  setBudgetCurrency('EUR');
-  db.prepare('DELETE FROM budget_loans').run();
-  const mk = () => call('POST', '/loans', {
-    as: AA,
-    body: {
-      borrower: 'Lukas', title: 'Auto', start_month: '2022-12',
-      interest_mode: 'fixed', principal: 21000,
-      fixed_rate: 4.07, initial_repayment_rate: 14.792857,
-    },
+  leeren();
+  await beiUhr('2022-12-10T12:00:00Z', async () => {
+    const mk = () => call('POST', '/loans', {
+      as: AA,
+      body: {
+        borrower: 'Lukas', title: 'Auto', start_month: '2022-12',
+        interest_mode: 'fixed', principal: 21000,
+        fixed_rate: 4.07, initial_repayment_rate: 14.792857,
+      },
+    });
+    const plain = (await mk()).body.data;
+    const extra = (await mk()).body.data;
+    // Ohne Zahlung: die letzte Rate des Plans. Rate 1 ist im Startmonat faellig,
+    // Rate n also n-1 Monate spaeter.
+    assert.equal(plain.projected_end_month, monatPlus('2022-12', plain.installment_count - 1));
+
+    assert.equal((await call('POST', `/loans/${plain.id}/payments`, { as: AA, body: { paid_date: '2022-12-01' } })).status, 201);
+    assert.equal((await call('POST', `/loans/${extra.id}/payments`, {
+      as: AA, body: { paid_date: '2022-12-01', amount: plain.installment_amount + 5000 },
+    })).status, 201);
+
+    const loans = (await call('GET', '/loans', { as: AA })).body.data.loans;
+    const a = loans.find((l) => l.id === plain.id);
+    const b = loans.find((l) => l.id === extra.id);
+    // Dieselbe Quelle wie die Restlaufzeit im Bericht: naechste Faelligkeit plus
+    // die Raten, die bei der REALEN Restschuld noch bleiben (#964).
+    for (const l of [a, b]) {
+      assert.equal(l.projected_end_month, monatPlus(l.next_due_month, l.remaining_installments_forecast - 1));
+    }
+    assert.equal(a.projected_end_month, plain.projected_end_month, 'planmaessig gezahlt: das Ende bleibt');
+    assert.ok(b.projected_end_month < a.projected_end_month,
+      `5000 extra muessen das Ende vorziehen (plain ${a.projected_end_month}, extra ${b.projected_end_month})`);
+    assert.equal(b.remaining_installments, a.remaining_installments, 'die Planzahl bleibt eine Planzahl');
   });
-  const plain = (await mk()).body.data;
-  const extra = (await mk()).body.data;
-  // Ohne Zahlung: die letzte Rate des Plans. Rate 1 ist im Startmonat faellig,
-  // Rate n also n-1 Monate spaeter.
-  const expectMonth = (start, offset) => {
-    const [y, m] = start.split('-').map(Number);
-    const d = new Date(Date.UTC(y, m - 1 + offset, 1));
-    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-  };
-  assert.equal(plain.projected_end_month, expectMonth('2022-12', plain.installment_count - 1));
-
-  assert.equal((await call('POST', `/loans/${plain.id}/payments`, { as: AA, body: { paid_date: '2022-12-01' } })).status, 201);
-  assert.equal((await call('POST', `/loans/${extra.id}/payments`, {
-    as: AA, body: { paid_date: '2022-12-01', amount: plain.installment_amount + 5000 },
-  })).status, 201);
-
-  const loans = (await call('GET', '/loans', { as: AA })).body.data.loans;
-  const a = loans.find((l) => l.id === plain.id);
-  const b = loans.find((l) => l.id === extra.id);
-  // Dieselbe Quelle wie die Restlaufzeit im Bericht: naechste Faelligkeit plus
-  // die Raten, die bei der REALEN Restschuld noch bleiben (#964).
-  for (const l of [a, b]) {
-    assert.equal(l.projected_end_month, expectMonth(l.next_due_month, l.remaining_installments_forecast - 1));
-  }
-  assert.equal(a.projected_end_month, plain.projected_end_month, 'planmaessig gezahlt: das Ende bleibt');
-  assert.ok(b.projected_end_month < a.projected_end_month,
-    `5000 extra muessen das Ende vorziehen (plain ${a.projected_end_month}, extra ${b.projected_end_month})`);
-  assert.equal(b.remaining_installments, a.remaining_installments, 'die Planzahl bleibt eine Planzahl');
 });
 
 test('#1706: zinsfrei zaehlt die Planzahl, getilgt hat kein Enddatum und keinen Rang', async () => {
-  setMode('shared');
-  setBudgetCurrency('EUR');
-  db.prepare('DELETE FROM budget_loans').run();
-  const made = await call('POST', '/loans', {
-    as: AA,
-    body: { borrower: 'Oma', title: 'Zinsfrei', total_amount: 300, installment_count: 3, start_month: '2026-01' },
+  leeren();
+  await beiUhr('2026-01-10T12:00:00Z', async () => {
+    const made = await call('POST', '/loans', {
+      as: AA,
+      body: { borrower: 'Oma', title: 'Zinsfrei', total_amount: 300, installment_count: 3, start_month: '2026-01' },
+    });
+    assert.equal(made.status, 201);
+    const id = made.body.data.id;
+    assert.equal(made.body.data.interest, null, 'ohne Zins kein Zinsblock - die Liste liest das als 0 %');
+    assert.equal(made.body.data.projected_end_month, '2026-03');
+
+    assert.equal((await call('POST', `/loans/${id}/payments`, { as: AA, body: { paid_date: '2026-01-01' } })).status, 201);
+    let loan = (await call('GET', '/loans', { as: AA })).body.data.loans.find((l) => l.id === id);
+    assert.equal(loan.projected_end_month, '2026-03', 'eine gebuchte Rate verschiebt das Ende nicht');
+
+    for (const paid_date of ['2026-02-01', '2026-03-01']) {
+      assert.equal((await call('POST', `/loans/${id}/payments`, { as: AA, body: { paid_date } })).status, 201);
+    }
+    loan = (await call('GET', '/loans', { as: AA })).body.data.loans.find((l) => l.id === id);
+    assert.equal(loan.status, 'paid');
+    assert.equal(loan.projected_end_month, null);
   });
-  assert.equal(made.status, 201);
-  const id = made.body.data.id;
-  assert.equal(made.body.data.interest, null, 'ohne Zins kein Zinsblock - die Liste liest das als 0 %');
-  assert.equal(made.body.data.projected_end_month, '2026-03');
+});
 
-  assert.equal((await call('POST', `/loans/${id}/payments`, { as: AA, body: { paid_date: '2026-01-01' } })).status, 201);
-  let loan = (await call('GET', '/loans', { as: AA })).body.data.loans.find((l) => l.id === id);
-  assert.equal(loan.projected_end_month, '2026-03', 'eine gebuchte Rate verschiebt das Ende nicht');
+test('#1706: projected_end_month bei Buchungsrueckstand - ein laufendes Darlehen endet nicht in der Vergangenheit', async () => {
+  leeren();
+  // 12 Raten ab 2025-01, 6 gebucht, heute 2026-10: ab der naechsten
+  // Faelligkeit (2025-07) gezaehlt laege das Ende in 2025-12.
+  await beiUhr('2026-10-08T12:00:00Z', async () => {
+    const made = await call('POST', '/loans', {
+      as: AA,
+      body: { borrower: 'Oma', title: 'Rueckstand', total_amount: 1200, installment_count: 12, start_month: '2025-01', paid_installments: 6 },
+    });
+    assert.equal(made.status, 201);
+    const loan = made.body.data;
+    assert.equal(loan.status, 'active');
+    assert.equal(loan.next_due_month, '2025-07', 'die Faelligkeit bleibt, wo sie war');
+    assert.equal(loan.remaining_installments, 6);
+    assert.equal(loan.projected_end_month, '2027-03', 'sechs Raten ab dem laufenden Monat: Oktober 2026 bis Maerz 2027');
+  });
+  // Im Takt und voraus aendert sich nichts: gezaehlt wird ab der Faelligkeit.
+  await beiUhr('2025-07-08T12:00:00Z', async () => {
+    assert.equal((await call('GET', '/loans', { as: AA })).body.data.loans[0].projected_end_month, '2025-12');
+  });
+  await beiUhr('2025-03-08T12:00:00Z', async () => {
+    assert.equal((await call('GET', '/loans', { as: AA })).body.data.loans[0].projected_end_month, '2025-12');
+  });
+});
 
-  for (const paid_date of ['2026-02-01', '2026-03-01']) {
-    assert.equal((await call('POST', `/loans/${id}/payments`, { as: AA, body: { paid_date } })).status, 201);
-  }
-  loan = (await call('GET', '/loans', { as: AA })).body.data.loans.find((l) => l.id === id);
-  assert.equal(loan.status, 'paid');
-  assert.equal(loan.projected_end_month, null);
+test('#1706: deckt die Rate den Zins nicht, gibt es kein Enddatum - auch keines aus der Planzahl', async () => {
+  leeren();
+  await beiUhr('2026-01-10T12:00:00Z', async () => {
+    // 10 % Zins, 0,1 % Tilgung: die Rate liegt knapp ueber dem Zins. Zwei fast
+    // leere Raten lassen die Restschuld so weit steigen, dass sie ihn nicht mehr deckt.
+    const made = await call('POST', '/loans', {
+      as: AA,
+      body: {
+        borrower: 'Bank', title: 'Kippt', start_month: '2026-01', direction: 'borrowed',
+        interest_mode: 'fixed', principal: 100000, fixed_rate: 10, initial_repayment_rate: 0.1,
+      },
+    });
+    assert.equal(made.status, 201);
+    const id = made.body.data.id;
+    assert.notEqual(made.body.data.projected_end_month, null, 'Gegenprobe: planmaessig tilgt es');
+    for (const paid_date of ['2026-01-01', '2026-02-01']) {
+      assert.equal((await call('POST', `/loans/${id}/payments`, { as: AA, body: { paid_date, amount: 1 } })).status, 201);
+    }
+    const loan = (await call('GET', '/loans', { as: AA })).body.data.loans.find((l) => l.id === id);
+    assert.ok(loan.interest, 'es bleibt ein Zins-Darlehen');
+    assert.equal(loan.status, 'active');
+    assert.ok(loan.remaining_installments > 0, 'die Planzahl waere da');
+    assert.equal(loan.remaining_installments_forecast, null);
+    assert.equal(loan.projected_end_month, null);
+  });
 });
 
 test('teardown: Server schließen', async () => {

@@ -244,7 +244,7 @@ let state = {
   activeTab:   'budget',
   loanFilterId: null,
   loanStatusFilter: 'active',
-  loanSort: 'start',           // 'start' | 'rate' | 'balance' (utils/loan-order.js)
+  loanSort: null,              // 'start' | 'rate' | 'balance'; null = noch nicht gelesen (loanSort())
   currency:    'EUR',
   budgetMode:  'shared',      // 'shared' (Altverhalten) | 'personal' (#476/#505)
   members:     [],            // Haushaltsmitglieder fuer den Zustaendigen-Picker (#1057)
@@ -829,7 +829,6 @@ export async function render(container, { user }) {
   }
   state.expensesOnly = localStorage.getItem(EXPENSES_ONLY_KEY) === '1';
   state.groupByResponsible = localStorage.getItem(GROUP_RESPONSIBLE_KEY) === '1';
-  try { state.loanSort = normalizeLoanSort(localStorage.getItem(LOAN_SORT_KEY)); } catch (_) { state.loanSort = normalizeLoanSort(null); }
 
   setHtml(container, `
     <div class="budget-page app-page app-page--reading page-measure--narrow" data-composition="reading">
@@ -2644,7 +2643,21 @@ function filteredLoans() {
     const matchesStatus = state.loanStatusFilter === 'all' || loan.status === state.loanStatusFilter;
     const matchesLoan = !state.loanFilterId || loan.id === state.loanFilterId;
     return matchesStatus && matchesLoan;
-  }), state.loanSort);
+  }), loanSort());
+}
+
+/**
+ * Die gewaehlte Sortierung. Beim ersten Zeichnen des Reiters aus dem
+ * Geraetespeicher gelesen, danach aus dem State - gelesen wird dort, wo der
+ * Wert gebraucht wird, damit kein Seitenaufbau ihn vergessen kann.
+ */
+function loanSort() {
+  if (state.loanSort == null) {
+    let stored = null;
+    try { stored = localStorage.getItem(LOAN_SORT_KEY); } catch (_) { /* Private-Mode: Voreinstellung */ }
+    state.loanSort = normalizeLoanSort(stored);
+  }
+  return state.loanSort;
 }
 
 const LOAN_SORT_LABELS = {
@@ -2674,7 +2687,7 @@ function loanToolsMenuHtml() {
       <div class="popover-menu__group" role="group" aria-labelledby="budget-loan-tools-sort-label">
         <div class="popover-menu__label" id="budget-loan-tools-sort-label">${esc(t('budget.loanSortLabel'))}</div>
         ${LOAN_SORTS.map((id) => {
-    const on = state.loanSort === id;
+    const on = loanSort() === id;
     return `
         <button type="button" role="menuitemradio" aria-checked="${on}" class="popover-menu__item" data-loan-sort="${id}">
           <i data-lucide="check" class="icon-md popover-menu__item-check${on ? '' : ' popover-menu__item-check--hidden'}" aria-hidden="true"></i><span>${esc(t(LOAN_SORT_LABELS[id]))}</span>
@@ -2690,8 +2703,15 @@ function activeLoanLabel() {
 }
 
 function loanPaymentsFor(loans) {
+  // Gleichstand (selber Tag, selbe Ratennummer an zwei Darlehen) bricht die
+  // Reihenfolge des SERVERS, nicht die der Karten: sonst tauschte die
+  // Sortierwahl der Darlehen (#1706) Zeilen in der Ratenliste.
+  const serverOrder = new Map((state.loans?.loans ?? []).map((loan, index) => [loan.id, index]));
+  const rank = (loan) => serverOrder.get(loan.id) ?? Number.MAX_SAFE_INTEGER;
   return loans.flatMap((loan) => (loan.payments ?? []).map((payment) => ({ ...payment, loan })))
-    .sort((a, b) => new Date(b.paid_date) - new Date(a.paid_date) || b.installment_number - a.installment_number);
+    .sort((a, b) => new Date(b.paid_date) - new Date(a.paid_date)
+      || b.installment_number - a.installment_number
+      || rank(a.loan) - rank(b.loan));
 }
 
 function renderLoanTransactions(loans) {
@@ -2856,8 +2876,6 @@ function wireLoansPage() {
       refocusSegmented('.budget-loans__filters');
     },
   });
-  // renderBody() baut die Leiste bei jedem Wechsel neu: der Schluessel laesst
-  // die neue Kapsel von der Stelle der alten gleiten.
   _container.querySelector('#budget-loan-tools-menu')?.addEventListener('click', (e) => {
     const item = e.target.closest('[data-loan-sort]');
     if (!item) return;
@@ -2868,6 +2886,8 @@ function wireLoansPage() {
     // geht an dessen Knopf zurueck statt auf <body>.
     _container.querySelector('.budget-loan-tools')?.focus();
   });
+  // renderBody() baut die Leiste bei jedem Wechsel neu: der Schluessel laesst
+  // die neue Kapsel von der Stelle der alten gleiten.
   const loanFilters = _container.querySelector('.budget-loans__filters');
   if (loanFilters) attachSegmentIndicator(loanFilters, { key: 'budget-loan-filter' });
   wireLoanCards(_container);

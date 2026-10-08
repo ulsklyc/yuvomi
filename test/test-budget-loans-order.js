@@ -203,6 +203,119 @@ test('die Karte nennt das voraussichtliche Ende - und laesst es weg, wo es keine
 });
 
 // -------------------------------------------------------------------------
+// Die Verdrahtung: Klick, Geraetespeicher, Fokus - als Programm gefahren
+// -------------------------------------------------------------------------
+
+/** Tauscht den Geraetespeicher fuer die Dauer von `fn` gegen einen, der mitschreibt. */
+function mitSpeicher(inhalt, fn) {
+  const vorher = globalThis.localStorage;
+  const geschrieben = [];
+  globalThis.localStorage = {
+    getItem: (key) => (key in inhalt ? inhalt[key] : null),
+    setItem: (key, value) => { geschrieben.push([key, value]); inhalt[key] = value; },
+    removeItem() {},
+  };
+  try { return fn(geschrieben); } finally { globalThis.localStorage = vorher; }
+}
+
+/**
+ * Der Darlehen-Reiter ueber den ECHTEN renderBody(): das Markup landet im
+ * Koerper, und was wireLoansPage() an das Menue haengt, landet in `klick`.
+ */
+function reiter() {
+  const lauf = { html: '', klick: null, fokus: 0 };
+  const body = {
+    replaceChildren() { lauf.html = ''; },
+    insertAdjacentHTML(_pos, markup) { lauf.html += markup; },
+    setAttribute() {}, querySelector: () => null, querySelectorAll: () => [],
+  };
+  const menue = { addEventListener(typ, fn) { if (typ === 'click') lauf.klick = fn; } };
+  const knopf = { focus() { lauf.fokus += 1; } };
+  const container = {
+    querySelector: (sel) => ({
+      '#budget-body': body, '#budget-loan-tools-menu': menue, '.budget-loan-tools': knopf,
+    }[sel] ?? null),
+    querySelectorAll: () => [],
+    classList: { toggle() {} },
+  };
+  lauf.zeichnen = () => budget.renderBodyForTest(container);
+  lauf.karten = () => [...lauf.html.matchAll(/<article class="budget-loan-card" data-loan-id="(\d+)"/g)].map((m) => Number(m[1]));
+  return lauf;
+}
+
+function mitBestand(extra, fn) {
+  const vorher = { ...budget.state };
+  Object.assign(budget.state, {
+    activeTab: 'loans', loadError: null,
+    loans: { loans: BESTAND, summary: { has_interest: true } },
+    loanStatusFilter: 'active', loanFilterId: null, ...extra,
+  });
+  try { return withAccess({ budget: 'write' }, fn); } finally { Object.assign(budget.state, vorher); }
+}
+
+test('ein Klick auf den Menue-Eintrag ordnet um, merkt die Wahl und gibt den Fokus zurueck', () => {
+  mitSpeicher({}, (geschrieben) => mitBestand({ loanSort: 'start' }, () => {
+    const lauf = reiter();
+    lauf.zeichnen();
+    assert.deepEqual(lauf.karten(), [1, 2, 3]);
+    assert.equal(typeof lauf.klick, 'function', 'am Menue haengt ein Klick-Handler');
+
+    // Ein Klick neben einen Eintrag (Gruppentitel) tut nichts.
+    lauf.klick({ target: { closest: () => null } });
+    assert.deepEqual(geschrieben, []);
+    assert.equal(lauf.fokus, 0);
+
+    const eintrag = { dataset: { loanSort: 'rate' } };
+    lauf.klick({ target: { closest: (sel) => (sel === '[data-loan-sort]' ? eintrag : null) } });
+    assert.deepEqual(lauf.karten(), [2, 1, 3], 'die Liste ist neu gezeichnet, in der neuen Reihenfolge');
+    assert.match(lauf.html, /aria-checked="true" class="popover-menu__item" data-loan-sort="rate"/);
+    assert.deepEqual(geschrieben, [['yuvomi:budget:loan-sort', 'rate']]);
+    assert.equal(lauf.fokus, 1, 'der Fokus geht an den Mehr-Knopf zurueck');
+    assert.equal(budget.state.loanSort, 'rate');
+  }));
+});
+
+test('ein gemerkter Wert bestimmt die Reihenfolge beim ersten Zeichnen', () => {
+  mitSpeicher({ 'yuvomi:budget:loan-sort': 'balance' }, () => mitBestand({ loanSort: null }, () => {
+    const lauf = reiter();
+    lauf.zeichnen();
+    assert.deepEqual(lauf.karten(), [3, 2, 1]);
+    assert.match(lauf.html, /aria-checked="true" class="popover-menu__item" data-loan-sort="balance"/);
+  }));
+  // Gegenstueck: ohne Wert und mit einem fremden Wert gilt die Voreinstellung.
+  for (const inhalt of [{}, { 'yuvomi:budget:loan-sort': 'recommended' }]) {
+    mitSpeicher(inhalt, () => mitBestand({ loanSort: null }, () => {
+      const lauf = reiter();
+      lauf.zeichnen();
+      assert.deepEqual(lauf.karten(), [1, 2, 3]);
+    }));
+  }
+});
+
+test('die Ratenliste haelt ihre Reihenfolge, wenn die Darlehen umsortiert werden', () => {
+  // Selber Tag, selbe Ratennummer an zwei Darlehen: der Gleichstand folgt der
+  // Reihenfolge des Servers, nicht der der Karten.
+  const rate = (id) => ({ id, installment_number: 1, amount: 100, paid_date: '2026-09-01', budget_entry_id: null });
+  const bestand = [
+    darlehen(1, { title: 'Haus', interest: zins(2.1), payments: [rate(11)] }),
+    darlehen(2, { title: 'Auto', interest: zins(6.4), payments: [rate(22)] }),
+  ];
+  const zeilen = (sort) => {
+    const vorher = { ...budget.state };
+    Object.assign(budget.state, { loans: { loans: bestand, summary: {} }, loanSort: sort, loanStatusFilter: 'active', loanFilterId: null });
+    try {
+      const html = withAccess({ budget: 'write' }, () => budget.renderLoansPage());
+      return {
+        karten: [...html.matchAll(/<article class="budget-loan-card" data-loan-id="(\d+)"/g)].map((m) => Number(m[1])),
+        raten: [...html.matchAll(/data-loan-payment-id="(\d+)"/g)].map((m) => Number(m[1])),
+      };
+    } finally { Object.assign(budget.state, vorher); }
+  };
+  assert.deepEqual(zeilen('start'), { karten: [1, 2], raten: [11, 22] });
+  assert.deepEqual(zeilen('rate'), { karten: [2, 1], raten: [11, 22] });
+});
+
+// -------------------------------------------------------------------------
 // Die Grenze: eine Rechnung, kein Rat
 // -------------------------------------------------------------------------
 
