@@ -726,6 +726,8 @@
         "addStore": "فروشگاه جدید",
         "duplicateListLabel": "کپی از فهرست",
         "duplicateListTitle": "کپی از «{{name}}»",
+        "itemListLabel": "فهرست",
+        "itemMovedToast": "«{{name}}» به «{{list}}» منتقل شد.",
         "duplicateListNameLabel": "نام فهرست جدید",
         "duplicateDefaultName": "{{name}} - کپی",
         "duplicateResetChecked": "بازنشانی موارد علامت‌خورده",

@@ -889,6 +889,8 @@
         "addStore": "متجر جديد",
         "duplicateListLabel": "تكرار القائمة",
         "duplicateListTitle": "تكرار «{{name}}»",
+        "itemListLabel": "القائمة",
+        "itemMovedToast": "تم نقل «{{name}}» إلى «{{list}}».",
         "duplicateListNameLabel": "اسم القائمة الجديدة",
         "duplicateDefaultName": "{{name}} - نسخة",
         "duplicateResetChecked": "إعادة تعيين العناصر المحددة",

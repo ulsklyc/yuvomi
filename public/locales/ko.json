@@ -726,6 +726,8 @@
         "addStore": "새 상점",
         "duplicateListLabel": "목록 복제",
         "duplicateListTitle": "“{{name}}” 복제",
+        "itemListLabel": "목록",
+        "itemMovedToast": "“{{name}}” 항목을 “{{list}}” 목록으로 옮겼습니다.",
         "duplicateListNameLabel": "새 목록 이름",
         "duplicateDefaultName": "{{name}} - 사본",
         "duplicateResetChecked": "체크 상태 초기화",

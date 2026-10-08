@@ -14,8 +14,11 @@
 // nicht durchgeht, bleibt vorgemerkt und läuft im nächsten Sync mit
 // (at-least-once).
 //
-// Ein Umzug zwischen Listen fehlt weiterhin bewusst: eine Aufgabe gehört zu der
-// Liste, aus der sie kam.
+// Ein Umzug zwischen Listen fehlt für AUFGABEN weiterhin bewusst: eine Aufgabe
+// gehört zu der Liste, aus der sie kam. Ein Einkaufsartikel kann seit #1700 die
+// Liste wechseln (`releaseShoppingMirror`): das alte Objekt wird zur Löschung
+// vorgemerkt, die Zeile wird lokal, und eine gespiegelte Zielliste legt sie
+// über den gewöhnlichen Upload-Weg neu an.
 //
 // Das Anlegen dagegen gibt es seit #695. Die alte Begründung ("ohne Zielwahl
 // gäbe es keine Liste, in die es gehörte") stimmte nicht mehr: die Zielwahl gibt
@@ -251,6 +254,50 @@ export function queueTodoDeletion(module, row) {
       DO UPDATE SET object_url = COALESCE(excluded.object_url, object_url)
   `).run(row.external_account_id, module, row.external_uid, row.external_object_url || null);
   return true;
+}
+
+/**
+ * Löst EINEN Einkaufsartikel von seinem Objekt auf dem Server, weil er die
+ * Liste wechselt (#1700): das Objekt in der alten Collection wird zur Löschung
+ * vorgemerkt, die Zeile selbst bleibt und ist danach ein gewöhnlicher, hier
+ * angelegter Artikel.
+ *
+ * Mehr braucht ein Umzug nicht. Die Collection eines Artikels folgt allein aus
+ * seiner Liste (`pendingShoppingCreations`): steht er als `local` auf einer
+ * gespiegelten Liste, legt ihn der nächste Lauf dort neu an; ist die Zielliste
+ * nicht gespiegelt, bleibt er lokal. Es gibt also keinen eigenen "Verschieben"-
+ * Weg zum Server und keinen Zwischenzustand, in dem das alte Objekt
+ * weiterlebt: der Tombstone hält auch den Inbound davon ab, den Artikel aus
+ * der alten Collection zurückzuholen, solange der Server ihn dort noch führt.
+ *
+ * Die gespiegelten Etiketten (VTODO-CATEGORIES, #586) gehen mit dem Objekt:
+ * sie sind eine Kopie SEINER Eigenschaft, Yuvomi verwaltet sie nicht, und das
+ * neu angelegte Objekt trägt keine. Blieben sie stehen, zeigte die Zeile
+ * Etiketten, die es nirgends mehr gibt und die sich hier nicht entfernen
+ * lassen.
+ *
+ * Muss mit der Zeile VOR dem Umzug gerufen werden.
+ *
+ * @returns {boolean} true, wenn ein Tombstone entstanden ist
+ */
+export function releaseShoppingMirror(row) {
+  if (!row || row.external_source !== 'caldav') return false;
+  // Ohne Konto (gedriftete Datenbank) gibt es keinen Rückweg und nichts
+  // vorzumerken - entkoppelt wird trotzdem, sonst zeigte die Zeile auf der
+  // neuen Liste weiter auf ein Objekt der alten.
+  const queued = queueTodoDeletion('shopping', row);
+  db.get().prepare('DELETE FROM shopping_item_tags WHERE item_id = ?').run(row.id);
+  db.get().prepare(`
+    UPDATE shopping_items
+       SET external_source     = 'local',
+           external_uid        = NULL,
+           external_account_id = NULL,
+           external_object_url = NULL,
+           outbound_dirty      = 0,
+           outbound_attempts   = 0
+     WHERE id = ?
+  `).run(row.id);
+  return queued;
 }
 
 /** Merkt alle gespiegelten Einträge einer Auswahl vor (Mehrfachlöschungen). */
@@ -671,8 +718,16 @@ export async function processPendingShoppingCreations(client, accountId, targets
       if (!fresh) continue; // zwischenzeitlich gelöscht
 
       try {
-        if (await uploadNewTodo(client, collection, 'shopping', fresh, accountId)) done++;
-        else log.error(`Could not build a VTODO for shopping item ${fresh.id}, keeping it local.`);
+        if (await uploadNewTodo(client, collection, 'shopping', fresh, accountId)) {
+          done++;
+          // DER UPLOAD WARTET AUF DEN SERVER, und in dieser Zeit kann der
+          // Artikel die Liste gewechselt haben (#1700). Dann liegt das eben
+          // angelegte Objekt in der Collection der ALTEN Liste und die Zeile
+          // zeigt von der neuen darauf: wieder lösen, das Objekt geht mit dem
+          // nächsten Lauf, und die neue Liste legt ihn selbst an.
+          const after = reloadRow('shopping', fresh.id);
+          if (after && after.list_id !== targetListId) releaseShoppingMirror(after);
+        } else log.error(`Could not build a VTODO for shopping item ${fresh.id}, keeping it local.`);
       } catch (err) {
         // Wie oben: bleibt lokal und läuft im nächsten Lauf wieder mit.
         log.warn(`Could not upload shopping item ${fresh.id} to ${listUrl}: ${err.message}`);

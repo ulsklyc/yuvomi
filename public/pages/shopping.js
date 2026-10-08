@@ -10,6 +10,7 @@ import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { flipSnapshot, flipPlay } from '/utils/flip.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { formRowsHtml, formRowHtml } from '/utils/form-row.js';
 import { readRowHtml, readDetailsLabel } from '/utils/read-row.js';
 import { promptModal, openModal, closeModal, confirmModal, reportFieldError, refocusAfterRender } from '/components/modal.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
@@ -2151,6 +2152,24 @@ function openItemDetails(itemId, container) {
       </a>`;
   };
 
+  // DIE LISTE IST EINE EIGENE FORMULARZEILE (#1700, Entscheidung 2026-10-08),
+  // unter Menge und Kategorie - die beiden bleiben nebeneinander, wie sie
+  // waren, und der Dialog sieht mit einer Liste genauso aus wie mit fuenf,
+  // nur ohne diese Zeile: mit einer Liste gibt es nichts zu waehlen. Sie
+  // spricht die Zielform des Hauses (utils/form-row.js, DESIGN.md
+  // "Formularzeile"): Etikett links, der Wert rechts als randlose Auswahl.
+  // Kein eigener "Verschieben"-Weg und kein Ziehen: der Dialog ist ohnehin der
+  // Ort, an dem man einen Artikel umhaengt.
+  const fromListId = state.activeListId;
+  const listRow = state.lists.length > 1 ? formRowsHtml(formRowHtml({
+    label: t('shopping.itemListLabel'),
+    labelFor: 'item-details-list',
+    field: true,
+    control: `<select class="form-input" id="item-details-list">
+              ${state.lists.map((l) => `<option value="${l.id}" ${l.id === fromListId ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}
+            </select>`,
+  })) : '';
+
   openModal({
     title: t('common.editItem'),
     size: 'md',
@@ -2174,6 +2193,7 @@ function openItemDetails(itemId, container) {
             </select>
           </div>
         </div>
+        ${listRow}
         ${/* PREIS UND LADEN (#1003).
             *
             * NICHT ALS ZWANGSDIALOG BEIM ABHAKEN. Das Ticket sagt "erfasst,
@@ -2310,8 +2330,18 @@ function openItemDetails(itemId, container) {
             price_cents: priceCents,
             store_id: storeId,
           };
+          // Die Zielliste reist nur mit, wenn sie eine andere ist (#1700):
+          // ein gewöhnliches Speichern bleibt ein gewöhnliches Speichern.
+          const targetListId = Number(panel.querySelector('#item-details-list')?.value) || fromListId;
+          if (targetListId !== fromListId) payload.list_id = targetListId;
           const data = await api.patch(`/shopping/items/${item.id}`, payload);
           acknowledgeOwnChange(data);
+          // Umgezogen ist er, wenn die Antwort die erbetene Liste traegt.
+          if (payload.list_id !== undefined && data.data.list_id === payload.list_id) {
+            closeModal({ force: true });
+            itemMovedAway(container, data.data, fromListId);
+            return;
+          }
           // DER ARTIKEL WIRD BEIM SPEICHERN NACHGESCHLAGEN, nicht beim Oeffnen
           // festgehalten: waehrend der Dialog offen war, kann eine
           // Live-Auffrischung `state.items` ersetzt haben - dann ist `item` ein
@@ -2760,6 +2790,39 @@ function updateListCounter(listId, totalDelta, checkedDelta) {
     list.item_total   = (list.item_total   || 0) + totalDelta;
     list.item_checked = (list.item_checked || 0) + checkedDelta;
   }
+}
+
+/**
+ * Der Artikel steht jetzt auf einer anderen Liste (#1700): er verlaesst den
+ * Bestand der Liste, von der er kam, beide Zaehler in den Reitern folgen, und
+ * eine Meldung sagt, wohin er gegangen ist - die Zeile ist ja einfach weg.
+ *
+ * `fromListId` kommt vom Oeffnen des Dialogs: waehrend er offen war, kann der
+ * Zettel gewechselt worden sein, und dann gehoert `state.items` einer anderen
+ * Liste. Der Zaehler der Herkunft zieht ab, was die Zeile GEZEIGT hat - eine
+ * noch offene Abhak-Absicht ist damit abgegolten, wie beim Loeschen.
+ */
+function itemMovedAway(container, moved, fromListId) {
+  const before = state.items.find((i) => i.id === moved.id);
+  const shownChecked = before ? Boolean(checkedOf(before)) : Boolean(moved.is_checked);
+  // DIE ABSICHT GEHT MIT DEM ARTIKEL. Sie haengt an der Liste, von der er kam
+  // (`intent.listId`), und nur eine Ladeantwort DIESER Liste kann sie erfuellen
+  // (`settleIntents`) - dort steht er aber nie wieder. Bliebe sie liegen,
+  // ueberlagerte sie den Artikel auf seiner neuen Liste fuer immer: jemand
+  // nimmt den Haken zurueck, und dieses Geraet zeigt ihn weiter abgehakt. Ihre
+  // Buchung ist mit dem Abzug der ANZEIGE unten abgegolten.
+  intents.delete(moved.id);
+
+  updateListCounter(fromListId, -1, shownChecked ? -1 : 0);
+  updateListCounter(moved.list_id, 1, moved.is_checked ? 1 : 0);
+  if (before && state.activeListId === fromListId) {
+    state.items = state.items.filter((i) => i.id !== moved.id);
+    updateItemsList(container);
+  }
+  renderTabs(container);
+
+  const target = state.lists.find((l) => l.id === moved.list_id);
+  window.yuvomi.showToast(t('shopping.itemMovedToast', { name: moved.name, list: target?.name ?? '' }), 'info');
 }
 
 function openMealPlanImport(container) {
@@ -3830,6 +3893,7 @@ export const __test = {
   // Der Dialog rendert ueber den Modal-Stub des Loaders; die Tests greifen
   // sein onSave ab und loesen das Speichern nach einer Auffrischung aus.
   openItemDetails,
+  itemMovedAway,
   // Die schwebenden Loeschungen: geprueft wird, dass eine Auffrischung im
   // Undo-Fenster sie nicht zurueckbringt und das Fenster sie wieder raeumt.
   pendingRemovals,

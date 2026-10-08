@@ -830,6 +830,8 @@
         "addStore": "Новий магазин",
         "duplicateListLabel": "Дублювати список",
         "duplicateListTitle": "Дублювати «{{name}}»",
+        "itemListLabel": "Список",
+        "itemMovedToast": "«{{name}}» тепер у списку «{{list}}».",
         "duplicateListNameLabel": "Назва нового списку",
         "duplicateDefaultName": "{{name}} - копія",
         "duplicateResetChecked": "Скинути позначки",

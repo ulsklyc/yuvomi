@@ -712,6 +712,8 @@
         "addStore": "Ny butikk",
         "duplicateListLabel": "Dupliser liste",
         "duplicateListTitle": "Dupliser «{{name}}»",
+        "itemListLabel": "Liste",
+        "itemMovedToast": "«{{name}}» er flyttet til «{{list}}».",
         "duplicateListNameLabel": "Nyt navn på liste",
         "duplicateDefaultName": "{{name}} - Kopi",
         "duplicateResetChecked": "Nullstill avkrysning",

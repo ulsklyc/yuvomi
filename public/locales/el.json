@@ -712,6 +712,8 @@
         "addStore": "Νέο κατάστημα",
         "duplicateListLabel": "Διπλασιασμός λίστας",
         "duplicateListTitle": "Διπλασιασμός «{{name}}»",
+        "itemListLabel": "Λίστα",
+        "itemMovedToast": "Το «{{name}}» μεταφέρθηκε στη λίστα «{{list}}».",
         "duplicateListNameLabel": "Όνομα νέας λίστας",
         "duplicateDefaultName": "{{name}} - Αντίγραφο",
         "duplicateResetChecked": "Επαναφορά τσεκαρισμένων",

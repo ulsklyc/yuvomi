@@ -844,6 +844,8 @@
         "addStore": "Nowy sklep",
         "duplicateListLabel": "Duplikuj listę",
         "duplicateListTitle": "Duplikuj „{{name}}”",
+        "itemListLabel": "Lista",
+        "itemMovedToast": "Przeniesiono „{{name}}” na listę „{{list}}”.",
         "duplicateListNameLabel": "Nazwa nowej listy",
         "duplicateDefaultName": "{{name}} - kopia",
         "duplicateResetChecked": "Zresetuj odhaczenia",
