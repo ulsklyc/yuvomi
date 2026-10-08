@@ -5386,6 +5386,8 @@
         "importNewTypeNameRequiredError": "Lütfen yeni atık türü için bir ad girin.",
         "importDefaultSourceName": "İçe aktarılan dosya",
         "importCommittedToast": "İçe aktarma uygulandı: {{added}} eklendi, {{changed}} değiştirildi, {{removed}} kaldırıldı.",
+        "importPreviewChangedError": "Takvim önizlemeden sonra değişti. Lütfen içe aktarmayı yeniden başlat.",
+        "importSourceChangedError": "Bu kaynak bu arada değişti. Lütfen içe aktarmayı yeniden başlat.",
         "sourcesSectionTitle": "İçe aktarma kaynakları",
         "sourceNameLabel": "Ad",
         "sourceCoverageLabel": "Kapsam",

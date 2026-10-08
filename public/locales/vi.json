@@ -5386,6 +5386,8 @@
         "importNewTypeNameRequiredError": "Vui lòng nhập tên cho loại rác mới.",
         "importDefaultSourceName": "Tệp đã nhập",
         "importCommittedToast": "Đã áp dụng nhập tệp: {{added}} được thêm, {{changed}} được thay đổi, {{removed}} bị xóa.",
+        "importPreviewChangedError": "Lịch đã thay đổi kể từ lần xem trước. Vui lòng bắt đầu nhập lại.",
+        "importSourceChangedError": "Nguồn này đã thay đổi trong lúc đó. Vui lòng bắt đầu nhập lại.",
         "sourcesSectionTitle": "Nguồn nhập",
         "sourceNameLabel": "Tên",
         "sourceCoverageLabel": "Phạm vi",

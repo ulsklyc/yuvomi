@@ -771,3 +771,304 @@ test('Stylesheets: die Koch-Zeichen schrumpfen nicht, und der Avatar der Kachel 
 
   assert.ok(regel('meals.css', '.meal-read__cook'), '.meal-read__cook hat eine Regel in meals.css');
 });
+
+// -------------------------------------------------------------------------
+// #1784: die nachgereichte Koch-Auswahl ist keine Eingabe
+// -------------------------------------------------------------------------
+
+/* GEMESSEN AM ECHTEN WAECHTER. Scheiterte der erste Abruf der Mitglieder,
+ * reicht openMealModal() die Auswahl nach, sobald sie da ist - und tauscht
+ * dafuer Felder im offenen Dialog. Der Waechter des Dialogs (components/
+ * modal.js) verglich danach neue Felder gegen die Basis vom Oeffnen und fragte
+ * "Aenderungen verwerfen?", obwohl niemand etwas angefasst hatte.
+ *
+ * Der Loader stubt modal.js fuer die Seite; hier haengt ueber seinen Haken die
+ * ECHTE Funktion, und gefragt wird der echte isFormDirty(). Die Felder der
+ * Attrappe entstehen aus dem ECHTEN Markup (Dialoginhalt und cookPickerHtml()
+ * ueber die echte Personenauswahl), und die Antwort auf `/family/members`
+ * kommt, wann der Test es sagt. */
+const echtesModal = await import('../public/components/modal.js');
+
+/** Die Koch-Checkboxen eines Markups als Felder, wie der Waechter sie liest. */
+function kochFelder(html) {
+  return [...String(html).matchAll(/<input type="checkbox" class="([^"]*)" value="([^"]*)"([^>]*)>/g)]
+    .filter((m) => /data-ms-input="meal_cook"/.test(m[3]))
+    .map((m) => ({
+      type: 'checkbox', name: '', id: '', value: m[2], checked: /(^|\s)checked(\s|$)/.test(m[3]),
+      classList: { contains: (name) => m[1].split(/\s+/).includes(name) },
+    }));
+}
+
+/**
+ * Der offene Dialog: ein Titelfeld, das bleibt, Zutatenzeilen, die der Nutzer
+ * hinzufuegt und wieder wegnimmt (`zutaten`), und die Koch-Auswahl, die
+ * getauscht wird. In dieser Reihenfolge stehen sie auch im echten Formular.
+ */
+function dialogAttrappe(content) {
+  const knoten = () => ({
+    value: '', checked: false, hidden: false, dataset: {}, style: {},
+    addEventListener() {}, setAttribute() {}, removeAttribute() {}, replaceChildren() {}, insertAdjacentHTML() {},
+    appendChild() {}, querySelector: () => null, querySelectorAll: () => [], focus() {},
+  });
+  const titel = { type: 'text', id: 'modal-title', name: '', value: '' };
+  const zutaten = [];
+  let koch = kochFelder(content);
+  let nachgereicht = null;
+  const auswahl = {
+    insertAdjacentHTML(position, html) {
+      assert.equal(position, 'afterend');
+      nachgereicht = kochFelder(html);
+    },
+    remove() { koch = nachgereicht; },
+  };
+  const panel = {
+    dataset: {},
+    querySelector: (sel) => (sel === '.meal-modal__cook' ? auswahl : knoten()),
+    querySelectorAll: (sel) => {
+      if (sel.startsWith('input:not(')) return [titel, ...zutaten, ...koch];
+      if (sel === '[data-ms-input="meal_cook"]') return koch;
+      return [];
+    },
+  };
+  return { panel, titel, zutaten, koch: () => koch };
+}
+
+/**
+ * Den Dialog oeffnen, waehrend die Mitglieder fehlen, und die Antwort erst auf
+ * Zuruf liefern. `fn` bekommt den Waechter (`schmutzig()`), die Felder und
+ * `antworte()`.
+ */
+async function mitNachgereichterAuswahl(opts, fn) {
+  const hakenZuvor = globalThis.__swapFieldsKeepingDirtyBase;
+  const apiZuvor = globalThis.__apiStub;
+  globalThis.__swapFieldsKeepingDirtyBase = echtesModal.swapFieldsKeepingDirtyBase;
+  let liefere = null;
+  globalThis.__apiStub = {
+    get: (path) => (path === '/family/members'
+      ? new Promise((resolve) => { liefere = () => resolve({ data: MITGLIEDER }); })
+      : Promise.resolve({ data: [] })),
+  };
+  try {
+    await withAccess(SCHREIBEN, () => mitPlan({ members: [] }, async () => {
+      const [dialog] = await modalMitschnitt(() => meals.openMealModal(opts));
+      assert.ok(dialog, 'Vorbedingung: der Editor ist aufgegangen');
+      const attrappe = dialogAttrappe(dialog.content);
+      const { panel } = attrappe;
+      const overlay = {
+        isConnected: true, inert: false,
+        querySelector: (sel) => (sel === '.modal-panel' ? panel : null),
+        removeAttribute() {}, contains: () => false,
+      };
+      echtesModal.__test.adoptOverlayForTest(overlay);
+      dialog.onSave(panel);
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.equal(typeof liefere, 'function', 'Vorbedingung: der Dialog holt die Mitglieder nach');
+      const antworte = async () => {
+        liefere();
+        await new Promise((resolve) => setImmediate(resolve));
+      };
+      await fn({ ...attrappe, overlay, antworte, schmutzig: () => echtesModal.__test.isFormDirty(panel) });
+    }));
+  } finally {
+    echtesModal.__test.releaseOverlayForTest();
+    globalThis.__swapFieldsKeepingDirtyBase = hakenZuvor;
+    globalThis.__apiStub = apiZuvor;
+  }
+}
+
+const NEU = { mode: 'create', date: '2026-10-07', mealType: 'lunch' };
+const zeichen = (felder) => felder.map((f) => `${f.value || 'niemand'}:${f.checked ? 1 : 0}`);
+
+test('#1784: die nachgereichte Koch-Auswahl macht den unberuehrten Dialog nicht schmutzig', async () => {
+  await mitNachgereichterAuswahl(NEU, async ({ koch, antworte, schmutzig }) => {
+    assert.deepEqual(zeichen(koch()), ['niemand:1'], 'Vorbedingung: ohne Mitglieder gibt es nur "Niemand"');
+    assert.equal(schmutzig(), false, 'Vorbedingung: frisch geoeffnet ist der Dialog sauber');
+    await antworte();
+    assert.deepEqual(zeichen(koch()), ['niemand:1', '1:0', '2:0'], 'Vorbedingung: die Auswahl ist getauscht');
+    assert.equal(schmutzig(), false, 'der Tausch ist keine Eingabe - das Schliessen fragt nicht');
+    // Gegenfall: eine Wahl in der NEUEN Auswahl ist eine Aenderung, und wer sie
+    // zuruecknimmt, ist wieder sauber - die neuen Felder zaehlen also mit.
+    const [niemand, anna] = koch();
+    anna.checked = true; niemand.checked = false;
+    assert.equal(schmutzig(), true);
+    anna.checked = false; niemand.checked = true;
+    assert.equal(schmutzig(), false);
+  });
+});
+
+test('#1784: was vor dem Tausch getippt wurde, bleibt eine Aenderung - und nur das', async () => {
+  await mitNachgereichterAuswahl(NEU, async ({ titel, koch, antworte, schmutzig }) => {
+    titel.value = 'Linsensuppe';
+    assert.equal(schmutzig(), true, 'Vorbedingung: der getippte Titel ist eine Aenderung');
+    await antworte();
+    assert.equal(koch().length, 3, 'Vorbedingung: die Auswahl ist getauscht');
+    assert.equal(schmutzig(), true, 'der Tausch friert die Eingabe nicht als Ausgangsstand ein');
+    titel.value = '';
+    assert.equal(schmutzig(), false, 'ohne die Eingabe ist der Dialog sauber - der Tausch selbst zaehlt nicht');
+  });
+});
+
+test('#1784: beim Bearbeiten bleibt der gespeicherte Koch gewaehlt, und der Dialog sauber', async () => {
+  const meal = mitBen();
+  const opts = { mode: 'edit', meal, date: meal.date, mealType: meal.meal_type };
+  await mitNachgereichterAuswahl(opts, async ({ koch, antworte, schmutzig }) => {
+    assert.deepEqual(zeichen(koch()), ['niemand:0', '2:1'], 'Vorbedingung: wer schon kocht, steht auch ohne Liste da');
+    await antworte();
+    assert.deepEqual(zeichen(koch()), ['niemand:0', '1:0', '2:1']);
+    assert.equal(schmutzig(), false);
+  });
+});
+
+// Review an #1813: die Basis blieb stehen, sobald sich die Feldzahl vor dem
+// Tausch geaendert hatte - Zeile hinzu, Tausch, Zeile wieder weg, und der Dialog
+// stand im Oeffnungszustand, galt aber als geaendert.
+test('#1784: eine Zutatenzeile vor dem Tausch bleibt eine Aenderung - und nimmt man sie weg, ist der Dialog sauber', async () => {
+  const zeile = () => ({ type: 'text', id: '', name: 'ingredient', value: '' });
+  await mitNachgereichterAuswahl(NEU, async ({ zutaten, koch, antworte, schmutzig }) => {
+    zutaten.push(zeile());
+    assert.equal(schmutzig(), true, 'Vorbedingung: die neue Zeile ist eine Aenderung');
+    await antworte();
+    assert.equal(koch().length, 3, 'Vorbedingung: die Auswahl ist getauscht');
+    assert.equal(schmutzig(), true, 'die Zeile des Nutzers geht nicht in die Basis');
+    zutaten.pop();
+    assert.equal(schmutzig(), false, 'ohne die Zeile steht der Dialog im Oeffnungszustand');
+    // Gegenfall: eine Zeile NACH dem Tausch ist ebenfalls eine Aenderung.
+    zutaten.push(zeile());
+    assert.equal(schmutzig(), true);
+  });
+});
+
+// Der Editor unter der Loesch-Rueckfrage (askOverModal): das ECHTE Parken und
+// Zurueckholen, dazwischen treffen die Mitglieder ein.
+test('#1784: auch unter einer Rueckfrage geparkt bleibt der unberuehrte Dialog sauber', async () => {
+  const dokument = globalThis.document;
+  const hatte = Object.hasOwn(dokument, 'removeEventListener');
+  if (!hatte) dokument.removeEventListener = () => {};
+  try {
+    await mitNachgereichterAuswahl(NEU, async ({ titel, koch, antworte, schmutzig }) => {
+      const geparkt = echtesModal.__test.suspendActiveModal();
+      await antworte();
+      assert.equal(koch().length, 3, 'Vorbedingung: der Tausch lief, waehrend der Dialog geparkt war');
+      echtesModal.__test.resumeSuspendedModal(geparkt);
+      assert.equal(schmutzig(), false, 'zurueckgeholt fragt das Schliessen nicht');
+      // Gegenfall: der Waechter ist nach dem Zurueckholen nicht still tot.
+      titel.value = 'Linsensuppe';
+      assert.equal(schmutzig(), true);
+    });
+  } finally {
+    if (!hatte) delete dokument.removeEventListener;
+  }
+});
+
+// Die geteilte Funktion fuer sich.
+test('#1784: swapFieldsKeepingDirtyBase tauscht immer und fasst nur die Basis SEINES Panels an', () => {
+  let getauscht = 0;
+  echtesModal.swapFieldsKeepingDirtyBase({ querySelectorAll: () => [] }, () => { getauscht += 1; });
+  assert.equal(getauscht, 1, 'ohne offenes Modal und ohne Basis');
+
+  const feld = { type: 'text', id: 'a', name: '', value: '' };
+  const panel = { querySelectorAll: () => [feld] };
+  echtesModal.__test.adoptOverlayForTest({ querySelector: () => panel });
+  try {
+    // Ein FREMDES Panel mit gleich vielen Feldern tauscht sein eines Feld aus.
+    // Griffe die Funktion zur Basis des offenen Formulars statt zu der ihres
+    // Panels, stuende danach das fremde Feld darin.
+    let fremdesFeld = { type: 'text', id: 'b', name: '', value: 'alt' };
+    const fremd = { querySelectorAll: () => [fremdesFeld] };
+    echtesModal.swapFieldsKeepingDirtyBase(fremd, () => {
+      getauscht += 1;
+      fremdesFeld = { type: 'text', id: 'b', name: '', value: 'neu' };
+    });
+    assert.equal(getauscht, 2);
+    assert.equal(echtesModal.__test.isFormDirty(panel), false, 'das offene Formular ist unberuehrt und bleibt sauber');
+    feld.value = 'x';
+    assert.equal(echtesModal.__test.isFormDirty(panel), true, 'und seine Basis ist die vom Oeffnen');
+  } finally {
+    echtesModal.__test.releaseOverlayForTest();
+  }
+});
+
+// Ein Feld, das der NUTZER vor dem Tausch entfernt hat, ist nicht "vom Tausch
+// entfernt": es bleibt als Aenderung in der Basis.
+test('#1784: was der Nutzer vor dem Tausch entfernt hat, bleibt eine Aenderung', () => {
+  const titel = { type: 'text', id: 't', name: '', value: '' };
+  const zeile = { type: 'text', id: '', name: 'ingredient', value: 'Linsen' };
+  let auswahl = [{ type: 'checkbox', id: '', name: '', value: '', checked: true }];
+  let zeilen = [zeile];
+  const panel = { querySelectorAll: () => [titel, ...zeilen, ...auswahl] };
+  echtesModal.__test.adoptOverlayForTest({ querySelector: () => panel });
+  try {
+    zeilen = [];
+    assert.equal(echtesModal.__test.isFormDirty(panel), true, 'Vorbedingung: die entfernte Zeile ist eine Aenderung');
+    echtesModal.swapFieldsKeepingDirtyBase(panel, () => {
+      auswahl = [
+        { type: 'checkbox', id: '', name: '', value: '', checked: true },
+        { type: 'checkbox', id: '', name: '', value: '1', checked: false },
+      ];
+    });
+    assert.equal(echtesModal.__test.isFormDirty(panel), true, 'der Tausch macht das Entfernen nicht ungeschehen');
+    zeilen = [zeile];
+    assert.equal(echtesModal.__test.isFormDirty(panel), false, 'mit der Zeile zurueck ist der Dialog sauber');
+  } finally {
+    echtesModal.__test.releaseOverlayForTest();
+  }
+});
+
+// Ein Tausch, der nur HINZUFUEGT (nichts aus der Basis geht): das Neue steht in
+// der Basis dort, wo es im Formular steht - am Anfang wie in der Mitte.
+test('#1784: ein Tausch, der nur Felder hinzufuegt, traegt sie an ihrer Stelle ein', () => {
+  const feld = (id) => ({ type: 'text', id, name: '', value: '' });
+  for (const [stelle, erwartet] of [[0, 'x,a,b'], [1, 'a,x,b'], [2, 'a,b,x']]) {
+    const felder = [feld('a'), feld('b')];
+    const panel = { querySelectorAll: () => felder };
+    echtesModal.__test.adoptOverlayForTest({ querySelector: () => panel });
+    try {
+      echtesModal.swapFieldsKeepingDirtyBase(panel, () => { felder.splice(stelle, 0, feld('x')); });
+      assert.equal(felder.map((f) => f.id).join(','), erwartet, 'Vorbedingung');
+      assert.equal(echtesModal.__test.isFormDirty(panel), false, `hinzugefuegt an Stelle ${stelle}`);
+      felder[stelle].value = 'getippt';
+      assert.equal(echtesModal.__test.isFormDirty(panel), true, 'und das neue Feld zaehlt mit');
+    } finally {
+      echtesModal.__test.releaseOverlayForTest();
+    }
+  }
+});
+
+test('#1784: auch beim reinen Hinzufuegen geht eine Zeile des Nutzers nicht in die Basis', () => {
+  const feld = (id) => ({ type: 'text', id, name: '', value: '' });
+  const felder = [feld('a'), feld('b')];
+  const panel = { querySelectorAll: () => felder };
+  echtesModal.__test.adoptOverlayForTest({ querySelector: () => panel });
+  try {
+    felder.splice(1, 0, feld('nutzer'));
+    echtesModal.swapFieldsKeepingDirtyBase(panel, () => { felder.push(feld('x')); });
+    assert.equal(felder.map((f) => f.id).join(','), 'a,nutzer,b,x', 'Vorbedingung');
+    assert.equal(echtesModal.__test.isFormDirty(panel), true, 'die Zeile des Nutzers bleibt eine Aenderung');
+    felder.splice(1, 1);
+    assert.equal(echtesModal.__test.isFormDirty(panel), false, 'ohne sie ist der Dialog sauber');
+  } finally {
+    echtesModal.__test.releaseOverlayForTest();
+  }
+});
+
+test('#1784: zwei hinzugefuegte Felder stehen in der Basis in ihrer Reihenfolge, ein zurueckgebrachtes nur einmal', () => {
+  const feld = (id) => ({ type: 'text', id, name: '', value: '' });
+  const felder = [feld('a'), feld('b')];
+  const panel = { querySelectorAll: () => felder };
+  echtesModal.__test.adoptOverlayForTest({ querySelector: () => panel });
+  try {
+    echtesModal.swapFieldsKeepingDirtyBase(panel, () => { felder.splice(1, 0, feld('x'), feld('y')); });
+    assert.equal(felder.map((f) => f.id).join(','), 'a,x,y,b', 'Vorbedingung');
+    assert.equal(echtesModal.__test.isFormDirty(panel), false, 'x vor y, wie im Formular');
+    // Der Nutzer nimmt b weg, und ein Tausch bringt DASSELBE Feld zurueck: es
+    // stand schon in der Basis und kommt kein zweites Mal hinein.
+    const [b] = felder.splice(3, 1);
+    assert.equal(echtesModal.__test.isFormDirty(panel), true, 'Vorbedingung: b fehlt');
+    // Derselbe Tausch nimmt y heraus - er ersetzt also, statt nur hinzuzufuegen.
+    echtesModal.swapFieldsKeepingDirtyBase(panel, () => { felder.splice(2, 1); felder.push(b); });
+    assert.equal(felder.map((f) => f.id).join(','), 'a,x,b', 'Vorbedingung');
+    assert.equal(echtesModal.__test.isFormDirty(panel), false);
+  } finally {
+    echtesModal.__test.releaseOverlayForTest();
+  }
+});

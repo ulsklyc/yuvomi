@@ -37,6 +37,7 @@ import {
   isSsoOnlyAccount,
   OIDC_PASSWORD_SENTINEL,
   getConfig as getOidcConfig,
+  exchangeAuthorizationCode,
   describeOidcError,
 } from './services/oidc.js';
 import { emailService as defaultEmailService } from './services/email.js';
@@ -1311,10 +1312,13 @@ function ssoLinkCandidates(database, address, { excludeUserId = null } = {}) {
  *   haben.
  * Rückgabe dann `{ refused, accountIds }` statt einer users-Zeile.
  *
- * Ausnahme: `OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM=true` — Opt-in für IdPs, die
- * den Claim zwar weglassen, aber nur verifizierte Adressen ausgeben (z. B. ältere
- * Authentik-Deployments). Nur setzen, wenn der IdP vollständig unter eigener
- * Kontrolle steht und keine unverifizierten E-Mails zulässt.
+ * Ausnahme: `OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM=true` - Opt-in für IdPs, die
+ * den Claim zwar weglassen, aber nur verifizierte Adressen ausgeben. Nur setzen,
+ * wenn der IdP vollständig unter eigener Kontrolle steht und keine
+ * unverifizierten E-Mails zulässt. Das Opt-in deckt NUR den fehlenden Claim: ein
+ * ausdrückliches `email_verified: false` verknüpft nie. Authentik ist dafür kein
+ * Beispiel - sein Standard-Mapping sendete bis 2025.10 `true` und sendet seither
+ * `false`, weggelassen hat es den Claim nicht (#1780).
  *
  * Mit `OIDC_ALLOW_SIGNUP=false` entfällt ausschließlich der letzte Schritt, das
  * Anlegen (#654); die Rückgabe ist dann `null`. Erkennen und Verknüpfen laufen
@@ -2284,14 +2288,19 @@ async function beginOidcFlow(req, config, extra = {}) {
   const codeVerifier  = oidcClient.randomPKCECodeVerifier();
   const codeChallenge = await oidcClient.calculatePKCECodeChallenge(codeVerifier);
 
-  req.session.oidc = { state, nonce, codeVerifier, ...extra };
+  // Der Wert, den die Authorize-Anfrage traegt, wird EINMAL gelesen und mit dem
+  // Lauf festgehalten: der Code-Tausch muss ihn Zeichen fuer Zeichen
+  // wiederholen (RFC 6749, 4.1.3) und leitet ihn deshalb nicht neu her (#1768).
+  const redirectUri = process.env.OIDC_REDIRECT_URI;
+
+  req.session.oidc = { state, nonce, codeVerifier, redirectUri, ...extra };
 
   await new Promise((resolve, reject) =>
     req.session.save(err => (err ? reject(err) : resolve()))
   );
 
   return oidcClient.buildAuthorizationUrl(config, {
-    redirect_uri:          process.env.OIDC_REDIRECT_URI,
+    redirect_uri:          redirectUri,
     scope:                 'openid email profile',
     state,
     nonce,
@@ -2405,16 +2414,28 @@ router.get('/oidc/callback', refuseWhileRestoring, async (req, res) => {
       return res.redirect('/login?error=oidc_state_mismatch');
     }
 
-    // Aktuelle Callback-URL: Host/Schema aus der registrierten redirect_uri (zuverlässig
-    // hinter Reverse-Proxy), Query (code, state, …) aus der eingehenden Anfrage.
-    const currentUrl = new URL(req.originalUrl, process.env.OIDC_REDIRECT_URI);
+    // Ein Lauf ohne festgehaltene Redirect-URI (vor dem Update begonnen) wird
+    // abgewiesen statt mit einem neu hergeleiteten Wert getauscht: der Anbieter
+    // vergleicht mit dem Wert der Authorize-Anfrage, und raten hiesse, genau
+    // den Fehler aus #1768 zu wiederholen. Ein zweiter Klick startet neu.
+    if (typeof stored.redirectUri !== 'string' || !stored.redirectUri) {
+      log.warn('OIDC callback: Session-State ohne redirect_uri (vor dem Update begonnen)');
+      return res.redirect('/login?error=oidc_state_mismatch');
+    }
 
-    // authorizationCodeGrant validiert state, tauscht den Code gegen Tokens und prüft
-    // Signatur, iss, aud, exp sowie nonce (über expectedNonce) am ID-Token.
-    const tokens = await oidcClient.authorizationCodeGrant(config, currentUrl, {
-      expectedState:    stored.state,
-      expectedNonce:    stored.nonce,
-      pkceCodeVerifier: stored.codeVerifier,
+    // Der Tausch sendet die redirect_uri der Authorize-Anfrage woertlich; von
+    // der eingehenden Anfrage kommt nur die Query (code, state, ...), weder
+    // Pfad noch Host oder Schema (#1768). Er validiert state, tauscht den Code
+    // gegen Tokens und prüft Signatur, iss, aud, exp sowie nonce am ID-Token.
+    const queryStart = req.originalUrl.indexOf('?');
+    const tokens = await exchangeAuthorizationCode(config, {
+      redirectUri: stored.redirectUri,
+      query:       queryStart === -1 ? '' : req.originalUrl.slice(queryStart),
+      checks: {
+        expectedState:    stored.state,
+        expectedNonce:    stored.nonce,
+        pkceCodeVerifier: stored.codeVerifier,
+      },
     });
 
     // Identität aus dem validierten ID-Token; fetchUserInfo erzwingt sub-Abgleich

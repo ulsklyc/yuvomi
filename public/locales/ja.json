@@ -5386,6 +5386,8 @@
         "importNewTypeNameRequiredError": "新しいごみの種類の名前を入力してください。",
         "importDefaultSourceName": "インポートされたファイル",
         "importCommittedToast": "インポートを反映しました: {{added}} 件追加、{{changed}} 件変更、{{removed}} 件削除。",
+        "importPreviewChangedError": "プレビュー後にカレンダーが変更されました。インポートをやり直してください。",
+        "importSourceChangedError": "このソースはその間に変更されました。インポートをやり直してください。",
         "sourcesSectionTitle": "インポート元",
         "sourceNameLabel": "名前",
         "sourceCoverageLabel": "対象期間",

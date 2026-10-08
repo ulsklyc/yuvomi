@@ -5386,6 +5386,8 @@
         "importNewTypeNameRequiredError": "Veuillez saisir un nom pour le nouveau type de déchet.",
         "importDefaultSourceName": "Fichier importé",
         "importCommittedToast": "Import validé : {{added}} ajoutées, {{changed}} modifiées, {{removed}} supprimées.",
+        "importPreviewChangedError": "Le calendrier a changé depuis l'aperçu. Relance l'import.",
+        "importSourceChangedError": "Cette source a changé entre-temps. Relance l'import.",
         "sourcesSectionTitle": "Sources d'import",
         "sourceNameLabel": "Nom",
         "sourceCoverageLabel": "Couverture",

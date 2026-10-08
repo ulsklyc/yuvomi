@@ -5386,6 +5386,8 @@
         "importNewTypeNameRequiredError": "Masukkan nama untuk jenis sampah baru.",
         "importDefaultSourceName": "File yang diimpor",
         "importCommittedToast": "Impor diterapkan: {{added}} ditambahkan, {{changed}} diubah, {{removed}} dihapus.",
+        "importPreviewChangedError": "Kalender telah berubah sejak pratinjau. Mulai ulang impor.",
+        "importSourceChangedError": "Sumber ini telah berubah sementara itu. Mulai ulang impor.",
         "sourcesSectionTitle": "Sumber impor",
         "sourceNameLabel": "Nama",
         "sourceCoverageLabel": "Cakupan",

@@ -5386,6 +5386,8 @@
         "importNewTypeNameRequiredError": "Ange ett namn för den nya avfallstypen.",
         "importDefaultSourceName": "Importerad fil",
         "importCommittedToast": "Importen tillämpades: {{added}} tillagda, {{changed}} ändrade, {{removed}} borttagna.",
+        "importPreviewChangedError": "Kalendern har ändrats sedan förhandsgranskningen. Starta importen igen.",
+        "importSourceChangedError": "Den här källan har ändrats under tiden. Starta importen igen.",
         "sourcesSectionTitle": "Importkällor",
         "sourceNameLabel": "Namn",
         "sourceCoverageLabel": "Täckning",

@@ -5518,6 +5518,8 @@
         "importNewTypeNameRequiredError": "Zadejte prosím název nového druhu odpadu.",
         "importDefaultSourceName": "Importovaný soubor",
         "importCommittedToast": "Import použit: přidáno {{added}}, změněno {{changed}}, odebráno {{removed}}.",
+        "importPreviewChangedError": "Kalendář se od náhledu změnil. Spusť import znovu.",
+        "importSourceChangedError": "Tento zdroj se mezitím změnil. Spusť import znovu.",
         "sourcesSectionTitle": "Zdroje importu",
         "sourceNameLabel": "Název",
         "sourceCoverageLabel": "Rozsah",

@@ -25,9 +25,15 @@ export class WasteValidationError extends Error {
 }
 
 export class WasteConflictError extends Error {
-  constructor(message) {
+  /**
+   * @param {string} message English sentence for logs and API consumers
+   * @param {string|null} [reason] stable machine-readable code the response carries next to the
+   *   sentence, so the client can say it in the household language instead of showing this one
+   */
+  constructor(message, reason = null) {
     super(message);
     this.name = 'WasteConflictError';
+    this.reason = reason;
   }
 }
 
@@ -640,7 +646,7 @@ export function commitImport(d, {
   const source = sourceId ? getSource(d, sourceId) : null;
   if (sourceId && !source) throw new WasteNotFoundError('Waste import source not found.');
   if (source && expectedVersion !== source.version) {
-    throw new WasteConflictError('This source changed since you last previewed it; preview again before committing.');
+    throw new WasteConflictError('This source changed since you last previewed it; preview again before committing.', 'source_changed');
   }
 
   // content_hash storage only - NOT the commit concurrency guard below (see
@@ -666,14 +672,15 @@ export function commitImport(d, {
     throw err;
   }
 
-  // Compares against what the preview actually SHOWED (candidates/labels/
-  // diagnostics), not the raw bytes behind it - a URL source's preview and
-  // this commit each fetch the URL independently, and two fetches of the
-  // same underlying feed routinely differ in bytes that don't change the
-  // parsed result (a request-time DTSTAMP, incidental whitespace, ...).
-  // Comparing raw bytes made every such source refuse every commit forever.
+  // Compares against what the preview actually SHOWED (which label on which
+  // day, the counts, the diagnostics), not the raw bytes behind it and not the
+  // feed's UIDs - a URL source's preview and this commit each fetch the URL
+  // independently, and two fetches of the same underlying feed routinely
+  // differ in things that don't change a single pickup (a request-time
+  // DTSTAMP, a UID minted per request - #1795). Comparing those made every
+  // such source refuse every commit forever.
   if (previewDigest && previewDigest !== preview.digest) {
-    throw new WasteConflictError('The file content changed since you last previewed it; preview again before committing.');
+    throw new WasteConflictError('The calendar content changed since you last previewed it; preview again before committing.', 'preview_changed');
   }
 
   const skipSet = new Set(skipEventKeys);
@@ -752,7 +759,7 @@ export function commitImport(d, {
       // Wirft INNERHALB der Transaktion, rollt also alles bereits Geschriebene
       // dieses Commits zurueck - der letzte gute Stand bleibt unberuehrt.
       if (swapped.changes !== 1) {
-        throw new WasteConflictError('This source changed since you last previewed it; preview again before committing.');
+        throw new WasteConflictError('This source changed since you last previewed it; preview again before committing.', 'source_changed');
       }
     } else {
       const result = d.prepare(`
@@ -790,21 +797,72 @@ export function commitImport(d, {
     const updateStmt = d.prepare(`
       UPDATE waste_imported_pickups SET type_id = ?, external_uid = ?, original_summary = ?, date_key = ?, tz_note = ? WHERE id = ?
     `);
+    // Pass 1: match by identity, the normal case of a feed with stable UIDs.
+    const unmatchedCandidates = [];
     for (const c of keptCandidates) {
       nextIdentities.add(c.identity_key);
       const typeId = resolvedTypeIdByLabel.get(c.normalized_label);
       const existingRow = existingByIdentity.get(c.identity_key);
       if (!existingRow) {
-        insertStmt.run(resolvedSourceId, typeId, c.identity_key, c.external_uid, c.original_summary, c.date_key, c.tz_note);
-        added++;
+        unmatchedCandidates.push(c);
       } else if (existingRow.type_id !== typeId || existingRow.date_key !== c.date_key
         || existingRow.original_summary !== c.original_summary || existingRow.tz_note !== c.tz_note) {
         updateStmt.run(typeId, c.external_uid, c.original_summary, c.date_key, c.tz_note, existingRow.id);
         changed++;
       }
     }
+
+    // Pass 2 (#1795): what identity did not match is paired by what the pickup
+    // IS - this source, this type, this day. A feed that mints a new UID for
+    // every event on every request (limburg.net) has no identity that survives
+    // a second fetch, so without this pass every refresh deleted every row and
+    // inserted it again: a full turnover reported for a calendar in which
+    // nothing moved, on every scheduled run. The row keeps its id and takes
+    // over the identity the feed uses NOW, so a feed whose UIDs are stable
+    // after all is matched in pass 1 again from the next import on. Rows are
+    // handed out one per candidate (a queue per type and day), so two pickups
+    // of one type on one day stay two rows.
+    //
+    // The TYPE is half of the key on purpose: a row of another type on the
+    // same day is another pickup, never a partner. And within one type and
+    // day the wording decides before the position does: two labels mapped to
+    // one type ("Rest 2w", "Rest 4w") on the same day are told apart by their
+    // summary, so a provider that merely lists them in another order does not
+    // cross the rows and get two "changes" reported. Hence two rounds - first
+    // every candidate that finds a row with its own summary, and only then
+    // the rest in order. One round with a mere preference would let an
+    // earlier candidate without a namesake take the row a later one matches.
+    const orphanRowsByFact = new Map();
     for (const row of existingRows) {
-      if (!nextIdentities.has(row.identity_key)) {
+      if (nextIdentities.has(row.identity_key)) continue;
+      const fact = `${row.type_id}|${row.date_key}`;
+      if (!orphanRowsByFact.has(fact)) orphanRowsByFact.set(fact, []);
+      orphanRowsByFact.get(fact).push(row);
+    }
+    const rekeyStmt = d.prepare(`
+      UPDATE waste_imported_pickups SET identity_key = ?, external_uid = ?, original_summary = ?, tz_note = ? WHERE id = ?
+    `);
+    const orphansFor = (c) => orphanRowsByFact.get(`${resolvedTypeIdByLabel.get(c.normalized_label)}|${c.date_key}`) ?? [];
+    const rowByCandidate = new Map();
+    for (const c of unmatchedCandidates) {
+      const orphans = orphansFor(c);
+      const namesake = orphans.findIndex((row) => row.original_summary === c.original_summary);
+      if (namesake !== -1) rowByCandidate.set(c, orphans.splice(namesake, 1)[0]);
+    }
+    for (const c of unmatchedCandidates) {
+      const typeId = resolvedTypeIdByLabel.get(c.normalized_label);
+      const row = rowByCandidate.get(c) ?? orphansFor(c).shift();
+      if (!row) {
+        insertStmt.run(resolvedSourceId, typeId, c.identity_key, c.external_uid, c.original_summary, c.date_key, c.tz_note);
+        added++;
+        continue;
+      }
+      rekeyStmt.run(c.identity_key, c.external_uid, c.original_summary, c.tz_note, row.id);
+      // A new name for the same pickup is no change; a new wording or time note is.
+      if (row.original_summary !== c.original_summary || row.tz_note !== c.tz_note) changed++;
+    }
+    for (const rows of orphanRowsByFact.values()) {
+      for (const row of rows) {
         d.prepare('DELETE FROM waste_imported_pickups WHERE id = ?').run(row.id);
         removed++;
       }

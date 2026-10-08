@@ -5386,6 +5386,8 @@
         "importNewTypeNameRequiredError": "Adjon nevet az új hulladéktípusnak.",
         "importDefaultSourceName": "Importált fájl",
         "importCommittedToast": "Az import alkalmazva: {{added}} hozzáadva, {{changed}} módosítva, {{removed}} eltávolítva.",
+        "importPreviewChangedError": "A naptár megváltozott az előnézet óta. Indítsd újra az importálást.",
+        "importSourceChangedError": "Ez a forrás időközben megváltozott. Indítsd újra az importálást.",
         "sourcesSectionTitle": "Importforrások",
         "sourceNameLabel": "Név",
         "sourceCoverageLabel": "Lefedettség",

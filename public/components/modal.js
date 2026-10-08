@@ -18,6 +18,8 @@
  *   mountFooter(panel)             → hebt eine neu gerenderte Fußzeile ans Panel
  *   decorateFooterDelete(footer)   → erkennt Löschen im Fuß (mobil Icon-Knopf)
  *   refreshDirtySnapshot()         → Dirty-Basis auf den jetzigen Stand setzen
+ *   swapFieldsKeepingDirtyBase(panel, swap) → Felder im offenen Formular
+ *                                    tauschen, ohne dass der Tausch als Eingabe zählt
  *   focusFirstField(panel)         → Fokus nach dem Pane-Wechsel, touch-bewusst
  *   updateHeaderAction(panel, …)   → Beschriftung/Handler des Kopf-Buttons tauschen
  */
@@ -35,7 +37,13 @@ let previouslyFocused = null;
 // zurueck, wenn die Seite erst nach einem `await` fertig gerendert hat.
 let _lastRestore = null;
 let focusTrapHandler = null;
+// Die Dirty-Basis des offenen Formulars: `{ fields, entries }` - die Felder vom
+// Snapshot und je Feld sein Eintrag (siehe _takeDirtyBase).
 let _initialFormSnapshot = null;
+// Dieselbe Basis, auffindbar ueber ihr Panel - auch waehrend das Formular unter
+// einer Rueckfrage geparkt ist und `_initialFormSnapshot` dem Dialog darueber
+// gehoert (swapFieldsKeepingDirtyBase).
+const _dirtyBaseByPanel = new WeakMap();
 let _initialFormTimeout = null;
 let _modalFormSeq = 0;
 // Monotone Kennung des zuletzt tatsaechlich eingesetzten Shared-Modals. Ein
@@ -418,10 +426,13 @@ export function focusFirstField(panel) {
 // fieldsets: a real field that starts disabled/hidden (e.g. a conditional
 // fieldset a mode enables) must still count once it holds typed content.
 function serializeForm(container) {
-  const inputs = container.querySelectorAll(
+  return formFields(container).map(serializeField).join('&');
+}
+
+function formFields(container) {
+  return Array.from(container.querySelectorAll(
     'input:not([type="file"]):not([data-dirty-ignore]), select:not([data-dirty-ignore]), textarea:not([data-dirty-ignore])'
-  );
-  return Array.from(inputs).map(serializeField).join('&');
+  ));
 }
 
 // EIN HAKEN IST SEIN ZUSTAND, NICHT SEIN WERT (#1775). Eine Checkbox traegt
@@ -440,12 +451,24 @@ function isFormDirty(container) {
   // Ein Ansichtsblatt hat nichts Ungespeichertes - siehe _dirtyGuardEnabled.
   if (!_dirtyGuardEnabled) return false;
   if (_initialFormSnapshot === null) return false;
-  return serializeForm(container) !== _initialFormSnapshot;
+  return serializeForm(container) !== _initialFormSnapshot.entries.join('&');
+}
+
+// Die Basis steht JE FELD da, nicht als ein Text, und merkt sich das ELEMENT
+// zu jedem Eintrag: nur so laesst sich spaeter sagen, welcher Eintrag zu
+// welchem Feld gehoert, egal wie viele Felder inzwischen dazukamen oder
+// gingen (swapFieldsKeepingDirtyBase). Verglichen wird weiter der eine Text -
+// fuer jeden Dialog, der nie Felder tauscht, ist das der Vergleich von immer.
+function _takeDirtyBase(panel) {
+  const fields = formFields(panel);
+  const base = { fields, entries: fields.map(serializeField) };
+  _dirtyBaseByPanel.set(panel, base);
+  return base;
 }
 
 function _snapshotNow() {
   if (!activeOverlay) return;
-  _initialFormSnapshot = serializeForm(activeOverlay.querySelector('.modal-panel') ?? activeOverlay);
+  _initialFormSnapshot = _takeDirtyBase(activeOverlay.querySelector('.modal-panel') ?? activeOverlay);
 }
 
 /**
@@ -464,6 +487,78 @@ export function refreshDirtySnapshot() {
   _snapshotNow();
   if (_initialFormTimeout) clearTimeout(_initialFormTimeout);
   _initialFormTimeout = setTimeout(_snapshotNow, 150);
+}
+
+/**
+ * Tauscht Felder im offenen Formular, ohne dass der Tausch als Eingabe zaehlt
+ * (#1784).
+ *
+ * Wer einem offenen Dialog Felder NACHREICHT (eine Auswahl, deren Optionen erst
+ * jetzt geladen sind), veraendert, was `serializeForm` liest - und das
+ * Schliessen fragt "Aenderungen verwerfen?", obwohl niemand etwas angefasst
+ * hat. `refreshDirtySnapshot()` waere hier die falsche Antwort: es friert den
+ * JETZIGEN Stand ein und damit auch, was der Nutzer inzwischen getippt hat -
+ * das Schliessen ginge ohne Frage durch, und die Eingabe waere still weg.
+ *
+ * Deshalb je ELEMENT. Die Basis kennt zu jedem Eintrag sein Feld:
+ *   - was der Tausch ENTFERNT, faellt aus der Basis;
+ *   - was er NEU bringt, geht mit dem Stand hinein, den `swap` ihm gegeben hat,
+ *     an der Stelle, an der es im Formular steht;
+ *   - alles andere bleibt, wie es war. Eine getippte Eingabe bleibt eine
+ *     Aenderung, und wer sie zuruecknimmt, ist wieder sauber. Eine Zeile, die
+ *     der Nutzer vor dem Tausch hinzugefuegt hat, bleibt ebenfalls eine - sie
+ *     war schon da und kommt deshalb NICHT in die Basis; nimmt er sie wieder
+ *     weg, steht der Dialog im Oeffnungszustand.
+ *
+ * Die Basis wird ueber das Panel gefunden und AN ORT UND STELLE geaendert. Sie
+ * ist dasselbe Objekt, das ein geparktes Formular in seinem Token traegt - der
+ * Tausch erreicht es also auch unter einer Rueckfrage, und das Zurueckholen
+ * bringt die nachgefuehrte Basis mit.
+ *
+ * `swap` laeuft synchron und IMMER - auch fuer ein Panel ohne Basis.
+ *
+ * @param {Element} panel - das `.modal-panel`, das `onSave` bekommen hat
+ * @param {() => void} swap - der Tausch samt allem, was die neuen Felder
+ *   programmatisch setzt (Vorauswahl), bevor der Nutzer sie zu sehen bekommt
+ */
+export function swapFieldsKeepingDirtyBase(panel, swap) {
+  const base = _dirtyBaseByPanel.get(panel) ?? null;
+  const before = base ? new Set(formFields(panel)) : null;
+  swap();
+  if (!base) return;
+  const after = formFields(panel);
+  const present = new Set(after);
+  // Vom Tausch entfernt: vorher da, jetzt weg. Was schon VOR dem Tausch
+  // fehlte, hat der Nutzer entfernt - das bleibt als Aenderung in der Basis.
+  const swappedOut = (el) => before.has(el) && !present.has(el);
+  const rows = base.fields.map((el, i) => [el, base.entries[i]]).filter(([el]) => !swappedOut(el));
+  const known = new Set(rows.map(([el]) => el));
+  // Neu ist, was weder vorher da war noch in der Basis steht. Was vorher da
+  // war und nicht in der Basis steht, hat der Nutzer hinzugefuegt.
+  const added = after.filter((el) => !known.has(el) && !before.has(el));
+  const gap = base.fields.findIndex(swappedOut);
+  if (gap >= 0) {
+    // Der Tausch ERSETZT: das Neue nimmt den Platz dessen ein, was er entfernt
+    // hat - gezaehlt in der Basis, nicht im Formular, denn dort koennen Zeilen
+    // des Nutzers dazwischenstehen oder fehlen.
+    // `gap` ist das ERSTE Entfernte - davor steht also nichts, was fehlt.
+    rows.splice(gap, 0, ...added.map((el) => [el, serializeField(el)]));
+  } else {
+    // Der Tausch fuegt nur HINZU: hinter das naechste Feld davor, das die
+    // Basis kennt.
+    const fresh = new Set(added);
+    let anchor = null;
+    for (const el of after) {
+      if (known.has(el)) { anchor = el; continue; }
+      if (!fresh.has(el)) continue;
+      const at = anchor ? rows.findIndex(([row]) => row === anchor) + 1 : 0;
+      rows.splice(at, 0, [el, serializeField(el)]);
+      known.add(el);
+      anchor = el;
+    }
+  }
+  base.fields = rows.map(([el]) => el);
+  base.entries = rows.map(([, entry]) => entry);
 }
 
 // --------------------------------------------------------
@@ -555,7 +650,7 @@ function _suspendActiveModal() {
     // hier: das gleich folgende openModal löscht den ausstehenden Timer, und ein
     // null-Snapshot schaltet isFormDirty() für die restliche Lebensdauer des
     // Formulars ab - der Dirty-Guard wäre danach still tot.
-    snapshot: _initialFormSnapshot ?? (panel ? serializeForm(panel) : null),
+    snapshot: _initialFormSnapshot ?? (panel ? _takeDirtyBase(panel) : null),
     // Mit demselben Grund wie der Snapshot daneben: der Dialog, der sich gleich
     // darüberlegt, läuft selbst durch openModal() und setzt den Wächter dabei
     // auf seinen Standardwert. Ohne dieses Merken käme ein geparktes
@@ -2008,6 +2103,23 @@ export const askOverModal = createAskOverModal();
 /** Nur fuer Tests: Gesten und Bestaetigungen ohne echtes Panel treiben. */
 export const __test = {
   serializeForm,
+  // #1784: die Dirty-Basis als Programm - ein Overlay ohne openModal() zum
+  // offenen Formular erklaeren (Basis sofort, ohne den 150-ms-Nachlauf), den
+  // Waechter fragen und wieder aufraeumen.
+  isFormDirty,
+  adoptOverlayForTest(overlay) {
+    activeOverlay = overlay;
+    _dirtyGuardEnabled = true;
+    _snapshotNow();
+  },
+  releaseOverlayForTest() {
+    activeOverlay = null;
+    _initialFormSnapshot = null;
+  },
+  // Das echte Parken und Zurueckholen (confirmOverModal/askOverModal), ohne
+  // den Dialog dazwischen: die Basis wandert im Token mit.
+  suspendActiveModal: _suspendActiveModal,
+  resumeSuspendedModal: _resumeSuspendedModal,
   wireSheetSwipe: _wireSheetSwipe,
   createConfirmOverModal,
   createAskOverModal,

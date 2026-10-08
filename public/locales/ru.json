@@ -5648,6 +5648,8 @@
         "importNewTypeNameRequiredError": "Введите название для нового вида отходов.",
         "importDefaultSourceName": "Импортированный файл",
         "importCommittedToast": "Импорт применён: добавлено {{added}}, изменено {{changed}}, удалено {{removed}}.",
+        "importPreviewChangedError": "Календарь изменился после просмотра. Запусти импорт заново.",
+        "importSourceChangedError": "Этот источник тем временем изменился. Запусти импорт заново.",
         "sourcesSectionTitle": "Источники импорта",
         "sourceNameLabel": "Название",
         "sourceCoverageLabel": "Охват",

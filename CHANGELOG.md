@@ -167,6 +167,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A wall tablet no longer offers to rearrange the overview or to search** (#1808). A paired
+  display showed the "Customise" button, let you rearrange the tiles, and answered "Done" with
+  "Token scope does not permit this operation." - a display changes no settings, and that
+  includes its own board. The search button beside it failed the same way. Both are gone on a
+  display. To decide what the tablet shows, arrange the overview as an administrator and choose
+  "Set as household default" while customising: a display never stores an arrangement of its
+  own, so it always follows that default.
+- **Waste: a calendar URL whose provider renames every entry on each download can be imported**
+  (#1795). Some providers hand out a new internal ID for every pickup each time the calendar is
+  fetched (limburg.net does). Yuvomi fetches the address once for the preview and once more to
+  apply it, took the new IDs for new content and refused every time with "The file content
+  changed since you last previewed it". The check now compares what the preview shows - which
+  waste type on which day, and how many - so the import goes through, and a calendar that really
+  changed in between is still refused. Later refreshes of such an address no longer report every
+  pickup as removed and added again. The refusal itself is now shown in the app's language.
+- **SSO sign-in no longer fails when `OIDC_REDIRECT_URI` is written differently from how a URL
+  is normally printed.** The first request to the provider sent the value exactly as written,
+  the second one - the code exchange - a rebuilt form of it, with the path of the incoming
+  request. The two differed with a default port written out (`https://host:443/...`), capital
+  letters in the host name, a query of its own, or a path the reverse proxy rewrites. A provider
+  has to refuse such an exchange, so the sign-in failed with `invalid_grant` after the login at
+  the provider had looked successful. Both requests now carry the same value, character for
+  character; the same goes for linking an account under Settings. Nothing changes for an
+  installation whose value was already in its plain form. A sign-in that is under way while the
+  update is installed is refused once and works on the second click (#1768).
+- **The installation guide says what `OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM` does not do.** It
+  covers a provider that leaves `email_verified` out, not one that sends `email_verified: false`,
+  which authentik does by default since 2025.10. The guide and `.env.example` now name the fix
+  on the provider side (#1780).
 - **Blood pressure and its unit stay on one line in the health tiles.** In a narrow tile "mmHg"
   dropped below "116/74". The size of the value used to follow the width of the whole row of
   tiles, which says little where the row fills itself with as many tiles as fit; it now follows
@@ -247,6 +276,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the three light circles of the app icon - and it no longer changes with the theme.
 - **A confirmation without an explanation has no empty gap.** Dialogs such as "Log out of this
   device?" showed an empty band between two hairlines, between the question and its buttons.
+- **A meal dialog you did not touch no longer asks "Discard changes?".** If the household members
+  could not be loaded with the page, the meal dialog fetches them when it opens and fills in the
+  cook selection a moment later. Closing the dialog after that asked whether to discard changes,
+  although nothing had been changed. What you typed before the selection arrived still counts as
+  a change, as it should.
+- **Fast clicks on the month arrows in the budget land on the right month.** Clicking "next"
+  twice while a month was still loading moved one month instead of two, and going forward and
+  straight back could leave the wrong month on screen - whichever answer arrived last won. Each
+  click now counts from the month you asked for, and a late answer for a month you already left
+  is ignored. The same holds for "Current" and for swiping.
 
 ## [2.75.0] - 2026-10-07
 

@@ -5648,6 +5648,8 @@
         "importNewTypeNameRequiredError": "Wpisz nazwę nowego rodzaju odpadów.",
         "importDefaultSourceName": "Zaimportowany plik",
         "importCommittedToast": "Import zastosowany: dodano {{added}}, zmieniono {{changed}}, usunięto {{removed}}.",
+        "importPreviewChangedError": "Kalendarz zmienił się od czasu podglądu. Rozpocznij import ponownie.",
+        "importSourceChangedError": "To źródło zostało w międzyczasie zmienione. Rozpocznij import ponownie.",
         "sourcesSectionTitle": "Źródła importu",
         "sourceNameLabel": "Nazwa",
         "sourceCoverageLabel": "Zakres",

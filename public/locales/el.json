@@ -5386,6 +5386,8 @@
         "importNewTypeNameRequiredError": "Εισαγάγετε ένα όνομα για τον νέο τύπο απορριμμάτων.",
         "importDefaultSourceName": "Εισαγόμενο αρχείο",
         "importCommittedToast": "Η εισαγωγή εφαρμόστηκε: {{added}} προστέθηκαν, {{changed}} άλλαξαν, {{removed}} αφαιρέθηκαν.",
+        "importPreviewChangedError": "Το ημερολόγιο άλλαξε μετά την προεπισκόπηση. Ξεκίνα ξανά την εισαγωγή.",
+        "importSourceChangedError": "Αυτή η πηγή άλλαξε στο μεταξύ. Ξεκίνα ξανά την εισαγωγή.",
         "sourcesSectionTitle": "Πηγές εισαγωγής",
         "sourceNameLabel": "Όνομα",
         "sourceCoverageLabel": "Κάλυψη",

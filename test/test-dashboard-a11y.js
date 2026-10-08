@@ -252,6 +252,30 @@ test('die globale Suche ist von der Uebersicht mit einem Tipp erreichbar, und ni
   assert.doesNotMatch(editing, /id="dashboard-search"/, 'im Anpassen-Modus zaehlt nur Abbrechen oder Speichern');
 });
 
+test('am Wandtablett bietet der Kopf weder Anpassen noch die Suche an (#1808)', () => {
+  // Beide Knoepfe enden an einer Route, die ein Display nicht erreicht:
+  // `PUT /preferences` und `GET /search` antworten ihm mit 403 (gemessen am
+  // echten Server in test:display-account). Der Melder ordnete sein Brett um
+  // und bekam beim Speichern den englischen Rohtext der Scope-Sperre.
+  global.window ??= { yuvomi: null };
+  const mensch = renderDashboardOverview({ display_name: 'Linda' }, false, null, {});
+  // BEIM MENSCHEN ZUERST: eine Zusicherung ueber eine Abwesenheit braucht den
+  // Gegenfall, sonst ist sie auch gruen, wenn der Kopf die Knoepfe gar nicht
+  // mehr zeichnet.
+  assert.match(mensch, /id="dashboard-customize-btn"/, 'der Mensch behaelt den Einstieg');
+  assert.match(mensch, /id="dashboard-search"/, 'und die Suche');
+
+  const tablett = renderDashboardOverview({ display_name: 'Kueche', access_scope: 'display' }, false, null, {});
+  assert.doesNotMatch(tablett, /id="dashboard-customize-btn"/, 'kein Einstieg in eine Anordnung, die sich nicht speichern laesst');
+  assert.doesNotMatch(tablett, /id="dashboard-search"/, 'keine Suche, die nur 403 antworten kann');
+  // Der Wandmodus bleibt: er ist ein Zustand der Seite und schreibt nichts.
+  assert.match(tablett, /id="dashboard-wall-enter"/, 'der Wandmodus gehoert gerade an dieses Geraet');
+  // Ein Ausgaben-Gast oder ein anderes enges Konto ist nicht mitgemeint:
+  // `/preferences` steht ihnen offen.
+  const gast = renderDashboardOverview({ display_name: 'Gast', access_scope: 'split_guest' }, false, null, {});
+  assert.match(gast, /id="dashboard-customize-btn"/, 'die Regel haengt am Display, nicht an jedem engen Konto');
+});
+
 test('Abbrechen fragt nur, wenn es etwas zu verlieren gibt (H2)', () => {
   const saved = [{ id: 'tasks', visible: true, size: '2x1', order: 0 }, { id: 'notes', visible: true, size: '1x1', order: 1 }];
   const same = saved.map((w) => ({ ...w }));
