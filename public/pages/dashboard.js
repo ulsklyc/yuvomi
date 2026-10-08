@@ -1164,15 +1164,14 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
         sortKey: time || '00:01',
         timeLabel: overviewEventTime(event, span),
         title: event.title,
-        sub: t('dashboard.todayEvent'),
-        // Die Wand liest Herkunft und Spanne (#1698): der Name des Kalenders
-        // statt des Wortes „Termin", und hinter dem Beginn das Ende. Beides
-        // reist NEBEN `sub` und `timeLabel` mit, statt sie zu ersetzen: dieselbe Zeile
-        // zeichnet auch das Heute-Blatt der Uebersicht, und ob es mitzieht,
-        // ist in #1698 offen. Wer es umstellt, liest dort diese zwei Felder.
-        // Ein Termin, der nur in Yuvomi lebt, hat keinen Kalendernamen - er
-        // behaelt das Wort.
-        wallSub: String(event.cal_name ?? '').trim() || t('dashboard.todayEvent'),
+        // Die Herkunft statt des Wortes „Termin" (#1698): der Name des
+        // Kalenders, im Heute-Blatt wie an der Wand. „Frueh" ist erst mit
+        // „Niklas Arbeitskalender" darunter eine Auskunft. Ein Termin, der nur
+        // in Yuvomi lebt, hat keinen Kalendernamen - er behaelt das Wort.
+        sub: String(event.cal_name ?? '').trim() || t('dashboard.todayEvent'),
+        // Das ENDE bleibt der Wand vorbehalten (entschieden in #1698): es reist
+        // neben `timeLabel` mit, und nur `renderWallRow` schreibt es dahinter.
+        // Das Blatt nennt weiter den Beginn allein.
         wallTimeEnd: wallEventEnd(event, span),
         icon: 'calendar',
         tone: 'event',
@@ -5407,12 +5406,11 @@ const WALL_ROW_CAP = 4;
 
 /** Eine Programmzeile als reiner Text - kein href, kein data-route, kein Modal. */
 function renderWallRow(row) {
-  // Die Wand-Fassung einer Zeile, wo sie eine hat (#1698): der Termin nennt
-  // hier seinen Kalender und, hinter dem Beginn, sein Ende. Das Ende steht in
-  // einem eigenen Element, weil es auf einer Flaeche unter Tablettbreite
-  // weicht (dashboard.css): dort naehme „9:30 PM - 11:30 PM" dem Titel mehr
-  // als die halbe Zeile.
-  const sub = row.wallSub ?? row.sub;
+  // Der Termin nennt an der Wand, hinter dem Beginn, sein Ende (#1698). Es
+  // steht in einem eigenen Element, weil es auf einer Flaeche unter
+  // Tablettbreite weicht (dashboard.css): dort naehme „9:30 PM - 11:30 PM" dem
+  // Titel mehr als die halbe Zeile.
+  const sub = row.sub;
   const end = row.timeLabel && row.wallTimeEnd
     ? `<span class="wall-row__time-end"> - ${esc(row.wallTimeEnd)}</span>`
     : '';

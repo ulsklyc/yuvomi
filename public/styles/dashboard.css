@@ -2659,10 +2659,22 @@ svg.weather-forecast__icon {
 
 /* Modul-Label als ruhiger Untertitel (Footnote, Sekundaerfarbe) - nie versal,
  * nie ueber dem Titel (Craft-Floor-Bann Eyebrow). */
+/* EINE ZEILE (#1698). Seit die Unterzeile eines Termins den Namen seines
+ * Kalenders traegt, steht dort Nutzereingabe: „Familienkalender Schule, Vereine
+ * und alle Arzttermine" braeche auf dem Telefon um und machte die Zeile hoeher
+ * als ihre Nachbarn. Die Zustandskarte spricht in einem Satz und darf weiter
+ * umbrechen. */
 .today-cockpit-card__sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--color-text-secondary);
   font-size: var(--type-caption);
   line-height: var(--line-height-tight);
+}
+
+.today-cockpit-card--state .today-cockpit-card__sub {
+  white-space: normal;
 }
 
 /* Zeit als trailing Detail: die Programm-Zeile beantwortet „wann", nicht „wie

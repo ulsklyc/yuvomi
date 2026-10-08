@@ -17,9 +17,9 @@
  *        4. „Heute bis HH:MM" (#1534): die Faelligkeit einer Aufgabe wurde
  *           in der Zone des Geraets gelesen und dann in die des Haushalts
  *           umgerechnet - hier mit Prozesszone != Haushaltszone.
- *        5. Die Wand-Fassung der Terminzeile (#1698): Kalendername statt
- *           „Termin", Beginn UND Ende nur mit echtem Ende unter 24 Stunden,
- *           und das Heute-Blatt der Uebersicht bleibt, wie es war.
+ *        5. Die Terminzeile nennt ihren Kalender statt „Termin" (#1698), im
+ *           Heute-Blatt wie an der Wand; Beginn UND Ende zeigt nur die Wand,
+ *           und nur mit echtem Ende unter einem Tag auf der Wanduhr.
  *
  * Ausfuehren: npm run test:dashboard-today
  */
@@ -589,16 +589,38 @@ test('#1698 Wand: das Ende steht in einem eigenen Element - die schmale Flaeche 
   assert.match(css, /@container wall \(max-width: 519px\) \{\s*\.wall-row__time-end \{\s*display: none;/);
 }));
 
-test('#1698: das Heute-Blatt der Uebersicht bleibt, wie es war - die Frage ist offen', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
-  const events = [ev(1, 'Frueh', '2026-09-24T14:00', '2026-09-24T22:00', { cal_name: 'Niklas Arbeitskalender' })];
-  const [row] = dash.buildTodayProgram({ upcomingEvents: events }, { includeTasks: false, includeMeals: false, now: new Date() }).rows;
-  assert.equal(row.sub, 'dashboard.todayEvent');
-  assert.equal(row.timeLabel, '2026-09-24T14:00');
+test('#1698: das Heute-Blatt nennt den Kalender - die Spanne bleibt der Wand', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  const events = [
+    ev(1, 'Frueh', '2026-09-24T14:00', '2026-09-24T22:00', { cal_name: 'Niklas Arbeitskalender' }),
+    ev(2, 'Nur in Yuvomi', '2026-09-24T15:00', '2026-09-24T16:00'),
+    ev(3, 'Boese', '2026-09-24T16:00', '2026-09-24T17:00', { cal_name: '<img src=x>' }),
+  ];
+  const rows = dash.buildTodayProgram({ upcomingEvents: events }, { includeTasks: false, includeMeals: false, now: new Date() }).rows;
+  assert.deepEqual(rows.map((row) => [row.title, row.sub, row.timeLabel]), [
+    ['Frueh', 'Niklas Arbeitskalender', '2026-09-24T14:00'],
+    ['Nur in Yuvomi', 'dashboard.todayEvent', '2026-09-24T15:00'],
+    ['Boese', '<img src=x>', '2026-09-24T16:00'],
+  ]);
   const sheet = dash.renderTodayCockpit({ upcomingEvents: events, urgentTasks: [], users: [] }, []);
-  assert.match(sheet, /Frueh/, 'Reichweite: das Blatt zeigt den Termin');
-  assert.ok(!sheet.includes('Niklas Arbeitskalender'), 'das Blatt nennt den Kalender (noch) nicht');
-  assert.ok(!sheet.includes('2026-09-24T22:00'), 'und kein Ende');
+  assert.match(sheet, /today-cockpit-card__sub">Niklas Arbeitskalender</, 'das Blatt nennt den Kalender');
+  assert.match(sheet, /today-cockpit-card__sub">dashboard\.todayEvent</, 'ohne Kalendernamen bleibt das Wort');
+  assert.ok(sheet.includes('&lt;img src=x&gt;') && !sheet.includes('<img src=x>'), 'der Name ist Nutzereingabe und laeuft durch esc()');
+  assert.ok(!sheet.includes('2026-09-24T22:00'), 'kein Ende im Blatt: die Spanne bleibt der Wand vorbehalten');
+  assert.ok(!sheet.includes('wall-row__time-end'));
 }));
+
+test('#1698: die Unterzeile des Blatts bleibt eine Zeile, die Zustandskarte darf umbrechen', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)].filter((rule) => rule.at.length === 0);
+  const own = rules.find((rule) => rule.selector.trim() === '.today-cockpit-card__sub');
+  assert.ok(own, 'Reichweite: die Regel der Unterzeile');
+  assert.match(own.body, /white-space:\s*nowrap/);
+  assert.match(own.body, /text-overflow:\s*ellipsis/);
+  const state = rules.find((rule) => rule.selector.trim() === '.today-cockpit-card--state .today-cockpit-card__sub');
+  assert.match(state?.body ?? '', /white-space:\s*normal/);
+});
 
 // --- Nachzug aus dem Review von #1826 ---
 
@@ -641,8 +663,8 @@ test('#1698 Wand: genau 24 Stunden sind ein Tag - eine Minute weniger ist eine S
   })));
 
 test('#1698 Wand: eine Zeile ohne Wand-Fassung behaelt Untertitel und Zeit', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
-  // Nur der Termin traegt `wallSub`/`wallTimeEnd`. Aufgabe, Mahlzeit, Dosis
-  // und Abfall zeigen in `renderWallRow` ihr `sub` und ihr `timeLabel`.
+  // Nur der Termin traegt `wallTimeEnd`. Aufgabe, Mahlzeit, Dosis und Abfall
+  // zeigen in `renderWallRow` ihr `sub` und ihr `timeLabel` allein.
   const rows = wallRows([], { tasks: [dueToday(1, 'Muell', '18:00')], tone: 'task' });
   assert.equal(rows.length, 1, 'Reichweite: die Aufgabenzeile steht an der Wand');
   assert.equal(rows[0].title, 'Muell');

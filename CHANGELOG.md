@@ -15,16 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Wall mode shows which calendar an appointment comes from, and when it ends** (#1698, from
-  D#988). Every appointment in the day's programme carried the same word underneath, "Event".
-  It now shows the name of its calendar there, so "Early" reads as the shift from the work
-  calendar, and the time shows start and end ("06:00 - 14:00", or "6:00 AM - 2:00 PM" in the
-  12-hour format) instead of the start alone. An appointment that lives in Yuvomi only keeps
-  the word "Event". All-day appointments, ones carried over from yesterday and ones that run
-  for a day or longer read as before. On a phone-sized screen the wall keeps the start alone,
-  so the title keeps its room. The line under the title of every wall row is now a
-  single line: a long calendar name, or any other long text there, ends in an ellipsis instead
-  of wrapping.
+- **Today's programme says which calendar an appointment comes from, and the wall when it
+  ends** (#1698, from D#988). Every appointment in "Today at a glance" and on the wall carried
+  the same word underneath, "Event". It now shows the name of its calendar there, so "Early"
+  reads as the shift from the work calendar. An appointment that lives in Yuvomi only keeps the
+  word "Event". In wall mode the time also shows start and end ("06:00 - 14:00", or "6:00 AM -
+  2:00 PM" in the 12-hour format) instead of the start alone; all-day appointments, ones carried
+  over from yesterday and ones that run for a day or longer read as before, and on a phone-sized
+  screen the wall keeps the start alone so the title keeps its room. The line under a title is
+  now a single line in both places: a long calendar name, or any other long text there, ends in
+  an ellipsis instead of wrapping.
 - **Rows show fewer buttons.** Lists no longer carry a pencil and a bin on every line. Editing,
   deleting and anything further sit behind one "more" button per row that is always visible and
   names what it does in words. This applies to shopping items, birthdays, tasks, loan payments
