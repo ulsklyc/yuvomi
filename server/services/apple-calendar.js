@@ -30,7 +30,7 @@ import { rruleLine } from './recurrence.js';
 import { eventDateTimeFields } from '../utils/ics-datetime.js';
 import { vtimezoneFor } from '../utils/vtimezone.js';
 import { householdTimeZone } from '../utils/timezone.js';
-import { createCalDAVClient } from '../utils/caldav-client.js';
+import { createCalDAVClient, createUploadGate } from '../utils/caldav-client.js';
 import { nearestIcalColorName } from '../utils/ical-color.js';
 import { outboundEvent } from './outbound-dtstart.js';
 import { followInboundStartChange } from './calendar-occurrence-overrides.js';
@@ -188,11 +188,11 @@ async function testConnection() {
  * @returns {string}
  */
 function buildICS(event, householdZone = null) {
-  // UID-Format bewusst auf `oikos-…@oikos.local` belassen (kein Rebrand):
-  // bereits synchronisierte Events tragen diese UID auf dem entfernten CalDAV-Server
-  // und in external_calendar_id. Eine Änderung würde beim nächsten Sync Duplikate
-  // bzw. verwaiste Remote-Objekte erzeugen.
-  const uid   = `oikos-${event.id}@oikos.local`;
+  // Gebaut wird nur für einen Termin, der noch NICHT oben liegt; seine UID
+  // trägt die Kennung dieser Installation (own-uid.js). Bereits gespiegelte
+  // Termine behalten `oikos-…@oikos.local` auf dem Server und in
+  // external_calendar_id - umbenannt wird nichts, das gäbe Duplikate.
+  const uid   = outbound.eventUidFor(event.id);
   const now   = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
   // Zeiten samt Zone zentral (#938). Vorher schnitt dieser Pfad die Trennzeichen
   // aus dem gespeicherten Wert und schickte die Ziffern ohne Zonenangabe los -
@@ -415,9 +415,17 @@ async function runSync({ makeClient } = {}) {
           // anlegen, sonst kehrt der Termin bei jedem Sync zurück (#593).
           if (pendingDeletionUids.has(ev.uid)) continue;
 
-          const existing = db.get().prepare(
+          const selExisting = db.get().prepare(
             `SELECT id, outbound_dirty, calendar_ref_id, start_datetime FROM calendar_events WHERE external_calendar_id = ? AND external_source = 'apple'`
-          ).get(ev.uid);
+          );
+          let existing = selExisting.get(ev.uid);
+
+          // Der eigene Upload, dessen Antwort verloren ging: in die noch lokale
+          // Zeile übernehmen statt eine zweite anzulegen (wie im CalDAV-Sync).
+          if (!existing && obj.url
+              && outbound.adoptOwnEventUpload({ source: 'apple', uid: ev.uid, objectUrl: obj.url, calRefId })) {
+            existing = selExisting.get(ev.uid);
+          }
 
           // Eine lokale Bearbeitung, die noch auf ihren Push wartet, darf der
           // Inbound nicht mit dem alten Serverstand überschreiben (#593).
@@ -529,41 +537,35 @@ async function runSync({ makeClient } = {}) {
   // Einmal je Lauf: die Zone, an der naive Zeiten haengen (#938).
   const householdZone = householdTimeZone(db.get());
 
+  // Lehnt der Kalender ab (nur lesbar, Konto voll), träfe jeder weitere Termin
+  // dieses Laufs dieselbe Absage: nach der ersten ist Schluss, und es gibt EINE
+  // Zeile mit der Anzahl statt einer je Termin.
+  const uploadGate = createUploadGate();
   for (const event of localEvents) {
+    if (!defaultCal || uploadGate.isClosed(defaultCal.url)) continue;
     try {
-      const icsData  = buildICS(event, householdZone);
-      const uid      = `oikos-${event.id}@oikos.local`;
-      const filename = `${uid}.ics`;
+      const icsData = buildICS(event, householdZone);
+      const uid     = outbound.eventUidFor(event.id);
 
-      await client.createCalendarObject({
-        calendar:     defaultCal,
-        filename,
-        iCalString:   icsData,
-      });
+      // Ein 412 auf den eigenen Namen ist der eigene frühere Upload und wird
+      // übernommen (uploadNewEvent).
+      const { objectUrl, adopted } = await outbound.uploadNewEvent(client, defaultCal, uid, icsData);
 
-      // Objekt-URL und Kalenderzuordnung festhalten: ohne sie wäre der frisch
-      // hochgeladene Termin für spätere Änderungen und Löschungen unerreichbar,
-      // bis ihn der nächste Inbound-Lauf wiederfindet (#593).
-      const objectUrl = `${String(defaultCal.url).replace(/\/?$/, '/')}${filename}`;
       const calRefId  = upsertExternalCalendar(
         'apple', defaultCal.url, defaultCal.displayName || 'Apple Calendar',
         normalizeCalColor(defaultCal.calendarColor) || APPLE_COLOR
       );
-      // `color_modified` mit hoch: die gerade hinausgegangene Farbe ist unsere.
-      // Der CSS3-Name ist eine verlustbehaftete Abbildung des Hex-Werts - ohne
-      // das Flag holte der nächste Inbound-Lauf ihn zurück und ersetzte den
-      // exakten Wert durch den gerundeten (#899).
-      db.get().prepare(`
-        UPDATE calendar_events
-        SET external_calendar_id = ?, external_source = 'apple',
-            external_object_url = ?, calendar_ref_id = ?,
-            color_modified = CASE WHEN color IS NOT NULL THEN 1 ELSE color_modified END
-        WHERE id = ?
-      `).run(uid, objectUrl, calRefId, event.id);
+      outbound.markEventUploaded(event.id, { source: 'apple', uid, objectUrl, calRefId, adopted });
     } catch (err) {
-      log.error(`Outbound error for event ${event.id}:`, err.message);
+      if (!uploadGate.refused(defaultCal.url, err)) {
+        log.error(`Outbound error for event ${event.id}:`, err.message);
+      }
     }
   }
+  uploadGate.report((calendarUrl, err, waiting) => log.error(
+    `Calendar ${calendarUrl} is not accepting uploads (${err.message}); `
+    + `${waiting} event(s) stay local and are tried again on the next run.`
+  ));
 
   cfgSet('apple_last_sync', new Date().toISOString());
   log.info(

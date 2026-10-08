@@ -23,7 +23,8 @@ import { toICSDatetime, escapeICSText } from '../utils/ics-format.js';
 import { eventDateTimeFields } from '../utils/ics-datetime.js';
 import { vtimezoneFor } from '../utils/vtimezone.js';
 import { householdTimeZone } from '../utils/timezone.js';
-import { createCalDAVClient, supportsComponent } from '../utils/caldav-client.js';
+import { createCalDAVClient, supportsComponent, createUploadGate } from '../utils/caldav-client.js';
+import { sqlLooksLikeOwnEventUid } from '../utils/own-uid.js';
 import { sameCredentialOrigin } from '../utils/credential-origin.js';
 import { rruleLine } from './recurrence.js';
 import { nearestIcalColorName } from '../utils/ical-color.js';
@@ -44,7 +45,7 @@ import {
 export { toICSDatetime };
 
 function buildCalDAVICS(event, householdZone = null) {
-  const uid  = `oikos-${event.id}@oikos.local`;
+  const uid  = outbound.eventUidFor(event.id);
   const now  = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
   // Die Zeiten und ihre Zone bestimmt eventDateTimeFields; bis #938 stand hier
   // ein blankes `DTSTART:20260830T100000`, das keinen Zeitpunkt bezeichnet,
@@ -89,13 +90,6 @@ function buildCalDAVICS(event, householdZone = null) {
 // --------------------------------------------------------
 
 /**
- * UID eines Termins, den Yuvomi selbst hochgeladen hat (`oikos-<id>@oikos.local`,
- * s. den Upload im Sync; ein `::`-Suffix fuer Einzelvorkommen folgt). `_` ist in
- * LIKE ein Platzhalter, im Muster steht keiner.
- */
-const UPLOADED_UID_PATTERN = 'oikos-%@oikos.local%';
-
-/**
  * SQL-Bedingung der Farb-Heilung (#1270) fuer selbst hochgeladene Zeilen, mit
  * dem Tabellenpraefix `t` (leer oder `e.`).
  *
@@ -115,7 +109,8 @@ const UPLOADED_UID_PATTERN = 'oikos-%@oikos.local%';
  * kein Kandidat (der Vergleich mit einem Ziel NULL findet keine Farbe).
  */
 function uploadedRowRule(t) {
-  return `(${t}external_calendar_id NOT LIKE '${UPLOADED_UID_PATTERN}'
+  // Selbst hochgeladen: beide UID-Muster, aus der einen Quelle (own-uid.js).
+  return `(NOT ${sqlLooksLikeOwnEventUid(`${t}external_calendar_id`)}
        OR (lower(${t}color) IN (
              SELECT lower(calendar_color) FROM caldav_calendar_selection
               WHERE calendar_url = ${t}target_caldav_calendar_url AND calendar_color IS NOT NULL
@@ -961,6 +956,19 @@ async function runSync({ createClient } = {}) {
       // Fetch all calendars from server
       const serverCalendars = await client.fetchCalendars();
 
+      // Der Server nennt KEINEN Kalender, obwohl welche ausgewählt sind: das
+      // ist eine unvollständige Antwort (ein Multistatus, der nur die
+      // Home-Collection nennt oder jede Ressource mit 403 quittiert), kein
+      // leeres Konto. Derselbe Leer-Guard wie beim Prune (#508) - sonst gälte
+      // jeder Kalender als verschwunden und würde abgeschaltet.
+      if (serverCalendars.length === 0) {
+        log.warn(
+          `Account ${account.id}: the server listed no calendars, but ${enabledCalendars.length} are selected. ` +
+          `Skipping this run - assuming an incomplete answer rather than a deleted account.`
+        );
+        continue;
+      }
+
       // Heilung eingebrannter Kalenderfarben (#1270), siehe oben. Nach dem
       // Abruf der Kalender, weil deren Faehigkeiten die Farbmenge begrenzen.
       const heal = legacyHealState(conn, account.id, { serverCalendars, cutoff: legacyCutoff });
@@ -1014,6 +1022,12 @@ async function runSync({ createClient } = {}) {
           continue;
         }
 
+        // Als Umzugsziel zählt der Kalender, sobald die AUFLISTUNG ihn nennt -
+        // vor dem Objektabruf. Ein Umzug schreibt in das Ziel, er liest es
+        // nicht; scheitert nur dessen Abruf, gälte es sonst als verschwunden
+        // und der wartende Umzug würde verworfen.
+        calendarsByUrl.set(selCal.calendar_url, serverCal);
+
         // Fetch calendar objects
         let calObjects;
         try {
@@ -1022,7 +1036,6 @@ async function runSync({ createClient } = {}) {
           log.error(`Failed to fetch calendar objects from ${selCal.calendar_name}:`, err.message);
           continue;
         }
-        calendarsByUrl.set(selCal.calendar_url, serverCal);
         ownCalendarUrls.add(selCal.calendar_url);
 
         // Upsert external calendar metadata
@@ -1073,7 +1086,17 @@ async function runSync({ createClient } = {}) {
               // anlegen, sonst kehrt der Termin bei jedem Sync zurück (#593).
               if (pendingDeletionUids.has(ev.uid)) continue;
 
-              const existing = selExistingEvent.get(ev.uid);
+              let existing = selExistingEvent.get(ev.uid);
+
+              // Der eigene Upload, dessen Antwort verloren ging: die Zeile ist
+              // noch lokal, das Objekt liegt schon hier. In die bestehende
+              // Zeile übernehmen statt eine zweite anzulegen; sie ist danach
+              // als geändert vorgemerkt, der Zweig darunter lässt sie stehen
+              // und der Outbound dieses Laufs trägt den lokalen Stand hinauf.
+              if (!existing && obj.url
+                  && outbound.adoptOwnEventUpload({ source: 'caldav', uid: ev.uid, objectUrl: obj.url, calRefId })) {
+                existing = selExistingEvent.get(ev.uid);
+              }
 
               // Eine lokale Bearbeitung, die noch auf ihren Push wartet, darf der
               // Inbound nicht mit dem alten Serverstand überschreiben (#593).
@@ -1216,6 +1239,7 @@ async function runSync({ createClient } = {}) {
       // Einmal je Lauf: die Zone, an der naive Zeiten haengen (#938).
       const householdZone = householdTimeZone(db.get());
 
+      const uploadGate = createUploadGate();
       for (const event of localEvents) {
         try {
           // Find target calendar
@@ -1226,45 +1250,37 @@ async function runSync({ createClient } = {}) {
             continue;
           }
 
-          const uid     = `oikos-${event.id}@oikos.local`;
+          // Der Kalender hat in diesem Lauf schon abgelehnt: nicht für jeden
+          // wartenden Termin dieselbe Absage abholen.
+          if (uploadGate.isClosed(targetCal.url)) continue;
+
+          const uid     = outbound.eventUidFor(event.id);
           const icsData = buildCalDAVICS(event, householdZone);
 
-          // Upload to CalDAV
-          await client.createCalendarObject({
-            calendar: targetCal,
-            filename: `${uid}.ics`,
-            iCalString: icsData,
-          });
+          // Upload to CalDAV. Ein 412 auf den eigenen Namen ist der eigene
+          // frühere Upload und wird übernommen (uploadNewEvent).
+          const { objectUrl, adopted } = await outbound.uploadNewEvent(client, targetCal, uid, icsData);
 
-          // Objekt-URL und Kalenderzuordnung festhalten: ohne sie wäre der frisch
-          // hochgeladene Termin für spätere Änderungen und Löschungen unerreichbar,
-          // bis ihn der nächste Inbound-Lauf wiederfindet (#593).
-          const objectUrl = `${String(targetCal.url).replace(/\/?$/, '/')}${uid}.ics`;
           const calRefId  = upsertExternalCalendar(
             'caldav', event.target_caldav_calendar_url,
             targetCal.displayName || event.target_caldav_calendar_url, null
           );
-          // `color_modified` mit hoch: die Farbe, die gerade als CSS3-Name
-          // hinausging, ist unsere. Der Name ist eine verlustbehaftete Abbildung
-          // des Hex-Werts, und ohne das Flag holte der nächste Inbound-Lauf
-          // genau ihn zurück und überschriebe den exakten Wert mit dem
-          // gerundeten (#899). Ein Termin, der gar keine eigene Farbe trägt,
-          // behält seinen Zustand - dann ist nichts hinausgegangen, was wir
-          // verteidigen müssten.
-          db.get().prepare(`
-            UPDATE calendar_events
-            SET external_source = 'caldav', external_calendar_id = ?,
-                external_object_url = ?, calendar_ref_id = ?,
-                color_modified = CASE WHEN color IS NOT NULL THEN 1 ELSE color_modified END
-            WHERE id = ?
-          `).run(uid, objectUrl, calRefId, event.id);
+          outbound.markEventUploaded(event.id, { source: 'caldav', uid, objectUrl, calRefId, adopted });
 
           accountEventCount++;
           accountChangedCount++;
         } catch (err) {
-          log.error(`Failed to upload event ${event.id} to CalDAV:`, err.message);
+          const calendarUrl = event.target_caldav_calendar_url;
+          if (!uploadGate.refused(calendarUrl, err)) {
+            log.error(`Failed to upload event ${event.id} to CalDAV:`, err.message);
+          }
         }
       }
+      // EINE Zeile je Kalender, der in diesem Lauf abgelehnt hat.
+      uploadGate.report((calendarUrl, err, waiting) => log.error(
+        `Calendar ${calendarUrl} is not accepting uploads (${err.message}); `
+        + `${waiting} event(s) stay local and are tried again on the next run.`
+      ));
 
       // Update last_sync for account
       db.get().prepare(`

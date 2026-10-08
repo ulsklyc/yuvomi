@@ -1461,18 +1461,65 @@ place every CalDAV and CardDAV client is built, so the rules above apply to refu
 they do to network errors:
 
 - A refused **upload** leaves the event, task or shopping item local and waiting; it is never
-  marked as mirrored. An upload has no attempt limit and is tried again on every run.
+  marked as mirrored. An upload has no attempt limit and is tried again on every run. What bounds
+  it is a gate per run: after the first refusal that concerns the collection (anything but `400`,
+  `409`, `412`, `413`, `415`, `422`, which concern the one object) nothing more is uploaded into
+  that collection in that run, and one log line names how many entries are waiting. Without it a
+  shopping list mapped to a read-only reminder list sent every unmirrored item again on every
+  tap. An object-level refusal does not close the gate, or one entry the server never accepts
+  would lock out everything queued behind it.
 - A refused **change** or **deletion** keeps its marker (`outbound_dirty`, tombstone) and counts as
   a failed attempt: `404`/`410` settle it (the object is gone), `400` gives up at once, everything
   else - `403`, `412` (stale ETag; the next run reads the fresh one), `5xx`, `507` - is retried and
   given up after five attempts.
-- A **move** whose copy is refused in the destination leaves the source untouched.
+- A **move** whose copy is refused in the destination leaves the source untouched. `404`/`410`
+  on the copy means the *destination* is gone, not the event: only the move is dropped, a pending
+  edit still goes out in the old calendar. `412` on the copy means the name is taken in the
+  destination: if the object there carries the event's UID it is the copy of an earlier attempt,
+  the current state is written onto it and the move completes; any other object is left alone and
+  the source stays.
 - A refused **listing** aborts the run for that account. It is not read as "the account has no
   calendars", so no calendar, reminder list or address book is disabled by it, no pending upload
   loses its target, and a pending move waits for a run that knows the calendar list. Only the
   listing request itself counts; a single collection refusing its `supported-report-set` lookup
   does not fail the list. A `200` that is not a WebDAV listing (the sign-in page of a proxy in
   front of the server) counts as a refusal too.
+- A listing that **arrives but names no collection** (a multistatus with only the home collection,
+  or one that answers every resource with `403`) is indistinguishable from an empty account at the
+  client and resolves to an empty list. The four places that read "not in the list" as "gone"
+  therefore carry the same empty guard as the prune (#508): with zero collections listed, the
+  calendar sync, the reminder sync and the immediate task upload skip the account, and the
+  CardDAV sync fails with an error on the account; nothing is disabled and no target is cleared.
+- A move's destination counts as known as soon as the **listing** names it, not only after its
+  objects were fetched: a move writes into the destination, it does not read it.
+
+Known gaps, not closed here: when the copy of a move succeeded and deleting the source is refused,
+that is logged once and not retried, so the event stays in both calendars until it is removed by
+hand. And CalDAV accounts have no `last_error` column: `POST /caldav/sync` answers `success: true`
+even when an account's listing was refused; the refusal is only in the server log (CardDAV records
+it on the account).
+
+**UIDs of uploaded objects (`server/utils/own-uid.js`).** An entry created in Yuvomi goes up under
+`yuvomi-<kind>-<id>-<installation>@yuvomi.local`, with `<kind>` one of `task`, `item`, `event` and
+`<installation>` a random 16-hex identifier generated once and kept in `sync_config`
+(`installation_id`). It travels with the database, so a restored backup is the same installation.
+The UID of a row never changes between attempts.
+
+- Before, the UID carried only the row id (`yuvomi-task-<id>@yuvomi.local`,
+  `yuvomi-item-<id>@yuvomi.local`, `oikos-<id>@oikos.local` for events). A row id is unique in one
+  database only: a second installation against the same account, or a fresh one whose ids start
+  at 1 again, produced the same name for a different entry.
+- With the installation in the name, `412` on an upload means "this is ours": the earlier PUT
+  arrived and only its answer was lost. The object is adopted - the row becomes a mirror and is
+  marked `outbound_dirty`, so the local state goes up as a change; nothing is guessed about what
+  the server holds.
+- The inbound run does the same from the other side: an object whose UID names this installation
+  and a row that is still local is adopted into that row instead of being imported as a second
+  one. Both orders end in the same state.
+- **Existing mirrors keep their UID.** Nothing is renamed on the server. Where the code only
+  *recognises* an upload of its own (default assignee, colour repair, inheriting a task series'
+  target) both patterns count; *adopting* needs the new pattern with this installation's
+  identifier, because an old-style UID may come from an earlier installation.
 
 Before this, a refused upload was stamped as mirrored and the next inbound run pruned the row as
 "deleted on the server"; a refused change was dropped and overwritten by the next inbound run; a
@@ -1558,9 +1605,10 @@ response, and retried by the next sync run (at-least-once, given up after 5 atte
     Shopping would send a task out and bring it back as a shopping item.
   - The upload is the **last** step of a sync run. The prune before it removes mirrors the server
     does not list, and a task uploaded any earlier would be deleted seconds after it arrived.
-  - The UID is derived from the task id (`yuvomi-task-<id>@yuvomi.local`), not drawn at random: a
-    run that dies between the upload and the bookkeeping overwrites its own object next time
-    instead of leaving a duplicate.
+  - The UID is derived from the task id and the installation
+    (`yuvomi-task-<id>-<installation>@yuvomi.local`, see "UIDs of uploaded objects" above), not
+    drawn at random: a run that dies between the upload and the bookkeeping finds its own object
+    next time and adopts it instead of leaving a duplicate.
   - **Subtasks are excluded.** As standalone VTODOs they would stand beside their parent as equals,
     and the relation that makes them subtasks would be lost — `RELATED-TO` exists in RFC 5545 but
     the inbound does not read it, so the round trip would return them as loose tasks.

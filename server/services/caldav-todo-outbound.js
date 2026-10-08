@@ -36,7 +36,8 @@ import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { outboundFailureAction } from './calendar-outbound.js';
 import { patchICSTodo } from '../utils/ics-patch.js';
-import { createCalDAVClient, collectionUrlOf } from '../utils/caldav-client.js';
+import { createCalDAVClient, collectionUrlOf, createUploadGate } from '../utils/caldav-client.js';
+import { ownUid, isOwnUidOfRow, ownUploadRowId, findObjectWithUid } from '../utils/own-uid.js';
 import { householdTimeZone, localToUTC } from '../utils/timezone.js';
 import { loadTags } from '../utils/task-tags.js';
 import { runSerialized } from '../utils/sync-lock.js';
@@ -381,19 +382,58 @@ function reloadRow(module, id) {
 // Vormerkung: Anlegen (#695)
 // --------------------------------------------------------
 
+/** Art eines Eintrags im UID-Namensraum (`server/utils/own-uid.js`). */
+function uidKind(module) {
+  return module === 'shopping' ? 'item' : 'task';
+}
+
 /**
- * UID einer in Yuvomi entstandenen Aufgabe.
+ * UID einer in Yuvomi entstandenen Aufgabe oder eines Einkaufsartikels.
  *
- * Bewusst aus der Zeilen-Id abgeleitet und nicht zufällig: scheitert der Schritt
- * NACH dem Upload (die Zeile auf 'caldav' umzuschreiben), nimmt der nächste Lauf
- * dieselbe UID und überschreibt das Objekt, statt ein zweites anzulegen. Eine
- * Zufalls-UID hätte an derselben Stelle eine Dublette hinterlassen.
+ * Aus der Zeilen-Id UND der Kennung dieser Installation abgeleitet, nicht
+ * zufällig je Versuch: die UID einer Zeile ist immer dieselbe. Kam ein PUT auf
+ * dem Server an, seine Antwort aber nicht hier, trifft der nächste Versuch
+ * deshalb auf das eigene Objekt - der Server meldet 412, und `uploadNewTodo`
+ * übernimmt es, statt ein zweites anzulegen. Die Installationskennung macht
+ * dieses 412 eindeutig: ohne sie konnte an der Adresse auch der Eintrag einer
+ * anderen Installation mit derselben Zeilen-Id liegen.
  *
- * Neuer Namensraum, deshalb `yuvomi`: die oikos-Kennungen der Termine bleiben aus
- * Rückwärtskompatibilität stehen, sie werden aber nicht fortgeschrieben.
+ * Schon gespiegelte Zeilen behalten ihre UID nach dem alten Muster
+ * (`yuvomi-task-<id>@yuvomi.local`); umbenannt wird nichts.
  */
 export function todoUidFor(module, id) {
-  return `yuvomi-${module === 'shopping' ? 'item' : 'task'}-${id}@yuvomi.local`;
+  return ownUid(uidKind(module), id, db.get());
+}
+
+/**
+ * Macht eine lokale Zeile zum Spiegel ihres eigenen, schon auf dem Server
+ * liegenden Uploads - der Inbound-Weg der Übernahme. Der Abruf sieht ein Objekt
+ * mit der UID dieser Installation, dessen Zeile noch lokal ist: der PUT kam an,
+ * die Antwort nicht. Ohne das legte der Abruf eine ZWEITE Zeile an.
+ *
+ * Endzustand wie nach dem 412 in `uploadNewTodo`: gespiegelt und als geändert
+ * vorgemerkt, damit der lokale Stand hinaufgeht - über den Inhalt auf dem
+ * Server wird nicht geraten.
+ *
+ * @returns {boolean} true, wenn eine Zeile übernommen wurde
+ */
+export function adoptOwnUpload(module, uid, accountId, objectUrl) {
+  const def = moduleDef(module);
+  const rowId = ownUploadRowId(uid, uidKind(module), db.get());
+  if (!rowId || !objectUrl) return false;
+  const adopted = db.get().prepare(`
+    UPDATE ${def.table}
+       SET external_source     = 'caldav',
+           external_uid        = ?,
+           external_account_id = ?,
+           external_object_url = ?,
+           outbound_dirty      = 1,
+           outbound_attempts   = 0
+     WHERE id = ? AND external_source = 'local'
+  `).run(uid, accountId, objectUrl, rowId).changes > 0;
+  if (adopted && module === 'tasks') clearCreationTarget(rowId);
+  if (adopted) log.info(`Adopted the earlier upload of ${def.table} row ${rowId} (${uid}).`);
+  return adopted;
 }
 
 /**
@@ -458,8 +498,8 @@ function sameCollection(a, b) {
  * weitergäbe, deckte also bloß den Fall ab, dass die Serie abgehakt wird, bevor
  * sie oben ist; die Folgeinstanz einer hochgeladenen Serie bliebe lokal.
  *
- * Einen Spiegel zählt nur mit, wer hier entstanden ist: seine UID ist die aus
- * todoUidFor. Ein vom Server geholter Eintrag bleibt, wie er war - seine Liste
+ * Einen Spiegel zählt nur mit, wer hier entstanden ist: seine UID ist eine aus
+ * dem eigenen Namensraum für genau diese Zeile (altes oder neues Muster). Ein vom Server geholter Eintrag bleibt, wie er war - seine Liste
  * gehört einem anderen Programm, und Yuvomi hat nie zugesagt, dort Einträge
  * anzulegen.
  *
@@ -477,7 +517,7 @@ export function recurrenceFollowupTarget(task) {
   if (task.external_source === 'local') {
     accountId = task.target_caldav_account_id;
     listUrl   = task.target_caldav_list_url;
-  } else if (isMirrored(task) && task.external_uid === todoUidFor('tasks', task.id)) {
+  } else if (isMirrored(task) && isOwnUidOfRow(task.external_uid, 'task', task.id)) {
     accountId = task.external_account_id;
     listUrl   = collectionUrlOf(task.external_object_url);
   }
@@ -572,24 +612,45 @@ async function uploadNewTodo(client, collection, module, row, accountId) {
   const ics = buildTodoICS(module, row, uid);
   if (!ics) return false;
 
-  await client.createCalendarObject({
-    calendar:   collection,
-    filename:   `${uid}.ics`,
-    iCalString: ics,
-  });
+  let objectUrl = `${String(collection.url).replace(/\/?$/, '/')}${uid}.ics`;
+  // Der Name ist vergeben (412) und das Objekt trägt unsere UID: ein früherer
+  // PUT kam an, seine Antwort nicht. Übernehmen und den lokalen Stand als
+  // Änderung vormerken, statt zu raten, was dort liegt.
+  let adopted = false;
+  try {
+    await client.createCalendarObject({
+      calendar:   collection,
+      filename:   `${uid}.ics`,
+      iCalString: ics,
+    });
+  } catch (err) {
+    if (err?.status !== 412) throw err;
+    const found = await findObjectWithUid(client, collection.url, objectUrl, uid);
+    if (!found) throw err;
+    objectUrl = found.url;
+    adopted = true;
+    log.info(`${def.table} row ${row.id} is already on the server as ${uid}, adopting it.`);
+  }
 
-  const objectUrl = `${String(collection.url).replace(/\/?$/, '/')}${uid}.ics`;
   db.get().prepare(`
     UPDATE ${def.table}
        SET external_source     = 'caldav',
            external_uid        = ?,
            external_account_id = ?,
            external_object_url = ?,
-           outbound_dirty      = 0,
+           outbound_dirty      = ?,
            outbound_attempts   = 0
      WHERE id = ?
-  `).run(uid, accountId, objectUrl, row.id);
+  `).run(uid, accountId, objectUrl, adopted ? 1 : 0, row.id);
   return true;
+}
+
+/** EINE Zeile je Liste, die in diesem Lauf abgelehnt hat - mit der Anzahl. */
+function reportClosedLists(gate, what) {
+  gate.report((listUrl, err, waiting) => log.warn(
+    `Reminder list ${listUrl} is not accepting uploads (${err.message}); `
+    + `${waiting} ${what} stay local and are tried again on the next run.`
+  ));
 }
 
 /**
@@ -605,6 +666,7 @@ export async function processPendingCreations(client, accountId, module, listsBy
   const rows = pendingCreations(accountId, module);
   if (rows.length === 0) return 0;
 
+  const gate = createUploadGate();
   let done = 0;
   for (const row of rows) {
     const collection = listsByUrl.get(row.target_caldav_list_url);
@@ -616,6 +678,10 @@ export async function processPendingCreations(client, accountId, module, listsBy
       clearCreationTarget(row.id);
       continue;
     }
+
+    // Die Liste hat in diesem Lauf schon abgelehnt: nicht für jede wartende
+    // Aufgabe dieselbe Absage abholen.
+    if (gate.isClosed(collection.url)) continue;
 
     const fresh = reloadRow(module, row.id);
     if (!fresh) continue; // zwischenzeitlich gelöscht
@@ -632,9 +698,12 @@ export async function processPendingCreations(client, accountId, module, listsBy
       // Kein Zähler und kein Aufgeben: anders als eine Änderung hat ein Upload
       // keinen Stand, der veralten könnte. Er bleibt vorgemerkt und läuft im
       // nächsten Lauf mit, so lange bis er durchgeht oder das Ziel verschwindet.
-      log.warn(`Could not upload task ${fresh.id} to ${row.target_caldav_list_url}: ${err.message}`);
+      if (!gate.refused(collection.url, err)) {
+        log.warn(`Could not upload task ${fresh.id} to ${row.target_caldav_list_url}: ${err.message}`);
+      }
     }
   }
+  reportClosedLists(gate, 'task(s)');
   return done;
 }
 
@@ -660,6 +729,7 @@ export async function processPendingCreations(client, accountId, module, listsBy
  * @returns {Promise<number>} erfolgreich hochgeladene Artikel
  */
 export async function processPendingShoppingCreations(client, accountId, targets, listsByUrl) {
+  const gate = createUploadGate();
   let done = 0;
   for (const { listUrl, targetListId } of targets) {
     if (!targetListId) continue;
@@ -667,6 +737,7 @@ export async function processPendingShoppingCreations(client, accountId, targets
     if (!collection) continue;
 
     for (const row of pendingShoppingCreations(targetListId)) {
+      if (gate.isClosed(collection.url)) continue;
       const fresh = reloadRow('shopping', row.id);
       if (!fresh) continue; // zwischenzeitlich gelöscht
 
@@ -675,10 +746,13 @@ export async function processPendingShoppingCreations(client, accountId, targets
         else log.error(`Could not build a VTODO for shopping item ${fresh.id}, keeping it local.`);
       } catch (err) {
         // Wie oben: bleibt lokal und läuft im nächsten Lauf wieder mit.
-        log.warn(`Could not upload shopping item ${fresh.id} to ${listUrl}: ${err.message}`);
+        if (!gate.refused(collection.url, err)) {
+          log.warn(`Could not upload shopping item ${fresh.id} to ${listUrl}: ${err.message}`);
+        }
       }
     }
   }
+  reportClosedLists(gate, 'shopping item(s)');
   return done;
 }
 
@@ -854,10 +928,28 @@ async function taskListsOf(client, accountId) {
   if (!selected.length) return new Map();
 
   const allowed = new Set(selected);
-  const calendars = await client.fetchCalendars();
+  const calendars = await listCollections(client);
   return new Map(
     (calendars || []).filter((c) => allowed.has(c.url)).map((c) => [c.url, c])
   );
+}
+
+/**
+ * Die Collections des Kontos - oder ein Fehler, wenn der Server KEINE nennt.
+ *
+ * Gefragt wird hier nur, weil ausgewählte Listen auf einen Upload warten; eine
+ * Antwort ohne eine einzige Collection ist dann eine unvollständige Antwort
+ * (ein Multistatus, der nur die Home-Collection nennt oder jede Ressource mit
+ * 403 quittiert) und kein leeres Konto. Als leere Liste gelesen, gälte jedes
+ * Upload-Ziel als verschwunden und würde freigegeben - derselbe Leer-Guard wie
+ * beim Prune (#508).
+ */
+async function listCollections(client) {
+  const calendars = await client.fetchCalendars();
+  if (!calendars || calendars.length === 0) {
+    throw new Error('the server listed no collections, although lists are selected');
+  }
+  return calendars;
 }
 
 /**
@@ -877,7 +969,7 @@ function shoppingSelectionsOf(accountId) {
 /** Collection-Objekte zu den Zuordnungen - ein Listenabruf. */
 async function collectionsForTargets(client, targets) {
   const allowed   = new Set(targets.map((tgt) => tgt.listUrl));
-  const calendars = await client.fetchCalendars();
+  const calendars = await listCollections(client);
   return new Map((calendars || []).filter((c) => allowed.has(c.url)).map((c) => [c.url, c]));
 }
 

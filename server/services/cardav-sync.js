@@ -853,6 +853,14 @@ async function syncAccount(accountId) {
     // Fetch all addressbooks from server
     const serverAddressbooks = await client.fetchAddressBooks();
 
+    // Kein einziges Adressbuch, obwohl welche ausgewählt sind: eine
+    // unvollständige Antwort, kein leeres Konto (derselbe Leer-Guard wie beim
+    // Prune der Kontakte). Als Fehler, damit er am Konto steht, statt jedes
+    // ausgewählte Adressbuch abzuschalten.
+    if (serverAddressbooks.length === 0) {
+      throw new Error('The server listed no address books, although some are selected. Nothing was changed.');
+    }
+
     for (const selAbook of enabledAddressbooks) {
       // Find matching addressbook from server
       const serverAbook = serverAddressbooks.find(sa => sa.url === selAbook.addressbook_url);

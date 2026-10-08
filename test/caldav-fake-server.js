@@ -16,6 +16,8 @@
  *   server.refuse({ method: 'PUT', status: 403 })
  *   server.refuse({ method: 'PROPFIND', path: '/cal/', status: 503 })
  *   server.refuse({ method: 'PUT', status: 412, when: (req) => !req.headers['if-match'] })
+ *   server.refuse({ method: 'PUT', status: 500, commit: true, once: true })   // gespeichert, Antwort verloren
+ *   server.refuse({ method: 'PROPFIND', path: '/cal/', status: 207, contentType: 'application/xml', body: ... })
  * `server.allowAll()` nimmt alle Regeln zurück.
  */
 
@@ -26,6 +28,13 @@ const NS = 'xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav" '
 
 const xmlEscape = (value) => String(value)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+/**
+ * Dateiname → Pfadsegment einer href. `@` und `:` bleiben stehen, wie bei
+ * sabre/dav (Nextcloud, Baikal): unsere eigenen Objektnamen enthalten ein `@`,
+ * und der Sofortversuch ordnet Objekte über den Wortlaut ihrer URL zu.
+ */
+const encodeSegment = (name) => encodeURIComponent(name).replace(/%40/g, '@').replace(/%3A/gi, ':');
 
 function multistatus(responses) {
   return `<?xml version="1.0" encoding="utf-8"?>\n<d:multistatus ${NS}>${responses.join('')}</d:multistatus>`;
@@ -68,7 +77,7 @@ export async function startFakeDavServer() {
 
   function objectResponse(collectionPath, filename, obj, dataTag) {
     return propResponse(
-      `${collectionPath}${encodeURIComponent(filename)}`,
+      `${collectionPath}${encodeSegment(filename)}`,
       `<d:getetag>${xmlEscape(obj.etag)}</d:getetag><${dataTag}>${xmlEscape(obj.data)}</${dataTag}>`
     );
   }
@@ -104,7 +113,7 @@ export async function startFakeDavServer() {
       if (col) {
         const members = req.headers.depth === '1'
           ? [...col.objects].map(([filename, obj]) => propResponse(
-            `${pathname}${encodeURIComponent(filename)}`, `<d:getetag>${xmlEscape(obj.etag)}</d:getetag>`))
+            `${pathname}${encodeSegment(filename)}`, `<d:getetag>${xmlEscape(obj.etag)}</d:getetag>`))
           : [];
         return sendXml(multistatus([propResponse(pathname, collectionProps(col)), ...members]));
       }
@@ -160,6 +169,10 @@ export async function startFakeDavServer() {
         && (!r.path || r.path === pathname)
         && (!r.when || r.when(entry)));
       if (rule) {
+        // `commit`: die Anfrage wird AUSGEFÜHRT, nur die Antwort ist die
+        // Absage - der PUT, der ankam, dessen Antwort aber verloren ging.
+        if (rule.commit) handle(req, body, { writeHead() {}, end() {} });
+        if (rule.once) rules = rules.filter((r) => r !== rule);
         res.writeHead(rule.status, { 'Content-Type': rule.contentType || 'text/plain' });
         res.end(rule.body ?? 'refused');
         return;
@@ -196,6 +209,15 @@ export async function startFakeDavServer() {
       return [...(collections.get(new URL(collectionUrl).pathname)?.objects.keys() ?? [])];
     },
     refuse(rule) { rules.push(rule); },
+    /** Ein Multistatus, der nur die Home-Collection nennt - gültig, aber leer. */
+    homeOnlyListing: () => multistatus([propResponse(homePath, '<d:resourcetype><d:collection/></d:resourcetype>')]),
+    /** Ein Multistatus, der jede Ressource mit 403 quittiert. */
+    forbiddenListing: () => multistatus([homePath, ...collections.keys()].map((path) =>
+      `<d:response><d:href>${xmlEscape(path)}</d:href><d:status>HTTP/1.1 403 Forbidden</d:status></d:response>`)),
+    /** Fehlerkörper, wie ihn sabre-basierte Server schicken: XML, kein Multistatus. */
+    xmlError: (message = 'Service unavailable') =>
+      `<?xml version="1.0" encoding="utf-8"?>\n<d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">`
+      + `<s:exception>Sabre\\DAV\\Exception</s:exception><s:message>${xmlEscape(message)}</s:message></d:error>`,
     allowAll() { rules = []; },
     /** Alles zurück auf leer: Collections, Regeln, Protokoll. */
     reset() { collections.clear(); rules = []; requests.length = 0; },

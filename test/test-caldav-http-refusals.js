@@ -212,6 +212,8 @@ test('Wrapper: die drei Schreibaufrufe werfen bei einer Absage, mit Status', asy
         assert.ok(err instanceof DavHttpError, `${name} ${status}: kein DavHttpError`);
         assert.equal(err.status, status, `${name}: Status fehlt am Fehler`);
         assert.equal(err.code, undefined, 'code muss leer bleiben, die Einordnung liest es zuerst');
+        assert.doesNotMatch(err.message, /CalendarObject|fetchCalendars/, 'die Meldung nennt einen internen Funktionsnamen');
+        assert.match(err.message, new RegExp(`HTTP ${status}`));
         return true;
       }, `${name} löste bei ${status} auf`);
     }
@@ -270,10 +272,19 @@ test('Wrapper: eine abgelehnte Auflistung ist keine leere Liste', async () => {
       `fetchAddressBooks löste bei ${status} auf`);
   }
 
+  // Eine Absage mit XML-Körper, wie sabre-basierte Server (Nextcloud, Baikal)
+  // sie schicken. Der Inhaltstyp allein darf sie nicht zur Auflistung machen:
+  // ohne die Prüfung auf den Status ginge genau diese Absage als leere Liste durch.
+  dav.allowAll();
+  dav.refuse({ method: 'PROPFIND', path: '/cal/', status: 503, contentType: 'application/xml; charset=utf-8', body: dav.xmlError() });
+  await assert.rejects(() => calClient.fetchCalendars(), (err) => err.status === 503,
+    'eine Absage mit XML-Körper ging als Auflistung durch');
+  await assert.rejects(() => cardClient.fetchAddressBooks(), (err) => err.status === 503);
+
   // Die Anmeldeseite eines vorgeschalteten Proxys: 200, aber keine Auflistung.
   dav.allowAll();
   dav.refuse({ method: 'PROPFIND', path: '/cal/', status: 200, contentType: 'text/html', body: '<html>Sign in</html>' });
-  await assert.rejects(() => calClient.fetchCalendars(), /not a WebDAV listing/);
+  await assert.rejects(() => calClient.fetchCalendars(), /did not answer with a list of calendars/);
 
   // Eine einzelne Collection, die ihre Zusatzabfrage verweigert, kippt die
   // Liste nicht: geprüft wird nur die Auflistung selbst.
@@ -582,6 +593,11 @@ test('Kalender: eine abgelehnte Auflistung schaltet keinen Kalender ab und verwi
   db.prepare(`
     UPDATE calendar_events SET outbound_move_to = ?, target_caldav_calendar_url = ? WHERE id = ?
   `).run(dest.url, dest.url, id);
+  // Ein zweiter Termin mit einer schlichten Bearbeitung, NACH dem Umzug in der
+  // Reihenfolge: bricht die Verarbeitung am Umzug ab statt ihn zu überspringen,
+  // geht diese Bearbeitung nicht hinaus.
+  const plain = mirroredEvent(source, 'plain-1@test', 'Alter Titel');
+  db.prepare("UPDATE calendar_events SET title = 'Neuer Titel', outbound_dirty = 1 WHERE id = ?").run(plain.id);
   const enabled = () => db.prepare('SELECT COUNT(*) AS n FROM caldav_calendar_selection WHERE enabled = 1').get().n;
 
   dav.refuse({ method: 'PROPFIND', path: '/cal/', status: 503 });
@@ -594,6 +610,8 @@ test('Kalender: eine abgelehnte Auflistung schaltet keinen Kalender ab und verwi
   // nicht verschwunden: der Umzug wartet.
   await caldavSync.flushOutbound();
   assert.equal(event(id).outbound_move_to, dest.url, 'der wartende Umzug wurde verworfen');
+  assert.equal(event(plain.id).outbound_dirty, 0, 'die Bearbeitung hinter dem wartenden Umzug ging nicht hinaus');
+  assert.match(dav.getObject(source.url, 'plain-1@test.ics').data, /SUMMARY:Neuer Titel/);
 
   dav.allowAll();
   await caldavSync.flushOutbound();
@@ -653,4 +671,323 @@ test('Adressbücher: eine abgelehnte Auflistung schaltet kein Adressbuch ab', as
   dav.allowAll();
   await cardavSync.syncAccount(cardAccount);
   assert.equal(selection().enabled, 1);
+});
+
+// ── Nachzug aus dem Review von #1837 ────────────────────────────────────────────
+
+/** Antwortet auf die Auflistung mit einem gültigen, aber leeren Multistatus. */
+function incompleteListing(body) {
+  dav.refuse({ method: 'PROPFIND', path: '/cal/', status: 207, contentType: 'application/xml; charset=utf-8', body });
+}
+
+const INCOMPLETE = {
+  'nur die Home-Collection':    () => dav.homeOnlyListing(),
+  '403 je Ressource':           () => dav.forbiddenListing(),
+};
+
+for (const [shape, body] of Object.entries(INCOMPLETE)) {
+  // Eine Auflistung, die ANKOMMT, aber keine Collection nennt, ist keine Absage:
+  // der Wrapper lässt sie durch (ein leeres Konto sieht genauso aus). Die vier
+  // Stellen, die daraus "verschwunden" lesen, brauchen ihren eigenen Leer-Guard.
+  test(`Unvollständige Auflistung (${shape}): Kalender bleiben eingeschaltet`, async () => {
+    reset();
+    calendar('family', 'Familie');
+    calendar('work', 'Arbeit');
+    incompleteListing(body());
+
+    const client = await createCalDAVClient({ caldav_url: dav.url, username: 'u', password: 'p' });
+    assert.deepEqual(await client.fetchCalendars(), [], 'die Form löst nicht mehr zu einer leeren Liste auf - der Test misst etwas anderes');
+
+    await caldavSync.sync();
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM caldav_calendar_selection WHERE enabled = 1').get().n, 2,
+      'eine Antwort ohne Kalender hat alle Kalender abgeschaltet');
+  });
+
+  test(`Unvollständige Auflistung (${shape}): Erinnerungslisten bleiben eingeschaltet`, async () => {
+    reset();
+    const list = taskList();
+    incompleteListing(body());
+
+    await remindersSync.sync();
+    assert.equal(db.prepare('SELECT enabled FROM caldav_reminder_selection WHERE list_url = ?').get(list).enabled, 1,
+      'eine Antwort ohne Collections hat die Liste abgeschaltet');
+  });
+
+  test(`Unvollständige Auflistung (${shape}): eine wartende Aufgabe behält ihr Ziel`, async () => {
+    reset();
+    const list = taskList();
+    const id   = localTask(list);
+    incompleteListing(body());
+
+    await todoOutbound.flushOutbound();
+    assert.ok(dav.seen('PROPFIND').some((r) => r.path === '/cal/' && r.status === 207), 'die Auflistung wurde nicht abgefragt');
+    assert.equal(task(id).target_caldav_list_url, list, 'das Upload-Ziel der Aufgabe wurde geleert');
+
+    dav.allowAll();
+    await todoOutbound.flushOutbound();
+    assert.equal(task(id).external_source, 'caldav');
+  });
+
+  test(`Unvollständige Auflistung (${shape}): Adressbücher bleiben eingeschaltet`, async () => {
+    reset();
+    const book = dav.addCollection('book', { name: 'Kontakte', kind: 'addressbook' });
+    const cardAccount = Number(db.prepare(`
+      INSERT INTO carddav_accounts (name, carddav_url, username, password) VALUES ('Fake', ?, 'u', 'p')
+    `).run(dav.url).lastInsertRowid);
+    db.prepare(`
+      INSERT INTO carddav_addressbook_selection (account_id, addressbook_url, addressbook_name, enabled)
+      VALUES (?, ?, 'Kontakte', 1)
+    `).run(cardAccount, book);
+    incompleteListing(body());
+
+    await assert.rejects(() => cardavSync.syncAccount(cardAccount), /listed no address books/);
+    assert.equal(db.prepare('SELECT enabled FROM carddav_addressbook_selection').get().enabled, 1,
+      'eine Antwort ohne Adressbücher hat das Adressbuch abgeschaltet');
+    assert.match(db.prepare('SELECT last_error FROM carddav_accounts WHERE id = ?').get(cardAccount).last_error,
+      /listed no address books/, 'der Fehler steht nicht am Konto');
+  });
+}
+
+// ── Schranke je Lauf: eine ablehnende Collection kostet EINEN Versuch ───────────
+
+test('Schranke: die erste Absage schliesst die Collection, eine Absage am Objekt nicht', async () => {
+  const { createUploadGate, isCollectionRefusal } = await import('../server/utils/caldav-client.js');
+  const refusal = (status) => Object.assign(new Error(`HTTP ${status}`), { status });
+
+  for (const status of [401, 403, 404, 429, 500, 503, 507]) {
+    assert.equal(isCollectionRefusal(refusal(status)), true, `HTTP ${status}`);
+  }
+  // Netzfehler: kein Status, dieselbe Wand für jeden weiteren Versuch.
+  assert.equal(isCollectionRefusal(Object.assign(new Error('x'), { code: 'ECONNREFUSED' })), true);
+  // Hängt am einzelnen Objekt: wer dahinter wartet, darf nicht ausgesperrt werden.
+  for (const status of [400, 409, 412, 413, 415, 422]) {
+    assert.equal(isCollectionRefusal(refusal(status)), false, `HTTP ${status}`);
+  }
+
+  const gate = createUploadGate();
+  assert.equal(gate.isClosed('a'), false);
+  assert.equal(gate.refused('a', refusal(412)), false, 'ein 412 hat die Collection geschlossen');
+  assert.equal(gate.isClosed('a'), false);
+  assert.equal(gate.refused('a', refusal(403)), true);
+  assert.equal(gate.isClosed('a'), true);
+  assert.equal(gate.isClosed('a'), true);
+  assert.equal(gate.isClosed('b'), false, 'die Schranke gilt je Collection');
+
+  // EINE Meldung je Collection, mit der Zahl aller wartenden Zeilen.
+  const lines = [];
+  gate.report((url, err, waiting) => lines.push([url, err.status, waiting]));
+  assert.deepEqual(lines, [['a', 403, 3]]);
+});
+
+test('Schranke: drei wartende Aufgaben auf einer ablehnenden Liste kosten einen PUT je Lauf', async () => {
+  reset();
+  const list = taskList();
+  const ids  = [localTask(list, 'Eins'), localTask(list, 'Zwei'), localTask(list, 'Drei')];
+
+  dav.refuse({ method: 'PUT', status: 403 });
+  await todoOutbound.flushOutbound();
+  assert.equal(dav.seen('PUT').length, 1, 'jede wartende Aufgabe hat ihre eigene Absage abgeholt');
+  await remindersSync.sync();
+  assert.equal(dav.seen('PUT').length, 2, 'der Sync-Lauf hat mehr als einen Versuch gemacht');
+  for (const id of ids) {
+    assert.equal(task(id).external_source, 'local');
+    assert.equal(task(id).target_caldav_list_url, list, 'eine übersprungene Aufgabe hat ihr Ziel verloren');
+  }
+
+  // Die Schranke gilt nur für den Lauf: nimmt der Server an, gehen alle hinaus.
+  dav.allowAll();
+  await todoOutbound.flushOutbound();
+  for (const id of ids) assert.equal(task(id).external_source, 'caldav');
+});
+
+test('Schranke: eine Aufgabe, die der Server nie annimmt, hält die anderen nicht auf', async () => {
+  reset();
+  const list = taskList();
+  const bad  = localTask(list, 'Kaputt');
+  const good = [localTask(list, 'Zwei'), localTask(list, 'Drei')];
+
+  // Die Absage hängt am Inhalt dieses einen Objekts, nicht an der Liste.
+  dav.refuse({ method: 'PUT', status: 400, when: (req) => req.body.includes('SUMMARY:Kaputt') });
+  await todoOutbound.flushOutbound();
+
+  assert.equal(task(bad).external_source, 'local');
+  for (const id of good) {
+    assert.equal(task(id).external_source, 'caldav', 'eine Aufgabe hinter der abgelehnten blieb liegen');
+  }
+});
+
+test('Schranke: drei Einkaufsartikel auf einer ablehnenden Liste kosten einen PUT je Sofortversuch', async () => {
+  reset();
+  const { listId } = shoppingList();
+  for (const name of ['Milch', 'Brot', 'Eier']) {
+    db.prepare('INSERT INTO shopping_items (list_id, name) VALUES (?, ?)').run(listId, name);
+  }
+
+  dav.refuse({ method: 'PUT', status: 403 });
+  await todoOutbound.flushOutbound();
+  assert.equal(dav.seen('PUT').length, 1, 'jeder ungespiegelte Artikel wurde erneut geschickt');
+  await todoOutbound.flushOutbound();
+  assert.equal(dav.seen('PUT').length, 2);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM shopping_items WHERE external_source = 'local'").get().n, 3);
+});
+
+test('Schranke: drei wartende Termine auf einem ablehnenden Kalender kosten einen PUT je Lauf', async () => {
+  reset();
+  const cal = calendar();
+  const other = calendar('work', 'Arbeit');
+  const ids = [localEvent(cal.url, 'Eins'), localEvent(cal.url, 'Zwei'), localEvent(cal.url, 'Drei')];
+  const elsewhere = localEvent(other.url, 'Woanders');
+
+  // Nur der eine Kalender lehnt ab; der andere nimmt weiter an.
+  dav.refuse({ method: 'PUT', status: 403, when: (req) => req.path.startsWith('/cal/family/') });
+  await caldavSync.sync();
+  assert.equal(dav.seen('PUT').filter((r) => r.status === 403).length, 1,
+    'jeder wartende Termin hat seine eigene Absage abgeholt');
+  for (const id of ids) assert.equal(event(id).external_source, 'local');
+  assert.equal(event(elsewhere).external_source, 'caldav', 'die Schranke hat einen anderen Kalender mitgeschlossen');
+});
+
+test('Schranke: der Apple-Kalender bekommt je Lauf einen Versuch, nicht einen je Termin', async () => {
+  reset();
+  const url = dav.addCollection('icloud', { name: 'iCloud' });
+  dav.putObject(url, 'neighbour.ics', vevent('apple-neighbour@test', 'Nachbar'));
+  appleCalendar.saveCredentials(dav.url, 'u', 'p');
+  for (const title of ['Eins', 'Zwei', 'Drei']) {
+    db.prepare(`
+      INSERT INTO calendar_events (title, start_datetime, end_datetime, all_day, created_by, external_source)
+      VALUES (?, '2035-03-10T09:00', '2035-03-10T10:00', 0, 1, 'local')
+    `).run(title);
+  }
+
+  try {
+    dav.refuse({ method: 'PUT', status: 403 });
+    await appleCalendar.sync();
+    await appleCalendar.sync();
+    assert.equal(dav.seen('PUT').length, 2, 'drei Termine, zwei Läufe: mehr als zwei abgelehnte PUTs');
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM calendar_events WHERE external_source = 'local'").get().n, 3);
+  } finally {
+    appleCalendar.clearCredentials();
+  }
+});
+
+// ── Umzug: was am ZIEL scheitert, trifft nicht den Termin ──────────────────────
+
+function pendingMove(uid, { edited = false } = {}) {
+  const source = calendar('family', 'Familie');
+  const dest   = calendar('work', 'Arbeit');
+  const { id } = mirroredEvent(source, uid, 'Alter Titel');
+  db.prepare(`
+    UPDATE calendar_events
+       SET outbound_move_to = ?, target_caldav_calendar_url = ?,
+           title = CASE WHEN ? = 1 THEN 'Neuer Titel' ELSE title END, outbound_dirty = ?
+     WHERE id = ?
+  `).run(dest.url, dest.url, edited ? 1 : 0, edited ? 1 : 0, id);
+  return { source, dest, id };
+}
+
+test('Umzug im Sync-Lauf: ein abgelehnter Objektabruf am Ziel verwirft den Umzug nicht', async () => {
+  reset();
+  const { source, dest, id } = pendingMove('move-3@test');
+
+  // Das Ziel steht in der Auflistung, nur sein REPORT scheitert. Ein Umzug
+  // schreibt in das Ziel, er liest es nicht.
+  dav.refuse({ method: 'REPORT', path: '/cal/work/', status: 503 });
+  await caldavSync.sync();
+  assertRefused('REPORT', 503);
+
+  const row = event(id);
+  assert.ok(row.outbound_move_to === dest.url || row.calendar_ref_id === dest.refId,
+    'der wartende Umzug wurde verworfen, weil der Abruf des Ziels scheiterte');
+  assert.equal(row.calendar_ref_id, dest.refId, 'der Umzug ist nicht gelaufen, obwohl die Auflistung das Ziel nennt');
+  assert.ok(dav.getObject(dest.url, 'move-3@test.ics'));
+  assert.equal(dav.getObject(source.url, 'move-3@test.ics'), null);
+});
+
+test('Umzug, Ziel antwortet 404 auf die Kopie: der Umzug fällt, die Bearbeitung nicht', async () => {
+  reset();
+  const { source, dest, id } = pendingMove('move-4@test', { edited: true });
+
+  dav.refuse({ method: 'PUT', status: 404, when: (req) => req.path.startsWith('/cal/work/') });
+  await caldavSync.flushOutbound();
+  assertRefused('PUT', 404);
+
+  let row = event(id);
+  assert.equal(row.outbound_move_to, null, 'ein Ziel, das es nicht mehr gibt, wird weiter versucht');
+  assert.equal(row.calendar_ref_id, source.refId);
+  // "Nicht mehr da" galt dem Ziel. Vorher fiel damit auch die Bearbeitung, und
+  // der nächste Abruf überschrieb "Neuer Titel" mit "Alter Titel".
+  assert.match(dav.getObject(source.url, 'move-4@test.ics').data, /SUMMARY:Neuer Titel/,
+    'die wartende Bearbeitung wurde mit dem Umzug verworfen');
+  assert.equal(row.outbound_dirty, 0);
+
+  dav.allowAll();
+  await caldavSync.sync();
+  row = event(id);
+  assert.equal(row.title, 'Neuer Titel', 'der Abruf hat die Bearbeitung überschrieben');
+  assert.equal(dav.objectNames(dest.url).includes('move-4@test.ics'), false);
+});
+
+test('Umzug, die Kopie liegt schon im Ziel (412): der Umzug schliesst ab', async () => {
+  reset();
+  const { source, dest, id } = pendingMove('move-5@test', { edited: true });
+  // Ein früherer Versuch hat die Kopie angelegt und ist danach abgebrochen.
+  dav.putObject(dest.url, 'move-5@test.ics', vevent('move-5@test', 'Alter Titel'));
+
+  await caldavSync.flushOutbound();
+  assertRefused('PUT', 412);
+
+  const row = event(id);
+  assert.equal(row.calendar_ref_id, dest.refId, 'der Umzug blieb an der eigenen Kopie hängen');
+  assert.equal(row.outbound_move_to, null);
+  assert.equal(dav.getObject(source.url, 'move-5@test.ics'), null, 'die Quelle steht noch: der Termin liegt doppelt');
+  // Die Kopie stammt aus dem früheren Versuch; der Stand von jetzt muss drauf.
+  assert.match(dav.getObject(dest.url, 'move-5@test.ics').data, /SUMMARY:Neuer Titel/,
+    'die alte Kopie wurde übernommen, ohne den aktuellen Stand hinaufzutragen');
+});
+
+test('Umzug, an der Adresse im Ziel liegt ein FREMDES Objekt (412): die Quelle bleibt', async () => {
+  reset();
+  const { source, dest, id } = pendingMove('move-6@test');
+  dav.putObject(dest.url, 'move-6@test.ics', vevent('somebody-else@test', 'Fremd'));
+
+  await caldavSync.flushOutbound();
+  assertRefused('PUT', 412);
+
+  assert.ok(dav.getObject(source.url, 'move-6@test.ics'), 'die Quelle wurde gelöscht, obwohl im Ziel ein fremdes Objekt liegt');
+  assert.match(dav.getObject(dest.url, 'move-6@test.ics').data, /SUMMARY:Fremd/, 'das fremde Objekt wurde überschrieben');
+  const row = event(id);
+  assert.equal(row.calendar_ref_id, source.refId);
+  assert.equal(row.outbound_move_to, dest.url, 'der Umzug ist nicht mehr vorgemerkt');
+  assert.equal(row.outbound_attempts, 1);
+});
+
+// ── CardDAV-Verbindungstest: die Absage erreicht den Nutzer ─────────────────────
+
+test('CardDAV-Konto anlegen: eine Absage des Servers kommt als Meldung an, nicht als "Internal error"', async () => {
+  reset();
+  dav.addCollection('book', { name: 'Kontakte', kind: 'addressbook' });
+  const express = (await import('express')).default;
+  const { default: cardavRouter } = await import('../server/routes/cardav.js');
+  const app = express();
+  app.use(express.json());
+  app.use((req, _res, next) => { req.authRole = 'admin'; next(); });
+  app.use('/cardav', cardavRouter);
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise((resolve) => server.once('listening', resolve));
+  try {
+    dav.refuse({ method: 'PROPFIND', path: '/cal/', status: 403 });
+    const res = await fetch(`http://127.0.0.1:${server.address().port}/cardav/accounts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Fake', cardavUrl: dav.url, username: 'u', password: 'p' }),
+    });
+    const body = await res.json();
+    assert.equal(res.status, 502);
+    assert.equal(body.errorCode, 'connection_failed');
+    assert.match(body.error, /refused to list the address books \(HTTP 403/);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM carddav_accounts').get().n, 0);
+  } finally {
+    server.closeAllConnections?.();
+    await new Promise((resolve) => server.close(resolve));
+  }
 });

@@ -19,6 +19,7 @@ import { householdTimeZone } from '../utils/timezone.js';
 import * as db from '../db.js';
 import { nearestIcalColorName } from '../utils/ical-color.js';
 import { outboundEvent } from './outbound-dtstart.js';
+import { findObjectWithUid } from '../utils/own-uid.js';
 import { upsertExternalCalendar } from './external-calendars.js';
 
 const log = createLogger('CalDAVOutbound');
@@ -216,7 +217,10 @@ export async function flushAccount(client, source, { deletions, updates, needsCa
 
   const objectIndex = await fetchObjectsByUrl(client, wanted);
 
-  let calendarsByUrl = new Map();
+  // null = unbekannt. Auch ohne Abruf: zwischen der Auswahl der Arbeit und hier
+  // liegt ein await, in dem ein Umzug vorgemerkt worden sein kann - eine leere
+  // Liste hiesse für ihn "das Ziel ist verschwunden".
+  let calendarsByUrl = null;
   if (needsCalendars) {
     try {
       const cals = await client.fetchCalendars();
@@ -293,7 +297,7 @@ export async function processPendingDeletions(client, source, objectIndex, ownCa
  *                                    Auflistung gescheitert ist (Umzüge warten dann)
  * @returns {Promise<number>} erfolgreich verarbeitete Termine
  */
-export async function processPendingUpdates(client, source, objectIndex, calendarsByUrl = new Map()) {
+export async function processPendingUpdates(client, source, objectIndex, calendarsByUrl = null) {
   const events = outbound.pendingUpdates(source);
   if (events.length === 0) return 0;
 
@@ -348,11 +352,25 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
           // der Collection statt darin - wie der Upload-Pfad als Collection behandeln.
           const collectionUrl = String(destCal.url).replace(/\/?$/, '/');
           const objectUrl = new URL(filename, collectionUrl).href;
-          await client.createCalendarObject({
-            calendar:   { ...destCal, url: collectionUrl },
-            filename,
-            iCalString: patched,
-          });
+          try {
+            await client.createCalendarObject({
+              calendar:   { ...destCal, url: collectionUrl },
+              filename,
+              iCalString: patched,
+            });
+          } catch (err) {
+            // 412: der Name ist im Ziel vergeben. Trägt das Objekt dort die UID
+            // dieses Termins, ist es die Kopie eines früheren Versuchs - dann
+            // geht der Umzug weiter, mit dem aktuellen Stand als Änderung auf
+            // die Kopie. Eine fremde UID an der Adresse heisst: nicht unseres,
+            // die Quelle bleibt, der Fehler nimmt den üblichen Weg.
+            if (err?.status !== 412) throw err;
+            const copy = await findObjectWithUid(client, collectionUrl, objectUrl, event.external_calendar_id);
+            if (!copy) throw err;
+            await client.updateCalendarObject({
+              calendarObject: { url: copy.url, etag: copy.etag, data: patched },
+            });
+          }
           // Erst nach erfolgreichem Anlegen löschen: scheitert das Löschen, steht
           // der Termin doppelt - das ist reparabel. Umgekehrt wäre er weg.
           try {
@@ -382,8 +400,16 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
           done++;
           continue; // der Patch ist mit dem Anlegen bereits geschrieben
         } catch (err) {
-          outbound.handleUpdateError(err, event, 'move', label(source), outbound.clearOutboundMove);
-          continue;
+          // 404/410 auf das Anlegen heisst "das ZIEL ist weg", nicht "der Termin
+          // ist weg": nur der Umzug fällt, eine wartende Bearbeitung geht unten
+          // im bisherigen Kalender hinaus. handleUpdateError läse es als
+          // "erledigt" und nähme die Bearbeitung mit.
+          if (outbound.classifyOutboundError(err) !== 'settled') {
+            outbound.handleUpdateError(err, event, 'move', label(source), outbound.clearOutboundMove);
+            continue;
+          }
+          log.warn(`[${label(source)}] Destination calendar ${moveTo} no longer accepts event ${event.id} (${err.message}), keeping it where it is.`);
+          outbound.clearOutboundMove(event.id);
         }
       }
     } else if (moveTo) {

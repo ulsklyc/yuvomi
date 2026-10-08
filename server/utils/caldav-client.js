@@ -43,6 +43,22 @@ export async function createCardDAVClient(account) {
 }
 
 /**
+ * Was der Server abgelehnt hat, als Satz. Die Meldung erreicht den Nutzer
+ * (Verbindungstest, Sync-Status), deshalb steht hier kein Funktionsname.
+ */
+const REFUSAL_TEXT = {
+  createCalendarObject: 'The server refused to save a new entry',
+  updateCalendarObject: 'The server refused to save a change',
+  deleteCalendarObject: 'The server refused to delete an entry',
+  fetchCalendars:       'The server refused to list the calendars',
+  fetchAddressBooks:    'The server refused to list the address books',
+};
+const NOT_A_LISTING_TEXT = {
+  fetchCalendars:    'The server did not answer with a list of calendars',
+  fetchAddressBooks: 'The server did not answer with a list of address books',
+};
+
+/**
  * Eine Absage des Servers, als Fehler. `status` ist das Feld, das
  * `classifyOutboundError` (calendar-outbound.js) liest; `code` bleibt bewusst
  * leer, denn das liest die Einordnung zuerst und dort stehen bei Netzfehlern
@@ -53,18 +69,76 @@ export class DavHttpError extends Error {
    * @param {string} operation  Name des tsdav-Aufrufs
    * @param {string} [url]      betroffene Ressource
    * @param {object} [response] Antwort des Servers, soweit es eine gab
-   * @param {string} [what]     was an der Antwort nicht stimmt
+   * @param {string} [what]     Satzanfang statt der Vorgabe je Aufruf
    */
-  constructor(operation, url, response, what = 'was refused by the server') {
+  constructor(operation, url, response, what = null) {
     const status = response?.status;
     const text   = response?.statusText ? ` ${response.statusText}` : '';
-    super(status ? `${operation} ${what}: HTTP ${status}${text}` : `${operation} ${what}`);
+    const lead   = what ?? REFUSAL_TEXT[operation] ?? 'The server refused the request';
+    super(status ? `${lead} (HTTP ${status}${text})` : lead);
     this.name       = 'DavHttpError';
     this.status     = status;
     this.statusText = response?.statusText;
     this.operation  = operation;
     this.url        = url ?? response?.url;
   }
+}
+
+/**
+ * Gilt die Absage eines Uploads der COLLECTION oder nur diesem einen Objekt?
+ *
+ * Die Frage stellt sich, weil ein Upload keinen Zähler hat: er bleibt
+ * vorgemerkt, bis er durchgeht. Lehnt die Collection ab (nur lesbar geteilt,
+ * Konto voll, Server überlastet), träfe jeder weitere Upload dieses Laufs
+ * dieselbe Absage - ein PUT und eine Logzeile je wartender Zeile, bei jedem
+ * Lauf. Dann ist nach der ersten Absage Schluss (`createUploadGate`).
+ *
+ * Eine Absage, die am einzelnen Objekt hängt, darf dagegen niemanden hinter
+ * sich aufhalten: die Reihenfolge ist fest, und ein einziger Eintrag, den der
+ * Server nie annimmt, sperrte sonst alle späteren für immer aus. Das sind 412
+ * (der Name ist vergeben) und die Antworten auf den Inhalt selbst (400, 409,
+ * 413, 415, 422).
+ *
+ * Ohne Status (Netzfehler, unbekannte Antwort) gilt die Collection: der nächste
+ * Versuch dieses Laufs liefe in dieselbe Wand.
+ */
+const OBJECT_LEVEL_STATUS = new Set([400, 409, 412, 413, 415, 422]);
+
+export function isCollectionRefusal(err) {
+  const status = err?.status;
+  if (typeof status !== 'number') return true;
+  return !OBJECT_LEVEL_STATUS.has(status);
+}
+
+/**
+ * Schranke für Uploads eines Laufs: nach der ersten Absage auf Collection-Ebene
+ * geht in DIESE Collection nichts mehr hinaus. Gezählt wird ohne Spalte und
+ * ohne Aufgeben - im nächsten Lauf ist die Schranke wieder offen.
+ *
+ *   const gate = createUploadGate();
+ *   if (gate.isClosed(url)) continue;        // zählt die übersprungene Zeile
+ *   try { ... } catch (err) { if (!gate.refused(url, err)) log.warn(...); }
+ *   gate.report((url, err, waiting) => log.warn(...));   // EINE Zeile je Collection
+ */
+export function createUploadGate() {
+  const closed = new Map(); // Collection-URL → { err, waiting }
+  return {
+    isClosed(collectionUrl) {
+      const entry = closed.get(collectionUrl);
+      if (!entry) return false;
+      entry.waiting++;
+      return true;
+    },
+    /** @returns {boolean} true, wenn die Absage die Collection schliesst */
+    refused(collectionUrl, err) {
+      if (!isCollectionRefusal(err)) return false;
+      if (!closed.has(collectionUrl)) closed.set(collectionUrl, { err, waiting: 1 });
+      return true;
+    },
+    report(write) {
+      for (const [collectionUrl, { err, waiting }] of closed) write(collectionUrl, err, waiting);
+    },
+  };
 }
 
 /** Schreibende Aufrufe, deren Antwort tsdav ungeprüft durchreicht. */
@@ -103,8 +177,14 @@ const LISTING_OPERATIONS = ['fetchCalendars', 'fetchAddressBooks'];
  * Angabe"; eine einzelne störrische Collection soll nicht die ganze Liste
  * kippen. Mitgelesen wird über den `fetch`-Parameter des einzelnen Aufrufs,
  * also ohne geteilten Zustand am Client.
+ *
+ * @param {object} client
+ * @param {{fetch?: Function}} [opts] das `fetch`, mit dem der Client gebaut
+ *        wurde, falls die Factory ihm eins mitgibt. Das Mitlesen ersetzt den
+ *        `fetch`-Parameter des Aufrufs; ohne diese Angabe ginge die Auflistung
+ *        am clientweiten `fetch` vorbei.
  */
-export function withHttpRefusalsAsErrors(client) {
+export function withHttpRefusalsAsErrors(client, { fetch: clientFetch } = {}) {
   const overrides = {};
 
   for (const name of WRITE_OPERATIONS) {
@@ -123,7 +203,7 @@ export function withHttpRefusalsAsErrors(client) {
     if (typeof client[name] !== 'function') continue;
     const call = client[name].bind(client);
     overrides[name] = async (params = {}) => {
-      const baseFetch = params?.fetch ?? globalThis.fetch;
+      const baseFetch = params?.fetch ?? clientFetch ?? globalThis.fetch;
       let first = null;
       const recordingFetch = async (...args) => {
         const pending = baseFetch(...args);
@@ -136,7 +216,7 @@ export function withHttpRefusalsAsErrors(client) {
       if (response && !isMultistatus(response)) {
         throw new DavHttpError(
           name, response.url, response,
-          response.ok ? 'got an answer that is not a WebDAV listing' : undefined
+          response.ok ? NOT_A_LISTING_TEXT[name] : null
         );
       }
       return result;

@@ -37,6 +37,9 @@ const { sync: caldavSync } = await import('../server/services/caldav-sync.js');
 const { sync: appleSync } = await import('../server/services/apple-calendar.js');
 const { __test: google } = await import('../server/services/google-calendar.js');
 const { reassignDefaultOnCalendarMove } = await import('../server/services/sync-assignment.js');
+// Die UID, unter der ein Termin hochgeht, kommt aus EINER Quelle (own-uid.js)
+// und traegt die Kennung der Installation; hier nachgebaut waere sie eine Kopie.
+const { eventUidFor } = await import('../server/services/calendar-outbound.js');
 
 const CAL_A = 'https://dav.example/cal-a/';
 const CAL_B = 'https://dav.example/cal-b/';
@@ -443,7 +446,7 @@ describe('#1270 - der Helfer selbst', () => {
 // die Handarbeit auf die Person von B um.
 //
 // Gefahren wird der ECHTE Weg: der Outbound-Push uebergibt die Zeile an den
-// Sync (oikos-UID, `calendar_ref_id`), der Inbound haengt sie danach um.
+// Sync (eigene UID, `calendar_ref_id`), der Inbound haengt sie danach um.
 // --------------------------------------------------------
 
 describe('#1270 - ein hinausgepushter Termin behaelt seine Zuweisung', () => {
@@ -475,10 +478,10 @@ describe('#1270 - ein hinausgepushter Termin behaelt seine Zuweisung', () => {
 
     // ECHTER Outbound: kein Kalender liefert etwas, der Push laeuft.
     await caldavSync({ createClient: caldavClient(null) });
-    const uid = `oikos-${id}@oikos.local`;
+    const uid = eventUidFor(id);
     const pushed = rowOf(id);
     assert.equal(pushed.external_source, 'caldav', 'der Push hat die Zeile uebergeben');
-    assert.equal(pushed.external_calendar_id, uid, 'und ihr die oikos-UID gegeben');
+    assert.equal(pushed.external_calendar_id, uid, 'und ihr die eigene UID gegeben');
     assert.equal(Number(pushed.calendar_ref_id), refOf(CAL_A), 'sie liegt in Kalender A');
 
     // ECHTER Inbound: derselbe Termin liegt jetzt in Kalender B.
@@ -489,7 +492,7 @@ describe('#1270 - ein hinausgepushter Termin behaelt seine Zuweisung', () => {
     assert.deepEqual(assignmentsOf(id), [ANNA], 'und sie ist die einzige');
   });
 
-  it('Apple: die oikos-UID allein haelt die Zuweisung, ohne jedes Ziel', async () => {
+  it('Apple: die eigene UID allein haelt die Zuweisung, ohne jedes Ziel', async () => {
     externalCalendar('apple', CAL_A, 'Kalender A', ANNA);
     externalCalendar('apple', CAL_B, 'Kalender B', BEN);
 
@@ -505,10 +508,10 @@ describe('#1270 - ein hinausgepushter Termin behaelt seine Zuweisung', () => {
 
     // ECHTER Outbound: kein Kalender liefert etwas, der Push laeuft.
     await appleSync({ makeClient: appleClient(null) });
-    const uid = `oikos-${id}@oikos.local`;
+    const uid = eventUidFor(id);
     const pushed = rowOf(id);
     assert.equal(pushed.external_source, 'apple', 'der Push hat die Zeile uebergeben');
-    assert.equal(pushed.external_calendar_id, uid, 'und ihr die oikos-UID gegeben');
+    assert.equal(pushed.external_calendar_id, uid, 'und ihr die eigene UID gegeben');
     assert.equal(Number(pushed.calendar_ref_id), refOf(CAL_A), 'sie liegt in Kalender A');
     const targets = db.prepare(`SELECT target_caldav_calendar_url AS c,
       target_google_calendar_id AS g FROM calendar_events WHERE id = ?`).get(id);

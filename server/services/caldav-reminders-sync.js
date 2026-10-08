@@ -453,6 +453,18 @@ async function runSync({ createClient: makeClient } = {}) {
 
       const client     = await clientFactory(account);
       const serverCals  = await client.fetchCalendars();
+      // Der Server nennt KEINE Collection, obwohl Listen ausgewählt sind: das
+      // ist eine unvollständige Antwort (ein Multistatus, der nur die
+      // Home-Collection nennt oder jede Ressource mit 403 quittiert), kein
+      // leeres Konto. Derselbe Leer-Guard wie beim Prune (#508) - sonst gälte
+      // jede Liste als verschwunden und würde abgeschaltet.
+      if (serverCals.length === 0) {
+        log.warn(
+          `Account ${account.id}: the server listed no collections, but ${enabledLists.length} reminder ` +
+          `list(s) are selected. Skipping this run - assuming an incomplete answer rather than a deleted account.`
+        );
+        continue;
+      }
       const owner       = db.get().prepare('SELECT id FROM users ORDER BY id ASC LIMIT 1').get();
       const createdBy   = owner ? owner.id : 1;
 
@@ -521,6 +533,15 @@ async function runSync({ createClient: makeClient } = {}) {
               // Lokale Bearbeitung wartet auf ihren Push: der alte Serverstand
               // darf sie nicht überschreiben.
               if (pendingByModule[module].dirty.has(todo.uid)) continue;
+
+              // Der eigene Upload, dessen Antwort verloren ging: die Zeile ist
+              // noch lokal, das Objekt liegt schon hier. In die bestehende
+              // Zeile übernehmen statt eine zweite anzulegen; ihr lokaler
+              // Stand geht mit dem Outbound dieses Laufs hinauf.
+              if (obj.url && todoOutbound.adoptOwnUpload(module, todo.uid, account.id, obj.url)) {
+                totalItems++;
+                continue;
+              }
 
               if (module === 'shopping') {
                 upsertShoppingItem(sel, todo, account.id, obj.url || null);
