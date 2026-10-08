@@ -51,6 +51,76 @@ export const NAVIGATE_DEPS = Object.freeze([
 ]);
 
 /**
+ * Der Pfad, den ein Element mit `data-route` vorwaermen laesst (#1821).
+ *
+ * `prefetchRoute()` findet eine Route nur an ihrem Pfad. Die Query fiel bisher
+ * allein von `data-nav-href` ab; eine Inhaltszeile der Uebersicht traegt ihr
+ * Ziel aber in `data-route` und samt Query (`/shopping?list=7`,
+ * `/calendar?open=3&date=..`, `/pantry?filter=low`) - sie waermte nichts vor.
+ * `data-nav-href` gewinnt, wie beim Klick-Handler der Navigation daneben.
+ *
+ * @param {{navHref?: string, route?: string}|null|undefined} dataset
+ * @returns {string|null}
+ */
+export function prefetchPathOf(dataset) {
+  const target = dataset?.navHref ?? dataset?.route;
+  if (typeof target !== 'string') return null;
+  return target.split(/[?#]/)[0] || null;
+}
+
+/**
+ * Steht der Fokus nach einer Navigation schon IN der neuen Seite (#1821)?
+ *
+ * Der Router setzt den Fokus einen Frame nach dem Aufbau auf `<main>`, damit
+ * Tastatur und Screenreader in der neuen Seite ankommen statt auf dem Link, der
+ * sie geoeffnet hat. Wer in diesem Frame schon in der Seite steht - eine Zeile
+ * der Uebersicht, ein Feld, das die Seite selbst fokussiert hat -, ist
+ * angekommen; ihn auf `<main>` zurueckzuholen nahm der Zeile den Fokus, und
+ * Enter tat nichts mehr. Der Frame ist kurz, solange der Tab sichtbar ist, und
+ * beliebig lang, wenn er es nicht ist (rAF ruht im Hintergrund).
+ *
+ * @param {{contains: (el: unknown) => boolean}|null} main
+ * @param {unknown} active - `document.activeElement`
+ */
+export function focusAlreadyInPage(main, active) {
+  return Boolean(main && active && active !== main && main.contains(active));
+}
+
+/**
+ * Fokus nach einer Navigation: einen Frame nach dem Aufbau auf `<main>`.
+ *
+ * Die Funktion steht HIER und nicht in router.js, damit sie als Programm
+ * laeuft (router.js laesst sich nicht importieren): der Router reicht nur noch
+ * seine Browser-Teile herein. Zwei Faelle lassen den Fokus, wo er ist, und
+ * beide werden IM Frame gefragt, nicht davor - dazwischen liegt genau die
+ * Zeit, in der jemand in die Seite tabbt oder die Seite einen Dialog oeffnet:
+ *
+ * - er liegt schon in der neuen Seite (focusAlreadyInPage);
+ * - ein Overlay ist offen. Eine Navigation schliesst alle Overlays; steht nach
+ *   dem Aufbau eines im Register, hat die NEUE Seite es geoeffnet (`?open=`
+ *   bei Notizen, Kontakten, Geburtstagen, Aufgaben). Das Overlay liegt
+ *   ausserhalb von `<main>` und haelt den Fokus selbst - `main.focus()` zoege
+ *   ihn hinter den offenen Dialog, und Tab liefe durch die Seite dahinter.
+ *
+ * Alles andere - der Link in Seitenleiste oder Tableiste, `<body>`, ein
+ * Element der alten Seite - gibt den Fokus an `<main>` ab. Das ist der Zweck
+ * der Funktion und darf mit den beiden Ausnahmen nicht verloren gehen.
+ *
+ * @param {string} path
+ * @param {{document: Document, requestAnimationFrame: (cb: () => void) => unknown, hasOpenOverlay: () => boolean}} env
+ */
+export function focusMainAfterNavigation(path, { document, requestAnimationFrame, hasOpenOverlay }) {
+  if (path === '/login' || path === '/setup') return;
+  const main = document.getElementById('main-content');
+  if (!main || typeof main.focus !== 'function') return;
+  requestAnimationFrame(() => {
+    if (hasOpenOverlay()) return;
+    if (focusAlreadyInPage(main, document.activeElement)) return;
+    main.focus({ preventScroll: true });
+  });
+}
+
+/**
  * @param {object} state - der geteilte Zustand, Felder wie in NAVIGATE_STATE
  * @param {object} deps - Abhaengigkeiten, Namen wie in NAVIGATE_DEPS
  * @returns {(path: string, userOrPushState?: object|boolean, pushState?: boolean) => Promise<void>}

@@ -86,6 +86,20 @@ export const DISPLAY_SCOPE_MODULES = Object.freeze(
 );
 
 /**
+ * Die BEREICHE, die ein Display zeigt (#1808): seine Lesemodule ohne die
+ * Uebersicht selbst. `dashboard` ist der Ort, an dem die anderen stehen, kein
+ * Bereich daneben. Der Hinweis unter Einstellungen > Wandtabletts zaehlt genau
+ * diese Liste auf - er bekommt sie mit `GET /displays`, damit es keine zweite
+ * Handliste im Browser gibt, die beim naechsten Scope stehen bleibt.
+ */
+export const DISPLAY_AREA_MODULES = Object.freeze(
+  DISPLAY_SCOPES
+    .filter((scope) => scope.endsWith(':read'))
+    .map((scope) => scope.split(':')[0])
+    .filter((key) => key !== 'dashboard'),
+);
+
+/**
  * Die Geruestpfade, die ein Display LESEN darf, zusaetzlich zu seinen Modulen.
  *
  * WARUM ES SIE BRAUCHT, gemessen im Browser: die App beantwortet beim Start

@@ -1377,6 +1377,31 @@ function syncBirthdaysDetailTop(page) {
   page.style.setProperty('--birthdays-detail-top', `${Math.round(detail.getBoundingClientRect().top)}px`);
 }
 
+/**
+ * `?open=<id>` UNTER der Spaltenschwelle (#1821): die Geburtstagszeile der
+ * Uebersicht und der Treffer der Suche nennen EINEN Anlass, also geht sein
+ * Leseblatt auf. In der Spalte hat der Baustein ihn schon ausgewaehlt, und
+ * dort bleibt der Parameter stehen - die Auswahl IST die Adresse.
+ *
+ * Unter der Schwelle verlaesst er die Adresse, BEVOR das Blatt aufgeht, und
+ * ohne eigenen History-Eintrag: dieselbe Regel wie bei den Notizen. Das Blatt
+ * ist ein Dialog; bliebe der Parameter, schluege es bei jedem Neuladen und bei
+ * jedem Zurueck auf diese Seite wieder auf. Die Reihenfolge zaehlt: das Blatt
+ * legt seinen Zurueck-Schritt auf die Adresse, die dann gilt.
+ *
+ * @returns {boolean} true, wenn ein Blatt aufging
+ */
+function openBirthdayFromQueryNarrow(md, find, { loc = window.location, openSheet = openBirthdaySheet } = {}) {
+  if (!md || md.isSplit()) return false;
+  const id = new URLSearchParams(loc.search ?? '').get('open');
+  if (id === null) return false;
+  md.clear({ history: 'replace' });
+  const birthday = find(id);
+  if (!birthday) return false;
+  openSheet(birthday);
+  return true;
+}
+
 function mountBirthdaysDetail(signal) {
   const root = _container?.querySelector('.birthdays-split');
   if (!root) return;
@@ -1384,6 +1409,9 @@ function mountBirthdaysDetail(signal) {
   _md = mountMasterDetail({
     root,
     signal,
+    // `deepLinkNarrow` bleibt aus: unter der Schwelle loest die SEITE den
+    // Link ein (openBirthdayFromQueryNarrow unten), weil der Parameter dort
+    // nach dem Einloesen aus der Adresse gehoert.
     renderDetail: (id, body) => renderBirthdayPane(id, body),
     // Unter der Schwelle das Leseblatt (E7), bei Nur-lesen die Leseansicht.
     openNarrow: (id) => {
@@ -1397,6 +1425,7 @@ function mountBirthdaysDetail(signal) {
   });
   const handle = _md;
   signal?.addEventListener('abort', () => { if (_md === handle) _md = null; }, { once: true });
+  openBirthdayFromQueryNarrow(_md, find);
   const page = _container.querySelector('.birthdays-page');
   syncBirthdaysHeadBlock(page);
   let frame = 0;
@@ -1444,4 +1473,6 @@ export const __test = {
   birthdayPreviewHtml,
   // R10 L5: die Detailspalte.
   birthdayPaneSections, birthdayDetailHead, renderBirthdayPane,
+  // #1821: `?open=` unter der Spaltenschwelle.
+  openBirthdayFromQueryNarrow,
 };

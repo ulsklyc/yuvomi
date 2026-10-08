@@ -433,6 +433,20 @@ export function sameWidgetConfig(a, b) {
  * @param {object[]} config normalisierte Widget-Konfiguration
  * @returns {string} '/dashboard' oder '/dashboard?…'
  */
+/**
+ * Die gespeicherte Listen-Auswahl der Einkaufs-Kachel als Ids (#1818):
+ * positive ganze Zahlen, ohne Doppelte. Was sonst im Layout steht (ein
+ * Fremdwert, ein String aus aelterem Stand), faellt weg - dieselbe Form, die
+ * die Route aus `?shopping_list=` liest.
+ *
+ * @param {unknown} value `options.lists`
+ * @returns {number[]}
+ */
+export function normalizeShoppingListSelection(value) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.map(Number).filter((id) => Number.isInteger(id) && id > 0))];
+}
+
 export function dashboardQuery(config) {
   const params = new URLSearchParams();
   const optionsOf = (id) => (Array.isArray(config) ? config.find((w) => w.id === id)?.options : null) ?? {};
@@ -447,6 +461,11 @@ export function dashboardQuery(config) {
   if (eventLimit !== EVENT_LIMIT_DEFAULT) params.set('events_limit', String(eventLimit));
   for (const key of optionsOf('tasks').categories ?? []) params.append('tasks_category', key);
   for (const id of optionsOf('notes').categories ?? []) params.append('notes_category', String(id));
+  // Die Listen-Auswahl der Einkaufs-Kachel (#1818). Sie reist wie jede andere
+  // Option, ob die Kachel sichtbar ist oder nicht: die Route legt die Auswahl
+  // in ein eigenes Feld (`shoppingTile`) und laesst alles andere unberuehrt,
+  // also haengt keine Zahl ausserhalb der Kachel an ihr.
+  for (const id of normalizeShoppingListSelection(optionsOf('shopping').lists)) params.append('shopping_list', String(id));
   const query = params.toString();
   return query ? `/dashboard?${query}` : '/dashboard';
 }
@@ -461,11 +480,15 @@ export function dashboardQuery(config) {
  * gewaehlter Stufe als gefiltert, und der Router holte anderthalb Sekunden
  * spaeter dieselbe Aggregation ein zweites Mal, bei jedem Kaltstart.
  *
+ * `shopping_list` (#1818) steht aus demselben Grund hier: die Auswahl fuellt
+ * ein eigenes Feld der Antwort (`shoppingTile`) und laesst `shoppingOpenCount`
+ * unberuehrt - die Zahl, die Navigation und Kuechen-Kachel lesen.
+ *
  * ALLOWLIST: was hier nicht steht, gilt als Filter. Ein neuer Parameter kostet
  * so hoechstens den zweiten Abruf, nie eine falsche Zahl. `events_scope` und
  * `events_birthdays` stehen bewusst nicht hier - sie waren vor #1680 schon
  * „gefiltert", und ob sie es bleiben, ist nicht Sache dieser Aenderung. */
-const COUNT_NEUTRAL_PARAMS = new Set(['events_limit']);
+const COUNT_NEUTRAL_PARAMS = new Set(['events_limit', 'shopping_list']);
 
 /**
  * @param {string} query Pfad der Uebersichts-Abfrage ('/dashboard' oder '/dashboard?…')
