@@ -178,6 +178,7 @@ const APP_SHELL = [
   '/utils/korean-particles.js',
   '/utils/leave-guard.js',
   '/utils/live-feed.js',
+  '/utils/loan-order.js',
   '/utils/markdown-checklist.js',
   '/utils/markdown-toolbar.js',
   '/utils/master-detail.js',
