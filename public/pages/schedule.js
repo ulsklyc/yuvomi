@@ -301,12 +301,25 @@ function rangeFields(form) {
 
 const rangeReversed = (from, to) => Boolean(from && to && from > to);
 
-/** "Bis" folgt "Von". Der Datepicker meldet `change` an sich selbst. */
+/**
+ * "Bis" folgt "Von". Der Datepicker meldet `change` an sich selbst.
+ *
+ * DIE MELDUNG AN "BIS" GEHT MIT. reportFieldError() raeumt sie erst ab, wenn
+ * "Bis" SELBST `input` oder `change` meldet. Wer den verkehrten Zeitraum
+ * ueber "Von" richtigstellt, fasst "Bis" nie an, und der Setter `to.value =`
+ * meldet nichts: Meldung und `aria-invalid="true"` blieben auf einem
+ * gueltigen Feld stehen. Deshalb meldet "Bis" hier `change`, sobald sich sein
+ * Wert durch das Mitziehen geaendert hat oder seine Meldung nicht mehr stimmt -
+ * dasselbe Ereignis, das der Datepicker nach einer Eingabe schickt.
+ */
 function wireRangeFollow(form) {
   const fields = rangeFields(form);
   if (!fields) return;
   fields.from.addEventListener('change', () => {
-    if (rangeReversed(fields.from.value, fields.to.value)) fields.to.value = fields.from.value;
+    const followed = rangeReversed(fields.from.value, fields.to.value);
+    if (followed) fields.to.value = fields.from.value;
+    const staleError = fields.to.getAttribute?.('aria-invalid') === 'true';
+    if (followed || staleError) fields.to.dispatchEvent?.(new Event('change', { bubbles: true }));
   });
 }
 

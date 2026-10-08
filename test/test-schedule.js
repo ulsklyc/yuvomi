@@ -3120,3 +3120,73 @@ test('#1777: Von nach Bis meldet der Dialog am Feld "Bis" und sendet nichts', as
     globalThis.window = saved.window;
   }
 });
+
+/* #1777, Review: die Meldung an "Bis" blieb stehen, wenn der Zeitraum ueber
+ * "Von" richtiggestellt wurde. reportFieldError() raeumt nur ab, wenn das Feld
+ * SELBST `input` oder `change` meldet - und weder eine Korrektur an "Von" noch
+ * der Setter `to.value =` des Mitziehens meldet an "Bis" etwas. Die Attrappe
+ * bildet genau das nach: Attribute, Listener, und ein Setter, der schweigt. */
+test('#1777: die Meldung an "Bis" faellt, wenn "Von" den Zeitraum richtigstellt', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const field = (name, value) => {
+    const listeners = new Map();
+    const attributes = new Map();
+    return {
+      name, value,
+      getAttribute: (key) => attributes.get(key) ?? null,
+      setAttribute: (key, val) => attributes.set(key, String(val)),
+      addEventListener(type, fn) { listeners.set(type, [...(listeners.get(type) ?? []), fn]); },
+      removeEventListener(type, fn) { listeners.set(type, (listeners.get(type) ?? []).filter((item) => item !== fn)); },
+      dispatchEvent(event) { for (const fn of [...(listeners.get(event.type) ?? [])]) fn(event); return true; },
+      /** Wie `_emit()` im Datepicker: der Wert steht, dann kommt `change`. */
+      pick(next) { this.value = next; this.dispatchEvent(new Event('change', { bubbles: true })); },
+    };
+  };
+  // Was das echte reportFieldError() am Feld tut (components/modal.js): markieren,
+  // und beim naechsten `input`/`change` DIESES Feldes wieder abraeumen.
+  const markInvalid = (input) => {
+    input.setAttribute('aria-invalid', 'true');
+    const clear = () => {
+      input.removeEventListener('input', clear);
+      input.removeEventListener('change', clear);
+      input.setAttribute('aria-invalid', 'false');
+    };
+    input.addEventListener('input', clear);
+    input.addEventListener('change', clear);
+  };
+  const dialog = (fromValue, toValue) => {
+    const from = field('range_from', fromValue);
+    const to = field('range_to', toValue);
+    __test.wireRangeFollow(rangeFormStub([from, to]));
+    return { from, to };
+  };
+
+  // (1) Verkehrt herum gemeldet, dann "Von" ZURUECK vor "Bis": der Zeitraum
+  //     stimmt, "Bis" wurde nie angefasst.
+  const a = dialog('2026-10-08', '2026-10-07');
+  markInvalid(a.to);
+  a.from.pick('2026-10-06');
+  assert.equal(a.to.value, '2026-10-07', '"Bis" bleibt, wo es war');
+  assert.equal(a.to.getAttribute('aria-invalid'), 'false', 'die Meldung an "Bis" steht auf einem gueltigen Feld');
+
+  // (2) Verkehrt herum gemeldet, dann "Von" noch weiter: "Bis" zieht mit, und
+  //     der Setter allein raeumt nichts ab.
+  const b = dialog('2026-10-08', '2026-10-07');
+  markInvalid(b.to);
+  b.from.pick('2026-10-09');
+  assert.equal(b.to.value, '2026-10-09');
+  assert.equal(b.to.getAttribute('aria-invalid'), 'false', 'nach dem Mitziehen steht die Meldung noch');
+
+  // (3) Das Mitziehen meldet `change` an "Bis" - wer darauf hoert, erfaehrt den neuen Wert.
+  const c = dialog('2026-10-07', '2026-10-07');
+  const heard = [];
+  c.to.addEventListener('change', () => heard.push(c.to.value));
+  c.from.pick('2026-10-10');
+  assert.deepEqual(heard, ['2026-10-10']);
+
+  // GEGENPROBEN: ohne Meldung und ohne Mitziehen bleibt "Bis" still, und eine
+  // Meldung faellt NICHT, solange der Zeitraum verkehrt herum bliebe - das kann
+  // er nach dem Mitziehen nicht, also zaehlt hier nur die Stille.
+  c.from.pick('2026-10-01');
+  assert.deepEqual(heard, ['2026-10-10'], 'ein frueheres "Von" ohne Meldung meldet an "Bis" nichts');
+});
