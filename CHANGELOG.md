@@ -236,6 +236,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cook selection a moment later. Closing the dialog after that asked whether to discard changes,
   although nothing had been changed. What you typed before the selection arrived still counts as
   a change, as it should.
+- **Fast clicks on the month arrows in the budget land on the right month.** Clicking "next"
+  twice while a month was still loading moved one month instead of two, and going forward and
+  straight back could leave the wrong month on screen - whichever answer arrived last won. Each
+  click now counts from the month you asked for, and a late answer for a month you already left
+  is ignored. The same holds for "Current" and for swiping.
 
 ## [2.75.0] - 2026-10-07
 
