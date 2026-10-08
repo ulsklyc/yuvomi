@@ -2712,6 +2712,18 @@ function openItemDetails(itemId, container) {
   });
 }
 
+/**
+ * Eine Zeile in einem zugeklappten Traeger (Kategorie oder „Abgehakt", #1816)
+ * hat keine Lage: gemessen wird sie bei 0/0, und kaeme sie im Neubau ins Bild,
+ * glitte sie aus der Fensterecke herein. Ohne Vorher-Lage erscheint sie wie
+ * eine neue Zeile.
+ */
+function dropHiddenRows(listEl, before) {
+  for (const row of listEl.querySelectorAll?.('.row-carrier[hidden] > .swipe-row[data-swipe-id]') ?? []) {
+    before.delete(row.dataset.swipeId);
+  }
+}
+
 function updateItemsList(container) {
   const listEl = container.querySelector('#items-list');
   if (listEl) {
@@ -2720,6 +2732,7 @@ function updateItemsList(container) {
     // jede bewegte Zeile gleitet danach von dort an ihre neue Stelle
     // (utils/flip.js; reduzierte Bewegung springt wie bisher).
     const before = flipSnapshot(listEl, '.swipe-row[data-swipe-id]', 'data-swipe-id');
+    dropHiddenRows(listEl, before);
     // mountItems() verdrahtet den CTA des Leerzustands selbst; der frühere
     // nachgelagerte #empty-cta-shopping-Listener entfällt damit.
     mountItems(listEl, container);
