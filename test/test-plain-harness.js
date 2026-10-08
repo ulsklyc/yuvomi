@@ -71,6 +71,16 @@ test('ein synchroner Rumpf laeuft sofort und an seiner Stelle', async () => {
   assert.deepEqual(await finish(), { passed: 2, failed: 1 });
 });
 
+test('finish() gibt einem Rumpf, der nie fertig wird, eine Frist und zaehlt ihn als fehlgeschlagen', async () => {
+  const lines = [];
+  const { test: run, finish } = createHarness('Probe', { log: (l) => lines.push(l), error: (l) => lines.push(l), timeoutMs: 50 });
+  run('haengt', async () => { await new Promise(() => {}); });
+  run('laeuft durch', async () => { await later(() => {}); });
+  // Ohne Frist kaeme dieses await nie zurueck (der Testprozess haelt die Loop am Leben).
+  assert.deepEqual(await finish(), { passed: 1, failed: 1 });
+  assert.ok(lines.includes('  ✗ haengt: der async-Rumpf ist nach 50 ms nicht fertig'), lines.join('|'));
+});
+
 test('finish() wartet auf alles, was noch laeuft - auch auf nachgemeldete Tests', async () => {
   const { test: run, finish } = quietHarness();
   run('meldet einen zweiten an', async () => {
@@ -87,17 +97,19 @@ test('als Programm: ein spaet scheiternder async-Test macht den Lauf rot (Exit 1
   {
     const harnessUrl = pathToFileURL(join(TEST_DIR, 'plain-harness.js')).href;
     // Derselbe Fuss wie in test-calendar.js.
-    const program = (body) => `import { createHarness } from ${JSON.stringify(harnessUrl)};
-const { test, finish } = createHarness('Probe');
+    const program = (body, options = '') => `import { createHarness } from ${JSON.stringify(harnessUrl)};
+const { test, finish } = createHarness('Probe'${options});
 test('synchron gruen', () => {});
 ${body}
 const { failed } = await finish();
 if (failed > 0) process.exit(1);
 `;
-    const run = (name, body) => {
+    const run = (name, body, options = '') => {
       const file = join(dir, name);
-      writeFileSync(file, program(body));
-      return spawnSync(process.execPath, [file], { encoding: 'utf8' });
+      writeFileSync(file, program(body, options));
+      // Die Frist des Kindprozesses: ein Lauf, der endlos haengt, endet hier
+      // mit status null und macht die Probe rot, statt die Suite anzuhalten.
+      return spawnSync(process.execPath, [file], { encoding: 'utf8', timeout: 15_000 });
     };
     const red = run('red.mjs', "test('scheitert spaet', async () => { await new Promise((r) => setImmediate(r)); throw new Error('zu spaet'); });");
     assert.equal(red.status, 1, `stdout: ${red.stdout}\nstderr: ${red.stderr}`);
@@ -118,6 +130,18 @@ if (failed > 0) process.exit(1);
     assert.notEqual(hang.status, 0, `stdout: ${hang.stdout}\nstderr: ${hang.stderr}`);
     assert.doesNotMatch(hang.stdout, /wird nie fertig|bestanden/);
     assert.match(hang.stderr, /✗ wird nie fertig: der async-Rumpf ist nie fertig geworden/, 'der Lauf nennt den Test, der haengt');
+
+    // Derselbe Haenger, aber etwas haelt die Event-Loop am Leben (ein
+    // Intervall, wie ein offener Server oder Zeitgeber der Suite). Dann gibt
+    // es kein Exit 13: ohne Frist liefe der Lauf endlos und nennte den Test
+    // nie. Mit Frist zaehlt er als fehlgeschlagen und endet mit Exit 1.
+    const alive = run('alive.mjs',
+      "setInterval(() => {}, 1000);\ntest('haengt bei lebender Loop', async () => { await new Promise(() => {}); });",
+      ', { timeoutMs: 300 }');
+    assert.equal(alive.signal, null, 'der Lauf endet von selbst, nicht erst durch die Frist des Kindprozesses');
+    assert.equal(alive.status, 1, `stdout: ${alive.stdout}\nstderr: ${alive.stderr}`);
+    assert.match(alive.stderr, /✗ haengt bei lebender Loop: der async-Rumpf ist nach 300 ms nicht fertig/);
+    assert.match(alive.stdout, /1 bestanden, 1 fehlgeschlagen/);
   }
 });
 
