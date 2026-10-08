@@ -31,6 +31,7 @@ import { formatMoney, formatSignedAmount, amountPlaceholder, amountStep, amountM
 import { budgetCategoryLabel } from '/utils/category-labels.js';
 import { trendMarkup, leadCardClass } from '/utils/metric-card.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
+import { LOAN_SORTS, DEFAULT_LOAN_SORT, normalizeLoanSort, sortLoans, groupLoans } from '/utils/loan-order.js';
 import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
 import { metricGlanceHtml, wireMetricGlance, glanceLeadClass } from '/utils/metric-glance.js';
 import { intervalUnitLabel } from '/rrule-ui.js';
@@ -57,6 +58,9 @@ const EXPENSES_ONLY_KEY = 'yuvomi-budget-expenses-only';
 // Geraeteweit wie die Ausgaben-Ansicht daneben: ob die Liste nach Zustaendigen
 // gruppiert erscheint, ist eine Frage des Schirms, nicht des Haushalts (#1057).
 const GROUP_RESPONSIBLE_KEY = 'yuvomi:budget:group-responsible';
+// Geraeteweit wie die beiden Ansichten darueber: in welcher Reihenfolge die
+// Darlehen stehen, ist eine Frage des Lesens, kein Datum des Haushalts (#1706).
+const LOAN_SORT_KEY = 'yuvomi:budget:loan-sort';
 
 const SUBCATEGORY_I18N = () => ({
   rent_mortgage:            t('budget.subcatRentMortgage'),
@@ -240,6 +244,7 @@ let state = {
   activeTab:   'budget',
   loanFilterId: null,
   loanStatusFilter: 'active',
+  loanSort: null,              // 'start' | 'rate' | 'balance'; null = noch nicht gelesen (loanSort())
   currency:    'EUR',
   budgetMode:  'shared',      // 'shared' (Altverhalten) | 'personal' (#476/#505)
   members:     [],            // Haushaltsmitglieder fuer den Zustaendigen-Picker (#1057)
@@ -2578,6 +2583,7 @@ function renderLoansDashboard() {
           <!-- Die Summenzeile („2 aktiv · 175.444,93 € offen") ist entfallen:
                sie wiederholte die Karte RESTSCHULD direkt darunter (R14 P1). -->
           ${state.loanFilterId ? `<div class="budget-list-header__filter">${esc(activeLoanLabel())}</div>` : ''}
+          ${loanSortNoteHtml()}
         </div>
         <div class="panel-head__actions">
           ${state.loanFilterId ? `
@@ -2596,6 +2602,7 @@ function renderLoansDashboard() {
                     tabindex="${on ? '0' : '-1'}">${t(key)}</button>`;
               }).join('')}
           </div>
+          ${loanToolsMenuHtml()}
         </div>
       </div>
       <!-- Geteilte Kennzahl-Zeile statt der früheren eigenen budget-loans__stats
@@ -2621,7 +2628,7 @@ function renderLoansDashboard() {
       })}</p>` : ''}
       ${visibleLoans.length ? `
         <div class="budget-loans__list">
-          ${visibleLoans.map(renderLoanCard).join('')}
+          ${loanListHtml(visibleLoans)}
         </div>
       ` : `
         <div class="budget-loans__empty">${t('budget.loansEmpty')}</div>
@@ -2633,11 +2640,98 @@ function renderLoansDashboard() {
 
 function filteredLoans() {
   const loans = state.loans?.loans ?? [];
-  return loans.filter((loan) => {
+  return sortLoans(loans.filter((loan) => {
     const matchesStatus = state.loanStatusFilter === 'all' || loan.status === state.loanStatusFilter;
     const matchesLoan = !state.loanFilterId || loan.id === state.loanFilterId;
     return matchesStatus && matchesLoan;
-  });
+  }), loanSort());
+}
+
+/**
+ * Die gewaehlte Sortierung. Beim ersten Zeichnen des Reiters aus dem
+ * Geraetespeicher gelesen, danach aus dem State - gelesen wird dort, wo der
+ * Wert gebraucht wird, damit kein Seitenaufbau ihn vergessen kann.
+ */
+function loanSort() {
+  if (state.loanSort == null) {
+    let stored = null;
+    try { stored = localStorage.getItem(LOAN_SORT_KEY); } catch (_) { /* Private-Mode: Voreinstellung */ }
+    state.loanSort = normalizeLoanSort(stored);
+  }
+  return state.loanSort;
+}
+
+// Die Koepfe der Gruppen tragen die Woerter, die schon an Karte und Filter
+// stehen - dieselbe Sache heisst auf der Seite nicht zweimal verschieden.
+const LOAN_GROUP_LABELS = {
+  borrowed: 'budget.loanDirectionBorrowedBadge',
+  lent: 'budget.loanDirectionLentBadge',
+  paid: 'budget.loanStatusPaid',
+};
+
+/**
+ * Die Karten der Liste. In einer Geld-Sortierung mit beiden Richtungen stehen
+ * sie in Gruppen (aufgenommen, verliehen, bezahlt) unter einem Gruppentitel
+ * (`.list-group__title`, DESIGN.md "Ueberschrift ueber Inhalt"); sonst ohne.
+ * `visibleLoans` ist schon sortiert, gruppiert wird dieselbe Menge.
+ */
+function loanListHtml(visibleLoans) {
+  const groups = groupLoans(visibleLoans, loanSort());
+  if (!groups) return visibleLoans.map(renderLoanCard).join('');
+  return groups.map((group) => `
+          <h3 class="list-group__title budget-loans__group" data-loan-group="${group.id}">${esc(t(LOAN_GROUP_LABELS[group.id]))}</h3>
+          ${group.loans.map(renderLoanCard).join('')}`).join('');
+}
+
+/**
+ * Die Statuszeile der Sortierung (Entscheidung Ulas, 2026-10-08): die Wahl
+ * wird gemerkt, also steht die Liste nach einer Woche evtl. anders da als
+ * erwartet - dann sagt die Zeile, wonach. In der Voreinstellung steht nichts.
+ * Dieselbe leise Zeile wie der Darlehens-Filter darueber, als echter Knopf:
+ * ein Tipp oeffnet das Sortiermenue (wireLoansPage).
+ */
+function loanSortNoteHtml() {
+  const sort = loanSort();
+  if (sort === DEFAULT_LOAN_SORT) return '';
+  return `<button type="button" class="budget-list-header__filter budget-loans__sort-note" id="budget-loan-sort-note"
+                  aria-haspopup="menu" aria-controls="budget-loan-tools-menu">${esc(t('budget.loanSortActive', { sort: t(LOAN_SORT_LABELS[sort]) }))}</button>`;
+}
+
+const LOAN_SORT_LABELS = {
+  start: 'budget.loanSortStart',
+  rate: 'budget.loanSortRate',
+  balance: 'budget.loanSortBalance',
+};
+
+/**
+ * Das Werkzeug-Menue der Darlehen (#1706; Muster: toolsMenuHtml der Abos,
+ * documentsToolsMenuHtml): die Sortierung als Einfachauswahl mit Haken. Sie
+ * ordnet nur und schreibt nichts - bei `budget: read` bleibt sie stehen.
+ *
+ * KEIN RAT: die Eintraege nennen, wonach geordnet wird, nicht was zu tun ist.
+ * Welches Darlehen zuerst getilgt wird, entscheidet, wer seine Vertraege
+ * kennt (#935).
+ */
+function loanToolsMenuHtml() {
+  const label = t('common.moreActions');
+  return `
+    <button type="button" class="btn btn--secondary btn--icon budget-loan-tools popover-menu__trigger"
+            popovertarget="budget-loan-tools-menu" aria-haspopup="menu" aria-expanded="false"
+            aria-label="${esc(label)}" title="${esc(label)}">
+      <i data-lucide="ellipsis" class="icon-md" aria-hidden="true"></i>
+    </button>
+    <div class="popover-menu budget-loan-tools-menu" id="budget-loan-tools-menu" popover role="menu" aria-label="${esc(label)}">
+      <div class="popover-menu__group" role="group" aria-labelledby="budget-loan-tools-sort-label">
+        <div class="popover-menu__label" id="budget-loan-tools-sort-label">${esc(t('budget.loanSortLabel'))}</div>
+        ${LOAN_SORTS.map((id) => {
+    const on = loanSort() === id;
+    return `
+        <button type="button" role="menuitemradio" aria-checked="${on}" class="popover-menu__item" data-loan-sort="${id}">
+          <i data-lucide="check" class="icon-md popover-menu__item-check${on ? '' : ' popover-menu__item-check--hidden'}" aria-hidden="true"></i><span>${esc(t(LOAN_SORT_LABELS[id]))}</span>
+        </button>`;
+  }).join('')}
+      </div>
+    </div>`;
 }
 
 function activeLoanLabel() {
@@ -2646,8 +2740,15 @@ function activeLoanLabel() {
 }
 
 function loanPaymentsFor(loans) {
+  // Gleichstand (selber Tag, selbe Ratennummer an zwei Darlehen) bricht die
+  // Reihenfolge des SERVERS, nicht die der Karten: sonst tauschte die
+  // Sortierwahl der Darlehen (#1706) Zeilen in der Ratenliste.
+  const serverOrder = new Map((state.loans?.loans ?? []).map((loan, index) => [loan.id, index]));
+  const rank = (loan) => serverOrder.get(loan.id) ?? Number.MAX_SAFE_INTEGER;
   return loans.flatMap((loan) => (loan.payments ?? []).map((payment) => ({ ...payment, loan })))
-    .sort((a, b) => new Date(b.paid_date) - new Date(a.paid_date) || b.installment_number - a.installment_number);
+    .sort((a, b) => new Date(b.paid_date) - new Date(a.paid_date)
+      || b.installment_number - a.installment_number
+      || rank(a.loan) - rank(b.loan));
 }
 
 function renderLoanTransactions(loans) {
@@ -2811,6 +2912,22 @@ function wireLoansPage() {
       renderBody();
       refocusSegmented('.budget-loans__filters');
     },
+  });
+  // Die Statuszeile oeffnet dasselbe Menue wie der Mehr-Knopf. Kein zweites
+  // `popovertarget`: das Menue richtet sich am ERSTEN sichtbaren Ausloeser aus
+  // (popover-menu.js triggerOf) und haenge sonst immer an der Zeile.
+  _container.querySelector('#budget-loan-sort-note')?.addEventListener('click', () => {
+    _container.querySelector('#budget-loan-tools-menu')?.showPopover?.();
+  });
+  _container.querySelector('#budget-loan-tools-menu')?.addEventListener('click', (e) => {
+    const item = e.target.closest('[data-loan-sort]');
+    if (!item) return;
+    state.loanSort = normalizeLoanSort(item.dataset.loanSort);
+    try { localStorage.setItem(LOAN_SORT_KEY, state.loanSort); } catch (_) { /* Private-Mode: nur diese Sitzung */ }
+    renderBody();
+    // Der Eintrag lag im Menue, das mit dem Neuaufbau verschwindet - der Fokus
+    // geht an dessen Knopf zurueck statt auf <body>.
+    _container.querySelector('.budget-loan-tools')?.focus();
   });
   // renderBody() baut die Leiste bei jedem Wechsel neu: der Schluessel laesst
   // die neue Kapsel von der Stelle der alten gleiten.
@@ -3112,7 +3229,13 @@ function renderLoanCard(loan) {
         <span data-bar-key="loan:${loan.id}" style="--bar-scale:${paidPct / 100}"></span>
       </div>
       <div class="budget-loan-card__footer">
-        <span>${t('budget.loanNextDue', { month: nextDue })}</span>
+        <div class="budget-loan-card__dates">
+          <span>${t('budget.loanNextDue', { month: nextDue })}</span>
+          ${/* Der Monat der letzten Rate (#1706), vom Server aus derselben
+              * Restlaufzeit gerechnet, die auch der Bericht zeigt. Fehlt er
+              * (getilgt, oder die Rate deckt den Zins nicht), faellt die Zeile weg. */ ''}
+          ${loan.projected_end_month ? `<span class="budget-loan-card__end">${t('budget.loanProjectedEnd', { month: formatMonthLabel(loan.projected_end_month) })}</span>` : ''}
+        </div>
         ${/* Bei `budget: read` gehen alle drei: Bearbeiten, Loeschen und das
             * Buchen einer Rate schreiben. Faelligkeit, Fortschritt und der
             * Bericht hinter der Karte bleiben - sie sind die Auskunft. */ ''}

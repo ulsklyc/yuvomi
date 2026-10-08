@@ -9,7 +9,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { computeLoanSchedule, remainingPrincipalAfter, remainingPrincipalFromPayments, remainingInstallmentsForBalance, MAX_LOAN_MONTHS } from '../server/services/loan-amortization.js';
+import { computeLoanSchedule, remainingPrincipalAfter, remainingPrincipalFromPayments, remainingInstallmentsForBalance, rateForInstallment, MAX_LOAN_MONTHS } from '../server/services/loan-amortization.js';
 
 const near = (a, b, eps = 0.02) => Math.abs(a - b) <= eps;
 
@@ -333,4 +333,32 @@ test('nach der Zinsbindung rechnet die Prognose mit dem Anschlusssatz', () => {
   assert.ok(amAnfang !== null && kurzVorAblauf !== null, 'beide muessen rechenbar sein');
   assert.ok(kurzVorAblauf > amAnfang,
     `kurz vor Ablauf (${kurzVorAblauf}) muss laenger dauern als am Anfang (${amAnfang}) - der teurere Satz greift sofort`);
+});
+
+test('rateForInstallment: derselbe Satz wie im Plan, fuer jede Rate und jeden Modus (#1706)', () => {
+  // Aequivalenz statt Stichprobe: die Darlehensliste sortiert nach diesem Satz,
+  // und er darf nie etwas anderes sagen als der Tilgungsplan, mit dem Restschuld
+  // und Restlaufzeit rechnen.
+  const faelle = [
+    { principal: 200000, fixedRate: 2.5, initialRepaymentRate: 2, interestMode: 'fixed' },
+    { principal: 50000, fixedRate: 6.1, initialRepaymentRate: 5, interestMode: 'variable' },
+    { principal: 200000, fixedRate: 2, initialRepaymentRate: 3, interestMode: 'fixed_then_variable', fixedPeriodMonths: 120, followupRate: 5 },
+    { principal: 9000, fixedRate: 0, initialRepaymentRate: 20, interestMode: 'fixed' },
+  ];
+  for (const params of faelle) {
+    const plan = computeLoanSchedule(params);
+    assert.equal(plan.ok, true);
+    for (const row of plan.schedule) {
+      assert.equal(rateForInstallment(params, row.n), row.rate, `${params.interestMode}, Rate ${row.n}`);
+    }
+  }
+});
+
+test('rateForInstallment: der Wechsel liegt NACH der letzten Rate der Bindung (#1706)', () => {
+  const params = { fixedRate: 2, interestMode: 'fixed_then_variable', fixedPeriodMonths: 120, followupRate: 5 };
+  assert.equal(rateForInstallment(params, 120), 2);
+  assert.equal(rateForInstallment(params, 121), 5);
+  // 'variable' und 'fixed' kennen keinen zweiten Satz, auch wenn einer mitkommt.
+  assert.equal(rateForInstallment({ ...params, interestMode: 'variable' }, 300), 2);
+  assert.equal(rateForInstallment({ ...params, interestMode: 'fixed' }, 300), 2);
 });
