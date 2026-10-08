@@ -720,6 +720,7 @@
         "duplicateSubmit": "Dupliceren",
         "duplicateError": "De lijst kon niet worden gedupliceerd.",
         "itemStateChecked": "afgevinkt",
+        "tickedSection": "Afgevinkt",
         "itemStateOpen": "niet afgevinkt"
     },
     "meals": {

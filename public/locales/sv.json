@@ -720,6 +720,7 @@
         "duplicateSubmit": "Duplicera",
         "duplicateError": "Listan kunde inte dupliceras.",
         "itemStateChecked": "avbockad",
+        "tickedSection": "Avbockat",
         "itemStateOpen": "inte avbockad"
     },
     "meals": {

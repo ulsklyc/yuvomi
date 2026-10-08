@@ -720,6 +720,7 @@
         "duplicateSubmit": "डुप्लीकेट करें",
         "duplicateError": "सूची डुप्लीकेट नहीं की जा सकी।",
         "itemStateChecked": "टिक किया गया",
+        "tickedSection": "टिक किए गए",
         "itemStateOpen": "टिक नहीं किया गया"
     },
     "meals": {

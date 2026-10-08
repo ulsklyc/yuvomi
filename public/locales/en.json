@@ -720,6 +720,7 @@
         "duplicateSubmit": "Duplicate",
         "duplicateError": "The list could not be duplicated.",
         "itemStateChecked": "checked off",
+        "tickedSection": "Ticked off",
         "itemStateOpen": "not checked off"
     },
     "meals": {

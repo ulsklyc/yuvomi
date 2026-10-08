@@ -720,6 +720,7 @@
         "duplicateSubmit": "Duplikálás",
         "duplicateError": "A listát nem sikerult duplikálni.",
         "itemStateChecked": "kipipálva",
+        "tickedSection": "Kipipálva",
         "itemStateOpen": "nincs kipipálva"
     },
     "meals": {

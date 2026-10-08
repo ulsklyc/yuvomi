@@ -720,6 +720,7 @@
         "duplicateSubmit": "Διπλασιασμός",
         "duplicateError": "Δεν ήταν δυνατός ο διπλασιασμός της λίστας.",
         "itemStateChecked": "τσεκαρισμένο",
+        "tickedSection": "Τσεκαρισμένα",
         "itemStateOpen": "μη τσεκαρισμένο"
     },
     "meals": {

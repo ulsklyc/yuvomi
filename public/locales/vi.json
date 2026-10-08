@@ -720,6 +720,7 @@
         "duplicateSubmit": "Nhân bản",
         "duplicateError": "Không thể nhân bản danh sách.",
         "itemStateChecked": "đã đánh dấu",
+        "tickedSection": "Đã đánh dấu",
         "itemStateOpen": "chưa đánh dấu"
     },
     "meals": {

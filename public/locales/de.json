@@ -734,6 +734,7 @@
         "duplicateSubmit": "Duplizieren",
         "duplicateError": "Die Liste konnte nicht dupliziert werden.",
         "itemStateChecked": "abgehakt",
+        "tickedSection": "Abgehakt",
         "itemStateOpen": "offen"
     },
     "meals": {

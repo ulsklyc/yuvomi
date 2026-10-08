@@ -720,6 +720,7 @@
         "duplicateSubmit": "Dupliser",
         "duplicateError": "Listen kunne ikke dupleres.",
         "itemStateChecked": "avkrysset",
+        "tickedSection": "Avkrysset",
         "itemStateOpen": "ikke avkrysset"
     },
     "meals": {

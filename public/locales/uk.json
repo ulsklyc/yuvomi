@@ -838,6 +838,7 @@
         "duplicateSubmit": "Дублювати",
         "duplicateError": "Не вдалося дублювати список.",
         "itemStateChecked": "позначено",
+        "tickedSection": "Позначено",
         "itemStateOpen": "не позначено"
     },
     "meals": {

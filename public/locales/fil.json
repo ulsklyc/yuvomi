@@ -734,6 +734,7 @@
         "duplicateSubmit": "I-duplicate",
         "duplicateError": "Hindi ma-duplicate ang listahan.",
         "itemStateChecked": "naka-check",
+        "tickedSection": "Mga naka-check",
         "itemStateOpen": "hindi pa naka-check"
     },
     "meals": {

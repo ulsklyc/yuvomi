@@ -529,6 +529,21 @@
   transition: background-color var(--transition-fast);
 }
 
+/* „Abgehakt" hinter einem Vorschlag, der auf dieser Liste schon steht (#1816):
+ * der Name fuehrt, der Zustand tritt zurueck und bleibt am Zeilenende. */
+.autocomplete-item:has(> .autocomplete-item__state) {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.autocomplete-item__state {
+  flex: none;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
 .autocomplete-item:hover,
 .autocomplete-item--active {
   background-color: var(--color-accent-light);
@@ -624,6 +639,15 @@
 
 .shopping-page .list-group {
   gap: var(--space-1);
+}
+
+/* EINE GRUPPE OHNE ZEILEN STEHT IM DOM UND NICHT IM BILD (#1816). Abgehaktes
+ * wandert in den Abschnitt am Listenende; die Kategorie, die dabei leer wird,
+ * behaelt ihren Traeger fuer den Rueckweg, und der Abschnitt selbst wartet
+ * leer auf den ersten Haken. `.list-group` setzt `display: grid` und schluege
+ * das UA-`[hidden]` (test:hidden-cascade). */
+.shopping-page .list-group[hidden] {
+  display: none;
 }
 
 /* ZWEI SPALTEN AM DESKTOP (Re-Critique 2026-09-27, A4 P1 / R10 L4).

@@ -720,6 +720,7 @@
         "duplicateSubmit": "複製",
         "duplicateError": "リストを複製できませんでした。",
         "itemStateChecked": "チェック済み",
+        "tickedSection": "チェック済み",
         "itemStateOpen": "未チェック"
     },
     "meals": {

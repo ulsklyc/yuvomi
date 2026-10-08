@@ -720,6 +720,7 @@
         "duplicateSubmit": "复制",
         "duplicateError": "无法复制该清单。",
         "itemStateChecked": "已勾选",
+        "tickedSection": "已勾选",
         "itemStateOpen": "未勾选"
     },
     "meals": {

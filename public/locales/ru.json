@@ -838,6 +838,7 @@
         "duplicateSubmit": "Дублировать",
         "duplicateError": "Не удалось дублировать список.",
         "itemStateChecked": "отмечено",
+        "tickedSection": "Отмечено",
         "itemStateOpen": "не отмечено"
     },
     "meals": {

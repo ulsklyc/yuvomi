@@ -897,6 +897,7 @@
         "duplicateSubmit": "تكرار",
         "duplicateError": "تعذّر تكرار القائمة.",
         "itemStateChecked": "تم التأشير",
+        "tickedSection": "تم التأشير عليها",
         "itemStateOpen": "لم يُؤشَّر عليه"
     },
     "meals": {
