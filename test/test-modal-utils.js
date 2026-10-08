@@ -1951,3 +1951,96 @@ test('#1775: das Teilnehmer-Blatt der Belohnungen ist ein Ansichtsblatt (dirtyGu
   assert.match(sheet, /cb\.addEventListener\('change', async \(\) => \{[\s\S]*?await api\.put\(`\/rewards\/participants\//, 'Vorbedingung: der Haken speichert sofort');
   assert.match(sheet.replace(/^\s*\/\/.*$/gm, ''), /^\s*dirtyGuard: false,$/m);
 });
+
+// --------------------------------------------------------
+// #1784: die Dirty-Basis je Element aendert nichts fuer Dialoge, die nie tauschen
+// --------------------------------------------------------
+
+/* AEQUIVALENZ ZUR ALTEN FASSUNG. Bis #1784 war die Basis EIN Text - der Stand
+ * von serializeForm() beim Oeffnen - und "schmutzig" hiess: der Text von jetzt
+ * ist ein anderer. Seitdem steht die Basis je Element da, damit
+ * swapFieldsKeepingDirtyBase() Felder nachtragen kann. Fuer jeden Dialog, der
+ * die Funktion nie ruft, muss isFormDirty() dasselbe sagen wie vorher: nach
+ * jedem Schritt jedes Ablaufs wird der echte Waechter gegen die alte
+ * Textfassung gehalten - und gegen das, was dort herauskommen MUSS, sonst
+ * waeren zwei gleich falsche Antworten ein gruener Test. */
+test('#1784: isFormDirty() urteilt ohne Tausch exakt wie der Textvergleich davor', () => {
+  const { serializeForm, isFormDirty, adoptOverlayForTest, releaseOverlayForTest } = modalTest;
+  const text = (name, value = '') => ({ type: 'text', name, id: '', value });
+  const box = (value, checked = false) => ({ type: 'checkbox', name: '', id: '', value, checked });
+  const radio = (value, checked = false) => ({ type: 'radio', name: 'scope', id: '', value, checked });
+
+  // Jeder Ablauf: die Felder beim Oeffnen und Schritte [was geschieht, erwartet schmutzig].
+  const ablaeufe = {
+    'leeres Formular': () => {
+      const f = [];
+      return [f, [
+        [() => {}, false],
+        [() => { f.push(text('spaet')); }, true],
+        [() => { f.pop(); }, false],
+      ]];
+    },
+    'unbenannte Felder': () => {
+      const [a, b] = [text('', 'eins'), text('', 'zwei')];
+      const f = [a, b];
+      return [f, [
+        [() => { a.value = 'zwei'; b.value = 'eins'; }, true],
+        [() => { a.value = 'eins'; b.value = 'zwei'; }, false],
+        [() => { a.value = 'eins&=zwei'; }, true],
+      ]];
+    },
+    'Checkbox und Radiogruppe': () => {
+      const [haken, alle, meine] = [box('on'), radio('all', true), radio('mine')];
+      const f = [haken, alle, meine];
+      return [f, [
+        [() => { haken.checked = true; }, true],
+        [() => { haken.checked = false; }, false],
+        [() => { alle.checked = false; meine.checked = true; }, true],
+        [() => { alle.checked = true; meine.checked = false; }, false],
+      ]];
+    },
+    'Umsortieren': () => {
+      const [a, b, c] = [text('a', '1'), text('b', '2'), text('c', '3')];
+      const f = [a, b, c];
+      return [f, [
+        [() => { f.splice(0, 3, c, a, b); }, true],
+        [() => { f.splice(0, 3, a, b, c); }, false],
+        // Zwei Zeilen mit gleichem Namen und gleichem Wert zu tauschen war nie
+        // eine Aenderung - der Text ist derselbe.
+        [() => { b.name = 'a'; b.value = '1'; }, true],
+        [() => { f.splice(0, 3, b, a, c); }, true],
+      ]];
+    },
+    'Zeile hinzu und weg': () => {
+      const [a, b] = [text('titel', 'Suppe'), text('zutat', 'Linsen')];
+      const neu = text('zutat', '');
+      const f = [a, b];
+      return [f, [
+        [() => { f.push(neu); }, true],
+        [() => { f.pop(); }, false],
+        [() => { f.splice(1, 1); }, true],
+        // Ein ANDERES Element mit demselben Namen und Wert an derselben Stelle
+        // ist fuer den Waechter dieselbe Zeile - wie im Textvergleich.
+        [() => { f.push(text('zutat', 'Linsen')); }, false],
+      ]];
+    },
+  };
+
+  for (const [name, bau] of Object.entries(ablaeufe)) {
+    const [felder, schritte] = bau();
+    const panel = { querySelectorAll: () => felder.slice() };
+    const alt = serializeForm(panel);
+    adoptOverlayForTest({ querySelector: () => panel });
+    try {
+      assert.equal(isFormDirty(panel), false, `${name}: frisch geoeffnet ist sauber`);
+      schritte.forEach(([schritt, erwartet], i) => {
+        schritt();
+        const vorher = serializeForm(panel) !== alt;
+        assert.equal(vorher, erwartet, `${name}, Schritt ${i + 1}: der Textvergleich sagt ${erwartet}`);
+        assert.equal(isFormDirty(panel), vorher, `${name}, Schritt ${i + 1}: der Waechter sagt dasselbe`);
+      });
+    } finally {
+      releaseOverlayForTest();
+    }
+  }
+});
