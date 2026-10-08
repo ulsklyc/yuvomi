@@ -712,6 +712,8 @@
         "addStore": "新商店",
         "duplicateListLabel": "复制清单",
         "duplicateListTitle": "复制“{{name}}”",
+        "itemListLabel": "清单",
+        "itemMovedToast": "已将“{{name}}”移到“{{list}}”。",
         "duplicateListNameLabel": "新清单名称",
         "duplicateDefaultName": "{{name}} - 副本",
         "duplicateResetChecked": "重置勾选状态",

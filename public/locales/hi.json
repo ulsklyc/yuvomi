@@ -712,6 +712,8 @@
         "addStore": "नई दुकान",
         "duplicateListLabel": "सूची डुप्लीकेट करें",
         "duplicateListTitle": "“{{name}}” डुप्लीकेट करें",
+        "itemListLabel": "सूची",
+        "itemMovedToast": "“{{name}}” को “{{list}}” में ले जाया गया।",
         "duplicateListNameLabel": "नई सूची का नाम",
         "duplicateDefaultName": "{{name}} - प्रतिलिपि",
         "duplicateResetChecked": "चेक किए गए आइटम रीसेट करें",

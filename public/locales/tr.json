@@ -712,6 +712,8 @@
         "addStore": "Yeni mağaza",
         "duplicateListLabel": "Listeyi kopyala",
         "duplicateListTitle": "„{{name}}” kopyalansın",
+        "itemListLabel": "Liste",
+        "itemMovedToast": "„{{name}}”, „{{list}}” listesine taşındı.",
         "duplicateListNameLabel": "Yeni listenin adı",
         "duplicateDefaultName": "{{name}} - Kopya",
         "duplicateResetChecked": "İşaretlemeleri sıfırla",

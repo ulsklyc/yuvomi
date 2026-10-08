@@ -726,6 +726,8 @@
         "addStore": "Neuer Laden",
         "duplicateListLabel": "Liste duplizieren",
         "duplicateListTitle": "„{{name}}“ duplizieren",
+        "itemListLabel": "Liste",
+        "itemMovedToast": "„{{name}}“ steht jetzt auf „{{list}}“.",
         "duplicateListNameLabel": "Name der neuen Liste",
         "duplicateDefaultName": "{{name}} - Kopie",
         "duplicateResetChecked": "Häkchen zurücksetzen",

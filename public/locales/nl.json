@@ -712,6 +712,8 @@
         "addStore": "Nieuwe winkel",
         "duplicateListLabel": "Lijst dupliceren",
         "duplicateListTitle": "„{{name}}” dupliceren",
+        "itemListLabel": "Lijst",
+        "itemMovedToast": "„{{name}}” staat nu op „{{list}}”.",
         "duplicateListNameLabel": "Naam van de nieuwe lijst",
         "duplicateDefaultName": "{{name}} - Kopie",
         "duplicateResetChecked": "Aangevinkte items resetten",

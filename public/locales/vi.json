@@ -712,6 +712,8 @@
         "addStore": "Cửa hàng mới",
         "duplicateListLabel": "Nhân bản danh sách",
         "duplicateListTitle": "Nhân bản “{{name}}”",
+        "itemListLabel": "Danh sách",
+        "itemMovedToast": "Đã chuyển “{{name}}” sang “{{list}}”.",
         "duplicateListNameLabel": "Tên danh sách mới",
         "duplicateDefaultName": "{{name}} - Bản sao",
         "duplicateResetChecked": "Đặt lại các mục đã đánh dấu",

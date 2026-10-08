@@ -771,6 +771,8 @@
         "addStore": "Nový obchod",
         "duplicateListLabel": "Duplikovat seznam",
         "duplicateListTitle": "Duplikovat „{{name}}“",
+        "itemListLabel": "Seznam",
+        "itemMovedToast": "Položka „{{name}}“ je teď v seznamu „{{list}}“.",
         "duplicateListNameLabel": "Název nového seznamu",
         "duplicateDefaultName": "{{name}} - kopie",
         "duplicateResetChecked": "Zrušit zaškrtnutí",

@@ -712,6 +712,8 @@
         "addStore": "新しい店",
         "duplicateListLabel": "リストを複製",
         "duplicateListTitle": "「{{name}}」を複製",
+        "itemListLabel": "リスト",
+        "itemMovedToast": "「{{name}}」を「{{list}}」に移動しました。",
         "duplicateListNameLabel": "新しいリストの名前",
         "duplicateDefaultName": "{{name}} - コピー",
         "duplicateResetChecked": "チェック状態をリセット",

@@ -2151,6 +2151,35 @@ function openItemDetails(itemId, container) {
       </a>`;
   };
 
+  // DIE LISTE STEHT NEBEN DER KATEGORIE (#1700): beide sagen, WO der Artikel
+  // steht - auf welchem Zettel und in welchem Gang. Kein eigener
+  // "Verschieben"-Weg und kein Ziehen: der Dialog ist ohnehin der Ort, an dem
+  // man einen Artikel umhängt. Mit nur einer Liste gibt es nichts zu wählen,
+  // und das Feld fehlt; die Menge teilt sich die Zeile dann wie bisher mit der
+  // Kategorie.
+  const fromListId = state.activeListId;
+  const canMove = state.lists.length > 1;
+  const qtyField = `
+          <div class="form-group">
+            <label class="form-label" for="item-details-qty">${t('shopping.itemQtyLabel')}</label>
+            <input class="form-input" type="text" id="item-details-qty"
+                   placeholder="${t('shopping.itemQtyPlaceholder')}" value="${esc(item.quantity || '')}">
+          </div>`;
+  const catField = `
+          <div class="form-group">
+            <label class="form-label" for="item-details-cat">${t('shopping.categoryLabel')}</label>
+            <select class="form-input" id="item-details-cat">
+              ${state.categories.map((c) => `<option value="${esc(c.name)}" ${c.name === item.category ? 'selected' : ''}>${esc(categoryLabel(c.name))}</option>`).join('')}
+            </select>
+          </div>`;
+  const listField = `
+          <div class="form-group">
+            <label class="form-label" for="item-details-list">${t('shopping.itemListLabel')}</label>
+            <select class="form-input" id="item-details-list">
+              ${state.lists.map((l) => `<option value="${l.id}" ${l.id === fromListId ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}
+            </select>
+          </div>`;
+
   openModal({
     title: t('common.editItem'),
     size: 'md',
@@ -2161,19 +2190,10 @@ function openItemDetails(itemId, container) {
           <input class="form-input" type="text" id="item-details-name" required
                  value="${esc(item.name)}">
         </div>
-        <div class="form-pair">
-          <div class="form-group">
-            <label class="form-label" for="item-details-qty">${t('shopping.itemQtyLabel')}</label>
-            <input class="form-input" type="text" id="item-details-qty"
-                   placeholder="${t('shopping.itemQtyPlaceholder')}" value="${esc(item.quantity || '')}">
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="item-details-cat">${t('shopping.categoryLabel')}</label>
-            <select class="form-input" id="item-details-cat">
-              ${state.categories.map((c) => `<option value="${esc(c.name)}" ${c.name === item.category ? 'selected' : ''}>${esc(categoryLabel(c.name))}</option>`).join('')}
-            </select>
-          </div>
-        </div>
+        ${canMove ? `${qtyField}
+        <div class="form-pair">${catField}${listField}
+        </div>` : `<div class="form-pair">${qtyField}${catField}
+        </div>`}
         ${/* PREIS UND LADEN (#1003).
             *
             * NICHT ALS ZWANGSDIALOG BEIM ABHAKEN. Das Ticket sagt "erfasst,
@@ -2310,8 +2330,18 @@ function openItemDetails(itemId, container) {
             price_cents: priceCents,
             store_id: storeId,
           };
+          // Die Zielliste reist nur mit, wenn sie eine andere ist (#1700):
+          // ein gewöhnliches Speichern bleibt ein gewöhnliches Speichern.
+          const targetListId = Number(panel.querySelector('#item-details-list')?.value) || fromListId;
+          if (targetListId !== fromListId) payload.list_id = targetListId;
           const data = await api.patch(`/shopping/items/${item.id}`, payload);
           acknowledgeOwnChange(data);
+          // Umgezogen ist er, wenn die Antwort die erbetene Liste traegt.
+          if (payload.list_id !== undefined && data.data.list_id === payload.list_id) {
+            closeModal({ force: true });
+            itemMovedAway(container, data.data, fromListId);
+            return;
+          }
           // DER ARTIKEL WIRD BEIM SPEICHERN NACHGESCHLAGEN, nicht beim Oeffnen
           // festgehalten: waehrend der Dialog offen war, kann eine
           // Live-Auffrischung `state.items` ersetzt haben - dann ist `item` ein
@@ -2760,6 +2790,34 @@ function updateListCounter(listId, totalDelta, checkedDelta) {
     list.item_total   = (list.item_total   || 0) + totalDelta;
     list.item_checked = (list.item_checked || 0) + checkedDelta;
   }
+}
+
+/**
+ * Der Artikel steht jetzt auf einer anderen Liste (#1700): er verlaesst den
+ * Bestand der Liste, von der er kam, beide Zaehler in den Reitern folgen, und
+ * eine Meldung sagt, wohin er gegangen ist - die Zeile ist ja einfach weg.
+ *
+ * `fromListId` kommt vom Oeffnen des Dialogs: waehrend er offen war, kann der
+ * Zettel gewechselt worden sein, und dann gehoert `state.items` einer anderen
+ * Liste. Der Zaehler der Herkunft zieht ab, was die Zeile GEZEIGT hat - eine
+ * noch offene Abhak-Absicht ist damit abgegolten, wie beim Loeschen.
+ */
+function itemMovedAway(container, moved, fromListId) {
+  const before = state.items.find((i) => i.id === moved.id);
+  const shownChecked = before ? Boolean(checkedOf(before)) : Boolean(moved.is_checked);
+  const offen = intents.get(moved.id);
+  if (offen) offen.delta = 0;
+
+  updateListCounter(fromListId, -1, shownChecked ? -1 : 0);
+  updateListCounter(moved.list_id, 1, moved.is_checked ? 1 : 0);
+  if (before && state.activeListId === fromListId) {
+    state.items = state.items.filter((i) => i.id !== moved.id);
+    updateItemsList(container);
+  }
+  renderTabs(container);
+
+  const target = state.lists.find((l) => l.id === moved.list_id);
+  window.yuvomi.showToast(t('shopping.itemMovedToast', { name: moved.name, list: target?.name ?? '' }), 'info');
 }
 
 function openMealPlanImport(container) {
@@ -3830,6 +3888,7 @@ export const __test = {
   // Der Dialog rendert ueber den Modal-Stub des Loaders; die Tests greifen
   // sein onSave ab und loesen das Speichern nach einer Auffrischung aus.
   openItemDetails,
+  itemMovedAway,
   // Die schwebenden Loeschungen: geprueft wird, dass eine Auffrischung im
   // Undo-Fenster sie nicht zurueckbringt und das Fenster sie wieder raeumt.
   pendingRemovals,

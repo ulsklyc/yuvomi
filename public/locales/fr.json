@@ -712,6 +712,8 @@
         "addStore": "Nouveau magasin",
         "duplicateListLabel": "Dupliquer la liste",
         "duplicateListTitle": "Dupliquer « {{name}} »",
+        "itemListLabel": "Liste",
+        "itemMovedToast": "« {{name}} » a été déplacé vers « {{list}} ».",
         "duplicateListNameLabel": "Nom de la nouvelle liste",
         "duplicateDefaultName": "{{name}} - Copie",
         "duplicateResetChecked": "Réinitialiser les cases cochées",

@@ -726,6 +726,8 @@
         "addStore": "Toko baru",
         "duplicateListLabel": "Duplikat daftar",
         "duplicateListTitle": "Duplikat \"{{name}}\"",
+        "itemListLabel": "Daftar",
+        "itemMovedToast": "\"{{name}}\" dipindahkan ke \"{{list}}\".",
         "duplicateListNameLabel": "Nama daftar baru",
         "duplicateDefaultName": "{{name}} - Salinan",
         "duplicateResetChecked": "Setel ulang tanda centang",

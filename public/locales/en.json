@@ -712,6 +712,8 @@
         "addStore": "New shop",
         "duplicateListLabel": "Duplicate list",
         "duplicateListTitle": "Duplicate \"{{name}}\"",
+        "itemListLabel": "List",
+        "itemMovedToast": "Moved \"{{name}}\" to \"{{list}}\".",
         "duplicateListNameLabel": "New list name",
         "duplicateDefaultName": "{{name}} - Copy",
         "duplicateResetChecked": "Reset checked state",

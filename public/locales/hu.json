@@ -712,6 +712,8 @@
         "addStore": "Új üzlet",
         "duplicateListLabel": "Lista duplikálása",
         "duplicateListTitle": "„{{name}}” duplikálása",
+        "itemListLabel": "Lista",
+        "itemMovedToast": "„{{name}}” átkerült ide: „{{list}}”.",
         "duplicateListNameLabel": "Az új lista neve",
         "duplicateDefaultName": "{{name}} - másolat",
         "duplicateResetChecked": "Pipák visszaállítása",

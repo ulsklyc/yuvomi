@@ -726,6 +726,8 @@
         "addStore": "Bagong tindahan",
         "duplicateListLabel": "I-duplicate ang listahan",
         "duplicateListTitle": "I-duplicate ang \"{{name}}\"",
+        "itemListLabel": "Listahan",
+        "itemMovedToast": "Inilipat ang \"{{name}}\" sa \"{{list}}\".",
         "duplicateListNameLabel": "Pangalan ng bagong listahan",
         "duplicateDefaultName": "{{name}} - Kopya",
         "duplicateResetChecked": "I-reset ang mga naka-check",

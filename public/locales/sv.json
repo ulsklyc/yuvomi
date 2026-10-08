@@ -712,6 +712,8 @@
         "addStore": "Ny butik",
         "duplicateListLabel": "Duplicera listan",
         "duplicateListTitle": "Duplicera ”{{name}}”",
+        "itemListLabel": "Lista",
+        "itemMovedToast": "”{{name}}” har flyttats till ”{{list}}”.",
         "duplicateListNameLabel": "Namn på den nya listan",
         "duplicateDefaultName": "{{name}} - Kopia",
         "duplicateResetChecked": "Återställ ibockade varor",
