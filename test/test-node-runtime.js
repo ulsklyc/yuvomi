@@ -171,8 +171,8 @@ test('the check module runs the check in its own body and imports nothing else',
 // Ein Preload, der dem Kindprozess eine alte Node-API vortaeuscht. Die echte
 // alte Laufzeit kann die Suite nicht fahren: sie laeuft auf der Version, die
 // die CI stellt.
-const fakeNapi = (value) => 'data:text/javascript,' + encodeURIComponent(
-  `Object.defineProperty(process.versions, 'napi', { value: ${JSON.stringify(value)}, enumerable: true, configurable: true });`,
+const FAKE_NAPI = 'data:text/javascript,' + encodeURIComponent(
+  "Object.defineProperty(process.versions, 'napi', { value: process.env.YUVOMI_TEST_FAKE_NAPI, enumerable: true, configurable: true });",
 );
 
 // Ein Preload, der das Laden des Treibers selbst scheitern laesst: der
@@ -180,26 +180,26 @@ const fakeNapi = (value) => 'data:text/javascript,' + encodeURIComponent(
 // zeigt sich, ob die Pruefung VOR dem Treiber laeuft. (Ein Fehler schon beim
 // Aufloesen taugte dafuer nicht: aufgeloest wird vor jeder Auswertung.)
 const DRIVER_BROKEN = 'the database driver module was evaluated';
-const brokenDriver = (() => {
-  const broken = 'data:text/javascript,' + encodeURIComponent(
-    // Der Default-Export muss da sein: sonst scheitert schon das Verknuepfen,
-    // und das laeuft vor jeder Auswertung.
-    `export default null; throw new Error(${JSON.stringify(DRIVER_BROKEN)});`,
-  );
-  const redirect = `if (specifier === ${JSON.stringify(DRIVER)}) return { url: ${JSON.stringify(broken)}, shortCircuit: true };`;
-  const asyncHooks = 'data:text/javascript,' + encodeURIComponent(
-    `export async function resolve(specifier, context, next) { ${redirect} return next(specifier, context); }`,
-  );
-  // registerHooks, wo es das gibt; module.register sonst (Node 22.14).
-  return 'data:text/javascript,' + encodeURIComponent(`
-    import module from 'node:module';
-    if (typeof module.registerHooks === 'function') {
-      module.registerHooks({ resolve(specifier, context, next) { ${redirect} return next(specifier, context); } });
-    } else {
-      module.register(${JSON.stringify(asyncHooks)});
-    }
-  `);
-})();
+// Die Preloads sind FESTE Texte: was sie brauchen (Spezifizierer, Ziel-URL,
+// Fehlertext), lesen sie aus der Umgebung des Kindprozesses, statt dass es in
+// den Quelltext geklebt wird (CodeQL js/bad-code-sanitization, Alert 130).
+const dataModule = (source) => 'data:text/javascript,' + encodeURIComponent(source);
+const BROKEN_DRIVER_URL = dataModule(
+  // Der Default-Export muss da sein: sonst scheitert schon das Verknuepfen,
+  // und das laeuft vor jeder Auswertung.
+  'export default null; throw new Error(process.env.YUVOMI_TEST_DRIVER_BROKEN);',
+);
+const REDIRECT = 'if (specifier === process.env.YUVOMI_TEST_DRIVER) return { url: process.env.YUVOMI_TEST_BROKEN_URL, shortCircuit: true };';
+const ASYNC_HOOKS_URL = dataModule(
+  'export async function resolve(specifier, context, next) { ' + REDIRECT + ' return next(specifier, context); }',
+);
+// registerHooks, wo es das gibt; module.register sonst (Node 22.14).
+const brokenDriver = dataModule(
+  "import module from 'node:module';"
+  + " if (typeof module.registerHooks === 'function') {"
+  + ' module.registerHooks({ resolve(specifier, context, next) { ' + REDIRECT + ' return next(specifier, context); } });'
+  + ' } else { module.register(process.env.YUVOMI_TEST_ASYNC_HOOKS); }',
+);
 
 function runProgram(args, { napi, dbPath, preloads = [] }) {
   const env = {
@@ -210,10 +210,15 @@ function runProgram(args, { napi, dbPath, preloads = [] }) {
     PORT: '0',
     BIND_ADDRESS: '127.0.0.1',
     BACKUP_ENABLED: 'false',
+    YUVOMI_TEST_FAKE_NAPI: String(napi),
+    YUVOMI_TEST_DRIVER: DRIVER,
+    YUVOMI_TEST_DRIVER_BROKEN: DRIVER_BROKEN,
+    YUVOMI_TEST_BROKEN_URL: BROKEN_DRIVER_URL,
+    YUVOMI_TEST_ASYNC_HOOKS: ASYNC_HOOKS_URL,
   };
   delete env.DB_ENCRYPTION_KEY;
   delete env.NODE_TEST_CONTEXT;
-  return spawnSync(process.execPath, ['--import', fakeNapi(napi), ...preloads.flatMap((url) => ['--import', url]), ...args], {
+  return spawnSync(process.execPath, ['--import', FAKE_NAPI, ...preloads.flatMap((url) => ['--import', url]), ...args], {
     cwd: ROOT,
     env,
     encoding: 'utf8',
