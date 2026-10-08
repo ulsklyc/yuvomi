@@ -20792,3 +20792,52 @@ test('R18: der Hover einer waehlbaren Kennzahlkarte addiert - der Ring gehoert d
   assert.match(active.body, /inset 0 0 0 2px var\(--module-accent, var\(--color-accent\)\), var\(--shadow-sm\)/,
     'die Auswahl traegt den Ring UEBER dem Schatten, den die Karte behaelt');
 });
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * R18, Schritt 7: die Formularzeile in RTL
+ *
+ * Gesehen in `ar` bei 390x844 ("Messwert erfassen"): der Kalender- und der
+ * Uhrknopf lagen AUF dem Wert, "120 / 80 mmHg" stand als "mmHg 80 / 120" und
+ * "/min" als "min/". Schritt 6 hatte die Zeile gebaut und RTL nicht gesehen.
+ *
+ * 1. Der Datepicker ist PHYSISCH gebaut: der Knopf sitzt rechts
+ *    (`.ydp__trigger { right }`), das Feld haelt ihm rechts Platz frei
+ *    (`.ydp__input { padding-right }`), in jeder Schreibrichtung. Wer das
+ *    Polster dieses Felds LOGISCH setzt, nimmt ihm in RTL genau diesen Platz.
+ * 2. Ein Messwert mit Trenner und Einheit ist eine Zahlenfolge, kein Satz:
+ *    "120/80" steht auch in arabischem Text von links nach rechts. Teilfelder
+ *    in Flex-Reihenfolge kippen sie um, und ein Suffix wie "/min" dreht der
+ *    Bidi-Algorithmus an seinem Schraegstrich.
+ * ──────────────────────────────────────────────────────────────────────────── */
+test('R18: die Formularzeile haelt in RTL den Platz des Datumsknopfs und die Reihenfolge des Messwerts', () => {
+  const datepicker = [...eachRule(read('../public/styles/datepicker.css'))];
+  const trigger = datepicker.find((rule) => rule.at.length === 0 && rule.selector.trim() === '.ydp__trigger');
+  const field = datepicker.find((rule) => rule.at.length === 0 && rule.selector.trim() === '.ydp__input');
+  assert.match(trigger?.body ?? '', /(?:^|;)\s*right\s*:/, 'Vorbedingung: der Knopf des Datepickers sitzt physisch rechts');
+  assert.match(field?.body ?? '', /(?:^|;)\s*padding-right\s*:/, 'Vorbedingung: das Feld haelt dem Knopf physisch rechts Platz frei');
+
+  const styles = new URL('../public/styles/', import.meta.url);
+  const logical = [];
+  let seen = 0;
+  for (const file of readdirSync(styles).filter((entry) => entry.endsWith('.css'))) {
+    for (const rule of eachRule(readFileSync(new URL(file, styles), 'utf8'))) {
+      if (!/\.ydp__input(?![\w-])/.test(rule.selector)) continue;
+      seen += 1;
+      const hit = rule.body.match(/(?:^|;)\s*(padding-inline(?:-start|-end)?|padding)\s*:/);
+      if (hit) logical.push(`${file}: ${rule.selector.replace(/\s+/g, ' ').slice(0, 120)}  ${hit[1]}${rule.at.length ? `  [${rule.at.join(' ')}]` : ''}`);
+    }
+  }
+  assert.ok(seen >= 6, `Nur ${seen} Regeln an .ydp__input gefunden - der Scan greift nicht mehr.`);
+  assert.deepEqual(logical, [],
+    'Eine Regel setzt das Polster des Datumsfelds logisch oder als Kurzform. In RTL liegt der Wert dann unter '
+    + 'dem Kalenderknopf: das Feld ist physisch gebaut, also padding-left/padding-right.');
+
+  const layout = [...eachRule(read('../public/styles/layout.css'))];
+  const composite = layout.find((rule) => rule.at.length === 0 && rule.selector.trim() === '.form-composite');
+  assert.match(composite?.body ?? '', /(?:^|;)\s*direction\s*:\s*ltr\s*(?:;|$)/,
+    'das zusammengesetzte Feld ist eine LTR-Insel: "120 / 80 mmHg" und "/min" behalten ihre Reihenfolge');
+  const mirrored = layout.filter((rule) => splitSelectorList(rule.selector)
+    .some((part) => /\[dir=["']rtl["']\]/.test(part) && /\.form-composite(?![\w-])/.test(part)));
+  assert.deepEqual(mirrored.map((rule) => rule.selector.replace(/\s+/g, ' ')), [],
+    'in der LTR-Insel sitzt das Zeichen der Einheiten-Auswahl rechts - keine RTL-Spiegelung am zusammengesetzten Feld');
+});

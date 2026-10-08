@@ -7424,8 +7424,14 @@ textarea::placeholder {
     justify-content: flex-start;
   }
 
+  /* PHYSISCH, nicht logisch (R18, Schritt 7): der Datepicker ist physisch
+   * gebaut - Knopf rechts, `padding-right` haelt ihm Platz (datepicker.css),
+   * in jeder Schreibrichtung. `padding-inline-start: 0` nahm in `ar` und `fa`
+   * genau dieses rechte Polster: Datum und Uhrzeit lagen unter ihrem Knopf
+   * (gesehen bei 390x844). Links faellt das Polster, damit der Wert in LTR in
+   * der Flucht des Etiketts beginnt; in RTL beginnt er neben dem Knopf. */
   .form-rows > .form-row--wide:not(.form-row--stacked) > .form-row__control > yuvomi-datepicker .ydp__input {
-    padding-inline-start: 0;
+    padding-left: 0;
     text-align: start;
   }
 }
@@ -7498,9 +7504,11 @@ textarea::placeholder {
   background-position: right 0 center;
 }
 
+/* Die Einheiten-Auswahl IM zusammengesetzten Feld spiegelt nicht mit: das
+ * Feld ist eine LTR-Insel (siehe `.form-composite`), ihr Zeichen bleibt
+ * rechts, wo auch ihr Polster liegt. */
 [dir="rtl"] .form-row__control > select.form-input:not([multiple]):not([size]),
-[dir="rtl"] .form-row__control > select.input:not([multiple]):not([size]),
-[dir="rtl"] .form-composite > select.form-input:not([multiple]):not([size]) {
+[dir="rtl"] .form-row__control > select.input:not([multiple]):not([size]) {
   background-position: left 0 center;
 }
 
@@ -7598,12 +7606,20 @@ textarea::placeholder {
  * Teilfelder bleiben FELDER (Kante 3:1, Fuellung): eine leere Zahl ohne Kasten
  * waere nur ein Platzhalter im Raum. Sie sind so breit wie ihr Wert, die
  * Ziffern tabellarisch und rechtsbuendig; Trenner und Einheit stehen in
- * Sekundaerfarbe auf der Grundlinie des Werts. */
+ * Sekundaerfarbe auf der Grundlinie des Werts.
+ *
+ * EINE LTR-INSEL (R18, Schritt 7): ein Messwert mit Trenner und Einheit ist
+ * eine Zahlenfolge, kein Satz - "120/80" steht auch in arabischem Text von
+ * links nach rechts. Ohne die feste Richtung kippte die Flex-Reihenfolge das
+ * Paar in `ar` zu "mmHg 80 / 120", und der Bidi-Algorithmus drehte "/min" an
+ * seinem Schraegstrich zu "min/". Die Zeile selbst spiegelt weiter: das Feld
+ * steht in RTL am linken Zeilenende. */
 .form-composite {
   display: inline-flex;
   align-items: baseline;
   gap: var(--space-2);
   min-width: 0;
+  direction: ltr;
 }
 
 .form-composite__part {
