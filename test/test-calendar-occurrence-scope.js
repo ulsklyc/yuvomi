@@ -703,3 +703,28 @@ test('ein Termintitel ist Userdaten und kommt maskiert im Markup an', async () =
   assert.doesNotMatch(raw, /<img/, 'aber nicht als Markup in den Dialog');
   assert.match(raw, /&lt;img/);
 });
+
+
+test('changing the local calendar offers only following or whole series', async () => {
+  for (const answer of ['following', 'series']) {
+    const event = { ...OCCURRENCE, local_calendar_id: 1 };
+    const panel = openForm(event);
+    const select = panel.append(new FakeEl('select', { id: 'event-local-calendar', value: '2' }));
+    userTypes(select, '2');
+    const { writes } = await clickSave(panel, event, { answer, whileOpen: ({ dialogs }) => {
+      assert.equal(dialogs[0].buttons.some(button => button.dataset.scope === 'this'), false);
+    } });
+    const put = writes.find(call => call.method === 'put');
+    assert.equal(put.body.local_calendar_id, 2);
+    assert.equal(put.path, answer === 'series' ? '/calendar/41' : '/calendar/41/occurrences/2026-10-02/following');
+  }
+});
+
+test('a single-occurrence edit omits unchanged calendar membership', async () => {
+  const event = { ...OCCURRENCE, local_calendar_id: 1 };
+  const panel = openForm(event);
+  panel.append(new FakeEl('select', { id: 'event-local-calendar', value: '1' }));
+  userChecks(personBox(panel, 2));
+  const { writes } = await clickSave(panel, event, { answer: 'this' });
+  assert.equal(Object.hasOwn(writes.find(call => call.method === 'put').body, 'local_calendar_id'), false);
+});

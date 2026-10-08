@@ -700,6 +700,7 @@ test('Vorrat und Uebersicht setzen die Menge ueber den flektierenden Helfer', ()
     return out;
   };
   const body = (src, name) => {
+    src = src.replace(/\r\n/g, '\n');
     const at = src.indexOf(`function ${name}(`);
     assert.ok(at >= 0, `${name} fehlt`);
     return src.slice(at, src.indexOf('\n}\n', at));

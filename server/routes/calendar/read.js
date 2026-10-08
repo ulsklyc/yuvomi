@@ -3,6 +3,8 @@
  * GET / (Bereich), GET /upcoming, GET /search (FTS).
  */
 
+import { localCalendarIdSql } from '../../services/local-calendars.js';
+
 import { createLogger } from '../../logger.js';
 import express from 'express';
 import * as db from '../../db.js';
@@ -59,6 +61,9 @@ router.get('/', (req, res) => {
              -- sichtbar die Farbe seiner Quelle und konnte sie nirgends nennen.
              COALESCE(ec.name, isub.name)   AS cal_name,
              COALESCE(ec.color, isub.color) AS cal_color,
+             lc.id AS local_calendar_id,
+             lc.name  AS local_calendar_name,
+             CASE WHEN (SELECT COUNT(*) FROM local_calendars) > 1 THEN lc.color END AS local_calendar_color,
              ${SOURCE_CALENDAR_COLUMNS},
              COALESCE(bd.name, nd.name) AS birthday_name,
              bd.birth_date AS birthday_date,
@@ -70,6 +75,7 @@ router.get('/', (req, res) => {
       LEFT JOIN users u_assigned ON u_assigned.id = e.assigned_to
       LEFT JOIN users u_created  ON u_created.id  = e.created_by
       LEFT JOIN external_calendars ec ON ec.id = e.calendar_ref_id
+      LEFT JOIN local_calendars lc ON lc.id = ${localCalendarIdSql()}
       ${SOURCE_CALENDAR_JOIN}
       LEFT JOIN ics_subscriptions isub ON isub.id = e.subscription_id
       LEFT JOIN birthdays bd ON bd.calendar_event_id = e.id
@@ -207,6 +213,9 @@ router.get('/search', (req, res) => {
              -- sichtbar die Farbe seiner Quelle und konnte sie nirgends nennen.
              COALESCE(ec.name, isub.name)   AS cal_name,
              COALESCE(ec.color, isub.color) AS cal_color,
+             lc.id AS local_calendar_id,
+             lc.name  AS local_calendar_name,
+             CASE WHEN (SELECT COUNT(*) FROM local_calendars) > 1 THEN lc.color END AS local_calendar_color,
              ${SOURCE_CALENDAR_COLUMNS},
              COALESCE(bd.name, nd.name) AS birthday_name,
              bd.birth_date AS birthday_date,
@@ -219,6 +228,7 @@ router.get('/search', (req, res) => {
       LEFT JOIN users u_assigned ON u_assigned.id = e.assigned_to
       LEFT JOIN users u_created  ON u_created.id  = e.created_by
       LEFT JOIN external_calendars ec ON ec.id = e.calendar_ref_id
+      LEFT JOIN local_calendars lc ON lc.id = ${localCalendarIdSql()}
       ${SOURCE_CALENDAR_JOIN}
       LEFT JOIN ics_subscriptions isub ON isub.id = e.subscription_id
       LEFT JOIN birthdays bd ON bd.calendar_event_id = e.id

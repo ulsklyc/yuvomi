@@ -62,6 +62,13 @@ db.exec(`
 db.exec(MIGRATIONS_SQL[1]);
 db.exec(MIGRATIONS_SQL[2]);  // sync_config - traegt die Haushaltszone (siehe unten)
 db.exec(MIGRATIONS_SQL[85]); // calendar_event_exceptions (EXDATE, #489)
+db.exec(MIGRATIONS_SQL[174]); // birthday/name-day membership exclusions
+db.exec(`
+  ALTER TABLE calendar_events ADD COLUMN target_google_calendar_id TEXT;
+  ALTER TABLE calendar_events ADD COLUMN target_caldav_account_id INTEGER;
+  CREATE TABLE housekeeping_work_sessions (id INTEGER PRIMARY KEY, calendar_event_id INTEGER);
+`);
+db.exec(MIGRATIONS_SQL[237]);
 
 // Testdaten einfügen
 const u1 = db.prepare(`INSERT INTO users (username, display_name, password_hash, avatar_color, role)
@@ -2000,6 +2007,12 @@ cdb.exec(`
     created_by INTEGER REFERENCES users(id) ON DELETE CASCADE
   );
 `);
+
+cdb.exec(`
+  ALTER TABLE calendar_events ADD COLUMN target_caldav_account_id INTEGER;
+  CREATE TABLE housekeeping_work_sessions (id INTEGER PRIMARY KEY, calendar_event_id INTEGER);
+`);
+cdb.exec(MIGRATIONS_SQL[237]);
 
 const cu1 = cdb.prepare(`INSERT INTO users (username, display_name, password_hash, avatar_color)
   VALUES ('theodore', 'Theodore', 'x', '#34C759')`).run();

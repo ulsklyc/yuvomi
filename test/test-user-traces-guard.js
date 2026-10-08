@@ -345,6 +345,7 @@ test('beim Deaktivieren enden alle fuenf Abo-Adressen - und es gibt keine sechst
  *   no-secret- heisst nur so
  */
 const SECRET_COLUMNS = {
+  'local_calendars.feed_token': 'household: the calendar belongs to the household; its feed stays when its creator leaves and can be revoked or rotated by an admin',
   'users.password_hash': 'kept: nur POST /auth/login (canSignIn) und PATCH /auth/me/password (requireAuth) lesen ihn',
   'users.oidc_sub': 'kept: der SSO-Rueckweg muss das Konto finden, um es abzuweisen statt ein neues anzulegen',
   'users.calendar_feed_token': 'ended: auf NULL gesetzt',

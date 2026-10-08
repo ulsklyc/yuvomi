@@ -113,6 +113,33 @@ const calendarProviderTargetProperties = {
 };
 
 export const schemas = {
+        CalendarImportInput: {
+          type: 'object',
+          description: 'Import an ICS document or URL into a household local calendar.',
+          properties: {
+            ics: { type: 'string', description: 'Raw ICS file text. Required when url is omitted.' },
+            url: { type: 'string', format: 'uri', description: 'Shared calendar URL. Required when ics is omitted.' },
+            color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$', description: 'Fallback event color for imported events without their own color.' },
+            local_calendar_id: { type: 'integer', minimum: 1, description: 'Target local calendar. Omit to use the default calendar.' },
+          },
+          oneOf: [{ required: ['ics'] }, { required: ['url'] }],
+        },
+        LocalCalendarCreateInput: {
+          type: 'object', required: ['name'],
+          properties: {
+            name: { type: 'string', minLength: 1, maxLength: 80 },
+            color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
+          },
+        },
+        LocalCalendarUpdateInput: {
+          type: 'object',
+          minProperties: 1,
+          properties: {
+            name: { type: 'string', minLength: 1, maxLength: 80 },
+            color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
+            sort_order: { type: 'integer', minimum: 0 },
+          },
+        },
         ApiError: {
           type: 'object',
           properties: {
@@ -643,6 +670,18 @@ export const schemas = {
             cal_color: {
               type: ['string', 'null'],
               description: 'Inherited colour of the source calendar or ICS subscription, read-only. Applies to every event of that source and therefore says nothing about this one; it is the fallback below color and the assignee.',
+            },
+            local_calendar_id: {
+              type: ['integer', 'null'],
+              description: 'Resolved local calendar for an authored event; null for generated or externally synchronized events and events with a Google/CalDAV target. Omit on create to resolve to the default without storing it. Membership applies to a whole series, never a single occurrence.',
+            },
+            local_calendar_name: {
+              type: ['string', 'null'],
+              description: 'Display name of the local Yuvomi calendar, read-only.',
+            },
+            local_calendar_color: {
+              type: ['string', 'null'],
+              description: 'Colour of the local Yuvomi calendar, read-only. Used after event, assignee, and external source colours.',
             },
             attachment_name: { type: ['string', 'null'], description: 'Null when the event has no attachment or the caller may not read its document (see attachment_document_id).' },
             attachment_mime: { type: ['string', 'null'], description: 'Null when the event has no attachment or the caller may not read its document (see attachment_document_id).' },

@@ -195,6 +195,24 @@ test('importToLocal: applies fallback color to events without their own color', 
   assert.equal(timed.color, '#007AFF');
 });
 
+test('importToLocal: targets the selected local calendar and deduplicates inside that calendar', async () => {
+  const targetId = db.prepare(`
+    INSERT INTO local_calendars (name, color, is_default, sort_order, created_by)
+    VALUES ('Imported work', '#123456', 0, 9, ?)
+  `).run(uid).lastInsertRowid;
+
+  const first = await importToLocal(uid, { ics: SAMPLE_ICS, localCalendarId: targetId });
+  assert.equal(first.imported, 3);
+  assert.equal(
+    db.prepare(`SELECT COUNT(*) AS c FROM calendar_events WHERE created_by = ? AND local_calendar_id = ?`).get(uid, targetId).c,
+    3,
+  );
+
+  const duplicate = await importToLocal(uid, { ics: SAMPLE_ICS, localCalendarId: targetId });
+  assert.equal(duplicate.imported, 0);
+  assert.equal(duplicate.skipped, 3);
+});
+
 test('importToLocal: throws when neither ics nor url is provided', async () => {
   await assert.rejects(() => importToLocal(uid, {}), /required/i);
 });
@@ -245,6 +263,24 @@ test('POST /import: imports from raw ICS body and returns counts', async () => {
   currentUid = uid;
 });
 
+test('POST /import: imports into the selected local calendar', async () => {
+  const freshUid = db.prepare(`INSERT INTO users (username, display_name, password_hash, role)
+    VALUES ('dana', 'Dana', '$2b$12$x', 'member')`).run().lastInsertRowid;
+  const targetId = db.prepare(`
+    INSERT INTO local_calendars (name, color, is_default, sort_order, created_by)
+    VALUES ('Dana imports', '#654321', 0, 10, ?)
+  `).run(freshUid).lastInsertRowid;
+  currentUid = freshUid;
+  const res = await request('POST', '/api/v1/calendar/import', { ics: SAMPLE_ICS, local_calendar_id: targetId });
+  assert.equal(res.status, 201);
+  assert.equal(res.body.data.imported, 3);
+  assert.equal(
+    db.prepare(`SELECT COUNT(*) AS c FROM calendar_events WHERE created_by = ? AND local_calendar_id = ?`).get(freshUid, targetId).c,
+    3,
+  );
+  currentUid = uid;
+});
+
 test('POST /import: 400 when neither ics nor url provided', async () => {
   const res = await request('POST', '/api/v1/calendar/import', {});
   assert.equal(res.status, 400);
@@ -252,6 +288,11 @@ test('POST /import: 400 when neither ics nor url provided', async () => {
 
 test('POST /import: 400 on invalid color', async () => {
   const res = await request('POST', '/api/v1/calendar/import', { ics: SAMPLE_ICS, color: 'not-a-color' });
+  assert.equal(res.status, 400);
+});
+
+test('POST /import: 400 on invalid local calendar', async () => {
+  const res = await request('POST', '/api/v1/calendar/import', { ics: SAMPLE_ICS, local_calendar_id: 999999 });
   assert.equal(res.status, 400);
 });
 

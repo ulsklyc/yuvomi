@@ -112,6 +112,16 @@ function renderPage(container) {
             <label class="form-label" for="cal-import-color">${t('settings.calendarImport.colorLabel')}</label>
             <input class="form-input form-input--color" type="color" id="cal-import-color" value="#007AFF" />
           </div>
+          <div class="form-group">
+            <label class="form-label" for="cal-import-calendar">${t('settings.calendarImport.targetCalendarLabel')}</label>
+            <select class="form-input" id="cal-import-calendar">
+              <option value="" disabled data-loading>${t('common.loading')}</option>
+            </select>
+          </div>
+          <div class="form-group" id="cal-import-new-calendar-group" hidden>
+            <label class="form-label" for="cal-import-new-calendar-name">${t('settings.calendarImport.newCalendarNameLabel')}</label>
+            <input class="form-input" type="text" id="cal-import-new-calendar-name" maxlength="80" />
+          </div>
           <div id="cal-import-error" class="form-error" role="alert" hidden></div>
           <div class="settings-form-actions">
             <button type="submit" class="btn btn--primary" id="cal-import-submit">${t('settings.calendarImport.submit')}</button>
@@ -402,14 +412,42 @@ function bindIcsEvents(container, subs, user) {
 // One-time calendar import (ICS file or shared feed → editable local events)
 // --------------------------------------------------------------------------
 
-function bindCalendarImport(container) {
+function populateCalendarImportTarget(container, calendars = []) {
+  const select = container.querySelector('#cal-import-calendar');
+  if (!select) return;
+  select.replaceChildren();
+  for (const calendar of calendars) {
+    const option = document.createElement('option');
+    option.value = String(calendar.id);
+    option.textContent = calendar.name;
+    if (calendar.is_default) option.selected = true;
+    select.appendChild(option);
+  }
+  const createOption = document.createElement('option');
+  createOption.value = '__new';
+  createOption.textContent = t('settings.calendarImport.createNewCalendar');
+  select.appendChild(createOption);
+  if (!select.value && select.options.length) select.selectedIndex = 0;
+}
+
+function bindCalendarImport(container, calendars = []) {
   const form = container.querySelector('#cal-import-form');
   if (!form) return;
   const fileInput = container.querySelector('#cal-import-file');
   const urlInput = container.querySelector('#cal-import-url');
   const colorInput = container.querySelector('#cal-import-color');
+  const calendarSelect = container.querySelector('#cal-import-calendar');
+  const newCalendarGroup = container.querySelector('#cal-import-new-calendar-group');
+  const newCalendarNameInput = container.querySelector('#cal-import-new-calendar-name');
   const errorEl = container.querySelector('#cal-import-error');
   const submitBtn = container.querySelector('#cal-import-submit');
+  const importedCalendars = [...calendars];
+
+  const syncNewCalendarVisibility = () => {
+    if (newCalendarGroup) newCalendarGroup.hidden = calendarSelect?.value !== '__new';
+  };
+  calendarSelect?.addEventListener('change', syncNewCalendarVisibility);
+  syncNewCalendarVisibility();
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -424,14 +462,33 @@ function bindCalendarImport(container) {
     }
 
     submitBtn.disabled = true;
+    let createdCalendarId = null;
     try {
       const payload = { color: colorInput.value };
       if (file) payload.ics = await file.text();
       else payload.url = url;
+      if (calendarSelect?.value === '__new') {
+        const name = newCalendarNameInput?.value.trim() || '';
+        if (!name) {
+          errorEl.textContent = t('settings.calendarImport.errorNoCalendarName');
+          errorEl.hidden = false;
+          return;
+        }
+        const created = await api.post('/calendar/calendars', { name, color: colorInput.value });
+        createdCalendarId = created.data.id;
+        payload.local_calendar_id = created.data.id;
+      } else if (calendarSelect?.value) {
+        payload.local_calendar_id = Number(calendarSelect.value);
+      }
 
       const res = await api.post('/calendar/import', payload);
+      if (createdCalendarId != null) {
+        importedCalendars.push({ id: createdCalendarId, name: newCalendarNameInput?.value.trim() });
+      }
       const { imported = 0, skipped = 0 } = res.data || {};
       form.reset();
+      populateCalendarImportTarget(container, importedCalendars);
+      syncNewCalendarVisibility();
 
       if (imported === 0 && skipped > 0) {
         showToast(t('settings.calendarImport.allDuplicates'), 'default');
@@ -441,6 +498,13 @@ function bindCalendarImport(container) {
         showToast(t('settings.calendarImport.success', { count: imported }), 'success');
       }
     } catch (err) {
+      if (createdCalendarId != null) {
+        try {
+          await api.delete(`/calendar/calendars/${createdCalendarId}`);
+        } catch (cleanupErr) {
+          console.warn('[Calendar import] Could not remove calendar after failed import:', cleanupErr);
+        }
+      }
       errorEl.textContent = err.message || t('common.errorGeneric');
       errorEl.hidden = false;
     } finally {
@@ -473,11 +537,17 @@ export async function render(container, { user } = {}) {
   renderPage(container);
 
   let subs = [];
-  const [res] = await Promise.allSettled([api.get('/calendar/subscriptions')]);
+  let calendars = [];
+  const [res, calendarsRes] = await Promise.allSettled([
+    api.get('/calendar/subscriptions'),
+    api.get('/calendar/calendars'),
+  ]);
   if (res.status === 'fulfilled') subs = res.value.data || [];
+  if (calendarsRes.status === 'fulfilled') calendars = calendarsRes.value.data || [];
+  populateCalendarImportTarget(container, calendars);
   renderIcsList(container, subs, user);
   bindIcsEvents(container, subs, user);
-  bindCalendarImport(container);
+  bindCalendarImport(container, calendars);
 
   window.lucide?.createIcons({ el: container });
 }

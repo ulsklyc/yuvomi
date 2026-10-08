@@ -817,6 +817,21 @@ test('eine eigene Farbe schlaegt die geliehene weiterhin', () => {
   assert.equal(zeile.color, '#3CA368', 'eine ausdrueckliche Farbe bleibt');
 });
 
+test('ein lokaler Countdown erbt die Kalenderfarbe erst mit mehreren Kalendern', () => {
+  reset();
+  seedEvent({ title: 'Lokal', start: '2026-09-10', color: null, assignedTo: null });
+  const item = () => getCountdowns(get(), { userId: ALICE, todayKey: '2026-08-27' }).items.find(c => c.title === 'Lokal');
+  assert.equal(item().color, null);
+  const id = get().prepare("INSERT INTO local_calendars (name, color) VALUES ('Second', '#3366AA')").run().lastInsertRowid;
+  try {
+    const calendar = get().prepare('SELECT color FROM local_calendars WHERE is_default = 1').get();
+    assert.equal(item().color, calendar.color);
+  } finally {
+    get().prepare('DELETE FROM local_calendars WHERE id = ?').run(id);
+  }
+  assert.equal(item().color, null);
+});
+
 test('ohne jede Quelle bleibt die Farbe null, damit der Modulton greift', () => {
   // Bewusst NICHT das neutrale Grau aus `resolveEventColor()`: die Kachel hat
   // mit dem Ton ihres Moduls einen besseren Notnagel, und ein Grau sieht aus

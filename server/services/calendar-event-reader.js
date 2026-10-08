@@ -6,6 +6,8 @@
  * two in one direction so neither foundational service imports the other.
  */
 
+import { localCalendarIdSql } from './local-calendars.js';
+
 import {
   ASSIGNED_USERS_SQL, expandRecurringEvents, loadEventExceptions, MAX_EXPANSION_ITERATIONS,
   SOURCE_CALENDAR_COLUMNS, SOURCE_CALENDAR_JOIN,
@@ -35,6 +37,7 @@ export const BODY_FREE_EVENT_COLUMNS = Object.freeze([
   'updated_at', 'target_google_calendar_id', 'outbound_dirty',
   'outbound_attempts', 'outbound_move_to', 'external_object_url',
   'target_outlook_account_id', 'target_outlook_calendar_id', 'color_modified',
+  'local_calendar_id',
 ]);
 
 const eventColumnCache = new WeakMap();
@@ -101,7 +104,16 @@ export function resolveProjectedEventRows(database, rows, { lightweight = false 
   return resolveEventRows(database, rows, resolutionOptions).map((resolved) => {
     if (!resolved.is_occurrence_override) return resolved;
     const source = sourceById.get(Number(resolved.id));
-    return source ? { ...source, ...resolved } : resolved;
+    return source ? {
+      ...source, ...resolved,
+      // Membership was resolved by the query; a raw master's NULL must not
+      // overwrite its default calendar while merging a linked replacement.
+      ...(Object.hasOwn(source, 'local_calendar_name') ? {
+        local_calendar_id: source.local_calendar_id,
+        local_calendar_name: source.local_calendar_name,
+        local_calendar_color: source.local_calendar_color,
+      } : {}),
+    } : resolved;
   });
 }
 
@@ -212,6 +224,9 @@ export function getUpcomingEvents(d, {
            -- am Abo-Termin NULL, obwohl dessen Farbe schon herauskam (#1064).
            COALESCE(ec.name, isub.name)   AS cal_name,
            COALESCE(ec.color, isub.color) AS cal_color,
+           lc.id AS local_calendar_id,
+           lc.name  AS local_calendar_name,
+           CASE WHEN (SELECT COUNT(*) FROM local_calendars) > 1 THEN lc.color END AS local_calendar_color,
            ${SOURCE_CALENDAR_COLUMNS},
            COALESCE(bd.name, nd.name) AS birthday_name,
            bd.birth_date AS birthday_date,
@@ -222,6 +237,7 @@ export function getUpcomingEvents(d, {
     FROM calendar_events e
     LEFT JOIN users u_assigned ON u_assigned.id = e.assigned_to
     LEFT JOIN external_calendars ec ON ec.id = e.calendar_ref_id
+    LEFT JOIN local_calendars lc ON lc.id = ${localCalendarIdSql()}
     ${SOURCE_CALENDAR_JOIN}
     LEFT JOIN ics_subscriptions isub ON isub.id = e.subscription_id
     LEFT JOIN birthdays bd ON bd.calendar_event_id = e.id

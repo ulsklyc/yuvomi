@@ -3098,6 +3098,63 @@
   flex-direction: column;
 }
 
+.cal-calendar-manager {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.cal-calendar-create {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--space-12) auto;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.cal-calendar-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.cal-calendar-row {
+  display: grid;
+  grid-template-columns: var(--space-4) minmax(8rem, 1fr) var(--space-12) auto repeat(4, var(--target-md));
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.cal-calendar-row__swatch {
+  width: var(--space-4);
+  height: var(--space-4);
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 0 1px var(--color-border) inset;
+}
+
+.cal-calendar-row__count {
+  color: var(--color-text-tertiary);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+@media (max-width: 639px) {
+  .cal-calendar-create,
+  .cal-calendar-row {
+    grid-template-columns: var(--space-4) minmax(0, 1fr) var(--space-12);
+  }
+
+  .cal-calendar-create .btn,
+  .cal-calendar-row__count,
+  .cal-calendar-row .btn {
+    grid-column: 2 / -1;
+  }
+
+  .cal-calendar-create .btn,
+  .cal-calendar-row .btn {
+    width: 100%;
+  }
+}
+
 /* Die Feiertags- und Schul-Layer tragen eine NUTZERFARBE und bekommen sie
    deshalb als Inline-Style aus den Einstellungen. Der Schichtplan hat keine -
    seine Farbe ist eine Designentscheidung und gehoert damit hierher und nicht

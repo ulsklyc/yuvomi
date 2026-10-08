@@ -36,6 +36,8 @@
  * die dieses Widget je hat.
  */
 
+import { localCalendarIdSql } from './local-calendars.js';
+
 import { hasAnyOccurrence, nextOccurrenceAfter, seriesStartFor } from './recurrence.js';
 import { loadEventExceptions } from './calendar-events.js';
 import { modulesLeftOut, notBirthdayEventSql } from './household-modules.js';
@@ -302,11 +304,13 @@ function eventCountdowns(d, userId, todayKey, graceDays, { withBirthdays = true 
              ORDER BY ea.user_id
              LIMIT 1
            )) AS assigned_color,
-           COALESCE(ec.color, isub.color) AS cal_color
+           COALESCE(ec.color, isub.color) AS cal_color,
+           CASE WHEN (SELECT COUNT(*) FROM local_calendars) > 1 THEN lc.color END AS local_calendar_color
     FROM calendar_events e
     LEFT JOIN users u ON u.id = e.assigned_to
     LEFT JOIN external_calendars ec ON ec.id = e.calendar_ref_id
     LEFT JOIN ics_subscriptions isub ON isub.id = e.subscription_id
+    LEFT JOIN local_calendars lc ON lc.id = ${localCalendarIdSql()}
     WHERE e.countdown = 1
       AND ${icsSubscriptionVisibleWhere('e')}
       AND ${visibilityWhere('e', 'event_assignments', 'event_id')}${
@@ -352,6 +356,7 @@ function eventCountdowns(d, userId, todayKey, graceDays, { withBirthdays = true 
         assigned_to: row.assigned_to,
         assigned_users: row.assigned_color ? [{ id: row.assigned_to, color: row.assigned_color }] : [],
         cal_color: row.cal_color,
+        local_calendar_color: row.local_calendar_color,
       }),
       recurring: Boolean(row.recurrence_rule),
       ...(row.is_occurrence_override ? {

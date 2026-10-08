@@ -142,6 +142,62 @@ function makeBtn({ textContent = 'Speichern' } = {}) {
 // wireBlurValidation
 // --------------------------------------------------------
 
+function confirmationPanel() {
+  const listeners = new Map();
+  const ok = { disabled: false, addEventListener: (_, fn) => listeners.set('ok', fn) };
+  const cancel = { disabled: false, addEventListener: (_, fn) => listeners.set('cancel', fn) };
+  const error = { hidden: true, textContent: '' };
+  const attributes = new Map();
+  return {
+    ok, cancel, error, listeners, attributes,
+    querySelector: (selector) => ({ '#confirm-modal-ok': ok, '#confirm-modal-cancel': cancel, '#confirm-modal-error': error })[selector],
+    setAttribute: (key, value) => attributes.set(key, value),
+    removeAttribute: (key) => attributes.delete(key),
+  };
+}
+
+test('confirmation waits for its action and ignores duplicate clicks while busy', async () => {
+  const panel = confirmationPanel();
+  const finished = [];
+  let complete;
+  let calls = 0;
+  modalTest.wireConfirmation(panel, value => finished.push(value), () => {
+    calls++;
+    return new Promise(resolve => { complete = resolve; });
+  });
+  const pending = panel.listeners.get('ok')();
+  assert.equal(panel.ok.disabled, true);
+  assert.equal(panel.cancel.disabled, true);
+  assert.equal(panel.attributes.get('aria-busy'), 'true');
+  await panel.listeners.get('ok')();
+  panel.listeners.get('cancel')();
+  assert.equal(calls, 1);
+  assert.deepEqual(finished, []);
+  complete();
+  await pending;
+  assert.deepEqual(finished, [true]);
+  assert.equal(panel.attributes.has('aria-busy'), false);
+});
+
+test('failed confirmation actions keep the dialog open and allow retry', async () => {
+  const panel = confirmationPanel();
+  const finished = [];
+  let fail = true;
+  modalTest.wireConfirmation(panel, value => finished.push(value), async () => {
+    if (fail) throw new Error('Could not disable export');
+  });
+  await panel.listeners.get('ok')();
+  assert.deepEqual(finished, []);
+  assert.equal(panel.error.hidden, false);
+  assert.equal(panel.error.textContent, 'Could not disable export');
+  assert.equal(panel.ok.disabled, false);
+  assert.equal(panel.cancel.disabled, false);
+  fail = false;
+  await panel.listeners.get('ok')();
+  assert.equal(panel.error.hidden, true);
+  assert.deepEqual(finished, [true]);
+});
+
 test('confirmOverModal finalisiert das geparkte Modal gemäß closeOnConfirm', async () => {
   const suspended = { id: 'editor' };
   const resumed = [];

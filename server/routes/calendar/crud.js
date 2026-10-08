@@ -26,6 +26,7 @@ import {
 } from '../../services/document-access.js';
 import { mayWriteModule } from '../../permissions.js';
 import { recordLocalColorChoice } from '../../services/legacy-color-snapshot.js';
+import { localCalendarIdSql, localCalendarProjection, resolveLocalCalendarId, validateCalendarId } from '../../services/local-calendars.js';
 import {
   assertSuccessorHasOccurrence,
   baseOccurrenceFor,
@@ -406,6 +407,9 @@ function validateOccurrenceMutationBody(database, body, { following = false, mas
   }
   const assignments = validateOccurrenceAssignments(database, body.assigned_to);
   if (assignments.error) errors.push(assignments.error);
+  const localCalendar = validateCalendarId(database, body.local_calendar_id);
+  if (localCalendar.error) errors.push(localCalendar.error);
+  if (localCalendar.value !== undefined) values.local_calendar_id = localCalendar.value;
 
   return { values, assignments: assignments.value, errors };
 }
@@ -431,6 +435,9 @@ router.get('/:id', (req, res) => {
              -- angelegter oder geaenderter Termin kam ohne ihn zurueck.
              COALESCE(ec.name, isub.name)   AS cal_name,
              COALESCE(ec.color, isub.color) AS cal_color,
+             lc.id AS local_calendar_id,
+             lc.name  AS local_calendar_name,
+             CASE WHEN (SELECT COUNT(*) FROM local_calendars) > 1 THEN lc.color END AS local_calendar_color,
              ${SOURCE_CALENDAR_COLUMNS},
              COALESCE(bd.name, nd.name) AS birthday_name,
              bd.birth_date AS birthday_date,
@@ -443,6 +450,7 @@ router.get('/:id', (req, res) => {
       LEFT JOIN users u_assigned ON u_assigned.id = e.assigned_to
       LEFT JOIN users u_created  ON u_created.id  = e.created_by
       LEFT JOIN external_calendars ec ON ec.id = e.calendar_ref_id
+      LEFT JOIN local_calendars lc ON lc.id = ${localCalendarIdSql()}
       ${SOURCE_CALENDAR_JOIN}
       LEFT JOIN ics_subscriptions isub ON isub.id = e.subscription_id
       LEFT JOIN birthdays bd ON bd.calendar_event_id = e.id
@@ -512,8 +520,14 @@ router.post('/', async (req, res) => {
     const vCaldav = caldavTarget(req.body);
     const vGoogle = googleTarget(req.body);
     const vOutlook = outlookTarget(req.body);
-    const errors = collectErrors([vTitle, vDesc, vStart, vEnd, vColor, vLoc, vRrule, vCaldav, vGoogle, vOutlook]);
+    const vLocalCalendar = validateCalendarId(db.get(), req.body.local_calendar_id);
+    const errors = collectErrors([vTitle, vDesc, vStart, vEnd, vColor, vLoc, vRrule, vCaldav, vGoogle, vOutlook, vLocalCalendar]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    if (req.body.local_calendar_id !== undefined
+        && ((req.body.external_source && req.body.external_source !== 'local')
+          || vCaldav.value.accountId || vGoogle.value)) {
+      return res.status(400).json({ error: 'Lokale Kalender können nur eigene Termine enthalten.', code: 400 });
+    }
     if (!vIcon) return res.status(400).json({ error: 'icon: invalid calendar event icon.', code: 400 });
     // Teilnehmen lassen nur Haushaltsmitglieder (#1207).
     const strangers = newNonMembers(parseAssignedTo(req.body.assigned_to));
@@ -560,6 +574,11 @@ router.post('/', async (req, res) => {
       });
     }
 
+    const calendarCheck = validateCalendarId(db.get(), vLocalCalendar.value);
+    if (calendarCheck.error) {
+      if (stagedUpload) await cleanupStagedUpload(stagedUpload);
+      return res.status(400).json({ error: calendarCheck.error, code: 400 });
+    }
     const rights = attachmentRights(req);
     const eventId = db.get().transaction(() => {
       const documentId = rights.createAttachmentDocument(
@@ -576,8 +595,8 @@ router.post('/', async (req, res) => {
            attachment_name, attachment_mime, attachment_size, attachment_data, attachment_document_id,
            target_caldav_account_id, target_caldav_calendar_url, target_google_calendar_id,
            target_outlook_account_id, target_outlook_calendar_id, visibility,
-           countdown)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           countdown, local_calendar_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         vTitle.value, vDesc.value,
         vStart.value, vEnd.value,
@@ -595,7 +614,8 @@ router.post('/', async (req, res) => {
         vOutlook.value.accountId,
         vOutlook.value.calendarId,
         normalizeVisibility(req.body.visibility),
-        req.body.countdown ? 1 : 0
+        req.body.countdown ? 1 : 0,
+        vLocalCalendar.value
       );
       setEventAssignments(db.get(), result.lastInsertRowid, userIds, {
         mayWidenAttachment: rights.mayWidenAttachment,
@@ -617,12 +637,16 @@ router.post('/', async (req, res) => {
              -- angelegter oder geaenderter Termin kam ohne ihn zurueck.
              COALESCE(ec.name, isub.name)   AS cal_name,
              COALESCE(ec.color, isub.color) AS cal_color,
+             lc.id AS local_calendar_id,
+             lc.name  AS local_calendar_name,
+             CASE WHEN (SELECT COUNT(*) FROM local_calendars) > 1 THEN lc.color END AS local_calendar_color,
              ${SOURCE_CALENDAR_COLUMNS},
              ${ASSIGNED_USERS_SQL}
       FROM calendar_events e
       LEFT JOIN users u_assigned ON u_assigned.id = e.assigned_to
       LEFT JOIN users u_created  ON u_created.id  = e.created_by
       LEFT JOIN external_calendars ec ON ec.id = e.calendar_ref_id
+      LEFT JOIN local_calendars lc ON lc.id = ${localCalendarIdSql()}
       ${SOURCE_CALENDAR_JOIN}
       LEFT JOIN ics_subscriptions isub ON isub.id = e.subscription_id
       WHERE e.id = ?
@@ -804,6 +828,14 @@ router.put('/:id', async (req, res) => {
       || req.body.target_outlook_calendar_id !== undefined;
     const vOutlook = outlookProvided ? outlookTarget(req.body) : null;
     if (vOutlook) checks.push(vOutlook);
+    const localCalendarProvided = req.body.local_calendar_id !== undefined;
+    if (localCalendarProvided && resolveLocalCalendarId(db.get(), event.id) === null) {
+      return res.status(400).json({ error: 'Lokale Kalender können nur eigene Termine enthalten.', code: 400 });
+    }
+    const vLocalCalendar = localCalendarProvided
+      ? validateCalendarId(db.get(), req.body.local_calendar_id, { required: true })
+      : null;
+    if (vLocalCalendar) checks.push(vLocalCalendar);
     const errors = collectErrors(checks);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
     if (event.recurrence_rule && req.body.confirmed_orphan_count !== undefined
@@ -1001,6 +1033,11 @@ router.put('/:id', async (req, res) => {
     const googleTargetId = vGoogle ? vGoogle.value : event.target_google_calendar_id;
     const outlookAccountId = vOutlook ? vOutlook.value.accountId : event.target_outlook_account_id;
     const outlookCalendarId = vOutlook ? vOutlook.value.calendarId : event.target_outlook_calendar_id;
+    if (localCalendarProvided && (caldavAccountId || googleTargetId)) {
+      return res.status(400).json({ error: 'Choose either a sync target or a local calendar.', code: 400 });
+    }
+    const localCalendarId = (caldavAccountId || googleTargetId) ? null
+      : vLocalCalendar ? vLocalCalendar.value : event.local_calendar_id;
 
     const applyUpdate = () => {
       // Der Anhang gegen den Stand, den dieses Schreiben vorfindet (#1358) -
@@ -1070,6 +1107,7 @@ router.put('/:id', async (req, res) => {
             target_google_calendar_id  = ?,
             target_outlook_account_id  = ?,
             target_outlook_calendar_id = ?,
+            local_calendar_id = ?,
             visibility      = ?,
             -- Anzeigeeinstellung, kein gespiegeltes Feld (#647): sie steht nicht
             -- in MIRRORED_FIELDS und löst deshalb keinen Push aus. Wie bei den
@@ -1101,6 +1139,7 @@ router.put('/:id', async (req, res) => {
         googleTargetId,
         outlookAccountId,
         outlookCalendarId,
+        localCalendarId,
         req.body.visibility !== undefined
           ? normalizeVisibility(req.body.visibility, event.visibility)
           : event.visibility,
@@ -1160,6 +1199,7 @@ router.put('/:id', async (req, res) => {
         seriesChanges.target_outlook_account_id = outlookAccountId;
         seriesChanges.target_outlook_calendar_id = outlookCalendarId;
       }
+      if (localCalendarProvided || caldavProvided || googleProvided) seriesChanges.local_calendar_id = localCalendarId;
       if (req.body.visibility !== undefined) {
         seriesChanges.visibility = normalizeVisibility(req.body.visibility, event.visibility);
       }
@@ -1210,12 +1250,16 @@ router.put('/:id', async (req, res) => {
              -- angelegter oder geaenderter Termin kam ohne ihn zurueck.
              COALESCE(ec.name, isub.name)   AS cal_name,
              COALESCE(ec.color, isub.color) AS cal_color,
+             lc.id AS local_calendar_id,
+             lc.name  AS local_calendar_name,
+             CASE WHEN (SELECT COUNT(*) FROM local_calendars) > 1 THEN lc.color END AS local_calendar_color,
              ${SOURCE_CALENDAR_COLUMNS},
              ${ASSIGNED_USERS_SQL}
       FROM calendar_events e
       LEFT JOIN users u_assigned ON u_assigned.id = e.assigned_to
       LEFT JOIN users u_created  ON u_created.id  = e.created_by
       LEFT JOIN external_calendars ec ON ec.id = e.calendar_ref_id
+      LEFT JOIN local_calendars lc ON lc.id = ${localCalendarIdSql()}
       ${SOURCE_CALENDAR_JOIN}
       LEFT JOIN ics_subscriptions isub ON isub.id = e.subscription_id
       WHERE e.id = ?
@@ -1270,6 +1314,9 @@ router.put('/:id', async (req, res) => {
 // Creates or updates one linked local recurrence replacement atomically.
 // --------------------------------------------------------
 router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
+  if (Object.hasOwn(req.body, 'local_calendar_id')) {
+    return res.status(400).json({ error: 'Calendar membership applies to the whole series.', code: 400 });
+  }
   let stagedUpload;
   try {
     const seriesId = parseInt(req.params.seriesId, 10);
@@ -1392,7 +1439,7 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
     });
 
     res.json({
-      data: serializeEvent(result.event, {
+      data: serializeEvent({ ...result.event, ...localCalendarProjection(db.get(), result.event.id) }, {
         viewer: documentViewer(req),
         database: db.get(),
         actorId,
@@ -1535,6 +1582,7 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
     for (const field of [
       'title', 'description', 'start_datetime', 'end_datetime', 'all_day',
       'location', 'color', 'visibility', 'countdown', 'recurrence_rule',
+      'local_calendar_id',
     ]) {
       if (Object.hasOwn(req.body, field)) {
         changes[field] = validated[field];
@@ -1549,6 +1597,12 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
       changes.target_outlook_account_id = vOutlook.value.accountId;
       changes.target_outlook_calendar_id = vOutlook.value.calendarId;
     }
+    const syncTarget = (caldavProvided ? vCaldav.value.accountId : master.target_caldav_account_id)
+      || (googleProvided ? vGoogle.value : master.target_google_calendar_id);
+    if (Object.hasOwn(req.body, 'local_calendar_id') && syncTarget) {
+      return res.status(400).json({ error: 'Choose either a sync target or a local calendar.', code: 400 });
+    }
+    if (syncTarget) changes.local_calendar_id = null;
     if (vIcon !== undefined) changes.icon = vIcon;
     const rights = attachmentRights(req);
     const commonOptions = {
@@ -1595,7 +1649,7 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
     );
     stagedUpload = null;
     res.status(result.wholeSeries ? 200 : 201).json({
-      data: serializeEvent(result.series, {
+      data: serializeEvent({ ...result.series, ...localCalendarProjection(db.get(), result.series.id) }, {
         viewer: documentViewer(req),
         database: db.get(),
         actorId,

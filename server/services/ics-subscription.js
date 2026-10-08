@@ -7,6 +7,8 @@
  *                  server/utils/http.js (node-nativer Safe-HTTP-Client)
  */
 
+import { localCalendarIdSql, defaultCalendarId, validateCalendarId } from './local-calendars.js';
+
 import { runExternalJob } from '../utils/restore-state.js';
 import dns from 'node:dns/promises';
 import { isIP } from 'node:net';
@@ -359,7 +361,7 @@ function toLocalRRule(raw) {
  *
  * @returns {Promise<{ imported:number, skipped:number, total:number }>}
  */
-async function importToLocal(userId, { ics, url, color } = {}) {
+async function importToLocal(userId, { ics, url, color, localCalendarId = null } = {}) {
   let rawEvents;
   if (typeof ics === 'string' && ics.trim()) {
     rawEvents = parseICS(ics);
@@ -369,6 +371,8 @@ async function importToLocal(userId, { ics, url, color } = {}) {
   } else {
     throw new Error('Either an ICS file or a URL is required.');
   }
+  const calendarCheck = validateCalendarId(db.get(), localCalendarId);
+  if (calendarCheck.error) throw new TypeError(calendarCheck.error);
   // RECURRENCE-ID-Overrides zusammenführen: Master behält die Serie, geänderte
   // Einzel-Vorkommen werden eigenständige Termine statt die Serie zu killen (#549).
   rawEvents = normalizeRecurrenceOverrides(rawEvents);
@@ -383,12 +387,13 @@ async function importToLocal(userId, { ics, url, color } = {}) {
     INSERT INTO calendar_events
       (title, description, start_datetime, end_datetime, all_day, location,
        color, external_calendar_id, external_source, subscription_id,
-       recurrence_rule, user_modified, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'local', NULL, ?, 0, ?)
+       recurrence_rule, user_modified, created_by, local_calendar_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'local', NULL, ?, 0, ?, ?)
   `);
   const existsStmt = db.get().prepare(`
-    SELECT 1 FROM calendar_events
-    WHERE created_by = ? AND subscription_id IS NULL AND external_calendar_id = ?
+    SELECT 1 FROM calendar_events e
+    WHERE e.created_by = ? AND e.subscription_id IS NULL AND e.external_calendar_id = ?
+      AND ${localCalendarIdSql()} = ?
     LIMIT 1
   `);
   // EXDATE-Ausnahmen der importierten Serie (#513): dieselbe Tabelle wie
@@ -404,13 +409,13 @@ async function importToLocal(userId, { ics, url, color } = {}) {
   db.get().transaction(() => {
     for (const ev of rawEvents) {
       if (!ev.dtstart) { skipped++; continue; }
-      if (ev.uid && existsStmt.get(userId, ev.uid)) { skipped++; continue; }
+      if (ev.uid && existsStmt.get(userId, ev.uid, localCalendarId ?? defaultCalendarId(db.get()))) { skipped++; continue; }
       try {
         const localRule = toLocalRRule(ev.rrule);
         const info = insert.run(
           ev.summary, ev.description, ev.dtstart, ev.dtend,
           ev.allDay ? 1 : 0, ev.location, ev.color || fallbackColor,
-          ev.uid || null, localRule, userId,
+          ev.uid || null, localRule, userId, localCalendarId,
         );
         // EXDATE nur übernehmen, wenn die Serie erhalten blieb (localRule != null).
         if (localRule && Array.isArray(ev.exdates) && ev.exdates.length) {
