@@ -209,7 +209,9 @@ function screensaverIdleText(seconds) {
   return formatUnit(seconds / 60, 'minute', { unitDisplay: 'long' });
 }
 
-function screensaverIdleOptions() {
+// Exported so test:screensaver-idle can check the select opens on the stored
+// value.
+export function screensaverIdleOptions() {
   const current = getScreensaverIdleSeconds();
   return SCREENSAVER_IDLE_STEPS.map((seconds) => `
     <option value="${seconds}"${seconds === current ? ' selected' : ''}>${esc(screensaverIdleText(seconds))}</option>`).join('');
