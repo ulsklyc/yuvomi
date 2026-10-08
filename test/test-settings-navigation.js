@@ -3301,9 +3301,24 @@ function sheetProbeContainer(part) {
   };
 }
 
+/**
+ * Entfernt HTML-Kommentare, bis keiner mehr faellt. Ein einzelner Durchlauf
+ * genuegt nicht: aus `<!<!-- a -->-- b -->` macht er `<!-- b -->`, und der
+ * Scanner dahinter liest wieder Markup, das auskommentiert ist (CodeQL
+ * `js/incomplete-multi-character-sanitization`).
+ */
+function stripHtmlComments(markup) {
+  let text = String(markup);
+  for (let prev = null; prev !== text;) {
+    prev = text;
+    text = text.replace(/<!--[\s\S]*?-->/g, '');
+  }
+  return text;
+}
+
 /** Jede `.settings-card` des Markups samt Inhalt (Kommentare vorher entfernt). */
 function settingsCardsIn(markup) {
-  const html = markup.replace(/<!--[\s\S]*?-->/g, '');
+  const html = stripHtmlComments(markup);
   const cards = [];
   const open = /<div class="(?:[^"]*\s)?settings-card(?:\s[^"]*)?"[^>]*>/g;
   let m;
@@ -3337,6 +3352,18 @@ test('R17: der Karten-Scanner sieht eine Karte mit genau einem Bedienelement - u
   assert.deepEqual(cards.map(cardControls), [1, 2, 1]);
   assert.deepEqual(cards.map(cardHasAction), [false, true, true]);
   assert.match(cards[1], /btn--primary/, 'die Karte reicht bis zu IHREM schliessenden div, nicht bis zum ersten');
+});
+
+test('R17: der Karten-Scanner liest kein Markup, das erst nach dem Entfernen eines Kommentars zum Kommentar wird', () => {
+  // Ein Durchlauf laesst hier `<!-- <div class="settings-card">...</div> -->`
+  // stehen, und der Scanner zaehlte die auskommentierte Karte mit.
+  const nested = '<!<!-- a -->-- <div class="settings-card"><select></select></div> -->';
+  assert.equal(stripHtmlComments(nested), '');
+  assert.equal(settingsCardsIn(nested).length, 0, 'die Karte ist auskommentiert');
+  assert.equal(stripHtmlComments('<!<!<!-- a -->-- b -->-- c --><p>bleibt</p>'), '<p>bleibt</p>', 'auch drei Ebenen tief');
+  // Gegenproben: ohne Kommentar bleibt alles, und eine echte Karte daneben zaehlt weiter.
+  assert.equal(stripHtmlComments('<p>a</p>'), '<p>a</p>');
+  assert.equal(settingsCardsIn(nested + '<div class="settings-card"><select></select></div>').length, 1);
 });
 
 /** Jeder Abschnitt der Registry, als Programm gerendert: id -> Markup. Einmal je Lauf. */
@@ -3378,7 +3405,7 @@ function probeSheets() {
         } catch {
           // Nach dem Zeichnen an einer Attrappe gescheitert: das Markup steht.
         }
-        rendered.set(section.id, host.html.replace(/<!--[\s\S]*?-->/g, ''));
+        rendered.set(section.id, stripHtmlComments(host.html));
       }
     } finally {
       globalThis.window = prev.window;
