@@ -1876,6 +1876,104 @@ function modalOptionen(fn) {
   return letzte;
 }
 
+// #1821: die Suche und die Notizzeile der Uebersicht nennen `/notes?open=<id>`,
+// die Seite las den Parameter nie - der Treffer landete auf der Liste.
+test('#1821 Notizen: `?open=<id>` oeffnet die Notiz und verlaesst danach die Adresse', async () => {
+  const before = notes.state.notes;
+  const hadModal = '__openModal' in globalThis;
+  const prevModal = globalThis.__openModal;
+  let opened = [];
+  globalThis.__openModal = (opts) => { opened.push(opts); };
+  notes.state.notes = [
+    { id: 5, title: 'Notrufnummern', content: '112', color: '#EFE3BE', pinned: 1, categories: [] },
+    { id: 12, title: 'WLAN', content: 'geheim', color: '#EFE3BE', pinned: 0, categories: [] },
+  ];
+  const visit = (search, hash = '') => {
+    opened = [];
+    const written = [];
+    const hist = { state: { path: `/notes${search}`, mark: 1 }, replaceState: (state, _, url) => written.push([state, url]) };
+    const result = withAccess({ notes: 'write' }, () => notes.openNoteFromQuery({ pathname: '/notes', search, hash }, hist));
+    return { result, written, title: opened[0]?.title ?? null, count: opened.length };
+  };
+  try {
+    // Der Weg der Suche und der Notizzeile der Uebersicht.
+    const hit = visit('?open=12');
+    assert.equal(hit.result, true);
+    assert.equal(hit.count, 1, 'genau ein Dialog');
+    assert.equal(hit.title, 'WLAN', 'und zwar der der genannten Notiz, nicht der ersten');
+    assert.deepEqual(hit.written, [[{ path: '/notes', mark: 1 }, '/notes']],
+      'die Adresse verliert den Parameter, der uebrige History-Zustand bleibt');
+
+    // Andere Parameter bleiben stehen.
+    assert.equal(visit('?open=5&x=1').written[0][1], '/notes?x=1');
+    // Und der Anker auch.
+    assert.equal(visit('?open=5', '#abschnitt').written[0][1], '/notes#abschnitt');
+    assert.equal(visit('?open=5&x=1', '#abschnitt').written[0][1], '/notes?x=1#abschnitt');
+
+    // Ohne Parameter: nichts oeffnen, nichts schreiben.
+    const none = visit('');
+    assert.deepEqual([none.result, none.count, none.written.length], [false, 0, 0]);
+
+    // Geloescht, fremd oder Unsinn: die Liste bleibt, ohne Fehler - und der
+    // tote Parameter geht trotzdem aus der Adresse.
+    // `5e0` und `0x5` sind fuer Number() eine 5 - eine Notiz meinen sie nicht.
+    for (const search of ['?open=999', '?open=abc', '?open=', '?open=5.5', '?open=-5', '?open=5e0', '?open=0x5', '?open=%205']) {
+      const miss = visit(search);
+      assert.deepEqual([miss.result, miss.count], [false, 0], search);
+      assert.equal(miss.written[0][1], '/notes', search);
+    }
+  } finally {
+    notes.state.notes = before;
+    if (hadModal) globalThis.__openModal = prevModal; else delete globalThis.__openModal;
+  }
+
+  // Und die Seite ruft es auch: NACH dem Laden der Notizen, sonst suchte der
+  // Link in einer leeren Liste.
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/pages/notes.js', import.meta.url), 'utf8');
+  const render = src.slice(src.indexOf('export async function render('));
+  const loaded = render.indexOf('state.notes = notesRes.data');
+  // Der Aufruf steht als EIGENE Anweisung auf der Ebene von render() - ein
+  // `if (false) openNoteFromQuery();` oder ein auskommentierter Aufruf ist keiner.
+  const called = render.search(/^ {2}openNoteFromQuery\(\);$/m);
+  assert.ok(loaded > 0 && called > loaded, 'render() loest den Link nach dem Laden ein');
+});
+
+test('#1821 Geburtstage: `?open=` oeffnet unter der Spaltenschwelle das Leseblatt und verlaesst vorher die Adresse', async () => {
+  const people = [{ id: 4, name: 'Mike' }, { id: 9, name: 'Lena' }];
+  const find = (id) => people.find((p) => String(p.id) === String(id));
+  const run = (search, { split = false } = {}) => {
+    const steps = [];
+    const md = { isSplit: () => split, clear: (opts) => steps.push(['clear', opts]) };
+    const result = birthdays.openBirthdayFromQueryNarrow(md, find, {
+      loc: { search }, openSheet: (b) => steps.push(['sheet', b.name]),
+    });
+    return { result, steps };
+  };
+  // Der Weg der Uebersichtszeile und der Suche am Telefon. ERST die Adresse,
+  // dann das Blatt: es legt seinen Zurueck-Schritt auf die Adresse, die dann gilt.
+  assert.deepEqual(run('?open=9'), { result: true, steps: [['clear', { history: 'replace' }], ['sheet', 'Lena']] });
+  // In der Spalte ist die Auswahl die Adresse: der Baustein hat sie, die Seite laesst sie.
+  assert.deepEqual(run('?open=9', { split: true }), { result: false, steps: [] });
+  // Ohne Parameter nichts.
+  assert.deepEqual(run(''), { result: false, steps: [] });
+  // Geloescht oder Unsinn: kein Blatt, der tote Parameter geht trotzdem.
+  assert.deepEqual(run('?open=404'), { result: false, steps: [['clear', { history: 'replace' }]] });
+  assert.equal(birthdays.openBirthdayFromQueryNarrow(null, find, { loc: { search: '?open=9' }, openSheet() {} }), false);
+
+  // Die Seite ruft es nach dem Einhaengen, als eigene Anweisung, und laesst
+  // den Baustein unter der Schwelle NICHT selbst einloesen (sonst ginge das
+  // Blatt zweimal auf und der Parameter bliebe stehen).
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/pages/birthdays.js', import.meta.url), 'utf8');
+  const mount = src.slice(src.indexOf('function mountBirthdaysDetail(signal) {'));
+  const body = mount.slice(0, mount.indexOf('\n}\n'));
+  const mounted = body.indexOf('_md = mountMasterDetail({');
+  const called = body.search(/^ {2}openBirthdayFromQueryNarrow\(_md, find\);$/m);
+  assert.ok(mounted > 0 && called > mounted);
+  assert.doesNotMatch(body.replace(/^\s*\/\/.*$/gm, ''), /deepLinkNarrow/);
+});
+
 test('Notiz-Dialog mit `notes: read`: Leseansicht, kein Editor, keine Fusszeile', () => {
   const offen = mitEchtemMarkdown(() => withAccess({ notes: 'read' }, () => (
     modalOptionen(() => notes.openNoteModal({ mode: 'edit', note: notiz({ pinned: 1 }) }))

@@ -188,6 +188,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A wall tablet shows events again when the household overview is set to "Assigned to me"** (#1808).
+  A paired display follows the household default of the overview. If that default had the calendar
+  tile set to "Assigned to me", the tablet looked for events assigned to the tablet itself and
+  showed none - in the event list and in the week strip; tasks and the other tiles were not
+  affected. On a display the option now means all events; for members it works as before. The
+  hint under Settings > Wall tablets now says where a tablet takes its overview from and names
+  what it shows: calendar, tasks, rewards and weather.
 - **A locked field looks locked.** A field you cannot change looked exactly like one you can -
   same text, same fill, same outline; only the mouse pointer gave it away, and on a phone nothing
   did. Text, number and date fields, dropdowns and text areas now all show it the same way,
@@ -199,6 +206,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   empty locked share in a split expense showed a grey "30" that looked like a value of 30. The
   calendar button of a locked date also steps back when a whole group of fields is locked, not
   only when the date itself is.
+- **A row on the overview opens what it shows** (#1821). A note on the overview opened the notes
+  page instead of the note, and so did a note found through search: the notes page now opens the
+  note it is asked for. A birthday row opens that birthday, on the phone as well, and so does a
+  birthday found through search. A bin without
+  an upcoming pickup leads to that bin, and "n open" for shopping in the today sheet opens the
+  list when only one list has open items.
+- **The keyboard focus stays on an overview row.** When the overview refreshed quietly - on
+  coming back to the tab, every quarter of an hour, at a day boundary - the focused row lost the
+  focus and Enter did nothing. Tabbing into a row in the instant after the page appeared could
+  lose it the same way. Both keep the focus now, and a dialog that a link opens directly keeps
+  it too.
+- **Overview rows that lead to one item open as fast as the others.** A row for an event, a
+  shopping list or a pantry filter did not preload the page behind it on hover or press, so its
+  first tap was slower than on any other row.
 - **"n open" for shopping counts every list.** With more than three lists that still had open
   items, the today sheet and the wall added up only three of them and showed a smaller number
   than the shopping page.

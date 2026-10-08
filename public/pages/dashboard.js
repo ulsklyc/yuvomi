@@ -1558,7 +1558,7 @@ export function renderUpcomingBirthdays(allBirthdays, size, total = null) {
         ? t('birthdays.turnsAge', { age: b.next_age })
         : '';
     return `
-      <div class="birthday-widget-item" data-route="/birthdays" role="button" tabindex="0">
+      <div class="birthday-widget-item" data-route="${esc(b.id != null ? `/birthdays?open=${encodeURIComponent(String(b.id))}` : '/birthdays')}" role="button" tabindex="0">
         <div class="birthday-widget-item__avatar"${avatarStyle}>
           ${b.photo_data ? `<img src="${esc(b.photo_data)}" alt="" loading="lazy">` : `<span>${esc(initials(b.name))}</span>`}
         </div>
@@ -1759,7 +1759,7 @@ function renderPinnedNotes(allNotes, size, total = null) {
   // Traegergrund: drei graubeige Kaesten, die wie deaktiviert aussahen. Ohne die
   // Deklaration greift der Fallback im Stylesheet (der Notizen-Ton).
   const items = notes.map((n) => `
-    <div class="note-item" data-route="/notes"
+    <div class="note-item" data-route="${esc(`/notes?open=${encodeURIComponent(String(n.id))}`)}"
          ${n.color ? `style="--note-color:${esc(n.color)};"` : ''}>
       <div class="note-item__body" role="link" tabindex="0">
       ${n.title ? `<div class="note-item__title">${esc(n.title)}</div>` : ''}
@@ -2301,6 +2301,22 @@ function renderBudgetWidget(budget, currency, size = '1x1') {
  * keine Kachel (siehe metricTileFor). */
 const METRIC_TILE_ORDER = ['tasks', 'shopping', 'budget', 'split-expenses', 'birthdays', 'meals', 'notes', 'rewards', 'health', 'housekeeping'];
 const METRIC_TILE_COUNT = 4;
+
+/**
+ * Wohin eine Zeile fuehrt, die ueber ALLE Einkaufslisten zaehlt (#1821).
+ *
+ * Die Zahl meint mehrere Listen, also ist die Modulseite das ehrliche Ziel -
+ * bis nur noch EINE Liste etwas Offenes hat: dann meint "5 offen" genau diese
+ * Liste, und `/shopping` oeffnete stattdessen die aelteste (shopping.js liest
+ * `?list=`, sonst die erste geladene). `shoppingOpenLists` zaehlt der Server
+ * ueber alle Listen; `shoppingLists` traegt hoechstens drei, bei einer einzigen
+ * also genau sie.
+ */
+function shoppingSoleListRoute(data) {
+  const lists = Array.isArray(data?.shoppingLists) ? data.shoppingLists : [];
+  if (Number(data?.shoppingOpenLists) !== 1 || lists.length !== 1 || lists[0]?.id == null) return '/shopping';
+  return `/shopping?list=${encodeURIComponent(String(lists[0].id))}`;
+}
 
 function metricTileFor(id, data, currency, sheetSpeaks = new Set()) {
   const route = { tasks: '/tasks', shopping: '/shopping', budget: BUDGET_MONTH_ROUTE, birthdays: '/birthdays', meals: '/meals', notes: '/notes', rewards: '/rewards', health: '/health', housekeeping: '/housekeeping' }[id];
@@ -3319,7 +3335,7 @@ function renderWasteWidget(waste, size) {
 
     if (!next) {
       return `
-        <div class="waste-widget-row" data-route="/waste" role="button" tabindex="0">
+        <div class="waste-widget-row" data-route="${esc(`/waste?type=${encodeURIComponent(String(type.id))}`)}" role="button" tabindex="0">
           <span class="waste-widget-row__dot" style="--waste-color:${esc(accent)}"></span>
           <span class="waste-widget-row__name">${icon}${esc(type.name)}</span>
           <span class="waste-widget-row__date waste-widget-row__date--none">${esc(t('waste.noUpcomingPickup'))}</span>
@@ -3699,7 +3715,7 @@ function buildTodayCockpitModel(data, cfg = [], {
         sub: t('dashboard.todayShopping'),
         icon: 'shopping-cart',
         tone: 'shopping',
-        route: '/shopping',
+        route: shoppingSoleListRoute(data),
         who: null,
       }
     : null;
@@ -4108,11 +4124,85 @@ const FOCUS_IDENTITY_ATTRS = [
 function focusKeyOf(el) {
   if (el.id) return `#${CSS.escape(el.id)}`;
   const attr = FOCUS_IDENTITY_ATTRS.find((a) => el.hasAttribute(a));
-  if (!attr) return null;
+  if (!attr) return rowFocusKeyOf(el);
   const value = el.getAttribute(attr);
   const own = value ? `[${attr}="${CSS.escape(value)}"]` : `[${attr}]`;
   const tile = el.closest('.widget-wrapper[data-widget-id]')?.dataset.widgetId;
   return tile ? `.widget-wrapper[data-widget-id="${CSS.escape(tile)}"] ${own}` : own;
+}
+
+/**
+ * Dasselbe fuer eine INHALTSZEILE (#1821): Termin, Notiz, Liste, Aufgabe.
+ *
+ * Die Flaeche baut nicht nur im Anpassen-Modus neu, sondern auch still - bei
+ * der Rueckkehr in den Tab, im Viertelstundentakt, an einer Tagesgrenze, nach
+ * dem Wetter. Wer mit der Tastatur auf einer Zeile stand, stand danach auf
+ * <body>, und Enter tat nichts mehr. Eine Zeile hat keine Id; ihre Identitaet
+ * ist, wohin sie fuehrt (`data-route`, bei Aufgaben `data-task-id`), in welcher
+ * Kachel sie steht und - wo mehrere Zeilen dasselbe Ziel haben (Schichtplan,
+ * Mahlzeiten) - die wievielte sie ist. Der Fokus kann auch auf einem Kind
+ * liegen (der Notizkoerper traegt den Tabstopp, die Karte den Weg).
+ *
+ * `preventScroll`: der stille Neuaufbau darf niemanden zu einer Zeile
+ * zurueckholen, von der er weggescrollt hat.
+ */
+function rowFocusKeyOf(el) {
+  const row = el.closest?.('[data-route], [data-task-id]');
+  if (!row) return null;
+  const quoted = (name, value) => `[${name}="${CSS.escape(value)}"]`;
+  let own = row.hasAttribute('data-task-id')
+    ? quoted('data-task-id', row.getAttribute('data-task-id'))
+    : quoted('data-route', row.getAttribute('data-route'));
+  if (row.dataset.objectKind && row.dataset.objectId) {
+    own += quoted('data-object-kind', row.dataset.objectKind) + quoted('data-object-id', row.dataset.objectId);
+  }
+  if (el !== row) {
+    const cls = el.classList?.[0];
+    if (!cls) return null;
+    own += ` .${CSS.escape(cls)}`;
+  }
+  const tile = row.closest('.widget-wrapper[data-widget-id]')?.dataset.widgetId;
+  const selector = tile ? `.widget-wrapper[data-widget-id="${CSS.escape(tile)}"] ${own}` : own;
+  const root = row.closest('#dashboard-shell') ?? row.ownerDocument;
+  const index = Math.max(0, [...root.querySelectorAll(selector)].indexOf(el));
+  return { selector, index, preventScroll: true };
+}
+
+/**
+ * VOR dem Neuaufbau: wer hat den Fokus, und unter welchem Schluessel findet
+ * man ihn danach wieder? Nur ein Element IN der Flaeche zaehlt - ein Dialog
+ * oder die Navigation behalten ihren Fokus ohnehin.
+ *
+ * @returns {{key: (string|object|null), had: boolean}}
+ */
+function captureRebuildFocus(shell, active, body) {
+  const had = Boolean(active) && active !== body && Boolean(shell?.contains(active));
+  return { key: had ? focusKeyOf(active) : null, had };
+}
+
+/**
+ * NACH dem Neuaufbau: der erste Kandidat, den es gibt und der bedienbar ist,
+ * bekommt den Fokus. Ein Kandidat ist ein Selektor (erster Treffer gilt: Ids,
+ * Bearbeiten-Knoepfe, der Nachfolger, den eine Geste nennt) oder der Schluessel
+ * einer Inhaltszeile mit Selektor UND Stelle (rowFocusKeyOf) - der kommt ohne
+ * Scrollen zurueck, weil der stille Neuaufbau niemanden zu einer Zeile holen
+ * darf, von der er weggescrollt hat.
+ *
+ * @returns {Element|null} das fokussierte Element
+ */
+function restoreFocusAfterRebuild(container, candidates) {
+  for (const candidate of (candidates ?? []).filter(Boolean)) {
+    const isRow = typeof candidate !== 'string';
+    const el = isRow
+      ? container.querySelectorAll(candidate.selector)[candidate.index]
+      : container.querySelector(candidate);
+    if (el && !el.disabled) {
+      if (isRow) el.focus({ preventScroll: candidate.preventScroll });
+      else el.focus();
+      return el;
+    }
+  }
+  return null;
 }
 
 /* EINE ANSAGE-REGION, DIE DEN NEUAUFBAU UEBERLEBT.
@@ -7029,11 +7119,8 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // nicht fuer die Zeile.
     const weatherCardShown = cfg.some((w) => w.id === 'weather' && w.visible) && isWidgetModuleEnabled('weather');
     // Wer hatte den Fokus? Nach dem setHtml gibt es sein Element nicht mehr
-    // (siehe focusKeyOf / restoreFocusAfterRebuild).
-    const focused = document.activeElement;
-    const keepFocus = focused && focused !== document.body && shell.contains(focused)
-      ? focusKeyOf(focused) : null;
-    const hadFocus = !!focused && focused !== document.body && shell.contains(focused);
+    // (captureRebuildFocus / restoreFocusAfterRebuild).
+    const { key: keepFocus, had: hadFocus } = captureRebuildFocus(shell, document.activeElement, document.body);
     const modeChanged = renderedCustomizing !== null && renderedCustomizing !== isCustomizing;
     // Nur eine Geste IM Anpassen-Modus gleitet (playTileFlip): beim Betreten
     // und Verlassen wachsen und schwinden die Bearbeiten-Leisten aller Kacheln,
@@ -7119,19 +7206,12 @@ export async function render(container, { user, signal: routeSignal = null } = {
      * als Nachfolger nennt (Ausblenden -> Nachbarkachel), und wenn die Geste den
      * Modus gewechselt hat (Speichern, Abbrechen), der Anpassen-Knopf, der ihn
      * wieder oeffnet. */
-    const candidates = [
+    restoreFocusAfterRebuild(container, [
       keepFocus,
       ...(focusAfterRebuild ?? []),
       ...(hadFocus && modeChanged ? ['#dashboard-customize-btn'] : []),
-    ].filter(Boolean);
+    ]);
     focusAfterRebuild = null;
-    for (const selector of candidates) {
-      const el = container.querySelector(selector);
-      if (el && !el.disabled) {
-        el.focus();
-        break;
-      }
-    }
     playTileFlip(shell, tileRectsBefore);
     playGridShift(shell, gridTopBefore);
   }
@@ -7366,7 +7446,7 @@ async function loadScheduleSlice(day) {
   };
 }
 
-export const __test = { customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill };
+export const __test = { customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -

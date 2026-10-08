@@ -79,6 +79,8 @@ const ADMIN = Number(addUser.run(`shop-admin-${randomUUID()}`, 'Anna', 'admin', 
 const LEO = Number(addUser.run(`shop-leo-${randomUUID()}`, 'Leo', 'member', 'child').lastInsertRowid);
 
 let currentUser = ADMIN;
+/** Ein gekoppeltes Display: Methode und Scopes wie `requireAuth` sie setzt, sonst null. */
+let displayScopes = null;
 const app = express();
 app.use(express.json());
 app.use((req, _res, next) => {
@@ -87,6 +89,7 @@ app.use((req, _res, next) => {
   req.authRole = user.role;
   req.session = { userId: user.id, role: user.role };
   req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(db, user));
+  if (displayScopes) { req.authMethod = 'display'; req.authScopes = displayScopes; }
   next();
 });
 app.use('/preferences', preferencesRouter);
@@ -273,6 +276,27 @@ test('wer Einkauf nicht sehen darf, bekommt die leere Fassung - mit und ohne Aus
   } finally {
     unlock();
     currentUser = ADMIN;
+  }
+});
+
+test('ein gekoppeltes Display bekommt keinen Einkauf - auch nicht ueber die Auswahl der Haushaltsvorgabe', async () => {
+  // Das Display folgt der Vorgabe des Haushalts, sein Browser schickt deren
+  // `shopping_list` also mit (#1808 fuer `events_scope`). Es hat aber keinen
+  // Einkaufs-Scope: die Auswahl darf dort kein Feld fuellen.
+  const { DISPLAY_SCOPES } = await import('../server/services/display-accounts.js');
+  assert.ok(!DISPLAY_SCOPES.some((scope) => scope.startsWith('shopping:')), 'Vorbedingung: das Display hat keinen Einkaufs-Scope');
+  assert.deepEqual(tileNames(await getJson(query(GARTEN))), ['Garten'], 'Gegenprobe: ohne Display fuellt dieselbe Anfrage die Kachel');
+  displayScopes = [...DISPLAY_SCOPES];
+  try {
+    for (const path of ['/', query(GARTEN), query(GARTEN, FEST)]) {
+      const body = await getJson(path);
+      assert.deepEqual(body.shoppingLists, [], path);
+      assert.deepEqual(numbers(body), [0, 0], path);
+      assert.equal('shoppingTile' in body, false, path);
+      assert.ok(!JSON.stringify(body).includes('Garten'), `${path}: kein Listenname in der Antwort`);
+    }
+  } finally {
+    displayScopes = null;
   }
 });
 
@@ -599,6 +623,23 @@ test('Heute-Blatt und Wand zaehlen ueber ALLE Listen - auch wenn die Kachel eine
       assert.equal(row.title, 'dashboard.todayShoppingCount{"count":14}', `${path} (Deckel ${cap})`);
     }
   }
+});
+
+test('die Einkaufszeile des Heute-Blatts waehlt ihr Ziel aus den UNGEFILTERTEN Listen (#1821)', async () => {
+  // `/shopping?list=<id>` gilt, wenn im HAUSHALT genau eine Liste Offenes hat -
+  // nicht, wenn die Kachel genau eine Liste gewaehlt hat. Hier haben vier Listen
+  // Offenes: das Ziel bleibt die Seite, auch mit einer einzelnen gewaehlten.
+  // Filterte die Route die geteilten Felder, stuende hier `?list=<Garten>`.
+  for (const path of ['/', query(GARTEN), query(FEST)]) {
+    const data = await getJson(path);
+    assert.equal(dash.shoppingSoleListRoute(data), '/shopping', path);
+    assert.equal((await sheetShoppingRow(data, dash.PROGRAM_ROW_CAP)).route, '/shopping', path);
+  }
+  // Reichweite: mit genau einer Liste mit Offenem im Haushalt ist sie das Ziel -
+  // auch wenn die Kachel eine ANDERE gewaehlt hat.
+  const one = { shoppingLists: [{ id: 7, name: 'Drogerie', open_count: 2, total_count: 2, items: [] }], shoppingOpenCount: 2, shoppingOpenLists: 1,
+    shoppingTile: { lists: [{ id: 9, name: 'Fest', open_count: 0, total_count: 1, items: [] }], openCount: 0, listCount: 1 } };
+  assert.equal(dash.shoppingSoleListRoute(one), '/shopping?list=7');
 });
 
 test('das Heute-Blatt liest die Zahl des Servers, nicht die Summe der drei gelieferten Listen', async () => {
