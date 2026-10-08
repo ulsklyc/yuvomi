@@ -256,7 +256,9 @@ function overviewEventTime(event, span) {
 }
 
 /**
- * Die Zeitangabe eines Termins an der WAND (#1698, D#988): Beginn UND Ende.
+ * Das Ende eines Termins fuer die WAND (#1698, D#988), fertig formatiert -
+ * oder leer, wenn die Zeile beim Beginn allein bleibt. Die Wand schreibt es
+ * hinter die Zeitangabe, die `overviewEventTime` liefert: Beginn UND Ende.
  *
  * „Frueh 6:00" sagt, wann die Schicht anfaengt; an der Wand will man wissen,
  * wann sie vorbei ist. Wo `overviewEventTime` schon etwas anderes als den
@@ -268,18 +270,28 @@ function overviewEventTime(event, span) {
  * - 06:00" liest jeder als die Nacht; „18:00 - 12:00" fuer eine Reise bis
  * uebermorgen laese sich wie ein Fehler.
  *
+ * „EIN TAG ODER MEHR" IST EINE FRAGE AN DIE WANDUHR, NICHT AN DIE STOPPUHR.
+ * Verglichen werden die Stempel des Haushalts: das Ende gegen den Beginn am
+ * Folgetag zur selben Uhrzeit. Hier standen zuerst Millisekunden
+ * (`new Date(end) - new Date(start) >= 24 h`), und das war zweimal falsch: in
+ * der Nacht der Zeitumstellung hat der Tag 23 Stunden, Samstag 22:00 bis
+ * Sonntag 22:00 las sich als „22:00 - 22:00"; und `new Date('…T22:00')` liest
+ * die Ziffern in der Zone des GERAETS, die Antwort hing also am Tablett statt
+ * am Haushalt (dieselbe Falle wie #1534).
+ *
  * Der Bindestrich ist dieselbe Form wie bei den Schichten des Blatts
  * (utils/today-sheet.js).
  */
-function wallEventTime(event, span) {
-  const base = overviewEventTime(event, span);
-  if (span.until || span.allDay) return base;
-  const start = String(event?.start_datetime || '');
+function wallEventEnd(event, span) {
+  if (span.until || span.allDay) return '';
   const end = String(event?.end_datetime || '');
-  if (end.length <= 10) return base;
-  const length = new Date(end).getTime() - new Date(start).getTime();
-  if (!(length > 0) || length >= 24 * 60 * 60 * 1000) return base;
-  return `${base} - ${formatTime(end)}`;
+  const startStamp = householdStamp(String(event?.start_datetime || ''));
+  // Ein Ende ohne Uhrzeit ('YYYY-MM-DD') ergibt keinen Stempel und damit keine Spanne.
+  const endStamp = householdStamp(end);
+  if (!startStamp || !endStamp || endStamp <= startStamp) return '';
+  const dayLater = `${addLocalDays(startStamp.slice(0, 10), 1)}${startStamp.slice(10)}`;
+  if (endStamp >= dayLater) return '';
+  return formatTime(end);
 }
 
 function getAppName() {
@@ -1154,14 +1166,14 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
         title: event.title,
         sub: t('dashboard.todayEvent'),
         // Die Wand liest Herkunft und Spanne (#1698): der Name des Kalenders
-        // statt des Wortes „Termin", und Beginn UND Ende. Beides reist NEBEN
-        // `sub` und `timeLabel` mit, statt sie zu ersetzen: dieselbe Zeile
+        // statt des Wortes „Termin", und hinter dem Beginn das Ende. Beides
+        // reist NEBEN `sub` und `timeLabel` mit, statt sie zu ersetzen: dieselbe Zeile
         // zeichnet auch das Heute-Blatt der Uebersicht, und ob es mitzieht,
         // ist in #1698 offen. Wer es umstellt, liest dort diese zwei Felder.
         // Ein Termin, der nur in Yuvomi lebt, hat keinen Kalendernamen - er
         // behaelt das Wort.
         wallSub: String(event.cal_name ?? '').trim() || t('dashboard.todayEvent'),
-        wallTimeLabel: wallEventTime(event, span),
+        wallTimeEnd: wallEventEnd(event, span),
         icon: 'calendar',
         tone: 'event',
         route: calendarEventRoute(event),
@@ -5396,11 +5408,16 @@ const WALL_ROW_CAP = 4;
 /** Eine Programmzeile als reiner Text - kein href, kein data-route, kein Modal. */
 function renderWallRow(row) {
   // Die Wand-Fassung einer Zeile, wo sie eine hat (#1698): der Termin nennt
-  // hier seinen Kalender und seine Spanne.
-  const timeLabel = row.wallTimeLabel ?? row.timeLabel;
+  // hier seinen Kalender und, hinter dem Beginn, sein Ende. Das Ende steht in
+  // einem eigenen Element, weil es auf einer Flaeche unter Tablettbreite
+  // weicht (dashboard.css): dort naehme „9:30 PM - 11:30 PM" dem Titel mehr
+  // als die halbe Zeile.
   const sub = row.wallSub ?? row.sub;
-  const time = timeLabel
-    ? `<span class="wall-row__time${row.overdue ? ' wall-row__time--overdue' : ''}">${esc(timeLabel)}</span>`
+  const end = row.timeLabel && row.wallTimeEnd
+    ? `<span class="wall-row__time-end"> - ${esc(row.wallTimeEnd)}</span>`
+    : '';
+  const time = row.timeLabel
+    ? `<span class="wall-row__time${row.overdue ? ' wall-row__time--overdue' : ''}">${esc(row.timeLabel)}${end}</span>`
     : '';
   return `
     <li class="wall-row wall-row--${esc(row.tone)}">

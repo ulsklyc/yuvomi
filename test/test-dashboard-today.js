@@ -527,12 +527,14 @@ test('#1534: Geraet und Haushalt in derselben Zone - unveraendert',
 // 5. Die Wand nennt Kalender und Spanne eines Termins (#1698, D#988)
 // --------------------------------------------------------------------------
 
-function wallRows(events) {
-  const html = dash.renderWallSurface({ upcomingEvents: events, urgentTasks: [], users: [] }, null, { now: new Date() });
-  return [...html.matchAll(/<li class="wall-row wall-row--event">([\s\S]*?)<\/li>/g)].map(([, row]) => ({
+function wallRows(events, { tasks = [], tone = 'event' } = {}) {
+  const html = dash.renderWallSurface({ upcomingEvents: events, urgentTasks: tasks, users: [] }, null, { now: new Date() });
+  return [...html.matchAll(new RegExp(`<li class="wall-row wall-row--${tone}">([\\s\\S]*?)</li>`, 'g'))].map(([, row]) => ({
     title: (/wall-row__title">([^<]*)</.exec(row) || [])[1],
     sub: (/wall-row__sub">([^<]*)</.exec(row) || [])[1],
-    time: (/wall-row__time[^>]*>([^<]*)</.exec(row) || [])[1] ?? null,
+    // Die ganze Zeitangabe, wie sie zu lesen ist: Beginn und, in einem eigenen
+    // Element, das Ende.
+    time: (/<span class="wall-row__time[^>]*>([\s\S]*?)<\/span>\s*$/.exec(row.trim()) || [])[1]?.replace(/<[^>]+>/g, '') ?? null,
   }));
 }
 
@@ -576,6 +578,17 @@ test('#1698 Wand: eine Spanne nur mit echtem Ende am selben Tag oder in der Nach
   });
 }));
 
+test('#1698 Wand: das Ende steht in einem eigenen Element - die schmale Flaeche blendet es aus', inBrowser(THU_10_BERLIN, 'Europe/Berlin', async () => {
+  const html = dash.renderWallSurface({
+    upcomingEvents: [ev(1, 'Frueh', '2026-09-24T14:00', '2026-09-24T22:00')], urgentTasks: [], users: [],
+  }, null, { now: new Date() });
+  assert.match(html, /wall-row__time">2026-09-24T14:00<span class="wall-row__time-end"> - 2026-09-24T22:00<\/span><\/span>/);
+  // Und die Regel dazu steht im Stylesheet, an der Grenze des Titels.
+  const { readFileSync } = await import('node:fs');
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  assert.match(css, /@container wall \(max-width: 519px\) \{\s*\.wall-row__time-end \{\s*display: none;/);
+}));
+
 test('#1698: das Heute-Blatt der Uebersicht bleibt, wie es war - die Frage ist offen', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
   const events = [ev(1, 'Frueh', '2026-09-24T14:00', '2026-09-24T22:00', { cal_name: 'Niklas Arbeitskalender' })];
   const [row] = dash.buildTodayProgram({ upcomingEvents: events }, { includeTasks: false, includeMeals: false, now: new Date() }).rows;
@@ -586,3 +599,83 @@ test('#1698: das Heute-Blatt der Uebersicht bleibt, wie es war - die Frage ist o
   assert.ok(!sheet.includes('Niklas Arbeitskalender'), 'das Blatt nennt den Kalender (noch) nicht');
   assert.ok(!sheet.includes('2026-09-24T22:00'), 'und kein Ende');
 }));
+
+// --- Nachzug aus dem Review von #1826 ---
+
+// Samstag, 27.03.2027, 10:00 in Berlin - in der Nacht darauf springt die Uhr
+// von 02:00 auf 03:00, der Tag bis Sonntag 22:00 hat 23 Stunden.
+const SAT_BEFORE_DST = '2027-03-27T09:00:00Z';
+const dstNight = () => Object.fromEntries(wallRows([
+  ev(1, 'Genau ein Tag', '2027-03-27T22:00', '2027-03-28T22:00'),
+  ev(2, 'Ein Tag und mehr', '2027-03-27T22:00', '2027-03-28T22:30'),
+  ev(3, 'Die Nacht', '2027-03-27T22:00', '2027-03-28T06:00'),
+]).map((row) => [row.title, row.time]));
+const DST_EXPECTED = {
+  'Genau ein Tag': '2027-03-27T22:00',
+  'Ein Tag und mehr': '2027-03-27T22:00',
+  'Die Nacht': '2027-03-27T22:00 - 2027-03-28T06:00',
+};
+
+// Die Geraetezone ist ausdruecklich gesetzt, nicht geerbt: mit Berlin als
+// Geraet war die Millisekunden-Rechnung in dieser Nacht falsch, mit einem
+// Geraet ohne Sommerzeit zufaellig richtig - beide muessen dasselbe sagen.
+for (const device of ['Europe/Berlin', 'UTC', 'America/New_York']) {
+  test(`#1698 Wand: „ein Tag oder mehr" misst die Wanduhr des Haushalts, auch in der Umstellungsnacht (Geraet ${device})`,
+    inProcessZone(device, inBrowser(SAT_BEFORE_DST, 'Europe/Berlin', () => {
+      assert.deepEqual(dstNight(), DST_EXPECTED);
+    })));
+}
+
+test('#1698 Wand: genau 24 Stunden sind ein Tag - eine Minute weniger ist eine Spanne',
+  inProcessZone('UTC', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+    const by = Object.fromEntries(wallRows([
+      ev(1, 'Bis morgen selbe Zeit', '2026-09-24T14:00', '2026-09-25T14:00'),
+      ev(2, 'Eine Minute weniger', '2026-09-24T14:00', '2026-09-25T13:59'),
+      ev(3, 'Morgen spaeter', '2026-09-24T14:00', '2026-09-25T19:00'),
+    ]).map((row) => [row.title, row.time]));
+    assert.deepEqual(by, {
+      'Bis morgen selbe Zeit': '2026-09-24T14:00',
+      'Eine Minute weniger': '2026-09-24T14:00 - 2026-09-25T13:59',
+      'Morgen spaeter': '2026-09-24T14:00',
+    });
+  })));
+
+test('#1698 Wand: eine Zeile ohne Wand-Fassung behaelt Untertitel und Zeit', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  // Nur der Termin traegt `wallSub`/`wallTimeEnd`. Aufgabe, Mahlzeit, Dosis
+  // und Abfall zeigen in `renderWallRow` ihr `sub` und ihr `timeLabel`.
+  const rows = wallRows([], { tasks: [dueToday(1, 'Muell', '18:00')], tone: 'task' });
+  assert.equal(rows.length, 1, 'Reichweite: die Aufgabenzeile steht an der Wand');
+  assert.equal(rows[0].title, 'Muell');
+  assert.equal(rows[0].sub, 'dashboard.todayTask');
+  assert.match(String(rows[0].time), /^dashboard\.todayUntil\{/);
+}));
+
+test('#1698 Wand: ganztaegig bleibt ganztaegig, auch mit Uhrzeit im Wert; ein Ende ohne Uhrzeit ist kein Ende',
+  inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+    const by = Object.fromEntries(wallRows([
+      ev(1, 'Ganztags mit Uhrzeit', '2026-09-24T00:00', '2026-09-24T23:59', { all_day: 1 }),
+      ev(2, 'Ende nur als Datum', '2026-09-24T15:00', '2026-09-24'),
+    ]).map((row) => [row.title, row.time]));
+    assert.deepEqual(by, { 'Ganztags mit Uhrzeit': 'dashboard.allDay', 'Ende nur als Datum': '2026-09-24T15:00' });
+  }));
+
+test('#1698 Wand: Beginn UND Ende gehen durch den echten Formatierer (12-Stunden-Format)',
+  inProcessZone('America/New_York', inBrowser(THU_10_BERLIN, 'Europe/Berlin', async () => {
+    const { formatTime: realFormatTime } = await import('../public/i18n.js');
+    const prevStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      writable: true,
+      value: { getItem: (key) => (key === 'yuvomi-time-format' ? '12h' : null), setItem() {}, removeItem() {} },
+    });
+    globalThis.__formatTime = realFormatTime;
+    try {
+      assert.equal(realFormatTime('2026-09-24T14:00'), '2:00 PM', 'Vorbedingung: der Formatierer schreibt 12-stuendig');
+      const rows = wallRows([ev(1, 'Frueh', '2026-09-24T14:00', '2026-09-24T22:00', { cal_name: 'Arbeit' })]);
+      assert.deepEqual(rows, [{ title: 'Frueh', sub: 'Arbeit', time: '2:00 PM - 10:00 PM' }]);
+    } finally {
+      delete globalThis.__formatTime;
+      if (prevStorage) Object.defineProperty(globalThis, 'localStorage', prevStorage);
+      else delete globalThis.localStorage;
+    }
+  })));
