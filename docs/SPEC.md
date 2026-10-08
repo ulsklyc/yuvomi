@@ -2387,8 +2387,11 @@ Without it the list grew by one dead row per re-pairing.
 
 **Where a display takes its overview from (#1808).** A display stores no layout of its own
 (`PUT /preferences` is not among its write routes), so it follows the household default
-(`dashboard_widgets_default`) and, when none is set, the shipped default; of that layout it reads only
-the modules of its scopes, every other tile arrives in its empty form. Tile options travel as query
+(`dashboard_widgets_default`), then the older household-wide value (`dashboard_widgets`, see
+`dashboardDefaults()` in `server/routes/preferences.js`), and only when neither is set the shipped
+default. Of that layout it reads only the modules of its scopes: a tile whose module is gated in
+`GET /dashboard` arrives in its empty form (`DENIED_PAYLOAD`). Three parts of the answer carry no
+module gate and arrive filled for a display as for anyone - `users`, `countdowns` and `quicklinks`. Tile options travel as query
 parameters from that default, and one of them is personal: `events_scope=mine` means "assigned to the
 caller". No event is ever assigned to a display account, so `GET /dashboard` reads the option as
 "all" for `authMethod === 'display'` - at the reader, not when the default is saved, because the same

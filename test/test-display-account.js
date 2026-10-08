@@ -1038,6 +1038,22 @@ test('"Mir zugewiesen" in der Vorgabe des Haushalts leert das Tablett nicht (#18
   assert.deepEqual(probe(eigene.body, 'upcomingEvents'), ['Scope Mila'], 'ein Mitglied sieht mit "mine" nur die eigenen');
   assert.deepEqual(probe(eigene.body, 'weekEvents'), ['Scope Mila']);
 
+  // UND EIN API-TOKEN BLEIBT PERSOENLICH. Die Ausnahme gilt dem Display, nicht
+  // "allem, was keine Sitzung ist": ein Token handelt fuer eine Person, der
+  // sehr wohl Termine zugewiesen sind. Ohne diesen Fall ueberlebte die
+  // Verwechslung `authMethod === 'session'` die ganze Suite.
+  const tokenRes = await admin('POST', '/auth/api-tokens', {
+    name: 'Milas Uebersicht', subject_user_id: milaId, scopes: ['dashboard:read', 'calendar:read'],
+  });
+  assert.equal(tokenRes.status, 201, JSON.stringify(tokenRes.body));
+  const perToken = await fetch(`${BASE}/api/v1/dashboard?events_scope=mine`, {
+    headers: { Authorization: `Bearer ${tokenRes.body.token}` },
+  });
+  assert.equal(perToken.status, 200);
+  const tokenBody = await perToken.json();
+  assert.deepEqual(probe(tokenBody, 'upcomingEvents'), ['Scope Mila'], 'ein Token sieht mit "mine" nur die Termine seiner Person');
+  assert.deepEqual(probe(tokenBody, 'weekEvents'), ['Scope Mila']);
+
   // Der Fall selbst, so wie ihn das Tablett stellt.
   const wand = await display('GET', '/dashboard?events_scope=mine');
   assert.equal(wand.status, 200);
