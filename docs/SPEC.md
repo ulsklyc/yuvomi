@@ -2912,7 +2912,11 @@ One row per concrete pickup fact accepted by a committed import. `identity_key` 
 cross-reimport identity a re-import diffs against: the ICS UID (suffixed with the concrete date for a
 recurring or overridden VEVENT) when the source event had one, otherwise a deterministic fingerprint
 over the label and date (the opt-in `allowMissingUid` mode in `server/services/ics-parser.js`, used
-only by Waste). `type_id` carries no cascade - an imported pickup is a reference that blocks type
+only by Waste). A UID is only as stable as its provider keeps it: a row whose identity no longer
+appears in a re-import is paired with a new entry of the same type on the same day and takes over
+that entry's identity, instead of being removed and inserted again (#1795 - some feeds mint a new UID
+per request). For the same reason the preview digest that guards a commit covers label, day and
+counts, never the UID. `type_id` carries no cascade - an imported pickup is a reference that blocks type
 deletion exactly like a schedule or one-off (invariant #5); only `source_id` cascades, so deleting a
 source never touches another source's or manual data.
 

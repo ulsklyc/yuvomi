@@ -5386,6 +5386,8 @@
         "importNewTypeNameRequiredError": "Bitte gib einen Namen für die neue Abfallart ein.",
         "importDefaultSourceName": "Importierte Datei",
         "importCommittedToast": "Import übernommen: {{added}} neu, {{changed}} geändert, {{removed}} entfernt.",
+        "importPreviewChangedError": "Der Kalender hat sich seit der Vorschau geändert. Bitte starte den Import erneut.",
+        "importSourceChangedError": "Diese Quelle wurde inzwischen geändert. Bitte starte den Import erneut.",
         "sourcesSectionTitle": "Importquellen",
         "sourceNameLabel": "Name",
         "sourceCoverageLabel": "Zeitraum",

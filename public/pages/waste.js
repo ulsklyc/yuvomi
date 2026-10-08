@@ -1495,6 +1495,19 @@ function importPreviewStepHtml(preview) {
     : `<p>${esc(t('waste.importNoLabels'))}</p>`}`;
 }
 
+// The import refusals the server names by `reason` (routes/waste/helpers.js),
+// each with its own sentence here. The server's own sentence is English and
+// stays the fallback for everything without an entry.
+const IMPORT_REFUSALS = new Map([
+  ['preview_changed', 'waste.importPreviewChangedError'],
+  ['source_changed', 'waste.importSourceChangedError'],
+]);
+
+function importErrorText(err) {
+  const key = IMPORT_REFUSALS.get(err?.data?.reason);
+  return key ? t(key) : (err?.data?.error ?? t('common.unknownError'));
+}
+
 function openImportWizard(source = null) {
   const isReimport = !!source;
   // A URL source has no file to pick - the server re-fetches its own stored
@@ -1608,7 +1621,7 @@ function openImportWizard(source = null) {
           const { added, changed, removed } = res.data.diff;
           window.yuvomi?.showToast(t('waste.importCommittedToast', { added, changed, removed }), 'success');
         } catch (err) {
-          showError(err.data?.error ?? t('common.unknownError'));
+          showError(importErrorText(err));
         }
       });
     },
@@ -2459,4 +2472,5 @@ export const __test = {
   typeCardHtml, scheduleRowHtml, sourceRowHtml, TYPE_PRESETS, WASTE_TYPE_COLORS,
   activeSwatchColor, resolveSwatchColors,
   isOnboarding, onboardingHtml, sectionVisibility, fabIntent, pageModeClasses,
+  importErrorText,
 };

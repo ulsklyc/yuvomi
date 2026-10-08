@@ -5386,6 +5386,8 @@
         "importNewTypeNameRequiredError": "Introduce un nombre para el nuevo tipo de residuo.",
         "importDefaultSourceName": "Archivo importado",
         "importCommittedToast": "Importación aplicada: {{added}} añadidas, {{changed}} modificadas, {{removed}} eliminadas.",
+        "importPreviewChangedError": "El calendario ha cambiado desde la vista previa. Vuelve a iniciar la importación.",
+        "importSourceChangedError": "Esta fuente ha cambiado entretanto. Vuelve a iniciar la importación.",
         "sourcesSectionTitle": "Fuentes de importación",
         "sourceNameLabel": "Nombre",
         "sourceCoverageLabel": "Cobertura",

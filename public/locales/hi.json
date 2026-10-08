@@ -5386,6 +5386,8 @@
         "importNewTypeNameRequiredError": "कृपया नए कचरा प्रकार के लिए एक नाम दर्ज करें।",
         "importDefaultSourceName": "आयातित फ़ाइल",
         "importCommittedToast": "आयात लागू हुआ: {{added}} जोड़े गए, {{changed}} बदले गए, {{removed}} हटाए गए।",
+        "importPreviewChangedError": "पूर्वावलोकन के बाद से कैलेंडर बदल गया है। कृपया आयात फिर से शुरू करें।",
+        "importSourceChangedError": "यह स्रोत इस बीच बदल गया है। कृपया आयात फिर से शुरू करें।",
         "sourcesSectionTitle": "आयात स्रोत",
         "sourceNameLabel": "नाम",
         "sourceCoverageLabel": "कवरेज",

@@ -5386,6 +5386,8 @@
         "importNewTypeNameRequiredError": "Maglagay ng pangalan para sa bagong uri ng basura.",
         "importDefaultSourceName": "Na-import na file",
         "importCommittedToast": "Na-apply ang import: {{added}} idinagdag, {{changed}} binago, {{removed}} tinanggal.",
+        "importPreviewChangedError": "Nagbago ang kalendaryo mula noong preview. Pakisimulan muli ang pag-import.",
+        "importSourceChangedError": "Nagbago ang pinagmulang ito samantala. Pakisimulan muli ang pag-import.",
         "sourcesSectionTitle": "Mga pinagmulan ng import",
         "sourceNameLabel": "Pangalan",
         "sourceCoverageLabel": "Saklaw",

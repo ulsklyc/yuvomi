@@ -1005,3 +1005,17 @@ test('R17 E6: Wochentage sind Chips mit Zustand, "Aktiv" ist ein Schalter', () =
   assert.match(modal, /body\.weekdays = weekdayPickerValue\(panel\)/, 'der Speicherweg liest die Chips');
   assert.match(modal, /wireWeekdayPicker\(panel\)/, 'und die Chips sind verdrahtet');
 });
+
+// #1795: a refusal the server names by reason is said in the household
+// language; the server's English sentence is only the fallback.
+test('importErrorText: a named refusal gets its own sentence, anything else the server sentence or the generic one', () => {
+  const { importErrorText } = __test;
+  assert.equal(importErrorText({ status: 409, data: { error: 'English sentence', reason: 'preview_changed' } }), 'waste.importPreviewChangedError');
+  assert.equal(importErrorText({ status: 409, data: { error: 'English sentence', reason: 'source_changed' } }), 'waste.importSourceChangedError');
+  assert.equal(importErrorText({ status: 400, data: { error: 'No mapping decision was given.' } }), 'No mapping decision was given.');
+  assert.equal(importErrorText({ status: 409, data: { error: 'Other', reason: 'toString' } }), 'Other', 'an inherited property name is not a refusal');
+  assert.equal(importErrorText(new Error('offline')), 'common.unknownError');
+
+  const wizard = WASTE_SRC.slice(WASTE_SRC.indexOf('function openImportWizard('), WASTE_SRC.indexOf('function sourceMappingRowHtml('));
+  assert.match(wizard, /api\.post\(endpoint, body\);[\s\S]*?catch \(err\) \{\s*showError\(importErrorText\(err\)\);/, 'the commit step of the wizard uses it');
+});

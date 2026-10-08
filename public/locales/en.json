@@ -5386,6 +5386,8 @@
         "importNewTypeNameRequiredError": "Please enter a name for the new waste type.",
         "importDefaultSourceName": "Imported file",
         "importCommittedToast": "Import applied: {{added}} added, {{changed}} changed, {{removed}} removed.",
+        "importPreviewChangedError": "The calendar has changed since the preview. Please start the import again.",
+        "importSourceChangedError": "This source has changed in the meantime. Please start the import again.",
         "sourcesSectionTitle": "Import sources",
         "sourceNameLabel": "Name",
         "sourceCoverageLabel": "Coverage",

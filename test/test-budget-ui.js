@@ -9,7 +9,7 @@
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
-import { withoutHtmlComments } from './source-text.js';
+import { withoutHtmlComments, withoutCommentsKeepingLines } from './source-text.js';
 import { eachRule } from './css-rules.js';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8').replace(/\r/g, '');
@@ -329,7 +329,8 @@ test('das Modul führt genau eine Zeitachse', () => {
   // folgt der Haushaltszone, waehrend `toLocalDateKey` der reine Konverter blieb.
   // Die Zusicherung ist dieselbe: der Anker startet auf heute.
   assert.match(budget, /reportAnchor:\s*todayKey\(\)/);
-  assert.match(budget, /state\.reportAnchor = anchorForMonth\(state\.month\)/, 'Hinweg Budget → Berichte fehlt');
+  // Der ANGEFRAGTE Monat, nicht der gezeigte (#1781) - gefahren weiter unten.
+  assert.match(budget, /state\.reportAnchor = anchorForMonth\(requestedMonth\(\)\)/, 'Hinweg Budget → Berichte fehlt');
   assert.match(budget, /const ym = state\.reportAnchor\.slice\(0, 7\)/, 'Rückweg Berichte → Budget fehlt');
 
   // Das Panel darf keinen eigenen Zeitraumwähler mehr aufbauen.
@@ -2969,7 +2970,9 @@ test('der Budget-Tab steht in der Adresse, ohne neuen Verlaufseintrag (R8 H5, A5
   // Verdrahtung: der Wechsel der Hauptleiste schreibt die Adresse.
   const wire = budgetCode.slice(budgetCode.indexOf("_tablist = wireTablist(_container.querySelector('.budget-tabs')"));
   const onChange = wire.slice(0, wire.indexOf('attachSegmentIndicator'));
-  assert.match(onChange, /onChange:\s*async \(id[^\n]*\) => \{[^}]*writeTabToUrl\(id\)/, 'der Tabwechsel schreibt nicht in die Adresse');
+  assert.match(onChange, /onChange:\s*changeTab,/, 'die Hauptleiste ruft changeTab()');
+  const changeTab = budgetCode.slice(budgetCode.indexOf('async function changeTab('), budgetCode.indexOf('function wireNav()'));
+  assert.match(changeTab, /async function changeTab\(id[^\n]*\) \{[^}]*writeTabToUrl\(id\)/, 'der Tabwechsel schreibt nicht in die Adresse');
 });
 
 test('die Bilanz rechnet eine geloeschte Buchung sofort heraus und beim Undo wieder hinein (R8 H6, A5 P3)', () => {
@@ -3406,10 +3409,13 @@ test('Abos- und Gruppensuche stehen im Listenkopf (.section-toolbar), ohne eigen
  * jedem Neuaufbau - und das Blaettern ueber swapPeriod(), gerichtet. Die
  * Regeln des Helfers (Tokens, reduzierte Bewegung, Abbruch) haelt test:motion. */
 test('Budget: Reiterwechsel und Blaettern tauschen ueber die geteilten Helfer (R16)', () => {
-  const onChange = budget.slice(budget.indexOf('_tablist = wireTablist('), budget.indexOf('_tablist = wireTablist(') + 1500);
-  assert.match(onChange, /onChange: async \(id, \{ direction = 0 \} = \{\}\)/, 'die Leiste reicht die Richtung durch');
+  // Der Reiterwechsel steht seit #1781 als changeTab() vor wireNav().
+  const onChange = budget.slice(budget.indexOf('async function changeTab('), budget.indexOf('function wireNav()'));
+  assert.match(onChange, /async function changeTab\(id, \{ direction = 0 \} = \{\}\)/, 'die Leiste reicht die Richtung durch');
+  assert.match(budget, /_tablist = wireTablist\([^\n]*\{\n\s*activeId: state\.activeTab,\n\s*onChange: changeTab,/, 'und ruft changeTab');
   assert.match(onChange, /swapContent\(_container\.querySelector\('#budget-body'\), renderBody, \{ direction \}\)/, 'der Reiterwechsel blendet in Schrittrichtung');
-  const nav = budget.slice(budget.indexOf('function wireNav()'), budget.indexOf('function wireNav()') + 2600);
+  // Stepper und "Aktuell" stehen seit #1781 als eigene Funktionen vor wireNav().
+  const nav = budget.slice(budget.indexOf('async function stepPeriod('), budget.indexOf('function wireNav()'));
   assert.match(nav, /swapPeriod\(bodyEl\(\), dir, renderBody\)/, 'Berichte: Blaettern ist gerichtet');
   assert.match(nav, /swapPeriod\(bodyEl\(\), dir, \(\) => \{ renderBody\(\); updateLabel\(\); \}\)/, 'Monat: Blaettern ist gerichtet');
   assert.match(nav, /swapPeriod\(bodyEl\(\), back,/, '"Aktuell" kommt aus der Richtung des laufenden Zeitraums');
@@ -5145,4 +5151,367 @@ test('R18 Konten: Staende in Textfarbe, nur das Minus ist rot - auch das Nettove
   } finally {
     Object.assign(budgetUi.state, zuvor);
   }
+});
+
+// --------------------------------------------------------
+// #1781: Blaettern, waehrend ein Monat laedt
+// --------------------------------------------------------
+
+/* DIE LETZTE ANFRAGE GEWINNT, NICHT DIE LETZTE ANTWORT. Gemessen am echten
+ * loadMonth(), stepPeriod() und jumpToCurrentPeriod(), gegen Antworten, deren
+ * Reihenfolge der Test in der Hand haelt: je Anfrage an `/budget?month=` EIN
+ * Tor, das erst auf Zuruf aufgeht. Die Summen antworten sofort und nennen ihren
+ * Monat - so ist sichtbar, wenn Liste und Summe aus zwei Monaten stammen. */
+async function mitMonatsToren(start, fn) {
+  const apiBefore = globalThis.__apiStub;
+  const motionBefore = globalThis.__motionStub;
+  const yuvomiBefore = global.window.yuvomi;
+  const saved = { ...budgetUi.state };
+  const gefragt = [];
+  const tore = [];
+  const blenden = [];
+  const posts = [];
+  globalThis.__apiStub = {
+    get: (url) => {
+      const liste = /^\/budget\?month=(\d{4}-\d{2})/.exec(url);
+      if (liste) {
+        gefragt.push(liste[1]);
+        return new Promise((resolve, reject) => {
+          tore.push({
+            auf: () => resolve({ data: [{ id: 1, title: `Buchung ${liste[1]}`, amount: -1, date: `${liste[1]}-01` }] }),
+            kaputt: () => reject(Object.assign(new Error('boom'), { status: 500 })),
+          });
+        });
+      }
+      const summe = /^\/budget\/summary\?month=(\d{4}-\d{2})/.exec(url);
+      if (summe) return Promise.resolve({ data: { income: 0, expenses: 0, balance: 0, byCategory: [], month: summe[1] } });
+      return Promise.resolve({ data: url === '/budget/loans' ? { loans: [], summary: {} } : [] });
+    },
+    post: async (url, body) => { posts.push([url, body]); return { data: { payment: { id: 55 } } }; },
+  };
+  globalThis.__motionStub = (name, host, opts) => blenden.push([name, opts?.direction]);
+  global.window.yuvomi = { ...yuvomiBefore, showToast() {} };
+  // Ein Container ohne #budget-body: renderBody() kehrt dort um, der Rest laeuft.
+  budgetUi.renderBodyForTest({ querySelector: () => null, querySelectorAll: () => [] });
+  Object.assign(budgetUi.state, {
+    activeTab: 'transactions', month: start, entries: [], loadError: null, ledgerQuery: '',
+    accountFilterId: null, budgetMode: 'household',
+  });
+  const auslaufen = () => new Promise((resolve) => setImmediate(resolve));
+  /** Das n-te Tor (in Anfragereihenfolge) oeffnen und die Mikrotasks auslaufen lassen. */
+  const oeffne = async (n, wie = 'auf') => {
+    assert.ok(tore[n], `Vorbedingung: Anfrage ${n} wurde gestellt (gefragt: ${gefragt.join(', ')})`);
+    tore[n][wie]();
+    await auslaufen();
+  };
+  const stand = () => ({
+    month: budgetUi.state.month,
+    liste: budgetUi.state.entries.map((e) => e.title),
+    summe: budgetUi.state.summary?.month ?? null,
+    fehler: Boolean(budgetUi.state.loadError),
+  });
+  try {
+    return await fn({ gefragt, oeffne, stand, blenden, posts, auslaufen });
+  } finally {
+    // Bricht ein Fall mittendrin ab, haengen seine Ladungen noch - und mit
+    // ihnen der Merker des Moduls. Alle Tore auf, sonst faerbt ein roter Fall
+    // die folgenden mit.
+    for (const tor of tore) tor.auf();
+    await auslaufen();
+    Object.assign(budgetUi.state, saved);
+    globalThis.__apiStub = apiBefore;
+    globalThis.__motionStub = motionBefore;
+    global.window.yuvomi = yuvomiBefore;
+  }
+}
+
+const monatsStand = (month) => ({ month, liste: [`Buchung ${month}`], summe: month, fehler: false });
+const MAI = monatsStand('2026-05');
+
+test('#1781: eine ueberholte Antwort ueberschreibt den neueren Monat nicht', async () => {
+  await mitMonatsToren('2026-03', async ({ oeffne, stand }) => {
+    const april = budgetUi.loadMonth('2026-04');
+    const mai = budgetUi.loadMonth('2026-05');
+    await oeffne(1);
+    const maiSchrieb = await mai;
+    assert.deepEqual(stand(), MAI, 'Vorbedingung: der Mai steht');
+    await oeffne(0);
+    const aprilSchrieb = await april;
+    assert.deepEqual(stand(), MAI, 'die spaete April-Antwort schreibt nichts mehr');
+    assert.deepEqual([maiSchrieb, aprilSchrieb], [true, false], 'und die ueberholte Ladung meldet das ihrem Aufrufer');
+  });
+  // Gegenfall: in Anfragereihenfolge beantwortet, steht ebenfalls der juengste.
+  await mitMonatsToren('2026-03', async ({ oeffne, stand }) => {
+    const april = budgetUi.loadMonth('2026-04');
+    const mai = budgetUi.loadMonth('2026-05');
+    await oeffne(0);
+    await oeffne(1);
+    await Promise.all([april, mai]);
+    assert.deepEqual(stand(), MAI);
+  });
+  // Und eine einzelne Ladung schreibt wie immer.
+  await mitMonatsToren('2026-03', async ({ oeffne, stand }) => {
+    const april = budgetUi.loadMonth('2026-04');
+    await oeffne(0);
+    assert.equal(await april, true);
+    assert.deepEqual(stand(), monatsStand('2026-04'));
+  });
+});
+
+test('#1781: ein spaet gescheiterter aelterer Abruf macht aus dem geladenen Monat keinen Ladefehler', async () => {
+  await mitMonatsToren('2026-03', async ({ oeffne, stand }) => {
+    const errors = mock.method(console, 'error', () => {});
+    try {
+      const april = budgetUi.loadMonth('2026-04');
+      const mai = budgetUi.loadMonth('2026-05');
+      await oeffne(1);
+      await mai;
+      await oeffne(0, 'kaputt');
+      await april;
+      assert.deepEqual(stand(), MAI);
+      // Gegenfall: scheitert die JUENGSTE Ladung, steht der Fehler da - mit ihrem Monat.
+      const juni = budgetUi.loadMonth('2026-06');
+      await oeffne(2, 'kaputt');
+      assert.equal(await juni, true);
+      assert.deepEqual(stand(), { month: '2026-06', liste: [], summe: null, fehler: true });
+    } finally {
+      errors.mock.restore();
+    }
+  });
+});
+
+test('#1781: zwei schnelle Schritte fuehren zwei Monate weiter, mit EINEM Bildwechsel', async () => {
+  for (const swap of [true, false]) {
+    await mitMonatsToren('2026-03', async ({ gefragt, oeffne, stand, blenden }) => {
+      const erster = budgetUi.stepPeriod(1, { swap });
+      const zweiter = budgetUi.stepPeriod(1, { swap });
+      assert.deepEqual(gefragt, ['2026-04', '2026-05'], 'der zweite Schritt rechnet vom angefragten Monat, nicht vom gezeigten');
+      await oeffne(0);
+      await oeffne(1);
+      await Promise.all([erster, zweiter]);
+      assert.deepEqual(stand(), MAI);
+      assert.deepEqual(blenden, swap ? [['swapContent', 1]] : [], 'der ueberholte Schritt blendet nicht');
+    });
+  }
+});
+
+test('#1781: vor und gleich zurueck landet auf dem Ausgangsmonat, egal welche Antwort zuletzt kommt', async () => {
+  for (const reihenfolge of [[0, 1], [1, 0]]) {
+    await mitMonatsToren('2026-03', async ({ gefragt, oeffne, stand }) => {
+      const vor = budgetUi.stepPeriod(1);
+      const zurueck = budgetUi.stepPeriod(-1);
+      assert.deepEqual(gefragt, ['2026-04', '2026-03']);
+      for (const n of reihenfolge) await oeffne(n);
+      await Promise.all([vor, zurueck]);
+      assert.deepEqual(stand(), monatsStand('2026-03'), `Antworten in der Reihenfolge ${reihenfolge.join(',')}`);
+    });
+  }
+});
+
+test('#1781: "Aktuell" waehrend eines Schritts fuehrt zum laufenden Monat und fragt nicht doppelt', async () => {
+  const jetzt = budgetUi.currentMonth();
+  const [y, m] = jetzt.split('-').map(Number);
+  const plus = (n) => {
+    const d = new Date(y, m - 1 + n, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  };
+  await mitMonatsToren(plus(2), async ({ gefragt, oeffne, stand, blenden }) => {
+    const schritt = budgetUi.stepPeriod(-1);
+    const aktuell = budgetUi.jumpToCurrentPeriod();
+    const nochmal = budgetUi.jumpToCurrentPeriod();
+    assert.deepEqual(gefragt, [plus(1), jetzt], 'der zweite Klick auf "Aktuell" hat sein Ziel schon angefragt');
+    await oeffne(1);
+    await oeffne(0);
+    await Promise.all([schritt, aktuell, nochmal]);
+    assert.deepEqual(stand(), monatsStand(jetzt));
+    assert.deepEqual(blenden, [['swapContent', -1]], 'ein Bildwechsel, zurueck in Richtung des laufenden Monats');
+  });
+  // Gegenfall: ohne laufende Ladung ist "Aktuell" auf dem laufenden Monat ein
+  // No-Op, und von woanders genau eine Anfrage.
+  await mitMonatsToren(jetzt, async ({ gefragt }) => {
+    await budgetUi.jumpToCurrentPeriod();
+    assert.deepEqual(gefragt, []);
+  });
+  await mitMonatsToren(plus(-1), async ({ gefragt, oeffne, stand, blenden }) => {
+    const aktuell = budgetUi.jumpToCurrentPeriod();
+    assert.deepEqual(gefragt, [jetzt]);
+    await oeffne(0);
+    await aktuell;
+    assert.deepEqual(stand(), monatsStand(jetzt));
+    assert.deepEqual(blenden, [['swapContent', 1]]);
+  });
+});
+
+test('#1781: ein Neuladen nach dem Schreiben folgt dem angefragten Monat, nicht dem noch gezeigten', async () => {
+  const loan = {
+    id: 7, title: 'Auto', installment_amount: 100, next_installment_number: 1,
+    next_due_date: '2026-03-27', is_settled: false,
+  };
+  await mitMonatsToren('2026-03', async ({ gefragt, oeffne, stand, posts, auslaufen }) => {
+    budgetUi.state.loans = { loans: [loan], summary: {} };
+    const schritt = budgetUi.stepPeriod(1);
+    const zahlung = budgetUi.markLoanPayment(loan.id);
+    await auslaufen();
+    assert.equal(posts.length, 1, 'Vorbedingung: die Rate ist gebucht');
+    assert.deepEqual(gefragt, ['2026-04', '2026-04'], 'das Neuladen holt den Monat, zu dem gerade geblaettert wird');
+    await oeffne(0);
+    await oeffne(1);
+    await Promise.all([schritt, zahlung]);
+    assert.deepEqual(stand(), monatsStand('2026-04'), 'der Schritt ist nicht verschluckt');
+  });
+  // Gegenfall: ohne laufenden Schritt laedt das Schreiben den gezeigten Monat neu.
+  await mitMonatsToren('2026-03', async ({ gefragt, oeffne, stand, auslaufen }) => {
+    budgetUi.state.loans = { loans: [loan], summary: {} };
+    const zahlung = budgetUi.markLoanPayment(loan.id);
+    await auslaufen();
+    assert.deepEqual(gefragt, ['2026-03']);
+    await oeffne(0);
+    await zahlung;
+    assert.deepEqual(stand(), monatsStand('2026-03'));
+  });
+});
+
+// Review an #1813 ------------------------------------------------------------
+
+// Der Merker faellt nur mit SEINER Anfrage: landet die ueberholte erste Antwort,
+// waehrend die zweite noch laeuft, bleibt deren Ziel der Ausgangspunkt.
+test('#1781: die Antwort eines ueberholten Schritts nimmt dem laufenden nicht sein Ziel', async () => {
+  await mitMonatsToren('2026-03', async ({ gefragt, oeffne, stand }) => {
+    const erster = budgetUi.stepPeriod(1);
+    const zweiter = budgetUi.stepPeriod(1);
+    await oeffne(0);
+    await erster;
+    assert.equal(stand().month, '2026-03', 'Vorbedingung: der ueberholte April hat nichts geschrieben');
+    const dritter = budgetUi.stepPeriod(1);
+    assert.deepEqual(gefragt, ['2026-04', '2026-05', '2026-06'], 'der dritte Schritt zaehlt vom Mai, der noch laedt');
+    await oeffne(2);
+    await oeffne(1);
+    await Promise.all([zweiter, dritter]);
+    assert.deepEqual(stand(), monatsStand('2026-06'));
+  });
+});
+
+test('#1781: der Reiterwechsel nimmt den angefragten Monat mit, nicht den noch gezeigten', async () => {
+  // Die Antwort kommt, waehrend die Berichte offen sind.
+  await mitMonatsToren('2026-03', async ({ gefragt, oeffne, stand }) => {
+    const schritt = budgetUi.stepPeriod(1);
+    await budgetUi.changeTab('reports');
+    assert.equal(budgetUi.state.reportAnchor, '2026-04-01', 'der Anker der Berichte ist der Monat, zu dem geblaettert wird');
+    await oeffne(0);
+    await schritt;
+    await budgetUi.changeTab('transactions');
+    assert.deepEqual(gefragt, ['2026-04'], 'der Rueckweg laedt den alten Monat nicht noch einmal');
+    assert.deepEqual(stand(), monatsStand('2026-04'), 'der Schritt ist nicht zurueckgenommen');
+  });
+  // Hin und zurueck, BEVOR die Antwort da ist: der Monat ist schon angefragt.
+  await mitMonatsToren('2026-03', async ({ gefragt, oeffne, stand }) => {
+    const schritt = budgetUi.stepPeriod(1);
+    await budgetUi.changeTab('reports');
+    const zurueck = budgetUi.changeTab('transactions');
+    assert.deepEqual(gefragt, ['2026-04'], 'keine zweite Anfrage fuer denselben Monat');
+    await oeffne(0);
+    await Promise.all([schritt, zurueck]);
+    assert.deepEqual(stand(), monatsStand('2026-04'));
+  });
+  // Gegenfall: wer in den Berichten woandershin blaettert, bekommt beim
+  // Rueckweg diesen Monat geladen.
+  await mitMonatsToren('2026-03', async ({ gefragt, oeffne, stand }) => {
+    await budgetUi.changeTab('reports');
+    assert.equal(budgetUi.state.reportAnchor, '2026-03-01');
+    budgetUi.state.reportAnchor = '2026-07-01';
+    const zurueck = budgetUi.changeTab('transactions');
+    assert.deepEqual(gefragt, ['2026-07']);
+    await oeffne(0);
+    await zurueck;
+    assert.deepEqual(stand(), monatsStand('2026-07'));
+  });
+});
+
+/* Der Wisch (utils/period-swipe.js) blendet nach onStep das erste Kind des
+ * Traegers ein. Hat der Schritt nicht gezeichnet, ist das noch das ALTE Panel.
+ * Gemessen an der echten Geste: Finger auf, Finger weiter, Finger ab. */
+const periodSwipe = await import('../public/utils/period-swipe.js');
+
+async function wischVor(onStep) {
+  const klassen = [];
+  const handlers = {};
+  const kind = { style: {}, isConnected: true, classList: { add: (c) => klassen.push(c), remove() {} } };
+  const surface = {
+    firstElementChild: kind,
+    addEventListener: (type, fn) => { handlers[type] = fn; },
+    removeEventListener() {},
+    closest: () => null,
+  };
+  const breite = global.window.innerWidth;
+  global.window.innerWidth = 375;
+  try {
+    periodSwipe.wirePeriodSwipe(surface, { enabled: () => true, onStep });
+    const target = { closest: () => null };
+    handlers.touchstart({ touches: [{ clientX: 250, clientY: 300 }], target });
+    handlers.touchmove({ touches: [{ clientX: 100, clientY: 302 }], cancelable: true, preventDefault() {} });
+    assert.ok(kind.style.transform, 'Vorbedingung: der Inhalt folgt dem Finger');
+    const ende = handlers.touchend({ touches: [] });
+    return { ende, klassen, kind };
+  } finally {
+    global.window.innerWidth = breite;
+  }
+}
+
+test('#1781: ein Wisch, dessen Schritt nicht gezeichnet hat, laesst nichts hereingleiten', async () => {
+  const nicht = await wischVor(async () => false);
+  await nicht.ende;
+  assert.deepEqual(nicht.klassen, [], 'kein Hereingleiten auf dem alten Panel');
+  assert.equal(nicht.kind.style.transform, '', 'aber das Panel steht wieder an seinem Platz');
+  // Fuer jeden Aufrufer ohne Rueckgabe (Kalender) bleibt es, wie es war.
+  for (const antwort of [undefined, true, null]) {
+    const gezeichnet = await wischVor(async () => antwort);
+    await gezeichnet.ende;
+    assert.deepEqual(gezeichnet.klassen, ['period-swipe-in--next'], `Rueckgabe ${antwort}: es gleitet herein`);
+  }
+});
+
+test('#1781: der Budget-Schritt meldet dem Wisch, ob er gezeichnet hat', async () => {
+  await mitMonatsToren('2026-03', async ({ oeffne, stand }) => {
+    // Ein Wisch, den ein Klick auf den Pfeil ueberholt, bevor sein Monat da ist.
+    const wisch = await wischVor((step) => budgetUi.stepPeriod(step, { swap: false }));
+    const klick = budgetUi.stepPeriod(1);
+    await oeffne(0);
+    await wisch.ende;
+    assert.deepEqual(wisch.klassen, [], 'der ueberholte Wisch blendet das alte Panel nicht ein');
+    await oeffne(1);
+    await klick;
+    assert.deepEqual(stand(), MAI);
+  });
+  // Gegenfall: der Wisch, den niemand ueberholt, gleitet herein - auch in den Berichten.
+  await mitMonatsToren('2026-03', async ({ oeffne, stand }) => {
+    const wisch = await wischVor((step) => budgetUi.stepPeriod(step, { swap: false }));
+    await oeffne(0);
+    await wisch.ende;
+    assert.deepEqual(wisch.klassen, ['period-swipe-in--next']);
+    assert.deepEqual(stand(), monatsStand('2026-04'));
+    budgetUi.state.activeTab = 'reports';
+    const berichte = await wischVor((step) => budgetUi.stepPeriod(step, { swap: false }));
+    await berichte.ende;
+    assert.deepEqual(berichte.klassen, ['period-swipe-in--next']);
+  });
+});
+
+/* EINE SCHREIBWEISE IST VERBOTEN, deshalb hier ein Textguard: `loadMonth(
+ * state.month)` laedt den GEZEIGTEN Monat und nimmt damit einen Schritt
+ * zurueck, der noch laedt. Achtzehn Stellen laden nach einem Schreiben neu;
+ * getrieben ist oben eine. Erlaubt bleibt der Erstaufruf in render() - dort ist
+ * `state.month` eben gesetzt und nichts unterwegs. Kommentare zaehlen nicht. */
+test('#1781: neu geladen wird ueber reloadMonth() - loadMonth(state.month) steht nur im Erstaufruf', () => {
+  const code = withoutCommentsKeepingLines(budget);
+  const stellen = code.split('\n')
+    .map((line, i) => [i + 1, line.trim()])
+    .filter(([, line]) => /loadMonth\(\s*state\.month\s*\)/.test(line));
+  assert.deepEqual(stellen.map(([, line]) => line), ['await Promise.all([loadMonth(state.month), loadAccounts()]);'],
+    `loadMonth(state.month) ausserhalb des Erstaufrufs - reloadMonth() nehmen (Zeilen ${stellen.map(([n]) => n).join(', ')})`);
+  const renderStart = code.indexOf('export async function render(container, { user }) {');
+  const renderEnde = code.indexOf('\n}\n', renderStart);
+  const erstaufruf = code.indexOf('loadMonth(state.month)');
+  assert.ok(renderStart > -1 && erstaufruf > renderStart && erstaufruf < renderEnde, 'und der steht in render()');
+  // Gegenprobe des Lesers: die Neulade-Stellen sind da und werden gesehen.
+  assert.ok((code.match(/\breloadMonth\(\)/g) ?? []).length >= 18, 'Vorbedingung: der Guard liest die Neulade-Stellen');
 });

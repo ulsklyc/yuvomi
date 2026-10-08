@@ -5386,6 +5386,8 @@
         "importNewTypeNameRequiredError": "لطفاً نامی برای نوع جدید زباله وارد کنید.",
         "importDefaultSourceName": "فایل واردشده",
         "importCommittedToast": "درون‌ریزی اعمال شد: {{added}} افزوده، {{changed}} تغییر یافته، {{removed}} حذف‌شده.",
+        "importPreviewChangedError": "تقویم از زمان پیش‌نمایش تغییر کرده است. لطفاً درون‌ریزی را دوباره شروع کنید.",
+        "importSourceChangedError": "این منبع در این فاصله تغییر کرده است. لطفاً درون‌ریزی را دوباره شروع کنید.",
         "sourcesSectionTitle": "منابع درون‌ریزی",
         "sourceNameLabel": "نام",
         "sourceCoverageLabel": "بازه پوشش",
