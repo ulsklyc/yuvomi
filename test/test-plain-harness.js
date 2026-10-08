@@ -74,11 +74,24 @@ test('ein synchroner Rumpf laeuft sofort und an seiner Stelle', async () => {
 test('finish() gibt einem Rumpf, der nie fertig wird, eine Frist und zaehlt ihn als fehlgeschlagen', async () => {
   const lines = [];
   const { test: run, finish } = createHarness('Probe', { log: (l) => lines.push(l), error: (l) => lines.push(l), timeoutMs: 50 });
-  run('haengt', async () => { await new Promise(() => {}); });
-  run('laeuft durch', async () => { await later(() => {}); });
-  // Ohne Frist kaeme dieses await nie zurueck (der Testprozess haelt die Loop am Leben).
-  assert.deepEqual(await finish(), { passed: 1, failed: 1 });
-  assert.ok(lines.includes('  ✗ haengt: der async-Rumpf ist nach 50 ms nicht fertig'), lines.join('|'));
+  // DIE FRIST IST DER FALL MIT LEBENDER EVENT-LOOP, und die stellt der Test
+  // selbst her. Der Zeitgeber der Frist ist `unref` (er soll allein keinen
+  // Prozess am Leben halten), und ein nie fertiges Promise haelt auch nichts:
+  // ohne dieses Intervall ist die Loop leer, bevor die Frist greift. Node 26
+  // liess den Test trotzdem durch, Node 22 brach ihn zu Recht ab ("Promise
+  // resolution is still pending but the event loop has already resolved") und
+  // riss alle folgenden Tests der Datei mit. Die leere Loop ist der ANDERE
+  // Ausgang (Exit 13), geprueft weiter unten am Kindprozess.
+  const alive = setInterval(() => {}, 1000);
+  try {
+    run('haengt', async () => { await new Promise(() => {}); });
+    run('laeuft durch', async () => { await later(() => {}); });
+    // Ohne Frist kaeme dieses await nie zurueck.
+    assert.deepEqual(await finish(), { passed: 1, failed: 1 });
+    assert.ok(lines.includes('  ✗ haengt: der async-Rumpf ist nach 50 ms nicht fertig'), lines.join('|'));
+  } finally {
+    clearInterval(alive);
+  }
 });
 
 test('finish() wartet auf alles, was noch laeuft - auch auf nachgemeldete Tests', async () => {
