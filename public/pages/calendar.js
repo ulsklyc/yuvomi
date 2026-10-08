@@ -2166,7 +2166,7 @@ export async function render(container, { user }) {
   state.monthTitles = localStorage.getItem(MONTH_TITLES_KEY) === 'true';
   state.currentUserId = user?.id ?? null;
   state.user          = user ?? null;
-  state.assignedToMe  = localStorage.getItem(ASSIGNED_TO_ME_KEY) === '1';
+  state.assignedToMe  = restoreAssignedToMe(state.user);
   state.people = restorePeopleFilter(state.users);
   state.hiddenSources = restoreHiddenSources(state.user?.id);
 
@@ -5451,7 +5451,7 @@ function openCalendarFilters() {
     }) + `<p class="form-hint">${t('schedule.fullBlocksHint')}</p>`
     : '';
 
-  const meRow = (people.length > 1 && state.currentUserId != null)
+  const meRow = (people.length > 1 && state.currentUserId != null && !isDisplayUser(state.user))
     ? toggleRowHtml({
       label: t('calendar.assignedToMe'),
       checked: state.assignedToMe,
@@ -5730,6 +5730,29 @@ function positionFiltersPopover(pop, anchor) {
  * unbekannte ID beim Laden weg - und wenn danach alle oder keine uebrig sind,
  * ist es wieder „alle", also gar kein Filter.
  */
+/**
+ * Ist dieses Konto ein gekoppeltes Wandtablett? Dieselbe Frage wie
+ * `actingAsDisplay()` der Aufgabenseite und `onDisplay` der Uebersicht.
+ */
+function isDisplayUser(user) {
+  return user?.access_scope === 'display';
+}
+
+/**
+ * „Mir zugewiesen" aus dem Geraetespeicher lesen (#1808).
+ *
+ * EIN DISPLAY HAT KEIN „MIR": dem Display-Konto weist nie jemand einen Termin
+ * zu (#1207), der Filter liesse den Kalender dort leer. Der Schluessel liegt
+ * aber im Browser und nicht am Konto - wer am selben Geraet vorher als Mensch
+ * angemeldet war, hinterlaesst ihn, und das Koppeln raeumt ihn nicht weg. Er
+ * wird deshalb HIER uebergangen statt geloescht: meldet sich am Geraet wieder
+ * ein Mensch an, gilt seine Wahl weiter.
+ */
+function restoreAssignedToMe(user) {
+  if (isDisplayUser(user)) return false;
+  try { return localStorage.getItem(ASSIGNED_TO_ME_KEY) === '1'; } catch { return false; }
+}
+
 function restorePeopleFilter(users) {
   const known = new Set((users ?? []).map((u) => u.id));
   // „Nicht zugewiesen" gehoert zur Achse (#1064) - ohne diesen Eintrag fiele er
@@ -6072,6 +6095,7 @@ export const __test = {
   passesSourceFilter,
   calendarSources,
   restorePeopleFilter,
+  restoreAssignedToMe,
   restoreHiddenSources,
   persistHiddenSources,
   activeFilterCount,

@@ -195,6 +195,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   affected. On a display the option now means all events; for members it works as before. The
   hint under Settings > Wall tablets now says where a tablet takes its overview from and names
   what it shows: calendar, tasks, rewards and weather.
+- **A wall tablet no longer ends up with an empty calendar or task list from "Assigned to me"** (#1808).
+  That switch is remembered per browser. If someone had turned it on while signed in on the device
+  that later became the wall tablet, the tablet kept filtering on itself and showed nothing - in
+  the calendar without any switch to turn it off again. A wall tablet now ignores the remembered
+  choice, and the task filters no longer offer the switch there. The choice itself stays stored
+  for the person who made it.
 - **A locked field looks locked.** A field you cannot change looked exactly like one you can -
   same text, same fill, same outline; only the mouse pointer gave it away, and on a phone nothing
   did. Text, number and date fields, dropdowns and text areas now all show it the same way,
