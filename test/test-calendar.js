@@ -10,16 +10,14 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
 import { eachRule } from './css-rules.js';
 import { installMiniDom } from './mini-dom.js';
+import { createHarness } from './plain-harness.js';
 const { __test: calendarHelpers } = await import('../public/pages/calendar.js');
 const periodSwipe = await import('../public/utils/period-swipe.js');
 
-let passed = 0;
-let failed = 0;
-
-function test(name, fn) {
-  try { fn(); console.log(`  ✓ ${name}`); passed++; }
-  catch (err) { console.error(`  ✗ ${name}: ${err.message}`); failed++; }
-}
+// Ein synchroner Rumpf laeuft sofort, ein async-Rumpf wird abgewartet (#1783):
+// siehe test/plain-harness.js. Wer geteilten Zustand anfasst (window,
+// document), schreibt `await test(...)`.
+const { test, finish } = createHarness('Calendar-Test');
 function assert(cond, msg) { if (!cond) throw new Error(msg || 'Assertion fehlgeschlagen'); }
 
 // Fake-Knopf mit einer echten (Set-gestuetzten) classList und einem
@@ -3754,13 +3752,10 @@ test('Zeitraum-Wisch: ein zweiter Finger mitten im Wisch setzt den Inhalt zuruec
  * das Ziel aus `state.month` ab, und der wandert erst nach den Anfragen: zwei
  * schnelle Wische verlangten denselben Monat zweimal. Gemessen wird die Geste
  * als Programm - ein onStep, das haengt, bis der Test es loslaesst. */
-// `test()` dieser Datei ist synchron: ein async-Rumpf waere gruen, bevor er
-// etwas gemessen hat. Deshalb hier ausgeschrieben und am Dateikopf abgewartet.
-await (async () => {
-  const name = 'Zeitraum-Wisch: waehrend ein Schritt laedt, beginnt keine zweite Geste';
+// Der Rumpf ist async und tauscht window und document: `await` haelt die
+// Reihenfolge, und test() zaehlt ihn erst, wenn er durch ist (#1783).
+await test('Zeitraum-Wisch: waehrend ein Schritt laedt, beginnt keine zweite Geste', async () => {
   const same = (a, b, msg) => assert(JSON.stringify(a) === JSON.stringify(b), `${msg} - ist ${JSON.stringify(a)}`);
-  try {
-  await (async () => {
   const zuvor = { window: globalThis.window, document: globalThis.document };
   try {
     globalThis.window = { matchMedia: () => ({ matches: false }), innerWidth: 375 };
@@ -3832,10 +3827,7 @@ await (async () => {
     globalThis.window = zuvor.window;
     globalThis.document = zuvor.document;
   }
-})();
-    console.log(`  ✓ ${name}`); passed++;
-  } catch (err) { console.error(`  ✗ ${name}: ${err.message}`); failed++; }
-})();
+});
 
 // --------------------------------------------------------
 // Tastatur und Screenreader (Critique 2026-09-24, P1, Schritt 3)
@@ -5661,5 +5653,5 @@ test('seriesEndConflict: neue Serie, geaenderte Regel und unveraenderte Bestands
 // --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
-console.log(`\n[Calendar-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);
+const { failed } = await finish();
 if (failed > 0) process.exit(1);
