@@ -167,6 +167,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **SSO sign-in no longer fails when `OIDC_REDIRECT_URI` is written differently from how a URL
+  is normally printed.** The first request to the provider sent the value exactly as written,
+  the second one - the code exchange - a rebuilt form of it, with the path of the incoming
+  request. The two differed with a default port written out (`https://host:443/...`), capital
+  letters in the host name, a query of its own, or a path the reverse proxy rewrites. A provider
+  has to refuse such an exchange, so the sign-in failed with `invalid_grant` after the login at
+  the provider had looked successful. Both requests now carry the same value, character for
+  character; the same goes for linking an account under Settings. Nothing changes for an
+  installation whose value was already in its plain form. A sign-in that is under way while the
+  update is installed is refused once and works on the second click (#1768).
+- **The installation guide says what `OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM` does not do.** It
+  covers a provider that leaves `email_verified` out, not one that sends `email_verified: false`,
+  which authentik does by default since 2025.10. The guide and `.env.example` now name the fix
+  on the provider side (#1780).
 - **The first visit no longer reloads itself and empties the login form.** One to four seconds
   after the very first load the page reloaded, and whatever had been typed into the login form
   was gone. The reload was meant for an update of the app, but it also fired when the app was
