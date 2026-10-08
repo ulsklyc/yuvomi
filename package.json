@@ -5,7 +5,7 @@
   "main": "server/index.js",
   "type": "module",
   "engines": {
-    "node": ">=22.14.0"
+    "node": "^22.14.0 || >=23.6.0"
   },
   "scripts": {
     "start": "node --import dotenv/config server/index.js",

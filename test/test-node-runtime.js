@@ -11,7 +11,11 @@
  *   - die Meldung nennt die Spanne aus package.json `engines.node`, und
  *     package-lock.json spiegelt sie - es gibt keine zweite Zahl im Code;
  *   - ausserhalb von test/ importiert nur server/utils/sqlite-driver.js den
- *     Treiber, also kommt niemand an der Pruefung vorbei;
+ *     Treiber (auch nicht ueber einen Unterpfad des Pakets), also kommt niemand
+ *     an der Pruefung vorbei. Grenze: ein zur Laufzeit zusammengesetzter
+ *     Spezifizierer entgeht dem Textvergleich;
+ *   - die Pruefung laeuft VOR dem Laden des Treibers, nicht nur vor dem ersten
+ *     Konstruktor: gemessen an einem Treiber, dessen Laden selbst scheitert;
  *   - als PROGRAMM: server/index.js und scripts/seed-demo.js brechen mit einer
  *     vorgetaeuschten Node-API 9 ab, BEVOR eine Datei neben DB_PATH entsteht.
  *     Die echte alte Laufzeit faehrt die Suite nicht (dort stuerzt der Treiber
@@ -35,19 +39,20 @@ const lock = JSON.parse(readFileSync(join(ROOT, 'package-lock.json'), 'utf8'));
 
 const DRIVER = 'better-sqlite3-multiple-ciphers';
 const GATE = 'server/utils/sqlite-driver.js';
+const CHECK = 'server/utils/require-supported-runtime.js';
 
 // ---------------------------------------------------------------------------
 // Reine Funktion
 // ---------------------------------------------------------------------------
 
 test('a runtime below the required Node-API gets one line that names what runs, what is needed and what helps', () => {
-  const message = runtimeProblem({ node: '22.12.0', napi: '9', range: '>=22.14.0' });
+  const message = runtimeProblem({ node: '22.12.0', napi: '9', range: '^22.14.0 || >=23.6.0' });
   assert.equal(typeof message, 'string');
   assert.ok(!message.includes('\n'), 'the message is a single line');
   assert.match(message, /Node\.js 22\.12\.0/);
   assert.match(message, /Node-API 9\b/);
   assert.match(message, new RegExp(`Node-API ${REQUIRED_NAPI}\\b`));
-  assert.match(message, />=22\.14\.0/);
+  assert.ok(message.includes('"^22.14.0 || >=23.6.0"'), message);
   assert.match(message, /Update Node\.js/);
 });
 
@@ -59,7 +64,10 @@ test('a runtime with the required Node-API or newer passes', () => {
 
 test('the check hangs on the capability, not on the version number', () => {
   // Node 23.0 bis 23.5 liegen ueber jeder 22er-Grenze und haben Node-API 9.
-  assert.match(runtimeProblem({ node: '23.5.0', napi: '9' }), /Node\.js 23\.5\.0/);
+  const odd = runtimeProblem({ node: '23.5.0', napi: '9', range: pkg.engines.node });
+  assert.match(odd, /Node\.js 23\.5\.0/);
+  // Die Meldung darf dort nicht behaupten, 23.5.0 sei zu alt fuer eine 22er-Grenze.
+  assert.ok(odd.includes(`matches "${pkg.engines.node}"`), odd);
   // Und eine Versionsnummer allein rettet nichts.
   assert.equal(typeof runtimeProblem({ node: '22.14.0', napi: '9' }), 'string');
 });
@@ -78,7 +86,6 @@ test('a runtime that reports no Node-API version is refused, with or without a k
 // ---------------------------------------------------------------------------
 
 test('the message quotes engines.node from package.json, and package-lock.json mirrors it', () => {
-  assert.match(pkg.engines.node, /^>=\d+\.\d+\.\d+$/);
   assert.equal(declaredNodeRange(), pkg.engines.node);
   assert.equal(lock.packages[''].engines.node, pkg.engines.node);
   const message = runtimeProblem({ node: '22.12.0', napi: '9', range: declaredNodeRange() });
@@ -86,7 +93,7 @@ test('the message quotes engines.node from package.json, and package-lock.json m
 });
 
 test('the runtime check carries no Node version of its own', () => {
-  for (const file of ['server/utils/node-runtime.js', GATE]) {
+  for (const file of ['server/utils/node-runtime.js', GATE, CHECK]) {
     const code = codeLines(readFileSync(join(ROOT, file), 'utf8')).join('\n');
     assert.ok(!/\b\d+\.\d+\.\d+\b/.test(code), `${file} must not spell out a Node version`);
   }
@@ -100,9 +107,15 @@ test('the runtime this suite runs on passes the check', () => {
 // Niemand kommt an der Pruefung vorbei
 // ---------------------------------------------------------------------------
 
-/** Zeilen ohne Kommentarzeilen: JSDoc nennt den Treiber als Typ, das zaehlt nicht. */
+/**
+ * Zeilen ohne Kommentarzeilen: JSDoc nennt den Treiber als Typ, das zaehlt nicht.
+ * Ein Blockkommentar am Zeilenanfang wird HERAUSGESCHNITTEN, nicht die Zeile
+ * verworfen: hinter `/* x *\/` kann ein Import stehen.
+ */
 function codeLines(source) {
-  return source.split('\n').filter((line) => !/^\s*(\*|\/\/|\/\*)/.test(line));
+  return source.split('\n')
+    .map((line) => line.replace(/^(\s*\/\*.*?\*\/)+/, ''))
+    .filter((line) => !/^\s*(\*|\/\/|\/\*)/.test(line));
 }
 
 function sourceFiles(dir, out = []) {
@@ -121,7 +134,9 @@ function sourceFiles(dir, out = []) {
 }
 
 function driverImporters() {
-  const quoted = new RegExp(`['"\`]${DRIVER}['"\`]`);
+  // Mit Unterpfad: das Paket exportiert `<name>/darwin-arm64` usw., und jeder
+  // davon liefert eine funktionierende Database.
+  const quoted = new RegExp(`['"\`]${DRIVER}(/[^'"\`]*)?['"\`]`);
   return sourceFiles(ROOT).filter((file) =>
     codeLines(readFileSync(join(ROOT, file), 'utf8')).some((line) => quoted.test(line)));
 }
@@ -130,9 +145,23 @@ test('outside test/, only the gate module loads the database driver', () => {
   assert.deepEqual(driverImporters(), [GATE]);
 });
 
-test('the gate module runs the check in its own body', () => {
-  const code = codeLines(readFileSync(join(ROOT, GATE), 'utf8')).join('\n');
-  assert.match(code, /^assertSupportedRuntime\(\);$/m);
+test('the gate module imports the check on the line above the driver', () => {
+  // ES-Module werten Importe in Quellreihenfolge aus. Steht die Pruefung
+  // darueber, ist sie gelaufen, bevor der Treiber ueberhaupt geladen wird -
+  // und haengt nicht daran, dass er sein Binary erst im Konstruktor laedt.
+  const imports = codeLines(readFileSync(join(ROOT, GATE), 'utf8')).filter((line) => /^\s*import\b/.test(line));
+  assert.deepEqual(imports, [
+    `import './${CHECK.split('/').pop()}';`,
+    `import Database from '${DRIVER}';`,
+  ]);
+});
+
+test('the check module runs the check in its own body and imports nothing else', () => {
+  const lines = codeLines(readFileSync(join(ROOT, CHECK), 'utf8'));
+  assert.deepEqual(lines.filter((line) => /^\s*import\b/.test(line)), [
+    "import { assertSupportedRuntime } from './node-runtime.js';",
+  ]);
+  assert.match(lines.join('\n'), /^assertSupportedRuntime\(\);$/m);
 });
 
 // ---------------------------------------------------------------------------
@@ -146,7 +175,33 @@ const fakeNapi = (value) => 'data:text/javascript,' + encodeURIComponent(
   `Object.defineProperty(process.versions, 'napi', { value: ${JSON.stringify(value)}, enumerable: true, configurable: true });`,
 );
 
-function runProgram(args, { napi, dbPath }) {
+// Ein Preload, der das Laden des Treibers selbst scheitern laesst: der
+// Spezifizierer wird auf ein Modul umgebogen, das beim Auswerten wirft. So
+// zeigt sich, ob die Pruefung VOR dem Treiber laeuft. (Ein Fehler schon beim
+// Aufloesen taugte dafuer nicht: aufgeloest wird vor jeder Auswertung.)
+const DRIVER_BROKEN = 'the database driver module was evaluated';
+const brokenDriver = (() => {
+  const broken = 'data:text/javascript,' + encodeURIComponent(
+    // Der Default-Export muss da sein: sonst scheitert schon das Verknuepfen,
+    // und das laeuft vor jeder Auswertung.
+    `export default null; throw new Error(${JSON.stringify(DRIVER_BROKEN)});`,
+  );
+  const redirect = `if (specifier === ${JSON.stringify(DRIVER)}) return { url: ${JSON.stringify(broken)}, shortCircuit: true };`;
+  const asyncHooks = 'data:text/javascript,' + encodeURIComponent(
+    `export async function resolve(specifier, context, next) { ${redirect} return next(specifier, context); }`,
+  );
+  // registerHooks, wo es das gibt; module.register sonst (Node 22.14).
+  return 'data:text/javascript,' + encodeURIComponent(`
+    import module from 'node:module';
+    if (typeof module.registerHooks === 'function') {
+      module.registerHooks({ resolve(specifier, context, next) { ${redirect} return next(specifier, context); } });
+    } else {
+      module.register(${JSON.stringify(asyncHooks)});
+    }
+  `);
+})();
+
+function runProgram(args, { napi, dbPath, preloads = [] }) {
   const env = {
     ...process.env,
     DB_PATH: dbPath,
@@ -158,7 +213,7 @@ function runProgram(args, { napi, dbPath }) {
   };
   delete env.DB_ENCRYPTION_KEY;
   delete env.NODE_TEST_CONTEXT;
-  return spawnSync(process.execPath, ['--import', fakeNapi(napi), ...args], {
+  return spawnSync(process.execPath, ['--import', fakeNapi(napi), ...preloads.flatMap((url) => ['--import', url]), ...args], {
     cwd: ROOT,
     env,
     encoding: 'utf8',
@@ -174,6 +229,7 @@ function assertRefused(run, dbPath) {
   assert.equal(run.status, 1, `stdout: ${run.stdout}\nstderr: ${run.stderr}`);
   const expected = runtimeProblem({ node: process.versions.node, napi: '9', range: pkg.engines.node });
   assert.equal(run.stderr, `${expected}\n`, 'stderr carries exactly the one line');
+  assert.equal(run.stdout, '', 'nothing on stdout');
   assert.equal(existsSync(dbPath), false, 'no database file was created');
   assert.equal(existsSync(`${dbPath}.lock`), false, 'no lock file was created');
 }
@@ -200,4 +256,21 @@ test('the same preload with the real Node-API opens a database through the gate'
   const run = runProgram(['--input-type=module', '-e', code], { napi: process.versions.napi, dbPath });
   assert.equal(run.status, 0, run.stderr);
   assert.equal(run.stdout.trim(), '42');
+});
+
+const importGate = `await import(${JSON.stringify(new URL(`../${GATE}`, import.meta.url).href)});`;
+
+test('the check answers before the driver is loaded, even when loading the driver itself fails', () => {
+  const dbPath = join(tempDir('yuvomi-node-runtime-'), 'unused.db');
+  const run = runProgram(['--input-type=module', '-e', importGate], { napi: '9', dbPath, preloads: [brokenDriver] });
+  assertRefused(run, dbPath);
+});
+
+test('the broken-driver preload does break the driver when the check passes', () => {
+  // Gegenstueck: ohne das waere der Test darueber auch gruen, wenn der Preload
+  // gar nicht griffe.
+  const dbPath = join(tempDir('yuvomi-node-runtime-'), 'unused.db');
+  const run = runProgram(['--input-type=module', '-e', importGate], { napi: process.versions.napi, dbPath, preloads: [brokenDriver] });
+  assert.notEqual(run.status, 0);
+  assert.ok(run.stderr.includes(DRIVER_BROKEN), run.stderr);
 });

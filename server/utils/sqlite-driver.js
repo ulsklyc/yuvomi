@@ -4,21 +4,19 @@
  *        nicht direkt aus dem Paket. So laeuft die Laufzeitpruefung genau
  *        einmal und sicher VOR dem ersten `new Database()` - auch fuer Skripte,
  *        die ohne server/index.js oder server/db.js auskommen.
- * Abhaengigkeiten: better-sqlite3-multiple-ciphers, ./node-runtime.js
+ * Abhaengigkeiten: ./require-supported-runtime.js, better-sqlite3-multiple-ciphers
  *
- * Reihenfolge: ES-Module werten ihre Imports aus, bevor der eigene Rumpf
- * laeuft, und den Rumpf des Importierten vor dem des Importierenden. Die
- * Pruefung hier unten laeuft also, bevor irgendeine Datei, die dieses Modul
- * importiert, ihre erste Zeile ausfuehrt. Das Laden des Treibers davor ist
- * harmlos (gemessen: erst der Konstruktor stuerzt ab).
+ * DIE REIHENFOLGE DER BEIDEN IMPORTE IST DIE SACHE. ES-Module werten Importe in
+ * Quellreihenfolge aus: die Pruefung steht ueber dem Treiber und ist gelaufen,
+ * bevor er geladen wird. Dass der Treiber sein Binary heute erst im Konstruktor
+ * laedt, ist eine Eigenschaft seiner Version und keine Zusage.
  *
- * `test:node-runtime` haelt fest, dass ausserhalb von test/ nur diese Datei den
- * Treiber importiert.
+ * `test:node-runtime` haelt die Reihenfolge fest (als Text und an einem
+ * Treiber, dessen Laden scheitert) und dass ausserhalb von test/ nur diese
+ * Datei den Treiber importiert.
  */
 
+import './require-supported-runtime.js';
 import Database from 'better-sqlite3-multiple-ciphers';
-import { assertSupportedRuntime } from './node-runtime.js';
-
-assertSupportedRuntime();
 
 export default Database;

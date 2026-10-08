@@ -12,9 +12,10 @@
  *
  * Geprueft wird die FAEHIGKEIT (`process.versions.napi`), nicht die
  * Versionsnummer: an ihr haengt der Absturz, und sie stimmt auch dort, wo eine
- * Versionsgrenze luegt (Node 23.0 bis 23.5 liegen ueber 22.14 und haben
- * trotzdem nur Node-API 9). Die Node-Untergrenze selbst steht nur in
- * package.json `engines.node`; die Meldung liest sie von dort.
+ * einfache Untergrenze luegt (Node 23.0 bis 23.5 liegen ueber 22.14 und haben
+ * trotzdem nur Node-API 9; 23.6.0 ist die erste 23er mit Node-API 10, gemessen
+ * am 2026-10-08). Welche Node-Versionen das sind, steht nur in package.json
+ * `engines.node`; die Meldung liest die Spanne von dort.
  */
 
 import { readFileSync, writeSync } from 'node:fs';
@@ -23,7 +24,7 @@ import { readFileSync, writeSync } from 'node:fs';
 export const REQUIRED_NAPI = 10;
 
 /**
- * Die Node-Spanne aus package.json, wie sie dort steht (etwa `>=22.14.0`).
+ * Die Node-Spanne aus package.json, wie sie dort steht.
  * @returns {string | null} null, wenn package.json nicht lesbar ist
  */
 export function declaredNodeRange() {
@@ -48,11 +49,11 @@ export function runtimeProblem({ node, napi, range = null }) {
   const have = Number.parseInt(String(napi ?? ''), 10);
   if (Number.isInteger(have) && have >= REQUIRED_NAPI) return null;
   const found = Number.isInteger(have) ? `Node-API ${have}` : 'no known Node-API version';
-  const wanted = range ? `Node.js ${range}` : 'a newer Node.js';
+  const wanted = range ? `a release that matches "${range}"` : 'a newer release';
   return (
     `Yuvomi cannot start: the database driver needs Node-API ${REQUIRED_NAPI}, ` +
     `but this is Node.js ${node} with ${found}. ` +
-    `Update Node.js (${wanted} is required) and start again.`
+    `Update Node.js to ${wanted} and start again.`
   );
 }
 
@@ -62,12 +63,10 @@ export function runtimeProblem({ node, napi, range = null }) {
  * auf einer Pipe darf die Zeile nicht hinter `process.exit` verloren gehen.
  */
 export function assertSupportedRuntime() {
-  const problem = runtimeProblem({
-    node: process.versions.node,
-    napi: process.versions.napi,
-    range: declaredNodeRange(),
-  });
-  if (!problem) return;
+  const runtime = { node: process.versions.node, napi: process.versions.napi };
+  if (!runtimeProblem(runtime)) return;
+  // package.json erst hier lesen: der gute Start zahlt dafuer nichts.
+  const problem = runtimeProblem({ ...runtime, range: declaredNodeRange() });
   try {
     writeSync(2, `${problem}\n`);
   } catch {
