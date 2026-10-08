@@ -8526,6 +8526,87 @@ function splitSelectorList(selector) {
   return parts;
 }
 
+/** Letztes Glied eines Selektors. Ein Kombinator zaehlt nur ausserhalb von
+ * Klammern: das Leerzeichen in `:not(.swipe-row--swiping *)` trennt nichts. */
+function lastCompoundOf(selector) {
+  let depth = 0;
+  let cur = '';
+  let last = '';
+  for (const ch of selector.trim()) {
+    if (ch === '(' || ch === '[') depth += 1;
+    if (ch === ')' || ch === ']') depth -= 1;
+    if (depth === 0 && /[\s>+~]/.test(ch)) {
+      if (cur) last = cur;
+      cur = '';
+    } else cur += ch;
+  }
+  return cur || last;
+}
+
+/** Inhalt des Klammerpaars, das bei `open` beginnt, und die Stelle dahinter. */
+function parenBody(selector, open) {
+  let depth = 0;
+  for (let i = open; i < selector.length; i += 1) {
+    if (selector[i] === '(') depth += 1;
+    if (selector[i] === ')') {
+      depth -= 1;
+      if (depth === 0) return { inner: selector.slice(open + 1, i), end: i + 1 };
+    }
+  }
+  return null;
+}
+
+/** `:is(a, b)` und `:where(a, b)` der obersten Ebene in ihre Varianten
+ * aufloesen: `:is(.a, .b):active` trifft `.a:active` UND `.b:active`. Listen
+ * IN `:not()`/`:has()` bleiben stehen - sie waehlen kein Element aus, sie
+ * schliessen eines aus. Die Spezifitaet einer Variante ist die des ganzen
+ * Selektors (das staerkste Glied der Liste zaehlt fuer alle), deshalb rechnet
+ * der Aufrufer sie am Original. */
+const IS_VARIANTS_MAX = 256;
+function expandIsLists(selector) {
+  let depth = 0;
+  for (let i = 0; i < selector.length; i += 1) {
+    const ch = selector[i];
+    if (ch === ')' || ch === ']') { depth -= 1; continue; }
+    if (ch === '[') { depth += 1; continue; }
+    if (ch === '(') { depth += 1; continue; }
+    if (depth !== 0 || ch !== ':') continue;
+    const head = selector.slice(i).match(/^:(?:is|where)\(/);
+    if (!head) continue;
+    const body = parenBody(selector, i + head[0].length - 1);
+    if (!body) return [selector];
+    const out = [];
+    for (const alt of splitSelectorList(body.inner)) {
+      for (const rest of expandIsLists(selector.slice(body.end))) {
+        out.push(`${selector.slice(0, i)}${alt}${rest}`);
+        if (out.length > IS_VARIANTS_MAX) throw new Error(`:is()-Liste mit mehr als ${IS_VARIANTS_MAX} Varianten: ${selector.slice(0, 80)}`);
+      }
+    }
+    return out;
+  }
+  return [selector];
+}
+
+/** Die Argumente aller `:not(...)` eines Glieds, an den Kommas getrennt. */
+function notArguments(compound) {
+  const args = [];
+  let depth = 0;
+  for (let i = 0; i < compound.length; i += 1) {
+    const ch = compound[i];
+    if (ch === ')' || ch === ']') { depth -= 1; continue; }
+    if (ch === '[') { depth += 1; continue; }
+    if (depth === 0 && compound.startsWith(':not(', i)) {
+      const body = parenBody(compound, i + 4);
+      if (!body) break;
+      args.push(...splitSelectorList(body.inner));
+      i = body.end - 1;
+      continue;
+    }
+    if (ch === '(') depth += 1;
+  }
+  return args;
+}
+
 test('zurueckgenommene Karten und Zeilen dimmen nicht ueber opacity, und ihre Textfarben halten 4.5:1', () => {
   const { light, dark } = themeTokenMaps();
   const STATE = RECEDED_STATE;
@@ -8640,7 +8721,26 @@ test('keine spezifischere Regel ueberschreibt eine zurueckgenommene Zustandsrege
     'index.html nennt glass.css/layout.css nicht mehr als Stylesheets - die Ladereihenfolge ist nicht mehr lesbar.');
   const loadRank = (file) => (globals.includes(file) ? globals.indexOf(file) : globals.length);
 
-  const stripNot = (s) => s.replace(/:not\((?:[^()]|\([^()]*\))*\)/g, '');
+  // `:not()` und `:has()` samt Inhalt streichen, in beliebiger Tiefe: was darin
+  // steht, sitzt nicht am Element (`:has`) oder gerade nicht (`:not`). Das
+  // fruehere Regex trug nur eine Klammerebene - an
+  // `:not(:has(:is(a, button):not(.u-row-title):active))` blieb der Rest
+  // stehen, und seine Klassen zaehlten als Klassen des Elements.
+  const stripFunctional = (s, opener) => {
+    let out = '';
+    for (let i = 0; i < s.length; i += 1) {
+      const head = s.slice(i).match(opener);
+      const body = head ? parenBody(s, i + head[0].length - 1) : null;
+      if (body) i = body.end - 1; else out += s[i];
+    }
+    return out;
+  };
+  const stripNot = (s) => stripFunctional(s, /^:(?:not|has)\(/);
+  // Ein Zustandswort NUR in `:not()` macht keine Zustandsregel: der
+  // Press-Baustein nennt `[class*="--done"]`, um erledigte Zeilen AUSZUNEHMEN.
+  // Als Zustandsregel gelesen, fiele er aus den Wettbewerbern - der Grund,
+  // aus dem der Guard ihn nach dem Aufloesen immer noch nicht sah.
+  const namesState = (sel) => RECEDED_STATE.test(stripFunctional(sel, /^:not\(/));
   const specificity = (sel) => {
     let a = 0; let b = 0; let c = 0;
     let s = sel.replace(/:where\((?:[^()]|\([^()]*\))*\)/g, '');
@@ -8657,7 +8757,6 @@ test('keine spezifischere Regel ueberschreibt eine zurueckgenommene Zustandsrege
   };
   const PROPS = { background: 'background', 'background-color': 'background', border: 'border-color', 'border-color': 'border-color', 'box-shadow': 'box-shadow', color: 'color', opacity: 'opacity' };
   const propsOf = (body) => new Set([...body.matchAll(/(?:^|;)\s*([\w-]+)\s*:/g)].map((m) => PROPS[m[1]]).filter(Boolean));
-  const lastCompound = (s) => s.trim().split(/\s+|>|\+|~/).filter(Boolean).pop() ?? '';
   const GESTURE = /:(?:hover|focus-within|focus-visible|active)(?![\w-])/g;
   const gestures = (compound) => new Set(stripNot(compound).match(GESTURE) ?? []);
 
@@ -8672,9 +8771,21 @@ test('keine spezifischere Regel ueberschreibt eine zurueckgenommene Zustandsrege
       // `:is()`-Liste; zerlegt las der Guard jedes Glied als eigene Regel OHNE
       // sein `:active` und meldete acht Ueberschreibungen, die es nicht gibt.
       // Dass der Baustein zurueckgenommene Zeilen ausnimmt, haelt test:motion.
-      for (const part of splitSelectorList(rule.selector)) {
-        rules.push({ file, index, part, at: rule.at, body: rule.body, props: propsOf(rule.body), spec: specificity(part), last: lastCompound(part) });
-        for (const cls of part.match(/\.[a-z][\w-]*/gi) ?? []) cssClasses.add(cls.slice(1));
+      //
+      // UND JEDE `:is()`-LISTE WIRD AUFGELOEST (R18, Schritt 7). Nach dem
+      // Trennen stand der Baustein als EIN Selektor da, dessen letztes Glied
+      // vierzehn Klassen nannte - "alle am selben Element" traf nie zu, und der
+      // Guard verglich ihn mit keiner Zustandsregel mehr. Er sah damit weniger
+      // als vor der Kette. Jede Variante ist ein eigener Wettbewerber mit der
+      // Spezifitaet des ganzen Selektors; was eine Variante per `:not()`
+      // ausnimmt, wird unten an der Zustandsklasse geprueft, nicht geglaubt.
+      for (const whole of splitSelectorList(rule.selector)) {
+        const spec = specificity(whole);
+        const variants = expandIsLists(whole);
+        for (const part of variants) {
+          rules.push({ file, index, part, whole, fromIs: variants.length > 1, at: rule.at, body: rule.body, props: propsOf(rule.body), spec, last: lastCompoundOf(part) });
+          for (const cls of part.match(/\.[a-z][\w-]*/gi) ?? []) cssClasses.add(cls.slice(1));
+        }
       }
       index += 1;
     }
@@ -8712,11 +8823,13 @@ test('keine spezifischere Regel ueberschreibt eine zurueckgenommene Zustandsrege
   };
   const coLoaded = (x, y) => x.file === y.file || globals.includes(x.file) || globals.includes(y.file);
 
-  const allStates = rules.filter((r) => RECEDED_STATE.test(r.part) && !RECEDED_EXEMPT.test(r.part) && r.props.size && !r.last.includes('::'));
+  const allStates = rules.filter((r) => namesState(r.part) && !RECEDED_EXEMPT.test(r.part) && r.props.size && !r.last.includes('::'));
   const states = allStates.filter((r) => /var\(\s*--color-(?:surface|border|text)-receded\s*\)/.test(r.body));
   const offenders = new Set();
   let compared = 0;
   let expanded = 0;
+  let viaIs = 0;
+  let excludedByIs = 0;
   for (const state of states) {
     const classes = stripNot(state.last).match(/\.[\w-]+/g) ?? [];
     const stateClass = classes.find((cls) => RECEDED_STATE.test(cls));
@@ -8742,10 +8855,20 @@ test('keine spezifischere Regel ueberschreibt eine zurueckgenommene Zustandsrege
       return stateClass ? own.includes(stateClass) : (s.part.includes(marker) && own.includes(base));
     });
     for (const other of rules) {
-      if (RECEDED_STATE.test(other.part) || RECEDED_EXEMPT.test(other.part) || other.last.includes('::')) continue;
+      if (namesState(other.part) || RECEDED_EXEMPT.test(other.part) || other.last.includes('::')) continue;
       if (!coLoaded(state, other)) continue;
       const otherClasses = stripNot(other.last).match(/\.[\w-]+/g) ?? [];
       if (!otherClasses.length || !otherClasses.every((cls) => onElement.has(cls))) continue;
+      // Nimmt der Wettbewerber GENAU DIESEN Zustand aus, gilt er an dessen
+      // Element nicht: `:not(.x--done)` oder `:not([class*="--done"])` im
+      // letzten Glied, wenn der Zustand dort sitzt. Ein anderes Zustandswort
+      // in der Liste nimmt diesen Zustand nicht aus.
+      if (stateClass && notArguments(other.last).some((arg) => arg === stateClass
+        || [...arg.matchAll(/^\[class\*=(["'])([^"']+)\1\]$/g)].some((m) => stateClass.includes(m[2])))) {
+        if (other.fromIs) excludedByIs += 1;
+        continue;
+      }
+      if (other.fromIs) viaIs += 1;
       const otherGestures = gestures(other.last);
       for (const prop of [...other.props].filter((p) => state.props.has(p))) {
         compared += 1;
@@ -8762,9 +8885,28 @@ test('keine spezifischere Regel ueberschreibt eine zurueckgenommene Zustandsrege
   }
   assert.ok(states.length >= 12, `Nur ${states.length} Zustandsregeln des Zuruecknehmen-Musters gefunden - der Scan greift nicht mehr.`);
   assert.ok(compared >= 10, `Nur ${compared} Wettbewerber verglichen - der Guard misst nichts.`);
+  // Der Press-Baustein (list-row.css) ist eine `:is()`-Liste ueber die Zeilen
+  // und Karten, an denen die Zustaende sitzen. Trifft keine ihrer Varianten
+  // mehr auf eine Zustandsregel, sieht der Guard `:is()` wieder nicht.
+  assert.ok(viaIs + excludedByIs >= 4,
+    `Nur ${viaIs + excludedByIs} Varianten aus :is()-Listen trafen auf eine Zustandsregel - der Guard sieht :is()-Regeln nicht.`);
   // Die meisten Vorlagen tragen nur Basis + Zustand; gezaehlt wird deshalb, ob
   // die Zustandsklasse ueberhaupt in einer Vorlage gefunden wurde.
   assert.ok(expanded >= 6, `Nur ${expanded} Zustandsregeln fanden ihre Vorlage in public/ - die Vorlagen-Suche greift nicht mehr.`);
+  // BENANNTE AUSNAHME, seit der Guard `:has()` nicht mehr fuer eine Klasse der
+  // Zeile haelt (R18, Schritt 7): das abgelegte Konto antwortet weiter auf den
+  // Zeiger. budget.css sagt das an `.budget-account--archived` ausdruecklich
+  // ("Die Zeile darin antwortet weiter auf den Zeiger") - die Zeile bleibt der
+  // Weg in die Buchungen des Kontos. Das widerspricht dem Satz zu #1230
+  // woertlich und steht deshalb HIER, sichtbar, statt in einem blinden Fleck.
+  // Jeder Eintrag muss weiter gefunden werden, sonst ist er zu streichen.
+  const SANCTIONED = [
+    'budget.css: .budget-account--archived [0,1,0]  <-  budget.css: .budget-account:has(> .budget-account__main:active) [0,3,0]  background',
+    'budget.css: .budget-account--archived [0,1,0]  <-  budget.css: .budget-account:has(> .budget-account__main:hover) [0,3,0]  background',
+  ];
+  for (const entry of SANCTIONED) {
+    assert.ok(offenders.delete(entry), `Die benannte Ausnahme trifft nicht mehr zu und ist zu streichen: ${entry}`);
+  }
   assert.deepEqual([...offenders].sort(), [],
     'Eine spezifischere (oder gleich spezifische, spaeter ladende) Regel ueberschreibt eine zurueckgenommene '
     + 'Zustandsregel bei derselben Eigenschaft. Den Zustandsselektor so qualifizieren, dass er gewinnt '
