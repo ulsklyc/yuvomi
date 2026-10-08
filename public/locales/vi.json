@@ -197,6 +197,8 @@
         "wallWhoCount": "{{count}} mục hôm nay",
         "wallWhoCount_one": "1 mục hôm nay",
         "wallWhoNone": "Hôm nay chưa giao cho ai",
+        "wallWhoDoneMore": "+{{count}} đã xong",
+        "wallWhoDoneMore_one": "+{{count}} đã xong",
         "wallExit": "Thoát chế độ treo tường",
         "wallEnter": "Bật chế độ treo tường",
         "wallTimerLabel": "Hẹn giờ nhà bếp",

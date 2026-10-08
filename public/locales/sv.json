@@ -197,6 +197,8 @@
         "wallWhoCount": "{{count}} poster i dag",
         "wallWhoCount_one": "1 post i dag",
         "wallWhoNone": "Ingen är inbokad i dag",
+        "wallWhoDoneMore": "+{{count}} klara",
+        "wallWhoDoneMore_one": "+{{count}} klar",
         "wallExit": "Lämna väggläget",
         "wallEnter": "Starta väggläget",
         "wallTimerLabel": "Köksklocka",

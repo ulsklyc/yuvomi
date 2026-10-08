@@ -211,6 +211,8 @@
         "wallWhoCount": "{{count}} مورد امروز",
         "wallWhoCount_one": "{{count}} مورد امروز",
         "wallWhoNone": "امروز به کسی واگذار نشده است",
+        "wallWhoDoneMore": "+{{count}} انجام‌شده",
+        "wallWhoDoneMore_one": "+{{count}} انجام‌شده",
         "wallExit": "خروج از حالت دیواری",
         "wallEnter": "شروع حالت دیواری",
         "wallTimerLabel": "تایمر آشپزخانه",

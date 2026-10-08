@@ -197,6 +197,8 @@
         "wallWhoCount": "{{count}} punten vandaag",
         "wallWhoCount_one": "1 punt vandaag",
         "wallWhoNone": "Vandaag is niemand ingedeeld",
+        "wallWhoDoneMore": "+{{count}} klaar",
+        "wallWhoDoneMore_one": "+{{count}} klaar",
         "wallExit": "Wandmodus verlaten",
         "wallEnter": "Wandmodus starten",
         "wallTimerLabel": "Keukentimer",

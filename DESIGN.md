@@ -3713,6 +3713,18 @@ sie scrollen muesste. Die Zaehler an den Gesichtern sind aus derselben Rechnung 
 Mikro-Badges, sondern volle Marken mit Kante - eine 13px-Marke an einem 56px-Gesicht waere aus
 zwei Metern Dekoration.
 
+**Unter jedem Gesicht stehen die Aufgaben von heute beim Namen, und die Zeilenzahl folgt dem
+Platz** (#1817). Die Zahl sagt, DASS etwas offen ist, der Titel sagt WAS. Offene zuerst in
+Primaerfarbe, darunter das heute Erledigte in Sekundaerfarbe mit Haken - kein Durchstreichen,
+keine Deckkraft: auf zwei Metern liest beides niemand. Mit Titeln wird aus der Reihe der
+Gesichter ein Raster von Personen (Gesicht und Vorname als Kopf, die Zeilen in voller
+Spaltenbreite; ab fuenf Personen drei Spalten). Weil die Wand nicht scrollt, steigt
+`fitWallWho` eine Leiter von Budgets hinab, bis das Bild passt: erst weichen die Haken, auf der
+ganzen Flaeche, dann die offenen Titel; was nicht passt, ist eine Zahl ("+2 weitere"), und die
+letzte Stufe ist die Reihe der Gesichter wie zuvor. Gemessen bei 1280x800: vier Personen tragen
+drei Zeilen, sechs tragen zwei. Nachts geht die Liste mit der Wand: offener Titel und Name eine
+Stufe zurueck, Erledigtes und Zaehlzeile eine weitere, und der Haken gibt sein Gruen ab.
+
 **Nachtabsenkung nach UHRZEIT, nicht nach Farbmodus.** Zwischen 22 und 6 Uhr traegt die Wurzel
 `data-wall-night` und der dunkle Grund wird erzwungen, auch bei hellem Theme: das Problem im
 Flur ist die Leuchtdichte, und ein dunkles Theme leuchtet immer noch. Erzwungen heisst nicht

@@ -197,6 +197,8 @@
         "wallWhoCount": "आज {{count}} प्रविष्टियाँ",
         "wallWhoCount_one": "आज {{count}} प्रविष्टि",
         "wallWhoNone": "आज किसी को नहीं सौंपा गया",
+        "wallWhoDoneMore": "+{{count}} पूरे",
+        "wallWhoDoneMore_one": "+{{count}} पूरा",
         "wallExit": "वॉल मोड छोड़ें",
         "wallEnter": "वॉल मोड शुरू करें",
         "wallTimerLabel": "किचन टाइमर",

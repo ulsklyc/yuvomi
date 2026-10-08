@@ -197,6 +197,8 @@
         "wallWhoCount": "{{count}} items today",
         "wallWhoCount_one": "1 item today",
         "wallWhoNone": "Nobody is assigned today",
+        "wallWhoDoneMore": "+{{count}} done",
+        "wallWhoDoneMore_one": "+{{count}} done",
         "wallExit": "Leave wall mode",
         "wallEnter": "Start wall mode",
         "wallTimerLabel": "Kitchen timer",

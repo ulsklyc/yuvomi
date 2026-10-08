@@ -197,6 +197,8 @@
         "wallWhoCount": "{{count}} itens hoje",
         "wallWhoCount_one": "{{count}} item hoje",
         "wallWhoNone": "Hoje não há ninguém atribuído",
+        "wallWhoDoneMore": "+{{count}} concluídas",
+        "wallWhoDoneMore_one": "+{{count}} concluída",
         "wallExit": "Sair do modo parede",
         "wallEnter": "Iniciar o modo parede",
         "wallTimerLabel": "Temporizador de cozinha",

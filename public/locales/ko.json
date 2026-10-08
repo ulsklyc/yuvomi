@@ -211,6 +211,8 @@
         "wallWhoCount": "오늘 {{count}}건",
         "wallWhoCount_one": "오늘 1건",
         "wallWhoNone": "오늘은 배정된 사람이 없습니다",
+        "wallWhoDoneMore": "+{{count}}개 완료",
+        "wallWhoDoneMore_one": "+{{count}}개 완료",
         "wallExit": "벽면 모드 종료",
         "wallEnter": "벽면 모드 시작",
         "wallTimerLabel": "주방 타이머",

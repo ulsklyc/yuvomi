@@ -211,6 +211,8 @@
         "wallWhoCount": "{{count}} na mga entry ngayong araw",
         "wallWhoCount_one": "{{count}} entry ngayong araw",
         "wallWhoNone": "Walang nakatalaga ngayong araw",
+        "wallWhoDoneMore": "+{{count}} tapos na",
+        "wallWhoDoneMore_one": "+{{count}} tapos na",
         "wallExit": "Lumabas sa wall mode",
         "wallEnter": "Simulan ang wall mode",
         "wallTimerLabel": "Kitchen timer",

@@ -197,6 +197,8 @@
         "wallWhoCount": "Ma {{count}} tétel",
         "wallWhoCount_one": "Ma 1 tétel",
         "wallWhoNone": "Ma senkire nincs kiosztva",
+        "wallWhoDoneMore": "+{{count}} kész",
+        "wallWhoDoneMore_one": "+{{count}} kész",
         "wallExit": "Kilépés a fali módból",
         "wallEnter": "Fali mód indítása",
         "wallTimerLabel": "Konyhai időzítő",

@@ -197,6 +197,8 @@
         "wallWhoCount": "{{count}} éléments aujourd'hui",
         "wallWhoCount_one": "{{count}} élément aujourd'hui",
         "wallWhoNone": "Personne n'est assigné aujourd'hui",
+        "wallWhoDoneMore": "+{{count}} terminées",
+        "wallWhoDoneMore_one": "+{{count}} terminée",
         "wallExit": "Quitter le mode mural",
         "wallEnter": "Démarrer le mode mural",
         "wallTimerLabel": "Minuteur de cuisine",

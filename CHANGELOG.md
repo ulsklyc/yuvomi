@@ -20,6 +20,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   took out come first and the money you lent follows as its own group. While the list is not in
   its default order, a line above it says which order applies; tap it to change. The order is a calculation to read:
   Yuvomi does not suggest which loan to pay first and does not move payments between loans.
+- **Wall mode names today's tasks under each person** (#1817, from D#1604). "Who's up today"
+  used to show a face and a number. It now lists each person's open tasks for today by title, and
+  below them, dimmed and with a checkmark, what they have already done today - so a glance shows
+  what is left and what is finished. The wall still does not scroll: it shows as many lines as
+  the screen has room for and says "+2 more" for the rest. When space runs short, finished tasks
+  give way first. Someone who has finished everything keeps their ticked tasks until the next
+  day. Under the faces only tasks the whole household may see appear: a task set to "Assignees
+  only" is not listed there, whoever is signed in on the device. (The day's programme beside it
+  is unchanged and still shows what the signed-in person may see.)
 
 ### Changed
 

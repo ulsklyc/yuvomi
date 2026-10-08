@@ -197,6 +197,8 @@
         "wallWhoCount": "{{count}} elementer i dag",
         "wallWhoCount_one": "1 element i dag",
         "wallWhoNone": "Ingen er tildelt i dag",
+        "wallWhoDoneMore": "+{{count}} utført",
+        "wallWhoDoneMore_one": "+{{count}} utført",
         "wallExit": "Avslutt veggmodus",
         "wallEnter": "Start veggmodus",
         "wallTimerLabel": "Kjøkkentimer",

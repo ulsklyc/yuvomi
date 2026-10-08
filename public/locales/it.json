@@ -197,6 +197,8 @@
         "wallWhoCount": "{{count}} voci oggi",
         "wallWhoCount_one": "1 voce oggi",
         "wallWhoNone": "Oggi non è assegnato a nessuno",
+        "wallWhoDoneMore": "+{{count}} completate",
+        "wallWhoDoneMore_one": "+{{count}} completata",
         "wallExit": "Esci dalla modalità parete",
         "wallEnter": "Avvia la modalità parete",
         "wallTimerLabel": "Timer da cucina",

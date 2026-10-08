@@ -197,6 +197,8 @@
         "wallWhoCount": "今日は{{count}}件",
         "wallWhoCount_one": "今日は1件",
         "wallWhoNone": "今日は担当者がいません",
+        "wallWhoDoneMore": "+{{count}} 件完了",
+        "wallWhoDoneMore_one": "+{{count}} 件完了",
         "wallExit": "ウォールモードを終了",
         "wallEnter": "ウォールモードを開始",
         "wallTimerLabel": "キッチンタイマー",

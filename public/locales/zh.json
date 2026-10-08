@@ -197,6 +197,8 @@
         "wallWhoCount": "今天 {{count}} 项",
         "wallWhoCount_one": "今天 1 项",
         "wallWhoNone": "今天没有指派给任何人",
+        "wallWhoDoneMore": "+{{count}} 项完成",
+        "wallWhoDoneMore_one": "+{{count}} 项完成",
         "wallExit": "退出壁挂模式",
         "wallEnter": "启动壁挂模式",
         "wallTimerLabel": "厨房定时器",
