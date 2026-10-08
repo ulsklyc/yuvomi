@@ -17,11 +17,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHarness } from './plain-harness.js';
+import { tempDir } from './tmp-dir.js';
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 
@@ -82,8 +82,9 @@ test('finish() wartet auf alles, was noch laeuft - auch auf nachgemeldete Tests'
 });
 
 test('als Programm: ein spaet scheiternder async-Test macht den Lauf rot (Exit 1)', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yuvomi-plain-harness-'));
-  try {
+  // tempDir() raeumt beim Prozessende weg (test/tmp-dir.js, test:tmp-clean).
+  const dir = tempDir('yuvomi-plain-harness-');
+  {
     const harnessUrl = pathToFileURL(join(TEST_DIR, 'plain-harness.js')).href;
     // Derselbe Fuss wie in test-calendar.js.
     const program = (body) => `import { createHarness } from ${JSON.stringify(harnessUrl)};
@@ -117,8 +118,6 @@ if (failed > 0) process.exit(1);
     assert.notEqual(hang.status, 0, `stdout: ${hang.stdout}\nstderr: ${hang.stderr}`);
     assert.doesNotMatch(hang.stdout, /wird nie fertig|bestanden/);
     assert.match(hang.stderr, /✗ wird nie fertig: der async-Rumpf ist nie fertig geworden/, 'der Lauf nennt den Test, der haengt');
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
   }
 });
 

@@ -21,11 +21,11 @@
 
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import puppeteer from 'puppeteer';
+import { tempDir } from './tmp-dir.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SHEETS = ['tokens', 'reset', 'layout', 'typography', 'panel', 'health'];
@@ -55,12 +55,11 @@ ${SHEETS.map((name) => `<link rel="stylesheet" href="${pathToFileURL(join(ROOT, 
 </body></html>`;
 
 let browser;
-let dir;
 let url;
 
 before(async () => {
-  dir = mkdtempSync(join(tmpdir(), 'yuvomi-metric-tile-'));
-  const file = join(dir, 'tiles.html');
+  // tempDir() raeumt beim Prozessende weg (test/tmp-dir.js, test:tmp-clean).
+  const file = join(tempDir('yuvomi-metric-tile-'), 'tiles.html');
   writeFileSync(file, PAGE);
   url = pathToFileURL(file).href;
   browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
@@ -68,7 +67,6 @@ before(async () => {
 
 after(async () => {
   await browser?.close();
-  if (dir) rmSync(dir, { recursive: true, force: true });
 });
 
 /** Misst jede Kachel eines Rasters bei jeder der genannten Reihenbreiten. */
