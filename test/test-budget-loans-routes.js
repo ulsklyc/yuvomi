@@ -1088,6 +1088,99 @@ test('#1656: jede Absage des Darlehens-Formulars traegt ihren Grund, der Satz bl
   });
 });
 
+// --------------------------------------------------------
+// #1706: die Zahlen, nach denen die Darlehensliste sortiert und die sie zeigt
+// --------------------------------------------------------
+
+test('#1706: current_rate ist der Satz der NAECHSTEN Rate - fest in der Bindung, danach der Anschlusssatz', async () => {
+  setMode('shared');
+  setBudgetCurrency('EUR');
+  db.prepare('DELETE FROM budget_loans').run();
+  const body = {
+    borrower: 'Bank', title: 'Haus', start_month: '2020-01', direction: 'borrowed',
+    interest_mode: 'fixed_then_variable', principal: 100000,
+    fixed_rate: 2, initial_repayment_rate: 6, fixed_period_months: 2, followup_rate: 5,
+  };
+  const made = await call('POST', '/loans', { as: AA, body });
+  assert.equal(made.status, 201);
+  const id = made.body.data.id;
+  assert.equal(made.body.data.interest.current_rate, 2, 'Rate 1 liegt in der Bindung');
+
+  for (const paid_date of ['2020-01-01', '2020-02-01']) {
+    assert.equal((await call('POST', `/loans/${id}/payments`, { as: AA, body: { paid_date } })).status, 201);
+  }
+  const after = (await call('GET', '/loans', { as: AA })).body.data.loans.find((l) => l.id === id);
+  assert.equal(after.next_installment_number, 3);
+  assert.equal(after.interest.current_rate, 5, 'Rate 3 ist die erste nach der Bindung');
+});
+
+test('#1706: projected_end_month folgt den gebuchten Zahlungen, nicht dem Plan', async () => {
+  setMode('shared');
+  setBudgetCurrency('EUR');
+  db.prepare('DELETE FROM budget_loans').run();
+  const mk = () => call('POST', '/loans', {
+    as: AA,
+    body: {
+      borrower: 'Lukas', title: 'Auto', start_month: '2022-12',
+      interest_mode: 'fixed', principal: 21000,
+      fixed_rate: 4.07, initial_repayment_rate: 14.792857,
+    },
+  });
+  const plain = (await mk()).body.data;
+  const extra = (await mk()).body.data;
+  // Ohne Zahlung: die letzte Rate des Plans. Rate 1 ist im Startmonat faellig,
+  // Rate n also n-1 Monate spaeter.
+  const expectMonth = (start, offset) => {
+    const [y, m] = start.split('-').map(Number);
+    const d = new Date(Date.UTC(y, m - 1 + offset, 1));
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+  };
+  assert.equal(plain.projected_end_month, expectMonth('2022-12', plain.installment_count - 1));
+
+  assert.equal((await call('POST', `/loans/${plain.id}/payments`, { as: AA, body: { paid_date: '2022-12-01' } })).status, 201);
+  assert.equal((await call('POST', `/loans/${extra.id}/payments`, {
+    as: AA, body: { paid_date: '2022-12-01', amount: plain.installment_amount + 5000 },
+  })).status, 201);
+
+  const loans = (await call('GET', '/loans', { as: AA })).body.data.loans;
+  const a = loans.find((l) => l.id === plain.id);
+  const b = loans.find((l) => l.id === extra.id);
+  // Dieselbe Quelle wie die Restlaufzeit im Bericht: naechste Faelligkeit plus
+  // die Raten, die bei der REALEN Restschuld noch bleiben (#964).
+  for (const l of [a, b]) {
+    assert.equal(l.projected_end_month, expectMonth(l.next_due_month, l.remaining_installments_forecast - 1));
+  }
+  assert.equal(a.projected_end_month, plain.projected_end_month, 'planmaessig gezahlt: das Ende bleibt');
+  assert.ok(b.projected_end_month < a.projected_end_month,
+    `5000 extra muessen das Ende vorziehen (plain ${a.projected_end_month}, extra ${b.projected_end_month})`);
+  assert.equal(b.remaining_installments, a.remaining_installments, 'die Planzahl bleibt eine Planzahl');
+});
+
+test('#1706: zinsfrei zaehlt die Planzahl, getilgt hat kein Enddatum und keinen Rang', async () => {
+  setMode('shared');
+  setBudgetCurrency('EUR');
+  db.prepare('DELETE FROM budget_loans').run();
+  const made = await call('POST', '/loans', {
+    as: AA,
+    body: { borrower: 'Oma', title: 'Zinsfrei', total_amount: 300, installment_count: 3, start_month: '2026-01' },
+  });
+  assert.equal(made.status, 201);
+  const id = made.body.data.id;
+  assert.equal(made.body.data.interest, null, 'ohne Zins kein Zinsblock - die Liste liest das als 0 %');
+  assert.equal(made.body.data.projected_end_month, '2026-03');
+
+  assert.equal((await call('POST', `/loans/${id}/payments`, { as: AA, body: { paid_date: '2026-01-01' } })).status, 201);
+  let loan = (await call('GET', '/loans', { as: AA })).body.data.loans.find((l) => l.id === id);
+  assert.equal(loan.projected_end_month, '2026-03', 'eine gebuchte Rate verschiebt das Ende nicht');
+
+  for (const paid_date of ['2026-02-01', '2026-03-01']) {
+    assert.equal((await call('POST', `/loans/${id}/payments`, { as: AA, body: { paid_date } })).status, 201);
+  }
+  loan = (await call('GET', '/loans', { as: AA })).body.data.loans.find((l) => l.id === id);
+  assert.equal(loan.status, 'paid');
+  assert.equal(loan.projected_end_month, null);
+});
+
 test('teardown: Server schließen', async () => {
   await new Promise((r) => server.close(r));
 });

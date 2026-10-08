@@ -1461,7 +1461,7 @@
 
 .budget-loan-card__amounts span,
 .budget-loan-card__meta,
-.budget-loan-card__footer > span {
+.budget-loan-card__dates > span {
   display: block;
   font-size: var(--text-xs);
   color: var(--color-text-secondary);

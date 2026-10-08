@@ -31,6 +31,7 @@ import { formatMoney, formatSignedAmount, amountPlaceholder, amountStep, amountM
 import { budgetCategoryLabel } from '/utils/category-labels.js';
 import { trendMarkup, leadCardClass } from '/utils/metric-card.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
+import { LOAN_SORTS, normalizeLoanSort, sortLoans } from '/utils/loan-order.js';
 import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
 import { metricGlanceHtml, wireMetricGlance, glanceLeadClass } from '/utils/metric-glance.js';
 import { intervalUnitLabel } from '/rrule-ui.js';
@@ -57,6 +58,9 @@ const EXPENSES_ONLY_KEY = 'yuvomi-budget-expenses-only';
 // Geraeteweit wie die Ausgaben-Ansicht daneben: ob die Liste nach Zustaendigen
 // gruppiert erscheint, ist eine Frage des Schirms, nicht des Haushalts (#1057).
 const GROUP_RESPONSIBLE_KEY = 'yuvomi:budget:group-responsible';
+// Geraeteweit wie die beiden Ansichten darueber: in welcher Reihenfolge die
+// Darlehen stehen, ist eine Frage des Lesens, kein Datum des Haushalts (#1706).
+const LOAN_SORT_KEY = 'yuvomi:budget:loan-sort';
 
 const SUBCATEGORY_I18N = () => ({
   rent_mortgage:            t('budget.subcatRentMortgage'),
@@ -240,6 +244,7 @@ let state = {
   activeTab:   'budget',
   loanFilterId: null,
   loanStatusFilter: 'active',
+  loanSort: 'start',           // 'start' | 'rate' | 'balance' (utils/loan-order.js)
   currency:    'EUR',
   budgetMode:  'shared',      // 'shared' (Altverhalten) | 'personal' (#476/#505)
   members:     [],            // Haushaltsmitglieder fuer den Zustaendigen-Picker (#1057)
@@ -824,6 +829,7 @@ export async function render(container, { user }) {
   }
   state.expensesOnly = localStorage.getItem(EXPENSES_ONLY_KEY) === '1';
   state.groupByResponsible = localStorage.getItem(GROUP_RESPONSIBLE_KEY) === '1';
+  try { state.loanSort = normalizeLoanSort(localStorage.getItem(LOAN_SORT_KEY)); } catch (_) { state.loanSort = normalizeLoanSort(null); }
 
   setHtml(container, `
     <div class="budget-page app-page app-page--reading page-measure--narrow" data-composition="reading">
@@ -2596,6 +2602,7 @@ function renderLoansDashboard() {
                     tabindex="${on ? '0' : '-1'}">${t(key)}</button>`;
               }).join('')}
           </div>
+          ${loanToolsMenuHtml()}
         </div>
       </div>
       <!-- Geteilte Kennzahl-Zeile statt der früheren eigenen budget-loans__stats
@@ -2633,11 +2640,48 @@ function renderLoansDashboard() {
 
 function filteredLoans() {
   const loans = state.loans?.loans ?? [];
-  return loans.filter((loan) => {
+  return sortLoans(loans.filter((loan) => {
     const matchesStatus = state.loanStatusFilter === 'all' || loan.status === state.loanStatusFilter;
     const matchesLoan = !state.loanFilterId || loan.id === state.loanFilterId;
     return matchesStatus && matchesLoan;
-  });
+  }), state.loanSort);
+}
+
+const LOAN_SORT_LABELS = {
+  start: 'budget.loanSortStart',
+  rate: 'budget.loanSortRate',
+  balance: 'budget.loanSortBalance',
+};
+
+/**
+ * Das Werkzeug-Menue der Darlehen (#1706; Muster: toolsMenuHtml der Abos,
+ * documentsToolsMenuHtml): die Sortierung als Einfachauswahl mit Haken. Sie
+ * ordnet nur und schreibt nichts - bei `budget: read` bleibt sie stehen.
+ *
+ * KEIN RAT: die Eintraege nennen, wonach geordnet wird, nicht was zu tun ist.
+ * Welches Darlehen zuerst getilgt wird, entscheidet, wer seine Vertraege
+ * kennt (#935).
+ */
+function loanToolsMenuHtml() {
+  const label = t('common.moreActions');
+  return `
+    <button type="button" class="btn btn--secondary btn--icon budget-loan-tools popover-menu__trigger"
+            popovertarget="budget-loan-tools-menu" aria-haspopup="menu" aria-expanded="false"
+            aria-label="${esc(label)}" title="${esc(label)}">
+      <i data-lucide="ellipsis" class="icon-md" aria-hidden="true"></i>
+    </button>
+    <div class="popover-menu budget-loan-tools-menu" id="budget-loan-tools-menu" popover role="menu" aria-label="${esc(label)}">
+      <div class="popover-menu__group" role="group" aria-labelledby="budget-loan-tools-sort-label">
+        <div class="popover-menu__label" id="budget-loan-tools-sort-label">${esc(t('budget.loanSortLabel'))}</div>
+        ${LOAN_SORTS.map((id) => {
+    const on = state.loanSort === id;
+    return `
+        <button type="button" role="menuitemradio" aria-checked="${on}" class="popover-menu__item" data-loan-sort="${id}">
+          <i data-lucide="check" class="icon-md popover-menu__item-check${on ? '' : ' popover-menu__item-check--hidden'}" aria-hidden="true"></i><span>${esc(t(LOAN_SORT_LABELS[id]))}</span>
+        </button>`;
+  }).join('')}
+      </div>
+    </div>`;
 }
 
 function activeLoanLabel() {
@@ -2814,6 +2858,16 @@ function wireLoansPage() {
   });
   // renderBody() baut die Leiste bei jedem Wechsel neu: der Schluessel laesst
   // die neue Kapsel von der Stelle der alten gleiten.
+  _container.querySelector('#budget-loan-tools-menu')?.addEventListener('click', (e) => {
+    const item = e.target.closest('[data-loan-sort]');
+    if (!item) return;
+    state.loanSort = normalizeLoanSort(item.dataset.loanSort);
+    try { localStorage.setItem(LOAN_SORT_KEY, state.loanSort); } catch (_) { /* Private-Mode: nur diese Sitzung */ }
+    renderBody();
+    // Der Eintrag lag im Menue, das mit dem Neuaufbau verschwindet - der Fokus
+    // geht an dessen Knopf zurueck statt auf <body>.
+    _container.querySelector('.budget-loan-tools')?.focus();
+  });
   const loanFilters = _container.querySelector('.budget-loans__filters');
   if (loanFilters) attachSegmentIndicator(loanFilters, { key: 'budget-loan-filter' });
   wireLoanCards(_container);
@@ -3112,7 +3166,13 @@ function renderLoanCard(loan) {
         <span data-bar-key="loan:${loan.id}" style="--bar-scale:${paidPct / 100}"></span>
       </div>
       <div class="budget-loan-card__footer">
-        <span>${t('budget.loanNextDue', { month: nextDue })}</span>
+        <div class="budget-loan-card__dates">
+          <span>${t('budget.loanNextDue', { month: nextDue })}</span>
+          ${/* Der Monat der letzten Rate (#1706), vom Server aus derselben
+              * Restlaufzeit gerechnet, die auch der Bericht zeigt. Fehlt er
+              * (getilgt, oder die Rate deckt den Zins nicht), faellt die Zeile weg. */ ''}
+          ${loan.projected_end_month ? `<span class="budget-loan-card__end">${t('budget.loanProjectedEnd', { month: formatMonthLabel(loan.projected_end_month) })}</span>` : ''}
+        </div>
         ${/* Bei `budget: read` gehen alle drei: Bearbeiten, Loeschen und das
             * Buchen einer Rate schreiben. Faelligkeit, Fortschritt und der
             * Bericht hinter der Karte bleiben - sie sind die Auskunft. */ ''}

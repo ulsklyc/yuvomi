@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Payment reminders can be turned off for each subscription** (#1708, from D#1226). Turn off the reminder
   in the subscription dialog while keeping the subscription active and its cost in the budget.
   Editing or renewing it keeps the reminder off. Existing subscriptions keep reminders enabled.
+- **Loans can be put in order by interest rate or by remaining balance** (#1706, from D#935). The
+  loans tab has a sort menu: highest rate first, smallest balance first, or by start as before.
+  Each loan now also names the month it is projected to end, which follows the payments you
+  actually booked. A loan in another currency is compared at its stored rate, a loan without
+  interest counts as 0 %, and paid-off loans stay at the end. The order is a calculation to read:
+  Yuvomi does not suggest which loan to pay first and does not move payments between loans.
 
 ### Changed
 

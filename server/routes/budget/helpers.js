@@ -12,7 +12,7 @@ import {
   budgetVisibilityWhere, budgetScopeWhere, budgetDetailsHiddenWhere, canEditEntry,
   resolveBudgetMode, maskBudgetEntry, BUDGET_MASKED_CATEGORY,
 } from '../../services/budget-visibility.js';
-import { computeLoanSchedule, remainingPrincipalFromPayments, remainingInstallmentsForBalance } from '../../services/loan-amortization.js';
+import { computeLoanSchedule, remainingPrincipalFromPayments, remainingInstallmentsForBalance, rateForInstallment } from '../../services/loan-amortization.js';
 import { todayKey } from '../../utils/timezone.js';
 import { DEFAULT_LOCALE, supportedLocaleFor } from '../../utils/i18n.js';
 import { newNonMembers } from '../../services/household-members.js';
@@ -863,6 +863,15 @@ export function loanSummaryRow(loan, baseCurrency = budgetCurrency(), today = to
 
   const nextDueMonth = !settled ? addMonths(loan.start_month, paidInstallments) : null;
 
+  // Restlaufzeit, die dem Geld folgt (#964); ohne Zinsteil ist die Planzahl die
+  // Antwort. Ein Zins-Darlehen ohne Prognose (die Rate deckt den Zins nicht)
+  // hat kein Enddatum - die Planzahl wuerde dort eines behaupten.
+  const forecastInstallments = forecastRemainingInstallments(loan, interest, paidInstallments);
+  const installmentsToGo = interest ? forecastInstallments : remainingInstallments;
+  const projectedEndMonth = nextDueMonth && installmentsToGo > 0
+    ? addMonths(nextDueMonth, installmentsToGo - 1)
+    : null;
+
   return {
     ...loan,
     currency,
@@ -878,7 +887,11 @@ export function loanSummaryRow(loan, baseCurrency = budgetCurrency(), today = to
     // Dieselbe Zahl, aber am Kontostand statt am Vertrag gerechnet (#964).
     // Ohne Zinsteil oder bei nicht amortisierender Rate bleibt sie null, und die
     // Oberflaeche zeigt dann allein die Planzahl.
-    remaining_installments_forecast: forecastRemainingInstallments(loan, interest, paidInstallments),
+    remaining_installments_forecast: forecastInstallments,
+    // Der Monat der letzten Rate (#1706), aus DERSELBEN Restlaufzeit gerechnet:
+    // die naechste Faelligkeit plus die noch faelligen Raten. Null, wenn nichts
+    // mehr offen ist oder die Restlaufzeit selbst keine Antwort hat.
+    projected_end_month: projectedEndMonth,
     is_settled: settled,
     next_installment_number: !settled ? paidInstallments + 1 : null,
     next_due_month: nextDueMonth,
@@ -925,6 +938,15 @@ export function loanInterestSummary(loan, payments = []) {
       fixedPeriodMonths: loan.fixed_period_months,
       followupRate: loan.followup_rate,
     }, payments),
+    // Der Satz der NAECHSTEN Rate (#1706): nach ihm sortiert die Darlehensliste.
+    // Waehrend der Zinsbindung der feste, danach der Anschlusssatz - dieselbe
+    // Phasenregel, mit der Restschuld und Restlaufzeit rechnen.
+    current_rate: rateForInstallment({
+      fixedRate: loan.fixed_rate,
+      interestMode: loan.interest_mode,
+      fixedPeriodMonths: loan.fixed_period_months,
+      followupRate: loan.followup_rate,
+    }, payments.length + 1),
     remaining_after_binding: calc.remainingAfterBinding,
     binding_end_month: loan.fixed_period_months ? addMonths(loan.start_month, loan.fixed_period_months) : null,
   };
