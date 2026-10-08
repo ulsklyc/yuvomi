@@ -375,9 +375,16 @@ router.get('/', (req, res) => {
   const taskVisibleSql = householdAudience
     ? householdVisibleWhere('t')
     : visibilityWhere('t', 'task_assignments', 'task_id', '@me');
-  // `mine` ist die Auslegung des Kalendermoduls: zugewiesen an mich. An der
-  // Wand gibt es kein „mich" - die Auswahl gilt dort nicht.
-  const eventsAssignedTo = !householdAudience && req.query.events_scope === 'mine' ? userId : null;
+  // `mine` ist die Auslegung des Kalendermoduls: zugewiesen an mich.
+  // EIN DISPLAY HAT KEIN "MIR" (#1808): es folgt der Vorgabe des Haushalts, sein
+  // Browser schickt deren Option mit, und dem Display-Konto weist nie jemand
+  // einen Termin zu (#1207) - das Tablett stuende leer da. Gelesen wird die
+  // Option deshalb HIER als "alle", statt sie beim Speichern der Vorgabe zu
+  // streichen: dieselbe Vorgabe gilt auch fuer Mitglieder, und dort stimmt sie.
+  // DIESELBE ANTWORT GILT FUER JEDE WAND (#1817): mit `audience=household` gibt
+  // es kein "mich", auch nicht aus der Sitzung eines Mitglieds.
+  const eventsAssignedTo = req.query.events_scope === 'mine' && req.authMethod !== 'display' && !householdAudience
+    ? userId : null;
   /* GEBURTSTAGE IM TERMIN-WIDGET (#927). Wer sie auf der Uebersicht schon als
    * eigene Kachel stehen hat, las sie zweimal - einmal bei den Geburtstagen,
    * einmal zwischen den naechsten Terminen. Abwaehlbar ist deshalb der EINE
