@@ -225,6 +225,19 @@ async function freshCase() {
   toasts.length = 0;
 }
 
+// First among the component cases on purpose: the module is loaded once, and
+// every later case sets the attribute. Only here is it still missing, which is
+// the state of every device that never touched the setting.
+test('an untouched device waits five minutes', async () => {
+  await freshCase();
+  assert.equal(pageRoot.getAttribute('data-screensaver-idle'), null, 'nothing has set the attribute yet');
+  mock.timers.tick(299_999);
+  assert.equal(requests.length, 0, 'not before five minutes');
+  mock.timers.tick(1);
+  assert.equal(requests.length, 1, 'and at five minutes, as before the setting existed');
+  gesture();
+});
+
 test('a changed delay re-arms the timer from the moment of the change', async () => {
   await freshCase();
   pageRoot.setAttribute('data-screensaver-idle', '900');
@@ -297,6 +310,32 @@ test('the select stores the delay, confirms it and re-arms the component', async
   // bindEvents wires exactly this handler to the rendered select.
   assert.match(read('../public/settings/pages/personal-appearance.js'),
     /bindScreensaverIdleSelect\(container\.querySelector\('#screensaver-idle-select'\)\)/);
+});
+
+test('the select opens on the delay stored on this device', async () => {
+  await page();
+  const { screensaverIdleOptions } = await import('../public/settings/pages/personal-appearance.js');
+  pageStorage.setItem(idle.SCREENSAVER_IDLE_KEY, '60');
+  const options = screensaverIdleOptions();
+  assert.match(options, /<option value="60" selected>/);
+  assert.equal(options.match(/ selected/g).length, 1, 'exactly one option is selected');
+  pageStorage.removeItem(idle.SCREENSAVER_IDLE_KEY);
+  assert.match(screensaverIdleOptions(), /<option value="300" selected>/, 'nothing stored: five minutes');
+});
+
+test('a running kitchen timer postpones by the chosen delay, not by five minutes', async () => {
+  await freshCase();
+  pageRoot.setAttribute('data-screensaver-idle', '60');
+  pageRoot.setAttribute('data-wall-timer', '');
+  mock.timers.tick(60_000);
+  assert.equal(requests.length, 0, 'the timer keeps the screensaver away');
+
+  pageRoot.attrs.delete('data-wall-timer');
+  mock.timers.tick(59_999);
+  assert.equal(requests.length, 0);
+  mock.timers.tick(1);
+  assert.equal(requests.length, 1, 'the next attempt comes one chosen delay later');
+  gesture();
 });
 
 test('a delay chosen in another tab reaches this page through the storage event', async () => {
