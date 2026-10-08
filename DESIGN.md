@@ -2110,6 +2110,17 @@ nur das gerenderte Dokument sieht, ob eine Liste ueberhaupt verdrahtet ist.
   zurueckfaellt). **Das Suchfeld ist davon ausgenommen:** es ist ein Bedienelement und
   traegt die gefuellte Kapsel des Komponenten-Kanons (`--color-fill-field`, Kante
   transparent, Platzhalter in Sekundaertext), nicht die Formularkante.
+- **Gesperrt (`:disabled`, 2026-10-08) - EIN Aussehen an der Feldhaut**
+  (`.input:disabled, .form-input:disabled`, layout.css), keine Regel je Dialog: die Fuellung
+  faellt weg (`transparent`), die Kante wird die Kartenkante (`--color-border`; 1.4.11 gilt
+  dem bedienbaren Element), der Wert steht in `--color-text-secondary` und bleibt lesbar
+  (gemessen 6,19:1 hell, 6,66:1 dunkel im Dialog) - nie `--color-text-disabled`, nie ueber
+  `opacity` (Deckung multipliziert den Kontrast herunter, wie bei `--color-surface-receded`).
+  Zeiger `not-allowed`. Unter `prefers-contrast: more` geht die Kante auf
+  `--color-text-secondary`. Die randlose Auswahl der Formularzeile hat weder Kante noch
+  Flaeche: sie nimmt Tertiaer und legt ihr Zeichen ab. Schalter und Knoepfe tragen keinen
+  Wert und dimmen weiter ueber die Deckung. `readonly` ist kein gesperrtes Feld und sieht
+  aus wie ein bedienbares (Ausnahme: `.input--fixed`, der von der Einladung vorgegebene Wert).
 - **Feldkanon:** ein `select` traegt `appearance: none` und sein eigenes Zeichen
   (`--field-chevron`, Lucide chevron-down, 16px, mit dem Feldpolster eingerueckt, in RTL
   gespiegelt); das Auswahlblatt bleibt das native. Dazu 32px Innenpolster am Ende

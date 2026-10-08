@@ -167,6 +167,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A locked field looks locked.** A field you cannot change looked exactly like one you can -
+  same text, same fill, same outline; only the mouse pointer gave it away, and on a phone nothing
+  did. Text, number and date fields, dropdowns and text areas now all show it the same way,
+  everywhere in the app: the fill goes, the outline turns quiet and the value steps back to grey
+  while staying easy to read. Settings and the reminder section used to fade such fields, which
+  made the value hard to read in light mode, and a locked date was close to invisible in dark
+  mode; both now follow the one look. A locked choice in a settings-style row drops its small
+  arrow, so it reads as a value rather than something to open.
 - **A shopping list on the overview opens that list.** The shopping tile shows up to three lists,
   the most recently changed first, but tapping any of them opened the shopping page on its first
   list - tap "Drugstore" and you got "Weekly shop". Each row now opens its own list, by tap, click

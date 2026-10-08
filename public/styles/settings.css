@@ -1580,13 +1580,12 @@
 
 /* Gesperrte Eingabefelder sahen aus wie bediente: es gab keine
    :disabled-Regel, und `admin-backup.js` half sich mit einem hartkodierten
-   `style.opacity = '0.6'` für die env-gesteuerten Felder. Die Regel gilt jetzt
-   für jedes gesperrte Feld der Fläche - auch für die, die ein Blatt während
-   eines laufenden Requests sperrt. */
-.settings-page .form-input:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
+   `style.opacity = '0.6'` für die env-gesteuerten Felder. Die Regel dafür
+   stand bis 2026-10-08 hier (`.settings-page .form-input:disabled`, opacity
+   0.6) und steht jetzt für die ganze App an der Feldhaut in layout.css
+   (`.input:disabled, .form-input:disabled`) - sie gilt weiter für jedes
+   gesperrte Feld der Fläche, auch für die, die ein Blatt während eines
+   laufenden Requests sperrt. */
 
 /* Fließtext lief in Settings über die volle Content-Spalte: bei 1440px
    gemessene 794-896px (Critique 2026-07-27). Ziel sind 65-75 Zeichen, damit

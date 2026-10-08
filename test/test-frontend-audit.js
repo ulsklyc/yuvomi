@@ -7919,7 +7919,6 @@ test('text/surface token pairs meet WCAG AA 4.5:1 in both themes', () => {
 // Selektor-Teilstring -> Kategorie. Geprueft wird gegen den Standard, nicht
 // gegen eine Meinung; die Stale-Pruefung darunter haelt sie ehrlich.
 const COPAIR_CATEGORY = new Map([
-  ['[disabled] .ydp__input', { min: 0, why: 'WCAG 1.4.3 nimmt deaktivierte Bedienelemente aus; Sonde 2 tut dasselbe' }],
   ['.ydp__trigger:hover', { min: 3, why: 'Ziel traegt ein 18px-Icon, keinen Text - WCAG 1.4.11 (3:1), gemessen 3,30:1 dark' }],
 ]);
 
@@ -8087,6 +8086,13 @@ test('Feldkanten tragen --color-border-control und halten 3:1 auf jedem Feldgrun
     ['.rrule-fields', 'Gruppe der Wiederholungsfelder; Gruppenkante, die Felder darin tragen ihre eigene'],
     ['.schedule-day-row-fields', 'Gruppe der Felder eines Wochentags; linke Gruppenlinie'],
     ['.note-category-selection', 'Chip der gewaehlten Notiz-Kategorie; Knopf, kein Feld'],
+    // Ein Feld, aber kein BEDIENBARES: WCAG 1.4.11 verlangt die 3:1 fuer die
+    // Grenze eines aktiven Bedienelements und nimmt deaktivierte aus. Die
+    // Kartenkante ist hier die Aussage (2026-10-08, "ein gesperrtes Feld sieht
+    // gesperrt aus"). Genau diese zwei Selektoren, kein Muster: ein gesperrter
+    // Modul-Skin mit Kartenkante faellt weiter auf.
+    ['.input:disabled', 'gesperrtes Feld; 1.4.11 nimmt deaktivierte Bedienelemente aus, die ruhige Kante zeigt die Sperre'],
+    ['.form-input:disabled', 'gesperrtes Feld; 1.4.11 nimmt deaktivierte Bedienelemente aus, die ruhige Kante zeigt die Sperre'],
   ]);
   const styles = new URL('../public/styles/', import.meta.url);
   const offenders = [];
@@ -11566,7 +11572,12 @@ test('settings.css haelt Zeilenlaenge, Token-Disziplin und keine toten Regeln', 
   const backup = read('../public/settings/pages/admin-backup.js');
   assert.ok(!/\.style\.(opacity|color)\s*=/.test(backup), 'Tone/Opazitaet ueber Klassen, nicht inline');
   assert.match(read('../public/styles/layout.css'), /\.form-hint--success \{ color: var\(--color-success\); \}/);
-  assert.match(css, /\.settings-page \.form-input:disabled \{/);
+  // Die Regel fuer gesperrte Felder stand hier (`.settings-page
+  // .form-input:disabled`) und steht seit 2026-10-08 fuer die ganze App an der
+  // Feldhaut - Guard: "ein gesperrtes Feld sieht gesperrt aus". Eine zweite
+  // auf diesem Blatt waere ein zweites Aussehen fuer denselben Zustand.
+  assert.ok(![...eachRule(css)].some((rule) => /\.form-input:disabled/.test(rule.selector)),
+    'settings.css malt gesperrte Felder nicht selbst - das tut die Feldhaut in layout.css');
 });
 
 /*
@@ -20604,6 +20615,123 @@ test('R17 E8: in den Einstellungen steht der Primaerknopf als Letzter in einer A
   assert.ok(rows >= 15, `der Scanner findet die Aktionszeilen (${rows})`);
   assert.deepEqual(notLast, [], 'der Primaerknopf steht im Markup zuletzt - Nebenaktionen davor, wie im Dialogfuss');
   assert.deepEqual(naked, [], 'ein Speichern-Knopf steht in `.settings-form-actions`, nicht nackt in der Formularspalte');
+});
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Ein gesperrtes Feld sieht gesperrt aus (2026-10-08)
+ *
+ * Im Browser gemessen: `disabled` an einem Zahlenfeld im Dialog aenderte weder
+ * Schrift noch Flaeche noch Kante, nur den Zeiger. Die Feldhaut kannte den
+ * Zustand nicht; zwei Stellen dimmten sich selbst ueber `opacity: 0.6`
+ * (Einstellungen, Erinnerungs-Abschnitt), der Datepicker nahm
+ * --color-text-disabled (2,24:1 dunkel), der Rest nichts.
+ *
+ * WAS DIESER GUARD HAELT - und was nicht. Er liest Stylesheets: dass die Regel
+ * an der Feldhaut steht, sich in allen drei Rollen von ihr unterscheidet, nur
+ * Tokens nennt, dass ihre Schrift auf jedem Feldgrund 4,5:1 haelt und dass
+ * keine zweite Regel denselben Zustand anders malt. Dass ein gesperrtes Feld
+ * im DOKUMENT so aussieht (Kaskade, ein hoeher spezifischer Modul-Skin, die
+ * Vorgaben des Browsers), belegt nur die Messung im Browser - die steht im PR.
+ * ──────────────────────────────────────────────────────────────────────────── */
+test('ein gesperrtes Feld sieht gesperrt aus - eine Regel an der Feldhaut, nur Tokens, der Wert bleibt lesbar', () => {
+  const styles = new URL('../public/styles/', import.meta.url);
+  const all = readdirSync(styles).filter((entry) => entry.endsWith('.css') && entry !== 'tokens.css')
+    .flatMap((file) => [...eachRule(readFileSync(new URL(file, styles), 'utf8'))].map((rule) => ({ ...rule, file })));
+  const parts = (rule) => rule.selector.split(',').map((s) => s.trim().replace(/\s+/g, ' '));
+  const decls = (rule) => new Map(rule.body.split(';').map((d) => d.trim()).filter(Boolean)
+    .map((d) => [d.slice(0, d.indexOf(':')).trim(), d.slice(d.indexOf(':') + 1).trim()]));
+  const tokenOf = (value) => String(value ?? '').match(/^var\(\s*(--[\w-]+)\s*\)$/)?.[1] ?? null;
+  const { light, dark } = themeTokenMaps();
+  const THEMES = [['light', light], ['dark', dark]];
+  // Die Gruende, auf denen ein Feld steht - dieselbe Liste wie beim Guard der
+  // Feldkante. Ein Feld ohne eigene Flaeche zeigt seinen Wert auf ihnen.
+  const GROUNDS = ['--color-surface', '--color-surface-work', '--color-surface-raised', '--color-surface-2', '--color-bg'];
+  const worstOn = (token, map, grounds) => Math.min(...grounds
+    .map((g) => contrastRatio(resolveColor(token, map), resolveColor(g, map))));
+
+  // 1. Die Regel steht an der Feldhaut, ohne Vorfahr: sie gilt ueberall.
+  const SKIN_PARTS = ['.input:disabled', '.form-input:disabled'];
+  const isSkinDisabled = (rule) => rule.file === 'layout.css' && SKIN_PARTS.every((p) => parts(rule).includes(p));
+  const rule = all.find((r) => isSkinDisabled(r) && r.at.length === 0);
+  assert.ok(rule, 'layout.css traegt keine Regel `.input:disabled, .form-input:disabled` auf der Basisebene - '
+    + 'ein gesperrtes Feld sieht aus wie ein bedienbares.');
+  const base = all.find((r) => r.file === 'layout.css' && r.at.length === 0
+    && parts(r).includes('.form-input') && parts(r).includes('.input') && /min-height/.test(r.body));
+  assert.ok(base, 'die Feldregel `.input, .form-input` (layout.css) wurde nicht gefunden');
+  const own = decls(rule);
+  const skin = decls(base);
+
+  // 2. Eigene Darstellung in allen drei Rollen - nicht nur ein anderer Zeiger.
+  assert.ok(own.get('color') && own.get('color') !== skin.get('color'),
+    'die Schrift des gesperrten Feldes ist die des bedienbaren');
+  assert.ok(own.get('background-color') && own.get('background-color') !== skin.get('background-color'),
+    'die Flaeche des gesperrten Feldes ist die des bedienbaren');
+  assert.ok(own.get('border-color') && !String(skin.get('border')).includes(own.get('border-color')),
+    'die Kante des gesperrten Feldes ist die des bedienbaren');
+  assert.match(own.get('cursor') ?? '', /^(?:not-allowed|default)$/, 'ein gesperrtes Feld zeigt keinen Schreibzeiger');
+
+  // 3. Nur Tokens. Jeder Wert ist ein Token aus tokens.css oder eines der
+  //    Schluesselwoerter, die keinen Designwert tragen. `opacity` darf nur die
+  //    Daempfung des Browsers AUFHEBEN: Deckung multipliziert den Kontrast
+  //    herunter (tokens.css, "Zurueckgenommen ist ein Muster, keine Deckung").
+  const KEYWORD = new Set(['transparent', 'currentColor', 'not-allowed', 'default', 'none', '1']);
+  const literal = [...own].filter(([, value]) => {
+    const token = tokenOf(value);
+    return token ? !light.has(token) : !KEYWORD.has(value);
+  }).map(([prop, value]) => `${prop}: ${value}`);
+  assert.deepEqual(literal, [], 'die Regel nennt einen festen Wert oder ein Token, das tokens.css nicht kennt');
+  if (own.has('opacity')) assert.equal(own.get('opacity'), '1', 'gesperrt dimmt nicht ueber die Deckung');
+
+  // 4. Der Wert bleibt lesbar - und ist kein Platzhalter.
+  const ink = tokenOf(own.get('color'));
+  assert.ok(ink, 'die Schrift des gesperrten Feldes kommt aus einem Token');
+  assert.notEqual(ink, '--color-text-disabled',
+    '--color-text-disabled traegt auf keiner Flaeche 3:1 - ein gesperrter WERT waere nicht mehr zu lesen');
+  const fill = tokenOf(own.get('background-color'));
+  for (const [theme, map] of THEMES) {
+    const worst = worstOn(ink, map, fill ? [fill] : GROUNDS);
+    assert.ok(worst >= 4.5, `${theme}: der Wert eines gesperrten Feldes faellt auf ${worst.toFixed(2)}:1 (soll 4,5)`);
+    assert.notEqual(resolveColor(ink, map), resolveColor('--color-text-placeholder', map),
+      `${theme}: der gesperrte Wert traegt die Farbe des Platzhalters - ein gefuelltes Feld liest sich als leeres`);
+  }
+
+  // 5. Mehr Kontrast: die Kante bleibt eine Kante.
+  const contrast = all.find((r) => isSkinDisabled(r) && r.at.some((a) => /prefers-contrast:\s*more/.test(a)));
+  assert.ok(contrast, 'unter `prefers-contrast: more` hat das gesperrte Feld keine eigene Kante - '
+    + 'die ruhige Kante verschwindet dort auf blankem Grund');
+  const strongEdge = tokenOf(decls(contrast).get('border-color'));
+  assert.ok(strongEdge && light.has(strongEdge), 'die Kontrast-Kante kommt aus einem Token');
+  for (const [theme, map] of THEMES) {
+    const worst = worstOn(strongEdge, map, GROUNDS);
+    assert.ok(worst >= 3, `${theme}: die Kante des gesperrten Feldes haelt im Kontrastmodus nur ${worst.toFixed(2)}:1`);
+  }
+
+  // 6. EIN Aussehen: keine Regel malt ein gesperrtes Feld daneben anders -
+  //    weder ueber die Deckung noch ueber die Farbe fuer Deaktiviertes.
+  const FIELD_END = /(?:\.(?:input|form-input)|__input)(?![\w-])[^\s>+~]*$/;
+  const disabledField = all.filter((r) => parts(r).some((p) => /:disabled|\[disabled\]/.test(p) && FIELD_END.test(p)));
+  assert.ok(disabledField.includes(rule), 'der Scan nach gesperrten Feldregeln findet die allgemeine Regel nicht - er misst nichts');
+  const second = disabledField.filter((r) => {
+    const d = decls(r);
+    return (d.has('opacity') && d.get('opacity') !== '1') || /--color-text-disabled/.test(r.body);
+  }).map((r) => `${r.file}: ${r.selector.trim().replace(/\s+/g, ' ')}`);
+  assert.deepEqual(second, [], 'eine lokale Regel dimmt ein gesperrtes Feld auf eigene Art. Die allgemeine Regel '
+    + '(layout.css, `.form-input:disabled`) traegt den Zustand; lokal steht nur, was eine Stelle ZUSAETZLICH braucht.');
+
+  // 7. Die randlose Auswahl der Formularzeile hat weder Kante noch Flaeche und
+  //    steht in Ruhe schon sekundaer: gesperrt legt sie ihr Zeichen ab.
+  const ROW = '.form-row__control > select.form-input';
+  const rowRest = all.find((r) => r.file === 'layout.css' && r.at.length === 0 && parts(r).includes(ROW) && decls(r).has('color'));
+  const rowOff = all.find((r) => r.file === 'layout.css' && r.at.length === 0 && parts(r).includes(`${ROW}:disabled`));
+  assert.ok(rowRest && rowOff, 'die randlose Auswahl der Formularzeile hat eine Ruhe- und eine gesperrte Regel');
+  assert.equal(decls(rowOff).get('background-image'), 'none',
+    'die gesperrte Auswahl der Zeile behaelt ihr Zeichen - ohne Kante und Flaeche ist es ihr einziges Merkmal "bedienbar"');
+  const rowInk = tokenOf(decls(rowOff).get('color'));
+  assert.ok(rowInk && rowInk !== tokenOf(decls(rowRest).get('color')), 'die gesperrte Auswahl der Zeile traegt ihre Ruhefarbe');
+  for (const [theme, map] of THEMES) {
+    const worst = worstOn(rowInk, map, GROUNDS);
+    assert.ok(worst >= 4.5, `${theme}: der Wert der gesperrten Zeilen-Auswahl faellt auf ${worst.toFixed(2)}:1`);
+  }
 });
 
 /* ────────────────────────────────────────────────────────────────────────────
