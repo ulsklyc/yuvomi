@@ -191,3 +191,30 @@ test('kein Abhak-Zeichen animiert aus dem Stylesheet heraus', () => {
     && /(?:^|;)\s*animation(?:-name)?\s*:\s*(?!none)/.test(r.body));
   assert.deepEqual(animiert.map((r) => r.selector), []);
 });
+
+// --------------------------------------------------------
+// #1808: der Hinweis in den Einstellungen zaehlt die Bereiche auf
+// --------------------------------------------------------
+test('der Bereichssatz entsteht aus der Liste des Servers, in der Sprache der App verbunden', async () => {
+  const { __test: seite } = await import('../public/settings/pages/admin-displays.js');
+  const vorher = globalThis.__locale;
+  try {
+    // Der i18n-Stub gibt Schluessel zurueck: sichtbar wird also, WELCHE Namen
+    // geholt werden und womit der Satz gefuellt wird - nicht der Wortlaut.
+    globalThis.__locale = 'de';
+    assert.equal(seite.displayAreasText(['calendar', 'tasks', 'weather']),
+      'settings.displaysAreasHint' + JSON.stringify({
+        areas: 'settings.apiTokenScopeModules.calendar, settings.apiTokenScopeModules.tasks und settings.apiTokenScopeModules.weather',
+      }), 'die Namen sind die der Scope-Module, verbunden wie eine deutsche Aufzaehlung');
+    globalThis.__locale = 'en';
+    assert.match(seite.displayAreasText(['calendar', 'tasks', 'weather']), /tasks, and settings\.apiTokenScopeModules\.weather/,
+      'die Verbindung folgt der App-Sprache, nicht einer festen');
+    // Eine Liste mehr oder weniger aendert den Satz - es gibt keine zweite im Browser.
+    assert.match(seite.displayAreasText(['rewards']), /"areas":"settings\.apiTokenScopeModules\.rewards"/);
+    // Ohne Liste (alte Antwort aus dem Cache): kein halber Satz.
+    assert.equal(seite.displayAreasText(undefined), '');
+    assert.equal(seite.displayAreasText([]), '');
+  } finally {
+    globalThis.__locale = vorher;
+  }
+});

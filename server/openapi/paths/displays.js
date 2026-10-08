@@ -6,7 +6,7 @@ export function displaysPaths() {
       get: op({
         summary: 'List wall displays and their paired devices',
         tag: 'Displays',
-        description: 'Admin only. A display is a `users` row of its own kind (#1208, DECISIONS entry 4): not a household member, without a password, and unable to sign in with a username and password or through SSO. This list is the exact counterpart of the member predicate - it shows only the accounts every list of people leaves out. Each entry carries its devices with "last seen" and, for a revoked one, the moment it was revoked; no secret is ever returned.',
+        description: 'Admin only. A display is a `users` row of its own kind (#1208, DECISIONS entry 4): not a household member, without a password, and unable to sign in with a username and password or through SSO. This list is the exact counterpart of the member predicate - it shows only the accounts every list of people leaves out. Each entry carries its devices with "last seen" and, for a revoked one, the moment it was revoked; no secret is ever returned. Beside `data` the answer carries `area_modules`: the modules a paired display reads besides the overview itself, derived from its fixed scope list.',
       }),
       post: op({
         summary: 'Create a wall display',

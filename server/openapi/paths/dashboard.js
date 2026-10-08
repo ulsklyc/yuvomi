@@ -28,7 +28,7 @@ export function dashboardPaths() {
             name: 'events_scope',
             in: 'query',
             required: false,
-            description: '`mine` limits appointments to those assigned to the calling user - among the assignees, so an unassigned event is not "mine" (same reading as the calendar module). Anything else means all appointments.',
+            description: '`mine` limits appointments to those assigned to the calling user - among the assignees, so an unassigned event is not "mine" (same reading as the calendar module). A paired display has no assignments of its own, so for it `mine` reads as all appointments. Anything else means all appointments.',
             schema: { type: 'string', enum: ['all', 'mine'] },
           },
           {
