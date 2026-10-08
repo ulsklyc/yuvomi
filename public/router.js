@@ -18,7 +18,7 @@ import { wireScrollFade, wireCollapsingHeader, watchNavCapsuleHeight } from '/ut
 import { TOAST_SURFACES } from '/utils/toast-surface.js';
 import { showToast } from '/utils/toast-show.js';
 import { unknownPathDetour, publicPathDetour, detourPaths } from '/utils/unknown-route.js';
-import { createNavigate } from '/utils/router-navigate.js';
+import { createNavigate, prefetchPathOf, focusAlreadyInPage } from '/utils/router-navigate.js';
 import { pageMountTarget } from '/utils/page-mount.js';
 import { friendlyError } from '/utils/friendly-error.js';
 import { BULK_PILL_LAYER, clearBulkPill } from '/utils/bulk-pill.js';
@@ -600,6 +600,8 @@ function focusMainContentAfterNavigation(path) {
   const main = document.getElementById('main-content');
   if (!main || typeof main.focus !== 'function') return;
   requestAnimationFrame(() => {
+    // Wer schon in der neuen Seite steht, bleibt dort (#1821).
+    if (focusAlreadyInPage(main, document.activeElement)) return;
     main.focus({ preventScroll: true });
   });
 }
@@ -2110,7 +2112,10 @@ function renderAppShell(container) {
   // bubblende Events (mouseover/pointerdown) — pointerenter würde nicht bubbeln.
   const prefetchFromEvent = (e) => {
     const el = e.target.closest?.('[data-route]');
-    if (el) prefetchRoute(el.dataset.navHref?.split('?')[0] ?? el.dataset.route);
+    // Die Query faellt fuer BEIDE Quellen weg (#1821): eine Inhaltszeile
+    // traegt ihr Ziel samt Query in `data-route` (`/shopping?list=7`,
+    // `/calendar?open=..`), und `prefetchRoute` findet Routen nur am Pfad.
+    if (el) prefetchRoute(prefetchPathOf(el.dataset));
   };
   container.addEventListener('mouseover', prefetchFromEvent);
   container.addEventListener('pointerdown', prefetchFromEvent);

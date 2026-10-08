@@ -1384,6 +1384,11 @@ function mountBirthdaysDetail(signal) {
   _md = mountMasterDetail({
     root,
     signal,
+    // `?open=<id>` auch unter der Schwelle einloesen (#1821): die Geburtstags-
+    // zeile der Uebersicht nennt EINEN Anlass und fuehrt zu ihm. In der Spalte
+    // waehlt der Baustein ihn ohnehin aus; ohne diesen Schalter landete
+    // dieselbe Zeile am Telefon auf der blossen Liste.
+    deepLinkNarrow: true,
     renderDetail: (id, body) => renderBirthdayPane(id, body),
     // Unter der Schwelle das Leseblatt (E7), bei Nur-lesen die Leseansicht.
     openNarrow: (id) => {

@@ -1876,6 +1876,63 @@ function modalOptionen(fn) {
   return letzte;
 }
 
+// #1821: die Suche und die Notizzeile der Uebersicht nennen `/notes?open=<id>`,
+// die Seite las den Parameter nie - der Treffer landete auf der Liste.
+test('#1821 Notizen: `?open=<id>` oeffnet die Notiz und verlaesst danach die Adresse', async () => {
+  const before = notes.state.notes;
+  const hadModal = '__openModal' in globalThis;
+  const prevModal = globalThis.__openModal;
+  let opened = [];
+  globalThis.__openModal = (opts) => { opened.push(opts); };
+  notes.state.notes = [
+    { id: 5, title: 'Notrufnummern', content: '112', color: '#EFE3BE', pinned: 1, categories: [] },
+    { id: 12, title: 'WLAN', content: 'geheim', color: '#EFE3BE', pinned: 0, categories: [] },
+  ];
+  const visit = (search) => {
+    opened = [];
+    const written = [];
+    const hist = { state: { path: `/notes${search}`, mark: 1 }, replaceState: (state, _, url) => written.push([state, url]) };
+    const result = withAccess({ notes: 'write' }, () => notes.openNoteFromQuery({ pathname: '/notes', search }, hist));
+    return { result, written, title: opened[0]?.title ?? null, count: opened.length };
+  };
+  try {
+    // Der Weg der Suche und der Notizzeile der Uebersicht.
+    const hit = visit('?open=12');
+    assert.equal(hit.result, true);
+    assert.equal(hit.count, 1, 'genau ein Dialog');
+    assert.equal(hit.title, 'WLAN', 'und zwar der der genannten Notiz, nicht der ersten');
+    assert.deepEqual(hit.written, [[{ path: '/notes', mark: 1 }, '/notes']],
+      'die Adresse verliert den Parameter, der uebrige History-Zustand bleibt');
+
+    // Andere Parameter bleiben stehen.
+    assert.equal(visit('?open=5&x=1').written[0][1], '/notes?x=1');
+
+    // Ohne Parameter: nichts oeffnen, nichts schreiben.
+    const none = visit('');
+    assert.deepEqual([none.result, none.count, none.written.length], [false, 0, 0]);
+
+    // Geloescht, fremd oder Unsinn: die Liste bleibt, ohne Fehler - und der
+    // tote Parameter geht trotzdem aus der Adresse.
+    for (const search of ['?open=999', '?open=abc', '?open=', '?open=5.5', '?open=-5']) {
+      const miss = visit(search);
+      assert.deepEqual([miss.result, miss.count], [false, 0], search);
+      assert.equal(miss.written[0][1], '/notes', search);
+    }
+  } finally {
+    notes.state.notes = before;
+    if (hadModal) globalThis.__openModal = prevModal; else delete globalThis.__openModal;
+  }
+
+  // Und die Seite ruft es auch: NACH dem Laden der Notizen, sonst suchte der
+  // Link in einer leeren Liste.
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/pages/notes.js', import.meta.url), 'utf8');
+  const render = src.slice(src.indexOf('export async function render('));
+  const loaded = render.indexOf('state.notes = notesRes.data');
+  const called = render.indexOf('openNoteFromQuery();');
+  assert.ok(loaded > 0 && called > loaded, 'render() loest den Link nach dem Laden ein');
+});
+
 test('Notiz-Dialog mit `notes: read`: Leseansicht, kein Editor, keine Fusszeile', () => {
   const offen = mitEchtemMarkdown(() => withAccess({ notes: 'read' }, () => (
     modalOptionen(() => notes.openNoteModal({ mode: 'edit', note: notiz({ pinned: 1 }) }))
