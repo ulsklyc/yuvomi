@@ -451,6 +451,26 @@ export function dashboardQuery(config) {
   return query ? `/dashboard?${query}` : '/dashboard';
 }
 
+/**
+ * Der Abruf der Uebersicht fuer die Flaeche, die ihn zeichnet (#1817).
+ *
+ * DIE WAND FRAGT DIE HAUSHALTSFASSUNG AB (`audience=household`): sie ist eine
+ * geteilte Flaeche, kein persoenlicher Bildschirm, und zeigt nur, was der ganze
+ * Haushalt sehen darf - gleich, aus wessen Sitzung sie geoeffnet wurde. Der
+ * Server liefert dafuer eine engere Antwort; hier wird nichts weggefiltert, was
+ * schon im Browser liegt. Die normale Uebersicht fragt ohne den Parameter und
+ * bleibt persoenlich.
+ *
+ * @param {string} query '/dashboard' oder '/dashboard?…' (dashboardQuery, layoutHintQuery)
+ * @param {{ wall?: boolean }} [surface]
+ * @returns {string}
+ */
+export function dashboardRequest(query, { wall = false } = {}) {
+  const text = String(query ?? '/dashboard');
+  if (!wall) return text;
+  return `${text}${text.includes('?') ? '&' : '?'}audience=household`;
+}
+
 /* WELCHE PARAMETER DIE ZAHLEN DER ANTWORT UNBERUEHRT LASSEN (#1680).
  *
  * Die Navigations-Badges und Modulkacheln nehmen die `/dashboard`-Antwort der

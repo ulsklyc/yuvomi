@@ -3686,6 +3686,13 @@ Gangart.** Gelesen wird sie aus zwei Metern und ohne Beruehrung; alles Weitere f
 diesem einen Satz. Der Screensaver bleibt der ruhende Zustand und legt sich nach seiner
 Leerlaufzeit unveraendert darueber.
 
+**Eine geteilte Flaeche, kein persoenlicher Bildschirm** (#1817). Die Wand haengt in der Kueche,
+gleich aus wessen Sitzung sie geoeffnet wurde - sie zeigt deshalb nur, was der ganze Haushalt
+sehen darf: Aufgaben und Termine mit Sichtbarkeit "alle", Termine aus Abos nur aus geteilten.
+Was einer Person allein gehoert, steht an keiner Stelle der Wand, auch nicht fuer sie selbst,
+und wer nur darueber "dran" waere, erscheint nicht unter den Gesichtern. Durchgesetzt am Leser
+(`audience=household`), nicht im Browser. Uebersicht und Heute-Blatt bleiben persoenlich.
+
 **Die Shell tritt ab.** Sidebar und Tab-Leiste sind Arm-Laengen-Moebel; auf zwei Metern sind
 sie siebzehn unleserliche Ziele. Auch die Installations-Einladung verschwindet - auf einer
 Anzeige, die niemand bedient, waere sie die lauteste Karte im Bild.
