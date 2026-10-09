@@ -2,7 +2,8 @@ import { api } from '/api.js';
 import { formatDate, formatTime, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { confirmModal, refocusAfterRender } from '/components/modal.js';
-import { rowActionHtml } from '/utils/row-action.js';
+import { rowMenuHtml } from '/utils/row-action.js';
+import { installPopoverMenus } from '/utils/popover-menu.js';
 import { emptyStateEl } from '/utils/empty-state.js';
 import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
 import {
@@ -220,18 +221,31 @@ function rowHtml(row) {
   // (isDeletableModule), und nur solange der Server es annimmt
   // (deleteOffered): eingebaute sind Teil der App, von Hand kopierte gehoeren
   // dem Server.
+  // EIN MEHR-KNOPF (Komponenten-Kanon, row-danger-visible): Loeschen ist ein
+  // Eintrag mit Wort hinter dem Mehr-Knopf der Zeile, kein sichtbarer
+  // Papierkorb - wie Geburtstage. Der Eintrag traegt dieselben Attribute wie
+  // vorher der Knopf; der delegierte Handler in bindEvents bleibt.
   const deletable = row.type === 'third-party' && row.deletable === true;
-  const deleteAction = deletable ? rowActionHtml({
-    icon: 'trash-2',
-    label: t('common.deleteNamed', { name: row.label }),
-    tone: 'danger',
-    className: 'settings-module-row__delete',
-    attrs: { 'data-module-delete': row.id, 'data-module-name': row.label },
-  }) : '';
-  const removableClass = deletable ? ' settings-module-row--removable' : '';
+  const rowMenu = deletable ? `
+      <div class="row-actions settings-module-row__actions">
+        ${rowMenuHtml({
+    id: moduleMenuId(row.id),
+    label: t('common.moreActionsNamed', { name: row.label }),
+    items: [
+      {
+        action: 'delete-module',
+        icon: 'trash-2',
+        label: t('common.delete'),
+        danger: true,
+        attrs: { 'data-module-delete': row.id, 'data-module-name': row.label },
+      },
+    ],
+  })}
+      </div>` : '';
+  const menuClass = deletable ? ' settings-module-row--menu' : '';
 
   return `
-    <div class="settings-module-row settings-module-row--fixed${removableClass} ${stateClass}${row.hasError ? ' settings-module-row--error' : ''}" data-module-row-id="${esc(row.id)}">
+    <div class="settings-module-row settings-module-row--fixed${menuClass} ${stateClass}${row.hasError ? ' settings-module-row--error' : ''}" data-module-row-id="${esc(row.id)}">
       <div class="settings-module-row__icon vivid-mark"${accentStyle}>
         ${moduleIconHTML(row.icon)}
       </div>
@@ -253,7 +267,7 @@ function rowHtml(row) {
     labelVisible: false,
     attrs: toggleAttr,
   })}
-      ${deleteAction}
+      ${rowMenu}
     </div>
   `;
 }
@@ -423,6 +437,9 @@ async function saveActiveModules(list) {
 function bindEvents(container, user) {
   const list = container.querySelector('#module-toggles');
   if (!list) return;
+  // Mehr-Knopf der Zeile: Position, Esc, Pfeiltasten, Schliessen beim Klick.
+  // Die Wurzel ueberlebt den Neuaufbau; installPopoverMenus ist idempotent.
+  installPopoverMenus(container);
 
   list.addEventListener('change', async (event) => {
     const input = event.target.closest(
@@ -461,13 +478,13 @@ function bindEvents(container, user) {
  * Wohin der Fokus nach dem Loeschen geht. Die Zeile samt Knopf ist weg, und der
  * allgemeine Rueckfall (`refocusAfterRender()`) kennt nur die Seitenwurzel - von
  * dort muesste man sich durch das ganze Blatt zurueckarbeiten. Also explizit:
- * der Loeschen-Knopf der naechsten Drittmodul-Zeile (sonst der vorigen), und
- * war es das letzte, die Ueberschrift der Gruppe "Eigene Module".
+ * der Mehr-Knopf der naechsten loeschbaren Drittmodul-Zeile (sonst der
+ * vorigen) - der Eintrag selbst steht im geschlossenen Menue und nimmt keinen
+ * Fokus an -, und war es das letzte, die Ueberschrift der Gruppe "Eigene Module".
  */
 export function focusAfterModuleDelete(container, neighbourIds) {
-  const rows = [...container.querySelectorAll('[data-module-delete]')];
   for (const id of neighbourIds) {
-    const target = rows.find((el) => el.dataset.moduleDelete === id);
+    const target = container.querySelector(`[popovertarget="${moduleMenuId(id)}"]`);
     if (target) {
       target.focus();
       return target;
@@ -479,6 +496,11 @@ export function focusAfterModuleDelete(container, neighbourIds) {
     heading.focus();
   }
   return heading;
+}
+
+/** Panel-ID des Zeilenmenues; die Kennung ist geprueft (isDeletableModuleId). */
+function moduleMenuId(id) {
+  return `module-menu-${id}`;
 }
 
 /** Die Drittmodule neben `id`, in der Reihenfolge, in der der Fokus sie versucht. */

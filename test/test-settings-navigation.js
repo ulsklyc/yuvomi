@@ -3874,17 +3874,23 @@ test('Eigenes Modul: Fokus, veraltete Kandidaten, ein Fehler, Persistenz-Hinweis
     setAttribute(name, value) { this.attributes[name] = value; },
     focus() { focused = this; },
   });
-  const rows = ['a-mod', 'c-mod'].map((id) => el({ dataset: { moduleDelete: id } }));
+  // Loeschen ist ein Eintrag im Mehr-Knopf der Zeile (row-danger-visible); der
+  // Eintrag steht im geschlossenen Menue, also geht der Fokus auf den
+  // Mehr-Knopf des Nachbarn (popovertarget = Panel-ID des Zeilenmenues).
+  const rows = ['a-mod', 'c-mod'].map((id) => el({ popovertarget: `module-menu-${id}` }));
   const heading = el({ tag: 'h3' });
   const container = {
-    querySelectorAll: (sel) => (sel === '[data-module-delete]' ? rows : []),
-    querySelector: (sel) => (/data-module-section/.test(sel) ? heading : null),
+    querySelector: (sel) => {
+      if (/data-module-section/.test(sel)) return heading;
+      const id = /^\[popovertarget="([^"]+)"\]$/.exec(sel)?.[1];
+      return rows.find((row) => row.popovertarget === id) ?? null;
+    },
   };
   // b-mod wurde geloescht; Nachbarn in Reihenfolge: naechster c-mod, dann a-mod.
   assert.equal(focusAfterModuleDelete(container, ['c-mod', 'a-mod']), rows[1]);
-  assert.equal(focused, rows[1], 'der Loeschen-Knopf der naechsten Zeile');
+  assert.equal(focused, rows[1], 'der Mehr-Knopf der naechsten Zeile');
   assert.equal(focusAfterModuleDelete(container, ['gone', 'a-mod']), rows[0], 'sonst der vorigen');
-  const empty = { querySelectorAll: () => [], querySelector: container.querySelector };
+  const empty = { querySelector: (sel) => (/data-module-section/.test(sel) ? heading : null) };
   assert.equal(focusAfterModuleDelete(empty, ['x']), heading, 'das letzte Modul: die Gruppenueberschrift');
   assert.equal(heading.attributes.tabindex, '-1', 'fokussierbar, ohne in die Tab-Folge zu geraten');
 
@@ -3994,6 +4000,14 @@ test('Eigenes Modul: Fokus, veraltete Kandidaten, ein Fehler, Persistenz-Hinweis
   assert.match(activeFlat, /const offerDelete = deleteOffered\(info\)/, 'buildRows fragt den Server-Stand einmal');
   assert.match(activeFlat, /deletable: offerDelete && isDeletableModule\(module\)/, 'buildRows entscheidet je Modul');
   assert.match(activeFlat, /row\.type === 'third-party' && row\.deletable === true/, 'rowHtml fragt nur die Entscheidung');
+  // Komponenten-Kanon (row-danger-visible): Loeschen steht als Eintrag mit
+  // Wort im Mehr-Knopf der Zeile, kein sichtbarer Papierkorb.
+  assert.match(activeFlat, /const rowMenu = deletable \? \x60[^\x60]*\$\{rowMenuHtml\(\{/, 'nur eine loeschbare Zeile bekommt den Mehr-Knopf');
+  assert.match(activeFlat, /label: t\('common\.moreActionsNamed', \{ name: row\.label \}\)/, 'der Mehr-Knopf nennt das Modul');
+  assert.match(activeFlat.replace(/\s+/g, ' '), /action: 'delete-module', icon: 'trash-2', label: t\('common\.delete'\), danger: true, attrs: \{ 'data-module-delete': row\.id, 'data-module-name': row\.label \}/,
+    'ein destruktiver Eintrag mit den Attributen, die der Handler liest');
+  assert.doesNotMatch(activeFlat, /rowActionHtml/, 'kein sichtbarer Loeschen-Knopf mehr');
+  assert.match(activeFlat, /installPopoverMenus\(container\)/, 'das Menue ist verdrahtet');
 
   // Details "Installiert von": der Name aus der Admin-Liste; null ist ein
   // geloeschtes Konto; fehlt das Feld (aelterer Server, kein Datensatz), keine Zeile.
