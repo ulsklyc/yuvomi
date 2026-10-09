@@ -4023,6 +4023,41 @@ test('Kuerzel: t, j/k und m/w/d/a gelten nur auf /calendar und gehen an die Seit
   assert(/addEventListener\?\.\('yuvomi:calendar-command', onCalendarCommand\)/.test(cal), 'die Seite hoert die Kuerzel nicht');
 });
 
+/* Passwort-Autofill von Edge/Chrome schickt ein keydown OHNE `key`: auf
+ * Einstellungen > Kalender (zwei Passwortfelder) standen deshalb zwei rote
+ * „Unerwarteter Fehler"-Toasts, denn der Dispatcher rief `e.key.toLowerCase()`.
+ * Gefahren wird der echte Listener aus initKeyboardShortcuts() gegen Attrappen. */
+test('Kuerzel: ein keydown ohne key (Autofill) wirft nicht und loest nichts aus', () => {
+  const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  const src = router.slice(router.indexOf('function initKeyboardShortcuts('), router.indexOf('function showHelpModal('));
+  const listeners = [];
+  const ran = [];
+  const doc = {
+    activeElement: { tagName: 'BODY', isContentEditable: false },
+    addEventListener: (type, fn) => { if (type === 'keydown') listeners.push(fn); },
+    querySelector: () => null,
+  };
+  const shortcuts = [{ key: '/', action: () => ran.push('/') }];
+  new Function('document', 'SHORTCUTS', 'shortcutApplies', 'focusIsBare', 'ran',
+    `let _pendingKey = null; let _pendingTimer = null; const _openSearch = () => ran.push('suche');\n${src}\ninitKeyboardShortcuts();`,
+  )(doc, shortcuts, () => true, () => true, ran);
+  assert(listeners.length === 1, 'initKeyboardShortcuts() haengt keinen keydown-Listener an document');
+  const fire = (init) => {
+    let prevented = false;
+    listeners[0]({ altKey: false, shiftKey: false, metaKey: false, ctrlKey: false, ...init, preventDefault: () => { prevented = true; } });
+    return prevented;
+  };
+  for (const init of [{}, { ctrlKey: true }, { metaKey: true }]) {
+    let thrown = null;
+    try { fire(init); } catch (err) { thrown = err; }
+    assert(thrown === null, `ein keydown ohne key warf (${JSON.stringify(init)}): ${thrown}`);
+  }
+  assert(ran.length === 0, `ein keydown ohne key loeste ein Kuerzel aus: ${ran.join(', ')}`);
+  // Gegenprobe: echte Tasten laufen weiter durch denselben Listener.
+  assert(fire({ key: '/' }) === true && ran.join() === '/', '„/" oeffnet die Suche nicht mehr');
+  assert(fire({ key: 'K', ctrlKey: true }) === true && ran.join() === '/,suche', 'Ctrl+K oeffnet die Suche nicht mehr');
+});
+
 /* PR #1460, Review: der Tipp auf einen Tag zeichnet das Raster bewusst NICHT
  * neu - also muss selectMonthDay() den einen Tab-Stopp selbst mitnehmen, sonst
  * landet Tab von aussen auf dem alten Tag und die Pfeile starten dort. */

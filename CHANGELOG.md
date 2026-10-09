@@ -352,6 +352,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   straight back could leave the wrong month on screen - whichever answer arrived last won. Each
   click now counts from the month you asked for, and a late answer for a month you already left
   is ignored. The same holds for "Current" and for swiping.
+- **Opening Settings > Calendar no longer shows "An unexpected error occurred."** When Edge or
+  Chrome filled in a saved password there, two red error messages could appear, because the
+  browser's autofill sends a key press without a key and the keyboard shortcuts did not expect
+  one. Such a key press is now ignored; the shortcuts work as before.
 
 ## [2.75.0] - 2026-10-07
 
