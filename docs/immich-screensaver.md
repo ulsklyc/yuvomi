@@ -45,6 +45,19 @@ minute while a kitchen tablet and every phone in the household keep their own de
 applies at once, without a reload. There is deliberately no household setting or environment
 variable for it: one value for the whole household would reach every signed-in device.
 
+## Clock and full-screen photos
+
+Two more choices sit right below the delay, and they are per device for the same reason:
+
+- **Show the time on the screensaver** - on by default. The current time, in the household's time
+  format and zone, in the corner diagonally opposite the photo caption. It moves with the caption
+  and turns on the full minute.
+- **Fill the screen with the photo** - off by default. Photos fill the whole screen instead of
+  fitting inside it, so the edges are cropped, most of all on a portrait photo shown on a landscape
+  screen.
+
+Both apply the next time the screensaver starts, without a reload.
+
 ## Configure through environment variables
 
 ```env

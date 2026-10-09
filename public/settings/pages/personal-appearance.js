@@ -16,6 +16,10 @@ import { isWallModeEnabled, setWallModeEnabled } from '/utils/wall-mode.js';
 import {
   SCREENSAVER_IDLE_STEPS,
   getScreensaverIdleSeconds,
+  isScreensaverClockOn,
+  isScreensaverCoverOn,
+  setScreensaverClockOn,
+  setScreensaverCoverOn,
   setScreensaverIdleSeconds,
 } from '/utils/screensaver-idle.js';
 import { setDisplayTimeZone } from '/utils/timezone.js';
@@ -223,6 +227,19 @@ export function screensaverIdleOptions() {
  * a reload, and the toast confirms it like the wall-mode toggle above it.
  * Exported so test:screensaver-idle can drive the real handler.
  */
+/**
+ * The clock and full-bleed switches (#1766). Device-local like the select
+ * above; the screensaver reads both when it next starts, which is what the
+ * toast says, since nothing on this page changes visibly. Exported so
+ * test:screensaver-device can drive the real handler.
+ */
+export function bindScreensaverSwitch(toggle, store) {
+  toggle?.addEventListener('change', () => {
+    store(toggle.checked);
+    window.yuvomi?.showToast(t('settings.screensaverDeviceSaved'), 'success');
+  });
+}
+
 export function bindScreensaverIdleSelect(select) {
   select?.addEventListener('change', () => {
     const seconds = setScreensaverIdleSeconds(Number(select.value));
@@ -315,6 +332,23 @@ function renderPage(container, preferences, isAdmin) {
           control: `<select class="form-input" id="screensaver-idle-select" aria-describedby="screensaver-idle-hint">
             ${screensaverIdleOptions()}
           </select>`,
+        })}
+        <!-- What the screensaver shows, on this device too (#1766). -->
+        ${settingSwitchRowHtml({
+          label: t('settings.screensaverClockLabel'),
+          checked: isScreensaverClockOn(),
+          icon: 'clock',
+          description: t('settings.screensaverClockHint'),
+          descriptionId: 'screensaver-clock-hint',
+          attrs: { id: 'screensaver-clock-toggle', 'aria-describedby': 'screensaver-clock-hint' },
+        })}
+        ${settingSwitchRowHtml({
+          label: t('settings.screensaverCoverLabel'),
+          checked: isScreensaverCoverOn(),
+          icon: 'maximize',
+          description: t('settings.screensaverCoverHint'),
+          descriptionId: 'screensaver-cover-hint',
+          attrs: { id: 'screensaver-cover-toggle', 'aria-describedby': 'screensaver-cover-hint' },
         })}
       </div>
     </section>
@@ -603,6 +637,8 @@ function bindEvents(container, user) {
   });
 
   bindScreensaverIdleSelect(container.querySelector('#screensaver-idle-select'));
+  bindScreensaverSwitch(container.querySelector('#screensaver-clock-toggle'), setScreensaverClockOn);
+  bindScreensaverSwitch(container.querySelector('#screensaver-cover-toggle'), setScreensaverCoverOn);
 
   const localeSelect = container.querySelector('#locale-select');
   // Die Auswahl, die wirklich gilt (auch "System") - dorthin geht ein

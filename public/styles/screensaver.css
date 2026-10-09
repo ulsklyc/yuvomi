@@ -43,3 +43,17 @@
 @media (prefers-reduced-motion: reduce) {
   .photo-screensaver img { transition: none; }
 }
+
+/* Full-bleed photos, chosen per device (#1766). Off by default: `cover` crops a
+   portrait photo hard on a landscape screen. */
+.photo-screensaver--cover img { object-fit: cover; }
+
+/* The clock shares the caption's plate and corners (it sits diagonally
+   opposite), and like the caption it is not themed. tabular-nums keeps it from
+   shifting sideways at every minute, as on the overview clock. */
+.photo-screensaver p.photo-screensaver__clock {
+  font-size: clamp(var(--text-3xl), 9vmin, var(--text-6xl));
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
