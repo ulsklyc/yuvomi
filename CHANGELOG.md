@@ -28,6 +28,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not change what anyone else in the household sees, and only applies to the tile: the
   today sheet, the wall and the menu keep counting every list.
 
+- **A profile picture can be fetched from Gravatar once, if the operator turns it on.** Off by
+  default: while `GRAVATAR_BASE_URL` is unset or empty nothing is sent and Settings → Account shows
+  no button. An operator opts in by setting it to `https://gravatar.com/avatar/` or a Libravatar
+  mirror; a household member can then fetch the picture for their saved address, named in the
+  hint, and it is stored exactly like an upload, never fetched again. Split-expense guests are
+  refused. Only a SHA-256 hash of the address and the server's IP leave the server, through the
+  SSRF-guarded client with an 8 second limit, a 512 KiB cap and a signature check. If the
+  picture, the address or the account changes while the fetch runs, nothing is stored (409).
+
 ### Changed
 
 - **Rows show fewer buttons.** Lists no longer carry a pencil and a bin on every line. Editing,

@@ -1427,6 +1427,19 @@
   background: var(--color-danger-light);
 }
 
+/* Gesperrt, aber erreichbar (wie `.btn[aria-disabled]` in layout.css): der
+   Gravatar-Knopf ohne gespeicherte Adresse und waehrend des Abrufs bleibt in
+   der Tab-Ordnung, die Hinweiszeile darunter nennt den Grund. Keine Opazitaet
+   auf dem Icon, sondern die gedeckte Farbe; Hover und Fokus heben nichts an. */
+.settings-avatar-action[aria-disabled='true'],
+.settings-avatar-action[aria-disabled='true']:hover,
+.settings-avatar-action[aria-disabled='true']:focus-visible {
+  color: var(--color-text-tertiary);
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  cursor: not-allowed;
+}
+
 .settings-avatar-action i,
 .settings-avatar-action svg {
   width: 14px;

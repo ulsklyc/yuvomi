@@ -802,6 +802,10 @@ const REASONS_READ_BY_A_PAGE = new Map([
   ['ATTACHMENT_CHANGE_REFUSED', 'pages/calendar.js'],
   ['ATTACHMENT_UPLOAD_REFUSED', 'pages/calendar.js'],
   ['FOLDER_DOCUMENTS_NOT_MANAGEABLE', 'utils/document-folder-delete.js'],
+  // Gravatar-Import (#1791): GRAVATAR_REASON_KEYS auf der Kontoseite. Einen
+  // Gast erreicht der Knopf gar nicht (gravatarAvailable), der Satz steht fuer
+  // einen Aufruf, der an der Oberflaeche vorbei kommt.
+  ['not_a_household_member', 'settings/pages/personal-account.js'],
 ]);
 
 const REASONS_WITHOUT_SENTENCE = new Set([
@@ -855,6 +859,13 @@ const REASONS_PASSED_THROUGH = new Map([
   ['routes/split-expenses.js: err.reason', { sites: 1, at403: [],
     why: 'Refusal: ein Grund nur an 409 (email_in_use); die 403 dort tragen keinen' }],
   ['auth.js: err.code', { sites: 1, at403: [], why: 'feste 409 (2FA)' }],
+  // Gravatar-Import: GravatarError traegt seinen Grund, die Route schlaegt den
+  // Status nach (400/404/413/415/502, 500 bei falsch gesetzter GRAVATAR_BASE_URL)
+  // - eine 403 baut sie daraus nie. Ihre eigene 403 (not_a_household_member)
+  // und 409 (gravatar_stale) stehen als Literal an der Stelle, die des
+  // Wandtabletts kommt mit Literal vom Riegel.
+  // Die zweite Stelle ist die Logzeile daneben, keine Antwort.
+  ['auth.js: err.reason', { sites: 2, at403: [], why: 'Gravatar-Import: 400/404/413/415/502 oder 500, nie 403' }],
   ['routes/notes.js: result.reason', { sites: 1, at403: [], why: 'feste 409' }],
   ['routes/family.js: problem.reason', { sites: 1, at403: [], why: 'memberOrderProblem: feste 400; die 403 daneben traegt ein Literal' }],
   ['routes/tasks.js: result.reason', { sites: 1, at403: [], why: 'feste 409' }],

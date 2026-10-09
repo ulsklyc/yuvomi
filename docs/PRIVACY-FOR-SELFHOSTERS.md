@@ -40,6 +40,7 @@
    - 2.17 [Feiertage und Schulferien (OpenHolidays)](#217-feiertage-und-schulferien-openholidays)
    - 2.18 [Immich-Bildschirmschoner](#218-immich-bildschirmschoner)
    - 2.19 [Abfall-Modul: ICS-URL-Quellen](#219-abfall-modul-ics-url-quellen)
+   - 2.20 [Gravatar (Profilbild-Import)](#220-gravatar-profilbild-import)
 3. [Logging und Speicherbegrenzung](#3-logging-und-speicherbegrenzung-art-5-abs-1-lit-e-dsgvo)
 4. [Haushaltsausnahme](#4-haushaltsausnahme-art-2-abs-2-lit-c-dsgvo)
 5. [Verarbeitungsverzeichnis-Vorlage (Art. 30 DSGVO)](#5-verarbeitungsverzeichnis-vorlage-art-30-dsgvo)
@@ -105,6 +106,7 @@ Betreiber daraus resultieren.
 | Feiertage/Schulferien (OpenHolidays) | `server/services/holidays.js` | nur wenn ein Admin ein Feiertagsland wählt und eine Feiertags-Ebene aktiv ist | Anbieter-Standort selbst prüfen | nein (siehe 2.17) |
 | Immich-Bildschirmschoner | `server/routes/screensaver.js` | nur wenn `IMMICH_URL` und `IMMICH_API_KEY` gesetzt oder unter Einstellungen → Haushalt → Fotos und Wetter → Immich eingetragen sind | i. d. R. selbst gehostet | i. d. R. nein (siehe 2.18) |
 | Abfall-Modul: ICS-URL-Quellen | `server/services/waste-url-source.js` | nur wenn im Abfall-Modul eine ICS-URL als Quelle abonniert wird | abhängig vom Feed-Anbieter | nein (siehe 2.19) |
+| Gravatar (Profilbild-Import) | `server/services/gravatar.js` | nein; ab Werk aus. Nur wenn `GRAVATAR_BASE_URL` gesetzt ist UND ein Haushaltsmitglied unter Einstellungen → Konto → „Gravatar verwenden" klickt | USA (Automattic) bzw. der gewählte Spiegel; DPF-Status prüfen | nein (siehe 2.20) |
 
 ### 2.1 Open-Meteo (Wetter-Standard)
 
@@ -618,6 +620,41 @@ Konfiguration so, dass du auf einen EU-Provider umstellen könntest.
   Transparenzhinweis. Eine URL mit eingebettetem Token wie Zugangsdaten
   behandeln.
 
+### 2.20 Gravatar (Profilbild-Import)
+
+- **Code-Stellen:** `server/services/gravatar.js`, Route
+  `POST /api/v1/auth/me/avatar/gravatar` in `server/auth.js`, Knopf
+  „Gravatar verwenden" unter Einstellungen → Konto (Profilbild).
+- **Ab Werk aus.** Solange `GRAVATAR_BASE_URL` nicht gesetzt (oder leer) ist,
+  geht nichts hinaus, und der Knopf wird gar nicht angezeigt.
+- **Aktiv nur, wenn:** der Betreiber `GRAVATAR_BASE_URL` gesetzt hat UND ein
+  Haushaltsmitglied den Knopf selbst drückt. Kein Abruf beim Anmelden, kein
+  Hintergrundlauf, kein Abruf durch einen Admin für andere. Nur für
+  Haushaltsmitglieder: ein Split-Gast bekommt den Knopf nicht, und die Route
+  weist ihn ab (403), weil seine Adresse eintippt, wer die Gruppe verwaltet.
+  Ohne gespeicherte E-Mail-Adresse ist der Knopf gesperrt. Kein API-Key.
+- **Endpunkt:** die vom Betreiber gesetzte Basis-URL plus Hash, z. B.
+  `https://gravatar.com/avatar/<hash>` oder ein Libravatar-Spiegel; genau
+  ein Abruf vom Backend über den SSRF-geschützten Client: nur HTTPS,
+  Weiterleitungen werden neu geprüft, 8 s Zeitlimit, höchstens 512 KiB,
+  nur PNG, JPEG oder WebP mit passender Dateisignatur. Das Ergebnis liegt
+  danach wie ein hochgeladenes Bild in `users.avatar_data`; gravatar.com
+  wird nicht erneut kontaktiert, und der Browser lädt nie direkt von dort
+  (CSP `img-src 'self' data:`).
+- **Was wird übertragen:** der SHA-256-Hash der kleingeschriebenen
+  E-Mail-Adresse, die IP deines Yuvomi-Servers und der User-Agent. Nie die
+  Adresse selbst, nie der Name oder andere Profildaten. Der Hash einer
+  bekannten Adresse lässt sich nachrechnen - deshalb ist der Abruf ab Werk
+  aus und danach ein bewusster Klick des Mitglieds, nichts Automatisches.
+  Kleingeschrieben wird nur A-Z (`emailMatchKey`, derselbe Schlüssel wie beim
+  E-Mail-Abgleich); eine Adresse mit einem Großbuchstaben außerhalb von ASCII
+  ergibt einen anderen Hash als bei Gravatar und bekommt „kein Bild".
+- **Abschalten:** `GRAVATAR_BASE_URL` ungesetzt oder leer lassen (Standard);
+  die Route antwortet dann mit 404, und die Kontoseite zeigt keinen Knopf.
+- **Drittland/AVV:** Automattic Inc. (USA); kein AVV (kein Auftrag, nur ein
+  einzelner Abruf, den das Mitglied selbst auslöst); DPF-Status prüfen und
+  in der Datenschutzerklärung transparent nennen.
+
 ---
 
 ## 3. Logging und Speicherbegrenzung (Art. 5 Abs. 1 lit. e DSGVO)
@@ -738,6 +775,7 @@ konkrete Konfiguration ein und ergänze um eigene Verarbeitungen.
 | 7 | Sicherheits-/Betriebs-Logs | Missbrauchserkennung, Fehlersuche | Art. 6 Abs. 1 lit. f | Nutzer / Login-Versuchende | IP bei fehlgeschlagenen Logins, Fehler-Stacktraces | nur lokal | nein | **max. 30 Tage** | Rotation, Zugangsbeschränkung |
 | 8 | MCP-/KI-Anbindung (falls genutzt) | Zugriff eines angebundenen KI-/Agent-Clients auf Instanzdaten | Art. 6 Abs. 1 lit. a/f; bei Art.-9-Daten zusätzlich Art. 9 Abs. 2 lit. a | Nutzer und in den Daten genannte Personen | je nach Token-Scope: Aufgaben, Termine, Einkauf, ggf. health/housekeeping | lokaler Client: keiner · Cloud: <<Anbieter>> | lokaler Client: nein · Cloud: <<je nach Anbieter>> | bis Token-Widerruf | Token-Scoping (Least Privilege), TLS; bei Cloud: AVV, DPF/SCCs+TIA |
 | 9 | Benachrichtigungen (Web Push / Kanäle / SMTP, falls genutzt) | Zustellung von Erinnerungen und Hinweisen | Art. 6 Abs. 1 lit. a/b; bei Medikamenten-Erinnerungen Art. 9 Abs. 2 lit. a | Nutzer der Instanz | Erinnerungsinhalte (ggf. Medikamentenname), Geräte-Endpoints, E-Mail-Adressen | Push-Dienst des Browsers (Inhalte verschlüsselt) · <<Gotify/ntfy-Ziel>> · <<SMTP-Provider>> | Push: USA möglich · sonst <<je nach Ziel>> | bis Abbestellung/Geräte-Abmeldung | RFC-8291-Verschlüsselung (Push), TLS, Selbsthosting der Kanäle |
+| 10 | Gravatar-Profilbild (nur wenn `GRAVATAR_BASE_URL` gesetzt ist und ein Haushaltsmitglied es nutzt; ab Werk aus) | Einmalige Übernahme des Profilbilds von gravatar.com oder dem gewählten Spiegel | Art. 6 Abs. 1 lit. a | Nutzer der Instanz | SHA-256-Hash der E-Mail-Adresse, Server-IP | Automattic Inc. (gravatar.com) bzw. der vom Betreiber gewählte Spiegel | USA; DPF-Status prüfen | Hash: sofort nach Anfrage; Bild: bis Entfernen oder Ersetzen durch den Nutzer | TLS, SSRF-Schutz, Größen- und Typprüfung, kein Hintergrundabruf, nur Haushaltsmitglieder, `GRAVATAR_BASE_URL` ungesetzt oder leer = aus (Standard) |
 
 ### 5.3 Auftragsverarbeiter (Art. 28)
 
