@@ -605,6 +605,49 @@ test('Einschalten schreibt die Freigabe in die Datei; eine leere Datenbank danac
   fs.rmSync(path.join(MODULES_DIR, 'record-mod'), { recursive: true, force: true });
 });
 
+// Runde 5 der Review (#1671): auch das `approved: false` beim Ausschalten liest
+// die Datei und schreibt sie um. Landete ein Ersetzen dazwischen, truege es
+// installedAt/installedBy (und url/commit) der alten Fassung in den Ordner der
+// neuen. Haelt eine Installation die Sperre, schaltet Ausschalten darum nur
+// ueber die Sperrliste aus und laesst die Datei, wie sie ist - es wartet nie.
+test('Ausschalten waehrend einer Installation: aus, die Installationsdatei bleibt byte-gleich, danach wird sie geschrieben', async () => {
+  writeModule('locked-off-mod', { id: 'locked-off-mod', entry: 'index.js' },
+    { 'index.js': '', '.yuvomi-install.json': installRecord({ approved: true }) });
+  clearDisabledConfig();
+  const dir = path.join(MODULES_DIR, 'locked-off-mod');
+  const file = path.join(dir, '.yuvomi-install.json');
+  assert.equal((await find('locked-off-mod')).enabled, true);
+  const before = fs.readFileSync(file);
+  const release = svc.acquireInstallLock(); // eine laufende Installation
+  assert.ok(release, 'die Sperre war frei');
+  try {
+    const off = await call('PATCH', '/locked-off-mod', { actor: ADM, body: { enabled: false } });
+    assert.equal(off.status, 200, JSON.stringify(off.body));
+    assert.equal(off.body.data.enabled, false, 'aus ueber die Sperrliste');
+    assert.deepEqual(disabledConfig(), ['locked-off-mod']);
+    assert.ok(fs.readFileSync(file).equals(before), 'die Datei blieb byte-gleich, solange die Sperre vergeben war');
+    assert.deepEqual(fs.readdirSync(dir).filter((n) => n.endsWith('.tmp')), [], 'keine Temp-Datei');
+  } finally {
+    release();
+  }
+  // Das Ausschalten hat die Sperre nicht behalten: sie ist frei, und ein
+  // weiteres Ausschalten schreibt die Datei jetzt.
+  const probe = svc.acquireInstallLock();
+  assert.ok(probe, 'die Sperre ist wieder frei');
+  probe();
+  const off = await call('PATCH', '/locked-off-mod', { actor: ADM, body: { enabled: false } });
+  assert.equal(off.status, 200, JSON.stringify(off.body));
+  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).approved, false, 'mit freier Sperre schreibt Ausschalten die Datei');
+  const on = await call('PATCH', '/locked-off-mod', { actor: ADM, body: { enabled: true } });
+  assert.equal(on.status, 200, JSON.stringify(on.body));
+  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).approved, true);
+  const after = svc.acquireInstallLock();
+  assert.ok(after, 'auch nach dem Einschalten ist die Sperre frei');
+  after();
+  clearDisabledConfig();
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test('readInstallRecord/readInstallMeta/writeInstallApproval: Felder, Grenzen, Atomaritaet', async () => {
   const dir = path.join(MODULES_DIR, 'rec-api-mod');
   fs.mkdirSync(dir, { recursive: true });

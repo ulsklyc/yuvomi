@@ -850,7 +850,11 @@ The three parts of the rule answer the three ways the gate could leak once it is
   restored from before the install, or a fresh one over a kept modules volume, must not turn
   on a module nobody looked at, must not turn off one that was approved, and must not turn
   back on one the admin switched off. The write on disable is best effort (the household
-  switch alone already decides): taking code away never fails because the folder is read-only.
+  switch alone already decides): taking code away never fails because the folder is read-only,
+  and never waits for an install. It rewrites the record only when the install lock is free;
+  while an install or delete holds it, the record is left as it is, because a replace landing
+  between its read and its rewrite would carry the old version's source and install date into
+  the new folder (which arrives with `approved: false` of its own).
   A replace resets
   the approval even from "the same" GitHub repository, since the ref is a branch or a movable
   tag and the comparison would be on a name that can change hands. A folder without the
@@ -892,7 +896,9 @@ The three parts of the rule answer the three ways the gate could leak once it is
   lock install and delete take), so a replace cannot land between the read of the record and
   its rewrite and collect an approval meant for the version before it; while the lock is held
   enabling answers 409 `busy`, and a folder the server cannot write answers 503
-  `not_writable` with no server path in the message.
+  `not_writable` with no server path in the message. `setModuleEnabled(id, false)` takes the
+  same lock without waiting: free, it writes `approved: false` under it; held, the household
+  switch alone turns the module off and the record write is skipped with a warning in the log.
 - The delete and the replace: `deleteModule()` and the record check in `installFilesUnlocked()`
   in `server/services/module-install.js`, 409 `not_web_installed` without a record, checked
   before the overwrite question. An unreadable record counts as none for both; `readModule()`
@@ -902,7 +908,8 @@ The three parts of the rule answer the three ways the gate could leak once it is
   disable and on replace from every source, enabling by token refused and by session accepted, disabling by
   token, delete and replace refused without a record (ZIP and GitHub, with and without
   overwrite). `npm run test:modules` holds the reading of the
-  record, the atomic rewrite and the literal `true`; `npm run test:installer-schema` holds the
+  record, the atomic rewrite, the literal `true` and the disable that leaves the record
+  untouched while the lock is held; `npm run test:installer-schema` holds the
   switch in the schema, `.env.example` and the Portainer stack; `npm run test:mcp` holds what
   the bridge lists and says about enabling.
 

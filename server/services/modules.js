@@ -546,11 +546,15 @@ async function setModuleEnabled(id, enabled) {
     err.status = 400;
     throw err;
   }
-  // Nur das Einschalten nimmt die Sperre: es liest die Liste und schreibt dann
-  // in die Datei im Ordner, und dazwischen darf kein Ersetzen landen (siehe
-  // acquireInstallLock). Ausschalten nimmt Code weg und wartet auf nichts -
-  // auch nicht auf einen GitHub-Download, der bis zu 30 s dauern kann.
-  const release = enabled ? acquireInstallLock() : null;
+  // Einschalten braucht die Sperre: es liest die Liste und schreibt dann in
+  // die Datei im Ordner, und dazwischen darf kein Ersetzen landen (siehe
+  // acquireInstallLock). Ausschalten nimmt sie nur, wenn sie frei ist, denn
+  // auch sein `approved: false` liest und schreibt die Datei um - ein Ersetzen
+  // dazwischen truege die Herkunft der alten Fassung in den neuen Ordner. Ist
+  // sie vergeben, schaltet es trotzdem aus und laesst nur die Datei liegen:
+  // Ausschalten nimmt Code weg und wartet auf nichts, auch nicht auf einen
+  // GitHub-Download, der bis zu 30 s dauern kann.
+  const release = acquireInstallLock();
   if (enabled && !release) {
     const err = new Error('Another module install or delete is in progress. Try again in a moment.');
     err.status = 409;
@@ -558,13 +562,13 @@ async function setModuleEnabled(id, enabled) {
     throw err;
   }
   try {
-    return await applyModuleEnabled(id, enabled);
+    return await applyModuleEnabled(id, enabled, { writeRecord: Boolean(release) });
   } finally {
     release?.();
   }
 }
 
-async function applyModuleEnabled(id, enabled) {
+async function applyModuleEnabled(id, enabled, { writeRecord = true } = {}) {
   const modules = await listModules({ admin: true });
   const target = modules.find((module) => module.id === id);
   if (!target) {
@@ -585,7 +589,9 @@ async function applyModuleEnabled(id, enabled) {
   // in die Datei, damit auch "aus" mit dem Ordner reist - eine zurueckgespielte
   // Datenbank schaltete sonst wieder ein, was der Admin abgeschaltet hatte.
   // Dieses zweite Schreiben ist Zugabe: Ausschalten nimmt Code weg und darf
-  // nie daran scheitern, dass der Ordner schreibgeschuetzt ist (log.warn).
+  // nie daran scheitern, dass der Ordner schreibgeschuetzt ist oder gerade
+  // eine Installation die Sperre haelt (log.warn, die Datei bleibt dann).
+  // Ein Ersetzen schreibt ohnehin seine eigene Datei mit `approved: false`.
   // Eine Installation oder ein Ersetzen setzt die Freigabe ebenfalls zurueck
   // (module-install.js).
   if (enabled && target.install && !target.install.approved) {
@@ -611,10 +617,14 @@ async function applyModuleEnabled(id, enabled) {
   else disabled.add(id);
   setDisabledModules([...disabled]);
   if (!enabled && target.install?.approved) {
-    try {
-      await writeInstallApproval(path.join(MODULES_DIR, id), false);
-    } catch (err) {
-      log.warn(`Module ${id} is off, but its install record still says approved (could not write it):`, err?.message);
+    if (!writeRecord) {
+      log.warn(`Module ${id} is off, but its install record still says approved (an install or delete holds the lock, so it was left as it is).`);
+    } else {
+      try {
+        await writeInstallApproval(path.join(MODULES_DIR, id), false);
+      } catch (err) {
+        log.warn(`Module ${id} is off, but its install record still says approved (could not write it):`, err?.message);
+      }
     }
   }
   return (await listModules({ admin: true })).find((module) => module.id === id);

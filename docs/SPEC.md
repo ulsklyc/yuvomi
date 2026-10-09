@@ -6038,7 +6038,7 @@ The full contract for every optional block lives in [`MODULES.md`](../MODULES.md
 | Endpoint | Access | Purpose |
 |----------|--------|---------|
 | `GET /api/v1/modules` | signed in | Loaded modules; `?admin=1` (admin) adds disabled and errored ones plus `install` |
-| `PATCH /api/v1/modules/:id` | admin; `enabled: true` browser session only | `{ enabled: boolean }` - the Active modules switch; enabling writes `approved: true` into the install record (`409 busy` while an install or delete runs, `503 not_writable` when the record cannot be written), disabling writes `approved: false` best effort and is never refused for either; error bodies carry `reason` when known |
+| `PATCH /api/v1/modules/:id` | admin; `enabled: true` browser session only | `{ enabled: boolean }` - the Active modules switch; enabling writes `approved: true` into the install record (`409 busy` while an install or delete runs, `503 not_writable` when the record cannot be written), disabling writes `approved: false` best effort (skipped while an install or delete holds the lock) and is never refused or delayed for either; error bodies carry `reason` when known |
 | `GET /api/v1/modules/assets/:id/*` | signed in | Module files (entry, style, widgets, locales); dotfiles are not served |
 | `GET /api/v1/modules/install/info` | admin | `{ data: { writable, persistent, webInstall, maxZipMb } }` (`persistent`: `true` / `false` / `null` = unknown; `webInstall`: the `MODULES_ALLOW_WEB_INSTALL` switch) |
 | `POST /api/v1/modules/install/zip?overwrite=1&path=<folder>` | admin, browser session, switch on | Raw ZIP body (`application/zip`) |
