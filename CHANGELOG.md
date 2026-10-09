@@ -601,6 +601,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Stacks of assigned people overlap correctly in right-to-left languages.** In Arabic and
+  Persian the first avatar of a stack stuck out past its edge and the last two sat side by side
+  instead of overlapping, on tasks, the board, events and meals alike. On the overview, the
+  people of an event sat right after its title instead of at the end of the line.
+  Left-to-right layouts are unchanged.
 - **Tasks on a phone: after picking a folded entry from the tools menu, the keyboard focus is
   back on the menu button.** With the header docked, view switch and filter move into the "..."
   menu; choosing one of them there left the focus on the page instead of on the button the menu

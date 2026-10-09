@@ -4805,11 +4805,6 @@ test('Kalender in RTL: keine Regel in calendar.css haengt an einer physischen Se
     '.week-view__now-line': ['left: 0', 'right: 0'],
     // left: 50% mit translateX(-50%) zentriert, die Richtung spielt keine Rolle
     '.day-view__empty-hint': ['left: 50%'],
-    // Ueberlappung im Avatar-Stapel: gehoert zur Folgearbeit an .avatar-stack
-    // (user-multi-select.css, row-reverse mit margin-left) und kippt mit ihr
-    '.allday-event .avatar-stack__item, .week-event__time .avatar-stack__item': [
-      'margin-left: calc(-1 * var(--space-1))',
-    ],
   };
   const used = new Set();
   for (const r of all) {
@@ -4857,6 +4852,7 @@ test('Kalender in RTL: keine Regel in calendar.css haengt an einer physischen Se
     '.cal-chip__assigned': /margin-inline-start:\s*auto/,
     '.cal-band__until + .cal-chip__assigned': /margin-inline:\s*0/,
     '.cal-filters__nested': /margin-inline-start:/,
+    '.allday-event .avatar-stack__item, .week-event__time .avatar-stack__item': /margin-inline-start:\s*calc\(-1 \* var\(--space-1\)\)/,
     '.event-icon-dialog__results': /padding-inline-end:/,
   };
   for (const [sel, logical] of Object.entries(expect)) {

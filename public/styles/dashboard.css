@@ -702,8 +702,8 @@
 
 .event-item .avatar-stack {
   flex-shrink: 0;
-  margin-left: auto;
-  padding-left: var(--space-1);
+  margin-inline-start: auto;
+  padding-inline-start: var(--space-1);
 }
 
 .event-item__title {
