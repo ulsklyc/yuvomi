@@ -168,7 +168,9 @@
     "sectionPrivateNetwork": "Zugriff auf dein Heimnetz",
     "privateNetworkHint": "Yuvomi lehnt Verbindungen zu Adressen im Heimnetz standardmäßig ab - das schützt davor, dass der Server dazu gebracht wird, interne Dienste zu erreichen. Gib frei, was du zu Hause wirklich betreibst.",
     "authPasswordLogin": "Anmeldung mit Benutzername und Passwort beibehalten",
-    "authPasswordLoginHint": "Ausschalten macht SSO zum einzigen Weg hinein: Das Anmeldeformular und das Zurücksetzen des Passworts verschwinden. Wirksam wird es, sobald mindestens ein Konto mit dem Anbieter verknüpft ist - eine frische Installation kann ihren ersten Administrator also noch anlegen. Ist der Anbieter nicht erreichbar, führt der Weg zurück über die .env-Datei und einen Neustart."
+    "authPasswordLoginHint": "Ausschalten macht SSO zum einzigen Weg hinein: Das Anmeldeformular und das Zurücksetzen des Passworts verschwinden. Wirksam wird es, sobald mindestens ein Konto mit dem Anbieter verknüpft ist - eine frische Installation kann ihren ersten Administrator also noch anlegen. Ist der Anbieter nicht erreichbar, führt der Weg zurück über die .env-Datei und einen Neustart.",
+    "moduleWebInstall": "Module aus den Einstellungen installieren erlauben",
+    "moduleWebInstallHint": "Lässt einen Admin Fremdmodule aus der Weboberfläche heraus auf den Server legen (ZIP-Upload oder GitHub-URL), ohne Dateizugriff. Installierte Module bleiben aus, bis ein Admin sie freigibt. Aus: Module werden von Hand in den Modulordner kopiert."
   },
   "review": {
     "title": "Überprüfung",
@@ -210,7 +212,8 @@
     "privateNetworkWaste": "Entsorgung",
     "privateNetworkWebdav": "WebDAV-Ziel",
     "baseUrl": "Öffentliche Adresse",
-    "outlook": "Outlook-Kalender"
+    "outlook": "Outlook-Kalender",
+    "moduleWebInstall": "Module aus den Einstellungen"
   },
   "docker": {
     "title": "Yuvomi wird gestartet",

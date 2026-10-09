@@ -268,6 +268,14 @@ const HTTP_METHODS = new Set(['get', 'post', 'put', 'patch', 'delete', 'head', '
 // Die OpenAPI-Spec ist zur Laufzeit statisch (hängt nur an der Paketversion) —
 // einmal ableiten und cachen statt bei jedem Tool-Aufruf neu zu bauen.
 let cachedOperations = null;
+let cachedExcluded = null;
+
+// OpenAPI-Operationen mit `x-mcp-exclude: true` gibt es fuer die Bruecke nicht:
+// weder in list_api_operations noch ueber call_api_operation. Gedacht fuer
+// Routen, die ein Token ohnehin abweisen (Modul installieren/loeschen: nur aus
+// einer Browser-Sitzung) - ein Assistent soll keinen Schritt planen, den er nie
+// ausfuehren kann. Die Route selbst bleibt die eigentliche Grenze.
+const MCP_EXCLUDE = 'x-mcp-exclude';
 
 function normalizeText(value) {
   return String(value ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
@@ -298,6 +306,7 @@ function openApiOperations() {
   if (cachedOperations) return cachedOperations;
   const spec = openApiSpec();
   const operations = new Map();
+  const excluded = new Set();
   const used = new Map();
   for (const [path, pathItem] of Object.entries(spec.paths || {})) {
     for (const [method, operation] of Object.entries(pathItem || {})) {
@@ -306,6 +315,13 @@ function openApiOperations() {
       const count = (used.get(key) || 0) + 1;
       used.set(key, count);
       if (count > 1) key = `${key}_${count}`;
+      // Erst NACH der Zaehlung: so behalten die uebrigen Operationen dieselben
+      // Schluessel, ob die ausgeschlossene nun mitzaehlt oder nicht.
+      if (operation[MCP_EXCLUDE] === true) {
+        excluded.add(key);
+        excluded.add(`${method.toUpperCase()} ${path}`);
+        continue;
+      }
       const parameters = Array.isArray(operation.parameters) ? operation.parameters : [];
       const requestBody = operation.requestBody && typeof operation.requestBody === 'object' ? operation.requestBody : {};
       const content = requestBody.content && typeof requestBody.content === 'object' ? requestBody.content : {};
@@ -327,7 +343,13 @@ function openApiOperations() {
     }
   }
   cachedOperations = operations;
+  cachedExcluded = excluded;
   return operations;
+}
+
+function excludedOperation(keyOrMethodPath) {
+  openApiOperations();
+  return cachedExcluded.has(keyOrMethodPath);
 }
 
 function publicOperationView(operation, includeParameters = false) {
@@ -355,6 +377,9 @@ function resolveOpenApiOperation({ operation_key: key, method, path }) {
   const operations = openApiOperations();
   if (key) {
     const operation = operations.get(key);
+    if (!operation && excludedOperation(key)) {
+      throw new ToolError(`Operation ${key} is not available through MCP. Use the web interface.`);
+    }
     if (!operation) throw new ToolError(`Unknown operation_key: ${key}`);
     return operation;
   }
@@ -363,6 +388,9 @@ function resolveOpenApiOperation({ operation_key: key, method, path }) {
   const normalizedPath = String(path).startsWith('/') ? String(path) : `/${path}`;
   for (const operation of operations.values()) {
     if (operation.method === normalizedMethod && operation.path === normalizedPath) return operation;
+  }
+  if (excludedOperation(`${normalizedMethod} ${normalizedPath}`)) {
+    throw new ToolError(`${normalizedMethod} ${normalizedPath} is not available through MCP. Use the web interface.`);
   }
   throw new ToolError(`OpenAPI operation not found for ${normalizedMethod} ${normalizedPath}`);
 }

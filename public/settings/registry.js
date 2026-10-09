@@ -290,6 +290,23 @@ export const SETTINGS_SECTIONS = freezeEntries([
     adminOnly: false,
     loader: () => import('/settings/pages/modules-navigation.js'),
   },
+  {
+    // Ein Modul ist Code vom selben Ursprung, der mit der Sitzung jedes
+    // Mitglieds laeuft, das es oeffnet. Es ueber die Oberflaeche zu
+    // installieren ist dasselbe wie einen Ordner auf den Server zu kopieren -
+    // jede Route traegt `requireAdmin` (server/routes/modules.js).
+    id: 'modules-install',
+    sheetId: 'modules-install',
+    scope: 'household',
+    labelKey: 'settings.pageInstallModule',
+    descriptionKey: 'settings.pageInstallModuleDescription',
+    options: [
+      { key: 'settings.installModuleGithubTitle', terms: ['GitHub'] },
+      { key: 'settings.installModuleZipTitle', terms: ['ZIP'] },
+    ],
+    adminOnly: true,
+    loader: () => import('/settings/pages/modules-install.js'),
+  },
 
   // ── Module: je Modul ein Blatt ─────────────────────────────────────────────
   {
@@ -688,6 +705,10 @@ export const SETTINGS_LEAVES = freezeEntries([
   { id: 'module-contacts', domainId: 'modules', path: '/settings/modules/contacts', labelKey: 'nav.contacts', descriptionKey: 'settings.pageSyncContactsDescription', icon: 'book-user', module: 'contacts' },
   { id: 'module-health', domainId: 'modules', path: '/settings/modules/health', labelKey: 'nav.health', descriptionKey: 'settings.sheetHealthDescription', icon: 'heart-pulse', module: 'health' },
   { id: 'module-budget', domainId: 'modules', path: '/settings/modules/budget', labelKey: 'nav.budget', descriptionKey: 'settings.sheetBudgetDescription', icon: 'wallet', module: 'budget' },
+  // `placement: 'end'` haelt das Blatt hinter den sortierten Modulblaettern
+  // (settingsSheetsForDomain): "Hinzufuegen" schliesst die Liste ab, egal wie
+  // der Haushalt seine Module anordnet.
+  { id: 'modules-install', domainId: 'modules', path: '/settings/modules/install', labelKey: 'settings.pageInstallModule', descriptionKey: 'settings.pageInstallModuleDescription', icon: 'package-plus', placement: 'end' },
 ]);
 
 /**
@@ -810,13 +831,20 @@ function currentModuleOrder() {
   }
 }
 
-/** Die Blaetter eines Bereichs, die diese Rolle sieht. */
+/**
+ * Die Blaetter eines Bereichs, die diese Rolle sieht: erst die allgemeinen,
+ * dann die Modulblaetter in der Reihenfolge der Seitenleiste, zuletzt die mit
+ * `placement: 'end'` ("Eigenes Modul hinzufuegen" schliesst die Liste ab).
+ */
 export function settingsSheetsForDomain(domainId, user, { moduleOrder = currentModuleOrder() } = {}) {
-  const sheets = SETTINGS_LEAVES.filter((sheet) => sheet.domainId === domainId && sheetVisible(sheet, user));
-  if (!sheets.some((sheet) => sheet.module)) return sheets;
+  const visible = SETTINGS_LEAVES.filter((sheet) => sheet.domainId === domainId && sheetVisible(sheet, user));
+  const end = visible.filter((sheet) => sheet.placement === 'end');
+  const sheets = visible.filter((sheet) => sheet.placement !== 'end');
+  if (!sheets.some((sheet) => sheet.module)) return [...sheets, ...end];
   return [
     ...sheets.filter((sheet) => !sheet.module),
     ...sortNavigationItems(sheets.filter((sheet) => sheet.module), moduleOrder),
+    ...end,
   ];
 }
 

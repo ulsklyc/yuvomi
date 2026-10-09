@@ -130,7 +130,8 @@
     "privateNetworkWaste": "垃圾收集",
     "privateNetworkWebdav": "WebDAV 文档",
     "baseUrl": "公开地址",
-    "outlook": "Outlook 日历"
+    "outlook": "Outlook 日历",
+    "moduleWebInstall": "从设置中安装模块"
   },
   "docker": {
     "title": "正在启动 Yuvomi",
@@ -276,7 +277,9 @@
     "sectionPrivateNetwork": "访问你的家庭网络",
     "privateNetworkHint": "Yuvomi 默认拒绝连接到你自己网络上的地址，这可以防止服务器被诱导访问内部服务。请只启用你在家中确实运行的服务。",
     "authPasswordLogin": "保留用户名和密码登录",
-    "authPasswordLoginHint": "关闭后 SSO 将成为唯一的入口：登录表单和密码重置都会消失。若提供方无法访问，返回的办法是修改 .env 文件并重启。"
+    "authPasswordLoginHint": "关闭后 SSO 将成为唯一的入口：登录表单和密码重置都会消失。若提供方无法访问，返回的办法是修改 .env 文件并重启。",
+    "moduleWebInstall": "允许从设置中安装模块",
+    "moduleWebInstallHint": "允许管理员通过网页界面（上传 ZIP 或 GitHub 网址）将第三方模块放到服务器上，无需文件访问权限。已安装的模块在管理员批准前保持关闭。关闭时：模块需手动复制到模块文件夹。"
   },
   "welcome": {
     "title": "你想如何设置 Yuvomi？",

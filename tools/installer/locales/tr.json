@@ -130,7 +130,8 @@
     "privateNetworkWaste": "Atık toplama",
     "privateNetworkWebdav": "WebDAV belgeleri",
     "baseUrl": "Herkese açık adres",
-    "outlook": "Outlook Takvimi"
+    "outlook": "Outlook Takvimi",
+    "moduleWebInstall": "Ayarlar'dan modül kurulumu"
   },
   "docker": {
     "title": "Yuvomi başlatılıyor",
@@ -276,7 +277,9 @@
     "sectionPrivateNetwork": "Ev ağına erişim",
     "privateNetworkHint": "Yuvomi varsayılan olarak kendi ağındaki adreslere bağlantıları reddeder; bu, sunucunun iç servislere ulaşmaya kandırılmasına karşı korur. Evde gerçekten çalıştırdıklarını etkinleştir.",
     "authPasswordLogin": "Kullanıcı adı ve şifreyle girişi koru",
-    "authPasswordLoginHint": "Kapatmak SSO'yu tek giriş yolu yapar: giriş formu ve şifre sıfırlama kaybolur. Sağlayıcıya erişilemez hale gelirse dönüş yolu .env dosyasını düzenlemek ve yeniden başlatmaktır."
+    "authPasswordLoginHint": "Kapatmak SSO'yu tek giriş yolu yapar: giriş formu ve şifre sıfırlama kaybolur. Sağlayıcıya erişilemez hale gelirse dönüş yolu .env dosyasını düzenlemek ve yeniden başlatmaktır.",
+    "moduleWebInstall": "Modüllerin Ayarlar'dan kurulmasına izin ver",
+    "moduleWebInstallHint": "Bir yöneticinin üçüncü taraf modülleri web arayüzünden (ZIP yükleme veya GitHub URL'si) dosya erişimi olmadan sunucuya koymasına izin verir. Kurulan modüller bir yönetici onaylayana kadar kapalı kalır. Kapalı: modüller modül klasörüne elle kopyalanır."
   },
   "welcome": {
     "title": "Yuvomi'yi nasıl kurmak istersiniz?",

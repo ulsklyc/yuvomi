@@ -168,7 +168,9 @@
     "sectionPrivateNetwork": "Access sa home network mo",
     "privateNetworkHint": "Bilang default ay tinatanggihan ng Yuvomi ang koneksyon sa mga address sa sarili mong network, na nagpoprotekta laban sa panlilinlang sa server para maabot ang mga internal na serbisyo. I-enable ang talagang pinapatakbo mo sa bahay.",
     "authPasswordLogin": "Panatilihin ang pag-login gamit ang username at password",
-    "authPasswordLoginHint": "Kapag ito ay naka-off, ang SSO na lang ang paraan para makapasok: mawawala ang login form at ang pag-reset ng password. Kung hindi maabot ang provider, ang daan pabalik ay ang pag-edit ng .env file at pag-restart."
+    "authPasswordLoginHint": "Kapag ito ay naka-off, ang SSO na lang ang paraan para makapasok: mawawala ang login form at ang pag-reset ng password. Kung hindi maabot ang provider, ang daan pabalik ay ang pag-edit ng .env file at pag-restart.",
+    "moduleWebInstall": "Payagan ang pag-install ng mga module mula sa Mga Setting",
+    "moduleWebInstallHint": "Hinahayaan ang isang admin na maglagay ng mga third-party module sa server mula sa web interface (pag-upload ng ZIP o GitHub URL) nang walang access sa mga file. Nananatiling naka-off ang mga na-install na module hangga't hindi ito inaaprubahan ng isang admin. Naka-off: kinokopya nang mano-mano ang mga module sa module folder."
   },
   "review": {
     "title": "Suriin",
@@ -210,7 +212,8 @@
     "privateNetworkWaste": "Koleksyon ng basura",
     "privateNetworkWebdav": "Mga dokumento sa WebDAV",
     "baseUrl": "Pampublikong address",
-    "outlook": "Outlook Calendar"
+    "outlook": "Outlook Calendar",
+    "moduleWebInstall": "Pag-install ng mga module mula sa Mga Setting"
   },
   "docker": {
     "title": "Sinisimulan ang Yuvomi",

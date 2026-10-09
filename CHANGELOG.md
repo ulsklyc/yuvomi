@@ -28,6 +28,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not change what anyone else in the household sees, and only applies to the tile: the
   today sheet, the wall and the menu keep counting every list.
 
+- **Custom modules can be installed from Settings, from GitHub or as a ZIP file, where the operator
+  allows it.** Until now a third-party module reached Yuvomi only as a folder copied into `modules/`
+  on the server. The new page Settings → Modules → Add custom module (admin only) takes the address
+  of a public GitHub repository or an uploaded `.zip` and installs the module from it. **The feature
+  is off unless the operator sets `MODULES_ALLOW_WEB_INSTALL`**: a module is JavaScript that runs
+  with the session of every member who opens it, so installing one is the operator's choice. A
+  module installed this way arrives disabled until an admin approves it in Active modules from a
+  browser session, and the web interface removes or replaces only what it installed. Limits, checks
+  and the API are in `MODULES.md` under "Installing From Settings".
+
 ### Changed
 
 - **Rows show fewer buttons.** Lists no longer carry a pencil and a bin on every line. Editing,

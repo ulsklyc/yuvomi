@@ -168,7 +168,9 @@
     "sectionPrivateNetwork": "홈 네트워크 접근",
     "privateNetworkHint": "Yuvomi는 기본적으로 자체 네트워크의 주소로의 연결을 거부합니다. 이는 서버가 내부 서비스에 접근하도록 유도되는 것을 막습니다. 집에서 실제로 운영하는 것만 허용하세요.",
     "authPasswordLogin": "사용자 이름과 비밀번호 로그인 유지",
-    "authPasswordLoginHint": "끄면 SSO가 유일한 접속 방법이 됩니다. 로그인 양식과 비밀번호 재설정이 사라집니다. 공급자에 연결할 수 없게 되면 되돌아가는 길은 .env 파일 편집과 재시작입니다."
+    "authPasswordLoginHint": "끄면 SSO가 유일한 접속 방법이 됩니다. 로그인 양식과 비밀번호 재설정이 사라집니다. 공급자에 연결할 수 없게 되면 되돌아가는 길은 .env 파일 편집과 재시작입니다.",
+    "moduleWebInstall": "설정에서 모듈 설치 허용",
+    "moduleWebInstallHint": "관리자가 파일 접근 없이 웹 화면에서(ZIP 업로드 또는 GitHub URL) 서드파티 모듈을 서버에 올릴 수 있게 합니다. 설치된 모듈은 관리자가 승인할 때까지 꺼진 상태로 유지됩니다. 꺼짐: 모듈을 모듈 폴더에 직접 복사합니다."
   },
   "review": {
     "title": "검토",
@@ -210,7 +212,8 @@
     "privateNetworkWaste": "폐기물 수거",
     "privateNetworkWebdav": "WebDAV 문서",
     "baseUrl": "공개 주소",
-    "outlook": "Outlook 캘린더"
+    "outlook": "Outlook 캘린더",
+    "moduleWebInstall": "설정에서 모듈 설치"
   },
   "docker": {
     "title": "Yuvomi 시작 중",

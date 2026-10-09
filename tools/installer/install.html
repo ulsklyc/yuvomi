@@ -2098,6 +2098,14 @@
           <input type="text" id="adv-push-subject" placeholder="mailto:admin@example.com">
           <div class="hint" data-i18n="advanced.pushSubjectHint">Sent to push services as a contact for your server. Leave empty to use the default.</div>
         </div>
+        <!-- Opt-in des Betreibers (DECISIONS.md, 12): ein Modul ist Skript im
+             Ursprung der App, und dieser Schalter laesst es aus dem Browser
+             heraus auf den Server. Der Hinweis nennt, was er oeffnet - nicht
+             nur, wofuer er praktisch ist. -->
+        <div class="field">
+          <label class="toggle-row"><span class="toggle-row__label" data-i18n="advanced.moduleWebInstall">Allow installing modules from Settings</span><span class="toggle"><input type="checkbox" role="switch" id="adv-module-web-install"><span class="toggle__track" aria-hidden="true"></span></span></label>
+          <div class="hint" data-i18n="advanced.moduleWebInstallHint">Lets an admin put third-party modules on the server from the web interface (ZIP upload or GitHub URL) without any file access. Installed modules stay off until an admin approves them. Off: modules are copied into the modules folder by hand.</div>
+        </div>
         </div>
 
         <div class="error-banner" id="adv-err" role="alert"></div>
@@ -2198,6 +2206,7 @@
             <!-- Die SSRF-Aufhebungen: eine Pruefseite, die ausgerechnet die
                  sicherheitsrelevanten Schalter auslaesst, prueft das Falsche. -->
             <div class="rv-row"><dt data-i18n="review.privateNetwork">Private-network access</dt><dd id="rv-private-network"></dd></div>
+            <div class="rv-row"><dt data-i18n="review.moduleWebInstall">Install modules from Settings</dt><dd id="rv-module-web-install"></dd></div>
             <div class="rv-row rv-row--unset"><dt data-i18n="review.notSetUp">Not set up</dt><dd id="rv-advanced-unset"></dd></div>
           </dl>
         </section>
@@ -2692,6 +2701,7 @@ const S = {
   ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK: '',
   RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK: '',
   WASTE_SOURCE_ALLOW_PRIVATE_NETWORK: '',
+  MODULES_ALLOW_WEB_INSTALL: '',
   MAX_UPLOAD_MB: '',
   DOCUMENT_STORAGE_LOCAL_ENABLED: '',
   DOCUMENT_STORAGE_LOCAL_PATH: '',
@@ -2827,6 +2837,7 @@ function buildEnv() {
     ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK: S.ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK,
     RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK: S.RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK,
     WASTE_SOURCE_ALLOW_PRIVATE_NETWORK: S.WASTE_SOURCE_ALLOW_PRIVATE_NETWORK,
+    MODULES_ALLOW_WEB_INSTALL: S.MODULES_ALLOW_WEB_INSTALL,
     MAX_UPLOAD_MB: S.MAX_UPLOAD_MB,
     DOCUMENT_STORAGE_LOCAL_ENABLED: S.DOCUMENT_STORAGE_LOCAL_ENABLED,
     DOCUMENT_STORAGE_LOCAL_PATH: S.DOCUMENT_STORAGE_LOCAL_PATH,
@@ -3956,6 +3967,9 @@ $('adv-next').addEventListener('click', () => {
   S.WASTE_SOURCE_ALLOW_PRIVATE_NETWORK = $('adv-waste-source-private').checked ? 'true' : '';
   S.DOCUMENT_STORAGE_WEBDAV_ALLOW_PRIVATE_NETWORK =
     $('adv-document-webdav-private').checked ? 'true' : '';
+  // Opt-in wie die Heimnetz-Freigaben: nur ein gesetzter Haken schreibt etwas,
+  // leer heisst "aus" und laesst die .env-Zeile auf ihrem Default.
+  S.MODULES_ALLOW_WEB_INSTALL = $('adv-module-web-install').checked ? 'true' : '';
 
   S.FIXER_API_KEY  = $('adv-fixer').value.trim();
   S.VAPID_SUBJECT  = $('adv-push-subject').value.trim();
@@ -4027,6 +4041,9 @@ function renderReview() {
   fillReviewGroup('rv-advanced-unset', [
     ['rv-oidc', S.OIDC_ISSUER ? setUp : ''],
     ['rv-private-network', privateNet.length ? privateNet.join(', ') : t('review.off')],
+    // Wie die Heimnetz-Zeile immer da, auch mit "Aus": ein Schalter, der
+    // Skript aus dem Browser auf den Server laesst, gehoert auf die Pruefseite.
+    ['rv-module-web-install', t(S.MODULES_ALLOW_WEB_INSTALL === 'true' ? 'review.on' : 'review.off')],
   ]);
 }
 

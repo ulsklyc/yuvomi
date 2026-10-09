@@ -130,7 +130,8 @@
     "privateNetworkWaste": "Avfallshåndtering",
     "privateNetworkWebdav": "WebDAV-dokumenter",
     "baseUrl": "Offentlig kunngjøring",
-    "outlook": "Outlook-kalender"
+    "outlook": "Outlook-kalender",
+    "moduleWebInstall": "Installere moduler fra Innstillinger"
   },
   "docker": {
     "title": "Starter Yuvomi",
@@ -276,7 +277,9 @@
     "sectionPrivateNetwork": "Tilgang til ditt hjemmenettverk",
     "privateNetworkHint": "Yuvomi avviser tilkoblinger til adresser på ditt eget nettverk som standard, noe som beskytter mot at en server kan lures til å nå interne tjenester. Aktiver det du faktisk kjører hjemme.",
     "authPasswordLogin": "Behold brukernavn og passord-innlogging",
-    "authPasswordLoginHint": "Ved å slå dette av blir SSO den eneste måten å logge inn på: innloggingsskjemaet og gjenoppretting av passord forsvinner. Det trer i kraft når minst én konto er koblet til din leverandør, slik at en ny installasjon fortsatt kan opprette sin første administrator. Hvis leverandøren din blir utilgjengelig, kan du få tilgang igjen ved å redigere .env-filen og starte på nytt."
+    "authPasswordLoginHint": "Ved å slå dette av blir SSO den eneste måten å logge inn på: innloggingsskjemaet og gjenoppretting av passord forsvinner. Det trer i kraft når minst én konto er koblet til din leverandør, slik at en ny installasjon fortsatt kan opprette sin første administrator. Hvis leverandøren din blir utilgjengelig, kan du få tilgang igjen ved å redigere .env-filen og starte på nytt.",
+    "moduleWebInstall": "Tillat installering av moduler fra Innstillinger",
+    "moduleWebInstallHint": "Lar en administrator legge tredjepartsmoduler på serveren fra nettgrensesnittet (ZIP-opplasting eller GitHub-URL) uten filtilgang. Installerte moduler forblir avslått til en administrator godkjenner dem. Av: moduler kopieres for hånd til modulmappen."
   },
   "welcome": {
     "title": "Hvordan vil du sette opp Yuvomi?",

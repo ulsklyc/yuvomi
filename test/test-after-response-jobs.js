@@ -447,6 +447,7 @@ const LESEN_NACH_AWAIT = new Map([
   ['server/routes/documents.js|/:id/thumbnail', 'Vorschaubild nur fuer DMS-Dokumente, DMS-Adapter ohne Datenbank'],
   ['server/routes/modules.js|/', 'Erweiterungen aus dem Dateisystem'],
   ['server/routes/modules.js|/assets/:id/{*assetPath}', 'Datei einer Erweiterung aus dem Dateisystem'],
+  ['server/routes/modules.js|/install/info', 'prueft, ob der Modulordner beschreibbar (mkdir/access) und dauerhaft ist (/proc/self/mountinfo, cgroup lesen), schreibt nichts in die Datenbank'],
   ['server/routes/permissions.js|/catalog', 'Erweiterungen aus dem Dateisystem'],
   ['server/routes/preferences.js|/holidays/countries', 'Feiertags-API, ohne Cache in der Datenbank'],
   ['server/routes/preferences.js|/holidays/subdivisions/:countryCode', 'Feiertags-API, ohne Cache in der Datenbank'],

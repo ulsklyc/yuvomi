@@ -2005,6 +2005,79 @@
   }
 }
 
+/* --------------------------------------------------------
+   Eigenes Modul hinzufuegen (settings/pages/modules-install.js)
+   Die Karten sind die des Backups (Icon, Dropzone, Dateizeile); neu sind nur
+   das Ergebnis, die Wahl zwischen mehreren Modulen eines Archivs und die
+   Liste der uebersprungenen Dateien.
+   -------------------------------------------------------- */
+
+.settings-module-install__result:not(:empty) {
+  margin-top: var(--space-4);
+}
+
+.settings-module-candidates {
+  min-width: 0;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  border: none;
+}
+
+.settings-module-candidates__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.settings-module-candidate {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-height: var(--target-lg);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.settings-module-candidate:hover {
+  background: var(--color-surface-hover);
+}
+
+.settings-module-candidate:has(input:checked) {
+  box-shadow: inset 0 0 0 1.5px var(--color-accent);
+}
+
+.settings-module-candidate input[type="radio"] {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.settings-module-candidate__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+}
+
+.settings-module-install__skipped {
+  margin: var(--space-2) 0 0;
+  padding-inline-start: var(--space-5);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+}
+
 /* Der Breadcrumb-Block ist zu den übrigen Breadcrumb-Regeln gewandert.
    `.settings-breadcrumb__current` ist ersatzlos weg: `shell.js:375` erzeugt
    `settings-breadcrumb__item--current`, die Klasse gab es nie im Markup. */
@@ -2999,6 +3072,50 @@
 .settings-module-row__toggle {
   margin: 0;
   white-space: nowrap;
+}
+
+/* Ein loeschbares Drittmodul traegt am Zeilenende zusaetzlich seinen
+   Mehr-Knopf (modules-active.js, Loeschen als Eintrag darin): eine vierte
+   Spalte hinter dem Schalter, auf jeder Breite. */
+.settings-module-row--fixed.settings-module-row--menu {
+  grid-template-columns: var(--target-base) minmax(0, 1fr) auto auto;
+}
+
+/* Die Details eines Drittmoduls sind eine eigene Rasterzeile unter der
+   Titelzeile, von der Textspalte bis zum Zeilenende. Im Textblock bekamen sie
+   auf dem Telefon nur dessen Spalte (127px bei 375px), Werte wurden
+   abgeschnitten, und Schalter und Mehr-Knopf schwebten auf halber Hoehe
+   der aufgeklappten Zeile. So bleiben beide neben dem Titel. */
+.settings-module-row__details {
+  grid-column: 2 / -1;
+  grid-row: 2;
+  min-width: 0;
+}
+
+/* Quelle (URL @ ref) und Ordner sind lange Woerter ohne Trennstelle; eine
+   lange Beschreibung trennt dagegen an Silben (test:typography W1). */
+.settings-module-row__details .settings-info-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+}
+
+@media (max-width: 639px) {
+  .settings-module-row--fixed.settings-module-row--menu {
+    grid-template-columns: var(--target-base) minmax(0, 1fr) auto auto;
+  }
+
+  .settings-module-row--menu .settings-module-row__actions {
+    grid-column: 4;
+    grid-row: 1;
+  }
+
+  /* Auf dem Telefon zaehlt jede Spalte: die Details nehmen auch die des
+     Symbols mit. */
+  .settings-module-row__details {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 639px) {

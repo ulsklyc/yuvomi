@@ -806,3 +806,111 @@ router, which makes the switch a lock and breaks tokens for a module that is mer
 timer, push or periodic sync that never asks the switch, which is #1279 again. A mixed answer
 that drops the key instead of emptying the value. And treating `hidden_modules` the same way:
 that one is a member tidying their own navigation and takes nothing away anywhere (#673).
+
+---
+
+## 12. A module gets in by the operator's choice, and stays off until somebody looked
+
+**Installing a module from Settings is the operator's choice (`MODULES_ALLOW_WEB_INSTALL`, off
+by default). A module installed that way stays off until an admin approves it in a browser
+session, and that state travels with the folder. The web interface removes or replaces only
+what it installed.**
+
+Module code never runs in the Node process: `modules/<id>/` is read as data and served as
+assets, so installing one is not code execution on the server. In the browser it is something
+else. A module is same-origin script with the session of whoever opens it, an admin included.
+Until #1671 (Settings → Modules → Add custom module, 2026-10), putting such script on the server
+took filesystem access. With the feature, a foothold in an admin's browser session is enough,
+an XSS or a module that is already enabled, and what it writes stays after the session ends,
+after a password change and after a token is revoked. The session requirement on the routes
+stops a leaked admin token, but it cannot stop that case, because that case runs inside the
+session. No design closes it completely. So it is a risk the operator chose where `modules/`
+is mounted, not something every installation receives with an update: the switch is a hard
+gate on purpose, unlike the household switch of entry 11, which is a tidy-up and never a lock.
+
+The three parts of the rule answer the three ways the gate could leak once it is open:
+
+- **Off by default.** Two settings decide it, the switch and the browser session, and both
+  have to be set by a person: the operator in `.env`, the Unraid template or the Portainer
+  stack, the admin by signing in. An API token, and therefore the MCP bridge, installs
+  nothing, deletes nothing and enables nothing; disabling by token stays, because taking code
+  away is the safe direction.
+- **Off until approved, and the approval lives in the folder.** Every install and every
+  replace writes `approved: false` into `.yuvomi-install.json` next to the module. Enabling
+  the module from a browser session rewrites it to `true` and clears the household switch;
+  disabling sets the household switch first and then writes `approved: false` back, so
+  `approved` means exactly "an admin has this version switched on". The state is in the
+  folder and not only in the database because no backup contains `modules/`: a database
+  restored from before the install, or a fresh one over a kept modules volume, must not turn
+  on a module nobody looked at, must not turn off one that was approved, and must not turn
+  back on one the admin switched off. The write on disable is best effort (the household
+  switch alone already decides): taking code away never fails because the folder is read-only,
+  and never waits for an install. It rewrites the record only when the install lock is free;
+  while an install or delete holds it, the record is left as it is, because a replace landing
+  between its read and its rewrite would carry the old version's source and install date into
+  the new folder (which arrives with `approved: false` of its own).
+  A replace resets
+  the approval even from "the same" GitHub repository, since the ref is a branch or a movable
+  tag and the comparison would be on a name that can change hands. A folder without the
+  record was copied by hand and behaves as before: the household switch alone.
+- **The web removes or replaces only what the web installed.** A hand-copied folder can be a
+  working checkout with uncommitted work, and `rm -r` has no undo; a replace moves the old
+  folder aside and removes it, which is the same thing with one step in between. Without the
+  record, delete and replace both answer 409 `not_web_installed`: the page shows no delete
+  button and asks no replace question, it says to remove the folder on the server first.
+
+### How to sort the next case
+
+1. **Does it put script in front of members, or take it away?** Putting it there (install,
+   replace, enable) sits behind both the switch and the session. Taking it away (disable) is
+   open to a token.
+2. **Would a fresh database change what runs?** Then the state belongs in the folder, next to
+   the code it describes, not in `sync_config`.
+3. **Did the web put it there?** Only then may the web take it away or swap it out.
+
+### Where the rule lives
+
+- The switch: `MODULES_ALLOW_WEB_INSTALL` in `tools/installer/env-schema.js`, `.env.example`,
+  `templates/yuvomi.xml`, `docs/docker-compose.portainer.yml` and the installer page; read
+  once at startup by `isWebInstallEnabled()` in `server/services/module-install.js`, with the
+  parse rule of the private-network opt-ins (exactly `true` or `1`). `requireWebInstall` in
+  `server/routes/modules.js` answers 403 `module_web_install_disabled` before the body is
+  read; `GET /modules/install/info` reports `webInstall`, and the page shows the manual way.
+  The default itself is pinned: `npm run test:module-install` imports the service afresh with
+  the variable unset, `yes`, `TRUE `, empty, `false` and `0` and expects the switch shut, so a
+  constant in place of the environment read turns the suite red.
+- The session: `requireBrowserSession` and `sessionRefusal` in `server/routes/modules.js`
+  (403 `module_session_required`) on install, delete and `PATCH /:id` with `enabled: true`;
+  the install and delete operations carry `x-mcp-exclude` in `server/openapi/paths/modules.js`.
+- The approval: `approved: false` in the install record written by `installFilesUnlocked()`
+  in `server/services/module-install.js`; `readInstallRecord()` and `writeInstallApproval()`
+  in `server/services/modules.js`, where `readModule()` keeps a module with a record off until
+  the record says `approved: true`, and `setModuleEnabled(id, true)` writes that. It writes
+  it under the install lock (`acquireInstallLock()` in `server/services/modules.js`, the same
+  lock install and delete take), so a replace cannot land between the read of the record and
+  its rewrite and collect an approval meant for the version before it; while the lock is held
+  enabling answers 409 `busy`, and a folder the server cannot write answers 503
+  `not_writable` with no server path in the message. `setModuleEnabled(id, false)` takes the
+  same lock without waiting: free, it writes `approved: false` under it; held, the household
+  switch alone turns the module off and the record write is skipped with a warning in the log.
+- The delete and the replace: `deleteModule()` and the record check in `installFilesUnlocked()`
+  in `server/services/module-install.js`, 409 `not_web_installed` without a record, checked
+  before the overwrite question. An unreadable record counts as none for both; `readModule()`
+  reports it as an error to fix on the server.
+- `npm run test:module-install` holds all of it: the switch off before the body and
+  `info.webInstall`, a record over an empty database, approval written on enable and reset on
+  disable and on replace from every source, enabling by token refused and by session accepted, disabling by
+  token, delete and replace refused without a record (ZIP and GitHub, with and without
+  overwrite). `npm run test:modules` holds the reading of the
+  record, the atomic rewrite, the literal `true` and the disable that leaves the record
+  untouched while the lock is held; `npm run test:installer-schema` holds the
+  switch in the schema, `.env.example` and the Portainer stack; `npm run test:mcp` holds what
+  the bridge lists and says about enabling.
+
+### What counts as undoing it
+
+A default of on. Enabling, installing or replacing by token, which hands the step that makes
+code live to a long-lived secret in a script. A review state that a fresh database forgets,
+which is the deny-list in `sync_config` deciding alone again. A replace that keeps the switch
+because the source "is the same". And a delete or a replace that reaches a folder without an
+install record.

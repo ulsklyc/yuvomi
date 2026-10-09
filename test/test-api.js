@@ -802,6 +802,13 @@ const REASONS_READ_BY_A_PAGE = new Map([
   ['ATTACHMENT_CHANGE_REFUSED', 'pages/calendar.js'],
   ['ATTACHMENT_UPLOAD_REFUSED', 'pages/calendar.js'],
   ['FOLDER_DOCUMENTS_NOT_MANAGEABLE', 'utils/document-folder-delete.js'],
+  // Installieren, Loeschen und Einschalten eines Moduls mit einem API-Token:
+  // beide Blaetter (Eigenes Modul hinzufuegen, Aktive Module) nehmen den Satz
+  // aus dieser Datei.
+  ['module_session_required', 'settings/module-install-errors.js'],
+  // Der Betreiber hat MODULES_ALLOW_WEB_INSTALL nicht gesetzt (DECISIONS.md 12):
+  // das Blatt zeigt dann den Weg von Hand, mit demselben Satzvorrat.
+  ['module_web_install_disabled', 'settings/module-install-errors.js'],
 ]);
 
 const REASONS_WITHOUT_SENTENCE = new Set([
@@ -868,6 +875,10 @@ const REASONS_PASSED_THROUGH = new Map([
   // Stellen ausgeschrieben, 409 - eine 403 baut sie nie.
   ['routes/budget/helpers.js: first.reason', { sites: 1, at403: [], why: '400 oder 409' }],
   ['routes/budget/loans.js: derived.reason', { sites: 1, at403: [], why: 'Vorschau: 200 mit ok: false' }],
+  ['routes/modules.js: err.reason', { sites: 2, at403: [],
+    why: 'sendInstallError: InstallError traegt nur 400-429 und 502/503 (REASON_STATUS in services/module-install.js); '
+      + 'PATCH /:id: setModuleEnabled setzt nur busy (409) und not_writable (503); '
+      + 'die beiden 403 der Modul-Installation (module_web_install_disabled, module_session_required) schickt die Route als Literal, vor dem Body' }],
   ['services/document-deletion-lock.js: err.reason', { sites: 1, at403: [], why: 'feste 409' }],
   ['middleware/error-handler.js: err.reason', { sites: 1, at403: [], why: 'feste 503' }],
   ['middleware/restore-gate.js: RESTORE_IN_PROGRESS_REASON', { sites: 1, at403: [], why: '503 oder 409' }],

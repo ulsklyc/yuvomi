@@ -168,7 +168,9 @@
     "sectionPrivateNetwork": "Akses ke jaringan rumahmu",
     "privateNetworkHint": "Secara bawaan Yuvomi menolak koneksi ke alamat di jaringanmu sendiri, yang melindungi dari server yang diperdaya untuk menjangkau layanan internal. Aktifkan yang benar-benar kamu jalankan di rumah.",
     "authPasswordLogin": "Pertahankan masuk dengan nama pengguna dan kata sandi",
-    "authPasswordLoginHint": "Mematikannya menjadikan SSO satu-satunya jalan masuk: formulir masuk dan pengaturan ulang kata sandi menghilang. Jika penyedia tidak dapat dijangkau, jalan kembalinya adalah menyunting berkas .env dan memulai ulang."
+    "authPasswordLoginHint": "Mematikannya menjadikan SSO satu-satunya jalan masuk: formulir masuk dan pengaturan ulang kata sandi menghilang. Jika penyedia tidak dapat dijangkau, jalan kembalinya adalah menyunting berkas .env dan memulai ulang.",
+    "moduleWebInstall": "Izinkan memasang modul dari Pengaturan",
+    "moduleWebInstallHint": "Memungkinkan admin menempatkan modul pihak ketiga di server dari antarmuka web (unggah ZIP atau URL GitHub) tanpa akses berkas. Modul yang terpasang tetap nonaktif sampai seorang admin menyetujuinya. Nonaktif: modul disalin secara manual ke folder modul."
   },
   "review": {
     "title": "Tinjauan",
@@ -210,7 +212,8 @@
     "privateNetworkWaste": "Pengumpulan sampah",
     "privateNetworkWebdav": "Dokumen WebDAV",
     "baseUrl": "Alamat publik",
-    "outlook": "Kalender Outlook"
+    "outlook": "Kalender Outlook",
+    "moduleWebInstall": "Pasang modul dari Pengaturan"
   },
   "docker": {
     "title": "Yuvomi sedang dimulai",

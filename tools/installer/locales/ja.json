@@ -130,7 +130,8 @@
     "privateNetworkWaste": "ごみ収集",
     "privateNetworkWebdav": "WebDAV ドキュメント",
     "baseUrl": "公開アドレス",
-    "outlook": "Outlook カレンダー"
+    "outlook": "Outlook カレンダー",
+    "moduleWebInstall": "設定からのモジュールのインストール"
   },
   "docker": {
     "title": "Yuvomi を起動しています",
@@ -276,7 +277,9 @@
     "sectionPrivateNetwork": "home ネットワークへのアクセス",
     "privateNetworkHint": "Yuvomi は既定で自宅ネットワーク上のアドレスへの接続を拒否します。これはサーバーが内部サービスへ誘導されるのを防ぎます。実際に自宅で動かしているものだけを許可してください。",
     "authPasswordLogin": "ユーザー名とパスワードでのログインを残す",
-    "authPasswordLoginHint": "オフにすると SSO が唯一の入口になります。ログインフォームとパスワードの再設定は表示されなくなります。プロバイダーに接続できなくなった場合の戻り道は、.env ファイルの編集と再起動です。"
+    "authPasswordLoginHint": "オフにすると SSO が唯一の入口になります。ログインフォームとパスワードの再設定は表示されなくなります。プロバイダーに接続できなくなった場合の戻り道は、.env ファイルの編集と再起動です。",
+    "moduleWebInstall": "設定からのモジュールのインストールを許可する",
+    "moduleWebInstallHint": "管理者がウェブ画面から（ZIP のアップロードまたは GitHub の URL で）ファイルアクセスなしにサードパーティ製モジュールをサーバーに置けるようにします。インストールしたモジュールは管理者が承認するまでオフのままです。オフの場合：モジュールは手動でモジュールフォルダーにコピーします。"
   },
   "welcome": {
     "title": "Yuvomi をどのようにセットアップしますか？",

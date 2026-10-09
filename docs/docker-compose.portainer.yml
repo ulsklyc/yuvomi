@@ -58,6 +58,11 @@ services:
       - PORT=3000
       - DB_PATH=/data/yuvomi.db
       - BACKUP_DIR=/backups
+      # Set true to let an admin install third-party modules from Settings into
+      # the oikos_modules volume (same-origin script from a browser session, no
+      # file access needed). Off by default; installed modules stay off until an
+      # admin approves them in a browser session.
+      - MODULES_ALLOW_WEB_INSTALL=${MODULES_ALLOW_WEB_INSTALL:-false}
       - SESSION_SECRET=${SESSION_SECRET:?Set SESSION_SECRET in .env}
       - DB_ENCRYPTION_KEY=${DB_ENCRYPTION_KEY:?Set DB_ENCRYPTION_KEY in .env}
       # Set to true when behind a reverse proxy with HTTPS (Caddy, nginx, Traefik)

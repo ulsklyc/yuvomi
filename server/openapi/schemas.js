@@ -1296,8 +1296,112 @@ export const schemas = {
               },
             },
             capabilities: { $ref: '#/components/schemas/ExtensionModuleCapabilities' },
+            manifestVersion: { type: 'integer', description: 'Manifest format version the module is written for (absent on errored modules).' },
+            entry: { type: 'string', description: 'Entry file relative to the module folder (absent on errored modules).' },
+            style: { type: ['string', 'null'], description: 'Stylesheet relative to the module folder, or null.' },
+            page: {
+              type: 'object',
+              description: 'Normalized page declaration (absent on errored modules).',
+              properties: {
+                composition: { type: 'string', enum: ['reading', 'data', 'dashboard', 'form', 'split', 'full'] },
+                width: { type: 'string', enum: ['reading', 'content', 'wide'] },
+                navigation: { type: 'string', enum: ['standard'] },
+                responsive: { type: 'string', enum: ['standard'] },
+              },
+            },
+            install: { $ref: '#/components/schemas/ExtensionModuleInstall' },
           },
           required: ['id', 'name', 'enabled', 'status'],
+        },
+        ExtensionModuleInstall: {
+          type: ['object', 'null'],
+          description: 'How the module was installed from Settings (read from `.yuvomi-install.json` in its folder) and whether an admin has approved it since. null when the folder was copied onto the server by hand. Only present in the admin listing (`GET /api/v1/modules?admin=1` by an admin) and in install responses.',
+          properties: {
+            source: { type: 'string', enum: ['zip', 'github'] },
+            url: { type: ['string', 'null'], description: 'GitHub repository URL.' },
+            ref: { type: ['string', 'null'], description: 'Branch, tag or commit that was downloaded.' },
+            commit: { type: ['string', 'null'], description: 'Commit SHA of the GitHub archive, when known.' },
+            path: { type: ['string', 'null'], description: 'Folder inside the archive the module came from.' },
+            installedAt: { type: ['string', 'null'], format: 'date-time' },
+            approved: { type: 'boolean', description: 'False after every install and replace; true once an admin enabled the module from a browser session. While false the module is disabled whatever the household switch says, so a restored or fresh database cannot turn on code nobody looked at. Stored in the module folder.' },
+            installedByName: { type: ['string', 'null'], description: 'Display name of the admin who installed it, resolved from the user id in the record; null when that account no longer exists. Only in the admin listing.' },
+          },
+          required: ['source', 'approved'],
+        },
+        ModuleInstallInfoResponse: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                writable: { type: 'boolean', description: 'False when the modules folder is read-only; installs then answer 503.' },
+                persistent: { type: ['boolean', 'null'], description: 'Best-effort guess whether the modules folder survives an update of the server. False when Yuvomi runs in a container and the folder is not on a volume or bind mount (installed modules would be lost with the next image update); null when it cannot be determined. The routes still answer when false; the Settings page then shows the manual way, like for a read-only folder.' },
+                webInstall: { type: 'boolean', description: 'Whether the operator switched installing from Settings on (`MODULES_ALLOW_WEB_INSTALL=true`). False by default; the install and delete routes then answer 403 `module_web_install_disabled`.' },
+                maxZipMb: { type: 'integer', description: 'Archive size limit in MB.' },
+              },
+              required: ['writable', 'persistent', 'webInstall', 'maxZipMb'],
+            },
+          },
+          required: ['data'],
+        },
+        ModuleInstallGithubRequest: {
+          type: 'object',
+          properties: {
+            url: { type: 'string', maxLength: 2000, description: 'GitHub URL or `owner/repo`.' },
+            ref: { type: 'string', maxLength: 200, description: 'Branch, tag or commit; overrides the ref from the URL.' },
+            path: { type: 'string', maxLength: 500, description: 'Folder inside the repository that holds module.json. Overrides the folder of a tree URL; an empty string selects the repository root.' },
+            overwrite: { type: 'boolean', description: 'Replace an installed module with the same id.' },
+          },
+          required: ['url'],
+        },
+        ModuleInstallResponse: {
+          type: 'object',
+          properties: {
+            data: { $ref: '#/components/schemas/ExtensionModule' },
+            replaced: { type: 'boolean', description: 'True when an installed module with the same id was replaced.' },
+            skipped: { type: 'array', items: { type: 'string' }, description: 'Files in the module folder that were not copied (not a web asset type, or a dotfile).' },
+          },
+          description: 'The module is disabled either way, after a fresh install and after a replace: `data.install.approved` is false until an admin enables it from a browser session.',
+          required: ['data', 'replaced', 'skipped'],
+        },
+        ModuleInstallError: {
+          type: 'object',
+          properties: {
+            error: { type: 'string' },
+            code: { type: 'integer' },
+            reason: { type: 'string', description: 'Stable machine-readable reason.' },
+            existing: {
+              type: 'object',
+              description: 'With `exists`: the installed module.',
+              properties: {
+                id: { type: 'string' },
+                name: { type: 'string' },
+                version: { type: 'string' },
+                install: { $ref: '#/components/schemas/ExtensionModuleInstall' },
+              },
+            },
+            incoming: {
+              type: 'object',
+              description: 'With `exists`: the module in the archive. A replace (retry with overwrite) always leaves the module disabled until it is approved again.',
+              properties: { id: { type: 'string' }, name: { type: 'string' }, version: { type: 'string' } },
+            },
+            candidates: {
+              type: 'array',
+              description: 'With `multiple`: the modules found in the archive.',
+              items: {
+                type: 'object',
+                properties: {
+                  path: { type: 'string' },
+                  id: { type: ['string', 'null'] },
+                  name: { type: ['string', 'null'] },
+                  version: { type: ['string', 'null'] },
+                },
+                required: ['path'],
+              },
+            },
+            resetAt: { type: 'string', format: 'date-time', description: 'With `rate_limited` from GitHub: when the limit resets.' },
+          },
+          required: ['error', 'code'],
         },
         ModulesListResponse: {
           type: 'object',

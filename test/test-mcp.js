@@ -476,6 +476,45 @@ test('get_api_operation: unbekannter operation_key → isError', async () => {
   assert.match(res.result.content[0].text, /Unknown operation_key/i);
 });
 
+// Modul installieren/loeschen geht nur aus einer Browser-Sitzung. Die Bruecke
+// reicht aber auch ein Sitzungs-Cookie weiter (siehe Loopback-Test unten) -
+// darum tragen die drei Operationen `x-mcp-exclude` und fehlen hier ganz.
+test('x-mcp-exclude: Modul-Installation und -Loeschen sind ueber MCP weder gelistet noch aufrufbar', async () => {
+  const listed = parseContent(await toolCall('list_api_operations', { tag: 'Modules' }));
+  const keys = listed.operations.map((op) => op.operation_key);
+  assert.ok(keys.includes('get_modules'), 'die Modulliste bleibt erreichbar');
+  assert.ok(keys.includes('patch_modules_by_id'), 'das Ein-/Ausschalten bleibt erreichbar');
+  for (const key of ['post_modules_install_zip', 'post_modules_install_github', 'delete_modules_by_id']) {
+    assert.ok(!keys.includes(key), `${key} darf nicht gelistet sein`);
+  }
+
+  const calls = installFetchMock(() => jsonResponse({ data: {} }));
+  try {
+    for (const args of [
+      { operation_key: 'post_modules_install_github', payload: { url: 'o/r' } },
+      { operation_key: 'delete_modules_by_id', path_params: { id: 'x-mod' } },
+      { method: 'DELETE', path: '/api/v1/modules/{id}', path_params: { id: 'x-mod' } },
+    ]) {
+      const res = await toolCallWithHeaders('call_api_operation', args, { cookie: 'sid=abc' });
+      assert.equal(res.result.isError, true, JSON.stringify(args));
+      assert.match(res.result.content[0].text, /not available through MCP/);
+    }
+    assert.equal(calls.length, 0, 'kein Loopback-Aufruf');
+  } finally {
+    global.fetch = realFetch;
+  }
+  const described = await toolCall('get_api_operation', { operation_key: 'delete_modules_by_id' });
+  assert.equal(described.result.isError, true);
+
+  // Das Ein-/Ausschalten bleibt gelistet, weil Ausschalten per Token nuetzlich
+  // ist; dass Einschalten eine Sitzung braucht (Runde 3 von #1671), steht in
+  // der Beschreibung, die der Assistent liest - sonst plant er den Schritt.
+  const patch = parseContent(await toolCall('get_api_operation', { operation_key: 'patch_modules_by_id' }));
+  assert.match(patch.description, /browser session/);
+  assert.match(patch.description, /module_session_required/);
+  assert.match(patch.description, /Disabling .* token/);
+});
+
 // ── OpenAPI-Brücke: call_api_operation (Loopback via gemocktem fetch) ─────────
 
 test('call_api_operation GET: baut URL, leitet Auth-Header weiter, gibt Body zurück', async () => {
