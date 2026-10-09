@@ -36,6 +36,19 @@ exists. Leaving the field empty preserves the saved key.
 The album UUID is the UUID portion of an Immich album URL. Only image assets are selected; videos
 are not shown by the screensaver.
 
+## Wall tablets
+
+A paired wall tablet shows the screensaver only when an administrator switches it on for that
+tablet, under **Settings → Household → Wall tablets → Show the photo screensaver**. It is off by
+default: a tablet changes no settings itself, and its delay has no "never", so without this switch
+every wall in a household with Immich would start covering its calendar with photos.
+
+A tablet with the switch on reads the same photos every signed-in device shows - a random selection
+from the configured album or, without one, from everything the API key can read, with the date,
+city and country of each photo - and nothing else of the screensaver: the connection, the album
+choice and the connection test stay with the administrators. With the switch off, the server
+refuses the photos to that tablet.
+
 ## Delay on each device
 
 How long a device waits before the screensaver starts is chosen on that device, under

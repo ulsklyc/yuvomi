@@ -241,13 +241,14 @@ router.use(requireAdmin);
 router.get('/', (_req, res) => {
   try {
     const rows = db.get().prepare(`
-      SELECT u.id, u.display_name, u.avatar_color, da.created_at
+      SELECT u.id, u.display_name, u.avatar_color, da.created_at, da.show_screensaver
         FROM users u
         JOIN display_accounts da ON da.user_id = u.id
        ORDER BY u.display_name
     `).all();
     const data = rows.map((row) => ({
       ...row,
+      show_screensaver: row.show_screensaver === 1,
       devices: listDisplayDevices(row.id),
     }));
     // `area_modules` steht NEBEN der Liste, nicht in jedem Eintrag: es ist eine
@@ -302,9 +303,38 @@ router.post('/', (req, res) => {
         .run(userId, req.authUserId || null);
     })();
 
-    return res.status(201).json({ data: { id: userId, display_name: displayName, devices: [] } });
+    return res.status(201).json({ data: { id: userId, display_name: displayName, show_screensaver: false, devices: [] } });
   } catch (err) {
     log.error('POST / error:', err);
+    return res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+/**
+ * Ob dieses Display den Foto-Bildschirmschoner zeigt (#1766, Migration 238).
+ * Body: { show_screensaver: boolean }
+ *
+ * DIE WAHL TRIFFT EIN ADMINISTRATOR, NICHT DAS TABLETT. Ein Display aendert
+ * keine Einstellungen; diese Route liegt hinter `requireAdmin` wie alles hier,
+ * und das Tablett selbst erreicht sie nicht (sie steht in keiner seiner
+ * Listen). Wirksam ist sie beim naechsten Request des Tabletts: das Gate liest
+ * die Spalte bei jedem Zugriff mit dem Credential. Nur ein echter Boolean -
+ * ein String "false" waere sonst wahr.
+ */
+router.patch('/:id', (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
+    const value = req.body?.show_screensaver;
+    if (typeof value !== 'boolean') {
+      return res.status(400).json({ error: 'show_screensaver must be a boolean.', code: 400 });
+    }
+    const result = db.get().prepare('UPDATE display_accounts SET show_screensaver = ? WHERE user_id = ?')
+      .run(value ? 1 : 0, id);
+    if (result.changes === 0) return res.status(404).json({ error: 'Display not found.', code: 404 });
+    return res.json({ data: { id, show_screensaver: value } });
+  } catch (err) {
+    log.error('PATCH /:id error:', err);
     return res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });

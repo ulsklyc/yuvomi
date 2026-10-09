@@ -344,7 +344,7 @@ export function authenticateDisplayDevice(token, { db } = {}) {
   if (!token || typeof token !== 'string') return null;
   const database = db || dbModule.get();
   const row = database.prepare(`
-    SELECT d.id, d.user_id, d.cookie_refreshed_at
+    SELECT d.id, d.user_id, d.cookie_refreshed_at, da.show_screensaver
       FROM display_devices d
       JOIN display_accounts da ON da.user_id = d.user_id
      WHERE d.token_hash = ? AND d.revoked_at IS NULL
@@ -368,10 +368,14 @@ export function authenticateDisplayDevice(token, { db } = {}) {
   // Waehrend eines Restores nimmt die Datenbank keine Schreibzugriffe an
   // (#1431): kein `last_seen_at` und keine Auffrischung, deren Frist sich
   // nicht festhalten liesse. Das Tablett bleibt angemeldet wie zuvor.
-  if (dbModule.isRestoreRunning()) return { userId: row.user_id, deviceId: row.id, refreshCookie: false };
+  // `showScreensaver` ist die Wahl des Administrators fuer dieses Display
+  // (#1766, Migration 238); die Gates in server/index.js lassen die Fotos des
+  // Bildschirmschoners nur damit durch.
+  const showScreensaver = row.show_screensaver === 1;
+  if (dbModule.isRestoreRunning()) return { userId: row.user_id, deviceId: row.id, refreshCookie: false, showScreensaver };
   const refreshCookie = cookieRefreshDue(row.cookie_refreshed_at, seen);
   database.prepare('UPDATE display_devices SET last_seen_at = ? WHERE id = ?').run(seen, row.id);
-  return { userId: row.user_id, deviceId: row.id, refreshCookie };
+  return { userId: row.user_id, deviceId: row.id, refreshCookie, showScreensaver };
 }
 
 /**

@@ -352,6 +352,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   straight back could leave the wrong month on screen - whichever answer arrived last won. Each
   click now counts from the month you asked for, and a late answer for a month you already left
   is ignored. The same holds for "Current" and for swiping.
+- **A paired wall tablet can show the photo screensaver** (#1766). Its account could not read the
+  screensaver photos, so the screensaver never started on the one device it was built for. An
+  administrator now switches it on per tablet under Settings → Household → Wall tablets; it is off
+  until then, so a wall that shows the calendar today keeps showing it after the update. A tablet
+  that has it on reads the same photos every signed-in device shows - with their date, city and
+  country - and nothing else of the screensaver: the Immich connection stays out of its reach.
 
 ## [2.75.0] - 2026-10-07
 

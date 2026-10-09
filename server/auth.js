@@ -986,6 +986,7 @@ function requireAuth(req, res, next) {
       req.authRole = 'member';
       req.authScopes = [...DISPLAY_SCOPES];
       req.displayDeviceId = device.deviceId;
+      req.displayShowsScreensaver = device.showScreensaver === true;
       // DAS COOKIE WIRD NACHDATIERT, ABER NICHT BEI JEDEM ZUGRIFF. Browser
       // kappen die Lebensdauer persistenter Cookies (Chromium: 400 Tage), eine
       // einmal geschriebene Jahreszahl haelt also nicht, was sie sagt - ein

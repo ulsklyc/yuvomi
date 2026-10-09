@@ -175,6 +175,7 @@ export const SETTINGS_SECTIONS = freezeEntries([
     descriptionKey: 'settings.pageDisplaysDescription',
     options: [
       'settings.displayPairingCodeLabel',
+      'settings.displayScreensaverLabel',
     ],
     adminOnly: true,
     loader: () => import('/settings/pages/admin-displays.js'),

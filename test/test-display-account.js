@@ -243,6 +243,87 @@ test('das Display darf genau die drei Geruestpfade LESEN, und nur lesend', async
   assert.equal((await display('PATCH', '/preferences', { week_start: 1 })).status, 403);
 });
 
+test('die Fotos des Bildschirmschoners nur, wenn ein Administrator sie fuer dieses Display einschaltet (#1766)', async () => {
+  // Ohne die Ausnahme lief der Schoner auf genau dem Geraet nie, fuer das er
+  // gebaut wurde: `/screensaver` ist kein Modul, das Scope-Gate sperrte, und
+  // `start()` schluckt das 403. Ohne den Schalter dagegen faenge jedes
+  // gekoppelte Tablett an, Fotos ueber den Kalender zu legen - ein Display
+  // aendert keine Einstellungen, also entscheidet der Administrator, je Display.
+  // In dieser Suite ist Immich nicht verbunden: die Liste antwortet deshalb
+  // 200 mit `enabled: false`, ein Foto 404 aus der Route. Beides heisst: das
+  // Gate hat durchgelassen.
+  const display = asDisplay(displayToken);
+  const photoPath = '/screensaver/photos/3f2504e0-4f89-41d3-9a0c-0305e82c3301';
+  const refusedAtGate = async (path, why) => {
+    const res = await display('GET', path);
+    assert.equal(res.status, 403, `${path} ${why}, war ${res.status}`);
+    assert.match(String(res.body?.error), /scope/i, `${path} muss am Scope-Gate scheitern`);
+  };
+
+  const listed = (await admin('GET', '/displays')).body.data.find((d) => d.id === displayId);
+  assert.equal(listed.show_screensaver, false, 'aus, solange niemand es einschaltet');
+  await refusedAtGate('/screensaver/photos', 'ist ohne Schalter gesperrt');
+  await refusedAtGate(photoPath, 'ist ohne Schalter gesperrt');
+
+  // Das Tablett schaltet sich nicht selbst ein - das haelt schon das
+  // Scope-Gate. Die eigentliche Regel dieser Route ist aber "nur ein
+  // Administrator": ein angemeldetes Mitglied kommt am Scope-Gate vorbei und
+  // muss an `requireAdmin` scheitern, ohne dass sich etwas aendert.
+  const self = await display('PATCH', `/displays/${displayId}`, { show_screensaver: true });
+  assert.equal(self.status, 403, `das Display darf sich nicht selbst einschalten, war ${self.status}`);
+  const neu = await admin('POST', '/auth/users', {
+    username: 'nora', display_name: 'Nora', password: 'norapass12345', role: 'member',
+  });
+  assert.equal(neu.status, 201, `Mitglied anlegen: ${JSON.stringify(neu.body)}`);
+  const nora = as(await login('nora', 'norapass12345'));
+  const byMember = await nora('PATCH', `/displays/${displayId}`, { show_screensaver: true });
+  assert.equal(byMember.status, 403, `ein Mitglied darf das Display nicht einschalten, war ${byMember.status}`);
+  assert.equal((await admin('GET', '/displays')).body.data.find((d) => d.id === displayId).show_screensaver, false,
+    'nach dem Versuch des Mitglieds weiter aus');
+  await refusedAtGate('/screensaver/photos', 'bleibt nach dem Versuch des Mitglieds gesperrt');
+
+  // Nur ein echter Boolean, nur ein echtes Display.
+  assert.equal((await admin('PATCH', `/displays/${displayId}`, { show_screensaver: 'true' })).status, 400);
+  assert.equal((await admin('PATCH', `/displays/${displayId}`, {})).status, 400);
+  assert.equal((await admin('PATCH', '/displays/999999', { show_screensaver: true })).status, 404);
+
+  const on = await admin('PATCH', `/displays/${displayId}`, { show_screensaver: true });
+  assert.equal(on.status, 200);
+  assert.deepEqual(on.body, { data: { id: displayId, show_screensaver: true } });
+  assert.equal((await admin('GET', '/displays')).body.data.find((d) => d.id === displayId).show_screensaver, true);
+
+  // Ab dem naechsten Request des Tabletts, ohne neue Kopplung.
+  const list = await display('GET', '/screensaver/photos');
+  assert.equal(list.status, 200, `die Fotoliste muss lesbar sein, war ${list.status}`);
+  assert.deepEqual(list.body, { data: { enabled: false, photos: [] } });
+  const photo = await display('GET', photoPath);
+  assert.equal(photo.status, 404, `ein Foto muss die Route erreichen, war ${photo.status}`);
+
+  // Auch eingeschaltet eng, nicht bequem: keine UUID (auch keine, die nur die
+  // Form hat - die Route verlangt Version und Variante, das Gate dieselbe),
+  // ein Praefix, eine andere Methode, und die Verwaltung des Haushalts
+  // scheitern am Gate.
+  for (const [method, path] of [
+    ['GET', '/screensaver/photos/keine-uuid'],
+    ['GET', '/screensaver/photos/3f2504e0-4f89-41d3-9a0c-0305e82c3301/x'],
+    ['GET', '/screensaver/photos/3f2504e0-4f89-01d3-9a0c-0305e82c3301'],
+    ['GET', '/screensaver/photos-irgendwas'],
+    ['POST', '/screensaver/photos'],
+    ['GET', '/screensaver/config'],
+    ['PUT', '/screensaver/config'],
+    ['POST', '/screensaver/test'],
+  ]) {
+    const res = await display(method, path);
+    assert.equal(res.status, 403, `${method} ${path} muss gesperrt sein, war ${res.status}`);
+    assert.match(String(res.body?.error), /scope/i, `${method} ${path} muss am Scope-Gate scheitern`);
+  }
+
+  // Wieder aus: gesperrt beim naechsten Request.
+  assert.equal((await admin('PATCH', `/displays/${displayId}`, { show_screensaver: false })).status, 200);
+  await refusedAtGate('/screensaver/photos', 'ist nach dem Ausschalten wieder gesperrt');
+  await refusedAtGate(photoPath, 'ist nach dem Ausschalten wieder gesperrt');
+});
+
 test('die Rechte-Nutzlast traegt die Scope-Liste als Modulrechte', async () => {
   // DIE OBERFLAECHE HAENGT DARAN, NICHT AN EINER ZWEITEN LISTE IM FRONTEND. Die
   // Uebersicht bot dem Tablett Kacheln fuer Geburtstage, Budget und Notizen an,

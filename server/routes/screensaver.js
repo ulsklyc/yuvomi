@@ -3,10 +3,13 @@ import express from 'express';
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
+import { SCREENSAVER_PHOTO_ID } from '../display-scopes.js';
 
 const router = express.Router();
 const log = createLogger('Screensaver');
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+// One pattern for the route and for the display gate in front of it
+// (display-scopes.js), so the two cannot drift apart.
+const UUID_RE = SCREENSAVER_PHOTO_ID;
 
 function config() {
   const cfgGet = (key) => db.get().prepare('SELECT value FROM sync_config WHERE key = ?').get(key)?.value || '';

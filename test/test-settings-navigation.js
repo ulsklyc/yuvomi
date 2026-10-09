@@ -2443,7 +2443,7 @@ const PRE_R10_LEAVES = Object.freeze({
   '/settings/admin/family': { id: 'admin-family', adminOnly: true, labelKey: 'settings.pageFamilyRoles', options: ['settings.sectionFamily', 'settings.invites.title', 'settings.twoFactorTitle'] },
   '/settings/admin/permissions': { id: 'admin-permissions', adminOnly: true, labelKey: 'settings.pagePermissions', options: ['settings.permCapabilitiesHeading'] },
   '/settings/admin/weather': { id: 'admin-weather', adminOnly: true, labelKey: 'settings.pageHouseholdWeather', options: ['settings.weatherTitle'] },
-  '/settings/admin/displays': { id: 'admin-displays', adminOnly: true, labelKey: 'settings.pageDisplays', options: ['settings.displayPairingCodeLabel'] },
+  '/settings/admin/displays': { id: 'admin-displays', adminOnly: true, labelKey: 'settings.pageDisplays', options: ['settings.displayPairingCodeLabel', 'settings.displayScreensaverLabel'] },
   '/settings/admin/api': { id: 'admin-api', adminOnly: true, labelKey: 'settings.pageApiAccess', options: ['settings.apiTokensTitle'] },
   '/settings/admin/backup': { id: 'admin-backup', adminOnly: true, labelKey: 'settings.pageBackupRestore', options: ['settings.backupDownloadTitle', 'settings.backupRestoreTitle', 'settings.backupSchedulerTitle', 'settings.backupWebdavEnabled'] },
   '/settings/admin/email': { id: 'admin-email', adminOnly: true, labelKey: 'settings.pageEmail', options: ['email.host'] },

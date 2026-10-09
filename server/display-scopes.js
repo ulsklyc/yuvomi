@@ -115,8 +115,11 @@ export const DISPLAY_AREA_MODULES = Object.freeze(
  * eigene Zeile, die Darstellungseinstellungen und die Modulliste. Es ist
  * dasselbe Zugestaendnis, das ein Ausgaben-Gast schon hat - dessen Gate in
  * server/index.js laesst ausdruecklich `/auth/me` und `/auth/logout` durch, aus
- * demselben Grund. Nur LESEN, und nur diese drei: die Liste ist exakt, nicht
- * praefixbasiert, damit `/preferences-irgendwas` nicht mitgemeint ist.
+ * demselben Grund. Nur LESEN, und nur diese Pfade: die Liste ist exakt, nicht
+ * praefixbasiert, damit `/preferences-irgendwas` nicht mitgemeint ist. Die
+ * Fotos des Bildschirmschoners stehen nicht hier, sondern in
+ * DISPLAY_READ_ROUTES darunter - als Muster, und nur fuer ein Display, das ein
+ * Administrator dafuer eingeschaltet hat.
  *
  * `/auth/logout` steht NICHT dabei. Ein Display meldet sich nicht ab - es wird
  * widerrufen, und das ist die Handlung eines Administrators, nicht die eines
@@ -132,6 +135,44 @@ export const DISPLAY_READ_PATHS = Object.freeze([
   // hinein und liefert Name, Farbe, Bild und die zwei Flaggen; die
   // Kontaktdaten, die `/family/members` mitgibt, bleiben draussen.
   '/displays/people',
+]);
+
+/**
+ * Die Fotos des Bildschirmschoners, die ein Display LESEN darf (#1766).
+ *
+ * WARUM ES SIE BRAUCHT. `components/photo-screensaver.js` laedt auf jeder Seite
+ * aus `index.html`, also auch auf dem Tablett - aber `/screensaver` ist kein
+ * Modul, das Scope-Gate in server/index.js lehnte beide Abrufe ab, und `start()`
+ * schluckt das 403. Die Wand, fuer die der Schoner gegen Einbrennen gebaut
+ * wurde (#693), war das eine Geraet, auf dem er nie lief.
+ *
+ * WAS EIN DISPLAY DAMIT SIEHT. Dieselben Fotos, die jedes angemeldete Geraet
+ * im Haushalt zeigt, sobald es ruht - keine engere Grenze: die Liste ist eine
+ * Zufallsauswahl aus dem gewaehlten Album oder, ohne Album, aus allem, was der
+ * Immich-Schluessel lesen darf, und sie traegt je Foto Datum, Stadt und Land;
+ * `/screensaver/photos/:id` reicht die Vorschau jeder Kennung durch, ohne das
+ * Album zu pruefen. Der Immich-Schluessel verlaesst den Server auch hier
+ * nicht. Verbindung und Test (`/screensaver/config`, `/screensaver/test`)
+ * bleiben gesperrt.
+ *
+ * NUR WENN EIN ADMINISTRATOR ES FUER DIESES DISPLAY EINGESCHALTET HAT
+ * (`display_accounts.show_screensaver`, Migration 238, Standard aus). Ein
+ * Display aendert keine Einstellungen: die Wartezeit kennt kein "nie", und die
+ * Display-Oberflaeche hat keine Einstellungen. Ohne den Schalter faenge jedes
+ * gekoppelte Tablett nach fuenf Minuten an, Fotos ueber den Kalender zu legen.
+ * Bei "aus" sperrt das Gate beide Routen, nicht erst die Seite.
+ *
+ * MUSTER STATT EXAKTER PFADE, ABER ENG - DIESELBE BAUART WIE DISPLAY_WRITE_ROUTES.
+ * Das Foto traegt seine Kennung im Pfad, und die Kennung ist dieselbe UUID, die
+ * die Route selbst verlangt (`SCREENSAVER_PHOTO_ID`, von routes/screensaver.js
+ * importiert, damit die beiden nicht auseinanderlaufen). Was keine ist, faellt
+ * schon am Gate durch. Nur GET.
+ */
+export const SCREENSAVER_PHOTO_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export const DISPLAY_READ_ROUTES = Object.freeze([
+  /^\/screensaver\/photos$/,
+  new RegExp(`^\\/screensaver\\/photos\\/${SCREENSAVER_PHOTO_ID.source.slice(1)}`, 'i'),
 ]);
 
 /**
@@ -175,8 +216,11 @@ export function pickDisplayPreferences(data) {
 }
 
 /**
- * Darf ein Display diesen Pfad mit dieser Methode lesen? Exakter Vergleich,
- * ausschliesslich GET.
+ * Darf ein Display diesen Pfad mit dieser Methode lesen? Exakter Vergleich gegen
+ * DISPLAY_READ_PATHS, ausschliesslich GET. Die Muster aus DISPLAY_READ_ROUTES
+ * gelten nur mit `{ screensaver: true }` - die Wahl des Administrators fuer
+ * dieses Display, die `requireAuth` als `req.displayShowsScreensaver` ablegt.
+ * Ohne Option bleibt es bei den exakten Pfaden (der Riegel im Auth-Router).
  *
  * DER PFAD IST IMMER `/api/v1`-RELATIV, und der Aufrufer schuldet das. Express
  * setzt `req.path` relativ zum MOUNT: im Gate von server/index.js (montiert auf
@@ -187,9 +231,11 @@ export function pickDisplayPreferences(data) {
  * anders verankerten Pfad hereingibt, bekommt `false`, also die geschlossene
  * Antwort - das ist die richtige Richtung fuer einen Fehler dieser Art.
  */
-export function displayMayRead(method, path) {
+export function displayMayRead(method, path, { screensaver = false } = {}) {
   if (String(method || '').toUpperCase() !== 'GET') return false;
-  return DISPLAY_READ_PATHS.includes(String(path || ''));
+  const p = String(path || '');
+  if (DISPLAY_READ_PATHS.includes(p)) return true;
+  return screensaver === true && DISPLAY_READ_ROUTES.some((pattern) => pattern.test(p));
 }
 
 /**
@@ -217,6 +263,6 @@ export function displayMayWrite(method, path) {
  * `displayMayRead`: dort geht es um die Konto-Routen, an denen ein Display
  * nichts zu schreiben hat.
  */
-export function displayMayAct(method, path) {
-  return displayMayRead(method, path) || displayMayWrite(method, path);
+export function displayMayAct(method, path, options = {}) {
+  return displayMayRead(method, path, options) || displayMayWrite(method, path);
 }
