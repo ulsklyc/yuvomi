@@ -457,15 +457,29 @@ test('Delegierter Handler bei `read`: nur die Positivliste kommt durch', async (
     assert.equal(undo.length, 0, 'und kein Loeschen landet im Undo-Fenster');
 
     zustand();
-    const schreibend = await withAccess(SCHREIBEN, () => aufrufe(async () => {
-      await handler(klick({ aktion: 'toggle-item' }));
-      zustand();
-      await handler(klick({ zeile }));
-      zustand();
-      await handler(klick({ aktion: 'delete-item' }));
-    }));
-    assert.deepEqual(schreibend, ['PATCH /shopping/items/1', 'PATCH /shopping/items/1'],
-      'Gegenprobe: Knopf und Zeilenklick haken mit Schreibrecht ab');
+    const dialogs = [];
+    const previousOpenModal = globalThis.__openModal;
+    globalThis.__openModal = (opts) => dialogs.push(opts);
+    let schreibend;
+    try {
+      schreibend = await withAccess(SCHREIBEN, () => aufrufe(async () => {
+        await handler(klick({ aktion: 'toggle-item' }));
+        zustand();
+        await handler(klick({ zeile }));
+        zustand();
+        await handler(klick({ aktion: 'delete-item' }));
+      }));
+    } finally {
+      globalThis.__openModal = previousOpenModal;
+    }
+    assert.deepEqual(schreibend, [],
+      'Mit Schreibrecht fordert das neue Kauf-Modal zuerst Preis/Menge an; ohne Bestaetigung kein PATCH');
+    assert.equal(dialogs.length, 2,
+      'Knopf und Zeilenklick muessen beide den Kaufdialog oeffnen');
+    for (const dialog of dialogs) {
+      assert.match(dialog.content, /id="shopping-purchase-form"/,
+        'Jede Kaufaktion zeigt das Formular vor dem Speichern');
+    }
     assert.equal(undo.length, 1, 'Gegenprobe: das Loeschen landet im Undo-Fenster');
   } finally {
     delete globalThis.__undoStub;

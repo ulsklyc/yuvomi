@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Shopping product catalog with purchase price history.** Manage reusable products and
+  categories, search the catalog, and add products directly to shopping lists with their
+  last known unit price. Confirming a purchase records its price and quantity; unchecking
+  an item preserves the history, while checking it again updates the same purchase record.
+  The catalog includes historical and lowest prices, and estimated totals distinguish
+  checked and unchecked items. Shopping items are displayed alphabetically within their
+  categories. Existing shopping items are linked to catalog products during migration 237,
+  which also adds unit prices and purchase history tables.
+
+
 ## [2.75.0] - 2026-10-07
 
 ### Added

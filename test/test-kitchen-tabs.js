@@ -26,9 +26,9 @@ const { KITCHEN_ROUTES, KITCHEN_STORAGE_KEY, getLastKitchenRoute, isKitchenRoute
   return import('../public/utils/kitchen-tabs.js');
 })();
 
-test('KITCHEN_ROUTES enthält alle vier Sub-Routen in Kreislauf-Reihenfolge', () => {
-  // planen → kochen → einkaufen → lagern (#596)
-  assert.deepEqual(KITCHEN_ROUTES, ['/meals', '/recipes', '/shopping', '/pantry']);
+test('KITCHEN_ROUTES enthält alle fünf Sub-Routen in Kreislauf-Reihenfolge', () => {
+  // planen → kochen → einkaufen → Katalog → lagern
+  assert.deepEqual(KITCHEN_ROUTES, ['/meals', '/recipes', '/shopping', '/catalog', '/pantry']);
 });
 
 test('KITCHEN_ROUTES ist eingefroren (kanonische Kitchen-Routen)', () => {

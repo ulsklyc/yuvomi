@@ -686,8 +686,8 @@ test('shopping-Route validiert und persistiert notes/url', () => {
   const source = readFileSync(new URL('../server/routes/shopping.js', import.meta.url), 'utf8');
   assert(/import\s*\{[^}]*\burl\b[^}]*\}\s*from\s*'\.\.\/middleware\/validate\.js'/.test(source), 'Route muss den url()-Validator importieren');
   assert(/url\(req\.body\.url,\s*'URL'\)/.test(source), 'POST muss req.body.url über url() validieren');
-  assert(/INSERT INTO shopping_items \(list_id, name, quantity, category, notes, url\)/.test(source), 'INSERT muss notes/url enthalten');
-  assert(/SET is_checked = \?, name = \?, quantity = \?, category = \?, notes = \?, url = \?/.test(source), 'UPDATE muss notes/url enthalten');
+  assert(/INSERT INTO shopping_items\s*\([^)]*\bnotes\s*,\s*url\b[^)]*\)/.test(source), 'INSERT muss notes/url enthalten');
+  assert(/SET\s+is_checked\s*=\s*\?,\s*name\s*=\s*\?,\s*quantity\s*=\s*\?,\s*category\s*=\s*\?,\s*notes\s*=\s*\?,\s*url\s*=\s*\?/.test(source), 'UPDATE muss notes/url enthalten');
 });
 
 test('shopping-Route bietet einen Datumsbereich-Import aus dem Essensplan an', () => {

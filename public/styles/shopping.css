@@ -360,7 +360,7 @@
  * braucht, kennt keine Zahl in diesem Blatt. Fest ist nur der Knopf. */
 .quick-add__form {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) var(--target-base);
+  grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) minmax(0, 3fr) var(--target-base);
   gap: var(--space-2);
   align-items: stretch;
 }
@@ -454,7 +454,7 @@
     /* Das Namensfeld behaelt die Haelfte, Menge und Kategorie teilen sich den
      * Rest wieder 2:3. Hier stand fuer die Menge eine feste Spur von 80px: der
      * Platzhalter passte in 12 von 24 Sprachen nicht hinein („Quantit", #1372). */
-    grid-template-columns: minmax(0, 5fr) minmax(0, 2fr) minmax(0, 3fr) var(--target-base);
+    grid-template-columns: minmax(0, 5fr) minmax(0, 1.7fr) minmax(0, 2fr) minmax(0, 3fr) var(--target-base);
   }
 
   .quick-add__input-wrap {
@@ -1043,3 +1043,516 @@
  * umverteilt statt es aufzulösen, ist genau die Sorte Regel, die die nächste
  * Änderung teuer macht.
  * -------------------------------------------------------- */
+
+/* CUSTOM YUVOMI — Seletor de produtos do catálogo */
+.catalog-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.catalog-picker__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: min(50vh, 420px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.catalog-picker__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.catalog-picker__item:hover {
+  background: var(--color-surface-hover, var(--color-surface));
+}
+
+.catalog-picker__item:has(input:disabled) {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.catalog-picker__item[hidden] {
+  display: none;
+}
+
+.catalog-picker__checkbox {
+  flex-shrink: 0;
+}
+
+.catalog-picker__content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+}
+
+.catalog-picker__meta {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.catalog-picker .modal-panel__footer {
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+@media (max-width: 639px) {
+  .catalog-picker__list {
+    max-height: 45vh;
+  }
+
+  .catalog-picker__item {
+    padding: var(--space-2);
+  }
+}
+
+/* CUSTOM: estimativas sempre visíveis acima da lista, inclusive em viewport touch. */
+.shopping-price-summary {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2); padding: var(--space-3) var(--page-inline-pad);
+  background: var(--color-surface); border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0; z-index: 2;
+}
+.shopping-price-summary > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.shopping-price-summary span { font-size: var(--text-xs); color: var(--color-text-secondary); }
+.shopping-price-summary strong { font-size: var(--text-base); overflow-wrap: anywhere; }
+.shopping-price-summary__total strong { font-weight: 800; }
+.catalog-picker__manage { display: flex; justify-content: flex-start; }
+@media (max-width: 639px) {
+  .shopping-price-summary { gap: var(--space-1); padding-block: var(--space-2); }
+  .shopping-price-summary strong { font-size: var(--text-sm); }
+}
+
+/* CUSTOM: UI do gerenciamento de catálogo. */
+.catalog-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: .75rem 1rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.catalog-card__name {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 650;
+  color: var(--color-text-primary);
+}
+
+.catalog-card__category {
+  margin-top: .2rem;
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+.catalog-card__prices {
+  grid-column: 1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .45rem 1.25rem;
+  font-size: var(--text-sm);
+}
+
+.catalog-price {
+  display: flex;
+  flex-direction: column;
+  gap: .12rem;
+}
+
+.catalog-price span {
+  color: var(--color-text-tertiary);
+  font-size: var(--text-xs);
+}
+
+.catalog-price strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.catalog-history-count {
+  align-self: end;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-xs);
+}
+
+.catalog-card__actions {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  display: flex;
+  gap: .25rem;
+}
+
+.catalog-icon-btn {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.catalog-icon-btn:hover {
+  background: var(--color-surface-raised, var(--color-surface));
+  color: var(--color-text-primary);
+}
+
+.catalog-icon-btn--danger:hover {
+  color: var(--color-danger, #d84a4a);
+}
+
+.catalog-history {
+  display: grid;
+  gap: .65rem;
+}
+
+.catalog-history__summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .75rem;
+}
+
+.catalog-history__metric {
+  padding: .85rem;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised, var(--color-surface));
+}
+
+.catalog-history__metric span {
+  display: block;
+  margin-bottom: .25rem;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-xs);
+}
+
+.catalog-history__metric strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.catalog-history__list {
+  display: grid;
+  gap: .35rem;
+  max-height: 50vh;
+  overflow: auto;
+}
+
+.catalog-history__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .7rem .2rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.catalog-history__row span {
+  color: var(--color-text-secondary);
+}
+
+.catalog-history__row strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.catalog-confirm-text {
+  line-height: 1.55;
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 767px) {
+  .catalog-page {
+    padding: .75rem;
+  }
+
+  .catalog-toolbar {
+    align-items: stretch;
+  }
+
+  .catalog-new-btn span {
+    display: none;
+  }
+
+  .catalog-new-btn {
+    width: var(--target-base);
+    height: var(--target-base);
+    min-height: var(--target-base);
+    padding: 0;
+    border-radius: var(--radius-full);
+  }
+
+  .catalog-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .catalog-card__actions {
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: end;
+  }
+
+  .catalog-card__prices {
+    grid-column: 1;
+  }
+
+  .catalog-history-count {
+    grid-column: 1;
+  }
+}
+
+
+/* ==========================================================
+ * LAB CATALOG PICKER V1
+ * Seleção múltipla de produtos do catálogo para a lista atual.
+ * ========================================================== */
+
+.quick-add__catalog-tools {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: .55rem;
+}
+
+.quick-add__catalog-btn {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  color: var(--color-ink-on-vivid);
+  cursor: pointer;
+  transition:
+    transform var(--duration-sm) var(--ease-out),
+    box-shadow var(--duration-sm) var(--ease-out);
+}
+
+.quick-add__catalog-btn:hover {
+  transform: translateY(-1px);
+}
+
+.quick-add__catalog-btn:active {
+  transform: scale(.96);
+}
+
+.catalog-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-height: 0;
+}
+
+.catalog-picker__search-wrap {
+  position: relative;
+}
+
+.catalog-picker__search-wrap > svg,
+.catalog-picker__search-wrap > .lucide {
+  position: absolute;
+  left: .85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--color-text-tertiary);
+}
+
+.catalog-picker__search {
+  padding-left: 2.6rem;
+}
+
+.catalog-picker__list {
+  display: grid;
+  gap: .4rem;
+  max-height: 52vh;
+  overflow: auto;
+}
+
+.catalog-picker__item {
+  display: flex;
+  align-items: center;
+  gap: .8rem;
+  padding: .8rem .9rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  background: var(--color-surface);
+}
+
+.catalog-picker__item:hover {
+  border-color: var(
+    --color-border-strong,
+    var(--color-border)
+  );
+}
+
+.catalog-picker__item--existing {
+  opacity: .6;
+  cursor: default;
+}
+
+.catalog-picker__checkbox {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  accent-color: var(--color-accent);
+}
+
+.catalog-picker__content {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+}
+
+.catalog-picker__name {
+  color: var(--color-text-primary);
+}
+
+.catalog-picker__meta {
+  color: var(--color-text-tertiary);
+  font-size: var(--text-xs);
+}
+
+.catalog-picker__existing-label {
+  flex: 0 0 auto;
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+.catalog-picker__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-top: .4rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.catalog-picker__selection {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 639px) {
+  .catalog-picker__footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .catalog-picker__footer .modal-actions {
+    width: 100%;
+  }
+
+  .catalog-picker__footer .btn {
+    flex: 1;
+  }
+
+  .catalog-picker__existing-label {
+    display: none;
+  }
+}
+
+
+/* LAB V3.5 — botão do catálogo na mesma coluna e tamanho do + */
+.quick-add__catalog-btn {
+  grid-column: 5;
+  justify-self: end;
+
+  width: var(--target-base);
+  height: var(--target-base);
+  min-height: var(--target-lg);
+
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
+
+  background-color: var(--color-accent);
+  color: var(--color-ink-on-vivid);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  cursor: pointer;
+  flex-shrink: 0;
+
+  transition: background-color var(--transition-fast);
+}
+
+.quick-add__catalog-btn:hover {
+  background-color: var(--color-accent-hover);
+}
+
+/* Como o catálogo fica abaixo do + dentro do mesmo grid,
+   ele ocupa a segunda linha da coluna de ações. */
+.quick-add__catalog-btn {
+  grid-row: 2;
+}
+
+/* Os demais campos continuam na primeira linha. */
+.quick-add__input-wrap,
+.quick-add__price,
+.quick-add__qty,
+.quick-add__cat,
+.quick-add__btn {
+  grid-row: 1;
+}
+
+@media (max-width: 767px) {
+  .quick-add__catalog-btn {
+    grid-column: 2;
+    grid-row: 3;
+    justify-self: end;
+  }
+}
+
+.catalog-page { padding: var(--space-4) var(--page-inline-pad); overflow: auto; height: 100%; }
+.catalog-toolbar { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-block: var(--space-3); align-items: center; }
+.catalog-new-btn { padding: var(--space-3); border-radius: var(--radius-md); background: var(--color-accent); color: white; display: flex; gap: var(--space-2); align-items: center; }
+.catalog-results { display: grid; gap: var(--space-3); }
+
+/* CUSTOM: campo de preço na inclusão rápida, adapta-se ao grid responsivo. */
+.quick-add__price { width: 100%; min-width: 0; min-height: var(--target-base); padding: var(--space-2); border-radius: var(--radius-sm); border: 1.5px solid var(--color-border-control); background: var(--color-surface); color: var(--color-text-primary); font-size: var(--text-base); font-variant-numeric: tabular-nums; text-align: center; text-overflow: ellipsis; }
+.quick-add__price:focus { outline: none; border-color: var(--module-accent, var(--color-accent)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-shadow), transparent); }
+
+/* CUSTOM: expandir o campo Nome enquanto recebe foco em telas pequenas. */
+@media (max-width: 767px) {
+  .quick-add__form:focus-within:has(#item-name-input:focus) {
+    grid-template-columns: minmax(0, 1fr) var(--target-base);
+  }
+
+  .quick-add__form:has(#item-name-input:focus) .quick-add__input-wrap {
+    grid-column: 1;
+  }
+
+  .quick-add__form:has(#item-name-input:focus) .quick-add__qty,
+  .quick-add__form:has(#item-name-input:focus) .quick-add__price,
+  .quick-add__form:has(#item-name-input:focus) .quick-add__cat {
+    display: none;
+  }
+
+  .quick-add__form:has(#item-name-input:focus) .quick-add__btn {
+    grid-column: 2;
+  }
+}
+
+/* Hidden is authoritative, including within flex components. */
+.catalog-new-btn[hidden] { display: none; }

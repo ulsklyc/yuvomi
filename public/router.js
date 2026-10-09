@@ -103,6 +103,7 @@ const ROUTES = [
   { path: '/',         page: '/pages/dashboard.js', requiresAuth: true, module: 'dashboard', titleKey: 'dashboard.title' },
   { path: '/tasks',    page: '/pages/tasks.js',     requiresAuth: true, module: 'tasks',     titleKey: 'nav.tasks' },
   { path: '/shopping', page: '/pages/shopping.js',  requiresAuth: true, module: 'shopping',  titleKey: 'nav.shopping' },
+  { path: '/catalog',  page: '/pages/catalog.js',   requiresAuth: true, module: 'catalog', style: '/styles/shopping.css',   titleKey: 'nav.catalog' },
   { path: '/meals',    page: '/pages/meals.js',     requiresAuth: true, module: 'meals',     titleKey: 'nav.meals' },
   { path: '/calendar', page: '/pages/calendar.js',  requiresAuth: true, module: 'calendar',  titleKey: 'nav.calendar' },
   { path: '/birthdays', page: '/pages/birthdays.js', requiresAuth: true, module: 'birthdays', titleKey: 'nav.birthdays' },

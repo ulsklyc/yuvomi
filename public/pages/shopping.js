@@ -8,8 +8,9 @@ import { api } from '/api.js';
 import { stagger, vibrate, scheduleUndoableDelete, collapseOut, expandIn } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { flipSnapshot, flipPlay } from '/utils/flip.js';
-import { t } from '/i18n.js';
+import { t, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { readRowHtml, readDetailsLabel } from '/utils/read-row.js';
 import { promptModal, openModal, closeModal, confirmModal, reportFieldError, refocusAfterRender } from '/components/modal.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
@@ -27,6 +28,35 @@ import { amountPlaceholder, formatMoney, currencyFractionDigits, centsToAmountIn
 import { startLiveFeed } from '/utils/live-feed.js';
 import { createPageController } from '/utils/page-lifecycle.js';
 
+
+// CUSTOM: estimativas por preço unitário e quantidade numérica simples.
+function shoppingMultiplier(quantity) {
+  const raw = String(quantity ?? '').trim();
+  const match = raw.match(/^(\d+(?:[.,]\d+)?)\s*(?:x|un|und|unid|unidade|unidades)?$/i);
+  if (!match) return 1;
+  const normalized = toDecimalString(match[1]);
+  const n = normalized ? Number(normalized) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
+function estimatedItemCents(item) {
+  const price = item.unit_price_cents ?? item.price_cents;
+  return price == null ? 0 : Math.round(Number(price) * shoppingMultiplier(item.quantity));
+}
+
+function renderShoppingSummary(container) {
+  const root = container.querySelector('#shopping-price-summary');
+  if (!root) return;
+  let pending = 0, purchased = 0;
+  for (const item of state.items) {
+    if (checkedOf(item)) purchased += estimatedItemCents(item);
+    else pending += estimatedItemCents(item);
+  }
+  const money = n => priceReadText(n);
+  root.querySelector('[data-summary="pending"]').textContent = money(pending);
+  root.querySelector('[data-summary="purchased"]').textContent = money(purchased);
+  root.querySelector('[data-summary="total"]').textContent = money(pending + purchased);
+}
 
 // --------------------------------------------------------
 // Konstanten
@@ -548,6 +578,158 @@ function settleIntents(items, listId, { fromCache = false, startedAt = 0 } = {})
     const ueberholt = bestaetigt != null && bestaetigt < startedAt;
     if (erfuellt || ueberholt) intents.delete(item.id);
   }
+}
+
+// CUSTOM: preço em unidades mínimas da moeda configurada.
+function shoppingPriceInputText(units) {
+  if (units == null) return '';
+  const digits = currencyFractionDigits(state.currency);
+  return getNumberFormat({
+    minimumFractionDigits: digits, maximumFractionDigits: digits,
+  }).format(Number(units) / 10 ** digits);
+}
+
+// Máscara de digitação: EUR/USD/BRL em centésimos, JPY/KRW em inteiros,
+// KWD/BHD em milésimos. Usa separadores do locale da aplicação.
+function attachShoppingPriceMask(input) {
+  if (!input || input.dataset?.shoppingMaskAttached) return;
+  // Test doubles may implement addEventListener without a DOM dataset.
+  if (input.dataset) input.dataset.shoppingMaskAttached = '1';
+  const digits = currencyFractionDigits(state.currency);
+  input.addEventListener('focus', () => input.select());
+  input.addEventListener('input', () => {
+    const numerals = getNumberFormat({ useGrouping: false, maximumFractionDigits: 0 });
+    const symbols = new Map(Array.from({ length: 10 }, (_, n) => [numerals.format(n), String(n)]));
+    const ascii = [...input.value].map(c => symbols.get(c) ?? c).join('');
+    const raw = ascii.replace(/\D/g, '').replace(/^0+(?=\d)/, '').slice(0, 11);
+    if (!raw) { input.value = ''; return; }
+    input.value = shoppingPriceInputText(Number(raw));
+    input.setSelectionRange(input.value.length, input.value.length);
+  });
+}
+
+// Respeita a precisao e o limite do Catalogo antes da conversao oficial.
+// amountInputToCents sozinho arredonda frações excedentes.
+function shoppingPriceInputIsValid(text) {
+  const raw = String(text ?? '').trim();
+  if (!raw) return false;
+  const normalized = toDecimalString(raw);
+  const digits = currencyFractionDigits(state.currency);
+  const pattern = digits === 0 ? /^\d+$/ : new RegExp(`^\\d+(?:\\.\\d{1,${digits}})?$`);
+  if (!pattern.test(normalized)) return false;
+  const minorUnits = amountInputToCents(raw, state.currency);
+  return Number.isSafeInteger(minorUnits) && minorUnits >= 0 && minorUnits <= 100000000;
+}
+
+function shoppingMaskedPriceToCents(text) {
+  return shoppingPriceInputIsValid(text) ? amountInputToCents(text, state.currency) : null;
+}
+
+// Placeholders substituem valores preexistentes na primeira digitação;
+// campo vazio significa manter o valor original na confirmação.
+function originalValueOrInput(input, initial) {
+  return input.value.trim() ? input.value.trim() : initial;
+}
+
+// CUSTOM: confirma quantidade e preco real antes de marcar como comprado.
+function openShoppingPurchaseConfirm(id, container) {
+  const item = state.items.find(row => row.id === id);
+  if (!item || readOnly()) return;
+  const last = item.last_price_cents;
+  const initial = item.unit_price_cents ?? item.price_cents;
+  openModal({
+    title: t('shoppingCustom.confirmPurchaseNamed', { name: item.name }),
+    size: 'sm',
+    content: `
+      <form id="shopping-purchase-form" novalidate>
+        <p class="form-hint">${esc(t('shoppingCustom.previousPrice', { price: last == null ? t('shoppingCustom.noPrevious') : priceReadText(last) }))}</p>
+        <div class="form-group">
+          <label class="form-label" for="shopping-purchase-quantity">${esc(t('shoppingCustom.purchasedQuantity'))}</label>
+          <input class="form-input" id="shopping-purchase-quantity" type="text" maxlength="80"
+            placeholder="${esc(item.quantity || '1')}">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="shopping-purchase-price">${esc(t('shoppingCustom.currentUnitPrice'))}</label>
+          <input class="form-input" id="shopping-purchase-price" type="text" inputmode="decimal"
+            placeholder="${esc(initial == null ? amountPlaceholder(state.currency) : shoppingPriceInputText(initial))}">
+        </div>
+        <p id="shopping-purchase-diff" class="form-hint" aria-live="polite"></p>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          <button type="button" class="btn btn--secondary" data-action="close-modal">${esc(t('shoppingCustom.cancel'))}</button>
+          <button type="submit" class="btn btn--primary">${esc(t('shoppingCustom.confirmPurchase'))}</button>
+        </div>
+      </form>`,
+    onSave(panel) {
+      const form = panel.querySelector('#shopping-purchase-form');
+      const input = panel.querySelector('#shopping-purchase-price');
+      attachShoppingPriceMask(input);
+      const quantity = panel.querySelector('#shopping-purchase-quantity');
+      const diff = panel.querySelector('#shopping-purchase-diff');
+      const update = () => {
+        const n = shoppingMaskedPriceToCents(originalValueOrInput(input, initial == null ? '' : shoppingPriceInputText(initial)));
+        if (n == null || last == null) { diff.textContent = ''; return; }
+        const delta = n - last;
+        diff.textContent = delta === 0 ? t('shoppingCustom.samePrice')
+          : t(delta > 0 ? 'shoppingCustom.priceIncrease' : 'shoppingCustom.priceDecrease', { price: priceReadText(Math.abs(delta)) });
+      };
+      input.addEventListener('input', update);
+      update();
+      form?.addEventListener('submit', async event => {
+        event.preventDefault();
+        if (readOnly() || state.activeListId !== item.list_id) return;
+        const raw = originalValueOrInput(input, initial == null ? '' : shoppingPriceInputText(initial));
+        const cents = raw ? shoppingMaskedPriceToCents(raw) : null;
+        if (raw && (cents == null || cents < 0 || cents > 100000000)) {
+          reportFieldError(input, t('shoppingCustom.invalidPrice'));
+          return;
+        }
+        const qty = originalValueOrInput(quantity, item.quantity || '1');
+        const button = panel.querySelector('.modal-panel__footer button[type="submit"][form="shopping-purchase-form"]');
+        if (!button) {
+          window.yuvomi?.showToast?.(t('shoppingCustom.confirmButtonMissing'), 'danger');
+          return;
+        }
+        // A desmarcação anterior pode manter uma intenção otimista (value: 0)
+        // até a próxima resposta fresca de loadItems(). Guarde sua identidade
+        // antes do PATCH para não apagar uma intenção mais recente.
+        const previousIntent = intents.get(item.id);
+        button.disabled = true;
+        try {
+          const response = await api.patch(`/shopping/items/${item.id}`, {
+            is_checked: 1, quantity: qty,
+            price_cents: cents,
+          });
+          acknowledgeOwnChange(response);
+          // O PATCH confirmou a compra; a intenção antiga de desmarcar
+          // não pode continuar prevalecendo sobre o estado recém-confirmado.
+          if (previousIntent && intents.get(item.id) === previousIntent) {
+            intents.delete(item.id);
+          }
+          // Um refresh pode ter substituído os objetos durante o PATCH.
+          const current = state.items.find(row => row.id === item.id) ?? item;
+          Object.assign(current, response.data);
+          settledAt.set(item.id, _loadSeq);
+          updateListCounter(item.list_id, 0, 1);
+          updateItemRow(container, current);
+          refreshItemName(container, current);
+          updateCheckedActions(container, { userChecked: true });
+          renderShoppingSummary(container);
+          renderTabs(container);
+          closeModal({ force: true });
+          vibrate(10);
+        } catch (err) {
+          button.disabled = false;
+          window.yuvomi.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+        }
+      });
+    },
+  });
+}
+
+// UI action: only checking opens confirmation; official toggle machinery remains unchanged.
+function shoppingCheckAction(id, checked, container) {
+  if (!checked) return openShoppingPurchaseConfirm(id, container);
+  return toggleShoppingItem(id, checked, container);
 }
 
 async function toggleShoppingItem(id, checked, container) {
@@ -1119,6 +1301,8 @@ function renderListContent(container) {
         </div>
         <input class="quick-add__qty" type="text" id="item-qty-input"
                placeholder="${t('shopping.itemQtyPlaceholder')}" aria-label="${t('shopping.itemQtyLabel')}" autocomplete="off">
+        <input class="quick-add__price" type="text" id="item-price-input" inputmode="decimal"
+               placeholder="${esc(t('shopping.priceLabel'))}" aria-label="${esc(t('shopping.priceLabel'))}" autocomplete="off">
         <select class="quick-add__cat" id="item-cat-select" aria-label="${t('shopping.categoryLabel')}">
           ${state.categories.map((c) => `<option value="${esc(c.name)}" ${c.name === DEFAULT_CATEGORY_NAME ? 'selected' : ''}>${esc(categoryLabel(c.name))}</option>`).join('')}
         </select>
@@ -1141,6 +1325,11 @@ function renderListContent(container) {
 
     <!-- Artikel-Liste; Inhalt via mountItems(), damit der Leerzustand über den
          geteilten Renderer läuft statt als HTML-String hier drin. -->
+    <div class="shopping-price-summary" id="shopping-price-summary" role="status" aria-live="polite">
+      <div><span>${esc(t('shoppingCustom.pending'))}</span><strong data-summary="pending"></strong></div>
+      <div><span>${esc(t('shoppingCustom.purchased'))}</span><strong data-summary="purchased"></strong></div>
+      <div class="shopping-price-summary__total"><span>${esc(t('shoppingCustom.total'))}</span><strong data-summary="total"></strong></div>
+    </div>
     <div class="list-scroller page-scrollport items-list" id="items-list"></div>
 
     <!-- Ansage für Umsortierungen (#678), wie im Kategorie-Manager: das
@@ -1226,6 +1415,9 @@ function mountItems(listEl, container) {
 
 function renderItems() {
   const groups = groupItemsByCategory(state.items);
+  for (const [, items] of groups) {
+    items.sort((a, b) => String(a.name ?? '').localeCompare(String(b.name ?? ''), undefined, { sensitivity: 'base' }));
+  }
   pruneCollapsedCategories(groups);
   // Geteilte Gruppen-Grammatik (styles/list-row.css): .list-group ordnet,
   // .row-carrier trägt die Fläche und die Trennlinien. Die Zeilen selbst
@@ -1433,6 +1625,7 @@ function applyAutocompleteSuggestion(container, el) {
   const nameInput = container.querySelector('#item-name-input');
   const qtyInput  = container.querySelector('#item-qty-input');
   const catSelect = container.querySelector('#item-cat-select');
+  const priceInput = container.querySelector('#item-price-input');
   if (!nameInput) return;
 
   nameInput.value = el.dataset.name ?? '';
@@ -1442,6 +1635,9 @@ function applyAutocompleteSuggestion(container, el) {
   }
   if (qtyInput && el.dataset.quantity) {
     qtyInput.value = el.dataset.quantity;
+  }
+  if (priceInput && el.dataset.price && !priceInput.value.trim()) {
+    priceInput.value = shoppingPriceInputText(Number(el.dataset.price));
   }
 }
 
@@ -1461,14 +1657,23 @@ function wireAutocomplete(container) {
       try {
         const data = await api.get(`/shopping/suggestions?q=${encodeURIComponent(q)}`);
         const suggestions = data.data ?? [];
-        if (!suggestions.length) { dropdown.hidden = true; return; }
+        const catalog = await api.get(`/shopping/catalog?q=${encodeURIComponent(q)}`);
+        const known = new Set(suggestions.map(row => row.name.toLocaleLowerCase()));
+        for (const product of catalog.data ?? []) {
+          if (known.has(product.name.toLocaleLowerCase())) continue;
+          suggestions.push({ name: product.name, category: product.category,
+            quantity: '', last_price_cents: product.last_price_cents });
+          known.add(product.name.toLocaleLowerCase());
+          if (suggestions.length >= 15) break;
+        }
+        if (!suggestions.length || input.value.trim() !== q) { dropdown.hidden = true; return; }
 
         dropdown.replaceChildren();
         // Angezeigt wird nur der Name - Kategorie/Menge reisen unsichtbar als
         // data-Attribute mit und füllen beim Wählen die übrigen Felder (#1103).
         dropdown.insertAdjacentHTML('beforeend', suggestions.map((s, i) =>
           `<div class="autocomplete-item" data-idx="${i}" data-name="${esc(s.name)}"
-                data-category="${esc(s.category ?? '')}" data-quantity="${esc(s.quantity ?? '')}">${esc(s.name)}</div>`
+                data-category="${esc(s.category ?? '')}" data-quantity="${esc(s.quantity ?? '')}" data-price="${s.last_price_cents ?? ''}">${esc(s.name)}${s.last_price_cents != null ? ` · ${esc(priceReadText(s.last_price_cents))}` : ''}</div>`
         ).join(''));
         dropdown.hidden = false;
         activeIdx = -1;
@@ -1648,9 +1853,146 @@ function resetQuickAddCategory(catSelect) {
   }
 }
 
+// CUSTOM: seleção múltipla de produtos do catálogo.
+async function openShoppingCatalogPicker(container) {
+  if (!state.activeListId || readOnly()) return;
+
+  const listId = state.activeListId;
+
+  try {
+    const response = await api.get('/shopping/catalog');
+    const products = response.data ?? [];
+    const existing = new Set(
+      state.items.map(item => String(item.name ?? '').trim().toLocaleLowerCase())
+    );
+
+    openModal({
+      title: t('shoppingCustom.addFromCatalog'),
+      size: 'md',
+      content: `
+        <div class="catalog-picker">
+          <div class="form-group">
+${renderPageSearch({ id: 'catalog-picker-search', label: t('shoppingCustom.searchCatalog'), clearLabel: t('shoppingCustom.cancel') })}
+          </div>
+          <div class="catalog-picker__list" id="catalog-picker-list">
+            ${products.length ? products.map(product => {
+              const key = String(product.name ?? '').trim().toLocaleLowerCase();
+              const already = existing.has(key);
+              return `
+                <label class="catalog-picker__item"
+                       data-catalog-name="${esc(key)}">
+                  <input type="checkbox" class="catalog-picker__checkbox"
+                         data-product-id="${Number(product.id)}"
+                         ${already ? 'disabled' : ''}>
+                  <span class="catalog-picker__content">
+                    <strong>${esc(product.name)}</strong>
+                    <span class="catalog-picker__meta">
+                      ${product.category ? esc(categoryLabel(product.category)) : t('shoppingCustom.uncategorized')}
+                      ${product.last_price_cents != null
+                        ? ` · ${esc(priceReadText(product.last_price_cents))}`
+                        : ''}
+                    </span>
+                  </span>
+                  ${already ? `<span>${esc(t('shoppingCustom.alreadyListed'))}</span>` : ''}
+                </label>`;
+            }).join('') : `<p>${esc(t('shoppingCustom.noProducts'))}</p>`}
+          </div>
+          <div class="catalog-picker__manage">
+            <button type="button" class="btn btn--secondary" id="catalog-picker-manage">${esc(t('shoppingCustom.manageCatalog'))}</button>
+          </div>
+          <div class="modal-panel__footer modal-panel__footer--plain">
+            <span id="catalog-picker-selection" aria-live="polite">${esc(t('shoppingCustom.selectedCount', { count: 0 }))}</span>
+            <button type="button" class="btn btn--secondary"
+                    data-action="close-modal">${esc(t('shoppingCustom.cancel'))}</button>
+            <button type="button" class="btn btn--primary"
+                    id="catalog-picker-add" disabled>${esc(t('shoppingCustom.add'))}</button>
+          </div>
+        </div>`,
+      onSave(panel) {
+        panel.querySelector('#catalog-picker-manage')?.addEventListener('click', () => {
+          closeModal({ force: true });
+          window.yuvomi.navigate('/catalog');
+        });
+        const rows = panel.querySelectorAll('.catalog-picker__item');
+        const checkboxes = panel.querySelectorAll('.catalog-picker__checkbox');
+        const addBtn = panel.querySelector('#catalog-picker-add');
+        const countEl = panel.querySelector('#catalog-picker-selection');
+
+        function syncSelection() {
+          const count = panel.querySelectorAll('.catalog-picker__checkbox:checked').length;
+          countEl.textContent = t('shoppingCustom.selectedCount', { count });
+          addBtn.disabled = count === 0;
+        }
+
+        wirePageSearch(panel, { id: 'catalog-picker-search', delay: 0, onQuery(query) {
+          const q = query.trim().toLocaleLowerCase();
+          rows.forEach(row => {
+            row.hidden = Boolean(q && !row.dataset.catalogName.includes(q));
+          });
+        }});
+
+        checkboxes.forEach(box => box.addEventListener('change', syncSelection));
+
+        addBtn?.addEventListener('click', async () => {
+          if (state.activeListId !== listId || readOnly()) {
+            window.yuvomi.showToast(t('shoppingCustom.listChanged'), 'danger');
+            return;
+          }
+
+          const selectedIds = new Set(
+            [...panel.querySelectorAll('.catalog-picker__checkbox:checked')]
+              .map(box => Number(box.dataset.productId))
+          );
+          const selected = products.filter(product => selectedIds.has(Number(product.id)));
+          if (!selected.length) return;
+
+          addBtn.disabled = true;
+          let added = 0;
+
+          try {
+            for (const product of selected) {
+              const result = await api.post(`/shopping/${listId}/items`, {
+                name: product.name,
+                quantity: null,
+                category: product.category || (state.categories[0]?.name ?? DEFAULT_CATEGORY_NAME),
+              });
+
+              acknowledgeOwnChange(result);
+              state.items.push(result.data);
+              added++;
+            }
+
+            updateItemsList(container);
+            updateListCounter(listId, added, 0);
+            renderTabs(container);
+            closeModal({ force: true });
+          } catch (err) {
+            if (added) {
+              updateItemsList(container);
+              updateListCounter(listId, added, 0);
+              renderTabs(container);
+            }
+            addBtn.disabled = false;
+            window.yuvomi.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+          }
+        });
+      },
+    });
+  } catch (err) {
+    window.yuvomi.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+  }
+}
+
+function wireCatalogPicker(container) {
+  container.querySelector('#shopping-catalog-picker')?.addEventListener('click', () => {
+    void openShoppingCatalogPicker(container);
+  });
+}
+
 function wireQuickAdd(container) {
   const form = container.querySelector('#quick-add-form');
   if (!form) return;
+  attachShoppingPriceMask(form.querySelector('#item-price-input'));
 
   // Esc klappt zu und gibt den Fokus an den FAB zurück - dieselbe Zusage wie im
   // Modal, wo Esc schließt und den Auslöser wieder fokussiert.
@@ -1668,6 +2010,10 @@ function wireQuickAdd(container) {
     const nameInput = container.querySelector('#item-name-input');
     const qtyInput  = container.querySelector('#item-qty-input');
     const catSelect = container.querySelector('#item-cat-select');
+    const priceInput = container.querySelector('#item-price-input');
+    const enteredPrice = priceInput?.value.trim() ?? '';
+    const unitPrice = enteredPrice ? shoppingMaskedPriceToCents(enteredPrice) : null;
+    if (enteredPrice && unitPrice == null) { reportFieldError(priceInput, t('shoppingCustom.invalidPrice')); return; }
 
     const name     = nameInput.value.trim();
     const quantity = qtyInput.value.trim() || null;
@@ -1676,7 +2022,7 @@ function wireQuickAdd(container) {
     if (!name) { nameInput.focus(); return; }
 
     try {
-      const data = await api.post(`/shopping/${state.activeListId}/items`, { name, quantity, category });
+      const data = await api.post(`/shopping/${state.activeListId}/items`, { name, quantity, category, ...(enteredPrice ? { unit_price_cents: unitPrice } : {}) });
       acknowledgeOwnChange(data);
       state.items.push(data.data);
       // Einfügen in DOM ohne komplettes Re-Render
@@ -1685,6 +2031,7 @@ function wireQuickAdd(container) {
       renderTabs(container);
       nameInput.value = '';
       qtyInput.value  = '';
+      if (priceInput) priceInput.value = '';
       resetQuickAddCategory(catSelect);
       // Erfolgs-Feedback auf dem +-Button (DOM-API, kein innerHTML)
       _flashAddBtn(form.querySelector('.quick-add__btn'));
@@ -1942,7 +2289,7 @@ function wireSwipeGestures(container) {
     leading: {
       reveal: '.swipe-reveal--done',
       flyOut: true,
-      run: (row) => toggleShoppingItem(
+      run: (row) => shoppingCheckAction(
         Number(row.dataset.swipeId),
         Number(row.dataset.swipeChecked),
         container,
@@ -1975,6 +2322,7 @@ function updateItemRow(container, item) {
   const isDone = Boolean(checkedOf(item));
 
   row.dataset.swipeChecked = String(checkedOf(item));
+  renderShoppingSummary(container);
 
   row.querySelector('.shopping-item')?.classList.toggle('shopping-item--checked', isDone);
 
@@ -2178,7 +2526,7 @@ function openItemDetails(itemId, container) {
             <label class="form-label" for="item-details-price">${t('shopping.priceLabel')}</label>
             <input class="form-input" type="text" id="item-details-price" inputmode="decimal"
                    placeholder="${esc(amountPlaceholder(state.currency))}"
-                   value="${item.price_cents != null ? esc(centsToAmountInput(item.price_cents, state.currency)) : ''}">
+                   value="${item.price_cents != null ? esc(shoppingPriceInputText(item.price_cents)) : ''}">
           </div>
           <div class="form-group">
             <label class="form-label" for="item-details-store">${t('shopping.storeLabel')}</label>
@@ -2232,6 +2580,7 @@ function openItemDetails(itemId, container) {
       const urlEl   = panel.querySelector('#item-details-url');
       const notesEl = panel.querySelector('#item-details-notes');
       const preview = panel.querySelector('#item-details-link');
+      attachShoppingPriceMask(panel.querySelector('#item-details-price'));
 
       panel.querySelector('#item-details-cancel')?.addEventListener('click', () => closeModal());
       panel.querySelector('#item-details-delete')?.addEventListener('click', () => {
@@ -2268,7 +2617,8 @@ function openItemDetails(itemId, container) {
         // spaeter darauf aufbaut, addiert genau solche Zahlen. Ein leeres Feld
         // heisst "kein Preis", nicht "null Cent".
         const priceRoh = priceEl?.value.trim() ?? '';
-        const priceCents = priceRoh === '' ? null : amountInputToCents(priceRoh, state.currency);
+        const priceCents = priceRoh === '' || !shoppingPriceInputIsValid(priceRoh)
+          ? null : amountInputToCents(priceRoh, state.currency);
         if (priceRoh !== '' && priceCents === null) {
           reportFieldError(priceEl, t('budget.validAmountRequired'));
           return;
@@ -2318,6 +2668,7 @@ function openItemDetails(itemId, container) {
           }
           const categoryChanged = data.data.category !== aktuell.category;
           Object.assign(aktuell, data.data);
+          renderShoppingSummary(container);
           // force: der Dirty-Guard vergleicht gegen den Snapshot vom Öffnen und
           // sähe die gerade gespeicherten Felder als ungespeicherte Änderungen.
           // Ohne das fragte Speichern „Änderungen verwerfen?" (Issue #625).
@@ -2367,6 +2718,7 @@ function updateItemsList(container) {
     }
   }
   updateCheckedActions(container);
+  renderShoppingSummary(container);
 }
 
 /**
@@ -2989,6 +3341,48 @@ async function loadItems(listId) {
   }
 }
 
+// CUSTOM: mantém o botão Catálogo sincronizado com a lista ativa.
+function syncCatalogToolbarButton(container) {
+  const actions = container.querySelector('.shopping-toolbar .page-toolbar__actions');
+  if (!actions) return;
+
+  let button = actions.querySelector('#shopping-catalog-picker');
+  const shouldShow = Boolean(state.activeListId && state.activeList && !readOnly());
+
+  if (!shouldShow) {
+    button?.remove();
+    return;
+  }
+
+  if (button) return;
+
+  button = document.createElement('button');
+  button.type = 'button';
+  button.id = 'shopping-catalog-picker';
+  button.className = 'btn btn--secondary shopping-catalog-toolbar-btn';
+  button.setAttribute('aria-label', t('shoppingCustom.addProductsFromCatalog'));
+
+  const icon = document.createElement('i');
+  icon.dataset.lucide = 'book-open';
+  icon.className = 'icon-md';
+
+  const label = document.createElement('span');
+  label.textContent = t('shoppingCustom.catalog');
+
+  button.append(icon, label);
+
+  // Antes do botão principal, que o router posiciona nesta área no desktop.
+  const fab = actions.querySelector('#fab-new-item');
+  if (fab) {
+    actions.insertBefore(button, fab);
+  } else {
+    actions.appendChild(button);
+  }
+
+  window.lucide?.createIcons({ el: button });
+  wireCatalogPicker(container);
+}
+
 async function switchList(listId, container) {
   // Die Pille gehoert zur Teilmenge EINER Liste (dieselbe Regel wie beim
   // Seitenwechsel in router.js) - eine laufende Frist der alten Liste darf die
@@ -3010,7 +3404,9 @@ async function switchList(listId, container) {
     state.activeList = state.lists.find((l) => l.id === listId) ?? null;
     state.itemsError = err;
   }
+  renderTabs(container);
   renderListContent(container);
+  syncCatalogToolbarButton(container);
   wireListContentEvents(container);
 }
 
@@ -3292,7 +3688,11 @@ function wireListContentEvents(container) {
       if (!row) return;
       const toggle = row.querySelector('[data-action="toggle-item"]');
       if (!toggle) return;
-      await toggleShoppingItem(Number(row.dataset.itemId), Number(toggle.dataset.checked), container);
+      if (Number(toggle.dataset.checked) === 0) {
+        openShoppingPurchaseConfirm(Number(row.dataset.itemId), container);
+      } else {
+        await toggleShoppingItem(Number(row.dataset.itemId), Number(toggle.dataset.checked), container);
+      }
       return;
     }
     const action = target.dataset.action;
@@ -3306,7 +3706,7 @@ function wireListContentEvents(container) {
     if (action === 'toggle-item') {
       const id      = Number(target.dataset.id);
       const checked = Number(target.dataset.checked);
-      await toggleShoppingItem(id, checked, container);
+      await shoppingCheckAction(id, checked, container);
     }
 
     // ---- Artikel-Details (URL/Notiz) bearbeiten ----
@@ -3422,6 +3822,7 @@ function wireListContentEvents(container) {
         state.activeList = null;
         renderTabs(container);
         renderListContent(container);
+        syncCatalogToolbarButton(container);
         wireListContentEvents(container);
       }
 
@@ -3717,6 +4118,13 @@ export async function render(container, { user, signal: routeSignal = null } = {
         </div>
         <div class="page-toolbar__actions">
           <div class="shopping-tools" id="shopping-tools"></div>
+          ${readOnly() || !state.activeList ? '' : `<button type="button"
+            class="btn btn--secondary shopping-catalog-toolbar-btn"
+            id="shopping-catalog-picker"
+            aria-label="${esc(t('shoppingCustom.addProductsFromCatalog'))}">
+            <i data-lucide="book-open" class="icon-md" aria-hidden="true"></i>
+            <span>${esc(t('shoppingCustom.catalog'))}</span>
+          </button>`}
         </div>
       </div>
       <div id="list-content" style="flex:1;display:flex;flex-direction:column;overflow:hidden"></div>
@@ -3729,6 +4137,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
   renderTabs(container);
   wireTabBar(container);
   renderListContent(container);
+  wireCatalogPicker(container);
   wireListContentEvents(container);
 
   findPageFab('fab-new-item')?.addEventListener('click', (e) => {

@@ -1334,6 +1334,7 @@ Kernseite fuehrt es. Die Zuordnung aller Seiten:
 | `split-expenses.js` Aufteilung | Liste + Detail | `split`, eigene Geometrie |
 | `dashboard.js` Uebersicht | Flaeche | `dashboard` |
 | `notes.js` Notizen | Flaeche | `full` |
+| `catalog.js` Einkaufskatalog | Lesemass | `reading`, Produktliste und Preise |
 | `shopping.js` Einkauf | Flaeche | `page-measure--narrow` unter 60rem, darueber Kategorien in zwei Spalten (Notizen-Muster, Kompositions-Ausnahme) |
 | `pantry.js` Vorrat | Flaeche | `reading` mit eigener Bahn: Liste plus festes Nebenpanel ab 60rem (wie das Budget) |
 | `meals.js` Mahlzeiten | Flaeche | Wochenraster (Kompositions-Ausnahme) |

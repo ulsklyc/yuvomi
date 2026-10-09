@@ -29,6 +29,7 @@ const NAV_TO_MODULE = Object.freeze({
   meals: 'meals',
   recipes: 'meals',
   shopping: 'shopping',
+  catalog: 'shopping',
   pantry: 'pantry',
   budget: 'budget',
   inventory: 'inventory',

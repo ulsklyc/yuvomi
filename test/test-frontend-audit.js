@@ -6720,8 +6720,9 @@ test('phase 3 mobile Shopping quick-add separates name, quantity, category, and 
   // als Regel - hier nur die Zusage dieses Tests: drei Spuren, der Knopf am Ende.
   assert.match(
     shoppingCss,
-    /\.quick-add__form\s*\{[\s\S]*display:\s*grid[\s\S]*grid-template-columns:\s*minmax\(0,\s*\d+fr\)\s*minmax\(0,\s*\d+fr\)\s*var\(--target-base\)/
+    /\.quick-add__form\s*\{[\s\S]*display:\s*grid[\s\S]*grid-template-columns:\s*minmax\(0,\s*\d+fr\)\s*minmax\(0,\s*\d+fr\)\s*minmax\(0,\s*\d+fr\)\s*var\(--target-base\)/
   );
+  assert.match(shoppingCss, /\.quick-add__price\s*\{[\s\S]*min-height:\s*var\(--target-base\)/, 'the additional price field must share the input minimum height');
   assert.match(shoppingCss, /\.quick-add__input-wrap\s*\{[\s\S]*grid-column:\s*1\s*\/\s*-1/);
   assert.match(shoppingCss, /\.quick-add__qty\s*\{[\s\S]*position:\s*static[\s\S]*min-height:\s*var\(--target-base\)/);
   assert.match(shoppingCss, /\.quick-add__cat\s*\{[\s\S]*min-width:\s*0[\s\S]*min-height:\s*var\(--target-base\)/);

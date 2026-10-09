@@ -10,6 +10,7 @@
 import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
+import { ensureShoppingProduct, loadProductPriceInfo, attachShoppingPriceInfo, recordShoppingPurchase, parseUnitPriceCents } from '../custom/shopping/catalog.js';
 import { str, oneOf, url, date, collectErrors, MAX_TITLE, MAX_SHORT, MAX_TEXT } from '../middleware/validate.js';
 import { aggregateMealIngredients } from '../services/shopping-import.js';
 import { loadItemTagsFor } from '../utils/task-tags.js';
@@ -103,7 +104,11 @@ function loadListItems(listId, categories) {
   // Gespiegelte CATEGORIES der Quellliste (#586). Eine Abfrage für die ganze
   // Liste, nicht eine pro Zeile.
   const tagMap = loadItemTagsFor(db.get(), items.map((i) => i.id));
-  for (const item of items) item.tags = tagMap.get(item.id) ?? [];
+  for (const item of items) {
+    item.tags = tagMap.get(item.id) ?? [];
+    // CUSTOM: valores historicos tambem nas respostas de carregamento/live feed.
+    Object.assign(item, loadProductPriceInfo(db.get(), item.product_id));
+  }
   return items;
 }
 
@@ -543,8 +548,24 @@ router.patch('/items/:itemId', (req, res) => {
       }
     }
 
+    // CUSTOM: preço unitário informado pela confirmação de compra.
+    let unitPriceCents = item.unit_price_cents;
+    if (Object.prototype.hasOwnProperty.call(req.body, 'price')) {
+      const householdCurrency = db.get().prepare("SELECT value FROM sync_config WHERE key = 'currency'").get()?.value || 'EUR';
+      const parsed = parseUnitPriceCents(req.body.price, householdCurrency);
+      if (parsed.error) {
+        return res.status(400).json({ error: parsed.error, code: 400 });
+      }
+      unitPriceCents = parsed.value;
+    }
+
     const storeGiven = req.body.store_id !== undefined;
     let storeId = item.store_id;
+    if (priceGiven && !Object.prototype.hasOwnProperty.call(req.body, 'price')) {
+      // Preco oficial informado no detalhe: tambem alimenta a historico personalizado.
+      unitPriceCents = priceCents;
+    }
+
     if (storeGiven) {
       const roh = req.body.store_id;
       if (roh === null || roh === '') storeId = null;
@@ -575,31 +596,51 @@ router.patch('/items/:itemId', (req, res) => {
     const fieldErrors = collectErrors([vNotes, vUrl]);
     if (fieldErrors.length) return res.status(400).json({ error: fieldErrors.join(' '), code: 400 });
 
-    const { list_change } = withListChange(item.list_id, () => {
-      db.get().prepare(`
-        UPDATE shopping_items
-        SET is_checked = ?, name = ?, quantity = ?, category = ?, notes = ?, url = ?,
-            price_cents = ?, store_id = ?
-        WHERE id = ?
-      `).run(is_checked ? 1 : 0, name.trim(), quantity ?? null, category, vNotes.value, vUrl.value,
-        priceCents ?? null, storeId ?? null, req.params.itemId);
+    const { result: updated, list_change } = withListChange(
+      item.list_id,
+      db.get().transaction(() => {
+        const connection = db.get();
 
-      // Kategoriewechsel heißt Positionswechsel: die Handsortierung zählt je
-      // Kategorie (#678), der alte Rang gilt in der neuen Nachbarschaft nicht.
-      // Ans Ende - dort landet in dieser Liste auch alles neu Hinzugefügte.
-      if (category !== item.category) {
-        db.get().prepare(`
-          UPDATE shopping_items SET sort_order = COALESCE((
-            SELECT MAX(sort_order) FROM shopping_items
-             WHERE list_id = ? AND category = ? AND id != ?
-          ), 0) + 1 WHERE id = ?
-        `).run(item.list_id, category, item.id, item.id);
-      }
-    });
+        const product = ensureShoppingProduct(
+          connection, name.trim(), category || null
+        );
 
-    const updated = db.get()
-      .prepare('SELECT * FROM shopping_items WHERE id = ?')
-      .get(req.params.itemId);
+        connection.prepare(`
+          UPDATE shopping_items
+          SET is_checked = ?, name = ?, quantity = ?, category = ?,
+              notes = ?, url = ?, price_cents = ?, store_id = ?,
+              unit_price_cents = ?, product_id = ?
+          WHERE id = ?
+        `).run(
+          is_checked ? 1 : 0, name.trim(), quantity ?? null, category,
+          vNotes.value, vUrl.value, priceCents ?? null, storeId ?? null,
+          unitPriceCents, product?.id ?? null, req.params.itemId
+        );
+
+        // Preserva a ordenação oficial quando a categoria muda.
+        if (category !== item.category) {
+          connection.prepare(`
+            UPDATE shopping_items SET sort_order = COALESCE((
+              SELECT MAX(sort_order) FROM shopping_items
+              WHERE list_id = ? AND category = ? AND id != ?
+            ), 0) + 1 WHERE id = ?
+          `).run(item.list_id, category, item.id, item.id);
+        }
+
+        const saved = connection.prepare(
+          'SELECT * FROM shopping_items WHERE id = ?'
+        ).get(req.params.itemId);
+
+        // Uma compra confirmada permanece no histórico mesmo se o item for
+        // desmarcado. Uma nova confirmação do mesmo item atualiza o registro
+        // existente (UNIQUE shopping_item_id), sem duplicar a compra.
+        if (saved.is_checked) {
+          recordShoppingPurchase(connection, saved);
+        }
+
+        return attachShoppingPriceInfo(connection, saved);
+      })
+    );
 
     // Abhaken oder Umbenennen eines gespiegelten Artikels zieht auf dem
     // CalDAV-Server nach (#617).
@@ -721,6 +762,244 @@ router.delete('/items/:itemId', (req, res) => {
 // Alle Einkaufslisten mit Artikel-Zähler.
 // Response: { data: ShoppingList[] }
 // --------------------------------------------------------
+// CUSTOM: catálogo de produtos e preços históricos.
+router.get('/catalog', (req, res) => {
+  try {
+    const q = String(req.query.q ?? '').trim().slice(0, 100);
+
+    const rows = db.get().prepare(`
+      SELECT
+        p.*,
+        (
+          SELECT h.unit_price_cents
+          FROM shopping_price_history h
+          WHERE h.product_id = p.id
+          ORDER BY h.purchased_at DESC, h.id DESC
+          LIMIT 1
+        ) AS last_price_cents,
+        (
+          SELECT MIN(h.unit_price_cents)
+          FROM shopping_price_history h
+          WHERE h.product_id = p.id
+        ) AS lowest_price_cents,
+        (
+          SELECT COUNT(*)
+          FROM shopping_price_history h
+          WHERE h.product_id = p.id
+        ) AS price_history_count
+      FROM shopping_products p
+      WHERE (? = '' OR instr(lower(p.name), lower(?)) > 0)
+      ORDER BY p.name COLLATE NOCASE ASC
+    `).all(q, q);
+
+    res.json({ data: rows });
+  } catch (err) {
+    log.error('GET /catalog error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+// CUSTOM: cadastro manual de produtos no catálogo.
+router.post('/catalog', (req, res) => {
+  try {
+    const name = String(req.body?.name ?? '').trim();
+    const category = String(req.body?.category ?? '').trim() || null;
+
+    if (!name || name.length > 200) {
+      return res.status(400).json({
+        error: 'Informe um nome válido (até 200 caracteres).',
+        code: 400,
+      });
+    }
+
+    if (category && !validCategoryNames().includes(category)) {
+      return res.status(400).json({
+        error: 'Categoria inválida.',
+        code: 400,
+      });
+    }
+
+    const conn = db.get();
+    const existing = conn.prepare(`
+      SELECT id FROM shopping_products
+      WHERE name = ? COLLATE NOCASE
+    `).get(name);
+
+    if (existing) {
+      return res.status(409).json({
+        error: 'Este produto já existe no catálogo.',
+        code: 409,
+      });
+    }
+
+    const product = conn.transaction(() => {
+      return ensureShoppingProduct(conn, name, category);
+    })();
+
+    res.status(201).json({ data: product });
+  } catch (err) {
+    log.error('POST /catalog error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+// CUSTOM: edição do produto sem alterar itens antigos das listas.
+router.patch('/catalog/:productId', (req, res) => {
+  try {
+    const conn = db.get();
+    const id = Number(req.params.productId);
+
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      return res.status(400).json({ error: 'ID inválido.', code: 400 });
+    }
+
+    const product = conn.prepare(`
+      SELECT * FROM shopping_products WHERE id = ?
+    `).get(id);
+
+    if (!product) {
+      return res.status(404).json({
+        error: 'Produto não encontrado.',
+        code: 404,
+      });
+    }
+
+    const name = String(req.body?.name ?? product.name).trim();
+    const category = String(req.body?.category ?? product.category ?? '').trim() || null;
+
+    if (!name || name.length > 200) {
+      return res.status(400).json({
+        error: 'Informe um nome válido (até 200 caracteres).',
+        code: 400,
+      });
+    }
+
+    if (category && !validCategoryNames().includes(category)) {
+      return res.status(400).json({
+        error: 'Categoria inválida.',
+        code: 400,
+      });
+    }
+
+    const duplicate = conn.prepare(`
+      SELECT id FROM shopping_products
+      WHERE name = ? COLLATE NOCASE AND id != ?
+    `).get(name, id);
+
+    if (duplicate) {
+      return res.status(409).json({
+        error: 'Já existe outro produto com esse nome no catálogo.',
+        code: 409,
+      });
+    }
+
+    const updated = conn.transaction(() => {
+      conn.prepare(`
+        UPDATE shopping_products
+        SET name = ?, category = ?,
+            updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+        WHERE id = ?
+      `).run(name, category, id);
+
+      return conn.prepare(`
+        SELECT * FROM shopping_products WHERE id = ?
+      `).get(id);
+    })();
+
+    const historyCount = conn.prepare(`
+      SELECT COUNT(*) AS count
+      FROM shopping_price_history
+      WHERE product_id = ?
+    `).get(id).count;
+
+    res.json({
+      data: {
+        ...updated,
+        ...loadProductPriceInfo(conn, id),
+        price_history_count: historyCount,
+      },
+    });
+  } catch (err) {
+    log.error('PATCH /catalog/:productId error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+// CUSTOM: consulta detalhada do histórico de preços.
+router.get('/catalog/:productId/history', (req, res) => {
+  try {
+    const id = Number(req.params.productId);
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      return res.status(400).json({ error: 'ID inválido.', code: 400 });
+    }
+
+    const conn = db.get();
+    const product = conn.prepare(
+      'SELECT * FROM shopping_products WHERE id = ?'
+    ).get(id);
+
+    if (!product) {
+      return res.status(404).json({
+        error: 'Produto não encontrado.',
+        code: 404,
+      });
+    }
+
+    const history = conn.prepare(`
+      SELECT *
+      FROM shopping_price_history
+      WHERE product_id = ?
+      ORDER BY purchased_at DESC, id DESC
+    `).all(id);
+
+    res.json({
+      data: {
+        product: {
+          ...product,
+          ...loadProductPriceInfo(conn, id),
+        },
+        history,
+      },
+    });
+  } catch (err) {
+    log.error('GET /catalog/:productId/history error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+// CUSTOM: exclusão do catálogo e de seu histórico de preços.
+// Os itens antigos permanecem nas listas com product_id = NULL.
+router.delete('/catalog/:productId', (req, res) => {
+  try {
+    const id = Number(req.params.productId);
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      return res.status(400).json({ error: 'ID inválido.', code: 400 });
+    }
+
+    const conn = db.get();
+    const product = conn.prepare(
+      'SELECT * FROM shopping_products WHERE id = ?'
+    ).get(id);
+
+    if (!product) {
+      return res.status(404).json({
+        error: 'Produto não encontrado.',
+        code: 404,
+      });
+    }
+
+    conn.prepare('DELETE FROM shopping_products WHERE id = ?').run(id);
+
+    res.json({
+      ok: true,
+      data: { id: product.id, name: product.name },
+    });
+  } catch (err) {
+    log.error('DELETE /catalog/:productId error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
 router.get('/', (req, res) => {
   try {
     const lists = db.get().prepare(`
@@ -1041,15 +1320,37 @@ router.post('/:listId/items', (req, res) => {
     const vUrl   = url(req.body.url, 'URL');
     const errors = collectErrors([vName, vQty, vCat, vNotes, vUrl]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    const providedPrice = req.body.unit_price_cents;
+    if (providedPrice !== undefined && providedPrice !== null &&
+        (!Number.isSafeInteger(providedPrice) || providedPrice < 0 || providedPrice > 100000000)) {
+      return res.status(400).json({ error: 'Invalid unit price.', code: 400 });
+    }
 
-    const { result, list_change } = withListChange(req.params.listId, () => db.get().prepare(`
-      INSERT INTO shopping_items (list_id, name, quantity, category, notes, url)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(req.params.listId, vName.value, vQty.value, vCat.value || defaultCat, vNotes.value, vUrl.value));
+    const { result, list_change } = withListChange(req.params.listId, db.get().transaction(() => {
+      const connection = db.get();
+      const product = ensureShoppingProduct(
+        connection, vName.value, vCat.value || defaultCat
+      );
+      const estimatedPrice = product
+        ? loadProductPriceInfo(connection, product.id).last_price_cents
+        : null;
 
-    const item = db.get()
-      .prepare('SELECT * FROM shopping_items WHERE id = ?')
-      .get(result.lastInsertRowid);
+      return connection.prepare(`
+        INSERT INTO shopping_items
+          (list_id, name, quantity, category, notes, url, unit_price_cents, product_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        req.params.listId, vName.value, vQty.value,
+        vCat.value || defaultCat, vNotes.value, vUrl.value,
+        providedPrice ?? estimatedPrice, product?.id ?? null
+      );
+    }));
+
+    const item = attachShoppingPriceInfo(
+      db.get(),
+      db.get().prepare('SELECT * FROM shopping_items WHERE id = ?')
+        .get(result.lastInsertRowid)
+    );
     res.status(201).json({ data: item, list_change });
     // Gehört die Liste zu einer gespiegelten CalDAV-Liste, wandert der neue
     // Artikel gleich mit (#831) - sonst hinge er bis zum nächsten Sync-Intervall

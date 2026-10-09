@@ -91,7 +91,7 @@ export function createNavigate(state, deps) {
     const known = routes.map((r) => r.path);
     const landable = routes
       .filter((r) => r.path === '/' || (r.path !== '/login' && r.path !== '/setup'
-        && !(r.module && (state._disabledModules.has(r.module) || !canAccessNavModule(r.module)))))
+        && !(r.module && (state._disabledModules.has(r.module === 'catalog' ? 'shopping' : r.module) || !canAccessNavModule(r.module)))))
       .map((r) => r.path);
     if (!state.currentUser) {
       return publicPathDetour(path, {
@@ -260,7 +260,7 @@ export function createNavigate(state, deps) {
       // Dashboard um (Rechte-Guard #467; die verbindliche 403-Sperre liegt am Server).
       if (route.module
           && route.path !== '/'
-          && (state._disabledModules.has(route.module) || !canAccessNavModule(route.module))) {
+          && (state._disabledModules.has(route.module === 'catalog' ? 'shopping' : route.module) || !canAccessNavModule(route.module))) {
         state.currentPath = null;
         state.isNavigating = false;
         navigate('/');
@@ -339,7 +339,7 @@ export function createNavigate(state, deps) {
       // es kann weder abgeschaltet noch gesperrt sein, eine Schleife gibt es nicht.
       if (route.module
           && route.path !== '/'
-          && (state._disabledModules.has(route.module) || !canAccessNavModule(route.module))) {
+          && (state._disabledModules.has(route.module === 'catalog' ? 'shopping' : route.module) || !canAccessNavModule(route.module))) {
         continueOn('/');
       }
 

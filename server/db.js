@@ -10455,6 +10455,92 @@ const MIGRATIONS = [
       CREATE INDEX idx_reward_allowances_next_run ON reward_allowances(next_run_date, paused_at);
     `,
   },
+  {
+    version: 237,
+    description: 'Shopping: product catalog, unit prices and purchase history',
+    // Additive and repeat-safe for databases that already ran the earlier
+    // standalone shopping catalog migration. Historical purchases are retained.
+    up(db) {
+      const columns = new Set(
+        db.prepare('PRAGMA table_info(shopping_items)')
+          .all()
+          .map(column => column.name)
+      );
+
+      if (!columns.has('unit_price_cents')) {
+        db.exec(`
+          ALTER TABLE shopping_items
+          ADD COLUMN unit_price_cents INTEGER
+          CHECK(unit_price_cents IS NULL OR unit_price_cents >= 0)
+        `);
+      }
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS shopping_products (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL COLLATE NOCASE,
+          category TEXT,
+          created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+          updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_shopping_products_name_nocase
+          ON shopping_products(name COLLATE NOCASE);
+      `);
+
+      if (!columns.has('product_id')) {
+        db.exec(`
+          ALTER TABLE shopping_items
+          ADD COLUMN product_id INTEGER
+          REFERENCES shopping_products(id) ON DELETE SET NULL
+        `);
+      }
+
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_shopping_items_product
+          ON shopping_items(product_id);
+
+        CREATE TABLE IF NOT EXISTS shopping_price_history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          product_id INTEGER NOT NULL
+            REFERENCES shopping_products(id) ON DELETE CASCADE,
+          shopping_item_id INTEGER
+            REFERENCES shopping_items(id) ON DELETE SET NULL,
+          unit_price_cents INTEGER NOT NULL
+            CHECK(unit_price_cents >= 0),
+          quantity TEXT,
+          purchased_at TEXT NOT NULL
+            DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+          created_at TEXT NOT NULL
+            DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_shopping_price_history_product
+          ON shopping_price_history(product_id, purchased_at DESC, id DESC);
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_shopping_price_history_item
+          ON shopping_price_history(shopping_item_id)
+          WHERE shopping_item_id IS NOT NULL;
+      `);
+
+      db.exec(`
+        INSERT OR IGNORE INTO shopping_products (name, category)
+        SELECT name, category
+        FROM shopping_items
+        WHERE TRIM(name) <> ''
+        GROUP BY LOWER(TRIM(name));
+
+        UPDATE shopping_items
+        SET product_id = (
+          SELECT product.id
+          FROM shopping_products product
+          WHERE product.name = shopping_items.name COLLATE NOCASE
+          LIMIT 1
+        )
+        WHERE product_id IS NULL;
+      `);
+    },
+  },
 ];
 
 /**

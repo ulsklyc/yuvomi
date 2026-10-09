@@ -39,7 +39,7 @@
  * STATUSBAR aber eines. Ein Farbwechsel beim Tabwechsel sendete dieselbe
  * Botschaft wie ein Modulwechsel (Critique 2026-07-29).
  */
-export const KITCHEN_MODULES = Object.freeze(['meals', 'recipes', 'shopping', 'pantry']);
+export const KITCHEN_MODULES = Object.freeze(['meals', 'recipes', 'shopping', 'catalog', 'pantry']);
 
 /** Der Sammelname der Gruppe: er taucht in der Navigation auf, nie im Routing. */
 const KITCHEN_GROUP_ID = 'kitchen';

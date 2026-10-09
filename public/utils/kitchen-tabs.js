@@ -23,8 +23,12 @@ const TABS = () => [
   { route: '/meals',    labelKey: 'nav.meals',    icon: 'utensils'      },
   { route: '/recipes',  labelKey: 'nav.recipes',  icon: 'book-text'     },
   { route: '/shopping', labelKey: 'nav.shopping', icon: 'shopping-cart' },
+  { route: '/catalog',  labelKey: 'nav.catalog',  icon: 'tags'          },
   { route: '/pantry',   labelKey: 'nav.pantry',   icon: 'archive'       },
-].filter(({ route }) => !window.yuvomi?.isModuleDisabled(route.slice(1)));
+].filter(({ route }) => {
+  const moduleId = route === '/catalog' ? 'shopping' : route.slice(1);
+  return !window.yuvomi?.isModuleDisabled(moduleId);
+});
 
 export function getLastKitchenRoute() {
   try {

@@ -2,6 +2,17 @@ import { op, jsonBody, idParam } from '../helpers.js';
 
 export function shoppingPaths() {
   return {
+    '/api/v1/shopping/catalog': {
+      get: op({ summary: 'List and search catalog products with price summaries', tag: 'Shopping' }),
+      post: op({ summary: 'Create a catalog product', tag: 'Shopping', stateChanging: true, requestBody: jsonBody(null), description: 'Body: { name, category? }. Names are case-insensitively unique.' }),
+    },
+    '/api/v1/shopping/catalog/{productId}': {
+      patch: op({ summary: 'Update a catalog product', tag: 'Shopping', params: [idParam('productId', 'Product ID')], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { name?, category? }.' }),
+      delete: op({ summary: 'Delete a catalog product and its price history', tag: 'Shopping', params: [idParam('productId', 'Product ID')], stateChanging: true, description: 'Existing shopping items remain in their lists.' }),
+    },
+    '/api/v1/shopping/catalog/{productId}/history': {
+      get: op({ summary: 'List purchase price history for a catalog product', tag: 'Shopping', params: [idParam('productId', 'Product ID')] }),
+    },
     '/api/v1/shopping': {
       get: op({ summary: 'List shopping lists', tag: 'Shopping' }),
       post: op({ summary: 'Create shopping list', tag: 'Shopping', stateChanging: true, requestBody: jsonBody(null) }),
