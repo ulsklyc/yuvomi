@@ -182,6 +182,14 @@ test('PUT date_format: ungültig -> 400, gültig -> persist', async () => {
   assert.equal((await put({ date_format: 'zzz' })).status, 400);
   assert.equal((await put({ date_format: 'mdy' })).body.data.date_format, 'mdy');
 });
+// #1847: DD-MM-YYYY, wie es die Niederlande schreiben. Der Wert muss die Route
+// passieren UND beim Lesen wiederkommen - ein Wert, der gespeichert, aber beim
+// Laden verworfen wird, haelt die Einstellung scheinbar fest und zeigt sie nie.
+test('PUT date_format dmy_dash wird gespeichert und wieder geliefert (#1847)', async () => {
+  assert.equal((await put({ date_format: 'dmy_dash' })).body.data.date_format, 'dmy_dash');
+  assert.equal((await get()).body.data.date_format, 'dmy_dash');
+  await put({ date_format: 'dmy' });
+});
 test('PUT time_format: ungültig -> 400, gültig -> persist', async () => {
   assert.equal((await put({ time_format: '48h' })).status, 400);
   assert.equal((await put({ time_format: '12h' })).body.data.time_format, '12h');

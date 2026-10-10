@@ -81,7 +81,7 @@ export const REGION_PRESETS = {
   'hi-IN': { currency: 'INR', date_format: 'dmy_slash', time_format: '12h' },
   'pt-PT': { currency: 'EUR', date_format: 'dmy_slash', time_format: '24h' },
   'pt-BR': { currency: 'BRL', date_format: 'dmy_slash', time_format: '24h' },
-  'nl-NL': { currency: 'EUR', date_format: 'dmy', time_format: '24h' },
+  'nl-NL': { currency: 'EUR', date_format: 'dmy_dash', time_format: '24h' },
   'ar-AE': { currency: 'AED', date_format: 'dmy_slash', time_format: '12h' },
   'ar-SA': { currency: 'SAR', date_format: 'dmy_slash', time_format: '12h' },
   'ko-KR': { currency: 'KRW', date_format: 'ymd', time_format: '12h' },
