@@ -406,6 +406,9 @@
         "weatherUnavailable": "현재 날씨를 불러올 수 없습니다"
     },
     "tasks": {
+        "resetOrder": "자동으로 정렬",
+        "resetOrderAria": "자동으로 정렬: {{group}}",
+        "resetOrderDone": "\"{{group}}\" 그룹이 다시 자동으로 정렬됩니다.",
         "manageCategories": "카테고리 관리",
         "addCategory": "+ 카테고리",
         "title": "할 일",

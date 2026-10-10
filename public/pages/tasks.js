@@ -481,7 +481,7 @@ function renderLockedBadge(task) {
  * Zeile, an der eine Anzahl OHNE ihren Gegenstand stand.
  */
 function renderTaskCard(task, opts = {}) {
-  const { expandedSubtasks = false, selecting = false, selected = false, showCategory = true } = opts;
+  const { expandedSubtasks = false, selecting = false, selected = false, showCategory = true, reorderable = false } = opts;
   const isDone = task.status === 'done';
   const archived = isArchived(task);
   // Gesperrte Aufgabe (#830): abhaken bleibt, umschreiben nicht. Die Knoepfe,
@@ -660,6 +660,16 @@ function renderTaskCard(task, opts = {}) {
               label: archived ? t('tasks.unarchiveButton') : t('tasks.archiveButton') },
           ],
         }) : ''}
+        ${/* GRIFF FUER DIE HANDORDNUNG - ein Button ohne data-action: die
+             Pfeiltasten am fokussierten Griff sind der Tastaturpfad (wie im
+             Einkauf, #678), ein Klick tut nichts. Beschriftung und Position
+             setzt refreshTaskHandleLabels(). */''}
+        ${reorderable ? `
+        <button type="button" class="row-action list-row__drag"
+                aria-label="${esc(t('shopping.reorderHandle', { name: task.title }))}"
+                title="${t('shopping.reorderHandleHint')}">
+          <i data-lucide="grip-vertical" class="icon-md" aria-hidden="true"></i>
+        </button>` : ''}
       </div>
 
       ${progress !== null ? `
@@ -722,6 +732,40 @@ function sortTasks(a, b, nowStamp) {
   return (PRIO_ORDER[a.priority] ?? 4) - (PRIO_ORDER[b.priority] ?? 4);
 }
 
+/**
+ * Reihenfolge innerhalb einer Kategorie: von Hand eingeordnete Aufgaben
+ * (sort_order gesetzt) zuerst nach ihrem Rang, danach der Rest in der
+ * bisherigen Ordnung. Eine neue Aufgabe steht damit am Ende ihrer Kategorie,
+ * statt sich vor eine bestehende Handordnung zu schieben.
+ */
+function sortTasksManual(a, b, now) {
+  const aRank = a.sort_order ?? null;
+  const bRank = b.sort_order ?? null;
+  if (aRank !== null && bRank !== null && aRank !== bRank) return aRank - bRank;
+  if ((aRank === null) !== (bRank === null)) return aRank === null ? 1 : -1;
+  return sortTasks(a, b, now);
+}
+
+/**
+ * Ob die Liste Griffe zum Umsortieren zeigt. Nur beim Gruppieren nach
+ * Kategorie: dort steht der Rang je Kategorie, und nur dort sagt die Position
+ * in der Gruppe etwas aus. Nicht im Auswahlmodus (die Zeile ist dann
+ * Auswahlflaeche), nicht bei `tasks: read` und nicht am Wandtablett.
+ */
+function canReorderTasks(groupMode) {
+  return groupMode === 'category' && state.viewMode === 'list'
+    && !state.bulkSelectMode && !readOnly() && !actingAsDisplay();
+}
+
+/** Der Knopf am Gruppenkopf, der die Gruppe zur automatischen Reihenfolge zurueckbringt. */
+function taskResetButtonHtml(id, label) {
+  return `
+        <button type="button" class="list-group__reset" data-group-reset="${esc(id)}"
+                aria-label="${esc(t('tasks.resetOrderAria', { group: label }))}">
+          ${esc(t('tasks.resetOrder'))}
+        </button>`;
+}
+
 function renderTaskGroups(tasks, groupMode) {
   if (!tasks.length) {
     // Leere Suche ≠ leeres Modul: bei aktiver Suche wäre „Noch keine Aufgaben"
@@ -751,11 +795,13 @@ function renderTaskGroups(tasks, groupMode) {
 
   const now = taskSortNow();
   const groups = groupBy(tasks, groupMode);
+  const reorderable = canReorderTasks(groupMode);
+  const compare = groupMode === 'category' ? sortTasksManual : sortTasks;
   return groups.map(({ id, label, tasks: groupTasks }) => {
-    const sorted = [...groupTasks].sort((a, b) => sortTasks(a, b, now));
+    const sorted = [...groupTasks].sort((a, b) => compare(a, b, now));
     const collapsed = isGroupCollapsed(groupMode, id);
     return `
-    <div class="task-group list-group">
+    <div class="task-group list-group" data-group-id="${esc(id)}">
       <!-- Gruppenkopf als echte Ueberschrift (Critique 2026-08-10): /tasks
            hatte genau EIN h-Element im ganzen Dokument, und wer per H-Taste
            navigiert, kam damit auf den Seitentitel und nicht weiter. Der
@@ -779,6 +825,7 @@ function renderTaskGroups(tasks, groupMode) {
           <span>${esc(label)}</span>
         </button>
         <span class="list-group__count">${groupTasks.length}</span>
+        ${reorderable && groupTasks.some((x) => x.sort_order != null) ? taskResetButtonHtml(id, label) : ''}
       </h2>
       ${collapsed ? '' : `<div class="row-carrier">
         ${sorted.map((t) => renderSwipeRow(t, renderTaskCard(t, {
@@ -786,6 +833,7 @@ function renderTaskGroups(tasks, groupMode) {
           selected: state.bulkSelectMode && state.selectedTaskIds.has(t.id),
           expandedSubtasks: state.subtasksExpandedByDefault,
           showCategory: groupMode !== 'category',
+          reorderable,
         }))).join('')}
       </div>`}
     </div>`;
@@ -3696,6 +3744,7 @@ function renderTaskList(container, { paneQuiet = false } = {}) {
   stagger(listEl.querySelectorAll('.swipe-row, .kanban-card'), { host: listEl });
   updateBulkActionsBar(container);
   wireSwipeGestures(container);
+  wireTaskReorder(container);
   // Kein Hinweis auf eine Geste, die der Auswahlmodus gerade abschaltet.
   if (!state.bulkSelectMode) maybeShowSwipeHint(container);
   listEl.querySelector('#empty-cta-tasks')?.addEventListener('click', () => {
@@ -4302,6 +4351,8 @@ function wireSwipeGestures(container) {
   // Display faellt die Schreib-Seite weg und die Lese-Seite bleibt.
   const optionen = {
     card: '.task-card',
+    // Der Zug am Griff ist Umsortieren, kein Wisch.
+    ignore: '.list-row__drag',
     // Vor 2.0.0 öffnete derselbe Wisch hier den Bearbeiten-Dialog: eine der
     // zwei Listen, in denen die Seiten wirklich getauscht haben.
     sidesSwapped: true,
@@ -4387,6 +4438,208 @@ function wireSwipeGestures(container) {
   }
   wireSwipeRows(listEl, optionen);
   return optionen;
+}
+
+// --------------------------------------------------------
+// Handordnung innerhalb einer Kategorie
+// --------------------------------------------------------
+
+let taskSortables = [];
+
+function destroyTaskSortables() {
+  taskSortables.forEach((inst) => { try { inst.destroy(); } catch { /* schon abgeraeumt */ } });
+  taskSortables = [];
+}
+
+/** Zeilen einer Gruppe in DOM-Reihenfolge. */
+function taskRows(rowsEl) {
+  return Array.from(rowsEl.querySelectorAll(':scope > .swipe-row'));
+}
+
+/**
+ * Position und Gesamtzahl in die Griff-Beschriftungen. Nach jedem Zug erneut:
+ * bei der Tastaturbedienung ist der Griff das fokussierte Element, und seine
+ * Beschriftung die einzige Rueckmeldung darueber, wo die Aufgabe jetzt steht.
+ */
+function refreshTaskHandleLabels(rowsEl) {
+  if (!rowsEl) return;
+  const rows = taskRows(rowsEl);
+  rows.forEach((row, idx) => {
+    const handle = row.querySelector('.list-row__drag');
+    const name = row.querySelector('.task-card__title')?.textContent?.trim() ?? '';
+    handle?.setAttribute('aria-label', `${t('shopping.reorderHandle', { name })}, ${
+      t('shopping.reorderPosition', { index: idx + 1, total: rows.length })}`);
+  });
+}
+
+function announceTaskMove(container, row) {
+  const el = container?.querySelector('#tasks-reorder-announce');
+  if (!el || !row) return;
+  const rows = taskRows(row.parentElement);
+  const idx = rows.indexOf(row);
+  if (idx === -1) return;
+  el.textContent = t('category.reorderAnnounce', {
+    name: row.querySelector('.task-card__title')?.textContent?.trim() ?? '',
+    position: idx + 1,
+    total: rows.length,
+  });
+}
+
+/** Gruppen mit laufender Sicherung: Gruppen-ID -> { again }. */
+const taskOrderRuns = new Map();
+
+/** Liest die Reihenfolge JETZT aus dem DOM und schickt sie. @returns {Promise<boolean>} */
+async function sendTaskOrder(groupEl, container) {
+  const rowsEl = groupEl.querySelector('.row-carrier');
+  if (!rowsEl) return true;
+  const order = taskRows(rowsEl).map((row) => Number(row.dataset.swipeId));
+  if (!order.length) return true;
+  try {
+    const res = await api.patch('/tasks/reorder', { order });
+    // Nur den State nachziehen, nicht neu zeichnen: das DOM steht schon richtig,
+    // und ein Neuzeichnen nahm dem Griff mitten in einer Tastaturbedienung den
+    // Fokus.
+    //
+    // DIE RAENGE KOMMEN AUS DER ANTWORT, nicht aus der Position. Der Server
+    // verteilt die Raenge der genannten Aufgaben neu und vergibt kein 1..n; ein
+    // selbst gerechnetes `idx + 1` widerspricht ihm, sobald die Gruppe nur eine
+    // Teilmenge zeigt (Suche, "heute faellig"): beide Filter wirken im Client und
+    // zeichnen aus dem State neu - die Reihenfolge nach dem Loeschen des Filters
+    // stimmte dann nicht mit dem Server ueberein, und der naechste Zug machte
+    // sie dauerhaft.
+    for (const { id, sort_order: rank } of res?.data ?? []) {
+      const task = state.tasks.find((x) => x.id === id);
+      if (task) task.sort_order = rank;
+    }
+    // Der Knopf zum Zuruecksetzen erscheint mit dem ERSTEN Zug, nicht erst beim
+    // naechsten Neuzeichnen: ohne ihn wuesste man nach einem versehentlichen
+    // Zug nicht, dass es einen Weg zurueck gibt.
+    const title = groupEl.querySelector('.list-group__title');
+    if (title && !title.querySelector('[data-group-reset]')) {
+      const label = groupEl.querySelector('.list-group__toggle span')?.textContent?.trim() ?? '';
+      title.insertAdjacentHTML('beforeend', taskResetButtonHtml(groupEl.dataset.groupId, label));
+    }
+    return true;
+  } catch (err) {
+    window.yuvomi.showToast(err.message, 'danger');
+    // Das DOM zeigt eine Reihenfolge, die der Server nicht kennt.
+    await loadTasks(container);
+    return false;
+  }
+}
+
+/**
+ * Sichert die Reihenfolge einer Gruppe. Ein Lauf je Gruppe zur Zeit: zwei Zuege
+ * kurz hintereinander duerfen sich nicht ueberholen, sonst gewaenne der aeltere
+ * Request. Weitere Zuege waehrend eines Laufs werden zu EINER Nachfolge
+ * zusammengefasst - die liest die dann aktuelle Reihenfolge.
+ */
+function persistTaskOrder(groupEl, container, movedRow) {
+  const key = groupEl?.dataset.groupId;
+  if (!groupEl || key === undefined) return;
+
+  refreshTaskHandleLabels(groupEl.querySelector('.row-carrier'));
+  announceTaskMove(container, movedRow);
+
+  const running = taskOrderRuns.get(key);
+  if (running) { running.again = true; return; }
+
+  const run = { again: false, done: null };
+  taskOrderRuns.set(key, run);
+  run.done = (async () => {
+    try {
+      let ok = true;
+      do {
+        run.again = false;
+        ok = await sendTaskOrder(groupEl, container);
+      } while (run.again && ok);
+    } finally {
+      taskOrderRuns.delete(key);
+    }
+  })();
+}
+
+/** Verschiebt eine Zeile um einen Platz (Tastaturpfad) und haelt den Fokus am Griff. */
+function moveTaskRow(row, delta, container) {
+  const rowsEl = row.parentElement;
+  const rows = taskRows(rowsEl);
+  const idx = rows.indexOf(row);
+  const target = idx + delta;
+  if (idx === -1 || target < 0 || target >= rows.length) return;
+
+  if (delta < 0) rowsEl.insertBefore(row, rows[target]);
+  else rowsEl.insertBefore(row, rows[target].nextSibling);
+
+  vibrate(15);
+  row.querySelector('.list-row__drag')?.focus();
+  persistTaskOrder(rowsEl.closest('.task-group'), container, row);
+}
+
+/**
+ * Zurueck zur automatischen Reihenfolge: loescht die Raenge der Aufgaben, die
+ * diese Gruppe gerade zeigt, und laedt neu. Die Gruppe sortiert sich danach
+ * wieder nach Faelligkeit und Prioritaet. Der Fokus geht auf den Gruppenkopf,
+ * weil der Knopf mit dem Neuzeichnen verschwindet.
+ */
+async function resetTaskOrder(groupEl, container) {
+  const rowsEl = groupEl?.querySelector('.row-carrier');
+  const key = groupEl?.dataset.groupId;
+  if (!rowsEl || key === undefined) return;
+  const ids = taskRows(rowsEl).map((row) => Number(row.dataset.swipeId));
+  if (!ids.length) return;
+  const label = groupEl.querySelector('.list-group__toggle span')?.textContent?.trim() ?? '';
+  try {
+    // Ein Zug derselben Gruppe, der noch gesichert wird, wuerde das Zuruecksetzen
+    // ueberholen, und die Raenge waeren wieder da. Erst abwarten.
+    await taskOrderRuns.get(key)?.done;
+    await api.post('/tasks/reorder/reset', { ids });
+    await loadTasks(container);
+    const el = container.querySelector('#tasks-reorder-announce');
+    if (el) el.textContent = t('tasks.resetOrderDone', { group: label });
+    const toggles = [...container.querySelectorAll('[data-group-toggle]')];
+    toggles.find((b) => b.dataset.groupToggle === key)?.focus();
+  } catch (err) {
+    window.yuvomi.showToast(err.message, 'danger');
+  }
+}
+
+/**
+ * Je Kategorie-Gruppe eine eigene Instanz und kein `group`-Verbund: ein Zug in
+ * eine andere Gruppe waere ein Kategoriewechsel, keine Umsortierung - dafuer
+ * gibt es den Bearbeiten-Dialog.
+ */
+function wireTaskReorder(container) {
+  destroyTaskSortables();
+  const listEl = container.querySelector('#task-list');
+  if (!listEl || !canReorderTasks(state.groupMode)) return;
+
+  listEl.querySelectorAll('.task-group').forEach((groupEl) => {
+    const rowsEl = groupEl.querySelector('.row-carrier');
+    if (!rowsEl) return;
+    refreshTaskHandleLabels(rowsEl);
+    makeSortable(rowsEl, {
+      handle: '.list-row__drag',
+      draggable: '.swipe-row',
+      onEnd: (evt) => persistTaskOrder(groupEl, container, evt?.item),
+    }).then((inst) => { if (inst) taskSortables.push(inst); })
+      .catch(() => { /* ohne SortableJS bleibt der Tastaturpfad */ });
+  });
+
+  // Einmal pro #task-list-Element: renderTaskList() tauscht nur dessen Inhalt
+  // aus, ein Listener je Aufruf stapelte sich mit jedem Neuzeichnen.
+  if (listEl.dataset.reorderWired) return;
+  listEl.dataset.reorderWired = '1';
+  listEl.addEventListener('click', (e) => {
+    const reset = e.target.closest?.('[data-group-reset]');
+    if (reset) resetTaskOrder(reset.closest('.task-group'), container);
+  });
+  listEl.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    const handle = e.target.closest?.('.list-row__drag');
+    if (!handle) return;
+    e.preventDefault();
+    moveTaskRow(handle.closest('.swipe-row'), e.key === 'ArrowUp' ? -1 : 1, container);
+  });
 }
 
 // --------------------------------------------------------
@@ -4947,6 +5200,9 @@ function wireDoerContextMenu(listEl) {
   listEl.addEventListener('pointerdown', (e) => {
     clear();
     if (state.bulkSelectMode) return;
+    // Der Griff der Handordnung gehoert dem Umsortieren: ein Halten daran ohne
+    // Bewegung oeffnete sonst beim Loslassen die Personenauswahl.
+    if (e.target.closest?.('.list-row__drag')) return;
     const card = e.target.closest?.('.task-card');
     if (!doerPanelOf(card) || e.target.closest('.popover-menu')) return;
     const primary = e.pointerType !== 'mouse' || e.button === 0;
@@ -5751,6 +6007,7 @@ export async function render(container, { user, signal } = {}) {
               (utils/bulk-pill.js, updateBulkActionsBar), wie in Einkauf,
               Kontakten und Vorrat - nicht mehr als eigene Leiste ueber der
               Liste (Re-Critique 2026-09-27, D5). */ ''}
+        <div class="sr-only" role="status" aria-live="polite" id="tasks-reorder-announce"></div>
         <div class="split-view tasks-split">
         <div id="task-list" class="split-view__list">
           ${[1,2,3].map(() => `
@@ -5908,6 +6165,8 @@ export const __test = {
   // nur im Quelltext behauptet: die Karte fuer das Markup, das Einhaengen der
   // Wischgeste fuer den Weg, der gar kein Markup hat.
   renderTaskCard, wireSwipeGestures,
+  // Handordnung: Vergleich, Griffe, Persistenz (Test: test-tasks-reorder-ui.js).
+  sortTasksManual, canReorderTasks, moveTaskRow, wireTaskReorder, resetTaskOrder,
   // Der Aufgaben-Dialog als Markup: welche Felder er zeigt und wen er anbietet.
   renderModalContent,
   // Der Erinnerungs-Abschnitt einzeln, weil er einen Zustand zu BENENNEN hat,

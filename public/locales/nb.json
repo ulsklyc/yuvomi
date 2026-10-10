@@ -392,6 +392,9 @@
         "weatherUnavailable": "Været er ikke tilgjengelig akkurat nå"
     },
     "tasks": {
+        "resetOrder": "Sorter automatisk",
+        "resetOrderAria": "Sorter automatisk: {{group}}",
+        "resetOrderDone": "«{{group}}» er sortert automatisk igjen.",
         "manageCategories": "Administrer kategorier",
         "addCategory": "+ kategori",
         "title": "Oppgaver",

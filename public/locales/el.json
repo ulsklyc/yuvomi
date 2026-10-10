@@ -392,6 +392,9 @@
         "weatherUnavailable": "Ο καιρός δεν είναι διαθέσιμος αυτή τη στιγμή"
     },
     "tasks": {
+        "resetOrder": "Αυτόματη ταξινόμηση",
+        "resetOrderAria": "Αυτόματη ταξινόμηση: {{group}}",
+        "resetOrderDone": "Η ομάδα «{{group}}» ταξινομείται ξανά αυτόματα.",
         "manageCategories": "Διαχείριση κατηγοριών",
         "addCategory": "+ κατηγορία",
         "title": "Εργασίες",

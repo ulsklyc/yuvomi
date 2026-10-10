@@ -406,6 +406,9 @@
         "weatherUnavailable": "Cuaca sedang tidak tersedia"
     },
     "tasks": {
+        "resetOrder": "Urutkan otomatis",
+        "resetOrderAria": "Urutkan otomatis: {{group}}",
+        "resetOrderDone": "\"{{group}}\" diurutkan otomatis lagi.",
         "manageCategories": "Kelola kategori",
         "addCategory": "+ Kategori",
         "title": "Tugas",

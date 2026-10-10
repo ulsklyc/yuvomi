@@ -392,6 +392,9 @@
         "weatherUnavailable": "Weer momenteel niet beschikbaar"
     },
     "tasks": {
+        "resetOrder": "Automatisch sorteren",
+        "resetOrderAria": "Automatisch sorteren: {{group}}",
+        "resetOrderDone": "„{{group}}” wordt weer automatisch gesorteerd.",
         "manageCategories": "Categorieën beheren",
         "addCategory": "+ categorie",
         "title": "Taken",

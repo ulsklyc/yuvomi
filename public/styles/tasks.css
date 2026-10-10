@@ -478,6 +478,34 @@
   }
 }
 
+/* Zurueck zur automatischen Reihenfolge, am Ende des Gruppenkopfs. Leise: ein
+ * Textknopf in der Farbe der Zaehlung, der erst beim Hovern oder Fokussieren
+ * Gewicht bekommt - er ist die Ausnahme, die Handordnung der Normalfall. Er
+ * steht nur in Gruppen, in denen ueberhaupt etwas von Hand eingeordnet ist. */
+.list-group__reset {
+  /* DIE BOX BLEIBT SO HOCH WIE DER GRUPPENKOPF (24px), nur die Trefferflaeche
+   * waechst: Polster plus gleich grosser negativer Rand, wie am Aufgabentitel.
+   * Ein min-height machte jeden Kopf einer handgeordneten Gruppe 16px hoeher
+   * als die Nachbarn - und liess ihn beim ersten gesicherten Zug unter der
+   * Liste wachsen, in der man gerade arbeitet. */
+  margin-block: calc(-1 * var(--space-2));
+  margin-inline: auto calc(-1 * var(--space-2));
+  padding: var(--space-2);
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: var(--font-weight-regular);
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+}
+
+.list-group__reset:hover,
+.list-group__reset:focus-visible {
+  color: var(--color-text-primary);
+}
+
 /* Status-Checkbox */
 .task-status-btn {
   width: var(--target-base);
@@ -998,6 +1026,32 @@
     grid-column: 3;
     grid-row: 2;
     align-self: center;
+  }
+
+  /* Der Griff der Handordnung bekommt eine eigene Endspalte ueber beide
+   * Zeilen. Ohne sie fiele er als viertes Rasterkind in eine dritte Zeile und
+   * machte jede Zeile doppelt so hoch; Titel und Metazeile enden dafuer vor
+   * ihm statt unter ihm. Die Regeln haengen am Griff selbst (:has), damit
+   * Zeilen ohne Griff - anderes Gruppieren, Auswahlmodus, nur lesen - ihr
+   * Raster behalten. */
+  /* Nicht in einer Gruppe mit nur einer Zeile: dort blendet list-row.css den
+   * Griff aus (.swipe-row:only-child), und die leere vierte Spalte kostete den
+   * Titel 8px. */
+  .swipe-row:not(:only-child) .task-card__main:has(> .list-row__drag) {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+  }
+
+  .swipe-row:not(:only-child) .task-card__main:has(> .list-row__drag) .task-card__title {
+    grid-column: 2 / 4;
+  }
+
+  .swipe-row:not(:only-child) .task-card__main:has(> .list-row__drag):not(:has(> .avatar-stack)) .task-card__meta {
+    grid-column: 2 / 4;
+  }
+
+  .task-card__main > .list-row__drag {
+    grid-column: 4;
+    grid-row: 1 / span 2;
   }
 
   /* Ein Long-Press ist hier eine Frage nach der Person, kein Markieren und

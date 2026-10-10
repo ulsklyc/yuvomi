@@ -482,6 +482,9 @@
         "weatherUnavailable": "Pogoda jest obecnie niedostępna"
     },
     "tasks": {
+        "resetOrder": "Sortuj automatycznie",
+        "resetOrderAria": "Sortuj automatycznie: {{group}}",
+        "resetOrderDone": "Grupa „{{group}}” jest znów sortowana automatycznie.",
         "manageCategories": "Zarządzaj kategoriami",
         "addCategory": "+ Kategoria",
         "title": "Zadania",

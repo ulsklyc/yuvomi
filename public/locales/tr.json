@@ -392,6 +392,9 @@
         "weatherUnavailable": "Hava durumu şu anda kullanılamıyor"
     },
     "tasks": {
+        "resetOrder": "Otomatik sırala",
+        "resetOrderAria": "Otomatik sırala: {{group}}",
+        "resetOrderDone": "\"{{group}}\" yeniden otomatik sıralanıyor.",
         "manageCategories": "Kategorileri yönet",
         "addCategory": "+ kategori",
         "title": "Görevler",

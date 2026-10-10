@@ -506,6 +506,9 @@
         "weatherUnavailable": "الطقس غير متاح حاليًا"
     },
     "tasks": {
+        "resetOrder": "الترتيب التلقائي",
+        "resetOrderAria": "الترتيب التلقائي: {{group}}",
+        "resetOrderDone": "تم ترتيب «{{group}}» تلقائيًا مرة أخرى.",
         "manageCategories": "إدارة الفئات",
         "addCategory": "+ فئة",
         "title": "المهام",

@@ -392,6 +392,9 @@
         "weatherUnavailable": "Vädret är inte tillgängligt just nu"
     },
     "tasks": {
+        "resetOrder": "Sortera automatiskt",
+        "resetOrderAria": "Sortera automatiskt: {{group}}",
+        "resetOrderDone": "”{{group}}” sorteras automatiskt igen.",
         "manageCategories": "Hantera kategorier",
         "addCategory": "+ kategori",
         "title": "Uppgifter",

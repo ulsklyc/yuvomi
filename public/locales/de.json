@@ -406,6 +406,9 @@
         "weatherUnavailable": "Wetter gerade nicht verfügbar"
     },
     "tasks": {
+        "resetOrder": "Automatisch sortieren",
+        "resetOrderAria": "Automatisch sortieren: {{group}}",
+        "resetOrderDone": "„{{group}}“ ist wieder automatisch sortiert.",
         "manageCategories": "Kategorien verwalten",
         "addCategory": "+ Kategorie",
         "title": "Aufgaben",

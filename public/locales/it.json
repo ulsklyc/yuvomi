@@ -392,6 +392,9 @@
         "weatherUnavailable": "Meteo al momento non disponibile"
     },
     "tasks": {
+        "resetOrder": "Ordina automaticamente",
+        "resetOrderAria": "Ordina automaticamente: {{group}}",
+        "resetOrderDone": "Ordine automatico ripristinato per «{{group}}».",
         "manageCategories": "Gestisci categorie",
         "addCategory": "+ categoria",
         "title": "Compiti",

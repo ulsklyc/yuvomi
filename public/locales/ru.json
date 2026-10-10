@@ -468,6 +468,9 @@
         "weatherUnavailable": "Погода сейчас недоступна"
     },
     "tasks": {
+        "resetOrder": "Сортировать автоматически",
+        "resetOrderAria": "Сортировать автоматически: {{group}}",
+        "resetOrderDone": "Для «{{group}}» снова включена автоматическая сортировка.",
         "manageCategories": "Управление категориями",
         "addCategory": "+ категория",
         "title": "Задачи",

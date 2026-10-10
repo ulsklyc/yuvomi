@@ -392,6 +392,9 @@
         "weatherUnavailable": "現在、天気を取得できません"
     },
     "tasks": {
+        "resetOrder": "自動で並べ替え",
+        "resetOrderAria": "自動で並べ替え: {{group}}",
+        "resetOrderDone": "「{{group}}」を自動の並び順に戻しました。",
         "manageCategories": "カテゴリーを管理",
         "addCategory": "+ カテゴリー",
         "title": "タスク",

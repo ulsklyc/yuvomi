@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Tasks can be put in an order of your own within a category.** In the task list grouped by
+  category, every row has a grip: drag it, or press the arrow keys at the focused grip, and the
+  order is saved for the whole household. Tasks you never placed keep the old order (due date,
+  then priority) and sort after the placed ones, so a new task lands at the end of its category.
+  A recurring task passes its place on to its next occurrence; a task that moves to another
+  category loses its place. A "Sort automatically" button in the group header returns a category
+  to the automatic order. Grouping by due date, the board, selection mode, `tasks: read` and the
+  wall display are unchanged. The API gets `PATCH /api/v1/tasks/reorder` and
+  `POST /api/v1/tasks/reorder/reset`, and `sort_order` on each task (migration 238).
 - **Payment reminders can be turned off for each subscription** (#1708, from D#1226). Turn off the reminder
   in the subscription dialog while keeping the subscription active and its cost in the budget.
   Editing or renewing it keeps the reminder off. Existing subscriptions keep reminders enabled.

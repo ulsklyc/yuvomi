@@ -392,6 +392,9 @@
         "weatherUnavailable": "天气暂时不可用"
     },
     "tasks": {
+        "resetOrder": "自动排序",
+        "resetOrderAria": "自动排序：{{group}}",
+        "resetOrderDone": "“{{group}}”已恢复自动排序。",
         "manageCategories": "管理类别",
         "addCategory": "+ 类别",
         "title": "任务",

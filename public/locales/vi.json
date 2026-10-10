@@ -392,6 +392,9 @@
         "weatherUnavailable": "Hiện không có dữ liệu thời tiết"
     },
     "tasks": {
+        "resetOrder": "Sắp xếp tự động",
+        "resetOrderAria": "Sắp xếp tự động: {{group}}",
+        "resetOrderDone": "\"{{group}}\" đã được sắp xếp tự động trở lại.",
         "manageCategories": "Quản lý danh mục",
         "addCategory": "+ danh mục",
         "title": "Nhiệm vụ",

@@ -392,6 +392,9 @@
         "weatherUnavailable": "El tiempo no está disponible en este momento"
     },
     "tasks": {
+        "resetOrder": "Ordenar automáticamente",
+        "resetOrderAria": "Ordenar automáticamente: {{group}}",
+        "resetOrderDone": "Orden automático restaurado para «{{group}}».",
         "manageCategories": "Gestionar categorías",
         "addCategory": "+ categoría",
         "title": "Tareas",

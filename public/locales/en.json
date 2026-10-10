@@ -392,6 +392,9 @@
         "weatherUnavailable": "Weather currently unavailable"
     },
     "tasks": {
+        "resetOrder": "Sort automatically",
+        "resetOrderAria": "Sort automatically: {{group}}",
+        "resetOrderDone": "\"{{group}}\" is sorted automatically again.",
         "manageCategories": "Manage categories",
         "addCategory": "+ category",
         "title": "Tasks",

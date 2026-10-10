@@ -392,6 +392,9 @@
         "weatherUnavailable": "Az időjárás jelenleg nem érhető el"
     },
     "tasks": {
+        "resetOrder": "Automatikus rendezés",
+        "resetOrderAria": "Automatikus rendezés: {{group}}",
+        "resetOrderDone": "A(z) „{{group}}” csoport újra automatikusan rendezett.",
         "manageCategories": "Kategóriák kezelése",
         "addCategory": "+ kategória",
         "title": "Feladatok",
