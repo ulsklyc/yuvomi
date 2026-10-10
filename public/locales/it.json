@@ -5553,6 +5553,7 @@
         "money": {
             "title": "Paghetta",
             "setUp": "Imposta la paghetta",
+            "empty": "Apri un conto per un bambino per tenere qui la sua paghetta, accreditata secondo un piano.",
             "planWeekly": "{{amount}} a settimana",
             "planMonthly": "{{amount}} al mese",
             "nextCredit": "Prossimo accredito: {{date}}",

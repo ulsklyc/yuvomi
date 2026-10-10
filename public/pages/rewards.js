@@ -1456,7 +1456,8 @@ function renderMoneySection() {
   const manage = isAdmin() && !readOnly();
   const canOpen = manage && (state.money.candidates || []).length > 0;
   // Ohne Konto und ohne die Moeglichkeit, eines zu eroeffnen, gibt es nichts
-  // zu zeigen - auch keine Ueberschrift ueber einer leeren Liste.
+  // zu zeigen - auch keine Ueberschrift ueber einer leeren Liste. Wer eines
+  // eroeffnen kann, sieht ohne Konto einen Satz im selben Traeger.
   if (!accounts.length && !canOpen) return '';
   const setUp = canOpen ? `
           <button class="btn btn--ghost btn--sm rw-money-setup" type="button"><i data-lucide="piggy-bank" aria-hidden="true"></i>${esc(t('rewards.money.setUp'))}</button>` : '';
@@ -1466,7 +1467,9 @@ function renderMoneySection() {
           <h2 class="rw-section__title u-section-title">${esc(t('rewards.money.title'))}</h2>
           ${setUp}
         </div>
-        ${accounts.length ? `<ul class="row-carrier rw-standings">${accounts.map(renderMoneyRow).join('')}</ul>` : ''}
+        <ul class="row-carrier rw-standings">${accounts.length
+    ? accounts.map(renderMoneyRow).join('')
+    : `<li class="list-row rw-money-empty"><p class="list-row__meta">${esc(t('rewards.money.empty'))}</p></li>`}</ul>
       </section>`;
 }
 

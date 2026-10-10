@@ -5686,6 +5686,7 @@
         "money": {
             "title": "Kapesné",
             "setUp": "Nastavit kapesné",
+            "empty": "Založte dítěti účet, kde se bude vést jeho kapesné a pravidelně připisovat podle plánu.",
             "planWeekly": "{{amount}} týdně",
             "planMonthly": "{{amount}} měsíčně",
             "nextCredit": "Další připsání: {{date}}",

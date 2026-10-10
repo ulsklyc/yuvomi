@@ -5817,6 +5817,7 @@
         "money": {
             "title": "Kieszonkowe",
             "setUp": "Ustaw kieszonkowe",
+            "empty": "Załóż konto dziecku, aby prowadzić tu jego kieszonkowe, wpłacane według harmonogramu.",
             "planWeekly": "{{amount}} na tydzień",
             "planMonthly": "{{amount}} na miesiąc",
             "nextCredit": "Następna wpłata: {{date}}",

@@ -188,6 +188,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Pocket money without an account now says what it is for** (#1774). Before an admin had opened
+  an account for any child, "Pocket money" was a heading with a button and nothing below it, which
+  read like a section that failed to load. It now shows one sentence below the heading, in the same
+  list the accounts appear in later. Only admins who can open an account see it; a child without an
+  account still sees no section.
 - **A wall tablet shows events again when the household overview is set to "Assigned to me"** (#1808).
   A paired display follows the household default of the overview. If that default had the calendar
   tile set to "Assigned to me", the tablet looked for events assigned to the tablet itself and

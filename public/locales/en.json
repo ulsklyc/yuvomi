@@ -5553,6 +5553,7 @@
         "money": {
             "title": "Pocket money",
             "setUp": "Set up pocket money",
+            "empty": "Open an account for a child to keep their pocket money here, credited on a schedule.",
             "planWeekly": "{{amount}} per week",
             "planMonthly": "{{amount}} per month",
             "nextCredit": "Next credit: {{date}}",

@@ -5553,6 +5553,7 @@
         "money": {
             "title": "용돈",
             "setUp": "용돈 설정",
+            "empty": "아이 계정을 만들면 용돈을 여기서 관리하고 정해진 일정에 맞춰 입금할 수 있어요.",
             "planWeekly": "주당 {{amount}}",
             "planMonthly": "월 {{amount}}",
             "nextCredit": "다음 입금: {{date}}",
