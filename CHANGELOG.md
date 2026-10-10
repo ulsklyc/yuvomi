@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Dutch date format DD-MM-YYYY** (#1847). The new `DD-MM-YYYY` choice is in Settings → Account →
+  Appearance → Date format, and the Netherlands region now uses it instead of `DD.MM.YYYY`.
+  Dates, the date field placeholder, short dates and typed input all follow it. Existing households
+  keep the format they have set.
 - **Payment reminders can be turned off for each subscription** (#1708, from D#1226). Turn off the reminder
   in the subscription dialog while keeping the subscription active and its cost in the budget.
   Editing or renewing it keeps the reminder off. Existing subscriptions keep reminders enabled.

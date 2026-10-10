@@ -14,7 +14,7 @@ import { CURRENCY_CODES } from '../public/utils/currency-codes.js';
 import { REGION_TAG, formatUnit, getNumberFormat } from '../public/i18n.js';
 import { withoutCommentsKeepingLines } from './source-text.js';
 import { withLocales } from './i18n-env.js';
-import { isRegionTag, regionLocale, resolveHouseholdLocale } from '../server/utils/i18n.js';
+import { formatDateKey, isRegionTag, regionLocale, resolveHouseholdLocale } from '../server/utils/i18n.js';
 
 // Die Formprüfung aus getFormatLocale() wird IMPORTIERT, nicht gespiegelt. Bis
 // 20.09.2026 stand hier eine Kopie des Musters, und eine Kopie belegt nur, dass
@@ -787,4 +787,19 @@ test('der formatMonthYear-Stub des Browser-Loaders rechnet wie das Original (#16
   } finally {
     globalThis.__locale = vorher;
   }
+});
+
+// #1847: die Niederlande schreiben 05-03-2026, nicht 05.03.2026. Das Preset
+// stand auf 'dmy' und teilte sich damit das Tripel mit de-DE - ohne gespeicherte
+// Region fuehrte es zurueck nach Deutschland. Das eigene Format loest beides.
+test('Netherlands preset writes day-month-year with dashes and no longer collides with de-DE (#1847)', () => {
+  assert.deepEqual(REGION_PRESETS['nl-NL'], { currency: 'EUR', date_format: 'dmy_dash', time_format: '24h' });
+  assert.equal(detectRegion(REGION_PRESETS['nl-NL']), 'nl-NL');
+  assert.equal(detectRegion(REGION_PRESETS['de-DE']), 'de-DE');
+
+  // Das Muster stimmt mit dem CLDR-Default von nl-NL ueberein (dd-MM-y).
+  const when = new Date(Date.UTC(2026, 2, 5, 12));
+  assert.equal(new Intl.DateTimeFormat('nl-NL', { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric' }).format(when), '05-03-2026');
+  // Der Server schreibt das Datum in gespeicherten Beschreibungen genauso.
+  assert.equal(formatDateKey('2026-03-05', REGION_PRESETS['nl-NL'].date_format), '05-03-2026');
 });

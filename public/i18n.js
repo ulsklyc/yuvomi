@@ -308,7 +308,7 @@ export function t(key, params = {}) {
   return currentLocale === 'ko' ? resolveKoreanParticles(str, fill) : fill(str);
 }
 
-const VALID_DATE_FORMATS = ['mdy', 'dmy', 'ymd', 'mdy_dot', 'dmy_dot', 'dmy_slash', 'ymd_dot', 'ymd_slash'];
+const VALID_DATE_FORMATS = ['mdy', 'dmy', 'ymd', 'mdy_dot', 'dmy_dot', 'dmy_slash', 'dmy_dash', 'ymd_dot', 'ymd_slash'];
 
 function getDateFormatPreference() {
   const stored = localStorage.getItem(DATE_FORMAT_KEY);
@@ -358,6 +358,7 @@ function formatDateParts(date) {
     case 'mdy_dot': return `${month}.${day}.${year}`;
     case 'dmy_dot': return `${day}.${month}.${year}`;
     case 'dmy_slash': return `${day}/${month}/${year}`;
+    case 'dmy_dash': return `${day}-${month}-${year}`;
     case 'ymd': return `${year}-${month}-${day}`;
     case 'ymd_dot': return `${year}.${month}.${day}`;
     case 'ymd_slash': return `${year}/${month}/${day}`;
@@ -581,6 +582,7 @@ export function formatDayMonth(date) {
     case 'mdy_dot': return `${month}.${day}.`;
     case 'dmy_dot': return `${day}.${month}.`;
     case 'dmy_slash': return `${day}/${month}`;
+    case 'dmy_dash': return `${day}-${month}`;
     case 'ymd': return `${month}-${day}`;
     case 'ymd_dot': return `${month}.${day}.`;
     case 'ymd_slash': return `${month}/${day}`;
@@ -643,6 +645,7 @@ export function dateInputPlaceholder() {
     case 'mdy_dot': return `${m}.${d}.${y}`;
     case 'dmy_dot': return `${d}.${m}.${y}`;
     case 'dmy_slash': return `${d}/${m}/${y}`;
+    case 'dmy_dash': return `${d}-${m}-${y}`;
     case 'ymd': return `${y}-${m}-${d}`;
     case 'ymd_dot': return `${y}.${m}.${d}`;
     case 'ymd_slash': return `${y}/${m}/${d}`;
