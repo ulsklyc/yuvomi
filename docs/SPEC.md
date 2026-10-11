@@ -1086,6 +1086,12 @@ The widget is not offered at all while nothing is flagged, in the same way the F
 
 ### Local calendars
 
+The calendar manager's More menu offers Move up/down for members with calendar write access.
+The first and last rows disable the unavailable direction. `PATCH /api/v1/calendar/calendars/reorder`
+accepts `{ order: [calendarId, ...] }` containing every current calendar exactly once and atomically
+assigns consecutive `sort_order` values; invalid or stale lists return 400 without changes.
+This also handles ties and gaps introduced through the individual calendar update API.
+
 `local_calendars` are household-wide collections of authored events. `created_by` records who
 created a calendar and grants no rights; the default calendar has no creator. The resolver in
 `server/services/local-calendars.js` supplies the default for an authored event whose

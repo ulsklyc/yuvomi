@@ -131,6 +131,11 @@ export const schemas = {
             color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
           },
         },
+        LocalCalendarReorderInput: {
+          type: 'object', required: ['order'], properties: {
+            order: { type: 'array', uniqueItems: true, items: { type: 'integer', minimum: 1 } },
+          },
+        },
         LocalCalendarUpdateInput: {
           type: 'object',
           minProperties: 1,

@@ -25,6 +25,7 @@ app.use((req, _res, next) => {
   next();
 });
 app.use(express.json({ limit: '10mb' }));
+app.use('/api/v1/calendar', calendarRouter);
 app.use('/', calendarRouter);
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((resolve) => {
@@ -73,12 +74,47 @@ test('local calendars: default exists and calendars can be created', async () =>
 
   const original = await createEvent('Single-calendar appearance');
   assert.equal(original.local_calendar_color, null);
+  const listUrl = '/api/v1/calendar?from=2035-05-01&to=2035-05-31';
+  const singleList = await call('GET', listUrl);
+  assert.equal(singleList.status, 200);
+  assert.equal(singleList.body.data.find(event => event.id === original.id).local_calendar_color, null,
+    'the list used to paint the calendar does not inherit a colour with one local calendar');
   const work = await createCalendar('Work', '#3366AA');
+  const multipleList = await call('GET', listUrl);
+  assert.equal(multipleList.status, 200);
+  assert.equal(multipleList.body.data.find(event => event.id === original.id).local_calendar_color,
+    before.body.data.find(calendar => calendar.is_default).color,
+    'adding another calendar enables inherited colours in the list');
   const projected = await call('GET', `/${original.id}`);
   assert.equal(projected.body.data.local_calendar_color, before.body.data.find(c => c.is_default).color);
   assert.equal(work.name, 'Work');
   assert.equal(work.color, '#3366AA');
   assert.equal(work.is_default, false);
+});
+
+test('calendar reordering persists ties and gaps, rejects invalid lists without changes, and requires write access', async () => {
+  const before = (await call('GET', '/calendars')).body.data;
+  const ids = before.map(row => row.id);
+  db.prepare('UPDATE local_calendars SET sort_order = 40').run();
+  const order = [...ids].reverse();
+  try {
+    actor = { id: 1, role: 'member', access: 'read' };
+    assert.equal((await call('PATCH', '/calendars/reorder', { body: { order } })).status, 403);
+    assert.ok(db.prepare('SELECT sort_order FROM local_calendars').all().every(row => row.sort_order === 40));
+    actor = { id: 1, role: 'member', access: 'write' };
+    assert.equal((await call('PATCH', '/calendars/reorder', { body: { order } })).status, 200);
+    const reordered = (await call('GET', '/calendars')).body.data;
+    assert.deepEqual(reordered.map(row => row.id), order);
+    assert.deepEqual(reordered.map(row => row.sort_order), order.map((_, index) => index));
+    for (const invalid of [undefined, [], order.slice(1), order.map(() => order[0]),
+      [...order, 999999], order.map((id, index) => index ? id : 999999), order.map(String)]) {
+      assert.equal((await call('PATCH', '/calendars/reorder', { body: { order: invalid } })).status, 400);
+      assert.deepEqual((await call('GET', '/calendars')).body.data, reordered, 'invalid requests preserve the complete order');
+    }
+  } finally {
+    actor = ADMIN;
+    for (const row of before) db.prepare('UPDATE local_calendars SET sort_order = ? WHERE id = ?').run(row.sort_order, row.id);
+  }
 });
 
 test('the default calendar can be renamed and its stored name is used by the API and feed', async () => {
@@ -187,7 +223,9 @@ test('member write access manages calendars; feeds and linked deletion require a
     actor = ADMIN;
     assert.equal((await call('POST', `/calendars/${calendar.id}/feed/regenerate`)).status, 200);
     actor = MEMBER;
-    assert.equal((await call('DELETE', `/calendars/${calendar.id}`)).status, 403);
+    const refusal = await call('DELETE', `/calendars/${calendar.id}`);
+    assert.equal(refusal.status, 403);
+    assert.deepEqual(refusal.body, { error: 'Admin access required.', code: 403 });
     const listed = (await call('GET', '/calendars')).body.data.find(row => row.id === calendar.id);
     assert.equal(listed.feed_token, null);
     actor = ADMIN;
@@ -396,6 +434,8 @@ test('production HTTP calendar feed excludes private events and events from othe
   child.stderr.on('data', chunk => { errors += chunk.toString(); });
   try {
     const details = await new Promise((resolve, reject) => {
+      // This allowance covers a second server process starting on slower CI workers;
+      // investigate this startup deadline first if the HTTP feed test becomes flaky.
       const timer = setTimeout(() => reject(new Error('Feed server did not start: ' + errors)), 15000);
       child.once('message', message => { clearTimeout(timer); resolve(message); });
       child.once('error', err => { clearTimeout(timer); reject(err); });

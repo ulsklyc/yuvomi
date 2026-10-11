@@ -6,7 +6,7 @@
  * two in one direction so neither foundational service imports the other.
  */
 
-import { localCalendarIdSql } from './local-calendars.js';
+import { localCalendarColorSql, localCalendarIdSql } from './local-calendars.js';
 
 import {
   ASSIGNED_USERS_SQL, expandRecurringEvents, loadEventExceptions, MAX_EXPANSION_ITERATIONS,
@@ -226,7 +226,7 @@ export function getUpcomingEvents(d, {
            COALESCE(ec.color, isub.color) AS cal_color,
            lc.id AS local_calendar_id,
            lc.name  AS local_calendar_name,
-           CASE WHEN (SELECT COUNT(*) FROM local_calendars) > 1 THEN lc.color END AS local_calendar_color,
+           ${localCalendarColorSql()} AS local_calendar_color,
            ${SOURCE_CALENDAR_COLUMNS},
            COALESCE(bd.name, nd.name) AS birthday_name,
            bd.birth_date AS birthday_date,

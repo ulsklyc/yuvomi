@@ -6,7 +6,7 @@
 
 import { api } from '/api.js';
 import { renderRRuleFields, bindRRuleEvents, getRRuleValues, recurrenceRow } from '/rrule-ui.js';
-import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, askOverModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender, renderKeepingFocus } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, askOverModal, promptModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender, renderKeepingFocus } from '/components/modal.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { openDetailView, visibilityRow, assignedRow } from '/components/detail-view.js';
 import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
@@ -45,6 +45,7 @@ import { withChosenPeople } from '/utils/people-picker.js';
 import { othersCanRead } from '/utils/household.js';
 import { wireTablist } from '/utils/tablist.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
+import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
 import { filterButtonHtml } from '/utils/filter-sheet.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { wirePeriodSwipe } from '/utils/period-swipe.js';
@@ -5242,6 +5243,47 @@ function buildLayerRowsHtml(layers) {
   }).join('');
 }
 
+function renderLocalCalendarRow(calendar) {
+  const writable = moduleAccess('calendar') === 'write';
+  const admin = isPermAdmin();
+  const index = state.localCalendars.findIndex(item => item.id === calendar.id);
+  const menu = rowMenuHtml({
+    id: `local-calendar-actions-${calendar.id}`,
+    label: t('common.moreActionsNamed', { name: calendar.name }),
+    items: [
+      writable && index >= 0 && state.localCalendars.length > 1 && {
+        action: 'calendar-move-up', label: t('category.moveUpNamed', { name: calendar.name }), icon: 'arrow-up', disabled: index === 0,
+      },
+      writable && index >= 0 && state.localCalendars.length > 1 && {
+        action: 'calendar-move-down', label: t('category.moveDownNamed', { name: calendar.name }), icon: 'arrow-down', disabled: index === state.localCalendars.length - 1,
+      },
+      admin && calendar.feed_url && {
+        action: 'calendar-copy-feed', label: t('calendar.localCalendarCopyExport'), icon: 'copy',
+      },
+      admin && (calendar.feed_url ? {
+        action: 'calendar-disable-feed', label: t('calendar.localCalendarDisableExport'), icon: 'link-2-off', danger: true,
+      } : {
+        action: 'calendar-enable-feed', label: t('calendar.localCalendarEnableExport'), icon: 'upload',
+      }),
+      writable && !calendar.is_default && {
+        action: 'calendar-delete', label: t('common.delete'), icon: 'trash-2', danger: true,
+      },
+    ],
+  });
+  return `
+    <div class="cal-calendar-row" data-calendar-id="${calendar.id}">
+      <span class="cal-calendar-row__swatch" style="background-color:${esc(calendar.color)}" aria-hidden="true"></span>
+      ${writable ? `<input class="form-input cal-calendar-row__name" value="${esc(calendar.name)}" aria-label="${esc(t('calendar.localCalendarName'))}">
+      <input class="form-input cal-calendar-row__color" type="color" value="${esc(calendar.color)}" aria-label="${esc(t('calendar.localCalendarColor'))}">` : ''}
+      <span class="cal-calendar-row__count">${t('calendar.localCalendarEventCount', { count: calendar.event_count ?? 0 })}</span>
+      <div class="cal-calendar-row__actions">
+        ${writable ? rowActionHtml({ icon: 'save', label: `${t('common.save')} · ${calendar.name}`, className: 'js-calendar-save' }) : ''}
+        ${menu}
+      </div>
+    </div>
+  `;
+}
+
 function renderLocalCalendarsContent() {
   if (state.localCalendarsError) {
     return `<div class="cal-calendar-load-error" role="alert">
@@ -5249,34 +5291,7 @@ function renderLocalCalendarsContent() {
       <button type="button" class="btn btn--secondary js-calendar-retry-load">${t('common.retry')}</button>
     </div>`;
   }
-  const rows = state.localCalendars.map((calendar) => `
-    <div class="cal-calendar-row" data-calendar-id="${calendar.id}">
-      <span class="cal-calendar-row__swatch" style="background-color:${esc(calendar.color)}" aria-hidden="true"></span>
-      ${moduleAccess('calendar') === 'write' ? `<input class="form-input cal-calendar-row__name" value="${esc(calendar.name)}" aria-label="${esc(t('calendar.localCalendarName'))}">
-      <input class="form-input cal-calendar-row__color" type="color" value="${esc(calendar.color)}" aria-label="${esc(t('calendar.localCalendarColor'))}">` : ''}
-      <span class="cal-calendar-row__count">${t('calendar.localCalendarEventCount', { count: calendar.event_count ?? 0 })}</span>
-      ${moduleAccess('calendar') === 'write' ? `<button type="button" class="btn btn--icon js-calendar-save" title="${esc(t('common.save'))}" aria-label="${esc(t('common.save'))}">
-        <i data-lucide="save" aria-hidden="true"></i>
-      </button>` : ''}
-      ${isPermAdmin() && calendar.feed_url ? `
-        <button type="button" class="btn btn--icon js-calendar-copy-feed" title="${esc(t('calendar.localCalendarCopyExport'))}" aria-label="${esc(t('calendar.localCalendarCopyExport'))}">
-          <i data-lucide="copy" aria-hidden="true"></i>
-        </button>
-        <button type="button" class="btn btn--icon js-calendar-disable-feed" title="${esc(t('calendar.localCalendarDisableExport'))}" aria-label="${esc(t('calendar.localCalendarDisableExport'))}">
-          <i data-lucide="link-2-off" aria-hidden="true"></i>
-        </button>
-      ` : isPermAdmin() ? `
-        <button type="button" class="btn btn--icon js-calendar-enable-feed" title="${esc(t('calendar.localCalendarEnableExport'))}" aria-label="${esc(t('calendar.localCalendarEnableExport'))}">
-          <i data-lucide="upload" aria-hidden="true"></i>
-        </button>
-      ` : ''}
-      ${moduleAccess('calendar') === 'write' && !calendar.is_default ? `
-        <button type="button" class="btn btn--icon btn--danger-outline js-calendar-delete" title="${esc(t('common.delete'))}" aria-label="${esc(t('common.delete'))}">
-          <i data-lucide="trash-2" aria-hidden="true"></i>
-        </button>
-      ` : ''}
-    </div>
-  `).join('');
+  const rows = state.localCalendars.map(renderLocalCalendarRow).join('');
 
   return `
     <div class="cal-calendar-manager">
@@ -5313,19 +5328,19 @@ async function copyText(value, toastKey) {
   input.style.opacity = '0';
   document.body.appendChild(input);
   const previousFocus = document.activeElement;
+  let copied = false;
   try {
     input.focus();
     input.select();
-    let copied = false;
     try { copied = Boolean(document.execCommand?.('copy')); } catch { /* Expose the link below. */ }
-    if (copied) {
-      window.yuvomi?.showToast(t(toastKey), 'success');
-    } else {
-      window.prompt(t('calendar.localCalendarCopyExport'), value);
-    }
   } finally {
     input.remove();
     previousFocus?.focus();
+  }
+  if (copied) {
+    window.yuvomi?.showToast(t(toastKey), 'success');
+  } else {
+    await askOverModal(() => promptModal(t('calendar.localCalendarCopyExport'), value));
   }
 }
 
@@ -5338,6 +5353,17 @@ async function refreshLocalCalendarsPanel(panel) {
     window.lucide?.createIcons({ el: body });
   }
   renderView();
+}
+
+async function moveLocalCalendar(id, direction) {
+  if (moduleAccess('calendar') !== 'write' || ![-1, 1].includes(direction)) return false;
+  const order = state.localCalendars.map(item => Number(item.id));
+  const index = order.indexOf(id);
+  const destination = index + direction;
+  if (index < 0 || destination < 0 || destination >= order.length) return false;
+  [order[index], order[destination]] = [order[destination], order[index]];
+  await api.patch('/calendar/calendars/reorder', { order });
+  return true;
 }
 
 async function openLocalCalendarsModal() {
@@ -5353,6 +5379,7 @@ async function openLocalCalendarsModal() {
   const panel = document.querySelector('#shared-modal-overlay .modal-panel');
   if (!panel) return;
   window.lucide?.createIcons({ el: panel });
+  installPopoverMenus(panel);
 
   panel.addEventListener('submit', async (e) => {
     if (!e.target.closest('#local-calendar-create')) return;
@@ -5381,7 +5408,12 @@ async function openLocalCalendarsModal() {
     const calendar = state.localCalendars.find((item) => Number(item.id) === id);
     if (!calendar) return;
     try {
-      if (e.target.closest('.js-calendar-save')) {
+      if (e.target.closest('[data-action="calendar-move-up"], [data-action="calendar-move-down"]')) {
+        const direction = e.target.closest('[data-action="calendar-move-up"]') ? -1 : 1;
+        if (!await moveLocalCalendar(id, direction)) return;
+        await refreshLocalCalendarsPanel(panel);
+        panel.querySelector(`.cal-calendar-row[data-calendar-id="${id}"] .popover-menu__trigger`)?.focus();
+      } else if (e.target.closest('.js-calendar-save')) {
         const name = row.querySelector('.cal-calendar-row__name')?.value.trim();
         const changes = { color: row.querySelector('.cal-calendar-row__color')?.value };
         if (name !== calendar.name) changes.name = name;
@@ -5389,13 +5421,13 @@ async function openLocalCalendarsModal() {
         window.yuvomi?.showToast(t('calendar.localCalendarSaved'), 'success');
         await refreshLocalCalendarsPanel(panel);
         refocusAfterRender();
-      } else if (e.target.closest('.js-calendar-enable-feed')) {
+      } else if (e.target.closest('[data-action="calendar-enable-feed"]')) {
         await api.post(`/calendar/calendars/${id}/feed/regenerate`);
         await refreshLocalCalendarsPanel(panel);
         refocusAfterRender();
-      } else if (e.target.closest('.js-calendar-copy-feed')) {
+      } else if (e.target.closest('[data-action="calendar-copy-feed"]')) {
         if (calendar.feed_url) await copyText(calendar.feed_url, 'calendar.localCalendarExportCopied');
-      } else if (e.target.closest('.js-calendar-disable-feed')) {
+      } else if (e.target.closest('[data-action="calendar-disable-feed"]')) {
         const ok = await confirmOverModal(t('settings.feedExportDisableConfirm'), {
           closeOnConfirm: false,
           danger: true,
@@ -5408,7 +5440,7 @@ async function openLocalCalendarsModal() {
         });
         if (!ok) return;
         refocusAfterRender();
-      } else if (e.target.closest('.js-calendar-delete')) {
+      } else if (e.target.closest('[data-action="calendar-delete"]')) {
         const ok = await confirmOverModal(t('calendar.localCalendarDeleteConfirm', { name: calendar.name }), {
           closeOnConfirm: false,
           detail: t('calendar.localCalendarDeleteDetail'),
@@ -6121,7 +6153,7 @@ export const __test = {
   restorePeopleFilter,
   restoreAssignedToMe,
   restoreHiddenSources,
-  localCalendarDisplayName, eventLocalCalendarDisplayName, copyText, localCalendarState: state,
+  localCalendarDisplayName, eventLocalCalendarDisplayName, renderLocalCalendarRow, moveLocalCalendar, copyText, localCalendarState: state,
   persistHiddenSources,
   activeFilterCount,
   UNASSIGNED,

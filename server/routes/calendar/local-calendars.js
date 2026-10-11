@@ -66,6 +66,29 @@ router.post('/calendars', (req, res) => {
   }
 });
 
+router.patch('/calendars/reorder', (req, res) => {
+  if (!mayWriteModule(req, 'calendar')) {
+    return res.status(403).json({ error: 'Write access to the calendar is required.', code: 403, reason: 'cross_module_access' });
+  }
+  try {
+    const database = db.get();
+    const order = req.body?.order;
+    const reorder = database.transaction(() => {
+      const ids = database.prepare('SELECT id FROM local_calendars').all().map(row => row.id);
+      if (!Array.isArray(order) || order.length !== ids.length || new Set(order).size !== ids.length
+          || !order.every(id => Number.isSafeInteger(id) && ids.includes(id))) return false;
+      const update = database.prepare('UPDATE local_calendars SET sort_order = ? WHERE id = ?');
+      order.forEach((id, index) => update.run(index, id));
+      return true;
+    });
+    if (!reorder()) return res.status(400).json({ error: 'Reihenfolge: Gib jeden Kalender genau einmal an.', code: 400 });
+    res.json({ data: true });
+  } catch (err) {
+    log.error('PATCH /calendars/reorder', err);
+    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+  }
+});
+
 router.put('/calendars/:id', (req, res) => {
   if (!mayWriteModule(req, 'calendar')) {
     return res.status(403).json({ error: 'Write access to the calendar is required.', code: 403, reason: 'cross_module_access' });
@@ -128,7 +151,7 @@ router.delete('/calendars/:id', (req, res) => {
       return res.status(400).json({ error: 'Der Standardkalender kann nicht gelöscht werden.', code: 400 });
     }
     if (row.feed_token && !isAdminUser(req)) {
-      return res.status(403).json({ error: 'Admin access is required to delete a calendar with an active feed.', code: 403, reason: 'cross_module_access' });
+      return res.status(403).json({ error: 'Admin access required.', code: 403 });
     }
     database.prepare('DELETE FROM local_calendars WHERE id = ?').run(id);
     res.status(204).end();

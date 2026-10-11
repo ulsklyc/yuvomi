@@ -26,7 +26,7 @@ import {
 } from '../../services/document-access.js';
 import { mayWriteModule } from '../../permissions.js';
 import { recordLocalColorChoice } from '../../services/legacy-color-snapshot.js';
-import { localCalendarIdSql, localCalendarProjection, resolveLocalCalendarId, validateCalendarId } from '../../services/local-calendars.js';
+import { localCalendarColorSql, localCalendarIdSql, localCalendarProjection, resolveLocalCalendarId, validateCalendarId } from '../../services/local-calendars.js';
 import {
   assertSuccessorHasOccurrence,
   baseOccurrenceFor,
@@ -437,7 +437,7 @@ router.get('/:id', (req, res) => {
              COALESCE(ec.color, isub.color) AS cal_color,
              lc.id AS local_calendar_id,
              lc.name  AS local_calendar_name,
-             CASE WHEN (SELECT COUNT(*) FROM local_calendars) > 1 THEN lc.color END AS local_calendar_color,
+             ${localCalendarColorSql()} AS local_calendar_color,
              ${SOURCE_CALENDAR_COLUMNS},
              COALESCE(bd.name, nd.name) AS birthday_name,
              bd.birth_date AS birthday_date,
@@ -639,7 +639,7 @@ router.post('/', async (req, res) => {
              COALESCE(ec.color, isub.color) AS cal_color,
              lc.id AS local_calendar_id,
              lc.name  AS local_calendar_name,
-             CASE WHEN (SELECT COUNT(*) FROM local_calendars) > 1 THEN lc.color END AS local_calendar_color,
+             ${localCalendarColorSql()} AS local_calendar_color,
              ${SOURCE_CALENDAR_COLUMNS},
              ${ASSIGNED_USERS_SQL}
       FROM calendar_events e
@@ -1252,7 +1252,7 @@ router.put('/:id', async (req, res) => {
              COALESCE(ec.color, isub.color) AS cal_color,
              lc.id AS local_calendar_id,
              lc.name  AS local_calendar_name,
-             CASE WHEN (SELECT COUNT(*) FROM local_calendars) > 1 THEN lc.color END AS local_calendar_color,
+             ${localCalendarColorSql()} AS local_calendar_color,
              ${SOURCE_CALENDAR_COLUMNS},
              ${ASSIGNED_USERS_SQL}
       FROM calendar_events e

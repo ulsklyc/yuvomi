@@ -124,6 +124,11 @@ export function localCalendarIdSql(alias = 'e') {
       (SELECT id FROM local_calendars WHERE is_default = 1)) END)`;
 }
 
+/** Preserve the original event colours until a household has multiple local calendars. */
+export function localCalendarColorSql(alias = 'lc') {
+  return `(CASE WHEN (SELECT COUNT(*) FROM local_calendars) > 1 THEN ${alias}.color END)`;
+}
+
 export function resolveLocalCalendarId(conn, eventId) {
   return conn.prepare(`SELECT ${localCalendarIdSql()} AS id FROM calendar_events e WHERE e.id = ?`)
     .get(eventId)?.id ?? null;
@@ -131,7 +136,7 @@ export function resolveLocalCalendarId(conn, eventId) {
 
 export function localCalendarProjection(conn, eventId) {
   return conn.prepare(`
-    SELECT lc.id AS local_calendar_id, lc.name AS local_calendar_name, CASE WHEN (SELECT COUNT(*) FROM local_calendars) > 1 THEN lc.color END AS local_calendar_color
+    SELECT lc.id AS local_calendar_id, lc.name AS local_calendar_name, ${localCalendarColorSql()} AS local_calendar_color
     FROM calendar_events e LEFT JOIN local_calendars lc ON lc.id = ${localCalendarIdSql()}
     WHERE e.id = ?
   `).get(eventId);

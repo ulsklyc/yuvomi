@@ -10,8 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Organize events in several local calendars** (#1243, from D#1231). Create and rename household
-  calendars, choose the destination when importing an ICS file, and share a separate ICS subscription
-  link for each calendar. Calendar links include only events visible to everyone in the household.
+  calendars, reorder them through the manager's More menu, choose the destination when importing an ICS
+  file, and share a separate ICS subscription link for each calendar. Calendar links include only events
+  visible to everyone in the household.
 - **The demo household has pocket money** (#1750). The Rewards overview of a demo database now
   shows the pocket money section: Emma has an account in euros with a monthly plan, three
   credits by that plan, a birthday bonus from a parent, an approved withdrawal and one request

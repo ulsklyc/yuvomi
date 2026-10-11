@@ -138,6 +138,15 @@ export function calendarPaths() {
         requestBody: jsonBody('#/components/schemas/LocalCalendarCreateInput'),
       }),
     },
+    '/api/v1/calendar/calendars/reorder': {
+      patch: op({
+        summary: 'Reorder local calendars',
+        tag: 'Calendar',
+        description: 'Requires calendar write access. Supply every current calendar ID exactly once in `order`; all sort_order values are updated atomically to consecutive values starting at zero. An incomplete, duplicate or stale list returns 400 without changes.',
+        stateChanging: true,
+        requestBody: jsonBody('#/components/schemas/LocalCalendarReorderInput'),
+      }),
+    },
     '/api/v1/calendar/calendars/{id}': {
       put: op({
         summary: 'Update local calendar',

@@ -3121,7 +3121,7 @@
 
 .cal-calendar-row {
   display: grid;
-  grid-template-columns: var(--space-4) minmax(8rem, 1fr) var(--space-12) auto repeat(4, var(--target-md));
+  grid-template-columns: var(--space-4) minmax(8rem, 1fr) var(--space-12) auto auto;
   gap: var(--space-2);
   align-items: center;
 }
@@ -3139,6 +3139,13 @@
   white-space: nowrap;
 }
 
+.cal-calendar-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
 @media (max-width: 639px) {
   .cal-calendar-create,
   .cal-calendar-row {
@@ -3147,12 +3154,12 @@
 
   .cal-calendar-create .btn,
   .cal-calendar-row__count,
-  .cal-calendar-row .btn {
+  .cal-calendar-row__actions {
     grid-column: 2 / -1;
   }
 
   .cal-calendar-create .btn,
-  .cal-calendar-row .btn {
+  .cal-calendar-row__actions {
     width: 100%;
   }
 }
