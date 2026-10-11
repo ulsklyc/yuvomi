@@ -549,53 +549,91 @@ test('die gebuchte Zeile wird privat: der andere sieht weder sie noch ihre Forts
   assert.equal(subsB.find((x) => x.id === sub.id).budget_entry_id, null);
 });
 
-test('"nur Betrag" an der gebuchten Zeile: die erwartete ist fuer andere genauso maskiert', async () => {
+test('"nur Betrag" an der gebuchten Zeile: fuer andere gibt es KEINE erwartete Zeile - in keiner Antwort', async () => {
   setConfig('budget_mode', 'personal');
   const sub = await createSub({ name: 'Therapie', visibility: 'shared' });
   const put = await call('PUT', `/budget/${sub.budget_entry_id}`, { body: { visibility: 'shared_amount' } });
   assert.equal(put.status, 200, put.text);
   const real = (await month('2026-10', { as: B, query: '&scope=household' }))[0];
   assert.equal(real.details_hidden, true, 'Vorbedingung: die echte Zeile ist fuer B maskiert');
-  const rows = await month('2026-11', { as: B, query: '&scope=household' });
-  assert.equal(rows.length, 1, 'der Betrag zaehlt weiter');
-  const row = rows[0];
-  assert.equal(row.details_hidden, true);
-  assert.equal(row.title, '', 'der Zweck steht nicht da');
-  assert.equal(row.category, '__private__');
-  assert.equal(row.amount, -12.99);
-  assert.equal(JSON.stringify(rows).includes('Therapie'), false);
-  // Auch kein Verweis auf das Abo: es kann selbst geteilt sein, und ueber die
-  // id liesse sich in der Abo-Liste nachschlagen, wofuer der Betrag ist.
-  assert.equal('subscription_id' in row, false, 'die maskierte Zeile nennt ihr Abo nicht');
-  assert.equal(row.expected, true, 'erwartet bleibt sie - das ist ein Zustand, kein Zweck');
-  // POSITIVLISTE: die maskierte erwartete Zeile traegt genau diese Felder.
-  // Ein Feld, das morgen an die Projektion kommt, ist damit fuer fremde Augen
-  // weg, bis es jemand hier ausdruecklich freigibt - eine Streichliste liesse
-  // es durch.
-  assert.deepEqual(Object.keys(row).sort(), [
-    'account_id', 'amount', 'category', 'created_by', 'creator_name', 'date', 'details_hidden',
-    'expected', 'id', 'is_pending', 'is_recurring', 'owner_id', 'subcategory', 'title', 'visibility',
-  ]);
-  assert.equal(row.id, null);
-  assert.equal(row.subcategory, '');
 
-  // DER RUECKVERWEIS. Die Abo-Liste nennt zu jedem Abo seine Buchung
-  // (`budget_entry_id`), und die maskierte Buchung im Oktober traegt ihre id:
-  // zusammen sagten sie B, wofuer der maskierte Betrag ist.
+  // AUSLASSEN STATT MASKIEREN. Eine maskierte Buchung bleibt stehen, weil ihr
+  // Betrag in den Summen steckt und sie ohne die Zeile nicht aufgingen. Eine
+  // erwartete Zeile steckt in keiner Summe: es gibt nichts, das ihr Fehlen
+  // verfaelschte - und eine Reihe gleicher Betraege im Rhythmus eines Abos
+  // waere der Zweck, auch ohne Titel.
+  //
+  // Geprueft wird JEDE Antwort des Budgets, die eine Zeile oder eine Zahl aus
+  // der Projektion tragen koennte, fuer beide Ansichten.
+  for (const scope of ['mine', 'household']) {
+    const q = `&scope=${scope}`;
+    const answers = {
+      list: await call('GET', `/budget?month=2026-11${q}`, { as: B }),
+      listByCategory: await call('GET', `/budget?month=2026-11&category=subscriptions${q}`, { as: B }),
+      listMasked: await call('GET', `/budget?month=2026-11&category=__private__${q}`, { as: B }),
+      summary: await call('GET', `/budget/summary?month=2026-11${q}`, { as: B }),
+      exportMonth: await call('GET', `/budget/export?month=2026-11${q}`, { as: B }),
+      exportRange: await call('GET', `/budget/export?from=2026-11-01&to=2027-06-30${q}`, { as: B }),
+      stats: await call('GET', `/budget/stats?range=month&anchor=2026-11-15${q}`, { as: B }),
+      plans: await call('GET', `/budget/plans?month=2026-11${q}`, { as: B }),
+    };
+    for (const [name, answer] of Object.entries(answers)) {
+      assert.equal(answer.status, 200, `${name} (${scope}): ${answer.text.slice(0, 120)}`);
+      assert.doesNotMatch(answer.text, /Therapie/, `${name} (${scope}): der Name des Abos`);
+      assert.doesNotMatch(answer.text, /subscription_id/, `${name} (${scope}): ein Verweis auf das Abo`);
+      assert.doesNotMatch(answer.text, /"expected":true|,Expected,/, `${name} (${scope}): eine erwartete Zeile`);
+      assert.doesNotMatch(answer.text, /subscriptions/, `${name} (${scope}): die Kategorie der Reihe`);
+      // Die Statistik nennt im Vergleich den Vormonat, und dort steht der
+      // Betrag der GEBUCHTEN Oktober-Zeile - den teilt die Stufe ja gerade.
+      if (name !== 'stats') assert.doesNotMatch(answer.text, /12\.99/, `${name} (${scope}): der Betrag der Reihe`);
+    }
+    assert.deepEqual(answers.list.body.data, [], `${scope}: der November ist fuer B leer`);
+    assert.equal(answers.summary.body.data.pending.count, 0, `${scope}: und keine Zahl zaehlt sie`);
+  }
+
+  // DER RUECKVERWEIS. Die Abo-Liste zeigt B das geteilte Abo weiter - es IST
+  // geteilt -, aber nicht, an welcher Buchung es haengt: deren id steht an der
+  // maskierten Oktober-Zeile.
   const subsB = (await call('GET', '/budget/subscriptions', { as: B })).body.data.subscriptions;
   const seenByB = subsB.find((x) => x.id === sub.id);
   assert.ok(seenByB, 'Vorbedingung: das geteilte Abo steht in Bs Abo-Liste');
   assert.equal(seenByB.budget_entry_id, null, 'ohne Verweis auf die Buchung, deren Zweck B nicht sieht');
   const subsA = (await call('GET', '/budget/subscriptions', { as: A })).body.data.subscriptions;
   assert.equal(subsA.find((x) => x.id === sub.id).budget_entry_id, sub.budget_entry_id, 'A behaelt ihn');
-  // Der Kategoriefilter trifft die MASKIERTE Kategorie, wie bei echten Zeilen (#659).
-  assert.equal((await month('2026-11', { as: B, query: '&scope=household&category=subscriptions' })).length, 0);
-  assert.equal((await month('2026-11', { as: B, query: '&scope=household&category=__private__' })).length, 1);
-  const csv = await call('GET', '/budget/export?month=2026-11&scope=household', { as: B });
-  assert.doesNotMatch(csv.text, /Therapie/);
-  assert.match(csv.text, /2026-11-20,"Private entry",-12\.99,Private,/);
+
   // A selbst sieht alles.
-  assert.equal((await month('2026-11', { as: A, query: '&scope=mine' }))[0].title, 'Therapie');
+  const own = await month('2026-11', { as: A, query: '&scope=mine' });
+  assert.equal(own.length, 1);
+  assert.equal(own[0].title, 'Therapie');
+  assert.equal(own[0].subscription_id, sub.id);
+});
+
+test('das Abo ist privat, seine Buchung wurde geteilt: wer das Abo nicht sieht, bekommt keine erwartete Zeile', async () => {
+  setConfig('budget_mode', 'personal');
+  const sub = await createSub({ name: 'Privat', visibility: 'private' });
+  const put = await call('PUT', `/budget/${sub.budget_entry_id}`, { body: { visibility: 'shared' } });
+  assert.equal(put.status, 200, put.text);
+  assert.equal((await month('2026-10', { as: B, query: '&scope=household' })).length, 1, 'Vorbedingung: die Buchung selbst sieht B');
+  for (const scope of ['mine', 'household']) {
+    assert.deepEqual(await month('2026-11', { as: B, query: `&scope=${scope}` }), [], `B, ${scope}`);
+    const csv = await call('GET', `/budget/export?month=2026-11&scope=${scope}`, { as: B });
+    assert.doesNotMatch(csv.text, /Privat|Expected/);
+  }
+  assert.equal(expectedOf(await month('2026-11', { as: A, query: '&scope=household' })).length, 1, 'A sieht sie, im Haushalts-Topf wie die Buchung');
+});
+
+test('eine erwartete Zeile hat fuer jeden, der sie sieht, dieselbe Form - eine maskierte gibt es nicht', async () => {
+  setConfig('budget_mode', 'personal');
+  await createSub({ name: 'Eins', visibility: 'shared' });
+  await createSub({ name: 'Zwei', visibility: 'private' });
+  const shapes = new Set();
+  for (const [as, scope] of [[A, 'mine'], [A, 'household'], [B, 'mine'], [B, 'household']]) {
+    for (const row of await month('2026-11', { as, query: `&scope=${scope}` })) {
+      assert.notEqual(row.details_hidden, true);
+      shapes.add(Object.keys(row).sort().join(','));
+    }
+  }
+  assert.equal(shapes.size, 1, [...shapes].join(' | '));
 });
 
 test('eine fremde private Buchung am selben Tag unterdrueckt nichts und verraet nichts', async () => {

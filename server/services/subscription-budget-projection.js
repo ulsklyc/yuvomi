@@ -252,14 +252,12 @@ export function upcomingPaymentDates(subscription, from, to, stats = { steps: 0 
  * keinen Platz, und es gibt nichts fortzusetzen; das naechste Speichern oder
  * Verlaengern legt die Buchung wieder an.
  *
- * SICHTBARKEIT: EINE REGEL, AN EINER ZEILE. `filter` ist das Fragment, mit dem
- * der Aufrufer `budget_entries` filtert (budgetFilter(req, 'b')), und es
- * trifft hier genau diese verknuepfte Buchung. Eigentuemer und Stufe der
- * erwarteten Zeile sind die IHREN, nicht die des Abos: wer die gebuchte Zeile
- * nicht sieht, sieht auch keine erwartete, und der Aufrufer maskiert sie mit
- * derselben Funktion (maskEntries) - eine Buchung, die nur ihren Betrag teilt,
- * setzt sich auch nur mit dem Betrag fort. Eine zweite Sichtbarkeitsregel am
- * Abo koennte von der ersten abweichen, sobald jemand die Buchung umstellt.
+ * SICHTBARKEIT: AUSLASSEN, NIE MASKIEREN. `filter` kommt von
+ * expectedSubscriptionFilter(req) in routes/budget/helpers.js und trifft die
+ * verknuepfte Buchung (Alias `b`) und das Abo (Alias `sub`): eine erwartete
+ * Zeile bekommt nur, wer die Buchung in seiner Ansicht MIT ihrem Zweck sieht
+ * und das Abo selbst auch. Begruendung dort. Eigentuemer und Stufe der Zeile
+ * sind die der Buchung.
  *
  * Eine Unterdrueckung gibt es nicht: die gebuchte Zeile steht am Tag der
  * naechsten Zahlung, die Reihe beginnt danach. Keine fremde Buchung kann eine
@@ -279,7 +277,7 @@ export function upcomingPaymentDates(subscription, from, to, stats = { steps: 0 
  * @param {object} range
  * @param {string} range.from  YYYY-MM-DD
  * @param {string} range.to    YYYY-MM-DD
- * @param {{ clause: string, params: any[] }} [range.filter]  beginnt mit ' AND ' oder ist leer; Alias `b` (die verknuepfte Buchung)
+ * @param {{ clause: string, params: any[] }} [range.filter]  beginnt mit ' AND ' oder ist leer; Aliase `b` (die verknuepfte Buchung) und `sub` (das Abo)
  * @param {string} [range.today]  YYYY-MM-DD, Vorgabe: heute in der Haushaltszone
  * @param {{ steps: number }} [range.stats]  zaehlt die Schritte (Tests)
  * @returns {{ entries: object[], omitted: boolean, until: string|null }}

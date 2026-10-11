@@ -14,7 +14,7 @@ import { sendDocumentDeletionConflict } from '../../services/document-deletion-l
 import { assertDocumentLinkTargetsAvailable, documentViewer, sendDocumentLinkRefusal } from '../../services/document-links.js';
 import { attachmentsFor, replaceAttachments, withAttachments } from './attachments.js';
 import {
-  budgetFilter, budgetCategoryExpr, maskEntries, getBudgetMode, mayEdit, bookedOnly,
+  budgetFilter, expectedSubscriptionFilter, budgetCategoryExpr, maskEntries, getBudgetMode, mayEdit, bookedOnly,
   DATE_RE, thisMonthLocalKey, cents,
   generateRecurringInstances, RECURRENCE_INTERVAL_KEYS, MAX_INTERVAL_COUNT,
   normalizeIntervalCount, effectiveMonthly, occurrencesPerYear,
@@ -118,7 +118,7 @@ router.get('/summary', (req, res) => {
     // (services/subscription-budget-projection.js), mit demselben Filter wie
     // die Buchungen: was der Betrachter nicht sieht, zaehlt er auch nicht.
     const expected = expectedSubscriptionTotals(db.get(), {
-      from, to, filter: budgetFilter(req, 'b'),
+      from, to, filter: expectedSubscriptionFilter(req),
     });
 
     res.json({
@@ -188,12 +188,13 @@ router.get('/export', (req, res) => {
     // `X-Budget-Expected-Until`, wenn der Bereich breiter war als das Fenster
     // der Projektion (erwartete Zeilen enden an diesem Tag), und
     // `X-Budget-Expected-Omitted`, wenn die Gesamtgrenze gegriffen hat.
-    const expected = expectedSubscriptionEntries(db.get(), { from, to, filter: budgetFilter(req, 'b') });
+    const expected = expectedSubscriptionEntries(db.get(), { from, to, filter: expectedSubscriptionFilter(req) });
     if (expected.until) res.setHeader('X-Budget-Expected-Until', expected.until);
     if (expected.omitted) res.setHeader('X-Budget-Expected-Omitted', 'true');
     if (expected.entries.length) {
-      // Dieselbe Maske wie fuer die Buchungen darueber (#659).
-      entries.push(...maskEntries(req, expected.entries));
+      // Nichts zu maskieren: eine erwartete Zeile bekommt nur, wer ihren
+      // Zweck sehen darf (expectedSubscriptionFilter).
+      entries.push(...expected.entries);
       entries.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
     }
 
@@ -337,19 +338,18 @@ router.get('/', (req, res) => {
     //
     // NUR IN DER MONATSLISTE: der Darlehens-Drilldown fragt nach Raten, und ein
     // Kontofilter nach dem, was ueber ein Konto lief - eine erwartete
-    // Abo-Zahlung haengt an keinem. Sichtbarkeit und Maske sind die der
-    // Buchungen: derselbe Filter (auf die verknuepfte Buchung), dieselbe
-    // maskEntries(), und der Kategoriefilter trifft wie oben die MASKIERTE
-    // Kategorie (#659).
+    // Abo-Zahlung haengt an keinem. Wer sie sieht, entscheidet
+    // expectedSubscriptionFilter() - ausgelassen, nie maskiert; der
+    // Kategoriefilter trifft sie deshalb unter ihrer echten Kategorie.
     const accountFiltered = Number.isInteger(parseInt(req.query.account_id, 10))
       && parseInt(req.query.account_id, 10) > 0;
     let expectedOmitted = false;
     if (!loanId && !accountFiltered) {
       const expected = expectedSubscriptionEntries(db.get(), {
-        from, to, filter: budgetFilter(req, 'b'),
+        from, to, filter: expectedSubscriptionFilter(req),
       });
       expectedOmitted = expected.omitted;
-      const rows = maskEntries(req, expected.entries)
+      const rows = expected.entries
         .filter((row) => !validCategoryFilter || row.category === categoryKey);
       if (rows.length) {
         masked.push(...rows);

@@ -63,7 +63,7 @@ export function budgetPaths() {
       get: op({
         summary: 'List budget entries',
         tag: 'Budget',
-        description: `Each entry carries \`attachments\`. ${DOCUMENT_LINKS_READ_NOTE} With \`month\`, the list also carries the subscription payments that follow a subscription's booked entry, worked out from its cycle when the month is read and not stored: \`expected: true\`, \`id: null\`, \`subscription_id\`, \`is_pending: 1\`. They are in no total, cannot be changed, confirmed or deleted through this API, and are left out with \`loan_id\`, \`account_id\` and \`q\`. Months before the household's current month carry none. \`meta.expected_omitted: true\` appears only when the projection hit its limit of 5000 lines; the list then carries none.`,
+        description: `Each entry carries \`attachments\`. ${DOCUMENT_LINKS_READ_NOTE} With \`month\`, the list also carries the subscription payments that follow a subscription's booked entry, worked out from its cycle when the month is read and not stored: \`expected: true\`, \`id: null\`, \`subscription_id\`, \`is_pending: 1\`. They are in no total, cannot be changed, confirmed or deleted through this API, and are left out with \`loan_id\`, \`account_id\` and \`q\`. Months before the household's current month carry none. In personal budget mode they reach only a viewer who sees both the booked entry with its purpose and the subscription; they are never returned masked. \`meta.expected_omitted: true\` appears only when the projection hit its limit of 5000 lines; the list then carries none.`,
         params: [{
           name: 'scope',
           in: 'query',
