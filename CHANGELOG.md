@@ -19,16 +19,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   calendar you moved it to. After the fifth refusal Yuvomi gives up, and the event stays in both
   calendars until you remove one copy yourself. Events that were left doubled before the update
   are not cleaned up.
-- **What you change while Yuvomi is talking to the server is no longer lost** (#1862). Sending
-  an entry to a CalDAV or iCloud server takes a moment, and Yuvomi booked the result against
-  the entry as it was before that moment. If you deleted a new event, task or shopping item
-  while it was being uploaded, it stayed on the server and came back with the next sync. If you
-  edited it during the upload, or edited an event while others were being uploaded before it,
-  the server kept the old text and the next sync wrote that old text back over your edit. And a
-  second edit to a task or shopping item made while the first one was on its way was replaced
-  by the first. Yuvomi now looks at the entry again after the server has answered: an entry
-  deleted in the meantime is removed from the server too, and an edit made in the meantime is
-  sent after it.
+- **Editing or deleting an entry while it is being uploaded is no longer lost or undone**
+  (#1862). Sending an entry to a CalDAV or iCloud server takes a moment, and Yuvomi booked the
+  result against the entry as it was before that moment. If you deleted a new event, task or
+  shopping item while it was being uploaded, it stayed on the server and came back with the next
+  sync. If you edited it during the upload, or edited an event while others were being uploaded
+  before it, the server kept the old text and the next sync wrote that old text back over your
+  edit. And a second edit to a task or shopping item made while the first one was on its way was
+  replaced by the first. Yuvomi now looks at the entry again after the server has answered: an
+  entry deleted in the meantime is removed from the server too, and an edit made in the meantime
+  is sent after it. Not covered yet: if you change the target calendar of an event while it is
+  being uploaded, the event stays in the calendar it was uploaded to.
 - **A CalDAV event belongs to the account that brought it** (#1860). With two or more CalDAV
   accounts, an event was identified by its UID alone. When a second account served an event with
   the same UID, it took over the entry of the first: title, calendar and address then came from

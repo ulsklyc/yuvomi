@@ -1186,6 +1186,39 @@ test('Umzug, die Quelle lehnt das Löschen ab, und für sie steht schon ein Auft
   assert.equal(eventRows(uid).length, 1);
 });
 
+test('Umzug, die Quelle lehnt das Löschen fünfmal ab: danach wird aufgegeben, der Termin liegt in beiden Kalendern bei einer Zeile, und nichts hängt', async () => {
+  reset();
+  const uid = 'move-11@test';
+  const { source, dest, id } = pendingMoveInOrder(uid, true);
+  refuseSourceDelete();
+
+  await caldavSync.flushOutbound();
+  assert.equal(eventTombstones()[0]?.attempts, 1);
+  for (const attempts of [2, 3, 4]) {
+    await caldavSync.sync();
+    assert.deepEqual(eventTombstones().map((t) => t.attempts), [attempts]);
+    assert.equal(eventRows(uid).length, 1);
+    assert.equal(event(id).calendar_ref_id, dest.refId);
+  }
+
+  // Die fünfte Absage: aufgegeben.
+  await caldavSync.sync();
+  assert.equal(eventTombstones().length, 0, 'der Auftrag wird nach der fünften Absage weiter versucht');
+  assert.ok(dav.getObject(source.url, `${uid}.ics`));
+  assert.ok(dav.getObject(dest.url, `${uid}.ics`));
+
+  const deletesBefore = dav.seen('DELETE').length;
+  await caldavSync.sync();
+  await caldavSync.sync();
+  assert.equal(dav.seen('DELETE').length, deletesBefore, 'nach dem Aufgeben wird weiter gelöscht');
+  assert.equal(eventRows(uid).length, 1, 'aus den zwei Objekten wurden zwei Zeilen');
+  const row = event(id);
+  assert.ok(row);
+  assert.equal(row.outbound_move_to, null);
+  assert.equal(row.outbound_dirty, 0);
+  assert.equal(eventTombstones().length, 0);
+});
+
 test('Umzug, die Quelle lehnt das Löschen ab, dann zurück in die Quelle: der Termin bleibt dort stehen', async () => {
   reset();
   const uid = 'move-8@test';

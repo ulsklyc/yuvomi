@@ -1460,7 +1460,10 @@ pending deletion and given up after five attempts. While it waits, the inbound r
 one object: for CalDAV the guard asks per object (`pendingDeletionGuard`: the calendar of the
 pending deletion, or the verbatim address where it has no calendar), no longer per UID, so the copy
 in the destination keeps receiving changes. Moving the event back into the old calendar adopts the
-copy still lying there and withdraws the pending deletion for that calendar (`dropDeletionsIn`).
+copy still lying there and withdraws the pending deletion for that calendar (`dropDeletionsIn`). A
+refusal is counted only on a pending deletion of the same account; if the entry already has a
+pending deletion of another account (two accounts on the same calendar), that one is left
+unchanged and the move stays pending, counted and retried like any failed move.
 
 **An upload is booked against the row as it is after the server answered (#1862).** Each event
 upload loop (CalDAV, iCloud) reads the row again when it is its turn, through the same selection the

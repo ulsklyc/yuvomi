@@ -262,17 +262,35 @@ export function pendingDeletionGuard(source, { accountId = null } = {}) {
  * die Quelle eines Umzugs, die ihr Objekt nicht hergibt. Die Absage zählt als
  * Versuch, wie bei jeder anderen abgelehnten Löschung.
  *
- * Steht für dieselbe UID in demselben Kalender schon ein Auftrag, behält er
- * Konto und Adresse (`queueDeletion`); gezählt wird die Absage auch dann. Der
+ * Steht für dieselbe UID in demselben Kalender schon ein Auftrag DESSELBEN
+ * Kontos, behält er seine Adresse (`queueDeletion`) und zählt die Absage; der
  * Lauf findet das Objekt über seinen Abruf, auch wenn die ältere Adresse nicht
  * mehr stimmt.
+ *
+ * Gehört der bestehende Auftrag einem ANDEREN CalDAV-Konto (zwei Konten
+ * führen denselben Kalender), bleibt er unberührt: weder Zähler noch
+ * Fehlertext noch Adresse. Der Schlüssel der Tabelle kennt das Konto nicht,
+ * einen zweiten Auftrag kann dieses Konto also nicht anlegen - dann `false`,
+ * und der Aufrufer lässt seine eigene Arbeit offen.
+ *
+ * @returns {boolean} true, wenn die Absage an einem Auftrag dieses Kontos gezählt ist
  */
 export function queueRefusedDeletion(target, err) {
+  const forCaldav = target.source === 'caldav';
+  const key = [target.source, target.calendarExternalId || '', target.eventExternalId];
+  if (forCaldav) {
+    // Lesen und Schreiben ohne await dazwischen.
+    const existing = db.get().prepare(`
+      SELECT caldav_account_id FROM calendar_pending_deletions
+      WHERE source = ? AND calendar_external_id = ? AND event_external_id = ?
+    `).get(...key);
+    if (existing && existing.caldav_account_id != null && existing.caldav_account_id !== target.accountId) return false;
+  }
   if (!queueDeletion(target)) return false;
   db.get().prepare(`
     UPDATE calendar_pending_deletions SET attempts = attempts + 1, last_error = ?
-    WHERE source = ? AND calendar_external_id = ? AND event_external_id = ?
-  `).run(String(err?.message || err).slice(0, 500), target.source, target.calendarExternalId || '', target.eventExternalId);
+    WHERE source = ? AND calendar_external_id = ? AND event_external_id = ?${forCaldav ? ' AND caldav_account_id = ?' : ''}
+  `).run(String(err?.message || err).slice(0, 500), ...key, ...(forCaldav ? [target.accountId] : []));
   return true;
 }
 

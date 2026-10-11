@@ -594,11 +594,22 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
           // Zeile, die einen anderen Kalender nennen kann. Hat der Nutzer
           // gelöscht, steht der Auftrag der Route schon.
           if (sourceRefusal && !userDeletedIt) {
-            outbound.queueRefusedDeletion({
+            const queued = outbound.queueRefusedDeletion({
               source, calendarExternalId: known.calendarUrl,
               eventExternalId: event.external_calendar_id, objectUrl: known.url, accountId,
             }, sourceRefusal);
-            log.warn(`[${label(source)}] Event ${event.id} was copied to ${moveTo} but could not be removed from its old calendar (${sourceRefusal.message}); the removal is tried again.`);
+            if (queued) {
+              log.warn(`[${label(source)}] Event ${event.id} was copied to ${moveTo} but could not be removed from its old calendar (${sourceRefusal.message}); the removal is tried again.`);
+            } else if (stillThere) {
+              // Für dieses Objekt steht schon der Auftrag eines anderen Kontos,
+              // und der bleibt, wie er ist. Der Umzug gilt dann NICHT als
+              // vollzogen: er bleibt vorgemerkt, zählt einen Versuch und läuft
+              // wie jeder gescheiterte Umzug wieder (die Kopie im Ziel wird
+              // dabei übernommen) - bis die Quelle fort ist oder aufgegeben wird.
+              log.warn(`[${label(source)}] Event ${event.id} was copied to ${moveTo} but could not be removed from its old calendar (${sourceRefusal.message}), and another account already has a pending deletion for that entry; the move stays pending.`);
+              outbound.handleUpdateError(sourceRefusal, event, 'move', label(source), outbound.clearOutboundMove);
+              continue;
+            }
           }
 
           if (!stillThere) {

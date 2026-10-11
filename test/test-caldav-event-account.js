@@ -1031,3 +1031,34 @@ test('bearbeitet, während der Upload läuft: die Zeile gehört dem Konto des Up
   assertRequestsStayWithTheirAccount(accounts);
   assert.deepEqual(writesAt(accounts.a.dav).map(describe), []);
 });
+
+test('Umzug abgelehnt, und für das Objekt steht schon der Auftrag eines ANDEREN Kontos: der bleibt unverändert, und der Umzug bleibt vorgemerkt', async (t) => {
+  const accounts = twoUsersOneCalendar();
+  const workUrl = accounts.a.dav.addCollection('work', { name: 'Arbeit' });
+  db.prepare(`
+    INSERT INTO caldav_calendar_selection (account_id, calendar_url, calendar_name, calendar_color, enabled)
+    VALUES (?, ?, 'Arbeit', '#4A90E2', 1)
+  `).run(accounts.a.accountId, workUrl);
+  // Der Auftrag von Konto B für dasselbe Objekt (ohne Adresse: der
+  // Sofortversuch fasst ihn dann nicht an), schon dreimal abgelehnt.
+  const theirs = tombstone(accounts.b, { objectUrl: null });
+  db.prepare("UPDATE calendar_pending_deletions SET attempts = 3, last_error = 'von B' WHERE id = ?").run(theirs);
+  const id = mirror(accounts.a, { title: 'Zieht um' });
+  db.prepare('UPDATE calendar_events SET outbound_move_to = ? WHERE id = ?').run(workUrl, id);
+  accounts.a.dav.refuse({ method: 'DELETE', status: 403, when: (req) => req.path.startsWith('/cal/family/') });
+
+  const lines = await logged(t, () => caldavSync.flushOutbound());
+
+  assert.ok(accounts.a.dav.seen('DELETE').length >= 1, 'der Fall ist nicht nachgestellt: das DELETE der Quelle lief nicht');
+  assert.deepEqual(
+    db.prepare('SELECT id, caldav_account_id, attempts, last_error, object_url FROM calendar_pending_deletions').all(),
+    [{ id: theirs, caldav_account_id: accounts.b.accountId, attempts: 3, last_error: 'von B', object_url: null }],
+    'die Absage von Konto A hat den Auftrag von Konto B verändert',
+  );
+  // Kein stilles "erledigt": der Umzug wartet weiter und hat einen Versuch gezählt.
+  assert.equal(row(id).outbound_move_to, workUrl, 'der Umzug gilt als vollzogen, obwohl die Quelle noch steht und niemand sie für dieses Konto abräumt');
+  assert.equal(row(id).outbound_attempts, 1);
+  assert.equal(row(id).calendar_ref_id, calendarRef(accounts.a.url));
+  assert.equal(lines.filter((l) => l.level === 'warn' && /another account/.test(l.text)).length, 1, 'der Fall wurde nicht gemeldet');
+  assert.deepEqual(accounts.a.dav.seen('DELETE').map(describe), ['DELETE /cal/family/shared.ics (user-a)'], 'der Auftrag des anderen Kontos wurde angestossen');
+});
