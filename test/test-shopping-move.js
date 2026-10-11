@@ -432,6 +432,68 @@ test('Umzug waehrend eines laufenden Uploads: das eben angelegte Objekt bleibt k
     'und das Objekt, das es jetzt in der alten Collection gibt, ist zur Loeschung vorgemerkt');
 });
 
+test('Scheitert die Loeschung des alten Objekts, wartet die Anlage in der neuen Liste - nie zwei Objekte mit einer UID', async () => {
+  reset();
+  const acc = account();
+  const a = list('Alt');
+  const b = list('Neu');
+  mirror(acc, URL_A, a);
+  mirror(acc, URL_B, b);
+  // Ein HIER angelegter Artikel: seine UID folgt aus der Zeile, und das neue
+  // Objekt bekaeme dieselbe wie das alte.
+  const item = localItem(a, { name: 'Milch' });
+  const uid = todoUidFor('shopping', item.id);
+  db.prepare(`
+    UPDATE shopping_items
+       SET external_source = 'caldav', external_uid = ?, external_account_id = ?, external_object_url = ?
+     WHERE id = ?
+  `).run(uid, acc, `${URL_A}${uid}.ics`, item.id);
+
+  assert.equal((await call('PATCH', `/items/${item.id}`, { list_id: b })).status, 200);
+
+  // Der Server ist kurz ueberlastet: die Loeschung scheitert, bleibt vorgemerkt.
+  let ueberlastet = true;
+  const client = fakeClient();
+  const loeschen = client.deleteCalendarObject;
+  client.deleteCalendarObject = async (args) => {
+    if (ueberlastet) throw Object.assign(new Error('Service Unavailable'), { status: 503 });
+    return loeschen(args);
+  };
+
+  await flushOutbound({ createClient: async () => client });
+  assert.deepEqual(pendingDeletions(acc, 'shopping').map((t) => t.uid), [uid], 'Gegenprobe: der Tombstone steht noch');
+  assert.equal(client.calls.created.length, 0, 'solange das alte Objekt lebt, entsteht kein zweites mit derselben UID');
+  assert.equal(row(item.id).external_source, 'local', 'die Zeile wartet lokal auf der neuen Liste');
+  assert.equal(row(item.id).list_id, b);
+
+  // Der naechste Lauf kommt durch: erst weg, dann neu - in EINEM Lauf.
+  ueberlastet = false;
+  await flushOutbound({ createClient: async () => client });
+  assert.deepEqual(client.calls.deleted.map((o) => o.url), [`${URL_A}${uid}.ics`]);
+  assert.deepEqual(client.calls.created.map((c) => [c.calendar.url, c.filename]), [[URL_B, `${uid}.ics`]]);
+  assert.equal(row(item.id).external_object_url, `${URL_B}${uid}.ics`);
+  assert.equal(pendingDeletions(acc, 'shopping').length, 0);
+});
+
+test('Ein Artikel mit fremder UID wartet nicht: sein neues Objekt traegt eine andere', async () => {
+  // Kam der Artikel vom Server, gehoert die UID des alten Objekts dem Server;
+  // das neue bekommt die eigene. Zwei verschiedene UIDs stoeren einander nicht.
+  reset();
+  const acc = account();
+  const a = list('Alt');
+  const b = list('Neu');
+  mirror(acc, URL_A, a);
+  mirror(acc, URL_B, b);
+  const item = mirroredItem(a, acc, { name: 'Milch' });
+  assert.equal((await call('PATCH', `/items/${item.id}`, { list_id: b })).status, 200);
+
+  const client = fakeClient();
+  client.deleteCalendarObject = async () => { throw Object.assign(new Error('Service Unavailable'), { status: 503 }); };
+  await flushOutbound({ createClient: async () => client });
+  assert.equal(pendingDeletions(acc, 'shopping').length, 1, 'Gegenprobe: die Loeschung steht noch an');
+  assert.deepEqual(client.calls.created.map((c) => c.calendar.url), [URL_B]);
+});
+
 // --------------------------------------------------------------------------
 // Alles oder nichts, und der Anstoss danach
 // --------------------------------------------------------------------------

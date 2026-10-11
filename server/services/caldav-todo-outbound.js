@@ -18,7 +18,8 @@
 // gehört zu der Liste, aus der sie kam. Ein Einkaufsartikel kann seit #1700 die
 // Liste wechseln (`releaseShoppingMirror`): das alte Objekt wird zur Löschung
 // vorgemerkt, die Zeile wird lokal, und eine gespiegelte Zielliste legt sie
-// über den gewöhnlichen Upload-Weg neu an.
+// über den gewöhnlichen Upload-Weg neu an - erst, wenn die Löschung des alten
+// Objekts durch ist (`processPendingShoppingCreations`).
 //
 // Das Anlegen dagegen gibt es seit #695. Die alte Begründung ("ohne Zielwahl
 // gäbe es keine Liste, in die es gehörte") stimmte nicht mehr: die Zielwahl gibt
@@ -880,6 +881,18 @@ export async function processPendingShoppingCreations(client, accountId, targets
       if (gate.isClosed(collection.url)) continue;
       const fresh = reloadRow('shopping', row.id);
       if (!fresh) continue; // zwischenzeitlich gelöscht
+
+      // EIN UMGEZOGENER ARTIKEL WARTET, BIS SEIN ALTES OBJEKT WEG IST (#1700).
+      // Ein hier angelegter Artikel trägt auf dem Server eine UID, die allein
+      // aus seiner Zeile folgt (`todoUidFor`) - das neue Objekt bekäme also
+      // dieselbe wie das alte, das in der Collection der alten Liste noch zur
+      // Löschung ansteht. Scheitert diese Löschung einmal, lägen zwei Objekte
+      // mit EINER UID unter einem Konto: der Objektindex des Abrufs führt je
+      // UID einen Eintrag, die Löschung schickte das ETag des neuen Objekts an
+      // die Adresse des alten (412, bis sie aufgibt), und der Inbound ordnete
+      // die Zeile der Liste zu, deren Objekt er zuletzt las. Frisch gelesen je
+      // Zeile: ein Umzug während eines Uploads oben merkt mitten im Lauf vor.
+      if (pendingDeletionUids(accountId, 'shopping').has(todoUidFor('shopping', fresh.id))) continue;
 
       try {
         if (await uploadNewTodo(client, collection, 'shopping', fresh, accountId)) {
