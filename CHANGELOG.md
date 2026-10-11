@@ -188,6 +188,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A long account name on a phone breaks between word parts, not inside one** (#1774). On the
+  accounts tab at 390px, "Wertpapierdepot" was split as "Wertpapierde-pot" and "Housekeeping cash"
+  as "Housekeepin" and "g cash", because the amount column kept its full width. A word is now only
+  hyphenated with at least four letters on each side ("Wertpapier-depot"), and the column with the
+  amount gives up its width, down to the amount itself, before the name is broken inside a word.
+  The amount is never squeezed or overlapped.
+
 - **A wall tablet shows events again when the household overview is set to "Assigned to me"** (#1808).
   A paired display follows the household default of the overview. If that default had the calendar
   tile set to "Assigned to me", the tablet looked for events assigned to the tablet itself and
