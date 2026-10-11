@@ -182,6 +182,33 @@ export function hidesBudgetDetails(row, viewerId, mode) {
  */
 export function maskBudgetEntry(row, viewerId, mode) {
   if (!hidesBudgetDetails(row, viewerId, mode)) return row;
+  // ERWARTETE ABO-ZAHLUNG (#1844): POSITIVLISTE STATT STREICHLISTE. Die Zeile
+  // ist keine Tabellenzeile, sondern wird in
+  // services/subscription-budget-projection.js gebaut - was sie traegt,
+  // entscheidet dort jemand. Eine Streichliste liesse jedes Feld durch, das
+  // morgen dazukommt (so stand `subscription_id` zuerst noch da: das Abo kann
+  // selbst geteilt sein, und ueber die id liesse sich in der Abo-Liste
+  // nachschlagen, wofuer der Betrag ist). Durch kommt, was die Stufe zeigen
+  // will - Betrag, Tag, wem er gehoert - und der Zustand "erwartet".
+  if (row.expected === true) {
+    return {
+      id: null,
+      expected: true,
+      is_pending: 1,
+      is_recurring: 0,
+      title: '',
+      category: BUDGET_MASKED_CATEGORY,
+      subcategory: '',
+      details_hidden: true,
+      amount: row.amount,
+      date: row.date,
+      account_id: null,
+      created_by: row.created_by,
+      creator_name: row.creator_name ?? null,
+      owner_id: row.owner_id,
+      visibility: row.visibility,
+    };
+  }
   const masked = {
     ...row,
     title: '',
@@ -206,10 +233,6 @@ export function maskBudgetEntry(row, viewerId, mode) {
   delete masked.loan_installment_number;
   delete masked.loan_title;
   delete masked.loan_borrower;
-  // Die erwartete Abo-Zahlung (#1844) traegt die id ihres Abos. Das Abo kann
-  // selbst geteilt sein, waehrend seine Buchung nur den Betrag teilt - ueber
-  // die id liesse sich in der Abo-Liste nachschlagen, wofuer das Geld ist.
-  delete masked.subscription_id;
   return masked;
 }
 

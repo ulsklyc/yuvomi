@@ -20,7 +20,7 @@ import {
 } from '../services/subscription-budget-projection.js';
 import { refuseWhileRestoring } from '../middleware/restore-gate.js';
 import { findLogoOptions } from '../services/subscription-logo.js';
-import { normalizeObjectVisibility, budgetVisibilityWhere, canEditEntry, resolveBudgetMode } from '../services/budget-visibility.js';
+import { normalizeObjectVisibility, budgetVisibilityWhere, budgetDetailsVisibleWhere, canEditEntry, resolveBudgetMode } from '../services/budget-visibility.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
 
 const log = createLogger('Subscriptions');
@@ -74,6 +74,35 @@ function loadSubscription(id) {
     LEFT JOIN users u ON u.id = s.created_by
     WHERE s.id = ?
   `).get(id);
+}
+
+/**
+ * Nimmt `budget_entry_id` von jedem Abo, dessen Buchung der Betrachter nicht
+ * mit ihrem Zweck sieht (#1844).
+ *
+ * Abo und Buchung tragen je eine eigene Stufe, und die Buchung laesst sich im
+ * Budget einzeln umstellen: privat, oder so, dass sie nur ihren Betrag teilt.
+ * Das Abo bleibt dabei geteilt und steht weiter in dieser Liste - mit dem
+ * Verweis auf die Buchung sagte es jedem, wofuer der maskierte Betrag im
+ * Budget ist (deren id steht an der maskierten Zeile). Gefragt wird mit
+ * derselben Regel wie ueberall, wo es um den ZWECK geht
+ * (budgetDetailsVisibleWhere), nicht mit einer zweiten.
+ *
+ * Im geteilten Modus gibt es keine Stufen, dort bleibt alles stehen.
+ */
+function hideUnreadableEntryLinks(rows, viewer) {
+  const mode = budgetMode();
+  if (mode !== 'personal') return;
+  const linked = rows.filter((row) => row.budget_entry_id != null);
+  if (!linked.length) return;
+  const readable = new Set(db.get().prepare(`
+    SELECT b.id FROM budget_entries b
+    JOIN budget_subscriptions s ON s.budget_entry_id = b.id
+    WHERE ${budgetDetailsVisibleWhere('b', '?', { mode })}
+  `).all(viewer).map((row) => row.id));
+  for (const row of linked) {
+    if (!readable.has(row.budget_entry_id)) row.budget_entry_id = null;
+  }
 }
 
 function subscriptionStatus(row) {
@@ -567,6 +596,7 @@ router.get('/', refuseWhileRestoring, async (req, res) => {
       ${clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''}
       ORDER BY s.next_payment_date, s.name COLLATE NOCASE
     `).all(...params);
+    hideUnreadableEntryLinks(rows, actorId(req));
     const configured = settings();
     const converted = await subscriptionsWithConversions(rows, configured.base_currency, req.query.refresh_rates === 'true');
     const enabledRows = converted.rows.filter((row) => row.enabled);
