@@ -203,6 +203,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Managing budget categories shows the built-in categories in your language** (#1859, from D#1841).
+  "Manage categories" in Budget listed the built-in categories and subcategories in English,
+  whatever language Yuvomi ran in. They now appear in the language of the interface you are
+  using, as they do everywhere else in Budget. Categories you created keep their name. For
+  API users this changes an answer: `GET /api/v1/budget/categories` and
+  `GET /api/v1/budget/categories/{categoryKey}/subcategories` without `lang`, or with a value
+  that is not supported, now return the labels in the household language instead of English.
+  Send `lang=en` to keep English; a supported `lang` works as before, and the response still
+  names the language it used.
 - **Pocket money without an account now says what it is for** (#1774). Before an admin had opened
   an account for any child, "Pocket money" was a heading with a button and nothing below it, which
   read like a section that failed to load. It now shows one sentence below the heading, in the same
