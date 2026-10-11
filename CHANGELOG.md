@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A CalDAV event belongs to the account that brought it** (#1860). With two or more CalDAV
+  accounts, an event was identified by its UID alone. When a second account served an event with
+  the same UID, it took over the entry of the first: title, calendar and address then came from
+  the second account, and an edit made in Yuvomi went there. An event now belongs to one account
+  and is changed, moved and deleted only through that account. The same UID in two accounts is
+  still shown once, and it belongs to the account that delivered it first; if that account is
+  removed or no longer has the event, the other account takes it on with its next sync. With a
+  single CalDAV account nothing changes. What to know after the update:
+  - Existing events are assigned to their account automatically. With several accounts, an event
+    whose calendar is in the selection of more than one account, or of none, cannot be assigned
+    with certainty. It stays without an account, is not sent to any server, and is taken on by
+    the first account that delivers it at the next sync. A change you made to such an event
+    before the update and that had not been sent yet is not sent and is dropped after five sync
+    runs; the event then shows what the server has.
+  - With exactly one CalDAV account, all existing CalDAV events go to it, including leftovers of
+    an account that was removed earlier.
+  - A deletion that was still waiting to be sent and cannot be assigned to an account is dropped.
+    The event may come back once with the next sync; delete it again then.
+  - Two different events that happen to carry the same UID in two accounts show as one.
+  - As a sync target for a new event, Yuvomi accepts only a calendar that is switched on for
+    that account - the ones the event form offers. A target saved earlier for a calendar that has
+    since been switched off stays as it is and is not uploaded until the calendar is switched on
+    again. An event that is already synchronised can only be moved to another calendar of its
+    own account.
+
 ## [2.76.0] - 2026-10-11
 
 ### Added
