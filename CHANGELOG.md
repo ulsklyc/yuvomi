@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The demo household has pocket money** (#1750). The Rewards overview of a demo database now
+  shows the pocket money section: Emma has an account in euros with a monthly plan, three
+  credits by that plan, a birthday bonus from a parent, an approved withdrawal and one request
+  that is still open. Leo has no account, so he appears as someone a parent can set up. Only a
+  database filled by `scripts/seed-demo.js` is affected.
 - **Payment reminders can be turned off for each subscription** (#1708, from D#1226). Turn off the reminder
   in the subscription dialog while keeping the subscription active and its cost in the budget.
   Editing or renewing it keeps the reminder off. Existing subscriptions keep reminders enabled.
