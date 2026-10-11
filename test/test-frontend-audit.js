@@ -6450,6 +6450,13 @@ test('responsive adaptation keeps Notes vertical and prevents intrinsic-width ov
     notes,
     /@container notes-page \(min-width:\s*720px\)[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/
   );
+  // #1765: never more than four columns, and the four-column step sits at 1200px.
+  assert.doesNotMatch(notes, /repeat\(5/);
+  assert.doesNotMatch(notes, /@container notes-page \(min-width:\s*900px\)/);
+  assert.match(
+    notes,
+    /@container notes-page \(min-width:\s*1200px\)\s*\{[^}]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/
+  );
   assert.match(
     dashboard,
     /\.notes-grid-widget\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/

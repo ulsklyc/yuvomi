@@ -11,6 +11,7 @@ import { todaySheetContext, collectSourceRows, composeTodaySheet, codaAllowed, s
 import { t, formatDate, formatDayMonth, formatTime, timeSuffix, getLocale, getNumberFormat } from '/i18n.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 import { resolveEventColor } from '/utils/event-color.js';
+import { hasEventIcon, eventIconHtml } from '/utils/event-icon.js';
 import { compareMembers, sortMembers } from '/utils/member-order.js';
 import { buildWeekStrip } from '/utils/week-strip.js';
 import { relativeDateLabel, housekeepingSinceLabel } from '/utils/day-label.js';
@@ -1203,6 +1204,12 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
         tone: 'event',
         route: calendarEventRoute(event),
         who: event.assigned_users?.[0] ?? null,
+        // ALLE Zugewiesenen, nicht nur das eine Gesicht der Zeile (#1828): die
+        // Wand zaehlt den Termin bei jeder Person (rowPeopleIds).
+        people: event.assigned_users ?? [],
+        // Das am Termin gewaehlte Icon (#1829). `icon` bleibt das Zeichen des
+        // Moduls; wer das eigene zeigt, fragt hasEventIcon().
+        eventIcon: event.icon ?? null,
         // Beitrags-Vertrag (utils/today-sheet.js): ein Termin ist ein Rahmen
         // des Tages, kein Auftrag - er haelt die Coda nicht auf.
         priority: 40,
@@ -1237,6 +1244,7 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
         tone: 'task',
         route: '/tasks',
         who: task.assigned_users?.[0] ?? null,
+        people: task.assigned_users ?? [],
         priority: overdue ? 10 : 30,
         open: true,
       });
@@ -1285,6 +1293,20 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
     openShoppingCount: highlights.openShoppingCount,
     tasksDoneToday: Number(data?.tasksDoneToday) || 0,
   };
+}
+
+/**
+ * Wen eine Programmzeile angeht - JEDE zugewiesene Person, einmal (#1828).
+ * Die Zeile selbst zeigt ein Gesicht (`who`); gezaehlt hat die Wand deshalb
+ * nur dieses eine, und ein Termin fuer zwei stand bei einer Person. Zeilen
+ * ohne Liste (das Kochen, Beitraege anderer Module) bleiben bei `who`.
+ */
+function rowPeopleIds(row) {
+  const ids = (Array.isArray(row.people) ? row.people : [])
+    .map((person) => person?.id)
+    .filter((id) => id != null);
+  if (ids.length) return [...new Set(ids)];
+  return row.who?.id != null ? [row.who.id] : [];
 }
 
 // --------------------------------------------------------
@@ -3603,11 +3625,16 @@ function groupOverdueRows(rows) {
   const seen = new Set();
   const people = [];
   for (const row of overdue) {
-    const id = row.who?.id;
-    if (id == null || seen.has(id)) continue;
-    seen.add(id);
-    // renderAvatarStack liest `color`, die Zeilen tragen `avatar_color`.
-    people.push({ ...row.who, color: row.who.color ?? row.who.avatar_color });
+    // JEDE zugewiesene Person, nicht nur das eine Gesicht der Zeile (#1828):
+    // eine Aufgabe fuer zwei geht beide an.
+    const assigned = Array.isArray(row.people) && row.people.length ? row.people : [row.who];
+    for (const person of assigned) {
+      const id = person?.id;
+      if (id == null || seen.has(id)) continue;
+      seen.add(id);
+      // renderAvatarStack liest `color`, die Zeilen tragen `avatar_color`.
+      people.push({ ...person, color: person.color ?? person.avatar_color });
+    }
   }
   const group = {
     kind: 'overdue',
@@ -5586,6 +5613,20 @@ const WALL_WHO_CAP = 6;
  * dafuer gibt es das Dashboard. */
 const WALL_ROW_CAP = 4;
 
+/**
+ * Das Zeichen im Siegel einer Wandzeile. Ein Termin zeigt das Icon, das jemand
+ * fuer ihn gewaehlt hat (#1829) - auf demselben Weg wie der Kalender
+ * (utils/event-icon.js): dieselbe Liste, derselbe Rueckfall. Ohne eigene Wahl
+ * und fuer jeden unbekannten Namen bleibt das Zeichen des Moduls, sonst stuende
+ * dort ein leeres Siegel. Die Herkunft traegt weiter die Farbe des Siegels.
+ * `module-glyph` ist die Marke aus nav-icons.js, an der die Strichstaerke haengt.
+ */
+function wallRowGlyph(row) {
+  return row.kind === 'event' && hasEventIcon(row.eventIcon)
+    ? eventIconHtml(row.eventIcon, 'module-glyph')
+    : moduleIconHTML(row.icon);
+}
+
 /** Eine Programmzeile als reiner Text - kein href, kein data-route, kein Modal. */
 function renderWallRow(row) {
   // Der Termin nennt an der Wand, hinter dem Beginn, sein Ende (#1698). Es
@@ -5601,7 +5642,7 @@ function renderWallRow(row) {
     : '';
   return `
     <li class="wall-row wall-row--${esc(row.tone)}">
-      <span class="module-seal wall-row__seal">${moduleIconHTML(row.icon)}</span>
+      <span class="module-seal wall-row__seal">${wallRowGlyph(row)}</span>
       <span class="wall-row__body">
         <span class="wall-row__title">${esc(row.title)}</span>
         <span class="wall-row__sub">${esc(sub)}</span>
@@ -5667,9 +5708,7 @@ function renderWallWho(data, model) {
 
   const counts = new Map();
   for (const row of model.allRows) {
-    const id = row.who?.id;
-    if (id == null) continue;
-    counts.set(id, (counts.get(id) ?? 0) + 1);
+    for (const id of rowPeopleIds(row)) counts.set(id, (counts.get(id) ?? 0) + 1);
   }
 
   const onDuty = users

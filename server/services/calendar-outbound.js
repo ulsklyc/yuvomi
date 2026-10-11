@@ -23,6 +23,8 @@
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { runExternalJob } from '../utils/restore-state.js';
+import { ownUid, ownUploadRowId, findObjectWithUid } from '../utils/own-uid.js';
+import { collectionUrlOf } from '../utils/caldav-client.js';
 
 const log = createLogger('CalendarOutbound');
 
@@ -504,4 +506,122 @@ async function flushOutboundUntracked() {
     }
   }
   return total;
+}
+
+// --------------------------------------------------------
+// Anlegen: lokaler Termin → CalDAV-Server (CalDAV-Konten und iCloud)
+// --------------------------------------------------------
+
+/**
+ * UID, unter der diese Installation einen hier angelegten Termin hochlädt.
+ * Schon gespiegelte Termine behalten `oikos-<id>@oikos.local`; das Muster und
+ * seine Begründung stehen in `server/utils/own-uid.js`.
+ */
+export function eventUidFor(eventId) {
+  return ownUid('event', eventId, db.get());
+}
+
+/**
+ * Lädt einen lokalen Termin hoch.
+ *
+ * Meldet der Server 412, ist der Name vergeben. Trägt das Objekt dort unsere
+ * UID, kam ein früherer PUT an und nur seine Antwort ging verloren: es wird
+ * übernommen (`adopted`), und der Aufrufer merkt den lokalen Stand als Änderung
+ * vor, statt zu raten, was dort liegt. Jede andere Absage geht als Fehler hoch.
+ *
+ * @returns {Promise<{objectUrl: string, adopted: boolean}>}
+ */
+export async function uploadNewEvent(client, calendar, uid, ics) {
+  const filename      = `${uid}.ics`;
+  const collectionUrl = String(calendar.url).replace(/\/?$/, '/');
+  const objectUrl     = `${collectionUrl}${filename}`;
+  try {
+    await client.createCalendarObject({ calendar, filename, iCalString: ics });
+    return { objectUrl, adopted: false };
+  } catch (err) {
+    if (err?.status !== 412) throw err;
+    // Die UID wird im Objekt GELESEN, nicht aus dem Dateinamen geschlossen;
+    // liegt dort etwas anderes, bleibt es unangetastet und der Termin lokal.
+    // Gemerkt wird die eigene, berechnete Adresse, nicht eine vom Server genannte.
+    if (!(await findObjectWithUid(client, collectionUrl, objectUrl, uid))) throw err;
+    return { objectUrl, adopted: true };
+  }
+}
+
+/**
+ * Macht den lokalen Termin zum Spiegel seines Uploads. Objekt-URL und
+ * Kalenderzuordnung werden gleich festgehalten: ohne sie wäre der Termin für
+ * spätere Änderungen und Löschungen unerreichbar, bis ihn der nächste Abruf
+ * wiederfindet (#593).
+ *
+ * `color_modified` geht mit hoch: die Farbe, die als CSS3-Name hinausging, ist
+ * unsere. Der Name ist eine verlustbehaftete Abbildung des Hex-Werts, und ohne
+ * das Flag holte der nächste Abruf genau ihn zurück (#899). Ein Termin ohne
+ * eigene Farbe behält seinen Zustand.
+ *
+ * `adopted`: das Objekt lag schon dort (siehe `uploadNewEvent`); dann geht der
+ * lokale Stand als Änderung hinterher.
+ *
+ * @returns {boolean} true, wenn die Zeile umgeschrieben wurde
+ */
+export function markEventUploaded(eventId, { source, uid, objectUrl, calRefId, adopted = false, onlyIfLocal = false }) {
+  return db.get().prepare(`
+    UPDATE calendar_events
+    SET external_source = ?, external_calendar_id = ?,
+        external_object_url = ?, calendar_ref_id = ?,
+        color_modified = CASE WHEN color IS NOT NULL THEN 1 ELSE color_modified END,
+        outbound_dirty = CASE WHEN ? = 1 THEN 1 ELSE outbound_dirty END,
+        outbound_attempts = CASE WHEN ? = 1 THEN 0 ELSE outbound_attempts END
+    WHERE id = ?
+      AND (? = 0 OR external_source = 'local')
+  `).run(source, uid, objectUrl, calRefId, adopted ? 1 : 0, adopted ? 1 : 0, eventId, onlyIfLocal ? 1 : 0)
+    .changes > 0;
+}
+
+/**
+ * Der Inbound-Weg der Übernahme: der Abruf sieht ein Objekt mit der UID dieser
+ * Installation, dessen Zeile noch lokal ist - der PUT kam an, die Antwort
+ * nicht. In die bestehende Zeile übernehmen, statt eine zweite anzulegen.
+ * Endzustand wie nach dem 412 im Upload: gespiegelt und als geändert vorgemerkt.
+ *
+ * DIE UID KOMMT VOM SERVER UND IST KEIN AUSWEIS. Die Installationskennung
+ * steht in jeder UID auf jedem Server, mit dem je synchronisiert wurde; wer in
+ * einen Kalender schreiben darf, kann ein Objekt mit einer UID im Muster
+ * dieser Installation und einer beliebigen Zeilen-Id hinlegen. Die UID benennt
+ * deshalb nur, WELCHER Termin gemeint sein könnte. Übernommen wird er allein
+ * nach dem lokalen Stand: `isWaitingHere` muss bestätigen, dass genau dieser
+ * Termin JETZT auf seinen Upload in genau DIESEN Kalender wartet - aus
+ * derselben Auswahl, aus der der Upload seine Termine nimmt. Dann erfährt der
+ * Server nichts, was er nicht im selben Lauf per PUT bekäme. Sonst würde ein
+ * fremder, privater oder für ein anderes Konto bestimmter Termin an diesen
+ * Kalender gebunden und sein Inhalt mit dem nächsten Outbound hinaufgetragen.
+ *
+ * Der Serverinhalt überschreibt beim Übernehmen nichts: Felder, Sichtbarkeit
+ * und Zuweisung bleiben die lokalen.
+ *
+ * @param {object}   p
+ * @param {string}   p.source          'caldav' | 'apple'
+ * @param {string}   p.uid             UID aus dem Serverobjekt
+ * @param {string}   p.objectUrl       Adresse des Objekts laut Server
+ * @param {string}   p.calendarUrl     Kalender, der gerade abgerufen wird
+ * @param {number}   p.calRefId
+ * @param {(eventId: number) => boolean} p.isWaitingHere
+ * @returns {boolean} true, wenn eine Zeile übernommen wurde
+ */
+export function adoptOwnEventUpload({ source, uid, objectUrl, calendarUrl, calRefId, isWaitingHere }) {
+  const eventId = ownUploadRowId(uid, 'event', db.get());
+  if (!eventId || !objectUrl || !calendarUrl || typeof isWaitingHere !== 'function') return false;
+  // Exakt die UID, die wir für diesen Termin erzeugen würden.
+  if (uid !== eventUidFor(eventId)) return false;
+  // Das Objekt liegt in dem Kalender, der gerade abgerufen wird - nicht an
+  // einer Adresse, die der Server frei gewählt hat.
+  const trim = (url) => String(url || '').replace(/\/+$/, '');
+  if (trim(collectionUrlOf(objectUrl)) !== trim(calendarUrl)) return false;
+  if (!isWaitingHere(eventId)) return false;
+
+  const adopted = markEventUploaded(eventId, {
+    source, uid, objectUrl, calRefId, adopted: true, onlyIfLocal: true,
+  });
+  if (adopted) log.info(`Adopted the earlier upload of event ${eventId} (${uid}).`);
+  return adopted;
 }
