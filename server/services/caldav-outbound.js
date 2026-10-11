@@ -147,6 +147,53 @@ export function icsFieldsForEvent(event, householdZone = null) {
   return { fields, tzid: when.tzid };
 }
 
+/** Liegt diese Adresse in einem der Kalender? Verglichen wird Origin und dekodierter Pfad. */
+function liesWithin(url, calendarUrls) {
+  const parts = (value) => {
+    try {
+      const parsed = new URL(value);
+      return { origin: parsed.origin, path: decodeURIComponent(parsed.pathname) };
+    } catch { return null; }
+  };
+  const target = parts(url);
+  if (!target) return false;
+  for (const calendarUrl of calendarUrls) {
+    const base = parts(String(calendarUrl).replace(/\/?$/, '/'));
+    if (base && base.origin === target.origin && target.path.startsWith(base.path)) return true;
+  }
+  return false;
+}
+
+/**
+ * Gehört diese Vormerkung zu dem Konto, dessen Client gerade arbeitet (#1860)?
+ *
+ * Vorgemerkte Änderungen und Löschungen ALLER CalDAV-Konten liegen
+ * beieinander, und beide Schleifen unten gehen über alle. Auseinandergehalten
+ * hat sie bisher nur der Index dieses Laufs (UID → Objekt): eine fremde Zeile
+ * fand dort nichts und blieb liegen. Das trägt nicht, sobald zwei Konten
+ * dieselbe UID führen - dann stand das Objekt des einen Kontos für die Zeile
+ * des anderen ein, und eine Bearbeitung landete im falschen Konto.
+ *
+ * Die Regel hängt deshalb an der Adresse, an die die Anfrage ginge: sie muss
+ * in einem Kalender DIESES Kontos liegen. Kommt die Adresse erst aus dem
+ * Index (Bestand ohne gespeicherte URL), ist sie von selbst die eigene; dann
+ * entscheidet der Kalender der Vormerkung, und nur eine ohne jeden
+ * Kalenderbezug läuft wie bisher mit.
+ *
+ * `accountCalendarUrls` fehlt bei Apple: dort gibt es ein Konto.
+ *
+ * @param {string|null} storedUrl    gespeicherte Objektadresse der Vormerkung
+ * @param {string|null} calendarUrl  Kalender, in dem sie laut Buchführung liegt
+ * @param {Iterable<string>|null|undefined} accountCalendarUrls
+ */
+function belongsToAccount(storedUrl, calendarUrl, accountCalendarUrls) {
+  if (!accountCalendarUrls) return true;
+  if (storedUrl) return liesWithin(storedUrl, accountCalendarUrls);
+  if (!calendarUrl) return true;
+  for (const own of accountCalendarUrls) if (own === calendarUrl) return true;
+  return false;
+}
+
 /** Dateiname eines Kalenderobjekts aus seiner URL, ersatzweise aus der UID. */
 export function filenameFromUrl(url, uid) {
   const last = String(url).split('/').filter(Boolean).pop();
@@ -206,7 +253,7 @@ export async function fetchObjectsByUrl(client, wanted) {
  * Was hier nicht klappt, bleibt vorgemerkt und läuft im nächsten Sync mit.
  * @returns {Promise<{deleted:number,updated:number}>}
  */
-export async function flushAccount(client, source, { deletions, updates, needsCalendars }) {
+export async function flushAccount(client, source, { deletions, updates, needsCalendars, accountCalendarUrls = null }) {
   const wanted = updates
     .filter((e) => e.external_object_url)
     .map((e) => ({
@@ -237,8 +284,9 @@ export async function flushAccount(client, source, { deletions, updates, needsCa
   // ownCalendarUrls bewusst nicht gesetzt: ohne vollen Abruf ist "der Server
   // führt das Objekt nicht mehr" nicht belegbar, und ein Tombstone ohne bekannte
   // URL darf hier nicht als erledigt gelten. Er bleibt für den Sync liegen.
-  const deleted = deletions.length ? await processPendingDeletions(client, source, objectIndex) : 0;
-  const updated = objectIndex.size ? await processPendingUpdates(client, source, objectIndex, calendarsByUrl) : 0;
+  const scope = { accountCalendarUrls };
+  const deleted = deletions.length ? await processPendingDeletions(client, source, objectIndex, null, scope) : 0;
+  const updated = objectIndex.size ? await processPendingUpdates(client, source, objectIndex, calendarsByUrl, scope) : 0;
   return { deleted, updated };
 }
 
@@ -248,9 +296,11 @@ export async function flushAccount(client, source, { deletions, updates, needsCa
  * @param {string} source       'caldav' | 'apple'
  * @param {Map}    objectIndex  UID → { url, etag, data, calendarUrl } aus dem Inbound dieses Laufs
  * @param {Set}    [ownCalendarUrls] Kalender dieses Accounts; fremde Tombstones bleiben unangetastet
+ * @param {{accountCalendarUrls?: Iterable<string>|null}} [scope] alle Kalender des
+ *        Kontos, dessen Client das ist (siehe belongsToAccount)
  * @returns {Promise<number>} erledigte Tombstones
  */
-export async function processPendingDeletions(client, source, objectIndex, ownCalendarUrls = null) {
+export async function processPendingDeletions(client, source, objectIndex, ownCalendarUrls = null, { accountCalendarUrls = null } = {}) {
   const rows = outbound.pendingDeletions(source);
   if (rows.length === 0) return 0;
 
@@ -260,6 +310,8 @@ export async function processPendingDeletions(client, source, objectIndex, ownCa
     // gerade abgerufenen Kalendern gehört, sonst zählt ein fremder Account fremde
     // Fehlversuche hoch und verwirft am Ende eine fremde Löschung.
     if (ownCalendarUrls && row.calendar_external_id && !ownCalendarUrls.has(row.calendar_external_id)) continue;
+    // Die Löschung eines anderen Kontos: dessen Lauf übernimmt.
+    if (!belongsToAccount(row.object_url, row.calendar_external_id || null, accountCalendarUrls)) continue;
 
     const known = objectIndex.get(row.event_external_id);
     const url   = row.object_url || known?.url || null;
@@ -295,9 +347,11 @@ export async function processPendingDeletions(client, source, objectIndex, ownCa
  * ausgeführt: CalDAV kennt kein Verschieben.
  * @param {Map|null} [calendarsByUrl] Kalender-URL → Collection; `null`, wenn die
  *                                    Auflistung gescheitert ist (Umzüge warten dann)
+ * @param {{accountCalendarUrls?: Iterable<string>|null}} [scope] alle Kalender des
+ *        Kontos, dessen Client das ist (siehe belongsToAccount)
  * @returns {Promise<number>} erfolgreich verarbeitete Termine
  */
-export async function processPendingUpdates(client, source, objectIndex, calendarsByUrl = null) {
+export async function processPendingUpdates(client, source, objectIndex, calendarsByUrl = null, { accountCalendarUrls = null } = {}) {
   const events = outbound.pendingUpdates(source);
   if (events.length === 0) return 0;
 
@@ -307,6 +361,12 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
 
   let done = 0;
   for (const event of events) {
+    // Die Zeile eines anderen Kontos: nichts tun, nichts verwerfen - dessen
+    // Lauf übernimmt. Vor dem Blick in den Index, denn der kennt nur UIDs.
+    if (!belongsToAccount(
+      event.external_object_url, outbound.calendarExternalId(event), accountCalendarUrls
+    )) continue;
+
     const known = objectIndex.get(event.external_calendar_id);
     const url   = event.external_object_url || known?.url || null;
 

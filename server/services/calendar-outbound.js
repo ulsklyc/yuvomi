@@ -364,7 +364,7 @@ function cfg(key) {
 }
 
 /** Externe Kalender-Kennung, in der das Event beim Provider liegt. */
-function calendarExternalId(event, database = null) {
+export function calendarExternalId(event, database = null) {
   if (event.calendar_ref_id) {
     const row = (database || db.get()).prepare(
       'SELECT external_id FROM external_calendars WHERE id = ? AND source = ?'

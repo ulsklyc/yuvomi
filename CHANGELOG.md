@@ -456,6 +456,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Chrome filled in a saved password there, two red error messages could appear, because the
   browser's autofill sends a key press without a key and the keyboard shortcuts did not expect
   one. Such a key press is now ignored; the shortcuts work as before.
+- **Two CalDAV accounts that hold the same event no longer share one entry** (#1860). An event is
+  recognised by its identifier (UID), and Yuvomi looked for it across all connected CalDAV
+  accounts at once. If a second account held an event with the same UID - which happens without
+  anybody doing anything unusual when an export is imported into another account, or when two
+  Yuvomi installations uploaded to them - that event took over the entry of the first account:
+  its title, its calendar, and where later edits went. The UID is now matched within its own
+  account. Each account keeps its own entry, and an edit or a deletion made in Yuvomi goes to the
+  calendar that entry belongs to. Where two events were merged before the update, the next sync
+  shows the one that lost its entry again as an entry of its own.
 
 ## [2.75.0] - 2026-10-07
 

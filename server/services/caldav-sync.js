@@ -833,9 +833,36 @@ async function runSync({ createClient } = {}) {
   // Hot-Path-Statements einmal vorbereiten statt pro Event neu (#519): das spart bei
   // großen Kalendern spürbar Zeit und verkürzt damit das synchrone Verarbeitungsfenster.
   const conn = db.get();
-  const selExistingEvent = conn.prepare(
-    `SELECT id, outbound_dirty, calendar_ref_id, start_datetime, color, color_modified FROM calendar_events WHERE external_calendar_id = ? AND external_source = 'caldav'`
-  );
+  // Die bestehende Zeile zu einem Serverobjekt: (Konto, UID), nicht die UID
+  // allein (#1860). Eine UID ist nur innerhalb eines Kontos eine Identität -
+  // alte eigene UIDs tragen bloss die Zeilen-Id, zwei Installationen oder ein
+  // in ein zweites Konto importierter Export treffen sich also ohne Zutun auf
+  // derselben. Ohne das Konto in der Suche übernahm das zweite Konto die
+  // Zeile des ersten. Aufgaben und Einkaufsartikel führen ihr Konto in einer
+  // eigenen Spalte; ein Termin hängt über seinen Kalender daran
+  // (calendar_ref_id → external_calendars → caldav_calendar_selection).
+  //
+  // Zweiter Arm: eine Zeile, deren Kalender KEINEM Konto zugeordnet ist (kein
+  // calendar_ref_id aus der Zeit davor, oder eine Auswahl, die es nicht mehr
+  // gibt). Sie wird wie bisher über die UID gefunden und vom Abruf an den
+  // Kalender gebunden, der sie liefert - sonst legte der erste Lauf nach dem
+  // Update jede solche Zeile ein zweites Mal an. Gibt es beides, gewinnt die
+  // Zeile des eigenen Kontos.
+  const selExistingEvent = conn.prepare(`
+    SELECT e.id, e.outbound_dirty, e.calendar_ref_id, e.start_datetime, e.color, e.color_modified,
+           EXISTS (SELECT 1 FROM caldav_calendar_selection s
+                   WHERE s.calendar_url = c.external_id AND s.account_id = ?) AS own
+    FROM calendar_events e
+    LEFT JOIN external_calendars c ON c.id = e.calendar_ref_id AND c.source = 'caldav'
+    WHERE e.external_calendar_id = ? AND e.external_source = 'caldav'
+      AND (   EXISTS (SELECT 1 FROM caldav_calendar_selection s
+                      WHERE s.calendar_url = c.external_id AND s.account_id = ?)
+           OR NOT EXISTS (SELECT 1 FROM caldav_calendar_selection s
+                          WHERE s.calendar_url = c.external_id))
+    ORDER BY own DESC, e.id
+    LIMIT 1
+  `);
+  const existingEventOf = (accountId, uid) => selExistingEvent.get(accountId, uid, accountId);
   // Offene Löschungen einmal je Lauf, nicht je eingehendem Termin.
   const pendingDeletionUids = outbound.pendingDeletionUids('caldav');
   // Der Vergleich in der WHERE-Klausel hält das Statement von Schreibvorgängen
@@ -1099,7 +1126,7 @@ async function runSync({ createClient } = {}) {
               // anlegen, sonst kehrt der Termin bei jedem Sync zurück (#593).
               if (pendingDeletionUids.has(ev.uid)) continue;
 
-              let existing = selExistingEvent.get(ev.uid);
+              let existing = existingEventOf(account.id, ev.uid);
 
               // Der eigene Upload, dessen Antwort verloren ging: die Zeile ist
               // noch lokal, das Objekt liegt schon hier. In die bestehende
@@ -1117,7 +1144,7 @@ async function runSync({ createClient } = {}) {
                       (e) => e.id === eventId && e.target_caldav_calendar_url === selCal.calendar_url
                     ),
                   })) {
-                existing = selExistingEvent.get(ev.uid);
+                existing = existingEventOf(account.id, ev.uid);
               }
 
               // Eine lokale Bearbeitung, die noch auf ihren Push wartet, darf der
@@ -1243,10 +1270,14 @@ async function runSync({ createClient } = {}) {
       // Ausgehende Löschungen und Änderungen (#593). Nach dem Inbound, weil der
       // Weg zum Objekt für Bestandstermine erst aus dessen Abruf bekannt wird;
       // der Inbound überspringt dafür alles, was hier noch aussteht.
+      // `accountCalendarUrls`: die Vormerkungen aller Konten liegen in EINER
+      // Tabelle bzw. Spalte. Dieser Lauf fasst nur an, was in einem Kalender
+      // dieses Kontos liegt (#1860).
       try {
-        const removed = await processPendingDeletions(client, 'caldav', objectIndex, ownCalendarUrls);
+        const scope = { accountCalendarUrls: accountCalendarUrls(account.id) };
+        const removed = await processPendingDeletions(client, 'caldav', objectIndex, ownCalendarUrls, scope);
         if (removed) log.info(`${removed} pending deletion(s) applied on the server.`);
-        const pushed = await processPendingUpdates(client, 'caldav', objectIndex, calendarsByUrl);
+        const pushed = await processPendingUpdates(client, 'caldav', objectIndex, calendarsByUrl, scope);
         if (pushed) log.info(`${pushed} local change(s) pushed to the server.`);
       } catch (err) {
         log.error(`Outbound changes failed for account ${account.id}:`, err.message);
@@ -1398,7 +1429,10 @@ async function runFlushOutbound({ createClient } = {}) {
     if (!account) continue;
     try {
       const client = await makeClient(account);
-      const res = await flushAccount(client, 'caldav', work);
+      // Nach dem await gelesen: die Auswahl kann sich inzwischen geändert haben.
+      const res = await flushAccount(client, 'caldav', {
+        ...work, accountCalendarUrls: accountCalendarUrls(accountId),
+      });
       total.deleted += res.deleted;
       total.updated += res.updated;
     } catch (err) {
