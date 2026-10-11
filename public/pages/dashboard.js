@@ -11,6 +11,7 @@ import { todaySheetContext, collectSourceRows, composeTodaySheet, codaAllowed, s
 import { t, formatDate, formatDayMonth, formatTime, timeSuffix, getLocale, getNumberFormat } from '/i18n.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 import { resolveEventColor } from '/utils/event-color.js';
+import { hasEventIcon, eventIconHtml } from '/utils/event-icon.js';
 import { compareMembers, sortMembers } from '/utils/member-order.js';
 import { buildWeekStrip } from '/utils/week-strip.js';
 import { relativeDateLabel, housekeepingSinceLabel } from '/utils/day-label.js';
@@ -40,7 +41,7 @@ import {
   WIDGET_SIZE_PRESETS, WIDGET_SIZE_OPTIONS,
   COCKPIT_COVERED_WIDGETS,
   nearestPreset, sameWidgetConfig, suggestGridHoleFill, rowFillSpans,
-  dashboardQuery, dashboardQueryFiltersCounts,
+  dashboardQuery, dashboardQueryFiltersCounts, normalizeShoppingListSelection,
 } from '/utils/dashboard-widgets.js';
 import { EVENT_LIMIT_STEPS, EVENT_LIMIT_DEFAULT, clampEventLimit } from '/utils/dashboard-event-limit.js';
 import {
@@ -253,6 +254,63 @@ function overviewEventTime(event, span) {
   if (span.until) return t('dashboard.todayUntil', { time: formatTime(span.until) });
   if (span.allDay) return t('dashboard.allDay');
   return formatTime(event.start_datetime);
+}
+
+/**
+ * Der Name des Kalenders, zu dem ein Termin gehoert - oder leer (#1698).
+ *
+ * `source_calendar_name` VOR `cal_name`, dieselbe Reihenfolge wie im
+ * Kalendermodul (calendar.js): `cal_name` kommt ueber die Verknuepfung des
+ * schon synchronisierten Termins und fehlt, solange ein neu angelegter Termin
+ * noch auf seinen Upload wartet; waehrend eines ausstehenden Umzugs nennt er
+ * noch den alten Kalender. `source_calendar_name` nennt in beiden Faellen das
+ * Ziel, das der Mensch gewaehlt hat.
+ */
+function eventCalendarName(event) {
+  return String(event?.source_calendar_name ?? '').trim() || String(event?.cal_name ?? '').trim();
+}
+
+/**
+ * Das Ende eines Termins fuer die WAND (#1698, D#988), fertig formatiert -
+ * oder leer, wenn die Zeile beim Beginn allein bleibt. Die Wand schreibt es
+ * hinter die Zeitangabe, die `overviewEventTime` liefert: Beginn UND Ende.
+ *
+ * „Frueh 6:00" sagt, wann die Schicht anfaengt; an der Wand will man wissen,
+ * wann sie vorbei ist. Wo `overviewEventTime` schon etwas anderes als den
+ * Beginn nennt („bis 12:00", „Ganztaegig"), bleibt es dabei - das Ende steht
+ * dort schon, oder es gibt keins.
+ *
+ * KEINE SPANNE OHNE ECHTES ENDE: fehlt es, liegt es nicht nach dem Beginn, oder
+ * liegt es einen ganzen Tag oder mehr danach, bleibt der Beginn allein. „22:00
+ * - 06:00" liest jeder als die Nacht; „18:00 - 12:00" fuer eine Reise bis
+ * uebermorgen laese sich wie ein Fehler.
+ *
+ * „EIN TAG ODER MEHR" IST EINE FRAGE AN DIE WANDUHR, NICHT AN DIE STOPPUHR.
+ * Verglichen werden die Stempel des Haushalts: das Ende gegen den Beginn am
+ * Folgetag zur selben Uhrzeit. Hier standen zuerst Millisekunden
+ * (`new Date(end) - new Date(start) >= 24 h`), und das war zweimal falsch: in
+ * der Nacht der Zeitumstellung hat der Tag 23 Stunden, Samstag 22:00 bis
+ * Sonntag 22:00 las sich als „22:00 - 22:00"; und `new Date('…T22:00')` liest
+ * die Ziffern in der Zone des GERAETS, die Antwort hing also am Tablett statt
+ * am Haushalt (dieselbe Falle wie #1534).
+ *
+ * Der Bindestrich ist dieselbe Form wie bei den Schichten des Blatts
+ * (utils/today-sheet.js).
+ */
+function wallEventEnd(event, span) {
+  if (span.until || span.allDay) return '';
+  const end = String(event?.end_datetime || '');
+  // Ein Ende ohne Uhrzeit ('YYYY-MM-DD') ist kein Ende einer Spanne. Der
+  // Riegel steht HIER und nicht im Stempel: `householdStamp('2026-09-25')`
+  // liest Mitternacht, und aus „18:00 bis zum 25." wuerde „18:00 - 00:00" -
+  // eine Uhrzeit, die niemand eingetragen hat.
+  if (end.length <= 10) return '';
+  const startStamp = householdStamp(String(event?.start_datetime || ''));
+  const endStamp = householdStamp(end);
+  if (!startStamp || !endStamp || endStamp <= startStamp) return '';
+  const dayLater = `${addLocalDays(startStamp.slice(0, 10), 1)}${startStamp.slice(10)}`;
+  if (endStamp >= dayLater) return '';
+  return formatTime(end);
 }
 
 function getAppName() {
@@ -479,7 +537,7 @@ function maybeHintCustomize(container) {
 // die geteilten Ausgaben haengen am Budget-Modul (server/scopes.js).
 const MODULE_FOR_WIDGET = { tasks: 'tasks', calendar: 'calendar', shopping: 'shopping', meals: 'meals', notes: 'notes', birthdays: 'birthdays', budget: 'budget', 'split-expenses': 'budget', rewards: 'rewards', health: 'health', cycle: 'health', fasting: 'health', nutrition: 'health', housekeeping: 'housekeeping', schedule: 'schedule', waste: 'waste', pantry: 'pantry' };
 
-const WIDGETS_WITH_OPTIONS = new Set(['calendar', 'tasks', 'notes', 'waste']);
+const WIDGETS_WITH_OPTIONS = new Set(['calendar', 'tasks', 'notes', 'waste', 'shopping']);
 
 const _extensionWidgetModules = new Map();
 
@@ -1025,8 +1083,16 @@ function buildTodayHighlights(data) {
   });
   const nextEvent = todayEvents[0] ?? null;
 
+  // DIE ZAHL DES SERVERS, wo es sie gibt (#1818): `shoppingLists` traegt
+  // hoechstens drei Listen, die Summe ihrer `open_count` war bei vier Listen
+  // schon zu klein (gemessen 13 gegen 14). `shoppingOpenCount` zaehlt ueber
+  // alle Listen; ohne ihn (aelterer Server, Abfrage gescheitert: `null`)
+  // bleibt die Summe der geladenen Listen.
+  const serverOpenCount = data?.shoppingOpenCount;
   const openShoppingCount = shoppingItems.length
     ? shoppingItems.filter((item) => !item.is_checked).length
+    : typeof serverOpenCount === 'number' && Number.isFinite(serverOpenCount)
+    ? serverOpenCount
     : shoppingLists.reduce((sum, list) => {
         if (Number.isFinite(Number(list.open_count))) return sum + Number(list.open_count);
         if (Number.isFinite(Number(list.openCount))) return sum + Number(list.openCount);
@@ -1125,11 +1191,25 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
         sortKey: time || '00:01',
         timeLabel: overviewEventTime(event, span),
         title: event.title,
-        sub: t('dashboard.todayEvent'),
+        // Die Herkunft statt des Wortes „Termin" (#1698): der Name des
+        // Kalenders, im Heute-Blatt wie an der Wand. „Frueh" ist erst mit
+        // „Niklas Arbeitskalender" darunter eine Auskunft. Ein Termin, der nur
+        // in Yuvomi lebt, hat keinen Kalendernamen - er behaelt das Wort.
+        sub: eventCalendarName(event) || t('dashboard.todayEvent'),
+        // Das ENDE bleibt der Wand vorbehalten (entschieden in #1698): es reist
+        // neben `timeLabel` mit, und nur `renderWallRow` schreibt es dahinter.
+        // Das Blatt nennt weiter den Beginn allein.
+        wallTimeEnd: wallEventEnd(event, span),
         icon: 'calendar',
         tone: 'event',
         route: calendarEventRoute(event),
         who: event.assigned_users?.[0] ?? null,
+        // ALLE Zugewiesenen, nicht nur das eine Gesicht der Zeile (#1828): die
+        // Wand zaehlt den Termin bei jeder Person (rowPeopleIds).
+        people: event.assigned_users ?? [],
+        // Das am Termin gewaehlte Icon (#1829). `icon` bleibt das Zeichen des
+        // Moduls; wer das eigene zeigt, fragt hasEventIcon().
+        eventIcon: event.icon ?? null,
         // Beitrags-Vertrag (utils/today-sheet.js): ein Termin ist ein Rahmen
         // des Tages, kein Auftrag - er haelt die Coda nicht auf.
         priority: 40,
@@ -1164,6 +1244,7 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
         tone: 'task',
         route: '/tasks',
         who: task.assigned_users?.[0] ?? null,
+        people: task.assigned_users ?? [],
         priority: overdue ? 10 : 30,
         open: true,
       });
@@ -1212,6 +1293,20 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
     openShoppingCount: highlights.openShoppingCount,
     tasksDoneToday: Number(data?.tasksDoneToday) || 0,
   };
+}
+
+/**
+ * Wen eine Programmzeile angeht - JEDE zugewiesene Person, einmal (#1828).
+ * Die Zeile selbst zeigt ein Gesicht (`who`); gezaehlt hat die Wand deshalb
+ * nur dieses eine, und ein Termin fuer zwei stand bei einer Person. Zeilen
+ * ohne Liste (das Kochen, Beitraege anderer Module) bleiben bei `who`.
+ */
+function rowPeopleIds(row) {
+  const ids = (Array.isArray(row.people) ? row.people : [])
+    .map((person) => person?.id)
+    .filter((id) => id != null);
+  if (ids.length) return [...new Set(ids)];
+  return row.who?.id != null ? [row.who.id] : [];
 }
 
 // --------------------------------------------------------
@@ -1550,7 +1645,7 @@ export function renderUpcomingBirthdays(allBirthdays, size, total = null) {
         ? t('birthdays.turnsAge', { age: b.next_age })
         : '';
     return `
-      <div class="birthday-widget-item" data-route="/birthdays" role="button" tabindex="0">
+      <div class="birthday-widget-item" data-route="${esc(b.id != null ? `/birthdays?open=${encodeURIComponent(String(b.id))}` : '/birthdays')}" role="button" tabindex="0">
         <div class="birthday-widget-item__avatar"${avatarStyle}>
           ${b.photo_data ? `<img src="${esc(b.photo_data)}" alt="" loading="lazy">` : `<span>${esc(initials(b.name))}</span>`}
         </div>
@@ -1751,7 +1846,7 @@ function renderPinnedNotes(allNotes, size, total = null) {
   // Traegergrund: drei graubeige Kaesten, die wie deaktiviert aussahen. Ohne die
   // Deklaration greift der Fallback im Stylesheet (der Notizen-Ton).
   const items = notes.map((n) => `
-    <div class="note-item" data-route="/notes"
+    <div class="note-item" data-route="${esc(`/notes?open=${encodeURIComponent(String(n.id))}`)}"
          ${n.color ? `style="--note-color:${esc(n.color)};"` : ''}>
       <div class="note-item__body" role="link" tabindex="0">
       ${n.title ? `<div class="note-item__title">${esc(n.title)}</div>` : ''}
@@ -2293,6 +2388,22 @@ function renderBudgetWidget(budget, currency, size = '1x1') {
  * keine Kachel (siehe metricTileFor). */
 const METRIC_TILE_ORDER = ['tasks', 'shopping', 'budget', 'split-expenses', 'birthdays', 'meals', 'notes', 'rewards', 'health', 'housekeeping'];
 const METRIC_TILE_COUNT = 4;
+
+/**
+ * Wohin eine Zeile fuehrt, die ueber ALLE Einkaufslisten zaehlt (#1821).
+ *
+ * Die Zahl meint mehrere Listen, also ist die Modulseite das ehrliche Ziel -
+ * bis nur noch EINE Liste etwas Offenes hat: dann meint "5 offen" genau diese
+ * Liste, und `/shopping` oeffnete stattdessen die aelteste (shopping.js liest
+ * `?list=`, sonst die erste geladene). `shoppingOpenLists` zaehlt der Server
+ * ueber alle Listen; `shoppingLists` traegt hoechstens drei, bei einer einzigen
+ * also genau sie.
+ */
+function shoppingSoleListRoute(data) {
+  const lists = Array.isArray(data?.shoppingLists) ? data.shoppingLists : [];
+  if (Number(data?.shoppingOpenLists) !== 1 || lists.length !== 1 || lists[0]?.id == null) return '/shopping';
+  return `/shopping?list=${encodeURIComponent(String(lists[0].id))}`;
+}
 
 function metricTileFor(id, data, currency, sheetSpeaks = new Set()) {
   const route = { tasks: '/tasks', shopping: '/shopping', budget: BUDGET_MONTH_ROUTE, birthdays: '/birthdays', meals: '/meals', notes: '/notes', rewards: '/rewards', health: '/health', housekeeping: '/housekeeping' }[id];
@@ -3311,7 +3422,7 @@ function renderWasteWidget(waste, size) {
 
     if (!next) {
       return `
-        <div class="waste-widget-row" data-route="/waste" role="button" tabindex="0">
+        <div class="waste-widget-row" data-route="${esc(`/waste?type=${encodeURIComponent(String(type.id))}`)}" role="button" tabindex="0">
           <span class="waste-widget-row__dot" style="--waste-color:${esc(accent)}"></span>
           <span class="waste-widget-row__name">${icon}${esc(type.name)}</span>
           <span class="waste-widget-row__date waste-widget-row__date--none">${esc(t('waste.noUpcomingPickup'))}</span>
@@ -3411,6 +3522,23 @@ function renderHousekeepingWidget(hk, currency) {
   </div>`;
 }
 
+/**
+ * Das Zeichen im Siegel einer Programmzeile - fuer "Heute wichtig" und fuer die
+ * Wand, die dieselben Zeilen lesen. Ein Termin zeigt das Icon, das jemand fuer
+ * ihn gewaehlt hat (#1829) - auf demselben Weg wie der Kalender
+ * (utils/event-icon.js): dieselbe Liste, derselbe Rueckfall. Ohne eigene Wahl
+ * und fuer jeden unbekannten Namen bleibt das Zeichen des Moduls, sonst stuende
+ * dort ein leeres Siegel. Die Herkunft traegt weiter die Farbe des Siegels.
+ * `module-glyph` ist die Marke aus nav-icons.js, an der die Strichstaerke haengt.
+ * Sammelzeile und Zustandszeile sprechen fuer kein einzelnes Objekt und fragen
+ * hier nicht.
+ */
+function programRowGlyph(row) {
+  return row.kind === 'event' && hasEventIcon(row.eventIcon)
+    ? eventIconHtml(row.eventIcon, 'module-glyph')
+    : moduleIconHTML(row.icon);
+}
+
 /* DAS UEBERLAPPUNGSZEICHEN (Block-2-Brief, utils/seal-pair.js): „Heute
  * wichtig" ist die Mischstelle des Dashboards - hier stehen Aufgabe, Termin,
  * Einkauf und Essen nebeneinander, und das Siegel sagt bereits, aus welchem
@@ -3457,7 +3585,7 @@ function renderTodayRow(row, extraClass = '') {
   // Reihenfolge, in der man eine Zeile liest.
   const whoName = mark ? `<span class="sr-only">, ${esc(row.who?.display_name ?? '')}</span>` : '';
   const inner = `
-      <span class="${mark ? 'seal-pair' : ''}"${mark ? ' aria-hidden="true"' : ''}><span class="module-seal today-cockpit-card__icon">${moduleIconHTML(row.icon)}</span>${mark}</span>
+      <span class="${mark ? 'seal-pair' : ''}"${mark ? ' aria-hidden="true"' : ''}><span class="module-seal today-cockpit-card__icon">${programRowGlyph(row)}</span>${mark}</span>
       <span class="today-cockpit-card__body">
         <strong class="today-cockpit-card__value">${esc(row.title)}</strong>
         <span class="today-cockpit-card__sub">${esc(row.sub)}</span>${whoName}
@@ -3514,11 +3642,16 @@ function groupOverdueRows(rows) {
   const seen = new Set();
   const people = [];
   for (const row of overdue) {
-    const id = row.who?.id;
-    if (id == null || seen.has(id)) continue;
-    seen.add(id);
-    // renderAvatarStack liest `color`, die Zeilen tragen `avatar_color`.
-    people.push({ ...row.who, color: row.who.color ?? row.who.avatar_color });
+    // JEDE zugewiesene Person, nicht nur das eine Gesicht der Zeile (#1828):
+    // eine Aufgabe fuer zwei geht beide an.
+    const assigned = Array.isArray(row.people) && row.people.length ? row.people : [row.who];
+    for (const person of assigned) {
+      const id = person?.id;
+      if (id == null || seen.has(id)) continue;
+      seen.add(id);
+      // renderAvatarStack liest `color`, die Zeilen tragen `avatar_color`.
+      people.push({ ...person, color: person.color ?? person.avatar_color });
+    }
   }
   const group = {
     kind: 'overdue',
@@ -3691,7 +3824,7 @@ function buildTodayCockpitModel(data, cfg = [], {
         sub: t('dashboard.todayShopping'),
         icon: 'shopping-cart',
         tone: 'shopping',
-        route: '/shopping',
+        route: shoppingSoleListRoute(data),
         who: null,
       }
     : null;
@@ -4100,11 +4233,85 @@ const FOCUS_IDENTITY_ATTRS = [
 function focusKeyOf(el) {
   if (el.id) return `#${CSS.escape(el.id)}`;
   const attr = FOCUS_IDENTITY_ATTRS.find((a) => el.hasAttribute(a));
-  if (!attr) return null;
+  if (!attr) return rowFocusKeyOf(el);
   const value = el.getAttribute(attr);
   const own = value ? `[${attr}="${CSS.escape(value)}"]` : `[${attr}]`;
   const tile = el.closest('.widget-wrapper[data-widget-id]')?.dataset.widgetId;
   return tile ? `.widget-wrapper[data-widget-id="${CSS.escape(tile)}"] ${own}` : own;
+}
+
+/**
+ * Dasselbe fuer eine INHALTSZEILE (#1821): Termin, Notiz, Liste, Aufgabe.
+ *
+ * Die Flaeche baut nicht nur im Anpassen-Modus neu, sondern auch still - bei
+ * der Rueckkehr in den Tab, im Viertelstundentakt, an einer Tagesgrenze, nach
+ * dem Wetter. Wer mit der Tastatur auf einer Zeile stand, stand danach auf
+ * <body>, und Enter tat nichts mehr. Eine Zeile hat keine Id; ihre Identitaet
+ * ist, wohin sie fuehrt (`data-route`, bei Aufgaben `data-task-id`), in welcher
+ * Kachel sie steht und - wo mehrere Zeilen dasselbe Ziel haben (Schichtplan,
+ * Mahlzeiten) - die wievielte sie ist. Der Fokus kann auch auf einem Kind
+ * liegen (der Notizkoerper traegt den Tabstopp, die Karte den Weg).
+ *
+ * `preventScroll`: der stille Neuaufbau darf niemanden zu einer Zeile
+ * zurueckholen, von der er weggescrollt hat.
+ */
+function rowFocusKeyOf(el) {
+  const row = el.closest?.('[data-route], [data-task-id]');
+  if (!row) return null;
+  const quoted = (name, value) => `[${name}="${CSS.escape(value)}"]`;
+  let own = row.hasAttribute('data-task-id')
+    ? quoted('data-task-id', row.getAttribute('data-task-id'))
+    : quoted('data-route', row.getAttribute('data-route'));
+  if (row.dataset.objectKind && row.dataset.objectId) {
+    own += quoted('data-object-kind', row.dataset.objectKind) + quoted('data-object-id', row.dataset.objectId);
+  }
+  if (el !== row) {
+    const cls = el.classList?.[0];
+    if (!cls) return null;
+    own += ` .${CSS.escape(cls)}`;
+  }
+  const tile = row.closest('.widget-wrapper[data-widget-id]')?.dataset.widgetId;
+  const selector = tile ? `.widget-wrapper[data-widget-id="${CSS.escape(tile)}"] ${own}` : own;
+  const root = row.closest('#dashboard-shell') ?? row.ownerDocument;
+  const index = Math.max(0, [...root.querySelectorAll(selector)].indexOf(el));
+  return { selector, index, preventScroll: true };
+}
+
+/**
+ * VOR dem Neuaufbau: wer hat den Fokus, und unter welchem Schluessel findet
+ * man ihn danach wieder? Nur ein Element IN der Flaeche zaehlt - ein Dialog
+ * oder die Navigation behalten ihren Fokus ohnehin.
+ *
+ * @returns {{key: (string|object|null), had: boolean}}
+ */
+function captureRebuildFocus(shell, active, body) {
+  const had = Boolean(active) && active !== body && Boolean(shell?.contains(active));
+  return { key: had ? focusKeyOf(active) : null, had };
+}
+
+/**
+ * NACH dem Neuaufbau: der erste Kandidat, den es gibt und der bedienbar ist,
+ * bekommt den Fokus. Ein Kandidat ist ein Selektor (erster Treffer gilt: Ids,
+ * Bearbeiten-Knoepfe, der Nachfolger, den eine Geste nennt) oder der Schluessel
+ * einer Inhaltszeile mit Selektor UND Stelle (rowFocusKeyOf) - der kommt ohne
+ * Scrollen zurueck, weil der stille Neuaufbau niemanden zu einer Zeile holen
+ * darf, von der er weggescrollt hat.
+ *
+ * @returns {Element|null} das fokussierte Element
+ */
+function restoreFocusAfterRebuild(container, candidates) {
+  for (const candidate of (candidates ?? []).filter(Boolean)) {
+    const isRow = typeof candidate !== 'string';
+    const el = isRow
+      ? container.querySelectorAll(candidate.selector)[candidate.index]
+      : container.querySelector(candidate);
+    if (el && !el.disabled) {
+      if (isRow) el.focus({ preventScroll: candidate.preventScroll });
+      else el.focus();
+      return el;
+    }
+  }
+  return null;
 }
 
 /* EINE ANSAGE-REGION, DIE DEN NEUAUFBAU UEBERLEBT.
@@ -4300,6 +4507,21 @@ async function loadWasteTypes() {
   return wasteTypesCache;
 }
 
+/**
+ * Die Einkaufslisten fuer den Optionen-Dialog (#1818). Bewusst OHNE Cache und
+ * mit `null` im Fehlerfall, wie bei den Notiz-Kategorien: eine eben angelegte
+ * Liste muss waehlbar sein, und ein Dialog ohne Katalog darf eine bestehende
+ * Auswahl nicht als "nichts gewaehlt" speichern.
+ */
+async function loadShoppingLists(getLists = (path) => api.get(path)) {
+  try {
+    const res = await getLists('/shopping');
+    return Array.isArray(res?.data) ? res.data : null;
+  } catch {
+    return null;
+  }
+}
+
 async function loadNoteCategories(getCategories = (path) => api.get(path)) {
   try {
     const res = await getCategories('/notes/categories');
@@ -4382,7 +4604,7 @@ async function openExtensionWidgetOptions(id, meta, current = {}) {
 }
 
 /** Der Optionen-Dialog eines Widgets. Aufloesen mit den neuen Optionen oder null. */
-async function openWidgetOptions(id, current = {}, { loadNotes = loadNoteCategories } = {}) {
+async function openWidgetOptions(id, current = {}, { loadNotes = loadNoteCategories, loadLists = loadShoppingLists } = {}) {
   const extMeta = getExtensionWidgetMeta(id);
   if (extMeta?.optionsSchema) return openExtensionWidgetOptions(id, extMeta, current);
 
@@ -4398,6 +4620,14 @@ async function openWidgetOptions(id, current = {}, { loadNotes = loadNoteCategor
     window.yuvomi?.showToast(t('dashboard.loadError'), 'danger');
     return null;
   }
+  const shoppingLists = id === 'shopping' ? await loadLists() : [];
+  if (shoppingLists === null) {
+    window.yuvomi?.showToast(t('dashboard.loadError'), 'danger');
+    return null;
+  }
+  // Angehakt ist, was gespeichert UND noch da ist: eine geloeschte Liste hat
+  // keine Zeile mehr und faellt mit dem naechsten Speichern aus der Auswahl.
+  const pickedLists = new Set(normalizeShoppingListSelection(options.lists));
 
   const body = id === 'calendar'
     ? `
@@ -4440,6 +4670,17 @@ async function openWidgetOptions(id, current = {}, { loadNotes = loadNoteCategor
                  ${(options.types ?? []).includes(wt.id) ? 'checked' : ''}>
           <span>${esc(wt.name)}</span>
         </label>`).join('') : `<p class="widget-options__hint">${t('dashboard.optionWasteTypesEmpty')}</p>`}
+      </fieldset>`
+    : id === 'shopping' ? `
+      <fieldset class="form-group widget-options__group">
+        <legend class="form-label">${t('dashboard.optionShoppingLists')}</legend>
+        <p class="widget-options__hint">${t('dashboard.optionShoppingListsHint')}</p>
+        ${shoppingLists.length ? shoppingLists.map((list) => `
+        <label class="widget-options__choice">
+          <input type="checkbox" name="shopping-list" value="${esc(String(list.id))}"
+                 ${pickedLists.has(Number(list.id)) ? 'checked' : ''}>
+          <span>${esc(list.name)}</span>
+        </label>`).join('') : `<p class="widget-options__hint">${t('dashboard.noShoppingLists')}</p>`}
       </fieldset>`
     : id === 'tasks' ? `
       <fieldset class="form-group widget-options__group">
@@ -4508,6 +4749,13 @@ async function openWidgetOptions(id, current = {}, { loadNotes = loadNoteCategor
             // heisst „alle" - eine seltene Abholung darf nie stillschweigend
             // verschwinden, nur weil niemand den Dialog geoeffnet hat.
             if (picked.length) next.types = picked;
+          } else if (id === 'shopping') {
+            // Keine Auswahl heisst „alle Listen" und wird nicht gespeichert -
+            // das Verhalten von vor der Option (#1818).
+            const picked = normalizeShoppingListSelection(
+              [...panel.querySelectorAll('input[name="shopping-list"]:checked')].map((el) => el.value),
+            );
+            if (picked.length) next.lists = picked;
           } else if (id === 'tasks') {
             const picked = [...panel.querySelectorAll('input[name="task-category"]:checked')].map((el) => el.value);
             // Keine Auswahl heisst „alle" - eine leere Liste als Filter waere
@@ -4684,7 +4932,7 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
     family: () => renderFamilyWidget(data.users ?? [], data, { manageHref: familyManage }),
     meals: () => renderTodayMeals(data.todayMeals ?? [], visibleMealTypes, data.users),
     notes: (size) => renderPinnedNotes(data.pinnedNotes ?? [], size, data.notesTotal),
-    shopping: () => renderShoppingLists(data.shoppingLists ?? [], data.shoppingOpenCount, data.shoppingOpenLists),
+    shopping: () => renderShoppingTile(data),
     // Hier ankommen heisst eingerichtet (`isWidgetModuleEnabled`); fehlt das
     // Wetter trotzdem, sagt die Kachel es, statt zu verschwinden.
     weather: () => (weather ? renderWeatherWidget(weather) : renderWeatherUnavailable()),
@@ -4832,7 +5080,22 @@ function renderWidgetError(id) {
 // Shopping-Widget
 // --------------------------------------------------------
 
-function renderShoppingLists(lists, openTotal = null, openListTotal = null) {
+/**
+ * Was die Einkaufs-Kachel aus der Antwort liest (#1818). Mit einer Auswahl
+ * liefert die Route `shoppingTile` - die gewaehlten Listen, die offenen Artikel
+ * darin und wie viele gewaehlte Listen es gibt. Ohne Auswahl (oder wenn das
+ * Feld fehlt) gelten die Felder, die auch das Heute-Blatt und die Wand lesen.
+ * Die Kachel ist der EINZIGE Leser von `shoppingTile`.
+ */
+function renderShoppingTile(data) {
+  const tile = data?.shoppingTile;
+  if (tile && Array.isArray(tile.lists)) {
+    return renderShoppingLists(tile.lists, tile.openCount, tile.listCount);
+  }
+  return renderShoppingLists(data?.shoppingLists ?? [], data?.shoppingOpenCount, data?.shoppingOpenLists);
+}
+
+function renderShoppingLists(lists, openTotal = null, listTotalCount = null) {
   if (!lists.length) {
     return `<div class="widget widget--shopping">
       ${widgetHeader('shopping', t('nav.shopping'), 0, '/shopping')}
@@ -4844,11 +5107,17 @@ function renderShoppingLists(lists, openTotal = null, openListTotal = null) {
     </div>`;
   }
 
-  // Der Server liefert hoechstens drei Listen; `shoppingOpenCount` und
-  // `shoppingOpenLists` zaehlen ueber alle (listTotal). Ohne sie bleibt es bei
-  // der Summe der geladenen Listen.
+  // Der Server liefert hoechstens drei Listen und zaehlt daneben, woraus sie
+  // geschnitten sind (listTotal): ohne Auswahl ueber alle Listen mit Offenem
+  // (`shoppingOpenCount`, `shoppingOpenLists`), mit Auswahl ueber die
+  // gewaehlten (`shoppingTile.openCount`, `.listCount`). Ohne die Zahlen
+  // bleibt es bei der Summe der geladenen Listen.
   const totalOpen = listTotal(openTotal, lists.reduce((sum, l) => sum + l.open_count, 0));
-  const moreLists = listTotal(openListTotal, lists.length) - lists.length;
+  // "+n weitere Listen" nennt, was der Deckel abschneidet. OHNE Auswahl sind
+  // das Listen mit Offenem, und jede gezeigte hat welches. MIT Auswahl (#1818)
+  // ist es JEDE gewaehlte Liste, auch eine fertig gekaufte: "eine gewaehlte
+  // Liste bleibt stehen" haelt nur, wenn die abgeschnittene als "+1" da ist.
+  const moreLists = listTotal(listTotalCount, lists.length) - lists.length;
 
   const listsHtml = lists.map((list) => {
     const progress = list.total_count > 0
@@ -4869,7 +5138,8 @@ function renderShoppingLists(lists, openTotal = null, openListTotal = null) {
     // `/shopping` oeffnet die erste Liste der Einkaufsseite (die aelteste),
     // waehrend die Kachel die zuletzt geaenderte zuerst zeigt - der Tipp auf
     // "Drogerie" landete im Wocheneinkauf. Der Kachelkopf bleibt beim blanken
-    // Pfad: er zaehlt ueber alle Listen. Eine inzwischen geloeschte id faellt
+    // Pfad: er zaehlt ueber mehrere Listen (alle, oder die gewaehlten) und ist
+    // der Sammelverweis. Eine inzwischen geloeschte id faellt
     // auf der Einkaufsseite auf die erste Liste zurueck.
     const listRoute = `/shopping?list=${encodeURIComponent(String(list.id))}`;
 
@@ -4885,6 +5155,9 @@ function renderShoppingLists(lists, openTotal = null, openListTotal = null) {
         <div class="shopping-widget-list__items">
           ${itemsHtml}
           ${moreCount > 0 ? `<div class="shopping-widget-item shopping-widget-item--more">${t('dashboard.shoppingMore', { count: moreCount })}</div>` : ''}
+          ${/* Eine AUSGEWAEHLTE Liste steht auch ohne Offenes da (#1818): die
+                Zeile bleibt der Weg zu ihr und sagt, warum sie leer ist. */ ''}
+          ${list.open_count === 0 ? `<div class="shopping-widget-item shopping-widget-item--more">${esc(t('dashboard.shoppingListNothingOpen'))}</div>` : ''}
         </div>
       </div>
     `;
@@ -5359,15 +5632,23 @@ const WALL_ROW_CAP = 4;
 
 /** Eine Programmzeile als reiner Text - kein href, kein data-route, kein Modal. */
 function renderWallRow(row) {
+  // Der Termin nennt an der Wand, hinter dem Beginn, sein Ende (#1698). Es
+  // steht in einem eigenen Element, weil es auf einer Flaeche unter
+  // Tablettbreite weicht (dashboard.css): dort naehme „9:30 PM - 11:30 PM" dem
+  // Titel mehr als die halbe Zeile.
+  const sub = row.sub;
+  const end = row.timeLabel && row.wallTimeEnd
+    ? `<span class="wall-row__time-end"> - ${esc(row.wallTimeEnd)}</span>`
+    : '';
   const time = row.timeLabel
-    ? `<span class="wall-row__time${row.overdue ? ' wall-row__time--overdue' : ''}">${esc(row.timeLabel)}</span>`
+    ? `<span class="wall-row__time${row.overdue ? ' wall-row__time--overdue' : ''}">${esc(row.timeLabel)}${end}</span>`
     : '';
   return `
     <li class="wall-row wall-row--${esc(row.tone)}">
-      <span class="module-seal wall-row__seal">${moduleIconHTML(row.icon)}</span>
+      <span class="module-seal wall-row__seal">${programRowGlyph(row)}</span>
       <span class="wall-row__body">
         <span class="wall-row__title">${esc(row.title)}</span>
-        <span class="wall-row__sub">${esc(row.sub)}</span>
+        <span class="wall-row__sub">${esc(sub)}</span>
       </span>
       ${time}
     </li>`;
@@ -5430,9 +5711,7 @@ function renderWallWho(data, model) {
 
   const counts = new Map();
   for (const row of model.allRows) {
-    const id = row.who?.id;
-    if (id == null) continue;
-    counts.set(id, (counts.get(id) ?? 0) + 1);
+    for (const id of rowPeopleIds(row)) counts.set(id, (counts.get(id) ?? 0) + 1);
   }
 
   const onDuty = users
@@ -6955,11 +7234,8 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // nicht fuer die Zeile.
     const weatherCardShown = cfg.some((w) => w.id === 'weather' && w.visible) && isWidgetModuleEnabled('weather');
     // Wer hatte den Fokus? Nach dem setHtml gibt es sein Element nicht mehr
-    // (siehe focusKeyOf / restoreFocusAfterRebuild).
-    const focused = document.activeElement;
-    const keepFocus = focused && focused !== document.body && shell.contains(focused)
-      ? focusKeyOf(focused) : null;
-    const hadFocus = !!focused && focused !== document.body && shell.contains(focused);
+    // (captureRebuildFocus / restoreFocusAfterRebuild).
+    const { key: keepFocus, had: hadFocus } = captureRebuildFocus(shell, document.activeElement, document.body);
     const modeChanged = renderedCustomizing !== null && renderedCustomizing !== isCustomizing;
     // Nur eine Geste IM Anpassen-Modus gleitet (playTileFlip): beim Betreten
     // und Verlassen wachsen und schwinden die Bearbeiten-Leisten aller Kacheln,
@@ -7045,19 +7321,12 @@ export async function render(container, { user, signal: routeSignal = null } = {
      * als Nachfolger nennt (Ausblenden -> Nachbarkachel), und wenn die Geste den
      * Modus gewechselt hat (Speichern, Abbrechen), der Anpassen-Knopf, der ihn
      * wieder oeffnet. */
-    const candidates = [
+    restoreFocusAfterRebuild(container, [
       keepFocus,
       ...(focusAfterRebuild ?? []),
       ...(hadFocus && modeChanged ? ['#dashboard-customize-btn'] : []),
-    ].filter(Boolean);
+    ]);
     focusAfterRebuild = null;
-    for (const selector of candidates) {
-      const el = container.querySelector(selector);
-      if (el && !el.disabled) {
-        el.focus();
-        break;
-      }
-    }
     playTileFlip(shell, tileRectsBefore);
     playGridShift(shell, gridTopBefore);
   }
@@ -7292,7 +7561,7 @@ async function loadScheduleSlice(day) {
   };
 }
 
-export const __test = { customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill };
+export const __test = { customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -
@@ -7358,7 +7627,7 @@ function wireWeatherRefresh(container, onUpdated = null, signal) {
 // Test-Tor fuer die Klarheits-Runde (test/test-dashboard-clarity.js): eigene
 // Zeile statt Verlaengerung der langen `__test`-Liste oben, damit parallele
 // Aenderungen an beiden nicht in derselben Zeile kollidieren.
-Object.assign(__test, { renderUpcomingEvents, renderShoppingLists, renderDashboardLayout, wireLinks });
+Object.assign(__test, { renderUpcomingEvents, renderShoppingLists, renderShoppingTile, loadShoppingLists, renderDashboardLayout, wireLinks });
 
 // Test-Tor fuer die Uebersichts-Bugs vom 2026-09-29 (#1449, #1451-#1457).
 Object.assign(__test, { renderBudgetWidget });

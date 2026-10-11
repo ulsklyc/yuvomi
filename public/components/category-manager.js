@@ -6,9 +6,11 @@
  *
  * Verhalten:
  *   - configure({ basePath, groups, groupField, supportsSubcategories, labelResolver, titleKey, hintKey,
- *                 addMaxLength,
+ *                 addMaxLength, localizedLabels,
  *                 deleteConfirmKey, deleteDetailKey, subDeleteDetailKey })
  *   - Lädt via api.get(basePath); mutiert über post/put/patch/delete relativ zu basePath
+ *   - `localizedLabels: true` haengt der Listenanfrage `?lang=<Oberflaechensprache>` an -
+ *     fuer Routen, die ihre Labels auf dem Server uebersetzen (heute nur Budget, #1859)
  *   - Dispatcht nach jeder Mutation `category-manager-changed`
  *   - Zeigt Server-Guard-Fehler (in-use/last) als Toast
  *   - Räumt Listener in disconnectedCallback() auf
@@ -31,7 +33,7 @@
  * dort muesste der Aufrufer `mayWritePath()` aus /utils/module-access.js fragen.
  */
 import { api } from '/api.js';
-import { t } from '/i18n.js';
+import { t, getLocale } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { makeSortable, isDragActive } from '/utils/sortable.js';
 import { wireTablist } from '/utils/tablist.js';
@@ -137,6 +139,7 @@ class CategoryManagerElement extends HTMLElement {
     if (Array.isArray(opts.groups) && opts.groups.length) this._groups = opts.groups;
     if (typeof opts.groupField === 'string' && opts.groupField) this._groupField = opts.groupField;
     this._supportsSub = !!opts.supportsSubcategories;
+    this._localizedLabels = !!opts.localizedLabels;
     if (typeof opts.labelResolver === 'function') this._labelResolver = opts.labelResolver;
     if (opts.titleKey) this._titleKey = opts.titleKey;
     if (opts.hintKey) this._hintKey = opts.hintKey;
@@ -182,11 +185,23 @@ class CategoryManagerElement extends HTMLElement {
     this._root.addEventListener('submit', this._onSubmit);
   }
 
+  // Der Pfad der Listenanfrage. Uebersetzt die Route ihre Labels selbst
+  // (`localizedLabels`), nennt die Komponente ihr die Sprache der Oberflaeche:
+  // die ist je Browser gewaehlt, und ohne `lang` antwortet die Route in der
+  // Sprache des Haushalts - richtig fuer die meisten, falsch fuer das Mitglied,
+  // dessen Browser eine andere spricht (#1859). Gelesen je Abruf, nicht in
+  // configure(): die Sprache kann zwischen zwei Abrufen wechseln. Nur am GET -
+  // die Schreibwege bauen ihre Pfade weiter aus dem nackten basePath.
+  _listPath() {
+    if (!this._localizedLabels) return this._basePath;
+    return `${this._basePath}?lang=${encodeURIComponent(getLocale())}`;
+  }
+
   // GET ohne Render: setzt this._cats aus der Server-Antwort. Wirft weiter,
   // damit der aufrufende Mutations-Handler (mit eigenem try/catch) selbst
   // entscheidet, welchen Ausschnitt er danach neu zeichnet.
   async _fetch() {
-    const res = await api.get(this._basePath);
+    const res = await api.get(this._listPath());
     this._cats = res.data ?? [];
   }
 

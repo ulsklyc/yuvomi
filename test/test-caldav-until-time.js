@@ -64,6 +64,8 @@ function buildDb() {
       default_assignee_user_id INTEGER, UNIQUE(source, external_id)
     );
     CREATE TABLE calendar_events (
+      -- Konto der Zeile (Migration 238, #1860)
+      caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL,
       -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
       created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -81,6 +83,8 @@ function buildDb() {
       external_object_url TEXT
     );
     CREATE TABLE calendar_pending_deletions (
+      -- Konto der Zeile (Migration 238, #1860)
+      caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE CASCADE,
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       source TEXT NOT NULL,
       calendar_external_id TEXT NOT NULL,

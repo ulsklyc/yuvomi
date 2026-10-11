@@ -21,7 +21,7 @@ import { redrawList, collapseRow } from '/utils/list-motion.js';
 import { friendlyError } from '/utils/friendly-error.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { render as renderSplitExpenses, prefillSplitExpense, canAddSplitExpense, openNewSplitExpense } from '/pages/split-expenses.js';
-import { openSubscriptionModal, render as renderSubscriptions } from '/pages/subscriptions.js';
+import { openSubscriptionModal, clearSubscriptionFilters, render as renderSubscriptions } from '/pages/subscriptions.js';
 import { renderStats } from '/pages/budget-stats.js';
 import { renderPlans, openAddPlan } from '/pages/budget-plans.js';
 import { toLocalDateKey, parseLocalDateKey, addLocalDays,
@@ -1502,6 +1502,22 @@ function renderBody() {
       return;
     }
 
+    // Die erwartete Abo-Zahlung (#1844) hat keine Buchung, die sich oeffnen
+    // liesse; ihre Zeile wechselt in den Abo-Reiter, wo das Abo steht und
+    // verlaengert wird. Ohne `data-action`, wie der Zustaendigen-Filter: der
+    // Wechsel liest nur und gilt auch bei `budget: read`.
+    const subscriptionRow = e.target.closest('[data-open-subscription]');
+    if (subscriptionRow && !action) {
+      // setActive() malt die Leiste und ruft changeTab() mit der Richtung.
+      // Der Fokus geht auf den Reiter: der getippte Knopf verschwindet mit
+      // dem Wechsel, und ohne Umzug fiele er auf <body>.
+      // Ein Filter aus einem frueheren Besuch der Abo-Liste bliebe sonst
+      // stehen, und das Abo, zu dem die Zeile fuehrt, fehlte dort.
+      clearSubscriptionFilters();
+      _tablist?.setActive('subscriptions', { focus: true });
+      return;
+    }
+
     // Der Zeilen-Klick fragt NICHT selbst: openBudgetModal verzweigt bei
     // `read` in die Leseansicht, und die ist der Leseweg dieser Zeile.
     const item = e.target.closest('.budget-entry[data-id]');
@@ -2150,7 +2166,16 @@ function entryRows(list, { fullDate = false, rowClass = '' } = {}) {
       : '';
     // Das Verbuchen ist die Handlung, „erwartet" der Zustand: bei `budget:
     // read` geht der Knopf, die Plakette daneben bleibt und sagt es weiter.
-    const confirmBtn = pending && !ro
+    /* ERWARTETE ABO-ZAHLUNG EINES FOLGEMONATS (#1844). Der Server rechnet sie
+     * beim Lesen aus dem Rhythmus des Abos und schickt sie ohne id: es gibt
+     * keine Buchung. Sie ist derselbe ZUSTAND wie eine erwartete Buchung
+     * (#637) und traegt deshalb dieselbe Plakette und denselben schraffierten
+     * Punkt - eine zweite Optik fuer "erwartet" waere eine zweite Aussage.
+     * Was fehlt, ist die Handlung: verbucht wird im Abo ("Als verlaengert
+     * markieren"), also fuehrt die Zeile dorthin, statt einen Dialog zu
+     * oeffnen, in dem sich nichts aendern liesse. */
+    const fromSubscription = e.expected === true && e.subscription_id != null;
+    const confirmBtn = pending && !ro && !fromSubscription
       ? `<button class="row-action" data-action="confirm" data-id="${e.id}" aria-label="${esc(t('budget.confirmAction'))}: ${esc(e.title)}">
           <i data-lucide="check" class="icon-md" aria-hidden="true"></i>
         </button>`
@@ -2168,11 +2193,16 @@ function entryRows(list, { fullDate = false, rowClass = '' } = {}) {
      * Bei `budget: read` bleibt die Zeile ein Knopf, oeffnet aber die
      * LESEANSICHT (openBudgetModal verzweigt, P1-Muster). Deshalb verspricht
      * sein Name dort kein „bearbeiten": Titel und Betrag, nichts weiter. */
-    const rowInteraction = masked ? '' : `data-id="${e.id}"`;
+    const rowInteraction = masked ? ''
+      : fromSubscription ? `data-open-subscription="${Number(e.subscription_id)}"`
+        : `data-id="${e.id}"`;
+    const titleAction = fromSubscription
+      ? `${esc(t('budget.expectedSubscriptionOpen'))}: `
+      : (ro ? '' : `${esc(t('budget.editEntry'))}: `);
     const titleCell = masked
       ? `<div class="list-row__name budget-entry__title">${esc(displayTitle)}${sharedBadge}${maskedBadge}${pendingBadge}</div>`
       : `<button class="list-row__name budget-entry__title" type="button"
-           aria-label="${ro ? '' : `${esc(t('budget.editEntry'))}: `}${esc(e.title)}, ${amountText}">${esc(displayTitle)}${sharedBadge}${maskedBadge}${pendingBadge}</button>`;
+           aria-label="${titleAction}${esc(e.title)}, ${amountText}">${esc(displayTitle)}${sharedBadge}${maskedBadge}${pendingBadge}</button>`;
     // ZUSTAENDIGE (#1057) als Avatar-Stapel in der Metazeile - dieselbe Sprache,
     // die Kalender und Aufgaben fuer "wer gehoert dazu" schon sprechen. Bei
     // einer maskierten Buchung faellt er weg: deren Zweck bleibt verborgen, und
@@ -3326,6 +3356,9 @@ function openCategoryManager() {
           { key: 'income',  labelKey: 'budget.income',   addLabelKey: 'budget.addCategory', subcategories: true },
         ],
         supportsSubcategories: true,
+        // Die Route uebersetzt die eingebauten Kategorien selbst und braucht
+        // dafuer die Sprache dieser Oberflaeche (#1859).
+        localizedLabels: true,
         labelResolver: (item) => item.label ?? budgetCategoryLabel(item.key, item.name, t),
         titleKey: 'budget.manageCategories',
         hintKey: 'category.manageHint',
