@@ -164,6 +164,45 @@ function liesWithin(url, calendarUrls) {
   return false;
 }
 
+/** Dieselbe Adresse, gleich ob der Server `@` als `%40` zurückgibt. */
+function sameAddress(a, b) {
+  if (a === b) return true;
+  const parts = (value) => {
+    try {
+      const parsed = new URL(value);
+      return `${parsed.origin}${decodeURIComponent(parsed.pathname)}`;
+    } catch { return null; }
+  };
+  const left = parts(a);
+  return left !== null && left === parts(b);
+}
+
+/**
+ * Das Objekt aus dem Index dieses Laufs, das zu einer Vormerkung gehört.
+ *
+ * Der Index führt UID → Objekt, und das genügt, solange eine UID einmal
+ * vorkommt. Liegt sie in zwei Kalendern - die Kopie eines Umzugs neben der
+ * Quelle, die ihr Löschen abgelehnt hat (#1861) -, steht unter der UID nur
+ * eines davon. Ein DELETE oder PUT mit dem etag des ANDEREN Objekts scheitert
+ * an 412, und zwar bei jedem Versuch.
+ *
+ * Kennt die Vormerkung ihre Adresse, zählt deshalb nur das Objekt an genau
+ * dieser Adresse; sonst das in ihrem Kalender. `null` heisst: dieser Lauf hat
+ * es nicht gesehen. Der Sync-Lauf legt alle Objekte zusätzlich unter
+ * `objectIndex.byUrl` ab; ein schlichter Map (Sofortversuch, Apple) kennt nur
+ * das eine je UID.
+ */
+function objectOf(objectIndex, uid, { url = null, calendarUrl = null } = {}) {
+  const first = objectIndex.get(uid) ?? null;
+  const all = () => [...(objectIndex.byUrl?.values() ?? [])];
+  if (url) {
+    if (first?.url && sameAddress(first.url, url)) return first;
+    return all().find((o) => sameAddress(o.url, url)) ?? null;
+  }
+  if (!first || !calendarUrl || !first.calendarUrl || first.calendarUrl === calendarUrl) return first;
+  return all().find((o) => o.uid === uid && o.calendarUrl === calendarUrl) ?? null;
+}
+
 /**
  * Gehört diese Vormerkung zu dem Konto, dessen Client gerade arbeitet (#1860)?
  *
@@ -313,7 +352,9 @@ export async function processPendingDeletions(client, source, objectIndex, ownCa
     // Die Löschung eines anderen Kontos: dessen Lauf übernimmt.
     if (!belongsToAccount(row.object_url, row.calendar_external_id || null, accountCalendarUrls)) continue;
 
-    const known = objectIndex.get(row.event_external_id);
+    const known = objectOf(objectIndex, row.event_external_id, {
+      url: row.object_url, calendarUrl: row.calendar_external_id || null,
+    });
     const url   = row.object_url || known?.url || null;
 
     if (!url) {
@@ -367,7 +408,11 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
       event.external_object_url, outbound.calendarExternalId(event), accountCalendarUrls
     )) continue;
 
-    const known = objectIndex.get(event.external_calendar_id);
+    // Das Objekt an der Adresse der Zeile. Hat der Lauf dort keines gesehen
+    // (auf dem Server verschoben), bleibt es beim Objekt unter der UID wie
+    // bisher: der PUT auf die alte Adresse meldet dann selbst, was dort ist.
+    const known = objectOf(objectIndex, event.external_calendar_id, { url: event.external_object_url })
+      ?? objectIndex.get(event.external_calendar_id);
     const url   = event.external_object_url || known?.url || null;
 
     // Weder gespeichert noch im aktuellen Abruf enthalten: das Objekt gehört zu
@@ -433,21 +478,42 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
           }
           // Erst nach erfolgreichem Anlegen löschen: scheitert das Löschen, steht
           // der Termin doppelt - das ist reparabel. Umgekehrt wäre er weg.
+          let sourceRefusal = null;
           try {
             await client.deleteCalendarObject({ calendarObject: { url, etag: known.etag } });
           } catch (err) {
             // Eine Absage kommt seit dem Wrapper in caldav-client.js hier an.
             // 404/410 heisst: die Quelle ist schon weg, der Umzug ist vollzogen.
-            if (outbound.classifyOutboundError(err) !== 'settled') {
-              log.error(`[${label(source)}] Event ${event.id} was copied to ${moveTo} but could not be removed from its old calendar:`, err.message);
-            }
+            if (outbound.classifyOutboundError(err) !== 'settled') sourceRefusal = err;
           }
           // Während der beiden awaits lokal entfernt. Hat der Nutzer gelöscht, gilt
           // der Tombstone der Route nur der Quelle; die Kopie im Ziel bliebe stehen,
           // und der nächste Lauf importierte den Termin von dort neu. Ein Aufräumen
           // dagegen soll den Anbieter nicht anfassen - siehe deletedByUser.
-          if (!outbound.reloadEvent(event.id)) {
-            if (deletedByUser(source, event.external_calendar_id, url, known.calendarUrl)) {
+          //
+          // Gelesen VOR der Vormerkung darunter: die legt selbst einen Tombstone
+          // für die Quelle an, und an genau dem erkennt deletedByUser den Nutzer.
+          const stillThere    = !!outbound.reloadEvent(event.id);
+          const userDeletedIt = !stillThere
+            && deletedByUser(source, event.external_calendar_id, url, known.calendarUrl);
+
+          // Die Quelle hat ihr Löschen abgelehnt (#1861). Die Kopie liegt im
+          // Ziel, der Umzug ist also zur Hälfte vollzogen - und galt bisher als
+          // ganz: niemand versuchte es wieder, der Termin lag für immer in
+          // beiden Kalendern. Das offene Löschen wird vorgemerkt wie jedes
+          // andere und läuft mit denselben Versuchen; der Abruf verdeckt dafür
+          // nur das Objekt in der Quelle, nicht die Kopie (pendingDeletionGuard).
+          // Hat der Nutzer gelöscht, steht die Vormerkung der Route schon.
+          if (sourceRefusal && !userDeletedIt) {
+            outbound.queueRefusedDeletion({
+              source, calendarExternalId: known.calendarUrl,
+              eventExternalId: event.external_calendar_id, objectUrl: url,
+            }, sourceRefusal);
+            log.warn(`[${label(source)}] Event ${event.id} was copied to ${moveTo} but could not be removed from its old calendar (${sourceRefusal.message}); the removal is tried again.`);
+          }
+
+          if (!stillThere) {
+            if (userDeletedIt) {
               outbound.queueDeletion({
                 source, calendarExternalId: moveTo, eventExternalId: event.external_calendar_id, objectUrl,
               });
@@ -456,6 +522,12 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
             continue;
           }
           applyMove(event.id, source, moveTo, destCal, objectUrl);
+          // Das Objekt im Ziel ist ab jetzt das gewollte. Wartet dort noch das
+          // Löschen aus einem früheren Umzug in die Gegenrichtung, träfe es
+          // sonst genau dieses Objekt - und der Termin wäre überall weg.
+          outbound.dropDeletionsIn({
+            source, calendarExternalId: moveTo, eventExternalId: event.external_calendar_id,
+          });
           outbound.settleOutbound(fresh, moveTo);
           done++;
           continue; // der Patch ist mit dem Anlegen bereits geschrieben

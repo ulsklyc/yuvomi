@@ -465,6 +465,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   account. Each account keeps its own entry, and an edit or a deletion made in Yuvomi goes to the
   calendar that entry belongs to. Where two events were merged before the update, the next sync
   shows the one that lost its entry again as an entry of its own.
+- **Moving an event to another CalDAV calendar no longer leaves it in both** (#1861). A move
+  stores the event in the new calendar and then removes it from the old one. When the server
+  stored the copy but refused the removal - an old calendar that is shared read-only, or a server
+  that was briefly overloaded - Yuvomi booked the move as done and never tried again: every other
+  app on that account showed the event twice from then on, and in Yuvomi it could jump back to
+  its old calendar. The refused removal is now remembered and tried again with every sync, up to
+  five times like any other refused deletion, and until then Yuvomi shows the event once, in the
+  calendar you moved it to. After the fifth refusal Yuvomi gives up, and the event stays in both
+  calendars until you remove one copy yourself. Events that were left doubled before the update
+  are not cleaned up.
 
 ## [2.75.0] - 2026-10-07
 

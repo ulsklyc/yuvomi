@@ -144,6 +144,72 @@ export function pendingDeletionUids(source) {
   }
 }
 
+/**
+ * Dieselbe Frage wie `pendingDeletionUids`, aber je Objekt statt je UID: steht
+ * für DIESES Objekt eine Löschung aus?
+ *
+ * Eine UID allein sagt das nicht. Derselbe Termin kann in zwei Kalendern
+ * liegen - nach einem Umzug, dessen Quelle das Löschen abgelehnt hat (#1861),
+ * oder mit derselben UID in einem zweiten Konto (#1860). Die Vormerkung gilt
+ * dann genau einem der beiden Objekte; über die UID verdeckte sie auch das
+ * andere, und dessen Zeile fiele beim Abruf als "auf dem Server gelöscht" weg.
+ *
+ * Eine Vormerkung nennt ihren Kalender. Nur wo er fehlt (Bestand mit nichts
+ * als der Objektadresse), entscheidet die Adresse - und was sich so nicht
+ * zuordnen lässt, bleibt verdeckt: lieber eine Runde zu lang verborgen als
+ * ein gelöschter Termin, der zurückkommt.
+ *
+ * @returns {(uid: string, calendarUrl: string, objectUrl?: string|null) => boolean}
+ */
+export function pendingDeletionGuard(source) {
+  let rows;
+  try {
+    rows = db.get().prepare(`
+      SELECT event_external_id, calendar_external_id, object_url
+      FROM calendar_pending_deletions WHERE source = ?
+    `).all(source);
+  } catch (err) {
+    log.warn(`Pending deletions are not readable (${err.message}); treating them as none.`);
+    return () => false;
+  }
+  const byUid = new Map();
+  for (const row of rows) {
+    if (!byUid.has(row.event_external_id)) byUid.set(row.event_external_id, []);
+    byUid.get(row.event_external_id).push(row);
+  }
+  const trim = (url) => String(url || '').replace(/\/+$/, '');
+  return (uid, calendarUrl, objectUrl = null) => (byUid.get(uid) || []).some((row) => {
+    if (row.calendar_external_id) return row.calendar_external_id === calendarUrl;
+    if (!row.object_url || !objectUrl) return true;
+    return row.object_url === objectUrl || trim(collectionUrlOf(row.object_url)) === trim(calendarUrl);
+  });
+}
+
+/**
+ * Merkt eine Löschung vor, deren erster Versuch gerade abgelehnt wurde - der
+ * Versuch zählt mit, wie bei jeder anderen abgelehnten Löschung.
+ */
+export function queueRefusedDeletion(target, err) {
+  if (!queueDeletion(target)) return false;
+  db.get().prepare(`
+    UPDATE calendar_pending_deletions SET attempts = attempts + 1, last_error = ?
+    WHERE source = ? AND calendar_external_id = ? AND event_external_id = ?
+  `).run(String(err?.message || err).slice(0, 500), target.source, target.calendarExternalId || '', target.eventExternalId);
+  return true;
+}
+
+/**
+ * Nimmt die Vormerkungen für das Objekt eines Termins in EINEM Kalender zurück:
+ * der Termin ist gerade dorthin gezogen, sein Objekt dort ist also gewollt.
+ */
+export function dropDeletionsIn({ source, calendarExternalId, eventExternalId }) {
+  if (!source || !calendarExternalId || !eventExternalId) return 0;
+  return db.get().prepare(`
+    DELETE FROM calendar_pending_deletions
+    WHERE source = ? AND calendar_external_id = ? AND event_external_id = ?
+  `).run(source, calendarExternalId, eventExternalId).changes;
+}
+
 export function dropDeletion(id) {
   db.get().prepare('DELETE FROM calendar_pending_deletions WHERE id = ?').run(id);
 }

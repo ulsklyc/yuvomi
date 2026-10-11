@@ -863,8 +863,10 @@ async function runSync({ createClient } = {}) {
     LIMIT 1
   `);
   const existingEventOf = (accountId, uid) => selExistingEvent.get(accountId, uid, accountId);
-  // Offene Löschungen einmal je Lauf, nicht je eingehendem Termin.
-  const pendingDeletionUids = outbound.pendingDeletionUids('caldav');
+  // Offene Löschungen einmal je Lauf, nicht je eingehendem Termin. Je Objekt,
+  // nicht je UID: dieselbe UID kann in einem zweiten Kalender liegen, der
+  // nicht gemeint ist (#1861, #1860).
+  const isPendingDeletion = outbound.pendingDeletionGuard('caldav');
   // Der Vergleich in der WHERE-Klausel hält das Statement von Schreibvorgängen
   // ab, die nichts ändern: ohne ihn meldet SQLite auch bei identischen Werten
   // changes = 1, sodass sich ein Tick über einen unveränderten Kalender nicht
@@ -1030,6 +1032,9 @@ async function runSync({ createClient } = {}) {
       // UID → das Kalenderobjekt, in dem sie steht (#593). Ausgehende Löschungen
       // brauchen dessen URL, Änderungen zusätzlich seinen Originalinhalt.
       const objectIndex   = new Map();
+      // Daneben JEDES Objekt des Laufs unter seiner Adresse: dieselbe UID kann
+      // in zwei Kalendern liegen, und unter der UID steht dann nur eines.
+      objectIndex.byUrl   = new Map();
       const calendarsByUrl = new Map();
       const ownCalendarUrls = new Set();
 
@@ -1106,12 +1111,17 @@ async function runSync({ createClient } = {}) {
             try {
               calendarUids.add(ev.uid);
               accountUids.add(ev.uid);
+              // Vom Nutzer gelöscht und noch nicht auf dem Server (#593) - oder
+              // die Quelle eines Umzugs, die ihr Löschen abgelehnt hat (#1861).
+              const awaitsDeletion = isPendingDeletion(ev.uid, selCal.calendar_url, obj.url);
               // Objekt merken: ausgehende Löschungen brauchen die URL, Änderungen
               // zusätzlich den Originalinhalt zum Patchen (#593).
               if (obj.url) {
-                objectIndex.set(ev.uid, {
-                  url: obj.url, etag: obj.etag, data: obj.data, calendarUrl: selCal.calendar_url,
-                });
+                const entry = {
+                  uid: ev.uid, url: obj.url, etag: obj.etag, data: obj.data, calendarUrl: selCal.calendar_url,
+                };
+                objectIndex.set(ev.uid, entry);
+                objectIndex.byUrl.set(obj.url, entry);
               }
               // NUR die Eigenfarbe des Termins (RFC 7986 COLOR). Die Kalenderfarbe
               // gehoert NICHT hierher: sie ist geerbt, gilt fuer jeden Termin des
@@ -1122,9 +1132,9 @@ async function runSync({ createClient } = {}) {
               // cal_color ueber calendar_ref_id, wo sie als geerbt erkennbar ist.
               const evColor = ev.color ?? null;
 
-              // Vom Nutzer gelöscht und noch nicht auf dem Server: nicht wieder
-              // anlegen, sonst kehrt der Termin bei jedem Sync zurück (#593).
-              if (pendingDeletionUids.has(ev.uid)) continue;
+              // Nicht wieder anlegen, sonst kehrt der Termin bei jedem Sync
+              // zurück (#593).
+              if (awaitsDeletion) continue;
 
               let existing = existingEventOf(account.id, ev.uid);
 

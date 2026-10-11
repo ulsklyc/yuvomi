@@ -246,6 +246,25 @@ test('zwei Konten mit je einer wartenden Löschung: jede läuft in ihrem eigenen
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_pending_deletions').get().n, 0);
 });
 
+test('eine wartende Löschung in einem Konto verdeckt den Termin mit derselben UID im anderen nicht', async () => {
+  const accounts = twoAccounts();
+  // In Konto A gelöscht, und dessen Server nimmt das Löschen gerade nicht an.
+  db.prepare(`
+    INSERT INTO calendar_pending_deletions (source, calendar_external_id, event_external_id, object_url)
+    VALUES ('caldav', ?, ?, ?)
+  `).run(accounts.a.url, UID, accounts.a.objectUrl);
+  accounts.a.dav.refuse({ method: 'DELETE', status: 503 });
+
+  await caldavSync.sync();
+
+  const { rows, of } = rowsByCalendar();
+  assert.equal(of(accounts.a), undefined, 'der in Konto A gelöschte Termin ist zurück');
+  assert.equal(rows.length, 1, 'der Termin aus Konto B wurde hinter der Löschung in Konto A verborgen');
+  assert.equal(of(accounts.b).title, 'Aus B');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_pending_deletions').get().n, 1);
+  assertRequestsStayWithTheirAccount(accounts);
+});
+
 // ── Bestand ─────────────────────────────────────────────────────────────────────
 
 test('Bestandszeile ohne Kalenderbezug: der Abruf findet sie weiter über die UID', async () => {
