@@ -9,6 +9,14 @@
 // wird über SEINE eigene URL angefasst. Die URL steht seit Migration v106 in
 // calendar_events.external_object_url; für Termine, die davor synchronisiert
 // wurden, löst der laufende Sync sie über die UID der gerade geholten Objekte auf.
+//
+// EIN KONTO JE AUFRUF (#1860). Der generische Sync führt mehrere Konten, und
+// jeder Durchgang hier arbeitet mit dem Client genau eines davon. Er bekommt
+// deshalb das Konto genannt (`accountId`) und sieht nur dessen Zeilen und
+// Löschaufträge. Welches Objekt gemeint ist, sagt dann der Abruf DIESES Kontos
+// (`ObjectIndex`), und die Anfrage geht an die Adresse, die dieser Abruf
+// genannt hat. Apple kennt kein Konto: ohne `accountId` gilt für beides der
+// Stand von vorher.
 // --------------------------------------------------------
 
 import { createLogger } from '../logger.js';
@@ -21,10 +29,74 @@ import { nearestIcalColorName } from '../utils/ical-color.js';
 import { outboundEvent } from './outbound-dtstart.js';
 import { findObjectWithUid } from '../utils/own-uid.js';
 import { upsertExternalCalendar } from './external-calendars.js';
+import { isOriginRefusal } from '../utils/caldav-client.js';
 
 const log = createLogger('CalDAVOutbound');
 
 const label = (source) => (source === 'apple' ? 'Apple' : 'CalDAV');
+
+/**
+ * Die Kalenderobjekte, die ein Konto in EINEM Lauf geliefert hat.
+ *
+ * Nach aussen eine Map UID → { url, etag, data, calendarUrl }, wie bisher. Sie
+ * merkt sich zusätzlich, an welcher Adresse und in welchem Kalender jedes
+ * Objekt lag: dieselbe UID kann während eines Umzugs kurz in zwei Kalendern
+ * eines Kontos stehen, und die Map allein behielte nur das zuletzt gesehene.
+ */
+export class ObjectIndex extends Map {
+  #byUrl = new Map();
+  #byCalendarUid = new Map();
+
+  static #key(calendarUrl, uid) { return `${calendarUrl}\n${uid}`; }
+
+  /** Eine fertige Map (Apple, Sofortversuch) als Index lesen. */
+  static from(entries) {
+    if (entries instanceof ObjectIndex) return entries;
+    const index = new ObjectIndex();
+    for (const [uid, entry] of entries ?? []) index.set(uid, entry);
+    return index;
+  }
+
+  set(uid, entry) {
+    super.set(uid, entry);
+    if (entry?.url) {
+      const known = this.#byUrl.get(entry.url);
+      // Ein Objekt führt eine UID; trägt es mehrere, gilt für die Adresse die erste.
+      if (!known || known.uid === null) this.#byUrl.set(entry.url, { uid, entry });
+    }
+    if (entry?.calendarUrl) this.#byCalendarUid.set(ObjectIndex.#key(entry.calendarUrl, uid), entry);
+    return this;
+  }
+
+  /** Ein Objekt, aus dem sich kein Termin lesen liess: bekannt ist nur seine Adresse. */
+  noteObject(entry) {
+    if (entry?.url && !this.#byUrl.has(entry.url)) this.#byUrl.set(entry.url, { uid: null, entry });
+  }
+
+  /**
+   * Das Objekt zu einer Zeile oder einem Löschauftrag, in dieser Reihenfolge:
+   *   1. an genau der gespeicherten Adresse (wörtlich gleich), sofern dort
+   *      diese UID liegt;
+   *   2. mit dieser UID im Kalender der Zeile;
+   *   3. mit dieser UID irgendwo im Konto (`anywhere`).
+   *
+   * @param {object}  wanted
+   * @param {string}  wanted.uid
+   * @param {string}  [wanted.url]         gespeicherte Objektadresse
+   * @param {string}  [wanted.calendarUrl] Kalender, in dem die Zeile liegt
+   * @param {boolean} [wanted.anywhere]    Stufe 3 zulassen
+   * @param {boolean} [wanted.unparsed]    an der Adresse auch ein Objekt ohne
+   *                                       lesbaren Termin gelten lassen
+   * @returns {object|null} { url, etag, data, calendarUrl }
+   */
+  find({ uid, url = null, calendarUrl = null, anywhere = true, unparsed = false }) {
+    const atAddress = url ? this.#byUrl.get(url) : null;
+    if (atAddress && (atAddress.uid === uid || (unparsed && atAddress.uid === null))) return atAddress.entry;
+    const inCalendar = calendarUrl ? this.#byCalendarUid.get(ObjectIndex.#key(calendarUrl, uid)) : null;
+    if (inCalendar) return inCalendar;
+    return anywhere ? (this.get(uid) ?? null) : null;
+  }
+}
 
 /**
  * Zieht die Zeile nach einem Umzug auf den Zielkalender und das dort angelegte
@@ -40,11 +112,17 @@ const label = (source) => (source === 'apple' ? 'Apple' : 'CalDAV');
  * Inbound schreibt: der Helfer überschreibt beide, und ein null hätte die Farbe
  * einer bestehenden Kalenderzeile bis dahin gelöscht.
  */
-function applyMove(eventId, source, calendarUrl, destCal, objectUrl) {
+function applyMove(eventId, source, calendarUrl, destCal, objectUrl, accountId = null) {
   const conn = db.get();
-  const selected = conn.prepare(
-    'SELECT calendar_name, calendar_color FROM caldav_calendar_selection WHERE calendar_url = ? LIMIT 1'
-  ).get(calendarUrl);
+  // Zwei Konten können dieselbe Kalender-URL führen, mit eigenem Namen und
+  // eigener Farbe: gelesen wird die Auswahl des Kontos, das umgezogen hat.
+  const selected = accountId == null
+    ? conn.prepare(
+      'SELECT calendar_name, calendar_color FROM caldav_calendar_selection WHERE calendar_url = ? LIMIT 1'
+    ).get(calendarUrl)
+    : conn.prepare(
+      'SELECT calendar_name, calendar_color FROM caldav_calendar_selection WHERE account_id = ? AND calendar_url = ?'
+    ).get(accountId, calendarUrl);
   const known = selected ? null : conn.prepare(
     'SELECT name, color FROM external_calendars WHERE source = ? AND external_id = ?'
   ).get(source, calendarUrl);
@@ -75,12 +153,15 @@ function applyMove(eventId, source, calendarUrl, destCal, objectUrl) {
  * bevor der Umzug hier ankommt, und die Kopie im Ziel bliebe stehen, bis der
  * nächste Inbound-Lauf den gelöschten Termin von dort neu importiert.
  */
-function deletedByUser(source, uid, sourceObjectUrl, sourceCalendarUrl) {
+function deletedByUser(source, uid, sourceObjectUrl, sourceCalendarUrl, accountId = null) {
+  // Der Tombstone der Route trägt das Konto der gelöschten Zeile; der eines
+  // anderen Kontos mit derselben UID meint einen anderen Termin.
+  const ofAccount = accountId == null ? '' : ' AND caldav_account_id = ?';
   return !!db.get().prepare(`
     SELECT 1 FROM calendar_pending_deletions
-    WHERE source = ? AND event_external_id = ?
+    WHERE source = ? AND event_external_id = ?${ofAccount}
       AND (object_url = ? OR (object_url IS NULL AND calendar_external_id = ?))
-  `).get(source, uid, sourceObjectUrl, sourceCalendarUrl);
+  `).get(source, uid, ...(accountId == null ? [] : [accountId]), sourceObjectUrl, sourceCalendarUrl);
 }
 
 /**
@@ -204,9 +285,13 @@ export async function fetchObjectsByUrl(client, wanted) {
  * das Originalobjekt; ein Umzug zusätzlich die Kalenderliste.
  *
  * Was hier nicht klappt, bleibt vorgemerkt und läuft im nächsten Sync mit.
+ *
+ * `accountId`: bei CalDAV das Konto, mit dessen Client gearbeitet wird. Die
+ * Arbeit wird unten je Konto neu gelesen; ohne es ginge für 'caldav' nichts
+ * hinaus.
  * @returns {Promise<{deleted:number,updated:number}>}
  */
-export async function flushAccount(client, source, { deletions, updates, needsCalendars }) {
+export async function flushAccount(client, source, { deletions, updates, needsCalendars, accountId = null }) {
   const wanted = updates
     .filter((e) => e.external_object_url)
     .map((e) => ({
@@ -237,32 +322,59 @@ export async function flushAccount(client, source, { deletions, updates, needsCa
   // ownCalendarUrls bewusst nicht gesetzt: ohne vollen Abruf ist "der Server
   // führt das Objekt nicht mehr" nicht belegbar, und ein Tombstone ohne bekannte
   // URL darf hier nicht als erledigt gelten. Er bleibt für den Sync liegen.
-  const deleted = deletions.length ? await processPendingDeletions(client, source, objectIndex) : 0;
-  const updated = objectIndex.size ? await processPendingUpdates(client, source, objectIndex, calendarsByUrl) : 0;
+  const deleted = deletions.length ? await processPendingDeletions(client, source, objectIndex, null, { accountId }) : 0;
+  const updated = objectIndex.size ? await processPendingUpdates(client, source, objectIndex, calendarsByUrl, { accountId }) : 0;
   return { deleted, updated };
 }
 
 /**
  * Arbeitet vorgemerkte Löschungen auf einem CalDAV-Server ab.
+ *
+ * MIT KONTO (CalDAV) sagt im Sync-Lauf der Abruf dieses Kontos, wo das Objekt
+ * liegt, und dorthin geht die Anfrage - nicht an die gespeicherte Adresse. Ein
+ * Auftrag ohne Kalender wird als Letztes über seine UID im Konto gesucht. Der
+ * Sofortversuch hat keinen Abruf und sendet an die gespeicherte Adresse; liegt
+ * sie nicht auf dem Server des Kontos, stellt der Client die Anfrage nicht,
+ * und der Auftrag wartet ohne gezählten Versuch auf den Lauf.
+ *
  * @param {object} client       tsdav-Client
  * @param {string} source       'caldav' | 'apple'
  * @param {Map}    objectIndex  UID → { url, etag, data, calendarUrl } aus dem Inbound dieses Laufs
- * @param {Set}    [ownCalendarUrls] Kalender dieses Accounts; fremde Tombstones bleiben unangetastet
+ * @param {Set}    [ownCalendarUrls] die in diesem Lauf abgerufenen Kalender; nur beim vollen Abruf gesetzt
+ * @param {object} [scope]
+ * @param {number} [scope.accountId] CalDAV-Konto, dem der Client gehört
+ * @param {boolean} [scope.complete] jeder eingeschaltete Kalender des Kontos wurde abgerufen
  * @returns {Promise<number>} erledigte Tombstones
  */
-export async function processPendingDeletions(client, source, objectIndex, ownCalendarUrls = null) {
-  const rows = outbound.pendingDeletions(source);
+export async function processPendingDeletions(client, source, objectIndex, ownCalendarUrls = null, { accountId = null, complete = true } = {}) {
+  const rows = outbound.pendingDeletions(source, { accountId });
   if (rows.length === 0) return 0;
+
+  const index = accountId == null ? null : ObjectIndex.from(objectIndex);
 
   let done = 0;
   for (const row of rows) {
-    // Mehrere Accounts teilen sich die Tombstone-Tabelle: nur anfassen, was zu den
-    // gerade abgerufenen Kalendern gehört, sonst zählt ein fremder Account fremde
-    // Fehlversuche hoch und verwirft am Ende eine fremde Löschung.
+    // Nur anfassen, was zu den gerade abgerufenen Kalendern gehört: der Kalender
+    // dieses Auftrags wurde in diesem Lauf nicht gelesen (abgewählt, Abruf
+    // gescheitert), also weiss niemand, ob sein Objekt noch dort liegt.
     if (ownCalendarUrls && row.calendar_external_id && !ownCalendarUrls.has(row.calendar_external_id)) continue;
 
-    const known = objectIndex.get(row.event_external_id);
-    const url   = row.object_url || known?.url || null;
+    let known;
+    let url;
+    if (index) {
+      known = index.find({
+        uid: row.event_external_id, url: row.object_url,
+        calendarUrl: row.calendar_external_id || null,
+        anywhere: !row.calendar_external_id, unparsed: true,
+      });
+      url = ownCalendarUrls ? (known?.url ?? null) : (row.object_url || null);
+      // Ohne Kalender am Auftrag belegt nur ein vollständiger Abruf, dass das
+      // Objekt fort ist.
+      if (!url && ownCalendarUrls && !row.calendar_external_id && !complete) continue;
+    } else {
+      known = objectIndex.get(row.event_external_id);
+      url   = row.object_url || known?.url || null;
+    }
 
     if (!url) {
       // Zuständig, aber der Server liefert das Objekt nicht mehr aus: dann ist es
@@ -280,6 +392,11 @@ export async function processPendingDeletions(client, source, objectIndex, ownCa
       outbound.dropDeletion(row.id);
       done++;
     } catch (err) {
+      if (isOriginRefusal(err)) {
+        // Nichts wurde gesendet. Der Lauf findet das Objekt über seinen Abruf.
+        log.warn(`[${label(source)}] The stored address of event ${row.event_external_id} is not on the server of its account, leaving its deletion to the next sync run.`);
+        continue;
+      }
       if (outbound.handleDeletionError(err, row, label(source))
           && outbound.classifyOutboundError(err) === 'settled') {
         done++;
@@ -293,13 +410,26 @@ export async function processPendingDeletions(client, source, objectIndex, ownCa
  * Schiebt lokal bearbeitete, bereits synchronisierte Termine zum Server.
  * Ein Wechsel des Zielkalenders wird als Anlegen im Ziel + Löschen in der Quelle
  * ausgeführt: CalDAV kennt kein Verschieben.
+ *
+ * MIT KONTO (CalDAV) sagt der Abruf dieses Kontos, welches Objekt gemeint ist
+ * (`ObjectIndex.find`), und die Anfrage geht an DESSEN Adresse. Die
+ * gespeicherte Adresse wählt nur aus; weicht sie ab, wird sie nach dem Senden
+ * nachgezogen.
+ *
  * @param {Map|null} [calendarsByUrl] Kalender-URL → Collection; `null`, wenn die
  *                                    Auflistung gescheitert ist (Umzüge warten dann)
+ * @param {object} [scope]
+ * @param {number} [scope.accountId] CalDAV-Konto, dem der Client gehört
  * @returns {Promise<number>} erfolgreich verarbeitete Termine
  */
-export async function processPendingUpdates(client, source, objectIndex, calendarsByUrl = null) {
-  const events = outbound.pendingUpdates(source);
+export async function processPendingUpdates(client, source, objectIndex, calendarsByUrl = null, { accountId = null } = {}) {
+  const events = outbound.pendingUpdates(source, { accountId });
   if (events.length === 0) return 0;
+
+  const index = accountId == null ? null : ObjectIndex.from(objectIndex);
+  const calendarOfRow = index ? db.get().prepare(
+    'SELECT external_id FROM external_calendars WHERE id = ? AND source = ?'
+  ) : null;
 
   // Einmal je Lauf, nicht je Termin: die Zone steht in sync_config und aendert
   // sich waehrend eines Sync-Durchlaufs nicht.
@@ -307,12 +437,27 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
 
   let done = 0;
   for (const event of events) {
-    const known = objectIndex.get(event.external_calendar_id);
-    const url   = event.external_object_url || known?.url || null;
+    let known;
+    let url;
+    if (index) {
+      known = index.find({
+        uid: event.external_calendar_id, url: event.external_object_url,
+        calendarUrl: event.calendar_ref_id
+          ? (calendarOfRow.get(event.calendar_ref_id, source)?.external_id ?? null)
+          : null,
+      });
+      url = known?.url ?? null;
+    } else {
+      known = objectIndex.get(event.external_calendar_id);
+      url   = event.external_object_url || known?.url || null;
+    }
 
-    // Weder gespeichert noch im aktuellen Abruf enthalten: das Objekt gehört zu
-    // einem anderen Account. Nichts tun, nichts verwerfen - dessen Lauf übernimmt.
-    if (!url) continue;
+    // Weder gespeichert noch im aktuellen Abruf enthalten: in diesem Lauf gibt
+    // es keinen Weg zum Objekt. Nichts tun, nichts verwerfen.
+    if (!url) {
+      if (index) log.warn(`[${label(source)}] No source object for event ${event.id} in this run, deferring its update.`);
+      continue;
+    }
 
     if (!known?.data) {
       // Ohne das Originalobjekt bliebe nur, es neu zu bauen - und das verlöre
@@ -387,15 +532,15 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
           // und der nächste Lauf importierte den Termin von dort neu. Ein Aufräumen
           // dagegen soll den Anbieter nicht anfassen - siehe deletedByUser.
           if (!outbound.reloadEvent(event.id)) {
-            if (deletedByUser(source, event.external_calendar_id, url, known.calendarUrl)) {
+            if (deletedByUser(source, event.external_calendar_id, event.external_object_url || url, known.calendarUrl, accountId)) {
               outbound.queueDeletion({
-                source, calendarExternalId: moveTo, eventExternalId: event.external_calendar_id, objectUrl,
+                source, calendarExternalId: moveTo, eventExternalId: event.external_calendar_id, objectUrl, accountId,
               });
               log.warn(`[${label(source)}] Event ${event.id} was deleted during its move, queued the deletion of its copy in ${moveTo}.`);
             }
             continue;
           }
-          applyMove(event.id, source, moveTo, destCal, objectUrl);
+          applyMove(event.id, source, moveTo, destCal, objectUrl, accountId);
           outbound.settleOutbound(fresh, moveTo);
           done++;
           continue; // der Patch ist mit dem Anlegen bereits geschrieben
@@ -422,6 +567,9 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
       await client.updateCalendarObject({
         calendarObject: { url, etag: known.etag, data: patched },
       });
+      // Die Adresse kam aus dem Abruf; die Zeile merkt sich die, an der ihr
+      // Objekt wirklich liegt.
+      if (index && url !== event.external_object_url) outbound.recordObjectUrl(event.id, url);
       outbound.settleOutbound(fresh);
       done++;
     } catch (err) {

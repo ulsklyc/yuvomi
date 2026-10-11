@@ -169,9 +169,9 @@ const WAYS = {
       return Number(db.prepare(`
         INSERT INTO calendar_events
           (title, start_datetime, end_datetime, all_day, created_by, external_source,
-           external_calendar_id, calendar_ref_id, external_object_url)
-        VALUES (?, '2035-03-10T09:00Z', '2035-03-10T10:00Z', 0, 1, 'caldav', ?, ?, ?)
-      `).run(title, uid, this.refId, objectUrl).lastInsertRowid);
+           external_calendar_id, calendar_ref_id, external_object_url, caldav_account_id)
+        VALUES (?, '2035-03-10T09:00Z', '2035-03-10T10:00Z', 0, 1, 'caldav', ?, ?, ?, ?)
+      `).run(title, uid, this.refId, objectUrl, accountId).lastInsertRowid);
     },
     upload: () => caldavSync.sync(),
     async blindUpload() {
@@ -708,7 +708,7 @@ for (const [label, way] of Object.entries(WAYS)) {
     const SYNC_COLUMNS = [
       'external_source', 'external_uid', 'external_calendar_id', 'external_account_id', 'external_object_url',
       'calendar_ref_id', 'outbound_dirty', 'outbound_attempts', 'target_caldav_account_id', 'target_caldav_list_url',
-      'color_modified',
+      'color_modified', 'caldav_account_id',
     ];
     for (const column of SYNC_COLUMNS) { delete before[column]; delete after[column]; }
     assert.deepEqual(after, before, 'der Inhalt vom Server hat lokale Felder überschrieben');
@@ -877,7 +877,7 @@ test('adoptOwnEventUpload: nur lokal, nur wenn der Aufrufer das Warten bestätig
   const uid = ownUid('event', id, db);
   const asked = [];
   const good = {
-    source: 'caldav', uid, objectUrl: `${cal}${uid}.ics`, calendarUrl: cal, calRefId: way.refId,
+    source: 'caldav', uid, objectUrl: `${cal}${uid}.ics`, calendarUrl: cal, calRefId: way.refId, accountId,
     isWaitingHere: (eventId) => { asked.push(eventId); return true; },
   };
   const before = snapshot('calendar_events', id);
@@ -910,6 +910,7 @@ test('adoptOwnEventUpload: nur lokal, nur wenn der Aufrufer das Warten bestätig
   const now = snapshot('calendar_events', id);
   assert.equal(now.external_source, 'caldav');
   assert.equal(now.external_object_url, good.objectUrl);
+  assert.equal(now.caldav_account_id, accountId, 'der übernommene Termin gehört nicht dem Konto, das ihn abgerufen hat');
   assert.equal(now.outbound_dirty, 1);
   assert.equal(now.title, 'Geheim');
 });

@@ -28,8 +28,8 @@ import assert from 'node:assert/strict';
 const dbmod = await import('../server/db.js');
 const db = dbmod.get();
 const outbound = await import('../server/services/calendar-outbound.js');
-const { processPendingDeletions, processPendingUpdates, icsFieldsForEvent, filenameFromUrl } =
-  await import('../server/services/caldav-outbound.js');
+const caldavOutbound = await import('../server/services/caldav-outbound.js');
+const { icsFieldsForEvent, filenameFromUrl } = caldavOutbound;
 const { patchICSEvent, countVEvents, unfoldICS, foldICSLine } =
   await import('../server/utils/ics-patch.js');
 const { nearestIcalColorName, resolveIcalColor, __test: icalColorTest } =
@@ -47,14 +47,26 @@ const CAL2_URL = 'https://dav.example/cal/work/';
 
 // ── Fixtures ────────────────────────────────────────────────────────────────────
 
+// Das eine CalDAV-Konto dieser Suite. Ein gespiegelter Termin gehört einem
+// Konto, und ein Durchgang arbeitet für genau eines (#1860); mehrere Konten
+// prüft test-caldav-event-account.js.
+let accountId = null;
+
 function reset() {
   db.prepare('DELETE FROM calendar_pending_deletions').run();
   db.prepare('DELETE FROM calendar_events').run();
   db.prepare('DELETE FROM external_calendars').run();
   db.prepare('DELETE FROM caldav_accounts').run();
-  db.prepare(`INSERT INTO caldav_accounts (name, caldav_url, username, password)
-              VALUES ('Radicale', 'https://dav.example/', 'u', 'p')`).run();
+  accountId = Number(db.prepare(`INSERT INTO caldav_accounts (name, caldav_url, username, password)
+              VALUES ('Radicale', 'https://dav.example/', 'u', 'p')`).run().lastInsertRowid);
 }
+
+/** Der Durchgang des einen Kontos; Apple kennt keines. */
+const scopeOf = (source) => (source === 'caldav' ? { accountId } : {});
+const processPendingDeletions = (client, source, index, ownCalendarUrls = null) =>
+  caldavOutbound.processPendingDeletions(client, source, index, ownCalendarUrls, scopeOf(source));
+const processPendingUpdates = (client, source, index, calendarsByUrl = null) =>
+  caldavOutbound.processPendingUpdates(client, source, index, calendarsByUrl, scopeOf(source));
 
 function upsertCalendar(url, name = 'Familie') {
   return db.prepare(`
@@ -79,10 +91,10 @@ function insertSyncedEvent({
     INSERT INTO calendar_events
       (title, description, location, color, start_datetime, end_datetime, all_day,
        recurrence_rule, tzid, external_calendar_id, external_source, calendar_ref_id,
-       external_object_url, target_caldav_calendar_url, created_by)
+       external_object_url, target_caldav_calendar_url, created_by, caldav_account_id)
     VALUES (@title, @description, @location, @color, @start_datetime, @end_datetime, @all_day,
-       @recurrence_rule, @tzid, @uid, @source, @calRefId, @objectUrl, @target, 1)
-  `).run({ ...f, uid, source, calRefId, objectUrl });
+       @recurrence_rule, @tzid, @uid, @source, @calRefId, @objectUrl, @target, 1, @account)
+  `).run({ ...f, uid, source, calRefId, objectUrl, account: source === 'caldav' ? accountId : null });
   return db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(r.lastInsertRowid);
 }
 
@@ -727,8 +739,11 @@ test('auch ohne gespeicherte Objekt-URL entsteht ein Tombstone', () => {
 
 test('ohne konfiguriertes CalDAV-Konto entsteht kein Tombstone', () => {
   reset();
+  const { id } = insertSyncedEvent({ uid: 'noacc@t', calRefId: upsertCalendar(CAL_URL) });
+  // Mit dem Konto verliert der Termin seines (ON DELETE SET NULL).
   db.prepare('DELETE FROM caldav_accounts').run();
-  const event = insertSyncedEvent({ uid: 'noacc@t', calRefId: upsertCalendar(CAL_URL) });
+  const event = reload(id);
+  assert.equal(event.caldav_account_id, null);
 
   assert.equal(outbound.queueEventDeletion(event), false);
   assert.equal(tombstones().length, 0);
@@ -772,18 +787,48 @@ test('Apple kennt keinen Zielkalender und damit keinen Umzug', () => {
 
 // ── Löschungen ausführen ────────────────────────────────────────────────────────
 
-test('löscht das Kalenderobjekt über die gespeicherte URL', async () => {
+test('der Sofortversuch löscht das Kalenderobjekt über die gespeicherte URL', async () => {
   reset();
   const calRefId = upsertCalendar(CAL_URL);
   const event = insertSyncedEvent({ uid: 'x1@t', calRefId, objectUrl: `${CAL_URL}x1.ics` });
   outbound.queueEventDeletion(event);
 
+  // Ohne Abruf (kein ownCalendarUrls) bleibt nur die gespeicherte Adresse.
   const client = fakeClient();
-  assert.equal(await processPendingDeletions(client, 'caldav', new Map(), new Set([CAL_URL])), 1);
+  assert.equal(await processPendingDeletions(client, 'caldav', new Map()), 1);
 
   assert.equal(client.deletes.length, 1);
   assert.equal(client.deletes[0].calendarObject.url, `${CAL_URL}x1.ics`);
   assert.equal(tombstones().length, 0);
+});
+
+test('der Lauf löscht an der Adresse, die sein Abruf nennt, nicht an der gespeicherten (#1860)', async () => {
+  reset();
+  const calRefId = upsertCalendar(CAL_URL);
+  const stored = 'https://elsewhere.example/cal/family/x1b.ics';
+  outbound.queueEventDeletion(insertSyncedEvent({ uid: 'x1b@t', calRefId, objectUrl: stored }));
+
+  const client = fakeClient();
+  const index = indexFor('x1b@t', { url: `${CAL_URL}x1b.ics`, etag: '"e1"' });
+  assert.equal(await processPendingDeletions(client, 'caldav', index, new Set([CAL_URL])), 1);
+
+  assert.deepEqual(client.deletes.map((d) => d.calendarObject.url), [`${CAL_URL}x1b.ics`]);
+  assert.equal(tombstones().length, 0);
+});
+
+test('zwei Objekte derselben UID im Konto: gelöscht wird das im Kalender des Auftrags', async () => {
+  reset();
+  const calRefId = upsertCalendar(CAL2_URL);
+  outbound.queueEventDeletion(insertSyncedEvent({ uid: 'x1c@t', calRefId }));
+
+  // Die Map allein behielte nur das zuletzt gesehene Objekt (hier: das in CAL_URL).
+  const index = new caldavOutbound.ObjectIndex();
+  index.set('x1c@t', { url: `${CAL2_URL}x1c.ics`, etag: '"work"', data: serverObject('x1c@t'), calendarUrl: CAL2_URL });
+  index.set('x1c@t', { url: `${CAL_URL}x1c.ics`, etag: '"family"', data: serverObject('x1c@t'), calendarUrl: CAL_URL });
+  const client = fakeClient();
+  assert.equal(await processPendingDeletions(client, 'caldav', index, new Set([CAL_URL, CAL2_URL])), 1);
+
+  assert.deepEqual(client.deletes.map((d) => d.calendarObject), [{ url: `${CAL2_URL}x1c.ics`, etag: '"work"' }]);
 });
 
 test('findet die URL eines Bestandstermins über den laufenden Abruf', async () => {
@@ -832,7 +877,8 @@ test('ein Serverfehler lässt die Löschung für den nächsten Lauf stehen', asy
   outbound.queueEventDeletion(event);
 
   const client = fakeClient({ onDelete: () => { throw httpError(503); } });
-  assert.equal(await processPendingDeletions(client, 'caldav', new Map(), new Set([CAL_URL])), 0);
+  const index = indexFor('err@t', { url: `${CAL_URL}err.ics` });
+  assert.equal(await processPendingDeletions(client, 'caldav', index, new Set([CAL_URL])), 0);
 
   const [row] = tombstones();
   assert.equal(row.attempts, 1);
@@ -845,7 +891,9 @@ test('ein 404 zählt als erledigt, nicht als Fehlversuch', async () => {
   outbound.queueEventDeletion(insertSyncedEvent({ uid: '404@t', calRefId, objectUrl: `${CAL_URL}a.ics` }));
 
   const client = fakeClient({ onDelete: () => { throw httpError(404); } });
-  assert.equal(await processPendingDeletions(client, 'caldav', new Map(), new Set([CAL_URL])), 1);
+  const index = indexFor('404@t', { url: `${CAL_URL}a.ics` });
+  assert.equal(await processPendingDeletions(client, 'caldav', index, new Set([CAL_URL])), 1);
+  assert.equal(client.deletes.length, 1, 'die Löschung wurde gar nicht erst versucht');
   assert.equal(tombstones().length, 0);
 });
 
@@ -1074,8 +1122,10 @@ test('ein Löschen direkt nach dem Umzug trifft das Objekt im Zielkalender', asy
   assert.equal(row.calendar_external_id, CAL2_URL, 'der Tombstone gehört zum Zielkalender');
   assert.equal(row.object_url, `${CAL2_URL}mv5@t.ics`);
 
+  // Der nächste Lauf findet das Objekt dort, wo der Umzug es angelegt hat.
   const client = fakeClient();
-  await processPendingDeletions(client, 'caldav', new Map(), new Set([CAL_URL, CAL2_URL]));
+  const index = indexFor('mv5@t', { url: `${CAL2_URL}mv5@t.ics`, calendarUrl: CAL2_URL });
+  await processPendingDeletions(client, 'caldav', index, new Set([CAL_URL, CAL2_URL]));
   assert.equal(client.deletes[0].calendarObject.url, `${CAL2_URL}mv5@t.ics`,
     'die alte URL ist schon gelöscht - ihr 404 hätte den Tombstone als erledigt verworfen');
 });
@@ -1171,10 +1221,11 @@ test('wird der Termin während des Umzugs gelöscht, wird auch die Kopie im Ziel
   assert.ok(target, 'für die Kopie im Ziel steht ein Tombstone');
   assert.equal(target.event_external_id, 'mv11@t');
   assert.equal(target.object_url, `${CAL2_URL}mv11@t.ics`);
-  assert.ok(outbound.hasPendingDeletion('caldav', 'mv11@t'), 'der Inbound importiert die UID nicht neu');
+  assert.ok(outbound.hasPendingDeletion('caldav', 'mv11@t', { accountId }), 'der Inbound importiert die UID nicht neu');
 
   const cleanup = fakeClient();
-  await processPendingDeletions(cleanup, 'caldav', new Map(), new Set([CAL_URL, CAL2_URL]));
+  const copy = indexFor('mv11@t', { url: `${CAL2_URL}mv11@t.ics`, calendarUrl: CAL2_URL });
+  await processPendingDeletions(cleanup, 'caldav', copy, new Set([CAL_URL, CAL2_URL]));
   assert.ok(cleanup.deletes.some((d) => d.calendarObject.url === `${CAL2_URL}mv11@t.ics`),
     'der nächste Lauf räumt die Kopie im Ziel ab');
 });
@@ -1555,19 +1606,31 @@ test('ohne bekannte Objekt-URL bleibt alles für den Sync liegen', async () => {
   assert.equal(tombstones().length, 1, 'der nächste Sync löst die URL über den Kalender auf');
 });
 
-test('der Sofortversuch fasst einen fremden Account nicht an', async () => {
+test('der Sofortversuch läuft mit dem Client des Kontos, dem der Auftrag gehört', async () => {
   reset();
   db.prepare('DELETE FROM caldav_calendar_selection').run();
-  // Der Kalender des Termins ist keinem Konto zugeordnet.
-  const calRefId = upsertCalendar(CAL2_URL);
-  outbound.queueEventDeletion(insertSyncedEvent({
-    uid: 'foreign@t', calRefId, objectUrl: `${CAL2_URL}foreign.ics`,
-  }));
+  // Beide Konten führen denselben Kalender; der Termin gehört dem zweiten.
+  seedAccountCalendar();
+  const first = accountId;
+  const second = Number(db.prepare(`INSERT INTO caldav_accounts (name, caldav_url, username, password)
+              VALUES ('Zweites', 'https://dav.example/', 'u2', 'p')`).run().lastInsertRowid);
+  db.prepare(`INSERT INTO caldav_calendar_selection (account_id, calendar_url, calendar_name, enabled)
+              VALUES (?, ?, 'Familie', 1)`).run(second, CAL_URL);
+  const calRefId = upsertCalendar(CAL_URL);
+  const event = insertSyncedEvent({ uid: 'foreign@t', calRefId, objectUrl: `${CAL_URL}foreign.ics` });
+  db.prepare('UPDATE calendar_events SET caldav_account_id = ? WHERE id = ?').run(second, event.id);
+  outbound.queueEventDeletion(reload(event.id));
 
-  const client = fakeImmediateClient();
+  const clients = { [first]: fakeImmediateClient(), [second]: fakeImmediateClient() };
+  const built = [];
   const { flushOutbound } = await import('../server/services/caldav-sync.js');
-  assert.deepEqual(await flushOutbound({ createClient: async () => client }), { deleted: 0, updated: 0 });
-  assert.equal(tombstones().length, 1);
+  const res = await flushOutbound({ createClient: async (account) => { built.push(account.id); return clients[account.id]; } });
+
+  assert.deepEqual(res, { deleted: 1, updated: 0 });
+  assert.deepEqual(built, [second], 'für ein Konto ohne eigene Arbeit wurde ein Client gebaut');
+  assert.equal(clients[first].deletes.length, 0, 'das Konto, dem der Auftrag nicht gehört, hat gelöscht');
+  assert.equal(clients[second].deletes[0].calendarObject.url, `${CAL_URL}foreign.ics`);
+  assert.equal(tombstones().length, 0);
 });
 
 test('ein nicht erreichbarer Server lässt die Vormerkung unangetastet', async () => {

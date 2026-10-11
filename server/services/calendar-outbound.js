@@ -15,6 +15,13 @@
 // liegt beim jeweiligen Provider-Service, weil sich nur dort entscheidet, ob eine
 // Änderung ein API-Call (Google) oder ein PUT auf eine Objekt-URL (CalDAV) ist.
 //
+// CalDAV führt mehrere Konten in denselben beiden Tabellen. Ein gespiegelter
+// Termin und sein Löschauftrag tragen deshalb ihr Konto
+// (`caldav_account_id`, Migration 238, #1860), und jede Abfrage für 'caldav'
+// läuft je Konto: gesendet wird ein Termin nur über das Konto, dem er gehört.
+// Google und Apple kennen je genau eine Verbindung und filtern wie bisher nur
+// auf die Quelle; ihre Abfragen nennen die Spalte gar nicht erst.
+//
 // Bewusst ohne Provider-Importe: die Vormerkung läuft synchron im Route-Handler,
 // noch vor dem lokalen DELETE. Ein Import der Provider-Services zurück in diese
 // Datei wäre ein Zyklus; die wenigen Vorbedingungen werden hier direkt geprüft.
@@ -87,12 +94,63 @@ export function outboundFailureAction(err, attempts) {
 // --------------------------------------------------------
 
 /**
+ * Konto-Filter einer Abfrage, die Arbeit AUSGIBT (#1860). Für 'caldav' ist das
+ * Konto Pflicht: ein Durchgang arbeitet für genau ein Konto, und eine Liste
+ * über alle Konten hinweg gäbe ihm die Arbeit der anderen in die Hand. Fehlt
+ * es, ist das ein Fehler im Aufrufer - er wird gemeldet, und die Abfrage
+ * liefert nichts.
+ *
+ * @returns {{sql: string, args: Array}|null} null = nichts ausgeben
+ */
+function accountFilter(source, accountId, caller) {
+  if (source !== 'caldav') return { sql: '', args: [] };
+  if (accountId == null) {
+    log.error(`${caller}('caldav') was called without an account. This is a bug in the caller; nothing is returned.`);
+    return null;
+  }
+  return { sql: ' AND caldav_account_id = ?', args: [accountId] };
+}
+
+/**
+ * Konto-Filter einer Abfrage, die nur ZÄHLT. Ohne Konto zählt sie für 'caldav'
+ * alles, was überhaupt einem Konto gehört - die Frage "gibt es für diesen
+ * Anbieter Arbeit?" stellt die Fassade unten, bevor sie ihn lädt. Was keinem
+ * Konto gehört, wird nie gesendet und zählt deshalb nicht mit.
+ */
+function accountCountFilter(source, accountId) {
+  if (source !== 'caldav') return { sql: '', args: [] };
+  if (accountId == null) return { sql: ' AND caldav_account_id IS NOT NULL', args: [] };
+  return { sql: ' AND caldav_account_id = ?', args: [accountId] };
+}
+
+/**
  * Legt einen Tombstone an. Idempotent über den UNIQUE-Index.
+ *
+ * Ein CalDAV-Tombstone trägt das Konto, über das er gesendet wird (#1860).
+ * Ohne Konto entsteht keiner: es gäbe keinen Server, an den er gehen dürfte.
  * @returns {boolean} true, wenn eine Löschung vorgemerkt ist
  */
-export function queueDeletion({ source, calendarExternalId, eventExternalId, objectUrl = null }, database = null) {
+export function queueDeletion({ source, calendarExternalId, eventExternalId, objectUrl = null, accountId = null }, database = null) {
   if (!source || !eventExternalId) return false;
   if (!calendarExternalId && !objectUrl) return false;
+
+  if (source === 'caldav') {
+    if (accountId == null) {
+      log.error("queueDeletion('caldav') was called without an account. This is a bug in the caller; nothing is queued.");
+      return false;
+    }
+    // Der UNIQUE-Index kennt das Konto nicht. Ein bestehender Auftrag behält
+    // seines; nur einer ohne Konto bekommt das neue.
+    (database || db.get()).prepare(`
+      INSERT INTO calendar_pending_deletions
+        (source, calendar_external_id, event_external_id, object_url, caldav_account_id)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(source, calendar_external_id, event_external_id)
+        DO UPDATE SET object_url = COALESCE(excluded.object_url, object_url),
+                      caldav_account_id = COALESCE(caldav_account_id, excluded.caldav_account_id)
+    `).run(source, calendarExternalId || '', eventExternalId, objectUrl, accountId);
+    return true;
+  }
 
   (database || db.get()).prepare(`
     INSERT INTO calendar_pending_deletions (source, calendar_external_id, event_external_id, object_url)
@@ -103,45 +161,78 @@ export function queueDeletion({ source, calendarExternalId, eventExternalId, obj
   return true;
 }
 
-export function pendingDeletions(source) {
+/** @param {{accountId?: number|null}} [scope] für 'caldav' Pflicht */
+export function pendingDeletions(source, { accountId = null } = {}) {
+  const filter = accountFilter(source, accountId, 'pendingDeletions');
+  if (!filter) return [];
   return db.get().prepare(`
     SELECT id, calendar_external_id, event_external_id, object_url, attempts
     FROM calendar_pending_deletions
-    WHERE source = ?
+    WHERE source = ?${filter.sql}
     ORDER BY id
-  `).all(source);
+  `).all(source, ...filter.args);
 }
 
-export function pendingDeletionCount(source) {
+export function pendingDeletionCount(source, { accountId = null } = {}) {
+  const filter = accountCountFilter(source, accountId);
   return db.get().prepare(
-    'SELECT COUNT(*) AS c FROM calendar_pending_deletions WHERE source = ?'
-  ).get(source).c;
+    `SELECT COUNT(*) AS c FROM calendar_pending_deletions WHERE source = ?${filter.sql}`
+  ).get(source, ...filter.args).c;
 }
 
 /** Ist für diese externe Event-ID eine Löschung offen? Schützt den Inbound. */
-export function hasPendingDeletion(source, eventExternalId) {
+export function hasPendingDeletion(source, eventExternalId, { accountId = null } = {}) {
+  const filter = accountFilter(source, accountId, 'hasPendingDeletion');
+  if (!filter) return false;
   return !!db.get().prepare(
-    'SELECT 1 FROM calendar_pending_deletions WHERE source = ? AND event_external_id = ?'
-  ).get(source, eventExternalId);
+    `SELECT 1 FROM calendar_pending_deletions WHERE source = ? AND event_external_id = ?${filter.sql}`
+  ).get(source, eventExternalId, ...filter.args);
 }
 
 /**
  * Alle offenen Tombstone-UIDs eines Providers als Set - einmal je Sync-Lauf statt
  * einer Abfrage pro eingehendem Termin, was bei großen Kalendern messbar ist.
+ * Für 'caldav' je Konto: die Löschung in einem Konto sagt nichts über den
+ * Termin, den ein anderes unter derselben UID führt.
  * Fehlt die Tabelle (gedriftete Datenbank), gilt "keine offenen Löschungen":
  * ein Inbound-Lauf darf daran nicht scheitern.
  */
-export function pendingDeletionUids(source) {
+export function pendingDeletionUids(source, { accountId = null } = {}) {
+  const filter = accountFilter(source, accountId, 'pendingDeletionUids');
+  if (!filter) return new Set();
   try {
     return new Set(
       db.get().prepare(
-        'SELECT event_external_id FROM calendar_pending_deletions WHERE source = ?'
-      ).all(source).map((r) => r.event_external_id)
+        `SELECT event_external_id FROM calendar_pending_deletions WHERE source = ?${filter.sql}`
+      ).all(source, ...filter.args).map((r) => r.event_external_id)
     );
   } catch (err) {
     log.warn(`Pending deletions are not readable (${err.message}); treating them as none.`);
     return new Set();
   }
+}
+
+/**
+ * Räumt CalDAV-Löschaufträge ab, die keinem Konto gehören (#1860): Bestand,
+ * den Migration 238 nicht sicher zuordnen konnte. Es gibt kein Konto, über das
+ * sie gesendet werden dürften, und ohne dieses Abräumen blieben sie für immer
+ * liegen. Der Termin kann danach einmal zurückkommen.
+ * @returns {number} Zahl der abgeräumten Aufträge
+ */
+export function dropDeletionsWithoutAccount() {
+  let removed = 0;
+  try {
+    removed = Number(db.get().prepare(
+      "DELETE FROM calendar_pending_deletions WHERE source = 'caldav' AND caldav_account_id IS NULL"
+    ).run().changes) || 0;
+  } catch (err) {
+    log.warn(`Pending deletions are not readable (${err.message}); nothing was cleared.`);
+    return 0;
+  }
+  if (removed) {
+    log.warn(`Dropped ${removed} pending deletion(s) that belong to no CalDAV account; the event(s) may come back once.`);
+  }
+  return removed;
 }
 
 export function dropDeletion(id) {
@@ -213,21 +304,68 @@ export function markOutbound(eventId, { dirty = false, moveTo = null, cancelMove
   return !!(row && (row.outbound_dirty || row.outbound_move_to));
 }
 
-export function pendingUpdates(source) {
+/** @param {{accountId?: number|null}} [scope] für 'caldav' Pflicht */
+export function pendingUpdates(source, { accountId = null } = {}) {
+  const filter = accountFilter(source, accountId, 'pendingUpdates');
+  if (!filter) return [];
   return db.get().prepare(`
     SELECT * FROM calendar_events
     WHERE (outbound_dirty = 1 OR outbound_move_to IS NOT NULL)
-      AND external_source = ? AND external_calendar_id IS NOT NULL
+      AND external_source = ? AND external_calendar_id IS NOT NULL${filter.sql}
     ORDER BY id
-  `).all(source);
+  `).all(source, ...filter.args);
 }
 
-export function pendingUpdateCount(source) {
+export function pendingUpdateCount(source, { accountId = null } = {}) {
+  const filter = accountCountFilter(source, accountId);
   return db.get().prepare(`
     SELECT COUNT(*) AS c FROM calendar_events
     WHERE (outbound_dirty = 1 OR outbound_move_to IS NOT NULL)
-      AND external_source = ? AND external_calendar_id IS NOT NULL
-  `).get(source).c;
+      AND external_source = ? AND external_calendar_id IS NOT NULL${filter.sql}
+  `).get(source, ...filter.args).c;
+}
+
+/**
+ * Wartende Arbeit an CalDAV-Zeilen, die keinem Konto gehören (#1860): eine
+ * Bearbeitung von vor Migration 238 an einer Zeile, die sie nicht sicher
+ * zuordnen konnte. Gesendet wird sie nie - es gibt kein Konto, über das sie
+ * hinausdürfte. Übernommen wird die Zeile aber auch nicht, solange etwas an
+ * ihr wartet, sonst ginge die Bearbeitung an das Konto, das zufällig zuerst
+ * ihre UID liefert.
+ *
+ * Damit sie nicht für immer wartet, zählt jeder Lauf einen Versuch, meldet es
+ * einmal und gibt nach MAX_OUTBOUND_ATTEMPTS auf. Danach ist die Zeile sauber,
+ * und das nächste Konto, das ihre UID liefert, übernimmt sie mit dem Stand des
+ * Servers.
+ * @returns {number} Zahl der Zeilen, an denen noch etwas wartet
+ */
+export function ageUpdatesWithoutAccount() {
+  let rows;
+  try {
+    rows = db.get().prepare(`
+      SELECT id, outbound_attempts FROM calendar_events
+      WHERE external_source = 'caldav' AND caldav_account_id IS NULL
+        AND (outbound_dirty = 1 OR outbound_move_to IS NOT NULL)
+      ORDER BY id
+    `).all();
+  } catch (err) {
+    log.warn(`Pending changes are not readable (${err.message}); nothing was counted.`);
+    return 0;
+  }
+  let waiting = 0;
+  for (const row of rows) {
+    if (row.outbound_attempts + 1 >= MAX_OUTBOUND_ATTEMPTS) {
+      log.error(`Giving up on the local change of event ${row.id} after ${row.outbound_attempts + 1} run(s): it belongs to no CalDAV account.`);
+      clearOutbound(row.id);
+    } else {
+      failOutbound(row.id);
+      waiting++;
+    }
+  }
+  if (waiting) {
+    log.warn(`${waiting} local change(s) wait on event(s) that belong to no CalDAV account and are not sent.`);
+  }
+  return waiting;
 }
 
 /** Alles erledigt: Push und Umzug. */
@@ -378,11 +516,19 @@ function calendarExternalId(event, database = null) {
   return null;
 }
 
-/** Nimmt der Provider dieses Events gerade ausgehende Änderungen entgegen? */
-function acceptsOutbound(source) {
+/**
+ * Nimmt der Provider DIESES Events gerade ausgehende Änderungen entgegen?
+ *
+ * Für CalDAV entscheidet die Zeile, nicht "irgendein Konto existiert" (#1860):
+ * gesendet wird nur über das Konto, dem der Termin gehört. Eine Zeile ohne
+ * Konto hat keinen Server, an den sie dürfte.
+ */
+function acceptsOutbound(event) {
+  const source = event.external_source;
   if (source === 'google') return !!cfg('google_refresh_token') && cfg('google_readonly') !== '1';
   if (source === 'caldav') {
-    return !!db.get().prepare('SELECT 1 FROM caldav_accounts LIMIT 1').get();
+    if (event.caldav_account_id == null) return false;
+    return !!db.get().prepare('SELECT 1 FROM caldav_accounts WHERE id = ?').get(event.caldav_account_id);
   }
   if (source === 'apple') {
     return !!(cfg('apple_caldav_url') || process.env.APPLE_CALDAV_URL);
@@ -398,7 +544,14 @@ function acceptsOutbound(source) {
 export function queueEventDeletion(event, database = null) {
   if (!event || !OUTBOUND_SOURCES.includes(event.external_source)) return false;
   if (!event.external_calendar_id) return false;
-  if (!acceptsOutbound(event.external_source)) return false;
+  // Lokal wird gelöscht, beim Anbieter nicht: ohne Konto gibt es keinen Weg
+  // dorthin. Liefert ein Konto die UID weiter, kommt der Termin zurück - dann
+  // gehört er diesem Konto und lässt sich dort löschen.
+  if (event.external_source === 'caldav' && event.caldav_account_id == null) {
+    log.warn(`Event ${event.id} belongs to no CalDAV account, deletion at the provider skipped.`);
+    return false;
+  }
+  if (!acceptsOutbound(event)) return false;
 
   const calId = calendarExternalId(event, database);
   // Ohne Kalender und ohne Objekt-URL gibt es keinen Weg zum entfernten Objekt.
@@ -412,6 +565,7 @@ export function queueEventDeletion(event, database = null) {
     calendarExternalId: calId,
     eventExternalId:    event.external_calendar_id,
     objectUrl:          event.external_object_url || null,
+    accountId:          event.external_source === 'caldav' ? event.caldav_account_id : null,
   }, database);
 }
 
@@ -455,7 +609,7 @@ export function markEventOutbound(before, after) {
   // muss sie durchkommen - sonst steht nach dem Abschalten des Nur-Lesen-Modus
   // noch ein Umzug an, den der Nutzer längst widerrufen hat. Ein Sofortversuch
   // lohnt dann trotzdem nicht, deshalb false.
-  if (!acceptsOutbound(after.external_source)) {
+  if (!acceptsOutbound(after)) {
     if (cancelMove) markOutbound(after.id, { cancelMove });
     return false;
   }
@@ -562,20 +716,33 @@ export async function uploadNewEvent(client, calendar, uid, ics) {
  * `adopted`: das Objekt lag schon dort (siehe `uploadNewEvent`); dann geht der
  * lokale Stand als Änderung hinterher.
  *
+ * `accountId`: bei CalDAV das Konto, über das der Upload lief; ihm gehört der
+ * Termin danach.
+ *
  * @returns {boolean} true, wenn die Zeile umgeschrieben wurde
  */
-export function markEventUploaded(eventId, { source, uid, objectUrl, calRefId, adopted = false, onlyIfLocal = false }) {
+export function markEventUploaded(eventId, { source, uid, objectUrl, calRefId, adopted = false, onlyIfLocal = false, accountId = null }) {
+  // Ein CalDAV-Upload macht die Zeile zum Termin DIESES Kontos (#1860). Die
+  // Spalte steht nur im CalDAV-Statement: Apple kennt kein Konto und lässt sie
+  // unberührt.
+  const forCaldav = source === 'caldav';
+  if (forCaldav && accountId == null) {
+    log.error(`markEventUploaded('caldav') was called without an account for event ${eventId}. This is a bug in the caller; the row stays local.`);
+    return false;
+  }
   return db.get().prepare(`
     UPDATE calendar_events
     SET external_source = ?, external_calendar_id = ?,
-        external_object_url = ?, calendar_ref_id = ?,
+        external_object_url = ?, calendar_ref_id = ?,${forCaldav ? '\n        caldav_account_id = ?,' : ''}
         color_modified = CASE WHEN color IS NOT NULL THEN 1 ELSE color_modified END,
         outbound_dirty = CASE WHEN ? = 1 THEN 1 ELSE outbound_dirty END,
         outbound_attempts = CASE WHEN ? = 1 THEN 0 ELSE outbound_attempts END
     WHERE id = ?
       AND (? = 0 OR external_source = 'local')
-  `).run(source, uid, objectUrl, calRefId, adopted ? 1 : 0, adopted ? 1 : 0, eventId, onlyIfLocal ? 1 : 0)
-    .changes > 0;
+  `).run(
+    source, uid, objectUrl, calRefId, ...(forCaldav ? [accountId] : []),
+    adopted ? 1 : 0, adopted ? 1 : 0, eventId, onlyIfLocal ? 1 : 0
+  ).changes > 0;
 }
 
 /**
@@ -605,10 +772,11 @@ export function markEventUploaded(eventId, { source, uid, objectUrl, calRefId, a
  * @param {string}   p.objectUrl       Adresse des Objekts laut Server
  * @param {string}   p.calendarUrl     Kalender, der gerade abgerufen wird
  * @param {number}   p.calRefId
+ * @param {number}   [p.accountId]     CalDAV-Konto, das gerade abgerufen wird
  * @param {(eventId: number) => boolean} p.isWaitingHere
  * @returns {boolean} true, wenn eine Zeile übernommen wurde
  */
-export function adoptOwnEventUpload({ source, uid, objectUrl, calendarUrl, calRefId, isWaitingHere }) {
+export function adoptOwnEventUpload({ source, uid, objectUrl, calendarUrl, calRefId, isWaitingHere, accountId = null }) {
   const eventId = ownUploadRowId(uid, 'event', db.get());
   if (!eventId || !objectUrl || !calendarUrl || typeof isWaitingHere !== 'function') return false;
   // Exakt die UID, die wir für diesen Termin erzeugen würden.
@@ -620,7 +788,7 @@ export function adoptOwnEventUpload({ source, uid, objectUrl, calendarUrl, calRe
   if (!isWaitingHere(eventId)) return false;
 
   const adopted = markEventUploaded(eventId, {
-    source, uid, objectUrl, calRefId, adopted: true, onlyIfLocal: true,
+    source, uid, objectUrl, calRefId, adopted: true, onlyIfLocal: true, accountId,
   });
   if (adopted) log.info(`Adopted the earlier upload of event ${eventId} (${uid}).`);
   return adopted;

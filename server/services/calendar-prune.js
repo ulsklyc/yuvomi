@@ -37,6 +37,11 @@ const log = createLogger('CalendarPrune');
  * @param {Set}    [opts.accountUids] Alle UIDs des Accounts (default: calendarUids)
  * @param {string} [opts.source]     external_source-Wert ('caldav' | 'apple')
  * @param {string} [opts.calendarName] Nur für die Log-Ausgabe
+ * @param {number} [opts.accountId]  CalDAV-Konto, dessen Abruf das ist (#1860).
+ *   Dann fallen nur Termine DIESES Kontos: führen zwei Konten denselben
+ *   Kalender oder dieselbe UID, sagt der Abruf des einen nichts über den
+ *   Termin des anderen, und eine Zeile ohne Konto hat niemand abgerufen.
+ *   Ohne Angabe (Apple) zählt wie bisher nur Kalender und Quelle.
  * @returns {number} Anzahl gelöschter Termine.
  */
 export function pruneDeletedEvents(database, {
@@ -45,11 +50,17 @@ export function pruneDeletedEvents(database, {
   accountUids = calendarUids,
   source = 'caldav',
   calendarName = null,
+  accountId = null,
 } = {}) {
-  const localEvents = database.prepare(`
-    SELECT id, external_calendar_id FROM calendar_events
-    WHERE calendar_ref_id = ? AND external_source = ?
-  `).all(calRefId, source);
+  const localEvents = accountId == null
+    ? database.prepare(`
+      SELECT id, external_calendar_id FROM calendar_events
+      WHERE calendar_ref_id = ? AND external_source = ?
+    `).all(calRefId, source)
+    : database.prepare(`
+      SELECT id, external_calendar_id FROM calendar_events
+      WHERE calendar_ref_id = ? AND external_source = ? AND caldav_account_id = ?
+    `).all(calRefId, source, accountId);
 
   const stale = localEvents.filter(ev => !accountUids.has(ev.external_calendar_id));
   if (stale.length === 0) return 0;
@@ -102,16 +113,19 @@ function calendarRefIds(database, externalIds) {
  *
  * @param {object} database
  * @param {string[]} externalIds  calendar_url je Kalender (external_calendars.external_id)
+ * @param {{accountId?: number}} [scope] nur die Termine dieses CalDAV-Kontos (#1860):
+ *   dieselbe Kalender-URL kann in der Auswahl zweier Konten stehen
  * @returns {number}
  */
-export function countMirroredEvents(database, externalIds) {
+export function countMirroredEvents(database, externalIds, { accountId = null } = {}) {
   const refIds = calendarRefIds(database, externalIds);
   if (!refIds.length) return 0;
   const marks = refIds.map(() => '?').join(',');
+  const ofAccount = accountId == null ? '' : ' AND caldav_account_id = ?';
   return database.prepare(
     `SELECT COUNT(*) AS n FROM calendar_events
-     WHERE calendar_ref_id IN (${marks}) AND external_source IN ('caldav','apple')`
-  ).get(...refIds).n;
+     WHERE calendar_ref_id IN (${marks}) AND external_source IN ('caldav','apple')${ofAccount}`
+  ).get(...refIds, ...(accountId == null ? [] : [accountId])).n;
 }
 
 /**
@@ -127,16 +141,43 @@ export function countMirroredEvents(database, externalIds) {
  * liesse einzelne Zeilen zurück, deren Herkunft danach niemand mehr erkennt,
  * und die Rückfrage hätte eine Zahl genannt, die nicht stimmt.
  *
+ * @param {{accountId?: number}} [scope] nur die Termine dieses CalDAV-Kontos (#1860)
  * @returns {number} Anzahl gelöschter Termine
  */
-export function deleteMirroredEvents(database, externalIds) {
+export function deleteMirroredEvents(database, externalIds, { accountId = null } = {}) {
   const refIds = calendarRefIds(database, externalIds);
   if (!refIds.length) return 0;
   const marks = refIds.map(() => '?').join(',');
+  const ofAccount = accountId == null ? '' : ' AND caldav_account_id = ?';
   const result = database.prepare(
     `DELETE FROM calendar_events
-     WHERE calendar_ref_id IN (${marks}) AND external_source IN ('caldav','apple')`
-  ).run(...refIds);
+     WHERE calendar_ref_id IN (${marks}) AND external_source IN ('caldav','apple')${ofAccount}`
+  ).run(...refIds, ...(accountId == null ? [] : [accountId]));
+  const removed = Number(result.changes) || 0;
+  if (removed) log.info(`Removed ${removed} mirrored event(s) on user request.`);
+  return removed;
+}
+
+/**
+ * Wie viele gespiegelte Termine gehören diesem CalDAV-Konto (#1860)? Über das
+ * Konto der Zeile, nicht über die Kalender seiner Auswahl: ein Termin gehört
+ * seinem Konto auch dann noch, wenn sein Kalender dort nicht mehr geführt wird.
+ */
+export function countAccountEvents(database, accountId) {
+  return database.prepare(
+    "SELECT COUNT(*) AS n FROM calendar_events WHERE external_source = 'caldav' AND caldav_account_id = ?"
+  ).get(accountId).n;
+}
+
+/**
+ * Entfernt die lokal gespiegelten Termine dieses CalDAV-Kontos. Lokal, nicht
+ * nach aussen - wie `deleteMirroredEvents`.
+ * @returns {number} Anzahl gelöschter Termine
+ */
+export function deleteAccountEvents(database, accountId) {
+  const result = database.prepare(
+    "DELETE FROM calendar_events WHERE external_source = 'caldav' AND caldav_account_id = ?"
+  ).run(accountId);
   const removed = Number(result.changes) || 0;
   if (removed) log.info(`Removed ${removed} mirrored event(s) on user request.`);
   return removed;

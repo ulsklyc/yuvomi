@@ -520,7 +520,12 @@ function updateVisitLinks(database, session, worker, visitDate, dailyRate, extra
     //
     // Der Feldvergleich bleibt derselbe: mirroredFieldsChanged prüft genau die
     // Felder, die zum Provider gespiegelt werden.
-    const mirrored = after && OUTBOUND_SOURCES.includes(after.external_source) && !!after.external_calendar_id;
+    //
+    // Ein CalDAV-Termin ohne Konto (#1860) wird nie gesendet: an ihm wird
+    // nichts vorgemerkt, sonst hielte der Marker die Zeile davon ab, vom
+    // nächsten Konto übernommen zu werden, das ihre UID liefert.
+    const mirrored = after && OUTBOUND_SOURCES.includes(after.external_source) && !!after.external_calendar_id
+      && !(after.external_source === 'caldav' && after.caldav_account_id == null);
     if (before && mirrored && mirroredFieldsChanged(before, after)) {
       database.prepare(
         'UPDATE calendar_events SET outbound_dirty = 1, outbound_attempts = 0 WHERE id = ?'

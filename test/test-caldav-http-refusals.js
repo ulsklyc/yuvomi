@@ -170,9 +170,9 @@ function mirroredEvent(cal, uid, title) {
   const id = Number(db.prepare(`
     INSERT INTO calendar_events
       (title, start_datetime, end_datetime, all_day, created_by, external_source,
-       external_calendar_id, calendar_ref_id, external_object_url)
-    VALUES (?, '2035-03-10T09:00Z', '2035-03-10T10:00Z', 0, 1, 'caldav', ?, ?, ?)
-  `).run(title, uid, cal.refId, url).lastInsertRowid);
+       external_calendar_id, calendar_ref_id, external_object_url, caldav_account_id)
+    VALUES (?, '2035-03-10T09:00Z', '2035-03-10T10:00Z', 0, 1, 'caldav', ?, ?, ?, ?)
+  `).run(title, uid, cal.refId, url, accountId).lastInsertRowid);
   return { id, url };
 }
 
@@ -528,9 +528,9 @@ for (const status of [403, 412, 503]) {
     const cal = calendar();
     const { url } = dav.putObject(cal.url, 'gone.ics', vevent('gone@test', 'Gelöscht'));
     db.prepare(`
-      INSERT INTO calendar_pending_deletions (source, calendar_external_id, event_external_id, object_url)
-      VALUES ('caldav', ?, 'gone@test', ?)
-    `).run(cal.url, url);
+      INSERT INTO calendar_pending_deletions (source, calendar_external_id, event_external_id, object_url, caldav_account_id)
+      VALUES ('caldav', ?, 'gone@test', ?, ?)
+    `).run(cal.url, url, accountId);
 
     dav.refuse({ method: 'DELETE', status });
     await caldavSync.flushOutbound();

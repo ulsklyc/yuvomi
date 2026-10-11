@@ -8,6 +8,8 @@
 // CalDAV-Account eingerichtet hat, soll ihn nie laden.
 // --------------------------------------------------------
 
+import { sameCredentialOrigin } from './credential-origin.js';
+
 /**
  * @param {{caldav_url: string, username: string, password: string}} account
  * @returns {Promise<object>} tsdav-Client
@@ -40,6 +42,75 @@ export async function createCardDAVClient(account) {
     defaultAccountType: 'carddav',
   });
   return withHttpRefusalsAsErrors(client);
+}
+
+/**
+ * Die Anfrage wurde nicht gestellt: ihre Adresse liegt nicht auf dem Server des
+ * Kontos (siehe `withAccountOrigin`). `code` statt `status`, damit die
+ * Einordnung in calendar-outbound.js sie nicht für eine HTTP-Antwort hält.
+ */
+export class DavOriginError extends Error {
+  constructor(operation, url) {
+    super('The address of this entry is not on the server of its account');
+    this.name      = 'DavOriginError';
+    this.code      = 'origin_not_allowed';
+    this.operation = operation;
+    this.url       = url;
+  }
+}
+
+/** Kam die Absage von `withAccountOrigin`, also bevor etwas gesendet wurde? */
+export function isOriginRefusal(err) {
+  return err?.code === 'origin_not_allowed';
+}
+
+/**
+ * Ein Konto spricht ein Kalenderobjekt nur auf seinem eigenen Server an
+ * (#1860): das ist `caldav_url` und jeder Kalender seiner Auswahl, verglichen
+ * wie bei der Passwort-Regel in `credential-origin.js` nach Schema, Host und
+ * Port. Woher eine Adresse auch stammt - aus einer Zeile, einem Löschauftrag,
+ * einer Antwort des Servers -, hier steht der EINE Vergleich, durch den jede
+ * gezielte Anfrage geht: PUT, DELETE und der Abruf von Objekten.
+ *
+ * Die Kalenderliste (`fetchCalendars`) geht nicht hier durch: sie fragt die
+ * Adresse ab, mit der der Client gebaut wurde.
+ *
+ * Eine relative Adresse wird gegen den Server des Kontos aufgelöst. Eine
+ * Anfrage an eine andere Adresse wird nicht gestellt; der Aufruf wirft
+ * `DavOriginError`.
+ *
+ * @param {object}   client
+ * @param {string[]} accountUrls  `caldav_url` zuerst, dann die Kalender der Auswahl
+ */
+export function withAccountOrigin(client, accountUrls) {
+  const bases = (accountUrls || []).filter(Boolean).map(String);
+  const allowed = (url) => {
+    let absolute;
+    try { absolute = new URL(String(url ?? ''), bases[0]).href; } catch { return false; }
+    return bases.some((base) => sameCredentialOrigin(absolute, base));
+  };
+  const guard = (name, urlsOf) => {
+    if (typeof client[name] !== 'function') return null;
+    const call = client[name].bind(client);
+    return async (params = {}) => {
+      for (const url of urlsOf(params)) {
+        if (!allowed(url)) throw new DavOriginError(name, url);
+      }
+      return call(params);
+    };
+  };
+  const overrides = {
+    createCalendarObject: guard('createCalendarObject', (p) => [p?.calendar?.url]),
+    updateCalendarObject: guard('updateCalendarObject', (p) => [p?.calendarObject?.url]),
+    deleteCalendarObject: guard('deleteCalendarObject', (p) => [p?.calendarObject?.url]),
+    fetchCalendarObjects: guard('fetchCalendarObjects', (p) => [p?.calendar?.url, ...(p?.objectUrls ?? [])]),
+  };
+  return Object.create(Object.getPrototypeOf(client), {
+    ...Object.getOwnPropertyDescriptors(client),
+    ...Object.fromEntries(Object.entries(overrides).filter(([, value]) => value).map(([name, value]) => [
+      name, { value, writable: true, enumerable: true, configurable: true },
+    ])),
+  });
 }
 
 /**
