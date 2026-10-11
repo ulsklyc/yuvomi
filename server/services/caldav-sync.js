@@ -16,14 +16,14 @@ import {
 import { assignDefaultToEvent, reassignDefaultOnCalendarMove } from './sync-assignment.js';
 import { pruneDeletedEvents, countMirroredEvents, deleteMirroredEvents } from './calendar-prune.js';
 import * as outbound from './calendar-outbound.js';
-import { processPendingDeletions, processPendingUpdates, flushAccount, inSameCalendarHome } from './caldav-outbound.js';
+import { processPendingDeletions, processPendingUpdates, flushAccount } from './caldav-outbound.js';
 import { detachAccountRows } from './caldav-todo-outbound.js';
 import { runSerialized } from '../utils/sync-lock.js';
 import { toICSDatetime, escapeICSText } from '../utils/ics-format.js';
 import { eventDateTimeFields } from '../utils/ics-datetime.js';
 import { vtimezoneFor } from '../utils/vtimezone.js';
 import { householdTimeZone } from '../utils/timezone.js';
-import { createCalDAVClient, supportsComponent, createUploadGate } from '../utils/caldav-client.js';
+import { createCalDAVClient, supportsComponent, createUploadGate, collectionUrlOf } from '../utils/caldav-client.js';
 import { sqlLooksLikeOwnEventUid } from '../utils/own-uid.js';
 import { sameCredentialOrigin } from '../utils/credential-origin.js';
 import { rruleLine } from './recurrence.js';
@@ -131,6 +131,20 @@ function calendarHome(url) {
   const segments = parsed.pathname.split('/').filter(Boolean);
   if (segments.length < 2) return null;
   return `${parsed.origin}/${segments.slice(0, -1).join('/')}/`;
+}
+
+/**
+ * Liegt dieses Objekt im Kalender-Home eines dieser Kalender - also in einem
+ * Kalender neben ihnen, beim selben Benutzer desselben Servers (#1860)?
+ * Dieselbe Regel wie `calendarHome`: wo sich kein Besitzer erkennen lässt
+ * (Query-adressiert, direkt an der Wurzel), gilt nichts als zugehörig.
+ */
+function inCalendarHomeOf(objectUrl, calendarUrls) {
+  let parsed;
+  try { parsed = new URL(String(objectUrl)); } catch { return false; }
+  if (parsed.search) return false;
+  const home = calendarHome(collectionUrlOf(parsed.href));
+  return home !== null && calendarUrls.some((calendarUrl) => calendarHome(calendarUrl) === home);
 }
 
 /**
@@ -875,7 +889,7 @@ async function runSync({ createClient } = {}) {
     return candidates.find((row) => row.own)
       ?? candidates.find((row) => !row.bound
         && (row.target_caldav_account_id == null || row.target_caldav_account_id === accountId)
-        && (!row.external_object_url || inSameCalendarHome(row.external_object_url, calendarUrls)));
+        && (!row.external_object_url || inCalendarHomeOf(row.external_object_url, calendarUrls)));
   };
   // Offene Löschungen einmal je Lauf, nicht je eingehendem Termin. Je Objekt,
   // nicht je UID: dieselbe UID kann in einem zweiten Kalender liegen, der

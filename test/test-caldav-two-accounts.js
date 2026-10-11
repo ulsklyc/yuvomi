@@ -354,6 +354,35 @@ test('Zeile ohne Kalenderbezug, deren Objekt auf demselben Server bei einem ande
   assert.equal(rowsByCalendar().of(accounts.a)?.title, 'Aus A');
 });
 
+test('Zeile ohne Kalenderbezug, deren Adresse den Benutzer in der Abfrage trägt: der Pfad allein belegt nichts', async () => {
+  const accounts = twoAccounts();
+  accounts.b.dav.reset();
+  // Derselbe Pfad wie das Objekt von Konto A, aber mit einer Abfrage: wo ein
+  // Server Benutzer so unterscheidet, sagt der Pfad nicht, wem etwas gehört.
+  const queried = `${accounts.a.objectUrl}?user=other`;
+  const id = Number(db.prepare(`
+    INSERT INTO calendar_events
+      (title, start_datetime, end_datetime, all_day, created_by, external_source,
+       external_calendar_id, external_object_url)
+    VALUES ('Mit Abfrage', '2035-03-10T09:00Z', '2035-03-10T10:00Z', 0, 1, 'caldav', ?, ?)
+  `).run(UID, queried).lastInsertRowid);
+
+  await caldavSync.sync();
+
+  const kept = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(id);
+  assert.equal(kept.title, 'Mit Abfrage', 'der gleiche Pfad hat als Zugehörigkeit genügt');
+  assert.equal(kept.external_object_url, queried);
+  assert.equal(rowsByCalendar().of(accounts.a)?.title, 'Aus A');
+
+  // Dasselbe im Ausgang: eine Bearbeitung dieser Zeile geht nicht hinaus.
+  db.prepare("UPDATE calendar_events SET title = 'Mit Abfrage, bearbeitet', outbound_dirty = 1 WHERE id = ?").run(id);
+  const { client, index, scope } = await clientOfA(accounts);
+  accounts.a.dav.requests.length = 0;
+  assert.equal(await caldavOutbound.processPendingUpdates(client, 'caldav', index, null, scope), 0);
+  assert.deepEqual(noWrites(accounts), []);
+  assert.equal(summaryAt(accounts.a), 'Aus A');
+});
+
 test('bearbeitete Bestandszeile ohne Adresse und Kalender: ihr Inhalt geht an kein Konto, und sie bleibt, wie sie ist', async () => {
   const accounts = twoAccounts();
   accounts.b.dav.reset();

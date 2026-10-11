@@ -149,44 +149,22 @@ export function icsFieldsForEvent(event, householdZone = null) {
 
 /** Liegt diese Adresse in einem der Kalender? Verglichen wird Origin und dekodierter Pfad. */
 export function liesWithin(url, calendarUrls) {
+  // Die Abfrage gehört zur Adresse: wo ein Server Benutzer oder Sammlungen so
+  // unterscheidet, sagt der Pfad allein nicht, wem etwas gehört.
   const parts = (value) => {
     try {
       const parsed = new URL(value);
-      return { origin: parsed.origin, path: decodeURIComponent(parsed.pathname) };
+      return { origin: parsed.origin, path: decodeURIComponent(parsed.pathname), search: parsed.search };
     } catch { return null; }
   };
   const target = parts(url);
   if (!target) return false;
   for (const calendarUrl of calendarUrls) {
     const base = parts(String(calendarUrl).replace(/\/?$/, '/'));
-    if (base && base.origin === target.origin && target.path.startsWith(base.path)) return true;
+    if (base && base.origin === target.origin && base.search === target.search
+        && target.path.startsWith(base.path)) return true;
   }
   return false;
-}
-
-/**
- * Liegt dieses Objekt im selben Kalender-Home wie einer der Kalender - also
- * in einem Kalender NEBEN ihnen, beim selben Benutzer desselben Servers?
- *
- * Derselbe Host genügt dafür nicht: auf einem Server liegen viele Benutzer.
- * Verglichen wird die Ebene über dem Kalender (`.../calendars/<benutzer>/`),
- * mit Origin und dekodiertem Pfad.
- */
-export function inSameCalendarHome(objectUrl, calendarUrls) {
-  const parentOf = (path) => path.replace(/[^/]*\/?$/, '');
-  const parts = (value) => {
-    try {
-      const parsed = new URL(value);
-      return { origin: parsed.origin, path: decodeURIComponent(parsed.pathname) };
-    } catch { return null; }
-  };
-  const object = parts(objectUrl);
-  if (!object) return false;
-  const home = parentOf(parentOf(object.path));
-  return calendarUrls.some((calendarUrl) => {
-    const calendar = parts(calendarUrl);
-    return !!calendar && calendar.origin === object.origin && parentOf(calendar.path) === home;
-  });
 }
 
 /** Dieselbe Adresse, gleich ob der Server `@` als `%40` zurückgibt. */
@@ -195,7 +173,7 @@ function sameAddress(a, b) {
   const parts = (value) => {
     try {
       const parsed = new URL(value);
-      return `${parsed.origin}${decodeURIComponent(parsed.pathname)}`;
+      return `${parsed.origin}${decodeURIComponent(parsed.pathname)}${parsed.search}`;
     } catch { return null; }
   };
   const left = parts(a);
