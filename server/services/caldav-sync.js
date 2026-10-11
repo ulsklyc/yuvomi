@@ -143,8 +143,14 @@ function inCalendarHomeOf(objectUrl, calendarUrls) {
   let parsed;
   try { parsed = new URL(String(objectUrl)); } catch { return false; }
   if (parsed.search) return false;
-  const home = calendarHome(collectionUrlOf(parsed.href));
-  return home !== null && calendarUrls.some((calendarUrl) => calendarHome(calendarUrl) === home);
+  // Dekodiert verglichen: derselbe Pfad kommt je nach Server mit `@` oder
+  // `%40` zurück.
+  const decoded = (home) => {
+    if (home === null) return null;
+    try { return decodeURIComponent(home); } catch { return home; }
+  };
+  const home = decoded(calendarHome(collectionUrlOf(parsed.href)));
+  return home !== null && calendarUrls.some((calendarUrl) => decoded(calendarHome(calendarUrl)) === home);
 }
 
 /**

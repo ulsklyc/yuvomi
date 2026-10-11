@@ -383,6 +383,56 @@ test('Zeile ohne Kalenderbezug, deren Adresse den Benutzer in der Abfrage trägt
   assert.equal(summaryAt(accounts.a), 'Aus A');
 });
 
+test('Zeile ohne Kalenderbezug, deren Adresse denselben Pfad anders kodiert: sie wird weiter gefunden', async () => {
+  const accounts = twoAccounts();
+  accounts.b.dav.reset();
+  // `%63` ist `c`: derselbe Kalender, wie ihn ein Server mit anderer
+  // Kodierung zurückgibt (in echt meist `@` gegen `%40`).
+  const encoded = accounts.a.objectUrl.replace('/cal/', '/%63al/');
+  assert.notEqual(encoded, accounts.a.objectUrl);
+  const id = Number(db.prepare(`
+    INSERT INTO calendar_events
+      (title, start_datetime, end_datetime, all_day, created_by, external_source,
+       external_calendar_id, external_object_url)
+    VALUES ('Alt', '2035-03-10T09:00Z', '2035-03-10T10:00Z', 0, 1, 'caldav', ?, ?)
+  `).run(UID, encoded).lastInsertRowid);
+
+  await caldavSync.sync();
+
+  const { rows, of } = rowsByCalendar();
+  assert.equal(rows.length, 1, 'die Bestandszeile wurde verdoppelt statt übernommen');
+  assert.equal(of(accounts.a)?.id, id);
+});
+
+test('Ausgang: ein Kalender, dessen Adresse eine Abfrage trägt, bekommt seine eigenen Änderungen', async () => {
+  const accounts = twoAccounts();
+  const a = accounts.a;
+  // Kalender und Objekt tragen dieselbe Abfrage; der Kalender endet davor
+  // ohne Schrägstrich.
+  const calendarUrl = `${a.url.replace(/\/$/, '')}?user=a`;
+  const objectUrl   = `${a.objectUrl}?user=a`;
+  const refId = db.prepare(`
+    INSERT INTO external_calendars (source, external_id, name, color) VALUES ('caldav', ?, 'Familie A', '#4A90E2') RETURNING id
+  `).get(calendarUrl).id;
+  const id = Number(db.prepare(`
+    INSERT INTO calendar_events
+      (title, start_datetime, end_datetime, all_day, created_by, external_source,
+       external_calendar_id, calendar_ref_id, external_object_url, outbound_dirty)
+    VALUES ('A bearbeitet', '2035-03-10T09:00Z', '2035-03-10T10:00Z', 0, 1, 'caldav', ?, ?, ?, 1)
+  `).run(UID, refId, objectUrl).lastInsertRowid);
+  const { client } = await clientOfA(accounts);
+  const object = a.dav.getObject(a.url, 'shared.ics');
+  const index = new Map([[UID, { url: objectUrl, etag: object.etag, data: object.data, calendarUrl }]]);
+
+  const sent = await caldavOutbound.processPendingUpdates(
+    client, 'caldav', index, null, { accountCalendarUrls: [calendarUrl] }
+  );
+
+  assert.equal(sent, 1, 'die eigene Änderung blieb liegen');
+  assert.equal(summaryAt(a), 'A bearbeitet');
+  assert.equal(db.prepare('SELECT outbound_dirty FROM calendar_events WHERE id = ?').get(id).outbound_dirty, 0);
+});
+
 test('bearbeitete Bestandszeile ohne Adresse und Kalender: ihr Inhalt geht an kein Konto, und sie bleibt, wie sie ist', async () => {
   const accounts = twoAccounts();
   accounts.b.dav.reset();

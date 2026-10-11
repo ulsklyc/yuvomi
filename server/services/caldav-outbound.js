@@ -160,9 +160,11 @@ export function liesWithin(url, calendarUrls) {
   const target = parts(url);
   if (!target) return false;
   for (const calendarUrl of calendarUrls) {
-    const base = parts(String(calendarUrl).replace(/\/?$/, '/'));
-    if (base && base.origin === target.origin && base.search === target.search
-        && target.path.startsWith(base.path)) return true;
+    const base = parts(calendarUrl);
+    if (!base || base.origin !== target.origin || base.search !== target.search) continue;
+    // Der Schrägstrich gehört ans Ende des PFADS - an die ganze Adresse
+    // gehängt, landete er in der Abfrage.
+    if (target.path.startsWith(base.path.replace(/\/?$/, '/'))) return true;
   }
   return false;
 }
