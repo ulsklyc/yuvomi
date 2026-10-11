@@ -709,8 +709,12 @@
   text-overflow: ellipsis;
   overflow-wrap: anywhere;
   /* Ein Wort, das allein breiter ist als die Spalte ("Wertpapierdepot"),
-   * trennt an der Silbe statt vor dem letzten Buchstaben. */
+   * trennt an der Silbe statt vor dem letzten Buchstaben. Mindestens vier
+   * Zeichen vor und nach der Trennung (wie die uebrigen Textbloecke,
+   * layout.css `hyphenate-limit-chars`): ohne Grenze steht "Wertpapierde-pot"
+   * oder "Gemeinsa-mes" in der schmalen Spalte (#1774). */
   hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
   min-width: 0;
 }
 
@@ -740,16 +744,21 @@
   min-width: 0;
 }
 
-/* Die Saldo-Spalte schrumpft NIE (Re-Critique 2026-09-28 P1-2): mit
- * `flex: 0 1 auto; min-width: 0` lief sie bei 390px unter den `nowrap`-Betrag,
- * und der lief nach links in den Namen ("Gemeinsames Gi.8.544,47 €"). Gekuerzt
- * wird der Name (`.budget-account__name-text` ellipsiert). */
+/* Die Saldo-Spalte gibt nach, aber nie unter ihren Betrag (Re-Critique
+ * 2026-09-28 P1-2, #1774). Mit `flex: 0 1 auto; min-width: 0` lief sie bei
+ * 390px unter den `nowrap`-Betrag, und der lief nach links in den Namen
+ * ("Gemeinsames Gi.8.544,47 €"). Ohne `min-width: 0` bleibt der automatische
+ * Mindestwert der Spalte die Breite des Betrags: sie schrumpft nur um die
+ * umbrechbare Startzeile (`.budget-account__starting`), nie in den Saldo
+ * hinein. Der Name bekommt so die Breite, die er braucht, bevor er mitten im
+ * Wort umbricht ("Housekeepin" und "g cash"); gekuerzt wird erst danach, und zwar
+ * der Name (`.budget-account__name-text` ellipsiert). */
 .budget-account__figures {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: var(--space-0h);
-  flex: 0 0 auto;
+  flex: 0 1 auto;
 }
 
 /* DIE BETRAGSREGEL (Critique 2026-10-05, R16): ein Betrag in einer Zeile oder
@@ -776,7 +785,9 @@
 .budget-account__starting {
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
-  white-space: nowrap;
+  /* Umbrechbar: die Startzeile ist das, was die Saldo-Spalte hergibt. */
+  white-space: normal;
+  text-align: end;
 }
 
 /* Der Chevron ist entfallen (Redesign Runde 6, Phase 1) - dieselbe Bauart wie
