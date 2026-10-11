@@ -5574,3 +5574,28 @@ test('#1844: der Tipp auf die erwartete Abo-Zeile wechselt in den Abo-Reiter - a
   // die Positivliste der Aktionen bleibt, wie sie ist.
   assert.doesNotMatch(budget, /data-action="open-subscription"/);
 });
+
+test('#1844: der Sprung zum Abo nimmt die Filter der Abo-Liste weg - das Abo, zu dem die Zeile fuehrt, steht da', async () => {
+  const abosModul = await import('../public/pages/subscriptions.js');
+  const { state } = abosModul.__test;
+  const vorher = { query: state.query, categoryId: state.categoryId, paymentMethodId: state.paymentMethodId, status: state.status, sort: state.sort };
+  try {
+    // Ein Filter aus einem frueheren Besuch: die Liste zeigte damit nur
+    // pausierte Abos, und ein laufendes - das einzige, das projiziert wird -
+    // fehlte genau dort, wohin die Zeile fuehrt.
+    Object.assign(state, { query: 'gym', categoryId: '4', paymentMethodId: '6', status: 'paused' });
+    assert.equal(typeof abosModul.clearSubscriptionFilters, 'function');
+    abosModul.clearSubscriptionFilters();
+    assert.deepEqual(
+      { query: state.query, categoryId: state.categoryId, paymentMethodId: state.paymentMethodId, status: state.status },
+      { query: '', categoryId: '', paymentMethodId: '', status: 'all' },
+    );
+    assert.equal(abosModul.__test.activeFilters().length, 0);
+    assert.equal(state.sort, vorher.sort, 'die Sortierung nimmt nichts weg und bleibt');
+  } finally { Object.assign(state, vorher); }
+  // Und der Aufrufer ruft sie, bevor er den Reiter wechselt.
+  const handler = budget.slice(budget.indexOf("e.target.closest('[data-open-subscription]')"));
+  const clear = handler.indexOf('clearSubscriptionFilters()');
+  const wechsel = handler.indexOf("_tablist?.setActive('subscriptions'");
+  assert.ok(clear > -1 && clear < wechsel, 'erst die Filter, dann der Wechsel');
+});

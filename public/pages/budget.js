@@ -21,7 +21,7 @@ import { redrawList, collapseRow } from '/utils/list-motion.js';
 import { friendlyError } from '/utils/friendly-error.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { render as renderSplitExpenses, prefillSplitExpense, canAddSplitExpense, openNewSplitExpense } from '/pages/split-expenses.js';
-import { openSubscriptionModal, render as renderSubscriptions } from '/pages/subscriptions.js';
+import { openSubscriptionModal, clearSubscriptionFilters, render as renderSubscriptions } from '/pages/subscriptions.js';
 import { renderStats } from '/pages/budget-stats.js';
 import { renderPlans, openAddPlan } from '/pages/budget-plans.js';
 import { toLocalDateKey, parseLocalDateKey, addLocalDays,
@@ -1511,6 +1511,9 @@ function renderBody() {
       // setActive() malt die Leiste und ruft changeTab() mit der Richtung.
       // Der Fokus geht auf den Reiter: der getippte Knopf verschwindet mit
       // dem Wechsel, und ohne Umzug fiele er auf <body>.
+      // Ein Filter aus einem frueheren Besuch der Abo-Liste bliebe sonst
+      // stehen, und das Abo, zu dem die Zeile fuehrt, fehlte dort.
+      clearSubscriptionFilters();
       _tablist?.setActive('subscriptions', { focus: true });
       return;
     }
