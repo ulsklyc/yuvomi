@@ -1525,6 +1525,7 @@
         "confirmFirstHint": "Każda utworzona pozycja czeka na Twoje potwierdzenie. Do tego czasu jest na liście, ale nie wlicza się do żadnej sumy - przy potwierdzaniu możesz poprawić kwotę i datę.",
         "pendingBadge": "Oczekiwana",
         "upcomingLabel": "Jeszcze nie nastąpiło",
+        "expectedSubscriptionOpen": "Zobacz w Subskrypcjach",
         "confirmAction": "Księguj",
         "confirmTitle": "Potwierdź pozycję",
         "confirmHint": "Popraw kwotę i datę, jeśli obciążenie wyglądało inaczej.",

@@ -1437,6 +1437,7 @@
         "confirmFirstHint": "Každá vytvořená položka čeká na vaše potvrzení. Do té doby je v seznamu, ale nezapočítává se do žádného součtu - při potvrzení lze upravit částku i datum.",
         "pendingBadge": "Očekáváno",
         "upcomingLabel": "Ještě nenastalo",
+        "expectedSubscriptionOpen": "Zobrazit v předplatných",
         "confirmAction": "Zaúčtovat",
         "confirmTitle": "Potvrdit položku",
         "confirmHint": "Částku a datum můžete opravit, pokud byly strženy jinak.",

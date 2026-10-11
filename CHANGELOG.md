@@ -215,6 +215,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   budget mode a subscription can only be changed or deleted by the member it belongs to. Marking
   it as renewed did not ask that question and now does: another member gets the same refusal as
   for editing, and nothing is changed. The shared budget mode is unchanged.
+- **A subscription now shows in every month of the budget it is due in** (#1844). A subscription
+  with "Include in budget" kept one expense, on its next payment date, so the budget showed it in
+  that month only. The following months now show it as an expected line that is not booked yet,
+  worked out from the subscription's cycle when the month is read. Nothing is written ahead of
+  time, and the booked expense still comes from "Mark as renewed". Expected lines count in no
+  total; the line under the summary names their number and amount, and the CSV export marks them
+  `Expected`. A tap on one leads to the Subscriptions tab. Months that are already over show none.
+  If you deleted a subscription's expense in the budget by hand, save or renew the subscription
+  to get it and the following months back.
 - **Managing budget categories shows the built-in categories in your language** (#1859, from D#1841).
   "Manage categories" in Budget listed the built-in categories and subcategories in English,
   whatever language Yuvomi ran in. They now appear in the language of the interface you are

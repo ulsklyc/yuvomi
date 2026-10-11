@@ -1364,6 +1364,7 @@
         "confirmFirstHint": "生成された記帳はあなたの確認を待ちます。それまでは一覧に表示されますが、どの合計にも含まれません。確認時に金額と日付を修正できます。",
         "pendingBadge": "予定",
         "upcomingLabel": "まだ発生していません",
+        "expectedSubscriptionOpen": "サブスクリプションで表示",
         "confirmAction": "記帳",
         "confirmTitle": "記帳を確認",
         "confirmHint": "引き落としが違っていた場合は金額と日付を修正してください。",
