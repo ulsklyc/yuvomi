@@ -579,6 +579,56 @@ test('#1829 Wand: Aufgabe und Mahlzeit behalten ihr Modulzeichen', onTheWall(THU
   assert.equal(wallSeals(html).Muell, moduleIconHTML('check-square'));
 }));
 
+/** Das Siegel jeder Zeile von „Heute wichtig" als { Titel: Markup }. */
+function todaySeals(html) {
+  return Object.fromEntries(
+    [...html.matchAll(/<span class="module-seal today-cockpit-card__icon">([\s\S]*?)<\/span>(?:<span class="seal-pair__who[\s\S]*?)?<\/span>\s*<span class="today-cockpit-card__body">\s*<strong class="today-cockpit-card__value">([^<]*)<\/strong>/g)]
+      .map(([, seal, title]) => [title, seal.trim()]),
+  );
+}
+
+// „Heute wichtig" ist dieselbe Mischstelle wie die Wand und liest dieselben
+// Zeilen: ein Termin, der dort sein Icon zeigt und hier das Kalenderzeichen,
+// ist derselbe Fehler auf der zweiten Flaeche.
+test('#1829 Heute wichtig: der Termin zeigt sein gewaehltes Icon wie an der Wand',
+  onTheWall(THU_14_BERLIN, 'Europe/Berlin', async () => {
+    clearEvents();
+    setIcon.run('car', addEvent('Werkstatt', '2026-09-24T15:00', '2026-09-24T16:00'));
+    setIcon.run('tooth', addEvent('Zahnarzt', '2026-09-24T16:00', '2026-09-24T17:00'));
+    setIcon.run('drill', addEvent('Kontrolle', '2026-09-24T17:00', '2026-09-24T18:00'));
+    setIcon.run('gibt-es-nicht', addEvent('Unbekannt', '2026-09-24T18:00', '2026-09-24T19:00'));
+    addEvent('Ohne Wahl', '2026-09-24T19:00', '2026-09-24T20:00');
+    const body = await getJson('/');
+    const sheet = todaySeals(dash.renderTodayCockpit(body, [], false, { now: new Date() }));
+    const wall = wallSeals(dash.renderWallSurface(body, null, { now: new Date() }));
+    const generic = moduleIconHTML('calendar');
+
+    assert.deepEqual(Object.keys(sheet).sort(), ['Kontrolle', 'Ohne Wahl', 'Unbekannt', 'Werkstatt', 'Zahnarzt'],
+      'Vorbedingung: alle fuenf Termine stehen als Zeile im Blatt');
+    assert.match(sheet.Werkstatt, /data-lucide="car"/, 'das gewaehlte Lucide-Icon steht im Siegel');
+    assert.match(sheet.Werkstatt, /class="module-glyph"/, 'mit der Marke, an der Groesse und Strichstaerke des Siegels haengen');
+    assert.match(sheet.Zahnarzt, /<svg class="module-glyph event-icon--custom"/, 'ein eigenes Zeichen (Zahn) wird gezeichnet wie im Kalender');
+    assert.equal(sheet.Kontrolle, sheet.Zahnarzt, 'der alte Name `drill` ist derselbe Zahn');
+    assert.equal(sheet['Ohne Wahl'], generic, 'ohne Wahl bleibt das Kalenderzeichen');
+    assert.equal(sheet.Unbekannt, generic, 'ein unbekannter Name faellt auf das Kalenderzeichen zurueck');
+    for (const title of ['Werkstatt', 'Zahnarzt', 'Kontrolle', 'Unbekannt']) {
+      assert.equal(sheet[title], wall[title], `${title}: Blatt und Wand zeigen dasselbe Zeichen`);
+    }
+  }));
+
+test('#1829 Heute wichtig: Aufgabe und Sammelzeile behalten das Modulzeichen',
+  onTheWall(THU_14_BERLIN, 'Europe/Berlin', () => {
+    // Eine Aufgabe, die zufaellig ein Feld `icon` truege, bekaeme kein Terminzeichen.
+    const single = dash.renderTodayCockpit({ urgentTasks: [wallTask('Muell', { icon: 'car' })], users: [] }, [], false, { now: new Date() });
+    assert.equal(todaySeals(single).Muell, moduleIconHTML('check-square'));
+    // Die Sammelzeile der Ueberfaelligen spricht fuer mehrere Aufgaben, nicht fuer ein Objekt.
+    const overdue = [1, 2, 3].map((id) => wallTask(`Alt ${id}`, { id, due_date: '2026-09-20', icon: 'car' }));
+    global.window.matchMedia = (query) => ({ matches: /max-width:\s*639px/.test(query), media: query });
+    const grouped = dash.renderTodayCockpit({ urgentTasks: overdue, users: [] }, [], false, { now: new Date(), overdueOpen: false });
+    assert.match(grouped, /today-cockpit-card--overdue-group|data-today-overdue/, 'Vorbedingung: auf dem Telefon steht die Sammelzeile');
+    assert.doesNotMatch(grouped, /data-lucide="car"/);
+  }));
+
 test('#1828 Wand: auch eine Aufgabe fuer zwei zaehlt bei beiden', onTheWall(THU_14_BERLIN, 'Europe/Berlin', () => {
   const anna = { id: 8, display_name: 'Anna', avatar_color: '#7C3AED' };
   const leo = { id: 7, display_name: 'Leo', avatar_color: '#FF9500' };

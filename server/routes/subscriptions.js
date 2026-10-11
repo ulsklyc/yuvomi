@@ -754,6 +754,10 @@ router.post('/:id/renew', async (req, res) => {
     const id = Number(req.params.id);
     const current = loadSubscription(id);
     if (!current) return res.status(404).json({ error: 'Subscription not found.', code: 404 });
+    // Verlaengern SCHREIBT: es rueckt den Zahlungstag vor, zaehlt eine Zahlung,
+    // legt eine Buchung an und schliesst ein endliches Abo ab. Es folgt
+    // deshalb derselben Regel wie PUT und DELETE - sie fehlte hier.
+    if (!mayEditSub(req, current)) return res.status(403).json({ error: 'You cannot modify this subscription.', code: 403 });
     const { completed, nextDate, occurrencesDone } = resolveRenewal(current);
     if (completed) {
       // Letzte Zahlung durch: abschließen. enabled = 0 lässt syncBudgetExpense den

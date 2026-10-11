@@ -207,6 +207,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **"Mark as renewed" follows the same permission as editing a subscription.** In the personal
+  budget mode a subscription can only be changed or deleted by the member it belongs to. Marking
+  it as renewed did not ask that question and now does: another member gets the same refusal as
+  for editing, and nothing is changed. The shared budget mode is unchanged.
 - **A subscription now shows in every month of the budget it is due in** (#1844). A subscription
   with "Include in budget" kept one expense, on its next payment date, so the budget showed it in
   that month only. The following months now show it as an expected line that is not booked yet,
@@ -245,6 +249,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Wall mode shows the icon you chose for an event** (#1829). Events on the wall always carried the
   generic calendar icon, whatever was picked in the event editor. They now show their own icon, as
   the calendar does; an event without one keeps the calendar icon.
+- **"Today at a glance" shows the icon you chose for an event** (#1829). The overview kept the
+  generic calendar icon on every event after the wall had learned to show the chosen one. Both now
+  read the icon the same way; the colour of the badge still says the row comes from the calendar,
+  and an event without an icon of its own keeps the calendar icon.
 - **The first-run state of Waste sits in the middle of the page on a desktop** (#1771). Without a
   waste type the page showed its first-run block left of the middle with an empty column beside
   it. On a wide window it now spans the content area and is centred in it. With at least one
