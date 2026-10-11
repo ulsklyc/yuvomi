@@ -693,6 +693,21 @@ test('R14 P2: mobil stehen mehrere Ueberfaellige als EINE Sammelzeile, die an Or
   assert.match(html, /Elternabend/, 'der Rest des Tages bleibt');
 }));
 
+test('#1828 Sammelzeile: eine ueberfaellige Aufgabe fuer zwei nennt BEIDE, nicht nur die erste Person', () => withStage(true, () => {
+  const linda = { id: 3, display_name: 'Linda Johnson', avatar_color: '#6a5acd' };
+  const emma = { id: 4, display_name: 'Emma Johnson', avatar_color: '#c2185b' };
+  const html = renderTodayCockpit({
+    urgentTasks: [
+      { id: 1, title: 'Rueckstand 1', due_date: overdueDay(), status: 'open', assigned_users: [linda, emma] },
+      { id: 2, title: 'Rueckstand 2', due_date: overdueDay(), status: 'open', assigned_users: [linda] },
+    ],
+  }, [], false, { overdueOpen: false });
+  const group = html.match(/<button\b[^>]*data-today-overdue[^>]*>[\s\S]*?<\/button>/)?.[0];
+  assert.ok(group, `eine Sammelzeile steht im Blatt: ${html.slice(0, 300)}`);
+  assert.match(accessibleText(group), /Linda Johnson, Emma Johnson/, 'Emma ist nur ueber die gemeinsame Aufgabe dran und steht trotzdem da');
+  assert.equal((accessibleText(group).match(/Linda Johnson/g) ?? []).length, 1, 'jede Person einmal');
+}));
+
 test('R14 P2: am Desktop bleiben die Zeilen einzeln, und eine einzelne Ueberfaellige wird nie gesammelt', async () => {
   await withStage(false, () => {
     const html = renderTodayCockpit({ urgentTasks: fiveOverdue() }, []);

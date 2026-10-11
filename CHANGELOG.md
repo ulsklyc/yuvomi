@@ -191,7 +191,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Wall mode counts a shared event for everyone it is assigned to** (#1828). An event assigned to
   two or more people added to the number of only one of them, and whoever had nothing else that day
   was missing from the row of faces. Each assigned person now gets the event in their number. The
-  same holds for a task assigned to several people.
+  same holds for a task assigned to several people. On a phone, the row that collects several
+  overdue tasks on the overview had the same fault and now shows every person those tasks are
+  assigned to.
 - **Wall mode shows the icon you chose for an event** (#1829). Events on the wall always carried the
   generic calendar icon, whatever was picked in the event editor. They now show their own icon, as
   the calendar does; an event without one keeps the calendar icon.

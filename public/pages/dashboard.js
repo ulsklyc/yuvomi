@@ -3560,11 +3560,16 @@ function groupOverdueRows(rows) {
   const seen = new Set();
   const people = [];
   for (const row of overdue) {
-    const id = row.who?.id;
-    if (id == null || seen.has(id)) continue;
-    seen.add(id);
-    // renderAvatarStack liest `color`, die Zeilen tragen `avatar_color`.
-    people.push({ ...row.who, color: row.who.color ?? row.who.avatar_color });
+    // JEDE zugewiesene Person, nicht nur das eine Gesicht der Zeile (#1828):
+    // eine Aufgabe fuer zwei geht beide an.
+    const assigned = Array.isArray(row.people) && row.people.length ? row.people : [row.who];
+    for (const person of assigned) {
+      const id = person?.id;
+      if (id == null || seen.has(id)) continue;
+      seen.add(id);
+      // renderAvatarStack liest `color`, die Zeilen tragen `avatar_color`.
+      people.push({ ...person, color: person.color ?? person.avatar_color });
+    }
   }
   const group = {
     kind: 'overdue',
