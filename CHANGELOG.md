@@ -188,6 +188,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An archived shared-expense group now refuses changes on the server too** (#1747). Until now only
+  the page was locked: an API client or a stale tab could still add, edit or delete expenses,
+  comments, settlements and recurring expenses in a group the household had put away, and the
+  hourly run kept booking its recurring expenses. Every write on an archived group is now answered
+  with 409 (`group_archived`) and changes nothing; restoring the group, reading it and deleting it
+  under the existing rules work as before. The hourly run skips an archived group without booking
+  or pausing anything, and restoring the group moves its active recurring expenses to their first
+  date from today on, so the months in between are never booked afterwards.
 - **A wall tablet shows events again when the household overview is set to "Assigned to me"** (#1808).
   A paired display follows the household default of the overview. If that default had the calendar
   tile set to "Assigned to me", the tablet looked for events assigned to the tablet itself and

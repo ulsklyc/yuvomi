@@ -229,12 +229,29 @@ function sendRefusal(res, err) {
 }
 
 /**
+ * Die Abweisung fuer eine archivierte Gruppe (#1747), sonst null: die einzige
+ * Stelle, die die Regel kennt. Archivieren (#574) sperrt jede Aenderung, nur
+ * Wiederherstellen bleibt. Jede Schreibroute ruft sie NACH 404 und 403 auf -
+ * wer die Gruppe nicht sehen oder aendern darf, erfaehrt nichts ueber ihren
+ * Zustand. Wo Fehler im catch zu 400 werden, antwortet der Handler mit
+ * `sendRefusal` VOR dem try, statt zu werfen.
+ */
+function archivedRefusal(groupId) {
+  const row = db.get().prepare('SELECT status FROM expense_groups WHERE id = ?').get(groupId);
+  return row?.status === 'archived'
+    ? new Refusal(409, 'This group is archived. Restore it to make changes.', 'group_archived')
+    : null;
+}
+
+/**
  * Die Gruppenpruefung der Schreibrouten, in der Form, die eine Transaktion
  * braucht: sie wirft statt zu antworten.
  */
 function assertManagesGroup(groupId, req) {
   if (!requireGroupAccess(groupId, req)) throw new Refusal(404, 'Group not found.');
   if (!canManageGroup(groupId, req)) throw new Refusal(403, 'Not authorized.');
+  const archived = archivedRefusal(groupId);
+  if (archived) throw archived;
 }
 
 /** Ein zufaelliges Passwort fuer einen Gast, der sich nie selbst anmeldet. */
@@ -627,6 +644,8 @@ router.patch('/groups/:id', (req, res) => {
     const id = Number(req.params.id);
     if (!requireGroupAccess(id, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
     if (!canManageGroup(id, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    const archived = archivedRefusal(id);
+    if (archived) return sendRefusal(res, archived);
     const vName = req.body.name !== undefined ? str(req.body.name, 'Name', { max: MAX_TITLE }) : { value: undefined };
     const vDescription = req.body.description !== undefined ? str(req.body.description, 'Description', { max: MAX_TEXT, required: false }) : { value: undefined };
     const errors = collectErrors([vName, vDescription]);
@@ -676,8 +695,23 @@ router.post('/groups/:id/unarchive', (req, res) => {
     const id = Number(req.params.id);
     if (!requireGroupAccess(id, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
     if (!canManageGroup(id, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
-    db.get().prepare("UPDATE expense_groups SET status = 'active', archived_at = NULL WHERE id = ?").run(id);
-    activity(id, userId(req), 'group_unarchived', 'group', id);
+    // Die Serien der Gruppe ruecken in derselben Transaktion hinter die Luecke
+    // (wie Fortsetzen mit `missed: "skip"`): der Lauf hat waehrend der Archivzeit
+    // nichts gebucht, und ohne das buchte er je Stunde einen Termin der Luecke
+    // nach. Pausierte Serien bleiben, wie sie sind - Fortsetzen entscheidet.
+    db.transaction(() => {
+      const database = db.get();
+      database.prepare("UPDATE expense_groups SET status = 'active', archived_at = NULL WHERE id = ?").run(id);
+      const today = todayKey(database);
+      let total = 0;
+      const advance = database.prepare('UPDATE recurring_expenses SET next_run_date = ? WHERE id = ?');
+      for (const series of database.prepare('SELECT id, next_run_date, frequency, anchor_day FROM recurring_expenses WHERE group_id = ? AND paused_at IS NULL').all(id)) {
+        const next = nextRunNotBefore(series.next_run_date, series.frequency, today, series.anchor_day);
+        if (next.date !== series.next_run_date) advance.run(next.date, series.id);
+        total += next.skipped;
+      }
+      activity(id, userId(req), 'group_unarchived', 'group', id, total ? { skipped: total } : {});
+    });
     res.json({ data: { ok: true } });
   } catch (err) {
     log.error('POST /groups/:id/unarchive error:', err);
@@ -896,6 +930,8 @@ router.delete('/groups/:id/members/:userId', (req, res) => {
     const memberUserId = Number(req.params.userId);
     if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
     if (!canManageGroup(groupId, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    const archived = archivedRefusal(groupId);
+    if (archived) return sendRefusal(res, archived);
     const target = db.get().prepare('SELECT role FROM expense_group_members WHERE group_id = ? AND user_id = ?').get(groupId, memberUserId);
     if (!target) return res.status(404).json({ error: 'Member not found.', code: 404 });
     if (target.role === 'owner') return res.status(400).json({ error: 'Group owner cannot be removed.', code: 400 });
@@ -1019,6 +1055,8 @@ router.post('/groups/:id/expenses', (req, res) => {
     const groupId = Number(req.params.id);
     const group = requireGroupAccess(groupId, req);
     if (!group) return res.status(404).json({ error: 'Group not found.', code: 404 });
+    const archived = archivedRefusal(groupId);
+    if (archived) return sendRefusal(res, archived);
     const parsed = parseExpenseBody(req.body, group.default_currency);
     const payerId = Number(req.body.payer_id || userId(req));
     const participants = Array.isArray(req.body.participants) ? req.body.participants : [payerId];
@@ -1066,6 +1104,8 @@ router.put('/expenses/:id', (req, res) => {
     const existing = loadExpense(Number(req.params.id), req);
     if (!existing) return res.status(404).json({ error: 'Expense not found.', code: 404 });
     if (!mayChangeGroupRecord(existing, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    const archived = archivedRefusal(existing.group_id);
+    if (archived) return sendRefusal(res, archived);
     const parsed = parseExpenseBody(req.body, existing.converted_currency);
     const payerId = Number(req.body.payer_id || existing.payer_id);
     const participants = Array.isArray(req.body.participants) ? req.body.participants : db.get().prepare('SELECT user_id FROM expense_splits WHERE expense_id = ?').all(existing.id).map((r) => r.user_id);
@@ -1129,6 +1169,8 @@ router.delete('/expenses/:id', (req, res) => {
     const existing = loadExpense(Number(req.params.id), req);
     if (!existing) return res.status(404).json({ error: 'Expense not found.', code: 404 });
     if (!mayChangeGroupRecord(existing, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    const archived = archivedRefusal(existing.group_id);
+    if (archived) return sendRefusal(res, archived);
     db.transaction(() => {
       db.get().prepare("UPDATE expenses SET status = 'deleted', deleted_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?").run(existing.id);
       const booked = db.get().prepare(`
@@ -1169,6 +1211,8 @@ router.post('/expenses/:id/comments', (req, res) => {
   try {
     const expense = loadExpense(Number(req.params.id), req);
     if (!expense) return res.status(404).json({ error: 'Expense not found.', code: 404 });
+    const archived = archivedRefusal(expense.group_id);
+    if (archived) return sendRefusal(res, archived);
     const vComment = str(req.body.comment, 'Comment', { max: MAX_TEXT });
     if (vComment.error) return res.status(400).json({ error: vComment.error, code: 400 });
     const result = db.get().prepare('INSERT INTO expense_comments (expense_id, user_id, comment) VALUES (?, ?, ?)').run(expense.id, userId(req), vComment.value);
@@ -1204,6 +1248,8 @@ router.post('/groups/:id/settlements', (req, res) => {
     const groupId = Number(req.params.id);
     const group = requireGroupAccess(groupId, req);
     if (!group) return res.status(404).json({ error: 'Group not found.', code: 404 });
+    const archived = archivedRefusal(groupId);
+    if (archived) return sendRefusal(res, archived);
     const payerId = Number(req.body.payer_id);
     const payeeId = Number(req.body.payee_id);
     if (!memberRole(groupId, payerId) || !memberRole(groupId, payeeId)) return res.status(400).json({ error: 'Settlement users must be group members.', code: 400 });
@@ -1260,6 +1306,8 @@ router.post('/groups/:id/settlements/:settlementId/reverse', (req, res) => {
     const settlement = db.get().prepare('SELECT * FROM settlements WHERE id = ? AND group_id = ?').get(Number(req.params.settlementId), groupId);
     if (!settlement) return res.status(404).json({ error: 'Settlement not found.', code: 404 });
     if (!mayChangeGroupRecord(settlement, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    const archived = archivedRefusal(groupId);
+    if (archived) return sendRefusal(res, archived);
     const outcome = db.transaction(() => {
       if (settlementReversal(db.get(), settlement.id)) return 'already_reversed';
       const booked = db.get().prepare(`
@@ -1570,6 +1618,8 @@ router.post('/groups/:id/recurring', (req, res) => {
     const groupId = Number(req.params.id);
     const group = requireGroupAccess(groupId, req);
     if (!group) return res.status(404).json({ error: 'Group not found.', code: 404 });
+    const archived = archivedRefusal(groupId);
+    if (archived) return sendRefusal(res, archived);
     const { parsed, frequency, payerId, snapshot } = parseRecurringBody(req.body, groupId, group.default_currency, userId(req));
     // Der Ankertag (#1721): der Tag des ersten Termins ist der Tag, fuer den
     // die Serie gedacht ist. Der Lauf klemmt in kuerzeren Monaten aufs
@@ -1637,6 +1687,8 @@ router.put('/recurring/:id', (req, res) => {
       const existing = loadRecurring(id, req);
       if (!existing) throw new Refusal(404, 'Recurring expense not found.');
       if (!mayChangeGroupRecord(existing, req)) throw new Refusal(403, 'Not authorized.');
+      const archived = archivedRefusal(existing.group_id);
+      if (archived) throw archived;
       const stored = storedSplitInput(existing);
       const body = {
         title: sent.title ?? existing.title,
@@ -1696,6 +1748,8 @@ router.delete('/recurring/:id', (req, res) => {
     const existing = loadRecurring(Number(req.params.id), req);
     if (!existing) return res.status(404).json({ error: 'Recurring expense not found.', code: 404 });
     if (!mayChangeGroupRecord(existing, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    const archived = archivedRefusal(existing.group_id);
+    if (archived) return sendRefusal(res, archived);
     db.transaction(() => {
       db.get().prepare('DELETE FROM recurring_expenses WHERE id = ?').run(existing.id);
       activity(existing.group_id, userId(req), 'recurring_deleted', 'recurring_expense', existing.id, expenseSnapshot(existing.title, existing.amount_minor, existing.currency));
@@ -1717,6 +1771,8 @@ router.post('/recurring/:id/pause', (req, res) => {
     const row = loadRecurring(id, req);
     if (!row) return res.status(404).json({ error: 'Recurring expense not found.', code: 404 });
     if (!mayChangeGroupRecord(row, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    const archived = archivedRefusal(row.group_id);
+    if (archived) return sendRefusal(res, archived);
     const missed = req.body?.missed ?? 'skip';
     if (!MISSED_MODES.includes(missed)) {
       return res.status(400).json({ error: 'missed must be "skip" or "book".', code: 400, reason: 'invalid_missed' });
