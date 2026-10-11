@@ -26,7 +26,7 @@ import {
 } from './helpers.js';
 import { nonMemberMessage } from '../../services/household-members.js';
 import {
-  expectedSubscriptionEntries, expectedSubscriptionTotals, SUBSCRIPTION_BUDGET_CATEGORY,
+  expectedSubscriptionEntries, expectedSubscriptionTotals,
 } from '../../services/subscription-budget-projection.js';
 
 const log = createLogger('Budget');
@@ -118,7 +118,7 @@ router.get('/summary', (req, res) => {
     // (services/subscription-budget-projection.js), mit demselben Filter wie
     // die Buchungen: was der Betrachter nicht sieht, zaehlt er auch nicht.
     const expected = expectedSubscriptionTotals(db.get(), {
-      from, to, filter: budgetFilter(req, 's'),
+      from, to, filter: budgetFilter(req, 'b'),
     });
 
     res.json({
@@ -188,11 +188,12 @@ router.get('/export', (req, res) => {
     // `X-Budget-Expected-Until`, wenn der Bereich breiter war als das Fenster
     // der Projektion (erwartete Zeilen enden an diesem Tag), und
     // `X-Budget-Expected-Omitted`, wenn die Gesamtgrenze gegriffen hat.
-    const expected = expectedSubscriptionEntries(db.get(), { from, to, filter: budgetFilter(req, 's') });
+    const expected = expectedSubscriptionEntries(db.get(), { from, to, filter: budgetFilter(req, 'b') });
     if (expected.until) res.setHeader('X-Budget-Expected-Until', expected.until);
     if (expected.omitted) res.setHeader('X-Budget-Expected-Omitted', 'true');
     if (expected.entries.length) {
-      entries.push(...expected.entries);
+      // Dieselbe Maske wie fuer die Buchungen darueber (#659).
+      entries.push(...maskEntries(req, expected.entries));
       entries.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
     }
 
@@ -336,20 +337,22 @@ router.get('/', (req, res) => {
     //
     // NUR IN DER MONATSLISTE: der Darlehens-Drilldown fragt nach Raten, und ein
     // Kontofilter nach dem, was ueber ein Konto lief - eine erwartete
-    // Abo-Zahlung haengt an keinem. Der Kategoriefilter trifft sie unter
-    // ihrer Kategorie; maskiert wird hier nichts, weil ein Abo die Stufe
-    // 'shared_amount' nicht kennt (BUDGET_OBJECT_VISIBILITY_VALUES).
+    // Abo-Zahlung haengt an keinem. Sichtbarkeit und Maske sind die der
+    // Buchungen: derselbe Filter (auf die verknuepfte Buchung), dieselbe
+    // maskEntries(), und der Kategoriefilter trifft wie oben die MASKIERTE
+    // Kategorie (#659).
     const accountFiltered = Number.isInteger(parseInt(req.query.account_id, 10))
       && parseInt(req.query.account_id, 10) > 0;
-    const categoryAllows = !categoryKey || !validCategoryFilter || categoryKey === SUBSCRIPTION_BUDGET_CATEGORY;
     let expectedOmitted = false;
-    if (!loanId && !accountFiltered && categoryAllows) {
+    if (!loanId && !accountFiltered) {
       const expected = expectedSubscriptionEntries(db.get(), {
-        from, to, filter: budgetFilter(req, 's'),
+        from, to, filter: budgetFilter(req, 'b'),
       });
       expectedOmitted = expected.omitted;
-      if (expected.entries.length) {
-        masked.push(...expected.entries);
+      const rows = maskEntries(req, expected.entries)
+        .filter((row) => !validCategoryFilter || row.category === categoryKey);
+      if (rows.length) {
+        masked.push(...rows);
         // Stabil: am selben Tag bleibt Gebuchtes vor Erwartetem.
         masked.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
       }

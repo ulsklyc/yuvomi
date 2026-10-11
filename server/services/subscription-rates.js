@@ -5,29 +5,12 @@ const log = createLogger('SubscriptionRates');
 const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 const FIXER_ENDPOINT = 'https://data.fixer.io/api/latest';
 
-function cachedRateRows(database, baseCurrency) {
-  return database.prepare(`
+function cachedRates(baseCurrency, currencies) {
+  const rows = db.get().prepare(`
     SELECT quote_currency, rate, fetched_at
     FROM subscription_exchange_rates
     WHERE base_currency = ?
   `).all(baseCurrency);
-}
-
-/**
- * Die gespeicherten Kurse zu einer Basiswaehrung, ohne Abruf und ohne Blick
- * auf ihr Alter - fuer Lesepfade, die nicht auf einen Kursdienst warten
- * duerfen (die Abo-Vorkommen im Budget, #1844). Die Verbindung wird
- * uebergeben, damit der Aufrufer `server/db.js` nicht selbst importieren muss.
- * @returns {Record<string, number>} Kurs je Waehrung, die Basis selbst ist 1
- */
-function cachedRatesFor(database, baseCurrency) {
-  const rates = Object.fromEntries(cachedRateRows(database, baseCurrency).map((row) => [row.quote_currency, row.rate]));
-  rates[baseCurrency] = 1;
-  return rates;
-}
-
-function cachedRates(baseCurrency, currencies) {
-  const rows = cachedRateRows(db.get(), baseCurrency);
   const rates = Object.fromEntries(rows.map((row) => [row.quote_currency, row.rate]));
   rates[baseCurrency] = 1;
   const oldest = rows.reduce((value, row) => Math.min(value, Date.parse(row.fetched_at)), Infinity);
@@ -94,4 +77,4 @@ async function getRates(baseCurrency, currencies, { refresh = false } = {}) {
   return { ...cached, source: cached.fetchedAt ? 'stale-cache' : 'unavailable' };
 }
 
-export { getRates, cachedRatesFor };
+export { getRates };

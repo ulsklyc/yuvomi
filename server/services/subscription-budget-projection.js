@@ -3,8 +3,8 @@
  * Zweck: Die EINE Stelle, die aus dem Rhythmus eines Abos die Zahlungen
  *        rechnet, die im Budget noch nicht gebucht sind - beim Lesen, ohne
  *        eine Zeile zu schreiben.
- * Abhängigkeiten: services/subscriptions.js (Rhythmus), services/subscription-rates.js
- *        (gespeicherte Kurse), utils/timezone.js ("heute"). KEIN Import von
+ * Abhängigkeiten: services/subscriptions.js (Rhythmus), utils/timezone.js
+ *        ("heute"). KEIN Import von
  *        server/db.js: die Verbindung wird uebergeben, wie bei timezone.js.
  *
  * AUSGANGSLAGE. Ein Abo mit "Ins Budget einbeziehen" haelt genau eine Buchung
@@ -37,9 +37,8 @@
  * Gleichheit fest, indem sie erst projiziert und dann verlaengert.
  */
 
-import { addBillingCycle, convertAmount, parseDateKey } from './subscriptions.js';
+import { addBillingCycle, convertAmount, parseDateKey, BILLING_CYCLES, END_TYPES } from './subscriptions.js';
 import { dateKey } from '../utils/interval-date.js';
-import { cachedRatesFor } from './subscription-rates.js';
 import { todayKey } from '../utils/timezone.js';
 
 /** Kategorie jeder Abo-Buchung im Budget (Migration v104, syncBudgetExpense). */
@@ -158,9 +157,9 @@ export function subscriptionBudgetTitle(subscription, budgetCurrency) {
 }
 
 /**
- * Betrag eines Abos in der Budget-Waehrung, positiv. Dieselbe Rechnung wie an
- * der gebuchten Zeile, samt ihrem Rueckfall: ohne Kurs steht der Betrag
- * unverrechnet da, statt zu verschwinden.
+ * Betrag eines Abos in der Budget-Waehrung, positiv - die Rechnung des
+ * SCHREIBPFADS (syncBudgetExpense), mit dessen Kursen. Die Projektion rechnet
+ * eine fremde Waehrung nicht selbst um, siehe expectedSubscriptionEntries().
  */
 export function subscriptionBudgetAmount(subscription, budgetCurrency, rates) {
   if (subscription.currency === budgetCurrency) return Math.abs(Number(subscription.amount));
@@ -185,22 +184,34 @@ export function subscriptionBudgetAmount(subscription, budgetCurrency, rates) {
  * @returns {string[]} YYYY-MM-DD
  */
 export function upcomingPaymentDates(subscription, from, to, stats = { steps: 0 }) {
-  if (!subscription?.enabled || subscription.completed_at) return [];
+  // POSITIVLISTE. Projiziert wird nur, was die Route selbst hereinliesse: ein
+  // laufendes Abo mit bekanntem Rhythmus und bekanntem Ende. Alles andere
+  // ergibt KEINE Reihe - ein unbekanntes Ende ist nicht "nie", ein Ende ohne
+  // Datum nicht unendlich, und "abgeschlossen" schlaegt einen Schalter, der
+  // noch steht.
+  if (!subscription || Number(subscription.enabled) !== 1 || subscription.completed_at) return [];
   const interval = Number(subscription.cycle_interval);
-  // Was die Route nie hereinliesse, ergibt keine Reihe - statt die Monatsliste
-  // des Budgets mit einer 500 zu beantworten.
   if (!Number.isInteger(interval) || interval < 1 || interval > 365) return [];
-  if (!['daily', 'weekly', 'monthly', 'yearly'].includes(subscription.billing_cycle)) return [];
+  if (!BILLING_CYCLES.includes(subscription.billing_cycle)) return [];
+  if (!END_TYPES.includes(subscription.end_type)) return [];
   // `to` darf "2026-11-31" heissen (so fragen die Monatsrouten): es wird nur
   // als Text verglichen. `from` und der Start werden gerechnet, also geprueft.
   try { parseDateKey(subscription.next_payment_date); parseDateKey(from); } catch { return []; }
 
   let remaining = Infinity;
   if (subscription.end_type === 'after_count') {
+    const count = Number(subscription.occurrence_count);
+    const done = Number(subscription.occurrences_done ?? 0);
+    if (subscription.occurrence_count == null || !Number.isInteger(count) || count < 1
+        || !Number.isInteger(done) || done < 0) return [];
     // Verbleibend inklusive der anstehenden (gebuchten) Zahlung - die faellt weg.
-    remaining = Number(subscription.occurrence_count) - Number(subscription.occurrences_done || 0) - 1;
+    remaining = count - done - 1;
   }
-  const endDate = subscription.end_type === 'on_date' ? subscription.end_date : null;
+  let endDate = null;
+  if (subscription.end_type === 'on_date') {
+    try { parseDateKey(subscription.end_date); } catch { return []; }
+    endDate = subscription.end_date;
+  }
   if (endDate && endDate < from) return [];
 
   // Den Vorlauf springen: nach `skipped` Verlaengerungen steht das Abo noch
@@ -234,11 +245,30 @@ export function upcomingPaymentDates(subscription, from, to, stats = { steps: 0 
  * genau das ist: erwartet, in keiner Summe. Mehr als die gebuchte Zeile
  * verraet sie nicht - Notizen und Kontoname des Abos bleiben im Abo.
  *
- * SICHTBARKEIT. `filter` ist das Fragment, mit dem der Aufrufer auch
- * `budget_entries` filtert (budgetFilter(req, 's')). Es trifft hier auf
- * `owner_id` und `visibility`, wie syncBudgetExpense sie an die gebuchte Zeile
- * schreibt - die erwartete Zeile ist damit fuer genau die sichtbar, die auch
- * die gebuchte sehen.
+ * DIE ERWARTETE ZEILE SETZT DIE GEBUCHTE FORT, und daran haengt alles Weitere.
+ * Projiziert wird nur ein Abo, dessen verknuepfte Buchung
+ * (`budget_subscriptions.budget_entry_id`) es gibt. Ohne sie - von Hand
+ * geloescht, die Verknuepfung steht dann auf NULL - hat das Abo im Budget
+ * keinen Platz, und es gibt nichts fortzusetzen; das naechste Speichern oder
+ * Verlaengern legt die Buchung wieder an.
+ *
+ * SICHTBARKEIT: EINE REGEL, AN EINER ZEILE. `filter` ist das Fragment, mit dem
+ * der Aufrufer `budget_entries` filtert (budgetFilter(req, 'b')), und es
+ * trifft hier genau diese verknuepfte Buchung. Eigentuemer und Stufe der
+ * erwarteten Zeile sind die IHREN, nicht die des Abos: wer die gebuchte Zeile
+ * nicht sieht, sieht auch keine erwartete, und der Aufrufer maskiert sie mit
+ * derselben Funktion (maskEntries) - eine Buchung, die nur ihren Betrag teilt,
+ * setzt sich auch nur mit dem Betrag fort. Eine zweite Sichtbarkeitsregel am
+ * Abo koennte von der ersten abweichen, sobald jemand die Buchung umstellt.
+ *
+ * Eine Unterdrueckung gibt es nicht: die gebuchte Zeile steht am Tag der
+ * naechsten Zahlung, die Reihe beginnt danach. Keine fremde Buchung kann eine
+ * erwartete Zeile verschwinden lassen oder durch deren Fehlen auffallen.
+ *
+ * BETRAG. In der Budget-Waehrung ist es der Betrag des Abos. In einer fremden
+ * Waehrung ist es der Betrag der gebuchten Zeile: sie traegt, was beim letzten
+ * Speichern umgerechnet wurde. Ein eigener Kurs beim Lesen waere ein zweiter
+ * Wert fuer dieselbe Zahlung - und ohne Kurs ein erfundener.
  *
  * VERGANGENE MONATE BLEIBEN LEER. Was vor dem laufenden Monat des Haushalts
  * liegt und nie verlaengert wurde, ist keine Erwartung mehr, sondern ein
@@ -249,7 +279,7 @@ export function upcomingPaymentDates(subscription, from, to, stats = { steps: 0 
  * @param {object} range
  * @param {string} range.from  YYYY-MM-DD
  * @param {string} range.to    YYYY-MM-DD
- * @param {{ clause: string, params: any[] }} [range.filter]  beginnt mit ' AND ' oder ist leer; Alias `s`
+ * @param {{ clause: string, params: any[] }} [range.filter]  beginnt mit ' AND ' oder ist leer; Alias `b` (die verknuepfte Buchung)
  * @param {string} [range.today]  YYYY-MM-DD, Vorgabe: heute in der Haushaltszone
  * @param {{ steps: number }} [range.stats]  zaehlt die Schritte (Tests)
  * @returns {{ entries: object[], omitted: boolean, until: string|null }}
@@ -275,28 +305,21 @@ export function expectedSubscriptionEntries(database, { from, to, filter, today 
 
   const f = filter?.clause ? filter : { clause: '', params: [] };
   const subscriptions = database.prepare(`
-    SELECT s.*, u.display_name AS creator_name
-    FROM (
-      SELECT sub.id, sub.name, sub.amount, sub.currency, sub.billing_cycle, sub.cycle_interval,
-             sub.next_payment_date, sub.enabled, sub.completed_at, sub.end_type, sub.end_date,
-             sub.occurrence_count, sub.occurrences_done, sub.created_by,
-             COALESCE(sub.owner_id, sub.created_by) AS owner_id,
-             COALESCE(sub.visibility, 'shared') AS visibility,
-             COALESCE(c.budget_subcategory_key, '') AS subcategory
-      FROM budget_subscriptions sub
-      LEFT JOIN subscription_categories c ON c.id = sub.category_id
-      WHERE sub.enabled = 1 AND sub.completed_at IS NULL AND sub.next_payment_date < ?
-    ) s
-    LEFT JOIN users u ON u.id = s.created_by
-    WHERE 1 = 1${f.clause}
+    SELECT sub.id, sub.name, sub.amount, sub.currency, sub.billing_cycle, sub.cycle_interval,
+           sub.next_payment_date, sub.enabled, sub.completed_at, sub.end_type, sub.end_date,
+           sub.occurrence_count, sub.occurrences_done, sub.created_by,
+           b.owner_id, b.visibility, b.amount AS booked_amount,
+           COALESCE(c.budget_subcategory_key, '') AS subcategory,
+           u.display_name AS creator_name
+    FROM budget_subscriptions sub
+    JOIN budget_entries b ON b.id = sub.budget_entry_id
+    LEFT JOIN subscription_categories c ON c.id = sub.category_id
+    LEFT JOIN users u ON u.id = sub.created_by
+    WHERE sub.enabled = 1 AND sub.completed_at IS NULL AND sub.next_payment_date < ?${f.clause}
   `).all(to, ...f.params);
   if (!subscriptions.length) return { entries: [], omitted: false, until };
 
   const currency = subscriptionBudgetCurrency(database);
-  const foreign = [...new Set(subscriptions.map((s) => s.currency).filter((c) => c !== currency))];
-  // Gespeicherte Kurse, ohne Abruf: ein Lesepfad des Budgets wartet nicht auf
-  // einen Kursdienst und schreibt keinen Cache.
-  const rates = foreign.length ? cachedRatesFor(database, currency) : {};
 
   // Ein Schritt ergibt hoechstens eine Zeile, dazu je Abo bis zu drei ohne
   // (vor dem Bereich, dahinter). Mit diesem Budget endet das Zaehlen, sobald
@@ -309,7 +332,11 @@ export function expectedSubscriptionEntries(database, { from, to, filter, today 
       return { entries: [], omitted: true, until };
     }
     if (!dates.length) continue;
-    const amount = -subscriptionBudgetAmount(subscription, currency, rates);
+    // Beide Spalten sind NOT NULL, die des Abos per CHECK nie negativ; was
+    // trotzdem keine Zahl ist, ergibt keine Zahlung - auch keine von 0.
+    const source = subscription.currency === currency ? subscription.amount : subscription.booked_amount;
+    if (source == null || !Number.isFinite(Number(source))) continue;
+    const amount = -Math.abs(Number(source));
     const title = subscriptionBudgetTitle(subscription, currency);
     for (const date of dates) {
       entries.push({

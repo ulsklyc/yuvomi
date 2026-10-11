@@ -432,12 +432,17 @@ test('Sprung zum Bereichsanfang == Schritt fuer Schritt (Aequivalenz, auch am Mo
 });
 
 test('Gesamtgrenze: zu viele erwartete Zeilen brechen das Zaehlen ab, und die Antwort sagt es', async () => {
+  // Direkt gesaet (170 Abos ueber die Route waeren 170 Anfragen), aber in der
+  // Form, die die Route hinterlaesst: jedes Abo mit seiner verknuepften Buchung.
+  const insertEntry = db.prepare(`
+    INSERT INTO budget_entries (title, amount, category, date, created_by, owner_id)
+    VALUES (?, -1, 'subscriptions', '2026-10-01', ?, ?)`);
   const insert = db.prepare(`
-    INSERT INTO budget_subscriptions (name, amount, currency, billing_cycle, cycle_interval, next_payment_date, created_by, owner_id)
-    VALUES (?, 1, 'EUR', 'daily', 1, '2026-10-01', ?, ?)`);
+    INSERT INTO budget_subscriptions (name, amount, currency, billing_cycle, cycle_interval, next_payment_date, created_by, owner_id, budget_entry_id)
+    VALUES (?, 1, 'EUR', 'daily', 1, '2026-10-01', ?, ?, ?)`);
   const perSub = 30; // November, taeglich
   const count = Math.ceil(projection.MAX_EXPECTED_ROWS / perSub) + 1;
-  for (let i = 0; i < count; i += 1) insert.run(`Abo ${i}`, A, A);
+  for (let i = 0; i < count; i += 1) insert.run(`Abo ${i}`, A, A, insertEntry.run(`Abo ${i}`, A, A).lastInsertRowid);
 
   const stats = { steps: 0 };
   const direct = projection.expectedSubscriptionEntries(db, { from: '2026-11-01', to: '2026-11-30', stats });
@@ -478,4 +483,111 @@ test('Export ueber Jahre: erwartete Zeilen hoechstens fuer das Fenster, und der 
   const monthly = await fetch(`${baseUrl}/budget/export?month=2026-11`);
   assert.equal(monthly.headers.get('x-budget-expected-until'), null, 'ein Monat passt ins Fenster: kein Hinweis');
   await monthly.text();
+});
+
+// ── Fehlender oder unpassender Zustand: keine Projektion ────────────────────────
+// Die erwartete Zeile setzt die GEBUCHTE fort. Fehlt die, oder passt ein Wert
+// nicht in die Positivliste, gibt es keine erwartete Zeile - nie "trotzdem",
+// und nie ein Ersatzwert, der wie eine Zahlung aussieht.
+
+test('ohne verknuepfte Buchung keine Projektion (von Hand geloescht), nach dem Speichern wieder', async () => {
+  const sub = await createSub();
+  assert.equal(expectedOf(await month('2026-11')).length, 1);
+  const del = await call('DELETE', `/budget/${sub.budget_entry_id}`);
+  assert.ok(del.status === 200 || del.status === 204, `Buchung geloescht: ${del.status}`);
+  assert.equal(db.prepare('SELECT budget_entry_id FROM budget_subscriptions WHERE id = ?').get(sub.id).budget_entry_id, null,
+    'die Verknuepfung ist verwaist (ON DELETE SET NULL)');
+  assert.equal((await month('2026-11')).length, 0, 'ohne gebuchte Zeile setzt nichts sie fort');
+  assert.equal((await call('GET', '/budget/summary?month=2026-11')).body.data.pending.count, 0);
+  // Das Abo speichern legt die Buchung wieder an - und mit ihr die Folgemonate.
+  await call('PUT', `/budget/subscriptions/${sub.id}`, { body: { name: 'Streaming' } });
+  assert.equal(expectedOf(await month('2026-11')).length, 1);
+});
+
+test('Positivliste: unbekanntes Ende, Ende ohne Datum, unbekannter Rhythmus, abgeschlossen trotz Schalter', () => {
+  const ok = { enabled: 1, completed_at: null, billing_cycle: 'monthly', cycle_interval: 1, next_payment_date: '2026-10-20', end_type: 'never' };
+  const dates = (over) => projection.upcomingPaymentDates({ ...ok, ...over }, '2026-11-01', '2026-11-30');
+  assert.deepEqual(dates({}), ['2026-11-20'], 'Vorbedingung: der gute Zustand projiziert');
+  assert.deepEqual(dates({ end_type: 'someday' }), [], 'ein Ende, das niemand kennt, ist nicht "nie"');
+  assert.deepEqual(dates({ end_type: null }), []);
+  assert.deepEqual(dates({ end_type: 'on_date', end_date: null }), [], 'Ende an einem Datum ohne Datum ist nicht unendlich');
+  assert.deepEqual(dates({ end_type: 'on_date', end_date: '2026-13-45' }), []);
+  assert.deepEqual(dates({ end_type: 'after_count', occurrence_count: null }), []);
+  assert.deepEqual(dates({ end_type: 'after_count', occurrence_count: 'viele' }), []);
+  assert.deepEqual(dates({ billing_cycle: 'quarterly' }), []);
+  assert.deepEqual(dates({ cycle_interval: 0 }), []);
+  assert.deepEqual(dates({ next_payment_date: '' }), []);
+  assert.deepEqual(dates({ next_payment_date: '2026-02-30' }), []);
+  assert.deepEqual(dates({ enabled: 0 }), []);
+  assert.deepEqual(dates({ enabled: 1, completed_at: '2026-10-01T00:00:00Z' }), [], 'abgeschlossen schlaegt den Schalter');
+});
+
+test('abgeschlossen, aber der Schalter steht noch: die Route projiziert nicht', async () => {
+  const sub = await createSub();
+  db.prepare("UPDATE budget_subscriptions SET completed_at = '2026-10-01T00:00:00Z' WHERE id = ?").run(sub.id);
+  assert.equal(expectedOf(await month('2026-11')).length, 0);
+});
+
+// ── Zwei Mitglieder: die Sichtbarkeit haengt an der gebuchten Zeile ─────────────
+
+test('die gebuchte Zeile wird privat: der andere sieht weder sie noch ihre Fortsetzung', async () => {
+  setConfig('budget_mode', 'personal');
+  const sub = await createSub({ name: 'Geteilt', visibility: 'shared' });
+  assert.equal(expectedOf(await month('2026-11', { as: B, query: '&scope=household' })).length, 1);
+  const put = await call('PUT', `/budget/${sub.budget_entry_id}`, { body: { visibility: 'private' } });
+  assert.equal(put.status, 200, put.text);
+  for (const scope of ['mine', 'household']) {
+    assert.equal((await month('2026-10', { as: B, query: `&scope=${scope}` })).length, 0, `B, ${scope}: die echte Zeile ist weg`);
+    assert.equal((await month('2026-11', { as: B, query: `&scope=${scope}` })).length, 0, `B, ${scope}: also auch keine erwartete`);
+    const summary = await call('GET', `/budget/summary?month=2026-11&scope=${scope}`, { as: B });
+    assert.equal(summary.body.data.pending.count, 0);
+  }
+  assert.equal(expectedOf(await month('2026-11', { as: A, query: '&scope=mine' })).length, 1, 'A sieht beide weiter');
+});
+
+test('"nur Betrag" an der gebuchten Zeile: die erwartete ist fuer andere genauso maskiert', async () => {
+  setConfig('budget_mode', 'personal');
+  const sub = await createSub({ name: 'Therapie', visibility: 'shared' });
+  const put = await call('PUT', `/budget/${sub.budget_entry_id}`, { body: { visibility: 'shared_amount' } });
+  assert.equal(put.status, 200, put.text);
+  const real = (await month('2026-10', { as: B, query: '&scope=household' }))[0];
+  assert.equal(real.details_hidden, true, 'Vorbedingung: die echte Zeile ist fuer B maskiert');
+  const rows = await month('2026-11', { as: B, query: '&scope=household' });
+  assert.equal(rows.length, 1, 'der Betrag zaehlt weiter');
+  const row = rows[0];
+  assert.equal(row.details_hidden, true);
+  assert.equal(row.title, '', 'der Zweck steht nicht da');
+  assert.equal(row.category, '__private__');
+  assert.equal(row.amount, -12.99);
+  assert.equal(JSON.stringify(rows).includes('Therapie'), false);
+  // Der Kategoriefilter trifft die MASKIERTE Kategorie, wie bei echten Zeilen (#659).
+  assert.equal((await month('2026-11', { as: B, query: '&scope=household&category=subscriptions' })).length, 0);
+  assert.equal((await month('2026-11', { as: B, query: '&scope=household&category=__private__' })).length, 1);
+  const csv = await call('GET', '/budget/export?month=2026-11&scope=household', { as: B });
+  assert.doesNotMatch(csv.text, /Therapie/);
+  assert.match(csv.text, /2026-11-20,"Private entry",-12\.99,Private,/);
+  // A selbst sieht alles.
+  assert.equal((await month('2026-11', { as: A, query: '&scope=mine' }))[0].title, 'Therapie');
+});
+
+test('eine fremde private Buchung am selben Tag unterdrueckt nichts und verraet nichts', async () => {
+  setConfig('budget_mode', 'personal');
+  await createSub({ name: 'Geteilt', visibility: 'shared' }, { as: B });
+  const before = await month('2026-11', { as: B, query: '&scope=mine' });
+  // A legt eine private Buchung mit gleichem Titel, Betrag und Tag an.
+  db.prepare(`INSERT INTO budget_entries (title, amount, category, date, created_by, owner_id, visibility)
+              VALUES ('Geteilt', -12.99, 'subscriptions', '2026-11-20', ?, ?, 'private')`).run(A, A);
+  assert.deepEqual(await month('2026-11', { as: B, query: '&scope=mine' }), before,
+    'die Antwort an B ist dieselbe: es gibt keine Unterdrueckung, an der eine fremde Zeile haengen koennte');
+});
+
+test('Fremdwaehrung ohne gespeicherten Kurs: der Betrag der gebuchten Zeile, kein zweiter Wert', async () => {
+  await createSub({ name: 'Cloud', amount: 10, currency: 'USD' });
+  const real = (await month('2026-10'))[0];
+  const projected = (await month('2026-11'))[0];
+  assert.equal(projected.amount, real.amount);
+  // Der Kurs aendert sich spaeter: die erwartete Zeile bleibt bei dem, was gebucht steht.
+  db.prepare(`INSERT INTO subscription_exchange_rates (base_currency, quote_currency, rate, fetched_at)
+              VALUES ('EUR', 'USD', 0.5, ?)`).run(new Date(NOW).toISOString());
+  assert.equal((await month('2026-11'))[0].amount, real.amount);
 });
