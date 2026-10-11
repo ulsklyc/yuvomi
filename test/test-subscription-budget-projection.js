@@ -560,6 +560,10 @@ test('"nur Betrag" an der gebuchten Zeile: die erwartete ist fuer andere genauso
   assert.equal(row.category, '__private__');
   assert.equal(row.amount, -12.99);
   assert.equal(JSON.stringify(rows).includes('Therapie'), false);
+  // Auch kein Verweis auf das Abo: es kann selbst geteilt sein, und ueber die
+  // id liesse sich in der Abo-Liste nachschlagen, wofuer der Betrag ist.
+  assert.equal('subscription_id' in row, false, 'die maskierte Zeile nennt ihr Abo nicht');
+  assert.equal(row.expected, true, 'erwartet bleibt sie - das ist ein Zustand, kein Zweck');
   // Der Kategoriefilter trifft die MASKIERTE Kategorie, wie bei echten Zeilen (#659).
   assert.equal((await month('2026-11', { as: B, query: '&scope=household&category=subscriptions' })).length, 0);
   assert.equal((await month('2026-11', { as: B, query: '&scope=household&category=__private__' })).length, 1);

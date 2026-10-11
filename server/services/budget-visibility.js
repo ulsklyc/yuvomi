@@ -206,6 +206,10 @@ export function maskBudgetEntry(row, viewerId, mode) {
   delete masked.loan_installment_number;
   delete masked.loan_title;
   delete masked.loan_borrower;
+  // Die erwartete Abo-Zahlung (#1844) traegt die id ihres Abos. Das Abo kann
+  // selbst geteilt sein, waehrend seine Buchung nur den Betrag teilt - ueber
+  // die id liesse sich in der Abo-Liste nachschlagen, wofuer das Geld ist.
+  delete masked.subscription_id;
   return masked;
 }
 
