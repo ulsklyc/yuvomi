@@ -5178,7 +5178,7 @@ Related hardening: the inbound `cancelled` delete is scoped to the reporting cal
 
 ### Notes (`/notes`)
 
-Responsive grid with colored sticky notes. Phones use one readable column; wider containers progressively use two columns from 520px, three from 720px, four from 900px, and five from 1200px. The title keeps its intrinsic width while search flexes into the remaining toolbar space, preventing clipping on narrow screens.
+Responsive grid with colored sticky notes. Phones use one readable column; wider containers progressively use two columns from 520px, three from 720px, and four from 1200px, never more, so a card stays at least 232px wide. The title keeps its intrinsic width while search flexes into the remaining toolbar space, preventing clipping on narrow screens.
 
 - CRUD: title (optional), content, color
 - **The editor is a workspace:** title and text carry no label rows (the labels stay as accessible names), and the text field has a minimum height that fills the sheet (300px or 38% of the viewport height on a phone, 400px or 45% in the wide dialog) and grows with its content where the browser supports `field-sizing`. Categories and "More settings" (colour, pin) follow below it. The formatting toolbar is the shared one (see Tasks).
