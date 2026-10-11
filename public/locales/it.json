@@ -1383,6 +1383,7 @@
         "confirmFirstHint": "Ogni movimento generato attende la tua conferma. Fino ad allora compare nell'elenco ma non conta in nessun totale - importo e data si possono correggere al momento della conferma.",
         "pendingBadge": "Previsto",
         "upcomingLabel": "Non ancora avvenuto",
+        "expectedSubscriptionOpen": "Vedi in Abbonamenti",
         "confirmAction": "Registra",
         "confirmTitle": "Conferma movimento",
         "confirmHint": "Correggi importo e data se l'addebito è stato diverso.",

@@ -24,7 +24,7 @@ import * as outbound from './calendar-outbound.js';
 import { decodeHtmlEntities } from '../utils/html-entities.js';
 import { nearestColorId } from '../utils/ical-color.js';
 // Fallback-Zone für den Outbound-Sync, wenn Google für den Zielkalender keine liefert.
-import { householdTimeZone } from '../utils/timezone.js';
+import { configuredHouseholdTimeZone, householdTimeZone } from '../utils/timezone.js';
 import { outboundEvent } from './outbound-dtstart.js';
 import { assignDefaultToEvent, reassignDefaultOnCalendarMove } from './sync-assignment.js';
 import { countSourceEvents, deleteSourceEvents } from './calendar-prune.js';
@@ -352,7 +352,7 @@ async function processPendingUpdates(calendar, colorMap = {}, metaCache = new Ma
     }
 
     try {
-      const gEvent = localEventToGoogle(fresh, colorMap, activeMeta?.timeZone || householdTimeZone(db.get()));
+      const gEvent = localEventToGoogle(fresh, colorMap, outboundTimeZone(activeMeta?.timeZone));
       await calendar.events.patch({ calendarId, eventId, requestBody: gEvent });
       // Während des Patches Eingetroffenes bleibt vorgemerkt.
       outbound.settleOutbound(fresh, movedTo, event);
@@ -758,7 +758,7 @@ async function runSync(createCalendar) {
         continue;
       }
       try {
-        const gEvent  = localEventToGoogle(event, eventColorMap, meta?.timeZone || householdTimeZone(db.get()));
+        const gEvent  = localEventToGoogle(event, eventColorMap, outboundTimeZone(meta?.timeZone));
         const created = await calendar.events.insert({ calendarId: targetId, requestBody: gEvent });
         // refId aus den Metadaten: trägt Name und Farbe des Kalenders statt der
         // rohen ID als Notnamen.
@@ -1186,13 +1186,40 @@ function normalizeRecurrenceUntil(rule, allDay) {
 }
 
 /**
+ * Die Zone, in der eine ausgehende Wanduhrzeit gemeint ist (#1875).
+ *
+ * `start_datetime` ist zonenlos, und gelesen wie geschrieben wird die Spalte
+ * überall in der Haushaltszone (`readStoredInstant`, die Kalender-Routen). Nur
+ * hier stand die Zone des ZIELKALENDERS vorn: steht der auf UTC, ging "14:00"
+ * als 14:00 UTC hinaus, lag in Amsterdam auf 16:00, und der nächste Inbound
+ * holte genau diesen verschobenen Zeitpunkt zurück.
+ *
+ * Reihenfolge:
+ *   1. die GESETZTE Haushaltszone - die einzige Aussage darüber, welche Uhr
+ *      gemeint war, als jemand "14:00" eintippte;
+ *   2. die Zone des Zielkalenders - ohne Einstellung die beste Auskunft, die es
+ *      gibt (#572: `TZ` ist im Container meist UTC und hat den Termin in
+ *      Australien um Stunden verschoben);
+ *   3. der Rückfall von `householdTimeZone()` (`TZ` → System → UTC).
+ *
+ * Ein Bestandshaushalt ohne Einstellung erlebt damit keinen Wechsel.
+ *
+ * @param {string|null|undefined} calendarTimeZone  Zone aus calendarList.get
+ * @returns {string} IANA-Zone
+ */
+function outboundTimeZone(calendarTimeZone) {
+  const database = db.get();
+  return configuredHouseholdTimeZone(database) || calendarTimeZone || householdTimeZone(database);
+}
+
+/**
  * Lokales Event → Google-Event-Body.
  * @param {object} event
  * @param {Record<string,string>} colorMap
- * @param {string} [timeZone]  IANA-Zone, in der Google die Wanduhrzeit interpretiert.
- *                             Normalerweise die Zone des Zielkalenders (siehe sync()).
+ * @param {string} [timeZone]  IANA-Zone, in der Google die Wanduhrzeit interpretiert
+ *                             (siehe outboundTimeZone()).
  */
-function localEventToGoogle(rawEvent, colorMap = {}, timeZone = householdTimeZone(null)) {
+function localEventToGoogle(rawEvent, colorMap = {}, timeZone = outboundTimeZone(null)) {
   // Start und Ende mit der eigenen Wiederholungsregel in Einklang (#986), bevor
   // irgendein Feld daraus abgeleitet wird - ein importiertes DTSTART bleibt
   // unberuehrt (#756). Begruendung in services/outbound-dtstart.js.
@@ -1244,8 +1271,8 @@ function localEventToGoogle(rawEvent, colorMap = {}, timeZone = householdTimeZon
     // timeZone lehnt Google Serien ab ("recurring events: field is required"),
     // mit einer festen Zone landet das Event bei allen Nutzern außerhalb dieser
     // Zone verschoben (Issue #572: Australien = +7,5 h gegenüber Europe/Berlin).
-    // Die Zone des Zielkalenders ist die, in der Google die Zeit anzeigt - damit
-    // steht in Google dieselbe Uhrzeit wie in Yuvomi.
+    // Welche Zone es ist, entscheidet outboundTimeZone() - die Uhrzeit selbst
+    // wird nie umgerechnet.
     const startDt = toRfc3339(event.start_datetime);
     const endDt   = toRfc3339(event.end_datetime) || startDt;
     gEvent.start = { dateTime: startDt, timeZone };
@@ -1265,7 +1292,7 @@ export const __test = {
   localEventToGoogle, googleAllDayEndToInclusive, localAllDayEndToExclusive,
   upsertGoogleEvents, upsertExternalCalendar, setReadonly, isReadonly, isWritableRole,
   listSelection, setCalendarEnabled, recordSyncToken, getSyncToken, enabledCalendarIds,
-  fetchEventColorMap, householdTimeZone,
+  fetchEventColorMap, householdTimeZone, outboundTimeZone,
   processPendingDeletions, pendingDeletionCount,
   processPendingUpdates, pendingUpdateCount,
   googleCalendarIdForEvent, currentGoogleCalendarId, loadCalendarMeta,

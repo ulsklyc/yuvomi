@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import path from 'path';
 import * as db from '../../db.js';
 import {
-  budgetVisibilityWhere, budgetScopeWhere, budgetDetailsHiddenWhere, canEditEntry,
+  budgetVisibilityWhere, budgetDetailsVisibleWhere, budgetScopeWhere, budgetDetailsHiddenWhere, canEditEntry,
   resolveBudgetMode, maskBudgetEntry, BUDGET_MASKED_CATEGORY,
 } from '../../services/budget-visibility.js';
 import { computeLoanSchedule, remainingPrincipalFromPayments, remainingInstallmentsForBalance, rateForInstallment } from '../../services/loan-amortization.js';
@@ -53,6 +53,42 @@ export function budgetFilter(req, alias, { scoped = true } = {}) {
     if (scope === 'mine') params.push(me); // household-Fragment hat keinen Bind
   }
   return { clause, params };
+}
+
+/**
+ * Wer sieht die erwarteten Abo-Zahlungen der Folgemonate (#1844)? Das
+ * WHERE-Fragment fuer services/subscription-budget-projection.js, Aliase `b`
+ * (die verknuepfte Buchung) und `sub` (das Abo).
+ *
+ * AUSLASSEN STATT MASKIEREN, und zwar an EINER Stelle. Eine erwartete Zeile
+ * bekommt nur, wer
+ *   - die gebuchte Zeile in dieser Ansicht sieht (budgetFilter, wie jede Buchung),
+ *   - sie MIT IHREM ZWECK sieht (budgetDetailsVisibleWhere), und
+ *   - das Abo selbst sieht (budgetVisibilityWhere, die Regel der Abo-Liste).
+ *
+ * Eine Buchung, die nur ihren Betrag teilt, bleibt maskiert in der Liste
+ * stehen, weil ihr Betrag in den Summen steckt und sie ohne die Zeile nicht
+ * aufgingen (#659). Eine erwartete Zeile steckt in KEINER Summe - ihr Fehlen
+ * verfaelscht nichts. Maskiert waere sie dagegen eine Reihe gleicher Betraege
+ * im Rhythmus eines Abos: der Zweck, nur ohne Titel, und gegen die Abo-Liste
+ * zu lesen. Das ist die Faustregel aus services/budget-visibility.js: geht es
+ * um den Zweck und gibt es keinen Saldo, den ein Weglassen verfaelscht, gilt
+ * die Zweck-Regel. Eine maskierte erwartete Zeile gibt es deshalb nicht, und
+ * damit auch keine Form, an der man sie erkennen koennte.
+ *
+ * @returns {{ clause: string, params: number[] }}  clause beginnt mit ' AND ' oder ''
+ */
+export function expectedSubscriptionFilter(req) {
+  const mode = getBudgetMode();
+  if (mode !== 'personal') return { clause: '', params: [] };
+  const me = viewerId(req);
+  const entry = budgetFilter(req, 'b');
+  return {
+    clause: `${entry.clause}`
+      + ` AND ${budgetDetailsVisibleWhere('b', '?', { mode })}`
+      + ` AND ${budgetVisibilityWhere('sub', '?', { mode })}`,
+    params: [...entry.params, me, me],
+  };
 }
 
 /**

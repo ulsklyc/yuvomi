@@ -1383,6 +1383,7 @@
         "confirmFirstHint": "Mỗi bút toán được tạo sẽ chờ bạn xác nhận. Đến lúc đó nó vẫn hiện trong danh sách nhưng không tính vào bất kỳ tổng nào - khi xác nhận bạn có thể sửa số tiền và ngày.",
         "pendingBadge": "Dự kiến",
         "upcomingLabel": "Chưa diễn ra",
+        "expectedSubscriptionOpen": "Xem trong Gói đăng ký",
         "confirmAction": "Ghi sổ",
         "confirmTitle": "Xác nhận bút toán",
         "confirmHint": "Sửa số tiền và ngày nếu khoản trừ khác đi.",

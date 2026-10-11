@@ -83,6 +83,34 @@
   flex-wrap: wrap;
 }
 
+/* Mehrere Kopfaktionen reisen als eine Gruppe (#1787): passt sie nicht neben
+ * den Titel, bricht sie als Ganzes darunter um und in sich erst danach. */
+.rw-section__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* AUF DEM TELEFON EINE ZEILE UNTER DEM TITEL. Gemessen bei 390px, deutsch:
+ * "Teilnehmer verwalten" (193px) und "Bonus vergeben" (161px) brauchen mit der
+ * Luecke 362 von 358px - vier zu viel, und der Kopf stand in drei Zeilen. Die
+ * Gruppe nimmt deshalb die ganze Breite: der leise Knopf rueckt um seine
+ * eigene Polsterung nach aussen, sodass sein Zeichen an der Kante des Titels
+ * steht, die Kapsel schliesst mit der Kante der Liste ab. Reicht es trotzdem
+ * nicht (320px, laengere Sprachen), stehen beide untereinander an derselben
+ * Kante. */
+@media (max-width: 639px) {
+  .rw-section__actions {
+    flex: 1 1 100%;
+    justify-content: space-between;
+  }
+
+  .rw-section__actions > .btn--ghost:first-child {
+    margin-inline-start: calc(-1 * var(--space-3));
+  }
+}
+
 /* Groesse/Gewicht kommen seit dem Polish-Batch (PLAN.md #7) aus der
  * geteilten .u-section-title-Rolle (typography.css) statt aus einer eigenen
  * 18px-Deklaration hier - vier Sektionskoepfe (Setup, Anfragen, Punktestand,

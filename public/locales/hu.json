@@ -1383,6 +1383,7 @@
         "confirmFirstHint": "Minden létrehozott tétel a megerősítésedre vár. Addig szerepel a listában, de egyetlen összegbe sem számít bele - megerősítéskor az összeg és a dátum módosítható.",
         "pendingBadge": "Várható",
         "upcomingLabel": "Még nem történt meg",
+        "expectedSubscriptionOpen": "Megtekintés az Előfizetésekben",
         "confirmAction": "Könyvelés",
         "confirmTitle": "Tétel megerősítése",
         "confirmHint": "Javítsd az összeget és a dátumot, ha másképp terhelték le.",
