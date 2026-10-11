@@ -5553,6 +5553,7 @@
         "money": {
             "title": "Paga",
             "setUp": "Configurar la paga",
+            "empty": "Abre una cuenta para un niño y lleva aquí su paga, abonada según un calendario.",
             "planWeekly": "{{amount}} por semana",
             "planMonthly": "{{amount}} al mes",
             "nextCredit": "Próximo abono: {{date}}",

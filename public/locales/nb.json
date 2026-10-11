@@ -5553,6 +5553,7 @@
         "money": {
             "title": "Lommepenger",
             "setUp": "Sett opp lommepenger",
+            "empty": "Opprett en konto for et barn for å ha lommepengene her, godskrevet etter en plan.",
             "planWeekly": "{{amount}} per uke",
             "planMonthly": "{{amount}} per måned",
             "nextCredit": "Neste innskudd: {{date}}",
