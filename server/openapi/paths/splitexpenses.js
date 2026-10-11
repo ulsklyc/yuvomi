@@ -87,8 +87,43 @@ const activityPageResponse = {
   },
 };
 
+// Archivierte Gruppe (#1747): jede Schreibroute der Gruppe antwortet 409 mit
+// `reason: "group_archived"`, nachdem 404 und 403 geprueft sind. Eine Liste
+// statt eines Textes je Operation: Archivieren, Wiederherstellen und Loeschen
+// der Gruppe stehen bewusst nicht darin.
+const ARCHIVED_NOTE = 'While the group is archived this is refused with `409` and `reason: "group_archived"` (checked after `404` and `403`); restore the group first.';
+const ARCHIVED_REFUSAL = 'The group is archived (`reason: "group_archived"`); nothing was changed';
+const ARCHIVE_REFUSING = [
+  ['/api/v1/split-expenses/groups/{id}', 'patch'],
+  ['/api/v1/split-expenses/groups/{id}/members', 'post'],
+  ['/api/v1/split-expenses/groups/{id}/members/{userId}', 'delete'],
+  ['/api/v1/split-expenses/groups/{id}/guests', 'post'],
+  ['/api/v1/split-expenses/groups/{id}/expenses', 'post'],
+  ['/api/v1/split-expenses/groups/{id}/settlements', 'post'],
+  ['/api/v1/split-expenses/groups/{id}/settlements/{settlementId}/reverse', 'post'],
+  ['/api/v1/split-expenses/groups/{id}/recurring', 'post'],
+  ['/api/v1/split-expenses/expenses/{id}', 'put'],
+  ['/api/v1/split-expenses/expenses/{id}', 'delete'],
+  ['/api/v1/split-expenses/expenses/{id}/comments', 'post'],
+  ['/api/v1/split-expenses/recurring/{id}', 'put'],
+  ['/api/v1/split-expenses/recurring/{id}', 'delete'],
+  ['/api/v1/split-expenses/recurring/{id}/pause', 'post'],
+];
+
+function refuseWhenArchived(paths) {
+  for (const [path, method] of ARCHIVE_REFUSING) {
+    const operation = paths[path][method];
+    operation.description = operation.description ? `${operation.description} ${ARCHIVED_NOTE}` : ARCHIVED_NOTE;
+    const known = operation.responses[409];
+    operation.responses[409] = known
+      ? { ...known, description: `${known.description} Or: ${ARCHIVED_REFUSAL}` }
+      : apiError(ARCHIVED_REFUSAL);
+  }
+  return paths;
+}
+
 export function splitexpensesPaths() {
-  return {
+  return refuseWhenArchived({
     '/api/v1/split-expenses/meta': { get: op({ summary: 'Get split expenses metadata', tag: 'SplitExpenses' }) },
     '/api/v1/split-expenses/dashboard': { get: op({ summary: 'Get split expenses dashboard summary', tag: 'SplitExpenses' }) },
     '/api/v1/split-expenses/groups': {
@@ -251,5 +286,5 @@ export function splitexpensesPaths() {
     '/api/v1/split-expenses/search': {
       get: op({ summary: 'Search split-expense groups, expenses, and people', tag: 'SplitExpenses' }),
     },
-  };
+  });
 }

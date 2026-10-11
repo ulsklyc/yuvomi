@@ -1832,6 +1832,181 @@ test('unbookableReason: ein Fehler, der kein "unbuchbar" ist, wird weitergeworfe
   assert.throws(() => unbookableReason(kaputt, zeile), TypeError);
 });
 
+// --------------------------------------------------------------------------
+// Archivierte Gruppe (#1747): der Server sperrt jede Aenderung, nicht nur die
+// Seite. Wiederherstellen bleibt moeglich; Lesen ebenfalls.
+// --------------------------------------------------------------------------
+const OWNER_ACTOR = { id: OWNER, role: 'member' };
+const MGR_ACTOR = { id: MGR, role: 'member' };
+const MEM_ACTOR = { id: MEM, role: 'member' };
+const TOKEN_ACTOR = { id: OWNER, role: 'member', scopes: ['budget:write'] };
+
+// Alles, was eine Schreibroute der Gruppe anfassen koennte.
+function gruppenStand(gid) {
+  const q = (sql) => db.prepare(sql).all(gid);
+  return JSON.stringify({
+    gruppe: q('SELECT * FROM expense_groups WHERE id = ?'),
+    mitglieder: q('SELECT * FROM expense_group_members WHERE group_id = ? ORDER BY user_id'),
+    ausgaben: q('SELECT * FROM expenses WHERE group_id = ? ORDER BY id'),
+    anteile: q('SELECT s.* FROM expense_splits s JOIN expenses e ON e.id = s.expense_id WHERE e.group_id = ? ORDER BY s.id'),
+    kommentare: q('SELECT c.* FROM expense_comments c JOIN expenses e ON e.id = c.expense_id WHERE e.group_id = ? ORDER BY c.id'),
+    ledger: q('SELECT * FROM expense_ledger_entries WHERE group_id = ? ORDER BY id'),
+    zahlungen: q('SELECT * FROM settlements WHERE group_id = ? ORDER BY id'),
+    serien: q('SELECT * FROM recurring_expenses WHERE group_id = ? ORDER BY id'),
+    verlauf: q('SELECT id FROM expense_activity WHERE group_id = ? ORDER BY id'),
+    gaeste: db.prepare('SELECT COUNT(*) AS n FROM split_expense_guest_users WHERE group_id = ?').get(gid).n,
+    nutzer: db.prepare('SELECT COUNT(*) AS n FROM users').get().n,
+  });
+}
+
+// Eine Gruppe mit Owner, Manager (admin) und Mitglied; je ein Datensatz von
+// Owner UND Mitglied, damit auch das Mitglied an "seinem" Datensatz ankommt.
+async function archivGruppe(name) {
+  const gid = await serienGruppe(name);
+  assert.equal((await call('POST', `/groups/${gid}/members`, { actor: OWNER_ACTOR, body: { user_id: MGR, role: 'admin' } })).status, 201);
+  const ids = {};
+  for (const [wer, actor] of [['owner', OWNER_ACTOR], ['mem', MEM_ACTOR]]) {
+    const e = await call('POST', `/groups/${gid}/expenses`, { actor, body: { title: `Ausgabe ${wer}`, amount: '12.00', currency: 'EUR', payer_id: actor.id, participants: [OWNER, MEM], expense_date: '2026-03-05' } });
+    assert.equal(e.status, 201, JSON.stringify(e.body));
+    const z = await call('POST', `/groups/${gid}/settlements`, { actor, body: { payer_id: MEM, payee_id: OWNER, amount: '1.00', currency: 'EUR' } });
+    assert.equal(z.status, 201, JSON.stringify(z.body));
+    ids[wer] = { expense: e.body.data.id, settlement: z.body.data.id, series: await serieIn(gid, { title: `Serie ${wer}` }) };
+    db.prepare('UPDATE recurring_expenses SET created_by = ? WHERE id = ?').run(actor.id, ids[wer].series);
+  }
+  return { gid, ids };
+}
+
+// Jede Schreibroute einer Gruppe. `mem` ist, was ein einfaches Mitglied
+// (Rolle guest) bekommt: 409, wo es schreiben duerfte (die Gruppe oder sein
+// eigener Datensatz), 403 bei Gruppenverwaltung und fremden Datensaetzen.
+function schreibRouten(gid, ids) {
+  const expenseBody = { title: 'Neu', amount: '5.00', currency: 'EUR', payer_id: OWNER, participants: [OWNER, MEM], expense_date: '2026-03-06' };
+  const own = (actor) => (actor.id === MEM ? ids.mem : ids.owner);
+  return (actor) => [
+    ['PATCH group', 'PATCH', `/groups/${gid}`, { name: 'Umbenannt' }, 'manage'],
+    ['POST members', 'POST', `/groups/${gid}/members`, { user_id: OUTSIDER, role: 'guest' }, 'manage'],
+    ['DELETE member', 'DELETE', `/groups/${gid}/members/${MEM}`, undefined, 'manage'],
+    ['POST guests', 'POST', `/groups/${gid}/guests`, { display_name: 'Archivgast', password: 'ein-langes-passwort' }, 'manage'],
+    ['POST expenses', 'POST', `/groups/${gid}/expenses`, expenseBody, 'any'],
+    ['PUT expense', 'PUT', `/expenses/${own(actor).expense}`, expenseBody, 'own'],
+    ['DELETE expense', 'DELETE', `/expenses/${own(actor).expense}`, undefined, 'own'],
+    ['POST comment', 'POST', `/expenses/${own(actor).expense}/comments`, { comment: 'Hallo' }, 'any'],
+    ['POST settlements', 'POST', `/groups/${gid}/settlements`, { payer_id: MEM, payee_id: OWNER, amount: '1.00', currency: 'EUR' }, 'any'],
+    ['POST settlement reverse', 'POST', `/groups/${gid}/settlements/${own(actor).settlement}/reverse`, undefined, 'own'],
+    ['POST recurring', 'POST', `/groups/${gid}/recurring`, { title: 'Neu', amount: '9.00', currency: 'EUR', frequency: 'monthly', next_run_date: '2026-04-10', payer_id: OWNER, participants: [OWNER, MEM] }, 'any'],
+    ['PUT recurring', 'PUT', `/recurring/${own(actor).series}`, { title: 'Anders' }, 'own'],
+    ['DELETE recurring', 'DELETE', `/recurring/${own(actor).series}`, undefined, 'own'],
+    ['POST recurring pause', 'POST', `/recurring/${own(actor).series}/pause`, {}, 'own'],
+  ];
+}
+
+test('archivierte Gruppe: jede Schreibroute antwortet 409 group_archived und aendert nichts (Manager, Mitglied, Token)', async () => {
+  const { gid, ids } = await archivGruppe('Archiv-Sperre');
+  assert.equal((await call('POST', `/groups/${gid}/archive`, { actor: OWNER_ACTOR })).status, 200);
+  const vorher = gruppenStand(gid);
+  const routen = schreibRouten(gid, ids);
+  for (const [wer, actor] of [['Owner', OWNER_ACTOR], ['Manager', MGR_ACTOR], ['Mitglied', MEM_ACTOR], ['Token', TOKEN_ACTOR]]) {
+    for (const [name, method, path, body, regel] of routen(actor)) {
+      const r = await call(method, path, { actor, body });
+      const erwartet = actor.id === MEM && regel === 'manage' ? 403 : 409;
+      assert.equal(r.status, erwartet, `${wer}: ${name} -> ${JSON.stringify(r.body)}`);
+      if (erwartet === 409) {
+        assert.equal(r.body.reason, 'group_archived', `${wer}: ${name}`);
+        assert.equal(r.body.error, 'This group is archived. Restore it to make changes.', `${wer}: ${name}`);
+      }
+      assert.equal(gruppenStand(gid), vorher, `${wer}: ${name} hat nichts geaendert`);
+    }
+  }
+});
+
+test('archivierte Gruppe: 404 und 403 gehen vor 409 - nichts ueber den Zustand verraten', async () => {
+  const { gid, ids } = await archivGruppe('Archiv-Reihenfolge');
+  await call('POST', `/groups/${gid}/archive`, { actor: OWNER_ACTOR });
+  const vorher = gruppenStand(gid);
+  const outsider = { id: OUTSIDER, role: 'member' };
+  for (const [name, method, path, body] of schreibRouten(gid, ids)(OWNER_ACTOR)) {
+    const r = await call(method, path, { actor: outsider, body });
+    assert.equal(r.status, 404, `Aussenstehender: ${name}`);
+    assert.notEqual(r.body.reason, 'group_archived', `Aussenstehender: ${name}`);
+  }
+  // Das Mitglied an fremden Datensaetzen: 403, nicht 409.
+  for (const [name, method, path, body] of [
+    ['PUT expense', 'PUT', `/expenses/${ids.owner.expense}`, { title: 'X', amount: '1.00', currency: 'EUR', payer_id: OWNER, participants: [OWNER, MEM] }],
+    ['DELETE expense', 'DELETE', `/expenses/${ids.owner.expense}`],
+    ['reverse', 'POST', `/groups/${gid}/settlements/${ids.owner.settlement}/reverse`],
+    ['PUT recurring', 'PUT', `/recurring/${ids.owner.series}`, { title: 'X' }],
+    ['DELETE recurring', 'DELETE', `/recurring/${ids.owner.series}`],
+    ['pause', 'POST', `/recurring/${ids.owner.series}/pause`, {}],
+  ]) {
+    const r = await call(method, path, { actor: MEM_ACTOR, body });
+    assert.equal(r.status, 403, `Mitglied, fremder Datensatz: ${name}`);
+  }
+  assert.equal(gruppenStand(gid), vorher);
+});
+
+test('archivierte Gruppe: Lesen bleibt, Wiederherstellen und erneutes Archivieren gehen, danach wird wieder geschrieben', async () => {
+  const { gid, ids } = await archivGruppe('Archiv-Lesen');
+  await call('POST', `/groups/${gid}/archive`, { actor: OWNER_ACTOR });
+  for (const path of [`/groups/${gid}/members`, `/groups/${gid}/expenses`, `/groups/${gid}/balances`, `/groups/${gid}/recurring`, `/groups/${gid}/activity`, '/groups?status=archived']) {
+    assert.equal((await call('GET', path, { actor: MEM_ACTOR })).status, 200, path);
+  }
+  assert.equal((await call('POST', `/groups/${gid}/archive`, { actor: OWNER_ACTOR })).status, 200, 'zweimal archivieren schadet nicht');
+  assert.equal((await call('DELETE', `/groups/${gid}`, { actor: OWNER_ACTOR })).status, 409, 'Loeschen bleibt an die Finanzhistorie gebunden');
+
+  assert.equal((await call('POST', `/groups/${gid}/unarchive`, { actor: OWNER_ACTOR })).status, 200);
+  const expense = { title: 'Wieder da', amount: '5.00', currency: 'EUR', payer_id: OWNER, participants: [OWNER, MEM], expense_date: '2026-03-06' };
+  assert.equal((await call('POST', `/groups/${gid}/expenses`, { actor: MEM_ACTOR, body: expense })).status, 201);
+  assert.equal((await call('PUT', `/expenses/${ids.mem.expense}`, { actor: MEM_ACTOR, body: expense })).status, 200);
+  assert.equal((await call('POST', `/expenses/${ids.mem.expense}/comments`, { actor: MEM_ACTOR, body: { comment: 'Hallo' } })).status, 201);
+  assert.equal((await call('POST', `/groups/${gid}/settlements`, { actor: MEM_ACTOR, body: { payer_id: MEM, payee_id: OWNER, amount: '1.00', currency: 'EUR' } })).status, 201);
+  assert.equal((await call('PATCH', `/groups/${gid}`, { actor: OWNER_ACTOR, body: { name: 'Wieder aktiv' } })).status, 200);
+  assert.equal((await call('POST', `/recurring/${ids.mem.series}/pause`, { actor: MEM_ACTOR, body: {} })).status, 200);
+});
+
+test('Buchungslauf: eine archivierte Gruppe wird weder gebucht noch pausiert; Wiederherstellen rueckt hinter die Luecke', async (t) => {
+  const archiviert = await serienGruppe('Lauf-Archiv');
+  const aktiv = await serienGruppe('Lauf-Aktiv');
+  const serie = await serieIn(archiviert, { title: 'Faellig im Archiv', next_run_date: '2026-03-10' });
+  const kaputt = await serieIn(archiviert, { title: 'Kaputt im Archiv', next_run_date: '2026-03-10' });
+  db.prepare("UPDATE recurring_expenses SET split_snapshot = '{participants' WHERE id = ?").run(kaputt);
+  const pausiert = await serieIn(archiviert, { title: 'Pausiert im Archiv', next_run_date: '2026-03-10' });
+  db.prepare("UPDATE recurring_expenses SET paused_at = '2026-02-01T00:00:00Z' WHERE id = ?").run(pausiert);
+  const daneben = await serieIn(aktiv, { title: 'Aktive Gruppe', next_run_date: '2026-03-10' });
+  assert.equal((await call('POST', `/groups/${archiviert}/archive`, { actor: OWNER_ACTOR })).status, 200);
+
+  // Die Luecke: der Lauf sieht fuer die archivierte Gruppe nichts, auch nicht
+  // die unbuchbare Serie, die er sonst pausierte; die aktive Gruppe laeuft.
+  assert.deepEqual(serienLauf('2026-06-15'), { generated: 1, paused: 0, failed: 0 });
+  assert.equal(gebucht(daneben), 1);
+  db.prepare('UPDATE recurring_expenses SET paused_at = ? WHERE id = ?').run('2026-06-15T00:00:00Z', daneben);
+  for (const id of [serie, kaputt]) {
+    assert.equal(gebucht(id), 0);
+    assert.deepEqual(serienStand(id), { next_run_date: '2026-03-10', paused_at: null });
+  }
+  assert.deepEqual(autoPausen(kaputt), []);
+  assert.deepEqual(serienLauf('2026-06-15'), { generated: 0, paused: 0, failed: 0 });
+
+  // Wiederherstellen am 15.06.: jede unpausierte Serie steht auf dem ersten
+  // Termin ab heute, die pausierte bleibt, wie sie ist.
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-06-15T12:00:00Z') });
+  const ok = await call('POST', `/groups/${archiviert}/unarchive`, { actor: OWNER_ACTOR });
+  t.mock.timers.reset();
+  assert.equal(ok.status, 200);
+  for (const id of [serie, kaputt]) assert.equal(serienStand(id).next_run_date, '2026-07-10');
+  assert.deepEqual(serienStand(pausiert), { next_run_date: '2026-03-10', paused_at: '2026-02-01T00:00:00Z' });
+  const eintrag = db.prepare("SELECT metadata FROM expense_activity WHERE group_id = ? AND type = 'group_unarchived'").get(archiviert);
+  assert.deepEqual(JSON.parse(eintrag.metadata), { skipped: 8 }, 'je Serie vier uebersprungene Termine (Maerz bis Juni)');
+
+  // Die Luecke wird nie gebucht: am Tag davor nichts, am 10.07. genau ein Termin.
+  assert.deepEqual(serienLauf('2026-07-09'), { generated: 0, paused: 0, failed: 0 });
+  assert.equal(gebucht(serie), 0);
+  assert.deepEqual(serienLauf('2026-07-10'), { generated: 1, paused: 1, failed: 0 }, 'ein Termin der gesunden Serie, die kaputte pausiert erst jetzt');
+  assert.equal(gebucht(serie), 1);
+  assert.equal(db.prepare('SELECT expense_date FROM expenses WHERE recurring_rule_id = ?').get(serie).expense_date, '2026-07-10');
+  assert.equal(serienStand(serie).next_run_date, '2026-08-10');
+  assert.equal(serienLauf('2026-07-10').generated, 0, 'kein zweiter Termin aus der Luecke');
+});
+
 test('teardown: Server schließen', async () => {
   await new Promise((r) => server.close(r));
 });
