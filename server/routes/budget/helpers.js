@@ -14,7 +14,7 @@ import {
 } from '../../services/budget-visibility.js';
 import { computeLoanSchedule, remainingPrincipalFromPayments, remainingInstallmentsForBalance, rateForInstallment } from '../../services/loan-amortization.js';
 import { todayKey } from '../../utils/timezone.js';
-import { DEFAULT_LOCALE, supportedLocaleFor } from '../../utils/i18n.js';
+import { DEFAULT_LOCALE, resolveHouseholdLocale, supportedLocaleFor } from '../../utils/i18n.js';
 import { newNonMembers } from '../../services/household-members.js';
 
 // --------------------------------------------------------
@@ -195,6 +195,18 @@ const SUBCATEGORY_LABEL_KEYS = {
 // Sprache bekam ihre Kategorienamen still auf Englisch (#1523).
 export function normalizeLang(raw) {
   return supportedLocaleFor(raw) ?? DEFAULT_LOCALE;
+}
+
+// Die Sprache einer Leseanfrage: ein brauchbares `?lang=` gewinnt, sonst die
+// Haushaltssprache (#1859). Bis dahin fiel ein fehlendes `lang` auf Englisch,
+// und der Kategorie-Manager, der die Liste ohne Parameter holt, zeigte die
+// eingebauten Kategorien in jedem Haushalt englisch. Ein unbekannter Code
+// nimmt denselben Weg wie ein fehlender: er nennt keine Sprache, die sich
+// bedienen liesse, und die naechstbeste Antwort ist die des Haushalts, nicht
+// Englisch. `resolveHouseholdLocale` endet selbst bei Englisch, wenn der
+// Haushalt weder Sprache noch Region gesetzt hat.
+export function requestLang(raw) {
+  return supportedLocaleFor(raw) ?? resolveHouseholdLocale(db.get());
 }
 
 export function budgetMessages(lang) {

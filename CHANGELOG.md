@@ -216,6 +216,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Expected`. A tap on one leads to the Subscriptions tab. Months that are already over show none.
   If you deleted a subscription's expense in the budget by hand, save or renew the subscription
   to get it and the following months back.
+- **Managing budget categories shows the built-in categories in your language** (#1859, from D#1841).
+  "Manage categories" in Budget listed the built-in categories and subcategories in English,
+  whatever language Yuvomi ran in. They now appear in the language of the interface you are
+  using, as they do everywhere else in Budget. Categories you created keep their name. For
+  API users this changes an answer: `GET /api/v1/budget/categories` and
+  `GET /api/v1/budget/categories/{categoryKey}/subcategories` without `lang`, or with a value
+  that is not supported, now return the labels in the household language instead of English.
+  Send `lang=en` to keep English; a supported `lang` works as before, and the response still
+  names the language it used.
 - **Pocket money without an account now says what it is for** (#1774). Before an admin had opened
   an account for any child, "Pocket money" was a heading with a button and nothing below it, which
   read like a section that failed to load. It now shows one sentence below the heading, in the same
@@ -235,6 +244,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it. On a wide window it now spans the content area and is centred in it. With at least one
   waste type the two columns are unchanged. From a window of about 1500px the page's width cap
   leaves it slightly left of centre again.
+- **A long account name on a phone breaks between word parts, not inside one** (#1774). On the
+  accounts tab at 390px, "Wertpapierdepot" was split as "Wertpapierde-pot" and "Housekeeping cash"
+  as "Housekeepin" and "g cash", because the amount column kept its full width. A word is now only
+  hyphenated with at least four letters on each side ("Wertpapier-depot"), and the column with the
+  amount gives up its width, down to the amount itself, before the name is broken inside a word.
+  The amount is never squeezed or overlapped.
 - **A wall tablet shows events again when the household overview is set to "Assigned to me"** (#1808).
   A paired display follows the household default of the overview. If that default had the calendar
   tile set to "Assigned to me", the tablet looked for events assigned to the tablet itself and

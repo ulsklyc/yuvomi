@@ -3353,6 +3353,9 @@ function openCategoryManager() {
           { key: 'income',  labelKey: 'budget.income',   addLabelKey: 'budget.addCategory', subcategories: true },
         ],
         supportsSubcategories: true,
+        // Die Route uebersetzt die eingebauten Kategorien selbst und braucht
+        // dafuer die Sprache dieser Oberflaeche (#1859).
+        localizedLabels: true,
         labelResolver: (item) => item.label ?? budgetCategoryLabel(item.key, item.name, t),
         titleKey: 'budget.manageCategories',
         hintKey: 'category.manageHint',

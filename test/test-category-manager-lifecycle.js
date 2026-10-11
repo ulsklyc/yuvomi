@@ -353,3 +353,68 @@ test('ohne Argument traegt das Ereignis ein leeres detail, kein undefined', () =
 
   assert.deepEqual(seen, {});
 });
+
+// --------------------------------------------------------------------------
+// Sprache der Liste (#1859)
+// --------------------------------------------------------------------------
+// Budget ist der eine Aufrufer, dessen Route die Labels auf dem Server
+// uebersetzt. Ohne `lang` antwortet sie in der Haushaltssprache - die
+// Oberflaeche ist aber je Browser gewaehlt, und ein Mitglied mit anderer
+// Browsersprache saehe sonst im Verwalter eine andere Sprache als ringsum.
+async function listPathFor(options, locale) {
+  const previousGet = api.get;
+  const previousLocale = globalThis.__locale;
+  const paths = [];
+  api.get = async (path) => { paths.push(path); return { data: [{ key: 'housing', name: 'Housing' }] }; };
+  if (locale === undefined) delete globalThis.__locale; else globalThis.__locale = locale;
+  try {
+    const manager = managerWithCategory(options);
+    await manager._fetch();
+    assert.deepEqual(manager._cats, [{ key: 'housing', name: 'Housing' }]);
+    return paths;
+  } finally {
+    api.get = previousGet;
+    if (previousLocale === undefined) delete globalThis.__locale; else globalThis.__locale = previousLocale;
+  }
+}
+
+test('localizedLabels: die Liste wird in der Oberflaechensprache des Browsers angefragt', async () => {
+  assert.deepEqual(
+    await listPathFor({ basePath: '/budget/categories', localizedLabels: true }, 'en'),
+    ['/budget/categories?lang=en'],
+  );
+  // Die Sprache wird je Abruf gelesen, nicht beim configure() eingefroren, und
+  // ein Tag mit Region geht unverstuemmelt durch.
+  assert.deepEqual(
+    await listPathFor({ basePath: '/budget/categories', localizedLabels: true }, 'pt-BR'),
+    ['/budget/categories?lang=pt-BR'],
+  );
+});
+
+test('ohne localizedLabels bleibt der Listenpfad der nackte basePath', async () => {
+  // Die acht uebrigen Aufrufer uebersetzen im Browser; ihre Routen kennen kein
+  // `lang`, und ein angehaengter Parameter waere nur ein zweiter Cache-Schluessel
+  // neben dem, unter dem die Seite dieselbe Liste holt.
+  assert.deepEqual(await listPathFor({ basePath: '/tasks/categories' }, 'en'), ['/tasks/categories']);
+});
+
+test('localizedLabels: Schreibwege tragen die Sprache nicht', async () => {
+  const previousPut = api.put;
+  const previousDelete = api.delete;
+  const paths = [];
+  globalThis.__promptModal = () => 'New';
+  globalThis.__confirmOverModal = () => true;
+  api.put = async (path) => { paths.push(path); return { data: { id: 7, name: 'New' } }; };
+  api.delete = async (path) => { paths.push(path); return { data: null }; };
+  try {
+    const manager = managerWithCategory({ basePath: '/budget/categories', localizedLabels: true });
+    await manager._rename('7');
+    await manager._delete('7');
+    assert.deepEqual(paths, ['/budget/categories/7', '/budget/categories/7']);
+  } finally {
+    api.put = previousPut;
+    api.delete = previousDelete;
+    delete globalThis.__promptModal;
+    delete globalThis.__confirmOverModal;
+  }
+});

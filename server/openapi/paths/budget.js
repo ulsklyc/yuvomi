@@ -13,7 +13,7 @@ export function budgetPaths() {
     '/api/v1/budget/export': { get: op({ summary: 'Export budget entries as CSV', tag: 'Budget', description: 'Expected bookings and projected subscription payments are included with `Expected` in the `Status` column. Subscription payments are projected for at most 366 days from the later of `from` and the first day of the household\'s current month; a wider range sets the response header `X-Budget-Expected-Until` (`YYYY-MM-DD`, last projected day). `X-Budget-Expected-Omitted: true` is set when the projection hit its limit of 5000 lines and the file contains none.' }) },
     '/api/v1/budget/meta': { get: op({ summary: 'Get budget categories and subcategories', tag: 'Budget' }) },
     '/api/v1/budget/categories': {
-      get: op({ summary: 'List budget categories', tag: 'Budget', params: [langParam()] }),
+      get: op({ summary: 'List budget categories', tag: 'Budget', params: [langParam({ fallback: 'household' })] }),
       post: op({ summary: 'Create budget category', tag: 'Budget', stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/budget/categories/reorder': {
@@ -24,7 +24,7 @@ export function budgetPaths() {
       delete: op({ summary: 'Delete budget category', tag: 'Budget', params: [{ name: 'key', in: 'path', required: true, schema: { type: 'string' } }], stateChanging: true }),
     },
     '/api/v1/budget/categories/{categoryKey}/subcategories': {
-      get: op({ summary: 'List subcategories for a budget category', tag: 'Budget', params: [{ name: 'categoryKey', in: 'path', required: true, schema: { type: 'string' } }, langParam()] }),
+      get: op({ summary: 'List subcategories for a budget category', tag: 'Budget', params: [{ name: 'categoryKey', in: 'path', required: true, schema: { type: 'string' } }, langParam({ fallback: 'household' })] }),
       post: op({ summary: 'Create budget subcategory', tag: 'Budget', params: [{ name: 'categoryKey', in: 'path', required: true, schema: { type: 'string' } }], stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/budget/categories/{key}/subcategories/reorder': {
