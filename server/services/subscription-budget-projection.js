@@ -29,12 +29,14 @@
  * eine Serie, die eine Bestaetigung verlangt. Die Summen selbst muessen dafuer
  * nichts wissen: sie lesen `budget_entries`, und dort steht die Zeile nicht.
  *
- * DER RHYTHMUS IST DER VON /renew. Gerechnet wird mit addBillingCycle(),
- * Schritt fuer Schritt ab `next_payment_date` - genau der Weg, den das
- * Verlaengern geht. Der 31. klemmt im Februar auf den 28. und bleibt danach
- * dort; eine Rechnung, die jeden Monat neu vom 31. ausginge, zeigte Termine,
- * die nie gebucht werden. `test:subscription-budget-projection` haelt die
- * Gleichheit fest, indem sie erst projiziert und dann verlaengert.
+ * DER RHYTHMUS IST DER VON /renew. Im Bereich wird mit addBillingCycle()
+ * weitergerueckt, genau wie beim Verlaengern: der 31. klemmt im Februar auf
+ * den 28. und bleibt danach dort; eine Rechnung, die jeden Monat neu vom 31.
+ * ausginge, zeigte Termine, die nie gebucht werden. Der Vorlauf von
+ * `next_payment_date` bis zum Bereichsanfang wird NICHT gezaehlt, sondern
+ * gesprungen (stateAfterSteps) - mit demselben Ergebnis, das
+ * `test:subscription-budget-projection` gegen das schrittweise Zaehlen
+ * prueft. Dieselbe Suite projiziert erst und verlaengert dann.
  */
 
 import { addBillingCycle, convertAmount, parseDateKey, BILLING_CYCLES, END_TYPES } from './subscriptions.js';

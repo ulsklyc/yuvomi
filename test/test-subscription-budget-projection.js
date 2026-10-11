@@ -524,6 +524,10 @@ test('Positivliste: unbekanntes Ende, Ende ohne Datum, unbekannter Rhythmus, abg
 
 test('abgeschlossen, aber der Schalter steht noch: die Route projiziert nicht', async () => {
   const sub = await createSub();
+  // Vorbedingung, ohne die der Fall nichts misst: VOR der Aenderung steht
+  // genau eine erwartete Zeile da. Waere die Projektion tot, bliebe die
+  // Null unten gruen.
+  assert.equal(expectedOf(await month('2026-11')).length, 1, 'Vorbedingung: das laufende Abo projiziert');
   db.prepare("UPDATE budget_subscriptions SET completed_at = '2026-10-01T00:00:00Z' WHERE id = ?").run(sub.id);
   assert.equal(expectedOf(await month('2026-11')).length, 0);
 });
@@ -640,6 +644,10 @@ test('eine fremde private Buchung am selben Tag unterdrueckt nichts und verraet 
   setConfig('budget_mode', 'personal');
   await createSub({ name: 'Geteilt', visibility: 'shared' }, { as: B });
   const before = await month('2026-11', { as: B, query: '&scope=mine' });
+  // Vorbedingung, ohne die der Vergleich unten zwei leere Listen vergliche:
+  // B sieht genau eine erwartete Zeile, die eine fremde Buchung unterdruecken
+  // KOENNTE.
+  assert.deepEqual(expectedOf(before).map((r) => [r.date, r.title]), [['2026-11-20', 'Geteilt']]);
   // A legt eine private Buchung mit gleichem Titel, Betrag und Tag an.
   db.prepare(`INSERT INTO budget_entries (title, amount, category, date, created_by, owner_id, visibility)
               VALUES ('Geteilt', -12.99, 'subscriptions', '2026-11-20', ?, ?, 'private')`).run(A, A);
