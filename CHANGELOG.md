@@ -18,7 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   five times like any other refused deletion, and until then Yuvomi shows the event once, in the
   calendar you moved it to. After the fifth refusal Yuvomi gives up, and the event stays in both
   calendars until you remove one copy yourself. Events that were left doubled before the update
-  are not cleaned up.
+  are not cleaned up. A removal that is still waiting only takes the entry as it was when you
+  moved the event (#1883): if the entry in the old calendar has been changed since, or the event
+  was put back there from another app, Yuvomi no longer removes it.
 - **Editing or deleting an entry while it is being uploaded is no longer lost or undone**
   (#1862). Sending an entry to a CalDAV or iCloud server takes a moment, and Yuvomi booked the
   result against the entry as it was before that moment. If you deleted a new event, task or

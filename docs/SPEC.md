@@ -1405,6 +1405,7 @@ the deleted event and is worked off by the sync (at-least-once).
 | created_at | TEXT | ISO 8601, NOT NULL |
 | object_url | TEXT | nullable (migration v106) - URL of the CalDAV object to delete |
 | caldav_account_id | INTEGER | FK → CalDAV Accounts (ON DELETE CASCADE), nullable (migration v238, #1860) - the account the deletion is sent through. Set for `source = 'caldav'` only |
+| etag | TEXT | nullable (migration v240, #1883) - ETag of the object at `object_url` when the deletion was queued. Set makes the deletion conditional, see below |
 
 Constraints: UNIQUE(source, calendar_external_id, event_external_id) ·
 Index: CREATE INDEX idx_cal_pending_del_event ON calendar_pending_deletions(source, event_external_id)
@@ -1412,6 +1413,17 @@ Index: CREATE INDEX idx_cal_pending_del_event ON calendar_pending_deletions(sour
 Rows are created **only** by the explicit user delete (`DELETE /api/v1/calendar/:id`), never by a
 database trigger: the inbound sync deletes local rows as well (cancelled events, deselected
 calendars), and a trigger would turn those into delete calls against the provider.
+
+**Conditional deletions (migration v240, #1883).** A row with `etag` and `object_url` is meant for
+that one object in that one state. It is written when a calendar move stored its copy and the old
+calendar refused the removal (#1861): the leftover in the old calendar is to be removed, not
+whatever carries the UID there later. Such a row hides only the object at its address with its
+ETag from the inbound run, is sent as `DELETE` with `If-Match: <etag>` to the stored address
+(never resolved through the UID), and is dropped without deleting when the fetch shows another
+state or another event at that address or the server answers `412`. A row without `etag` - the
+user delete, and a refused move whose refusal was itself a `412` - applies to the event in
+whatever state it is in. Queueing an unconditional deletion onto a conditional row clears the
+condition; the reverse never adds one.
 
 **One row per UID, and the first account owns it (migration v238, #1860).** Several CalDAV accounts
 share `calendar_events` and `calendar_pending_deletions`. A mirrored event carries the account it
