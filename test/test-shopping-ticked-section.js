@@ -78,13 +78,17 @@ function zustand(items, patch = {}) {
 
 const nullContainer = () => ({ querySelector: () => null, querySelectorAll: () => [], isConnected: true });
 
-/** Jede Anfrage mitschreiben; die Antwort je "METHODE pfad" oder ein leeres Ergebnis. */
+/**
+ * Jede Anfrage mitschreiben; die Antwort je "METHODE pfad" oder ein leeres
+ * Ergebnis. Eine Funktion als Antwort entscheidet am Inhalt der Anfrage.
+ */
 async function aufrufe(fn, antworten = {}) {
   const liste = [];
   const zuvor = globalThis.__apiStub;
   const merke = (method) => async (path, body) => {
     liste.push({ method, path, body });
-    const antwort = antworten[`${method} ${path}`];
+    const fest = antworten[`${method} ${path}`];
+    const antwort = typeof fest === 'function' ? fest(body) : fest;
     if (antwort instanceof Error) throw antwort;
     return antwort ?? { data: null };
   };
@@ -461,8 +465,8 @@ test('Getippte Menge ueberschreibt, eine NICHT gewaehlte Kategorie schreibt nich
   const liste = await aufrufe(() => f.absenden(), {
     'PATCH /shopping/items/2': { data: item(2, 'Karotten', 'Milch', { is_checked: 0, quantity: '2 kg' }) },
   });
-  assert.deepEqual(liste.map((a) => a.body), [{ is_checked: 0 }, { quantity: '2 kg' }],
-    'die Kategorie "Sonstiges" hat niemand gewaehlt - die Zeile bleibt unter Milch');
+  assert.deepEqual(liste.map((a) => a.body), [{ quantity: '2 kg', is_checked: 0 }],
+    'EINE Anfrage traegt Haken und Menge; die Kategorie "Sonstiges" hat niemand gewaehlt - die Zeile bleibt unter Milch');
   assert.equal(shopping.state.items[0].category, 'Milch');
   assert.equal(shopping.state.items[0].quantity, '2 kg');
 });
@@ -498,12 +502,13 @@ test('Eine von Hand GEWAEHLTE Kategorie wird geschrieben, und die Liste baut neu
   f.container.querySelector = (sel) => (sel === '#items-list' ? liste5 : base(sel));
 
   const liste = await aufrufe(() => f.absenden(), {
-    // Die Antwort traegt einen ALTEN Haken (sie wurde vor dem ersten PATCH gelesen).
+    // Die Antwort traegt einen ALTEN Haken - den Haken fuehrt die Bestaetigung
+    // des Schreibvorgangs, nicht das Feld in seiner Antwort.
     'PATCH /shopping/items/2': { data: item(2, 'Karotten', 'Milch', { is_checked: 1 }) },
   });
-  assert.deepEqual(liste.map((a) => a.body), [{ is_checked: 0 }, { category: 'Milch' }]);
+  assert.deepEqual(liste.map((a) => a.body), [{ category: 'Milch', is_checked: 0 }]);
   assert.equal(shopping.state.items[0].category, 'Milch');
-  assert.equal(shopping.state.items[0].is_checked, 0, 'die Antwort des zweiten PATCH dreht den bestaetigten Haken nicht zurueck');
+  assert.equal(shopping.state.items[0].is_checked, 0, 'die Felder der Antwort drehen den bestaetigten Haken nicht zurueck');
   assert.equal(neubau, 1, 'ein Kategoriewechsel gruppiert neu (updateItemsList), genau einmal');
 });
 
@@ -594,6 +599,29 @@ test('Scheitert das Zurueckholen, bleibt das Formular stehen, nichts wird angele
 
   const nochmal = await aufrufe(() => f.absenden(), { 'PATCH /shopping/items/2': { data: null } });
   assert.deepEqual(wege(nochmal), ['PATCH /shopping/items/2'], 'die Sperre faellt auch nach einem Fehlschlag');
+});
+
+test('Lehnt der Server die getippte Menge ab, ist nichts halb geschrieben: Haken, Formular und Meldung bleiben', async () => {
+  // Als zwei Anfragen (erst der Haken, dann die Menge) fiel der Haken, die
+  // Menge scheiterte, und das Formular meldete Erfolg und leerte sich: die
+  // getippte Menge war weg, die Fehlermeldung von der Erfolgsmeldung verdeckt.
+  zustand([item(2, 'Karotten', 'Obst', { is_checked: 1, quantity: '1 kg' })]);
+  const f = formular();
+  shopping.wireQuickAdd(f.container);
+  f.name.value = 'Karotten';
+  f.qty.value = '2 kg';
+
+  const fehler = Object.assign(new Error('400'), { data: { error: 'Menge zu lang.' } });
+  // Ein Server, der den blossen Haken annimmt und alles mit Menge ablehnt.
+  const liste = await aufrufe(() => f.absenden(), {
+    'PATCH /shopping/items/2': (body) => ('quantity' in body ? fehler : { data: null }),
+  });
+  assert.equal(liste.length, 1, 'eine Anfrage, nicht Haken und Menge getrennt');
+  assert.equal(shopping.checkedOf(shopping.state.items[0]), 1, 'die Zeile steht weiter abgehakt');
+  assert.equal(shopping.state.items[0].quantity, '1 kg');
+  assert.equal(f.name.value, 'Karotten', 'der Name bleibt im Feld');
+  assert.equal(f.qty.value, '2 kg', 'die getippte Menge bleibt im Feld');
+  assert.deepEqual(toasts, [['Menge zu lang.', 'danger']], 'die Fehlermeldung steht, keine Erfolgsmeldung darueber');
 });
 
 // -------------------------------------------------------------------------

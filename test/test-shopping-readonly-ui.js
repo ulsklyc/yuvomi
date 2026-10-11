@@ -893,13 +893,13 @@ test('CSS: eine Zeile ohne Geste zeigt keinen Wisch-Chevron', () => {
  * Der FAB wird ueber `document.getElementById` gesucht (utils/fab.js) - er ist
  * nur da, wenn render() ihn wirklich gezeichnet hat, wie im echten DOM.
  */
-async function seite(modules, { search = '', items = [artikel()], lists = [LISTE] } = {}) {
+async function seite(modules, { search = '', items = [artikel()], lists = [LISTE], closest = () => null } = {}) {
   let html = '';
   const gefragt = [];
   const bar = Object.assign(new MiniElement('div'), lauscher());
   const content = new MiniElement('div');
   const root = Object.assign(lauscher(), { classList: { toggle() {}, contains: () => false } });
-  const treffer = { scrolled: 0, scrollIntoView() { this.scrolled += 1; }, closest: () => null };
+  const treffer = { scrolled: 0, scrollIntoView() { this.scrolled += 1; }, closest };
   const fab = { listeners: {}, addEventListener(type, fn) { this.listeners[type] = fn; }, getAttribute: () => null, setAttribute() {}, removeAttribute() {} };
   const neueListe = { clicks: 0, click() { this.clicks += 1; } };
   const knoten = {
@@ -984,6 +984,29 @@ test('Deep-Link ?highlight=: der Suchtreffer kommt auch bei `read` an', async ()
   // der Container liefert, was das echte DOM dann liefert: nur die Zeile.
   const { treffer, gefragt } = await seite(LESEN, { search: '?highlight=1' });
   assert.ok(gefragt.includes('.shopping-item[data-item-id="1"]'), 'gesucht wird ueber die Zeile');
+  assert.equal(treffer.scrolled, 1, 'der Treffer wird angesteuert');
+});
+
+test('Deep-Link ?highlight=: ein abgehakter Treffer klappt den Abschnitt "Abgehakt" auf (#1816)', async () => {
+  // Abgehaktes steht im Abschnitt am Listenende, und der ist im Grundzustand
+  // zu. Der Deep-Link kannte nur Kategoriekoepfe: der Treffer wurde gefunden
+  // und unsichtbar angesteuert - der Suchtreffer fuehrte ins Leere.
+  const rowsEl = { hidden: true, style: {} };
+  const gruppe = {
+    querySelector: (q) => (q === '[data-ticked-toggle]' ? knopf : q === '.row-carrier' ? rowsEl : null),
+  };
+  const knopf = {
+    attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, querySelector: () => null,
+    closest: (sel) => (sel === '.list-group' ? gruppe : null),
+  };
+  rowsEl.closest = (sel) => (sel === '.list-group' ? gruppe : null);
+
+  const { treffer } = await seite(SCHREIBEN, {
+    search: '?highlight=1', items: [artikel({ is_checked: 1 })],
+    closest: (sel) => (sel === '.row-carrier' ? rowsEl : null),
+  });
+  assert.equal(rowsEl.hidden, false, 'der Traeger des Abschnitts ist offen');
+  assert.equal(knopf.attrs['aria-expanded'], 'true', 'und der Kopf sagt es');
   assert.equal(treffer.scrolled, 1, 'der Treffer wird angesteuert');
 });
 

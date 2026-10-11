@@ -446,6 +446,39 @@ test('Der Kopf von "Abgehakt" ist ein volles Ziel, traegt Wort und Zahl im Namen
   await page.evaluate(() => localStorage.clear());
 });
 
+// --------------------------------------------------------------------------
+// Der Suchtreffer
+// --------------------------------------------------------------------------
+
+test('Suchtreffer auf einen abgehakten Artikel: der Abschnitt geht auf, und die Zeile steht im Bild', async () => {
+  // Eine Liste, die laenger ist als das Fenster: sonst gibt es nichts zu rollen.
+  const offen = Array.from({ length: 24 }, (_, i) => item(i + 1, `Artikel ${i + 1}`, i % 2 ? 'Milch' : 'Obst'));
+  const abgehakt = [40, 41, 42, 43, 44, 45].map((id) => item(id, `Erledigt ${id}`, 'Obst', { is_checked: 1 }));
+  await setup([...offen, ...abgehakt]);
+  const lage = () => page.evaluate(() => {
+    const row = document.querySelector('.shopping-item[data-item-id="40"]');
+    const r = row.getBoundingClientRect();
+    // Der sichtbare Ausschnitt: das Fenster, geschnitten mit dem Rollbereich.
+    const port = document.querySelector('.page-scrollport').getBoundingClientRect();
+    return {
+      offen: !row.closest('.row-carrier').hidden,
+      knopf: document.querySelector('[data-ticked-toggle]').getAttribute('aria-expanded'),
+      top: r.top, bottom: r.bottom,
+      von: Math.max(0, port.top), bis: Math.min(window.innerHeight, port.bottom),
+    };
+  });
+  assert.equal((await lage()).offen, false, 'Ausgang: der Abschnitt ist zu');
+
+  await page.evaluate(() => window.s.revealHighlightedItem(document.getElementById('c'), 40));
+  await wait(1200);
+  const ziel = await lage();
+  assert.equal(ziel.offen, true, 'der Traeger ist offen');
+  assert.equal(ziel.knopf, 'true');
+  assert.ok(ziel.top >= ziel.von && ziel.bottom <= ziel.bis,
+    `die Zeile (${Math.round(ziel.top)}-${Math.round(ziel.bottom)}) steht ganz im sichtbaren Ausschnitt (${Math.round(ziel.von)}-${Math.round(ziel.bis)})`);
+  await page.evaluate(() => localStorage.clear());
+});
+
 test('Keine Seite hat geworfen', () => {
   assert.deepEqual(pageErrors, []);
 });

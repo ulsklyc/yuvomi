@@ -658,7 +658,17 @@ function checkOf(container, id) {
   return container.querySelector(`.swipe-row[data-swipe-id="${id}"] .item-check`);
 }
 
-async function toggleShoppingItem(id, checked, container, { settleNow = false } = {}) {
+/**
+ * @param {object} [opts]
+ * @param {boolean} [opts.settleNow] die Zeile zieht sofort um statt nach der Pause
+ * @param {object|null} [opts.extra] weitere Felder, die MIT dem Haken in
+ *   derselben Anfrage geschrieben werden (das Zurueckholen ueber das
+ *   Eingabefeld: Menge, Kategorie). Eine Anfrage, damit es kein Halb gibt -
+ *   die Route schreibt alle Felder in einem UPDATE oder keines.
+ * @returns {Promise<object|undefined>} die Antwort des Servers; undefined, wenn
+ *   nichts geschrieben wurde oder der Schreibvorgang scheiterte
+ */
+async function toggleShoppingItem(id, checked, container, { settleNow = false, extra = null } = {}) {
   // Dritte Linie hinter Markup und Handler-Riegel: auch ein Aufruf, den ein
   // Rechtewechsel ueberholt hat, schickt nichts.
   if (readOnly()) return;
@@ -714,7 +724,8 @@ async function toggleShoppingItem(id, checked, container, { settleNow = false } 
   }
 
   try {
-    acknowledgeOwnChange(await api.patch(`/shopping/items/${id}`, { is_checked: newVal }));
+    const antwort = await api.patch(`/shopping/items/${id}`, { ...extra, is_checked: newVal });
+    acknowledgeOwnChange(antwort);
     // BEWUSST OHNE AUFRAEUMEN. Die Absicht faellt erst, wenn eine Ladeantwort
     // den Wert traegt (`settleIntents`) - der Erfolg allein beweist der Zeile
     // nichts gegen eine Antwort, die gleich danach mit dem alten Stand kommt.
@@ -738,6 +749,7 @@ async function toggleShoppingItem(id, checked, container, { settleNow = false } 
       current.is_checked = newVal;
     }
     settledAt.set(id, _loadSeq);
+    return antwort;
   } catch (err) {
     // ZWEI GRUENDE, WARUM DIE EIGENE ABSICHT NICHT MEHR DA IST, und sie fuehren
     // auseinander. Ueberstimmt: ein neueres Antippen steht an, dessen Ausgang
@@ -768,6 +780,7 @@ async function toggleShoppingItem(id, checked, container, { settleNow = false } 
     }
     window.yuvomi.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
   }
+  return undefined;
 }
 
 /**
@@ -1617,27 +1630,28 @@ function tickedItemNamed(name) {
  */
 async function reviveTickedItem(container, item, { quantity, category }) {
   const id = item.id;
-  await toggleShoppingItem(id, 1, container, { settleNow: true });
+  const changes = {};
+  if (quantity && quantity !== (item.quantity ?? null)) changes.quantity = quantity;
+  if (category && category !== item.category) changes.category = category;
+  const hatAenderung = Object.keys(changes).length > 0;
+
+  // HAKEN UND FELDER IN EINER ANFRAGE. Als zwei Anfragen gab es ein Halb: der
+  // Haken fiel, das Schreiben der Menge scheiterte, und das Formular meldete
+  // trotzdem "ist wieder auf der Liste" und leerte sich - die getippte Menge
+  // war weg und die Fehlermeldung von der Erfolgsmeldung ueberschrieben.
+  const antwort = await toggleShoppingItem(id, 1, container, {
+    settleNow: true, extra: hatAenderung ? changes : null,
+  });
 
   const current = state.items.find((i) => i.id === id);
   if (!current || checkedOf(current)) return false;
 
-  const changes = {};
-  if (quantity && quantity !== (current.quantity ?? null)) changes.quantity = quantity;
-  if (category && category !== current.category) changes.category = category;
-  if (!Object.keys(changes).length) return true;
-  try {
-    const data = await api.patch(`/shopping/items/${id}`, changes);
-    acknowledgeOwnChange(data);
-    const aktuell = state.items.find((i) => i.id === id);
-    if (!aktuell) return true;
+  if (hatAenderung && antwort?.data) {
     // Den Haken traegt die Absicht bzw. die Bestaetigung von eben - die
     // Antwort hier kann ihn nicht besser kennen.
-    Object.assign(aktuell, data.data, { is_checked: aktuell.is_checked });
+    Object.assign(current, antwort.data, { is_checked: current.is_checked });
     if ('category' in changes) updateItemsList(container);
-    else refreshItemName(container, aktuell);
-  } catch (err) {
-    window.yuvomi.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+    else refreshItemName(container, current);
   }
   return true;
 }
@@ -4288,22 +4302,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
 
   // Deep-Link: ?highlight=<id> scrollt zum Artikel
   const highlightId = parseInt(new URLSearchParams(window.location.search).get('highlight'), 10) || null;
-  if (highlightId) {
-    // Ueber die Zeile, nicht ueber den Abhak-Knopf: bei `read` steht dort ein
-    // Zeichen ohne `data-action`, und ein Suchtreffer muss trotzdem ankommen.
-    const el = container.querySelector(`.shopping-item[data-item-id="${highlightId}"]`);
-    if (el) {
-      // Steht der Treffer in einer eingeklappten Kategorie, bleibt er bei
-      // [hidden] unsichtbar, obwohl der Selektor ihn findet - ein globaler
-      // Suchtreffer darf nie hinter persistiertem Zustand verschwinden.
-      const rowsEl = el.closest('.row-carrier');
-      if (rowsEl?.hidden) {
-        const toggleBtn = rowsEl.closest('.list-group')?.querySelector('[data-category-toggle]');
-        if (toggleBtn) toggleCategoryCollapse(toggleBtn);
-      }
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  }
+  if (highlightId) revealHighlightedItem(container, highlightId);
 
   // Deep-Link: ?manage=categories öffnet den Kategorie-Manager sofort. Bei
   // `read` riegelt `openCategoryManager()` selbst ab - ein zweiter Riegel hier
@@ -4313,7 +4312,42 @@ export async function render(container, { user, signal: routeSignal = null } = {
   }
 }
 
+/**
+ * Fuehrt einen Suchtreffer (`?highlight=<id>`) ins Bild.
+ *
+ * Ueber die Zeile, nicht ueber den Abhak-Knopf: bei `read` steht dort ein
+ * Zeichen ohne `data-action`, und ein Suchtreffer muss trotzdem ankommen.
+ *
+ * Steht der Treffer in einem zugeklappten Traeger, bleibt er bei [hidden]
+ * unsichtbar, obwohl der Selektor ihn findet - ein globaler Suchtreffer darf
+ * nie hinter persistiertem Zustand verschwinden. Der Traeger ist eine
+ * Kategorie ODER der Abschnitt "Abgehakt" (#1816): ein abgehakter Treffer
+ * steht dort, und der ist im Grundzustand zu.
+ *
+ * DAS AUFKLAPPEN WIRD HIER NICHT ABGEWARTET, SONDERN BEENDET. Es laeuft als
+ * Bewegung von Hoehe 0 an, und `scrollIntoView` rechnet sein Ziel im selben
+ * Augenblick aus: die Zeile lag dann am Ende des noch geschlossenen Inhalts,
+ * das Rollen endete dort, und der Traeger wuchs danach nach unten aus dem
+ * Bild - gemessen bei 390 px: der Treffer lag hinter der Navigationsleiste.
+ * Beim Ankommen ueber einen Link sieht dem Aufklappen ohnehin niemand zu.
+ */
+function revealHighlightedItem(container, id) {
+  const el = container.querySelector(`.shopping-item[data-item-id="${id}"]`);
+  if (!el) return;
+  const rowsEl = el.closest('.row-carrier');
+  if (rowsEl?.hidden) {
+    const group = rowsEl.closest('.list-group');
+    const toggleBtn = group?.querySelector('[data-category-toggle]');
+    const tickedBtn = group?.querySelector('[data-ticked-toggle]');
+    if (toggleBtn) toggleCategoryCollapse(toggleBtn);
+    else if (tickedBtn) toggleTickedSection(tickedBtn);
+    rowsEl.getAnimations?.().forEach((anim) => anim.finish());
+  }
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
 export const __test = {
+  revealHighlightedItem,
   shouldIgnoreShoppingRowToggle,
   // Mengen-Zerlegung fuer den Vorrats-Uebertrag: haengt an der Format-Locale,
   // ist also nur verhaltensgetrieben pruefbar (siehe test-shopping-ux.js).
