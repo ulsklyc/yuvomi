@@ -5553,6 +5553,7 @@
         "money": {
             "title": "Argent de poche",
             "setUp": "Configurer l'argent de poche",
+            "empty": "Ouvrez un compte pour un enfant afin de suivre son argent de poche ici, crédité selon un calendrier.",
             "planWeekly": "{{amount}} par semaine",
             "planMonthly": "{{amount}} par mois",
             "nextCredit": "Prochain versement : {{date}}",

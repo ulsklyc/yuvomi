@@ -5553,6 +5553,7 @@
         "money": {
             "title": "Uang saku",
             "setUp": "Atur uang saku",
+            "empty": "Buka akun untuk seorang anak agar uang sakunya tercatat di sini dan dikreditkan sesuai jadwal.",
             "planWeekly": "{{amount}} per minggu",
             "planMonthly": "{{amount}} per bulan",
             "nextCredit": "Kredit berikutnya: {{date}}",

@@ -5553,6 +5553,7 @@
         "money": {
             "title": "Baon",
             "setUp": "I-set up ang baon",
+            "empty": "Magbukas ng account para sa isang bata para dito itago ang baon niya, na naidaragdag ayon sa iskedyul.",
             "planWeekly": "{{amount}} kada linggo",
             "planMonthly": "{{amount}} kada buwan",
             "nextCredit": "Susunod na dagdag: {{date}}",

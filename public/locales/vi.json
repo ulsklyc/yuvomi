@@ -5553,6 +5553,7 @@
         "money": {
             "title": "Tiền tiêu vặt",
             "setUp": "Thiết lập tiền tiêu vặt",
+            "empty": "Hãy mở tài khoản cho một bạn nhỏ để quản lý tiền tiêu vặt tại đây, được cộng theo lịch.",
             "planWeekly": "{{amount}} mỗi tuần",
             "planMonthly": "{{amount}} mỗi tháng",
             "nextCredit": "Lần cộng tiếp theo: {{date}}",

@@ -5553,6 +5553,7 @@
         "money": {
             "title": "零花钱",
             "setUp": "设置零花钱",
+            "empty": "为孩子开设账户，在这里管理零花钱，并按计划定期入账。",
             "planWeekly": "每周 {{amount}}",
             "planMonthly": "每月 {{amount}}",
             "nextCredit": "下次入账：{{date}}",

@@ -933,6 +933,30 @@ test('Taschengeld: ohne Antwort oder ohne Konto steht kein leerer Abschnitt da',
   });
 });
 
+test('Taschengeld ohne Konto: wer eines eroeffnen kann, liest im selben Traeger, wofuer der Abschnitt da ist (#1774)', () => {
+  mitTaschengeld(() => {
+    withAccess({ rewards: 'write' }, () => {
+      const kandidaten = [{ id: 4, display_name: 'Leo' }];
+      rewards.state.money = { currency: 'EUR', minor_unit: 2, accounts: [], candidates: kandidaten };
+      const leer = rewards.renderMoneySection();
+      assert.match(leer, /<ul class="row-carrier rw-standings"><li class="list-row rw-money-empty"><p class="list-row__meta">rewards\.money\.empty<\/p><\/li><\/ul>/,
+        'ein Satz im Zeilentraeger, kein nacktes Ende unter der Ueberschrift');
+      assert.match(leer, /rw-money-setup/, 'die Handlung steht weiter im Kopf');
+      // Mit einem Konto sieht der Abschnitt aus wie bisher: keine Erklaerung mehr.
+      rewards.state.money = { currency: 'EUR', minor_unit: 2, candidates: kandidaten,
+        accounts: [{ id: 3, display_name: 'Emma', balance_minor: 100, former: false, currency: 'EUR', minor_unit: 2, plan: null }] };
+      const voll = rewards.renderMoneySection();
+      assert.doesNotMatch(voll, /rw-money-empty|rewards\.money\.empty/);
+      assert.match(voll, /rw-standing/);
+    });
+    // nur-lesen: weder Handlung noch Satz - der Abschnitt entfaellt ganz
+    withAccess({ rewards: 'read' }, () => {
+      rewards.state.money = { currency: 'EUR', minor_unit: 2, accounts: [], candidates: [{ id: 4, display_name: 'Leo' }] };
+      assert.equal(rewards.renderMoneySection(), '');
+    });
+  }, { role: 'admin' });
+});
+
 test('eine Geld-Anfrage in der Liste: Betrag in Geld, nicht in Punkten - und nur-lesen ohne Entscheidung', () => {
   mitTaschengeld(() => {
     withAccess({ rewards: 'write' }, () => {

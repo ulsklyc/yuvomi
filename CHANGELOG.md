@@ -30,6 +30,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Today's programme says which calendar an appointment comes from, and the wall when it
+  ends** (#1698, from D#988). Every appointment in "Today at a glance" and on the wall carried
+  the same word underneath, "Event". It now shows the name of its calendar there, so "Early"
+  reads as the shift from the work calendar. An appointment that lives in Yuvomi only keeps the
+  word "Event". In wall mode the time also shows start and end ("06:00 - 14:00", or "6:00 AM -
+  2:00 PM" in the 12-hour format) instead of the start alone; all-day appointments, ones carried
+  over from yesterday and ones that run for a day or longer read as before, and on a phone-sized
+  screen the wall keeps the start alone so the title keeps its room. The line under a title is
+  now a single line in both places: a long calendar name, or any other long text there, ends in
+  an ellipsis instead of wrapping.
 - **Rows show fewer buttons.** Lists no longer carry a pencil and a bin on every line. Editing,
   deleting and anything further sit behind one "more" button per row that is always visible and
   names what it does in words. This applies to shopping items, birthdays, tasks, loan payments
@@ -188,6 +198,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Pocket money without an account now says what it is for** (#1774). Before an admin had opened
+  an account for any child, "Pocket money" was a heading with a button and nothing below it, which
+  read like a section that failed to load. It now shows one sentence below the heading, in the same
+  list the accounts appear in later. Only admins who can open an account see it; a child without an
+  account still sees no section.
 - **A wall tablet shows events again when the household overview is set to "Assigned to me"** (#1808).
   A paired display follows the household default of the overview. If that default had the calendar
   tile set to "Assigned to me", the tablet looked for events assigned to the tablet itself and
@@ -195,6 +210,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   affected. On a display the option now means all events; for members it works as before. The
   hint under Settings > Wall tablets now says where a tablet takes its overview from and names
   what it shows: calendar, tasks, rewards and weather.
+- **A wall tablet no longer ends up with an empty calendar or task list from "Assigned to me"** (#1808).
+  That switch is remembered per browser. If someone had turned it on while signed in on the device
+  that later became the wall tablet, the tablet kept filtering on itself and showed nothing - in
+  the calendar without any switch to turn it off again. A wall tablet now ignores the remembered
+  choice, and the task filters no longer offer the switch there. The choice itself stays stored
+  for the person who made it.
 - **A calendar or reminder server that says no is no longer taken for a yes.** When a CalDAV
   server refused a request - a calendar or list shared read-only, a full account, a server that
   was briefly overloaded, or an entry somebody else had just changed - Yuvomi booked the request
@@ -377,6 +398,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   straight back could leave the wrong month on screen - whichever answer arrived last won. Each
   click now counts from the month you asked for, and a late answer for a month you already left
   is ignored. The same holds for "Current" and for swiping.
+- **Opening Settings > Calendar no longer shows "An unexpected error occurred."** When Edge or
+  Chrome filled in a saved password there, two red error messages could appear, because the
+  browser's autofill sends a key press without a key and the keyboard shortcuts did not expect
+  one. Such a key press is now ignored; the shortcuts work as before.
 
 ## [2.75.0] - 2026-10-07
 

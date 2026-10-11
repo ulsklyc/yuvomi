@@ -5553,6 +5553,7 @@
         "money": {
             "title": "Zakgeld",
             "setUp": "Zakgeld instellen",
+            "empty": "Open een rekening voor een kind om zijn zakgeld hier bij te houden, volgens een schema bijgeschreven.",
             "planWeekly": "{{amount}} elke week",
             "planMonthly": "{{amount}} elke maand",
             "nextCredit": "Volgende bijschrijving: {{date}}",

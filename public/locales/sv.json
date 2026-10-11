@@ -5553,6 +5553,7 @@
         "money": {
             "title": "Veckopeng",
             "setUp": "Ställ in veckopeng",
+            "empty": "Öppna ett konto för ett barn för att hålla veckopengen här, insatt enligt ett schema.",
             "planWeekly": "{{amount}} per vecka",
             "planMonthly": "{{amount}} per månad",
             "nextCredit": "Nästa insättning: {{date}}",
