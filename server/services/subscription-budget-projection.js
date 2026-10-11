@@ -37,7 +37,8 @@
  * Gleichheit fest, indem sie erst projiziert und dann verlaengert.
  */
 
-import { addBillingCycle, convertAmount } from './subscriptions.js';
+import { addBillingCycle, convertAmount, parseDateKey } from './subscriptions.js';
+import { dateKey } from '../utils/interval-date.js';
 import { cachedRatesFor } from './subscription-rates.js';
 import { todayKey } from '../utils/timezone.js';
 
@@ -45,11 +46,103 @@ import { todayKey } from '../utils/timezone.js';
 export const SUBSCRIPTION_BUDGET_CATEGORY = 'subscriptions';
 
 /**
- * Obergrenze der Schritte je Abo und Anfrage. Ein taegliches Abo braucht 365
- * im Jahr; 40.000 reichen fuer gut hundert Jahre und halten eine Anfrage mit
- * einem unsinnig fernen Monat trotzdem endlich.
+ * GRENZEN DER ARBEIT JE ANFRAGE. Die Projektion laeuft bei jedem Aufschlagen
+ * eines Monats; was sie kostet, darf an nichts haengen, das ein Aufrufer oder
+ * ein alter Datenbestand frei waehlt.
+ *
+ *  - Der VORLAUF wird gesprungen, nicht gezaehlt (stateAfterSteps): ein
+ *    taegliches Abo von 1900 kostet fuer den November 2026 dieselben dreissig
+ *    Schritte wie eines von gestern.
+ *  - Das FENSTER ist hoechstens PROJECTION_WINDOW_DAYS breit. Monatsliste und
+ *    Zusammenfassung fragen nach einem Monat und liegen immer darin; nur der
+ *    Export kennt einen freien Bereich (`from`/`to`), und dort endet die
+ *    Projektion am Fensterende - die Antwort nennt den Tag (`until`).
+ *  - Die GESAMTZAHL der Zeilen ueber alle Abos ist auf MAX_EXPECTED_ROWS
+ *    begrenzt, und das Zaehlen bricht dort AB, statt erst das Ergebnis zu
+ *    kuerzen. Dann gibt es gar keine erwartete Zeile (`omitted: true`): eine
+ *    gekuerzte Liste saehe vollstaendig aus, und `pending` wuerde eine
+ *    Teilsumme als Summe ausgeben.
  */
-const MAX_STEPS = 40_000;
+export const PROJECTION_WINDOW_DAYS = 366;
+export const MAX_EXPECTED_ROWS = 5000;
+
+const MS_PER_DAY = 86_400_000;
+const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function addDays(key, days) {
+  return dateKey(new Date(parseDateKey(key).getTime() + days * MS_PER_DAY));
+}
+
+/** Letzter Tag des Monats mit laufendem Index `index` (Jahr * 12 + Monat 0-11). */
+const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+function lastDayOfMonthIndex(index) {
+  const month = index % 12;
+  if (month !== 1) return MONTH_DAYS[month];
+  const year = Math.floor(index / 12);
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0 ? 29 : 28;
+}
+
+/** Das Schaltjahrmuster wiederholt sich nach 400 Jahren. */
+const LEAP_PERIOD_MONTHS = 4800;
+
+/**
+ * Der Tag, auf dem ein Abo nach `steps` Verlaengerungen steht - GERECHNET,
+ * und zwar so, dass dasselbe herauskommt wie nach `steps` Aufrufen von
+ * addBillingCycle().
+ *
+ * Tage und Wochen sind reine Addition. Monate und Jahre klemmen aufs
+ * Monatsende, und der geklemmte Tag bleibt (31.01. -> 28.02. -> 28.03.): der
+ * Tag nach k Schritten ist der kleinste letzte Tag aller Monate, durch die
+ * die Reihe gegangen ist, hoechstens der Starttag. Bis zum 28. klemmt nie
+ * etwas. Darueber genuegt es, die ersten 4800 Monate der Reihe anzusehen -
+ * danach wiederholt sich jeder Monat samt Schaltjahr -, und sobald der 28.
+ * erreicht ist, geht es nicht tiefer.
+ *
+ * `test:subscription-budget-projection` vergleicht den Sprung gegen das
+ * schrittweise Zaehlen, an Monatsenden, Schalttagen und Abstaenden bis 48.
+ */
+function stateAfterSteps(subscription, steps) {
+  const start = subscription.next_payment_date;
+  const interval = Number(subscription.cycle_interval);
+  if (steps <= 0) return start;
+  if (subscription.billing_cycle === 'daily') return addDays(start, steps * interval);
+  if (subscription.billing_cycle === 'weekly') return addDays(start, steps * interval * 7);
+
+  const monthsPer = interval * (subscription.billing_cycle === 'yearly' ? 12 : 1);
+  const [y, m, d] = start.split('-').map(Number);
+  const startIndex = y * 12 + (m - 1);
+  let day = d;
+  if (day > 28) {
+    const look = Math.min(steps, LEAP_PERIOD_MONTHS);
+    for (let i = 1; i <= look && day > 28; i += 1) {
+      day = Math.min(day, lastDayOfMonthIndex(startIndex + i * monthsPer));
+    }
+  }
+  const index = startIndex + steps * monthsPer;
+  return `${String(Math.floor(index / 12)).padStart(4, '0')}-${String((index % 12) + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/**
+ * Wie viele Verlaengerungen sich ueberspringen lassen, ohne einen Tag ab
+ * `from` zu verpassen: der Stand danach liegt sicher VOR `from`.
+ */
+function stepsBefore(subscription, from) {
+  const start = subscription.next_payment_date;
+  if (!(start < from)) return 0;
+  const interval = Number(subscription.cycle_interval);
+  const cycle = subscription.billing_cycle;
+  if (cycle === 'daily' || cycle === 'weekly') {
+    const stepDays = interval * (cycle === 'weekly' ? 7 : 1);
+    const days = Math.round((parseDateKey(from).getTime() - parseDateKey(start).getTime()) / MS_PER_DAY);
+    // Der letzte Schritt, der noch vor `from` landet.
+    return Math.max(0, Math.ceil(days / stepDays) - 1);
+  }
+  const monthsPer = interval * (cycle === 'yearly' ? 12 : 1);
+  const [y, m] = start.split('-').map(Number);
+  const [fy, fm] = from.split('-').map(Number);
+  // Der letzte Schritt, der in einem Monat VOR dem von `from` landet.
+  return Math.max(0, Math.ceil(((fy * 12 + fm) - (y * 12 + m)) / monthsPer) - 1);
+}
 
 /** Die Budget-Waehrung, wie syncBudgetExpense sie liest. */
 export function subscriptionBudgetCurrency(database) {
@@ -86,27 +179,47 @@ export function subscriptionBudgetAmount(subscription, budgetCurrency, rates) {
  * @param {object} subscription  Zeile aus budget_subscriptions
  * @param {string} from  YYYY-MM-DD, einschliesslich
  * @param {string} to    YYYY-MM-DD, einschliesslich
+ * @param {{ steps: number, budget?: number }} [stats]  zaehlt die Schritte;
+ *        mit `budget` bricht die Reihe ab, sobald es aufgebraucht ist, und
+ *        setzt `stats.exhausted`
  * @returns {string[]} YYYY-MM-DD
  */
-export function upcomingPaymentDates(subscription, from, to) {
+export function upcomingPaymentDates(subscription, from, to, stats = { steps: 0 }) {
   if (!subscription?.enabled || subscription.completed_at) return [];
+  const interval = Number(subscription.cycle_interval);
+  // Was die Route nie hereinliesse, ergibt keine Reihe - statt die Monatsliste
+  // des Budgets mit einer 500 zu beantworten.
+  if (!Number.isInteger(interval) || interval < 1 || interval > 365) return [];
+  if (!['daily', 'weekly', 'monthly', 'yearly'].includes(subscription.billing_cycle)) return [];
+  // `to` darf "2026-11-31" heissen (so fragen die Monatsrouten): es wird nur
+  // als Text verglichen. `from` und der Start werden gerechnet, also geprueft.
+  try { parseDateKey(subscription.next_payment_date); parseDateKey(from); } catch { return []; }
+
   let remaining = Infinity;
   if (subscription.end_type === 'after_count') {
     // Verbleibend inklusive der anstehenden (gebuchten) Zahlung - die faellt weg.
     remaining = Number(subscription.occurrence_count) - Number(subscription.occurrences_done || 0) - 1;
   }
   const endDate = subscription.end_type === 'on_date' ? subscription.end_date : null;
+  if (endDate && endDate < from) return [];
+
+  // Den Vorlauf springen: nach `skipped` Verlaengerungen steht das Abo noch
+  // vor `from`, und keine davon gehoert in den Bereich.
+  const skipped = Math.min(stepsBefore(subscription, from), remaining === Infinity ? Infinity : Math.max(0, remaining));
+  let date = stateAfterSteps(subscription, skipped);
+  remaining -= skipped;
+
   const dates = [];
-  let date = subscription.next_payment_date;
-  for (let step = 0; step < MAX_STEPS && remaining > 0; step += 1, remaining -= 1) {
+  while (remaining > 0) {
+    if (stats.budget !== undefined && stats.steps >= stats.budget) { stats.exhausted = true; break; }
+    stats.steps += 1;
     let next;
-    // Ein Datum oder Rhythmus, den die Route nie hereinliesse, beendet die
-    // Reihe, statt die Monatsliste des Budgets mit einer 500 zu beantworten.
-    try { next = addBillingCycle(date, subscription.billing_cycle, subscription.cycle_interval); } catch { break; }
+    try { next = addBillingCycle(date, subscription.billing_cycle, interval); } catch { break; }
     if (!(next > date) || next > to) break;
     if (endDate && next > endDate) break;
     if (next >= from) dates.push(next);
     date = next;
+    remaining -= 1;
   }
   return dates;
 }
@@ -138,12 +251,27 @@ export function upcomingPaymentDates(subscription, from, to) {
  * @param {string} range.to    YYYY-MM-DD
  * @param {{ clause: string, params: any[] }} [range.filter]  beginnt mit ' AND ' oder ist leer; Alias `s`
  * @param {string} [range.today]  YYYY-MM-DD, Vorgabe: heute in der Haushaltszone
- * @returns {object[]} nach Datum absteigend, wie die Monatsliste
+ * @param {{ steps: number }} [range.stats]  zaehlt die Schritte (Tests)
+ * @returns {{ entries: object[], omitted: boolean, until: string|null }}
+ *          `entries` nach Datum absteigend, wie die Monatsliste. `omitted`:
+ *          MAX_EXPECTED_ROWS waere ueberschritten, es gibt KEINE erwartete
+ *          Zeile. `until`: der Bereich war breiter als das Fenster, die
+ *          Projektion endet an diesem Tag (einschliesslich); sonst null.
  */
-export function expectedSubscriptionEntries(database, { from, to, filter, today = todayKey(database) }) {
+export function expectedSubscriptionEntries(database, { from, to, filter, today = todayKey(database), stats = { steps: 0 } }) {
+  const none = { entries: [], omitted: false, until: null };
+  if (!DATE_KEY_RE.test(String(from)) || !DATE_KEY_RE.test(String(to))) return none;
   const monthStart = `${today.slice(0, 7)}-01`;
   const lower = from > monthStart ? from : monthStart;
-  if (lower > to) return [];
+  if (lower > to) return none;
+  // DAS FENSTER STEHT, BEVOR GEZAEHLT WIRD. `to` kommt beim Export vom
+  // Aufrufer; ohne diese Zeile bestimmte er, wie weit jede Reihe laeuft.
+  let windowEnd;
+  // "2026-02-30" hat die Form eines Datums und ist keins (der Export prueft
+  // nur die Form): dann gibt es nichts zu projizieren.
+  try { windowEnd = addDays(lower, PROJECTION_WINDOW_DAYS - 1); } catch { return none; }
+  const until = to > windowEnd ? windowEnd : null;
+  if (until) to = until;
 
   const f = filter?.clause ? filter : { clause: '', params: [] };
   const subscriptions = database.prepare(`
@@ -162,7 +290,7 @@ export function expectedSubscriptionEntries(database, { from, to, filter, today 
     LEFT JOIN users u ON u.id = s.created_by
     WHERE 1 = 1${f.clause}
   `).all(to, ...f.params);
-  if (!subscriptions.length) return [];
+  if (!subscriptions.length) return { entries: [], omitted: false, until };
 
   const currency = subscriptionBudgetCurrency(database);
   const foreign = [...new Set(subscriptions.map((s) => s.currency).filter((c) => c !== currency))];
@@ -170,9 +298,16 @@ export function expectedSubscriptionEntries(database, { from, to, filter, today 
   // einen Kursdienst und schreibt keinen Cache.
   const rates = foreign.length ? cachedRatesFor(database, currency) : {};
 
+  // Ein Schritt ergibt hoechstens eine Zeile, dazu je Abo bis zu drei ohne
+  // (vor dem Bereich, dahinter). Mit diesem Budget endet das Zaehlen, sobald
+  // die Gesamtgrenze nicht mehr zu halten ist - nicht erst danach.
+  stats.budget = stats.steps + MAX_EXPECTED_ROWS + subscriptions.length * 3;
   const entries = [];
   for (const subscription of subscriptions) {
-    const dates = upcomingPaymentDates(subscription, lower, to);
+    const dates = upcomingPaymentDates(subscription, lower, to, stats);
+    if (stats.exhausted || entries.length + dates.length > MAX_EXPECTED_ROWS) {
+      return { entries: [], omitted: true, until };
+    }
     if (!dates.length) continue;
     const amount = -subscriptionBudgetAmount(subscription, currency, rates);
     const title = subscriptionBudgetTitle(subscription, currency);
@@ -200,16 +335,18 @@ export function expectedSubscriptionEntries(database, { from, to, filter, today 
     }
   }
   entries.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.subscription_id - b.subscription_id));
-  return entries;
+  return { entries, omitted: false, until };
 }
 
 /**
  * Anzahl und Summen der erwarteten Abo-Zahlungen - das, was `pending` der
  * Zusammenfassung zu den erwarteten Buchungen aus `budget_entries` dazuzaehlt.
- * @returns {{ count: number, income: number, expenses: number }}
+ * `omitted` reicht die Gesamtgrenze durch: dann ist die Zahl unvollstaendig,
+ * und der Aufrufer sagt es, statt 0 als Antwort auszugeben.
+ * @returns {{ count: number, income: number, expenses: number, omitted: boolean }}
  */
 export function expectedSubscriptionTotals(database, range) {
-  const entries = expectedSubscriptionEntries(database, range);
+  const { entries, omitted } = expectedSubscriptionEntries(database, range);
   const cents = entries.reduce((sum, entry) => sum + Math.round(entry.amount * 100), 0);
-  return { count: entries.length, income: 0, expenses: cents / 100 };
+  return { count: entries.length, income: 0, expenses: cents / 100, omitted };
 }

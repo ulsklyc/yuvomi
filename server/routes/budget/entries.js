@@ -132,6 +132,10 @@ router.get('/summary', (req, res) => {
           count:    pending.count + expected.count,
           income:   cents(pending.income + expected.income),
           expenses: cents(pending.expenses + expected.expenses),
+          // Nur wenn die Gesamtgrenze der Projektion gegriffen hat: die Zahl
+          // enthaelt dann KEINE Abo-Zahlung und ist als unvollstaendig
+          // gekennzeichnet, statt eine Teilsumme zu sein.
+          ...(expected.omitted ? { expected_omitted: true } : {}),
         },
       },
     });
@@ -179,9 +183,16 @@ router.get('/export', (req, res) => {
     // Die erwarteten Abo-Zahlungen stehen in der Liste, also auch im Export
     // desselben Zeitraums (#1844) - als `Expected`, wie jede erwartete Buchung.
     // Stabil nach Datum einsortiert: Gebuchtes steht am selben Tag zuerst.
+    //
+    // Ein CSV hat kein Feld fuer "hier fehlt etwas", also sagen es zwei Koepfe:
+    // `X-Budget-Expected-Until`, wenn der Bereich breiter war als das Fenster
+    // der Projektion (erwartete Zeilen enden an diesem Tag), und
+    // `X-Budget-Expected-Omitted`, wenn die Gesamtgrenze gegriffen hat.
     const expected = expectedSubscriptionEntries(db.get(), { from, to, filter: budgetFilter(req, 's') });
-    if (expected.length) {
-      entries.push(...expected);
+    if (expected.until) res.setHeader('X-Budget-Expected-Until', expected.until);
+    if (expected.omitted) res.setHeader('X-Budget-Expected-Omitted', 'true');
+    if (expected.entries.length) {
+      entries.push(...expected.entries);
       entries.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
     }
 
@@ -331,12 +342,14 @@ router.get('/', (req, res) => {
     const accountFiltered = Number.isInteger(parseInt(req.query.account_id, 10))
       && parseInt(req.query.account_id, 10) > 0;
     const categoryAllows = !categoryKey || !validCategoryFilter || categoryKey === SUBSCRIPTION_BUDGET_CATEGORY;
+    let expectedOmitted = false;
     if (!loanId && !accountFiltered && categoryAllows) {
       const expected = expectedSubscriptionEntries(db.get(), {
         from, to, filter: budgetFilter(req, 's'),
       });
-      if (expected.length) {
-        masked.push(...expected);
+      expectedOmitted = expected.omitted;
+      if (expected.entries.length) {
+        masked.push(...expected.entries);
         // Stabil: am selben Tag bleibt Gebuchtes vor Erwartetem.
         masked.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
       }
@@ -347,6 +360,9 @@ router.get('/', (req, res) => {
     // verriete die Treffermenge, wofuer das Geld war.
     res.json({
       data: loanId ? masked.filter((row) => !row.details_hidden) : masked,
+      // Nur wenn die Gesamtgrenze der Projektion gegriffen hat: die Liste
+      // traegt dann keine erwartete Abo-Zeile und sagt es.
+      ...(expectedOmitted ? { meta: { expected_omitted: true } } : {}),
     });
   } catch (err) {
     log.error('', err);

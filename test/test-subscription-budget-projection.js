@@ -361,3 +361,121 @@ test('erwartete Zeile traegt die Form einer Buchung, aber nichts aus dem Abo dar
   assert.equal(JSON.stringify(row).includes('geheim'), false);
   assert.equal(JSON.stringify(row).includes('konto@example.org'), false);
 });
+
+// ── Grenzen der Arbeit je Anfrage ───────────────────────────────────────────────
+// Die Projektion rechnet beim Lesen, also bei JEDEM Aufschlagen eines Monats.
+// Was sie kostet, darf weder am Alter eines Abos haengen noch an der Breite
+// des Bereichs noch an der Zahl der Abos - und wo eine Grenze greift, sagt die
+// Antwort es, statt eine kuerzere Liste wie eine vollstaendige aussehen zu
+// lassen.
+
+const projection = await import('../server/services/subscription-budget-projection.js');
+
+/** Die Referenz: Schritt fuer Schritt mit addBillingCycle, wie /renew. */
+function steppedDates(sub, from, to) {
+  const dates = [];
+  let remaining = sub.end_type === 'after_count'
+    ? Number(sub.occurrence_count) - Number(sub.occurrences_done || 0) - 1 : Infinity;
+  let date = sub.next_payment_date;
+  while (remaining > 0) {
+    const next = addBillingCycle(date, sub.billing_cycle, sub.cycle_interval);
+    if (next > to) break;
+    if (sub.end_type === 'on_date' && next > sub.end_date) break;
+    if (next >= from) dates.push(next);
+    date = next;
+    remaining -= 1;
+  }
+  return dates;
+}
+
+test('ein uraltes Abo kostet nicht mehr Schritte als ein neues', () => {
+  const base = { enabled: 1, completed_at: null, end_type: 'never', cycle_interval: 1 };
+  for (const [cycle, start] of [['daily', '1900-01-01'], ['weekly', '1900-01-01'], ['monthly', '1000-01-31'], ['yearly', '1004-02-29']]) {
+    const sub = { ...base, billing_cycle: cycle, next_payment_date: start };
+    const stats = { steps: 0 };
+    const dates = projection.upcomingPaymentDates(sub, '2026-11-01', '2026-11-30', stats);
+    assert.deepEqual(dates, steppedDates(sub, '2026-11-01', '2026-11-30'), `${cycle} ab ${start}: dieselben Tage wie Schritt fuer Schritt`);
+    assert.ok(stats.steps > 0 || dates.length === 0, 'der Zaehler misst');
+    assert.ok(stats.steps <= dates.length + 2,
+      `${cycle} ab ${start}: ${stats.steps} Schritte fuer ${dates.length} Tage - der Vorlauf wird gesprungen, nicht gezaehlt`);
+  }
+});
+
+test('Sprung zum Bereichsanfang == Schritt fuer Schritt (Aequivalenz, auch am Monatsende)', () => {
+  // Fester Zufall: dieselben Faelle bei jedem Lauf.
+  let seed = 1844;
+  const rnd = (n) => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
+  const starts = ['2019-01-29', '2019-01-30', '2019-01-31', '2020-02-29', '2023-08-31', '2024-12-31',
+    '2023-11-30', '2025-03-15', '2026-10-28', '1996-02-29', '2000-02-29', '2026-10-01'];
+  const windows = [['2026-10-01', '2026-10-31'], ['2026-11-01', '2026-11-30'], ['2027-02-01', '2027-02-28'],
+    ['2028-02-01', '2028-02-29'], ['2026-10-11', '2027-10-11'], ['2100-02-01', '2100-03-31'], ['2031-01-01', '2031-12-31']];
+  let cases = 0;
+  for (const start of starts) {
+    for (const cycle of ['daily', 'weekly', 'monthly', 'yearly']) {
+      for (const interval of [1, 2, 3, 4, 5, 6, 7, 11, 12, 13, 24, 48]) {
+        const [from, to] = windows[rnd(windows.length)];
+        const end = rnd(4);
+        const sub = {
+          enabled: 1, completed_at: null, billing_cycle: cycle, cycle_interval: interval, next_payment_date: start,
+          end_type: end === 1 ? 'on_date' : end === 2 ? 'after_count' : 'never',
+          end_date: end === 1 ? ['2026-11-15', '2027-02-28', '2030-06-30'][rnd(3)] : null,
+          occurrence_count: end === 2 ? 1 + rnd(400) : null,
+          occurrences_done: end === 2 ? rnd(3) : 0,
+        };
+        assert.deepEqual(projection.upcomingPaymentDates(sub, from, to), steppedDates(sub, from, to),
+          JSON.stringify({ start, cycle, interval, from, to, end: sub.end_type, end_date: sub.end_date, n: sub.occurrence_count, done: sub.occurrences_done }));
+        cases += 1;
+      }
+    }
+  }
+  assert.equal(cases, starts.length * 4 * 12);
+});
+
+test('Gesamtgrenze: zu viele erwartete Zeilen brechen das Zaehlen ab, und die Antwort sagt es', async () => {
+  const insert = db.prepare(`
+    INSERT INTO budget_subscriptions (name, amount, currency, billing_cycle, cycle_interval, next_payment_date, created_by, owner_id)
+    VALUES (?, 1, 'EUR', 'daily', 1, '2026-10-01', ?, ?)`);
+  const perSub = 30; // November, taeglich
+  const count = Math.ceil(projection.MAX_EXPECTED_ROWS / perSub) + 1;
+  for (let i = 0; i < count; i += 1) insert.run(`Abo ${i}`, A, A);
+
+  const stats = { steps: 0 };
+  const direct = projection.expectedSubscriptionEntries(db, { from: '2026-11-01', to: '2026-11-30', stats });
+  assert.equal(direct.omitted, true);
+  assert.deepEqual(direct.entries, [], 'ganz oder gar nicht: eine gekuerzte Liste saehe vollstaendig aus');
+  assert.ok(stats.steps <= projection.MAX_EXPECTED_ROWS + count * 2,
+    `abgebrochen nach ${stats.steps} Schritten, nicht erst nach ${count * perSub}`);
+
+  const list = await call('GET', '/budget?month=2026-11');
+  assert.equal(list.status, 200);
+  assert.equal(expectedOf(list.body.data).length, 0);
+  assert.equal(list.body.meta?.expected_omitted, true, 'die Liste sagt, dass die Erwartungen fehlen');
+
+  const summary = await call('GET', '/budget/summary?month=2026-11');
+  assert.equal(summary.body.data.pending.count, 0, 'keine Teilsumme');
+  assert.equal(summary.body.data.pending.expected_omitted, true, 'die Zahl sagt, dass sie unvollstaendig ist');
+
+  // Unter der Grenze: alles da, kein Hinweis.
+  db.prepare('DELETE FROM budget_subscriptions WHERE id IN (SELECT id FROM budget_subscriptions LIMIT 2)').run();
+  const ok = await call('GET', '/budget?month=2026-11');
+  assert.equal(expectedOf(ok.body.data).length, (count - 2) * perSub);
+  assert.equal(ok.body.meta?.expected_omitted, undefined);
+});
+
+test('Export ueber Jahre: erwartete Zeilen hoechstens fuer das Fenster, und der Kopf nennt das Ende', async () => {
+  await createSub();
+  const res = await fetch(`${baseUrl}/budget/export?from=2026-01-01&to=2099-12-31`);
+  const text = await res.text();
+  const expectedLines = text.split('\n').filter((l) => l.includes(',Expected,'));
+  // Fenster: ab dem laufenden Monat (01.10.2026), PROJECTION_WINDOW_DAYS weit.
+  assert.equal(projection.PROJECTION_WINDOW_DAYS, 366);
+  assert.deepEqual(expectedLines.map((l) => l.slice(0, 10)), [
+    '2026-11-20', '2026-12-20', '2027-01-20', '2027-02-20', '2027-03-20', '2027-04-20',
+    '2027-05-20', '2027-06-20', '2027-07-20', '2027-08-20', '2027-09-20',
+  ]);
+  assert.equal(res.headers.get('x-budget-expected-until'), '2027-10-01');
+
+  const monthly = await fetch(`${baseUrl}/budget/export?month=2026-11`);
+  assert.equal(monthly.headers.get('x-budget-expected-until'), null, 'ein Monat passt ins Fenster: kein Hinweis');
+  await monthly.text();
+});
