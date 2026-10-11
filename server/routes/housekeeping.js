@@ -26,9 +26,9 @@ import {
   translate,
 } from '../utils/i18n.js';
 import {
-  OUTBOUND_SOURCES,
   mirroredFieldsChanged,
   queueEventDeletion,
+  markInlineOutbound,
 } from '../services/calendar-outbound.js';
 import { mayWriteModule, moduleAccessVerdict, MODULE_ACCESS_ALLOW } from '../permissions.js';
 import { documentVisibleSql } from '../services/document-access.js';
@@ -521,15 +521,10 @@ function updateVisitLinks(database, session, worker, visitDate, dailyRate, extra
     // Der Feldvergleich bleibt derselbe: mirroredFieldsChanged prüft genau die
     // Felder, die zum Provider gespiegelt werden.
     //
-    // Ein CalDAV-Termin ohne Konto (#1860) wird nie gesendet: an ihm wird
-    // nichts vorgemerkt, sonst hielte der Marker die Zeile davon ab, vom
-    // nächsten Konto übernommen zu werden, das ihre UID liefert.
-    const mirrored = after && OUTBOUND_SOURCES.includes(after.external_source) && !!after.external_calendar_id
-      && !(after.external_source === 'caldav' && after.caldav_account_id == null);
-    if (before && mirrored && mirroredFieldsChanged(before, after)) {
-      database.prepare(
-        'UPDATE calendar_events SET outbound_dirty = 1, outbound_attempts = 0 WHERE id = ?'
-      ).run(session.calendar_event_id);
+    // Ob die Zeile vormerkbar ist (gespiegelt, und bei CalDAV mit Konto, #1860),
+    // entscheidet markInlineOutbound - ein Leser mit birthdays.js.
+    if (before && mirroredFieldsChanged(before, after)) {
+      markInlineOutbound(database, after);
     }
   }
   if (session.payment_task_id) {

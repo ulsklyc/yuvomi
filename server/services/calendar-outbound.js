@@ -139,14 +139,18 @@ export function queueDeletion({ source, calendarExternalId, eventExternalId, obj
       log.error("queueDeletion('caldav') was called without an account. This is a bug in the caller; nothing is queued.");
       return false;
     }
-    // Der UNIQUE-Index kennt das Konto nicht. Ein bestehender Auftrag behält
-    // seines; nur einer ohne Konto bekommt das neue.
+    // Konto UND Adresse eines Auftrags gehören zusammen: sie benennen EIN
+    // Objekt auf EINEM Server. Trifft ein neuer Auftrag auf einen bestehenden
+    // (gleiche UID in gleichem Kalender), bleibt der bestehende unangetastet
+    // und der neue füllt nur, was dort noch fehlt - nie die Adresse des einen
+    // mit dem Konto des anderen paaren. Eine später vom Sync erlernte Adresse
+    // trägt `recordDeletionObjectUrl` nach, nicht ein erneutes Einreihen.
     (database || db.get()).prepare(`
       INSERT INTO calendar_pending_deletions
         (source, calendar_external_id, event_external_id, object_url, caldav_account_id)
       VALUES (?, ?, ?, ?, ?)
       ON CONFLICT(source, calendar_external_id, event_external_id)
-        DO UPDATE SET object_url = COALESCE(excluded.object_url, object_url),
+        DO UPDATE SET object_url = COALESCE(object_url, excluded.object_url),
                       caldav_account_id = COALESCE(caldav_account_id, excluded.caldav_account_id)
     `).run(source, calendarExternalId || '', eventExternalId, objectUrl, accountId);
     return true;
@@ -291,6 +295,33 @@ export function handleDeletionError(err, row, provider) {
  *   gescheiterten Versuch noch ein Push offen sein, und der Aufrufer entscheidet
  *   daran über seinen Sofortversuch.
  */
+/**
+ * Der Inline-Marker fuer gespiegelte Termine, deren Zeile schon in der Hand
+ * ist und die ueber EINE uebergebene Verbindung geschrieben werden muss
+ * (housekeeping.js, birthdays.js). Anders als `markEventOutbound` laeuft er
+ * nicht ueber `db.get()` und lehnt keinen schreibgeschuetzten Provider ab: der
+ * Marker ist auch der Schutz davor, dass der Inbound die lokale Aenderung
+ * ueberschreibt (`if (existing?.outbound_dirty) continue`).
+ *
+ * Nimmt ein gespiegelter CalDAV-Termin OHNE Konto (#1860) teil, wird nichts
+ * vorgemerkt: er wird nie gesendet, und der Marker hielte die Zeile sonst von
+ * der Uebernahme durch das naechste Konto fern. Der Aufrufer entscheidet
+ * VORHER, ob ein gespiegeltes Feld sich geaendert hat; diese Funktion
+ * entscheidet, OB die Zeile ueberhaupt vormerkbar ist, und schreibt dann.
+ *
+ * @param {object} database  die Verbindung, in der auch der Termin liegt
+ * @param {{id:number, external_source:string, external_calendar_id:?string, caldav_account_id:?number}} event
+ * @returns {boolean} true, wenn vorgemerkt wurde
+ */
+export function markInlineOutbound(database, event) {
+  if (!event || !OUTBOUND_SOURCES.includes(event.external_source) || !event.external_calendar_id) return false;
+  if (event.external_source === 'caldav' && event.caldav_account_id == null) return false;
+  database.prepare(
+    'UPDATE calendar_events SET outbound_dirty = 1, outbound_attempts = 0 WHERE id = ?'
+  ).run(event.id);
+  return true;
+}
+
 export function markOutbound(eventId, { dirty = false, moveTo = null, cancelMove = false } = {}) {
   if (!dirty && !moveTo && !cancelMove) return false;
   const row = db.get().prepare(`
