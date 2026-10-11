@@ -864,6 +864,48 @@ test('die Messwoerter der Re-Critique trennen an der Basis ihres Subjekts (W1)',
 /* R16 (Critique 2026-10-05, P1 Bausteine): der Name einer Listenzeile stand in
  * vier Schnitten da (15/600, 16/400, 16/500, 17/600). Kanon ist 16px medium,
  * registriert als Rolle Zeilentitel. Gegen den Stand davor rot gelaufen. */
+// ---------------------------------------------------------------------------
+// DIE TRENNGRENZE GILT AUCH IN SAFARI (#1774)
+//
+// `hyphenate-limit-chars` kennt Safari nicht (Stand Safari 27; nur die
+// Technology Preview parst sie). Die Deklaration faellt dort weg, und
+// `hyphens: auto` trennt ohne Untergrenze: „Wertpapierde-pot". WebKit fuehrt
+// dieselbe Grenze als `-webkit-hyphenate-limit-before` / `-after`. Verlangt
+// wird das Paar in DERSELBEN Regel und mit DENSELBEN Zahlen - eine Regel, die
+// in Chromium bei 4 trennt und in Safari bei 2, ist derselbe Befund in klein.
+// Keine Anzahl, keine Dateiliste: jede Regel unter public/styles wird gefragt.
+// ---------------------------------------------------------------------------
+
+/** Regeln, deren Safari-Grenze fehlt oder von `hyphenate-limit-chars` abweicht. */
+function hyphenLimitGaps() {
+  const gaps = [];
+  let seen = 0;
+  for (const file of cssFiles) {
+    const css = readFileSync(new URL(file, STYLES_DIR), 'utf8');
+    for (const { selector, body, at } of eachRule(css)) {
+      const chars = lastDeclaration(body, 'hyphenate-limit-chars');
+      if (!chars) continue;
+      seen += 1;
+      // Kurzform nach CSS Text 4: <wort> [<vor> [<nach>]]; fehlt <nach>, gilt <vor>.
+      const [, before = 'auto', after = before] = chars.split(/\s+/);
+      const where = `${file} ${[...at, selector].join(' | ')}`;
+      for (const [prop, want] of [['-webkit-hyphenate-limit-before', before], ['-webkit-hyphenate-limit-after', after]]) {
+        const got = lastDeclaration(body, prop);
+        if (got !== want) gaps.push(`${where}: ${prop} ist "${got}", erwartet "${want}" (hyphenate-limit-chars: ${chars})`);
+      }
+    }
+  }
+  return { gaps, seen };
+}
+
+test('jede Trenngrenze steht auch in der Safari-Schreibweise, mit denselben Zahlen (#1774)', () => {
+  const { gaps, seen } = hyphenLimitGaps();
+  assert.ok(seen > 0, 'der Guard hat keine einzige hyphenate-limit-chars-Regel gefunden - er misst nichts');
+  assert.deepEqual(gaps, [],
+    'Safari kennt hyphenate-limit-chars nicht und trennt ohne Grenze. Direkt darunter '
+    + '-webkit-hyphenate-limit-before / -after mit denselben Zahlen ergaenzen.');
+});
+
 test('der Zeilentitel ist eine Rolle (R16)', () => {
   const typo = [...eachRule(readFileSync(new URL('typography.css', STYLES_DIR), 'utf8'))];
   const sels = (rule) => rule.selector.split(',').map((s) => s.trim());

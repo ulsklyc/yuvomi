@@ -207,6 +207,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Long words break at a sensible place in Safari and on the iPhone** (Refs #1774). Where a long
+  word does not fit its line, Yuvomi hyphenates it and keeps at least four letters on each side of
+  the hyphen (three in the calendar's week view). Safari ignored that limit, so a name such as
+  "Wertpapierdepot" could end up as "Wertpapierde-pot". The limit is now also written the way
+  Safari understands it, in every place that hyphenates, and the word breaks as
+  "Wertpapier-depot". Chrome, Edge and Firefox are unchanged.
 - **Pocket money without an account now says what it is for** (#1774). Before an admin had opened
   an account for any child, "Pocket money" was a heading with a button and nothing below it, which
   read like a section that failed to load. It now shows one sentence below the heading, in the same
