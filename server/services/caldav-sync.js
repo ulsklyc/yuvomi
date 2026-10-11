@@ -842,7 +842,9 @@ const YIELD_EVERY = 50;
  * stehen und wartet: wird der Kalender wieder eingeschaltet, geht der Termin
  * hinaus.
  */
-function localUploadsOf(accountId) {
+function localUploadsOf(accountId, id = null) {
+  // Mit `id` dieselbe Frage für EINEN Termin: die Upload-Schleife liest ihn
+  // frisch, wenn er an der Reihe ist (#1862) - durch dieselbe Auswahl.
   return db.get().prepare(`
     SELECT e.* FROM calendar_events e
     WHERE e.external_source = 'local' AND e.target_caldav_account_id = ?
@@ -852,7 +854,8 @@ function localUploadsOf(accountId) {
           AND s.calendar_url = e.target_caldav_calendar_url
           AND s.enabled = 1
       )
-  `).all(accountId);
+      AND (? IS NULL OR e.id = ?)
+  `).all(accountId, id, id);
 }
 
 /** Echter tsdav-Client für einen Account; in Tests durch eine Factory ersetzbar. */
@@ -1123,8 +1126,10 @@ async function runSync({ createClient } = {}) {
       let fetchedEveryCalendar = true;
       // Offene Löschungen DIESES Kontos, einmal je Konto statt je Termin. Die
       // Löschung in einem Konto verdeckt nicht den Termin, den ein anderes
-      // unter derselben UID führt.
-      const pendingDeletionUids = outbound.pendingDeletionUids('caldav', { accountId: account.id });
+      // unter derselben UID führt. Und je OBJEKT, nicht je UID (#1861): nach
+      // einem Umzug, dessen Quelle ihr Objekt nicht hergibt, liegt dieselbe
+      // UID in zwei Kalendern, und gemeint ist nur das Objekt in der Quelle.
+      const awaitsDeletion = outbound.pendingDeletionGuard('caldav', { accountId: account.id });
 
       for (const selCal of enabledCalendars) {
         // Find matching calendar from server
@@ -1218,7 +1223,7 @@ async function runSync({ createClient } = {}) {
 
               // Vom Nutzer gelöscht und noch nicht auf dem Server: nicht wieder
               // anlegen, sonst kehrt der Termin bei jedem Sync zurück (#593).
-              if (pendingDeletionUids.has(ev.uid)) continue;
+              if (awaitsDeletion(ev.uid, selCal.calendar_url, obj.url ?? null)) continue;
 
               let existing = rowForUid(ev.uid, obj.url ?? null, account.id);
               // Die Zeile gehört einem anderen Konto, oder sie hat keines und
@@ -1399,7 +1404,13 @@ async function runSync({ createClient } = {}) {
       const householdZone = householdTimeZone(db.get());
 
       const uploadGate = createUploadGate();
-      for (const event of localEvents) {
+      for (const listed of localEvents) {
+        // Frisch lesen (#1862): die Liste stammt von vor der Schleife, und
+        // jeder Upload davor war ein await. Wer inzwischen bearbeitet wurde,
+        // geht mit dem Stand von jetzt hinauf; wer gelöscht wurde oder nicht
+        // mehr auf den Upload in dieses Konto wartet, gar nicht.
+        const [event] = localUploadsOf(account.id, listed.id);
+        if (!event) continue;
         try {
           // Find target calendar
           const targetCal = serverCalendars.find(sc => sc.url === event.target_caldav_calendar_url);
@@ -1424,9 +1435,12 @@ async function runSync({ createClient } = {}) {
             'caldav', event.target_caldav_calendar_url,
             targetCal.displayName || event.target_caldav_calendar_url, null
           );
-          outbound.markEventUploaded(event.id, {
+          // Gebucht wird gegen den Stand NACH dem await (bookEventUpload).
+          const booked = outbound.bookEventUpload(event, {
             source: 'caldav', uid, objectUrl, calRefId, adopted, accountId: account.id,
+            calendarUrl: event.target_caldav_calendar_url,
           });
+          if (booked !== 'mirrored') continue;
 
           accountEventCount++;
           accountChangedCount++;

@@ -217,6 +217,83 @@ export function pendingDeletionUids(source, { accountId = null } = {}) {
 }
 
 /**
+ * Dieselbe Frage wie `pendingDeletionUids`, aber je OBJEKT statt je UID: steht
+ * für dieses Objekt eine Löschung aus (#1861)?
+ *
+ * Eine UID allein sagt das nicht. Derselbe Termin kann in zwei Kalendern eines
+ * Kontos liegen - nach einem Umzug, dessen Quelle das Löschen abgelehnt hat.
+ * Der Auftrag gilt dann genau dem Objekt in der Quelle; über die UID verdeckte
+ * er auch die Kopie im Ziel, und der Abruf sähe deren Änderungen nicht mehr.
+ *
+ * Ein Auftrag nennt seinen Kalender, und der entscheidet. Nur wo er fehlt,
+ * entscheidet die Adresse, und zwar wörtlich: gleiche Adresse oder nicht. Ist
+ * eine der beiden Adressen unbekannt, bleibt das Objekt verdeckt - lieber eine
+ * Runde zu lang verborgen als ein gelöschter Termin, der zurückkommt.
+ *
+ * @returns {(uid: string, calendarUrl: string, objectUrl?: string|null) => boolean}
+ */
+export function pendingDeletionGuard(source, { accountId = null } = {}) {
+  const filter = accountFilter(source, accountId, 'pendingDeletionGuard');
+  if (!filter) return () => false;
+  let rows;
+  try {
+    rows = db.get().prepare(`
+      SELECT event_external_id, calendar_external_id, object_url
+      FROM calendar_pending_deletions WHERE source = ?${filter.sql}
+    `).all(source, ...filter.args);
+  } catch (err) {
+    log.warn(`Pending deletions are not readable (${err.message}); treating them as none.`);
+    return () => false;
+  }
+  const byUid = new Map();
+  for (const row of rows) {
+    if (!byUid.has(row.event_external_id)) byUid.set(row.event_external_id, []);
+    byUid.get(row.event_external_id).push(row);
+  }
+  return (uid, calendarUrl, objectUrl = null) => (byUid.get(uid) || []).some((row) => {
+    if (row.calendar_external_id) return row.calendar_external_id === calendarUrl;
+    if (!row.object_url || !objectUrl) return true;
+    return row.object_url === objectUrl;
+  });
+}
+
+/**
+ * Merkt eine Löschung vor, deren erster Versuch gerade abgelehnt wurde (#1861):
+ * die Quelle eines Umzugs, die ihr Objekt nicht hergibt. Die Absage zählt als
+ * Versuch, wie bei jeder anderen abgelehnten Löschung.
+ *
+ * Steht für dieselbe UID in demselben Kalender schon ein Auftrag, behält er
+ * Konto und Adresse (`queueDeletion`); gezählt wird die Absage auch dann. Der
+ * Lauf findet das Objekt über seinen Abruf, auch wenn die ältere Adresse nicht
+ * mehr stimmt.
+ */
+export function queueRefusedDeletion(target, err) {
+  if (!queueDeletion(target)) return false;
+  db.get().prepare(`
+    UPDATE calendar_pending_deletions SET attempts = attempts + 1, last_error = ?
+    WHERE source = ? AND calendar_external_id = ? AND event_external_id = ?
+  `).run(String(err?.message || err).slice(0, 500), target.source, target.calendarExternalId || '', target.eventExternalId);
+  return true;
+}
+
+/**
+ * Nimmt den Löschauftrag für das Objekt eines Termins in EINEM Kalender zurück
+ * (#1861): der Termin ist gerade dorthin gezogen, sein Objekt dort ist also
+ * gewollt. Ohne das träfe ein Auftrag aus einem früheren Umzug in die
+ * Gegenrichtung genau dieses Objekt, und der Termin wäre überall fort.
+ * Für 'caldav' nur der Auftrag des Kontos, das umgezogen hat.
+ */
+export function dropDeletionsIn({ source, calendarExternalId, eventExternalId, accountId = null }) {
+  if (!source || !calendarExternalId || !eventExternalId) return 0;
+  const filter = accountFilter(source, accountId, 'dropDeletionsIn');
+  if (!filter) return 0;
+  return Number(db.get().prepare(`
+    DELETE FROM calendar_pending_deletions
+    WHERE source = ? AND calendar_external_id = ? AND event_external_id = ?${filter.sql}
+  `).run(source, calendarExternalId, eventExternalId, ...filter.args).changes) || 0;
+}
+
+/**
  * Räumt CalDAV-Löschaufträge ab, die keinem Konto gehören (#1860): Bestand,
  * den Migration 238 nicht sicher zuordnen konnte. Es gibt kein Konto, über das
  * sie gesendet werden dürften, und ohne dieses Abräumen blieben sie für immer
@@ -247,12 +324,6 @@ export function failDeletion(id, err) {
   db.get().prepare(
     'UPDATE calendar_pending_deletions SET attempts = attempts + 1, last_error = ? WHERE id = ?'
   ).run(String(err?.message || err).slice(0, 500), id);
-}
-
-/** Objekt-URL eines Tombstones nachtragen, sobald der Sync sie kennt. */
-export function recordDeletionObjectUrl(id, objectUrl) {
-  if (!objectUrl) return;
-  db.get().prepare('UPDATE calendar_pending_deletions SET object_url = ? WHERE id = ?').run(objectUrl, id);
 }
 
 /**
@@ -774,6 +845,45 @@ export function markEventUploaded(eventId, { source, uid, objectUrl, calRefId, a
     source, uid, objectUrl, calRefId, ...(forCaldav ? [accountId] : []),
     adopted ? 1 : 0, adopted ? 1 : 0, eventId, onlyIfLocal ? 1 : 0
   ).changes > 0;
+}
+
+/**
+ * Bucht das Ergebnis eines Uploads - gegen den Stand von JETZT, nicht gegen
+ * den, aus dem die Anfrage gebaut wurde (#1862).
+ *
+ * Zwischen dem Lesen der Zeile und hier liegt die Anfrage an den Server, und
+ * in der Zeit läuft die App weiter:
+ *
+ *   - Die Zeile ist weg: der Nutzer hat den Termin gelöscht. Für eine lokale
+ *     Zeile merkt die Löschroute nichts vor (es gab noch nichts zu löschen),
+ *     das Objekt läge also für immer oben, und der nächste Abruf holte den
+ *     gelöschten Termin als neue Zeile zurück. Das gerade angelegte Objekt
+ *     wird deshalb zum Löschen vorgemerkt - bei CalDAV für das Konto, über
+ *     das der Upload lief.
+ *   - Die Zeile wurde bearbeitet: oben liegt der Stand von vor der
+ *     Bearbeitung. Eine lokale Zeile merkt auch das nicht vor. Sie würde zum
+ *     sauberen Spiegel, und der nächste Abruf überschriebe die Bearbeitung mit
+ *     dem alten Stand. Sie wird Spiegel UND als geändert vorgemerkt.
+ *   - Die Zeile ist nicht mehr lokal (ein anderer Weg hat sie inzwischen zum
+ *     Spiegel gemacht): nichts wird überschrieben.
+ *
+ * Synchron: zwischen dem Nachladen und dem Schreiben liegt kein await.
+ *
+ * @param {object} sent  die Zeile, aus der die Anfrage gebaut wurde
+ * @param {object} what  wie `markEventUploaded`, dazu `calendarUrl`
+ * @returns {'mirrored'|'deleted'|'unchanged'}
+ */
+export function bookEventUpload(sent, { source, uid, objectUrl, calRefId, calendarUrl, adopted = false, accountId = null }) {
+  const now = reloadEvent(sent.id);
+  if (!now) {
+    queueDeletion({ source, calendarExternalId: calendarUrl, eventExternalId: uid, objectUrl, accountId });
+    log.info(`Event ${sent.id} was deleted while its upload was in flight, queued the deletion of ${uid}.`);
+    return 'deleted';
+  }
+  const edited = mirroredFieldsChanged(sent, now);
+  return markEventUploaded(sent.id, {
+    source, uid, objectUrl, calRefId, adopted: adopted || edited, onlyIfLocal: true, accountId,
+  }) ? 'mirrored' : 'unchanged';
 }
 
 /**

@@ -24,6 +24,10 @@
  *     eine übernimmt nicht das Objekt der anderen;
  *   - eine schon gespiegelte Zeile behält ihre alte UID.
  *
+ * Seit #1862 dazu, für dieselben vier Wege: was an der Zeile geschieht,
+ * WÄHREND ihre Anfrage unterwegs ist (gelöscht, bearbeitet, ein zweites Mal
+ * bearbeitet), geht nicht verloren und kommt nicht zurück.
+ *
  * Wie in test-caldav-http-refusals.js: echte Dienste, echter tsdav-Client,
  * echtes HTTP gegen test/caldav-fake-server.js. Eine Attrappe am Client kann
  * "gespeichert, aber mit 500 beantwortet" nicht darstellen.
@@ -227,6 +231,22 @@ function helpers(way) {
   return { row, setTitle, rows, names };
 }
 
+/**
+ * Führt `action` aus, sobald der n-te PUT beim Server ANKOMMT, also während
+ * die Anfrage unterwegs ist: der Dienst wartet auf die Antwort, die Zeile ist
+ * längst gelesen. Die Regel lehnt nichts ab (`when` gibt false zurück), der
+ * PUT läuft danach normal durch.
+ */
+function duringPut(action, nth = 1) {
+  let seen = 0;
+  let ran = false;
+  dav.refuse({
+    method: 'PUT', status: 500,
+    when: () => { if (++seen === nth && !ran) { ran = true; action(); } return false; },
+  });
+  return () => ran;
+}
+
 // ── Die eine Quelle: erzeugen und erkennen ──────────────────────────────────────
 
 test('Installationskennung: einmal erzeugt, dann dieselbe, und sie liegt in der Datenbank', () => {
@@ -306,6 +326,120 @@ test('Serie: die Folgeinstanz erbt das Ziel einer hier entstandenen Aufgabe, alt
 
 for (const [label, way] of Object.entries(WAYS)) {
   const { row, setTitle, rows, names } = helpers(way);
+
+  // ── Was während einer laufenden Anfrage geschieht (#1862) ───────────────────
+  //
+  // Die Zeile wird gelesen, die Anfrage geschickt, das Ergebnis gebucht. Was
+  // in der Zeit dazwischen an der Zeile geschah, zählte nicht: ein Löschen
+  // liess das Objekt oben stehen und der nächste Abruf holte den Eintrag
+  // zurück, eine Bearbeitung wurde als "liegt so auf dem Server" gebucht und
+  // vom nächsten Abruf mit dem alten Stand überschrieben.
+
+  test(`${label}: gelöscht, während der Upload läuft - der Eintrag kommt nicht zurück`, async () => {
+    reset();
+    const url = way.setup();
+    const id  = way.create(url, 'Wird gelöscht');
+    const uid = ownUid(way.kind, id, db);
+
+    const happened = duringPut(() => db.prepare(`DELETE FROM ${way.table} WHERE id = ?`).run(id));
+    await way.upload();
+    assert.ok(happened(), 'es lief kein PUT - der Fall ist nicht nachgestellt');
+    assert.deepEqual(names(url), [`${uid}.ics`], 'der Upload kam nicht an - der Fall ist nicht nachgestellt');
+    dav.allowAll();
+
+    // Folgeläufe: Abruf, Outbound, noch ein Abruf.
+    await way.sync();
+    assert.equal(rows().length, 0, 'der gelöschte Eintrag ist nach dem Abruf zurück');
+    await way.push();
+    await way.sync();
+
+    assert.equal(rows().length, 0, 'der gelöschte Eintrag ist zurück');
+    assert.deepEqual(names(url), [], 'das Objekt des gelöschten Eintrags liegt weiter auf dem Server');
+  });
+
+  test(`${label}: bearbeitet, während der Upload läuft - die Bearbeitung bleibt`, async () => {
+    reset();
+    const url = way.setup();
+    const id  = way.create(url, 'Alt');
+    const uid = ownUid(way.kind, id, db);
+
+    const happened = duringPut(() => setTitle(id, 'Neu'));
+    await way.upload();
+    assert.ok(happened());
+    assert.match(dav.getObject(url, `${uid}.ics`).data, /SUMMARY:Alt/, 'der Fall ist nicht nachgestellt: oben liegt schon der neue Stand');
+    dav.allowAll();
+
+    let now = row(id);
+    assert.equal(now.external_source, way.source);
+    assert.equal(now.outbound_dirty, 1, 'die Zeile gilt als sauberer Spiegel, obwohl oben der alte Stand liegt');
+
+    await way.sync();
+    assert.equal(row(id)[way.titleColumn], 'Neu', 'der Abruf hat die Bearbeitung mit dem alten Stand überschrieben');
+    await way.push();
+    await way.sync();
+
+    now = row(id);
+    assert.equal(rows().length, 1);
+    assert.equal(now[way.titleColumn], 'Neu');
+    assert.equal(now.outbound_dirty, 0);
+    assert.match(dav.getObject(url, `${uid}.ics`).data, /SUMMARY:Neu/, 'auf dem Server liegt nicht die Bearbeitung');
+  });
+
+  test(`${label}: bearbeitet, bevor er im selben Lauf an der Reihe ist - hinauf geht der neue Stand`, async () => {
+    reset();
+    const url    = way.setup();
+    const first  = way.create(url, 'Erster');
+    const second = way.create(url, 'Alt');
+    const uid    = ownUid(way.kind, second, db);
+
+    // Während der Upload des ersten läuft, wird der zweite bearbeitet.
+    const happened = duringPut(() => setTitle(second, 'Neu'));
+    await way.upload();
+    assert.ok(happened());
+    dav.allowAll();
+    assert.equal(row(first).external_source, way.source);
+    // Schon der erste PUT des zweiten trägt die Bearbeitung: die Zeile wird
+    // gelesen, wenn sie an der Reihe ist, nicht vor der Schleife.
+    assert.match(dav.getObject(url, `${uid}.ics`).data, /SUMMARY:Neu/, 'hinauf ging der Stand von vor der Schleife');
+    assert.equal(row(second).outbound_dirty, 0);
+
+    await way.sync();
+    await way.push();
+    await way.sync();
+
+    const now = row(second);
+    assert.equal(now[way.titleColumn], 'Neu', 'der Abruf hat die Bearbeitung mit dem alten Stand überschrieben');
+    assert.equal(now.outbound_dirty, 0);
+    assert.match(dav.getObject(url, `${uid}.ics`).data, /SUMMARY:Neu/, 'auf dem Server liegt der Stand von vor der Bearbeitung');
+  });
+
+  test(`${label}: ein zweites Mal bearbeitet, während die Änderung hinausgeht - die zweite bleibt`, async () => {
+    reset();
+    const url = way.setup();
+    const uid = 'twice@test';
+    const { url: objectUrl } = dav.putObject(url, `${uid}.ics`, ics(way.component, uid, 'Alt'));
+    const id = way.createMirrored(url, uid, 'Alt', objectUrl);
+    const editTo = (title) => db.prepare(
+      `UPDATE ${way.table} SET ${way.titleColumn} = ?, outbound_dirty = 1 WHERE id = ?`
+    ).run(title, id);
+
+    editTo('Erste');
+    const happened = duringPut(() => editTo('Zweite'));
+    await way.push();
+    assert.ok(happened(), 'es lief kein PUT - der Fall ist nicht nachgestellt');
+    assert.match(dav.getObject(url, `${uid}.ics`).data, /SUMMARY:Erste/);
+    dav.allowAll();
+    assert.equal(row(id).outbound_dirty, 1, 'die Zeile gilt als sauber, obwohl oben erst die erste Bearbeitung liegt');
+
+    await way.sync();
+    assert.equal(row(id)[way.titleColumn], 'Zweite', 'der Abruf hat die zweite Bearbeitung durch die erste ersetzt');
+    await way.push();
+    await way.sync();
+
+    assert.equal(row(id)[way.titleColumn], 'Zweite');
+    assert.equal(row(id).outbound_dirty, 0);
+    assert.match(dav.getObject(url, `${uid}.ics`).data, /SUMMARY:Zweite/);
+  });
 
   test(`${label}: gespeichert, aber mit 500 beantwortet - der nächste Upload übernimmt (412)`, async () => {
     reset();

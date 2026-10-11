@@ -934,3 +934,100 @@ test('ein zweiter Löschauftrag für dieselbe UID im selben Kalender lässt Kont
   const [t2] = db.prepare('SELECT caldav_account_id, object_url FROM calendar_pending_deletions').all();
   assert.equal(t2.object_url, `${accounts.a.url}shared.ics`, 'eine fehlende Adresse wurde nicht nachgetragen');
 });
+
+// ── #1861 und #1862 mit zwei Konten ─────────────────────────────────────────────
+
+test('Umzug, die Quelle lehnt das Löschen ab: der Auftrag gehört dem Konto der Zeile, und nur dieses räumt die Quelle ab', async () => {
+  const { a, b, workUrl } = accountWithTwoCalendars();
+  const id = mirror(a, { title: 'Zieht um' });
+  db.prepare('UPDATE calendar_events SET outbound_move_to = ? WHERE id = ?').run(workUrl, id);
+  a.dav.refuse({ method: 'DELETE', status: 403, when: (req) => req.path.startsWith('/cal/family/') });
+
+  await caldavSync.sync();
+
+  assert.ok(a.dav.getObject(workUrl, 'shared.ics'), 'die Kopie im Ziel fehlt - der Fall ist nicht nachgestellt');
+  assert.ok(a.dav.getObject(a.url, 'shared.ics'));
+  assert.deepEqual(
+    db.prepare('SELECT calendar_external_id, object_url, caldav_account_id, attempts FROM calendar_pending_deletions').all(),
+    [{ calendar_external_id: a.url, object_url: a.objectUrl, caldav_account_id: a.accountId, attempts: 1 }],
+    'das abgelehnte Löschen ist nicht für das Konto der Zeile vorgemerkt',
+  );
+  assert.equal(row(id).calendar_ref_id, calendarRef(workUrl));
+
+  // Die Quelle lehnt weiter ab: die Zeile bleibt am Ziel und allein.
+  await caldavSync.sync();
+  assert.deepEqual(rowsWithUid().map((r) => r.id), [id]);
+  assert.equal(row(id).calendar_ref_id, calendarRef(workUrl), 'die Zeile ist zur Quelle zurückgewandert');
+  assert.equal(row(id).caldav_account_id, a.accountId);
+
+  a.dav.allowAll();
+  await caldavSync.sync();
+
+  assert.equal(a.dav.getObject(a.url, 'shared.ics'), null, 'der Termin liegt weiter in beiden Kalendern');
+  assert.ok(a.dav.getObject(workUrl, 'shared.ics'), 'die Kopie im Ziel wurde mit abgeräumt');
+  assert.equal(tombstoneCount(), 0);
+  assertRequestsStayWithTheirAccount({ a, b });
+  assert.deepEqual(writesAt(b.dav).map(describe), [], 'das andere Konto hat geschrieben');
+  assert.equal(summaryAt(b), 'Aus B', 'das Objekt des anderen Kontos wurde angefasst');
+});
+
+/** Führt `action` aus, sobald der erste PUT bei diesem Server ankommt. */
+function duringPut(dav, action) {
+  let ran = false;
+  dav.refuse({ method: 'PUT', status: 500, when: () => { if (!ran) { ran = true; action(); } return false; } });
+  return () => ran;
+}
+
+function waitingUpload(acc, title) {
+  return Number(db.prepare(`
+    INSERT INTO calendar_events
+      (title, start_datetime, end_datetime, all_day, created_by, target_caldav_account_id, target_caldav_calendar_url)
+    VALUES (?, '2035-03-10T10:00', '2035-03-10T11:00', 0, ?, ?, ?)
+  `).run(title, userId, acc.accountId, acc.url).lastInsertRowid);
+}
+
+test('gelöscht, während der Upload läuft: der Auftrag gehört dem Konto des Uploads, und der Termin kommt nicht zurück', async () => {
+  const accounts = twoAccounts();
+  const id = waitingUpload(accounts.b, 'Wird gelöscht');
+  const happened = duringPut(accounts.b.dav, () => db.prepare('DELETE FROM calendar_events WHERE id = ?').run(id));
+
+  await caldavSync.sync();
+  assert.ok(happened(), 'es lief kein PUT - der Fall ist nicht nachgestellt');
+  accounts.b.dav.allowAll();
+  const uploaded = accounts.b.dav.objectNames(accounts.b.url).filter((n) => n.startsWith('yuvomi-event-'));
+  assert.equal(uploaded.length, 1, 'der Upload kam nicht an - der Fall ist nicht nachgestellt');
+  assert.deepEqual(db.prepare('SELECT caldav_account_id, object_url FROM calendar_pending_deletions').all(),
+    [{ caldav_account_id: accounts.b.accountId, object_url: `${accounts.b.url}${uploaded[0]}` }],
+    'für das gerade angelegte Objekt steht kein Auftrag des hochladenden Kontos');
+
+  await caldavSync.sync();
+  await caldavSync.sync();
+
+  assert.deepEqual(accounts.b.dav.objectNames(accounts.b.url).filter((n) => n.startsWith('yuvomi-event-')), [],
+    'das Objekt des gelöschten Termins liegt weiter auf dem Server');
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM calendar_events WHERE title = 'Wird gelöscht'").get().n, 0, 'der gelöschte Termin ist zurück');
+  assert.equal(tombstoneCount(), 0);
+  assertRequestsStayWithTheirAccount(accounts);
+});
+
+test('bearbeitet, während der Upload läuft: die Zeile gehört dem Konto des Uploads, und die Bearbeitung geht über dieses hinaus', async () => {
+  const accounts = twoAccounts();
+  const id = waitingUpload(accounts.b, 'Alt');
+  const happened = duringPut(accounts.b.dav, () => db.prepare("UPDATE calendar_events SET title = 'Neu' WHERE id = ?").run(id));
+
+  await caldavSync.sync();
+  assert.ok(happened());
+  accounts.b.dav.allowAll();
+  assert.equal(row(id).external_source, 'caldav');
+  assert.equal(row(id).caldav_account_id, accounts.b.accountId);
+  assert.equal(row(id).outbound_dirty, 1, 'die Zeile gilt als sauberer Spiegel, obwohl oben der alte Stand liegt');
+
+  await caldavSync.sync();
+
+  assert.equal(row(id).title, 'Neu', 'der Abruf hat die Bearbeitung mit dem alten Stand überschrieben');
+  assert.equal(row(id).outbound_dirty, 0);
+  const name = accounts.b.dav.objectNames(accounts.b.url).find((n) => n.startsWith('yuvomi-event-'));
+  assert.match(accounts.b.dav.getObject(accounts.b.url, name).data, /SUMMARY:Neu/);
+  assertRequestsStayWithTheirAccount(accounts);
+  assert.deepEqual(writesAt(accounts.a.dav).map(describe), []);
+});
