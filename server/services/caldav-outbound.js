@@ -21,6 +21,7 @@ import { nearestIcalColorName } from '../utils/ical-color.js';
 import { outboundEvent } from './outbound-dtstart.js';
 import { findObjectWithUid } from '../utils/own-uid.js';
 import { upsertExternalCalendar } from './external-calendars.js';
+import { addressWithin, sameDavAddress } from '../utils/dav-address.js';
 
 const log = createLogger('CalDAVOutbound');
 
@@ -147,41 +148,6 @@ export function icsFieldsForEvent(event, householdZone = null) {
   return { fields, tzid: when.tzid };
 }
 
-/** Liegt diese Adresse in einem der Kalender? Verglichen wird Origin und dekodierter Pfad. */
-export function liesWithin(url, calendarUrls) {
-  // Die Abfrage gehört zur Adresse: wo ein Server Benutzer oder Sammlungen so
-  // unterscheidet, sagt der Pfad allein nicht, wem etwas gehört.
-  const parts = (value) => {
-    try {
-      const parsed = new URL(value);
-      return { origin: parsed.origin, path: decodeURIComponent(parsed.pathname), search: parsed.search };
-    } catch { return null; }
-  };
-  const target = parts(url);
-  if (!target) return false;
-  for (const calendarUrl of calendarUrls) {
-    const base = parts(calendarUrl);
-    if (!base || base.origin !== target.origin || base.search !== target.search) continue;
-    // Der Schrägstrich gehört ans Ende des PFADS - an die ganze Adresse
-    // gehängt, landete er in der Abfrage.
-    if (target.path.startsWith(base.path.replace(/\/?$/, '/'))) return true;
-  }
-  return false;
-}
-
-/** Dieselbe Adresse, gleich ob der Server `@` als `%40` zurückgibt. */
-function sameAddress(a, b) {
-  if (a === b) return true;
-  const parts = (value) => {
-    try {
-      const parsed = new URL(value);
-      return `${parsed.origin}${decodeURIComponent(parsed.pathname)}${parsed.search}`;
-    } catch { return null; }
-  };
-  const left = parts(a);
-  return left !== null && left === parts(b);
-}
-
 /**
  * Das Objekt aus dem Index dieses Laufs, das zu einer Vormerkung gehört.
  *
@@ -201,8 +167,8 @@ function objectOf(objectIndex, uid, { url = null, calendarUrl = null } = {}) {
   const first = objectIndex.get(uid) ?? null;
   const all = () => [...(objectIndex.byUrl?.values() ?? [])];
   if (url) {
-    if (first?.url && sameAddress(first.url, url)) return first;
-    return all().find((o) => sameAddress(o.url, url)) ?? null;
+    if (first?.url && sameDavAddress(first.url, url)) return first;
+    return all().find((o) => sameDavAddress(o.url, url)) ?? null;
   }
   if (!first || !calendarUrl || !first.calendarUrl || first.calendarUrl === calendarUrl) return first;
   return all().find((o) => o.uid === uid && o.calendarUrl === calendarUrl) ?? null;
@@ -218,29 +184,47 @@ function objectOf(objectIndex, uid, { url = null, calendarUrl = null } = {}) {
  * dieselbe UID führen - dann stand das Objekt des einen Kontos für die Zeile
  * des anderen ein, und eine Bearbeitung landete im falschen Konto.
  *
- * Die Zugehörigkeit muss deshalb BELEGT sein, bevor eine Anfrage entsteht:
- *   - die gespeicherte Objektadresse liegt in einem Kalender dieses Kontos, und
- *   - der Kalender, in dem die Vormerkung laut Buchführung liegt, gehört ihm.
- * Eines von beiden darf fehlen (Bestand ohne gespeicherte Adresse, Tombstone
- * ohne Kalender), widersprechen darf keines. Fehlt beides, oder nennt der
- * Aufrufer gar kein Konto, geht nichts hinaus: die Vormerkung bleibt stehen,
- * ohne dass ein Versuch gezählt wird - es gab keinen.
+ * Belegt wird die Zugehörigkeit aus GESPEICHERTEN SCHLÜSSELN, nicht aus einem
+ * Adressvergleich: der Kalender, in dem die Vormerkung laut Buchführung liegt
+ * (Termin → calendar_ref_id → external_calendars, bzw. der Kalender am
+ * Tombstone), ist Zeichen für Zeichen ein Kalender aus der Auswahl dieses
+ * Kontos. Beide Seiten hat derselbe Code aus demselben Wert geschrieben; es
+ * wird nichts gelesen, gedeutet oder normalisiert.
  *
- * Apple ist ausgenommen: dort gibt es ein einziges Konto und keine Tabelle,
+ * Fehlt der Kalender, oder nennt der Aufrufer kein Konto, ist nichts belegt
+ * und es geht nichts hinaus: die Vormerkung bleibt stehen, ohne dass ein
+ * Versuch gezählt wird - es gab keinen.
+ *
+ * Apple ist ausgenommen: dort gibt es ein einziges Konto und keine Auswahl,
  * aus der sich eine Zugehörigkeit lesen liesse.
  *
- * @param {string}      source       'caldav' | 'apple'
- * @param {string|null} storedUrl    gespeicherte Objektadresse der Vormerkung
- * @param {string|null} calendarUrl  Kalender, in dem sie laut Buchführung liegt
- * @param {string[]|null} accountCalendarUrls  alle Kalender des Kontos
+ * @param {string}        source       'caldav' | 'apple'
+ * @param {string|null}   calendarUrl  Kalender der Vormerkung laut Buchführung
+ * @param {string[]|null} accountCalendarUrls  die Auswahl des Kontos
  */
-function belongsToAccount(source, storedUrl, calendarUrl, accountCalendarUrls) {
+function belongsToAccount(source, calendarUrl, accountCalendarUrls) {
   if (source !== 'caldav') return true;
-  if (!accountCalendarUrls) return false;
-  if (!storedUrl && !calendarUrl) return false;
-  if (storedUrl && !liesWithin(storedUrl, accountCalendarUrls)) return false;
-  if (calendarUrl && !accountCalendarUrls.includes(calendarUrl)) return false;
-  return true;
+  return !!calendarUrl && Array.isArray(accountCalendarUrls) && accountCalendarUrls.includes(calendarUrl);
+}
+
+/**
+ * Die Adresse, an die die Anfrage für eine Vormerkung geht - oder `null`, wenn
+ * sie sich nicht eindeutig in den Kalender lesen lässt, dem die Vormerkung
+ * gehört.
+ *
+ * Wer besitzt, ist oben schon entschieden. Hier geht es nur noch darum, dass
+ * die Anfrage auch DORT ankommt: die gespeicherte Adresse muss im Kalender der
+ * Vormerkung liegen; eine Adresse aus dem Index dieses Laufs (Bestand ohne
+ * gespeicherte) in einem Kalender des Kontos. Zurück kommt die Form, die
+ * `dav-address.js` geprüft hat - sie geht hinaus, nicht die gespeicherte
+ * Zeichenkette.
+ *
+ * Apple: unverändert die Adresse, wie sie steht.
+ */
+function requestAddress(source, storedUrl, indexedUrl, calendarUrl, accountCalendarUrls) {
+  if (source !== 'caldav') return storedUrl || indexedUrl || null;
+  if (storedUrl) return addressWithin(storedUrl, [calendarUrl]);
+  return indexedUrl ? addressWithin(indexedUrl, accountCalendarUrls) : null;
 }
 
 /**
@@ -248,7 +232,7 @@ function belongsToAccount(source, storedUrl, calendarUrl, accountCalendarUrls) {
  * er wird gemeldet, und es geht nichts hinaus.
  */
 function accountIsNamed(source, accountCalendarUrls, what) {
-  if (source !== 'caldav' || accountCalendarUrls) return true;
+  if (source !== 'caldav' || Array.isArray(accountCalendarUrls)) return true;
   log.error(`[${label(source)}] Pending ${what} were not processed: the caller named no account.`);
   return false;
 }
@@ -371,12 +355,18 @@ export async function processPendingDeletions(client, source, objectIndex, ownCa
     // Fehlversuche hoch und verwirft am Ende eine fremde Löschung.
     if (ownCalendarUrls && row.calendar_external_id && !ownCalendarUrls.has(row.calendar_external_id)) continue;
     // Die Löschung eines anderen Kontos: dessen Lauf übernimmt.
-    if (!belongsToAccount(source, row.object_url, row.calendar_external_id || null, accountCalendarUrls)) continue;
+    if (!belongsToAccount(source, row.calendar_external_id || null, accountCalendarUrls)) continue;
 
     const known = objectOf(objectIndex, row.event_external_id, {
       url: row.object_url, calendarUrl: row.calendar_external_id || null,
     });
-    const url   = row.object_url || known?.url || null;
+    const url   = requestAddress(
+      source, row.object_url, known?.url, row.calendar_external_id, accountCalendarUrls
+    );
+    if (!url && (row.object_url || known?.url)) {
+      log.warn(`[${label(source)}] The pending deletion of ${row.event_external_id} names an address outside its calendar; it is not sent.`);
+      continue;
+    }
 
     if (!url) {
       // Zuständig, aber der Server liefert das Objekt nicht mehr aus: dann ist es
@@ -427,9 +417,9 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
     // Die Zeile eines anderen Kontos: nichts tun, nichts verwerfen - dessen
     // Lauf übernimmt. Vor dem Blick in den Index, denn der kennt nur UIDs.
     const eventCalendarUrl = outbound.calendarExternalId(event);
-    if (!belongsToAccount(source, event.external_object_url, eventCalendarUrl, accountCalendarUrls)) {
-      if (!event.external_object_url && !eventCalendarUrl) {
-        log.warn(`[${label(source)}] Event ${event.id} has neither an object address nor a calendar, so no account can take its pending change.`);
+    if (!belongsToAccount(source, eventCalendarUrl, accountCalendarUrls)) {
+      if (!eventCalendarUrl) {
+        log.warn(`[${label(source)}] Event ${event.id} has no calendar, so no account can take its pending change.`);
       }
       continue;
     }
@@ -439,7 +429,13 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
     // bisher: der PUT auf die alte Adresse meldet dann selbst, was dort ist.
     const known = objectOf(objectIndex, event.external_calendar_id, { url: event.external_object_url })
       ?? objectIndex.get(event.external_calendar_id);
-    const url   = event.external_object_url || known?.url || null;
+    const url   = requestAddress(
+      source, event.external_object_url, known?.url, eventCalendarUrl, accountCalendarUrls
+    );
+    if (!url && (event.external_object_url || known?.url)) {
+      log.warn(`[${label(source)}] The object address of event ${event.id} does not lie in its calendar; its pending change is not sent.`);
+      continue;
+    }
 
     // Weder gespeichert noch im aktuellen Abruf enthalten: das Objekt gehört zu
     // einem anderen Account. Nichts tun, nichts verwerfen - dessen Lauf übernimmt.
@@ -521,7 +517,7 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
           // für die Quelle an, und an genau dem erkennt deletedByUser den Nutzer.
           const stillThere    = !!outbound.reloadEvent(event.id);
           const userDeletedIt = !stillThere
-            && deletedByUser(source, event.external_calendar_id, url, known.calendarUrl);
+            && deletedByUser(source, event.external_calendar_id, event.external_object_url || url, known.calendarUrl);
 
           // Die Quelle hat ihr Löschen abgelehnt (#1861). Die Kopie liegt im
           // Ziel, der Umzug ist also zur Hälfte vollzogen - und galt bisher als

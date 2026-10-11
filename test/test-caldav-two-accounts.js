@@ -49,6 +49,7 @@ const db = dbmod.get();
 const caldavSync = await import('../server/services/caldav-sync.js');
 const caldavOutbound = await import('../server/services/caldav-outbound.js');
 const { createCalDAVClient } = await import('../server/utils/caldav-client.js');
+const { addressWithin, inCalendarHomeOf } = await import('../server/utils/dav-address.js');
 
 db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('admin','Admin','x','admin')").run();
 
@@ -533,3 +534,102 @@ test('Ausgang: Adresse im einen Konto, Kalender im anderen - es geht nichts hina
   assert.equal(summaryAt(accounts.a), 'Aus A', 'die Bearbeitung einer Zeile aus Konto B liegt im Objekt von Konto A');
   assert.equal(db.prepare('SELECT outbound_dirty FROM calendar_events WHERE id = ?').get(ids.b).outbound_dirty, 1);
 });
+
+// ── Schreibweisen einer Adresse ─────────────────────────────────────────────────
+//
+// Wem eine Zeile gehört, steht in gespeicherten Schlüsseln (Zeile → Kalender →
+// Auswahl des Kontos), nicht in einem Adressvergleich. Die Adresse entscheidet
+// nur noch, WOHIN die Anfrage geht - und sie wird einmal gelesen: dieselbe
+// normalisierte Form wird geprüft und abgeschickt. Was sich nicht eindeutig in
+// den Kalender der Zeile lesen lässt, geht nicht hinaus.
+
+/** Die Zeile von Konto A mit dieser gespeicherten Objektadresse, als bearbeitet vorgemerkt. */
+async function pushWithStoredAddress(storedUrl) {
+  const accounts = twoAccounts();
+  const ids = mirroredInBoth(accounts);
+  db.prepare("UPDATE calendar_events SET external_object_url = ?, title = 'A bearbeitet', outbound_dirty = 1 WHERE id = ?")
+    .run(storedUrl(accounts), ids.a);
+  const { client, index, scope } = await clientOfA(accounts);
+  for (const account of Object.values(accounts)) account.dav.requests.length = 0;
+  const sent = await caldavOutbound.processPendingUpdates(client, 'caldav', index, null, scope);
+  const row = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(ids.a);
+  return { accounts, sent, row };
+}
+
+const SAME_OBJECT = {
+  'Schema gross geschrieben':        (a) => a.objectUrl.replace(/^http:/, 'HTTP:'),
+  'mit Fragment':                    (a) => `${a.objectUrl}#teil`,
+  'mit Punkt-Segment':               (a) => a.objectUrl.replace('/cal/family/', '/cal/./family/'),
+  'über ein Nachbarsegment zurück':  (a) => a.objectUrl.replace('/cal/family/', '/cal/other/../family/'),
+  'mit Backslash statt Schrägstrich': (a) => a.objectUrl.replace('/cal/family/', '\\cal\\family\\'),
+  'ein Buchstabe prozentkodiert':    (a) => a.objectUrl.replace('shared.ics', '%73hared.ics'),
+};
+
+for (const [label, spell] of Object.entries(SAME_OBJECT)) {
+  test(`Adresse ${label}: dasselbe Objekt, die Änderung kommt dort an`, async () => {
+    const { accounts, sent, row } = await pushWithStoredAddress((acc) => spell(acc.a));
+    assert.equal(sent, 1);
+    const writes = accounts.a.dav.requests.filter((r) => r.method === 'PUT');
+    assert.equal(writes.length, 1);
+    assert.equal(decodeURIComponent(writes[0].path), '/cal/family/shared.ics', 'die Anfrage ging an eine andere Adresse als die geprüfte');
+    assert.equal(summaryAt(accounts.a), 'A bearbeitet');
+    assert.equal(row.outbound_dirty, 0);
+    assertRequestsStayWithTheirAccount(accounts);
+  });
+}
+
+const NOT_IN_ITS_CALENDAR = {
+  'mit Benutzerangaben':                   (acc) => acc.a.objectUrl.replace('://', '://someone:secret@'),
+  'aus dem Kalender hinaus (..)':          (acc) => acc.a.objectUrl.replace('/cal/family/', '/cal/family/../other/'),
+  'aus dem Kalender hinaus (%2e%2e)':      (acc) => acc.a.objectUrl.replace('/cal/family/', '/cal/family/%2e%2e/other/'),
+  'kodierter Schrägstrich im Segment':     (acc) => acc.a.objectUrl.replace('/cal/family/', '/cal/family%2F..%2Fother/'),
+  'Kalender mit gleichem Namensanfang':    (acc) => acc.a.objectUrl.replace('/cal/family/', '/cal/family-2/'),
+  'mit einer Abfrage':                     (acc) => `${acc.a.objectUrl}?user=other`,
+  'auf dem Server des anderen Kontos':     (acc) => acc.b.objectUrl,
+  'anderes Schema':                        (acc) => acc.a.objectUrl.replace(/^http:/, 'ftp:'),
+  'ohne Schema':                           () => 'cal/family/shared.ics',
+  'kaputte Prozentkodierung':              (acc) => acc.a.objectUrl.replace('shared.ics', '%zzshared.ics'),
+};
+
+for (const [label, spell] of Object.entries(NOT_IN_ITS_CALENDAR)) {
+  test(`Adresse ${label}: liegt nicht eindeutig im Kalender der Zeile, es geht nichts hinaus`, async () => {
+    const { accounts, sent, row } = await pushWithStoredAddress(spell);
+    assert.equal(sent, 0);
+    assert.deepEqual(
+      Object.values(accounts).flatMap((a) => a.dav.requests).map((r) => `${r.method} ${r.path}`), [],
+      'es ging eine Anfrage hinaus'
+    );
+    assert.equal(summaryAt(accounts.a), 'Aus A');
+    assert.equal(row.outbound_dirty, 1, 'die Vormerkung wurde verworfen');
+    assert.equal(row.outbound_attempts, 0, 'ein Versuch wurde gezählt, obwohl es keinen gab');
+  });
+}
+
+test('der eine Leser: Host, Port und Kodierung, die ein echter Server hier nicht zeigen kann', () => {
+  const CAL = 'https://dav.example/calendars/alice@example.org/family/';
+  const within = (url) => addressWithin(url, [CAL]);
+  // Dieselbe Adresse in anderer Schreibweise: zurück kommt EINE Form.
+  const plain = 'https://dav.example/calendars/alice@example.org/family/x.ics';
+  assert.equal(within(plain), plain);
+  assert.equal(within('https://DAV.Example:443/calendars/alice@example.org/family/x.ics'), plain);
+  assert.equal(within('https://dav.example/calendars/alice%40example.org/family/x.ics'),
+    'https://dav.example/calendars/alice%40example.org/family/x.ics');
+  // Nicht dieselbe Stelle.
+  for (const url of [
+    'http://dav.example/calendars/alice@example.org/family/x.ics',
+    'https://dav.example:8443/calendars/alice@example.org/family/x.ics',
+    'https://dav.example.evil.test/calendars/alice@example.org/family/x.ics',
+    'https://dav.example/calendars/bob@example.org/family/x.ics',
+    'https://dav.example/calendars/alice@example.org/family/',
+    'https://dav.example/calendars/alice@example.org/family',
+    'https://dav.example/calendars/alice@example.org/familyx/x.ics',
+    null, undefined, 42, '',
+  ]) assert.equal(within(url), null, `als im Kalender gelesen: ${url}`);
+
+  // Kalender-Home: daneben ja, ein anderer Benutzer nein, mit Abfrage nie.
+  assert.equal(inCalendarHomeOf('https://dav.example/calendars/alice%40example.org/old/x.ics', [CAL]), true);
+  assert.equal(inCalendarHomeOf('https://dav.example/calendars/bob@example.org/old/x.ics', [CAL]), false);
+  assert.equal(inCalendarHomeOf('https://dav.example/calendars/alice@example.org/old/x.ics?u=1', [CAL]), false);
+  assert.equal(inCalendarHomeOf('https://dav.example/x.ics', ['https://dav.example/']), false);
+});
+

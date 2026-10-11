@@ -23,7 +23,8 @@ import { toICSDatetime, escapeICSText } from '../utils/ics-format.js';
 import { eventDateTimeFields } from '../utils/ics-datetime.js';
 import { vtimezoneFor } from '../utils/vtimezone.js';
 import { householdTimeZone } from '../utils/timezone.js';
-import { createCalDAVClient, supportsComponent, createUploadGate, collectionUrlOf } from '../utils/caldav-client.js';
+import { createCalDAVClient, supportsComponent, createUploadGate } from '../utils/caldav-client.js';
+import { inCalendarHomeOf } from '../utils/dav-address.js';
 import { sqlLooksLikeOwnEventUid } from '../utils/own-uid.js';
 import { sameCredentialOrigin } from '../utils/credential-origin.js';
 import { rruleLine } from './recurrence.js';
@@ -131,26 +132,6 @@ function calendarHome(url) {
   const segments = parsed.pathname.split('/').filter(Boolean);
   if (segments.length < 2) return null;
   return `${parsed.origin}/${segments.slice(0, -1).join('/')}/`;
-}
-
-/**
- * Liegt dieses Objekt im Kalender-Home eines dieser Kalender - also in einem
- * Kalender neben ihnen, beim selben Benutzer desselben Servers (#1860)?
- * Dieselbe Regel wie `calendarHome`: wo sich kein Besitzer erkennen lässt
- * (Query-adressiert, direkt an der Wurzel), gilt nichts als zugehörig.
- */
-function inCalendarHomeOf(objectUrl, calendarUrls) {
-  let parsed;
-  try { parsed = new URL(String(objectUrl)); } catch { return false; }
-  if (parsed.search) return false;
-  // Dekodiert verglichen: derselbe Pfad kommt je nach Server mit `@` oder
-  // `%40` zurück.
-  const decoded = (home) => {
-    if (home === null) return null;
-    try { return decodeURIComponent(home); } catch { return home; }
-  };
-  const home = decoded(calendarHome(collectionUrlOf(parsed.href)));
-  return home !== null && calendarUrls.some((calendarUrl) => decoded(calendarHome(calendarUrl)) === home);
 }
 
 /**
@@ -862,20 +843,25 @@ async function runSync({ createClient } = {}) {
   // eigenen Spalte; ein Termin hängt über seinen Kalender daran
   // (calendar_ref_id → external_calendars → caldav_calendar_selection).
   //
-  // Zweiter Arm: eine Zeile, deren Kalender KEINEM Konto zugeordnet ist (kein
-  // calendar_ref_id aus der Zeit davor, oder eine Auswahl, die es nicht mehr
-  // gibt). Sie wird weiter über die UID gefunden und vom Abruf an den Kalender
-  // gebunden, der sie liefert - sonst legte der erste Lauf nach dem Update
-  // jede solche Zeile ein zweites Mal an. Aber nur, wenn nichts an ihr auf ein
-  // ANDERES Konto zeigt: ihre Objektadresse liegt im Kalender-Home dieses
-  // Kontos oder fehlt, und ihr Upload-Ziel ist dieses Konto oder keins. Das
-  // Home, nicht der einzelne Kalender: nach einem Umzug auf dem Server oder
-  // einem gelöschten und neu angelegten Konto zeigt die Adresse in einen
-  // Kalender, den die Auswahl nicht mehr führt, und genau diese Zeilen soll
-  // der Abruf wiederfinden (#1270). Und nicht bloss der Host: auf einem Server
-  // liegen viele Benutzer. Was sich so nicht zuordnen lässt, bleibt stehen,
-  // und das Objekt bekommt eine eigene Zeile. Die Zeile des eigenen Kontos
-  // geht immer vor.
+  // Zweiter Arm: eine Zeile, deren Kalender KEINEM Konto zugeordnet ist - die
+  // Auswahl gibt es nicht mehr (Konto gelöscht und neu angelegt, Kalender auf
+  // dem Server aufgegeben), oder die Zeile ist älter als calendar_ref_id. Sie
+  // wird weiter über die UID gefunden und an den Kalender gebunden, der sie
+  // liefert; das ist der Weg, auf dem #1270 seine Altzeilen wiederfindet.
+  // Aber nur, solange nichts an ihr auf ein ANDERES Konto zeigt:
+  //   - ihr Upload-Ziel ist dieses Konto oder keins, und
+  //   - ihre Objektadresse liegt im Kalender-Home dieses Kontos, also in einem
+  //     Kalender neben den seinen (`dav-address.js`), oder fehlt. Das Home,
+  //     nicht der einzelne Kalender: nach einem Umzug auf dem Server zeigt die
+  //     Adresse in einen Kalender, den die Auswahl nicht mehr führt. Und nicht
+  //     bloss der Host: auf einem Server liegen viele Benutzer.
+  //
+  // Für eine Zeile ohne Ziel UND ohne Adresse bleibt damit die UID der einzige
+  // Anhalt. Das ist hingenommen, weil hier nur der Abruf arbeitet: die Zeile
+  // nimmt den Stand des Servers an, hinaufgetragen wird dabei nichts - eine
+  // wartende Bearbeitung wird weiter unten ausdrücklich NICHT gebunden. Ganz
+  // schliessen liesse es sich nur mit dem Konto an der Zeile selbst.
+  // Die Zeile des eigenen Kontos geht immer vor.
   const selEventCandidates = conn.prepare(`
     SELECT e.id, e.outbound_dirty, e.calendar_ref_id, e.start_datetime, e.color, e.color_modified,
            e.external_object_url, e.target_caldav_account_id,
