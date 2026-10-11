@@ -548,8 +548,12 @@ async function runSync({ makeClient } = {}) {
   // dieses Laufs dieselbe Absage: nach der ersten ist Schluss, und es gibt EINE
   // Zeile mit der Anzahl statt einer je Termin.
   const uploadGate = createUploadGate();
-  for (const event of localEvents) {
+  for (const listed of localEvents) {
     if (!defaultCal || uploadGate.isClosed(defaultCal.url)) continue;
+    // Frisch nachladen (#1862): die Liste stammt von vor der Schleife, und
+    // jeder Upload davor war ein await.
+    const event = outbound.reloadEvent(listed.id);
+    if (!event || event.external_source !== 'local' || event.external_calendar_id) continue;
     try {
       const icsData = buildICS(event, householdZone);
       const uid     = outbound.eventUidFor(event.id);
@@ -562,7 +566,10 @@ async function runSync({ makeClient } = {}) {
         'apple', defaultCal.url, defaultCal.displayName || 'Apple Calendar',
         normalizeCalColor(defaultCal.calendarColor) || APPLE_COLOR
       );
-      outbound.markEventUploaded(event.id, { source: 'apple', uid, objectUrl, calRefId, adopted });
+      // Gebucht wird gegen den Stand NACH dem await (bookEventUpload).
+      outbound.bookEventUpload(event, {
+        source: 'apple', uid, objectUrl, calRefId, adopted, calendarUrl: defaultCal.url,
+      });
     } catch (err) {
       if (!uploadGate.refused(defaultCal.url, err)) {
         log.error(`Outbound error for event ${event.id}:`, err.message);

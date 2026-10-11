@@ -645,6 +645,42 @@ export function markEventUploaded(eventId, { source, uid, objectUrl, calRefId, a
 }
 
 /**
+ * Bucht das Ergebnis eines Uploads - gegen den Stand von JETZT, nicht gegen
+ * den, aus dem die Anfrage gebaut wurde (#1862).
+ *
+ * Zwischen dem Lesen der Zeile und hier liegt die Anfrage an den Server, und
+ * in der Zeit läuft die App weiter:
+ *
+ *   - Die Zeile ist weg: der Nutzer hat den Termin gelöscht. Für eine lokale
+ *     Zeile merkt die Löschroute nichts vor (es gab noch nichts zu löschen),
+ *     das Objekt läge also für immer oben, und der nächste Abruf holte den
+ *     gelöschten Termin als neue Zeile zurück. Das gerade angelegte Objekt
+ *     wird deshalb zum Löschen vorgemerkt.
+ *   - Die Zeile wurde bearbeitet: oben liegt der Stand von vor der
+ *     Bearbeitung. Eine lokale Zeile merkt auch das nicht vor. Sie würde zum
+ *     sauberen Spiegel, und der nächste Abruf überschriebe die Bearbeitung mit
+ *     dem alten Stand. Sie wird Spiegel UND als geändert vorgemerkt.
+ *
+ * Synchron: zwischen dem Nachladen und dem Schreiben liegt kein await.
+ *
+ * @param {object} sent  die Zeile, aus der die Anfrage gebaut wurde
+ * @param {object} what  wie `markEventUploaded`, dazu `calendarUrl`
+ * @returns {'mirrored'|'deleted'|'unchanged'}
+ */
+export function bookEventUpload(sent, { source, uid, objectUrl, calRefId, calendarUrl, adopted = false }) {
+  const now = reloadEvent(sent.id);
+  if (!now) {
+    queueDeletion({ source, calendarExternalId: calendarUrl, eventExternalId: uid, objectUrl });
+    log.info(`Event ${sent.id} was deleted while its upload was in flight, queued the deletion of ${uid}.`);
+    return 'deleted';
+  }
+  const edited = mirroredFieldsChanged(sent, now);
+  return markEventUploaded(sent.id, {
+    source, uid, objectUrl, calRefId, adopted: adopted || edited, onlyIfLocal: true,
+  }) ? 'mirrored' : 'unchanged';
+}
+
+/**
  * Der Inbound-Weg der Übernahme: der Abruf sieht ein Objekt mit der UID dieser
  * Installation, dessen Zeile noch lokal ist - der PUT kam an, die Antwort
  * nicht. In die bestehende Zeile übernehmen, statt eine zweite anzulegen.

@@ -1314,7 +1314,13 @@ async function runSync({ createClient } = {}) {
       const householdZone = householdTimeZone(db.get());
 
       const uploadGate = createUploadGate();
-      for (const event of localEvents) {
+      for (const listed of localEvents) {
+        // Frisch nachladen (#1862): die Liste stammt von vor der Schleife, und
+        // jeder Upload davor war ein await. Wer inzwischen bearbeitet wurde,
+        // geht mit dem Stand von jetzt hinauf; wer gelöscht wurde oder nicht
+        // mehr auf den Upload in dieses Konto wartet, gar nicht.
+        const event = outbound.reloadEvent(listed.id);
+        if (!event || event.external_source !== 'local' || event.target_caldav_account_id !== account.id) continue;
         try {
           // Find target calendar
           const targetCal = serverCalendars.find(sc => sc.url === event.target_caldav_calendar_url);
@@ -1339,7 +1345,12 @@ async function runSync({ createClient } = {}) {
             'caldav', event.target_caldav_calendar_url,
             targetCal.displayName || event.target_caldav_calendar_url, null
           );
-          outbound.markEventUploaded(event.id, { source: 'caldav', uid, objectUrl, calRefId, adopted });
+          // Gebucht wird gegen den Stand NACH dem await (bookEventUpload).
+          const booked = outbound.bookEventUpload(event, {
+            source: 'caldav', uid, objectUrl, calRefId, adopted,
+            calendarUrl: event.target_caldav_calendar_url,
+          });
+          if (booked !== 'mirrored') continue;
 
           accountEventCount++;
           accountChangedCount++;
