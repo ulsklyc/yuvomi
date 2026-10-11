@@ -15,8 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the second account, and an edit made in Yuvomi went there. An event now belongs to one account
   and is changed, moved and deleted only through that account. The same UID in two accounts is
   still shown once, and it belongs to the account that delivered it first; if that account is
-  removed or no longer has the event, the other account takes it on with its next sync. With a
-  single CalDAV account nothing changes. What to know after the update:
+  removed or no longer has the event, the other account takes it on with its next sync. What to
+  know after the update:
   - Existing events are assigned to their account automatically. With several accounts, an event
     whose calendar is in the selection of more than one account, or of none, cannot be assigned
     with certainty. It stays without an account, is not sent to any server, and is taken on by
@@ -30,9 +30,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Two different events that happen to carry the same UID in two accounts show as one.
   - As a sync target for a new event, Yuvomi accepts only a calendar that is switched on for
     that account - the ones the event form offers. A target saved earlier for a calendar that has
-    since been switched off stays as it is and is not uploaded until the calendar is switched on
-    again. An event that is already synchronised can only be moved to another calendar of its
-    own account.
+    since been switched off is rejected when you change it and is no longer uploaded until the
+    calendar is switched on again. An event that is already synchronised can only be moved to
+    another calendar of its own account.
+  - Pointing an account at a different server or a different user drops its deletions that were
+    still waiting to be sent, since they named objects on the old server.
+  - Deleting an account while keeping its events drops any edits of those events that had not
+    been sent yet.
+  - An event that belongs to no account is deleted only in Yuvomi, never at a server.
+  - Events without an account that no account delivers any more stay until you delete them.
+  - If you delete an event that a second account also keeps as its own copy, that account adds it
+    back on its next sync.
 
 ## [2.76.0] - 2026-10-11
 
