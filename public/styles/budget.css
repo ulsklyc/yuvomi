@@ -715,6 +715,8 @@
    * oder "Gemeinsa-mes" in der schmalen Spalte (#1774). */
   hyphens: auto;
   hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
   min-width: 0;
 }
 

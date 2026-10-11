@@ -211,6 +211,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **"Mark as renewed" follows the same permission as editing a subscription.** In the personal
+  budget mode a subscription can only be changed or deleted by the member it belongs to. Marking
+  it as renewed did not ask that question and now does: another member gets the same refusal as
+  for editing, and nothing is changed. The shared budget mode is unchanged.
 - **Managing budget categories shows the built-in categories in your language** (#1859, from D#1841).
   "Manage categories" in Budget listed the built-in categories and subcategories in English,
   whatever language Yuvomi ran in. They now appear in the language of the interface you are
@@ -220,6 +224,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that is not supported, now return the labels in the household language instead of English.
   Send `lang=en` to keep English; a supported `lang` works as before, and the response still
   names the language it used.
+- **Long words break at a sensible place in Safari and on the iPhone** (Refs #1774). Where a long
+  word does not fit its line, Yuvomi hyphenates it and keeps at least four letters on each side of
+  the hyphen (three in the calendar's week view). Safari ignored that limit, so a name such as
+  "Wertpapierdepot" could end up as "Wertpapierde-pot". The limit is now also written the way
+  Safari understands it, in every place that hyphenates, and the word breaks as
+  "Wertpapier-depot". Chrome, Edge and Firefox are unchanged.
 - **Pocket money without an account now says what it is for** (#1774). Before an admin had opened
   an account for any child, "Pocket money" was a heading with a button and nothing below it, which
   read like a section that failed to load. It now shows one sentence below the heading, in the same
@@ -234,6 +244,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Wall mode shows the icon you chose for an event** (#1829). Events on the wall always carried the
   generic calendar icon, whatever was picked in the event editor. They now show their own icon, as
   the calendar does; an event without one keeps the calendar icon.
+- **"Today at a glance" shows the icon you chose for an event** (#1829). The overview kept the
+  generic calendar icon on every event after the wall had learned to show the chosen one. Both now
+  read the icon the same way; the colour of the badge still says the row comes from the calendar,
+  and an event without an icon of its own keeps the calendar icon.
 - **The first-run state of Waste sits in the middle of the page on a desktop** (#1771). Without a
   waste type the page showed its first-run block left of the middle with an empty column beside
   it. On a wide window it now spans the content area and is centred in it. With at least one

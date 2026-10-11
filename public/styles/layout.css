@@ -1412,6 +1412,16 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
  * Bruch, den die Regel immer gemeint hat. (Browser ohne die Eigenschaft
  * verhalten sich wie bisher; sie ist eine Verschaerfung, kein Fundament.)
  *
+ * SAFARI KENNT DIE EIGENSCHAFT NICHT (Stand Safari 27, nur die Technology
+ * Preview parst sie) und trennte deshalb ohne Grenze: „Wertpapierde-pot"
+ * (#1774). WebKit hat dieselbe Grenze seit Safari 5.1 unter eigenem Namen,
+ * deshalb steht unter JEDEM `hyphenate-limit-chars` das Paar
+ * `-webkit-hyphenate-limit-before` / `-after` mit denselben beiden Zahlen. Die
+ * erste Zahl (Mindestlaenge des Worts) hat dort keine Entsprechung; before +
+ * after tragen sie mit. Das Paar steht NACH der Kurzform: in WebKit sind die
+ * beiden Praefix-Eigenschaften deren Langformen, gleiche Werte ueberschreiben
+ * also nichts. `test:typography` haelt das Paar an jeder Regel.
+ *
  * Die Groesse folgt derselben Quelle wie die Leiste: Caption 2 (11px) ist die
  * kleinste TEXTROLLE der Skala - darunter beginnt --text-2xs, und das ist eine
  * Badge-Groesse. Es ist zugleich der Plattform-Wert (iOS setzt Icon-Labels auf
@@ -1437,6 +1447,8 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   overflow: hidden;
   hyphens: auto;
   hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
   overflow-wrap: anywhere;
 }
 
@@ -1535,6 +1547,8 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   overflow: hidden;
   hyphens: auto;
   hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
   overflow-wrap: anywhere;
 }
 
@@ -7445,6 +7459,8 @@ textarea::placeholder {
   overflow-wrap: anywhere;
   hyphens: auto;
   hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
 }
 
 .form-rows .form-row__description {
@@ -7551,6 +7567,8 @@ textarea::placeholder {
   overflow-wrap: anywhere;
   hyphens: auto;
   hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
 }
 
 /* ── In der Zeile: die randlose Auswahl ──
@@ -9104,6 +9122,8 @@ textarea::placeholder {
   overflow-wrap: anywhere;
   hyphens: auto;
   hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
   opacity: 0;
   pointer-events: none;
   z-index: 0;

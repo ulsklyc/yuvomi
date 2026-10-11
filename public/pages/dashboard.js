@@ -3522,6 +3522,23 @@ function renderHousekeepingWidget(hk, currency) {
   </div>`;
 }
 
+/**
+ * Das Zeichen im Siegel einer Programmzeile - fuer "Heute wichtig" und fuer die
+ * Wand, die dieselben Zeilen lesen. Ein Termin zeigt das Icon, das jemand fuer
+ * ihn gewaehlt hat (#1829) - auf demselben Weg wie der Kalender
+ * (utils/event-icon.js): dieselbe Liste, derselbe Rueckfall. Ohne eigene Wahl
+ * und fuer jeden unbekannten Namen bleibt das Zeichen des Moduls, sonst stuende
+ * dort ein leeres Siegel. Die Herkunft traegt weiter die Farbe des Siegels.
+ * `module-glyph` ist die Marke aus nav-icons.js, an der die Strichstaerke haengt.
+ * Sammelzeile und Zustandszeile sprechen fuer kein einzelnes Objekt und fragen
+ * hier nicht.
+ */
+function programRowGlyph(row) {
+  return row.kind === 'event' && hasEventIcon(row.eventIcon)
+    ? eventIconHtml(row.eventIcon, 'module-glyph')
+    : moduleIconHTML(row.icon);
+}
+
 /* DAS UEBERLAPPUNGSZEICHEN (Block-2-Brief, utils/seal-pair.js): „Heute
  * wichtig" ist die Mischstelle des Dashboards - hier stehen Aufgabe, Termin,
  * Einkauf und Essen nebeneinander, und das Siegel sagt bereits, aus welchem
@@ -3568,7 +3585,7 @@ function renderTodayRow(row, extraClass = '') {
   // Reihenfolge, in der man eine Zeile liest.
   const whoName = mark ? `<span class="sr-only">, ${esc(row.who?.display_name ?? '')}</span>` : '';
   const inner = `
-      <span class="${mark ? 'seal-pair' : ''}"${mark ? ' aria-hidden="true"' : ''}><span class="module-seal today-cockpit-card__icon">${moduleIconHTML(row.icon)}</span>${mark}</span>
+      <span class="${mark ? 'seal-pair' : ''}"${mark ? ' aria-hidden="true"' : ''}><span class="module-seal today-cockpit-card__icon">${programRowGlyph(row)}</span>${mark}</span>
       <span class="today-cockpit-card__body">
         <strong class="today-cockpit-card__value">${esc(row.title)}</strong>
         <span class="today-cockpit-card__sub">${esc(row.sub)}</span>${whoName}
@@ -5613,20 +5630,6 @@ const WALL_WHO_CAP = 6;
  * dafuer gibt es das Dashboard. */
 const WALL_ROW_CAP = 4;
 
-/**
- * Das Zeichen im Siegel einer Wandzeile. Ein Termin zeigt das Icon, das jemand
- * fuer ihn gewaehlt hat (#1829) - auf demselben Weg wie der Kalender
- * (utils/event-icon.js): dieselbe Liste, derselbe Rueckfall. Ohne eigene Wahl
- * und fuer jeden unbekannten Namen bleibt das Zeichen des Moduls, sonst stuende
- * dort ein leeres Siegel. Die Herkunft traegt weiter die Farbe des Siegels.
- * `module-glyph` ist die Marke aus nav-icons.js, an der die Strichstaerke haengt.
- */
-function wallRowGlyph(row) {
-  return row.kind === 'event' && hasEventIcon(row.eventIcon)
-    ? eventIconHtml(row.eventIcon, 'module-glyph')
-    : moduleIconHTML(row.icon);
-}
-
 /** Eine Programmzeile als reiner Text - kein href, kein data-route, kein Modal. */
 function renderWallRow(row) {
   // Der Termin nennt an der Wand, hinter dem Beginn, sein Ende (#1698). Es
@@ -5642,7 +5645,7 @@ function renderWallRow(row) {
     : '';
   return `
     <li class="wall-row wall-row--${esc(row.tone)}">
-      <span class="module-seal wall-row__seal">${wallRowGlyph(row)}</span>
+      <span class="module-seal wall-row__seal">${programRowGlyph(row)}</span>
       <span class="wall-row__body">
         <span class="wall-row__title">${esc(row.title)}</span>
         <span class="wall-row__sub">${esc(sub)}</span>

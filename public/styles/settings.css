@@ -829,6 +829,8 @@
   overflow-wrap: anywhere;
   hyphens: auto;
   hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
 }
 
 .settings-group .settings-setting-row__description {
@@ -921,6 +923,8 @@
   overflow-wrap: anywhere;
   hyphens: auto;
   hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
 }
 
 .settings-group > .settings-setting-row--switch > .settings-setting-row__description,
