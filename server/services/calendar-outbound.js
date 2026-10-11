@@ -141,7 +141,9 @@ function accountCountFilter(source, accountId) {
  * bedingt nichts und wird nicht gespeichert.
  *
  * Trifft ein Auftrag ohne ETag auf einen bedingten, gilt danach der
- * unbedingte: die Bedingung fällt. Umgekehrt bekommt ein bestehender Auftrag
+ * unbedingte: die Bedingung fällt. Löscht der Nutzer den Termin, fällt sie
+ * auch an den Aufträgen derselben UID in anderen Kalendern
+ * (`queueEventDeletion`). Umgekehrt bekommt ein bestehender Auftrag
  * nachträglich keine - Adresse und ETag benennen zusammen EIN Objekt, und die
  * Adresse des bestehenden bleibt.
  * @returns {boolean} true, wenn eine Löschung vorgemerkt ist
@@ -725,13 +727,28 @@ export function queueEventDeletion(event, database = null) {
     return false;
   }
 
-  return queueDeletion({
+  const accountId = event.external_source === 'caldav' ? event.caldav_account_id : null;
+  const queued = queueDeletion({
     source:             event.external_source,
     calendarExternalId: calId,
     eventExternalId:    event.external_calendar_id,
     objectUrl:          event.external_object_url || null,
-    accountId:          event.external_source === 'caldav' ? event.caldav_account_id : null,
+    accountId,
   }, database);
+  // Wartet für diesen Termin noch der Rest eines Umzugs in einem ANDEREN
+  // Kalender (#1883), gilt für ihn ab jetzt dasselbe wie für die Zeile: der
+  // Nutzer will den Termin fort haben, gleich in welchem Stand. Bliebe der
+  // Auftrag bedingt, fiele er bei einem geänderten Rest, und der gelöschte
+  // Termin käme von dort zurück. Der Schlüssel der Tabelle nennt den
+  // Kalender, das ON CONFLICT oben erreicht diesen Auftrag also nicht.
+  if (queued) {
+    (database || db.get()).prepare(`
+      UPDATE calendar_pending_deletions SET etag = NULL
+      WHERE source = ? AND event_external_id = ? AND etag IS NOT NULL
+        AND caldav_account_id IS ?
+    `).run(event.external_source, event.external_calendar_id, accountId);
+  }
+  return queued;
 }
 
 /**

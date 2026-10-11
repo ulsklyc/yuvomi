@@ -1423,7 +1423,9 @@ ETag from the inbound run, is sent as `DELETE` with `If-Match: <etag>` to the st
 state or another event at that address or the server answers `412`. A row without `etag` - the
 user delete, and a refused move whose refusal was itself a `412` - applies to the event in
 whatever state it is in. Queueing an unconditional deletion onto a conditional row clears the
-condition; the reverse never adds one.
+condition; the reverse never adds one. Deleting the event in Yuvomi also clears the condition on
+the rows of the same UID and account in other calendars: the user wants the event gone, including
+the leftover of a move that is still waiting.
 
 **One row per UID, and the first account owns it (migration v238, #1860).** Several CalDAV accounts
 share `calendar_events` and `calendar_pending_deletions`. A mirrored event carries the account it

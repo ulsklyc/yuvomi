@@ -45,7 +45,7 @@ const db = dbmod.get();
 const {
   createCalDAVClient, createCardDAVClient, withHttpRefusalsAsErrors, DavHttpError,
 } = await import('../server/utils/caldav-client.js');
-const { classifyOutboundError, outboundFailureAction, MAX_OUTBOUND_ATTEMPTS, queueDeletion } =
+const { classifyOutboundError, outboundFailureAction, MAX_OUTBOUND_ATTEMPTS, queueDeletion, queueEventDeletion } =
   await import('../server/services/calendar-outbound.js');
 const todoOutbound   = await import('../server/services/caldav-todo-outbound.js');
 const remindersSync  = await import('../server/services/caldav-reminders-sync.js');
@@ -1416,6 +1416,28 @@ test('Wartendes Löschen ohne bekannten Stand (Löschen in Yuvomi): gilt weiter 
   assert.equal(dav.getObject(cal.url, `${uid}.ics`), null, 'eine Löschung des Nutzers hängt jetzt am Stand des Objekts');
   assert.equal(eventTombstones().length, 0);
   assert.equal(eventRows(uid).length, 0);
+});
+
+test('Wartendes Löschen, dann löscht der Nutzer den Termin: auch der inzwischen geänderte Rest im alten Kalender geht mit', async () => {
+  reset();
+  const uid = 'back-8@test';
+  const { source, dest, id } = await refusedMove(uid);
+  assert.ok(eventTombstones()[0].etag, 'der Auftrag für die Quelle ist nicht bedingt - der Fall misst nichts');
+
+  // Der Rest im alten Kalender wird woanders bearbeitet; danach löscht der
+  // Nutzer den Termin in Yuvomi. Die Löschroute merkt für den Kalender der
+  // Zeile vor (das Ziel) - wie sie es tut: vormerken, dann die Zeile löschen.
+  dav.putObject(source.url, `${uid}.ics`, vevent(uid, 'Woanders bearbeitet'));
+  assert.equal(queueEventDeletion(event(id)), true);
+  db.prepare('DELETE FROM calendar_events WHERE id = ?').run(id);
+
+  await caldavSync.sync();
+  await caldavSync.sync();
+  assert.equal(dav.getObject(dest.url, `${uid}.ics`), null);
+  assert.equal(dav.getObject(source.url, `${uid}.ics`), null,
+    'der Rest im alten Kalender blieb stehen: der gelöschte Termin kommt von dort zurück');
+  assert.equal(eventRows(uid).length, 0, 'der vom Nutzer gelöschte Termin ist wieder da');
+  assert.equal(eventTombstones().length, 0);
 });
 
 test('Umzug, die Quelle lehnt das Löschen mit 412 ab: ihr Stand ist schon überholt, der Auftrag bleibt ohne Bedingung', async () => {
