@@ -99,14 +99,38 @@ export class DavHttpError extends Error {
  * (der Name ist vergeben) und die Antworten auf den Inhalt selbst (400, 409,
  * 413, 415, 422).
  *
- * Ohne Status (Netzfehler, unbekannte Antwort) gilt die Collection: der nächste
- * Versuch dieses Laufs liefe in dieselbe Wand.
+ * Ohne Status gilt die Collection nur bei einem ERKANNTEN Netzfehler: der
+ * nächste Versuch dieses Laufs liefe in dieselbe Wand. Alles andere ohne Status
+ * kommt aus dem eigenen Code - der `try` der Aufrufer umfasst auch den ICS-Bau
+ * und die Buchung nach dem PUT - und hängt an dieser einen Zeile. Erkannt wird
+ * per Positivliste: ein unbekannter Netzfehler kostet dann einen Versuch und
+ * eine Logzeile je Zeile, ein verkannter eigener Fehler sperrte dagegen alle
+ * Zeilen hinter der kaputten aus, bei jedem Lauf und ohne eigene Meldung.
  */
 const OBJECT_LEVEL_STATUS = new Set([400, 409, 412, 413, 415, 422]);
 
+/** Systemfehler der Verbindung, wie Node und undici sie als `code` tragen. */
+const NETWORK_ERROR_CODE = /^(ECONN[A-Z]+|ENOTFOUND|EAI_[A-Z]+|ETIMEDOUT|EHOSTUNREACH|EHOSTDOWN|ENETUNREACH|ENETDOWN|EPIPE|EPROTO|UND_ERR_[A-Z_]+|ERR_TLS_[A-Z_]+|ERR_SSL_[A-Z_]+|CERT_[A-Z_]+|DEPTH_ZERO_SELF_SIGNED_CERT|SELF_SIGNED_CERT_IN_CHAIN|UNABLE_TO_[A-Z_]+)$/;
+const NETWORK_ERROR_NAMES = new Set(['AbortError', 'TimeoutError', 'FetchError']);
+
+/**
+ * Ist der Fehler einer der Verbindung? Das `fetch` von Node meldet ihn als
+ * `TypeError: fetch failed` und hängt den Systemfehler als `cause` an;
+ * node-fetch trägt den Code am Fehler selbst.
+ */
+function isNetworkFailure(err) {
+  for (let current = err, depth = 0; current && depth < 4; current = current.cause, depth++) {
+    if (NETWORK_ERROR_NAMES.has(current.name)) return true;
+    // Nicht jede Ursache trägt einen Code (gesperrter Port, abgerissener Body).
+    if (current instanceof TypeError && current.message === 'fetch failed') return true;
+    if (typeof current.code === 'string' && NETWORK_ERROR_CODE.test(current.code)) return true;
+  }
+  return false;
+}
+
 export function isCollectionRefusal(err) {
   const status = err?.status;
-  if (typeof status !== 'number') return true;
+  if (typeof status !== 'number') return isNetworkFailure(err);
   return !OBJECT_LEVEL_STATUS.has(status);
 }
 

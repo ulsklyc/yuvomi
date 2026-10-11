@@ -757,8 +757,38 @@ test('Schranke: die erste Absage schliesst die Collection, eine Absage am Objekt
   for (const status of [401, 403, 404, 429, 500, 503, 507]) {
     assert.equal(isCollectionRefusal(refusal(status)), true, `HTTP ${status}`);
   }
-  // Netzfehler: kein Status, dieselbe Wand für jeden weiteren Versuch.
-  assert.equal(isCollectionRefusal(Object.assign(new Error('x'), { code: 'ECONNREFUSED' })), true);
+  // Netzfehler: kein Status, dieselbe Wand für jeden weiteren Versuch. In den
+  // Formen, in denen er wirklich ankommt: Code am Fehler (node-fetch), Code an
+  // der Ursache (fetch von Node: `TypeError: fetch failed`), Abbruch per Timeout.
+  const network = [
+    Object.assign(new Error('x'), { code: 'ECONNREFUSED' }),
+    Object.assign(new Error('x'), { name: 'FetchError', code: 'ENOTFOUND' }),
+    Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('y'), { code: 'UND_ERR_CONNECT_TIMEOUT' }) }),
+    Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('y'), { code: 'ECONNRESET' }) }),
+    Object.assign(new TypeError('fetch failed'), { cause: new Error('bad port') }),
+    Object.assign(new Error('aborted'), { name: 'AbortError' }),
+    Object.assign(new Error('timeout'), { name: 'TimeoutError' }),
+  ];
+  for (const err of network) {
+    assert.equal(isCollectionRefusal(err), true, `${err.name} ${err.code ?? err.cause?.code ?? ''}`);
+  }
+  // Kein Status und kein Netzfehler: ein Fehler aus dem eigenen Code (ICS-Bau,
+  // die Buchung nach dem PUT). Der hängt an DIESER Zeile - schlösse er die
+  // Collection, sperrte eine einzige kaputte Zeile alle dahinter aus, bei jedem
+  // Lauf und ohne eigene Logzeile.
+  const local = [
+    new Error('boom'),
+    new TypeError("Cannot read properties of undefined (reading 'x')"),
+    new RangeError('Invalid time value'),
+    Object.assign(new Error('constraint failed'), { code: 'ERR_SQLITE_ERROR', errcode: 1811 }),
+    Object.assign(new Error('constraint failed'), { code: 'SQLITE_CONSTRAINT_TRIGGER' }),
+    Object.assign(new TypeError('The "url" argument must be of type string'), { code: 'ERR_INVALID_ARG_TYPE' }),
+    null,
+    undefined,
+  ];
+  for (const err of local) {
+    assert.equal(isCollectionRefusal(err), false, `ein eigener Fehler (${err?.code ?? err?.message}) galt als Absage der Collection`);
+  }
   // Hängt am einzelnen Objekt: wer dahinter wartet, darf nicht ausgesperrt werden.
   for (const status of [400, 409, 412, 413, 415, 422]) {
     assert.equal(isCollectionRefusal(refusal(status)), false, `HTTP ${status}`);
@@ -845,6 +875,31 @@ test('Schranke: drei wartende Termine auf einem ablehnenden Kalender kosten eine
     'jeder wartende Termin hat seine eigene Absage abgeholt');
   for (const id of ids) assert.equal(event(id).external_source, 'local');
   assert.equal(event(elsewhere).external_source, 'caldav', 'die Schranke hat einen anderen Kalender mitgeschlossen');
+});
+
+test('Schranke: ein Termin, dessen Buchung hier scheitert, hält die anderen nicht auf', async () => {
+  reset();
+  const cal = calendar();
+  const bad  = localEvent(cal.url, 'Kaputt');
+  const good = [localEvent(cal.url, 'Zwei'), localEvent(cal.url, 'Drei')];
+
+  // Der PUT geht durch, das Festhalten danach nicht: ein Fehler OHNE Status,
+  // aus dem eigenen Code. Er sagt nichts über den Kalender.
+  db.exec(`
+    CREATE TRIGGER test_bad_event_booking BEFORE UPDATE OF external_source ON calendar_events
+    WHEN NEW.title = 'Kaputt' AND NEW.external_source = 'caldav'
+    BEGIN SELECT RAISE(ABORT, 'booking failed'); END
+  `);
+  try {
+    await caldavSync.sync();
+  } finally {
+    db.exec('DROP TRIGGER test_bad_event_booking');
+  }
+
+  assert.equal(event(bad).external_source, 'local', 'VORBEDINGUNG: der Trigger hat die Buchung nicht verhindert');
+  for (const id of good) {
+    assert.equal(event(id).external_source, 'caldav', 'ein Termin hinter dem gescheiterten blieb liegen');
+  }
 });
 
 test('Schranke: der Apple-Kalender bekommt je Lauf einen Versuch, nicht einen je Termin', async () => {
