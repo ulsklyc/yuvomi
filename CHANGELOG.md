@@ -35,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **"Grant bonus" is on the Rewards overview** (#1787). Giving bonus points was only possible from
+  the history tab, which is not where parents look first. They now find a "Grant bonus" button
+  in the head of the point standings, next to "Manage participants"; it opens the same dialog. The button in the history tab stays. Children and members who can only read
+  Rewards do not see it.
 - **Today's programme says which calendar an appointment comes from, and the wall when it
   ends** (#1698, from D#988). Every appointment in "Today at a glance" and on the wall carried
   the same word underneath, "Event". It now shows the name of its calendar there, so "Early"

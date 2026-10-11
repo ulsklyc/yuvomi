@@ -599,8 +599,15 @@ function renderOverview(el) {
     icons(el);
     return;
   }
+  // Zwei Kopfaktionen fuer Eltern (#1787). Der Bonus ist die haeufigere und
+  // steht als die staerkere am Ende; er oeffnet denselben Dialog wie der FAB
+  // im Verlauf. Beide reisen als EINE Gruppe, damit ein schmaler Kopf sie
+  // gemeinsam unter den Titel legt statt eine allein in die zweite Zeile.
   const adminBar = isAdmin() && !readOnly() ? `
-    <button class="btn btn--ghost btn--sm rw-manage-participants" type="button"><i data-lucide="users-round" aria-hidden="true"></i>${esc(t('rewards.manageParticipants'))}</button>` : '';
+          <div class="rw-section__actions">
+            <button class="btn btn--ghost btn--sm rw-manage-participants" type="button"><i data-lucide="users-round" aria-hidden="true"></i>${esc(t('rewards.manageParticipants'))}</button>
+            <button class="btn btn--secondary btn--sm rw-grant-bonus" type="button"><i data-lucide="plus" aria-hidden="true"></i>${esc(t('rewards.grantBonus'))}</button>
+          </div>` : '';
   // Anfragen und Punktestaende links, die letzten Buchungen ab der
   // Split-Schwelle rechts daneben (mobil darunter) - `.page-columns`.
   el.insertAdjacentHTML('beforeend', `
@@ -630,6 +637,7 @@ function wireOverview(el) {
     document.querySelector('.rewards-tabs [data-tab-id="ledger"]')?.click();
   });
   el.querySelector('.rw-manage-participants')?.addEventListener('click', openParticipantsModal);
+  el.querySelector('.rw-grant-bonus')?.addEventListener('click', () => openBonusModal());
   el.querySelectorAll('.rw-redeem-open').forEach((btn) => {
     btn.addEventListener('click', () => openRedeemModal(Number(btn.dataset.member)));
   });
