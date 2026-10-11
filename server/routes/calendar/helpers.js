@@ -120,6 +120,55 @@ export function caldavTarget(body) {
   return { value: { accountId, calendarUrl }, error: null };
 }
 
+/**
+ * Ist das CalDAV-Ziel eines, das angeboten wird (#1860)? `caldavTarget` prüft
+ * nur die Form; hier geht es um den Inhalt.
+ *
+ * EIN ZIEL IST EIN PAAR aus Konto und Kalender, und zwar aus der
+ * EINGESCHALTETEN Auswahl dieses Kontos - dieselbe Menge, die
+ * `GET /calendar/sync-targets` dem Formular liefert und aus der der Upload
+ * seine Termine nimmt (`localUploadsOf` in services/caldav-sync.js). Konto und
+ * Kalender einzeln zu prüfen reichte nicht: beides kann es geben, ohne dass
+ * der Kalender zu diesem Konto gehört.
+ *
+ * EIN GESPIEGELTER TERMIN wechselt den Kalender nur innerhalb des Kontos, dem
+ * er gehört (`caldav_account_id`): ein Umzug ist ein Anlegen und Löschen über
+ * dieses eine Konto.
+ *
+ * EIN UNVERÄNDERTES ZIEL kommt ohne Prüfung durch, wie die unveränderte
+ * Wiederholungsregel in der Route. Das Formular selbst schickt für ein Ziel
+ * ausserhalb der Auswahl `null` (es bietet nur die eingeschalteten Kalender
+ * an); diese Ausnahme ist für API-Clients, die das gespeicherte Altziel
+ * unverändert zurückschicken, damit ein inzwischen abgewählter Kalender nicht
+ * jede Bearbeitung des Termins verhindert. Gesendet wird an ein solches Ziel
+ * trotzdem nichts.
+ *
+ * @param {object} database
+ * @param {{accountId: number|null, calendarUrl: string|null}} target  Ergebnis von `caldavTarget`
+ * @param {object|null} [event]  die bestehende Zeile beim Bearbeiten
+ * @returns {{value: object, error: string|null}}
+ */
+export function caldavTargetOffered(database, target, event = null) {
+  const ok = { value: target, error: null };
+  if (!target || target.accountId === null) return ok;
+  if (event
+      && event.target_caldav_account_id === target.accountId
+      && event.target_caldav_calendar_url === target.calendarUrl) {
+    return ok;
+  }
+  if (event?.external_source === 'caldav' && event.caldav_account_id !== target.accountId) {
+    return { value: null, error: 'target_caldav_account_id: ein gespiegelter Termin wechselt den Kalender nur innerhalb seines Kontos.' };
+  }
+  const offered = database.prepare(`
+    SELECT 1 FROM caldav_calendar_selection
+    WHERE account_id = ? AND calendar_url = ? AND enabled = 1
+  `).get(target.accountId, target.calendarUrl);
+  if (!offered) {
+    return { value: null, error: 'target_caldav_calendar_url: kein eingeschalteter Kalender dieses Kontos.' };
+  }
+  return ok;
+}
+
 // Outlook-Push-Ziel eines Events validieren (Muster caldavTarget). Leere/fehlende
 // account_id bedeutet "Lokal" (kein Push zu Outlook).
 export function outlookTarget(body) {
