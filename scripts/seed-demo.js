@@ -26,6 +26,8 @@
  *   - Health (vitals, activities, medications + schedules/logs, lab reports, cycle,
  *     plus caregiver grants: both parents may record for the two children)
  *   - Rewards (participants, catalog, points ledger, fulfilled + pending redemptions)
+ *   - Pocket money (Emma: account, monthly plan, scheduled credits, a parent bonus,
+ *     an approved and an open withdrawal; Leo has no account yet)
  *   - Budget subscriptions (streaming, storage, gym - mixed billing cycles, one ending)
  *   - Household preferences (EUR, dd.mm.yyyy, 24h, weather = Dortmund)
  *
@@ -193,6 +195,7 @@ const WIPE = [
   'medication_logs', 'medication_schedules', 'medications',
   'cycle_day_logs', 'cycle_periods', 'cycle_settings',
   'reward_ledger', 'reward_redemptions', 'reward_participants', 'reward_catalog',
+  'reward_allowances', 'reward_money_accounts',
   'budget_subscriptions',
   'users',
 ];
@@ -1426,6 +1429,53 @@ insertRewardLedger.run(emmaId, -25, 'redeem', REWARD_ICE_CREAM, null, emmaRedemp
 insertRedemption.run(leoId, 4, REWARD_GAMING, '🎮', 40, 'pending',
   L('Please? Finished all my homework!', 'Bitte? Ich habe alle Hausaufgaben fertig!'),
   leoId, null, null, isoFromNow(-1, 17, 30));
+
+// ── Rewards: Pocket money (#1734) ────────────────────────────────────────────
+// Emma has an account with a monthly plan; Leo has none, so he shows up as a
+// "Set up" candidate. The rows mirror what the write paths in
+// server/services/reward-money.js and server/routes/rewards.js produce.
+
+console.log('Inserting pocket money…');
+// Hard-coded like the other money rows here: the household currency is set once, above.
+db.prepare('INSERT INTO reward_money_accounts (user_id, currency, created_by) VALUES (?, ?, ?)')
+  .run(emmaId, 'EUR', alexId);
+// The next run has to lie after today, or the scheduler books catch-up credits right after start.
+db.prepare(`
+  INSERT INTO reward_allowances (user_id, amount_minor, currency, frequency, anchor_day, next_run_date, created_by)
+  VALUES (?, ?, 'EUR', 'monthly', 1, ?, ?)
+`).run(emmaId, 1000, thisMonthDate(1) > daysFromNow(0) ? thisMonthDate(1) : `${thisMonthKey(1)}-01`, alexId);
+
+// Credits by the plan: one per 1st of the month, all before the next run (unique per person and date)
+const insertAllowanceCredit = db.prepare(`
+  INSERT INTO reward_ledger (user_id, delta, type, reason, created_by, unit, currency, allowance_date, created_at)
+  VALUES (?, 1000, 'bonus', NULL, NULL, 'money', 'EUR', ?, ?)
+`);
+[-2, -1, 0].forEach((m) => {
+  const day = `${thisMonthKey(m)}-01`;
+  insertAllowanceCredit.run(emmaId, day, `${day}T07:00:00Z`);
+});
+const insertMoneyLedger = db.prepare(`
+  INSERT INTO reward_ledger (user_id, delta, type, reason, redemption_id, created_by, unit, currency, created_at)
+  VALUES (?, ?, ?, ?, ?, ?, 'money', 'EUR', ?)
+`);
+// A parent bonus with a reason
+insertMoneyLedger.run(emmaId, 1500, 'bonus', L('Birthday money from Grandma', 'Geburtstagsgeld von Oma'), null, alexId, isoFromNow(-12, 18, 0));
+
+// Withdrawals are requests with `kind = 'withdrawal'`; the name column holds the kind as a marker.
+const insertMoneyRedemption = db.prepare(`
+  INSERT INTO reward_redemptions (user_id, catalog_id, kind, currency, reward_name, reward_icon, cost, status, note, requested_by, decided_by, decided_at, created_at)
+  VALUES (?, NULL, 'withdrawal', 'EUR', 'withdrawal', NULL, ?, ?, ?, ?, ?, ?, ?)
+`);
+// Approved: a matching payout in the ledger
+const paidNote = L('Cinema with friends', 'Kino mit Freunden');
+const paidId = insertMoneyRedemption.run(
+  emmaId, 2000, 'fulfilled', paidNote, emmaId, alexId, isoFromNow(-6, 19, 0), isoFromNow(-6, 16, 0)
+).lastInsertRowid;
+insertMoneyLedger.run(emmaId, -2000, 'redeem', paidNote, paidId, alexId, isoFromNow(-6, 19, 0));
+// Still open: 10 EUR, within the remaining balance of 25 EUR
+insertMoneyRedemption.run(
+  emmaId, 1000, 'pending', L('For the new football', 'Für den neuen Fußball'), emmaId, null, null, isoFromNow(-1, 17, 0)
+);
 
 // ── Budget: Subscriptions ────────────────────────────────────────────────────
 
