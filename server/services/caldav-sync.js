@@ -868,6 +868,8 @@ async function runSync({ createClient } = {}) {
     WHERE e.external_calendar_id = ? AND e.external_source = 'caldav'
     ORDER BY e.id
   `);
+  // Je Lauf einmal gemeldet, nicht je Konto und Kalender.
+  const unsendable = new Set();
   const existingEventOf = (accountId, uid, calendarUrls) => {
     const candidates = selEventCandidates.all(accountId, uid);
     return candidates.find((row) => row.own)
@@ -971,16 +973,6 @@ async function runSync({ createClient } = {}) {
       AND outbound_dirty = 0 AND outbound_move_to IS NULL AND lower(color) = lower(?)
       AND ${uploadedRowRule('calendar_events.')}
       AND (? IS NULL OR datetime(created_at) <= datetime(?))
-  `);
-  // Eine Zeile ohne Konto, die der Abruf gerade diesem Konto zugeordnet hat,
-  // an das Objekt binden, das sie liefert - ohne ihren Inhalt anzufassen.
-  // Gebraucht wird das für eine WARTENDE Bearbeitung: der Zweig darunter lässt
-  // sie stehen, und der Ausgang schickt nichts ohne belegtes Konto. Ohne die
-  // Bindung wartete sie für immer.
-  const bindEvent = conn.prepare(`
-    UPDATE calendar_events
-    SET calendar_ref_id = ?, external_object_url = COALESCE(?, external_object_url)
-    WHERE id = ?
   `);
   const insEvent = conn.prepare(`
     INSERT INTO calendar_events
@@ -1185,7 +1177,18 @@ async function runSync({ createClient } = {}) {
               // Eine lokale Bearbeitung, die noch auf ihren Push wartet, darf der
               // Inbound nicht mit dem alten Serverstand überschreiben (#593).
               if (existing?.outbound_dirty) {
-                if (!existing.own) bindEvent.run(calRefId, obj.url ?? null, existing.id);
+                // Eine Zeile, deren Kalender keinem Konto gehört, wird hier
+                // NICHT gebunden: die Bindung käme allein aus der UID, und die
+                // nennt der Server. Der Ausgang trüge danach ihren Inhalt in
+                // dieses Konto, ohne dass irgendetwas an der Zeile es belegt.
+                // Sie bleibt also liegen - gemeldet, nicht still.
+                if (!existing.own && !unsendable.has(existing.id)) {
+                  unsendable.add(existing.id);
+                  log.warn(
+                    `Event ${existing.id} has a pending change, but its calendar belongs to no account. `
+                    + 'The change is not sent; nothing on the event says which account it belongs to.'
+                  );
+                }
                 accountEventCount++;
                 continue;
               }

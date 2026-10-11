@@ -23,8 +23,8 @@
  *   - eine Bestandszeile ohne Kalenderbezug wird weiter über die UID gefunden -
  *     aber nicht, wenn ihre Adresse oder ihr Upload-Ziel auf ein anderes Konto
  *     zeigt (ein anderer Server, oder derselbe Server bei einem anderen
- *     Benutzer); trägt sie eine wartende Bearbeitung, bindet der Abruf sie,
- *     damit die Bearbeitung hinausgehen kann;
+ *     Benutzer); trägt sie eine wartende Bearbeitung, wird sie nicht über
+ *     die UID gebunden und ihr Inhalt geht an kein Konto;
  *   - ohne belegtes Konto geht nichts hinaus: kein Konto genannt, eine Zeile
  *     ohne Adresse und Kalender, oder Adresse und Kalender in verschiedenen
  *     Konten - jeweils keine Anfrage, und die Vormerkung bleibt ohne gezählten
@@ -354,7 +354,7 @@ test('Zeile ohne Kalenderbezug, deren Objekt auf demselben Server bei einem ande
   assert.equal(rowsByCalendar().of(accounts.a)?.title, 'Aus A');
 });
 
-test('bearbeitete Bestandszeile ohne Adresse und Kalender: der Abruf bindet sie, die Bearbeitung geht hinaus', async () => {
+test('bearbeitete Bestandszeile ohne Adresse und Kalender: ihr Inhalt geht an kein Konto, und sie bleibt, wie sie ist', async () => {
   const accounts = twoAccounts();
   accounts.b.dav.reset();
   const id = Number(db.prepare(`
@@ -364,17 +364,19 @@ test('bearbeitete Bestandszeile ohne Adresse und Kalender: der Abruf bindet sie,
   `).run(UID).lastInsertRowid);
 
   await caldavSync.sync();
+  await caldavSync.sync();
 
-  // Ohne Bindung bliebe sie für immer liegen: der Ausgang schickt nichts ohne
-  // belegtes Konto, und der Abruf fasst eine wartende Bearbeitung nicht an.
-  const { rows, of } = rowsByCalendar();
-  assert.equal(rows.length, 1);
-  assert.equal(of(accounts.a)?.id, id, 'die Zeile wurde nicht an den Kalender gebunden, der sie liefert');
-  assert.equal(rows[0].external_object_url, accounts.a.objectUrl);
-  assert.equal(rows[0].title, 'Hier bearbeitet', 'der Abruf hat die wartende Bearbeitung überschrieben');
-  assert.equal(summaryAt(accounts.a), 'Hier bearbeitet', 'die Bearbeitung ist nicht hinausgegangen');
-  assert.equal(rows[0].outbound_dirty, 0);
-  assertRequestsStayWithTheirAccount({ a: accounts.a });
+  // Nichts an der Zeile sagt, zu welchem Konto sie gehört - nur die UID, und
+  // die kommt vom Server. Ihr Inhalt wird deshalb nirgends hinaufgetragen,
+  // und der Abruf überschreibt die wartende Bearbeitung nicht.
+  assert.deepEqual(noWrites(accounts), []);
+  assert.equal(summaryAt(accounts.a), 'Aus A');
+  const row = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(id);
+  assert.equal(row.title, 'Hier bearbeitet');
+  assert.equal(row.calendar_ref_id, null, 'die Zeile wurde über die UID an ein Konto gebunden');
+  assert.equal(row.external_object_url, null);
+  assert.equal(row.outbound_dirty, 1);
+  assert.equal(row.outbound_attempts, 0);
 });
 
 // ── Ohne belegtes Konto geht nichts hinaus ──────────────────────────────────────
@@ -383,9 +385,11 @@ test('bearbeitete Bestandszeile ohne Adresse und Kalender: der Abruf bindet sie,
 // sich eine nicht dem Konto zuordnen, dessen Client gerade arbeitet, gibt es
 // keine Anfrage - auch dann nicht, wenn der Aufrufer gar kein Konto nennt.
 
-const noWrites = (accounts) => Object.values(accounts)
-  .flatMap((a) => a.dav.requests.filter((r) => r.method === 'PUT' || r.method === 'DELETE'))
-  .map((r) => `${r.method} ${r.path}`);
+function noWrites(accounts) {
+  return Object.values(accounts)
+    .flatMap((a) => a.dav.requests.filter((r) => r.method === 'PUT' || r.method === 'DELETE'))
+    .map((r) => `${r.method} ${r.path}`);
+}
 
 /** Client von Konto A und der Index, wie ihn dessen Lauf hätte. */
 async function clientOfA(accounts) {
