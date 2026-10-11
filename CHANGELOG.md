@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The demo household has pocket money** (#1750). The Rewards overview of a demo database now
+  shows the pocket money section: Emma has an account in euros with a monthly plan, three
+  credits by that plan, a birthday bonus from a parent, an approved withdrawal and one request
+  that is still open. Leo has no account, so he appears as someone a parent can set up. Only a
+  database filled by `scripts/seed-demo.js` is affected.
 - **Payment reminders can be turned off for each subscription** (#1708, from D#1226). Turn off the reminder
   in the subscription dialog while keeping the subscription active and its cost in the budget.
   Editing or renewing it keeps the reminder off. Existing subscriptions keep reminders enabled.
@@ -40,6 +45,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   screen the wall keeps the start alone so the title keeps its room. The line under a title is
   now a single line in both places: a long calendar name, or any other long text there, ends in
   an ellipsis instead of wrapping.
+- **The notes grid stops at four columns** (#1765, from D#826). The four-column step now starts at
+  1200px of grid width instead of 900px, and the fifth column is gone. A note card is never
+  narrower than 232px, where it could be 216px before, so the title and first lines of a note
+  stay readable on a wide screen. Phones and narrow windows look as they did.
 - **Rows show fewer buttons.** Lists no longer carry a pencil and a bin on every line. Editing,
   deleting and anything further sit behind one "more" button per row that is always visible and
   names what it does in words. This applies to shopping items, birthdays, tasks, loan payments
@@ -203,6 +212,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   read like a section that failed to load. It now shows one sentence below the heading, in the same
   list the accounts appear in later. Only admins who can open an account see it; a child without an
   account still sees no section.
+- **Wall mode counts a shared event for everyone it is assigned to** (#1828). An event assigned to
+  two or more people added to the number of only one of them, and whoever had nothing else that day
+  was missing from the row of faces. Each assigned person now gets the event in their number. The
+  same holds for a task assigned to several people. On a phone, the row that collects several
+  overdue tasks on the overview had the same fault and now shows every person those tasks are
+  assigned to.
+- **Wall mode shows the icon you chose for an event** (#1829). Events on the wall always carried the
+  generic calendar icon, whatever was picked in the event editor. They now show their own icon, as
+  the calendar does; an event without one keeps the calendar icon.
 - **A wall tablet shows events again when the household overview is set to "Assigned to me"** (#1808).
   A paired display follows the household default of the overview. If that default had the calendar
   tile set to "Assigned to me", the tablet looked for events assigned to the tablet itself and
