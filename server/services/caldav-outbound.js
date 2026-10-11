@@ -74,6 +74,14 @@ export class ObjectIndex extends Map {
   }
 
   /**
+   * Die UID, die der Abruf an dieser Adresse gesehen hat: `undefined`, wenn er
+   * dort nichts führt, `null` bei einem Objekt ohne lesbaren Termin.
+   */
+  uidAt(url) {
+    return url ? this.#byUrl.get(url)?.uid : undefined;
+  }
+
+  /**
    * Das Objekt zu einer Zeile oder einem Löschauftrag, in dieser Reihenfolge:
    *   1. an genau der gespeicherten Adresse (wörtlich gleich), sofern dort
    *      diese UID liegt;
@@ -288,10 +296,11 @@ export async function fetchObjectsByUrl(client, wanted) {
  *
  * `accountId`: bei CalDAV das Konto, mit dessen Client gearbeitet wird. Die
  * Arbeit wird unten je Konto neu gelesen; ohne es ginge für 'caldav' nichts
- * hinaus.
+ * hinaus. `calendarUrls`: die Auswahl dieses Kontos - ein Löschauftrag für
+ * einen Kalender ausserhalb davon bleibt liegen.
  * @returns {Promise<{deleted:number,updated:number}>}
  */
-export async function flushAccount(client, source, { deletions, updates, needsCalendars, accountId = null }) {
+export async function flushAccount(client, source, { deletions, updates, needsCalendars, accountId = null, calendarUrls = null }) {
   const wanted = updates
     .filter((e) => e.external_object_url)
     .map((e) => ({
@@ -322,7 +331,7 @@ export async function flushAccount(client, source, { deletions, updates, needsCa
   // ownCalendarUrls bewusst nicht gesetzt: ohne vollen Abruf ist "der Server
   // führt das Objekt nicht mehr" nicht belegbar, und ein Tombstone ohne bekannte
   // URL darf hier nicht als erledigt gelten. Er bleibt für den Sync liegen.
-  const deleted = deletions.length ? await processPendingDeletions(client, source, objectIndex, null, { accountId }) : 0;
+  const deleted = deletions.length ? await processPendingDeletions(client, source, objectIndex, null, { accountId, calendarUrls }) : 0;
   const updated = objectIndex.size ? await processPendingUpdates(client, source, objectIndex, calendarsByUrl, { accountId }) : 0;
   return { deleted, updated };
 }
@@ -330,12 +339,22 @@ export async function flushAccount(client, source, { deletions, updates, needsCa
 /**
  * Arbeitet vorgemerkte Löschungen auf einem CalDAV-Server ab.
  *
- * MIT KONTO (CalDAV) sagt im Sync-Lauf der Abruf dieses Kontos, wo das Objekt
- * liegt, und dorthin geht die Anfrage - nicht an die gespeicherte Adresse. Ein
- * Auftrag ohne Kalender wird als Letztes über seine UID im Konto gesucht. Der
- * Sofortversuch hat keinen Abruf und sendet an die gespeicherte Adresse; liegt
- * sie nicht auf dem Server des Kontos, stellt der Client die Anfrage nicht,
- * und der Auftrag wartet ohne gezählten Versuch auf den Lauf.
+ * MIT KONTO (CalDAV), wohin die Anfrage im Sync-Lauf geht:
+ *   1. Kennt der Abruf dieses Kontos das Objekt (`ObjectIndex.find`), an die
+ *      Adresse aus dem Abruf.
+ *   2. Sonst an die gespeicherte Adresse - sofern der Abruf dort nichts
+ *      ANDERES führt. Dass ein Objekt in einer Antwort fehlt, belegt nicht,
+ *      dass es fort ist: eine leere oder unvollständige Antwort sieht genauso
+ *      aus, und ohne die Anfrage käme der gelöschte Termin beim nächsten Lauf
+ *      zurück. Ein 404 erledigt den Auftrag dann von selbst.
+ *   3. Ohne Anfrage fällt der Auftrag nur, wenn an der gespeicherten Adresse
+ *      inzwischen ein anderer Termin liegt oder gar keine Adresse gespeichert
+ *      ist und der Abruf das Objekt nicht führt.
+ * Liegt die Adresse nicht auf dem Server des Kontos, stellt der Client die
+ * Anfrage nicht (`withAccountOrigin`). Im Lauf heisst das: dieses Objekt liegt
+ * nicht bei diesem Konto, der Auftrag wird mit Meldung abgeräumt. Im
+ * Sofortversuch, der keinen Abruf hat, bleibt er ohne gezählten Versuch für den
+ * Lauf liegen.
  *
  * @param {object} client       tsdav-Client
  * @param {string} source       'caldav' | 'apple'
@@ -344,9 +363,14 @@ export async function flushAccount(client, source, { deletions, updates, needsCa
  * @param {object} [scope]
  * @param {number} [scope.accountId] CalDAV-Konto, dem der Client gehört
  * @param {boolean} [scope.complete] jeder eingeschaltete Kalender des Kontos wurde abgerufen
- * @returns {Promise<number>} erledigte Tombstones
+ * @param {Set}    [scope.calendarUrls] Sofortversuch: nur Aufträge für diese Kalender
+ *   (die Auswahl des Kontos); ein Auftrag ohne Kalender zählt immer dazu
+ * @param {{sent: number}} [scope.outcome] zählt mit, was der Server wirklich gelöscht hat
+ * @returns {Promise<number>} erledigte Tombstones - auch die, die ohne Anfrage fielen
  */
-export async function processPendingDeletions(client, source, objectIndex, ownCalendarUrls = null, { accountId = null, complete = true } = {}) {
+export async function processPendingDeletions(client, source, objectIndex, ownCalendarUrls = null, {
+  accountId = null, complete = true, calendarUrls = null, outcome = null,
+} = {}) {
   const rows = outbound.pendingDeletions(source, { accountId });
   if (rows.length === 0) return 0;
 
@@ -358,6 +382,7 @@ export async function processPendingDeletions(client, source, objectIndex, ownCa
     // dieses Auftrags wurde in diesem Lauf nicht gelesen (abgewählt, Abruf
     // gescheitert), also weiss niemand, ob sein Objekt noch dort liegt.
     if (ownCalendarUrls && row.calendar_external_id && !ownCalendarUrls.has(row.calendar_external_id)) continue;
+    if (calendarUrls && row.calendar_external_id && !calendarUrls.has(row.calendar_external_id)) continue;
 
     let known;
     let url;
@@ -367,9 +392,20 @@ export async function processPendingDeletions(client, source, objectIndex, ownCa
         calendarUrl: row.calendar_external_id || null,
         anywhere: !row.calendar_external_id, unparsed: true,
       });
-      url = ownCalendarUrls ? (known?.url ?? null) : (row.object_url || null);
-      // Ohne Kalender am Auftrag belegt nur ein vollständiger Abruf, dass das
-      // Objekt fort ist.
+      if (known) {
+        url = known.url;
+      } else if (row.object_url && index.uidAt(row.object_url) === undefined) {
+        url = row.object_url;
+      } else if (row.object_url && ownCalendarUrls) {
+        log.info(`[${label(source)}] Another entry now lives at the stored address of event ${row.event_external_id}, dropping the pending deletion.`);
+        outbound.dropDeletion(row.id);
+        done++;
+        continue;
+      } else {
+        url = null;
+      }
+      // Ohne Adresse und ohne Kalender am Auftrag belegt nur ein vollständiger
+      // Abruf, dass das Objekt fort ist.
       if (!url && ownCalendarUrls && !row.calendar_external_id && !complete) continue;
     } else {
       known = objectIndex.get(row.event_external_id);
@@ -391,10 +427,17 @@ export async function processPendingDeletions(client, source, objectIndex, ownCa
       await client.deleteCalendarObject({ calendarObject: { url, etag: known?.etag } });
       outbound.dropDeletion(row.id);
       done++;
+      if (outcome) outcome.sent++;
     } catch (err) {
       if (isOriginRefusal(err)) {
-        // Nichts wurde gesendet. Der Lauf findet das Objekt über seinen Abruf.
-        log.warn(`[${label(source)}] The stored address of event ${row.event_external_id} is not on the server of its account, leaving its deletion to the next sync run.`);
+        // Nichts wurde gesendet.
+        if (ownCalendarUrls) {
+          log.warn(`[${label(source)}] The stored address of event ${row.event_external_id} is not on the server of its account and the account does not hold the entry, dropping the pending deletion.`);
+          outbound.dropDeletion(row.id);
+          done++;
+        } else {
+          log.warn(`[${label(source)}] The stored address of event ${row.event_external_id} is not on the server of its account, leaving its deletion to the next sync run.`);
+        }
         continue;
       }
       if (outbound.handleDeletionError(err, row, label(source))
@@ -454,10 +497,7 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
 
     // Weder gespeichert noch im aktuellen Abruf enthalten: in diesem Lauf gibt
     // es keinen Weg zum Objekt. Nichts tun, nichts verwerfen.
-    if (!url) {
-      if (index) log.warn(`[${label(source)}] No source object for event ${event.id} in this run, deferring its update.`);
-      continue;
-    }
+    if (!url) continue;
 
     if (!known?.data) {
       // Ohne das Originalobjekt bliebe nur, es neu zu bauen - und das verlöre

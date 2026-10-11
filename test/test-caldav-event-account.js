@@ -44,6 +44,7 @@ const caldavSync = await import('../server/services/caldav-sync.js');
 const outbound = await import('../server/services/calendar-outbound.js');
 const { createCalDAVClient } = await import('../server/utils/caldav-client.js');
 const { default: calendarRouter } = await import('../server/routes/calendar.js');
+const { retitleBirthdayEvents } = await import('../server/services/birthdays.js');
 
 const userId = Number(db.prepare(
   "INSERT INTO users (username, display_name, password_hash, role) VALUES ('admin','Admin','x','admin')"
@@ -356,6 +357,152 @@ test('gespeicherte Adresse auf einem fremden Server: der Lauf sendet an das Obje
   assert.equal(row(id).external_object_url, accounts.a.objectUrl, 'die Zeile merkt sich weiter die fremde Adresse');
   assert.equal(accounts.a.dav.getObject(accounts.a.url, 'gone.ics'), null, 'die Löschung kam beim Server des Kontos nicht an');
   assert.equal(tombstoneCount(), 0);
+});
+
+/** Eine Antwort auf den Objektabruf, die gültig ist und nichts nennt. */
+function answerEmptyOnce(acc) {
+  acc.dav.refuse({
+    method: 'REPORT', path: new URL(acc.url).pathname, status: 207, contentType: 'application/xml',
+    body: '<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"></d:multistatus>', once: true,
+  });
+}
+
+test('der Abruf nennt das Objekt nicht (leere Antwort): die Löschung geht trotzdem hinaus, und der Termin kommt nicht zurück', async (t) => {
+  const accounts = twoAccounts();
+  accounts.a.dav.putObject(accounts.a.url, 'gone.ics', vevent('gone@test', 'Soll weg'));
+  tombstone(accounts.a, { uid: 'gone@test', objectUrl: `${accounts.a.url}gone.ics` });
+  answerEmptyOnce(accounts.a);
+
+  const lines = await logged(t, () => caldavSync.sync());
+
+  assert.equal(accounts.a.dav.getObject(accounts.a.url, 'gone.ics'), null, 'der Auftrag fiel, ohne dass gelöscht wurde');
+  assert.equal(tombstoneCount(), 0);
+  assert.equal(lines.filter((l) => /1 pending deletion\(s\) applied/.test(l.text)).length, 1);
+
+  await caldavSync.sync();
+  assert.deepEqual(rowsWithUid('gone@test'), [], 'der gelöschte Termin ist zurück');
+  assertRequestsStayWithTheirAccount(accounts);
+});
+
+test('ein Auftrag, der ohne Anfrage fällt, wird nicht als Löschung gemeldet', async (t) => {
+  const accounts = twoAccounts();
+  // Ohne gespeicherte Adresse, und der Server führt das Objekt nicht (mehr).
+  tombstone(accounts.a, { uid: 'never@test', objectUrl: null });
+
+  const lines = await logged(t, () => caldavSync.sync());
+
+  assert.equal(tombstoneCount(), 0);
+  assert.deepEqual(writesAt(accounts.a.dav).map(describe), []);
+  assert.deepEqual(lines.filter((l) => /pending deletion\(s\) applied/.test(l.text)), [],
+    'gemeldet wurde eine Löschung, die es nicht gab');
+});
+
+test('der Abruf nennt das Objekt nicht (leere Antwort): eine wartende Bearbeitung bleibt vorgemerkt', async () => {
+  const accounts = twoAccounts();
+  const id = mirror(accounts.a, { title: 'Vorher' });
+  edit(id, 'Bearbeitet');
+  answerEmptyOnce(accounts.a);
+
+  await caldavSync.sync();
+
+  assert.deepEqual(writesAt(accounts.a.dav).map(describe), [], 'ohne das Objekt des Servers wurde geschrieben');
+  assert.equal(row(id)?.outbound_dirty, 1, 'die Bearbeitung ist verloren');
+  assert.equal(row(id).outbound_attempts, 0);
+  assert.equal(row(id).title, 'Bearbeitet');
+
+  await caldavSync.sync();
+  assert.equal(summaryAt(accounts.a), 'Bearbeitet', 'der nächste Lauf hat die Bearbeitung nicht nachgeholt');
+  assert.equal(row(id).outbound_dirty, 0);
+});
+
+test('gespeicherte Adresse auf einem fremden Server, und das Konto führt den Termin nicht: der Lauf räumt den Auftrag mit Meldung ab', async (t) => {
+  const accounts = twoAccounts();
+  tombstone(accounts.a, { uid: 'elsewhere@test', objectUrl: `${servers.foreign.origin}/cal/family/elsewhere.ics` });
+
+  const lines = await logged(t, () => caldavSync.sync());
+
+  assert.deepEqual(servers.foreign.requests.map(describe), []);
+  assert.equal(tombstoneCount(), 0, 'der Auftrag bleibt für immer liegen');
+  assert.equal(lines.filter((l) => l.level === 'warn' && /not on the server of its account/.test(l.text)).length, 1);
+  assert.deepEqual(lines.filter((l) => /pending deletion\(s\) applied/.test(l.text)), []);
+});
+
+// ── Kalenderumzug: Anlegen im Ziel ──────────────────────────────────────────────
+
+/** Konto A mit einem zweiten eingeschalteten Kalender `work` als Umzugsziel. */
+function accountWithTwoCalendars() {
+  const accounts = twoAccounts();
+  const workUrl = accounts.a.dav.addCollection('work', { name: 'Arbeit' });
+  accounts.a.dav.putObject(workUrl, 'neighbour.ics', vevent('neighbour-work@test', 'Nachbar'));
+  db.prepare(`
+    INSERT INTO caldav_calendar_selection (account_id, calendar_url, calendar_name, calendar_color, enabled)
+    VALUES (?, ?, 'Arbeit', '#4A90E2', 1)
+  `).run(accounts.a.accountId, workUrl);
+  return { ...accounts, workUrl };
+}
+
+for (const run of ['sync', 'flushOutbound']) {
+  test(`Kalenderumzug: der Termin wird im Ziel angelegt, in der Quelle gelöscht, und die Zeile zieht mit (${run})`, async () => {
+    const { a, b, workUrl } = accountWithTwoCalendars();
+    const id = mirror(a, { title: 'Zieht um' });
+    db.prepare('UPDATE calendar_events SET outbound_move_to = ? WHERE id = ?').run(workUrl, id);
+
+    await caldavSync[run]();
+
+    assertRequestsStayWithTheirAccount({ a, b });
+    assert.deepEqual(a.dav.objectNames(workUrl).sort(), ['neighbour.ics', 'shared.ics'], 'im Ziel liegt der Termin nicht');
+    assert.equal(a.dav.getObject(a.url, 'shared.ics'), null, 'in der Quelle liegt der Termin noch');
+    assert.equal(row(id).outbound_move_to, null);
+    assert.equal(row(id).calendar_ref_id, calendarRef(workUrl));
+    assert.equal(row(id).external_object_url, `${workUrl}shared.ics`);
+    assert.equal(row(id).caldav_account_id, a.accountId);
+    assert.deepEqual(writesAt(b.dav).map(describe), []);
+  });
+
+}
+
+test('die Host-Sperre prüft bei jeder Methode die Adresse, an die gesendet wird', async () => {
+  const { withAccountOrigin, isOriginRefusal } = await import('../server/utils/caldav-client.js');
+  const bases = ['https://a.example/dav/', 'https://a.example/cal/family/', 'https://a.example/cal/work/'];
+  const sent = [];
+  const stub = {
+    // genau wie tsdav 2.3.4: der Dateiname wird gegen die Collection aufgelöst.
+    createCalendarObject: async ({ calendar, filename }) => { sent.push(new URL(String(filename), String(calendar.url)).href); return { ok: true }; },
+    updateCalendarObject: async ({ calendarObject }) => { sent.push(calendarObject.url); return { ok: true }; },
+    deleteCalendarObject: async ({ calendarObject }) => { sent.push(calendarObject.url); return { ok: true }; },
+    fetchCalendarObjects: async ({ calendar }) => { sent.push(calendar.url); return []; },
+  };
+  const client = withAccountOrigin(stub, bases);
+  const refused = async (label, run) => {
+    sent.length = 0;
+    await assert.rejects(run, (err) => isOriginRefusal(err), label);
+    assert.deepEqual(sent, [], `${label}: es wurde doch gesendet`);
+  };
+  const allowed = async (label, run, expected) => {
+    sent.length = 0;
+    await run();
+    assert.deepEqual(sent, [expected], label);
+  };
+
+  // createCalendarObject: ein Dateiname, der zu einer Adresse ausserhalb des
+  // Servers aufloest, wird abgewiesen - der Name allein sagt noch nichts.
+  await refused('create: Name loest off-host auf',
+    () => client.createCalendarObject({ calendar: { url: 'https://a.example/cal/work/' }, filename: 'http:elsewhere.example.ics', iCalString: 'x' }));
+  await allowed('create: gewoehnlicher Name im eigenen Kalender',
+    () => client.createCalendarObject({ calendar: { url: 'https://a.example/cal/work/' }, filename: 'uid.ics', iCalString: 'x' }),
+    'https://a.example/cal/work/uid.ics');
+  await refused('create: Collection selbst off-host',
+    () => client.createCalendarObject({ calendar: { url: 'https://b.example/cal/work/' }, filename: 'uid.ics', iCalString: 'x' }));
+
+  await refused('update: Objektadresse off-host',
+    () => client.updateCalendarObject({ calendarObject: { url: 'https://b.example/cal/x.ics', data: 'x' } }));
+  await refused('delete: Objektadresse off-host',
+    () => client.deleteCalendarObject({ calendarObject: { url: 'https://b.example/cal/x.ics' } }));
+  await refused('fetch: Collection off-host',
+    () => client.fetchCalendarObjects({ calendar: { url: 'https://b.example/cal/family/' } }));
+  await allowed('update: eigene Objektadresse',
+    () => client.updateCalendarObject({ calendarObject: { url: 'https://a.example/cal/family/x.ics', data: 'x' } }),
+    'https://a.example/cal/family/x.ics');
 });
 
 // ── 3: ein Konto zieht auf einen anderen Server um ──────────────────────────────
@@ -716,3 +863,72 @@ for (const run of ['sync', 'flushOutbound']) {
     assert.equal(tombstoneCount(), 0);
   });
 }
+
+// ── Der geteilte Inline-Marker (#1860, housekeeping.js + birthdays.js) ────────────
+
+test('markInlineOutbound merkt nur vormerkbare Zeilen vor und lässt einen CalDAV-Termin ohne Konto in Ruhe', () => {
+  const accounts = twoAccounts();
+  const owned = row(mirror(accounts.a, { uid: 'm-owned@test', title: 'Konto' }));
+  const orphan = row(mirror(accounts.a, { owner: null, uid: 'm-orphan@test', title: 'Ohne Konto' }));
+  const local = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(
+    Number(db.prepare("INSERT INTO calendar_events (title, start_datetime, created_by, external_source) VALUES ('Lokal','2035-01-01T09:00',?, 'local')").run(userId).lastInsertRowid)
+  );
+
+  assert.equal(outbound.markInlineOutbound(db, owned), true);
+  assert.equal(row(owned.id).outbound_dirty, 1);
+  assert.equal(outbound.markInlineOutbound(db, orphan), false, 'eine Zeile ohne Konto wurde vorgemerkt');
+  assert.equal(row(orphan.id).outbound_dirty, 0);
+  assert.equal(outbound.markInlineOutbound(db, local), false, 'eine lokale Zeile wurde vorgemerkt');
+});
+
+test('retitleBirthdayEvents merkt einen gespiegelten Geburtstag mit Konto vor, einen ohne Konto nicht', () => {
+  const accounts = twoAccounts();
+  db.prepare('DELETE FROM sync_config').run();
+  db.prepare("INSERT INTO sync_config (key, value) VALUES ('language', 'de')").run();
+  const birthday = (name, owner) => {
+    const eventId = mirror(accounts.a, { owner, uid: `bday-${name}@test`, title: 'Alt', withCalendar: true });
+    // englischer Bestandstitel, den der Lauf auf Deutsch zieht
+    db.prepare("UPDATE calendar_events SET title = 'Old', description = 'x', outbound_dirty = 0 WHERE id = ?").run(eventId);
+    db.prepare('INSERT INTO birthdays (name, birth_date, calendar_event_id, created_by) VALUES (?, ?, ?, ?)')
+      .run(name, '2014-05-10', eventId, userId);
+    return eventId;
+  };
+  const withAccount = birthday('Mit', accounts.a.accountId);
+  const withoutAccount = birthday('Ohne', null);
+
+  const changed = retitleBirthdayEvents(db);
+  assert.ok(changed >= 2, 'die Titel wurden nicht neu geschrieben');
+
+  assert.equal(row(withAccount).outbound_dirty, 1, 'der gespiegelte Geburtstag mit Konto wurde nicht vorgemerkt');
+  assert.equal(row(withoutAccount).outbound_dirty, 0, 'ein Geburtstag ohne Konto wurde vorgemerkt und bliebe unübernommen');
+});
+
+test('ein zweiter Löschauftrag für dieselbe UID im selben Kalender lässt Konto und Adresse des ersten unangetastet', () => {
+  const accounts = twoAccounts();
+  // Erster Auftrag: Konto A mit seiner Adresse.
+  assert.equal(outbound.queueDeletion({
+    source: 'caldav', calendarExternalId: accounts.a.url, eventExternalId: UID,
+    objectUrl: `${accounts.a.url}shared.ics`, accountId: accounts.a.accountId,
+  }), true);
+  // Zweiter Auftrag, gleicher Kalender, gleiche UID, aber Konto B und eine
+  // andere Adresse: er darf die Adresse des ersten nicht mit Konto B paaren.
+  outbound.queueDeletion({
+    source: 'caldav', calendarExternalId: accounts.a.url, eventExternalId: UID,
+    objectUrl: `${accounts.b.url}elsewhere.ics`, accountId: accounts.b.accountId,
+  });
+
+  const [t] = db.prepare('SELECT caldav_account_id, object_url FROM calendar_pending_deletions').all();
+  assert.equal(tombstoneCount(), 1);
+  assert.equal(t.caldav_account_id, accounts.a.accountId, 'das Konto des ersten Auftrags wurde überschrieben');
+  assert.equal(t.object_url, `${accounts.a.url}shared.ics`, 'die Adresse des ersten Auftrags wurde überschrieben');
+
+  // Ein Auftrag OHNE Adresse füllt die fehlende Adresse eines Auftrags ohne sie.
+  db.prepare('DELETE FROM calendar_pending_deletions').run();
+  outbound.queueDeletion({ source: 'caldav', calendarExternalId: accounts.a.url, eventExternalId: UID, accountId: accounts.a.accountId });
+  outbound.queueDeletion({
+    source: 'caldav', calendarExternalId: accounts.a.url, eventExternalId: UID,
+    objectUrl: `${accounts.a.url}shared.ics`, accountId: accounts.a.accountId,
+  });
+  const [t2] = db.prepare('SELECT caldav_account_id, object_url FROM calendar_pending_deletions').all();
+  assert.equal(t2.object_url, `${accounts.a.url}shared.ics`, 'eine fehlende Adresse wurde nicht nachgetragen');
+});

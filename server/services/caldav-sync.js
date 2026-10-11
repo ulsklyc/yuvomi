@@ -1378,10 +1378,12 @@ async function runSync({ createClient } = {}) {
       // Weg zum Objekt für Bestandstermine erst aus dessen Abruf bekannt wird;
       // der Inbound überspringt dafür alles, was hier noch aussteht.
       try {
-        const removed = await processPendingDeletions(client, 'caldav', objectIndex, ownCalendarUrls, {
-          accountId: account.id, complete: fetchedEveryCalendar,
+        // Gemeldet wird, was der Server gelöscht hat - nicht, was ohne Anfrage fiel.
+        const deletions = { sent: 0 };
+        await processPendingDeletions(client, 'caldav', objectIndex, ownCalendarUrls, {
+          accountId: account.id, complete: fetchedEveryCalendar, outcome: deletions,
         });
-        if (removed) log.info(`${removed} pending deletion(s) applied on the server.`);
+        if (deletions.sent) log.info(`${deletions.sent} pending deletion(s) applied on the server.`);
         const pushed = await processPendingUpdates(client, 'caldav', objectIndex, calendarsByUrl, {
           accountId: account.id,
         });
@@ -1502,15 +1504,18 @@ async function runFlushOutbound({ createClient } = {}) {
   const makeClient = createClient || defaultClientFactory;
   const total = { deleted: 0, updated: 0 };
   for (const account of getAllAccounts()) {
+    // Was in einem Kalender ausserhalb der Auswahl dieses Kontos liegt, fasst
+    // der Sofortversuch nicht an.
+    const calendarUrls = new Set(accountUrls(account).slice(1));
     // Ohne URL hilft nur der volle Abruf des Syncs.
     const deletions = outbound.pendingDeletions('caldav', { accountId: account.id })
-      .filter((row) => row.object_url);
+      .filter((row) => row.object_url && (!row.calendar_external_id || calendarUrls.has(row.calendar_external_id)));
     const updates = [];
     let needsCalendars = false;
     for (const event of outbound.pendingUpdates('caldav', { accountId: account.id })) {
       const calendarUrl = (event.calendar_ref_id ? calendarForRef.get(event.calendar_ref_id)?.external_id : null)
         || event.target_caldav_calendar_url || null;
-      if (!calendarUrl || !event.external_object_url) continue;
+      if (!calendarUrl || !event.external_object_url || !calendarUrls.has(calendarUrl)) continue;
       updates.push({ ...event, __calendarUrl: calendarUrl });
       if (event.outbound_move_to) needsCalendars = true;
     }
@@ -1519,7 +1524,7 @@ async function runFlushOutbound({ createClient } = {}) {
     try {
       const client = withAccountOrigin(await makeClient(account), accountUrls(account));
       const res = await flushAccount(client, 'caldav', {
-        deletions, updates, needsCalendars, accountId: account.id,
+        deletions, updates, needsCalendars, accountId: account.id, calendarUrls,
       });
       total.deleted += res.deleted;
       total.updated += res.updated;
