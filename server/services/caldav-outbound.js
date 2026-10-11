@@ -148,7 +148,7 @@ export function icsFieldsForEvent(event, householdZone = null) {
 }
 
 /** Liegt diese Adresse in einem der Kalender? Verglichen wird Origin und dekodierter Pfad. */
-function liesWithin(url, calendarUrls) {
+export function liesWithin(url, calendarUrls) {
   const parts = (value) => {
     try {
       const parsed = new URL(value);
@@ -162,6 +162,13 @@ function liesWithin(url, calendarUrls) {
     if (base && base.origin === target.origin && target.path.startsWith(base.path)) return true;
   }
   return false;
+}
+
+/** Liegt diese Adresse auf demselben Server (Origin) wie eine der anderen? */
+export function onSameServer(url, otherUrls) {
+  const originOf = (value) => { try { return new URL(value).origin; } catch { return null; } };
+  const origin = originOf(url);
+  return origin !== null && otherUrls.some((other) => originOf(other) === origin);
 }
 
 /** Dieselbe Adresse, gleich ob der Server `@` als `%40` zurückgibt. */
@@ -213,23 +220,38 @@ function objectOf(objectIndex, uid, { url = null, calendarUrl = null } = {}) {
  * dieselbe UID führen - dann stand das Objekt des einen Kontos für die Zeile
  * des anderen ein, und eine Bearbeitung landete im falschen Konto.
  *
- * Die Regel hängt deshalb an der Adresse, an die die Anfrage ginge: sie muss
- * in einem Kalender DIESES Kontos liegen. Kommt die Adresse erst aus dem
- * Index (Bestand ohne gespeicherte URL), ist sie von selbst die eigene; dann
- * entscheidet der Kalender der Vormerkung, und nur eine ohne jeden
- * Kalenderbezug läuft wie bisher mit.
+ * Die Zugehörigkeit muss deshalb BELEGT sein, bevor eine Anfrage entsteht:
+ *   - die gespeicherte Objektadresse liegt in einem Kalender dieses Kontos, und
+ *   - der Kalender, in dem die Vormerkung laut Buchführung liegt, gehört ihm.
+ * Eines von beiden darf fehlen (Bestand ohne gespeicherte Adresse, Tombstone
+ * ohne Kalender), widersprechen darf keines. Fehlt beides, oder nennt der
+ * Aufrufer gar kein Konto, geht nichts hinaus: die Vormerkung bleibt stehen,
+ * ohne dass ein Versuch gezählt wird - es gab keinen.
  *
- * `accountCalendarUrls` fehlt bei Apple: dort gibt es ein Konto.
+ * Apple ist ausgenommen: dort gibt es ein einziges Konto und keine Tabelle,
+ * aus der sich eine Zugehörigkeit lesen liesse.
  *
+ * @param {string}      source       'caldav' | 'apple'
  * @param {string|null} storedUrl    gespeicherte Objektadresse der Vormerkung
  * @param {string|null} calendarUrl  Kalender, in dem sie laut Buchführung liegt
- * @param {Iterable<string>|null|undefined} accountCalendarUrls
+ * @param {string[]|null} accountCalendarUrls  alle Kalender des Kontos
  */
-function belongsToAccount(storedUrl, calendarUrl, accountCalendarUrls) {
-  if (!accountCalendarUrls) return true;
-  if (storedUrl) return liesWithin(storedUrl, accountCalendarUrls);
-  if (!calendarUrl) return true;
-  for (const own of accountCalendarUrls) if (own === calendarUrl) return true;
+function belongsToAccount(source, storedUrl, calendarUrl, accountCalendarUrls) {
+  if (source !== 'caldav') return true;
+  if (!accountCalendarUrls) return false;
+  if (!storedUrl && !calendarUrl) return false;
+  if (storedUrl && !liesWithin(storedUrl, accountCalendarUrls)) return false;
+  if (calendarUrl && !accountCalendarUrls.includes(calendarUrl)) return false;
+  return true;
+}
+
+/**
+ * Ein Aufruf für CalDAV ohne Konto ist ein Programmierfehler, kein Sonderfall:
+ * er wird gemeldet, und es geht nichts hinaus.
+ */
+function accountIsNamed(source, accountCalendarUrls, what) {
+  if (source !== 'caldav' || accountCalendarUrls) return true;
+  log.error(`[${label(source)}] Pending ${what} were not processed: the caller named no account.`);
   return false;
 }
 
@@ -342,6 +364,7 @@ export async function flushAccount(client, source, { deletions, updates, needsCa
 export async function processPendingDeletions(client, source, objectIndex, ownCalendarUrls = null, { accountCalendarUrls = null } = {}) {
   const rows = outbound.pendingDeletions(source);
   if (rows.length === 0) return 0;
+  if (!accountIsNamed(source, accountCalendarUrls, 'deletions')) return 0;
 
   let done = 0;
   for (const row of rows) {
@@ -350,7 +373,7 @@ export async function processPendingDeletions(client, source, objectIndex, ownCa
     // Fehlversuche hoch und verwirft am Ende eine fremde Löschung.
     if (ownCalendarUrls && row.calendar_external_id && !ownCalendarUrls.has(row.calendar_external_id)) continue;
     // Die Löschung eines anderen Kontos: dessen Lauf übernimmt.
-    if (!belongsToAccount(row.object_url, row.calendar_external_id || null, accountCalendarUrls)) continue;
+    if (!belongsToAccount(source, row.object_url, row.calendar_external_id || null, accountCalendarUrls)) continue;
 
     const known = objectOf(objectIndex, row.event_external_id, {
       url: row.object_url, calendarUrl: row.calendar_external_id || null,
@@ -395,6 +418,7 @@ export async function processPendingDeletions(client, source, objectIndex, ownCa
 export async function processPendingUpdates(client, source, objectIndex, calendarsByUrl = null, { accountCalendarUrls = null } = {}) {
   const events = outbound.pendingUpdates(source);
   if (events.length === 0) return 0;
+  if (!accountIsNamed(source, accountCalendarUrls, 'changes')) return 0;
 
   // Einmal je Lauf, nicht je Termin: die Zone steht in sync_config und aendert
   // sich waehrend eines Sync-Durchlaufs nicht.
@@ -404,9 +428,13 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
   for (const event of events) {
     // Die Zeile eines anderen Kontos: nichts tun, nichts verwerfen - dessen
     // Lauf übernimmt. Vor dem Blick in den Index, denn der kennt nur UIDs.
-    if (!belongsToAccount(
-      event.external_object_url, outbound.calendarExternalId(event), accountCalendarUrls
-    )) continue;
+    const eventCalendarUrl = outbound.calendarExternalId(event);
+    if (!belongsToAccount(source, event.external_object_url, eventCalendarUrl, accountCalendarUrls)) {
+      if (!event.external_object_url && !eventCalendarUrl) {
+        log.warn(`[${label(source)}] Event ${event.id} has neither an object address nor a calendar, so no account can take its pending change.`);
+      }
+      continue;
+    }
 
     // Das Objekt an der Adresse der Zeile. Hat der Lauf dort keines gesehen
     // (auf dem Server verschoben), bleibt es beim Objekt unter der UID wie

@@ -28,8 +28,8 @@ import assert from 'node:assert/strict';
 const dbmod = await import('../server/db.js');
 const db = dbmod.get();
 const outbound = await import('../server/services/calendar-outbound.js');
-const { processPendingDeletions, processPendingUpdates, icsFieldsForEvent, filenameFromUrl } =
-  await import('../server/services/caldav-outbound.js');
+const caldavOutbound = await import('../server/services/caldav-outbound.js');
+const { icsFieldsForEvent, filenameFromUrl } = caldavOutbound;
 const { patchICSEvent, countVEvents, unfoldICS, foldICSLine } =
   await import('../server/utils/ics-patch.js');
 const { nearestIcalColorName, resolveIcalColor, __test: icalColorTest } =
@@ -44,6 +44,16 @@ db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALU
 
 const CAL_URL  = 'https://dav.example/cal/family/';
 const CAL2_URL = 'https://dav.example/cal/work/';
+
+// Seit #1860 nennt der Aufrufer das Konto, für das sein Client arbeitet: ohne
+// das geht für CalDAV nichts hinaus. Die Fälle hier haben EIN Konto mit diesen
+// zwei Kalendern, wie es caldav-sync.js aus der Auswahl liest. Apple kennt
+// keine Konten und bekommt die Angabe nur mit, weil sie dort nichts ändert.
+const ACCOUNT = { accountCalendarUrls: [CAL_URL, CAL2_URL] };
+const processPendingDeletions = (client, source, index, ownCalendarUrls = null) =>
+  caldavOutbound.processPendingDeletions(client, source, index, ownCalendarUrls, ACCOUNT);
+const processPendingUpdates = (client, source, index, calendarsByUrl = null) =>
+  caldavOutbound.processPendingUpdates(client, source, index, calendarsByUrl, ACCOUNT);
 
 // ── Fixtures ────────────────────────────────────────────────────────────────────
 

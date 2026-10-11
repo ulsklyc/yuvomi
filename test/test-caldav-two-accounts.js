@@ -20,7 +20,13 @@
  *     im Sofortversuch, und jede Anfrage bleibt bei dem Konto, zu dem ihre
  *     Zeile gehört;
  *   - eine Löschung bleibt bei ihrem Konto;
- *   - eine Bestandszeile ohne Kalenderbezug wird weiter über die UID gefunden.
+ *   - eine Bestandszeile ohne Kalenderbezug wird weiter über die UID gefunden -
+ *     aber nicht, wenn ihre Adresse oder ihr Upload-Ziel auf ein anderes Konto
+ *     zeigt;
+ *   - ohne belegtes Konto geht nichts hinaus: kein Konto genannt, eine Zeile
+ *     ohne Adresse und Kalender, oder Adresse und Kalender in verschiedenen
+ *     Konten - jeweils keine Anfrage, und die Vormerkung bleibt ohne gezählten
+ *     Versuch stehen.
  *
  * Wie in test-caldav-http-refusals.js: echte Dienste, echter tsdav-Client,
  * echtes HTTP - hier gegen ZWEI Server aus test/caldav-fake-server.js, einen je
@@ -39,6 +45,8 @@ import { startFakeDavServer } from './caldav-fake-server.js';
 const dbmod = await import('../server/db.js');
 const db = dbmod.get();
 const caldavSync = await import('../server/services/caldav-sync.js');
+const caldavOutbound = await import('../server/services/caldav-outbound.js');
+const { createCalDAVClient } = await import('../server/utils/caldav-client.js');
 
 db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('admin','Admin','x','admin')").run();
 
@@ -283,4 +291,116 @@ test('Bestandszeile ohne Kalenderbezug: der Abruf findet sie weiter über die UI
   assert.equal(rows.length, 1, 'die Bestandszeile wurde verdoppelt statt übernommen');
   assert.equal(of(accounts.a)?.id, id);
   assert.equal(rows[0].title, 'Aus A');
+});
+
+test('Zeile ohne Kalenderbezug, deren Objekt in einem anderen Konto liegt: der Abruf lässt sie stehen', async () => {
+  const accounts = twoAccounts();
+  // Die Zeile hat keinen Kalender mehr, aber ihre Adresse zeigt in Konto B.
+  // Konto B liefert die UID nicht (mehr), Konto A schon.
+  accounts.b.dav.reset();
+  const id = Number(db.prepare(`
+    INSERT INTO calendar_events
+      (title, start_datetime, end_datetime, all_day, created_by, external_source,
+       external_calendar_id, external_object_url)
+    VALUES ('Gehört B', '2035-03-10T09:00Z', '2035-03-10T10:00Z', 0, 1, 'caldav', ?, ?)
+  `).run(UID, accounts.b.objectUrl).lastInsertRowid);
+
+  await caldavSync.sync();
+
+  const kept = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(id);
+  assert.equal(kept.title, 'Gehört B', 'Konto A hat eine Zeile übernommen, deren Objekt in Konto B liegt');
+  assert.equal(kept.external_object_url, accounts.b.objectUrl);
+  assert.equal(kept.calendar_ref_id, null);
+  assert.equal(rowsByCalendar().of(accounts.a)?.title, 'Aus A', 'das Objekt aus Konto A hat keine eigene Zeile bekommen');
+});
+
+test('Zeile ohne Kalenderbezug, die für ein anderes Konto bestimmt ist: der Abruf lässt sie stehen', async () => {
+  const accounts = twoAccounts();
+  accounts.b.dav.reset();
+  const id = Number(db.prepare(`
+    INSERT INTO calendar_events
+      (title, start_datetime, end_datetime, all_day, created_by, external_source,
+       external_calendar_id, target_caldav_account_id)
+    VALUES ('Für B', '2035-03-10T09:00Z', '2035-03-10T10:00Z', 0, 1, 'caldav', ?, ?)
+  `).run(UID, accounts.b.accountId).lastInsertRowid);
+
+  await caldavSync.sync();
+
+  assert.equal(db.prepare('SELECT title FROM calendar_events WHERE id = ?').get(id).title, 'Für B',
+    'Konto A hat eine Zeile übernommen, die für Konto B bestimmt ist');
+  assert.equal(rowsByCalendar().of(accounts.a)?.title, 'Aus A');
+});
+
+// ── Ohne belegtes Konto geht nichts hinaus ──────────────────────────────────────
+//
+// Die zwei Ausgangsschleifen gehen über die Vormerkungen ALLER Konten. Lässt
+// sich eine nicht dem Konto zuordnen, dessen Client gerade arbeitet, gibt es
+// keine Anfrage - auch dann nicht, wenn der Aufrufer gar kein Konto nennt.
+
+const noWrites = (accounts) => Object.values(accounts)
+  .flatMap((a) => a.dav.requests.filter((r) => r.method === 'PUT' || r.method === 'DELETE'))
+  .map((r) => `${r.method} ${r.path}`);
+
+/** Client von Konto A und der Index, wie ihn dessen Lauf hätte. */
+async function clientOfA(accounts) {
+  const a = accounts.a;
+  const client = await createCalDAVClient({ caldav_url: a.dav.url, username: a.user, password: 'p' });
+  const object = a.dav.getObject(a.url, 'shared.ics');
+  const index = new Map([[UID, { url: a.objectUrl, etag: object.etag, data: object.data, calendarUrl: a.url }]]);
+  return { client, index, scope: { accountCalendarUrls: [a.url] } };
+}
+
+test('Ausgang ohne Konto-Angabe: keine Änderung und keine Löschung geht hinaus, die Vormerkung bleibt', async () => {
+  const accounts = twoAccounts();
+  const ids = mirroredInBoth(accounts);
+  edit(ids.a, 'A bearbeitet');
+  db.prepare(`
+    INSERT INTO calendar_pending_deletions (source, calendar_external_id, event_external_id, object_url)
+    VALUES ('caldav', ?, 'gone@test', ?)
+  `).run(accounts.a.url, `${accounts.a.url}neighbour.ics`);
+  const { client, index } = await clientOfA(accounts);
+
+  assert.equal(await caldavOutbound.processPendingUpdates(client, 'caldav', index), 0);
+  assert.equal(await caldavOutbound.processPendingDeletions(client, 'caldav', index), 0);
+
+  assert.deepEqual(noWrites(accounts), []);
+  const row = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(ids.a);
+  assert.equal(row.outbound_dirty, 1, 'die Vormerkung wurde verworfen');
+  assert.equal(row.outbound_attempts, 0, 'der Versuchszähler lief, obwohl nichts versucht wurde');
+  const pending = db.prepare('SELECT * FROM calendar_pending_deletions').all();
+  assert.equal(pending.length, 1);
+  assert.equal(pending[0].attempts, 0);
+});
+
+test('Ausgang: eine Zeile ohne Adresse und ohne Kalender geht nicht an das Objekt mit derselben UID', async () => {
+  const accounts = twoAccounts();
+  const id = Number(db.prepare(`
+    INSERT INTO calendar_events
+      (title, start_datetime, end_datetime, all_day, created_by, external_source, external_calendar_id, outbound_dirty)
+    VALUES ('Ohne Bezug', '2035-03-10T09:00Z', '2035-03-10T10:00Z', 0, 1, 'caldav', ?, 1)
+  `).run(UID).lastInsertRowid);
+  const { client, index, scope } = await clientOfA(accounts);
+
+  assert.equal(await caldavOutbound.processPendingUpdates(client, 'caldav', index, null, scope), 0);
+
+  assert.deepEqual(noWrites(accounts), []);
+  assert.equal(summaryAt(accounts.a), 'Aus A');
+  const row = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(id);
+  assert.equal(row.outbound_dirty, 1);
+  assert.equal(row.outbound_attempts, 0);
+});
+
+test('Ausgang: Adresse im einen Konto, Kalender im anderen - es geht nichts hinaus', async () => {
+  const accounts = twoAccounts();
+  const ids = mirroredInBoth(accounts);
+  // Die Zeile von Konto B trägt die Adresse aus Konto A: beides muss passen.
+  db.prepare('UPDATE calendar_events SET external_object_url = ?, title = ?, outbound_dirty = 1 WHERE id = ?')
+    .run(accounts.a.objectUrl, 'B bearbeitet', ids.b);
+  const { client, index, scope } = await clientOfA(accounts);
+
+  assert.equal(await caldavOutbound.processPendingUpdates(client, 'caldav', index, null, scope), 0);
+
+  assert.deepEqual(noWrites(accounts), []);
+  assert.equal(summaryAt(accounts.a), 'Aus A', 'die Bearbeitung einer Zeile aus Konto B liegt im Objekt von Konto A');
+  assert.equal(db.prepare('SELECT outbound_dirty FROM calendar_events WHERE id = ?').get(ids.b).outbound_dirty, 1);
 });

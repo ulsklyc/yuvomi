@@ -965,13 +965,14 @@ test('Umzug: ohne Kalenderliste wartet er - auch wenn der Aufrufer keine mitgibt
   const moveTo = () => db.prepare('SELECT outbound_move_to FROM calendar_events WHERE id = ?').get(id).outbound_move_to;
 
   // Die Vorgabe des Parameters: früher eine leere Map, also "das Ziel gibt es nicht".
-  await caldavOutbound.processPendingUpdates(client, 'caldav', index);
+  const account = { accountCalendarUrls: [url, dest] };
+  await caldavOutbound.processPendingUpdates(client, 'caldav', index, undefined, account);
   assert.equal(moveTo(), dest, 'ohne Kalenderliste wurde der Umzug verworfen');
 
   // Der Sofortversuch, dem beim Auswählen der Arbeit noch kein Umzug vorlag
   // (needsCalendars = false) - er ist während eines await dazugekommen.
   const pending = outbound.pendingUpdates('caldav').map((e) => ({ ...e, __calendarUrl: url }));
-  await caldavOutbound.flushAccount(client, 'caldav', { deletions: [], updates: pending, needsCalendars: false });
+  await caldavOutbound.flushAccount(client, 'caldav', { deletions: [], updates: pending, needsCalendars: false, ...account });
   assert.equal(moveTo(), dest, 'ein dazwischen vorgemerkter Umzug wurde verworfen');
   assert.equal(dav.seen('PUT').length, 0);
 });
