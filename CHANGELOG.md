@@ -250,7 +250,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   answered with an empty list, also used to get all of them switched off in the sync settings;
   they now stay on. This affects CalDAV accounts, iCloud calendars and CardDAV address books. The
   update cannot bring back entries that were already removed this way, and a calendar or list
-  that was switched off has to be switched on again in the sync settings.
+  that was switched off has to be switched on again in the sync settings. An entry that an
+  earlier version booked as uploaded although the server had refused it, and that is still in
+  Yuvomi, is not rescued either: the first sync after the update still removes it (#1839).
 - **An entry no longer doubles when the server's answer gets lost.** If the server saved a new
   event, task or shopping item but its confirmation never arrived, Yuvomi now recognises its own
   entry on the server instead of importing it as a second one. For that, entries created in Yuvomi
