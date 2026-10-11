@@ -143,8 +143,8 @@ export function queueDeletion({ source, calendarExternalId, eventExternalId, obj
     // Objekt auf EINEM Server. Trifft ein neuer Auftrag auf einen bestehenden
     // (gleiche UID in gleichem Kalender), bleibt der bestehende unangetastet
     // und der neue füllt nur, was dort noch fehlt - nie die Adresse des einen
-    // mit dem Konto des anderen paaren. Eine später vom Sync erlernte Adresse
-    // trägt `recordDeletionObjectUrl` nach, nicht ein erneutes Einreihen.
+    // mit dem Konto des anderen paaren. Fehlt die Adresse, findet der Lauf das
+    // Objekt über seinen Abruf (`processPendingDeletions`).
     (database || db.get()).prepare(`
       INSERT INTO calendar_pending_deletions
         (source, calendar_external_id, event_external_id, object_url, caldav_account_id)

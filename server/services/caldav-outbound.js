@@ -463,9 +463,10 @@ export async function processPendingDeletions(client, source, objectIndex, ownCa
  *                                    Auflistung gescheitert ist (Umzüge warten dann)
  * @param {object} [scope]
  * @param {number} [scope.accountId] CalDAV-Konto, dem der Client gehört
+ * @param {boolean} [scope.fullRun]  voller Sync-Lauf (nicht der Sofortversuch)
  * @returns {Promise<number>} erfolgreich verarbeitete Termine
  */
-export async function processPendingUpdates(client, source, objectIndex, calendarsByUrl = null, { accountId = null } = {}) {
+export async function processPendingUpdates(client, source, objectIndex, calendarsByUrl = null, { accountId = null, fullRun = false } = {}) {
   const events = outbound.pendingUpdates(source, { accountId });
   if (events.length === 0) return 0;
 
@@ -496,8 +497,13 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
     }
 
     // Weder gespeichert noch im aktuellen Abruf enthalten: in diesem Lauf gibt
-    // es keinen Weg zum Objekt. Nichts tun, nichts verwerfen.
-    if (!url) continue;
+    // es keinen Weg zum Objekt. Nichts tun, nichts verwerfen. Der volle Lauf
+    // meldet das Vertagen; der Sofortversuch holt nur einzelne Objekte und
+    // bleibt still.
+    if (!url) {
+      if (index && fullRun) log.warn(`[${label(source)}] No source object for event ${event.id} in this run, deferring its update.`);
+      continue;
+    }
 
     if (!known?.data) {
       // Ohne das Originalobjekt bliebe nur, es neu zu bauen - und das verlöre

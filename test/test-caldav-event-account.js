@@ -397,13 +397,15 @@ test('ein Auftrag, der ohne Anfrage fällt, wird nicht als Löschung gemeldet', 
     'gemeldet wurde eine Löschung, die es nicht gab');
 });
 
-test('der Abruf nennt das Objekt nicht (leere Antwort): eine wartende Bearbeitung bleibt vorgemerkt', async () => {
+test('der Abruf nennt das Objekt nicht (leere Antwort): eine wartende Bearbeitung bleibt vorgemerkt', async (t) => {
   const accounts = twoAccounts();
   const id = mirror(accounts.a, { title: 'Vorher' });
   edit(id, 'Bearbeitet');
   answerEmptyOnce(accounts.a);
 
-  await caldavSync.sync();
+  const lines = await logged(t, () => caldavSync.sync());
+  assert.equal(lines.filter((l) => l.level === 'warn' && /No source object for event/.test(l.text)).length, 1,
+    'der Lauf hat das Vertagen nicht gemeldet');
 
   assert.deepEqual(writesAt(accounts.a.dav).map(describe), [], 'ohne das Objekt des Servers wurde geschrieben');
   assert.equal(row(id)?.outbound_dirty, 1, 'die Bearbeitung ist verloren');

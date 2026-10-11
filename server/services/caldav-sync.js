@@ -1385,7 +1385,7 @@ async function runSync({ createClient } = {}) {
         });
         if (deletions.sent) log.info(`${deletions.sent} pending deletion(s) applied on the server.`);
         const pushed = await processPendingUpdates(client, 'caldav', objectIndex, calendarsByUrl, {
-          accountId: account.id,
+          accountId: account.id, fullRun: true,
         });
         if (pushed) log.info(`${pushed} local change(s) pushed to the server.`);
       } catch (err) {

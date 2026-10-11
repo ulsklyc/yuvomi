@@ -28,11 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - A deletion that was still waiting to be sent and cannot be assigned to an account is dropped.
     The event may come back once with the next sync; delete it again then.
   - Two different events that happen to carry the same UID in two accounts show as one.
-  - As a sync target for a new event, Yuvomi accepts only a calendar that is switched on for
-    that account - the ones the event form offers. A target saved earlier for a calendar that has
-    since been switched off is rejected when you change it and is no longer uploaded until the
-    calendar is switched on again. An event that is already synchronised can only be moved to
-    another calendar of its own account.
+  - As a sync target, Yuvomi accepts only a calendar that is switched on for that account - the
+    ones the event form offers. A new target outside that selection is rejected. A target saved
+    earlier for a calendar that has since been switched off stays as it is, but the event is no
+    longer uploaded until the calendar is switched on again; changing it to one of the offered
+    calendars works. An event that is already synchronised can only be moved to another calendar
+    of its own account.
   - Pointing an account at a different server or a different user drops its deletions that were
     still waiting to be sent, since they named objects on the old server.
   - Deleting an account while keeping its events drops any edits of those events that had not

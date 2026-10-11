@@ -101,14 +101,16 @@ export function withAccountOrigin(client, accountUrls) {
   };
   // Geprüft wird die Adresse, an die tsdav wirklich sendet, nicht die im
   // Aufruf genannte Collection: `createCalendarObject` löst den Dateinamen
-  // gegen die Collection auf (`new URL(filename, calendar.url)`, tsdav 2.3.4),
-  // und ein Dateiname, der selbst eine absolute Adresse ist, verliese damit
-  // den Server. `fetchCalendarObjects` adressiert über `calendar.url`; die
-  // `objectUrls` stehen nur im Multistatus und werden mitgeprüft.
+  // gegen die Collection auf (tsdav 2.3.4:
+  // `new URL(filename, ensureTrailingSlash(calendar.url)).href`), und das
+  // Ergebnis muss nicht in der Collection liegen. Verglichen wird wie überall
+  // hier nach Schema, Host und Port. `fetchCalendarObjects` sendet nur an
+  // `calendar.url`; die `objectUrls` stehen als Pfade in der Anfrage und werden
+  // mitgeprüft.
   const resolvedCreateUrl = (p) => {
     const base = p?.calendar?.url;
     if (p?.filename == null) return base;
-    try { return new URL(String(p.filename), String(base)).href; } catch { return String(p.filename); }
+    try { return new URL(String(p.filename), String(base).replace(/\/?$/, '/')).href; } catch { return String(p.filename); }
   };
   const overrides = {
     createCalendarObject: guard('createCalendarObject', (p) => [resolvedCreateUrl(p)]),
