@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Moving an event to another CalDAV calendar no longer leaves it in both** (#1861). A move
+  stores the event in the new calendar and then removes it from the old one. When the server
+  stored the copy but refused the removal - an old calendar that is shared read-only, or a server
+  that was briefly overloaded - Yuvomi booked the move as done and never tried again: every other
+  app on that account showed the event twice from then on, and in Yuvomi it could jump back to
+  its old calendar. The refused removal is now remembered and tried again with every sync, up to
+  five times like any other refused deletion, and until then Yuvomi shows the event once, in the
+  calendar you moved it to. After the fifth refusal Yuvomi gives up, and the event stays in both
+  calendars until you remove one copy yourself. Events that were left doubled before the update
+  are not cleaned up.
+- **What you change while Yuvomi is talking to the server is no longer lost** (#1862). Sending
+  an entry to a CalDAV or iCloud server takes a moment, and Yuvomi booked the result against
+  the entry as it was before that moment. If you deleted a new event, task or shopping item
+  while it was being uploaded, it stayed on the server and came back with the next sync. If you
+  edited it during the upload, or edited an event while others were being uploaded before it,
+  the server kept the old text and the next sync wrote that old text back over your edit. And a
+  second edit to a task or shopping item made while the first one was on its way was replaced
+  by the first. Yuvomi now looks at the entry again after the server has answered: an entry
+  deleted in the meantime is removed from the server too, and an edit made in the meantime is
+  sent after it.
 - **A CalDAV event belongs to the account that brought it** (#1860). With two or more CalDAV
   accounts, an event was identified by its UID alone. When a second account served an event with
   the same UID, it took over the entry of the first: title, calendar and address then came from

@@ -1450,6 +1450,27 @@ belongs to in `caldav_account_id`, and so does its pending deletion. The rules:
 Apple and Google keep one connection each and are unaffected: their rows and pending deletions
 leave the column `NULL`, and the shared functions filter by source only, as before.
 
+**A move whose source refuses the DELETE stays pending (#1861).** A CalDAV calendar move stores a
+copy in the destination and deletes the object in the source. If the copy is stored and the source
+refuses the DELETE (anything but 404/410), the row is bound to the destination as before and a
+pending deletion is queued for the source object, with the refusal counted as its first attempt
+(`queueRefusedDeletion`). It carries the account of the row, and its calendar and address both come
+from the object the refused DELETE was sent to, not from the row. It is retried like any other
+pending deletion and given up after five attempts. While it waits, the inbound run hides only that
+one object: for CalDAV the guard asks per object (`pendingDeletionGuard`: the calendar of the
+pending deletion, or the verbatim address where it has no calendar), no longer per UID, so the copy
+in the destination keeps receiving changes. Moving the event back into the old calendar adopts the
+copy still lying there and withdraws the pending deletion for that calendar (`dropDeletionsIn`).
+
+**An upload is booked against the row as it is after the server answered (#1862).** Each event
+upload loop (CalDAV, iCloud) reads the row again when it is its turn, through the same selection the
+list came from, and `bookEventUpload` reads it once more after the request, with nothing awaited
+between that read and the write. A row deleted in the meantime gets a pending deletion for the
+object just created (for CalDAV with the uploading account); a row whose mirrored fields changed
+becomes a mirror with `outbound_dirty = 1`, so the edit follows; a row that is no longer local is
+left alone. Tasks and shopping items do the same in `uploadNewTodo`, and their update path settles
+against the current row instead of clearing `outbound_dirty` unconditionally.
+
 The counterpart for *edits* lives on the event row itself (migration v104): `outbound_dirty` (0/1)
 marks a mirrored event whose local change still has to reach the provider, and `outbound_attempts`
 counts failed pushes under the same five-attempt limit. Deliberately **not** `user_modified` — that
