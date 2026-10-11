@@ -36,8 +36,10 @@
  * geprüft und schalteten eine Stufe zu früh. Jetzt ist Container-Content ==
  * Grid-Breite. Folge: knapp oberhalb eines Breakpoints kippt die Spaltenzahl
  * eine Stufe nach unten (bei 900px Viewport 3 statt 4). Das ist die Korrektur
- * des alten Fehlers, keine Regression — die Werte 520/720/900/1200 bleiben
- * bewusst stehen und meinen jetzt echte Rasterbreite.
+ * des alten Fehlers, keine Regression — die Werte 520/720/1200 bleiben
+ * bewusst stehen und meinen jetzt echte Rasterbreite. Das Raster hat höchstens
+ * vier Spalten (#1765): die Stufe mit vier Spalten beginnt erst bei 1200px,
+ * damit eine Karte nirgends schmaler als 232px wird (bei 720px in drei Spalten).
  *
  * Container für das Masonry-Grid: Spaltenzahl reflowt nach EIGENEM Platz
  * (Sidebar-bewusst), nicht nach Viewport. Siehe tokens.css §11c. */
@@ -199,12 +201,8 @@
   .notes-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
-@container notes-page (min-width: 900px) {
-  .notes-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-}
-
 @container notes-page (min-width: 1200px) {
-  .notes-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .notes-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 .notes-grid > .empty-state {
