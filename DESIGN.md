@@ -993,7 +993,9 @@ Subheadline 15, Footnote 13, Caption 2 11.
 und "SAUERSTOFFSAETTI/GUNG" kamen aus `overflow-wrap: break-word` neben `hyphens: manual`:
 das Wort brach dort, wo die Zeile endete, ohne Strich. Wer ein Wort brechen laesst, gibt
 seinem Subjekt `hyphens: auto; hyphenate-limit-chars: 6 4 4` (die App setzt `lang`, der
-Browser kennt die Silben); `overflow-wrap: anywhere` bleibt die letzte Stufe fuer
+Browser kennt die Silben), dazu direkt darunter `-webkit-hyphenate-limit-before: 4;
+-webkit-hyphenate-limit-after: 4`, weil Safari die Kurzform nicht kennt und sonst ohne Grenze
+trennt (#1774); `overflow-wrap: anywhere` bleibt die letzte Stufe fuer
 Zeichenketten ohne Silben (URLs, Codes, Zeitangaben). Versal-Labels, die nicht passen,
 werden kuerzer oder verlieren den Versal-Transform, statt mitten im Wort zu brechen. Der
 Guard (`test:typography`) prueft die Regel am Subjekt, nicht die Schreibweise, und fuehrt
