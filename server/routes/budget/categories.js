@@ -8,7 +8,7 @@ import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import { str, oneOf, MAX_SHORT } from '../../middleware/validate.js';
 import {
-  loadBudgetMeta, normalizeLang, localizedCategory, localizedSubcategory,
+  loadBudgetMeta, requestLang, localizedCategory, localizedSubcategory,
   uniqueKey, categoryInUseCount, subcategoryInUseCount,
   categoryCountByType, subcategoryCountForCategory, refusals, refuse,
 } from './helpers.js';
@@ -32,7 +32,7 @@ router.get('/meta', (req, res) => {
 
 router.get('/categories', (req, res) => {
   try {
-    const lang = normalizeLang(req.query.lang);
+    const lang = requestLang(req.query.lang);
     const categories = db.get().prepare(`
       SELECT key, name, type, sort_order
       FROM budget_categories
@@ -61,7 +61,7 @@ router.get('/categories', (req, res) => {
 
 router.get('/categories/:categoryKey/subcategories', (req, res) => {
   try {
-    const lang = normalizeLang(req.query.lang);
+    const lang = requestLang(req.query.lang);
     const category = db.get().prepare(`
       SELECT key, name, type, sort_order
       FROM budget_categories

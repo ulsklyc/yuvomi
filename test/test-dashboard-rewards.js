@@ -722,6 +722,91 @@ test('Genehmigungsliste: der Saldo kommt mit der Anfrage, nicht aus der Teilnehm
   }
 });
 
+/** Ein Inhaltsknoten, der dazu merkt, was `wireOverview` an welchen Knopf haengt. */
+function wiredEl() {
+  const el = markupEl();
+  el.clicks = new Map();
+  el.querySelector = (selector) => {
+    const cls = selector.startsWith('.') ? selector.slice(1) : null;
+    // Nur ein Knopf, den das Markup wirklich traegt, laesst sich verdrahten.
+    if (!cls || !new RegExp(`class="[^"]*\\b${cls}\\b`).test(el.html)) return null;
+    return { addEventListener: (type, fn) => { if (type === 'click') el.clicks.set(cls, fn); } };
+  };
+  return el;
+}
+
+test('Uebersicht: "Bonus vergeben" steht im Kopf der Punktestaende und oeffnet den Bonus-Dialog (#1787)', async () => {
+  // Der Bonus war nur ueber den FAB im Reiter Verlauf zu erreichen; Eltern
+  // suchen ihn dort, wo die Punktestaende stehen.
+  const { setPermissions, clearPermissions } = await import('../public/permissions.js');
+  const s = rewardsPage.state;
+  const vorher = { user: s.user, overview: s.overview, catalog: s.catalog, redemptions: s.redemptions, open: globalThis.__openModal };
+  const dialoge = [];
+  globalThis.__openModal = (options) => { dialoge.push(options); };
+  const kopf = (html) => (html.match(/<div class="rw-section__head">\s*<h2[^>]*>rewards\.standings<\/h2>([\s\S]*?)<\/div>\s*<ul class="row-carrier rw-standings">/) || [])[1];
+  try {
+    s.user = { id: 1, role: 'admin' };
+    s.overview = { me: 1, balances: [{ id: 2, display_name: 'Emma', balance: 30 }] };
+    s.catalog = [];
+    s.redemptions = [];
+
+    const el = wiredEl();
+    rewardsPage.renderOverview(el);
+    const head = kopf(el.html);
+    assert.ok(head, 'Vorbedingung: der Kopf der Punktestaende steht da');
+    const knoepfe = [...head.matchAll(/<button class="([^"]*)" type="button">[\s\S]*?<\/i>([^<]*)<\/button>/g)].map(([, cls, label]) => ({ cls, label }));
+    assert.deepEqual(knoepfe.map((k) => k.label), ['rewards.manageParticipants', 'rewards.grantBonus'],
+      'zwei beschriftete Kopfaktionen, der Bonus am Ende');
+    assert.match(knoepfe[1].cls, /\bbtn--secondary\b/, 'der Bonus ist die staerkere der beiden');
+    assert.match(knoepfe[0].cls, /\bbtn--ghost\b/, 'Teilnehmer verwalten bleibt leise');
+    assert.equal((el.html.match(/rw-grant-bonus/g) || []).length, 1, 'genau EIN Knopf - keiner je Personenzeile');
+
+    assert.equal(typeof el.clicks.get('rw-grant-bonus'), 'function', 'der Knopf ist verdrahtet');
+    el.clicks.get('rw-grant-bonus')({ type: 'click' });
+    assert.equal(dialoge.length, 1, 'ein Klick oeffnet einen Dialog');
+    assert.equal(dialoge[0].title, 'rewards.grantBonus');
+    assert.match(dialoge[0].content, /id="rw-bonus-form"/, 'und zwar den vorhandenen Bonus-Dialog');
+    assert.match(dialoge[0].content, /<option value="2">Emma/);
+
+    // Kind: weder Knopf noch Verdrahtung.
+    s.user = { id: 2, role: 'member' };
+    const kind = wiredEl();
+    rewardsPage.renderOverview(kind);
+    assert.ok(kopf(kind.html) !== undefined, 'Vorbedingung: das Kind sieht die Punktestaende');
+    assert.doesNotMatch(kind.html, /rw-grant-bonus|rewards\.grantBonus/);
+    assert.equal(kind.clicks.has('rw-grant-bonus'), false);
+
+    // Nur lesen: der Zustand bleibt, die Handlung geht - auch fuer ein Elternteil.
+    s.user = { id: 1, role: 'admin' };
+    setPermissions({ admin: false, modules: { rewards: 'read' }, widgets: {}, capabilities: {} });
+    try {
+      const ro = wiredEl();
+      rewardsPage.renderOverview(ro);
+      assert.match(ro.html, /rewards\.standings/);
+      assert.doesNotMatch(ro.html, /rw-grant-bonus|rewards\.grantBonus/);
+    } finally {
+      clearPermissions();
+    }
+
+    // Ohne Teilnehmende gibt es keinen Kopf und damit keinen Knopf (gewollt).
+    const { installMiniDom } = await import('./mini-dom.js');
+    const domZurueck = installMiniDom();
+    try {
+      s.overview = { me: 1, balances: [], setup: { participantCount: 0, catalogCount: 1, pointedTaskCount: 1 } };
+      const leer = wiredEl();
+      rewardsPage.renderOverview(leer);
+      assert.match(leer.html, /rewards\.emptyOverviewTitle/);
+      assert.doesNotMatch(leer.html, /rw-grant-bonus/);
+    } finally {
+      domZurueck();
+    }
+  } finally {
+    const { open, ...rest } = vorher;
+    Object.assign(s, rest);
+    globalThis.__openModal = open;
+  }
+});
+
 test('Uebersicht ohne Teilnehmende: die offene Anfrage steht trotzdem da und ist entscheidbar (#1623)', async () => {
   // Der haerteste Fall: die Anfragende war die LETZTE Teilnehmende und wurde
   // ausgetragen. `balances` ist leer, die Uebersicht kehrte mit dem

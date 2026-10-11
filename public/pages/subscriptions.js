@@ -375,11 +375,23 @@ function hasActiveFilters() {
   return Boolean(state.query) || activeFilters().length > 0;
 }
 
-async function resetFilters() {
+/**
+ * Nimmt Suche und Filter weg, OHNE zu zeichnen - fuer einen Aufrufer, der
+ * gleich danach in diesen Reiter wechselt und dort ein bestimmtes Abo
+ * erwartet (die erwartete Abo-Zeile der Budgetliste, #1844). Der Zustand lebt
+ * im Modul und ueberdauert den Reiterwechsel: mit einem Filter aus einem
+ * frueheren Besuch fuehrte die Zeile auf eine Liste, in der ihr Abo fehlt.
+ * Die Sortierung bleibt, sie nimmt nichts weg.
+ */
+export function clearSubscriptionFilters() {
   state.query = '';
   state.categoryId = '';
   state.paymentMethodId = '';
   state.status = 'all';
+}
+
+async function resetFilters() {
+  clearSubscriptionFilters();
   searchField?.clear();
   syncFilterSheet();
   await reload();

@@ -28,7 +28,7 @@ export function dashboardPaths() {
             name: 'events_scope',
             in: 'query',
             required: false,
-            description: '`mine` limits appointments to those assigned to the calling user - among the assignees, so an unassigned event is not "mine" (same reading as the calendar module). Anything else means all appointments.',
+            description: '`mine` limits appointments to those assigned to the calling user - among the assignees, so an unassigned event is not "mine" (same reading as the calendar module). A paired display has no assignments of its own, so for it `mine` reads as all appointments. Anything else means all appointments.',
             schema: { type: 'string', enum: ['all', 'mine'] },
           },
           {
@@ -37,6 +37,15 @@ export function dashboardPaths() {
             required: false,
             description: '`hide` drops appointments that belong to a birthday entry from `upcomingEvents` and `weekEvents`, so a household that already shows the Birthdays tile does not read them twice. Applied before the cap (`events_limit`), so the freed rows are filled with the next real appointments. Anything else keeps them - birthdays are in by default.',
             schema: { type: 'string', enum: ['show', 'hide'] },
+          },
+          {
+            name: 'shopping_list',
+            in: 'query',
+            required: false,
+            description: 'Which lists the shopping tile shows. Repeatable positive list IDs, deduplicated and capped at 50. The selection applies to the tile only: with it the response carries an extra field `shoppingTile` = `{ lists, openCount, listCount }` - the selected lists (at most three, also those without open items, lists with open items first, each with up to six open items), the open items within the selection, and how many selected lists exist. `shoppingLists`, `shoppingOpenCount` and `shoppingOpenLists` are never affected and keep counting across all lists. IDs of lists that do not exist are dropped; when none of the IDs exists, or the value is not an ID, the request answers like one without the parameter and `shoppingTile` is absent. A caller without access to shopping gets the empty shopping payload and no `shoppingTile`.',
+            schema: { type: 'array', items: { type: 'integer', minimum: 1 }, maxItems: 50 },
+            style: 'form',
+            explode: true,
           },
           {
             name: 'events_limit',

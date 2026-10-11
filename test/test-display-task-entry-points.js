@@ -191,3 +191,103 @@ test('kein Abhak-Zeichen animiert aus dem Stylesheet heraus', () => {
     && /(?:^|;)\s*animation(?:-name)?\s*:\s*(?!none)/.test(r.body));
   assert.deepEqual(animiert.map((r) => r.selector), []);
 });
+
+// --------------------------------------------------------
+// #1808: der Hinweis in den Einstellungen zaehlt die Bereiche auf
+// --------------------------------------------------------
+test('der Bereichssatz entsteht aus der Liste des Servers, in der Sprache der App verbunden', async () => {
+  const { __test: seite } = await import('../public/settings/pages/admin-displays.js');
+  const vorher = globalThis.__locale;
+  try {
+    // Der i18n-Stub gibt Schluessel zurueck: sichtbar wird also, WELCHE Namen
+    // geholt werden und womit der Satz gefuellt wird - nicht der Wortlaut.
+    globalThis.__locale = 'de';
+    assert.equal(seite.displayAreasText(['calendar', 'tasks', 'weather']),
+      'settings.displaysAreasHint' + JSON.stringify({
+        areas: 'settings.apiTokenScopeModules.calendar, settings.apiTokenScopeModules.tasks und settings.apiTokenScopeModules.weather',
+      }), 'die Namen sind die der Scope-Module, verbunden wie eine deutsche Aufzaehlung');
+    globalThis.__locale = 'en';
+    assert.match(seite.displayAreasText(['calendar', 'tasks', 'weather']), /tasks, and settings\.apiTokenScopeModules\.weather/,
+      'die Verbindung folgt der App-Sprache, nicht einer festen');
+    // Eine Liste mehr oder weniger aendert den Satz - es gibt keine zweite im Browser.
+    assert.match(seite.displayAreasText(['rewards']), /"areas":"settings\.apiTokenScopeModules\.rewards"/);
+    // Ohne Liste (alte Antwort aus dem Cache): kein halber Satz.
+    assert.equal(seite.displayAreasText(undefined), '');
+    assert.equal(seite.displayAreasText([]), '');
+  } finally {
+    globalThis.__locale = vorher;
+  }
+});
+
+// --------------------------------------------------------
+// #1808: der SEITENAUFBAU ruft den Leser fuer „Mir zugewiesen"
+// --------------------------------------------------------
+// `restoreAssignedToMe()` ist in test:task-filters und test:calendar einzeln
+// gemessen. Das belegt den Leser, nicht seinen Aufruf: ein tot gestellter
+// Aufruf oder die alte Zeile (`localStorage.getItem(...) === '1'`) bestuende
+// beide Suiten. Hier laeuft deshalb das echte `render()` beider Seiten.
+//
+// DAS MINI-DOM TRAEGT DEN AUFBAU NICHT BIS ZUM ENDE - es parst kein Markup,
+// und spaetere Schritte (Hoehenmessung, Periodenknopf) werfen. Das ist
+// hingenommen und wird abgefangen: der Leser laeuft VOR dem ersten Zeichnen,
+// gemessen wird der Zustand danach. Der Mensch steht zuerst, damit ein Aufbau,
+// der kuenftig schon VOR dem Leser abbricht, hier rot wird statt still gruen.
+test('der Seitenaufbau von Aufgaben und Kalender uebergeht am Display ein gespeichertes „Mir zugewiesen"', async () => {
+  const { installMiniDom, MiniElement } = await import('./mini-dom.js');
+  const restoreDom = installMiniDom();
+  const hadWindow = 'window' in globalThis;
+  const prevWindow = globalThis.window;
+  globalThis.window = {
+    ...(prevWindow ?? {}),
+    location: { search: '', pathname: '/' },
+    matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }),
+    addEventListener() {}, removeEventListener() {},
+  };
+  // Jede Abfrage findet einen Knoten: die Seiten suchen nach dem, was sie eben
+  // als Markup eingesetzt haben, und das Mini-DOM kennt dieses Markup nicht.
+  class Wurzel extends MiniElement {
+    querySelector() { return new Wurzel('div'); }
+    querySelectorAll() { return []; }
+  }
+  const aufbauen = async (page, user) => {
+    try { await page.render(new Wurzel('div'), { user }); } catch { /* siehe oben */ }
+  };
+  const MENSCH = { id: 1 };
+  const WAND = { id: 9, access_scope: 'display' };
+  const { render: renderCalendar, __test: calendar } = await import('../public/pages/calendar.js');
+  const tasksPage = await import('../public/pages/tasks.js');
+  const vorher = { user: tasks.state.user, currentUserId: tasks.state.currentUserId, assigned: tasks.state.filters.assigned_to };
+  try {
+    // Aufgaben: der Schluessel setzt die eigene Id in den Personenfilter.
+    for (const [user, erwartet, text] of [
+      [MENSCH, ['1'], 'Gegenfall: beim Menschen stellt der Aufbau die Wahl wieder her'],
+      [WAND, [], 'am Display uebergeht der Aufbau den gespeicherten Wert'],
+    ]) {
+      store.clear();
+      store.set('yuvomi:taskAssignedToMe', '1');
+      tasks.state.filters.assigned_to = [];
+      await aufbauen(tasksPage, user);
+      assert.equal(tasks.state.currentUserId, user.id, 'Vorbedingung: der Aufbau hat dieses Konto uebernommen');
+      assert.deepEqual(tasks.state.filters.assigned_to, erwartet, `Aufgaben: ${text}`);
+    }
+    // Kalender: der Schluessel wird zum Zustand `assignedToMe`.
+    for (const [user, erwartet, text] of [
+      [MENSCH, true, 'Gegenfall: beim Menschen stellt der Aufbau die Wahl wieder her'],
+      [WAND, false, 'am Display uebergeht der Aufbau den gespeicherten Wert'],
+    ]) {
+      store.clear();
+      store.set('yuvomi:calendar:assignedToMe', '1');
+      calendar.state.assignedToMe = null;
+      await aufbauen({ render: renderCalendar }, user);
+      assert.equal(calendar.state.currentUserId, user.id, 'Vorbedingung: der Aufbau hat dieses Konto uebernommen');
+      assert.equal(calendar.state.assignedToMe, erwartet, `Kalender: ${text}`);
+    }
+  } finally {
+    store.clear();
+    tasks.state.user = vorher.user;
+    tasks.state.currentUserId = vorher.currentUserId;
+    tasks.state.filters.assigned_to = vorher.assigned;
+    if (hadWindow) globalThis.window = prevWindow; else delete globalThis.window;
+    restoreDom();
+  }
+});
