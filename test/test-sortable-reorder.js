@@ -180,7 +180,8 @@ test('category-manager: subcategory-Mutationen zeichnen nur ihre Sublist neu', (
 });
 
 test('category-manager: Refresh ohne Render (_fetch) trennt Datenladen vom Zeichnen', () => {
-  assert.match(comp, /async _fetch\(\)\s*\{[\s\S]*?api\.get\(this\._basePath\)/);
+  // Seit #1859 baut _listPath() den Pfad (basePath, optional mit `lang`).
+  assert.match(comp, /async _fetch\(\)\s*\{[\s\S]*?api\.get\(this\._listPath\(\)\)/);
   // _load bleibt der Voll-Load-Pfad (Erstbefüllung), gebaut auf _fetch.
   assert.match(comp, /async _load\(\)\s*\{[\s\S]*?await this\._fetch\(\);[\s\S]*?this\._render\(\);/);
 });

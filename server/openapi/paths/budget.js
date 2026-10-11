@@ -13,7 +13,7 @@ export function budgetPaths() {
     '/api/v1/budget/export': { get: op({ summary: 'Export budget entries as CSV', tag: 'Budget' }) },
     '/api/v1/budget/meta': { get: op({ summary: 'Get budget categories and subcategories', tag: 'Budget' }) },
     '/api/v1/budget/categories': {
-      get: op({ summary: 'List budget categories', tag: 'Budget', params: [langParam()] }),
+      get: op({ summary: 'List budget categories', tag: 'Budget', params: [langParam({ fallback: 'household' })] }),
       post: op({ summary: 'Create budget category', tag: 'Budget', stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/budget/categories/reorder': {
@@ -24,7 +24,7 @@ export function budgetPaths() {
       delete: op({ summary: 'Delete budget category', tag: 'Budget', params: [{ name: 'key', in: 'path', required: true, schema: { type: 'string' } }], stateChanging: true }),
     },
     '/api/v1/budget/categories/{categoryKey}/subcategories': {
-      get: op({ summary: 'List subcategories for a budget category', tag: 'Budget', params: [{ name: 'categoryKey', in: 'path', required: true, schema: { type: 'string' } }, langParam()] }),
+      get: op({ summary: 'List subcategories for a budget category', tag: 'Budget', params: [{ name: 'categoryKey', in: 'path', required: true, schema: { type: 'string' } }, langParam({ fallback: 'household' })] }),
       post: op({ summary: 'Create budget subcategory', tag: 'Budget', params: [{ name: 'categoryKey', in: 'path', required: true, schema: { type: 'string' } }], stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/budget/categories/{key}/subcategories/reorder': {
@@ -43,7 +43,7 @@ export function budgetPaths() {
       delete: op({ summary: 'Delete account (linked entries are kept, account_id cleared)', tag: 'Budget', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/budget/loans': {
-      get: op({ summary: 'List loans and repayment summary', tag: 'Budget', description: 'Each loan carries `due_day` (1 to 31, or `null`), `next_due_month` (`YYYY-MM`) and `next_due_date` (`YYYY-MM-DD`): the due day in the month the next installment is due, clamped to the last day of a shorter month. For a loan without a due day, `next_due_date` is the 1st of `next_due_month` when that month lies before the household\'s current month (a booking date, not a due date), and `null` for an installment due in the current or a later month. Both are `null` once the loan is settled.' }),
+      get: op({ summary: 'List loans and repayment summary', tag: 'Budget', description: 'Each loan carries `due_day` (1 to 31, or `null`), `next_due_month` (`YYYY-MM`) and `next_due_date` (`YYYY-MM-DD`): the due day in the month the next installment is due, clamped to the last day of a shorter month. For a loan without a due day, `next_due_date` is the 1st of `next_due_month` when that month lies before the household\'s current month (a booking date, not a due date), and `null` for an installment due in the current or a later month. Both are `null` once the loan is settled. `projected_end_month` (`YYYY-MM`) is the month of the last installment: the remaining installments counted from the later of `next_due_month` and the household\'s current month, following the payments actually booked for a loan with interest; `null` once settled and for a loan whose installment does not cover its interest. A loan with interest carries `interest.current_rate`, the rate that applies today: that of the installment due in the household\'s current month, at least the next unrecorded one (the fixed rate during the fixed-rate period, the follow-up rate after it).' }),
       post: op({ summary: 'Create loan', tag: 'Budget', stateChanging: true, requestBody: jsonBody(null), description: 'Optional `due_day`: a whole number from 1 to 31, the day of the month an installment is due; `null`, an empty string or leaving it out means none. Anything else is refused with 400 and `reason: loan_due_day_invalid`. With a due day, the installments recorded through `paid_installments` are dated on that day instead of the 1st. The response carries `due_day`, `next_due_month` and `next_due_date`.' }),
     },
     '/api/v1/budget/loans/{id}': {
@@ -101,8 +101,8 @@ export function budgetPaths() {
       get: op({ summary: 'Get budget statistics for week, month, or year', tag: 'Budget' }),
     },
     '/api/v1/budget/subscriptions': {
-      get: op({ summary: 'List subscriptions with normalized costs and analytics', tag: 'Budget', description: 'The `by_category` and `by_payment_method` breakdowns group by ROW, not by display text: each entry is `{ id, name, label_key, amount }`. `id` is `null` for the catch-all bucket of subscriptions without a category or payment method, and `name`/`label_key` are then `null` too - the caller supplies the wording. A seeded row carries `label_key` (an i18n key such as `subscriptions.paymentMethodCreditCard`) and a `name` of its original English wording; a row the household created or renamed carries only `name`. Resolve as `label_key ? t(label_key) : name`. Subscription objects carry the same pair denormalized as `category_label_key` / `category_name` and `payment_method_label_key` / `payment_method_name`.' }),
-      post: op({ summary: 'Create subscription', tag: 'Budget', stateChanging: true, requestBody: jsonBody(null) }),
+      get: op({ summary: 'List subscriptions with normalized costs and analytics', tag: 'Budget', description: 'The `by_category` and `by_payment_method` breakdowns group by ROW, not by display text: each entry is `{ id, name, label_key, amount }`. `id` is `null` for the catch-all bucket of subscriptions without a category or payment method, and `name`/`label_key` are then `null` too - the caller supplies the wording. A seeded row carries `label_key` (an i18n key such as `subscriptions.paymentMethodCreditCard`) and a `name` of its original English wording; a row the household created or renamed carries only `name`. Resolve as `label_key ? t(label_key) : name`. Subscription objects include boolean `reminder_enabled` (default true). When false, no payment reminder is scheduled, including after edits and renewals; subscription status and costs are unaffected. `reminder_days: 0` still means a reminder on the payment date when enabled. Subscription objects carry the same pair denormalized as `category_label_key` / `category_name` and `payment_method_label_key` / `payment_method_name`.' }),
+      post: op({ summary: 'Create subscription', description: 'Optional boolean `reminder_enabled` defaults to true. Set false to create an active subscription without a payment reminder. `reminder_days` remains a lead time of 0-365 days; zero means the payment date.', tag: 'Budget', stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/budget/subscriptions/meta': {
       get: op({ summary: 'Get subscription categories, payment methods, and billing cycles', tag: 'Budget', description: 'Categories and payment methods each carry `label_key` (an i18n key) when they are one of the seeded defaults and `null` once the household renamed them - resolve as `label_key ? t(label_key) : name`.' }),
@@ -132,10 +132,10 @@ export function budgetPaths() {
       post: op({ summary: 'Find selectable logo options from a website URL or service name', tag: 'Budget', stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/budget/subscriptions/{id}/renew': {
-      post: op({ summary: 'Advance a subscription to its next renewal date, or complete it when its end condition is reached', tag: 'Budget', params: [idParam()], stateChanging: true }),
+      post: op({ summary: 'Advance a subscription to its next renewal date, or complete it when its end condition is reached', description: 'Preserves `reminder_enabled`. A renewed subscription with reminders disabled has no reminder row.', tag: 'Budget', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/budget/subscriptions/{id}': {
-      put: op({ summary: 'Update subscription', tag: 'Budget', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      put: op({ summary: 'Update subscription', description: 'Optional boolean `reminder_enabled`: false removes the payment reminder; true schedules it using `reminder_days`. Omitting the field preserves its current value. Changing it does not pause the subscription or remove its budget expense.', tag: 'Budget', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
       delete: op({ summary: 'Delete subscription', tag: 'Budget', params: [idParam()], stateChanging: true }),
     },
   };

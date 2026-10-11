@@ -16,6 +16,7 @@ process.env.DB_PATH = ':memory:';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import { readFileSync } from 'node:fs';
 
 const dbmod = await import('../server/db.js');
 const { default: catRouter } = await import('../server/routes/budget/categories.js');
@@ -79,9 +80,102 @@ test('GET /categories: lokalisierte Liste mit genesteten Subkategorien + lang', 
   assert.ok('label' in r.body.data[0], 'lokalisiertes label ergänzt');
 });
 
-test('GET /categories: unbekannte Sprache fällt auf en zurück', async () => {
+test('GET /categories: unbekannte Sprache ohne Haushaltssprache fällt auf en zurück', async () => {
   const r = await call('GET', '/categories?lang=xx');
   assert.equal(r.body.lang, 'en');
+});
+
+// --------------------------------------------------------------------------
+// Sprache der Labels ohne brauchbares `lang` (#1859)
+// --------------------------------------------------------------------------
+// Der Kategorie-Manager rief die Liste ohne `lang`, und die Route antwortete
+// dann englisch - in jedem Haushalt. Der Rueckfall ist die Haushaltssprache;
+// Englisch bleibt nur, wo auch der Haushalt nichts anderes sagt.
+function setHousehold(key, value) {
+  if (value === null) db.prepare('DELETE FROM sync_config WHERE key = ?').run(key);
+  else db.prepare('INSERT INTO sync_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, value);
+}
+
+async function withHousehold(settings, fn) {
+  for (const [key, value] of Object.entries(settings)) setHousehold(key, value);
+  try { await fn(); } finally {
+    for (const key of Object.keys(settings)) setHousehold(key, null);
+  }
+}
+
+const labelOf = (body, key) => body.data.find((c) => c.key === key)?.label;
+
+// Die Erwartung kommt aus den Locale-Dateien, nicht aus einer Abschrift hier:
+// eine umformulierte Uebersetzung soll diesen Test nicht roeten.
+const budgetOf = (locale) => JSON.parse(readFileSync(new URL(`../public/locales/${locale}.json`, import.meta.url), 'utf8')).budget;
+const DE = budgetOf('de');
+const EN = budgetOf('en');
+const FR = budgetOf('fr');
+assert.notEqual(DE.categoryHousing, EN.categoryHousing, 'Vorbedingung: de und en unterscheiden sich');
+assert.notEqual(DE.subcatRentMortgage, EN.subcatRentMortgage, 'Vorbedingung: de und en unterscheiden sich');
+
+test('GET /categories ohne lang: Labels in der Haushaltssprache statt englisch', async () => {
+  await withHousehold({ language: 'de' }, async () => {
+    const r = await call('GET', '/categories');
+    assert.equal(r.status, 200);
+    assert.equal(r.body.lang, 'de');
+    assert.equal(labelOf(r.body, 'housing'), DE.categoryHousing);
+    const housing = r.body.data.find((c) => c.key === 'housing');
+    assert.equal(housing.subcategories.find((s) => s.key === 'rent_mortgage').label, DE.subcatRentMortgage);
+  });
+});
+
+test('GET /categories ohne lang: die aus der Region abgeleitete Haushaltssprache zaehlt mit', async () => {
+  await withHousehold({ region: 'de-DE' }, async () => {
+    const r = await call('GET', '/categories');
+    assert.equal(r.body.lang, 'de');
+    assert.equal(labelOf(r.body, 'housing'), DE.categoryHousing);
+  });
+});
+
+test('GET /categories/:key/subcategories ohne lang: Haushaltssprache fuer Liste und Kategorie', async () => {
+  await withHousehold({ language: 'de' }, async () => {
+    const r = await call('GET', '/categories/housing/subcategories');
+    assert.equal(r.status, 200);
+    assert.equal(r.body.lang, 'de');
+    assert.equal(r.body.category.label, DE.categoryHousing);
+    assert.equal(r.body.data.find((s) => s.key === 'rent_mortgage').label, DE.subcatRentMortgage);
+  });
+});
+
+test('GET /categories: ein ausdrueckliches lang gewinnt gegen die Haushaltssprache', async () => {
+  await withHousehold({ language: 'de' }, async () => {
+    const en = await call('GET', '/categories?lang=en');
+    assert.equal(en.body.lang, 'en');
+    assert.equal(labelOf(en.body, 'housing'), EN.categoryHousing);
+    const fr = await call('GET', '/categories/housing/subcategories?lang=fr');
+    assert.equal(fr.body.lang, 'fr');
+    assert.equal(fr.body.category.label, FR.categoryHousing);
+  });
+});
+
+test('GET /categories: ein unbekanntes lang faellt auf die Haushaltssprache, nicht auf englisch', async () => {
+  await withHousehold({ language: 'de' }, async () => {
+    const r = await call('GET', '/categories?lang=xx');
+    assert.equal(r.body.lang, 'de');
+    assert.equal(labelOf(r.body, 'housing'), DE.categoryHousing);
+    const sub = await call('GET', '/categories/housing/subcategories?lang=xx');
+    assert.equal(sub.body.lang, 'de');
+  });
+});
+
+test('GET /categories ohne lang: selbst angelegte Kategorien behalten ihren Namen', async () => {
+  await withHousehold({ language: 'de' }, async () => {
+    const created = await newCategory('Eigenes #1859');
+    const r = await call('GET', '/categories');
+    assert.equal(labelOf(r.body, created.key), 'Eigenes #1859');
+  });
+});
+
+test('GET /categories ohne lang und ohne Haushaltssprache: englisch', async () => {
+  const r = await call('GET', '/categories');
+  assert.equal(r.body.lang, 'en');
+  assert.equal(labelOf(r.body, 'housing'), EN.categoryHousing);
 });
 
 test('GET /categories/:key/subcategories: unbekannte Kategorie → 404', async () => {

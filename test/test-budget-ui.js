@@ -3227,20 +3227,23 @@ test('Treffer der Suche stehen mit vollem Datum, ein leeres Ergebnis nennt die A
   }
 });
 
-test('Kontosaldo schrumpft nie unter seinen Betrag - der Name ellipsiert (Re-Critique 2026-09-28 P1-2)', () => {
+test('Kontosaldo gibt nach, aber nie unter seinen Betrag - der Name ellipsiert (Re-Critique 2026-09-28 P1-2, #1774)', () => {
   // 390px: die Saldo-Spalte lief mit `flex: 0 1 auto; min-width: 0` unter den
   // `nowrap`-Betrag, der nach links in den Namen auslief ("Gemeinsames
-  // Gi.8.544,47 €", 11px Ueberlappung). Die Spalte darf nicht schrumpfen; die
-  // Kuerzung gehoert dem Namen.
+  // Gi.8.544,47 €", 11px Ueberlappung). Seit #1774 darf sie schrumpfen, damit
+  // der Name nicht mitten im Wort bricht ("Housekeepin|g cash") - aber nur bis
+  // zur Breite des Betrags: der automatische Mindestwert bleibt, `min-width: 0`
+  // (oder `overflow: hidden`) ist verboten, und der Betrag bleibt `nowrap`.
   const regeln = [...eachRule(budgetCss)].filter(({ selector }) => selector.split(',').some((s) => s.trim() === '.budget-account__figures'));
   assert.ok(regeln.length > 0, '.budget-account__figures fehlt');
   for (const { body, at } of regeln) {
-    const flex = body.match(/(?:^|;|\s)flex:\s*([^;]+)/);
-    const shrink = body.match(/flex-shrink:\s*([^;]+)/);
-    if (flex) assert.match(flex[1].trim(), /^0 0 auto$|^none$/, `${at.join(' ')} .budget-account__figures: flex ${flex[1].trim()} laesst die Spalte schrumpfen`);
-    if (shrink) assert.equal(shrink[1].trim(), '0');
+    assert.doesNotMatch(body, /(?:^|[;\s])min-width:\s*0/, `${at.join(' ')} .budget-account__figures: min-width:0 laesst den Betrag unter den Saldo laufen`);
+    assert.doesNotMatch(body, /overflow(?:-x)?:\s*(?:hidden|clip)/, `${at.join(' ')} .budget-account__figures: overflow kappt den Betrag`);
   }
-  assert.ok(regeln.some(({ body }) => /flex:\s*(?:0 0 auto|none)|flex-shrink:\s*0/.test(body)), 'die Saldo-Spalte muss ausdruecklich unschrumpfbar sein');
+  const balance = [...eachRule(budgetCss)].find(({ selector, at }) => selector.trim() === '.budget-account__balance' && !at.length);
+  assert.match(balance?.body ?? '', /white-space:\s*nowrap/, 'der Betrag bleibt unzerbrechlich - er ist der Mindestwert der Spalte');
+  const starting = [...eachRule(budgetCss)].find(({ selector, at }) => selector.trim() === '.budget-account__starting' && !at.length);
+  assert.match(starting?.body ?? '', /white-space:\s*normal/, 'die Startzeile ist das, was die Saldo-Spalte hergibt, und muss umbrechen duerfen');
   const nameText = [...eachRule(budgetCss)].find(({ selector }) => selector.trim() === '.budget-account__name-text');
   assert.match(nameText.body, /text-overflow:\s*ellipsis/);
   const body = [...eachRule(budgetCss)].find(({ selector }) => selector.trim() === '.budget-account__body');
@@ -4310,8 +4313,14 @@ test('R16: ein Kontoname bricht auf zwei Zeilen um, statt gekappt zu werden', ()
   assert.match(rule.body, /-webkit-line-clamp:\s*2/);
   assert.doesNotMatch(rule.body, /white-space:\s*nowrap/, 'einzeilig mit Ellipse war der Befund');
   assert.match(rule.body, /overflow-wrap:\s*anywhere/, 'ein langes Wort ohne Leerzeichen laeuft sonst unter den Saldo');
+  // #1774: "Wertpapierde-pot" - ohne Grenze trennt `hyphens: auto` in der
+  // schmalen Spalte zwei Zeichen vor dem Ende. Dieselbe Grenze wie die
+  // Textbloecke in layout.css.
+  assert.match(rule.body, /hyphens:\s*auto/);
+  assert.match(rule.body, /hyphenate-limit-chars:\s*6 4 4/, 'ohne Grenze steht "Wertpapierde-pot" statt "Wertpapier-depot"');
   const figures = [...eachRule(budgetCss)].find((r) => r.selector.trim() === '.budget-account__figures' && !r.at.length);
-  assert.match(figures?.body ?? '', /flex:\s*0 0 auto/, 'die Saldo-Spalte schrumpft weiter nie');
+  assert.match(figures?.body ?? '', /flex:\s*0 1 auto/, 'die Saldo-Spalte gibt vor dem Namen nach (der Name bricht sonst mitten im Wort)');
+  assert.doesNotMatch(figures?.body ?? '', /min-width:\s*0/, 'aber nie unter den Betrag');
 });
 
 // --------------------------------------------------------

@@ -110,6 +110,455 @@ test('Einkauf: Badge nennt alle offenen Artikel, weitere Listen werden genannt',
   assert.equal(badgeOf(__test.renderShoppingLists(lists)), '8', 'ohne Gesamtzahl: die geladenen Listen');
 });
 
+// Refs #1818: die Kachel zeigt die zuletzt geaenderte Liste zuerst, die
+// Einkaufsseite oeffnet ohne `?list=` die aelteste. Jede Zeile trug nur
+// `/shopping` - der Tipp auf "Drogerie" oeffnete den Wocheneinkauf. Gemessen
+// wird der ganze Weg: die gerenderte Zeile durch die echte Verdrahtung
+// (`wireLinks`), Klick und Tastatur, bis zu dem Pfad, den der Router bekommt.
+test('Einkauf: jede Listenzeile fuehrt zu IHRER Liste, per Klick und per Tastatur', () => {
+  const lists = [
+    { id: 7, name: 'Drogerie', open_count: 1, total_count: 1, items: [{ id: 70, name: 'Zahnpasta' }] },
+    { id: 3, name: 'Baumarkt & "Garten"', open_count: 2, total_count: 4, items: [{ id: 30, name: 'Duebel' }] },
+    { id: 1, name: 'Wocheneinkauf', open_count: 8, total_count: 10, items: [{ id: 10, name: 'Milch' }] },
+  ];
+  const html = __test.renderShoppingLists(lists, 23, 5);
+
+  // Die gerenderten Elemente mit `data-route`, in Dokumentreihenfolge, als das,
+  // was `querySelectorAll('[data-route]')` im Browser liefert.
+  const unesc = (v) => v.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  const elements = [...html.matchAll(/<([a-z]+)\b([^>]*\bdata-route="([^"]*)"[^>]*)>/g)].map((m) => {
+    const listeners = {};
+    return {
+      tagName: m[1].toUpperCase(),
+      id: '',
+      isListRow: /class="shopping-widget-list"/.test(m[2]),
+      attrs: m[2],
+      dataset: { route: unesc(m[3]) },
+      closest: () => null,
+      addEventListener: (type, fn) => { (listeners[type] ??= []).push(fn); },
+      fire: (type, event) => (listeners[type] ?? []).forEach((fn) => fn(event)),
+    };
+  });
+  const rows = elements.filter((el) => el.isListRow);
+  assert.equal(rows.length, 3, 'Reichweite: drei Listenzeilen stehen im Markup');
+  for (const row of rows) {
+    assert.match(row.attrs, /role="button"/, 'die Zeile bleibt per Tastatur erreichbar');
+    assert.match(row.attrs, /tabindex="0"/);
+  }
+
+  const visited = [];
+  const hadWindow = 'window' in globalThis;
+  const prevWindow = globalThis.window;
+  globalThis.window = { yuvomi: { navigate: (path) => { visited.push(path); } } };
+  try {
+    __test.wireLinks({ querySelectorAll: (sel) => (sel === '[data-route]' ? elements : []) }, () => {});
+    const key = (k) => ({ key: k, preventDefault() {}, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, button: 0 });
+    // JEDE GESTE WIRD AN IHREM EIGENEN SCHRITT GEMESSEN (#1821). Bis hierher
+    // las `target()` einfach den letzten Eintrag: eine Geste, die gar nicht
+    // navigierte, bestand ihre Zusicherung am Wert der Geste davor, und rot
+    // wurde erst die Summe am Ende - ohne zu sagen, WELCHE Geste fehlt.
+    const gesture = (label, fire) => {
+      const before = visited.length;
+      fire();
+      assert.equal(visited.length - before, 1, `${label}: navigiert genau einmal`);
+      // Was die Einkaufsseite aus der Adresse liest (shopping.js): `?list=`.
+      const url = new URL(visited.at(-1), 'http://yuvomi.test');
+      return [url.pathname, url.searchParams.get('list')];
+    };
+    rows.forEach((row, i) => {
+      const want = ['/shopping', String(lists[i].id)];
+      const name = `"${lists[i].name}"`;
+      assert.deepEqual(gesture(`Klick auf ${name}`, () => row.fire('click', key(''))), want, `Klick auf ${name}`);
+      assert.deepEqual(gesture(`Enter auf ${name}`, () => row.fire('keydown', key('Enter'))), want, `Enter auf ${name}`);
+      assert.deepEqual(gesture(`Leertaste auf ${name}`, () => row.fire('keydown', key(' '))), want, `Leertaste auf ${name}`);
+    });
+    assert.equal(visited.length, 9, 'jede Geste hat genau einmal navigiert');
+
+    // Der Kachelkopf zaehlt ueber alle Listen und bleibt ein Sammelverweis.
+    const header = elements.find((el) => /widget__link/.test(el.attrs));
+    assert.ok(header, 'Reichweite: der Kachelkopf ist verlinkt');
+    assert.equal(header.dataset.route, '/shopping');
+  } finally {
+    if (hadWindow) globalThis.window = prevWindow;
+    else delete globalThis.window;
+  }
+});
+
+// --------------------------------------------------------
+// #1821: eine Zeile, die EINEN Eintrag zeigt, fuehrt zu ihm
+// --------------------------------------------------------
+
+/** Die `data-route`-Ziele eines Markups, in Dokumentreihenfolge und entschluesselt. */
+function rowRoutesOf(html, className) {
+  const unesc = (v) => v.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  return [...html.matchAll(/<[a-z]+\b([^>]*\bdata-route="([^"]*)"[^>]*)>/g)]
+    .filter((m) => new RegExp(`class="${className}(?:["\\s])`).test(m[1]))
+    .map((m) => unesc(m[2]));
+}
+
+test('#1821 Notizen: jede Zeile fuehrt zu IHRER Notiz, der Kopf bleibt Sammelverweis', () => {
+  const notes = [{ id: 12, title: 'WLAN', content: 'a', pinned: 1 }, { id: 5, title: 'Schule', content: 'b', pinned: 0 }];
+  const html = __test.renderPinnedNotes(notes, '1x2', 2);
+  assert.deepEqual(rowRoutesOf(html, 'note-item'), ['/notes?open=12', '/notes?open=5']);
+  assert.deepEqual(rowRoutesOf(html, 'widget__link'), ['/notes']);
+});
+
+test('#1821 Geburtstage: jede Zeile fuehrt zu IHREM Anlass', () => {
+  const rows = [
+    { id: 4, name: 'Mike', next_birthday: '2026-11-02', days_until: 25, next_age: 41 },
+    { id: 9, name: 'Lena', next_birthday: '2026-11-09', days_until: 32, next_age: 8 },
+  ];
+  const html = renderUpcomingBirthdays(rows, '1x2', 2);
+  assert.deepEqual(rowRoutesOf(html, 'birthday-widget-item'), ['/birthdays?open=4', '/birthdays?open=9']);
+});
+
+test('#1821 Entsorgung: auch die Zeile OHNE naechsten Termin fuehrt zu ihrer Tonne', () => {
+  const html = __test.renderWasteWidget({
+    needsRefresh: false,
+    items: [
+      { type: { id: 3, name: 'Glas', sort_order: 1, color: null, icon: null }, next: null },
+      { type: { id: 8, name: 'Papier', sort_order: 0, color: null, icon: null },
+        next: { date_key: '2026-10-12', moved: false, coalesced: false, origins: [], deep_link: '?type=8&date=2026-10-12' } },
+    ],
+  }, '1x2');
+  // Die Seite liest `?type=` ohne Datum und hebt dann die Karte der Tonne hervor
+  // (parseDeepLinkParams / deepLinkSelectors in pages/waste.js).
+  assert.deepEqual(rowRoutesOf(html, 'waste-widget-row'), ['/waste?type=8&date=2026-10-12', '/waste?type=3']);
+});
+
+test('#1821 Einkauf im Heute-Blatt: eine einzige Liste mit Offenem ist das Ziel, mehrere sind die Seite', () => withSheet(() => {
+  const list = (id, open) => ({ id, name: `L${id}`, open_count: open, total_count: open, items: [] });
+  const one = { shoppingLists: [list(7, 4)], shoppingOpenCount: 4, shoppingOpenLists: 1 };
+  const two = { shoppingLists: [list(7, 4), list(2, 1)], shoppingOpenCount: 5, shoppingOpenLists: 2 };
+  assert.equal(__test.shoppingSoleListRoute(one), '/shopping?list=7');
+  assert.equal(__test.shoppingSoleListRoute(two), '/shopping');
+  // Der Server kappt bei drei Listen: vier offene Listen duerfen nicht auf die
+  // erste geladene zeigen, nur weil die Antwort sie zuerst nennt.
+  assert.equal(__test.shoppingSoleListRoute({ ...one, shoppingOpenLists: 4 }), '/shopping');
+  // Aelterer Server ohne Zaehler: lieber die Seite als eine geratene Liste.
+  assert.equal(__test.shoppingSoleListRoute({ shoppingLists: [list(7, 4)] }), '/shopping');
+  assert.equal(__test.shoppingSoleListRoute({}), '/shopping');
+
+  // Durch den echten Aufrufer: die Schlusszeile des Blatts.
+  const row = (data) => {
+    const model = __test.buildTodayCockpitModel(data, [], { cap: __test.PROGRAM_ROW_CAP, groupOverdue: false });
+    let found;
+    JSON.stringify(model, (_, value) => {
+      if (value && value.kind === 'shopping') found = value.route;
+      return value;
+    });
+    return found;
+  };
+  assert.equal(row(one), '/shopping?list=7', 'Schlusszeile, eine Liste');
+  assert.equal(row(two), '/shopping', 'Schlusszeile, zwei Listen');
+}));
+
+// --------------------------------------------------------
+// #1821: eine Zeile mit Query im Ziel waermt ihr Modul vor
+// --------------------------------------------------------
+
+test('#1821 Prefetch: die Query faellt auch von `data-route` ab', async () => {
+  const { prefetchPathOf } = await import('../public/utils/router-navigate.js');
+  // Bis #1821 fiel sie nur von `data-nav-href` ab: diese Ziele fanden keine Route.
+  assert.equal(prefetchPathOf({ route: '/shopping?list=7' }), '/shopping');
+  assert.equal(prefetchPathOf({ route: '/calendar?open=3&date=2026-10-08' }), '/calendar');
+  assert.equal(prefetchPathOf({ route: '/waste?type=2' }), '/waste');
+  assert.equal(prefetchPathOf({ route: '/tasks' }), '/tasks');
+  assert.equal(prefetchPathOf({ route: '/schedule/patterns' }), '/schedule/patterns');
+  // `data-nav-href` gewinnt, wie beim Klick der Navigation.
+  assert.equal(prefetchPathOf({ navHref: '/meals?week=1', route: '/kitchen' }), '/meals');
+  assert.equal(prefetchPathOf({ route: '/notes#x' }), '/notes');
+  assert.equal(prefetchPathOf({}), null);
+  assert.equal(prefetchPathOf(null), null);
+  assert.equal(prefetchPathOf({ route: '?x=1' }), null);
+
+  // Der Aufrufer: der Hover-/Press-Handler der Shell reicht genau das weiter.
+  const { readFileSync } = await import('node:fs');
+  const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  const handler = router.slice(router.indexOf('const prefetchFromEvent = (e) => {'));
+  const body = handler.slice(0, handler.indexOf('};')).replace(/^\s*\/\/.*$/gm, '');
+  assert.match(body, /prefetchRoute\(prefetchPathOf\(el\.dataset\)\)/);
+  assert.doesNotMatch(body, /dataset\.route\)/, 'kein zweiter Weg mit der rohen Route');
+});
+
+test('#1821 Suche: ein Geburtstags-Treffer fuehrt zu SEINEM Anlass', async () => {
+  const { SEARCH_SECTIONS } = await import('../public/utils/search-sections.js');
+  const route = (bucket, item) => SEARCH_SECTIONS.find((s) => s.bucket === bucket).route(item, {});
+  assert.equal(route('birthdays', { id: 4 }), '/birthdays?open=4');
+  // Derselbe Parameter wie bei den Nachbarn mit Tiefenlink.
+  assert.equal(route('notes', { id: 4 }), '/notes?open=4');
+  assert.equal(route('contacts', { id: 4 }), '/contacts?open=4');
+});
+
+// --------------------------------------------------------
+// #1821: wohin der Router den Fokus nach einer Navigation legt
+// --------------------------------------------------------
+
+/** Die echte Funktion des Routers, mit einem Dokument, das nur den Fokus kennt. */
+async function navigateFocus({ path = '/', active, overlayOpen = false, inMain = [], atFrame = null }) {
+  const { focusMainAfterNavigation } = await import('../public/utils/router-navigate.js');
+  const frames = [];
+  const focused = [];
+  const doc = { activeElement: active };
+  const main = {
+    contains: (el) => el === main || inMain.includes(el),
+    focus(options) { focused.push(options); doc.activeElement = main; },
+  };
+  doc.getElementById = (id) => (id === 'main-content' ? main : null);
+  let overlay = overlayOpen;
+  focusMainAfterNavigation(path, {
+    document: doc,
+    requestAnimationFrame: (cb) => { frames.push(cb); },
+    hasOpenOverlay: () => overlay,
+  });
+  const queued = frames.length;
+  const focusedBeforeFrame = focused.length;
+  // Zwischen Aufbau und Frame: jemand tabbt in die Seite, die Seite oeffnet einen Dialog.
+  atFrame?.({ doc, main, openOverlay: () => { overlay = true; } });
+  frames.forEach((cb) => cb());
+  return { queued, focusedBeforeFrame, focused, activeIsMain: doc.activeElement === main, active: doc.activeElement };
+}
+
+test('#1821 Router-Fokus: nach einer Navigation aus Seitenleiste oder Tableiste bekommt <main> den Fokus', async () => {
+  // Der Zweck der Funktion - und der Rueckschritt, der mit den Ausnahmen unten
+  // nicht passieren darf: der Fokus bliebe auf dem Link, der die Seite oeffnete.
+  const navLink = { name: 'nav' };
+  const fromNav = await navigateFocus({ active: navLink });
+  assert.equal(fromNav.queued, 1, 'genau ein Frame');
+  assert.equal(fromNav.focusedBeforeFrame, 0, 'gefragt und fokussiert wird IM Frame, nicht davor');
+  assert.deepEqual(fromNav.focused, [{ preventScroll: true }]);
+  assert.equal(fromNav.activeIsMain, true);
+
+  // Die Zeile der ALTEN Seite ist mit ihr verschwunden: der Fokus liegt auf <body>.
+  const body = { name: 'body' };
+  assert.equal((await navigateFocus({ active: body })).activeIsMain, true);
+  assert.equal((await navigateFocus({ active: null })).activeIsMain, true);
+  // Ein Element ausserhalb von <main>, das kein Overlay ist (Suchfeld der Shell).
+  assert.equal((await navigateFocus({ active: { name: 'shell-search' } })).activeIsMain, true);
+});
+
+test('#1821 Router-Fokus: wer schon auf einer Zeile der neuen Seite steht, bleibt dort', async () => {
+  const row = { name: 'row' };
+  // Schon beim Aufruf dort ...
+  const there = await navigateFocus({ active: { name: 'nav' }, inMain: [row], atFrame: ({ doc }) => { doc.activeElement = row; } });
+  assert.deepEqual(there.focused, [], '<main> zieht den Fokus nicht von der Zeile ab');
+  assert.equal(there.active, row);
+  // ... und <main> selbst zaehlt nicht als "in der Seite".
+  const onMain = await navigateFocus({ active: null, atFrame: ({ doc, main }) => { doc.activeElement = main; } });
+  assert.equal(onMain.focused.length, 1);
+});
+
+test('#1821 Router-Fokus: ein Dialog, den die neue Seite oeffnet, behaelt den Fokus', async () => {
+  // `/notes?open=5` im verdeckten Tab: der Dialog nimmt den Fokus, der Frame
+  // des Routers ruht bis zum Zeigen des Tabs. Das Overlay liegt AUSSERHALB von
+  // <main> - `main.focus()` zoege den Fokus hinter den offenen Dialog.
+  const dialogButton = { name: 'dialog-close' };
+  const opened = await navigateFocus({
+    active: { name: 'nav' },
+    atFrame: ({ doc, openOverlay }) => { openOverlay(); doc.activeElement = dialogButton; },
+  });
+  assert.deepEqual(opened.focused, []);
+  assert.equal(opened.active, dialogButton);
+  // Auch wenn der Dialog den Fokus (noch) nicht hat: hinter ihn gehoert er nicht.
+  const pending = await navigateFocus({ active: { name: 'body' }, overlayOpen: true });
+  assert.deepEqual(pending.focused, []);
+});
+
+test('#1821 Router-Fokus: Anmeldung und Einrichtung bleiben unberuehrt, und der Router ruft genau diese Funktion', async () => {
+  assert.equal((await navigateFocus({ path: '/login', active: null })).queued, 0);
+  assert.equal((await navigateFocus({ path: '/setup', active: null })).queued, 0);
+
+  // router.js laesst sich nicht importieren; sein Anteil ist das Hereinreichen.
+  const { readFileSync } = await import('node:fs');
+  const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  const fn = router.slice(router.indexOf('function focusMainContentAfterNavigation('));
+  const body = fn.slice(0, fn.indexOf('\n}\n') + 2).replace(/\s+/g, ' ');
+  assert.equal(body,
+    'function focusMainContentAfterNavigation(path) { focusMainAfterNavigation(path, { document, requestAnimationFrame: (cb) => requestAnimationFrame(cb), hasOpenOverlay, }); }',
+    'der Router fuegt keine eigene Bedingung hinzu - jede Regel steht in der gemessenen Funktion');
+  assert.match(router, /focusMainContentAfterNavigation, showToast, t,/, 'und reicht sie an navigate() weiter');
+});
+
+// --------------------------------------------------------
+// #1821: der Fokus auf einer Inhaltszeile ueberlebt den stillen Neuaufbau
+// --------------------------------------------------------
+
+/** Ein Element, wie `focusKeyOf` es liest - ohne DOM, mit benannten Vorfahren. */
+function fakeEl({ attrs = {}, classes = [], ancestors = {}, matches = [] } = {}) {
+  const el = {
+    id: attrs.id ?? '',
+    classList: classes,
+    dataset: Object.fromEntries(Object.entries(attrs)
+      .filter(([k]) => k.startsWith('data-'))
+      .map(([k, v]) => [k.slice(5).replace(/-([a-z])/g, (_, c) => c.toUpperCase()), v])),
+    hasAttribute: (name) => name in attrs,
+    getAttribute: (name) => attrs[name] ?? null,
+    ownerDocument: { querySelectorAll: () => matches },
+    closest(selector) {
+      for (const part of selector.split(',').map((x) => x.trim())) {
+        if (part in ancestors) return ancestors[part];
+        const own = /^\[([a-z-]+)\]$/.exec(part);
+        if (own && own[1] in attrs) return el;
+      }
+      return null;
+    },
+  };
+  return el;
+}
+
+test('#1821 Fokus: eine Zeile nennt sich ueber Ziel, Kachel und Stelle', () => {
+  const hadCss = 'CSS' in globalThis;
+  const prevCss = globalThis.CSS;
+  // Node kennt `CSS.escape` nicht; die Probe braucht nur, dass die Werte
+  // unveraendert im Selektor ankommen.
+  globalThis.CSS = { escape: (v) => String(v) };
+  try {
+    const shellOf = (matches) => ({ querySelectorAll: () => matches });
+    const tile = { dataset: { widgetId: 'shopping' } };
+
+    // Bis #1821 hatte eine Inhaltszeile KEINEN Schluessel: der stille Neuaufbau
+    // (Rueckkehr in den Tab, Viertelstundentakt) liess den Fokus auf <body>.
+    const row = fakeEl({ attrs: { 'data-route': '/shopping?list=7' } });
+    row.closest = ((orig) => (sel) => (sel === '.widget-wrapper[data-widget-id]' ? tile
+      : sel === '#dashboard-shell' ? shellOf([row]) : orig(sel)))(row.closest);
+    assert.deepEqual(__test.focusKeyOf(row), {
+      selector: '.widget-wrapper[data-widget-id="shopping"] [data-route="/shopping?list=7"]',
+      index: 0,
+      preventScroll: true,
+    });
+
+    // Mehrere Zeilen mit demselben Ziel (Schichtplan): die Stelle entscheidet.
+    const other = {};
+    const third = fakeEl({ attrs: { 'data-route': '/schedule/patterns' } });
+    third.closest = ((orig) => (sel) => (sel === '#dashboard-shell' ? shellOf([other, other, third]) : orig(sel)))(third.closest);
+    assert.equal(__test.focusKeyOf(third).index, 2);
+    assert.equal(__test.focusKeyOf(third).selector, '[data-route="/schedule/patterns"]');
+
+    // Der Tabstopp der Notizkarte ist ein KIND der Zeile.
+    const card = fakeEl({ attrs: { 'data-route': '/notes?open=5' } });
+    const body = fakeEl({ classes: ['note-item__body'], ancestors: { '[data-route]': card } });
+    assert.equal(__test.focusKeyOf(body).selector, '[data-route="/notes?open=5"] .note-item__body');
+    // Die Stelle zaehlt das KIND, nicht die Zeile: liegt der Fokus auf dem
+    // zweiten Treffer des Kind-Selektors, ist es der zweite - die Zeile selbst
+    // steht in dieser Trefferliste gar nicht.
+    const otherBody = {};
+    card.closest = ((orig) => (sel) => (sel === '#dashboard-shell' ? { querySelectorAll: () => [otherBody, body] } : orig(sel)))(card.closest);
+    assert.equal(__test.focusKeyOf(body).index, 1);
+
+    // Eine Aufgabenzeile fuehrt nirgendhin, sie oeffnet ein Objekt.
+    const task = fakeEl({ attrs: { 'data-task-id': '31' } });
+    assert.equal(__test.focusKeyOf(task).selector, '[data-task-id="31"]');
+
+    // Die Heute-Zeile einer Aufgabe: Ziel UND Objekt, sonst traefe `/tasks` die erste.
+    const cockpit = fakeEl({ attrs: { 'data-route': '/tasks', 'data-object-kind': 'task', 'data-object-id': '31' } });
+    assert.equal(__test.focusKeyOf(cockpit).selector, '[data-route="/tasks"][data-object-kind="task"][data-object-id="31"]');
+
+    // Was vorher galt, gilt weiter: Id zuerst, dann die Bearbeiten-Attribute.
+    assert.equal(__test.focusKeyOf(fakeEl({ attrs: { id: 'dashboard-customize-btn', 'data-route': '/x' } })), '#dashboard-customize-btn');
+    assert.equal(__test.focusKeyOf(fakeEl({ attrs: { 'data-widget-hide': 'notes' } })), '[data-widget-hide="notes"]');
+    // Und was keine Zeile ist, bekommt keinen Schluessel.
+    assert.equal(__test.focusKeyOf(fakeEl({ classes: ['widget__title'] })), null);
+  } finally {
+    if (hadCss) globalThis.CSS = prevCss; else delete globalThis.CSS;
+  }
+});
+
+/**
+ * Eine Flaeche fuer captureRebuildFocus/restoreFocusAfterRebuild: `nodes` sind
+ * die Elemente, die `selector` jeweils trifft - wie der Neuaufbau sie liefert.
+ */
+function fakeSurface(nodes) {
+  const log = [];
+  const make = (name, extra = {}) => ({ name, disabled: false, focus(options) { log.push([name, options]); }, ...extra });
+  const table = Object.fromEntries(Object.entries(nodes).map(([selector, list]) => [selector,
+    list.map((entry) => (typeof entry === 'string' ? make(entry) : make(entry.name, entry)))]));
+  return {
+    log,
+    table,
+    querySelector: (selector) => table[selector]?.[0] ?? null,
+    querySelectorAll: (selector) => table[selector] ?? [],
+  };
+}
+
+test('#1821 Fokus: der Neuaufbau gibt der Zeile den Fokus zurueck - an ihrer Stelle, ohne zu scrollen', () => {
+  const hadCss = 'CSS' in globalThis;
+  const prevCss = globalThis.CSS;
+  globalThis.CSS = { escape: (v) => String(v) };
+  try {
+    // VORHER: die dritte Schichtplan-Zeile hat den Fokus.
+    const body = {};
+    const rowsBefore = [{}, {}, null];
+    const row = fakeEl({ attrs: { 'data-route': '/schedule/patterns' } });
+    rowsBefore[2] = row;
+    const shellBefore = { contains: (el) => el === row, querySelectorAll: () => rowsBefore };
+    row.closest = ((orig) => (sel) => (sel === '#dashboard-shell' ? shellBefore : orig(sel)))(row.closest);
+    const before = __test.captureRebuildFocus(shellBefore, row, body);
+    assert.equal(before.had, true);
+    assert.deepEqual(before.key, { selector: '[data-route="/schedule/patterns"]', index: 2, preventScroll: true },
+      'die Erfassung gibt den Zeilenschluessel weiter');
+
+    // NACHHER: neue Elemente, derselbe Selektor. Die dritte bekommt den Fokus.
+    const after = fakeSurface({ '[data-route="/schedule/patterns"]': ['erste', 'zweite', 'dritte'] });
+    const got = __test.restoreFocusAfterRebuild(after, [before.key]);
+    assert.equal(got?.name, 'dritte');
+    assert.deepEqual(after.log, [['dritte', { preventScroll: true }]]);
+
+    // Die Zeile gibt es nach dem Neuaufbau nicht mehr (eine weniger): kein Fokus, kein Wurf.
+    const fewer = fakeSurface({ '[data-route="/schedule/patterns"]': ['erste', 'zweite'] });
+    assert.equal(__test.restoreFocusAfterRebuild(fewer, [before.key]), null);
+    assert.deepEqual(fewer.log, []);
+  } finally {
+    if (hadCss) globalThis.CSS = prevCss; else delete globalThis.CSS;
+  }
+});
+
+test('#1821 Fokus: ausserhalb der Flaeche oder auf <body> wird nichts erfasst', () => {
+  const body = {};
+  const outside = fakeEl({ attrs: { id: 'nav-link' } });
+  const shell = { contains: () => false };
+  assert.deepEqual(__test.captureRebuildFocus(shell, outside, body), { key: null, had: false });
+  assert.deepEqual(__test.captureRebuildFocus({ contains: () => true }, body, body), { key: null, had: false });
+  assert.deepEqual(__test.captureRebuildFocus({ contains: () => true }, null, body), { key: null, had: false });
+  // In der Flaeche, aber ohne Identitaet: Fokus war da, einen Schluessel gibt es nicht.
+  assert.deepEqual(__test.captureRebuildFocus({ contains: () => true }, fakeEl({ classes: ['widget__title'] }), body), { key: null, had: true });
+});
+
+test('#1821 Fokus: Selektor-Kandidaten des Anpassen-Modus gelten weiter - erster Treffer, mit Scrollen, in Reihenfolge', () => {
+  // Was vor #1821 galt: Ids und Bearbeiten-Knoepfe sind Selektoren. Ihr Fokus
+  // darf scrollen (die Geste hat ihn ausgeloest), und es gilt der ERSTE Treffer.
+  const surface = fakeSurface({
+    '#dashboard-customize-cancel': ['abbrechen'],
+    '#dashboard-customize-btn': ['anpassen'],
+    '[data-widget-hide="notes"]': ['ausblenden-a', 'ausblenden-b'],
+    '#gesperrt': [{ name: 'gesperrt', disabled: true }],
+  });
+  assert.equal(__test.restoreFocusAfterRebuild(surface, ['[data-widget-hide="notes"]', '#dashboard-customize-btn']).name, 'ausblenden-a');
+  assert.deepEqual(surface.log.at(-1), ['ausblenden-a', undefined], 'ohne preventScroll');
+  // Der erste Kandidat fehlt nach dem Aufbau: der naechste ist dran.
+  assert.equal(__test.restoreFocusAfterRebuild(surface, [null, '#gibt-es-nicht', '#dashboard-customize-cancel', '#dashboard-customize-btn']).name, 'abbrechen');
+  // Ein gesperrter Knopf wird uebersprungen.
+  assert.equal(__test.restoreFocusAfterRebuild(surface, ['#gesperrt', '#dashboard-customize-btn']).name, 'anpassen');
+  assert.equal(__test.restoreFocusAfterRebuild(surface, []), null);
+  assert.equal(__test.restoreFocusAfterRebuild(surface, null), null);
+  assert.equal(surface.log.length, 3);
+});
+
+test('#1821 Fokus: der Neuaufbau der Seite ruft Erfassen und Wiederfokus, um das setHtml herum', async () => {
+  // rebuildDashboard() lebt im Abschluss von render() und laesst sich nicht
+  // rufen. Was die beiden Funktionen TUN, messen die Tests darueber; hier steht
+  // nur, dass der Abschluss sie in dieser Reihenfolge und mit diesen Werten ruft.
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
+  const fn = src.slice(src.indexOf('  function rebuildDashboard(cfg) {'));
+  const body = fn.slice(0, fn.indexOf('\n  }\n')).split('\n').filter((line) => !/^\s*(\/\/|\/?\*)/.test(line)).join('\n');
+  const capture = body.indexOf('const { key: keepFocus, had: hadFocus } = captureRebuildFocus(shell, document.activeElement, document.body);');
+  const paint = body.indexOf('setHtml(shell, `\n      <section class="dashboard-masthead');
+  const restore = body.search(/^ {4}restoreFocusAfterRebuild\(container, \[\n {6}keepFocus,\n {6}\.\.\.\(focusAfterRebuild \?\? \[\]\),\n {6}\.\.\.\(hadFocus && modeChanged \? \['#dashboard-customize-btn'\] : \[\]\),\n {4}\]\);$/m);
+  assert.ok(capture > 0, 'erfasst wird vor dem Aufbau');
+  assert.ok(paint > capture, 'dann wird gebaut');
+  assert.ok(restore > paint, 'und danach wieder fokussiert: eigener Schluessel, Nachfolger der Geste, Anpassen-Knopf');
+});
+
 test('der Aufrufer reicht die Gesamtzahlen aus der Antwort an die Kacheln durch', () => {
   // Der Renderer allein beweist nichts, wenn niemand ihm die Zahl gibt.
   const prevWindow = global.window;

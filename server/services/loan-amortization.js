@@ -104,6 +104,35 @@ export function computeLoanSchedule({
 }
 
 /**
+ * Der Sollzins, zu dem Rate Nummer `n` verzinst wird (#1706).
+ *
+ * Dieselbe Phasenregel wie in computeLoanSchedule: waehrend der Zinsbindung der
+ * feste Satz, danach der Anschlusssatz; 'fixed' und 'variable' kennen nur einen.
+ * Die Darlehensliste sortiert danach - "welcher Satz gilt gerade" ist damit
+ * dieselbe Antwort, mit der auch Restschuld und Restlaufzeit rechnen, und keine
+ * zweite Lesart im Client (Aequivalenztest gegen den Plan in
+ * test:budget-loans-amortization).
+ *
+ * @param {object} params Zins-Parameter wie bei computeLoanSchedule
+ * @param {number} n      Ratennummer (1-basiert)
+ * @returns {number} Sollzins p.a. in %
+ */
+export function rateForInstallment({
+  fixedRate,
+  interestMode,
+  fixedPeriodMonths = null,
+  followupRate = null,
+}, n) {
+  const rf = Number(fixedRate) || 0;
+  const variable = interestMode === 'fixed_then_variable';
+  const rv = variable ? (Number(followupRate) || 0) : rf;
+  const bindingMonths = variable && Number.isFinite(Number(fixedPeriodMonths))
+    ? Number(fixedPeriodMonths)
+    : null;
+  return (!bindingMonths || Number(n) <= bindingMonths) ? rf : rv;
+}
+
+/**
  * Planmäßige Restschuld (offenes Kapital) nach `paidInstallments` gezahlten Raten.
  *
  * Abgrenzung: Das ist NICHT die Summe der noch offenen Raten. Die enthält auch die

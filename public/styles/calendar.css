@@ -976,6 +976,8 @@
    * Strich - wie in der Liste (list-row.css, `.list-row__name`). */
   hyphens: auto;
   hyphenate-limit-chars: 6 3 3;
+  -webkit-hyphenate-limit-before: 3;
+  -webkit-hyphenate-limit-after: 3;
 }
 
 @container ev-block (height >= 3.25rem) {

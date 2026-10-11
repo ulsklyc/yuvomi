@@ -68,7 +68,7 @@ db.exec(`
   ALTER TABLE calendar_events ADD COLUMN target_caldav_account_id INTEGER;
   CREATE TABLE housekeeping_work_sessions (id INTEGER PRIMARY KEY, calendar_event_id INTEGER);
 `);
-db.exec(MIGRATIONS_SQL[237]);
+db.exec(MIGRATIONS_SQL[238]);
 
 // Testdaten einfügen
 const u1 = db.prepare(`INSERT INTO users (username, display_name, password_hash, avatar_color, role)
@@ -2012,7 +2012,7 @@ cdb.exec(`
   ALTER TABLE calendar_events ADD COLUMN target_caldav_account_id INTEGER;
   CREATE TABLE housekeeping_work_sessions (id INTEGER PRIMARY KEY, calendar_event_id INTEGER);
 `);
-cdb.exec(MIGRATIONS_SQL[237]);
+cdb.exec(MIGRATIONS_SQL[238]);
 
 const cu1 = cdb.prepare(`INSERT INTO users (username, display_name, password_hash, avatar_color)
   VALUES ('theodore', 'Theodore', 'x', '#34C759')`).run();

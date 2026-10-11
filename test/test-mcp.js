@@ -52,7 +52,7 @@ db.exec(`
 db.exec(MIGRATIONS_SQL[85]);  // calendar_event_exceptions
 db.exec(MIGRATIONS_SQL[174]); // generated birthday/name-day joins
 db.exec(MIGRATIONS_SQL[44]); // search index rebuilt by migration 194
-db.exec(MIGRATIONS_SQL[237]);
+db.exec(MIGRATIONS_SQL[238]);
 db.exec(MIGRATIONS_SQL[194]); // linked occurrence overrides
 db.exec(MIGRATIONS_SQL[41]);  // tasks.start_date (geplante Aufgaben)
 db.exec(MIGRATIONS_SQL[74]);  // access_permissions (Modulrechte, #467)

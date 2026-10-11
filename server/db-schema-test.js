@@ -1499,6 +1499,10 @@ const MIGRATIONS_SQL = {
     CREATE INDEX idx_reward_allowances_next_run ON reward_allowances(next_run_date, paused_at);
   `,
   237: `
+      ALTER TABLE budget_subscriptions ADD COLUMN reminder_enabled INTEGER NOT NULL DEFAULT 1
+        CHECK(reminder_enabled IN (0,1));
+  `,
+  238: `
     CREATE TABLE local_calendars (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       name        TEXT    NOT NULL,

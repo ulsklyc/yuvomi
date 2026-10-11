@@ -259,7 +259,7 @@ test('default repair never assigns rows and generated events have no local calen
   assert.match(buildCalendarFeed(db, fallback.id), /X-WR-CALNAME:Our calendar/);
 });
 
-test('migration 237 leaves every existing event untouched', async () => {
+test('migration 238 leaves every existing event untouched', async () => {
   const { DatabaseSync } = await import('node:sqlite');
   const { MIGRATIONS } = dbmod;
   const database = new DatabaseSync(':memory:');
@@ -270,7 +270,7 @@ test('migration 237 leaves every existing event untouched', async () => {
       INSERT INTO calendar_events VALUES (1, 'Authored', 'local', NULL, NULL, 'original'),
         (2, 'External', 'google', NULL, NULL, 'original');`);
     const before = database.prepare('SELECT * FROM calendar_events ORDER BY id').all();
-    database.exec(MIGRATIONS.find(row => row.version === 237).up);
+    database.exec(MIGRATIONS.find(row => row.version === 238).up);
     const after = database.prepare('SELECT id,title,external_source,target_google_calendar_id,target_caldav_account_id,updated_at FROM calendar_events ORDER BY id').all();
     assert.deepEqual(after, before);
     assert.equal(database.prepare('SELECT COUNT(*) AS n FROM calendar_events WHERE local_calendar_id IS NOT NULL').get().n, 0);
@@ -326,6 +326,21 @@ test('sync targets exclude local calendars before and after outbound sync; Outlo
   assert.equal(resolveLocalCalendarId(db, outlook.id), local.id);
 });
 
+
+test('successful Apple and CalDAV uploads clear local-calendar membership', async () => {
+  const { markEventUploaded } = await import('../server/services/calendar-outbound.js');
+  const calendar = await createCalendar('Uploaded events', '#336699');
+  for (const source of ['apple', 'caldav']) {
+    const event = await createEvent(`Upload to ${source}`, calendar.id);
+    assert.equal(markEventUploaded(event.id, {
+      source, uid: `upload-${source}`, objectUrl: `https://calendar.test/${source}/event.ics`, calRefId: null,
+    }), true);
+    const row = db.prepare('SELECT external_source, local_calendar_id FROM calendar_events WHERE id = ?').get(event.id);
+    assert.equal(row.external_source, source);
+    assert.equal(row.local_calendar_id, null);
+    assert.equal(resolveLocalCalendarId(db, event.id), null);
+  }
+});
 
 test('linked default-calendar occurrences keep resolved membership in API projections', async () => {
   const created = await call('POST', '/', { body: { title: 'Implicit default series', start_datetime: '2035-05-01T09:00', recurrence_rule: 'FREQ=DAILY;COUNT=5' } });
