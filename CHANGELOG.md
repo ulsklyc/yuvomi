@@ -211,6 +211,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An event written to Google keeps its time when the Google calendar is set to another time zone**
+  (#1875). Yuvomi sent the time you typed together with the time zone of the Google calendar it
+  went into. If that calendar was set to UTC while your household lives in Amsterdam, a 14:00
+  event arrived in Google as 14:00 UTC, showed there at 16:00, and came back to Yuvomi at 16:00
+  with the next sync. The same happened to an event from Google once it was edited in Yuvomi.
+  The time now goes out in the household time zone. This applies only when the household time
+  zone is set under Settings; without it Yuvomi keeps using the time zone of the Google calendar,
+  as before. Events that were already shifted are not corrected automatically: set them to the
+  right time once, in Yuvomi or in Google.
 - **"Mark as renewed" follows the same permission as editing a subscription.** In the personal
   budget mode a subscription can only be changed or deleted by the member it belongs to. Marking
   it as renewed did not ask that question and now does: another member gets the same refusal as
