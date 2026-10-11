@@ -22,7 +22,9 @@
  *   - eine Löschung bleibt bei ihrem Konto;
  *   - eine Bestandszeile ohne Kalenderbezug wird weiter über die UID gefunden -
  *     aber nicht, wenn ihre Adresse oder ihr Upload-Ziel auf ein anderes Konto
- *     zeigt;
+ *     zeigt (ein anderer Server, oder derselbe Server bei einem anderen
+ *     Benutzer); trägt sie eine wartende Bearbeitung, bindet der Abruf sie,
+ *     damit die Bearbeitung hinausgehen kann;
  *   - ohne belegtes Konto geht nichts hinaus: kein Konto genannt, eine Zeile
  *     ohne Adresse und Kalender, oder Adresse und Kalender in verschiedenen
  *     Konten - jeweils keine Anfrage, und die Vormerkung bleibt ohne gezählten
@@ -329,6 +331,50 @@ test('Zeile ohne Kalenderbezug, die für ein anderes Konto bestimmt ist: der Abr
   assert.equal(db.prepare('SELECT title FROM calendar_events WHERE id = ?').get(id).title, 'Für B',
     'Konto A hat eine Zeile übernommen, die für Konto B bestimmt ist');
   assert.equal(rowsByCalendar().of(accounts.a)?.title, 'Aus A');
+});
+
+test('Zeile ohne Kalenderbezug, deren Objekt auf demselben Server bei einem anderen Benutzer liegt: der Abruf lässt sie stehen', async () => {
+  const accounts = twoAccounts();
+  accounts.b.dav.reset();
+  // Derselbe Server wie Konto A, aber ein anderes Kalender-Home: die Zeile
+  // eines früheren Kontos, das auf demselben Host lag.
+  const elsewhere = `${accounts.a.dav.origin}/other-user/family/shared.ics`;
+  const id = Number(db.prepare(`
+    INSERT INTO calendar_events
+      (title, start_datetime, end_datetime, all_day, created_by, external_source,
+       external_calendar_id, external_object_url)
+    VALUES ('Vom anderen Benutzer', '2035-03-10T09:00Z', '2035-03-10T10:00Z', 0, 1, 'caldav', ?, ?)
+  `).run(UID, elsewhere).lastInsertRowid);
+
+  await caldavSync.sync();
+
+  const kept = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(id);
+  assert.equal(kept.title, 'Vom anderen Benutzer', 'derselbe Host hat als Zugehörigkeit genügt');
+  assert.equal(kept.external_object_url, elsewhere);
+  assert.equal(rowsByCalendar().of(accounts.a)?.title, 'Aus A');
+});
+
+test('bearbeitete Bestandszeile ohne Adresse und Kalender: der Abruf bindet sie, die Bearbeitung geht hinaus', async () => {
+  const accounts = twoAccounts();
+  accounts.b.dav.reset();
+  const id = Number(db.prepare(`
+    INSERT INTO calendar_events
+      (title, start_datetime, end_datetime, all_day, created_by, external_source, external_calendar_id, outbound_dirty)
+    VALUES ('Hier bearbeitet', '2035-03-10T09:00Z', '2035-03-10T10:00Z', 0, 1, 'caldav', ?, 1)
+  `).run(UID).lastInsertRowid);
+
+  await caldavSync.sync();
+
+  // Ohne Bindung bliebe sie für immer liegen: der Ausgang schickt nichts ohne
+  // belegtes Konto, und der Abruf fasst eine wartende Bearbeitung nicht an.
+  const { rows, of } = rowsByCalendar();
+  assert.equal(rows.length, 1);
+  assert.equal(of(accounts.a)?.id, id, 'die Zeile wurde nicht an den Kalender gebunden, der sie liefert');
+  assert.equal(rows[0].external_object_url, accounts.a.objectUrl);
+  assert.equal(rows[0].title, 'Hier bearbeitet', 'der Abruf hat die wartende Bearbeitung überschrieben');
+  assert.equal(summaryAt(accounts.a), 'Hier bearbeitet', 'die Bearbeitung ist nicht hinausgegangen');
+  assert.equal(rows[0].outbound_dirty, 0);
+  assertRequestsStayWithTheirAccount({ a: accounts.a });
 });
 
 // ── Ohne belegtes Konto geht nichts hinaus ──────────────────────────────────────

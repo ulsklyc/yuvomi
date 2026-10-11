@@ -16,7 +16,7 @@ import {
 import { assignDefaultToEvent, reassignDefaultOnCalendarMove } from './sync-assignment.js';
 import { pruneDeletedEvents, countMirroredEvents, deleteMirroredEvents } from './calendar-prune.js';
 import * as outbound from './calendar-outbound.js';
-import { processPendingDeletions, processPendingUpdates, flushAccount, onSameServer } from './caldav-outbound.js';
+import { processPendingDeletions, processPendingUpdates, flushAccount, inSameCalendarHome } from './caldav-outbound.js';
 import { detachAccountRows } from './caldav-todo-outbound.js';
 import { runSerialized } from '../utils/sync-lock.js';
 import { toICSDatetime, escapeICSText } from '../utils/ics-format.js';
@@ -847,14 +847,15 @@ async function runSync({ createClient } = {}) {
   // gibt). Sie wird weiter über die UID gefunden und vom Abruf an den Kalender
   // gebunden, der sie liefert - sonst legte der erste Lauf nach dem Update
   // jede solche Zeile ein zweites Mal an. Aber nur, wenn nichts an ihr auf ein
-  // ANDERES Konto zeigt: ihre Objektadresse liegt auf dem Server dieses Kontos
-  // oder fehlt, und ihr Upload-Ziel ist dieses Konto oder keins. Der Server,
-  // nicht der Kalender: nach einem Umzug auf dem Server oder einem gelöschten
-  // und neu angelegten Konto zeigt die Adresse in einen Kalender, den die
-  // Auswahl nicht mehr führt, und genau diese Zeilen soll der Abruf
-  // wiederfinden (#1270). Was sich so nicht zuordnen lässt, bleibt stehen, und
-  // das Objekt bekommt eine eigene Zeile. Die Zeile des eigenen Kontos geht
-  // immer vor.
+  // ANDERES Konto zeigt: ihre Objektadresse liegt im Kalender-Home dieses
+  // Kontos oder fehlt, und ihr Upload-Ziel ist dieses Konto oder keins. Das
+  // Home, nicht der einzelne Kalender: nach einem Umzug auf dem Server oder
+  // einem gelöschten und neu angelegten Konto zeigt die Adresse in einen
+  // Kalender, den die Auswahl nicht mehr führt, und genau diese Zeilen soll
+  // der Abruf wiederfinden (#1270). Und nicht bloss der Host: auf einem Server
+  // liegen viele Benutzer. Was sich so nicht zuordnen lässt, bleibt stehen,
+  // und das Objekt bekommt eine eigene Zeile. Die Zeile des eigenen Kontos
+  // geht immer vor.
   const selEventCandidates = conn.prepare(`
     SELECT e.id, e.outbound_dirty, e.calendar_ref_id, e.start_datetime, e.color, e.color_modified,
            e.external_object_url, e.target_caldav_account_id,
@@ -867,12 +868,12 @@ async function runSync({ createClient } = {}) {
     WHERE e.external_calendar_id = ? AND e.external_source = 'caldav'
     ORDER BY e.id
   `);
-  const existingEventOf = (accountId, uid, serverUrls) => {
+  const existingEventOf = (accountId, uid, calendarUrls) => {
     const candidates = selEventCandidates.all(accountId, uid);
     return candidates.find((row) => row.own)
       ?? candidates.find((row) => !row.bound
         && (row.target_caldav_account_id == null || row.target_caldav_account_id === accountId)
-        && (!row.external_object_url || onSameServer(row.external_object_url, serverUrls)));
+        && (!row.external_object_url || inSameCalendarHome(row.external_object_url, calendarUrls)));
   };
   // Offene Löschungen einmal je Lauf, nicht je eingehendem Termin. Je Objekt,
   // nicht je UID: dieselbe UID kann in einem zweiten Kalender liegen, der
@@ -970,6 +971,16 @@ async function runSync({ createClient } = {}) {
       AND outbound_dirty = 0 AND outbound_move_to IS NULL AND lower(color) = lower(?)
       AND ${uploadedRowRule('calendar_events.')}
       AND (? IS NULL OR datetime(created_at) <= datetime(?))
+  `);
+  // Eine Zeile ohne Konto, die der Abruf gerade diesem Konto zugeordnet hat,
+  // an das Objekt binden, das sie liefert - ohne ihren Inhalt anzufassen.
+  // Gebraucht wird das für eine WARTENDE Bearbeitung: der Zweig darunter lässt
+  // sie stehen, und der Ausgang schickt nichts ohne belegtes Konto. Ohne die
+  // Bindung wartete sie für immer.
+  const bindEvent = conn.prepare(`
+    UPDATE calendar_events
+    SET calendar_ref_id = ?, external_object_url = COALESCE(?, external_object_url)
+    WHERE id = ?
   `);
   const insEvent = conn.prepare(`
     INSERT INTO calendar_events
@@ -1150,7 +1161,7 @@ async function runSync({ createClient } = {}) {
               // zurück (#593).
               if (awaitsDeletion) continue;
 
-              let existing = existingEventOf(account.id, ev.uid, [account.caldav_url, ...ownUrls]);
+              let existing = existingEventOf(account.id, ev.uid, ownUrls);
 
               // Der eigene Upload, dessen Antwort verloren ging: die Zeile ist
               // noch lokal, das Objekt liegt schon hier. In die bestehende
@@ -1168,12 +1179,13 @@ async function runSync({ createClient } = {}) {
                       (e) => e.id === eventId && e.target_caldav_calendar_url === selCal.calendar_url
                     ),
                   })) {
-                existing = existingEventOf(account.id, ev.uid, [account.caldav_url, ...ownUrls]);
+                existing = existingEventOf(account.id, ev.uid, ownUrls);
               }
 
               // Eine lokale Bearbeitung, die noch auf ihren Push wartet, darf der
               // Inbound nicht mit dem alten Serverstand überschreiben (#593).
               if (existing?.outbound_dirty) {
+                if (!existing.own) bindEvent.run(calRefId, obj.url ?? null, existing.id);
                 accountEventCount++;
                 continue;
               }

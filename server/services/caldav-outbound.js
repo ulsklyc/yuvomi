@@ -164,11 +164,29 @@ export function liesWithin(url, calendarUrls) {
   return false;
 }
 
-/** Liegt diese Adresse auf demselben Server (Origin) wie eine der anderen? */
-export function onSameServer(url, otherUrls) {
-  const originOf = (value) => { try { return new URL(value).origin; } catch { return null; } };
-  const origin = originOf(url);
-  return origin !== null && otherUrls.some((other) => originOf(other) === origin);
+/**
+ * Liegt dieses Objekt im selben Kalender-Home wie einer der Kalender - also
+ * in einem Kalender NEBEN ihnen, beim selben Benutzer desselben Servers?
+ *
+ * Derselbe Host genügt dafür nicht: auf einem Server liegen viele Benutzer.
+ * Verglichen wird die Ebene über dem Kalender (`.../calendars/<benutzer>/`),
+ * mit Origin und dekodiertem Pfad.
+ */
+export function inSameCalendarHome(objectUrl, calendarUrls) {
+  const parentOf = (path) => path.replace(/[^/]*\/?$/, '');
+  const parts = (value) => {
+    try {
+      const parsed = new URL(value);
+      return { origin: parsed.origin, path: decodeURIComponent(parsed.pathname) };
+    } catch { return null; }
+  };
+  const object = parts(objectUrl);
+  if (!object) return false;
+  const home = parentOf(parentOf(object.path));
+  return calendarUrls.some((calendarUrl) => {
+    const calendar = parts(calendarUrl);
+    return !!calendar && calendar.origin === object.origin && parentOf(calendar.path) === home;
+  });
 }
 
 /** Dieselbe Adresse, gleich ob der Server `@` als `%40` zurückgibt. */
