@@ -207,6 +207,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **"Mark as renewed" follows the same permission as editing a subscription.** In the personal
+  budget mode a subscription can only be changed or deleted by the member it belongs to. Marking
+  it as renewed did not ask that question and now does: another member gets the same refusal as
+  for editing, and nothing is changed. The shared budget mode is unchanged.
 - **Managing budget categories shows the built-in categories in your language** (#1859, from D#1841).
   "Manage categories" in Budget listed the built-in categories and subcategories in English,
   whatever language Yuvomi ran in. They now appear in the language of the interface you are
