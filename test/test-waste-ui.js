@@ -974,6 +974,14 @@ test('Onboarding-CSS: Abholungen, Quellen, Abschnittstitel und Kopfknopf treten 
     '.waste-page--onboarding .waste-types-section .waste-section-title',
     '.waste-page--onboarding #waste-add-type-btn',
   ]) assert.ok(hidden.includes(sel), `${sel} fehlt`);
+  // #1771: ab der Schwelle des Spaltenrasters ueberspannt der Leerzustand beide
+  // Spuren, sonst steht er links der Mitte neben einer leeren Spalte. Die
+  // Schwelle ist wortgleich die des Rasters (PAGE-019, test-frontend-audit.js).
+  assert.match(
+    css,
+    /@container module-surface \(min-width: 65rem\)\s*\{\s*\.waste-page--onboarding \.page-columns__rail\s*\{\s*grid-column:\s*1 \/ -1;\s*\}\s*\}/,
+    'Onboarding: die Seitenspalte ueberspannt das Raster ab 65rem',
+  );
   // Seit #1775 kommen die Zustandsklassen aus pageModeClasses() - gemessen
   // wird, was die Funktion fuer das Onboarding sagt, nicht ihre Schreibweise.
   assert.equal(__test.pageModeClasses({ loading: false, error: null, types: [] })['waste-page--onboarding'], true);
