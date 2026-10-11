@@ -5515,3 +5515,53 @@ test('#1781: neu geladen wird ueber reloadMonth() - loadMonth(state.month) steht
   // Gegenprobe des Lesers: die Neulade-Stellen sind da und werden gesehen.
   assert.ok((code.match(/\breloadMonth\(\)/g) ?? []).length >= 18, 'Vorbedingung: der Guard liest die Neulade-Stellen');
 });
+
+// ── #1844: die erwartete Abo-Zahlung eines Folgemonats ──────────────────────────
+// Der Server rechnet sie beim Lesen (services/subscription-budget-projection.js)
+// und schickt sie ohne id. Die Zeile spricht die Sprache der erwarteten Buchung
+// (#637) - dieselbe Plakette, derselbe schraffierte Punkt -, hat aber nichts zu
+// oeffnen, zu aendern oder zu verbuchen: gebucht wird im Abo.
+test('#1844: erwartete Abo-Zeile - erwartet gekennzeichnet, ohne id, ohne Verbuchen, fuehrt zu den Abos', () => {
+  const vorher = { ...budgetUi.state };
+  const abo = zeile({
+    id: null, expected: true, subscription_id: 7, title: 'Streaming <b>', amount: -12.99,
+    category: 'subscriptions', date: '2999-02-20', is_pending: 1,
+  });
+  const erwartet = zeile({ id: 55, title: 'Strom', date: '2999-02-03', is_pending: 1 });
+  try {
+    Object.assign(budgetUi.state, {
+      month: '2999-02', entries: [abo, erwartet], responsibleFilterId: null, groupByResponsible: false,
+      ledgerQuery: '', ledgerResults: null, plannedExpandedMonth: null,
+    });
+    const html = budgetUi.renderEntries();
+    const reihen = html.split('<div class="list-row budget-entry').slice(1);
+    assert.equal(reihen.length, 2);
+    const [aboZeile, serienZeile] = reihen;
+
+    assert.match(aboZeile, /^ budget-entry--pending/, 'dieselbe Optik wie jede erwartete Buchung');
+    assert.match(aboZeile, /budget-badge--pending">budget\.pendingBadge</, 'dieselbe Plakette');
+    assert.doesNotMatch(aboZeile, /data-id=/, 'keine id: es gibt keine Buchung, die sich oeffnen liesse');
+    assert.doesNotMatch(html, /data-id="null"/);
+    assert.doesNotMatch(aboZeile, /data-action="confirm"/, 'verbucht wird im Abo, nicht hier');
+    assert.match(aboZeile, /data-open-subscription="7"/, 'die Zeile fuehrt zum Abo');
+    assert.match(aboZeile, /<button class="list-row__name budget-entry__title" type="button"\s+aria-label="budget\.expectedSubscriptionOpen: Streaming &lt;b&gt;, /,
+      'der Knopf nennt, wohin er fuehrt, und der Titel ist escaped');
+    assert.doesNotMatch(aboZeile, /budget\.editEntry/, 'kein "bearbeiten" fuer etwas, das sich nicht bearbeiten laesst');
+
+    // Gegenstueck: die erwartete Buchung einer Serie behaelt id und Verbuchen.
+    assert.match(serienZeile, /data-id="55"/);
+    assert.match(serienZeile, /data-action="confirm" data-id="55"/);
+    assert.doesNotMatch(serienZeile, /data-open-subscription/);
+  } finally { Object.assign(budgetUi.state, vorher); }
+});
+
+test('#1844: der Tipp auf die erwartete Abo-Zeile wechselt in den Abo-Reiter - auch bei Nur-lesen', () => {
+  const handler = budget.slice(budget.indexOf("_container.querySelector('#budget-list')?.addEventListener('click'"));
+  const riegel = handler.indexOf('if (action && readOnly() && !READ_SAFE_ACTIONS.has(action.dataset.action)) return;');
+  const sprung = handler.indexOf("e.target.closest('[data-open-subscription]')");
+  const zeile_ = handler.indexOf("e.target.closest('.budget-entry[data-id]')");
+  assert.ok(riegel > -1 && sprung > riegel && sprung < zeile_, 'nach dem Riegel, vor dem Zeilen-Klick');
+  // Kein `data-action`: der Wechsel liest nur, wie der Zustaendigen-Filter -
+  // die Positivliste der Aktionen bleibt, wie sie ist.
+  assert.doesNotMatch(budget, /data-action="open-subscription"/);
+});

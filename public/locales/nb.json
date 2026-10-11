@@ -1364,6 +1364,7 @@
         "confirmFirstHint": "Hver generert booking venter på din bekreftelse. Inntil da vises den i listen, men telles ikke med i totalsummen - du kan justere beløp og dato når du bekrefter.",
         "pendingBadge": "Forventet",
         "upcomingLabel": "Ikke skjedd ennå",
+        "expectedSubscriptionOpen": "Vis i Abonnementer",
         "confirmAction": "Book",
         "confirmTitle": "Bekreft booking",
         "confirmHint": "Korriger beløp og dato hvis det ble trukket annerledes.",

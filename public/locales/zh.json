@@ -1364,6 +1364,7 @@
         "confirmFirstHint": "每笔生成的记账都会等待你确认。在此之前它显示在列表中，但不计入任何合计；确认时可以调整金额和日期。",
         "pendingBadge": "待确认",
         "upcomingLabel": "尚未发生",
+        "expectedSubscriptionOpen": "在订阅中查看",
         "confirmAction": "记账",
         "confirmTitle": "确认记账",
         "confirmHint": "如果实际扣款不同，请更正金额和日期。",
