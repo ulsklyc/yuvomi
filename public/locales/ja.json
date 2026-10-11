@@ -5553,6 +5553,7 @@
         "money": {
             "title": "おこづかい",
             "setUp": "おこづかいを設定",
+            "empty": "子どものアカウントを作ると、おこづかいをここで管理でき、決めた日程で入金されます。",
             "planWeekly": "週に{{amount}}",
             "planMonthly": "月に{{amount}}",
             "nextCredit": "次回の入金: {{date}}",

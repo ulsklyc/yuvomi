@@ -5553,6 +5553,7 @@
         "money": {
             "title": "Taschengeld",
             "setUp": "Taschengeld einrichten",
+            "empty": "Eröffne ein Konto für ein Kind, um sein Taschengeld hier zu führen, nach Plan gutgeschrieben.",
             "planWeekly": "{{amount}} pro Woche",
             "planMonthly": "{{amount}} pro Monat",
             "nextCredit": "Nächste Gutschrift: {{date}}",

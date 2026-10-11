@@ -5553,6 +5553,7 @@
         "money": {
             "title": "Harçlık",
             "setUp": "Harçlığı ayarla",
+            "empty": "Bir çocuk için hesap açın; harçlığı burada tutulsun ve belirlenen takvimle hesabına yatırılsın.",
             "planWeekly": "Haftada {{amount}}",
             "planMonthly": "Ayda {{amount}}",
             "nextCredit": "Sonraki yatırma: {{date}}",

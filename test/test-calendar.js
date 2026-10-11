@@ -4023,6 +4023,41 @@ test('Kuerzel: t, j/k und m/w/d/a gelten nur auf /calendar und gehen an die Seit
   assert(/addEventListener\?\.\('yuvomi:calendar-command', onCalendarCommand\)/.test(cal), 'die Seite hoert die Kuerzel nicht');
 });
 
+/* Passwort-Autofill von Edge/Chrome schickt ein keydown OHNE `key`: auf
+ * Einstellungen > Kalender (zwei Passwortfelder) standen deshalb zwei rote
+ * „Unerwarteter Fehler"-Toasts, denn der Dispatcher rief `e.key.toLowerCase()`.
+ * Gefahren wird der echte Listener aus initKeyboardShortcuts() gegen Attrappen. */
+test('Kuerzel: ein keydown ohne key (Autofill) wirft nicht und loest nichts aus', () => {
+  const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  const src = router.slice(router.indexOf('function initKeyboardShortcuts('), router.indexOf('function showHelpModal('));
+  const listeners = [];
+  const ran = [];
+  const doc = {
+    activeElement: { tagName: 'BODY', isContentEditable: false },
+    addEventListener: (type, fn) => { if (type === 'keydown') listeners.push(fn); },
+    querySelector: () => null,
+  };
+  const shortcuts = [{ key: '/', action: () => ran.push('/') }];
+  new Function('document', 'SHORTCUTS', 'shortcutApplies', 'focusIsBare', 'ran',
+    `let _pendingKey = null; let _pendingTimer = null; const _openSearch = () => ran.push('suche');\n${src}\ninitKeyboardShortcuts();`,
+  )(doc, shortcuts, () => true, () => true, ran);
+  assert(listeners.length === 1, 'initKeyboardShortcuts() haengt keinen keydown-Listener an document');
+  const fire = (init) => {
+    let prevented = false;
+    listeners[0]({ altKey: false, shiftKey: false, metaKey: false, ctrlKey: false, ...init, preventDefault: () => { prevented = true; } });
+    return prevented;
+  };
+  for (const init of [{}, { ctrlKey: true }, { metaKey: true }]) {
+    let thrown = null;
+    try { fire(init); } catch (err) { thrown = err; }
+    assert(thrown === null, `ein keydown ohne key warf (${JSON.stringify(init)}): ${thrown}`);
+  }
+  assert(ran.length === 0, `ein keydown ohne key loeste ein Kuerzel aus: ${ran.join(', ')}`);
+  // Gegenprobe: echte Tasten laufen weiter durch denselben Listener.
+  assert(fire({ key: '/' }) === true && ran.join() === '/', '„/" oeffnet die Suche nicht mehr');
+  assert(fire({ key: 'K', ctrlKey: true }) === true && ran.join() === '/,suche', 'Ctrl+K oeffnet die Suche nicht mehr');
+});
+
 /* PR #1460, Review: der Tipp auf einen Tag zeichnet das Raster bewusst NICHT
  * neu - also muss selectMonthDay() den einen Tab-Stopp selbst mitnehmen, sonst
  * landet Tab von aussen auf dem alten Tag und die Pfeile starten dort. */
@@ -5648,6 +5683,54 @@ test('seriesEndConflict: neue Serie, geaenderte Regel und unveraenderte Bestands
   assert(calendarHelpers.seriesEndConflict('edit', lokal, lokal.recurrence_rule, '2091-10-02T11:00') === false,
     'gleicher Tag, gleiche Regel: der Bestand bleibt bearbeitbar');
   assert(calendarHelpers.seriesEndConflict('edit', lokal, 'FREQ=DAILY;UNTIL=20910929T235959Z', '2091-10-02T09:00') === true, 'geaenderte Regel: wird gefragt');
+});
+
+// --------------------------------------------------------
+// #1808: ein Wandtablett hat kein „mir"
+// --------------------------------------------------------
+test('am Display wird ein gespeichertes „Mir zugewiesen" uebergangen (#1808)', () => {
+  // Im Browser gemessen: der Schluessel im Geraetespeicher ueberlebt das
+  // Koppeln, und der Kalender eines Displays blieb damit leer - ohne Schalter
+  // im Blatt, der ihn wieder ausgestellt haette.
+  const KEY = 'yuvomi:calendar:assignedToMe';
+  const basis = { events: FILTER_TERMINE, users: NUTZER, people: new Set(), hiddenSources: new Map(), layerBirthdays: true };
+  const tagMit = (user) => mitSpeicher({ [KEY]: '1' }, (daten) => {
+    const assignedToMe = calendarHelpers.restoreAssignedToMe(user);
+    const ids = mitFilterzustand({ ...basis, user, currentUserId: user.id, assignedToMe }, tagesIds);
+    return { ids, gespeichert: daten.get(KEY) };
+  });
+
+  const mensch = tagMit({ id: 1 });
+  assert(mensch.ids === '1', `Gegenfall: der Mensch sieht mit gespeicherter Wahl nur seine Termine, war ${mensch.ids}`);
+
+  const wand = tagMit({ id: 9, access_scope: 'display' });
+  assert(wand.ids === '1,2,3,4', `das Display sieht alle Termine, war "${wand.ids}"`);
+  assert(wand.gespeichert === '1', 'der Speicher bleibt stehen - die Wahl gehoert dem Menschen an diesem Geraet');
+});
+
+test('am Display bietet das Filterblatt „Mir zugewiesen" nicht an (#1808)', () => {
+  const blatt = (user) => {
+    let opened = null;
+    const prevOpen = globalThis.__openModal;
+    const prevDoc = globalThis.document;
+    const hadWindow = 'window' in globalThis;
+    const prevWindow = globalThis.window;
+    globalThis.__openModal = (opts) => { opened = opts; };
+    globalThis.document = { ...(prevDoc ?? {}), querySelector: () => null };
+    globalThis.window = { matchMedia: () => ({ matches: false }) };
+    try {
+      mitFilterzustand({ users: NUTZER, user, currentUserId: user.id, assignedToMe: false, people: new Set(), hiddenSources: new Map() },
+        () => calendarHelpers.openCalendarFilters());
+    } finally {
+      globalThis.__openModal = prevOpen;
+      globalThis.document = prevDoc;
+      if (hadWindow) globalThis.window = prevWindow; else delete globalThis.window;
+    }
+    assert(opened, 'das Filterblatt oeffnet kein Modal');
+    return opened.content;
+  };
+  assert(/data-filter-mine/.test(blatt({ id: 1 })), 'Gegenfall: der Mensch behaelt den Schalter');
+  assert(!/data-filter-mine/.test(blatt({ id: 9, access_scope: 'display' })), 'am Display steht der Schalter nicht im Blatt');
 });
 
 // --------------------------------------------------------

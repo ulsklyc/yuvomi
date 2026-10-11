@@ -2659,10 +2659,22 @@ svg.weather-forecast__icon {
 
 /* Modul-Label als ruhiger Untertitel (Footnote, Sekundaerfarbe) - nie versal,
  * nie ueber dem Titel (Craft-Floor-Bann Eyebrow). */
+/* EINE ZEILE (#1698). Seit die Unterzeile eines Termins den Namen seines
+ * Kalenders traegt, steht dort Nutzereingabe: „Familienkalender Schule, Vereine
+ * und alle Arzttermine" braeche auf dem Telefon um und machte die Zeile hoeher
+ * als ihre Nachbarn. Die Zustandskarte spricht in einem Satz und darf weiter
+ * umbrechen. */
 .today-cockpit-card__sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--color-text-secondary);
   font-size: var(--type-caption);
   line-height: var(--line-height-tight);
+}
+
+.today-cockpit-card--state .today-cockpit-card__sub {
+  white-space: normal;
 }
 
 /* Zeit als trailing Detail: die Programm-Zeile beantwortet „wann", nicht „wie
@@ -5616,10 +5628,24 @@ button.today-cockpit__more--link {
   }
 }
 
+/* AUCH DIE UNTERZEILE BLEIBT EINE ZEILE (#1698). Bis dahin stand dort ein
+ * Wort aus der App („Termin", „Aufgabe"); seit sie den Namen des Kalenders
+ * traegt, steht dort Nutzereingabe - „Familienkalender Schule und Vereine"
+ * braeche um und kostete die Hoehe, die WALL_ROW_CAP fuer vier Zeilen
+ * gerechnet hat. */
 .wall-row__sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--wall-row-sub);
   line-height: var(--line-height-tight);
   color: var(--color-text-secondary);
+}
+
+/* Die Zustandszeile des leeren Tages spricht in einem Satz („Als Naechstes
+ * morgen: …") und steht allein - sie darf umbrechen wie bisher. */
+.wall-row--state .wall-row__sub {
+  white-space: normal;
 }
 
 .wall-row__time {
@@ -5627,6 +5653,18 @@ button.today-cockpit__more--link {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   color: var(--color-text-secondary);
+}
+
+/* DAS ENDE WEICHT, WO DIE ZEILE ZU SCHMAL IST (#1698). Auf dem Wandtablet
+ * nimmt „9:30 PM - 11:30 PM" 161 von 617px Zeilenbreite. Auf einer Flaeche
+ * unter Tablettbreite - jemand hat den Schalter auf dem Telefon erwischt -
+ * waren es 132 von 254px: die Uhrzeit breiter als der Titel, der dann nach elf
+ * Zeichen umbrach. Dort bleibt der Beginn allein, wie vor #1698. Dieselbe
+ * Grenze wie beim Titel darueber. */
+@container wall (max-width: 519px) {
+  .wall-row__time-end {
+    display: none;
+  }
 }
 
 .wall-row__time--overdue {
