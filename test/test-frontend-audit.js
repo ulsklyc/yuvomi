@@ -2360,7 +2360,9 @@ test('Shopping uses the shared category manager component (Audit F-15)', () => {
   const component = read('../public/components/category-manager.js');
   assert.match(component, /customElements\.define\(\s*'yuvomi-category-manager'/);
   assert.match(component, /import \{ api \} from '\/api\.js'/);
-  assert.match(component, /import \{ t \} from '\/i18n\.js'/);
+  // `t` unter den Importen, nicht die Schreibweise der Zeile: seit #1859 steht
+  // `getLocale` daneben.
+  assert.match(component, /import \{[^}]*\bt\b[^}]*\} from '\/i18n\.js'/);
   assert.match(component, /import \{ esc \} from '\/utils\/html\.js'/);
   // Schlüssel-Helper: Budget/Tasks/Kontakte liefern `key`, Einkauf numerische `id`.
   assert.match(component, /item\.key \?\? item\.id/);

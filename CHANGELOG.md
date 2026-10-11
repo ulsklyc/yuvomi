@@ -207,6 +207,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Managing budget categories shows the built-in categories in your language** (#1859, from D#1841).
+  "Manage categories" in Budget listed the built-in categories and subcategories in English,
+  whatever language Yuvomi ran in. They now appear in the language of the interface you are
+  using, as they do everywhere else in Budget. Categories you created keep their name. For
+  API users this changes an answer: `GET /api/v1/budget/categories` and
+  `GET /api/v1/budget/categories/{categoryKey}/subcategories` without `lang`, or with a value
+  that is not supported, now return the labels in the household language instead of English.
+  Send `lang=en` to keep English; a supported `lang` works as before, and the response still
+  names the language it used.
 - **Long words break at a sensible place in Safari and on the iPhone** (Refs #1774). Where a long
   word does not fit its line, Yuvomi hyphenates it and keeps at least four letters on each side of
   the hyphen (three in the calendar's week view). Safari ignored that limit, so a name such as
@@ -227,6 +236,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Wall mode shows the icon you chose for an event** (#1829). Events on the wall always carried the
   generic calendar icon, whatever was picked in the event editor. They now show their own icon, as
   the calendar does; an event without one keeps the calendar icon.
+- **The first-run state of Waste sits in the middle of the page on a desktop** (#1771). Without a
+  waste type the page showed its first-run block left of the middle with an empty column beside
+  it. On a wide window it now spans the content area and is centred in it. With at least one
+  waste type the two columns are unchanged. From a window of about 1500px the page's width cap
+  leaves it slightly left of centre again.
+- **A long account name on a phone breaks between word parts, not inside one** (#1774). On the
+  accounts tab at 390px, "Wertpapierdepot" was split as "Wertpapierde-pot" and "Housekeeping cash"
+  as "Housekeepin" and "g cash", because the amount column kept its full width. A word is now only
+  hyphenated with at least four letters on each side ("Wertpapier-depot"), and the column with the
+  amount gives up its width, down to the amount itself, before the name is broken inside a word.
+  The amount is never squeezed or overlapped.
 - **A wall tablet shows events again when the household overview is set to "Assigned to me"** (#1808).
   A paired display follows the household default of the overview. If that default had the calendar
   tile set to "Assigned to me", the tablet looked for events assigned to the tablet itself and
@@ -240,6 +260,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the calendar without any switch to turn it off again. A wall tablet now ignores the remembered
   choice, and the task filters no longer offer the switch there. The choice itself stays stored
   for the person who made it.
+- **A calendar or reminder server that says no is no longer taken for a yes.** When a CalDAV
+  server refused a request - a calendar or list shared read-only, a full account, a server that
+  was briefly overloaded, or an entry somebody else had just changed - Yuvomi booked the request
+  as done. An event, task or shopping item created here and refused by the server was then removed
+  from Yuvomi by the next sync, as if it had been deleted on the server. An edit that the server
+  refused was undone by the next sync. Something deleted here came back. And moving an event into
+  a calendar that refused it deleted the event from its old calendar, so it was gone on both
+  sides. Now an entry created here that the server refuses stays in Yuvomi and is offered again
+  with every sync, for as long as it takes. A refused change or deletion is retried up to five
+  times, as it always was after a network error; after the fifth refusal Yuvomi gives up on it,
+  and the next sync brings the server's version back - the old text of an edited entry, or the
+  entry you deleted. A move into a calendar that refuses it leaves the event where it was. A
+  server that briefly refused to list your calendars, reminder lists or address books, or
+  answered with an empty list, also used to get all of them switched off in the sync settings;
+  they now stay on. This affects CalDAV accounts, iCloud calendars and CardDAV address books. The
+  update cannot bring back entries that were already removed this way, and a calendar or list
+  that was switched off has to be switched on again in the sync settings. An entry that an
+  earlier version booked as uploaded although the server had refused it, and that is still in
+  Yuvomi, is not rescued either: the first sync after the update still removes it (#1839).
+- **An entry no longer doubles when the server's answer gets lost.** If the server saved a new
+  event, task or shopping item but its confirmation never arrived, Yuvomi now recognises its own
+  entry on the server instead of importing it as a second one. For that, entries created in Yuvomi
+  from now on get a file name on the server that also carries an identifier of this installation,
+  so two Yuvomi installations using the same account can no longer overwrite each other's
+  entries. Entries that are already on the server keep their name.
+- **The contact sync says why a connection failed.** Adding or testing a CardDAV account that the
+  server refuses now shows the server's answer instead of a generic error.
 - **A locked field looks locked.** A field you cannot change looked exactly like one you can -
   same text, same fill, same outline; only the mouse pointer gave it away, and on a phone nothing
   did. Text, number and date fields, dropdowns and text areas now all show it the same way,
