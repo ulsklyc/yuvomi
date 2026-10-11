@@ -604,9 +604,20 @@
 /* Die Abschnitte stehen im Spaltenraster der Seite (`.page-columns`,
    layout.css): Abholungen links, Abfallarten und Quellen in der Seitenspalte.
    Im Onboarding ist die Listenspalte leer - ohne sie rueckt der Leerzustand in
-   die erste Spur und steht auf dem Lesemass statt in der schmalen Spalte. */
+   die erste Spur und steht auf dem Lesemass statt in der schmalen Spalte. Ab
+   der Schwelle des Rasters ueberspannt er beide Spuren (Regel darunter). */
 .waste-page--onboarding .page-columns__main {
   display: none;
+}
+
+/* Mit zwei Spuren (ab der Schwelle des Spaltenrasters, layout.css) stuende der
+   Leerzustand in der ersten Spur und die zweite bliebe leer. Er ueberspannt
+   beide und steht damit in der Mitte der Inhaltsflaeche. Die Schwelle ist die
+   des Rasters (`--layout-split-threshold`, PAGE-019). */
+@container module-surface (min-width: 65rem) {
+  .waste-page--onboarding .page-columns__rail {
+    grid-column: 1 / -1;
+  }
 }
 
 /* Der Abstand der Abschnitte bleibt der des Seitenkoerpers vor dem Raster. */

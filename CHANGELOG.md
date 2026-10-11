@@ -188,6 +188,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The first-run state of Waste sits in the middle of the page on a desktop** (#1771). Without a
+  waste type the page showed its first-run block left of the middle with an empty column beside
+  it. On a wide window it now spans the content area and is centred in it. With at least one
+  waste type the two columns are unchanged. From a window of about 1500px the page's width cap
+  leaves it slightly left of centre again.
 - **A wall tablet shows events again when the household overview is set to "Assigned to me"** (#1808).
   A paired display follows the household default of the overview. If that default had the calendar
   tile set to "Assigned to me", the tablet looked for events assigned to the tablet itself and
