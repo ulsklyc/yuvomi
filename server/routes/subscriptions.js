@@ -15,6 +15,9 @@ import {
   resolveRenewal,
 } from '../services/subscriptions.js';
 import { getRates } from '../services/subscription-rates.js';
+import {
+  subscriptionBudgetAmount, subscriptionBudgetCurrency, subscriptionBudgetTitle,
+} from '../services/subscription-budget-projection.js';
 import { refuseWhileRestoring } from '../middleware/restore-gate.js';
 import { findLogoOptions } from '../services/subscription-logo.js';
 import { normalizeObjectVisibility, budgetVisibilityWhere, canEditEntry, resolveBudgetMode } from '../services/budget-visibility.js';
@@ -111,21 +114,21 @@ function endConfigErrors({ end_type, end_date, occurrence_count, next_payment_da
 }
 
 function budgetCurrency() {
-  return db.get().prepare("SELECT value FROM sync_config WHERE key = 'currency'").get()?.value
-    || settings().base_currency
-    || 'EUR';
+  return subscriptionBudgetCurrency(db.get());
 }
 
+// Betrag und Titel der Buchung rechnet services/subscription-budget-projection.js:
+// die gebuchte Zeile hier und die erwarteten Zeilen der Folgemonate (#1844)
+// muessen dasselbe sagen, also gibt es die Rechnung einmal.
 async function budgetExpenseAmount(subscription) {
   const currency = budgetCurrency();
-  if (subscription.currency === currency) return Math.abs(Number(subscription.amount));
+  if (subscription.currency === currency) return subscriptionBudgetAmount(subscription, currency, {});
   const result = await getRates(currency, [subscription.currency]);
-  return Math.abs(convertAmount(subscription.amount, subscription.currency, currency, result.rates) ?? Number(subscription.amount));
+  return subscriptionBudgetAmount(subscription, currency, result.rates);
 }
 
 function budgetEntryTitle(subscription) {
-  const suffix = subscription.currency === budgetCurrency() ? '' : ` (${subscription.currency})`;
-  return `${subscription.name}${suffix}`;
+  return subscriptionBudgetTitle(subscription, budgetCurrency());
 }
 
 async function syncBudgetExpense(subscription, { preserveCurrent = false } = {}) {

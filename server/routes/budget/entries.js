@@ -25,6 +25,9 @@ import {
   refusal, refusals, refuse,
 } from './helpers.js';
 import { nonMemberMessage } from '../../services/household-members.js';
+import {
+  expectedSubscriptionEntries, expectedSubscriptionTotals, SUBSCRIPTION_BUDGET_CATEGORY,
+} from '../../services/subscription-budget-projection.js';
 
 const log = createLogger('Budget');
 const router = express.Router();
@@ -109,6 +112,15 @@ router.get('/summary', (req, res) => {
       WHERE date BETWEEN ? AND ?${filter.clause} AND is_pending = 1
     `).get(from, to, ...filter.params);
 
+    // ABO-ZAHLUNGEN DER FOLGEMONATE GEHOEREN IN DIESELBE ZAHL (#1844). Sie
+    // stehen in der Liste als erwartet und in keiner Summe - genau der Fall,
+    // fuer den es `pending` gibt. Gerechnet beim Lesen
+    // (services/subscription-budget-projection.js), mit demselben Filter wie
+    // die Buchungen: was der Betrachter nicht sieht, zaehlt er auch nicht.
+    const expected = expectedSubscriptionTotals(db.get(), {
+      from, to, filter: budgetFilter(req, 's'),
+    });
+
     res.json({
       data: {
         month,
@@ -117,9 +129,9 @@ router.get('/summary', (req, res) => {
         balance:    totals.balance  || 0,
         byCategory,
         pending: {
-          count:    pending.count,
-          income:   pending.income,
-          expenses: pending.expenses,
+          count:    pending.count + expected.count,
+          income:   cents(pending.income + expected.income),
+          expenses: cents(pending.expenses + expected.expenses),
         },
       },
     });
@@ -164,6 +176,14 @@ router.get('/export', (req, res) => {
       WHERE b.date BETWEEN ? AND ?${filter.clause}
       ORDER BY b.date ASC
     `).all(from, to, ...filter.params));
+    // Die erwarteten Abo-Zahlungen stehen in der Liste, also auch im Export
+    // desselben Zeitraums (#1844) - als `Expected`, wie jede erwartete Buchung.
+    // Stabil nach Datum einsortiert: Gebuchtes steht am selben Tag zuerst.
+    const expected = expectedSubscriptionEntries(db.get(), { from, to, filter: budgetFilter(req, 's') });
+    if (expected.length) {
+      entries.push(...expected);
+      entries.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    }
 
     const header = 'Date,Title,Amount,Category,Subcategory,Recurring,Status,Created by\n';
     const csvSafe = (val) => {
@@ -271,7 +291,9 @@ router.get('/', (req, res) => {
     // Kategorie-Aufschluesselung einen Drilldown hat. Der Bind des Ausdrucks
     // steht an seiner Stelle im WHERE, also VOR dem Vergleichswert.
     const categoryKey = req.query.category;
-    if (categoryKey && (categoryKey === BUDGET_MASKED_CATEGORY || validCategoryKeys().includes(categoryKey))) {
+    const validCategoryFilter = Boolean(categoryKey)
+      && (categoryKey === BUDGET_MASKED_CATEGORY || validCategoryKeys().includes(categoryKey));
+    if (validCategoryFilter) {
       const catExpr = budgetCategoryExpr(req, 'b');
       sql += ` AND ${catExpr.expr} = ?`;
       params.push(...catExpr.params, categoryKey);
@@ -295,6 +317,30 @@ router.get('/', (req, res) => {
 
     const entries = db.get().prepare(sql).all(...params).map(withResponsibles);
     const masked = maskEntries(req, withAttachments(entries, documentViewer(req)));
+
+    // DIE FOLGEMONATE EINES ABOS (#1844). Ein Abo haelt genau eine Buchung, am
+    // Tag seiner naechsten Zahlung; ohne diese Zeilen stand es in einem
+    // einzigen Monat. Gerechnet beim Lesen, nichts wird angelegt - Regeln und
+    // Begruendung in services/subscription-budget-projection.js.
+    //
+    // NUR IN DER MONATSLISTE: der Darlehens-Drilldown fragt nach Raten, und ein
+    // Kontofilter nach dem, was ueber ein Konto lief - eine erwartete
+    // Abo-Zahlung haengt an keinem. Der Kategoriefilter trifft sie unter
+    // ihrer Kategorie; maskiert wird hier nichts, weil ein Abo die Stufe
+    // 'shared_amount' nicht kennt (BUDGET_OBJECT_VISIBILITY_VALUES).
+    const accountFiltered = Number.isInteger(parseInt(req.query.account_id, 10))
+      && parseInt(req.query.account_id, 10) > 0;
+    const categoryAllows = !categoryKey || !validCategoryFilter || categoryKey === SUBSCRIPTION_BUDGET_CATEGORY;
+    if (!loanId && !accountFiltered && categoryAllows) {
+      const expected = expectedSubscriptionEntries(db.get(), {
+        from, to, filter: budgetFilter(req, 's'),
+      });
+      if (expected.length) {
+        masked.push(...expected);
+        // Stabil: am selben Tag bleibt Gebuchtes vor Erwartetem.
+        masked.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+      }
+    }
     // Der Darlehens-Drilldown filtert auf eine Verknuepfung, und die nimmt die
     // Maske einer fremden 'shared_amount'-Rate weg (#659). Auf die maskierte
     // Sicht gefiltert passt eine solche Rate deshalb zu keinem Darlehen - sonst
