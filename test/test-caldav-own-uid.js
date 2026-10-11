@@ -937,7 +937,7 @@ test('412: gelesen wird das Objekt an genau dieser Adresse, und gemerkt wird nur
   assert.equal(await find(undefined), null);
 
   // Dieselbe Adresse in der Schreibweise des Servers (`@` als `%40`).
-  const encoded = `${collection}${uid.replace('@', '%40')}.ics`;
+  const encoded = `${collection}${uid.replaceAll('@', '%40')}.ics`;
   assert.notEqual(encoded, objectUrl);
   assert.deepEqual(await find([{ url: encoded, etag: '"2"', data: ours }]), { url: objectUrl, etag: '"2"', data: ours },
     'die Adresse aus der Antwort wurde übernommen statt der angefragten');
