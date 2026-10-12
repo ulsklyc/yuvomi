@@ -25,7 +25,6 @@
  */
 
 import { t } from '/i18n.js';
-import { errorSentence } from '/utils/friendly-error.js';
 import { esc } from '/utils/html.js';
 import { pushOverlay, dropOverlay, isOverlayOpen } from '/utils/overlay-history.js';
 import { wireSheetDrag } from '/utils/sheet-drag.js';
@@ -1972,7 +1971,7 @@ function wireConfirmation(panel, finish, onConfirm) {
       finish(true);
     } catch (err) {
       if (error) {
-        error.textContent = errorSentence(err);
+        error.textContent = err?.data?.error ?? err?.message ?? t('common.errorGeneric');
         error.hidden = false;
       }
     } finally {

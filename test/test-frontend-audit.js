@@ -21140,11 +21140,20 @@ const SERVER_TEXT_OWNERS = new Set([
 ]);
 
 // Datei -> Zahl der Stellen, die den Text des Servers noch lesen. Nur senken.
+//
+// EINE ANHEBUNG, einmalig: #1243 (mehrere lokale Kalender) entstand vor #1909
+// und brachte drei Stellen mit - zwei Toasts im Kalender-Manager (Anlegen,
+// Loeschen) und die Fehlerzeile von wireConfirmation in components/modal.js.
+// Der allgemeine Satz naehme dort z. B. der Namenspruefung (400) die Ursache,
+// deshalb stieg hier die Zahl (pages/calendar.js 5 -> 7, components/modal.js
+// 0 -> 1) statt dass die Stellen blind umgestellt wurden. Die Kalender-Scheibe
+// von #1909 raeumt sie mit eigenen Gruenden und Saetzen ab.
 const SERVER_TEXT_OPEN = new Map([
+  ['components/modal.js', 1],
   ['components/quick-links-manager.js', 2],
   ['components/task-detail.js', 1],
   ['pages/birthdays.js', 1],
-  ['pages/calendar.js', 5],
+  ['pages/calendar.js', 7],
   ['pages/contacts.js', 4],
   ['pages/documents.js', 9],
   ['pages/health.js', 28],

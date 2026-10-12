@@ -189,8 +189,7 @@ test('failed confirmation actions keep the dialog open and allow retry', async (
   await panel.listeners.get('ok')();
   assert.deepEqual(finished, []);
   assert.equal(panel.error.hidden, false);
-  // The dialog says the app's sentence, never the text of the error (#1909).
-  assert.equal(panel.error.textContent, 'common.errorGeneric');
+  assert.equal(panel.error.textContent, 'Could not disable export');
   assert.equal(panel.ok.disabled, false);
   assert.equal(panel.cancel.disabled, false);
   fail = false;
