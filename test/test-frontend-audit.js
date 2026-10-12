@@ -2360,7 +2360,9 @@ test('Shopping uses the shared category manager component (Audit F-15)', () => {
   const component = read('../public/components/category-manager.js');
   assert.match(component, /customElements\.define\(\s*'yuvomi-category-manager'/);
   assert.match(component, /import \{ api \} from '\/api\.js'/);
-  assert.match(component, /import \{ t \} from '\/i18n\.js'/);
+  // `t` unter den Importen, nicht die Schreibweise der Zeile: seit #1859 steht
+  // `getLocale` daneben.
+  assert.match(component, /import \{[^}]*\bt\b[^}]*\} from '\/i18n\.js'/);
   assert.match(component, /import \{ esc \} from '\/utils\/html\.js'/);
   // Schlüssel-Helper: Budget/Tasks/Kontakte liefern `key`, Einkauf numerische `id`.
   assert.match(component, /item\.key \?\? item\.id/);
@@ -6449,6 +6451,13 @@ test('responsive adaptation keeps Notes vertical and prevents intrinsic-width ov
   assert.match(
     notes,
     /@container notes-page \(min-width:\s*720px\)[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/
+  );
+  // #1765: never more than four columns, and the four-column step sits at 1200px.
+  assert.doesNotMatch(notes, /repeat\(5/);
+  assert.doesNotMatch(notes, /@container notes-page \(min-width:\s*900px\)/);
+  assert.match(
+    notes,
+    /@container notes-page \(min-width:\s*1200px\)\s*\{[^}]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/
   );
   assert.match(
     dashboard,

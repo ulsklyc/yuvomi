@@ -213,7 +213,8 @@ export function moduleCountsFrom(data, { isAdmin = false, shoppingVisible = fals
    * einzige, die einen FREMDEN Modulzähler tragen kann - die anderen erscheinen
    * gar nicht erst, wenn ihr Modul fehlt, diese hier bleibt stehen, solange
    * eines der vier da ist. Der Server zählt `shoppingOpenCount` ungefiltert über
-   * den ganzen Haushalt (`routes/dashboard.js`), also warb die Kachel mit
+   * den ganzen Haushalt (`routes/dashboard.js`) - auch wenn die Einkaufs-Kachel
+   * eine Listen-Auswahl trägt: die füllt nur `shoppingTile` (#1818) -, also warb die Kachel mit
    * Arbeit in einem Modul, das sich nicht öffnen lässt, und führte beim Antippen
    * nach Mahlzeiten (Codex-Review zu PR #754). */
   counts.kitchen = shoppingVisible ? counts.shopping : 0;

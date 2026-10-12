@@ -1166,7 +1166,9 @@ test('Listenbewegung R17: Notizen, Dokumente, Kontakte, Budget, Inventar, Abos, 
     ['documents', /<article class="document-card\$\{[^}]+\}" data-id="\$\{doc\.id\}">/],
     ['documents', /<article class="list-row document-row\$\{[^}]+\}" data-id="\$\{doc\.id\}">/],
     ['contacts', /contact-item" data-id="\$\{c\.id\}"/],
-    ['budget', /const rowInteraction = masked \? '' : `data-id="\$\{e\.id\}"`;/],
+    // Die erwartete Abo-Zeile (#1844) hat keine Buchung und damit keine id;
+    // jede Zeile MIT Buchung traegt sie weiter.
+    ['budget', /const rowInteraction = masked \? ''\s*: fromSubscription \? `data-open-subscription="[^`]+`\s*: `data-id="\$\{e\.id\}"`;/],
     ['inventory', /<div class="list-row" data-id="\$\{item\.id\}" data-md-id=/],
     ['subscriptions', /data-swipe-id="\$\{subscription\.id\}"/],
     ['split-expenses', /data-expense-id="\$\{expense\.id\}" data-row-key="expense-\$\{expense\.id\}"/],

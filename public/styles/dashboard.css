@@ -1249,6 +1249,8 @@
   /* Kategorienamen trennen statt brechen (W1, test:typography). */
   hyphens: auto;
   hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
   overflow-wrap: anywhere;
   color: var(--color-text-primary);
   background: var(--color-surface);
@@ -2659,10 +2661,22 @@ svg.weather-forecast__icon {
 
 /* Modul-Label als ruhiger Untertitel (Footnote, Sekundaerfarbe) - nie versal,
  * nie ueber dem Titel (Craft-Floor-Bann Eyebrow). */
+/* EINE ZEILE (#1698). Seit die Unterzeile eines Termins den Namen seines
+ * Kalenders traegt, steht dort Nutzereingabe: „Familienkalender Schule, Vereine
+ * und alle Arzttermine" braeche auf dem Telefon um und machte die Zeile hoeher
+ * als ihre Nachbarn. Die Zustandskarte spricht in einem Satz und darf weiter
+ * umbrechen. */
 .today-cockpit-card__sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--color-text-secondary);
   font-size: var(--type-caption);
   line-height: var(--line-height-tight);
+}
+
+.today-cockpit-card--state .today-cockpit-card__sub {
+  white-space: normal;
 }
 
 /* Zeit als trailing Detail: die Programm-Zeile beantwortet „wann", nicht „wie
@@ -4481,6 +4495,8 @@ button.today-cockpit__more--link {
   line-height: var(--line-height-snug);
   hyphens: auto;
   hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
   overflow-wrap: anywhere;
 }
 
@@ -5616,10 +5632,24 @@ button.today-cockpit__more--link {
   }
 }
 
+/* AUCH DIE UNTERZEILE BLEIBT EINE ZEILE (#1698). Bis dahin stand dort ein
+ * Wort aus der App („Termin", „Aufgabe"); seit sie den Namen des Kalenders
+ * traegt, steht dort Nutzereingabe - „Familienkalender Schule und Vereine"
+ * braeche um und kostete die Hoehe, die WALL_ROW_CAP fuer vier Zeilen
+ * gerechnet hat. */
 .wall-row__sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--wall-row-sub);
   line-height: var(--line-height-tight);
   color: var(--color-text-secondary);
+}
+
+/* Die Zustandszeile des leeren Tages spricht in einem Satz („Als Naechstes
+ * morgen: …") und steht allein - sie darf umbrechen wie bisher. */
+.wall-row--state .wall-row__sub {
+  white-space: normal;
 }
 
 .wall-row__time {
@@ -5627,6 +5657,18 @@ button.today-cockpit__more--link {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   color: var(--color-text-secondary);
+}
+
+/* DAS ENDE WEICHT, WO DIE ZEILE ZU SCHMAL IST (#1698). Auf dem Wandtablet
+ * nimmt „9:30 PM - 11:30 PM" 161 von 617px Zeilenbreite. Auf einer Flaeche
+ * unter Tablettbreite - jemand hat den Schalter auf dem Telefon erwischt -
+ * waren es 132 von 254px: die Uhrzeit breiter als der Titel, der dann nach elf
+ * Zeichen umbrach. Dort bleibt der Beginn allein, wie vor #1698. Dieselbe
+ * Grenze wie beim Titel darueber. */
+@container wall (max-width: 519px) {
+  .wall-row__time-end {
+    display: none;
+  }
 }
 
 .wall-row__time--overdue {
@@ -6662,7 +6704,7 @@ button.today-cockpit__more--link {
 .nutrition-widget { display: grid; gap: var(--space-3); padding: var(--space-4); }
 .nutrition-widget__rows { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
 .nutrition-widget__row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--space-2) var(--space-3); }
-.nutrition-widget__label { font-size: var(--text-sm); color: var(--color-text-secondary); min-width: 0; hyphens: auto; hyphenate-limit-chars: 6 4 4; overflow-wrap: anywhere; }
+.nutrition-widget__label { font-size: var(--text-sm); color: var(--color-text-secondary); min-width: 0; hyphens: auto; hyphenate-limit-chars: 6 4 4; -webkit-hyphenate-limit-before: 4; -webkit-hyphenate-limit-after: 4; overflow-wrap: anywhere; }
 .nutrition-widget__bar { grid-column: 1 / -1; grid-row: 2; display: block; block-size: var(--space-2); border-radius: var(--radius-full); background: var(--color-fill-well); overflow: hidden; }
 .nutrition-widget__fill { display: block; block-size: 100%; inline-size: 100%; transform: scaleX(var(--nutrition-scale, 0)); transform-origin: left center; border-radius: inherit; background: var(--module-health); }
 .nutrition-widget__bar--over .nutrition-widget__fill { background: var(--color-warning); }
