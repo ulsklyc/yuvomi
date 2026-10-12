@@ -1664,6 +1664,30 @@ they do to network errors:
   a failed attempt: `404`/`410` settle it (the object is gone), `400` gives up at once, everything
   else - `403`, `412` (stale ETag; the next run reads the fresh one), `5xx`, `507` - is retried and
   given up after five attempts.
+- A **deletion for a calendar or reminder list that is switched off** waits (#1884). Switching a
+  calendar or list off is not a clean-up: while it is off, no `DELETE` goes there, neither in the
+  sync run nor in the immediate attempt, and the tombstone counts no attempt. It is carried out
+  once the calendar or list is selected again, and until then keeps hiding its entry from the
+  import. It is dropped without a request when its place is gone: the server's listing no longer
+  names the calendar or list (the same listing that switches a selected one off; an empty listing
+  counts as an incomplete answer and drops nothing), or the account is deleted. An account with
+  nothing selected asks for the listing only while such a deletion waits. Selection is read per
+  tombstone right before its request (`selectionOf` in `server/services/caldav-sync.js`,
+  `inUnselectedList` in `server/services/caldav-todo-outbound.js`). An event tombstone names its
+  calendar; a task or shopping tombstone does not, its list is the collection of its stored
+  object address, and an address in no known list is not treated as switched off. If the fetch
+  finds the task's object in a selected list by now, it is deleted there. The run reports the
+  number of waiting deletions per account in the log when it changes, not on every run. iCloud
+  has no selection; there only the "calendar is gone" part applies. Known boundaries: a deletion
+  for a selected calendar whose fetch keeps failing still waits without counting (see #1863); and
+  a task whose own stray upload is queued for removal in a list that is switched off before the
+  removal ran is not uploaded through that account until the list is selected again or gone
+  (`withoutOwnRemoval`).
+  Before, an event tombstone was skipped by the run but sent by the immediate attempt, where
+  every refusal counted until it was given up and the event came back on re-selecting; one
+  without a stored address, or in an account with nothing selected, waited forever, also after
+  its calendar was deleted on the server; and a task or shopping tombstone was sent into a
+  switched-off list.
 - A **move** whose copy is refused in the destination leaves the source untouched. `404`/`410`
   on the copy means the *destination* is gone, not the event: only the move is dropped, a pending
   edit still goes out in the old calendar. `412` on the copy means the name is taken in the

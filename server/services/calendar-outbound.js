@@ -384,6 +384,63 @@ export function dropDeletionsWithoutAccount() {
   return removed;
 }
 
+/**
+ * Räumt die Löschaufträge ab, deren Kalender es auf dem Server nicht mehr gibt
+ * (#1884): mit dem Kalender ist auch das Objekt fort, der Auftrag hat sein
+ * Ziel erreicht. Ohne das wartete er für immer - der Lauf liest einen
+ * verschwundenen Kalender nie wieder (er schaltet ihn ab), und ein Auftrag
+ * ohne gespeicherte Adresse hat keinen anderen Weg.
+ *
+ * `listedUrls` ist die Auflistung DIESES Laufs und muss vom Aufrufer als
+ * brauchbar befunden sein: eine leere gilt bei allen Anbietern als
+ * unvollständige Antwort, nicht als leeres Konto, und darf hier nicht ankommen.
+ * Dieselbe Auflistung schaltet auch einen eingeschalteten Kalender ab, der in
+ * ihr fehlt. Verglichen wird ohne Rücksicht auf den Schlussstrich.
+ *
+ * Ohne Anfrage an den Server. Taucht der Kalender doch wieder auf (die
+ * Auflistung war unvollständig), kann der gelöschte Termin einmal zurückkommen.
+ *
+ * @param {string} source 'caldav' | 'apple'
+ * @param {object} p
+ * @param {number} [p.accountId]  bei CalDAV das Konto, dessen Auflistung das ist
+ * @param {Iterable<string>} p.listedUrls  jede Collection, die der Server nennt
+ * @returns {number} abgeräumte Aufträge
+ */
+export function dropDeletionsOfMissingCalendars(source, { accountId = null, listedUrls }) {
+  const listed = [...(listedUrls || [])];
+  if (listed.length === 0) return 0;
+  let rows;
+  try {
+    rows = pendingDeletions(source, { accountId });
+  } catch (err) {
+    log.warn(`Pending deletions are not readable (${err.message}); nothing was cleared.`);
+    return 0;
+  }
+  const gone = new Map();
+  for (const row of rows) {
+    const calendarUrl = row.calendar_external_id;
+    if (!calendarUrl || listed.some((url) => sameCalendarUrl(url, calendarUrl))) continue;
+    dropDeletion(row.id);
+    gone.set(calendarUrl, (gone.get(calendarUrl) || 0) + 1);
+  }
+  let dropped = 0;
+  for (const [calendarUrl, count] of gone) {
+    dropped += count;
+    log.warn(`[${source === 'apple' ? 'Apple' : 'CalDAV'}] Calendar ${calendarUrl} no longer exists on the server: dropped ${count} pending deletion(s) for it, its entries are gone with it.`);
+  }
+  return dropped;
+}
+
+/**
+ * Wie viele Löschaufträge dieses Kontos warten, weil ihr Kalender abgewählt
+ * ist (#1884)? Für die Meldung des Laufs.
+ * @param {(calendarUrl: string) => boolean} isSelected
+ */
+export function deletionsWaitingForSelection(source, { accountId = null, isSelected }) {
+  return pendingDeletions(source, { accountId })
+    .filter((row) => row.calendar_external_id && !isSelected(row.calendar_external_id)).length;
+}
+
 export function dropDeletion(id) {
   db.get().prepare('DELETE FROM calendar_pending_deletions WHERE id = ?').run(id);
 }
@@ -1075,7 +1132,7 @@ function uploadTargetNow(now, { source, calendarUrl, accountId }) {
 }
 
 /** Zwei Schreibweisen derselben Kalender-URL: mit und ohne Schlussstrich. */
-function sameCalendarUrl(a, b) {
+export function sameCalendarUrl(a, b) {
   const trim = (url) => String(url || '').replace(/\/+$/, '');
   return trim(a) === trim(b);
 }

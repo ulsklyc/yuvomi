@@ -430,6 +430,25 @@ async function sync(opts = {}) {
   return runSerialized('caldav-todo', 'sync', () => runSync(opts));
 }
 
+// Konto → Zahl der wartenden Aufträge, die zuletzt gemeldet wurde: im
+// Standard-Log steht der Zustand, wenn er sich ändert, nicht bei jedem Lauf.
+const reportedWaiting = new Map();
+
+/**
+ * Meldet, wie viele Löschaufträge dieses Kontos auf eine abgewählte Liste
+ * warten (#1884).
+ */
+function reportWaitingDeletions(account) {
+  const waiting = todoOutbound.deletionsWaitingForSelection(account.id).length;
+  const before = reportedWaiting.get(account.id) || 0;
+  reportedWaiting.set(account.id, waiting);
+  if (!waiting) return;
+  const line = `Account ${account.id} ("${account.name}"): ${waiting} pending deletion(s) wait for a reminder list that is not selected. `
+    + 'Nothing is deleted there while it is switched off; they are carried out once it is selected again and dropped if it no longer exists on the server.';
+  if (waiting !== before) log.info(line);
+  else log.debug(line);
+}
+
 async function runSync({ createClient: makeClient } = {}) {
   const accounts = getAllAccounts();
   if (accounts.length === 0) {
@@ -449,10 +468,23 @@ async function runSync({ createClient: makeClient } = {}) {
         SELECT * FROM caldav_reminder_selection WHERE account_id = ? AND enabled = 1
       `).all(account.id);
 
-      if (enabledLists.length === 0) continue;
+      // Ohne eingeschaltete Liste gibt es nichts abzurufen. Wartet aber ein
+      // Löschauftrag auf eine abgewählte (#1884), fragt der Lauf trotzdem die
+      // Auflistung ab: nur sie sagt, ob es die Liste noch gibt.
+      const waitsForSelection = todoOutbound.deletionsWaitingForSelection(account.id).length > 0;
+      if (enabledLists.length === 0 && !waitsForSelection) continue;
 
       const client     = await clientFactory(account);
       const serverCals  = await client.fetchCalendars();
+
+      if (enabledLists.length === 0) {
+        // Eine leere Auflistung sagt auch hier nichts.
+        if (serverCals.length > 0) {
+          todoOutbound.dropDeletionsOfMissingLists(account.id, serverCals.map((c) => c.url));
+        }
+        reportWaitingDeletions(account);
+        continue;
+      }
       // Der Server nennt KEINE Collection, obwohl Listen ausgewählt sind: das
       // ist eine unvollständige Antwort (ein Multistatus, der nur die
       // Home-Collection nennt oder jede Ressource mit 403 quittiert), kein
@@ -465,6 +497,10 @@ async function runSync({ createClient: makeClient } = {}) {
         );
         continue;
       }
+      // Löschaufträge für Listen, die der Server nicht mehr nennt, haben ihr
+      // Ziel erreicht (#1884). Vor dem Lesen der Aufträge für den Abruf unten.
+      todoOutbound.dropDeletionsOfMissingLists(account.id, serverCals.map((c) => c.url));
+
       const owner       = db.get().prepare('SELECT id FROM users ORDER BY id ASC LIMIT 1').get();
       const createdBy   = owner ? owner.id : 1;
 
@@ -638,6 +674,8 @@ async function runSync({ createClient: makeClient } = {}) {
           log.error(`Outbound VTODO changes failed for account ${account.id} (${module}):`, err.message);
         }
       }
+
+      reportWaitingDeletions(account);
 
       // Die Reste nie bestätigter Uploads entfernen (#1882). Nach dem Abruf,
       // der sie nicht importiert hat, und vor den Uploads: eine Zeile mit

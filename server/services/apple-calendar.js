@@ -561,6 +561,11 @@ async function runSync({ makeClient } = {}) {
     await outbound.releaseLeftoverUploads(client, {
       source: 'apple', wantsUploadHere: stillWantsUpload, calendarUrls: ownCalendarUrls,
     });
+    // iCloud kennt keine Auswahl, also keinen abgewählten Kalender. Was es
+    // gibt, ist der Kalender, den die Auflistung nicht mehr nennt: sein
+    // Auftrag hat sein Ziel erreicht (#1884). Die Auflistung ist oben als
+    // nicht leer befunden.
+    outbound.dropDeletionsOfMissingCalendars('apple', { listedUrls: calendars.map((cal) => cal.url) });
     const removed = await processPendingDeletions(client, 'apple', objectIndex, ownCalendarUrls);
     if (removed) log.info(`${removed} pending deletion(s) applied in iCloud.`);
     const pushed = await processPendingUpdates(client, 'apple', objectIndex, calendarsByUrl);
