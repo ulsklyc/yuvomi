@@ -1364,6 +1364,7 @@
         "confirmFirstHint": "Cada lançamento gerado aguarda a sua confirmação. Até lá aparece na lista mas não conta em nenhum total - pode ajustar o valor e a data ao confirmar.",
         "pendingBadge": "Previsto",
         "upcomingLabel": "Ainda não aconteceu",
+        "expectedSubscriptionOpen": "Ver em Assinaturas",
         "confirmAction": "Lançar",
         "confirmTitle": "Confirmar lançamento",
         "confirmHint": "Corrija o valor e a data se o débito foi diferente.",
@@ -5566,6 +5567,7 @@
         "money": {
             "title": "Mesada",
             "setUp": "Configurar a mesada",
+            "empty": "Abra uma conta para uma criança e acompanhe aqui a mesada dela, creditada em datas programadas.",
             "planWeekly": "{{amount}} por semana",
             "planMonthly": "{{amount}} por mês",
             "nextCredit": "Próximo crédito: {{date}}",

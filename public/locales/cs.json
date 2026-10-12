@@ -1437,6 +1437,7 @@
         "confirmFirstHint": "Každá vytvořená položka čeká na vaše potvrzení. Do té doby je v seznamu, ale nezapočítává se do žádného součtu - při potvrzení lze upravit částku i datum.",
         "pendingBadge": "Očekáváno",
         "upcomingLabel": "Ještě nenastalo",
+        "expectedSubscriptionOpen": "Zobrazit v předplatných",
         "confirmAction": "Zaúčtovat",
         "confirmTitle": "Potvrdit položku",
         "confirmHint": "Částku a datum můžete opravit, pokud byly strženy jinak.",
@@ -5699,6 +5700,7 @@
         "money": {
             "title": "Kapesné",
             "setUp": "Nastavit kapesné",
+            "empty": "Založte dítěti účet, kde se bude vést jeho kapesné a pravidelně připisovat podle plánu.",
             "planWeekly": "{{amount}} týdně",
             "planMonthly": "{{amount}} měsíčně",
             "nextCredit": "Další připsání: {{date}}",

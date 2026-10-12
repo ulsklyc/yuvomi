@@ -1379,6 +1379,7 @@
         "confirmFirstHint": "Jede erzeugte Buchung wartet auf deine Bestätigung. Bis dahin steht sie in der Liste, zählt aber in keiner Summe mit - Betrag und Datum lassen sich beim Bestätigen anpassen.",
         "pendingBadge": "Erwartet",
         "upcomingLabel": "Noch nicht eingetreten",
+        "expectedSubscriptionOpen": "In Abonnements ansehen",
         "confirmAction": "Buchen",
         "confirmTitle": "Buchung bestätigen",
         "confirmHint": "Betrag und Datum kannst du korrigieren, falls anders abgebucht wurde.",
@@ -5566,6 +5567,7 @@
         "money": {
             "title": "Taschengeld",
             "setUp": "Taschengeld einrichten",
+            "empty": "Eröffne ein Konto für ein Kind, um sein Taschengeld hier zu führen, nach Plan gutgeschrieben.",
             "planWeekly": "{{amount}} pro Woche",
             "planMonthly": "{{amount}} pro Monat",
             "nextCredit": "Nächste Gutschrift: {{date}}",

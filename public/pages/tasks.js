@@ -3845,7 +3845,9 @@ function filterSheetGroups() {
   }
 
   const showRows = [];
-  if (state.users.length > 1 && state.currentUserId != null) {
+  // Am Wandtablett nicht (#1808): „mir" waere das Display-Konto, dem nie eine
+  // Aufgabe zugewiesen ist - der Schalter leerte die Liste.
+  if (state.users.length > 1 && state.currentUserId != null && !actingAsDisplay()) {
     showRows.push(toggleRowHtml({ label: t('tasks.assignedToMe'), icon: 'user', checked: isAssignedToMe(),
       attrs: { 'data-filter-mine': 'true' } }));
   }
@@ -4092,7 +4094,30 @@ function isAssignedToMe() {
   return state.currentUserId != null && hasFilter('assigned_to', state.currentUserId);
 }
 
+/**
+ * „Mir zugewiesen" pro Geraet wiederherstellen (setzt assigned_to auf die eigene ID).
+ *
+ * NICHT AM WANDTABLETT (#1808). Der Schluessel liegt im Browser, nicht am
+ * Konto: wer am selben Geraet vorher als Mensch angemeldet war, hinterlaesst
+ * ihn, und das Koppeln raeumt ihn nicht weg. Am Display hiesse „mir" das
+ * Display-Konto - die Liste bliebe leer. Er wird hier UEBERGANGEN statt
+ * geloescht: meldet sich am Geraet wieder ein Mensch an, gilt seine Wahl weiter.
+ */
+function restoreAssignedToMe() {
+  if (actingAsDisplay()) return;
+  try {
+    if (state.currentUserId != null && localStorage.getItem(ASSIGNED_TO_ME_KEY) === '1') {
+      if (!hasFilter('assigned_to', state.currentUserId)) {
+        state.filters.assigned_to = [...state.filters.assigned_to, String(state.currentUserId)];
+      }
+    }
+  } catch {}
+}
+
 function persistAssignedToMe() {
+  // Am Display nie schreiben: der Filter ist dort nie gesetzt, das erste Laden
+  // schriebe '0' ueber die Wahl des Menschen, die oben stehen bleiben soll.
+  if (actingAsDisplay()) return;
   try { localStorage.setItem(ASSIGNED_TO_ME_KEY, isAssignedToMe() ? '1' : '0'); } catch {}
 }
 
@@ -5667,14 +5692,7 @@ export async function render(container, { user, signal } = {}) {
   // darf (#734) - der Server prüft dieselbe Bedingung noch einmal.
   state.isAdmin = user?.role === 'admin';
 
-  // „Mir zugewiesen" pro Gerät wiederherstellen (setzt assigned_to auf die eigene ID)
-  try {
-    if (state.currentUserId != null && localStorage.getItem(ASSIGNED_TO_ME_KEY) === '1') {
-      if (!hasFilter('assigned_to', state.currentUserId)) {
-        state.filters.assigned_to = [...state.filters.assigned_to, String(state.currentUserId)];
-      }
-    }
-  } catch {}
+  restoreAssignedToMe();
 
   // View-Mode: URL-Parameter > localStorage > Default 'list'
   const urlView = new URLSearchParams(window.location.search).get('view');
@@ -5908,6 +5926,9 @@ export const __test = {
   // nur im Quelltext behauptet: die Karte fuer das Markup, das Einhaengen der
   // Wischgeste fuer den Weg, der gar kein Markup hat.
   renderTaskCard, wireSwipeGestures,
+  // #1808: ein Display hat kein „mir" - der gespeicherte Schalter wird dort
+  // beim Lesen uebergangen.
+  restoreAssignedToMe, persistAssignedToMe,
   // Der Aufgaben-Dialog als Markup: welche Felder er zeigt und wen er anbietet.
   renderModalContent,
   // Der Erinnerungs-Abschnitt einzeln, weil er einen Zustand zu BENENNEN hat,

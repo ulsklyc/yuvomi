@@ -1725,3 +1725,125 @@ test('ein zweiter Google-Sofortversuch arbeitet den Tombstone des ersten nicht m
   assert.equal(second.deletes.length, 0);
   assert.equal(tombstones().length, 0);
 });
+
+// ── Zone der ausgehenden Wanduhrzeit (#1875) ────────────────────────────────────
+// `start_datetime` ist zonenlose Wanduhrzeit, und gelesen wie geschrieben wird sie
+// überall in der Haushaltszone. Der Outbound etikettierte sie dagegen mit der Zone
+// des ZIELKALENDERS: steht der auf UTC (Familien- und per API angelegte Kalender
+// tun das), ging "14:00" als 14:00 UTC hinaus und stand in Amsterdam auf 16:00 -
+// und der nächste Inbound holte genau diesen verschobenen Zeitpunkt zurück.
+//
+// Die GESETZTE Haushaltszone gilt deshalb zuerst. Ohne Einstellung bleibt es bei
+// der Kalenderzone (#572): `TZ` ist im Container meist UTC und sagt nichts über
+// den Haushalt, die Kalenderzone ist dort die bessere Auskunft.
+//
+// Zeit und Zone stehen fest: ein Sommertermin 2035, Zone als Einstellung, keine
+// Uhr und keine Maschinenzone in der Aussage.
+
+function setHouseholdZone(zone) {
+  if (zone) {
+    db.prepare(`
+      INSERT INTO sync_config (key, value) VALUES ('household_timezone', ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    `).run(zone);
+  } else {
+    db.prepare("DELETE FROM sync_config WHERE key = 'household_timezone'").run();
+  }
+}
+
+/** Führt `fn` mit dieser Haushaltszone aus und nimmt die Einstellung danach zurück. */
+async function withHouseholdZone(zone, fn) {
+  setHouseholdZone(zone);
+  try { return await fn(); } finally { setHouseholdZone(null); }
+}
+
+/** Attrappe für einen ganzen sync()-Lauf: leerer Inbound, aufgezeichnete Inserts. */
+function fakeSyncCalendar(calendarTimeZone) {
+  const inserts = [];
+  return {
+    inserts,
+    calendarList: {
+      get: async ({ calendarId }) => ({
+        data: { accessRole: 'owner', timeZone: calendarTimeZone, summary: calendarId, backgroundColor: '#4285F4' },
+      }),
+    },
+    colors: { get: async () => ({ data: { event: {} } }) },
+    events: {
+      list:   async () => ({ data: { items: [], nextSyncToken: 'token-1' } }),
+      insert: async (params) => { inserts.push(params); return { data: { id: `created-${inserts.length}` } }; },
+      patch:  async () => ({}),
+      delete: async () => ({}),
+    },
+  };
+}
+
+function insertLocalEventFor(target) {
+  const r = db.prepare(`
+    INSERT INTO calendar_events
+      (title, start_datetime, end_datetime, all_day, external_source, target_google_calendar_id, created_by)
+    VALUES ('Zahnarzt', '2035-07-10T14:00', '2035-07-10T15:00', 0, 'local', ?, 1)
+  `).run(target);
+  return r.lastInsertRowid;
+}
+
+test('#1875: der Patch nennt die gesetzte Haushaltszone, nicht die des Kalenders', async () => {
+  reset();
+  await withHouseholdZone('Europe/Amsterdam', async () => {
+    seedDirty({ start_datetime: '2035-07-10T14:00', end_datetime: '2035-07-10T15:00' }, 'gev-zone-patch');
+
+    const calendar = fakeCalendar({ calendars: writableCalendars(['primary'], { timeZone: 'UTC' }) });
+    assert.equal(await __test.processPendingUpdates(calendar, {}), 1);
+
+    const { start, end } = calendar.patches[0].requestBody;
+    assert.equal(start.dateTime, '2035-07-10T14:00:00', 'die Wanduhrzeit geht unverändert hinaus');
+    assert.equal(start.timeZone, 'Europe/Amsterdam', '14:00 ist 14:00 im Haushalt, nicht 14:00 UTC');
+    assert.equal(end.timeZone, 'Europe/Amsterdam');
+  });
+});
+
+test('#1875: ein neu angelegter Termin geht über sync() in der gesetzten Haushaltszone hinaus', async () => {
+  reset();
+  await withHouseholdZone('Europe/Amsterdam', async () => {
+    __test.setCalendarEnabled('family', true, { name: 'Family' });
+    const id = insertLocalEventFor('family');
+
+    const calendar = fakeSyncCalendar('UTC');
+    await sync({ createCalendar: () => calendar });
+
+    assert.equal(calendar.inserts.length, 1, 'der lokale Termin wurde angelegt');
+    const { start, end } = calendar.inserts[0].requestBody;
+    assert.equal(start.dateTime, '2035-07-10T14:00:00');
+    assert.equal(start.timeZone, 'Europe/Amsterdam');
+    assert.equal(end.timeZone, 'Europe/Amsterdam');
+    assert.equal(reload(id).external_source, 'google', 'der Termin ist danach gespiegelt');
+  });
+});
+
+test('#1875: ohne gesetzte Haushaltszone bleibt es bei der Zone des Kalenders (#572)', async () => {
+  reset();
+  setHouseholdZone(null);
+
+  seedDirty({ start_datetime: '2035-07-10T14:00', end_datetime: '2035-07-10T15:00' }, 'gev-zone-unset');
+  const patching = fakeCalendar({ calendars: writableCalendars(['primary'], { timeZone: 'Australia/Adelaide' }) });
+  assert.equal(await __test.processPendingUpdates(patching, {}), 1);
+  assert.equal(patching.patches[0].requestBody.start.timeZone, 'Australia/Adelaide');
+
+  reset();
+  __test.setCalendarEnabled('family', true, { name: 'Family' });
+  insertLocalEventFor('family');
+  const inserting = fakeSyncCalendar('Australia/Adelaide');
+  await sync({ createCalendar: () => inserting });
+  assert.equal(inserting.inserts.length, 1);
+  assert.equal(inserting.inserts[0].requestBody.start.timeZone, 'Australia/Adelaide');
+  assert.equal(inserting.inserts[0].requestBody.start.dateTime, '2035-07-10T14:00:00');
+});
+
+test('#1875: meldet Google keine Kalenderzone, gilt die Haushaltszone', async () => {
+  reset();
+  await withHouseholdZone('Europe/Amsterdam', async () => {
+    seedDirty({ start_datetime: '2035-07-10T14:00', end_datetime: '2035-07-10T15:00' }, 'gev-zone-nocal');
+    const calendar = fakeCalendar({ calendars: writableCalendars(['primary'], { timeZone: undefined }) });
+    assert.equal(await __test.processPendingUpdates(calendar, {}), 1);
+    assert.equal(calendar.patches[0].requestBody.start.timeZone, 'Europe/Amsterdam');
+  });
+});

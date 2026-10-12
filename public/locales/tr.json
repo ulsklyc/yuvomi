@@ -1364,6 +1364,7 @@
         "confirmFirstHint": "Oluşturulan her kayıt onayınızı bekler. O ana kadar listede görünür ama hiçbir toplama girmez - onaylarken tutarı ve tarihi düzeltebilirsiniz.",
         "pendingBadge": "Bekleniyor",
         "upcomingLabel": "Henüz gerçekleşmedi",
+        "expectedSubscriptionOpen": "Aboneliklerde görüntüle",
         "confirmAction": "İşle",
         "confirmTitle": "Kaydı onayla",
         "confirmHint": "Tahsilat farklı olduysa tutarı ve tarihi düzeltin.",
@@ -5566,6 +5567,7 @@
         "money": {
             "title": "Harçlık",
             "setUp": "Harçlığı ayarla",
+            "empty": "Bir çocuk için hesap açın; harçlığı burada tutulsun ve belirlenen takvimle hesabına yatırılsın.",
             "planWeekly": "Haftada {{amount}}",
             "planMonthly": "Ayda {{amount}}",
             "nextCredit": "Sonraki yatırma: {{date}}",

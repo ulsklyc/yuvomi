@@ -1364,6 +1364,7 @@
         "confirmFirstHint": "Chaque écriture générée attend votre confirmation. Jusque-là elle figure dans la liste sans compter dans aucun total - vous pouvez ajuster le montant et la date au moment de confirmer.",
         "pendingBadge": "Attendu",
         "upcomingLabel": "Pas encore survenu",
+        "expectedSubscriptionOpen": "Voir dans Abonnements",
         "confirmAction": "Comptabiliser",
         "confirmTitle": "Confirmer l'écriture",
         "confirmHint": "Corrigez le montant et la date si le prélèvement a été différent.",
@@ -5566,6 +5567,7 @@
         "money": {
             "title": "Argent de poche",
             "setUp": "Configurer l'argent de poche",
+            "empty": "Ouvrez un compte pour un enfant afin de suivre son argent de poche ici, crédité selon un calendrier.",
             "planWeekly": "{{amount}} par semaine",
             "planMonthly": "{{amount}} par mois",
             "nextCredit": "Prochain versement : {{date}}",

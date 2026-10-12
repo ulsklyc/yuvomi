@@ -1364,6 +1364,7 @@
         "confirmFirstHint": "Elke aangemaakte boeking wacht op je bevestiging. Tot dan staat ze in de lijst maar telt ze in geen enkel totaal mee - bij het bevestigen kun je bedrag en datum aanpassen.",
         "pendingBadge": "Verwacht",
         "upcomingLabel": "Nog niet gebeurd",
+        "expectedSubscriptionOpen": "Bekijken in Abonnementen",
         "confirmAction": "Boeken",
         "confirmTitle": "Boeking bevestigen",
         "confirmHint": "Corrigeer bedrag en datum als er anders is afgeschreven.",
@@ -5566,6 +5567,7 @@
         "money": {
             "title": "Zakgeld",
             "setUp": "Zakgeld instellen",
+            "empty": "Open een rekening voor een kind om zijn zakgeld hier bij te houden, volgens een schema bijgeschreven.",
             "planWeekly": "{{amount}} elke week",
             "planMonthly": "{{amount}} elke maand",
             "nextCredit": "Volgende bijschrijving: {{date}}",

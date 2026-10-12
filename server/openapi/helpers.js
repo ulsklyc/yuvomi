@@ -126,13 +126,31 @@ function stringPathParam(name, description) {
 // aus der die Route ihren `lang` aufloest. Bis #1523 stand hier eine Liste mit
 // 15 Codes, und jede spaeter hinzugekommene Sprache war als ungueltig
 // dokumentiert, obwohl die Route sie bediente.
-function langParam() {
+//
+// `fallback` sagt, was ohne brauchbares `lang` gilt, denn das ist je Route
+// verschieden: 'household' fuer die Budget-Kategorien (#1859, die Sprache des
+// Haushalts - ein fester `default` waere dort gelogen, er haengt an einer
+// Einstellung), sonst Englisch.
+function langParam({ fallback = 'default' } = {}) {
   const locales = getSupportedLocales();
+  const supported = `Language code for localized labels. Supported values: ${locales.join(', ')}.`;
+  if (fallback === 'household') {
+    return {
+      name: 'lang',
+      in: 'query',
+      required: false,
+      description: `${supported} Without it, or with a value that is not supported, the labels come in the household language (the \`language\` preference, else derived from \`region\`, else ${DEFAULT_LOCALE}). The response names the language it used in \`lang\`.`,
+      schema: {
+        type: 'string',
+        enum: [...locales],
+      },
+    };
+  }
   return {
     name: 'lang',
     in: 'query',
     required: false,
-    description: `Language code for localized labels. Supported values: ${locales.join(', ')}. Defaults to ${DEFAULT_LOCALE}.`,
+    description: `${supported} Defaults to ${DEFAULT_LOCALE}.`,
     schema: {
       type: 'string',
       default: DEFAULT_LOCALE,

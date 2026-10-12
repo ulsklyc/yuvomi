@@ -1364,6 +1364,7 @@
         "confirmFirstHint": "Cada apunte generado espera tu confirmación. Hasta entonces aparece en la lista pero no suma en ningún total; al confirmar puedes ajustar importe y fecha.",
         "pendingBadge": "Previsto",
         "upcomingLabel": "Aún no ha ocurrido",
+        "expectedSubscriptionOpen": "Ver en Suscripciones",
         "confirmAction": "Registrar",
         "confirmTitle": "Confirmar apunte",
         "confirmHint": "Corrige importe y fecha si el cargo fue distinto.",
@@ -5566,6 +5567,7 @@
         "money": {
             "title": "Paga",
             "setUp": "Configurar la paga",
+            "empty": "Abre una cuenta para un niño y lleva aquí su paga, abonada según un calendario.",
             "planWeekly": "{{amount}} por semana",
             "planMonthly": "{{amount}} al mes",
             "nextCredit": "Próximo abono: {{date}}",

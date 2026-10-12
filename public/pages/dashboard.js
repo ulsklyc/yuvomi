@@ -11,6 +11,7 @@ import { todaySheetContext, collectSourceRows, composeTodaySheet, codaAllowed, s
 import { t, formatDate, formatDayMonth, formatTime, timeSuffix, getLocale, getNumberFormat } from '/i18n.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 import { resolveEventColor } from '/utils/event-color.js';
+import { hasEventIcon, eventIconHtml } from '/utils/event-icon.js';
 import { compareMembers, sortMembers } from '/utils/member-order.js';
 import { buildWeekStrip } from '/utils/week-strip.js';
 import { relativeDateLabel, housekeepingSinceLabel } from '/utils/day-label.js';
@@ -253,6 +254,63 @@ function overviewEventTime(event, span) {
   if (span.until) return t('dashboard.todayUntil', { time: formatTime(span.until) });
   if (span.allDay) return t('dashboard.allDay');
   return formatTime(event.start_datetime);
+}
+
+/**
+ * Der Name des Kalenders, zu dem ein Termin gehoert - oder leer (#1698).
+ *
+ * `source_calendar_name` VOR `cal_name`, dieselbe Reihenfolge wie im
+ * Kalendermodul (calendar.js): `cal_name` kommt ueber die Verknuepfung des
+ * schon synchronisierten Termins und fehlt, solange ein neu angelegter Termin
+ * noch auf seinen Upload wartet; waehrend eines ausstehenden Umzugs nennt er
+ * noch den alten Kalender. `source_calendar_name` nennt in beiden Faellen das
+ * Ziel, das der Mensch gewaehlt hat.
+ */
+function eventCalendarName(event) {
+  return String(event?.source_calendar_name ?? '').trim() || String(event?.cal_name ?? '').trim();
+}
+
+/**
+ * Das Ende eines Termins fuer die WAND (#1698, D#988), fertig formatiert -
+ * oder leer, wenn die Zeile beim Beginn allein bleibt. Die Wand schreibt es
+ * hinter die Zeitangabe, die `overviewEventTime` liefert: Beginn UND Ende.
+ *
+ * „Frueh 6:00" sagt, wann die Schicht anfaengt; an der Wand will man wissen,
+ * wann sie vorbei ist. Wo `overviewEventTime` schon etwas anderes als den
+ * Beginn nennt („bis 12:00", „Ganztaegig"), bleibt es dabei - das Ende steht
+ * dort schon, oder es gibt keins.
+ *
+ * KEINE SPANNE OHNE ECHTES ENDE: fehlt es, liegt es nicht nach dem Beginn, oder
+ * liegt es einen ganzen Tag oder mehr danach, bleibt der Beginn allein. „22:00
+ * - 06:00" liest jeder als die Nacht; „18:00 - 12:00" fuer eine Reise bis
+ * uebermorgen laese sich wie ein Fehler.
+ *
+ * „EIN TAG ODER MEHR" IST EINE FRAGE AN DIE WANDUHR, NICHT AN DIE STOPPUHR.
+ * Verglichen werden die Stempel des Haushalts: das Ende gegen den Beginn am
+ * Folgetag zur selben Uhrzeit. Hier standen zuerst Millisekunden
+ * (`new Date(end) - new Date(start) >= 24 h`), und das war zweimal falsch: in
+ * der Nacht der Zeitumstellung hat der Tag 23 Stunden, Samstag 22:00 bis
+ * Sonntag 22:00 las sich als „22:00 - 22:00"; und `new Date('…T22:00')` liest
+ * die Ziffern in der Zone des GERAETS, die Antwort hing also am Tablett statt
+ * am Haushalt (dieselbe Falle wie #1534).
+ *
+ * Der Bindestrich ist dieselbe Form wie bei den Schichten des Blatts
+ * (utils/today-sheet.js).
+ */
+function wallEventEnd(event, span) {
+  if (span.until || span.allDay) return '';
+  const end = String(event?.end_datetime || '');
+  // Ein Ende ohne Uhrzeit ('YYYY-MM-DD') ist kein Ende einer Spanne. Der
+  // Riegel steht HIER und nicht im Stempel: `householdStamp('2026-09-25')`
+  // liest Mitternacht, und aus „18:00 bis zum 25." wuerde „18:00 - 00:00" -
+  // eine Uhrzeit, die niemand eingetragen hat.
+  if (end.length <= 10) return '';
+  const startStamp = householdStamp(String(event?.start_datetime || ''));
+  const endStamp = householdStamp(end);
+  if (!startStamp || !endStamp || endStamp <= startStamp) return '';
+  const dayLater = `${addLocalDays(startStamp.slice(0, 10), 1)}${startStamp.slice(10)}`;
+  if (endStamp >= dayLater) return '';
+  return formatTime(end);
 }
 
 function getAppName() {
@@ -1133,11 +1191,25 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
         sortKey: time || '00:01',
         timeLabel: overviewEventTime(event, span),
         title: event.title,
-        sub: t('dashboard.todayEvent'),
+        // Die Herkunft statt des Wortes „Termin" (#1698): der Name des
+        // Kalenders, im Heute-Blatt wie an der Wand. „Frueh" ist erst mit
+        // „Niklas Arbeitskalender" darunter eine Auskunft. Ein Termin, der nur
+        // in Yuvomi lebt, hat keinen Kalendernamen - er behaelt das Wort.
+        sub: eventCalendarName(event) || t('dashboard.todayEvent'),
+        // Das ENDE bleibt der Wand vorbehalten (entschieden in #1698): es reist
+        // neben `timeLabel` mit, und nur `renderWallRow` schreibt es dahinter.
+        // Das Blatt nennt weiter den Beginn allein.
+        wallTimeEnd: wallEventEnd(event, span),
         icon: 'calendar',
         tone: 'event',
         route: calendarEventRoute(event),
         who: event.assigned_users?.[0] ?? null,
+        // ALLE Zugewiesenen, nicht nur das eine Gesicht der Zeile (#1828): die
+        // Wand zaehlt den Termin bei jeder Person (rowPeopleIds).
+        people: event.assigned_users ?? [],
+        // Das am Termin gewaehlte Icon (#1829). `icon` bleibt das Zeichen des
+        // Moduls; wer das eigene zeigt, fragt hasEventIcon().
+        eventIcon: event.icon ?? null,
         // Beitrags-Vertrag (utils/today-sheet.js): ein Termin ist ein Rahmen
         // des Tages, kein Auftrag - er haelt die Coda nicht auf.
         priority: 40,
@@ -1172,6 +1244,7 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
         tone: 'task',
         route: '/tasks',
         who: task.assigned_users?.[0] ?? null,
+        people: task.assigned_users ?? [],
         priority: overdue ? 10 : 30,
         open: true,
       });
@@ -1220,6 +1293,20 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
     openShoppingCount: highlights.openShoppingCount,
     tasksDoneToday: Number(data?.tasksDoneToday) || 0,
   };
+}
+
+/**
+ * Wen eine Programmzeile angeht - JEDE zugewiesene Person, einmal (#1828).
+ * Die Zeile selbst zeigt ein Gesicht (`who`); gezaehlt hat die Wand deshalb
+ * nur dieses eine, und ein Termin fuer zwei stand bei einer Person. Zeilen
+ * ohne Liste (das Kochen, Beitraege anderer Module) bleiben bei `who`.
+ */
+function rowPeopleIds(row) {
+  const ids = (Array.isArray(row.people) ? row.people : [])
+    .map((person) => person?.id)
+    .filter((id) => id != null);
+  if (ids.length) return [...new Set(ids)];
+  return row.who?.id != null ? [row.who.id] : [];
 }
 
 // --------------------------------------------------------
@@ -3435,6 +3522,23 @@ function renderHousekeepingWidget(hk, currency) {
   </div>`;
 }
 
+/**
+ * Das Zeichen im Siegel einer Programmzeile - fuer "Heute wichtig" und fuer die
+ * Wand, die dieselben Zeilen lesen. Ein Termin zeigt das Icon, das jemand fuer
+ * ihn gewaehlt hat (#1829) - auf demselben Weg wie der Kalender
+ * (utils/event-icon.js): dieselbe Liste, derselbe Rueckfall. Ohne eigene Wahl
+ * und fuer jeden unbekannten Namen bleibt das Zeichen des Moduls, sonst stuende
+ * dort ein leeres Siegel. Die Herkunft traegt weiter die Farbe des Siegels.
+ * `module-glyph` ist die Marke aus nav-icons.js, an der die Strichstaerke haengt.
+ * Sammelzeile und Zustandszeile sprechen fuer kein einzelnes Objekt und fragen
+ * hier nicht.
+ */
+function programRowGlyph(row) {
+  return row.kind === 'event' && hasEventIcon(row.eventIcon)
+    ? eventIconHtml(row.eventIcon, 'module-glyph')
+    : moduleIconHTML(row.icon);
+}
+
 /* DAS UEBERLAPPUNGSZEICHEN (Block-2-Brief, utils/seal-pair.js): „Heute
  * wichtig" ist die Mischstelle des Dashboards - hier stehen Aufgabe, Termin,
  * Einkauf und Essen nebeneinander, und das Siegel sagt bereits, aus welchem
@@ -3481,7 +3585,7 @@ function renderTodayRow(row, extraClass = '') {
   // Reihenfolge, in der man eine Zeile liest.
   const whoName = mark ? `<span class="sr-only">, ${esc(row.who?.display_name ?? '')}</span>` : '';
   const inner = `
-      <span class="${mark ? 'seal-pair' : ''}"${mark ? ' aria-hidden="true"' : ''}><span class="module-seal today-cockpit-card__icon">${moduleIconHTML(row.icon)}</span>${mark}</span>
+      <span class="${mark ? 'seal-pair' : ''}"${mark ? ' aria-hidden="true"' : ''}><span class="module-seal today-cockpit-card__icon">${programRowGlyph(row)}</span>${mark}</span>
       <span class="today-cockpit-card__body">
         <strong class="today-cockpit-card__value">${esc(row.title)}</strong>
         <span class="today-cockpit-card__sub">${esc(row.sub)}</span>${whoName}
@@ -3538,11 +3642,16 @@ function groupOverdueRows(rows) {
   const seen = new Set();
   const people = [];
   for (const row of overdue) {
-    const id = row.who?.id;
-    if (id == null || seen.has(id)) continue;
-    seen.add(id);
-    // renderAvatarStack liest `color`, die Zeilen tragen `avatar_color`.
-    people.push({ ...row.who, color: row.who.color ?? row.who.avatar_color });
+    // JEDE zugewiesene Person, nicht nur das eine Gesicht der Zeile (#1828):
+    // eine Aufgabe fuer zwei geht beide an.
+    const assigned = Array.isArray(row.people) && row.people.length ? row.people : [row.who];
+    for (const person of assigned) {
+      const id = person?.id;
+      if (id == null || seen.has(id)) continue;
+      seen.add(id);
+      // renderAvatarStack liest `color`, die Zeilen tragen `avatar_color`.
+      people.push({ ...person, color: person.color ?? person.avatar_color });
+    }
   }
   const group = {
     kind: 'overdue',
@@ -5523,15 +5632,23 @@ const WALL_ROW_CAP = 4;
 
 /** Eine Programmzeile als reiner Text - kein href, kein data-route, kein Modal. */
 function renderWallRow(row) {
+  // Der Termin nennt an der Wand, hinter dem Beginn, sein Ende (#1698). Es
+  // steht in einem eigenen Element, weil es auf einer Flaeche unter
+  // Tablettbreite weicht (dashboard.css): dort naehme „9:30 PM - 11:30 PM" dem
+  // Titel mehr als die halbe Zeile.
+  const sub = row.sub;
+  const end = row.timeLabel && row.wallTimeEnd
+    ? `<span class="wall-row__time-end"> - ${esc(row.wallTimeEnd)}</span>`
+    : '';
   const time = row.timeLabel
-    ? `<span class="wall-row__time${row.overdue ? ' wall-row__time--overdue' : ''}">${esc(row.timeLabel)}</span>`
+    ? `<span class="wall-row__time${row.overdue ? ' wall-row__time--overdue' : ''}">${esc(row.timeLabel)}${end}</span>`
     : '';
   return `
     <li class="wall-row wall-row--${esc(row.tone)}">
-      <span class="module-seal wall-row__seal">${moduleIconHTML(row.icon)}</span>
+      <span class="module-seal wall-row__seal">${programRowGlyph(row)}</span>
       <span class="wall-row__body">
         <span class="wall-row__title">${esc(row.title)}</span>
-        <span class="wall-row__sub">${esc(row.sub)}</span>
+        <span class="wall-row__sub">${esc(sub)}</span>
       </span>
       ${time}
     </li>`;
@@ -5594,9 +5711,7 @@ function renderWallWho(data, model) {
 
   const counts = new Map();
   for (const row of model.allRows) {
-    const id = row.who?.id;
-    if (id == null) continue;
-    counts.set(id, (counts.get(id) ?? 0) + 1);
+    for (const id of rowPeopleIds(row)) counts.set(id, (counts.get(id) ?? 0) + 1);
   }
 
   const onDuty = users

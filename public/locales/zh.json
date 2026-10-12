@@ -1364,6 +1364,7 @@
         "confirmFirstHint": "每笔生成的记账都会等待你确认。在此之前它显示在列表中，但不计入任何合计；确认时可以调整金额和日期。",
         "pendingBadge": "待确认",
         "upcomingLabel": "尚未发生",
+        "expectedSubscriptionOpen": "在订阅中查看",
         "confirmAction": "记账",
         "confirmTitle": "确认记账",
         "confirmHint": "如果实际扣款不同，请更正金额和日期。",
@@ -5566,6 +5567,7 @@
         "money": {
             "title": "零花钱",
             "setUp": "设置零花钱",
+            "empty": "为孩子开设账户，在这里管理零花钱，并按计划定期入账。",
             "planWeekly": "每周 {{amount}}",
             "planMonthly": "每月 {{amount}}",
             "nextCredit": "下次入账：{{date}}",
