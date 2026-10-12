@@ -1690,3 +1690,76 @@ for (const via of ['upload', 'sync']) {
     assert.equal(rows().length, neighbours, 'die Aufgabe steht öfter da als jeder andere Eintrag der Liste');
   });
 }
+
+// Derselbe Kalender, zwei Schreibweisen: das erste Konto führt ihn mit, das
+// zweite ohne Schlussstrich. Der Löschauftrag des ersten nennt seine
+// Schreibweise; wird die Zeile über das zweite Spiegel, muss er trotzdem fallen.
+for (const via of ['Buchung', 'Übernahme']) {
+  test(`Termin: der Löschauftrag eines Kontos fällt auch bei anderer Schreibweise des Kalenders (${via})`, () => {
+    reset();
+    const way = WAYS.Termin;
+    const url     = way.setup();
+    const noSlash = url.slice(0, -1);
+    const second  = secondAccount();
+    const id  = way.create(url, 'Geteilter Kalender');
+    const uid = ownUid('event', id, db);
+    const objectUrl = `${url}${uid}.ics`;
+
+    // Wie nach dem Zielwechsel während des Uploads über das erste Konto.
+    assert.equal(outbound.queueDeletion({
+      source: 'caldav', calendarExternalId: url, eventExternalId: uid, objectUrl, accountId,
+    }), true);
+    setEventTarget(id, second, noSlash);
+    const what = { source: 'caldav', uid, objectUrl, calRefId: way.refId, calendarUrl: noSlash, accountId: second };
+    if (via === 'Buchung') {
+      const sent = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(id);
+      assert.equal(outbound.bookEventUpload(sent, { ...what, adopted: true }), 'mirrored');
+    } else {
+      assert.equal(outbound.adoptOwnEventUpload({ ...what, isWaitingHere: () => true }), true);
+    }
+    assert.equal(db.prepare('SELECT caldav_account_id FROM calendar_events WHERE id = ?').get(id).caldav_account_id, second);
+    assert.deepEqual(eventTombstones(), [], 'der Auftrag des ersten Kontos wartet weiter auf das übernommene Objekt');
+  });
+}
+
+test('Aufgabe: das unerreichbare Ziel wird nur abgeräumt, solange es noch das gelesene ist', async () => {
+  reset();
+  const way = WAYS.Aufgabe;
+  const url   = way.setup();
+  const other = addTaskList('todo2');
+  const id    = way.create(url, 'Ziel wechselt');
+  // Zwischen dem Lesen der Zeile und dem Abräumen wählt jemand ein anderes
+  // Ziel: die Liste, nach der die Schleife fragt, gibt es nicht, und während
+  // sie fragt, steht an der Zeile schon die andere.
+  const lists = new Map();
+  lists.get = () => { setTaskTarget(id, accountId, other); return undefined; };
+  await todoOutbound.processPendingCreations({}, accountId, 'tasks', lists);
+
+  const now = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+  assert.equal(now.target_caldav_list_url, other, 'das inzwischen gewählte Ziel wurde abgeräumt');
+  assert.equal(now.target_caldav_account_id, accountId);
+});
+
+for (const [label, way] of [['Aufgabe', WAYS.Aufgabe], ['Einkaufsartikel', WAYS.Einkaufsartikel]]) {
+  test(`${label}: während des Uploads auf anderem Weg Spiegel geworden - die Buchung überschreibt nichts`, async () => {
+    reset();
+    const { row, names } = helpers(way);
+    const url = way.setup();
+    const id  = way.create(url, 'Schon gespiegelt');
+    const uid = ownUid(way.kind, id, db);
+
+    const happened = duringPut(() => db.prepare(`
+      UPDATE ${way.table}
+         SET external_source = 'caldav', external_uid = 'theirs@test', external_account_id = ?, external_object_url = ?
+       WHERE id = ?
+    `).run(accountId, `${url}theirs.ics`, id));
+    await way.upload();
+    assert.ok(happened(), 'es lief kein PUT - der Fall ist nicht nachgestellt');
+    assert.ok(names(url).includes(`${uid}.ics`), 'der Upload kam nicht an - der Fall ist nicht nachgestellt');
+    dav.allowAll();
+
+    const now = row(id);
+    assert.equal(now.external_uid, 'theirs@test', 'die Buchung hat eine schon gespiegelte Zeile umgeschrieben');
+    assert.equal(now.external_object_url, `${url}theirs.ics`);
+  });
+}

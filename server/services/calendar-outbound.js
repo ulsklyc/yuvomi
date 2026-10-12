@@ -1020,10 +1020,14 @@ export function bookEventUpload(sent, { source, uid, objectUrl, calRefId, calend
  */
 function keepOwnUpload({ source, calendarUrl, uid }) {
   if (!source || !calendarUrl || !uid) return;
-  db.get().prepare(`
-    DELETE FROM calendar_pending_deletions
-    WHERE source = ? AND calendar_external_id = ? AND event_external_id = ?
-  `).run(source, calendarUrl, uid);
+  // Der Kalender entscheidet, nicht seine Schreibweise: zwei Konten können ihn
+  // mit und ohne Schlussstrich führen (wie `keepOwnUpload` der Aufgaben).
+  const waiting = db.get().prepare(
+    'SELECT id, calendar_external_id FROM calendar_pending_deletions WHERE source = ? AND event_external_id = ?'
+  ).all(source, uid);
+  for (const row of waiting) {
+    if (row.calendar_external_id && sameCalendarUrl(row.calendar_external_id, calendarUrl)) dropDeletion(row.id);
+  }
 }
 
 /**
