@@ -56,6 +56,9 @@ export async function startFakeDavServer() {
   const requests = [];
   let rules = [];
   let etagCounter = 0;
+  // Ein Server, der kein getetag nennt: der Client kennt dann keinen Stand.
+  let announceEtags = true;
+  const etagProp = (obj) => (announceEtags ? `<d:getetag>${xmlEscape(obj.etag)}</d:getetag>` : '');
   const nextEtag = () => `"e${++etagCounter}"`;
 
   const principalPath = '/principals/u/';
@@ -80,7 +83,7 @@ export async function startFakeDavServer() {
   function objectResponse(collectionPath, filename, obj, dataTag) {
     return propResponse(
       `${collectionPath}${encodeSegment(filename)}`,
-      `<d:getetag>${xmlEscape(obj.etag)}</d:getetag><${dataTag}>${xmlEscape(obj.data)}</${dataTag}>`
+      `${etagProp(obj)}<${dataTag}>${xmlEscape(obj.data)}</${dataTag}>`
     );
   }
 
@@ -115,7 +118,7 @@ export async function startFakeDavServer() {
       if (col) {
         const members = req.headers.depth === '1'
           ? [...col.objects].map(([filename, obj]) => propResponse(
-            `${pathname}${encodeSegment(filename)}`, `<d:getetag>${xmlEscape(obj.etag)}</d:getetag>`))
+            `${pathname}${encodeSegment(filename)}`, etagProp(obj) || '<d:getcontenttype>text/calendar</d:getcontenttype>'))
           : [];
         return sendXml(multistatus([propResponse(pathname, collectionProps(col)), ...members]));
       }
@@ -224,6 +227,8 @@ export async function startFakeDavServer() {
       collections.delete(path);
       collections.set(path, col);
     },
+    /** Nennt der Server ETags? `false`: weder im Abruf noch in der Auflistung. */
+    announceEtags(on) { announceEtags = !!on; },
     refuse(rule) { rules.push(rule); },
     /** Ein Multistatus, der nur die Home-Collection nennt - gültig, aber leer. */
     homeOnlyListing: () => multistatus([propResponse(homePath, '<d:resourcetype><d:collection/></d:resourcetype>')]),
@@ -236,7 +241,7 @@ export async function startFakeDavServer() {
       + `<s:exception>Sabre\\DAV\\Exception</s:exception><s:message>${xmlEscape(message)}</s:message></d:error>`,
     allowAll() { rules = []; },
     /** Alles zurück auf leer: Collections, Regeln, Protokoll. */
-    reset() { collections.clear(); rules = []; requests.length = 0; },
+    reset() { collections.clear(); rules = []; requests.length = 0; announceEtags = true; },
     /** Anfragen einer Methode seit dem letzten `reset()`. */
     seen(method) { return requests.filter((r) => r.method === method); },
     close: () => new Promise((resolve) => { server.closeAllConnections?.(); server.close(resolve); }),

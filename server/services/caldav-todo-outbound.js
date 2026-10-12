@@ -869,6 +869,21 @@ function bookTodoUpload(module, sent, { uid, objectUrl, accountId, collectionUrl
 // --------------------------------------------------------
 
 /**
+ * Führt diese Liste des Kontos noch Einträge dieses Moduls? Nein nur, wenn
+ * die Auswahl sie inzwischen dem ANDEREN Modul zuordnet (von "Aufgaben" auf
+ * "Einkauf" umgestellt): eine Aufgabe trägt ihr Ziel als Konto und Adresse,
+ * und beides stimmt dann weiter, obwohl dort keine Aufgabe mehr hingehört.
+ * Abgeschaltet oder aus der Auswahl verschwunden zählt nicht als "nein".
+ */
+function listStillServes(module, accountId, listUrl) {
+  const selected = db.get().prepare(
+    'SELECT list_url, target_module FROM caldav_reminder_selection WHERE account_id = ?'
+  ).all(accountId).filter((sel) => sameCollection(sel.list_url, listUrl));
+  return !selected.length
+    || selected.some((sel) => (sel.target_module === 'shopping' ? 'shopping' : 'tasks') === module);
+}
+
+/**
  * Wie steht die Zeile JETZT zu dem Objekt, das ein nie gebuchter Upload an
  * diesem Platz hinterlassen haben kann? Dieselben drei Antworten wie bei den
  * Terminen (`uploadAttemptState` in calendar-outbound.js):
@@ -882,7 +897,8 @@ function todoAttemptState(module, attempt) {
   const now = db.get().prepare(`SELECT * FROM ${def.table} WHERE id = ?`).get(attempt.row_id);
   if (!now) return 'leftover';
   if (now.external_source === 'local') {
-    return waitsForUploadHere(module, now, attempt.account_id, attempt.collection_url) ? 'waiting' : 'leftover';
+    return waitsForUploadHere(module, now, attempt.account_id, attempt.collection_url)
+      && listStillServes(module, attempt.account_id, attempt.collection_url) ? 'waiting' : 'leftover';
   }
   if (now.external_source === 'caldav' && now.external_uid === attempt.uid
       && sameCollection(collectionUrlOf(now.external_object_url) || '', attempt.collection_url)) {
@@ -906,18 +922,23 @@ function todoAttemptState(module, attempt) {
  * Zeile kann fallen, während der Lauf noch den Server liest.
  */
 export function isUnbookedOwnUpload(module, uid, listUrl) {
-  const kind = uidKind(module);
-  // Billig zuerst: das Muster der UID, ohne Datenbank.
+  // Billig zuerst: das Muster der UID, ohne Datenbank. Die ART kommt aus der
+  // UID, nicht aus dem Modul, das die Liste gerade führt: wird eine Liste von
+  // "Aufgaben" auf "Einkauf" umgestellt, liegt dort der Rest einer Aufgabe,
+  // und der Abruf läse ihn sonst als Einkaufsartikel. `module` sagt nur noch,
+  // wer fragt.
   const parsed = parseOwnUid(uid);
-  if (!parsed || parsed.kind !== kind || parsed.installation === null) return false;
+  if (!parsed || !['task', 'item'].includes(parsed.kind) || parsed.installation === null) return false;
+  moduleDef(module);
+  const noted = parsed.kind === 'item' ? 'shopping' : 'tasks';
   let attempts;
   try {
-    attempts = uploadAttemptsAt({ source: 'caldav', kind, uid, collectionUrl: listUrl });
+    attempts = uploadAttemptsAt({ source: 'caldav', kind: parsed.kind, uid, collectionUrl: listUrl });
   } catch (err) {
     log.warn(`Upload notes are not readable (${err.message}); treating them as none.`);
     return false;
   }
-  return attempts.some((attempt) => todoAttemptState(module, attempt) !== 'mirrored');
+  return attempts.some((attempt) => todoAttemptState(noted, attempt) !== 'mirrored');
 }
 
 /**
@@ -1024,6 +1045,9 @@ export async function processPendingCreations(client, accountId, module, listsBy
       // abwählen heisst aber "nicht mehr abgleichen", nicht "auf dem Server
       // aufräumen". Das Ziel bleibt, die Notiz auch; ist die Liste wieder da,
       // übernimmt der Lauf das Objekt.
+      // Gehört die Liste inzwischen dem anderen Modul, gilt die Notiz als
+      // Rest (`todoAttemptState`), wird entfernt, und das Ziel fällt im
+      // Durchgang danach.
       if (hasUploadAttempt({
         source: 'caldav', accountId, kind: uidKind(module), rowId: fresh.id,
         collectionUrl: fresh.target_caldav_list_url,

@@ -1549,7 +1549,10 @@ is done.
 
 - It carries the UID of the upload: `DELETE` to that address with the ETag just read as
   `If-Match`; the note is dropped once the object is gone (a `404` counts). A `412` or another
-  refusal leaves the note for the next pass.
+  refusal leaves the note for the next pass. A server that names no ETag gets the `DELETE` without
+  `If-Match`: the UID read immediately before is then the only guard, and an object replaced at
+  that address between the read and the `DELETE` would be removed. That window is accepted;
+  refusing to delete without an ETag would leave the leftover on such servers for good.
 - It carries a foreign UID: nothing is deleted and the note is dropped. The note proves the
   attempt, not what lies at the address today.
 - Nothing lies there: the PUT never arrived, or the server is still working on it. The note stays
@@ -1585,8 +1588,12 @@ whose list is unavailable keeps its target while a note for that list stands (ot
 `processPendingCreations` clears an unreachable target). For iCloud, which uploads into the first
 calendar of an unordered listing, a row counts as waiting as long as the upload loop would still
 take it, whichever calendar is first now; its object in the former first calendar becomes a
-leftover only once the row is a mirror elsewhere. Disconnecting iCloud, deleting a CalDAV account
-and pointing an account at another server or user drop its notes.
+leftover only once the row is a mirror elsewhere, and a skipped leftover does not enter the run's
+UID-keyed object map. A task does not wait in a list that the selection has since assigned to
+shopping, although its target still names it; the fetch reads the kind of a leftover from its UID,
+not from the module the list serves now. Deleting a CalDAV account and pointing an account at
+another server or user drop its notes; disconnecting iCloud drops them only if no connection
+remains through the `APPLE_*` environment variables.
 
 The removal is unconditional as to content on purpose, like the user delete (#1883): the entry was
 deleted in Yuvomi or no longer belongs there, in whatever state another app has left it - but

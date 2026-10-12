@@ -135,12 +135,14 @@ function clearCredentials({ deleteEvents = false } = {}) {
   // stehen bleibt (oder umgekehrt).
   return db.get().transaction(() => {
     const removed = deleteEvents ? clearMirroredEvents() : 0;
-    // Die Notizen nie gebuchter Uploads gehören zur Verbindung (#1882): ohne
-    // sie gibt es keinen Weg mehr zu den Objekten, von denen sie handeln.
-    dropUploadAttemptsOf({ source: 'apple' });
     ['apple_caldav_url', 'apple_username', 'apple_app_password', 'apple_last_sync',
      // Der Fehlerstand gehoert zur Verbindung (#820).
      'apple_last_error', 'apple_last_error_at'].forEach(cfgDel);
+    // Die Notizen nie gebuchter Uploads gehören zur Verbindung (#1882): ohne
+    // sie gibt es keinen Weg mehr zu den Objekten, von denen sie handeln.
+    // Läuft sie über die APPLE_*-Umgebungsvariablen weiter (`getCredentials`),
+    // ist nichts getrennt, und die Notizen bleiben der einzige Beleg.
+    if (!getCredentials()) dropUploadAttemptsOf({ source: 'apple' });
     log.info('Disconnected.' + (removed ? ` ${removed} mirrored event(s) removed.` : ''));
     return { removed };
   })();
@@ -414,6 +416,26 @@ async function runSync({ makeClient } = {}) {
         try {
           calendarUids.add(ev.uid);
           accountUids.add(ev.uid);
+          // Der eigene Upload, dessen Antwort verloren ging: übernommen wird
+          // nur ein Termin, den der Upload unten in GENAU diesen Kalender
+          // schicken würde (den ersten) - die UID kommt vom Server und weist
+          // nichts aus.
+          const adoptOwn = () => !!obj.url && outbound.adoptOwnEventUpload({
+            source: 'apple', uid: ev.uid, objectUrl: obj.url, calRefId, calendarUrl: cal.url,
+            isWaitingHere: (eventId) => cal.url === syncCalendars[0].url
+              && collectLocalOutboundEvents(db.get()).some((e) => e.id === eventId),
+          });
+
+          // Für dieses Objekt steht die Notiz eines nie gebuchten Uploads
+          // (#1882, wie im CalDAV-Sync): übernehmen, wenn sein Termin hier
+          // wartet, sonst weder importieren noch zuordnen. VOR dem Index
+          // darunter: der führt ein Objekt je UID, und der Rest im früheren
+          // ersten Kalender verdrängte sonst das Objekt, das die Zeile
+          // inzwischen woanders spiegelt - ihre nächste Bearbeitung ginge mit
+          // dem ETag des Rests hinaus.
+          if (outbound.isUnbookedOwnUpload({ source: 'apple', uid: ev.uid, calendarUrl: cal.url })
+              && !adoptOwn()) continue;
+
           // Objekt merken: ausgehende Löschungen brauchen die URL, Änderungen
           // zusätzlich den Originalinhalt zum Patchen (#593).
           if (obj.url) {
@@ -430,22 +452,6 @@ async function runSync({ makeClient } = {}) {
           // Vom Nutzer gelöscht und noch nicht auf dem Server: nicht wieder
           // anlegen, sonst kehrt der Termin bei jedem Sync zurück (#593).
           if (pendingDeletionUids.has(ev.uid)) continue;
-
-          // Der eigene Upload, dessen Antwort verloren ging: übernommen wird
-          // nur ein Termin, den der Upload unten in GENAU diesen Kalender
-          // schicken würde (den ersten) - die UID kommt vom Server und weist
-          // nichts aus.
-          const adoptOwn = () => !!obj.url && outbound.adoptOwnEventUpload({
-            source: 'apple', uid: ev.uid, objectUrl: obj.url, calRefId, calendarUrl: cal.url,
-            isWaitingHere: (eventId) => cal.url === syncCalendars[0].url
-              && collectLocalOutboundEvents(db.get()).some((e) => e.id === eventId),
-          });
-
-          // Für dieses Objekt steht die Notiz eines nie gebuchten Uploads
-          // (#1882, wie im CalDAV-Sync): übernehmen, wenn sein Termin hier
-          // wartet, sonst weder importieren noch zuordnen.
-          if (outbound.isUnbookedOwnUpload({ source: 'apple', uid: ev.uid, calendarUrl: cal.url })
-              && !adoptOwn()) continue;
 
           const selExisting = db.get().prepare(
             `SELECT id, outbound_dirty, calendar_ref_id, start_datetime FROM calendar_events WHERE external_calendar_id = ? AND external_source = 'apple'`

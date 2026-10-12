@@ -2944,3 +2944,126 @@ test('adoptOwnUpload: die Übernahme bucht - die Notiz des Uploads fällt mit ih
     'der Fall ist nicht nachgestellt: nicht übernommen');
   assert.deepEqual(uploadAttempts(), [], 'die Notiz hat die Übernahme überlebt');
 });
+
+// ── Befunde der zweiten Bot-Runde zu #1895 ──────────────────────────────────────
+
+// Der übersprungene Rest darf nicht in den Index des Laufs: iCloud führt ihn
+// je UID, und der Rest im früheren ersten Kalender verdrängte sonst das Objekt,
+// das die Zeile inzwischen spiegelt.
+test('iCloud-Termin: der Rest im früheren ersten Kalender liegt noch, die Zeile ist woanders Spiegel und wird bearbeitet - die Bearbeitung geht ohne 412 hinaus', async () => {
+  reset();
+  const way = WAYS['iCloud-Termin'];
+  const { row, names } = helpers(way);
+  const url   = way.setup();
+  const other = dav.addCollection('icloud2', { name: 'Zweiter', components: ['VEVENT'] });
+  const id    = way.create(url, 'Alt');
+  const uid   = await uploadWithLostAnswer(way, url, id);
+
+  // Der andere Kalender steht jetzt vorn (und wird zuerst gelesen), der Rest
+  // im früheren ersten lässt sich nicht entfernen.
+  dav.moveToEnd(url);
+  dav.refuse({ method: 'DELETE', status: 403 });
+  await runAll(way);
+  assert.equal(row(id).external_object_url, `${other}${uid}.ics`, 'der Fall ist nicht nachgestellt: nicht im neuen ersten Kalender gespiegelt');
+  assert.deepEqual(names(url), [`${uid}.ics`], 'der Fall ist nicht nachgestellt: der Rest ist fort');
+
+  db.prepare("UPDATE calendar_events SET title = 'Neu', outbound_dirty = 1, outbound_attempts = 0 WHERE id = ?").run(id);
+  const before = dav.seen('PUT').length;
+  await way.sync();
+  const puts = dav.seen('PUT').slice(before);
+  assert.deepEqual(puts.map((r) => r.status).filter((status) => status === 412), [], 'die Bearbeitung ging mit dem ETag des Rests hinaus');
+  assert.match(dav.getObject(other, `${uid}.ics`).data, /SUMMARY:Neu/, 'die Bearbeitung ist nicht auf dem Server angekommen');
+  assert.equal(row(id).outbound_dirty, 0);
+});
+
+// Eine Liste wird von "Aufgaben" auf "Einkauf" umgestellt. Die Aufgabe, deren
+// Upload dorthin nie bestätigt wurde, wartet dort nicht mehr.
+test('Aufgabe: Antwort verloren, die Liste wird auf Einkauf umgestellt - der Rest wird entfernt, nichts wird als Artikel importiert, das Ziel fällt', async () => {
+  reset();
+  const way = WAYS.Aufgabe;
+  const { row, names } = helpers(way);
+  const url = way.setup();
+  const id  = way.create(url, 'War eine Aufgabe');
+  await uploadWithLostAnswer(way, url, id);
+
+  const listId = db.prepare("INSERT INTO shopping_lists (name, created_by) VALUES ('Einkauf', 1) RETURNING id").get().id;
+  db.prepare(`
+    UPDATE caldav_reminder_selection SET target_module = 'shopping', target_list_id = ?
+    WHERE account_id = ? AND list_url = ?
+  `).run(listId, accountId, url);
+
+  await way.sync();
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM shopping_items WHERE name = 'War eine Aufgabe'").get().n, 0,
+    'das Objekt der Aufgabe wurde als Einkaufsartikel importiert');
+  await way.push();
+  await way.sync();
+
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM shopping_items WHERE name = 'War eine Aufgabe'").get().n, 0);
+  assert.deepEqual(names(url), [], 'der Rest der Aufgabe liegt weiter in der Liste');
+  const now = row(id);
+  assert.equal(now.external_source, 'local');
+  assert.equal(now.target_caldav_list_url, null, 'die Aufgabe hält an einer Liste fest, die keine Aufgaben mehr führt');
+  noBookkeepingLeft();
+});
+
+// Die Verbindung läuft über die Umgebungsvariablen weiter: dann ist nichts
+// getrennt, und die Notizen sind weiter der einzige Beleg.
+test('iCloud: Trennen lässt die Upload-Notizen stehen, solange die Verbindung über APPLE_* weiterläuft', async () => {
+  reset();
+  const way = WAYS['iCloud-Termin'];
+  const url = way.setup();
+  const id  = way.create(url, 'Wartet');
+  await uploadWithLostAnswer(way, url, id);
+  const env = ['APPLE_CALDAV_URL', 'APPLE_USERNAME', 'APPLE_APP_SPECIFIC_PASSWORD'];
+  const saved = env.map((name) => process.env[name]);
+  process.env.APPLE_CALDAV_URL = dav.url;
+  process.env.APPLE_USERNAME = 'u';
+  process.env.APPLE_APP_SPECIFIC_PASSWORD = 'p';
+  try {
+    appleCalendar.clearCredentials();
+    assert.equal(uploadAttempts().length, 1, 'die Notiz ist gefallen, obwohl die Verbindung weiterläuft');
+  } finally {
+    env.forEach((name, i) => { if (saved[i] === undefined) delete process.env[name]; else process.env[name] = saved[i]; });
+  }
+});
+
+// Nennt der Server keinen ETag, geht das DELETE ohne If-Match hinaus. Die
+// UID-Prüfung unmittelbar davor trägt auch diesen Fall.
+for (const [label, way] of Object.entries(WAYS)) {
+  const { rows, names } = helpers(way);
+
+  test(`${label}: der Server nennt keinen ETag, an der Adresse liegt die EIGENE UID - der Rest wird entfernt`, async () => {
+    reset();
+    const url = way.setup();
+    const id  = way.create(url, 'Wird gelöscht');
+    const uid = await uploadWithLostAnswer(way, url, id);
+    deleteLikeTheRoute(way, id);
+    dav.announceEtags(false);
+
+    await runAll(way);
+    assert.equal(rows().length, 0, 'der gelöschte Eintrag ist zurück');
+    assert.deepEqual(names(url), [], 'der Rest liegt weiter auf dem Server');
+    const sent = deletesOf(uid);
+    assert.ok(sent.length >= 1 && sent.every((r) => !r.headers['if-match']), 'der Fall ist nicht nachgestellt: das DELETE trug einen ETag');
+    assert.deepEqual(uploadAttempts(), []);
+  });
+
+  test(`${label}: der Server nennt keinen ETag, an der Adresse liegt eine FREMDE UID - kein DELETE`, async () => {
+    reset();
+    const url = way.setup();
+    const id  = way.create(url, 'Nie oben');
+    const uid = ownUid(way.kind, id, db);
+    dav.refuse({ method: 'PUT', status: 403, once: true });
+    await way.upload();
+    dav.allowAll();
+    assert.equal(uploadAttempts().length, 1, 'der Fall ist nicht nachgestellt: keine Notiz');
+    dav.putObject(url, `${uid}.ics`, ics(way.component, 'somebody-else@test', 'Fremd'));
+    deleteLikeTheRoute(way, id);
+    dav.announceEtags(false);
+
+    await runAll(way);
+    assert.match(dav.getObject(url, `${uid}.ics`)?.data ?? '', /UID:somebody-else@test/, 'das fremde Objekt wurde gelöscht');
+    assert.equal(deletesOf(uid).length, 0, 'an die Adresse des fremden Objekts ging ein DELETE');
+    assert.deepEqual(uploadAttempts(), []);
+  });
+}
