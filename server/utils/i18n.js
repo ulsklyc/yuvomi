@@ -265,7 +265,7 @@ export function translate(locale, key, params = {}) {
   return strLocale === 'ko' ? resolveKoreanParticles(str, fill) : fill(str);
 }
 
-const VALID_DATE_FORMATS = ['mdy', 'dmy', 'ymd', 'mdy_dot', 'dmy_dot', 'dmy_slash', 'ymd_dot', 'ymd_slash'];
+const VALID_DATE_FORMATS = ['mdy', 'dmy', 'ymd', 'mdy_dot', 'dmy_dot', 'dmy_slash', 'dmy_dash', 'ymd_dot', 'ymd_slash'];
 
 /**
  * Formatiert einen lokalen Datums-Key (YYYY-MM-DD) nach der Haushalts-Einstellung
@@ -288,6 +288,7 @@ export function formatDateKey(dateKey, dateFormat = 'dmy') {
     case 'mdy_dot':   return `${month}.${day}.${year}`;
     case 'dmy_dot':   return `${day}.${month}.${year}`;
     case 'dmy_slash': return `${day}/${month}/${year}`;
+    case 'dmy_dash':  return `${day}-${month}-${year}`;
     case 'ymd':       return `${year}-${month}-${day}`;
     case 'ymd_dot':   return `${year}.${month}.${day}`;
     case 'ymd_slash': return `${year}/${month}/${day}`;

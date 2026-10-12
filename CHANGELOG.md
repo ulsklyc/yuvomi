@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Dutch date format DD-MM-YYYY** (#1847). The new `DD-MM-YYYY` choice is in Settings → Account →
+  Appearance → Date format, and the Netherlands region now uses it instead of `DD.MM.YYYY`.
+  Dates, the date field placeholder, short dates and typed input all follow it. Existing households
+  keep the format they have set. A household that already has the Netherlands as its region gets
+  the new format by setting "Region" to "Custom" and then "Preferred date format" to `DD-MM-YYYY`.
+
 ### Fixed
 
 - **An archived shared-expense group now refuses changes on the server too** (#1747). Until now only

@@ -595,6 +595,17 @@ test('dateInputPlaceholder spricht die UI-Sprache, die Reihenfolge bleibt die de
     assert.equal(i18n.dateInputPlaceholder(), 'DD.MM.YYYY', 'en behaelt seine Buchstaben');
     await i18n.setLocale('fr');
     assert.equal(i18n.dateInputPlaceholder(), 'JJ.MM.AAAA', 'fr: jour, mois, annee');
+
+    // #1847: niederlaendisch DD-MM-YYYY. Schreiben, Platzhalter, Kurzform und
+    // Eingabe muessen dasselbe Trennzeichen benutzen und sich umkehren lassen.
+    store.set('yuvomi-date-format', 'dmy_dash');
+    await i18n.setLocale('en');
+    assert.equal(i18n.dateInputPlaceholder(), 'DD-MM-YYYY', 'dmy_dash: Platzhalter');
+    assert.equal(i18n.formatDate('2026-03-05'), '05-03-2026', 'dmy_dash: Datum');
+    assert.equal(i18n.formatDayMonth('2026-03-05'), '05-03', 'dmy_dash: Tag und Monat');
+    assert.equal(i18n.getDateFormat(), 'dmy_dash', 'dmy_dash faellt nicht auf den Default zurueck');
+    assert.equal(i18n.parseDateInput('05-03-2026'), '2026-03-05', 'dmy_dash: Tag vor Monat');
+    assert.equal(i18n.parseDateInput('05032026'), '2026-03-05', 'dmy_dash: Ziffernfolge Tag vor Monat');
   } finally {
     await i18n.setLocale('de');
     for (const [name, descriptor] of saved) {
