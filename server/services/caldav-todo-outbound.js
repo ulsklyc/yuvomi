@@ -1429,9 +1429,10 @@ function returnShoppingMove(row) {
      WHERE sel.account_id = ? AND sel.target_module = 'shopping'
   `).all(row.external_account_id).find((sel) => sameCollection(sel.list_url, from)) : null;
 
+  // `row` ist die eben gelesene Zeile: zwischen dem Lesen beim Aufrufer und
+  // hier liegt kein await.
+  const now = row;
   return db.get().transaction(() => {
-    const now = reloadRow('shopping', row.id);
-    if (!now || now.external_source !== 'caldav' || now.outbound_move !== 1) return null;
     clearShoppingMove(now.id);
     if (!home || home.target_list_id === now.list_id) return null;
     // Ans Ende der Kategorie dort, wie bei jedem Listenwechsel (Route).
