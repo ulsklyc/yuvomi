@@ -7,7 +7,8 @@
  * Verhalten:
  *   - configure({ basePath, groups, groupField, supportsSubcategories, labelResolver, titleKey, hintKey,
  *                 addMaxLength, localizedLabels,
- *                 deleteConfirmKey, deleteDetailKey, subDeleteDetailKey, errorFallbackKey })
+ *                 deleteConfirmKey, deleteDetailKey, subDeleteDetailKey, errorFallbackKey,
+ *                 alreadyDeletedReason })
  *   - Lädt via api.get(basePath); mutiert über post/put/patch/delete relativ zu basePath
  *   - `localizedLabels: true` haengt der Listenanfrage `?lang=<Oberflaechensprache>` an -
  *     fuer Routen, die ihre Labels auf dem Server uebersetzen (heute nur Budget, #1859)
@@ -16,6 +17,11 @@
  *   - `errorFallbackKey`: der allgemeine Satz fuer einen Fehler ohne bekannten Grund.
  *     Wer ihn setzt, zeigt nie den Text des Servers (#1909, heute der Einkauf); ohne
  *     ihn bleibt der alte Rueckfall auf `err.message`, bis das Modul seine Gruende hat
+ *   - `alreadyDeletedReason`: der `reason`, mit dem die Route des Aufrufers beim
+ *     Loeschen sagt "diese Zeile gibt es nicht mehr" (jemand anderes war schneller).
+ *     Wer ihn setzt, bekommt dafuer den Erfolgsweg statt eines Fehlers (#1909, heute
+ *     der Einkauf); ohne ihn bleibt jedes gescheiterte Loeschen ein Fehler. Die
+ *     Komponente kennt selbst keinen Grund eines Moduls
  *   - Räumt Listener in disconnectedCallback() auf
  *
  * VERTRAG FUER AUFRUFER: die Auffrischung gehoert in den Ereignis-Handler, nicht
@@ -41,7 +47,7 @@ import { esc } from '/utils/html.js';
 import { makeSortable, isDragActive } from '/utils/sortable.js';
 import { wireTablist } from '/utils/tablist.js';
 import { rowActionHtml } from '/utils/row-action.js';
-import { errorSentence, isGone } from '/utils/friendly-error.js';
+import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
 
 /** Platzhalter-Id fuer den Eintrag ohne Ton: eine leere `data-tab-id` waere kein Knopf. */
 const NO_COLOR_ID = '__none__';
@@ -123,6 +129,10 @@ class CategoryManagerElement extends HTMLElement {
     this._subDeleteDetailKey = 'category.deleteSubConfirmDetail';
     // Siehe `_errMsg`: gesetzt heisst, der Text des Servers erreicht den Toast nie.
     this._errorFallbackKey = null;
+    // Siehe `_delete`: der Grund, mit dem die Route des Aufrufers sagt "diese
+    // Zeile gibt es nicht mehr". Ohne ihn bleibt jedes gescheiterte Loeschen
+    // ein Fehler.
+    this._alreadyDeletedReason = null;
     // OPT-IN: nur wer eine Palette mitgibt, bekommt die Farbwahl. Fuenf der
     // sechs Aufrufer zeigen ihre Kategorien nirgends als farbige Marke - dort
     // waere ein Farbknopf eine Einstellung ohne Wirkung.
@@ -162,6 +172,9 @@ class CategoryManagerElement extends HTMLElement {
     if (opts.deleteDetailKey) this._deleteDetailKey = opts.deleteDetailKey;
     if (opts.subDeleteDetailKey) this._subDeleteDetailKey = opts.subDeleteDetailKey;
     if (opts.errorFallbackKey) this._errorFallbackKey = opts.errorFallbackKey;
+    if (typeof opts.alreadyDeletedReason === 'string' && opts.alreadyDeletedReason) {
+      this._alreadyDeletedReason = opts.alreadyDeletedReason;
+    }
     this._renderShell();
     this._load();
   }
@@ -915,7 +928,16 @@ class CategoryManagerElement extends HTMLElement {
     );
     if (!confirmed) return;
     try {
-      await api.delete(`${this._basePath}/${encodeURIComponent(key)}`);
+      try {
+        await api.delete(`${this._basePath}/${encodeURIComponent(key)}`);
+      } catch (err) {
+        // JEMAND ANDERES HAT DIE ZEILE SCHON GELOESCHT: das Ziel ist erreicht,
+        // also laeuft der Erfolgsweg darunter - Zeile raus, "Geloescht", und
+        // die Seite erfaehrt es wie jedes Loeschen. Nur mit dem Grund, den der
+        // Aufrufer genannt hat (`alreadyDeletedReason`); alles andere ist ein
+        // Fehler und geht an `_fail`.
+        if (!this._alreadyDeletedReason || !isAlreadyDeleted(err, this._alreadyDeletedReason)) throw err;
+      }
       this._cats = this._cats.filter((c) => this._keyOf(c) !== key);
       this._renderGroup(this._groupOf(cat));
       window.yuvomi?.showToast(t('category.deleted'), 'default');

@@ -840,15 +840,15 @@ function deleteItemUndoable(id, container) {
     message: t('shopping.itemDeletedToast', { name: snapshot?.name ?? '' }),
     commit: async ({ keepalive }) => {
       let response;
-      let schonWeg = false;
+      let alreadyGone = false;
       try {
         response = await api.delete(`/shopping/items/${id}`, { keepalive });
       } catch (err) {
         // JEMAND ANDERES HAT DEN ARTIKEL SCHON GELOESCHT: das Ziel ist
         // erreicht, also gilt das als Erfolg - kein Toast, und die Zeile kommt
         // nicht zurueck (`isAlreadyDeleted`). Alles andere ist ein Fehler.
-        schonWeg = isAlreadyDeleted(err, 'shopping_item_not_found');
-        if (!schonWeg) {
+        alreadyGone = isAlreadyDeleted(err, 'shopping_item_not_found');
+        if (!alreadyGone) {
           // Schlaegt das DELETE fehl, bringt `restore` die Zeile zurueck, und
           // jede Antwort darf sie wieder tragen - sofort, nicht erst spaeter.
           pendingRemovals.delete(id);
@@ -869,7 +869,7 @@ function deleteItemUndoable(id, container) {
       // und erst NACH `confirmRemovals`: die Antwort beginnt dann nach der
       // Bestaetigung und gilt als Wahrheit des Servers, auch fuer den Zaehler.
       // Nicht beim Verlassen der Seite (`keepalive`): da zeichnet niemand mehr.
-      if (schonWeg && !keepalive) reloadAfterGone(container);
+      if (alreadyGone && !keepalive) reloadAfterGone(container);
     },
     restore: (err) => {
       pendingRemovals.delete(id);
@@ -3892,9 +3892,11 @@ function wireLiveUpdates(container, routeSignal) {
  *
  * Erkannt wird am `reason`, nie am Text und nie am blanken Status 404.
  *
- * EINE AUSNAHME, und sie kommt hier gar nicht an: wer einen Artikel LOESCHT,
- * den es nicht mehr gibt, hat sein Ziel erreicht (`isAlreadyDeleted` in
- * `deleteItemUndoable`) - kein Toast, nur das stille Nachladen.
+ * EINE AUSNAHME, und sie kommt hier gar nicht an: wer einen Artikel oder eine
+ * Liste LOESCHT, die es nicht mehr gibt, hat sein Ziel erreicht
+ * (`isAlreadyDeleted` in `deleteItemUndoable` und im Zweig `delete-list`) -
+ * kein Toast, nur das stille Nachladen. Laden und Kategorie loescht der
+ * Verwalter; er wertet denselben Fall als Erfolg (`alreadyDeletedReason`).
  *
  * @param {unknown} err
  * @param {Element} container
@@ -4237,12 +4239,26 @@ function wireListContentEvents(container) {
       scheduleUndoableDelete({
         message: t('shopping.deletedListToast'),
         commit: async ({ keepalive }) => {
-          await api.delete(`/shopping/${deletedListId}`, { keepalive });
+          let alreadyGone = false;
+          try {
+            await api.delete(`/shopping/${deletedListId}`, { keepalive });
+          } catch (err) {
+            // JEMAND ANDERES HAT DIE LISTE SCHON GELOESCHT: das Ziel ist
+            // erreicht, also gilt das als Erfolg wie beim Artikel
+            // (`isAlreadyDeleted`) - kein Toast, und `restore` holt die Liste
+            // nicht fuer einen Augenblick zurueck. Alles andere ist ein Fehler.
+            alreadyGone = isAlreadyDeleted(err, 'shopping_list_not_found');
+            if (!alreadyGone) throw err;
+          }
           // Erst wenn das Loeschen wirklich feststeht (Undo-Fenster verstrichen):
           // ein rueckgaengig gemachtes Loeschen soll den Klapp-Zustand behalten.
           try {
             localStorage.removeItem(collapsedCategoriesStorageKey(state.currentUserId, deletedListId));
           } catch { /* Privatmodus/Quota - unschaedlich, die Zeile war ohnehin verwaist */ }
+          // Der Stand der Seite war veraltet, also holt sie den frischen -
+          // still. Nicht beim Verlassen der Seite (`keepalive`): da zeichnet
+          // niemand mehr.
+          if (alreadyGone && !keepalive) reloadAfterGone(container);
         },
         restore: async (err) => {
           // Der Server hat nichts gelöscht (der Commit war aufgeschoben) - die Liste
@@ -4330,6 +4346,9 @@ function openStoreManager(container) {
         deleteDetailKey: 'shopping.storeDeleteConfirmDetail',
         // Nie der Satz des Servers (#1909): bekannter Fall oder der allgemeine.
         errorFallbackKey: 'common.errorGeneric',
+        // Einen Laden loeschen, den jemand anderes schon geloescht hat: erledigt,
+        // kein Fehler - wie beim Artikel (`isAlreadyDeleted`).
+        alreadyDeletedReason: 'shopping_store_not_found',
       });
     },
     // Bewusst KEIN onClose, das den Listener abmeldet: gemessen kommt das
@@ -4421,6 +4440,9 @@ async function openCategoryManager(container, { fromDeepLink = false } = {}) {
         deleteDetailKey: 'shopping.categoryDeleteConfirmDetail',
         // Nie der Satz des Servers (#1909): bekannter Fall oder der allgemeine.
         errorFallbackKey: 'common.errorGeneric',
+        // Eine Kategorie loeschen, die jemand anderes schon geloescht hat: erledigt,
+        // kein Fehler - wie beim Artikel (`isAlreadyDeleted`).
+        alreadyDeletedReason: 'shopping_category_not_found',
       });
     },
     // onClose traegt nur noch, was wirklich am Schliessen haengt. Kein

@@ -457,13 +457,14 @@ test('der Einkauf verlangt den allgemeinen Satz an beiden Verwaltern', async () 
 // sie geloescht, waehrend der Dialog offen war), holt der Manager seine Liste
 // selbst neu und meldet dem Aufrufer eine Aenderung - der Satz raet nicht mehr
 // zum Neuladen. Gefahren wird das echte `_delete` bis in sein catch.
-async function deleteAnswering(err, { connected = true } = {}) {
-  const manager = managerWithCategory({ basePath: '/shopping/stores', errorFallbackKey: 'common.errorGeneric' });
+async function deleteAnswering(err, { connected = true, options = {} } = {}) {
+  const manager = managerWithCategory({ basePath: '/shopping/stores', errorFallbackKey: 'common.errorGeneric', ...options });
   let loads = 0;
   manager._load = () => { loads += 1; };
   manager.isConnected = connected;
   let changed = 0;
-  manager.addEventListener('category-manager-changed', () => { changed += 1; });
+  const details = [];
+  manager.addEventListener('category-manager-changed', (e) => { changed += 1; details.push(e.detail); });
   const toasts = [];
   const previousToast = globalThis.window.yuvomi.showToast;
   globalThis.window.yuvomi.showToast = (text, kind) => toasts.push([text, kind]);
@@ -478,7 +479,10 @@ async function deleteAnswering(err, { connected = true } = {}) {
     api.delete = previousDelete;
     globalThis.window.yuvomi.showToast = previousToast;
   }
-  return { loads, changed, toasts };
+  // Nicht aufzaehlbar: die Faelle oben vergleichen das Ergebnis als Ganzes.
+  return Object.defineProperties({ loads, changed, toasts }, {
+    details: { value: details }, rows: { value: manager._cats.length },
+  });
 }
 
 test('a row that is gone on the server reloads the manager and tells the page', async () => {
@@ -518,4 +522,92 @@ test('a failing load does not start another load', async () => {
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(fetches, 1);
   assert.equal(changed, 0);
+});
+
+// #1909, Folge: wer eine Zeile loescht, die jemand anderes schon geloescht hat,
+// hat sein Ziel erreicht. Den Grund dafuer nennt der AUFRUFER
+// (`alreadyDeletedReason`) - die Komponente kennt keinen Grund eines Moduls,
+// und ohne die Option aendert sich fuer niemanden etwas.
+test('alreadyDeletedReason: deleting a row that is already gone takes the success path', async () => {
+  for (const [basePath, reason] of [
+    ['/shopping/stores', 'shopping_store_not_found'],
+    ['/shopping/categories', 'shopping_category_not_found'],
+  ]) {
+    const result = await deleteAnswering(serverAnswer(404, 'Not found.', reason), {
+      options: { basePath, alreadyDeletedReason: reason },
+    });
+    assert.deepEqual(result.toasts, [['category.deleted', 'default']], reason);
+    assert.equal(result.rows, 0, 'the row left the manager');
+    assert.equal(result.changed, 1);
+    assert.deepEqual(result.details.map(({ action, key, item }) => ({ action, key, id: item?.id })),
+      [{ action: 'delete', key: '7', id: 7 }], 'the same event detail as any delete');
+    // Der Erfolgsweg laedt nicht neu - das tut nur `_fail`.
+    assert.equal(result.loads, 0);
+  }
+});
+
+test('alreadyDeletedReason: any other failure of a delete stays a failure', async () => {
+  const options = { alreadyDeletedReason: 'shopping_store_not_found' };
+  for (const [err, sentence, toldPage] of [
+    [serverAnswer(404, 'Not found.'), 'common.errorGeneric', false],
+    [serverAnswer(500, 'Internal error.'), 'common.errorGeneric', false],
+    [serverAnswer(403, 'Not authorized.', 'shopping_store_not_found'), 'common.errorNoPermission', false],
+    [serverAnswer(404, 'Not found.', 'some_future_not_found'), 'common.errorGeneric', false],
+    [serverAnswer(400, 'The last category cannot be deleted.', 'category_last'), 'category.errorLast', false],
+    // Ein anderes Ding ist weg, nicht diese Zeile: Fehler, und `_fail` laedt neu.
+    [serverAnswer(404, 'Category not found.', 'shopping_category_not_found'), 'shopping.errorCategoryGone', true],
+    [Object.assign(new Error('offline'), { status: 0 }), 'common.errorOfflineMutation', false],
+  ]) {
+    const result = await deleteAnswering(err, { options });
+    assert.deepEqual(result.toasts, [[sentence, 'danger']]);
+    assert.equal(result.rows, 1, 'the row stays');
+    assert.equal(result.changed, toldPage ? 1 : 0);
+    assert.ok(result.details.every((d) => d.action !== 'delete'));
+  }
+});
+
+test('alreadyDeletedReason: a reason outside the allowlist of gone reasons never counts', async () => {
+  // `isAlreadyDeleted` fragt GONE_REASONS: ein Aufrufer kann keinen beliebigen
+  // Grund zum Erfolg erklaeren (etwa "in Benutzung").
+  for (const reason of ['category_in_use', 'category_last', 'some_future_not_found']) {
+    const result = await deleteAnswering(serverAnswer(409, 'Refused.', reason), {
+      options: { alreadyDeletedReason: reason },
+    });
+    assert.equal(result.rows, 1, reason);
+    assert.equal(result.toasts[0][1], 'danger', reason);
+  }
+});
+
+test('without alreadyDeletedReason nothing changes for the other modules', async () => {
+  // Die Routen der anderen Module nennen keinen `reason`: eine blanke 404.
+  // Und selbst ein Grund des Einkaufs zaehlt ohne die Option nicht.
+  const base = { basePath: '/notes/categories', errorFallbackKey: undefined };
+  const blank = await deleteAnswering(serverAnswer(404, 'Category not found.'), { options: base });
+  assert.deepEqual(blank.toasts, [['Category not found.', 'danger']], 'der alte Rueckfall auf den Servertext');
+  assert.equal(blank.rows, 1);
+  assert.equal(blank.changed, 0);
+  const named = await deleteAnswering(serverAnswer(404, 'Store not found.', 'shopping_store_not_found'), { options: base });
+  assert.equal(named.rows, 1);
+  assert.equal(named.toasts[0][1], 'danger');
+  for (const ignored of ['', null, 42, {}]) {
+    const result = await deleteAnswering(serverAnswer(404, 'Store not found.', 'shopping_store_not_found'), {
+      options: { alreadyDeletedReason: ignored },
+    });
+    assert.equal(result.rows, 1, `alreadyDeletedReason: ${JSON.stringify(ignored)}`);
+  }
+});
+
+test('only shopping names an alreadyDeletedReason, once per manager', async () => {
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const { withoutCommentsKeepingLines } = await import('./source-text.js');
+  const dir = new URL('../public/pages/', import.meta.url);
+  const found = [];
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.js'))) {
+    const page = withoutCommentsKeepingLines(readFileSync(new URL(file, dir), 'utf8'));
+    for (const m of page.matchAll(/alreadyDeletedReason:\s*'([^']+)'/g)) found.push(`${file}: ${m[1]}`);
+  }
+  assert.deepEqual(found.sort(), [
+    'shopping.js: shopping_category_not_found',
+    'shopping.js: shopping_store_not_found',
+  ]);
 });

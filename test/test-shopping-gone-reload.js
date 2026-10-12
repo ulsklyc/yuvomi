@@ -17,19 +17,42 @@
  * Gefahren wird `deleteItemUndoable` - der eine Weg hinter Knopf, Wisch und
  * Bearbeiten-Dialog - samt dem Ablauf des Undo-Fensters.
  *
+ * Dasselbe gilt fuer die drei anderen Loeschwege der Seite: die Liste (der
+ * Zweig `delete-list` des delegierten Handlers, gefahren ueber einen Klick) und
+ * Laden und Kategorie (die echten `openStoreManager`/`openCategoryManager`
+ * konfigurieren die echte Verwalter-Komponente, deren `_delete` laeuft).
+ *
  * Ausführen: npm run test:shopping-gone-reload
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-globalThis.HTMLElement = globalThis.HTMLElement ?? class {};
-globalThis.customElements = globalThis.customElements ?? { define() {}, get() {} };
+// Ein EventTarget, damit die echte Verwalter-Komponente Zuhoerer tragen kann.
+globalThis.HTMLElement = globalThis.HTMLElement ?? class HTMLElement extends EventTarget {};
+/** Die echte Klasse hinter `<yuvomi-category-manager>`, wie shopping.js sie laedt. */
+let CategoryManager = null;
+globalThis.customElements = {
+  define(name, constructor) { if (name === 'yuvomi-category-manager') CategoryManager = constructor; },
+  get() {},
+};
 
 const { installMiniDom } = await import('./mini-dom.js');
 installMiniDom();
 const toasts = [];
 globalThis.window.yuvomi = { ...globalThis.window.yuvomi, showToast: (text, kind) => { toasts.push([text, kind]); } };
 globalThis.document.getElementById = () => null;
+// Der Klapp-Zustand je Liste liegt im localStorage; die Seite raeumt ihn beim
+// Loeschen der Liste ab.
+const speicher = new Map();
+Object.defineProperty(globalThis, 'localStorage', {
+  configurable: true,
+  writable: true,
+  value: {
+    getItem: (k) => (speicher.has(k) ? speicher.get(k) : null),
+    setItem: (k, v) => { speicher.set(k, String(v)); },
+    removeItem: (k) => { speicher.delete(k); },
+  },
+});
 
 const { __test: shopping } = await import('../public/pages/shopping.js');
 
@@ -557,3 +580,251 @@ test('Abgehakte loeschen, von denen einer schon weg ist: 200 mit kleinerer Zahl,
   assert.equal(shopping.state.lists[0].item_total, 0);
   assert.equal(shopping.state.lists[0].item_checked, 0);
 });
+
+// -------------------------------------------------------------------------
+// Loeschen einer Liste, die es nicht mehr gibt: still erledigt
+// -------------------------------------------------------------------------
+
+/** Der Klapp-Zustand der Kategorien von Liste 1, wie die Seite ihn ablegt. */
+const KLAPP_LISTE_1 = 'yuvomi:shopping:collapsedCategories:v1:anon:1';
+
+/**
+ * Die aktive Liste ueber den delegierten Klick-Handler der Seite loeschen
+ * (`data-action="delete-list"`), samt Rueckfrage (der Loader sagt Ja) und dem
+ * Wechsel auf die Nachbarliste. Das Undo-Fenster ist derselbe Stub wie beim
+ * Artikel: `ablauf` tut, was `finish` in utils/ux.js tut.
+ */
+async function listeLoeschen({ keepalive = false } = {}) {
+  const handlers = {};
+  const root = { dataset: {}, addEventListener(type, fn, opts) { if (!opts?.capture) (handlers[type] ??= []).push(fn); } };
+  const container = { querySelector: (sel) => (sel === '.shopping-page' ? root : null), querySelectorAll: () => [], isConnected: true };
+  shopping.wireListContentEvents(container);
+  const [klick] = handlers.click ?? [];
+  assert.equal(typeof klick, 'function', 'der delegierte Handler haengt nicht');
+  let opts = null;
+  let zurueck = 0;
+  globalThis.__undoStub = (o) => { opts = o; };
+  try {
+    await klick({ target: { closest: (sel) => (sel === '[data-action]' ? { dataset: { action: 'delete-list' } } : null) } });
+  } finally {
+    delete globalThis.__undoStub;
+  }
+  assert.ok(opts, 'das Loeschen der Liste hat ein Undo-Fenster geoeffnet');
+  return {
+    zurueckgeholt: () => zurueck,
+    ablauf: async () => {
+      try {
+        await opts.commit({ keepalive });
+      } catch (err) {
+        if (!keepalive) { zurueck += 1; await opts.restore(err); }
+      }
+    },
+  };
+}
+
+/** Der Server nach der fremden Loeschung von Liste 1. */
+const OHNE_LISTE_1 = () => LISTEN().filter((l) => l.id !== 1);
+const NACHLADEN_LISTE_2 = ['/preferences', '/shopping', '/shopping/2/items', '/shopping/categories', '/shopping/stores'];
+
+test('Loeschen einer schon geloeschten Liste: kein Toast, die Liste kommt nicht zurueck, die Seite laedt still nach', async () => {
+  zustand();
+  speicher.clear();
+  speicher.set(KLAPP_LISTE_1, '["x"]');
+  const { gets, stub } = server({ lists: OHNE_LISTE_1() });
+  const geloescht = [];
+  stub.delete = async (path) => { geloescht.push(path); throw fehler(404, 'shopping_list_not_found'); };
+
+  let lauf;
+  await mit(stub, async () => {
+    lauf = await listeLoeschen();
+    // Die Liste geht sofort, die Seite steht auf der Nachbarliste.
+    assert.deepEqual(shopping.state.lists.map((l) => l.id), [2]);
+    assert.equal(shopping.state.activeListId, 2);
+    assert.ok(speicher.has(KLAPP_LISTE_1), 'im Undo-Fenster bleibt der Klapp-Zustand');
+    gets.length = 0;
+    await lauf.ablauf();
+    // Gleich nach der Antwort, noch vor dem Ende des Nachladens: nichts ist
+    // zurueckgesprungen.
+    assert.deepEqual(shopping.state.lists.map((l) => l.id), [2], 'die Liste ist nicht zurueckgekommen');
+    assert.equal(shopping.state.activeListId, 2, 'und nicht wieder die aktive');
+  });
+
+  assert.deepEqual(geloescht, ['/shopping/1']);
+  assert.deepEqual(toasts, [], 'kein Toast: der Nutzer hat, was er wollte');
+  assert.equal(lauf.zurueckgeholt(), 0, 'restore lief nicht');
+  assert.deepEqual(shopping.state.lists.map((l) => l.id), [2]);
+  assert.equal(shopping.state.activeListId, 2);
+  assert.deepEqual(shopping.state.items.map((i) => i.id), [20]);
+  // Wie beim gewoehnlichen Erfolg: der verwaiste Klapp-Zustand geht mit.
+  assert.equal(speicher.has(KLAPP_LISTE_1), false, 'der Klapp-Zustand der Liste ist abgeraeumt');
+  // Der Stand war veraltet: die Seite holt den frischen, still.
+  assert.deepEqual([...gets].sort(), NACHLADEN_LISTE_2);
+});
+
+test('Gegenfall: das gewoehnliche Loeschen einer Liste raeumt denselben Klapp-Zustand ab und laedt nichts nach', async () => {
+  zustand();
+  speicher.clear();
+  speicher.set(KLAPP_LISTE_1, '["x"]');
+  const { gets, stub } = server({ lists: OHNE_LISTE_1() });
+  stub.delete = async () => ({ ok: true });
+
+  let lauf;
+  await mit(stub, async () => { lauf = await listeLoeschen(); gets.length = 0; await lauf.ablauf(); });
+
+  assert.deepEqual(toasts, []);
+  assert.equal(lauf.zurueckgeholt(), 0);
+  assert.equal(speicher.has(KLAPP_LISTE_1), false);
+  assert.deepEqual(gets, [], 'nur das erledigte Loeschen laedt nach, das gelungene nicht');
+});
+
+test('Beim Verlassen der Seite (keepalive) laedt das erledigte Loeschen der Liste nichts nach', async () => {
+  zustand();
+  const { gets, stub } = server({ lists: OHNE_LISTE_1() });
+  stub.delete = async () => { throw fehler(404, 'shopping_list_not_found'); };
+
+  await mit(stub, async () => { const lauf = await listeLoeschen({ keepalive: true }); gets.length = 0; await lauf.ablauf(); });
+
+  assert.deepEqual(toasts, []);
+  assert.deepEqual(gets, []);
+  assert.equal(laeuft(), null);
+});
+
+for (const [name, err, satz, laedtNach] of [
+  ['500 ohne Grund', fehler(500), 'common.unknownError', false],
+  ['blanke 404 ohne Grund', fehler(404), 'common.unknownError', false],
+  ['400 mit unbekanntem Grund', fehler(400, 'shopping_future_not_found'), 'common.unknownError', false],
+  ['eine Absage (403) mit diesem Grund', fehler(403, 'shopping_list_not_found'), 'common.errorNoPermission', false],
+  ['offline', Object.assign(new Error('offline'), { status: 0 }), 'common.errorOfflineMutation', false],
+  // Ein ANDERES Ding ist weg, nicht die Liste: das bleibt ein Fehler mit Satz
+  // und Nachladen.
+  ['ein Artikel ist weg, nicht die Liste', fehler(404, 'shopping_item_not_found'), 'shopping.errorItemGone', true],
+]) {
+  test(`Loeschen der Liste scheitert an etwas anderem: sie kommt zurueck, Toast - ${name}`, async () => {
+    zustand();
+    speicher.clear();
+    speicher.set(KLAPP_LISTE_1, '["x"]');
+    // Der Server hat die Liste noch (das Loeschen ist ja gescheitert).
+    const { gets, stub } = server({ items: { 1: [item(), item({ id: 11, name: 'Brot', sort_order: 2 })], 2: [item({ id: 20, list_id: 2, name: 'Dübel' })] } });
+    stub.delete = async () => { throw err; };
+
+    let lauf;
+    await mit(stub, async () => { lauf = await listeLoeschen(); gets.length = 0; await lauf.ablauf(); });
+
+    assert.deepEqual(toasts, [[satz, 'danger']]);
+    assert.equal(lauf.zurueckgeholt(), 1);
+    assert.deepEqual(shopping.state.lists.map((l) => l.id), [1, 2], 'die Liste ist wieder da, an ihrem Platz');
+    assert.equal(shopping.state.activeListId, 1);
+    assert.deepEqual(shopping.state.items.map((i) => i.id), [10, 11]);
+    assert.ok(speicher.has(KLAPP_LISTE_1), 'der Klapp-Zustand einer Liste, die es noch gibt, bleibt');
+    assert.deepEqual([...gets].sort(), laedtNach ? NACHLADEN : []);
+  });
+}
+
+// -------------------------------------------------------------------------
+// Laden und Kategorie loeschen, die es nicht mehr gibt: ein Erfolg
+// -------------------------------------------------------------------------
+
+/**
+ * Einen Verwalter so oeffnen, wie die Seite es tut, und eine Zeile loeschen.
+ *
+ * `open` ist der echte Aufrufer (`openStoreManager`/`openCategoryManager`): er
+ * konfiguriert die ECHTE Komponente und haengt seinen Zuhoerer an sie. Danach
+ * laeuft das echte `_delete` gegen den api-Stub. Gestubt sind das Modal (der
+ * Loader), die Rueckfrage (sagt Ja) und das Zeichnen der Komponente
+ * (`_renderShell`, `_load`, `_renderGroup`) - das Markup des Verwalters faehrt
+ * diese Suite also nicht.
+ */
+async function imVerwalterLoeschen(open, zeile) {
+  assert.ok(CategoryManager, 'shopping.js hat die Verwalter-Komponente geladen');
+  const manager = new CategoryManager();
+  manager._renderShell = () => {};
+  manager._load = () => {};
+  manager._renderGroup = () => {};
+  const ereignisse = [];
+  manager.addEventListener('category-manager-changed', (e) => { ereignisse.push(e.detail?.action ?? null); });
+  let opts = null;
+  globalThis.__openModal = (o) => { opts = o; };
+  try {
+    await open(nullContainer());
+  } finally {
+    delete globalThis.__openModal;
+  }
+  assert.ok(opts, 'der Verwalter ist aufgegangen');
+  opts.onSave({ querySelector: (sel) => (sel === 'yuvomi-category-manager' ? manager : null) });
+  manager._cats = [zeile, { id: 99, name: 'Bleibt' }];
+  await manager._delete(String(zeile.id));
+  // Der Zuhoerer der Seite laedt asynchron nach; das Ereignis wartet nicht auf ihn.
+  for (let i = 0; i < 5; i += 1) await new Promise((r) => setImmediate(r));
+  return { ereignisse, zeilen: manager._cats.map((c) => c.id) };
+}
+
+const VERWALTER = [
+  {
+    was: 'Laden', open: (c) => shopping.openStoreManager(c), zeile: { id: 5, name: 'Eckladen' },
+    pfad: '/shopping/stores/5', grund: 'shopping_store_not_found', satz: 'shopping.errorStoreGone',
+    fremderGrund: 'shopping_category_not_found', fremderSatz: 'shopping.errorCategoryGone',
+    holt: ['/preferences', '/shopping/1/items', '/shopping/stores'],
+  },
+  {
+    was: 'Kategorie', open: (c) => shopping.openCategoryManager(c), zeile: { id: 2, name: 'Alt' },
+    pfad: '/shopping/categories/2', grund: 'shopping_category_not_found', satz: 'shopping.errorCategoryGone',
+    fremderGrund: 'shopping_store_not_found', fremderSatz: 'shopping.errorStoreGone',
+    holt: ['/shopping/1/items', '/shopping/categories'],
+  },
+];
+
+for (const v of VERWALTER) {
+  test(`${v.was} loeschen, schon fremd geloescht: der gewoehnliche Erfolg - Zeile raus, "Geloescht", die Seite zieht nach`, async () => {
+    zustand();
+    const { gets, stub } = server({ items: { 1: [item(), item({ id: 11, name: 'Brot', sort_order: 2 })] } });
+    const geloescht = [];
+    stub.delete = async (path) => { geloescht.push(path); throw fehler(404, v.grund); };
+
+    let ergebnis;
+    await mit(stub, async () => { ergebnis = await imVerwalterLoeschen(v.open, v.zeile); });
+
+    assert.deepEqual(geloescht, [v.pfad]);
+    assert.deepEqual(toasts, [['category.deleted', 'default']], 'der gewoehnliche Erfolgs-Toast, kein Fehler');
+    assert.deepEqual(ergebnis.zeilen, [99], 'die Zeile ist aus dem Verwalter');
+    assert.deepEqual(ergebnis.ereignisse, ['delete'], 'die Seite erfaehrt es wie jedes Loeschen');
+    assert.deepEqual([...gets].sort(), v.holt, 'und holt, was sie nach jedem Loeschen holt');
+  });
+
+  test(`Gegenfall: das gewoehnliche Loeschen (${v.was}) sieht genauso aus`, async () => {
+    zustand();
+    const { gets, stub } = server({ items: { 1: [item(), item({ id: 11, name: 'Brot', sort_order: 2 })] } });
+    stub.delete = async () => ({ ok: true });
+
+    let ergebnis;
+    await mit(stub, async () => { ergebnis = await imVerwalterLoeschen(v.open, v.zeile); });
+
+    assert.deepEqual(toasts, [['category.deleted', 'default']]);
+    assert.deepEqual(ergebnis, { ereignisse: ['delete'], zeilen: [99] });
+    assert.deepEqual([...gets].sort(), v.holt);
+  });
+
+  for (const [name, err, satz, gemeldet] of [
+    ['500 ohne Grund', fehler(500), 'common.errorGeneric', false],
+    ['blanke 404 ohne Grund', fehler(404), 'common.errorGeneric', false],
+    ['400 mit unbekanntem Grund', fehler(400, 'shopping_future_not_found'), 'common.errorGeneric', false],
+    ['eine Absage (403) mit diesem Grund', fehler(403, v.grund), 'common.errorNoPermission', false],
+    ['die letzte Kategorie', fehler(400, 'category_last'), 'category.errorLast', false],
+    // Ein ANDERES Ding ist weg: Fehler mit Satz, und der Verwalter meldet der
+    // Seite den veralteten Stand (wie seit #1921) - aber die Zeile bleibt.
+    ['etwas anderes ist weg', fehler(404, v.fremderGrund), v.fremderSatz, true],
+    ['die Liste ist weg', fehler(404, 'shopping_list_not_found'), 'shopping.errorListGone', true],
+  ]) {
+    test(`${v.was} loeschen scheitert an etwas anderem: Fehler-Toast, die Zeile bleibt - ${name}`, async () => {
+      zustand();
+      const { stub } = server({ items: { 1: [item(), item({ id: 11, name: 'Brot', sort_order: 2 })] } });
+      stub.delete = async () => { throw err; };
+
+      let ergebnis;
+      await mit(stub, async () => { ergebnis = await imVerwalterLoeschen(v.open, v.zeile); });
+
+      assert.deepEqual(toasts, [[satz, 'danger']]);
+      assert.deepEqual(ergebnis.zeilen, [v.zeile.id, 99], 'die Zeile steht noch im Verwalter');
+      assert.deepEqual(ergebnis.ereignisse, gemeldet ? [null] : [], 'kein "delete" an die Seite');
+    });
+  }
+}

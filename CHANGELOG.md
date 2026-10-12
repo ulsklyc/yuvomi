@@ -136,6 +136,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   current lists, shops and categories. The dialogs that manage shops and shopping categories
   refresh their rows the same way. One case stays quiet: if you delete an item that somebody else
   has already deleted, it is simply gone - no note, and the row does not come back for a moment.
+  The same holds for a list, a shop or a shopping category that somebody else deleted first: the
+  list stays gone without a note, and the dialog confirms the shop or category as deleted instead
+  of reporting an error.
 - **Two texts no longer suggest that wall mode follows the arrangement of the overview** (#1908).
   Wall mode always shows the same four things - the time, today's schedule, who's up today and
   the weather - on every device. The hint under Settings → Household → Wall tablets now names
