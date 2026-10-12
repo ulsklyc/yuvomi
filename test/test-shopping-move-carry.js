@@ -686,6 +686,71 @@ test('Eine andere App aendert das Objekt am alten Platz zwischen Lesen und Entfe
   assert.deepEqual(rowsOf().map((x) => [x.id, x.list_id, x.name]), [[item.id, b.listId, 'Milch laktosefrei']]);
 });
 
+test('Zielkonto zuerst, Bearbeitung im Umzug, und eine andere App aendert das alte Objekt vor dem Entfernen: das Nachtragen behaelt die Bearbeitung von hier', async () => {
+  reset();
+  secondAccount();
+  const a = mirroredList('alt', { server: dav2, accountId: account2 });
+  const b = mirroredList('neu');
+  dav2.putObject(a.url, FILE, original());
+  await remindersSync.sync();
+  const [item] = rowsOf();
+
+  dav.refuse({ status: 503 });
+  dav2.refuse({ status: 503 });
+  await patch(item.id, { list_id: b.listId, name: 'Hafermilch' });
+  dav.allowAll();
+  dav2.allowAll();
+  // Zwischen Lesen und Entfernen aendert eine andere App etwas am alten
+  // Objekt, das Yuvomi nicht fuehrt - der Name dort ist noch der alte.
+  let once = true;
+  dav2.refuse({
+    method: 'DELETE',
+    when: () => {
+      if (once) { once = false; dav2.putObject(a.url, FILE, original().replace('DESCRIPTION:fettarm', 'DESCRIPTION:laktosefrei')); }
+      return false;
+    },
+  });
+
+  await remindersSync.sync();
+
+  const carried = objectsWith(dav, b.url);
+  assert.equal(carried.length, 1);
+  assert.match(carried[0].data, /DESCRIPTION:laktosefrei/, 'die Aenderung der anderen App ist nachgetragen');
+  assert.match(carried[0].data, /SUMMARY:Hafermilch\r\n/, 'und die Bearbeitung von hier steht weiter darin');
+  assert.deepEqual(objectsWith(dav2, a.url), []);
+  await remindersSync.sync();
+  assert.deepEqual(rowsOf().map((x) => [x.id, x.list_id, x.name]), [[item.id, b.listId, 'Hafermilch']]);
+});
+
+test('Zwei Konten fuehren DIESELBE Server-Liste, je auf eine eigene Einkaufsliste: ein Umzug dazwischen fasst das eine Objekt nicht an', async () => {
+  reset();
+  const a = mirroredList('alt');
+  // Ein zweites Konto auf demselben Server (ein anderes Mitglied, dem die
+  // Liste freigegeben ist): dieselbe Collection, eigene Einkaufsliste.
+  account2 = Number(db.prepare(
+    "INSERT INTO caldav_accounts (name, caldav_url, username, password) VALUES ('Zwei', ?, 'v', 'p')"
+  ).run(dav.url).lastInsertRowid);
+  const other = plainList('alt (Konto zwei)');
+  db.prepare(`
+    INSERT INTO caldav_reminder_selection (account_id, list_url, list_name, target_module, enabled, target_list_id)
+    VALUES (?, ?, 'alt', 'shopping', 1, ?)
+  `).run(account2, a.url, other);
+  dav.putObject(a.url, FILE, original());
+  await remindersSync.sync();
+  const mine = rowsOf().find((x) => x.external_account_id === account1);
+  assert.equal(rowsOf().length, 2, 'jedes Konto spiegelt das Objekt in seine Liste');
+
+  await patch(mine.id, { list_id: other });
+  await remindersSync.sync();
+
+  assert.equal(objectsWith(dav, a.url)[0]?.data, original(), 'das Objekt liegt unveraendert dort - es gab nichts mitzunehmen');
+  assert.equal(dav.seen('DELETE').length, 0);
+  assert.equal(dav.seen('PUT').length, 0);
+  assert.equal(row(mine.id).outbound_move, 0);
+  assert.deepEqual(notes(), []);
+  assert.equal(rowsOf().length, 2);
+});
+
 // ── Der Nutzer handelt, waehrend der Umzug unterwegs ist ────────────────────────
 
 /** Fuehrt `act` aus, waehrend der PUT des Umzugs beim Server liegt. */

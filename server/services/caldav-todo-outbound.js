@@ -338,6 +338,8 @@ function shoppingMappingsOf(listId) {
  *   - Das Objekt liegt schon in einer Server-Liste, die der Zielliste über
  *     dasselbe Konto zugeordnet ist (der Artikel zieht zurück, bevor sein
  *     Objekt nachgezogen ist): nichts ist zu tun, eine Vormerkung fällt.
+ *     Führt ein ANDERES Konto dieselbe Server-Liste auf die Zielliste, fällt
+ *     die Vormerkung im Durchgang (`carryShoppingItem`).
  *   - Die Zielliste ist nicht gespiegelt: `releaseShoppingMirror`.
  *
  * @returns {'none'|'carry'|'home'|'released'}
@@ -1624,6 +1626,13 @@ function bookShoppingCarry(sent, { accountId, collectionUrl, objectUrl }) {
  * dem nächsten Durchgang (`releaseLeftoverTodoUploads`).
  */
 async function removeCarriedOriginal(source, target, { row, original, from, objectUrl, collectionUrl }) {
+  // `row` ist die Zeile, wie sie hinausging. War an ihr eine Bearbeitung
+  // vorgemerkt, steht sie im abgelegten Objekt - und die Buchung hat die
+  // Vormerkung danach abgeräumt. Das Nachtragen unten schreibt den neuen Platz
+  // noch einmal, mit dem neu gelesenen alten Objekt als Grundlage, und muss
+  // dieselbe Bearbeitung wieder einarbeiten: sonst stünde am neuen Platz der
+  // Name von vor der Bearbeitung, und der nächste Abruf trüge ihn in die Zeile.
+  const workedIn = !!row.outbound_dirty;
   const place = { source: 'caldav', accountId: row.external_account_id, kind: 'item', rowId: row.id, collectionUrl: from };
   const gone = (err) => err?.status === 404 || err?.status === 410;
   try {
@@ -1650,7 +1659,11 @@ async function removeCarriedOriginal(source, target, { row, original, from, obje
     const now = reloadRow('shopping', row.id);
     if (!there.own || !now || now.external_source !== 'caldav' || now.external_object_url !== objectUrl) return;
     await target.updateCalendarObject({
-      calendarObject: { url: objectUrl, etag: there.own.etag, data: carriedContent(now, again.own.data) },
+      calendarObject: {
+        url: objectUrl,
+        etag: there.own.etag,
+        data: carriedContent({ ...now, outbound_dirty: workedIn || now.outbound_dirty ? 1 : 0 }, again.own.data),
+      },
     });
     await source.deleteCalendarObject({ calendarObject: { url: row.external_object_url, etag: again.own.etag } });
     settleUploadAttempt(place);
@@ -1692,7 +1705,14 @@ async function carryShoppingItem(client, accountId, collection, rowId, clientFor
   // Ohne Adresse (Bestand von vor #617) ist das Original nicht lesbar; der
   // nächste volle Abruf trägt sie nach.
   if (!from || !name || !listed.external_uid) return 'waiting';
-  if (listed.external_account_id === accountId && sameCollection(from, collection.url)) {
+  // Das Objekt liegt schon in der Server-Liste des Ziels. Gefragt wird nach
+  // der ADRESSE, nicht nach dem Konto: zwei Konten können dieselbe Liste
+  // führen (einem zweiten Mitglied freigegeben), jedes auf eine eigene
+  // Einkaufsliste. Zwischen diesen beiden gibt es nichts mitzunehmen - es ist
+  // EIN Objekt, und wer es "am alten Platz" entfernte, entfernte es ganz.
+  // Die Vormerkung fällt; der nächste Abruf stellt die Zeile wieder auf die
+  // Liste, die ihr Konto dieser Server-Liste zuordnet.
+  if (sameCollection(from, collection.url)) {
     clearShoppingMove(listed.id);
     return 'dropped';
   }
