@@ -236,6 +236,13 @@ deletions cannot be learned at all. Tracked as #1002.
   *Opens with:* a geocoder URL the household configures itself - its own Nominatim, for example -
   that is off unless set, with nothing sent while it is unset. That shape is settled, the work is
   not scheduled; the person who asked said a self-hosted lookup would be enough for them.
+- **Gravatar import for the profile picture** (#1791; #254 set it aside) is *here, in that shape*.
+  It is an import on click, not a provider: a household member presses a button, the server
+  fetches the picture once and stores it like an upload. What it sends is a stable identifier of a
+  person - the hash of a known address can be recomputed - to a company outside the household, so
+  it is off unless the operator sets `GRAVATAR_BASE_URL` (to gravatar.com or a Libravatar mirror),
+  with nothing sent and no button while it is unset. Same shape as the geocoder above and #656 in
+  section 3.
 - **A training log** (#1733) - exercises with sets and repetitions, weights over time, saved
   routines such as "Push day" - is *not here*. Yuvomi coordinates what several people in one home
   have to settle together; a training log is one person's tool, with a data model as large as one

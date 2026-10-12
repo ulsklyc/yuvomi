@@ -465,6 +465,7 @@ describe('CalDAV sync yields to the event loop (#519)', () => {
         last_error TEXT,
         created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
         object_url TEXT,
+        etag TEXT,
         UNIQUE(source, calendar_external_id, event_external_id)
       );
       CREATE TABLE event_assignments (
@@ -626,6 +627,7 @@ describe('CalDAV: RECURRENCE-ID-Overrides killen die Serie nicht (#549)', () => 
         last_error TEXT,
         created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
         object_url TEXT,
+        etag TEXT,
         UNIQUE(source, calendar_external_id, event_external_id)
       );
       CREATE TABLE event_assignments (event_id INTEGER, user_id INTEGER, UNIQUE(event_id, user_id));
@@ -815,6 +817,7 @@ describe('CalDAV: No-op-Syncs bleiben im Standard-Log-Level still', () => {
         last_error TEXT,
         created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
         object_url TEXT,
+        etag TEXT,
         UNIQUE(source, calendar_external_id, event_external_id)
       );
       CREATE TABLE event_assignments (
@@ -1054,6 +1057,7 @@ describe('CalDAV: eine Bearbeitung friert die Farbe nicht mehr ein (#899)', () =
         event_external_id TEXT NOT NULL,
         attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT,
         object_url TEXT,
+        etag TEXT,
         UNIQUE(source, calendar_external_id, event_external_id)
       );
       CREATE TABLE event_assignments (
@@ -1244,6 +1248,7 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
         event_external_id TEXT NOT NULL,
         attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT,
         object_url TEXT,
+        etag TEXT,
         UNIQUE(source, calendar_external_id, event_external_id)
       );
       CREATE TABLE event_assignments (
@@ -2189,6 +2194,7 @@ describe('CalDAV: eine Aufgabenliste bleibt kein Terminziel (#617)', () => {
         last_error TEXT,
         created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
         object_url TEXT,
+        etag TEXT,
         UNIQUE(source, calendar_external_id, event_external_id)
       );
       CREATE TABLE event_assignments (

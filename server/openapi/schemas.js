@@ -861,6 +861,12 @@ export const schemas = {
           properties: {
             user: { $ref: '#/components/schemas/User' },
             csrfToken: { type: 'string' },
+            gravatarAvailable: {
+              type: 'boolean',
+              description: 'Whether the calling account may use the one-time Gravatar import '
+                + '(`POST /api/v1/auth/me/avatar/gravatar`): true only when the operator set `GRAVATAR_BASE_URL` '
+                + 'and the account is a household member. The configured URL itself is never exposed.',
+            },
           },
           required: ['user'],
         },

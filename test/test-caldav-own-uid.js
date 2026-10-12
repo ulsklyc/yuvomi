@@ -1110,3 +1110,656 @@ test('Umzug: ohne Kalenderliste wartet er - auch wenn der Aufrufer keine mitgibt
   assert.equal(moveTo(), dest, 'ein dazwischen vorgemerkter Umzug wurde verworfen');
   assert.equal(dav.seen('PUT').length, 0);
 });
+
+// ── Das Ziel wechselt, während der Upload unterwegs ist (#1881) ─────────────────
+//
+// Die Zeile wird gelesen, der PUT geht hinaus, und bevor seine Antwort da ist,
+// wählt jemand ein anderes Ziel. Gebucht wurde danach gegen das Ziel der
+// ANFRAGE: die Zeile wurde sauberer Spiegel dort, wo sie niemand mehr haben
+// wollte, und das neue Ziel galt nie. Bei Aufgaben räumte der Upload die
+// gerade gewählten Zielspalten sogar ab.
+//
+// Der Wechsel passiert in `duringPut`, also zwischen Anfrage und Antwort. Er
+// schreibt, was die Route für eine lokale Zeile schreibt: nur die Zielspalten.
+
+function secondAccount() {
+  return Number(db.prepare(`
+    INSERT INTO caldav_accounts (name, caldav_url, username, password) VALUES ('Zweites', ?, 'u2', 'p2')
+  `).run(dav.url).lastInsertRowid);
+}
+
+function addCalendar(slug, forAccount = accountId) {
+  const url = dav.addCollection(slug, { name: slug, components: ['VEVENT'] });
+  db.prepare(`
+    INSERT INTO caldav_calendar_selection (account_id, calendar_url, calendar_name, calendar_color, enabled)
+    VALUES (?, ?, ?, '#4A90E2', 1)
+  `).run(forAccount, url, slug);
+  return url;
+}
+
+function addTaskList(slug, forAccount = accountId) {
+  const url = dav.addCollection(slug, { name: slug, components: ['VTODO'] });
+  db.prepare(`
+    INSERT INTO caldav_reminder_selection (account_id, list_url, list_name, target_module, enabled)
+    VALUES (?, ?, ?, 'tasks', 1)
+  `).run(forAccount, url, slug);
+  return url;
+}
+
+const setEventTarget = (id, account, url) => db.prepare(
+  'UPDATE calendar_events SET target_caldav_account_id = ?, target_caldav_calendar_url = ? WHERE id = ?'
+).run(account, url, id);
+const setTaskTarget = (id, account, url) => db.prepare(
+  'UPDATE tasks SET target_caldav_account_id = ?, target_caldav_list_url = ? WHERE id = ?'
+).run(account, url, id);
+const eventTombstones = () => db.prepare('SELECT * FROM calendar_pending_deletions').all();
+const todoTombstones  = () => db.prepare('SELECT * FROM caldav_todo_pending_deletions').all();
+
+test('Termin: Ziel wechselt während des Uploads in einen anderen Kalender des Kontos - der Umzug ist vorgemerkt und läuft', async () => {
+  reset();
+  const way = WAYS.Termin;
+  const { row, rows, names } = helpers(way);
+  const url   = way.setup();
+  const other = addCalendar('work');
+  const id    = way.create(url, 'Zieht um');
+  const uid   = ownUid('event', id, db);
+
+  const happened = duringPut(() => setEventTarget(id, accountId, other));
+  await way.upload();
+  assert.ok(happened(), 'es lief kein PUT - der Fall ist nicht nachgestellt');
+  assert.deepEqual(names(url), [`${uid}.ics`], 'der Upload kam nicht im ersten Kalender an - der Fall ist nicht nachgestellt');
+  dav.allowAll();
+
+  let now = row(id);
+  assert.equal(now.external_source, 'caldav');
+  assert.equal(now.outbound_move_to, other, 'der Termin gilt als sauberer Spiegel im alten Kalender, das neue Ziel ist nicht vorgemerkt');
+
+  await way.sync();
+  await way.push();
+  await way.sync();
+
+  now = row(id);
+  assert.equal(rows().length, 1);
+  assert.equal(now.outbound_move_to, null);
+  assert.equal(now.external_object_url, `${other}${uid}.ics`, 'die Zeile zeigt nicht auf das Objekt im neuen Kalender');
+  assert.deepEqual(names(other), [`${uid}.ics`], 'der Termin liegt nicht im neuen Kalender');
+  assert.deepEqual(names(url), [], 'der Termin liegt weiter im alten Kalender');
+  assert.deepEqual(eventTombstones(), []);
+});
+
+test('Termin: dasselbe Ziel in anderer Schreibweise während des Uploads - kein Umzug in den eigenen Kalender', async () => {
+  reset();
+  const way = WAYS.Termin;
+  const { row, rows, names } = helpers(way);
+  const url = way.setup();
+  const id  = way.create(url, 'Bleibt');
+  const uid = ownUid('event', id, db);
+  assert.ok(url.endsWith('/'));
+
+  // Derselbe Kalender ohne Schlussstrich. Als Umzug gelesen, legte er im
+  // "Ziel" an und löschte in der "Quelle" - dasselbe Objekt.
+  const happened = duringPut(() => setEventTarget(id, accountId, url.slice(0, -1)));
+  await way.upload();
+  assert.ok(happened(), 'es lief kein PUT - der Fall ist nicht nachgestellt');
+  dav.allowAll();
+
+  assert.equal(row(id).external_source, 'caldav');
+  assert.equal(row(id).outbound_move_to, null, 'dieselbe URL ohne Schlussstrich gilt als anderer Kalender');
+
+  await way.sync();
+  await way.push();
+  await way.sync();
+
+  assert.equal(rows().length, 1);
+  assert.deepEqual(names(url), [`${uid}.ics`], 'der Termin wurde aus seinem eigenen Kalender gelöscht');
+  assert.deepEqual(eventTombstones(), []);
+});
+
+test('Termin: Ziel wechselt während des Uploads auf "Lokal" - das Objekt wird wieder entfernt, der Termin bleibt lokal', async () => {
+  reset();
+  const way = WAYS.Termin;
+  const { row, rows, names } = helpers(way);
+  const url = way.setup();
+  const id  = way.create(url, 'Doch lokal');
+  const uid = ownUid('event', id, db);
+
+  const happened = duringPut(() => setEventTarget(id, null, null));
+  await way.upload();
+  assert.ok(happened(), 'es lief kein PUT - der Fall ist nicht nachgestellt');
+  assert.deepEqual(names(url), [`${uid}.ics`], 'der Upload kam nicht an - der Fall ist nicht nachgestellt');
+  dav.allowAll();
+
+  let now = row(id);
+  assert.equal(now.external_source, 'local', 'der Termin wurde Spiegel in einem Kalender, den niemand mehr gewählt hat');
+  assert.equal(now.external_calendar_id, null);
+  assert.equal(now.caldav_account_id, null);
+
+  await way.sync();
+  assert.equal(rows().length, 1, 'der Abruf hat das eigene Objekt als zweite Zeile importiert');
+  await way.push();
+  await way.sync();
+
+  now = row(id);
+  assert.equal(rows().length, 1);
+  assert.equal(now.external_source, 'local');
+  assert.equal(now.title, 'Doch lokal');
+  assert.equal(now.target_caldav_account_id, null);
+  assert.deepEqual(names(url), [], 'das Objekt liegt weiter auf dem Server');
+  assert.deepEqual(eventTombstones(), []);
+});
+
+test('Termin: Ziel wechselt während des Uploads auf ein anderes Konto - er liegt am Ende nur dort', async () => {
+  reset();
+  const way = WAYS.Termin;
+  const { row, rows, names } = helpers(way);
+  const url    = way.setup();
+  const second = secondAccount();
+  const theirs = addCalendar('theirs', second);
+  const id     = way.create(url, 'Anderes Konto');
+  const uid    = ownUid('event', id, db);
+
+  const happened = duringPut(() => setEventTarget(id, second, theirs));
+  await way.upload();
+  assert.ok(happened(), 'es lief kein PUT - der Fall ist nicht nachgestellt');
+  assert.equal(decodeURIComponent(dav.seen('PUT')[0].path), `${new URL(url).pathname}${uid}.ics`,
+    'der erste PUT ging nicht in den Kalender des ersten Kontos - der Fall ist nicht nachgestellt');
+  dav.allowAll();
+
+  await way.sync();
+  await way.push();
+  await way.sync();
+
+  const now = row(id);
+  assert.equal(rows().length, 1, `aus einem Termin sind ${rows().length} Zeilen geworden`);
+  assert.equal(now.external_source, 'caldav');
+  assert.equal(now.caldav_account_id, second, 'der Termin gehört dem Konto, das niemand mehr gewählt hat');
+  assert.equal(now.external_object_url, `${theirs}${uid}.ics`);
+  assert.deepEqual(names(theirs), [`${uid}.ics`]);
+  assert.deepEqual(names(url), [], 'das Objekt im Kalender des ersten Kontos liegt weiter dort');
+  assert.deepEqual(eventTombstones(), []);
+});
+
+test('Termin: auf "Lokal" gewechselt, das Entfernen scheitert, dann zurück in denselben Kalender - das Objekt bleibt stehen', async () => {
+  reset();
+  const way = WAYS.Termin;
+  const { row, rows, names } = helpers(way);
+  const url = way.setup();
+  const id  = way.create(url, 'Hin und her');
+  const uid = ownUid('event', id, db);
+
+  const happened = duringPut(() => setEventTarget(id, null, null));
+  await way.upload();
+  assert.ok(happened());
+  dav.allowAll();
+  assert.equal(row(id).external_source, 'local', 'der Fall ist nicht nachgestellt: der Termin wurde gespiegelt');
+  assert.equal(eventTombstones().length, 1, 'der Fall ist nicht nachgestellt: das Entfernen ist nicht vorgemerkt');
+
+  // Der Server gibt das Objekt nicht her; inzwischen wählt der Nutzer den
+  // Kalender wieder. Der Upload trifft auf das eigene Objekt (412) und
+  // übernimmt es - ab da ist es gewollt.
+  dav.refuse({ method: 'DELETE', status: 403 });
+  await way.sync();
+  assert.deepEqual(names(url), [`${uid}.ics`], 'der Fall ist nicht nachgestellt: das Objekt ist schon fort');
+  setEventTarget(id, accountId, url);
+  await way.sync();
+  assert.equal(row(id).external_source, 'caldav', 'der Termin ging nicht wieder hinauf');
+  dav.allowAll();
+
+  await way.sync();
+  await way.push();
+  await way.sync();
+
+  const now = row(id);
+  assert.equal(rows().length, 1, 'der Termin ist fort oder doppelt');
+  assert.equal(now.external_source, 'caldav');
+  assert.equal(now.outbound_dirty, 0);
+  assert.deepEqual(names(url), [`${uid}.ics`], 'der alte Löschauftrag hat das wieder gewollte Objekt entfernt');
+  assert.deepEqual(eventTombstones(), []);
+});
+
+test('Aufgabe: Ziel wechselt während des Uploads in eine andere Liste - sie liegt am Ende nur dort', async () => {
+  reset();
+  const way = WAYS.Aufgabe;
+  const { row, rows, names } = helpers(way);
+  const url   = way.setup();
+  const other = addTaskList('todo2');
+  const id    = way.create(url, 'Andere Liste');
+  const uid   = ownUid('task', id, db);
+
+  const happened = duringPut(() => setTaskTarget(id, accountId, other));
+  await way.upload();
+  assert.ok(happened(), 'es lief kein PUT - der Fall ist nicht nachgestellt');
+  assert.deepEqual(names(url), [`${uid}.ics`], 'der Upload kam nicht in der ersten Liste an - der Fall ist nicht nachgestellt');
+  dav.allowAll();
+
+  let now = row(id);
+  assert.equal(now.external_source, 'local', 'die Aufgabe wurde Spiegel in der Liste, die niemand mehr gewählt hat');
+  assert.equal(now.target_caldav_list_url, other, 'das gerade gewählte Ziel wurde abgeräumt');
+  assert.equal(now.target_caldav_account_id, accountId);
+
+  await way.sync();
+  await way.push();
+  await way.sync();
+
+  now = row(id);
+  assert.equal(rows().length, 1, `aus einer Aufgabe sind ${rows().length} Zeilen geworden`);
+  assert.equal(now.external_source, 'caldav');
+  assert.equal(now.external_object_url, `${other}${uid}.ics`);
+  assert.equal(now.target_caldav_list_url, null, 'die gespiegelte Aufgabe trägt weiter ein Upload-Ziel');
+  assert.equal(now.target_caldav_account_id, null);
+  assert.deepEqual(names(other), [`${uid}.ics`]);
+  assert.deepEqual(names(url), [], 'die Aufgabe liegt weiter in der alten Liste');
+  assert.deepEqual(todoTombstones(), []);
+});
+
+test('Aufgabe: Ziel wird während des Uploads zurückgenommen - das Objekt wird wieder entfernt, die Aufgabe bleibt lokal', async () => {
+  reset();
+  const way = WAYS.Aufgabe;
+  const { row, rows, names } = helpers(way);
+  const url = way.setup();
+  const id  = way.create(url, 'Doch lokal');
+  const uid = ownUid('task', id, db);
+
+  const happened = duringPut(() => setTaskTarget(id, null, null));
+  await way.upload();
+  assert.ok(happened(), 'es lief kein PUT - der Fall ist nicht nachgestellt');
+  assert.deepEqual(names(url), [`${uid}.ics`], 'der Upload kam nicht an - der Fall ist nicht nachgestellt');
+  dav.allowAll();
+
+  assert.equal(row(id).external_source, 'local', 'die Aufgabe wurde Spiegel, obwohl sie lokal bleiben sollte');
+
+  await way.sync();
+  assert.equal(rows().length, 1, 'der Abruf hat das eigene Objekt als zweite Zeile importiert');
+  await way.push();
+  await way.sync();
+
+  const now = row(id);
+  assert.equal(rows().length, 1);
+  assert.equal(now.external_source, 'local');
+  assert.equal(now.external_uid, null);
+  assert.equal(now.title, 'Doch lokal');
+  assert.deepEqual(names(url), [], 'das Objekt liegt weiter auf dem Server');
+  assert.deepEqual(todoTombstones(), []);
+});
+
+test('Aufgabe: Ziel wechselt während des Uploads auf ein anderes Konto - sie liegt am Ende nur dort', async () => {
+  reset();
+  const way = WAYS.Aufgabe;
+  const { row, rows, names } = helpers(way);
+  const url    = way.setup();
+  const second = secondAccount();
+  const theirs = addTaskList('theirs', second);
+  const id     = way.create(url, 'Anderes Konto');
+  const uid    = ownUid('task', id, db);
+
+  const happened = duringPut(() => setTaskTarget(id, second, theirs));
+  await way.upload();
+  assert.ok(happened(), 'es lief kein PUT - der Fall ist nicht nachgestellt');
+  dav.allowAll();
+
+  await way.sync();
+  await way.push();
+  await way.sync();
+
+  const now = row(id);
+  assert.equal(rows().length, 1, `aus einer Aufgabe sind ${rows().length} Zeilen geworden`);
+  assert.equal(now.external_source, 'caldav');
+  assert.equal(now.external_account_id, second, 'die Aufgabe gehört dem Konto, das niemand mehr gewählt hat');
+  assert.equal(now.external_object_url, `${theirs}${uid}.ics`);
+  assert.deepEqual(names(theirs), [`${uid}.ics`]);
+  assert.deepEqual(names(url), [], 'das Objekt in der Liste des ersten Kontos liegt weiter dort');
+  assert.deepEqual(todoTombstones(), []);
+});
+
+test('Aufgabe: Ziel zurückgenommen, das Entfernen scheitert, dann zurück in dieselbe Liste - der Upload wartet, die Aufgabe liegt am Ende einmal oben', async () => {
+  reset();
+  const way = WAYS.Aufgabe;
+  const { row, rows, names } = helpers(way);
+  const url = way.setup();
+  const id  = way.create(url, 'Hin und her');
+  const uid = ownUid('task', id, db);
+
+  const happened = duringPut(() => setTaskTarget(id, null, null));
+  await way.upload();
+  assert.ok(happened());
+  dav.allowAll();
+  assert.equal(row(id).external_source, 'local', 'der Fall ist nicht nachgestellt: die Aufgabe wurde gespiegelt');
+  assert.equal(todoTombstones().length, 1, 'der Fall ist nicht nachgestellt: das Entfernen ist nicht vorgemerkt');
+
+  dav.refuse({ method: 'DELETE', status: 403 });
+  await way.sync();
+  assert.deepEqual(names(url), [`${uid}.ics`], 'der Fall ist nicht nachgestellt: das Objekt ist schon fort');
+  setTaskTarget(id, accountId, url);
+  // Solange das alte Objekt noch entfernt werden soll, geht die Zeile nicht
+  // wieder hinauf: sie träfe auf genau dieses Objekt, übernähme es, und der
+  // wartende Auftrag nähme es ihr danach weg.
+  await way.upload();
+  await way.sync();
+  assert.equal(row(id).external_source, 'local', 'die Aufgabe ging hinauf, während ihr altes Objekt noch entfernt werden soll');
+  dav.allowAll();
+
+  await way.sync();
+  await way.push();
+  await way.sync();
+
+  const now = row(id);
+  assert.equal(rows().length, 1, 'die Aufgabe ist fort oder doppelt');
+  assert.equal(now.external_source, 'caldav');
+  assert.equal(now.outbound_dirty, 0);
+  assert.deepEqual(names(url), [`${uid}.ics`], 'die Aufgabe liegt nicht (mehr) auf dem Server');
+  assert.match(dav.getObject(url, `${uid}.ics`).data, /SUMMARY:Hin und her/);
+  assert.deepEqual(todoTombstones(), []);
+});
+
+test('Einkaufsartikel: wandert während des Uploads in eine nicht zugeordnete Liste - das Objekt wird wieder entfernt', async () => {
+  reset();
+  const way = WAYS.Einkaufsartikel;
+  const { row, rows, names } = helpers(way);
+  const url = way.setup();
+  const privateList = db.prepare("INSERT INTO shopping_lists (name, created_by) VALUES ('Privat', 1) RETURNING id").get().id;
+  const id  = way.create(url, 'Wandert');
+  const uid = ownUid('item', id, db);
+
+  const happened = duringPut(() => db.prepare('UPDATE shopping_items SET list_id = ? WHERE id = ?').run(privateList, id));
+  await way.upload();
+  assert.ok(happened(), 'es lief kein PUT - der Fall ist nicht nachgestellt');
+  assert.deepEqual(names(url), [`${uid}.ics`], 'der Upload kam nicht an - der Fall ist nicht nachgestellt');
+  dav.allowAll();
+
+  assert.equal(row(id).external_source, 'local', 'der Artikel einer nicht gespiegelten Liste wurde Spiegel');
+
+  await way.sync();
+  await way.push();
+  await way.sync();
+
+  const now = row(id);
+  assert.equal(rows().length, 1, `aus einem Artikel sind ${rows().length} Zeilen geworden`);
+  assert.equal(now.external_source, 'local');
+  assert.equal(now.list_id, privateList);
+  assert.deepEqual(names(url), [], 'das Objekt liegt weiter auf dem Server');
+  assert.deepEqual(todoTombstones(), []);
+});
+
+test('Einkaufsartikel: wandert während des Uploads in eine anders zugeordnete Liste - er liegt am Ende nur dort', async () => {
+  reset();
+  const way = WAYS.Einkaufsartikel;
+  const { row, rows, names } = helpers(way);
+  const url   = way.setup();
+  const other = dav.addCollection('shop2', { name: 'Drogerie', components: ['VTODO'] });
+  const otherList = db.prepare("INSERT INTO shopping_lists (name, created_by) VALUES ('Drogerie', 1) RETURNING id").get().id;
+  db.prepare(`
+    INSERT INTO caldav_reminder_selection (account_id, list_url, list_name, target_module, enabled, target_list_id)
+    VALUES (?, ?, 'Drogerie', 'shopping', 1, ?)
+  `).run(accountId, other, otherList);
+  const id  = way.create(url, 'Wandert');
+  const uid = ownUid('item', id, db);
+
+  const happened = duringPut(() => db.prepare('UPDATE shopping_items SET list_id = ? WHERE id = ?').run(otherList, id));
+  await way.upload();
+  assert.ok(happened(), 'es lief kein PUT - der Fall ist nicht nachgestellt');
+  dav.allowAll();
+
+  await way.sync();
+  await way.push();
+  await way.sync();
+
+  const now = row(id);
+  assert.equal(rows().length, 1, `aus einem Artikel sind ${rows().length} Zeilen geworden`);
+  assert.equal(now.external_source, 'caldav');
+  assert.equal(now.list_id, otherList);
+  assert.equal(now.external_object_url, `${other}${uid}.ics`);
+  assert.deepEqual(names(other), [`${uid}.ics`]);
+  assert.deepEqual(names(url), [], 'der Artikel liegt weiter in der alten Liste');
+  assert.deepEqual(todoTombstones(), []);
+});
+
+test('Einkaufsartikel: weggewandert, das Entfernen scheitert, dann zurück in die Liste - der Upload wartet, der Artikel liegt am Ende einmal oben', async () => {
+  reset();
+  const way = WAYS.Einkaufsartikel;
+  const { row, rows, names } = helpers(way);
+  const url = way.setup();
+  const privateList = db.prepare("INSERT INTO shopping_lists (name, created_by) VALUES ('Privat', 1) RETURNING id").get().id;
+  const id  = way.create(url, 'Hin und her');
+  const uid = ownUid('item', id, db);
+  const moveTo = (listId) => db.prepare('UPDATE shopping_items SET list_id = ? WHERE id = ?').run(listId, id);
+
+  const happened = duringPut(() => moveTo(privateList));
+  await way.upload();
+  assert.ok(happened());
+  dav.allowAll();
+  assert.equal(row(id).external_source, 'local', 'der Fall ist nicht nachgestellt: der Artikel wurde gespiegelt');
+  assert.equal(todoTombstones().length, 1, 'der Fall ist nicht nachgestellt: das Entfernen ist nicht vorgemerkt');
+
+  dav.refuse({ method: 'DELETE', status: 403 });
+  await way.sync();
+  assert.deepEqual(names(url), [`${uid}.ics`], 'der Fall ist nicht nachgestellt: das Objekt ist schon fort');
+  moveTo(way.listId);
+  await way.upload();
+  await way.sync();
+  assert.equal(row(id).external_source, 'local', 'der Artikel ging hinauf, während sein altes Objekt noch entfernt werden soll');
+  dav.allowAll();
+
+  await way.sync();
+  await way.push();
+  await way.sync();
+
+  const now = row(id);
+  assert.equal(rows().length, 1, 'der Artikel ist fort oder doppelt');
+  assert.equal(now.external_source, 'caldav');
+  assert.equal(now.outbound_dirty, 0);
+  assert.deepEqual(names(url), [`${uid}.ics`], 'der Artikel liegt nicht (mehr) auf dem Server');
+  assert.deepEqual(todoTombstones(), []);
+});
+
+// Dieselbe Frage eine Zeile früher: das Ziel wechselt, während der Upload
+// einer ANDEREN Zeile läuft. Die Schleife las ihre Liste davor und ging mit dem
+// Ziel von damals hinaus.
+
+test('Aufgabe: Ziel wechselt, bevor sie im selben Lauf an der Reihe ist - sie geht nicht mehr in die alte Liste', async () => {
+  reset();
+  const way = WAYS.Aufgabe;
+  const { row, names } = helpers(way);
+  const url    = way.setup();
+  const second = secondAccount();
+  const theirs = addTaskList('theirs', second);
+  const first  = way.create(url, 'Erste');
+  const id     = way.create(url, 'Zweite');
+  // Eine dritte wartet weiter auf dieses Konto: gefragt wird nach DIESER
+  // Zeile, nicht danach, ob überhaupt noch etwas wartet.
+  const third  = way.create(url, 'Dritte');
+  const uid    = ownUid('task', id, db);
+
+  const happened = duringPut(() => setTaskTarget(id, second, theirs));
+  // Nur das erste Konto läuft: was es mit der zweiten Aufgabe tut, ist die Frage.
+  const client = await createCalDAVClient({ caldav_url: dav.url, username: 'u', password: 'p' });
+  await todoOutbound.processPendingCreations(client, accountId, 'tasks', new Map([[url, { url }]]));
+  assert.ok(happened(), 'es lief kein PUT - der Fall ist nicht nachgestellt');
+  dav.allowAll();
+
+  assert.equal(row(first).external_source, 'caldav');
+  assert.equal(row(third).external_source, 'caldav');
+  const now = row(id);
+  assert.equal(now.external_source, 'local', 'die Aufgabe ging über das Konto hinaus, das niemand mehr gewählt hat');
+  assert.equal(now.target_caldav_account_id, second, 'das gerade gewählte Ziel wurde abgeräumt');
+  assert.equal(now.target_caldav_list_url, theirs);
+  assert.ok(!names(url).includes(`${uid}.ics`), 'die Aufgabe liegt in der alten Liste');
+  assert.deepEqual(todoTombstones(), [], 'für ein Objekt, das nie angelegt wurde, wartet ein Löschauftrag');
+});
+
+test('Einkaufsartikel: wandert, bevor er im selben Lauf an der Reihe ist - er geht nicht mehr in die alte Liste', async () => {
+  reset();
+  const way = WAYS.Einkaufsartikel;
+  const { row, names } = helpers(way);
+  const url = way.setup();
+  const privateList = db.prepare("INSERT INTO shopping_lists (name, created_by) VALUES ('Privat', 1) RETURNING id").get().id;
+  const first = way.create(url, 'Erster');
+  const id    = way.create(url, 'Zweiter');
+  const uid   = ownUid('item', id, db);
+
+  const happened = duringPut(() => db.prepare('UPDATE shopping_items SET list_id = ? WHERE id = ?').run(privateList, id));
+  await way.upload();
+  assert.ok(happened(), 'es lief kein PUT - der Fall ist nicht nachgestellt');
+  dav.allowAll();
+
+  assert.equal(row(first).external_source, 'caldav');
+  assert.equal(row(id).external_source, 'local', 'der Artikel einer nicht gespiegelten Liste wurde Spiegel');
+  assert.equal(dav.seen('PUT').filter((r) => r.path.includes(encodeURIComponent(uid)) || r.path.includes(uid)).length, 0,
+    'der Artikel ging noch in die alte Liste hinauf');
+  assert.ok(!names(url).includes(`${uid}.ics`));
+  assert.deepEqual(todoTombstones(), []);
+});
+
+// Zwei Konten führen DENSELBEN Kalender bzw. dieselbe Liste, und das Ziel
+// wechselt während des Uploads vom einen auf das andere. Das Objekt von eben
+// liegt dann schon dort, wo es hin soll; das zweite Konto übernimmt es, und der
+// Löschauftrag des ersten darf es ihm nicht mehr wegnehmen.
+
+test('Termin: Ziel wechselt während des Uploads auf ein anderes Konto mit DEMSELBEN Kalender - das Objekt bleibt stehen', async () => {
+  reset();
+  const way = WAYS.Termin;
+  const { row, rows, names } = helpers(way);
+  const url    = way.setup();
+  const second = secondAccount();
+  db.prepare(`
+    INSERT INTO caldav_calendar_selection (account_id, calendar_url, calendar_name, calendar_color, enabled)
+    VALUES (?, ?, 'Familie', '#4A90E2', 1)
+  `).run(second, url);
+  const id  = way.create(url, 'Geteilter Kalender');
+  const uid = ownUid('event', id, db);
+
+  const happened = duringPut(() => setEventTarget(id, second, url));
+  await way.upload();
+  assert.ok(happened(), 'es lief kein PUT - der Fall ist nicht nachgestellt');
+  dav.allowAll();
+
+  await way.sync();
+  await way.push();
+  await way.sync();
+
+  const now = row(id);
+  assert.equal(rows().length, 1, 'der Termin ist fort oder doppelt');
+  assert.equal(now.external_source, 'caldav');
+  assert.equal(now.caldav_account_id, second);
+  assert.deepEqual(names(url), [`${uid}.ics`], 'der Löschauftrag des ersten Kontos hat das übernommene Objekt entfernt');
+  assert.deepEqual(eventTombstones(), []);
+});
+
+// Das zweite Konto kommt auf zwei Wegen an das Objekt: sein Upload trifft
+// darauf (412), oder sein Abruf sieht es zuerst und übernimmt es.
+for (const via of ['upload', 'sync']) {
+  test(`Aufgabe: Ziel wechselt während des Uploads auf ein anderes Konto mit DERSELBEN Liste (${via === 'upload' ? 'Upload trifft auf das Objekt' : 'Abruf übernimmt'}) - das Objekt bleibt stehen`, async () => {
+    reset();
+    const way = WAYS.Aufgabe;
+    const { row, rows, names } = helpers(way);
+    const url    = way.setup();
+    const second = secondAccount();
+    db.prepare(`
+      INSERT INTO caldav_reminder_selection (account_id, list_url, list_name, target_module, enabled)
+      VALUES (?, ?, 'Erinnerungen', 'tasks', 1)
+    `).run(second, url);
+    const id  = way.create(url, 'Geteilte Liste');
+    const uid = ownUid('task', id, db);
+
+    const happened = duringPut(() => setTaskTarget(id, second, url));
+    await way.upload();
+    assert.ok(happened(), 'es lief kein PUT - der Fall ist nicht nachgestellt');
+    dav.allowAll();
+    assert.equal(todoTombstones().length, 1, 'der Fall ist nicht nachgestellt: das Entfernen ist nicht vorgemerkt');
+
+    // Das erste Konto bekommt sein Objekt nicht gelöscht, bevor das zweite an
+    // der Reihe ist.
+    dav.refuse({ method: 'DELETE', status: 403 });
+    await way[via]();
+    assert.equal(row(id).external_account_id, second, 'der Fall ist nicht nachgestellt: das zweite Konto hat nicht übernommen');
+    dav.allowAll();
+
+    await way.sync();
+    await way.push();
+    await way.sync();
+
+    const now = row(id);
+    assert.ok(now, 'die Aufgabe ist fort');
+    assert.equal(now.external_source, 'caldav');
+    assert.equal(now.external_account_id, second);
+    assert.deepEqual(names(url), [`${uid}.ics`], 'der Löschauftrag des ersten Kontos hat das übernommene Objekt entfernt');
+    assert.deepEqual(todoTombstones(), []);
+    // Aufgaben kennen kein "eine Zeile je UID" über Konten hinweg: jedes Konto
+    // führt seine eigene Zeile je Eintrag einer geteilten Liste. Das ist älter
+    // als dieser Fall und gilt für den Nachbarn genauso.
+    const neighbours = db.prepare("SELECT COUNT(*) AS n FROM tasks WHERE title = 'Nachbar'").get().n;
+    assert.equal(rows().length, neighbours, 'die Aufgabe steht öfter da als jeder andere Eintrag der Liste');
+  });
+}
+
+// Derselbe Kalender, zwei Schreibweisen: das erste Konto führt ihn mit, das
+// zweite ohne Schlussstrich. Der Löschauftrag des ersten nennt seine
+// Schreibweise; wird die Zeile über das zweite Spiegel, muss er trotzdem fallen.
+for (const via of ['Buchung', 'Übernahme']) {
+  test(`Termin: der Löschauftrag eines Kontos fällt auch bei anderer Schreibweise des Kalenders (${via})`, () => {
+    reset();
+    const way = WAYS.Termin;
+    const url     = way.setup();
+    const noSlash = url.slice(0, -1);
+    const second  = secondAccount();
+    const id  = way.create(url, 'Geteilter Kalender');
+    const uid = ownUid('event', id, db);
+    const objectUrl = `${url}${uid}.ics`;
+
+    // Wie nach dem Zielwechsel während des Uploads über das erste Konto.
+    assert.equal(outbound.queueDeletion({
+      source: 'caldav', calendarExternalId: url, eventExternalId: uid, objectUrl, accountId,
+    }), true);
+    setEventTarget(id, second, noSlash);
+    const what = { source: 'caldav', uid, objectUrl, calRefId: way.refId, calendarUrl: noSlash, accountId: second };
+    if (via === 'Buchung') {
+      const sent = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(id);
+      assert.equal(outbound.bookEventUpload(sent, { ...what, adopted: true }), 'mirrored');
+    } else {
+      assert.equal(outbound.adoptOwnEventUpload({ ...what, isWaitingHere: () => true }), true);
+    }
+    assert.equal(db.prepare('SELECT caldav_account_id FROM calendar_events WHERE id = ?').get(id).caldav_account_id, second);
+    assert.deepEqual(eventTombstones(), [], 'der Auftrag des ersten Kontos wartet weiter auf das übernommene Objekt');
+  });
+}
+
+test('Aufgabe: das unerreichbare Ziel wird nur abgeräumt, solange es noch das gelesene ist', async () => {
+  reset();
+  const way = WAYS.Aufgabe;
+  const url   = way.setup();
+  const other = addTaskList('todo2');
+  const id    = way.create(url, 'Ziel wechselt');
+  // Zwischen dem Lesen der Zeile und dem Abräumen wählt jemand ein anderes
+  // Ziel: die Liste, nach der die Schleife fragt, gibt es nicht, und während
+  // sie fragt, steht an der Zeile schon die andere.
+  const lists = new Map();
+  lists.get = () => { setTaskTarget(id, accountId, other); return undefined; };
+  await todoOutbound.processPendingCreations({}, accountId, 'tasks', lists);
+
+  const now = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+  assert.equal(now.target_caldav_list_url, other, 'das inzwischen gewählte Ziel wurde abgeräumt');
+  assert.equal(now.target_caldav_account_id, accountId);
+});
+
+for (const [label, way] of [['Aufgabe', WAYS.Aufgabe], ['Einkaufsartikel', WAYS.Einkaufsartikel]]) {
+  test(`${label}: während des Uploads auf anderem Weg Spiegel geworden - die Buchung überschreibt nichts`, async () => {
+    reset();
+    const { row, names } = helpers(way);
+    const url = way.setup();
+    const id  = way.create(url, 'Schon gespiegelt');
+    const uid = ownUid(way.kind, id, db);
+
+    const happened = duringPut(() => db.prepare(`
+      UPDATE ${way.table}
+         SET external_source = 'caldav', external_uid = 'theirs@test', external_account_id = ?, external_object_url = ?
+       WHERE id = ?
+    `).run(accountId, `${url}theirs.ics`, id));
+    await way.upload();
+    assert.ok(happened(), 'es lief kein PUT - der Fall ist nicht nachgestellt');
+    assert.ok(names(url).includes(`${uid}.ics`), 'der Upload kam nicht an - der Fall ist nicht nachgestellt');
+    dav.allowAll();
+
+    const now = row(id);
+    assert.equal(now.external_uid, 'theirs@test', 'die Buchung hat eine schon gespiegelte Zeile umgeschrieben');
+    assert.equal(now.external_object_url, `${url}theirs.ics`);
+  });
+}
