@@ -540,7 +540,8 @@ npm run test:installer-a11y  # Zielgrößen, Kontrast und Fokus des Web-Installe
 resolved membership, per-calendar ICS feeds, visibility, member permissions, sync exclusion,
 and fallback on deletion. It also drives whole iCloud and Google sync runs against a stand-in
 client and moves an event through the write route while its upload is in flight (#1926): the row
-must stay local and keep its calendar, and the next run must delete the copy at the provider.
+must stay local and keep its calendar, and the next run must delete the copy at the provider;
+the same holds for a series that gets its first single-occurrence override in that moment.
 It runs independently in the main test chain.
 
 Run `npm run test:calendar-occurrence-overrides`

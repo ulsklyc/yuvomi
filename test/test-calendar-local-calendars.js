@@ -689,6 +689,67 @@ test('an event that still belongs to the default calendar when its iCloud upload
   });
 });
 
+// The booking asks the whole listing, not only its calendar half (#1926). The listing leaves out a
+// series that has a single-occurrence override: `NOT EXISTS (SELECT 1 FROM calendar_events child
+// WHERE child.recurrence_parent_id = e.id)` in `collectLocalOutboundEvents()`, the only source of
+// the upload loop. So a series that gets its first override while its upload is in flight must not
+// be booked either: it was never meant to go up in that shape, and its copy is removed again.
+test('a series that gets a single-occurrence override while its iCloud upload is in flight stays local', async () => {
+  await withAppleConnection(async ({ CAL_URL, server, uploads, removals, fileOf, uidOf, sync, rowOf, queued, notes }) => {
+    const { __test: apple } = await import('../server/services/apple-calendar.js');
+    const series = async (title) => {
+      const res = await call('POST', '/', {
+        body: { title, start_datetime: '2035-05-01T09:00', end_datetime: '2035-05-01T10:00', recurrence_rule: 'FREQ=DAILY;COUNT=5' },
+      });
+      assert.equal(res.status, 201, JSON.stringify(res.body));
+      return res.body.data;
+    };
+    const childrenOf = (id) => db.prepare('SELECT COUNT(*) AS n FROM calendar_events WHERE recurrence_parent_id = ?').get(id).n;
+    const overridden = await series('Series overridden while uploading');
+    const plain = await series('Series without an override');
+    assert.equal(apple.collectLocalOutboundEvents(db, overridden.id).length, 1, 'a series without an override is listed');
+
+    let changed = 0;
+    await sync(async (filename) => {
+      if (filename !== fileOf(overridden.id)) return;
+      const res = await call('PUT', `/${overridden.id}/occurrences/2035-05-02`, { body: { title: 'Moved occurrence' } });
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+      changed++;
+    });
+    assert.equal(changed, 1, 'the override was written during the upload of its own series');
+    assert.equal(childrenOf(overridden.id), 1, 'the override is a row of its own');
+    assert.equal(apple.collectLocalOutboundEvents(db, overridden.id).length, 0, 'the listing no longer names the series');
+
+    const objectUrl = `${CAL_URL}${fileOf(overridden.id)}`;
+    assert.deepEqual({ ...rowOf(overridden.id) }, {
+      external_source: 'local', external_calendar_id: null, external_object_url: null, local_calendar_id: null,
+    }, 'the series is not booked as uploaded');
+    assert.deepEqual(queued().map(row => ({ ...row })), [{
+      calendar_external_id: CAL_URL, event_external_id: uidOf(overridden.id), object_url: objectUrl,
+    }], 'the uploaded copy is queued for deletion');
+    assert.equal(notes(overridden.id), 0, 'the note of the upload is settled');
+    assert.ok(server.has(objectUrl), 'until the next run the copy is still at the provider');
+    // The override alone is the reason: the series next to it went up in the same run.
+    assert.deepEqual({ ...rowOf(plain.id) }, {
+      external_source: 'apple', external_calendar_id: uidOf(plain.id),
+      external_object_url: `${CAL_URL}${fileOf(plain.id)}`, local_calendar_id: null,
+    }, 'a series that kept its shape is booked as before');
+
+    // The next run removes the copy, does not read it back and does not send the series again.
+    uploads.length = 0;
+    await sync();
+    assert.deepEqual(removals, [objectUrl], 'the copy is deleted at the provider');
+    assert.ok(!server.has(objectUrl));
+    assert.equal(queued().length, 0);
+    assert.deepEqual(uploads, [], 'a series with an override is not uploaded');
+    assert.equal(rowOf(overridden.id).external_source, 'local');
+    assert.equal(childrenOf(overridden.id), 1);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events WHERE external_calendar_id = ?').get(uidOf(overridden.id)).n, 0,
+      'the copy did not come back as a mirrored event');
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM calendar_events WHERE title = 'Series overridden while uploading'").get().n, 1);
+  });
+});
+
 test('the booking of a CalDAV upload asks its target only, and a local calendar cannot hold a targeted event', async () => {
   const outbound = await import('../server/services/calendar-outbound.js');
   const CAL = 'https://calendar.test/1926/cal/';
