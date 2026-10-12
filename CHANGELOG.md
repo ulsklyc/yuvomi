@@ -13,7 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   calendars, reorder them through the manager's More menu, choose the destination when importing an ICS
   file, and share a separate ICS subscription link for each calendar. Calendar links include only events
   visible to everyone in the household. Legacy iCloud auto-upload continues for the default calendar,
-  including when explicitly selected; events in other local calendars stay local.
+  including when explicitly selected; events in other local calendars stay local. Deleting a calendar
+  moves its events to the default calendar, so with the legacy Apple Calendar connection they then
+  upload to iCloud; the delete confirmation says so when that connection is set up.
 - **Checked-off shopping items collect in one section at the end of the list** (#1816, from D#1624).
   Ticking an item moves it out of its category into "Checked off", a collapsed section at the
   bottom that shows how many items it holds. The items stay on the list, and the list above gets
