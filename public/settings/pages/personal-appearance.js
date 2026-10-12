@@ -43,6 +43,7 @@ const DATE_FORMATS = [
   ['mdy', 'MM/DD/YYYY'],
   ['dmy', 'DD.MM.YYYY'],
   ['dmy_slash', 'DD/MM/YYYY'],
+  ['dmy_dash', 'DD-MM-YYYY'],
   ['ymd', 'YYYY-MM-DD'],
   ['mdy_dot', 'MM.DD.YYYY'],
   ['ymd_dot', 'YYYY.MM.DD'],
