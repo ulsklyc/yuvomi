@@ -768,7 +768,7 @@ test('GET /auth/me nennt den Host des gewaehlten Dienstes - und nur ihn, nur wen
     assert.equal(body.gravatarAvailable, true);
     assert.equal(body.gravatarHost, MIRROR_HOST, 'der Spiegel, nicht gravatar.com');
     const text = JSON.stringify(body);
-    assert.ok(!text.includes('gravatar.com'), 'kein fest verdrahteter Name');
+    assert.doesNotMatch(text, /gravatar\.com/, 'kein fest verdrahteter Name');
     assert.ok(!text.includes('/avatar') && !/https?:\/\//.test(text), 'nur der Hostname, nie die URL');
     // Ein Split-Gast bekommt keinen Knopf und erfaehrt auch nicht, was eingetragen ist.
     const guest = (await call('GET', '/me', await signIn(307))).body;
@@ -791,7 +791,7 @@ test('GET /auth/me nennt den Host des gewaehlten Dienstes - und nur ihn, nur wen
     const body = await me();
     assert.equal(body.gravatarAvailable, true);
     assert.equal(body.gravatarHost, null);
-    assert.ok(!JSON.stringify(body).includes('plain.example.org'));
+    assert.doesNotMatch(JSON.stringify(body), /plain\.example\.org/);
   });
 });
 
@@ -819,7 +819,7 @@ test('mit einem Spiegel nennen die Fehlersaetze der API den Spiegel, nicht grava
     assert.equal(refused.body.error, `${MIRROR_HOST} could not be reached.`);
 
     for (const body of [missing.body, down.body, refused.body]) {
-      assert.ok(!JSON.stringify(body).includes('gravatar.com'), JSON.stringify(body));
+      assert.doesNotMatch(JSON.stringify(body), /gravatar\.com/);
       assert.ok(!/https?:\/\//.test(JSON.stringify(body)), 'nur der Hostname, nie die URL');
     }
   });
