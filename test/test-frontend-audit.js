@@ -21258,7 +21258,7 @@ function countFriendlyErrorCalls(source) {
   }
   let direct = 0;
   for (const name of names) {
-    const call = new RegExp(`(?<![.\\w$])${name.replace(/\$/g, '\\$')}\\s*(?:\\?\\.)?\\s*\\(`, 'g');
+    const call = new RegExp(`(?<![.\\w$])${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*(?:\\?\\.)?\\s*\\(`, 'g');
     direct += [...code.matchAll(call)].length;
   }
   return viaGlobal + direct;
@@ -21282,6 +21282,7 @@ test('der Zaehler fuer friendlyError sieht beide Wege und keine eigene Funktion 
     ["import { friendlyError as say } from '/utils/friendly-error.js';\nshowToast(say(err));", 1],
     ['const { showToast, friendlyError } = window.yuvomi;\nshowToast(friendlyError(err));', 1],
     ['const { friendlyError: say } = window.yuvomi ?? {};\nsay(err); say(other);', 2],
+    ["import { friendlyError as $say } from '/utils/friendly-error.js';\n$say(err); say(err);", 1],
     [`${imported}el.textContent = \`\${friendlyError(err)}\`;`, 1],
     ['showToast(window.yuvomi?.friendlyError?.(err) ?? t(key));', 1],
     ['showToast(window.yuvomi.friendlyError(err));', 1],
