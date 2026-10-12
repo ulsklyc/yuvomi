@@ -749,6 +749,20 @@ test('Geteilte Flaeche: die Haushaltsfassung traegt in KEINER Scheibe etwas Eing
   }
 }));
 
+// Ein Parameter, der zweimal in der Adresse steht, kommt als LISTE an. Der
+// Vergleich mit dem einen Wort fiel dann durch, und die Antwort war wieder die
+// persoenliche - ein Schalter, der nur verengt, darf beim Stolpern nicht weiter
+// oeffnen als verlangt.
+test('Geteilte Flaeche: der Parameter gilt auch, wenn er doppelt in der Adresse steht', withClock(NOON_BERLIN, 'Europe/Berlin', async () => {
+  seedSharedSurface();
+  const wall = await overview(BEN, '?audience=household&audience=household');
+  assert.deepEqual(titles(wall.urgentTasks), ['Aufgabe fuer alle']);
+  assert.equal(wall.openTaskCount, 1);
+  assert.deepEqual(eventTitles(wall.upcomingEvents), ['Aus dem geteilten Abo', 'Termin fuer alle']);
+  // Ein anderes Wort bleibt, was es war: keine Haushaltsfassung.
+  assert.equal((await overview(BEN, '?audience=me')).openTaskCount, 3);
+}));
+
 test('Geteilte Flaeche: beide Fassungen sagen jedem Mitglied dasselbe', withClock(NOON_BERLIN, 'Europe/Berlin', async () => {
   seedSharedSurface();
   const pick = (body) => [titles(body.urgentTasks), eventTitles(body.upcomingEvents), body.openTaskCount, body.wallTasks];

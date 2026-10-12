@@ -386,7 +386,9 @@ router.get('/', (req, res) => {
    *
    * Die normale Uebersicht derselben Sitzung fragt ohne ihn und bleibt
    * persoenlich. */
-  const householdAudience = req.query.audience === 'household';
+  // Doppelt in der Adresse kommt der Parameter als Liste an. Ein Schalter, der
+  // nur verengt, faellt dann nicht still auf die persoenliche Fassung zurueck.
+  const householdAudience = [].concat(req.query.audience ?? []).includes('household');
   const taskVisibleSql = householdAudience
     ? householdVisibleWhere('t')
     : visibilityWhere('t', 'task_assignments', 'task_id', '@me');
