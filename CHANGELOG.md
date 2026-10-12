@@ -95,6 +95,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for what concerns one person alone: a wall opened from a member's session no longer shows
   that person's medication doses, own shift, due reminders or the reward requests waiting for
   their approval - a coupled display never showed them, and now every wall reads the same.
+  And the device on the wall no longer receives what the wall never draws: pinned notes, the
+  budget, shared-expense balances, quick links, countdowns and the housekeeper's unpaid amount
+  used to travel along in the background and now stay off it, as does anything a future module
+  adds until it is given a place on the wall.
   The normal overview and "Today at a glance" stay personal and show all of it as before.
 
 ### Fixed

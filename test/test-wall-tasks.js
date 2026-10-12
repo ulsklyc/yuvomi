@@ -30,6 +30,13 @@
  *           Freigaben - steht in der Haushaltsfassung gar nicht, aus keiner
  *           Sitzung; ohne den Parameter bleibt es stehen; und die Wand ist aus
  *           jeder Sitzung dieselbe wie auf einem gekoppelten Display.
+ *        8. ALLOWLIST: die Haushaltsfassung traegt nur die Schluessel, die die
+ *           Wand zeichnet (`HOUSEHOLD_AUDIENCE_SHOWS`); Notizen, Budget,
+ *           geteilte Ausgaben, Schnellzugriffe, Countdowns und der offene Lohn
+ *           der Haushaltshilfe kommen leer, als Text wie als Zahl, und werden
+ *           nicht gelesen. DRIFT-GUARD: die Schluessel der ECHTEN Antwort
+ *           gegen die Allowlist und eine hier gefuehrte Bewusst-leer-Liste -
+ *           ein neuer Schluessel der Route ist rot, bis jemand entscheidet.
  *
  * Ausfuehren: npm run test:wall-tasks
  */
@@ -748,13 +755,16 @@ test('Geteilte Flaeche: die Haushaltsfassung traegt in KEINER Scheibe etwas Eing
     const wall = await overview(who, '?audience=household');
     const label = who === BEN ? 'Sitzung des Besitzers' : 'Sitzung eines anderen Mitglieds';
     assert.deepEqual(titles(wall.urgentTasks), ['Aufgabe fuer alle'], label);
-    assert.equal(wall.openTaskCount, 1, label);
-    assert.equal(wall.overdueTaskCount, 0, label);
     assert.equal(wall.tasksDoneToday, 0, label);
-    assert.deepEqual(wall.memberTodayTasks, [{ user_id: BEN, open_count: 1 }], label);
+    assert.deepEqual(wall.wallTasks.map((entry) => [entry.user_id, titles(entry.open)]), [[BEN, ['Aufgabe fuer alle']]], label);
     assert.deepEqual(eventTitles(wall.upcomingEvents), ['Aus dem geteilten Abo', 'Termin fuer alle'], label);
-    assert.deepEqual(eventTitles(wall.weekEvents), ['Aus dem geteilten Abo', 'Termin fuer alle'], label);
-    assert.deepEqual(eventTitles(wall.familyEvents), ['Termin fuer alle'], `${label}: Ben ist an der Wand nicht ueber seinen Termin dran`);
+    // Was die Wand nicht zeichnet, kommt seit der Allowlist leer (Abschnitt 8):
+    // die Zahlen der Kacheln, der Wochenstreifen, die Familienkarte.
+    assert.equal(wall.openTaskCount, 0, label);
+    assert.equal(wall.overdueTaskCount, 0, label);
+    assert.deepEqual(wall.memberTodayTasks, [], label);
+    assert.deepEqual(wall.weekEvents, [], label);
+    assert.deepEqual(wall.familyEvents, [], label);
     const text = JSON.stringify([wall.urgentTasks, wall.upcomingEvents, wall.weekEvents, wall.familyEvents, wall.wallTasks]);
     for (const title of PRIVATE_TITLES) assert.ok(!text.includes(title), `${label}: „${title}" reist nicht mit`);
   }
@@ -768,7 +778,7 @@ test('Geteilte Flaeche: der Parameter gilt auch, wenn er doppelt in der Adresse 
   seedSharedSurface();
   const wall = await overview(BEN, '?audience=household&audience=household');
   assert.deepEqual(titles(wall.urgentTasks), ['Aufgabe fuer alle']);
-  assert.equal(wall.openTaskCount, 1);
+  assert.equal(wall.openTaskCount, 0);
   assert.deepEqual(eventTitles(wall.upcomingEvents), ['Aus dem geteilten Abo', 'Termin fuer alle']);
   // Ein anderes Wort bleibt, was es war: keine Haushaltsfassung.
   assert.equal((await overview(BEN, '?audience=me')).openTaskCount, 3);
@@ -776,7 +786,7 @@ test('Geteilte Flaeche: der Parameter gilt auch, wenn er doppelt in der Adresse 
 
 test('Geteilte Flaeche: beide Fassungen sagen jedem Mitglied dasselbe', withClock(NOON_BERLIN, 'Europe/Berlin', async () => {
   seedSharedSurface();
-  const pick = (body) => [titles(body.urgentTasks), eventTitles(body.upcomingEvents), body.openTaskCount, body.wallTasks];
+  const pick = (body) => [titles(body.urgentTasks), eventTitles(body.upcomingEvents), body.tasksDoneToday, body.wallTasks];
   assert.deepEqual(pick(await overview(BEN, '?audience=household')), pick(await overview(CLEO, '?audience=household')));
 }));
 
@@ -1169,3 +1179,301 @@ test('Persoenliches: die Glocke der Shell fragt ueber einer Wand die Haushaltsfa
     }
   }
 });
+
+// --------------------------------------------------------------------------
+// 8. ALLOWLIST: die Haushaltsfassung traegt nur, was die Wand zeichnet
+// --------------------------------------------------------------------------
+//
+// #1838 und #1900 liessen bestimmte Module aus und alles andere durch - eine
+// Denylist. Gemessen trug die Haushaltsfassung weiter angepinnte Notizen, das
+// Budget, den Stand geteilter Ausgaben, Schnellzugriffe, Countdowns und den
+// offenen Lohn der Haushaltshilfe: nichts davon zeichnet die Wand, alles davon
+// lag auf dem Geraet. Jetzt gilt die Umkehrung, und diese Tests messen sie an
+// der ECHTEN Route.
+
+const visibility = await import('../server/services/visibility.js');
+
+const HELGA = addUser('Helga');
+let SHOPPING_LIST = null;
+
+function seedWallSources() {
+  seedPersonal();
+  for (const table of ['notes', 'budget_entries', 'expense_ledger_entries', 'expense_group_members', 'expense_groups',
+    'quick_links', 'housekeeping_work_sessions', 'housekeeping_workers', 'meals', 'shopping_items', 'shopping_lists',
+    'waste_one_off_pickups', 'waste_types', 'pantry_items', 'birthdays']) {
+    db.prepare(`DELETE FROM ${table}`).run();
+  }
+  // WAS DIE WAND NICHT ZEICHNET.
+  db.prepare("INSERT INTO notes (title, content, pinned, created_by) VALUES ('Kontonummer Sparbuch', 'DE00 1234', 1, ?)").run(ANNA);
+  db.prepare("INSERT INTO budget_entries (title, amount, category, date, created_by) VALUES ('Gehalt', 4321.09, 'salary', '2026-10-05', ?)").run(ANNA);
+  const group = db.prepare("INSERT INTO expense_groups (name, type, default_currency, created_by) VALUES ('Zuhause', 'general', 'EUR', ?)").run(ANNA).lastInsertRowid;
+  for (const [userId, role] of [[ANNA, 'owner'], [BEN, 'admin']]) {
+    db.prepare('INSERT INTO expense_group_members (group_id, user_id, role, invited_by) VALUES (?, ?, ?, ?)').run(group, userId, role, ANNA);
+  }
+  db.prepare(`
+    INSERT INTO expense_ledger_entries (group_id, source_type, source_id, user_id, counterparty_id, amount_minor, currency, memo, created_by)
+    VALUES (?, 'expense', 1, ?, ?, 98765, 'EUR', 'Pizzaabend', ?)
+  `).run(group, ANNA, BEN, ANNA);
+  db.prepare("INSERT INTO quick_links (name, url, visibility, created_by, position) VALUES ('Bankportal', 'https://bank.example/login', 'private', ?, 0)").run(ANNA);
+  const countdown = addTask('Urlaub in Sicht', BEN, { due: '2026-10-20' });
+  db.prepare('UPDATE tasks SET countdown = 1 WHERE id = ?').run(countdown);
+  // Die Haushaltshilfe: ein bezahlbarer Besuch vom Dienstag (Geld), und heute da (Programm).
+  const worker = db.prepare('INSERT INTO housekeeping_workers (user_id, daily_rate) VALUES (?, 87.5)').run(HELGA).lastInsertRowid;
+  db.prepare("INSERT INTO housekeeping_work_sessions (check_in, check_out, daily_rate, worker_id, created_by) VALUES ('2026-10-06T07:00:00Z', '2026-10-06T11:00:00Z', 87.5, ?, ?)").run(worker, ANNA);
+  db.prepare("INSERT INTO housekeeping_work_sessions (check_in, daily_rate, worker_id, created_by) VALUES ('2026-10-08T07:00:00Z', 87.5, ?, ?)").run(worker, ANNA);
+  // WAS DIE WAND ZEICHNET.
+  db.prepare("INSERT INTO meals (date, meal_type, title, created_by) VALUES ('2026-10-08', 'lunch', 'Linsensuppe', ?)").run(ANNA);
+  SHOPPING_LIST = Number(db.prepare("INSERT INTO shopping_lists (name, created_by) VALUES ('Wochenmarkt', ?)").run(ANNA).lastInsertRowid);
+  db.prepare("INSERT INTO shopping_items (list_id, name) VALUES (?, 'Tomaten')").run(SHOPPING_LIST);
+  const bin = db.prepare("INSERT INTO waste_types (name, color, created_by) VALUES ('Biotonne', '#2E7D32', ?)").run(ANNA).lastInsertRowid;
+  db.prepare("INSERT INTO waste_one_off_pickups (type_id, date, created_by) VALUES (?, '2026-10-08', ?)").run(bin, ANNA);
+  db.prepare("INSERT INTO pantry_items (name, quantity, unit, expires_on, created_by) VALUES ('Joghurt', 1, 'Becher', '2026-10-08', ?)").run(ANNA);
+  db.prepare("INSERT INTO birthdays (name, birth_date, created_by) VALUES ('Oma Erna', '1950-10-08', ?)").run(ANNA);
+  addEvent('Elternabend', { assignees: [ANNA] });
+}
+/** Woerter und Zahlen, die an keiner Wand etwas verloren haben - als Text gesucht. */
+const OFF_WALL_WORDS = ['Sparbuch', 'DE00 1234', '4321', '98765', 'Bankportal', 'bank.example', '87.5'];
+const householdQuery = () => `?audience=household&shopping_list=${SHOPPING_LIST}`;
+
+test('Allowlist: ohne den Parameter traegt die Antwort all das weiter (Reichweite der Saat)', withClock(NOON_BERLIN, 'Europe/Berlin', async () => {
+  seedWallSources();
+  const anna = await overview(ANNA, `?shopping_list=${SHOPPING_LIST}`);
+  assert.deepEqual(titles(anna.pinnedNotes), ['Kontonummer Sparbuch']);
+  assert.equal(anna.pinnedNotesCount, 1);
+  assert.equal(anna.notesTotal, 1);
+  assert.equal(anna.budget.income, 4321.09);
+  assert.equal(anna.budget.entryCount, 1);
+  assert.ok(anna.splitBalance.net.length > 0, 'ein offener Stand geteilter Ausgaben');
+  assert.deepEqual(anna.quicklinks.map((link) => link.name), ['Bankportal']);
+  assert.deepEqual(titles(anna.countdowns), ['Urlaub in Sicht']);
+  assert.equal(anna.countdownTotal, 1);
+  assert.equal(anna.housekeeping.unpaidAmount, 87.5);
+  assert.equal(anna.housekeeping.visitsThisMonth, 1);
+  assert.ok(anna.housekeeping.lastVisit);
+  assert.ok(anna.shoppingTile, 'die Auswahl der Einkaufs-Kachel');
+  assert.ok(anna.openTaskCount > 0);
+  assert.ok(anna.weekEvents.length > 0);
+  assert.ok(anna.familyEvents.length > 0);
+  assert.ok(anna.birthdayTotal > 0);
+  const text = JSON.stringify(anna);
+  for (const word of OFF_WALL_WORDS) assert.ok(text.includes(word), `Reichweite: „${word}" steht in der persoenlichen Antwort`);
+}));
+
+test('Allowlist: die Haushaltsfassung traegt nichts, was die Wand nicht zeichnet - nicht als Text, nicht als Zahl', withClock(NOON_BERLIN, 'Europe/Berlin', async () => {
+  seedWallSources();
+  // DER MASSSTAB FUER „LEER": ein gekoppeltes Display hat weder Notizen noch
+  // Budget, Haushaltshilfe, Vorrat oder Einkauf - es bekommt von der Route die
+  // Fassung eines Kontos ohne das Modulrecht.
+  const denied = await asCoupledDisplay(() => overview(DISPLAY));
+  for (const who of [ANNA, BEN, CLEO]) {
+    const personal = await overview(who, `?shopping_list=${SHOPPING_LIST}`);
+    const wall = await overview(who, householdQuery());
+    const text = JSON.stringify(wall);
+    for (const word of OFF_WALL_WORDS) assert.ok(!text.includes(word), `Sitzung ${who}: „${word}" reist nicht mit`);
+
+    for (const key of ['pinnedNotes', 'pinnedNotesCount', 'notesTotal', 'budget', 'splitBalance', 'shoppingLists',
+      'shoppingOpenLists', 'health', 'fasting', 'nutrition', 'myShiftsToday']) {
+      assert.deepEqual(wall[key], denied[key], `Sitzung ${who}: „${key}" in der Fassung eines Kontos ohne das Modulrecht`);
+    }
+    assert.deepEqual(wall.rewards, { view: null, standings: [], participantCount: 0, pending: 0, moneyPending: 0, catalog: [], recent: [] });
+    // Was keinem Modul gehoert.
+    assert.deepEqual(wall.countdowns, []);
+    assert.equal(wall.countdownTotal, 0);
+    assert.deepEqual(wall.quicklinks, []);
+    assert.ok(!('shoppingTile' in wall), 'die Kachel-Auswahl fehlt, wie bei einem Konto ohne den Einkauf');
+    // Scheiben erlaubter Module, die die Wand nicht zeichnet.
+    assert.deepEqual(wall.familyEvents, []);
+    assert.deepEqual(wall.weekEvents, []);
+    assert.deepEqual(wall.memberTodayTasks, []);
+    assert.equal(wall.openTaskCount, 0);
+    assert.equal(wall.overdueTaskCount, 0);
+    assert.equal(wall.birthdayCount, 0);
+    assert.equal(wall.birthdayTotal, 0);
+    assert.equal(wall.birthdaySoonCount, 0);
+    // FELDER in einer erlaubten Scheibe: die Anwesenheit steht im Programm,
+    // der offene Lohn nicht.
+    assert.deepEqual(wall.housekeeping, {
+      ...denied.housekeeping, present: true, presentSince: '2026-10-08T07:00:00Z', workerName: 'Helga',
+    });
+    assert.deepEqual(wall.pantryExpiring, {
+      ...denied.pantryExpiring, todayItems: personal.pantryExpiring.todayItems, todayCount: 1,
+    });
+    assert.deepEqual(wall.pantryExpiring.todayItems.map((item) => item.name), ['Joghurt']);
+
+    // KEIN FEHLENDER SCHLUESSEL: die Form der Antwort bleibt.
+    assert.deepEqual(Object.keys(wall).sort(), Object.keys(personal).filter((key) => key !== 'shoppingTile').sort());
+    for (const key of ['housekeeping', 'pantryExpiring', 'budget', 'rewards', 'health']) {
+      const own = Object.keys(personal[key]).filter((field) => !(key === 'rewards' && field === 'me')).sort();
+      assert.deepEqual(Object.keys(wall[key]).sort(), own, `„${key}" behaelt seine Felder`);
+    }
+  }
+}));
+
+/* DIE ZWEITE HAELFTE DES DRIFT-GUARDS, VON HAND GEFUEHRT: was die Route liefert
+ * und die Wand bewusst leer bekommt. Die Schluessel der Antwort kommen unten
+ * aus der ECHTEN Route und nicht aus einer Konstante des Servers - ein neues
+ * Feld der Uebersicht steht dann in keiner der beiden Listen, und der Test ist
+ * rot, bis jemand entschieden hat, ob eine Wand es zeigt. */
+const DELIBERATELY_EMPTY_ON_THE_WALL = Object.freeze({
+  // Kalender: die Familienkarte, der Wochenstreifen und die Zahlen der Kachel.
+  familyEvents: 'calendar', weekEvents: 'calendar',
+  birthdayCount: 'calendar', birthdayTotal: 'calendar', birthdaySoonCount: 'calendar',
+  // Aufgaben: Kennzahlen der Kacheln und der Navigation.
+  openTaskCount: 'tasks', overdueTaskCount: 'tasks', memberTodayTasks: 'tasks',
+  // Einkauf: die Wand nennt nur die Zahl der offenen Artikel.
+  shoppingLists: 'shopping', shoppingOpenLists: 'shopping', shoppingTile: 'shopping',
+  pinnedNotes: 'notes', pinnedNotesCount: 'notes', notesTotal: 'notes',
+  // Geld steht an keiner Wand.
+  budget: 'budget', splitBalance: 'budget',
+  // Was nur dem Betrachter gilt (#1900).
+  rewards: 'rewards', health: 'health', fasting: 'health', nutrition: 'health', myShiftsToday: 'schedule',
+  // Keinem Modul zugeordnet: nach der anfragenden Person geschnitten.
+  countdowns: null, countdownTotal: null, quicklinks: null,
+});
+const DELIBERATELY_EMPTY_FIELDS = Object.freeze({
+  housekeeping: ['configured', 'visitsThisMonth', 'unpaidAmount', 'lastVisit'],
+  pantryExpiring: ['items', 'total', 'expiredCount'],
+});
+
+test('Drift: jeder Schluessel, den die Route liefert, ist entschieden - gezeichnet oder bewusst leer', withClock(NOON_BERLIN, 'Europe/Berlin', async () => {
+  seedWallSources();
+  const shows = visibility.HOUSEHOLD_AUDIENCE_SHOWS;
+  assert.ok(shows && typeof shows === 'object', 'die Allowlist der Wand-Quellen ist benannt und exportiert');
+  // Die volle Antwort: Admin, jedes Modul an, jede Quelle belegt, mit der Auswahl
+  // der Einkaufs-Kachel (ihr Feld gibt es nur dann).
+  const real = await overview(ANNA, `?shopping_list=${SHOPPING_LIST}`);
+  const delivered = Object.keys(real).sort();
+  assert.ok(delivered.length >= 30, `Reichweite: die Route liefert ihre Schluessel (${delivered.length})`);
+
+  const undecided = delivered.filter((key) => !(key in shows) && !(key in DELIBERATELY_EMPTY_ON_THE_WALL));
+  assert.deepEqual(undecided, [], 'neuer Schluessel in GET /dashboard: zeichnet die Wand ihn (HOUSEHOLD_AUDIENCE_SHOWS) oder bleibt er leer (diese Liste)?');
+  const both = delivered.filter((key) => key in shows && key in DELIBERATELY_EMPTY_ON_THE_WALL);
+  assert.deepEqual(both, [], 'ein Schluessel steht in beiden Listen');
+  // Und keine Liste nennt etwas, das die Route nicht (mehr) liefert.
+  assert.deepEqual(Object.keys(shows).filter((key) => !(key in real)), [], 'die Allowlist nennt einen Schluessel, den die Route nicht liefert');
+  assert.deepEqual(Object.keys(DELIBERATELY_EMPTY_ON_THE_WALL).filter((key) => !(key in real)), []);
+
+  // Dieselbe Frage eine Ebene tiefer, wo die Allowlist nur einzelne Felder nennt.
+  const partial = Object.keys(shows).filter((key) => Array.isArray(shows[key])).sort();
+  assert.deepEqual(partial, Object.keys(DELIBERATELY_EMPTY_FIELDS).sort());
+  for (const key of partial) {
+    const fields = Object.keys(real[key]).sort();
+    assert.deepEqual([...shows[key], ...DELIBERATELY_EMPTY_FIELDS[key]].sort(), fields, `„${key}": jedes Feld ist entschieden`);
+  }
+}));
+
+test('Drift: was die Haushaltsfassung traegt, ist genau das Gezeichnete - an der echten Antwort abgelesen', withClock(NOON_BERLIN, 'Europe/Berlin', async () => {
+  seedWallSources();
+  const personal = await overview(ANNA, `?shopping_list=${SHOPPING_LIST}`);
+  const wall = await overview(ANNA, householdQuery());
+  // OHNE DIE KONSTANTE DES SERVERS: ein Schluessel „traegt", wenn er sich von
+  // der Antwort desselben Haushalts ohne jede Zeile unterscheidet.
+  for (const table of ['tasks', 'calendar_events', 'notes', 'budget_entries', 'expense_ledger_entries', 'quick_links',
+    'housekeeping_work_sessions', 'meals', 'shopping_items', 'shopping_lists', 'waste_one_off_pickups', 'pantry_items',
+    'birthdays', 'medication_schedules', 'medications', 'schedule_extra_shifts', 'reward_redemptions', 'reward_participants']) {
+    db.prepare(`DELETE FROM ${table}`).run();
+  }
+  const blank = await overview(ANNA, householdQuery());
+  const differs = (a, b) => { try { assert.deepEqual(a, b); return false; } catch { return true; } };
+  const carried = Object.keys(wall).filter((key) => differs(wall[key], blank[key])).sort();
+  assert.deepEqual(carried, ['birthdays', 'housekeeping', 'pantryExpiring', 'shoppingOpenCount', 'todayMeals',
+    'upcomingEvents', 'urgentTasks', 'wallTasks', 'wastePickups'], 'belegt in der Saat UND an der Wand gezeichnet');
+  for (const key of carried.filter((name) => !['housekeeping', 'pantryExpiring'].includes(name))) {
+    assert.deepEqual(wall[key], personal[key], `„${key}" kommt unveraendert`);
+  }
+  assert.deepEqual(wall.users, personal.users, 'die Gesichter kommen unveraendert');
+  assert.ok(wall.users.length >= 3);
+  // Reichweite der Messung: persoenlich traegt dieselbe Saat weit mehr.
+  const blankPersonal = await overview(ANNA);
+  const carriedPersonal = Object.keys(personal).filter((key) => differs(personal[key], blankPersonal[key]));
+  for (const key of ['budget', 'splitBalance', 'pinnedNotes', 'quicklinks', 'countdowns', 'rewards', 'weekEvents', 'openTaskCount']) {
+    assert.ok(carriedPersonal.includes(key), `Reichweite: persoenlich traegt „${key}"`);
+  }
+}));
+
+test('Allowlist: ein unbekannter Schluessel bekommt NEIN - auch einer, den es heute noch nicht gibt', () => {
+  assert.equal(typeof visibility.householdAudienceAnswer, 'function');
+  const empty = { users: [], budget: { income: 0 }, housekeeping: { present: false, unpaidAmount: 0 } };
+  const answer = visibility.householdAudienceAnswer({
+    users: [{ id: 1 }],
+    budget: { income: 4321.09 },
+    housekeeping: { present: true, unpaidAmount: 87.5, brandNewField: 'Lohnzettel' },
+    brandNewModule: { secret: 'Kontostand' },
+  }, empty);
+  assert.deepEqual(answer, {
+    users: [{ id: 1 }],
+    budget: { income: 0 },
+    housekeeping: { present: true, unpaidAmount: 0 },
+  });
+});
+
+test('Allowlist: was die Wand nicht zeigt, wird auch nicht gelesen', withClock(NOON_BERLIN, 'Europe/Berlin', async () => {
+  seedWallSources();
+  const OFF_WALL_TABLES = /\b(notes|budget_entries|expense_ledger_entries|quick_links|medications|reward_redemptions|schedule_extra_shifts)\b/;
+  const original = db.prepare;
+  let seen = [];
+  db.prepare = function prepare(sql) { seen.push(String(sql)); return original.call(this, sql); };
+  try {
+    await overview(ANNA);
+    const personalReads = seen.filter((sql) => OFF_WALL_TABLES.test(sql)).length;
+    assert.ok(personalReads >= 5, `Reichweite: die persoenliche Fassung liest diese Tabellen (${personalReads})`);
+    seen = [];
+    await overview(ANNA, householdQuery());
+    assert.ok(seen.length > 5, 'Reichweite: die Haushaltsfassung liest');
+    assert.deepEqual(seen.filter((sql) => OFF_WALL_TABLES.test(sql)).map((sql) => sql.trim().slice(0, 60)), []);
+  } finally {
+    db.prepare = original;
+  }
+}));
+
+test('Allowlist: die gebaute Wand ist dieselbe wie zuvor - nichts, was sie zeichnet, ist weggefallen', async () => {
+  let personal;
+  let wall;
+  await withClock(NOON_BERLIN, 'Europe/Berlin', async () => {
+    seedWallSources();
+    personal = await overview(ANNA, `?shopping_list=${SHOPPING_LIST}`);
+    wall = await overview(ANNA, householdQuery());
+  })();
+  await onWallAt(NOON_BERLIN, () => {
+    // Der Stand vor der Allowlist: die volle Antwort, ohne die drei Module, die
+    // #1900 schon ausliess.
+    const beforeData = {
+      ...personal,
+      health: wall.health, fasting: wall.fasting, nutrition: wall.nutrition, rewards: wall.rewards, myShiftsToday: [],
+      pendingReminders: [],
+    };
+    const afterData = { ...wall, pendingReminders: [] };
+    // Das Modell des ganzen Tages, nicht nur die vier Zeilen ueber dem Deckel.
+    const day = (data) => {
+      const model = dash.buildTodayCockpitModel(data, [], { cap: dash.WALL_ROW_CAP, now: new Date(), groupOverdue: false });
+      return { rows: model.allRows.map((row) => [row.kind, row.title, row.sub, row.timeLabel]), shopping: model.shopping?.title ?? null, overflow: model.overflow, coda: model.coda };
+    };
+    const before = day(beforeData);
+    const text = JSON.stringify(before.rows);
+    for (const word of ['Elternabend', 'Tisch decken', 'Linsensuppe', 'Biotonne', 'Joghurt', 'Helga', 'Oma Erna']) {
+      assert.ok(text.includes(word), `Reichweite: „${word}" steht im Programm des Tages`);
+    }
+    assert.ok(before.shopping, 'Reichweite: die Einkaufszeile steht');
+    assert.deepEqual(day(afterData), before, 'das Programm des Tages ist dasselbe');
+    const shown = wallParts(afterData);
+    const was = wallParts(beforeData);
+    assert.equal(shown.who, was.who, '„Wer heute dran ist" ist dasselbe');
+    assert.equal(shown.html, was.html, 'die ganze Flaeche ist dieselbe');
+    for (const word of OFF_WALL_WORDS) assert.ok(!shown.html.includes(word));
+  })();
+});
+
+test('Allowlist: das Display ohne den Parameter bekommt, was es bekam', withClock(NOON_BERLIN, 'Europe/Berlin', async () => {
+  seedWallSources();
+  const display = await asCoupledDisplay(() => overview(DISPLAY));
+  assert.deepEqual(titles(display.countdowns), ['Urlaub in Sicht'], 'Countdowns bleiben der Uebersicht des Displays');
+  assert.ok(display.openTaskCount > 0);
+  assert.ok(display.weekEvents.length > 0);
+  assert.equal(display.rewards.view, 'family');
+  // Und an der Wand folgt auch das Display der Allowlist.
+  const wall = await asCoupledDisplay(() => overview(DISPLAY, '?audience=household'));
+  assert.deepEqual(wall.countdowns, []);
+  assert.equal(wall.openTaskCount, 0);
+  assert.deepEqual(wall.weekEvents, []);
+  assert.ok(titles(wall.urgentTasks).includes('Tisch decken'), 'Reichweite: das Programm steht');
+}));
