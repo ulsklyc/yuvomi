@@ -81,6 +81,11 @@ export class ObjectIndex extends Map {
     return url ? this.#byUrl.get(url)?.uid : undefined;
   }
 
+  /** Was der Abruf an genau dieser Adresse gesehen hat: `{ uid, entry }` oder `undefined`. */
+  at(url) {
+    return url ? this.#byUrl.get(url) : undefined;
+  }
+
   /**
    * Das Objekt zu einer Zeile oder einem Löschauftrag, in dieser Reihenfolge:
    *   1. an genau der gespeicherten Adresse (wörtlich gleich), sofern dort
@@ -350,6 +355,17 @@ export async function flushAccount(client, source, { deletions, updates, needsCa
  *   3. Ohne Anfrage fällt der Auftrag nur, wenn an der gespeicherten Adresse
  *      inzwischen ein anderer Termin liegt oder gar keine Adresse gespeichert
  *      ist und der Abruf das Objekt nicht führt.
+ * EIN BEDINGTER AUFTRAG (#1883, `isConditionalDeletion`) gilt nur dem Objekt
+ * an seiner Adresse in dem Stand, für den er vorgemerkt wurde - der Rest eines
+ * Umzugs, dessen Quelle ihr Löschen abgelehnt hat. Er sucht sein Objekt NICHT
+ * über die UID: das DELETE geht an die gespeicherte Adresse, mit dem
+ * gespeicherten ETag als If-Match. Führt der Abruf dort einen anderen Stand
+ * oder einen anderen Termin, fällt der Auftrag ohne Anfrage; antwortet der
+ * Server mit 412, fällt er ebenfalls. Beides heisst: was dort liegt, ist nicht
+ * mehr der Rest des Umzugs (der Termin wurde woanders zurückgelegt), und ein
+ * Löschen nähme ihn aus beiden Kalendern. Das gilt auch im Sofortversuch und
+ * für Apple.
+ *
  * Liegt die Adresse nicht auf dem Server des Kontos, stellt der Client die
  * Anfrage nicht (`withAccountOrigin`). Im Lauf heisst das: dieses Objekt liegt
  * nicht bei diesem Konto, der Auftrag wird mit Meldung abgeräumt. Im
@@ -386,7 +402,27 @@ export async function processPendingDeletions(client, source, objectIndex, ownCa
 
     let known;
     let url;
-    if (index) {
+    const conditional = outbound.isConditionalDeletion(row);
+    if (conditional) {
+      // Was dieser Durchgang an der Adresse des Auftrags gesehen hat. Ohne
+      // Konto (Apple) kennt die Map nur ein Objekt je UID.
+      let seen;
+      if (index) {
+        seen = index.at(row.object_url);
+      } else {
+        const entry = objectIndex.get(row.event_external_id);
+        seen = entry?.url === row.object_url ? { uid: row.event_external_id, entry } : undefined;
+      }
+      const otherEvent = seen && seen.uid !== null && seen.uid !== row.event_external_id;
+      const otherState = seen?.entry?.etag && seen.entry.etag !== row.etag;
+      if (otherEvent || otherState) {
+        log.info(`[${label(source)}] The entry of event ${row.event_external_id} in its old calendar has changed since its removal was queued, dropping the pending deletion.`);
+        outbound.dropDeletion(row.id);
+        done++;
+        continue;
+      }
+      url = row.object_url;
+    } else if (index) {
       known = index.find({
         uid: row.event_external_id, url: row.object_url,
         calendarUrl: row.calendar_external_id || null,
@@ -424,11 +460,21 @@ export async function processPendingDeletions(client, source, objectIndex, ownCa
     }
 
     try {
-      await client.deleteCalendarObject({ calendarObject: { url, etag: known?.etag } });
+      await client.deleteCalendarObject({ calendarObject: { url, etag: conditional ? row.etag : known?.etag } });
       outbound.dropDeletion(row.id);
       done++;
       if (outcome) outcome.sent++;
     } catch (err) {
+      // 412 auf den gespeicherten ETag: das Objekt hat sich geändert, seit der
+      // Auftrag vorgemerkt wurde. Kein Wiederholungsfall - ein späterer Versuch
+      // käme nur mit einem frischen ETag durch, und der löschte genau das, was
+      // die Vorbedingung schützt.
+      if (conditional && outbound.outboundErrorStatus(err) === 412) {
+        log.info(`[${label(source)}] The entry of event ${row.event_external_id} in its old calendar has changed since its removal was queued, dropping the pending deletion.`);
+        outbound.dropDeletion(row.id);
+        done++;
+        continue;
+      }
       if (isOriginRefusal(err)) {
         // Nichts wurde gesendet.
         if (ownCalendarUrls) {
@@ -594,9 +640,14 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
           // Zeile, die einen anderen Kalender nennen kann. Hat der Nutzer
           // gelöscht, steht der Auftrag der Route schon.
           if (sourceRefusal && !userDeletedIt) {
+            // Der Auftrag gilt dem Objekt in dem Stand, den dieser Umzug
+            // kopiert hat (#1883): sein ETag geht mit. Nach einem 412 ist
+            // gerade dieser Stand schon überholt - dann bleibt der Auftrag
+            // ohne Bedingung, wie vor #1883.
             const queued = outbound.queueRefusedDeletion({
               source, calendarExternalId: known.calendarUrl,
               eventExternalId: event.external_calendar_id, objectUrl: known.url, accountId,
+              etag: outbound.outboundErrorStatus(sourceRefusal) === 412 ? null : (known.etag ?? null),
             }, sourceRefusal);
             if (queued) {
               log.warn(`[${label(source)}] Event ${event.id} was copied to ${moveTo} but could not be removed from its old calendar (${sourceRefusal.message}); the removal is tried again.`);

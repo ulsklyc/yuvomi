@@ -9,11 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Dutch date format DD-MM-YYYY** (#1847). The new `DD-MM-YYYY` choice is in Settings → Account →
+  Appearance → Date format, and the Netherlands region now uses it instead of `DD.MM.YYYY`.
+  Dates, the date field placeholder, short dates and typed input all follow it. Existing households
+  keep the format they have set. A household that already has the Netherlands as its region gets
+  the new format by setting "Region" to "Custom" and then "Preferred date format" to `DD-MM-YYYY`.
 - **Tapping a category or subcategory in the budget overview filters the transactions list.**
   (#1593, from D#1583) The filter applies in place and can be cleared again.
 
 ### Fixed
 
+- **An archived shared-expense group now refuses changes on the server too** (#1747). Until now only
+  the page was locked: an API client or a stale tab could still add, edit or delete expenses,
+  comments, settlements and recurring expenses in a group the household had put away, and the
+  hourly run kept booking its recurring expenses. Every write on an archived group is now answered
+  with 409 (`group_archived`) and changes nothing; restoring the group, reading it and deleting it
+  under the existing rules work as before. The hourly run skips an archived group without booking
+  or pausing anything, and restoring the group moves its active recurring expenses to their first
+  date from today on, so the months in between are never booked afterwards.
 - **Moving an event to another CalDAV calendar no longer leaves it in both** (#1861). A move
   stores the event in the new calendar and then removes it from the old one. When the server
   stored the copy but refused the removal - an old calendar that is shared read-only, or a server
@@ -23,7 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   five times like any other refused deletion, and until then Yuvomi shows the event once, in the
   calendar you moved it to. After the fifth refusal Yuvomi gives up, and the event stays in both
   calendars until you remove one copy yourself. Events that were left doubled before the update
-  are not cleaned up.
+  are not cleaned up. A removal that is still waiting only takes the entry as it was when you
+  moved the event (#1883): if the entry in the old calendar has been changed since, or the event
+  was put back there from another app, Yuvomi no longer removes it.
 - **Editing or deleting an entry while it is being uploaded is no longer lost or undone**
   (#1862). Sending an entry to a CalDAV or iCloud server takes a moment, and Yuvomi booked the
   result against the entry as it was before that moment. If you deleted a new event, task or
