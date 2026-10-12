@@ -217,7 +217,7 @@
         "wallTimerStarted": "Mutfak zamanlayıcısı çalışıyor: {{duration}}",
         "wallTimerCancelled": "Mutfak zamanlayıcısı iptal edildi",
         "wallExited": "Duvar modu kapatıldı. Sayfa başlığındaki “{{action}}” ile geri dönebilirsiniz.",
-        "wallEntered": "Duvar modu: her zaman saat, günün programı, bugün kimin sırası olduğu ve hava durumu; genel bakışın düzeni değil. Aşağıdaki “{{action}}” ya da Geri ile çıkabilirsiniz.",
+        "wallEntered": "Duvar modu: duvar için sabit bir program, genel bakıştan bağımsız. Aşağıdaki “{{action}}” ya da Geri ile çıkabilirsiniz.",
         "wallOffline": "Bağlantı yok",
         "wallOfflineHint": "Ekran denemeye devam ediyor.",
         "familyDayCalm": "Bugün için görev dağıtılmadı",

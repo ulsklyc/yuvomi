@@ -217,7 +217,7 @@
         "wallTimerStarted": "Kjøkkentimer kjører: {{duration}}",
         "wallTimerCancelled": "Kjøkkentimeren ble avbrutt",
         "wallExited": "Veggmodus av. Bruk «{{action}}» i sidetitelen for å gå tilbake.",
-        "wallEntered": "Veggmodus: alltid klokken, dagens program, hvem som er på vakt i dag og været, ikke oppsettet av oversikten. Gå ut med «{{action}}» nederst eller med Tilbake.",
+        "wallEntered": "Veggmodus: et fast program for veggen, uavhengig av oversikten din. Gå ut med «{{action}}» nederst eller med Tilbake.",
         "wallOffline": "Ingen tilkobling",
         "wallOfflineHint": "Skjermen prøver fortsatt.",
         "familyDayCalm": "Ingen oppgaver tildelt for i dag",

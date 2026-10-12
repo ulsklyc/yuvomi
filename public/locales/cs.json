@@ -226,7 +226,7 @@
         "wallTimerStarted": "Kuchyňská minutka běží: {{duration}}",
         "wallTimerCancelled": "Kuchyňská minutka zrušena",
         "wallExited": "Nástěnný režim ukončen. Zpět se dostanete přes „{{action}}“ v záhlaví stránky.",
-        "wallEntered": "Nástěnný režim: vždy čas, program dne, kdo je dnes na řadě a počasí, ne rozvržení přehledu. Ukončíte ho přes „{{action}}“ dole nebo tlačítkem Zpět.",
+        "wallEntered": "Nástěnný režim: pevný program na zeď, nezávislý na přehledu. Ukončíte ho přes „{{action}}“ dole nebo tlačítkem Zpět.",
         "wallOffline": "Bez připojení",
         "wallOfflineHint": "Obrazovka to zkouší dál.",
         "familyDayCalm": "Na dnešek nejsou rozdělené žádné úkoly",

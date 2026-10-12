@@ -217,7 +217,7 @@
         "wallTimerStarted": "Temporizador de cozinha a correr: {{duration}}",
         "wallTimerCancelled": "Temporizador de cozinha cancelado",
         "wallExited": "Modo parede desativado. Volte por «{{action}}» no cabeçalho.",
-        "wallEntered": "Modo parede: sempre hora, programa do dia, quem está de serviço hoje e o tempo, não a disposição do resumo. Saia por «{{action}}» em baixo ou com Voltar.",
+        "wallEntered": "Modo parede: um programa fixo para a parede, independente do resumo. Saia por «{{action}}» em baixo ou com Voltar.",
         "wallOffline": "Sem ligação",
         "wallOfflineHint": "O ecrã continua a tentar.",
         "familyDayCalm": "Hoje não há tarefas atribuídas",

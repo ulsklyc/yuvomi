@@ -217,7 +217,7 @@
         "wallTimerStarted": "Keukentimer loopt: {{duration}}",
         "wallTimerCancelled": "Keukentimer geannuleerd",
         "wallExited": "Wandmodus uit. Ga terug via ‘{{action}}’ in de paginakop.",
-        "wallEntered": "Wandmodus: altijd tijd, dagprogramma, wie vandaag aan de beurt is en het weer, niet de indeling van het overzicht. Verlaat hem via ‘{{action}}’ onderaan of met Terug.",
+        "wallEntered": "Wandmodus: een vast programma voor aan de wand, los van jouw overzicht. Verlaat hem via ‘{{action}}’ onderaan of met Terug.",
         "wallOffline": "Geen verbinding",
         "wallOfflineHint": "Het scherm blijft het proberen.",
         "familyDayCalm": "Vandaag zijn er geen taken verdeeld",

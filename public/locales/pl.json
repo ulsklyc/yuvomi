@@ -249,7 +249,7 @@
         "wallTimerStarted": "Minutnik kuchenny działa: {{duration}}",
         "wallTimerCancelled": "Minutnik kuchenny anulowany",
         "wallExited": "Tryb ścienny wyłączony. Wróć przez „{{action}}” w nagłówku strony.",
-        "wallEntered": "Tryb ścienny: zawsze godzina, plan dnia, kto dziś ma dyżur i pogoda, a nie układ przeglądu. Wyjdziesz przez „{{action}}” na dole lub przyciskiem Wstecz.",
+        "wallEntered": "Tryb ścienny: stały program na ścianę, niezależny od twojego przeglądu. Wyjdziesz przez „{{action}}” na dole lub przyciskiem Wstecz.",
         "wallOffline": "Brak połączenia",
         "wallOfflineHint": "Ekran próbuje dalej.",
         "familyDayCalm": "Na dziś nie przydzielono zadań",

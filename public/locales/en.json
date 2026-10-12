@@ -217,7 +217,7 @@
         "wallTimerStarted": "Kitchen timer running: {{duration}}",
         "wallTimerCancelled": "Kitchen timer cancelled",
         "wallExited": "Wall mode off. Use “{{action}}” in the page header to go back.",
-        "wallEntered": "Wall mode: always the time, today's schedule, who's up today and the weather, not the arrangement of the overview. Leave with “{{action}}” at the bottom or with Back.",
+        "wallEntered": "Wall mode: a fixed programme for the wall, independent of your overview. Leave with “{{action}}” at the bottom or with Back.",
         "wallOffline": "No connection",
         "wallOfflineHint": "The screen keeps trying.",
         "familyDayCalm": "No tasks assigned for today",

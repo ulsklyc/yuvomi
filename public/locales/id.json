@@ -231,7 +231,7 @@
         "wallTimerStarted": "Pengatur waktu dapur berjalan: {{duration}}",
         "wallTimerCancelled": "Pengatur waktu dapur dibatalkan",
         "wallExited": "Mode dinding nonaktif. Kembali lewat “{{action}}” di header halaman.",
-        "wallEntered": "Mode dinding: selalu jam, program hari ini, siapa yang bertugas, dan cuaca, bukan tata letak ringkasan. Keluar lewat “{{action}}” di bawah atau tombol Kembali.",
+        "wallEntered": "Mode dinding: program tetap untuk dinding, terlepas dari ringkasanmu. Keluar lewat “{{action}}” di bawah atau tombol Kembali.",
         "wallOffline": "Tidak ada koneksi",
         "wallOfflineHint": "Layar terus mencoba.",
         "familyDayCalm": "Tidak ada tugas untuk hari ini",

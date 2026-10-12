@@ -217,7 +217,7 @@
         "wallTimerStarted": "Timer da cucina avviato: {{duration}}",
         "wallTimerCancelled": "Timer da cucina annullato",
         "wallExited": "Modalità parete disattivata. Torna con «{{action}}» nell’intestazione.",
-        "wallEntered": "Modalità parete: sempre ora, programma del giorno, a chi tocca oggi e meteo, non la disposizione della panoramica. Esci con «{{action}}» in basso o con Indietro.",
+        "wallEntered": "Modalità parete: un programma fisso per la parete, indipendente dalla tua panoramica. Esci con «{{action}}» in basso o con Indietro.",
         "wallOffline": "Nessuna connessione",
         "wallOfflineHint": "Lo schermo continua a riprovare.",
         "familyDayCalm": "Nessuna attività assegnata per oggi",

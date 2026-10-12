@@ -204,7 +204,7 @@
         "wallTimerAcknowledge": "Desligar temporizador",
         "wallTimerDone": "Pronto",
         "wallExited": "Modo parede desativado. Volte por «{{action}}» no cabeçalho.",
-        "wallEntered": "Modo parede: sempre hora, programa do dia, quem está de serviço hoje e o tempo, não a disposição do resumo. Saia por “{{action}}” embaixo ou com Voltar.",
+        "wallEntered": "Modo parede: um programa fixo para a parede, independente do seu resumo. Saia por “{{action}}” embaixo ou com Voltar.",
         "wallOffline": "Sem conexão",
         "wallOfflineHint": "A tela continua tentando.",
         "familyDayCalm": "Hoje não há tarefas atribuídas",

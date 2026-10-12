@@ -231,7 +231,7 @@
         "wallTimerStarted": "Küchentimer läuft: {{duration}}",
         "wallTimerCancelled": "Küchentimer abgebrochen",
         "wallExited": "Wand-Modus beendet. Über »{{action}}« im Seitenkopf geht es zurück.",
-        "wallEntered": "Wand-Modus: immer Uhrzeit, Tagesprogramm, wer heute dran ist und das Wetter, nicht die Anordnung der Übersicht. Hinaus geht es über »{{action}}« unten oder mit Zurück.",
+        "wallEntered": "Wand-Modus: ein festes Programm für die Wand, unabhängig von deiner Übersicht. Hinaus geht es über »{{action}}« unten oder mit Zurück.",
         "wallOffline": "Keine Verbindung",
         "wallOfflineHint": "Der Bildschirm versucht es weiter.",
         "familyDayCalm": "Heute sind keine Aufgaben verteilt",

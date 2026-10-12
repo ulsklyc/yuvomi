@@ -217,7 +217,7 @@
         "wallTimerStarted": "キッチンタイマー作動中: {{duration}}",
         "wallTimerCancelled": "キッチンタイマーを取り消しました",
         "wallExited": "ウォールモードを終了しました。ページ上部の「{{action}}」で戻れます。",
-        "wallEntered": "ウォールモード: 概要の配置にかかわらず、常に時刻、今日の予定、今日の担当、天気を表示します。下の「{{action}}」または「戻る」で終了できます。",
+        "wallEntered": "ウォールモード: 壁掛け用の固定プログラムで、あなたの概要とは別です。下の「{{action}}」または「戻る」で終了できます。",
         "wallOffline": "接続がありません",
         "wallOfflineHint": "画面は再試行を続けます。",
         "familyDayCalm": "今日は割り当てられたタスクがありません",
