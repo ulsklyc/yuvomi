@@ -126,6 +126,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `shopping_store_not_found`, `shopping_store_exists`, `shopping_category_not_found`,
   `category_exists`, `category_last`); status codes are unchanged, and three German `error`
   sentences are now English ("Unknown list.", "Unknown store.", "Store already exists.").
+- **Two texts no longer suggest that wall mode follows the arrangement of the overview** (#1908).
+  Wall mode always shows the same four things - the time, today's schedule, who's up today and
+  the weather - on every device. The hint under Settings → Household → Wall tablets now names
+  them, and the note shown when entering wall mode calls it a fixed programme, independent of
+  your overview. The household default still sets a wall tablet's normal overview, as before;
+  nothing about the behaviour changes.
 - **A task due late tomorrow evening is no longer labelled "Due today" on the dashboard.** A task
   due tomorrow at 22:00 or later and less than 24 hours away gets its own label next to the date,
   "Due soon". In English and 17 other languages that label carried the text of "Due today", so the
