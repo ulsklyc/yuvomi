@@ -445,6 +445,26 @@ test('Der Umzug wartet, und eine andere App loescht den Artikel in seiner ABGERU
   assert.deepEqual(rowsOf(), [], 'der Server fuehrt das Objekt nicht mehr - ein wartender Umzug haelt die Zeile nicht fest');
 });
 
+test('Der Server liefert fuer die abgerufene Liste NICHTS, ein Umzug wartet: der Leer-Guard des Prune gilt weiter, kein Artikel des Kontos wird abgeraeumt', async () => {
+  const { a, b, item } = await mirroredItem();
+  const neighbourRow = rowsOf('neighbour-neu@test')[0];
+  assert.ok(neighbourRow, 'der Nachbar der Zielliste ist gespiegelt');
+  select(account1, a.url, false);
+  await patch(item.id, { list_id: b.listId });
+  assert.equal(row(item.id).outbound_move, 1);
+  // Die einzige abgerufene Liste kommt leer zurueck - haeufiger ein stiller
+  // Fehler des Servers als eine geleerte Liste (#508).
+  dav.refuse({
+    method: 'REPORT', path: new URL(b.url).pathname, status: 207, contentType: 'application/xml',
+    body: '<?xml version="1.0" encoding="utf-8"?><d:multistatus xmlns:d="DAV:"></d:multistatus>',
+  });
+
+  await remindersSync.sync();
+
+  assert.ok(row(neighbourRow.id), 'die UID des wartenden Umzugs macht aus "nichts gesehen" kein "alles andere ist fort"');
+  assert.ok(row(item.id));
+});
+
 test('Quellliste abgewaehlt: aus ihr wird nichts gelesen und nichts entfernt, der Umzug wartet', async () => {
   const { a, b, item } = await mirroredItem();
   select(account1, a.url, false);

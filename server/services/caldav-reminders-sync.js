@@ -678,10 +678,18 @@ async function runSync({ createClient: makeClient } = {}) {
         } else {
           // Ein wartender Umzug, dessen Objekt in einer nicht abgerufenen
           // Liste liegt (#1700), ist nicht "auf dem Server gelöscht".
-          pruneRemoved(db.get(), 'shopping_items', account.id, [
-            ...seenByModule.shopping,
-            ...todoOutbound.uidsOfMovesFromUnfetchedLists(account.id, enabledLists.map((s) => s.list_url)),
-          ]);
+          //
+          // NUR ZUSÄTZLICH zu dem, was der Server geliefert hat. Hat er nichts
+          // geliefert, bleibt die Liste leer und der Leer-Guard von
+          // `pruneRemoved` (#508) greift: eine einzige hier ergänzte UID
+          // machte sonst aus "nichts gesehen" ein "alles andere ist fort", und
+          // der Prune räumte jeden Einkaufsartikel des Kontos ab.
+          // Scheitert das Lesen der wartenden Umzüge, geht der Fehler hoch und
+          // dieser Lauf prunt gar nicht - es gibt hier keinen leeren Ersatzwert.
+          const shielded = seenByModule.shopping.length
+            ? todoOutbound.uidsOfMovesFromUnfetchedLists(account.id, enabledLists.map((s) => s.list_url))
+            : [];
+          pruneRemoved(db.get(), 'shopping_items', account.id, [...seenByModule.shopping, ...shielded]);
         }
       }
 
