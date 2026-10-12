@@ -676,7 +676,12 @@ async function runSync({ createClient: makeClient } = {}) {
         if (incompleteModules.has('shopping')) {
           log.warn(`Account ${account.id}: a reminder list could not be fetched, skipping shopping deletion.`);
         } else {
-          pruneRemoved(db.get(), 'shopping_items', account.id, seenByModule.shopping);
+          // Ein wartender Umzug, dessen Objekt in einer nicht abgerufenen
+          // Liste liegt (#1700), ist nicht "auf dem Server gelöscht".
+          pruneRemoved(db.get(), 'shopping_items', account.id, [
+            ...seenByModule.shopping,
+            ...todoOutbound.uidsOfMovesFromUnfetchedLists(account.id, enabledLists.map((s) => s.list_url)),
+          ]);
         }
       }
 

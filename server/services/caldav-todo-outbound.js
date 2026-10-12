@@ -1106,19 +1106,24 @@ export function isUnbookedOwnUpload(module, uid, listUrl) {
   // Jede andere UID kann die eines MITGENOMMENEN Einkaufsartikels sein (#1700):
   // er behält die UID, die sein Objekt schon trug. Notizen der Art `item` zu
   // einer solchen UID schreibt nur die Mitnahme.
+  // Das gilt auch für eine UID im Muster einer AUFGABE: ein Artikel trägt sie,
+  // wenn seine Liste von "Aufgaben" auf "Einkauf" umgestellt wurde. Gefragt
+  // wird deshalb immer auch nach Notizen der Art `item`; jede Notiz wird an
+  // der Zeile IHRER Art gemessen.
   const parsed = parseOwnUid(uid);
   const own = !!parsed && ['task', 'item'].includes(parsed.kind) && parsed.installation !== null;
-  const kind = own ? parsed.kind : 'item';
+  const kinds = own && parsed.kind === 'task' ? ['task', 'item'] : ['item'];
   moduleDef(module);
-  const noted = kind === 'item' ? 'shopping' : 'tasks';
   let attempts;
   try {
-    attempts = uploadAttemptsAt({ source: 'caldav', kind, uid, collectionUrl: listUrl });
+    attempts = kinds.flatMap((kind) => uploadAttemptsAt({ source: 'caldav', kind, uid, collectionUrl: listUrl }));
   } catch (err) {
     log.warn(`Upload notes are not readable (${err.message}); treating them as none.`);
     return false;
   }
-  return attempts.some((attempt) => todoAttemptState(noted, attempt) !== 'mirrored');
+  return attempts.some(
+    (attempt) => todoAttemptState(attempt.kind === 'item' ? 'shopping' : 'tasks', attempt) !== 'mirrored'
+  );
 }
 
 /**
@@ -1437,6 +1442,30 @@ export function returnMovesIntoMissingLists(accountId, listedUrls) {
     }
   }
   return returned;
+}
+
+/**
+ * UIDs der Artikel dieses Kontos, deren Umzug wartet und deren Objekt in einer
+ * Liste liegt, die dieser Lauf NICHT abgerufen hat (die Quelle ist abgewählt).
+ * Für den Prune gelten sie als gesehen: er räumt ab, was der Server nicht mehr
+ * führt, und über eine nicht gelesene Liste weiss der Lauf das nicht. Ohne das
+ * nähme er die Zeile fort, sobald er eine ANDERE Liste des Kontos liest - der
+ * Artikel steht ja auf einer eingeschalteten -, und mit ihr alles, was nur
+ * hier steht. Liegt das Objekt in einer abgerufenen Liste und fehlte dort,
+ * ist es wirklich fort: dann nennt diese Funktion es nicht.
+ *
+ * @param {string[]} fetchedListUrls  die Listen, die der Lauf gelesen hat
+ */
+export function uidsOfMovesFromUnfetchedLists(accountId, fetchedListUrls) {
+  const fetched = [...(fetchedListUrls || [])];
+  return db.get().prepare(`
+    SELECT external_uid, external_object_url FROM shopping_items
+     WHERE external_source = 'caldav' AND external_account_id = ? AND outbound_move = 1
+       AND external_uid IS NOT NULL
+  `).all(accountId).filter((row) => {
+    const from = collectionUrlOf(row.external_object_url);
+    return !from || !fetched.some((url) => sameCollection(url, from));
+  }).map((row) => row.external_uid);
 }
 
 /** Wartet ein Umzug auf eine Liste dieses Kontos, die gerade nicht eingeschaltet ist? */

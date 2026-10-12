@@ -39,6 +39,7 @@ const todoOutbound  = await import('../server/services/caldav-todo-outbound.js')
 const remindersSync = await import('../server/services/caldav-reminders-sync.js');
 const { runSerialized } = await import('../server/utils/sync-lock.js');
 const { loadItemTags } = await import('../server/utils/task-tags.js');
+const { ownUid } = await import('../server/utils/own-uid.js');
 
 const U = Number(db.prepare(
   "INSERT INTO users (username, display_name, password_hash, role) VALUES ('admin','Admin','x','admin')"
@@ -429,6 +430,21 @@ test('Die Zielliste hat noch eine Server-Liste in einem anderen Konto: der Umzug
   assert.deepEqual(objectsWith(dav, a.url), []);
 });
 
+test('Der Umzug wartet, und eine andere App loescht den Artikel in seiner ABGERUFENEN Liste: der Abruf raeumt die Zeile ab', async () => {
+  const { a, b, item } = await mirroredItem({ target: { enabled: false } });
+  await patch(item.id, { list_id: b.listId });
+  assert.equal(row(item.id).outbound_move, 1);
+  // Der Nachbar bleibt, die Liste ist also nicht leer.
+  dav.reset();
+  assert.equal(dav.addCollection('alt', { name: 'alt', components: ['VTODO'] }), a.url);
+  dav.putObject(a.url, 'neighbour-alt.ics', neighbour('alt'));
+  dav.addCollection('neu', { name: 'neu', components: ['VTODO'] });
+
+  await remindersSync.sync();
+
+  assert.deepEqual(rowsOf(), [], 'der Server fuehrt das Objekt nicht mehr - ein wartender Umzug haelt die Zeile nicht fest');
+});
+
 test('Quellliste abgewaehlt: aus ihr wird nichts gelesen und nichts entfernt, der Umzug wartet', async () => {
   const { a, b, item } = await mirroredItem();
   select(account1, a.url, false);
@@ -444,6 +460,13 @@ test('Quellliste abgewaehlt: aus ihr wird nichts gelesen und nichts entfernt, de
   assert.equal(objectsWith(dav, a.url).length, 1);
   assert.deepEqual(objectsWith(dav, b.url), []);
   assert.deepEqual([row(item.id).list_id, row(item.id).outbound_move], [b.listId, 1]);
+
+  // Der volle Lauf liest nur die Zielliste. Das Objekt des Artikels liegt in
+  // der abgewaehlten - der Lauf weiss also nicht, ob der Server es noch fuehrt,
+  // und raeumt die Zeile nicht als "auf dem Server geloescht" ab.
+  await remindersSync.sync();
+  assert.deepEqual(rowsOf().map((x) => [x.id, x.list_id, x.outbound_move]), [[item.id, b.listId, 1]]);
+  assert.deepEqual(loadItemTags(db, item.id).sort(), ['Bio', 'Kuehlregal']);
 
   select(account1, a.url, true);
   await todoOutbound.flushOutbound();
@@ -539,6 +562,28 @@ test('Zwei Konten, die Antwort des PUT geht verloren: der Abruf des Zielkontos i
   assert.deepEqual(rowsOf().map((x) => [x.id, x.list_id, x.external_account_id]), [[item.id, b.listId, account2]]);
   assert.equal(objectsWith(dav2, b.url).length, 1);
   assert.deepEqual(objectsWith(dav, a.url), []);
+});
+
+test('Der Artikel traegt die UID einer hier angelegten AUFGABE (Liste umgestellt), zwei Konten, Antwort des PUT verloren: auch dann kein zweiter Artikel', async () => {
+  reset();
+  const a = mirroredList('alt');
+  const b = mirroredList('neu', { server: dav2, accountId: secondAccount() });
+  const uid = ownUid('task', 4711, db);
+  dav.putObject(a.url, FILE, original({ uid }));
+  await remindersSync.sync();
+  const [item] = rowsOf(uid);
+  assert.ok(item);
+  dav2.refuse({ method: 'PUT', commit: true, drop: true, once: true });
+
+  await patch(item.id, { list_id: b.listId });
+  assert.equal(objectsWith(dav2, b.url, uid).length, 1);
+  dav.refuse({ method: 'REPORT', path: new URL(a.url).pathname, status: 503 });
+  await remindersSync.sync();
+  assert.equal(named('Milch').length, 1, 'der Abruf des Zielkontos hat das ungebuchte Objekt nicht importiert');
+
+  dav.allowAll();
+  await remindersSync.sync();
+  assert.deepEqual(rowsOf(uid).map((x) => [x.id, x.list_id, x.external_account_id]), [[item.id, b.listId, account2]]);
 });
 
 test('Das Entfernen am alten Platz scheitert: der Abruf sieht zwei Objekte einer UID in einem Konto und laesst die Zeile, wo sie ist', async () => {

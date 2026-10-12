@@ -3497,6 +3497,9 @@ async function loadLists() {
     // Auch eine GESCHEITERTE aeltere Antwort ersetzt keine juengere: ihr
     // Fehler sagt nichts mehr ueber den Stand, den die Seite schon zeigt.
     if (startedAt < _appliedListsLoad) return;
+    // Und sie ist selbst die juengste: eine noch aeltere Antwort, die erst
+    // danach eintrifft, traegt einen Stand von davor und kommt nicht mehr zum Zug.
+    _appliedListsLoad = startedAt;
     console.error('[Shopping] loadLists Fehler:', err);
     state.lists = [];
     // Fehler statt Toast: der Toast verging, während darunter „Keine Listen ·
