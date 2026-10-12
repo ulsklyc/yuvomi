@@ -5033,8 +5033,9 @@ function refusalSentence(err, { refusals, statuses, fallback }) {
       ? { fields: entry[0], message: refusalText(entry, err.data?.max) }
       : { fields: null, message: t(fallback) };
   }
-  // friendlyError reicht bei einem Status ohne eigenen Satz den Text des Servers
-  // durch - hier nur dort fragen, wo es einen Satz hat.
+  // friendlyError hat fuer einen Status ohne eigenen Satz nur den allgemeinen
+  // (bis #1909 reichte es dort den Text des Servers durch) - hier nur dort
+  // fragen, wo es einen eigenen hat, sonst gilt der Satz dieser Stelle.
   const known = status === 0 || status === 403 || status === 404 || status >= 500 || !navigator.onLine;
   return { fields: null, message: known ? friendlyError(err) : t(fallback) };
 }
