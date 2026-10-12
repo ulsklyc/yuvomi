@@ -1160,7 +1160,8 @@
         "localCalendarDisableExport": "Export deaktivieren",
         "localCalendarExportCopied": "Exportlink kopiert",
         "localCalendarDeleteConfirm": "\"{{name}}\" löschen?",
-        "localCalendarDeleteDetail": "Termine aus diesem Kalender werden in den Standardkalender verschoben, und sein Exportlink funktioniert danach nicht mehr."
+        "localCalendarDeleteDetail": "Termine aus diesem Kalender werden in den Standardkalender verschoben, und sein Exportlink funktioniert danach nicht mehr.",
+        "localCalendarDeleteDetailIcloud": "Termine aus diesem Kalender werden in den Standardkalender verschoben und danach über Apple Calendar zu iCloud hochgeladen. Sein Exportlink funktioniert danach nicht mehr."
     },
     "noteCategories": {
         "categories": "Kategorien",

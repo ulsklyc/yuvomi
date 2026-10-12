@@ -158,3 +158,55 @@ test('copying a calendar feed works without Clipboard API and exposes the link i
     else globalThis.__askOverModal = previous.askOverModal;
   }
 });
+
+test('deleting a calendar names the iCloud upload only while the default calendar uploads', async () => {
+  const previous = { document: globalThis.document, window: globalThis.window, apiStub: globalThis.__apiStub,
+    confirmOverModal: globalThis.__confirmOverModal, calendars: calendar.localCalendarState.localCalendars };
+  const permissions = getPermissions();
+  const questions = [];
+  const deleted = [];
+  let served = [];
+  const handlers = {};
+  const panel = { dataset: {}, addEventListener(type, handler) { handlers[type] = handler; }, querySelector: () => null, querySelectorAll: () => [] };
+  // A click on "Delete" in the row of calendar 2, as the manager's listener reads it.
+  const row = { dataset: { calendarId: '2' } };
+  const click = { target: { closest: (selector) => {
+    if (selector === '.cal-calendar-row') return row;
+    return selector === '[data-action="calendar-delete"]' ? {} : null;
+  } } };
+  globalThis.document = { querySelector: (selector) => (selector.includes('.modal-panel') ? panel : null),
+    querySelectorAll: () => [], addEventListener() {}, removeEventListener() {} };
+  globalThis.window = { yuvomi: { showToast() {} } };
+  globalThis.__apiStub = {
+    get: async () => ({ data: served }),
+    delete: async (...args) => { deleted.push(args); return { data: true }; },
+  };
+  globalThis.__confirmOverModal = async (...args) => { questions.push(args); return false; };
+  try {
+    setPermissions({ admin: true, modules: { calendar: 'write' } });
+    for (const [uploads, expected] of [
+      [false, 'calendar.localCalendarDeleteDetail'],
+      [true, 'calendar.localCalendarDeleteDetailIcloud'],
+      [undefined, 'calendar.localCalendarDeleteDetail'],
+    ]) {
+      served = [
+        { id: 1, name: 'Yuvomi', color: '#007AFF', is_default: true, uploads_to_icloud: uploads },
+        { id: 2, name: 'School', color: '#336699', is_default: false, uploads_to_icloud: false },
+      ];
+      await calendar.openLocalCalendarsModal();
+      await handlers.click(click);
+      const [title, options] = questions.pop();
+      assert.match(title, /^calendar.localCalendarDeleteConfirm.*School/);
+      assert.equal(options.detail, expected, `default calendar uploads: ${uploads}`);
+      assert.equal(options.danger, true);
+    }
+    assert.equal(deleted.length, 0, 'a declined confirmation deletes nothing');
+  } finally {
+    calendar.localCalendarState.localCalendars = previous.calendars;
+    setPermissions(permissions);
+    globalThis.document = previous.document; globalThis.window = previous.window;
+    if (previous.apiStub === undefined) delete globalThis.__apiStub; else globalThis.__apiStub = previous.apiStub;
+    if (previous.confirmOverModal === undefined) delete globalThis.__confirmOverModal;
+    else globalThis.__confirmOverModal = previous.confirmOverModal;
+  }
+});

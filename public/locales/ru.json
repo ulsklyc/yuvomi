@@ -1289,6 +1289,7 @@
         "localCalendarExportCopied": "Ссылка экспорта скопирована",
         "localCalendarDeleteConfirm": "Удалить «{{name}}»?",
         "localCalendarDeleteDetail": "События этого календаря будут перенесены в календарь по умолчанию, а его ссылка экспорта перестанет работать.",
+        "localCalendarDeleteDetailIcloud": "События этого календаря будут перенесены в календарь по умолчанию, а затем загружены в iCloud через Apple Calendar. Его ссылка экспорта перестанет работать.",
         "localCalendarEventCount_many": "{{count}} событий",
         "localCalendarEventCount_other": "{{count}} событий"
     },

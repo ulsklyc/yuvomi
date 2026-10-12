@@ -121,7 +121,7 @@ export function calendarPaths() {
       get: op({
         summary: 'List local calendars',
         tag: 'Calendar',
-        description: 'Feed URLs and tokens are included only for administrators.',
+        description: 'Feed URLs and tokens are included only for administrators. `uploads_to_icloud` is true on the default calendar while the legacy Apple Calendar connection is configured: its events upload to iCloud, events in other local calendars stay local.',
       }),
       post: op({
         summary: 'Create local calendar',

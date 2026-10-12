@@ -1146,6 +1146,7 @@
         "localCalendarExportCopied": "書き出しリンクをコピーしました",
         "localCalendarDeleteConfirm": "「{{name}}」を削除しますか？",
         "localCalendarDeleteDetail": "このカレンダーの予定は既定のカレンダーへ移動し、エクスポートリンクは使えなくなります。",
+        "localCalendarDeleteDetailIcloud": "このカレンダーの予定は既定のカレンダーへ移動し、その後 Apple カレンダー経由で iCloud にアップロードされます。エクスポートリンクは使えなくなります。",
         "localCalendarEventCount_one": "{{count}}件の予定"
     },
     "noteCategories": {

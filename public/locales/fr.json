@@ -1146,7 +1146,8 @@
         "localCalendarDisableExport": "Désactiver l’export",
         "localCalendarExportCopied": "Lien d’export copié",
         "localCalendarDeleteConfirm": "Supprimer « {{name}} » ?",
-        "localCalendarDeleteDetail": "Les événements de ce calendrier seront déplacés vers le calendrier par défaut, et son lien d’export cessera de fonctionner."
+        "localCalendarDeleteDetail": "Les événements de ce calendrier seront déplacés vers le calendrier par défaut, et son lien d’export cessera de fonctionner.",
+        "localCalendarDeleteDetailIcloud": "Les événements de ce calendrier seront déplacés vers le calendrier par défaut, puis envoyés vers iCloud via Apple Calendar. Son lien d’export cessera de fonctionner."
     },
     "noteCategories": {
         "categories": "Catégories",

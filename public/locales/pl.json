@@ -1303,6 +1303,7 @@
         "localCalendarExportCopied": "Link eksportu skopiowany",
         "localCalendarDeleteConfirm": "Usunąć „{{name}}”?",
         "localCalendarDeleteDetail": "Wydarzenia z tego kalendarza zostaną przeniesione do kalendarza domyślnego, a jego link eksportu przestanie działać.",
+        "localCalendarDeleteDetailIcloud": "Wydarzenia z tego kalendarza zostaną przeniesione do kalendarza domyślnego, a następnie przesłane do iCloud przez Apple Calendar. Jego link eksportu przestanie działać.",
         "localCalendarEventCount_many": "{{count}} wydarzeń",
         "localCalendarEventCount_other": "{{count}} wydarzeń"
     },

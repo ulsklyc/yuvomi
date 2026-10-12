@@ -1146,7 +1146,8 @@
         "localCalendarDisableExport": "Deaktiver eksport",
         "localCalendarExportCopied": "Eksportlenke kopiert",
         "localCalendarDeleteConfirm": "Slette \"{{name}}\"?",
-        "localCalendarDeleteDetail": "Hendelsene flyttes til standardkalenderen, og eksportlenken slutter å virke."
+        "localCalendarDeleteDetail": "Hendelsene flyttes til standardkalenderen, og eksportlenken slutter å virke.",
+        "localCalendarDeleteDetailIcloud": "Hendelsene flyttes til standardkalenderen og lastes deretter opp til iCloud via Apple Kalender. Eksportlenken slutter å virke."
     },
     "noteCategories": {
         "categories": "Kategorier",

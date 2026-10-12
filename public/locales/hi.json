@@ -1146,7 +1146,8 @@
         "localCalendarDisableExport": "निर्यात बंद करें",
         "localCalendarExportCopied": "निर्यात लिंक कॉपी हुआ",
         "localCalendarDeleteConfirm": "\"{{name}}\" हटाएं?",
-        "localCalendarDeleteDetail": "इस कैलेंडर के इवेंट डिफ़ॉल्ट कैलेंडर में चले जाएंगे, और इसका एक्सपोर्ट लिंक काम करना बंद कर देगा."
+        "localCalendarDeleteDetail": "इस कैलेंडर के इवेंट डिफ़ॉल्ट कैलेंडर में चले जाएंगे, और इसका एक्सपोर्ट लिंक काम करना बंद कर देगा.",
+        "localCalendarDeleteDetailIcloud": "इस कैलेंडर के इवेंट डिफ़ॉल्ट कैलेंडर में चले जाएंगे और उसके बाद Apple कैलेंडर के ज़रिए iCloud पर अपलोड होंगे। इसका एक्सपोर्ट लिंक काम करना बंद कर देगा।"
     },
     "noteCategories": {
         "categories": "श्रेणियाँ",

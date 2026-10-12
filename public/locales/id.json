@@ -1160,6 +1160,7 @@
         "localCalendarExportCopied": "Tautan ekspor disalin",
         "localCalendarDeleteConfirm": "Hapus \"{{name}}\"?",
         "localCalendarDeleteDetail": "Acara dari kalender ini dipindahkan ke kalender default, dan tautan ekspornya akan berhenti berfungsi.",
+        "localCalendarDeleteDetailIcloud": "Acara dari kalender ini dipindahkan ke kalender default lalu diunggah ke iCloud melalui Apple Calendar. Tautan ekspornya akan berhenti berfungsi.",
         "localCalendarEventCount_one": "{{count}} acara"
     },
     "noteCategories": {

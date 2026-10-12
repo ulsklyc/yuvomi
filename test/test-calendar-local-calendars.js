@@ -484,3 +484,56 @@ test('import rejects a calendar removed before insertion instead of reporting du
   }), TypeError);
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM calendar_events WHERE external_calendar_id = 'removed-destination'").get().n, 0);
 });
+
+test('the default calendar reports the iCloud upload exactly while the legacy Apple connection would run it', async () => {
+  const appleCalendar = await import('../server/services/apple-calendar.js');
+  const previousEnv = {};
+  for (const key of ['APPLE_CALDAV_URL', 'APPLE_USERNAME', 'APPLE_APP_SPECIFIC_PASSWORD']) {
+    previousEnv[key] = process.env[key];
+    delete process.env[key];
+  }
+  const uploads = [];
+  const makeClient = async () => ({
+    fetchCalendars: async () => [{ url: 'https://caldav.icloud.test/home/', displayName: 'Home', calendarColor: '#FF0000' }],
+    fetchCalendarObjects: async () => [],
+    createCalendarObject: async ({ filename }) => { uploads.push(filename); return {}; },
+  });
+  const signal = async () => {
+    const res = await call('GET', '/calendars');
+    assert.equal(res.status, 200);
+    return res.body.data;
+  };
+  const sourceOf = (id) => db.prepare('SELECT external_source, local_calendar_id FROM calendar_events WHERE id = ?').get(id);
+  try {
+    db.prepare("DELETE FROM sync_config WHERE key LIKE 'apple_%'").run();
+    const other = await createCalendar('Deleted with iCloud on', '#225588');
+    const event = await createEvent('Falls into the default calendar', other.id);
+
+    // Without the connection: no calendar reports an upload, and the run stops before it.
+    for (const row of await signal()) assert.equal(row.uploads_to_icloud, false, `${row.name} without a connection`);
+    await assert.rejects(appleCalendar.sync({ makeClient }), /No credentials/);
+    assert.equal(uploads.length, 0);
+
+    // With it: the default calendar reports the upload, every other calendar does not.
+    appleCalendar.saveCredentials('https://caldav.icloud.test/', 'placeholder-user', 'placeholder-pass');
+    for (const row of await signal()) assert.equal(row.uploads_to_icloud, row.is_default, `${row.name} with the connection`);
+    assert.equal((await signal()).filter(row => row.uploads_to_icloud).length, 1);
+
+    // The consequence the confirmation names: the event of a deleted calendar uploads on the next run.
+    await appleCalendar.sync({ makeClient });
+    assert.equal(sourceOf(event.id).external_source, 'local', 'an event in another local calendar stays local');
+    assert.equal((await call('DELETE', `/calendars/${other.id}`)).status, 204);
+    assert.equal(sourceOf(event.id).local_calendar_id, null);
+    uploads.length = 0;
+    await appleCalendar.sync({ makeClient });
+    assert.equal(sourceOf(event.id).external_source, 'apple', 'after the deletion it uploads to iCloud');
+    assert.equal(uploads.length, 1);
+
+    // Disconnected again: the signal follows.
+    appleCalendar.clearCredentials();
+    for (const row of await signal()) assert.equal(row.uploads_to_icloud, false, `${row.name} after disconnecting`);
+  } finally {
+    db.prepare("DELETE FROM sync_config WHERE key LIKE 'apple_%'").run();
+    for (const [key, value] of Object.entries(previousEnv)) if (value !== undefined) process.env[key] = value;
+  }
+});

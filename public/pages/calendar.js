@@ -5355,6 +5355,14 @@ async function refreshLocalCalendarsPanel(panel) {
   renderView();
 }
 
+// Lädt der Standardkalender zu iCloud hoch (alte Apple-Verbindung, vom Server
+// je Kalender gemeldet)? Die Rückfrage vor dem Löschen eines Kalenders nennt
+// es dann als Folge: seine Termine fallen in den Standardkalender und gehen
+// mit. Sonst bleibt ihr Satz, wie er war.
+function defaultCalendarUploadsToIcloud() {
+  return state.localCalendars.some((item) => item.is_default && item.uploads_to_icloud);
+}
+
 async function moveLocalCalendar(id, direction) {
   if (moduleAccess('calendar') !== 'write' || ![-1, 1].includes(direction)) return false;
   const order = state.localCalendars.map(item => Number(item.id));
@@ -5443,7 +5451,9 @@ async function openLocalCalendarsModal() {
       } else if (e.target.closest('[data-action="calendar-delete"]')) {
         const ok = await confirmOverModal(t('calendar.localCalendarDeleteConfirm', { name: calendar.name }), {
           closeOnConfirm: false,
-          detail: t('calendar.localCalendarDeleteDetail'),
+          detail: defaultCalendarUploadsToIcloud()
+            ? t('calendar.localCalendarDeleteDetailIcloud')
+            : t('calendar.localCalendarDeleteDetail'),
           confirmLabel: t('common.delete'),
           danger: true,
         });
@@ -6153,7 +6163,7 @@ export const __test = {
   restorePeopleFilter,
   restoreAssignedToMe,
   restoreHiddenSources,
-  localCalendarDisplayName, eventLocalCalendarDisplayName, renderLocalCalendarRow, moveLocalCalendar, copyText, localCalendarState: state,
+  localCalendarDisplayName, eventLocalCalendarDisplayName, renderLocalCalendarRow, moveLocalCalendar, copyText, openLocalCalendarsModal, localCalendarState: state,
   persistHiddenSources,
   activeFilterCount,
   UNASSIGNED,

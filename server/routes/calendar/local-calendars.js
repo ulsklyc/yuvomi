@@ -13,6 +13,7 @@ import {
   validateCalendarColor,
   validateCalendarName,
 } from '../../services/local-calendars.js';
+import { uploadsLocalEvents } from '../../services/apple-calendar.js';
 import { createLogger } from '../../logger.js';
 import { feedUrl, getUserId, isAdminUser } from './helpers.js';
 
@@ -32,9 +33,14 @@ function loadCalendars(database, viewerId) {
 router.get('/calendars', (req, res) => {
   try {
     const rows = loadCalendars(db.get(), getUserId(req));
+    // Nur der Standardkalender geht mit der alten Apple-Verbindung zu iCloud
+    // hinauf. Die Rückfrage vor dem Löschen eines anderen Kalenders nennt das,
+    // weil dessen Termine dorthin fallen. Ein Ja oder Nein, keine Zugangsdaten.
+    const icloudUpload = uploadsLocalEvents();
     res.json({ data: rows.map((row) => ({
       ...serializeCalendar(req, row, feedUrl, { includeFeedToken: isAdminUser(req) }),
       event_count: row.event_count ?? 0,
+      uploads_to_icloud: icloudUpload && !!row.is_default,
     })) });
   } catch (err) {
     log.error('GET /calendars', err);

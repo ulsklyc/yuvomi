@@ -1146,7 +1146,8 @@
         "localCalendarDisableExport": "Export kikapcsolása",
         "localCalendarExportCopied": "Exportlink másolva",
         "localCalendarDeleteConfirm": "Törlöd: „{{name}}”?",
-        "localCalendarDeleteDetail": "A naptár eseményei az alapértelmezett naptárba kerülnek, és az exportálási hivatkozása többé nem fog működni."
+        "localCalendarDeleteDetail": "A naptár eseményei az alapértelmezett naptárba kerülnek, és az exportálási hivatkozása többé nem fog működni.",
+        "localCalendarDeleteDetailIcloud": "A naptár eseményei az alapértelmezett naptárba kerülnek, majd az Apple Naptár kapcsolaton keresztül feltöltődnek az iCloudba. Az exportálási hivatkozása többé nem fog működni."
     },
     "noteCategories": {
         "categories": "Kategóriák",

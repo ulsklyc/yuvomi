@@ -1146,7 +1146,8 @@
         "localCalendarDisableExport": "Export uitschakelen",
         "localCalendarExportCopied": "Exportlink gekopieerd",
         "localCalendarDeleteConfirm": "\"{{name}}\" verwijderen?",
-        "localCalendarDeleteDetail": "Afspraken uit deze agenda worden naar de standaardagenda verplaatst en de exportlink werkt daarna niet meer."
+        "localCalendarDeleteDetail": "Afspraken uit deze agenda worden naar de standaardagenda verplaatst en de exportlink werkt daarna niet meer.",
+        "localCalendarDeleteDetailIcloud": "Afspraken uit deze agenda worden naar de standaardagenda verplaatst en daarna via Apple Agenda naar iCloud geüpload. De exportlink werkt daarna niet meer."
     },
     "noteCategories": {
         "categories": "Categorieën",
