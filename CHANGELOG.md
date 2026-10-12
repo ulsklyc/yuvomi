@@ -38,8 +38,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   edit. And a second edit to a task or shopping item made while the first one was on its way was
   replaced by the first. Yuvomi now looks at the entry again after the server has answered: an
   entry deleted in the meantime is removed from the server too, and an edit made in the meantime
-  is sent after it. Not covered yet: if you change the target calendar of an event while it is
-  being uploaded, the event stays in the calendar it was uploaded to.
+  is sent after it.
+- **Changing where an entry is synced to while it is being uploaded is now followed** (#1881). If
+  you picked another CalDAV calendar for a new event, or set it back to "Local", in the moment
+  its upload was on the way, the event stayed in the calendar it had just been sent to, and saving
+  it again changed nothing. It now ends up where you last put it: moved to the other calendar of
+  the same account, or removed from the server again and kept as a local event (or uploaded
+  through the other account, if you chose one). The same holds for a new task whose reminder list
+  you changed or took back during the upload, and for a new shopping item that left its synced
+  list in that moment. Until now such a task also lost the list you had just chosen and stayed in
+  the old one.
 - **A CalDAV event belongs to the account that brought it** (#1860). With two or more CalDAV
   accounts, an event was identified by its UID alone. When a second account served an event with
   the same UID, it took over the entry of the first: title, calendar and address then came from
