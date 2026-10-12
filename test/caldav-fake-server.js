@@ -220,6 +220,10 @@ export async function startFakeDavServer() {
     objectNames(collectionUrl) {
       return [...(collections.get(new URL(collectionUrl).pathname)?.objects.keys() ?? [])];
     },
+    /** Nimmt eine Collection samt Inhalt fort, als hätte sie jemand auf dem Server gelöscht. */
+    removeCollection(collectionUrl) {
+      return collections.delete(new URL(collectionUrl).pathname);
+    },
     /** Stellt eine Collection ans Ende der Auflistung: Server sagen keine Reihenfolge zu. */
     moveToEnd(collectionUrl) {
       const path = new URL(collectionUrl).pathname;

@@ -115,22 +115,93 @@ export function asksHouseholdAudience(query) {
 }
 
 /**
- * Die Module, deren Beitrag zur Uebersicht dem BETRACHTER gilt und keiner
- * Sichtbarkeitsstufe folgt - eine geteilte Flaeche bekommt sie in der leeren
- * Fassung, wie ein gekoppeltes Display, dem das Modulrecht fehlt.
+ * WAS DIE WAND ZEICHNET - die Allowlist der Haushaltsfassung von `GET /dashboard`.
  *
- * Aufgaben und Termine haben eine Stufe „alle", und die Fragmente oben lesen
- * sie. Diese drei haben keine: was die Uebersicht aus ihnen zeigt, ist nach der
- * anfragenden Person geschnitten.
+ * Die Haushaltsfassung traegt genau diese Schluessel der Antwort. Jeder andere
+ * kommt in der LEEREN Fassung, die ein Konto ohne das Modulrecht bekommt - auch
+ * einer, den es heute noch nicht gibt.
  *
- *   health   - die EIGENEN Dosen, das eigene Fasten, die eigene Bilanz (#592);
- *   schedule - die EIGENE Schicht von heute (`myShiftsToday`);
- *   rewards  - wartende Freigaben fuer den, der freigibt, sonst die eigenen
- *              Bitten und Gutschriften. Die Sicht `family` (alle nach Namen)
- *              waere fuer ein Kind MEHR, als seine Sitzung sonst bekommt - der
- *              Parameter verengt nur, also bleibt die leere Fassung.
+ * WARUM EINE ALLOWLIST. Bis hierher stand an dieser Stelle die Umkehrung: drei
+ * Module, die ausgelassen wurden, und alles andere ging mit. Gemessen trug die
+ * Antwort fuer die Wand damit weiter angepinnte Notizen, das Budget, den Stand
+ * geteilter Ausgaben, Schnellzugriffe (auch private), Countdowns und den
+ * offenen Lohn der Haushaltshilfe - nichts davon zeichnet die Wand, alles davon
+ * lag auf dem Geraet in der Kueche. Eine Denylist sagt zu einem Schluessel, den
+ * sie nicht kennt, JA; ein neues Modul der Uebersicht waere von selbst an die
+ * Wand gereist. Diese Liste sagt NEIN, bis jemand ihn hier eintraegt.
  *
- * Eine vierte Quelle steht nicht hier, weil sie eine eigene Route hat: die
- * faelligen Erinnerungen (`GET /reminders/pending`) - immer die der Person.
+ * DER MASSSTAB IST DIE FLAECHE, nicht die Harmlosigkeit: hier steht, was das
+ * Programm, „Wer heute dran ist" und ihre Zeilen LESEN (public/pages/
+ * dashboard.js `renderWallSurface`, public/utils/today-sheet.js). Der
+ * Wochenstreifen, die Familienkarte und die Zahlen der Kacheln sind
+ * Haushaltsdaten und stehen trotzdem nicht hier - die Wand zeichnet sie nicht.
+ *
+ * `true` laesst den Schluessel ganz durch. Eine Liste nennt die FELDER einer
+ * Scheibe, die die Wand liest; die uebrigen kommen leer:
+ *   housekeeping   - dass die Hilfe da ist, seit wann und wer. Der offene Lohn
+ *                    (`unpaidAmount`) ist Geld, und Geld steht an keiner Wand;
+ *   pantryExpiring - was HEUTE ablaeuft. Die Kachelliste der naechsten Tage
+ *                    und ihre Zahlen zeichnet die Wand nicht.
+ *
+ * Was fehlt, weil es nur dem BETRACHTER gilt (#1900): Dosen, Fasten und
+ * Naehrwerte, die eigene Schicht, wartende Freigaben - sie haben keine Stufe
+ * „alle". Eine weitere Quelle hat eine eigene Route und fragt dort dieselbe
+ * Stelle: die faelligen Erinnerungen (`GET /reminders/pending`).
+ *
+ * WER HIER ETWAS EINTRAEGT, entscheidet, dass es an einer Wand haengt, die
+ * jeder im Raum liest. `test:wall-tasks` gleicht diese Liste mit den
+ * Schluesseln der echten Antwort ab und wird rot, sobald die Route einen
+ * liefert, ueber den niemand entschieden hat.
  */
-export const HOUSEHOLD_AUDIENCE_LEAVES_OUT = Object.freeze(['health', 'schedule', 'rewards']);
+export const HOUSEHOLD_AUDIENCE_SHOWS = Object.freeze({
+  // Die Gesichter unter „Wer heute dran ist" und am Koch einer Mahlzeit.
+  users: true,
+  // Das Programm: Termine, Aufgaben, die Mahlzeit, der Geburtstag von heute.
+  upcomingEvents: true,
+  birthdays: true,
+  urgentTasks: true,
+  tasksDoneToday: true,
+  todayMeals: true,
+  // Die Titel unter jeder Person (#1817).
+  wallTasks: true,
+  // Die Schlusszeile „n Artikel offen" - die Zahl, nicht die Listen.
+  shoppingOpenCount: true,
+  wastePickups: true,
+  pantryExpiring: Object.freeze(['todayItems', 'todayCount']),
+  housekeeping: Object.freeze(['present', 'presentSince', 'workerName']),
+});
+
+/** Traegt die Haushaltsfassung diesen Schluessel der Antwort (ganz oder in Feldern)? */
+export function householdAudienceShows(key) {
+  return Object.hasOwn(HOUSEHOLD_AUDIENCE_SHOWS, key);
+}
+
+/**
+ * Die Antwort der Uebersicht fuer eine geteilte Flaeche.
+ *
+ * GEBAUT WIRD VON DER LEEREN FASSUNG AUS, nicht von der vollen: jeder
+ * Schluessel beginnt leer, und nur was die Allowlist nennt, wird aus der
+ * Antwort uebernommen. Ein Schluessel, den weder die Liste noch die leere
+ * Fassung kennt, kommt deshalb gar nicht vor - es gibt keinen Zweig, durch den
+ * er durchfallen koennte. Die Form bleibt: was leer ist, steht in derselben
+ * Fassung da wie bei einer Modulsperre, kein Client stolpert ueber ein
+ * fehlendes Feld.
+ *
+ * @param {object} answer die fertige Antwort der Route
+ * @param {object} empty  die leere Fassung der GANZEN Antwort
+ * @returns {object}
+ */
+export function householdAudienceAnswer(answer, empty) {
+  const shown = { ...empty };
+  for (const [key, fields] of Object.entries(HOUSEHOLD_AUDIENCE_SHOWS)) {
+    if (!Object.hasOwn(answer, key)) continue;
+    const value = answer[key];
+    if (fields === true) { shown[key] = value; continue; }
+    // Eine Scheibe, deren Abfrage scheiterte (`null`), hat keine Felder.
+    if (!value || typeof value !== 'object') continue;
+    const slice = { ...empty[key] };
+    for (const field of fields) if (Object.hasOwn(value, field)) slice[field] = value[field];
+    shown[key] = slice;
+  }
+  return shown;
+}

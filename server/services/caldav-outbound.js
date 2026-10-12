@@ -301,11 +301,12 @@ export async function fetchObjectsByUrl(client, wanted) {
  *
  * `accountId`: bei CalDAV das Konto, mit dessen Client gearbeitet wird. Die
  * Arbeit wird unten je Konto neu gelesen; ohne es ginge für 'caldav' nichts
- * hinaus. `calendarUrls`: die Auswahl dieses Kontos - ein Löschauftrag für
- * einen Kalender ausserhalb davon bleibt liegen.
+ * hinaus. `isSelected`: ist dieser Kalender für das Konto EINGESCHALTET? Ein
+ * Löschauftrag für einen anderen bleibt liegen (#1884), siehe
+ * `processPendingDeletions`.
  * @returns {Promise<{deleted:number,updated:number}>}
  */
-export async function flushAccount(client, source, { deletions, updates, needsCalendars, accountId = null, calendarUrls = null }) {
+export async function flushAccount(client, source, { deletions, updates, needsCalendars, accountId = null, isSelected = null }) {
   const wanted = updates
     .filter((e) => e.external_object_url)
     .map((e) => ({
@@ -336,7 +337,7 @@ export async function flushAccount(client, source, { deletions, updates, needsCa
   // ownCalendarUrls bewusst nicht gesetzt: ohne vollen Abruf ist "der Server
   // führt das Objekt nicht mehr" nicht belegbar, und ein Tombstone ohne bekannte
   // URL darf hier nicht als erledigt gelten. Er bleibt für den Sync liegen.
-  const deleted = deletions.length ? await processPendingDeletions(client, source, objectIndex, null, { accountId, calendarUrls }) : 0;
+  const deleted = deletions.length ? await processPendingDeletions(client, source, objectIndex, null, { accountId, isSelected }) : 0;
   const updated = objectIndex.size ? await processPendingUpdates(client, source, objectIndex, calendarsByUrl, { accountId }) : 0;
   return { deleted, updated };
 }
@@ -372,6 +373,18 @@ export async function flushAccount(client, source, { deletions, updates, needsCa
  * Sofortversuch, der keinen Abruf hat, bleibt er ohne gezählten Versuch für den
  * Lauf liegen.
  *
+ * EIN AUFTRAG FÜR EINEN ABGEWÄHLTEN KALENDER WARTET (#1884, `isSelected`).
+ * Abschalten heisst nicht aufräumen: solange der Kalender abgewählt ist, geht
+ * dorthin kein DELETE, weder im Lauf noch im Sofortversuch. Der Auftrag bleibt
+ * stehen, zählt dabei keinen Versuch und läuft, sobald der Kalender wieder
+ * eingeschaltet ist. Vorher übersprang ihn nur der Lauf; der Sofortversuch
+ * schickte das DELETE trotzdem, und jede Absage dort zählte, bis der Auftrag
+ * nach fünf aufgegeben war und der gelöschte Termin beim Wieder-Einschalten
+ * zurückkam. Endgültig fällt ein wartender Auftrag, wenn es seinen Kalender
+ * nicht mehr gibt (`dropDeletionsOfMissingCalendars`) oder sein Konto gelöscht
+ * wird. Gefragt wird je Auftrag unmittelbar vor seiner Anfrage: davor liegen
+ * die awaits der Aufträge davor, und die Auswahl kann sich in jedem ändern.
+ *
  * @param {object} client       tsdav-Client
  * @param {string} source       'caldav' | 'apple'
  * @param {Map}    objectIndex  UID → { url, etag, data, calendarUrl } aus dem Inbound dieses Laufs
@@ -379,13 +392,15 @@ export async function flushAccount(client, source, { deletions, updates, needsCa
  * @param {object} [scope]
  * @param {number} [scope.accountId] CalDAV-Konto, dem der Client gehört
  * @param {boolean} [scope.complete] jeder eingeschaltete Kalender des Kontos wurde abgerufen
- * @param {Set}    [scope.calendarUrls] Sofortversuch: nur Aufträge für diese Kalender
- *   (die Auswahl des Kontos); ein Auftrag ohne Kalender zählt immer dazu
+ * @param {(calendarUrl: string) => boolean} [scope.isSelected] ist der Kalender
+ *   für dieses Konto jetzt eingeschaltet? Ein Auftrag ohne Kalender wird nicht
+ *   gefragt. Ohne die Funktion (Apple kennt keine Auswahl) gilt jeder als
+ *   eingeschaltet.
  * @param {{sent: number}} [scope.outcome] zählt mit, was der Server wirklich gelöscht hat
  * @returns {Promise<number>} erledigte Tombstones - auch die, die ohne Anfrage fielen
  */
 export async function processPendingDeletions(client, source, objectIndex, ownCalendarUrls = null, {
-  accountId = null, complete = true, calendarUrls = null, outcome = null,
+  accountId = null, complete = true, isSelected = null, outcome = null,
 } = {}) {
   const rows = outbound.pendingDeletions(source, { accountId });
   if (rows.length === 0) return 0;
@@ -398,7 +413,8 @@ export async function processPendingDeletions(client, source, objectIndex, ownCa
     // dieses Auftrags wurde in diesem Lauf nicht gelesen (abgewählt, Abruf
     // gescheitert), also weiss niemand, ob sein Objekt noch dort liegt.
     if (ownCalendarUrls && row.calendar_external_id && !ownCalendarUrls.has(row.calendar_external_id)) continue;
-    if (calendarUrls && row.calendar_external_id && !calendarUrls.has(row.calendar_external_id)) continue;
+    // Abgewählt (#1884): dort wird nichts gelöscht, und der Auftrag altert nicht.
+    if (isSelected && row.calendar_external_id && !isSelected(row.calendar_external_id)) continue;
 
     let known;
     let url;

@@ -93,6 +93,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for what concerns one person alone: a wall opened from a member's session no longer shows
   that person's medication doses, own shift, due reminders or the reward requests waiting for
   their approval - a coupled display never showed them, and now every wall reads the same.
+  And the device on the wall no longer receives what the wall never draws: pinned notes, the
+  budget, shared-expense balances, quick links, countdowns and the housekeeper's unpaid amount
+  used to travel along in the background and now stay off it, as does anything a future module
+  adds until it is given a place on the wall.
   The normal overview and "Today at a glance" stay personal and show all of it as before.
 
 ### Fixed
@@ -189,6 +193,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the installer after using them day to day: one word for a shift ("vakt"), a reminder
   ("påminnelse") and a tablet ("nettbrett") throughout, "container" and "image" for Docker
   instead of literal translations, and singular forms for a count of one instead of "(er)".
+- **Deleting an entry of a switched-off CalDAV calendar or reminder list no longer deletes it on
+  the server, and is no longer lost or stuck** (#1884). Switching a calendar or reminder list off
+  in Settings is meant to leave everything in it alone. A deletion made in Yuvomi for an entry of
+  such a calendar was sent to the server right away all the same; if the server refused it five
+  times, Yuvomi gave up, and the deleted event came back when you switched the calendar on
+  again. For tasks and shopping items the deletion always went through.
+  In other cases the deletion waited for good, also after the calendar itself had been deleted on
+  the server. Now the deletion waits while the calendar or list is switched off: nothing is
+  deleted there, and waiting does not use up its retries. It is carried out when you switch the
+  calendar or list on again, so the entry does not come back, and it is dropped when the
+  calendar or list no longer exists on the server or the account is removed. The sync log names
+  how many deletions are waiting. For iCloud, a deletion for a calendar that no longer exists is
+  dropped the same way.
 
 ## [2.76.0] - 2026-10-11
 

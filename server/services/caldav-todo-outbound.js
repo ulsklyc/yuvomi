@@ -299,6 +299,72 @@ function dropDeletion(id) {
   db.get().prepare('DELETE FROM caldav_todo_pending_deletions WHERE id = ?').run(id);
 }
 
+/**
+ * Liegt diese Objektadresse in einer Liste, die für das Konto ABGEWÄHLT ist
+ * (#1884)? Ein Löschauftrag nennt seine Liste nicht; sie ergibt sich aus der
+ * Adresse seines Objekts. Abgewählt heisst: die Auswahl des Kontos kennt die
+ * Liste, und keine ihrer Zeilen ist eingeschaltet. Eine Adresse ohne Liste in
+ * der Auswahl ist nicht abgewählt, sondern unbekannt - für sie gilt nichts
+ * von hier.
+ *
+ * Gelesen bei jedem Aufruf: gefragt wird unmittelbar vor einem DELETE, und
+ * davor liegen awaits.
+ */
+function inUnselectedList(accountId, objectUrl) {
+  const list = collectionUrlOf(objectUrl);
+  if (!list) return false;
+  const known = db.get().prepare(
+    'SELECT list_url, enabled FROM caldav_reminder_selection WHERE account_id = ?'
+  ).all(accountId).filter((sel) => sameCollection(sel.list_url, list));
+  return known.length > 0 && !known.some((sel) => sel.enabled === 1);
+}
+
+/**
+ * Die Löschaufträge eines Kontos, die auf eine abgewählte Liste warten
+ * (#1884), über beide Module.
+ */
+export function deletionsWaitingForSelection(accountId) {
+  return db.get().prepare(
+    'SELECT id, module, uid, object_url FROM caldav_todo_pending_deletions WHERE account_id = ? ORDER BY id'
+  ).all(accountId).filter((row) => row.object_url && inUnselectedList(accountId, row.object_url));
+}
+
+/**
+ * Räumt die Löschaufträge ab, deren Liste es auf dem Server nicht mehr gibt
+ * (#1884): mit der Liste ist auch das Objekt fort. Der Lauf schaltet eine
+ * verschwundene Liste ab, und ein Auftrag für eine abgewählte wartet - ohne
+ * das hier für immer.
+ *
+ * Nur für Aufträge, deren Liste die Auswahl des Kontos kennt; eine Adresse,
+ * die zu keiner bekannten Liste gehört, wird nicht beurteilt. `listedUrls` ist
+ * die Auflistung DIESES Laufs und vom Aufrufer als nicht leer befunden.
+ *
+ * @returns {number} abgeräumte Aufträge
+ */
+export function dropDeletionsOfMissingLists(accountId, listedUrls) {
+  const listed = [...(listedUrls || [])];
+  if (listed.length === 0) return 0;
+  const selection = db.get().prepare(
+    'SELECT list_url FROM caldav_reminder_selection WHERE account_id = ?'
+  ).all(accountId);
+  const gone = new Map();
+  for (const row of db.get().prepare(
+    'SELECT id, object_url FROM caldav_todo_pending_deletions WHERE account_id = ? ORDER BY id'
+  ).all(accountId)) {
+    const list = collectionUrlOf(row.object_url);
+    if (!list || !selection.some((sel) => sameCollection(sel.list_url, list))) continue;
+    if (listed.some((url) => sameCollection(url, list))) continue;
+    dropDeletion(row.id);
+    gone.set(list, (gone.get(list) || 0) + 1);
+  }
+  let dropped = 0;
+  for (const [list, count] of gone) {
+    dropped += count;
+    log.warn(`Reminder list ${list} no longer exists on the server: dropped ${count} pending deletion(s) for it, its entries are gone with it.`);
+  }
+  return dropped;
+}
+
 function failDeletion(id, err) {
   db.get().prepare(
     'UPDATE caldav_todo_pending_deletions SET attempts = attempts + 1, last_error = ? WHERE id = ?'
@@ -1156,6 +1222,15 @@ export async function processPendingShoppingCreations(client, accountId, targets
  *                               nicht mehr" belegt und der Tombstone erledigt;
  *                               im Sofortversuch (nur einzelne Objekte geholt)
  *                               bleibt er sonst liegen.
+ *
+ * EIN AUFTRAG FÜR EINE ABGEWÄHLTE LISTE WARTET (#1884). Abschalten heisst
+ * nicht aufräumen: solange die Liste abgewählt ist, geht dorthin kein DELETE,
+ * weder im Lauf noch im Sofortversuch. Der Auftrag bleibt stehen, zählt keinen
+ * Versuch und läuft, sobald die Liste wieder eingeschaltet ist; endgültig
+ * fällt er, wenn es die Liste nicht mehr gibt (`dropDeletionsOfMissingLists`)
+ * oder das Konto gelöscht wird. Führt der Abruf das Objekt inzwischen in einer
+ * EINGESCHALTETEN Liste (auf einem anderen Gerät verschoben), wird es dort
+ * gelöscht.
  * @returns {Promise<number>} erledigte Tombstones
  */
 export async function processPendingDeletions(client, accountId, module, objectIndex, complete = false) {
@@ -1165,7 +1240,13 @@ export async function processPendingDeletions(client, accountId, module, objectI
   let done = 0;
   for (const row of rows) {
     const known = objectIndex.get(row.uid);
-    const url   = row.object_url || known?.url || null;
+    let url     = row.object_url || known?.url || null;
+
+    // Je Auftrag gelesen, unmittelbar vor seiner Anfrage.
+    if (url && inUnselectedList(accountId, url)) {
+      if (!known?.url || inUnselectedList(accountId, known.url)) continue;
+      url = known.url;
+    }
 
     if (!url) {
       if (complete) {
@@ -1279,9 +1360,13 @@ function accountsWithPendingWork() {
     buckets.get(accountId).add(module);
   };
 
+  // Ein Auftrag, der auf eine abgewählte Liste wartet (#1884), ist keine
+  // Arbeit für den Sofortversuch: sonst baute jede Bearbeitung einen Client
+  // für ein Konto auf, an das nichts geht.
   for (const row of db.get().prepare(
-    'SELECT DISTINCT account_id, module FROM caldav_todo_pending_deletions'
+    'SELECT account_id, module, object_url FROM caldav_todo_pending_deletions'
   ).all()) {
+    if (row.object_url && inUnselectedList(row.account_id, row.object_url)) continue;
     add(row.account_id, row.module);
   }
   for (const [module, def] of Object.entries(MODULES)) {
@@ -1429,7 +1514,7 @@ async function runFlushOutbound({ createClient } = {}) {
       for (const module of modules) {
         const wanted = [
           ...pendingDeletions(accountId, module)
-            .filter((r) => r.object_url)
+            .filter((r) => r.object_url && !inUnselectedList(accountId, r.object_url))
             .map((r) => ({ uid: r.uid, url: r.object_url })),
           ...pendingUpdates(accountId, module)
             .filter((r) => r.external_object_url)

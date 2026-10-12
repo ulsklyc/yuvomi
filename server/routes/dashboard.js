@@ -14,7 +14,7 @@ import { taskScopeWhere, taskCategoryWhere, categoryBindings, normalizeCategoryF
 import { getCountdowns } from '../services/countdowns.js';
 import { listQuickLinksFor } from './quick-links.js';
 import {
-  HOUSEHOLD_AUDIENCE_LEAVES_OUT, asksHouseholdAudience, householdVisibleWhere, visibilityWhere,
+  asksHouseholdAudience, householdAudienceAnswer, householdAudienceShows, householdVisibleWhere, visibilityWhere,
 } from '../services/visibility.js';
 import { resolveBudgetMode } from '../services/budget-visibility.js';
 import { hiddenModulesFor } from '../permissions.js';
@@ -107,6 +107,21 @@ const DENIED_PAYLOAD = Object.freeze({
   // Vorrat „läuft bald ab": Chargennamen sind Haushaltsdaten des Moduls pantry.
   pantry: () => ({ pantryExpiring: emptyPantryExpiring() }),
 });
+
+/**
+ * Die leere Fassung der GANZEN Antwort: jedes Modul aus `DENIED_PAYLOAD`, dazu
+ * die Schluessel, die keinem Modul gehoeren. Von ihr aus baut die
+ * Haushaltsfassung (`householdAudienceAnswer`) - was die Wand nicht zeichnet,
+ * bleibt in genau dieser Form stehen.
+ *
+ * `shoppingTile` fehlt hier, und das ist seine leere Fassung: das Feld gibt es
+ * nur bei einer Listen-Auswahl, und ein Konto ohne den Einkauf bekommt es nie.
+ */
+function emptyAnswer(context) {
+  const empty = { users: [], countdowns: [], countdownTotal: 0, quicklinks: [] };
+  for (const build of Object.values(DENIED_PAYLOAD)) Object.assign(empty, build(context));
+  return empty;
+}
 
 /**
  * Die leere Fassung der Geburtstags-Kachel. Eigene Funktion, weil sie zwei
@@ -386,14 +401,16 @@ router.get('/', (req, res) => {
    * VERENGT nur - die Haushaltsfassung ist eine Teilmenge dessen, was dieselbe
    * Person ohnehin bekaeme -, er braucht deshalb kein eigenes Recht.
    *
-   * UND WAS NUR DEM BETRACHTER GILT, FEHLT GANZ. Dosen, die eigene Schicht und
-   * wartende Freigaben haben keine Stufe „alle": sie sind nach der anfragenden
-   * Person geschnitten. Ein gekoppeltes Display bekam sie nie (ihm fehlt das
-   * Modulrecht), eine Wand aus der Sitzung eines Mitglieds schon - „2 zu
-   * bestaetigen" und „Eisen 20:00" in der Kueche. Fuer die Haushaltsfassung
-   * zaehlen diese Module deshalb zu den ausgelassenen (`leftOut` unten,
-   * `HOUSEHOLD_AUDIENCE_LEAVES_OUT`) und kommen in derselben leeren Fassung
-   * wie bei einer Sperre.
+   * UND SIE TRAEGT NUR, WAS DIE WAND ZEICHNET. Welche Schluessel das sind,
+   * steht als Allowlist an einer Stelle (`HOUSEHOLD_AUDIENCE_SHOWS` in
+   * services/visibility.js); alles andere kommt in der leeren Fassung einer
+   * Modulsperre - Notizen, Budget, geteilte Ausgaben, Schnellzugriffe,
+   * Countdowns, der offene Lohn der Haushaltshilfe, und was nur dem Betrachter
+   * gilt (Dosen, die eigene Schicht, wartende Freigaben: „2 zu bestaetigen"
+   * und „Eisen 20:00" standen aus der Sitzung eines Mitglieds in der Kueche).
+   * Durchgesetzt wird es am Ende der Route (`householdAudienceAnswer`); ein
+   * Modul, von dem die Wand nichts zeichnet, wird vorher gar nicht gelesen
+   * (`leftOut` unten).
    *
    * Die normale Uebersicht derselben Sitzung fragt ohne ihn und bleibt
    * persoenlich. */
@@ -482,13 +499,22 @@ router.get('/', (req, res) => {
   // in EINEM Set, damit jede Abfrage unten dieselbe Frage stellt; die leere
   // Fassung ist dieselbe wie bei einer Sperre, die Form der Antwort bleibt.
   const leftOut = modulesLeftOut(d, denied);
-  // Die dritte Achse (#1817): was nur dem Betrachter gilt, laesst die
-  // Haushaltsfassung aus. Im SELBEN Set, damit jede Abfrage unten weiter eine
-  // einzige Frage stellt - und die leere Fassung dieselbe ist, die ein Display
-  // ohne das Modulrecht bekommt.
-  if (householdAudience) for (const key of HOUSEHOLD_AUDIENCE_LEAVES_OUT) leftOut.add(key);
+  // Die dritte Achse (#1817): ein Modul, von dem die Haushaltsfassung keinen
+  // Schluessel traegt, wird gar nicht erst gelesen. Im SELBEN Set, damit jede
+  // Abfrage unten weiter eine einzige Frage stellt. Abgeleitet aus der
+  // Allowlist und nicht als zweite Liste gefuehrt - die Regel selbst setzt das
+  // Ende der Route durch (`householdAudienceAnswer`), das hier spart nur die
+  // Abfragen, deren Ergebnis dort ohnehin leer herauskaeme.
+  if (householdAudience) {
+    for (const [key, build] of Object.entries(DENIED_PAYLOAD)) {
+      if (!Object.keys(build({ month: currentMonth })).some(householdAudienceShows)) leftOut.add(key);
+    }
+  }
   for (const key of leftOut) Object.assign(result, DENIED_PAYLOAD[key]?.({ month: currentMonth }));
   const allows = (moduleKey) => !leftOut.has(moduleKey);
+  // Dasselbe fuer die Schluessel, die keinem Modul gehoeren (Countdowns,
+  // Schnellzugriffe, die Auswahl der Einkaufs-Kachel).
+  const wants = (key) => !householdAudience || householdAudienceShows(key);
   // GEBURTSTAGE HABEN ZWEI WEGE. Als RECHT gehoeren sie zum Kalender (siehe
   // DENIED_PAYLOAD), als SCHALTER sind sie ein eigenes Modul - dieselbe
   // Unterscheidung wie bei den Erinnerungen (reminder-origins.js). Ein
@@ -797,7 +823,7 @@ router.get('/', (req, res) => {
   // Liste, die der Deckel abschneidet, ist so als "+1" da und fehlt nie stumm.
   //
   // Scheitert die Abfrage, fehlt das Feld, und die Kachel zeigt alle Listen.
-  if (shoppingSelection) try {
+  if (shoppingSelection && wants('shoppingTile')) try {
     const lists = d.prepare(`
       SELECT sl.id, sl.name,
         (SELECT COUNT(*) FROM shopping_items si WHERE si.list_id = sl.id AND si.is_checked = 0) AS open_count,
@@ -925,7 +951,7 @@ router.get('/', (req, res) => {
   // die der haushaltweite Modulschalter im Review zu PR #793 gestellt hat. Die
   // Gesamtzahl entsteht in `getCountdowns` hinter demselben Filter, damit
   // Schnitt und Zahl dieselbe Menge meinen.
-  try {
+  if (wants('countdowns')) try {
     const countdowns = getCountdowns(d, {
       userId,
       todayKey: todayLocalKey,
@@ -950,7 +976,7 @@ router.get('/', (req, res) => {
   // geteilt gegen privat, und die setzt `listQuickLinksFor` ueber die anfragende
   // Person durch - eine fremde private Kachel liegt also auch dann nicht auf der
   // Leitung, wenn der Browser sie nie zeichnen wuerde.
-  try {
+  if (wants('quicklinks')) try {
     result.quicklinks = listQuickLinksFor(userId, req.authRole === 'admin');
   } catch (err) {
     log.error('quick links error:', err.message);
@@ -1355,7 +1381,10 @@ router.get('/', (req, res) => {
     result.tasksDoneToday = 0;
   }
 
-  res.json(result);
+  // DIE HAUSHALTSFASSUNG (#1817): von der leeren Fassung aus, nur was die Wand
+  // zeichnet. Hier, hinter jeder Abfrage - ein Block, den jemand oben ergaenzt,
+  // erreicht die Wand erst ueber die Allowlist.
+  res.json(householdAudience ? householdAudienceAnswer(result, emptyAnswer({ month: currentMonth })) : result);
   } catch (err) {
     log.error('Critical error:', err.message);
     res.status(500).json({ error: 'Dashboard could not be loaded.', code: 500 });

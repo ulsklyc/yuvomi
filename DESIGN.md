@@ -3701,7 +3701,10 @@ Beitraege ohne Sichtbarkeitsstufe, die nur dem Betrachter gelten: die eigene Dos
 Schicht, die eigene Erinnerung, wartende Freigaben. Sie fehlen an jeder Wand, wie auf einem
 gekoppelten Display - ohne Ersatzzeile und ohne Luecke: das Programm rueckt zusammen, und ein
 Tag ohne Zeile sagt "Heute frei". Durchgesetzt am Leser (`audience=household`), nicht im
-Browser. Uebersicht und Heute-Blatt bleiben persoenlich.
+Browser. Uebersicht und Heute-Blatt bleiben persoenlich. Die Antwort fuer die Wand ist eine
+Allowlist: sie traegt nur die Quellen, die die Flaeche zeichnet - Notizen, Geld (Budget,
+geteilte Ausgaben, offener Lohn), Schnellzugriffe und Countdowns erreichen das Geraet nicht,
+und ein neues Modul steht erst an der Wand, wenn es dort einen Platz bekommen hat.
 
 **Die Shell tritt ab.** Sidebar und Tab-Leiste sind Arm-Laengen-Moebel; auf zwei Metern sind
 sie siebzehn unleserliche Ziele. Auch die Installations-Einladung verschwindet - auf einer
