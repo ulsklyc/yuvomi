@@ -168,7 +168,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the copy from the server instead of importing it, and the entry ends up only where you last
   put it. The copy is removed with the next sync run, not at the moment you delete the entry,
   and only after Yuvomi has read that the entry at that address is really its own. An upload
-  that the server finishes late is covered for 24 hours after the last attempt.
+  that the server finishes late is covered for 24 hours after the last attempt. A copy that is
+  still waiting to be removed does not keep an event or task in Yuvomi (#1905): if the entry has
+  meanwhile gone to another calendar or list of the same account and is deleted there in another
+  app, it disappears from Yuvomi with the next sync, also while the server refuses to remove the
+  old copy. A shopping item in that situation stays and returns to the list of the copy that is
+  left, as before.
 - **A CalDAV event belongs to the account that brought it** (#1860). With two or more CalDAV
   accounts, an event was identified by its UID alone. When a second account served an event with
   the same UID, it took over the entry of the first: title, calendar and address then came from

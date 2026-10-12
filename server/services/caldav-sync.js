@@ -1272,8 +1272,11 @@ async function runSync({ createClient } = {}) {
 
           for (const ev of parsed) {
             try {
+              // Für den Leer-Guard des Prune zählt jedes gelieferte Objekt.
+              // Ob die UID auch als "der Server führt diesen Termin noch"
+              // zählt (`accountUids`), entscheidet sich weiter unten: der
+              // Rest eines nie gebuchten Uploads tut es nicht (#1905).
               calendarUids.add(ev.uid);
-              accountUids.add(ev.uid);
               // Objekt merken: ausgehende Löschungen brauchen die URL, Änderungen
               // zusätzlich den Originalinhalt zum Patchen (#593).
               if (obj.url) {
@@ -1294,7 +1297,10 @@ async function runSync({ createClient } = {}) {
               // anlegen, sonst kehrt der Termin bei jedem Sync zurück (#593).
               // Ein Auftrag aus einem abgelehnten Umzug verdeckt nur das Objekt
               // in dem Stand, für den er vorgemerkt wurde (#1883).
-              if (awaitsDeletion(ev.uid, selCal.calendar_url, obj.url ?? null, obj.etag ?? null)) continue;
+              if (awaitsDeletion(ev.uid, selCal.calendar_url, obj.url ?? null, obj.etag ?? null)) {
+                accountUids.add(ev.uid);
+                continue;
+              }
 
               // Der eigene Upload, dessen Antwort verloren ging. Übernommen
               // wird er nur für einen Termin, der auf den Upload in GENAU
@@ -1317,8 +1323,17 @@ async function runSync({ createClient } = {}) {
               // wird es nach dem Abruf (`releaseLeftoverUploads`). Frisch
               // gefragt: der Termin kann gefallen sein, während dieser Lauf
               // noch liest.
+              //
+              // Ein übersprungener Rest zählt NICHT als gesehen (#1905): er
+              // gehört zu keiner Zeile. Ist seine Zeile inzwischen in einem
+              // anderen Kalender des Kontos Spiegel derselben UID und wurde
+              // sie dort auf dem Server gelöscht, hielte der Rest sie sonst
+              // fest - einen Lauf lang, und so lange der Server sein
+              // Entfernen ablehnt, bis zum Ende der Frist der Notiz. Liegt
+              // das Objekt am neuen Platz noch, nennt dessen Abruf die UID.
               if (outbound.isUnbookedOwnUpload({ source: 'caldav', uid: ev.uid, calendarUrl: selCal.calendar_url })
                   && !adoptOwn()) continue;
+              accountUids.add(ev.uid);
 
               let existing = rowForUid(ev.uid, obj.url ?? null, account.id);
               // Die Zeile gehört einem anderen Konto, oder sie hat keines und

@@ -583,10 +583,6 @@ async function runSync({ createClient: makeClient } = {}) {
           const todos = parseVTODO(obj.data || '');
           for (const todo of todos) {
             try {
-              // Gesehen ist der Eintrag auch dann, wenn er hier übersprungen
-              // wird - sonst würde der Prune ihn gleich wieder entfernen.
-              seenByModule[module].push(todo.uid);
-
               // Für dieses Objekt steht die Notiz eines Uploads, der nie
               // gebucht wurde (#1882) - gleich über welches Konto er lief.
               // Dann ist es kein Eintrag wie jeder andere: wartet seine Zeile
@@ -607,7 +603,28 @@ async function runSync({ createClient: makeClient } = {}) {
               const adoptOwn = () => !!obj.url && todoOutbound.adoptOwnUpload(module, todo.uid, account.id, obj.url, {
                 listUrl: sel.list_url, targetListId: sel.target_list_id,
               });
-              if (unbooked && !adoptOwn()) continue;
+              //
+              // Ein übersprungener Rest zählt NICHT als gesehen (#1905): er
+              // gehört zu keiner Zeile. Ist seine Zeile inzwischen in einer
+              // anderen Liste des Kontos Spiegel derselben UID und wurde sie
+              // dort auf dem Server gelöscht, hielte der Rest sie sonst fest -
+              // einen Lauf lang, und so lange der Server sein Entfernen
+              // ablehnt, bis zum Ende der Frist der Notiz.
+              // Die eine Ausnahme ist der Einkaufsartikel, der anderswo
+              // Spiegel derselben UID ist (#1700): fehlt seine Kopie dort,
+              // ist dieses Objekt das letzte, und die Zeile geht nach dem
+              // Prune zu ihm zurück (`confirmCarriedCopy`).
+              if (unbooked && !adoptOwn()) {
+                if (todoOutbound.leftoverHoldsCarriedItem(todo.uid, sel.list_url)) {
+                  seenByModule.shopping.push(todo.uid);
+                }
+                continue;
+              }
+
+              // Gesehen ist der Eintrag auch dann, wenn er weiter unten
+              // übersprungen wird (lokal gelöscht, lokal bearbeitet) - sonst
+              // würde der Prune ihn gleich wieder entfernen.
+              seenByModule[module].push(todo.uid);
 
               if (obj.url) {
                 objectsByModule[module].set(todo.uid, {
