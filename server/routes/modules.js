@@ -34,29 +34,52 @@ const router = express.Router();
 const log = createLogger('Modules');
 
 // Installing a module downloads or unpacks up to 20 MB and writes it to disk.
-// The global API limiter (300/min) is sized for reading lists, not for that;
-// ten installs in ten minutes is more than any admin needs by hand and keeps a
-// stolen session or a script from turning the server into a download loop.
-// Keyed per user (the route sits behind requireAuth), IP only as a fallback.
-const installLimiter = rateLimit({
-  windowMs: 10 * 60_000,
-  max: 10,
+// The global API limiter (300/min) is sized for reading lists, not for that,
+// so the two install routes carry two budgets of their own. Both are keyed per
+// user (the routes sit behind requireAuth), IP only as a fallback, and both
+// answer with the same reason: to the admin it is one sentence, "you installed
+// a lot, wait a few minutes". GitHub's `rate_limited` is a different one
+// ("GitHub refuses this server for a while"), and the UI says so.
+const INSTALL_WINDOW_MS = 10 * 60_000;
+const installLimiterKey = (req) => (req.authUserId ? `user:${req.authUserId}` : ipKeyGenerator(req.ip || ''));
+const installLimiterOptions = {
+  windowMs: INSTALL_WINDOW_MS,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => (req.authUserId ? `user:${req.authUserId}` : ipKeyGenerator(req.ip || '')),
-  // The two answers that are a question back to the admin do not count: 409
-  // (already installed - replace?) and 422 (several modules - which one?) are
-  // half of one install, and an admin answering them should not burn the
-  // budget. Everything else counts, failures included: a typo'd URL or a
-  // broken ZIP still cost a download or an unpack. In express-rate-limit v8,
-  // skipFailedRequests takes the hit back for every request this function
-  // calls unsuccessful (and for one the client aborted before the answer).
+  keyGenerator: installLimiterKey,
+  message: { error: 'Too many module installs. Please wait a few minutes.', code: 429, reason: 'install_rate_limited' },
+};
+
+// The install budget: ten installs in ten minutes is more than any admin needs
+// by hand. The two answers that are a question back to the admin do not count:
+// 409 (already installed - replace?) and 422 (several modules - which one?) are
+// half of one install, and an admin answering them should not burn the budget.
+// Everything else counts, failures included: a typo'd URL or a broken ZIP still
+// cost a download or an unpack. In express-rate-limit v8, skipFailedRequests
+// takes the hit back for every request this function calls unsuccessful (and
+// for one the client aborted before the answer).
+const installLimiter = rateLimit({
+  ...installLimiterOptions,
+  max: 10,
   skipFailedRequests: true,
   requestWasSuccessful: (_req, res) => ![409, 422].includes(res.statusCode),
-  // Its own reason: GitHub's `rate_limited` means "GitHub refuses this server
-  // for a while", this one means "you installed a lot" - the UI says different
-  // things for the two.
-  message: { error: 'Too many module installs. Please wait a few minutes.', code: 429, reason: 'install_rate_limited' },
+});
+
+// The attempt budget: what keeps a stolen session or a script from turning the
+// server into a download loop. The exemption above cannot do that on its own,
+// because a 409 or a 422 is known only AFTER the work: `exists`,
+// `not_web_installed` and `not_a_module` come after the download, the unpack
+// and the staged copy on disk, `multiple` after the download and the unpack,
+// and a `busy` ZIP upload has still been read into memory. A loop that asks
+// "replace?" forever would never be counted. So this one counts every request
+// that gets as far as the work, whatever it answers. Thirty is the install
+// budget times the three requests one install can honestly take (which
+// module? - replace? - install), so installing by hand reaches the install
+// budget first. It stands before installLimiter in both routes: a request it
+// refuses is not an install and must not be counted as one.
+const installAttemptLimiter = rateLimit({
+  ...installLimiterOptions,
+  max: 30,
 });
 
 /**
@@ -173,7 +196,7 @@ router.get('/install/info', requireAdmin, async (_req, res) => {
   }
 });
 
-router.post('/install/zip', requireAdmin, requireWebInstall, requireBrowserSession, installLimiter, parseZipBody, async (req, res) => {
+router.post('/install/zip', requireAdmin, requireWebInstall, requireBrowserSession, installAttemptLimiter, installLimiter, parseZipBody, async (req, res) => {
   try {
     if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
       throw new InstallError('not_zip', 'Send the module ZIP file as the request body with Content-Type application/zip.');
@@ -189,7 +212,7 @@ router.post('/install/zip', requireAdmin, requireWebInstall, requireBrowserSessi
   }
 });
 
-router.post('/install/github', requireAdmin, requireWebInstall, requireBrowserSession, installLimiter, async (req, res) => {
+router.post('/install/github', requireAdmin, requireWebInstall, requireBrowserSession, installAttemptLimiter, installLimiter, async (req, res) => {
   try {
     const body = req.body && typeof req.body === 'object' ? req.body : {};
     if (typeof body.url !== 'string' || !body.url.trim()) {

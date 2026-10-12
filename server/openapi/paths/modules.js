@@ -9,7 +9,7 @@ const SWITCH_NOTE = 'Exists only where the operator set `MODULES_ALLOW_WEB_INSTA
 
 const SESSION_NOTE = 'Only from a signed-in browser session: an API token (and therefore the MCP bridge) gets 403 `module_session_required`, and the operation is not offered as an MCP tool.';
 
-const INSTALL_NOTE = `${SWITCH_NOTE} A module is same-origin JavaScript that runs with the session of every member who opens it; installing one is equivalent to copying its folder onto the server. Every install and every replace lands DISABLED: the install record in the module folder (\`install.approved: false\`) keeps it off, whatever the database says, until an admin enables it with PATCH /api/v1/modules/{id} from a browser session. A replace resets that approval even when it comes from the same repository. Only the module folder is copied, files other than web assets are skipped and listed in \`skipped\`, and nothing from the archive runs on the server. Limited to 10 install requests per 10 minutes per user; the 409 \`exists\` and 422 \`multiple\` answers that ask back do not count. Errors carry a stable \`reason\`. ${SESSION_NOTE}`;
+const INSTALL_NOTE = `${SWITCH_NOTE} A module is same-origin JavaScript that runs with the session of every member who opens it; installing one is equivalent to copying its folder onto the server. Every install and every replace lands DISABLED: the install record in the module folder (\`install.approved: false\`) keeps it off, whatever the database says, until an admin enables it with PATCH /api/v1/modules/{id} from a browser session. A replace resets that approval even when it comes from the same repository. Only the module folder is copied, files other than web assets are skipped and listed in \`skipped\`, and nothing from the archive runs on the server. Limited to 10 install requests per 10 minutes per user; the 409 \`exists\` and 422 \`multiple\` answers that ask back do not count there, but every request counts against a second limit of 30 attempts per 10 minutes, because those answers come after the download and the unpack. Errors carry a stable \`reason\`. ${SESSION_NOTE}`;
 
 // The MCP bridge (server/mcp/tools.js) leaves operations with this flag out of
 // list_api_operations and refuses them in call_api_operation. The route would
@@ -42,7 +42,7 @@ function installResponses(extra = {}) {
     409: { description: 'A module with this id is installed (`exists`, with `existing: { id, name, version, install }` and `incoming: { id, name, version }`; `existing.install` is always the install record, because only a recorded module reaches this answer; retry with overwrite, which leaves the module disabled until it is approved again), the folder `modules/<id>` carries no install record, so it was copied to the server by hand and is not replaced from here (`not_web_installed`, without `existing`, with or without overwrite; remove the folder on the server first, then install again), `modules/<id>` is a symbolic link or a file (`not_a_module`, cannot be replaced from here), or another install/delete is running (`busy`).', content: errorContent() },
     413: { description: `Archive larger than ${MAX_ZIP_MB} MB (\`too_large\`), too many entries (\`too_many_entries\`) or suspicious compression (\`bomb\`).`, content: errorContent() },
     422: { description: 'The archive holds several modules (`multiple`, with `candidates: [{ path, id, name, version }]`), or `path` names a folder that holds several; retry with `path` set to one candidate (`""` is the archive root).', content: errorContent() },
-    429: { description: 'Install rate limit reached (`install_rate_limited`)', content: errorContent() },
+    429: { description: 'Install rate limit reached (`install_rate_limited`): 10 installs or 30 attempts in 10 minutes', content: errorContent() },
     503: { description: 'The modules folder on the server is not writable (`not_writable`).', content: errorContent() },
     500: { $ref: '#/components/responses/InternalServerError' },
     ...extra,
@@ -117,7 +117,7 @@ export function modulesPaths() {
         requestBody: jsonBody('#/components/schemas/ModuleInstallGithubRequest'),
         responses: installResponses({
           404: { description: 'Repository (`repo_not_found`) or ref (`ref_not_found`) not found', content: errorContent() },
-          429: { description: 'Install rate limit reached (`install_rate_limited`), or the GitHub API rate limit is used up (`rate_limited`, with `resetAt`)', content: errorContent() },
+          429: { description: 'Install rate limit reached (`install_rate_limited`: 10 installs or 30 attempts in 10 minutes), or the GitHub API rate limit is used up (`rate_limited`, with `resetAt`)', content: errorContent() },
           502: { description: 'GitHub could not be reached or answered unexpectedly (`github_failed`), including a redirect to a non-GitHub host', content: errorContent() },
         }),
       })),

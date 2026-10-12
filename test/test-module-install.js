@@ -27,7 +27,8 @@
  *            multiple, install nur in der Admin-Liste, 415 bei fremdem
  *            Content-Encoding, nicht schreibbarer Name → unsafe_path,
  *            Persistenz-Erkennung (isPersistent) ueber injizierte /proc-Dateien
- *          - Runde 2: Ref-Probe nur per SHA, 409/422 zaehlen nicht zum Limit,
+ *          - Runde 2: Ref-Probe nur per SHA, 409/422 zaehlen nicht zum Limit
+ *            (wohl aber zum Versuchs-Limit, 30 je 10 Minuten),
  *            releases/latest ohne brauchbaren Tag → Fehler, Tiefe unter dem
  *            Oberordner, verschachtelte Module werden nicht mitkopiert
  *          - Runde 3 (DECISIONS.md 12): der Schalter MODULES_ALLOW_WEB_INSTALL
@@ -152,8 +153,8 @@ const adminListed = async (id) => (await modulesSvc.listModules({ admin: true })
 
 // ── App mit injizierter Auth ────────────────────────────────────────────────
 // Jede Admin-Anfrage bekommt eine eigene Nutzer-Id: das Install-Limit zaehlt
-// je Nutzer (10 je 10 Minuten), und diese Suite installiert weit oefter. Die
-// Limit-Probe selbst nimmt eine feste Id.
+// je Nutzer (10 je 10 Minuten, dazu 30 Versuche), und diese Suite installiert
+// weit oefter. Die Limit-Proben selbst nehmen eine feste Id.
 let nextAdminId = 100;
 const admin = () => ({ id: nextAdminId++, role: 'admin' });
 const MEM = { id: 2, role: 'member' };
@@ -1439,6 +1440,71 @@ test('Install-Limit: 409 exists und 422 multiple zaehlen nicht, Fehlversuche sch
   const limited = await call('POST', '/install/zip', { actor: same, raw: again });
   assert.equal(limited.status, 429, 'Fehlversuche (400) zaehlen weiter');
   assert.equal(limited.body.reason, 'install_rate_limited');
+});
+
+// 409 exists und 422 multiple entstehen erst NACH Download und Entpacken (409
+// sogar nach dem Schreiben des Staging-Ordners). Vom Install-Budget bleiben sie
+// ausgenommen, aber ein zweites Budget zaehlt jeden Versuch, der diese Arbeit
+// ausloesen kann - sonst faehrt eine Admin-Sitzung die Download-Schleife, die
+// der Limiter verhindern soll, nur eben mit einer Rueckfrage als Antwort.
+test('Versuchs-Limit: eine Schleife aus 409/422-Rueckfragen endet nach 30 Versuchen mit 429, ohne weiteren Download', async () => {
+  const same = { id: 6161, role: 'admin' };
+  const single = makeZip(moduleFiles('attempt-mod'));
+  const multi = makeZip({ ...moduleFiles('att-a', { prefix: 'r/a/' }), ...moduleFiles('att-b', { prefix: 'r/b/' }) });
+  let downloads = 0;
+  github.__setGithubRequestForTests(async (url) => {
+    if (url.endsWith('/zipball/main')) { downloads += 1; return fakeResponse(200, { body: single }); }
+    if (url.endsWith('/zipball/multi')) { downloads += 1; return fakeResponse(200, { body: multi }); }
+    return fakeResponse(404);
+  });
+  const ask = (ref, a = same) => call('POST', '/install/github', { actor: a, json: { url: 'o/attempt', ref } });
+  try {
+    assert.equal((await ask('main')).status, 201);
+    const many = await ask('multi');
+    assert.equal(many.status, 422);
+    assert.equal(many.body.reason, 'multiple');
+    for (let i = 0; i < 28; i += 1) {
+      const r = await ask('main');
+      assert.equal(r.status, 409, `Versuch ${i + 3}`);
+      assert.equal(r.body.reason, 'exists');
+    }
+    assert.equal(downloads, 30, 'bis hierher hat jeder Versuch heruntergeladen');
+
+    const limited = await ask('main');
+    assert.equal(limited.status, 429, 'der 31. Versuch wird abgewiesen');
+    assert.equal(limited.body.code, 429);
+    assert.equal(limited.body.reason, 'install_rate_limited');
+    assert.equal((await ask('multi')).status, 429);
+    assert.equal(downloads, 30, 'abgewiesen VOR dem Download');
+
+    // Dasselbe Budget fuer beide Routen, und vor dem Entpacken: das ZIP wird
+    // nicht mehr installiert.
+    const zip = await call('POST', '/install/zip', { actor: same, raw: makeZip(moduleFiles('attempt-zip-mod')) });
+    assert.equal(zip.status, 429);
+    assert.ok(!fs.existsSync(path.join(MODULES_DIR, 'attempt-zip-mod')));
+
+    // Je Nutzer: ein anderer Admin bekommt weiter seine Rueckfrage.
+    assert.equal((await ask('main', admin())).status, 409);
+    assert.equal(downloads, 31);
+  } finally {
+    github.__setGithubRequestForTests(null);
+  }
+});
+
+test('Versuchs-Limit laesst die Absicht stehen: Rueckfrage + Ersetzen kosten EINE Installation', async () => {
+  const same = { id: 6262, role: 'admin' };
+  await postZip(makeZip(moduleFiles('ask-once-mod', { version: '1.0.0' })));
+  const next = makeZip(moduleFiles('ask-once-mod', { version: '2.0.0' }));
+  assert.equal((await call('POST', '/install/zip', { actor: same, raw: next })).status, 409);
+  const replaced = await call('POST', '/install/zip?overwrite=1', { actor: same, raw: next });
+  assert.equal(replaced.status, 201);
+  assert.equal(replaced.body.replaced, true);
+  // Gezaehlt: eine Installation. Neun Fehlversuche fuellen das Install-Budget,
+  // der naechste Versuch ist der elfte gezaehlte.
+  for (let i = 0; i < 9; i += 1) {
+    assert.equal((await call('POST', '/install/zip', { actor: same, raw: 'x', contentType: 'text/plain' })).status, 400, `Fehlversuch ${i + 1}`);
+  }
+  assert.equal((await call('POST', '/install/zip', { actor: same, raw: 'x', contentType: 'text/plain' })).status, 429);
 });
 
 // ── Review Runde 3 ──────────────────────────────────────────────────────────
