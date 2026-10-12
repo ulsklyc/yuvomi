@@ -11,6 +11,7 @@ import { attachOverlay } from '/utils/overlay-history.js';
 import { openDetailView, visibilityRow, assignedRow } from '/components/detail-view.js';
 import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete, vibrate, durationToken } from '/utils/ux.js';
+import { errorSentence } from '/utils/friendly-error.js';
 import { t, getLocale, formatDate as formatPreferredDate, formatDayMonth, formatMonthYear, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, fmtLocation, REQUIRED_MARK } from '/utils/html.js';
 import { periodStepperHtml, syncPeriodReset, swapPeriod } from '/utils/period-stepper.js';
@@ -5393,7 +5394,7 @@ async function openLocalCalendarsModal() {
       await refreshLocalCalendarsPanel(panel);
       refocusAfterRender();
     } catch (err) {
-      window.yuvomi?.showToast(err.data?.error ?? t('calendar.saveError'), 'danger');
+      window.yuvomi?.showToast(errorSentence(err, 'calendar.saveError'), 'danger');
     }
   });
 
@@ -5454,7 +5455,7 @@ async function openLocalCalendarsModal() {
         refocusAfterRender();
       }
     } catch (err) {
-      window.yuvomi?.showToast(err.data?.error ?? t('calendar.saveError'), 'danger');
+      window.yuvomi?.showToast(errorSentence(err, 'calendar.saveError'), 'danger');
     }
   });
 }

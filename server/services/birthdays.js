@@ -1,6 +1,6 @@
 import { formatDateKey, resolveHouseholdFormats, translate } from '../utils/i18n.js';
 import { householdTimeZone, localToUTC, todayKey } from '../utils/timezone.js';
-import { OUTBOUND_SOURCES, markEventOutbound, queueEventDeletion } from './calendar-outbound.js';
+import { OUTBOUND_SOURCES, markInlineOutbound, queueEventDeletion } from './calendar-outbound.js';
 import { householdDisabledModules } from './household-modules.js';
 
 const BIRTHDAY_COLOR = '#E11D48';
@@ -251,17 +251,13 @@ function syncBirthdayCalendarEvent(database, birthday, kind = 'birthday') {
           linkedEventId,
         );
 
-        // Marker inline statt über markEventOutbound: das schreibt über db.get()
-        // und würde die übergebene Connection umgehen (dieselbe Überlegung wie
-        // in retitleBirthdayEvents). Verglichen wird genau das, was oben
-        // geschrieben wurde - alles andere ist Provider-Normalisierung und darf
-        // keinen Push auslösen.
+        // Vorgemerkt wird über markInlineOutbound (ein Leser mit housekeeping.js,
+        // #1860): es schreibt über die übergebene Verbindung, lehnt keinen
+        // schreibgeschützten Provider ab und lässt einen CalDAV-Termin ohne
+        // Konto in Ruhe. Verglichen wird genau das, was oben geschrieben wurde -
+        // alles andere ist Provider-Normalisierung und darf keinen Push auslösen.
         const authoredChanged = AUTHORED_FIELDS.some((f) => existing[f] !== payload[f]);
-        if (authoredChanged) {
-          database.prepare(
-            'UPDATE calendar_events SET outbound_dirty = 1, outbound_attempts = 0 WHERE id = ?'
-          ).run(linkedEventId);
-        }
+        if (authoredChanged) markInlineOutbound(database, existing);
       } else {
         database.prepare(`
           UPDATE calendar_events
@@ -407,23 +403,18 @@ function retitleBirthdayEvents(database) {
   const { locale, dateFormat } = resolveHouseholdFormats(database);
   const rows = database.prepare(`
     SELECT b.name, b.birth_date, 'birthday' AS event_kind,
-           e.id, e.title, e.description, e.external_source, e.external_calendar_id
+           e.id, e.title, e.description, e.external_source, e.external_calendar_id, e.caldav_account_id
     FROM birthdays b
     JOIN calendar_events e ON e.id = b.calendar_event_id
     UNION ALL
     SELECT b.name, NULL AS birth_date, 'name_day' AS event_kind,
-           e.id, e.title, e.description, e.external_source, e.external_calendar_id
+           e.id, e.title, e.description, e.external_source, e.external_calendar_id, e.caldav_account_id
     FROM birthdays b
     JOIN calendar_events e ON e.id = b.name_day_calendar_event_id
   `).all();
 
   const update = database.prepare(
     'UPDATE calendar_events SET title = ?, description = ? WHERE id = ?'
-  );
-  // Kein Reset von outbound_dirty auf 0: ein anderer Grund für einen
-  // ausstehenden Push darf durch diesen Lauf nicht verlorengehen.
-  const markDirty = database.prepare(
-    'UPDATE calendar_events SET outbound_dirty = 1, outbound_attempts = 0 WHERE id = ?'
   );
 
   let changed = 0;
@@ -439,9 +430,10 @@ function retitleBirthdayEvents(database) {
     update.run(title, description, row.id);
     changed++;
 
-    if (OUTBOUND_SOURCES.includes(row.external_source) && row.external_calendar_id) {
-      markDirty.run(row.id);
-    }
+    // Vormerken über den geteilten Marker (#1860): er lässt einen CalDAV-Termin
+    // ohne Konto in Ruhe, der sonst nie gesendet würde. Kein Reset auf 0 - ein
+    // anderer Grund für einen ausstehenden Push bleibt bestehen.
+    markInlineOutbound(database, row);
   }
   return changed;
 }

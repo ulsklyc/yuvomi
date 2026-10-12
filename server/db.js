@@ -10465,6 +10465,312 @@ const MIGRATIONS = [
   },
   {
     version: 238,
+    description: 'CalDAV: a mirrored event and its pending deletion carry their account (#1860)',
+    // EIN GESPIEGELTER TERMIN GEHOERT ZU EINEM KONTO, UND DAS STEHT JETZT IN
+    // DER ZEILE (#1860). Bis hierher war die UID die ganze Identitaet, ueber
+    // alle CalDAV-Konten hinweg; welches Konto einen Termin sendet, ergab sich
+    // erst zur Laufzeit aus Kalender-URL und Objektadresse.
+    //
+    // `caldav_account_id` IST DIE TATSACHE, `target_caldav_account_id` DER
+    // WUNSCH. Das Ziel schreibt die Route aus dem Formular; das Konto schreibt
+    // nur der Sync, und nur an Zeilen mit external_source = 'caldav'. Apple,
+    // Google, ICS und lokale Zeilen bleiben NULL.
+    //
+    // EINE ZEILE JE UID, DAS ERSTE KONTO BESITZT SIE. Deshalb KEIN
+    // Unique-Index auf (Konto, UID): bringt ein zweites Konto dieselbe UID,
+    // legt es keine zweite Zeile an. Der Index hier beschleunigt nur.
+    //
+    // ON DELETE SET NULL an den Terminen: wer ein Konto loescht, behaelt seine
+    // Termine, und das naechste Konto, das die UID liefert, uebernimmt sie.
+    // ON DELETE CASCADE an den Loeschauftraegen: ohne Konto gibt es keinen
+    // Server mehr, an den sie gehen koennten.
+    //
+    // ADD COLUMN, KEIN REBUILD: Trigger und Indizes von calendar_events
+    // bleiben, wie sie sind. Ein kuenftiger Rebuild einer der beiden Tabellen
+    // muss die Spalte samt Fremdschluessel mitnehmen (Guard in test-db.js).
+    //
+    // BESTAND, nur Zeilen mit external_source = 'caldav':
+    //   - kein Konto: nichts zuzuordnen;
+    //   - genau ein Konto: alles gehoert ihm;
+    //   - mehrere: eine Zeile gehoert dem Konto, in dessen Auswahl der
+    //     Schluessel ihres Kalenders (external_calendars.external_id) steht -
+    //     aber nur, wenn er in genau EINER Auswahl steht. Beide Seiten hat
+    //     derselbe Code geschrieben, verglichen wird zeichengleich.
+    //   Alles andere bleibt NULL: eine solche Zeile wird nicht gesendet und
+    //   vom ersten Konto uebernommen, das ihre UID liefert. Das Upload-Ziel
+    //   und die Objektadresse entscheiden hier bewusst nichts.
+    // Fuer die Loeschauftraege gilt dasselbe ueber `calendar_external_id`.
+    //
+    // DIE TRIGGER VON calendar_events RUHEN WAEHREND DES NACHTRAGS: der
+    // Such-Trigger `trg_search_events_au` schreibt die FTS-Zeile je UPDATE neu
+    // (teuer, bei vielen Terminen Sekunden), und `trg_calendar_events_updated_at`
+    // setzte jede zugeordnete Zeile auf "eben geaendert". Beides soll ein reiner
+    // Konto-Nachtrag nicht ausloesen. Sie werden mit ihrem gespeicherten
+    // Wortlaut wieder angelegt, in derselben Reihenfolge, in derselben
+    // Transaktion. (Migration 239 verengt den Such-Trigger dauerhaft auf seine
+    // indizierten Spalten; dieses Ruhen bleibt für den einmaligen Nachtrag.)
+    up(database) {
+      // Eine gedriftete Datenbank kann die Spalte schon tragen
+      // (reconcileCriticalSchema): dann nur noch Index und Nachtrag.
+      const hasColumn = (table) => database.prepare(`PRAGMA table_info(${table})`).all()
+        .some((column) => column.name === 'caldav_account_id');
+      if (!hasColumn('calendar_events')) {
+        database.exec(`
+          ALTER TABLE calendar_events ADD COLUMN caldav_account_id INTEGER
+            REFERENCES caldav_accounts(id) ON DELETE SET NULL;
+        `);
+      }
+      if (!hasColumn('calendar_pending_deletions')) {
+        database.exec(`
+          ALTER TABLE calendar_pending_deletions ADD COLUMN caldav_account_id INTEGER
+            REFERENCES caldav_accounts(id) ON DELETE CASCADE;
+        `);
+      }
+      database.exec(`
+        CREATE INDEX IF NOT EXISTS idx_calendar_caldav_account_uid
+          ON calendar_events(caldav_account_id, external_calendar_id)
+          WHERE caldav_account_id IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_cal_pending_del_account
+          ON calendar_pending_deletions(caldav_account_id)
+          WHERE caldav_account_id IS NOT NULL;
+      `);
+
+      const accounts = database.prepare('SELECT id FROM caldav_accounts ORDER BY id').all();
+      if (accounts.length === 0) return;
+
+      const triggers = database.prepare(`
+        SELECT name, sql FROM sqlite_master
+        WHERE type = 'trigger' AND tbl_name = 'calendar_events' AND sql IS NOT NULL
+        ORDER BY rowid
+      `).all();
+      for (const trigger of triggers) database.exec(`DROP TRIGGER "${trigger.name}"`);
+
+      if (accounts.length === 1) {
+        database.prepare(
+          "UPDATE calendar_events SET caldav_account_id = ? WHERE external_source = 'caldav'"
+        ).run(accounts[0].id);
+        database.prepare(
+          "UPDATE calendar_pending_deletions SET caldav_account_id = ? WHERE source = 'caldav'"
+        ).run(accounts[0].id);
+      } else {
+        // COUNT(*) zaehlt Konten: (account_id, calendar_url) ist eindeutig.
+        database.exec(`
+          UPDATE calendar_events
+          SET caldav_account_id = (
+            SELECT MIN(s.account_id)
+            FROM external_calendars x
+            JOIN caldav_calendar_selection s ON s.calendar_url = x.external_id
+            WHERE x.id = calendar_events.calendar_ref_id AND x.source = 'caldav'
+          )
+          WHERE external_source = 'caldav' AND calendar_ref_id IS NOT NULL
+            AND (
+              SELECT COUNT(*)
+              FROM external_calendars x
+              JOIN caldav_calendar_selection s ON s.calendar_url = x.external_id
+              WHERE x.id = calendar_events.calendar_ref_id AND x.source = 'caldav'
+            ) = 1;
+
+          UPDATE calendar_pending_deletions
+          SET caldav_account_id = (
+            SELECT MIN(s.account_id) FROM caldav_calendar_selection s
+            WHERE s.calendar_url = calendar_pending_deletions.calendar_external_id
+          )
+          WHERE source = 'caldav' AND calendar_external_id <> ''
+            AND (
+              SELECT COUNT(*) FROM caldav_calendar_selection s
+              WHERE s.calendar_url = calendar_pending_deletions.calendar_external_id
+            ) = 1;
+        `);
+      }
+
+      for (const trigger of triggers) database.exec(trigger.sql);
+    },
+  },
+  {
+    version: 239,
+    description: 'Calendar: the search index update trigger fires only on the indexed columns (#1860)',
+    // DER SUCH-TRIGGER FEUERTE BEI JEDEM UPDATE AN calendar_events. Sein Rumpf
+    // loescht und schreibt die FTS-Zeile des Termins neu - teuer. Bei einem
+    // UPDATE ueber viele Zeilen, das die durchsuchten Felder gar nicht anfasst
+    // (das SET NULL beim Loeschen eines CalDAV-Kontos, #1860), lief das je
+    // Zeile mit und machte das Loeschen eines Kontos mit vielen Terminen
+    // sekundenlang.
+    //
+    // `AFTER UPDATE OF <spalten>`: die Spalten sind GENAU die, die der Rumpf
+    // von trg_search_events_ai/au liest (NEW.title, NEW.description,
+    // NEW.location, NEW.recurrence_parent_id, NEW.overridden_fields) - eine
+    // Aenderung an irgendeiner anderen Spalte kann die FTS-Zeile nicht
+    // veraendern. Nur trg_search_events_au wird neu angelegt; sein Rumpf bleibt
+    // WORTGLEICH. Die Insert- und Delete-Trigger (ai, ad) und die uebrigen
+    // (updated_at, reminders) bleiben unberuehrt. au war schon bisher der
+    // juengste AFTER-UPDATE-Trigger (v194, juenger als updated_at aus v106);
+    // neu angelegt bleibt er der juengste, die Feuerreihenfolge aendert sich
+    // nicht.
+    up: `
+      DROP TRIGGER IF EXISTS trg_search_events_au;
+      CREATE TRIGGER trg_search_events_au
+        AFTER UPDATE OF title, description, location, recurrence_parent_id, overridden_fields
+        ON calendar_events BEGIN
+        DELETE FROM search_index WHERE entity = 'event' AND entity_id = OLD.id;
+        INSERT INTO search_index (entity, entity_id, title, body)
+        VALUES ('event', NEW.id,
+          CASE WHEN NEW.recurrence_parent_id IS NULL
+                 OR EXISTS (SELECT 1 FROM json_each(
+                      CASE WHEN json_valid(NEW.overridden_fields) THEN
+                        CASE WHEN json_type(NEW.overridden_fields) = 'array' THEN NEW.overridden_fields END
+                      END) WHERE type = 'text' AND value = 'title')
+               THEN COALESCE(NEW.title, '') ELSE '' END,
+          TRIM(
+            CASE WHEN NEW.recurrence_parent_id IS NULL
+                    OR EXISTS (SELECT 1 FROM json_each(
+                         CASE WHEN json_valid(NEW.overridden_fields) THEN
+                           CASE WHEN json_type(NEW.overridden_fields) = 'array' THEN NEW.overridden_fields END
+                         END) WHERE type = 'text' AND value = 'description')
+                 THEN COALESCE(NEW.description, '') ELSE '' END
+            || ' ' ||
+            CASE WHEN NEW.recurrence_parent_id IS NULL
+                    OR EXISTS (SELECT 1 FROM json_each(
+                         CASE WHEN json_valid(NEW.overridden_fields) THEN
+                           CASE WHEN json_type(NEW.overridden_fields) = 'array' THEN NEW.overridden_fields END
+                         END) WHERE type = 'text' AND value = 'location')
+                 THEN COALESCE(NEW.location, '') ELSE '' END));
+      END;
+    `,
+  },
+  {
+    version: 240,
+    description: 'Calendar: a pending deletion can carry the ETag of the entry it was queued for (#1883)',
+    // EIN LOESCHAUFTRAG, DER WARTET, KANNTE NUR DIE ADRESSE SEINES OBJEKTS. Der
+    // Auftrag aus einem Umzug, dessen Quelle ihr Loeschen abgelehnt hat (#1861),
+    // wartet ueber Laeufe hinweg; liegt der Termin dann wieder im alten Kalender
+    // (auf einem anderen Geraet zurueckgeschoben), traf ihn der naechste Versuch,
+    // und er war in beiden Kalendern fort.
+    //
+    // `etag` ist der Stand des Objekts, fuer den der Auftrag vorgemerkt wurde.
+    // Traegt ein Auftrag einen, gilt er genau diesem Objekt in genau diesem
+    // Stand: das DELETE geht mit ihm als If-Match hinaus, und ein anderer Stand
+    // verwirft den Auftrag. NULL heisst "gleich in welchem Stand" - das Loeschen
+    // durch den Nutzer und jeder Auftrag von vor dieser Migration; fuer sie
+    // aendert sich nichts.
+    up: `
+      ALTER TABLE calendar_pending_deletions ADD COLUMN etag TEXT;
+    `,
+  },
+  {
+    version: 241,
+    description: 'CalDAV: an upload is noted before it is sent, so a lost answer leaves a trace (#1882)',
+    // EIN UPLOAD, DESSEN ANTWORT VERLOREN GING, HINTERLIESS NICHTS. Der PUT kam
+    // an, das Objekt liegt auf dem Server, und lokal stand nur eine Zeile wie
+    // jede andere, die noch nie hinaufging. Wartet sie weiter auf denselben
+    // Platz, uebernimmt der naechste Lauf das Objekt (#1837). Wird sie aber
+    // vorher geloescht oder bekommt sie ein anderes Ziel, wusste niemand mehr,
+    // dass dort etwas von ihr liegt: der naechste Abruf holte den geloeschten
+    // Eintrag als neue Zeile zurueck bzw. legte neben die bestehende eine
+    // zweite.
+    //
+    // Die UID des Objekts allein darf das nicht entscheiden. Sie kommt vom
+    // Server, und wer dort schreiben darf, kann eine im Muster dieser
+    // Installation bauen (`server/utils/own-uid.js`); nach dem Einspielen
+    // eines aelteren Backups traegt ausserdem eine NEUE Zeile die Id einer
+    // frueheren, deren Objekt noch oben liegt. Geloescht wird ein Objekt
+    // deshalb nur, wenn der LOKALE Stand belegt, dass genau diese Zeile an
+    // genau diesen Platz hinaufgeschickt wurde.
+    //
+    // Dieser Beleg ist die Zeile hier: geschrieben VOR der Anfrage, entfernt,
+    // sobald ihr Ergebnis gebucht ist. Bleibt sie stehen, ist die Antwort nie
+    // angekommen. Sie ueberlebt die Zeile, von der sie handelt (kein
+    // Fremdschluessel auf calendar_events/tasks/shopping_items: drei Tabellen,
+    // und der Fall ist gerade der, in dem die Zeile fort ist); ihr Konto
+    // ueberlebt sie nicht - ohne Konto gibt es keinen Weg zum Objekt.
+    //
+    // `account_id` ist NULL fuer iCloud (eine Verbindung, kein Konto). Der
+    // Schluessel nennt den Platz: eine Zeile kann nacheinander an mehrere
+    // Plaetze geschickt worden sein, ohne dass eine Antwort ankam.
+    up: `
+      CREATE TABLE IF NOT EXISTS caldav_upload_attempts (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        source         TEXT    NOT NULL CHECK (source IN ('caldav', 'apple')),
+        account_id     INTEGER REFERENCES caldav_accounts(id) ON DELETE CASCADE,
+        kind           TEXT    NOT NULL CHECK (kind IN ('event', 'task', 'item')),
+        row_id         INTEGER NOT NULL,
+        collection_url TEXT    NOT NULL,
+        uid            TEXT    NOT NULL,
+        object_url     TEXT    NOT NULL,
+        created_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_caldav_upload_attempts_place
+        ON caldav_upload_attempts(source, COALESCE(account_id, 0), kind, row_id, collection_url);
+      CREATE INDEX IF NOT EXISTS idx_caldav_upload_attempts_uid
+        ON caldav_upload_attempts(uid);
+    `,
+  },
+  {
+    version: 242,
+    description: 'Tasks: manual order within a category (tasks.sort_order)',
+    // NULL = nie von Hand eingeordnet. Solche Aufgaben behalten die bisherige
+    // Reihenfolge (Faelligkeit, dann Prioritaet) und stehen HINTER den von Hand
+    // eingeordneten: eine neue Aufgabe landet damit am Ende ihrer Kategorie,
+    // statt eine bestehende Handordnung zu verschieben. Kein Backfill - bis zum
+    // ersten Zug aendert sich nichts an der Anzeige.
+    //
+    // Der Rang gilt in der Kategorie, in der er vergeben wurde: wechselt eine
+    // Aufgabe die Kategorie, setzt PUT /tasks/:id ihn auf NULL zurueck, und sie
+    // steht dort, wo jede neue Aufgabe steht. Die Folgeinstanz einer
+    // Wiederholung erbt den Rang ihrer Vorgaengerin. Gelesen wird er nur beim
+    // Gruppieren nach Kategorie.
+    up(db) {
+      const has = (table, column) => db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === column);
+      if (!has('tasks', 'sort_order')) db.exec('ALTER TABLE tasks ADD COLUMN sort_order INTEGER');
+    },
+  },
+  {
+    version: 243,
+    description: 'Shopping: a mirrored item waits to be carried to the list it was moved to',
+    // Ein gespiegelter Artikel, der auf eine andere gespiegelte Liste umzieht
+    // (#1700), nimmt sein Objekt auf dem CalDAV-Server mit. `outbound_move = 1`
+    // heisst: die Zeile steht schon auf der neuen Liste, ihr Objekt liegt noch
+    // in der Collection der alten (`external_object_url`) und soll in die
+    // Collection, die der Liste zugeordnet ist, in der die Zeile JETZT steht.
+    // Das Ziel steht deshalb nicht hier - es folgt aus `list_id`. Solange die
+    // Vormerkung steht, ordnet der Abruf die Zeile nicht nach dem Server um.
+    // `outbound_move_attempts` zaehlt die Absagen des Ziels; nach der fuenften
+    // faellt die Vormerkung, und die Zeile steht wieder auf der Liste ihres
+    // Objekts. Ein eigener Zaehler, weil `outbound_attempts` der Bearbeitung
+    // gehoert und mit ihr zurueckgesetzt wird.
+    up(db) {
+      const has = (column) => db.prepare('PRAGMA table_info(shopping_items)').all().some((c) => c.name === column);
+      if (!has('outbound_move')) {
+        db.exec('ALTER TABLE shopping_items ADD COLUMN outbound_move INTEGER NOT NULL DEFAULT 0');
+      }
+      if (!has('outbound_move_attempts')) {
+        db.exec('ALTER TABLE shopping_items ADD COLUMN outbound_move_attempts INTEGER NOT NULL DEFAULT 0');
+      }
+    },
+  },
+  {
+    version: 244,
+    description: 'Displays: the photo screensaver is switched on per display by an administrator (#1766)',
+    // OB EIN WANDTABLETT DEN FOTO-SCHONER ZEIGT, ENTSCHEIDET EIN ADMINISTRATOR,
+    // JE DISPLAY (#1766, PR #1793). Ohne diese Spalte haette jedes gekoppelte
+    // Tablett in einem Haushalt mit Immich nach fuenf Minuten Fotos gezeigt -
+    // und ein Display aendert keine Einstellungen: die Wartezeit kennt kein
+    // "nie", und die Display-Oberflaeche hat keine Einstellungen. Ein
+    // Haushaltsschalter (Modul) koennte die Kueche nicht vom Flur
+    // unterscheiden, deshalb steht die Wahl am Display.
+    //
+    // DEFAULT 0, KEIN BACKFILL: ein Display, das bisher den Kalender zeigte,
+    // zeigt ihn nach dem Update weiter. Bei 0 sperrt das Gate in
+    // server/index.js die beiden Bildrouten, nicht erst die Seite.
+    //
+    // Der CHECK geht mit ADD COLUMN, weil der Default konstant ist und den
+    // Ausdruck erfuellt. Ein kuenftiger Rebuild von display_accounts muss die
+    // Spalte samt CHECK mitnehmen.
+    up: `
+      ALTER TABLE display_accounts ADD COLUMN show_screensaver INTEGER NOT NULL DEFAULT 0 CHECK(show_screensaver IN (0, 1));
+    `,
+  },
+  {
+    version: 245,
     description: 'Calendar: first-class local calendars with per-calendar feeds',
     up: `
       CREATE TABLE local_calendars (
@@ -10723,6 +11029,22 @@ const CRITICAL_COLUMNS = [
   // #549: v97 trägt calendar_events.tzid nach; ohne die Spalte scheitert der
   // Sync-Upsert (schreibt tzid) still und die Kalender-Expansion driftet über DST.
   { table: 'calendar_events', column: 'tzid', type: 'TEXT' },
+  // #1860: v238 traegt das Konto eines gespiegelten Termins und seines
+  // Loeschauftrags nach; ohne die Spalten scheitert jeder CalDAV-Lauf, weil
+  // Abruf, Ausgang und Prune danach filtern.
+  { table: 'calendar_events', column: 'caldav_account_id',
+    type: 'INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL' },
+  { table: 'calendar_pending_deletions', column: 'caldav_account_id',
+    type: 'INTEGER REFERENCES caldav_accounts(id) ON DELETE CASCADE' },
+  // #1883: v240 traegt den ETag eines Loeschauftrags nach; ohne die Spalte
+  // scheitert das Lesen der Auftraege und damit jeder ausgehende Durchgang.
+  { table: 'calendar_pending_deletions', column: 'etag', type: 'TEXT' },
+  // #1700: v243 traegt die Vormerkung eines Umzugs zwischen gespiegelten
+  // Einkaufslisten nach; ohne die Spalten scheitert der Abruf jedes
+  // Einkaufsartikels (er liest sie, bevor er die Zeile anfasst) und jeder
+  // Sofortversuch.
+  { table: 'shopping_items', column: 'outbound_move', type: 'INTEGER NOT NULL DEFAULT 0' },
+  { table: 'shopping_items', column: 'outbound_move_attempts', type: 'INTEGER NOT NULL DEFAULT 0' },
 ];
 
 /**

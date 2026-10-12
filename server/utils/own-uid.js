@@ -183,16 +183,32 @@ function samePath(a, b) {
  * @returns {Promise<{url: string, etag: string|undefined, data: string}|null>}
  */
 export async function findObjectWithUid(client, collectionUrl, objectUrl, uid) {
+  return (await inspectObjectAt(client, collectionUrl, objectUrl, uid)).own;
+}
+
+/**
+ * Dieselbe Frage mit beiden Antworten (#1882): `own` wie `findObjectWithUid`,
+ * und `foreign`, wenn an der Adresse NACHWEISLICH etwas anderes liegt - ein
+ * gelesenes Objekt, das UIDs trägt, aber nicht diese. Eine leere oder
+ * unlesbare Antwort ist weder noch: sie belegt nichts.
+ *
+ * @returns {Promise<{own: {url: string, etag: string|undefined, data: string}|null, foreign: boolean}>}
+ */
+export async function inspectObjectAt(client, collectionUrl, objectUrl, uid) {
   const objects = await client.fetchCalendarObjects({
     calendar:   { url: collectionUrl },
     objectUrls: [objectUrl],
   });
+  let foreign = false;
   for (const obj of objects || []) {
     if (obj?.url && !samePath(obj.url, objectUrl)) continue;
     const lines = String(obj?.data ?? '').replace(/\r\n/g, '\n').replace(/\n[ \t]/g, '').split('\n');
     if (lines.some((line) => line.trim() === `UID:${uid}`)) {
-      return { url: objectUrl, etag: obj.etag, data: obj.data };
+      return { own: { url: objectUrl, etag: obj.etag, data: obj.data }, foreign: false };
     }
+    // Nur ein Objekt, dessen Adresse der Server genannt hat, belegt etwas
+    // über diese Adresse.
+    if (obj?.url && lines.some((line) => /^UID:\S/.test(line.trim()))) foreign = true;
   }
-  return null;
+  return { own: null, foreign };
 }

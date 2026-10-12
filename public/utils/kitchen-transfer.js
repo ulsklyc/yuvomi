@@ -56,6 +56,7 @@ import { api } from '/api.js';
 import { selectModal } from '/components/modal.js';
 import { refreshKitchenBadges } from '/utils/kitchen-tabs.js';
 import { mayWritePath } from '/utils/module-access.js';
+import { errorSentence } from '/utils/friendly-error.js';
 
 /**
  * Darf dieses Konto den AUSDRUECKLICHEN Transfer einer Mahlzeit bzw. eines
@@ -304,7 +305,7 @@ export function announceTransfer({ message, addedIds = [], onUndone } = {}) {
           // die nichts Neues sagt.
           window.yuvomi?.showToast(t('kitchen.transferUndone'), 'info');
         } catch (err) {
-          window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+          window.yuvomi?.showToast(errorSentence(err), 'danger');
         }
       }
     : null;

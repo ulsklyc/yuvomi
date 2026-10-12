@@ -3692,6 +3692,20 @@ Gangart.** Gelesen wird sie aus zwei Metern und ohne Beruehrung; alles Weitere f
 diesem einen Satz. Der Screensaver bleibt der ruhende Zustand und legt sich nach seiner
 Leerlaufzeit unveraendert darueber.
 
+**Eine geteilte Flaeche, kein persoenlicher Bildschirm** (#1817). Die Wand haengt in der Kueche,
+gleich aus wessen Sitzung sie geoeffnet wurde - sie zeigt deshalb nur, was der ganze Haushalt
+sehen darf: Aufgaben und Termine mit Sichtbarkeit "alle", Termine aus Abos nur aus geteilten.
+Was einer Person allein gehoert, steht an keiner Stelle der Wand, auch nicht fuer sie selbst,
+und wer nur darueber "dran" waere, erscheint nicht unter den Gesichtern. Dasselbe gilt fuer
+Beitraege ohne Sichtbarkeitsstufe, die nur dem Betrachter gelten: die eigene Dosis, die eigene
+Schicht, die eigene Erinnerung, wartende Freigaben. Sie fehlen an jeder Wand, wie auf einem
+gekoppelten Display - ohne Ersatzzeile und ohne Luecke: das Programm rueckt zusammen, und ein
+Tag ohne Zeile sagt "Heute frei". Durchgesetzt am Leser (`audience=household`), nicht im
+Browser. Uebersicht und Heute-Blatt bleiben persoenlich. Die Antwort fuer die Wand ist eine
+Allowlist: sie traegt nur die Quellen, die die Flaeche zeichnet - Notizen, Geld (Budget,
+geteilte Ausgaben, offener Lohn), Schnellzugriffe und Countdowns erreichen das Geraet nicht,
+und ein neues Modul steht erst an der Wand, wenn es dort einen Platz bekommen hat.
+
 **Die Shell tritt ab.** Sidebar und Tab-Leiste sind Arm-Laengen-Moebel; auf zwei Metern sind
 sie siebzehn unleserliche Ziele. Auch die Installations-Einladung verschwindet - auf einer
 Anzeige, die niemand bedient, waere sie die lauteste Karte im Bild.
@@ -3718,6 +3732,18 @@ Umbruch kostet die Hoehe einer ganzen weiteren Zeile, und die Flaeche hat sechs 
 sie scrollen muesste. Die Zaehler an den Gesichtern sind aus derselben Rechnung keine
 Mikro-Badges, sondern volle Marken mit Kante - eine 13px-Marke an einem 56px-Gesicht waere aus
 zwei Metern Dekoration.
+
+**Unter jedem Gesicht stehen die Aufgaben von heute beim Namen, und die Zeilenzahl folgt dem
+Platz** (#1817). Die Zahl sagt, DASS etwas offen ist, der Titel sagt WAS. Offene zuerst in
+Primaerfarbe, darunter das heute Erledigte in Sekundaerfarbe mit Haken - kein Durchstreichen,
+keine Deckkraft: auf zwei Metern liest beides niemand. Mit Titeln wird aus der Reihe der
+Gesichter ein Raster von Personen (Gesicht und Vorname als Kopf, die Zeilen in voller
+Spaltenbreite; ab fuenf Personen drei Spalten). Weil die Wand nicht scrollt, steigt
+`fitWallWho` eine Leiter von Budgets hinab, bis das Bild passt: erst weichen die Haken, auf der
+ganzen Flaeche, dann die offenen Titel; was nicht passt, ist eine Zahl ("+2 weitere"), und die
+letzte Stufe ist die Reihe der Gesichter wie zuvor. Gemessen bei 1280x800: vier Personen tragen
+drei Zeilen, sechs tragen zwei. Nachts geht die Liste mit der Wand: offener Titel und Name eine
+Stufe zurueck, Erledigtes und Zaehlzeile eine weitere, und der Haken gibt sein Gruen ab.
 
 **Nachtabsenkung nach UHRZEIT, nicht nach Farbmodus.** Zwischen 22 und 6 Uhr traegt die Wurzel
 `data-wall-night` und der dunkle Grund wird erzwungen, auch bei hellem Theme: das Problem im

@@ -243,6 +243,29 @@ test('Geburtstag mit Kalender-Referenz anlegen', () => {
 });
 
 // --------------------------------------------------------
+// Das CalDAV-Konto eines Termins und seines Löschauftrags (#1860)
+//
+// Anders als der Rest dieser Datei gegen das ECHTE Schema, also nach allen
+// Migrationen von server/db.js: die Frage ist, ob die Spalten ihren
+// Fremdschlüssel am Ende noch tragen. Migration 238 legt ihn an; ein späterer
+// Rebuild einer der beiden Tabellen, der die Spalte ohne ihn abschreibt, fiele
+// sonst erst auf, wenn ein gelöschtes Konto Termine hinterlässt, die auf
+// nichts mehr zeigen.
+// --------------------------------------------------------
+process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
+process.env.DB_PATH = ':memory:';
+const migrated = (await import('../server/db.js')).get();
+
+for (const [table, onDelete] of [['calendar_events', 'SET NULL'], ['calendar_pending_deletions', 'CASCADE']]) {
+  test(`${table}.caldav_account_id zeigt nach allen Migrationen auf caldav_accounts (ON DELETE ${onDelete})`, () => {
+    const fk = migrated.pragma(`foreign_key_list(${table})`).find((row) => row.from === 'caldav_account_id');
+    assert(fk, `${table}.caldav_account_id trägt keinen Fremdschlüssel`);
+    assert(fk.table === 'caldav_accounts' && fk.to === 'id', `zeigt auf ${fk.table}.${fk.to}`);
+    assert(fk.on_delete === onDelete, `ON DELETE ist ${fk.on_delete}, erwartet ${onDelete}`);
+  });
+}
+
+// --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
 console.log(`\n[DB-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);

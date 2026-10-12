@@ -13,7 +13,9 @@ import { getEventsOverlappingDays, getUpcomingEvents } from '../services/calenda
 import { taskScopeWhere, taskCategoryWhere, categoryBindings, normalizeCategoryFilter } from '../services/task-scope.js';
 import { getCountdowns } from '../services/countdowns.js';
 import { listQuickLinksFor } from './quick-links.js';
-import { visibilityWhere } from '../services/visibility.js';
+import {
+  asksHouseholdAudience, householdAudienceAnswer, householdAudienceShows, householdVisibleWhere, visibilityWhere,
+} from '../services/visibility.js';
 import { resolveBudgetMode } from '../services/budget-visibility.js';
 import { hiddenModulesFor } from '../permissions.js';
 import { birthdaysSwitchedOff, modulesLeftOut } from '../services/household-modules.js';
@@ -71,7 +73,7 @@ const DENIED_PAYLOAD = Object.freeze({
   calendar: () => ({ upcomingEvents: [], familyEvents: [], weekEvents: [], ...emptyBirthdays() }),
   tasks: () => ({
     urgentTasks: [], openTaskCount: 0, overdueTaskCount: 0,
-    memberTodayTasks: [], tasksDoneToday: 0,
+    memberTodayTasks: [], tasksDoneToday: 0, wallTasks: [],
   }),
   meals: () => ({ todayMeals: [] }),
   notes: () => ({ pinnedNotes: [], pinnedNotesCount: 0, notesTotal: 0 }),
@@ -81,7 +83,7 @@ const DENIED_PAYLOAD = Object.freeze({
   // Geteilte Ausgaben gehoeren zum Budget-Modul (server/scopes.js fuehrt
   // `split-expenses` als zweiten Praefix von `budget`).
   budget: ({ month }) => ({ budget: emptyBudget(month), splitBalance: emptySplitBalance() }),
-  rewards: () => ({ rewards: { view: null, standings: [], participantCount: 0, pending: 0, catalog: [], recent: [] } }),
+  rewards: () => ({ rewards: { view: null, standings: [], participantCount: 0, pending: 0, moneyPending: 0, catalog: [], recent: [] } }),
   health: () => ({
     health: {
       hasMeds: false, dosesTotal: 0, dosesTaken: 0, dosesSkipped: 0,
@@ -105,6 +107,21 @@ const DENIED_PAYLOAD = Object.freeze({
   // Vorrat „läuft bald ab": Chargennamen sind Haushaltsdaten des Moduls pantry.
   pantry: () => ({ pantryExpiring: emptyPantryExpiring() }),
 });
+
+/**
+ * Die leere Fassung der GANZEN Antwort: jedes Modul aus `DENIED_PAYLOAD`, dazu
+ * die Schluessel, die keinem Modul gehoeren. Von ihr aus baut die
+ * Haushaltsfassung (`householdAudienceAnswer`) - was die Wand nicht zeichnet,
+ * bleibt in genau dieser Form stehen.
+ *
+ * `shoppingTile` fehlt hier, und das ist seine leere Fassung: das Feld gibt es
+ * nur bei einer Listen-Auswahl, und ein Konto ohne den Einkauf bekommt es nie.
+ */
+function emptyAnswer(context) {
+  const empty = { users: [], countdowns: [], countdownTotal: 0, quicklinks: [] };
+  for (const build of Object.values(DENIED_PAYLOAD)) Object.assign(empty, build(context));
+  return empty;
+}
 
 /**
  * Die leere Fassung der Geburtstags-Kachel. Eigene Funktion, weil sie zwei
@@ -202,6 +219,89 @@ function weekEventFields(event) {
   };
 }
 
+/** So viele Titel je Mitglied und Zustand reisen mit; die Zahlen daneben sind ungekappt. */
+const WALL_TASKS_PER_MEMBER = 6;
+
+/**
+ * Die Aufgaben von heute je Mitglied, MIT TITEL, fuer die Wand (#1817).
+ *
+ * WARUM EINE EIGENE LESUNG. `urgentTasks` ist haushaltsweit auf fuenf gekappt -
+ * daraus laesst sich nicht lesen, was unter einer einzelnen Person steht.
+ * `memberTodayTasks` ist ungekappt, traegt aber nur eine Zahl.
+ *
+ * NUR `visibility = 'all'`, UND DAS IST NICHT DIE BETRACHTER-REGEL. Jede andere
+ * Aufgabenabfrage dieser Route haengt `visibilityWhere(..., '@me')` an: sie
+ * zeigt, was die angemeldete Person sehen darf. Ein Wandtablett ist keine
+ * Person - es haengt in der Kueche, und der Wandmodus laesst sich aus jeder
+ * Sitzung oeffnen. Eine Aufgabe auf "nur Zugewiesene" oder privat steht deshalb
+ * auf keiner Wand, auch nicht, wenn die Wand aus der Sitzung der zugewiesenen
+ * Person geoeffnet wurde. `'all'` ist eine Teilmenge dessen, was jeder
+ * Betrachter ohnehin sieht; die Lesung gibt also nichts frei, was der
+ * Betrachter nicht schon hat, und ein gekoppeltes Display erreicht sie nur
+ * ueber `dashboard:read` + `tasks:read` wie den Rest der Antwort.
+ *
+ * "HEUTE" FUER EINE PERSON: offen ist, was heute oder frueher faellig ist -
+ * dieselbe Menge, die `memberTodayTasks` zaehlt und die das Programm links als
+ * "ueberfaellig" fuehrt. Erledigt ist, was heute faellig war, und dazu, was
+ * ueberfaellig war und HEUTE abgehakt wurde: sonst verschwaende eine Aufgabe
+ * von gestern beim Abhaken von der Wand, statt ihren Haken zu bekommen. Der Tag
+ * einer Erledigung ist der des HAUSHALTS (`completed_at` ist ein UTC-Zeitpunkt).
+ * Mit dem Tageswechsel faellt beides von selbst heraus.
+ *
+ * MEHRERE ZUGEWIESENE: die Aufgabe steht unter jeder von ihnen, wie
+ * `memberTodayTasks` sie zaehlt.
+ *
+ * @returns {{user_id: number, open_count: number, done_count: number,
+ *            open: {id: number, title: string, due_date: string}[],
+ *            done: {id: number, title: string}[]}[]}
+ */
+function wallTasksByMember(d, { today, zone, now, categoryAnd = '', categoryBinds = {} }) {
+  // Grobe Vorauswahl in SQL (48 Stunden decken jede Zone), der Tag selbst wird
+  // unten in der Haushaltszone entschieden.
+  const since = new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString();
+  const rows = d.prepare(`
+    SELECT ta.user_id AS user_id, t.id, t.title, t.status, t.due_date, tc.completed_at
+    FROM tasks t
+    JOIN task_assignments ta ON ta.task_id = t.id
+    LEFT JOIN task_completions tc ON tc.task_id = t.id
+    WHERE t.archived_at IS NULL
+      AND t.visibility = 'all'
+      AND t.due_date IS NOT NULL AND t.due_date <= @today
+      AND ${taskScopeWhere('t', { bind: '@today' })}${categoryAnd}
+      AND (t.status != 'done' OR t.due_date = @today OR tc.completed_at >= @since)
+    ORDER BY
+      t.due_date ASC,
+      t.due_time IS NULL ASC, t.due_time ASC,
+      CASE t.priority
+        WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2
+        WHEN 'low' THEN 3 ELSE 4
+      END ASC,
+      t.id ASC
+  `).all({ today, since, ...categoryBinds });
+
+  const byMember = new Map();
+  for (const row of rows) {
+    const isDone = row.status === 'done';
+    if (isDone && row.due_date !== today
+      && utcToWall(row.completed_at, zone)?.date !== today) continue;
+    let entry = byMember.get(row.user_id);
+    if (!entry) {
+      entry = { user_id: row.user_id, open_count: 0, done_count: 0, open: [], done: [] };
+      byMember.set(row.user_id, entry);
+    }
+    if (isDone) {
+      entry.done_count += 1;
+      if (entry.done.length < WALL_TASKS_PER_MEMBER) entry.done.push({ id: row.id, title: row.title });
+    } else {
+      entry.open_count += 1;
+      if (entry.open.length < WALL_TASKS_PER_MEMBER) {
+        entry.open.push({ id: row.id, title: row.title, due_date: row.due_date });
+      }
+    }
+  }
+  return [...byMember.values()];
+}
+
 /**
  * `?shopping_list=` als Liste von Listen-Ids (#1818): einzeln oder mehrfach
  * angegeben, nur positive ganze Zahlen, ohne Doppelte, hoechstens 50 - dieselbe
@@ -235,6 +335,7 @@ const router = express.Router();
  *   users:          User[],            // Alle User (für Avatar-Farben)
  *   memberTodayTasks: {user_id, open_count}[], // Heute fällige/überfällige offene Aufgaben je Mitglied
  *   tasksDoneToday: number,            // Heute fällige, bereits erledigte Aufgaben
+ *   wallTasks:      {user_id, open_count, done_count, open: {id,title,due_date}[], done: {id,title}[]}[], // Haushaltssichtbare Aufgaben von heute je Mitglied (#1817)
  *   countdowns:     Countdown[]        // Als Countdown markierte Termine + Aufgaben (#647)
  *   quicklinks:      QuickLink[]        // Haushaltslinks der Kachelreihe (#469)
  * }
@@ -288,13 +389,45 @@ router.get('/', (req, res) => {
         AND (nc.scope = 'household' OR nc.owner_user_id = @me)
     )
   `).join('');
+  /* FUER WEN DIE ANTWORT IST (#1817). `audience=household` fragt die Fassung
+   * fuer eine GETEILTE FLAECHE ab - die Wand. Dort gilt nicht „was darf die
+   * angemeldete Person sehen", sondern „was darf jeder sehen": Aufgaben und
+   * Termine nur mit Sichtbarkeit `all`, Termine aus ICS-Abos nur aus geteilten.
+   * Wer die Wand aus seiner eigenen Sitzung oeffnet, stellt damit nicht seine
+   * privaten Zeilen in die Kueche.
+   *
+   * DURCHGESETZT WIRD ES HIER, AM LESER, nicht im Browser: was die Antwort
+   * nicht traegt, liegt auch nicht im Speicher des Tabletts. Der Parameter
+   * VERENGT nur - die Haushaltsfassung ist eine Teilmenge dessen, was dieselbe
+   * Person ohnehin bekaeme -, er braucht deshalb kein eigenes Recht.
+   *
+   * UND SIE TRAEGT NUR, WAS DIE WAND ZEICHNET. Welche Schluessel das sind,
+   * steht als Allowlist an einer Stelle (`HOUSEHOLD_AUDIENCE_SHOWS` in
+   * services/visibility.js); alles andere kommt in der leeren Fassung einer
+   * Modulsperre - Notizen, Budget, geteilte Ausgaben, Schnellzugriffe,
+   * Countdowns, der offene Lohn der Haushaltshilfe, und was nur dem Betrachter
+   * gilt (Dosen, die eigene Schicht, wartende Freigaben: „2 zu bestaetigen"
+   * und „Eisen 20:00" standen aus der Sitzung eines Mitglieds in der Kueche).
+   * Durchgesetzt wird es am Ende der Route (`householdAudienceAnswer`); ein
+   * Modul, von dem die Wand nichts zeichnet, wird vorher gar nicht gelesen
+   * (`leftOut` unten).
+   *
+   * Die normale Uebersicht derselben Sitzung fragt ohne ihn und bleibt
+   * persoenlich. */
+  const householdAudience = asksHouseholdAudience(req.query);
+  const taskVisibleSql = householdAudience
+    ? householdVisibleWhere('t')
+    : visibilityWhere('t', 'task_assignments', 'task_id', '@me');
   // `mine` ist die Auslegung des Kalendermoduls: zugewiesen an mich.
   // EIN DISPLAY HAT KEIN "MIR" (#1808): es folgt der Vorgabe des Haushalts, sein
   // Browser schickt deren Option mit, und dem Display-Konto weist nie jemand
   // einen Termin zu (#1207) - das Tablett stuende leer da. Gelesen wird die
   // Option deshalb HIER als "alle", statt sie beim Speichern der Vorgabe zu
   // streichen: dieselbe Vorgabe gilt auch fuer Mitglieder, und dort stimmt sie.
-  const eventsAssignedTo = req.query.events_scope === 'mine' && req.authMethod !== 'display' ? userId : null;
+  // DIESELBE ANTWORT GILT FUER JEDE WAND (#1817): mit `audience=household` gibt
+  // es kein "mich", auch nicht aus der Sitzung eines Mitglieds.
+  const eventsAssignedTo = req.query.events_scope === 'mine' && req.authMethod !== 'display' && !householdAudience
+    ? userId : null;
   /* GEBURTSTAGE IM TERMIN-WIDGET (#927). Wer sie auf der Uebersicht schon als
    * eigene Kachel stehen hat, las sie zweimal - einmal bei den Geburtstagen,
    * einmal zwischen den naechsten Terminen. Abwaehlbar ist deshalb der EINE
@@ -366,8 +499,22 @@ router.get('/', (req, res) => {
   // in EINEM Set, damit jede Abfrage unten dieselbe Frage stellt; die leere
   // Fassung ist dieselbe wie bei einer Sperre, die Form der Antwort bleibt.
   const leftOut = modulesLeftOut(d, denied);
+  // Die dritte Achse (#1817): ein Modul, von dem die Haushaltsfassung keinen
+  // Schluessel traegt, wird gar nicht erst gelesen. Im SELBEN Set, damit jede
+  // Abfrage unten weiter eine einzige Frage stellt. Abgeleitet aus der
+  // Allowlist und nicht als zweite Liste gefuehrt - die Regel selbst setzt das
+  // Ende der Route durch (`householdAudienceAnswer`), das hier spart nur die
+  // Abfragen, deren Ergebnis dort ohnehin leer herauskaeme.
+  if (householdAudience) {
+    for (const [key, build] of Object.entries(DENIED_PAYLOAD)) {
+      if (!Object.keys(build({ month: currentMonth })).some(householdAudienceShows)) leftOut.add(key);
+    }
+  }
   for (const key of leftOut) Object.assign(result, DENIED_PAYLOAD[key]?.({ month: currentMonth }));
   const allows = (moduleKey) => !leftOut.has(moduleKey);
+  // Dasselbe fuer die Schluessel, die keinem Modul gehoeren (Countdowns,
+  // Schnellzugriffe, die Auswahl der Einkaufs-Kachel).
+  const wants = (key) => !householdAudience || householdAudienceShows(key);
   // GEBURTSTAGE HABEN ZWEI WEGE. Als RECHT gehoeren sie zum Kalender (siehe
   // DENIED_PAYLOAD), als SCHALTER sind sie ein eigenes Modul - dieselbe
   // Unterscheidung wie bei den Erinnerungen (reminder-origins.js). Ein
@@ -387,7 +534,7 @@ router.get('/', (req, res) => {
     // Browser an der Uhr: ein Termin endet auch zwischen zwei Abrufen.
     result.upcomingEvents = serializeEvents(getUpcomingEvents(d, {
       userId, limit: eventsLimit, fromToday: true, assignedTo: eventsAssignedTo, includeBirthdays,
-      keepEndedToday: ENDED_TODAY_POOL,
+      keepEndedToday: ENDED_TODAY_POOL, household: householdAudience,
     }), { database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminUser(req) });
   } catch (err) {
     log.error('upcomingEvents error:', err.message);
@@ -412,7 +559,7 @@ router.get('/', (req, res) => {
   if (allows('calendar')) try {
     result.weekEvents = serializeEvents(getEventsOverlappingDays(d, {
       userId, fromKey: shiftDateKey(todayLocalKey, -1), days: 9,
-      assignedTo: eventsAssignedTo, includeBirthdays,
+      assignedTo: eventsAssignedTo, includeBirthdays, household: householdAudience,
     }), { database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminUser(req) })
       .map(weekEventFields);
   } catch (err) {
@@ -447,7 +594,7 @@ router.get('/', (req, res) => {
         -- öffnete, fand sie in der Liste nicht wieder.
         AND t.archived_at IS NULL
         AND ${taskScopeWhere('t', { bind: '@today' })}
-        AND ${visibilityWhere('t', 'task_assignments', 'task_id', '@me')}${taskCategoryAnd}
+        AND ${taskVisibleSql}${taskCategoryAnd}
       ORDER BY
         CASE WHEN __due_sort IS NOT NULL AND __due_sort < @now THEN 0 ELSE 1 END ASC,
         __due_sort IS NULL ASC,
@@ -475,7 +622,7 @@ router.get('/', (req, res) => {
       SELECT COUNT(*) AS n FROM tasks t
       WHERE t.status != 'done' AND t.archived_at IS NULL
         AND ${taskScopeWhere('t', { bind: '@today' })}
-        AND ${visibilityWhere('t', 'task_assignments', 'task_id', '@me')}${taskCategoryAnd}
+        AND ${taskVisibleSql}${taskCategoryAnd}
     `).get({ me: userId, today: todayLocalKey, ...taskCategoryBinds }).n;
   } catch (err) {
     log.error('openTaskCount error:', err.message);
@@ -490,7 +637,7 @@ router.get('/', (req, res) => {
       WHERE t.status != 'done' AND t.archived_at IS NULL
         AND t.due_date IS NOT NULL AND t.due_date < @today
         AND ${taskScopeWhere('t', { bind: '@today' })}
-        AND ${visibilityWhere('t', 'task_assignments', 'task_id', '@me')}${taskCategoryAnd}
+        AND ${taskVisibleSql}${taskCategoryAnd}
     `).get({ today: todayLocalKey, me: userId, ...taskCategoryBinds }).n;
   } catch (err) {
     log.error('overdueTaskCount error:', err.message);
@@ -676,7 +823,7 @@ router.get('/', (req, res) => {
   // Liste, die der Deckel abschneidet, ist so als "+1" da und fehlt nie stumm.
   //
   // Scheitert die Abfrage, fehlt das Feld, und die Kachel zeigt alle Listen.
-  if (shoppingSelection) try {
+  if (shoppingSelection && wants('shoppingTile')) try {
     const lists = d.prepare(`
       SELECT sl.id, sl.name,
         (SELECT COUNT(*) FROM shopping_items si WHERE si.list_id = sl.id AND si.is_checked = 0) AS open_count,
@@ -724,7 +871,7 @@ router.get('/', (req, res) => {
     for (const member of result.users) {
       for (const event of getUpcomingEvents(d, {
         userId, limit: FAMILY_AHEAD_PER_MEMBER, fromToday: true, assignedTo: member.id, includeBirthdays,
-        keepEndedToday: ENDED_TODAY_POOL,
+        keepEndedToday: ENDED_TODAY_POOL, household: householdAudience,
       })) {
         const key = `${event.id}@${event.start_datetime}`;
         if (seen.has(key)) continue;
@@ -804,7 +951,7 @@ router.get('/', (req, res) => {
   // die der haushaltweite Modulschalter im Review zu PR #793 gestellt hat. Die
   // Gesamtzahl entsteht in `getCountdowns` hinter demselben Filter, damit
   // Schnitt und Zahl dieselbe Menge meinen.
-  try {
+  if (wants('countdowns')) try {
     const countdowns = getCountdowns(d, {
       userId,
       todayKey: todayLocalKey,
@@ -829,7 +976,7 @@ router.get('/', (req, res) => {
   // geteilt gegen privat, und die setzt `listQuickLinksFor` ueber die anfragende
   // Person durch - eine fremde private Kachel liegt also auch dann nicht auf der
   // Leitung, wenn der Browser sie nie zeichnen wuerde.
-  try {
+  if (wants('quicklinks')) try {
     result.quicklinks = listQuickLinksFor(userId, req.authRole === 'admin');
   } catch (err) {
     log.error('quick links error:', err.message);
@@ -1196,12 +1343,26 @@ router.get('/', (req, res) => {
       WHERE t.status != 'done' AND t.archived_at IS NULL
         AND t.due_date IS NOT NULL AND t.due_date <= @today
         AND ${taskScopeWhere('t', { bind: '@today' })}
-        AND ${visibilityWhere('t', 'task_assignments', 'task_id', '@me')}${taskCategoryAnd}
+        AND ${taskVisibleSql}${taskCategoryAnd}
       GROUP BY ta.user_id
     `).all({ today: todayLocalKey, me: userId, ...taskCategoryBinds });
   } catch (err) {
     log.error('memberTodayTasks error:', err.message);
     result.memberTodayTasks = [];
+  }
+
+  // Die Wand nennt die Aufgaben beim Namen (#1817), siehe `wallTasksByMember`.
+  if (allows('tasks')) try {
+    result.wallTasks = wallTasksByMember(d, {
+      today: todayLocalKey,
+      zone: householdTimeZone(d),
+      now,
+      categoryAnd: taskCategoryAnd,
+      categoryBinds: taskCategoryBinds,
+    });
+  } catch (err) {
+    log.error('wallTasks error:', err.message);
+    result.wallTasks = [];
   }
 
   // „Alles erledigt"-Zustand des Tagesprogramms: nur mit der Zahl heute fälliger,
@@ -1213,14 +1374,17 @@ router.get('/', (req, res) => {
       WHERE t.status = 'done' AND t.archived_at IS NULL
         AND t.due_date = @today
         AND ${taskScopeWhere('t', { bind: '@today' })}
-        AND ${visibilityWhere('t', 'task_assignments', 'task_id', '@me')}${taskCategoryAnd}
+        AND ${taskVisibleSql}${taskCategoryAnd}
     `).get({ today: todayLocalKey, me: userId, ...taskCategoryBinds }).n;
   } catch (err) {
     log.error('tasksDoneToday error:', err.message);
     result.tasksDoneToday = 0;
   }
 
-  res.json(result);
+  // DIE HAUSHALTSFASSUNG (#1817): von der leeren Fassung aus, nur was die Wand
+  // zeichnet. Hier, hinter jeder Abfrage - ein Block, den jemand oben ergaenzt,
+  // erreicht die Wand erst ueber die Allowlist.
+  res.json(householdAudience ? householdAudienceAnswer(result, emptyAnswer({ month: currentMonth })) : result);
   } catch (err) {
     log.error('Critical error:', err.message);
     res.status(500).json({ error: 'Dashboard could not be loaded.', code: 500 });

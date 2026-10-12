@@ -289,6 +289,44 @@ test('ein Verwerfen-Knopf heisst in keiner Sprache wie der Abbrechen-Knopf daneb
   assert.deepEqual(offenders, [], 'beide Knoepfe der Rueckfrage sagen dasselbe');
 });
 
+/**
+ * Zwei Schluessel, die der Code fuer VERSCHIEDENE Zustaende waehlt, duerfen in
+ * keiner Sprache denselben Text tragen - sonst sieht der Leser einen Zustand,
+ * wo die Oberflaeche zwei unterscheidet.
+ *
+ * `dashboard.dueSoon` steht an einer Aufgabe, die MORGEN ab 22 Uhr und in
+ * weniger als 24 Stunden faellig ist, `dashboard.dueToday` an einer von heute
+ * (formatDueDate in pages/dashboard.js). en.json trug fuer beide "Due today",
+ * seit dem ersten Locale-Commit, und 18 weitere Sprachen hatten das uebernommen:
+ * die Kachel nannte ein Datum von morgen "heute faellig". Schluesselabgleich und
+ * Uebersetzungs-Ratchet sahen nichts - der Schluessel existierte und war
+ * uebersetzt, nur eben mit dem Text des Nachbarn.
+ *
+ * Die Liste ist Handarbeit und bewusst kurz: ein allgemeines "keine zwei
+ * Schluessel gleich" waere voller Fehlalarme (Knopf und Titel heissen oft zu
+ * Recht gleich). Ein Paar gehoert hierher, wenn EIN Codepfad zwischen beiden
+ * waehlt. Was der Vergleich NICHT sieht: zwei verschiedene Woerter mit derselben
+ * Bedeutung - das bleibt Lesearbeit.
+ */
+const DISTINCT_STATE_LABELS = [
+  ['dashboard.dueSoon', 'dashboard.dueToday'],
+];
+
+test('Labels fuer verschiedene Zustaende sind in keiner Sprache textgleich', () => {
+  const fold = (value, locale) => String(value ?? '').trim().toLocaleLowerCase(locale);
+  const offenders = [];
+  for (const locale of LOCALES) {
+    const flat = flatten(JSON.parse(readLocale(locale)));
+    for (const [a, b] of DISTINCT_STATE_LABELS) {
+      assert.ok(fold(flat.get(a), locale), `${locale}.json: ${a} fehlt`);
+      assert.ok(fold(flat.get(b), locale), `${locale}.json: ${b} fehlt`);
+      if (fold(flat.get(a), locale) !== fold(flat.get(b), locale)) continue;
+      offenders.push(`${locale}.json: ${a} = ${b} = "${flat.get(a)}"`);
+    }
+  }
+  assert.deepEqual(offenders, [], 'zwei Zustaende tragen denselben Text');
+});
+
 test('Modulnamen sind in nav und in den API-Token-Scopes wortgleich', () => {
   const drift = [];
   let compared = 0;
@@ -595,6 +633,17 @@ test('dateInputPlaceholder spricht die UI-Sprache, die Reihenfolge bleibt die de
     assert.equal(i18n.dateInputPlaceholder(), 'DD.MM.YYYY', 'en behaelt seine Buchstaben');
     await i18n.setLocale('fr');
     assert.equal(i18n.dateInputPlaceholder(), 'JJ.MM.AAAA', 'fr: jour, mois, annee');
+
+    // #1847: niederlaendisch DD-MM-YYYY. Schreiben, Platzhalter, Kurzform und
+    // Eingabe muessen dasselbe Trennzeichen benutzen und sich umkehren lassen.
+    store.set('yuvomi-date-format', 'dmy_dash');
+    await i18n.setLocale('en');
+    assert.equal(i18n.dateInputPlaceholder(), 'DD-MM-YYYY', 'dmy_dash: Platzhalter');
+    assert.equal(i18n.formatDate('2026-03-05'), '05-03-2026', 'dmy_dash: Datum');
+    assert.equal(i18n.formatDayMonth('2026-03-05'), '05-03', 'dmy_dash: Tag und Monat');
+    assert.equal(i18n.getDateFormat(), 'dmy_dash', 'dmy_dash faellt nicht auf den Default zurueck');
+    assert.equal(i18n.parseDateInput('05-03-2026'), '2026-03-05', 'dmy_dash: Tag vor Monat');
+    assert.equal(i18n.parseDateInput('05032026'), '2026-03-05', 'dmy_dash: Ziffernfolge Tag vor Monat');
   } finally {
     await i18n.setLocale('de');
     for (const [name, descriptor] of saved) {

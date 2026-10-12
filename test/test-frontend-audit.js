@@ -21087,3 +21087,249 @@ test('R18: die Formularzeile haelt in RTL den Platz des Datumsknopfs und die Rei
   assert.deepEqual(mirrored.map((rule) => rule.selector.replace(/\s+/g, ' ')), [],
     'in der LTR-Insel sitzt das Zeichen der Einheiten-Auswahl rechts - keine RTL-Spiegelung am zusammengesetzten Feld');
 });
+
+/* DER SATZ DES SERVERS ERREICHT DIE OBERFLAECHE NICHT (#1909).
+ *
+ * Der Server benennt den Fall (`reason`), die App besitzt den Satz: eine Seite
+ * macht aus einem gefangenen Fehler ueber `errorSentence()`
+ * (utils/friendly-error.js) den Satz des Falls oder den allgemeinen. Wer
+ * stattdessen `err.data.error` liest, zeigt den Text des Servers - englisch
+ * oder deutsch, in keiner Sprache des Nutzers ("Unbekannte Liste." in einer
+ * englischen Sitzung).
+ *
+ * GEPRUEFT WIRD DAS LESEN, NICHT EINE SCHREIBWEISE: jedes `error` an einem
+ * `data` (`err.data.error`, `e.data?.error`, `error?.data?.error`,
+ * `data['error']`, eine Destrukturierung aus `data`), in Code - Kommentare und
+ * Zeichenketten sind vorher herausgeschnitten, ein auskommentierter Verstoss
+ * zaehlt also nicht und ein Kommentar macht nichts gruen.
+ *
+ * RATCHET: die noch offenen Dateien stehen mit ihrer Zahl hier. Die Zahl darf
+ * sinken (dann hier nachziehen), nie steigen; eine Datei, die nicht in der
+ * Liste steht, steht auf 0. Der Einkauf (pages/shopping.js,
+ * utils/kitchen-transfer.js) ist die erste Seite auf 0.
+ *
+ * GRENZE: `err.message` traegt bei einem ApiError denselben Text und wird hier
+ * nicht gezaehlt - dieselbe Eigenschaft tragen auch die Wuerfe der App selbst.
+ */
+const SERVER_TEXT_READS = [
+  /\bdata\s*(?:\?\.|\.)\s*error\b(?!\s*[:(])/g,
+  /\bdata\s*(?:\?\.)?\[\s*(['"`])error\1\s*\]/g,
+  /\{[^{}=;]*\berror\b[^{}=;]*\}\s*=\s*[^;\n]*\bdata\b/g,
+  /\bdata\s*:\s*\{[^{}]*\berror\b[^{}]*\}\s*\}\s*=/g,
+];
+
+// Zeichenketten bleiben stehen, damit `data['error']` lesbar bleibt; ein Treffer
+// IN einer Zeichenkette faellt ueber die geleerte Fassung heraus.
+function countServerTextReads(source) {
+  const code = withoutCommentsKeepingLines(source);
+  const blank = withoutCommentsKeepingLines(source, { blankLiterals: true });
+  let count = 0;
+  for (const pattern of SERVER_TEXT_READS) {
+    for (const hit of code.matchAll(pattern)) {
+      // Der Anfang des Treffers (`data`, `{`) muss Code sein, kein Literal.
+      if (blank[hit.index] === code[hit.index]) count += 1;
+    }
+  }
+  return count;
+}
+
+// Wer den Satz BAUT, liest den Text des Servers zu Recht.
+const SERVER_TEXT_OWNERS = new Set([
+  'api.js',                    // setzt `message` und `data.error` des ApiError
+  'utils/friendly-error.js',   // friendlyError reicht ihn im Uebergang durch - wer dort fragt, zaehlt FRIENDLY_ERROR_CALLERS
+]);
+
+// Datei -> Zahl der Stellen, die den Text des Servers noch lesen. Nur senken.
+const SERVER_TEXT_OPEN = new Map([
+  ['components/quick-links-manager.js', 2],
+  ['components/task-detail.js', 1],
+  ['pages/birthdays.js', 1],
+  ['pages/calendar.js', 5],
+  ['pages/contacts.js', 4],
+  ['pages/documents.js', 9],
+  ['pages/health.js', 28],
+  ['pages/inventory.js', 8],
+  ['pages/meals.js', 6],
+  ['pages/notes.js', 5],
+  ['pages/pantry.js', 6],
+  ['pages/recipes.js', 9],
+  ['pages/schedule.js', 1],
+  ['pages/subscriptions.js', 8],
+  ['pages/tasks.js', 1],
+  ['pages/waste.js', 27],
+  ['settings/module-install-errors.js', 1],
+  ['settings/pages/modules-health.js', 2],
+  ['settings/pages/modules-kitchen.js', 1],
+  ['utils/document-folder-delete.js', 1],
+]);
+
+test('der Leser fuer den Servertext sieht jede Schreibweise und keinen Kommentar (#1909)', () => {
+  for (const [source, expected] of [
+    ["showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');", 1],
+    ['showToast(e.data.error);', 1],
+    ['el.textContent = error?.data?.error || fallback;', 1],
+    ["const text = err.data['error'];", 1],
+    ['const text = err.data?.["error"];', 1],
+    ['const { error } = err.data;', 1],
+    ['const { error: text, code } = err?.data ?? {};', 1],
+    ['const { data: { error } } = err;', 1],
+    ['const data = err.data;\nshowToast(data.error);', 1],
+    ['toast(`${err.data.error}`);', 1],
+    ['a(err.data?.error); b(err.data?.error);', 2],
+    // Kein Lesen des Servertexts:
+    ['// showToast(err.data?.error)', 0],
+    ['/* err.data.error */ showToast(errorSentence(err));', 0],
+    ["const hint = 'err.data.error';", 0],
+    ['showToast(errorSentence(err)); // nie err.data.error', 0],
+    ['const reason = err.data?.reason;', 0],
+    ['const { errors } = res.data;', 0],
+    ['const errorCount = res.data.errorCount;', 0],
+  ]) {
+    assert.equal(countServerTextReads(source), expected, source);
+  }
+});
+
+test('keine Seite zeigt den Text des Servers ohne Zuordnung, die offenen stehen als Zahl (#1909)', () => {
+  const counts = new Map();
+  let files = 0;
+  for (const path of walkJsFiles('../public/')) {
+    const name = path.slice('../public/'.length);
+    if (name.startsWith('vendor/') || SERVER_TEXT_OWNERS.has(name)) continue;
+    files += 1;
+    const count = countServerTextReads(read(path));
+    if (count) counts.set(name, count);
+  }
+  assert.ok(files > 150, `nur ${files} Dateien gelesen - der Scan greift nicht mehr`);
+
+  const grown = [];
+  const shrunk = [];
+  for (const [name, count] of counts) {
+    const allowed = SERVER_TEXT_OPEN.get(name) ?? 0;
+    if (count > allowed) grown.push(`${name}: ${count} (erlaubt ${allowed})`);
+  }
+  for (const [name, allowed] of SERVER_TEXT_OPEN) {
+    const count = counts.get(name) ?? 0;
+    if (count < allowed) shrunk.push(`${name}: ${count} (Liste sagt ${allowed})`);
+  }
+  assert.deepEqual(grown, [],
+    'Eine Stelle liest `err.data.error` und zeigt damit den Satz des Servers statt den der App. '
+    + 'errorSentence(err, fallbackKey) aus utils/friendly-error.js nehmen; ein Fall, den ein Nutzer erreicht, '
+    + 'bekommt am Server einen `reason` und in CASE_MESSAGES einen Schluessel.');
+  assert.deepEqual(shrunk, [],
+    'Eine Datei liest den Servertext seltener als die Liste sagt - SERVER_TEXT_OPEN auf die neue Zahl senken '
+    + '(bei 0 den Eintrag streichen), sonst darf die Zahl unbemerkt wieder steigen.');
+  for (const name of ['pages/shopping.js', 'utils/kitchen-transfer.js', 'components/category-manager.js']) {
+    assert.equal(SERVER_TEXT_OPEN.has(name), false, `${name} steht auf 0 und gehoert nicht in die Liste`);
+  }
+});
+
+/* WER NOCH UEBER friendlyError FRAGT, STEHT ALS ZAHL DA (#1909, Uebergang).
+ *
+ * `utils/friendly-error.js` ist oben ausgenommen, und `friendlyError()` reicht
+ * an einem Status ohne eigenen Satz den Text des Servers durch: ein Aufrufer,
+ * der noch nicht umgestellt ist, sagt damit nicht weniger als vor #1909. Ohne
+ * diese Liste waere genau dieser Weg fuer den Guard darueber unsichtbar - eine
+ * Seite koennte `err.data.error` gegen `friendlyError(err)` tauschen und stuende
+ * auf 0, mit demselben Text im Toast.
+ *
+ * GEZAEHLT WIRD DER AUFRUF der geteilten Funktion: `friendlyError(...)` in einer
+ * Datei, die sie aus utils/friendly-error.js importiert, und jeder Aufruf ueber
+ * `yuvomi.friendlyError` (auch `?.`). Eine Datei mit einer EIGENEN Funktion
+ * dieses Namens (pages/documents.js) ruft nicht die geteilte - ihre Lesestellen
+ * zaehlt SERVER_TEXT_OPEN. Das Weiterreichen im Router (`window.yuvomi = {
+ * friendlyError }`) ist kein Aufruf.
+ *
+ * RATCHET wie oben: nur senken, bei 0 streichen. Ein Aufrufer verschwindet,
+ * indem seine Stelle zu `errorSentence(err, fallbackKey)` wandert.
+ */
+function countFriendlyErrorCalls(source) {
+  const code = withoutCommentsKeepingLines(source, { blankLiterals: true });
+  const viaGlobal = [...code.matchAll(/\byuvomi\s*(?:\?\.|\.)\s*friendlyError\s*(?:\?\.)?\s*\(/g)].length;
+  // Der Name, unter dem die Datei die geteilte Funktion fuehrt: importiert
+  // (auch `as`) oder aus `window.yuvomi` destrukturiert (auch `: name`).
+  const names = new Set();
+  for (const [, list] of code.matchAll(/\bimport\s*\{([^}]*)\}\s*from\b/g)) {
+    const hit = list.match(/(?:^|,)\s*friendlyError(?:\s+as\s+([\w$]+))?\s*(?:,|$)/);
+    if (hit) names.add(hit[1] ?? 'friendlyError');
+  }
+  for (const [, list] of code.matchAll(/\{([^{}=;]*)\}\s*=\s*[^;\n]*\byuvomi\b/g)) {
+    const hit = list.match(/(?:^|,)\s*friendlyError(?:\s*:\s*([\w$]+))?\s*(?:,|$)/);
+    if (hit) names.add(hit[1] ?? 'friendlyError');
+  }
+  let direct = 0;
+  for (const name of names) {
+    const call = new RegExp(`(?<![.\\w$])${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*(?:\\?\\.)?\\s*\\(`, 'g');
+    direct += [...code.matchAll(call)].length;
+  }
+  return viaGlobal + direct;
+}
+
+// Datei -> Zahl der Aufrufe von friendlyError. Nur senken.
+const FRIENDLY_ERROR_CALLERS = new Map([
+  ['pages/budget.js', 1],
+  ['pages/contacts.js', 1],
+  ['pages/housekeeping.js', 1],
+  ['pages/meals.js', 3],
+  ['router.js', 2],   // Fehlerbildschirm und unbehandelte Rejection
+]);
+
+test('der Zaehler fuer friendlyError sieht beide Wege und keine eigene Funktion (#1909)', () => {
+  const imported = "import { friendlyError } from '/utils/friendly-error.js';\n";
+  for (const [source, expected] of [
+    [`${imported}showToast(friendlyError(err), 'danger');`, 1],
+    [`${imported}a(friendlyError(e)); b(friendlyError (e));`, 2],
+    ["import { errorSentence, friendlyError } from '/utils/friendly-error.js';\nfriendlyError(err);", 1],
+    ["import { friendlyError as say } from '/utils/friendly-error.js';\nshowToast(say(err));", 1],
+    ['const { showToast, friendlyError } = window.yuvomi;\nshowToast(friendlyError(err));', 1],
+    ['const { friendlyError: say } = window.yuvomi ?? {};\nsay(err); say(other);', 2],
+    ["import { friendlyError as $say } from '/utils/friendly-error.js';\n$say(err); say(err);", 1],
+    [`${imported}el.textContent = \`\${friendlyError(err)}\`;`, 1],
+    ['showToast(window.yuvomi?.friendlyError?.(err) ?? t(key));', 1],
+    ['showToast(window.yuvomi.friendlyError(err));', 1],
+    ['const reason = yuvomi?.friendlyError?.(lastError) || lastError?.message;', 1],
+    // Kein Aufruf der geteilten Funktion:
+    [`${imported}window.yuvomi = { navigate, friendlyError, showToast };`, 0],
+    [`${imported}// friendlyError(err)`, 0],
+    [`${imported}const hint = 'friendlyError(err)';`, 0],
+    ['function friendlyError(err) { return err.message; }\nshowToast(friendlyError(err));', 0],
+    ['// window.yuvomi.friendlyError(err)', 0],
+    ["import { errorSentence } from '/utils/friendly-error.js';\nshowToast(errorSentence(err));", 0],
+  ]) {
+    assert.equal(countFriendlyErrorCalls(source), expected, source);
+  }
+});
+
+test('friendlyError hat keinen neuen Aufrufer, die verbliebenen stehen als Zahl (#1909)', () => {
+  const counts = new Map();
+  let files = 0;
+  for (const path of walkJsFiles('../public/')) {
+    const name = path.slice('../public/'.length);
+    if (name.startsWith('vendor/') || name === 'utils/friendly-error.js') continue;
+    files += 1;
+    const count = countFriendlyErrorCalls(read(path));
+    if (count) counts.set(name, count);
+  }
+  assert.ok(files > 150, `nur ${files} Dateien gelesen - der Scan greift nicht mehr`);
+
+  const grown = [];
+  const shrunk = [];
+  for (const [name, count] of counts) {
+    const allowed = FRIENDLY_ERROR_CALLERS.get(name) ?? 0;
+    if (count > allowed) grown.push(`${name}: ${count} (erlaubt ${allowed})`);
+  }
+  for (const [name, allowed] of FRIENDLY_ERROR_CALLERS) {
+    const count = counts.get(name) ?? 0;
+    if (count < allowed) shrunk.push(`${name}: ${count} (Liste sagt ${allowed})`);
+  }
+  assert.deepEqual(grown, [],
+    'Eine Stelle fragt neu ueber friendlyError(), das den Text des Servers durchreicht (Uebergang, #1909). '
+    + 'errorSentence(err, fallbackKey) aus utils/friendly-error.js nehmen.');
+  assert.deepEqual(shrunk, [],
+    'Eine Datei ruft friendlyError() seltener als die Liste sagt - FRIENDLY_ERROR_CALLERS auf die neue Zahl '
+    + 'senken (bei 0 den Eintrag streichen), sonst darf die Zahl unbemerkt wieder steigen.');
+  // Der Einkauf ist umgestellt: kein Weg dort fuehrt ueber friendlyError.
+  for (const name of ['pages/shopping.js', 'utils/kitchen-transfer.js', 'components/category-manager.js']) {
+    assert.equal(counts.has(name), false, `${name} ruft friendlyError() - der Einkauf zeigt nie den Text des Servers`);
+    assert.equal(FRIENDLY_ERROR_CALLERS.has(name), false, `${name} steht auf 0 und gehoert nicht in die Liste`);
+  }
+});

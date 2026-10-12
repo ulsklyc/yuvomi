@@ -297,7 +297,7 @@ test('default repair never assigns rows and generated events have no local calen
   assert.match(buildCalendarFeed(db, fallback.id), /X-WR-CALNAME:Our calendar/);
 });
 
-test('migration 238 leaves every existing event untouched', async () => {
+test('migration 245 leaves every existing event untouched', async () => {
   const { DatabaseSync } = await import('node:sqlite');
   const { MIGRATIONS } = dbmod;
   const database = new DatabaseSync(':memory:');
@@ -308,7 +308,7 @@ test('migration 238 leaves every existing event untouched', async () => {
       INSERT INTO calendar_events VALUES (1, 'Authored', 'local', NULL, NULL, 'original'),
         (2, 'External', 'google', NULL, NULL, 'original');`);
     const before = database.prepare('SELECT * FROM calendar_events ORDER BY id').all();
-    database.exec(MIGRATIONS.find(row => row.version === 238).up);
+    database.exec(MIGRATIONS.find(row => row.version === 245).up);
     const after = database.prepare('SELECT id,title,external_source,target_google_calendar_id,target_caldav_account_id,updated_at FROM calendar_events ORDER BY id').all();
     assert.deepEqual(after, before);
     assert.equal(database.prepare('SELECT COUNT(*) AS n FROM calendar_events WHERE local_calendar_id IS NOT NULL').get().n, 0);
@@ -368,10 +368,15 @@ test('sync targets exclude local calendars before and after outbound sync; Outlo
 test('successful Apple and CalDAV uploads clear local-calendar membership', async () => {
   const { markEventUploaded } = await import('../server/services/calendar-outbound.js');
   const calendar = await createCalendar('Uploaded events', '#336699');
+  // Since #1860 a CalDAV upload names its account; Apple has none.
+  const accountId = db.prepare(
+    "INSERT INTO caldav_accounts (name, caldav_url, username, password) VALUES ('Upload', 'https://calendar.test/caldav/', 'u', 'p')"
+  ).run().lastInsertRowid;
   for (const source of ['apple', 'caldav']) {
     const event = await createEvent(`Upload to ${source}`, calendar.id);
     assert.equal(markEventUploaded(event.id, {
       source, uid: `upload-${source}`, objectUrl: `https://calendar.test/${source}/event.ics`, calRefId: null,
+      accountId: source === 'caldav' ? accountId : null,
     }), true);
     const row = db.prepare('SELECT external_source, local_calendar_id FROM calendar_events WHERE id = ?').get(event.id);
     assert.equal(row.external_source, source);

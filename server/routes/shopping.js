@@ -14,7 +14,7 @@ import { str, oneOf, url, date, collectErrors, MAX_TITLE, MAX_SHORT, MAX_TEXT } 
 import { aggregateMealIngredients } from '../services/shopping-import.js';
 import { loadItemTagsFor } from '../utils/task-tags.js';
 import {
-  flushOutbound, markTodoOutbound, queueTodoDeletions,
+  flushOutbound, markTodoOutbound, queueTodoDeletions, moveShoppingMirror,
 } from '../services/caldav-todo-outbound.js';
 import rateLimit from 'express-rate-limit';
 import { emailService as defaultEmailService } from '../services/email.js';
@@ -66,6 +66,23 @@ function mirroredItems(where, ...params) {
  */
 function pushToCalDAV(what) {
   flushOutbound().catch((err) => log.warn(`${what} vorgemerkt, Sofortversuch fehlgeschlagen:`, err.message));
+}
+
+/**
+ * Eine Id aus dem Anfragekoerper: eine positive Ganzzahl, als Zahl oder als
+ * reine Ziffernfolge - sonst null.
+ *
+ * `Number()` allein ist dafuer zu grosszuegig: es liest auch " 4 ", "0x4",
+ * "4.0" und "4e0" als 4. Bei einem Umzug (#1700) hiesse das, ein Artikel
+ * wandert auf Liste 4, obwohl niemand "4" geschickt hat. Der Typ wird zuerst
+ * gefragt: `true`, ein Array oder ein Objekt sind keine Ids, auch wenn
+ * `Number()` aus manchen eine Zahl macht.
+ */
+function bodyId(raw) {
+  if (typeof raw === 'number') return Number.isSafeInteger(raw) && raw > 0 ? raw : null;
+  if (typeof raw !== 'string' || !/^[1-9][0-9]*$/.test(raw)) return null;
+  const n = Number(raw);
+  return Number.isSafeInteger(n) ? n : null;
 }
 
 /** Alle Kategorien aus DB laden (nach sort_order sortiert). */
@@ -186,7 +203,7 @@ router.post('/categories', (req, res) => {
     const existing = db.get()
       .prepare('SELECT id FROM shopping_categories WHERE name = ? COLLATE NOCASE')
       .get(vName.value);
-    if (existing) return res.status(409).json({ error: 'Category already exists.', code: 409 });
+    if (existing) return res.status(409).json({ error: 'Category already exists.', code: 409, reason: 'category_exists' });
 
     const maxOrder = db.get()
       .prepare('SELECT COALESCE(MAX(sort_order), -1) AS m FROM shopping_categories')
@@ -217,7 +234,7 @@ router.put('/categories/:catId', (req, res) => {
     const cat = db.get()
       .prepare('SELECT * FROM shopping_categories WHERE id = ?')
       .get(req.params.catId);
-    if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404 });
+    if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'shopping_category_not_found' });
 
     const vName = str(req.body.name, 'Name', { max: MAX_SHORT });
     if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
@@ -225,7 +242,7 @@ router.put('/categories/:catId', (req, res) => {
     const conflict = db.get()
       .prepare('SELECT id FROM shopping_categories WHERE name = ? COLLATE NOCASE AND id != ?')
       .get(vName.value, cat.id);
-    if (conflict) return res.status(409).json({ error: 'Category already exists.', code: 409 });
+    if (conflict) return res.status(409).json({ error: 'Category already exists.', code: 409, reason: 'category_exists' });
 
     // Artikel, die die alte Kategorie nutzen, mitumbenennen
     db.get().transaction(() => {
@@ -258,12 +275,12 @@ router.delete('/categories/:catId', (req, res) => {
     const cat = db.get()
       .prepare('SELECT * FROM shopping_categories WHERE id = ?')
       .get(req.params.catId);
-    if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404 });
+    if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'shopping_category_not_found' });
 
     const total = db.get()
       .prepare('SELECT COUNT(*) AS c FROM shopping_categories')
       .get().c;
-    if (total <= 1) return res.status(400).json({ error: 'The last category cannot be deleted.', code: 400 });
+    if (total <= 1) return res.status(400).json({ error: 'The last category cannot be deleted.', code: 400, reason: 'category_last' });
 
     // Fallback-Kategorie: erste andere Kategorie nach sort_order
     const fallback = db.get()
@@ -459,7 +476,7 @@ router.put('/stores/:id', (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ error: 'Invalid store ID.', code: 400 });
     const store = db.get().prepare('SELECT * FROM shopping_stores WHERE id = ?').get(id);
-    if (!store) return res.status(404).json({ error: 'Store not found.', code: 404 });
+    if (!store) return res.status(404).json({ error: 'Store not found.', code: 404, reason: 'shopping_store_not_found' });
 
     const vName = str(req.body.name, 'Name', { max: MAX_SHORT });
     const errors = collectErrors([vName]);
@@ -468,7 +485,7 @@ router.put('/stores/:id', (req, res) => {
     const kollision = db.get().prepare(
       'SELECT id FROM shopping_stores WHERE name = ? COLLATE NOCASE AND id != ?'
     ).get(vName.value, id);
-    if (kollision) return res.status(409).json({ error: 'Diesen Laden gibt es schon.', code: 409 });
+    if (kollision) return res.status(409).json({ error: 'Store already exists.', code: 409, reason: 'shopping_store_exists' });
 
     db.get().prepare('UPDATE shopping_stores SET name = ? WHERE id = ?').run(vName.value, id);
     res.json({ data: db.get().prepare('SELECT * FROM shopping_stores WHERE id = ?').get(id) });
@@ -484,7 +501,7 @@ router.delete('/stores/:id', (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ error: 'Invalid store ID.', code: 400 });
     const store = db.get().prepare('SELECT id FROM shopping_stores WHERE id = ?').get(id);
-    if (!store) return res.status(404).json({ error: 'Store not found.', code: 404 });
+    if (!store) return res.status(404).json({ error: 'Store not found.', code: 404, reason: 'shopping_store_not_found' });
     // Der Fremdschluessel steht auf SET NULL: bezahlte Preise bleiben stehen,
     // sie verlieren nur ihren Laden. Was einmal bezahlt wurde, bleibt wahr.
     db.get().prepare('DELETE FROM shopping_stores WHERE id = ?').run(id);
@@ -496,16 +513,27 @@ router.delete('/stores/:id', (req, res) => {
 });
 
 // --------------------------------------------------------
-// Artikel aktualisieren (is_checked, name, quantity, category, notes, url).
-// Body: { is_checked?, name?, quantity?, category?, notes?, url? }
-// Response: { data: ShoppingItem }
+// Artikel aktualisieren (is_checked, name, quantity, category, notes, url)
+// und auf eine andere Liste umziehen (list_id, #1700).
+// Body: { is_checked?, name?, quantity?, category?, notes?, url?, list_id? }
+// Response: { data: ShoppingItem, list_change }
+//
+// EIN UMZUG IST EIN UMZUG, KEIN LÖSCHEN UND NEU ANLEGEN: dieselbe Zeile, mit
+// Notiz, Link, Preis und Laden. Zwei Dinge gelten in der neuen Liste nicht
+// weiter und werden deshalb neu gesetzt - der Rang (er zählt je Liste und
+// Kategorie) und der Platz des Objekts auf dem CalDAV-Server: es zieht mit
+// (`moveShoppingMirror`), mit Etiketten, Alarm und allem, was daran hängt.
+//
+// `list_change` nennt die Liste, von der der Artikel KOMMT - das ist der
+// Zettel, den der Schreibende offen hat. Die Zielliste bewegt ihre Nummer
+// über denselben Trigger wie jeder andere Schreibweg.
 // --------------------------------------------------------
 router.patch('/items/:itemId', (req, res) => {
   try {
     const item = db.get()
       .prepare('SELECT * FROM shopping_items WHERE id = ?')
       .get(req.params.itemId);
-    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404 });
+    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'shopping_item_not_found' });
 
     const {
       is_checked = item.is_checked,
@@ -549,15 +577,15 @@ router.patch('/items/:itemId', (req, res) => {
       const roh = req.body.store_id;
       if (roh === null || roh === '') storeId = null;
       else {
-        const n = Number(roh);
-        if (!Number.isInteger(n) || n <= 0) {
+        const n = bodyId(roh);
+        if (n === null) {
           return res.status(400).json({ error: 'store_id muss eine Laden-ID sein.', code: 400 });
         }
         // Ein unbekannter Laden wird abgelehnt statt still verworfen: anders als
         // bei einer Personenauswahl ist das hier ein Aufruffehler - die Liste
         // der Laeden ist verwaltet und kurz.
         if (!db.get().prepare('SELECT 1 FROM shopping_stores WHERE id = ?').get(n)) {
-          return res.status(400).json({ error: 'Unbekannter Laden.', code: 400 });
+          return res.status(400).json({ error: 'Unknown store.', code: 400, reason: 'shopping_store_not_found' });
         }
         storeId = n;
       }
@@ -565,9 +593,29 @@ router.patch('/items/:itemId', (req, res) => {
 
     if (!name?.trim()) return res.status(400).json({ error: 'name darf nicht leer sein.', code: 400 });
 
+    // ZIELLISTE (#1700). Nicht mitgeschickt oder die eigene Liste heisst: kein
+    // Umzug. Geprüft wird hier, nicht nur im Dialog: die Route ist Teil der
+    // zugesagten API. Eine Liste, die es nicht gibt, ist ein Aufruffehler wie
+    // ein unbekannter Laden - der Artikel bleibt, wo er ist, statt am
+    // Fremdschlüssel in einem 500 zu enden. Listen kennen keine eigene
+    // Sichtbarkeit; wer hier schreibt, hat `shopping: write` (Modul-Gate) und
+    // damit jede Liste des Haushalts.
+    let targetListId = item.list_id;
+    if (req.body.list_id !== undefined && req.body.list_id !== null) {
+      const n = bodyId(req.body.list_id);
+      if (n === null) {
+        return res.status(400).json({ error: 'list_id muss eine Listen-ID sein.', code: 400 });
+      }
+      if (n !== item.list_id && !db.get().prepare('SELECT 1 FROM shopping_lists WHERE id = ?').get(n)) {
+        return res.status(400).json({ error: 'Unknown list.', code: 400, reason: 'shopping_list_not_found' });
+      }
+      targetListId = n;
+    }
+    const moved = targetListId !== item.list_id;
+
     const validNames = validCategoryNames();
     if (category && !validNames.includes(category))
-      return res.status(400).json({ error: 'Invalid category.', code: 400 });
+      return res.status(400).json({ error: 'Invalid category.', code: 400, reason: 'shopping_category_not_found' });
 
     // notes/url gleich validieren wie beim Anlegen (URL nur http/https → XSS-sicher).
     const vNotes = str(notes, 'Notiz', { max: MAX_TEXT, required: false });
@@ -576,25 +624,35 @@ router.patch('/items/:itemId', (req, res) => {
     if (fieldErrors.length) return res.status(400).json({ error: fieldErrors.join(' '), code: 400 });
 
     const { list_change } = withListChange(item.list_id, () => {
-      db.get().prepare(`
-        UPDATE shopping_items
-        SET is_checked = ?, name = ?, quantity = ?, category = ?, notes = ?, url = ?,
-            price_cents = ?, store_id = ?
-        WHERE id = ?
-      `).run(is_checked ? 1 : 0, name.trim(), quantity ?? null, category, vNotes.value, vUrl.value,
-        priceCents ?? null, storeId ?? null, req.params.itemId);
+      // Eine Transaktion: ein Umzug, der zwischen der Vormerkung für den
+      // Server und "auf der neuen Liste" abbricht, hinterliesse einen Artikel,
+      // dessen Objekt in eine Liste gezogen würde, in der er nicht steht.
+      db.get().transaction(() => {
+        // VOR dem Umzug, mit der Zeile der alten Liste.
+        if (moved) moveShoppingMirror(item, targetListId);
 
-      // Kategoriewechsel heißt Positionswechsel: die Handsortierung zählt je
-      // Kategorie (#678), der alte Rang gilt in der neuen Nachbarschaft nicht.
-      // Ans Ende - dort landet in dieser Liste auch alles neu Hinzugefügte.
-      if (category !== item.category) {
         db.get().prepare(`
-          UPDATE shopping_items SET sort_order = COALESCE((
-            SELECT MAX(sort_order) FROM shopping_items
-             WHERE list_id = ? AND category = ? AND id != ?
-          ), 0) + 1 WHERE id = ?
-        `).run(item.list_id, category, item.id, item.id);
-      }
+          UPDATE shopping_items
+          SET is_checked = ?, name = ?, quantity = ?, category = ?, notes = ?, url = ?,
+              price_cents = ?, store_id = ?, list_id = ?
+          WHERE id = ?
+        `).run(is_checked ? 1 : 0, name.trim(), quantity ?? null, category, vNotes.value, vUrl.value,
+          priceCents ?? null, storeId ?? null, targetListId, req.params.itemId);
+
+        // Kategoriewechsel heißt Positionswechsel: die Handsortierung zählt je
+        // Kategorie (#678), der alte Rang gilt in der neuen Nachbarschaft nicht.
+        // Ans Ende - dort landet in dieser Liste auch alles neu Hinzugefügte.
+        // Ein Listenwechsel ebenso, und gemessen wird an der ZIELLISTE: der
+        // Rang aus der alten Liste stünde dort zwischen fremden Nachbarn.
+        if (moved || category !== item.category) {
+          db.get().prepare(`
+            UPDATE shopping_items SET sort_order = COALESCE((
+              SELECT MAX(sort_order) FROM shopping_items
+               WHERE list_id = ? AND category = ? AND id != ?
+            ), 0) + 1 WHERE id = ?
+          `).run(targetListId, category, item.id, item.id);
+        }
+      })();
     });
 
     const updated = db.get()
@@ -603,11 +661,16 @@ router.patch('/items/:itemId', (req, res) => {
 
     // Abhaken oder Umbenennen eines gespiegelten Artikels zieht auf dem
     // CalDAV-Server nach (#617).
+    // Bleibt der Artikel nach einem Umzug Spiegel, geht eine Bearbeitung aus
+    // derselben Anfrage mit seinem Objekt an den neuen Platz.
     const pending = markTodoOutbound('shopping', item, updated);
 
     res.json({ data: updated, list_change });
 
     if (pending) pushToCalDAV('Änderung');
+    // Wie beim Anlegen ohne Vorprüfung: ob die Zielliste gespiegelt ist, weiss
+    // der Lauf selbst, und ohne offene Arbeit kehrt er sofort zurück.
+    else if (moved) pushToCalDAV('Umzug');
   } catch (err) {
     log.error('PATCH items/:id error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -700,7 +763,7 @@ router.delete('/items/:itemId', (req, res) => {
     const item = db.get()
       .prepare('SELECT id, list_id FROM shopping_items WHERE id = ?')
       .get(req.params.itemId);
-    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404 });
+    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'shopping_item_not_found' });
 
     const queued = queueTodoDeletions('shopping', mirroredItems('id = ?', req.params.itemId));
 
@@ -780,7 +843,7 @@ router.put('/:listId', (req, res) => {
       .prepare('UPDATE shopping_lists SET name = ? WHERE id = ?')
       .run(vName.value, req.params.listId);
     if (result.changes === 0)
-      return res.status(404).json({ error: 'List not found.', code: 404 });
+      return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
 
     const list = db.get()
       .prepare('SELECT * FROM shopping_lists WHERE id = ?')
@@ -827,7 +890,7 @@ router.post('/:listId/duplicate', (req, res) => {
     const list = db.get()
       .prepare('SELECT * FROM shopping_lists WHERE id = ?')
       .get(req.params.listId);
-    if (!list) return res.status(404).json({ error: 'List not found.', code: 404 });
+    if (!list) return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
 
     // Express 5 laesst req.body bei einem POST ohne Body undefined -
     // ohne das ?. antwortete die Route hier mit 500 statt 400.
@@ -903,7 +966,7 @@ router.delete('/:listId', (req, res) => {
       .prepare('DELETE FROM shopping_lists WHERE id = ?')
       .run(req.params.listId);
     if (result.changes === 0)
-      return res.status(404).json({ error: 'List not found.', code: 404 });
+      return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
     res.json({ ok: true });
 
     if (queued) pushToCalDAV('Löschung');
@@ -925,7 +988,7 @@ router.get('/:listId/items', (req, res) => {
     const list = db.get()
       .prepare('SELECT * FROM shopping_lists WHERE id = ?')
       .get(req.params.listId);
-    if (!list) return res.status(404).json({ error: 'List not found.', code: 404 });
+    if (!list) return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
 
     const categories = loadCategories();
     // Die Laufnummer, zu der diese Artikel gehoeren: der Zettel sagt sie dem
@@ -960,7 +1023,7 @@ router.patch('/:listId/items/reorder', (req, res) => {
     const list = db.get()
       .prepare('SELECT id FROM shopping_lists WHERE id = ?')
       .get(req.params.listId);
-    if (!list) return res.status(404).json({ error: 'List not found.', code: 404 });
+    if (!list) return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
 
     const { category, order } = req.body;
     if (!Array.isArray(order) || order.length === 0)
@@ -1017,7 +1080,7 @@ router.post('/:listId/items', (req, res) => {
     const list = db.get()
       .prepare('SELECT id FROM shopping_lists WHERE id = ?')
       .get(req.params.listId);
-    if (!list) return res.status(404).json({ error: 'List not found.', code: 404 });
+    if (!list) return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
 
     // Ohne Kategorie faellt der Artikel auf "Sonstiges", solange der Haushalt
     // diese Kategorie noch hat - erst wenn sie umbenannt oder geloescht wurde,
@@ -1085,7 +1148,7 @@ router.post('/:listId/send', sendListLimiter, async (req, res) => {
   const emailService = req.app?.locals?.emailService || defaultEmailService;
   try {
     const list = db.get().prepare('SELECT * FROM shopping_lists WHERE id = ?').get(req.params.listId);
-    if (!list) return res.status(404).json({ error: 'List not found.', code: 404 });
+    if (!list) return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
 
     const userId = Number(req.body?.userId);
     if (!Number.isInteger(userId) || userId <= 0) {
@@ -1196,7 +1259,7 @@ router.post('/:listId/import-meal-plan', (req, res) => {
     const list = db.get()
       .prepare('SELECT id FROM shopping_lists WHERE id = ?')
       .get(req.params.listId);
-    if (!list) return res.status(404).json({ error: 'List not found.', code: 404 });
+    if (!list) return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
 
     const vFrom = date(req.body.from, 'From date', true);
     const vTo = date(req.body.to, 'To date', true);
@@ -1287,7 +1350,7 @@ router.post('/:listId/import-pantry', (req, res) => {
     const list = db.get()
       .prepare('SELECT id FROM shopping_lists WHERE id = ?')
       .get(req.params.listId);
-    if (!list) return res.status(404).json({ error: 'List not found.', code: 404 });
+    if (!list) return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
 
     const entries = Array.isArray(req.body.items) ? req.body.items : [];
     if (!entries.length) return res.json({ data: { added: 0, skipped: 0, added_ids: [] } });

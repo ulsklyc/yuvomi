@@ -1,6 +1,10 @@
 import { api } from '/api.js';
-import { formatDate } from '/i18n.js';
-import { syncScreensaverIdleFromStorage } from '/utils/screensaver-idle.js';
+import { formatDate, formatTime } from '/i18n.js';
+import {
+  isScreensaverClockOn,
+  isScreensaverCoverOn,
+  syncScreensaverIdleFromStorage,
+} from '/utils/screensaver-idle.js';
 
 // Read on every arming, not once at load: the delay is a per-device choice
 // (utils/screensaver-idle.js, #885) that theme-init.js applies before this
@@ -12,6 +16,7 @@ const SLIDE_MS = 20_000;
 
 let idleTimer;
 let slideTimer;
+let clockTimer;
 let overlay;
 let run = 0;
 
@@ -19,6 +24,8 @@ function stop() {
   run += 1;
   clearInterval(slideTimer);
   slideTimer = undefined;
+  clearTimeout(clockTimer);
+  clockTimer = undefined;
   overlay?.remove();
   overlay = undefined;
 }
@@ -43,6 +50,24 @@ function caption(photo) {
   // Follows the date-format preference like every other date in the app.
   const formatted = Number.isNaN(date.getTime()) ? '' : formatDate(date);
   return [formatted, place].filter(Boolean).join(' · ');
+}
+
+// The household's time in the household's format and zone (formatTime), on the
+// full minute like the clock on the overview (dashboard.js, startClockTicker),
+// so it turns when every other clock in the room does.
+function tickClock(clock) {
+  const now = new Date();
+  clock.textContent = formatTime(now);
+  clockTimer = setTimeout(() => tickClock(clock), 60_000 - (now.getSeconds() * 1000 + now.getMilliseconds()));
+}
+
+// Knock again after one more idle period without waiting for input. `start()`
+// runs from a one-shot idle timeout, and on a wall tablet "the next pointer,
+// key or visibility event" can be hours away - the same trap the kitchen-timer
+// branch in `start()` avoids with the same two lines.
+function rearm() {
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(start, idleMs());
 }
 
 async function start() {
@@ -72,10 +97,29 @@ async function start() {
     overlay = document.createElement('div');
     overlay.className = 'photo-screensaver';
     overlay.setAttribute('aria-hidden', 'true');
+    // Both read per start, not once at load: they are this device's choice
+    // (#1766) and apply from the next start on, without a reload.
+    if (isScreensaverCoverOn()) overlay.classList.add('photo-screensaver--cover');
     const image = document.createElement('img');
     image.alt = '';
+    // A refused image - an administrator switched this display off while the
+    // screensaver was showing (#1766) - or one Immich no longer has: take the
+    // overlay down instead of leaving a black screen with only the text
+    // moving over it, and knock again after the next idle period.
+    image.onerror = () => {
+      if (currentRun !== run) return;
+      stop();
+      rearm();
+    };
     const label = document.createElement('p');
     overlay.append(image, label);
+    let clock = null;
+    if (isScreensaverClockOn()) {
+      clock = document.createElement('p');
+      clock.className = 'photo-screensaver__clock';
+      overlay.append(clock);
+      tickClock(clock);
+    }
     document.body.append(overlay);
 
     let index = Math.floor(Math.random() * photos.length);
@@ -89,12 +133,20 @@ async function start() {
       // Move the only persistent text so the screensaver itself has no fixed
       // bright pixels that could cause burn-in.
       label.dataset.position = String(index % 4);
+      // The clock takes the corner diagonally opposite and moves with the
+      // caption, so the two never meet and no text stays in one place.
+      if (clock) clock.dataset.position = String((index + 2) % 4);
     };
     show();
     slideTimer = setInterval(show, SLIDE_MS);
     return true;
   } catch {
-    // Screensaver is optional; retry after the next period of inactivity.
+    // Screensaver is optional; try again after one more idle period, without
+    // waiting for input. A paired display that an administrator switches on
+    // (#1766) gets its photos on the next knock instead of on the next touch,
+    // and one that stays off asks once per idle period and gets its 403. Only
+    // for the current run: a start() retired by stop() is not ours to re-arm.
+    if (currentRun === run) rearm();
     return false;
   }
 }
@@ -119,6 +171,12 @@ window.addEventListener('pointermove', () => {
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) stop(); else resetIdle();
 });
+// The session is gone (api.js fires this before it throws on a 401): retire the
+// run, so the catch in start() arms nothing. This module also loads on the
+// sign-in and setup pages, where every knock would end the same way and make
+// the router draw the page again - once per idle period, for as long as the tab
+// stays open. The gesture that signs in arms the timer again.
+window.addEventListener('auth:expired', () => stop());
 // A new delay re-arms the timer at once, so it applies without a reload. Only
 // while nothing is showing: the change comes from the settings page, and a
 // visible screensaver there is the admin preview, which stays until dismissed.

@@ -68,7 +68,7 @@ db.exec(`
   ALTER TABLE calendar_events ADD COLUMN target_caldav_account_id INTEGER;
   CREATE TABLE housekeeping_work_sessions (id INTEGER PRIMARY KEY, calendar_event_id INTEGER);
 `);
-db.exec(MIGRATIONS_SQL[238]);
+db.exec(MIGRATIONS_SQL[245]);
 
 // Testdaten einfügen
 const u1 = db.prepare(`INSERT INTO users (username, display_name, password_hash, avatar_color, role)
@@ -2012,7 +2012,7 @@ cdb.exec(`
   ALTER TABLE calendar_events ADD COLUMN target_caldav_account_id INTEGER;
   CREATE TABLE housekeeping_work_sessions (id INTEGER PRIMARY KEY, calendar_event_id INTEGER);
 `);
-cdb.exec(MIGRATIONS_SQL[238]);
+cdb.exec(MIGRATIONS_SQL[245]);
 
 const cu1 = cdb.prepare(`INSERT INTO users (username, display_name, password_hash, avatar_color)
   VALUES ('theodore', 'Theodore', 'x', '#34C759')`).run();
@@ -2705,11 +2705,24 @@ test('Wand-Modus: der Deckel greift, und der Überlauf sagt die Wahrheit', async
 test('Wand-Modus: „Wer heute dran ist" zählt den ganzen Tag, nicht nur die sichtbaren Zeilen', async () => {
   const { __test } = await import('../public/pages/dashboard.js');
   await withWallWindow(() => {
-    // Mia hat GENAU EINE Aufgabe, und die liegt hinter dem Deckel. Zählte der
+    // Mia hat GENAU EINEN Termin, und der liegt hinter dem Deckel. Zählte der
     // Abschnitt nur die gezeigten Zeilen, verschwände sie aus der Antwort.
+    //
+    // EIN TERMIN, KEINE AUFGABE, und ohne `wallTasks` für sie: seit #1817
+    // kommen die Aufgaben einer Person aus `wallTasks`, und mit einem Eintrag
+    // dort stünde Mia ohnehin da - gleich, welche Zeilen die Schleife liest.
     const spaet = { id: 42, display_name: 'Mia Muster', avatar_color: '#CE2A63' };
-    const tasks = wallTasks(8, { assignTo: (i) => (i === 7 ? spaet : null) });
-    const html = __test.renderWallSurface({ urgentTasks: tasks, users: [spaet] }, null, {});
+    const day = '2031-05-06';
+    const events = Array.from({ length: 8 }, (_, i) => ({
+      id: i + 1,
+      title: `Termin ${i + 1}`,
+      start_datetime: `${day}T${String(8 + i).padStart(2, '0')}:00`,
+      end_datetime: `${day}T${String(8 + i).padStart(2, '0')}:30`,
+      all_day: 0,
+      assigned_users: i === 7 ? [spaet] : [],
+    }));
+    const html = __test.renderWallSurface({ upcomingEvents: events, urgentTasks: [], users: [spaet] }, null, { now: new Date(`${day}T06:00:00`) });
+    nodeAssert.ok(!html.includes('Termin 8'), 'Vorbedingung: Mias Termin steht NICHT unter den gezeigten Zeilen');
     nodeAssert.match(html, /wall-who__member/, 'Reichweite: der Abschnitt wurde gebaut');
     nodeAssert.match(html, /Mia/, 'wer hinter dem Deckel steht, steht trotzdem in der Antwort');
     nodeAssert.match(html, /wall-who__count/, 'die Zahl beantwortet „wie viel"');

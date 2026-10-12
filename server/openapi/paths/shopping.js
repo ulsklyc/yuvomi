@@ -8,19 +8,19 @@ export function shoppingPaths() {
     },
     '/api/v1/shopping/categories': {
       get: op({ summary: 'List shopping categories', tag: 'Shopping' }),
-      post: op({ summary: 'Create shopping category', tag: 'Shopping', stateChanging: true, requestBody: jsonBody(null) }),
+      post: op({ summary: 'Create shopping category', tag: 'Shopping', stateChanging: true, requestBody: jsonBody(null), description: 'Body: { name }. A name that is already taken is refused with 409 and `reason: "category_exists"`.' }),
     },
     '/api/v1/shopping/stores': {
       get: op({ summary: 'List the shops a price can be recorded against', tag: 'Shopping', description: 'A managed list rather than free text on the item: a household visits few enough shops that maintaining them is cheap, and free text is messy from the first week ("REWE", "Rewe", "rewe City" would be three).' }),
       post: op({ summary: 'Add a shop', tag: 'Shopping', stateChanging: true, requestBody: jsonBody(null), description: 'Body: { name }. Adding a shop that already exists returns the existing row with 200 rather than a conflict - that is not a mistake, it is already there.' }),
     },
     '/api/v1/shopping/stores/{id}': {
-      put: op({ summary: 'Rename a shop', tag: 'Shopping', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { name }. Renaming rather than re-creating, so a typo does not split the purchase history away from the shop it belongs to. 409 when another shop already carries that name.' }),
-      delete: op({ summary: 'Remove a shop', tag: 'Shopping', params: [idParam()], stateChanging: true, description: 'Prices recorded against it keep their value and lose only the shop reference: what was once paid stays true even when the shop leaves the list.' }),
+      put: op({ summary: 'Rename a shop', tag: 'Shopping', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { name }. Renaming rather than re-creating, so a typo does not split the purchase history away from the shop it belongs to. 409 with `reason: "shopping_store_exists"` when another shop already carries that name, 404 with `reason: "shopping_store_not_found"` when the shop is gone.' }),
+      delete: op({ summary: 'Remove a shop', tag: 'Shopping', params: [idParam()], stateChanging: true, description: 'Prices recorded against it keep their value and lose only the shop reference: what was once paid stays true even when the shop leaves the list. 404 with `reason: "shopping_store_not_found"` when the shop is already gone.' }),
     },
     '/api/v1/shopping/categories/{catId}': {
-      put: op({ summary: 'Update shopping category', tag: 'Shopping', params: [idParam('catId', 'Category ID')], stateChanging: true, requestBody: jsonBody(null) }),
-      delete: op({ summary: 'Delete shopping category', tag: 'Shopping', params: [idParam('catId', 'Category ID')], stateChanging: true }),
+      put: op({ summary: 'Update shopping category', tag: 'Shopping', params: [idParam('catId', 'Category ID')], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { name }. 409 with `reason: "category_exists"` when another category carries that name, 404 with `reason: "shopping_category_not_found"` when the category is gone.' }),
+      delete: op({ summary: 'Delete shopping category', tag: 'Shopping', params: [idParam('catId', 'Category ID')], stateChanging: true, description: 'Items of the category move to the next one. The last category is kept: 400 with `reason: "category_last"`. 404 with `reason: "shopping_category_not_found"` when the category is already gone.' }),
     },
     '/api/v1/shopping/categories/reorder': {
       patch: op({ summary: 'Reorder shopping categories', tag: 'Shopping', stateChanging: true, requestBody: jsonBody(null) }),
@@ -63,7 +63,25 @@ export function shoppingPaths() {
       }),
     },
     '/api/v1/shopping/items/{itemId}': {
-      patch: op({ summary: 'Update shopping item', tag: 'Shopping', params: [idParam('itemId', 'Item ID')], stateChanging: true, requestBody: jsonBody(null) }),
+      patch: op({
+        summary: 'Update shopping item',
+        description: 'Body: { is_checked?, name?, quantity?, category?, notes?, url?, price_cents?, store_id?, list_id? } - '
+          + 'a field that is not sent stays as it is. `list_id` moves the item to another list: it keeps its name, quantity, '
+          + 'category, note, link, price and shop, and goes to the end of its category on the list it lands on. `list_id` and '
+          + '`store_id` are positive integers, as a number or a string of digits; anything else and an unknown '
+          + '`list_id` are refused with 400 and nothing changes. If the item is mirrored from a CalDAV list and the target '
+          + 'list is mirrored too, its object on the server moves along after the response, unchanged and under the same UID; '
+          + 'if the target list is not mirrored, the object is removed on the server and its mirrored tags are dropped. '
+          + '`list_change` in the response names the list the item came from. A case a household member can run into carries a '
+          + 'machine-readable `reason` next to `error`: `shopping_item_not_found` (404, the item is gone), '
+          + '`shopping_list_not_found` (400, unknown `list_id`), `shopping_store_not_found` (400, unknown `store_id`), '
+          + '`shopping_category_not_found` (400, unknown `category`). Every shopping route that works on a list answers a '
+          + 'missing list with 404 and `reason: "shopping_list_not_found"`. Validation errors carry no `reason`.',
+        tag: 'Shopping',
+        params: [idParam('itemId', 'Item ID')],
+        stateChanging: true,
+        requestBody: jsonBody(null),
+      }),
       delete: op({ summary: 'Delete shopping item', tag: 'Shopping', params: [idParam('itemId', 'Item ID')], stateChanging: true }),
     },
     '/api/v1/shopping/{listId}': {

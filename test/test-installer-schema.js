@@ -89,11 +89,19 @@ const OIDC_SIGNUP_KEYS = ['OIDC_ALLOW_SIGNUP'];
 // was die EINGEBAUTE Anmeldung darf, nicht was der Anbieter darf.
 const PASSWORD_LOGIN_KEYS = ['AUTH_ALLOW_PASSWORD_LOGIN'];
 
+// Der Schalter, der Module aus den Einstellungen installieren laesst (#1671,
+// DECISIONS.md 12). Eigene Liste wie die zwei darueber: ein Opt-in des
+// Betreibers, kein Mitglied einer Sachgruppe - und anders als MODULES_DIR
+// (bewusst nicht im Wizard, siehe INTENTIONALLY_NOT_IN_INSTALLER) eine echte
+// App-Variable, die im Container dasselbe bedeutet wie auf dem Host.
+const MODULE_WEB_INSTALL_KEYS = ['MODULES_ALLOW_WEB_INSTALL'];
+
 const TOTAL_KEYS = ORIGINAL_KEYS.length + GOOGLE_DRIVE_KEYS.length + OUTLOOK_KEYS.length + 2 + P5_KEYS.length
   + DOCUMENT_STORAGE_KEYS.length + DOCUMENT_STORAGE_LOCAL_KEYS.length
   + SUBSCRIPTION_KEYS.length + EMAIL_KEYS.length + WEBDAV_BACKUP_KEYS.length
   + WIZARD_EXTRA_KEYS.length + COMPLETENESS_KEYS.length + UPLOAD_KEYS.length
-  + OIDC_SIGNUP_KEYS.length + PASSWORD_LOGIN_KEYS.length; // + TZ + OIKOS_HTTP_PORT
+  + OIDC_SIGNUP_KEYS.length + PASSWORD_LOGIN_KEYS.length
+  + MODULE_WEB_INSTALL_KEYS.length; // + TZ + OIKOS_HTTP_PORT
 
 // ── Regel-Guard: .env.example ⇄ ENV_SCHEMA ⇄ gesendetes env-Objekt ───────────
 //
@@ -161,6 +169,14 @@ const INTENTIONALLY_NOT_IN_INSTALLER = {
     + 'Formular nennt den Schalter, wenn es eine private Adresse ablehnt.',
   IMMICH_API_KEY: 'Geheimnis, das in der App gesetzt und dort auch getestet wird.',
   IMMICH_SCREENSAVER_ALBUM_ID: 'Optionale Album-Einschränkung, in der App wählbar.',
+  // Ab Werk AUS (leer = nichts geht hinaus, kein Knopf): fuer jede vom Wizard
+  // erzeugte Installation ist "nicht gesetzt" der richtige Wert. Einschalten
+  // ist eine bewusste Entscheidung des Betreibers, einen fremden Dienst mit dem
+  // Hash der Adressen seiner Mitglieder zu befragen (docs/SCOPE.md) - die gehoert
+  // nicht als weitere Frage vor die erste Anmeldung.
+  GRAVATAR_BASE_URL:
+    'Optionaler Gravatar-Import, ab Werk aus (leer); wer ihn will, setzt die Basis-URL '
+    + '(gravatar.com oder ein Libravatar-Spiegel) bewusst in der .env - keine Frage fuer den Wizard.',
 
   // Betriebs-Feinjustage, keine Installationsentscheidung.
   LOG_LEVEL: 'Betriebs-Feinjustage.',

@@ -231,6 +231,9 @@ test('bekannte Module mit gespeicherter *_url-Spalte binden den SSRF-Schutz ein'
     '../server/services/recipe-providers/mealie.js',
     '../server/services/recipe-providers/tandoor.js',
     '../server/services/waste-url-source.js',
+    // Keine DB-Spalte, aber derselbe Umstand: die Basis-URL setzt der Betreiber
+    // (GRAVATAR_BASE_URL), und ein Spiegel kann umleiten.
+    '../server/services/gravatar.js',
   ];
   for (const path of modules) {
     const src = read(path);

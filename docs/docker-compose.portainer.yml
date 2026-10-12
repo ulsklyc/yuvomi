@@ -58,6 +58,11 @@ services:
       - PORT=3000
       - DB_PATH=/data/yuvomi.db
       - BACKUP_DIR=/backups
+      # Set true to let an admin install third-party modules from Settings into
+      # the oikos_modules volume (same-origin script from a browser session, no
+      # file access needed). Off by default; installed modules stay off until an
+      # admin approves them in a browser session.
+      - MODULES_ALLOW_WEB_INSTALL=${MODULES_ALLOW_WEB_INSTALL:-false}
       - SESSION_SECRET=${SESSION_SECRET:?Set SESSION_SECRET in .env}
       - DB_ENCRYPTION_KEY=${DB_ENCRYPTION_KEY:?Set DB_ENCRYPTION_KEY in .env}
       # Set to true when behind a reverse proxy with HTTPS (Caddy, nginx, Traefik)
@@ -163,6 +168,11 @@ services:
       # Sync interval in minutes
       - SYNC_INTERVAL_MINUTES=${SYNC_INTERVAL_MINUTES:-15}
       - MAX_UPLOAD_MB=${MAX_UPLOAD_MB:-5}
+      # One-time Gravatar import of a member's profile picture (only a hash of the
+      # address leaves the server). Off unless set: empty means nothing is sent and
+      # no button is shown. Opt in with e.g. https://gravatar.com/avatar/ or a
+      # Libravatar mirror (https only, public host).
+      - GRAVATAR_BASE_URL=${GRAVATAR_BASE_URL:-}
       # Set true only for ICS calendar feeds on a private/local network.
       - ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK=${ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK:-false}
       # Set true only for recipe provider (Mealie/Tandoor) mirrors on a private/local network.

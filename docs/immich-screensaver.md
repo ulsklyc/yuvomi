@@ -36,6 +36,19 @@ exists. Leaving the field empty preserves the saved key.
 The album UUID is the UUID portion of an Immich album URL. Only image assets are selected; videos
 are not shown by the screensaver.
 
+## Wall tablets
+
+A paired wall tablet shows the screensaver only when an administrator switches it on for that
+tablet, under **Settings → Household → Wall tablets → Show the photo screensaver**. It is off by
+default: a tablet changes no settings itself, and its delay has no "never", so without this switch
+every wall in a household with Immich would start covering its calendar with photos.
+
+A tablet with the switch on reads the same photos every signed-in device shows - a random selection
+from the configured album or, without one, from everything the API key can read, with the date,
+city and country of each photo - and nothing else of the screensaver: the connection, the album
+choice and the connection test stay with the administrators. With the switch off, the server
+refuses the photos to that tablet.
+
 ## Delay on each device
 
 How long a device waits before the screensaver starts is chosen on that device, under
@@ -44,6 +57,19 @@ five by default. It is stored in the browser like wall mode, so a photo frame ca
 minute while a kitchen tablet and every phone in the household keep their own delay. A new value
 applies at once, without a reload. There is deliberately no household setting or environment
 variable for it: one value for the whole household would reach every signed-in device.
+
+## Clock and full-screen photos
+
+Two more choices sit right below the delay, and they are per device for the same reason:
+
+- **Show the time on the screensaver** - on by default. The current time, in the household's time
+  format and zone, in the corner diagonally opposite the photo caption. It moves with the caption
+  and turns on the full minute.
+- **Fill the screen with the photo** - off by default. Photos fill the whole screen instead of
+  fitting inside it, so the edges are cropped, most of all on a portrait photo shown on a landscape
+  screen.
+
+Both apply the next time the screensaver starts, without a reload.
 
 ## Configure through environment variables
 

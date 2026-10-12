@@ -244,3 +244,24 @@ test('categorizeIngredient: mehrwortiges Stichwort ("baking powder") matcht als 
 test('categorizeIngredient: kein Treffer → Fallback Sonstiges', () => {
   assert.equal(categorizeIngredient({ foodName: 'Xyzzy' }), 'Sonstiges');
 });
+
+
+// --------------------------------------------------------------------------
+// categorizeIngredient: norwegische Stichworte
+// --------------------------------------------------------------------------
+
+test('categorizeIngredient: norwegisches "hvetemel" → Backwaren', () => {
+  assert.equal(categorizeIngredient({ foodName: 'hvetemel' }), 'Backwaren');
+});
+
+test('categorizeIngredient: norwegisches "frosne erter" → Tiefkühl', () => {
+  assert.equal(categorizeIngredient({ foodName: 'frosne erter' }), 'Tiefkühl');
+});
+
+test('categorizeIngredient: norwegisches "oppvaskmiddel" → Haushalt', () => {
+  assert.equal(categorizeIngredient({ foodName: 'oppvaskmiddel' }), 'Haushalt');
+});
+
+test('categorizeIngredient: Kompositum "kyllinglår" bleibt bei der Wortgrenze → Sonstiges', () => {
+  assert.equal(categorizeIngredient({ foodName: 'kyllinglår' }), 'Sonstiges');
+});

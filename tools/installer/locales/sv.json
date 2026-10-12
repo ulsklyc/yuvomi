@@ -130,7 +130,8 @@
     "privateNetworkWaste": "Avfallshämtning",
     "privateNetworkWebdav": "WebDAV-dokument",
     "baseUrl": "Publik adress",
-    "outlook": "Outlook-kalender"
+    "outlook": "Outlook-kalender",
+    "moduleWebInstall": "Installera moduler från Inställningar"
   },
   "docker": {
     "title": "Startar Yuvomi",
@@ -276,7 +277,9 @@
     "sectionPrivateNetwork": "Åtkomst till ditt hemnätverk",
     "privateNetworkHint": "Yuvomi vägrar som standard anslutningar till adresser i ditt eget nätverk, vilket skyddar mot att servern luras att nå interna tjänster. Aktivera det du faktiskt kör hemma.",
     "authPasswordLogin": "Behåll inloggning med användarnamn och lösenord",
-    "authPasswordLoginHint": "Om du stänger av detta blir SSO enda vägen in: inloggningsformuläret och lösenordsåterställningen försvinner. Om leverantören blir onåbar går vägen tillbaka via .env-filen och en omstart."
+    "authPasswordLoginHint": "Om du stänger av detta blir SSO enda vägen in: inloggningsformuläret och lösenordsåterställningen försvinner. Om leverantören blir onåbar går vägen tillbaka via .env-filen och en omstart.",
+    "moduleWebInstall": "Tillåt installation av moduler från Inställningar",
+    "moduleWebInstallHint": "Låter en administratör lägga tredjepartsmoduler på servern från webbgränssnittet (ZIP-uppladdning eller GitHub-URL) utan filåtkomst. Installerade moduler förblir avstängda tills en administratör godkänner dem. Av: moduler kopieras för hand till modulmappen."
   },
   "welcome": {
     "title": "Hur vill du konfigurera Yuvomi?",

@@ -33,31 +33,96 @@ export const REFUSAL_MESSAGES = new Map([
 ]);
 
 /**
+ * Fall, den der Server benennt (`reason` an einer 400/404/409) -> Schluessel
+ * seines Satzes (#1909). Die Fortsetzung von REFUSAL_MESSAGES ueber die 403
+ * hinaus: der Server nennt den Fall, die App besitzt den Satz.
+ *
+ * Hier steht, was ein NUTZER erreichen kann (die Liste wurde inzwischen
+ * geloescht, den Laden gibt es schon). Eine Validierung, die nur ein Aufrufer
+ * der API ausloest, bekommt keinen Eintrag - sie faellt auf den allgemeinen
+ * Satz. Die Gruende tragen ihr Modul im Namen, weil die Liste fuer alle Seiten
+ * gilt. Eine Map, damit ein Grund wie `__proto__` nichts findet.
+ */
+export const CASE_MESSAGES = new Map([
+  ['shopping_list_not_found', 'shopping.errorListGone'],
+  ['shopping_item_not_found', 'shopping.errorItemGone'],
+  ['shopping_store_not_found', 'shopping.errorStoreGone'],
+  ['shopping_store_exists', 'shopping.errorStoreExists'],
+  ['shopping_category_not_found', 'shopping.errorCategoryGone'],
+  // Dieselben Gruende liest der Kategorie-Manager selbst (mit Zaehler, wo es
+  // einen gibt); hier stehen die beiden ohne Zaehler, fuer jede andere Stelle.
+  ['category_exists', 'category.errorExists'],
+  ['category_last', 'category.errorLast'],
+]);
+
+/**
+ * Der Satz, den die App fuer diesen Fehler SICHER kennt - oder nichts.
+ * Eine Stelle fuer friendlyError und errorSentence, damit beide dasselbe sagen.
+ *
+ * @param {unknown} err
+ * @returns {string|undefined} Schluessel
+ */
+function knownKey(err) {
+  // Offline-Mutation (ApiError status 0).
+  if (err?.status === 0) return 'common.errorOfflineMutation';
+  const reason = err?.data?.reason;
+  // Ein 503 waehrend eines Restores ist kein Serverfehler (#1431).
+  if (reason === 'restore_in_progress') return 'common.errorRestoreInProgress';
+  const status = err?.status ?? err?.response?.status;
+  // EIN Satz fuer "das darfst du nicht" (#1640), derselbe wie in api.js. Nennt
+  // die Absage einen Grund, fuer den es einen Satz gibt, dann dieser. Der Grund
+  // einer Absage zaehlt nur an einer Absage, und umgekehrt.
+  if (status === 403) return REFUSAL_MESSAGES.get(reason) ?? 'common.errorNoPermission';
+  return CASE_MESSAGES.get(reason);
+}
+
+/**
+ * DER EINE WEG FUER DIE SEITEN (#1909): aus einem gefangenen Fehler der Satz,
+ * den ein Toast zeigt. Bekannter Fall -> sein Satz, alles andere -> der
+ * allgemeine Satz der Stelle. Der Text des Servers (`err.data.error`,
+ * `err.message`) kommt hier nie heraus.
+ *
+ * @param {unknown} err
+ * @param {string} [fallbackKey] - der allgemeine Satz dieser Stelle
+ * @returns {string} uebersetzter Satz
+ */
+export function errorSentence(err, fallbackKey = 'common.errorGeneric') {
+  return t(knownKey(err) ?? fallbackKey);
+}
+
+/**
+ * UEBERGANG (#1909): der Satz fuer Aufrufer, die noch nicht umgestellt sind.
+ * Jeder wandert mit der Scheibe seines Moduls zu `errorSentence`; bis dahin
+ * sagt er hier nicht weniger als vor #1909. Bekannter Fall -> sein Satz, sonst
+ * der Text des Servers (`err.data.error`), sonst der allgemeine Satz. Wer noch
+ * hier fragt, steht als Zahl in test:frontend-audit (FRIENDLY_ERROR_CALLERS).
+ *
  * @param {unknown} err - ApiError (status, data), ein Netzfehler oder irgendein Wurf
- * @returns {string} uebersetzter Satz, oder der Text des Fehlers selbst
+ * @returns {string} uebersetzter Satz, oder an einem Status ohne eigenen Satz
+ *   (400, 409, 422, 429 ohne bekannten Grund) der Text des Servers
  */
 export function friendlyError(err) {
   // Offline-Mutation (ApiError status 0): spezifische Meldung - auch wenn
   // navigator.onLine faelschlich true meldet (Netz weg, aber kein offline-Event).
   if (err?.status === 0) return t('common.errorOfflineMutation');
   if (!navigator.onLine) return t('common.errorOffline');
-  // Vor dem Status-Zweig: ein 503 waehrend eines Restores ist kein Serverfehler (#1431).
-  if (err?.data?.reason === 'restore_in_progress') return t('common.errorRestoreInProgress');
+  // Nachgeschlagen wird am Grund, nicht am Text des Fehlers - an einer Absage
+  // (403) ergibt ein unbekannter oder gar kein Grund den allgemeinen Satz, nie
+  // den des Servers. Bis #1640 stand fuer die 403 ein zweiter Satz hier
+  // ("Zugriff verweigert. Bitte erneut anmelden."), und der riet zur Anmeldung,
+  // wo die Sitzung in Ordnung war: eine abgelaufene Sitzung ist ein 401 und
+  // laeuft ueber auth:expired, nie hier durch.
+  const known = knownKey(err);
+  if (known) return t(known);
   const status = err?.status ?? err?.response?.status;
-  // EIN Satz fuer "das darfst du nicht" (#1640), derselbe wie in api.js. Bis
-  // dahin stand hier ein zweiter ("Zugriff verweigert. Bitte erneut anmelden."),
-  // und der riet zur Anmeldung, wo die Sitzung in Ordnung war: eine abgelaufene
-  // Sitzung ist ein 401 und laeuft ueber auth:expired, nie hier durch.
-  //
-  // Nennt die Absage einen Grund, fuer den es einen Satz gibt, dann dieser: er
-  // sagt mehr (nur lesen, gesperrte Aufgabe, gespiegeltes Rezept). Nachgeschlagen
-  // wird am Grund, nicht am Text des Fehlers - ein unbekannter oder gar kein
-  // Grund ergibt den allgemeinen Satz, nie den englischen des Servers.
-  if (status === 403) return t(REFUSAL_MESSAGES.get(err?.data?.reason) ?? 'common.errorNoPermission');
   if (status === 404) return t('common.errorNotFound');
   if (status >= 500) return t('common.errorServer');
   if (err?.name === 'AbortError' || err?.name === 'TimeoutError') return t('common.errorTimeout');
   if (/Failed to fetch|NetworkError|Load failed/i.test(err?.message || '')) return t('common.errorServer');
   if (err?.name === 'TypeError') return t('common.unexpectedError');
+  // Jede andere Antwort des Servers (400, 409, 422, 429 ohne bekannten Grund):
+  // ihr eigener Text. Er nennt die Ursache (welches Feld, welcher Konflikt),
+  // und der allgemeine Satz an seiner Stelle sagte weniger - das gilt, bis der
+  // Aufrufer umgestellt ist und der Server den Fall mit einem `reason` benennt.
   return err?.data?.error || err?.message || t('common.errorGeneric');
 }

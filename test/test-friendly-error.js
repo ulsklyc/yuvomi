@@ -91,8 +91,9 @@ test('die uebrigen Zuordnungen bleiben, wie sie waren', async () => {
   assert.equal(friendlyError({ name: 'TimeoutError' }), 'common.errorTimeout');
   assert.equal(friendlyError(new TypeError('Failed to fetch')), 'common.errorServer');
   assert.equal(friendlyError(new TypeError('x is not a function')), 'common.unexpectedError');
-  // Ein anderer 4xx reicht den Text des Servers durch.
+  // Ein anderer 4xx reicht den Text des Servers durch (Uebergang, siehe unten).
   assert.equal(friendlyError({ status: 409, data: { error: 'Name is taken.' }, message: 'x' }), 'Name is taken.');
+  // Ein Wurf der App selbst (kein Status, kein Rumpf) behaelt seinen Text.
   assert.equal(friendlyError(new Error('Boom')), 'Boom');
   assert.equal(friendlyError(undefined), 'common.errorGeneric');
 });
@@ -110,4 +111,134 @@ test('der Router reicht genau diese Funktion weiter und hat keine eigene', () =>
   assert.doesNotMatch(router, /function friendlyError\(/, 'router.js hat wieder eine eigene Zuordnung');
   const sw = readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8');
   assert.ok(sw.includes("'/utils/friendly-error.js'"), 'das Modul fehlt in der Shell-Liste des Service Workers');
+});
+
+// ---------------------------------------------------------------------------
+// #1909: der Server benennt den Fall, die App besitzt den Satz - auch jenseits
+// der 403. Bis dahin endete friendlyError bei `err.data.error`, und die Seiten
+// zeigten `err.data?.error ?? t(...)`: "Unbekannte Liste." in jeder Sprache.
+// ---------------------------------------------------------------------------
+
+// Wie der Fehler aus api.js kommt: `message` und `data.error` tragen den Text des Servers.
+const answer = (status, error, reason) => Object.assign(new Error(error), {
+  name: 'ApiError', status, data: { error, code: status, ...(reason === undefined ? {} : { reason }) },
+});
+const SERVER_TEXT = 'Ein Satz des Servers, den kein Nutzer lesen soll.';
+
+test('errorSentence: ein bekannter Fall bekommt seinen Satz, an jedem Status', async () => {
+  const { errorSentence, CASE_MESSAGES } = await load();
+  assert.ok(CASE_MESSAGES.size >= 7, `nur ${CASE_MESSAGES.size} Faelle gelesen`);
+  for (const [reason, key] of CASE_MESSAGES) {
+    for (const status of [400, 404, 409]) {
+      assert.equal(errorSentence(answer(status, SERVER_TEXT, reason)), key, `${reason} @${status}`);
+      // Der Satz der Stelle gilt nur fuer das Unbekannte.
+      assert.equal(errorSentence(answer(status, SERVER_TEXT, reason), 'shopping.duplicateError'), key, reason);
+    }
+  }
+  // Der Fall aus dem Issue, ausgeschrieben.
+  assert.equal(errorSentence(answer(400, 'Unknown list.', 'shopping_list_not_found')), 'shopping.errorListGone');
+  assert.equal(errorSentence(answer(409, 'Category already exists.', 'category_exists')), 'category.errorExists');
+});
+
+test('errorSentence: unbekannter oder fehlender Grund ergibt den allgemeinen Satz, nie den des Servers', async () => {
+  const { errorSentence } = await load();
+  for (const status of [400, 404, 409, 422, 429, 500, 502]) {
+    for (const reason of [undefined, 'some_future_reason', '__proto__', 'constructor', 'toString', '', 7, null, {}]) {
+      const err = answer(status, SERVER_TEXT, reason);
+      assert.equal(errorSentence(err), 'common.errorGeneric', `${status} ${String(reason)}`);
+      assert.equal(errorSentence(err, 'shopping.sendListError'), 'shopping.sendListError', `${status} ${String(reason)}`);
+    }
+  }
+  // Auch ohne Rumpf, ohne Status und bei einem Wurf der App: nie dessen Text.
+  assert.equal(errorSentence(new Error(SERVER_TEXT)), 'common.errorGeneric');
+  assert.equal(errorSentence({ data: { error: SERVER_TEXT } }), 'common.errorGeneric');
+  assert.equal(errorSentence(undefined), 'common.errorGeneric');
+  assert.equal(errorSentence(null, 'common.unknownError'), 'common.unknownError');
+});
+
+test('errorSentence: Absage, Offline und Restore sagen dasselbe wie friendlyError', async () => {
+  const { errorSentence, friendlyError, REFUSAL_MESSAGES } = await load();
+  for (const [reason, key] of REFUSAL_MESSAGES) {
+    assert.equal(errorSentence(answer(403, SERVER_TEXT, reason)), key, reason);
+  }
+  // Eine Absage ohne Satz zu ihrem Grund: der eine allgemeine Satz der Absage.
+  assert.equal(errorSentence(answer(403, SERVER_TEXT, 'cross_module_access'), 'shopping.duplicateError'), 'common.errorNoPermission');
+  assert.equal(errorSentence(answer(403, SERVER_TEXT)), 'common.errorNoPermission');
+  assert.equal(errorSentence({ status: 0 }), 'common.errorOfflineMutation');
+  assert.equal(errorSentence(answer(503, SERVER_TEXT, 'restore_in_progress')), 'common.errorRestoreInProgress');
+  // Der Grund einer Absage zaehlt nur an einer Absage, der eines Falls nicht an ihr.
+  assert.equal(errorSentence(answer(404, SERVER_TEXT, 'task_locked')), 'common.errorGeneric');
+  assert.equal(errorSentence(answer(403, SERVER_TEXT, 'shopping_list_not_found')), 'common.errorNoPermission');
+  for (const err of [answer(403, SERVER_TEXT, 'task_locked'), answer(400, SERVER_TEXT, 'shopping_store_exists'), { status: 0 }]) {
+    assert.equal(friendlyError(err), errorSentence(err));
+  }
+});
+
+// UEBERGANG: #1916 hatte den letzten Rueckfall von friendlyError fuer ALLE
+// Aufrufer auf den allgemeinen Satz verengt - auch fuer die, die noch nicht
+// umgestellt sind (Kontakt-Import, Essensplan, Fehlerbildschirm, unbehandelte
+// Rejection). Dort stand dann "Ein Fehler ist aufgetreten" statt der Ursache.
+// Bis ein Modul umgestellt ist, sagt es nicht weniger als vorher: der strenge
+// Weg ist errorSentence, friendlyError behaelt den Text des Servers.
+test('friendlyError: ein Status ohne eigenen Satz behaelt den Text des Servers, errorSentence nie', async () => {
+  const { friendlyError, errorSentence } = await load();
+  for (const status of [400, 401, 409, 422, 429]) {
+    for (const reason of [undefined, 'some_future_reason', '__proto__']) {
+      const err = answer(status, SERVER_TEXT, reason);
+      assert.equal(friendlyError(err), SERVER_TEXT, `friendlyError ${status} ${String(reason)}`);
+      assert.equal(errorSentence(err), 'common.errorGeneric', `errorSentence ${status} ${String(reason)}`);
+    }
+  }
+  // Die Ursachen, die der Kontakt-Import nennt (server/routes/contacts.js).
+  const invalid = answer(400, 'Name is required. Telefon must not exceed 50 characters.');
+  assert.equal(friendlyError(invalid), 'Name is required. Telefon must not exceed 50 characters.');
+  assert.equal(errorSentence(invalid), 'common.errorGeneric');
+  const taken = answer(409, 'This email address already belongs to another account.', 'email_in_use');
+  assert.equal(friendlyError(taken), 'This email address already belongs to another account.');
+  assert.equal(errorSentence(taken), 'common.errorGeneric');
+  // `data.error` geht vor `message`; ohne Rumpf bleibt `message`, ohne beides der allgemeine Satz.
+  assert.equal(friendlyError({ status: 409, data: { error: 'Name is taken.' }, message: 'x' }), 'Name is taken.');
+  assert.equal(friendlyError({ status: 409, message: 'HTTP 409' }), 'HTTP 409');
+  assert.equal(friendlyError({ data: { error: SERVER_TEXT } }), SERVER_TEXT);
+  assert.equal(friendlyError({ status: 409, data: {} }), 'common.errorGeneric');
+});
+
+test('friendlyError und errorSentence: ein bekannter Fall bekommt ueber beide denselben Satz', async () => {
+  const { friendlyError, errorSentence, CASE_MESSAGES, REFUSAL_MESSAGES } = await load();
+  for (const [reason, key] of CASE_MESSAGES) {
+    for (const status of [400, 404, 409]) {
+      const err = answer(status, SERVER_TEXT, reason);
+      assert.equal(friendlyError(err), key, `friendlyError ${reason} @${status}`);
+      assert.equal(errorSentence(err), key, `errorSentence ${reason} @${status}`);
+    }
+  }
+  for (const [reason, key] of REFUSAL_MESSAGES) {
+    const err = answer(403, SERVER_TEXT, reason);
+    assert.equal(friendlyError(err), key, reason);
+    assert.equal(errorSentence(err), key, reason);
+  }
+  // Die Zuordnungen am Status gehen dem Text des Servers weiter vor.
+  assert.equal(friendlyError(answer(403, SERVER_TEXT)), 'common.errorNoPermission');
+  assert.equal(friendlyError(answer(403, SERVER_TEXT, 'some_future_reason')), 'common.errorNoPermission');
+  assert.equal(friendlyError(answer(404, SERVER_TEXT)), 'common.errorNotFound');
+  assert.equal(friendlyError(answer(500, SERVER_TEXT)), 'common.errorServer');
+  assert.equal(friendlyError(answer(503, SERVER_TEXT, 'restore_in_progress')), 'common.errorRestoreInProgress');
+});
+
+test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', () => {
+  const dir = new URL('../public/locales/', import.meta.url);
+  const files = readdirSync(dir).filter((name) => name.endsWith('.json'));
+  const routes = readFileSync(new URL('../server/routes/shopping.js', import.meta.url), 'utf8');
+  return load().then(({ CASE_MESSAGES, REFUSAL_MESSAGES }) => {
+    for (const [reason, key] of CASE_MESSAGES) {
+      assert.equal(REFUSAL_MESSAGES.has(reason), false, `${reason} steht in beiden Listen`);
+      assert.ok(routes.includes(`reason: '${reason}'`), `${reason}: kein Server nennt diesen Fall`);
+      const [section, leaf] = key.split('.');
+      for (const name of files) {
+        const text = JSON.parse(readFileSync(new URL(name, dir), 'utf8'))[section]?.[leaf];
+        assert.equal(typeof text, 'string', `${name}: ${key} fehlt`);
+        assert.doesNotMatch(text, /[\u2013\u2014]/, `${name}: ${key} traegt einen Gedankenstrich`);
+      }
+    }
+  });
 });

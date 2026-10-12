@@ -1502,7 +1502,7 @@ const MIGRATIONS_SQL = {
       ALTER TABLE budget_subscriptions ADD COLUMN reminder_enabled INTEGER NOT NULL DEFAULT 1
         CHECK(reminder_enabled IN (0,1));
   `,
-  238: `
+  245: `
     CREATE TABLE local_calendars (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       name        TEXT    NOT NULL,
