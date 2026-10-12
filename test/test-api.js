@@ -857,7 +857,7 @@ const REASONS_PASSED_THROUGH = new Map([
   ['routes/health/visibility-defaults.js: error.reason', { sites: 1, at403: [['FASTING_CAPABILITY_REQUIRED', 'services/fasting.js']],
     why: 'requireFastingCapability wirft nur diesen' }],
   ['routes/split-expenses.js: err.reason', { sites: 1, at403: [],
-    why: 'Refusal: ein Grund nur an 409 (email_in_use); die 403 dort tragen keinen' }],
+    why: 'Refusal: ein Grund nur an 409 (email_in_use, group_archived); die 403 dort tragen keinen' }],
   ['auth.js: err.code', { sites: 1, at403: [], why: 'feste 409 (2FA)' }],
   // Gravatar-Import: GravatarError traegt seinen Grund, die Route schlaegt den
   // Status nach (400/404/413/415/502, 500 bei falsch gesetzter GRAVATAR_BASE_URL)
