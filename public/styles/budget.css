@@ -1275,6 +1275,25 @@ button.budget-bar-row {
   transition: background var(--transition-fast), color var(--transition-fast);
 }
 
+/* Der Balken ist ein Knopf und antwortet dem Zeiger wie die Planzeile
+ * darunter (`.budget-plan-row`). Nicht am gedrueckten: dessen Toenung ist der
+ * Zustand, und die neutrale Hover-Flaeche wuerde ihn beim Ueberfahren loeschen.
+ * Unter (hover: hover): auf Touch klebt :hover nach dem Tipp - der eben
+ * abgewaehlte Balken saehe dort weiter getoent aus. */
+@media (hover: hover) {
+  button.budget-bar-row:not(.is-category-selected):hover {
+    background: var(--color-surface-hover);
+  }
+}
+
+/* Die Zeilen liegen in einer Karte mit `overflow: hidden` (die runden Ecken):
+ * ein Ring mit dem ueblichen Abstand nach aussen wird dort an allen vier
+ * Seiten abgeschnitten - der Balken hatte den Fokus, und man sah ihn nicht.
+ * Deshalb der Innen-Abstand, den tokens.css fuer geclippte Kanten fuehrt. */
+button.budget-bar-row:focus-visible {
+  outline-offset: var(--focus-ring-offset-inset);
+}
+
 .budget-bar-row.is-category-selected {
   background: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-state), var(--color-surface));
   color: var(--color-text-primary);

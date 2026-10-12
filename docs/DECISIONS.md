@@ -27,7 +27,7 @@ into existing private data cannot be inferred from a field people filled in for 
 purpose, and cannot be narrowed silently on update: permissions can be opened later, but what
 somebody has already seen cannot be unseen.
 
-The same rule was reached three times, each time from a different module:
+The same rule was reached four times, each time from a different module:
 
 - **Health, v1.83.0 (#584).** Asked for as a property of the family role - dad, mum,
   guardian. Built as a per-person grant an admin sets under Settings → Family, because the
@@ -54,6 +54,12 @@ The same rule was reached three times, each time from a different module:
   first by refusing the whole subtree, later by leaving that row in place with only its folder
   cleared, because a refusal that depends on a hidden row tells the caller it is there;
   sharing a single document deliberately is the owner's act, and that path already exists.
+- **Gravatar, review of PR #1791 (October 2026).** The profile picture import was proposed on in
+  every install, with gravatar.com as the built-in target. Decided in review: off unless the
+  operator sets `GRAVATAR_BASE_URL`, with nothing sent and no button while it is unset, and only
+  for household members, because a split-expense guest's address is typed by whoever manages the
+  group, not by the guest. Sending the hash of somebody's address to an outside company stays
+  that member's own click on a server whose operator opened the door.
 
 The task lock in v2.30.0 rests on the same reasoning from the other side: a family role says
 who somebody is, not what they may do, and Yuvomi had already replaced that inference with

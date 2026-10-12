@@ -903,50 +903,7 @@ export async function render(container, { user }) {
 
   const budgetBody = _container.querySelector('#budget-body');
 
-  budgetBody?.addEventListener('click', (event) => {
-    const subcategoryButton = event.target.closest(
-      'button[data-subcategory-category][data-subcategory-filter]'
-    );
-
-    if (subcategoryButton && budgetBody.contains(subcategoryButton)) {
-      toggleSubcategoryFilter(
-        subcategoryButton.dataset.subcategoryCategory,
-        subcategoryButton.dataset.subcategoryFilter
-      );
-      return;
-    }
-
-    const chipCategoryButton = event.target.closest(
-      'button[data-clear-category-filter]'
-    );
-
-    if (chipCategoryButton && budgetBody.contains(chipCategoryButton)) {
-      toggleCategoryFilter(chipCategoryButton.dataset.clearCategoryFilter);
-      return;
-    }
-    const chipSubcategoryButton = event.target.closest(
-      'button[data-clear-subcategory-category][data-clear-subcategory-key]'
-    );
-
-    if (chipSubcategoryButton && budgetBody.contains(chipSubcategoryButton)) {
-      toggleSubcategoryFilter(
-        chipSubcategoryButton.dataset.clearSubcategoryCategory,
-        chipSubcategoryButton.dataset.clearSubcategoryKey
-      );
-      return;
-    }
-
-    const categoryButton = event.target.closest('button[data-category-filter]');
-    if (categoryButton && budgetBody.contains(categoryButton)) {
-      toggleCategoryFilter(categoryButton.dataset.categoryFilter);
-      return;
-    }
-
-    const clearBudgetFilterButton = event.target.closest('button[data-clear-budget-filters]');
-    if (clearBudgetFilterButton && budgetBody.contains(clearBudgetFilterButton)) {
-      void clearBudgetFilters();
-    }
-  });
+  budgetBody?.addEventListener('click', (event) => onBudgetBodyClick(event, budgetBody));
 
   // Werkzeug-Menue der Buchungsliste (listToolsMenuHtml): Position, Schliessen
   // und Pfeiltasten haengen an der stabilen Wurzel, nicht am ersetzten Panel.
@@ -1955,12 +1912,19 @@ function renderCategoryBars(byCategory) {
             const scale = Math.abs(r.amount) / max;
             const label = esc(categoryLabel(r.category));
 
+            /* GEDRUECKT HEISST: DANACH WIRD GEFILTERT. Der Filter kennt nur die
+             * Kategorie, nicht die Richtung (visibleEntries) - eine Kategorie
+             * mit Einnahmen UND Ausgaben steht in beiden Bloecken, und nach
+             * einem Tipp zeigt die Liste beide. Zwei gedrueckte Balken sind
+             * dann die Wahrheit, kein Versehen. `data-category-kind` sagt nur,
+             * WELCHER der beiden getippt wurde: dort bleibt der Fokus. */
             const selected = state.categoryFilter === r.category;
             return `
             <button
               type="button"
               class="budget-bar-row${lead && i < CHART_LEAD ? ' budget-bar-row--lead' : ''}${selected ? ' is-category-selected' : ''}"
               data-category-filter="${esc(r.category)}"
+              data-category-kind="${kind}"
               aria-pressed="${selected ? 'true' : 'false'}"
               >
               <span class="budget-bar-row__label" title="${label}">${label}</span>
@@ -2062,11 +2026,60 @@ function renderSubcategoryBreakdowns() {
     : '';
 }
 
-function toggleCategoryFilter(category) {
+/* Die Delegation fuer Filter-Tipps im Seitenkoerper: Kategorie- und
+ * Unterkategorie-Balken, die Chips im Listenkopf, "Filter leeren". Als eigene
+ * Funktion, damit ein Test den Tipp durch DIESELBE Stelle schickt wie der
+ * Browser - was der Balken an den Filter weiterreicht, steht hier. */
+function onBudgetBodyClick(event, budgetBody) {
+  const subcategoryButton = event.target.closest(
+    'button[data-subcategory-category][data-subcategory-filter]'
+  );
+
+  if (subcategoryButton && budgetBody.contains(subcategoryButton)) {
+    toggleSubcategoryFilter(
+      subcategoryButton.dataset.subcategoryCategory,
+      subcategoryButton.dataset.subcategoryFilter
+    );
+    return;
+  }
+
+  const chipCategoryButton = event.target.closest(
+    'button[data-clear-category-filter]'
+  );
+
+  if (chipCategoryButton && budgetBody.contains(chipCategoryButton)) {
+    toggleCategoryFilter(chipCategoryButton.dataset.clearCategoryFilter);
+    return;
+  }
+  const chipSubcategoryButton = event.target.closest(
+    'button[data-clear-subcategory-category][data-clear-subcategory-key]'
+  );
+
+  if (chipSubcategoryButton && budgetBody.contains(chipSubcategoryButton)) {
+    toggleSubcategoryFilter(
+      chipSubcategoryButton.dataset.clearSubcategoryCategory,
+      chipSubcategoryButton.dataset.clearSubcategoryKey
+    );
+    return;
+  }
+
+  const categoryButton = event.target.closest('button[data-category-filter]');
+  if (categoryButton && budgetBody.contains(categoryButton)) {
+    toggleCategoryFilter(categoryButton.dataset.categoryFilter, categoryButton.dataset.categoryKind);
+    return;
+  }
+
+  const clearBudgetFilterButton = event.target.closest('button[data-clear-budget-filters]');
+  if (clearBudgetFilterButton && budgetBody.contains(clearBudgetFilterButton)) {
+    void clearBudgetFilters();
+  }
+}
+
+function toggleCategoryFilter(category, kind = null) {
   state.categoryFilter = state.categoryFilter === category ? null : category;
   state.subcategoryFilter = null;
   renderBody();
-  focusFilterResult({ category });
+  focusFilterResult({ category, kind });
 }
 
 function toggleSubcategoryFilter(category, key) {
@@ -2093,13 +2106,27 @@ async function clearBudgetFilters() {
   focusFilterResult({ focusList: true });
 }
 
-function focusFilterResult({ category = null, subcategoryKey = null, focusList = false } = {}) {
+/* Stehen Balken und Liste nebeneinander? Dieselbe Frage, die das CSS stellt
+ * (`@container budget-page (min-width: 960px)`, budget.css), an dieselbe
+ * Flaeche: die Inhaltsbreite von `#budget-body`, nicht die des Fensters. Mit
+ * der Seitenleiste daneben ist ein 1200px-Fenster eine einspaltige Flaeche -
+ * `matchMedia` hielt sie fuer zweispaltig und liess den Fokus auf einem Balken,
+ * dessen Liste eine Bildschirmhoehe tiefer stand (#1593: "below a 960 px
+ * container"). */
+const BUDGET_TWO_COLUMN_MIN = 960;
+function budgetBodyIsTwoColumn(body) {
+  const style = globalThis.getComputedStyle?.(body);
+  const padding = style
+    ? (Number.parseFloat(style.paddingInlineStart) || 0) + (Number.parseFloat(style.paddingInlineEnd) || 0)
+    : 0;
+  return (body.clientWidth || 0) - padding >= BUDGET_TWO_COLUMN_MIN;
+}
+
+function focusFilterResult({ category = null, kind = null, subcategoryKey = null, focusList = false } = {}) {
   const body = _container?.querySelector('#budget-body');
   if (!body) return;
 
-  const narrow = window.matchMedia
-    ? window.matchMedia('(max-width: 959px)').matches
-    : window.innerWidth < 960;
+  const narrow = !budgetBodyIsTwoColumn(body);
   const listHeading = body.querySelector('.budget-list-header__title');
   if (narrow) {
     body.querySelector('.budget-list-section')?.scrollIntoView?.({ block: 'start' });
@@ -2112,12 +2139,20 @@ function focusFilterResult({ category = null, subcategoryKey = null, focusList =
     const selector = subcategoryKey == null
       ? 'button[data-category-filter]'
       : 'button[data-subcategory-category][data-subcategory-filter]';
-    target = [...body.querySelectorAll(selector)].find((button) => (
+    const matches = [...body.querySelectorAll(selector)].filter((button) => (
       subcategoryKey == null
         ? button.dataset.categoryFilter === category
         : button.dataset.subcategoryCategory === category
           && button.dataset.subcategoryFilter === subcategoryKey
     ));
+    // Eine Kategorie mit Einnahmen und Ausgaben hat ZWEI Balken. Der Fokus
+    // gehoert dem getippten (sein Block reist als `kind` mit), nicht dem
+    // ersten Treffer im Dokument - sonst springt er in den anderen Block. Ohne
+    // `kind` (der Chip im Listenkopf) oder wenn der Block nach dem Neuaufbau
+    // fehlt, bleibt es beim ersten.
+    target = matches.find((button) => kind != null && button.dataset.categoryKind === kind)
+      ?? matches[0]
+      ?? null;
   }
   (target ?? listHeading)?.focus();
 }
@@ -5919,6 +5954,10 @@ export const __test = {
   clearBudgetFiltersForTest(container) {
     _container = container;
     clearBudgetFilters();
+  },
+  budgetBodyClickForTest(container, event) {
+    _container = container;
+    onBudgetBodyClick(event, container.querySelector('#budget-body'));
   },
   toggleCategoryFilterForTest(container, category) {
     _container = container;

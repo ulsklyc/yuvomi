@@ -1964,6 +1964,7 @@ test('Kategorieauswahl behaelt am Desktop den Fokus auf dem Balken', () => {
     focus() { focused = true; },
   };
   const body = {
+    clientWidth: 1200,
     querySelector() { return null; },
     querySelectorAll() { return [categoryButton]; },
   };
@@ -1975,6 +1976,183 @@ test('Kategorieauswahl behaelt am Desktop den Fokus auf dem Balken', () => {
   } finally {
     global.window.matchMedia = previousMatchMedia;
   }
+});
+
+// Folge zu #1728: eine Kategorie mit Einnahmen UND Ausgaben steht in beiden
+// Bloecken. Der Filter wirkt ueber beide Richtungen (visibleEntries prueft nur
+// `entry.category`), also sind zwei gedrueckte Balken die Wahrheit - aber der
+// Fokus gehoert dem Balken, der getippt wurde, nicht dem ersten Treffer.
+function mixedCategoryHarness({ width }) {
+  let html = '';
+  const focused = [];
+  let scrolled = false;
+  const heading = { focus() { focused.push('heading'); } };
+  const listSection = { scrollIntoView() { scrolled = true; } };
+  // Die Balken aus dem ZULETZT gerenderten Markup - wie querySelectorAll nach
+  // renderBody(): die Knoepfe von vor dem Tipp gibt es dann nicht mehr.
+  const bars = () => [...html.matchAll(/<button\b[^>]*data-category-filter="([^"]*)"[^>]*>/g)].map((m) => {
+    const kind = m[0].match(/data-category-kind="([^"]*)"/)?.[1];
+    const bar = {
+      dataset: { categoryFilter: m[1], ...(kind ? { categoryKind: kind } : {}) },
+      pressed: m[0].match(/aria-pressed="([^"]*)"/)?.[1],
+      // Die Stelle im Dokument: welcher Balken, nicht nur welche Kategorie.
+      focus() { focused.push(bars.last.indexOf(bar)); },
+    };
+    return bar;
+  });
+  const body = {
+    clientWidth: width,
+    replaceChildren() { html = ''; },
+    insertAdjacentHTML(_position, value) { html += value; },
+    setAttribute() {},
+    contains() { return true; },
+    querySelector(selector) {
+      if (selector === '.budget-list-header__title') return heading;
+      if (selector === '.budget-list-section') return listSection;
+      return null;
+    },
+    querySelectorAll(selector) {
+      if (selector !== 'button[data-category-filter]') return [];
+      bars.last = bars();
+      return bars.last;
+    },
+  };
+  const container = {
+    querySelector(selector) { return selector === '#budget-body' ? body : null; },
+    querySelectorAll() { return []; },
+    classList: { toggle() {} },
+  };
+  /** Ein Tipp auf den n-ten Balken der Kategorie, durch die echte Delegation. */
+  const tap = (category, index) => {
+    const all = bars();
+    const bar = all.filter((b) => b.dataset.categoryFilter === category)[index];
+    assert.ok(bar, `Balken ${index} von ${category} fehlt`);
+    bar.position = all.indexOf(bar);
+    budgetUi.budgetBodyClickForTest(container, {
+      target: { closest: (selector) => (selector === 'button[data-category-filter]' ? bar : null) },
+    });
+    return bar;
+  };
+  return { container, bars, tap, focused, get scrolled() { return scrolled; }, get html() { return html; } };
+}
+
+const MIXED_STATE = {
+  activeTab: 'budget', loadError: null, month: '2026-06', currency: 'EUR',
+  entries: [
+    { id: 1, title: 'Refund', amount: 50, date: '2026-06-02', category: 'other' },
+    { id: 2, title: 'Gift', amount: -20, date: '2026-06-03', category: 'other' },
+    { id: 3, title: 'Fuel', amount: -40, date: '2026-06-04', category: 'transport' },
+  ],
+  summary: {
+    income: 50, expenses: -60, balance: -10, pending: { count: 0 },
+    byCategory: [
+      { category: 'other', income: 50, expenses: -20, total: 30 },
+      { category: 'transport', income: 0, expenses: -40, total: -40 },
+    ],
+  },
+  categoryFilter: null, subcategoryFilter: null, responsibleFilterId: null,
+  accountFilterId: null, groupByResponsible: false, ledgerQuery: '', ledgerResults: null,
+  chartExpanded: true,
+};
+
+test('Kategorie in beiden Bloecken: der Filter gilt beiden Richtungen, also sind beide Balken gedrueckt', () => {
+  const state = budgetUi.state;
+  const previous = { ...state };
+  const restoreDom = installMiniDom();
+  try {
+    Object.assign(state, MIXED_STATE);
+    const h = mixedCategoryHarness({ width: 1200 });
+    budgetUi.renderBodyForTest(h.container);
+    const kinds = h.bars().filter((b) => b.dataset.categoryFilter === 'other').map((b) => b.dataset.categoryKind);
+    assert.deepEqual([...kinds].sort(), ['expenses', 'income'], 'jeder Balken nennt seinen Block');
+
+    h.tap('other', 1);
+    assert.equal(state.categoryFilter, 'other');
+    // Was gefiltert wird, entscheidet, was gedrueckt heisst: die Liste zeigt
+    // Einnahme UND Ausgabe der Kategorie.
+    assert.deepEqual(budgetUi.visibleEntries().map((entry) => entry.id), [1, 2]);
+    const after = h.bars();
+    assert.deepEqual(after.filter((b) => b.dataset.categoryFilter === 'other').map((b) => b.pressed), ['true', 'true']);
+    assert.deepEqual(after.filter((b) => b.dataset.categoryFilter === 'transport').map((b) => b.pressed), ['false']);
+  } finally {
+    Object.assign(state, previous);
+    restoreDom();
+  }
+});
+
+test('Kategorie in beiden Bloecken: der Fokus bleibt auf dem getippten Balken, nicht auf dem ersten Treffer', () => {
+  const state = budgetUi.state;
+  const previous = { ...state };
+  const restoreDom = installMiniDom();
+  try {
+    for (const index of [0, 1]) {
+      Object.assign(state, MIXED_STATE);
+      const h = mixedCategoryHarness({ width: 1200 });
+      budgetUi.renderBodyForTest(h.container);
+      const tapped = h.tap('other', index);
+      assert.deepEqual(h.focused, [tapped.position], `Tipp auf Balken ${index}: an`);
+      assert.equal(h.scrolled, false, 'zweispaltig springt nichts');
+      // Der zweite Tipp hebt den Filter auf - der Fokus bleibt auch dann dort.
+      const again = h.tap('other', index);
+      assert.equal(state.categoryFilter, null);
+      assert.equal(again.position, tapped.position);
+      assert.deepEqual(h.focused, [tapped.position, tapped.position], `Tipp auf Balken ${index}: aus`);
+    }
+  } finally {
+    Object.assign(state, previous);
+    restoreDom();
+  }
+});
+
+test('der Fokus nach dem Tipp folgt der Breite des Containers, nicht der des Fensters (#1593)', () => {
+  const state = budgetUi.state;
+  const previous = { ...state };
+  const restoreDom = installMiniDom();
+  const previousMatchMedia = global.window.matchMedia;
+  try {
+    // Breites Fenster, schmale Modulflaeche (Seitenleiste daneben): die Liste
+    // steht UNTER den Balken, also Sprung zur Liste wie am Telefon.
+    global.window.matchMedia = () => ({ matches: false });
+    Object.assign(state, MIXED_STATE);
+    const narrow = mixedCategoryHarness({ width: 900 });
+    budgetUi.renderBodyForTest(narrow.container);
+    narrow.tap('transport', 0);
+    assert.deepEqual(narrow.focused, ['heading']);
+    assert.equal(narrow.scrolled, true);
+
+    // Umgekehrt: sagt das Fenster "schmal", die Flaeche aber hat zwei Spalten,
+    // bleibt der Fokus auf dem Balken.
+    global.window.matchMedia = () => ({ matches: true });
+    Object.assign(state, MIXED_STATE);
+    const wide = mixedCategoryHarness({ width: 960 });
+    budgetUi.renderBodyForTest(wide.container);
+    const bar = wide.tap('transport', 0);
+    assert.deepEqual(wide.focused, [bar.position]);
+    assert.equal(wide.scrolled, false);
+  } finally {
+    Object.assign(state, previous);
+    global.window.matchMedia = previousMatchMedia;
+    restoreDom();
+  }
+});
+
+test('Kategoriebalken: der Fokusring liegt innen, und der Zeiger loescht den gedrueckten Zustand nicht', () => {
+  const rules = [...eachRule(budgetCss)].map(({ selector, body, at }) => ({ selector: selector.trim(), body, at }));
+  // Die Zeilen liegen in einer Karte, die abschneidet: ein Ring nach aussen
+  // waere an allen vier Seiten weg (im Browser gemessen, Folge zu #1728).
+  const clip = rules.find((r) => r.selector.split(',').some((part) => part.trim() === '.budget-chart-block__rows') && /overflow:\s*hidden/.test(r.body));
+  assert.ok(clip, 'die Balkenkarte schneidet nicht mehr ab - dann darf der Ring wieder nach aussen');
+  const ring = rules.find((r) => r.selector === 'button.budget-bar-row:focus-visible' && !r.at.length);
+  assert.ok(ring, 'Fokusregel der Balken fehlt');
+  assert.match(ring.body, /outline-offset:\s*var\(--focus-ring-offset-inset\)/);
+
+  const hover = rules.filter((r) => /\.budget-bar-row\b[^,]*:hover/.test(r.selector) && /background/.test(r.body));
+  assert.equal(hover.length, 1, 'genau eine Hover-Flaeche fuer die Balken');
+  assert.equal(hover[0].selector, 'button.budget-bar-row:not(.is-category-selected):hover');
+  assert.match(hover[0].body, /background:\s*var\(--color-surface-hover\)/);
+  // Auf Touch klebt :hover nach dem Tipp - am eben abgewaehlten Balken saehe
+  // das aus wie "noch gedrueckt" (Ratchet R18 in test:motion).
+  assert.ok(hover[0].at.some((preamble) => /\(hover:\s*hover\)/.test(preamble)), 'die Hover-Flaeche steht unter (hover: hover)');
 });
 
 test('das Inline-Kategorie-Overlay ist ein vollwertiger Dialog', () => {
