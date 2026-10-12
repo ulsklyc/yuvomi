@@ -220,12 +220,27 @@ test('Ein abgehakter Artikel nimmt seinen Haken in beiden Zaehlern mit', async (
 
 test('Sagt der Server Nein, bleibt der Artikel, wo er ist', async () => {
   zustand();
-  const fehler = Object.assign(new Error('400'), { data: { error: 'Unbekannte Liste.' } });
+  // So kommt die Absage aus api.js: Status, Rumpf mit `reason`, und der Text
+  // des Servers in `message` und `data.error`.
+  const fehler = Object.assign(new Error('Unknown list.'), {
+    status: 400, data: { error: 'Unknown list.', code: 400, reason: 'shopping_list_not_found' },
+  });
   const { geschlossen } = await speichere(felder({ 'item-details-list': '2' }), () => { throw fehler; });
   assert.deepEqual(shopping.state.items.map((i) => i.id), [10, 11]);
   assert.deepEqual(shopping.state.lists.map((l) => l.item_total), [2, 4]);
   assert.deepEqual(geschlossen, [], 'der Dialog bleibt mit der Eingabe offen');
-  assert.deepEqual(toasts, [['Unbekannte Liste.', 'danger']]);
+  // #1909: der Satz der App zum Fall, nicht der des Servers ("Unbekannte
+  // Liste." stand in einer englischen Sitzung im Toast).
+  assert.deepEqual(toasts, [['shopping.errorListGone', 'danger']]);
+});
+
+test('Ein Nein ohne bekannten Grund zeigt den allgemeinen Satz, nie den des Servers (#1909)', async () => {
+  zustand();
+  const fehler = Object.assign(new Error('list_id muss eine Listen-ID sein.'), {
+    status: 400, data: { error: 'list_id muss eine Listen-ID sein.', code: 400 },
+  });
+  await speichere(felder({ 'item-details-list': '2' }), () => { throw fehler; });
+  assert.deepEqual(toasts, [['common.errorGeneric', 'danger']]);
 });
 
 // -------------------------------------------------------------------------

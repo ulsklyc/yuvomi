@@ -804,3 +804,109 @@ test('DELETE /stores/:id laesst den bezahlten Preis stehen', async () => {
   assert.equal(nachher.price_cents, 399, 'der Preis bleibt');
   assert.equal(nachher.store_id, null, 'nur der Laden ist weg');
 });
+
+// --------------------------------------------------------------------------
+// #1909: der Server benennt den Fall (`reason`), die App besitzt den Satz.
+// Jeder Fall hier ist einer, den ein NUTZER erreicht - meist, weil jemand
+// anderes im Haushalt inzwischen etwas geloescht oder gleich benannt hat.
+// `error` und Status bleiben, was sie waren; `reason` kommt dazu.
+// --------------------------------------------------------------------------
+const GONE = 999999;
+
+async function newItem(list, name = 'Ding') {
+  return (await call('POST', `/${list}/items`, { name })).body.data.id;
+}
+
+test('#1909 doppelte Kategorie: 409 mit reason category_exists, beim Anlegen und Umbenennen', async () => {
+  const first = await call('POST', '/categories', { name: 'Reason-Kat A' });
+  assert.equal(first.status, 201);
+  const second = await call('POST', '/categories', { name: 'Reason-Kat B' });
+  const dupCreate = await call('POST', '/categories', { name: 'Reason-Kat A' });
+  assert.deepEqual([dupCreate.status, dupCreate.body.reason, dupCreate.body.code], [409, 'category_exists', 409]);
+  assert.equal(dupCreate.body.error, 'Category already exists.');
+  const dupRename = await call('PUT', `/categories/${second.body.data.id}`, { name: 'Reason-Kat A' });
+  assert.deepEqual([dupRename.status, dupRename.body.reason], [409, 'category_exists']);
+});
+
+test('#1909 inzwischen geloeschte Kategorie: 404 mit reason, beim Umbenennen und Loeschen', async () => {
+  const rename = await call('PUT', `/categories/${GONE}`, { name: 'Egal' });
+  assert.deepEqual([rename.status, rename.body.reason], [404, 'shopping_category_not_found']);
+  const remove = await call('DELETE', `/categories/${GONE}`);
+  assert.deepEqual([remove.status, remove.body.reason], [404, 'shopping_category_not_found']);
+});
+
+test('#1909 Artikel in eine inzwischen geloeschte Kategorie: 400 mit reason', async () => {
+  const list = await newList('Reason-Kategorie');
+  const item = await newItem(list);
+  const r = await call('PATCH', `/items/${item}`, { category: 'Gibt es nicht mehr' });
+  assert.deepEqual([r.status, r.body.reason], [400, 'shopping_category_not_found']);
+});
+
+test('#1909 doppelter Laden beim Umbenennen: 409 mit reason, der Satz ist englisch', async () => {
+  const a = await call('POST', '/stores', { name: 'Reason-Laden A' });
+  const b = await call('POST', '/stores', { name: 'Reason-Laden B' });
+  const r = await call('PUT', `/stores/${b.body.data.id}`, { name: 'reason-laden a' });
+  assert.deepEqual([r.status, r.body.reason, r.body.error], [409, 'shopping_store_exists', 'Store already exists.']);
+  assert.ok(a.body.data.id);
+});
+
+test('#1909 inzwischen geloeschter Laden: reason am Verwalter (404) und am Artikel (400)', async () => {
+  const rename = await call('PUT', `/stores/${GONE}`, { name: 'Egal' });
+  assert.deepEqual([rename.status, rename.body.reason], [404, 'shopping_store_not_found']);
+  const remove = await call('DELETE', `/stores/${GONE}`);
+  assert.deepEqual([remove.status, remove.body.reason], [404, 'shopping_store_not_found']);
+
+  const list = await newList('Reason-Laden');
+  const item = await newItem(list);
+  const r = await call('PATCH', `/items/${item}`, { store_id: GONE });
+  assert.deepEqual([r.status, r.body.reason, r.body.error], [400, 'shopping_store_not_found', 'Unknown store.']);
+});
+
+test('#1909 Artikel verschieben, Zielliste inzwischen geloescht: 400 mit reason shopping_list_not_found', async () => {
+  const from = await newList('Reason-Von');
+  const to = await newList('Reason-Nach');
+  const item = await newItem(from);
+  assert.equal((await call('DELETE', `/${to}`)).status, 200);
+  const r = await call('PATCH', `/items/${item}`, { list_id: to });
+  assert.deepEqual([r.status, r.body.reason, r.body.error], [400, 'shopping_list_not_found', 'Unknown list.']);
+});
+
+test('#1909 inzwischen geloeschter Artikel: 404 mit reason, beim Aendern und Loeschen', async () => {
+  const patch = await call('PATCH', `/items/${GONE}`, { is_checked: 1 });
+  assert.deepEqual([patch.status, patch.body.reason], [404, 'shopping_item_not_found']);
+  const remove = await call('DELETE', `/items/${GONE}`);
+  assert.deepEqual([remove.status, remove.body.reason], [404, 'shopping_item_not_found']);
+});
+
+test('#1909 inzwischen geloeschte Liste: jede Route, die an ihr arbeitet, nennt den Fall', async () => {
+  const today = '2026-01-05';
+  for (const [method, path, body] of [
+    ['PUT', `/${GONE}`, { name: 'Neu' }],
+    ['POST', `/${GONE}/duplicate`, { name: 'Kopie' }],
+    ['DELETE', `/${GONE}`],
+    ['GET', `/${GONE}/items`],
+    ['PATCH', `/${GONE}/items/reorder`, { category: 'Sonstiges', order: [1] }],
+    ['POST', `/${GONE}/items`, { name: 'Milch' }],
+    ['POST', `/${GONE}/send`, { userId: U }],
+    ['POST', `/${GONE}/import-meal-plan`, { from: today, to: today }],
+    ['POST', `/${GONE}/import-pantry`, {}],
+  ]) {
+    const r = await call(method, path, body);
+    assert.deepEqual([r.status, r.body?.reason, r.body?.error], [404, 'shopping_list_not_found', 'List not found.'], `${method} ${path}`);
+  }
+});
+
+test('#1909 eine Validierung, die nur ein Aufrufer der API ausloest, nennt keinen Fall', async () => {
+  const list = await newList('Reason-Ohne');
+  const item = await newItem(list);
+  for (const [method, path, body] of [
+    ['PATCH', '/categories/reorder', { order: [] }],
+    ['PATCH', `/items/${item}`, { list_id: 'x' }],
+    ['PATCH', `/items/${item}`, { store_id: 'x' }],
+    ['PUT', '/stores/0', { name: 'x' }],
+  ]) {
+    const r = await call(method, path, body);
+    assert.equal(r.status, 400, `${method} ${path}`);
+    assert.equal(r.body.reason, undefined, `${method} ${path}`);
+  }
+});

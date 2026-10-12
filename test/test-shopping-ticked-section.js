@@ -590,12 +590,13 @@ test('Scheitert das Zurueckholen, bleibt das Formular stehen, nichts wird angele
   shopping.wireQuickAdd(f.container);
   f.name.value = 'Karotten';
 
-  const fehler = Object.assign(new Error('403'), { data: { error: 'Nein.' } });
+  // Kein Status: der allgemeine Satz, nie der des Servers (#1909).
+  const fehler = Object.assign(new Error('Nein.'), { data: { error: 'Nein.' } });
   const liste = await aufrufe(() => f.absenden(), { 'PATCH /shopping/items/2': fehler });
   assert.deepEqual(liste.map((a) => a.method), ['PATCH']);
   assert.equal(shopping.checkedOf(shopping.state.items[0]), 1, 'der Haken steht wieder');
   assert.equal(f.name.value, 'Karotten', 'die Eingabe geht nicht verloren');
-  assert.deepEqual(toasts, [['Nein.', 'danger']], 'keine Erfolgsmeldung');
+  assert.deepEqual(toasts, [['common.errorGeneric', 'danger']], 'keine Erfolgsmeldung');
 
   const nochmal = await aufrufe(() => f.absenden(), { 'PATCH /shopping/items/2': { data: null } });
   assert.deepEqual(wege(nochmal), ['PATCH /shopping/items/2'], 'die Sperre faellt auch nach einem Fehlschlag');
@@ -611,7 +612,7 @@ test('Lehnt der Server die getippte Menge ab, ist nichts halb geschrieben: Haken
   f.name.value = 'Karotten';
   f.qty.value = '2 kg';
 
-  const fehler = Object.assign(new Error('400'), { data: { error: 'Menge zu lang.' } });
+  const fehler = Object.assign(new Error('Menge zu lang.'), { status: 400, data: { error: 'Menge zu lang.', code: 400 } });
   // Ein Server, der den blossen Haken annimmt und alles mit Menge ablehnt.
   const liste = await aufrufe(() => f.absenden(), {
     'PATCH /shopping/items/2': (body) => ('quantity' in body ? fehler : { data: null }),
@@ -621,7 +622,7 @@ test('Lehnt der Server die getippte Menge ab, ist nichts halb geschrieben: Haken
   assert.equal(shopping.state.items[0].quantity, '1 kg');
   assert.equal(f.name.value, 'Karotten', 'der Name bleibt im Feld');
   assert.equal(f.qty.value, '2 kg', 'die getippte Menge bleibt im Feld');
-  assert.deepEqual(toasts, [['Menge zu lang.', 'danger']], 'die Fehlermeldung steht, keine Erfolgsmeldung darueber');
+  assert.deepEqual(toasts, [['common.errorGeneric', 'danger']], 'die Fehlermeldung steht, keine Erfolgsmeldung darueber');
 });
 
 // -------------------------------------------------------------------------

@@ -418,3 +418,37 @@ test('localizedLabels: Schreibwege tragen die Sprache nicht', async () => {
     delete globalThis.__confirmOverModal;
   }
 });
+
+// #1909: der Verwalter zeigt den Satz der App, nicht den des Servers - dort,
+// wo der Aufrufer es verlangt (`errorFallbackKey`, heute der Einkauf).
+const serverAnswer = (status, error, reason) => Object.assign(new Error(error), {
+  status, data: { error, code: status, ...(reason ? { reason } : {}) },
+});
+
+test('errorFallbackKey: ein Fehler ohne bekannten Grund zeigt den allgemeinen Satz, nie den des Servers', () => {
+  const manager = managerWithCategory({ basePath: '/shopping/stores', errorFallbackKey: 'common.errorGeneric' });
+  assert.equal(manager._errMsg(serverAnswer(400, 'Name ist erforderlich.')), 'common.errorGeneric');
+  assert.equal(manager._errMsg(serverAnswer(409, 'Diesen Laden gibt es schon.', 'some_future_reason')), 'common.errorGeneric');
+  // Ein Fall, den die App kennt, bekommt seinen Satz - auch ein fremder des Verwalters.
+  assert.equal(manager._errMsg(serverAnswer(409, 'Store already exists.', 'shopping_store_exists')), 'shopping.errorStoreExists');
+  assert.equal(manager._errMsg(serverAnswer(404, 'Store not found.', 'shopping_store_not_found')), 'shopping.errorStoreGone');
+  assert.equal(manager._errMsg(serverAnswer(403, 'Not authorized.')), 'common.errorNoPermission');
+  // Die eigenen Gruende des Verwalters bleiben, wie sie waren.
+  assert.equal(manager._errMsg(serverAnswer(409, 'Category already exists.', 'category_exists')), 'category.errorExists');
+  assert.equal(manager._errMsg(serverAnswer(400, 'The last category cannot be deleted.', 'category_last')), 'category.errorLast');
+});
+
+test('ohne errorFallbackKey bleibt der Rueckfall der anderen Module unveraendert', () => {
+  const manager = managerWithCategory();
+  assert.equal(manager._errMsg(serverAnswer(400, 'Name ist erforderlich.')), 'Name ist erforderlich.');
+  assert.equal(manager._errMsg(serverAnswer(409, 'Category already exists.', 'category_exists')), 'category.errorExists');
+});
+
+test('der Einkauf verlangt den allgemeinen Satz an beiden Verwaltern', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { withoutCommentsKeepingLines } = await import('./source-text.js');
+  const page = withoutCommentsKeepingLines(readFileSync(new URL('../public/pages/shopping.js', import.meta.url), 'utf8'));
+  const calls = [...page.matchAll(/manager\.configure\(\{[\s\S]*?\n\s*\}\);/g)].map((m) => m[0]);
+  assert.equal(calls.length, 2, 'Laeden und Kategorien');
+  for (const call of calls) assert.match(call, /errorFallbackKey:\s*'common\.errorGeneric'/);
+});

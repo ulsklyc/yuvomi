@@ -114,6 +114,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Shopping: an error message is in your language** (#1909). When something could not be
+  saved, the note showed the server's own sentence, in English or German whatever the app was set
+  to - "Unbekannte Liste." in an English session, when an item was moved to a list somebody had
+  just deleted. The shopping page now says it in the language of the app and adds what to do: the
+  list, item, shop or category no longer exists (reload the page), or a shop of that name already
+  exists (choose a different name). The same goes for the dialogs that manage shops and shopping
+  categories. Anything else shows the general sentence instead of a server text. The other pages
+  follow module by module. For API clients: the affected answers of `/api/v1/shopping` carry a
+  `reason` next to `error` (`shopping_list_not_found`, `shopping_item_not_found`,
+  `shopping_store_not_found`, `shopping_store_exists`, `shopping_category_not_found`,
+  `category_exists`, `category_last`); status codes are unchanged, and three German `error`
+  sentences are now English ("Unknown list.", "Unknown store.", "Store already exists.").
 - **A task due late tomorrow evening is no longer labelled "Due today" on the dashboard.** A task
   due tomorrow at 22:00 or later and less than 24 hours away gets its own label next to the date,
   "Due soon". In English and 17 other languages that label carried the text of "Due today", so the

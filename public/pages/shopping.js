@@ -28,6 +28,7 @@ import { makeSortable } from '/utils/sortable.js';
 import { amountPlaceholder, formatMoney, currencyFractionDigits, centsToAmountInput, amountInputToCents, toDecimalString, breaksOffAtSeparator } from '/utils/money.js';
 import { startLiveFeed } from '/utils/live-feed.js';
 import { createPageController } from '/utils/page-lifecycle.js';
+import { errorSentence } from '/utils/friendly-error.js';
 
 
 // --------------------------------------------------------
@@ -782,7 +783,7 @@ async function toggleShoppingItem(id, checked, container, { settleNow = false, e
       }
       renderTabs(container);
     }
-    window.yuvomi.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+    window.yuvomi.showToast(errorSentence(err), 'danger');
   }
   return undefined;
 }
@@ -880,7 +881,7 @@ function deleteItemUndoable(id, container) {
         updateListCounter(listId, 1, checkedOf(snapshot) ? 1 : 0);
         renderTabs(container);
       }
-      if (err) window.yuvomi.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+      if (err) window.yuvomi.showToast(errorSentence(err), 'danger');
     },
   });
 }
@@ -1099,16 +1100,16 @@ async function openSendListDialog(container) {
           window.yuvomi.showToast(t('shopping.sendListSent', { name }), 'info');
         } catch (err) {
           // Der Server nennt seinen Grund maschinenlesbar mit, damit die drei
-          // Absagen hier in der Sprache der Oberflaeche stehen koennen. Sein
-          // Meldungstext bleibt der Rueckfall fuer alles Unerwartete - er ist
-          // englisch wie jede Server-Meldung, aber besser als "ging nicht".
+          // Absagen hier in der Sprache der Oberflaeche stehen koennen. Alles
+          // Unerwartete bekommt den allgemeinen Satz des Versands, nie den
+          // Meldungstext des Servers (#1909).
           const byReason = {
             recipient_no_email: 'shopping.sendListRecipientNoEmail',
             smtp_unconfigured: 'shopping.sendListSmtpMissing',
             nothing_open: 'shopping.sendListEmpty',
           }[err.data?.reason];
           window.yuvomi.showToast(
-            byReason ? t(byReason) : (err.data?.error ?? t('shopping.sendListError')),
+            byReason ? t(byReason) : errorSentence(err, 'shopping.sendListError'),
             'danger',
           );
           btn.disabled = false;
@@ -1190,7 +1191,7 @@ async function openDuplicateListDialog(container) {
           await switchList(data.data.id, container);
           refocusAfterRender();
         } catch (err) {
-          window.yuvomi.showToast(err.data?.error ?? t('shopping.duplicateError'), 'danger');
+          window.yuvomi.showToast(errorSentence(err, 'shopping.duplicateError'), 'danger');
           btn.disabled = false;
         }
       });
@@ -1983,7 +1984,7 @@ function wireQuickAdd(container) {
       nameInput.classList.add('quick-add__input--flash');
       nameInput.addEventListener('animationend', () => nameInput.classList.remove('quick-add__input--flash'), { once: true });
     } catch (err) {
-      window.yuvomi.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+      window.yuvomi.showToast(errorSentence(err), 'danger');
     } finally {
       submitting = false;
     }
@@ -2112,7 +2113,7 @@ async function sendItemOrder(groupEl, container, listId) {
     // Fehler einer Liste, die gar nicht mehr offen ist, nicht dem Nutzer
     // vorlegen und erst recht nicht die sichtbare Liste dafür neu bauen.
     if (listId !== state.activeListId) return false;
-    window.yuvomi.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+    window.yuvomi.showToast(errorSentence(err), 'danger');
     updateItemsList(container);
     return false;
   }
@@ -2875,7 +2876,7 @@ function openItemDetails(itemId, container) {
             refreshItemName(container, aktuell);
           }
         } catch (err) {
-          window.yuvomi.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+          window.yuvomi.showToast(errorSentence(err), 'danger');
         }
       });
     },
@@ -3002,7 +3003,7 @@ async function openPantryTransfer(container) {
     const res = await api.get('/pantry/locations');
     locations = res.data ?? [];
   } catch (err) {
-    window.yuvomi.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+    window.yuvomi.showToast(errorSentence(err), 'danger');
     return;
   }
 
@@ -3111,7 +3112,7 @@ async function openPantryTransfer(container) {
           refreshKitchenBadges();
         } catch (err) {
           btn.disabled = false;
-          window.yuvomi.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+          window.yuvomi.showToast(errorSentence(err), 'danger');
         }
       });
     },
@@ -3293,7 +3294,7 @@ function clearCheckedUndoable(container) {
       }
       updateListCounter(listId, count, count);
       renderTabs(container);
-      if (err) window.yuvomi.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+      if (err) window.yuvomi.showToast(errorSentence(err), 'danger');
     },
   });
 }
@@ -3458,7 +3459,7 @@ function openMealPlanImport(container) {
           const count = Number(data.data.transferred) || 0;
           window.yuvomi.showToast(t('meals.transferSuccess', { count }), 'success');
         } catch (err) {
-          window.yuvomi.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+          window.yuvomi.showToast(errorSentence(err), 'danger');
         }
       });
     },
@@ -3882,7 +3883,7 @@ function wireTabBar(container) {
         await switchList(data.data.id, container);
         refocusAfterRender();
       } catch (err) {
-        window.yuvomi.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+        window.yuvomi.showToast(errorSentence(err), 'danger');
       }
     }
   });
@@ -4020,7 +4021,7 @@ function wireListContentEvents(container) {
         wireListContentEvents(container);
         refocusAfterRender();
       } catch (err) {
-        window.yuvomi.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+        window.yuvomi.showToast(errorSentence(err), 'danger');
       }
     }
 
@@ -4091,7 +4092,7 @@ function wireListContentEvents(container) {
           renderTabs(container);
           renderListContent(container);
           wireListContentEvents(container);
-          if (err) window.yuvomi.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+          if (err) window.yuvomi.showToast(errorSentence(err, 'common.unknownError'), 'danger');
         },
       });
     }
@@ -4163,6 +4164,8 @@ function openStoreManager(container) {
         // den Kategorien dieses Moduls.
         deleteConfirmKey: 'shopping.storeDeleteConfirm',
         deleteDetailKey: 'shopping.storeDeleteConfirmDetail',
+        // Nie der Satz des Servers (#1909): bekannter Fall oder der allgemeine.
+        errorFallbackKey: 'common.errorGeneric',
       });
     },
     // Bewusst KEIN onClose, das den Listener abmeldet: gemessen kommt das
@@ -4252,6 +4255,8 @@ async function openCategoryManager(container, { fromDeepLink = false } = {}) {
         // Anders als Budget/Tasks/Kontakte loescht der Einkauf auch belegte
         // Kategorien und schiebt die Artikel auf die naechste Kategorie.
         deleteDetailKey: 'shopping.categoryDeleteConfirmDetail',
+        // Nie der Satz des Servers (#1909): bekannter Fall oder der allgemeine.
+        errorFallbackKey: 'common.errorGeneric',
       });
     },
     // onClose traegt nur noch, was wirklich am Schliessen haengt. Kein
