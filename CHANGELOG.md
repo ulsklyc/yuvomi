@@ -32,7 +32,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   SSRF-guarded client with an 8 second limit, a 512 KiB cap and a signature check. If the
   picture, the address or the account changes while the fetch runs, nothing is stored (409).
 - **Tapping a category or subcategory in the budget overview filters the transactions list.**
-  (#1593, from D#1583) The filter applies in place and can be cleared again.
+  (#1593, from D#1583) The filter applies in place and can be cleared again. A category with
+  both income and spending is marked in both blocks, because the list then shows both; keyboard
+  focus stays on the bar that was tapped and its ring is no longer cut off, and whether the tap
+  jumps to the list follows the width of the budget area, not of the window. The bars answer to
+  the pointer.
 
 ### Changed
 
