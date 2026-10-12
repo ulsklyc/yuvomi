@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Checked-off shopping items collect in one section at the end of the list** (#1816, from D#1624).
+  Ticking an item moves it out of its category into "Checked off", a collapsed section at the
+  bottom that shows how many items it holds. The items stay on the list, and the list above gets
+  shorter as you shop. Nothing moves while you are still ticking: the rows wait until you pause
+  for a moment and then move together. Whether the section is open is remembered per person and
+  per list. Adding a name that is checked off on the open list - picked from the suggestions or
+  typed - brings that row back instead of adding a second one, and a short note says so; an
+  amount you typed replaces the row's, an empty field keeps it. A name that is not checked off
+  on the list is added as before.
 - **Dutch date format DD-MM-YYYY** (#1847). The new `DD-MM-YYYY` choice is in Settings → Account →
   Appearance → Date format, and the Netherlands region now uses it instead of `DD.MM.YYYY`.
   Dates, the date field placeholder, short dates and typed input all follow it. Existing households
@@ -22,6 +31,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refused. Only a SHA-256 hash of the address and the server's IP leave the server, through the
   SSRF-guarded client with an 8 second limit, a 512 KiB cap and a signature check. If the
   picture, the address or the account changes while the fetch runs, nothing is stored (409).
+- **Tapping a category or subcategory in the budget overview filters the transactions list.**
+  (#1593, from D#1583) The filter applies in place and can be cleared again.
+
+### Changed
+
+- **Recipes mirrored from a Norwegian Mealie or Tandoor sort into shopping categories.** The
+  keyword list that guesses a category from an ingredient's name now knows Norwegian words as
+  well as German and English, so "hvetemel" lands under baked goods and "oppvaskmiddel" under
+  household instead of everything ending up under "Other". Matching stays whole-word, so a
+  compound such as "kyllinglår" still falls through unless it is listed on its own.
 
 ### Fixed
 
@@ -89,6 +108,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Events without an account that no account delivers any more stay until you delete them.
   - If you delete an event that a second account also keeps as its own copy, that account adds it
     back on its next sync.
+- **Norwegian Bokmål reads more naturally.** A second pass over the app
+  and the installer after using them day to day: one word for a shift ("vakt"), a reminder
+  ("påminnelse") and a tablet ("nettbrett") throughout, "container" and "image" for Docker
+  instead of literal translations, and singular forms for a count of one instead of "(er)".
 
 ## [2.76.0] - 2026-10-11
 
