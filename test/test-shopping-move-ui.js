@@ -318,6 +318,25 @@ test('Eine Listenantwort von VOR dem Umzug, die nach dem Nachlesen eintrifft, er
   assert.deepEqual([alt.item_total, neu.item_total], [1, 5], 'die aeltere Antwort hat die juengere nicht ersetzt');
 });
 
+test('Eine aeltere Listenanfrage SCHEITERT, nachdem das Nachlesen angekommen ist: kein Fehlerbild, die Zaehler bleiben', async () => {
+  zustand();
+  let scheitere;
+  const alteAntwort = new Promise((_, reject) => { scheitere = reject; });
+  globalThis.__apiStub = { get: async () => alteAntwort };
+  const fehler = console.error;
+  console.error = () => {};
+  const unterwegs = shopping.loadLists();
+  try {
+    await speichere(felder({ 'item-details-list': '2' }), umzugsAntwort, { listen: async () => NACH_DEM_UMZUG() });
+    scheitere(new Error('Netz weg'));
+    await unterwegs;
+  } finally {
+    console.error = fehler;
+  }
+  assert.equal(shopping.state.listsError, null);
+  assert.deepEqual(shopping.state.lists.map((l) => l.item_total), [1, 5]);
+});
+
 test('Scheitert das Nachlesen, bleiben die Reiter mit der eigenen Buchung stehen', async () => {
   zustand();
   await speichere(felder({ 'item-details-list': '2' }), umzugsAntwort);

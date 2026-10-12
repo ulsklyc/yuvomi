@@ -491,7 +491,9 @@ async function runSync({ createClient: makeClient } = {}) {
       // Ohne eingeschaltete Liste gibt es nichts abzurufen. Wartet aber ein
       // Löschauftrag auf eine abgewählte (#1884), fragt der Lauf trotzdem die
       // Auflistung ab: nur sie sagt, ob es die Liste noch gibt.
-      const waitsForSelection = todoOutbound.deletionsWaitingForSelection(account.id).length > 0;
+      // Dasselbe für einen Umzug in eine abgewählte Liste (#1700).
+      const waitsForSelection = todoOutbound.deletionsWaitingForSelection(account.id).length > 0
+        || todoOutbound.movesWaitingForSelection(account.id) > 0;
       if (enabledLists.length === 0 && !waitsForSelection) continue;
 
       const client     = await clientFactory(account);
@@ -501,6 +503,7 @@ async function runSync({ createClient: makeClient } = {}) {
         // Eine leere Auflistung sagt auch hier nichts.
         if (serverCals.length > 0) {
           todoOutbound.dropDeletionsOfMissingLists(account.id, serverCals.map((c) => c.url));
+          todoOutbound.returnMovesIntoMissingLists(account.id, serverCals.map((c) => c.url));
         }
         reportWaitingDeletions(account);
         continue;
@@ -520,6 +523,8 @@ async function runSync({ createClient: makeClient } = {}) {
       // Löschaufträge für Listen, die der Server nicht mehr nennt, haben ihr
       // Ziel erreicht (#1884). Vor dem Lesen der Aufträge für den Abruf unten.
       todoOutbound.dropDeletionsOfMissingLists(account.id, serverCals.map((c) => c.url));
+      // Ein Umzug in eine Liste, die der Server nicht mehr nennt, geht zurück (#1700).
+      todoOutbound.returnMovesIntoMissingLists(account.id, serverCals.map((c) => c.url));
 
       const owner       = db.get().prepare('SELECT id FROM users ORDER BY id ASC LIMIT 1').get();
       const createdBy   = owner ? owner.id : 1;

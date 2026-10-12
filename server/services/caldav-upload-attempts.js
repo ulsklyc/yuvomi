@@ -225,10 +225,14 @@ function attemptById(id) {
  * @param {(collectionUrl: string) => boolean} [p.inScope]  nur Reste an Plätzen,
  *        die dieser Durchgang führt (eingeschaltete Kalender bzw. Listen);
  *        alles andere bleibt unberührt stehen
+ * @param {(attempt: object) => boolean} [p.keepWhileRefused]  Reste, deren
+ *        Notiz auch NACH der Frist stehen bleibt, solange der Server das
+ *        Entfernen ablehnt: die Zeile ist anderswo Spiegel DERSELBEN UID, und
+ *        ohne die Notiz läse der Abruf zwei Objekte für eine Zeile
  * @param {string} p.label  für das Log
  * @returns {Promise<number>} entfernte Objekte
  */
-export async function removeLeftoverUploads(client, { source, accountId = null, kinds, stateOf, inScope = null, label }) {
+export async function removeLeftoverUploads(client, { source, accountId = null, kinds, stateOf, inScope = null, keepWhileRefused = null, label }) {
   let attempts;
   try {
     attempts = uploadAttemptsOf({ source, accountId, kinds });
@@ -273,7 +277,7 @@ export async function removeLeftoverUploads(client, { source, accountId = null, 
     } catch (err) {
       const status = err?.status;
       if (status !== 404 && status !== 410) {
-        if (isExpired(attempt, Date.now())) {
+        if (isExpired(attempt, Date.now()) && !(keepWhileRefused && keepWhileRefused(attempt))) {
           log.error(`[${label}] Giving up on removing ${attempt.uid}, the leftover of an unconfirmed upload: ${err.message}`);
           dropUploadAttempt(attempt.id);
         } else {

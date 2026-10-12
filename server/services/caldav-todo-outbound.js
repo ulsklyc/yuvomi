@@ -1150,6 +1150,20 @@ export function releaseLeftoverTodoUploads(client, accountId) {
     source: 'caldav', accountId, kinds: ['task', 'item'],
     stateOf: (attempt) => todoAttemptState(attempt.kind === 'item' ? 'shopping' : 'tasks', attempt),
     inScope: (url) => enabled.some((known) => sameCollection(known, url)),
+    // Die Zeile ist anderswo Spiegel DERSELBEN UID (nach einer Mitnahme, #1700,
+    // oder einem Upload, der seinem Ziel gefolgt ist): der Rest liegt dann
+    // unter einer UID, die der Abruf dieser Zeile zuordnet. Fiele die Notiz
+    // nach der Frist, obwohl der Server das Entfernen weiter ablehnt, läse der
+    // Abruf zwei Objekte für eine Zeile - sie wechselte mit jedem Lauf die
+    // Liste, über zwei Konten entstünde ein zweiter Artikel. Die Notiz bleibt,
+    // bis das Objekt fort ist oder nachweislich ein anderes.
+    keepWhileRefused: (attempt) => {
+      const def = moduleDef(attempt.kind === 'item' ? 'shopping' : 'tasks');
+      const now = db.get().prepare(
+        `SELECT external_source, external_uid FROM ${def.table} WHERE id = ?`
+      ).get(attempt.row_id);
+      return !!now && now.external_source === 'caldav' && now.external_uid === attempt.uid;
+    },
     label: 'CalDAV-Todo',
   });
 }
@@ -1379,6 +1393,61 @@ export function releaseStrandedShoppingMoves(accountId) {
     log.info(`Shopping item ${row.id} was moved to a list that is no longer mirrored; its entry on the server is removed and the item stays in Yuvomi.`);
   }
   return released;
+}
+
+/**
+ * Umzüge in Listen dieses Kontos, deren Server-Liste es NICHT MEHR GIBT: die
+ * Auswahl des Kontos kennt sie, die Auflistung dieses Laufs nennt sie nicht.
+ * Der Lauf schaltet eine solche Liste ab, und ein Umzug in eine abgeschaltete
+ * wartet - ohne das hier für immer, mit einem Objekt, das am alten Platz
+ * weiterlebt.
+ *
+ * Die Zeile geht auf die Liste ihres Objekts zurück (`returnShoppingMove`),
+ * sie wird NICHT vom Server gelöst: dass es die Liste nicht mehr gibt, sagt
+ * hier eine Auflistung des Servers, nicht der Nutzer, und ein Löschen am alten
+ * Platz wäre nicht rückholbar. Hat die Zielliste noch eine andere Server-Liste,
+ * die der Server nennt oder über die dieser Lauf nichts weiss (anderes Konto),
+ * wartet der Umzug weiter.
+ *
+ * `listedUrls` ist die Auflistung DIESES Laufs und vom Aufrufer als nicht leer
+ * befunden (wie `dropDeletionsOfMissingLists`).
+ *
+ * @returns {number} zurückgestellte Zeilen
+ */
+export function returnMovesIntoMissingLists(accountId, listedUrls) {
+  const listed = [...(listedUrls || [])];
+  if (listed.length === 0) return 0;
+  const missing = (sel) => sel.account_id === accountId && !listed.some((url) => sameCollection(url, sel.list_url));
+  const targets = db.get().prepare(`
+    SELECT DISTINCT target_list_id FROM caldav_reminder_selection
+     WHERE account_id = ? AND target_module = 'shopping' AND target_list_id IS NOT NULL
+  `).all(accountId).map((r) => r.target_list_id);
+  let returned = 0;
+  for (const listId of targets) {
+    const mappings = shoppingMappingsOf(listId);
+    if (!mappings.length || !mappings.every(missing)) continue;
+    for (const row of pendingShoppingMoves(listId)) {
+      const back = returnShoppingMove(row);
+      returned++;
+      log.warn(
+        `The reminder list that shopping item "${row.name}" (${row.id}) was moved to no longer exists on the server. `
+        + 'Its entry on the server was not touched'
+        + (back ? `, and the item is back on the list it came from (${back}).` : '.')
+      );
+    }
+  }
+  return returned;
+}
+
+/** Wartet ein Umzug auf eine Liste dieses Kontos, die gerade nicht eingeschaltet ist? */
+export function movesWaitingForSelection(accountId) {
+  return db.get().prepare(`
+    SELECT COUNT(*) AS n
+      FROM caldav_reminder_selection sel
+      JOIN shopping_items i ON i.list_id = sel.target_list_id
+     WHERE sel.account_id = ? AND sel.enabled = 0 AND sel.target_module = 'shopping'
+       AND i.external_source = 'caldav' AND i.outbound_move = 1
+  `).get(accountId).n;
 }
 
 /**

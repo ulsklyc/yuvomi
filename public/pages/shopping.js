@@ -3494,6 +3494,9 @@ async function loadLists() {
     }
     state.listsError = null;
   } catch (err) {
+    // Auch eine GESCHEITERTE aeltere Antwort ersetzt keine juengere: ihr
+    // Fehler sagt nichts mehr ueber den Stand, den die Seite schon zeigt.
+    if (startedAt < _appliedListsLoad) return;
     console.error('[Shopping] loadLists Fehler:', err);
     state.lists = [];
     // Fehler statt Toast: der Toast verging, während darunter „Keine Listen ·

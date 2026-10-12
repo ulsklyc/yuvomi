@@ -73,8 +73,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   one and only then removes it from the old one, so its tags, alarms and everything another app
   keeps on it come along - also from one account to another. If the server does not accept it
   in the new list, the entry stays untouched where it was, and after the fifth refusal the item
-  is back on the list it came from, with a line in the sync log. While the new list is switched
-  off in the reminder sync, the move waits until it is switched on again. Moving an item to a
+  is back on the list it came from, with a line in the sync log. The same happens when the new
+  list no longer exists on the server. While the new list is switched off in the reminder sync,
+  the move waits until it is switched on again. Moving an item to a
   list that is not mirrored removes it on the server without deleting it in Yuvomi.
   `PATCH /api/v1/shopping/items/:itemId` takes `list_id` for the same move (migration 243).
 

@@ -363,6 +363,72 @@ test('Die Zuordnung der Zielliste gibt es nicht mehr: der wartende Umzug wird zu
   assert.equal(named('Milch').length, 1);
 });
 
+test('Die Zielliste gibt es auf dem Server nicht mehr: der Artikel geht zurueck, sein Eintrag bleibt unberuehrt', async () => {
+  const { a, b, item } = await mirroredItem();
+  dav.removeCollection(b.url);
+
+  await patch(item.id, { list_id: b.listId });
+  assert.deepEqual([row(item.id).list_id, row(item.id).outbound_move], [b.listId, 1]);
+
+  await remindersSync.sync();
+
+  const now = row(item.id);
+  assert.deepEqual([now.list_id, now.outbound_move, now.external_source, now.external_object_url],
+    [a.listId, 0, 'caldav', `${a.url}${FILE}`]);
+  assert.equal(objectsWith(dav, a.url)[0]?.data, original());
+  assert.deepEqual(orders(), []);
+  assert.deepEqual(loadItemTags(db, item.id).sort(), ['Bio', 'Kuehlregal']);
+});
+
+test('Die Zielliste war schon abgeschaltet, als es sie nicht mehr gab: auch dann geht der Artikel zurueck', async () => {
+  const { a, b, item } = await mirroredItem({ target: { enabled: false } });
+  dav.removeCollection(b.url);
+
+  await patch(item.id, { list_id: b.listId });
+  await remindersSync.sync();
+
+  assert.deepEqual([row(item.id).list_id, row(item.id).outbound_move], [a.listId, 0]);
+  assert.equal(objectsWith(dav, a.url)[0]?.data, original());
+});
+
+test('Zwei Konten, die abgeschaltete Zielliste ist die einzige ihres Kontos und fort: der Lauf fragt das Konto trotzdem, der Artikel geht zurueck', async () => {
+  const { a, b, item } = await mirroredItem({ target: { server: dav2 } });
+  select(account2, b.url, false);
+  await patch(item.id, { list_id: b.listId });
+  assert.equal(row(item.id).outbound_move, 1);
+  dav2.removeCollection(b.url);
+  // Der Server des Zielkontos nennt noch eine andere Liste - eine leere
+  // Auflistung sagte nichts.
+  dav2.addCollection('anderes', { name: 'anderes', components: ['VTODO'] });
+
+  await remindersSync.sync();
+
+  assert.deepEqual([row(item.id).list_id, row(item.id).outbound_move], [a.listId, 0]);
+  assert.equal(objectsWith(dav, a.url)[0]?.data, original());
+});
+
+test('Die Zielliste hat noch eine Server-Liste in einem anderen Konto: der Umzug geht dorthin statt zurueck', async () => {
+  const { a, b, item } = await mirroredItem();
+  secondAccount();
+  const other = dav2.addCollection('auch-neu', { name: 'auch-neu', components: ['VTODO'] });
+  dav2.putObject(other, 'neighbour-auch-neu.ics', neighbour('auch-neu'));
+  db.prepare(`
+    INSERT INTO caldav_reminder_selection (account_id, list_url, list_name, target_module, enabled, target_list_id)
+    VALUES (?, ?, 'auch-neu', 'shopping', 1, ?)
+  `).run(account2, other, b.listId);
+  dav.removeCollection(b.url);
+  dav2.refuse({ status: 503 });
+  await patch(item.id, { list_id: b.listId });
+  dav2.allowAll();
+
+  await remindersSync.sync();
+
+  assertCarried(dav2, other);
+  assert.deepEqual([row(item.id).list_id, row(item.id).external_account_id, row(item.id).outbound_move],
+    [b.listId, account2, 0]);
+  assert.deepEqual(objectsWith(dav, a.url), []);
+});
+
 test('Quellliste abgewaehlt: aus ihr wird nichts gelesen und nichts entfernt, der Umzug wartet', async () => {
   const { a, b, item } = await mirroredItem();
   select(account1, a.url, false);
@@ -497,6 +563,27 @@ test('Das Entfernen am alten Platz scheitert: der Abruf sieht zwei Objekte einer
   assert.deepEqual(objectsWith(dav, a.url), [], 'der naechste Durchgang raeumt den alten Platz');
   assertCarried(dav, b.url);
   assert.deepEqual(rowsOf().map((x) => [x.id, x.list_id]), [[item.id, b.listId]]);
+  assert.deepEqual(notes(), []);
+});
+
+test('Der Server lehnt das Entfernen am alten Platz laenger ab als die Frist der Notiz: sie bleibt, und die Zeile wechselt nicht die Liste', async () => {
+  const { a, b, item } = await mirroredItem();
+  dav.refuse({ method: 'DELETE', status: 403 });
+  await patch(item.id, { list_id: b.listId });
+  assert.equal(notes().length, 1);
+  // Die Notiz ist aelter als ihre Frist (24 Stunden).
+  db.prepare("UPDATE caldav_upload_attempts SET created_at = '2020-01-01T00:00:00Z'").run();
+  dav.moveToEnd(a.url);
+
+  await remindersSync.sync();
+  await remindersSync.sync();
+
+  assert.deepEqual(notes().map((n) => n.collection_url), [a.url], 'die Notiz verdeckt das Objekt weiter');
+  assert.deepEqual(rowsOf().map((x) => [x.id, x.list_id, x.external_object_url]), [[item.id, b.listId, `${b.url}${FILE}`]]);
+
+  dav.allowAll();
+  await remindersSync.sync();
+  assert.deepEqual(objectsWith(dav, a.url), []);
   assert.deepEqual(notes(), []);
 });
 
