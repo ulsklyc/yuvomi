@@ -62,8 +62,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to everyone - a task set to "Assignees only" or private, an appointment set to "Assignees
   only" or private, and appointments from a calendar subscription that is not shared with the
   household - also when the wall was opened from the session of the person they belong to.
-  Someone who would only be "up today" because of such an entry is not listed. The normal
-  overview and "Today at a glance" stay personal and show them as before.
+  Someone who would only be "up today" because of such an entry is not listed. The same holds
+  for what concerns one person alone: a wall opened from a member's session no longer shows
+  that person's medication doses, own shift, due reminders or the reward requests waiting for
+  their approval - a coupled display never showed them, and now every wall reads the same.
+  The normal overview and "Today at a glance" stay personal and show all of it as before.
 
 ### Fixed
 

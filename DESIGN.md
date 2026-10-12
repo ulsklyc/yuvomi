@@ -3696,8 +3696,12 @@ Leerlaufzeit unveraendert darueber.
 gleich aus wessen Sitzung sie geoeffnet wurde - sie zeigt deshalb nur, was der ganze Haushalt
 sehen darf: Aufgaben und Termine mit Sichtbarkeit "alle", Termine aus Abos nur aus geteilten.
 Was einer Person allein gehoert, steht an keiner Stelle der Wand, auch nicht fuer sie selbst,
-und wer nur darueber "dran" waere, erscheint nicht unter den Gesichtern. Durchgesetzt am Leser
-(`audience=household`), nicht im Browser. Uebersicht und Heute-Blatt bleiben persoenlich.
+und wer nur darueber "dran" waere, erscheint nicht unter den Gesichtern. Dasselbe gilt fuer
+Beitraege ohne Sichtbarkeitsstufe, die nur dem Betrachter gelten: die eigene Dosis, die eigene
+Schicht, die eigene Erinnerung, wartende Freigaben. Sie fehlen an jeder Wand, wie auf einem
+gekoppelten Display - ohne Ersatzzeile und ohne Luecke: das Programm rueckt zusammen, und ein
+Tag ohne Zeile sagt "Heute frei". Durchgesetzt am Leser (`audience=household`), nicht im
+Browser. Uebersicht und Heute-Blatt bleiben persoenlich.
 
 **Die Shell tritt ab.** Sidebar und Tab-Leiste sind Arm-Laengen-Moebel; auf zwei Metern sind
 sie siebzehn unleserliche Ziele. Auch die Installations-Einladung verschwindet - auf einer

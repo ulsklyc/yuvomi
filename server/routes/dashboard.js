@@ -13,7 +13,9 @@ import { getEventsOverlappingDays, getUpcomingEvents } from '../services/calenda
 import { taskScopeWhere, taskCategoryWhere, categoryBindings, normalizeCategoryFilter } from '../services/task-scope.js';
 import { getCountdowns } from '../services/countdowns.js';
 import { listQuickLinksFor } from './quick-links.js';
-import { householdVisibleWhere, visibilityWhere } from '../services/visibility.js';
+import {
+  HOUSEHOLD_AUDIENCE_LEAVES_OUT, asksHouseholdAudience, householdVisibleWhere, visibilityWhere,
+} from '../services/visibility.js';
 import { resolveBudgetMode } from '../services/budget-visibility.js';
 import { hiddenModulesFor } from '../permissions.js';
 import { birthdaysSwitchedOff, modulesLeftOut } from '../services/household-modules.js';
@@ -384,11 +386,18 @@ router.get('/', (req, res) => {
    * VERENGT nur - die Haushaltsfassung ist eine Teilmenge dessen, was dieselbe
    * Person ohnehin bekaeme -, er braucht deshalb kein eigenes Recht.
    *
+   * UND WAS NUR DEM BETRACHTER GILT, FEHLT GANZ. Dosen, die eigene Schicht und
+   * wartende Freigaben haben keine Stufe „alle": sie sind nach der anfragenden
+   * Person geschnitten. Ein gekoppeltes Display bekam sie nie (ihm fehlt das
+   * Modulrecht), eine Wand aus der Sitzung eines Mitglieds schon - „2 zu
+   * bestaetigen" und „Eisen 20:00" in der Kueche. Fuer die Haushaltsfassung
+   * zaehlen diese Module deshalb zu den ausgelassenen (`leftOut` unten,
+   * `HOUSEHOLD_AUDIENCE_LEAVES_OUT`) und kommen in derselben leeren Fassung
+   * wie bei einer Sperre.
+   *
    * Die normale Uebersicht derselben Sitzung fragt ohne ihn und bleibt
    * persoenlich. */
-  // Doppelt in der Adresse kommt der Parameter als Liste an. Ein Schalter, der
-  // nur verengt, faellt dann nicht still auf die persoenliche Fassung zurueck.
-  const householdAudience = [].concat(req.query.audience ?? []).includes('household');
+  const householdAudience = asksHouseholdAudience(req.query);
   const taskVisibleSql = householdAudience
     ? householdVisibleWhere('t')
     : visibilityWhere('t', 'task_assignments', 'task_id', '@me');
@@ -473,6 +482,11 @@ router.get('/', (req, res) => {
   // in EINEM Set, damit jede Abfrage unten dieselbe Frage stellt; die leere
   // Fassung ist dieselbe wie bei einer Sperre, die Form der Antwort bleibt.
   const leftOut = modulesLeftOut(d, denied);
+  // Die dritte Achse (#1817): was nur dem Betrachter gilt, laesst die
+  // Haushaltsfassung aus. Im SELBEN Set, damit jede Abfrage unten weiter eine
+  // einzige Frage stellt - und die leere Fassung dieselbe ist, die ein Display
+  // ohne das Modulrecht bekommt.
+  if (householdAudience) for (const key of HOUSEHOLD_AUDIENCE_LEAVES_OUT) leftOut.add(key);
   for (const key of leftOut) Object.assign(result, DENIED_PAYLOAD[key]?.({ month: currentMonth }));
   const allows = (moduleKey) => !leftOut.has(moduleKey);
   // GEBURTSTAGE HABEN ZWEI WEGE. Als RECHT gehoeren sie zum Kalender (siehe

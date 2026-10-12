@@ -25,6 +25,11 @@
  *           die Zeile gehoert. Ohne den Parameter bleibt die Antwort
  *           persoenlich. Und die gebaute Wand zeigt davon an keiner Stelle
  *           etwas.
+ *        7. PERSOENLICHE BEITRAEGE: was dem Betrachter allein gilt - die eigene
+ *           Dosis, die eigene Schicht, die eigene Erinnerung, wartende
+ *           Freigaben - steht in der Haushaltsfassung gar nicht, aus keiner
+ *           Sitzung; ohne den Parameter bleibt es stehen; und die Wand ist aus
+ *           jeder Sitzung dieselbe wie auf einem gekoppelten Display.
  *
  * Ausfuehren: npm run test:wall-tasks
  */
@@ -44,6 +49,8 @@ process.env.SESSION_SECRET = 'wall-tasks-test-secret';
 const { resolvePermissions, buildSessionModuleAccess } = await import('../server/permissions.js');
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+const { default: remindersRouter } = await import('../server/routes/reminders.js');
+const { DISPLAY_SCOPES } = await import('../server/services/display-accounts.js');
 
 function buildMigratedDatabase(migrations) {
   const database = new Database(':memory:');
@@ -81,15 +88,19 @@ const BEN = addUser('Ben');
 const CLEO = addUser('Cleo');
 
 let viewer = ANNA;
+/** Ein gekoppeltes Display: Methode, Scopes und Rechte wie `requireAuth` sie setzt. */
+let asDisplay = false;
 const app = express();
 app.use((req, _res, next) => {
   const user = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(viewer);
   req.authUserId = user.id;
   req.authRole = user.role;
   req.session = { userId: user.id, role: user.role };
-  req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(db, user));
+  if (asDisplay) { req.authMethod = 'display'; req.authScopes = [...DISPLAY_SCOPES]; }
+  req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(db, user, { isDisplay: asDisplay }));
   next();
 });
+app.use('/reminders', remindersRouter);
 app.use('/', dashboardRouter);
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -832,4 +843,217 @@ test('Geteilte Flaeche: die Wand fragt die Haushaltsfassung ab, die Uebersicht n
   const bare = calls.filter((call) => !call.startsWith('overviewRequest('));
   assert.deepEqual(bare, [], 'Abruf der Uebersicht an `overviewRequest` vorbei');
   assert.match(page, /const overviewRequest = \(query\) => dashboardRequest\(query, \{ wall: wallMode \}\);/);
+});
+
+// --------------------------------------------------------------------------
+// 7. Die Wand laesst persoenliche Beitraege weg - wie das Display
+// --------------------------------------------------------------------------
+//
+// #1838 hat Aufgaben und Termine auf „was jeder sehen darf" gestellt. Uebrig
+// blieben die Beitraege zum Tagesprogramm, die keinem Sichtbarkeitsfeld folgen,
+// sondern dem BETRACHTER gelten: die eigene Dosis, die eigene Schicht, die
+// eigene Erinnerung, die Freigaben, die nur ein Admin entscheidet. Ein
+// gekoppeltes Display bekam sie nie, eine Wand aus der Sitzung eines Mitglieds
+// schon (gemessen an der Demo-Saat: „2 zu bestaetigen" und „Eisen 20:00").
+
+const DISPLAY = addUser('Wandtablett');
+
+async function reminders(userId, query = '') {
+  viewer = userId;
+  const res = await fetch(`${base}/reminders/pending${query}`);
+  assert.equal(res.status, 200);
+  return (await res.json()).data;
+}
+async function asCoupledDisplay(fn) {
+  asDisplay = true;
+  try { return await fn(); } finally { asDisplay = false; }
+}
+
+function seedPersonal() {
+  for (const table of ['reminders', 'medication_schedules', 'medications', 'schedule_extra_shifts',
+    'schedule_shift_types', 'reward_redemptions', 'reward_participants', 'calendar_events', 'ics_subscriptions']) {
+    db.prepare(`DELETE FROM ${table}`).run();
+  }
+  // Der Haushalt dieser Tests nutzt jedes Modul: ab Werk ist der Schichtplan
+  // abgeschaltet, und eine Schicht, die gar nicht erst geliefert wird, kann
+  // nicht zeigen, dass die Wand sie weglaesst.
+  db.prepare(`
+    INSERT INTO sync_config (key, value) VALUES ('disabled_modules', '[]')
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run();
+  // Etwas fuer alle - die Wand ist nie leer, und Cleo ist darueber dran.
+  addTask('Tisch decken', CLEO);
+  // Bens Dosis heute Abend.
+  const med = db.prepare("INSERT INTO medications (user_id, name, active, visibility) VALUES (?, 'Eisen', 1, 'private')").run(BEN).lastInsertRowid;
+  db.prepare("INSERT INTO medication_schedules (medication_id, time_of_day, days_mask, active) VALUES (?, '20:00', NULL, 1)").run(med);
+  // Bens Schicht heute.
+  const shift = db.prepare(`
+    INSERT INTO schedule_shift_types (name, short_code, start_time, end_time, color, created_by)
+    VALUES ('Fruehdienst', 'F', '06:00', '14:00', '#00668F', ?)
+  `).run(ANNA).lastInsertRowid;
+  db.prepare('INSERT INTO schedule_extra_shifts (user_id, date_key, shift_type_id, created_by) VALUES (?, ?, ?, ?)')
+    .run(BEN, '2026-10-08', shift, ANNA);
+  // Bens Erinnerung an eine Aufgabe, die JEDER sehen darf und die heute nicht
+  // im Programm steht: die Aufgabe ist Haushaltssache, die Erinnerung ist seine.
+  const later = addTask('Steuer abgeben', BEN, { due: '2026-10-20' });
+  db.prepare('INSERT INTO reminders (entity_type, entity_id, remind_at, created_by) VALUES (?, ?, ?, ?)')
+    .run('task', later, '2026-10-08T06:00:00Z', BEN);
+  // Cleo sammelt Punkte und wartet auf eine Praemie und eine Auszahlung; Anna (Admin) gibt frei.
+  db.prepare('INSERT INTO reward_participants (user_id, enabled) VALUES (?, 1)').run(CLEO);
+  db.prepare('INSERT INTO reward_participants (user_id, enabled) VALUES (?, 1)').run(BEN);
+  db.prepare("INSERT INTO reward_redemptions (user_id, reward_name, cost, status) VALUES (?, 'Kinoabend', 10, 'pending')").run(CLEO);
+  db.prepare("INSERT INTO reward_redemptions (user_id, reward_name, cost, status, kind, currency) VALUES (?, 'Auszahlung', 5, 'pending', 'withdrawal', 'EUR')").run(CLEO);
+}
+const PERSONAL_WORDS = ['Eisen', 'Fruehdienst', 'Steuer abgeben', 'Kinoabend'];
+/** Der Programmteil der gebauten Wand und die Gesichter - ohne Uhr und Fuss. */
+function wallParts(body) {
+  const html = dash.renderWallSurface(body, null, { now: new Date() });
+  const cut = (name) => (new RegExp(`<section class="wall__${name}"[\\s\\S]*?</section>`).exec(html) || [''])[0];
+  return { html, program: cut('program'), who: cut('who') };
+}
+function onWallAt(iso, fn) {
+  return onWall(() => {
+    mock.timers.enable({ apis: ['Date'], now: new Date(iso) });
+    tzClient.setDisplayTimeZone('Europe/Berlin');
+    try { return fn(); } finally { tzClient.setDisplayTimeZone(null); mock.timers.reset(); }
+  });
+}
+
+test('Persoenliches: ohne den Parameter bleibt die Uebersicht persoenlich', withClock(NOON_BERLIN, 'Europe/Berlin', async () => {
+  seedPersonal();
+  const ben = await overview(BEN);
+  assert.equal(ben.health.dosesTotal, 1);
+  assert.deepEqual(ben.health.nextDose, { name: 'Eisen', time: '20:00' });
+  assert.deepEqual(ben.myShiftsToday.map((entry) => entry.shift_type.name), ['Fruehdienst']);
+  assert.deepEqual((await reminders(BEN)).map((row) => row.entity_title), ['Steuer abgeben']);
+  const anna = await overview(ANNA);
+  assert.equal(anna.rewards.view, 'approver');
+  assert.equal(anna.rewards.pending, 1);
+  assert.equal(anna.rewards.moneyPending, 1);
+  const cleo = await overview(CLEO);
+  assert.equal(cleo.rewards.view, 'self');
+  assert.equal(cleo.rewards.pending, 1);
+  assert.deepEqual(cleo.rewards.standings.map((row) => row.id), [CLEO], 'Vorbedingung: ein Kind bekommt nur die eigene Zeile');
+}));
+
+test('Persoenliches: die Haushaltsfassung traegt es gar nicht - auch nicht fuer die Person, der es gilt', withClock(NOON_BERLIN, 'Europe/Berlin', async () => {
+  seedPersonal();
+  const display = await asCoupledDisplay(() => overview(DISPLAY));
+  assert.equal(display.health.dosesTotal, 0, 'Massstab: ein Display bekommt keine Dosen');
+  assert.deepEqual(display.myShiftsToday, [], 'Massstab: und keine Schicht');
+  for (const [who, label] of [[BEN, 'Ben, dem Dosis, Schicht und Erinnerung gelten'], [ANNA, 'Anna, die freigibt'], [CLEO, 'Cleo, die wartet']]) {
+    const wall = await overview(who, '?audience=household');
+    assert.deepEqual(wall.health, display.health, `${label}: Dosen in der leeren Fassung des Displays`);
+    assert.deepEqual(wall.fasting, display.fasting, label);
+    assert.deepEqual(wall.nutrition, display.nutrition, label);
+    assert.deepEqual(wall.myShiftsToday, [], `${label}: keine Schicht`);
+    assert.equal(wall.rewards.view, null, `${label}: keine Sicht auf Belohnungen`);
+    assert.equal(wall.rewards.pending, 0, `${label}: keine wartende Praemie`);
+    assert.ok(!wall.rewards.moneyPending, `${label}: keine wartende Auszahlung`);
+    // Der Parameter verengt nur: aus der Sitzung eines Kindes oeffnet er nicht
+    // die Zeilen der Geschwister, die die Sicht `self` zurueckhaelt.
+    assert.deepEqual(wall.rewards.standings, [], `${label}: keine Staende`);
+    assert.deepEqual(wall.rewards.recent, [], label);
+    assert.deepEqual(await reminders(who, '?audience=household'), [], `${label}: keine Erinnerung`);
+    const text = JSON.stringify(wall);
+    for (const word of ['Eisen', 'Fruehdienst', 'Kinoabend']) assert.ok(!text.includes(word), `${label}: „${word}" reist nicht mit`);
+    assert.ok(titles(wall.urgentTasks).includes('Tisch decken'), `${label}: Reichweite - was alle sehen duerfen, steht da`);
+  }
+}));
+
+test('Persoenliches: auch die Erinnerungen fallen bei doppeltem Parameter nicht auf die persoenliche Fassung zurueck', withClock(NOON_BERLIN, 'Europe/Berlin', async () => {
+  seedPersonal();
+  assert.deepEqual(await reminders(BEN, '?audience=household&audience=household'), []);
+  assert.equal((await overview(BEN, '?audience=household&audience=household')).health.dosesTotal, 0);
+  // Ein anderes Wort bleibt, was es war.
+  assert.equal((await reminders(BEN, '?audience=me')).length, 1);
+  assert.equal((await overview(BEN, '?audience=me')).health.dosesTotal, 1);
+}));
+
+test('Persoenliches: das Display bekommt, was es bekam', withClock(NOON_BERLIN, 'Europe/Berlin', async () => {
+  seedPersonal();
+  const display = await asCoupledDisplay(() => overview(DISPLAY));
+  // Belohnungen sind eines der Module, die ein Display lesen darf: seine
+  // normale Uebersicht behaelt die Sicht `family`, ohne fremde Anfragen.
+  assert.equal(display.rewards.view, 'family');
+  assert.equal(display.rewards.pending, 0);
+  assert.equal(display.rewards.moneyPending, 0);
+  assert.deepEqual(display.rewards.standings.map((row) => row.id).sort(), [BEN, CLEO].sort());
+  assert.ok(titles(display.urgentTasks).includes('Tisch decken'));
+}));
+
+test('Persoenliches: die Wand ist aus jeder Sitzung dieselbe wie auf dem Display, die Uebersicht bleibt persoenlich', async () => {
+  const personal = {};
+  const wall = {};
+  let wallReminders;
+  let ownReminders;
+  await withClock(NOON_BERLIN, 'Europe/Berlin', async () => {
+    seedPersonal();
+    for (const [name, id] of [['ben', BEN], ['anna', ANNA], ['cleo', CLEO]]) {
+      personal[name] = await overview(id);
+      wall[name] = await overview(id, '?audience=household');
+    }
+    wall.display = await asCoupledDisplay(() => overview(DISPLAY, '?audience=household'));
+    ownReminders = await reminders(BEN);
+    wallReminders = await reminders(BEN, '?audience=household');
+  })();
+  await onWallAt(NOON_BERLIN, () => {
+    // REICHWEITE: aus der persoenlichen Antwort gebaut, stuende es an der Wand.
+    const before = wallParts({ ...personal.ben, pendingReminders: ownReminders });
+    for (const word of ['Eisen', 'Fruehdienst', 'Steuer abgeben']) {
+      assert.ok(before.program.includes(word), `Reichweite: persoenlich gebaut stuende „${word}" im Programm`);
+    }
+    assert.match(wallParts(personal.anna).program, /wall-row--rewards/, 'Reichweite: persoenlich gebaut stuende die Freigabe im Programm');
+
+    const shown = wallParts({ ...wall.ben, pendingReminders: wallReminders });
+    assert.match(shown.program, /Tisch decken/, 'Reichweite: die Wand ist gebaut');
+    for (const word of PERSONAL_WORDS) assert.ok(!shown.html.includes(word), `„${word}" steht an keiner Stelle der Wand`);
+    for (const tone of ['health', 'schedule', 'rewards']) {
+      assert.ok(!shown.program.includes(`wall-row--${tone}`), `keine Zeile im Ton ${tone}`);
+    }
+    // EINE WAND: wer sie oeffnet, aendert nichts an ihr.
+    for (const name of ['anna', 'cleo', 'display']) {
+      const other = wallParts({ ...wall[name], pendingReminders: [] });
+      assert.equal(other.program, shown.program, `Programm aus der Sitzung „${name}" ist dasselbe`);
+      assert.equal(other.who, shown.who, `„Wer heute dran ist" aus der Sitzung „${name}" ist dasselbe`);
+    }
+  })();
+});
+
+test('Persoenliches: genommene Dosen machen aus einem freien Tag an der Wand kein „Alles erledigt"', async () => {
+  let personal;
+  let wall;
+  await withClock(NOON_BERLIN, 'Europe/Berlin', async () => {
+    seedPersonal();
+    db.prepare('DELETE FROM tasks').run();
+    db.prepare('DELETE FROM reminders').run();
+    db.prepare('DELETE FROM schedule_extra_shifts').run();
+    const med = db.prepare("SELECT id FROM medications WHERE name = 'Eisen'").get().id;
+    db.prepare("INSERT INTO medication_logs (medication_id, scheduled_at, status) VALUES (?, '2026-10-08T20:00', 'taken')").run(med);
+    personal = await overview(BEN);
+    wall = await overview(BEN, '?audience=household');
+    db.prepare('DELETE FROM medication_logs').run();
+  })();
+  assert.equal(personal.health.dosesTaken, 1, 'Vorbedingung: die Dosis ist genommen');
+  await onWallAt(NOON_BERLIN, () => {
+    assert.match(wallParts(personal).program, /check-circle/, 'Reichweite: persoenlich gebaut sagte die Wand „Alles erledigt"');
+    const program = wallParts(wall).program;
+    assert.ok(!program.includes('check-circle'), 'die Wand sagt es nicht ueber die Dosen einer Person');
+    assert.match(program, /sparkles/, 'sie sagt „Heute frei"');
+  })();
+});
+
+test('Persoenliches: die Erinnerungen der Seite gehen durch dieselbe Stelle wie die Uebersicht', async () => {
+  const asked = [];
+  const get = async (path) => { asked.push(path); return { data: [{ id: 1 }] }; };
+  assert.deepEqual(await dash.loadPendingReminders((path) => dashboardRequest(path, { wall: true }), get), [{ id: 1 }]);
+  assert.deepEqual(await dash.loadPendingReminders((path) => dashboardRequest(path, { wall: false }), get), [{ id: 1 }]);
+  assert.deepEqual(asked, ['/reminders/pending?audience=household', '/reminders/pending']);
+  // Und die Seite reicht an BEIDEN Stellen ihre eine Regel herein - der stille
+  // Refresh braechte sonst nach einer Viertelstunde die Erinnerungen zurueck.
+  const { readFileSync } = await import('node:fs');
+  const page = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
+  const calls = [...page.matchAll(/(?<!function )loadPendingReminders\(([^)]*)\)/g)].map((m) => m[1]);
+  assert.ok(calls.length >= 2, `nur ${calls.length} Aufrufe gefunden - misst der Leser noch?`);
+  assert.deepEqual(calls.filter((args) => args !== 'overviewRequest'), [], 'Erinnerungen an `overviewRequest` vorbei geladen');
 });

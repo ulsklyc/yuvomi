@@ -6780,7 +6780,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // Die Wand fragt die Haushaltsfassung der Uebersicht ab (#1817,
   // `dashboardRequest`). JEDER Abruf dieser Seite geht hier durch - auch der
   // stille Refresh, sonst stuende nach einer Viertelstunde wieder die
-  // persoenliche Fassung an der Wand.
+  // persoenliche Fassung an der Wand. Die faelligen Erinnerungen ebenso
+  // (`loadPendingReminders`): sie sind die zweite Antwort, die davon abhaengt,
+  // wer fragt.
   const overviewRequest = (query) => dashboardRequest(query, { wall: wallMode });
   let isCustomizing = false;
   let currency     = 'EUR';
@@ -6799,7 +6801,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
       // sie herein (utils/start-handoff.js) - sonst zwei `/preferences` je
       // Kaltstart. Danach gibt es nichts mehr abzuholen, und die Seite fragt selbst.
       (window.yuvomi?.takeStartPreferences?.() ?? api.get('/preferences')).catch(() => ({ data: {} })),
-      loadPendingReminders(),
+      loadPendingReminders(overviewRequest),
     ]);
     // Ueberholt oder verlassen, waehrend die Antworten unterwegs waren (#977):
     // dieser Aufbau gehoert niemandem mehr und faesst die Flaeche nicht an.
@@ -7674,7 +7676,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
       }
       fresh.schedule = data.schedule;
       fresh.waste = data.waste;
-      fresh.pendingReminders = await loadPendingReminders();
+      fresh.pendingReminders = await loadPendingReminders(overviewRequest);
       if (signal.aborted) return;
       data = fresh;
       lastLoadedAt = new Date();
@@ -7807,10 +7809,14 @@ function todayFingerprint(data, cfg, now = new Date()) {
  * Modulrecht und Token-Scope (`mayTouchOrigin`), das Blatt waehlt daraus nur
  * noch, welche Herkunft eine Zeile ist. Ein Fehler kostet die Zeilen, nicht
  * die Uebersicht: die Erinnerung spricht weiter ueber Toast und Glocke.
+ *
+ * `request` IST DIE EINE REGEL DER SEITE (`overviewRequest`): die Wand fragt
+ * auch hier die Haushaltsfassung ab, und die ist leer - eine Erinnerung gilt
+ * der Person, die um sie gebeten hat, nicht der Kueche (#1817).
  */
-async function loadPendingReminders() {
+async function loadPendingReminders(request = (path) => path, get = (path) => api.get(path)) {
   try {
-    const res = await api.get('/reminders/pending');
+    const res = await get(request('/reminders/pending'));
     return Array.isArray(res?.data) ? res.data : [];
   } catch {
     return [];
@@ -7904,7 +7910,7 @@ function wireWeatherRefresh(container, onUpdated = null, signal) {
 // Test-Tor fuer die Klarheits-Runde (test/test-dashboard-clarity.js): eigene
 // Zeile statt Verlaengerung der langen `__test`-Liste oben, damit parallele
 // Aenderungen an beiden nicht in derselben Zeile kollidieren.
-Object.assign(__test, { renderUpcomingEvents, renderShoppingLists, renderShoppingTile, loadShoppingLists, renderDashboardLayout, wireLinks });
+Object.assign(__test, { renderUpcomingEvents, renderShoppingLists, renderShoppingTile, loadShoppingLists, loadPendingReminders, renderDashboardLayout, wireLinks });
 
 // Test-Tor fuer die Uebersichts-Bugs vom 2026-09-29 (#1449, #1451-#1457).
 Object.assign(__test, { renderBudgetWidget });
