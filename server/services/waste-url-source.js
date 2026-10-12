@@ -239,7 +239,7 @@ export async function refreshUrlSource(d, sourceId) {
 
 async function refreshUrlSourceUnclaimed(d, sourceId) {
   const source = store.getSource(d, sourceId);
-  if (!source) throw new WasteNotFoundError('Waste import source not found.');
+  if (!source) throw new WasteNotFoundError('Waste import source not found.', 'waste_source_not_found');
   if (source.kind !== 'url') throw new WasteValidationError(['This source is not a URL subscription.']);
 
   let fetched;

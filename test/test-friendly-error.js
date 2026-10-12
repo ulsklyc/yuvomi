@@ -228,7 +228,16 @@ test('friendlyError und errorSentence: ein bekannter Fall bekommt ueber beide de
 test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', () => {
   const dir = new URL('../public/locales/', import.meta.url);
   const files = readdirSync(dir).filter((name) => name.endsWith('.json'));
-  const routes = readFileSync(new URL('../server/routes/shopping.js', import.meta.url), 'utf8');
+  // Wer den Fall nennt: die Einkaufs-Routen, und fuer die Abfuhr Routen und
+  // Dienste (die getypten Fehler und die Pruefungen der Domaene tragen den Grund
+  // dort als letztes Argument). Dass eine ECHTE Antwort ihn traegt, misst
+  // test:waste-routes je Grund.
+  const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
+  const wasteServer = [
+    ...readdirSync(new URL('../server/routes/waste/', import.meta.url)).map((name) => `../server/routes/waste/${name}`),
+    ...readdirSync(new URL('../server/services/', import.meta.url)).filter((name) => name.startsWith('waste-')).map((name) => `../server/services/${name}`),
+  ].map(read).join('\n');
+  const routes = `${read('../server/routes/shopping.js')}\n${wasteServer.replace(/,\s*'(waste_[a-z_]+)'\s*\)/g, ", reason: '$1')")}`;
   return load().then(({ CASE_MESSAGES, REFUSAL_MESSAGES }) => {
     for (const [reason, key] of CASE_MESSAGES) {
       assert.equal(REFUSAL_MESSAGES.has(reason), false, `${reason} steht in beiden Listen`);
@@ -249,6 +258,8 @@ test('isGone: nur die bekannten "gibt es nicht mehr"-Gruende, nie der blanke Sta
   const { isGone, GONE_REASONS, CASE_MESSAGES } = await load();
   assert.deepEqual([...GONE_REASONS].sort(), [
     'shopping_category_not_found', 'shopping_item_not_found', 'shopping_list_not_found', 'shopping_store_not_found',
+    'waste_mapping_not_found', 'waste_occurrence_not_found', 'waste_override_not_found', 'waste_pickup_not_found',
+    'waste_schedule_not_found', 'waste_source_not_found', 'waste_type_not_found',
   ]);
   for (const reason of GONE_REASONS) {
     assert.ok(CASE_MESSAGES.has(reason), `${reason}: ohne Satz`);
@@ -315,4 +326,24 @@ test('ein Fall, bei dem die Seite selbst nachlaedt, sagt in jeder Sprache nur, w
     }
   }
   assert.equal(checked, GONE_REASONS.size * files.length);
+});
+
+// #1909, Abfuhr: zwei Saetze nennen eine Grenze als Zahl, weil der Fehler sie
+// nicht strukturiert mitgibt. Die Zahl im Satz ist damit eine zweite Fassung
+// der Grenze am Server - sie steht hier gegen dessen Konstanten, in jeder
+// Sprache und in westlichen Ziffern.
+test('die Grenzen in den Abfuhr-Saetzen sind die des Servers', async () => {
+  const { WEEKLY_INTERVAL_MAX, MONTHLY_INTERVAL_MAX } = await import('../server/services/waste-domain.js');
+  const reminders = readFileSync(new URL('../server/services/waste-reminders.js', import.meta.url), 'utf8');
+  const bound = (name) => Number(reminders.match(new RegExp(`export const ${name} = (\\d+);`))[1]);
+  const dir = new URL('../public/locales/', import.meta.url);
+  const files = readdirSync(dir).filter((name) => name.endsWith('.json'));
+  assert.ok(files.length >= 26);
+  const numbers = (text) => (text.match(/\d+/g) ?? []).map(Number);
+  for (const name of files) {
+    const waste = JSON.parse(readFileSync(new URL(name, dir), 'utf8')).waste;
+    assert.deepEqual(numbers(waste.errorScheduleInterval), [1, WEEKLY_INTERVAL_MAX, 1, MONTHLY_INTERVAL_MAX], `${name}: errorScheduleInterval`);
+    assert.deepEqual(numbers(waste.errorScheduleMonthDay), [1, 31], `${name}: errorScheduleMonthDay`);
+    assert.deepEqual(numbers(waste.errorReminderOffset), [bound('MIN_OFFSET_DAYS'), bound('MAX_OFFSET_DAYS')], `${name}: errorReminderOffset`);
+  }
 });

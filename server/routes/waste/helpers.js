@@ -14,18 +14,19 @@ import { moduleAccessVerdict, MODULE_ACCESS_ALLOW } from '../../permissions.js';
  * @returns {boolean} true if a response was sent (caller must not fall through to 500)
  */
 export function wasteErrorResponse(res, err) {
+  // `reason` is the stable code a client translates (public/utils/friendly-error.js,
+  // #1909); `error` stays the English sentence for logs and API consumers. A typed
+  // error without a reason (validation only an API caller triggers) sends none.
   if (err instanceof WasteValidationError) {
-    res.status(400).json({ error: err.errors.join(' '), code: 400 });
+    res.status(400).json({ error: err.errors.join(' '), code: 400, ...(err.reason && { reason: err.reason }) });
     return true;
   }
   if (err instanceof WasteConflictError) {
-    // `reason` is the stable code a client translates (public/pages/waste.js#importErrorText);
-    // `error` stays the English sentence for logs and API consumers.
     res.status(409).json({ error: err.message, code: 409, ...(err.reason && { reason: err.reason }) });
     return true;
   }
   if (err instanceof WasteNotFoundError) {
-    res.status(404).json({ error: err.message, code: 404 });
+    res.status(404).json({ error: err.message, code: 404, ...(err.reason && { reason: err.reason }) });
     return true;
   }
   return false;

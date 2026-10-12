@@ -67,6 +67,11 @@ function isDateKey(value) {
   return parsed.getUTCFullYear() === y && parsed.getUTCMonth() === m - 1 && parsed.getUTCDate() === d;
 }
 
+/** One validation finding: the sentence, and the reason the client translates (or none). */
+function problem(message, reason = null) {
+  return { message, reason };
+}
+
 function daysBetween(fromKey, toKey) {
   const a = new Date(`${fromKey}T00:00:00Z`).getTime();
   const b = new Date(`${toKey}T00:00:00Z`).getTime();
@@ -111,14 +116,15 @@ export function validateType(input, { partial = false } = {}) {
 /**
  * Validates a one-off pickup's editable fields (type_id is validated by the
  * caller, which is the only place that knows whether it resolves to a row).
- * @returns {{ value: object, errors: string[] }}
+ * `reason` names the case a member can reach from the dialog (an empty date).
+ * @returns {{ value: object, errors: string[], reason: string|null }}
  */
 export function validateOneOff(input, { partial = false } = {}) {
   const checks = [];
   const value = {};
 
   if (!partial || input.date !== undefined) {
-    if (!isDateKey(input.date)) checks.push({ error: 'date must be a valid YYYY-MM-DD date.' });
+    if (!isDateKey(input.date)) checks.push({ error: 'date must be a valid YYYY-MM-DD date.', reason: 'waste_pickup_date_invalid' });
     else value.date = input.date;
   }
   if (input.note !== undefined) {
@@ -127,7 +133,7 @@ export function validateOneOff(input, { partial = false } = {}) {
     value.note = v.value;
   }
 
-  return { value, errors: collectErrors(checks) };
+  return { value, errors: collectErrors(checks), reason: checks.find((check) => check.error && check.reason)?.reason ?? null };
 }
 
 /**
@@ -137,62 +143,67 @@ export function validateOneOff(input, { partial = false } = {}) {
  * must equal month_day, because that's what carries the day through
  * recurrence.js's MONTHLY branch (it reads the anchor's day, not a stored
  * BYMONTHDAY, for anything other than "last day of month").
- * @returns {string[]} error messages; empty means valid
+ *
+ * Each problem carries the English sentence and, for a case a household member
+ * can reach from the schedule dialog, a stable `reason` the client translates
+ * (#1909). A problem only an API caller can cause (an unknown recurrence_kind,
+ * a field that does not belong to the kind) has `reason: null`.
+ * @returns {{message: string, reason: string|null}[]} empty means valid
  */
-export function validateScheduleRecurrence(schedule) {
-  const errors = [];
+export function scheduleRecurrenceProblems(schedule) {
+  const problems = [];
   const { recurrence_kind: kind, anchor_date: anchor, interval, weekdays, month_day: monthDay, valid_until: validUntil } = schedule;
 
   if (!RECURRENCE_KINDS.includes(kind)) {
-    errors.push(`recurrence_kind must be one of: ${RECURRENCE_KINDS.join(', ')}.`);
+    problems.push(problem(`recurrence_kind must be one of: ${RECURRENCE_KINDS.join(', ')}.`));
   }
   if (!isDateKey(anchor)) {
-    errors.push('anchor_date must be a valid YYYY-MM-DD date.');
+    problems.push(problem('anchor_date must be a valid YYYY-MM-DD date.', 'waste_schedule_anchor_date_invalid'));
   }
   if (validUntil !== null && validUntil !== undefined && !isDateKey(validUntil)) {
-    errors.push('valid_until must be a valid YYYY-MM-DD date.');
+    problems.push(problem('valid_until must be a valid YYYY-MM-DD date.'));
   }
   if (isDateKey(anchor) && isDateKey(validUntil) && validUntil < anchor) {
-    errors.push('valid_until must not be before anchor_date.');
+    problems.push(problem('valid_until must not be before anchor_date.', 'waste_schedule_ends_before_anchor'));
   }
 
   if (kind === 'weekly') {
     if (!Number.isInteger(interval) || interval < 1 || interval > WEEKLY_INTERVAL_MAX) {
-      errors.push(`interval must be an integer between 1 and ${WEEKLY_INTERVAL_MAX} for a weekly schedule.`);
+      problems.push(problem(`interval must be an integer between 1 and ${WEEKLY_INTERVAL_MAX} for a weekly schedule.`, 'waste_schedule_interval_invalid'));
     }
     const codes = String(weekdays ?? '').split(',').filter(Boolean);
     if (codes.length === 0 || codes.some((c) => !WEEKDAY_CODES.includes(c))) {
-      errors.push(`weekdays must be a non-empty list of: ${WEEKDAY_CODES.join(', ')}.`);
+      problems.push(problem(`weekdays must be a non-empty list of: ${WEEKDAY_CODES.join(', ')}.`, 'waste_schedule_weekdays_required'));
     }
     if (monthDay !== null && monthDay !== undefined) {
-      errors.push('month_day must not be set for a weekly schedule.');
+      problems.push(problem('month_day must not be set for a weekly schedule.'));
     }
   } else if (kind === 'monthly_fixed_day') {
     if (!Number.isInteger(interval) || interval < 1 || interval > MONTHLY_INTERVAL_MAX) {
-      errors.push(`interval must be an integer between 1 and ${MONTHLY_INTERVAL_MAX} for a monthly schedule.`);
+      problems.push(problem(`interval must be an integer between 1 and ${MONTHLY_INTERVAL_MAX} for a monthly schedule.`, 'waste_schedule_interval_invalid'));
     }
     if (monthDay !== -1 && (!Number.isInteger(monthDay) || monthDay < 1 || monthDay > 31)) {
-      errors.push('month_day must be -1 (last day of month) or an integer between 1 and 31.');
+      problems.push(problem('month_day must be -1 (last day of month) or an integer between 1 and 31.', 'waste_schedule_month_day_invalid'));
     }
     if (weekdays !== null && weekdays !== undefined) {
-      errors.push('weekdays must not be set for a monthly schedule.');
+      problems.push(problem('weekdays must not be set for a monthly schedule.'));
     }
     if (isDateKey(anchor) && Number.isInteger(monthDay) && monthDay >= 1 && monthDay <= 31) {
       const anchorDay = Number(anchor.slice(8, 10));
       if (anchorDay !== monthDay) {
-        errors.push('anchor_date must fall on month_day itself (its day-of-month must equal month_day).');
+        problems.push(problem('anchor_date must fall on month_day itself (its day-of-month must equal month_day).', 'waste_schedule_anchor_not_month_day'));
       }
     }
     if (isDateKey(anchor) && monthDay === -1) {
       const [y, m] = anchor.split('-').map(Number);
       const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
       if (Number(anchor.slice(8, 10)) !== lastDay) {
-        errors.push('anchor_date must be the last day of its month when month_day is -1.');
+        problems.push(problem('anchor_date must be the last day of its month when month_day is -1.', 'waste_schedule_anchor_not_last_day'));
       }
     }
   } else if (kind === 'monthly_ordinal_weekday') {
     if (!Number.isInteger(interval) || interval < 1 || interval > MONTHLY_INTERVAL_MAX) {
-      errors.push(`interval must be an integer between 1 and ${MONTHLY_INTERVAL_MAX} for a monthly schedule.`);
+      problems.push(problem(`interval must be an integer between 1 and ${MONTHLY_INTERVAL_MAX} for a monthly schedule.`, 'waste_schedule_interval_invalid'));
     }
     // Reuses `weekdays` (exactly ONE code here, not the CSV list a weekly
     // schedule stores) and `month_day` (the ordinal position, not a day
@@ -200,11 +211,11 @@ export function validateScheduleRecurrence(schedule) {
     const codes = String(weekdays ?? '').split(',').filter(Boolean);
     const singleWeekdayValid = codes.length === 1 && WEEKDAY_CODES.includes(codes[0]);
     if (!singleWeekdayValid) {
-      errors.push(`weekdays must be exactly one of: ${WEEKDAY_CODES.join(', ')} for an ordinal-weekday schedule.`);
+      problems.push(problem(`weekdays must be exactly one of: ${WEEKDAY_CODES.join(', ')} for an ordinal-weekday schedule.`));
     }
     const ordinalValid = ORDINAL_WEEKDAY_VALUES.includes(monthDay);
     if (!ordinalValid) {
-      errors.push(`month_day must be one of ${ORDINAL_WEEKDAY_VALUES.join(', ')} (the ordinal position: -1 for last, 1-4 for nth) for an ordinal-weekday schedule.`);
+      problems.push(problem(`month_day must be one of ${ORDINAL_WEEKDAY_VALUES.join(', ')} (the ordinal position: -1 for last, 1-4 for nth) for an ordinal-weekday schedule.`));
     }
     if (isDateKey(anchor) && singleWeekdayValid && ordinalValid) {
       // The same consistency rule monthly_fixed_day's own anchor_date check
@@ -213,30 +224,40 @@ export function validateScheduleRecurrence(schedule) {
       // recurrence.js's own ordinal predicate rather than duplicating its
       // date math here.
       if (!matchesRRuleByday(anchor, `FREQ=MONTHLY;BYDAY=${monthDay}${codes[0]}`)) {
-        errors.push(`anchor_date must itself be the ${monthDay}${codes[0]} occurrence (the chosen ordinal weekday) of its own month.`);
+        problems.push(problem(`anchor_date must itself be the ${monthDay}${codes[0]} occurrence (the chosen ordinal weekday) of its own month.`, 'waste_schedule_anchor_not_ordinal_weekday'));
       }
     }
   }
 
-  return errors;
+  return problems;
+}
+
+/** The same check as {@link scheduleRecurrenceProblems}, as sentences only. */
+export function validateScheduleRecurrence(schedule) {
+  return scheduleRecurrenceProblems(schedule).map((entry) => entry.message);
 }
 
 /**
  * Validates an override's dates in isolation (no schedule/range context - the
  * caller is responsible for confirming original_date is really one of the
  * schedule's calculated occurrences).
- * @returns {string[]}
+ * @returns {{message: string, reason: string|null}[]}
  */
-export function validateOverride({ original_date: original, replacement_date: replacement }) {
-  const errors = [];
-  if (!isDateKey(original)) errors.push('original_date must be a valid YYYY-MM-DD date.');
+export function overrideProblems({ original_date: original, replacement_date: replacement }) {
+  const problems = [];
+  if (!isDateKey(original)) problems.push(problem('original_date must be a valid YYYY-MM-DD date.'));
   if (replacement !== null && replacement !== undefined && !isDateKey(replacement)) {
-    errors.push('replacement_date must be a valid YYYY-MM-DD date, or null to skip.');
+    problems.push(problem('replacement_date must be a valid YYYY-MM-DD date, or null to skip.', 'waste_override_date_invalid'));
   }
   if (isDateKey(original) && isDateKey(replacement) && original === replacement) {
-    errors.push('replacement_date must differ from original_date.');
+    problems.push(problem('replacement_date must differ from original_date.', 'waste_override_same_date'));
   }
-  return errors;
+  return problems;
+}
+
+/** The same check as {@link overrideProblems}, as sentences only. */
+export function validateOverride(input) {
+  return overrideProblems(input).map((entry) => entry.message);
 }
 
 /**

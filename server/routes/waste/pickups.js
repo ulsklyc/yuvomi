@@ -40,7 +40,7 @@ router.get('/:id', (req, res) => {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
     const pickup = store.getOneOff(db.get(), vId.value);
-    if (!pickup) return res.status(404).json({ error: 'One-off pickup not found.', code: 404 });
+    if (!pickup) return res.status(404).json({ error: 'One-off pickup not found.', code: 404, reason: 'waste_pickup_not_found' });
     res.json({ data: pickup });
   } catch (err) {
     log.error('GET /waste/pickups/:id error:', err);

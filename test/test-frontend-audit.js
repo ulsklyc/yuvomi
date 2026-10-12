@@ -21165,7 +21165,7 @@ const SERVER_TEXT_OPEN = new Map([
   ['pages/schedule.js', 1],
   ['pages/subscriptions.js', 8],
   ['pages/tasks.js', 1],
-  ['pages/waste.js', 27],
+  ['pages/waste.js', 6],
   ['settings/module-install-errors.js', 1],
   ['settings/pages/modules-health.js', 2],
   ['settings/pages/modules-kitchen.js', 1],

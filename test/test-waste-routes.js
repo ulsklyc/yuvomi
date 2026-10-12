@@ -746,3 +746,210 @@ test('hasWasteWriteAccess: a read-only-scoped token is denied even for an admin 
   const req = { authMethod: 'api_token', authScopes: ['waste:read'], sessionModuleAccess: null };
   assert.equal(helpers.hasWasteWriteAccess(req), false);
 });
+
+// -------------------------------------------------------------------------
+// #1909: the server names the case (`reason`), the client owns the sentence
+// -------------------------------------------------------------------------
+//
+// One case per reason, through the real routes: status AND reason. The `error`
+// sentence stays (it is the API's), so each case also asserts it is still there.
+// What a case answers is written down here by hand - it is not derived from the
+// server source or from the client's map, so the two closing tests below compare
+// three independent things: what the routes really answer, which literals the
+// server source carries, and which reasons the client has a sentence for.
+
+const MISSING = 987654;
+const seenReasons = new Set();
+
+async function expectReason(response, status, reason) {
+  const r = await response;
+  assert.equal(r.status, status, JSON.stringify(r.body));
+  assert.equal(r.body.reason, reason, JSON.stringify(r.body));
+  assert.equal(r.body.code, status);
+  assert.equal(typeof r.body.error, 'string', 'the English sentence stays for API consumers');
+  assert.ok(r.body.error.length > 0);
+  seenReasons.add(reason);
+}
+
+const monthly = (typeId, overrides = {}) => ({
+  type_id: typeId, recurrence_kind: 'monthly_fixed_day', anchor_date: '2026-01-15', interval: 1, month_day: 15, ...overrides,
+});
+
+test('reason waste_type_not_found: a type that is gone, on every route that names one', async () => {
+  await expectReason(call('GET', `/waste/types/${MISSING}`), 404, 'waste_type_not_found');
+  await expectReason(call('PUT', `/waste/types/${MISSING}`, { body: { name: 'x' } }), 404, 'waste_type_not_found');
+  await expectReason(call('DELETE', `/waste/types/${MISSING}`), 404, 'waste_type_not_found');
+  await expectReason(call('PUT', `/waste/reminder-settings/${MISSING}`, { body: { enabled: true } }), 404, 'waste_type_not_found');
+  // A schedule, a pickup or a mapping that points at a type somebody deleted:
+  // the status stays 400 (the request body is what is wrong), the reason says why.
+  await expectReason(call('POST', '/waste/schedules', {
+    body: { type_id: MISSING, recurrence_kind: 'weekly', anchor_date: '2026-01-05', interval: 1, weekdays: ['MO'] },
+  }), 400, 'waste_type_not_found');
+  const type = await createType();
+  const schedule = await createWeeklySchedule(type.id);
+  await expectReason(call('PUT', `/waste/schedules/${schedule.id}`, { body: { type_id: MISSING } }), 400, 'waste_type_not_found');
+  await expectReason(call('POST', '/waste/pickups', { body: { type_id: MISSING, date: '2026-03-01' } }), 400, 'waste_type_not_found');
+  const source = await commitSource();
+  const mapping = (await call('GET', `/waste/sources/${source.id}`)).body.data.mappings[0];
+  await expectReason(call('PUT', `/waste/sources/${source.id}/mappings/${mapping.id}`, { body: { type_id: MISSING } }), 400, 'waste_type_not_found');
+  await expectReason(call('POST', '/waste/import/commit', {
+    body: { ics: icsFixture('2026-10-09'), name: 'gone type', mappings: [{ normalized_label: 'restmüll', type_id: MISSING }] },
+  }), 400, 'waste_type_not_found');
+});
+
+test('reason waste_schedule_not_found: get, update, delete and an override on a schedule that is gone', async () => {
+  await expectReason(call('GET', `/waste/schedules/${MISSING}`), 404, 'waste_schedule_not_found');
+  await expectReason(call('PUT', `/waste/schedules/${MISSING}`, { body: { active: false } }), 404, 'waste_schedule_not_found');
+  await expectReason(call('DELETE', `/waste/schedules/${MISSING}`), 404, 'waste_schedule_not_found');
+  await expectReason(call('PUT', `/waste/schedules/${MISSING}/overrides/2026-01-05`, { body: { replacement_date: null } }), 404, 'waste_schedule_not_found');
+});
+
+test('reason waste_pickup_not_found: get, update and delete of a pickup that is gone', async () => {
+  await expectReason(call('GET', `/waste/pickups/${MISSING}`), 404, 'waste_pickup_not_found');
+  await expectReason(call('PUT', `/waste/pickups/${MISSING}`, { body: { date: '2026-03-01' } }), 404, 'waste_pickup_not_found');
+  await expectReason(call('DELETE', `/waste/pickups/${MISSING}`), 404, 'waste_pickup_not_found');
+});
+
+test('reason waste_source_not_found: every source route on a source that is gone', async () => {
+  for (const [method, path, body] of [
+    ['GET', `/waste/sources/${MISSING}`],
+    ['PUT', `/waste/sources/${MISSING}`, { name: 'x' }],
+    ['DELETE', `/waste/sources/${MISSING}`],
+    ['POST', `/waste/sources/${MISSING}/refresh`, {}],
+    ['GET', `/waste/sources/${MISSING}/mapping-profile/export`],
+    ['POST', `/waste/sources/${MISSING}/mapping-profile/import/preview`, { profile: { mappings: [] } }],
+    ['POST', `/waste/sources/${MISSING}/mapping-profile/import/commit`, { profile: { mappings: [] } }],
+    ['PUT', `/waste/sources/${MISSING}/mappings/1`, { ignored: true }],
+    ['POST', `/waste/sources/${MISSING}/reimport/preview`, { ics: icsFixture('2026-10-03') }],
+    ['POST', `/waste/sources/${MISSING}/reimport/commit`, { ics: icsFixture('2026-10-03') }],
+  ]) {
+    await expectReason(call(method, path, { body }), 404, 'waste_source_not_found');
+  }
+});
+
+test('reason waste_mapping_not_found: a mapping that is gone on a source that exists', async () => {
+  const source = await commitSource();
+  await expectReason(call('PUT', `/waste/sources/${source.id}/mappings/${MISSING}`, { body: { ignored: true } }), 404, 'waste_mapping_not_found');
+});
+
+test('reason waste_override_not_found and waste_occurrence_not_found: restoring twice, moving a day the schedule does not have', async () => {
+  const type = await createType();
+  const schedule = await createWeeklySchedule(type.id);
+  await expectReason(call('DELETE', `/waste/schedules/${schedule.id}/overrides/2026-01-05`), 404, 'waste_override_not_found');
+  // 2026-01-06 is a Tuesday; the schedule runs on Mondays.
+  await expectReason(call('PUT', `/waste/schedules/${schedule.id}/overrides/2026-01-06`, { body: { replacement_date: '2026-01-08' } }), 400, 'waste_occurrence_not_found');
+});
+
+test('reason waste_type_in_use and waste_pickup_exists: the two conflicts', async () => {
+  const type = await createType();
+  await createWeeklySchedule(type.id);
+  await expectReason(call('DELETE', `/waste/types/${type.id}`), 409, 'waste_type_in_use');
+
+  const first = await call('POST', '/waste/pickups', { body: { type_id: type.id, date: '2026-04-01' } });
+  assert.equal(first.status, 201);
+  await expectReason(call('POST', '/waste/pickups', { body: { type_id: type.id, date: '2026-04-01' } }), 409, 'waste_pickup_exists');
+  const second = await call('POST', '/waste/pickups', { body: { type_id: type.id, date: '2026-04-02' } });
+  await expectReason(call('PUT', `/waste/pickups/${second.body.data.id}`, { body: { date: '2026-04-01' } }), 409, 'waste_pickup_exists');
+});
+
+test('reasons of the schedule dialog: each input the dialog lets through names its own case', async () => {
+  const type = await createType();
+  const weekly = (overrides) => ({ type_id: type.id, recurrence_kind: 'weekly', anchor_date: '2026-01-05', interval: 1, weekdays: ['MO'], ...overrides });
+  const post = (body) => call('POST', '/waste/schedules', { body });
+
+  await expectReason(post(weekly({ anchor_date: '' })), 400, 'waste_schedule_anchor_date_invalid');
+  await expectReason(post(weekly({ valid_until: '2026-01-01' })), 400, 'waste_schedule_ends_before_anchor');
+  await expectReason(post(weekly({ weekdays: [] })), 400, 'waste_schedule_weekdays_required');
+  await expectReason(post(weekly({ interval: 53 })), 400, 'waste_schedule_interval_invalid');
+  await expectReason(post(monthly(type.id, { interval: 25 })), 400, 'waste_schedule_interval_invalid');
+  await expectReason(post({ type_id: type.id, recurrence_kind: 'monthly_ordinal_weekday', anchor_date: '2026-01-13', interval: 25, weekdays: 'TU', month_day: 2 }), 400, 'waste_schedule_interval_invalid');
+  await expectReason(post(monthly(type.id, { month_day: 0, anchor_date: '2026-01-15' })), 400, 'waste_schedule_month_day_invalid');
+  await expectReason(post(monthly(type.id, { month_day: 1 })), 400, 'waste_schedule_anchor_not_month_day');
+  await expectReason(post(monthly(type.id, { month_day: -1 })), 400, 'waste_schedule_anchor_not_last_day');
+  // 2026-01-13 is the second Tuesday; the 14th is not.
+  await expectReason(post({ type_id: type.id, recurrence_kind: 'monthly_ordinal_weekday', anchor_date: '2026-01-14', interval: 1, weekdays: 'TU', month_day: 2 }), 400, 'waste_schedule_anchor_not_ordinal_weekday');
+
+  // The same through the update route.
+  const schedule = await createWeeklySchedule(type.id);
+  await expectReason(call('PUT', `/waste/schedules/${schedule.id}`, { body: { weekdays: [] } }), 400, 'waste_schedule_weekdays_required');
+});
+
+test('a validation only an API caller triggers carries no reason, and does not hide one a member can reach', async () => {
+  const type = await createType();
+  const apiOnly = await call('POST', '/waste/schedules', {
+    body: { type_id: type.id, recurrence_kind: 'yearly', anchor_date: '2026-01-05', interval: 1 },
+  });
+  assert.equal(apiOnly.status, 400);
+  assert.equal('reason' in apiOnly.body, false, JSON.stringify(apiOnly.body));
+
+  // Two problems at once: the response carries every sentence and the reason of
+  // the first problem that has one.
+  const both = await call('POST', '/waste/schedules', {
+    body: { type_id: type.id, recurrence_kind: 'weekly', anchor_date: '2026-01-05', interval: 1, weekdays: [], valid_until: 'someday' },
+  });
+  assert.equal(both.status, 400);
+  assert.equal(both.body.reason, 'waste_schedule_weekdays_required');
+  assert.match(both.body.error, /^valid_until must be a valid YYYY-MM-DD date\. weekdays must be a non-empty list/,
+    'the problem without a reason comes first and does not take the reason away from the second');
+
+  const typeName = await call('POST', '/waste/types', { body: {} });
+  assert.equal(typeName.status, 400);
+  assert.equal('reason' in typeName.body, false);
+});
+
+test('reasons waste_pickup_date_invalid, waste_override_date_invalid, waste_override_same_date: an empty or unchanged date', async () => {
+  const type = await createType();
+  await expectReason(call('POST', '/waste/pickups', { body: { type_id: type.id, date: '' } }), 400, 'waste_pickup_date_invalid');
+  const pickup = await call('POST', '/waste/pickups', { body: { type_id: type.id, date: '2026-05-01' } });
+  await expectReason(call('PUT', `/waste/pickups/${pickup.body.data.id}`, { body: { date: '' } }), 400, 'waste_pickup_date_invalid');
+
+  const schedule = await createWeeklySchedule(type.id);
+  const override = (replacement) => call('PUT', `/waste/schedules/${schedule.id}/overrides/2026-01-05`, { body: { replacement_date: replacement } });
+  await expectReason(override(''), 400, 'waste_override_date_invalid');
+  await expectReason(override('2026-01-05'), 400, 'waste_override_same_date');
+});
+
+test('reasons waste_reminder_offset_invalid and waste_reminder_time_invalid: the two fields of a reminder row', async () => {
+  const type = await createType();
+  const put = (body) => call('PUT', `/waste/reminder-settings/${type.id}`, { body });
+  await expectReason(put({ enabled: true, offset_days: 99, delivery_time: '08:00' }), 400, 'waste_reminder_offset_invalid');
+  await expectReason(put({ enabled: true, offset_days: 'soon', delivery_time: '08:00' }), 400, 'waste_reminder_offset_invalid');
+  await expectReason(put({ enabled: true, offset_days: 1, delivery_time: '25:00' }), 400, 'waste_reminder_time_invalid');
+  // The emptied time field of the dialog: this was a 500 (NOT NULL constraint).
+  await expectReason(put({ enabled: true, offset_days: 1, delivery_time: '' }), 400, 'waste_reminder_time_invalid');
+});
+
+// Runs after the cases above (node:test keeps file order): what they SAW.
+test('every waste_* reason the server source carries is answered by a real route, and nothing else is', async () => {
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const files = [
+    ...readdirSync(new URL('../server/routes/waste/', import.meta.url)).map((name) => `../server/routes/waste/${name}`),
+    ...readdirSync(new URL('../server/services/', import.meta.url)).filter((name) => name.startsWith('waste-')).map((name) => `../server/services/${name}`),
+  ];
+  assert.ok(files.length >= 15, 'the scan found the waste routes and services');
+  const inSource = new Set();
+  for (const file of files) {
+    const text = readFileSync(new URL(file, import.meta.url), 'utf8');
+    // A reason stands as `reason: '...'` or as the trailing argument of a typed
+    // error / a domain problem. `entity_type = 'waste_pickup'` in SQL is neither.
+    for (const [, reason] of text.matchAll(/(?:reason:\s*|,\s*)'(waste_[a-z_]+)'\s*[)}]/g)) inSource.add(reason);
+  }
+  assert.ok(inSource.size >= 20, `the scan reads reasons at all (found ${inSource.size})`);
+  assert.deepEqual([...seenReasons].sort(), [...inSource].sort(),
+    'a reason in the server source has no case above that sees it in a real answer - or a case sees one the scan misses');
+});
+
+test('every waste_* reason a route answers has a sentence in the client, and the client knows no other', async () => {
+  const { readFileSync } = await import('node:fs');
+  // The client side, read without the server: the map in public/utils/friendly-error.js.
+  // This suite runs without the browser loader, so the map is read as text here;
+  // test:friendly-error imports the same file as a program and checks the keys
+  // in every locale.
+  const client = readFileSync(new URL('../public/utils/friendly-error.js', import.meta.url), 'utf8');
+  const caseMap = client.slice(client.indexOf('export const CASE_MESSAGES'), client.indexOf('export const GONE_REASONS'));
+  const withSentence = new Set([...caseMap.matchAll(/^\s*\['(waste_[a-z_]+)',\s*'waste\.[A-Za-z]+'\],?\s*$/gm)].map((m) => m[1]));
+  assert.ok(withSentence.size >= 20, `the map is read at all (found ${withSentence.size})`);
+  assert.deepEqual([...withSentence].sort(), [...seenReasons].sort(),
+    'server and client disagree: a reason without a sentence shows the general one and hides the cause, '
+    + 'a sentence without a reason is never shown');
+});

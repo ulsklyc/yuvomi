@@ -53,6 +53,34 @@ export const CASE_MESSAGES = new Map([
   // einen gibt); hier stehen die beiden ohne Zaehler, fuer jede andere Stelle.
   ['category_exists', 'category.errorExists'],
   ['category_last', 'category.errorLast'],
+  // Abfuhr (#1909). Die sieben "gibt es nicht mehr" stehen auch in GONE_REASONS.
+  // `waste_occurrence_not_found`: der Termin wurde inzwischen geaendert, die
+  // Abholung, die verschoben oder ausgesetzt werden sollte, steht nicht mehr
+  // im Plan. `waste_override_not_found` sieht nur, wer ihn anders als ueber
+  // "Zuruecksetzen" erreicht - dort ist er ein Erfolg (isAlreadyDeleted).
+  ['waste_type_not_found', 'waste.errorTypeGone'],
+  ['waste_schedule_not_found', 'waste.errorScheduleGone'],
+  ['waste_pickup_not_found', 'waste.errorPickupGone'],
+  ['waste_source_not_found', 'waste.errorSourceGone'],
+  ['waste_mapping_not_found', 'waste.errorMappingGone'],
+  ['waste_override_not_found', 'waste.errorOverrideGone'],
+  ['waste_occurrence_not_found', 'waste.errorOccurrenceGone'],
+  ['waste_type_in_use', 'waste.typeDeleteRefused'],
+  ['waste_pickup_exists', 'waste.pickupDuplicateError'],
+  // Eingaben, die der Termin-Dialog durchlaesst und erst der Server prueft.
+  ['waste_schedule_anchor_date_invalid', 'waste.errorScheduleAnchorRequired'],
+  ['waste_schedule_ends_before_anchor', 'waste.errorScheduleEndsBeforeStart'],
+  ['waste_schedule_weekdays_required', 'waste.errorScheduleWeekdaysRequired'],
+  ['waste_schedule_interval_invalid', 'waste.errorScheduleInterval'],
+  ['waste_schedule_month_day_invalid', 'waste.errorScheduleMonthDay'],
+  ['waste_schedule_anchor_not_month_day', 'waste.errorScheduleAnchorNotMonthDay'],
+  ['waste_schedule_anchor_not_last_day', 'waste.errorScheduleAnchorNotLastDay'],
+  ['waste_schedule_anchor_not_ordinal_weekday', 'waste.errorScheduleAnchorNotWeekday'],
+  ['waste_pickup_date_invalid', 'waste.errorDateRequired'],
+  ['waste_override_date_invalid', 'waste.errorDateRequired'],
+  ['waste_override_same_date', 'waste.errorOverrideSameDate'],
+  ['waste_reminder_offset_invalid', 'waste.errorReminderOffset'],
+  ['waste_reminder_time_invalid', 'waste.errorReminderTime'],
 ]);
 
 /**
@@ -71,6 +99,13 @@ export const GONE_REASONS = new Set([
   'shopping_item_not_found',
   'shopping_store_not_found',
   'shopping_category_not_found',
+  'waste_type_not_found',
+  'waste_schedule_not_found',
+  'waste_pickup_not_found',
+  'waste_source_not_found',
+  'waste_mapping_not_found',
+  'waste_override_not_found',
+  'waste_occurrence_not_found',
 ]);
 
 /**

@@ -29,6 +29,7 @@ import { createPageController } from '/utils/page-lifecycle.js';
 import { USER_COLORS } from '/utils/color.js';
 import { redrawList } from '/utils/list-motion.js';
 import { daysBetweenDateKeys, countdownPhrase } from '/utils/countdown.js';
+import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
 
 const UPCOMING_WINDOW_DAYS = 90;
 const WEEKDAY_CODES = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
@@ -638,7 +639,7 @@ async function createPresetType(key, button) {
     window.yuvomi?.showToast(t('waste.typeSavedToast'), 'success');
   } catch (err) {
     if (button) button.disabled = false;
-    window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    reportError(err);
   }
 }
 
@@ -815,6 +816,57 @@ async function reloadAndRender() {
 }
 
 /**
+ * EIN WEG FUER DIE FEHLER-TOASTS DER SEITE (#1909).
+ *
+ * Der Toast sagt den Satz der App (`errorSentence`): den des Falls, den der
+ * Server mit `reason` nennt, sonst den allgemeinen. Der Text des Servers kommt
+ * hier nie an. Sagt der Grund, dass es das Ziel der Handlung nicht mehr gibt
+ * (jemand anderes im Haushalt hat die Abfallart, den Termin, die Abholung oder
+ * die Quelle geloescht oder den Termin geaendert), ist der Stand der Seite
+ * veraltet - sie holt ihn dann selbst neu, statt dazu zu raten.
+ *
+ * Noch NICHT hier: der Import-Assistent, das Zuordnungsprofil, die URL-Quelle
+ * und ihr Handabruf. Deren Fehler tragen eine Ursache mit Daten (Dateigrenze,
+ * HTTP-Status der Quelle), fuer die der Server noch keinen Grund nennt; sie
+ * zeigen bis zu ihrer eigenen Scheibe den Text des Servers.
+ *
+ * @param {unknown} err
+ * @param {string} [fallbackKey] - der allgemeine Satz der Stelle
+ */
+function reportError(err, fallbackKey) {
+  window.yuvomi?.showToast(errorSentence(err, fallbackKey), 'danger');
+  if (isGone(err)) reloadAfterGone();
+}
+
+/**
+ * Nachladen nach "gibt es nicht mehr". Ein offener Dialog geht zu: er
+ * bearbeitet etwas, das es nicht mehr gibt, oder bietet eine Abfallart zur
+ * Wahl an, die fehlt. Der Weg ist derselbe `reloadAndRender()` wie nach jedem
+ * Speichern; er meldet seine eigenen Fehler nirgends, ein scheiterndes
+ * Nachladen kann also kein weiteres ausloesen.
+ */
+async function reloadAfterGone() {
+  await closeModal({ force: true });
+  await reloadAndRender();
+  refocusAfterRender();
+}
+
+/**
+ * LOESCHEN, auch wenn es schon erledigt ist (#1909): wer etwas loescht, das
+ * ein anderes Haushaltsmitglied schon geloescht hat, bekommt "gibt es nicht
+ * mehr" - und hat damit, was er wollte. Der Aufrufer laeuft dann seinen
+ * Erfolgsweg (Dialog zu, nachladen, Erfolgs-Toast). Nur der Grund des Dings
+ * selbst zaehlt (`isAlreadyDeleted`); alles andere bleibt ein Fehler.
+ */
+async function deleteOrAlreadyGone(path, goneReason) {
+  try {
+    await api.delete(path);
+  } catch (err) {
+    if (!isAlreadyDeleted(err, goneReason)) throw err;
+  }
+}
+
+/**
  * Reorders by swapping sort_order with the adjacent type - no drag library
  * needed, and this is never the only path to reordering (up/down buttons are
  * themselves the keyboard-operable path, matching category-manager.js's
@@ -831,7 +883,7 @@ async function moveType(id, direction) {
     await api.put(`/waste/types/${b.id}`, { sort_order: a.sort_order });
     await reloadAndRender();
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    reportError(err);
   }
 }
 
@@ -1079,7 +1131,7 @@ function openTypeModal(type = null) {
           refocusAfterRender();
           window.yuvomi?.showToast(type.archived ? t('waste.typeRestoredToast') : t('waste.typeArchivedToast'), 'success');
         } catch (err) {
-          window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+          reportError(err);
         }
       });
 
@@ -1087,13 +1139,13 @@ function openTypeModal(type = null) {
         const ok = await confirmOverModal(t('waste.typeDeleteConfirm'), { danger: true, confirmLabel: t('common.delete'), detail: t('waste.typeDeleteConfirmDetail') });
         if (!ok) return;
         try {
-          await api.delete(`/waste/types/${type.id}`);
+          await deleteOrAlreadyGone(`/waste/types/${type.id}`, 'waste_type_not_found');
           closeModal({ force: true });
           await reloadAndRender();
           refocusAfterRender();
           window.yuvomi?.showToast(t('waste.typeDeletedToast'), 'success');
         } catch (err) {
-          window.yuvomi?.showToast(err.status === 409 ? t('waste.typeDeleteRefused') : (err.data?.error ?? t('common.unknownError')), 'danger');
+          reportError(err);
         }
       });
 
@@ -1116,7 +1168,7 @@ function openTypeModal(type = null) {
           refocusAfterRender();
           window.yuvomi?.showToast(t('waste.typeSavedToast'), 'success');
         } catch (err) {
-          window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+          reportError(err);
         }
       });
     },
@@ -1274,13 +1326,13 @@ function openScheduleModal(type, schedule = null) {
         const ok = await confirmOverModal(t('waste.scheduleDeleteConfirm'), { danger: true, confirmLabel: t('common.delete'), detail: t('waste.scheduleDeleteConfirmDetail') });
         if (!ok) return;
         try {
-          await api.delete(`/waste/schedules/${schedule.id}`);
+          await deleteOrAlreadyGone(`/waste/schedules/${schedule.id}`, 'waste_schedule_not_found');
           closeModal({ force: true });
           await reloadAndRender();
           refocusAfterRender();
           window.yuvomi?.showToast(t('waste.scheduleDeletedToast'), 'success');
         } catch (err) {
-          window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+          reportError(err);
         }
       });
 
@@ -1313,7 +1365,7 @@ function openScheduleModal(type, schedule = null) {
           refocusAfterRender();
           window.yuvomi?.showToast(t('waste.scheduleSavedToast'), 'success');
         } catch (err) {
-          window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+          reportError(err);
         }
       });
     },
@@ -1361,13 +1413,13 @@ function openPickupModal(pickup = null) {
         const ok = await confirmOverModal(t('waste.pickupDeleteConfirm'), { danger: true, confirmLabel: t('common.delete'), detail: t('waste.pickupDeleteConfirmDetail') });
         if (!ok) return;
         try {
-          await api.delete(`/waste/pickups/${pickup.id}`);
+          await deleteOrAlreadyGone(`/waste/pickups/${pickup.id}`, 'waste_pickup_not_found');
           closeModal({ force: true });
           await reloadAndRender();
           refocusAfterRender();
           window.yuvomi?.showToast(t('waste.pickupDeletedToast'), 'success');
         } catch (err) {
-          window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+          reportError(err);
         }
       });
 
@@ -1387,7 +1439,7 @@ function openPickupModal(pickup = null) {
           refocusAfterRender();
           window.yuvomi?.showToast(t('waste.pickupSavedToast'), 'success');
         } catch (err) {
-          window.yuvomi?.showToast(err.status === 409 ? t('waste.pickupDuplicateError') : (err.data?.error ?? t('common.unknownError')), 'danger');
+          reportError(err);
         }
       });
     },
@@ -1657,7 +1709,7 @@ async function exportMappingProfileFile(source) {
     link.click();
     URL.revokeObjectURL(url);
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    reportError(err);
   }
 }
 
@@ -1807,13 +1859,13 @@ function openSourceModal(source) {
         const ok = await confirmOverModal(t('waste.sourceDeleteConfirm'), { danger: true, confirmLabel: t('common.delete'), detail: t('waste.sourceDeleteConfirmDetail') });
         if (!ok) return;
         try {
-          await api.delete(`/waste/sources/${source.id}`);
+          await deleteOrAlreadyGone(`/waste/sources/${source.id}`, 'waste_source_not_found');
           closeModal({ force: true });
           await reloadAndRender();
           refocusAfterRender();
           window.yuvomi?.showToast(t('waste.sourceDeletedToast'), 'success');
         } catch (err) {
-          window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+          reportError(err);
         }
       });
 
@@ -1835,7 +1887,7 @@ function openSourceModal(source) {
           refocusAfterRender();
           window.yuvomi?.showToast(t('waste.sourceSavedToast'), 'success');
         } catch (err) {
-          window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+          reportError(err);
         }
       });
     },
@@ -1847,7 +1899,7 @@ async function loadSourceAndOpen(id) {
     const res = await api.get(`/waste/sources/${id}`);
     openSourceModal(res.data);
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    reportError(err);
   }
 }
 
@@ -1973,7 +2025,7 @@ async function openReminderSettingsModal() {
   try {
     settings = (await api.get('/waste/reminder-settings')).data;
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    reportError(err);
     return;
   }
 
@@ -2018,7 +2070,7 @@ async function openReminderSettingsModal() {
           window.yuvomi?.showToast(t('waste.reminderSettingsSavedToast'), 'success');
         } catch (err) {
           stopLoading();
-          window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+          reportError(err);
         }
       });
     },
@@ -2068,7 +2120,7 @@ async function moveOccurrence(occurrenceKey) {
           refocusAfterRender();
           window.yuvomi?.showToast(t('waste.scheduleSavedToast'), 'success');
         } catch (err) {
-          window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+          reportError(err);
         }
       });
     },
@@ -2086,7 +2138,7 @@ async function skipOccurrence(occurrenceKey) {
     refocusAfterRender();
     window.yuvomi?.showToast(t('waste.scheduleSavedToast'), 'success');
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    reportError(err);
   }
 }
 
@@ -2094,11 +2146,11 @@ async function restoreOccurrence(occurrenceKey) {
   const found = findScheduleOrigin(occurrenceKey);
   if (!found) return;
   try {
-    await api.delete(`/waste/schedules/${found.scheduleId}/overrides/${found.originalDate}`);
+    await deleteOrAlreadyGone(`/waste/schedules/${found.scheduleId}/overrides/${found.originalDate}`, 'waste_override_not_found');
     await reloadAndRender();
     window.yuvomi?.showToast(t('waste.scheduleSavedToast'), 'success');
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    reportError(err);
   }
 }
 
@@ -2299,12 +2351,12 @@ function bindEvents() {
       confirmModal(t('waste.scheduleDeleteConfirm'), { danger: true, confirmLabel: t('common.delete'), detail: t('waste.scheduleDeleteConfirmDetail') }).then(async (ok) => {
         if (!ok) return;
         try {
-          await api.delete(`/waste/schedules/${schedule.id}`);
+          await deleteOrAlreadyGone(`/waste/schedules/${schedule.id}`, 'waste_schedule_not_found');
           await reloadAndRender();
           refocusAfterRender();
           window.yuvomi?.showToast(t('waste.scheduleDeletedToast'), 'success');
         } catch (err) {
-          window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+          reportError(err);
         }
       });
     } else if (kind === 'move-occurrence') {
@@ -2355,7 +2407,7 @@ async function loadPickupAndEdit(id) {
     const res = await api.get(`/waste/pickups/${id}`);
     openPickupModal(res.data);
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    reportError(err);
   }
 }
 
@@ -2363,12 +2415,12 @@ async function deletePickup(id) {
   const ok = await confirmModal(t('waste.pickupDeleteConfirm'), { danger: true, confirmLabel: t('common.delete'), detail: t('waste.pickupDeleteConfirmDetail') });
   if (!ok) return;
   try {
-    await api.delete(`/waste/pickups/${id}`);
+    await deleteOrAlreadyGone(`/waste/pickups/${id}`, 'waste_pickup_not_found');
     await reloadAndRender();
     refocusAfterRender();
     window.yuvomi?.showToast(t('waste.pickupDeletedToast'), 'success');
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    reportError(err);
   }
 }
 
@@ -2473,4 +2525,12 @@ export const __test = {
   activeSwatchColor, resolveSwatchColors,
   isOnboarding, onboardingHtml, sectionVisibility, fabIntent, pageModeClasses,
   importErrorText,
+  // #1909: die echten Aufrufer hinter den Fehler-Toasts, fuer test:waste-errors.
+  state: () => state,
+  setStateForTest(patch) { Object.assign(state, patch); },
+  setContainerForTest(container) { _container = container; },
+  reportError, reloadAndRender, deleteOrAlreadyGone,
+  moveType, createPresetType, openTypeModal, openScheduleModal, openPickupModal, openSourceModal,
+  loadSourceAndOpen, loadPickupAndEdit, deletePickup, openReminderSettingsModal,
+  moveOccurrence, skipOccurrence, restoreOccurrence, exportMappingProfileFile,
 };

@@ -51,13 +51,17 @@ router.put('/:typeId', (req, res) => {
 
     const enabled = !!body.enabled;
     const vOffset = num(body.offset_days, 'offset_days', { required: false });
-    if (vOffset.error) throw new WasteValidationError([vOffset.error]);
+    if (vOffset.error) throw new WasteValidationError([vOffset.error], 'waste_reminder_offset_invalid');
     const offsetDays = vOffset.value ?? DEFAULT_OFFSET_DAYS;
     if (!Number.isInteger(offsetDays) || offsetDays < MIN_OFFSET_DAYS || offsetDays > MAX_OFFSET_DAYS) {
-      throw new WasteValidationError([`offset_days must be an integer between ${MIN_OFFSET_DAYS} and ${MAX_OFFSET_DAYS}.`]);
+      throw new WasteValidationError([`offset_days must be an integer between ${MIN_OFFSET_DAYS} and ${MAX_OFFSET_DAYS}.`], 'waste_reminder_offset_invalid');
     }
     const vTime = time(body.delivery_time ?? DEFAULT_DELIVERY_TIME, 'delivery_time');
-    if (vTime.error) throw new WasteValidationError([vTime.error]);
+    if (vTime.error) throw new WasteValidationError([vTime.error], 'waste_reminder_time_invalid');
+    // An EMPTY time passes the shared validator as "not given" (value null), and
+    // the column is NOT NULL: the emptied time field of the dialog used to end
+    // in a 500. `?? DEFAULT` above only covers a missing field, not an empty one.
+    if (!vTime.value) throw new WasteValidationError(['delivery_time must be a valid HH:MM time.'], 'waste_reminder_time_invalid');
 
     // One transaction for the setting write AND the immediate resync
     // (Phase 8's own "must update pending reminders idempotently"

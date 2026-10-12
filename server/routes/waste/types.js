@@ -41,7 +41,7 @@ router.get('/:id', (req, res) => {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
     const type = store.getType(db.get(), vId.value);
-    if (!type) return res.status(404).json({ error: 'Waste type not found.', code: 404 });
+    if (!type) return res.status(404).json({ error: 'Waste type not found.', code: 404, reason: 'waste_type_not_found' });
     res.json({ data: type });
   } catch (err) {
     log.error('GET /waste/types/:id error:', err);

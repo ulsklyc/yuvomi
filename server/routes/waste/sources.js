@@ -36,7 +36,7 @@ router.get('/:id', (req, res) => {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
     const source = store.getSource(db.get(), vId.value);
-    if (!source) return res.status(404).json({ error: 'Waste import source not found.', code: 404 });
+    if (!source) return res.status(404).json({ error: 'Waste import source not found.', code: 404, reason: 'waste_source_not_found' });
     res.json({ data: { ...redactSourceForReader(source, req), mappings: store.listMappings(db.get(), vId.value) } });
   } catch (err) {
     log.error('GET /waste/sources/:id error:', err);
@@ -103,7 +103,7 @@ router.post('/:id/refresh', async (req, res) => {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
     const source = store.getSource(db.get(), vId.value);
-    if (!source) return res.status(404).json({ error: 'Waste import source not found.', code: 404 });
+    if (!source) return res.status(404).json({ error: 'Waste import source not found.', code: 404, reason: 'waste_source_not_found' });
     if (source.kind !== 'url') {
       return res.status(400).json({ error: 'Manual refresh only applies to URL sources; use re-import for file sources.', code: 400 });
     }
@@ -218,7 +218,7 @@ router.post('/:id/reimport/preview', async (req, res) => {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
     const source = store.getSource(db.get(), vId.value);
-    if (!source) return res.status(404).json({ error: 'Waste import source not found.', code: 404 });
+    if (!source) return res.status(404).json({ error: 'Waste import source not found.', code: 404, reason: 'waste_source_not_found' });
     const fetched = await icsTextForReimport(source, req, res);
     if (fetched === null) return;
     const preview = store.previewImport(db.get(), { sourceId: vId.value, icsText: fetched.text });
@@ -235,7 +235,7 @@ router.post('/:id/reimport/commit', async (req, res) => {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
     const source = store.getSource(db.get(), vId.value);
-    if (!source) return res.status(404).json({ error: 'Waste import source not found.', code: 404 });
+    if (!source) return res.status(404).json({ error: 'Waste import source not found.', code: 404, reason: 'waste_source_not_found' });
     const fetched = await icsTextForReimport(source, req, res);
     if (fetched === null) return;
     const body = req.body ?? {};

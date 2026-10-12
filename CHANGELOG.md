@@ -153,6 +153,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The same holds for a list, a shop or a shopping category that somebody else deleted first: the
   list stays gone without a note, and the dialog confirms the shop or category as deleted instead
   of reporting an error.
+- **Waste collection: an error message is in your language and names the cause** (#1909). The
+  waste page showed the server's own English sentence when something could not be saved, for
+  example "anchor_date must fall on month_day itself (its day-of-month must equal month_day)."
+  for a monthly schedule whose first pickup is not on the chosen day. Types, schedules, moved or
+  skipped pickups, one-off pickups, the rename and mapping of a source and the reminder settings
+  now say it in the language of the app, each cause with its own sentence: no weekday chosen, the
+  end date before the first pickup, an interval or day of the month out of range, a first pickup
+  that does not fall on the chosen day, a missing date, a pickup moved to the day it is already
+  on, a reminder outside 0 to 14 days or without a time. If somebody else in the household
+  deleted the type, schedule, pickup or source in the meantime, the note says so, an open dialog
+  closes and the page fetches the current state by itself. Deleting something that is already
+  deleted, or resetting a pickup that is already back on its day, simply succeeds. Saving a
+  reminder with an emptied time field no longer ends in a server error. Not yet covered: the ICS
+  import, the mapping profile and URL sources still show the server's text. For API clients: the
+  affected answers of `/api/v1/waste` carry a `reason` next to `error` (`waste_*_not_found`,
+  `waste_type_in_use`, `waste_pickup_exists`, `waste_schedule_*`, `waste_pickup_date_invalid`,
+  `waste_override_*`, `waste_reminder_*`, listed in the OpenAPI description); status codes and
+  `error` texts are unchanged, except that an empty `delivery_time` on
+  `PUT /waste/reminder-settings/{typeId}` now answers 400 instead of 500.
 - **Two texts no longer suggest that wall mode follows the arrangement of the overview** (#1908).
   Wall mode always shows the same four things - the time, today's schedule, who's up today and
   the weather - on every device. The hint under Settings → Household → Wall tablets now names

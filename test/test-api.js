@@ -877,10 +877,16 @@ const REASONS_PASSED_THROUGH = new Map([
   ['routes/family.js: problem.reason', { sites: 1, at403: [], why: 'memberOrderProblem: feste 400; die 403 daneben traegt ein Literal' }],
   ['routes/tasks.js: result.reason', { sites: 1, at403: [], why: 'feste 409' }],
   ['routes/backup.js: err.reason', { sites: 1, at403: [], why: 'Restore: 409, 503 oder 400' }],
-  // wasteErrorResponse (#1795): der Grund eines WasteConflictError
-  // (preview_changed, source_changed, refresh_in_progress) haengt im Zweig,
-  // der die 409 baut - 400 und 404 daneben tragen keinen, eine 403 gibt es dort nicht.
-  ['routes/waste/helpers.js: err.reason', { sites: 1, at403: [], why: 'feste 409' }],
+  // wasteErrorResponse (#1795, #1909): der Grund eines getypten Abfuhr-Fehlers
+  // haengt an seinem Zweig - 400 (WasteValidationError), 409 (WasteConflictError:
+  // preview_changed, source_changed, refresh_in_progress, waste_type_in_use,
+  // waste_pickup_exists) oder 404 (WasteNotFoundError). Eine 403 gibt es dort nicht.
+  ['routes/waste/helpers.js: err.reason', { sites: 3, at403: [], why: 'feste 400, 409 oder 404' }],
+  // validateOneOff reicht den Grund seiner Pruefung (waste_pickup_date_invalid)
+  // an den Store, der daraus einen WasteValidationError baut: keine Antwort,
+  // und am Ende eine 400.
+  ['services/waste-domain.js: checks.find((check) => check.error && check.reason)?.reason ?? null',
+    { sites: 1, at403: [], why: 'Rueckgabewert einer Pruefung, wird zur 400' }],
   // refuse() (#1656, #1668): die eine Stelle, ueber die jede Absage der
   // Budget-Routen ihren Grund bekommt. Ihr Status ist 400 oder, an zwei
   // Stellen ausgeschrieben, 409 - eine 403 baut sie nie.

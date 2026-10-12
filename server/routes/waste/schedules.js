@@ -43,7 +43,7 @@ router.get('/:id', (req, res) => {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
     const schedule = store.getSchedule(db.get(), vId.value);
-    if (!schedule) return res.status(404).json({ error: 'Waste schedule not found.', code: 404 });
+    if (!schedule) return res.status(404).json({ error: 'Waste schedule not found.', code: 404, reason: 'waste_schedule_not_found' });
     res.json({ data: schedule });
   } catch (err) {
     log.error('GET /waste/schedules/:id error:', err);

@@ -64,7 +64,7 @@ export function wastePaths() {
         summary: 'Get a waste type',
         tag: 'Waste',
         params: [idParam()],
-        responses: schemaResponse('WasteTypeResponse', 'Type', 200, { 404: apiError('Type not found') }),
+        responses: schemaResponse('WasteTypeResponse', 'Type', 200, { 404: apiError('Type not found (`reason: "waste_type_not_found"`)') }),
       }),
       put: op({
         summary: 'Update a waste type',
@@ -72,7 +72,7 @@ export function wastePaths() {
         params: [idParam()],
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/WasteTypeInput'),
-        responses: schemaResponse('WasteTypeResponse', 'Type updated', 200, { 404: apiError('Type not found') }),
+        responses: schemaResponse('WasteTypeResponse', 'Type updated', 200, { 404: apiError('Type not found (`reason: "waste_type_not_found"`)') }),
       }),
       delete: op({
         summary: 'Delete a waste type',
@@ -81,8 +81,8 @@ export function wastePaths() {
         params: [idParam()],
         stateChanging: true,
         responses: noContentResponse('Type deleted', {
-          404: apiError('Type not found'),
-          409: apiError('Type has schedules or pickups and cannot be deleted'),
+          404: apiError('Type not found (`reason: "waste_type_not_found"`)'),
+          409: apiError('Type has schedules or pickups and cannot be deleted (`reason: "waste_type_in_use"`)'),
         }),
       }),
     },
@@ -100,7 +100,12 @@ export function wastePaths() {
       post: op({
         summary: 'Create a waste schedule',
         tag: 'Waste',
-        description: 'A weekly schedule requires weekdays; a monthly_fixed_day schedule requires month_day and an anchor_date whose own day-of-month matches it (or, for month_day=-1, is the actual last day of its month). type_id must reference an existing waste type, or the request is refused with 400.',
+        description: 'A weekly schedule requires weekdays; a monthly_fixed_day schedule requires month_day and an anchor_date whose own day-of-month matches it (or, for month_day=-1, is the actual last day of its month). type_id must reference an existing waste type, or the request is refused with 400 and `reason: "waste_type_not_found"`. '
+          + 'A 400 that a household member can reach from the schedule dialog carries a machine-readable `reason` next to `error` (create and update alike): '
+          + '`waste_schedule_anchor_date_invalid`, `waste_schedule_ends_before_anchor` (valid_until before anchor_date), `waste_schedule_weekdays_required`, '
+          + '`waste_schedule_interval_invalid`, `waste_schedule_month_day_invalid`, `waste_schedule_anchor_not_month_day`, `waste_schedule_anchor_not_last_day`, '
+          + '`waste_schedule_anchor_not_ordinal_weekday`. `error` lists every problem; `reason` names the first one that has a reason. '
+          + 'Validation only an API caller triggers (an unknown recurrence_kind, a field that does not belong to the kind) carries no `reason`.',
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/WasteScheduleInput'),
         responses: schemaResponse('WasteScheduleResponse', 'Schedule created', 201),
@@ -111,7 +116,7 @@ export function wastePaths() {
         summary: 'Get a waste schedule',
         tag: 'Waste',
         params: [idParam()],
-        responses: schemaResponse('WasteScheduleResponse', 'Schedule', 200, { 404: apiError('Schedule not found') }),
+        responses: schemaResponse('WasteScheduleResponse', 'Schedule', 200, { 404: apiError('Schedule not found (`reason: "waste_schedule_not_found"`)') }),
       }),
       put: op({
         summary: 'Update a waste schedule',
@@ -119,7 +124,7 @@ export function wastePaths() {
         params: [idParam()],
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/WasteScheduleInput'),
-        responses: schemaResponse('WasteScheduleResponse', 'Schedule updated', 200, { 404: apiError('Schedule not found') }),
+        responses: schemaResponse('WasteScheduleResponse', 'Schedule updated', 200, { 404: apiError('Schedule not found (`reason: "waste_schedule_not_found"`)') }),
       }),
       delete: op({
         summary: 'Delete a waste schedule',
@@ -127,25 +132,25 @@ export function wastePaths() {
         description: 'Cascades this schedule\'s own overrides only. The type itself and any other schedule/one-off referencing it are untouched.',
         params: [idParam()],
         stateChanging: true,
-        responses: noContentResponse('Schedule deleted', { 404: apiError('Schedule not found') }),
+        responses: noContentResponse('Schedule deleted', { 404: apiError('Schedule not found (`reason: "waste_schedule_not_found"`)') }),
       }),
     },
     '/api/v1/waste/schedules/{id}/overrides/{originalDate}': {
       put: op({
         summary: 'Move or skip one calculated occurrence',
         tag: 'Waste',
-        description: 'Sets an override for the schedule\'s calculated occurrence on original_date: a replacement_date moves it, null explicitly skips it. Refused with 400 if original_date is not really one of the schedule\'s own calculated dates.',
+        description: 'Sets an override for the schedule\'s calculated occurrence on original_date: a replacement_date moves it, null explicitly skips it. Refused with 400 if original_date is not really one of the schedule\'s own calculated dates (`reason: "waste_occurrence_not_found"`), if replacement_date is not a date (`waste_override_date_invalid`) or equals original_date (`waste_override_same_date`).',
         params: [idParam(), stringPathParam('originalDate', 'The occurrence\'s own calculated date (YYYY-MM-DD), not the replacement date')],
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/WasteScheduleOverrideInput'),
-        responses: schemaResponse('WasteScheduleOverrideResponse', 'Override set', 200, { 404: apiError('Schedule not found') }),
+        responses: schemaResponse('WasteScheduleOverrideResponse', 'Override set', 200, { 404: apiError('Schedule not found (`reason: "waste_schedule_not_found"`)') }),
       }),
       delete: op({
         summary: 'Restore one calculated occurrence to its schedule-computed date',
         tag: 'Waste',
         params: [idParam(), stringPathParam('originalDate', 'The occurrence\'s own calculated date (YYYY-MM-DD)')],
         stateChanging: true,
-        responses: noContentResponse('Override removed', { 404: apiError('No override exists for this schedule/date') }),
+        responses: noContentResponse('Override removed', { 404: apiError('No override exists for this schedule/date (`reason: "waste_override_not_found"`)') }),
       }),
     },
     '/api/v1/waste/pickups': {
@@ -158,10 +163,10 @@ export function wastePaths() {
       post: op({
         summary: 'Create a manual one-off pickup',
         tag: 'Waste',
-        description: 'For an irregular or special collection that is a fact on its own, not a schedule with a fake recurrence. type_id must reference an existing waste type, or the request is refused with 400.',
+        description: 'For an irregular or special collection that is a fact on its own, not a schedule with a fake recurrence. type_id must reference an existing waste type, or the request is refused with 400 and `reason: "waste_type_not_found"`. A missing or malformed date is refused with 400 and `reason: "waste_pickup_date_invalid"`.',
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/WasteOneOffPickupInput'),
-        responses: schemaResponse('WasteOneOffPickupResponse', 'Pickup created', 201, { 409: apiError('A pickup already exists for this type and date') }),
+        responses: schemaResponse('WasteOneOffPickupResponse', 'Pickup created', 201, { 409: apiError('A pickup already exists for this type and date (`reason: "waste_pickup_exists"`)') }),
       }),
     },
     '/api/v1/waste/pickups/{id}': {
@@ -169,7 +174,7 @@ export function wastePaths() {
         summary: 'Get a one-off pickup',
         tag: 'Waste',
         params: [idParam()],
-        responses: schemaResponse('WasteOneOffPickupResponse', 'Pickup', 200, { 404: apiError('Pickup not found') }),
+        responses: schemaResponse('WasteOneOffPickupResponse', 'Pickup', 200, { 404: apiError('Pickup not found (`reason: "waste_pickup_not_found"`)') }),
       }),
       put: op({
         summary: 'Update a one-off pickup',
@@ -177,14 +182,14 @@ export function wastePaths() {
         params: [idParam()],
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/WasteOneOffPickupInput'),
-        responses: schemaResponse('WasteOneOffPickupResponse', 'Pickup updated', 200, { 404: apiError('Pickup not found'), 409: apiError('A pickup already exists for this type and date') }),
+        responses: schemaResponse('WasteOneOffPickupResponse', 'Pickup updated', 200, { 404: apiError('Pickup not found (`reason: "waste_pickup_not_found"`)'), 409: apiError('A pickup already exists for this type and date (`reason: "waste_pickup_exists"`)') }),
       }),
       delete: op({
         summary: 'Delete a one-off pickup',
         tag: 'Waste',
         params: [idParam()],
         stateChanging: true,
-        responses: noContentResponse('Pickup deleted', { 404: apiError('Pickup not found') }),
+        responses: noContentResponse('Pickup deleted', { 404: apiError('Pickup not found (`reason: "waste_pickup_not_found"`)') }),
       }),
     },
     '/api/v1/waste/occurrences': {
@@ -248,7 +253,7 @@ export function wastePaths() {
         summary: 'Get an import source, including its label mappings',
         tag: 'Waste',
         params: [idParam()],
-        responses: schemaResponse('WasteSourceDetailResponse', 'Source', 200, { 404: apiError('Source not found') }),
+        responses: schemaResponse('WasteSourceDetailResponse', 'Source', 200, { 404: apiError('Source not found (`reason: "waste_source_not_found"`)') }),
       }),
       put: op({
         summary: 'Rename an import source',
@@ -256,7 +261,7 @@ export function wastePaths() {
         params: [idParam()],
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/WasteSourceRenameInput'),
-        responses: schemaResponse('WasteSourceDetailResponse', 'Source renamed', 200, { 404: apiError('Source not found') }),
+        responses: schemaResponse('WasteSourceDetailResponse', 'Source renamed', 200, { 404: apiError('Source not found (`reason: "waste_source_not_found"`)') }),
       }),
       delete: op({
         summary: 'Delete an import source',
@@ -264,7 +269,7 @@ export function wastePaths() {
         description: 'Cascades this source\'s own label mappings and imported pickups only. Other sources, manual schedules/one-offs, and the waste types themselves are untouched.',
         params: [idParam()],
         stateChanging: true,
-        responses: noContentResponse('Source deleted', { 404: apiError('Source not found') }),
+        responses: noContentResponse('Source deleted', { 404: apiError('Source not found (`reason: "waste_source_not_found"`)') }),
       }),
     },
     '/api/v1/waste/sources/{id}/refresh': {
@@ -276,7 +281,7 @@ export function wastePaths() {
         stateChanging: true,
         responses: schemaResponse('WasteUrlSourceRefreshResponse', 'Refresh attempted', 200, {
           400: apiError('Not a URL source'),
-          404: apiError('Source not found'),
+          404: apiError('Source not found (`reason: "waste_source_not_found"`)'),
         }),
       }),
     },
@@ -288,7 +293,7 @@ export function wastePaths() {
         params: [idParam('id', 'Source ID'), idParam('mappingId', 'Mapping ID')],
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/WasteSourceMappingUpdateInput'),
-        responses: schemaResponse('WasteSourceMappingResponse', 'Mapping updated', 200, { 404: apiError('Source or mapping not found') }),
+        responses: schemaResponse('WasteSourceMappingResponse', 'Mapping updated', 200, { 404: apiError('Source or mapping not found (`reason: "waste_source_not_found"` or `"waste_mapping_not_found"`)') }),
       }),
     },
     '/api/v1/waste/sources/{id}/reimport/preview': {
@@ -299,7 +304,7 @@ export function wastePaths() {
         params: [idParam()],
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/WasteImportPreviewInput'),
-        responses: schemaResponse('WasteImportPreviewResponse', 'Preview', 200, { 404: apiError('Source not found') }),
+        responses: schemaResponse('WasteImportPreviewResponse', 'Preview', 200, { 404: apiError('Source not found (`reason: "waste_source_not_found"`)') }),
       }),
     },
     '/api/v1/waste/sources/{id}/reimport/commit': {
@@ -311,7 +316,7 @@ export function wastePaths() {
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/WasteImportCommitInput'),
         responses: schemaResponse('WasteImportCommitResponse', 'Import applied', 200, {
-          404: apiError('Source not found'),
+          404: apiError('Source not found (`reason: "waste_source_not_found"`)'),
           409: apiError('The source changed since the preview, or the file content changed since the preview'),
         }),
       }),
@@ -328,11 +333,11 @@ export function wastePaths() {
       put: op({
         summary: "Upsert the calling user's own reminder setting for one waste type",
         tag: 'Waste',
-        description: 'Applies immediately - triggers a synchronous reminder-sync for this user in addition to the periodic one, so a change is not left waiting for the next scheduler tick.',
+        description: 'Applies immediately - triggers a synchronous reminder-sync for this user in addition to the periodic one, so a change is not left waiting for the next scheduler tick. 400 with `reason: "waste_reminder_offset_invalid"` for offset_days outside its bound and `reason: "waste_reminder_time_invalid"` for a delivery_time that is empty or not HH:MM.',
         params: [idParam('typeId', 'Waste type ID')],
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/WasteReminderSettingUpdateInput'),
-        responses: schemaResponse('WasteReminderSettingResponse', 'Setting saved', 200, { 404: apiError('Waste type not found') }),
+        responses: schemaResponse('WasteReminderSettingResponse', 'Setting saved', 200, { 404: apiError('Waste type not found (`reason: "waste_type_not_found"`)') }),
       }),
     },
     '/api/v1/waste/sources/{id}/mapping-profile/export': {
@@ -341,7 +346,7 @@ export function wastePaths() {
         tag: 'Waste',
         description: 'Only mapped, non-ignored labels are included. No municipal/provider catalog ships with the app - a profile only ever carries a household\'s own prior decisions, for reuse on another source or import elsewhere.',
         params: [idParam()],
-        responses: schemaResponse('WasteMappingProfileExportResponse', 'Profile', 200, { 404: apiError('Source not found') }),
+        responses: schemaResponse('WasteMappingProfileExportResponse', 'Profile', 200, { 404: apiError('Source not found (`reason: "waste_source_not_found"`)') }),
       }),
     },
     '/api/v1/waste/sources/{id}/mapping-profile/import/preview': {
@@ -352,7 +357,7 @@ export function wastePaths() {
         params: [idParam()],
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/WasteMappingProfileImportPreviewInput'),
-        responses: schemaResponse('WasteMappingProfileImportPreviewResponse', 'Preview', 200, { 404: apiError('Source not found') }),
+        responses: schemaResponse('WasteMappingProfileImportPreviewResponse', 'Preview', 200, { 404: apiError('Source not found (`reason: "waste_source_not_found"`)') }),
       }),
     },
     '/api/v1/waste/sources/{id}/mapping-profile/import/commit': {
@@ -364,7 +369,7 @@ export function wastePaths() {
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/WasteMappingProfileImportCommitInput'),
         responses: schemaResponse('WasteMappingProfileImportCommitResponse', 'Applied', 200, {
-          404: apiError('Source not found'),
+          404: apiError('Source not found (`reason: "waste_source_not_found"`)'),
           409: apiError('The mapping profile changed since it was last previewed'),
         }),
       }),
