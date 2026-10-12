@@ -2150,6 +2150,9 @@ test('Kategoriebalken: der Fokusring liegt innen, und der Zeiger loescht den ged
   assert.equal(hover.length, 1, 'genau eine Hover-Flaeche fuer die Balken');
   assert.equal(hover[0].selector, 'button.budget-bar-row:not(.is-category-selected):hover');
   assert.match(hover[0].body, /background:\s*var\(--color-surface-hover\)/);
+  // Auf Touch klebt :hover nach dem Tipp - am eben abgewaehlten Balken saehe
+  // das aus wie "noch gedrueckt" (Ratchet R18 in test:motion).
+  assert.ok(hover[0].at.some((preamble) => /\(hover:\s*hover\)/.test(preamble)), 'die Hover-Flaeche steht unter (hover: hover)');
 });
 
 test('das Inline-Kategorie-Overlay ist ein vollwertiger Dialog', () => {

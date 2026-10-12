@@ -1277,9 +1277,13 @@ button.budget-bar-row {
 
 /* Der Balken ist ein Knopf und antwortet dem Zeiger wie die Planzeile
  * darunter (`.budget-plan-row`). Nicht am gedrueckten: dessen Toenung ist der
- * Zustand, und die neutrale Hover-Flaeche wuerde ihn beim Ueberfahren loeschen. */
-button.budget-bar-row:not(.is-category-selected):hover {
-  background: var(--color-surface-hover);
+ * Zustand, und die neutrale Hover-Flaeche wuerde ihn beim Ueberfahren loeschen.
+ * Unter (hover: hover): auf Touch klebt :hover nach dem Tipp - der eben
+ * abgewaehlte Balken saehe dort weiter getoent aus. */
+@media (hover: hover) {
+  button.budget-bar-row:not(.is-category-selected):hover {
+    background: var(--color-surface-hover);
+  }
 }
 
 /* Die Zeilen liegen in einer Karte mit `overflow: hidden` (die runden Ecken):
