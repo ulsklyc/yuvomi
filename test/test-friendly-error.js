@@ -271,6 +271,27 @@ test('isGone: nur die bekannten "gibt es nicht mehr"-Gruende, nie der blanke Sta
   }
 });
 
+// #1909: loeschen, was schon geloescht ist, ist erledigt - aber nur mit dem
+// Grund des Dings selbst.
+test('isAlreadyDeleted: nur der genannte Grund, nie ein anderer, nie der blanke Status, nie eine Absage', async () => {
+  const { isAlreadyDeleted, GONE_REASONS } = await load();
+  for (const reason of GONE_REASONS) {
+    assert.equal(isAlreadyDeleted(answer(404, SERVER_TEXT, reason), reason), true, reason);
+    assert.equal(isAlreadyDeleted(answer(403, SERVER_TEXT, reason), reason), false, `${reason} @403`);
+    for (const other of GONE_REASONS) {
+      if (other !== reason) assert.equal(isAlreadyDeleted(answer(404, SERVER_TEXT, other), reason), false, `${other} ist nicht ${reason}`);
+    }
+  }
+  // Ein Grund ausserhalb der Allowlist zaehlt auch dann nicht, wenn der Aufrufer ihn nennt.
+  assert.equal(isAlreadyDeleted(answer(404, SERVER_TEXT, 'some_future_not_found'), 'some_future_not_found'), false);
+  for (const err of [
+    answer(404, SERVER_TEXT), answer(500, SERVER_TEXT), { status: 0 }, new Error('shopping_item_not_found'), undefined, null,
+  ]) {
+    assert.equal(isAlreadyDeleted(err, 'shopping_item_not_found'), false);
+  }
+  assert.equal(isAlreadyDeleted(answer(404, SERVER_TEXT), undefined), false, 'ohne Grund auf beiden Seiten');
+});
+
 // EIN RAT IN EINER FEHLERMELDUNG IST CODE (#1909): wo die Seite selbst
 // nachlaedt, darf der Satz nicht mehr dazu raten. Gemessen wird die Regel,
 // nicht eine Schreibweise von "neu laden" in 26 Sprachen: der Satz ist EINE

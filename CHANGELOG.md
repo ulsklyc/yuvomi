@@ -134,7 +134,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   were looking at is gone, you land on the first remaining one. An edit dialog for an item that
   no longer exists closes; in any other case it stays open with what you typed and offers the
   current lists, shops and categories. The dialogs that manage shops and shopping categories
-  refresh their rows the same way.
+  refresh their rows the same way. One case stays quiet: if you delete an item that somebody else
+  has already deleted, it is simply gone - no note, and the row does not come back for a moment.
 - **Two texts no longer suggest that wall mode follows the arrangement of the overview** (#1908).
   Wall mode always shows the same four things - the time, today's schedule, who's up today and
   the weather - on every device. The hint under Settings → Household → Wall tablets now names

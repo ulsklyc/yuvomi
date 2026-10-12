@@ -28,7 +28,7 @@ import { makeSortable } from '/utils/sortable.js';
 import { amountPlaceholder, formatMoney, currencyFractionDigits, centsToAmountInput, amountInputToCents, toDecimalString, breaksOffAtSeparator } from '/utils/money.js';
 import { startLiveFeed } from '/utils/live-feed.js';
 import { createPageController } from '/utils/page-lifecycle.js';
-import { errorSentence, isGone } from '/utils/friendly-error.js';
+import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
 
 
 // --------------------------------------------------------
@@ -840,15 +840,23 @@ function deleteItemUndoable(id, container) {
     message: t('shopping.itemDeletedToast', { name: snapshot?.name ?? '' }),
     commit: async ({ keepalive }) => {
       let response;
+      let schonWeg = false;
       try {
         response = await api.delete(`/shopping/items/${id}`, { keepalive });
       } catch (err) {
-        // Schlaegt das DELETE fehl, bringt `restore` die Zeile zurueck, und
-        // jede Antwort darf sie wieder tragen - sofort, nicht erst spaeter.
-        pendingRemovals.delete(id);
-        throw err;
+        // JEMAND ANDERES HAT DEN ARTIKEL SCHON GELOESCHT: das Ziel ist
+        // erreicht, also gilt das als Erfolg - kein Toast, und die Zeile kommt
+        // nicht zurueck (`isAlreadyDeleted`). Alles andere ist ein Fehler.
+        schonWeg = isAlreadyDeleted(err, 'shopping_item_not_found');
+        if (!schonWeg) {
+          // Schlaegt das DELETE fehl, bringt `restore` die Zeile zurueck, und
+          // jede Antwort darf sie wieder tragen - sofort, nicht erst spaeter.
+          pendingRemovals.delete(id);
+          throw err;
+        }
       }
-      acknowledgeOwnChange(response);
+      // Ohne Antwort gibt es keine Quittung: die Marke des Feeds bleibt stehen.
+      if (response) acknowledgeOwnChange(response);
       // Bestaetigt, aber noch nicht geraeumt: eine Antwort, die vor dem DELETE
       // losging, traegt den Artikel noch (siehe `pendingRemovals`).
       confirmRemovals([id]);
@@ -857,6 +865,11 @@ function deleteItemUndoable(id, container) {
       // sie liegen - ein Zuruecknehmen im Undo-Fenster braucht sie, damit die
       // wiederhergestellte Zeile zeigt, was der Server inzwischen hat.
       intents.delete(id);
+      // Der Stand der Seite war veraltet, also holt sie den frischen - still,
+      // und erst NACH `confirmRemovals`: die Antwort beginnt dann nach der
+      // Bestaetigung und gilt als Wahrheit des Servers, auch fuer den Zaehler.
+      // Nicht beim Verlassen der Seite (`keepalive`): da zeichnet niemand mehr.
+      if (schonWeg && !keepalive) reloadAfterGone(container);
     },
     restore: (err) => {
       pendingRemovals.delete(id);
@@ -3878,6 +3891,10 @@ function wireLiveUpdates(container, routeSignal) {
  * mehr zu tun gibt. Der Toast bleibt: er sagt, WARUM etwas verschwunden ist.
  *
  * Erkannt wird am `reason`, nie am Text und nie am blanken Status 404.
+ *
+ * EINE AUSNAHME, und sie kommt hier gar nicht an: wer einen Artikel LOESCHT,
+ * den es nicht mehr gibt, hat sein Ziel erreicht (`isAlreadyDeleted` in
+ * `deleteItemUndoable`) - kein Toast, nur das stille Nachladen.
  *
  * @param {unknown} err
  * @param {Element} container

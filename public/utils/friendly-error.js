@@ -86,6 +86,26 @@ export function isGone(err) {
 }
 
 /**
+ * War das LOESCHEN schon erledigt? Wer etwas loescht, das ein anderes
+ * Haushaltsmitglied schon geloescht hat, bekommt "gibt es nicht mehr" - und hat
+ * damit, was er wollte. Das ist kein Fehler, den die Seite melden muesste: kein
+ * Toast, und die Zeile kommt nicht zurueck.
+ *
+ * Nur fuer den Loeschweg, und nur fuer den Grund des Dings, das geloescht
+ * werden sollte: `reason` nennt der Aufrufer. Ein Loeschen, das an etwas
+ * ANDEREM scheitert (die Liste des Artikels, ein unbekannter Grund, eine blanke
+ * 404, eine Absage), bleibt ein Fehler. Abhaken oder Speichern auf einem
+ * verschwundenen Ding fragen hier nie - sie behalten Toast und Nachladen.
+ *
+ * @param {unknown} err
+ * @param {string} reason - der Grund "dieses Ding gibt es nicht mehr"
+ * @returns {boolean}
+ */
+export function isAlreadyDeleted(err, reason) {
+  return isGone(err) && err.data.reason === reason;
+}
+
+/**
  * Der Satz, den die App fuer diesen Fehler SICHER kennt - oder nichts.
  * Eine Stelle fuer friendlyError und errorSentence, damit beide dasselbe sagen.
  *

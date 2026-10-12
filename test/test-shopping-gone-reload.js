@@ -12,6 +12,11 @@
  * Fehler meldet. Der api-Stub schreibt mit, was die Seite danach holt; er
  * nimmt keine Antwort der Seite vorweg.
  *
+ * Die eine Ausnahme: wer einen Artikel LOESCHT, den es nicht mehr gibt, hat sein
+ * Ziel erreicht. Kein Toast, die Zeile bleibt weg, die Seite laedt still nach.
+ * Gefahren wird `deleteItemUndoable` - der eine Weg hinter Knopf, Wisch und
+ * Bearbeiten-Dialog - samt dem Ablauf des Undo-Fensters.
+ *
  * Ausführen: npm run test:shopping-gone-reload
  */
 import test from 'node:test';
@@ -357,4 +362,198 @@ test('Der offene Dialog bekommt die frische Auswahl: Kategorie, Zielliste und La
   assert.deepEqual(werte(liste), ['1']);
   assert.equal(liste.value, '1', 'die verschwundene Zielliste faellt auf die eigene Liste zurueck');
   assert.deepEqual(werte(laeden), ['Markt']);
+});
+
+// -------------------------------------------------------------------------
+// Loeschen eines Artikels, den es nicht mehr gibt: still erledigt
+// -------------------------------------------------------------------------
+
+/**
+ * Einen Artikel loeschen und das Undo-Fenster ablaufen lassen.
+ *
+ * Der Loader ersetzt `scheduleUndoableDelete` durch einen Stub, der `commit`
+ * und `restore` herausgibt. `ablauf` tut damit, was `finish` in utils/ux.js
+ * tut: commit, und bei einem Wurf restore mit dem Fehler - beim Verlassen der
+ * Seite (`keepalive`) ohne restore. Die vier Zeilen dort faehrt diese Suite
+ * also NICHT selbst.
+ */
+function loeschen(id, { keepalive = false } = {}) {
+  let opts = null;
+  let zurueck = 0;
+  globalThis.__undoStub = (o) => { opts = o; };
+  try {
+    shopping.deleteItemUndoable(id, nullContainer());
+  } finally {
+    delete globalThis.__undoStub;
+  }
+  assert.ok(opts, 'das Loeschen hat ein Undo-Fenster geoeffnet');
+  return {
+    opts,
+    zurueckgeholt: () => zurueck,
+    ablauf: async () => {
+      try {
+        await opts.commit({ keepalive });
+      } catch (err) {
+        if (!keepalive) { zurueck += 1; opts.restore(err); }
+      }
+    },
+  };
+}
+
+/** Der Server nach der fremden Loeschung von Artikel 10: Liste 1 zaehlt einen weniger. */
+const NACH_FREMDEM_LOESCHEN = (checked = 0) => LISTEN().map((l) => (l.id === 1 ? { ...l, item_total: 1, item_checked: checked } : l));
+
+test('Loeschen eines schon geloeschten Artikels: kein Toast, die Zeile bleibt weg, der Zaehler stimmt', async () => {
+  zustand();
+  const { gets, stub } = server({ lists: NACH_FREMDEM_LOESCHEN() });
+  const geloescht = [];
+  stub.delete = async (path) => { geloescht.push(path); throw fehler(404, 'shopping_item_not_found'); };
+
+  let lauf;
+  await mit(stub, async () => {
+    lauf = loeschen(10);
+    // Die Zeile geht sofort, der Zaehler mit.
+    assert.deepEqual(shopping.state.items.map((i) => i.id), [11]);
+    assert.equal(shopping.state.lists[0].item_total, 1);
+    await lauf.ablauf();
+    // Gleich nach der Antwort, noch vor dem Ende des Nachladens: nichts ist
+    // zurueckgesprungen.
+    assert.deepEqual(shopping.state.items.map((i) => i.id), [11], 'die Zeile ist nicht zurueckgekommen');
+    assert.equal(shopping.state.lists[0].item_total, 1);
+  });
+
+  assert.deepEqual(geloescht, ['/shopping/items/10']);
+  assert.deepEqual(toasts, [], 'kein Toast: der Nutzer hat, was er wollte');
+  assert.equal(lauf.zurueckgeholt(), 0, 'restore lief nicht');
+  assert.deepEqual(shopping.state.items.map((i) => i.id), [11]);
+  assert.equal(shopping.state.lists[0].item_total, 1, 'Reiter zaehlt den Artikel nicht mehr');
+  assert.equal(shopping.state.lists[0].item_checked, 0);
+  assert.equal(shopping.pendingRemovals.size, 0, 'keine schwebende Loeschung bleibt liegen');
+  // Der Stand war veraltet: die Seite holt den frischen, still.
+  assert.deepEqual([...gets].sort(), NACHLADEN);
+});
+
+test('Loeschen eines schon geloeschten, abgehakten Artikels: auch der Abgehakt-Zaehler stimmt', async () => {
+  zustand({ items: [item({ is_checked: 1 }), item({ id: 11, name: 'Brot', sort_order: 2, is_checked: 1 })] });
+  shopping.state.lists[0].item_checked = 2;
+  const { stub } = server({
+    lists: NACH_FREMDEM_LOESCHEN(1),
+    items: { 1: [item({ id: 11, name: 'Brot', sort_order: 2, is_checked: 1 })] },
+  });
+  stub.delete = async () => { throw fehler(404, 'shopping_item_not_found'); };
+
+  await mit(stub, () => loeschen(10).ablauf());
+
+  assert.deepEqual(toasts, []);
+  assert.deepEqual(shopping.state.items.map((i) => i.id), [11]);
+  assert.equal(shopping.state.lists[0].item_total, 1);
+  assert.equal(shopping.state.lists[0].item_checked, 1);
+});
+
+test('Scheitert das stille Nachladen, stimmt der Stand trotzdem - und es bleibt still', async () => {
+  zustand();
+  const { stub } = server({ liest: async () => { throw new Error('Netz weg'); } });
+  stub.delete = async () => { throw fehler(404, 'shopping_item_not_found'); };
+
+  await mit(stub, () => loeschen(10).ablauf());
+
+  assert.deepEqual(toasts, []);
+  assert.deepEqual(shopping.state.items.map((i) => i.id), [11]);
+  assert.equal(shopping.state.lists[0].item_total, 1, 'der Zaehler kommt vom Loeschen, nicht vom Nachladen');
+  assert.equal(shopping.pendingRemovals.size, 0);
+});
+
+test('Beim Verlassen der Seite (keepalive) laedt das erledigte Loeschen nichts nach', async () => {
+  zustand();
+  const { gets, stub } = server();
+  stub.delete = async () => { throw fehler(404, 'shopping_item_not_found'); };
+
+  await mit(stub, () => loeschen(10, { keepalive: true }).ablauf());
+
+  assert.deepEqual(toasts, []);
+  assert.deepEqual(gets, []);
+  assert.equal(laeuft(), null);
+});
+
+for (const [name, err, satz, laedtNach] of [
+  ['500 ohne Grund', fehler(500), 'common.errorGeneric', false],
+  ['blanke 404 ohne Grund', fehler(404), 'common.errorGeneric', false],
+  ['eine Absage (403) mit diesem Grund', fehler(403, 'shopping_item_not_found'), 'common.errorNoPermission', false],
+  ['offline', Object.assign(new Error('offline'), { status: 0 }), 'common.errorOfflineMutation', false],
+  // Ein ANDERES Ding ist weg, nicht der Artikel: das bleibt ein Fehler mit
+  // Satz und Nachladen. Nur der Grund des geloeschten Dings zaehlt als erledigt.
+  ['die Liste ist weg, nicht der Artikel', fehler(404, 'shopping_list_not_found'), 'shopping.errorListGone', true],
+]) {
+  test(`Loeschen scheitert an etwas anderem: die Zeile kommt zurueck, Toast - ${name}`, async () => {
+    zustand();
+    // Der Server hat den Artikel noch (das Loeschen ist ja gescheitert).
+    const { gets, stub } = server({ items: { 1: [item(), item({ id: 11, name: 'Brot', sort_order: 2 })] } });
+    stub.delete = async () => { throw err; };
+
+    let lauf;
+    await mit(stub, async () => { lauf = loeschen(10); await lauf.ablauf(); });
+
+    assert.deepEqual(toasts, [[satz, 'danger']]);
+    assert.equal(lauf.zurueckgeholt(), 1);
+    assert.deepEqual(shopping.state.items.map((i) => i.id), [10, 11], 'die Zeile ist wieder da');
+    assert.equal(shopping.state.lists[0].item_total, 2);
+    assert.equal(shopping.pendingRemovals.size, 0);
+    assert.deepEqual([...gets].sort(), laedtNach ? NACHLADEN : []);
+  });
+}
+
+// Gemessen, nicht gebaut: was "Rueckgaengig" tut, wenn der Artikel fremd
+// geloescht wurde. Im Undo-Fenster ist das DELETE noch gar nicht unterwegs -
+// die Seite weiss also nichts. Das Zuruecknehmen ist rein lokal und kann
+// deshalb in keinen Fehler laufen; die Zeile steht bis zur naechsten
+// Auffrischung als Rest da, und die naechste Handlung daran meldet es (#1921).
+test('Rueckgaengig im Undo-Fenster ist lokal: kein Aufruf, kein Fehler - die naechste Handlung meldet den verschwundenen Artikel', async () => {
+  zustand();
+  const { gets, stub } = server({ lists: NACH_FREMDEM_LOESCHEN() });
+  const schreibt = [];
+  stub.delete = async (path) => { schreibt.push(path); throw fehler(404, 'shopping_item_not_found'); };
+  stub.patch = async (path) => { schreibt.push(path); throw fehler(404, 'shopping_item_not_found'); };
+
+  await mit(stub, async () => {
+    const { opts } = loeschen(10);
+    // Der Nutzer tippt "Rueckgaengig": restore ohne Fehler.
+    opts.restore();
+    assert.deepEqual(schreibt, [], 'das Zuruecknehmen ruft den Server nicht');
+    assert.deepEqual(toasts, []);
+    assert.deepEqual(shopping.state.items.map((i) => i.id), [10, 11]);
+    assert.equal(shopping.state.lists[0].item_total, 2);
+    assert.deepEqual(gets, []);
+    await shopping.toggleShoppingItem(10, 0, nullContainer());
+  });
+
+  assert.deepEqual(schreibt, ['/shopping/items/10']);
+  assert.deepEqual(toasts, [['shopping.errorItemGone', 'danger']]);
+  assert.deepEqual(shopping.state.items.map((i) => i.id), [11]);
+});
+
+// Das Sammel-Loeschen kennt den Fall nicht als Fehler: die Route loescht, was
+// von den genannten Artikeln noch da ist, und antwortet 200 mit der Zahl. Ist
+// ein Teil (oder alles) schon weg, bleibt es still - und weil die Quittung dann
+// nicht gilt, holt die naechste Abfrage den Stand.
+test('Abgehakte loeschen, von denen einer schon weg ist: 200 mit kleinerer Zahl, kein Toast, nichts kommt zurueck', async () => {
+  zustand({ items: [item({ is_checked: 1 }), item({ id: 11, name: 'Brot', sort_order: 2, is_checked: 1 })] });
+  shopping.state.lists[0].item_checked = 2;
+  const { stub } = server();
+  const koerper = [];
+  stub.delete = async (path, opts) => { koerper.push([path, JSON.parse(opts.body)]); return { deleted: 1, list_change: { list_id: 1, before: 3, after: 4 } }; };
+
+  let opts = null;
+  let zurueck = 0;
+  await mit(stub, async () => {
+    globalThis.__undoStub = (o) => { opts = o; };
+    try { shopping.clearCheckedUndoable(nullContainer()); } finally { delete globalThis.__undoStub; }
+    try { await opts.commit({ keepalive: false }); } catch (err) { zurueck += 1; opts.restore(err); }
+  });
+
+  assert.deepEqual(koerper, [['/shopping/1/items/checked', { ids: [10, 11] }]]);
+  assert.equal(zurueck, 0);
+  assert.deepEqual(toasts, []);
+  assert.deepEqual(shopping.state.items, []);
+  assert.equal(shopping.state.lists[0].item_total, 0);
+  assert.equal(shopping.state.lists[0].item_checked, 0);
 });
