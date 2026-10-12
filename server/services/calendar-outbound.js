@@ -30,8 +30,11 @@
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { runExternalJob } from '../utils/restore-state.js';
-import { ownUid, ownUploadRowId, findObjectWithUid } from '../utils/own-uid.js';
+import { ownUid, ownUploadRowId, parseOwnUid, inspectObjectAt } from '../utils/own-uid.js';
 import { collectionUrlOf } from '../utils/caldav-client.js';
+import {
+  noteUploadAttempt, settleUploadAttempt, dropUploadAttempt, uploadAttemptsOf, uploadAttemptAt,
+} from './caldav-upload-attempts.js';
 
 const log = createLogger('CalendarOutbound');
 
@@ -865,12 +868,26 @@ export function eventUidFor(eventId) {
  * übernommen (`adopted`), und der Aufrufer merkt den lokalen Stand als Änderung
  * vor, statt zu raten, was dort liegt. Jede andere Absage geht als Fehler hoch.
  *
+ * VOR der Anfrage wird der Upload notiert (#1882, `caldav-upload-attempts.js`):
+ * geht die Antwort verloren, belegt die Notiz, dass von diesem Termin etwas an
+ * diesem Platz liegen kann. Sie fällt mit der Buchung (`bookEventUpload`) - der
+ * Aufrufer MUSS danach buchen - und sonst nur, wenn an der eigenen Adresse
+ * nachweislich ein fremdes Objekt liegt.
+ *
+ * @param {object} attempt
+ * @param {string} attempt.source      'caldav' | 'apple'
+ * @param {number} attempt.eventId     die Zeile, die hinaufgeht
+ * @param {number} [attempt.accountId] bei CalDAV das Konto, über das sie geht
  * @returns {Promise<{objectUrl: string, adopted: boolean}>}
  */
-export async function uploadNewEvent(client, calendar, uid, ics) {
+export async function uploadNewEvent(client, calendar, uid, ics, { source, eventId, accountId = null } = {}) {
   const filename      = `${uid}.ics`;
   const collectionUrl = String(calendar.url).replace(/\/?$/, '/');
   const objectUrl     = `${collectionUrl}${filename}`;
+  const place = { source, accountId, kind: 'event', rowId: eventId, collectionUrl: calendar.url };
+  // Synchron und unmittelbar vor der Anfrage; wirft, wenn Angaben fehlen -
+  // dann geht auch nichts hinaus.
+  noteUploadAttempt({ ...place, uid, objectUrl });
   try {
     await client.createCalendarObject({ calendar, filename, iCalString: ics });
     return { objectUrl, adopted: false };
@@ -879,7 +896,13 @@ export async function uploadNewEvent(client, calendar, uid, ics) {
     // Die UID wird im Objekt GELESEN, nicht aus dem Dateinamen geschlossen;
     // liegt dort etwas anderes, bleibt es unangetastet und der Termin lokal.
     // Gemerkt wird die eigene, berechnete Adresse, nicht eine vom Server genannte.
-    if (!(await findObjectWithUid(client, collectionUrl, objectUrl, uid))) throw err;
+    const found = await inspectObjectAt(client, collectionUrl, objectUrl, uid);
+    if (!found.own) {
+      // Dort liegt nachweislich ein fremdes Objekt, also nicht unseres: die
+      // Notiz fällt, sonst gälte ihm später ein Löschauftrag.
+      if (found.foreign) settleUploadAttempt(place);
+      throw err;
+    }
     return { objectUrl, adopted: true };
   }
 }
@@ -972,14 +995,21 @@ export function markEventUploaded(eventId, { source, uid, objectUrl, calRefId, a
  * Synchron: zwischen dem Nachladen und dem Schreiben liegt kein await, und
  * jeder Ausgang ist EIN Schreibvorgang an der Zeile oder am Löschauftrag.
  *
+ * Mit jeder Buchung fällt die Notiz des Uploads (#1882): die Antwort ist
+ * angekommen und verarbeitet. Bei `unchanged` bleibt sie stehen - über das
+ * Objekt wurde nichts entschieden, das tut `releaseLeftoverUploads` am Stand
+ * der Zeile.
+ *
  * @param {object} sent  die Zeile, aus der die Anfrage gebaut wurde
  * @param {object} what  wie `markEventUploaded`, dazu `calendarUrl`
  * @returns {'mirrored'|'deleted'|'released'|'unchanged'}
  */
 export function bookEventUpload(sent, { source, uid, objectUrl, calRefId, calendarUrl, adopted = false, accountId = null }) {
+  const booked = () => settleUploadAttempt({ source, accountId, kind: 'event', rowId: sent.id, collectionUrl: calendarUrl });
   const now = reloadEvent(sent.id);
   if (!now) {
     queueDeletion({ source, calendarExternalId: calendarUrl, eventExternalId: uid, objectUrl, accountId });
+    booked();
     log.info(`Event ${sent.id} was deleted while its upload was in flight, queued the deletion of ${uid}.`);
     return 'deleted';
   }
@@ -988,6 +1018,7 @@ export function bookEventUpload(sent, { source, uid, objectUrl, calRefId, calend
   const wanted = uploadTargetNow(now, { source, calendarUrl, accountId });
   if (wanted.released) {
     queueDeletion({ source, calendarExternalId: calendarUrl, eventExternalId: uid, objectUrl, accountId });
+    booked();
     log.info(`The target of event ${sent.id} was changed while its upload was in flight, queued the deletion of ${uid} in ${calendarUrl}.`);
     return 'released';
   }
@@ -1001,6 +1032,7 @@ export function bookEventUpload(sent, { source, uid, objectUrl, calRefId, calend
   });
   if (!mirrored) return 'unchanged';
   keepOwnUpload({ source, calendarUrl, uid });
+  booked();
   if (wanted.moveTo) {
     log.info(`The target of event ${sent.id} was changed while its upload was in flight, queued its move to ${wanted.moveTo}.`);
   }
@@ -1101,7 +1133,139 @@ export function adoptOwnEventUpload({ source, uid, objectUrl, calendarUrl, calRe
   });
   if (adopted) {
     keepOwnUpload({ source, calendarUrl, uid });
+    // Übernommen ist gebucht: die Notiz des Uploads fällt (#1882).
+    settleUploadAttempt({ source, accountId, kind: 'event', rowId: eventId, collectionUrl: calendarUrl });
     log.info(`Adopted the earlier upload of event ${eventId} (${uid}).`);
   }
   return adopted;
+}
+
+// --------------------------------------------------------
+// Der Upload, dessen Antwort nie ankam (#1882)
+// --------------------------------------------------------
+
+/**
+ * Wartet ein lokaler CalDAV-Termin auf den Upload an diesen Platz? Massgeblich
+ * ist sein Ziel, das Paar aus Konto und Kalender - nicht, ob der Kalender
+ * gerade eingeschaltet ist: ein abgewähltes Ziel bleibt stehen und wartet.
+ * iCloud kennt kein Ziel an der Zeile; dort fragt der Aufrufer selbst.
+ */
+function wantsCaldavUploadAt(row, attempt) {
+  return row.target_caldav_account_id === attempt.account_id
+    && !!row.target_caldav_calendar_url
+    && sameCalendarUrl(row.target_caldav_calendar_url, attempt.collection_url);
+}
+
+/**
+ * Wie steht die Zeile JETZT zu dem Objekt, das ein nie gebuchter Upload an
+ * diesem Platz hinterlassen haben kann?
+ *
+ *   waiting  - sie ist lokal und will weiter genau dorthin: der nächste Upload
+ *              oder der Abruf übernimmt das Objekt.
+ *   mirrored - sie ist Spiegel an genau diesem Platz (über einen anderen Weg
+ *              gebucht, etwa von einem zweiten Konto mit demselben Kalender):
+ *              das Objekt ist ihres.
+ *   leftover - alles andere: die Zeile ist gelöscht, hat ein anderes oder kein
+ *              Ziel, oder ist woanders Spiegel. Dann gehört das Objekt dort zu
+ *              nichts mehr, und der Abruf darf es nicht als Termin lesen.
+ *
+ * Synchron, aus dem Stand von jetzt.
+ */
+function uploadAttemptState(attempt, wantsUploadHere) {
+  const row = reloadEvent(attempt.row_id);
+  if (!row) return 'leftover';
+  if (row.external_source === 'local') {
+    const waiting = wantsUploadHere ? wantsUploadHere(row, attempt.collection_url) : wantsCaldavUploadAt(row, attempt);
+    return waiting ? 'waiting' : 'leftover';
+  }
+  if (row.external_source === attempt.source && row.external_calendar_id === attempt.uid
+      && sameCalendarUrl(calendarExternalId(row), attempt.collection_url)) {
+    return 'mirrored';
+  }
+  return 'leftover';
+}
+
+/**
+ * Für den Abruf: ist das Objekt mit dieser UID in diesem Kalender der Rest
+ * eines eigenen Uploads, dessen Antwort nie ankam, und dessen Zeile dort nicht
+ * mehr hingehört? Dann wird es weder importiert noch einer Zeile zugeordnet;
+ * `releaseLeftoverUploads` merkt im selben Lauf sein Löschen vor.
+ *
+ * Der Beleg ist die lokale Notiz, nicht die UID (`caldav-upload-attempts.js`).
+ * Ohne Notiz ist das Objekt ein Eintrag wie jeder andere.
+ *
+ * Frisch je Objekt gefragt, nicht einmal je Lauf: die Zeile kann fallen,
+ * während der Lauf noch den Server liest.
+ *
+ * @param {object} p
+ * @param {string} p.source
+ * @param {number} [p.accountId]
+ * @param {string} p.uid          UID aus dem Serverobjekt
+ * @param {string} p.calendarUrl  Kalender, der gerade abgerufen wird
+ * @param {(row: object, calendarUrl: string) => boolean} [p.wantsUploadHere]
+ *        iCloud: wartet diese lokale Zeile auf den Upload in diesen Kalender?
+ * @returns {boolean}
+ */
+export function isLeftoverOwnUpload({ source, accountId = null, uid, calendarUrl, wantsUploadHere = null }) {
+  // Billig zuerst: das Muster der UID, ohne Datenbank. Fast jedes Objekt
+  // eines Kalenders scheidet hier aus.
+  const parsed = parseOwnUid(uid);
+  if (!parsed || parsed.kind !== 'event' || parsed.installation === null) return false;
+  let attempt;
+  try {
+    attempt = uploadAttemptAt({ source, accountId, kind: 'event', uid, collectionUrl: calendarUrl });
+  } catch (err) {
+    log.warn(`Upload notes are not readable (${err.message}); treating them as none.`);
+    return false;
+  }
+  return !!attempt && uploadAttemptState(attempt, wantsUploadHere) === 'leftover';
+}
+
+/**
+ * Räumt die Reste von Uploads ab, deren Antwort nie ankam (#1882): für jede
+ * stehen gebliebene Notiz dieser Verbindung wird am Stand der Zeile
+ * entschieden (`uploadAttemptState`).
+ *
+ * Ein Rest wird zum Löschen vorgemerkt, wie `bookEventUpload` es getan hätte,
+ * wäre die Antwort angekommen - ohne Bedingung: der Termin ist in Yuvomi
+ * gelöscht oder soll dort nicht mehr liegen, gleich in welchem Stand (dieselbe
+ * Regel wie für das Löschen durch den Nutzer, `queueDeletion`). Ob dort
+ * überhaupt etwas liegt, ist offen; ein 404 erledigt den Auftrag.
+ *
+ * Aufgerufen im vollen Lauf NACH dem Abruf und VOR `processPendingDeletions`,
+ * nicht im Sofortversuch und nicht aus einer Route: so geht das DELETE an das
+ * Objekt, das dieser Lauf unter der eigenen UID an der Adresse gesehen hat,
+ * mit dessen ETag - und nicht blind an eine Adresse. Und so hängt die Regel an
+ * keiner Löschroute: gleich auf welchem Weg die Zeile fiel, der nächste Lauf
+ * findet die Notiz.
+ *
+ * Synchron: je Notiz Lesen, Entscheiden und Schreiben ohne await dazwischen.
+ * Die Notiz fällt erst, wenn der Auftrag steht.
+ *
+ * @returns {number} vorgemerkte Löschungen
+ */
+export function releaseLeftoverUploads({ source, accountId = null, wantsUploadHere = null }) {
+  let attempts;
+  try {
+    attempts = uploadAttemptsOf({ source, accountId, kinds: ['event'] });
+  } catch (err) {
+    log.warn(`Upload notes are not readable (${err.message}); nothing was released.`);
+    return 0;
+  }
+  let released = 0;
+  for (const attempt of attempts) {
+    const state = uploadAttemptState(attempt, wantsUploadHere);
+    if (state === 'waiting') continue;
+    if (state === 'leftover') {
+      const queued = queueDeletion({
+        source, calendarExternalId: attempt.collection_url, eventExternalId: attempt.uid,
+        objectUrl: attempt.object_url, accountId,
+      });
+      if (!queued) continue;
+      released++;
+      log.info(`The upload of event ${attempt.row_id} to ${attempt.collection_url} was never confirmed and the event no longer belongs there, queued the deletion of ${attempt.uid}.`);
+    }
+    dropUploadAttempt(attempt.id);
+  }
+  return released;
 }

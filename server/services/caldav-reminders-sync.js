@@ -478,6 +478,9 @@ async function runSync({ createClient: makeClient } = {}) {
       // Ausstehende Rückrichtung einmal je Lauf und Modul (#617): eine lokal
       // gelöschte Aufgabe darf der Inbound nicht wieder anlegen, eine lokal
       // bearbeitete nicht mit dem alten Serverstand überschreiben.
+      // Vorher: Reste nie bestätigter Uploads zum Löschen vormerken (#1882),
+      // damit der Abruf sie unten schon verdeckt.
+      todoOutbound.releaseLeftoverTodoUploads(account.id);
       const pendingByModule = {
         tasks: {
           deleted: todoOutbound.pendingDeletionUids(account.id, 'tasks'),
@@ -533,6 +536,13 @@ async function runSync({ createClient: makeClient } = {}) {
               // Lokale Bearbeitung wartet auf ihren Push: der alte Serverstand
               // darf sie nicht überschreiben.
               if (pendingByModule[module].dirty.has(todo.uid)) continue;
+
+              // Der Rest eines eigenen Uploads, dessen Antwort nie ankam und
+              // dessen Zeile hier nicht mehr hingehört - gelöscht, mit
+              // anderem Ziel, woanders gespiegelt (#1882). Weder importieren
+              // noch einer Zeile zuordnen. Frisch gefragt: die Zeile kann
+              // gefallen sein, während dieser Lauf noch liest.
+              if (todoOutbound.isLeftoverOwnUpload(module, todo.uid, account.id, sel.list_url)) continue;
 
               // Der eigene Upload, dessen Antwort verloren ging: die Zeile ist
               // noch lokal, das Objekt liegt schon hier. In die bestehende

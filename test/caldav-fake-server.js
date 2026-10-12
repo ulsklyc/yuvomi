@@ -17,6 +17,7 @@
  *   server.refuse({ method: 'PROPFIND', path: '/cal/', status: 503 })
  *   server.refuse({ method: 'PUT', status: 412, when: (req) => !req.headers['if-match'] })
  *   server.refuse({ method: 'PUT', status: 500, commit: true, once: true })   // gespeichert, Antwort verloren
+ *   server.refuse({ method: 'PUT', commit: true, drop: true, once: true })     // gespeichert, Verbindung abgerissen
  *   server.refuse({ method: 'PROPFIND', path: '/cal/', status: 207, contentType: 'application/xml', body: ... })
  * `server.allowAll()` nimmt alle Regeln zurück.
  */
@@ -173,6 +174,9 @@ export async function startFakeDavServer() {
         // Absage - der PUT, der ankam, dessen Antwort aber verloren ging.
         if (rule.commit) handle(req, body, { writeHead() {}, end() {} });
         if (rule.once) rules = rules.filter((r) => r !== rule);
+        // `drop`: gar keine Antwort - die Verbindung reisst ab. Der Client
+        // sieht einen Netzfehler ohne Status.
+        if (rule.drop) { req.socket.destroy(); return; }
         res.writeHead(rule.status, { 'Content-Type': rule.contentType || 'text/plain' });
         res.end(rule.body ?? 'refused');
         return;

@@ -56,6 +56,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   you changed or took back during the upload, and for a new shopping item that left its synced
   list in that moment. Until now such a task also lost the list you had just chosen and stayed in
   the old one.
+- **An entry deleted after an interrupted upload no longer comes back** (#1882). When a new
+  event, task or shopping item reached the CalDAV or iCloud server but the server's answer got
+  lost on the way - a dropped connection, a timeout, a server error after saving - Yuvomi kept
+  the entry as not yet uploaded. If you deleted it before the next sync, the copy stayed on the
+  server and the next sync brought the deleted entry back. If you instead picked another calendar
+  or list for it, or set it back to "Local", the next sync added the server copy as a second
+  entry. Yuvomi now remembers that an upload was sent and never confirmed: the next sync removes
+  the copy from the server instead of importing it, and the entry ends up only where you last
+  put it. The copy is removed with the next sync run, not at the moment you delete the entry.
 - **A CalDAV event belongs to the account that brought it** (#1860). With two or more CalDAV
   accounts, an event was identified by its UID alone. When a second account served an event with
   the same UID, it took over the entry of the first: title, calendar and address then came from

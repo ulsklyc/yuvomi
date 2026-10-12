@@ -1227,6 +1227,16 @@ async function runSync({ createClient } = {}) {
               // in dem Stand, für den er vorgemerkt wurde (#1883).
               if (awaitsDeletion(ev.uid, selCal.calendar_url, obj.url ?? null, obj.etag ?? null)) continue;
 
+              // Der Rest eines eigenen Uploads, dessen Antwort nie ankam und
+              // dessen Termin hier nicht mehr hingehört - gelöscht, mit
+              // anderem Ziel, woanders gespiegelt (#1882). Weder importieren
+              // noch einer Zeile zuordnen; sein Löschen merkt der Lauf nach
+              // dem Abruf vor (`releaseLeftoverUploads`). Frisch gefragt: der
+              // Termin kann gefallen sein, während dieser Lauf noch liest.
+              if (outbound.isLeftoverOwnUpload({
+                source: 'caldav', accountId: account.id, uid: ev.uid, calendarUrl: selCal.calendar_url,
+              })) continue;
+
               let existing = rowForUid(ev.uid, obj.url ?? null, account.id);
               // Die Zeile gehört einem anderen Konto, oder sie hat keines und
               // ist nicht zu übernehmen: nicht anfassen, keine zweite anlegen.
@@ -1387,6 +1397,10 @@ async function runSync({ createClient } = {}) {
       try {
         // Gemeldet wird, was der Server gelöscht hat - nicht, was ohne Anfrage fiel.
         const deletions = { sent: 0 };
+        // Erst die Reste nie bestätigter Uploads zum Löschen vormerken
+        // (#1882), dann löschen: so geht ihr DELETE im selben Lauf hinaus,
+        // an das Objekt, das der Abruf oben gesehen hat.
+        outbound.releaseLeftoverUploads({ source: 'caldav', accountId: account.id });
         await processPendingDeletions(client, 'caldav', objectIndex, ownCalendarUrls, {
           accountId: account.id, complete: fetchedEveryCalendar, outcome: deletions,
         });
@@ -1431,7 +1445,9 @@ async function runSync({ createClient } = {}) {
 
           // Upload to CalDAV. Ein 412 auf den eigenen Namen ist der eigene
           // frühere Upload und wird übernommen (uploadNewEvent).
-          const { objectUrl, adopted } = await outbound.uploadNewEvent(client, targetCal, uid, icsData);
+          const { objectUrl, adopted } = await outbound.uploadNewEvent(client, targetCal, uid, icsData, {
+            source: 'caldav', eventId: event.id, accountId: account.id,
+          });
 
           const calRefId  = upsertExternalCalendar(
             'caldav', event.target_caldav_calendar_url,

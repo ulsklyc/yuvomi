@@ -37,7 +37,10 @@ import * as db from '../db.js';
 import { outboundFailureAction } from './calendar-outbound.js';
 import { patchICSTodo } from '../utils/ics-patch.js';
 import { createCalDAVClient, collectionUrlOf, createUploadGate } from '../utils/caldav-client.js';
-import { ownUid, isOwnUidOfRow, ownUploadRowId, findObjectWithUid } from '../utils/own-uid.js';
+import { ownUid, isOwnUidOfRow, ownUploadRowId, parseOwnUid, inspectObjectAt } from '../utils/own-uid.js';
+import {
+  noteUploadAttempt, settleUploadAttempt, dropUploadAttempt, uploadAttemptsOf, uploadAttemptAt,
+} from './caldav-upload-attempts.js';
 import { householdTimeZone, localToUTC } from '../utils/timezone.js';
 import { loadTags, tagsKey } from '../utils/task-tags.js';
 import { runSerialized } from '../utils/sync-lock.js';
@@ -505,8 +508,12 @@ export function adoptOwnUpload(module, uid, accountId, objectUrl, { listUrl, tar
            outbound_attempts   = 0
      WHERE id = ? AND external_source = 'local'
   `).run(uid, accountId, objectUrl, rowId).changes > 0;
-  if (adopted) keepOwnUpload(module, uid, objectUrl);
-  if (adopted) log.info(`Adopted the earlier upload of ${def.table} row ${rowId} (${uid}).`);
+  if (adopted) {
+    keepOwnUpload(module, uid, objectUrl);
+    // Übernommen ist gebucht: die Notiz des Uploads fällt (#1882).
+    settleUploadAttempt({ source: 'caldav', accountId, kind: uidKind(module), rowId, collectionUrl: listUrl });
+    log.info(`Adopted the earlier upload of ${def.table} row ${rowId} (${uid}).`);
+  }
   return adopted;
 }
 
@@ -572,12 +579,25 @@ export function pendingCreations(accountId, module = 'tasks', id = null) {
  * (der Abruf verdeckt die UID kontoweit). Also erst fort, dann neu: der
  * Auftrag läuft in jedem Durchgang VOR den Uploads, im Regelfall wartet die
  * Zeile keinen Lauf. Gibt der Auftrag auf, ist sie wieder frei.
+ *
+ * Dasselbe gilt, BEVOR der Auftrag steht (#1882): ging die Antwort eines
+ * Uploads verloren und hat die Zeile seither ein anderes Ziel in diesem Konto,
+ * kann ihr Objekt noch am alten Platz liegen. Die Notiz des Uploads hält sie
+ * zurück, bis `releaseLeftoverTodoUploads` daraus den Auftrag gemacht hat und
+ * der erledigt ist.
  */
 function withoutOwnRemoval(module, accountId, rows) {
   if (!rows.length) return rows;
   const removing = pendingDeletionUids(accountId, module);
-  if (!removing.size) return rows;
-  return rows.filter((row) => !removing.has(todoUidFor(module, row.id)));
+  let attempts = [];
+  try {
+    attempts = uploadAttemptsOf({ source: 'caldav', accountId, kinds: [uidKind(module)] });
+  } catch (err) {
+    log.warn(`Upload notes are not readable (${err.message}); treating them as none.`);
+  }
+  if (!removing.size && !attempts.length) return rows;
+  return rows.filter((row) => !removing.has(todoUidFor(module, row.id))
+    && !attempts.some((attempt) => attempt.row_id === row.id && todoAttemptState(module, attempt, row) === 'leftover'));
 }
 
 /** Zwei Schreibweisen derselben Collection-URL: mit und ohne Schlussstrich. */
@@ -725,6 +745,12 @@ async function uploadNewTodo(client, collection, module, row, accountId) {
   if (!ics) return null;
 
   const objectUrl = `${String(collection.url).replace(/\/?$/, '/')}${uid}.ics`;
+  // VOR der Anfrage notiert (#1882, `caldav-upload-attempts.js`): geht die
+  // Antwort verloren, belegt die Notiz, dass von dieser Zeile etwas an diesem
+  // Platz liegen kann. Sie fällt mit der Buchung unten. Synchron, unmittelbar
+  // vor der Anfrage.
+  const place = { source: 'caldav', accountId, kind: uidKind(module), rowId: row.id, collectionUrl: collection.url };
+  noteUploadAttempt({ ...place, uid, objectUrl });
   // Der Name ist vergeben (412) und das Objekt trägt unsere UID: ein früherer
   // PUT kam an, seine Antwort nicht. Übernehmen und den lokalen Stand als
   // Änderung vormerken, statt zu raten, was dort liegt.
@@ -740,7 +766,13 @@ async function uploadNewTodo(client, collection, module, row, accountId) {
     // Die UID wird im Objekt GELESEN, nicht aus dem Dateinamen geschlossen;
     // liegt dort etwas anderes, bleibt es unangetastet und die Zeile lokal.
     // Gemerkt wird die eigene, berechnete Adresse, nicht eine vom Server genannte.
-    if (!(await findObjectWithUid(client, collection.url, objectUrl, uid))) throw err;
+    const found = await inspectObjectAt(client, collection.url, objectUrl, uid);
+    if (!found.own) {
+      // Dort liegt nachweislich ein fremdes Objekt, also nicht unseres: die
+      // Notiz fällt, sonst gälte ihm später ein Löschauftrag.
+      if (found.foreign) settleUploadAttempt(place);
+      throw err;
+    }
     adopted = true;
     log.info(`${def.table} row ${row.id} is already on the server as ${uid}, adopting it.`);
   }
@@ -797,16 +829,26 @@ function waitsForUploadHere(module, now, accountId, collectionUrl) {
  * Synchron: zwischen dem Nachladen und dem Schreiben liegt kein await, und
  * jeder Ausgang ist EIN Schreibvorgang.
  *
+ * Mit jeder Buchung fällt die Notiz des Uploads (#1882). Bei `unchanged`
+ * bleibt sie stehen - über das Objekt wurde nichts entschieden, das tut
+ * `releaseLeftoverTodoUploads` am Stand der Zeile.
+ *
  * @returns {'mirrored'|'deleted'|'released'|'unchanged'}
  */
 function bookTodoUpload(module, sent, { uid, objectUrl, accountId, collectionUrl, adopted = false }) {
   const def = moduleDef(module);
-  const queueRemoval = () => db.get().prepare(`
-    INSERT INTO caldav_todo_pending_deletions (account_id, module, uid, object_url)
-    VALUES (?, ?, ?, ?)
-    ON CONFLICT(account_id, module, uid)
-      DO UPDATE SET object_url = COALESCE(excluded.object_url, object_url)
-  `).run(accountId, module, uid, objectUrl);
+  const booked = () => settleUploadAttempt({
+    source: 'caldav', accountId, kind: uidKind(module), rowId: sent.id, collectionUrl,
+  });
+  const queueRemoval = () => {
+    db.get().prepare(`
+      INSERT INTO caldav_todo_pending_deletions (account_id, module, uid, object_url)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(account_id, module, uid)
+        DO UPDATE SET object_url = COALESCE(excluded.object_url, object_url)
+    `).run(accountId, module, uid, objectUrl);
+    booked();
+  };
 
   const now = reloadRow(module, sent.id);
   if (!now) {
@@ -836,7 +878,135 @@ function bookTodoUpload(module, sent, { uid, objectUrl, accountId, collectionUrl
   `).run(uid, accountId, objectUrl, adopted || edited ? 1 : 0, sent.id).changes > 0;
   if (!mirrored) return 'unchanged';
   keepOwnUpload(module, uid, objectUrl);
+  booked();
   return 'mirrored';
+}
+
+// --------------------------------------------------------
+// Der Upload, dessen Antwort nie ankam (#1882)
+// --------------------------------------------------------
+
+/**
+ * Gehört diese lokale Zeile weiter an diesen Platz? Eine Aufgabe trägt ihr
+ * Ziel selbst. Ein Einkaufsartikel erbt es von der Zuordnung seiner
+ * Yuvomi-Liste - hier auch von einer gerade ABGESCHALTETEN: abschalten heisst
+ * "nicht mehr abgleichen", nicht "auf dem Server aufräumen", und wird sie
+ * wieder eingeschaltet, übernimmt der Lauf das Objekt.
+ */
+function belongsAt(module, row, accountId, collectionUrl) {
+  if (module !== 'shopping') return waitsForUploadHere(module, row, accountId, collectionUrl);
+  return db.get().prepare(`
+    SELECT list_url FROM caldav_reminder_selection
+     WHERE account_id = ? AND target_module = 'shopping' AND target_list_id = ?
+  `).all(accountId, row.list_id).some((sel) => sameCollection(sel.list_url, collectionUrl));
+}
+
+/**
+ * Wie steht die Zeile JETZT zu dem Objekt, das ein nie gebuchter Upload an
+ * diesem Platz hinterlassen haben kann? Dieselben drei Antworten wie bei den
+ * Terminen (`uploadAttemptState` in calendar-outbound.js):
+ *
+ *   waiting  - lokal, und sie gehört weiter genau dorthin;
+ *   mirrored - Spiegel an genau diesem Platz: das Objekt ist ihres;
+ *   leftover - gelöscht, anderes oder kein Ziel, woanders Spiegel.
+ *
+ * @param {object} [row]  die Zeile, wenn der Aufrufer sie gerade gelesen hat
+ */
+function todoAttemptState(module, attempt, row = undefined) {
+  const def = moduleDef(module);
+  const now = row === undefined
+    ? db.get().prepare(`SELECT * FROM ${def.table} WHERE id = ?`).get(attempt.row_id)
+    : row;
+  if (!now) return 'leftover';
+  if (now.external_source === 'local') {
+    return belongsAt(module, now, attempt.account_id, attempt.collection_url) ? 'waiting' : 'leftover';
+  }
+  if (now.external_source === 'caldav' && now.external_uid === attempt.uid
+      && sameCollection(collectionUrlOf(now.external_object_url) || '', attempt.collection_url)) {
+    return 'mirrored';
+  }
+  return 'leftover';
+}
+
+/**
+ * Für den Abruf: ist das Objekt mit dieser UID in dieser Liste der Rest eines
+ * eigenen Uploads, dessen Antwort nie ankam, und dessen Zeile dort nicht mehr
+ * hingehört? Dann wird es weder importiert noch einer Zeile zugeordnet;
+ * `releaseLeftoverTodoUploads` merkt sein Löschen vor.
+ *
+ * Der Beleg ist die lokale Notiz, nicht die UID. Frisch je Objekt gefragt: die
+ * Zeile kann fallen, während der Lauf noch den Server liest.
+ */
+export function isLeftoverOwnUpload(module, uid, accountId, listUrl) {
+  const kind = uidKind(module);
+  // Billig zuerst: das Muster der UID, ohne Datenbank.
+  const parsed = parseOwnUid(uid);
+  if (!parsed || parsed.kind !== kind || parsed.installation === null) return false;
+  let attempt;
+  try {
+    attempt = uploadAttemptAt({ source: 'caldav', accountId, kind, uid, collectionUrl: listUrl });
+  } catch (err) {
+    log.warn(`Upload notes are not readable (${err.message}); treating them as none.`);
+    return false;
+  }
+  return !!attempt && todoAttemptState(module, attempt) === 'leftover';
+}
+
+/**
+ * Räumt die Reste von Uploads ab, deren Antwort nie ankam (#1882): für jede
+ * stehen gebliebene Notiz des Kontos wird am Stand der Zeile entschieden
+ * (`todoAttemptState`). Ein Rest wird zum Löschen vorgemerkt, wie
+ * `bookTodoUpload` es getan hätte, wäre die Antwort angekommen. Ob dort
+ * überhaupt etwas liegt, ist offen; ein 404 erledigt den Auftrag.
+ *
+ * Zu Beginn jedes Durchgangs (Lauf und Sofortversuch), vor allem anderen: der
+ * Abruf verdeckt den Rest dann schon, und die Uploads desselben Durchgangs
+ * sehen den Auftrag (`withoutOwnRemoval`). Das DELETE geht nach dem Abruf des
+ * Objekts hinaus, mit dessen ETag. Und die Regel hängt so an keiner
+ * Löschroute: gleich auf welchem Weg die Zeile fiel, der nächste Durchgang
+ * findet die Notiz.
+ *
+ * Ein Auftrag nennt Konto, Modul und UID, aber nur EINE Adresse. Wartet für
+ * dieselbe UID schon einer mit der Adresse einer ANDEREN Liste, bleibt die
+ * Notiz stehen, bis der erledigt ist - sie verdeckt ihren Rest solange selbst
+ * (`isLeftoverOwnUpload`).
+ *
+ * Synchron: je Notiz Lesen, Entscheiden und Schreiben ohne await dazwischen.
+ * Die Notiz fällt erst, wenn der Auftrag steht.
+ *
+ * @returns {number} vorgemerkte Löschungen
+ */
+export function releaseLeftoverTodoUploads(accountId) {
+  let attempts;
+  try {
+    attempts = uploadAttemptsOf({ source: 'caldav', accountId, kinds: ['task', 'item'] });
+  } catch (err) {
+    log.warn(`Upload notes are not readable (${err.message}); nothing was released.`);
+    return 0;
+  }
+  let released = 0;
+  for (const attempt of attempts) {
+    const module = attempt.kind === 'item' ? 'shopping' : 'tasks';
+    const state = todoAttemptState(module, attempt);
+    if (state === 'waiting') continue;
+    if (state === 'leftover') {
+      const waiting = db.get().prepare(
+        'SELECT object_url FROM caldav_todo_pending_deletions WHERE account_id = ? AND module = ? AND uid = ?'
+      ).get(accountId, module, attempt.uid);
+      if (waiting?.object_url
+          && !sameCollection(collectionUrlOf(waiting.object_url) || '', attempt.collection_url)) continue;
+      db.get().prepare(`
+        INSERT INTO caldav_todo_pending_deletions (account_id, module, uid, object_url)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(account_id, module, uid)
+          DO UPDATE SET object_url = COALESCE(object_url, excluded.object_url)
+      `).run(accountId, module, attempt.uid, attempt.object_url);
+      released++;
+      log.info(`The upload of ${moduleDef(module).table} row ${attempt.row_id} to ${attempt.collection_url} was never confirmed and the row no longer belongs there, queued the deletion of ${attempt.uid}.`);
+    }
+    dropUploadAttempt(attempt.id);
+  }
+  return released;
 }
 
 /**
@@ -1259,6 +1429,11 @@ export async function flushOutbound(opts = {}) {
 
 async function runFlushOutbound({ createClient } = {}) {
   const total  = { deleted: 0, updated: 0, created: 0 };
+  // Reste nie bestätigter Uploads zuerst zum Löschen vormerken (#1882): sie
+  // zählen dann unten als offene Arbeit ihres Kontos.
+  for (const { id } of db.get().prepare('SELECT id FROM caldav_accounts ORDER BY id').all()) {
+    releaseLeftoverTodoUploads(id);
+  }
   const work   = accountsWithPendingWork();
   if (work.size === 0) return total;
 

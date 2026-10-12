@@ -348,6 +348,13 @@ async function runSync({ makeClient } = {}) {
 
   // Alle Kalender synchen (inklusive Geburtstags-Kalender)
   const syncCalendars = calendars;
+  // Wartet diese lokale Zeile auf ihren Upload in diesen Kalender (#1882)?
+  // Hinauf geht es nur in den ERSTEN Kalender, und nur für die Termine, die
+  // die Upload-Schleife unten selbst nähme.
+  const sameCalendar = (a, b) => String(a || '').replace(/\/+$/, '') === String(b || '').replace(/\/+$/, '');
+  const waitsForUploadIn = (row, calendarUrl) => !!syncCalendars[0]
+    && sameCalendar(calendarUrl, syncCalendars[0].url)
+    && collectLocalOutboundEvents(db.get(), row.id).length > 0;
 
   let totalObjects = 0;
 
@@ -420,6 +427,13 @@ async function runSync({ makeClient } = {}) {
           // Vom Nutzer gelöscht und noch nicht auf dem Server: nicht wieder
           // anlegen, sonst kehrt der Termin bei jedem Sync zurück (#593).
           if (pendingDeletionUids.has(ev.uid)) continue;
+
+          // Der Rest eines eigenen Uploads, dessen Antwort nie ankam und
+          // dessen Termin hier nicht mehr hingehört (#1882, wie im
+          // CalDAV-Sync): nicht importieren, sein Löschen wird unten vorgemerkt.
+          if (outbound.isLeftoverOwnUpload({
+            source: 'apple', uid: ev.uid, calendarUrl: cal.url, wantsUploadHere: waitsForUploadIn,
+          })) continue;
 
           const selExisting = db.get().prepare(
             `SELECT id, outbound_dirty, calendar_ref_id, start_datetime FROM calendar_events WHERE external_calendar_id = ? AND external_source = 'apple'`
@@ -533,6 +547,8 @@ async function runSync({ makeClient } = {}) {
   // Inbound überspringt dafür alles, was hier noch aussteht.
   // --------------------------------------------------------
   try {
+    // Erst die Reste nie bestätigter Uploads vormerken (#1882), dann löschen.
+    outbound.releaseLeftoverUploads({ source: 'apple', wantsUploadHere: waitsForUploadIn });
     const removed = await processPendingDeletions(client, 'apple', objectIndex, ownCalendarUrls);
     if (removed) log.info(`${removed} pending deletion(s) applied in iCloud.`);
     const pushed = await processPendingUpdates(client, 'apple', objectIndex, calendarsByUrl);
@@ -568,7 +584,9 @@ async function runSync({ makeClient } = {}) {
 
       // Ein 412 auf den eigenen Namen ist der eigene frühere Upload und wird
       // übernommen (uploadNewEvent).
-      const { objectUrl, adopted } = await outbound.uploadNewEvent(client, defaultCal, uid, icsData);
+      const { objectUrl, adopted } = await outbound.uploadNewEvent(client, defaultCal, uid, icsData, {
+        source: 'apple', eventId: event.id,
+      });
 
       const calRefId  = upsertExternalCalendar(
         'apple', defaultCal.url, defaultCal.displayName || 'Apple Calendar',

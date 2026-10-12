@@ -1509,6 +1509,58 @@ deletion of another account for the same object falls when the row becomes a mir
 loops read the row again when it is its turn, so a target changed before that is not uploaded to
 the old list.
 
+**An upload whose answer never arrived leaves a note (migration v241, #1882).** A PUT can reach
+the server while its answer is lost. The row then stays local although its object lies on the
+server. While the row keeps waiting for the same place, the next run adopts the object (`adoptOwnEventUpload`, `adoptOwnUpload`).
+If it is deleted or gets another target first, nothing local used to say that something of it lies
+there: the fetch brought the deleted entry back as a new row, or put a second row next to the
+existing one. Every upload is therefore noted in `caldav_upload_attempts` synchronously before the
+request is sent (`uploadNewEvent`, `uploadNewTodo`) and the note is removed when the result is
+booked (`bookEventUpload`, `bookTodoUpload`, or the fetch adopting the object). A note that is
+still there means the answer never came.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT |
+| source | TEXT | NOT NULL - `caldav` or `apple` |
+| account_id | INTEGER | FK → CalDAV Accounts (ON DELETE CASCADE), NULL for iCloud |
+| kind | TEXT | NOT NULL - `event`, `task` or `item` |
+| row_id | INTEGER | NOT NULL - id in `calendar_events`, `tasks` or `shopping_items`; no foreign key, the note outlives its row |
+| collection_url | TEXT | NOT NULL - the calendar or list the upload went to |
+| uid | TEXT | NOT NULL - the UID the object was sent under |
+| object_url | TEXT | NOT NULL - the address the object was sent to |
+| created_at | TEXT | ISO 8601, NOT NULL |
+
+Constraints: UNIQUE(source, COALESCE(account_id, 0), kind, row_id, collection_url) ·
+Index: idx_caldav_upload_attempts_uid ON caldav_upload_attempts(uid)
+
+A note is never removed because an upload failed: a refusal speaks about that one attempt, and the
+object of an earlier attempt can still lie there. The one exception is a `412` whose address
+verifiably holds an object with a foreign UID (`inspectObjectAt`): then ours is not there.
+
+Each run decides per note from the row as it is now (`uploadAttemptState`, `todoAttemptState`):
+*waiting* - the row is local and still belongs to that place, the note stays; *mirrored* - the row
+is a mirror at exactly that place (another account on the same calendar took the object over), the
+note is dropped; *leftover* - the row is gone, has another or no target, or is a mirror elsewhere.
+A leftover is queued as an ordinary unconditional pending deletion and the note is dropped once
+that deletion is queued (`releaseLeftoverUploads`, `releaseLeftoverTodoUploads`). The fetch asks
+the same question per object, freshly, and neither imports a leftover nor matches it to a row
+(`isLeftoverOwnUpload`), because the row can be deleted while the run is still reading the server.
+For events this runs in the full sync run after the fetch and before the pending deletions, never
+in the immediate attempt and never from a delete route: the DELETE goes to the object this run saw
+under the own UID, with its ETag as `If-Match`, and the rule does not depend on which code path
+removed the row. For tasks and shopping items it runs at the start of every pass (run and
+immediate attempt, which fetches the object before deleting it); a task or item whose leftover in
+the same account is not removed yet is held back from its next upload (`withoutOwnRemoval`), and a
+second leftover of the same UID in another list waits until the first deletion is done, because
+that tombstone carries one address.
+
+The deletion is unconditional on purpose, like the user delete (#1883): the entry was deleted in
+Yuvomi or no longer belongs there, in whatever state another app has left it. The note, not the
+UID, is the evidence: a UID comes from the server and proves nothing, and after restoring an older
+backup it can name a row that does not exist any more. An object with an own UID but no note is an
+entry like any other and is imported.
+
 The counterpart for *edits* lives on the event row itself (migration v104): `outbound_dirty` (0/1)
 marks a mirrored event whose local change still has to reach the provider, and `outbound_attempts`
 counts failed pushes under the same five-attempt limit. Deliberately **not** `user_modified` — that
