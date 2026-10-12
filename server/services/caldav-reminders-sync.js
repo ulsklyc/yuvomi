@@ -723,7 +723,7 @@ async function runSync({ createClient: makeClient } = {}) {
       // der sie nicht importiert hat, und vor den Uploads: eine Zeile mit
       // neuem Ziel in diesem Konto geht so nicht neben ihren Rest.
       try {
-        const cleared = await todoOutbound.releaseLeftoverTodoUploads(client, account.id);
+        const cleared = await todoOutbound.releaseLeftoverTodoUploads(client, account.id, { clientFor });
         if (cleared) log.info(`${cleared} leftover(s) of unconfirmed uploads removed from the server.`);
       } catch (err) {
         log.error(`Removing leftovers of unconfirmed uploads failed for account ${account.id}:`, err.message);

@@ -229,10 +229,15 @@ function attemptById(id) {
  *        Notiz auch NACH der Frist stehen bleibt, solange der Server das
  *        Entfernen ablehnt: die Zeile ist anderswo Spiegel DERSELBEN UID, und
  *        ohne die Notiz läse der Abruf zwei Objekte für eine Zeile
+ * @param {(attempt: object) => Promise<boolean>} [p.beforeRemove]  letzte
+ *        Frage vor dem DELETE eines Rests, an dessen Adresse das Objekt mit
+ *        der UID des Uploads liegt: `false` lässt Objekt und Notiz stehen (der
+ *        Aufrufer hat selbst entschieden, was mit der Notiz geschieht). Wirft
+ *        sie, wird nichts entfernt und die Notiz bleibt.
  * @param {string} p.label  für das Log
  * @returns {Promise<number>} entfernte Objekte
  */
-export async function removeLeftoverUploads(client, { source, accountId = null, kinds, stateOf, inScope = null, keepWhileRefused = null, label }) {
+export async function removeLeftoverUploads(client, { source, accountId = null, kinds, stateOf, inScope = null, keepWhileRefused = null, beforeRemove = null, label }) {
   let attempts;
   try {
     attempts = uploadAttemptsOf({ source, accountId, kinds });
@@ -270,6 +275,19 @@ export async function removeLeftoverUploads(client, { source, accountId = null, 
     if (!found.own) {
       if (isExpired(attempt, Date.now())) dropUploadAttempt(attempt.id);
       continue;
+    }
+
+    if (beforeRemove) {
+      let allowed;
+      try {
+        allowed = await beforeRemove(attempt);
+      } catch (err) {
+        log.warn(`[${label}] Could not confirm that ${attempt.uid} may be removed at ${attempt.object_url} (${err.message}); nothing is removed there.`);
+        continue;
+      }
+      // Nach dem await: Notiz und Zeile von jetzt.
+      const still = attemptById(attempt.id);
+      if (!allowed || !still || stateOf(still) !== 'leftover') continue;
     }
 
     try {

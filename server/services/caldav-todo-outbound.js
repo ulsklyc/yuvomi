@@ -1144,11 +1144,21 @@ export function isUnbookedOwnUpload(module, uid, listUrl) {
  * bleibt damit aber unberührt; wird sie wieder eingeschaltet, wartet er
  * wieder, und der Lauf übernimmt das Objekt.
  *
+ * DER REST EINER MITNAHME FÄLLT NUR, WENN DIE KOPIE BELEGT IST (#1700). Nach
+ * einem Umzug steht für den alten Platz eine Notiz, und die Zeile zeigt auf
+ * den neuen. Hat eine andere App die Kopie dort inzwischen gelöscht, wäre das
+ * Objekt am alten Platz das letzte - es zu entfernen, nur weil die Zeile
+ * woanders hinzeigt, nähme den Eintrag ganz fort, und der Prune danach die
+ * Zeile. Vor dem DELETE wird deshalb der Platz GELESEN, auf den die Zeile
+ * zeigt (`confirmCarriedCopy`); aus der Zeile geschlossen wird nichts.
+ *
  * @param {object} client
  * @param {number} accountId
+ * @param {{clientFor?: (accountId: number) => Promise<object|null>}} [opts]
+ *        Client eines anderen Kontos - die Kopie kann dort liegen
  * @returns {Promise<number>} entfernte Objekte
  */
-export function releaseLeftoverTodoUploads(client, accountId) {
+export function releaseLeftoverTodoUploads(client, accountId, { clientFor = null } = {}) {
   // Nur in Listen, die für dieses Konto eingeschaltet sind.
   const enabled = db.get().prepare(
     'SELECT list_url FROM caldav_reminder_selection WHERE account_id = ? AND enabled = 1'
@@ -1157,6 +1167,7 @@ export function releaseLeftoverTodoUploads(client, accountId) {
     source: 'caldav', accountId, kinds: ['task', 'item'],
     stateOf: (attempt) => todoAttemptState(attempt.kind === 'item' ? 'shopping' : 'tasks', attempt),
     inScope: (url) => enabled.some((known) => sameCollection(known, url)),
+    beforeRemove: (attempt) => confirmCarriedCopy(attempt, client, accountId, clientFor),
     // Die Zeile ist anderswo Spiegel DERSELBEN UID (nach einer Mitnahme, #1700,
     // oder einem Upload, der seinem Ziel gefolgt ist): der Rest liegt dann
     // unter einer UID, die der Abruf dieser Zeile zuordnet. Fiele die Notiz
@@ -1173,6 +1184,60 @@ export function releaseLeftoverTodoUploads(client, accountId) {
     },
     label: 'CalDAV-Todo',
   });
+}
+
+/**
+ * Darf der Rest an der Adresse dieser Notiz entfernt werden? Gefragt für einen
+ * Einkaufsartikel, der anderswo Spiegel DERSELBEN UID ist - der alte Platz
+ * nach einer Mitnahme (#1700). Für alles andere gilt die Regel der Notizen
+ * unverändert (`true`): die Zeile ist gelöscht oder lokal, der Rest ist ein
+ * nie gebuchter Upload.
+ *
+ *   - Am Platz der Zeile liegt das Objekt mit ihrer UID (gerade gelesen):
+ *     der Rest darf fort.
+ *   - Dort liegt es NICHT: das Objekt an der Adresse der Notiz ist das, was
+ *     der Server von diesem Eintrag noch führt. Es bleibt, die Zeile zeigt
+ *     wieder darauf (Konto und Adresse der Notiz), die Notiz fällt, und der
+ *     nächste Abruf stellt die Zeile auf die Liste dieser Server-Liste. Der
+ *     Eintrag bleibt, wo der Server ihn führt.
+ *   - Der Platz der Zeile ist nicht lesbar (Fehler, kein Client für das
+ *     andere Konto): nichts wird entfernt, nichts umgeschrieben. Ein Fehler
+ *     geht hoch; es gibt keinen Ersatzwert, der "liegt dort" behauptet.
+ *
+ * Nach dem Lesen wird die Zeile neu gelesen und in einem synchronen Schritt
+ * geschrieben.
+ */
+async function confirmCarriedCopy(attempt, client, accountId, clientFor) {
+  if (attempt.kind !== 'item') return true;
+  const mirrorElsewhere = (row) => !!row && row.external_source === 'caldav'
+    && row.external_uid === attempt.uid && !!row.external_object_url && !!row.external_account_id;
+  const row = reloadRow('shopping', attempt.row_id);
+  if (!mirrorElsewhere(row)) return true;
+
+  const place = collectionUrlOf(row.external_object_url);
+  const other = row.external_account_id === accountId
+    ? client
+    : (clientFor ? await clientFor(row.external_account_id) : null);
+  if (!place || !other) return false;
+  const copy = await inspectObjectAt(other, place, row.external_object_url, row.external_uid);
+  if (copy.own) return true;
+
+  return db.get().transaction(() => {
+    const now = reloadRow('shopping', attempt.row_id);
+    if (!mirrorElsewhere(now) || now.external_object_url !== row.external_object_url
+        || now.external_account_id !== row.external_account_id) return false;
+    db.get().prepare(
+      'UPDATE shopping_items SET external_account_id = ?, external_object_url = ? WHERE id = ?'
+    ).run(attempt.account_id, attempt.object_url, now.id);
+    settleUploadAttempt({
+      source: 'caldav', accountId: attempt.account_id, kind: 'item', rowId: now.id, collectionUrl: attempt.collection_url,
+    });
+    log.warn(
+      `Shopping item ${now.id} was carried to ${place}, but its entry is no longer there; `
+      + `the one at ${attempt.object_url} is kept and the item follows it.`
+    );
+    return false;
+  })();
 }
 
 /**
@@ -2136,7 +2201,7 @@ async function runFlushOutbound({ createClient } = {}) {
 
       // Vor allem anderen: die Reste nie bestätigter Uploads entfernen
       // (#1882), damit eine Zeile mit neuem Ziel nicht neben ihren Rest geht.
-      await releaseLeftoverTodoUploads(client, accountId);
+      await releaseLeftoverTodoUploads(client, accountId, { clientFor });
 
       for (const module of modules) {
         const wanted = [

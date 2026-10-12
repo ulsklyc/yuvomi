@@ -652,6 +652,67 @@ test('Der Server lehnt das Entfernen am alten Platz laenger ab als die Frist der
   assert.deepEqual(notes(), []);
 });
 
+/** Entfernt ein Objekt, als haette es eine andere App geloescht. */
+async function deletedByAnotherApp(server, collectionUrl, name) {
+  const res = await fetch(`${collectionUrl}${name}`, { method: 'DELETE' });
+  assert.equal(res.status, 204);
+}
+
+test('Das Entfernen am alten Platz steht aus, und eine andere App loescht die Kopie am NEUEN Platz: das letzte Objekt bleibt, die Zeile auch', async () => {
+  const { a, b, item } = await mirroredItem();
+  dav.refuse({ method: 'DELETE', status: 503 });
+  await patch(item.id, { list_id: b.listId });
+  assert.equal(objectsWith(dav, a.url).length, 1);
+  assert.equal(notes().length, 1);
+  dav.allowAll();
+  await deletedByAnotherApp(dav, b.url, FILE);
+
+  await remindersSync.sync();
+  await remindersSync.sync();
+
+  assert.equal(objectsWith(dav, a.url)[0]?.data, original(), 'am alten Platz liegt das einzige verbliebene Objekt - es wurde nicht entfernt');
+  const rows = rowsOf();
+  assert.equal(rows.length, 1, 'die Zeile ist nicht abgeraeumt');
+  assert.deepEqual([rows[0].id, rows[0].list_id, rows[0].external_account_id, rows[0].external_object_url],
+    [item.id, a.listId, account1, `${a.url}${FILE}`], 'sie steht wieder, wo der Server den Eintrag fuehrt');
+  assert.deepEqual(loadItemTags(db, item.id).sort(), ['Bio', 'Kuehlregal']);
+  assert.deepEqual(notes(), []);
+});
+
+test('Dasselbe ueber zwei Konten: die Zeile geht an das Konto des alten Platzes zurueck', async () => {
+  const { a, b, item } = await mirroredItem({ target: { server: dav2 } });
+  dav.refuse({ method: 'DELETE', status: 503 });
+  await patch(item.id, { list_id: b.listId });
+  assert.equal(row(item.id).external_account_id, account2);
+  dav.allowAll();
+  await deletedByAnotherApp(dav2, b.url, FILE);
+
+  await remindersSync.sync();
+  await remindersSync.sync();
+
+  assert.equal(objectsWith(dav, a.url)[0]?.data, original());
+  assert.deepEqual(rowsOf().map((x) => [x.id, x.list_id, x.external_account_id]), [[item.id, a.listId, account1]]);
+});
+
+test('Der neue Platz ist nicht lesbar: am alten wird nichts entfernt, die Notiz bleibt', async () => {
+  const { a, b, item } = await mirroredItem();
+  dav.refuse({ method: 'DELETE', status: 503 });
+  await patch(item.id, { list_id: b.listId });
+  dav.allowAll();
+  dav.refuse({ method: 'REPORT', path: new URL(b.url).pathname, status: 503 });
+
+  await remindersSync.sync();
+
+  assert.equal(objectsWith(dav, a.url).length, 1, 'ohne Beleg vom neuen Platz bleibt das alte Objekt');
+  assert.equal(notes().length, 1);
+  assert.deepEqual([row(item.id).list_id, row(item.id).external_object_url], [b.listId, `${b.url}${FILE}`]);
+
+  dav.allowAll();
+  await remindersSync.sync();
+  assert.deepEqual(objectsWith(dav, a.url), [], 'liegt die Kopie belegt am neuen Platz, geht der Rest');
+  assertCarried(dav, b.url);
+});
+
 test('Am alten Platz liegt inzwischen ein FREMDES Objekt: es wird nicht entfernt', async () => {
   const { a, b, item } = await mirroredItem();
   dav.refuse({ method: 'DELETE', status: 503 });
