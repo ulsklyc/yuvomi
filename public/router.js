@@ -2529,6 +2529,11 @@ let _openSearch = null;
 
 function initKeyboardShortcuts() {
   document.addEventListener('keydown', (e) => {
+    // Passwort-Autofill (Edge/Chrome) schickt ein keydown ohne `key` - etwa
+    // auf Einstellungen > Kalender mit seinen zwei Passwortfeldern. Ohne
+    // Taste gibt es kein Kuerzel; `e.key.toLowerCase()` warf sonst einen
+    // TypeError, der als „Unerwarteter Fehler" aufschlug.
+    if (typeof e.key !== 'string') return;
     // ⌘K / Ctrl+K: das Kuerzel, das die Suche in der Seitenleiste nennt. Es
     // gilt auch aus einem Eingabefeld heraus (so kennt man es aus jeder App
     // mit Befehlssuche), aber nicht ueber einem offenen Dialog, und nie mit

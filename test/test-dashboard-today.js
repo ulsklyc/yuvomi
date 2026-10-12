@@ -17,6 +17,9 @@
  *        4. „Heute bis HH:MM" (#1534): die Faelligkeit einer Aufgabe wurde
  *           in der Zone des Geraets gelesen und dann in die des Haushalts
  *           umgerechnet - hier mit Prozesszone != Haushaltszone.
+ *        5. Die Terminzeile nennt ihren Kalender statt „Termin" (#1698), im
+ *           Heute-Blatt wie an der Wand; Beginn UND Ende zeigt nur die Wand,
+ *           und nur mit echtem Ende unter einem Tag auf der Wanduhr.
  *
  * Ausfuehren: npm run test:dashboard-today
  */
@@ -466,6 +469,188 @@ test('#1449 Browser: endet ein Termin der Familienkarte, baut der Minutentakt ne
 }));
 
 // --------------------------------------------------------------------------
+// Die Wand: jede zugewiesene Person, und das gewaehlte Icon (#1828, #1829)
+// --------------------------------------------------------------------------
+//
+// Beide Fehler sassen im Browser, nicht im Server: die Antwort trug alle
+// Zugewiesenen und das Icon schon. Deshalb laeuft hier die ECHTE Antwort der
+// Route durch den Renderer der Wand - ein von Hand gebautes Objekt haette nur
+// belegt, dass der Renderer liest, was der Test ihm hinlegt.
+
+const { moduleIconHTML } = await import('/nav-icons.js');
+const wallTask = (title, extra = {}) => ({ id: 1, title, due_date: '2026-09-24', due_time: '18:00', status: 'open', assigned_users: [], ...extra });
+
+function onTheWall(iso, zone, fn) {
+  return async () => {
+    db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('household_timezone', ?)").run(zone);
+    mock.timers.enable({ apis: ['Date'], now: new Date(iso) });
+    tz.setDisplayTimeZone(zone);
+    const prevWindow = global.window;
+    global.window = { yuvomi: { isModuleDisabled: () => false } };
+    setPermissions({ admin: true, modules: {}, widgets: {}, capabilities: {} });
+    try {
+      await fn();
+    } finally {
+      clearPermissions();
+      global.window = prevWindow;
+      tz.setDisplayTimeZone(null);
+      mock.timers.reset();
+    }
+  };
+}
+
+const setIcon = db.prepare('UPDATE calendar_events SET icon = ? WHERE id = ?');
+
+/** „Wer heute dran ist" als { Vorname: Zahl }. */
+function wallCounts(html) {
+  return Object.fromEntries(
+    [...html.matchAll(/<li class="wall-who__member">[\s\S]*?<span aria-hidden="true">(\d+)<\/span>[\s\S]*?wall-who__name">([^<]*)<\/span>/g)]
+      .map(([, count, name]) => [name, Number(count)]),
+  );
+}
+
+/** Das Siegel jeder Programmzeile der Wand als { Titel: Markup }. */
+function wallSeals(html) {
+  return Object.fromEntries(
+    [...html.matchAll(/<span class="module-seal wall-row__seal">([\s\S]*?)<\/span>\s*<span class="wall-row__body">\s*<span class="wall-row__title">([^<]*)<\/span>/g)]
+      .map(([, seal, title]) => [title, seal.trim()]),
+  );
+}
+
+test('#1828 Wand: ein Termin fuer zwei zaehlt bei BEIDEN, nicht nur bei der ersten Person',
+  onTheWall(THU_14_BERLIN, 'Europe/Berlin', async () => {
+    clearEvents();
+    addAssigned('Elternabend', '2026-09-24T19:00', '2026-09-24T20:00', [ADMIN, LEO]);
+    addAssigned('Training', '2026-09-24T17:00', '2026-09-24T18:00', [LEO]);
+    const body = await getJson('/');
+    const shared = body.upcomingEvents.find((event) => event.title === 'Elternabend');
+    assert.deepEqual(shared.assigned_users.map((user) => user.display_name).sort(), ['Anna', 'Leo'],
+      'Vorbedingung: die Antwort traegt beide Zugewiesenen');
+
+    const html = dash.renderWallSurface(body, null, { now: new Date() });
+    assert.deepEqual(wallCounts(html), { Leo: 2, Anna: 1 },
+      'der gemeinsame Termin zaehlt bei Anna UND bei Leo; Leo hat dazu sein Training');
+  }));
+
+test('#1828 Wand: wer nur durch den gemeinsamen Termin dran ist, steht trotzdem in der Reihe',
+  onTheWall(THU_14_BERLIN, 'Europe/Berlin', async () => {
+    clearEvents();
+    // Die Reihenfolge der Zuweisung darf nichts entscheiden: einmal Leo
+    // zuerst, einmal Anna zuerst - beide Male stehen beide da.
+    addAssigned('Zahnarzt', '2026-09-24T16:00', '2026-09-24T17:00', [LEO, ADMIN]);
+    assert.deepEqual(wallCounts(dash.renderWallSurface(await getJson('/'), null, { now: new Date() })), { Anna: 1, Leo: 1 });
+    clearEvents();
+    addAssigned('Zahnarzt', '2026-09-24T16:00', '2026-09-24T17:00', [ADMIN, LEO]);
+    assert.deepEqual(wallCounts(dash.renderWallSurface(await getJson('/'), null, { now: new Date() })), { Anna: 1, Leo: 1 });
+  }));
+
+test('#1829 Wand: der Termin zeigt sein gewaehltes Icon, das Kalenderzeichen nur ohne Wahl',
+  onTheWall(THU_14_BERLIN, 'Europe/Berlin', async () => {
+    clearEvents();
+    setIcon.run('car', addEvent('Werkstatt', '2026-09-24T15:00', '2026-09-24T16:00'));
+    setIcon.run('tooth', addEvent('Zahnarzt', '2026-09-24T16:00', '2026-09-24T17:00'));
+    setIcon.run('drill', addEvent('Kontrolle', '2026-09-24T17:00', '2026-09-24T18:00'));
+    setIcon.run('gibt-es-nicht', addEvent('Unbekannt', '2026-09-24T18:00', '2026-09-24T19:00'));
+    const body = await getJson('/');
+    const icons = Object.fromEntries(body.upcomingEvents.map((event) => [event.title, event.icon]));
+    assert.deepEqual(icons, { Werkstatt: 'car', Zahnarzt: 'tooth', Kontrolle: 'drill', Unbekannt: 'gibt-es-nicht' },
+      'Vorbedingung: die Antwort traegt das Icon jedes Termins');
+    // Vier Zeilen: genau der Deckel der Wand. Der Termin ohne Wahl kommt danach allein.
+    const seals = wallSeals(dash.renderWallSurface(body, null, { now: new Date() }));
+    clearEvents();
+    addEvent('Ohne Wahl', '2026-09-24T19:00', '2026-09-24T20:00');
+    const plain = await getJson('/');
+    assert.equal(plain.upcomingEvents[0].icon, 'calendar', 'Vorbedingung: ohne Wahl traegt die Spalte ihren Default');
+    seals['Ohne Wahl'] = wallSeals(dash.renderWallSurface(plain, null, { now: new Date() }))['Ohne Wahl'];
+    const generic = moduleIconHTML('calendar');
+
+    assert.match(seals.Werkstatt, /data-lucide="car"/, 'ein Lucide-Icon steht als Platzhalter fuer createIcons da');
+    assert.match(seals.Werkstatt, /class="module-glyph"/, 'mit der Marke, an der Groesse und Strichstaerke des Siegels haengen');
+    assert.match(seals.Zahnarzt, /<svg class="module-glyph event-icon--custom"/, 'ein eigenes Zeichen (Zahn) wird gezeichnet wie im Kalender');
+    assert.equal(seals.Kontrolle, seals.Zahnarzt, 'der alte Name `drill` ist derselbe Zahn - derselbe Alias wie im Kalender');
+    assert.equal(seals['Ohne Wahl'], generic, 'ohne Wahl bleibt das Kalenderzeichen');
+    assert.equal(seals.Unbekannt, generic, 'ein unbekannter Name faellt auf das Kalenderzeichen zurueck, statt ein leeres Siegel zu lassen');
+    assert.notEqual(seals.Werkstatt, generic);
+  }));
+
+test('#1829 Wand: Aufgabe und Mahlzeit behalten ihr Modulzeichen', onTheWall(THU_14_BERLIN, 'Europe/Berlin', () => {
+  // Eine Aufgabe, die zufaellig ein Feld `icon` truege, bekaeme kein Terminzeichen.
+  const html = dash.renderWallSurface({ urgentTasks: [wallTask('Muell', { icon: 'car' })], users: [] }, null, { now: new Date() });
+  assert.equal(wallSeals(html).Muell, moduleIconHTML('check-square'));
+}));
+
+/** Das Siegel jeder Zeile von „Heute wichtig" als { Titel: Markup }. */
+function todaySeals(html) {
+  return Object.fromEntries(
+    [...html.matchAll(/<span class="module-seal today-cockpit-card__icon">([\s\S]*?)<\/span>(?:<span class="seal-pair__who[\s\S]*?)?<\/span>\s*<span class="today-cockpit-card__body">\s*<strong class="today-cockpit-card__value">([^<]*)<\/strong>/g)]
+      .map(([, seal, title]) => [title, seal.trim()]),
+  );
+}
+
+// „Heute wichtig" ist dieselbe Mischstelle wie die Wand und liest dieselben
+// Zeilen: ein Termin, der dort sein Icon zeigt und hier das Kalenderzeichen,
+// ist derselbe Fehler auf der zweiten Flaeche.
+test('#1829 Heute wichtig: der Termin zeigt sein gewaehltes Icon wie an der Wand',
+  onTheWall(THU_14_BERLIN, 'Europe/Berlin', async () => {
+    clearEvents();
+    setIcon.run('car', addEvent('Werkstatt', '2026-09-24T15:00', '2026-09-24T16:00'));
+    setIcon.run('tooth', addEvent('Zahnarzt', '2026-09-24T16:00', '2026-09-24T17:00'));
+    setIcon.run('drill', addEvent('Kontrolle', '2026-09-24T17:00', '2026-09-24T18:00'));
+    setIcon.run('gibt-es-nicht', addEvent('Unbekannt', '2026-09-24T18:00', '2026-09-24T19:00'));
+    addEvent('Ohne Wahl', '2026-09-24T19:00', '2026-09-24T20:00');
+    const body = await getJson('/');
+    const sheet = todaySeals(dash.renderTodayCockpit(body, [], false, { now: new Date() }));
+    const wall = wallSeals(dash.renderWallSurface(body, null, { now: new Date() }));
+    const generic = moduleIconHTML('calendar');
+
+    assert.deepEqual(Object.keys(sheet).sort(), ['Kontrolle', 'Ohne Wahl', 'Unbekannt', 'Werkstatt', 'Zahnarzt'],
+      'Vorbedingung: alle fuenf Termine stehen als Zeile im Blatt');
+    assert.match(sheet.Werkstatt, /data-lucide="car"/, 'das gewaehlte Lucide-Icon steht im Siegel');
+    assert.match(sheet.Werkstatt, /class="module-glyph"/, 'mit der Marke, an der Groesse und Strichstaerke des Siegels haengen');
+    assert.match(sheet.Zahnarzt, /<svg class="module-glyph event-icon--custom"/, 'ein eigenes Zeichen (Zahn) wird gezeichnet wie im Kalender');
+    assert.equal(sheet.Kontrolle, sheet.Zahnarzt, 'der alte Name `drill` ist derselbe Zahn');
+    assert.equal(sheet['Ohne Wahl'], generic, 'ohne Wahl bleibt das Kalenderzeichen');
+    assert.equal(sheet.Unbekannt, generic, 'ein unbekannter Name faellt auf das Kalenderzeichen zurueck');
+    for (const title of ['Werkstatt', 'Zahnarzt', 'Kontrolle', 'Unbekannt']) {
+      assert.equal(sheet[title], wall[title], `${title}: Blatt und Wand zeigen dasselbe Zeichen`);
+    }
+  }));
+
+test('#1829 Heute wichtig: Aufgabe und Sammelzeile behalten das Modulzeichen',
+  onTheWall(THU_14_BERLIN, 'Europe/Berlin', () => {
+    // Eine Aufgabe, die zufaellig ein Feld `icon` truege, bekaeme kein Terminzeichen.
+    const single = dash.renderTodayCockpit({ urgentTasks: [wallTask('Muell', { icon: 'car' })], users: [] }, [], false, { now: new Date() });
+    assert.equal(todaySeals(single).Muell, moduleIconHTML('check-square'));
+    // Die Sammelzeile der Ueberfaelligen spricht fuer mehrere Aufgaben, nicht fuer ein Objekt.
+    const overdue = [1, 2, 3].map((id) => wallTask(`Alt ${id}`, { id, due_date: '2026-09-20', icon: 'car' }));
+    global.window.matchMedia = (query) => ({ matches: /max-width:\s*639px/.test(query), media: query });
+    const grouped = dash.renderTodayCockpit({ urgentTasks: overdue, users: [] }, [], false, { now: new Date(), overdueOpen: false });
+    assert.match(grouped, /today-cockpit-card--overdue-group|data-today-overdue/, 'Vorbedingung: auf dem Telefon steht die Sammelzeile');
+    assert.doesNotMatch(grouped, /data-lucide="car"/);
+  }));
+
+test('#1828 Wand: auch eine Aufgabe fuer zwei zaehlt bei beiden', onTheWall(THU_14_BERLIN, 'Europe/Berlin', () => {
+  const anna = { id: 8, display_name: 'Anna', avatar_color: '#7C3AED' };
+  const leo = { id: 7, display_name: 'Leo', avatar_color: '#FF9500' };
+  // Seit #1817 zaehlt die Wand die Aufgaben einer Person aus `wallTasks`, nicht
+  // mehr aus den (gekappten) Programmzeilen: der Server liefert je zugewiesener
+  // Person einen Eintrag (test:wall-tasks, "mehrere Zugewiesene"). Die
+  // Programmzeile daneben darf die Aufgabe bei keinem der beiden ein zweites
+  // Mal zaehlen.
+  const task = wallTask('Zimmer aufraeumen', { assigned_users: [leo, anna] });
+  const entry = (user) => ({
+    user_id: user.id, open_count: 1, done_count: 0,
+    open: [{ id: task.id, title: task.title, due_date: task.due_date }], done: [],
+  });
+  const html = dash.renderWallSurface({
+    urgentTasks: [task],
+    wallTasks: [entry(leo), entry(anna)],
+    users: [anna, leo],
+  }, null, { now: new Date() });
+  assert.deepEqual(wallCounts(html), { Anna: 1, Leo: 1 });
+}));
+
+// --------------------------------------------------------------------------
 // 4. „Heute bis HH:MM" ist die Uhrzeit des Haushalts (#1534)
 // --------------------------------------------------------------------------
 // Die Faelligkeit einer Aufgabe ist zonenlose Wanduhrzeit. Das Heute-Blatt
@@ -518,4 +703,209 @@ test('#1534: Geraet und Haushalt in derselben Zone - unveraendert',
     const rows = taskRows(new Date());
     assert.deepEqual(rows.map((row) => [row.title, tz.zonedTimeKey(todayUntil(row)), row.sortKey]),
       [['Frueh', '06:15', '06:15'], ['Muell', '18:00', '18:00'], ['Spaet', '23:30', '23:30']]);
+  })));
+
+// --------------------------------------------------------------------------
+// 5. Die Wand nennt Kalender und Spanne eines Termins (#1698, D#988)
+// --------------------------------------------------------------------------
+
+function wallRowTime(row) {
+  const m = /<span class="wall-row__time[^"]*">([^<]*)(?:<span class="wall-row__time-end">([^<]*)<\/span>)?<\/span>/.exec(row);
+  return m ? `${m[1]}${m[2] ?? ''}` : null;
+}
+
+function wallRows(events, { tasks = [], tone = 'event' } = {}) {
+  const html = dash.renderWallSurface({ upcomingEvents: events, urgentTasks: tasks, users: [] }, null, { now: new Date() });
+  return [...html.matchAll(new RegExp(`<li class="wall-row wall-row--${tone}">([\\s\\S]*?)</li>`, 'g'))].map(([, row]) => ({
+    title: (/wall-row__title">([^<]*)</.exec(row) || [])[1],
+    sub: (/wall-row__sub">([^<]*)</.exec(row) || [])[1],
+    // Die ganze Zeitangabe, wie sie zu lesen ist: der Beginn und, in einem
+    // eigenen Element dahinter, das Ende.
+    time: wallRowTime(row),
+  }));
+}
+
+test('#1698 Wand: der Kalendername ersetzt „Termin", und die Zeit nennt Beginn und Ende', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  const rows = wallRows([
+    ev(1, 'Frueh', '2026-09-24T14:00', '2026-09-24T22:00', { cal_name: 'Niklas Arbeitskalender' }),
+  ]);
+  assert.deepEqual(rows, [{ title: 'Frueh', sub: 'Niklas Arbeitskalender', time: '2026-09-24T14:00 - 2026-09-24T22:00' }]);
+}));
+
+test('#1698 Wand: ohne Kalendernamen bleibt das Wort, und der Name laeuft durch esc()', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  const rows = wallRows([
+    ev(1, 'Nur in Yuvomi', '2026-09-24T14:00', '2026-09-24T15:00'),
+    ev(2, 'Leer', '2026-09-24T15:00', '2026-09-24T16:00', { cal_name: '   ' }),
+    ev(3, 'Boese', '2026-09-24T16:00', '2026-09-24T17:00', { cal_name: '<img src=x>' }),
+  ]);
+  assert.deepEqual(rows.map((row) => row.sub), ['dashboard.todayEvent', 'dashboard.todayEvent', '&lt;img src=x&gt;']);
+}));
+
+test('#1698 Wand: eine Spanne nur mit echtem Ende am selben Tag oder in der Nacht', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  // Zwei Aufrufe: die Wand zeigt hoechstens WALL_ROW_CAP Zeilen.
+  const by = Object.fromEntries([
+    ...wallRows([
+      ev(1, 'Ohne Ende', '2026-09-24T14:00', null),
+      ev(2, 'Ende gleich Beginn', '2026-09-24T15:00', '2026-09-24T15:00'),
+      ev(3, 'Nachtschicht', '2026-09-24T22:00', '2026-09-25T06:00'),
+    ]),
+    ...wallRows([
+      ev(4, 'Reise ab heute', '2026-09-24T18:00', '2026-09-26T12:00'),
+      ev(5, 'Ganztags', '2026-09-24', '2026-09-24', { all_day: 1 }),
+      ev(6, 'Seit gestern', '2026-09-23T20:00', '2026-09-24T12:00'),
+    ]),
+  ].map((row) => [row.title, row.time]));
+  assert.deepEqual(by, {
+    'Ohne Ende': '2026-09-24T14:00',
+    'Ende gleich Beginn': '2026-09-24T15:00',
+    Nachtschicht: '2026-09-24T22:00 - 2026-09-25T06:00',
+    'Reise ab heute': '2026-09-24T18:00',
+    Ganztags: 'dashboard.allDay',
+    'Seit gestern': 'dashboard.todayUntil{&quot;time&quot;:&quot;2026-09-24T12:00&quot;}',
+  });
+}));
+
+test('#1698 Wand: das Ende steht in einem eigenen Element - die schmale Flaeche blendet es aus', inBrowser(THU_10_BERLIN, 'Europe/Berlin', async () => {
+  const html = dash.renderWallSurface({
+    upcomingEvents: [ev(1, 'Frueh', '2026-09-24T14:00', '2026-09-24T22:00')], urgentTasks: [], users: [],
+  }, null, { now: new Date() });
+  assert.match(html, /wall-row__time">2026-09-24T14:00<span class="wall-row__time-end"> - 2026-09-24T22:00<\/span><\/span>/);
+  // Und die Regel dazu steht im Stylesheet, an der Grenze des Titels.
+  const { readFileSync } = await import('node:fs');
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  assert.match(css, /@container wall \(max-width: 519px\) \{\s*\.wall-row__time-end \{\s*display: none;/);
+}));
+
+test('#1698: das Heute-Blatt nennt den Kalender - die Spanne bleibt der Wand', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  const events = [
+    ev(1, 'Frueh', '2026-09-24T14:00', '2026-09-24T22:00', { cal_name: 'Niklas Arbeitskalender' }),
+    ev(2, 'Nur in Yuvomi', '2026-09-24T15:00', '2026-09-24T16:00'),
+    ev(3, 'Boese', '2026-09-24T16:00', '2026-09-24T17:00', { cal_name: '<img src=x>' }),
+  ];
+  const rows = dash.buildTodayProgram({ upcomingEvents: events }, { includeTasks: false, includeMeals: false, now: new Date() }).rows;
+  assert.deepEqual(rows.map((row) => [row.title, row.sub, row.timeLabel]), [
+    ['Frueh', 'Niklas Arbeitskalender', '2026-09-24T14:00'],
+    ['Nur in Yuvomi', 'dashboard.todayEvent', '2026-09-24T15:00'],
+    ['Boese', '<img src=x>', '2026-09-24T16:00'],
+  ]);
+  const sheet = dash.renderTodayCockpit({ upcomingEvents: events, urgentTasks: [], users: [] }, []);
+  assert.match(sheet, /today-cockpit-card__sub">Niklas Arbeitskalender</, 'das Blatt nennt den Kalender');
+  assert.match(sheet, /today-cockpit-card__sub">dashboard\.todayEvent</, 'ohne Kalendernamen bleibt das Wort');
+  assert.ok(sheet.includes('&lt;img src=x&gt;') && !sheet.includes('<img src=x>'), 'der Name ist Nutzereingabe und laeuft durch esc()');
+  assert.ok(!sheet.includes('2026-09-24T22:00'), 'kein Ende im Blatt: die Spanne bleibt der Wand vorbehalten');
+  assert.ok(!sheet.includes('wall-row__time-end'));
+}));
+
+test('#1698: die Unterzeile des Blatts bleibt eine Zeile, die Zustandskarte darf umbrechen', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)].filter((rule) => rule.at.length === 0);
+  const own = rules.find((rule) => rule.selector.trim() === '.today-cockpit-card__sub');
+  assert.ok(own, 'Reichweite: die Regel der Unterzeile');
+  assert.match(own.body, /white-space:\s*nowrap/);
+  assert.match(own.body, /text-overflow:\s*ellipsis/);
+  const state = rules.find((rule) => rule.selector.trim() === '.today-cockpit-card--state .today-cockpit-card__sub');
+  assert.match(state?.body ?? '', /white-space:\s*normal/);
+});
+
+test('#1698: der Kalendername ist der des gewaehlten Ziels - `source_calendar_name` vor `cal_name`', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  // Wie im Kalendermodul: ein neu angelegter Termin wartet noch auf seinen
+  // Upload (`cal_name` fehlt), ein umziehender nennt in `cal_name` noch den
+  // alten Kalender.
+  const events = [
+    ev(1, 'Wartet auf Upload', '2026-09-24T14:00', '2026-09-24T15:00', { source_calendar_name: 'Arbeit' }),
+    ev(2, 'Zieht um', '2026-09-24T15:00', '2026-09-24T16:00', { cal_name: 'Alt', source_calendar_name: 'Neu' }),
+    ev(3, 'Nur verknuepft', '2026-09-24T16:00', '2026-09-24T17:00', { cal_name: 'Familie', source_calendar_name: '  ' }),
+  ];
+  const rows = dash.buildTodayProgram({ upcomingEvents: events }, { includeTasks: false, includeMeals: false, now: new Date() }).rows;
+  assert.deepEqual(rows.map((row) => row.sub), ['Arbeit', 'Neu', 'Familie']);
+  assert.deepEqual(wallRows(events).map((row) => row.sub), ['Arbeit', 'Neu', 'Familie']);
+}));
+
+// --- Nachzug aus dem Review von #1826 ---
+
+// Samstag, 27.03.2027, 10:00 in Berlin - in der Nacht darauf springt die Uhr
+// von 02:00 auf 03:00, der Tag bis Sonntag 22:00 hat 23 Stunden.
+const SAT_BEFORE_DST = '2027-03-27T09:00:00Z';
+const dstNight = () => Object.fromEntries(wallRows([
+  ev(1, 'Genau ein Tag', '2027-03-27T22:00', '2027-03-28T22:00'),
+  ev(2, 'Ein Tag und mehr', '2027-03-27T22:00', '2027-03-28T22:30'),
+  ev(3, 'Die Nacht', '2027-03-27T22:00', '2027-03-28T06:00'),
+]).map((row) => [row.title, row.time]));
+const DST_EXPECTED = {
+  'Genau ein Tag': '2027-03-27T22:00',
+  'Ein Tag und mehr': '2027-03-27T22:00',
+  'Die Nacht': '2027-03-27T22:00 - 2027-03-28T06:00',
+};
+
+// Die Geraetezone ist ausdruecklich gesetzt, nicht geerbt: mit Berlin als
+// Geraet war die Millisekunden-Rechnung in dieser Nacht falsch, mit einem
+// Geraet ohne Sommerzeit zufaellig richtig - beide muessen dasselbe sagen.
+for (const device of ['Europe/Berlin', 'UTC', 'America/New_York']) {
+  test(`#1698 Wand: „ein Tag oder mehr" misst die Wanduhr des Haushalts, auch in der Umstellungsnacht (Geraet ${device})`,
+    inProcessZone(device, inBrowser(SAT_BEFORE_DST, 'Europe/Berlin', () => {
+      assert.deepEqual(dstNight(), DST_EXPECTED);
+    })));
+}
+
+test('#1698 Wand: genau 24 Stunden sind ein Tag - eine Minute weniger ist eine Spanne',
+  inProcessZone('UTC', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+    const by = Object.fromEntries(wallRows([
+      ev(1, 'Bis morgen selbe Zeit', '2026-09-24T14:00', '2026-09-25T14:00'),
+      ev(2, 'Eine Minute weniger', '2026-09-24T14:00', '2026-09-25T13:59'),
+      ev(3, 'Morgen spaeter', '2026-09-24T14:00', '2026-09-25T19:00'),
+    ]).map((row) => [row.title, row.time]));
+    assert.deepEqual(by, {
+      'Bis morgen selbe Zeit': '2026-09-24T14:00',
+      'Eine Minute weniger': '2026-09-24T14:00 - 2026-09-25T13:59',
+      'Morgen spaeter': '2026-09-24T14:00',
+    });
+  })));
+
+test('#1698 Wand: eine Zeile ohne Wand-Fassung behaelt Untertitel und Zeit', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  // Nur der Termin traegt `wallTimeEnd`. Aufgabe, Mahlzeit, Dosis und Abfall
+  // zeigen in `renderWallRow` ihr `sub` und ihr `timeLabel` allein.
+  const rows = wallRows([], { tasks: [dueToday(1, 'Muell', '18:00')], tone: 'task' });
+  assert.equal(rows.length, 1, 'Reichweite: die Aufgabenzeile steht an der Wand');
+  assert.equal(rows[0].title, 'Muell');
+  assert.equal(rows[0].sub, 'dashboard.todayTask');
+  assert.match(String(rows[0].time), /^dashboard\.todayUntil\{/);
+}));
+
+test('#1698 Wand: ganztaegig bleibt ganztaegig, auch mit Uhrzeit im Wert; ein Ende ohne Uhrzeit ist kein Ende',
+  inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+    const by = Object.fromEntries(wallRows([
+      ev(1, 'Ganztags mit Uhrzeit', '2026-09-24T00:00', '2026-09-24T23:59', { all_day: 1 }),
+      ev(2, 'Ende nur als Datum', '2026-09-24T15:00', '2026-09-24'),
+      // Ein Datum am FOLGETAG liest als Stempel Mitternacht - „15:30 - 00:00"
+      // waere eine Uhrzeit, die niemand eingetragen hat.
+      ev(3, 'Ende als Datum von morgen', '2026-09-24T15:30', '2026-09-25'),
+    ]).map((row) => [row.title, row.time]));
+    assert.deepEqual(by, {
+      'Ganztags mit Uhrzeit': 'dashboard.allDay',
+      'Ende nur als Datum': '2026-09-24T15:00',
+      'Ende als Datum von morgen': '2026-09-24T15:30',
+    });
+  }));
+
+test('#1698 Wand: Beginn UND Ende gehen durch den echten Formatierer (12-Stunden-Format)',
+  inProcessZone('America/New_York', inBrowser(THU_10_BERLIN, 'Europe/Berlin', async () => {
+    const { formatTime: realFormatTime } = await import('../public/i18n.js');
+    const prevStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      writable: true,
+      value: { getItem: (key) => (key === 'yuvomi-time-format' ? '12h' : null), setItem() {}, removeItem() {} },
+    });
+    globalThis.__formatTime = realFormatTime;
+    try {
+      assert.equal(realFormatTime('2026-09-24T14:00'), '2:00 PM', 'Vorbedingung: der Formatierer schreibt 12-stuendig');
+      const rows = wallRows([ev(1, 'Frueh', '2026-09-24T14:00', '2026-09-24T22:00', { cal_name: 'Arbeit' })]);
+      assert.deepEqual(rows, [{ title: 'Frueh', sub: 'Arbeit', time: '2:00 PM - 10:00 PM' }]);
+    } finally {
+      delete globalThis.__formatTime;
+      if (prevStorage) Object.defineProperty(globalThis, 'localStorage', prevStorage);
+      else delete globalThis.localStorage;
+    }
   })));

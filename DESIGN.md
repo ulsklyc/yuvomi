@@ -549,7 +549,8 @@ Inhalt, kein Verlauf ueber eine Karte, kein Text auf einer Flaeche, die nicht ge
   enthielten Kollisionspaare, die niemand auseinanderhalten konnte - zwei Violetts, zwei
   Teals. Jetzt gibt es neun klar trennbare Familien (`overview`, `time`, `work`, `kitchen`,
   `money`, `people`, `health`, `records`, `neutral`), jedes `--module-*` bezieht aus seiner,
-  und **innerhalb einer Familie unterscheidet das Siegel-Icon, nicht der Ton**. Damit
+  und **innerhalb einer Familie unterscheidet das Siegel-Icon, nicht der Ton** (an einer
+  Mischstelle darf es das Zeichen des Objekts sein, siehe Herkunfts-Regel). Damit
   verschwinden die Kollisionen strukturell statt durch Nachjustieren. Die Kueche war der
   Praezedenzfall: vier Module, ein Ton, unterschieden durch ihr Zeichen. Die privaten
   `--_family-*` tragen den Dark-Wechsel; die oeffentliche `--module-*`-API bleibt vollstaendig.
@@ -993,7 +994,9 @@ Subheadline 15, Footnote 13, Caption 2 11.
 und "SAUERSTOFFSAETTI/GUNG" kamen aus `overflow-wrap: break-word` neben `hyphens: manual`:
 das Wort brach dort, wo die Zeile endete, ohne Strich. Wer ein Wort brechen laesst, gibt
 seinem Subjekt `hyphens: auto; hyphenate-limit-chars: 6 4 4` (die App setzt `lang`, der
-Browser kennt die Silben); `overflow-wrap: anywhere` bleibt die letzte Stufe fuer
+Browser kennt die Silben), dazu direkt darunter `-webkit-hyphenate-limit-before: 4;
+-webkit-hyphenate-limit-after: 4`, weil Safari die Kurzform nicht kennt und sonst ohne Grenze
+trennt (#1774); `overflow-wrap: anywhere` bleibt die letzte Stufe fuer
 Zeichenketten ohne Silben (URLs, Codes, Zeitangaben). Versal-Labels, die nicht passen,
 werden kuerzer oder verlieren den Versal-Transform, statt mitten im Wort zu brechen. Der
 Guard (`test:typography`) prueft die Regel am Subjekt, nicht die Schreibweise, und fuehrt
@@ -3125,7 +3128,10 @@ Herkunft zeigt man nur, wo sie nicht selbstverstaendlich ist. Daraus folgen gena
 - **Jede MISCHSTELLE** - eine Liste, deren Zeilen aus verschiedenen Modulen stammen
   (moduluebergreifende Suche, "Heute wichtig", Dashboard-Widget-Koepfe, "Mehr"-Liste,
   Benachrichtigungsdarstellung) - gibt jedem Objekt sein Siegel und BENENNT dabei die fremde
-  Herkunft, inline oder ueber die Klasse ihres Traegers.
+  Herkunft, inline oder ueber die Klasse ihres Traegers. Die Herkunft nennt der TON der
+  Scheibe; das ZEICHEN darf das des Objekts sein, wo das Objekt eines traegt (der Mahlzeittyp,
+  das am Termin gewaehlte Icon in "Heute wichtig" und an der Wand). Ohne eigenes Zeichen steht
+  das des Moduls, und eine Zeile, die fuer mehrere Objekte spricht, behaelt es immer.
 - **Im eigenen Modul** steht es genau einmal, als Absender im Kopf (siehe Modulkopf). Es
   benennt dort nichts, sondern ERBT den Ton des Raumes, in dem es steht - genau daran ist die
   Rolle zu erkennen.

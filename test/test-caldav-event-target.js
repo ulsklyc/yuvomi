@@ -43,6 +43,12 @@ describe('CalDAV-Ziel an Events (Issue #241)', () => {
       `INSERT INTO caldav_accounts (name, caldav_url, username, password)
        VALUES ('mailbox', 'https://caldav.example.com', 'u', 'p')`
     ).run().lastInsertRowid;
+    // Ein Ziel ist ein eingeschalteter Kalender aus der Auswahl des Kontos
+    // (#1860); alles andere lehnt die Route ab (test-caldav-event-account.js).
+    d.prepare(
+      `INSERT INTO caldav_calendar_selection (account_id, calendar_url, calendar_name, calendar_color, enabled)
+       VALUES (?, ?, 'Familie', '#4A90E2', 1)`
+    ).run(accountId, calUrl);
 
     const app = express();
     app.use(express.json({ limit: '10mb' }));
@@ -153,10 +159,8 @@ describe('CalDAV-Ziel an Events (Issue #241)', () => {
   describe('GET /calendar/sync-targets (Issue #618)', () => {
     before(() => {
       const d = db.get();
-      d.prepare(
-        `INSERT INTO caldav_calendar_selection (account_id, calendar_url, calendar_name, calendar_color, enabled)
-         VALUES (?, ?, 'Familie', '#4A90E2', 1)`
-      ).run(accountId, calUrl);
+      // Der eingeschaltete Kalender `Familie` steht seit dem Anlegen des Kontos
+      // in der Auswahl (siehe oben); hier kommt der abgewählte dazu.
       d.prepare(
         `INSERT INTO caldav_calendar_selection (account_id, calendar_url, calendar_name, calendar_color, enabled)
          VALUES (?, ?, 'Archiv', '#4A90E2', 0)`

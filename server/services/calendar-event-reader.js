@@ -35,6 +35,9 @@ export const BODY_FREE_EVENT_COLUMNS = Object.freeze([
   'updated_at', 'target_google_calendar_id', 'outbound_dirty',
   'outbound_attempts', 'outbound_move_to', 'external_object_url',
   'target_outlook_account_id', 'target_outlook_calendar_id', 'color_modified',
+  // Das CalDAV-Konto der Zeile (#1860), neben den uebrigen Sync-Spalten: wer
+  // eine so gelesene Zeile an den Ausgang weitergibt, braucht es dort.
+  'caldav_account_id',
 ]);
 
 const eventColumnCache = new WeakMap();

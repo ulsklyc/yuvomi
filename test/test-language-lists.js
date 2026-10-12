@@ -86,7 +86,24 @@ test('OpenAPI: `lang` nennt genau die App-Sprachen', async () => {
     assert.deepEqual(sorted(param.schema.enum), sorted(APP_LOCALES), `${where}: lang-Enum weicht von SUPPORTED_LOCALES ab`);
     const genannt = param.description.match(/Supported values: ([^.]+)\./)?.[1].split(', ') ?? [];
     assert.deepEqual(sorted(genannt), sorted(APP_LOCALES), `${where}: die Beschreibung nennt andere Sprachen als das Enum`);
-    assert.ok(param.schema.enum.includes(param.schema.default), `${where}: Default ${param.schema.default} nicht im Enum`);
+    // Ein Default ist nur dort genannt, wo er fest ist; nennt ihn die Spec, muss
+    // er eine App-Sprache sein.
+    if ('default' in param.schema) {
+      assert.ok(param.schema.enum.includes(param.schema.default), `${where}: Default ${param.schema.default} nicht im Enum`);
+    }
+  }
+
+  // #1859: die Budget-Kategorien fallen ohne `lang` auf die Haushaltssprache.
+  // Ein fester `default: en` in der Spec widerspraeche der Route.
+  const budget = langParams.filter(({ where }) => where.includes('/budget/categories'));
+  assert.equal(budget.length, 2, 'beide Budget-Leserouten tragen `lang`');
+  for (const { where, param } of budget) {
+    assert.ok(!('default' in param.schema), `${where}: kein fester Default, der Rueckfall ist die Haushaltssprache`);
+    assert.match(param.description, /household language/, `${where}: die Beschreibung nennt den Rueckfall`);
+  }
+  const andere = langParams.filter(({ where }) => !where.includes('/budget/categories'));
+  for (const { where, param } of andere) {
+    assert.equal(param.schema.default, 'en', `${where}: faellt weiter auf Englisch`);
   }
 });
 

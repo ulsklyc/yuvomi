@@ -549,6 +549,8 @@
 .inventory-history-entry__label {
   hyphens: auto;
   hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
   overflow-wrap: anywhere;
 }
 

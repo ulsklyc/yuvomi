@@ -3227,20 +3227,23 @@ test('Treffer der Suche stehen mit vollem Datum, ein leeres Ergebnis nennt die A
   }
 });
 
-test('Kontosaldo schrumpft nie unter seinen Betrag - der Name ellipsiert (Re-Critique 2026-09-28 P1-2)', () => {
+test('Kontosaldo gibt nach, aber nie unter seinen Betrag - der Name ellipsiert (Re-Critique 2026-09-28 P1-2, #1774)', () => {
   // 390px: die Saldo-Spalte lief mit `flex: 0 1 auto; min-width: 0` unter den
   // `nowrap`-Betrag, der nach links in den Namen auslief ("Gemeinsames
-  // Gi.8.544,47 €", 11px Ueberlappung). Die Spalte darf nicht schrumpfen; die
-  // Kuerzung gehoert dem Namen.
+  // Gi.8.544,47 €", 11px Ueberlappung). Seit #1774 darf sie schrumpfen, damit
+  // der Name nicht mitten im Wort bricht ("Housekeepin|g cash") - aber nur bis
+  // zur Breite des Betrags: der automatische Mindestwert bleibt, `min-width: 0`
+  // (oder `overflow: hidden`) ist verboten, und der Betrag bleibt `nowrap`.
   const regeln = [...eachRule(budgetCss)].filter(({ selector }) => selector.split(',').some((s) => s.trim() === '.budget-account__figures'));
   assert.ok(regeln.length > 0, '.budget-account__figures fehlt');
   for (const { body, at } of regeln) {
-    const flex = body.match(/(?:^|;|\s)flex:\s*([^;]+)/);
-    const shrink = body.match(/flex-shrink:\s*([^;]+)/);
-    if (flex) assert.match(flex[1].trim(), /^0 0 auto$|^none$/, `${at.join(' ')} .budget-account__figures: flex ${flex[1].trim()} laesst die Spalte schrumpfen`);
-    if (shrink) assert.equal(shrink[1].trim(), '0');
+    assert.doesNotMatch(body, /(?:^|[;\s])min-width:\s*0/, `${at.join(' ')} .budget-account__figures: min-width:0 laesst den Betrag unter den Saldo laufen`);
+    assert.doesNotMatch(body, /overflow(?:-x)?:\s*(?:hidden|clip)/, `${at.join(' ')} .budget-account__figures: overflow kappt den Betrag`);
   }
-  assert.ok(regeln.some(({ body }) => /flex:\s*(?:0 0 auto|none)|flex-shrink:\s*0/.test(body)), 'die Saldo-Spalte muss ausdruecklich unschrumpfbar sein');
+  const balance = [...eachRule(budgetCss)].find(({ selector, at }) => selector.trim() === '.budget-account__balance' && !at.length);
+  assert.match(balance?.body ?? '', /white-space:\s*nowrap/, 'der Betrag bleibt unzerbrechlich - er ist der Mindestwert der Spalte');
+  const starting = [...eachRule(budgetCss)].find(({ selector, at }) => selector.trim() === '.budget-account__starting' && !at.length);
+  assert.match(starting?.body ?? '', /white-space:\s*normal/, 'die Startzeile ist das, was die Saldo-Spalte hergibt, und muss umbrechen duerfen');
   const nameText = [...eachRule(budgetCss)].find(({ selector }) => selector.trim() === '.budget-account__name-text');
   assert.match(nameText.body, /text-overflow:\s*ellipsis/);
   const body = [...eachRule(budgetCss)].find(({ selector }) => selector.trim() === '.budget-account__body');
@@ -4310,8 +4313,14 @@ test('R16: ein Kontoname bricht auf zwei Zeilen um, statt gekappt zu werden', ()
   assert.match(rule.body, /-webkit-line-clamp:\s*2/);
   assert.doesNotMatch(rule.body, /white-space:\s*nowrap/, 'einzeilig mit Ellipse war der Befund');
   assert.match(rule.body, /overflow-wrap:\s*anywhere/, 'ein langes Wort ohne Leerzeichen laeuft sonst unter den Saldo');
+  // #1774: "Wertpapierde-pot" - ohne Grenze trennt `hyphens: auto` in der
+  // schmalen Spalte zwei Zeichen vor dem Ende. Dieselbe Grenze wie die
+  // Textbloecke in layout.css.
+  assert.match(rule.body, /hyphens:\s*auto/);
+  assert.match(rule.body, /hyphenate-limit-chars:\s*6 4 4/, 'ohne Grenze steht "Wertpapierde-pot" statt "Wertpapier-depot"');
   const figures = [...eachRule(budgetCss)].find((r) => r.selector.trim() === '.budget-account__figures' && !r.at.length);
-  assert.match(figures?.body ?? '', /flex:\s*0 0 auto/, 'die Saldo-Spalte schrumpft weiter nie');
+  assert.match(figures?.body ?? '', /flex:\s*0 1 auto/, 'die Saldo-Spalte gibt vor dem Namen nach (der Name bricht sonst mitten im Wort)');
+  assert.doesNotMatch(figures?.body ?? '', /min-width:\s*0/, 'aber nie unter den Betrag');
 });
 
 // --------------------------------------------------------
@@ -5514,4 +5523,79 @@ test('#1781: neu geladen wird ueber reloadMonth() - loadMonth(state.month) steht
   assert.ok(renderStart > -1 && erstaufruf > renderStart && erstaufruf < renderEnde, 'und der steht in render()');
   // Gegenprobe des Lesers: die Neulade-Stellen sind da und werden gesehen.
   assert.ok((code.match(/\breloadMonth\(\)/g) ?? []).length >= 18, 'Vorbedingung: der Guard liest die Neulade-Stellen');
+});
+
+// ── #1844: die erwartete Abo-Zahlung eines Folgemonats ──────────────────────────
+// Der Server rechnet sie beim Lesen (services/subscription-budget-projection.js)
+// und schickt sie ohne id. Die Zeile spricht die Sprache der erwarteten Buchung
+// (#637) - dieselbe Plakette, derselbe schraffierte Punkt -, hat aber nichts zu
+// oeffnen, zu aendern oder zu verbuchen: gebucht wird im Abo.
+test('#1844: erwartete Abo-Zeile - erwartet gekennzeichnet, ohne id, ohne Verbuchen, fuehrt zu den Abos', () => {
+  const vorher = { ...budgetUi.state };
+  const abo = zeile({
+    id: null, expected: true, subscription_id: 7, title: 'Streaming <b>', amount: -12.99,
+    category: 'subscriptions', date: '2999-02-20', is_pending: 1,
+  });
+  const erwartet = zeile({ id: 55, title: 'Strom', date: '2999-02-03', is_pending: 1 });
+  try {
+    Object.assign(budgetUi.state, {
+      month: '2999-02', entries: [abo, erwartet], responsibleFilterId: null, groupByResponsible: false,
+      ledgerQuery: '', ledgerResults: null, plannedExpandedMonth: null,
+    });
+    const html = budgetUi.renderEntries();
+    const reihen = html.split('<div class="list-row budget-entry').slice(1);
+    assert.equal(reihen.length, 2);
+    const [aboZeile, serienZeile] = reihen;
+
+    assert.match(aboZeile, /^ budget-entry--pending/, 'dieselbe Optik wie jede erwartete Buchung');
+    assert.match(aboZeile, /budget-badge--pending">budget\.pendingBadge</, 'dieselbe Plakette');
+    assert.doesNotMatch(aboZeile, /data-id=/, 'keine id: es gibt keine Buchung, die sich oeffnen liesse');
+    assert.doesNotMatch(html, /data-id="null"/);
+    assert.doesNotMatch(aboZeile, /data-action="confirm"/, 'verbucht wird im Abo, nicht hier');
+    assert.match(aboZeile, /data-open-subscription="7"/, 'die Zeile fuehrt zum Abo');
+    assert.match(aboZeile, /<button class="list-row__name budget-entry__title" type="button"\s+aria-label="budget\.expectedSubscriptionOpen: Streaming &lt;b&gt;, /,
+      'der Knopf nennt, wohin er fuehrt, und der Titel ist escaped');
+    assert.doesNotMatch(aboZeile, /budget\.editEntry/, 'kein "bearbeiten" fuer etwas, das sich nicht bearbeiten laesst');
+
+    // Gegenstueck: die erwartete Buchung einer Serie behaelt id und Verbuchen.
+    assert.match(serienZeile, /data-id="55"/);
+    assert.match(serienZeile, /data-action="confirm" data-id="55"/);
+    assert.doesNotMatch(serienZeile, /data-open-subscription/);
+  } finally { Object.assign(budgetUi.state, vorher); }
+});
+
+test('#1844: der Tipp auf die erwartete Abo-Zeile wechselt in den Abo-Reiter - auch bei Nur-lesen', () => {
+  const handler = budget.slice(budget.indexOf("_container.querySelector('#budget-list')?.addEventListener('click'"));
+  const riegel = handler.indexOf('if (action && readOnly() && !READ_SAFE_ACTIONS.has(action.dataset.action)) return;');
+  const sprung = handler.indexOf("e.target.closest('[data-open-subscription]')");
+  const zeile_ = handler.indexOf("e.target.closest('.budget-entry[data-id]')");
+  assert.ok(riegel > -1 && sprung > riegel && sprung < zeile_, 'nach dem Riegel, vor dem Zeilen-Klick');
+  // Kein `data-action`: der Wechsel liest nur, wie der Zustaendigen-Filter -
+  // die Positivliste der Aktionen bleibt, wie sie ist.
+  assert.doesNotMatch(budget, /data-action="open-subscription"/);
+});
+
+test('#1844: der Sprung zum Abo nimmt die Filter der Abo-Liste weg - das Abo, zu dem die Zeile fuehrt, steht da', async () => {
+  const abosModul = await import('../public/pages/subscriptions.js');
+  const { state } = abosModul.__test;
+  const vorher = { query: state.query, categoryId: state.categoryId, paymentMethodId: state.paymentMethodId, status: state.status, sort: state.sort };
+  try {
+    // Ein Filter aus einem frueheren Besuch: die Liste zeigte damit nur
+    // pausierte Abos, und ein laufendes - das einzige, das projiziert wird -
+    // fehlte genau dort, wohin die Zeile fuehrt.
+    Object.assign(state, { query: 'gym', categoryId: '4', paymentMethodId: '6', status: 'paused' });
+    assert.equal(typeof abosModul.clearSubscriptionFilters, 'function');
+    abosModul.clearSubscriptionFilters();
+    assert.deepEqual(
+      { query: state.query, categoryId: state.categoryId, paymentMethodId: state.paymentMethodId, status: state.status },
+      { query: '', categoryId: '', paymentMethodId: '', status: 'all' },
+    );
+    assert.equal(abosModul.__test.activeFilters().length, 0);
+    assert.equal(state.sort, vorher.sort, 'die Sortierung nimmt nichts weg und bleibt');
+  } finally { Object.assign(state, vorher); }
+  // Und der Aufrufer ruft sie, bevor er den Reiter wechselt.
+  const handler = budget.slice(budget.indexOf("e.target.closest('[data-open-subscription]')"));
+  const clear = handler.indexOf('clearSubscriptionFilters()');
+  const wechsel = handler.indexOf("_tablist?.setActive('subscriptions'");
+  assert.ok(clear > -1 && clear < wechsel, 'erst die Filter, dann der Wechsel');
 });
