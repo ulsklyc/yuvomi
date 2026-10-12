@@ -210,7 +210,7 @@ async function page() {
     }
   };
   globalThis.__apiStub = {
-    get: (path) => new Promise((resolve) => { requests.push({ path, resolve }); }),
+    get: (path) => new Promise((resolve, reject) => { requests.push({ path, resolve, reject }); }),
   };
   component = await import('../public/components/photo-screensaver.js');
   return component;
@@ -367,6 +367,109 @@ test('a junk attribute falls back to five minutes, and the 30 s floor stays', as
   assert.equal(requests.length, 0, 'below the floor waits for the floor');
   mock.timers.tick(1);
   assert.equal(requests.length, 1);
+  gesture();
+});
+
+// A paired display starts with its screensaver switched off (#1766, #1793):
+// the photo request answers 403. Nobody touches a wall tablet, so a refusal
+// must not use up the only scheduled attempt - otherwise switching the display
+// on reaches the wall only with the next touch.
+test('a refused request knocks again after one idle period, without a gesture', async () => {
+  await freshCase();
+  pageRoot.setAttribute('data-screensaver-idle', '60');
+  mock.timers.tick(60_000);
+  assert.equal(requests.length, 1);
+  requests[0].reject(new Error('Token scope does not permit this operation.'));
+  await flush();
+  assert.equal(overlays(), 0);
+
+  mock.timers.tick(59_999);
+  assert.equal(requests.length, 1, 'not before the next idle period');
+  mock.timers.tick(1);
+  assert.equal(requests.length, 2, 'asks again on its own');
+  requests[1].resolve(PHOTOS);
+  await flush();
+  assert.equal(overlays(), 1, 'switched on in between: the screensaver opens without anyone touching the tablet');
+  gesture();
+});
+
+test('a retired start that fails later does not arm a second timer', async () => {
+  await freshCase();
+  pageRoot.setAttribute('data-screensaver-idle', '60');
+  mock.timers.tick(60_000);
+  assert.equal(requests.length, 1, 'start() is waiting');
+  gesture();
+  mock.timers.tick(30_000);
+  // Thirty seconds after the gesture: a re-arm here would push the gesture's
+  // timer back by thirty seconds.
+  requests[0].reject(new Error('late'));
+  await flush();
+  mock.timers.tick(30_000);
+  assert.equal(requests.length, 2, 'the gesture\'s timer still fires on time - the retired start armed nothing');
+  gesture();
+});
+
+// An administrator switches the display off while the screensaver shows: the
+// next image is refused. Without a handler the picture never comes back and the
+// wall shows black with only the text moving over it.
+test('an image that fails to load takes the overlay down and knocks again later', async () => {
+  await freshCase();
+  pageRoot.setAttribute('data-screensaver-idle', '60');
+  mock.timers.tick(60_000);
+  requests[0].resolve(PHOTOS);
+  await flush();
+  assert.equal(overlays(), 1);
+  const overlayNode = body.children.find((node) => node.className === 'photo-screensaver');
+  const image = overlayNode.children.find((node) => node.tag === 'img');
+  assert.equal(typeof image.onerror, 'function', 'the image handles its own failure');
+
+  image.onerror();
+  assert.equal(overlays(), 0, 'no black wall');
+  mock.timers.tick(59_999);
+  assert.equal(requests.length, 1);
+  mock.timers.tick(1);
+  assert.equal(requests.length, 2, 'and the next idle period asks again');
+  requests[1].resolve(PHOTOS);
+  await flush();
+  assert.equal(overlays(), 1);
+
+  // An error from an overlay that is already gone does nothing - thirty
+  // seconds after the gesture, a re-arm would push its timer back.
+  gesture();
+  mock.timers.tick(30_000);
+  image.onerror();
+  mock.timers.tick(30_000);
+  assert.equal(requests.length, 3, 'the gesture\'s timer fires on time - a stale image error re-arms nothing');
+  gesture();
+});
+
+// The component loads from index.html on the sign-in and setup pages too. There
+// the request answers 401, and api.js fires `auth:expired` before it throws -
+// which the router answers by drawing the sign-in page again. A re-arm after
+// that would repeat it every idle period for as long as the tab is open: one
+// request, one redraw of a form somebody may be filling in, one history entry.
+test('a request that ends the session does not knock again - the next gesture arms it', async () => {
+  await freshCase();
+  pageRoot.setAttribute('data-screensaver-idle', '60');
+  mock.timers.tick(60_000);
+  assert.equal(requests.length, 1);
+  // What api.js does on a 401: the event first, synchronously, then the throw.
+  for (const handler of listeners['auth:expired'] || []) handler({});
+  requests[0].reject(new Error('Sitzung abgelaufen.'));
+  await flush();
+  mock.timers.tick(10 * 60_000);
+  assert.equal(requests.length, 1, 'ten idle periods later: still the one request');
+  assert.equal(overlays(), 0);
+
+  // Signing in again takes a pointer or a key, and that arms the timer as ever.
+  gesture();
+  mock.timers.tick(59_999);
+  assert.equal(requests.length, 1);
+  mock.timers.tick(1);
+  assert.equal(requests.length, 2, 'one idle period after the gesture');
+  requests[1].resolve(PHOTOS);
+  await flush();
+  assert.equal(overlays(), 1, 'and the screensaver opens for the new session');
   gesture();
 });
 

@@ -559,6 +559,36 @@ test('DELETE /:id: ungueltige id → 400, Symlink wird verweigert', async (t) =>
   fs.unlinkSync(link);
 });
 
+// Geprueft wurde `String(id)`, benutzt wurde `id`: ein Array wie ['typed-mod']
+// bestand die Id-Regel (String() macht daraus `typed-mod`) und lief dann
+// ungeprueft in path.join. Ueber HTTP ist `req.params.id` immer ein String,
+// die Luecke stand nur Aufrufern im Server offen - und endete dort in einem
+// TypeError (Loeschen) bzw. einem 404 "nicht gefunden" (Schalten) statt in der
+// Absage, die fuer eine ungueltige Id gilt. moduleFolderPath() ist jetzt die
+// eine Stelle, an der aus einer Id ein Pfad wird.
+test('eine Modul-Id, die kein String ist, wird abgewiesen, bevor ein Pfad entsteht', async () => {
+  await postZip(makeZip(moduleFiles('typed-mod')));
+  const dir = path.join(MODULES_DIR, 'typed-mod');
+  assert.ok(dirExists(dir));
+
+  for (const id of [['typed-mod'], { toString: () => 'typed-mod' }, new String('typed-mod')]) {
+    await assert.rejects(install.deleteModule(id),
+      (e) => e instanceof install.InstallError && e.reason === 'bad_id' && e.status === 400);
+    await assert.rejects(modulesSvc.setModuleEnabled(id, false), (e) => e.status === 400);
+    await assert.rejects(modulesSvc.setModuleEnabled(id, true), (e) => e.status === 400);
+  }
+  assert.ok(dirExists(dir), 'der Ordner steht noch');
+  assert.equal(recordOf('typed-mod').approved, false, 'und ist nicht freigegeben');
+
+  assert.equal(modulesSvc.moduleFolderPath('typed-mod'), dir);
+  for (const id of ['..', '.', '../typed-mod', 'typed-mod/..', 'a/b', 'a\\b', 'typed-mod\n', 'typed-mod\u0000',
+    'Typed-Mod', '.install-x', dir, '', ['typed-mod'], null, undefined, 7]) {
+    assert.equal(modulesSvc.moduleFolderPath(id), null, JSON.stringify(id));
+  }
+
+  assert.equal((await call('DELETE', '/typed-mod')).status, 200);
+});
+
 // Runde 3: die Weboberflaeche nimmt nur weg, was sie hingelegt hat. Ein von
 // Hand kopierter Ordner kann ein Arbeitsstand mit nicht eingecheckten
 // Aenderungen sein, und `rm -r` hat kein Zurueck.

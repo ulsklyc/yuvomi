@@ -61,6 +61,15 @@ function tickClock(clock) {
   clockTimer = setTimeout(() => tickClock(clock), 60_000 - (now.getSeconds() * 1000 + now.getMilliseconds()));
 }
 
+// Knock again after one more idle period without waiting for input. `start()`
+// runs from a one-shot idle timeout, and on a wall tablet "the next pointer,
+// key or visibility event" can be hours away - the same trap the kitchen-timer
+// branch in `start()` avoids with the same two lines.
+function rearm() {
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(start, idleMs());
+}
+
 async function start() {
   // A running kitchen timer (#844) keeps the screensaver away. A countdown that
   // disappears behind a photo is not a timer, and the wall tablet is exactly
@@ -93,6 +102,15 @@ async function start() {
     if (isScreensaverCoverOn()) overlay.classList.add('photo-screensaver--cover');
     const image = document.createElement('img');
     image.alt = '';
+    // A refused image - an administrator switched this display off while the
+    // screensaver was showing (#1766) - or one Immich no longer has: take the
+    // overlay down instead of leaving a black screen with only the text
+    // moving over it, and knock again after the next idle period.
+    image.onerror = () => {
+      if (currentRun !== run) return;
+      stop();
+      rearm();
+    };
     const label = document.createElement('p');
     overlay.append(image, label);
     let clock = null;
@@ -123,7 +141,12 @@ async function start() {
     slideTimer = setInterval(show, SLIDE_MS);
     return true;
   } catch {
-    // Screensaver is optional; retry after the next period of inactivity.
+    // Screensaver is optional; try again after one more idle period, without
+    // waiting for input. A paired display that an administrator switches on
+    // (#1766) gets its photos on the next knock instead of on the next touch,
+    // and one that stays off asks once per idle period and gets its 403. Only
+    // for the current run: a start() retired by stop() is not ours to re-arm.
+    if (currentRun === run) rearm();
     return false;
   }
 }
@@ -148,6 +171,12 @@ window.addEventListener('pointermove', () => {
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) stop(); else resetIdle();
 });
+// The session is gone (api.js fires this before it throws on a 401): retire the
+// run, so the catch in start() arms nothing. This module also loads on the
+// sign-in and setup pages, where every knock would end the same way and make
+// the router draw the page again - once per idle period, for as long as the tab
+// stays open. The gesture that signs in arms the timer again.
+window.addEventListener('auth:expired', () => stop());
 // A new delay re-arms the timer at once, so it applies without a reload. Only
 // while nothing is showing: the change comes from the settings page, and a
 // visible screensaver there is the admin preview, which stays until dismissed.

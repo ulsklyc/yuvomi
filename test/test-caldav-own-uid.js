@@ -3067,3 +3067,161 @@ for (const [label, way] of Object.entries(WAYS)) {
     assert.deepEqual(uploadAttempts(), []);
   });
 }
+
+// ── Der Rest zählt nicht als "der Server liefert den Eintrag noch" (#1905) ───────
+//
+// Die Zeile ist inzwischen woanders im selben Konto Spiegel, am alten Platz
+// liegt noch der Rest des nie bestätigten Uploads. Löscht eine andere App den
+// Eintrag am neuen Platz, ist er auf dem Server fort - der übersprungene Rest
+// trägt dieselbe UID, wird aber weder importiert noch einer Zeile zugeordnet.
+// Zählte er trotzdem als gesehen, bliebe die Zeile einen Lauf länger stehen,
+// und so lange der Server das Entfernen des Rests ablehnt: bis zum Ende der
+// Frist der Notiz.
+
+/** Entfernt ein Objekt, als hätte es eine andere App gelöscht. */
+async function deletedByAnotherApp(collectionUrl, name) {
+  const res = await fetch(`${collectionUrl}${name}`, { method: 'DELETE' });
+  assert.equal(res.status, 204, 'der Fall ist nicht nachgestellt: das Objekt liess sich nicht löschen');
+}
+
+/**
+ * Bis hierher für jeden Weg gleich: die Zeile `id` ist Spiegel in `other`, in
+ * `url` liegt der Rest mit seiner Notiz, und in `other` liegt ein zweiter
+ * Eintrag (sonst antwortet der Leer-Guard des Prune).
+ */
+function assertMirroredWithLeftover(way, { id, uid, url, other }) {
+  const { row, names } = helpers(way);
+  assert.equal(row(id).external_source, way.source, 'der Fall ist nicht nachgestellt: die Zeile ist kein Spiegel');
+  assert.equal(row(id).external_object_url, `${other}${uid}.ics`, 'der Fall ist nicht nachgestellt: nicht am neuen Platz gespiegelt');
+  assert.deepEqual(names(url), [`${uid}.ics`], 'der Fall ist nicht nachgestellt: der Rest ist fort');
+  assert.equal(uploadAttempts().length, 1, 'der Fall ist nicht nachgestellt: keine Notiz für den Rest');
+  assert.deepEqual(names(other).sort(), ['neighbour2.ics', `${uid}.ics`].sort());
+}
+
+const LEFTOVER_CASES = {
+  Termin: {
+    way: WAYS.Termin,
+    async arrange() {
+      const way = WAYS.Termin;
+      const url   = way.setup();
+      const other = addCalendar('other');
+      dav.putObject(other, 'neighbour2.ics', ics('VEVENT', 'neighbour2@test', 'Nachbar'));
+      const id  = way.create(url, 'Zieht um');
+      const uid = await uploadWithLostAnswer(way, url, id);
+      // Neues Ziel, und der Upload dorthin kommt vor dem nächsten Abruf. Der
+      // Server lässt den Rest so lange nicht entfernen.
+      setEventTarget(id, accountId, other);
+      dav.refuse({ method: 'DELETE', status: 403 });
+      dav.refuse({ method: 'REPORT', status: 503 });
+      await way.sync();
+      dav.allowAll();
+      return { id, uid, url, other };
+    },
+  },
+  'iCloud-Termin': {
+    way: WAYS['iCloud-Termin'],
+    async arrange() {
+      const way = WAYS['iCloud-Termin'];
+      const url   = way.setup();
+      const other = dav.addCollection('icloud2', { name: 'Zweiter', components: ['VEVENT'] });
+      dav.putObject(other, 'neighbour2.ics', ics('VEVENT', 'neighbour2@test', 'Nachbar'));
+      const id  = way.create(url, 'Zieht um');
+      const uid = await uploadWithLostAnswer(way, url, id);
+      // Der andere Kalender steht jetzt vorn: dorthin geht der Upload.
+      dav.moveToEnd(url);
+      dav.refuse({ method: 'DELETE', status: 403 });
+      await runAll(way);
+      dav.allowAll();
+      return { id, uid, url, other };
+    },
+  },
+  Aufgabe: {
+    way: WAYS.Aufgabe,
+    async arrange() {
+      const way = WAYS.Aufgabe;
+      const url   = way.setup();
+      const other = addTaskList('todo2');
+      dav.putObject(other, 'neighbour2.ics', ics('VTODO', 'neighbour2@test', 'Nachbar'));
+      const id  = way.create(url, 'Zieht um');
+      const uid = await uploadWithLostAnswer(way, url, id);
+      setTaskTarget(id, accountId, other);
+      dav.refuse({ method: 'DELETE', status: 403 });
+      await way.push();
+      dav.allowAll();
+      return { id, uid, url, other };
+    },
+  },
+};
+
+for (const [label, { way, arrange }] of Object.entries(LEFTOVER_CASES)) {
+  const { rows, names } = helpers(way);
+
+  test(`${label}: woanders gespiegelt und dort von einer anderen App gelöscht, am alten Platz liegt noch der Rest - die Zeile fällt im selben Lauf`, async () => {
+    reset();
+    const placed = await arrange();
+    assertMirroredWithLeftover(way, placed);
+    await deletedByAnotherApp(placed.other, `${placed.uid}.ics`);
+
+    await way.sync();
+    assert.equal(rows().length, 0, 'die auf dem Server gelöschte Zeile steht noch - der Rest am alten Platz hat sie gehalten');
+    assert.deepEqual(names(placed.url), [], 'der Rest liegt weiter am alten Platz');
+
+    await way.sync();
+    assert.equal(rows().length, 0, 'der Eintrag ist zurück');
+    noBookkeepingLeft();
+  });
+
+  test(`${label}: dasselbe, und der Server lehnt das Entfernen des Rests ab - die Zeile fällt trotzdem sofort, der Rest wird nie importiert`, async () => {
+    reset();
+    const placed = await arrange();
+    assertMirroredWithLeftover(way, placed);
+    await deletedByAnotherApp(placed.other, `${placed.uid}.ics`);
+    dav.refuse({ method: 'DELETE', status: 403 });
+
+    await way.sync();
+    assert.equal(rows().length, 0, 'die auf dem Server gelöschte Zeile steht noch, solange der Rest sich nicht entfernen lässt');
+    await way.sync();
+    assert.equal(rows().length, 0, 'der Rest wurde als Eintrag importiert');
+    assert.deepEqual(names(placed.url), [`${placed.uid}.ics`], 'der Fall ist nicht nachgestellt: der Rest wurde entfernt');
+    assert.equal(uploadAttempts().length, 1, 'die Notiz ist gefallen, obwohl der Rest noch liegt');
+  });
+}
+
+// Die eine Ausnahme (#1700): ein Einkaufsartikel, der anderswo Spiegel
+// derselben UID ist, geht zu dem Objekt am alten Platz ZURÜCK, wenn seine Kopie
+// am neuen fehlt - es ist dann das letzte, das der Server von ihm führt. Das
+// entscheidet `confirmCarriedCopy` nach dem Prune; zählte der Rest hier nicht
+// als gesehen, räumte der Prune die Zeile vorher ab und der Lauf danach das
+// Objekt. Für die Mitnahme selbst steht das in test:shopping-move-carry; hier
+// für den Upload, der seinem Ziel gefolgt ist.
+test('Einkaufsartikel: woanders gespiegelt und dort von einer anderen App gelöscht, am alten Platz liegt noch der Rest - der Artikel bleibt und geht zu ihm zurück', async () => {
+  reset();
+  const way = WAYS.Einkaufsartikel;
+  const { row, rows, names } = helpers(way);
+  const url   = way.setup();
+  const other = dav.addCollection('shop2', { name: 'Drogerie', components: ['VTODO'] });
+  dav.putObject(other, 'neighbour2.ics', ics('VTODO', 'neighbour2@test', 'Nachbar'));
+  const otherList = db.prepare("INSERT INTO shopping_lists (name, created_by) VALUES ('Drogerie', 1) RETURNING id").get().id;
+  db.prepare(`
+    INSERT INTO caldav_reminder_selection (account_id, list_url, list_name, target_module, enabled, target_list_id)
+    VALUES (?, ?, 'Drogerie', 'shopping', 1, ?)
+  `).run(accountId, other, otherList);
+  const id  = way.create(url, 'Wandert');
+  const uid = await uploadWithLostAnswer(way, url, id);
+  db.prepare('UPDATE shopping_items SET list_id = ? WHERE id = ?').run(otherList, id);
+  dav.refuse({ method: 'DELETE', status: 403 });
+  await way.push();
+  dav.allowAll();
+  assertMirroredWithLeftover(way, { id, uid, url, other });
+  await deletedByAnotherApp(other, `${uid}.ics`);
+
+  await way.sync();
+  await way.sync();
+
+  assert.equal(rows().length, 1, 'der Artikel ist abgeräumt, obwohl sein letztes Objekt noch auf dem Server liegt');
+  assert.deepEqual(names(url), [`${uid}.ics`], 'das letzte Objekt des Artikels wurde entfernt');
+  const now = row(id);
+  assert.deepEqual([now.external_source, now.external_object_url, now.list_id],
+    ['caldav', `${url}${uid}.ics`, way.listId], 'der Artikel steht nicht, wo der Server ihn führt');
+  noBookkeepingLeft();
+});

@@ -620,14 +620,17 @@ app.use('/api/v1', (req, res, next) => {
 // `authScopes === null` und steigen in derselben Zeile aus wie vorher.
 app.use('/api/v1', (req, res, next) => {
   if (req.authScopes == null) return next();
-  // Ein gekoppeltes Display darf zusaetzlich zu seinen Modulen drei Geruestpfade
-  // LESEN (services/display-accounts.js, `DISPLAY_READ_PATHS`): die eigene
-  // Zeile, die Darstellungseinstellungen und die Modulliste. Keiner davon ist
-  // ein scopebares Modul, also verwuerfe dieses Gate sie samt und sonders - und
-  // die App auf dem Tablett kaeme nie ueber ihren Start hinaus. Die Ausnahme
-  // gilt NUR fuer `authMethod === 'display'`; fuer ein gescoptes Token aendert
-  // sich nichts.
-  if (req.authMethod === 'display' && displayMayAct(req.method, req.path)) return next();
+  // Ein gekoppeltes Display darf zusaetzlich zu seinen Modulen eine Handvoll
+  // Geruestpfade LESEN (display-scopes.js, `DISPLAY_READ_PATHS`): die eigene
+  // Zeile, die Darstellungseinstellungen, die Modulliste, die Personen fuer
+  // seine Aktionen - und, nur wenn ein Administrator es fuer dieses Display
+  // eingeschaltet hat, die Fotos des Bildschirmschoners (`DISPLAY_READ_ROUTES`,
+  // #1766). Keiner davon ist ein scopebares Modul, also verwuerfe dieses Gate
+  // sie samt und sonders - und die App auf dem Tablett kaeme nie ueber ihren
+  // Start hinaus. Die Ausnahme gilt NUR fuer `authMethod === 'display'`; fuer
+  // ein gescoptes Token aendert sich nichts.
+  if (req.authMethod === 'display'
+    && displayMayAct(req.method, req.path, { screensaver: req.displayShowsScreensaver === true })) return next();
   // `tokenAccessRequirement()` statt `moduleForPath()` + `requiredAccess()`:
   // dieselbe Regel, plus die EINE Ausnahme, die fuer beide Achsen gilt
   // (Rezept -> Einkauf liest `meals`, #1290 - Begruendung in server/scopes.js).
@@ -674,7 +677,13 @@ app.use('/api/v1', (req, res, next) => {
   // Anlegen-, Bearbeiten- und Loeschen-Knoepfe, die der Server hinterher
   // abweist. Die Erlaubnis ist keine Modulstufe, sondern genau zwei Routen, und
   // beide Gates fragen dieselbe Liste.
-  if (req.authMethod === 'display' && displayMayAct(req.method, req.path)) return next();
+  // Die Bildschirmschoner-Wahl geht auch hier mit, damit beide Gates dieselbe
+  // Frage stellen - entscheidend ist sie an dieser Stelle nicht, und kein Test
+  // misst sie hier: das Scope-Gate davor hat ein ausgeschaltetes Display
+  // schon abgewiesen, und `/screensaver` ist kein Modul, das dieses Gate
+  // sperren koennte (#1766). Die Regel steht im Scope-Gate.
+  if (req.authMethod === 'display'
+    && displayMayAct(req.method, req.path, { screensaver: req.displayShowsScreensaver === true })) return next();
   const { moduleKey: scopedModuleKey, access: scopedAccess } =
     sessionModuleAccessRequirement(req.path, req.method);
   const verdict = moduleAccessVerdict(

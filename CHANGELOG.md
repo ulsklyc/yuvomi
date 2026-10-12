@@ -123,7 +123,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   due tomorrow at 22:00 or later and less than 24 hours away gets its own label next to the date,
   "Due soon". In English and 17 other languages that label carried the text of "Due today", so the
   tile said "today" in front of tomorrow's date. It now reads "Due soon" in each of them. Dutch
-  follows with the pending Dutch locale update (#1892).
+  gets its own label with the Dutch wording corrections below (#1892).
 - **An archived shared-expense group now refuses changes on the server too** (#1747). Until now only
   the page was locked: an API client or a stale tab could still add, edit or delete expenses,
   comments, settlements and recurring expenses in a group the household had put away, and the
@@ -173,7 +173,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the copy from the server instead of importing it, and the entry ends up only where you last
   put it. The copy is removed with the next sync run, not at the moment you delete the entry,
   and only after Yuvomi has read that the entry at that address is really its own. An upload
-  that the server finishes late is covered for 24 hours after the last attempt.
+  that the server finishes late is covered for 24 hours after the last attempt. A copy that is
+  still waiting to be removed does not keep an event or task in Yuvomi (#1905): if the entry has
+  meanwhile gone to another calendar or list of the same account and is deleted there in another
+  app, it disappears from Yuvomi with the next sync, also while the server refuses to remove the
+  old copy. A shopping item in that situation stays and returns to the list of the copy that is
+  left, as before.
 - **A CalDAV event belongs to the account that brought it** (#1860). With two or more CalDAV
   accounts, an event was identified by its UID alone. When a second account served an event with
   the same UID, it took over the entry of the first: title, calendar and address then came from
@@ -211,6 +216,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the installer after using them day to day: one word for a shift ("vakt"), a reminder
   ("påminnelse") and a tablet ("nettbrett") throughout, "container" and "image" for Docker
   instead of literal translations, and singular forms for a count of one instead of "(er)".
+- **Dutch wording corrections from daily use** (#1892). The notes module was called "Bord" in the
+  navigation, as its page title and in the API token scopes, and "Notities" elsewhere; it is
+  "Notities" in all three now. The due labels on the dashboard, in Tasks, Housekeeping and health
+  prevention read "Vervalt vandaag" and "Vervalt morgen" instead of "Vandaag vervallen" and
+  "Morgen vervallen", and the dashboard's "Due soon" label has its own text, "Vervalt
+  binnenkort", where it repeated the one for today. The empty housekeeping tile says
+  "huishoudhulp" instead of "huishoudelijke hulp".
 - **Deleting an entry of a switched-off CalDAV calendar or reminder list no longer deletes it on
   the server, and is no longer lost or stuck** (#1884). Switching a calendar or reminder list off
   in Settings is meant to leave everything in it alone. A deletion made in Yuvomi for an entry of
@@ -224,6 +236,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   calendar or list no longer exists on the server or the account is removed. The sync log names
   how many deletions are waiting. For iCloud, a deletion for a calendar that no longer exists is
   dropped the same way.
+- **A paired wall tablet can show the photo screensaver** (#1766). Its account could not read the
+  screensaver photos, so the screensaver never started on the one device it was built for. An
+  administrator now switches it on per tablet under Settings → Household → Wall tablets; it is off
+  until then, so a wall that shows the calendar today keeps showing it after the update. A tablet
+  that has it on reads the same photos every signed-in device shows - with their date, city and
+  country - and nothing else of the screensaver: the Immich connection stays out of its reach.
+  The switch reaches a tablet nobody touches in both directions: a screensaver that could not
+  get its photos asks again after the next idle period instead of waiting for a touch, and one
+  whose next photo is refused closes instead of leaving a black screen.
 
 ## [2.76.0] - 2026-10-11
 

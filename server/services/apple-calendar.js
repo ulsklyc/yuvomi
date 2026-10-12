@@ -414,8 +414,10 @@ async function runSync({ makeClient } = {}) {
       }));
       for (const ev of parsed) {
         try {
+          // Für den Leer-Guard des Prune zählt jedes gelieferte Objekt; als
+          // "iCloud führt diesen Termin noch" (`accountUids`) zählt die UID
+          // erst hinter dem Rest-Zweig darunter (#1905).
           calendarUids.add(ev.uid);
-          accountUids.add(ev.uid);
           // Der eigene Upload, dessen Antwort verloren ging: übernommen wird
           // nur ein Termin, den der Upload unten in GENAU diesen Kalender
           // schicken würde (den ersten) - die UID kommt vom Server und weist
@@ -433,8 +435,13 @@ async function runSync({ makeClient } = {}) {
           // ersten Kalender verdrängte sonst das Objekt, das die Zeile
           // inzwischen woanders spiegelt - ihre nächste Bearbeitung ginge mit
           // dem ETag des Rests hinaus.
+          // Und VOR `accountUids` (#1905): ein übersprungener Rest gehört zu
+          // keiner Zeile und zählt nicht als gesehen. Sonst hielte er die
+          // Zeile fest, die inzwischen woanders Spiegel derselben UID ist und
+          // dort auf dem Server gelöscht wurde - so lange, wie er liegt.
           if (outbound.isUnbookedOwnUpload({ source: 'apple', uid: ev.uid, calendarUrl: cal.url })
               && !adoptOwn()) continue;
+          accountUids.add(ev.uid);
 
           // Objekt merken: ausgehende Löschungen brauchen die URL, Änderungen
           // zusätzlich den Originalinhalt zum Patchen (#593).

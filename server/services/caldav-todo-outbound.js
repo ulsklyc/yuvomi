@@ -1129,6 +1129,35 @@ export function isUnbookedOwnUpload(module, uid, listUrl) {
 }
 
 /**
+ * Für den Abruf, der einen Rest überspringt: hängt an dem Objekt mit dieser
+ * UID in dieser Liste noch ein Einkaufsartikel, der anderswo Spiegel
+ * DERSELBEN UID ist?
+ *
+ * Ein übersprungener Rest zählt sonst nicht als "der Server liefert den
+ * Eintrag noch" (#1905). Für diesen einen Fall gilt die ältere Regel der
+ * Mitnahme (#1700, `confirmCarriedCopy`): fehlt die Kopie am Platz der Zeile,
+ * ist das Objekt hier das letzte, und die Zeile geht zu ihm zurück. Das
+ * entscheidet `releaseLeftoverTodoUploads` NACH dem Prune desselben Laufs -
+ * der Prune darf die Zeile deshalb nicht vorher abräumen.
+ *
+ * Dieselbe Frage wie dort an die Zeile, aus dem Stand von jetzt; Notizen der
+ * Art `task` zählen nie.
+ */
+export function leftoverHoldsCarriedItem(uid, listUrl) {
+  let attempts;
+  try {
+    attempts = uploadAttemptsAt({ source: 'caldav', kind: 'item', uid, collectionUrl: listUrl });
+  } catch (err) {
+    log.warn(`Upload notes are not readable (${err.message}); treating them as none.`);
+    return false;
+  }
+  return attempts.some((attempt) => {
+    const row = reloadRow('shopping', attempt.row_id);
+    return !!row && row.external_source === 'caldav' && row.external_uid === attempt.uid;
+  });
+}
+
+/**
  * Entfernt die Reste von Aufgaben- und Einkaufs-Uploads, deren Antwort nie
  * ankam (#1882): die Notizen des Kontos, deren Zeile dort nicht mehr
  * hingehört (`todoAttemptState`). Was dabei gelesen, gelöscht oder stehen

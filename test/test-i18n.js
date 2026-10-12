@@ -312,14 +312,6 @@ const DISTINCT_STATE_LABELS = [
   ['dashboard.dueSoon', 'dashboard.dueToday'],
 ];
 
-/* nl.json korrigiert der offene PR #1892 (dort wird `dueSoon` zu "Vervalt
- * binnenkort"); dieselbe Zeile hier anzufassen, ergaebe einen Konflikt. Die
- * Ausnahme haengt am EXAKTEN Altwert, nicht an der Sprache: jeder andere
- * Gleichstand in nl.json wird rot. Nach dem Merge von #1892 entfaellt sie. */
-const DISTINCT_STATE_PENDING = new Map([
-  ['nl:dashboard.dueSoon', 'Vandaag vervallen'],
-]);
-
 test('Labels fuer verschiedene Zustaende sind in keiner Sprache textgleich', () => {
   const fold = (value, locale) => String(value ?? '').trim().toLocaleLowerCase(locale);
   const offenders = [];
@@ -329,7 +321,6 @@ test('Labels fuer verschiedene Zustaende sind in keiner Sprache textgleich', () 
       assert.ok(fold(flat.get(a), locale), `${locale}.json: ${a} fehlt`);
       assert.ok(fold(flat.get(b), locale), `${locale}.json: ${b} fehlt`);
       if (fold(flat.get(a), locale) !== fold(flat.get(b), locale)) continue;
-      if (DISTINCT_STATE_PENDING.get(`${locale}:${a}`) === flat.get(a)) continue;
       offenders.push(`${locale}.json: ${a} = ${b} = "${flat.get(a)}"`);
     }
   }
