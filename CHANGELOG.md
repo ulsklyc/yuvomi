@@ -31,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refused. Only a SHA-256 hash of the address and the server's IP leave the server, through the
   SSRF-guarded client with an 8 second limit, a 512 KiB cap and a signature check. If the
   picture, the address or the account changes while the fetch runs, nothing is stored (409).
+  The hint and the error messages name the service the operator chose by its host name, so a
+  mirror is never called gravatar.com, and a failed fetch is announced once, in the form's error
+  line.
 - **Tapping a category or subcategory in the budget overview filters the transactions list.**
   (#1593, from D#1583) The filter applies in place and can be cleared again.
 

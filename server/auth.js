@@ -18,7 +18,7 @@ import { SESSION_MAX_AGE_MS, sessionCookieRefreshDue } from './utils/session-lif
 import { collectErrors, date as validateDate, str, MAX_SHORT, MAX_TITLE } from './middleware/validate.js';
 import { createLogger } from './logger.js';
 import { memberEmail } from './services/member-email.js';
-import { GravatarError, fetchGravatar, gravatarEnabled } from './services/gravatar.js';
+import { GravatarError, fetchGravatar, gravatarEnabled, gravatarHost } from './services/gravatar.js';
 import {
   accessScopeSql, activeAccountSql, deactivatedAtColumnSql, householdMemberSql, isActiveAccount,
   isHouseholdMember, memberOrderSql, memberPositionSql,
@@ -2692,7 +2692,7 @@ router.get('/me', requireAuth, (req, res) => {
         householdSize: householdSize(db.get()),
         initialsRoster: initialsRoster(db.get(), user.id),
         othersCanRead: othersCanRead(db.get(), user.id),
-        gravatarAvailable: gravatarAvailable(user.id),
+        ...gravatarClientState(user.id),
       });
     }
 
@@ -2735,7 +2735,7 @@ router.get('/me', requireAuth, (req, res) => {
       householdSize: householdSize(db.get()),
       initialsRoster: initialsRoster(db.get(), user.id),
       othersCanRead: othersCanRead(db.get(), user.id),
-      gravatarAvailable: gravatarAvailable(user.id),
+      ...gravatarClientState(user.id),
       csrfToken: req.session.csrfToken,
     });
   } catch (err) {
@@ -3719,6 +3719,19 @@ function gravatarAvailable(userId) {
 }
 
 /**
+ * Was GET /auth/me der Kontoseite ueber den Import sagt: ob es den Knopf gibt,
+ * und WELCHEN Dienst der Hinweis nennen muss. `gravatarHost` ist der Hostname
+ * der geprueften Basis-URL (gravatarHost() im Dienst) und nur dann gesetzt,
+ * wenn es den Knopf gibt - ein Split-Gast oder ein Server ohne Import erfaehrt
+ * nicht, was eingetragen ist. null bei einer falsch gesetzten Basis: dann nennt
+ * die Seite keinen Dienst, und der Klick meldet den Betreiberfehler (500).
+ */
+function gravatarClientState(userId) {
+  const available = gravatarAvailable(userId);
+  return { gravatarAvailable: available, gravatarHost: available ? (gravatarHost() || null) : null };
+}
+
+/**
  * POST /api/v1/auth/me/avatar/gravatar
  * Holt das Gravatar zur eigenen gespeicherten Adresse EINMAL und legt es wie
  * einen Upload ab: derselbe Weg wie PATCH /me/profile mit `avatar_data`
@@ -3791,13 +3804,16 @@ export function buildGravatarRoute(targetRouter, { fetch = fetchGravatar, limite
         // nicht die Meldung - die traegt bei einem DNS-Fehler den Host der
         // Basis-URL. Ein Betreiberfehler (500) bekommt nach aussen einen
         // neutralen Satz; der genaue steht im Log, wo der Betreiber liest.
-        log.info('Gravatar import refused', { userId, reason: err.reason, cause: err.cause?.code ?? err.cause?.name, detail: status >= 500 ? err.message : undefined });
-        const error = status >= 500 ? 'Gravatar import is misconfigured on this server.' : err.message;
+        // Genau die 500, nicht "ab 500": ein 502 gravatar_unreachable ist kein
+        // Betreiberfehler, und sein Satz nennt den Dienst, der nicht antwortete.
+        const operatorError = status === 500;
+        log.info('Gravatar import refused', { userId, reason: err.reason, cause: err.cause?.code ?? err.cause?.name, detail: operatorError ? err.message : undefined });
+        const error = operatorError ? 'Gravatar import is misconfigured on this server.' : err.message;
         return res.status(status).json({ error, code: status, reason: err.reason });
       }
       if (!fetched) {
         log.info('Gravatar import: no picture', { userId });
-        return res.status(404).json({ error: 'gravatar.com has no picture for your email address.', code: 404, reason: 'gravatar_not_found' });
+        return res.status(404).json({ error: `${gravatarHost()} has no picture for your email address.`, code: 404, reason: 'gravatar_not_found' });
       }
 
       // Derselbe Filter wie beim Upload. Er kann hier nur noch an der Laenge

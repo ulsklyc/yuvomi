@@ -688,7 +688,8 @@ member can then fetch the picture that the service holds for their saved email a
 **Settings → Account → Use my Gravatar**. The server fetches it once, on that click, and stores it
 exactly like an uploaded picture; nothing is fetched again later. Split-expense guests do not get
 the button. Only a SHA-256 hash of the lowercased address, this server's IP and its User-Agent
-reach the service, never the address itself. The fetch uses HTTPS only, follows at most five
+reach the service, never the address itself. The hint under the button and the error messages
+name the service by the host name of the URL you set, so with a mirror they name the mirror. The fetch uses HTTPS only, follows at most five
 redirects, refuses private network targets, times out after 8 seconds and accepts at most 512 KiB
 of PNG, JPEG or WebP. Only A-Z is lowercased (the same key as the email matching,
 `emailMatchKey`), while Gravatar lowercases everything: an address with a non-ASCII capital

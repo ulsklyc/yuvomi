@@ -867,6 +867,13 @@ export const schemas = {
                 + '(`POST /api/v1/auth/me/avatar/gravatar`): true only when the operator set `GRAVATAR_BASE_URL` '
                 + 'and the account is a household member. The configured URL itself is never exposed.',
             },
+            gravatarHost: {
+              type: ['string', 'null'],
+              description: 'Host name of the service the operator configured in `GRAVATAR_BASE_URL` '
+                + '(e.g. `gravatar.com` or a Libravatar mirror), so the account page can name where the hash goes. '
+                + 'Host name only - no scheme, port, path or credentials. `null` unless `gravatarAvailable` is true, '
+                + 'and `null` when the configured value is not a valid public https URL.',
+            },
           },
           required: ['user'],
         },

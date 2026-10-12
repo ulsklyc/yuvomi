@@ -638,9 +638,12 @@ Konfiguration so, dass du auf einen EU-Provider umstellen könntest.
   ein Abruf vom Backend über den SSRF-geschützten Client: nur HTTPS,
   Weiterleitungen werden neu geprüft, 8 s Zeitlimit, höchstens 512 KiB,
   nur PNG, JPEG oder WebP mit passender Dateisignatur. Das Ergebnis liegt
-  danach wie ein hochgeladenes Bild in `users.avatar_data`; gravatar.com
+  danach wie ein hochgeladenes Bild in `users.avatar_data`; der Dienst
   wird nicht erneut kontaktiert, und der Browser lädt nie direkt von dort
-  (CSP `img-src 'self' data:`).
+  (CSP `img-src 'self' data:`). Der Hinweis unter dem Knopf und die
+  Fehlermeldungen nennen den Dienst beim Hostnamen der gesetzten Basis-URL
+  (`gravatarHost` aus `GET /api/v1/auth/me`), bei einem Spiegel also den
+  Spiegel und nicht gravatar.com.
 - **Was wird übertragen:** der SHA-256-Hash der kleingeschriebenen
   E-Mail-Adresse, die IP deines Yuvomi-Servers und der User-Agent. Nie die
   Adresse selbst, nie der Name oder andere Profildaten. Der Hash einer
@@ -651,7 +654,8 @@ Konfiguration so, dass du auf einen EU-Provider umstellen könntest.
   ergibt einen anderen Hash als bei Gravatar und bekommt „kein Bild".
 - **Abschalten:** `GRAVATAR_BASE_URL` ungesetzt oder leer lassen (Standard);
   die Route antwortet dann mit 404, und die Kontoseite zeigt keinen Knopf.
-- **Drittland/AVV:** Automattic Inc. (USA); kein AVV (kein Auftrag, nur ein
+- **Drittland/AVV:** bei gravatar.com Automattic Inc. (USA), bei einem
+  Spiegel dessen Betreiber; kein AVV (kein Auftrag, nur ein
   einzelner Abruf, den das Mitglied selbst auslöst); DPF-Status prüfen und
   in der Datenschutzerklärung transparent nennen.
 

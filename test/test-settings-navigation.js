@@ -227,7 +227,12 @@ test('Gravatar: der Knopf steht im Bild-Editor, gesperrt ohne gespeicherte Adres
   assert.doesNotMatch(free, /aria-disabled/);
   // Der Hinweis nennt die Adresse, die gehasht wird (der Stub von t() haengt
   // die Parameter als JSON an).
-  assert.equal(gravatarHintText({ email: ' ada@example.org ' }), 'settings.gravatarHint{"email":"ada@example.org"}');
+  // Und er nennt den Dienst, den der Betreiber eingetragen hat (#1791-Folge):
+  // der Host kommt vom Server, nie als fester Name aus dem Satz. Ohne Host
+  // (Basis-URL falsch gesetzt) nennt der Satz keinen Dienst.
+  assert.equal(gravatarHintText({ email: ' ada@example.org ' }, 'seccdn.libravatar.org'), 'settings.gravatarHint{"email":"ada@example.org","host":"seccdn.libravatar.org"}');
+  assert.equal(gravatarHintText({ email: ' ada@example.org ' }), 'settings.gravatarHintUnnamed{"email":"ada@example.org"}');
+  assert.equal(gravatarHintText({ email: null }, 'gravatar.com'), 'settings.gravatarNeedsEmail');
 
   // Dieselbe Familie wie Hochladen und Entfernen daneben, mit Icon.
   assert.match(free, /class="settings-avatar-action"/);
@@ -256,11 +261,15 @@ test('Gravatar: die Hinweiszeile kommt leer aus dem HTML und wird als Text gefue
   // Speichern des Profils zieht er mit (syncGravatarButton).
   const source = await readFile(new URL('../public/settings/pages/personal-account.js', import.meta.url), 'utf8');
   assert.match(source, /gravatarAvailable = response\?\.gravatarAvailable === true;/);
+  // Der Host reist denselben Weg: aus auth.me() in bindEvents() und von dort
+  // in Hinweis und Fehlersatz.
+  assert.match(source, /gravatarHost = gravatarAvailable && typeof response\?\.gravatarHost === 'string' \? response\.gravatarHost : '';/);
+  assert.match(source, /\}, \{ gravatarHost \}\);/);
   assert.match(source, /\$\{gravatarHintHtml\(gravatarAvailable\)\}/);
   assert.match(source, /\$\{avatarEditorHtml\(user, \{ gravatarAvailable \}\)\}/);
   assert.doesNotMatch(source, /gravatarHint[A-Za-z]*\.innerHTML|esc\(gravatarHintText/);
   const sync = source.slice(source.indexOf('const syncGravatarButton = () => {'), source.indexOf('const labelGravatarButton'));
-  assert.match(sync, /fillGravatarHint\(gravatarHint, user\)/);
+  assert.match(sync, /fillGravatarHint\(gravatarHint, user, gravatarHost\)/);
   assert.match(sync, /\n  syncGravatarButton\(\);/, 'beim Binden einmal gefuellt');
 });
 
@@ -290,6 +299,11 @@ test('Gravatar: jeder Grund, den die Route nennen kann, hat seinen Satz, 429 lie
   assert.equal(gravatarErrorText({ status: 429, data: { error: 'Too many requests' } }), 'settings.gravatarErrorRateLimited');
   assert.equal(gravatarErrorText({ status: 500, data: { reason: 'something_new' }, message: 'Server text' }), 'Server text');
   assert.equal(gravatarErrorText(new Error('offline')), 'offline');
+  // Mit dem Host des gewaehlten Dienstes reist er als Parameter in den Satz.
+  assert.equal(
+    gravatarErrorText({ status: 502, data: { reason: 'gravatar_unreachable' } }, 'seccdn.libravatar.org'),
+    'settings.gravatarErrorUnreachable{"host":"seccdn.libravatar.org"}',
+  );
 
   // Der Klick-Handler: ruft die Route, nimmt genau diese Funktion, uebernimmt
   // das gespeicherte Bild in Vorschau und Seitenleiste - und speichert NICHT
@@ -304,8 +318,12 @@ test('Gravatar: jeder Grund, den die Route nennen kann, hat seinen Satz, 429 lie
   // user.email.trim()) - die Route sagt 409, wenn der Server inzwischen eine
   // andere fuehrt.
   assert.match(handler, /api\.post\('\/auth\/me\/avatar\/gravatar', \{ email: user\.email\.trim\(\) \}\)/);
-  assert.match(source, /t\('settings\.gravatarHint', \{ email: user\.email\.trim\(\) \}\)/, 'Hinweis und Anfrage nennen dieselbe Adresse');
-  assert.match(handler, /showError\(profileError, gravatarErrorText\(error\)\)/);
+  assert.match(source, /const email = user\.email\.trim\(\);\n  return host\n    \? t\('settings\.gravatarHint', \{ email, host \}\)/, 'Hinweis und Anfrage nennen dieselbe Adresse');
+  assert.match(handler, /showError\(profileError, gravatarErrorText\(error, gravatarHost\)\)/);
+  // EINE Ansage: die Fehlerzeile (role="alert") - kein Fehler-Toast daneben,
+  // sonst hoert die Vorlesehilfe den Satz zweimal.
+  assert.doesNotMatch(handler, /showToast\([^)]*'danger'\)/);
+  assert.equal((handler.match(/showToast\(/g) || []).length, 1, 'nur der Erfolgs-Toast');
   assert.match(handler, /profileState\.avatarData = data\.avatar_data \?\? null/);
   assert.match(handler, /new CustomEvent\('yuvomi:profile-changed'/);
   assert.match(handler, /showToast\(t\('settings\.gravatarDone'\), 'success'\)/);

@@ -47,7 +47,7 @@ const ALLOWED_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 /**
  * Ein Fehler mit maschinenlesbarem Grund (snake_case) fuer die Route und die
  * Oberflaeche. Die Meldung ist fuer Menschen und nennt nie den Hash, die
- * Basis-URL oder einen Serverpfad.
+ * Basis-URL oder einen Serverpfad - vom Dienst nur den Hostnamen.
  */
 export class GravatarError extends Error {
   constructor(reason, message, { cause } = {}) {
@@ -81,6 +81,25 @@ export function gravatarBaseUrl(env = process.env) {
  */
 export function gravatarEnabled(env = process.env) {
   return gravatarBaseUrl(env) !== '';
+}
+
+/**
+ * Der Hostname des Dienstes, den der Betreiber gewaehlt hat - das, was Hinweis
+ * und Fehlersaetze NENNEN. Die Kontoseite verspricht dem Mitglied, wohin der
+ * Hash seiner Adresse geht; mit einem Libravatar-Spiegel waere ein fest
+ * verdrahtetes "gravatar.com" dort eine falsche Datenschutz-Aussage.
+ *
+ * Nur der Hostname der GEPRUEFTEN Basis-URL (resolvedBase): kein Schema, kein
+ * Port, kein Pfad, keine Zugangsdaten - und nie etwas aus einer Anfrage. Ein
+ * IDN kommt als Punycode, so wie er auch abgerufen wird. '' heisst: aus oder
+ * falsch gesetzt - dann gibt es keinen Dienst, den man nennen koennte.
+ */
+export function gravatarHost(env = process.env) {
+  try {
+    return resolvedBase(gravatarBaseUrl(env)).hostname;
+  } catch {
+    return '';
+  }
 }
 
 /**
@@ -195,6 +214,10 @@ export async function fetchGravatar(email, {
   // Die URL VOR der Adresspruefung zu bauen hiesse, einem Konto ohne Adresse
   // "abgeschaltet" zu melden - der Grund, den es selbst beheben kann, geht vor.
   const url = gravatarUrl(email, { size, base });
+  // Der Dienst beim Namen: der Host der geprueften Basis, nicht "gravatar.com" -
+  // bei einem Spiegel waere das der falsche. Leitet der Spiegel um, bleibt es
+  // der Name, den der Betreiber eingetragen hat und den der Hinweis nennt.
+  const unreachable = `${new URL(url).hostname} could not be reached.`;
 
   let res;
   try {
@@ -207,7 +230,7 @@ export async function fetchGravatar(email, {
     // Timeout, DNS, vom Guard abgewiesene Adresse, TLS, zu viele Redirects:
     // fuer das Mitglied ist das alles "nicht erreichbar". Was genau, steht als
     // `cause` im Log der Route, nicht in der Antwort.
-    throw new GravatarError('gravatar_unreachable', 'gravatar.com could not be reached.', { cause: err });
+    throw new GravatarError('gravatar_unreachable', unreachable, { cause: err });
   }
 
   if (res.status === 404) {
@@ -216,7 +239,7 @@ export async function fetchGravatar(email, {
   }
   if (!res.ok) {
     res.body.destroy();
-    throw new GravatarError('gravatar_unreachable', 'gravatar.com could not be reached.');
+    throw new GravatarError('gravatar_unreachable', unreachable);
   }
 
   const type = contentType(res);
@@ -234,7 +257,7 @@ export async function fetchGravatar(email, {
     image = await readLimited(res, MAX_GRAVATAR_BYTES);
   } catch (err) {
     if (err instanceof GravatarError) throw err;
-    throw new GravatarError('gravatar_unreachable', 'gravatar.com could not be reached.', { cause: err });
+    throw new GravatarError('gravatar_unreachable', unreachable, { cause: err });
   }
   // Der Typ kommt aus einer fremden Antwort; die Bytes muessen ihn bestaetigen,
   // genau wie bei einem Upload (dataUrlContentMatches in den Upload-Routen).

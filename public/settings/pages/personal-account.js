@@ -77,17 +77,24 @@ function avatarEditorHtml(user, { gravatarAvailable = false } = {}) {
  * den Grund, warum der Gravatar-Knopf gesperrt ist; mit Adresse NENNT sie die
  * Adresse, die gehasht wird - sie steht auf einer Kontaktkarte, die auch andere
  * Mitglieder bearbeiten koennen - und sagt, was den Server beim Klick verlaesst
- * (nur ein Hash der Adresse und die Server-IP).
+ * (nur ein Hash der Adresse und die Server-IP) und WOHIN: zu dem Dienst, den
+ * der Betreiber eingetragen hat. `host` ist dessen Hostname aus GET /auth/me
+ * (`gravatarHost`), nie ein fester Name - mit einem Libravatar-Spiegel waere
+ * "erreicht gravatar.com" eine falsche Aussage. Ohne Host (die Basis-URL ist
+ * falsch gesetzt, der Klick meldet das) nennt der Satz keinen Dienst.
  *
  * Reiner Text, nie HTML: er geht nur ueber textContent auf die Seite
  * (fillGravatarHint), deshalb hier kein esc() - das ergaebe `&amp;` im Satz.
  * @param {{ email?: string|null }|null|undefined} user
+ * @param {string} [host]
  * @returns {string}
  */
-function gravatarHintText(user) {
-  return hasSavedEmail(user)
-    ? t('settings.gravatarHint', { email: user.email.trim() })
-    : t('settings.gravatarNeedsEmail');
+function gravatarHintText(user, host = '') {
+  if (!hasSavedEmail(user)) return t('settings.gravatarNeedsEmail');
+  const email = user.email.trim();
+  return host
+    ? t('settings.gravatarHint', { email, host })
+    : t('settings.gravatarHintUnnamed', { email });
 }
 
 /**
@@ -106,8 +113,8 @@ function gravatarHintHtml(gravatarAvailable) {
  * @param {{ textContent: string }|null|undefined} element
  * @param {{ email?: string|null }|null|undefined} user
  */
-function fillGravatarHint(element, user) {
-  if (element) element.textContent = gravatarHintText(user);
+function fillGravatarHint(element, user, host = '') {
+  if (element) element.textContent = gravatarHintText(user, host);
 }
 
 function showError(element, message) {
@@ -462,12 +469,14 @@ export const GRAVATAR_REASON_KEYS = Object.freeze({
  * Fehlertext fuer den Gravatar-Abruf. Ein 429 ohne `reason` (etwa vom
  * allgemeinen Limit davor) liest sich ebenfalls als "zu oft", nicht als
  * Fehlschlag; alles Unbekannte faellt auf den Servertext zurueck.
+ * `host` ist der Dienst, den die Saetze nennen (`gravatarHost` aus /auth/me).
  * @param {{ status?: number, data?: { reason?: string }, message?: string }} err
+ * @param {string} [host]
  * @returns {string}
  */
-export function gravatarErrorText(err) {
+export function gravatarErrorText(err, host = '') {
   const key = GRAVATAR_REASON_KEYS[err?.data?.reason];
-  if (key) return t(key);
+  if (key) return host ? t(key, { host }) : t(key);
   if (err?.status === 429) return t('settings.gravatarErrorRateLimited');
   return err?.message || t('common.errorGeneric');
 }
@@ -713,7 +722,7 @@ function bindOidcEvents(container) {
   });
 }
 
-function bindEvents(container, user, profileState) {
+function bindEvents(container, user, profileState, { gravatarHost = '' } = {}) {
   bindOidcEvents(container);
   const profileError = container.querySelector('#profile-error');
   const avatarFile = container.querySelector('#profile-avatar-file');
@@ -768,7 +777,7 @@ function bindEvents(container, user, profileState) {
   const gravatarHint   = container.querySelector('#profile-gravatar-hint');
   let gravatarBusy = false;
   const syncGravatarButton = () => {
-    fillGravatarHint(gravatarHint, user);
+    fillGravatarHint(gravatarHint, user, gravatarHost);
     if (!gravatarButton) return;
     if (hasSavedEmail(user) && !gravatarBusy) gravatarButton.removeAttribute('aria-disabled');
     else gravatarButton.setAttribute('aria-disabled', 'true');
@@ -802,12 +811,14 @@ function bindEvents(container, user, profileState) {
       }
       window.yuvomi?.showToast(t('settings.gravatarDone'), 'success');
     } catch (error) {
-      // Der Fehlerbereich des Formulars liegt unter den Kontaktfeldern - auf
-      // dem Telefon eine Bildschirmhoehe unter dem Knopf, der gedrueckt wurde.
-      // Deshalb zusaetzlich der Toast: er steht dort, wo der Finger ist. Die
-      // Zeile mit role="alert" bleibt fuer die Vorlesehilfe und den Desktop.
-      showError(profileError, gravatarErrorText(error));
-      window.yuvomi?.showToast(gravatarErrorText(error), 'danger');
+      // EINE Stelle sagt den Fehler an: die Fehlerzeile des Formulars
+      // (role="alert"), wie bei jedem anderen Fehler dieser Karte. Ein Toast
+      // daneben liesse die Vorlesehilfe denselben Satz zweimal sprechen. Die
+      // Zeile liegt unter den Kontaktfeldern - auf dem Telefon eine
+      // Bildschirmhoehe unter dem Knopf -, deshalb wird sie in den Blick
+      // geholt statt verdoppelt ('nearest': steht sie schon da, bewegt sich nichts).
+      showError(profileError, gravatarErrorText(error, gravatarHost));
+      profileError?.scrollIntoView?.({ block: 'nearest' });
     } finally {
       gravatarBusy = false;
       labelGravatarButton(t('settings.gravatarUse'));
@@ -943,12 +954,16 @@ export async function render(container, { user }) {
   // Ohne frische Antwort kein Gravatar-Knopf: ob der Betreiber ihn
   // eingeschaltet hat, weiss nur der Server.
   let gravatarAvailable = false;
+  // Der Dienst, den Hinweis und Fehlersaetze nennen: der Hostname, den der
+  // Server aus der Basis-URL des Betreibers ableitet. Nie ein fester Name.
+  let gravatarHost = '';
 
   try {
     const response = await auth.me();
     if (response?.user && user) Object.assign(user, response.user);
     else if (response?.user) currentUser = response.user;
     gravatarAvailable = response?.gravatarAvailable === true;
+    gravatarHost = gravatarAvailable && typeof response?.gravatarHost === 'string' ? response.gravatarHost : '';
   } catch {
     refreshFailed = true;
   }
@@ -977,7 +992,7 @@ export async function render(container, { user }) {
     renderPage(container, currentUser, refreshFailed, accessNotice, oidcState, oidcNotice, twoFactorState, gravatarAvailable);
     bindEvents(container, currentUser, {
       avatarData: currentUser?.avatar_data ?? null,
-    });
+    }, { gravatarHost });
     bindTwoFactorEvents(container, () => render(container, { user: currentUser }));
     container.querySelector('#account-retry')?.addEventListener('click', () => {
       render(container, { user: currentUser });

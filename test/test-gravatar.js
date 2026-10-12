@@ -612,7 +612,10 @@ test('ab Werk AUS: GRAVATAR_BASE_URL ungesetzt -> 404 gravatar_disabled ohne Abr
   assert.equal(avatarOf(308), null);
   assert.equal(await gravatarFlag(session), true, 'eingeschaltet und Mitglied: der Knopf darf erscheinen');
   const me = await call('GET', '/me', session);
-  assert.ok(!JSON.stringify(me.body).includes('gravatar.com'), '/auth/me nennt die Basis-URL nie');
+  // Den Hostnamen des Dienstes ja (der Hinweis der Kontoseite nennt ihn), die
+  // Basis-URL nie.
+  assert.equal(me.body.gravatarHost, 'gravatar.com');
+  assert.ok(!/https?:\/\/|\/avatar/.test(JSON.stringify(me.body)), '/auth/me nennt die Basis-URL nie');
 });
 
 test('ein Split-Gast -> 403 not_a_household_member, bevor irgendetwas abgerufen wird', async () => {
@@ -730,4 +733,98 @@ test('die Seite schickt die Adresse ihres Hinweises: weicht die gespeicherte ab 
   assert.equal(noField.status, 200, JSON.stringify(noField.body));
   assert.equal(calls, 2);
   assert.equal(avatarOf(313), `data:image/jpeg;base64,${JPEG.toString('base64')}`);
+});
+
+// --------------------------------------------------------------------------
+// Der Dienst beim Namen. Das Ziel waehlt der Betreiber; Hinweis und
+// Fehlersaetze duerfen deshalb nicht fest "gravatar.com" sagen - mit einem
+// Spiegel waere "nur ein Hash erreicht gravatar.com" eine falsche Aussage.
+// --------------------------------------------------------------------------
+
+const MIRROR_BASE = 'https://seccdn.libravatar.org/avatar/';
+const MIRROR_HOST = 'seccdn.libravatar.org';
+
+test('gravatarHost(): nur der Hostname der geprueften Basis - kein Schema, Port, Pfad, keine Zugangsdaten', async () => {
+  const { gravatarHost } = await import('../server/services/gravatar.js');
+  assert.equal(typeof gravatarHost, 'function');
+  assert.equal(gravatarHost({ GRAVATAR_BASE_URL: GRAVATAR_BASE }), 'gravatar.com');
+  assert.equal(gravatarHost({ GRAVATAR_BASE_URL: ` ${MIRROR_BASE} ` }), MIRROR_HOST);
+  assert.equal(gravatarHost({ GRAVATAR_BASE_URL: 'https://user:secret@Mirror.Example.ORG:8443/a/b' }), 'mirror.example.org');
+  // Aus oder falsch gesetzt: es gibt keinen Dienst, den man nennen koennte -
+  // und der rohe Wert des Betreibers wird nie durchgereicht.
+  for (const base of [undefined, '', '   ', 'http://gravatar.com/avatar/', 'https://localhost/avatar/', 'https://gravatar.com/avatar/?x=1', 'not a url', '<b>x</b>']) {
+    assert.equal(gravatarHost({ GRAVATAR_BASE_URL: base }), '', String(base));
+  }
+});
+
+test('GET /auth/me nennt den Host des gewaehlten Dienstes - und nur ihn, nur wenn es den Knopf gibt', async () => {
+  addUser(320, 'lena', { email: 'lena@example.com' });
+  const session = await signIn(320);
+  const me = async () => (await call('GET', '/me', session)).body;
+
+  assert.equal((await me()).gravatarHost, 'gravatar.com', 'das Standardziel dieser Suite');
+  await withBase(MIRROR_BASE, async () => {
+    const body = await me();
+    assert.equal(body.gravatarAvailable, true);
+    assert.equal(body.gravatarHost, MIRROR_HOST, 'der Spiegel, nicht gravatar.com');
+    const text = JSON.stringify(body);
+    assert.ok(!text.includes('gravatar.com'), 'kein fest verdrahteter Name');
+    assert.ok(!text.includes('/avatar') && !/https?:\/\//.test(text), 'nur der Hostname, nie die URL');
+    // Ein Split-Gast bekommt keinen Knopf und erfaehrt auch nicht, was eingetragen ist.
+    const guest = (await call('GET', '/me', await signIn(307))).body;
+    assert.equal(guest.gravatarAvailable, false);
+    assert.equal(guest.gravatarHost, null);
+  });
+  await withBase('https://user:secret@mirror.example.org:8443/a/b', async () => {
+    const body = await me();
+    assert.equal(body.gravatarHost, 'mirror.example.org');
+    assert.ok(!JSON.stringify(body).includes('secret'), 'Zugangsdaten der Basis-URL verlassen den Server nicht');
+  });
+  await withBase(undefined, async () => {
+    const body = await me();
+    assert.equal(body.gravatarAvailable, false);
+    assert.equal(body.gravatarHost, null);
+  });
+  // Falsch gesetzt bleibt "eingeschaltet" (der Klick meldet den Betreiberfehler),
+  // aber es gibt keinen Dienst zu nennen - und der rohe Wert geht nicht hinaus.
+  await withBase('http://plain.example.org/avatar/', async () => {
+    const body = await me();
+    assert.equal(body.gravatarAvailable, true);
+    assert.equal(body.gravatarHost, null);
+    assert.ok(!JSON.stringify(body).includes('plain.example.org'));
+  });
+});
+
+test('mit einem Spiegel nennen die Fehlersaetze der API den Spiegel, nicht gravatar.com', async () => {
+  addUser(321, 'mona', { email: 'mona@example.com' });
+  const session = await signIn(321);
+  await withBase(MIRROR_BASE, async () => {
+    transport.reply = (url) => {
+      assert.ok(url.startsWith(MIRROR_BASE), url);
+      return response(404, { 'Content-Type': 'image/png' }, PNG);
+    };
+    const missing = await importGravatar(session);
+    assert.equal(missing.status, 404);
+    assert.equal(missing.body.reason, 'gravatar_not_found');
+    assert.equal(missing.body.error, `${MIRROR_HOST} has no picture for your email address.`);
+
+    transport.reply = () => Promise.reject(Object.assign(new Error(`getaddrinfo ENOTFOUND ${MIRROR_HOST}`), { code: 'ENOTFOUND' }));
+    const down = await importGravatar(session);
+    assert.equal(down.status, 502);
+    assert.equal(down.body.error, `${MIRROR_HOST} could not be reached.`);
+
+    transport.reply = () => response(503, {}, Buffer.alloc(0));
+    const refused = await importGravatar(session);
+    assert.equal(refused.status, 502);
+    assert.equal(refused.body.error, `${MIRROR_HOST} could not be reached.`);
+
+    for (const body of [missing.body, down.body, refused.body]) {
+      assert.ok(!JSON.stringify(body).includes('gravatar.com'), JSON.stringify(body));
+      assert.ok(!/https?:\/\//.test(JSON.stringify(body)), 'nur der Hostname, nie die URL');
+    }
+  });
+  // Gegenprobe: mit dem Standardziel der Suite heisst der Dienst gravatar.com.
+  transport.reply = () => response(404, { 'Content-Type': 'image/png' }, PNG);
+  const standard = await importGravatar(session);
+  assert.equal(standard.body.error, 'gravatar.com has no picture for your email address.');
 });
