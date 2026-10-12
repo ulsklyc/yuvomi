@@ -130,7 +130,8 @@
     "privateNetworkWaste": "Odbiór odpadów",
     "privateNetworkWebdav": "Dokumenty WebDAV",
     "baseUrl": "Adres publiczny",
-    "outlook": "Kalendarz Outlook"
+    "outlook": "Kalendarz Outlook",
+    "moduleWebInstall": "Instalowanie modułów z Ustawień"
   },
   "docker": {
     "title": "Uruchamianie Yuvomi",
@@ -276,7 +277,9 @@
     "sectionPrivateNetwork": "Dostęp do sieci domowej",
     "privateNetworkHint": "Yuvomi domyślnie odrzuca połączenia z adresami w twojej sieci, co chroni przed nakłonieniem serwera do sięgnięcia po usługi wewnętrzne. Włącz to, co naprawdę masz w domu.",
     "authPasswordLogin": "Zachowaj logowanie nazwą użytkownika i hasłem",
-    "authPasswordLoginHint": "Wyłączenie sprawia, że SSO jest jedyną drogą do środka: formularz logowania i resetowanie hasła znikają. Jeśli dostawca stanie się nieosiągalny, droga powrotna prowadzi przez plik .env i ponowne uruchomienie."
+    "authPasswordLoginHint": "Wyłączenie sprawia, że SSO jest jedyną drogą do środka: formularz logowania i resetowanie hasła znikają. Jeśli dostawca stanie się nieosiągalny, droga powrotna prowadzi przez plik .env i ponowne uruchomienie.",
+    "moduleWebInstall": "Zezwól na instalowanie modułów z Ustawień",
+    "moduleWebInstallHint": "Pozwala administratorowi umieszczać moduły innych autorów na serwerze z poziomu interfejsu WWW (wgranie ZIP lub adres GitHub) bez dostępu do plików. Zainstalowane moduły pozostają wyłączone, dopóki administrator ich nie zatwierdzi. Wyłączone: moduły kopiuje się ręcznie do folderu modułów."
   },
   "welcome": {
     "title": "Jak chcesz skonfigurować Yuvomi?",

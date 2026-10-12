@@ -12,7 +12,7 @@ modules/
     style.css
 ```
 
-The folder name must match the manifest `id`.
+The folder name must match the manifest `id`. A module installed from Settings gets its folder named after the `id` automatically (see [Installing From Settings](#installing-from-settings)), so the folder in a repository or archive may be called anything.
 
 ## Manifest
 
@@ -236,7 +236,138 @@ Serve a sidecar from the same origin under `/api/extensions/<module-id>/` (Traef
 
 Yuvomi scans `modules/` and validates each `module.json`. Invalid modules are shown as errored in Settings and are not loaded. Disabled modules are not served to the browser and do not appear in navigation. If a module page fails while rendering, Yuvomi shows an error for that page without changing core application code.
 
-Admins enable and disable modules in Settings -> Modules -> Active modules. Ordering is a separate, personal matter and lives in Settings -> Modules -> Navigation, where every member also decides which modules they want in their own navigation - hiding one there removes it from that member's sidebar and mobile favourites without taking it from the household. Copying a new folder into `modules/` makes it appear in both places automatically.
+Admins enable and disable modules in Settings -> Modules -> Active modules. Ordering is a separate, personal matter and lives in Settings -> Modules -> Navigation, where every member also decides which modules they want in their own navigation - hiding one there removes it from that member's sidebar and mobile favourites without taking it from the household. A new module arrives in one of two ways: an admin installs it from Settings -> Modules -> Add custom module (from a GitHub address or a ZIP file, on installations whose operator has switched that on with `MODULES_ALLOW_WEB_INSTALL=true`, see [Installing From Settings](#installing-from-settings)), or somebody with access to the server copies its folder into `modules/`. Either way it appears in both places automatically. A module installed from Settings starts disabled and waits for an admin to approve it in a browser session; that approval is written into the module's folder, so it survives a database restore. A folder copied by hand starts enabled, because whoever copied it has already made that decision on the server.
+
+## Installing From Settings
+
+Admins can install a module without access to the server: Settings -> Modules -> **Add custom module**, the last entry of the Modules group. The page offers two ways, a GitHub address and a ZIP upload, and both end in the same installer.
+
+**The operator switches it on.** The feature is off by default. Set `MODULES_ALLOW_WEB_INSTALL=true` in the environment (`.env`, the Unraid template, the Portainer stack, the installer page; it sits next to `MODULES_DIR`) and restart Yuvomi. Until then the page shows the manual way below and the install and delete routes answer `403 module_web_install_disabled`. The reason it is a choice rather than a default: until now, putting same-origin script into `modules/` needed access to the server's filesystem. With the page, a foothold in an admin's browser session is enough (an XSS, or a module that is already enabled), and what it writes outlives that session, a password change and a revoked token. Nothing in the design closes that completely, so it is a risk for the operator to take where `modules/` is mounted and the household wants it, not something every installation receives with an update ([docs/DECISIONS.md](docs/DECISIONS.md), entry 12).
+
+**Trust first.** A module is same-origin JavaScript: it runs in the browser of every member who opens it, with that member's session, and can do whatever that member can do. Installing one from Settings is the same act as copying its folder onto the server, which is why only an admin can do it and why a new module never goes live on its own. The installer checks that an archive is well-formed and safe to unpack; it does not read or review the module's code. Install only modules whose author you trust.
+
+### From GitHub
+
+Paste the address of a public repository. Accepted forms (`www.github.com`, a trailing `/` or `.git` are fine; a query string or fragment is ignored; `http://` and other hosts are refused):
+
+```text
+https://github.com/owner/repo
+github.com/owner/repo
+owner/repo
+https://github.com/owner/repo/releases/latest
+https://github.com/owner/repo/releases/tag/v1.2.0
+https://github.com/owner/repo/tree/main
+https://github.com/owner/repo/tree/main/modules/example
+https://github.com/owner/repo/tree/feature/x/modules/example
+```
+
+Which version is installed:
+
+- **No tag or branch in the address** (the first four forms): the repository's latest release, as GitHub reports it (drafts and pre-releases do not count). A repository without a release installs its default branch instead. If the latest release has a tag name Yuvomi cannot use, the install is refused rather than quietly taking the default branch; use the release's tag or a `tree/` address.
+- **`releases/tag/<tag>`:** exactly that tag.
+- **`tree/<ref>/<path>`:** the branch, tag or commit `<ref>`, and the rest of the address is the folder of the module inside the repository. Because a branch name may itself contain slashes, Yuvomi asks GitHub which prefix exists, shortest first and up to three segments: in the last example the branch is `feature/x` if `feature` does not exist, and the folder `modules/example`.
+
+What is installed is the state of that ref at that moment; the commit is recorded (see [Install record](#install-record)). Nothing updates itself later.
+
+Only `github.com` is supported, and only public repositories: no GitLab, Codeberg or self-hosted Git, and no GitHub tokens. The download talks only to `github.com`, `api.github.com` and `codeload.github.com` (every redirect is checked against that list), goes through the same private-network guard as Yuvomi's other outbound requests, and has 30 seconds for the whole exchange. GitHub allows about 60 unauthenticated API calls per hour per server address; when that is used up, the page says so and names the time it resets.
+
+### From a ZIP file
+
+Upload a `.zip` of up to 20 MB. The module folder may sit at the root of the archive or anywhere inside it; an archive with one top folder around everything (what GitHub's "Download ZIP" produces) is handled like a repository.
+
+### How the module is found
+
+- Yuvomi collects every `module.json` in the archive, at most six folders deep counted from the repository root (the one top folder of a GitHub archive does not count), ignoring anything under `node_modules` and under folders whose name starts with `.`.
+- Exactly one: that module is installed. None: the install is refused.
+- Several (a monorepo, or a repository with examples): the page lists them with name, id, version and folder, and the admin picks one. The ZIP route takes the choice as `?path=<folder>`, the GitHub route as `path`; an empty `path` selects a module at the root of the archive.
+- A `tree/<ref>/<path>` address selects the module in exactly that folder. If that folder holds no `module.json` itself but several modules below it, those are offered for choice; if nothing is below it, the install is refused.
+- The installed folder is always `modules/<id>`, from the manifest's `id`, whatever the folder in the archive is called.
+
+### What is copied
+
+Only the chosen module folder and its subfolders, never the rest of the repository. A subfolder that holds a `module.json` of its own is another module and is left out (a root module with examples in `plugins/x/` gets no copy of them). Inside the folder, only the file types a browser module is made of:
+
+```text
+.js .mjs .css .json .svg .png .jpg .jpeg .webp .gif .ico .woff .woff2 .ttf .md .txt .map
+```
+
+plus files named `LICENSE`, `LICENCE`, `NOTICE` or `README` (any letter case, with no extension or one of those above). Everything else, and every file or folder whose name starts with `.`, is skipped and listed after the install; that is not an error, since a module folder often carries a build script or a CI file. A file the manifest refers to (`entry`, `style`, a widget `entry`) must of course survive that filter. Before the folder is moved into place it passes the same validation the loader runs at startup; a module that would load as errored is not installed, and the page shows the loader's message.
+
+### Archive limits
+
+An archive is unpacked in memory and checked completely before anything is written:
+
+| Limit | Value |
+|-------|-------|
+| Archive size (upload and GitHub download) | 20 MB |
+| Unpacked size, all files together | 50 MB |
+| Entries | 2000 |
+| Single file | 10 MB |
+| `module.json` | 64 KiB |
+| Compression ratio | 200:1 for a file over 1 MB, and for the archive as a whole once it unpacks to more than 1 MB |
+
+Refused outright: symbolic links and other non-regular files; paths that are absolute, carry a drive letter or `..`, or would land outside the module folder (zip slip); Windows-reserved names (`CON`, `NUL`, `COM1`, ...) and characters (`< > : " | ? *`); names that differ only in letter case or Unicode normalization; ZIP64, multi-part and encrypted archives; compression methods other than stored and deflate; and files whose checksum does not match. Nothing from the archive is executed on the server.
+
+### Disabled until approved, replacing and updating
+
+A newly installed module is **disabled**, and that state lives in the module's folder, not in the database: the install record (`.yuvomi-install.json`, see below) carries `"approved": false`, and a folder whose record lacks an explicit `"approved": true` is off whatever the database says. Restoring a database backup from before the install, or starting a fresh database over a kept modules volume, therefore never switches on a module nobody has looked at. The module appears in Settings -> Modules -> Active modules, where its Details disclosure shows id, version, description, source, install date, who installed it and the folder, and an admin approves it there with the usual switch. **Enabling needs a browser session:** `PATCH /api/v1/modules/:id` with `enabled: true` is refused for API tokens and the MCP endpoint (`403 module_session_required`), the same rule as for installing, because the step that makes installed code live must not be weaker than the step that placed it. Disabling by token stays allowed. Once approved, the switch behaves as it always has, and its state travels with the folder as well: switching off writes `"approved": false` into the record (and the id onto the disabled list), switching on writes `"approved": true` again, so `approved` means "an admin has this version switched on", and a restored database cannot switch on what an admin switched off any more than what nobody has looked at. An install or a replace resets it too. Enabling takes the same lock as installing and deleting, so while one of those runs (a GitHub download may take up to 30 s) the switch answers `409 busy` and can simply be retried; when the record cannot be written (the module folder is read-only) it answers `503 not_writable`. Disabling is never refused or delayed for either: the disabled list is written first and the record best effort, and while an install or delete holds the lock the record is left as it is. Unlike the household switch for built-in modules, which only stops what the server does on its own and leaves their routes open ([docs/DECISIONS.md](docs/DECISIONS.md#11-switching-a-module-off-is-not-a-lock), entry 11), the switch for a third-party module is a hard gate on purpose: a disabled module has no route, is not served, and its assets answer `404`.
+
+Updating a module means installing it again, for example from its new release. When a module with the same `id` is already installed, the page asks before replacing it and names the installed and the incoming version. The new folder replaces the old one in a single rename; if that fails, the old folder is put back unchanged. **Every replacement arrives disabled**, whatever the module's state before and wherever the new copy comes from: a GitHub ref is a branch or a movable tag, so "the same repository" is no proof that the same code arrived, and a ZIP upload shows no origin at all. The replace writes `"approved": false` into the record; review the new version in Active modules and switch it on again there. A module that was copied by hand (no install record) is **not** replaced from Settings: both install routes answer `409 not_web_installed`, and the page shows that message instead of the replace question. Such a folder may be a working checkout with uncommitted work, and the web interface removes or replaces only what it installed. Remove the folder on the server first, then install again.
+
+If `modules/<id>` exists but is a symbolic link or a file rather than a folder, the installer refuses to touch it; fix that on the server. Only one install or delete runs at a time; a second one started meanwhile is refused with "busy" and can simply be retried.
+
+### Deleting
+
+Active modules has a delete button on the row of every third-party module **that was installed from Settings**, that is, whose folder carries an install record, and only while the server would accept the delete: the page reads `GET /api/v1/modules/install/info` like Add custom module does and leaves the button out unless `webInstall` is `true` and `writable` is not `false` (with `MODULES_ALLOW_WEB_INSTALL` unset every delete would end in `403`, on a read-only folder in `503`; when the answer is missing, as from an older server, there is no button either). A hand-copied folder has no record and no delete button, and `DELETE` refuses it with `409 not_web_installed`, as both install routes refuse to replace it: such a folder may be a working checkout with uncommitted work, and the web interface removes or replaces only what it installed. Remove those on the server, as you placed them. The same goes for a folder whose name is not a valid module id (it shows as an errored row). Deleting removes the folder `modules/<id>` and takes the id off the disabled list. It deliberately leaves two things in place, both of which already tolerate a module that is not there: the `ext:<id>` rows in Settings -> Household -> Roles and permissions, and the dashboard widget configurations of `<id>:<widget>` tiles. A later reinstall of the same `id` therefore comes back with its permissions and dashboard layout. A `modules/<id>` that is a symbolic link is not deleted, because deleting through it would remove files outside `modules/`.
+
+### Install record
+
+The installer writes `.yuvomi-install.json` into the module folder:
+
+```json
+{
+  "source": "github",
+  "url": "https://github.com/owner/repo",
+  "ref": "v1.2.0",
+  "commit": "3f2c...40 hex characters",
+  "path": "modules/example",
+  "installedAt": "2026-10-02T09:15:00.000Z",
+  "installedBy": 1,
+  "approved": false
+}
+```
+
+A ZIP upload records `"source": "zip"` without `url`, `ref` and `commit`. The record is what Details shows as source, install date and installer, and what marks a folder as installed from Settings (so deletable and replaceable from there). `approved` is the review state: `false` on install and on every replace, `true` once an admin has switched the module on in a browser session, `false` again when an admin switches it off (the file is rewritten atomically each time). `GET /api/v1/modules?admin=1` returns the record to admins as `install`, with `approved` and with the user id resolved to `installedByName` (`null` when that account no longer exists; Details then says "a former member"); members never see it, and the asset route does not serve dotfiles. A module without the file was copied by hand, and Details says so. Do not ship your own `.yuvomi-install.json`: dotfiles in an archive are skipped.
+
+### Read-only folders and Umbrel
+
+The page first asks the server about `modules/` (`GET /api/v1/modules/install/info`). Where the folder is not writable (a `:ro` mount, a volume owned by another user, a read-only filesystem), where the operator has not set `MODULES_ALLOW_WEB_INSTALL`, or where the folder would not survive an update, the page explains that and shows no install controls; copy the folder by hand as described under [Docker / Podman](#docker--podman) instead.
+
+Umbrel's package mounts no modules folder at all. The folder inside the container is writable, but a module placed there lives in the container layer and is gone after the next app update, exactly like a folder copied in by hand. The same applies to any container started without a volume on `/app/modules`. The server tries to detect this case, best effort: `GET /api/v1/modules/install/info` reports `persistent: false` when Yuvomi seems to run in a container and `/app/modules` is not its own mount (read from `/proc/self/mountinfo`), and the page then behaves exactly as for a read-only folder: it explains that installed modules would be lost on the next update, points to mounting a volume, and shows no install controls. `persistent` is `null` when the server cannot tell, and `true` when it finds no container. The guess can be wrong: an LXC container may look like a plain host, and a Kubernetes `emptyDir` counts as a mount although it is gone with the pod. On Umbrel, third-party modules are not available.
+
+### Who can install
+
+Only an admin, only from a signed-in browser session, and only where the operator has switched the feature on. API tokens (an admin's included) and the MCP endpoint are refused with `403` and `reason: "module_session_required"`, so a leaked token cannot place code in front of the household; with `MODULES_ALLOW_WEB_INSTALL` unset the same routes answer `403 module_web_install_disabled`, in both cases before the body is read. Enabling an installed module needs the browser session as well (see above). Install and delete are CSRF-protected like every other state-changing request, and the two install routes allow 10 requests per 10 minutes per user. The answers that ask back (`409` already installed, `422` several modules) do not count; failed attempts do.
+
+API, for completeness (session only, as above):
+
+- `GET /api/v1/modules/install/info` returns `{ data: { writable, persistent, webInstall, maxZipMb } }` (admin; readable with a token too). `webInstall` is the operator's switch.
+- `POST /api/v1/modules/install/zip?overwrite=1&path=<folder>` takes the archive as the raw request body (`Content-Type: application/zip`).
+- `POST /api/v1/modules/install/github` takes `{ url, ref?, path?, overwrite? }`; `ref` and `path` override what the address says.
+- `PATCH /api/v1/modules/:id` with `{ enabled: true }` approves (session only; `409 busy` while an install or delete runs, `503 not_writable` when the record cannot be written); `{ enabled: false }` works with a token too and is never refused for either. Its error bodies carry `reason` when there is one.
+- `DELETE /api/v1/modules/:id` returns `{ data: { id, deleted: true } }`; only for folders with an install record.
+
+A successful install answers `201` with `{ data: <module>, replaced, skipped }`; the module in `data` is always disabled. Errors carry `{ error, code, reason }`: `409 exists` adds `existing: { id, name, version, install }` (the record, never `null` here) and `incoming: { id, name, version }`, `422 multiple` adds `candidates: [{ path, id, name, version }]`, and a GitHub rate limit adds `resetAt`. Both install routes answer `409 not_web_installed` when `modules/<id>` already exists without an install record (a hand-copied folder; no `existing` in the body, with or without `overwrite`). `not_a_module` (`modules/<id>` is a link or a file) is `409` on install and `400` on delete; delete also answers `400 bad_id` for an id that is not a valid module id and `409 not_web_installed` for a folder without an install record. A record that is present but corrupt is refused by delete and replace alike; that is fixed on the server.
+
+### Preparing a module for installation
+
+If you publish a module, a few habits make it install cleanly:
+
+- **Give `module.json` a folder of its own** (`module/`, or `modules/<id>/` in a larger repository) rather than the repository root. The installer copies the folder that holds the manifest with everything allowed inside it; at the root that would include your docs, tests and example files.
+- **One module per folder.** For several modules, use sibling folders, and link each one in your README as `https://github.com/owner/repo/tree/main/<folder>` so admins can install it without choosing from a list.
+- **The folder name need not equal the `id`.** The installer names the folder on the server after the manifest; only a hand copy has to match.
+- **Tag releases.** A plain repository address installs the latest release, so a tag gives admins a defined version and a meaningful update. Without releases they get whatever the default branch holds at that moment.
+- **Ship built files.** Nothing is built or installed on the server: commit the JavaScript and CSS the browser loads, use only the file types listed under [What is copied](#what-is-copied), and stay inside the [archive limits](#archive-limits).
 
 ## Compatibility Across Yuvomi Releases
 
@@ -261,4 +392,4 @@ On Podman (RHEL/Fedora/CentOS Stream) use `podman-compose.yml` instead — it mo
 
 On Portainer the stack mounts a named volume (`oikos_modules`) at `/app/modules`, since a Portainer deployment has no repository checkout to bind-mount from. Copy module folders into that volume (for example via `docker cp` into the running container, or a temporary container mounting the volume); a bind mount to a host path works too if you edit the stack.
 
-Unraid (the template's *Modules* path, `/mnt/user/appdata/yuvomi/modules` by default), TrueNAS (the *Modules Storage* entry) and the Podman Quadlet (`~/.local/share/oikos/modules`) mount `/app/modules` as well. **Umbrel is the exception:** its store package mounts no modules folder, so third-party modules are not available there. A module copied into the running container would sit in the container layer and be gone on the next update.
+Unraid (the template's *Modules* path, `/mnt/user/appdata/yuvomi/modules` by default), TrueNAS (the *Modules Storage* entry) and the Podman Quadlet (`~/.local/share/oikos/modules`) mount `/app/modules` as well. **Umbrel is the exception:** its store package mounts no modules folder, so third-party modules are not available there. A module copied into the running container would sit in the container layer and be gone on the next update, which is why Settings -> Modules -> Add custom module offers no install there either.

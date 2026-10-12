@@ -65,6 +65,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to the automatic order. Grouping by due date, the board, selection mode, `tasks: read` and the
   wall display are unchanged. The API gets `PATCH /api/v1/tasks/reorder` and
   `POST /api/v1/tasks/reorder/reset`, and `sort_order` on each task (migration 242).
+
+- **Custom modules can be installed from Settings, from GitHub or as a ZIP file, where the operator
+  allows it.** Until now a third-party module reached Yuvomi only as a folder copied into `modules/`
+  on the server. The new page Settings → Modules → Add custom module (admin only) takes the address
+  of a public GitHub repository or an uploaded `.zip` and installs the module from it. **The feature
+  is off unless the operator sets `MODULES_ALLOW_WEB_INSTALL`**: a module is JavaScript that runs
+  with the session of every member who opens it, so installing one is the operator's choice. A
+  module installed this way arrives disabled until an admin approves it in Active modules from a
+  browser session, and the web interface removes or replaces only what it installed. Limits, checks
+  and the API are in `MODULES.md` under "Installing From Settings".
 - **Move a shopping item to another list** (#1700, from D#998). The edit dialog has a list
   selector under amount and category when there is more than one list. The item moves as it is -
   name, amount, category, note, link, price and shop - and lands at the end of its category on

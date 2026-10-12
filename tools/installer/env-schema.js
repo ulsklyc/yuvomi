@@ -41,6 +41,14 @@ export const ENV_SCHEMA = [
   // Self-Hoster-Fall wie bei den ICS-Abos/Rezept-Providern oben - ein
   // kommunales Abfuhrkalender-Feed im eigenen LAN scheitert sonst stumm.
   { key: 'WASTE_SOURCE_ALLOW_PRIVATE_NETWORK', type: 'default', label: 'Allow Waste Source Feeds from Private Network', default: 'false', required: false, group: 'sync', writeToEnv: true },
+  // Module aus den Einstellungen installieren (DECISIONS.md, 12): Opt-in des
+  // Betreibers, aus ab Werk. Ein Modul ist Skript im Ursprung der App, und wer
+  // es ueber den Browser ablegen kann, braucht dafuer keinen Zugriff aufs
+  // Dateisystem mehr - deshalb entscheidet das der Betreiber beim Einrichten,
+  // nicht jede Installation per Update. Steht hier neben MODULES_DIR nur im
+  // Geiste: MODULES_DIR selbst fehlt bewusst (siehe unten), der Schalter ist
+  // eine echte App-Variable und gehoert in den Wizard.
+  { key: 'MODULES_ALLOW_WEB_INSTALL',   type: 'default', label: 'Allow Installing Modules from Settings', default: 'false', required: false, group: 'system', writeToEnv: true },
   // Zeitzone des Containers: Logzeitstempel und Backup-Cron, und der DEFAULT für
   // die Haushaltszone. Seit v2.34.0 (#829) ist die Haushaltszone eine eigene
   // Einstellung in der App (sync_config `household_timezone`) und gewinnt, wo es
