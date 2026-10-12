@@ -412,7 +412,13 @@ async function dismissReminder(id) {
  */
 async function poll() {
   try {
-    const data = await api.get(dashboardRequest('/reminders/pending', { wall: wallShowsOn() }));
+    const wall = wallShowsOn();
+    const data = await api.get(dashboardRequest('/reminders/pending', { wall }));
+    // Persoenlich gefragt, ueber einer Wand angekommen (jemand ist waehrend
+    // des Abrufs zur Uebersicht gewechselt): die Antwort gehoert nicht auf
+    // diese Flaeche. Verworfen, nicht verbucht - der naechste Abruf fragt
+    // passend.
+    if (!wall && wallShowsOn()) return;
     const reminders = data.data ?? [];
     updateBellBadge(reminders.length);
     processReminders(reminders);

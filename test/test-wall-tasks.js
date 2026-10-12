@@ -1133,6 +1133,31 @@ test('Persoenliches: die Glocke der Shell fragt ueber einer Wand die Haushaltsfa
       bell.refresh();
       await settle();
       assert.equal(asked.at(-1), '/reminders/pending');
+
+      // EINE PERSOENLICHE ANTWORT, DIE UNTERWEGS WAR, ALS DIE WAND AUFGING
+      // (Codex an #1900, zweite Runde): gefragt auf /tasks, angekommen ueber
+      // der Wand. Sie wird verworfen und nicht als gezeigt verbucht.
+      bell.stop();
+      surface.children.length = 0;
+      notifications.length = 0;
+      store.set('yuvomi-wall-mode', '1');
+      globalThis.location.pathname = '/tasks';
+      const direct = globalThis.__apiStub.get;
+      globalThis.__apiStub.get = async (path) => {
+        const answer = await direct(path);
+        globalThis.location.pathname = '/';
+        return answer;
+      };
+      bell.refresh();
+      await settle();
+      assert.equal(asked.at(-1), '/reminders/pending', 'Reichweite: gefragt wurde persoenlich');
+      assert.equal(surface.children.length, 0, 'die unterwegs gewesene Antwort wird ueber der Wand kein Toast');
+      assert.equal(notifications.length, 0);
+      globalThis.__apiStub.get = direct;
+      globalThis.location.pathname = '/tasks';
+      bell.refresh();
+      await settle();
+      assert.equal(surface.children.length, 1, 'und sie war nicht verbraucht: zurueck auf der Seite kommt der Toast');
     })();
   } finally {
     bell.stop();
