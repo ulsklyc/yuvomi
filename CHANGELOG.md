@@ -121,6 +121,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Calendar: an event moved away while it was uploading stays where you put it** (#1926). The
+  legacy Apple Calendar connection uploads the events of the default calendar to iCloud. If an
+  event was moved to another local calendar in the moment its upload was running, it was recorded
+  as uploaded anyway: it was on iCloud and had lost the calendar it had just been given. The same
+  could happen with Google when an event gave up its Google calendar during the upload, and an
+  event deleted in that moment stayed behind at Google. Now such an event stays local and keeps
+  its calendar, and the copy that reached the provider is removed on the next sync.
 - **Shopping: an error message is in your language** (#1909). When something could not be
   saved, the note showed the server's own sentence, in English or German whatever the app was set
   to - "Unbekannte Liste." in an English session, when an item was moved to a list somebody had

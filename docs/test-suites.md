@@ -538,7 +538,10 @@ npm run test:installer-a11y  # Zielgrößen, Kontrast und Fokus des Web-Installe
 
 `npm run test:calendar-local-calendars` covers default-calendar repair without event rewrites,
 resolved membership, per-calendar ICS feeds, visibility, member permissions, sync exclusion,
-and fallback on deletion. It runs independently in the main test chain.
+and fallback on deletion. It also drives whole iCloud and Google sync runs against a stand-in
+client and moves an event through the write route while its upload is in flight (#1926): the row
+must stay local and keep its calendar, and the next run must delete the copy at the provider.
+It runs independently in the main test chain.
 
 Run `npm run test:calendar-occurrence-overrides`
 for migration 194, original-slot identity, inheritance and owner resolution,

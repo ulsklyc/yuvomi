@@ -631,9 +631,13 @@ async function runSync({ makeClient } = {}) {
         'apple', defaultCal.url, defaultCal.displayName || 'Apple Calendar',
         normalizeCalColor(defaultCal.calendarColor) || APPLE_COLOR
       );
-      // Gebucht wird gegen den Stand NACH dem await (bookEventUpload).
+      // Gebucht wird gegen den Stand NACH dem await (bookEventUpload) - und
+      // nur, wenn die Auswahl oben den Termin dann noch nennt (#1926): wer
+      // während des Uploads in einen anderen lokalen Kalender verschoben
+      // wurde, bleibt lokal, und sein Objekt wird wieder entfernt.
       outbound.bookEventUpload(event, {
         source: 'apple', uid, objectUrl, calRefId, adopted, calendarUrl: defaultCal.url,
+        wantsUploadHere: stillWantsUpload,
       });
     } catch (err) {
       if (!uploadGate.refused(defaultCal.url, err)) {

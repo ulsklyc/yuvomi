@@ -1038,6 +1038,14 @@ export function markEventUploaded(eventId, { source, uid, objectUrl, calRefId, a
  *         Ziel. Ein Umzug über Konten hinweg ist kein Umzug (Anlegen und
  *         Löschen laufen über EIN Konto); das andere Konto lädt sie hoch,
  *         wenn es an der Reihe ist.
+ *   - Die Zeile wartet gar nicht mehr auf diesen Upload (#1926, nur wo der
+ *     Aufrufer das fragen lässt: `wantsUploadHere`). Die alte Apple-Verbindung
+ *     kennt kein Ziel am Termin, aber eine Auswahl: hinauf geht, was in keinem
+ *     oder im Standardkalender liegt. Wer inzwischen in einen anderen lokalen
+ *     Kalender verschoben wurde, bleibt lokal und BEHÄLT ihn - gebucht verlöre
+ *     er ihn (ein Spiegel trägt keinen) und läge bei iCloud, obwohl der
+ *     Haushalt ihn gerade lokal gestellt hat. Das angelegte Objekt wird zum
+ *     Löschen vorgemerkt.
  *
  * Wird die Zeile Spiegel, ist das Objekt an dieser Stelle ab jetzt gewollt:
  * ein Löschauftrag, der aus einem früheren Zielwechsel noch für genau dieses
@@ -1054,9 +1062,14 @@ export function markEventUploaded(eventId, { source, uid, objectUrl, calRefId, a
  *
  * @param {object} sent  die Zeile, aus der die Anfrage gebaut wurde
  * @param {object} what  wie `markEventUploaded`, dazu `calendarUrl`
+ * @param {(row: object) => boolean} [what.wantsUploadHere]  wartet die Zeile
+ *   JETZT noch auf diesen Upload? Die Antwort gibt die Auswahl, aus der der
+ *   Aufrufer seine Termine nimmt - keine zweite, ähnliche Bedingung hier
+ *   (wie `releaseLeftoverUploads`, das dieselbe Frage für den Upload stellt,
+ *   dessen Antwort nie ankam). Ohne sie entscheidet allein das Ziel.
  * @returns {'mirrored'|'deleted'|'released'|'unchanged'}
  */
-export function bookEventUpload(sent, { source, uid, objectUrl, calRefId, calendarUrl, adopted = false, accountId = null }) {
+export function bookEventUpload(sent, { source, uid, objectUrl, calRefId, calendarUrl, adopted = false, accountId = null, wantsUploadHere = null }) {
   const booked = () => settleUploadAttempt({ source, accountId, kind: 'event', rowId: sent.id, collectionUrl: calendarUrl });
   const now = reloadEvent(sent.id);
   if (!now) {
@@ -1067,11 +1080,11 @@ export function bookEventUpload(sent, { source, uid, objectUrl, calRefId, calend
   }
   if (now.external_source !== 'local') return 'unchanged';
 
-  const wanted = uploadTargetNow(now, { source, calendarUrl, accountId });
+  const wanted = uploadTargetNow(now, { source, calendarUrl, accountId, wantsUploadHere });
   if (wanted.released) {
     queueDeletion({ source, calendarExternalId: calendarUrl, eventExternalId: uid, objectUrl, accountId });
     booked();
-    log.info(`The target of event ${sent.id} was changed while its upload was in flight, queued the deletion of ${uid} in ${calendarUrl}.`);
+    log.info(`Event ${sent.id} stopped waiting for this upload while it was in flight (its target or its calendar was changed), queued the deletion of ${uid} in ${calendarUrl}.`);
     return 'released';
   }
 
@@ -1117,14 +1130,18 @@ function keepOwnUpload({ source, calendarUrl, uid }) {
 /**
  * Wohin will die Zeile JETZT, gemessen an dem Upload, der gerade ankam (#1881)?
  *
- * Nur CalDAV: dort trägt der Termin sein Ziel als Paar aus Konto und Kalender.
- * Apple lädt in den ersten verfügbaren Kalender, es gibt nichts zu wechseln.
+ * Ein Ziel trägt nur der CalDAV-Termin: als Paar aus Konto und Kalender.
+ * Apple lädt in den ersten verfügbaren Kalender, es gibt nichts zu wechseln -
+ * dort entscheidet allein, ob die Zeile überhaupt noch wartet (#1926). Diese
+ * Frage beantwortet der Aufrufer aus seiner eigenen Auswahl
+ * (`wantsUploadHere`); wer sie nicht stellt, bekommt die Antwort von vorher.
  *
  * @returns {{released: boolean, moveTo: string|null}}
  *   `released`: die Zeile will nicht (mehr) über dieses Konto hinaus;
  *   `moveTo`: sie will in einen anderen Kalender desselben Kontos
  */
-function uploadTargetNow(now, { source, calendarUrl, accountId }) {
+function uploadTargetNow(now, { source, calendarUrl, accountId, wantsUploadHere = null }) {
+  if (typeof wantsUploadHere === 'function' && !wantsUploadHere(now)) return { released: true, moveTo: null };
   if (source !== 'caldav') return { released: false, moveTo: null };
   const target = now.target_caldav_calendar_url || null;
   if (!target || now.target_caldav_account_id !== accountId) return { released: true, moveTo: null };

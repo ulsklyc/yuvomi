@@ -537,3 +537,296 @@ test('the default calendar reports the iCloud upload exactly while the legacy Ap
     for (const [key, value] of Object.entries(previousEnv)) if (value !== undefined) process.env[key] = value;
   }
 });
+
+// #1926: the legacy iCloud upload lists an event, sends it, and books the answer. Between the
+// listing and the booking lies a network request, and the app keeps running. These tests drive the
+// real sync run; the stand-in is the CalDAV client alone, and the move in flight goes through the
+// real write route.
+async function withAppleConnection(run) {
+  const appleCalendar = await import('../server/services/apple-calendar.js');
+  const { eventUidFor } = await import('../server/services/calendar-outbound.js');
+  const CAL_URL = 'https://caldav.icloud.test/1926/home/';
+  const previousEnv = {};
+  for (const key of ['APPLE_CALDAV_URL', 'APPLE_USERNAME', 'APPLE_APP_SPECIFIC_PASSWORD']) {
+    previousEnv[key] = process.env[key];
+    delete process.env[key];
+  }
+  // What iCloud holds: object URL -> ICS. The next run reads it back.
+  const server = new Map();
+  const uploads = [];
+  const removals = [];
+  let inFlight = null;
+  const makeClient = async () => ({
+    fetchCalendars: async () => [{ url: CAL_URL, displayName: 'Home', calendarColor: '#FF0000' }],
+    fetchCalendarObjects: async () => [...server].map(([url, data]) => ({ url, data, etag: '"1"' })),
+    createCalendarObject: async ({ calendar, filename, iCalString }) => {
+      uploads.push(filename);
+      server.set(`${calendar.url}${filename}`, iCalString);
+      if (inFlight) await inFlight(filename);
+      return {};
+    },
+    deleteCalendarObject: async ({ calendarObject }) => {
+      removals.push(calendarObject.url);
+      server.delete(calendarObject.url);
+      return {};
+    },
+    updateCalendarObject: async () => ({}),
+  });
+  try {
+    db.prepare("DELETE FROM sync_config WHERE key LIKE 'apple_%'").run();
+    // Rows of earlier tests would upload as well; only the events of this test are meant.
+    db.prepare("DELETE FROM calendar_events WHERE external_source IN ('local', 'apple')").run();
+    db.prepare("DELETE FROM calendar_pending_deletions WHERE source = 'apple'").run();
+    appleCalendar.saveCredentials('https://caldav.icloud.test/', 'placeholder-user', 'placeholder-pass');
+    await run({
+      CAL_URL, server, uploads, removals,
+      fileOf: (id) => `${eventUidFor(id)}.ics`,
+      uidOf: (id) => eventUidFor(id),
+      sync: async (duringUpload = null) => {
+        inFlight = duringUpload;
+        try { await appleCalendar.sync({ makeClient }); } finally { inFlight = null; }
+      },
+      rowOf: (id) => db.prepare(`
+        SELECT external_source, external_calendar_id, external_object_url, local_calendar_id
+        FROM calendar_events WHERE id = ?
+      `).get(id),
+      queued: () => db.prepare(`
+        SELECT calendar_external_id, event_external_id, object_url
+        FROM calendar_pending_deletions WHERE source = 'apple'
+      `).all(),
+      notes: (id) => db.prepare(
+        "SELECT COUNT(*) AS n FROM caldav_upload_attempts WHERE source = 'apple' AND kind = 'event' AND row_id = ?"
+      ).get(id).n,
+    });
+  } finally {
+    appleCalendar.clearCredentials();
+    db.prepare("DELETE FROM sync_config WHERE key LIKE 'apple_%'").run();
+    for (const [key, value] of Object.entries(previousEnv)) if (value !== undefined) process.env[key] = value;
+  }
+}
+
+test('an event moved to another local calendar while its iCloud upload is in flight stays local and keeps its calendar', async () => {
+  await withAppleConnection(async ({ CAL_URL, server, uploads, removals, fileOf, uidOf, sync, rowOf, queued, notes }) => {
+    const { __test: apple } = await import('../server/services/apple-calendar.js');
+    const defaultCalendar = ensureDefaultCalendar(db);
+    const local = await createCalendar('Stays local in flight', '#447799');
+    const event = await createEvent('Moved while uploading', defaultCalendar.id);
+    assert.ok(apple.collectLocalOutboundEvents(db, event.id).length === 1, 'listed for the upload');
+
+    let moved = 0;
+    await sync(async (filename) => {
+      if (filename !== fileOf(event.id)) return;
+      const res = await call('PUT', `/${event.id}`, { body: { local_calendar_id: local.id } });
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+      moved++;
+    });
+    assert.equal(moved, 1, 'the event was moved during its own upload');
+    assert.equal(apple.collectLocalOutboundEvents(db, event.id).length, 0, 'the listing no longer names it');
+
+    const objectUrl = `${CAL_URL}${fileOf(event.id)}`;
+    assert.deepEqual({ ...rowOf(event.id) }, {
+      external_source: 'local', external_calendar_id: null, external_object_url: null, local_calendar_id: local.id,
+    }, 'the row is not booked as uploaded and keeps the calendar it was moved to');
+    assert.equal(resolveLocalCalendarId(db, event.id), local.id);
+    assert.deepEqual(queued().map(row => ({ ...row })), [{
+      calendar_external_id: CAL_URL, event_external_id: uidOf(event.id), object_url: objectUrl,
+    }], 'the uploaded copy is queued for deletion');
+    assert.equal(notes(event.id), 0, 'the answer arrived and was handled: the note of the upload is gone');
+    assert.ok(server.has(objectUrl), 'until the next run the copy is still at the provider');
+
+    // The next run removes the copy, does not read it back as a new event and does not upload again.
+    uploads.length = 0;
+    await sync();
+    assert.deepEqual(removals, [objectUrl], 'the copy is deleted at the provider');
+    assert.equal(server.size, 0);
+    assert.equal(queued().length, 0);
+    assert.deepEqual(uploads, []);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events WHERE external_calendar_id = ?').get(uidOf(event.id)).n, 0,
+      'the copy did not come back as a mirrored event');
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM calendar_events WHERE title = 'Moved while uploading'").get().n, 1);
+    assert.equal(rowOf(event.id).local_calendar_id, local.id);
+    assert.equal(rowOf(event.id).external_source, 'local');
+
+    // Moved back, it waits again and uploads like any other event of the default calendar.
+    assert.equal((await call('PUT', `/${event.id}`, { body: { local_calendar_id: defaultCalendar.id } })).status, 200);
+    await sync();
+    assert.deepEqual(uploads, [fileOf(event.id)]);
+    assert.equal(rowOf(event.id).external_source, 'apple');
+    assert.equal(queued().length, 0, 'nothing waits to delete the copy that is wanted now');
+  });
+});
+
+test('an event that still belongs to the default calendar when its iCloud upload returns is booked', async () => {
+  await withAppleConnection(async ({ CAL_URL, uploads, fileOf, uidOf, sync, rowOf, queued }) => {
+    const defaultCalendar = ensureDefaultCalendar(db);
+    await createCalendar('Unrelated local calendar', '#775544');
+    const stored = await createEvent('Stored default uploads', defaultCalendar.id);
+    const implicit = await createEvent('Implicit default uploads');
+    const chosen = await createEvent('Default chosen in flight');
+    const edited = await createEvent('Edited in flight', defaultCalendar.id);
+    assert.equal(db.prepare('SELECT local_calendar_id FROM calendar_events WHERE id = ?').get(implicit.id).local_calendar_id, null);
+
+    await sync(async (filename) => {
+      // Storing the default calendar explicitly is no reason to step back, and neither is an edit.
+      if (filename === fileOf(chosen.id)) {
+        assert.equal((await call('PUT', `/${chosen.id}`, { body: { local_calendar_id: defaultCalendar.id } })).status, 200);
+      }
+      if (filename === fileOf(edited.id)) {
+        assert.equal((await call('PUT', `/${edited.id}`, { body: { title: 'Edited in flight, later' } })).status, 200);
+      }
+    });
+
+    assert.deepEqual([...uploads].sort(), [stored, implicit, chosen, edited].map(e => fileOf(e.id)).sort());
+    for (const event of [stored, implicit, chosen, edited]) {
+      assert.deepEqual({ ...rowOf(event.id) }, {
+        external_source: 'apple', external_calendar_id: uidOf(event.id),
+        external_object_url: `${CAL_URL}${fileOf(event.id)}`, local_calendar_id: null,
+      }, `${event.title} is booked as uploaded`);
+    }
+    assert.equal(db.prepare('SELECT outbound_dirty FROM calendar_events WHERE id = ?').get(edited.id).outbound_dirty, 1,
+      'the edit made in flight still goes out afterwards');
+    assert.equal(queued().length, 0);
+  });
+});
+
+test('the booking of a CalDAV upload asks its target only, and a local calendar cannot hold a targeted event', async () => {
+  const outbound = await import('../server/services/calendar-outbound.js');
+  const CAL = 'https://calendar.test/1926/cal/';
+  const accountId = db.prepare(
+    "INSERT INTO caldav_accounts (name, caldav_url, username, password) VALUES ('In flight', 'https://calendar.test/1926/', 'u', 'p')"
+  ).run().lastInsertRowid;
+  const local = await createCalendar('No home for targeted events', '#228866');
+  const targeted = (title) => {
+    const id = db.prepare(`
+      INSERT INTO calendar_events (title, start_datetime, end_datetime, created_by, target_caldav_account_id, target_caldav_calendar_url)
+      VALUES (?, '2035-05-01T09:00', '2035-05-01T10:00', 1, ?, ?)
+    `).run(title, accountId, CAL).lastInsertRowid;
+    return db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(id);
+  };
+  const what = (row) => ({
+    source: 'caldav', uid: outbound.eventUidFor(row.id), objectUrl: `${CAL}${outbound.eventUidFor(row.id)}.ics`,
+    calRefId: null, calendarUrl: CAL, accountId,
+  });
+  const rowOf = (id) => db.prepare('SELECT external_source, local_calendar_id, target_caldav_account_id FROM calendar_events WHERE id = ?').get(id);
+
+  // With its target in place the row cannot enter a local calendar: the route refuses, the trigger too.
+  const kept = targeted('Keeps its CalDAV target');
+  assert.equal((await call('PUT', `/${kept.id}`, { body: { local_calendar_id: local.id } })).status, 400);
+  assert.throws(() => db.prepare('UPDATE calendar_events SET local_calendar_id = ? WHERE id = ?').run(local.id, kept.id), /mutually exclusive/);
+  assert.equal(outbound.bookEventUpload(kept, what(kept)), 'mirrored');
+  assert.equal(rowOf(kept.id).external_source, 'caldav');
+
+  // The only way into a local calendar drops the target first - and that alone releases the upload.
+  const moved = targeted('Leaves CalDAV for a local calendar');
+  assert.equal((await call('PUT', `/${moved.id}`, {
+    body: { target_caldav_account_id: null, target_caldav_calendar_url: null },
+  })).status, 200);
+  assert.equal((await call('PUT', `/${moved.id}`, { body: { local_calendar_id: local.id } })).status, 200);
+  assert.equal(outbound.bookEventUpload(moved, what(moved)), 'released');
+  assert.deepEqual({ ...rowOf(moved.id) }, { external_source: 'local', local_calendar_id: local.id, target_caldav_account_id: null });
+  assert.equal(db.prepare(
+    "SELECT COUNT(*) AS n FROM calendar_pending_deletions WHERE source = 'caldav' AND event_external_id = ?"
+  ).get(outbound.eventUidFor(moved.id)).n, 1);
+});
+
+// The Google upload has the same gap between listing and booking (#1926). A targeted event cannot
+// enter a local calendar; the way there drops the target first, and the booking has to notice that.
+async function withGoogleUpload(run) {
+  const google = await import('../server/services/google-calendar.js');
+  const TARGET = 'family-1926';
+  const inserts = [];
+  const removals = [];
+  let inFlight = null;
+  const calendar = {
+    calendarList: {
+      get: async ({ calendarId }) => ({
+        data: { accessRole: 'owner', timeZone: 'UTC', summary: calendarId, backgroundColor: '#4285F4' },
+      }),
+    },
+    colors: { get: async () => ({ data: { event: {} } }) },
+    events: {
+      list: async () => ({ data: { items: [], nextSyncToken: 'token-1926' } }),
+      insert: async (params) => {
+        inserts.push(params.requestBody.summary);
+        const id = `created-1926-${inserts.length}`;
+        if (inFlight) await inFlight(params.requestBody.summary);
+        return { data: { id } };
+      },
+      patch: async () => ({}),
+      delete: async (params) => { removals.push(params); return {}; },
+    },
+  };
+  db.prepare("DELETE FROM calendar_events WHERE external_source = 'local' AND target_google_calendar_id IS NOT NULL").run();
+  db.prepare("DELETE FROM calendar_pending_deletions WHERE source = 'google'").run();
+  google.__test.setCalendarEnabled(TARGET, true, { name: 'Family' });
+  try {
+    await run({
+      TARGET, inserts, removals,
+      targeted: async (title) => {
+        const res = await call('POST', '/', {
+          body: { title, start_datetime: '2035-07-10T14:00', end_datetime: '2035-07-10T15:00', target_google_calendar_id: TARGET },
+        });
+        assert.equal(res.status, 201, JSON.stringify(res.body));
+        return res.body.data;
+      },
+      sync: async (duringUpload = null) => {
+        inFlight = duringUpload;
+        try { await google.sync({ createCalendar: () => calendar }); } finally { inFlight = null; }
+      },
+      rowOf: (id) => db.prepare(`
+        SELECT external_source, external_calendar_id, target_google_calendar_id, local_calendar_id
+        FROM calendar_events WHERE id = ?
+      `).get(id),
+      queued: () => db.prepare(`
+        SELECT calendar_external_id, event_external_id FROM calendar_pending_deletions WHERE source = 'google'
+      `).all().map(row => ({ ...row })),
+    });
+  } finally {
+    google.__test.setCalendarEnabled(TARGET, false);
+  }
+}
+
+test('an event that gave up its Google target for a local calendar while its upload is in flight stays local', async () => {
+  await withGoogleUpload(async ({ TARGET, inserts, removals, targeted, sync, rowOf, queued }) => {
+    const local = await createCalendar('Local instead of Google', '#664422');
+    const event = await targeted('Leaves Google in flight');
+    const stays = await targeted('Stays with Google');
+
+    await sync(async (title) => {
+      if (title !== 'Leaves Google in flight') return;
+      assert.equal((await call('PUT', `/${event.id}`, { body: { target_google_calendar_id: null } })).status, 200);
+      assert.equal((await call('PUT', `/${event.id}`, { body: { local_calendar_id: local.id } })).status, 200);
+    });
+
+    assert.deepEqual([...inserts].sort(), ['Leaves Google in flight', 'Stays with Google']);
+    const created = `created-1926-${inserts.indexOf('Leaves Google in flight') + 1}`;
+    assert.deepEqual({ ...rowOf(event.id) }, {
+      external_source: 'local', external_calendar_id: null, target_google_calendar_id: null, local_calendar_id: local.id,
+    }, 'the row is not booked and keeps the calendar it was moved to');
+    assert.deepEqual(queued(), [{ calendar_external_id: TARGET, event_external_id: created }],
+      'the entry created at Google is queued for deletion');
+    const kept = rowOf(stays.id);
+    assert.equal(kept.external_source, 'google', 'an event that still targets the calendar is booked as before');
+    assert.equal(kept.external_calendar_id, `created-1926-${inserts.indexOf('Stays with Google') + 1}`);
+
+    inserts.length = 0;
+    await sync();
+    assert.deepEqual(removals.map(({ calendarId, eventId }) => ({ calendarId, eventId })), [{ calendarId: TARGET, eventId: created }],
+      'the next run deletes the entry at Google');
+    assert.deepEqual(queued(), []);
+    assert.deepEqual(inserts, [], 'and uploads nothing again');
+    assert.equal(rowOf(event.id).local_calendar_id, local.id);
+  });
+});
+
+test('an event deleted while its Google upload is in flight leaves no entry behind at Google', async () => {
+  await withGoogleUpload(async ({ TARGET, inserts, targeted, sync, rowOf, queued }) => {
+    const event = await targeted('Deleted while uploading to Google');
+    await sync(async () => {
+      assert.equal((await call('DELETE', `/${event.id}`)).status, 204);
+    });
+    assert.equal(rowOf(event.id), undefined);
+    assert.deepEqual(inserts, ['Deleted while uploading to Google']);
+    assert.deepEqual(queued(), [{ calendar_external_id: TARGET, event_external_id: 'created-1926-1' }]);
+  });
+});

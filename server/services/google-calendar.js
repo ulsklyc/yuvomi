@@ -767,12 +767,24 @@ async function runSync(createCalendar) {
         // Die elf `colorId`s sind eine verlustbehaftete Abbildung des Hex-Werts -
         // ohne das Flag holte der nächste Inbound-Lauf die gemappte Farbe zurück
         // und ersetzte damit die gewählte (#899).
-        db.get().prepare(`
+        // Gebucht wird gegen den Stand NACH dem await (#1926), und zwar in dem
+        // einen Schreibvorgang selbst: Spiegel wird nur die Zeile, die die
+        // Auswahl oben JETZT noch für diesen Kalender nennte. Wer inzwischen
+        // gelöscht wurde, sein Ziel gewechselt oder es für einen lokalen
+        // Kalender aufgegeben hat, bleibt, wie er ist - gebucht verlöre er den
+        // lokalen Kalender und stünde bei Google, obwohl ihn dort niemand mehr
+        // haben will. Der gerade angelegte Termin wird dann zum Löschen
+        // vorgemerkt; die Löschroute tut das für eine lokale Zeile nicht.
+        const booked = db.get().prepare(`
           UPDATE calendar_events
           SET external_calendar_id = ?, external_source = 'google', local_calendar_id = NULL, calendar_ref_id = ?,
               color_modified = CASE WHEN color IS NOT NULL THEN 1 ELSE color_modified END
-          WHERE id = ?
-        `).run(created.data.id, calRefId, event.id);
+          WHERE id = ? AND external_source = 'local' AND target_google_calendar_id = ?
+        `).run(created.data.id, calRefId, event.id, targetId).changes > 0;
+        if (!booked) {
+          outbound.queueDeletion({ source: 'google', calendarExternalId: targetId, eventExternalId: created.data.id });
+          log.info(`Event ${event.id} stopped waiting for its upload to ${targetId} while it was in flight, queued the deletion of the created entry.`);
+        }
       } catch (err) {
         log.error(`Outbound error for event ${event.id}:`, err.message);
       }
