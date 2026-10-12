@@ -1,6 +1,10 @@
 import { api } from '/api.js';
-import { formatDate } from '/i18n.js';
-import { syncScreensaverIdleFromStorage } from '/utils/screensaver-idle.js';
+import { formatDate, formatTime } from '/i18n.js';
+import {
+  isScreensaverClockOn,
+  isScreensaverCoverOn,
+  syncScreensaverIdleFromStorage,
+} from '/utils/screensaver-idle.js';
 
 // Read on every arming, not once at load: the delay is a per-device choice
 // (utils/screensaver-idle.js, #885) that theme-init.js applies before this
@@ -12,6 +16,7 @@ const SLIDE_MS = 20_000;
 
 let idleTimer;
 let slideTimer;
+let clockTimer;
 let overlay;
 let run = 0;
 
@@ -19,6 +24,8 @@ function stop() {
   run += 1;
   clearInterval(slideTimer);
   slideTimer = undefined;
+  clearTimeout(clockTimer);
+  clockTimer = undefined;
   overlay?.remove();
   overlay = undefined;
 }
@@ -43,6 +50,15 @@ function caption(photo) {
   // Follows the date-format preference like every other date in the app.
   const formatted = Number.isNaN(date.getTime()) ? '' : formatDate(date);
   return [formatted, place].filter(Boolean).join(' · ');
+}
+
+// The household's time in the household's format and zone (formatTime), on the
+// full minute like the clock on the overview (dashboard.js, startClockTicker),
+// so it turns when every other clock in the room does.
+function tickClock(clock) {
+  const now = new Date();
+  clock.textContent = formatTime(now);
+  clockTimer = setTimeout(() => tickClock(clock), 60_000 - (now.getSeconds() * 1000 + now.getMilliseconds()));
 }
 
 async function start() {
@@ -72,10 +88,20 @@ async function start() {
     overlay = document.createElement('div');
     overlay.className = 'photo-screensaver';
     overlay.setAttribute('aria-hidden', 'true');
+    // Both read per start, not once at load: they are this device's choice
+    // (#1766) and apply from the next start on, without a reload.
+    if (isScreensaverCoverOn()) overlay.classList.add('photo-screensaver--cover');
     const image = document.createElement('img');
     image.alt = '';
     const label = document.createElement('p');
     overlay.append(image, label);
+    let clock = null;
+    if (isScreensaverClockOn()) {
+      clock = document.createElement('p');
+      clock.className = 'photo-screensaver__clock';
+      overlay.append(clock);
+      tickClock(clock);
+    }
     document.body.append(overlay);
 
     let index = Math.floor(Math.random() * photos.length);
@@ -89,6 +115,9 @@ async function start() {
       // Move the only persistent text so the screensaver itself has no fixed
       // bright pixels that could cause burn-in.
       label.dataset.position = String(index % 4);
+      // The clock takes the corner diagonally opposite and moves with the
+      // caption, so the two never meet and no text stays in one place.
+      if (clock) clock.dataset.position = String((index + 2) % 4);
     };
     show();
     slideTimer = setInterval(show, SLIDE_MS);
