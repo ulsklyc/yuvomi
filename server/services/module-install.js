@@ -42,6 +42,7 @@ import {
   acquireInstallLock,
   listModules,
   loadModuleDir,
+  moduleFolderPath,
   readInstallMeta,
   setModuleDisabledFlag,
 } from './modules.js';
@@ -726,11 +727,14 @@ export function installFromZip(buffer, opts = {}) {
  */
 export function deleteModule(id, { userId } = {}) {
   return withInstallLock(async () => {
-    if (!MODULE_ID_RE.test(String(id || ''))) {
+    // The path comes from the one function that checks the id (a string
+    // matching the id rule, inside modules/), so what is checked and what is
+    // removed below are the same value.
+    const target = moduleFolderPath(id);
+    if (!target) {
       throw new InstallError('bad_id', 'Invalid module id.');
     }
     await assertWritable();
-    const target = path.join(MODULES_DIR, id);
     const st = await lstatOrNull(target);
     if (!st) throw new InstallError('not_found', 'Module not found.');
     // A symlink is something the operator set up by hand (a dev checkout, a

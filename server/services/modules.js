@@ -35,6 +35,32 @@ let _extensionCatalog = {
   scopeModules: [],
 };
 
+/**
+ * Der Ordner des Moduls `id` unter modules/, oder null, wenn `id` keine
+ * Modul-Id ist. Die EINE Stelle, an der aus einer Id aus einer Anfrage ein
+ * Pfad wird (Einschalten, Loeschen): wer den Pfad von hier hat, hat die
+ * Pruefung nicht vergessen koennen.
+ *
+ * Nur ein STRING zaehlt. `ID_RE.test(String(id))` liess ein Array wie
+ * `['abc']` durch (String() macht daraus `abc`), und der Pfad wurde danach aus
+ * dem ungeprueften Wert selbst gebaut - geprueft war also etwas anderes als
+ * benutzt. Ueber HTTP kommt `req.params.id` immer als String an; die Luecke
+ * stand nur einem Aufrufer im Server offen und endete dort in einem TypeError
+ * von path.join statt in einer Absage.
+ *
+ * Die Praefix-Probe ist das zweite Schloss an derselben Tuer, wie in
+ * resolveAssetPath und beim Staging der Installation: ID_RE laesst weder `.`
+ * noch `/` noch `\` zu, sie kann also heute nicht anschlagen. Sie steht da,
+ * damit eine spaeter gelockerte Id-Regel nicht allein entscheidet, wo
+ * `rm -r` und das Umschreiben der Installationsdatei landen.
+ */
+export function moduleFolderPath(id) {
+  if (typeof id !== 'string' || !ID_RE.test(id)) return null;
+  const folder = path.resolve(MODULES_DIR, id);
+  if (!folder.startsWith(`${MODULES_DIR}${path.sep}`)) return null;
+  return folder;
+}
+
 function cfgGet(key) {
   const row = db.get().prepare('SELECT value FROM sync_config WHERE key = ?').get(key);
   return row ? row.value : null;
@@ -541,7 +567,8 @@ async function listModules({ admin = false } = {}) {
 }
 
 async function setModuleEnabled(id, enabled) {
-  if (!ID_RE.test(String(id || ''))) {
+  const folder = moduleFolderPath(id);
+  if (!folder) {
     const err = new Error('Invalid module id.');
     err.status = 400;
     throw err;
@@ -562,13 +589,13 @@ async function setModuleEnabled(id, enabled) {
     throw err;
   }
   try {
-    return await applyModuleEnabled(id, enabled, { writeRecord: Boolean(release) });
+    return await applyModuleEnabled(id, folder, enabled, { writeRecord: Boolean(release) });
   } finally {
     release?.();
   }
 }
 
-async function applyModuleEnabled(id, enabled, { writeRecord = true } = {}) {
+async function applyModuleEnabled(id, folder, enabled, { writeRecord = true } = {}) {
   const modules = await listModules({ admin: true });
   const target = modules.find((module) => module.id === id);
   if (!target) {
@@ -596,7 +623,7 @@ async function applyModuleEnabled(id, enabled, { writeRecord = true } = {}) {
   // (module-install.js).
   if (enabled && target.install && !target.install.approved) {
     try {
-      await writeInstallApproval(path.join(MODULES_DIR, id), true);
+      await writeInstallApproval(folder, true);
     } catch (err) {
       // Ein schreibgeschuetzter Modulordner ist der eine Fall, den der Admin
       // selbst einordnen kann: 503 wie bei der Installation, mit Grund. Alles
@@ -621,7 +648,7 @@ async function applyModuleEnabled(id, enabled, { writeRecord = true } = {}) {
       log.warn(`Module ${id} is off, but its install record still says approved (an install or delete holds the lock, so it was left as it is).`);
     } else {
       try {
-        await writeInstallApproval(path.join(MODULES_DIR, id), false);
+        await writeInstallApproval(folder, false);
       } catch (err) {
         log.warn(`Module ${id} is off, but its install record still says approved (could not write it):`, err?.message);
       }
