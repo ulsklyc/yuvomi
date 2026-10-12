@@ -2059,8 +2059,10 @@
   transition: background-color var(--transition-fast);
 }
 
-.settings-module-candidate:hover {
-  background: var(--color-surface-hover);
+@media (hover: hover) {
+  .settings-module-candidate:hover {
+    background: var(--color-surface-hover);
+  }
 }
 
 .settings-module-candidate:has(input:checked) {
@@ -2084,6 +2086,8 @@
   overflow-wrap: anywhere;
   hyphens: auto;
   hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
 }
 
 .settings-module-install__skipped {
@@ -2093,6 +2097,8 @@
   overflow-wrap: anywhere;
   hyphens: auto;
   hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
 }
 
 /* Der Breadcrumb-Block ist zu den übrigen Breadcrumb-Regeln gewandert.
@@ -3116,6 +3122,8 @@
   overflow-wrap: anywhere;
   hyphens: auto;
   hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
 }
 
 @media (max-width: 639px) {
