@@ -1494,7 +1494,9 @@ account makes the row a mirror where the object lies and sets `outbound_move_to`
 so the move runs like any other; no target, or a target in another account, queues a pending
 deletion for the object just created and leaves the row local with whatever target it now has (a
 move never crosses accounts; the other account uploads the row on its turn). A row that becomes a
-mirror withdraws a pending deletion still waiting for exactly that object (`dropDeletionsIn`).
+mirror - through the booking or through the fetch adopting its own upload - withdraws every pending
+deletion still waiting for exactly that object (`keepOwnUpload`, across accounts: a second account
+on the same calendar may have taken the object over).
 Tasks and shopping items know no move between lists: `bookTodoUpload` asks whether the row still
 waits for its upload into this list of this account (`waitsForUploadHere` - the task's own target
 columns, or for a shopping item the list mapping of the Yuvomi list it is in now) and otherwise
@@ -1502,7 +1504,8 @@ queues the deletion and leaves the row local. A task's target columns are cleare
 makes it a mirror, not afterwards by the caller, and an unreachable target is only cleared while it
 is still the one that was read. While a pending deletion for a row's own UID is open in an account,
 that row is not uploaded through this account (`withoutOwnRemoval`): the deletion runs before the
-uploads in every pass, and the tombstone is keyed by account and UID, not by list. Both creation
+uploads in every pass, and the tombstone is keyed by account and UID, not by list. A pending
+deletion of another account for the same object falls when the row becomes a mirror there. Both creation
 loops read the row again when it is its turn, so a target changed before that is not uploaded to
 the old list.
 

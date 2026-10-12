@@ -966,7 +966,7 @@ export function markEventUploaded(eventId, { source, uid, objectUrl, calRefId, a
  *
  * Wird die Zeile Spiegel, ist das Objekt an dieser Stelle ab jetzt gewollt:
  * ein Löschauftrag, der aus einem früheren Zielwechsel noch für genau dieses
- * Objekt wartet, fällt (`dropDeletionsIn`). Sonst nähme er der Zeile ihr
+ * Objekt wartet, fällt (`keepOwnUpload`). Sonst nähme er der Zeile ihr
  * Objekt wieder weg, sobald der Server das Löschen zulässt.
  *
  * Synchron: zwischen dem Nachladen und dem Schreiben liegt kein await, und
@@ -1000,11 +1000,30 @@ export function bookEventUpload(sent, { source, uid, objectUrl, calRefId, calend
     moveTo: wanted.moveTo,
   });
   if (!mirrored) return 'unchanged';
-  dropDeletionsIn({ source, calendarExternalId: calendarUrl, eventExternalId: uid, accountId });
+  keepOwnUpload({ source, calendarUrl, uid });
   if (wanted.moveTo) {
     log.info(`The target of event ${sent.id} was changed while its upload was in flight, queued its move to ${wanted.moveTo}.`);
   }
   return 'mirrored';
+}
+
+/**
+ * Das Objekt eines eigenen Uploads in diesem Kalender ist ab jetzt gewollt
+ * (#1881): Löschaufträge für genau diese UID in genau diesem Kalender fallen.
+ *
+ * Über ALLE Konten, anders als `dropDeletionsIn`. Die UID ist die dieser
+ * Installation für diese eine Zeile, ein Auftrag für sie kann also nur aus
+ * einem früheren Upload derselben Zeile stammen - auch der eines ANDEREN
+ * Kontos, das denselben Kalender führt: wechselt das Ziel während des Uploads
+ * von Konto A auf Konto B mit demselben Kalender, übernimmt B das Objekt, und
+ * der Auftrag von A löschte es ihm sonst im nächsten Lauf weg.
+ */
+function keepOwnUpload({ source, calendarUrl, uid }) {
+  if (!source || !calendarUrl || !uid) return;
+  db.get().prepare(`
+    DELETE FROM calendar_pending_deletions
+    WHERE source = ? AND calendar_external_id = ? AND event_external_id = ?
+  `).run(source, calendarUrl, uid);
 }
 
 /**
@@ -1021,7 +1040,15 @@ function uploadTargetNow(now, { source, calendarUrl, accountId }) {
   if (source !== 'caldav') return { released: false, moveTo: null };
   const target = now.target_caldav_calendar_url || null;
   if (!target || now.target_caldav_account_id !== accountId) return { released: true, moveTo: null };
-  return { released: false, moveTo: target === calendarUrl ? null : target };
+  // Derselbe Kalender in anderer Schreibweise (mit und ohne Schlussstrich) ist
+  // kein Umzug: der legte im Ziel an und löschte in der Quelle - dasselbe Objekt.
+  return { released: false, moveTo: sameCalendarUrl(target, calendarUrl) ? null : target };
+}
+
+/** Zwei Schreibweisen derselben Kalender-URL: mit und ohne Schlussstrich. */
+function sameCalendarUrl(a, b) {
+  const trim = (url) => String(url || '').replace(/\/+$/, '');
+  return trim(a) === trim(b);
 }
 
 /**
@@ -1062,13 +1089,15 @@ export function adoptOwnEventUpload({ source, uid, objectUrl, calendarUrl, calRe
   if (uid !== eventUidFor(eventId)) return false;
   // Das Objekt liegt in dem Kalender, der gerade abgerufen wird - nicht an
   // einer Adresse, die der Server frei gewählt hat.
-  const trim = (url) => String(url || '').replace(/\/+$/, '');
-  if (trim(collectionUrlOf(objectUrl)) !== trim(calendarUrl)) return false;
+  if (!sameCalendarUrl(collectionUrlOf(objectUrl), calendarUrl)) return false;
   if (!isWaitingHere(eventId)) return false;
 
   const adopted = markEventUploaded(eventId, {
     source, uid, objectUrl, calRefId, adopted: true, onlyIfLocal: true, accountId,
   });
-  if (adopted) log.info(`Adopted the earlier upload of event ${eventId} (${uid}).`);
+  if (adopted) {
+    keepOwnUpload({ source, calendarUrl, uid });
+    log.info(`Adopted the earlier upload of event ${eventId} (${uid}).`);
+  }
   return adopted;
 }

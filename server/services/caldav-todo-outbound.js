@@ -505,6 +505,7 @@ export function adoptOwnUpload(module, uid, accountId, objectUrl, { listUrl, tar
            outbound_attempts   = 0
      WHERE id = ? AND external_source = 'local'
   `).run(uid, accountId, objectUrl, rowId).changes > 0;
+  if (adopted) keepOwnUpload(module, uid, objectUrl);
   if (adopted) log.info(`Adopted the earlier upload of ${def.table} row ${rowId} (${uid}).`);
   return adopted;
 }
@@ -542,17 +543,20 @@ export function buildTodoICS(module, row, uid) {
  * ginge dabei verloren. VTODO kennt zwar RELATED-TO, aber der Inbound wertet es
  * nicht aus; die Rundreise würde sie also als lose Aufgaben zurückbringen.
  */
-export function pendingCreations(accountId, module = 'tasks') {
+export function pendingCreations(accountId, module = 'tasks', id = null) {
   const def = moduleDef(module);
   if (module !== 'tasks') return [];
+  // Mit `id` dieselbe Frage für EINE Zeile: die Upload-Schleife stellt sie
+  // frisch, wenn die Zeile an der Reihe ist (#1881) - durch dieselbe Auswahl.
   return withoutOwnRemoval(module, accountId, db.get().prepare(`
     SELECT * FROM ${def.table}
      WHERE external_source          = 'local'
        AND target_caldav_account_id = ?
        AND target_caldav_list_url IS NOT NULL
        AND parent_task_id IS NULL
+       AND (? IS NULL OR id = ?)
      ORDER BY id
-  `).all(accountId));
+  `).all(accountId, id, id));
 }
 
 /**
@@ -830,7 +834,36 @@ function bookTodoUpload(module, sent, { uid, objectUrl, accountId, collectionUrl
            outbound_attempts   = 0
      WHERE id = ? AND external_source = 'local'
   `).run(uid, accountId, objectUrl, adopted || edited ? 1 : 0, sent.id).changes > 0;
-  return mirrored ? 'mirrored' : 'unchanged';
+  if (!mirrored) return 'unchanged';
+  keepOwnUpload(module, uid, objectUrl);
+  return 'mirrored';
+}
+
+/**
+ * Das Objekt eines eigenen Uploads an dieser Adresse ist ab jetzt gewollt
+ * (#1881): Löschaufträge für genau diese UID an genau dieser Adresse fallen,
+ * über alle Konten.
+ *
+ * Im selben Konto kommt es dazu nicht (`withoutOwnRemoval` lässt die Zeile
+ * warten). Führen aber zwei Konten dieselbe Liste und wechselt das Ziel
+ * während des Uploads von A auf B, trifft der Upload über B auf das Objekt von
+ * eben, übernimmt es - und der Auftrag von A löschte es ihm sonst weg. Die UID
+ * ist die dieser Installation für diese eine Zeile; ein Auftrag für sie stammt
+ * immer aus einem früheren Upload derselben Zeile.
+ */
+function keepOwnUpload(module, uid, objectUrl) {
+  // Die Liste entscheidet, nicht die Schreibweise der Adresse: der Abruf nennt
+  // sie, wie der Server sie schreibt (`@` als `%40`), der Auftrag trägt die
+  // selbst berechnete.
+  const list = collectionUrlOf(objectUrl);
+  if (!list) return;
+  const waiting = db.get().prepare(
+    'SELECT id, object_url FROM caldav_todo_pending_deletions WHERE module = ? AND uid = ?'
+  ).all(module, uid);
+  for (const row of waiting) {
+    const theirs = collectionUrlOf(row.object_url);
+    if (theirs && sameCollection(theirs, list)) dropDeletion(row.id);
+  }
 }
 
 /** EINE Zeile je Liste, die in diesem Lauf abgelehnt hat - mit der Anzahl. */
@@ -862,7 +895,7 @@ export async function processPendingCreations(client, accountId, module, listsBy
     // gelöscht wurde oder nicht mehr auf den Upload über dieses Konto wartet,
     // geht nicht hinauf - und sein Ziel, das jetzt ein anderes sein kann,
     // wird hier weder gelesen noch abgeräumt.
-    if (!pendingCreations(accountId, module).some((row) => row.id === listed.id)) continue;
+    if (!pendingCreations(accountId, module, listed.id).length) continue;
     const fresh = reloadRow(module, listed.id);
     if (!fresh) continue;
 

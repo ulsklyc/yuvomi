@@ -1187,6 +1187,34 @@ test('Termin: Ziel wechselt während des Uploads in einen anderen Kalender des K
   assert.deepEqual(eventTombstones(), []);
 });
 
+test('Termin: dasselbe Ziel in anderer Schreibweise während des Uploads - kein Umzug in den eigenen Kalender', async () => {
+  reset();
+  const way = WAYS.Termin;
+  const { row, rows, names } = helpers(way);
+  const url = way.setup();
+  const id  = way.create(url, 'Bleibt');
+  const uid = ownUid('event', id, db);
+  assert.ok(url.endsWith('/'));
+
+  // Derselbe Kalender ohne Schlussstrich. Als Umzug gelesen, legte er im
+  // "Ziel" an und löschte in der "Quelle" - dasselbe Objekt.
+  const happened = duringPut(() => setEventTarget(id, accountId, url.slice(0, -1)));
+  await way.upload();
+  assert.ok(happened(), 'es lief kein PUT - der Fall ist nicht nachgestellt');
+  dav.allowAll();
+
+  assert.equal(row(id).external_source, 'caldav');
+  assert.equal(row(id).outbound_move_to, null, 'dieselbe URL ohne Schlussstrich gilt als anderer Kalender');
+
+  await way.sync();
+  await way.push();
+  await way.sync();
+
+  assert.equal(rows().length, 1);
+  assert.deepEqual(names(url), [`${uid}.ics`], 'der Termin wurde aus seinem eigenen Kalender gelöscht');
+  assert.deepEqual(eventTombstones(), []);
+});
+
 test('Termin: Ziel wechselt während des Uploads auf "Lokal" - das Objekt wird wieder entfernt, der Termin bleibt lokal', async () => {
   reset();
   const way = WAYS.Termin;
@@ -1233,7 +1261,7 @@ test('Termin: Ziel wechselt während des Uploads auf ein anderes Konto - er lieg
   const happened = duringPut(() => setEventTarget(id, second, theirs));
   await way.upload();
   assert.ok(happened(), 'es lief kein PUT - der Fall ist nicht nachgestellt');
-  assert.equal(dav.seen('PUT')[0].path, `${new URL(url).pathname}${encodeURIComponent(uid)}.ics`.replace('%40', '@'),
+  assert.equal(decodeURIComponent(dav.seen('PUT')[0].path), `${new URL(url).pathname}${uid}.ics`,
     'der erste PUT ging nicht in den Kalender des ersten Kontos - der Fall ist nicht nachgestellt');
   dav.allowAll();
 
@@ -1536,6 +1564,9 @@ test('Aufgabe: Ziel wechselt, bevor sie im selben Lauf an der Reihe ist - sie ge
   const theirs = addTaskList('theirs', second);
   const first  = way.create(url, 'Erste');
   const id     = way.create(url, 'Zweite');
+  // Eine dritte wartet weiter auf dieses Konto: gefragt wird nach DIESER
+  // Zeile, nicht danach, ob überhaupt noch etwas wartet.
+  const third  = way.create(url, 'Dritte');
   const uid    = ownUid('task', id, db);
 
   const happened = duringPut(() => setTaskTarget(id, second, theirs));
@@ -1546,6 +1577,7 @@ test('Aufgabe: Ziel wechselt, bevor sie im selben Lauf an der Reihe ist - sie ge
   dav.allowAll();
 
   assert.equal(row(first).external_source, 'caldav');
+  assert.equal(row(third).external_source, 'caldav');
   const now = row(id);
   assert.equal(now.external_source, 'local', 'die Aufgabe ging über das Konto hinaus, das niemand mehr gewählt hat');
   assert.equal(now.target_caldav_account_id, second, 'das gerade gewählte Ziel wurde abgeräumt');
@@ -1576,3 +1608,85 @@ test('Einkaufsartikel: wandert, bevor er im selben Lauf an der Reihe ist - er ge
   assert.ok(!names(url).includes(`${uid}.ics`));
   assert.deepEqual(todoTombstones(), []);
 });
+
+// Zwei Konten führen DENSELBEN Kalender bzw. dieselbe Liste, und das Ziel
+// wechselt während des Uploads vom einen auf das andere. Das Objekt von eben
+// liegt dann schon dort, wo es hin soll; das zweite Konto übernimmt es, und der
+// Löschauftrag des ersten darf es ihm nicht mehr wegnehmen.
+
+test('Termin: Ziel wechselt während des Uploads auf ein anderes Konto mit DEMSELBEN Kalender - das Objekt bleibt stehen', async () => {
+  reset();
+  const way = WAYS.Termin;
+  const { row, rows, names } = helpers(way);
+  const url    = way.setup();
+  const second = secondAccount();
+  db.prepare(`
+    INSERT INTO caldav_calendar_selection (account_id, calendar_url, calendar_name, calendar_color, enabled)
+    VALUES (?, ?, 'Familie', '#4A90E2', 1)
+  `).run(second, url);
+  const id  = way.create(url, 'Geteilter Kalender');
+  const uid = ownUid('event', id, db);
+
+  const happened = duringPut(() => setEventTarget(id, second, url));
+  await way.upload();
+  assert.ok(happened(), 'es lief kein PUT - der Fall ist nicht nachgestellt');
+  dav.allowAll();
+
+  await way.sync();
+  await way.push();
+  await way.sync();
+
+  const now = row(id);
+  assert.equal(rows().length, 1, 'der Termin ist fort oder doppelt');
+  assert.equal(now.external_source, 'caldav');
+  assert.equal(now.caldav_account_id, second);
+  assert.deepEqual(names(url), [`${uid}.ics`], 'der Löschauftrag des ersten Kontos hat das übernommene Objekt entfernt');
+  assert.deepEqual(eventTombstones(), []);
+});
+
+// Das zweite Konto kommt auf zwei Wegen an das Objekt: sein Upload trifft
+// darauf (412), oder sein Abruf sieht es zuerst und übernimmt es.
+for (const via of ['upload', 'sync']) {
+  test(`Aufgabe: Ziel wechselt während des Uploads auf ein anderes Konto mit DERSELBEN Liste (${via === 'upload' ? 'Upload trifft auf das Objekt' : 'Abruf übernimmt'}) - das Objekt bleibt stehen`, async () => {
+    reset();
+    const way = WAYS.Aufgabe;
+    const { row, rows, names } = helpers(way);
+    const url    = way.setup();
+    const second = secondAccount();
+    db.prepare(`
+      INSERT INTO caldav_reminder_selection (account_id, list_url, list_name, target_module, enabled)
+      VALUES (?, ?, 'Erinnerungen', 'tasks', 1)
+    `).run(second, url);
+    const id  = way.create(url, 'Geteilte Liste');
+    const uid = ownUid('task', id, db);
+
+    const happened = duringPut(() => setTaskTarget(id, second, url));
+    await way.upload();
+    assert.ok(happened(), 'es lief kein PUT - der Fall ist nicht nachgestellt');
+    dav.allowAll();
+    assert.equal(todoTombstones().length, 1, 'der Fall ist nicht nachgestellt: das Entfernen ist nicht vorgemerkt');
+
+    // Das erste Konto bekommt sein Objekt nicht gelöscht, bevor das zweite an
+    // der Reihe ist.
+    dav.refuse({ method: 'DELETE', status: 403 });
+    await way[via]();
+    assert.equal(row(id).external_account_id, second, 'der Fall ist nicht nachgestellt: das zweite Konto hat nicht übernommen');
+    dav.allowAll();
+
+    await way.sync();
+    await way.push();
+    await way.sync();
+
+    const now = row(id);
+    assert.ok(now, 'die Aufgabe ist fort');
+    assert.equal(now.external_source, 'caldav');
+    assert.equal(now.external_account_id, second);
+    assert.deepEqual(names(url), [`${uid}.ics`], 'der Löschauftrag des ersten Kontos hat das übernommene Objekt entfernt');
+    assert.deepEqual(todoTombstones(), []);
+    // Aufgaben kennen kein "eine Zeile je UID" über Konten hinweg: jedes Konto
+    // führt seine eigene Zeile je Eintrag einer geteilten Liste. Das ist älter
+    // als dieser Fall und gilt für den Nachbarn genauso.
+    const neighbours = db.prepare("SELECT COUNT(*) AS n FROM tasks WHERE title = 'Nachbar'").get().n;
+    assert.equal(rows().length, neighbours, 'die Aufgabe steht öfter da als jeder andere Eintrag der Liste');
+  });
+}
