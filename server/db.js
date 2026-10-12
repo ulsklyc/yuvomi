@@ -10637,6 +10637,92 @@ const MIGRATIONS = [
       END;
     `,
   },
+  {
+    version: 240,
+    description: 'Calendar: a pending deletion can carry the ETag of the entry it was queued for (#1883)',
+    // EIN LOESCHAUFTRAG, DER WARTET, KANNTE NUR DIE ADRESSE SEINES OBJEKTS. Der
+    // Auftrag aus einem Umzug, dessen Quelle ihr Loeschen abgelehnt hat (#1861),
+    // wartet ueber Laeufe hinweg; liegt der Termin dann wieder im alten Kalender
+    // (auf einem anderen Geraet zurueckgeschoben), traf ihn der naechste Versuch,
+    // und er war in beiden Kalendern fort.
+    //
+    // `etag` ist der Stand des Objekts, fuer den der Auftrag vorgemerkt wurde.
+    // Traegt ein Auftrag einen, gilt er genau diesem Objekt in genau diesem
+    // Stand: das DELETE geht mit ihm als If-Match hinaus, und ein anderer Stand
+    // verwirft den Auftrag. NULL heisst "gleich in welchem Stand" - das Loeschen
+    // durch den Nutzer und jeder Auftrag von vor dieser Migration; fuer sie
+    // aendert sich nichts.
+    up: `
+      ALTER TABLE calendar_pending_deletions ADD COLUMN etag TEXT;
+    `,
+  },
+  {
+    version: 241,
+    description: 'CalDAV: an upload is noted before it is sent, so a lost answer leaves a trace (#1882)',
+    // EIN UPLOAD, DESSEN ANTWORT VERLOREN GING, HINTERLIESS NICHTS. Der PUT kam
+    // an, das Objekt liegt auf dem Server, und lokal stand nur eine Zeile wie
+    // jede andere, die noch nie hinaufging. Wartet sie weiter auf denselben
+    // Platz, uebernimmt der naechste Lauf das Objekt (#1837). Wird sie aber
+    // vorher geloescht oder bekommt sie ein anderes Ziel, wusste niemand mehr,
+    // dass dort etwas von ihr liegt: der naechste Abruf holte den geloeschten
+    // Eintrag als neue Zeile zurueck bzw. legte neben die bestehende eine
+    // zweite.
+    //
+    // Die UID des Objekts allein darf das nicht entscheiden. Sie kommt vom
+    // Server, und wer dort schreiben darf, kann eine im Muster dieser
+    // Installation bauen (`server/utils/own-uid.js`); nach dem Einspielen
+    // eines aelteren Backups traegt ausserdem eine NEUE Zeile die Id einer
+    // frueheren, deren Objekt noch oben liegt. Geloescht wird ein Objekt
+    // deshalb nur, wenn der LOKALE Stand belegt, dass genau diese Zeile an
+    // genau diesen Platz hinaufgeschickt wurde.
+    //
+    // Dieser Beleg ist die Zeile hier: geschrieben VOR der Anfrage, entfernt,
+    // sobald ihr Ergebnis gebucht ist. Bleibt sie stehen, ist die Antwort nie
+    // angekommen. Sie ueberlebt die Zeile, von der sie handelt (kein
+    // Fremdschluessel auf calendar_events/tasks/shopping_items: drei Tabellen,
+    // und der Fall ist gerade der, in dem die Zeile fort ist); ihr Konto
+    // ueberlebt sie nicht - ohne Konto gibt es keinen Weg zum Objekt.
+    //
+    // `account_id` ist NULL fuer iCloud (eine Verbindung, kein Konto). Der
+    // Schluessel nennt den Platz: eine Zeile kann nacheinander an mehrere
+    // Plaetze geschickt worden sein, ohne dass eine Antwort ankam.
+    up: `
+      CREATE TABLE IF NOT EXISTS caldav_upload_attempts (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        source         TEXT    NOT NULL CHECK (source IN ('caldav', 'apple')),
+        account_id     INTEGER REFERENCES caldav_accounts(id) ON DELETE CASCADE,
+        kind           TEXT    NOT NULL CHECK (kind IN ('event', 'task', 'item')),
+        row_id         INTEGER NOT NULL,
+        collection_url TEXT    NOT NULL,
+        uid            TEXT    NOT NULL,
+        object_url     TEXT    NOT NULL,
+        created_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_caldav_upload_attempts_place
+        ON caldav_upload_attempts(source, COALESCE(account_id, 0), kind, row_id, collection_url);
+      CREATE INDEX IF NOT EXISTS idx_caldav_upload_attempts_uid
+        ON caldav_upload_attempts(uid);
+    `,
+  },
+  {
+    version: 242,
+    description: 'Tasks: manual order within a category (tasks.sort_order)',
+    // NULL = nie von Hand eingeordnet. Solche Aufgaben behalten die bisherige
+    // Reihenfolge (Faelligkeit, dann Prioritaet) und stehen HINTER den von Hand
+    // eingeordneten: eine neue Aufgabe landet damit am Ende ihrer Kategorie,
+    // statt eine bestehende Handordnung zu verschieben. Kein Backfill - bis zum
+    // ersten Zug aendert sich nichts an der Anzeige.
+    //
+    // Der Rang gilt in der Kategorie, in der er vergeben wurde: wechselt eine
+    // Aufgabe die Kategorie, setzt PUT /tasks/:id ihn auf NULL zurueck, und sie
+    // steht dort, wo jede neue Aufgabe steht. Die Folgeinstanz einer
+    // Wiederholung erbt den Rang ihrer Vorgaengerin. Gelesen wird er nur beim
+    // Gruppieren nach Kategorie.
+    up(db) {
+      const has = (table, column) => db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === column);
+      if (!has('tasks', 'sort_order')) db.exec('ALTER TABLE tasks ADD COLUMN sort_order INTEGER');
+    },
+  },
 ];
 
 /**
@@ -10862,6 +10948,9 @@ const CRITICAL_COLUMNS = [
     type: 'INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL' },
   { table: 'calendar_pending_deletions', column: 'caldav_account_id',
     type: 'INTEGER REFERENCES caldav_accounts(id) ON DELETE CASCADE' },
+  // #1883: v240 traegt den ETag eines Loeschauftrags nach; ohne die Spalte
+  // scheitert das Lesen der Auftraege und damit jeder ausgehende Durchgang.
+  { table: 'calendar_pending_deletions', column: 'etag', type: 'TEXT' },
 ];
 
 /**

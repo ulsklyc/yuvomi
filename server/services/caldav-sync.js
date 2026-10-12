@@ -19,6 +19,7 @@ import {
   countAccountEvents as countEventsOfAccount, deleteAccountEvents,
 } from './calendar-prune.js';
 import * as outbound from './calendar-outbound.js';
+import { dropUploadAttemptsOf } from './caldav-upload-attempts.js';
 import { processPendingDeletions, processPendingUpdates, flushAccount, ObjectIndex } from './caldav-outbound.js';
 import { detachAccountRows } from './caldav-todo-outbound.js';
 import { runSerialized } from '../utils/sync-lock.js';
@@ -604,6 +605,10 @@ async function updateAccount(accountId, { name, caldavUrl, username, password, c
       const dropped = Number(db.get().prepare(
         "DELETE FROM calendar_pending_deletions WHERE source = 'caldav' AND caldav_account_id = ?"
       ).run(accountId).changes) || 0;
+      // Ebenso die Notizen nie gebuchter Uploads (#1882): ihre Adressen
+      // meinen den alten Server, und eine Aufgabe hielte sonst für immer an
+      // einer Liste des alten Kontos fest.
+      dropUploadAttemptsOf({ source: 'caldav', accountId });
       if (dropped) {
         log.warn(`Account ${accountId} points to a new server or user: dropped ${dropped} pending deletion(s) meant for the old one.`);
       }
@@ -665,6 +670,8 @@ function deleteAccount(accountId, { deleteEvents = false } = {}) {
     db.get().prepare(
       "DELETE FROM calendar_pending_deletions WHERE source = 'caldav' AND caldav_account_id = ?"
     ).run(accountId);
+    // Ebenso die Notizen nie gebuchter Uploads (#1882).
+    dropUploadAttemptsOf({ source: 'caldav', accountId });
     const rows = detachAccountRows(accountId);
     db.get().prepare('DELETE FROM caldav_accounts WHERE id = ?').run(accountId);
     // Die Frist der Farb-Heilung (#1270) haengt an keinem Fremdschluessel.
@@ -809,6 +816,42 @@ function accountUrls(account) {
       'SELECT calendar_url FROM caldav_calendar_selection WHERE account_id = ?'
     ).all(account.id).map((r) => r.calendar_url),
   ];
+}
+
+/**
+ * Ist dieser Kalender für das Konto JETZT eingeschaltet (#1884)? Gelesen bei
+ * jedem Aufruf: gefragt wird unmittelbar vor einem DELETE, und zwischen zwei
+ * Aufträgen liegt ein await, in dem die Auswahl sich ändern kann. Ohne
+ * Rücksicht auf den Schlussstrich, wie überall, wo zwei Kalender-URLs
+ * verglichen werden.
+ */
+function selectionOf(accountId) {
+  const enabled = db.get().prepare(
+    'SELECT calendar_url FROM caldav_calendar_selection WHERE account_id = ? AND enabled = 1'
+  );
+  return (calendarUrl) => enabled.all(accountId).some((row) => outbound.sameCalendarUrl(row.calendar_url, calendarUrl));
+}
+
+// Konto → Zahl der wartenden Aufträge, die zuletzt gemeldet wurde. Der Zustand
+// kann Monate dauern; im Standard-Log steht er einmal, wenn er sich ändert,
+// nicht bei jedem Lauf.
+const reportedWaiting = new Map();
+
+/**
+ * Meldet, wie viele Löschaufträge dieses Kontos auf einen abgewählten Kalender
+ * warten (#1884). Vorher blieben sie ohne jede Zeile liegen.
+ */
+function reportWaitingDeletions(account) {
+  const waiting = outbound.deletionsWaitingForSelection('caldav', {
+    accountId: account.id, isSelected: selectionOf(account.id),
+  });
+  const before = reportedWaiting.get(account.id) || 0;
+  reportedWaiting.set(account.id, waiting);
+  if (!waiting) return;
+  const line = `Account ${account.id} ("${account.name}"): ${waiting} pending deletion(s) wait for a calendar that is not selected. `
+    + 'Nothing is deleted there while it is switched off; they are carried out once it is selected again and dropped if it no longer exists on the server.';
+  if (waiting !== before) log.info(line);
+  else log.debug(line);
 }
 
 /**
@@ -1077,13 +1120,32 @@ async function runSync({ createClient } = {}) {
         WHERE account_id = ? AND enabled = 1
       `).all(account.id);
 
-      if (enabledCalendars.length === 0) {
+      // Ohne eingeschalteten Kalender gibt es nichts abzurufen. Wartet aber
+      // ein Löschauftrag auf einen abgewählten (#1884), fragt der Lauf
+      // trotzdem die Auflistung ab: nur sie sagt, ob es den Kalender noch
+      // gibt, und ohne sie wartete der Auftrag in einem Konto ohne Auswahl
+      // für immer.
+      const hasPlacedDeletions = outbound.pendingDeletions('caldav', { accountId: account.id })
+        .some((row) => row.calendar_external_id);
+      if (enabledCalendars.length === 0 && !hasPlacedDeletions) {
         log.debug(`Account ${account.id}: no enabled calendars, skipping.`);
         continue;
       }
 
       // Fetch all calendars from server
       const serverCalendars = await client.fetchCalendars();
+
+      // Ohne Auswahl ging es nur um die wartenden Aufträge. Eine leere
+      // Auflistung sagt auch hier nichts.
+      if (enabledCalendars.length === 0) {
+        if (serverCalendars.length > 0) {
+          outbound.dropDeletionsOfMissingCalendars('caldav', {
+            accountId: account.id, listedUrls: serverCalendars.map((sc) => sc.url),
+          });
+        }
+        reportWaitingDeletions(account);
+        continue;
+      }
 
       // Der Server nennt KEINEN Kalender, obwohl welche ausgewählt sind: das
       // ist eine unvollständige Antwort (ein Multistatus, der nur die
@@ -1097,6 +1159,13 @@ async function runSync({ createClient } = {}) {
         );
         continue;
       }
+
+      // Löschaufträge für Kalender, die der Server nicht mehr nennt, haben ihr
+      // Ziel erreicht (#1884). Dieselbe Auflistung schaltet unten einen
+      // eingeschalteten Kalender ab, der in ihr fehlt.
+      outbound.dropDeletionsOfMissingCalendars('caldav', {
+        accountId: account.id, listedUrls: serverCalendars.map((sc) => sc.url),
+      });
 
       // Heilung eingebrannter Kalenderfarben (#1270), siehe oben. Nach dem
       // Abruf der Kalender, weil deren Faehigkeiten die Farbmenge begrenzen.
@@ -1223,7 +1292,33 @@ async function runSync({ createClient } = {}) {
 
               // Vom Nutzer gelöscht und noch nicht auf dem Server: nicht wieder
               // anlegen, sonst kehrt der Termin bei jedem Sync zurück (#593).
-              if (awaitsDeletion(ev.uid, selCal.calendar_url, obj.url ?? null)) continue;
+              // Ein Auftrag aus einem abgelehnten Umzug verdeckt nur das Objekt
+              // in dem Stand, für den er vorgemerkt wurde (#1883).
+              if (awaitsDeletion(ev.uid, selCal.calendar_url, obj.url ?? null, obj.etag ?? null)) continue;
+
+              // Der eigene Upload, dessen Antwort verloren ging. Übernommen
+              // wird er nur für einen Termin, der auf den Upload in GENAU
+              // diesen Kalender dieses Kontos wartet - die UID kommt vom
+              // Server und weist nichts aus.
+              const adoptOwn = () => !!obj.url && outbound.adoptOwnEventUpload({
+                source: 'caldav', uid: ev.uid, objectUrl: obj.url, calRefId,
+                calendarUrl: selCal.calendar_url, accountId: account.id,
+                isWaitingHere: (eventId) => localUploadsOf(account.id).some(
+                  (e) => e.id === eventId && e.target_caldav_calendar_url === selCal.calendar_url
+                ),
+              });
+
+              // Für dieses Objekt steht die Notiz eines Uploads, der nie
+              // gebucht wurde (#1882) - gleich über welches Konto er lief.
+              // Dann ist es kein Eintrag wie jeder andere: wartet sein Termin
+              // hier, wird es übernommen; sonst wird es weder importiert noch
+              // einer Zeile zugeordnet (gelöscht, anderes Ziel, woanders
+              // gespiegelt, oder er wartet über ein anderes Konto). Entfernt
+              // wird es nach dem Abruf (`releaseLeftoverUploads`). Frisch
+              // gefragt: der Termin kann gefallen sein, während dieser Lauf
+              // noch liest.
+              if (outbound.isUnbookedOwnUpload({ source: 'caldav', uid: ev.uid, calendarUrl: selCal.calendar_url })
+                  && !adoptOwn()) continue;
 
               let existing = rowForUid(ev.uid, obj.url ?? null, account.id);
               // Die Zeile gehört einem anderen Konto, oder sie hat keines und
@@ -1235,17 +1330,7 @@ async function runSync({ createClient } = {}) {
               // Zeile übernehmen statt eine zweite anzulegen; sie ist danach
               // als geändert vorgemerkt, der Zweig darunter lässt sie stehen
               // und der Outbound dieses Laufs trägt den lokalen Stand hinauf.
-              if (!existing && obj.url
-                  && outbound.adoptOwnEventUpload({
-                    source: 'caldav', uid: ev.uid, objectUrl: obj.url, calRefId,
-                    calendarUrl: selCal.calendar_url, accountId: account.id,
-                    // Nur ein Termin, der auf den Upload in GENAU diesen
-                    // Kalender dieses Kontos wartet - die UID kommt vom
-                    // Server und weist nichts aus.
-                    isWaitingHere: (eventId) => localUploadsOf(account.id).some(
-                      (e) => e.id === eventId && e.target_caldav_calendar_url === selCal.calendar_url
-                    ),
-                  })) {
+              if (!existing && adoptOwn()) {
                 existing = rowForUid(ev.uid, obj.url ?? null, account.id);
                 if (existing === false) continue;
               }
@@ -1385,10 +1470,17 @@ async function runSync({ createClient } = {}) {
       try {
         // Gemeldet wird, was der Server gelöscht hat - nicht, was ohne Anfrage fiel.
         const deletions = { sent: 0 };
+        // Die Reste nie bestätigter Uploads entfernen (#1882), in den
+        // Kalendern, die dieser Lauf abgerufen hat.
+        await outbound.releaseLeftoverUploads(client, {
+          source: 'caldav', accountId: account.id, calendarUrls: ownCalendarUrls,
+        });
         await processPendingDeletions(client, 'caldav', objectIndex, ownCalendarUrls, {
           accountId: account.id, complete: fetchedEveryCalendar, outcome: deletions,
+          isSelected: selectionOf(account.id),
         });
         if (deletions.sent) log.info(`${deletions.sent} pending deletion(s) applied on the server.`);
+        reportWaitingDeletions(account);
         const pushed = await processPendingUpdates(client, 'caldav', objectIndex, calendarsByUrl, {
           accountId: account.id, fullRun: true,
         });
@@ -1429,7 +1521,9 @@ async function runSync({ createClient } = {}) {
 
           // Upload to CalDAV. Ein 412 auf den eigenen Namen ist der eigene
           // frühere Upload und wird übernommen (uploadNewEvent).
-          const { objectUrl, adopted } = await outbound.uploadNewEvent(client, targetCal, uid, icsData);
+          const { objectUrl, adopted } = await outbound.uploadNewEvent(client, targetCal, uid, icsData, {
+            source: 'caldav', eventId: event.id, accountId: account.id,
+          });
 
           const calRefId  = upsertExternalCalendar(
             'caldav', event.target_caldav_calendar_url,
@@ -1521,9 +1615,13 @@ async function runFlushOutbound({ createClient } = {}) {
     // Was in einem Kalender ausserhalb der Auswahl dieses Kontos liegt, fasst
     // der Sofortversuch nicht an.
     const calendarUrls = new Set(accountUrls(account).slice(1));
+    // Gelöscht wird nur in einem EINGESCHALTETEN Kalender (#1884). Vorher
+    // genügte, dass die Auswahl ihn kannte: das DELETE ging auch in einen
+    // abgewählten, und jede Absage dort zählte gegen den Auftrag.
+    const isSelected = selectionOf(account.id);
     // Ohne URL hilft nur der volle Abruf des Syncs.
     const deletions = outbound.pendingDeletions('caldav', { accountId: account.id })
-      .filter((row) => row.object_url && (!row.calendar_external_id || calendarUrls.has(row.calendar_external_id)));
+      .filter((row) => row.object_url && (!row.calendar_external_id || isSelected(row.calendar_external_id)));
     const updates = [];
     let needsCalendars = false;
     for (const event of outbound.pendingUpdates('caldav', { accountId: account.id })) {
@@ -1538,7 +1636,7 @@ async function runFlushOutbound({ createClient } = {}) {
     try {
       const client = withAccountOrigin(await makeClient(account), accountUrls(account));
       const res = await flushAccount(client, 'caldav', {
-        deletions, updates, needsCalendars, accountId: account.id, calendarUrls,
+        deletions, updates, needsCalendars, accountId: account.id, isSelected,
       });
       total.deleted += res.deleted;
       total.updated += res.updated;

@@ -413,6 +413,30 @@ test('das Display sieht nur haushaltssichtbare Zeilen, nie private', async () =>
   assert.ok(!titles.includes('Geheim'), 'die Sichtbarkeitsregel gilt fuer ein Display wie fuer jeden');
 });
 
+test('das Display liest die Aufgaben je Person fuer die Wand - nur die haushaltssichtbaren (#1817)', async () => {
+  // `wallTasks` reist in der Antwort von /dashboard mit, also ueber die Scopes,
+  // die das Display ohnehin hat (dashboard:read, tasks:read) - kein neuer Weg.
+  const adminId = (await admin('GET', '/auth/me')).body.user.id;
+  // Ueberfaellig zaehlt zu heute; so haengt der Test an keinem Kalendertag.
+  const shared = { due_date: '2020-01-01', assigned_to: [adminId] };
+  assert.equal((await admin('POST', '/tasks', { title: 'Wand: fuer alle', visibility: 'all', ...shared })).status, 201);
+  assert.equal((await admin('POST', '/tasks', { title: 'Wand: nur Zugewiesene', visibility: 'assignees', ...shared })).status, 201);
+
+  const titlesFor = async (request) => {
+    const res = await request('GET', '/dashboard');
+    assert.equal(res.status, 200);
+    assert.ok(Array.isArray(res.body.wallTasks), 'Reichweite: die Antwort traegt wallTasks');
+    return (res.body.wallTasks.find((entry) => entry.user_id === adminId)?.open ?? []).map((task) => task.title);
+  };
+  const onDisplay = await titlesFor(asDisplay(displayToken));
+  assert.ok(onDisplay.includes('Wand: fuer alle'));
+  assert.ok(!onDisplay.includes('Wand: nur Zugewiesene'));
+  // Und dieselbe Liste aus der Sitzung der zugewiesenen Person selbst. Das
+  // gilt fuer dieselbe Anfrage: eine Kategorie-Auswahl (`tasks_category`)
+  // schraenkt die Liste fuer den ein, der sie mitschickt.
+  assert.deepEqual(await titlesFor(admin), onDisplay, 'ohne Filter liefert dieselbe Anfrage jedem dieselbe Liste');
+});
+
 // --------------------------------------------------------
 // Ein Display ist kein Mensch
 // --------------------------------------------------------

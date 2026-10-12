@@ -41,7 +41,11 @@ import * as db from '../db.js';
 import { outboundFailureAction } from './calendar-outbound.js';
 import { patchICSTodo } from '../utils/ics-patch.js';
 import { createCalDAVClient, collectionUrlOf, createUploadGate } from '../utils/caldav-client.js';
-import { ownUid, isOwnUidOfRow, ownUploadRowId, findObjectWithUid } from '../utils/own-uid.js';
+import { ownUid, isOwnUidOfRow, ownUploadRowId, parseOwnUid, findObjectWithUid } from '../utils/own-uid.js';
+import {
+  noteUploadAttempt, settleUploadAttempt, uploadAttemptsAt,
+  hasUploadAttempt, removeLeftoverUploads,
+} from './caldav-upload-attempts.js';
 import { householdTimeZone, localToUTC } from '../utils/timezone.js';
 import { loadTags, tagsKey } from '../utils/task-tags.js';
 import { runSerialized } from '../utils/sync-lock.js';
@@ -343,6 +347,72 @@ function dropDeletion(id) {
   db.get().prepare('DELETE FROM caldav_todo_pending_deletions WHERE id = ?').run(id);
 }
 
+/**
+ * Liegt diese Objektadresse in einer Liste, die für das Konto ABGEWÄHLT ist
+ * (#1884)? Ein Löschauftrag nennt seine Liste nicht; sie ergibt sich aus der
+ * Adresse seines Objekts. Abgewählt heisst: die Auswahl des Kontos kennt die
+ * Liste, und keine ihrer Zeilen ist eingeschaltet. Eine Adresse ohne Liste in
+ * der Auswahl ist nicht abgewählt, sondern unbekannt - für sie gilt nichts
+ * von hier.
+ *
+ * Gelesen bei jedem Aufruf: gefragt wird unmittelbar vor einem DELETE, und
+ * davor liegen awaits.
+ */
+function inUnselectedList(accountId, objectUrl) {
+  const list = collectionUrlOf(objectUrl);
+  if (!list) return false;
+  const known = db.get().prepare(
+    'SELECT list_url, enabled FROM caldav_reminder_selection WHERE account_id = ?'
+  ).all(accountId).filter((sel) => sameCollection(sel.list_url, list));
+  return known.length > 0 && !known.some((sel) => sel.enabled === 1);
+}
+
+/**
+ * Die Löschaufträge eines Kontos, die auf eine abgewählte Liste warten
+ * (#1884), über beide Module.
+ */
+export function deletionsWaitingForSelection(accountId) {
+  return db.get().prepare(
+    'SELECT id, module, uid, object_url FROM caldav_todo_pending_deletions WHERE account_id = ? ORDER BY id'
+  ).all(accountId).filter((row) => row.object_url && inUnselectedList(accountId, row.object_url));
+}
+
+/**
+ * Räumt die Löschaufträge ab, deren Liste es auf dem Server nicht mehr gibt
+ * (#1884): mit der Liste ist auch das Objekt fort. Der Lauf schaltet eine
+ * verschwundene Liste ab, und ein Auftrag für eine abgewählte wartet - ohne
+ * das hier für immer.
+ *
+ * Nur für Aufträge, deren Liste die Auswahl des Kontos kennt; eine Adresse,
+ * die zu keiner bekannten Liste gehört, wird nicht beurteilt. `listedUrls` ist
+ * die Auflistung DIESES Laufs und vom Aufrufer als nicht leer befunden.
+ *
+ * @returns {number} abgeräumte Aufträge
+ */
+export function dropDeletionsOfMissingLists(accountId, listedUrls) {
+  const listed = [...(listedUrls || [])];
+  if (listed.length === 0) return 0;
+  const selection = db.get().prepare(
+    'SELECT list_url FROM caldav_reminder_selection WHERE account_id = ?'
+  ).all(accountId);
+  const gone = new Map();
+  for (const row of db.get().prepare(
+    'SELECT id, object_url FROM caldav_todo_pending_deletions WHERE account_id = ? ORDER BY id'
+  ).all(accountId)) {
+    const list = collectionUrlOf(row.object_url);
+    if (!list || !selection.some((sel) => sameCollection(sel.list_url, list))) continue;
+    if (listed.some((url) => sameCollection(url, list))) continue;
+    dropDeletion(row.id);
+    gone.set(list, (gone.get(list) || 0) + 1);
+  }
+  let dropped = 0;
+  for (const [list, count] of gone) {
+    dropped += count;
+    log.warn(`Reminder list ${list} no longer exists on the server: dropped ${count} pending deletion(s) for it, its entries are gone with it.`);
+  }
+  return dropped;
+}
+
 function failDeletion(id, err) {
   db.get().prepare(
     'UPDATE caldav_todo_pending_deletions SET attempts = attempts + 1, last_error = ? WHERE id = ?'
@@ -534,24 +604,31 @@ export function adoptOwnUpload(module, uid, accountId, objectUrl, { listUrl, tar
   if (!sameCollection(collectionUrlOf(objectUrl) || '', listUrl)) return false;
 
   const waitingHere = module === 'shopping'
-    ? !!targetListId && pendingShoppingCreations(targetListId).some((row) => row.id === rowId)
+    ? !!targetListId && pendingShoppingCreations(targetListId, accountId).some((row) => row.id === rowId)
     : pendingCreations(accountId, module).some(
       (row) => row.id === rowId && sameCollection(row.target_caldav_list_url, listUrl)
     );
   if (!waitingHere) return false;
 
+  // Das Ziel einer Aufgabe fällt im selben Schreibvorgang (wie `bookTodoUpload`).
   const adopted = db.get().prepare(`
     UPDATE ${def.table}
        SET external_source     = 'caldav',
            external_uid        = ?,
            external_account_id = ?,
-           external_object_url = ?,
+           external_object_url = ?,${module === 'tasks' ? `
+           target_caldav_account_id = NULL,
+           target_caldav_list_url   = NULL,` : ''}
            outbound_dirty      = 1,
            outbound_attempts   = 0
      WHERE id = ? AND external_source = 'local'
   `).run(uid, accountId, objectUrl, rowId).changes > 0;
-  if (adopted && module === 'tasks') clearCreationTarget(rowId);
-  if (adopted) log.info(`Adopted the earlier upload of ${def.table} row ${rowId} (${uid}).`);
+  if (adopted) {
+    keepOwnUpload(module, uid, objectUrl);
+    // Übernommen ist gebucht: die Notiz des Uploads fällt (#1882).
+    settleUploadAttempt({ source: 'caldav', accountId, kind: uidKind(module), rowId, collectionUrl: listUrl });
+    log.info(`Adopted the earlier upload of ${def.table} row ${rowId} (${uid}).`);
+  }
   return adopted;
 }
 
@@ -588,17 +665,41 @@ export function buildTodoICS(module, row, uid) {
  * ginge dabei verloren. VTODO kennt zwar RELATED-TO, aber der Inbound wertet es
  * nicht aus; die Rundreise würde sie also als lose Aufgaben zurückbringen.
  */
-export function pendingCreations(accountId, module = 'tasks') {
+export function pendingCreations(accountId, module = 'tasks', id = null) {
   const def = moduleDef(module);
   if (module !== 'tasks') return [];
-  return db.get().prepare(`
+  // Mit `id` dieselbe Frage für EINE Zeile: die Upload-Schleife stellt sie
+  // frisch, wenn die Zeile an der Reihe ist (#1881) - durch dieselbe Auswahl.
+  return withoutOwnRemoval(module, accountId, db.get().prepare(`
     SELECT * FROM ${def.table}
      WHERE external_source          = 'local'
        AND target_caldav_account_id = ?
        AND target_caldav_list_url IS NOT NULL
        AND parent_task_id IS NULL
+       AND (? IS NULL OR id = ?)
      ORDER BY id
-  `).all(accountId);
+  `).all(accountId, id, id));
+}
+
+/**
+ * Nimmt die Zeilen heraus, deren EIGENES Objekt in diesem Konto noch entfernt
+ * werden soll (#1881).
+ *
+ * Das gibt es, seit ein Zielwechsel während des Uploads das gerade angelegte
+ * Objekt zum Löschen vormerkt und die Zeile lokal lässt: Zeile und Auftrag
+ * tragen dann dieselbe UID. Ginge die Zeile in der Zeit wieder hinauf, träfe
+ * sie in derselben Liste auf genau dieses Objekt, übernähme es (412), und der
+ * wartende Auftrag nähme es ihr danach weg; in einer anderen Liste des Kontos
+ * stünde die UID zweimal, und der Auftrag kennt keine Liste, nur das Konto
+ * (der Abruf verdeckt die UID kontoweit). Also erst fort, dann neu: der
+ * Auftrag läuft in jedem Durchgang VOR den Uploads, im Regelfall wartet die
+ * Zeile keinen Lauf. Gibt der Auftrag auf, ist sie wieder frei.
+ */
+function withoutOwnRemoval(module, accountId, rows) {
+  if (!rows.length) return rows;
+  const removing = pendingDeletionUids(accountId, module);
+  if (!removing.size) return rows;
+  return rows.filter((row) => !removing.has(todoUidFor(module, row.id)));
 }
 
 /** Zwei Schreibweisen derselben Collection-URL: mit und ohne Schlussstrich. */
@@ -657,14 +758,21 @@ export function recurrenceFollowupTarget(task) {
  *
  * `external_source = 'local'` ist der Spalten-Default, trennt also genau die
  * hier angelegten Artikel von den vom Server geholten Spiegeln.
+ *
+ * @param {number} listId
+ * @param {number|null} [accountId] das Konto, das hochladen würde
  */
-export function pendingShoppingCreations(listId) {
-  return db.get().prepare(`
+export function pendingShoppingCreations(listId, accountId = null) {
+  const rows = db.get().prepare(`
     SELECT * FROM shopping_items
      WHERE external_source = 'local'
        AND list_id         = ?
      ORDER BY id
   `).all(listId);
+  // Mit Konto: ohne die Artikel, deren eigenes Objekt dort noch entfernt
+  // werden soll (`withoutOwnRemoval`). Wer nur zählt, ob überhaupt etwas
+  // wartet, fragt ohne.
+  return accountId == null ? rows : withoutOwnRemoval('shopping', accountId, rows);
 }
 
 /**
@@ -704,11 +812,17 @@ function accountsWithPendingCreations() {
   }
 }
 
-/** Das Ziel wieder abräumen - nach dem Upload und wenn es unerreichbar ist. */
-function clearCreationTarget(id) {
-  db.get().prepare(
-    'UPDATE tasks SET target_caldav_account_id = NULL, target_caldav_list_url = NULL WHERE id = ?'
-  ).run(id);
+/**
+ * Ein unerreichbares Ziel abräumen - genau das Ziel, das `task` trägt (#1881).
+ * Steht an der Zeile inzwischen ein anderes, bleibt es: der Aufrufer hat über
+ * das gelesene geurteilt, nicht über das, was danach gewählt wurde. Nach einem
+ * geglückten Upload räumt die Buchung selbst ab (`bookTodoUpload`).
+ */
+function clearCreationTarget(task) {
+  db.get().prepare(`
+    UPDATE tasks SET target_caldav_account_id = NULL, target_caldav_list_url = NULL
+     WHERE id = ? AND target_caldav_account_id IS ? AND target_caldav_list_url IS ?
+  `).run(task.id, task.target_caldav_account_id ?? null, task.target_caldav_list_url ?? null);
 }
 
 /**
@@ -723,15 +837,22 @@ function clearCreationTarget(id) {
  * nächste Inbound-Lauf ihn wiederfindet (dieselbe Lehre wie bei den Terminen,
  * #593).
  *
- * @returns {Promise<boolean>} false, wenn sich kein VTODO bauen ließ
+ * @returns {Promise<'mirrored'|'deleted'|'released'|'unchanged'|null>} wie
+ *   `bookTodoUpload`; null, wenn sich kein VTODO bauen ließ
  */
 async function uploadNewTodo(client, collection, module, row, accountId) {
   const def = moduleDef(module);
   const uid = todoUidFor(module, row.id);
   const ics = buildTodoICS(module, row, uid);
-  if (!ics) return false;
+  if (!ics) return null;
 
   const objectUrl = `${String(collection.url).replace(/\/?$/, '/')}${uid}.ics`;
+  // VOR der Anfrage notiert (#1882, `caldav-upload-attempts.js`): geht die
+  // Antwort verloren, belegt die Notiz, dass von dieser Zeile etwas an diesem
+  // Platz liegen kann. Sie fällt mit der Buchung unten. Synchron, unmittelbar
+  // vor der Anfrage.
+  const place = { source: 'caldav', accountId, kind: uidKind(module), rowId: row.id, collectionUrl: collection.url };
+  noteUploadAttempt({ ...place, uid, objectUrl });
   // Der Name ist vergeben (412) und das Objekt trägt unsere UID: ein früherer
   // PUT kam an, seine Antwort nicht. Übernehmen und den lokalen Stand als
   // Änderung vormerken, statt zu raten, was dort liegt.
@@ -752,38 +873,246 @@ async function uploadNewTodo(client, collection, module, row, accountId) {
     log.info(`${def.table} row ${row.id} is already on the server as ${uid}, adopting it.`);
   }
 
-  // Gebucht wird gegen den Stand von JETZT (#1862): zwischen `row` und hier
-  // lag die Anfrage. Synchron bis zum Schreiben, kein await dazwischen.
-  const now = reloadRow(module, row.id);
-  if (!now) {
-    // Während des Uploads gelöscht. Für eine lokale Zeile merkt die Löschroute
-    // nichts vor, das Objekt läge also für immer oben und der nächste Abruf
-    // holte den gelöschten Eintrag als neue Zeile zurück.
+  return bookTodoUpload(module, row, { uid, objectUrl, accountId, collectionUrl: collection.url, adopted });
+}
+
+/**
+ * Wartet diese Zeile JETZT auf ihren Upload in genau diese Liste dieses Kontos
+ * (#1881)? Dieselbe Frage, die die Upload-Schleifen vor der Anfrage stellen,
+ * hier NACH ihr gestellt.
+ *
+ * Eine Aufgabe trägt ihr Ziel selbst. Ein Einkaufsartikel erbt es von der
+ * Zuordnung seiner Yuvomi-Liste (`shoppingSelectionsOf`): er wartet hier,
+ * solange die Liste, in der er JETZT liegt, dieser Server-Liste zugeordnet ist.
+ */
+function waitsForUploadHere(module, now, accountId, collectionUrl) {
+  if (module === 'shopping') {
+    return shoppingSelectionsOf(accountId).some(
+      (sel) => sel.targetListId === now.list_id && sameCollection(sel.listUrl, collectionUrl)
+    );
+  }
+  return now.target_caldav_account_id === accountId
+    && !!now.target_caldav_list_url
+    && sameCollection(now.target_caldav_list_url, collectionUrl)
+    && !now.parent_task_id;
+}
+
+/**
+ * Bucht das Ergebnis eines Uploads - gegen den Stand von JETZT (#1862, #1881):
+ * zwischen `sent` und hier lag die Anfrage, und in der Zeit lief die App
+ * weiter.
+ *
+ *   - Die Zeile ist weg: für eine lokale Zeile merkt die Löschroute nichts
+ *     vor, das Objekt läge also für immer oben, und der nächste Abruf holte
+ *     den gelöschten Eintrag als neue Zeile zurück. Das gerade angelegte
+ *     Objekt wird zum Löschen vorgemerkt.
+ *   - Die Zeile ist nicht mehr lokal: nichts wird überschrieben.
+ *   - Die Zeile wartet nicht mehr auf DIESEN Upload (`waitsForUploadHere`):
+ *     ihr Ziel wurde gewechselt oder zurückgenommen, der Artikel liegt in
+ *     einer anderen Liste. Einen Umzug zwischen Listen gibt es bewusst nicht -
+ *     das gerade angelegte Objekt wird zum Löschen vorgemerkt, die Zeile
+ *     bleibt lokal und behält, was jetzt an ihr steht. Hat sie ein neues Ziel,
+ *     geht sie dorthin, sobald das alte Objekt fort ist (`withoutOwnRemoval`).
+ *   - Die Zeile wurde bearbeitet: oben liegt der Stand davor. Sie wird Spiegel
+ *     UND als geändert vorgemerkt, sonst überschriebe der nächste Abruf die
+ *     Bearbeitung mit dem alten Stand.
+ *
+ * Das Ziel einer Aufgabe fällt IM SELBEN Schreibvorgang, der sie zum Spiegel
+ * macht, und nur dort. Vorher räumte es der Aufrufer nach jedem geglückten
+ * Upload ab - auch das Ziel, das während der Anfrage gerade erst gewählt
+ * worden war.
+ *
+ * Synchron: zwischen dem Nachladen und dem Schreiben liegt kein await, und
+ * jeder Ausgang ist EIN Schreibvorgang.
+ *
+ * Mit jeder Buchung fällt die Notiz des Uploads (#1882). Bei `unchanged`
+ * bleibt sie stehen - über das Objekt wurde nichts entschieden, das tut
+ * `releaseLeftoverTodoUploads` am Stand der Zeile.
+ *
+ * @returns {'mirrored'|'deleted'|'released'|'unchanged'}
+ */
+function bookTodoUpload(module, sent, { uid, objectUrl, accountId, collectionUrl, adopted = false }) {
+  const def = moduleDef(module);
+  const booked = () => settleUploadAttempt({
+    source: 'caldav', accountId, kind: uidKind(module), rowId: sent.id, collectionUrl,
+  });
+  const queueRemoval = () => {
     db.get().prepare(`
       INSERT INTO caldav_todo_pending_deletions (account_id, module, uid, object_url)
       VALUES (?, ?, ?, ?)
       ON CONFLICT(account_id, module, uid)
         DO UPDATE SET object_url = COALESCE(excluded.object_url, object_url)
     `).run(accountId, module, uid, objectUrl);
-    log.info(`${def.table} row ${row.id} was deleted while its upload was in flight, queued the deletion of ${uid}.`);
-    return true;
-  }
-  // Während des Uploads bearbeitet: oben liegt der Stand davor. Die Zeile wird
-  // Spiegel UND als geändert vorgemerkt, sonst überschriebe der nächste Abruf
-  // die Bearbeitung mit dem alten Stand.
-  const edited = changedSince(module, row, now);
+    booked();
+  };
 
-  db.get().prepare(`
+  const now = reloadRow(module, sent.id);
+  if (!now) {
+    queueRemoval();
+    log.info(`${def.table} row ${sent.id} was deleted while its upload was in flight, queued the deletion of ${uid}.`);
+    return 'deleted';
+  }
+  if (now.external_source !== 'local') return 'unchanged';
+  if (!waitsForUploadHere(module, now, accountId, collectionUrl)) {
+    queueRemoval();
+    log.info(`The target of ${def.table} row ${sent.id} was changed while its upload was in flight, queued the deletion of ${uid}.`);
+    return 'released';
+  }
+  const edited = changedSince(module, sent, now);
+
+  const mirrored = db.get().prepare(`
     UPDATE ${def.table}
        SET external_source     = 'caldav',
            external_uid        = ?,
            external_account_id = ?,
-           external_object_url = ?,
+           external_object_url = ?,${module === 'tasks' ? `
+           target_caldav_account_id = NULL,
+           target_caldav_list_url   = NULL,` : ''}
            outbound_dirty      = ?,
            outbound_attempts   = 0
-     WHERE id = ?
-  `).run(uid, accountId, objectUrl, adopted || edited ? 1 : 0, row.id);
-  return true;
+     WHERE id = ? AND external_source = 'local'
+  `).run(uid, accountId, objectUrl, adopted || edited ? 1 : 0, sent.id).changes > 0;
+  if (!mirrored) return 'unchanged';
+  keepOwnUpload(module, uid, objectUrl);
+  booked();
+  return 'mirrored';
+}
+
+// --------------------------------------------------------
+// Der Upload, dessen Antwort nie ankam (#1882)
+// --------------------------------------------------------
+
+/**
+ * Führt diese Liste des Kontos noch Einträge dieses Moduls? Nein nur, wenn
+ * die Auswahl sie inzwischen dem ANDEREN Modul zuordnet (von "Aufgaben" auf
+ * "Einkauf" umgestellt): eine Aufgabe trägt ihr Ziel als Konto und Adresse,
+ * und beides stimmt dann weiter, obwohl dort keine Aufgabe mehr hingehört.
+ * Abgeschaltet oder aus der Auswahl verschwunden zählt nicht als "nein".
+ */
+function listStillServes(module, accountId, listUrl) {
+  const selected = db.get().prepare(
+    'SELECT list_url, target_module FROM caldav_reminder_selection WHERE account_id = ?'
+  ).all(accountId).filter((sel) => sameCollection(sel.list_url, listUrl));
+  return !selected.length
+    || selected.some((sel) => (sel.target_module === 'shopping' ? 'shopping' : 'tasks') === module);
+}
+
+/**
+ * Wie steht die Zeile JETZT zu dem Objekt, das ein nie gebuchter Upload an
+ * diesem Platz hinterlassen haben kann? Dieselben drei Antworten wie bei den
+ * Terminen (`uploadAttemptState` in calendar-outbound.js):
+ *
+ *   waiting  - lokal, und sie gehört weiter genau dorthin;
+ *   mirrored - Spiegel an genau diesem Platz: das Objekt ist ihres;
+ *   leftover - gelöscht, anderes oder kein Ziel, woanders Spiegel.
+ */
+function todoAttemptState(module, attempt) {
+  const def = moduleDef(module);
+  const now = db.get().prepare(`SELECT * FROM ${def.table} WHERE id = ?`).get(attempt.row_id);
+  if (!now) return 'leftover';
+  if (now.external_source === 'local') {
+    return waitsForUploadHere(module, now, attempt.account_id, attempt.collection_url)
+      && listStillServes(module, attempt.account_id, attempt.collection_url) ? 'waiting' : 'leftover';
+  }
+  if (now.external_source === 'caldav' && now.external_uid === attempt.uid
+      && sameCollection(collectionUrlOf(now.external_object_url) || '', attempt.collection_url)) {
+    return 'mirrored';
+  }
+  return 'leftover';
+}
+
+/**
+ * Für den Abruf: liegt für das Objekt mit dieser UID in dieser Liste eine
+ * Notiz vor, deren Upload nie gebucht wurde und die NICHT schon aufgegangen
+ * ist (die Zeile ist nicht Spiegel an diesem Platz)? Dann darf der Aufrufer
+ * es nur noch ÜBERNEHMEN (`adoptOwnUpload`, vorher) - sonst weder importieren
+ * noch einer Zeile zuordnen. Entfernt wird es von
+ * `releaseLeftoverTodoUploads`, für das Konto, dem die Notiz gehört.
+ *
+ * Über ALLE Konten gefragt: führen zwei Konten dieselbe Liste, sieht der Abruf
+ * des einen das Objekt, das über das andere hinaufging.
+ *
+ * Der Beleg ist die lokale Notiz, nicht die UID. Frisch je Objekt gefragt: die
+ * Zeile kann fallen, während der Lauf noch den Server liest.
+ */
+export function isUnbookedOwnUpload(module, uid, listUrl) {
+  // Billig zuerst: das Muster der UID, ohne Datenbank. Die ART kommt aus der
+  // UID, nicht aus dem Modul, das die Liste gerade führt: wird eine Liste von
+  // "Aufgaben" auf "Einkauf" umgestellt, liegt dort der Rest einer Aufgabe,
+  // und der Abruf läse ihn sonst als Einkaufsartikel. `module` sagt nur noch,
+  // wer fragt.
+  const parsed = parseOwnUid(uid);
+  if (!parsed || !['task', 'item'].includes(parsed.kind) || parsed.installation === null) return false;
+  moduleDef(module);
+  const noted = parsed.kind === 'item' ? 'shopping' : 'tasks';
+  let attempts;
+  try {
+    attempts = uploadAttemptsAt({ source: 'caldav', kind: parsed.kind, uid, collectionUrl: listUrl });
+  } catch (err) {
+    log.warn(`Upload notes are not readable (${err.message}); treating them as none.`);
+    return false;
+  }
+  return attempts.some((attempt) => todoAttemptState(noted, attempt) !== 'mirrored');
+}
+
+/**
+ * Entfernt die Reste von Aufgaben- und Einkaufs-Uploads, deren Antwort nie
+ * ankam (#1882): die Notizen des Kontos, deren Zeile dort nicht mehr
+ * hingehört (`todoAttemptState`). Was dabei gelesen, gelöscht oder stehen
+ * gelassen wird, steht an `removeLeftoverUploads`.
+ *
+ * In jedem Lauf, und im Sofortversuch für jedes Konto, das er ohnehin
+ * anfasst, VOR den Uploads: hat die Zeile inzwischen ein anderes Ziel in
+ * diesem Konto, ist ihr Rest im Regelfall fort, bevor sie neu hinaufgeht. Und
+ * die Regel hängt so an keiner Löschroute.
+ *
+ * Nur in Listen, die für das Konto eingeschaltet sind. Ein Einkaufsartikel
+ * einer abgeschalteten Zuordnung gilt zwar als Rest (er wartet dort nicht),
+ * bleibt damit aber unberührt; wird sie wieder eingeschaltet, wartet er
+ * wieder, und der Lauf übernimmt das Objekt.
+ *
+ * @param {object} client
+ * @param {number} accountId
+ * @returns {Promise<number>} entfernte Objekte
+ */
+export function releaseLeftoverTodoUploads(client, accountId) {
+  // Nur in Listen, die für dieses Konto eingeschaltet sind.
+  const enabled = db.get().prepare(
+    'SELECT list_url FROM caldav_reminder_selection WHERE account_id = ? AND enabled = 1'
+  ).all(accountId).map((r) => r.list_url);
+  return removeLeftoverUploads(client, {
+    source: 'caldav', accountId, kinds: ['task', 'item'],
+    stateOf: (attempt) => todoAttemptState(attempt.kind === 'item' ? 'shopping' : 'tasks', attempt),
+    inScope: (url) => enabled.some((known) => sameCollection(known, url)),
+    label: 'CalDAV-Todo',
+  });
+}
+
+/**
+ * Das Objekt eines eigenen Uploads an dieser Adresse ist ab jetzt gewollt
+ * (#1881): Löschaufträge für genau diese UID an genau dieser Adresse fallen,
+ * über alle Konten.
+ *
+ * Im selben Konto kommt es dazu nicht (`withoutOwnRemoval` lässt die Zeile
+ * warten). Führen aber zwei Konten dieselbe Liste und wechselt das Ziel
+ * während des Uploads von A auf B, trifft der Upload über B auf das Objekt von
+ * eben, übernimmt es - und der Auftrag von A löschte es ihm sonst weg. Die UID
+ * ist die dieser Installation für diese eine Zeile; ein Auftrag für sie stammt
+ * immer aus einem früheren Upload derselben Zeile.
+ */
+function keepOwnUpload(module, uid, objectUrl) {
+  // Die Liste entscheidet, nicht die Schreibweise der Adresse: der Abruf nennt
+  // sie, wie der Server sie schreibt (`@` als `%40`), der Auftrag trägt die
+  // selbst berechnete.
+  const list = collectionUrlOf(objectUrl);
+  if (!list) return;
+  const waiting = db.get().prepare(
+    'SELECT id, object_url FROM caldav_todo_pending_deletions WHERE module = ? AND uid = ?'
+  ).all(module, uid);
+  for (const row of waiting) {
+    const theirs = collectionUrlOf(row.object_url);
+    if (theirs && sameCollection(theirs, list)) dropDeletion(row.id);
+  }
 }
 
 /** EINE Zeile je Liste, die in diesem Lauf abgelehnt hat - mit der Anzahl. */
@@ -809,14 +1138,39 @@ export async function processPendingCreations(client, accountId, module, listsBy
 
   const gate = createUploadGate();
   let done = 0;
-  for (const row of rows) {
-    const collection = listsByUrl.get(row.target_caldav_list_url);
+  for (const listed of rows) {
+    // Frisch lesen, durch dieselbe Auswahl (#1881): die Liste stammt von vor
+    // der Schleife, und jeder Upload davor war ein await. Wer inzwischen
+    // gelöscht wurde oder nicht mehr auf den Upload über dieses Konto wartet,
+    // geht nicht hinauf - und sein Ziel, das jetzt ein anderes sein kann,
+    // wird hier weder gelesen noch abgeräumt.
+    if (!pendingCreations(accountId, module, listed.id).length) continue;
+    const fresh = reloadRow(module, listed.id);
+    if (!fresh) continue;
+
+    const collection = listsByUrl.get(fresh.target_caldav_list_url);
     if (!collection) {
       // Die Liste ist weg oder wurde abgewählt. Das Ziel stehen zu lassen hieße,
       // es bei jedem Lauf erneut zu versuchen; die Aufgabe bleibt lokal, was der
       // Zustand vor #695 war und keine Daten kostet.
-      log.warn(`Reminder list ${row.target_caldav_list_url} is not available, keeping task ${row.id} local.`);
-      clearCreationTarget(row.id);
+      // Ausnahme (#1882): von dieser Aufgabe ging schon ein Upload in genau
+      // diese Liste, und seine Antwort kam nie an. Ihr Objekt kann dort
+      // liegen. Fiele jetzt ihr Ziel, gälte es als Rest und würde gelöscht -
+      // abwählen heisst aber "nicht mehr abgleichen", nicht "auf dem Server
+      // aufräumen". Das Ziel bleibt, die Notiz auch; ist die Liste wieder da,
+      // übernimmt der Lauf das Objekt.
+      // Gehört die Liste inzwischen dem anderen Modul, gilt die Notiz als
+      // Rest (`todoAttemptState`), wird entfernt, und das Ziel fällt im
+      // Durchgang danach.
+      if (hasUploadAttempt({
+        source: 'caldav', accountId, kind: uidKind(module), rowId: fresh.id,
+        collectionUrl: fresh.target_caldav_list_url,
+      })) {
+        log.debug(`Reminder list ${fresh.target_caldav_list_url} is not available; task ${fresh.id} has an unconfirmed upload there and keeps its target.`);
+        continue;
+      }
+      log.warn(`Reminder list ${fresh.target_caldav_list_url} is not available, keeping task ${fresh.id} local.`);
+      clearCreationTarget(fresh);
       continue;
     }
 
@@ -824,23 +1178,23 @@ export async function processPendingCreations(client, accountId, module, listsBy
     // Aufgabe dieselbe Absage abholen.
     if (gate.isClosed(collection.url)) continue;
 
-    const fresh = reloadRow(module, row.id);
-    if (!fresh) continue; // zwischenzeitlich gelöscht
-
     try {
-      if (await uploadNewTodo(client, collection, module, fresh, accountId)) {
-        clearCreationTarget(fresh.id);
+      // Das Ziel räumt die Buchung selbst ab, wenn die Aufgabe Spiegel wird
+      // (`bookTodoUpload`) - nicht hier, nach dem await: dann stünde dort
+      // womöglich schon das Ziel, das während der Anfrage gewählt wurde.
+      const booked = await uploadNewTodo(client, collection, module, fresh, accountId);
+      if (booked === 'mirrored') {
         done++;
-      } else {
+      } else if (booked === null) {
         log.error(`Could not build a VTODO for task ${fresh.id}, keeping it local.`);
-        clearCreationTarget(fresh.id);
+        clearCreationTarget(fresh);
       }
     } catch (err) {
       // Kein Zähler und kein Aufgeben: anders als eine Änderung hat ein Upload
       // keinen Stand, der veralten könnte. Er bleibt vorgemerkt und läuft im
       // nächsten Lauf mit, so lange bis er durchgeht oder das Ziel verschwindet.
       if (!gate.refused(collection.url, err)) {
-        log.warn(`Could not upload task ${fresh.id} to ${row.target_caldav_list_url}: ${err.message}`);
+        log.warn(`Could not upload task ${fresh.id} to ${fresh.target_caldav_list_url}: ${err.message}`);
       }
     }
   }
@@ -877,10 +1231,12 @@ export async function processPendingShoppingCreations(client, accountId, targets
     const collection = listsByUrl.get(listUrl);
     if (!collection) continue;
 
-    for (const row of pendingShoppingCreations(targetListId)) {
+    for (const row of pendingShoppingCreations(targetListId, accountId)) {
       if (gate.isClosed(collection.url)) continue;
       const fresh = reloadRow('shopping', row.id);
-      if (!fresh) continue; // zwischenzeitlich gelöscht
+      // Zwischenzeitlich gelöscht, schon gespiegelt oder in eine andere Liste
+      // gewandert (#1881): dann wartet er nicht mehr auf den Upload HIERHER.
+      if (!fresh || fresh.external_source !== 'local' || fresh.list_id !== targetListId) continue;
 
       // EIN UMGEZOGENER ARTIKEL WARTET, BIS SEIN ALTES OBJEKT WEG IST (#1700).
       // Ein hier angelegter Artikel trägt auf dem Server eine UID, die allein
@@ -895,16 +1251,9 @@ export async function processPendingShoppingCreations(client, accountId, targets
       if (pendingDeletionUids(accountId, 'shopping').has(todoUidFor('shopping', fresh.id))) continue;
 
       try {
-        if (await uploadNewTodo(client, collection, 'shopping', fresh, accountId)) {
-          done++;
-          // DER UPLOAD WARTET AUF DEN SERVER, und in dieser Zeit kann der
-          // Artikel die Liste gewechselt haben (#1700). Dann liegt das eben
-          // angelegte Objekt in der Collection der ALTEN Liste und die Zeile
-          // zeigt von der neuen darauf: wieder lösen, das Objekt geht mit dem
-          // nächsten Lauf, und die neue Liste legt ihn selbst an.
-          const after = reloadRow('shopping', fresh.id);
-          if (after && after.list_id !== targetListId) releaseShoppingMirror(after);
-        } else log.error(`Could not build a VTODO for shopping item ${fresh.id}, keeping it local.`);
+        const booked = await uploadNewTodo(client, collection, 'shopping', fresh, accountId);
+        if (booked === 'mirrored') done++;
+        else if (booked === null) log.error(`Could not build a VTODO for shopping item ${fresh.id}, keeping it local.`);
       } catch (err) {
         // Wie oben: bleibt lokal und läuft im nächsten Lauf wieder mit.
         if (!gate.refused(collection.url, err)) {
@@ -933,6 +1282,15 @@ export async function processPendingShoppingCreations(client, accountId, targets
  *                               nicht mehr" belegt und der Tombstone erledigt;
  *                               im Sofortversuch (nur einzelne Objekte geholt)
  *                               bleibt er sonst liegen.
+ *
+ * EIN AUFTRAG FÜR EINE ABGEWÄHLTE LISTE WARTET (#1884). Abschalten heisst
+ * nicht aufräumen: solange die Liste abgewählt ist, geht dorthin kein DELETE,
+ * weder im Lauf noch im Sofortversuch. Der Auftrag bleibt stehen, zählt keinen
+ * Versuch und läuft, sobald die Liste wieder eingeschaltet ist; endgültig
+ * fällt er, wenn es die Liste nicht mehr gibt (`dropDeletionsOfMissingLists`)
+ * oder das Konto gelöscht wird. Führt der Abruf das Objekt inzwischen in einer
+ * EINGESCHALTETEN Liste (auf einem anderen Gerät verschoben), wird es dort
+ * gelöscht.
  * @returns {Promise<number>} erledigte Tombstones
  */
 export async function processPendingDeletions(client, accountId, module, objectIndex, complete = false) {
@@ -942,7 +1300,13 @@ export async function processPendingDeletions(client, accountId, module, objectI
   let done = 0;
   for (const row of rows) {
     const known = objectIndex.get(row.uid);
-    const url   = row.object_url || known?.url || null;
+    let url     = row.object_url || known?.url || null;
+
+    // Je Auftrag gelesen, unmittelbar vor seiner Anfrage.
+    if (url && inUnselectedList(accountId, url)) {
+      if (!known?.url || inUnselectedList(accountId, known.url)) continue;
+      url = known.url;
+    }
 
     if (!url) {
       if (complete) {
@@ -1056,9 +1420,13 @@ function accountsWithPendingWork() {
     buckets.get(accountId).add(module);
   };
 
+  // Ein Auftrag, der auf eine abgewählte Liste wartet (#1884), ist keine
+  // Arbeit für den Sofortversuch: sonst baute jede Bearbeitung einen Client
+  // für ein Konto auf, an das nichts geht.
   for (const row of db.get().prepare(
-    'SELECT DISTINCT account_id, module FROM caldav_todo_pending_deletions'
+    'SELECT account_id, module, object_url FROM caldav_todo_pending_deletions'
   ).all()) {
+    if (row.object_url && inUnselectedList(row.account_id, row.object_url)) continue;
     add(row.account_id, row.module);
   }
   for (const [module, def] of Object.entries(MODULES)) {
@@ -1199,10 +1567,14 @@ async function runFlushOutbound({ createClient } = {}) {
     try {
       const client = await makeClient(account);
 
+      // Vor allem anderen: die Reste nie bestätigter Uploads entfernen
+      // (#1882), damit eine Zeile mit neuem Ziel nicht neben ihren Rest geht.
+      await releaseLeftoverTodoUploads(client, accountId);
+
       for (const module of modules) {
         const wanted = [
           ...pendingDeletions(accountId, module)
-            .filter((r) => r.object_url)
+            .filter((r) => r.object_url && !inUnselectedList(accountId, r.object_url))
             .map((r) => ({ uid: r.uid, url: r.object_url })),
           ...pendingUpdates(accountId, module)
             .filter((r) => r.external_object_url)
@@ -1227,7 +1599,7 @@ async function runFlushOutbound({ createClient } = {}) {
         }
         if (module === 'shopping') {
           const targets = shoppingSelectionsOf(accountId)
-            .filter((tgt) => pendingShoppingCreations(tgt.targetListId).length);
+            .filter((tgt) => pendingShoppingCreations(tgt.targetListId, accountId).length);
           if (targets.length) {
             total.created += await processPendingShoppingCreations(
               client, accountId, targets, await collectionsForTargets(client, targets)

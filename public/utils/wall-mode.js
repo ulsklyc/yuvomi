@@ -129,6 +129,17 @@ export function isWallRoute(path) {
 }
 
 /**
+ * Laeuft auf diesem Pfad die Wand? Schalter des Geraets UND Route.
+ *
+ * Aus Ablage und Pfad gerechnet, nicht aus dem Attribut der Wurzel gelesen
+ * (`isWallActive`): die Glocke der Shell fragt beim Kaltstart, bevor
+ * `syncWallMode` das Attribut gesetzt hat (reminders.js).
+ */
+export function wallShowsOn(path = location.pathname) {
+  return isWallModeEnabled() && isWallRoute(path);
+}
+
+/**
  * Nachtfenster. Ueber Mitternacht hinweg, deshalb ODER statt UND - dieselbe
  * Falle, die das Tagesprogramm beim Mitternachts-Ausblick schon einmal hatte.
  */
@@ -176,7 +187,7 @@ function restoreUserTheme() {
  */
 export function syncWallMode(path = location.pathname) {
   const root = document.documentElement;
-  const active = isWallModeEnabled() && isWallRoute(path);
+  const active = wallShowsOn(path);
   const night = active && isWallNight();
   const wasNight = root.hasAttribute('data-wall-night');
 

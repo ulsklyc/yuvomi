@@ -30,8 +30,11 @@
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { runExternalJob } from '../utils/restore-state.js';
-import { ownUid, ownUploadRowId, findObjectWithUid } from '../utils/own-uid.js';
+import { ownUid, ownUploadRowId, parseOwnUid, findObjectWithUid } from '../utils/own-uid.js';
 import { collectionUrlOf } from '../utils/caldav-client.js';
+import {
+  noteUploadAttempt, settleUploadAttempt, uploadAttemptsAt, removeLeftoverUploads,
+} from './caldav-upload-attempts.js';
 
 const log = createLogger('CalendarOutbound');
 
@@ -55,6 +58,11 @@ export function mirroredFieldsChanged(before, after) {
   return MIRRORED_FIELDS.some((f) => before?.[f] !== after[f]);
 }
 
+/** Der HTTP-Status eines Provider-Fehlers, gleich aus welchem Client er kommt. */
+export function outboundErrorStatus(err) {
+  return err?.code ?? err?.response?.status ?? err?.status;
+}
+
 /**
  * Einordnung eines Provider-Fehlers.
  *   settled   - Ziel bereits erreicht bzw. gegenstandslos (Objekt existiert nicht mehr)
@@ -66,7 +74,7 @@ export function mirroredFieldsChanged(before, after) {
  * nächste Lauf liest den frischen etag und versucht es erneut.
  */
 export function classifyOutboundError(err) {
-  const status = err?.code ?? err?.response?.status ?? err?.status;
+  const status = outboundErrorStatus(err);
   if (status === 404 || status === 410) return 'settled';
   if (status === 400) return 'permanent';
   return 'retry';
@@ -128,11 +136,25 @@ function accountCountFilter(source, accountId) {
  *
  * Ein CalDAV-Tombstone trägt das Konto, über das er gesendet wird (#1860).
  * Ohne Konto entsteht keiner: es gäbe keinen Server, an den er gehen dürfte.
+ *
+ * `etag` (#1883) macht den Auftrag BEDINGT: er gilt dem Objekt an `objectUrl`
+ * in genau diesem Stand und fällt, sobald dort etwas anderes liegt. Ohne ETag
+ * gilt er dem Termin, gleich in welchem Stand - so merkt die Löschroute vor,
+ * denn wer in Yuvomi löscht, will den Termin fort haben. Ein ETag ohne Adresse
+ * bedingt nichts und wird nicht gespeichert.
+ *
+ * Trifft ein Auftrag ohne ETag auf einen bedingten, gilt danach der
+ * unbedingte: die Bedingung fällt. Löscht der Nutzer den Termin, fällt sie
+ * auch an den Aufträgen derselben UID in anderen Kalendern
+ * (`queueEventDeletion`). Umgekehrt bekommt ein bestehender Auftrag
+ * nachträglich keine - Adresse und ETag benennen zusammen EIN Objekt, und die
+ * Adresse des bestehenden bleibt.
  * @returns {boolean} true, wenn eine Löschung vorgemerkt ist
  */
-export function queueDeletion({ source, calendarExternalId, eventExternalId, objectUrl = null, accountId = null }, database = null) {
+export function queueDeletion({ source, calendarExternalId, eventExternalId, objectUrl = null, accountId = null, etag = null }, database = null) {
   if (!source || !eventExternalId) return false;
   if (!calendarExternalId && !objectUrl) return false;
+  const state = objectUrl && etag ? String(etag) : null;
 
   if (source === 'caldav') {
     if (accountId == null) {
@@ -147,21 +169,25 @@ export function queueDeletion({ source, calendarExternalId, eventExternalId, obj
     // Objekt über seinen Abruf (`processPendingDeletions`).
     (database || db.get()).prepare(`
       INSERT INTO calendar_pending_deletions
-        (source, calendar_external_id, event_external_id, object_url, caldav_account_id)
-      VALUES (?, ?, ?, ?, ?)
+        (source, calendar_external_id, event_external_id, object_url, caldav_account_id, etag)
+      VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(source, calendar_external_id, event_external_id)
         DO UPDATE SET object_url = COALESCE(object_url, excluded.object_url),
-                      caldav_account_id = COALESCE(caldav_account_id, excluded.caldav_account_id)
-    `).run(source, calendarExternalId || '', eventExternalId, objectUrl, accountId);
+                      caldav_account_id = COALESCE(caldav_account_id, excluded.caldav_account_id),
+                      etag = CASE WHEN excluded.etag IS NULL THEN NULL ELSE etag END
+    `).run(source, calendarExternalId || '', eventExternalId, objectUrl, accountId, state);
     return true;
   }
 
+  // Hier gewinnt die neue Adresse, also auch ihr Stand; ohne neue Adresse ist
+  // der neue Auftrag unbedingt, und die Bedingung fällt.
   (database || db.get()).prepare(`
-    INSERT INTO calendar_pending_deletions (source, calendar_external_id, event_external_id, object_url)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO calendar_pending_deletions (source, calendar_external_id, event_external_id, object_url, etag)
+    VALUES (?, ?, ?, ?, ?)
     ON CONFLICT(source, calendar_external_id, event_external_id)
-      DO UPDATE SET object_url = COALESCE(excluded.object_url, object_url)
-  `).run(source, calendarExternalId || '', eventExternalId, objectUrl);
+      DO UPDATE SET object_url = COALESCE(excluded.object_url, object_url),
+                    etag = excluded.etag
+  `).run(source, calendarExternalId || '', eventExternalId, objectUrl, state);
   return true;
 }
 
@@ -170,7 +196,7 @@ export function pendingDeletions(source, { accountId = null } = {}) {
   const filter = accountFilter(source, accountId, 'pendingDeletions');
   if (!filter) return [];
   return db.get().prepare(`
-    SELECT id, calendar_external_id, event_external_id, object_url, attempts
+    SELECT id, calendar_external_id, event_external_id, object_url, attempts, etag
     FROM calendar_pending_deletions
     WHERE source = ?${filter.sql}
     ORDER BY id
@@ -230,7 +256,16 @@ export function pendingDeletionUids(source, { accountId = null } = {}) {
  * eine der beiden Adressen unbekannt, bleibt das Objekt verdeckt - lieber eine
  * Runde zu lang verborgen als ein gelöschter Termin, der zurückkommt.
  *
- * @returns {(uid: string, calendarUrl: string, objectUrl?: string|null) => boolean}
+ * Ein BEDINGTER Auftrag (`isConditionalDeletion`, #1883) verdeckt enger: nur
+ * das Objekt an seiner Adresse, und nur in dem Stand, für den er vorgemerkt
+ * wurde. Liegt der Termin dort inzwischen anders oder im selben Kalender unter
+ * einer anderen Adresse, ist das nicht mehr der Rest eines Umzugs, sondern der
+ * Termin selbst (auf einem anderen Gerät zurückgelegt): der Abruf übernimmt
+ * ihn, und `processPendingDeletions` verwirft den Auftrag im selben Lauf.
+ * Liefert der Server zu dem Objekt keinen ETag, bleibt es verdeckt; dann
+ * entscheidet die Vorbedingung am DELETE.
+ *
+ * @returns {(uid: string, calendarUrl: string, objectUrl?: string|null, etag?: string|null) => boolean}
  */
 export function pendingDeletionGuard(source, { accountId = null } = {}) {
   const filter = accountFilter(source, accountId, 'pendingDeletionGuard');
@@ -238,7 +273,7 @@ export function pendingDeletionGuard(source, { accountId = null } = {}) {
   let rows;
   try {
     rows = db.get().prepare(`
-      SELECT event_external_id, calendar_external_id, object_url
+      SELECT event_external_id, calendar_external_id, object_url, etag
       FROM calendar_pending_deletions WHERE source = ?${filter.sql}
     `).all(source, ...filter.args);
   } catch (err) {
@@ -250,11 +285,23 @@ export function pendingDeletionGuard(source, { accountId = null } = {}) {
     if (!byUid.has(row.event_external_id)) byUid.set(row.event_external_id, []);
     byUid.get(row.event_external_id).push(row);
   }
-  return (uid, calendarUrl, objectUrl = null) => (byUid.get(uid) || []).some((row) => {
-    if (row.calendar_external_id) return row.calendar_external_id === calendarUrl;
+  return (uid, calendarUrl, objectUrl = null, etag = null) => (byUid.get(uid) || []).some((row) => {
+    if (row.calendar_external_id && row.calendar_external_id !== calendarUrl) return false;
+    if (isConditionalDeletion(row) && objectUrl) {
+      return row.object_url === objectUrl && (!etag || row.etag === etag);
+    }
+    if (row.calendar_external_id) return true;
     if (!row.object_url || !objectUrl) return true;
     return row.object_url === objectUrl;
   });
+}
+
+/**
+ * Gilt dieser Auftrag nur einem Objekt in einem bestimmten Stand (#1883)?
+ * Dazu braucht er beides, Adresse und ETag.
+ */
+export function isConditionalDeletion(row) {
+  return !!(row?.etag && row?.object_url);
 }
 
 /**
@@ -272,6 +319,9 @@ export function pendingDeletionGuard(source, { accountId = null } = {}) {
  * Fehlertext noch Adresse. Der Schlüssel der Tabelle kennt das Konto nicht,
  * einen zweiten Auftrag kann dieses Konto also nicht anlegen - dann `false`,
  * und der Aufrufer lässt seine eigene Arbeit offen.
+ *
+ * `target.etag` (#1883): der Stand des Objekts, an das das abgelehnte DELETE
+ * ging. Mit ihm wartet der Auftrag nur auf dieses Objekt in diesem Stand.
  *
  * @returns {boolean} true, wenn die Absage an einem Auftrag dieses Kontos gezählt ist
  */
@@ -332,6 +382,63 @@ export function dropDeletionsWithoutAccount() {
     log.warn(`Dropped ${removed} pending deletion(s) that belong to no CalDAV account; the event(s) may come back once.`);
   }
   return removed;
+}
+
+/**
+ * Räumt die Löschaufträge ab, deren Kalender es auf dem Server nicht mehr gibt
+ * (#1884): mit dem Kalender ist auch das Objekt fort, der Auftrag hat sein
+ * Ziel erreicht. Ohne das wartete er für immer - der Lauf liest einen
+ * verschwundenen Kalender nie wieder (er schaltet ihn ab), und ein Auftrag
+ * ohne gespeicherte Adresse hat keinen anderen Weg.
+ *
+ * `listedUrls` ist die Auflistung DIESES Laufs und muss vom Aufrufer als
+ * brauchbar befunden sein: eine leere gilt bei allen Anbietern als
+ * unvollständige Antwort, nicht als leeres Konto, und darf hier nicht ankommen.
+ * Dieselbe Auflistung schaltet auch einen eingeschalteten Kalender ab, der in
+ * ihr fehlt. Verglichen wird ohne Rücksicht auf den Schlussstrich.
+ *
+ * Ohne Anfrage an den Server. Taucht der Kalender doch wieder auf (die
+ * Auflistung war unvollständig), kann der gelöschte Termin einmal zurückkommen.
+ *
+ * @param {string} source 'caldav' | 'apple'
+ * @param {object} p
+ * @param {number} [p.accountId]  bei CalDAV das Konto, dessen Auflistung das ist
+ * @param {Iterable<string>} p.listedUrls  jede Collection, die der Server nennt
+ * @returns {number} abgeräumte Aufträge
+ */
+export function dropDeletionsOfMissingCalendars(source, { accountId = null, listedUrls }) {
+  const listed = [...(listedUrls || [])];
+  if (listed.length === 0) return 0;
+  let rows;
+  try {
+    rows = pendingDeletions(source, { accountId });
+  } catch (err) {
+    log.warn(`Pending deletions are not readable (${err.message}); nothing was cleared.`);
+    return 0;
+  }
+  const gone = new Map();
+  for (const row of rows) {
+    const calendarUrl = row.calendar_external_id;
+    if (!calendarUrl || listed.some((url) => sameCalendarUrl(url, calendarUrl))) continue;
+    dropDeletion(row.id);
+    gone.set(calendarUrl, (gone.get(calendarUrl) || 0) + 1);
+  }
+  let dropped = 0;
+  for (const [calendarUrl, count] of gone) {
+    dropped += count;
+    log.warn(`[${source === 'apple' ? 'Apple' : 'CalDAV'}] Calendar ${calendarUrl} no longer exists on the server: dropped ${count} pending deletion(s) for it, its entries are gone with it.`);
+  }
+  return dropped;
+}
+
+/**
+ * Wie viele Löschaufträge dieses Kontos warten, weil ihr Kalender abgewählt
+ * ist (#1884)? Für die Meldung des Laufs.
+ * @param {(calendarUrl: string) => boolean} isSelected
+ */
+export function deletionsWaitingForSelection(source, { accountId = null, isSelected }) {
+  return pendingDeletions(source, { accountId })
+    .filter((row) => row.calendar_external_id && !isSelected(row.calendar_external_id)).length;
 }
 
 export function dropDeletion(id) {
@@ -680,13 +787,28 @@ export function queueEventDeletion(event, database = null) {
     return false;
   }
 
-  return queueDeletion({
+  const accountId = event.external_source === 'caldav' ? event.caldav_account_id : null;
+  const queued = queueDeletion({
     source:             event.external_source,
     calendarExternalId: calId,
     eventExternalId:    event.external_calendar_id,
     objectUrl:          event.external_object_url || null,
-    accountId:          event.external_source === 'caldav' ? event.caldav_account_id : null,
+    accountId,
   }, database);
+  // Wartet für diesen Termin noch der Rest eines Umzugs in einem ANDEREN
+  // Kalender (#1883), gilt für ihn ab jetzt dasselbe wie für die Zeile: der
+  // Nutzer will den Termin fort haben, gleich in welchem Stand. Bliebe der
+  // Auftrag bedingt, fiele er bei einem geänderten Rest, und der gelöschte
+  // Termin käme von dort zurück. Der Schlüssel der Tabelle nennt den
+  // Kalender, das ON CONFLICT oben erreicht diesen Auftrag also nicht.
+  if (queued) {
+    (database || db.get()).prepare(`
+      UPDATE calendar_pending_deletions SET etag = NULL
+      WHERE source = ? AND event_external_id = ? AND etag IS NOT NULL
+        AND caldav_account_id IS ?
+    `).run(event.external_source, event.external_calendar_id, accountId);
+  }
+  return queued;
 }
 
 /**
@@ -803,12 +925,25 @@ export function eventUidFor(eventId) {
  * übernommen (`adopted`), und der Aufrufer merkt den lokalen Stand als Änderung
  * vor, statt zu raten, was dort liegt. Jede andere Absage geht als Fehler hoch.
  *
+ * VOR der Anfrage wird der Upload notiert (#1882, `caldav-upload-attempts.js`):
+ * geht die Antwort verloren, belegt die Notiz, dass von diesem Termin etwas an
+ * diesem Platz liegen kann. Sie fällt mit der Buchung (`bookEventUpload`) - der
+ * Aufrufer MUSS danach buchen - und nie, weil der Versuch scheiterte.
+ *
+ * @param {object} attempt
+ * @param {string} attempt.source      'caldav' | 'apple'
+ * @param {number} attempt.eventId     die Zeile, die hinaufgeht
+ * @param {number} [attempt.accountId] bei CalDAV das Konto, über das sie geht
  * @returns {Promise<{objectUrl: string, adopted: boolean}>}
  */
-export async function uploadNewEvent(client, calendar, uid, ics) {
+export async function uploadNewEvent(client, calendar, uid, ics, { source, eventId, accountId = null } = {}) {
   const filename      = `${uid}.ics`;
   const collectionUrl = String(calendar.url).replace(/\/?$/, '/');
   const objectUrl     = `${collectionUrl}${filename}`;
+  const place = { source, accountId, kind: 'event', rowId: eventId, collectionUrl: calendar.url };
+  // Synchron und unmittelbar vor der Anfrage; wirft, wenn Angaben fehlen -
+  // dann geht auch nichts hinaus.
+  noteUploadAttempt({ ...place, uid, objectUrl });
   try {
     await client.createCalendarObject({ calendar, filename, iCalString: ics });
     return { objectUrl, adopted: false };
@@ -839,9 +974,12 @@ export async function uploadNewEvent(client, calendar, uid, ics) {
  * `accountId`: bei CalDAV das Konto, über das der Upload lief; ihm gehört der
  * Termin danach.
  *
+ * `moveTo`: der Kalender, in den der Termin von hier aus weiterziehen soll
+ * (#1881, siehe `bookEventUpload`). Im selben Schreibvorgang vorgemerkt.
+ *
  * @returns {boolean} true, wenn die Zeile umgeschrieben wurde
  */
-export function markEventUploaded(eventId, { source, uid, objectUrl, calRefId, adopted = false, onlyIfLocal = false, accountId = null }) {
+export function markEventUploaded(eventId, { source, uid, objectUrl, calRefId, adopted = false, onlyIfLocal = false, accountId = null, moveTo = null }) {
   // Ein CalDAV-Upload macht die Zeile zum Termin DIESES Kontos (#1860). Die
   // Spalte steht nur im CalDAV-Statement: Apple kennt kein Konto und lässt sie
   // unberührt.
@@ -856,12 +994,13 @@ export function markEventUploaded(eventId, { source, uid, objectUrl, calRefId, a
         external_object_url = ?, calendar_ref_id = ?,${forCaldav ? '\n        caldav_account_id = ?,' : ''}
         color_modified = CASE WHEN color IS NOT NULL THEN 1 ELSE color_modified END,
         outbound_dirty = CASE WHEN ? = 1 THEN 1 ELSE outbound_dirty END,
+        outbound_move_to = COALESCE(?, outbound_move_to),
         outbound_attempts = CASE WHEN ? = 1 THEN 0 ELSE outbound_attempts END
     WHERE id = ?
       AND (? = 0 OR external_source = 'local')
   `).run(
     source, uid, objectUrl, calRefId, ...(forCaldav ? [accountId] : []),
-    adopted ? 1 : 0, adopted ? 1 : 0, eventId, onlyIfLocal ? 1 : 0
+    adopted ? 1 : 0, moveTo, adopted || moveTo ? 1 : 0, eventId, onlyIfLocal ? 1 : 0
   ).changes > 0;
 }
 
@@ -884,24 +1023,118 @@ export function markEventUploaded(eventId, { source, uid, objectUrl, calRefId, a
  *     dem alten Stand. Sie wird Spiegel UND als geändert vorgemerkt.
  *   - Die Zeile ist nicht mehr lokal (ein anderer Weg hat sie inzwischen zum
  *     Spiegel gemacht): nichts wird überschrieben.
+ *   - Das Ziel wurde gewechselt (#1881, nur wo ein Termin sein Ziel selbst
+ *     trägt, also CalDAV). Eine lokale Zeile merkt auch das nicht vor: die
+ *     Route kennt für sie weder Umzug noch Löschung. Gebucht gegen das Ziel
+ *     der ANFRAGE, wäre sie sauberer Spiegel in einem Kalender, den niemand
+ *     mehr gewählt hat, und das neue Ziel gälte nie - auch ein erneutes
+ *     Speichern merkte nichts vor, weil sich dabei kein Ziel mehr ändert.
+ *       - Anderer Kalender desselben Kontos: die Zeile wird Spiegel dort, wo
+ *         das Objekt liegt, und der Umzug ins neue Ziel ist vorgemerkt.
+ *       - Kein Ziel oder ein anderes Konto: das gerade angelegte Objekt wird
+ *         zum Löschen vorgemerkt, die Zeile bleibt lokal und behält ihr neues
+ *         Ziel. Ein Umzug über Konten hinweg ist kein Umzug (Anlegen und
+ *         Löschen laufen über EIN Konto); das andere Konto lädt sie hoch,
+ *         wenn es an der Reihe ist.
  *
- * Synchron: zwischen dem Nachladen und dem Schreiben liegt kein await.
+ * Wird die Zeile Spiegel, ist das Objekt an dieser Stelle ab jetzt gewollt:
+ * ein Löschauftrag, der aus einem früheren Zielwechsel noch für genau dieses
+ * Objekt wartet, fällt (`keepOwnUpload`). Sonst nähme er der Zeile ihr
+ * Objekt wieder weg, sobald der Server das Löschen zulässt.
+ *
+ * Synchron: zwischen dem Nachladen und dem Schreiben liegt kein await, und
+ * jeder Ausgang ist EIN Schreibvorgang an der Zeile oder am Löschauftrag.
+ *
+ * Mit jeder Buchung fällt die Notiz des Uploads (#1882): die Antwort ist
+ * angekommen und verarbeitet. Bei `unchanged` bleibt sie stehen - über das
+ * Objekt wurde nichts entschieden, das tut `releaseLeftoverUploads` am Stand
+ * der Zeile.
  *
  * @param {object} sent  die Zeile, aus der die Anfrage gebaut wurde
  * @param {object} what  wie `markEventUploaded`, dazu `calendarUrl`
- * @returns {'mirrored'|'deleted'|'unchanged'}
+ * @returns {'mirrored'|'deleted'|'released'|'unchanged'}
  */
 export function bookEventUpload(sent, { source, uid, objectUrl, calRefId, calendarUrl, adopted = false, accountId = null }) {
+  const booked = () => settleUploadAttempt({ source, accountId, kind: 'event', rowId: sent.id, collectionUrl: calendarUrl });
   const now = reloadEvent(sent.id);
   if (!now) {
     queueDeletion({ source, calendarExternalId: calendarUrl, eventExternalId: uid, objectUrl, accountId });
+    booked();
     log.info(`Event ${sent.id} was deleted while its upload was in flight, queued the deletion of ${uid}.`);
     return 'deleted';
   }
+  if (now.external_source !== 'local') return 'unchanged';
+
+  const wanted = uploadTargetNow(now, { source, calendarUrl, accountId });
+  if (wanted.released) {
+    queueDeletion({ source, calendarExternalId: calendarUrl, eventExternalId: uid, objectUrl, accountId });
+    booked();
+    log.info(`The target of event ${sent.id} was changed while its upload was in flight, queued the deletion of ${uid} in ${calendarUrl}.`);
+    return 'released';
+  }
+
+  // Spiegel und Umzug in EINEM Schreibvorgang: ein Spiegel ohne den Umzug
+  // wäre genau der Zustand, den #1881 beschreibt.
   const edited = mirroredFieldsChanged(sent, now);
-  return markEventUploaded(sent.id, {
+  const mirrored = markEventUploaded(sent.id, {
     source, uid, objectUrl, calRefId, adopted: adopted || edited, onlyIfLocal: true, accountId,
-  }) ? 'mirrored' : 'unchanged';
+    moveTo: wanted.moveTo,
+  });
+  if (!mirrored) return 'unchanged';
+  keepOwnUpload({ source, calendarUrl, uid });
+  booked();
+  if (wanted.moveTo) {
+    log.info(`The target of event ${sent.id} was changed while its upload was in flight, queued its move to ${wanted.moveTo}.`);
+  }
+  return 'mirrored';
+}
+
+/**
+ * Das Objekt eines eigenen Uploads in diesem Kalender ist ab jetzt gewollt
+ * (#1881): Löschaufträge für genau diese UID in genau diesem Kalender fallen.
+ *
+ * Über ALLE Konten, anders als `dropDeletionsIn`. Die UID ist die dieser
+ * Installation für diese eine Zeile, ein Auftrag für sie kann also nur aus
+ * einem früheren Upload derselben Zeile stammen - auch der eines ANDEREN
+ * Kontos, das denselben Kalender führt: wechselt das Ziel während des Uploads
+ * von Konto A auf Konto B mit demselben Kalender, übernimmt B das Objekt, und
+ * der Auftrag von A löschte es ihm sonst im nächsten Lauf weg.
+ */
+function keepOwnUpload({ source, calendarUrl, uid }) {
+  if (!source || !calendarUrl || !uid) return;
+  // Der Kalender entscheidet, nicht seine Schreibweise: zwei Konten können ihn
+  // mit und ohne Schlussstrich führen (wie `keepOwnUpload` der Aufgaben).
+  const waiting = db.get().prepare(
+    'SELECT id, calendar_external_id FROM calendar_pending_deletions WHERE source = ? AND event_external_id = ?'
+  ).all(source, uid);
+  for (const row of waiting) {
+    if (row.calendar_external_id && sameCalendarUrl(row.calendar_external_id, calendarUrl)) dropDeletion(row.id);
+  }
+}
+
+/**
+ * Wohin will die Zeile JETZT, gemessen an dem Upload, der gerade ankam (#1881)?
+ *
+ * Nur CalDAV: dort trägt der Termin sein Ziel als Paar aus Konto und Kalender.
+ * Apple lädt in den ersten verfügbaren Kalender, es gibt nichts zu wechseln.
+ *
+ * @returns {{released: boolean, moveTo: string|null}}
+ *   `released`: die Zeile will nicht (mehr) über dieses Konto hinaus;
+ *   `moveTo`: sie will in einen anderen Kalender desselben Kontos
+ */
+function uploadTargetNow(now, { source, calendarUrl, accountId }) {
+  if (source !== 'caldav') return { released: false, moveTo: null };
+  const target = now.target_caldav_calendar_url || null;
+  if (!target || now.target_caldav_account_id !== accountId) return { released: true, moveTo: null };
+  // Derselbe Kalender in anderer Schreibweise (mit und ohne Schlussstrich) ist
+  // kein Umzug: der legte im Ziel an und löschte in der Quelle - dasselbe Objekt.
+  return { released: false, moveTo: sameCalendarUrl(target, calendarUrl) ? null : target };
+}
+
+/** Zwei Schreibweisen derselben Kalender-URL: mit und ohne Schlussstrich. */
+export function sameCalendarUrl(a, b) {
+  const trim = (url) => String(url || '').replace(/\/+$/, '');
+  return trim(a) === trim(b);
 }
 
 /**
@@ -942,13 +1175,136 @@ export function adoptOwnEventUpload({ source, uid, objectUrl, calendarUrl, calRe
   if (uid !== eventUidFor(eventId)) return false;
   // Das Objekt liegt in dem Kalender, der gerade abgerufen wird - nicht an
   // einer Adresse, die der Server frei gewählt hat.
-  const trim = (url) => String(url || '').replace(/\/+$/, '');
-  if (trim(collectionUrlOf(objectUrl)) !== trim(calendarUrl)) return false;
+  if (!sameCalendarUrl(collectionUrlOf(objectUrl), calendarUrl)) return false;
   if (!isWaitingHere(eventId)) return false;
 
   const adopted = markEventUploaded(eventId, {
     source, uid, objectUrl, calRefId, adopted: true, onlyIfLocal: true, accountId,
   });
-  if (adopted) log.info(`Adopted the earlier upload of event ${eventId} (${uid}).`);
+  if (adopted) {
+    keepOwnUpload({ source, calendarUrl, uid });
+    // Übernommen ist gebucht: die Notiz des Uploads fällt (#1882).
+    settleUploadAttempt({ source, accountId, kind: 'event', rowId: eventId, collectionUrl: calendarUrl });
+    log.info(`Adopted the earlier upload of event ${eventId} (${uid}).`);
+  }
   return adopted;
+}
+
+// --------------------------------------------------------
+// Der Upload, dessen Antwort nie ankam (#1882)
+// --------------------------------------------------------
+
+/**
+ * Wartet ein lokaler CalDAV-Termin auf den Upload an diesen Platz? Massgeblich
+ * ist sein Ziel, das Paar aus Konto und Kalender - nicht, ob der Kalender
+ * gerade eingeschaltet ist: ein abgewähltes Ziel bleibt stehen und wartet.
+ * iCloud kennt kein Ziel an der Zeile; dort fragt der Aufrufer selbst.
+ */
+function wantsCaldavUploadAt(row, attempt) {
+  return row.target_caldav_account_id === attempt.account_id
+    && !!row.target_caldav_calendar_url
+    && sameCalendarUrl(row.target_caldav_calendar_url, attempt.collection_url);
+}
+
+/**
+ * Wie steht die Zeile JETZT zu dem Objekt, das ein nie gebuchter Upload an
+ * diesem Platz hinterlassen haben kann?
+ *
+ *   waiting  - sie ist lokal und will weiter genau dorthin: der nächste Upload
+ *              oder der Abruf übernimmt das Objekt.
+ *   mirrored - sie ist Spiegel an genau diesem Platz (über einen anderen Weg
+ *              gebucht, etwa von einem zweiten Konto mit demselben Kalender,
+ *              oder unter der anderen Quelle, wenn derselbe Kalender als
+ *              CalDAV-Konto UND über iCloud verbunden ist): das Objekt ist
+ *              ihres.
+ *   leftover - alles andere: die Zeile ist gelöscht, hat ein anderes oder kein
+ *              Ziel, oder ist woanders Spiegel. Dann gehört das Objekt dort zu
+ *              nichts mehr, und der Abruf darf es nicht als Termin lesen.
+ *
+ * Synchron, aus dem Stand von jetzt.
+ */
+function uploadAttemptState(attempt, wantsUploadHere) {
+  const row = reloadEvent(attempt.row_id);
+  if (!row) return 'leftover';
+  if (row.external_source === 'local') {
+    const waiting = wantsUploadHere ? wantsUploadHere(row, attempt.collection_url) : wantsCaldavUploadAt(row, attempt);
+    return waiting ? 'waiting' : 'leftover';
+  }
+  if (row.external_calendar_id === attempt.uid
+      && sameCalendarUrl(calendarExternalId(row), attempt.collection_url)) {
+    return 'mirrored';
+  }
+  return 'leftover';
+}
+
+/**
+ * Für den Abruf: liegt für das Objekt mit dieser UID in diesem Kalender eine
+ * Notiz vor, deren Upload nie gebucht wurde und die NICHT schon aufgegangen
+ * ist (die Zeile ist nicht Spiegel an diesem Platz)? Dann ist das Objekt kein
+ * Eintrag wie jeder andere: der Aufrufer darf es nur noch ÜBERNEHMEN
+ * (`adoptOwnEventUpload`, für die Zeile, die genau hier wartet) - sonst weder
+ * importieren noch einer Zeile zuordnen. Entfernt wird es von
+ * `releaseLeftoverUploads`, für das Konto, dem die Notiz gehört.
+ *
+ * Über ALLE Konten der Quelle gefragt: führen zwei Konten denselben Kalender,
+ * sieht der Abruf des einen das Objekt, das über das andere hinaufging, und
+ * importierte den gelöschten Termin sonst für einen Lauf.
+ *
+ * Der Beleg ist die lokale Notiz, nicht die UID (`caldav-upload-attempts.js`).
+ * Ohne Notiz ist das Objekt ein Eintrag wie jeder andere.
+ *
+ * Frisch je Objekt gefragt, nicht einmal je Lauf: die Zeile kann fallen,
+ * während der Lauf noch den Server liest.
+ *
+ * @param {object} p
+ * @param {string} p.source
+ * @param {string} p.uid          UID aus dem Serverobjekt
+ * @param {string} p.calendarUrl  Kalender, der gerade abgerufen wird
+ * @returns {boolean}
+ */
+export function isUnbookedOwnUpload({ source, uid, calendarUrl }) {
+  // Billig zuerst: das Muster der UID, ohne Datenbank. Fast jedes Objekt
+  // eines Kalenders scheidet hier aus.
+  const parsed = parseOwnUid(uid);
+  if (!parsed || parsed.kind !== 'event' || parsed.installation === null) return false;
+  let attempts;
+  try {
+    attempts = uploadAttemptsAt({ source, kind: 'event', uid, collectionUrl: calendarUrl });
+  } catch (err) {
+    log.warn(`Upload notes are not readable (${err.message}); treating them as none.`);
+    return false;
+  }
+  // `waiting` und `leftover` zählen beide: was mit einer wartenden Zeile
+  // geschieht, entscheidet die Übernahme, nicht der Import.
+  return attempts.some((attempt) => uploadAttemptState(attempt, () => true) !== 'mirrored');
+}
+
+/**
+ * Entfernt die Reste von Termin-Uploads, deren Antwort nie ankam (#1882): die
+ * Notizen dieser Verbindung, deren Zeile dort nicht mehr hingehört
+ * (`uploadAttemptState`). Was dabei gelesen, gelöscht oder stehen gelassen
+ * wird, steht an `removeLeftoverUploads`.
+ *
+ * Aufgerufen im vollen Lauf nach dem Abruf, nicht im Sofortversuch und nicht
+ * aus einer Route: die Regel hängt so an keiner Löschroute - gleich auf
+ * welchem Weg die Zeile fiel, der nächste Lauf findet die Notiz.
+ *
+ * @param {object} client
+ * @param {object} p
+ * @param {string} p.source
+ * @param {number} [p.accountId]
+ * @param {(row: object, calendarUrl: string) => boolean} [p.wantsUploadHere]
+ *        iCloud: will diese lokale Zeile weiter hinauf?
+ * @param {Set<string>} [p.calendarUrls]  die in diesem Lauf abgerufenen Kalender
+ * @returns {Promise<number>} entfernte Objekte
+ */
+export function releaseLeftoverUploads(client, { source, accountId = null, wantsUploadHere = null, calendarUrls = null }) {
+  return removeLeftoverUploads(client, {
+    source, accountId, kinds: ['event'],
+    stateOf: (attempt) => uploadAttemptState(attempt, wantsUploadHere),
+    inScope: calendarUrls
+      ? (url) => [...calendarUrls].some((known) => sameCalendarUrl(known, url))
+      : null,
+    label: source === 'apple' ? 'Apple' : 'CalDAV',
+  });
 }

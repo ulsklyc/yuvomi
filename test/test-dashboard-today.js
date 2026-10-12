@@ -632,8 +632,19 @@ test('#1829 Heute wichtig: Aufgabe und Sammelzeile behalten das Modulzeichen',
 test('#1828 Wand: auch eine Aufgabe fuer zwei zaehlt bei beiden', onTheWall(THU_14_BERLIN, 'Europe/Berlin', () => {
   const anna = { id: 8, display_name: 'Anna', avatar_color: '#7C3AED' };
   const leo = { id: 7, display_name: 'Leo', avatar_color: '#FF9500' };
+  // Seit #1817 zaehlt die Wand die Aufgaben einer Person aus `wallTasks`, nicht
+  // mehr aus den (gekappten) Programmzeilen: der Server liefert je zugewiesener
+  // Person einen Eintrag (test:wall-tasks, "mehrere Zugewiesene"). Die
+  // Programmzeile daneben darf die Aufgabe bei keinem der beiden ein zweites
+  // Mal zaehlen.
+  const task = wallTask('Zimmer aufraeumen', { assigned_users: [leo, anna] });
+  const entry = (user) => ({
+    user_id: user.id, open_count: 1, done_count: 0,
+    open: [{ id: task.id, title: task.title, due_date: task.due_date }], done: [],
+  });
   const html = dash.renderWallSurface({
-    urgentTasks: [wallTask('Zimmer aufraeumen', { assigned_users: [leo, anna] })],
+    urgentTasks: [task],
+    wallTasks: [entry(leo), entry(anna)],
     users: [anna, leo],
   }, null, { now: new Date() });
   assert.deepEqual(wallCounts(html), { Anna: 1, Leo: 1 });

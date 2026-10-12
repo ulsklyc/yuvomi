@@ -28,7 +28,20 @@ const REMIND_AT_INPUT = ' `remind_at` is stored as UTC without a zone suffix, al
 
 export function remindersPaths() {
   return {
-    '/api/v1/reminders/pending': { get: op({ summary: 'List pending reminders', tag: 'Reminders' }) },
+    '/api/v1/reminders/pending': {
+      get: op({
+        summary: 'List pending reminders',
+        tag: 'Reminders',
+        description: 'The caller\'s own due reminders. With `audience=household` - the version for a shared surface (wall mode), as in `GET /dashboard` - the list is always empty: a reminder belongs to the person who asked for it, never to the household. The bell of the app sends the parameter while a wall is shown, so no toast and no browser notification appears above it.',
+        params: [{
+          name: 'audience',
+          in: 'query',
+          required: false,
+          description: '`household` asks for the version for a shared surface; it carries no reminders. Anything else means the personal version.',
+          schema: { type: 'string', enum: ['household'] },
+        }],
+      }),
+    },
     '/api/v1/reminders/all': { get: op({ summary: 'List all reminders for an entity', tag: 'Reminders', description: 'Returns every non-dismissed reminder for the given entity (calendar events support multiple reminders).' }) },
     '/api/v1/reminders': {
       get: op({ summary: 'List reminders', tag: 'Reminders' }),

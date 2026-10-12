@@ -25,6 +25,7 @@ import { runSerialized } from '../utils/sync-lock.js';
 import { unfoldLines, parseICS, formatICSDate, tzLocalToUTC, applyDuration, normalizeRecurrenceOverrides } from './ics-parser.js';
 import { decodeHtmlEntities } from '../utils/html-entities.js';
 import * as outbound from './calendar-outbound.js';
+import { dropUploadAttemptsOf } from './caldav-upload-attempts.js';
 import { processPendingDeletions, processPendingUpdates, flushAccount } from './caldav-outbound.js';
 import { rruleLine } from './recurrence.js';
 import { eventDateTimeFields } from '../utils/ics-datetime.js';
@@ -137,6 +138,11 @@ function clearCredentials({ deleteEvents = false } = {}) {
     ['apple_caldav_url', 'apple_username', 'apple_app_password', 'apple_last_sync',
      // Der Fehlerstand gehoert zur Verbindung (#820).
      'apple_last_error', 'apple_last_error_at'].forEach(cfgDel);
+    // Die Notizen nie gebuchter Uploads gehören zur Verbindung (#1882): ohne
+    // sie gibt es keinen Weg mehr zu den Objekten, von denen sie handeln.
+    // Läuft sie über die APPLE_*-Umgebungsvariablen weiter (`getCredentials`),
+    // ist nichts getrennt, und die Notizen bleiben der einzige Beleg.
+    if (!getCredentials()) dropUploadAttemptsOf({ source: 'apple' });
     log.info('Disconnected.' + (removed ? ` ${removed} mirrored event(s) removed.` : ''));
     return { removed };
   })();
@@ -348,6 +354,12 @@ async function runSync({ makeClient } = {}) {
 
   // Alle Kalender synchen (inklusive Geburtstags-Kalender)
   const syncCalendars = calendars;
+  // Will diese lokale Zeile weiter hinauf (#1882)? Gefragt wird NICHT, in
+  // welchen Kalender: hinauf geht es in den ersten der Auflistung, und die
+  // sagt keine Reihenfolge zu. Steht beim nächsten Lauf ein anderer vorn, ist
+  // das Objekt im früheren ersten erst dann ein Rest, wenn der Termin woanders
+  // angekommen ist - vorher wäre sein Löschen der einzige Stand auf dem Server.
+  const stillWantsUpload = (row) => collectLocalOutboundEvents(db.get(), row.id).length > 0;
 
   let totalObjects = 0;
 
@@ -404,6 +416,26 @@ async function runSync({ makeClient } = {}) {
         try {
           calendarUids.add(ev.uid);
           accountUids.add(ev.uid);
+          // Der eigene Upload, dessen Antwort verloren ging: übernommen wird
+          // nur ein Termin, den der Upload unten in GENAU diesen Kalender
+          // schicken würde (den ersten) - die UID kommt vom Server und weist
+          // nichts aus.
+          const adoptOwn = () => !!obj.url && outbound.adoptOwnEventUpload({
+            source: 'apple', uid: ev.uid, objectUrl: obj.url, calRefId, calendarUrl: cal.url,
+            isWaitingHere: (eventId) => cal.url === syncCalendars[0].url
+              && collectLocalOutboundEvents(db.get()).some((e) => e.id === eventId),
+          });
+
+          // Für dieses Objekt steht die Notiz eines nie gebuchten Uploads
+          // (#1882, wie im CalDAV-Sync): übernehmen, wenn sein Termin hier
+          // wartet, sonst weder importieren noch zuordnen. VOR dem Index
+          // darunter: der führt ein Objekt je UID, und der Rest im früheren
+          // ersten Kalender verdrängte sonst das Objekt, das die Zeile
+          // inzwischen woanders spiegelt - ihre nächste Bearbeitung ginge mit
+          // dem ETag des Rests hinaus.
+          if (outbound.isUnbookedOwnUpload({ source: 'apple', uid: ev.uid, calendarUrl: cal.url })
+              && !adoptOwn()) continue;
+
           // Objekt merken: ausgehende Löschungen brauchen die URL, Änderungen
           // zusätzlich den Originalinhalt zum Patchen (#593).
           if (obj.url) {
@@ -428,15 +460,7 @@ async function runSync({ makeClient } = {}) {
 
           // Der eigene Upload, dessen Antwort verloren ging: in die noch lokale
           // Zeile übernehmen statt eine zweite anzulegen (wie im CalDAV-Sync).
-          if (!existing && obj.url
-              && outbound.adoptOwnEventUpload({
-                source: 'apple', uid: ev.uid, objectUrl: obj.url, calRefId, calendarUrl: cal.url,
-                // Nur ein Termin, den der Upload unten in GENAU diesen Kalender
-                // schicken würde (den ersten) - die UID kommt vom Server und
-                // weist nichts aus.
-                isWaitingHere: (eventId) => cal.url === syncCalendars[0].url
-                  && collectLocalOutboundEvents(db.get()).some((e) => e.id === eventId),
-              })) {
+          if (!existing && adoptOwn()) {
             existing = selExisting.get(ev.uid);
           }
 
@@ -533,6 +557,15 @@ async function runSync({ makeClient } = {}) {
   // Inbound überspringt dafür alles, was hier noch aussteht.
   // --------------------------------------------------------
   try {
+    // Die Reste nie bestätigter Uploads entfernen (#1882).
+    await outbound.releaseLeftoverUploads(client, {
+      source: 'apple', wantsUploadHere: stillWantsUpload, calendarUrls: ownCalendarUrls,
+    });
+    // iCloud kennt keine Auswahl, also keinen abgewählten Kalender. Was es
+    // gibt, ist der Kalender, den die Auflistung nicht mehr nennt: sein
+    // Auftrag hat sein Ziel erreicht (#1884). Die Auflistung ist oben als
+    // nicht leer befunden.
+    outbound.dropDeletionsOfMissingCalendars('apple', { listedUrls: calendars.map((cal) => cal.url) });
     const removed = await processPendingDeletions(client, 'apple', objectIndex, ownCalendarUrls);
     if (removed) log.info(`${removed} pending deletion(s) applied in iCloud.`);
     const pushed = await processPendingUpdates(client, 'apple', objectIndex, calendarsByUrl);
@@ -568,7 +601,9 @@ async function runSync({ makeClient } = {}) {
 
       // Ein 412 auf den eigenen Namen ist der eigene frühere Upload und wird
       // übernommen (uploadNewEvent).
-      const { objectUrl, adopted } = await outbound.uploadNewEvent(client, defaultCal, uid, icsData);
+      const { objectUrl, adopted } = await outbound.uploadNewEvent(client, defaultCal, uid, icsData, {
+        source: 'apple', eventId: event.id,
+      });
 
       const calRefId  = upsertExternalCalendar(
         'apple', defaultCal.url, defaultCal.displayName || 'Apple Calendar',

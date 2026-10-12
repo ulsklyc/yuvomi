@@ -86,3 +86,59 @@ export function syncScreensaverIdleFromStorage(event) {
   if (event?.key !== SCREENSAVER_IDLE_KEY && event?.key !== null) return;
   document.documentElement.setAttribute('data-screensaver-idle', String(getScreensaverIdleSeconds()));
 }
+
+// --------------------------------------------------------
+// What the screensaver shows on this device (#1766)
+// --------------------------------------------------------
+//
+// Device-local for the same reason as the delay: the frame in the hallway wants
+// a clock and full-bleed photos, the kitchen tablet maybe neither. Both are
+// read each time the screensaver opens, so a change applies at its next start
+// without a reload, and neither has to exist before the first render - there
+// is nothing to repeat in theme-init.js. As with the delay, the default is
+// stored as "no key".
+
+export const SCREENSAVER_CLOCK_KEY = 'yuvomi-screensaver-clock';
+export const SCREENSAVER_COVER_KEY = 'yuvomi-screensaver-cover';
+
+function readFlag(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeFlag(key, value) {
+  try {
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+  } catch {
+    // Blocked storage: the default applies again after the next reload.
+  }
+}
+
+/** The current time on the screensaver - on unless switched off here. */
+export function isScreensaverClockOn() {
+  return readFlag(SCREENSAVER_CLOCK_KEY) !== '0';
+}
+
+/** @param {boolean} on @returns {boolean} the value stored */
+export function setScreensaverClockOn(on) {
+  writeFlag(SCREENSAVER_CLOCK_KEY, on ? null : '0');
+  return Boolean(on);
+}
+
+/**
+ * Full-bleed photos (`object-fit: cover`) - off unless chosen here, because
+ * `cover` crops a portrait photo hard on a landscape screen.
+ */
+export function isScreensaverCoverOn() {
+  return readFlag(SCREENSAVER_COVER_KEY) === '1';
+}
+
+/** @param {boolean} on @returns {boolean} the value stored */
+export function setScreensaverCoverOn(on) {
+  writeFlag(SCREENSAVER_COVER_KEY, on ? '1' : null);
+  return Boolean(on);
+}

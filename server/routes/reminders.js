@@ -15,6 +15,7 @@ import { tokenAllows } from '../scopes.js';
 import { ORIGIN_MODULE, withoutSwitchedOffModules } from '../services/reminder-origins.js';
 import { reminderTargetVisible, reminderTargetVisibleSql } from '../services/reminder-targets.js';
 import { remindAtCompareKey, remindAtUtcSql } from '../utils/reminder-schedule.js';
+import { asksHouseholdAudience } from '../services/visibility.js';
 
 const log    = createLogger('Reminders');
 const router = express.Router();
@@ -197,9 +198,16 @@ const MAX_REMINDERS_PER_ENTITY = 5;
 // Gibt alle fälligen, nicht-verworfenen Erinnerungen des aktuellen Nutzers zurück.
 // "Fällig" = remind_at <= jetzt, als Zeitpunkt verglichen (#1364)
 // Response: { data: Reminder[] }
+//
+// `audience=household` (#1817): die Fassung fuer eine geteilte Flaeche. Eine
+// Erinnerung gilt immer der Person, die um sie gebeten hat - es gibt keine, die
+// dem Haushalt gehoert. Die Wand fragt mit dem Parameter und bekommt nichts,
+// auch aus der Sitzung dieser Person. Dieselbe Erkennung wie in GET /dashboard
+// (`asksHouseholdAudience`); Glocke und Toast fragen ohne ihn.
 // --------------------------------------------------------
 router.get('/pending', (req, res) => {
   try {
+    if (asksHouseholdAudience(req.query)) return res.json({ data: [] });
     const userId = req.authUserId || req.session.userId;
     const now    = new Date().toISOString();
     syncAllBirthdayReminders(db.get(), userId, new Date());
