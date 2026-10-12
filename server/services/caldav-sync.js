@@ -1223,7 +1223,9 @@ async function runSync({ createClient } = {}) {
 
               // Vom Nutzer gelöscht und noch nicht auf dem Server: nicht wieder
               // anlegen, sonst kehrt der Termin bei jedem Sync zurück (#593).
-              if (awaitsDeletion(ev.uid, selCal.calendar_url, obj.url ?? null)) continue;
+              // Ein Auftrag aus einem abgelehnten Umzug verdeckt nur das Objekt
+              // in dem Stand, für den er vorgemerkt wurde (#1883).
+              if (awaitsDeletion(ev.uid, selCal.calendar_url, obj.url ?? null, obj.etag ?? null)) continue;
 
               let existing = rowForUid(ev.uid, obj.url ?? null, account.id);
               // Die Zeile gehört einem anderen Konto, oder sie hat keines und

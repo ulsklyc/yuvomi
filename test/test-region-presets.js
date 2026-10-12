@@ -14,7 +14,7 @@ import { CURRENCY_CODES } from '../public/utils/currency-codes.js';
 import { REGION_TAG, formatUnit, getNumberFormat } from '../public/i18n.js';
 import { withoutCommentsKeepingLines } from './source-text.js';
 import { withLocales } from './i18n-env.js';
-import { isRegionTag, regionLocale, resolveHouseholdLocale } from '../server/utils/i18n.js';
+import { formatDateKey, isRegionTag, regionLocale, resolveHouseholdLocale } from '../server/utils/i18n.js';
 
 // Die Formprüfung aus getFormatLocale() wird IMPORTIERT, nicht gespiegelt. Bis
 // 20.09.2026 stand hier eine Kopie des Musters, und eine Kopie belegt nur, dass
@@ -787,4 +787,41 @@ test('der formatMonthYear-Stub des Browser-Loaders rechnet wie das Original (#16
   } finally {
     globalThis.__locale = vorher;
   }
+});
+
+// #1847: die Niederlande schreiben 05-03-2026, nicht 05.03.2026. Das Preset
+// stand auf 'dmy' und teilte sich damit das Tripel mit de-DE - ohne gespeicherte
+// Region fuehrte es zurueck nach Deutschland. Das eigene Format loest beides.
+test('Netherlands preset writes day-month-year with dashes and no longer collides with de-DE (#1847)', () => {
+  assert.deepEqual(REGION_PRESETS['nl-NL'], { currency: 'EUR', date_format: 'dmy_dash', time_format: '24h' });
+  assert.equal(detectRegion(REGION_PRESETS['nl-NL']), 'nl-NL');
+  assert.equal(detectRegion(REGION_PRESETS['de-DE']), 'de-DE');
+
+  // Das Muster stimmt mit dem CLDR-Default von nl-NL ueberein (dd-MM-y).
+  const when = new Date(Date.UTC(2026, 2, 5, 12));
+  assert.equal(new Intl.DateTimeFormat('nl-NL', { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric' }).format(when), '05-03-2026');
+  // Der Server schreibt das Datum in gespeicherten Beschreibungen genauso.
+  assert.equal(formatDateKey('2026-03-05', REGION_PRESETS['nl-NL'].date_format), '05-03-2026');
+});
+
+// #1847: Haushalte, die nl-NL vor der Aenderung gewaehlt haben, tragen
+// EUR/dmy/24h. Ohne die Altzuordnung fielen sie auf de-DE zurueck.
+test('a stored nl-NL household with the former dmy triple keeps its region and number locale (#1847)', () => {
+  const former = { region: 'nl-NL', currency: 'EUR', date_format: 'dmy', time_format: '24h' };
+  assert.equal(resolveRegion(former), 'nl-NL');
+  assert.equal(numberLocaleFor(former), 'nl-NL');
+  const fmt = (locale) => new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR' }).format(-1234.5);
+  assert.equal(fmt(numberLocaleFor(former)), fmt('nl-NL'));
+  assert.notEqual(fmt(numberLocaleFor(former)), fmt('de-DE'));
+
+  // Das neue Tripel loest weiterhin nach nl-NL auf.
+  assert.equal(resolveRegion({ region: 'nl-NL', ...REGION_PRESETS['nl-NL'] }), 'nl-NL');
+  assert.equal(numberLocaleFor({ region: 'nl-NL', ...REGION_PRESETS['nl-NL'] }), 'nl-NL');
+
+  // Ein fremdes Tripel faellt wie bisher auf die Erkennung zurueck, und die
+  // Altzuordnung gilt nur fuer nl-NL.
+  const unrelated = { region: 'nl-NL', currency: 'EUR', date_format: 'mdy', time_format: '12h' };
+  assert.equal(resolveRegion(unrelated), detectRegion(unrelated));
+  assert.equal(resolveRegion({ ...former, region: 'de-AT' }), 'de-AT');
+  assert.equal(resolveRegion({ ...former, region: undefined }), 'de-DE');
 });

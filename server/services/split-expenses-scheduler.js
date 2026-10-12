@@ -154,6 +154,10 @@ function pauseUnbookable(database, recurring, reason) {
 // der UTC-Tag dort bereits der folgende ist - die Buchung trug dann das
 // Vortagsdatum ihres eigenen Laufs.
 //
+// Serien einer archivierten Gruppe (#1747) bucht der Lauf nicht und pausiert sie
+// auch nicht: sie bleiben unberuehrt, und das Wiederherstellen der Gruppe
+// rueckt sie hinter die Luecke (POST /groups/:id/unarchive).
+//
 // Jede Serie bucht in ihrer EIGENEN Transaktion. Frueher war es eine fuer den
 // ganzen Lauf: eine einzige unbuchbare Serie rollte alle zurueck, kein Termin
 // rueckte vor, und jede Stunde scheiterte der Lauf an derselben Serie neu.
@@ -163,10 +167,11 @@ function pauseUnbookable(database, recurring, reason) {
 function processDueRecurringExpenses(today = todayKey(db.get()), book = generateRecurringExpense) {
   const database = db.get();
   const due = database.prepare(`
-    SELECT *
-    FROM recurring_expenses
-    WHERE paused_at IS NULL AND next_run_date <= ?
-    ORDER BY next_run_date ASC, id ASC
+    SELECT r.*
+    FROM recurring_expenses r
+    JOIN expense_groups g ON g.id = r.group_id
+    WHERE r.paused_at IS NULL AND r.next_run_date <= ? AND g.status = 'active'
+    ORDER BY r.next_run_date ASC, r.id ASC
     LIMIT 100
   `).all(today);
   const result = { generated: 0, paused: 0, failed: 0 };

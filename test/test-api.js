@@ -853,7 +853,7 @@ const REASONS_PASSED_THROUGH = new Map([
   ['routes/health/visibility-defaults.js: error.reason', { sites: 1, at403: [['FASTING_CAPABILITY_REQUIRED', 'services/fasting.js']],
     why: 'requireFastingCapability wirft nur diesen' }],
   ['routes/split-expenses.js: err.reason', { sites: 1, at403: [],
-    why: 'Refusal: ein Grund nur an 409 (email_in_use); die 403 dort tragen keinen' }],
+    why: 'Refusal: ein Grund nur an 409 (email_in_use, group_archived); die 403 dort tragen keinen' }],
   ['auth.js: err.code', { sites: 1, at403: [], why: 'feste 409 (2FA)' }],
   ['routes/notes.js: result.reason', { sites: 1, at403: [], why: 'feste 409' }],
   ['routes/family.js: problem.reason', { sites: 1, at403: [], why: 'memberOrderProblem: feste 400; die 403 daneben traegt ein Literal' }],
