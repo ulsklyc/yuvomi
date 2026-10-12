@@ -83,7 +83,7 @@ const DENIED_PAYLOAD = Object.freeze({
   // Geteilte Ausgaben gehoeren zum Budget-Modul (server/scopes.js fuehrt
   // `split-expenses` als zweiten Praefix von `budget`).
   budget: ({ month }) => ({ budget: emptyBudget(month), splitBalance: emptySplitBalance() }),
-  rewards: () => ({ rewards: { view: null, standings: [], participantCount: 0, pending: 0, catalog: [], recent: [] } }),
+  rewards: () => ({ rewards: { view: null, standings: [], participantCount: 0, pending: 0, moneyPending: 0, catalog: [], recent: [] } }),
   health: () => ({
     health: {
       hasMeds: false, dosesTotal: 0, dosesTaken: 0, dosesSkipped: 0,

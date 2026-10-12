@@ -32,7 +32,7 @@ export function remindersPaths() {
       get: op({
         summary: 'List pending reminders',
         tag: 'Reminders',
-        description: 'The caller\'s own due reminders. With `audience=household` - the version for a shared surface (wall mode), as in `GET /dashboard` - the list is always empty: a reminder belongs to the person who asked for it, never to the household.',
+        description: 'The caller\'s own due reminders. With `audience=household` - the version for a shared surface (wall mode), as in `GET /dashboard` - the list is always empty: a reminder belongs to the person who asked for it, never to the household. The app's own bell sends the parameter while a wall is shown, so no toast and no browser notification appears above it.',
         params: [{
           name: 'audience',
           in: 'query',

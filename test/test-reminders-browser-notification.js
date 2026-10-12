@@ -57,6 +57,11 @@ test('polling localizes fasting reminders on the device and exposes a keyboard l
     yuvomi: { navigate: (path) => navigated.push(path) },
   };
   globalThis.Notification = FakeNotification;
+  // Die Glocke fragt, ob sie ueber einer Wand laeuft (wallShowsOn, #1817): eine
+  // Seite hat immer einen Pfad. Ohne ihn scheiterte die Frage im stillen catch
+  // des Polls, und kein Toast erschien.
+  const hadLocation = Object.getOwnPropertyDescriptor(globalThis, 'location');
+  Object.defineProperty(globalThis, 'location', { value: { pathname: '/tasks' }, configurable: true, writable: true });
   globalThis.__apiStub = {
     get: async () => ({ data: pending }),
     patch: async (path) => { dismissed.push(path); return {}; },
@@ -116,6 +121,8 @@ test('polling localizes fasting reminders on the device and exposes a keyboard l
     globalThis.setInterval = realSetInterval;
     globalThis.clearInterval = realClearInterval;
     delete globalThis.__apiStub;
+    if (hadLocation) Object.defineProperty(globalThis, 'location', hadLocation);
+    else delete globalThis.location;
     delete globalThis.Notification;
     delete globalThis.window;
     delete globalThis.document;

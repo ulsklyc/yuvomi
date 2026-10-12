@@ -949,7 +949,9 @@ test('Persoenliches: die Haushaltsfassung traegt es gar nicht - auch nicht fuer 
     assert.deepEqual(wall.myShiftsToday, [], `${label}: keine Schicht`);
     assert.equal(wall.rewards.view, null, `${label}: keine Sicht auf Belohnungen`);
     assert.equal(wall.rewards.pending, 0, `${label}: keine wartende Praemie`);
-    assert.ok(!wall.rewards.moneyPending, `${label}: keine wartende Auszahlung`);
+    // Als ZAHL, wie in jeder anderen Fassung der Scheibe - die leere Form
+    // liess das Feld aus (Codex an #1900).
+    assert.equal(wall.rewards.moneyPending, 0, `${label}: keine wartende Auszahlung`);
     // Der Parameter verengt nur: aus der Sitzung eines Kindes oeffnet er nicht
     // die Zeilen der Geschwister, die die Sicht `self` zurueckhaelt.
     assert.deepEqual(wall.rewards.standings, [], `${label}: keine Staende`);
@@ -1056,4 +1058,89 @@ test('Persoenliches: die Erinnerungen der Seite gehen durch dieselbe Stelle wie 
   const calls = [...page.matchAll(/(?<!function )loadPendingReminders\(([^)]*)\)/g)].map((m) => m[1]);
   assert.ok(calls.length >= 2, `nur ${calls.length} Aufrufe gefunden - misst der Leser noch?`);
   assert.deepEqual(calls.filter((args) => args !== 'overviewRequest'), [], 'Erinnerungen an `overviewRequest` vorbei geladen');
+});
+
+// Die Glocke der Shell pollt denselben Endpunkt jede Minute und macht aus einer
+// faelligen Erinnerung einen Toast (30 s) und eine Browser-Benachrichtigung -
+// ueber der Wand eines Mitglieds stuende damit doch wieder, was nur ihm gilt
+// (Codex an #1900). Ein gekoppeltes Display pollt gar nicht. Gemessen gegen die
+// ECHTE Route: der Stub reicht die Anfrage der Glocke an den Server durch.
+test('Persoenliches: die Glocke der Shell fragt ueber einer Wand die Haushaltsfassung ab - kein Toast, keine Benachrichtigung', async () => {
+  class El {
+    constructor(tag) { this.tag = tag; this.children = []; this.dataset = {}; this.style = { setProperty() {} }; this.classList = { add() {} }; }
+    appendChild(child) { this.children.push(child); return child; }
+    setAttribute(name, value) { this[name] = value; }
+    addEventListener() {}
+    querySelectorAll() { return []; }
+    remove() {}
+  }
+  const surface = new El('div');
+  const notifications = [];
+  class FakeNotification {
+    static permission = 'granted';
+    constructor(title, options) { notifications.push({ title, options }); }
+  }
+  const asked = [];
+  const store = new Map();
+  const saved = {};
+  const realSetTimeout = globalThis.setTimeout;
+  const timers = [];
+  const globals = {
+    document: { createElement: (tag) => new El(tag), createElementNS: (_ns, tag) => new El(tag), getElementById: () => surface, querySelectorAll: () => [], documentElement: { hasAttribute: () => false } },
+    window: { Notification: FakeNotification, yuvomi: {} },
+    Notification: FakeNotification,
+    localStorage: { getItem: (key) => (store.has(key) ? store.get(key) : null), setItem: (key, value) => store.set(key, String(value)), removeItem: (key) => store.delete(key) },
+    location: { pathname: '/' },
+    setInterval: () => 2,
+    clearInterval: () => {},
+    // Der Toast raeumt sich nach 30 s selbst ab - der Timer hielte den Prozess
+    // so lange offen und liefe dann in abgebaute Globals. Er laeuft echt (die
+    // Anfragen an die Route brauchen ihre eigenen) und wird am Ende geloescht.
+    setTimeout: (...args) => { const handle = realSetTimeout(...args); timers.push(handle); return handle; },
+  };
+  for (const [name, value] of Object.entries(globals)) {
+    saved[name] = Object.getOwnPropertyDescriptor(globalThis, name);
+    Object.defineProperty(globalThis, name, { value, configurable: true, writable: true });
+  }
+  const settle = async () => { for (let i = 0; i < 20; i += 1) await new Promise((resolve) => setImmediate(resolve)); };
+  const bell = await import('../public/reminders.js');
+  try {
+    await withClock(NOON_BERLIN, 'Europe/Berlin', async () => {
+      seedPersonal();
+      viewer = BEN;
+      globalThis.__apiStub = {
+        get: async (path) => { asked.push(path); return (await fetch(`${base}${path}`)).json(); },
+      };
+      // An der Wand: Schalter an, Route der Uebersicht.
+      store.set('yuvomi-wall-mode', '1');
+      bell.init();
+      await settle();
+      assert.deepEqual(asked, ['/reminders/pending?audience=household']);
+      assert.equal(surface.children.length, 0, 'kein Toast ueber der Wand');
+      assert.equal(notifications.length, 0, 'keine Browser-Benachrichtigung');
+
+      // Dieselbe Sitzung auf einer anderen Seite: der Schalter allein macht keine Wand.
+      globalThis.location.pathname = '/tasks';
+      bell.refresh();
+      await settle();
+      assert.equal(asked.at(-1), '/reminders/pending');
+      assert.equal(surface.children.length, 1, 'Reichweite: ausserhalb der Wand kommt der Toast - und er war nicht als gezeigt verbucht');
+      assert.equal(notifications.at(-1)?.options.body, 'Steuer abgeben');
+
+      // Und ohne den Schalter auf der Uebersicht ebenso persoenlich.
+      store.delete('yuvomi-wall-mode');
+      globalThis.location.pathname = '/';
+      bell.refresh();
+      await settle();
+      assert.equal(asked.at(-1), '/reminders/pending');
+    })();
+  } finally {
+    bell.stop();
+    for (const handle of timers) clearTimeout(handle);
+    delete globalThis.__apiStub;
+    for (const [name, descriptor] of Object.entries(saved)) {
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+      else delete globalThis[name];
+    }
+  }
 });
