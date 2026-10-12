@@ -480,7 +480,11 @@ export function dashboardQuery(config) {
  * schon im Browser liegt. Die normale Uebersicht fragt ohne den Parameter und
  * bleibt persoenlich.
  *
- * @param {string} query '/dashboard' oder '/dashboard?…' (dashboardQuery, layoutHintQuery)
+ * Dasselbe gilt fuer die faelligen Erinnerungen (`/reminders/pending`), die
+ * zweite Antwort der Seite, die davon abhaengt, wer fragt: die Wand haengt den
+ * Parameter auch dort an und bekommt keine.
+ *
+ * @param {string} query '/dashboard' oder '/dashboard?…' (dashboardQuery, layoutHintQuery), oder '/reminders/pending'
  * @param {{ wall?: boolean }} [surface]
  * @returns {string}
  */

@@ -10,6 +10,8 @@ import { t, formatDate } from '/i18n.js';
 import { isPushSubscribed } from '/push.js';
 import { moduleIconEl } from '/nav-icons.js';
 import { toastSurface } from '/utils/toast-surface.js';
+import { dashboardRequest } from '/utils/dashboard-widgets.js';
+import { wallShowsOn } from '/utils/wall-mode.js';
 
 // --------------------------------------------------------
 // Konfiguration
@@ -399,10 +401,24 @@ async function dismissReminder(id) {
 
 /**
  * Lädt fällige Erinnerungen vom Server und verarbeitet sie.
+ *
+ * UEBER EINER WAND FRAGT AUCH DIE GLOCKE DIE HAUSHALTSFASSUNG AB (#1817), und
+ * die traegt keine Erinnerung: sonst stuende, was die Wand aus ihrem Programm
+ * laesst, eine halbe Minute als Toast darueber und ginge als
+ * Browser-Benachrichtigung hinaus. Derselbe Parameter wie beim Abruf der
+ * Uebersicht (`dashboardRequest`), der Server entscheidet. Nichts wird als
+ * gezeigt verbucht: verlaesst jemand die Wand, kommt die Erinnerung mit dem
+ * naechsten Abruf. Ein gekoppeltes Display pollt gar nicht (router-navigate.js).
  */
 async function poll() {
   try {
-    const data = await api.get('/reminders/pending');
+    const wall = wallShowsOn();
+    const data = await api.get(dashboardRequest('/reminders/pending', { wall }));
+    // Persoenlich gefragt, ueber einer Wand angekommen (jemand ist waehrend
+    // des Abrufs zur Uebersicht gewechselt): die Antwort gehoert nicht auf
+    // diese Flaeche. Verworfen, nicht verbucht - der naechste Abruf fragt
+    // passend.
+    if (!wall && wallShowsOn()) return;
     const reminders = data.data ?? [];
     updateBellBadge(reminders.length);
     processReminders(reminders);

@@ -28,7 +28,7 @@ export function dashboardPaths() {
             name: 'audience',
             in: 'query',
             required: false,
-            description: '`household` asks for the version for a shared surface (wall mode): every task and appointment slice then carries only what the whole household may see - tasks and appointments with visibility `all`, appointments from ICS subscriptions only from shared ones - whoever the caller is, creator and assignees included. `events_scope=mine` is ignored with it. The parameter only narrows the response, so it needs no scope of its own. Anything else means the personal version.',
+            description: '`household` asks for the version for a shared surface (wall mode): every task and appointment slice then carries only what the whole household may see - tasks and appointments with visibility `all`, appointments from ICS subscriptions only from shared ones - whoever the caller is, creator and assignees included. `events_scope=mine` is ignored with it. What belongs to the caller alone and has no household level is left out entirely, in the same empty form as for a caller without the module: `health`, `fasting` and `nutrition` (own doses), `myShiftsToday` (own shift) and `rewards` (pending approvals, own requests). The parameter only narrows the response, so it needs no scope of its own. Anything else means the personal version.',
             schema: { type: 'string', enum: ['household'] },
           },
           {

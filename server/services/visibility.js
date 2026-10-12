@@ -95,3 +95,42 @@ export function icsSubscriptionSharedWhere(alias) {
     )
   )`;
 }
+
+/**
+ * Fragt diese Anfrage die Fassung fuer eine geteilte Flaeche ab?
+ *
+ * DIE EINE STELLE, DIE DAS WAND-PUBLIKUM ERKENNT. `audience=household` schickt
+ * die Wand an jeden Abruf, dessen Antwort davon abhaengt, wer fragt (die
+ * Uebersicht, die faelligen Erinnerungen); jede Route, die ihn versteht, fragt
+ * hier.
+ *
+ * Doppelt in der Adresse kommt der Parameter als Liste an. Ein Schalter, der
+ * nur verengt, faellt dann nicht still auf die persoenliche Fassung zurueck.
+ *
+ * @param {object} query `req.query`
+ * @returns {boolean}
+ */
+export function asksHouseholdAudience(query) {
+  return [].concat(query?.audience ?? []).includes('household');
+}
+
+/**
+ * Die Module, deren Beitrag zur Uebersicht dem BETRACHTER gilt und keiner
+ * Sichtbarkeitsstufe folgt - eine geteilte Flaeche bekommt sie in der leeren
+ * Fassung, wie ein gekoppeltes Display, dem das Modulrecht fehlt.
+ *
+ * Aufgaben und Termine haben eine Stufe „alle", und die Fragmente oben lesen
+ * sie. Diese drei haben keine: was die Uebersicht aus ihnen zeigt, ist nach der
+ * anfragenden Person geschnitten.
+ *
+ *   health   - die EIGENEN Dosen, das eigene Fasten, die eigene Bilanz (#592);
+ *   schedule - die EIGENE Schicht von heute (`myShiftsToday`);
+ *   rewards  - wartende Freigaben fuer den, der freigibt, sonst die eigenen
+ *              Bitten und Gutschriften. Die Sicht `family` (alle nach Namen)
+ *              waere fuer ein Kind MEHR, als seine Sitzung sonst bekommt - der
+ *              Parameter verengt nur, also bleibt die leere Fassung.
+ *
+ * Eine vierte Quelle steht nicht hier, weil sie eine eigene Route hat: die
+ * faelligen Erinnerungen (`GET /reminders/pending`) - immer die der Person.
+ */
+export const HOUSEHOLD_AUDIENCE_LEAVES_OUT = Object.freeze(['health', 'schedule', 'rewards']);
