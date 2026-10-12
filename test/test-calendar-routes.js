@@ -1643,7 +1643,21 @@ test('POST / — Anhang wird als Familien-Dokument abgelegt', async () => {
   assert.equal(doc.mime_type, 'text/plain');
 });
 
+// Ein CalDAV-Ziel ist ein eingeschalteter Kalender aus der Auswahl seines
+// Kontos (#1860); die beiden Tests darunter schreiben auf Konto 7.
+function caldavTargetAccount7() {
+  db.prepare("INSERT OR IGNORE INTO caldav_accounts (id, name, caldav_url, username, password) VALUES (7, 'Ziel 7', 'https://dav.test/', 'u7', 'p')").run();
+  for (const url of ['https://dav.test/cal/', 'https://dav.test/ziel-1064/']) {
+    db.prepare(`
+      INSERT INTO caldav_calendar_selection (account_id, calendar_url, calendar_name, enabled)
+      SELECT 7, ?, 'Ziel', 1
+      WHERE NOT EXISTS (SELECT 1 FROM caldav_calendar_selection WHERE account_id = 7 AND calendar_url = ?)
+    `).run(url, url);
+  }
+}
+
 test('POST / — CalDAV-Ziel wird gespeichert', async () => {
+  caldavTargetAccount7();
   const res = await call('POST', '/', { actor: ADMIN, body: {
     title: 'CalDAV-Termin', start_datetime: '2040-05-01T09:00',
     target_caldav_account_id: 7, target_caldav_calendar_url: 'https://dav.test/cal/',
@@ -1685,6 +1699,7 @@ test('source_calendar_ref_id - das Ziel vertritt die Quelle, bis der Sync sie se
   const kommend = getUpcomingEvents(db, { userId: ADMIN.id, limit: 200, now: new Date(Date.UTC(2035, 4, 31, 12)) });
   assert.equal(kommend.find((e) => e.id === id)?.source_calendar_ref_id, google, 'getUpcomingEvents (Dashboard, /upcoming)');
 
+  caldavTargetAccount7();
   const perCaldav = await call('POST', '/', { body: {
     title: 'Quellziel CalDAV', start_datetime: '2035-06-01T10:00',
     target_caldav_account_id: 7, target_caldav_calendar_url: 'https://dav.test/ziel-1064/',

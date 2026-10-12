@@ -170,9 +170,9 @@ function mirroredEvent(cal, uid, title) {
   const id = Number(db.prepare(`
     INSERT INTO calendar_events
       (title, start_datetime, end_datetime, all_day, created_by, external_source,
-       external_calendar_id, calendar_ref_id, external_object_url)
-    VALUES (?, '2035-03-10T09:00Z', '2035-03-10T10:00Z', 0, 1, 'caldav', ?, ?, ?)
-  `).run(title, uid, cal.refId, url).lastInsertRowid);
+       external_calendar_id, calendar_ref_id, external_object_url, caldav_account_id)
+    VALUES (?, '2035-03-10T09:00Z', '2035-03-10T10:00Z', 0, 1, 'caldav', ?, ?, ?, ?)
+  `).run(title, uid, cal.refId, url, accountId).lastInsertRowid);
   return { id, url };
 }
 
@@ -528,9 +528,9 @@ for (const status of [403, 412, 503]) {
     const cal = calendar();
     const { url } = dav.putObject(cal.url, 'gone.ics', vevent('gone@test', 'Gelöscht'));
     db.prepare(`
-      INSERT INTO calendar_pending_deletions (source, calendar_external_id, event_external_id, object_url)
-      VALUES ('caldav', ?, 'gone@test', ?)
-    `).run(cal.url, url);
+      INSERT INTO calendar_pending_deletions (source, calendar_external_id, event_external_id, object_url, caldav_account_id)
+      VALUES ('caldav', ?, 'gone@test', ?, ?)
+    `).run(cal.url, url, accountId);
 
     dav.refuse({ method: 'DELETE', status });
     await caldavSync.flushOutbound();
@@ -1014,6 +1014,250 @@ test('Umzug, an der Adresse im Ziel liegt ein FREMDES Objekt (412): die Quelle b
   assert.equal(row.calendar_ref_id, source.refId);
   assert.equal(row.outbound_move_to, dest.url, 'der Umzug ist nicht mehr vorgemerkt');
   assert.equal(row.outbound_attempts, 1);
+});
+
+// ── Umzug: die QUELLE lehnt das Löschen ab (#1861) ──────────────────────────────
+//
+// Die Kopie liegt im Ziel, das DELETE der Quelle scheitert. Vorher galt der
+// Umzug damit als vollzogen und wurde nie wiederholt: das Objekt lag für immer
+// in beiden Kalendern, jeder andere Client des Kontos zeigte den Termin
+// doppelt, und die Zeile folgte dem Kalender, den der Lauf zuletzt las.
+
+const eventRows = (uid) => db.prepare(
+  'SELECT * FROM calendar_events WHERE external_calendar_id = ? ORDER BY id'
+).all(uid);
+const refuseSourceDelete = () => dav.refuse({
+  method: 'DELETE', status: 403, when: (req) => req.path.startsWith('/cal/family/'),
+});
+
+/**
+ * Wie `pendingMove`, aber mit wählbarer Reihenfolge der Kalender: der Lauf
+ * liest sie in der Reihenfolge der Auswahl, und der Fehler hing daran, welcher
+ * zuletzt kam.
+ */
+function pendingMoveInOrder(uid, sourceFirst) {
+  let source; let dest;
+  if (sourceFirst) { source = calendar('family', 'Familie'); dest = calendar('work', 'Arbeit'); }
+  else { dest = calendar('work', 'Arbeit'); source = calendar('family', 'Familie'); }
+  const { id } = mirroredEvent(source, uid, 'Zieht um');
+  db.prepare(`
+    UPDATE calendar_events SET outbound_move_to = ?, target_caldav_calendar_url = ? WHERE id = ?
+  `).run(dest.url, dest.url, id);
+  return { source, dest, id };
+}
+
+for (const sourceFirst of [true, false]) {
+  const order = sourceFirst ? 'Quelle zuerst gelesen' : 'Quelle zuletzt gelesen';
+
+  test(`Umzug, die Quelle lehnt das Löschen ab (403), ${order}: es wird wiederholt, der Termin liegt am Ende einmal`, async () => {
+    reset();
+    const uid = 'move-7@test';
+    const { source, dest, id } = pendingMoveInOrder(uid, sourceFirst);
+
+    refuseSourceDelete();
+    await caldavSync.flushOutbound();
+    assertRefused('DELETE', 403);
+    assert.ok(dav.getObject(dest.url, `${uid}.ics`), 'die Kopie im Ziel fehlt - der Fall ist nicht nachgestellt');
+    assert.ok(dav.getObject(source.url, `${uid}.ics`));
+
+    // Die Zeile gehört dem Ziel, und das offene Löschen der Quelle ist gebucht.
+    let row = event(id);
+    assert.equal(row.calendar_ref_id, dest.refId);
+    assert.equal(row.outbound_move_to, null);
+    let pending = eventTombstones();
+    assert.equal(pending.length, 1, 'das abgelehnte Löschen der Quelle ist nirgends vorgemerkt');
+    assert.equal(pending[0].calendar_external_id, source.url);
+    assert.equal(pending[0].object_url, `${source.url}${uid}.ics`);
+    assert.equal(pending[0].event_external_id, uid);
+    assert.equal(pending[0].caldav_account_id, accountId, 'der Auftrag gehört nicht dem Konto der Zeile');
+    assert.equal(pending[0].attempts, 1, 'die Absage wurde nicht als Versuch gezählt');
+
+    // Ein Lauf, in dem die Quelle weiter ablehnt: EINE Zeile, am Ziel - gleich,
+    // welcher Kalender zuletzt gelesen wird, und die Kopie im Ziel ist nicht
+    // hinter der Vormerkung verschwunden.
+    await caldavSync.sync();
+    assert.equal(eventRows(uid).length, 1);
+    row = event(id);
+    assert.ok(row, 'die Zeile ist weg: die Vormerkung hat die Kopie im Ziel verdeckt');
+    assert.equal(row.calendar_ref_id, dest.refId, 'die Zeile ist zur Quelle zurückgewandert');
+    assert.equal(row.external_object_url, `${dest.url}${uid}.ics`);
+    assert.equal(eventTombstones()[0].attempts, 2);
+
+    // Der Auftrag verdeckt nur das Objekt in der Quelle: was ein anderer
+    // Client inzwischen an der Kopie im Ziel ändert, kommt weiter an.
+    dav.putObject(dest.url, `${uid}.ics`, vevent(uid, 'Im Ziel geändert'));
+    await caldavSync.sync();
+    assert.equal(event(id).title, 'Im Ziel geändert', 'der Auftrag für die Quelle verdeckt auch die Kopie im Ziel');
+    assert.equal(event(id).calendar_ref_id, dest.refId);
+    assert.equal(eventTombstones()[0].attempts, 3);
+
+    // Eine Bearbeitung in dieser Zeit geht an die Kopie im Ziel.
+    db.prepare("UPDATE calendar_events SET title = 'Neuer Titel', outbound_dirty = 1 WHERE id = ?").run(id);
+    await caldavSync.sync();
+    assert.match(dav.getObject(dest.url, `${uid}.ics`).data, /SUMMARY:Neuer Titel/,
+      'die Bearbeitung ging nicht an die Kopie im Ziel');
+    assert.equal(event(id).outbound_dirty, 0);
+    assert.match(dav.getObject(source.url, `${uid}.ics`).data, /SUMMARY:Zieht um/);
+
+    // Der Server lässt wieder alles zu: der nächste Lauf räumt die Quelle ab.
+    dav.allowAll();
+    await caldavSync.sync();
+    assert.equal(dav.getObject(source.url, `${uid}.ics`), null, 'der Termin liegt weiter in beiden Kalendern');
+    assert.ok(dav.getObject(dest.url, `${uid}.ics`), 'die Kopie im Ziel wurde mit abgeräumt');
+    assert.equal(eventTombstones().length, 0);
+
+    // Und es bleibt dabei.
+    await caldavSync.sync();
+    assert.equal(eventRows(uid).length, 1);
+    row = event(id);
+    assert.equal(row.calendar_ref_id, dest.refId);
+    assert.equal(row.title, 'Neuer Titel');
+    assert.ok(dav.getObject(dest.url, `${uid}.ics`));
+  });
+}
+
+test('Umzug, die Quelle lehnt das Löschen ab: Kalender und Adresse des Auftrags stammen von dem Objekt, an das das DELETE ging', async () => {
+  reset();
+  const uid = 'move-9@test';
+  // Die Zeile glaubt, in `family` zu liegen; das Objekt liegt inzwischen in
+  // `school` (auf dem Server verschoben). Eine wartende Bearbeitung hält den
+  // Abruf davon ab, die Zeile vorher nachzuziehen.
+  const family = calendar('family', 'Familie');
+  const school = calendar('school', 'Schule');
+  const dest   = calendar('work', 'Arbeit');
+  const { id } = mirroredEvent(family, uid, 'Zieht um');
+  dav.putObject(school.url, `${uid}.ics`, dav.getObject(family.url, `${uid}.ics`).data);
+  await fetch(`${family.url}${uid}.ics`, { method: 'DELETE' });
+  dav.requests.length = 0;
+  db.prepare(`
+    UPDATE calendar_events SET outbound_dirty = 1, outbound_move_to = ?, target_caldav_calendar_url = ? WHERE id = ?
+  `).run(dest.url, dest.url, id);
+
+  dav.refuse({ method: 'DELETE', status: 403, when: (req) => req.path.startsWith('/cal/school/') });
+  await caldavSync.sync();
+  assertRefused('DELETE', 403);
+  assert.ok(dav.getObject(dest.url, `${uid}.ics`), 'die Kopie im Ziel fehlt - der Fall ist nicht nachgestellt');
+
+  const pending = eventTombstones();
+  assert.equal(pending.length, 1, 'das abgelehnte Löschen ist nirgends vorgemerkt');
+  assert.equal(pending[0].object_url, `${school.url}${uid}.ics`);
+  assert.equal(pending[0].calendar_external_id, school.url,
+    'der Auftrag nennt einen Kalender, in dem seine Adresse nicht liegt');
+  assert.equal(pending[0].caldav_account_id, accountId);
+
+  dav.allowAll();
+  await caldavSync.sync();
+  assert.equal(dav.getObject(school.url, `${uid}.ics`), null, 'der Termin liegt weiter in zwei Kalendern');
+  assert.ok(dav.getObject(dest.url, `${uid}.ics`));
+  assert.equal(eventTombstones().length, 0);
+  assert.equal(eventRows(uid).length, 1);
+  assert.equal(event(id).calendar_ref_id, dest.refId);
+});
+
+test('Umzug, die Quelle lehnt das Löschen ab, und für sie steht schon ein Auftrag mit veralteter Adresse: er zählt die Absage und räumt später das richtige Objekt ab', async () => {
+  reset();
+  const uid = 'move-10@test';
+  const { source, dest, id } = pendingMoveInOrder(uid, true);
+  // Ein älterer Auftrag für dieselbe UID in der Quelle; er behält Konto und
+  // Adresse (ein Auftrag je UID und Kalender).
+  db.prepare(`
+    INSERT INTO calendar_pending_deletions (source, calendar_external_id, event_external_id, object_url, caldav_account_id)
+    VALUES ('caldav', ?, ?, ?, ?)
+  `).run(source.url, uid, `${source.url}renamed-long-ago.ics`, accountId);
+
+  refuseSourceDelete();
+  await caldavSync.flushOutbound();
+  // Der ältere Auftrag wurde selbst abgelehnt (ein Versuch), die Absage des
+  // Umzugs zählt als zweiter. Er behält seine Adresse; der Lauf findet das
+  // Objekt über seinen Abruf.
+  assert.equal(event(id).calendar_ref_id, dest.refId);
+  const pending = eventTombstones();
+  assert.equal(pending.length, 1);
+  assert.equal(pending[0].calendar_external_id, source.url);
+  assert.equal(pending[0].object_url, `${source.url}renamed-long-ago.ics`);
+  assert.equal(pending[0].caldav_account_id, accountId);
+  assert.equal(pending[0].attempts, 2, 'die Absage des Umzugs wurde am bestehenden Auftrag nicht gezählt');
+
+  dav.allowAll();
+  await caldavSync.sync();
+  assert.equal(dav.getObject(source.url, `${uid}.ics`), null, 'der Termin liegt weiter in beiden Kalendern');
+  assert.ok(dav.getObject(dest.url, `${uid}.ics`));
+  assert.equal(eventTombstones().length, 0);
+  assert.equal(eventRows(uid).length, 1);
+});
+
+test('Umzug, die Quelle lehnt das Löschen fünfmal ab: danach wird aufgegeben, der Termin liegt in beiden Kalendern bei einer Zeile, und nichts hängt', async () => {
+  reset();
+  const uid = 'move-11@test';
+  const { source, dest, id } = pendingMoveInOrder(uid, true);
+  refuseSourceDelete();
+
+  await caldavSync.flushOutbound();
+  assert.equal(eventTombstones()[0]?.attempts, 1);
+  for (const attempts of [2, 3, 4]) {
+    await caldavSync.sync();
+    assert.deepEqual(eventTombstones().map((t) => t.attempts), [attempts]);
+    assert.equal(eventRows(uid).length, 1);
+    assert.equal(event(id).calendar_ref_id, dest.refId);
+  }
+
+  // Die fünfte Absage: aufgegeben.
+  await caldavSync.sync();
+  assert.equal(eventTombstones().length, 0, 'der Auftrag wird nach der fünften Absage weiter versucht');
+  assert.ok(dav.getObject(source.url, `${uid}.ics`));
+  assert.ok(dav.getObject(dest.url, `${uid}.ics`));
+
+  const deletesBefore = dav.seen('DELETE').length;
+  await caldavSync.sync();
+  await caldavSync.sync();
+  assert.equal(dav.seen('DELETE').length, deletesBefore, 'nach dem Aufgeben wird weiter gelöscht');
+  assert.equal(eventRows(uid).length, 1, 'aus den zwei Objekten wurden zwei Zeilen');
+  const row = event(id);
+  assert.ok(row);
+  assert.equal(row.outbound_move_to, null);
+  assert.equal(row.outbound_dirty, 0);
+  assert.equal(eventTombstones().length, 0);
+});
+
+test('Umzug, die Quelle lehnt das Löschen ab, dann zurück in die Quelle: der Termin bleibt dort stehen', async () => {
+  reset();
+  const uid = 'move-8@test';
+  const { source, dest, id } = pendingMoveInOrder(uid, true);
+
+  refuseSourceDelete();
+  await caldavSync.flushOutbound();
+  assert.equal(event(id).calendar_ref_id, dest.refId);
+
+  // Zurück in den alten Kalender, während dessen Objekt noch auf sein Löschen
+  // wartet. Der Umzug trifft dort auf die eigene, stehengebliebene Kopie (412)
+  // und übernimmt sie - das wartende Löschen darf sie danach nicht mehr treffen.
+  db.prepare(`
+    UPDATE calendar_events SET outbound_move_to = ?, target_caldav_calendar_url = ? WHERE id = ?
+  `).run(source.url, source.url, id);
+  await caldavSync.flushOutbound();
+  assert.equal(event(id).calendar_ref_id, source.refId, 'der Rückweg ist nicht gelaufen');
+  assert.equal(dav.getObject(dest.url, `${uid}.ics`), null);
+
+  dav.allowAll();
+  await caldavSync.sync();
+  await caldavSync.sync();
+  assert.ok(dav.getObject(source.url, `${uid}.ics`), 'das wartende Löschen hat den zurückgezogenen Termin vom Server genommen');
+  assert.ok(event(id), 'der zurückgezogene Termin ist hier verschwunden');
+  assert.equal(event(id).calendar_ref_id, source.refId);
+  assert.equal(eventTombstones().length, 0);
+});
+
+test('Umzug, die Quelle ist schon weg (404): der Umzug ist vollzogen, nichts wird vorgemerkt', async () => {
+  reset();
+  const uid = 'move-9@test';
+  const { source, dest, id } = pendingMoveInOrder(uid, true);
+
+  dav.refuse({ method: 'DELETE', status: 404, when: (req) => req.path.startsWith('/cal/family/') });
+  await caldavSync.flushOutbound();
+  assertRefused('DELETE', 404);
+
+  assert.equal(event(id).calendar_ref_id, dest.refId);
+  assert.equal(eventTombstones().length, 0, 'ein 404 der Quelle wurde als offenes Löschen vorgemerkt');
 });
 
 // ── CardDAV-Verbindungstest: die Absage erreicht den Nutzer ─────────────────────

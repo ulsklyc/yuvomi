@@ -1043,13 +1043,14 @@ them with 400 (see the Reminders section), because the run would recreate them w
 | user_modified | INTEGER | 0/1 — prevents sync overwrite when 1. Set on **any** edit to a mirrored appointment, which is why it no longer gates the colour, see below |
 | color_modified | INTEGER | 0/1 (migration v167, #899) — the colour's own state: `1` means "this colour is managed locally", set only when `color` actually changes and by the upload paths for a colour they just sent to a provider. Inbound gates the colour column on this instead of `user_modified`, which a mere title edit already flips; and `color IS NULL AND color_modified = 1` is the *cleared* state the outbound may mirror, as opposed to a colour that was never learned. Backfilled as `color_modified = user_modified` |
 | calendar_ref_id | INTEGER | FK → External Calendars (ON DELETE SET NULL) |
+| caldav_account_id | INTEGER | FK → CalDAV Accounts (ON DELETE SET NULL), nullable (migration v238, #1860) - the account a mirrored CalDAV event belongs to. Set only on rows with `external_source = 'caldav'`, and only by the sync; Apple, Google, ICS and local rows stay `NULL`. See "One row per UID" below |
 | attachment_name | TEXT | Original filename of attached file, nullable |
 | attachment_mime | TEXT | MIME type (e.g. image/jpeg, application/pdf), nullable |
 | attachment_size | INTEGER | File size in bytes, nullable |
 | attachment_data | TEXT | Legacy Base64 data URL of attachment (≤ 5 MB), nullable; new attachments leave this NULL |
 | attachment_document_id | INTEGER | FK → Family Documents (SET NULL on delete), nullable (migration v38) |
-| target_caldav_account_id | INTEGER | FK → CalDAV Accounts (for outbound sync), nullable |
-| target_caldav_calendar_url | TEXT | CalDAV calendar URL (for outbound sync), nullable |
+| target_caldav_account_id | INTEGER | CalDAV account chosen as upload target, nullable. A soft reference without a foreign key: it is the *wish* written by the form, `caldav_account_id` is the fact written by the sync |
+| target_caldav_calendar_url | TEXT | CalDAV calendar URL (for outbound sync), nullable. Account and URL form a pair: accepted on create, and on edit when changed, only if that calendar is enabled in the selection of that account - the same set `GET /api/v1/calendar/sync-targets` offers. Anything else is answered with 400; a stored target outside that set is left as it is and not uploaded. A mirrored CalDAV event can only be given a calendar of the account it belongs to |
 | target_google_calendar_id | TEXT | Google calendar ID for outbound sync, nullable. Mutually exclusive with the CalDAV target columns — an event syncs to at most one destination |
 | target_outlook_account_id | INTEGER | Outlook account ID for the one-way push (migration v134), nullable. Mutually exclusive with the other target columns |
 | target_outlook_calendar_id | TEXT | Microsoft Graph calendar ID for the one-way push (migration v134), nullable |
@@ -1402,6 +1403,8 @@ the deleted event and is worked off by the sync (at-least-once).
 | attempts | INTEGER | NOT NULL, default 0 — failed remote deletions so far |
 | last_error | TEXT | nullable, truncated to 500 chars |
 | created_at | TEXT | ISO 8601, NOT NULL |
+| object_url | TEXT | nullable (migration v106) - URL of the CalDAV object to delete |
+| caldav_account_id | INTEGER | FK → CalDAV Accounts (ON DELETE CASCADE), nullable (migration v238, #1860) - the account the deletion is sent through. Set for `source = 'caldav'` only |
 
 Constraints: UNIQUE(source, calendar_external_id, event_external_id) ·
 Index: CREATE INDEX idx_cal_pending_del_event ON calendar_pending_deletions(source, event_external_id)
@@ -1409,6 +1412,67 @@ Index: CREATE INDEX idx_cal_pending_del_event ON calendar_pending_deletions(sour
 Rows are created **only** by the explicit user delete (`DELETE /api/v1/calendar/:id`), never by a
 database trigger: the inbound sync deletes local rows as well (cancelled events, deselected
 calendars), and a trigger would turn those into delete calls against the provider.
+
+**One row per UID, and the first account owns it (migration v238, #1860).** Several CalDAV accounts
+share `calendar_events` and `calendar_pending_deletions`. A mirrored event carries the account it
+belongs to in `caldav_account_id`, and so does its pending deletion. The rules:
+
+- The account that first delivers a UID owns the row. A second account that serves the same UID
+  does not create a second row and does not take over, change or prune the existing one. The same
+  UID is almost always the same appointment (a shared family calendar, an invitation both parents
+  received), and it should appear once. Known cost: two genuinely different events that happen to
+  share a UID in two accounts show as one. There is deliberately no unique index on
+  (account, UID); `idx_calendar_caldav_account_uid` only speeds the lookup up.
+- An edit, a deletion or a calendar move is sent only through the owning account, in the sync run
+  and in the immediate attempt, and only to the server of that account: its `caldav_url` and the
+  calendars of its selection (`withAccountOrigin` in `server/utils/caldav-client.js`). In a sync
+  run the request goes to the object address the fetch of that account returned, not to the
+  stored `external_object_url`; the stored one is corrected afterwards.
+- When the owning account is deleted the row stays without an account (`ON DELETE SET NULL`), its
+  waiting outbound work is dropped, and its pending deletions go with the account. When the
+  owning account no longer serves the UID, its prune removes the row. In both cases the next
+  account that serves the UID adopts the row or creates it on its next fetch.
+- A row without an account is never sent. It is adopted by the first account that serves its UID,
+  provided nothing is waiting on it (`outbound_dirty`, `outbound_move_to`) and it is not meant for
+  another existing account (`target_caldav_account_id`). Editing it queues nothing and deleting
+  it creates no pending deletion. A change that was already waiting on such a row is counted once
+  per sync run, reported, and given up after five runs; the row can then be adopted. A pending
+  deletion without an account is dropped at the start of the next sync run, with a log line.
+- Migration v238 assigns existing rows: with exactly one account, every CalDAV row and pending
+  deletion goes to it. With several, a row goes to the account whose selection contains the key
+  of its calendar (`external_calendars.external_id`, compared verbatim), but only if exactly one
+  selection contains it. Everything else stays without an account. The upload target and the
+  object address decide nothing there.
+- When an account is pointed at a different server or user, its rows stay with it and are found
+  again by UID on the next fetch; its pending deletions are dropped in the same step, because they
+  name objects of the old server.
+
+Apple and Google keep one connection each and are unaffected: their rows and pending deletions
+leave the column `NULL`, and the shared functions filter by source only, as before.
+
+**A move whose source refuses the DELETE stays pending (#1861).** A CalDAV calendar move stores a
+copy in the destination and deletes the object in the source. If the copy is stored and the source
+refuses the DELETE (anything but 404/410), the row is bound to the destination as before and a
+pending deletion is queued for the source object, with the refusal counted as its first attempt
+(`queueRefusedDeletion`). It carries the account of the row, and its calendar and address both come
+from the object the refused DELETE was sent to, not from the row. It is retried like any other
+pending deletion and given up after five attempts. While it waits, the inbound run hides only that
+one object: for CalDAV the guard asks per object (`pendingDeletionGuard`: the calendar of the
+pending deletion, or the verbatim address where it has no calendar), no longer per UID, so the copy
+in the destination keeps receiving changes. Moving the event back into the old calendar adopts the
+copy still lying there and withdraws the pending deletion for that calendar (`dropDeletionsIn`). A
+refusal is counted only on a pending deletion of the same account; if the entry already has a
+pending deletion of another account (two accounts on the same calendar), that one is left
+unchanged and the move stays pending, counted and retried like any failed move.
+
+**An upload is booked against the row as it is after the server answered (#1862).** Each event
+upload loop (CalDAV, iCloud) reads the row again when it is its turn, through the same selection the
+list came from, and `bookEventUpload` reads it once more after the request, with nothing awaited
+between that read and the write. A row deleted in the meantime gets a pending deletion for the
+object just created (for CalDAV with the uploading account); a row whose mirrored fields changed
+becomes a mirror with `outbound_dirty = 1`, so the edit follows; a row that is no longer local is
+left alone. Tasks and shopping items do the same in `uploadNewTodo`, and their update path settles
+against the current row instead of clearing `outbound_dirty` unconditionally.
 
 The counterpart for *edits* lives on the event row itself (migration v104): `outbound_dirty` (0/1)
 marks a mirrored event whose local change still has to reach the provider, and `outbound_attempts`

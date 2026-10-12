@@ -7,12 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.76.0] - 2026-10-11
-
 ### Added
 
 - **Tapping a category or subcategory in the budget overview filters the transactions list.**
   (#1593, from D#1583) The filter applies in place and can be cleared again.
+
+### Fixed
+
+- **Moving an event to another CalDAV calendar no longer leaves it in both** (#1861). A move
+  stores the event in the new calendar and then removes it from the old one. When the server
+  stored the copy but refused the removal - an old calendar that is shared read-only, or a server
+  that was briefly overloaded - Yuvomi booked the move as done and never tried again: every other
+  app on that account showed the event twice from then on, and in Yuvomi it could jump back to
+  its old calendar. The refused removal is now remembered and tried again with every sync, up to
+  five times like any other refused deletion, and until then Yuvomi shows the event once, in the
+  calendar you moved it to. After the fifth refusal Yuvomi gives up, and the event stays in both
+  calendars until you remove one copy yourself. Events that were left doubled before the update
+  are not cleaned up.
+- **Editing or deleting an entry while it is being uploaded is no longer lost or undone**
+  (#1862). Sending an entry to a CalDAV or iCloud server takes a moment, and Yuvomi booked the
+  result against the entry as it was before that moment. If you deleted a new event, task or
+  shopping item while it was being uploaded, it stayed on the server and came back with the next
+  sync. If you edited it during the upload, or edited an event while others were being uploaded
+  before it, the server kept the old text and the next sync wrote that old text back over your
+  edit. And a second edit to a task or shopping item made while the first one was on its way was
+  replaced by the first. Yuvomi now looks at the entry again after the server has answered: an
+  entry deleted in the meantime is removed from the server too, and an edit made in the meantime
+  is sent after it. Not covered yet: if you change the target calendar of an event while it is
+  being uploaded, the event stays in the calendar it was uploaded to.
+- **A CalDAV event belongs to the account that brought it** (#1860). With two or more CalDAV
+  accounts, an event was identified by its UID alone. When a second account served an event with
+  the same UID, it took over the entry of the first: title, calendar and address then came from
+  the second account, and an edit made in Yuvomi went there. An event now belongs to one account
+  and is changed, moved and deleted only through that account. The same UID in two accounts is
+  still shown once, and it belongs to the account that delivered it first; if that account is
+  removed or no longer has the event, the other account takes it on with its next sync. What to
+  know after the update:
+  - Existing events are assigned to their account automatically. With several accounts, an event
+    whose calendar is in the selection of more than one account, or of none, cannot be assigned
+    with certainty. It stays without an account, is not sent to any server, and is taken on by
+    the first account that delivers it at the next sync. A change you made to such an event
+    before the update and that had not been sent yet is not sent and is dropped after five sync
+    runs; the event then shows what the server has.
+  - With exactly one CalDAV account, all existing CalDAV events go to it, including leftovers of
+    an account that was removed earlier.
+  - A deletion that was still waiting to be sent and cannot be assigned to an account is dropped.
+    The event may come back once with the next sync; delete it again then.
+  - Two different events that happen to carry the same UID in two accounts show as one.
+  - As a sync target, Yuvomi accepts only a calendar that is switched on for that account - the
+    ones the event form offers. A new target outside that selection is rejected. A target saved
+    earlier for a calendar that has since been switched off stays as it is, but the event is no
+    longer uploaded until the calendar is switched on again; changing it to one of the offered
+    calendars works. An event that is already synchronised can only be moved to another calendar
+    of its own account.
+  - Pointing an account at a different server or a different user drops its deletions that were
+    still waiting to be sent, since they named objects on the old server.
+  - Deleting an account while keeping its events drops any edits of those events that had not
+    been sent yet.
+  - An event that belongs to no account is deleted only in Yuvomi, never at a server.
+  - Events without an account that no account delivers any more stay until you delete them.
+  - If you delete an event that a second account also keeps as its own copy, that account adds it
+    back on its next sync.
+
+## [2.76.0] - 2026-10-11
+
+### Added
+
 - **The demo household has pocket money** (#1750). The Rewards overview of a demo database now
   shows the pocket money section: Emma has an account in euros with a monthly plan, three
   credits by that plan, a birthday bonus from a parent, an approved withdrawal and one request

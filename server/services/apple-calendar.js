@@ -37,7 +37,12 @@ import { followInboundStartChange } from './calendar-occurrence-overrides.js';
 
 const APPLE_COLOR = '#FC3C44';
 
-function collectLocalOutboundEvents(database) {
+/**
+ * Lokale Termine, die auf ihren Upload warten. Mit `id` dieselbe Frage für EINEN
+ * Termin: die Upload-Schleife liest ihn frisch, wenn er an der Reihe ist
+ * (#1862), und zwar durch dieselbe Auswahl, aus der die Liste stammt.
+ */
+function collectLocalOutboundEvents(database, id = null) {
   return database.prepare(`
     SELECT e.* FROM calendar_events e
     WHERE e.external_source = 'local' AND e.external_calendar_id IS NULL
@@ -46,7 +51,8 @@ function collectLocalOutboundEvents(database) {
         SELECT 1 FROM calendar_events child
         WHERE child.recurrence_parent_id = e.id
       )
-  `).all();
+      AND (? IS NULL OR e.id = ?)
+  `).all(id, id);
 }
 
 // --------------------------------------------------------
@@ -548,8 +554,14 @@ async function runSync({ makeClient } = {}) {
   // dieses Laufs dieselbe Absage: nach der ersten ist Schluss, und es gibt EINE
   // Zeile mit der Anzahl statt einer je Termin.
   const uploadGate = createUploadGate();
-  for (const event of localEvents) {
+  for (const listed of localEvents) {
     if (!defaultCal || uploadGate.isClosed(defaultCal.url)) continue;
+    // Frisch lesen (#1862): die Liste stammt von vor der Schleife, und jeder
+    // Upload davor war ein await. Wer inzwischen bearbeitet wurde, geht mit
+    // dem Stand von jetzt hinauf; wer gelöscht wurde oder nicht mehr wartet,
+    // gar nicht.
+    const [event] = collectLocalOutboundEvents(db.get(), listed.id);
+    if (!event) continue;
     try {
       const icsData = buildICS(event, householdZone);
       const uid     = outbound.eventUidFor(event.id);
@@ -562,7 +574,10 @@ async function runSync({ makeClient } = {}) {
         'apple', defaultCal.url, defaultCal.displayName || 'Apple Calendar',
         normalizeCalColor(defaultCal.calendarColor) || APPLE_COLOR
       );
-      outbound.markEventUploaded(event.id, { source: 'apple', uid, objectUrl, calRefId, adopted });
+      // Gebucht wird gegen den Stand NACH dem await (bookEventUpload).
+      outbound.bookEventUpload(event, {
+        source: 'apple', uid, objectUrl, calRefId, adopted, calendarUrl: defaultCal.url,
+      });
     } catch (err) {
       if (!uploadGate.refused(defaultCal.url, err)) {
         log.error(`Outbound error for event ${event.id}:`, err.message);

@@ -39,7 +39,7 @@ import { patchICSTodo } from '../utils/ics-patch.js';
 import { createCalDAVClient, collectionUrlOf, createUploadGate } from '../utils/caldav-client.js';
 import { ownUid, isOwnUidOfRow, ownUploadRowId, findObjectWithUid } from '../utils/own-uid.js';
 import { householdTimeZone, localToUTC } from '../utils/timezone.js';
-import { loadTags } from '../utils/task-tags.js';
+import { loadTags, tagsKey } from '../utils/task-tags.js';
 import { runSerialized } from '../utils/sync-lock.js';
 
 const log = createLogger('CalDAV-Todo-Outbound');
@@ -378,6 +378,39 @@ function reloadRow(module, id) {
   return row;
 }
 
+/**
+ * Hat sich die Zeile geändert, seit `sent` gelesen wurde (#1862)? Beide Seiten
+ * kommen aus `reloadRow`, tragen ihre Tags also als Liste; der Feldvergleich
+ * kennt sie nur als `tags_key`.
+ */
+function changedSince(module, sent, now) {
+  const keyed = (row) => (module === 'tasks' ? { ...row, tags_key: tagsKey(row.tags || []) } : row);
+  return mirroredFieldsChanged(module, keyed(sent), keyed(now));
+}
+
+/**
+ * Schliesst eine hinausgegangene Änderung ab - gegen den Stand von JETZT.
+ *
+ * Zwischen dem Nachladen vor dem PUT und hier liegt die Anfrage. Trifft in der
+ * Zeit eine zweite Bearbeitung ein, steht outbound_dirty schon (wieder) auf 1,
+ * und ein pauschales Zurücksetzen löschte genau diese Vormerkung: oben läge
+ * die erste Bearbeitung, und der nächste Abruf ersetzte die zweite durch sie.
+ * Erledigt ist nur, was hinausging - dasselbe wie `settleOutbound` bei den
+ * Terminen. Synchron: zwischen dem Nachladen und dem Schreiben liegt kein await.
+ */
+function settleOutbound(module, sent) {
+  const now = reloadRow(module, sent.id);
+  if (!now) return; // inzwischen gelöscht - der Tombstone der Route übernimmt
+  if (!changedSince(module, sent, now)) {
+    clearOutbound(module, sent.id);
+    return;
+  }
+  const def = moduleDef(module);
+  db.get().prepare(
+    `UPDATE ${def.table} SET outbound_dirty = 1, outbound_attempts = 0 WHERE id = ?`
+  ).run(sent.id);
+}
+
 // --------------------------------------------------------
 // Vormerkung: Anlegen (#695)
 // --------------------------------------------------------
@@ -671,6 +704,27 @@ async function uploadNewTodo(client, collection, module, row, accountId) {
     log.info(`${def.table} row ${row.id} is already on the server as ${uid}, adopting it.`);
   }
 
+  // Gebucht wird gegen den Stand von JETZT (#1862): zwischen `row` und hier
+  // lag die Anfrage. Synchron bis zum Schreiben, kein await dazwischen.
+  const now = reloadRow(module, row.id);
+  if (!now) {
+    // Während des Uploads gelöscht. Für eine lokale Zeile merkt die Löschroute
+    // nichts vor, das Objekt läge also für immer oben und der nächste Abruf
+    // holte den gelöschten Eintrag als neue Zeile zurück.
+    db.get().prepare(`
+      INSERT INTO caldav_todo_pending_deletions (account_id, module, uid, object_url)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(account_id, module, uid)
+        DO UPDATE SET object_url = COALESCE(excluded.object_url, object_url)
+    `).run(accountId, module, uid, objectUrl);
+    log.info(`${def.table} row ${row.id} was deleted while its upload was in flight, queued the deletion of ${uid}.`);
+    return true;
+  }
+  // Während des Uploads bearbeitet: oben liegt der Stand davor. Die Zeile wird
+  // Spiegel UND als geändert vorgemerkt, sonst überschriebe der nächste Abruf
+  // die Bearbeitung mit dem alten Stand.
+  const edited = changedSince(module, row, now);
+
   db.get().prepare(`
     UPDATE ${def.table}
        SET external_source     = 'caldav',
@@ -680,7 +734,7 @@ async function uploadNewTodo(client, collection, module, row, accountId) {
            outbound_dirty      = ?,
            outbound_attempts   = 0
      WHERE id = ?
-  `).run(uid, accountId, objectUrl, adopted ? 1 : 0, row.id);
+  `).run(uid, accountId, objectUrl, adopted || edited ? 1 : 0, row.id);
   return true;
 }
 
@@ -899,7 +953,8 @@ export async function processPendingUpdates(client, accountId, module, objectInd
 
     try {
       await client.updateCalendarObject({ calendarObject: { url, etag: known.etag, data: patched } });
-      clearOutbound(module, row.id);
+      // Erledigt ist nur, was hinausging (#1862).
+      settleOutbound(module, fresh);
       done++;
     } catch (err) {
       const action = outboundFailureAction(err, row.outbound_attempts);

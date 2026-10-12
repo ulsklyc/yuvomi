@@ -422,11 +422,21 @@ test('der Upload merkt sich, dass die hinausgeschickte Farbe unsere ist (#899)',
       if (!/color_modified/.test(setListe)) ohneFlag.push(datei);
     }
     // Der Aufruf muss die Quelle woertlich nennen: nur so ist belegt, WELCHER
-    // Anbieter ueber den Helfer laeuft.
-    for (const treffer of quelle.matchAll(/markEventUploaded\(\s*[^,]+,\s*\{[^}]*?source:\s*'(caldav|apple|google)'/g)) {
+    // Anbieter ueber den Helfer laeuft. Seit #1862 rufen die Upload-Schleifen
+    // `bookEventUpload`, das gegen den Stand nach dem await bucht und dafuer
+    // `markEventUploaded` ruft (unten geprueft) - beide Namen zaehlen.
+    for (const treffer of quelle.matchAll(/(?:markEventUploaded|bookEventUpload)\(\s*[^,]+,\s*\{[^}]*?source:\s*'(caldav|apple|google)'/g)) {
       angekommen.add(treffer[1]);
     }
   }
+
+  // `bookEventUpload` zaehlt nur, solange es wirklich bei `markEventUploaded`
+  // ankommt und die Quelle durchreicht.
+  const buchStart = helferQuelle.indexOf('export function bookEventUpload(');
+  assert.ok(buchStart >= 0, 'bookEventUpload fehlt in calendar-outbound.js - stimmt der Guard noch?');
+  const buchRumpf = helferQuelle.slice(buchStart, helferQuelle.indexOf('\nexport ', buchStart + 1));
+  assert.match(buchRumpf, /markEventUploaded\(\s*sent\.id,\s*\{\s*source,/,
+    'bookEventUpload reicht die Quelle nicht mehr an markEventUploaded weiter');
 
   assert.deepEqual([...angekommen].sort(), ['apple', 'caldav', 'google'],
     'jeder der drei Anbieter braucht eine Upload-Stelle, die den Termin zum Spiegel macht');
