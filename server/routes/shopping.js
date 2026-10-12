@@ -14,7 +14,7 @@ import { str, oneOf, url, date, collectErrors, MAX_TITLE, MAX_SHORT, MAX_TEXT } 
 import { aggregateMealIngredients } from '../services/shopping-import.js';
 import { loadItemTagsFor } from '../utils/task-tags.js';
 import {
-  flushOutbound, markTodoOutbound, queueTodoDeletions, releaseShoppingMirror,
+  flushOutbound, markTodoOutbound, queueTodoDeletions, moveShoppingMirror,
 } from '../services/caldav-todo-outbound.js';
 import rateLimit from 'express-rate-limit';
 import { emailService as defaultEmailService } from '../services/email.js';
@@ -521,8 +521,8 @@ router.delete('/stores/:id', (req, res) => {
 // EIN UMZUG IST EIN UMZUG, KEIN LÖSCHEN UND NEU ANLEGEN: dieselbe Zeile, mit
 // Notiz, Link, Preis und Laden. Zwei Dinge gelten in der neuen Liste nicht
 // weiter und werden deshalb neu gesetzt - der Rang (er zählt je Liste und
-// Kategorie) und die Bindung an ein Objekt auf dem CalDAV-Server (dessen
-// Collection folgt allein aus der Liste, siehe `releaseShoppingMirror`).
+// Kategorie) und der Platz des Objekts auf dem CalDAV-Server: es zieht mit
+// (`moveShoppingMirror`), mit Etiketten, Alarm und allem, was daran hängt.
 //
 // `list_change` nennt die Liste, von der der Artikel KOMMT - das ist der
 // Zettel, den der Schreibende offen hat. Die Zielliste bewegt ihre Nummer
@@ -623,15 +623,13 @@ router.patch('/items/:itemId', (req, res) => {
     const fieldErrors = collectErrors([vNotes, vUrl]);
     if (fieldErrors.length) return res.status(400).json({ error: fieldErrors.join(' '), code: 400 });
 
-    let released = false;
     const { list_change } = withListChange(item.list_id, () => {
-      // Eine Transaktion: ein Umzug, der zwischen "vom Server gelöst" und "auf
-      // der neuen Liste" abbricht, hinterliesse einen Artikel, der auf seiner
-      // gespiegelten Liste steht und dort ein zweites Mal angelegt würde.
+      // Eine Transaktion: ein Umzug, der zwischen der Vormerkung für den
+      // Server und "auf der neuen Liste" abbricht, hinterliesse einen Artikel,
+      // dessen Objekt in eine Liste gezogen würde, in der er nicht steht.
       db.get().transaction(() => {
-        // VOR dem Umzug, mit der Zeile der alten Liste: danach sind UID und
-        // Objekt-URL weg.
-        if (moved) released = releaseShoppingMirror(item);
+        // VOR dem Umzug, mit der Zeile der alten Liste.
+        if (moved) moveShoppingMirror(item, targetListId);
 
         db.get().prepare(`
           UPDATE shopping_items
@@ -663,9 +661,8 @@ router.patch('/items/:itemId', (req, res) => {
 
     // Abhaken oder Umbenennen eines gespiegelten Artikels zieht auf dem
     // CalDAV-Server nach (#617).
-    // Nach einem Umzug ist die Zeile `local` und hier nichts vorzumerken: das
-    // alte Objekt geht über den Tombstone, das neue entsteht über die
-    // Zielliste, wenn sie gespiegelt ist.
+    // Bleibt der Artikel nach einem Umzug Spiegel, geht eine Bearbeitung aus
+    // derselben Anfrage mit seinem Objekt an den neuen Platz.
     const pending = markTodoOutbound('shopping', item, updated);
 
     res.json({ data: updated, list_change });
@@ -673,7 +670,7 @@ router.patch('/items/:itemId', (req, res) => {
     if (pending) pushToCalDAV('Änderung');
     // Wie beim Anlegen ohne Vorprüfung: ob die Zielliste gespiegelt ist, weiss
     // der Lauf selbst, und ohne offene Arbeit kehrt er sofort zurück.
-    else if (moved) pushToCalDAV(released ? 'Umzug (Löschung in der alten Liste)' : 'Umzug');
+    else if (moved) pushToCalDAV('Umzug');
   } catch (err) {
     log.error('PATCH items/:id error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });

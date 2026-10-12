@@ -66,12 +66,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wall display are unchanged. The API gets `PATCH /api/v1/tasks/reorder` and
   `POST /api/v1/tasks/reorder/reset`, and `sort_order` on each task (migration 242).
 - **Move a shopping item to another list** (#1700, from D#998). The edit dialog has a list
-  selector under amount and category when there is more than one list. The item moves as it is - name, amount, category, note, link,
-  price and shop - and lands at the end of its category on the other list, so nothing has to be
-  typed again. On lists mirrored from a CalDAV server the entry is removed from the old list
-  there and created in the new one, and moving it to a list that is not mirrored removes it on
-  the server without deleting it in Yuvomi. Tags mirrored from the old entry are not carried
-  over. `PATCH /api/v1/shopping/items/:itemId` takes `list_id` for the same move.
+  selector under amount and category when there is more than one list. The item moves as it is -
+  name, amount, category, note, link, price and shop - and lands at the end of its category on
+  the other list, so nothing has to be typed again. Between two lists mirrored from a CalDAV
+  server the entry itself moves: Yuvomi reads it in the old list, stores it unchanged in the new
+  one and only then removes it from the old one, so its tags, alarms and everything another app
+  keeps on it come along - also from one account to another. If the server does not accept it
+  in the new list, the entry stays untouched where it was, and after the fifth refusal the item
+  is back on the list it came from, with a line in the sync log. While the new list is switched
+  off in the reminder sync, the move waits until it is switched on again. Moving an item to a
+  list that is not mirrored removes it on the server without deleting it in Yuvomi.
+  `PATCH /api/v1/shopping/items/:itemId` takes `list_id` for the same move (migration 243).
 
 ### Changed
 

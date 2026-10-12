@@ -334,8 +334,23 @@ function upsertShoppingItem(sel, todo, accountId, objectUrl = null) {
   const isChecked = todo.completed ? 1 : 0;
 
   const existing = db.get().prepare(
-    `SELECT id FROM shopping_items WHERE external_uid = ? AND external_source = 'caldav' AND external_account_id = ?`
+    `SELECT id, outbound_move FROM shopping_items WHERE external_uid = ? AND external_source = 'caldav' AND external_account_id = ?`
   ).get(todo.uid, accountId);
+
+  // DER ARTIKEL IST HIER UMGEZOGEN, SEIN OBJEKT NOCH NICHT (#1700). Der Abruf
+  // liest es am alten Platz und stellte die Zeile sonst dorthin zurück - der
+  // Server folgt hier der Zeile, nicht umgekehrt. Frisch an der Zeile gelesen,
+  // nicht aus dem Stand vom Anfang des Laufs: der Umzug kann eintreffen,
+  // während der Lauf noch den Server liest. Nur eine fehlende Adresse wird
+  // nachgetragen, ohne sie ist das Original nicht lesbar.
+  if (existing?.outbound_move) {
+    if (objectUrl) {
+      db.get().prepare(
+        'UPDATE shopping_items SET external_object_url = COALESCE(external_object_url, ?) WHERE id = ?'
+      ).run(objectUrl, existing.id);
+    }
+    return;
+  }
 
   let itemId;
   if (existing) {
@@ -457,6 +472,11 @@ async function runSync({ createClient: makeClient } = {}) {
 
   // Client-Factory injizierbar (Tests), Default = echter tsdav-Client.
   const clientFactory = makeClient || createClient;
+  // Die Quelle einer Mitnahme (#1700) kann ein anderes Konto sein.
+  const clientFor = async (id) => {
+    const other = getAccountById(id);
+    return other ? clientFactory(other) : null;
+  };
 
   let totalItems       = 0;
   let totalPushed      = 0;
@@ -510,6 +530,10 @@ async function runSync({ createClient: makeClient } = {}) {
       // nicht die Listen-URL — ein Prune träfe sonst auch die Einträge der Liste, die
       // gerade nur wegen eines Server-Fehlers leer aussieht.
       const incompleteModules = new Set();
+
+      // Ein Umzug, dessen Zielliste gar keinen Platz auf einem Server mehr hat
+      // (#1700), wird zum Löschen am Server - vor dem Lesen der Aufträge.
+      todoOutbound.releaseStrandedShoppingMoves(account.id);
 
       // Ausstehende Rückrichtung einmal je Lauf und Modul (#617): eine lokal
       // gelöschte Aufgabe darf der Inbound nicht wieder anlegen, eine lokal
@@ -728,6 +752,30 @@ async function runSync({ createClient: makeClient } = {}) {
         if (created) log.info(`${created} locally created shopping item(s) uploaded to the server.`);
       } catch (err) {
         log.error(`Uploading local shopping items failed for account ${account.id}:`, err.message);
+      }
+
+      // Umgezogene Einkaufsartikel nehmen ihr Objekt mit (#1700). Ebenfalls
+      // nach dem Prune: die Zeile zeigt danach auf ein Objekt, das dieser Lauf
+      // in der neuen Liste noch nicht gelesen hat.
+      try {
+        const targets = db.get().prepare(`
+          SELECT list_url, target_list_id FROM caldav_reminder_selection
+           WHERE account_id = ? AND enabled = 1 AND target_module = 'shopping' AND target_list_id IS NOT NULL
+        `).all(account.id);
+        const lists = new Map(
+          targets.map((s) => [s.list_url, serverCals.find((c) => c.url === s.list_url)]).filter(([, cal]) => cal)
+        );
+        const carried = await todoOutbound.processPendingShoppingMoves(
+          client,
+          account.id,
+          targets.map((s) => ({ listUrl: s.list_url, targetListId: s.target_list_id })),
+          lists,
+          { clientFor }
+        );
+        totalPushed += carried;
+        if (carried) log.info(`${carried} moved shopping item(s) carried to their new list on the server.`);
+      } catch (err) {
+        log.error(`Carrying moved shopping items failed for account ${account.id}:`, err.message);
       }
 
       db.get().prepare('UPDATE caldav_accounts SET last_sync = ? WHERE id = ?')

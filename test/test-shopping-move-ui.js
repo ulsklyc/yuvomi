@@ -83,20 +83,39 @@ const felder = (over = {}) => ({
   'item-details-link': '', 'item-details-cancel': '', 'item-details-delete': '', ...over,
 });
 
-/** Speichert den Dialog und schreibt die PATCH-Anfragen mit. */
-async function speichere(values, antwort) {
+/**
+ * Speichert den Dialog und schreibt die PATCH-Anfragen mit. `listen` ist die
+ * Antwort des Servers auf das Nachlesen der Reiter-Zaehler nach einem Umzug;
+ * ohne sie scheitert das Nachlesen, und es gilt, was die Seite selbst gebucht
+ * hat. `vorDerAntwort` laeuft, waehrend der PATCH beim Server liegt.
+ */
+async function speichere(values, antwort, { listen = null, vorDerAntwort = null } = {}) {
   const gesendet = [];
   const geschlossen = [];
   globalThis.__apiStub = {
-    patch: async (path, payload) => { gesendet.push({ path, payload }); return antwort(payload); },
+    patch: async (path, payload) => {
+      gesendet.push({ path, payload });
+      if (vorDerAntwort) await vorDerAntwort();
+      return antwort(payload);
+    },
+    get: async (path) => {
+      if (path !== '/shopping' || !listen) throw new Error(`kein Stub fuer GET ${path}`);
+      return { data: await listen() };
+    },
   };
   globalThis.__closeModal = (...args) => { geschlossen.push(args[0] ?? {}); };
+  const fehler = console.error;
+  console.error = () => {};
   try {
     const opts = oeffne();
     const p = panel(values);
     opts.onSave(p);
     await p.submit();
+    // Das Nachlesen der Zaehler laeuft hinter dem Speichern her.
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
   } finally {
+    console.error = fehler;
     delete globalThis.__apiStub;
     delete globalThis.__closeModal;
   }
@@ -255,4 +274,53 @@ test('Gehoert der Bestand inzwischen der ZIELLISTE, bleibt der Artikel dort steh
   }
   assert.equal(gesendet[0].list_id, 2);
   assert.deepEqual(shopping.state.items.map((i) => i.id), [10], 'er steht auf dem Zettel, den man jetzt ansieht');
+});
+
+// -------------------------------------------------------------------------
+// Die Zaehler der Reiter folgen dem Server, nicht der eigenen Buchung
+// -------------------------------------------------------------------------
+
+/** Der Stand des Servers NACH dem Umzug von Artikel 10 auf Liste 2. */
+const NACH_DEM_UMZUG = () => [
+  { id: 1, name: 'Wocheneinkauf', item_total: 1, item_checked: 1 },
+  { id: 2, name: 'Bau & <Markt>', item_total: 5, item_checked: 0 },
+];
+const umzugsAntwort = (payload) => ({ data: { ...item(), ...payload }, list_change: { list_id: 1, before: 3, after: 4 } });
+
+test('Eine Live-Auffrischung landet zwischen Umzug und Antwort: der Umzug wird nicht zweimal gezaehlt', async () => {
+  zustand();
+  await speichere(felder({ 'item-details-list': '2' }), umzugsAntwort, {
+    listen: async () => NACH_DEM_UMZUG(),
+    // Der Server hat den Umzug geschrieben, die Antwort ist noch unterwegs -
+    // und die Abfrage des Feeds traegt die Zaehler von danach schon ein.
+    vorDerAntwort: async () => { shopping.state.lists = NACH_DEM_UMZUG(); },
+  });
+  const [alt, neu] = shopping.state.lists;
+  assert.deepEqual([alt.item_total, alt.item_checked], [1, 1]);
+  assert.deepEqual([neu.item_total, neu.item_checked], [5, 0]);
+});
+
+test('Eine Listenantwort von VOR dem Umzug, die nach dem Nachlesen eintrifft, ersetzt die Zaehler nicht', async () => {
+  zustand();
+  let spaet;
+  let aufrufe = 0;
+  const alteAntwort = new Promise((r) => { spaet = r; });
+  // Die erste Abfrage beginnt vor dem Umzug und bleibt haengen.
+  globalThis.__apiStub = { get: async () => { aufrufe++; await alteAntwort; return { data: LISTEN() }; } };
+  const unterwegs = shopping.loadLists();
+  await speichere(felder({ 'item-details-list': '2' }), umzugsAntwort, { listen: async () => NACH_DEM_UMZUG() });
+  assert.equal(aufrufe, 1);
+
+  spaet();
+  await unterwegs;
+
+  const [alt, neu] = shopping.state.lists;
+  assert.deepEqual([alt.item_total, neu.item_total], [1, 5], 'die aeltere Antwort hat die juengere nicht ersetzt');
+});
+
+test('Scheitert das Nachlesen, bleiben die Reiter mit der eigenen Buchung stehen', async () => {
+  zustand();
+  await speichere(felder({ 'item-details-list': '2' }), umzugsAntwort);
+  assert.equal(shopping.state.listsError, null, 'kein Fehlerbild fuer ein stilles Nachlesen');
+  assert.deepEqual(shopping.state.lists.map((l) => l.item_total), [1, 5]);
 });

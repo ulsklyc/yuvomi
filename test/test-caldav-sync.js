@@ -2551,7 +2551,8 @@ describe('CalDAV: das Aufräumen beim Abwählen ist eine Wahl (#732)', () => {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         external_source TEXT NOT NULL DEFAULT 'local', external_uid TEXT,
         external_account_id INTEGER, external_object_url TEXT,
-        outbound_dirty INTEGER NOT NULL DEFAULT 0, outbound_attempts INTEGER NOT NULL DEFAULT 0
+        outbound_dirty INTEGER NOT NULL DEFAULT 0, outbound_attempts INTEGER NOT NULL DEFAULT 0,
+        outbound_move INTEGER NOT NULL DEFAULT 0, outbound_move_attempts INTEGER NOT NULL DEFAULT 0
       );
 
       INSERT INTO caldav_accounts (name, caldav_url, username, password)

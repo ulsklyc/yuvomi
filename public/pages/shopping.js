@@ -547,6 +547,9 @@ const settledAt = new Map();
  */
 let _loadSeq = 0;
 const _appliedLoad = new Map();
+// Die Nummer der zuletzt ANGEWANDTEN Listenantwort: eine aeltere, die danach
+// eintrifft, ersetzt sie nicht (siehe `loadLists`).
+let _appliedListsLoad = 0;
 const _loadsInFlight = new Set();
 
 /** Einen Ladevorgang beginnen: Nummer ziehen und als offen vermerken. */
@@ -3334,6 +3337,31 @@ function itemMovedAway(container, moved, fromListId) {
 
   const target = state.lists.find((l) => l.id === moved.list_id);
   window.yuvomi.showToast(t('shopping.itemMovedToast', { name: moved.name, list: target?.name ?? '' }), 'info');
+
+  // DIE BUCHUNG OBEN IST EINE ANNAHME, DER SERVER DIE WAHRHEIT. Landet eine
+  // Live-Auffrischung zwischen dem Schreiben des Umzugs und seiner Antwort,
+  // traegt `state.lists` die Zaehler von NACH dem Umzug schon, und die beiden
+  // Abzuege oben zaehlen ihn ein zweites Mal - der Feed laedt danach nicht
+  // mehr nach, er hat die Aenderung ja gesehen. Die Listenantwort enthaelt
+  // keine Artikel, an ihr laesst sich also nicht ablesen, ob sie den Umzug
+  // schon traegt. Deshalb wird nachgelesen: diese Antwort beginnt nach dem
+  // Umzug und ersetzt jede fruehere (`loadLists`).
+  return refreshListCounters(container);
+}
+
+/**
+ * Die Zaehler der Reiter vom Server nachlesen, still: scheitert es, bleibt der
+ * letzte Stand stehen (dieselbe Regel wie `refreshFromFeed`).
+ */
+async function refreshListCounters(container) {
+  const previous = state.lists;
+  await loadLists();
+  if (state.listsError) {
+    state.listsError = null;
+    state.lists = previous;
+    return;
+  }
+  renderTabs(container);
 }
 
 function openMealPlanImport(container) {
@@ -3447,6 +3475,14 @@ async function loadLists() {
   const startedAt = beginLoad();
   try {
     const data   = await api.get('/shopping');
+    // EINE AELTERE ANTWORT ERSETZT KEINE JUENGERE. Zwei Listenantworten koennen
+    // sich ueberholen (eine Live-Auffrischung und das Nachladen nach einem
+    // Umzug, #1700): die frueher begonnene hat den Server frueher gelesen und
+    // truege die Zaehler von vor dem Umzug nach - und sie blieben, weil die
+    // Quittung den Feed schon vorgerueckt hat. Dieselbe Regel wie
+    // `_appliedLoad` bei den Artikeln.
+    if (startedAt < _appliedListsLoad) return;
+    _appliedListsLoad = startedAt;
     state.lists  = data.data ?? [];
     // Der Zaehler im Reiter zeigt, was die Zeilen zeigen: ein Artikel im
     // Undo-Fenster ist fuer den Server noch da, fuer die Anzeige nicht mehr
@@ -4447,6 +4483,7 @@ export const __test = {
   // sein onSave ab und loesen das Speichern nach einer Auffrischung aus.
   openItemDetails,
   itemMovedAway,
+  loadLists,
   // Die schwebenden Loeschungen: geprueft wird, dass eine Auffrischung im
   // Undo-Fenster sie nicht zurueckbringt und das Fenster sie wieder raeumt.
   pendingRemovals,
@@ -4492,7 +4529,7 @@ export const __test = {
   // global, und eine Wasserstandsmarke aus einem frueheren Fall verwirft die
   // Auffrischung des naechsten. Aufraeumen gehoert an den ANFANG jedes Falls.
   clearItems,
-  resetLoadOrderForTest: () => { _appliedLoad.clear(); settledAt.clear(); _loadsInFlight.clear(); _itemsListId = null; },
+  resetLoadOrderForTest: () => { _appliedLoad.clear(); settledAt.clear(); _loadsInFlight.clear(); _itemsListId = null; _appliedListsLoad = 0; },
   // Live-Aktualisierung: der Plan ist reine Logik (Serverstand vorher/nachher),
   // das Nachladen und die Verdrahtung laufen ueber den api-Stub.
   liveRefreshPlan,

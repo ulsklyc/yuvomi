@@ -10723,6 +10723,30 @@ const MIGRATIONS = [
       if (!has('tasks', 'sort_order')) db.exec('ALTER TABLE tasks ADD COLUMN sort_order INTEGER');
     },
   },
+  {
+    version: 243,
+    description: 'Shopping: a mirrored item waits to be carried to the list it was moved to',
+    // Ein gespiegelter Artikel, der auf eine andere gespiegelte Liste umzieht
+    // (#1700), nimmt sein Objekt auf dem CalDAV-Server mit. `outbound_move = 1`
+    // heisst: die Zeile steht schon auf der neuen Liste, ihr Objekt liegt noch
+    // in der Collection der alten (`external_object_url`) und soll in die
+    // Collection, die der Liste zugeordnet ist, in der die Zeile JETZT steht.
+    // Das Ziel steht deshalb nicht hier - es folgt aus `list_id`. Solange die
+    // Vormerkung steht, ordnet der Abruf die Zeile nicht nach dem Server um.
+    // `outbound_move_attempts` zaehlt die Absagen des Ziels; nach der fuenften
+    // faellt die Vormerkung, und die Zeile steht wieder auf der Liste ihres
+    // Objekts. Ein eigener Zaehler, weil `outbound_attempts` der Bearbeitung
+    // gehoert und mit ihr zurueckgesetzt wird.
+    up(db) {
+      const has = (column) => db.prepare('PRAGMA table_info(shopping_items)').all().some((c) => c.name === column);
+      if (!has('outbound_move')) {
+        db.exec('ALTER TABLE shopping_items ADD COLUMN outbound_move INTEGER NOT NULL DEFAULT 0');
+      }
+      if (!has('outbound_move_attempts')) {
+        db.exec('ALTER TABLE shopping_items ADD COLUMN outbound_move_attempts INTEGER NOT NULL DEFAULT 0');
+      }
+    },
+  },
 ];
 
 /**
@@ -10951,6 +10975,12 @@ const CRITICAL_COLUMNS = [
   // #1883: v240 traegt den ETag eines Loeschauftrags nach; ohne die Spalte
   // scheitert das Lesen der Auftraege und damit jeder ausgehende Durchgang.
   { table: 'calendar_pending_deletions', column: 'etag', type: 'TEXT' },
+  // #1700: v243 traegt die Vormerkung eines Umzugs zwischen gespiegelten
+  // Einkaufslisten nach; ohne die Spalten scheitert der Abruf jedes
+  // Einkaufsartikels (er liest sie, bevor er die Zeile anfasst) und jeder
+  // Sofortversuch.
+  { table: 'shopping_items', column: 'outbound_move', type: 'INTEGER NOT NULL DEFAULT 0' },
+  { table: 'shopping_items', column: 'outbound_move_attempts', type: 'INTEGER NOT NULL DEFAULT 0' },
 ];
 
 /**
