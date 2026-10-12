@@ -400,11 +400,26 @@ test('the default calendar cannot be deleted through the API', async () => {
   assert.ok(db.prepare('SELECT id FROM local_calendars WHERE id = ?').get(calendar.id));
 });
 
-test('legacy iCloud auto-upload preserves explicit local-calendar membership', async () => {
+test('legacy iCloud auto-upload includes the stored default calendar but excludes other local calendars', async () => {
   const { __test: apple } = await import('../server/services/apple-calendar.js');
+  const defaultCalendar = ensureDefaultCalendar(db);
   const local = await createCalendar('Stay local', '#3366AA');
+  const defaultEvent = await createEvent('Default still uploads to iCloud', defaultCalendar.id);
   const event = await createEvent('Local instead of iCloud', local.id);
-  assert.equal(apple.collectLocalOutboundEvents(db).some(row => row.id === event.id), false);
+  assert.equal(db.prepare('SELECT local_calendar_id FROM calendar_events WHERE id = ?').get(defaultEvent.id).local_calendar_id,
+    defaultCalendar.id, 'the route stores the explicitly selected default calendar');
+  const outboundIds = apple.collectLocalOutboundEvents(db).map(row => row.id);
+  assert.ok(outboundIds.includes(defaultEvent.id), 'default-calendar events keep uploading with multiple calendars');
+  assert.equal(outboundIds.includes(event.id), false, 'events in another local calendar stay local');
+
+  const older = await createEvent('Older implicit default');
+  assert.equal(db.prepare('SELECT local_calendar_id FROM calendar_events WHERE id = ?').get(older.id).local_calendar_id, null);
+  assert.ok(apple.collectLocalOutboundEvents(db).some(row => row.id === older.id));
+  const edited = await call('PUT', `/${older.id}`, { body: { local_calendar_id: defaultCalendar.id } });
+  assert.equal(edited.status, 200, JSON.stringify(edited.body));
+  assert.equal(db.prepare('SELECT local_calendar_id FROM calendar_events WHERE id = ?').get(older.id).local_calendar_id, defaultCalendar.id);
+  assert.ok(apple.collectLocalOutboundEvents(db).some(row => row.id === older.id),
+    'saving an older event with the default calendar does not stop its upload');
 });
 
 test('production HTTP calendar feed excludes private events and events from other calendars', { timeout: 20000 }, async () => {
