@@ -22,6 +22,59 @@ const {
 } = await rewardMoneyHousehold('reward-money-accounts');
 
 const planOf = (id) => db.prepare('SELECT * FROM reward_allowances WHERE user_id = ?').get(id);
+const allowanceDates = (id) => db.prepare('SELECT allowance_date FROM reward_ledger WHERE user_id = ? AND allowance_date IS NOT NULL ORDER BY allowance_date').all(id).map((r) => r.allowance_date);
+
+/*
+ * DIE UHR UND DIE HAUSHALTSZONE STEHEN, WO DIESE SUITE "HEUTE" LESEN LAESST.
+ *
+ * `removeUser()` nimmt keinen Tag entgegen: das Deaktivieren liest die Uhr
+ * (`deactivated_at`) und den Haushaltstag (`todayKey()`) selbst und bucht, was
+ * bis dahin faellig war. Die erste Fassung dieser Suite liess dabei die echte
+ * Uhr laufen und legte ihre Plaene auf feste Tage im Oktober 2026 - gruen, bis
+ * die Uhr den ersten Termin (Montag, 12.10.2026) erreichte, und von da an rot
+ * auf jedem Zweig, ohne dass sich eine Zeile geaendert haette.
+ *
+ * Der Aufruf ist SYNCHRON (der Treiber ist es), also steht die Uhr genau fuer
+ * ihn: kein `await` zwischen Stellen und Zuruecksetzen, der Server im selben
+ * Prozess sieht die gestellte Uhr nie. Die Zone steht ausdruecklich da, statt
+ * aus der Zone der Maschine zu fallen (lokal Europe/Berlin, in der CI UTC).
+ */
+const setHouseholdZone = (zone) => (zone
+  ? db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('household_timezone', ?)").run(zone)
+  : db.prepare("DELETE FROM sync_config WHERE key = 'household_timezone'").run());
+
+function inHouseholdZone(zone, fn) {
+  const before = db.prepare("SELECT value FROM sync_config WHERE key = 'household_timezone'").get()?.value ?? null;
+  setHouseholdZone(zone);
+  try {
+    const out = fn();
+    assert.ok(!(out instanceof Promise), 'die Zone steht nur fuer einen synchronen Aufruf');
+    return out;
+  } finally {
+    setHouseholdZone(before);
+  }
+}
+
+const RealDate = globalThis.Date;
+
+function atHouseholdClock(instant, zone, fn) {
+  const fixed = new RealDate(instant).getTime();
+  assert.ok(Number.isFinite(fixed), `${instant} ist kein Zeitpunkt`);
+  class FixedDate extends RealDate {
+    constructor(...args) {
+      if (args.length === 0) super(fixed);
+      else super(...args);
+    }
+
+    static now() { return fixed; }
+  }
+  globalThis.Date = FixedDate;
+  try {
+    return inHouseholdZone(zone, fn);
+  } finally {
+    globalThis.Date = RealDate;
+  }
+}
 
 // ==========================================================================
 // Die Waehrung eines Kontos (#1734, Entscheidung X)
@@ -35,7 +88,11 @@ const lastMoneyRow = (id) => moneyRows(id).at(-1);
 test('ein Konto behaelt seine Waehrung, wenn der Haushalt sie wechselt: 1,00 EUR bleiben 1,00 EUR', async () => {
   const kid = await member('eurokind');
   assert.equal((await admin('POST', '/rewards/money/entries', { user_id: kid.id, amount: '1.00', direction: 'credit' })).status, 201);
-  money.savePlan(db, kid.id, { amountMinor: 50, frequency: 'weekly', anchorDay: 2, paused: false }, { today: '2026-10-07' });
+  // Die Termine dieses Plans liegen in 2099: die Planaenderung weiter unten geht
+  // ueber die Route, und die liest die echte Uhr. Ein Termin, den die Uhr
+  // ueberholen kann, wird dort nachgebucht - mit festen Tagen im Oktober 2026
+  // war die Probe ab dem 20.10.2026 rot.
+  money.savePlan(db, kid.id, { amountMinor: 50, frequency: 'weekly', anchorDay: 2, paused: false }, { today: '2099-10-07' });
   assert.equal(planOf(kid.id).currency, 'EUR');
   try {
     for (const [household, unit] of [['JPY', 0], ['KWD', 3]]) {
@@ -70,8 +127,8 @@ test('ein Konto behaelt seine Waehrung, wenn der Haushalt sie wechselt: 1,00 EUR
       assert.deepEqual([booked.body.data.currency, booked.body.data.minor_unit, booked.body.data.balance_minor], ['EUR', 2, start - 25 + 10 + 5]);
 
       // Der Plan bucht weiter EUR.
-      db.prepare("UPDATE reward_allowances SET next_run_date = ? WHERE user_id = ?").run(household === 'JPY' ? '2026-10-13' : '2026-10-20', kid.id);
-      assert.equal(money.creditDueAllowances(db, { today: household === 'JPY' ? '2026-10-13' : '2026-10-20' }).credited, 1);
+      db.prepare("UPDATE reward_allowances SET next_run_date = ? WHERE user_id = ?").run(household === 'JPY' ? '2099-10-13' : '2099-10-20', kid.id);
+      assert.equal(money.creditDueAllowances(db, { today: household === 'JPY' ? '2099-10-13' : '2099-10-20' }).credited, 1);
       assert.deepEqual([lastMoneyRow(kid.id).delta, lastMoneyRow(kid.id).currency, lastMoneyRow(kid.id).allowance_date != null], [50, 'EUR', true]);
       const amountOnly = await admin('PUT', `/rewards/money/plans/${kid.id}`, { amount: '0.60', frequency: 'weekly', anchor_day: 2 });
       assert.deepEqual([amountOnly.body.data.plan.amount_minor, amountOnly.body.data.plan.currency], [60, 'EUR'], 'auch eine Planaenderung rechnet in EUR');
@@ -272,12 +329,15 @@ test('beim Deaktivieren enden offene Geld-Anfragen und der Plan; das Restguthabe
   const kid = await member('abschied');
   assert.equal((await credit(kid, 500)).status, 201);
   money.savePlan(db, kid.id, { amountMinor: 100, frequency: 'weekly', anchorDay: 1, paused: false }, { today: '2026-10-07' });
+  assert.equal(planOf(kid.id).next_run_date, '2026-10-12', 'der naechste Montag');
   const dep = await kid.call('POST', '/rewards/redemptions', { kind: 'deposit', amount: '3.00' });
   const wd = await kid.call('POST', '/rewards/redemptions', { kind: 'withdrawal', amount: '1.00' });
   // Eine offene PRAEMIEN-Anfrage bleibt, was sie ist: die Regel gilt dem Geld.
   db.prepare("INSERT INTO reward_redemptions (user_id, reward_name, cost, status) VALUES (?, 'Eis', 1, 'pending')").run(kid.id);
 
-  assert.equal(removeUser(db, kid.id).outcome, 'deactivated', 'ein Kind mit Restguthaben ist eine Spur: nur deaktivierbar');
+  // Deaktiviert am Mittwoch, 07.10.2026 - fuenf Tage vor dem ersten Termin.
+  // Faellig ist nichts; was faellig waere, misst die Probe weiter unten.
+  assert.equal(atHouseholdClock('2026-10-07T12:00:00Z', 'UTC', () => removeUser(db, kid.id)).outcome, 'deactivated', 'ein Kind mit Restguthaben ist eine Spur: nur deaktivierbar');
 
   const status = (id) => db.prepare('SELECT status, decision_reason, decided_by FROM reward_redemptions WHERE id = ?').get(id);
   for (const id of [dep.body.data.id, wd.body.data.id]) {
@@ -399,34 +459,126 @@ test('ein Plan in fremder Waehrung wird nicht gebucht, sondern pausiert - der Sa
   db.prepare('DELETE FROM reward_allowances WHERE user_id = ?').run(kid);
 });
 
+/*
+ * "Heute" ist in den drei Proben darunter ein fester Tag, und die Uhr steht auf
+ * ihm. Der Plan beginnt drei Wochen davor: gespeichert am Vortag seines ersten
+ * Termins, also ohne dass `savePlan()` selbst schon bucht.
+ *
+ * Die erste Fassung nahm den echten Tag und speicherte den Plan AN ihm, mit dem
+ * Montag als Wochentag. An sechs Tagen der Woche lag der erste Termin damit in
+ * der Zukunft; an einem Montag ist er heute, und `savePlan()` bucht ihn gleich
+ * mit - richtig so, nur stand danach eine Gutschrift da, von der die Probe
+ * nichts wusste. Rot jeden Montag, gruen von Dienstag bis Sonntag.
+ */
+const WEEK = [1, 2, 3, 4, 5, 6, 7].map((weekday) => ({ weekday, today: shiftDateKey('2026-10-12', weekday - 1) }));
+
+/** Ein Konto mit 1,00 und einem Wochenplan ueber 2,00, dessen erster Termin drei Wochen vor `today` liegt und der seither nie lief. */
+function overduePlan(id, today, weekday) {
+  assert.equal(parseDateKey(today).getUTCDay() || 7, weekday, `${today} ist der Wochentag ${weekday}`);
+  money.savePlan(db, id, { amountMinor: 200, frequency: 'weekly', anchorDay: weekday, paused: false }, { today: shiftDateKey(today, -22) });
+  assert.equal(planOf(id).next_run_date, shiftDateKey(today, -21));
+  assert.deepEqual(allowanceDates(id), [], 'gespeichert vor dem ersten Termin: noch nichts gebucht');
+}
+
 test('beim Deaktivieren wird erst gebucht, was faellig war, dann pausiert', async () => {
   const { removeUser } = await import('../server/services/user-removal.js');
-  const today = todayKey(db);
+  const today = '2026-10-12';
   const kid = await member('faellig');
   assert.equal((await credit(kid, 100)).status, 201);
-  money.savePlan(db, kid.id, { amountMinor: 200, frequency: 'weekly', anchorDay: 1, paused: false }, { today });
-  // Der Lauf hat drei Wochen nicht stattgefunden.
-  db.prepare('UPDATE reward_allowances SET next_run_date = ? WHERE user_id = ?').run(shiftDateKey(today, -21), kid.id);
+  overduePlan(kid.id, today, 1);
 
-  assert.equal(removeUser(db, kid.id).outcome, 'deactivated');
+  assert.equal(atHouseholdClock(`${today}T12:00:00Z`, 'UTC', () => removeUser(db, kid.id)).outcome, 'deactivated');
   const booked = db.prepare('SELECT allowance_date, delta FROM reward_ledger WHERE user_id = ? AND allowance_date IS NOT NULL ORDER BY allowance_date').all(kid.id).map((r) => [r.allowance_date, r.delta]);
-  assert.deepEqual(booked, [-21, -14, -7, 0].map((days) => [shiftDateKey(today, days), 200]), 'die vier faelligen Termine stehen im Guthaben, das ausgezahlt wird');
+  assert.deepEqual(booked, [['2026-09-21', 200], ['2026-09-28', 200], ['2026-10-05', 200], ['2026-10-12', 200]], 'die vier faelligen Termine stehen im Guthaben, das ausgezahlt wird');
   assert.equal(moneyOf(kid.id), 100 + 4 * 200);
   assert.ok(planOf(kid.id).paused_at);
+  assert.equal(planOf(kid.id).next_run_date, '2026-10-19', 'der Plan steht auf dem Termin, den er nicht mehr bucht');
   assert.equal((await admin('GET', '/rewards/money')).body.data.accounts.find((a) => a.id === kid.id).balance_minor, 900);
+  db.prepare('DELETE FROM reward_allowances WHERE user_id = ?').run(kid.id);
+});
 
-  // Ein Konto, das an deactivate() vorbei deaktiviert wurde und das der Lauf
-  // erst spaeter findet: gebucht wird bis zum Tag des Deaktivierens, nicht bis heute.
-  const late = freshKid();
-  sqlMoney(late, 100);
-  money.savePlan(db, late, { amountMinor: 200, frequency: 'weekly', anchorDay: 1, paused: false }, { today });
-  db.prepare('UPDATE reward_allowances SET next_run_date = ? WHERE user_id = ?').run(shiftDateKey(today, -21), late);
-  db.prepare('UPDATE users SET deactivated_at = ? WHERE id = ?').run(`${shiftDateKey(today, -10)}T12:00:00Z`, late);
-  money.creditDueAllowances(db, { today });
-  const lateBooked = db.prepare('SELECT allowance_date FROM reward_ledger WHERE user_id = ? AND allowance_date IS NOT NULL ORDER BY allowance_date').all(late).map((r) => r.allowance_date);
-  assert.deepEqual(lateBooked, [shiftDateKey(today, -21), shiftDateKey(today, -14)], 'die Woche nach dem Deaktivieren steht dem Konto nicht mehr zu');
-  assert.ok(planOf(late).paused_at);
-  for (const id of [kid.id, late]) db.prepare('DELETE FROM reward_allowances WHERE user_id = ?').run(id);
+test('was beim Deaktivieren faellig ist, haengt nicht am Wochentag: sieben Tage, je der Termin selbst, der Tag davor und der danach', async () => {
+  const { removeUser } = await import('../server/services/user-removal.js');
+  for (const { weekday, today } of WEEK) {
+    // Deaktiviert am Tag des Termins, am Tag davor und am Tag danach.
+    for (const [shift, expected] of [[-1, [-21, -14, -7]], [0, [-21, -14, -7, 0]], [1, [-21, -14, -7, 0]]]) {
+      const kid = freshKid();
+      sqlMoney(kid, 100);
+      overduePlan(kid, today, weekday);
+      const day = shiftDateKey(today, shift);
+      assert.equal(atHouseholdClock(`${day}T12:00:00Z`, 'UTC', () => removeUser(db, kid)).outcome, 'deactivated');
+      assert.deepEqual(allowanceDates(kid), expected.map((days) => shiftDateKey(today, days)), `Wochentag ${weekday}, deaktiviert am ${day}`);
+      assert.equal(moneyOf(kid), 100 + expected.length * 200);
+      assert.ok(planOf(kid).paused_at);
+      db.prepare('DELETE FROM reward_allowances WHERE user_id = ?').run(kid);
+    }
+
+    // Ein Konto, das an deactivate() vorbei deaktiviert wurde und das der Lauf
+    // erst spaeter findet: gebucht wird bis zum Tag des Deaktivierens, nicht bis heute.
+    const late = freshKid();
+    sqlMoney(late, 100);
+    overduePlan(late, today, weekday);
+    db.prepare('UPDATE users SET deactivated_at = ? WHERE id = ?').run(`${shiftDateKey(today, -10)}T12:00:00Z`, late);
+    inHouseholdZone('UTC', () => money.creditDueAllowances(db, { today }));
+    assert.deepEqual(allowanceDates(late), [shiftDateKey(today, -21), shiftDateKey(today, -14)], `Wochentag ${weekday}: die Woche nach dem Deaktivieren steht dem Konto nicht mehr zu`);
+    assert.ok(planOf(late).paused_at);
+    db.prepare('DELETE FROM reward_allowances WHERE user_id = ?').run(late);
+
+    // Der Fall, an dem die erste Fassung montags scheiterte, als Regel: ein Plan,
+    // der AN seinem Termin angelegt wird, bucht ihn sofort - und das Deaktivieren
+    // am selben Tag bucht ihn kein zweites Mal.
+    const sameDay = freshKid();
+    sqlMoney(sameDay, 100);
+    money.savePlan(db, sameDay, { amountMinor: 200, frequency: 'weekly', anchorDay: weekday, paused: false }, { today });
+    assert.deepEqual(allowanceDates(sameDay), [today], `Wochentag ${weekday}: der erste Termin ist heute`);
+    assert.equal(atHouseholdClock(`${today}T12:00:00Z`, 'UTC', () => removeUser(db, sameDay)).outcome, 'deactivated');
+    assert.deepEqual(allowanceDates(sameDay), [today]);
+    assert.equal(moneyOf(sameDay), 300);
+    db.prepare('DELETE FROM reward_allowances WHERE user_id = ?').run(sameDay);
+  }
+});
+
+test('der Tag des Deaktivierens ist der HAUSHALTSTAG: um Mitternacht entscheidet die Zone, nicht der UTC-Tag', async () => {
+  const { removeUser } = await import('../server/services/user-removal.js');
+  // Ein Wochenplan, Termin Montag, 12.10.2026. Derselbe Zeitpunkt ist je nach
+  // Zone noch Sonntag oder schon Montag - und nur am Montag steht der Termin zu.
+  const cases = [
+    // Zeitpunkt,              Zone,                   Haushaltstag,  gebucht
+    ['2026-10-11T23:30:00Z', 'UTC',                  '2026-10-11', []],
+    ['2026-10-12T00:30:00Z', 'UTC',                  '2026-10-12', ['2026-10-12']],
+    // UTC ist schon Montag, der Haushalt noch nicht: der UTC-Tag buchte hier zu frueh.
+    ['2026-10-12T00:30:00Z', 'America/Los_Angeles',  '2026-10-11', []],
+    ['2026-10-12T06:59:00Z', 'America/Los_Angeles',  '2026-10-11', []],
+    ['2026-10-12T07:00:00Z', 'America/Los_Angeles',  '2026-10-12', ['2026-10-12']],
+    // UTC ist noch Sonntag, der Haushalt schon Montag: der UTC-Tag liesse den Termin fallen.
+    ['2026-10-11T10:00:00Z', 'Pacific/Kiritimati',   '2026-10-12', ['2026-10-12']],
+    ['2026-10-11T09:59:00Z', 'Pacific/Kiritimati',   '2026-10-11', []],
+    ['2026-10-11T22:30:00Z', 'Europe/Berlin',        '2026-10-12', ['2026-10-12']],
+    ['2026-10-11T21:59:00Z', 'Europe/Berlin',        '2026-10-11', []],
+    // Eine Woche spaeter, wieder beiderseits der Grenze.
+    ['2026-10-19T06:59:00Z', 'America/Los_Angeles',  '2026-10-18', ['2026-10-12']],
+    ['2026-10-19T07:00:00Z', 'America/Los_Angeles',  '2026-10-19', ['2026-10-12', '2026-10-19']],
+  ];
+  const outcomes = new Set();
+  for (const [instant, zone, householdDay, expected] of cases) {
+    const kid = freshKid();
+    sqlMoney(kid, 100);
+    money.savePlan(db, kid, { amountMinor: 200, frequency: 'weekly', anchorDay: 1, paused: false }, { today: '2026-10-07' });
+    assert.equal(planOf(kid).next_run_date, '2026-10-12');
+    const seen = atHouseholdClock(instant, zone, () => {
+      const day = todayKey(db);
+      return { day, utcDay: new Date().toISOString().slice(0, 10), outcome: removeUser(db, kid).outcome };
+    });
+    assert.deepEqual([seen.day, seen.outcome], [householdDay, 'deactivated'], `${instant} in ${zone}`);
+    assert.deepEqual(allowanceDates(kid), expected, `${instant} in ${zone}: gebucht bis zum ${householdDay}`);
+    assert.equal(moneyOf(kid), 100 + expected.length * 200);
+    assert.ok(planOf(kid).paused_at);
+    if (seen.day !== seen.utcDay) outcomes.add(seen.day < seen.utcDay ? 'hinter UTC' : 'vor UTC');
+    db.prepare('DELETE FROM reward_allowances WHERE user_id = ?').run(kid);
+  }
+  assert.deepEqual([...outcomes].sort(), ['hinter UTC', 'vor UTC'], 'die Tabelle trifft beide Seiten: Haushaltstag vor und hinter dem UTC-Tag');
+  assert.equal(globalThis.Date, RealDate, 'die Uhr laeuft wieder');
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM sync_config WHERE key = 'household_timezone'").get().n, 0, 'und die Zone ist wieder die der Maschine');
 });
 
 test('der eigene Geld-Zaehler der Uebersicht stimmt auch ohne Punkte-Teilnahme - und bleibt fuer alle anderen null', async () => {
