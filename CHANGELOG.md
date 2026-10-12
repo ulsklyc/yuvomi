@@ -120,8 +120,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   just deleted. The shopping page now says it in the language of the app and adds what to do: the
   list, item, shop or category no longer exists (reload the page), or a shop of that name already
   exists (choose a different name). The same goes for the dialogs that manage shops and shopping
-  categories. Anything else shows the general sentence instead of a server text. The other pages
-  follow module by module. For API clients: the affected answers of `/api/v1/shopping` carry a
+  categories. Anything else on the shopping page shows the general sentence instead of a server
+  text. The other pages are unchanged for now and follow module by module. For API clients: the
+  affected answers of `/api/v1/shopping` carry a
   `reason` next to `error` (`shopping_list_not_found`, `shopping_item_not_found`,
   `shopping_store_not_found`, `shopping_store_exists`, `shopping_category_not_found`,
   `category_exists`, `category_last`); status codes are unchanged, and three German `error`

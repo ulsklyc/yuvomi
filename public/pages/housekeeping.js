@@ -2450,10 +2450,10 @@ function openStaffModal(worker, content, options = {}) {
 // NAT teilt sich diese IP, und `api.js` traegt sogar `Retry-After` am
 // `ApiError` - ein Retry kann hier durchaus gelingen. Neben 429 duerfen es
 // also ein Serverfehler und ein Netzwerkproblem (kein Status) erneut
-// versuchen. `friendlyError()` kennt nur 403/404/5xx explizit; bis #1909 fiel
-// es sonst auf den rohen, unlokalisierten Servertext zurueck (`err.data.error`)
-// - fuer jeden anderen 4xx (auch 429) steht deshalb hier ausdruecklich die
-// generische, lokalisierte Meldung, heute dieselbe wie dort. Es gilt keine
+// versuchen. `friendlyError()` kennt nur 403/404/5xx explizit und faellt
+// sonst auf den rohen, unlokalisierten Servertext zurueck (`err.data.error`,
+// Uebergang bis #1909 durch ist) - fuer jeden anderen 4xx (auch 429) wird
+// deshalb bewusst die generische, lokalisierte Meldung erzwungen. Es gilt keine
 // visit-eigene Zugriffssperre - `GET /visits/:id` prueft nur die ID, der
 // einzige 403 kommt vom Modul-Gate, und der Router leitet vor dieser Stelle
 // schon weg (siehe render()) - 403 wird trotzdem defensiv behandelt, etwa fuer

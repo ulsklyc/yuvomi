@@ -77,16 +77,6 @@ function knownKey(err) {
 }
 
 /**
- * Kommt dieser Fehler als Antwort des Servers? Dann ist sein Text der Satz des
- * Servers (englisch oder deutsch, in keiner Sprache des Nutzers) und gehoert
- * nie in die Oberflaeche.
- */
-function isServerAnswer(err) {
-  const status = err?.status ?? err?.response?.status;
-  return typeof status === 'number' || typeof err?.data?.error === 'string';
-}
-
-/**
  * DER EINE WEG FUER DIE SEITEN (#1909): aus einem gefangenen Fehler der Satz,
  * den ein Toast zeigt. Bekannter Fall -> sein Satz, alles andere -> der
  * allgemeine Satz der Stelle. Der Text des Servers (`err.data.error`,
@@ -101,21 +91,27 @@ export function errorSentence(err, fallbackKey = 'common.errorGeneric') {
 }
 
 /**
+ * UEBERGANG (#1909): der Satz fuer Aufrufer, die noch nicht umgestellt sind.
+ * Jeder wandert mit der Scheibe seines Moduls zu `errorSentence`; bis dahin
+ * sagt er hier nicht weniger als vor #1909. Bekannter Fall -> sein Satz, sonst
+ * der Text des Servers (`err.data.error`), sonst der allgemeine Satz. Wer noch
+ * hier fragt, steht als Zahl in test:frontend-audit (FRIENDLY_ERROR_CALLERS).
+ *
  * @param {unknown} err - ApiError (status, data), ein Netzfehler oder irgendein Wurf
- * @returns {string} uebersetzter Satz; nur bei einem Wurf der App selbst (kein
- *   Status, kein Rumpf) dessen eigener Text
+ * @returns {string} uebersetzter Satz, oder an einem Status ohne eigenen Satz
+ *   (400, 409, 422, 429 ohne bekannten Grund) der Text des Servers
  */
 export function friendlyError(err) {
   // Offline-Mutation (ApiError status 0): spezifische Meldung - auch wenn
   // navigator.onLine faelschlich true meldet (Netz weg, aber kein offline-Event).
   if (err?.status === 0) return t('common.errorOfflineMutation');
   if (!navigator.onLine) return t('common.errorOffline');
-  // Nachgeschlagen wird am Grund, nicht am Text des Fehlers - ein unbekannter
-  // oder gar kein Grund ergibt einen allgemeinen Satz, nie den des Servers.
-  // Bis #1640 stand fuer die 403 ein zweiter Satz hier ("Zugriff verweigert.
-  // Bitte erneut anmelden."), und der riet zur Anmeldung, wo die Sitzung in
-  // Ordnung war: eine abgelaufene Sitzung ist ein 401 und laeuft ueber
-  // auth:expired, nie hier durch.
+  // Nachgeschlagen wird am Grund, nicht am Text des Fehlers - an einer Absage
+  // (403) ergibt ein unbekannter oder gar kein Grund den allgemeinen Satz, nie
+  // den des Servers. Bis #1640 stand fuer die 403 ein zweiter Satz hier
+  // ("Zugriff verweigert. Bitte erneut anmelden."), und der riet zur Anmeldung,
+  // wo die Sitzung in Ordnung war: eine abgelaufene Sitzung ist ein 401 und
+  // laeuft ueber auth:expired, nie hier durch.
   const known = knownKey(err);
   if (known) return t(known);
   const status = err?.status ?? err?.response?.status;
@@ -125,7 +121,8 @@ export function friendlyError(err) {
   if (/Failed to fetch|NetworkError|Load failed/i.test(err?.message || '')) return t('common.errorServer');
   if (err?.name === 'TypeError') return t('common.unexpectedError');
   // Jede andere Antwort des Servers (400, 409, 422, 429 ohne bekannten Grund):
-  // der allgemeine Satz. Bis #1909 lief hier `err.data.error` durch.
-  if (isServerAnswer(err)) return t('common.errorGeneric');
-  return err?.message || t('common.errorGeneric');
+  // ihr eigener Text. Er nennt die Ursache (welches Feld, welcher Konflikt),
+  // und der allgemeine Satz an seiner Stelle sagte weniger - das gilt, bis der
+  // Aufrufer umgestellt ist und der Server den Fall mit einem `reason` benennt.
+  return err?.data?.error || err?.message || t('common.errorGeneric');
 }
