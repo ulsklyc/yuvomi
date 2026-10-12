@@ -55,6 +55,11 @@ export function mirroredFieldsChanged(before, after) {
   return MIRRORED_FIELDS.some((f) => before?.[f] !== after[f]);
 }
 
+/** Der HTTP-Status eines Provider-Fehlers, gleich aus welchem Client er kommt. */
+export function outboundErrorStatus(err) {
+  return err?.code ?? err?.response?.status ?? err?.status;
+}
+
 /**
  * Einordnung eines Provider-Fehlers.
  *   settled   - Ziel bereits erreicht bzw. gegenstandslos (Objekt existiert nicht mehr)
@@ -66,7 +71,7 @@ export function mirroredFieldsChanged(before, after) {
  * nächste Lauf liest den frischen etag und versucht es erneut.
  */
 export function classifyOutboundError(err) {
-  const status = err?.code ?? err?.response?.status ?? err?.status;
+  const status = outboundErrorStatus(err);
   if (status === 404 || status === 410) return 'settled';
   if (status === 400) return 'permanent';
   return 'retry';
@@ -128,11 +133,25 @@ function accountCountFilter(source, accountId) {
  *
  * Ein CalDAV-Tombstone trägt das Konto, über das er gesendet wird (#1860).
  * Ohne Konto entsteht keiner: es gäbe keinen Server, an den er gehen dürfte.
+ *
+ * `etag` (#1883) macht den Auftrag BEDINGT: er gilt dem Objekt an `objectUrl`
+ * in genau diesem Stand und fällt, sobald dort etwas anderes liegt. Ohne ETag
+ * gilt er dem Termin, gleich in welchem Stand - so merkt die Löschroute vor,
+ * denn wer in Yuvomi löscht, will den Termin fort haben. Ein ETag ohne Adresse
+ * bedingt nichts und wird nicht gespeichert.
+ *
+ * Trifft ein Auftrag ohne ETag auf einen bedingten, gilt danach der
+ * unbedingte: die Bedingung fällt. Löscht der Nutzer den Termin, fällt sie
+ * auch an den Aufträgen derselben UID in anderen Kalendern
+ * (`queueEventDeletion`). Umgekehrt bekommt ein bestehender Auftrag
+ * nachträglich keine - Adresse und ETag benennen zusammen EIN Objekt, und die
+ * Adresse des bestehenden bleibt.
  * @returns {boolean} true, wenn eine Löschung vorgemerkt ist
  */
-export function queueDeletion({ source, calendarExternalId, eventExternalId, objectUrl = null, accountId = null }, database = null) {
+export function queueDeletion({ source, calendarExternalId, eventExternalId, objectUrl = null, accountId = null, etag = null }, database = null) {
   if (!source || !eventExternalId) return false;
   if (!calendarExternalId && !objectUrl) return false;
+  const state = objectUrl && etag ? String(etag) : null;
 
   if (source === 'caldav') {
     if (accountId == null) {
@@ -147,21 +166,25 @@ export function queueDeletion({ source, calendarExternalId, eventExternalId, obj
     // Objekt über seinen Abruf (`processPendingDeletions`).
     (database || db.get()).prepare(`
       INSERT INTO calendar_pending_deletions
-        (source, calendar_external_id, event_external_id, object_url, caldav_account_id)
-      VALUES (?, ?, ?, ?, ?)
+        (source, calendar_external_id, event_external_id, object_url, caldav_account_id, etag)
+      VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(source, calendar_external_id, event_external_id)
         DO UPDATE SET object_url = COALESCE(object_url, excluded.object_url),
-                      caldav_account_id = COALESCE(caldav_account_id, excluded.caldav_account_id)
-    `).run(source, calendarExternalId || '', eventExternalId, objectUrl, accountId);
+                      caldav_account_id = COALESCE(caldav_account_id, excluded.caldav_account_id),
+                      etag = CASE WHEN excluded.etag IS NULL THEN NULL ELSE etag END
+    `).run(source, calendarExternalId || '', eventExternalId, objectUrl, accountId, state);
     return true;
   }
 
+  // Hier gewinnt die neue Adresse, also auch ihr Stand; ohne neue Adresse ist
+  // der neue Auftrag unbedingt, und die Bedingung fällt.
   (database || db.get()).prepare(`
-    INSERT INTO calendar_pending_deletions (source, calendar_external_id, event_external_id, object_url)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO calendar_pending_deletions (source, calendar_external_id, event_external_id, object_url, etag)
+    VALUES (?, ?, ?, ?, ?)
     ON CONFLICT(source, calendar_external_id, event_external_id)
-      DO UPDATE SET object_url = COALESCE(excluded.object_url, object_url)
-  `).run(source, calendarExternalId || '', eventExternalId, objectUrl);
+      DO UPDATE SET object_url = COALESCE(excluded.object_url, object_url),
+                    etag = excluded.etag
+  `).run(source, calendarExternalId || '', eventExternalId, objectUrl, state);
   return true;
 }
 
@@ -170,7 +193,7 @@ export function pendingDeletions(source, { accountId = null } = {}) {
   const filter = accountFilter(source, accountId, 'pendingDeletions');
   if (!filter) return [];
   return db.get().prepare(`
-    SELECT id, calendar_external_id, event_external_id, object_url, attempts
+    SELECT id, calendar_external_id, event_external_id, object_url, attempts, etag
     FROM calendar_pending_deletions
     WHERE source = ?${filter.sql}
     ORDER BY id
@@ -230,7 +253,16 @@ export function pendingDeletionUids(source, { accountId = null } = {}) {
  * eine der beiden Adressen unbekannt, bleibt das Objekt verdeckt - lieber eine
  * Runde zu lang verborgen als ein gelöschter Termin, der zurückkommt.
  *
- * @returns {(uid: string, calendarUrl: string, objectUrl?: string|null) => boolean}
+ * Ein BEDINGTER Auftrag (`isConditionalDeletion`, #1883) verdeckt enger: nur
+ * das Objekt an seiner Adresse, und nur in dem Stand, für den er vorgemerkt
+ * wurde. Liegt der Termin dort inzwischen anders oder im selben Kalender unter
+ * einer anderen Adresse, ist das nicht mehr der Rest eines Umzugs, sondern der
+ * Termin selbst (auf einem anderen Gerät zurückgelegt): der Abruf übernimmt
+ * ihn, und `processPendingDeletions` verwirft den Auftrag im selben Lauf.
+ * Liefert der Server zu dem Objekt keinen ETag, bleibt es verdeckt; dann
+ * entscheidet die Vorbedingung am DELETE.
+ *
+ * @returns {(uid: string, calendarUrl: string, objectUrl?: string|null, etag?: string|null) => boolean}
  */
 export function pendingDeletionGuard(source, { accountId = null } = {}) {
   const filter = accountFilter(source, accountId, 'pendingDeletionGuard');
@@ -238,7 +270,7 @@ export function pendingDeletionGuard(source, { accountId = null } = {}) {
   let rows;
   try {
     rows = db.get().prepare(`
-      SELECT event_external_id, calendar_external_id, object_url
+      SELECT event_external_id, calendar_external_id, object_url, etag
       FROM calendar_pending_deletions WHERE source = ?${filter.sql}
     `).all(source, ...filter.args);
   } catch (err) {
@@ -250,11 +282,23 @@ export function pendingDeletionGuard(source, { accountId = null } = {}) {
     if (!byUid.has(row.event_external_id)) byUid.set(row.event_external_id, []);
     byUid.get(row.event_external_id).push(row);
   }
-  return (uid, calendarUrl, objectUrl = null) => (byUid.get(uid) || []).some((row) => {
-    if (row.calendar_external_id) return row.calendar_external_id === calendarUrl;
+  return (uid, calendarUrl, objectUrl = null, etag = null) => (byUid.get(uid) || []).some((row) => {
+    if (row.calendar_external_id && row.calendar_external_id !== calendarUrl) return false;
+    if (isConditionalDeletion(row) && objectUrl) {
+      return row.object_url === objectUrl && (!etag || row.etag === etag);
+    }
+    if (row.calendar_external_id) return true;
     if (!row.object_url || !objectUrl) return true;
     return row.object_url === objectUrl;
   });
+}
+
+/**
+ * Gilt dieser Auftrag nur einem Objekt in einem bestimmten Stand (#1883)?
+ * Dazu braucht er beides, Adresse und ETag.
+ */
+export function isConditionalDeletion(row) {
+  return !!(row?.etag && row?.object_url);
 }
 
 /**
@@ -272,6 +316,9 @@ export function pendingDeletionGuard(source, { accountId = null } = {}) {
  * Fehlertext noch Adresse. Der Schlüssel der Tabelle kennt das Konto nicht,
  * einen zweiten Auftrag kann dieses Konto also nicht anlegen - dann `false`,
  * und der Aufrufer lässt seine eigene Arbeit offen.
+ *
+ * `target.etag` (#1883): der Stand des Objekts, an das das abgelehnte DELETE
+ * ging. Mit ihm wartet der Auftrag nur auf dieses Objekt in diesem Stand.
  *
  * @returns {boolean} true, wenn die Absage an einem Auftrag dieses Kontos gezählt ist
  */
@@ -680,13 +727,28 @@ export function queueEventDeletion(event, database = null) {
     return false;
   }
 
-  return queueDeletion({
+  const accountId = event.external_source === 'caldav' ? event.caldav_account_id : null;
+  const queued = queueDeletion({
     source:             event.external_source,
     calendarExternalId: calId,
     eventExternalId:    event.external_calendar_id,
     objectUrl:          event.external_object_url || null,
-    accountId:          event.external_source === 'caldav' ? event.caldav_account_id : null,
+    accountId,
   }, database);
+  // Wartet für diesen Termin noch der Rest eines Umzugs in einem ANDEREN
+  // Kalender (#1883), gilt für ihn ab jetzt dasselbe wie für die Zeile: der
+  // Nutzer will den Termin fort haben, gleich in welchem Stand. Bliebe der
+  // Auftrag bedingt, fiele er bei einem geänderten Rest, und der gelöschte
+  // Termin käme von dort zurück. Der Schlüssel der Tabelle nennt den
+  // Kalender, das ON CONFLICT oben erreicht diesen Auftrag also nicht.
+  if (queued) {
+    (database || db.get()).prepare(`
+      UPDATE calendar_pending_deletions SET etag = NULL
+      WHERE source = ? AND event_external_id = ? AND etag IS NOT NULL
+        AND caldav_account_id IS ?
+    `).run(event.external_source, event.external_calendar_id, accountId);
+  }
+  return queued;
 }
 
 /**
