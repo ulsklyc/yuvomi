@@ -28,7 +28,7 @@ import { makeSortable } from '/utils/sortable.js';
 import { amountPlaceholder, formatMoney, currencyFractionDigits, centsToAmountInput, amountInputToCents, toDecimalString, breaksOffAtSeparator } from '/utils/money.js';
 import { startLiveFeed } from '/utils/live-feed.js';
 import { createPageController } from '/utils/page-lifecycle.js';
-import { errorSentence } from '/utils/friendly-error.js';
+import { errorSentence, isGone } from '/utils/friendly-error.js';
 
 
 // --------------------------------------------------------
@@ -783,7 +783,7 @@ async function toggleShoppingItem(id, checked, container, { settleNow = false, e
       }
       renderTabs(container);
     }
-    window.yuvomi.showToast(errorSentence(err), 'danger');
+    reportError(err, container);
   }
   return undefined;
 }
@@ -881,7 +881,7 @@ function deleteItemUndoable(id, container) {
         updateListCounter(listId, 1, checkedOf(snapshot) ? 1 : 0);
         renderTabs(container);
       }
-      if (err) window.yuvomi.showToast(errorSentence(err), 'danger');
+      if (err) reportError(err, container);
     },
   });
 }
@@ -1108,10 +1108,8 @@ async function openSendListDialog(container) {
             smtp_unconfigured: 'shopping.sendListSmtpMissing',
             nothing_open: 'shopping.sendListEmpty',
           }[err.data?.reason];
-          window.yuvomi.showToast(
-            byReason ? t(byReason) : errorSentence(err, 'shopping.sendListError'),
-            'danger',
-          );
+          if (byReason) window.yuvomi.showToast(t(byReason), 'danger');
+          else reportError(err, container, 'shopping.sendListError');
           btn.disabled = false;
         }
       });
@@ -1191,7 +1189,7 @@ async function openDuplicateListDialog(container) {
           await switchList(data.data.id, container);
           refocusAfterRender();
         } catch (err) {
-          window.yuvomi.showToast(errorSentence(err, 'shopping.duplicateError'), 'danger');
+          reportError(err, container, 'shopping.duplicateError');
           btn.disabled = false;
         }
       });
@@ -1984,7 +1982,7 @@ function wireQuickAdd(container) {
       nameInput.classList.add('quick-add__input--flash');
       nameInput.addEventListener('animationend', () => nameInput.classList.remove('quick-add__input--flash'), { once: true });
     } catch (err) {
-      window.yuvomi.showToast(errorSentence(err), 'danger');
+      reportError(err, container);
     } finally {
       submitting = false;
     }
@@ -2113,7 +2111,7 @@ async function sendItemOrder(groupEl, container, listId) {
     // Fehler einer Liste, die gar nicht mehr offen ist, nicht dem Nutzer
     // vorlegen und erst recht nicht die sichtbare Liste dafür neu bauen.
     if (listId !== state.activeListId) return false;
-    window.yuvomi.showToast(errorSentence(err), 'danger');
+    reportError(err, container);
     updateItemsList(container);
     return false;
   }
@@ -2757,7 +2755,10 @@ function openItemDetails(itemId, container) {
           <button type="submit" class="btn btn--primary">${t('common.save')}</button>
         </div>
       </form>`,
+    // Der Dialog meldet sich ab, wenn er zugeht (siehe `reloadAfterGone`).
+    onClose: () => { if (_itemDialog?.id === item.id) _itemDialog = null; },
     onSave: (panel) => {
+      _itemDialog = { id: item.id, panel };
       const form    = panel.querySelector('#item-details-form');
       const nameEl  = panel.querySelector('#item-details-name');
       const qtyEl   = panel.querySelector('#item-details-qty');
@@ -2876,7 +2877,7 @@ function openItemDetails(itemId, container) {
             refreshItemName(container, aktuell);
           }
         } catch (err) {
-          window.yuvomi.showToast(errorSentence(err), 'danger');
+          reportError(err, container);
         }
       });
     },
@@ -3003,7 +3004,7 @@ async function openPantryTransfer(container) {
     const res = await api.get('/pantry/locations');
     locations = res.data ?? [];
   } catch (err) {
-    window.yuvomi.showToast(errorSentence(err), 'danger');
+    reportError(err, container);
     return;
   }
 
@@ -3112,7 +3113,7 @@ async function openPantryTransfer(container) {
           refreshKitchenBadges();
         } catch (err) {
           btn.disabled = false;
-          window.yuvomi.showToast(errorSentence(err), 'danger');
+          reportError(err, container);
         }
       });
     },
@@ -3294,7 +3295,7 @@ function clearCheckedUndoable(container) {
       }
       updateListCounter(listId, count, count);
       renderTabs(container);
-      if (err) window.yuvomi.showToast(errorSentence(err), 'danger');
+      if (err) reportError(err, container);
     },
   });
 }
@@ -3459,7 +3460,7 @@ function openMealPlanImport(container) {
           const count = Number(data.data.transferred) || 0;
           window.yuvomi.showToast(t('meals.transferSuccess', { count }), 'success');
         } catch (err) {
-          window.yuvomi.showToast(errorSentence(err), 'danger');
+          reportError(err, container);
         }
       });
     },
@@ -3512,12 +3513,14 @@ async function loadLists() {
   }
 }
 
-async function loadCategories() {
+async function loadCategories({ keepOnError = false } = {}) {
   try {
     const data       = await api.get('/shopping/categories');
     state.categories = data.data ?? [];
   } catch {
-    state.categories = [];
+    // `keepOnError`: ein stilles Nachladen behaelt den letzten Stand, statt
+    // aus einem Netzfehler "es gibt keine" zu machen (`reloadAfterGone`).
+    if (!keepOnError) state.categories = [];
   }
 }
 
@@ -3527,12 +3530,12 @@ async function loadCategories() {
  * (der Preis laesst sich trotzdem eintragen), ohne Waehrung gilt EUR. Ein
  * Einkaufszettel, der wegen eines Nebenfeldes gar nicht aufgeht, waere der
  * schlechtere Tausch. */
-async function loadStores() {
+async function loadStores({ keepOnError = false } = {}) {
   try {
     const data   = await api.get('/shopping/stores');
     state.stores = data.data ?? [];
   } catch {
-    state.stores = [];
+    if (!keepOnError) state.stores = [];
   }
   try {
     const prefs    = await api.get('/preferences');
@@ -3731,7 +3734,9 @@ function liveRefreshPlan(previous, fresh) {
  */
 async function refreshFromFeed(container, listId, signal) {
   if (state.listsError) return;
-  const active        = listId === state.activeListId;
+  // Ohne aktive Liste (Leerzustand) gibt es keine Artikel nachzuladen - das
+  // Nachladen nach "gibt es nicht mehr" kommt auch von dort.
+  const active        = listId != null && listId === state.activeListId;
   const previous      = state.items;
   const previousLists = state.lists;
   // BEIDE Antworten abwarten, nicht nur bis zur ersten Ablehnung. `loadLists`
@@ -3859,6 +3864,148 @@ function wireLiveUpdates(container, routeSignal) {
 }
 
 // --------------------------------------------------------
+// Fehler melden - und nachladen, wenn das Ziel verschwunden ist (#1909)
+// --------------------------------------------------------
+
+/**
+ * DER EINE WEG, AUF DEM DIESE SEITE EINEN FEHLER MELDET.
+ *
+ * Der Toast sagt den Satz der App (`errorSentence`). Nennt der Server als
+ * Grund, dass es das Ziel der Handlung nicht mehr gibt (`isGone`: Liste,
+ * Artikel, Laden, Kategorie), war der Stand der Seite veraltet - jemand anderes
+ * im Haushalt hat es geloescht. Dann holt die Seite den frischen Stand selbst
+ * (`reloadAfterGone`); der Satz raet nicht mehr zum Neuladen, weil es nichts
+ * mehr zu tun gibt. Der Toast bleibt: er sagt, WARUM etwas verschwunden ist.
+ *
+ * Erkannt wird am `reason`, nie am Text und nie am blanken Status 404.
+ *
+ * @param {unknown} err
+ * @param {Element} container
+ * @param {string} [fallbackKey] - der allgemeine Satz dieser Stelle
+ */
+function reportError(err, container, fallbackKey) {
+  window.yuvomi.showToast(errorSentence(err, fallbackKey), 'danger');
+  if (isGone(err)) reloadAfterGone(container);
+}
+
+/** Laeuft gerade ein Nachladen, und wurde waehrenddessen ein weiteres erbeten? */
+let _goneReloadRunning = null;
+let _goneReloadWanted = false;
+/** Der offene Bearbeiten-Dialog eines Artikels: { id, panel } - oder nichts. */
+let _itemDialog = null;
+const NEVER_ABORTED = Object.freeze({ aborted: false });
+
+/**
+ * Listen, Laeden, Kategorien und die Artikel der aktiven Liste neu holen und
+ * zeichnen, weil der Server gemeldet hat, dass etwas nicht mehr da ist.
+ *
+ * - EIN Lauf zur Zeit. Ein zweiter Fehler waehrenddessen bestellt genau einen
+ *   weiteren Lauf danach (sein Ding kann nach dem Lesen des ersten verschwunden
+ *   sein), nie einen parallelen.
+ * - KEINE SCHLEIFE: das Nachladen meldet seine eigenen Fehler nirgends, also
+ *   kann es sich nicht selbst wieder ausloesen. Scheitert es, bleibt der
+ *   letzte Stand stehen - wie bei der Live-Auffrischung.
+ * - Die eigene Bearbeitung ueberlebt: es ist derselbe Weg wie die
+ *   Live-Auffrischung (`refreshFromFeed`), mit Ladeordnung, Absichten und
+ *   schwebenden Loeschungen. Auch der Fall "die aktive Liste ist weg" wird
+ *   dort entschieden: erste verbliebene Liste oder Leerzustand.
+ */
+function reloadAfterGone(container) {
+  _goneReloadWanted = true;
+  if (_goneReloadRunning) return _goneReloadRunning;
+  const run = (async () => {
+    try {
+      while (_goneReloadWanted) {
+        _goneReloadWanted = false;
+        await reloadAfterGoneOnce(container);
+      }
+    } catch (err) {
+      console.warn('[Shopping] Nachladen nach "gibt es nicht mehr" fehlgeschlagen:', err);
+    } finally {
+      _goneReloadRunning = null;
+      _goneReloadWanted = false;
+    }
+  })();
+  _goneReloadRunning = run;
+  return run;
+}
+
+async function reloadAfterGoneOnce(container) {
+  const signal = _liveController?.signal ?? NEVER_ABORTED;
+  const listBefore = state.activeListId;
+  await Promise.all([
+    loadCategories({ keepOnError: true }),
+    loadStores({ keepOnError: true }),
+  ]);
+  await refreshFromFeed(container, listBefore, signal);
+  if (signal.aborted || container?.isConnected === false) return;
+  // Was die Seite zur AUSWAHL anbietet, kommt aus demselben Stand: die
+  // Kategorie im Eingabefeld und die Felder eines offenen Dialogs. Getipptes
+  // bleibt stehen - nur die Auswahl wird ersetzt, nicht das Formular.
+  refreshQuickAddChoices(container);
+  // EIN DIALOG ZU ETWAS, DAS ES NICHT MEHR GIBT, GEHT ZU. Die aktive Liste ist
+  // weg: jeder Dialog dieser Seite meinte sie. Oder der Artikel, den der
+  // Bearbeiten-Dialog zeigt, ist weg: Speichern kann nie mehr gelingen, und der
+  // Toast hat gesagt, warum. In jedem anderen Fall (Laden, Kategorie oder
+  // Zielliste verschwunden) bleibt der Dialog mit den Eingaben offen und
+  // bekommt die frische Auswahl.
+  const dialog = _itemDialog;
+  const listGone = listBefore != null && state.activeListId !== listBefore;
+  const itemGone = Boolean(dialog) && _itemsListId === state.activeListId
+    && !state.items.some((i) => i.id === dialog.id);
+  if (listGone || itemGone) {
+    _itemDialog = null;
+    await closeModal({ force: true });
+  } else if (dialog) {
+    refreshItemDialogChoices(dialog.panel);
+  }
+}
+
+/**
+ * Die Optionen einer Auswahl ersetzen und die Wahl behalten, wenn es sie noch
+ * gibt. Sonst gilt `fallback`, sonst die erste Option.
+ */
+function setOptions(el, options, fallback) {
+  if (!el?.replaceChildren) return;
+  const keep = el.value;
+  el.replaceChildren(...options.map(({ value, label }) => {
+    const option = document.createElement('option');
+    option.value = String(value);
+    if (label != null) option.textContent = label;
+    return option;
+  }));
+  const has = (v) => v != null && options.some((o) => String(o.value) === String(v));
+  if (has(keep)) el.value = keep;
+  else if (has(fallback)) el.value = String(fallback);
+}
+
+const categoryOptions = () => state.categories.map((c) => ({ value: c.name, label: categoryLabel(c.name) }));
+
+function refreshQuickAddChoices(container) {
+  const select = container?.querySelector?.('#item-cat-select');
+  if (!select) return;
+  const before = select.value;
+  setOptions(select, categoryOptions(), DEFAULT_CATEGORY_NAME);
+  // Die gewaehlte Kategorie gibt es nicht mehr: das Feld steht wieder auf dem
+  // Standard, und das ist keine Wahl von Hand mehr.
+  if (select.value !== before) quickAddCategoryChosen = false;
+}
+
+function refreshItemDialogChoices(panel) {
+  if (!panel?.querySelector) return;
+  setOptions(panel.querySelector('#item-details-cat'), categoryOptions());
+  setOptions(
+    panel.querySelector('#item-details-list'),
+    state.lists.map((l) => ({ value: l.id, label: l.name })),
+    state.activeListId,
+  );
+  setOptions(
+    panel.querySelector('#item-details-store-options'),
+    state.stores.map((st) => ({ value: st.name })),
+  );
+}
+
+// --------------------------------------------------------
 // Event-Verdrahtung
 // --------------------------------------------------------
 
@@ -3883,7 +4030,7 @@ function wireTabBar(container) {
         await switchList(data.data.id, container);
         refocusAfterRender();
       } catch (err) {
-        window.yuvomi.showToast(errorSentence(err), 'danger');
+        reportError(err, container);
       }
     }
   });
@@ -4021,7 +4168,7 @@ function wireListContentEvents(container) {
         wireListContentEvents(container);
         refocusAfterRender();
       } catch (err) {
-        window.yuvomi.showToast(errorSentence(err), 'danger');
+        reportError(err, container);
       }
     }
 
@@ -4092,7 +4239,7 @@ function wireListContentEvents(container) {
           renderTabs(container);
           renderListContent(container);
           wireListContentEvents(container);
-          if (err) window.yuvomi.showToast(errorSentence(err, 'common.unknownError'), 'danger');
+          if (err) reportError(err, container, 'common.unknownError');
         },
       });
     }
@@ -4568,6 +4715,11 @@ export const __test = {
   openDuplicateListDialog,
   openCategoryManager,
   openStoreManager,
+  // #1909: das Nachladen nach "gibt es nicht mehr". Die Tests fahren die
+  // echten Aufrufer und warten hier auf den Lauf, den deren catch anstoesst.
+  reloadAfterGone,
+  goneReloadForTest: () => _goneReloadRunning,
+  resetGoneReloadForTest: () => { _goneReloadRunning = null; _goneReloadWanted = false; _itemDialog = null; },
   READ_SAFE_ACTIONS,
   render,
 };

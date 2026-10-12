@@ -56,6 +56,36 @@ export const CASE_MESSAGES = new Map([
 ]);
 
 /**
+ * Gruende, die sagen: das Ding, auf das die Handlung zielte, gibt es nicht
+ * mehr - der Stand der Seite ist also veraltet (jemand anderes im Haushalt hat
+ * es geloescht). Die Seite laedt dann selbst nach, statt dem Nutzer dazu zu
+ * raten (#1909); der Satz sagt nur noch, was passiert ist.
+ *
+ * Eine ALLOWLIST, kein Muster auf `_not_found` und nie der blanke Status 404:
+ * ein Grund, den diese Liste nicht kennt, loest kein Nachladen aus. Jeder
+ * Eintrag hat einen Satz in CASE_MESSAGES, und jeder `*_not_found` dort steht
+ * hier - beides haelt test:friendly-error.
+ */
+export const GONE_REASONS = new Set([
+  'shopping_list_not_found',
+  'shopping_item_not_found',
+  'shopping_store_not_found',
+  'shopping_category_not_found',
+]);
+
+/**
+ * Sagt dieser Fehler, dass das Ziel der Handlung verschwunden ist?
+ * Der Grund einer Absage (403) zaehlt nur an einer Absage - wie in `knownKey`.
+ *
+ * @param {unknown} err
+ * @returns {boolean}
+ */
+export function isGone(err) {
+  const status = err?.status ?? err?.response?.status;
+  return status !== 403 && GONE_REASONS.has(err?.data?.reason);
+}
+
+/**
  * Der Satz, den die App fuer diesen Fehler SICHER kennt - oder nichts.
  * Eine Stelle fuer friendlyError und errorSentence, damit beide dasselbe sagen.
  *
