@@ -428,6 +428,8 @@
   min-width: 0;
   hyphens: auto;
   hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
   overflow-wrap: break-word;
 }
 
@@ -575,6 +577,8 @@
   text-overflow: ellipsis;
   hyphens: auto;
   hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
 }
 
 .meal-card__recurrence {
@@ -1632,6 +1636,8 @@
     min-width: 0;
     hyphens: auto;
     hyphenate-limit-chars: 6 4 4;
+    -webkit-hyphenate-limit-before: 4;
+    -webkit-hyphenate-limit-after: 4;
     overflow-wrap: break-word;
   }
 

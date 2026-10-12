@@ -19,7 +19,7 @@
  *   → bypassCacheUntil (in-memory + Cache API für SW-Restart-Robustheit)
  */
 
-const APP_RELEASE        = '2.75.0';
+const APP_RELEASE        = '2.76.0';
 const APP_BUILD_REVISION = '__YUVOMI_BUILD_REVISION__';
 const CACHE_RELEASE      = `${APP_RELEASE}-${APP_BUILD_REVISION}`;
 const SHELL_CACHE        = `yuvomi-shell-${CACHE_RELEASE}`;
@@ -137,6 +137,7 @@ const APP_SHELL = [
   '/utils/document-folder-delete.js',
   '/utils/document-preview.js',
   '/utils/event-color.js',
+  '/utils/event-icon.js',
   '/utils/empty-state.js',
   '/utils/extension-i18n.js',
   '/utils/extension-widgets.js',
@@ -178,6 +179,7 @@ const APP_SHELL = [
   '/utils/korean-particles.js',
   '/utils/leave-guard.js',
   '/utils/live-feed.js',
+  '/utils/loan-order.js',
   '/utils/markdown-checklist.js',
   '/utils/markdown-toolbar.js',
   '/utils/master-detail.js',

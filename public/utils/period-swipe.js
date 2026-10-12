@@ -101,7 +101,10 @@ function overlayOpen() {
  * @param {HTMLElement} surface
  * @param {Object} opts
  * @param {() => boolean} opts.enabled        - gilt die Geste gerade (Ansicht, Suche)?
- * @param {(step: 1 | -1) => Promise<void>|void} opts.onStep - blaettert und rendert neu
+ * @param {(step: 1 | -1) => Promise<boolean|void>|boolean|void} opts.onStep - blaettert und
+ *   rendert neu. Liefert es `false`, hat es NICHT gezeichnet (der Schritt wurde
+ *   ueberholt) - dann gleitet nichts herein. Alles andere, auch gar keine
+ *   Rueckgabe, heisst: gezeichnet.
  * @param {string} [opts.ignore]              - Selektor, an dem die Geste einem anderen Zweck gehoert
  * @returns {() => void} Abbau
  */
@@ -197,8 +200,9 @@ export function wirePeriodSwipe(surface, { enabled, onStep, ignore } = {}) {
     const outgoing = moving;
     moving = null;
     stepping = true;
+    let drawn;
     try {
-      await onStep(step);
+      drawn = await onStep(step);
     } finally {
       stepping = false;
       if (outgoing?.isConnected) {
@@ -207,6 +211,9 @@ export function wirePeriodSwipe(surface, { enabled, onStep, ignore } = {}) {
         outgoing.style.willChange = '';
       }
     }
+    // Nicht gezeichnet (#1781): im Traeger steht noch das ALTE Panel. Es als
+    // "hereinkommend" zu animieren zeigte einen Wechsel, den es nicht gab.
+    if (drawn === false) return;
     if (prefersReducedMotion()) return;
     const incoming = surface.firstElementChild;
     if (!incoming) return;

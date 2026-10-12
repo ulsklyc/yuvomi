@@ -227,7 +227,7 @@ export function minutesFromNow(minutes) {
  */
 export async function refreshUrlSource(d, sourceId) {
   if (inFlight.has(sourceId)) {
-    throw new WasteConflictError('This source is already being refreshed; try again in a moment.');
+    throw new WasteConflictError('This source is already being refreshed; try again in a moment.', 'refresh_in_progress');
   }
   inFlight.add(sourceId);
   try {

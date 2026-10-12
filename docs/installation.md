@@ -313,9 +313,9 @@ docker compose up -d
 Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no Node.js installation needed.
 
 > **Pinning a version.** Every release is also published under immutable tags:
-> `2.75.0` (exact version), `2.74` (latest patch of that minor), plus a moving `main`
+> `2.76.0` (exact version), `2.76` (latest patch of that minor), plus a moving `main`
 > tag for the current development state. To pin production to a known-good release,
-> set `image: ghcr.io/ulsklyc/yuvomi:2.75.0` in your compose file and bump it
+> set `image: ghcr.io/ulsklyc/yuvomi:2.76.0` in your compose file and bump it
 > deliberately; `latest` always points at the newest release.
 
 > **Verifying what you pull.** Every image the publish workflow builds is signed at build
@@ -324,7 +324,7 @@ Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no No
 > image you are about to run is one GitHub built from a release tag of this repository:
 >
 > ```bash
-> cosign verify ghcr.io/ulsklyc/yuvomi:2.75.0 \
+> cosign verify ghcr.io/ulsklyc/yuvomi:2.76.0 \
 >   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
 >   --certificate-identity-regexp '^https://github.com/ulsklyc/yuvomi/.github/workflows/docker-publish.yml@refs/tags/v'
 > ```
@@ -333,7 +333,7 @@ Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no No
 > anything else means the image is not one this repository released. The `main` tag is
 > signed too, under `refs/heads/main`, which the pattern above deliberately excludes. Tags
 > published before September 2026 carry no signature. Provenance and SBOM travel inside the
-> image: `docker buildx imagetools inspect ghcr.io/ulsklyc/yuvomi:2.75.0 --format '{{ json .Provenance }}'`.
+> image: `docker buildx imagetools inspect ghcr.io/ulsklyc/yuvomi:2.76.0 --format '{{ json .Provenance }}'`.
 
 Continue with [Step 4 — Verify](#4-verify-the-container-is-running).
 
@@ -378,7 +378,7 @@ docker compose logs -f
 You should see output like:
 
 ```
-yuvomi  | [Yuvomi] Server running on port 3000 | Version 2.75.0
+yuvomi  | [Yuvomi] Server running on port 3000 | Version 2.76.0
 yuvomi  | [Yuvomi] Environment: production
 yuvomi  | [Sync] Auto-sync active every 15 minutes.
 ```
@@ -1038,7 +1038,7 @@ Pocket ID documents Yuvomi as one of its [client examples](https://pocket-id.org
 | `OIDC_CLIENT_ID` | Client ID registered with your OIDC provider | - | No |
 | `OIDC_CLIENT_SECRET` | Client secret for the registered application | - | No |
 | `OIDC_REDIRECT_URI` | OAuth callback URL — must be registered with the provider (e.g. `https://yuvomi.example.com/api/v1/auth/oidc/callback`) | - | No |
-| `OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM` | Set to `true` to allow account linking when the IdP omits the `email_verified` claim entirely. Only enable for IdPs fully under your control that never issue unverified addresses (e.g. older Authentik without an explicit `email_verified` property mapping). | - | No |
+| `OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM` | Set to `true` to allow account linking when the IdP omits the `email_verified` claim entirely. It does not cover a provider that sends `email_verified: false` - such an address is never linked, with or without this setting. Only enable for IdPs fully under your control that never issue unverified addresses. | - | No |
 | `OIDC_ALLOW_SIGNUP` | Set to `false` so an SSO sign-in never provisions a new account. Sign-in and account linking are unaffected, so the admin creates the account and the user signs in with SSO. Use this when your identity provider serves more people than this household. | `true` | No |
 | `AUTH_ALLOW_PASSWORD_LOGIN` | Set to `false` to make SSO the only way in: the login form, password login and password reset are all switched off. Ignored until all four OIDC variables are set **and** at least one administrator account is linked to the provider, so a typo - or a fresh install - can never lock everyone out. | `true` | No |
 
@@ -1047,7 +1047,7 @@ When all four OIDC variables are set, a **"Sign in with SSO"** button appears on
 - **The address is on more than one account.** The sign-in is refused with "Your email address belongs to more than one account here"; keep the address on one account only (Settings → Household → Family) and have the person sign in again.
 - **The address belongs to a member account that has a password.** A member maintains their own address and could enter someone else's, so the first SSO sign-in of that other person would land in the member's account. The sign-in is refused with a message that points to the fix: the person signs in with their password and links SSO under **Settings → Account → Single sign-on**, or an admin switches the account to "SSO sign-in only" under **Settings → Household → Family**, after which the next SSO sign-in links it.
 
-Unverified emails never take over an existing account; without a match a new account is provisioned (unless `OIDC_ALLOW_SIGNUP=false`). If your provider omits the `email_verified` claim, set `OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM=true` to enable linking. A member cannot set an email address on their own profile, their own contact or a shared-expense guest that already belongs to another account; an admin can, for example for a shared family mailbox, and SSO then treats that address as ambiguous.
+Unverified emails never take over an existing account; without a match a new account is provisioned (unless `OIDC_ALLOW_SIGNUP=false`). If your provider omits the `email_verified` claim, set `OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM=true` to enable linking. The setting covers a missing claim only: a provider that explicitly sends `email_verified: false` is taken at its word, and the address is not linked. authentik does this since 2025.10 - its default `email` scope mapping used to send `true` and now sends `false`. There the fix is on the provider side: create a custom `email` scope mapping that returns `email_verified` as `True` and select it in the provider instead of the default one. Only do that if every address in your authentik is one you entered or checked yourself. A member cannot set an email address on their own profile, their own contact or a shared-expense guest that already belongs to another account; an admin can, for example for a shared family mailbox, and SSO then treats that address as ambiguous.
 
 **Who gets an account.** By default every identity your provider accepts gets one on first sign-in - convenient for a provider you run for this household alone, but a directory is a list of people, not a list of household members. Set `OIDC_ALLOW_SIGNUP=false` and provisioning stops: an unknown identity is turned away with "There is no account here yet for this SSO sign-in" instead of the generic SSO error, while known accounts sign in as before. Linking still happens too, which is what makes the switch usable: create the account under **Settings → Household → Family** with the member's email address and "SSO sign-in only" switched on, and their first SSO sign-in binds the two together (the provider must report `email_verified: true`, or the account owner links it themselves under **Settings → Account → Single sign-on**).
 

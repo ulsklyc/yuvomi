@@ -99,12 +99,20 @@ yuvomi-datepicker {
   border-color: var(--color-danger);
 }
 
-yuvomi-datepicker[disabled] .ydp__input {
-  background: var(--color-surface-2);
-  color: var(--color-text-disabled);
-}
-
-yuvomi-datepicker[disabled] .ydp__trigger {
+/* Das gesperrte FELD traegt die allgemeine Regel (`.form-input:disabled`,
+ * layout.css): `_syncDisabled()` sperrt das innere Feld selbst. Hier stand
+ * --color-text-disabled auf --color-surface-2 - der gesetzte Tag war gesperrt
+ * nicht mehr zu lesen (1,58:1 hell, 2,24:1 dunkel). Der Knopf bleibt: ein
+ * Icon traegt keinen Wert.
+ *
+ * Am KNOPF, nicht am Host-Attribut: in einem `fieldset[disabled]`
+ * (Schichtplan-Muster ohne Schreibrecht) traegt der Host kein `disabled`,
+ * das innere Feld und der Knopf sind es trotzdem - das Feld stand gesperrt
+ * da, der Kalenderknopf daneben in voller Farbe samt Hover. `:disabled`
+ * deckt beide Wege: am Host setzt `_syncDisabled()` `trigger.disabled`, im
+ * gesperrten Fieldset sperrt der Browser den Knopf selbst (im Browser
+ * gemessen: `matches(':disabled')` ohne Host-Attribut). */
+.ydp__trigger:disabled {
   color: var(--color-text-disabled);
   pointer-events: none;
 }

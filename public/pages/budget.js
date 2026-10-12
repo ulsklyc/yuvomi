@@ -21,7 +21,7 @@ import { redrawList, collapseRow } from '/utils/list-motion.js';
 import { friendlyError } from '/utils/friendly-error.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { render as renderSplitExpenses, prefillSplitExpense, canAddSplitExpense, openNewSplitExpense } from '/pages/split-expenses.js';
-import { openSubscriptionModal, render as renderSubscriptions } from '/pages/subscriptions.js';
+import { openSubscriptionModal, clearSubscriptionFilters, render as renderSubscriptions } from '/pages/subscriptions.js';
 import { renderStats } from '/pages/budget-stats.js';
 import { renderPlans, openAddPlan } from '/pages/budget-plans.js';
 import { toLocalDateKey, parseLocalDateKey, addLocalDays,
@@ -31,6 +31,7 @@ import { formatMoney, formatSignedAmount, amountPlaceholder, amountStep, amountM
 import { budgetCategoryLabel } from '/utils/category-labels.js';
 import { trendMarkup, leadCardClass } from '/utils/metric-card.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
+import { LOAN_SORTS, DEFAULT_LOAN_SORT, normalizeLoanSort, sortLoans, groupLoans } from '/utils/loan-order.js';
 import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
 import { metricGlanceHtml, wireMetricGlance, glanceLeadClass } from '/utils/metric-glance.js';
 import { intervalUnitLabel } from '/rrule-ui.js';
@@ -44,6 +45,7 @@ import { withChosenPeople } from '/utils/people-picker.js';
 import { compareMembers, memberRanks, memberRankOf } from '/utils/member-order.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
+import { createLatestResponseApplier } from '/utils/document-folder-delete.js';
 
 // --------------------------------------------------------
 // Konstanten
@@ -56,6 +58,9 @@ const EXPENSES_ONLY_KEY = 'yuvomi-budget-expenses-only';
 // Geraeteweit wie die Ausgaben-Ansicht daneben: ob die Liste nach Zustaendigen
 // gruppiert erscheint, ist eine Frage des Schirms, nicht des Haushalts (#1057).
 const GROUP_RESPONSIBLE_KEY = 'yuvomi:budget:group-responsible';
+// Geraeteweit wie die beiden Ansichten darueber: in welcher Reihenfolge die
+// Darlehen stehen, ist eine Frage des Lesens, kein Datum des Haushalts (#1706).
+const LOAN_SORT_KEY = 'yuvomi:budget:loan-sort';
 
 const SUBCATEGORY_I18N = () => ({
   rent_mortgage:            t('budget.subcatRentMortgage'),
@@ -239,6 +244,7 @@ let state = {
   activeTab:   'budget',
   loanFilterId: null,
   loanStatusFilter: 'active',
+  loanSort: null,              // 'start' | 'rate' | 'balance'; null = noch nicht gelesen (loanSort())
   currency:    'EUR',
   budgetMode:  'shared',      // 'shared' (Altverhalten) | 'personal' (#476/#505)
   members:     [],            // Haushaltsmitglieder fuer den Zustaendigen-Picker (#1057)
@@ -270,6 +276,19 @@ let state = {
   ledgerError:     null,
 };
 let _ledgerSeq = 0;    // nur die juengste Suchantwort darf die Liste setzen
+/* DIE LETZTE ANFRAGE GEWINNT, NICHT DIE LETZTE ANTWORT (#1781). `state.month`
+ * ist der GEZEIGTE Monat und wechselt erst, wenn seine vier Abrufe da sind.
+ * Solange stand nirgends, wohin die Seite unterwegs ist: zwei schnelle Klicks
+ * auf "weiter" rechneten beide vom gezeigten Monat und kamen einen weit, und
+ * von zwei laufenden Ladungen blieb stehen, was zuletzt ANTWORTETE.
+ *
+ * Deshalb zwei Dinge. Jede Ladung laeuft ueber denselben Helfer wie die
+ * Dokumente (createLatestResponseApplier): eine ueberholte schreibt nichts,
+ * auch ihren Fehler nicht. Und `_monthInFlight` nennt den Monat der juengsten
+ * LAUFENDEN Ladung - der Merker gehoert der Anfrage und faellt mit genau ihr
+ * (Erfolg, Fehler oder ueberholt), nie mit einer fremden. */
+const applyLatestMonth = createLatestResponseApplier();
+let _monthInFlight = null;
 let _container = null;
 let _user = null;
 let _tablist = null;   // wireTablist-Handle: erlaubt programmatische Tab-Wechsel (sync)
@@ -512,41 +531,81 @@ function setHtml(element, html) {
 // API
 // --------------------------------------------------------
 
+/** Der Monat, zu dem die Seite unterwegs ist - sonst der, den sie zeigt. */
+function requestedMonth() {
+  return _monthInFlight?.month ?? state.month;
+}
+
+/**
+ * Neuladen nach einem Schreiben, einem Filter- oder Scope-Wechsel. Laeuft
+ * gerade ein Schritt zu einem anderen Monat, laedt es DIESEN: mit dem noch
+ * gezeigten Monat ueberholte das Neuladen den Schritt und naehme ihn zurueck.
+ */
+function reloadMonth() {
+  return loadMonth(requestedMonth());
+}
+
+/**
+ * Laedt einen Monat und macht ihn zum gezeigten.
+ * @returns {Promise<boolean>} false, wenn eine juengere Ladung diese ueberholt
+ *   hat - dann ist nichts geschrieben, und der Aufrufer blendet nichts ein.
+ */
 async function loadMonth(month) {
+  const flight = { month };
+  _monthInFlight = flight;
   const prevMonth = addMonths(month, -1);
   // Konto-Drilldown: Transaktionsliste optional auf ein Konto filtern.
   const accountQuery = state.accountFilterId ? `&account_id=${state.accountFilterId}` : '';
   // Ansichts-Scope (#476/#505): nur im personal-Modus relevant; sonst ignoriert der Server ihn.
   const scopeQuery = state.budgetMode === 'personal' ? `&scope=${state.scope}` : '';
+  // Der Fehler ist ein ERGEBNIS, kein Wurf: auch er darf nur stehen bleiben,
+  // wenn seine Ladung noch die juengste ist.
+  const request = async () => {
+    try {
+      const [entriesRes, summaryRes, prevSummaryRes, loansRes] = await Promise.all([
+        api.get(`/budget?month=${month}${accountQuery}${scopeQuery}`),
+        api.get(`/budget/summary?month=${month}${scopeQuery}`),
+        api.get(`/budget/summary?month=${prevMonth}${scopeQuery}`),
+        api.get('/budget/loans'),
+      ]);
+      return {
+        entries: entriesRes.data, summary: summaryRes.data,
+        prevSummary: prevSummaryRes.data, loans: loansRes.data,
+      };
+    } catch (err) {
+      return { err };
+    }
+  };
   try {
-    const [entriesRes, summaryRes, prevSummaryRes, loansRes] = await Promise.all([
-      api.get(`/budget?month=${month}${accountQuery}${scopeQuery}`),
-      api.get(`/budget/summary?month=${month}${scopeQuery}`),
-      api.get(`/budget/summary?month=${prevMonth}${scopeQuery}`),
-      api.get('/budget/loans'),
-    ]);
-    state.loadError   = null;
-    state.month       = month;
-    state.entries     = entriesRes.data;
-    // Nach jedem Schreiben laedt der Monat neu - die Treffer der Suche mit,
-    // sonst stuende eine geloeschte Buchung weiter in der Trefferliste.
-    if (state.ledgerQuery) await loadLedgerSearch(state.ledgerQuery);
-    state.summary     = summaryRes.data;
-    state.prevSummary = prevSummaryRes.data;
-    state.loans       = loansRes.data;
-  } catch (err) {
-    console.error('[Budget] loadMonth Fehler:', err);
-    // Der Toast allein war die falsche Antwort: er verging, und darunter blieb
-    // „Keine Eintraege diesen Monat" mit „Eintrag erstellen" stehen - ein
-    // Serverfehler sah damit aus wie ein leerer Monat, und die Summen zeigten
-    // 0. Dieselbe Verwechslung, die Einkauf und Essensplan 2026-07-30 hatten
-    // (Critique P0). `renderBody` prueft das Feld jetzt VOR dem Leer-Zweig.
-    state.loadError   = err;
-    state.month       = month;
-    state.entries     = [];
-    state.summary     = { income: 0, expenses: 0, balance: 0, byCategory: [] };
-    state.prevSummary = null;
-    state.loans       = { loans: [], summary: { active_count: 0, remaining_amount: 0, remaining_installments: 0 } };
+    return await applyLatestMonth(request, async (result) => {
+      // Ohne Yield zwischen den Feldern: Liste und Summen stammen aus EINER Ladung.
+      if (result.err) {
+        console.error('[Budget] loadMonth Fehler:', result.err);
+        // Der Toast allein war die falsche Antwort: er verging, und darunter blieb
+        // „Keine Eintraege diesen Monat" mit „Eintrag erstellen" stehen - ein
+        // Serverfehler sah damit aus wie ein leerer Monat, und die Summen zeigten
+        // 0. Dieselbe Verwechslung, die Einkauf und Essensplan 2026-07-30 hatten
+        // (Critique P0). `renderBody` prueft das Feld jetzt VOR dem Leer-Zweig.
+        state.loadError   = result.err;
+        state.month       = month;
+        state.entries     = [];
+        state.summary     = { income: 0, expenses: 0, balance: 0, byCategory: [] };
+        state.prevSummary = null;
+        state.loans       = { loans: [], summary: { active_count: 0, remaining_amount: 0, remaining_installments: 0 } };
+        return;
+      }
+      state.loadError   = null;
+      state.month       = month;
+      state.entries     = result.entries;
+      state.summary     = result.summary;
+      state.prevSummary = result.prevSummary;
+      state.loans       = result.loans;
+      // Nach jedem Schreiben laedt der Monat neu - die Treffer der Suche mit,
+      // sonst stuende eine geloeschte Buchung weiter in der Trefferliste.
+      if (state.ledgerQuery) await loadLedgerSearch(state.ledgerQuery);
+    });
+  } finally {
+    if (_monthInFlight === flight) _monthInFlight = null;
   }
 }
 
@@ -853,26 +912,87 @@ export async function render(container, { user }) {
 // Navigation
 // --------------------------------------------------------
 
+const bodyEl = () => _container.querySelector('#budget-body');
+
+// `swap: false` setzt der Wisch, der sein eigenes Hereingleiten mitbringt
+// (utils/period-swipe.js) - kein zweiter Uebergang darueber.
+// Liefert, ob der Schritt GEZEICHNET hat: ein ueberholter laesst das alte
+// Panel stehen, und der Wisch darf es dann nicht hereingleiten lassen.
+async function stepPeriod(dir, { swap = true } = {}) {
+  if (state.activeTab === 'reports') {
+    state.reportAnchor = stepAnchor(state.reportAnchor, state.range, dir);
+    if (swap) swapPeriod(bodyEl(), dir, renderBody);
+    else renderBody();
+    return true;
+  }
+  // Vom ANGEFRAGTEN Monat aus: ein zweiter Klick, waehrend der erste laedt,
+  // fuehrt einen Monat weiter als dieser, nicht noch einmal zum selben (#1781).
+  // Ein ueberholter Schritt blendet nichts ein - das tut der, der ihn ueberholt hat.
+  if (!await loadMonth(addMonths(requestedMonth(), dir))) return false;
+  if (swap) swapPeriod(bodyEl(), dir, () => { renderBody(); updateLabel(); });
+  else { renderBody(); updateLabel(); }
+  return true;
+}
+
+/** "Aktuell": zurueck zum laufenden Zeitraum des Reiters. */
+async function jumpToCurrentPeriod() {
+  if (state.activeTab === 'reports') {
+    // Containment statt Ankergleichheit (Befund 4, wie in reportShowsToday()):
+    // ein Klick, waehrend der Anker schon im heutigen Bereich liegt, waere
+    // sonst ein sichtbares No-Op, obwohl der Knopf `inert` sein sollte.
+    if (reportShowsToday()) return;
+    const back = todayKey() < state.reportAnchor ? -1 : 1;
+    state.reportAnchor = todayKey();
+    swapPeriod(bodyEl(), back, renderBody);
+    return;
+  }
+  const m = currentMonth();
+  // Gemessen am angefragten Monat (#1781): ist die Seite schon dorthin
+  // unterwegs, ist der Klick erledigt; kommt sie von einem Schritt, der noch
+  // laedt, zaehlt dessen Ziel fuer die Richtung.
+  const from = requestedMonth();
+  if (m === from) return;
+  // 'YYYY-MM' vergleicht sich als Text: zurueck zum laufenden Monat oder vor.
+  const back = m < from ? -1 : 1;
+  if (!await loadMonth(m)) return;
+  swapPeriod(bodyEl(), back, () => { renderBody(); updateLabel(); });
+}
+
+/**
+ * Reiterwechsel. Eine Zeitachse ueber den Wechsel hinweg: der Monat aus dem
+ * Budget-Tab wird zum Anker der Berichte und umgekehrt. Vorher hielt
+ * budget-stats.js einen eigenen Anker, sodass ein im Budget gewaehlter Maerz in
+ * den Berichten weiter als Juli erschien (Critique 2026-07-30, P1).
+ *
+ * GEMESSEN AM ANGEFRAGTEN MONAT (#1781). Wer "weiter" tippt und in die Berichte
+ * wechselt, bevor der Monat da ist, nahm sonst den noch GEZEIGTEN als Anker mit
+ * - und der Rueckweg lud genau den und nahm den Schritt zurueck.
+ */
+async function changeTab(id, { direction = 0 } = {}) {
+  const prev = state.activeTab;
+  state.activeTab = id;
+  writeTabToUrl(id);
+  if (id === 'reports' && prev !== 'reports') {
+    state.reportAnchor = anchorForMonth(requestedMonth());
+  }
+  // Nur der Reiterwechsel blendet (in Schrittrichtung der Leiste) - ein
+  // Neuaufbau desselben Reiters (Filter, Speichern) nicht.
+  swapContent(_container.querySelector('#budget-body'), renderBody, { direction });
+  if (prev === 'reports' && id !== 'reports') {
+    const ym = state.reportAnchor.slice(0, 7);
+    if (ym !== requestedMonth()) {
+      await loadMonth(ym);
+      if (state.activeTab === id) renderBody();
+    }
+  }
+}
+
 function wireNav() {
   // EIN Stepper für alle Tabs mit Zeitbezug. Welche Achse er bewegt, sagt der
   // Tab: Budget und Plan rechnen in Monaten, die Berichte in ihrer gewählten
   // Auflösung. Vorher trugen die Berichte einen zweiten Stepper im Panel.
   // Der neue Zeitraum kommt von der Seite, zu der man blaettert (swapPeriod,
   // utils/period-stepper.js) - vorher ein harter Schnitt.
-  const bodyEl = () => _container.querySelector('#budget-body');
-  // `swap: false` setzt der Wisch, der sein eigenes Hereingleiten mitbringt
-  // (utils/period-swipe.js) - kein zweiter Uebergang darueber.
-  const stepPeriod = async (dir, { swap = true } = {}) => {
-    if (state.activeTab === 'reports') {
-      state.reportAnchor = stepAnchor(state.reportAnchor, state.range, dir);
-      if (swap) swapPeriod(bodyEl(), dir, renderBody);
-      else renderBody();
-      return;
-    }
-    await loadMonth(addMonths(state.month, dir));
-    if (swap) swapPeriod(bodyEl(), dir, () => { renderBody(); updateLabel(); });
-    else { renderBody(); updateLabel(); }
-  };
   // WISCHEN BLAETTERT DEN ZEITRAUM WIE IM KALENDER (R17, Bewegung): auf den
   // Reitern mit Zeitachse (`TAB_CAPS.month`: Budget, Plan, Berichte) holt ein
   // waagerechter Wisch den naechsten bzw. vorigen Zeitraum - derselbe Stepper
@@ -888,24 +1008,7 @@ function wireNav() {
   });
   _container.querySelector('#budget-prev').addEventListener('click', () => stepPeriod(-1));
   _container.querySelector('#budget-next').addEventListener('click', () => stepPeriod(1));
-  _container.querySelector('#budget-today').addEventListener('click', async () => {
-    if (state.activeTab === 'reports') {
-      // Containment statt Ankergleichheit (Befund 4, wie in reportShowsToday()):
-      // ein Klick, waehrend der Anker schon im heutigen Bereich liegt, waere
-      // sonst ein sichtbares No-Op, obwohl der Knopf `inert` sein sollte.
-      if (reportShowsToday()) return;
-      const back = todayKey() < state.reportAnchor ? -1 : 1;
-      state.reportAnchor = todayKey();
-      swapPeriod(bodyEl(), back, renderBody);
-      return;
-    }
-    const m = currentMonth();
-    if (m === state.month) return;
-    // 'YYYY-MM' vergleicht sich als Text: zurueck zum laufenden Monat oder vor.
-    const back = m < state.month ? -1 : 1;
-    await loadMonth(m);
-    swapPeriod(bodyEl(), back, () => { renderBody(); updateLabel(); });
-  });
+  _container.querySelector('#budget-today').addEventListener('click', jumpToCurrentPeriod);
   // Ansichts-Scope (Mein Budget / Haushalt) — nur im personal-Modus vorhanden.
   // Dieselbe Verhaltensschicht wie die Haupt-Tabs: Roving-Tabindex ohne
   // Pfeiltasten wäre eine Tastaturfalle (nur ein Button per Tab erreichbar).
@@ -913,7 +1016,7 @@ function wireNav() {
     activeId: state.scope,
     onChange: async (id) => {
       state.scope = id;
-      await loadMonth(state.month);
+      await reloadMonth();
       renderBody();
     },
   });
@@ -948,28 +1051,7 @@ function wireNav() {
   // Tab (sub-tab--active/aria/tabindex); renderBody übernimmt nur noch den Inhalt.
   _tablist = wireTablist(_container.querySelector('.budget-tabs'), {
     activeId: state.activeTab,
-    onChange: async (id, { direction = 0 } = {}) => {
-      const prev = state.activeTab;
-      state.activeTab = id;
-      writeTabToUrl(id);
-      // Eine Zeitachse über den Tabwechsel hinweg: der Monat aus dem Budget-Tab
-      // wird zum Anker der Berichte und umgekehrt. Vorher hielt budget-stats.js
-      // einen eigenen Anker, sodass ein im Budget gewählter März in den Berichten
-      // weiter als Juli erschien (Critique 2026-07-30, P1).
-      if (id === 'reports' && prev !== 'reports') {
-        state.reportAnchor = anchorForMonth(state.month);
-      }
-      // Nur der Reiterwechsel blendet (in Schrittrichtung der Leiste) - ein
-      // Neuaufbau desselben Reiters (Filter, Speichern) nicht.
-      swapContent(_container.querySelector('#budget-body'), renderBody, { direction });
-      if (prev === 'reports' && id !== 'reports') {
-        const ym = state.reportAnchor.slice(0, 7);
-        if (ym !== state.month) {
-          await loadMonth(ym);
-          if (state.activeTab === id) renderBody();
-        }
-      }
-    },
+    onChange: changeTab,
   });
   // Edge-Fade + Aktiver-Tab-in-Sicht übernimmt jetzt wireTablist zentral
   // (Audit A2-18: gleiche Affordanz für Budget, Haushaltshilfe, Rewards).
@@ -1073,7 +1155,7 @@ function renderBody() {
       description: t('common.loadErrorDescription'),
       error: state.loadError,
       retryLabel: t('common.retry'),
-      onRetry: async () => { await loadMonth(state.month); renderBody(); },
+      onRetry: async () => { await reloadMonth(); renderBody(); },
     });
     return;
   }
@@ -1374,7 +1456,7 @@ function renderBody() {
   _container.querySelector('#budget-manage-categories')?.addEventListener('click', openCategoryManager);
   _container.querySelector('#budget-clear-account-filter')?.addEventListener('click', async () => {
     state.accountFilterId = null;
-    await loadMonth(state.month);
+    await reloadMonth();
     renderBody();
   });
   // Zustaendigen-Filter und Gruppierung arbeiten auf den SCHON geladenen Zeilen
@@ -1417,6 +1499,22 @@ function renderBody() {
       const id = parseInt(respBtn.dataset.responsible, 10);
       toggleResponsibleFilter(state, id);
       renderBody();
+      return;
+    }
+
+    // Die erwartete Abo-Zahlung (#1844) hat keine Buchung, die sich oeffnen
+    // liesse; ihre Zeile wechselt in den Abo-Reiter, wo das Abo steht und
+    // verlaengert wird. Ohne `data-action`, wie der Zustaendigen-Filter: der
+    // Wechsel liest nur und gilt auch bei `budget: read`.
+    const subscriptionRow = e.target.closest('[data-open-subscription]');
+    if (subscriptionRow && !action) {
+      // setActive() malt die Leiste und ruft changeTab() mit der Richtung.
+      // Der Fokus geht auf den Reiter: der getippte Knopf verschwindet mit
+      // dem Wechsel, und ohne Umzug fiele er auf <body>.
+      // Ein Filter aus einem frueheren Besuch der Abo-Liste bliebe sonst
+      // stehen, und das Abo, zu dem die Zeile fuehrt, fehlte dort.
+      clearSubscriptionFilters();
+      _tablist?.setActive('subscriptions', { focus: true });
       return;
     }
 
@@ -1995,7 +2093,7 @@ function entryRows(list, { fullDate = false, rowClass = '' } = {}) {
     const amountText = amountByRole(e.amount, 'flow').text;
     /* DER MONAT STEHT ÜBER DER LISTE, NICHT IN JEDER ZEILE.
      *
-     * Die Liste ist per Konstruktion EIN Monat - `loadMonth(state.month)` holt
+     * Die Liste ist per Konstruktion EIN Monat - loadMonth() holt
      * sie, der Monatsschritter im Kopf benennt ihn, und der CSV-Link daneben
      * trägt denselben Monat als Parameter. „19.08.2026" wiederholte ihn 23 Mal
      * und das Jahr dazu; „19.08." sagt in der Zeile dasselbe.
@@ -2068,7 +2166,16 @@ function entryRows(list, { fullDate = false, rowClass = '' } = {}) {
       : '';
     // Das Verbuchen ist die Handlung, „erwartet" der Zustand: bei `budget:
     // read` geht der Knopf, die Plakette daneben bleibt und sagt es weiter.
-    const confirmBtn = pending && !ro
+    /* ERWARTETE ABO-ZAHLUNG EINES FOLGEMONATS (#1844). Der Server rechnet sie
+     * beim Lesen aus dem Rhythmus des Abos und schickt sie ohne id: es gibt
+     * keine Buchung. Sie ist derselbe ZUSTAND wie eine erwartete Buchung
+     * (#637) und traegt deshalb dieselbe Plakette und denselben schraffierten
+     * Punkt - eine zweite Optik fuer "erwartet" waere eine zweite Aussage.
+     * Was fehlt, ist die Handlung: verbucht wird im Abo ("Als verlaengert
+     * markieren"), also fuehrt die Zeile dorthin, statt einen Dialog zu
+     * oeffnen, in dem sich nichts aendern liesse. */
+    const fromSubscription = e.expected === true && e.subscription_id != null;
+    const confirmBtn = pending && !ro && !fromSubscription
       ? `<button class="row-action" data-action="confirm" data-id="${e.id}" aria-label="${esc(t('budget.confirmAction'))}: ${esc(e.title)}">
           <i data-lucide="check" class="icon-md" aria-hidden="true"></i>
         </button>`
@@ -2086,11 +2193,16 @@ function entryRows(list, { fullDate = false, rowClass = '' } = {}) {
      * Bei `budget: read` bleibt die Zeile ein Knopf, oeffnet aber die
      * LESEANSICHT (openBudgetModal verzweigt, P1-Muster). Deshalb verspricht
      * sein Name dort kein „bearbeiten": Titel und Betrag, nichts weiter. */
-    const rowInteraction = masked ? '' : `data-id="${e.id}"`;
+    const rowInteraction = masked ? ''
+      : fromSubscription ? `data-open-subscription="${Number(e.subscription_id)}"`
+        : `data-id="${e.id}"`;
+    const titleAction = fromSubscription
+      ? `${esc(t('budget.expectedSubscriptionOpen'))}: `
+      : (ro ? '' : `${esc(t('budget.editEntry'))}: `);
     const titleCell = masked
       ? `<div class="list-row__name budget-entry__title">${esc(displayTitle)}${sharedBadge}${maskedBadge}${pendingBadge}</div>`
       : `<button class="list-row__name budget-entry__title" type="button"
-           aria-label="${ro ? '' : `${esc(t('budget.editEntry'))}: `}${esc(e.title)}, ${amountText}">${esc(displayTitle)}${sharedBadge}${maskedBadge}${pendingBadge}</button>`;
+           aria-label="${titleAction}${esc(e.title)}, ${amountText}">${esc(displayTitle)}${sharedBadge}${maskedBadge}${pendingBadge}</button>`;
     // ZUSTAENDIGE (#1057) als Avatar-Stapel in der Metazeile - dieselbe Sprache,
     // die Kalender und Aufgaben fuer "wer gehoert dazu" schon sprechen. Bei
     // einer maskierten Buchung faellt er weg: deren Zweck bleibt verborgen, und
@@ -2261,7 +2373,7 @@ function wireAccountsPage() {
       // daher malt wireTablist ihn nur über sync() nach (updateTabs tut es nicht mehr).
       _tablist?.sync('budget');
       writeTabToUrl('budget');
-      await loadMonth(state.month);
+      await reloadMonth();
       renderBody();
       // Der geklickte Button wird beim Re-Render entfernt — ohne Fokus-Umzug
       // fällt der Fokus auf <body> und Tastatur-/Screenreader-Nutzer landen
@@ -2409,7 +2521,7 @@ function openAccountModal(account = null) {
         if (!ok) return;
         try {
           await api.delete(`/budget/accounts/${account.id}`);
-          await loadMonth(state.month);
+          await reloadMonth();
           renderBody();
           refocusAfterRender();
           window.yuvomi?.showToast(t('budget.accountDeletedToast'), 'success');
@@ -2501,6 +2613,7 @@ function renderLoansDashboard() {
           <!-- Die Summenzeile („2 aktiv · 175.444,93 € offen") ist entfallen:
                sie wiederholte die Karte RESTSCHULD direkt darunter (R14 P1). -->
           ${state.loanFilterId ? `<div class="budget-list-header__filter">${esc(activeLoanLabel())}</div>` : ''}
+          ${loanSortNoteHtml()}
         </div>
         <div class="panel-head__actions">
           ${state.loanFilterId ? `
@@ -2519,6 +2632,7 @@ function renderLoansDashboard() {
                     tabindex="${on ? '0' : '-1'}">${t(key)}</button>`;
               }).join('')}
           </div>
+          ${loanToolsMenuHtml()}
         </div>
       </div>
       <!-- Geteilte Kennzahl-Zeile statt der früheren eigenen budget-loans__stats
@@ -2544,7 +2658,7 @@ function renderLoansDashboard() {
       })}</p>` : ''}
       ${visibleLoans.length ? `
         <div class="budget-loans__list">
-          ${visibleLoans.map(renderLoanCard).join('')}
+          ${loanListHtml(visibleLoans)}
         </div>
       ` : `
         <div class="budget-loans__empty">${t('budget.loansEmpty')}</div>
@@ -2556,11 +2670,98 @@ function renderLoansDashboard() {
 
 function filteredLoans() {
   const loans = state.loans?.loans ?? [];
-  return loans.filter((loan) => {
+  return sortLoans(loans.filter((loan) => {
     const matchesStatus = state.loanStatusFilter === 'all' || loan.status === state.loanStatusFilter;
     const matchesLoan = !state.loanFilterId || loan.id === state.loanFilterId;
     return matchesStatus && matchesLoan;
-  });
+  }), loanSort());
+}
+
+/**
+ * Die gewaehlte Sortierung. Beim ersten Zeichnen des Reiters aus dem
+ * Geraetespeicher gelesen, danach aus dem State - gelesen wird dort, wo der
+ * Wert gebraucht wird, damit kein Seitenaufbau ihn vergessen kann.
+ */
+function loanSort() {
+  if (state.loanSort == null) {
+    let stored = null;
+    try { stored = localStorage.getItem(LOAN_SORT_KEY); } catch (_) { /* Private-Mode: Voreinstellung */ }
+    state.loanSort = normalizeLoanSort(stored);
+  }
+  return state.loanSort;
+}
+
+// Die Koepfe der Gruppen tragen die Woerter, die schon an Karte und Filter
+// stehen - dieselbe Sache heisst auf der Seite nicht zweimal verschieden.
+const LOAN_GROUP_LABELS = {
+  borrowed: 'budget.loanDirectionBorrowedBadge',
+  lent: 'budget.loanDirectionLentBadge',
+  paid: 'budget.loanStatusPaid',
+};
+
+/**
+ * Die Karten der Liste. In einer Geld-Sortierung mit beiden Richtungen stehen
+ * sie in Gruppen (aufgenommen, verliehen, bezahlt) unter einem Gruppentitel
+ * (`.list-group__title`, DESIGN.md "Ueberschrift ueber Inhalt"); sonst ohne.
+ * `visibleLoans` ist schon sortiert, gruppiert wird dieselbe Menge.
+ */
+function loanListHtml(visibleLoans) {
+  const groups = groupLoans(visibleLoans, loanSort());
+  if (!groups) return visibleLoans.map(renderLoanCard).join('');
+  return groups.map((group) => `
+          <h3 class="list-group__title budget-loans__group" data-loan-group="${group.id}">${esc(t(LOAN_GROUP_LABELS[group.id]))}</h3>
+          ${group.loans.map(renderLoanCard).join('')}`).join('');
+}
+
+/**
+ * Die Statuszeile der Sortierung (Entscheidung Ulas, 2026-10-08): die Wahl
+ * wird gemerkt, also steht die Liste nach einer Woche evtl. anders da als
+ * erwartet - dann sagt die Zeile, wonach. In der Voreinstellung steht nichts.
+ * Dieselbe leise Zeile wie der Darlehens-Filter darueber, als echter Knopf:
+ * ein Tipp oeffnet das Sortiermenue (wireLoansPage).
+ */
+function loanSortNoteHtml() {
+  const sort = loanSort();
+  if (sort === DEFAULT_LOAN_SORT) return '';
+  return `<button type="button" class="budget-list-header__filter budget-loans__sort-note" id="budget-loan-sort-note"
+                  aria-haspopup="menu" aria-controls="budget-loan-tools-menu">${esc(t('budget.loanSortActive', { sort: t(LOAN_SORT_LABELS[sort]) }))}</button>`;
+}
+
+const LOAN_SORT_LABELS = {
+  start: 'budget.loanSortStart',
+  rate: 'budget.loanSortRate',
+  balance: 'budget.loanSortBalance',
+};
+
+/**
+ * Das Werkzeug-Menue der Darlehen (#1706; Muster: toolsMenuHtml der Abos,
+ * documentsToolsMenuHtml): die Sortierung als Einfachauswahl mit Haken. Sie
+ * ordnet nur und schreibt nichts - bei `budget: read` bleibt sie stehen.
+ *
+ * KEIN RAT: die Eintraege nennen, wonach geordnet wird, nicht was zu tun ist.
+ * Welches Darlehen zuerst getilgt wird, entscheidet, wer seine Vertraege
+ * kennt (#935).
+ */
+function loanToolsMenuHtml() {
+  const label = t('common.moreActions');
+  return `
+    <button type="button" class="btn btn--secondary btn--icon budget-loan-tools popover-menu__trigger"
+            popovertarget="budget-loan-tools-menu" aria-haspopup="menu" aria-expanded="false"
+            aria-label="${esc(label)}" title="${esc(label)}">
+      <i data-lucide="ellipsis" class="icon-md" aria-hidden="true"></i>
+    </button>
+    <div class="popover-menu budget-loan-tools-menu" id="budget-loan-tools-menu" popover role="menu" aria-label="${esc(label)}">
+      <div class="popover-menu__group" role="group" aria-labelledby="budget-loan-tools-sort-label">
+        <div class="popover-menu__label" id="budget-loan-tools-sort-label">${esc(t('budget.loanSortLabel'))}</div>
+        ${LOAN_SORTS.map((id) => {
+    const on = loanSort() === id;
+    return `
+        <button type="button" role="menuitemradio" aria-checked="${on}" class="popover-menu__item" data-loan-sort="${id}">
+          <i data-lucide="check" class="icon-md popover-menu__item-check${on ? '' : ' popover-menu__item-check--hidden'}" aria-hidden="true"></i><span>${esc(t(LOAN_SORT_LABELS[id]))}</span>
+        </button>`;
+  }).join('')}
+      </div>
+    </div>`;
 }
 
 function activeLoanLabel() {
@@ -2569,8 +2770,15 @@ function activeLoanLabel() {
 }
 
 function loanPaymentsFor(loans) {
+  // Gleichstand (selber Tag, selbe Ratennummer an zwei Darlehen) bricht die
+  // Reihenfolge des SERVERS, nicht die der Karten: sonst tauschte die
+  // Sortierwahl der Darlehen (#1706) Zeilen in der Ratenliste.
+  const serverOrder = new Map((state.loans?.loans ?? []).map((loan, index) => [loan.id, index]));
+  const rank = (loan) => serverOrder.get(loan.id) ?? Number.MAX_SAFE_INTEGER;
   return loans.flatMap((loan) => (loan.payments ?? []).map((payment) => ({ ...payment, loan })))
-    .sort((a, b) => new Date(b.paid_date) - new Date(a.paid_date) || b.installment_number - a.installment_number);
+    .sort((a, b) => new Date(b.paid_date) - new Date(a.paid_date)
+      || b.installment_number - a.installment_number
+      || rank(a.loan) - rank(b.loan));
 }
 
 function renderLoanTransactions(loans) {
@@ -2734,6 +2942,22 @@ function wireLoansPage() {
       renderBody();
       refocusSegmented('.budget-loans__filters');
     },
+  });
+  // Die Statuszeile oeffnet dasselbe Menue wie der Mehr-Knopf. Kein zweites
+  // `popovertarget`: das Menue richtet sich am ERSTEN sichtbaren Ausloeser aus
+  // (popover-menu.js triggerOf) und haenge sonst immer an der Zeile.
+  _container.querySelector('#budget-loan-sort-note')?.addEventListener('click', () => {
+    _container.querySelector('#budget-loan-tools-menu')?.showPopover?.();
+  });
+  _container.querySelector('#budget-loan-tools-menu')?.addEventListener('click', (e) => {
+    const item = e.target.closest('[data-loan-sort]');
+    if (!item) return;
+    state.loanSort = normalizeLoanSort(item.dataset.loanSort);
+    try { localStorage.setItem(LOAN_SORT_KEY, state.loanSort); } catch (_) { /* Private-Mode: nur diese Sitzung */ }
+    renderBody();
+    // Der Eintrag lag im Menue, das mit dem Neuaufbau verschwindet - der Fokus
+    // geht an dessen Knopf zurueck statt auf <body>.
+    _container.querySelector('.budget-loan-tools')?.focus();
   });
   // renderBody() baut die Leiste bei jedem Wechsel neu: der Schluessel laesst
   // die neue Kapsel von der Stelle der alten gleiten.
@@ -3035,7 +3259,13 @@ function renderLoanCard(loan) {
         <span data-bar-key="loan:${loan.id}" style="--bar-scale:${paidPct / 100}"></span>
       </div>
       <div class="budget-loan-card__footer">
-        <span>${t('budget.loanNextDue', { month: nextDue })}</span>
+        <div class="budget-loan-card__dates">
+          <span>${t('budget.loanNextDue', { month: nextDue })}</span>
+          ${/* Der Monat der letzten Rate (#1706), vom Server aus derselben
+              * Restlaufzeit gerechnet, die auch der Bericht zeigt. Fehlt er
+              * (getilgt, oder die Rate deckt den Zins nicht), faellt die Zeile weg. */ ''}
+          ${loan.projected_end_month ? `<span class="budget-loan-card__end">${t('budget.loanProjectedEnd', { month: formatMonthLabel(loan.projected_end_month) })}</span>` : ''}
+        </div>
         ${/* Bei `budget: read` gehen alle drei: Bearbeiten, Loeschen und das
             * Buchen einer Rate schreiben. Faelligkeit, Fortschritt und der
             * Bericht hinter der Karte bleiben - sie sind die Auskunft. */ ''}
@@ -3126,6 +3356,9 @@ function openCategoryManager() {
           { key: 'income',  labelKey: 'budget.income',   addLabelKey: 'budget.addCategory', subcategories: true },
         ],
         supportsSubcategories: true,
+        // Die Route uebersetzt die eingebauten Kategorien selbst und braucht
+        // dafuer die Sprache dieser Oberflaeche (#1859).
+        localizedLabels: true,
         labelResolver: (item) => item.label ?? budgetCategoryLabel(item.key, item.name, t),
         titleKey: 'budget.manageCategories',
         hintKey: 'category.manageHint',
@@ -3794,7 +4027,7 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
           if (mode === 'create') {
             const res = await api.post('/budget', await withReceipts());
             state.entries.unshift(res.data);
-            await loadMonth(state.month);
+            await reloadMonth();
             closeModal({ force: true });
             redrawEntries();
             window.yuvomi?.showToast(t('budget.addedToast'), 'success');
@@ -3853,14 +4086,14 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
               if (idx !== -1) state.entries[idx] = res.data;
               window.yuvomi?.showToast(t('budget.savedToast'), 'success');
             }
-            await loadMonth(state.month);
+            await reloadMonth();
             renderBody();
             refocusAfterRender();
           } else {
             const res = await api.put(`/budget/${entry.id}`, await withReceipts());
             const idx = state.entries.findIndex((e) => e.id === entry.id);
             if (idx !== -1) state.entries[idx] = res.data;
-            await loadMonth(state.month);
+            await reloadMonth();
             closeModal({ force: true });
             renderBody();
             window.yuvomi?.showToast(t('budget.savedToast'), 'success');
@@ -4766,7 +4999,7 @@ async function saveLoanFromPanel(panel, saveBtn, { loan = null, closeAfterSave =
     } else {
       await api.post('/budget/loans', body);
     }
-    await loadMonth(state.month);
+    await reloadMonth();
     if (closeAfterSave) closeModal({ force: true });
     renderBody();
     window.yuvomi?.showToast(isEdit ? t('budget.loanSavedToast') : t('budget.loanAddedToast'), 'success');
@@ -4825,7 +5058,7 @@ async function markLoanPayment(id) {
       paid_date: paidDate,
     });
     const paymentId = res.data?.payment?.id;
-    await loadMonth(state.month);
+    await reloadMonth();
     renderBody();
     vibrate(30);
 
@@ -4835,7 +5068,7 @@ async function markLoanPayment(id) {
       window.yuvomi?.showToast(booked, 'default', 5000, async () => {
         try {
           await api.delete(`/budget/loans/${id}/payments/${paymentId}`);
-          await loadMonth(state.month);
+          await reloadMonth();
           renderBody();
         } catch (err) {
           showBudgetError(err);
@@ -4862,7 +5095,7 @@ async function deleteLoan(id) {
     commit: async ({ keepalive }) => {
       await api.delete(`/budget/loans/${id}`, { keepalive });
       if (keepalive) return; // Seite verschwindet — kein UI-Refresh mehr
-      await loadMonth(state.month);
+      await reloadMonth();
       renderBody();
     },
     restore: (err) => {
@@ -4888,7 +5121,7 @@ async function deleteLoanPayment(loanId, paymentId) {
     commit: async ({ keepalive }) => {
       await api.delete(`/budget/loans/${loanId}/payments/${paymentId}`, { keepalive });
       if (keepalive) return; // Seite verschwindet — kein UI-Refresh mehr
-      await loadMonth(state.month);
+      await reloadMonth();
       renderBody();
     },
     restore: (err) => {
@@ -4956,7 +5189,7 @@ async function openConfirmBookingModal(id) {
         try {
           await api.patch(`/budget/${id}/confirm`, { amount: value, date: date || undefined });
           closeModal({ force: true });
-          await loadMonth(state.month);
+          await reloadMonth();
           renderBody();
           refocusAfterRender();
           window.yuvomi?.showToast(t('budget.confirmSaved'), 'success');
@@ -5065,7 +5298,7 @@ async function deleteEntry(id) {
     commit: async ({ keepalive }) => {
       await api.delete(`/budget/${id}`, { keepalive });
       if (keepalive) return; // Seite verschwindet — kein UI-Refresh mehr
-      await loadMonth(state.month);
+      await reloadMonth();
       renderBody();
     },
     restore: (err) => {
@@ -5256,14 +5489,14 @@ async function deleteEntrySeries(id) {
     commit: async ({ keepalive }) => {
       await api.delete(`/budget/${id}/series`, { keepalive });
       if (keepalive) return; // Seite verschwindet — kein UI-Refresh mehr
-      await loadMonth(state.month);
+      await reloadMonth();
       renderBody();
     },
     // Undo stellte bisher nichts wieder her (Serie blieb bis zum nächsten
     // Reload verschwunden) — jetzt lädt der Monat neu, der Server hat ja
     // nie gelöscht.
     restore: async (err) => {
-      await loadMonth(state.month);
+      await reloadMonth();
       renderBody();
       if (err) showBudgetError(err);
     },
@@ -5368,6 +5601,11 @@ export const __test = {
   // renderBody() schreibt in den Seitencontainer statt Markup zurueckzugeben;
   // derselbe Griff wie updateTabsForTest oben laesst den ECHTEN Render-Pfad
   // des Buchungs-Tabs laufen, statt seinen Quelltext zu lesen.
+  // #1781: Laden und Blaettern als Programm, mit gesteuerten Antworten.
+  loadMonth,
+  stepPeriod,
+  jumpToCurrentPeriod,
+  changeTab,
   renderBodyForTest(container) {
     _container = container;
     renderBody();

@@ -78,7 +78,7 @@ export function schedulePaths() {
       get: op({ summary: 'List per-day overrides', tag: 'Schedule' }),
       delete: op({
         summary: 'Remove overrides across a date range',
-        description: 'The counterpart to /overrides/fill - a single indexed delete, so it carries the read-side range cap (731 days) rather than the smaller one on fill.',
+        description: 'The counterpart to /overrides/fill - a single indexed delete, so it carries the read-side range cap (731 days) rather than the smaller one on fill. A range whose `from` lies after `to` is refused with 400 and reason `range_reversed`.',
         tag: 'Schedule',
         params: [
           { name: 'user_id', in: 'query', required: false, description: 'Household member; defaults to the caller', schema: { type: 'integer' } },
@@ -91,7 +91,7 @@ export function schedulePaths() {
     '/api/v1/schedule/overrides/fill': {
       post: op({
         summary: 'Fill a date range of overrides in one call',
-        description: 'Upserts the same shift type (or NULL for a free day) across an inclusive range - e.g. marking a vacation - instead of one PUT per day. Writes real rows, so it is capped separately from /entries at 100 days.',
+        description: 'Upserts the same shift type (or NULL for a free day) across an inclusive range - e.g. marking a vacation - instead of one PUT per day. Writes real rows, so it is capped separately from /entries at 100 days. A range whose `from` lies after `to` is refused with 400 and reason `range_reversed`.',
         tag: 'Schedule',
         stateChanging: true,
         requestBody: jsonBody(null),
@@ -121,7 +121,7 @@ export function schedulePaths() {
     '/api/v1/schedule/extras/fill': {
       post: op({
         summary: 'Add the same extra shift across a date range in one call',
-        description: 'An insert loop, not an upsert - every day in range gets its own new row. Writes real rows, capped at 100 days like /overrides/fill.',
+        description: 'An insert loop, not an upsert - every day in range gets its own new row. Writes real rows, capped at 100 days like /overrides/fill. A range whose `from` lies after `to` is refused with 400 and reason `range_reversed`.',
         tag: 'Schedule',
         stateChanging: true,
         requestBody: jsonBody(null),

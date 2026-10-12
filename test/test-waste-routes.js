@@ -443,6 +443,7 @@ test('POST /waste/sources/:id/reimport/commit: 409 on a stale expected_version',
     body: { ics: icsFixture('2026-11-14'), mappings: [], expected_version: 0 },
   });
   assert.equal(r.status, 409);
+  assert.equal(r.body.reason, 'source_changed', 'the refusal names its reason, so the client can say it in the household language');
 });
 
 test('DELETE /waste/sources/:id: cascades mappings and imported pickups, survives a 404 on repeat', async () => {

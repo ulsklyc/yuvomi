@@ -599,8 +599,15 @@ function renderOverview(el) {
     icons(el);
     return;
   }
+  // Zwei Kopfaktionen fuer Eltern (#1787). Der Bonus ist die haeufigere und
+  // steht als die staerkere am Ende; er oeffnet denselben Dialog wie der FAB
+  // im Verlauf. Beide reisen als EINE Gruppe, damit ein schmaler Kopf sie
+  // gemeinsam unter den Titel legt statt eine allein in die zweite Zeile.
   const adminBar = isAdmin() && !readOnly() ? `
-    <button class="btn btn--ghost btn--sm rw-manage-participants" type="button"><i data-lucide="users-round" aria-hidden="true"></i>${esc(t('rewards.manageParticipants'))}</button>` : '';
+          <div class="rw-section__actions">
+            <button class="btn btn--ghost btn--sm rw-manage-participants" type="button"><i data-lucide="users-round" aria-hidden="true"></i>${esc(t('rewards.manageParticipants'))}</button>
+            <button class="btn btn--secondary btn--sm rw-grant-bonus" type="button"><i data-lucide="plus" aria-hidden="true"></i>${esc(t('rewards.grantBonus'))}</button>
+          </div>` : '';
   // Anfragen und Punktestaende links, die letzten Buchungen ab der
   // Split-Schwelle rechts daneben (mobil darunter) - `.page-columns`.
   el.insertAdjacentHTML('beforeend', `
@@ -630,6 +637,7 @@ function wireOverview(el) {
     document.querySelector('.rewards-tabs [data-tab-id="ledger"]')?.click();
   });
   el.querySelector('.rw-manage-participants')?.addEventListener('click', openParticipantsModal);
+  el.querySelector('.rw-grant-bonus')?.addEventListener('click', () => openBonusModal());
   el.querySelectorAll('.rw-redeem-open').forEach((btn) => {
     btn.addEventListener('click', () => openRedeemModal(Number(btn.dataset.member)));
   });
@@ -1456,7 +1464,8 @@ function renderMoneySection() {
   const manage = isAdmin() && !readOnly();
   const canOpen = manage && (state.money.candidates || []).length > 0;
   // Ohne Konto und ohne die Moeglichkeit, eines zu eroeffnen, gibt es nichts
-  // zu zeigen - auch keine Ueberschrift ueber einer leeren Liste.
+  // zu zeigen - auch keine Ueberschrift ueber einer leeren Liste. Wer eines
+  // eroeffnen kann, sieht ohne Konto einen Satz im selben Traeger.
   if (!accounts.length && !canOpen) return '';
   const setUp = canOpen ? `
           <button class="btn btn--ghost btn--sm rw-money-setup" type="button"><i data-lucide="piggy-bank" aria-hidden="true"></i>${esc(t('rewards.money.setUp'))}</button>` : '';
@@ -1466,7 +1475,9 @@ function renderMoneySection() {
           <h2 class="rw-section__title u-section-title">${esc(t('rewards.money.title'))}</h2>
           ${setUp}
         </div>
-        ${accounts.length ? `<ul class="row-carrier rw-standings">${accounts.map(renderMoneyRow).join('')}</ul>` : ''}
+        <ul class="row-carrier rw-standings">${accounts.length
+    ? accounts.map(renderMoneyRow).join('')
+    : `<li class="list-row rw-money-empty"><p class="list-row__meta">${esc(t('rewards.money.empty'))}</p></li>`}</ul>
       </section>`;
 }
 

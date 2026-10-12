@@ -4,9 +4,39 @@
  *        getConfig() führt Discovery durch und cached die Configuration für die Laufzeit.
  *        resetClient() wird in Tests verwendet um den Cache zu leeren.
  */
+import { AsyncLocalStorage } from 'node:async_hooks';
 import * as client from 'openid-client';
 
 let _config = null;
+
+/**
+ * Die Redirect-URI des laufenden Code-Tauschs, je Aufruf (#1768).
+ * Siehe `exchangeAuthorizationCode`.
+ */
+const grantRedirectUri = new AsyncLocalStorage();
+
+/**
+ * `fetch` fuer die Anfragen an den Anbieter. Reicht alles unveraendert durch,
+ * nur die Token-Anfrage des Code-Tauschs bekommt die Redirect-URI, die die
+ * Authorize-Anfrage getragen hat. Das ist der Weg, den `openid-client` dafuer
+ * dokumentiert (`customFetch`, Beispiel "Correcting the redirect_uri token
+ * endpoint request parameter"): die Bibliothek leitet den Wert sonst aus der
+ * Callback-URL ab, und zusaetzliche Token-Parameter ueberschreibt sie.
+ *
+ * Ein Code-Tausch ohne festgehaltenen Wert wird abgewiesen statt mit dem
+ * abgeleiteten gesendet: der abgeleitete ist genau der, der abweichen kann.
+ */
+function providerFetch(url, options) {
+  const body = options?.body;
+  if (body instanceof URLSearchParams && body.get('grant_type') === 'authorization_code') {
+    const redirectUri = grantRedirectUri.getStore();
+    if (typeof redirectUri !== 'string' || !redirectUri) {
+      throw new Error('OIDC code exchange without the redirect URI of its authorize request.');
+    }
+    body.set('redirect_uri', redirectUri);
+  }
+  return fetch(url, options);
+}
 
 /**
  * Gibt true zurück wenn alle vier OIDC-Umgebungsvariablen gesetzt sind.
@@ -152,9 +182,46 @@ export async function getConfig() {
     process.env.OIDC_CLIENT_ID,
     process.env.OIDC_CLIENT_SECRET,
     client.ClientSecretBasic(process.env.OIDC_CLIENT_SECRET),
+    { [client.customFetch]: providerFetch },
   );
 
   return _config;
+}
+
+/**
+ * Tauscht den Code aus dem Callback gegen Tokens - mit GENAU der Redirect-URI,
+ * die die Authorize-Anfrage dieses Laufs getragen hat (#1768).
+ *
+ * RFC 6749, 4.1.3: der Anbieter muss einen Tausch ablehnen, dessen
+ * `redirect_uri` nicht identisch mit der aus der Authorize-Anfrage ist.
+ * `authorizationCodeGrant` bekommt nur eine URL und nimmt deren Form ohne Query
+ * als Redirect-URI. Aus `OIDC_REDIRECT_URI` und dem Pfad der eingehenden
+ * Anfrage gebaut, war das die NORMALISIERTE Herkunft der Variable mit dem Pfad,
+ * der bei Express ankam: `https://Host:443/...` wurde zu `https://host/...`,
+ * und ein Pfad, den der Reverse Proxy umschreibt, ging mit. Die Anmeldung
+ * scheiterte dann nach dem erfolgreichen Login beim Anbieter mit `invalid_grant`.
+ *
+ * Von der eingehenden Anfrage kommen deshalb nur die Antwortparameter (`code`,
+ * `state`, `iss`, `error`): die URL fuer die Bibliothek traegt den
+ * festgehaltenen Wert als Basis, und `providerFetch` setzt ihn in der
+ * Token-Anfrage Zeichen fuer Zeichen. Der Wert reist ueber AsyncLocalStorage
+ * und nicht ueber die geteilte Configuration, weil zwei Anmeldungen
+ * gleichzeitig laufen koennen.
+ *
+ * @param {import('openid-client').Configuration} config
+ * @param {object} args
+ * @param {string} args.redirectUri  Wert aus der Authorize-Anfrage dieses Laufs
+ * @param {string} args.query        Query der eingehenden Callback-Anfrage, mit oder ohne `?`
+ * @param {object} args.checks       expectedState, expectedNonce, pkceCodeVerifier
+ */
+export function exchangeAuthorizationCode(config, { redirectUri, query, checks }) {
+  if (typeof redirectUri !== 'string' || !redirectUri) {
+    throw new TypeError('exchangeAuthorizationCode needs the redirect URI of the authorize request.');
+  }
+  const currentUrl = new URL(redirectUri);
+  currentUrl.search = query ?? '';
+  currentUrl.hash = '';
+  return grantRedirectUri.run(redirectUri, () => client.authorizationCodeGrant(config, currentUrl, checks));
 }
 
 /**

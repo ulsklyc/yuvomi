@@ -49,6 +49,7 @@ import {
   attachmentUploadRefused, storedAttachmentLocked,
   ATTACHMENT_UPLOAD_REFUSAL, ATTACHMENT_CHANGE_REFUSAL,
   caldavTarget,
+  caldavTargetOffered,
   cloneAttachmentDocument,
   googleTarget,
   outlookTarget,
@@ -509,7 +510,9 @@ router.post('/', async (req, res) => {
     const vIcon  = eventIcon(req.body.icon);
     const vLoc   = str(req.body.location, 'Ort', { max: MAX_TITLE, required: false });
     const vRrule = rrule(req.body.recurrence_rule, 'Wiederholung');
-    const vCaldav = caldavTarget(req.body);
+    // Erst die Form, dann der Inhalt: ein Paar aus der eingeschalteten Auswahl (#1860).
+    const vCaldavForm = caldavTarget(req.body);
+    const vCaldav = vCaldavForm.error ? vCaldavForm : caldavTargetOffered(db.get(), vCaldavForm.value);
     const vGoogle = googleTarget(req.body);
     const vOutlook = outlookTarget(req.body);
     const errors = collectErrors([vTitle, vDesc, vStart, vEnd, vColor, vLoc, vRrule, vCaldav, vGoogle, vOutlook]);
@@ -795,6 +798,8 @@ router.put('/:id', async (req, res) => {
       || req.body.target_caldav_calendar_url !== undefined;
     const vCaldav = caldavProvided ? caldavTarget(req.body) : null;
     if (vCaldav) checks.push(vCaldav);
+    // Ein NEUES Ziel muss angeboten sein; das unveränderte kommt durch (#1860).
+    if (vCaldav && !vCaldav.error) checks.push(caldavTargetOffered(db.get(), vCaldav.value, event));
     // Google-Ziel nur prüfen, wenn der Client es mitschickt; sonst bestehenden Wert behalten.
     const googleProvided = req.body.target_google_calendar_id !== undefined;
     const vGoogle = googleProvided ? googleTarget(req.body) : null;
@@ -1468,6 +1473,8 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
     const errors = [
       ...mutation.errors,
       ...[vCaldav, vGoogle, vOutlook].filter(Boolean),
+      // Ein NEUES Ziel muss angeboten sein; das der Serie kommt durch (#1860).
+      ...(vCaldav && !vCaldav.error ? [caldavTargetOffered(db.get(), vCaldav.value, master)] : []),
     ].flatMap((result) => typeof result === 'string' ? [result] : (result.error ? [result.error] : []));
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
     const vIcon = req.body.icon !== undefined ? eventIcon(req.body.icon) : undefined;

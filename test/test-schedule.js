@@ -1049,6 +1049,36 @@ test('saving a multi-day "replace" range parks the form through the confirmation
   assert.match(replaceBranch, /confirmOverModal\([\s\S]*closeOnConfirm:\s*false/, 'a failed /schedule/overrides/fill must find the form still parked, not already closed by the confirmation itself');
 });
 
+/* #1782: die Feld-Auswahl im Schichtart-Dialog hatte keinen Namen - kein Label,
+ * kein aria-label, kein aria-labelledby. Ein Screenreader sagte
+ * "Kombinationsfeld" und den Namen des ersten Feldes. Gelesen wird das Markup,
+ * das die echte shiftTypeFieldsEditor() schreibt, in beiden Zustaenden der
+ * Auswahl. */
+test('#1782: die Feld-Auswahl im Schichtart-Dialog traegt einen zugaenglichen Namen', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const state = __test.scheduleState();
+  const savedFields = state.customFields;
+  state.customFields = [{ id: 11, name: 'Station' }, { id: 12, name: 'Fahrzeug' }];
+  try {
+    const editors = {
+      'mit waehlbarem Feld': __test.shiftTypeFieldsEditor({ id: 5, fields: [{ id: 11, name: 'Station', show_in_overlay: 0 }] }),
+      'leer und verborgen': __test.shiftTypeFieldsEditor({ id: 5, fields: state.customFields.map((f) => ({ ...f, show_in_overlay: 0 })) }),
+    };
+    for (const [label, html] of Object.entries(editors)) {
+      const selects = html.match(/<select\b[^>]*data-field-picker[^>]*>/g) ?? [];
+      assert.equal(selects.length, 1, `${label}: genau eine Feld-Auswahl`);
+      // Der Test-Stub von t() gibt den Schluessel zurueck: der Name kommt aus den Locales.
+      assert.match(selects[0], / aria-label="schedule\.fieldPickerLabel"/, `${label}: die Auswahl hat keinen zugaenglichen Namen`);
+    }
+    // Der Schluessel hat in der Referenzsprache einen Text, der nicht der Schluessel ist.
+    const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
+    assert.equal(typeof de.schedule.fieldPickerLabel, 'string');
+    assert.ok(de.schedule.fieldPickerLabel.trim().length > 0);
+  } finally {
+    state.customFields = savedFields;
+  }
+});
+
 /* #1775: ein im Schichtart-Dialog entferntes Feld liess sich im selben Dialog
  * nicht wieder anhaengen - "Entfernen" loeschte nur die Zeile, und waren alle
  * Felder angehaengt, gab es gar keine Auswahl. Gefahren wird die echte
@@ -1067,7 +1097,7 @@ test('#1775: ein entferntes eigenes Feld kehrt in die Auswahl des Schichtart-Dia
 
     // Markup: die Auswahl steht IMMER da, ohne waehlbares Feld verborgen.
     const all = __test.shiftTypeFieldsEditor({ id: 5, fields: state.customFields.map((f) => ({ ...f, show_in_overlay: 0 })) });
-    assert.match(all, /<div class="schedule-type-field-add" data-field-add hidden><select class="form-input" data-field-picker="5"><\/select>/,
+    assert.match(all, /<div class="schedule-type-field-add" data-field-add hidden><select class="form-input" data-field-picker="5"[^>]*><\/select>/,
       'alle Felder angehaengt: die Auswahl ist da, leer und verborgen');
     const some = __test.shiftTypeFieldsEditor({ id: 5, fields: [{ id: 11, name: 'Station', show_in_overlay: 0 }] });
     assert.match(some, /<div class="schedule-type-field-add" data-field-add><select[^>]*><option value="12">Fahrzeug<\/option><option value="13">Partner<\/option><\/select>/);
@@ -2910,4 +2940,253 @@ test('R16: Vergleich und Auswertung tragen mobil zwei Bedienzeilen', async () =>
     'Person und Zeitraum stehen nebeneinander');
   const labels = narrow.find((r) => r.selector.includes('.schedule-stat-range > .form-label'));
   assert.match(labels?.body ?? '', /clip-path:\s*inset\(50%\)/, 'die Feld-Labels bleiben im Baum');
+});
+
+/* #1777: "Bis" folgte "Von" nicht, und die Absage des Servers stand englisch
+ * im Toast. Drei Dinge, jedes am laufenden Code:
+ *   (1) der Server gibt der Absage einen `reason` mit, der Satz bleibt;
+ *   (2) "Bis" zieht mit, sobald "Von" es ueberholt - gefahren wird die echte
+ *       wireRangeFollow() an Feld-Attrappen, die `change` melden wie der
+ *       Datepicker;
+ *   (3) die Pruefung des Dialogs: die echte saveCreatedSchedule() mit Von nach
+ *       Bis meldet den Fehler AM FELD "Bis" und sendet nichts. */
+test('#1777: a reversed range is refused with reason range_reversed, the sentence stays', async () => {
+  const fill = await call('POST', '/overrides/fill', { as: ALICE, body: { user_id: ALICE.id, from: '2027-03-10', to: '2027-03-01', shift_type_id: null } });
+  assert.deepEqual(fill, { status: 400, body: { error: 'from must be before to.', code: 400, reason: 'range_reversed' } });
+  const clear = await call('DELETE', `/overrides?user_id=${ALICE.id}&from=2027-04-10&to=2027-04-01`, { as: ALICE });
+  assert.deepEqual(clear, { status: 400, body: { error: 'from must be before to.', code: 400, reason: 'range_reversed' } });
+  const list = await call('GET', '/overrides?from=2027-04-10&to=2027-04-01', { as: ALICE });
+  assert.equal(list.body.reason, 'range_reversed');
+  const entries = await call('GET', '/entries?from=2027-04-10&to=2027-04-01', { as: ALICE });
+  assert.deepEqual(entries, { status: 400, body: { error: 'from must be before to.', code: 400, reason: 'range_reversed' } });
+
+  // Mit einem zweiten Fehler im selben Satz bleibt der reason - am Wortlaut hinge er nicht mehr.
+  const two = await call('POST', '/overrides/fill', { as: ADMIN, body: { user_id: 99999, from: '2027-03-10', to: '2027-03-01', shift_type_id: null } });
+  assert.equal(two.status, 400);
+  assert.equal(two.body.error, 'from must be before to. user_id does not exist.');
+  assert.equal(two.body.reason, 'range_reversed');
+
+  // Gegenproben: ein fremdes Konto ist eine 403 ohne diesen reason, und eine
+  // andere 400 traegt ihn nicht.
+  const foreign = await call('POST', '/overrides/fill', { as: ALICE, body: { user_id: BOB.id, from: '2027-03-10', to: '2027-03-01', shift_type_id: null } });
+  assert.equal(foreign.status, 403);
+  assert.equal('reason' in foreign.body, false);
+  const other = await call('GET', '/entries?from=not-a-date&to=2027-04-01', { as: ALICE });
+  assert.equal(other.status, 400);
+  assert.equal('reason' in other.body, false);
+
+  // Die Oberflaeche liest den reason der ECHTEN Antwort, nicht den Satz.
+  const { __test } = await import('../public/pages/schedule.js');
+  assert.equal(__test.scheduleErrorMessage({ data: fill.body }), 'schedule.rangeOrderError');
+  assert.equal(__test.scheduleErrorMessage({ data: two.body }), 'schedule.rangeOrderError');
+});
+
+/** Feld-Attrappe mit genau der Flaeche, die der Datepicker den Dialogen bietet. */
+function rangeFieldStub(name, value) {
+  const listeners = new Map();
+  return {
+    name, value,
+    addEventListener(type, fn) { listeners.set(type, [...(listeners.get(type) ?? []), fn]); },
+    /** Wie `_emit()` im Datepicker: der Wert steht, dann kommt `change`. */
+    pick(next) { this.value = next; for (const fn of listeners.get('change') ?? []) fn({ currentTarget: this, target: this }); },
+  };
+}
+
+function rangeFormStub(fields, extra = {}) {
+  return {
+    ...extra,
+    fields,
+    querySelector(selector) {
+      const name = /^\[name="([^"]+)"\]$/.exec(selector)?.[1];
+      return fields.find((field) => field.name === name) ?? null;
+    },
+    querySelectorAll() { return []; },
+  };
+}
+
+test('#1777: "Bis" folgt "Von", sobald "Von" daran vorbeizieht - in beiden Feldpaaren', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  assert.equal(typeof __test.wireRangeFollow, 'function', 'kein Dialog verdrahtet Von und Bis miteinander');
+  for (const [fromName, toName] of [['range_from', 'range_to'], ['from', 'to']]) {
+    const from = rangeFieldStub(fromName, '2026-10-07');
+    const to = rangeFieldStub(toName, '2026-10-07');
+    __test.wireRangeFollow(rangeFormStub([from, to]));
+
+    from.pick('2026-10-08');
+    assert.equal(to.value, '2026-10-08', `${toName} zieht mit`);
+
+    // Gegenproben: ein frueheres "Von" laesst "Bis" stehen (der Zeitraum wird
+    // laenger), und "Bis" selbst zu verschieben bewegt "Von" nie.
+    from.pick('2026-10-01');
+    assert.equal(to.value, '2026-10-08', 'ein frueheres Von verlaengert den Zeitraum');
+    to.pick('2026-10-20');
+    assert.equal(from.value, '2026-10-01');
+    from.pick('2026-11-02');
+    assert.equal(to.value, '2026-11-02', 'ueber die Monatsgrenze');
+    // Ein geleertes "Von" raeumt "Bis" nicht ab.
+    from.pick('');
+    assert.equal(to.value, '2026-11-02');
+  }
+  // Ein Formular ohne Zeitraum (Schichtart anlegen) wirft nicht.
+  assert.doesNotThrow(() => __test.wireRangeFollow(rangeFormStub([rangeFieldStub('name', 'Frueh')])));
+});
+
+test('#1777: jeder Dialog mit Von und Bis verdrahtet das Mitziehen', () => {
+  // Die Funktion oben misst das Verhalten; hier steht, dass die drei Dialoge
+  // sie auch RUFEN - je einmal, direkt vor dem Verdrahten des Sendens.
+  const page = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const forms = page.split("form?.addEventListener('submit', saveCreatedSchedule);").length - 1;
+  const wired = page.split("wireRangeFollow(form);\n      form?.addEventListener('submit', saveCreatedSchedule);").length - 1;
+  assert.equal(forms, 3, 'drei Dialoge senden ueber saveCreatedSchedule()');
+  assert.equal(wired, forms);
+});
+
+test('#1777: Von nach Bis meldet der Dialog am Feld "Bis" und sendet nichts', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  assert.equal(typeof __test.saveCreatedSchedule, 'function', 'saveCreatedSchedule() ist fuer den Test nicht erreichbar');
+  const saved = {
+    FormData: globalThis.FormData, api: globalThis.__apiStub, report: globalThis.__reportFieldError,
+    confirm: globalThis.__confirmOverModal, close: globalThis.__closeModal, window: globalThis.window,
+  };
+  const sent = [];
+  const reported = [];
+  const toasts = [];
+  // Was ein echtes FormData aus dem Formular laese: die Felder, die nicht `disabled` sind.
+  globalThis.FormData = class {
+    constructor(form) { this.form = form; }
+    * [Symbol.iterator]() { for (const field of this.form.fields) if (!field.disabled) yield [field.name, field.value]; }
+  };
+  const record = (method) => async (path, body) => { sent.push([method, path, body]); return { data: {} }; };
+  globalThis.__apiStub = { post: record('POST'), put: record('PUT'), delete: record('DELETE'), get: async () => ({ data: [] }) };
+  globalThis.__reportFieldError = (field, message) => reported.push([field?.name, message]);
+  globalThis.__confirmOverModal = async () => true;
+  globalThis.__closeModal = async () => true;
+  globalThis.window = { ...(saved.window ?? {}), yuvomi: { showToast: (text, kind) => toasts.push([text, kind]) } };
+
+  const submit = async (kind, fields) => {
+    sent.length = 0; reported.length = 0; toasts.length = 0;
+    const form = rangeFormStub(fields, { dataset: { form: kind }, elements: { reminder_enabled: { checked: false }, is_active: { checked: true } } });
+    await __test.saveCreatedSchedule({ preventDefault() {}, currentTarget: form });
+    return { sent: [...sent], reported: [...reported], toasts: [...toasts] };
+  };
+  const field = (name, value, disabled = false) => ({ ...rangeFieldStub(name, value), disabled });
+
+  try {
+    // Der Fall aus dem Ticket: Zusatzschicht, Von 08.10., Bis noch 07.10.
+    const extra = await submit('pattern-create', [
+      field('mode', 'add'), field('user_id', '1'), field('shift_type_id', '1'), field('note', ''),
+      field('range_from', '2026-10-08'), field('range_to', '2026-10-07'),
+    ]);
+    assert.deepEqual(extra.sent, [], 'nichts geht an den Server');
+    assert.deepEqual(extra.reported, [['range_to', 'schedule.rangeOrderError']], 'die Meldung steht am Feld "Bis"');
+    assert.deepEqual(extra.toasts, [], 'und es gibt keinen Toast');
+
+    // Dieselbe Pruefung im Modus "Abweichung" und in beiden Bearbeiten-Dialogen.
+    const replace = await submit('pattern-create', [
+      field('mode', 'replace'), field('user_id', '1'), field('shift_type_id', ''), field('note', ''),
+      field('range_from', '2026-10-08'), field('range_to', '2026-10-07'),
+    ]);
+    assert.deepEqual([replace.reported, replace.sent], [[['range_to', 'schedule.rangeOrderError']], []]);
+    for (const kind of ['override-edit', 'extra-edit-range']) {
+      const edit = await submit(kind, [
+        field('user_id', '1'), field('shift_type_id', '1'), field('note', ''), field('ids', '7'),
+        field('original_from', '2026-10-01'), field('original_to', '2026-10-03'),
+        field('from', '2026-10-08'), field('to', '2026-10-07'),
+      ]);
+      assert.deepEqual([edit.reported, edit.sent], [[['to', 'schedule.rangeOrderError']], []], kind);
+    }
+
+    // GEGENPROBEN - die Pruefung haelt nichts auf, was gehen soll.
+    // Ein richtiger Zeitraum geht raus, ohne Meldung am Feld.
+    const ok = await submit('pattern-create', [
+      field('mode', 'add'), field('user_id', '1'), field('shift_type_id', '1'), field('note', ''),
+      field('range_from', '2026-10-07'), field('range_to', '2026-10-08'),
+    ]);
+    assert.deepEqual(ok.reported, []);
+    assert.equal(ok.sent[0]?.[1], '/schedule/extras/fill');
+    assert.deepEqual([ok.sent[0][2].from, ok.sent[0][2].to], ['2026-10-07', '2026-10-08']);
+    // Im Modus "Muster" ist das Feldpaar `disabled`: was dort steht, zaehlt nicht.
+    const pattern = await submit('pattern-create', [
+      field('mode', 'pattern'), field('user_id', '1'), field('name', 'Woche'), field('cycle_length', '7'), field('anchor_date', '2026-10-05'),
+      field('range_from', '2026-10-08', true), field('range_to', '2026-10-07', true),
+    ]);
+    assert.deepEqual(pattern.reported, []);
+  } finally {
+    globalThis.FormData = saved.FormData;
+    globalThis.__apiStub = saved.api;
+    globalThis.__reportFieldError = saved.report;
+    globalThis.__confirmOverModal = saved.confirm;
+    globalThis.__closeModal = saved.close;
+    globalThis.window = saved.window;
+  }
+});
+
+/* #1777, Review: die Meldung an "Bis" blieb stehen, wenn der Zeitraum ueber
+ * "Von" richtiggestellt wurde. reportFieldError() raeumt nur ab, wenn das Feld
+ * SELBST `input` oder `change` meldet - und weder eine Korrektur an "Von" noch
+ * der Setter `to.value =` des Mitziehens meldet an "Bis" etwas. Die Attrappe
+ * bildet genau das nach: Attribute, Listener, und ein Setter, der schweigt. */
+test('#1777: die Meldung an "Bis" faellt, wenn "Von" den Zeitraum richtigstellt', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const field = (name, value) => {
+    const listeners = new Map();
+    const attributes = new Map();
+    return {
+      name, value,
+      getAttribute: (key) => attributes.get(key) ?? null,
+      setAttribute: (key, val) => attributes.set(key, String(val)),
+      addEventListener(type, fn) { listeners.set(type, [...(listeners.get(type) ?? []), fn]); },
+      removeEventListener(type, fn) { listeners.set(type, (listeners.get(type) ?? []).filter((item) => item !== fn)); },
+      dispatchEvent(event) { for (const fn of [...(listeners.get(event.type) ?? [])]) fn(event); return true; },
+      /** Wie `_emit()` im Datepicker: der Wert steht, dann kommt `change`. */
+      pick(next) { this.value = next; this.dispatchEvent(new Event('change', { bubbles: true })); },
+    };
+  };
+  // Was das echte reportFieldError() am Feld tut (components/modal.js): markieren,
+  // und beim naechsten `input`/`change` DIESES Feldes wieder abraeumen.
+  const markInvalid = (input) => {
+    input.setAttribute('aria-invalid', 'true');
+    const clear = () => {
+      input.removeEventListener('input', clear);
+      input.removeEventListener('change', clear);
+      input.setAttribute('aria-invalid', 'false');
+    };
+    input.addEventListener('input', clear);
+    input.addEventListener('change', clear);
+  };
+  const dialog = (fromValue, toValue) => {
+    const from = field('range_from', fromValue);
+    const to = field('range_to', toValue);
+    __test.wireRangeFollow(rangeFormStub([from, to]));
+    return { from, to };
+  };
+
+  // (1) Verkehrt herum gemeldet, dann "Von" ZURUECK vor "Bis": der Zeitraum
+  //     stimmt, "Bis" wurde nie angefasst.
+  const a = dialog('2026-10-08', '2026-10-07');
+  markInvalid(a.to);
+  a.from.pick('2026-10-06');
+  assert.equal(a.to.value, '2026-10-07', '"Bis" bleibt, wo es war');
+  assert.equal(a.to.getAttribute('aria-invalid'), 'false', 'die Meldung an "Bis" steht auf einem gueltigen Feld');
+
+  // (2) Verkehrt herum gemeldet, dann "Von" noch weiter: "Bis" zieht mit, und
+  //     der Setter allein raeumt nichts ab.
+  const b = dialog('2026-10-08', '2026-10-07');
+  markInvalid(b.to);
+  b.from.pick('2026-10-09');
+  assert.equal(b.to.value, '2026-10-09');
+  assert.equal(b.to.getAttribute('aria-invalid'), 'false', 'nach dem Mitziehen steht die Meldung noch');
+
+  // (3) Das Mitziehen meldet `change` an "Bis" - wer darauf hoert, erfaehrt den neuen Wert.
+  const c = dialog('2026-10-07', '2026-10-07');
+  const heard = [];
+  c.to.addEventListener('change', () => heard.push(c.to.value));
+  c.from.pick('2026-10-10');
+  assert.deepEqual(heard, ['2026-10-10']);
+
+  // GEGENPROBEN: ohne Meldung und ohne Mitziehen bleibt "Bis" still, und eine
+  // Meldung faellt NICHT, solange der Zeitraum verkehrt herum bliebe - das kann
+  // er nach dem Mitziehen nicht, also zaehlt hier nur die Stille.
+  c.from.pick('2026-10-01');
+  assert.deepEqual(heard, ['2026-10-10'], 'ein frueheres "Von" ohne Meldung meldet an "Bis" nichts');
 });

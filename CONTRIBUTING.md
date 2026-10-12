@@ -25,7 +25,7 @@ Backend dependencies are evaluated case-by-case but must remain minimal. When in
 
 ### Prerequisites
 
-- Node.js ≥ 22 (required for `--experimental-sqlite` in tests)
+- Node.js 22.14 or newer, on Node 23 at least 23.6 (the database driver needs Node-API 10; tests also use `--experimental-sqlite`)
 - Git
 
 ### Getting started

@@ -5,7 +5,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal as closeSharedModal, selectModal, confirmModal, askOverModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal as closeSharedModal, selectModal, confirmModal, askOverModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender, swapFieldsKeepingDirtyBase } from '/components/modal.js';
 import { stagger, scheduleUndoableDelete, wireScrollFade } from '/utils/ux.js';
 import { t, formatDate, formatDayMonth, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
@@ -2314,6 +2314,13 @@ function showCookForScope(panel, meal) {
  * Oeffnen leer war (gescheiterter Abruf, siehe loadMembers()). Ersetzt wird nur,
  * wenn derselbe Dialog noch offen ist und niemand gewaehlt hat - eine Wahl aus
  * der unvollstaendigen Liste ("Niemand") ueberschriebe das neue Markup sonst.
+ *
+ * DER TAUSCH IST KEINE EINGABE (#1784). Die neuen Checkboxen kennt die Basis
+ * des Verwerfen-Waechters nicht: das Schliessen des unberuehrten Dialogs
+ * fragte "Aenderungen verwerfen?". Die Basis einfach neu aufzunehmen waere die
+ * andere Luege - sie froere mit ein, was bis dahin getippt wurde. Der Tausch
+ * laeuft deshalb ueber swapFieldsKeepingDirtyBase(), samt der Vorauswahl aus
+ * showCookForScope(): sie gehoert zum Ausgangsstand der neuen Felder.
  */
 async function refreshCookPicker(panel, meal) {
   const opened = state.modal;
@@ -2321,10 +2328,12 @@ async function refreshCookPicker(panel, meal) {
   if (!state.members.length || state.modal !== opened || opened.cookTouched) return;
   const old = panel.querySelector('.meal-modal__cook');
   if (!old) return;
-  old.insertAdjacentHTML('afterend', cookPickerHtml(meal));
-  old.remove();
-  wireCookPicker(panel);
-  showCookForScope(panel, meal);
+  swapFieldsKeepingDirtyBase(panel, () => {
+    old.insertAdjacentHTML('afterend', cookPickerHtml(meal));
+    old.remove();
+    wireCookPicker(panel);
+    showCookForScope(panel, meal);
+  });
 }
 
 /** Beschriftung des Zutaten-Aufklappers: "Zutaten · 6" (wie "Geplant · n" im Budget). */

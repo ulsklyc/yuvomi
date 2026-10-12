@@ -22,7 +22,10 @@ jobs:
   test:
     name: Tests (Node.js ${{ matrix.node-version }})
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Die Kette brauchte am 8.10.2026 auf main 19:40 bis 19:53 Minuten. Bei 20
+    # brach das Limit jeden PR ab, der eine Suite hinzufuegte - ein abgebrochener
+    # Lauf sieht aus wie ein roter, sagt aber nichts ueber die Tests.
+    timeout-minutes: 30
 
     strategy:
       matrix:

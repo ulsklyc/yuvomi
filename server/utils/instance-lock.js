@@ -27,7 +27,7 @@
  * sperrt sich nicht selbst aus.
  */
 
-import Database from 'better-sqlite3-multiple-ciphers';
+import Database from './sqlite-driver.js';
 
 export const INSTANCE_LOCKED = 'YUVOMI_INSTANCE_LOCKED';
 

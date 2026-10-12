@@ -202,6 +202,21 @@ function weekEventFields(event) {
   };
 }
 
+/**
+ * `?shopping_list=` als Liste von Listen-Ids (#1818): einzeln oder mehrfach
+ * angegeben, nur positive ganze Zahlen, ohne Doppelte, hoechstens 50 - dieselbe
+ * Form und Grenze wie `notes_category` und wie die gespeicherten Optionen
+ * (preferences.js). Alles andere faellt weg, nie ein Fehler.
+ */
+export function normalizeShoppingListFilter(raw) {
+  if (raw === undefined || raw === null) return [];
+  return [...new Set(
+    (Array.isArray(raw) ? raw : [raw])
+      .filter((value) => typeof value === 'string' && /^[1-9]\d{0,14}$/.test(value))
+      .map(Number),
+  )].slice(0, 50);
+}
+
 const router = express.Router();
 
 /**
@@ -274,7 +289,12 @@ router.get('/', (req, res) => {
     )
   `).join('');
   // `mine` ist die Auslegung des Kalendermoduls: zugewiesen an mich.
-  const eventsAssignedTo = req.query.events_scope === 'mine' ? userId : null;
+  // EIN DISPLAY HAT KEIN "MIR" (#1808): es folgt der Vorgabe des Haushalts, sein
+  // Browser schickt deren Option mit, und dem Display-Konto weist nie jemand
+  // einen Termin zu (#1207) - das Tablett stuende leer da. Gelesen wird die
+  // Option deshalb HIER als "alle", statt sie beim Speichern der Vorgabe zu
+  // streichen: dieselbe Vorgabe gilt auch fuer Mitglieder, und dort stimmt sie.
+  const eventsAssignedTo = req.query.events_scope === 'mine' && req.authMethod !== 'display' ? userId : null;
   /* GEBURTSTAGE IM TERMIN-WIDGET (#927). Wer sie auf der Uebersicht schon als
    * eigene Kachel stehen hat, las sie zweimal - einmal bei den Geburtstagen,
    * einmal zwischen den naechsten Terminen. Abwaehlbar ist deshalb der EINE
@@ -477,6 +497,52 @@ router.get('/', (req, res) => {
     result.overdueTaskCount = null;
   }
 
+  /* WELCHE EINKAUFSLISTEN DIE KACHEL ZEIGT (#1818, aus D#1624). `shopping_list`
+   * nennt eine Auswahl von Listen-Ids; ohne den Parameter bleibt alles, wie es
+   * war.
+   *
+   * DIE AUSWAHL GILT NUR DER KACHEL, und zwar an der Quelle: sie fuellt ein
+   * EIGENES Feld der Antwort (`shoppingTile`) und laesst `shoppingLists`,
+   * `shoppingOpenCount` und `shoppingOpenLists` unberuehrt. Anders als bei
+   * Aufgaben und Notizen, wo eine Auswahl die ganze Uebersicht meint: der
+   * Einkauf spricht ausserhalb der Kachel als ZAHL ("n offen" im Heute-Blatt,
+   * an der Wand, in der Navigation), und die liest dieselben Daten. Die erste
+   * Fassung filterte die geteilten Felder - das Wandtablet eines Haushalts,
+   * dessen Vorgabe eine Liste waehlt, zeigte "1 offen" bei vierzehn. Kein
+   * Leser der ungefilterten Felder haengt jetzt von einer Kachel-Option ab,
+   * und der Parameter aendert keine Zahl der Navigation.
+   *
+   * In der Kachel wirkt die Auswahl VOR der Deckelung und auf Liste UND Zahl:
+   * eine Kachel, die eine Liste zeigt und ueber allen "23" zaehlt,
+   * widerspraeche sich.
+   *
+   * GEPRUEFT WIRD GEGEN DIE TABELLE, nicht nur die Form. Eine Liste, die es
+   * nicht (mehr) gibt, faellt aus der Auswahl; bleibt KEINE uebrig, gilt die
+   * Anfrage als ungefiltert - derselbe Satz wie bei den anderen Kacheln: keine
+   * Auswahl heisst "alle". So macht eine geloeschte Liste in einer gespeicherten
+   * Anordnung die Kachel weder leer noch kaputt, und Unsinn (`abc`, `-1`, eine
+   * erfundene Id) antwortet wie gar kein Parameter. Listen-Ids sind
+   * AUTOINCREMENT, eine geloeschte Id kehrt nie als andere Liste zurueck.
+   *
+   * RECHTE: Einkaufslisten haben keine Zeilen-Sichtbarkeit, das Modul ist ganz
+   * sichtbar oder gar nicht. Die Auswahl wird deshalb NUR gelesen, wenn das
+   * Modul fuer diese Person offen ist - sonst bleibt es bei der leeren Fassung
+   * von oben, was immer der Parameter nennt. */
+  let shoppingSelection = null;
+  if (allows('shopping')) try {
+    const wanted = normalizeShoppingListFilter(req.query.shopping_list);
+    if (wanted.length) {
+      const existing = d.prepare(
+        `SELECT id FROM shopping_lists WHERE id IN (${wanted.map(() => '?').join(', ')})`,
+      ).all(...wanted).map((row) => row.id);
+      if (existing.length) shoppingSelection = existing;
+    }
+  } catch (err) {
+    log.error('shopping selection error:', err.message);
+  }
+  const shoppingMarks = shoppingSelection ? shoppingSelection.map(() => '?').join(', ') : '';
+  const shoppingBinds = shoppingSelection ?? [];
+
   if (allows('shopping')) try {
     const row = d.prepare(`
       SELECT COUNT(*) AS items, COUNT(DISTINCT si.list_id) AS lists
@@ -571,7 +637,16 @@ router.get('/', (req, res) => {
     result.notesTotal = 0;
   }
 
-  // Einkaufslisten mit offenen Artikeln (max. 3 Listen, je bis zu 6 offene Items)
+  // Einkaufslisten mit offenen Artikeln (max. 3 Listen, je bis zu 6 offene Items).
+  // Immer ueber ALLE Listen - was ausserhalb der Kachel vom Einkauf spricht,
+  // liest dieses Feld und die beiden Zaehler oben.
+  const shoppingItemsOf = (listId) => d.prepare(`
+    SELECT id, name, quantity, is_checked
+    FROM shopping_items
+    WHERE list_id = ? AND is_checked = 0
+    ORDER BY id ASC
+    LIMIT 6
+  `).all(listId);
   if (allows('shopping')) try {
     const lists = d.prepare(`
       SELECT sl.id, sl.name,
@@ -582,20 +657,43 @@ router.get('/', (req, res) => {
       ORDER BY sl.updated_at DESC
       LIMIT 3
     `).all();
-
-    for (const list of lists) {
-      list.items = d.prepare(`
-        SELECT id, name, quantity, is_checked
-        FROM shopping_items
-        WHERE list_id = ? AND is_checked = 0
-        ORDER BY id ASC
-        LIMIT 6
-      `).all(list.id);
-    }
+    for (const list of lists) list.items = shoppingItemsOf(list.id);
     result.shoppingLists = lists;
   } catch (err) {
     log.error('shoppingLists error:', err.message);
     result.shoppingLists = [];
+  }
+
+  // DIE FASSUNG DER KACHEL (#1818), nur bei einer Auswahl. Die gewaehlten
+  // Listen stehen da, AUCH OHNE OFFENES: wer eine Liste auf die Uebersicht
+  // holt, will sie antippen, um den ersten Artikel einzutragen - genau dann
+  // waere sie sonst verschwunden. Listen mit Offenem zuerst, damit der Deckel
+  // von drei keine volle Liste hinter einer leeren versteckt; darin wie bisher
+  // die zuletzt geaenderte.
+  //
+  // `listCount` zaehlt JEDE gewaehlte Liste, die es gibt - auch die ohne
+  // Offenes. Daraus rechnet die Kachel "+n weitere Listen": eine gewaehlte
+  // Liste, die der Deckel abschneidet, ist so als "+1" da und fehlt nie stumm.
+  //
+  // Scheitert die Abfrage, fehlt das Feld, und die Kachel zeigt alle Listen.
+  if (shoppingSelection) try {
+    const lists = d.prepare(`
+      SELECT sl.id, sl.name,
+        (SELECT COUNT(*) FROM shopping_items si WHERE si.list_id = sl.id AND si.is_checked = 0) AS open_count,
+        (SELECT COUNT(*) FROM shopping_items si WHERE si.list_id = sl.id) AS total_count
+      FROM shopping_lists sl
+      WHERE sl.id IN (${shoppingMarks})
+      ORDER BY (open_count > 0) DESC, sl.updated_at DESC
+      LIMIT 3
+    `).all(...shoppingBinds);
+    for (const list of lists) list.items = shoppingItemsOf(list.id);
+    const openCount = d.prepare(`
+      SELECT COUNT(*) AS items FROM shopping_items si
+      WHERE si.is_checked = 0 AND si.list_id IN (${shoppingMarks})
+    `).get(...shoppingBinds).items;
+    result.shoppingTile = { lists, openCount, listCount: shoppingSelection.length };
+  } catch (err) {
+    log.error('shoppingTile error:', err.message);
   }
 
   // Alle User (für Avatar-Farben in Widgets)

@@ -853,12 +853,16 @@ const REASONS_PASSED_THROUGH = new Map([
   ['routes/health/visibility-defaults.js: error.reason', { sites: 1, at403: [['FASTING_CAPABILITY_REQUIRED', 'services/fasting.js']],
     why: 'requireFastingCapability wirft nur diesen' }],
   ['routes/split-expenses.js: err.reason', { sites: 1, at403: [],
-    why: 'Refusal: ein Grund nur an 409 (email_in_use); die 403 dort tragen keinen' }],
+    why: 'Refusal: ein Grund nur an 409 (email_in_use, group_archived); die 403 dort tragen keinen' }],
   ['auth.js: err.code', { sites: 1, at403: [], why: 'feste 409 (2FA)' }],
   ['routes/notes.js: result.reason', { sites: 1, at403: [], why: 'feste 409' }],
   ['routes/family.js: problem.reason', { sites: 1, at403: [], why: 'memberOrderProblem: feste 400; die 403 daneben traegt ein Literal' }],
   ['routes/tasks.js: result.reason', { sites: 1, at403: [], why: 'feste 409' }],
   ['routes/backup.js: err.reason', { sites: 1, at403: [], why: 'Restore: 409, 503 oder 400' }],
+  // wasteErrorResponse (#1795): der Grund eines WasteConflictError
+  // (preview_changed, source_changed, refresh_in_progress) haengt im Zweig,
+  // der die 409 baut - 400 und 404 daneben tragen keinen, eine 403 gibt es dort nicht.
+  ['routes/waste/helpers.js: err.reason', { sites: 1, at403: [], why: 'feste 409' }],
   // refuse() (#1656, #1668): die eine Stelle, ueber die jede Absage der
   // Budget-Routen ihren Grund bekommt. Ihr Status ist 400 oder, an zwei
   // Stellen ausgeschrieben, 409 - eine 403 baut sie nie.

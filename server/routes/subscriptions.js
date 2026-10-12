@@ -15,9 +15,12 @@ import {
   resolveRenewal,
 } from '../services/subscriptions.js';
 import { getRates } from '../services/subscription-rates.js';
+import {
+  subscriptionBudgetAmount, subscriptionBudgetCurrency, subscriptionBudgetTitle,
+} from '../services/subscription-budget-projection.js';
 import { refuseWhileRestoring } from '../middleware/restore-gate.js';
 import { findLogoOptions } from '../services/subscription-logo.js';
-import { normalizeObjectVisibility, budgetVisibilityWhere, canEditEntry, resolveBudgetMode } from '../services/budget-visibility.js';
+import { normalizeObjectVisibility, budgetVisibilityWhere, budgetDetailsVisibleWhere, canEditEntry, resolveBudgetMode } from '../services/budget-visibility.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
 
 const log = createLogger('Subscriptions');
@@ -48,7 +51,7 @@ function syncReminder(subscription) {
   database.prepare(`
     DELETE FROM reminders WHERE entity_type = 'subscription' AND entity_id = ?
   `).run(subscription.id);
-  if (!subscription.enabled) return;
+  if (!subscription.enabled || !subscription.reminder_enabled) return;
   database.prepare(`
     INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
     VALUES ('subscription', ?, ?, ?)
@@ -73,6 +76,35 @@ function loadSubscription(id) {
   `).get(id);
 }
 
+/**
+ * Nimmt `budget_entry_id` von jedem Abo, dessen Buchung der Betrachter nicht
+ * mit ihrem Zweck sieht (#1844).
+ *
+ * Abo und Buchung tragen je eine eigene Stufe, und die Buchung laesst sich im
+ * Budget einzeln umstellen: privat, oder so, dass sie nur ihren Betrag teilt.
+ * Das Abo bleibt dabei geteilt und steht weiter in dieser Liste - mit dem
+ * Verweis auf die Buchung sagte es jedem, wofuer der maskierte Betrag im
+ * Budget ist (deren id steht an der maskierten Zeile). Gefragt wird mit
+ * derselben Regel wie ueberall, wo es um den ZWECK geht
+ * (budgetDetailsVisibleWhere), nicht mit einer zweiten.
+ *
+ * Im geteilten Modus gibt es keine Stufen, dort bleibt alles stehen.
+ */
+function hideUnreadableEntryLinks(rows, viewer) {
+  const mode = budgetMode();
+  if (mode !== 'personal') return;
+  const linked = rows.filter((row) => row.budget_entry_id != null);
+  if (!linked.length) return;
+  const readable = new Set(db.get().prepare(`
+    SELECT b.id FROM budget_entries b
+    JOIN budget_subscriptions s ON s.budget_entry_id = b.id
+    WHERE ${budgetDetailsVisibleWhere('b', '?', { mode })}
+  `).all(viewer).map((row) => row.id));
+  for (const row of linked) {
+    if (!readable.has(row.budget_entry_id)) row.budget_entry_id = null;
+  }
+}
+
 function subscriptionStatus(row) {
   if (row.completed_at) return 'completed';
   return row.enabled ? 'active' : 'paused';
@@ -83,6 +115,7 @@ function decorate(row) {
   return {
     ...row,
     enabled: Boolean(row.enabled),
+    reminder_enabled: Boolean(row.reminder_enabled),
     status: subscriptionStatus(row),
     occurrences_remaining: occurrencesRemaining(row),
   };
@@ -110,21 +143,21 @@ function endConfigErrors({ end_type, end_date, occurrence_count, next_payment_da
 }
 
 function budgetCurrency() {
-  return db.get().prepare("SELECT value FROM sync_config WHERE key = 'currency'").get()?.value
-    || settings().base_currency
-    || 'EUR';
+  return subscriptionBudgetCurrency(db.get());
 }
 
+// Betrag und Titel der Buchung rechnet services/subscription-budget-projection.js:
+// die gebuchte Zeile hier und die erwarteten Zeilen der Folgemonate (#1844)
+// muessen dasselbe sagen, also gibt es die Rechnung einmal.
 async function budgetExpenseAmount(subscription) {
   const currency = budgetCurrency();
-  if (subscription.currency === currency) return Math.abs(Number(subscription.amount));
+  if (subscription.currency === currency) return subscriptionBudgetAmount(subscription, currency, {});
   const result = await getRates(currency, [subscription.currency]);
-  return Math.abs(convertAmount(subscription.amount, subscription.currency, currency, result.rates) ?? Number(subscription.amount));
+  return subscriptionBudgetAmount(subscription, currency, result.rates);
 }
 
 function budgetEntryTitle(subscription) {
-  const suffix = subscription.currency === budgetCurrency() ? '' : ` (${subscription.currency})`;
-  return `${subscription.name}${suffix}`;
+  return subscriptionBudgetTitle(subscription, budgetCurrency());
 }
 
 async function syncBudgetExpense(subscription, { preserveCurrent = false } = {}) {
@@ -230,6 +263,7 @@ function validatePayload(body, { partial = false } = {}) {
     }
   }
   if (body.enabled !== undefined && typeof body.enabled !== 'boolean') errors.push('Enabled must be a boolean.');
+  if (body.reminder_enabled !== undefined && typeof body.reminder_enabled !== 'boolean') errors.push('Reminder enabled must be a boolean.');
   if (body.end_type !== undefined && !END_TYPES.includes(String(body.end_type))) errors.push('End type is invalid.');
   return { errors, currency, cycleInterval, reminderDays };
 }
@@ -243,6 +277,7 @@ async function subscriptionsWithConversions(rows, baseCurrency, refresh = false)
       return {
         ...row,
         enabled: Boolean(row.enabled),
+        reminder_enabled: Boolean(row.reminder_enabled),
         status: subscriptionStatus(row),
         occurrences_remaining: occurrencesRemaining(row),
         monthly_native: Number(nativeMonthly.toFixed(2)),
@@ -561,6 +596,7 @@ router.get('/', refuseWhileRestoring, async (req, res) => {
       ${clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''}
       ORDER BY s.next_payment_date, s.name COLLATE NOCASE
     `).all(...params);
+    hideUnreadableEntryLinks(rows, actorId(req));
     const configured = settings();
     const converted = await subscriptionsWithConversions(rows, configured.base_currency, req.query.refresh_rates === 'true');
     const enabledRows = converted.rows.filter((row) => row.enabled);
@@ -628,14 +664,15 @@ router.post('/', async (req, res) => {
     const result = db.get().prepare(`
       INSERT INTO budget_subscriptions
         (name, description, amount, currency, billing_cycle, cycle_interval, next_payment_date,
-         category_id, payment_method_id, reminder_days, enabled, website_url, logo_data,
+         category_id, payment_method_id, reminder_days, reminder_enabled, enabled, website_url, logo_data,
          brand_color, notes, account_username, created_by, owner_id, visibility,
          end_type, end_date, occurrence_count)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       req.body.name.trim(), req.body.description?.trim() || null, Number(req.body.amount), validated.currency,
       req.body.billing_cycle, validated.cycleInterval, req.body.next_payment_date,
       req.body.category_id || null, req.body.payment_method_id || null, validated.reminderDays,
+      req.body.reminder_enabled === false ? 0 : 1,
       req.body.enabled === false ? 0 : 1, req.body.website_url?.trim() || null, req.body.logo_data || null,
       req.body.brand_color || null, req.body.notes?.trim() || null,
       req.body.account_username?.trim() || null, me, me, visibility,
@@ -685,7 +722,7 @@ router.put('/:id', async (req, res) => {
     db.get().prepare(`
       UPDATE budget_subscriptions SET
         name = ?, description = ?, amount = ?, currency = ?, billing_cycle = ?, cycle_interval = ?,
-        next_payment_date = ?, category_id = ?, payment_method_id = ?, reminder_days = ?, enabled = ?,
+        next_payment_date = ?, category_id = ?, payment_method_id = ?, reminder_days = ?, reminder_enabled = ?, enabled = ?,
         website_url = ?, logo_data = ?, brand_color = ?, notes = ?, account_username = ?, visibility = ?,
         end_type = ?, end_date = ?, occurrence_count = ?, completed_at = ?
       WHERE id = ?
@@ -695,7 +732,8 @@ router.put('/:id', async (req, res) => {
       value('billing_cycle', current.billing_cycle), validated.cycleInterval || current.cycle_interval,
       nextPaymentDate, value('category_id', current.category_id) || null,
       value('payment_method_id', current.payment_method_id) || null,
-      validated.reminderDays ?? current.reminder_days, nextEnabled,
+      validated.reminderDays ?? current.reminder_days,
+      value('reminder_enabled', Boolean(current.reminder_enabled)) ? 1 : 0, nextEnabled,
       value('website_url', current.website_url)?.trim() || null, value('logo_data', current.logo_data) || null,
       value('brand_color', current.brand_color) || null, value('notes', current.notes)?.trim() || null,
       value('account_username', current.account_username)?.trim() || null, nextVisibility,
@@ -716,6 +754,10 @@ router.post('/:id/renew', async (req, res) => {
     const id = Number(req.params.id);
     const current = loadSubscription(id);
     if (!current) return res.status(404).json({ error: 'Subscription not found.', code: 404 });
+    // Verlaengern SCHREIBT: es rueckt den Zahlungstag vor, zaehlt eine Zahlung,
+    // legt eine Buchung an und schliesst ein endliches Abo ab. Es folgt
+    // deshalb derselben Regel wie PUT und DELETE - sie fehlte hier.
+    if (!mayEditSub(req, current)) return res.status(403).json({ error: 'You cannot modify this subscription.', code: 403 });
     const { completed, nextDate, occurrencesDone } = resolveRenewal(current);
     if (completed) {
       // Letzte Zahlung durch: abschließen. enabled = 0 lässt syncBudgetExpense den

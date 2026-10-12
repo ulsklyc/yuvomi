@@ -27,7 +27,10 @@ test('Bietet eine configure()-Methode für Properties', () => {
   assert(/configure\s*\(/.test(comp), 'configure() muss existieren');
 });
 test('Lädt Kategorien relativ zu basePath via api.get', () => {
-  assert(/api\.get\(\s*this\._basePath/.test(comp) || /api\.get\(`?\$\{this\._basePath\}/.test(comp), 'Muss api.get(basePath) nutzen');
+  // Der Pfad laeuft seit #1859 ueber _listPath(), das basePath nur um ein
+  // `lang` ergaenzen darf; das Verhalten prueft test-category-manager-lifecycle.js.
+  assert(/api\.get\(\s*this\._listPath\(\)/.test(comp), 'Muss die Liste ueber _listPath() laden');
+  assert(/_listPath\(\)\s*\{[\s\S]*?return this\._basePath;/.test(comp), '_listPath() muss ohne Option den nackten basePath liefern');
 });
 test('Mutiert über post/put/patch/delete relativ zu basePath', () => {
   assert(/api\.post\(/.test(comp), 'POST zum Hinzufügen');
@@ -116,6 +119,15 @@ test('Budget konfiguriert basePath /budget/categories und Gruppen', () => {
   assert(/configure\(/.test(budgetPage), 'configure() muss aufgerufen werden');
   assert(/\/budget\/categories/.test(budgetPage), 'basePath /budget/categories nötig');
   assert(/supportsSubcategories:\s*true/.test(budgetPage), 'Subkategorien müssen aktiviert sein');
+});
+test('Budget fragt die Kategorienliste in der Oberflaechensprache an (#1859)', () => {
+  // Die Verdrahtung, nicht die Option: die Komponente kann `localizedLabels`
+  // richtig umsetzen und Budget sie trotzdem nicht setzen. Kommentare fallen
+  // vorher weg, damit die Begruendung im Quelltext den Test nicht gruen haelt.
+  const fn = budgetPage.match(/function openCategoryManager\(\)[\s\S]*?\n\}/)?.[0] || '';
+  const code = fn.replace(/\/\/.*$/gm, '');
+  assert(/basePath:\s*'\/budget\/categories'/.test(code), 'openCategoryManager() nicht gefunden');
+  assert(/localizedLabels:\s*true/.test(code), 'Budget muss localizedLabels: true setzen');
 });
 test('Budget reagiert auf category-manager-changed', () => {
   assert(/category-manager-changed/.test(budgetPage), 'Listener auf category-manager-changed nötig');

@@ -549,7 +549,8 @@ Inhalt, kein Verlauf ueber eine Karte, kein Text auf einer Flaeche, die nicht ge
   enthielten Kollisionspaare, die niemand auseinanderhalten konnte - zwei Violetts, zwei
   Teals. Jetzt gibt es neun klar trennbare Familien (`overview`, `time`, `work`, `kitchen`,
   `money`, `people`, `health`, `records`, `neutral`), jedes `--module-*` bezieht aus seiner,
-  und **innerhalb einer Familie unterscheidet das Siegel-Icon, nicht der Ton**. Damit
+  und **innerhalb einer Familie unterscheidet das Siegel-Icon, nicht der Ton** (an einer
+  Mischstelle darf es das Zeichen des Objekts sein, siehe Herkunfts-Regel). Damit
   verschwinden die Kollisionen strukturell statt durch Nachjustieren. Die Kueche war der
   Praezedenzfall: vier Module, ein Ton, unterschieden durch ihr Zeichen. Die privaten
   `--_family-*` tragen den Dark-Wechsel; die oeffentliche `--module-*`-API bleibt vollstaendig.
@@ -993,7 +994,9 @@ Subheadline 15, Footnote 13, Caption 2 11.
 und "SAUERSTOFFSAETTI/GUNG" kamen aus `overflow-wrap: break-word` neben `hyphens: manual`:
 das Wort brach dort, wo die Zeile endete, ohne Strich. Wer ein Wort brechen laesst, gibt
 seinem Subjekt `hyphens: auto; hyphenate-limit-chars: 6 4 4` (die App setzt `lang`, der
-Browser kennt die Silben); `overflow-wrap: anywhere` bleibt die letzte Stufe fuer
+Browser kennt die Silben), dazu direkt darunter `-webkit-hyphenate-limit-before: 4;
+-webkit-hyphenate-limit-after: 4`, weil Safari die Kurzform nicht kennt und sonst ohne Grenze
+trennt (#1774); `overflow-wrap: anywhere` bleibt die letzte Stufe fuer
 Zeichenketten ohne Silben (URLs, Codes, Zeitangaben). Versal-Labels, die nicht passen,
 werden kuerzer oder verlieren den Versal-Transform, statt mitten im Wort zu brechen. Der
 Guard (`test:typography`) prueft die Regel am Subjekt, nicht die Schreibweise, und fuehrt
@@ -2110,6 +2113,25 @@ nur das gerenderte Dokument sieht, ob eine Liste ueberhaupt verdrahtet ist.
   zurueckfaellt). **Das Suchfeld ist davon ausgenommen:** es ist ein Bedienelement und
   traegt die gefuellte Kapsel des Komponenten-Kanons (`--color-fill-field`, Kante
   transparent, Platzhalter in Sekundaertext), nicht die Formularkante.
+- **Gesperrt (`:disabled`, 2026-10-08) - EIN Aussehen an der Feldhaut**
+  (`.input:disabled, .form-input:disabled`, layout.css), keine Regel je Dialog: die Fuellung
+  faellt weg (`transparent`), die Kante wird die Kartenkante (`--color-border`; 1.4.11 gilt
+  dem bedienbaren Element), der Wert steht in `--color-text-secondary` und bleibt lesbar
+  (gemessen 6,19:1 hell, 6,66:1 dunkel im Dialog) - nie `--color-text-disabled`, nie ueber
+  `opacity` (Deckung multipliziert den Kontrast herunter, wie bei `--color-surface-receded`).
+  Die Regel hebt die Daempfung des Browsers ausdruecklich auf (`opacity: 1` gegen Chromes
+  0,7 an `select:disabled`, `-webkit-text-fill-color: currentColor` gegen WebKits
+  Fuellfarbe), sonst gilt der gerechnete Kontrast nicht. Zeiger `not-allowed`. **Kein
+  Platzhalter:** `:disabled::placeholder` ist `transparent` - sekundaer gegen tertiaer sind
+  1,10 / 1,14:1, ein leeres gesperrtes Feld laese sich sonst als gefuelltes. **Kein
+  Zeichen:** JEDE gesperrte Auswahl legt `--field-chevron` ab (das Bild laesst sich nicht
+  umfaerben); der Kalenderknopf des Datepickers dimmt ueber `.ydp__trigger:disabled`, also
+  auch im gesperrten `fieldset`. Unter `prefers-contrast: more` geht die Kante auf
+  `--color-text-secondary`. Die randlosen Auswahlen (Formularzeile, Einheit im
+  zusammengesetzten Feld) haben weder Kante noch Flaeche und stehen in Ruhe schon
+  sekundaer: sie nehmen zusaetzlich Tertiaer. Schalter und Knoepfe tragen keinen
+  Wert und dimmen weiter ueber die Deckung. `readonly` ist kein gesperrtes Feld und sieht
+  aus wie ein bedienbares (Ausnahme: `.input--fixed`, der von der Einladung vorgegebene Wert).
 - **Feldkanon:** ein `select` traegt `appearance: none` und sein eigenes Zeichen
   (`--field-chevron`, Lucide chevron-down, 16px, mit dem Feldpolster eingerueckt, in RTL
   gespiegelt); das Auswahlblatt bleibt das native. Dazu 32px Innenpolster am Ende
@@ -3106,7 +3128,10 @@ Herkunft zeigt man nur, wo sie nicht selbstverstaendlich ist. Daraus folgen gena
 - **Jede MISCHSTELLE** - eine Liste, deren Zeilen aus verschiedenen Modulen stammen
   (moduluebergreifende Suche, "Heute wichtig", Dashboard-Widget-Koepfe, "Mehr"-Liste,
   Benachrichtigungsdarstellung) - gibt jedem Objekt sein Siegel und BENENNT dabei die fremde
-  Herkunft, inline oder ueber die Klasse ihres Traegers.
+  Herkunft, inline oder ueber die Klasse ihres Traegers. Die Herkunft nennt der TON der
+  Scheibe; das ZEICHEN darf das des Objekts sein, wo das Objekt eines traegt (der Mahlzeittyp,
+  das am Termin gewaehlte Icon in "Heute wichtig" und an der Wand). Ohne eigenes Zeichen steht
+  das des Moduls, und eine Zeile, die fuer mehrere Objekte spricht, behaelt es immer.
 - **Im eigenen Modul** steht es genau einmal, als Absender im Kopf (siehe Modulkopf). Es
   benennt dort nichts, sondern ERBT den Ton des Raumes, in dem es steht - genau daran ist die
   Rolle zu erkennen.
@@ -3868,7 +3893,12 @@ Angabe braeuchte einen zweiten Timer, nur damit sie sich selbst aktuell haelt.
   Fehlt ein Teil, bleibt seine Zeile leer, statt die naechste hochzuziehen; mit Subgrid teilen
   die Karten einer Rasterzeile dieselben vier Zeilenhoehen, ohne bleibt der Rueckfall mit
   festen Zeilen. Wert und Einheit stehen auf einer Grundlinie - dafuer meldet sich das Raster
-  als `metric-grid`-Container.
+  als `metric-grid`-Container. Fuellt sich das Raster selbst (`auto-fit`/`auto-fill`), sagt
+  die Breite der Reihe nichts ueber die Kachel: dort ist zusaetzlich die WERTZEILE ein Container
+  (`metric-tile` an `.metric-card__body`) und senkt den Wert auf Title 2, in der schmalsten
+  Kachel auf Title 3 mit der Einheit in Caption 1 (#1799, gemessen an "180/110 mmHg";
+  `test:metric-tile-fit-browser`). **Don't** die Kachel selbst zum Container machen: ihr
+  Layout-Containment schaltet das Subgrid ab, und die geteilten Zeilen sind weg.
 - **Do** eine Trendlinie in der Kennzahlkarte im MODULTON zeichnen, 1,5px mit einem Hauch
   Flaeche darunter (14 % auf 0), den letzten Punkt in Label-Farbe mit Ring in Kartenflaeche
   (`.metric-card__spark`). Kein Erfolgs- oder Gefahrenton: bei Vitalwerten ist "hoch" je nach
