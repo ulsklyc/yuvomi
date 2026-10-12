@@ -478,9 +478,6 @@ async function runSync({ createClient: makeClient } = {}) {
       // Ausstehende Rückrichtung einmal je Lauf und Modul (#617): eine lokal
       // gelöschte Aufgabe darf der Inbound nicht wieder anlegen, eine lokal
       // bearbeitete nicht mit dem alten Serverstand überschreiben.
-      // Vorher: Reste nie bestätigter Uploads zum Löschen vormerken (#1882),
-      // damit der Abruf sie unten schon verdeckt.
-      todoOutbound.releaseLeftoverTodoUploads(account.id);
       const pendingByModule = {
         tasks: {
           deleted: todoOutbound.pendingDeletionUids(account.id, 'tasks'),
@@ -521,14 +518,41 @@ async function runSync({ createClient: makeClient } = {}) {
           const todos = parseVTODO(obj.data || '');
           for (const todo of todos) {
             try {
+              // Gesehen ist der Eintrag auch dann, wenn er hier übersprungen
+              // wird - sonst würde der Prune ihn gleich wieder entfernen.
+              seenByModule[module].push(todo.uid);
+
+              // Für dieses Objekt steht die Notiz eines Uploads, der nie
+              // gebucht wurde (#1882) - gleich über welches Konto er lief.
+              // Dann ist es kein Eintrag wie jeder andere: wartet seine Zeile
+              // genau hier, wird es übernommen; sonst wird es weder
+              // importiert noch einer Zeile zugeordnet (gelöscht, anderes
+              // Ziel, woanders gespiegelt, oder sie wartet über ein anderes
+              // Konto), und es kommt auch nicht in den Index dieses Laufs -
+              // dieselbe UID kann rechtmässig in einer anderen Liste des
+              // Kontos liegen. Entfernt wird es von
+              // `releaseLeftoverTodoUploads`. Frisch gefragt: die Zeile kann
+              // gefallen sein, während dieser Lauf noch liest.
+              const unbooked = todoOutbound.isUnbookedOwnUpload(module, todo.uid, sel.list_url);
+              // Der eigene Upload, dessen Antwort verloren ging: in die noch
+              // lokale Zeile übernehmen statt eine zweite anzulegen; ihr
+              // lokaler Stand geht mit dem Outbound dieses Laufs hinauf. Nur
+              // für eine Zeile, die auf den Upload in GENAU diese Liste
+              // wartet - die UID kommt vom Server und weist nichts aus.
+              const adoptOwn = () => !!obj.url && todoOutbound.adoptOwnUpload(module, todo.uid, account.id, obj.url, {
+                listUrl: sel.list_url, targetListId: sel.target_list_id,
+              });
+              if (unbooked && !adoptOwn()) continue;
+
               if (obj.url) {
                 objectsByModule[module].set(todo.uid, {
                   url: obj.url, etag: obj.etag, data: obj.data,
                 });
               }
-              // Gesehen ist der Eintrag auch dann, wenn er hier übersprungen
-              // wird - sonst würde der Prune ihn gleich wieder entfernen.
-              seenByModule[module].push(todo.uid);
+              if (unbooked) {
+                totalItems++;
+                continue;
+              }
 
               // Lokal gelöscht und noch nicht auf dem Server: nicht wieder
               // anlegen, sonst kehrt der Eintrag bei jedem Sync zurück.
@@ -537,26 +561,10 @@ async function runSync({ createClient: makeClient } = {}) {
               // darf sie nicht überschreiben.
               if (pendingByModule[module].dirty.has(todo.uid)) continue;
 
-              // Der eigene Upload, dessen Antwort verloren ging: die Zeile ist
-              // noch lokal, das Objekt liegt schon hier. In die bestehende
-              // Zeile übernehmen statt eine zweite anzulegen; ihr lokaler
-              // Stand geht mit dem Outbound dieses Laufs hinauf. Nur für eine
-              // Zeile, die auf den Upload in GENAU diese Liste wartet - die
-              // UID kommt vom Server und weist nichts aus (adoptOwnUpload).
-              if (obj.url && todoOutbound.adoptOwnUpload(module, todo.uid, account.id, obj.url, {
-                listUrl: sel.list_url, targetListId: sel.target_list_id,
-              })) {
+              if (adoptOwn()) {
                 totalItems++;
                 continue;
               }
-
-              // Nicht übernommen, aber für das Objekt steht die Notiz eines
-              // Uploads, der nie gebucht wurde (#1882) - gleich über welches
-              // Konto er lief: die Zeile ist gelöscht, hat ein anderes Ziel,
-              // ist woanders gespiegelt oder wartet über ein anderes Konto.
-              // Weder importieren noch einer Zeile zuordnen. Frisch gefragt:
-              // die Zeile kann gefallen sein, während dieser Lauf noch liest.
-              if (todoOutbound.isUnbookedOwnUpload(module, todo.uid, sel.list_url)) continue;
 
               if (module === 'shopping') {
                 upsertShoppingItem(sel, todo, account.id, obj.url || null);
@@ -629,6 +637,16 @@ async function runSync({ createClient: makeClient } = {}) {
         } catch (err) {
           log.error(`Outbound VTODO changes failed for account ${account.id} (${module}):`, err.message);
         }
+      }
+
+      // Die Reste nie bestätigter Uploads entfernen (#1882). Nach dem Abruf,
+      // der sie nicht importiert hat, und vor den Uploads: eine Zeile mit
+      // neuem Ziel in diesem Konto geht so nicht neben ihren Rest.
+      try {
+        const cleared = await todoOutbound.releaseLeftoverTodoUploads(client, account.id);
+        if (cleared) log.info(`${cleared} leftover(s) of unconfirmed uploads removed from the server.`);
+      } catch (err) {
+        log.error(`Removing leftovers of unconfirmed uploads failed for account ${account.id}:`, err.message);
       }
 
       // Hier angelegte Aufgaben hochladen (#695). Bewusst als LETZTER Schritt:

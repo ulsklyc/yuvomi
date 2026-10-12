@@ -30,10 +30,10 @@
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { runExternalJob } from '../utils/restore-state.js';
-import { ownUid, ownUploadRowId, parseOwnUid, inspectObjectAt } from '../utils/own-uid.js';
+import { ownUid, ownUploadRowId, parseOwnUid, findObjectWithUid } from '../utils/own-uid.js';
 import { collectionUrlOf } from '../utils/caldav-client.js';
 import {
-  noteUploadAttempt, settleUploadAttempt, dropUploadAttempt, uploadAttemptsOf, uploadAttemptsAt,
+  noteUploadAttempt, settleUploadAttempt, uploadAttemptsAt, removeLeftoverUploads,
 } from './caldav-upload-attempts.js';
 
 const log = createLogger('CalendarOutbound');
@@ -871,8 +871,7 @@ export function eventUidFor(eventId) {
  * VOR der Anfrage wird der Upload notiert (#1882, `caldav-upload-attempts.js`):
  * geht die Antwort verloren, belegt die Notiz, dass von diesem Termin etwas an
  * diesem Platz liegen kann. Sie fällt mit der Buchung (`bookEventUpload`) - der
- * Aufrufer MUSS danach buchen - und sonst nur, wenn an der eigenen Adresse
- * nachweislich ein fremdes Objekt liegt.
+ * Aufrufer MUSS danach buchen - und nie, weil der Versuch scheiterte.
  *
  * @param {object} attempt
  * @param {string} attempt.source      'caldav' | 'apple'
@@ -896,13 +895,7 @@ export async function uploadNewEvent(client, calendar, uid, ics, { source, event
     // Die UID wird im Objekt GELESEN, nicht aus dem Dateinamen geschlossen;
     // liegt dort etwas anderes, bleibt es unangetastet und der Termin lokal.
     // Gemerkt wird die eigene, berechnete Adresse, nicht eine vom Server genannte.
-    const found = await inspectObjectAt(client, collectionUrl, objectUrl, uid);
-    if (!found.own) {
-      // Dort liegt nachweislich ein fremdes Objekt, also nicht unseres: die
-      // Notiz fällt, sonst gälte ihm später ein Löschauftrag.
-      if (found.foreign) settleUploadAttempt(place);
-      throw err;
-    }
+    if (!(await findObjectWithUid(client, collectionUrl, objectUrl, uid))) throw err;
     return { objectUrl, adopted: true };
   }
 }
@@ -1193,8 +1186,8 @@ function uploadAttemptState(attempt, wantsUploadHere) {
  * ist (die Zeile ist nicht Spiegel an diesem Platz)? Dann ist das Objekt kein
  * Eintrag wie jeder andere: der Aufrufer darf es nur noch ÜBERNEHMEN
  * (`adoptOwnEventUpload`, für die Zeile, die genau hier wartet) - sonst weder
- * importieren noch einer Zeile zuordnen. Ob es gelöscht wird, entscheidet
- * `releaseLeftoverUploads` für das Konto, dem die Notiz gehört.
+ * importieren noch einer Zeile zuordnen. Entfernt wird es von
+ * `releaseLeftoverUploads`, für das Konto, dem die Notiz gehört.
  *
  * Über ALLE Konten der Quelle gefragt: führen zwei Konten denselben Kalender,
  * sieht der Abruf des einen das Objekt, das über das andere hinaufging, und
@@ -1230,50 +1223,31 @@ export function isUnbookedOwnUpload({ source, uid, calendarUrl }) {
 }
 
 /**
- * Räumt die Reste von Uploads ab, deren Antwort nie ankam (#1882): für jede
- * stehen gebliebene Notiz dieser Verbindung wird am Stand der Zeile
- * entschieden (`uploadAttemptState`).
+ * Entfernt die Reste von Termin-Uploads, deren Antwort nie ankam (#1882): die
+ * Notizen dieser Verbindung, deren Zeile dort nicht mehr hingehört
+ * (`uploadAttemptState`). Was dabei gelesen, gelöscht oder stehen gelassen
+ * wird, steht an `removeLeftoverUploads`.
  *
- * Ein Rest wird zum Löschen vorgemerkt, wie `bookEventUpload` es getan hätte,
- * wäre die Antwort angekommen - ohne Bedingung: der Termin ist in Yuvomi
- * gelöscht oder soll dort nicht mehr liegen, gleich in welchem Stand (dieselbe
- * Regel wie für das Löschen durch den Nutzer, `queueDeletion`). Ob dort
- * überhaupt etwas liegt, ist offen; ein 404 erledigt den Auftrag.
+ * Aufgerufen im vollen Lauf nach dem Abruf, nicht im Sofortversuch und nicht
+ * aus einer Route: die Regel hängt so an keiner Löschroute - gleich auf
+ * welchem Weg die Zeile fiel, der nächste Lauf findet die Notiz.
  *
- * Aufgerufen im vollen Lauf NACH dem Abruf und VOR `processPendingDeletions`,
- * nicht im Sofortversuch und nicht aus einer Route: so geht das DELETE an das
- * Objekt, das dieser Lauf unter der eigenen UID an der Adresse gesehen hat,
- * mit dessen ETag - und nicht blind an eine Adresse. Und so hängt die Regel an
- * keiner Löschroute: gleich auf welchem Weg die Zeile fiel, der nächste Lauf
- * findet die Notiz.
- *
- * Synchron: je Notiz Lesen, Entscheiden und Schreiben ohne await dazwischen.
- * Die Notiz fällt erst, wenn der Auftrag steht.
- *
- * @returns {number} vorgemerkte Löschungen
+ * @param {object} client
+ * @param {object} p
+ * @param {string} p.source
+ * @param {number} [p.accountId]
+ * @param {(row: object, calendarUrl: string) => boolean} [p.wantsUploadHere]
+ *        iCloud: will diese lokale Zeile weiter hinauf?
+ * @param {Set<string>} [p.calendarUrls]  die in diesem Lauf abgerufenen Kalender
+ * @returns {Promise<number>} entfernte Objekte
  */
-export function releaseLeftoverUploads({ source, accountId = null, wantsUploadHere = null }) {
-  let attempts;
-  try {
-    attempts = uploadAttemptsOf({ source, accountId, kinds: ['event'] });
-  } catch (err) {
-    log.warn(`Upload notes are not readable (${err.message}); nothing was released.`);
-    return 0;
-  }
-  let released = 0;
-  for (const attempt of attempts) {
-    const state = uploadAttemptState(attempt, wantsUploadHere);
-    if (state === 'waiting') continue;
-    if (state === 'leftover') {
-      const queued = queueDeletion({
-        source, calendarExternalId: attempt.collection_url, eventExternalId: attempt.uid,
-        objectUrl: attempt.object_url, accountId,
-      });
-      if (!queued) continue;
-      released++;
-      log.info(`The upload of event ${attempt.row_id} to ${attempt.collection_url} was never confirmed and the event no longer belongs there, queued the deletion of ${attempt.uid}.`);
-    }
-    dropUploadAttempt(attempt.id);
-  }
-  return released;
+export function releaseLeftoverUploads(client, { source, accountId = null, wantsUploadHere = null, calendarUrls = null }) {
+  return removeLeftoverUploads(client, {
+    source, accountId, kinds: ['event'],
+    stateOf: (attempt) => uploadAttemptState(attempt, wantsUploadHere),
+    inScope: calendarUrls
+      ? (url) => [...calendarUrls].some((known) => sameCalendarUrl(known, url))
+      : null,
+    label: source === 'apple' ? 'Apple' : 'CalDAV',
+  });
 }

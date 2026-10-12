@@ -605,6 +605,10 @@ async function updateAccount(accountId, { name, caldavUrl, username, password, c
       const dropped = Number(db.get().prepare(
         "DELETE FROM calendar_pending_deletions WHERE source = 'caldav' AND caldav_account_id = ?"
       ).run(accountId).changes) || 0;
+      // Ebenso die Notizen nie gebuchter Uploads (#1882): ihre Adressen
+      // meinen den alten Server, und eine Aufgabe hielte sonst für immer an
+      // einer Liste des alten Kontos fest.
+      dropUploadAttemptsOf({ source: 'caldav', accountId });
       if (dropped) {
         log.warn(`Account ${accountId} points to a new server or user: dropped ${dropped} pending deletion(s) meant for the old one.`);
       }
@@ -1247,8 +1251,8 @@ async function runSync({ createClient } = {}) {
               // Dann ist es kein Eintrag wie jeder andere: wartet sein Termin
               // hier, wird es übernommen; sonst wird es weder importiert noch
               // einer Zeile zugeordnet (gelöscht, anderes Ziel, woanders
-              // gespiegelt, oder er wartet über ein anderes Konto). Ob es
-              // gelöscht wird, entscheidet `releaseLeftoverUploads`. Frisch
+              // gespiegelt, oder er wartet über ein anderes Konto). Entfernt
+              // wird es nach dem Abruf (`releaseLeftoverUploads`). Frisch
               // gefragt: der Termin kann gefallen sein, während dieser Lauf
               // noch liest.
               if (outbound.isUnbookedOwnUpload({ source: 'caldav', uid: ev.uid, calendarUrl: selCal.calendar_url })
@@ -1404,10 +1408,11 @@ async function runSync({ createClient } = {}) {
       try {
         // Gemeldet wird, was der Server gelöscht hat - nicht, was ohne Anfrage fiel.
         const deletions = { sent: 0 };
-        // Erst die Reste nie bestätigter Uploads zum Löschen vormerken
-        // (#1882), dann löschen: so geht ihr DELETE im selben Lauf hinaus,
-        // an das Objekt, das der Abruf oben gesehen hat.
-        outbound.releaseLeftoverUploads({ source: 'caldav', accountId: account.id });
+        // Die Reste nie bestätigter Uploads entfernen (#1882), in den
+        // Kalendern, die dieser Lauf abgerufen hat.
+        await outbound.releaseLeftoverUploads(client, {
+          source: 'caldav', accountId: account.id, calendarUrls: ownCalendarUrls,
+        });
         await processPendingDeletions(client, 'caldav', objectIndex, ownCalendarUrls, {
           accountId: account.id, complete: fetchedEveryCalendar, outcome: deletions,
         });

@@ -1806,6 +1806,11 @@ async function uploadWithLostAnswer(way, url, id, lose = LOST['mit 500 beantwort
   return uid;
 }
 
+/** Als läge der letzte Versuch länger zurück als die Frist, in der ein später PUT noch ankommen kann. */
+const letNotesExpire = () => db.prepare(
+  "UPDATE caldav_upload_attempts SET created_at = '2020-01-01T00:00:00Z'"
+).run();
+
 const noBookkeepingLeft = () => {
   assert.deepEqual(eventTombstones(), [], 'ein Löschauftrag für Termine ist liegen geblieben');
   assert.deepEqual(todoTombstones(), [], 'ein Löschauftrag für Aufgaben/Einkauf ist liegen geblieben');
@@ -1958,6 +1963,15 @@ for (const [label, way] of Object.entries(WAYS)) {
 
     assert.equal(rows().length, 0);
     assert.deepEqual(names(url), []);
+    assert.equal(dav.seen('DELETE').length, 0, 'ohne ein Objekt an der Adresse ging ein DELETE hinaus');
+    assert.deepEqual(eventTombstones(), []);
+    assert.deepEqual(todoTombstones(), []);
+    // Die Notiz bleibt die Frist lang stehen (ein später PUT kann noch
+    // ankommen) und fällt danach ohne Anfrage.
+    assert.equal(uploadAttempts().length, 1, 'die Notiz ist gefallen, bevor ein später PUT ausgeschlossen ist');
+    letNotesExpire();
+    await runAll(way);
+    assert.equal(dav.seen('DELETE').length, 0);
     noBookkeepingLeft();
   });
 
@@ -2533,35 +2547,6 @@ test('adoptOwnEventUpload: die Übernahme bucht - die Notiz des Uploads fällt m
   assert.deepEqual(uploadAttempts(), [], 'die Notiz hat die Übernahme überlebt');
 });
 
-// Ein Löschauftrag für Aufgaben nennt Konto, Modul und UID, aber nur EINE
-// Adresse. Wartet für die UID schon einer mit der Adresse einer anderen Liste,
-// darf der zweite Rest seine Adresse nicht an ihn verlieren.
-test('Aufgabe: zwei Reste derselben UID in einem Konto - der zweite wartet, bis der erste Auftrag erledigt ist', () => {
-  reset();
-  const way = WAYS.Aufgabe;
-  const url   = way.setup();
-  const other = addTaskList('todo2');
-  const uid   = ownUid('task', 4242, db);
-  db.prepare(`
-    INSERT INTO caldav_todo_pending_deletions (account_id, module, uid, object_url) VALUES (?, 'tasks', ?, ?)
-  `).run(accountId, uid, `${other}${uid}.ics`);
-  db.prepare(`
-    INSERT INTO caldav_upload_attempts (source, account_id, kind, row_id, collection_url, uid, object_url)
-    VALUES ('caldav', ?, 'task', 4242, ?, ?, ?)
-  `).run(accountId, url, uid, `${url}${uid}.ics`);
-
-  assert.equal(todoOutbound.releaseLeftoverTodoUploads(accountId), 0);
-  assert.equal(uploadAttempts().length, 1, 'die Notiz ist gefallen, ohne dass ein Auftrag ihre Adresse trägt');
-  assert.deepEqual(todoTombstones().map((t) => t.object_url), [`${other}${uid}.ics`]);
-  assert.equal(todoOutbound.isUnbookedOwnUpload('tasks', uid, url), true,
-    'solange die Notiz steht, verdeckt sie ihren Rest nicht');
-
-  db.prepare('DELETE FROM caldav_todo_pending_deletions').run();
-  assert.equal(todoOutbound.releaseLeftoverTodoUploads(accountId), 1);
-  assert.deepEqual(uploadAttempts(), []);
-  assert.deepEqual(todoTombstones().map((t) => t.object_url), [`${url}${uid}.ics`]);
-});
-
 // ── Befunde der Durchsicht von #1895 ────────────────────────────────────────────
 
 test('Aufgabe: Antwort verloren, Liste abgewählt - nichts wird gelöscht; wieder eingeschaltet übernimmt der Lauf', async () => {
@@ -2724,7 +2709,7 @@ test('iCloud: beim Trennen der Verbindung fallen ihre Upload-Notizen', async () 
 // Fehlt die Tabelle (gedriftete Datenbank), scheitert das Schreiben der Notiz
 // laut und nichts geht hinaus. Das Buchen danach darf daran NICHT scheitern:
 // die Zeile ist dann schon umgeschrieben.
-test('Übernahme ohne Notiztabelle: gebucht wird trotzdem, ohne Fehler', () => {
+test('Übernahme ohne Notiztabelle: gebucht wird trotzdem, ohne Fehler', async () => {
   reset();
   const way = WAYS.Termin;
   const url = way.setup();
@@ -2736,10 +2721,226 @@ test('Übernahme ohne Notiztabelle: gebucht wird trotzdem, ohne Fehler', () => {
       source: 'caldav', uid, objectUrl: `${url}${uid}.ics`, calendarUrl: url, calRefId: way.refId,
       accountId, isWaitingHere: () => true,
     }), true);
-    assert.equal(outbound.releaseLeftoverUploads({ source: 'caldav', accountId }), 0);
-    assert.equal(todoOutbound.releaseLeftoverTodoUploads(accountId), 0);
+    assert.equal(await outbound.releaseLeftoverUploads(null, { source: 'caldav', accountId }), 0);
+    assert.equal(await todoOutbound.releaseLeftoverTodoUploads(null, accountId), 0);
   } finally {
     db.exec('ALTER TABLE caldav_upload_attempts_away RENAME TO caldav_upload_attempts');
   }
   assert.equal(db.prepare('SELECT external_source FROM calendar_events WHERE id = ?').get(id).external_source, 'caldav');
+});
+
+// ── Befunde der ersten Bot-Runde zu #1895 ───────────────────────────────────────
+
+// Der Client hat aufgegeben, der Server verarbeitet den PUT noch. Wird die
+// Zeile in der Zwischenzeit gelöscht, liegt beim nächsten Lauf NICHTS oben -
+// und danach doch.
+for (const [label, way] of Object.entries(WAYS)) {
+  const { rows, names } = helpers(way);
+
+  test(`${label}: der PUT wird erst gespeichert, NACHDEM der gelöschte Eintrag schon einen Lauf hinter sich hat - er kommt trotzdem nicht zurück`, async () => {
+    reset();
+    const url = way.setup();
+    const id  = way.create(url, 'Wird gelöscht');
+    const uid = ownUid(way.kind, id, db);
+    let late = null;
+    dav.refuse({ method: 'PUT', drop: true, once: true, defer: (run) => { late = run; } });
+    await way.upload();
+    dav.allowAll();
+    assert.ok(late, 'es lief kein PUT - der Fall ist nicht nachgestellt');
+    assert.deepEqual(names(url), [], 'der PUT ist schon gespeichert - der Fall ist nicht nachgestellt');
+
+    deleteLikeTheRoute(way, id);
+    await way.sync();
+    await way.push();
+    await way.sync();
+
+    late();
+    assert.deepEqual(names(url), [`${uid}.ics`], 'der späte PUT kam nicht an - der Fall ist nicht nachgestellt');
+    await way.sync();
+    assert.equal(rows().length, 0, 'der gelöschte Eintrag ist mit dem späten PUT zurück');
+    await way.push();
+    await way.sync();
+    assert.equal(rows().length, 0, 'der gelöschte Eintrag ist zurück');
+    assert.deepEqual(names(url), [], 'das Objekt des späten PUT liegt weiter auf dem Server');
+    noBookkeepingLeft();
+  });
+
+  // Der Upload scheiterte, OHNE etwas zu speichern. Später liegt an derselben
+  // Adresse ein Objekt mit anderer UID. Die Notiz belegt nur den Versuch,
+  // nicht, was dort heute liegt.
+  test(`${label}: Upload abgelehnt, später ein FREMDES Objekt an der Adresse, dann gelöscht - das fremde Objekt bleibt`, async () => {
+    reset();
+    const url = way.setup();
+    const id  = way.create(url, 'Nie oben');
+    const uid = ownUid(way.kind, id, db);
+    dav.refuse({ method: 'PUT', status: 403, once: true });
+    await way.upload();
+    dav.allowAll();
+    assert.deepEqual(names(url), [], 'der abgelehnte Upload liegt auf dem Server - der Fall ist nicht nachgestellt');
+    assert.equal(uploadAttempts().length, 1, 'der Fall ist nicht nachgestellt: keine Notiz');
+
+    dav.putObject(url, `${uid}.ics`, ics(way.component, 'somebody-else@test', 'Fremd'));
+    deleteLikeTheRoute(way, id);
+    await runAll(way);
+    await runAll(way);
+
+    assert.match(dav.getObject(url, `${uid}.ics`)?.data ?? '', /UID:somebody-else@test/, 'das fremde Objekt wurde gelöscht');
+    assert.equal(deletesOf(uid).length, 0, 'an die Adresse des fremden Objekts ging ein DELETE');
+    assert.deepEqual(uploadAttempts(), [], 'die Notiz zeigt weiter auf das fremde Objekt');
+  });
+}
+
+test('Konto auf einen anderen Server oder Benutzer umgestellt: seine Upload-Notizen fallen', async () => {
+  reset();
+  const way = WAYS.Aufgabe;
+  const url = way.setup();
+  const id  = way.create(url, 'Wartet');
+  await uploadWithLostAnswer(way, url, id);
+  assert.equal(uploadAttempts().length, 1, 'der Fall ist nicht nachgestellt: keine Notiz');
+
+  await caldavSync.updateAccount(accountId, { username: 'somebody-else', password: 'p' });
+  assert.deepEqual(uploadAttempts(), [], 'die Notiz meint ein Objekt des alten Kontos und steht noch');
+});
+
+// Die Frist gilt dem späten PUT, nicht dem Löschen: liegt das Objekt oben,
+// wird es auch nach Ablauf entfernt - und ein abgelehntes Löschen wird nach
+// Ablauf aufgegeben statt für immer wiederholt.
+for (const [label, way] of Object.entries(WAYS)) {
+  const { rows, names } = helpers(way);
+
+  test(`${label}: Antwort verloren, gelöscht, die Frist ist längst um - das Objekt wird trotzdem entfernt`, async () => {
+    reset();
+    const url = way.setup();
+    const id  = way.create(url, 'Wird gelöscht');
+    await uploadWithLostAnswer(way, url, id);
+    deleteLikeTheRoute(way, id);
+    letNotesExpire();
+
+    await way.sync();
+    await way.push();
+    assert.equal(rows().length, 0, 'der gelöschte Eintrag ist zurück');
+    assert.deepEqual(names(url), [], 'das Objekt des gelöschten Eintrags liegt weiter auf dem Server');
+    noBookkeepingLeft();
+  });
+
+  test(`${label}: das Entfernen des Rests wird abgelehnt - wiederholt bis zum Ende der Frist, dann aufgegeben`, async () => {
+    reset();
+    const url = way.setup();
+    const id  = way.create(url, 'Wird gelöscht');
+    const uid = await uploadWithLostAnswer(way, url, id);
+    deleteLikeTheRoute(way, id);
+
+    dav.refuse({ method: 'DELETE', status: 403 });
+    await way.sync();
+    await way.sync();
+    assert.ok(deletesOf(uid).length >= 2, 'das abgelehnte Entfernen wurde nicht wiederholt');
+    assert.equal(rows().length, 0, 'der gelöschte Eintrag ist zurück, solange sein Entfernen wartet');
+    assert.equal(uploadAttempts().length, 1);
+
+    letNotesExpire();
+    await way.sync();
+    assert.deepEqual(uploadAttempts(), [], 'das Entfernen wird nach Ablauf der Frist weiter versucht');
+    assert.deepEqual(names(url), [`${uid}.ics`]);
+  });
+}
+
+// Zwischen dem Blick auf den Server und dem Löschen liegt eine Anfrage. Wählt
+// in der Zeit jemand das alte Ziel wieder, wartet die Zeile dort erneut - ihr
+// Objekt ist dann kein Rest mehr.
+for (const [label, way, away, back] of [
+  ['Termin', WAYS.Termin, (id) => setEventTarget(id, null, null), (id, url) => setEventTarget(id, accountId, url)],
+  ['Aufgabe', WAYS.Aufgabe, (id) => setTaskTarget(id, null, null), (id, url) => setTaskTarget(id, accountId, url)],
+]) {
+  test(`${label}: Ziel zurückgenommen und wieder gewählt, WÄHREND der Rest geprüft wird - nichts wird gelöscht`, async () => {
+    reset();
+    const { row, rows, names } = helpers(way);
+    const url = way.setup();
+    const id  = way.create(url, 'Hin und zurück');
+    const uid = await uploadWithLostAnswer(way, url, id);
+
+    away(id);
+    let probed = false;
+    dav.refuse({
+      method: 'REPORT', status: 500,
+      when: (req) => {
+        // Der Abruf des Laufs fragt alle Objekte auf einmal ab, die Prüfung
+        // des Rests genau eines.
+        const asked = (req.body.match(/<[^/>]*href[^>]*>/g) || []).length;
+        if (!probed && /multiget/.test(req.body) && asked === 1) { probed = true; back(id, url); }
+        return false;
+      },
+    });
+    await way.sync();
+    assert.ok(probed, 'der Rest wurde nicht geprüft - der Fall ist nicht nachgestellt');
+    dav.allowAll();
+    assert.equal(deletesOf(uid).length, 0, 'das Objekt einer wieder wartenden Zeile wurde gelöscht');
+    assert.deepEqual(names(url), [`${uid}.ics`]);
+
+    await runAll(way);
+    assert.equal(rows().length, 1);
+    assert.equal(row(id).external_object_url, `${url}${uid}.ics`);
+    assert.equal(deletesOf(uid).length, 0);
+    noBookkeepingLeft();
+  });
+}
+
+// Entfernt wird nur an Plätzen, die der Durchgang führt: ein abgewählter
+// Kalender bzw. eine abgeschaltete Liste bleibt unberührt, auch wenn der
+// Eintrag gelöscht ist.
+for (const [label, way, table, column, addOther] of [
+  ['Termin', WAYS.Termin, 'caldav_calendar_selection', 'calendar_url', () => addCalendar('other')],
+  ['Aufgabe', WAYS.Aufgabe, 'caldav_reminder_selection', 'list_url', () => addTaskList('todo-other')],
+]) {
+  test(`${label}: Antwort verloren, gelöscht, Platz abgeschaltet - dort wird nichts entfernt, bis er wieder eingeschaltet ist`, async () => {
+    reset();
+    const { rows, names } = helpers(way);
+    const url = way.setup();
+    addOther();
+    const id  = way.create(url, 'Wird gelöscht');
+    const uid = await uploadWithLostAnswer(way, url, id);
+    deleteLikeTheRoute(way, id);
+
+    const enable = (on) => db.prepare(`UPDATE ${table} SET enabled = ? WHERE account_id = ? AND ${column} = ?`).run(on, accountId, url);
+    enable(0);
+    await runAll(way);
+    assert.deepEqual(names(url), [`${uid}.ics`], 'in einem abgeschalteten Platz wurde ein Objekt entfernt');
+    assert.equal(deletesOf(uid).length, 0);
+    assert.equal(uploadAttempts().length, 1);
+
+    enable(1);
+    await way.sync();
+    assert.equal(rows().length, 0, 'der gelöschte Eintrag ist zurück');
+    await way.push();
+    assert.deepEqual(names(url), []);
+    noBookkeepingLeft();
+  });
+}
+
+test('Notiz: jeder neue Versuch setzt ihre Frist neu', async () => {
+  reset();
+  const way = WAYS.Termin;
+  const url = way.setup();
+  way.create(url, 'Wird abgelehnt');
+  dav.refuse({ method: 'PUT', status: 403 });
+  await way.upload();
+  letNotesExpire();
+  await way.upload();
+  assert.equal(uploadAttempts().length, 1);
+  assert.notEqual(uploadAttempts()[0].created_at, '2020-01-01T00:00:00Z', 'die Frist zählt weiter ab dem ersten Versuch');
+});
+
+test('adoptOwnUpload: die Übernahme bucht - die Notiz des Uploads fällt mit ihr', () => {
+  reset();
+  const way = WAYS.Aufgabe;
+  const url = way.setup();
+  const id  = way.create(url, 'Wartet');
+  const uid = ownUid('task', id, db);
+  db.prepare(`
+    INSERT INTO caldav_upload_attempts (source, account_id, kind, row_id, collection_url, uid, object_url)
+    VALUES ('caldav', ?, 'task', ?, ?, ?, ?)
+  `).run(accountId, id, url, uid, `${url}${uid}.ics`);
+
+  assert.equal(todoOutbound.adoptOwnUpload('tasks', uid, accountId, `${url}${uid}.ics`, { listUrl: url }), true,
+    'der Fall ist nicht nachgestellt: nicht übernommen');
+  assert.deepEqual(uploadAttempts(), [], 'die Notiz hat die Übernahme überlebt');
 });

@@ -119,7 +119,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or list for it, or set it back to "Local", the next sync added the server copy as a second
   entry. Yuvomi now remembers that an upload was sent and never confirmed: the next sync removes
   the copy from the server instead of importing it, and the entry ends up only where you last
-  put it. The copy is removed with the next sync run, not at the moment you delete the entry.
+  put it. The copy is removed with the next sync run, not at the moment you delete the entry,
+  and only after Yuvomi has read that the entry at that address is really its own. An upload
+  that the server finishes late is covered for 24 hours after the last attempt.
 - **A CalDAV event belongs to the account that brought it** (#1860). With two or more CalDAV
   accounts, an event was identified by its UID alone. When a second account served an event with
   the same UID, it took over the entry of the first: title, calendar and address then came from

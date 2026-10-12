@@ -551,8 +551,10 @@ async function runSync({ makeClient } = {}) {
   // Inbound überspringt dafür alles, was hier noch aussteht.
   // --------------------------------------------------------
   try {
-    // Erst die Reste nie bestätigter Uploads vormerken (#1882), dann löschen.
-    outbound.releaseLeftoverUploads({ source: 'apple', wantsUploadHere: stillWantsUpload });
+    // Die Reste nie bestätigter Uploads entfernen (#1882).
+    await outbound.releaseLeftoverUploads(client, {
+      source: 'apple', wantsUploadHere: stillWantsUpload, calendarUrls: ownCalendarUrls,
+    });
     const removed = await processPendingDeletions(client, 'apple', objectIndex, ownCalendarUrls);
     if (removed) log.info(`${removed} pending deletion(s) applied in iCloud.`);
     const pushed = await processPendingUpdates(client, 'apple', objectIndex, calendarsByUrl);
