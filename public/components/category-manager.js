@@ -41,7 +41,7 @@ import { esc } from '/utils/html.js';
 import { makeSortable, isDragActive } from '/utils/sortable.js';
 import { wireTablist } from '/utils/tablist.js';
 import { rowActionHtml } from '/utils/row-action.js';
-import { errorSentence } from '/utils/friendly-error.js';
+import { errorSentence, isGone } from '/utils/friendly-error.js';
 
 /** Platzhalter-Id fuer den Eintrag ohne Ton: eine leere `data-tab-id` waere kein Knopf. */
 const NO_COLOR_ID = '__none__';
@@ -219,6 +219,8 @@ class CategoryManagerElement extends HTMLElement {
       await this._fetch();
       this._render();
     } catch (err) {
+      // BEWUSST NICHT `_fail`: das Laden darf sich nicht selbst wieder
+      // anstossen, wenn es scheitert.
       window.yuvomi?.showToast(this._errMsg(err), 'danger');
     }
   }
@@ -662,6 +664,24 @@ class CategoryManagerElement extends HTMLElement {
     }
   }
 
+  /**
+   * Der eine Weg, auf dem eine gescheiterte Aenderung gemeldet wird.
+   *
+   * Sagt der Server, dass es die Zeile nicht mehr gibt (`isGone`, #1909) -
+   * jemand anderes hat sie geloescht, waehrend dieser Dialog offen war -,
+   * holt die Komponente ihre Liste selbst neu und meldet dem Aufrufer eine
+   * Aenderung, damit auch die Seite darunter nachzieht. Der Satz raet nicht
+   * mehr zum Neuladen.
+   */
+  _fail(err) {
+    window.yuvomi?.showToast(this._errMsg(err), 'danger');
+    if (!isGone(err)) return;
+    // Beim Loeschen ist das Element schon aus dem Dokument (siehe
+    // `_notifyChanged`): dann gibt es hier nichts mehr zu zeichnen.
+    if (this.isConnected) this._load();
+    this._notifyChanged();
+  }
+
   async _onSubmit(e) {
     e.preventDefault();
     const subForm = e.target.closest('.cat-subadd-form');
@@ -688,7 +708,7 @@ class CategoryManagerElement extends HTMLElement {
       window.yuvomi?.showToast(t('category.added'), 'success');
       this._notifyChanged();
     } catch (err) {
-      window.yuvomi?.showToast(this._errMsg(err), 'danger');
+      this._fail(err);
     }
   }
 
@@ -762,7 +782,7 @@ class CategoryManagerElement extends HTMLElement {
       this._paintMark(key, res.data.color);
       this._notifyChanged();
     } catch (err) {
-      window.yuvomi?.showToast(this._errMsg(err), 'danger');
+      this._fail(err);
     }
   }
 
@@ -794,7 +814,7 @@ class CategoryManagerElement extends HTMLElement {
         this._notifyChanged();
         return;
       } catch (err) {
-        window.yuvomi?.showToast(this._errMsg(err), 'danger');
+        this._fail(err);
         if (err?.status !== 409) return;
         // Der 409 darf nur den Prompt wiederholen, aus dem diese Anfrage kam.
         // Ein inzwischen geoeffnetes (selbst schon wieder geschlossenes)
@@ -851,7 +871,7 @@ class CategoryManagerElement extends HTMLElement {
       if (movedKey) this._announceMove(movedKey, { groupKey });
       this._notifyChanged();
     } catch (err) {
-      window.yuvomi?.showToast(this._errMsg(err), 'danger');
+      this._fail(err);
       if (rollbackRender) {
         const inputs = this._snapshotAddInputs();
         this._renderGroup(groupKey);
@@ -901,7 +921,7 @@ class CategoryManagerElement extends HTMLElement {
       window.yuvomi?.showToast(t('category.deleted'), 'default');
       this._notifyChanged({ action: 'delete', key, item: cat });
     } catch (err) {
-      window.yuvomi?.showToast(this._errMsg(err), 'danger');
+      this._fail(err);
     }
   }
 
@@ -924,7 +944,7 @@ class CategoryManagerElement extends HTMLElement {
       this._notifyChanged();
       return res;
     } catch (err) {
-      window.yuvomi?.showToast(this._errMsg(err), 'danger');
+      this._fail(err);
     }
   }
 
@@ -945,7 +965,7 @@ class CategoryManagerElement extends HTMLElement {
       window.yuvomi?.showToast(t('category.renamed'), 'success');
       this._notifyChanged();
     } catch (err) {
-      window.yuvomi?.showToast(this._errMsg(err), 'danger');
+      this._fail(err);
     }
   }
 
@@ -979,7 +999,7 @@ class CategoryManagerElement extends HTMLElement {
       if (movedSubKey) this._announceMove(movedSubKey, { parentKey: parent });
       this._notifyChanged();
     } catch (err) {
-      window.yuvomi?.showToast(this._errMsg(err), 'danger');
+      this._fail(err);
       if (rollbackRender) {
         const inputs = this._snapshotAddInputs();
         this._renderSublist(parent);
@@ -1006,7 +1026,7 @@ class CategoryManagerElement extends HTMLElement {
       window.yuvomi?.showToast(t('category.deleted'), 'default');
       this._notifyChanged();
     } catch (err) {
-      window.yuvomi?.showToast(this._errMsg(err), 'danger');
+      this._fail(err);
     }
   }
 }

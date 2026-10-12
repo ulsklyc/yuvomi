@@ -452,3 +452,70 @@ test('der Einkauf verlangt den allgemeinen Satz an beiden Verwaltern', async () 
   assert.equal(calls.length, 2, 'Laeden und Kategorien');
   for (const call of calls) assert.match(call, /errorFallbackKey:\s*'common\.errorGeneric'/);
 });
+
+// #1909: sagt der Server, dass es die Zeile nicht mehr gibt (jemand anderes hat
+// sie geloescht, waehrend der Dialog offen war), holt der Manager seine Liste
+// selbst neu und meldet dem Aufrufer eine Aenderung - der Satz raet nicht mehr
+// zum Neuladen. Gefahren wird das echte `_delete` bis in sein catch.
+async function deleteAnswering(err, { connected = true } = {}) {
+  const manager = managerWithCategory({ basePath: '/shopping/stores', errorFallbackKey: 'common.errorGeneric' });
+  let loads = 0;
+  manager._load = () => { loads += 1; };
+  manager.isConnected = connected;
+  let changed = 0;
+  manager.addEventListener('category-manager-changed', () => { changed += 1; });
+  const toasts = [];
+  const previousToast = globalThis.window.yuvomi.showToast;
+  globalThis.window.yuvomi.showToast = (text, kind) => toasts.push([text, kind]);
+  globalThis.__confirmOverModal = () => true;
+  // Direkt gesetzt wie in den Faellen oben: sie haben `api.delete` ersetzt.
+  const previousDelete = api.delete;
+  api.delete = async () => { throw err; };
+  try {
+    await manager._delete('7');
+  } finally {
+    delete globalThis.__confirmOverModal;
+    api.delete = previousDelete;
+    globalThis.window.yuvomi.showToast = previousToast;
+  }
+  return { loads, changed, toasts };
+}
+
+test('a row that is gone on the server reloads the manager and tells the page', async () => {
+  const gone = serverAnswer(404, 'Store not found.', 'shopping_store_not_found');
+  assert.deepEqual(await deleteAnswering(gone), {
+    loads: 1, changed: 1, toasts: [['shopping.errorStoreGone', 'danger']],
+  });
+  // Beim Loeschen ist das Element schon aus dem Dokument: nichts zu zeichnen,
+  // aber die Seite darunter muss es trotzdem erfahren.
+  const detached = await deleteAnswering(gone, { connected: false });
+  assert.equal(detached.loads, 0);
+  assert.equal(detached.changed, 1);
+});
+
+test('any other failure reloads nothing', async () => {
+  for (const err of [
+    serverAnswer(404, 'Not found.'),
+    serverAnswer(409, 'Store already exists.', 'shopping_store_exists'),
+    serverAnswer(403, 'Not authorized.', 'shopping_store_not_found'),
+    serverAnswer(500, 'Internal error.'),
+  ]) {
+    const { loads, changed, toasts } = await deleteAnswering(err);
+    assert.equal(loads, 0);
+    assert.equal(changed, 0);
+    assert.equal(toasts.length, 1);
+  }
+});
+
+test('a failing load does not start another load', async () => {
+  const manager = new CategoryManager();
+  manager._renderShell = () => {};
+  let fetches = 0;
+  let changed = 0;
+  manager.addEventListener('category-manager-changed', () => { changed += 1; });
+  manager._fetch = async () => { fetches += 1; throw serverAnswer(404, 'Store not found.', 'shopping_store_not_found'); };
+  await manager._load();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(fetches, 1);
+  assert.equal(changed, 0);
+});

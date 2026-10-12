@@ -122,16 +122,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Shopping: an error message is in your language** (#1909). When something could not be
   saved, the note showed the server's own sentence, in English or German whatever the app was set
   to - "Unbekannte Liste." in an English session, when an item was moved to a list somebody had
-  just deleted. The shopping page now says it in the language of the app and adds what to do: the
-  list, item, shop or category no longer exists (reload the page), or a shop of that name already
-  exists (choose a different name). The same goes for the dialogs that manage shops and shopping
-  categories. Anything else on the shopping page shows the general sentence instead of a server
+  just deleted. The shopping page now says it in the language of the app: the list, item, shop or
+  category no longer exists, or a shop of that name already exists (choose a different name). The
+  same goes for the dialogs that manage shops and shopping categories. Anything else on the shopping page shows the general sentence instead of a server
   text. The other pages are unchanged for now and follow module by module. For API clients: the
   affected answers of `/api/v1/shopping` carry a
   `reason` next to `error` (`shopping_list_not_found`, `shopping_item_not_found`,
   `shopping_store_not_found`, `shopping_store_exists`, `shopping_category_not_found`,
   `category_exists`, `category_last`); status codes are unchanged, and three German `error`
   sentences are now English ("Unknown list.", "Unknown store.", "Store already exists.").
+- **Shopping: the page catches up by itself when something is gone** (#1909). If somebody else
+  in the household deleted a list, an item, a shop or a category while your page was open, the
+  next thing you did with it failed, and the note told you to reload the page. The page now does
+  that for you: it fetches the lists, shops, categories and items again and shows the current
+  state, and the note only says what happened ("This item no longer exists."). If the list you
+  were looking at is gone, you land on the first remaining one. An edit dialog for an item that
+  no longer exists closes; in any other case it stays open with what you typed and offers the
+  current lists, shops and categories. The dialogs that manage shops and shopping categories
+  refresh their rows the same way.
 - **Two texts no longer suggest that wall mode follows the arrangement of the overview** (#1908).
   Wall mode always shows the same four things - the time, today's schedule, who's up today and
   the weather - on every device. The hint under Settings → Household → Wall tablets now names

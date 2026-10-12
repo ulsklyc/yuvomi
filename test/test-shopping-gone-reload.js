@@ -1,0 +1,360 @@
+/**
+ * Tests: die Einkaufsseite laedt selbst nach, wenn etwas verschwunden ist (#1909)
+ * Modul: /public/pages/shopping.js
+ *
+ * Nennt der Server als Grund, dass es das Ziel einer Handlung nicht mehr gibt
+ * (`shopping_*_not_found`: jemand anderes im Haushalt hat es geloescht), holt
+ * die Seite Listen, Laeden, Kategorien und Artikel selbst neu. Der Toast bleibt,
+ * raet aber zu nichts mehr.
+ *
+ * Gefahren werden die ECHTEN Aufrufer - das Abhaken (`toggleShoppingItem`) und
+ * das Speichern im Bearbeiten-Dialog (`openItemDetails`) -, deren catch den
+ * Fehler meldet. Der api-Stub schreibt mit, was die Seite danach holt; er
+ * nimmt keine Antwort der Seite vorweg.
+ *
+ * Ausführen: npm run test:shopping-gone-reload
+ */
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+globalThis.HTMLElement = globalThis.HTMLElement ?? class {};
+globalThis.customElements = globalThis.customElements ?? { define() {}, get() {} };
+
+const { installMiniDom } = await import('./mini-dom.js');
+installMiniDom();
+const toasts = [];
+globalThis.window.yuvomi = { ...globalThis.window.yuvomi, showToast: (text, kind) => { toasts.push([text, kind]); } };
+globalThis.document.getElementById = () => null;
+
+const { __test: shopping } = await import('../public/pages/shopping.js');
+
+const item = (over = {}) => ({
+  id: 10, list_id: 1, name: 'Milch', quantity: '1', category: 'Sonstiges', is_checked: 0,
+  price_cents: null, store_id: null, url: null, notes: null, tags: [], sort_order: 1, ...over,
+});
+const LISTEN = () => [
+  { id: 1, name: 'Wocheneinkauf', item_total: 2, item_checked: 0 },
+  { id: 2, name: 'Baumarkt', item_total: 1, item_checked: 0 },
+];
+const KATEGORIEN = () => [{ id: 1, name: 'Sonstiges', icon: 'tag', sort_order: 0 }];
+
+function zustand(patch = {}) {
+  toasts.length = 0;
+  shopping.intents.clear();
+  shopping.pendingRemovals.clear();
+  shopping.resetLoadOrderForTest();
+  shopping.resetGoneReloadForTest?.();
+  shopping.abortLiveUpdatesForTest();
+  const lists = LISTEN();
+  Object.assign(shopping.state, {
+    lists, activeList: lists[0], activeListId: 1,
+    items: [item(), item({ id: 11, name: 'Brot', sort_order: 2 })],
+    categories: [...KATEGORIEN(), { id: 2, name: 'Alt', icon: 'tag', sort_order: 1 }],
+    stores: [{ id: 5, name: 'Eckladen' }], currency: 'EUR',
+    listsError: null, itemsError: null, collapsedCategories: new Set(),
+  }, patch);
+  shopping.setItemsListForTest(shopping.state.activeListId);
+}
+
+const nullContainer = () => ({ querySelector: () => null, querySelectorAll: () => [], isConnected: true });
+
+const fehler = (status, reason) => Object.assign(new Error('Server sentence.'), {
+  status, data: { error: 'Server sentence.', code: status, ...(reason ? { reason } : {}) },
+});
+
+/**
+ * Der Server NACH der fremden Loeschung: was er auf die Lese-Anfragen sagt.
+ * `gets` schreibt jede mit. `liest` darf werfen (das Nachladen scheitert).
+ */
+function server({ lists = LISTEN(), items = { 1: [item({ id: 11, name: 'Brot', sort_order: 2 })], 2: [item({ id: 20, list_id: 2, name: 'Dübel' })] },
+  categories = KATEGORIEN(), stores = [], liest = null } = {}) {
+  const gets = [];
+  const lese = async (path) => {
+    gets.push(path);
+    if (liest) await liest(path);
+    if (path === '/shopping') return { data: lists };
+    if (path === '/shopping/categories') return { data: categories };
+    if (path === '/shopping/stores') return { data: stores };
+    if (path === '/preferences') return { data: { currency: 'EUR' } };
+    const m = /^\/shopping\/(\d+)\/items$/.exec(path);
+    if (m) {
+      const id = Number(m[1]);
+      if (!lists.some((l) => l.id === id)) throw fehler(404, 'shopping_list_not_found');
+      return { data: items[id] ?? [], list: lists.find((l) => l.id === id), version: 7 };
+    }
+    throw new Error(`kein Stub fuer GET ${path}`);
+  };
+  return {
+    gets,
+    stub: {
+      get: lese,
+      getWithSource: async (path) => ({ data: await lese(path), fromCache: false }),
+    },
+  };
+}
+
+/** Mit dem api-Stub laufen lassen und auf das angestossene Nachladen warten. */
+async function mit(stub, lauf) {
+  globalThis.__apiStub = stub;
+  const geschlossen = [];
+  globalThis.__closeModal = (...args) => { geschlossen.push(args[0] ?? {}); };
+  const laut = [console.error, console.warn];
+  console.error = () => {};
+  console.warn = () => {};
+  try {
+    await lauf();
+    // Ein bestellter Folgelauf haengt am selben Versprechen.
+    await laeuft();
+    await new Promise((r) => setImmediate(r));
+  } finally {
+    [console.error, console.warn] = laut;
+    delete globalThis.__apiStub;
+    delete globalThis.__closeModal;
+  }
+  return geschlossen;
+}
+
+/** Der laufende Nachlade-Lauf, oder nichts. */
+const laeuft = () => shopping.goneReloadForTest?.() ?? null;
+
+const NACHLADEN = ['/preferences', '/shopping', '/shopping/1/items', '/shopping/categories', '/shopping/stores'];
+
+/** Der Bearbeiten-Dialog ueber den Modal-Stub: sein Panel und sein Speichern. */
+function dialog(id = 10, eigeneFelder = {}) {
+  let opts = null;
+  globalThis.__openModal = (o) => { opts = o; };
+  try {
+    shopping.openItemDetails(id, nullContainer());
+  } finally {
+    delete globalThis.__openModal;
+  }
+  const werte = {
+    'item-details-name': 'Milch', 'item-details-qty': '1', 'item-details-cat': 'Sonstiges',
+    'item-details-url': '', 'item-details-notes': '', 'item-details-price': '', 'item-details-store': '',
+    'item-details-link': '', 'item-details-cancel': '', 'item-details-delete': '',
+  };
+  const fields = {};
+  for (const [key, value] of Object.entries(werte)) fields[`#${key}`] = { value, addEventListener() {} };
+  Object.assign(fields, eigeneFelder);
+  const handlers = {};
+  const form = { addEventListener(type, fn) { handlers[type] = fn; } };
+  const panel = { querySelector: (sel) => (sel === '#item-details-form' ? form : fields[sel] ?? null) };
+  opts.onSave(panel);
+  return { opts, submit: () => handlers.submit({ preventDefault() {} }) };
+}
+
+// -------------------------------------------------------------------------
+// Nachladen bei "gibt es nicht mehr"
+// -------------------------------------------------------------------------
+
+test('Abhaken eines geloeschten Artikels: Toast ohne Rat, und die Seite holt den frischen Stand selbst', async () => {
+  zustand();
+  const { gets, stub } = server({ stores: [{ id: 6, name: 'Markt' }] });
+  stub.patch = async () => { throw fehler(404, 'shopping_item_not_found'); };
+
+  await mit(stub, () => shopping.toggleShoppingItem(10, 0, nullContainer()));
+
+  assert.deepEqual(toasts, [['shopping.errorItemGone', 'danger']]);
+  // Listen, Laeden, Kategorien und die Artikel der aktiven Liste - je einmal.
+  assert.deepEqual([...gets].sort(), NACHLADEN);
+  assert.deepEqual(shopping.state.items.map((i) => i.id), [11], 'der geloeschte Artikel ist aus dem Bestand');
+  assert.deepEqual(shopping.state.stores, [{ id: 6, name: 'Markt' }]);
+  assert.deepEqual(shopping.state.categories.map((c) => c.name), ['Sonstiges']);
+  assert.equal(shopping.intents.size, 0);
+});
+
+for (const [name, err] of [
+  ['500 ohne Grund', fehler(500)],
+  ['blanke 404 ohne Grund', fehler(404)],
+  ['400 mit unbekanntem Grund', fehler(400, 'shopping_future_not_found')],
+  ['409, den Laden gibt es schon', fehler(409, 'shopping_store_exists')],
+  ['eine Absage (403), auch wenn sie einen solchen Grund nennt', fehler(403, 'shopping_item_not_found')],
+  ['offline', Object.assign(new Error('offline'), { status: 0 })],
+]) {
+  test(`Kein Nachladen bei einem anderen Fehler: ${name}`, async () => {
+    zustand();
+    const { gets, stub } = server();
+    stub.patch = async () => { throw err; };
+
+    await mit(stub, () => shopping.toggleShoppingItem(10, 0, nullContainer()));
+
+    assert.equal(toasts.length, 1);
+    assert.deepEqual(gets, [], 'die Seite hat nichts nachgeladen');
+    assert.equal(laeuft(), null);
+    assert.deepEqual(shopping.state.items.map((i) => i.id), [10, 11]);
+  });
+}
+
+test('Scheitert das Nachladen selbst, loest es kein zweites aus - und der letzte Stand bleibt stehen', async () => {
+  zustand();
+  // Jede Lese-Anfrage scheitert, und zwar ausgerechnet mit einem Grund, der
+  // sonst Nachladen ausloest.
+  // Mit Atempause und Deckel: liefe das Nachladen doch im Kreis, endet der Fall
+  // rot statt nie.
+  let versuche = 0;
+  const { gets, stub } = server({
+    liest: async () => {
+      await new Promise((r) => setImmediate(r));
+      versuche += 1;
+      if (versuche <= 60) throw fehler(404, 'shopping_list_not_found');
+    },
+  });
+  stub.patch = async () => { throw fehler(404, 'shopping_item_not_found'); };
+
+  await mit(stub, () => shopping.toggleShoppingItem(10, 0, nullContainer()));
+  await new Promise((r) => setTimeout(r, 20));
+
+  assert.deepEqual([...gets].sort(), NACHLADEN, 'genau EIN Lauf');
+  assert.deepEqual(toasts, [['shopping.errorItemGone', 'danger']], 'das Nachladen meldet seinen Fehler nicht');
+  assert.equal(laeuft(), null);
+  assert.equal(shopping.state.listsError, null, 'kein Fehlerbild aus einem stillen Nachladen');
+  assert.deepEqual(shopping.state.lists.map((l) => l.id), [1, 2]);
+  assert.deepEqual(shopping.state.items.map((i) => i.id), [10, 11]);
+  assert.deepEqual(shopping.state.categories.map((c) => c.name), ['Sonstiges', 'Alt'], 'Kategorien nicht geleert');
+  assert.deepEqual(shopping.state.stores, [{ id: 5, name: 'Eckladen' }], 'Laeden nicht geleert');
+});
+
+test('Zwei Fehler waehrend EINES Laufs bestellen genau einen Folgelauf, keinen parallelen', async () => {
+  zustand({ items: [item(), item({ id: 11, name: 'Brot', sort_order: 2 }), item({ id: 12, name: 'Salz', sort_order: 3 })] });
+  let offen = 0;
+  let hoechstens = 0;
+  const { gets, stub } = server({
+    liest: async (path) => {
+      if (path !== '/shopping') return;
+      offen += 1;
+      hoechstens = Math.max(hoechstens, offen);
+      await new Promise((r) => setTimeout(r, 10));
+      offen -= 1;
+    },
+  });
+  stub.patch = async () => { throw fehler(404, 'shopping_item_not_found'); };
+
+  await mit(stub, async () => {
+    const c = nullContainer();
+    await shopping.toggleShoppingItem(10, 0, c);
+    // Der erste Lauf ist unterwegs; zwei weitere Fehler treffen ein.
+    await shopping.toggleShoppingItem(11, 0, c);
+    await shopping.toggleShoppingItem(12, 0, c);
+  });
+
+  assert.equal(gets.filter((p) => p === '/shopping').length, 2, 'ein Lauf und EIN Folgelauf');
+  assert.equal(hoechstens, 1, 'nie zwei Laeufe zugleich');
+});
+
+test('Eine laufende eigene Aenderung ueberlebt das Nachladen', async () => {
+  zustand();
+  // Der Server kennt 11 noch als offen; die Seite hat ihn gerade abgehakt und
+  // wartet auf die Antwort, als der Fehler zu Artikel 10 das Nachladen anstoesst.
+  const { stub } = server();
+  let loese;
+  stub.patch = (path) => (path.endsWith('/11')
+    ? new Promise((r) => { loese = r; })
+    : Promise.reject(fehler(404, 'shopping_item_not_found')));
+
+  await mit(stub, async () => {
+    const c = nullContainer();
+    shopping.toggleShoppingItem(11, 0, c);
+    await shopping.toggleShoppingItem(10, 0, c);
+    await laeuft();
+    assert.equal(shopping.checkedOf(shopping.state.items.find((i) => i.id === 11)), 1, 'die Zeile zeigt weiter die Absicht');
+    loese({ data: item({ id: 11, is_checked: 1 }) });
+  });
+  assert.equal(shopping.state.items.find((i) => i.id === 11).is_checked, 1);
+});
+
+// -------------------------------------------------------------------------
+// Die aktive Liste ist weg
+// -------------------------------------------------------------------------
+
+test('Ist die aktive Liste weg, faellt die Seite auf die erste verbliebene - und ein offener Dialog geht zu', async () => {
+  zustand();
+  const { stub } = server({ lists: LISTEN().filter((l) => l.id !== 1) });
+  stub.patch = async () => { throw fehler(404, 'shopping_item_not_found'); };
+
+  const geschlossen = await mit(stub, () => dialog().submit());
+
+  assert.equal(shopping.state.activeListId, 2);
+  assert.deepEqual(shopping.state.items.map((i) => i.id), [20]);
+  assert.deepEqual(shopping.state.lists.map((l) => l.id), [2]);
+  assert.deepEqual(geschlossen, [{ force: true }]);
+});
+
+test('Ist die letzte Liste weg, zeigt die Seite den Leerzustand', async () => {
+  zustand();
+  const { stub } = server({ lists: [] });
+  stub.patch = async () => { throw fehler(404, 'shopping_item_not_found'); };
+
+  await mit(stub, () => shopping.toggleShoppingItem(10, 0, nullContainer()));
+
+  assert.equal(shopping.state.activeListId, null);
+  assert.equal(shopping.state.activeList, null);
+  assert.deepEqual(shopping.state.items, []);
+  assert.equal(shopping.state.listsError, null);
+});
+
+// -------------------------------------------------------------------------
+// Der offene Bearbeiten-Dialog
+// -------------------------------------------------------------------------
+
+test('Dialog zu einem Artikel, den es nicht mehr gibt: er geht zu', async () => {
+  zustand();
+  const { stub } = server();
+  stub.patch = async () => { throw fehler(404, 'shopping_item_not_found'); };
+
+  const geschlossen = await mit(stub, () => dialog().submit());
+
+  assert.deepEqual(toasts, [['shopping.errorItemGone', 'danger']]);
+  assert.deepEqual(geschlossen, [{ force: true }]);
+});
+
+test('Dialog, dessen Artikel noch da ist (der Laden ist weg): er bleibt mit den Eingaben offen', async () => {
+  zustand();
+  const { gets, stub } = server({ items: { 1: [item(), item({ id: 11, name: 'Brot', sort_order: 2 })] } });
+  stub.patch = async () => { throw fehler(400, 'shopping_store_not_found'); };
+
+  const geschlossen = await mit(stub, () => dialog().submit());
+
+  assert.deepEqual(toasts, [['shopping.errorStoreGone', 'danger']]);
+  assert.deepEqual([...gets].sort(), NACHLADEN);
+  assert.deepEqual(geschlossen, [], 'der Dialog bleibt offen');
+  assert.deepEqual(shopping.state.stores, [], 'der verschwundene Laden wird nicht mehr angeboten');
+});
+
+test('Ein gescheitertes Nachladen schliesst keinen Dialog', async () => {
+  zustand();
+  const { stub } = server({ liest: async () => { throw new Error('Netz weg'); } });
+  stub.patch = async () => { throw fehler(404, 'shopping_item_not_found'); };
+
+  const geschlossen = await mit(stub, () => dialog().submit());
+
+  assert.deepEqual(geschlossen, []);
+  assert.deepEqual(shopping.state.items.map((i) => i.id), [10, 11]);
+});
+
+test('Der offene Dialog bekommt die frische Auswahl: Kategorie, Zielliste und Laeden', async () => {
+  zustand();
+  const auswahl = (value) => Object.assign(globalThis.document.createElement('select'), { value });
+  const kategorie = auswahl('Sonstiges');
+  // Der Nutzer hatte als Ziel die Liste gewaehlt, die es nicht mehr gibt.
+  const liste = auswahl('2');
+  const laeden = globalThis.document.createElement('datalist');
+  const { stub } = server({
+    lists: LISTEN().filter((l) => l.id !== 2),
+    items: { 1: [item(), item({ id: 11, name: 'Brot', sort_order: 2 })] },
+    stores: [{ id: 6, name: 'Markt' }],
+  });
+  stub.patch = async () => { throw fehler(400, 'shopping_list_not_found'); };
+
+  const geschlossen = await mit(stub, () => dialog(10, {
+    '#item-details-cat': kategorie, '#item-details-list': liste, '#item-details-store-options': laeden,
+  }).submit());
+
+  assert.deepEqual(toasts, [['shopping.errorListGone', 'danger']]);
+  assert.deepEqual(geschlossen, []);
+  const werte = (el) => el.childNodes.map((o) => o.value);
+  assert.deepEqual(werte(kategorie), ['Sonstiges'], 'die geloeschte Kategorie "Alt" ist nicht mehr waehlbar');
+  assert.equal(kategorie.value, 'Sonstiges', 'die Wahl bleibt, wo es sie noch gibt');
+  assert.deepEqual(werte(liste), ['1']);
+  assert.equal(liste.value, '1', 'die verschwundene Zielliste faellt auf die eigene Liste zurueck');
+  assert.deepEqual(werte(laeden), ['Markt']);
+});

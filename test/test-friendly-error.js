@@ -242,3 +242,56 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
     }
   });
 });
+
+// #1909: die Gruende, bei denen die Seite selbst nachlaedt. Eine Allowlist -
+// und sie haelt mit CASE_MESSAGES Schritt, in beide Richtungen.
+test('isGone: nur die bekannten "gibt es nicht mehr"-Gruende, nie der blanke Status', async () => {
+  const { isGone, GONE_REASONS, CASE_MESSAGES } = await load();
+  assert.deepEqual([...GONE_REASONS].sort(), [
+    'shopping_category_not_found', 'shopping_item_not_found', 'shopping_list_not_found', 'shopping_store_not_found',
+  ]);
+  for (const reason of GONE_REASONS) {
+    assert.ok(CASE_MESSAGES.has(reason), `${reason}: ohne Satz`);
+    for (const status of [400, 404]) assert.equal(isGone(answer(status, SERVER_TEXT, reason)), true, `${reason} @${status}`);
+    // Der Grund einer Absage zaehlt nur an einer Absage.
+    assert.equal(isGone(answer(403, SERVER_TEXT, reason)), false, `${reason} @403`);
+    assert.equal(isGone({ response: { status: 403 }, data: { reason } }), false);
+  }
+  // Jeder Fall, der "nicht gefunden" heisst, laedt nach - ein neuer, der hier
+  // fehlt, liesse den Nutzer mit einem veralteten Stand und ohne Rat zurueck.
+  for (const reason of CASE_MESSAGES.keys()) {
+    assert.equal(GONE_REASONS.has(reason), reason.endsWith('_not_found'), reason);
+  }
+  for (const err of [
+    answer(404, SERVER_TEXT), answer(404, SERVER_TEXT, 'some_future_not_found'), answer(404, SERVER_TEXT, '__proto__'),
+    answer(409, SERVER_TEXT, 'shopping_store_exists'), answer(500, SERVER_TEXT), { status: 0 },
+    new Error('shopping_item_not_found'), undefined, null,
+  ]) {
+    assert.equal(isGone(err), false);
+  }
+});
+
+// EIN RAT IN EINER FEHLERMELDUNG IST CODE (#1909): wo die Seite selbst
+// nachlaedt, darf der Satz nicht mehr dazu raten. Gemessen wird die Regel,
+// nicht eine Schreibweise von "neu laden" in 26 Sprachen: der Satz ist EINE
+// Aussage - ein Satzende, und es steht am Schluss, kein angehaengter Teilsatz.
+// Die alte Fassung war in jeder Sprache "Aussage. Rat." (zh: "Aussage, Rat.").
+test('ein Fall, bei dem die Seite selbst nachlaedt, sagt in jeder Sprache nur, was passiert ist', async () => {
+  const { GONE_REASONS, CASE_MESSAGES } = await load();
+  const dir = new URL('../public/locales/', import.meta.url);
+  const files = readdirSync(dir).filter((name) => name.endsWith('.json'));
+  assert.ok(files.length >= 26);
+  let checked = 0;
+  for (const reason of GONE_REASONS) {
+    const [section, leaf] = CASE_MESSAGES.get(reason).split('.');
+    for (const name of files) {
+      const text = JSON.parse(readFileSync(new URL(name, dir), 'utf8'))[section][leaf];
+      const ends = text.match(/[.!?\u3002\u0964\u061F\uFF01\uFF1F]/g) ?? [];
+      assert.equal(ends.length, 1, `${name}: ${section}.${leaf} ist mehr als ein Satz: ${text}`);
+      assert.match(text, /[.\u3002\u0964]$/, `${name}: ${section}.${leaf} endet nicht mit seinem Satzende`);
+      assert.doesNotMatch(text, /[,;:\u3001\uFF0C\uFF1B\uFF1A\u060C\u061B]/, `${name}: ${section}.${leaf} haengt einen Teilsatz an: ${text}`);
+      checked += 1;
+    }
+  }
+  assert.equal(checked, GONE_REASONS.size * files.length);
+});
