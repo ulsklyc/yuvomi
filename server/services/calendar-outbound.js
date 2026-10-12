@@ -901,9 +901,12 @@ export async function uploadNewEvent(client, calendar, uid, ics) {
  * `accountId`: bei CalDAV das Konto, über das der Upload lief; ihm gehört der
  * Termin danach.
  *
+ * `moveTo`: der Kalender, in den der Termin von hier aus weiterziehen soll
+ * (#1881, siehe `bookEventUpload`). Im selben Schreibvorgang vorgemerkt.
+ *
  * @returns {boolean} true, wenn die Zeile umgeschrieben wurde
  */
-export function markEventUploaded(eventId, { source, uid, objectUrl, calRefId, adopted = false, onlyIfLocal = false, accountId = null }) {
+export function markEventUploaded(eventId, { source, uid, objectUrl, calRefId, adopted = false, onlyIfLocal = false, accountId = null, moveTo = null }) {
   // Ein CalDAV-Upload macht die Zeile zum Termin DIESES Kontos (#1860). Die
   // Spalte steht nur im CalDAV-Statement: Apple kennt kein Konto und lässt sie
   // unberührt.
@@ -918,12 +921,13 @@ export function markEventUploaded(eventId, { source, uid, objectUrl, calRefId, a
         external_object_url = ?, calendar_ref_id = ?,${forCaldav ? '\n        caldav_account_id = ?,' : ''}
         color_modified = CASE WHEN color IS NOT NULL THEN 1 ELSE color_modified END,
         outbound_dirty = CASE WHEN ? = 1 THEN 1 ELSE outbound_dirty END,
+        outbound_move_to = COALESCE(?, outbound_move_to),
         outbound_attempts = CASE WHEN ? = 1 THEN 0 ELSE outbound_attempts END
     WHERE id = ?
       AND (? = 0 OR external_source = 'local')
   `).run(
     source, uid, objectUrl, calRefId, ...(forCaldav ? [accountId] : []),
-    adopted ? 1 : 0, adopted ? 1 : 0, eventId, onlyIfLocal ? 1 : 0
+    adopted ? 1 : 0, moveTo, adopted || moveTo ? 1 : 0, eventId, onlyIfLocal ? 1 : 0
   ).changes > 0;
 }
 
@@ -946,12 +950,31 @@ export function markEventUploaded(eventId, { source, uid, objectUrl, calRefId, a
  *     dem alten Stand. Sie wird Spiegel UND als geändert vorgemerkt.
  *   - Die Zeile ist nicht mehr lokal (ein anderer Weg hat sie inzwischen zum
  *     Spiegel gemacht): nichts wird überschrieben.
+ *   - Das Ziel wurde gewechselt (#1881, nur wo ein Termin sein Ziel selbst
+ *     trägt, also CalDAV). Eine lokale Zeile merkt auch das nicht vor: die
+ *     Route kennt für sie weder Umzug noch Löschung. Gebucht gegen das Ziel
+ *     der ANFRAGE, wäre sie sauberer Spiegel in einem Kalender, den niemand
+ *     mehr gewählt hat, und das neue Ziel gälte nie - auch ein erneutes
+ *     Speichern merkte nichts vor, weil sich dabei kein Ziel mehr ändert.
+ *       - Anderer Kalender desselben Kontos: die Zeile wird Spiegel dort, wo
+ *         das Objekt liegt, und der Umzug ins neue Ziel ist vorgemerkt.
+ *       - Kein Ziel oder ein anderes Konto: das gerade angelegte Objekt wird
+ *         zum Löschen vorgemerkt, die Zeile bleibt lokal und behält ihr neues
+ *         Ziel. Ein Umzug über Konten hinweg ist kein Umzug (Anlegen und
+ *         Löschen laufen über EIN Konto); das andere Konto lädt sie hoch,
+ *         wenn es an der Reihe ist.
  *
- * Synchron: zwischen dem Nachladen und dem Schreiben liegt kein await.
+ * Wird die Zeile Spiegel, ist das Objekt an dieser Stelle ab jetzt gewollt:
+ * ein Löschauftrag, der aus einem früheren Zielwechsel noch für genau dieses
+ * Objekt wartet, fällt (`keepOwnUpload`). Sonst nähme er der Zeile ihr
+ * Objekt wieder weg, sobald der Server das Löschen zulässt.
+ *
+ * Synchron: zwischen dem Nachladen und dem Schreiben liegt kein await, und
+ * jeder Ausgang ist EIN Schreibvorgang an der Zeile oder am Löschauftrag.
  *
  * @param {object} sent  die Zeile, aus der die Anfrage gebaut wurde
  * @param {object} what  wie `markEventUploaded`, dazu `calendarUrl`
- * @returns {'mirrored'|'deleted'|'unchanged'}
+ * @returns {'mirrored'|'deleted'|'released'|'unchanged'}
  */
 export function bookEventUpload(sent, { source, uid, objectUrl, calRefId, calendarUrl, adopted = false, accountId = null }) {
   const now = reloadEvent(sent.id);
@@ -960,10 +983,76 @@ export function bookEventUpload(sent, { source, uid, objectUrl, calRefId, calend
     log.info(`Event ${sent.id} was deleted while its upload was in flight, queued the deletion of ${uid}.`);
     return 'deleted';
   }
+  if (now.external_source !== 'local') return 'unchanged';
+
+  const wanted = uploadTargetNow(now, { source, calendarUrl, accountId });
+  if (wanted.released) {
+    queueDeletion({ source, calendarExternalId: calendarUrl, eventExternalId: uid, objectUrl, accountId });
+    log.info(`The target of event ${sent.id} was changed while its upload was in flight, queued the deletion of ${uid} in ${calendarUrl}.`);
+    return 'released';
+  }
+
+  // Spiegel und Umzug in EINEM Schreibvorgang: ein Spiegel ohne den Umzug
+  // wäre genau der Zustand, den #1881 beschreibt.
   const edited = mirroredFieldsChanged(sent, now);
-  return markEventUploaded(sent.id, {
+  const mirrored = markEventUploaded(sent.id, {
     source, uid, objectUrl, calRefId, adopted: adopted || edited, onlyIfLocal: true, accountId,
-  }) ? 'mirrored' : 'unchanged';
+    moveTo: wanted.moveTo,
+  });
+  if (!mirrored) return 'unchanged';
+  keepOwnUpload({ source, calendarUrl, uid });
+  if (wanted.moveTo) {
+    log.info(`The target of event ${sent.id} was changed while its upload was in flight, queued its move to ${wanted.moveTo}.`);
+  }
+  return 'mirrored';
+}
+
+/**
+ * Das Objekt eines eigenen Uploads in diesem Kalender ist ab jetzt gewollt
+ * (#1881): Löschaufträge für genau diese UID in genau diesem Kalender fallen.
+ *
+ * Über ALLE Konten, anders als `dropDeletionsIn`. Die UID ist die dieser
+ * Installation für diese eine Zeile, ein Auftrag für sie kann also nur aus
+ * einem früheren Upload derselben Zeile stammen - auch der eines ANDEREN
+ * Kontos, das denselben Kalender führt: wechselt das Ziel während des Uploads
+ * von Konto A auf Konto B mit demselben Kalender, übernimmt B das Objekt, und
+ * der Auftrag von A löschte es ihm sonst im nächsten Lauf weg.
+ */
+function keepOwnUpload({ source, calendarUrl, uid }) {
+  if (!source || !calendarUrl || !uid) return;
+  // Der Kalender entscheidet, nicht seine Schreibweise: zwei Konten können ihn
+  // mit und ohne Schlussstrich führen (wie `keepOwnUpload` der Aufgaben).
+  const waiting = db.get().prepare(
+    'SELECT id, calendar_external_id FROM calendar_pending_deletions WHERE source = ? AND event_external_id = ?'
+  ).all(source, uid);
+  for (const row of waiting) {
+    if (row.calendar_external_id && sameCalendarUrl(row.calendar_external_id, calendarUrl)) dropDeletion(row.id);
+  }
+}
+
+/**
+ * Wohin will die Zeile JETZT, gemessen an dem Upload, der gerade ankam (#1881)?
+ *
+ * Nur CalDAV: dort trägt der Termin sein Ziel als Paar aus Konto und Kalender.
+ * Apple lädt in den ersten verfügbaren Kalender, es gibt nichts zu wechseln.
+ *
+ * @returns {{released: boolean, moveTo: string|null}}
+ *   `released`: die Zeile will nicht (mehr) über dieses Konto hinaus;
+ *   `moveTo`: sie will in einen anderen Kalender desselben Kontos
+ */
+function uploadTargetNow(now, { source, calendarUrl, accountId }) {
+  if (source !== 'caldav') return { released: false, moveTo: null };
+  const target = now.target_caldav_calendar_url || null;
+  if (!target || now.target_caldav_account_id !== accountId) return { released: true, moveTo: null };
+  // Derselbe Kalender in anderer Schreibweise (mit und ohne Schlussstrich) ist
+  // kein Umzug: der legte im Ziel an und löschte in der Quelle - dasselbe Objekt.
+  return { released: false, moveTo: sameCalendarUrl(target, calendarUrl) ? null : target };
+}
+
+/** Zwei Schreibweisen derselben Kalender-URL: mit und ohne Schlussstrich. */
+function sameCalendarUrl(a, b) {
+  const trim = (url) => String(url || '').replace(/\/+$/, '');
+  return trim(a) === trim(b);
 }
 
 /**
@@ -1004,13 +1093,15 @@ export function adoptOwnEventUpload({ source, uid, objectUrl, calendarUrl, calRe
   if (uid !== eventUidFor(eventId)) return false;
   // Das Objekt liegt in dem Kalender, der gerade abgerufen wird - nicht an
   // einer Adresse, die der Server frei gewählt hat.
-  const trim = (url) => String(url || '').replace(/\/+$/, '');
-  if (trim(collectionUrlOf(objectUrl)) !== trim(calendarUrl)) return false;
+  if (!sameCalendarUrl(collectionUrlOf(objectUrl), calendarUrl)) return false;
   if (!isWaitingHere(eventId)) return false;
 
   const adopted = markEventUploaded(eventId, {
     source, uid, objectUrl, calRefId, adopted: true, onlyIfLocal: true, accountId,
   });
-  if (adopted) log.info(`Adopted the earlier upload of event ${eventId} (${uid}).`);
+  if (adopted) {
+    keepOwnUpload({ source, calendarUrl, uid });
+    log.info(`Adopted the earlier upload of event ${eventId} (${uid}).`);
+  }
   return adopted;
 }

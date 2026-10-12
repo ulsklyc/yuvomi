@@ -2110,9 +2110,11 @@ test('wireLiveUpdates: die Abfrage haengt am Router-Signal, eine bewegte Nummer 
 // --------------------------------------------------------------------------
 
 /** Minimaler Eingabefeld-Doppelgaenger: nur die eine Eigenschaft, die
- *  applyAutocompleteSuggestion() anfasst. */
+ *  applyAutocompleteSuggestion() anfasst, und sein `dataset`. */
 function fakeInput(initial = '') {
-  return { value: initial };
+  // `dataset` wie am echten Feld: die Wahl merkt dort, ob sie eine abgehakte
+  // Zeile dieser Liste meint (#1816).
+  return { value: initial, dataset: {} };
 }
 
 /** Minimaler <select>-Doppelgaenger mit einer festen Options-Liste. */

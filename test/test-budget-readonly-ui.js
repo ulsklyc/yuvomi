@@ -189,6 +189,30 @@ test('Buchungszeile mit `budget: read`: jede Handlung geht, die Zeile oeffnet di
   });
 });
 
+test('Kategorie- und Unterkategoriefilter bleiben mit `budget: read` lesende Aktionen', () => {
+  withAccess({ budget: 'read' }, () => {
+    const html = buchungsTab([
+      buchung({ id: 17, category: 'housing', subcategory: 'rent_mortgage' }),
+      buchung({ id: 19, title: 'Nebenkosten', category: 'housing', subcategory: 'utilities' }),
+      buchung({ id: 18, title: 'Lebensmittel', category: 'food', subcategory: 'groceries' }),
+    ], {
+      categoryFilter: 'housing',
+      subcategoryFilter: { category: 'housing', key: 'rent_mortgage' },
+      meta: {
+        expenseCategories: [
+          { key: 'housing', name: 'Wohnen' },
+          { key: 'food', name: 'Lebensmittel' },
+        ],
+        incomeCategories: [],
+        subcategories: { housing: [{ key: 'rent_mortgage', name: 'Miete' }, { key: 'utilities', name: 'Nebenkosten' }] },
+      },
+    });
+    assert.match(html, /data-id="17"/);
+    assert.doesNotMatch(html, /data-id="18"/);
+    assert.match(html, /data-subcategory-filter="rent_mortgage"/);
+  });
+});
+
 test('Leere Buchungsliste mit `budget: read`: nur der Titel, kein CTA und keine Anleitung zum Anlegen', () => {
   withAccess({ budget: 'write' }, () => {
     const html = budget.renderEntries();

@@ -161,6 +161,14 @@ const INTENTIONALLY_NOT_IN_INSTALLER = {
     + 'Formular nennt den Schalter, wenn es eine private Adresse ablehnt.',
   IMMICH_API_KEY: 'Geheimnis, das in der App gesetzt und dort auch getestet wird.',
   IMMICH_SCREENSAVER_ALBUM_ID: 'Optionale Album-Einschränkung, in der App wählbar.',
+  // Ab Werk AUS (leer = nichts geht hinaus, kein Knopf): fuer jede vom Wizard
+  // erzeugte Installation ist "nicht gesetzt" der richtige Wert. Einschalten
+  // ist eine bewusste Entscheidung des Betreibers, einen fremden Dienst mit dem
+  // Hash der Adressen seiner Mitglieder zu befragen (docs/SCOPE.md) - die gehoert
+  // nicht als weitere Frage vor die erste Anmeldung.
+  GRAVATAR_BASE_URL:
+    'Optionaler Gravatar-Import, ab Werk aus (leer); wer ihn will, setzt die Basis-URL '
+    + '(gravatar.com oder ein Libravatar-Spiegel) bewusst in der .env - keine Frage fuer den Wizard.',
 
   // Betriebs-Feinjustage, keine Installationsentscheidung.
   LOG_LEVEL: 'Betriebs-Feinjustage.',

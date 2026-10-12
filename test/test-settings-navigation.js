@@ -190,6 +190,130 @@ test('sign out other devices names the rate limit instead of a generic failure (
   assert.match(source, /catch \(error\) \{\s*showError\(errorBox, logoutOthersErrorText\(error\)\);/);
 });
 
+test('Gravatar: der Knopf steht im Bild-Editor, gesperrt ohne gespeicherte Adresse, frei mit ihr', async () => {
+  // Der Server hasht die GESPEICHERTE Adresse; was im Feld steht, kennt er
+  // nicht. Darum entscheidet das geladene Profil, nicht die Eingabe - und die
+  // Sperre ist aria-disabled, damit der Knopf per Tastatur erreichbar bleibt
+  // und die Hinweiszeile sagt, warum er noch nichts tut.
+  const { __test, hasSavedEmail } = await import('/settings/pages/personal-account.js');
+  const { avatarEditorHtml, gravatarHintText } = __test;
+  assert.equal(typeof avatarEditorHtml, 'function');
+
+  assert.equal(hasSavedEmail({ email: 'a@b.de' }), true);
+  // Dieselbe Regel wie memberEmail() auf dem Server: eine Liste oder ein
+  // zweites @ ist keine Adresse - der Knopf bliebe sonst aktiv und liefe in 400.
+  for (const user of [{ email: null }, { email: '' }, { email: '   ' }, {}, null, undefined,
+    { email: 'a@x.de, b@y.de' }, { email: 'a@x.de b@y.de' }, { email: 'a@@b.de' }, { email: '@b.de' }]) {
+    assert.equal(hasSavedEmail(user), false, JSON.stringify(user));
+  }
+
+  const buttonOf = (html) => html.match(/<button[^>]*id="profile-avatar-gravatar"[^>]*>/)?.[0] ?? '';
+  // Ohne gravatarAvailable vom Server (Betreiber hat GRAVATAR_BASE_URL nicht
+  // gesetzt, Konto ist kein Mitglied, oder /auth/me schlug fehl) gibt es den
+  // Knopf nicht - auch nicht gesperrt.
+  assert.doesNotMatch(avatarEditorHtml({ display_name: 'Ada', email: 'ada@example.org' }), /profile-avatar-gravatar/);
+  assert.doesNotMatch(avatarEditorHtml({ email: 'ada@example.org' }, { gravatarAvailable: false }), /profile-avatar-gravatar/);
+  const on = { gravatarAvailable: true };
+  const locked = buttonOf(avatarEditorHtml({ display_name: 'Ada', email: null }, on));
+  assert.ok(locked, 'der Knopf existiert');
+  assert.match(locked, /aria-disabled="true"/);
+  assert.match(locked, /aria-label="settings\.gravatarUse"/);
+  assert.match(locked, /aria-describedby="profile-gravatar-hint"/);
+  assert.doesNotMatch(locked, /\sdisabled[\s>]/, 'aria-disabled statt disabled: erreichbar bleiben');
+  assert.equal(gravatarHintText({ email: null }), 'settings.gravatarNeedsEmail');
+
+  const free = buttonOf(avatarEditorHtml({ display_name: 'Ada', email: 'ada@example.org' }, on));
+  assert.ok(free);
+  assert.doesNotMatch(free, /aria-disabled/);
+  // Der Hinweis nennt die Adresse, die gehasht wird (der Stub von t() haengt
+  // die Parameter als JSON an).
+  assert.equal(gravatarHintText({ email: ' ada@example.org ' }), 'settings.gravatarHint{"email":"ada@example.org"}');
+
+  // Dieselbe Familie wie Hochladen und Entfernen daneben, mit Icon.
+  assert.match(free, /class="settings-avatar-action"/);
+  assert.match(avatarEditorHtml({ email: 'ada@example.org' }, on), /id="profile-avatar-gravatar"[^]*?data-lucide="cloud-download"/);
+});
+
+test('Gravatar: die Hinweiszeile kommt leer aus dem HTML und wird als Text gefuellt - die Adresse steht woertlich da', async () => {
+  const { __test } = await import('/settings/pages/personal-account.js');
+  const { gravatarHintHtml, fillGravatarHint } = __test;
+  assert.equal(gravatarHintHtml(false), '', 'ohne Freigabe keine Hinweiszeile');
+  assert.equal(gravatarHintHtml(true), '<p class="form-hint" id="profile-gravatar-hint"></p>', 'leer: gefuellt wird nur ueber textContent');
+
+  // Die Adresse kommt von einer Kontaktkarte, die andere Mitglieder bearbeiten
+  // koennen. Sie darf nie als HTML gelesen werden - und auch nicht doppelt
+  // escapet als "&amp;" im Satz stehen.
+  const element = { textContent: '' };
+  fillGravatarHint(element, { email: '<b>&x@y.de' });
+  assert.ok(element.textContent.includes('<b>&x@y.de'), element.textContent);
+  assert.doesNotMatch(element.textContent, /&amp;|&lt;/);
+  fillGravatarHint(element, { email: null });
+  assert.equal(element.textContent, 'settings.gravatarNeedsEmail');
+  fillGravatarHint(null, { email: 'a@b.de' }); // ohne Element kein Fehler
+
+  // Die Verdrahtung: render() liest gravatarAvailable aus auth.me() und nur
+  // bei true; die Seite schreibt den Hinweis nie per innerHTML, und nach dem
+  // Speichern des Profils zieht er mit (syncGravatarButton).
+  const source = await readFile(new URL('../public/settings/pages/personal-account.js', import.meta.url), 'utf8');
+  assert.match(source, /gravatarAvailable = response\?\.gravatarAvailable === true;/);
+  assert.match(source, /\$\{gravatarHintHtml\(gravatarAvailable\)\}/);
+  assert.match(source, /\$\{avatarEditorHtml\(user, \{ gravatarAvailable \}\)\}/);
+  assert.doesNotMatch(source, /gravatarHint[A-Za-z]*\.innerHTML|esc\(gravatarHintText/);
+  const sync = source.slice(source.indexOf('const syncGravatarButton = () => {'), source.indexOf('const labelGravatarButton'));
+  assert.match(sync, /fillGravatarHint\(gravatarHint, user\)/);
+  assert.match(sync, /\n  syncGravatarButton\(\);/, 'beim Binden einmal gefuellt');
+});
+
+test('Gravatar: jeder Grund, den die Route nennen kann, hat seinen Satz, 429 liest sich als zu oft', async () => {
+  const { GRAVATAR_REASON_KEYS, gravatarErrorText } = await import('/settings/pages/personal-account.js');
+  // Der Vertrag der Route (POST /auth/me/avatar/gravatar): keiner dieser
+  // Gruende darf auf den englischen Servertext zurueckfallen.
+  const reasons = [
+    'no_email', 'gravatar_disabled', 'gravatar_not_found', 'gravatar_unreachable',
+    'gravatar_too_large', 'gravatar_not_image', 'gravatar_rate_limited',
+    'gravatar_stale', 'not_a_household_member',
+  ];
+  assert.deepEqual(Object.keys(GRAVATAR_REASON_KEYS).sort(), [...reasons].sort());
+
+  const de = JSON.parse(await readFile(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
+  const en = JSON.parse(await readFile(new URL('../public/locales/en.json', import.meta.url), 'utf8'));
+  for (const reason of reasons) {
+    const key = GRAVATAR_REASON_KEYS[reason];
+    assert.equal(gravatarErrorText({ status: 400, data: { reason }, message: 'Server text' }), key);
+    for (const [name, locale] of [['de', de], ['en', en]]) {
+      assert.equal(typeof getTranslation(locale, key), 'string', `${name}: ${key}`);
+    }
+  }
+  for (const key of ['settings.gravatarUse', 'settings.gravatarFetching', 'settings.gravatarHint', 'settings.gravatarDone']) {
+    assert.equal(typeof getTranslation(de, key), 'string', key);
+  }
+  assert.equal(gravatarErrorText({ status: 429, data: { error: 'Too many requests' } }), 'settings.gravatarErrorRateLimited');
+  assert.equal(gravatarErrorText({ status: 500, data: { reason: 'something_new' }, message: 'Server text' }), 'Server text');
+  assert.equal(gravatarErrorText(new Error('offline')), 'offline');
+
+  // Der Klick-Handler: ruft die Route, nimmt genau diese Funktion, uebernimmt
+  // das gespeicherte Bild in Vorschau und Seitenleiste - und speichert NICHT
+  // noch einmal: der Server hat es schon, ein zweites Save waere eine Luege
+  // an den Nutzer ("ungespeichert").
+  const source = await readFile(new URL('../public/settings/pages/personal-account.js', import.meta.url), 'utf8');
+  const start = source.indexOf("container.querySelector('#profile-avatar-gravatar')");
+  const end = source.indexOf("const profileForm = container.querySelector('#profile-form')");
+  assert.ok(start > 0 && end > start, 'der Handler steht vor dem Formular-Submit');
+  const handler = source.slice(start, end);
+  // Mitgeschickt wird die Adresse, die der Hinweis nennt (gravatarHintText:
+  // user.email.trim()) - die Route sagt 409, wenn der Server inzwischen eine
+  // andere fuehrt.
+  assert.match(handler, /api\.post\('\/auth\/me\/avatar\/gravatar', \{ email: user\.email\.trim\(\) \}\)/);
+  assert.match(source, /t\('settings\.gravatarHint', \{ email: user\.email\.trim\(\) \}\)/, 'Hinweis und Anfrage nennen dieselbe Adresse');
+  assert.match(handler, /showError\(profileError, gravatarErrorText\(error\)\)/);
+  assert.match(handler, /profileState\.avatarData = data\.avatar_data \?\? null/);
+  assert.match(handler, /new CustomEvent\('yuvomi:profile-changed'/);
+  assert.match(handler, /showToast\(t\('settings\.gravatarDone'\), 'success'\)/);
+  assert.match(handler, /t\('settings\.gravatarFetching'\)/);
+  assert.doesNotMatch(handler, /updateProfile|requestSubmit|\.submit\(/);
+  assert.doesNotMatch(handler, /innerHTML/);
+});
+
 test('sign out other devices: hint, status and buttons keep a token gap, an empty status none (#1423)', async () => {
   // a11y-Audit zu #1423: zwischen Hinweis, Statuszeile und Knopfreihe standen
   // 0 px. Der Status las sich als vierte Zeile des Hinweises, und der Fokusring

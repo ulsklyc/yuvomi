@@ -289,6 +289,53 @@ test('ein Verwerfen-Knopf heisst in keiner Sprache wie der Abbrechen-Knopf daneb
   assert.deepEqual(offenders, [], 'beide Knoepfe der Rueckfrage sagen dasselbe');
 });
 
+/**
+ * Zwei Schluessel, die der Code fuer VERSCHIEDENE Zustaende waehlt, duerfen in
+ * keiner Sprache denselben Text tragen - sonst sieht der Leser einen Zustand,
+ * wo die Oberflaeche zwei unterscheidet.
+ *
+ * `dashboard.dueSoon` steht an einer Aufgabe, die MORGEN ab 22 Uhr und in
+ * weniger als 24 Stunden faellig ist, `dashboard.dueToday` an einer von heute
+ * (formatDueDate in pages/dashboard.js). en.json trug fuer beide "Due today",
+ * seit dem ersten Locale-Commit, und 18 weitere Sprachen hatten das uebernommen:
+ * die Kachel nannte ein Datum von morgen "heute faellig". Schluesselabgleich und
+ * Uebersetzungs-Ratchet sahen nichts - der Schluessel existierte und war
+ * uebersetzt, nur eben mit dem Text des Nachbarn.
+ *
+ * Die Liste ist Handarbeit und bewusst kurz: ein allgemeines "keine zwei
+ * Schluessel gleich" waere voller Fehlalarme (Knopf und Titel heissen oft zu
+ * Recht gleich). Ein Paar gehoert hierher, wenn EIN Codepfad zwischen beiden
+ * waehlt. Was der Vergleich NICHT sieht: zwei verschiedene Woerter mit derselben
+ * Bedeutung - das bleibt Lesearbeit.
+ */
+const DISTINCT_STATE_LABELS = [
+  ['dashboard.dueSoon', 'dashboard.dueToday'],
+];
+
+/* nl.json korrigiert der offene PR #1892 (dort wird `dueSoon` zu "Vervalt
+ * binnenkort"); dieselbe Zeile hier anzufassen, ergaebe einen Konflikt. Die
+ * Ausnahme haengt am EXAKTEN Altwert, nicht an der Sprache: jeder andere
+ * Gleichstand in nl.json wird rot. Nach dem Merge von #1892 entfaellt sie. */
+const DISTINCT_STATE_PENDING = new Map([
+  ['nl:dashboard.dueSoon', 'Vandaag vervallen'],
+]);
+
+test('Labels fuer verschiedene Zustaende sind in keiner Sprache textgleich', () => {
+  const fold = (value, locale) => String(value ?? '').trim().toLocaleLowerCase(locale);
+  const offenders = [];
+  for (const locale of LOCALES) {
+    const flat = flatten(JSON.parse(readLocale(locale)));
+    for (const [a, b] of DISTINCT_STATE_LABELS) {
+      assert.ok(fold(flat.get(a), locale), `${locale}.json: ${a} fehlt`);
+      assert.ok(fold(flat.get(b), locale), `${locale}.json: ${b} fehlt`);
+      if (fold(flat.get(a), locale) !== fold(flat.get(b), locale)) continue;
+      if (DISTINCT_STATE_PENDING.get(`${locale}:${a}`) === flat.get(a)) continue;
+      offenders.push(`${locale}.json: ${a} = ${b} = "${flat.get(a)}"`);
+    }
+  }
+  assert.deepEqual(offenders, [], 'zwei Zustaende tragen denselben Text');
+});
+
 test('Modulnamen sind in nav und in den API-Token-Scopes wortgleich', () => {
   const drift = [];
   let compared = 0;
