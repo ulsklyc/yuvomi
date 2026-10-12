@@ -36,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A task due late tomorrow evening is no longer labelled "Due today" on the dashboard.** A task
+  due tomorrow at 22:00 or later and less than 24 hours away gets its own label next to the date,
+  "Due soon". In English and 17 other languages that label carried the text of "Due today", so the
+  tile said "today" in front of tomorrow's date. It now reads "Due soon" in each of them. Dutch
+  follows with the pending Dutch locale update (#1892).
 - **An archived shared-expense group now refuses changes on the server too** (#1747). Until now only
   the page was locked: an API client or a stale tab could still add, edit or delete expenses,
   comments, settlements and recurring expenses in a group the household had put away, and the
