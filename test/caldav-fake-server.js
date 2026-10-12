@@ -212,6 +212,13 @@ export async function startFakeDavServer() {
     objectNames(collectionUrl) {
       return [...(collections.get(new URL(collectionUrl).pathname)?.objects.keys() ?? [])];
     },
+    /** Stellt eine Collection ans Ende der Auflistung: Server sagen keine Reihenfolge zu. */
+    moveToEnd(collectionUrl) {
+      const path = new URL(collectionUrl).pathname;
+      const col = collections.get(path);
+      collections.delete(path);
+      collections.set(path, col);
+    },
     refuse(rule) { rules.push(rule); },
     /** Ein Multistatus, der nur die Home-Collection nennt - gültig, aber leer. */
     homeOnlyListing: () => multistatus([propResponse(homePath, '<d:resourcetype><d:collection/></d:resourcetype>')]),

@@ -2553,11 +2553,193 @@ test('Aufgabe: zwei Reste derselben UID in einem Konto - der zweite wartet, bis 
   assert.equal(todoOutbound.releaseLeftoverTodoUploads(accountId), 0);
   assert.equal(uploadAttempts().length, 1, 'die Notiz ist gefallen, ohne dass ein Auftrag ihre Adresse trägt');
   assert.deepEqual(todoTombstones().map((t) => t.object_url), [`${other}${uid}.ics`]);
-  assert.equal(todoOutbound.isLeftoverOwnUpload('tasks', uid, accountId, url), true,
+  assert.equal(todoOutbound.isUnbookedOwnUpload('tasks', uid, url), true,
     'solange die Notiz steht, verdeckt sie ihren Rest nicht');
 
   db.prepare('DELETE FROM caldav_todo_pending_deletions').run();
   assert.equal(todoOutbound.releaseLeftoverTodoUploads(accountId), 1);
   assert.deepEqual(uploadAttempts(), []);
   assert.deepEqual(todoTombstones().map((t) => t.object_url), [`${url}${uid}.ics`]);
+});
+
+// ── Befunde der Durchsicht von #1895 ────────────────────────────────────────────
+
+test('Aufgabe: Antwort verloren, Liste abgewählt - nichts wird gelöscht; wieder eingeschaltet übernimmt der Lauf', async () => {
+  reset();
+  const way = WAYS.Aufgabe;
+  const { row, rows, names } = helpers(way);
+  const url = way.setup();
+  // Eine zweite, eingeschaltete Liste: sonst überspringt der Lauf das Konto ganz.
+  addTaskList('todo-other');
+  const id  = way.create(url, 'Wartet');
+  const uid = await uploadWithLostAnswer(way, url, id);
+
+  const enable = (on) => db.prepare(
+    'UPDATE caldav_reminder_selection SET enabled = ? WHERE account_id = ? AND list_url = ?'
+  ).run(on, accountId, url);
+  enable(0);
+  await runAll(way);
+  await runAll(way);
+  assert.deepEqual(names(url), [`${uid}.ics`], 'das Objekt in der abgewählten Liste wurde entfernt');
+  assert.equal(deletesOf(uid).length, 0);
+  assert.equal(row(id).external_source, 'local');
+  assert.equal(row(id).target_caldav_list_url, url, 'das Ziel einer Aufgabe mit unbestätigtem Upload wurde abgeräumt');
+  assert.equal(uploadAttempts().length, 1);
+
+  enable(1);
+  await runAll(way);
+  assert.equal(rows().length, 1);
+  assert.equal(row(id).external_object_url, `${url}${uid}.ics`);
+  assert.deepEqual(names(url), [`${uid}.ics`]);
+  assert.equal(deletesOf(uid).length, 0, 'das Objekt wurde gelöscht und neu angelegt statt übernommen');
+  noBookkeepingLeft();
+});
+
+// Zwei Konten führen denselben Kalender bzw. dieselbe Liste, die Notiz gehört
+// dem ZWEITEN. Der Lauf nimmt das erste Konto zuerst: es hat keine eigene
+// Notiz, darf den Rest aber trotzdem nicht importieren.
+test('Termin: Antwort über das zweite Konto verloren, gelöscht - auch das erste Konto mit demselben Kalender importiert ihn nicht', async () => {
+  reset();
+  const way = WAYS.Termin;
+  const { rows, names } = helpers(way);
+  const url    = way.setup();
+  const second = secondAccount();
+  db.prepare(`
+    INSERT INTO caldav_calendar_selection (account_id, calendar_url, calendar_name, calendar_color, enabled)
+    VALUES (?, ?, 'Familie', '#4A90E2', 1)
+  `).run(second, url);
+  const id = way.create(url, 'Wird gelöscht');
+  setEventTarget(id, second, url);
+  await uploadWithLostAnswer(way, url, id);
+  assert.equal(uploadAttempts()[0]?.account_id, second, 'der Fall ist nicht nachgestellt: der Upload lief nicht über das zweite Konto');
+
+  deleteLikeTheRoute(way, id);
+  await way.sync();
+  assert.equal(rows().length, 0, 'das erste Konto hat den gelöschten Termin importiert');
+  await way.push();
+  await way.sync();
+
+  assert.equal(rows().length, 0, 'der gelöschte Termin ist zurück');
+  assert.deepEqual(names(url), [], 'das Objekt des gelöschten Termins liegt weiter auf dem Server');
+  noBookkeepingLeft();
+});
+
+test('Aufgabe: Antwort über das zweite Konto verloren, gelöscht - auch das erste Konto mit derselben Liste importiert sie nicht', async () => {
+  reset();
+  const way = WAYS.Aufgabe;
+  const { rows, names } = helpers(way);
+  const url    = way.setup();
+  const second = secondAccount();
+  db.prepare(`
+    INSERT INTO caldav_reminder_selection (account_id, list_url, list_name, target_module, enabled)
+    VALUES (?, ?, 'Erinnerungen', 'tasks', 1)
+  `).run(second, url);
+  const id = way.create(url, 'Wird gelöscht');
+  setTaskTarget(id, second, url);
+  await uploadWithLostAnswer(way, url, id);
+  assert.equal(uploadAttempts()[0]?.account_id, second, 'der Fall ist nicht nachgestellt: der Upload lief nicht über das zweite Konto');
+
+  deleteLikeTheRoute(way, id);
+  await way.sync();
+  assert.equal(rows().filter((r) => r.title === 'Wird gelöscht').length, 0, 'das erste Konto hat die gelöschte Aufgabe importiert');
+  await way.push();
+  await way.sync();
+
+  assert.equal(rows().filter((r) => r.title === 'Wird gelöscht').length, 0, 'die gelöschte Aufgabe ist zurück');
+  assert.deepEqual(names(url), [], 'das Objekt der gelöschten Aufgabe liegt weiter auf dem Server');
+  noBookkeepingLeft();
+});
+
+// iCloud lädt in den ERSTEN Kalender der Auflistung, und die sagt keine
+// Reihenfolge zu. Steht beim nächsten Lauf ein anderer vorn, will der Termin
+// weiter hinauf - sein Objekt im früheren ersten ist kein Rest, solange er
+// nirgends sonst angekommen ist.
+test('iCloud-Termin: Antwort verloren, die Auflistung nennt einen anderen Kalender zuerst und der lehnt ab - nichts wird gelöscht, nichts verdoppelt', async () => {
+  reset();
+  const way = WAYS['iCloud-Termin'];
+  const { row, rows, names } = helpers(way);
+  const url   = way.setup();
+  const other = dav.addCollection('icloud2', { name: 'Zweiter', components: ['VEVENT'] });
+  const id    = way.create(url, 'Wartet');
+  const uid   = await uploadWithLostAnswer(way, url, id);
+
+  dav.moveToEnd(url);
+  dav.refuse({ method: 'PUT', status: 403, when: (req) => req.path.startsWith(new URL(other).pathname) });
+  await runAll(way);
+
+  assert.deepEqual(names(url), [`${uid}.ics`], 'das Objekt wurde gelöscht, obwohl der Termin nirgends sonst angekommen ist');
+  assert.equal(deletesOf(uid).length, 0);
+  assert.equal(rows().length, 1, 'der Abruf hat das eigene Objekt als zweite Zeile importiert');
+  assert.equal(row(id).external_source, 'local');
+
+  // Der andere Kalender nimmt ihn an: er liegt dann dort, und der Rest fällt.
+  dav.allowAll();
+  await runAll(way);
+  assert.equal(rows().length, 1);
+  assert.equal(row(id).external_object_url, `${other}${uid}.ics`);
+  assert.deepEqual(names(other), [`${uid}.ics`]);
+  assert.deepEqual(names(url), [], 'der Rest im früheren ersten Kalender liegt weiter dort');
+  noBookkeepingLeft();
+});
+
+// Derselbe Kalender über zwei Wege verbunden: die Zeile ist an genau diesem
+// Platz Spiegel, nur unter der anderen Quelle. Ihr Objekt ist kein Rest.
+test('Termin: Antwort verloren, die Zeile ist inzwischen über iCloud Spiegel am selben Platz - die Notiz löscht das Objekt nicht', async () => {
+  reset();
+  const way = WAYS.Termin;
+  const { names } = helpers(way);
+  const url = way.setup();
+  const id  = way.create(url, 'Zwei Wege');
+  const uid = await uploadWithLostAnswer(way, url, id);
+
+  const appleRef = db.prepare(`
+    INSERT INTO external_calendars (source, external_id, name, color) VALUES ('apple', ?, 'iCloud', '#4A90E2') RETURNING id
+  `).get(url).id;
+  db.prepare(`
+    UPDATE calendar_events
+    SET external_source = 'apple', external_calendar_id = ?, calendar_ref_id = ?, external_object_url = ?,
+        target_caldav_account_id = NULL, target_caldav_calendar_url = NULL
+    WHERE id = ?
+  `).run(uid, appleRef, `${url}${uid}.ics`, id);
+
+  await way.sync();
+  await way.sync();
+  assert.deepEqual(names(url), [`${uid}.ics`], 'das Objekt, das die Zeile spiegelt, wurde gelöscht');
+  assert.equal(deletesOf(uid).length, 0);
+  assert.deepEqual(uploadAttempts(), [], 'die Notiz ist stehen geblieben');
+  assert.deepEqual(eventTombstones(), []);
+});
+
+test('iCloud: beim Trennen der Verbindung fallen ihre Upload-Notizen', async () => {
+  reset();
+  const way = WAYS['iCloud-Termin'];
+  const url = way.setup();
+  const id  = way.create(url, 'Wartet');
+  await uploadWithLostAnswer(way, url, id);
+  assert.equal(uploadAttempts().length, 1, 'der Fall ist nicht nachgestellt: keine Notiz');
+  appleCalendar.clearCredentials();
+  assert.deepEqual(uploadAttempts(), []);
+});
+
+// Fehlt die Tabelle (gedriftete Datenbank), scheitert das Schreiben der Notiz
+// laut und nichts geht hinaus. Das Buchen danach darf daran NICHT scheitern:
+// die Zeile ist dann schon umgeschrieben.
+test('Übernahme ohne Notiztabelle: gebucht wird trotzdem, ohne Fehler', () => {
+  reset();
+  const way = WAYS.Termin;
+  const url = way.setup();
+  const id  = way.create(url, 'Wartet');
+  const uid = ownUid('event', id, db);
+  db.exec('ALTER TABLE caldav_upload_attempts RENAME TO caldav_upload_attempts_away');
+  try {
+    assert.equal(outbound.adoptOwnEventUpload({
+      source: 'caldav', uid, objectUrl: `${url}${uid}.ics`, calendarUrl: url, calRefId: way.refId,
+      accountId, isWaitingHere: () => true,
+    }), true);
+    assert.equal(outbound.releaseLeftoverUploads({ source: 'caldav', accountId }), 0);
+    assert.equal(todoOutbound.releaseLeftoverTodoUploads(accountId), 0);
+  } finally {
+    db.exec('ALTER TABLE caldav_upload_attempts_away RENAME TO caldav_upload_attempts');
+  }
+  assert.equal(db.prepare('SELECT external_source FROM calendar_events WHERE id = ?').get(id).external_source, 'caldav');
 });

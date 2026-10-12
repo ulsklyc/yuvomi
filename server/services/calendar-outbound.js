@@ -33,7 +33,7 @@ import { runExternalJob } from '../utils/restore-state.js';
 import { ownUid, ownUploadRowId, parseOwnUid, inspectObjectAt } from '../utils/own-uid.js';
 import { collectionUrlOf } from '../utils/caldav-client.js';
 import {
-  noteUploadAttempt, settleUploadAttempt, dropUploadAttempt, uploadAttemptsOf, uploadAttemptAt,
+  noteUploadAttempt, settleUploadAttempt, dropUploadAttempt, uploadAttemptsOf, uploadAttemptsAt,
 } from './caldav-upload-attempts.js';
 
 const log = createLogger('CalendarOutbound');
@@ -1163,8 +1163,10 @@ function wantsCaldavUploadAt(row, attempt) {
  *   waiting  - sie ist lokal und will weiter genau dorthin: der nächste Upload
  *              oder der Abruf übernimmt das Objekt.
  *   mirrored - sie ist Spiegel an genau diesem Platz (über einen anderen Weg
- *              gebucht, etwa von einem zweiten Konto mit demselben Kalender):
- *              das Objekt ist ihres.
+ *              gebucht, etwa von einem zweiten Konto mit demselben Kalender,
+ *              oder unter der anderen Quelle, wenn derselbe Kalender als
+ *              CalDAV-Konto UND über iCloud verbunden ist): das Objekt ist
+ *              ihres.
  *   leftover - alles andere: die Zeile ist gelöscht, hat ein anderes oder kein
  *              Ziel, oder ist woanders Spiegel. Dann gehört das Objekt dort zu
  *              nichts mehr, und der Abruf darf es nicht als Termin lesen.
@@ -1178,7 +1180,7 @@ function uploadAttemptState(attempt, wantsUploadHere) {
     const waiting = wantsUploadHere ? wantsUploadHere(row, attempt.collection_url) : wantsCaldavUploadAt(row, attempt);
     return waiting ? 'waiting' : 'leftover';
   }
-  if (row.external_source === attempt.source && row.external_calendar_id === attempt.uid
+  if (row.external_calendar_id === attempt.uid
       && sameCalendarUrl(calendarExternalId(row), attempt.collection_url)) {
     return 'mirrored';
   }
@@ -1186,10 +1188,17 @@ function uploadAttemptState(attempt, wantsUploadHere) {
 }
 
 /**
- * Für den Abruf: ist das Objekt mit dieser UID in diesem Kalender der Rest
- * eines eigenen Uploads, dessen Antwort nie ankam, und dessen Zeile dort nicht
- * mehr hingehört? Dann wird es weder importiert noch einer Zeile zugeordnet;
- * `releaseLeftoverUploads` merkt im selben Lauf sein Löschen vor.
+ * Für den Abruf: liegt für das Objekt mit dieser UID in diesem Kalender eine
+ * Notiz vor, deren Upload nie gebucht wurde und die NICHT schon aufgegangen
+ * ist (die Zeile ist nicht Spiegel an diesem Platz)? Dann ist das Objekt kein
+ * Eintrag wie jeder andere: der Aufrufer darf es nur noch ÜBERNEHMEN
+ * (`adoptOwnEventUpload`, für die Zeile, die genau hier wartet) - sonst weder
+ * importieren noch einer Zeile zuordnen. Ob es gelöscht wird, entscheidet
+ * `releaseLeftoverUploads` für das Konto, dem die Notiz gehört.
+ *
+ * Über ALLE Konten der Quelle gefragt: führen zwei Konten denselben Kalender,
+ * sieht der Abruf des einen das Objekt, das über das andere hinaufging, und
+ * importierte den gelöschten Termin sonst für einen Lauf.
  *
  * Der Beleg ist die lokale Notiz, nicht die UID (`caldav-upload-attempts.js`).
  * Ohne Notiz ist das Objekt ein Eintrag wie jeder andere.
@@ -1199,26 +1208,25 @@ function uploadAttemptState(attempt, wantsUploadHere) {
  *
  * @param {object} p
  * @param {string} p.source
- * @param {number} [p.accountId]
  * @param {string} p.uid          UID aus dem Serverobjekt
  * @param {string} p.calendarUrl  Kalender, der gerade abgerufen wird
- * @param {(row: object, calendarUrl: string) => boolean} [p.wantsUploadHere]
- *        iCloud: wartet diese lokale Zeile auf den Upload in diesen Kalender?
  * @returns {boolean}
  */
-export function isLeftoverOwnUpload({ source, accountId = null, uid, calendarUrl, wantsUploadHere = null }) {
+export function isUnbookedOwnUpload({ source, uid, calendarUrl }) {
   // Billig zuerst: das Muster der UID, ohne Datenbank. Fast jedes Objekt
   // eines Kalenders scheidet hier aus.
   const parsed = parseOwnUid(uid);
   if (!parsed || parsed.kind !== 'event' || parsed.installation === null) return false;
-  let attempt;
+  let attempts;
   try {
-    attempt = uploadAttemptAt({ source, accountId, kind: 'event', uid, collectionUrl: calendarUrl });
+    attempts = uploadAttemptsAt({ source, kind: 'event', uid, collectionUrl: calendarUrl });
   } catch (err) {
     log.warn(`Upload notes are not readable (${err.message}); treating them as none.`);
     return false;
   }
-  return !!attempt && uploadAttemptState(attempt, wantsUploadHere) === 'leftover';
+  // `waiting` und `leftover` zählen beide: was mit einer wartenden Zeile
+  // geschieht, entscheidet die Übernahme, nicht der Import.
+  return attempts.some((attempt) => uploadAttemptState(attempt, () => true) !== 'mirrored');
 }
 
 /**

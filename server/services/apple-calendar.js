@@ -25,6 +25,7 @@ import { runSerialized } from '../utils/sync-lock.js';
 import { unfoldLines, parseICS, formatICSDate, tzLocalToUTC, applyDuration, normalizeRecurrenceOverrides } from './ics-parser.js';
 import { decodeHtmlEntities } from '../utils/html-entities.js';
 import * as outbound from './calendar-outbound.js';
+import { dropUploadAttemptsOf } from './caldav-upload-attempts.js';
 import { processPendingDeletions, processPendingUpdates, flushAccount } from './caldav-outbound.js';
 import { rruleLine } from './recurrence.js';
 import { eventDateTimeFields } from '../utils/ics-datetime.js';
@@ -134,6 +135,9 @@ function clearCredentials({ deleteEvents = false } = {}) {
   // stehen bleibt (oder umgekehrt).
   return db.get().transaction(() => {
     const removed = deleteEvents ? clearMirroredEvents() : 0;
+    // Die Notizen nie gebuchter Uploads gehören zur Verbindung (#1882): ohne
+    // sie gibt es keinen Weg mehr zu den Objekten, von denen sie handeln.
+    dropUploadAttemptsOf({ source: 'apple' });
     ['apple_caldav_url', 'apple_username', 'apple_app_password', 'apple_last_sync',
      // Der Fehlerstand gehoert zur Verbindung (#820).
      'apple_last_error', 'apple_last_error_at'].forEach(cfgDel);
@@ -348,13 +352,12 @@ async function runSync({ makeClient } = {}) {
 
   // Alle Kalender synchen (inklusive Geburtstags-Kalender)
   const syncCalendars = calendars;
-  // Wartet diese lokale Zeile auf ihren Upload in diesen Kalender (#1882)?
-  // Hinauf geht es nur in den ERSTEN Kalender, und nur für die Termine, die
-  // die Upload-Schleife unten selbst nähme.
-  const sameCalendar = (a, b) => String(a || '').replace(/\/+$/, '') === String(b || '').replace(/\/+$/, '');
-  const waitsForUploadIn = (row, calendarUrl) => !!syncCalendars[0]
-    && sameCalendar(calendarUrl, syncCalendars[0].url)
-    && collectLocalOutboundEvents(db.get(), row.id).length > 0;
+  // Will diese lokale Zeile weiter hinauf (#1882)? Gefragt wird NICHT, in
+  // welchen Kalender: hinauf geht es in den ersten der Auflistung, und die
+  // sagt keine Reihenfolge zu. Steht beim nächsten Lauf ein anderer vorn, ist
+  // das Objekt im früheren ersten erst dann ein Rest, wenn der Termin woanders
+  // angekommen ist - vorher wäre sein Löschen der einzige Stand auf dem Server.
+  const stillWantsUpload = (row) => collectLocalOutboundEvents(db.get(), row.id).length > 0;
 
   let totalObjects = 0;
 
@@ -428,12 +431,21 @@ async function runSync({ makeClient } = {}) {
           // anlegen, sonst kehrt der Termin bei jedem Sync zurück (#593).
           if (pendingDeletionUids.has(ev.uid)) continue;
 
-          // Der Rest eines eigenen Uploads, dessen Antwort nie ankam und
-          // dessen Termin hier nicht mehr hingehört (#1882, wie im
-          // CalDAV-Sync): nicht importieren, sein Löschen wird unten vorgemerkt.
-          if (outbound.isLeftoverOwnUpload({
-            source: 'apple', uid: ev.uid, calendarUrl: cal.url, wantsUploadHere: waitsForUploadIn,
-          })) continue;
+          // Der eigene Upload, dessen Antwort verloren ging: übernommen wird
+          // nur ein Termin, den der Upload unten in GENAU diesen Kalender
+          // schicken würde (den ersten) - die UID kommt vom Server und weist
+          // nichts aus.
+          const adoptOwn = () => !!obj.url && outbound.adoptOwnEventUpload({
+            source: 'apple', uid: ev.uid, objectUrl: obj.url, calRefId, calendarUrl: cal.url,
+            isWaitingHere: (eventId) => cal.url === syncCalendars[0].url
+              && collectLocalOutboundEvents(db.get()).some((e) => e.id === eventId),
+          });
+
+          // Für dieses Objekt steht die Notiz eines nie gebuchten Uploads
+          // (#1882, wie im CalDAV-Sync): übernehmen, wenn sein Termin hier
+          // wartet, sonst weder importieren noch zuordnen.
+          if (outbound.isUnbookedOwnUpload({ source: 'apple', uid: ev.uid, calendarUrl: cal.url })
+              && !adoptOwn()) continue;
 
           const selExisting = db.get().prepare(
             `SELECT id, outbound_dirty, calendar_ref_id, start_datetime FROM calendar_events WHERE external_calendar_id = ? AND external_source = 'apple'`
@@ -442,15 +454,7 @@ async function runSync({ makeClient } = {}) {
 
           // Der eigene Upload, dessen Antwort verloren ging: in die noch lokale
           // Zeile übernehmen statt eine zweite anzulegen (wie im CalDAV-Sync).
-          if (!existing && obj.url
-              && outbound.adoptOwnEventUpload({
-                source: 'apple', uid: ev.uid, objectUrl: obj.url, calRefId, calendarUrl: cal.url,
-                // Nur ein Termin, den der Upload unten in GENAU diesen Kalender
-                // schicken würde (den ersten) - die UID kommt vom Server und
-                // weist nichts aus.
-                isWaitingHere: (eventId) => cal.url === syncCalendars[0].url
-                  && collectLocalOutboundEvents(db.get()).some((e) => e.id === eventId),
-              })) {
+          if (!existing && adoptOwn()) {
             existing = selExisting.get(ev.uid);
           }
 
@@ -548,7 +552,7 @@ async function runSync({ makeClient } = {}) {
   // --------------------------------------------------------
   try {
     // Erst die Reste nie bestätigter Uploads vormerken (#1882), dann löschen.
-    outbound.releaseLeftoverUploads({ source: 'apple', wantsUploadHere: waitsForUploadIn });
+    outbound.releaseLeftoverUploads({ source: 'apple', wantsUploadHere: stillWantsUpload });
     const removed = await processPendingDeletions(client, 'apple', objectIndex, ownCalendarUrls);
     if (removed) log.info(`${removed} pending deletion(s) applied in iCloud.`);
     const pushed = await processPendingUpdates(client, 'apple', objectIndex, calendarsByUrl);

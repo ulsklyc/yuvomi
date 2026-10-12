@@ -31,7 +31,10 @@
 // (`server/utils/sync-lock.js`), synchron und ohne await dazwischen.
 // --------------------------------------------------------
 
+import { createLogger } from '../logger.js';
 import * as db from '../db.js';
+
+const log = createLogger('CalDAV-Upload-Notes');
 
 /** Zwei Schreibweisen derselben Collection-URL: mit und ohne Schlussstrich. */
 function samePlace(a, b) {
@@ -67,16 +70,42 @@ export function noteUploadAttempt(attempt) {
 /**
  * Das Ergebnis des Uploads an diesen Platz ist gebucht: die Notiz fällt.
  * Auch in der anderen Schreibweise des Platzes.
+ *
+ * Wirft nie. Wer bucht, hat die Zeile schon umgeschrieben; scheiterte er hier
+ * (gedriftete Datenbank ohne die Tabelle), meldete der Aufrufer einen Fehler
+ * für etwas, das gelungen ist. Ohne Tabelle gab es auch keine Notiz.
  * @returns {number} entfernte Notizen
  */
 export function settleUploadAttempt({ source, accountId = null, kind, rowId, collectionUrl }) {
   let removed = 0;
-  for (const attempt of uploadAttemptsOf({ source, accountId, kinds: [kind], rowId })) {
-    if (!samePlace(attempt.collection_url, collectionUrl)) continue;
-    dropUploadAttempt(attempt.id);
-    removed++;
+  try {
+    for (const attempt of uploadAttemptsOf({ source, accountId, kinds: [kind], rowId })) {
+      if (!samePlace(attempt.collection_url, collectionUrl)) continue;
+      dropUploadAttempt(attempt.id);
+      removed++;
+    }
+  } catch (err) {
+    log.warn(`Upload notes are not writable (${err.message}); none was settled.`);
   }
   return removed;
+}
+
+/**
+ * Die Verbindung selbst fällt weg (iCloud getrennt, CalDAV-Konto gelöscht):
+ * ohne sie gibt es keinen Weg mehr zu den Objekten, von denen die Notizen
+ * handeln. Für ein CalDAV-Konto tut das auch der Fremdschlüssel; hier steht
+ * es ausdrücklich, damit es nicht davon abhängt, dass er durchgesetzt wird.
+ * @returns {number} entfernte Notizen
+ */
+export function dropUploadAttemptsOf({ source, accountId = null }) {
+  try {
+    return Number(db.get().prepare(
+      'DELETE FROM caldav_upload_attempts WHERE source = ? AND account_id IS ?'
+    ).run(source, accountId).changes) || 0;
+  } catch (err) {
+    log.warn(`Upload notes are not writable (${err.message}); none was dropped.`);
+    return 0;
+  }
 }
 
 export function dropUploadAttempt(id) {
@@ -104,8 +133,23 @@ export function uploadAttemptsOf({ source, accountId = null, kinds, rowId = null
   `).all(source, accountId, ...kinds, rowId, rowId, uid, uid);
 }
 
-/** Die Notiz für genau dieses Objekt an genau diesem Platz, oder null. */
-export function uploadAttemptAt({ source, accountId = null, kind, uid, collectionUrl }) {
-  return uploadAttemptsOf({ source, accountId, kinds: [kind], uid })
-    .find((attempt) => samePlace(attempt.collection_url, collectionUrl)) ?? null;
+/**
+ * Alle Notizen für dieses Objekt an diesem Platz - über ALLE Konten der
+ * Quelle. Zwei Konten können denselben Kalender führen, und der Abruf des
+ * einen sieht das Objekt, das über das andere hinaufging: ob es als Eintrag
+ * gelesen werden darf, hängt nicht davon ab, wessen Abruf gerade läuft.
+ */
+export function uploadAttemptsAt({ source, kind, uid, collectionUrl }) {
+  return db.get().prepare(`
+    SELECT id, source, account_id, kind, row_id, collection_url, uid, object_url
+    FROM caldav_upload_attempts
+    WHERE source = ? AND kind = ? AND uid = ?
+    ORDER BY id
+  `).all(source, kind, uid).filter((attempt) => samePlace(attempt.collection_url, collectionUrl));
+}
+
+/** Gibt es für diese Zeile eine Notiz an diesem Platz dieses Kontos? */
+export function hasUploadAttempt({ source, accountId = null, kind, rowId, collectionUrl }) {
+  return uploadAttemptsOf({ source, accountId, kinds: [kind], rowId })
+    .some((attempt) => samePlace(attempt.collection_url, collectionUrl));
 }

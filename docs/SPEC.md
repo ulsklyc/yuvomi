@@ -1544,8 +1544,12 @@ is a mirror at exactly that place (another account on the same calendar took the
 note is dropped; *leftover* - the row is gone, has another or no target, or is a mirror elsewhere.
 A leftover is queued as an ordinary unconditional pending deletion and the note is dropped once
 that deletion is queued (`releaseLeftoverUploads`, `releaseLeftoverTodoUploads`). The fetch asks
-the same question per object, freshly, and neither imports a leftover nor matches it to a row
-(`isLeftoverOwnUpload`), because the row can be deleted while the run is still reading the server.
+per object, freshly, whether a note stands for it at this place whose row is not a mirror there
+(`isUnbookedOwnUpload`), because the row can be deleted while the run is still reading the server.
+Such an object may only be adopted, for the row that waits exactly here; otherwise it is neither
+imported nor matched to a row. That question is asked across all accounts of the source: two
+accounts can hold the same calendar or list, and the fetch of one sees the object that went up
+through the other. The deletion stays with the account the note belongs to.
 For events this runs in the full sync run after the fetch and before the pending deletions, never
 in the immediate attempt and never from a delete route: the DELETE goes to the object this run saw
 under the own UID, with its ETag as `If-Match`, and the rule does not depend on which code path
@@ -1554,6 +1558,17 @@ immediate attempt, which fetches the object before deleting it); a task or item 
 the same account is not removed yet is held back from its next upload (`withoutOwnRemoval`), and a
 second leftover of the same UID in another list waits until the first deletion is done, because
 that tombstone carries one address.
+
+"Still belongs to that place" is read from the target the row carries, not from whether that
+calendar or list is currently switched on: switching off means "stop syncing", not "clean up on
+the server". A deselected calendar and a switched-off shopping mapping keep the note, and a task
+whose list is unavailable keeps its target while a note for that list stands (otherwise
+`processPendingCreations` clears an unreachable target). For iCloud, which uploads into the first
+calendar of an unordered listing, a row counts as waiting as long as the upload loop would still
+take it, whichever calendar is first now; its object in the former first calendar becomes a
+leftover only once the row is a mirror elsewhere. A row that is a mirror at the place under the
+other source (the same calendar connected as a CalDAV account and through iCloud) counts as
+mirrored. Disconnecting iCloud and deleting a CalDAV account drop their notes.
 
 The deletion is unconditional on purpose, like the user delete (#1883): the entry was deleted in
 Yuvomi or no longer belongs there, in whatever state another app has left it. The note, not the

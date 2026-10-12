@@ -39,7 +39,8 @@ import { patchICSTodo } from '../utils/ics-patch.js';
 import { createCalDAVClient, collectionUrlOf, createUploadGate } from '../utils/caldav-client.js';
 import { ownUid, isOwnUidOfRow, ownUploadRowId, parseOwnUid, inspectObjectAt } from '../utils/own-uid.js';
 import {
-  noteUploadAttempt, settleUploadAttempt, dropUploadAttempt, uploadAttemptsOf, uploadAttemptAt,
+  noteUploadAttempt, settleUploadAttempt, dropUploadAttempt, uploadAttemptsOf, uploadAttemptsAt,
+  hasUploadAttempt,
 } from './caldav-upload-attempts.js';
 import { householdTimeZone, localToUTC } from '../utils/timezone.js';
 import { loadTags, tagsKey } from '../utils/task-tags.js';
@@ -929,27 +930,32 @@ function todoAttemptState(module, attempt, row = undefined) {
 }
 
 /**
- * Für den Abruf: ist das Objekt mit dieser UID in dieser Liste der Rest eines
- * eigenen Uploads, dessen Antwort nie ankam, und dessen Zeile dort nicht mehr
- * hingehört? Dann wird es weder importiert noch einer Zeile zugeordnet;
- * `releaseLeftoverTodoUploads` merkt sein Löschen vor.
+ * Für den Abruf: liegt für das Objekt mit dieser UID in dieser Liste eine
+ * Notiz vor, deren Upload nie gebucht wurde und die NICHT schon aufgegangen
+ * ist (die Zeile ist nicht Spiegel an diesem Platz)? Dann darf der Aufrufer
+ * es nur noch ÜBERNEHMEN (`adoptOwnUpload`, vorher) - sonst weder importieren
+ * noch einer Zeile zuordnen. Ob es gelöscht wird, entscheidet
+ * `releaseLeftoverTodoUploads` für das Konto, dem die Notiz gehört.
+ *
+ * Über ALLE Konten gefragt: führen zwei Konten dieselbe Liste, sieht der Abruf
+ * des einen das Objekt, das über das andere hinaufging.
  *
  * Der Beleg ist die lokale Notiz, nicht die UID. Frisch je Objekt gefragt: die
  * Zeile kann fallen, während der Lauf noch den Server liest.
  */
-export function isLeftoverOwnUpload(module, uid, accountId, listUrl) {
+export function isUnbookedOwnUpload(module, uid, listUrl) {
   const kind = uidKind(module);
   // Billig zuerst: das Muster der UID, ohne Datenbank.
   const parsed = parseOwnUid(uid);
   if (!parsed || parsed.kind !== kind || parsed.installation === null) return false;
-  let attempt;
+  let attempts;
   try {
-    attempt = uploadAttemptAt({ source: 'caldav', accountId, kind, uid, collectionUrl: listUrl });
+    attempts = uploadAttemptsAt({ source: 'caldav', kind, uid, collectionUrl: listUrl });
   } catch (err) {
     log.warn(`Upload notes are not readable (${err.message}); treating them as none.`);
     return false;
   }
-  return !!attempt && todoAttemptState(module, attempt) === 'leftover';
+  return attempts.some((attempt) => todoAttemptState(module, attempt) !== 'mirrored');
 }
 
 /**
@@ -969,7 +975,7 @@ export function isLeftoverOwnUpload(module, uid, accountId, listUrl) {
  * Ein Auftrag nennt Konto, Modul und UID, aber nur EINE Adresse. Wartet für
  * dieselbe UID schon einer mit der Adresse einer ANDEREN Liste, bleibt die
  * Notiz stehen, bis der erledigt ist - sie verdeckt ihren Rest solange selbst
- * (`isLeftoverOwnUpload`).
+ * (`isUnbookedOwnUpload`).
  *
  * Synchron: je Notiz Lesen, Entscheiden und Schreiben ohne await dazwischen.
  * Die Notiz fällt erst, wenn der Auftrag steht.
@@ -1074,6 +1080,19 @@ export async function processPendingCreations(client, accountId, module, listsBy
       // Die Liste ist weg oder wurde abgewählt. Das Ziel stehen zu lassen hieße,
       // es bei jedem Lauf erneut zu versuchen; die Aufgabe bleibt lokal, was der
       // Zustand vor #695 war und keine Daten kostet.
+      // Ausnahme (#1882): von dieser Aufgabe ging schon ein Upload in genau
+      // diese Liste, und seine Antwort kam nie an. Ihr Objekt kann dort
+      // liegen. Fiele jetzt ihr Ziel, gälte es als Rest und würde gelöscht -
+      // abwählen heisst aber "nicht mehr abgleichen", nicht "auf dem Server
+      // aufräumen". Das Ziel bleibt, die Notiz auch; ist die Liste wieder da,
+      // übernimmt der Lauf das Objekt.
+      if (hasUploadAttempt({
+        source: 'caldav', accountId, kind: uidKind(module), rowId: fresh.id,
+        collectionUrl: fresh.target_caldav_list_url,
+      })) {
+        log.debug(`Reminder list ${fresh.target_caldav_list_url} is not available; task ${fresh.id} has an unconfirmed upload there and keeps its target.`);
+        continue;
+      }
       log.warn(`Reminder list ${fresh.target_caldav_list_url} is not available, keeping task ${fresh.id} local.`);
       clearCreationTarget(fresh);
       continue;

@@ -537,13 +537,6 @@ async function runSync({ createClient: makeClient } = {}) {
               // darf sie nicht überschreiben.
               if (pendingByModule[module].dirty.has(todo.uid)) continue;
 
-              // Der Rest eines eigenen Uploads, dessen Antwort nie ankam und
-              // dessen Zeile hier nicht mehr hingehört - gelöscht, mit
-              // anderem Ziel, woanders gespiegelt (#1882). Weder importieren
-              // noch einer Zeile zuordnen. Frisch gefragt: die Zeile kann
-              // gefallen sein, während dieser Lauf noch liest.
-              if (todoOutbound.isLeftoverOwnUpload(module, todo.uid, account.id, sel.list_url)) continue;
-
               // Der eigene Upload, dessen Antwort verloren ging: die Zeile ist
               // noch lokal, das Objekt liegt schon hier. In die bestehende
               // Zeile übernehmen statt eine zweite anzulegen; ihr lokaler
@@ -556,6 +549,14 @@ async function runSync({ createClient: makeClient } = {}) {
                 totalItems++;
                 continue;
               }
+
+              // Nicht übernommen, aber für das Objekt steht die Notiz eines
+              // Uploads, der nie gebucht wurde (#1882) - gleich über welches
+              // Konto er lief: die Zeile ist gelöscht, hat ein anderes Ziel,
+              // ist woanders gespiegelt oder wartet über ein anderes Konto.
+              // Weder importieren noch einer Zeile zuordnen. Frisch gefragt:
+              // die Zeile kann gefallen sein, während dieser Lauf noch liest.
+              if (todoOutbound.isUnbookedOwnUpload(module, todo.uid, sel.list_url)) continue;
 
               if (module === 'shopping') {
                 upsertShoppingItem(sel, todo, account.id, obj.url || null);
