@@ -23,8 +23,9 @@ import assert from 'node:assert/strict';
 // an der Datenbank nachgesehen, nicht geraten. Ein Testwert mit Leerzeichen
 // ('2026-01-15 09:00:00') laeuft durch `toICSDatetime` zu Unsinn und laesst die
 // Pruefung aus dem falschen Grund scheitern.
-const { outboundStartDatetime, outboundDateRange, outboundEvent } =
-  await import('../server/services/outbound-dtstart.js');
+const {
+  outboundStartDatetime, outboundDateRange, outboundEvent, startOrRuleChanged, inboundSeriesVerdict,
+} = await import('../server/services/outbound-dtstart.js');
 
 const MONATSLETZTER = 'FREQ=MONTHLY;BYMONTHDAY=-1';
 
@@ -33,29 +34,64 @@ const MONATSLETZTER = 'FREQ=MONTHLY;BYMONTHDAY=-1';
 // --------------------------------------------------------
 
 test('eine eigene Monatsletzten-Serie startet nach draussen am Monatsletzten', () => {
-  const ev = { start_datetime: '2026-01-15T09:00', recurrence_rule: MONATSLETZTER, external_source: 'local' };
+  const ev = { start_datetime: '2026-01-15T09:00', recurrence_rule: MONATSLETZTER, external_source: 'local', series_authored: 1 };
   assert.equal(outboundStartDatetime(ev), '2026-01-31T09:00');
 });
+
+// WER DEN START VERFASST HAT, SAGT `series_authored` - NICHT `external_source`
+// (#1935). Der Test hier fuetterte bis dahin Zeilen mit `external_source:
+// 'google'` und erwartete sie unveraendert: er konnte eine hochgeladene eigene
+// Serie nicht von einer eingelesenen unterscheiden und nagelte fuer beide
+// dasselbe fest - also genau den Fehler. Jetzt stehen die beiden Faelle
+// getrennt, je Quelle, und die Quelle entscheidet in keinem von beiden.
+const QUELLEN = ['local', 'ics', 'caldav', 'google', 'apple'];
 
 test('eine importierte Serie geht Wort fuer Wort zurueck (#756)', () => {
   // Fremde Kalender duerfen ein unsynchronisiertes DTSTART absichtlich fuehren;
   // beim Round-Trip ist Yuvomi darueber nicht der Schiedsrichter.
-  for (const quelle of ['ics', 'caldav', 'google', 'apple']) {
-    const ev = { start_datetime: '2026-01-15T09:00', recurrence_rule: MONATSLETZTER, external_source: quelle };
-    assert.equal(outboundStartDatetime(ev), '2026-01-15T09:00', `Quelle ${quelle}`);
+  for (const quelle of QUELLEN) {
+    const ev = {
+      start_datetime: '2026-01-15T09:00', end_datetime: '2026-01-15T10:00',
+      recurrence_rule: MONATSLETZTER, external_source: quelle, series_authored: 0,
+    };
+    assert.deepEqual(outboundDateRange(ev),
+      { start_datetime: '2026-01-15T09:00', end_datetime: '2026-01-15T10:00' }, `Quelle ${quelle}`);
+  }
+});
+
+test('eine hier verfasste Serie wird ausgerichtet, gleich wo sie gespiegelt liegt (#1935)', () => {
+  // Das Buchen des Uploads schreibt `external_source` um. Die Serie bleibt
+  // trotzdem die eigene: derselbe Start wie beim ersten Upload, bei jedem Push.
+  for (const quelle of QUELLEN) {
+    const ev = {
+      start_datetime: '2026-01-15T09:00', end_datetime: '2026-01-15T10:00',
+      recurrence_rule: MONATSLETZTER, external_source: quelle, series_authored: 1,
+    };
+    assert.deepEqual(outboundDateRange(ev),
+      { start_datetime: '2026-01-31T09:00', end_datetime: '2026-01-31T10:00' }, `Quelle ${quelle}`);
+  }
+});
+
+test('ohne die Marke wird nichts ausgerichtet: unbekannt heisst wie eingelesen', () => {
+  // Ein Objekt ohne die Spalte (von Hand gebaut, Schema von vor Migration 246)
+  // ist nicht "eigen", auch nicht mit `external_source: 'local'`.
+  for (const marke of [undefined, null, 0, '0']) {
+    const ev = { start_datetime: '2026-01-15T09:00', recurrence_rule: MONATSLETZTER, external_source: 'local' };
+    if (marke !== undefined) ev.series_authored = marke;
+    assert.equal(outboundStartDatetime(ev), '2026-01-15T09:00', `Marke ${String(marke)}`);
   }
 });
 
 test('eine BYDAY-Regel bleibt unangetastet (#549)', () => {
   // Apple serialisiert "jeden Werktag" als Serie, deren Start auf ein Wochenende
   // fallen darf; diese Entscheidung ist aelter und gilt weiter.
-  const ev = { start_datetime: '2026-01-17T09:00', recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO', external_source: 'local' };
+  const ev = { start_datetime: '2026-01-17T09:00', recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO', external_source: 'local', series_authored: 1 };
   assert.equal(outboundStartDatetime(ev), '2026-01-17T09:00');
 });
 
 test('ohne Regel und bei schon passendem Start aendert sich nichts', () => {
-  assert.equal(outboundStartDatetime({ start_datetime: '2026-01-15T09:00', external_source: 'local' }), '2026-01-15T09:00');
-  const passend = { start_datetime: '2026-01-31T09:00', recurrence_rule: MONATSLETZTER, external_source: 'local' };
+  assert.equal(outboundStartDatetime({ start_datetime: '2026-01-15T09:00', external_source: 'local', series_authored: 1 }), '2026-01-15T09:00');
+  const passend = { start_datetime: '2026-01-31T09:00', recurrence_rule: MONATSLETZTER, external_source: 'local', series_authored: 1 };
   assert.equal(outboundStartDatetime(passend), '2026-01-31T09:00');
 });
 
@@ -64,19 +100,19 @@ test('das Ende wandert mit und behaelt die Dauer', () => {
   // endete der Termin drueben vor seinem Beginn.
   const kurz = outboundDateRange({
     start_datetime: '2026-01-15T09:00', end_datetime: '2026-01-15T10:30',
-    recurrence_rule: MONATSLETZTER, external_source: 'local',
+    recurrence_rule: MONATSLETZTER, external_source: 'local', series_authored: 1,
   });
   assert.deepEqual(kurz, { start_datetime: '2026-01-31T09:00', end_datetime: '2026-01-31T10:30' });
 
   const mehrtaegig = outboundDateRange({
     start_datetime: '2026-01-15T09:00', end_datetime: '2026-01-17T10:30',
-    recurrence_rule: MONATSLETZTER, external_source: 'local',
+    recurrence_rule: MONATSLETZTER, external_source: 'local', series_authored: 1,
   });
   assert.equal(mehrtaegig.end_datetime, '2026-02-02T10:30', 'zwei Tage Spanne bleiben zwei Tage');
 
   const ohneEnde = outboundDateRange({
     start_datetime: '2026-01-15T09:00', end_datetime: null,
-    recurrence_rule: MONATSLETZTER, external_source: 'local',
+    recurrence_rule: MONATSLETZTER, external_source: 'local', series_authored: 1,
   });
   assert.equal(ohneEnde.end_datetime, null);
 });
@@ -86,7 +122,7 @@ test('das gespeicherte Zeitformat bleibt, wie es war', () => {
   // tauscht nur den Datumsteil und darf keines davon umschreiben.
   const z = outboundDateRange({
     start_datetime: '2026-01-15T09:00:00Z', end_datetime: '2026-01-15T10:30:00Z',
-    recurrence_rule: MONATSLETZTER, external_source: 'local',
+    recurrence_rule: MONATSLETZTER, external_source: 'local', series_authored: 1,
   });
   assert.deepEqual(z, { start_datetime: '2026-01-31T09:00:00Z', end_datetime: '2026-01-31T10:30:00Z' });
 });
@@ -95,7 +131,7 @@ test('outboundEvent laesst alle uebrigen Felder unberuehrt', () => {
   const ev = {
     id: 7, title: 'Miete', description: 'x', location: 'y', all_day: 0,
     start_datetime: '2026-01-15T09:00', end_datetime: '2026-01-15T10:00',
-    recurrence_rule: MONATSLETZTER, external_source: 'local', tzid: null,
+    recurrence_rule: MONATSLETZTER, external_source: 'local', series_authored: 1, tzid: null,
   };
   const out = outboundEvent(ev);
   assert.equal(out.start_datetime, '2026-01-31T09:00');
@@ -118,7 +154,7 @@ test('der ausgehende CalDAV/Apple-Pfad schreibt den begradigten DTSTART', async 
   const { fields } = icsFieldsForEvent({
     id: 1, title: 'Miete', all_day: 0,
     start_datetime: '2026-01-15T09:00', end_datetime: '2026-01-15T10:00',
-    recurrence_rule: MONATSLETZTER, external_source: 'local',
+    recurrence_rule: MONATSLETZTER, external_source: 'local', series_authored: 1,
   }, 'Europe/Berlin');
   assert.match(fields.DTSTART.value, /^20260131T/, `DTSTART war ${fields.DTSTART.value}`);
   assert.match(fields.DTEND.value, /^20260131T/, `DTEND war ${fields.DTEND.value}`);
@@ -129,7 +165,7 @@ test('der ausgehende Pfad laesst ein importiertes DTSTART stehen (#756)', async 
   const { fields } = icsFieldsForEvent({
     id: 2, title: 'Fremd', all_day: 0,
     start_datetime: '2026-01-15T09:00', end_datetime: '2026-01-15T10:00',
-    recurrence_rule: MONATSLETZTER, external_source: 'ics',
+    recurrence_rule: MONATSLETZTER, external_source: 'ics', series_authored: 0,
   }, 'Europe/Berlin');
   assert.match(fields.DTSTART.value, /^20260115T/, `DTSTART war ${fields.DTSTART.value}`);
 });
@@ -139,9 +175,177 @@ test('ein ganztaegiger Termin wandert ebenfalls, mit exklusivem DTEND', async ()
   const { fields } = icsFieldsForEvent({
     id: 3, title: 'Ganztags', all_day: 1,
     start_datetime: '2026-01-15', end_datetime: '2026-01-15',
-    recurrence_rule: MONATSLETZTER, external_source: 'local',
+    recurrence_rule: MONATSLETZTER, external_source: 'local', series_authored: 1,
   }, 'Europe/Berlin');
   assert.equal(fields.DTSTART.value, '20260131');
   // DTEND ist bei VALUE=DATE exklusiv: der Tag nach dem letzten sichtbaren.
   assert.equal(fields.DTEND.value, '20260201');
+});
+
+// --------------------------------------------------------
+// Ein Zeitpunkt mit eigener Zone (#1935)
+// --------------------------------------------------------
+//
+// So liegt eine eingelesene Serie in der Zeile, deren REGEL in Yuvomi geaendert
+// wurde: der Start steht noch in der Form des Anbieters, die Marke ist gesetzt.
+
+test('ein Zeitpunkt mit Zone wird auf der Wanduhr ausgerichtet, nicht am Text', () => {
+  // 15. Januar 14:00 in Berlin, als Zeitpunkt mit Versatz und in UTC.
+  for (const [start, ende] of [
+    ['2035-01-15T14:00:00+01:00', '2035-01-15T15:00:00+01:00'],
+    ['2035-01-15T13:00:00Z', '2035-01-15T14:00:00Z'],
+  ]) {
+    const out = outboundDateRange({
+      start_datetime: start, end_datetime: ende, tzid: 'Europe/Berlin',
+      recurrence_rule: MONATSLETZTER, external_source: 'google', series_authored: 1,
+    });
+    assert.deepEqual(out, { start_datetime: '2035-01-31T13:00:00Z', end_datetime: '2035-01-31T14:00:00Z' }, start);
+  }
+});
+
+test('ueber die Zeitumstellung bleibt die Wanduhrzeit, nicht der Versatz', () => {
+  // 15. Maerz 14:00 Berlin ist 13:00Z, 31. Maerz 14:00 Berlin ist 12:00Z. Den
+  // Datumsteil im Text zu tauschen liesse den Termin eine Stunde spaeter beginnen.
+  const out = outboundDateRange({
+    start_datetime: '2035-03-15T13:00:00Z', end_datetime: '2035-03-15T14:30:00Z', tzid: 'Europe/Berlin',
+    recurrence_rule: MONATSLETZTER, external_source: 'caldav', series_authored: 1,
+  });
+  assert.deepEqual(out, { start_datetime: '2035-03-31T12:00:00Z', end_datetime: '2035-03-31T13:30:00Z' });
+});
+
+test('der Ortstag zaehlt, wo er neben dem UTC-Tag liegt', () => {
+  // 31. Januar 00:30 Berlin ist der 30. Januar 23:30Z: am Ort schon der
+  // Monatsletzte, also nichts zu tun. Am Text gemessen wanderte der Termin
+  // auf den 31. Januar 23:30Z, das ist der 1. Februar in Berlin.
+  const amOrtPassend = {
+    start_datetime: '2035-01-30T23:30:00Z', end_datetime: '2035-01-31T00:30:00Z', tzid: 'Europe/Berlin',
+    recurrence_rule: MONATSLETZTER, external_source: 'caldav', series_authored: 1,
+  };
+  assert.deepEqual(outboundDateRange(amOrtPassend),
+    { start_datetime: amOrtPassend.start_datetime, end_datetime: amOrtPassend.end_datetime });
+
+  // Umgekehrt: 15. Januar 23:30 Berlin (22:30Z) wandert auf den 31. 23:30 Berlin.
+  const spaet = outboundDateRange({
+    start_datetime: '2035-01-15T22:30:00Z', end_datetime: null, tzid: 'Europe/Berlin',
+    recurrence_rule: MONATSLETZTER, external_source: 'caldav', series_authored: 1,
+  });
+  assert.deepEqual(spaet, { start_datetime: '2035-01-31T22:30:00Z', end_datetime: null });
+});
+
+test('ein Zeitpunkt mit Zone bleibt ohne die Marke stehen (#756)', () => {
+  const ev = {
+    start_datetime: '2035-01-15T13:00:00Z', end_datetime: '2035-01-15T14:00:00Z', tzid: 'Europe/Berlin',
+    recurrence_rule: MONATSLETZTER, external_source: 'caldav', series_authored: 0,
+  };
+  assert.deepEqual(outboundDateRange(ev), { start_datetime: ev.start_datetime, end_datetime: ev.end_datetime });
+});
+
+// --------------------------------------------------------
+// Wer die Marke setzt: eine Bearbeitung von Start oder Regel in Yuvomi
+// --------------------------------------------------------
+
+const BERLIN = 'Europe/Berlin';
+
+test('eine Bearbeitung ohne Start und Regel setzt die Marke nicht', () => {
+  const zeile = { start_datetime: '2035-01-15T14:00', all_day: 0, recurrence_rule: MONATSLETZTER };
+  assert.equal(startOrRuleChanged(zeile, { ...zeile }, BERLIN), false);
+});
+
+test('derselbe Beginn in anderer Schreibweise ist keine Startaenderung', () => {
+  // Das Formular schickt die Wanduhrzeit des Haushalts zurueck, in der Zeile
+  // eines eingelesenen Termins steht der Zeitpunkt. Am Text verglichen setzte
+  // jede Titelaenderung die Marke, und die Serie ginge mit anderem DTSTART zurueck.
+  for (const gespeichert of ['2035-01-15T14:00:00+01:00', '2035-01-15T13:00:00Z', '2035-01-15T14:00:00', '2035-01-15T14:00']) {
+    const zeile = { start_datetime: gespeichert, all_day: 0, recurrence_rule: `RRULE:${MONATSLETZTER}` };
+    const danach = { start_datetime: '2035-01-15T14:00', all_day: 0, recurrence_rule: `RRULE:${MONATSLETZTER}` };
+    assert.equal(startOrRuleChanged(zeile, danach, BERLIN), false, gespeichert);
+  }
+  const ganztags = { start_datetime: '2035-01-15', all_day: 1, recurrence_rule: MONATSLETZTER };
+  assert.equal(startOrRuleChanged(ganztags, { ...ganztags }, BERLIN), false);
+});
+
+test('dieselbe Regel in anderer Schreibweise ist keine Regelaenderung', () => {
+  const zeile = { start_datetime: '2035-01-15T14:00', all_day: 0, recurrence_rule: 'RRULE:FREQ=MONTHLY;BYMONTHDAY=-1' };
+  const danach = { ...zeile, recurrence_rule: 'bymonthday=-1;FREQ=MONTHLY' };
+  assert.equal(startOrRuleChanged(zeile, danach, BERLIN), false);
+});
+
+test('ein anderer Start, eine andere Regel oder der Wechsel auf ganztaegig setzen die Marke', () => {
+  const zeile = { start_datetime: '2035-01-15T13:00:00Z', all_day: 0, recurrence_rule: 'FREQ=MONTHLY' };
+  assert.equal(startOrRuleChanged(zeile, { ...zeile, start_datetime: '2035-02-10T14:00' }, BERLIN), true, 'anderer Tag');
+  assert.equal(startOrRuleChanged(zeile, { ...zeile, start_datetime: '2035-01-15T14:30' }, BERLIN), true, 'andere Uhrzeit');
+  assert.equal(startOrRuleChanged(zeile, { ...zeile, recurrence_rule: MONATSLETZTER }, BERLIN), true, 'andere Regel');
+  assert.equal(startOrRuleChanged(zeile, { ...zeile, recurrence_rule: null }, BERLIN), true, 'Regel entfernt');
+  assert.equal(startOrRuleChanged(zeile, { ...zeile, start_datetime: '2035-01-15', all_day: 1 }, BERLIN), true, 'ganztaegig');
+});
+
+// --------------------------------------------------------
+// Wer die Marke nimmt: der Abruf
+// --------------------------------------------------------
+
+const eigene = (felder = {}) => ({
+  start_datetime: '2035-01-15T14:00', end_datetime: '2035-01-15T15:00', all_day: 0,
+  recurrence_rule: MONATSLETZTER, tzid: null, series_authored: 1, ...felder,
+});
+
+test('das Echo des eigenen Uploads laesst die Eingabe stehen', () => {
+  // Der Anbieter liefert den 31. Januar - genau das, was hinausging.
+  for (const kommt of [
+    { start_datetime: '2035-01-31T14:00:00+01:00', end_datetime: '2035-01-31T15:00:00+01:00' },
+    { start_datetime: '2035-01-31T13:00:00Z', end_datetime: '2035-01-31T14:00:00Z' },
+  ]) {
+    assert.deepEqual(
+      inboundSeriesVerdict(eigene(), { ...kommt, all_day: false, recurrence_rule: `RRULE:${MONATSLETZTER}` }, { zone: BERLIN }),
+      { keep: true, authored: 1 }, kommt.start_datetime,
+    );
+  }
+  // Ganztaegig, und ohne gespeichertes Ende: hinaus geht der Start als Ende.
+  assert.deepEqual(
+    inboundSeriesVerdict(
+      eigene({ start_datetime: '2035-01-15', end_datetime: null, all_day: 1 }),
+      { start_datetime: '2035-01-31', end_datetime: '2035-01-31', all_day: true, recurrence_rule: MONATSLETZTER },
+      { zone: BERLIN },
+    ),
+    { keep: true, authored: 1 },
+  );
+});
+
+test('ein anderer Start oder eine andere Regel vom Anbieter nimmt die Marke', () => {
+  const basis = { start_datetime: '2035-01-31T13:00:00Z', end_datetime: '2035-01-31T14:00:00Z', all_day: false, recurrence_rule: MONATSLETZTER };
+  const fremd = { keep: false, authored: 0 };
+  assert.deepEqual(inboundSeriesVerdict(eigene(), { ...basis, start_datetime: '2035-01-31T12:00:00Z' }, { zone: BERLIN }), fremd, 'andere Uhrzeit');
+  assert.deepEqual(inboundSeriesVerdict(eigene(), { ...basis, start_datetime: '2035-01-15T13:00:00Z', end_datetime: '2035-01-15T14:00:00Z' }, { zone: BERLIN }), fremd,
+    'der eingegebene Tag selbst: der Anbieter haelt nicht, was Yuvomi hinausgibt');
+  assert.deepEqual(inboundSeriesVerdict(eigene(), { ...basis, recurrence_rule: 'FREQ=MONTHLY' }, { zone: BERLIN }), fremd, 'andere Regel');
+  assert.deepEqual(inboundSeriesVerdict(eigene(), { ...basis, end_datetime: '2035-01-31T16:00:00Z' }, { zone: BERLIN }), fremd, 'anderes Ende');
+  assert.deepEqual(inboundSeriesVerdict(eigene(), { ...basis, start_datetime: '2035-01-31', end_datetime: '2035-01-31', all_day: true }, { zone: BERLIN }), fremd, 'ganztaegig geworden');
+});
+
+test('derselbe Start ohne Verschiebung: der Anbieter gilt wie bisher, die Marke bleibt', () => {
+  const passend = eigene({ start_datetime: '2035-01-31T14:00', end_datetime: '2035-01-31T15:00' });
+  const kommt = { start_datetime: '2035-01-31T13:00:00Z', end_datetime: '2035-01-31T14:00:00Z', all_day: false, recurrence_rule: MONATSLETZTER };
+  assert.deepEqual(inboundSeriesVerdict(passend, kommt, { zone: BERLIN }), { keep: false, authored: 1 });
+  // Ein anderes Ende aendert nicht, wer Start und Regel verfasst hat.
+  assert.deepEqual(inboundSeriesVerdict(passend, { ...kommt, end_datetime: '2035-01-31T16:00:00Z' }, { zone: BERLIN }),
+    { keep: false, authored: 1 });
+});
+
+test('eine Zeile ohne Marke folgt dem Anbieter und bekommt keine', () => {
+  const kommt = { start_datetime: '2035-01-31T13:00:00Z', end_datetime: '2035-01-31T14:00:00Z', all_day: false, recurrence_rule: MONATSLETZTER };
+  assert.deepEqual(inboundSeriesVerdict(eigene({ series_authored: 0 }), kommt, { zone: BERLIN }), { keep: false, authored: 0 });
+});
+
+test('eine gesendete Schreibweise der Regel ist dieselbe Regel', () => {
+  // Google bekommt `UNTIL` umgeformt; kommt genau diese Form zurueck, hat
+  // niemand die Regel geaendert.
+  const mitEnde = eigene({ recurrence_rule: `${MONATSLETZTER};UNTIL=20351231` });
+  const kommt = {
+    start_datetime: '2035-01-31T13:00:00Z', end_datetime: '2035-01-31T14:00:00Z', all_day: false,
+    recurrence_rule: `${MONATSLETZTER};UNTIL=20351231T225959Z`,
+  };
+  assert.deepEqual(inboundSeriesVerdict(mitEnde, kommt, { zone: BERLIN }), { keep: false, authored: 0 });
+  assert.deepEqual(
+    inboundSeriesVerdict(mitEnde, kommt, { zone: BERLIN, sentRules: [`${MONATSLETZTER};UNTIL=20351231T225959Z`] }),
+    { keep: true, authored: 1 },
+  );
 });

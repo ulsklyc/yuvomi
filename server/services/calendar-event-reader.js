@@ -43,6 +43,9 @@ export const BODY_FREE_EVENT_COLUMNS = Object.freeze([
   // Das CalDAV-Konto der Zeile (#1860), neben den uebrigen Sync-Spalten: wer
   // eine so gelesene Zeile an den Ausgang weitergibt, braucht es dort.
   'caldav_account_id',
+  // Wer Start und Regel verfasst hat (#1935): der Feed und jeder andere
+  // ausgehende Weg richten den Start nur aus, wenn die Zeile die Marke traegt.
+  'series_authored',
 ]);
 
 const eventColumnCache = new WeakMap();

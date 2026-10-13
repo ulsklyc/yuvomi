@@ -25,7 +25,7 @@ import { decodeHtmlEntities } from '../utils/html-entities.js';
 import { nearestColorId } from '../utils/ical-color.js';
 // Fallback-Zone für den Outbound-Sync, wenn Google für den Zielkalender keine liefert.
 import { configuredHouseholdTimeZone, householdTimeZone } from '../utils/timezone.js';
-import { outboundEvent } from './outbound-dtstart.js';
+import { inboundSeriesVerdict, outboundEvent } from './outbound-dtstart.js';
 import { assignDefaultToEvent, reassignDefaultOnCalendarMove } from './sync-assignment.js';
 import { countSourceEvents, deleteSourceEvents } from './calendar-prune.js';
 import { readSyncOutcome, withSyncOutcome } from './sync-outcome.js';
@@ -1014,9 +1014,11 @@ function upsertGoogleEvents(items, calRefId = null, calColor = GOOGLE_COLOR, col
     // eigene Farbe folgerichtig keine colorId zurück.
     const evColor = (item.colorId && colorMap[item.colorId]) || null;
 
-    const existing = db.get().prepare(
-      'SELECT id, outbound_dirty, calendar_ref_id, start_datetime FROM calendar_events WHERE external_calendar_id = ? AND external_source = ?'
-    ).get(item.id, 'google');
+    const existing = db.get().prepare(`
+      SELECT id, outbound_dirty, calendar_ref_id, start_datetime, end_datetime, all_day,
+             recurrence_rule, tzid, series_authored
+      FROM calendar_events WHERE external_calendar_id = ? AND external_source = ?
+    `).get(item.id, 'google');
 
     // Eine lokale Bearbeitung, die noch auf ihren Push wartet, darf der Inbound
     // nicht mit dem alten Google-Stand überschreiben (#593). Der Push kommt im
@@ -1040,15 +1042,33 @@ function upsertGoogleEvents(items, calRefId = null, calColor = GOOGLE_COLOR, col
       // muss; die Farbspalte wiederholt ihren SET-Ausdruck, damit eine lokale
       // Umfärbung (color_modified) nicht als Unterschied zählt. Die Bindings der
       // SET-Liste kommen dafür ein zweites Mal.
-      const values = [
-        title, description, startDt, endDt, allDay ? 1 : 0, location, rrule, tzid, evColor, calRefId,
-      ];
+      //
+      // START, ENDE UND REGEL EINER HIER VERFASSTEN SERIE (#1935). Liefert
+      // Google genau den ausgerichteten Start zurueck, den Yuvomi hinausgegeben
+      // hat, ist das kein neuer Stand: die Zeile bleibt bei der Eingabe
+      // (`keep`), und die Erinnerungen haengen weiter an ihr. Uebernimmt der
+      // Abruf dagegen einen anderen Start oder eine andere Regel, faellt die
+      // Marke (`authored`) - alles in services/outbound-dtstart.js. Als
+      // gesendete Schreibweise der Regel zaehlt die mit Googles `UNTIL`-Form.
+      const verdict = inboundSeriesVerdict(existing, {
+        start_datetime: startDt, end_datetime: endDt, all_day: allDay, recurrence_rule: rrule,
+      }, {
+        // Dieselbe Zone, in der dieser Kalender die Wanduhrzeit hinausbekommt.
+        zone: outboundTimeZone(calTimeZone),
+        sentRules: existing.recurrence_rule
+          ? [normalizeRecurrenceUntil(rruleValue(existing.recurrence_rule), !!existing.all_day)]
+          : [],
+      });
+      const when = verdict.keep
+        ? [existing.start_datetime, existing.end_datetime, existing.all_day, location, existing.recurrence_rule, existing.tzid]
+        : [startDt, endDt, allDay ? 1 : 0, location, rrule, tzid];
+      const values = [title, description, ...when, evColor, calRefId, verdict.authored];
       db.get().prepare(`
         UPDATE calendar_events
         SET title = ?, description = ?, start_datetime = ?, end_datetime = ?,
             all_day = ?, location = ?, recurrence_rule = ?, tzid = ?,
             color = CASE WHEN color_modified = 0 THEN ? ELSE color END,
-            calendar_ref_id = ?
+            calendar_ref_id = ?, series_authored = ?
         WHERE id = ?
           AND (   title           IS NOT ?
                OR description     IS NOT ?
@@ -1060,10 +1080,12 @@ function upsertGoogleEvents(items, calRefId = null, calColor = GOOGLE_COLOR, col
                OR tzid            IS NOT ?
                OR color           IS NOT CASE WHEN color_modified = 0 THEN ? ELSE color END
                OR calendar_ref_id IS NOT ?
+               OR series_authored IS NOT ?
               )
       `).run(...values, existing.id, ...values);
-      // In Google verschoben (#1377): die Erinnerungen ziehen mit.
-      followInboundStartChange(db.get(), existing.id, existing.start_datetime, startDt);
+      // In Google verschoben (#1377): die Erinnerungen ziehen mit. Beim Echo des
+      // eigenen Uploads (`keep`) hat sich der Start der Zeile nicht bewegt.
+      followInboundStartChange(db.get(), existing.id, existing.start_datetime, when[0]);
       // Von einem Kalender in einen anderen verschoben (#1270): die unangetastete
       // Standard-Zuweisung zieht mit um.
       reassignDefaultOnCalendarMove(db.get(), existing.id, {

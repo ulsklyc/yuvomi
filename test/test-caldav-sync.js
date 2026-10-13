@@ -60,6 +60,7 @@ describe('CalDAV Multi-Account Sync', () => {
         -- sich, dass sie unsere ist (#899).
         color                       TEXT,
         color_modified              INTEGER NOT NULL DEFAULT 0,
+        series_authored INTEGER NOT NULL DEFAULT 0,
         target_caldav_account_id    INTEGER,
         target_caldav_calendar_url  TEXT
       );
@@ -447,6 +448,7 @@ describe('CalDAV sync yields to the event loop (#519)', () => {
         -- Der eigene Zustand der Farbe (#899, Migration v167): das Farb-Gatter
         -- des Inbound haengt daran, nicht mehr an user_modified.
         color_modified INTEGER NOT NULL DEFAULT 0,
+        series_authored INTEGER NOT NULL DEFAULT 0,
         target_caldav_account_id INTEGER, target_caldav_calendar_url TEXT,
         -- Ausgehende Vormerkungen (#593, Migrationen v104-v106)
         outbound_dirty INTEGER NOT NULL DEFAULT 0,
@@ -620,6 +622,7 @@ describe('CalDAV: RECURRENCE-ID-Overrides killen die Serie nicht (#549)', () => 
         -- Der eigene Zustand der Farbe (#899, Migration v167): das Farb-Gatter
         -- des Inbound haengt daran, nicht mehr an user_modified.
         color_modified INTEGER NOT NULL DEFAULT 0,
+        series_authored INTEGER NOT NULL DEFAULT 0,
         target_caldav_account_id INTEGER, target_caldav_calendar_url TEXT,
         -- Ausgehende Vormerkungen (#593, Migrationen v104-v106)
         outbound_dirty INTEGER NOT NULL DEFAULT 0,
@@ -822,6 +825,7 @@ describe('CalDAV: No-op-Syncs bleiben im Standard-Log-Level still', () => {
         -- Der eigene Zustand der Farbe (#899, Migration v167): das Farb-Gatter
         -- des Inbound haengt daran, nicht mehr an user_modified.
         color_modified INTEGER NOT NULL DEFAULT 0,
+        series_authored INTEGER NOT NULL DEFAULT 0,
         target_caldav_account_id INTEGER, target_caldav_calendar_url TEXT,
         outbound_dirty INTEGER NOT NULL DEFAULT 0,
         outbound_attempts INTEGER NOT NULL DEFAULT 0,
@@ -1077,6 +1081,7 @@ describe('CalDAV: eine Bearbeitung friert die Farbe nicht mehr ein (#899)', () =
         local_calendar_id INTEGER,
         user_modified INTEGER NOT NULL DEFAULT 0, assigned_to INTEGER,
         color_modified INTEGER NOT NULL DEFAULT 0,
+        series_authored INTEGER NOT NULL DEFAULT 0,
         target_caldav_account_id INTEGER, target_caldav_calendar_url TEXT,
         outbound_dirty INTEGER NOT NULL DEFAULT 0,
         outbound_attempts INTEGER NOT NULL DEFAULT 0,
@@ -1280,6 +1285,7 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
         local_calendar_id INTEGER,
         user_modified INTEGER NOT NULL DEFAULT 0, assigned_to INTEGER,
         color_modified INTEGER NOT NULL DEFAULT 0,
+        series_authored INTEGER NOT NULL DEFAULT 0,
         target_caldav_account_id INTEGER, target_caldav_calendar_url TEXT,
         outbound_dirty INTEGER NOT NULL DEFAULT 0,
         outbound_attempts INTEGER NOT NULL DEFAULT 0,
@@ -2234,6 +2240,7 @@ describe('CalDAV: eine Aufgabenliste bleibt kein Terminziel (#617)', () => {
         -- Der eigene Zustand der Farbe (#899, Migration v167): das Farb-Gatter
         -- des Inbound haengt daran, nicht mehr an user_modified.
         color_modified INTEGER NOT NULL DEFAULT 0,
+        series_authored INTEGER NOT NULL DEFAULT 0,
         target_caldav_account_id INTEGER, target_caldav_calendar_url TEXT,
         outbound_dirty INTEGER NOT NULL DEFAULT 0,
         outbound_attempts INTEGER NOT NULL DEFAULT 0,

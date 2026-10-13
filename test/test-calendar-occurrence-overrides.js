@@ -108,6 +108,8 @@ function createDatabase() {
   database.exec(MIGRATIONS_SQL[85]); // calendar_event_exceptions
   database.exec(MIGRATIONS_SQL[174]); // generated name-day event owner
   database.exec(MIGRATIONS_SQL[245]);
+  // Migration 246 (#1935) hat ein Funktions-up und steht nicht im Spiegel.
+  database.exec('ALTER TABLE calendar_events ADD COLUMN series_authored INTEGER NOT NULL DEFAULT 0 CHECK(series_authored IN (0, 1));');
   database.exec(`
     CREATE TABLE housekeeping_work_sessions (
       id INTEGER PRIMARY KEY,

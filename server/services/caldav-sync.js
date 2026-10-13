@@ -32,7 +32,7 @@ import { sqlLooksLikeOwnEventUid } from '../utils/own-uid.js';
 import { sameCredentialOrigin } from '../utils/credential-origin.js';
 import { rruleLine } from './recurrence.js';
 import { nearestIcalColorName } from '../utils/ical-color.js';
-import { outboundEvent } from './outbound-dtstart.js';
+import { inboundSeriesVerdict, outboundEvent } from './outbound-dtstart.js';
 import { followInboundStartChange } from './calendar-occurrence-overrides.js';
 
 // Reused functions from apple-calendar.js
@@ -941,9 +941,13 @@ async function runSync({ createClient } = {}) {
   // Hot-Path-Statements einmal vorbereiten statt pro Event neu (#519): das spart bei
   // großen Kalendern spürbar Zeit und verkürzt damit das synchrone Verarbeitungsfenster.
   const conn = db.get();
+  // Die Zone, in der eine zonenlose Wanduhrzeit der Zeile gemeint ist - dieselbe,
+  // in der der ausgehende Weg sie hinausgibt (#1935, `inboundSeriesVerdict`).
+  const inboundZone = householdTimeZone(conn);
   const selEventsWithUid = conn.prepare(`
     SELECT id, outbound_dirty, calendar_ref_id, start_datetime, color, color_modified,
-           caldav_account_id, external_object_url
+           caldav_account_id, external_object_url,
+           end_datetime, all_day, recurrence_rule, tzid, series_authored
     FROM calendar_events
     WHERE external_calendar_id = ? AND external_source = 'caldav'
     ORDER BY id
@@ -1016,7 +1020,8 @@ async function runSync({ createClient } = {}) {
         all_day = ?, location = ?, recurrence_rule = ?, tzid = ?,
         color = CASE WHEN color_modified = 0 THEN ? ELSE color END,
         calendar_ref_id = ?,
-        external_object_url = COALESCE(?, external_object_url)
+        external_object_url = COALESCE(?, external_object_url),
+        series_authored = ?
     WHERE id = ?
       AND (   title               IS NOT ?
            OR description         IS NOT ?
@@ -1029,6 +1034,7 @@ async function runSync({ createClient } = {}) {
            OR color               IS NOT CASE WHEN color_modified = 0 THEN ? ELSE color END
            OR calendar_ref_id     IS NOT ?
            OR external_object_url IS NOT COALESCE(?, external_object_url)
+           OR series_authored     IS NOT ?
           )
   `);
   // Eingebrannte Kalenderfarbe aus der Zeit vor #891 loesen (#1270). Bis
@@ -1366,10 +1372,22 @@ async function runSync({ createClient } = {}) {
                 // umgefärbt hat (color_modified = 0); Titel/Zeit bleiben remote-geführt.
                 // Dieselben Werte binden die SET-Liste und den Vergleich in der
                 // WHERE-Klausel, weshalb sie zweimal übergeben werden.
+                //
+                // START, ENDE UND REGEL EINER HIER VERFASSTEN SERIE (#1935):
+                // liefert der Server genau den ausgerichteten Start zurueck,
+                // den Yuvomi hinausgegeben hat, bleibt die Zeile bei der
+                // Eingabe (`keep`); uebernimmt der Abruf einen anderen Start
+                // oder eine andere Regel, faellt die Marke (`authored`).
+                // Die Regel steht in services/outbound-dtstart.js.
+                const verdict = inboundSeriesVerdict(existing, {
+                  start_datetime: ev.dtstart, end_datetime: ev.dtend, all_day: ev.allDay, recurrence_rule: ev.rrule,
+                }, { zone: inboundZone });
+                const when = verdict.keep
+                  ? [existing.start_datetime, existing.end_datetime, existing.all_day, ev.location, existing.recurrence_rule, existing.tzid]
+                  : [ev.dtstart, ev.dtend, ev.allDay ? 1 : 0, ev.location, ev.rrule, ev.tzid ?? null];
                 const values = [
-                  ev.summary, ev.description, ev.dtstart, ev.dtend,
-                  ev.allDay ? 1 : 0, ev.location, ev.rrule, ev.tzid ?? null, evColor, calRefId,
-                  obj.url ?? null,
+                  ev.summary, ev.description, ...when, evColor, calRefId,
+                  obj.url ?? null, verdict.authored,
                 ];
                 // `hasColor`, nicht `evColor`: auch eine COLOR-Zeile mit einem
                 // unlesbaren Wert (etwa #RRGGBBAA) sagt, dass der Server ueber
@@ -1384,7 +1402,9 @@ async function runSync({ createClient } = {}) {
                 changed = updEvent.run(...values, existing.id, ...values).changes > 0;
                 eventId = existing.id;
                 // Auf dem Server verschoben (#1377): die Erinnerungen ziehen mit.
-                if (changed) followInboundStartChange(conn, eventId, existing.start_datetime, ev.dtstart);
+                // Beim Echo des eigenen Uploads (`keep`) hat sich der Start der
+                // Zeile nicht bewegt.
+                if (changed) followInboundStartChange(conn, eventId, existing.start_datetime, when[0]);
                 // Von einem Kalender in einen anderen verschoben (#1270): die
                 // unangetastete Standard-Zuweisung zieht mit um.
                 reassignDefaultOnCalendarMove(db.get(), eventId, {
