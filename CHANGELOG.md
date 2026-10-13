@@ -377,6 +377,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so both show the same number, and adherence and the streak count only the medications still
   being taken. The medication stays in the list, and the doses already logged stay in the intake
   log.
+- **Wall mode on a phone: the note on entering no longer covers the clock, and the footer shows
+  that the list goes on** (#1917). Up to a width of about 834 px the note that explains wall mode
+  lay on the time and date for eight seconds; it now sits directly below them and still clear of
+  the timer buttons, and on wider screens it stays where it was, next to the clock. Any later
+  message on the wall keeps the clock and the footer free in the same way. "Who's up today" was
+  never cut off, but the footer that stays at the bottom covered faces behind a hard edge; the
+  content now fades out softly above the footer while there is more to scroll to, and nothing is
+  covered once you reach the end.
 
 ## [2.76.0] - 2026-10-11
 
