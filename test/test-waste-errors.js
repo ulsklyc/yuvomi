@@ -516,6 +516,7 @@ test('Quelle speichern, eine Zuordnung zeigt auf eine geloeschte Abfallart: der 
   assert.equal(attrs['aria-invalid'], 'true');
   assert.equal(d.element('#wsrc-name').value, 'Mein Kalender', 'der Name im Feld bleibt');
   assert.equal(quelle.mappings, frisch.mappings, 'der Dialog vergleicht ab jetzt gegen den frischen Stand');
+  assert.equal(quelle.name, 'Mein Kalender', 'auch der Name: ein zweites Speichern schickt ihn nicht noch einmal');
 });
 
 test('Quelle speichern, die Zuordnung zeigt auf eine geloeschte Art UND die Quelle ist inzwischen auch weg: der gewohnte Weg, Dialog zu', async () => {

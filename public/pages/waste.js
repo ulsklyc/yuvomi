@@ -2014,6 +2014,8 @@ async function keepSourceDialogForMissingType(err, panel, source, mappingId) {
     reportError(reloadErr);
     return true;
   }
+  // Der Dialog vergleicht beim naechsten Speichern gegen diesen Stand.
+  source.name = fresh.name;
   source.mappings = fresh.mappings;
   const host = panel.querySelector('#wsrc-mappings');
   host.replaceChildren();
