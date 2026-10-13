@@ -804,17 +804,22 @@ function repeatedRubrics(text) {
  * zulassen. Deshalb stehen sie hier mit Namen statt hinter einer Versionsgrenze:
  * eine Grenze liesse jeden aelteren Block ungeprueft, die Liste laesst genau
  * diese acht durch und haelt die Regel fuer alle anderen, `[Unreleased]` und
- * jedes kuenftige Release eingeschlossen. Hier kommt nichts dazu. */
-const KNOWN_REPEATED_RUBRICS = [
-  '[1.40.6] ### Fixed',
-  '[1.40.3] ### Fixed',
-  '[1.31.3] ### Fixed',
-  '[1.24.0] ### Fixed',
-  '[1.6.0] ### Added',
-  '[1.2.0] ### Added',
-  '[0.99.0] ### Added',
-  '[0.54.10] ### Changed',
-];
+ * jedes kuenftige Release eingeschlossen. Hier kommt nichts dazu.
+ *
+ * Die Zahl ist, wie oft die Rubrik in dem Block steht. Ohne sie waere ein
+ * dritter `### Fixed` in einem der acht Bloecke derselbe Fund wie der zweite,
+ * und die Ausnahme liesse dort beliebig viele neue durch. Zeilennummern taugen
+ * dafuer nicht: jeder neue Eintrag oben verschiebt sie. */
+const KNOWN_REPEATED_RUBRICS = new Map([
+  ['[1.40.6] ### Fixed', 2],
+  ['[1.40.3] ### Fixed', 2],
+  ['[1.31.3] ### Fixed', 2],
+  ['[1.24.0] ### Fixed', 2],
+  ['[1.6.0] ### Added', 2],
+  ['[1.2.0] ### Added', 2],
+  ['[0.99.0] ### Added', 2],
+  ['[0.54.10] ### Changed', 2],
+]);
 
 const readChangelog = () => readFileSync(new URL('../CHANGELOG.md', import.meta.url), 'utf8');
 
@@ -882,14 +887,22 @@ test('der Setext-Guard erkennt eine Unterstreichung aus =', () => {
 
 test('keine Rubrik steht in einem Release-Block zweimal (#1918)', () => {
   const found = repeatedRubrics(readChangelog());
-  const known = (hit) => KNOWN_REPEATED_RUBRICS.some((entry) => hit.startsWith(`${entry} (`));
+  // Ein Fund ist nur bekannt, wenn auch die Anzahl stimmt (siehe Liste).
+  const signature = (hit) => {
+    const m = /^(.*) \(Zeilen ([\d, ]+)\)$/.exec(hit);
+    return m ? { entry: m[1], count: m[2].split(', ').length } : { entry: hit, count: 0 };
+  };
+  const known = (hit) => {
+    const { entry, count } = signature(hit);
+    return KNOWN_REPEATED_RUBRICS.get(entry) === count;
+  };
 
   assert.deepEqual(found.filter((hit) => !known(hit)), [],
     'dieselbe Rubrik zweimal in einem Block - die Eintraege gehoeren unter EINE Ueberschrift');
   // Die Liste darf nicht breiter sein als der Bestand: ein Eintrag, den die
   // Datei nicht mehr deckt, waere eine Ausnahme ohne Anlass.
   assert.deepEqual(
-    KNOWN_REPEATED_RUBRICS.filter((entry) => !found.some((hit) => hit.startsWith(`${entry} (`))), [],
+    [...KNOWN_REPEATED_RUBRICS.keys()].filter((entry) => !found.some((hit) => signature(hit).entry === entry)), [],
     'KNOWN_REPEATED_RUBRICS nennt eine Doppelung, die in CHANGELOG.md nicht steht');
 });
 
