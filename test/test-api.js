@@ -886,6 +886,8 @@ const REASONS_PASSED_THROUGH = new Map([
   // Quelle mit Adresse, aus einem WasteFetchError oder aus der Validierung der
   // gespeicherten Adresse. Sie reist als 502 (Vorschau/Uebernahme) oder im
   // Rumpf einer 200/201 mit `outcome: 'error'` - nie an einer 403.
+  // #1938: auch die Antwort ohne einen Kalendereintrag (waste_source_fetch_no_events)
+  // kommt als WasteFetchError durch diese zwei Stellen, keine dritte.
   ['services/waste-url-source.js: err.reason', { sites: 2, at403: [], why: 'Rueckgabewert einer Einordnung, wird zur 502 oder zu outcome error' }],
   // validateOneOff reicht den Grund seiner Pruefung (waste_pickup_date_invalid)
   // an den Store, der daraus einen WasteValidationError baut: keine Antwort,

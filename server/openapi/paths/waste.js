@@ -217,7 +217,7 @@ export function wastePaths() {
         summary: 'Preview a fresh ICS import (stateless)',
         tag: 'Waste',
         description: 'Parses the given ICS text and returns candidate pickups, per-label mapping suggestions, and diagnostics. Writes nothing; a "blocking" diagnostic excludes its event\'s instances from the preview and must be explicitly acknowledged via skip_event_keys on commit, or the whole commit is refused. '
-          + '400 with a machine-readable `reason` next to `error` when the calendar hits a limit: `waste_import_empty_file`, `waste_import_file_too_large` (`params.limit_mb`), `waste_import_event_cap_exceeded`, `waste_import_instance_cap_exceeded`, `waste_import_label_cap_exceeded` (each `params.limit`).',
+          + '400 with a machine-readable `reason` next to `error` when the calendar hits a limit: `waste_import_empty_file`, `waste_import_no_events` (text without a single calendar entry is never a calendar, #1938; a calendar whose entries all fall outside the import window still previews), `waste_import_file_too_large` (`params.limit_mb`), `waste_import_event_cap_exceeded`, `waste_import_instance_cap_exceeded`, `waste_import_label_cap_exceeded` (each `params.limit`).',
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/WasteImportPreviewInput'),
         responses: schemaResponse('WasteImportPreviewResponse', 'Preview', 200, { 400: apiError('No ICS text, or an import limit was hit (see `reason` and `params`)') }),
@@ -228,7 +228,7 @@ export function wastePaths() {
         summary: 'Commit a fresh ICS import as a new source',
         tag: 'Waste',
         description: 'Re-parses the ICS text (never trusts a client-supplied candidate list) and atomically creates the source, its label mappings, and its imported pickups. Every distinct label reported by a preview of this same file must have exactly one mapping decision: an existing type_id, a new_type to create inline, or ignored. '
-          + 'A decision that names a type deleted in the meantime is refused with 400 and `reason: "waste_selected_type_not_found"`. 400 with a machine-readable `reason` next to `error` when the calendar hits a limit: `waste_import_empty_file`, `waste_import_file_too_large` (`params.limit_mb`), `waste_import_event_cap_exceeded`, `waste_import_instance_cap_exceeded`, `waste_import_label_cap_exceeded` (each `params.limit`). '
+          + 'A decision that names a type deleted in the meantime is refused with 400 and `reason: "waste_selected_type_not_found"`. 400 with a machine-readable `reason` next to `error` when the calendar hits a limit: `waste_import_empty_file`, `waste_import_no_events` (text without a single calendar entry is never a calendar, #1938; a calendar whose entries all fall outside the import window still previews), `waste_import_file_too_large` (`params.limit_mb`), `waste_import_event_cap_exceeded`, `waste_import_instance_cap_exceeded`, `waste_import_label_cap_exceeded` (each `params.limit`). '
           + 'Refusals only an API caller triggers (no name, a label without a decision, an unacknowledged blocking diagnostic) carry no `reason`.',
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/WasteImportCommitInput'),
@@ -249,7 +249,7 @@ export function wastePaths() {
         summary: 'Add a subscribed ICS URL source',
         tag: 'Waste',
         description: 'Creates the source, then performs its first fetch synchronously (same feedback as a fresh file import) - a first-fetch failure does not fail creation; the source is created either way and the scheduler retries per its own backoff. Fresh FILE sources are still created via POST /waste/import/commit. '
-          + 'A first fetch that failed answers 201 with `outcome: "error"` and the class of the failure as `reason` (see WasteUrlSourceRefreshResult). '
+          + 'A first fetch that failed answers 201 with `outcome: "error"` and the class of the failure as `reason` (see WasteUrlSourceRefreshResult); an answer without a single calendar entry is such a failure (`waste_source_fetch_no_events`, #1938). '
           + '400 with `reason` for the inputs of the dialog: `waste_source_url_invalid`, `waste_source_url_not_https`, `waste_source_interval_invalid` (`params.min`, `params.max`); '
           + 'a first fetch that could be read but not evaluated is refused with the import limits of POST /waste/import/preview, and no source is created.',
         stateChanging: true,
@@ -285,7 +285,8 @@ export function wastePaths() {
       post: op({
         summary: 'Manually refresh a URL source now',
         tag: 'Waste',
-        description: 'Runs the exact same fetch/auto-commit/needs-mapping logic the scheduler uses, outside its own schedule. 400 if the source is not kind=url (use re-import for a file source instead). A fetch that failed answers 200 with `outcome: "error"` and the class of the failure as `reason` (see WasteUrlSourceRefreshResult).',
+        description: 'Runs the exact same fetch/auto-commit/needs-mapping logic the scheduler uses, outside its own schedule. 400 if the source is not kind=url (use re-import for a file source instead). A fetch that failed answers 200 with `outcome: "error"` and the class of the failure as `reason` (see WasteUrlSourceRefreshResult). '
+          + 'An answer without a single calendar entry (a maintenance or login page, an empty calendar) is such a failure since #1938 - `reason: "waste_source_fetch_no_events"` - and no longer a commit that removes every imported pickup: nothing is applied, `last_error`, `consecutive_failures` and the backoff are recorded, and the validators of that answer are not stored.',
         params: [idParam()],
         stateChanging: true,
         responses: schemaResponse('WasteUrlSourceRefreshResponse', 'Refresh attempted', 200, {
@@ -311,8 +312,8 @@ export function wastePaths() {
         summary: 'Preview a re-import of an existing source (stateless)',
         tag: 'Waste',
         description: 'Same as /import/preview, but prefills each label\'s remembered_type_id/remembered_ignored from this source\'s existing mappings and returns expected_version for the commit\'s concurrency check. A URL source is fetched server-side; a fetch that fails answers 502 with the class of the failure as `reason` '
-          + '(`waste_source_fetch_http_status` with `params.status`, `waste_source_fetch_too_large` with `params.limit_mb`, `waste_source_fetch_blocked`, `waste_source_fetch_unreachable`, '
-          + 'or the reason of the URL validation). The import limits answer 400 as on POST /waste/import/preview.',
+          + '(`waste_source_fetch_http_status` with `params.status`, `waste_source_fetch_too_large` with `params.limit_mb`, `waste_source_fetch_blocked`, `waste_source_fetch_unreachable`, `waste_source_fetch_no_events` for an answer without a single calendar entry, '
+          + 'or the reason of the URL validation). The import limits answer 400 as on POST /waste/import/preview; a FILE without a single calendar entry is one of them (`waste_import_no_events`).',
         params: [idParam()],
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/WasteImportPreviewInput'),
@@ -327,11 +328,13 @@ export function wastePaths() {
       post: op({
         summary: 'Commit a re-import onto an existing source',
         tag: 'Waste',
-        description: 'Requires expected_version to match the source\'s current version (409 on mismatch - invariant #9, two editors cannot silently replace each other\'s reviewed snapshot). Applies additions/changes/removals atomically; a failure preserves the last good snapshot.',
+        description: 'Requires expected_version to match the source\'s current version (409 on mismatch - invariant #9, two editors cannot silently replace each other\'s reviewed snapshot). Applies additions/changes/removals atomically; a failure preserves the last good snapshot. '
+          + 'Content without a single calendar entry is refused instead of emptying the source (#1938): 400 with `reason: "waste_import_no_events"` for a file, 502 with `reason: "waste_source_fetch_no_events"` for a URL source. To empty a source, delete it.',
         params: [idParam()],
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/WasteImportCommitInput'),
         responses: schemaResponse('WasteImportCommitResponse', 'Import applied', 200, {
+          400: apiError('Invalid input or an import limit was hit (see `reason` and `params`)'),
           404: apiError('Source not found (`reason: "waste_source_not_found"`)'),
           409: apiError('The source changed since the preview (`reason: "source_changed"`), or the file content changed since the preview (`reason: "preview_changed"`)'),
           502: apiError('Fetching the URL of the source failed (see `reason` and `params`, as on the preview)'),

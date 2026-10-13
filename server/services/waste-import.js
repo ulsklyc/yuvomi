@@ -237,6 +237,21 @@ export function buildImportPreview(icsText, {
   const skipped = [];
   const rawEvents = parseICS(icsText, { allowMissingUid: true, onSkip: (info) => skipped.push(info) });
 
+  // Zero calendar entries is never a calendar (#1938). Text without a single
+  // VEVENT parses to an empty list without an error - a maintenance or login
+  // page answered with 200, an empty VCALENDAR - and an empty list used to read
+  // as "this source has no pickups any more": the commit removed every imported
+  // pickup of the source, and their reminders went with the next reminder sync.
+  //
+  // The rule asks what was SENT (the parsed entries), never what remains of it
+  // below: a real calendar whose entries all lie outside the import window, are
+  // cancelled or belong to ignored labels has entries, and imports as before.
+  // It stands here, before any caller, so the preview refuses already and no
+  // path - file, re-import, URL source - can reach a commit with it.
+  if (rawEvents.length === 0) {
+    throw new WasteImportError('The file contains no calendar entries.', 'no_events');
+  }
+
   if (rawEvents.length > MAX_VEVENTS) {
     throw new WasteImportError(`The file contains more than ${MAX_VEVENTS} calendar entries; split it into smaller files.`, 'event_cap_exceeded', { limit: MAX_VEVENTS });
   }

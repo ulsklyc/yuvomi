@@ -94,6 +94,8 @@ export const CASE_MESSAGES = new Map([
   ['waste_import_event_cap_exceeded', 'waste.errorImportTooManyEvents'],
   ['waste_import_instance_cap_exceeded', 'waste.errorImportTooManyPickups'],
   ['waste_import_label_cap_exceeded', 'waste.errorImportTooManyLabels'],
+  // #1938: eine Datei ohne einen einzigen Kalendereintrag ist kein Kalender.
+  ['waste_import_no_events', 'waste.errorImportNoEvents'],
   ['preview_changed', 'waste.importPreviewChangedError'],
   ['source_changed', 'waste.importSourceChangedError'],
   ['waste_profile_invalid', 'waste.mappingProfileInvalidFile'],
@@ -109,6 +111,9 @@ export const CASE_MESSAGES = new Map([
   ['waste_source_fetch_too_large', 'waste.errorSourceFetchTooLarge'],
   ['waste_source_fetch_blocked', 'waste.errorSourceFetchBlocked'],
   ['waste_source_fetch_unreachable', 'waste.errorSourceFetchUnreachable'],
+  // #1938: die Adresse hat geantwortet, aber ohne einen Kalendereintrag. Die
+  // bisherigen Abholungen bleiben, der Satz sagt das.
+  ['waste_source_fetch_no_events', 'waste.errorSourceFetchNoEvents'],
 ]);
 
 /**

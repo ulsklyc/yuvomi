@@ -909,3 +909,315 @@ test('runDueWasteSourceRefreshes: a due source is skipped entirely while the Was
     server.close();
   }
 });
+
+// -------------------------------------------------------------------------
+// #1938: an answer without a single calendar entry is a FAILED attempt of the
+// source, never a calendar with zero pickups. Every case below starts from the
+// same household: a URL source with 6 imported pickups (4 + 2 of two types)
+// and 6 pending reminders, and drives the real callers - the scheduler
+// function, the routes - against a local stand-in for the other side.
+// -------------------------------------------------------------------------
+
+const { syncAllWasteReminders } = await import('../server/services/waste-reminders.js');
+const { todayKey, shiftDateKey } = await import('../server/utils/timezone.js');
+
+const HTML_PAGE = '<html><head><title>Wartung</title></head><body><h1>Wartung</h1><p>Wir sind gleich wieder da.</p></body></html>';
+const EMPTY_VCALENDAR = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//probe//EN\r\nEND:VCALENDAR\r\n';
+const NO_EVENTS_ERROR = 'No calendar entries in the response';
+
+/** The household from the issue. `feed.serve` is swapped between requests; every request is counted and kept. */
+async function emptyFeedHousehold() {
+  const d = get();
+  // The scheduler fetches EVERY due source and honours the module switch: the
+  // module ships switched OFF, and a test that leaves it off fetches nothing
+  // and is green. Leftover sources of earlier tests would be fetched too.
+  d.prepare("DELETE FROM waste_sources WHERE kind = 'url'").run();
+  d.prepare("INSERT INTO sync_config (key, value) VALUES ('disabled_modules', '[]') ON CONFLICT(key) DO UPDATE SET value = '[]'").run();
+
+  const today = todayKey(d);
+  const compact = (offset) => shiftDateKey(today, offset).replace(/-/g, '');
+  const tag = randomUUID().slice(0, 8);
+  const labels = { rest: `Rest-${tag}`, bio: `Bio-${tag}` };
+  const vevent = (label, offset) => `BEGIN:VEVENT\r\nUID:${label}-${compact(offset)}@probe\r\nDTSTART;VALUE=DATE:${compact(offset)}\r\nSUMMARY:${label}\r\nEND:VEVENT\r\n`;
+  const calendar = (events) => `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//probe//EN\r\n${events.join('')}END:VCALENDAR\r\n`;
+  const rest = [3, 10, 17, 24].map((o) => vevent(labels.rest, o));
+  const bio = [5, 19].map((o) => vevent(labels.bio, o));
+
+  const feed = {
+    hits: [],
+    valid: { status: 200, headers: { 'Content-Type': 'text/calendar', ETag: '"good-1"', 'Last-Modified': 'Mon, 05 Oct 2026 08:00:00 GMT' }, body: calendar([...rest, ...bio]) },
+    fewer: { status: 200, headers: { 'Content-Type': 'text/calendar', ETag: '"good-2"' }, body: calendar(rest) },
+    more: { status: 200, headers: { 'Content-Type': 'text/calendar', ETag: '"good-3"' }, body: calendar([...rest, ...bio, vevent(labels.bio, 33)]) },
+    // Entries, but every one of them years outside the import window.
+    outside: { status: 200, headers: { 'Content-Type': 'text/calendar', ETag: '"far"' }, body: calendar([vevent(labels.rest, 2000), vevent(labels.bio, 2001)]) },
+    html: { status: 200, headers: { 'Content-Type': 'text/html', ETag: '"maintenance"', 'Last-Modified': 'Tue, 06 Oct 2026 09:00:00 GMT' }, body: HTML_PAGE },
+    emptyCalendar: { status: 200, headers: { 'Content-Type': 'text/calendar', ETag: '"empty"' }, body: EMPTY_VCALENDAR },
+    emptyBody: { status: 200, headers: { 'Content-Type': 'text/calendar' }, body: '' },
+    unavailable: { status: 503, headers: { 'Content-Type': 'text/html' }, body: '<html>Service Unavailable</html>' },
+  };
+  feed.serve = feed.valid;
+  const { server, url } = await startServer((req, res) => {
+    feed.hits.push({ ifNoneMatch: req.headers['if-none-match'] ?? null });
+    const answer = feed.serve;
+    // An honest remote: the validator it handed out last is answered with 304.
+    if (answer.status === 200 && answer.headers.ETag && req.headers['if-none-match'] === answer.headers.ETag) {
+      res.writeHead(304).end();
+      return;
+    }
+    res.writeHead(answer.status, answer.headers);
+    res.end(answer.body);
+  });
+
+  const created = await apiCall('POST', '/waste/sources', { body: { name: `Feed ${tag}`, url: url('/cal.ics'), refresh_interval_minutes: 1440 } });
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  const id = created.body.data.source.id;
+  const preview = await apiCall('POST', `/waste/sources/${id}/reimport/preview`, { body: {} });
+  const committed = await apiCall('POST', `/waste/sources/${id}/reimport/commit`, {
+    body: {
+      preview_digest: preview.body.data.digest, expected_version: preview.body.data.expected_version,
+      mappings: preview.body.data.labels.map((l) => ({ normalized_label: l.normalized_label, new_type: { name: l.original_label } })),
+    },
+  });
+  assert.equal(committed.status, 200, JSON.stringify(committed.body));
+  const typeIds = d.prepare('SELECT DISTINCT type_id FROM waste_source_mappings WHERE source_id = ?').all(id).map((r) => r.type_id);
+  for (const typeId of typeIds) {
+    const set = await apiCall('PUT', `/waste/reminder-settings/${typeId}`, { body: { enabled: true, offset_days: 1, delivery_time: '18:00' } });
+    assert.equal(set.status, 200, JSON.stringify(set.body));
+  }
+
+  const reminderCount = () => {
+    syncAllWasteReminders(d);
+    const marks = typeIds.map(() => '?').join(',');
+    return d.prepare(`
+      SELECT COUNT(*) AS n FROM reminders r
+      JOIN waste_reminder_entries e ON e.id = r.entity_id
+      WHERE r.entity_type = 'waste_pickup' AND e.type_id IN (${marks})
+    `).get(...typeIds).n;
+  };
+  const snapshot = () => {
+    const row = d.prepare('SELECT * FROM waste_sources WHERE id = ?').get(id);
+    return {
+      pickups: d.prepare('SELECT COUNT(*) AS n FROM waste_imported_pickups WHERE source_id = ?').get(id).n,
+      mappings: d.prepare('SELECT COUNT(*) AS n FROM waste_source_mappings WHERE source_id = ?').get(id).n,
+      reminders: reminderCount(),
+      version: row.version, etag: row.etag, last_modified: row.last_modified, last_success_at: row.last_success_at,
+      last_error: row.last_error, consecutive_failures: row.consecutive_failures,
+      needs_mapping: row.needs_mapping, next_attempt_at: row.next_attempt_at,
+    };
+  };
+  // "The refresh interval has elapsed" - the one thing these tests set by hand.
+  const makeDue = () => d.prepare("UPDATE waste_sources SET next_attempt_at = '2000-01-01T00:00:00Z' WHERE id = ?").run(id);
+  const runScheduler = async () => {
+    makeDue();
+    const before = feed.hits.length;
+    await runDueWasteSourceRefreshes();
+    assert.equal(feed.hits.length - before, 1, 'control: the scheduler really fetched this source (module on, source due)');
+  };
+
+  const before = snapshot();
+  assert.deepEqual(
+    { pickups: before.pickups, mappings: before.mappings, reminders: before.reminders, etag: before.etag, last_error: before.last_error, failures: before.consecutive_failures },
+    { pickups: 6, mappings: 2, reminders: 6, etag: '"good-1"', last_error: null, failures: 0 },
+    'control: the start state of every case',
+  );
+  assert.ok(before.last_success_at, 'control: a success is on record');
+  return { id, feed, before, snapshot, runScheduler, makeDue, close: () => new Promise((r) => { server.closeAllConnections?.(); server.close(r); }) };
+}
+
+/** What a failed attempt must leave exactly as it was. */
+const KEPT = ['pickups', 'mappings', 'reminders', 'version', 'etag', 'last_modified', 'last_success_at', 'needs_mapping'];
+const pick = (state, keys) => Object.fromEntries(keys.map((k) => [k, state[k]]));
+const minutesUntil = (iso) => (Date.parse(iso) - Date.now()) / 60_000;
+
+for (const [name, key] of [['an HTML page with 200', 'html'], ['an empty VCALENDAR with 200', 'emptyCalendar']]) {
+  test(`#1938 scheduler: ${name} is a failed attempt - pickups, mappings, version, validators, last success and reminders stay; error, count and backoff are recorded`, async () => {
+    const h = await emptyFeedHousehold();
+    try {
+      h.feed.serve = h.feed[key];
+      await h.runScheduler();
+      const after = h.snapshot();
+      assert.deepEqual(pick(after, KEPT), pick(h.before, KEPT), 'nothing of the last good snapshot moved (6 -> 6 pickups and reminders)');
+      assert.equal(after.last_error, NO_EVENTS_ERROR);
+      assert.equal(after.consecutive_failures, 1);
+      const wait = minutesUntil(after.next_attempt_at);
+      assert.ok(wait > 25 && wait < 35, `the backoff of a first failure (30 min), not the 24 h cadence: ${wait}`);
+
+      // The answer carried its own ETag. Stored, the next attempt would be a
+      // 304, read as "unchanged", and clear the error after one round.
+      await h.runScheduler();
+      assert.equal(h.feed.hits.at(-1).ifNoneMatch, '"good-1"', 'the next attempt still asks with the validator of the last GOOD answer');
+      const second = h.snapshot();
+      assert.equal(second.consecutive_failures, 2, 'the same answer again is the second failure, not "unchanged"');
+      assert.equal(second.last_error, NO_EVENTS_ERROR);
+      assert.deepEqual(pick(second, KEPT), pick(h.before, KEPT));
+
+      // Recovery: the remote serves a calendar again, here one pickup longer.
+      h.feed.serve = h.feed.more;
+      await h.runScheduler();
+      const recovered = h.snapshot();
+      assert.deepEqual(
+        pick(recovered, ['pickups', 'reminders', 'last_error', 'consecutive_failures', 'etag']),
+        { pickups: 7, reminders: 7, last_error: null, consecutive_failures: 0, etag: '"good-3"' },
+        'a calendar is applied as always and the failure state is gone',
+      );
+      assert.equal(recovered.version, h.before.version + 1);
+      const cadence = minutesUntil(recovered.next_attempt_at);
+      assert.ok(cadence > 1400 && cadence < 1445, `back at the normal cadence: ${cadence}`);
+    } finally {
+      await h.close();
+    }
+  });
+
+  test(`#1938 manual refresh: ${name} answers 200 with outcome "error" and the reason waste_source_fetch_no_events, and applies nothing`, async () => {
+    const h = await emptyFeedHousehold();
+    try {
+      h.feed.serve = h.feed[key];
+      const r = await apiCall('POST', `/waste/sources/${h.id}/refresh`, { body: {} });
+      assert.equal(r.status, 200, JSON.stringify(r.body));
+      assert.equal(r.body.data.outcome, 'error', JSON.stringify(r.body.data));
+      assert.equal(r.body.data.reason, 'waste_source_fetch_no_events');
+      assert.equal('params' in r.body.data, false);
+      assert.equal('diff' in r.body.data, false, 'nothing was applied, so there is no diff');
+      assert.equal(r.body.data.source.last_error, NO_EVENTS_ERROR);
+      const after = h.snapshot();
+      assert.deepEqual(pick(after, KEPT), pick(h.before, KEPT));
+      assert.equal(after.consecutive_failures, 1);
+    } finally {
+      await h.close();
+    }
+  });
+
+  test(`#1938 reviewed re-import of a URL source: ${name} is refused at the PREVIEW and at the commit with 502 and the same reason`, async () => {
+    const h = await emptyFeedHousehold();
+    try {
+      h.feed.serve = h.feed[key];
+      const preview = await apiCall('POST', `/waste/sources/${h.id}/reimport/preview`, { body: {} });
+      assert.equal(preview.status, 502, `the preview refuses, it does not show "0 pickups": ${JSON.stringify(preview.body)}`);
+      assert.equal(preview.body.reason, 'waste_source_fetch_no_events');
+      assert.equal(preview.body.error, `Fetching the source URL failed: ${NO_EVENTS_ERROR}`);
+      // A client that commits without a preview, with everything a commit needs.
+      const commit = await apiCall('POST', `/waste/sources/${h.id}/reimport/commit`, { body: { expected_version: h.before.version, mappings: [] } });
+      assert.equal(commit.status, 502, JSON.stringify(commit.body));
+      assert.equal(commit.body.reason, 'waste_source_fetch_no_events');
+      const after = h.snapshot();
+      assert.deepEqual(pick(after, KEPT), pick(h.before, KEPT));
+      assert.equal(after.last_error, null, 'like every failed fetch of the reviewed path, it is not an attempt of the schedule');
+    } finally {
+      await h.close();
+    }
+  });
+
+  test(`#1938 a NEW URL source whose first answer is ${name}: 201 with outcome "error" and the reason, in the shape of a failed first fetch - never "committed"`, async () => {
+    const h = await emptyFeedHousehold();
+    try {
+      const firstFetch = async (serve) => {
+        h.feed.serve = serve;
+        const r = await apiCall('POST', '/waste/sources', { body: { name: `New ${randomUUID()}`, url: h.feed.url ?? null, refresh_interval_minutes: 1440 } });
+        return r;
+      };
+      // The same remote, another path: startServer answers every path alike.
+      h.feed.url = get().prepare('SELECT url FROM waste_sources WHERE id = ?').get(h.id).url.replace('/cal.ics', '/other.ics');
+      const empty = await firstFetch(h.feed[key]);
+      const failed = await firstFetch(h.feed.unavailable);
+      assert.equal(empty.status, 201, JSON.stringify(empty.body));
+      assert.equal(empty.body.data.outcome, 'error', 'not a working subscription with a diff of zeros');
+      assert.equal(empty.body.data.reason, 'waste_source_fetch_no_events');
+      assert.equal(empty.body.data.source.last_error, NO_EVENTS_ERROR);
+      // What a failed first fetch stores today (503) is the shape to stay in.
+      assert.equal(failed.body.data.outcome, 'error');
+      const stored = (r) => {
+        const row = get().prepare('SELECT * FROM waste_sources WHERE id = ?').get(r.body.data.source.id);
+        return {
+          version: row.version, etag: row.etag, last_modified: row.last_modified, last_success_at: row.last_success_at,
+          consecutive_failures: row.consecutive_failures, needs_mapping: row.needs_mapping, has_error: row.last_error !== null,
+          pickups: get().prepare('SELECT COUNT(*) AS n FROM waste_imported_pickups WHERE source_id = ?').get(row.id).n,
+        };
+      };
+      assert.deepEqual(stored(empty), stored(failed));
+      assert.deepEqual(stored(empty), { version: 0, etag: null, last_modified: null, last_success_at: null, consecutive_failures: 1, needs_mapping: 0, has_error: true, pickups: 0 });
+      assert.deepEqual(Object.keys(empty.body.data).sort(), Object.keys(failed.body.data).filter((k) => k !== 'params').sort(), 'the same fields as a failed first fetch');
+    } finally {
+      await h.close();
+    }
+  });
+}
+
+test('#1938 what stays as it was: fewer entries are applied (6 -> 4), an empty body and a 503 fail as before, a 304 is unchanged', async () => {
+  const h = await emptyFeedHousehold();
+  try {
+    // 503: a failed fetch.
+    h.feed.serve = h.feed.unavailable;
+    await h.runScheduler();
+    let state = h.snapshot();
+    assert.deepEqual(pick(state, KEPT), pick(h.before, KEPT));
+    assert.equal(state.last_error, 'HTTP 503');
+    assert.equal(state.consecutive_failures, 1);
+
+    // 304: unchanged, and the failure state is cleared.
+    h.feed.serve = h.feed.valid;
+    await h.runScheduler();
+    state = h.snapshot();
+    assert.deepEqual(pick(state, KEPT), pick(h.before, KEPT));
+    assert.deepEqual([state.last_error, state.consecutive_failures], [null, 0]);
+    const unchanged = await apiCall('POST', `/waste/sources/${h.id}/refresh`, { body: {} });
+    assert.equal(unchanged.body.data.outcome, 'unchanged');
+
+    // A body of nothing: the importer's own refusal, 400 at the manual refresh.
+    h.feed.serve = h.feed.emptyBody;
+    await h.runScheduler();
+    state = h.snapshot();
+    assert.deepEqual(pick(state, KEPT), pick(h.before, KEPT));
+    assert.equal(state.last_error, 'An ICS file is required.');
+    const emptyBody = await apiCall('POST', `/waste/sources/${h.id}/refresh`, { body: {} });
+    assert.equal(emptyBody.status, 400, JSON.stringify(emptyBody.body));
+    assert.equal(emptyBody.body.reason, 'waste_import_empty_file');
+    const emptyReview = await apiCall('POST', `/waste/sources/${h.id}/reimport/preview`, { body: {} });
+    assert.deepEqual([emptyReview.status, emptyReview.body.reason], [400, 'waste_import_empty_file']);
+
+    // A valid calendar with one of the two types gone: a legitimate change.
+    h.feed.serve = h.feed.fewer;
+    await h.runScheduler();
+    state = h.snapshot();
+    assert.deepEqual(
+      pick(state, ['pickups', 'reminders', 'last_error', 'consecutive_failures', 'etag', 'version']),
+      { pickups: 4, reminders: 4, last_error: null, consecutive_failures: 0, etag: '"good-2"', version: h.before.version + 1 },
+    );
+  } finally {
+    await h.close();
+  }
+});
+
+test('#1938 the rule asks what was SENT, not what remains: a calendar whose entries all lie outside the import window is applied', async () => {
+  const h = await emptyFeedHousehold();
+  try {
+    h.feed.serve = h.feed.outside;
+    const preview = await apiCall('POST', `/waste/sources/${h.id}/reimport/preview`, { body: {} });
+    assert.equal(preview.status, 200, JSON.stringify(preview.body));
+    assert.deepEqual(preview.body.data.counts, { events: 2, candidates: 0, distinct_labels: 0 });
+    await h.runScheduler();
+    const state = h.snapshot();
+    assert.deepEqual(
+      pick(state, ['pickups', 'last_error', 'consecutive_failures', 'etag', 'version']),
+      { pickups: 0, last_error: null, consecutive_failures: 0, etag: '"far"', version: h.before.version + 1 },
+      'entries arrived, none of them in the window: applied as before',
+    );
+  } finally {
+    await h.close();
+  }
+});
+
+test('#1938 the scheduler path is still off while the module is off - the cases above measure nothing unless they switch it on', async () => {
+  const h = await emptyFeedHousehold();
+  try {
+    get().prepare("UPDATE sync_config SET value = '[\"waste\"]' WHERE key = 'disabled_modules'").run();
+    h.feed.serve = h.feed.html;
+    h.makeDue();
+    const hits = h.feed.hits.length;
+    await runDueWasteSourceRefreshes();
+    assert.equal(h.feed.hits.length, hits, 'no fetch');
+    assert.equal(h.snapshot().last_error, null);
+  } finally {
+    get().prepare("DELETE FROM sync_config WHERE key = 'disabled_modules'").run();
+    await h.close();
+  }
+});

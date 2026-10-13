@@ -293,6 +293,30 @@ test('rejects an empty file', () => {
   assert.throws(() => buildImportPreview('', { today: TODAY }), (err) => err.code === 'empty_file' && err.params === null);
 });
 
+// #1938: zero calendar entries is never a calendar. The rule asks what the text
+// HOLDS (parsed entries), not what remains of it as pickups.
+test('#1938 text without a single calendar entry is refused as no_events - an HTML page, an empty VCALENDAR, plain words', () => {
+  const html = '<html><head><title>Wartung</title></head><body><h1>Wartung</h1><p>Wir sind gleich wieder da.</p></body></html>';
+  for (const [name, text] of [
+    ['an HTML page', html],
+    ['an empty VCALENDAR', vcalendar([])],
+    ['plain words', 'not a calendar at all'],
+  ]) {
+    let thrown = null;
+    try { buildImportPreview(text, { today: TODAY }); } catch (err) { thrown = err; }
+    assert.ok(thrown instanceof WasteImportError, `${name}: refused, not previewed as "0 pickups"`);
+    assert.equal(thrown.code, 'no_events', name);
+    assert.equal(thrown.params, null, name);
+  }
+});
+
+test('#1938 a calendar WITH entries of which none becomes a pickup still previews: outside the window, cancelled', () => {
+  const outside = buildImportPreview(vcalendar(['BEGIN:VEVENT\r\nUID:far@x\r\nSUMMARY:Restmüll\r\nDTSTART;VALUE=DATE:20300701\r\nEND:VEVENT']), { today: TODAY });
+  assert.deepEqual(outside.counts, { events: 1, candidates: 0, distinct_labels: 0 });
+  const cancelled = buildImportPreview(vcalendar(['BEGIN:VEVENT\r\nUID:c@x\r\nSUMMARY:Restmüll\r\nSTATUS:CANCELLED\r\nDTSTART;VALUE=DATE:20260701\r\nEND:VEVENT']), { today: TODAY });
+  assert.deepEqual(cancelled.counts, { events: 1, candidates: 0, distinct_labels: 0 });
+});
+
 // #1909: a limit carries itself as a number, so the client can put it into its
 // own sentence. The number is the constant the check compares against.
 test('every limit names itself as a number next to its code', () => {

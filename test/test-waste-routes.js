@@ -1148,6 +1148,96 @@ test('reasons of a failed fetch: one per class - the status of the other side, t
   }
 });
 
+// -------------------------------------------------------------------------
+// #1938: zero calendar entries is never a calendar
+// -------------------------------------------------------------------------
+
+const NO_EVENT_TEXTS = [
+  ['an HTML page', '<html><head><title>Login</title></head><body><form><input name="user"></form></body></html>'],
+  ['an empty VCALENDAR', 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//x//EN\r\nEND:VCALENDAR\r\n'],
+];
+
+function importedPickupCount(sourceId) {
+  return db.prepare('SELECT COUNT(*) AS n FROM waste_imported_pickups WHERE source_id = ?').get(sourceId).n;
+}
+
+test('reason waste_import_no_events: a file without a calendar entry is refused at the preview and at the commit - fresh import and re-import, and nothing is created or removed', async () => {
+  const source = await commitSource('2026-11-05');
+  assert.equal(importedPickupCount(source.id), 1);
+  const sourcesBefore = await sourceCount();
+  for (const [name, ics] of NO_EVENT_TEXTS) {
+    // The preview refuses already: nobody gets to confirm "0 pickups".
+    for (const path of ['/waste/import/preview', `/waste/sources/${source.id}/reimport/preview`]) {
+      const r = await expectReasonWithParams(call('POST', path, { body: { ics } }), 400, 'waste_import_no_events', undefined);
+      assert.equal(r.body.error, 'The file contains no calendar entries.', `${name}: ${path}`);
+      assert.equal('params' in r.body, false);
+    }
+    // A client that goes straight to the commit, with everything it needs.
+    await expectReason(call('POST', '/waste/import/commit', { body: { ics, name: `Empty ${name}`, mappings: [] } }), 400, 'waste_import_no_events');
+    await expectReason(call('POST', `/waste/sources/${source.id}/reimport/commit`, { body: { ics, mappings: [], expected_version: source.version } }), 400, 'waste_import_no_events');
+  }
+  assert.equal(await sourceCount(), sourcesBefore, 'no empty source was created');
+  assert.equal(importedPickupCount(source.id), 1, 'the re-import removed nothing');
+  assert.equal((await call('GET', `/waste/sources/${source.id}`)).body.data.version, source.version);
+
+  // A calendar WITH entries, none of them a pickup (far outside the window),
+  // previews and commits as before: the rule is about what the file holds.
+  const far = icsFixture('2040-01-01');
+  const preview = await call('POST', `/waste/sources/${source.id}/reimport/preview`, { body: { ics: far } });
+  assert.equal(preview.status, 200, JSON.stringify(preview.body));
+  assert.deepEqual(preview.body.data.counts, { events: 1, candidates: 0, distinct_labels: 0 });
+  const commit = await call('POST', `/waste/sources/${source.id}/reimport/commit`, {
+    body: { ics: far, mappings: [], expected_version: source.version, preview_digest: preview.body.data.digest },
+  });
+  assert.equal(commit.status, 200, JSON.stringify(commit.body));
+  assert.equal(commit.body.data.diff.removed, 1);
+});
+
+test('reason waste_source_fetch_no_events: an address that answers 200 without a calendar entry - on refresh, on create and in the reviewed re-import', async () => {
+  const standIn = await startStandIn();
+  try {
+    const labelType = await createType({ name: `Emptyfeed-${randomUUID()}` });
+    const feed = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:ef-1@x\r\nSUMMARY:${labelType.name}\r\nDTSTART;VALUE=DATE:20261201\r\nEND:VEVENT\r\nEND:VCALENDAR`;
+    standIn.handler = (_req, res) => { res.writeHead(200, { 'Content-Type': 'text/calendar' }).end(feed); };
+    const created = await withPrivateNetwork(() => call('POST', '/waste/sources', { body: { name: 'Feed that goes empty', url: standIn.url } }));
+    assert.equal(created.body.data.outcome, 'needs_mapping', JSON.stringify(created.body));
+    const id = created.body.data.source.id;
+    // The reviewed first commit, so that the source HAS a pickup to lose.
+    const first = await withPrivateNetwork(() => call('POST', `/waste/sources/${id}/reimport/commit`, {
+      body: {
+        expected_version: created.body.data.preview.expected_version, preview_digest: created.body.data.preview.digest,
+        mappings: created.body.data.preview.labels.map((l) => ({ normalized_label: l.normalized_label, type_id: labelType.id })),
+      },
+    }));
+    assert.equal(first.status, 200, JSON.stringify(first.body));
+    const { version } = first.body.data.source;
+    assert.equal(importedPickupCount(id), 1);
+
+    for (const [name, body] of NO_EVENT_TEXTS) {
+      standIn.handler = (_req, res) => { res.writeHead(200, { 'Content-Type': 'text/html', ETag: '"page"' }).end(body); };
+      const refreshed = await expectFetchFailure(withPrivateNetwork(() => call('POST', `/waste/sources/${id}/refresh`, { body: {} })), 200, 'waste_source_fetch_no_events', undefined);
+      assert.equal(refreshed.body.data.source.last_error, 'No calendar entries in the response', name);
+      assert.equal(refreshed.body.data.source.version, version, 'nothing was committed');
+      assert.equal(importedPickupCount(id), 1, `${name}: the imported pickup is still there`);
+      for (const step of ['preview', 'commit']) {
+        const r = await expectReasonWithParams(
+          withPrivateNetwork(() => call('POST', `/waste/sources/${id}/reimport/${step}`, { body: { mappings: [], expected_version: version } })),
+          502, 'waste_source_fetch_no_events', undefined,
+        );
+        assert.equal(r.body.error, 'Fetching the source URL failed: No calendar entries in the response');
+      }
+      const fresh = await expectFetchFailure(
+        withPrivateNetwork(() => call('POST', '/waste/sources', { body: { name: `Typo ${name}`, url: standIn.url } })),
+        201, 'waste_source_fetch_no_events', undefined,
+      );
+      assert.equal(fresh.body.data.source.version, 0, 'the first answer was not taken for a calendar');
+    }
+    assert.equal(importedPickupCount(id), 1);
+  } finally {
+    await standIn.close();
+  }
+});
+
 test('reason refresh_in_progress: a second manual refresh while the first is still fetching', async () => {
   const standIn = await startStandIn();
   try {
@@ -1191,7 +1281,7 @@ test('every waste_* reason the server source carries is answered by a real route
   // `waste_import_<code>` from the WasteImportError it catches.
   const importer = readFileSync(new URL('../server/services/waste-import.js', import.meta.url), 'utf8');
   const codes = [...importer.matchAll(/new WasteImportError\([^\n]*?,\s*'([a-z_]+)'\s*[,)]/g)].map((m) => m[1]);
-  assert.equal(codes.length, 5, `the scan reads the import limits (found ${codes.join(', ')})`);
+  assert.equal(codes.length, 6, `the scan reads the import refusals (found ${codes.join(', ')})`);
   for (const code of codes) inSource.add(`waste_import_${code}`);
   assert.ok(inSource.size >= 20, `the scan reads reasons at all (found ${inSource.size})`);
   assert.deepEqual([...seenReasons].sort(), [...inSource].sort(),

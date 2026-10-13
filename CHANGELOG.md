@@ -121,6 +121,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Waste: an address that stops serving its calendar no longer wipes your pickups** (#1938). A
+  subscribed waste calendar is fetched on its own. When the other side answered with something
+  that holds no calendar entry - a maintenance or login page, an empty calendar - Yuvomi took
+  that for a calendar with zero pickups: every imported pickup of the source was removed, the
+  reminders for them went with it, and the source looked healthy. Now such an answer is a failed
+  fetch like any other. The pickups and reminders stay, the source records the error and tries
+  again sooner, and the page says that no calendar with entries arrived. Adding a new address
+  that serves no calendar says so instead of showing a working source, and a file without a
+  single calendar entry is refused in the import assistant before anything can be confirmed.
+  A calendar that has entries is applied as before, also when it has fewer than last time.
+  For API clients: `POST /waste/sources/{id}/refresh` answers 200 with `outcome: "error"` and
+  `reason: "waste_source_fetch_no_events"` where it answered `outcome: "committed"` with
+  `diff.removed`; `POST /waste/sources` answers 201 with the same outcome and reason. The four
+  import endpoints (`/waste/import/preview`, `/waste/import/commit` and
+  `/waste/sources/{id}/reimport/preview`, `.../reimport/commit`) refuse a file without calendar
+  entries with 400 and `reason: "waste_import_no_events"` where they answered 200 or 201, and a
+  URL source's re-import answers 502 with `reason: "waste_source_fetch_no_events"`. Re-importing
+  an empty calendar no longer empties a source; delete the source instead.
 - **Calendar: an event moved away while it was uploading stays where you put it** (#1926). The
   legacy Apple Calendar connection uploads the events of the default calendar to iCloud. If an
   event was moved to another local calendar in the moment its upload was running, it was recorded

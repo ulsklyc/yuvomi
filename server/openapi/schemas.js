@@ -1848,8 +1848,8 @@ export const schemas = {
             },
             reason: {
               type: 'string',
-              enum: ['waste_source_fetch_http_status', 'waste_source_fetch_too_large', 'waste_source_fetch_blocked', 'waste_source_fetch_unreachable', 'waste_source_url_invalid', 'waste_source_url_not_https'],
-              description: 'Only with outcome=error: the class of the failed fetch. http_status: the other side answered, but not with a success (params.status). too_large: the response exceeds the upload limit (params.limit_mb). blocked: a private or blocked address. unreachable: everything else (DNS, refused or reset connection, TLS, timeout, a redirect that is not followed). url_invalid / url_not_https: the stored URL no longer passes validation. Not stored with the source - a later read knows only last_error.',
+              enum: ['waste_source_fetch_http_status', 'waste_source_fetch_too_large', 'waste_source_fetch_blocked', 'waste_source_fetch_unreachable', 'waste_source_fetch_no_events', 'waste_source_url_invalid', 'waste_source_url_not_https'],
+              description: 'Only with outcome=error: the class of the failed fetch. http_status: the other side answered, but not with a success (params.status). too_large: the response exceeds the upload limit (params.limit_mb). blocked: a private or blocked address. unreachable: everything else (DNS, refused or reset connection, TLS, timeout, a redirect that is not followed). no_events: the other side answered with a success, but without a single calendar entry (a maintenance or login page, an empty calendar) - nothing is applied and the imported pickups stay (#1938). url_invalid / url_not_https: the stored URL no longer passes validation. Not stored with the source - a later read knows only last_error.',
             },
             params: { type: 'object', additionalProperties: { type: 'integer' }, description: 'Only with a reason that carries a number: `{ "status": 404 }` or `{ "limit_mb": 5 }`.' },
             diff: { $ref: '#/components/schemas/WasteImportDiff' },

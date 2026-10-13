@@ -561,6 +561,7 @@ for (const [name, err, satz] of [
   ['zu viele Abholungen', fehler(400, 'waste_import_instance_cap_exceeded', { limit: 5000 }), 'waste.errorImportTooManyPickups{"limit":5000}'],
   ['zu viele Bezeichnungen', fehler(400, 'waste_import_label_cap_exceeded', { limit: 200 }), 'waste.errorImportTooManyLabels{"limit":200}'],
   ['leere Datei', fehler(400, 'waste_import_empty_file'), 'waste.errorImportEmpty'],
+  ['Datei ohne einen Kalendereintrag (#1938)', fehler(400, 'waste_import_no_events'), 'waste.errorImportNoEvents'],
   ['die Zahl fehlt in der Antwort', fehler(400, 'waste_import_file_too_large'), 'common.unknownError'],
   ['400 ohne Grund', fehler(400), 'common.unknownError'],
   ['500', fehler(500), 'common.unknownError'],
@@ -598,6 +599,7 @@ for (const [name, err, satz] of [
   ['die Antwort ist zu gross', fehler(502, 'waste_source_fetch_too_large', { limit_mb: 5 }), 'waste.errorSourceFetchTooLarge{"limit_mb":5}'],
   ['eine gesperrte Adresse', fehler(502, 'waste_source_fetch_blocked'), 'waste.errorSourceFetchBlocked'],
   ['nicht erreichbar', fehler(502, 'waste_source_fetch_unreachable'), 'waste.errorSourceFetchUnreachable'],
+  ['die Adresse antwortet ohne einen Kalendereintrag (#1938)', fehler(502, 'waste_source_fetch_no_events'), 'waste.errorSourceFetchNoEvents'],
   ['die gespeicherte Adresse ist nicht mehr https', fehler(502, 'waste_source_url_not_https'), 'waste.errorSourceUrlNotHttps'],
   ['502 ohne Grund', fehler(502), 'common.unknownError'],
 ]) {
@@ -776,6 +778,7 @@ for (const [name, antwort, satz] of [
   ['Status der Gegenstelle', abruf({ reason: 'waste_source_fetch_http_status', params: { status: 404 } }), 'waste.errorSourceFetchStatus{"status":404}'],
   ['zu gross', abruf({ reason: 'waste_source_fetch_too_large', params: { limit_mb: 5 } }), 'waste.errorSourceFetchTooLarge{"limit_mb":5}'],
   ['nicht erreichbar', abruf({ reason: 'waste_source_fetch_unreachable' }), 'waste.errorSourceFetchUnreachable'],
+  ['die Adresse antwortet ohne einen Kalendereintrag (#1938)', abruf({ reason: 'waste_source_fetch_no_events' }), 'waste.errorSourceFetchNoEvents'],
   ['ohne Grund (ein aelterer Server)', abruf({}), 'waste.errorSourceFetch'],
   ['ein Grund, den die App nicht kennt', abruf({ reason: 'waste_source_fetch_future' }), 'waste.errorSourceFetch'],
   ['die Zahl fehlt', abruf({ reason: 'waste_source_fetch_http_status' }), 'waste.errorSourceFetch'],

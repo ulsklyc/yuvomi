@@ -3257,6 +3257,16 @@ reviewed refresh through the same mapping wizard a file re-import uses. `next_at
 whenever `needs_mapping` is set, for the same reason. `consecutive_failures` drives exponential
 backoff (capped at 24h) and resets to 0 on any successful fetch, whether or not it committed.
 
+Content without a single calendar entry is never a calendar (#1938). The importer refuses it before
+any caller sees a preview (`waste_import_no_events`, 400), so a file import or re-import cannot empty
+a source. For a URL source the same answer is a failed fetch (`waste_source_fetch_no_events`): the
+scheduler and the manual refresh record `last_error`, raise `consecutive_failures` and back off,
+and leave the imported pickups, the mappings, `version`, `etag`, `last_modified` and
+`last_success_at` as they were - storing the validators of that answer would turn the next attempt
+into a 304 and hide the failure. The rule counts parsed entries, not resulting pickups: a calendar
+whose entries all fall outside the import window, are cancelled or belong to ignored labels is
+applied as before. To empty a source, delete it.
+
 | Column | Type | Constraint |
 |--------|------|-----------|
 | kind | TEXT | NOT NULL DEFAULT 'file' - 'file' or 'url' |
