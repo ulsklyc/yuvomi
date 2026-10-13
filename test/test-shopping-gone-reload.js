@@ -587,6 +587,17 @@ test('Abgehakte loeschen, von denen einer schon weg ist: 200 mit kleinerer Zahl,
 
 /** Der Klapp-Zustand der Kategorien von Liste 1, wie die Seite ihn ablegt. */
 const KLAPP_LISTE_1 = 'yuvomi:shopping:collapsedCategories:v1:anon:1';
+/** Der zweite Eintrag je Liste (#1816): "Abgehakt" steht offen. */
+const ABGEHAKT_LISTE_1 = 'yuvomi:shopping:tickedOpen:v1:anon:1';
+/** Derselbe Eintrag der Nachbarliste: er gehoert nicht zur geloeschten. */
+const ABGEHAKT_LISTE_2 = 'yuvomi:shopping:tickedOpen:v1:anon:2';
+/** Beide Eintraege der Liste 1 ablegen, dazu den der Nachbarliste. */
+function speicherFuellen() {
+  speicher.clear();
+  speicher.set(KLAPP_LISTE_1, '["x"]');
+  speicher.set(ABGEHAKT_LISTE_1, '1');
+  speicher.set(ABGEHAKT_LISTE_2, '1');
+}
 
 /**
  * Die aktive Liste ueber den delegierten Klick-Handler der Seite loeschen
@@ -628,8 +639,7 @@ const NACHLADEN_LISTE_2 = ['/preferences', '/shopping', '/shopping/2/items', '/s
 
 test('Loeschen einer schon geloeschten Liste: kein Toast, die Liste kommt nicht zurueck, die Seite laedt still nach', async () => {
   zustand();
-  speicher.clear();
-  speicher.set(KLAPP_LISTE_1, '["x"]');
+  speicherFuellen();
   const { gets, stub } = server({ lists: OHNE_LISTE_1() });
   const geloescht = [];
   stub.delete = async (path) => { geloescht.push(path); throw fehler(404, 'shopping_list_not_found'); };
@@ -641,6 +651,7 @@ test('Loeschen einer schon geloeschten Liste: kein Toast, die Liste kommt nicht 
     assert.deepEqual(shopping.state.lists.map((l) => l.id), [2]);
     assert.equal(shopping.state.activeListId, 2);
     assert.ok(speicher.has(KLAPP_LISTE_1), 'im Undo-Fenster bleibt der Klapp-Zustand');
+    assert.ok(speicher.has(ABGEHAKT_LISTE_1), 'und der Zustand des Abschnitts "Abgehakt"');
     gets.length = 0;
     await lauf.ablauf();
     // Gleich nach der Antwort, noch vor dem Ende des Nachladens: nichts ist
@@ -657,23 +668,33 @@ test('Loeschen einer schon geloeschten Liste: kein Toast, die Liste kommt nicht 
   assert.deepEqual(shopping.state.items.map((i) => i.id), [20]);
   // Wie beim gewoehnlichen Erfolg: der verwaiste Klapp-Zustand geht mit.
   assert.equal(speicher.has(KLAPP_LISTE_1), false, 'der Klapp-Zustand der Liste ist abgeraeumt');
+  assert.deepEqual([...speicher.keys()], [ABGEHAKT_LISTE_2], 'keiner der beiden Eintraege der Liste bleibt (#1929)');
   // Der Stand war veraltet: die Seite holt den frischen, still.
   assert.deepEqual([...gets].sort(), NACHLADEN_LISTE_2);
 });
 
 test('Gegenfall: das gewoehnliche Loeschen einer Liste raeumt denselben Klapp-Zustand ab und laedt nichts nach', async () => {
   zustand();
-  speicher.clear();
-  speicher.set(KLAPP_LISTE_1, '["x"]');
+  speicherFuellen();
   const { gets, stub } = server({ lists: OHNE_LISTE_1() });
   stub.delete = async () => ({ ok: true });
 
   let lauf;
-  await mit(stub, async () => { lauf = await listeLoeschen(); gets.length = 0; await lauf.ablauf(); });
+  await mit(stub, async () => {
+    lauf = await listeLoeschen();
+    // Im Undo-Fenster steht noch alles: ein zurueckgenommenes Loeschen soll
+    // beide Zustaende behalten.
+    assert.deepEqual([...speicher.keys()].sort(), [KLAPP_LISTE_1, ABGEHAKT_LISTE_1, ABGEHAKT_LISTE_2].sort());
+    gets.length = 0;
+    await lauf.ablauf();
+  });
 
   assert.deepEqual(toasts, []);
   assert.equal(lauf.zurueckgeholt(), 0);
   assert.equal(speicher.has(KLAPP_LISTE_1), false);
+  // #1929: der zweite Eintrag der Liste geht an derselben Stelle mit - und nur
+  // der dieser Liste.
+  assert.deepEqual([...speicher.keys()], [ABGEHAKT_LISTE_2], 'keiner der beiden Eintraege der Liste bleibt');
   assert.deepEqual(gets, [], 'nur das erledigte Loeschen laedt nach, das gelungene nicht');
 });
 
@@ -701,8 +722,7 @@ for (const [name, err, satz, laedtNach] of [
 ]) {
   test(`Loeschen der Liste scheitert an etwas anderem: sie kommt zurueck, Toast - ${name}`, async () => {
     zustand();
-    speicher.clear();
-    speicher.set(KLAPP_LISTE_1, '["x"]');
+    speicherFuellen();
     // Der Server hat die Liste noch (das Loeschen ist ja gescheitert).
     const { gets, stub } = server({ items: { 1: [item(), item({ id: 11, name: 'Brot', sort_order: 2 })], 2: [item({ id: 20, list_id: 2, name: 'Dübel' })] } });
     stub.delete = async () => { throw err; };
@@ -716,6 +736,7 @@ for (const [name, err, satz, laedtNach] of [
     assert.equal(shopping.state.activeListId, 1);
     assert.deepEqual(shopping.state.items.map((i) => i.id), [10, 11]);
     assert.ok(speicher.has(KLAPP_LISTE_1), 'der Klapp-Zustand einer Liste, die es noch gibt, bleibt');
+    assert.ok(speicher.has(ABGEHAKT_LISTE_1), 'und ihr Abschnitt "Abgehakt" bleibt offen');
     assert.deepEqual([...gets].sort(), laedtNach ? NACHLADEN : []);
   });
 }
@@ -735,6 +756,16 @@ for (const [name, err, satz, laedtNach] of [
  * diese Suite also nicht.
  */
 async function imVerwalterLoeschen(open, zeile) {
+  const { manager, ereignisse } = await verwalterOeffnen(open);
+  manager._cats = [zeile, { id: 99, name: 'Bleibt' }];
+  await manager._delete(String(zeile.id));
+  // Der Zuhoerer der Seite laedt asynchron nach; das Ereignis wartet nicht auf ihn.
+  for (let i = 0; i < 5; i += 1) await new Promise((r) => setImmediate(r));
+  return { ereignisse, zeilen: manager._cats.map((c) => c.id) };
+}
+
+/** Die echte Komponente, vom echten Aufrufer konfiguriert - noch ohne Zeilen. */
+async function verwalterOeffnen(open) {
   assert.ok(CategoryManager, 'shopping.js hat die Verwalter-Komponente geladen');
   const manager = new CategoryManager();
   manager._renderShell = () => {};
@@ -751,23 +782,22 @@ async function imVerwalterLoeschen(open, zeile) {
   }
   assert.ok(opts, 'der Verwalter ist aufgegangen');
   opts.onSave({ querySelector: (sel) => (sel === 'yuvomi-category-manager' ? manager : null) });
-  manager._cats = [zeile, { id: 99, name: 'Bleibt' }];
-  await manager._delete(String(zeile.id));
-  // Der Zuhoerer der Seite laedt asynchron nach; das Ereignis wartet nicht auf ihn.
-  for (let i = 0; i < 5; i += 1) await new Promise((r) => setImmediate(r));
-  return { ereignisse, zeilen: manager._cats.map((c) => c.id) };
+  return { manager, ereignisse };
 }
 
 const VERWALTER = [
   {
     was: 'Laden', open: (c) => shopping.openStoreManager(c), zeile: { id: 5, name: 'Eckladen' },
     pfad: '/shopping/stores/5', grund: 'shopping_store_not_found', satz: 'shopping.errorStoreGone',
+    // #1929: der Laden-Dialog spricht von Laeden, nicht von Kategorien.
+    wort: { angelegt: 'shopping.storeAdded', umbenannt: 'shopping.storeRenamed', geloescht: 'shopping.storeDeleted', loeschknopf: 'shopping.storeDeleteNamed' },
     fremderGrund: 'shopping_category_not_found', fremderSatz: 'shopping.errorCategoryGone',
     holt: ['/preferences', '/shopping/1/items', '/shopping/stores'],
   },
   {
     was: 'Kategorie', open: (c) => shopping.openCategoryManager(c), zeile: { id: 2, name: 'Alt' },
     pfad: '/shopping/categories/2', grund: 'shopping_category_not_found', satz: 'shopping.errorCategoryGone',
+    wort: { angelegt: 'category.added', umbenannt: 'category.renamed', geloescht: 'category.deleted', loeschknopf: 'category.deleteNamed' },
     fremderGrund: 'shopping_store_not_found', fremderSatz: 'shopping.errorStoreGone',
     holt: ['/shopping/1/items', '/shopping/categories'],
   },
@@ -784,7 +814,7 @@ for (const v of VERWALTER) {
     await mit(stub, async () => { ergebnis = await imVerwalterLoeschen(v.open, v.zeile); });
 
     assert.deepEqual(geloescht, [v.pfad]);
-    assert.deepEqual(toasts, [['category.deleted', 'default']], 'der gewoehnliche Erfolgs-Toast, kein Fehler');
+    assert.deepEqual(toasts, [[v.wort.geloescht, 'default']], 'der gewoehnliche Erfolgs-Toast, kein Fehler');
     assert.deepEqual(ergebnis.zeilen, [99], 'die Zeile ist aus dem Verwalter');
     assert.deepEqual(ergebnis.ereignisse, ['delete'], 'die Seite erfaehrt es wie jedes Loeschen');
     assert.deepEqual([...gets].sort(), v.holt, 'und holt, was sie nach jedem Loeschen holt');
@@ -798,9 +828,36 @@ for (const v of VERWALTER) {
     let ergebnis;
     await mit(stub, async () => { ergebnis = await imVerwalterLoeschen(v.open, v.zeile); });
 
-    assert.deepEqual(toasts, [['category.deleted', 'default']]);
+    assert.deepEqual(toasts, [[v.wort.geloescht, 'default']]);
     assert.deepEqual(ergebnis, { ereignisse: ['delete'], zeilen: [99] });
     assert.deepEqual([...gets].sort(), v.holt);
+  });
+
+  // #1929, die VERDRAHTUNG: gefahren wird der echte Aufrufer der Seite, nicht
+  // eine von Hand konfigurierte Komponente. Was er `configure()` mitgibt, liest
+  // die Suite an dem ab, was die Komponente danach sagt.
+  test(`${v.was}: anlegen, umbenennen und der Name des Loeschknopfs tragen den Wortlaut des Aufrufers`, async () => {
+    zustand();
+    const { stub } = server({ items: { 1: [item(), item({ id: 11, name: 'Brot', sort_order: 2 })] } });
+    stub.post = async (_path, body) => ({ data: { id: 77, ...body } });
+    stub.put = async (_path, body) => ({ data: { ...v.zeile, ...body } });
+
+    let knopfnamen;
+    await mit(stub, async () => {
+      const { manager } = await verwalterOeffnen(v.open);
+      manager._cats = [v.zeile];
+      const input = { value: 'Neu' };
+      const form = { dataset: { group: '' }, querySelector: (sel) => (sel === 'input' ? input : null) };
+      await manager._onSubmit({ preventDefault() {}, target: { closest: (sel) => (sel === '.cat-add-form' ? form : null) } });
+      globalThis.__promptModal = () => 'Anders';
+      try { await manager._rename(String(v.zeile.id)); } finally { delete globalThis.__promptModal; }
+      knopfnamen = [...manager._rowActionsHtml('Anders', { isFirst: true, isLast: true }).matchAll(/aria-label="([a-zA-Z.]+)\{/g)].map((m) => m[1]);
+      for (let i = 0; i < 5; i += 1) await new Promise((r) => setImmediate(r));
+    });
+
+    assert.deepEqual(toasts, [[v.wort.angelegt, 'success'], [v.wort.umbenannt, 'success']]);
+    assert.equal(knopfnamen.length, 4, 'umbenennen, hoch, runter, loeschen');
+    assert.equal(knopfnamen.at(-1), v.wort.loeschknopf);
   });
 
   for (const [name, err, satz, gemeldet] of [

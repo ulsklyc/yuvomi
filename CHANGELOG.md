@@ -342,6 +342,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The switch reaches a tablet nobody touches in both directions: a screensaver that could not
   get its photos asks again after the next idle period instead of waiting for a touch, and one
   whose next photo is refused closes instead of leaving a black screen.
+- **Shopping: deleting a shop no longer says "Category deleted"** (#1929). The shop manager
+  borrowed three messages from the category managers: adding, renaming and deleting a shop each
+  ended with "Category ...", and a screen reader announced the delete button as "Delete category
+  <name>". All four now name the shop, in every language; the category managers read as before.
+  A deleted shopping list also no longer leaves its "Checked off is open" entry behind in the
+  browser's storage.
 
 ## [2.76.0] - 2026-10-11
 

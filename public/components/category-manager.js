@@ -8,7 +8,8 @@
  *   - configure({ basePath, groups, groupField, supportsSubcategories, labelResolver, titleKey, hintKey,
  *                 addMaxLength, localizedLabels,
  *                 deleteConfirmKey, deleteDetailKey, subDeleteDetailKey, errorFallbackKey,
- *                 alreadyDeletedReason })
+ *                 alreadyDeletedReason,
+ *                 addedKey, renamedKey, deletedKey, deleteNamedKey })
  *   - Lädt via api.get(basePath); mutiert über post/put/patch/delete relativ zu basePath
  *   - `localizedLabels: true` haengt der Listenanfrage `?lang=<Oberflaechensprache>` an -
  *     fuer Routen, die ihre Labels auf dem Server uebersetzen (heute nur Budget, #1859)
@@ -22,6 +23,12 @@
  *     Wer ihn setzt, bekommt dafuer den Erfolgsweg statt eines Fehlers (#1909, heute
  *     der Einkauf); ohne ihn bleibt jedes gescheiterte Loeschen ein Fehler. Die
  *     Komponente kennt selbst keinen Grund eines Moduls
+ *   - `addedKey`, `renamedKey`, `deletedKey`: die drei Erfolgs-Toasts einer Zeile,
+ *     `deleteNamedKey` (mit `{{name}}`): der zugaengliche Name ihres Loeschknopfs.
+ *     Das sind die Texte, die das DING beim Namen nennen ("Kategorie geloescht");
+ *     wer etwas anderes verwaltet, nennt sie selbst (#1929, heute die Laeden des
+ *     Einkaufs). Ohne sie bleibt der bisherige `category.*`-Text. Unterzeilen
+ *     behalten ihre eigenen Texte
  *   - Räumt Listener in disconnectedCallback() auf
  *
  * VERTRAG FUER AUFRUFER: die Auffrischung gehoert in den Ereignis-Handler, nicht
@@ -127,6 +134,16 @@ class CategoryManagerElement extends HTMLElement {
     this._deleteConfirmKey = 'category.deleteConfirm';
     this._deleteDetailKey = 'category.deleteConfirmDetail';
     this._subDeleteDetailKey = 'category.deleteSubConfirmDetail';
+    // Dieselbe Falle ein drittes Mal (#1929): die Rueckfrage sprach schon vom
+    // Laden, der Toast danach sagte "Kategorie geloescht" und der Loeschknopf
+    // hiess fuer einen Screenreader "Kategorie Rewe loeschen". Jeder Text, der
+    // das Ding beim Namen nennt, gehoert dem Aufrufer; die uebrigen
+    // (`renameNamed`, `moveUpNamed`, `dragHandle` ...) nennen es in keiner
+    // Sprache und bleiben geteilt.
+    this._addedKey = 'category.added';
+    this._renamedKey = 'category.renamed';
+    this._deletedKey = 'category.deleted';
+    this._deleteNamedKey = 'category.deleteNamed';
     // Siehe `_errMsg`: gesetzt heisst, der Text des Servers erreicht den Toast nie.
     this._errorFallbackKey = null;
     // Siehe `_delete`: der Grund, mit dem die Route des Aufrufers sagt "diese
@@ -172,6 +189,10 @@ class CategoryManagerElement extends HTMLElement {
     if (opts.deleteDetailKey) this._deleteDetailKey = opts.deleteDetailKey;
     if (opts.subDeleteDetailKey) this._subDeleteDetailKey = opts.subDeleteDetailKey;
     if (opts.errorFallbackKey) this._errorFallbackKey = opts.errorFallbackKey;
+    if (opts.addedKey) this._addedKey = opts.addedKey;
+    if (opts.renamedKey) this._renamedKey = opts.renamedKey;
+    if (opts.deletedKey) this._deletedKey = opts.deletedKey;
+    if (opts.deleteNamedKey) this._deleteNamedKey = opts.deleteNamedKey;
     if (typeof opts.alreadyDeletedReason === 'string' && opts.alreadyDeletedReason) {
       this._alreadyDeletedReason = opts.alreadyDeletedReason;
     }
@@ -543,7 +564,7 @@ class CategoryManagerElement extends HTMLElement {
         icon: 'trash-2',
         tone: 'danger',
         action: `${prefix}delete`,
-        label: t(sub ? 'category.deleteSubNamed' : 'category.deleteNamed', { name }),
+        label: t(sub ? 'category.deleteSubNamed' : this._deleteNamedKey, { name }),
       }),
     ].join('');
   }
@@ -718,7 +739,7 @@ class CategoryManagerElement extends HTMLElement {
       this._cats.push(res.data);
       this._renderGroup(group ?? '');
       if (this._unifiedAdd) input.value = '';
-      window.yuvomi?.showToast(t('category.added'), 'success');
+      window.yuvomi?.showToast(t(this._addedKey), 'success');
       this._notifyChanged();
     } catch (err) {
       this._fail(err);
@@ -823,7 +844,7 @@ class CategoryManagerElement extends HTMLElement {
         const idx = this._cats.findIndex((c) => this._keyOf(c) === key);
         if (idx >= 0) this._cats[idx] = res.data;
         this._renderGroup(this._groupOf(cat));
-        window.yuvomi?.showToast(t('category.renamed'), 'success');
+        window.yuvomi?.showToast(t(this._renamedKey), 'success');
         this._notifyChanged();
         return;
       } catch (err) {
@@ -940,7 +961,7 @@ class CategoryManagerElement extends HTMLElement {
       }
       this._cats = this._cats.filter((c) => this._keyOf(c) !== key);
       this._renderGroup(this._groupOf(cat));
-      window.yuvomi?.showToast(t('category.deleted'), 'default');
+      window.yuvomi?.showToast(t(this._deletedKey), 'default');
       this._notifyChanged({ action: 'delete', key, item: cat });
     } catch (err) {
       this._fail(err);

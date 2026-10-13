@@ -4252,8 +4252,11 @@ function wireListContentEvents(container) {
           }
           // Erst wenn das Loeschen wirklich feststeht (Undo-Fenster verstrichen):
           // ein rueckgaengig gemachtes Loeschen soll den Klapp-Zustand behalten.
+          // BEIDE Eintraege der Liste (#1929): der Abschnitt "Abgehakt" merkt
+          // sich seit #1816 einen zweiten, und der blieb fuer immer liegen.
           try {
             localStorage.removeItem(collapsedCategoriesStorageKey(state.currentUserId, deletedListId));
+            localStorage.removeItem(tickedOpenStorageKey(state.currentUserId, deletedListId));
           } catch { /* Privatmodus/Quota - unschaedlich, die Zeile war ohnehin verwaist */ }
           // Der Stand der Seite war veraltet, also holt sie den frischen -
           // still. Nicht beim Verlassen der Seite (`keepalive`): da zeichnet
@@ -4344,6 +4347,13 @@ function openStoreManager(container) {
         // den Kategorien dieses Moduls.
         deleteConfirmKey: 'shopping.storeDeleteConfirm',
         deleteDetailKey: 'shopping.storeDeleteConfirmDetail',
+        // Und was danach kommt (#1929): der Toast sagte "Kategorie geloescht",
+        // der Loeschknopf hiess "Kategorie Rewe loeschen". Alle vier Texte, die
+        // im Verwalter das Ding beim Namen nennen.
+        addedKey: 'shopping.storeAdded',
+        renamedKey: 'shopping.storeRenamed',
+        deletedKey: 'shopping.storeDeleted',
+        deleteNamedKey: 'shopping.storeDeleteNamed',
         // Nie der Satz des Servers (#1909): bekannter Fall oder der allgemeine.
         errorFallbackKey: 'common.errorGeneric',
         // Einen Laden loeschen, den jemand anderes schon geloescht hat: erledigt,

@@ -611,3 +611,91 @@ test('only shopping names an alreadyDeletedReason, once per manager', async () =
     'shopping.js: shopping_store_not_found',
   ]);
 });
+
+// #1929: der Einkauf verwaltet mit dieser Komponente Laeden. Die Rueckfrage hatte
+// schon eigene Keys, die drei Erfolgs-Toasts und der Name des Loeschknopfs nicht:
+// wer einen Laden loeschte, las "Kategorie geloescht". Gefahren werden die echten
+// Wege (`_onSubmit`, `_rename`, `_delete`, `_rowActionsHtml`), je einmal MIT den
+// Optionen und einmal OHNE - ohne sie bleibt exakt der bisherige Key.
+const STORE_WORDING = {
+  addedKey: 'shopping.storeAdded',
+  renamedKey: 'shopping.storeRenamed',
+  deletedKey: 'shopping.storeDeleted',
+  deleteNamedKey: 'shopping.storeDeleteNamed',
+};
+
+/** Anlegen, umbenennen und loeschen: die drei Toasts in dieser Reihenfolge. */
+async function successToasts(options) {
+  const manager = managerWithCategory(options);
+  const toasts = [];
+  const previousToast = globalThis.window.yuvomi.showToast;
+  globalThis.window.yuvomi.showToast = (text, kind) => toasts.push([text, kind]);
+  const previous = { post: api.post, put: api.put, delete: api.delete };
+  api.post = async (_path, body) => ({ data: { id: 8, ...body } });
+  api.put = async (_path, body) => ({ data: { id: 7, ...body } });
+  api.delete = async () => ({ data: null });
+  globalThis.__promptModal = () => 'Renamed';
+  globalThis.__confirmOverModal = () => true;
+  try {
+    const input = { value: 'Fresh' };
+    const form = { dataset: { group: '' }, querySelector: (selector) => (selector === 'input' ? input : null) };
+    await manager._onSubmit({
+      preventDefault() {},
+      target: { closest: (selector) => (selector === '.cat-add-form' ? form : null) },
+    });
+    await manager._rename('7');
+    await manager._delete('7');
+  } finally {
+    Object.assign(api, previous);
+    delete globalThis.__promptModal;
+    delete globalThis.__confirmOverModal;
+    globalThis.window.yuvomi.showToast = previousToast;
+  }
+  return toasts;
+}
+
+/** Die Namen (`aria-label`) der Zeilenknoepfe, wie `t` aus dem Loader sie schreibt. */
+function rowActionLabels(options, rowOptions = {}) {
+  const manager = managerWithCategory(options);
+  const html = manager._rowActionsHtml('Rewe', { isFirst: false, isLast: false, ...rowOptions });
+  return [...html.matchAll(/aria-label="([a-zA-Z.]+)\{/g)].map((m) => m[1]);
+}
+
+test('wording options: a manager configured for stores names the store in all three toasts', async () => {
+  assert.deepEqual(await successToasts(STORE_WORDING), [
+    ['shopping.storeAdded', 'success'],
+    ['shopping.storeRenamed', 'success'],
+    ['shopping.storeDeleted', 'default'],
+  ]);
+});
+
+test('wording options: without them the three toasts are exactly the keys they were', async () => {
+  assert.deepEqual(await successToasts({}), [
+    ['category.added', 'success'],
+    ['category.renamed', 'success'],
+    ['category.deleted', 'default'],
+  ]);
+});
+
+test('wording options: the delete button is named after the caller\'s thing', () => {
+  assert.deepEqual(rowActionLabels(STORE_WORDING), [
+    'category.renameNamed', 'category.moveUpNamed', 'category.moveDownNamed', 'shopping.storeDeleteNamed',
+  ]);
+  // Eine Unterzeile ist keine Zeile des Aufrufers: sie behaelt ihren eigenen Namen.
+  assert.equal(rowActionLabels(STORE_WORDING, { sub: true }).at(-1), 'category.deleteSubNamed');
+});
+
+test('wording options: without them the delete button keeps today\'s name', () => {
+  assert.deepEqual(rowActionLabels({}), [
+    'category.renameNamed', 'category.moveUpNamed', 'category.moveDownNamed', 'category.deleteNamed',
+  ]);
+  assert.equal(rowActionLabels({}, { sub: true }).at(-1), 'category.deleteSubNamed');
+});
+
+test('wording options: an empty or missing value never blanks a text', async () => {
+  const blank = { addedKey: '', renamedKey: null, deletedKey: undefined, deleteNamedKey: '' };
+  assert.deepEqual((await successToasts(blank)).map(([text]) => text), [
+    'category.added', 'category.renamed', 'category.deleted',
+  ]);
+  assert.equal(rowActionLabels(blank).at(-1), 'category.deleteNamed');
+});
