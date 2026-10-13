@@ -371,6 +371,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   <name>". All four now name the shop, in every language; the category managers read as before.
   A deleted shopping list also no longer leaves its "Checked off is open" entry behind in the
   browser's storage.
+- **Health: a switched-off medication no longer shows a dose as due today** (#1950). The Health page
+  listed a dose under "Due today" and among the next reminders for a medication that was no longer
+  active, while the Overview tile and the reminders left it out. The page now leaves it out too,
+  so both show the same number, and adherence and the streak count only the medications still
+  being taken. The medication stays in the list, and the doses already logged stay in the intake
+  log.
 
 ## [2.76.0] - 2026-10-11
 
