@@ -274,13 +274,16 @@ export function startOrRuleChanged(before, after, zone) {
  * DREI AUSGAENGE, und nur der erste ist neu:
  *
  *   - `keep`: die Zeile traegt die Marke, ihr Start liegt neben der eigenen
- *     Regel, und der Anbieter liefert GENAU das, was Yuvomi daraus hinausgibt
- *     (`outboundDateRange`: Start am ersten Tag der Regel, Ende um dieselben
- *     Tage verschoben), mit derselben Regel. Dann ist das kein neuer Stand,
- *     sondern das Echo des eigenen Uploads: Start, Ende, Regel und Zone der
- *     Zeile bleiben, wie sie eingegeben wurden, und der Aufrufer ruft
- *     `followInboundStartChange` nicht - die Erinnerungen haengen am
- *     eingegebenen Tag.
+ *     Regel, und der Anbieter liefert GENAU den Start, den Yuvomi daraus
+ *     hinausgibt (`outboundDateRange`: der erste Tag der Regel), mit derselben
+ *     Regel. Dann hat der Anbieter weder Start noch Regel angefasst: Start,
+ *     Regel und Zone der Zeile bleiben, wie sie eingegeben wurden, und der
+ *     Aufrufer ruft `followInboundStartChange` nicht - die Erinnerungen
+ *     haengen am eingegebenen Tag. Das ENDE steht in `end_datetime`: beim
+ *     Echo des eigenen Uploads das gespeicherte, und wenn der Anbieter nur
+ *     die Dauer geaendert hat, sein Ende in der Lage der Eingabe
+ *     (`endAtEnteredStart`). Eine andere Dauer nimmt die Marke nicht - sie
+ *     sagt nichts darueber, wer Start und Regel verfasst hat.
  *   - Marke bleibt, der Anbieter gilt: derselbe Beginn und dieselbe Regel wie
  *     in der Zeile (hoechstens anders geschrieben). Die Zeile folgt dem
  *     Anbieter wie bisher.
@@ -301,7 +304,8 @@ export function startOrRuleChanged(before, after, zone) {
  * @param {{ zone: string, sentRules?: Array<?string>, recurrenceZone?: string|null }} options
  *   `zone`: Zone des Haushalts; `recurrenceZone`: dieselbe Angabe, die der
  *   ausgehende Weg dieses Anbieters an `outboundDateRange` gibt
- * @returns {{ keep: boolean, authored: 0|1 }}
+ * @returns {{ keep: boolean, authored: 0|1, end_datetime?: string|null }}
+ *   `end_datetime` nur bei `keep`: das Ende, das in die Zeile gehoert
  */
 export function inboundSeriesVerdict(stored, incoming, { zone, sentRules = [], recurrenceZone = null } = {}) {
   const fremd = { keep: false, authored: 0 };
@@ -318,5 +322,53 @@ export function inboundSeriesVerdict(stored, incoming, { zone, sentRules = [], r
   // Ohne Ende gibt jeder ausgehende Weg den Start als Ende hinaus.
   const endeHinaus = hinaus.end_datetime ?? hinaus.start_datetime;
   const endeKommt = incoming.end_datetime ?? incoming.start_datetime;
-  return sameStart(endeKommt, endeHinaus, zone, allDay) ? { keep: true, authored: 1 } : fremd;
+  if (sameStart(endeKommt, endeHinaus, zone, allDay)) {
+    return { keep: true, authored: 1, end_datetime: stored.end_datetime ?? null };
+  }
+  // NUR DAS ENDE IST ANDERS: der Anbieter hat die Dauer geaendert, Start und
+  // Regel sind weiter die aus Yuvomi. Das neue Ende gilt, die Eingabe bleibt.
+  return {
+    keep: true,
+    authored: 1,
+    end_datetime: endAtEnteredStart(stored, hinaus, incoming.end_datetime, { zone, recurrenceZone }),
+  };
+}
+
+/**
+ * Das Ende des Anbieters, zurueckgerechnet in die Lage der Eingabe.
+ *
+ * Der Anbieter haelt die Serie am ausgerichteten Tag (dem 31.), die Zeile am
+ * eingegebenen (dem 15.). Sein Ende roh zu uebernehmen hiesse, einen Termin
+ * vom 15. bis zum 31. zu speichern. Uebernommen wird deshalb seine DAUER: das
+ * Ende wandert um dieselben Tage zurueck, um die `outboundDateRange` es beim
+ * Hinausgeben vorschiebt - auf der Wanduhr, nicht in Millisekunden, damit die
+ * Uhrzeit ueber eine Zeitumstellung dieselbe bleibt. Heraus kommt die Form,
+ * in der der Start der Zeile steht (Tag, Wanduhrzeit des Haushalts oder
+ * Zeitpunkt), sodass der naechste Push genau das Ende des Anbieters ergibt.
+ *
+ * @returns {string|null} null, wenn der Anbieter kein Ende fuehrt
+ */
+function endAtEnteredStart(stored, hinaus, endeKommt, { zone, recurrenceZone }) {
+  if (endeKommt == null) return null;
+  const start = String(stored.start_datetime);
+  if (stored.all_day) {
+    const tage = tagesDifferenz(start.slice(0, 10), String(hinaus.start_datetime).slice(0, 10));
+    return shiftDateKey(String(endeKommt).slice(0, 10), -tage);
+  }
+  // Die Zone, in der die Tage gezaehlt wurden: fuer einen Zeitpunkt die des
+  // Empfaengers (wie in `outboundDateRange`), fuer eine Wanduhrzeit die des Haushalts.
+  const zeitpunkt = hasExplicitZone(start);
+  const rechenZone = zeitpunkt ? (recurrenceZone || stored.tzid) : zone;
+  const wandVon = (wert) => (hasExplicitZone(wert)
+    ? utcToWall(new Date(wert).toISOString(), rechenZone)
+    : { date: String(wert).slice(0, 10), time: `${String(wert).slice(11)}:00`.slice(0, 8) });
+  const tage = zeitpunkt
+    ? tagesDifferenz(wandVon(start).date, wandVon(hinaus.start_datetime).date)
+    : tagesDifferenz(start.slice(0, 10), String(hinaus.start_datetime).slice(0, 10));
+  const wand = wandVon(endeKommt);
+  if (!wand) return endeKommt;
+  const tag = shiftDateKey(wand.date, -tage);
+  if (zeitpunkt) return localToUTCPrecise(`${tag}T${wand.time}`, rechenZone);
+  // Wie die Route speichert: ohne Sekunden, solange der Anbieter keine fuehrt.
+  return `${tag}T${wand.time.endsWith(':00') ? wand.time.slice(0, 5) : wand.time}`;
 }

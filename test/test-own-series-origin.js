@@ -248,6 +248,19 @@ const PROVIDERS = {
       });
       return () => googleWhen(this.calendar.held.get('foreign-1935'));
     },
+    /** Ändert beim Anbieter NUR das Ende; Start, Regel und Zone bleiben. */
+    changeEndAtProvider(end) {
+      const [id, item] = [...this.calendar.held.entries()].at(-1);
+      this.calendar.held.set(id, { ...item, end: { dateTime: end, timeZone: item.start.timeZone } });
+    },
+    /** Stellt die Serie beim Anbieter in eine andere Zone; die Zeitpunkte bleiben. */
+    changeZoneAtProvider(zone) {
+      const [id, item] = [...this.calendar.held.entries()].at(-1);
+      const instant = (when) => ({
+        dateTime: new Date(localToUTCPrecise(when.dateTime, when.timeZone)).toISOString(), timeZone: zone,
+      });
+      this.calendar.held.set(id, { ...item, start: instant(item.start), end: instant(item.end) });
+    },
     /** Verlegt den Eintrag beim Anbieter, als hätte es jemand in Google getan. */
     moveAtProvider(start, end) {
       const [id, item] = [...this.calendar.held.entries()].at(-1);
@@ -291,6 +304,31 @@ const PROVIDERS = {
         { dtstart: stamp(start), dtend: stamp(end), rrule }));
       return () => icsWhen(dav.getObject(this.url, 'foreign.ics').data);
     },
+    /** Schreibt das VEVENT des eigenen Objekts um; ein VTIMEZONE davor bleibt. */
+    rewriteVevent(change) {
+      const [name] = dav.objectNames(this.url);
+      const stored = dav.getObject(this.url, name).data;
+      const at = stored.indexOf('BEGIN:VEVENT');
+      dav.putObject(this.url, name, stored.slice(0, at) + change(stored.slice(at)));
+    },
+    changeEndAtProvider(end) {
+      // In der Schreibweise, in der das Objekt liegt: mit TZID die Wanduhr, sonst UTC.
+      this.rewriteVevent((vevent) => vevent.replace(/^DTEND([^:\r\n]*):[^\r\n]*/m, (_line, params) => (
+        /TZID=/.test(params)
+          ? `DTEND${params}:${end.replace(/[-:]/g, '')}00`
+          : `DTEND${params}:${new Date(wall(end)).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}`
+      )));
+    },
+    changeZoneAtProvider(zone) {
+      const digits = (prop, vevent) => {
+        const iso = icsWhen(vevent)[prop];
+        const w = utcToWall(iso, zone);
+        return `${w.date.replace(/-/g, '')}T${w.time.replace(/:/g, '')}`;
+      };
+      this.rewriteVevent((vevent) => vevent
+        .replace(/^DTSTART[^\r\n]*/m, `DTSTART;TZID=${zone}:${digits('start', vevent)}`)
+        .replace(/^DTEND[^\r\n]*/m, `DTEND;TZID=${zone}:${digits('end', vevent)}`));
+    },
     moveAtProvider(start, end) {
       const [name] = dav.objectNames(this.url);
       const stamp = (v) => new Date(wall(v)).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
@@ -325,6 +363,9 @@ const PROVIDERS = {
     pushes() { return this.puts(); },
     seedForeign(what) { return PROVIDERS.CalDAV.seedForeign.call(this, what); },
     moveAtProvider(start, end) { return PROVIDERS.CalDAV.moveAtProvider.call(this, start, end); },
+    rewriteVevent(change) { return PROVIDERS.CalDAV.rewriteVevent.call(this, change); },
+    changeEndAtProvider(end) { return PROVIDERS.CalDAV.changeEndAtProvider.call(this, end); },
+    changeZoneAtProvider(zone) { return PROVIDERS.CalDAV.changeZoneAtProvider.call(this, zone); },
   },
 };
 
@@ -535,6 +576,36 @@ for (const name of Object.keys(PROVIDERS)) {
     await editTitle(p, event.id, { start_datetime: '2035-02-10T14:00', end_datetime: '2035-02-10T15:00' });
     assert.deepEqual(p.last(), { start: wall('2035-02-28T14:00'), end: wall('2035-02-28T15:00') });
     assert.equal(row(event.id).start_datetime, '2035-02-10T14:00', 'in der Zeile steht die Eingabe');
+  });
+
+  // ── Der Anbieter ändert nur die Dauer: Start, Regel und Marke bleiben ──────────
+
+  test(`${name} [${ZONE}] ändert der Anbieter nur das Ende, bleibt der eingegebene Start und die Marke`, async () => {
+    const p = provider(name);
+    const event = await post({
+      title: 'Miete', start_datetime: '2035-01-15T14:00', end_datetime: '2035-01-15T15:00',
+      recurrence_rule: LAST_DAY, ...p.target,
+    });
+    const remindAt = addReminder(event.id);
+    await p.sync();
+
+    // Beim Anbieter liegt die Serie am 31. Januar; jemand verlängert sie dort bis 16:30.
+    p.changeEndAtProvider('2035-01-31T16:30');
+    await p.sync();
+    const taken = row(event.id);
+    assert.equal(taken.start_datetime, '2035-01-15T14:00', 'den Start hat der Anbieter nicht angefasst: die Eingabe bleibt');
+    assert.equal(taken.end_datetime, '2035-01-15T16:30', 'das neue Ende gilt, in der Lage der Eingabe');
+    assert.equal(taken.recurrence_rule, LAST_DAY);
+    assert.equal(reminderOf(event.id), remindAt, 'keine Erinnerung wandert');
+    assert.equal(taken.series_authored, 1, 'Start und Regel sind weiter die aus Yuvomi');
+
+    // Der nächste Push trägt den ausgerichteten Start und das Ende des Anbieters.
+    await editTitle(p, event.id);
+    assert.deepEqual(p.last(), { start: wall('2035-01-31T14:00'), end: wall('2035-01-31T16:30') });
+    // Und der Abruf danach lässt es dabei.
+    await p.sync();
+    assert.equal(row(event.id).start_datetime, '2035-01-15T14:00');
+    assert.equal(row(event.id).end_datetime, '2035-01-15T16:30');
   });
 
   // ── Der Anbieter verlegt den Start: die Marke fällt ────────────────────────────

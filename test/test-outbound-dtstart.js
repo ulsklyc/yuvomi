@@ -258,7 +258,7 @@ test('der Abruf erkennt das Echo in derselben Zone, in der hinaus ausgerichtet w
   };
   const kommt = { start_datetime: '2035-01-31T05:30:00+01:00', end_datetime: '2035-01-31T05:45:00+01:00', all_day: false, recurrence_rule: MONATSLETZTER };
   assert.deepEqual(inboundSeriesVerdict(zeile, kommt, { zone: 'Europe/Berlin', recurrenceZone: 'Europe/Berlin' }),
-    { keep: true, authored: 1 });
+    { keep: true, authored: 1, end_datetime: '2035-01-16T04:45:00Z' });
   assert.deepEqual(inboundSeriesVerdict(zeile, kommt, { zone: 'Europe/Berlin' }), { keep: false, authored: 0 },
     'ohne die Angabe waere es der in New York ausgerichtete Start, und der kam nicht zurueck');
 });
@@ -345,7 +345,7 @@ test('das Echo des eigenen Uploads laesst die Eingabe stehen', () => {
   ]) {
     assert.deepEqual(
       inboundSeriesVerdict(eigene(), { ...kommt, all_day: false, recurrence_rule: `RRULE:${MONATSLETZTER}` }, { zone: BERLIN }),
-      { keep: true, authored: 1 }, kommt.start_datetime,
+      { keep: true, authored: 1, end_datetime: '2035-01-15T15:00' }, kommt.start_datetime,
     );
   }
   // Ganztaegig, und ohne gespeichertes Ende: hinaus geht der Start als Ende.
@@ -355,7 +355,7 @@ test('das Echo des eigenen Uploads laesst die Eingabe stehen', () => {
       { start_datetime: '2035-01-31', end_datetime: '2035-01-31', all_day: true, recurrence_rule: MONATSLETZTER },
       { zone: BERLIN },
     ),
-    { keep: true, authored: 1 },
+    { keep: true, authored: 1, end_datetime: null },
   );
 });
 
@@ -366,8 +366,38 @@ test('ein anderer Start oder eine andere Regel vom Anbieter nimmt die Marke', ()
   assert.deepEqual(inboundSeriesVerdict(eigene(), { ...basis, start_datetime: '2035-01-15T13:00:00Z', end_datetime: '2035-01-15T14:00:00Z' }, { zone: BERLIN }), fremd,
     'der eingegebene Tag selbst: der Anbieter haelt nicht, was Yuvomi hinausgibt');
   assert.deepEqual(inboundSeriesVerdict(eigene(), { ...basis, recurrence_rule: 'FREQ=MONTHLY' }, { zone: BERLIN }), fremd, 'andere Regel');
-  assert.deepEqual(inboundSeriesVerdict(eigene(), { ...basis, end_datetime: '2035-01-31T16:00:00Z' }, { zone: BERLIN }), fremd, 'anderes Ende');
   assert.deepEqual(inboundSeriesVerdict(eigene(), { ...basis, start_datetime: '2035-01-31', end_datetime: '2035-01-31', all_day: true }, { zone: BERLIN }), fremd, 'ganztaegig geworden');
+});
+
+test('aendert der Anbieter nur das Ende, gilt es in der Lage der Eingabe, und die Marke bleibt', () => {
+  // Stand hier bis zur Review-Runde als "anderes Ende nimmt die Marke" - das
+  // hielt das Falsche fest: die Dauer sagt nichts darueber, wer Start und Regel
+  // verfasst hat, und die Zeile verlor den eingegebenen Tag samt Erinnerungen.
+  const kommt = { start_datetime: '2035-01-31T13:00:00Z', end_datetime: '2035-01-31T15:30:00Z', all_day: false, recurrence_rule: MONATSLETZTER };
+  assert.deepEqual(inboundSeriesVerdict(eigene(), kommt, { zone: BERLIN }),
+    { keep: true, authored: 1, end_datetime: '2035-01-15T16:30' }, 'die Dauer des Anbieters, am eingegebenen Tag');
+  // Mehrtaegig, mit Sekunden, ohne Ende beim Anbieter.
+  assert.equal(inboundSeriesVerdict(eigene(), { ...kommt, end_datetime: '2035-02-02T09:00:30Z' }, { zone: BERLIN }).end_datetime,
+    '2035-01-17T10:00:30');
+  assert.equal(inboundSeriesVerdict(eigene(), { ...kommt, end_datetime: null }, { zone: BERLIN }).end_datetime, null,
+    'der Anbieter fuehrt kein Ende: die Zeile dann auch nicht, hinaus geht der Start als Ende');
+  // Ganztaegig: Tage, keine Uhrzeit.
+  assert.deepEqual(
+    inboundSeriesVerdict(
+      eigene({ start_datetime: '2035-01-15', end_datetime: '2035-01-15', all_day: 1 }),
+      { start_datetime: '2035-01-31', end_datetime: '2035-02-02', all_day: true, recurrence_rule: MONATSLETZTER },
+      { zone: BERLIN },
+    ),
+    { keep: true, authored: 1, end_datetime: '2035-01-17' },
+  );
+  // Ueber die Zeitumstellung bleibt die Uhrzeit: 15. Maerz -> 31. Maerz.
+  const maerz = eigene({ start_datetime: '2035-03-15T14:00', end_datetime: '2035-03-15T15:00' });
+  assert.equal(inboundSeriesVerdict(maerz,
+    { start_datetime: '2035-03-31T12:00:00Z', end_datetime: '2035-03-31T14:30:00Z', all_day: false, recurrence_rule: MONATSLETZTER },
+    { zone: BERLIN }).end_datetime, '2035-03-15T16:30');
+  // Ein Zeitpunkt in der Zeile bleibt ein Zeitpunkt.
+  const zoniert = eigene({ start_datetime: '2035-01-15T13:00:00Z', end_datetime: '2035-01-15T14:00:00Z', tzid: BERLIN });
+  assert.equal(inboundSeriesVerdict(zoniert, kommt, { zone: BERLIN }).end_datetime, '2035-01-15T15:30:00Z');
 });
 
 test('derselbe Start ohne Verschiebung: der Anbieter gilt wie bisher, die Marke bleibt', () => {
@@ -395,6 +425,6 @@ test('eine gesendete Schreibweise der Regel ist dieselbe Regel', () => {
   assert.deepEqual(inboundSeriesVerdict(mitEnde, kommt, { zone: BERLIN }), { keep: false, authored: 0 });
   assert.deepEqual(
     inboundSeriesVerdict(mitEnde, kommt, { zone: BERLIN, sentRules: [`${MONATSLETZTER};UNTIL=20351231T225959Z`] }),
-    { keep: true, authored: 1 },
+    { keep: true, authored: 1, end_datetime: '2035-01-15T15:00' },
   );
 });

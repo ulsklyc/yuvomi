@@ -511,7 +511,7 @@ async function runSync({ makeClient } = {}) {
               start_datetime: ev.dtstart, end_datetime: ev.dtend, all_day: ev.allDay, recurrence_rule: ev.rrule,
             }, { zone: householdTimeZone(db.get()) });
             const when = verdict.keep
-              ? [existing.start_datetime, existing.end_datetime, existing.all_day, ev.location, existing.recurrence_rule, existing.tzid]
+              ? [existing.start_datetime, verdict.end_datetime, existing.all_day, ev.location, existing.recurrence_rule, existing.tzid]
               : [ev.dtstart, ev.dtend, ev.allDay ? 1 : 0, ev.location, ev.rrule, ev.tzid ?? null];
             db.get().prepare(`
               UPDATE calendar_events

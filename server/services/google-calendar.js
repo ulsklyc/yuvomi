@@ -1062,7 +1062,7 @@ function upsertGoogleEvents(items, calRefId = null, calColor = GOOGLE_COLOR, col
           : [],
       });
       const when = verdict.keep
-        ? [existing.start_datetime, existing.end_datetime, existing.all_day, location, existing.recurrence_rule, existing.tzid]
+        ? [existing.start_datetime, verdict.end_datetime, existing.all_day, location, existing.recurrence_rule, existing.tzid]
         : [startDt, endDt, allDay ? 1 : 0, location, rrule, tzid];
       const values = [title, description, ...when, evColor, calRefId, verdict.authored];
       db.get().prepare(`
