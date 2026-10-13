@@ -44,6 +44,7 @@ export const NAVIGATE_DEPS = Object.freeze([
   'hasLeaveGuard', 'mayLeave', 'whenHistorySettled', 'consumeOverlayMarker',
   // Sitzung
   'auth', 'syncPreferencesOnce', 'startThirdPartyModulePolling', 'loadReminderStyles', 'initReminders', 'initPush',
+  'armScreensaver',
   // Seite
   'rememberScrollPosition', 'scrollPositionFor', 'renderPage', 'adoptPageFab', 'updateNav', 'topLevelSection',
   'syncWallMode', 'applyModuleAccentForRoute', 'updateThemeColorForRoute', 'updateBranding',
@@ -136,6 +137,7 @@ export function createNavigate(state, deps) {
     location, history, window, document,
     hasLeaveGuard, mayLeave, whenHistorySettled, consumeOverlayMarker,
     auth, syncPreferencesOnce, startThirdPartyModulePolling, loadReminderStyles, initReminders, initPush,
+    armScreensaver,
     rememberScrollPosition, scrollPositionFor, renderPage, adoptPageFab, updateNav, topLevelSection,
     syncWallMode, applyModuleAccentForRoute, updateThemeColorForRoute, updateBranding,
     focusMainContentAfterNavigation, showToast, t,
@@ -245,6 +247,10 @@ export function createNavigate(state, deps) {
       if (typeof userOrPushState === 'object' && userOrPushState !== null) {
         state.currentUser = userOrPushState;
         state._setupRequired = false;
+        // Ab hier gibt es jemanden, dessen Bildschirmschoner es sein kann
+        // (#1919). VOR dem await: laeuft die Sitzung dabei ab, entschaerft
+        // `auth:expired` ihn wieder. Fuer jedes Konto, auch Gast und Display.
+        armScreensaver();
         await syncPreferencesOnce();
         startThirdPartyModulePolling();
         // currentUser kann während des await oben auf null gesetzt worden sein
@@ -342,6 +348,10 @@ export function createNavigate(state, deps) {
         try {
           const result = await auth.me();
           state.currentUser = result.user;
+          // Wie beim Anmelden oben (#1919). Hier wird auch ein gekoppeltes
+          // Wanddisplay scharf: es hat keine Nutzersitzung, aber `/auth/me`
+          // antwortet ihm mit seinem Konto.
+          armScreensaver();
           await syncPreferencesOnce();
           startThirdPartyModulePolling();
           // currentUser kann während des await oben auf null gesetzt worden sein

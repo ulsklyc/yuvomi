@@ -43,6 +43,7 @@ export const HARNESS_ROUTES = Object.freeze([
  * @param {{ search?: string, hash?: string }} [options.location]
  * @param {() => Promise<boolean>} [options.leaveGuard] - Verlassen-Schutz; fehlt er, gibt es keinen
  * @param {(route: object) => Promise<void>} [options.onRender] - haelt das Rendern an
+ * @param {() => void} [options.armScreensaver] - die echte Komponente statt der Attrappe (#1919)
  */
 export function createNavigateHarness({
   user = null,
@@ -54,6 +55,7 @@ export function createNavigateHarness({
   location = {},
   leaveGuard = null,
   onRender = null,
+  armScreensaver = null,
   routes = HARNESS_ROUTES,
 } = {}) {
   /** Was nach aussen sichtbar wurde, in der Reihenfolge des Geschehens. */
@@ -109,6 +111,7 @@ export function createNavigateHarness({
       env._disabledModules = new Set(disabledModules);
     },
     startThirdPartyModulePolling: () => {},
+    armScreensaver: () => { armScreensaver?.(); },
     loadReminderStyles: () => {},
     initReminders: () => {},
     initPush: () => {},

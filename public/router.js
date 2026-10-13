@@ -65,6 +65,7 @@ import {
   forgetScrollPositions,
 } from '/utils/scroll-restore.js';
 import { openModal, confirmModal } from '/components/modal.js';
+import { armScreensaver, disarmScreensaver } from '/components/photo-screensaver.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { prefersInkText } from '/utils/contrast.js';
 import { handleMasterDetailPopstate } from '/utils/master-detail.js';
@@ -660,6 +661,7 @@ const navigate = createNavigate(routerState, {
   location, history, window, document,
   hasLeaveGuard, mayLeave, whenHistorySettled, consumeOverlayMarker,
   auth: startHandoff.auth, syncPreferencesOnce, startThirdPartyModulePolling, loadReminderStyles, initReminders, initPush,
+  armScreensaver,
   rememberScrollPosition, scrollPositionFor, renderPage, adoptPageFab, updateNav, topLevelSection,
   syncWallMode, applyModuleAccentForRoute, updateThemeColorForRoute, updateBranding,
   focusMainContentAfterNavigation, showToast, t,
@@ -4533,6 +4535,11 @@ function forgetSessionState() {
   stopThirdPartyModulePolling();
   stopReminders();
   stopPush();
+  // Und der Foto-Bildschirmschoner (#1919): ohne Sitzung fragt er nichts mehr
+  // an - sein 401 zeichnete sonst die Anmeldeseite ueber ein halb
+  // ausgefuelltes Formular. Scharf macht ihn navigate(), sobald es wieder
+  // jemanden gibt.
+  disarmScreensaver();
 }
 
 // Session abgelaufen

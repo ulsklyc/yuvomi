@@ -167,6 +167,9 @@ async function page() {
     get: (path) => new Promise((resolve) => { requests.push({ path, resolve }); }),
   };
   component = await import('../public/components/photo-screensaver.js');
+  // The timer is armed by a session, not by loading (#1919; the session cases
+  // are in test-screensaver-idle.js). Every case here is a signed-in device.
+  component.armScreensaver();
   return component;
 }
 

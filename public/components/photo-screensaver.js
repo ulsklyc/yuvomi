@@ -19,6 +19,16 @@ let slideTimer;
 let clockTimer;
 let overlay;
 let run = 0;
+// SOMEBODY IS SIGNED IN ON THIS PAGE (#1919). This module loads from index.html
+// on every page, the sign-in and setup pages included, and there is nobody
+// there whose screensaver it could be: the photo request would answer 401,
+// api.js would fire `auth:expired`, and the router would draw the sign-in page
+// again over a form somebody is filling in. So nothing below arms the idle
+// timer until the router says a session exists (armScreensaver, called by
+// navigate() where it sets the current user), and forgetSessionState() takes
+// it back. "Somebody" includes a paired wall display: it has no user session,
+// but /auth/me answers it with an account of scope `display` (#1793).
+let armed = false;
 
 function stop() {
   run += 1;
@@ -34,7 +44,7 @@ function resetIdle(event) {
   const wasVisible = Boolean(overlay);
   stop();
   clearTimeout(idleTimer);
-  idleTimer = setTimeout(start, idleMs());
+  if (armed) idleTimer = setTimeout(start, idleMs());
   // A dismissing gesture belongs to the overlay and must not activate the
   // dashboard control underneath it (particularly important on wall tablets).
   if (wasVisible && event) {
@@ -151,6 +161,29 @@ async function start() {
   }
 }
 
+/**
+ * A session exists from here on: arm the idle timer, without a reload and
+ * without waiting for a gesture - the click that signed in came before the
+ * session did. Does nothing while already armed, so a second call neither
+ * pushes a running timer back nor takes a showing screensaver down.
+ */
+export function armScreensaver() {
+  if (armed) return;
+  armed = true;
+  resetIdle();
+}
+
+/**
+ * The session is gone, by sign-out or by expiry: take down what is showing,
+ * retire a start still waiting for its photos (so its catch arms nothing) and
+ * stay quiet until the next session.
+ */
+export function disarmScreensaver() {
+  armed = false;
+  stop();
+  clearTimeout(idleTimer);
+}
+
 /** Opens the real screensaver immediately for the admin configuration preview. */
 export async function preview() {
   stop();
@@ -171,24 +204,21 @@ window.addEventListener('pointermove', () => {
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) stop(); else resetIdle();
 });
-// The session is gone (api.js fires this before it throws on a 401): retire the
-// run, so the catch in start() arms nothing. This module also loads on the
-// sign-in and setup pages, where every knock would end the same way and make
-// the router draw the page again - once per idle period, for as long as the tab
-// stays open. The gesture that signs in arms the timer again.
-window.addEventListener('auth:expired', () => stop());
+// The session is gone (api.js fires this before it throws on a 401). The
+// router disarms on the same event through forgetSessionState(); listening
+// here as well keeps it independent of which of the two listeners runs first
+// and of a start() whose own request was the one that ended the session.
+window.addEventListener('auth:expired', disarmScreensaver);
 // A new delay re-arms the timer at once, so it applies without a reload. Only
 // while nothing is showing: the change comes from the settings page, and a
 // visible screensaver there is the admin preview, which stays until dismissed.
 new MutationObserver(() => {
   if (overlay) return;
   // stop() also retires a start() still waiting for its photos, so the re-armed
-  // timer cannot open a second overlay on top of it.
-  stop();
-  clearTimeout(idleTimer);
-  idleTimer = setTimeout(start, idleMs());
+  // timer cannot open a second overlay on top of it. resetIdle() arms only
+  // while somebody is signed in.
+  resetIdle();
 }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-screensaver-idle'] });
 // A delay chosen in another tab of this browser reaches this page through the
 // storage event and then takes the same path as above.
 window.addEventListener('storage', syncScreensaverIdleFromStorage);
-resetIdle();

@@ -121,6 +121,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Sign-in and setup: a form you are filling in is no longer cleared after a few minutes** (#1919).
+  The photo screensaver started its idle timer on every page, also where nobody is signed in. Once
+  the idle delay had passed it asked for its photos, was refused, and the app took that for an
+  expired session and drew the sign-in page again - over whatever had been typed so far. The
+  screensaver now waits for somebody to be signed in, or for a paired wall display, and stops when
+  you sign out. After signing in it is ready without a reload.
 - **Waste: an address that stops serving its calendar no longer wipes your pickups** (#1938). A
   subscribed waste calendar is fetched on its own. When the other side answered with something
   that holds no calendar entry - a maintenance or login page, an empty calendar - Yuvomi took

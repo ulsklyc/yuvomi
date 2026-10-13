@@ -13,6 +13,7 @@
 import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createNavigateHarness } from './router-navigate-harness.js';
 
 const idle = await import('../public/utils/screensaver-idle.js');
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
@@ -138,6 +139,7 @@ test('theme-init.js sets the delay before any module loads - and only a valid st
 // resets the component on a real device too.
 
 const listeners = {};
+const documentListeners = {};
 const toasts = [];
 const requests = [];
 const observers = [];
@@ -198,7 +200,7 @@ async function page() {
     body,
     hidden: false,
     createElement: makeElement,
-    addEventListener() {},
+    addEventListener: (name, handler) => { (documentListeners[name] ||= []).push(handler); },
     querySelectorAll: () => [],
   };
   globalThis.localStorage = pageStorage;
@@ -216,8 +218,27 @@ async function page() {
   return component;
 }
 
+// THE SESSION, THROUGH THE ROUTER'S OWN navigate() (#1919). Nobody arms the
+// component by hand here: signing in is `navigate('/', user)` from the sign-in
+// page, a page load with a running session is the auth guard answering
+// `/auth/me` - the real utils/router-navigate.js both times, with the real
+// component as its `armScreensaver`. Only the two ways out are played by hand,
+// because router.js cannot be imported: `auth:expired` as api.js fires it, and
+// `disarmScreensaver()` as forgetSessionState() calls it.
+const MEMBER = { id: 1, username: 'anna', role: 'member' };
+const DISPLAY = { id: 9, username: 'kitchen', role: 'member', access_scope: 'display' };
+const router = () => ({ armScreensaver: component.armScreensaver });
+const signIn = (user = MEMBER) => createNavigateHarness(router()).navigate('/', user);
+const loadWithSession = (user) => createNavigateHarness({ ...router(), sessionUser: user }).navigate('/', false);
+const loadWithoutSession = () => createNavigateHarness(router()).navigate('/', false);
+const sessionExpires = () => { for (const handler of listeners['auth:expired'] || []) handler({}); };
+const idlePeriods = async (count, ms) => {
+  for (let i = 0; i < count; i += 1) { mock.timers.tick(ms); await flush(); }
+};
+
 async function freshCase() {
   await page();
+  await signIn();
   gesture();
   await flush();
   assert.equal(overlays(), 0, 'every case starts without a screensaver');
@@ -225,8 +246,108 @@ async function freshCase() {
   toasts.length = 0;
 }
 
-// First among the component cases on purpose: the module is loaded once, and
-// every later case sets the attribute. Only here is it still missing, which is
+// FIRST OF ALL, AND BEFORE ANYBODY SIGNS IN (#1919): the page as index.html
+// loads it on /login and /setup. There is nobody whose screensaver it could be,
+// so nothing may leave the component - the answer would be a 401, api.js would
+// fire `auth:expired`, and the router would draw the sign-in page again over a
+// form somebody is filling in. Typing into that form is the gesture below.
+test('on a signed-out page no request leaves the component, however long it idles', async () => {
+  await page();
+  await idlePeriods(3, 300_000);
+  assert.equal(requests.length, 0, 'three idle periods after loading: nothing asked');
+
+  gesture();
+  for (const handler of listeners.keydown) handler({ preventDefault() {}, stopImmediatePropagation() {} });
+  await idlePeriods(10, 300_000);
+  assert.equal(requests.length, 0, 'ten idle periods after typing: still nothing asked');
+
+  // A tab that comes back to the front is no sign-in either.
+  for (const handler of documentListeners.visibilitychange || []) handler({});
+  await idlePeriods(3, 300_000);
+  assert.equal(requests.length, 0);
+
+  // And a page load that finds no session (the auth guard gets its 401 and
+  // sends the visitor to /login) arms nothing on the way.
+  await loadWithoutSession();
+  gesture();
+  await idlePeriods(3, 300_000);
+  assert.equal(requests.length, 0, 'a failed /auth/me is not a session');
+  assert.equal(overlays(), 0);
+});
+
+test('signing in arms the timer without a reload', async () => {
+  await page();
+  assert.equal(requests.length, 0);
+  // What pages/login.js does with the answer of /auth/login. No gesture after
+  // it: the click that sent the form came before the session existed.
+  await signIn();
+  mock.timers.tick(299_999);
+  assert.equal(requests.length, 0, 'not before the idle delay');
+  mock.timers.tick(1);
+  assert.equal(requests.length, 1, 'one idle period after signing in');
+  assert.equal(requests[0].path, '/screensaver/photos');
+  requests[0].resolve(PHOTOS);
+  await flush();
+  assert.equal(overlays(), 1, 'and the screensaver opens on the page that was loaded signed out');
+  gesture();
+  requests.length = 0;
+});
+
+// A page load with a running session never passes the sign-in page: the auth
+// guard asks /auth/me and that is where the session becomes known.
+test('a page that loads into a running session is armed by the auth guard', async () => {
+  await page();
+  sessionExpires();
+  gesture();
+  await idlePeriods(2, 300_000);
+  assert.equal(requests.length, 0, 'signed out again: nothing asked');
+
+  await loadWithSession(MEMBER);
+  mock.timers.tick(300_000);
+  assert.equal(requests.length, 1, 'armed by /auth/me, without a gesture');
+  requests[0].reject(new Error('later'));
+  await flush();
+  gesture();
+  requests.length = 0;
+});
+
+// A PAIRED DISPLAY HAS NO USER SESSION, BUT IT IS SOMEBODY (#1793). Its access
+// is its own cookie, and /auth/me answers with an account of scope `display` -
+// "signed in" must not mean "a person". The wall is the device the screensaver
+// was built for (#693), and nobody touches it: switched on by an administrator
+// it has to open on its own, and switched off while showing it has to come
+// down and ask again.
+test('a paired display is armed like a session and keeps its switch-on and switch-off', async () => {
+  await page();
+  sessionExpires();
+  await loadWithSession(DISPLAY);
+
+  mock.timers.tick(300_000);
+  assert.equal(requests.length, 1, 'the display asks after its idle delay, untouched');
+  requests[0].reject(new Error('Token scope does not permit this operation.'));
+  await flush();
+  assert.equal(overlays(), 0, 'switched off: the 403 shows nothing');
+
+  mock.timers.tick(300_000);
+  assert.equal(requests.length, 2, 'and knocks again one idle period later');
+  requests[1].resolve(PHOTOS);
+  await flush();
+  assert.equal(overlays(), 1, 'switched on in between: it opens without a touch');
+
+  const image = body.children.find((node) => node.className === 'photo-screensaver').children
+    .find((node) => node.tag === 'img');
+  image.onerror();
+  assert.equal(overlays(), 0, 'switched off while showing: no black wall');
+  mock.timers.tick(300_000);
+  assert.equal(requests.length, 3, 'and it asks again, still untouched');
+  requests[2].reject(new Error('Token scope does not permit this operation.'));
+  await flush();
+  gesture();
+  requests.length = 0;
+});
+
+// First among the cases that set the delay on purpose: the module is loaded
+// once, and every later case sets the attribute. Only here is it still missing, which is
 // the state of every device that never touched the setting.
 test('an untouched device waits five minutes', async () => {
   await freshCase();
@@ -443,34 +564,87 @@ test('an image that fails to load takes the overlay down and knocks again later'
   gesture();
 });
 
-// The component loads from index.html on the sign-in and setup pages too. There
-// the request answers 401, and api.js fires `auth:expired` before it throws -
-// which the router answers by drawing the sign-in page again. A re-arm after
-// that would repeat it every idle period for as long as the tab is open: one
-// request, one redraw of a form somebody may be filling in, one history entry.
-test('a request that ends the session does not knock again - the next gesture arms it', async () => {
+// The session ends under a running page: the request answers 401, and api.js
+// fires `auth:expired` before it throws - which the router answers by drawing
+// the sign-in page. From there on the page is a signed-out page (#1919): not
+// the next gesture arms the timer (that was #1793, and it left one request per
+// visit to the sign-in page), only the next session does.
+test('a request that ends the session disarms - no gesture, only the next sign-in arms it', async () => {
   await freshCase();
   pageRoot.setAttribute('data-screensaver-idle', '60');
   mock.timers.tick(60_000);
   assert.equal(requests.length, 1);
   // What api.js does on a 401: the event first, synchronously, then the throw.
-  for (const handler of listeners['auth:expired'] || []) handler({});
+  sessionExpires();
   requests[0].reject(new Error('Sitzung abgelaufen.'));
   await flush();
-  mock.timers.tick(10 * 60_000);
+  await idlePeriods(10, 60_000);
   assert.equal(requests.length, 1, 'ten idle periods later: still the one request');
   assert.equal(overlays(), 0);
 
-  // Signing in again takes a pointer or a key, and that arms the timer as ever.
+  // Filling in the sign-in form, a delay changed in another tab, a tab coming
+  // back to the front: none of them is a session.
   gesture();
+  await idlePeriods(3, 60_000);
+  pageRoot.setAttribute('data-screensaver-idle', '120');
+  await idlePeriods(3, 120_000);
+  pageRoot.setAttribute('data-screensaver-idle', '60');
+  for (const handler of documentListeners.visibilitychange || []) handler({});
+  await idlePeriods(3, 60_000);
+  assert.equal(requests.length, 1, 'the sign-in page asks for nothing');
+
+  await signIn();
   mock.timers.tick(59_999);
   assert.equal(requests.length, 1);
   mock.timers.tick(1);
-  assert.equal(requests.length, 2, 'one idle period after the gesture');
+  assert.equal(requests.length, 2, 'one idle period after signing in');
   requests[1].resolve(PHOTOS);
   await flush();
   assert.equal(overlays(), 1, 'and the screensaver opens for the new session');
   gesture();
+});
+
+// The other way out is the deliberate one: "Sign out" runs clearSession() and
+// never fires `auth:expired`. Both ways end in forgetSessionState(), which is
+// where the router disarms.
+test('signing out takes a showing screensaver down and disarms', async () => {
+  await freshCase();
+  pageRoot.setAttribute('data-screensaver-idle', '60');
+  mock.timers.tick(60_000);
+  requests[0].resolve(PHOTOS);
+  await flush();
+  assert.equal(overlays(), 1);
+
+  component.disarmScreensaver();
+  assert.equal(overlays(), 0, 'the photos of the household do not stay over the sign-in page');
+  gesture();
+  await idlePeriods(5, 60_000);
+  assert.equal(requests.length, 1, 'and nothing is asked after it');
+
+  // A start that was still waiting for its photos when the session went.
+  await signIn();
+  mock.timers.tick(60_000);
+  assert.equal(requests.length, 2);
+  component.disarmScreensaver();
+  requests[1].resolve(PHOTOS);
+  await flush();
+  assert.equal(overlays(), 0, 'a late answer opens nothing on a signed-out page');
+  await idlePeriods(3, 60_000);
+  assert.equal(requests.length, 2);
+  await signIn();
+  gesture();
+});
+
+// router.js cannot be imported (it hangs on the browser), so its half is read:
+// forgetSessionState() is the one function both ways out run through, and the
+// router hands the component's own arming to navigate().
+test('the router disarms where every session ends and hands navigate() the arming', () => {
+  const router = read('../public/router.js');
+  const forget = router.slice(router.indexOf('function forgetSessionState()'));
+  const body = forget.slice(0, forget.indexOf('\n}\n'));
+  assert.match(body, /^\s*disarmScreensaver\(\);$/m, 'forgetSessionState() disarms the screensaver');
+  assert.match(router, /import \{[^}]*\barmScreensaver\b[^}]*\bdisarmScreensaver\b[^}]*\} from '\/components\/photo-screensaver\.js';/);
+  assert.match(router, /createNavigate\(routerState, \{[^}]*\barmScreensaver\b[^}]*\}\)/);
 });
 
 test('the setting sits next to wall mode in Appearance, not under the Immich connection', () => {
