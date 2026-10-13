@@ -1053,8 +1053,10 @@ function upsertGoogleEvents(items, calRefId = null, calColor = GOOGLE_COLOR, col
       const verdict = inboundSeriesVerdict(existing, {
         start_datetime: startDt, end_datetime: endDt, all_day: allDay, recurrence_rule: rrule,
       }, {
-        // Dieselbe Zone, in der dieser Kalender die Wanduhrzeit hinausbekommt.
+        // Dieselbe Zone, in der dieser Kalender die Wanduhrzeit hinausbekommt -
+        // und in der `localEventToGoogle` deshalb ausrichtet.
         zone: outboundTimeZone(calTimeZone),
+        recurrenceZone: outboundTimeZone(calTimeZone),
         sentRules: existing.recurrence_rule
           ? [normalizeRecurrenceUntil(rruleValue(existing.recurrence_rule), !!existing.all_day)]
           : [],
@@ -1269,7 +1271,9 @@ function localEventToGoogle(rawEvent, colorMap = {}, timeZone = outboundTimeZone
   // Start und Ende mit der eigenen Wiederholungsregel in Einklang (#986), bevor
   // irgendein Feld daraus abgeleitet wird - ein importiertes DTSTART bleibt
   // unberuehrt (#756). Begruendung in services/outbound-dtstart.js.
-  const event = outboundEvent(rawEvent);
+  // Ausgerichtet wird in der Zone, die unten als `timeZone` hinausgeht: in
+  // ihr rechnet Google die Vorkommen, nicht in der `tzid` der Zeile (#1935).
+  const event = outboundEvent(rawEvent, { zone: timeZone });
   const allDay = !!event.all_day;
   const gEvent = {
     summary:     event.title,

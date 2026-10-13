@@ -232,6 +232,37 @@ test('der Ortstag zaehlt, wo er neben dem UTC-Tag liegt', () => {
   assert.deepEqual(spaet, { start_datetime: '2035-01-31T22:30:00Z', end_datetime: null });
 });
 
+test('ausgerichtet wird in der Zone, in der der Empfaenger die Serie rechnet', () => {
+  // 15. Januar 23:30 in New York = 16. Januar 04:30Z = 05:30 in Berlin.
+  const ev = {
+    start_datetime: '2035-01-16T04:30:00Z', end_datetime: '2035-01-16T04:45:00Z', tzid: 'America/New_York',
+    recurrence_rule: MONATSLETZTER, external_source: 'google', series_authored: 1,
+  };
+  // CalDAV, iCloud und der Feed geben `TZID=America/New_York` hinaus: der 31. dort.
+  assert.deepEqual(outboundDateRange(ev),
+    { start_datetime: '2035-02-01T04:30:00Z', end_datetime: '2035-02-01T04:45:00Z' });
+  // Google rechnet in der `timeZone`, die es mitbekommt. Der in New York
+  // ausgerichtete Zeitpunkt waere in Berlin der 1. Februar - neben der Regel.
+  assert.deepEqual(outboundDateRange(ev, { zone: 'Europe/Berlin' }),
+    { start_datetime: '2035-01-31T04:30:00Z', end_datetime: '2035-01-31T04:45:00Z' });
+  assert.equal(outboundEvent(ev, { zone: 'Europe/Berlin' }).start_datetime, '2035-01-31T04:30:00Z');
+  // Eine zonenlose Wanduhrzeit meint ihren Tag selbst; die Angabe aendert nichts.
+  const naiv = { start_datetime: '2035-01-15T23:30', recurrence_rule: MONATSLETZTER, series_authored: 1 };
+  assert.equal(outboundDateRange(naiv, { zone: 'America/New_York' }).start_datetime, '2035-01-31T23:30');
+});
+
+test('der Abruf erkennt das Echo in derselben Zone, in der hinaus ausgerichtet wurde', () => {
+  const zeile = {
+    start_datetime: '2035-01-16T04:30:00Z', end_datetime: '2035-01-16T04:45:00Z', all_day: 0, tzid: 'America/New_York',
+    recurrence_rule: MONATSLETZTER, series_authored: 1,
+  };
+  const kommt = { start_datetime: '2035-01-31T05:30:00+01:00', end_datetime: '2035-01-31T05:45:00+01:00', all_day: false, recurrence_rule: MONATSLETZTER };
+  assert.deepEqual(inboundSeriesVerdict(zeile, kommt, { zone: 'Europe/Berlin', recurrenceZone: 'Europe/Berlin' }),
+    { keep: true, authored: 1 });
+  assert.deepEqual(inboundSeriesVerdict(zeile, kommt, { zone: 'Europe/Berlin' }), { keep: false, authored: 0 },
+    'ohne die Angabe waere es der in New York ausgerichtete Start, und der kam nicht zurueck');
+});
+
 test('ein Zeitpunkt mit Zone bleibt ohne die Marke stehen (#756)', () => {
   const ev = {
     start_datetime: '2035-01-15T13:00:00Z', end_datetime: '2035-01-15T14:00:00Z', tzid: 'Europe/Berlin',

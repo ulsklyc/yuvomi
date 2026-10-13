@@ -51,7 +51,7 @@ const google        = await import('../server/services/google-calendar.js');
 const caldavSync    = await import('../server/services/caldav-sync.js');
 const appleCalendar = await import('../server/services/apple-calendar.js');
 const { default: calendarRouter } = await import('../server/routes/calendar.js');
-const { localToUTCPrecise, storedToInstantMsPrecise } = await import('../server/utils/timezone.js');
+const { localToUTCPrecise, storedToInstantMsPrecise, utcToWall } = await import('../server/utils/timezone.js');
 
 db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('admin','Admin','x','admin')").run();
 
@@ -240,10 +240,10 @@ const PROVIDERS = {
     },
     pushes() { return this.calendar.patches.length; },
     /** Legt einen Eintrag ab, als hätte ihn jemand in Google angelegt. */
-    seedForeign({ start, end, rrule }) {
+    seedForeign({ start, end, rrule, zone = ZONE }) {
       this.calendar.held.set('foreign-1935', {
         id: 'foreign-1935', status: 'confirmed', summary: 'Fremd',
-        start: { dateTime: start, timeZone: ZONE }, end: { dateTime: end, timeZone: ZONE },
+        start: { dateTime: start, timeZone: zone }, end: { dateTime: end, timeZone: zone },
         recurrence: [`RRULE:${rrule}`],
       });
       return () => googleWhen(this.calendar.held.get('foreign-1935'));
@@ -537,6 +537,35 @@ for (const name of Object.keys(PROVIDERS)) {
     assert.equal(taken.series_authored, 0, 'Start und Regel sind jetzt die des Anbieters');
   });
 }
+
+// ── Die Zone, in der der Anbieter die Serie rechnet ─────────────────────────────
+//
+// Google bekommt neben dem Zeitpunkt eine `timeZone` und rechnet die Vorkommen
+// in IHR - das ist die Zone des Haushalts bzw. des Kalenders, nicht die `tzid`
+// der Zeile. Eine eingelesene Serie aus einer anderen Zone, deren Regel in
+// Yuvomi geändert wird, muss deshalb in der Zone ausgerichtet werden, die
+// hinausgeht: 23:30 in New York ist in Berlin und in UTC schon der Folgetag.
+
+test(`Google [${ZONE}] eine Serie aus einer anderen Zone wird in der Zone ausgerichtet, die hinausgeht`, async () => {
+  const p = provider('Google');
+  // 15. Januar 23:30 in New York = 16. Januar 04:30 UTC = 05:30 in Berlin.
+  p.seedForeign({
+    start: '2035-01-15T23:30:00', end: '2035-01-15T23:45:00', rrule: 'FREQ=MONTHLY', zone: 'America/New_York',
+  });
+  await p.sync();
+  const imported = db.prepare("SELECT * FROM calendar_events WHERE title = 'Fremd'").get();
+  assert.equal(imported.tzid, 'America/New_York');
+
+  await editTitle(p, imported.id, { recurrence_rule: LAST_DAY });
+  const { start, end } = p.calendar.patches.at(-1).requestBody;
+  assert.equal(start.timeZone, ZONE, 'Google rechnet die Serie in dieser Zone');
+  const dayIn = (when) => utcToWall(new Date(when.dateTime).toISOString(), when.timeZone);
+  assert.equal(dayIn(start).date, '2035-01-31',
+    `der Start liegt in ${ZONE} auf dem Monatsletzten, sonst trifft er die eigene Regel dort nicht`);
+  // Dieselbe Uhrzeit wie vorher, in der Zone, die hinausgeht; die Dauer bleibt.
+  assert.equal(dayIn(start).time, utcToWall('2035-01-16T04:30:00Z', ZONE).time);
+  assert.equal(Date.parse(end.dateTime) - Date.parse(start.dateTime), 15 * 60000);
+});
 
 // ── Migration 246: der Bestand ──────────────────────────────────────────────────
 

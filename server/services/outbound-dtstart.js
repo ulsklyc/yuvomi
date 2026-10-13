@@ -106,11 +106,21 @@ export function outboundStartDatetime(event) {
  * Termin stuende eine Stunde daneben. Heraus kommt wieder ein Zeitpunkt
  * (`...Z`): dieselbe Wanduhrzeit, am ersten Tag, den die Regel trifft.
  *
+ * WELCHE ZONE: die, in der der EMPFAENGER die Serie rechnet. CalDAV, iCloud
+ * und der Feed geben eine solche Serie mit `TZID=<tzid der Zeile>` hinaus
+ * (`eventDateTimeFields`), dort ist es die Zone der Zeile. Google bekommt
+ * neben dem Zeitpunkt eine eigene `timeZone` (Haushalt bzw. Kalender) und
+ * rechnet die Vorkommen in IHR: 23:30 in New York ist in Berlin der Folgetag,
+ * und ein in New York ausgerichteter Start laege bei Google wieder neben
+ * `BYMONTHDAY=-1`. Der Aufrufer nennt sie deshalb, wo sie von der Zeile
+ * abweicht.
+ *
+ * @param {object} event
+ * @param {string} zone  IANA-Zone, in der die Vorkommen gerechnet werden
  * @returns {{ start_datetime: string, end_datetime: string|null }|null} null,
- *   wenn dieser Weg nicht gilt oder nichts zu begradigen ist
+ *   wenn nichts zu begradigen ist
  */
-function zonedDateRange(event) {
-  const zone = event.tzid;
+function zonedDateRange(event, zone) {
   const wandStart = utcToWall(event.start_datetime, zone);
   if (!wandStart) return null;
   const ziel = seriesStartFor(wandStart.date, event.recurrence_rule);
@@ -158,14 +168,20 @@ function verschiebe(wert, tage) {
  * gespeicherte Format (naiv, `Z`, Offset) bleibt, wie es war. Dieselbe Zusage
  * wie in der Expansion: die DAUER gehoert dem Termin, das Datum der Regel.
  *
+ * @param {object} event
+ * @param {{ zone?: string|null }} [options]  `zone`: die Zone, in der der
+ *   Empfaenger die Serie rechnet, wenn es nicht die `tzid` der Zeile ist
+ *   (Google). Gelesen wird sie nur fuer einen Start, der ein Zeitpunkt ist;
+ *   eine zonenlose Wanduhrzeit meint ihren Tag selbst.
  * @returns {{ start_datetime: string, end_datetime: string|null }}
  */
-export function outboundDateRange(event) {
+export function outboundDateRange(event, { zone = null } = {}) {
   const roh = event?.start_datetime;
   const ende = event?.end_datetime ?? null;
   const unveraendert = { start_datetime: roh, end_datetime: ende };
   if (!roh || !event?.recurrence_rule || !istEigen(event)) return unveraendert;
-  if (hasExplicitZone(roh) && isValidTimeZone(event.tzid)) return zonedDateRange(event) ?? unveraendert;
+  const rechenZone = zone || event.tzid;
+  if (hasExplicitZone(roh) && isValidTimeZone(rechenZone)) return zonedDateRange(event, rechenZone) ?? unveraendert;
   const start = seriesStartFor(roh, event.recurrence_rule, { utcDiffersFromLocal: zonenUnsicher(event) });
   if (!start || start === roh) return unveraendert;
   const tage = tagesDifferenz(String(event.start_datetime).slice(0, 10), String(start).slice(0, 10));
@@ -181,9 +197,9 @@ export function outboundDateRange(event) {
  * importiert, dreht die Schichtung um. So sagt jeder ausgehende Pfad an seiner
  * eigenen Zeile, dass er sie anwendet.
  */
-export function outboundEvent(event) {
+export function outboundEvent(event, options) {
   if (!event) return event;
-  return { ...event, ...outboundDateRange(event) };
+  return { ...event, ...outboundDateRange(event, options) };
 }
 
 
@@ -269,10 +285,12 @@ export function startOrRuleChanged(before, after, zone) {
  *   recurrence_rule, tzid, series_authored)
  * @param {{start_datetime: string, end_datetime: ?string, all_day: boolean|number, recurrence_rule: ?string}} incoming
  *   was der Abruf in die Zeile schreiben wuerde
- * @param {{ zone: string, sentRules?: Array<?string> }} options  Zone des Haushalts
+ * @param {{ zone: string, sentRules?: Array<?string>, recurrenceZone?: string|null }} options
+ *   `zone`: Zone des Haushalts; `recurrenceZone`: dieselbe Angabe, die der
+ *   ausgehende Weg dieses Anbieters an `outboundDateRange` gibt
  * @returns {{ keep: boolean, authored: 0|1 }}
  */
-export function inboundSeriesVerdict(stored, incoming, { zone, sentRules = [] } = {}) {
+export function inboundSeriesVerdict(stored, incoming, { zone, sentRules = [], recurrenceZone = null } = {}) {
   const fremd = { keep: false, authored: 0 };
   if (!istEigen(stored)) return fremd;
   const allDay = !!stored.all_day;
@@ -281,7 +299,7 @@ export function inboundSeriesVerdict(stored, incoming, { zone, sentRules = [] } 
   const gleicheRegel = [stored.recurrence_rule, ...sentRules].some((regel) => ruleKey(regel) === kommt);
   if (!gleicheRegel) return fremd;
 
-  const hinaus = outboundDateRange(stored);
+  const hinaus = outboundDateRange(stored, { zone: recurrenceZone });
   if (!sameStart(incoming.start_datetime, hinaus.start_datetime, zone, allDay)) return fremd;
   if (hinaus.start_datetime === stored.start_datetime) return { keep: false, authored: 1 };
   // Ohne Ende gibt jeder ausgehende Weg den Start als Ende hinaus.
