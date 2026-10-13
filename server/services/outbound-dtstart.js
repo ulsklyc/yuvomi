@@ -227,18 +227,17 @@ function ruleKey(rule) {
  * Haushalts und der Zeitpunkt des Anbieters. Am Text verglichen waere jede
  * Bearbeitung eines eingelesenen Termins eine Startaenderung - das Formular
  * schickt die Wanduhrzeit zurueck, in der Zeile steht der Zeitpunkt.
- * Ganztaegig zaehlt der Tag, sonst der Zeitpunkt.
- *
- * `toMinute`: nur die Minute zaehlt, Sekunden und Bruchteile fallen weg
- * (abgeschnitten, nicht gerundet - so zeigt sie auch das Formular).
+ * Ganztaegig zaehlt der Tag, sonst der Zeitpunkt AUF DIE MINUTE: Sekunden und
+ * Bruchteile fallen weg (abgeschnitten, nicht gerundet - so zeigt sie auch das
+ * Formular, der einzige Aufrufer ist die Bearbeitung in Yuvomi).
  */
-function sameStart(a, b, zone, allDay, { toMinute = false } = {}) {
+function sameStart(a, b, zone, allDay) {
   if (a == null || b == null) return a == null && b == null;
   if (allDay) return String(a).slice(0, 10) === String(b).slice(0, 10);
   const links = storedToInstantMsPrecise(a, zone);
   const rechts = storedToInstantMsPrecise(b, zone);
   if (links === null || rechts === null) return false;
-  return toMinute ? Math.floor(links / 60000) === Math.floor(rechts / 60000) : links === rechts;
+  return Math.floor(links / 60000) === Math.floor(rechts / 60000);
 }
 
 /**
@@ -258,6 +257,19 @@ function sameStart(a, b, zone, allDay, { toMinute = false } = {}) {
  * Marke und ginge mit einem anderen DTSTART zurueck. Eine Minute Unterschied
  * bleibt eine Aenderung.
  *
+ * DIE ZONE IST DIE, IN DER DIE ROUTE SPEICHERT. Die zonenlose Eingabe des
+ * Formulars landet Ziffer fuer Ziffer in der Spalte, und jeder Leser auf dem
+ * Server nimmt sie als Wanduhrzeit von `householdTimeZone()`; die Route gibt
+ * hier dieselbe Angabe herein, mit der sie den Wert formt (`zoneOpts`).
+ * OFFEN (Review zu #1953, nicht geloest): hat der Haushalt KEINE Zone gewaehlt
+ * und laeuft der Browser in einer anderen Zone als der Server, zeigt das
+ * Formular einen eingelesenen Zeitpunkt in der Browserzone und schickt diese
+ * Ziffern zurueck. Der Server liest sie in seiner Zone: schon die gespeicherte
+ * Zeit ist dann eine andere (so auch vor #1935, der Termin wandert beim
+ * Anbieter um den Versatz), und der Vergleich hier sieht folgerichtig einen
+ * anderen Start und setzt die Marke. Die Browserzone kommt in der Anfrage
+ * nicht vor; ohne sie laesst sich das hier nicht unterscheiden.
+ *
  * @param {object} before  Zeile vor der Bearbeitung
  * @param {{start_datetime: string, all_day: number|boolean, recurrence_rule: ?string}} after
  * @param {string} zone    Zone des Haushalts (`householdTimeZone`)
@@ -266,7 +278,7 @@ function sameStart(a, b, zone, allDay, { toMinute = false } = {}) {
 export function startOrRuleChanged(before, after, zone) {
   if (ruleKey(before?.recurrence_rule) !== ruleKey(after?.recurrence_rule)) return true;
   if (!!before?.all_day !== !!after?.all_day) return true;
-  return !sameStart(before?.start_datetime, after?.start_datetime, zone, !!after?.all_day, { toMinute: true });
+  return !sameStart(before?.start_datetime, after?.start_datetime, zone, !!after?.all_day);
 }
 
 /**
