@@ -382,9 +382,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lay on the time and date for eight seconds; it now sits directly below them and still clear of
   the timer buttons, and on wider screens it stays where it was, next to the clock. Any later
   message on the wall keeps the clock and the footer free in the same way. "Who's up today" was
-  never cut off, but the footer that stays at the bottom covered faces behind a hard edge; the
-  content now fades out softly above the footer while there is more to scroll to, and nothing is
-  covered once you reach the end.
+  never cut off, but the footer that stays at the bottom covered faces behind a hard edge; on a
+  phone the content now fades out softly above the footer, and at the end of the list the last
+  entry stands clear of it. On a tablet or a wall display the layout is unchanged.
 
 ## [2.76.0] - 2026-10-11
 

@@ -5459,8 +5459,9 @@ button.today-cockpit__more--link {
    * zwei Metern ablesbar sein, ohne der Uhr den Rang abzulaufen. */
   --wall-timer:      clamp(var(--text-4xl), 7vw, var(--text-5xl));
 
-  /* Der Abstand zwischen Uhr, Buehne und Fuss. Als Variable, weil die
-   * Scroll-Kante des Fusses genau diesen Streifen fuellt (`.wall__foot::before`). */
+  /* Der Abstand zwischen Uhr, Buehne und Fuss. Als Variable, weil der Fuss
+   * aus ihm die Hoehe seiner Scroll-Kante und seinen Endabstand rechnet
+   * (`.wall__foot`, #1917). */
   --wall-gap:        clamp(var(--space-4), 3vmin, var(--space-8));
 
   display: flex;
@@ -6072,16 +6073,43 @@ button.today-cockpit__more--link {
    * (layout.css, Leiste ausgeblendet) - dieselbe Regel wie jede klebende
    * Fusszeile im Inhalt (test:mobile-chrome).
    *
-   * OBEN HAT ER KEIN POLSTER MEHR (#1917): dort stand ein deckender Streifen
-   * von `--space-2` mit Gegenrand, und er machte die Oberkante hart. Den
-   * Streifen ueber den Knoepfen fuellt jetzt die Scroll-Kante darunter; die
-   * Knoepfe stehen, wo sie standen. */
+   * OBEN HAT ER KEIN POLSTER MEHR, DAFUER DEN ENDABSTAND DER FLAECHE (#1917).
+   * Dort stand ein deckender Streifen von `--space-2` mit Gegenrand, und er
+   * machte die Oberkante hart. Jetzt haelt der Fuss zum Inhalt davor genau die
+   * Hoehe seiner Scroll-Kante: der Abstand der Flaeche (`gap`) plus dieser
+   * Rand ergeben `--wall-foot-edge`. Am Scrollende und bei passender Wand
+   * steht der letzte Eintrag damit frei UEBER der Kante.
+   *
+   * ER WOHNT HIER UND NICHT AM SCROLLPORT (`.app-content`): ein Nachlauf dort
+   * laege HINTER dem Fuss. Der Fuss klebt nur innerhalb der Flaeche; endete
+   * die Flaeche ueber der Unterkante des Scrollports, hoebe sie den Fuss am
+   * Scrollende mit an, und die Kante laege weiter auf der letzten Zeile. Der
+   * Endabstand des Inhalts ist der Abstand VOR dem Fuss.
+   *
+   * `--wall-foot-edge` IST DIE EINE ZAHL FUER BEIDES: die Kante liest sie als
+   * Hoehe, der Rand hier als Endabstand - sie koennen nicht auseinanderlaufen.
+   * Auf der Wand ist sie der Abstand der Flaeche selbst: der Rand ist dann 0,
+   * die Flaeche keinen Pixel hoeher als zuvor (1280x800 passt weiter - eine
+   * Wand scrollt nicht), und die Kante liegt im leeren Streifen. Am Telefon
+   * hebt die Containerregel darunter sie auf die Hoehe eines Gesichts. */
+  --wall-foot-edge: var(--wall-gap);
+
   position: sticky;
   bottom: var(--nav-tail);
   z-index: 1;
-  margin-block: 0 calc(-1 * var(--wall-pad));
+  margin-block: calc(var(--wall-foot-edge) - var(--wall-gap)) calc(-1 * var(--wall-pad));
   padding-block: 0 max(var(--wall-pad), var(--safe-area-inset-bottom));
   background: var(--color-bg);
+}
+
+/* Das Telefon - dieselbe Grenze wie bei Zeilentitel und Zeitspanne oben:
+ * schmaler als jedes Wandtablet, alles gestapelt, die Flaeche scrollt ohnehin
+ * (`wallIsStacked`). Nur dort kostet der Endabstand nichts, was die Wand
+ * braucht, und nur dort verdeckte der Fuss Gesichter. */
+@container wall (max-width: 519px) {
+  .wall__foot {
+    --wall-foot-edge: var(--space-12);
+  }
 }
 
 /* DIE SCROLL-KANTE DES FUSSES (#1917). Am Telefon ist die Flaeche laenger als
@@ -6091,13 +6119,15 @@ button.today-cockpit__more--link {
  * Abgeschnitten war nichts - es fehlte die Kante. Jetzt laeuft der Inhalt in
  * einem Verlauf vom Grund der Flaeche unter die Leiste aus.
  *
- * DIE GRUNDFORM FUELLT GENAU DEN ABSTAND DER FLAECHE (`--wall-gap`) UEBER DEM
- * FUSS, nicht mehr. Das ist der Streifen, in dem am Scrollende und bei
- * passender Wand ohnehin nichts steht: dort liegt der Verlauf auf seinem
- * eigenen Grund und ist unsichtbar. Sie braucht keinen Zustand und kein
- * Skript, und sie verdeckt am Ende des Scrollwegs keine Zeile.
+ * EINE FESTE KANTE, IN JEDEM BROWSER DIESELBE (`--wall-foot-edge`): am Telefon
+ * so hoch wie ein Gesicht. Niedriger traegt sie dort nicht - mit dem Abstand
+ * der Flaeche allein (16px) sah man von ihr nichts, sobald die Kante des
+ * Fusses in eine Luecke zwischen zwei Zeilen fiel (gemessen 390x844). Sie
+ * braucht keinen Zustand, kein Skript und keine Bewegung: der Endabstand des
+ * Fusses ist genau ihre Hoehe, am Ende des Scrollwegs und bei passender Wand
+ * liegt sie also auf leerem Grund derselben Farbe und ist unsichtbar.
  *
- * Kein Tipp bleibt an ihm haengen (`pointer-events: none`). Die Farbe ist die
+ * Kein Tipp bleibt an ihr haengen (`pointer-events: none`). Die Farbe ist die
  * des Grundes selbst, in beiden Themen und nachts dieselbe Variable; es
  * entsteht keine neue Flaeche und kein Licht (DESIGN.md, Der Wand-Modus:
  * genau ein gefuellter Traeger). Die Achse ist die Blockachse, in RTL gleich. */
@@ -6106,37 +6136,9 @@ button.today-cockpit__more--link {
   position: absolute;
   inset-inline: 0;
   inset-block-end: 100%;
-  block-size: var(--wall-gap);
+  block-size: var(--wall-foot-edge);
   background: linear-gradient(to bottom, transparent, var(--color-bg));
   pointer-events: none;
-}
-
-/* SOLANGE ES WEITERGEHT, REICHT DIE KANTE HOEHER. Der Abstand allein ist am
- * Telefon 16px: faellt die Kante des Fusses in eine Luecke zwischen zwei
- * Zeilen, sieht man von ihr nichts (gemessen 390x844, die Kante lag unter der
- * Aufgabenzeile der zweiten Person). `--wall-foot-edge` hebt den Verlauf
- * deshalb auf die Hoehe eines Gesichts - und nimmt ihn auf den letzten Pixeln
- * des Scrollwegs im Gleichschritt mit dem Scrollen auf die Grundform zurueck,
- * damit er am Ende nichts verdeckt. Seine Oberkante steht dabei still auf dem
- * Inhalt; es bewegt sich nichts, was nicht der Finger bewegt.
- *
- * Die Zeitachse ist der Scrollweg der Flaeche, keine Uhr. Passt die Wand ins
- * Bild, gibt es keinen Scrollweg, die Achse ist inaktiv und es gilt die
- * Grundform - also auch auf dem Wandtablet, fuer das die Flaeche gebaut ist.
- * Ein Browser ohne scrollgetriebene Animationen (Firefox, Safari vor 26)
- * behaelt ebenfalls die Grundform: eine Kante weniger hoch, kein Fehler. */
-@supports (animation-timeline: scroll()) {
-  .wall__foot::before {
-    --wall-foot-edge: var(--space-12);
-    animation: wall-foot-edge linear both;
-    animation-timeline: scroll(nearest block);
-    animation-range: calc(100% - (var(--wall-foot-edge) - var(--wall-gap))) 100%;
-  }
-}
-
-@keyframes wall-foot-edge {
-  from { block-size: var(--wall-foot-edge); }
-  to { block-size: var(--wall-gap); }
 }
 
 .wall__foot > :first-child {

@@ -3781,10 +3781,12 @@ Oben steht die Uhr; sie nimmt keinen Tipp, ist aber Sperrzone (#1917), und wo de
 traefe, rueckt er direkt unter das Datum. Die Lage neben einem offenen Dialog (`[data-dock]`)
 bleibt Sache der Ausweich-Regel des Toast-Stapels. **Der klebende Fuss hat eine Scroll-Kante**
 (#1917): ueber ihm laeuft der Inhalt in einem Verlauf zum Grund der Flaeche aus, statt an einer
-unsichtbaren harten Kante mitten im Gesicht zu enden. Die Grundform fuellt genau `--wall-gap`,
-den Streifen, in dem am Scrollende nichts steht; wo der Browser scrollgetriebene Animationen
-kann, reicht sie in Ruhe `--space-12` hoch und geht auf den letzten Pixeln des Scrollwegs auf
-die Grundform zurueck. Kein Zustand, kein Skript, kein Tipp bleibt an ihr haengen.
+unsichtbaren harten Kante mitten im Gesicht zu enden. Sie ist statisch, in jedem Browser
+dieselbe, und ihre Hoehe `--wall-foot-edge` ist zugleich der Endabstand vor dem Fuss: am
+Scrollende steht der letzte Eintrag frei ueber ihr. Auf der Wand ist sie der Abstand der
+Flaeche selbst (`--wall-gap`, die Flaeche wird keinen Pixel hoeher), am Telefon (Flaeche unter
+520px, dieselbe Grenze wie beim Zeilentitel) `--space-12`, die Hoehe eines Gesichts. Kein
+Zustand, kein Skript, keine Bewegung, kein Tipp bleibt an ihr haengen.
 
 **Die Startknoepfe der Kuechenuhr ruhen sichtbar, und die erste Beruehrung weckt nur**
 (2026-09-23). Unsichtbare Knoepfe, die trotzdem auf Beruehrung reagierten, waren eine Falle:
