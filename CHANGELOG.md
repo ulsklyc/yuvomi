@@ -172,12 +172,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deleted the type, schedule, pickup or source in the meantime, the note says so, an open dialog
   closes and the page fetches the current state by itself. Deleting something that is already
   deleted, or resetting a pickup that is already back on its day, simply succeeds. Saving a
-  reminder with an emptied time field no longer ends in a server error. Not yet covered: the ICS
-  import, the mapping profile and URL sources still show the server's text. For API clients: the
-  affected answers of `/api/v1/waste` carry a `reason` next to `error` (`waste_*_not_found`,
-  `waste_type_in_use`, `waste_pickup_exists`, `waste_schedule_*`, `waste_pickup_date_invalid`,
-  `waste_override_*`, `waste_reminder_*`, listed in the OpenAPI description); status codes and
-  `error` texts are unchanged, except that an empty `delivery_time` on
+  reminder with an emptied time field no longer ends in a server error. The ICS import, the
+  mapping profile and sources with an address say it the same way, with the number where the
+  cause has one: a calendar larger than the upload limit, with more entries, pickups or labels
+  than the import takes, an address that is none or does not start with https://, an interval
+  out of range, a source that is being refreshed right now. A calendar that could not be fetched
+  says why by its kind - the address answered but delivered no calendar, the calendar is too
+  large, the address is on a private network, or it cannot be reached - instead of
+  "Fetching the source URL failed: HTTP 404". A file over the limit is refused before it is
+  sent. If only the type you picked in a dialog is gone (a schedule, a one-off pickup, a mapping
+  of a source, an import decision), the dialog stays open with everything you entered, the list
+  of types is fetched again and the focus is on it; nothing else is chosen in its place. The
+  failure text a source keeps from its last automatic fetch, shown in the source dialog, is
+  still the server's. For API clients: the affected answers of `/api/v1/waste` carry a `reason`
+  next to `error` (`waste_*_not_found`, `waste_type_in_use`, `waste_pickup_exists`,
+  `waste_schedule_*`, `waste_pickup_date_invalid`, `waste_override_*`, `waste_reminder_*`,
+  `waste_import_*`, `waste_profile_*`, `waste_source_*`, listed in the OpenAPI description), and
+  `params` with the number where the cause has one (`{ "limit_mb": 5 }`); a refresh or create
+  that ends with `outcome: "error"` names the class of the failed fetch as `reason` in `data`.
+  Status codes and `error` texts are unchanged, except that an empty `delivery_time` on
   `PUT /waste/reminder-settings/{typeId}` now answers 400 instead of 500.
 - **Two texts no longer suggest that wall mode follows the arrangement of the overview** (#1908).
   Wall mode always shows the same four things - the time, today's schedule, who's up today and

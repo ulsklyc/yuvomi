@@ -18,7 +18,12 @@ export function wasteErrorResponse(res, err) {
   // #1909); `error` stays the English sentence for logs and API consumers. A typed
   // error without a reason (validation only an API caller triggers) sends none.
   if (err instanceof WasteValidationError) {
-    res.status(400).json({ error: err.errors.join(' '), code: 400, ...(err.reason && { reason: err.reason }) });
+    res.status(400).json({
+      error: err.errors.join(' '), code: 400,
+      ...(err.reason && { reason: err.reason }),
+      // The numbers of the cause (a limit in MB, a count), for the client's sentence.
+      ...(err.reason && err.params && { params: err.params }),
+    });
     return true;
   }
   if (err instanceof WasteConflictError) {

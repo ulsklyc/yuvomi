@@ -290,6 +290,29 @@ test('events outside the import window are silently excluded from candidates', (
 
 test('rejects an empty file', () => {
   assert.throws(() => buildImportPreview('', { today: TODAY }), WasteImportError);
+  assert.throws(() => buildImportPreview('', { today: TODAY }), (err) => err.code === 'empty_file' && err.params === null);
+});
+
+// #1909: a limit carries itself as a number, so the client can put it into its
+// own sentence. The number is the constant the check compares against.
+test('every limit names itself as a number next to its code', () => {
+  const thrown = (ics) => {
+    try { buildImportPreview(ics, { today: TODAY }); } catch (err) { return err; }
+    return null;
+  };
+  const events = (n, line) => vcalendar(Array.from({ length: n }, (_, i) => line(i)));
+  const anchor = shiftDateKey(TODAY, -IMPORT_WINDOW_PAST_DAYS).replace(/-/g, '');
+  for (const [ics, code, params] of [
+    ['X'.repeat(MAX_ICS_BYTES + 1), 'file_too_large', { limit_mb: Math.round(MAX_ICS_BYTES / (1024 * 1024)) }],
+    [events(MAX_VEVENTS + 1, (i) => `BEGIN:VEVENT\r\nUID:p-${i}@x\r\nSUMMARY:R\r\nDTSTART;VALUE=DATE:20260701\r\nEND:VEVENT`), 'event_cap_exceeded', { limit: MAX_VEVENTS }],
+    [events(MAX_DISTINCT_LABELS + 1, (i) => `BEGIN:VEVENT\r\nUID:p-${i}@x\r\nSUMMARY:L${i}\r\nCATEGORIES:L${i}\r\nDTSTART;VALUE=DATE:20260701\r\nEND:VEVENT`), 'label_cap_exceeded', { limit: MAX_DISTINCT_LABELS }],
+    [events(6, (i) => `BEGIN:VEVENT\r\nUID:p-${i}@x\r\nSUMMARY:R\r\nDTSTART;VALUE=DATE:${anchor}\r\nRRULE:FREQ=DAILY;COUNT=1500\r\nEND:VEVENT`), 'instance_cap_exceeded', { limit: MAX_CANDIDATE_INSTANCES }],
+  ]) {
+    const err = thrown(ics);
+    assert.ok(err instanceof WasteImportError, code);
+    assert.equal(err.code, code);
+    assert.deepEqual(err.params, params, code);
+  }
 });
 
 test('rejects a file over the upload byte limit', () => {

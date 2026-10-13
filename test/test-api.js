@@ -882,6 +882,11 @@ const REASONS_PASSED_THROUGH = new Map([
   // preview_changed, source_changed, refresh_in_progress, waste_type_in_use,
   // waste_pickup_exists) oder 404 (WasteNotFoundError). Eine 403 gibt es dort nicht.
   ['routes/waste/helpers.js: err.reason', { sites: 3, at403: [], why: 'feste 400, 409 oder 404' }],
+  // classifyFetchFailure (#1909): die Klasse eines gescheiterten Abrufs einer
+  // Quelle mit Adresse, aus einem WasteFetchError oder aus der Validierung der
+  // gespeicherten Adresse. Sie reist als 502 (Vorschau/Uebernahme) oder im
+  // Rumpf einer 200/201 mit `outcome: 'error'` - nie an einer 403.
+  ['services/waste-url-source.js: err.reason', { sites: 2, at403: [], why: 'Rueckgabewert einer Einordnung, wird zur 502 oder zu outcome error' }],
   // validateOneOff reicht den Grund seiner Pruefung (waste_pickup_date_invalid)
   // an den Store, der daraus einen WasteValidationError baut: keine Antwort,
   // und am Ende eine 400.

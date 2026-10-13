@@ -125,14 +125,29 @@ const answer = (status, error, reason) => Object.assign(new Error(error), {
 });
 const SERVER_TEXT = 'Ein Satz des Servers, den kein Nutzer lesen soll.';
 
+// Ein Fall mit Zahlen (CASE_PARAMS) bekommt sie in der Antwort mit; der
+// Test-Loader haengt sie als JSON an den Schluessel. `withParams` baut die
+// Antwort so, wie der Server sie schickt, `sentenceOf` den erwarteten Satz.
+const SAMPLE = { limit_mb: 5, limit: 5000, min: 60, max: 43200, status: 404 };
+const paramsFor = (names) => Object.fromEntries(names.map((name) => [name, SAMPLE[name]]));
+function withParams(err, CASE_PARAMS) {
+  const names = CASE_PARAMS.get(err.data.reason);
+  if (names) err.data.params = paramsFor(names);
+  return err;
+}
+const sentenceOf = (reason, key, CASE_PARAMS) => (
+  CASE_PARAMS.has(reason) ? `${key}${JSON.stringify(paramsFor(CASE_PARAMS.get(reason)))}` : key
+);
+
 test('errorSentence: ein bekannter Fall bekommt seinen Satz, an jedem Status', async () => {
-  const { errorSentence, CASE_MESSAGES } = await load();
+  const { errorSentence, CASE_MESSAGES, CASE_PARAMS } = await load();
   assert.ok(CASE_MESSAGES.size >= 7, `nur ${CASE_MESSAGES.size} Faelle gelesen`);
   for (const [reason, key] of CASE_MESSAGES) {
-    for (const status of [400, 404, 409]) {
-      assert.equal(errorSentence(answer(status, SERVER_TEXT, reason)), key, `${reason} @${status}`);
+    const sentence = sentenceOf(reason, key, CASE_PARAMS);
+    for (const status of [400, 404, 409, 502]) {
+      assert.equal(errorSentence(withParams(answer(status, SERVER_TEXT, reason), CASE_PARAMS)), sentence, `${reason} @${status}`);
       // Der Satz der Stelle gilt nur fuer das Unbekannte.
-      assert.equal(errorSentence(answer(status, SERVER_TEXT, reason), 'shopping.duplicateError'), key, reason);
+      assert.equal(errorSentence(withParams(answer(status, SERVER_TEXT, reason), CASE_PARAMS), 'shopping.duplicateError'), sentence, reason);
     }
   }
   // Der Fall aus dem Issue, ausgeschrieben.
@@ -204,12 +219,13 @@ test('friendlyError: ein Status ohne eigenen Satz behaelt den Text des Servers, 
 });
 
 test('friendlyError und errorSentence: ein bekannter Fall bekommt ueber beide denselben Satz', async () => {
-  const { friendlyError, errorSentence, CASE_MESSAGES, REFUSAL_MESSAGES } = await load();
+  const { friendlyError, errorSentence, CASE_MESSAGES, CASE_PARAMS, REFUSAL_MESSAGES } = await load();
   for (const [reason, key] of CASE_MESSAGES) {
+    const sentence = sentenceOf(reason, key, CASE_PARAMS);
     for (const status of [400, 404, 409]) {
-      const err = answer(status, SERVER_TEXT, reason);
-      assert.equal(friendlyError(err), key, `friendlyError ${reason} @${status}`);
-      assert.equal(errorSentence(err), key, `errorSentence ${reason} @${status}`);
+      const err = withParams(answer(status, SERVER_TEXT, reason), CASE_PARAMS);
+      assert.equal(friendlyError(err), sentence, `friendlyError ${reason} @${status}`);
+      assert.equal(errorSentence(err), sentence, `errorSentence ${reason} @${status}`);
     }
   }
   for (const [reason, key] of REFUSAL_MESSAGES) {
@@ -237,7 +253,12 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
     ...readdirSync(new URL('../server/routes/waste/', import.meta.url)).map((name) => `../server/routes/waste/${name}`),
     ...readdirSync(new URL('../server/services/', import.meta.url)).filter((name) => name.startsWith('waste-')).map((name) => `../server/services/${name}`),
   ].map(read).join('\n');
-  const routes = `${read('../server/routes/shopping.js')}\n${wasteServer.replace(/,\s*'(waste_[a-z_]+)'\s*\)/g, ", reason: '$1')")}`;
+  // Ein Grund steht dort als `reason: '...'` oder als Argument eines getypten
+  // Fehlers (danach `)` oder die Zahlen des Falls). Die Importgrenzen nennen
+  // ihn ueber ihren eigenen Code: der Store baut `waste_import_<code>` daraus.
+  const importCodes = [...read('../server/services/waste-import.js').matchAll(/new WasteImportError\([^\n]*?,\s*'([a-z_]+)'\s*[,)]/g)]
+    .map((m) => `reason: 'waste_import_${m[1]}'`).join('\n');
+  const routes = `${read('../server/routes/shopping.js')}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
   return load().then(({ CASE_MESSAGES, REFUSAL_MESSAGES }) => {
     for (const [reason, key] of CASE_MESSAGES) {
       assert.equal(REFUSAL_MESSAGES.has(reason), false, `${reason} steht in beiden Listen`);
@@ -259,7 +280,7 @@ test('isGone: nur die bekannten "gibt es nicht mehr"-Gruende, nie der blanke Sta
   assert.deepEqual([...GONE_REASONS].sort(), [
     'shopping_category_not_found', 'shopping_item_not_found', 'shopping_list_not_found', 'shopping_store_not_found',
     'waste_mapping_not_found', 'waste_occurrence_not_found', 'waste_override_not_found', 'waste_pickup_not_found',
-    'waste_schedule_not_found', 'waste_source_not_found', 'waste_type_not_found',
+    'waste_schedule_not_found', 'waste_selected_type_not_found', 'waste_source_not_found', 'waste_type_not_found',
   ]);
   for (const reason of GONE_REASONS) {
     assert.ok(CASE_MESSAGES.has(reason), `${reason}: ohne Satz`);
@@ -346,4 +367,110 @@ test('die Grenzen in den Abfuhr-Saetzen sind die des Servers', async () => {
     assert.deepEqual(numbers(waste.errorScheduleMonthDay), [1, 31], `${name}: errorScheduleMonthDay`);
     assert.deepEqual(numbers(waste.errorReminderOffset), [bound('MIN_OFFSET_DAYS'), bound('MAX_OFFSET_DAYS')], `${name}: errorReminderOffset`);
   }
+});
+
+// ---------------------------------------------------------------------------
+// #1909, Zahlen im Satz: wo die Ursache eine Zahl traegt (Grenze in MB, Anzahl,
+// Status der Gegenstelle), gibt der Server sie strukturiert mit (`params`), und
+// der Satz setzt sie ein. Aus der Antwort kommt NUR, was CASE_PARAMS fuer den
+// Fall freigibt, und nur als ganze Zahl.
+// ---------------------------------------------------------------------------
+
+const withData = (reason, params, extra = {}) => Object.assign(new Error(SERVER_TEXT), {
+  name: 'ApiError', status: 400, data: { error: SERVER_TEXT, code: 400, reason, ...(params === undefined ? {} : { params }), ...extra },
+});
+
+test('errorSentence: die Zahl der Ursache kommt in den Satz, und nur die freigegebene', async () => {
+  const { errorSentence, friendlyError } = await load();
+  assert.equal(errorSentence(withData('waste_import_file_too_large', { limit_mb: 12 })), 'waste.errorImportTooLarge{"limit_mb":12}');
+  assert.equal(errorSentence(withData('waste_source_interval_invalid', { min: 60, max: 43200 })), 'waste.errorSourceInterval{"min":60,"max":43200}');
+  assert.equal(errorSentence(withData('waste_source_fetch_http_status', { status: 404 })), 'waste.errorSourceFetchStatus{"status":404}');
+  assert.equal(errorSentence(withData('waste_import_event_cap_exceeded', { limit: 0 })), 'waste.errorImportTooManyEvents{"limit":0}', 'die Null ist eine Zahl');
+
+  // Was der Server sonst mitschickt, kommt nicht in den Satz: weder ein
+  // weiteres Feld in `params` noch eines daneben, auch nicht unter dem Namen
+  // eines Platzhalters.
+  const noisy = withData('waste_import_file_too_large',
+    { limit_mb: 5, limit: 99, name: '<img src=x>', error: SERVER_TEXT, __proto__: { status: 1 } }, { limit_mb: 77, status: 500 });
+  assert.equal(errorSentence(noisy), 'waste.errorImportTooLarge{"limit_mb":5}');
+  assert.equal(friendlyError(noisy), 'waste.errorImportTooLarge{"limit_mb":5}', 'der Uebergangsweg sagt dasselbe');
+
+  // Ein Fall OHNE Zahlen setzt nie etwas ein, auch wenn die Antwort welche traegt.
+  assert.equal(errorSentence(withData('waste_source_fetch_blocked', { status: 404, limit_mb: 5 })), 'waste.errorSourceFetchBlocked');
+  assert.equal(errorSentence(withData('shopping_list_not_found', { name: 'x' })), 'shopping.errorListGone');
+});
+
+test('errorSentence: fehlt die Zahl oder ist sie keine, gilt der allgemeine Satz der Stelle - nie ein Satz mit Luecke, nie der Text des Servers', async () => {
+  const { errorSentence, friendlyError } = await load();
+  const inherited = Object.create({ limit_mb: 5 });
+  for (const params of [
+    undefined, null, {}, [], [5], 'limit_mb', 5, { limit: 5 }, inherited,
+    { limit_mb: '5' }, { limit_mb: '<b>5</b>' }, { limit_mb: 5.5 }, { limit_mb: -1 }, { limit_mb: NaN }, { limit_mb: Infinity },
+    { limit_mb: 1e12 }, { limit_mb: null }, { limit_mb: true }, { limit_mb: { valueOf: () => 5 } }, { limit_mb: [5] },
+  ]) {
+    const err = withData('waste_import_file_too_large', params);
+    assert.equal(errorSentence(err), 'common.errorGeneric', JSON.stringify(params));
+    assert.equal(errorSentence(err, 'common.unknownError'), 'common.unknownError', JSON.stringify(params));
+  }
+  // Von zwei Zahlen fehlt eine: kein halber Satz.
+  assert.equal(errorSentence(withData('waste_source_interval_invalid', { min: 60 })), 'common.errorGeneric');
+  assert.equal(errorSentence(withData('waste_source_interval_invalid', { min: 60, max: 'viel' })), 'common.errorGeneric');
+  // friendlyError (Uebergang) faellt dann auf seinen eigenen Rest, den Text des
+  // Servers - wie vor #1909 und wie fuer jeden unbekannten Grund.
+  assert.equal(friendlyError(withData('waste_import_file_too_large', {})), SERVER_TEXT);
+});
+
+test('errorSentence: eine Absage und Offline setzen keine Zahlen ein, auch mit einem Grund aus CASE_PARAMS', async () => {
+  const { errorSentence } = await load();
+  const refused = withData('waste_import_file_too_large', { limit_mb: 5 });
+  refused.status = 403;
+  assert.equal(errorSentence(refused), 'common.errorNoPermission');
+  const offline = withData('waste_import_file_too_large', { limit_mb: 5 });
+  offline.status = 0;
+  assert.equal(errorSentence(offline), 'common.errorOfflineMutation');
+});
+
+test('CASE_PARAMS: jeder Eintrag gehoert zu einem Fall, kein Name waehlt die Pluralform, und der Server schickt genau diese Namen', async () => {
+  const { CASE_PARAMS, CASE_MESSAGES } = await load();
+  assert.ok(CASE_PARAMS.size >= 7);
+  const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
+  const server = ['../server/services/waste-import.js', '../server/services/waste-url-source.js', '../server/routes/waste/sources.js'].map(read).join('\n');
+  for (const [reason, names] of CASE_PARAMS) {
+    assert.ok(CASE_MESSAGES.has(reason), `${reason}: Zahlen ohne Satz`);
+    assert.ok(Array.isArray(names) && names.length > 0, reason);
+    for (const name of names) {
+      assert.match(name, /^[a-z_]+$/, `${reason}: ${name}`);
+      assert.notEqual(name, 'count', `${reason}: \`count\` waehlt in t() die Pluralform`);
+      // Der Name steht am Server als Feld eines `params`-Objekts (`{ limit_mb: ...`,
+      // `{ status: ...`, `{ min: ..., max: ...`). Dass eine ECHTE Antwort ihn
+      // traegt, misst test:waste-routes je Grund.
+      assert.match(server, new RegExp(`[{,]\\s*${name}:`), `${reason}: kein Server schickt ${name}`);
+    }
+  }
+});
+
+// Der Satz und die Liste muessen dieselben Namen tragen, in JEDER Sprache: ein
+// Platzhalter, den CASE_PARAMS nicht freigibt, bliebe als `{{name}}` stehen;
+// ein freigegebener, den der Satz nicht nennt, verschwiege die Zahl.
+test('die Platzhalter jedes Satzes sind in jeder Sprache genau die freigegebenen Zahlen', async () => {
+  const { CASE_PARAMS, CASE_MESSAGES } = await load();
+  const dir = new URL('../public/locales/', import.meta.url);
+  const files = readdirSync(dir).filter((name) => name.endsWith('.json'));
+  assert.ok(files.length >= 26);
+  let checked = 0;
+  for (const name of files) {
+    const locale = JSON.parse(readFileSync(new URL(name, dir), 'utf8'));
+    for (const [reason, key] of CASE_MESSAGES) {
+      const [section, leaf] = key.split('.');
+      const text = locale[section][leaf];
+      const used = [...text.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]).sort();
+      assert.deepEqual(used, [...(CASE_PARAMS.get(reason) ?? [])].sort(), `${name}: ${key} (${reason})`);
+      // Die Zahl kommt vom Server, nie ein zweites Mal als Ziffern im Satz -
+      // ausser in den Saetzen aus Scheibe A, die test 'die Grenzen in den
+      // Abfuhr-Saetzen' gegen die Konstanten haelt.
+      if (CASE_PARAMS.has(reason)) assert.doesNotMatch(text.replace(/\{\{\w+\}\}/g, ''), /\d/, `${name}: ${key} nennt eine Zahl neben dem Platzhalter`);
+      checked += 1;
+    }
+  }
+  assert.equal(checked, files.length * CASE_MESSAGES.size);
 });

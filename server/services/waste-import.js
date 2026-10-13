@@ -34,12 +34,23 @@ export const MAX_DISTINCT_LABELS = 200;
 export const MAX_CANDIDATE_INSTANCES = 5000;
 
 export class WasteImportError extends Error {
-  constructor(message, code = 'import_error') {
+  /**
+   * @param {string} message English sentence for logs and API consumers
+   * @param {string} [code] which limit was hit; the store turns it into the
+   *   response's `reason` (`waste_import_<code>`, #1909)
+   * @param {object|null} [params] the limit itself as a number, so the client
+   *   can put it into its own sentence instead of showing this one
+   */
+  constructor(message, code = 'import_error', params = null) {
     super(message);
     this.name = 'WasteImportError';
     this.code = code;
+    this.params = params;
   }
 }
+
+/** The upload limit in whole megabytes, as every sentence and response names it. */
+export const MAX_ICS_MB = Math.round(MAX_ICS_BYTES / (1024 * 1024));
 
 /** sha256 of the raw ICS text - stored as the source's content_hash. NOT used for the commit
  * concurrency guard (see computeReviewDigest) - a URL source's preview and commit each fetch the
@@ -220,14 +231,14 @@ export function buildImportPreview(icsText, {
     throw new WasteImportError('An ICS file is required.', 'empty_file');
   }
   if (Buffer.byteLength(icsText, 'utf8') > MAX_ICS_BYTES) {
-    throw new WasteImportError(`The file exceeds the ${Math.round(MAX_ICS_BYTES / (1024 * 1024))} MB upload limit.`, 'file_too_large');
+    throw new WasteImportError(`The file exceeds the ${MAX_ICS_MB} MB upload limit.`, 'file_too_large', { limit_mb: MAX_ICS_MB });
   }
 
   const skipped = [];
   const rawEvents = parseICS(icsText, { allowMissingUid: true, onSkip: (info) => skipped.push(info) });
 
   if (rawEvents.length > MAX_VEVENTS) {
-    throw new WasteImportError(`The file contains more than ${MAX_VEVENTS} calendar entries; split it into smaller files.`, 'event_cap_exceeded');
+    throw new WasteImportError(`The file contains more than ${MAX_VEVENTS} calendar entries; split it into smaller files.`, 'event_cap_exceeded', { limit: MAX_VEVENTS });
   }
 
   // Correlate UID-based recurrence overrides (RECURRENCE-ID) the same way
@@ -313,7 +324,7 @@ export function buildImportPreview(icsText, {
 
   const candidates = [...candidatesByIdentity.values()];
   if (candidates.length > MAX_CANDIDATE_INSTANCES) {
-    throw new WasteImportError(`The file expands to more than ${MAX_CANDIDATE_INSTANCES} pickup dates; split it into smaller files.`, 'instance_cap_exceeded');
+    throw new WasteImportError(`The file expands to more than ${MAX_CANDIDATE_INSTANCES} pickup dates; split it into smaller files.`, 'instance_cap_exceeded', { limit: MAX_CANDIDATE_INSTANCES });
   }
 
   if (skipped.length) {
@@ -341,7 +352,7 @@ export function buildImportPreview(icsText, {
     labelGroups.get(c.normalized_label).count++;
   }
   if (labelGroups.size > MAX_DISTINCT_LABELS) {
-    throw new WasteImportError(`The file contains more than ${MAX_DISTINCT_LABELS} distinct labels; this is almost always a parsing mismatch rather than genuinely that many waste types.`, 'label_cap_exceeded');
+    throw new WasteImportError(`The file contains more than ${MAX_DISTINCT_LABELS} distinct labels; this is almost always a parsing mismatch rather than genuinely that many waste types.`, 'label_cap_exceeded', { limit: MAX_DISTINCT_LABELS });
   }
 
   const typesByLowerName = new Map(existingTypes.map((t) => [t.name.trim().toLowerCase(), t.id]));

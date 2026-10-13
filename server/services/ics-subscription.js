@@ -16,7 +16,7 @@ import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { assignDefaultToEvent } from './sync-assignment.js';
 import { parseICS, expandRRULE, normalizeRecurrenceOverrides } from './ics-parser.js';
-import { isBlockedAddress, readPrivateNetworkOptIn, createGuardedLookup } from '../utils/ssrf.js';
+import { isBlockedAddress, readPrivateNetworkOptIn, createGuardedLookup, BlockedAddressError } from '../utils/ssrf.js';
 import { safeRequest } from '../utils/http.js';
 import { followInboundStartChange } from './calendar-occurrence-overrides.js';
 
@@ -67,14 +67,14 @@ async function checkSSRF(urlStr, allowPrivateNetwork = isPrivateNetworkAllowed) 
   // Literale IPs werden von dns.resolve4/6 nicht aufgelöst (liefert []), müssen
   // also direkt geprüft werden – sonst schlüpft https://192.168.0.1/ durch.
   if (isIP(host)) {
-    if (isBlockedAddress(host)) throw new Error(`URL resolves to a private IP address: ${host}`);
+    if (isBlockedAddress(host)) throw new BlockedAddressError(host);
     return;
   }
   const v4 = await dns.resolve4(hostname).catch(() => []);
   const v6 = await dns.resolve6(hostname).catch(() => []);
   for (const addr of [...v4, ...v6]) {
     if (isBlockedAddress(addr)) {
-      throw new Error(`URL resolves to a private IP address: ${addr}`);
+      throw new BlockedAddressError(addr);
     }
   }
 }

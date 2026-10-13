@@ -1014,16 +1014,18 @@ test('R17 E6: Wochentage sind Chips mit Zustand, "Aktiv" ist ein Schalter', () =
   assert.match(modal, /wireWeekdayPicker\(panel\)/, 'und die Chips sind verdrahtet');
 });
 
-// #1795: a refusal the server names by reason is said in the household
-// language; the server's English sentence is only the fallback.
-test('importErrorText: a named refusal gets its own sentence, anything else the server sentence or the generic one', () => {
+// #1795, #1909: a refusal the server names by reason is said in the household
+// language; everything else gets the general sentence, never the server's.
+test('importErrorText: a named refusal gets its own sentence, anything else the generic one - never the server sentence', () => {
   const { importErrorText } = __test;
   assert.equal(importErrorText({ status: 409, data: { error: 'English sentence', reason: 'preview_changed' } }), 'waste.importPreviewChangedError');
   assert.equal(importErrorText({ status: 409, data: { error: 'English sentence', reason: 'source_changed' } }), 'waste.importSourceChangedError');
-  assert.equal(importErrorText({ status: 400, data: { error: 'No mapping decision was given.' } }), 'No mapping decision was given.');
-  assert.equal(importErrorText({ status: 409, data: { error: 'Other', reason: 'toString' } }), 'Other', 'an inherited property name is not a refusal');
+  assert.equal(importErrorText({ status: 400, data: { error: 'No mapping decision was given.' } }), 'common.unknownError');
+  assert.equal(importErrorText({ status: 409, data: { error: 'Other', reason: 'toString' } }), 'common.unknownError', 'an inherited property name is not a refusal');
+  assert.equal(importErrorText({ status: 400, data: { error: 'English', reason: 'waste_import_file_too_large', params: { limit_mb: 5 } } }),
+    'waste.errorImportTooLarge{"limit_mb":5}', 'a limit carries its number into the sentence');
   assert.equal(importErrorText(new Error('offline')), 'common.unknownError');
 
   const wizard = WASTE_SRC.slice(WASTE_SRC.indexOf('function openImportWizard('), WASTE_SRC.indexOf('function sourceMappingRowHtml('));
-  assert.match(wizard, /api\.post\(endpoint, body\);[\s\S]*?catch \(err\) \{\s*showError\(importErrorText\(err\)\);/, 'the commit step of the wizard uses it');
+  assert.match(wizard, /api\.post\(endpoint, body\);[\s\S]*?catch \(err\) \{[\s\S]*?showError\(importErrorText\(err\)\);/, 'the commit step of the wizard uses it');
 });

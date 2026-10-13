@@ -126,6 +126,103 @@ test('validateRefreshIntervalMinutes: defaults, accepts the bounds, rejects outs
 });
 
 // -------------------------------------------------------------------------
+// #1909: the class of a failed fetch, one reason each
+// -------------------------------------------------------------------------
+
+test('classifyFetchFailure: what fetchIcsText really throws, by class - never by the wording of the message', async () => {
+  const { classifyFetchFailure, WasteFetchError } = urlSource;
+  const { createGuardedLookup, BlockedAddressError } = await import('../server/utils/ssrf.js');
+  const { safeRequest } = await import('../server/utils/http.js');
+  const { MAX_ICS_BYTES } = await import('../server/services/waste-import.js');
+  const limitMb = Math.round(MAX_ICS_BYTES / (1024 * 1024));
+  const thrownBy = async (run) => { try { await run(); } catch (err) { return err; } return null; };
+
+  // The status of the other side, and a body over the limit.
+  const { server, url } = await startServer((req, res) => {
+    if (req.url === '/gone') { res.writeHead(410).end(); return; }
+    res.writeHead(200); res.end('X'.repeat(MAX_ICS_BYTES + 10));
+  });
+  try {
+    const status = await thrownBy(() => fetchIcsText(url('/gone')));
+    assert.ok(status instanceof WasteFetchError);
+    assert.equal(status.message, 'HTTP 410', 'the message last_error stores is unchanged');
+    assert.deepEqual(classifyFetchFailure(status), { reason: 'waste_source_fetch_http_status', params: { status: 410 } });
+
+    const large = await thrownBy(() => fetchIcsText(url('/big')));
+    assert.match(large.message, /^ICS file exceeds the \d+ MB limit\.$/);
+    assert.deepEqual(classifyFetchFailure(large), { reason: 'waste_source_fetch_too_large', params: { limit_mb: limitMb } });
+  } finally {
+    server.closeAllConnections?.();
+    server.close();
+  }
+
+  // A port nothing listens on: Node's own error, the remainder class.
+  const probe = await startServer(() => {});
+  const deadUrl = probe.url('/cal.ics');
+  await new Promise((r) => probe.server.close(r));
+  const refused = await thrownBy(() => fetchIcsText(deadUrl));
+  assert.equal(refused.code, 'ECONNREFUSED');
+  assert.deepEqual(classifyFetchFailure(refused), { reason: 'waste_source_fetch_unreachable' });
+  // A timeout is the same class (the abort of the 15 s timer).
+  assert.deepEqual(classifyFetchFailure(Object.assign(new Error('The operation was aborted'), { name: 'AbortError' })),
+    { reason: 'waste_source_fetch_unreachable' });
+
+  // A blocked address, from both places that refuse one: the pre-check on a
+  // literal, and the lookup at connect time (a name that resolves privately -
+  // the DNS answer is injected, nothing leaves this process).
+  const prev = process.env.WASTE_SOURCE_ALLOW_PRIVATE_NETWORK;
+  delete process.env.WASTE_SOURCE_ALLOW_PRIVATE_NETWORK;
+  try {
+    const literal = await thrownBy(() => fetchIcsText('https://127.0.0.1/cal.ics'));
+    assert.ok(literal instanceof BlockedAddressError);
+    assert.equal(literal.message, 'URL resolves to a private IP address: 127.0.0.1');
+    assert.deepEqual(classifyFetchFailure(literal), { reason: 'waste_source_fetch_blocked' });
+
+    // The stored address no longer passes validation: its own reason.
+    const plain = await thrownBy(() => fetchIcsText('http://example.org/cal.ics'));
+    assert.deepEqual(classifyFetchFailure(plain), { reason: 'waste_source_url_not_https' });
+  } finally {
+    process.env.WASTE_SOURCE_ALLOW_PRIVATE_NETWORK = prev;
+  }
+  const lookup = createGuardedLookup({ lookup: (_host, _opts, cb) => cb(null, [{ address: '10.0.0.7', family: 4 }]) });
+  const rebound = await thrownBy(() => safeRequest('http://rebound.test/cal.ics', { lookup }));
+  assert.ok(rebound instanceof BlockedAddressError, `the lookup's own error reaches the caller unwrapped: ${rebound}`);
+  assert.deepEqual(classifyFetchFailure(rebound), { reason: 'waste_source_fetch_blocked' });
+
+  // A message that merely SOUNDS like a class is not that class.
+  assert.deepEqual(classifyFetchFailure(new Error('HTTP 404')), { reason: 'waste_source_fetch_unreachable' });
+  assert.deepEqual(classifyFetchFailure(new Error('URL resolves to a private IP address: 10.0.0.1')), { reason: 'waste_source_fetch_unreachable' });
+});
+
+test('refreshUrlSource and createUrlSource: a failed fetch names its class in the answer, a fetch that worked names none', async () => {
+  const { server, url } = await startServer((req, res) => {
+    if (req.url === '/ok.ics') { res.writeHead(304).end(); return; }
+    res.writeHead(404).end();
+  });
+  try {
+    const failing = store.createUrlSourcePlaceholder(get(), { name: 'Gone feed', url: url('/cal.ics'), refreshIntervalMinutes: 60, userId: ALICE });
+    const failed = await refreshUrlSource(get(), failing.id);
+    assert.equal(failed.outcome, 'error');
+    assert.equal(failed.reason, 'waste_source_fetch_http_status');
+    assert.deepEqual(failed.params, { status: 404 });
+    assert.equal(failed.source.last_error, 'HTTP 404');
+    assert.equal('reason' in store.getSource(get(), failing.id), false, 'the class is not stored with the source');
+
+    const created = await createUrlSource(get(), { name: 'Gone on create', url: url('/cal.ics'), refreshIntervalMinutes: 60, userId: ALICE });
+    assert.equal(created.outcome, 'error');
+    assert.equal(created.reason, 'waste_source_fetch_http_status');
+
+    const fine = store.createUrlSourcePlaceholder(get(), { name: 'Unchanged feed', url: url('/ok.ics'), refreshIntervalMinutes: 60, userId: ALICE });
+    const unchanged = await refreshUrlSource(get(), fine.id);
+    assert.equal(unchanged.outcome, 'unchanged');
+    assert.equal('reason' in unchanged, false);
+    assert.equal('params' in unchanged, false);
+  } finally {
+    server.close();
+  }
+});
+
+// -------------------------------------------------------------------------
 // buildAutoMappingDecisions / backoffMinutes (pure)
 // -------------------------------------------------------------------------
 

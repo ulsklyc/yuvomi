@@ -23,13 +23,25 @@ export class WasteValidationError extends Error {
    *   reach from the page (#1909); the client owns the sentence for it. Several errors at once
    *   carry the reason of the first one that has any. Validation only an API caller triggers
    *   carries none.
+   * @param {object|null} [params] the numbers the cause carries (a limit in MB, a count), sent
+   *   next to `reason` so the client puts them into its own sentence. Only with a reason.
    */
-  constructor(errors, reason = null) {
+  constructor(errors, reason = null, params = null) {
     super(errors.join(' '));
     this.name = 'WasteValidationError';
     this.errors = errors;
     this.reason = reason;
+    this.params = reason ? params : null;
   }
+}
+
+/**
+ * An import limit as the 400 it is at the route: the sentence stays, and the
+ * limit's own code becomes the reason (`waste_import_file_too_large`, ...) with
+ * the limit as a number next to it. Before #1909 the code was dropped here.
+ */
+function importValidationError(err) {
+  return new WasteValidationError([err.message], `waste_import_${err.code}`, err.params);
 }
 
 export class WasteConflictError extends Error {
@@ -216,7 +228,7 @@ function normalizeScheduleInput(input, existing = null) {
 
 export function createSchedule(d, input, userId) {
   if (!getType(d, input.type_id)) {
-    throw new WasteValidationError(['type_id must reference an existing waste type.'], 'waste_type_not_found');
+    throw new WasteValidationError(['type_id must reference an existing waste type.'], 'waste_selected_type_not_found');
   }
   const schedule = normalizeScheduleInput(input);
   throwOnProblems(scheduleRecurrenceProblems(schedule));
@@ -236,7 +248,7 @@ export function updateSchedule(d, id, input) {
   const existing = getSchedule(d, id);
   if (!existing) throw new WasteNotFoundError('Waste schedule not found.', 'waste_schedule_not_found');
   if (input.type_id !== undefined && !getType(d, input.type_id)) {
-    throw new WasteValidationError(['type_id must reference an existing waste type.'], 'waste_type_not_found');
+    throw new WasteValidationError(['type_id must reference an existing waste type.'], 'waste_selected_type_not_found');
   }
   const schedule = normalizeScheduleInput(input, existing);
   throwOnProblems(scheduleRecurrenceProblems(schedule));
@@ -337,7 +349,7 @@ export function getOneOff(d, id) {
 
 export function createOneOff(d, input, userId) {
   if (!getType(d, input.type_id)) {
-    throw new WasteValidationError(['type_id must reference an existing waste type.'], 'waste_type_not_found');
+    throw new WasteValidationError(['type_id must reference an existing waste type.'], 'waste_selected_type_not_found');
   }
   const { value, errors, reason } = validateOneOff(input);
   if (errors.length) throw new WasteValidationError(errors, reason);
@@ -595,7 +607,7 @@ export function updateMapping(d, sourceId, mappingId, { type_id = null, ignored 
     d.prepare('UPDATE waste_source_mappings SET type_id = NULL, ignored = 1 WHERE id = ?').run(mappingId);
   } else {
     if (!type_id || !getType(d, type_id)) {
-      throw new WasteValidationError(['type_id must reference an existing waste type when a mapping is not ignored.'], 'waste_type_not_found');
+      throw new WasteValidationError(['type_id must reference an existing waste type when a mapping is not ignored.'], 'waste_selected_type_not_found');
     }
     d.prepare('UPDATE waste_source_mappings SET type_id = ?, ignored = 0 WHERE id = ?').run(type_id, mappingId);
   }
@@ -637,7 +649,7 @@ export function previewImport(d, { sourceId = null, icsText } = {}) {
     const preview = buildImportPreview(icsText, { today, timeZone, existingTypes, existingMappings });
     return { ...preview, source_id: source?.id ?? null, expected_version: source?.version ?? null };
   } catch (err) {
-    if (err instanceof WasteImportError) throw new WasteValidationError([err.message]);
+    if (err instanceof WasteImportError) throw importValidationError(err);
     throw err;
   }
 }
@@ -691,7 +703,7 @@ export function commitImport(d, {
   try {
     preview = buildImportPreview(icsText, { today, timeZone, existingTypes, existingMappings });
   } catch (err) {
-    if (err instanceof WasteImportError) throw new WasteValidationError([err.message]);
+    if (err instanceof WasteImportError) throw importValidationError(err);
     throw err;
   }
 
@@ -753,7 +765,7 @@ export function commitImport(d, {
         resolvedTypeIdByLabel.set(normalizedLabel, typeId);
       } else {
         if (!getType(d, decision.type_id)) {
-          throw new WasteValidationError([`type_id ${decision.type_id} does not reference an existing waste type.`], 'waste_type_not_found');
+          throw new WasteValidationError([`type_id ${decision.type_id} does not reference an existing waste type.`], 'waste_selected_type_not_found');
         }
         resolvedTypeIdByLabel.set(normalizedLabel, decision.type_id);
       }
@@ -968,12 +980,12 @@ function sameLabelNormalization(label) {
 
 function assertProfileShape(profile) {
   if (!profile || typeof profile !== 'object' || !Array.isArray(profile.mappings)) {
-    throw new WasteValidationError(['profile must be an object with a mappings array.']);
+    throw new WasteValidationError(['profile must be an object with a mappings array.'], 'waste_profile_invalid');
   }
   for (const entry of profile.mappings) {
     if (typeof entry?.pattern !== 'string' || !entry.pattern.trim()
       || typeof entry?.type_name !== 'string' || !entry.type_name.trim()) {
-      throw new WasteValidationError(['Each mapping profile entry needs a non-empty pattern and type_name.']);
+      throw new WasteValidationError(['Each mapping profile entry needs a non-empty pattern and type_name.'], 'waste_profile_invalid');
     }
   }
 }
@@ -1065,7 +1077,7 @@ export function commitMappingProfileImport(d, sourceId, profile, profileDigest) 
   if (!getSource(d, sourceId)) throw new WasteNotFoundError('Waste import source not found.', 'waste_source_not_found');
   assertProfileShape(profile);
   if (profileDigest !== computeMappingProfileDigest(profile)) {
-    throw new WasteConflictError('The mapping profile changed since it was last previewed; preview it again before committing.');
+    throw new WasteConflictError('The mapping profile changed since it was last previewed; preview it again before committing.', 'waste_profile_changed');
   }
   const preview = previewMappingProfileImport(d, sourceId, profile);
   const applied = d.transaction(() => {

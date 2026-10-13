@@ -37,8 +37,8 @@ globalThis.document.getElementById = () => null;
 const { __test: waste } = await import('../public/pages/waste.js');
 
 const SERVER_TEXT = 'Server sentence.';
-const fehler = (status, reason) => Object.assign(new Error(SERVER_TEXT), {
-  status, data: { error: SERVER_TEXT, code: status, ...(reason ? { reason } : {}) },
+const fehler = (status, reason, params) => Object.assign(new Error(SERVER_TEXT), {
+  status, data: { error: SERVER_TEXT, code: status, ...(reason ? { reason } : {}), ...(params ? { params } : {}) },
 });
 
 const TYPE = () => ({ id: 1, name: 'Restmuell', icon: 'trash-2', color: '#555555', archived: 0, sort_order: 0 });
@@ -71,7 +71,7 @@ const NACHLADEN = ['/waste/occurrences', '/waste/schedules', '/waste/sources', '
  * `closed` jedes Schliessen eines Dialogs. Lesen liefert den frischen Stand,
  * ausser `liest` wirft; die Schreibwege (`post`, `put`, `delete`) nennt der Test.
  */
-async function mit({ liest = null, ...schreiben }, lauf) {
+async function mit({ liest = null, quelle = null, ...schreiben }, lauf) {
   const calls = [];
   const closed = [];
   const lese = async (path) => {
@@ -81,6 +81,8 @@ async function mit({ liest = null, ...schreiben }, lauf) {
     if (path === '/waste/schedules') return { data: FRISCH.schedules };
     if (path.startsWith('/waste/occurrences')) return { data: FRISCH.occurrences };
     if (path === '/waste/sources') return { data: FRISCH.sources };
+    // Die frisch gelesene Quelle, wenn ein Dialog sie nachholt.
+    if (quelle && path === `/waste/sources/${quelle.id}`) return { data: quelle };
     throw new Error(`kein Stub fuer GET ${path}`);
   };
   const stub = { get: lese };
@@ -122,12 +124,19 @@ async function dialog(oeffne, { werte = {}, listen = {} } = {}) {
   assert.ok(opts, 'der Dialog wurde geoeffnet');
   const handlers = new Map();
   const elements = new Map();
+  const fokus = [];
   const element = (selector) => {
     if (!elements.has(selector)) {
       elements.set(selector, {
-        value: '', checked: false, hidden: false, disabled: false, dataset: {}, files: [],
+        value: '', checked: false, hidden: false, disabled: false, dataset: {}, files: [], textContent: '',
+        attrs: {}, html: null,
         addEventListener(type, fn) { handlers.set(`${selector}:${type}`, fn); },
-        focus() {}, click() {}, setAttribute() {}, getAttribute: () => null,
+        focus() { fokus.push(selector); }, click() {},
+        setAttribute(name, value) { this.attrs[name] = value; }, removeAttribute(name) { delete this.attrs[name]; },
+        getAttribute: () => null,
+        // Neu gebautes Markup: `html` ist, was nach replaceChildren() eingefuegt wurde.
+        replaceChildren() { this.html = ''; },
+        insertAdjacentHTML(_position, html) { this.html = (this.html ?? '') + html; },
         classList: { add() {}, remove() {}, toggle() {} },
         querySelector: () => null, querySelectorAll: () => [],
         ...werte[selector],
@@ -142,6 +151,7 @@ async function dialog(oeffne, { werte = {}, listen = {} } = {}) {
   };
   opts.onSave(panel);
   return {
+    element, fokus,
     klick: (selector) => {
       const fn = handlers.get(`${selector}:click`);
       assert.equal(typeof fn, 'function', `${selector} hat einen Klick-Handler`);
@@ -250,14 +260,14 @@ test('Erinnerung speichern: der Satz zum Feld, der Dialog bleibt', async () => {
 // "Gibt es nicht mehr": die Seite laedt selbst nach
 // -------------------------------------------------------------------------
 
-test('Termin speichern, die Abfallart wurde inzwischen geloescht: Satz ohne Rat, der Dialog geht zu, die Seite holt den frischen Stand', async () => {
+test('Termin aus der Zeile SEINER Abfallart speichern, die inzwischen geloescht wurde: der Dialog hat keine Auswahl, er geht zu, die Seite holt den frischen Stand', async () => {
   zustand();
   const d = await terminDialog();
   const { closed, gets } = await mit({
-    put: async () => { throw fehler(400, 'waste_type_not_found'); },
+    put: async () => { throw fehler(400, 'waste_selected_type_not_found'); },
   }, () => d.klick('#wsm-save'));
 
-  assert.deepEqual(toasts, [['waste.errorTypeGone', 'danger']]);
+  assert.deepEqual(toasts, [['waste.errorSelectedTypeGone', 'danger']]);
   assert.deepEqual(closed, [{ force: true }]);
   assert.deepEqual(gets, NACHLADEN, 'Abfallarten, Termine, Abholungen und Quellen - je einmal');
   assert.deepEqual(waste.state().types.map((type) => type.id), [2], 'die geloeschte Abfallart ist aus dem Bestand');
@@ -280,7 +290,7 @@ for (const [name, reason, key, lauf] of [
 ]) {
   test(`Nachladen bei "gibt es nicht mehr": ${name}`, async () => {
     zustand();
-    const wirft = async () => { throw fehler(reason.endsWith('occurrence_not_found') || reason === 'waste_type_not_found' ? 400 : 404, reason); };
+    const wirft = async () => { throw fehler(reason.endsWith('occurrence_not_found') ? 400 : 404, reason); };
     let geworfen = false;
     const { gets, calls } = await mit({
       put: wirft,
@@ -378,14 +388,443 @@ for (const [name, reason, erfolg, pfad, oeffne] of [
 // Jeder Grund, den die Seite erreichen kann, kommt am Toast als sein Satz an
 // -------------------------------------------------------------------------
 
+// -------------------------------------------------------------------------
+// Nur die GEWAEHLTE Abfallart fehlt: der Dialog bleibt offen (#1909)
+// -------------------------------------------------------------------------
+
+const GEWAEHLT_WEG = () => fehler(400, 'waste_selected_type_not_found');
+
+/** Die Optionen, die eine neu gebaute Auswahl traegt: [value, selected, disabled]. */
+const optionen = (html) => [...html.matchAll(/<option value="([^"]*)"([^>]*)>/g)]
+  .map(([, value, attrs]) => [value, / selected/.test(attrs), / disabled/.test(attrs)]);
+
+for (const [name, oeffne, select, werte, erster] of [
+  ['Termin (Primaerknopf, mit Auswahl)', () => waste.openScheduleModal(null), '#wsm-type', {
+    '#wsm-kind': { value: 'monthly_fixed_day' }, '#wsm-anchor': { value: '2026-01-05' }, '#wsm-valid-until': { value: '' },
+    '#wsm-interval': { value: '3' }, '#wsm-active': { checked: true }, '#wsm-last-day': { checked: false },
+    '#wsm-month-day': { value: '5' }, '.waste-weekday-picker': null,
+  }, ['POST', '/waste/schedules']],
+  ['Einzelabholung', () => waste.openPickupModal(), '#wpm-type', {
+    '#wpm-date': { value: '2026-03-01' }, '#wpm-note': { value: 'Sperrmuell vor die Tuer' },
+  }, ['POST', '/waste/pickups']],
+]) {
+  test(`${name}: die gewaehlte Abfallart wurde geloescht - der Dialog bleibt, die Eingaben bleiben, die Auswahl zeigt den frischen Stand`, async () => {
+    zustand();
+    const d = await dialog(oeffne, { werte: { ...werte, [select]: { value: '1' } } });
+    const { calls, closed, gets } = await mit({ post: async () => { throw GEWAEHLT_WEG(); } }, () => d.klick(select.replace('type', 'save')));
+
+    assert.deepEqual(calls[0], erster);
+    assert.deepEqual(toasts, [['waste.errorSelectedTypeGone', 'danger']], 'der Satz sagt, dass die Art fehlt');
+    assert.deepEqual(closed, [], 'der Dialog bleibt offen');
+    assert.deepEqual(gets, NACHLADEN, 'die Seite holt den frischen Stand, einmal');
+    assert.deepEqual(waste.state().types.map((type) => type.id), [2]);
+
+    const auswahl = d.element(select);
+    assert.deepEqual(optionen(auswahl.html), [['', true, true], ['2', false, false]],
+      'die geloeschte Art ist weg, die verbliebene steht da, und KEINE ist an ihrer Stelle gewaehlt');
+    assert.match(auswahl.html, /^<option value="" disabled selected>waste\.typeSelectPlaceholder<\/option>/);
+    assert.equal(auswahl.attrs['aria-invalid'], 'true');
+    assert.deepEqual(d.fokus, [select], 'der Fokus steht auf der Auswahl');
+    // Die uebrigen Eingaben fasst niemand an.
+    for (const [feld, wert] of Object.entries(werte)) {
+      if (wert) assert.deepEqual({ value: d.element(feld).value, checked: d.element(feld).checked }, { value: '', checked: false, ...wert }, feld);
+    }
+
+    // Ein zweiter Druck auf Speichern mit der leeren Aufforderung schickt nichts.
+    auswahl.value = '';
+    const zweiter = await mit({ post: async () => { throw new Error('darf nicht senden'); } }, () => d.klick(select.replace('type', 'save')));
+    assert.deepEqual(zweiter.calls, []);
+  });
+
+  test(`${name}: die gewaehlte Abfallart gibt es nach dem Nachladen doch - sie bleibt gewaehlt, ohne Aufforderung`, async () => {
+    zustand();
+    const d = await dialog(oeffne, { werte: { ...werte, [select]: { value: '2' } } });
+    const { closed } = await mit({ post: async () => { throw GEWAEHLT_WEG(); } }, () => d.klick(select.replace('type', 'save')));
+
+    assert.deepEqual(closed, []);
+    assert.deepEqual(optionen(d.element(select).html), [['2', true, false]]);
+    assert.equal('aria-invalid' in d.element(select).attrs, false);
+  });
+
+  test(`${name}: jeder ANDERE Grund "gibt es nicht mehr" schliesst den Dialog weiter`, async () => {
+    for (const reason of ['waste_type_not_found', 'waste_schedule_not_found', 'waste_pickup_not_found']) {
+      zustand();
+      const d = await dialog(oeffne, { werte: { ...werte, [select]: { value: '1' } } });
+      const { closed, gets } = await mit({ post: async () => { throw fehler(404, reason); } }, () => d.klick(select.replace('type', 'save')));
+      assert.deepEqual(closed, [{ force: true }], reason);
+      assert.deepEqual(gets, NACHLADEN, reason);
+      assert.equal(d.element(select).html, null, `${reason}: die Auswahl wird nicht angefasst`);
+    }
+  });
+}
+
+test('Einzelabholung bearbeiten: die eigene, archivierte Abfallart bleibt nach dem Auffrischen waehlbar', async () => {
+  zustand();
+  const archiviert = { ...TYPE_B(), id: 3, name: 'Altglas', archived: 1 };
+  const d = await dialog(() => waste.openPickupModal({ id: 55, type_id: 3, date: '2026-03-01', note: null }), {
+    werte: { '#wpm-type': { value: '1' }, '#wpm-date': { value: '2026-03-01' }, '#wpm-note': { value: '' } },
+  });
+  FRISCH.types = [TYPE_B(), archiviert];
+  try {
+    await mit({ put: async () => { throw GEWAEHLT_WEG(); } }, () => d.klick('#wpm-save'));
+  } finally {
+    FRISCH.types = [TYPE_B()];
+  }
+  assert.deepEqual(optionen(d.element('#wpm-type').html), [['', true, true], ['2', false, false], ['3', false, false]]);
+});
+
+test('Quelle speichern, eine Zuordnung zeigt auf eine geloeschte Abfallart: der Dialog bleibt, die Zeilen kommen frisch vom Server, der Fokus steht auf der gescheiterten', async () => {
+  zustand();
+  const quelle = { ...SOURCE(), mappings: [
+    { id: 30, original_label: 'Bio', normalized_label: 'bio', type_id: 2, ignored: 0 },
+    { id: 31, original_label: 'Papier', normalized_label: 'papier', type_id: null, ignored: 1 },
+  ] };
+  const zeile = (id, value) => ({ dataset: { mappingId: String(id) }, querySelector: () => ({ value }) });
+  const fokus = [];
+  const attrs = {};
+  const d = await dialog(() => waste.openSourceModal(quelle), {
+    werte: {
+      '#wsrc-name': { value: 'Mein Kalender' },
+      '#wsrc-mappings': {
+        html: null,
+        replaceChildren() { this.html = ''; },
+        insertAdjacentHTML(_position, html) { this.html += html; },
+        querySelector: (selector) => ({ focus() { fokus.push(selector); }, setAttribute(name, value) { attrs[name] = value; } }),
+      },
+    },
+    // Zeile 30 wird gespeichert (auf Art 2), Zeile 31 zeigt auf die geloeschte Art 1.
+    listen: { '.waste-source-mapping-row': [zeile(30, '2'), zeile(31, '1')] },
+  });
+  // Der Server nach dem Teil-Speichern: Name und Zeile 30 stehen, Zeile 31 unveraendert.
+  const frisch = { ...quelle, name: 'Mein Kalender', mappings: [
+    { id: 30, original_label: 'Bio', normalized_label: 'bio', type_id: 2, ignored: 0 },
+    { id: 31, original_label: 'Papier', normalized_label: 'papier', type_id: null, ignored: 1 },
+  ] };
+  const { calls, closed, gets } = await mit({
+    quelle: frisch,
+    put: async (path) => { if (path.endsWith('/mappings/31')) throw GEWAEHLT_WEG(); return { data: {} }; },
+  }, () => d.klick('#wsrc-save'));
+
+  assert.deepEqual(calls.filter(([verb]) => verb === 'PUT').map(([, path]) => path), ['/waste/sources/4', '/waste/sources/4/mappings/31']);
+  assert.deepEqual(toasts, [['waste.errorSelectedTypeGone', 'danger']]);
+  assert.deepEqual(closed, [], 'der Dialog bleibt offen');
+  assert.deepEqual(gets, [...NACHLADEN, '/waste/sources/4'].sort(), 'der Stand der Seite und die Quelle selbst, je einmal');
+  const host = d.element('#wsrc-mappings');
+  assert.equal([...host.html.matchAll(/data-mapping-id="(\d+)"/g)].map((m) => m[1]).join(), '30,31', 'beide Zeilen neu gebaut');
+  assert.doesNotMatch(host.html, /<option value="1"/, 'die geloeschte Abfallart steht nicht mehr zur Wahl');
+  assert.deepEqual(fokus, ['[data-mapping-id="31"] [data-role="mapping-type"]'], 'der Fokus steht auf der gescheiterten Zeile');
+  assert.equal(attrs['aria-invalid'], 'true');
+  assert.equal(d.element('#wsrc-name').value, 'Mein Kalender', 'der Name im Feld bleibt');
+  assert.equal(quelle.mappings, frisch.mappings, 'der Dialog vergleicht ab jetzt gegen den frischen Stand');
+});
+
+test('Quelle speichern, die Zuordnung zeigt auf eine geloeschte Art UND die Quelle ist inzwischen auch weg: der gewohnte Weg, Dialog zu', async () => {
+  zustand();
+  const d = await dialog(() => waste.openSourceModal(SOURCE()), {
+    werte: { '#wsrc-name': { value: 'Kalender' } },
+    listen: { '.waste-source-mapping-row': [{ dataset: { mappingId: '30' }, querySelector: () => ({ value: '2' }) }] },
+  });
+  const { closed } = await mit({
+    put: async () => { throw GEWAEHLT_WEG(); },
+    liest: async (path) => { if (path === '/waste/sources/4') throw fehler(404, 'waste_source_not_found'); },
+  }, () => d.klick('#wsrc-save'));
+
+  assert.deepEqual(toasts, [['waste.errorSelectedTypeGone', 'danger'], ['waste.errorSourceGone', 'danger']]);
+  assert.deepEqual(closed, [{ force: true }]);
+});
+
+// -------------------------------------------------------------------------
+// Import-Assistent: der Satz steht im Dialog, mit der Zahl der Ursache
+// -------------------------------------------------------------------------
+
+const VORSCHAU = () => ({
+  digest: 'd1', expected_version: 1, source_id: null, diagnostics: [], counts: { events: 2, candidates: 2 },
+  labels: [
+    { normalized_label: 'bio', original_label: 'Bio', count: 1, suggested_type_id: 1 },
+    { normalized_label: 'papier', original_label: 'Papier', count: 1, suggested_type_id: 2 },
+  ],
+});
+
+const datei = (size = 100) => ({ size, text: async () => 'BEGIN:VCALENDAR' });
+
+async function assistent(quelle = null, werte = {}, listen = {}) {
+  return dialog(() => waste.openImportWizard(quelle), {
+    werte: { '#wiz-file': { files: [datei()] }, '#wiz-name': { value: 'Kalender' }, ...werte },
+    listen,
+  });
+}
+
+for (const [name, err, satz] of [
+  ['Datei ueber der Grenze, die der Server nennt', fehler(400, 'waste_import_file_too_large', { limit_mb: 12 }), 'waste.errorImportTooLarge{"limit_mb":12}'],
+  ['zu viele Kalendereintraege', fehler(400, 'waste_import_event_cap_exceeded', { limit: 5000 }), 'waste.errorImportTooManyEvents{"limit":5000}'],
+  ['zu viele Abholungen', fehler(400, 'waste_import_instance_cap_exceeded', { limit: 5000 }), 'waste.errorImportTooManyPickups{"limit":5000}'],
+  ['zu viele Bezeichnungen', fehler(400, 'waste_import_label_cap_exceeded', { limit: 200 }), 'waste.errorImportTooManyLabels{"limit":200}'],
+  ['leere Datei', fehler(400, 'waste_import_empty_file'), 'waste.errorImportEmpty'],
+  ['die Zahl fehlt in der Antwort', fehler(400, 'waste_import_file_too_large'), 'common.unknownError'],
+  ['400 ohne Grund', fehler(400), 'common.unknownError'],
+  ['500', fehler(500), 'common.unknownError'],
+]) {
+  test(`Import-Vorschau scheitert: der Satz der App steht im Dialog, nie der des Servers - ${name}`, async () => {
+    zustand();
+    const d = await assistent();
+    const { calls, closed, gets } = await mit({ post: async () => { throw err; } }, () => d.klick('#wiz-preview'));
+
+    assert.deepEqual(calls, [['POST', '/waste/import/preview']]);
+    assert.equal(d.element('#wiz-error').textContent, satz);
+    assert.equal(d.element('#wiz-error').hidden, false);
+    assert.deepEqual(toasts, [], 'kein Toast neben dem Satz im Dialog');
+    assert.deepEqual(closed, []);
+    assert.deepEqual(gets, []);
+  });
+}
+
+test('Import-Vorschau: eine Datei ueber der Grenze geht gar nicht erst an den Server, der Satz nennt die Grenze', async () => {
+  zustand();
+  const { maxUploadBytes, maxUploadMb } = await import('../public/utils/upload-limit.js');
+  const d = await assistent(null, { '#wiz-file': { files: [datei(maxUploadBytes() + 1)] } });
+  const { calls } = await mit({ post: async () => { throw new Error('darf nicht senden'); } }, () => d.klick('#wiz-preview'));
+  assert.deepEqual(calls, []);
+  assert.equal(d.element('#wiz-error').textContent, `waste.errorImportTooLarge{"limit_mb":${maxUploadMb()}}`);
+
+  // Genau an der Grenze geht sie durch.
+  const genau = await assistent(null, { '#wiz-file': { files: [datei(maxUploadBytes())] } });
+  const zweiter = await mit({ post: async () => { throw fehler(500); } }, () => genau.klick('#wiz-preview'));
+  assert.deepEqual(zweiter.calls, [['POST', '/waste/import/preview']]);
+});
+
+for (const [name, err, satz] of [
+  ['die Gegenstelle antwortet mit einem Fehler', fehler(502, 'waste_source_fetch_http_status', { status: 404 }), 'waste.errorSourceFetchStatus{"status":404}'],
+  ['die Antwort ist zu gross', fehler(502, 'waste_source_fetch_too_large', { limit_mb: 5 }), 'waste.errorSourceFetchTooLarge{"limit_mb":5}'],
+  ['eine gesperrte Adresse', fehler(502, 'waste_source_fetch_blocked'), 'waste.errorSourceFetchBlocked'],
+  ['nicht erreichbar', fehler(502, 'waste_source_fetch_unreachable'), 'waste.errorSourceFetchUnreachable'],
+  ['die gespeicherte Adresse ist nicht mehr https', fehler(502, 'waste_source_url_not_https'), 'waste.errorSourceUrlNotHttps'],
+  ['502 ohne Grund', fehler(502), 'common.unknownError'],
+]) {
+  test(`Quelle mit Adresse erneut pruefen, der Abruf scheitert: je Klasse ein eigener Satz - ${name}`, async () => {
+    zustand();
+    const d = await assistent({ ...SOURCE(), kind: 'url', needs_mapping: 1 });
+    const { calls } = await mit({ post: async () => { throw err; } }, () => d.klick('#wiz-preview'));
+    assert.deepEqual(calls, [['POST', '/waste/sources/4/reimport/preview']]);
+    assert.equal(d.element('#wiz-error').textContent, satz);
+    assert.deepEqual(toasts, []);
+  });
+}
+
+test('Import-Vorschau einer Quelle, die es nicht mehr gibt: Satz im Toast, der Assistent geht zu, die Seite laedt nach', async () => {
+  zustand();
+  const d = await assistent(SOURCE());
+  const { closed, gets } = await mit({ post: async () => { throw fehler(404, 'waste_source_not_found'); } }, () => d.klick('#wiz-preview'));
+  assert.deepEqual(toasts, [['waste.errorSourceGone', 'danger']]);
+  assert.deepEqual(closed, [{ force: true }]);
+  assert.deepEqual(gets, NACHLADEN);
+});
+
+/** Der Assistent nach einer gelungenen Vorschau: die Zeilen der Bezeichnungen als Attrappen. */
+async function assistentMitVorschau(entscheidungen) {
+  const fokus = [];
+  const zeilen = entscheidungen.map(([label, value]) => {
+    const select = {
+      value, html: null,
+      replaceChildren() { this.html = ''; },
+      insertAdjacentHTML(_position, html) { this.html += html; this.value = html.match(/<option value="([^"]*)" selected>/)?.[1] ?? ''; },
+      focus() { fokus.push(label); },
+    };
+    const name = { value: label, hidden: value !== '__new__' };
+    return {
+      dataset: { label }, select, name,
+      querySelector: (selector) => (selector.includes('decision-type') ? select : name),
+    };
+  });
+  const d = await assistent(null, {
+    '#wiz-step2': { replaceChildren() {}, insertAdjacentHTML() {} },
+  }, { '.waste-import-label-row': zeilen, '#wiz-step1 input': [] });
+  await mit({ post: async () => ({ data: VORSCHAU() }) }, () => d.klick('#wiz-preview'));
+  return { d, zeilen, fokus };
+}
+
+test('Import uebernehmen, eine Bezeichnung zeigt auf eine geloeschte Abfallart: der Assistent bleibt, jede Entscheidung bleibt, die Auswahl zeigt den frischen Stand', async () => {
+  zustand();
+  // Bio -> Art 1 (wird geloescht), Papier -> Art 2 (bleibt), Glas -> ignorieren, Metall -> neu.
+  const { d, zeilen, fokus } = await assistentMitVorschau([['bio', '1'], ['papier', '2'], ['glas', ''], ['metall', '__new__']]);
+  toasts.length = 0;
+  const { calls, closed, gets } = await mit({ post: async () => { throw GEWAEHLT_WEG(); } }, () => d.klick('#wiz-commit'));
+
+  assert.deepEqual(calls[0], ['POST', '/waste/import/commit']);
+  assert.equal(d.element('#wiz-error').textContent, 'waste.errorSelectedTypeGone', 'der Satz steht im Dialog');
+  assert.deepEqual(toasts, []);
+  assert.deepEqual(closed, [], 'der Assistent bleibt offen');
+  assert.deepEqual(gets, NACHLADEN);
+  assert.deepEqual(zeilen.map((zeile) => zeile.select.value), ['__new__', '2', '', '__new__'],
+    'nur die Zeile der geloeschten Art faellt auf "neue Abfallart anlegen", jede andere Entscheidung bleibt');
+  assert.deepEqual(zeilen.map((zeile) => zeile.name.hidden), [false, true, true, false], 'das Namensfeld der betroffenen Zeile ist sichtbar');
+  for (const zeile of zeilen) assert.doesNotMatch(zeile.select.html, /<option value="1"/, 'die geloeschte Art steht in keiner Auswahl mehr');
+  assert.deepEqual(fokus, ['bio'], 'der Fokus steht auf der betroffenen Auswahl');
+});
+
+for (const [name, err, satz] of [
+  ['der Kalender hat sich seit der Vorschau geaendert', fehler(409, 'preview_changed'), 'waste.importPreviewChangedError'],
+  ['die Quelle wurde inzwischen geaendert', fehler(409, 'source_changed'), 'waste.importSourceChangedError'],
+  ['eine Grenze, erst bei der Uebernahme', fehler(400, 'waste_import_instance_cap_exceeded', { limit: 5000 }), 'waste.errorImportTooManyPickups{"limit":5000}'],
+  ['400 ohne Grund', fehler(400), 'common.unknownError'],
+]) {
+  test(`Import uebernehmen scheitert: der Satz im Dialog, der Assistent bleibt, nichts wird nachgeladen - ${name}`, async () => {
+    zustand();
+    const { d, zeilen } = await assistentMitVorschau([['bio', '1'], ['papier', '2']]);
+    const { closed, gets } = await mit({ post: async () => { throw err; } }, () => d.klick('#wiz-commit'));
+    assert.equal(d.element('#wiz-error').textContent, satz);
+    assert.deepEqual(closed, []);
+    assert.deepEqual(gets, []);
+    assert.equal(zeilen[0].select.html, null, 'die Auswahl wird nicht angefasst');
+  });
+}
+
+// -------------------------------------------------------------------------
+// Zuordnungsprofil
+// -------------------------------------------------------------------------
+
+/** Faehrt die Dateiwahl des Zuordnungsprofils: liefert, was nach `change` passiert. */
+async function profilWaehlen(inhalt) {
+  const original = globalThis.document.createElement;
+  let input = null;
+  globalThis.document.createElement = (tag) => {
+    if (tag !== 'input') return original(tag);
+    input = { files: [{ text: async () => inhalt }], addEventListener(type, fn) { this[type] = fn; }, click() {} };
+    return input;
+  };
+  try {
+    waste.openMappingProfileImportModal(SOURCE());
+  } finally {
+    globalThis.document.createElement = original;
+  }
+  return () => input.change();
+}
+
+test('Zuordnungsprofil, die Datei ist keines: der Satz der App, kein Dialog', async () => {
+  zustand();
+  const wechsel = await profilWaehlen('{"something":"else"}');
+  let geoeffnet = false;
+  globalThis.__openModal = () => { geoeffnet = true; };
+  try {
+    const { calls } = await mit({ post: async () => { throw fehler(400, 'waste_profile_invalid'); } }, wechsel);
+    assert.deepEqual(calls, [['POST', '/waste/sources/4/mapping-profile/import/preview']]);
+  } finally {
+    delete globalThis.__openModal;
+  }
+  assert.deepEqual(toasts, [['waste.mappingProfileInvalidFile', 'danger']]);
+  assert.equal(geoeffnet, false);
+});
+
+test('Zuordnungsprofil uebernehmen, es wurde seit der Vorschau geaendert (409): eigener Satz, der Dialog bleibt', async () => {
+  zustand();
+  const wechsel = await profilWaehlen('{"mappings":[]}');
+  let opts = null;
+  globalThis.__openModal = (o) => { opts = o; };
+  try {
+    await mit({ post: async () => ({ data: { applicable_count: 1, entries: [], profile_digest: 'p1' } }) }, wechsel);
+  } finally {
+    delete globalThis.__openModal;
+  }
+  assert.ok(opts, 'die Vorschau oeffnet den Dialog');
+  let anwenden = null;
+  opts.onSave({ querySelector: (selector) => ({ addEventListener(_type, fn) { if (selector === '#wmp-apply') anwenden = fn; } }) });
+  const { closed, gets } = await mit({ post: async () => { throw fehler(409, 'waste_profile_changed'); } }, () => anwenden());
+  assert.deepEqual(toasts, [['waste.errorProfileChanged', 'danger']]);
+  assert.deepEqual(closed, []);
+  assert.deepEqual(gets, []);
+
+  // Die Quelle ist inzwischen weg: der gewohnte Weg.
+  toasts.length = 0;
+  const weg = await mit({ post: async () => { throw fehler(404, 'waste_source_not_found'); } }, () => anwenden());
+  assert.deepEqual(toasts, [['waste.errorSourceGone', 'danger']]);
+  assert.deepEqual(weg.closed, [{ force: true }]);
+});
+
+// -------------------------------------------------------------------------
+// Quelle mit Adresse: anlegen und von Hand abrufen
+// -------------------------------------------------------------------------
+
+const urlDialog = () => dialog(() => waste.openUrlSourceWizard(), {
+  werte: { '#wurl-name': { value: 'Stadt' }, '#wurl-url': { value: 'https://example.org/a.ics' }, '#wurl-interval': { value: '1440' } },
+});
+
+for (const [name, err, satz, feld] of [
+  ['keine Adresse', fehler(400, 'waste_source_url_invalid'), 'waste.errorSourceUrlInvalid', '#wurl-url'],
+  ['ohne https', fehler(400, 'waste_source_url_not_https'), 'waste.errorSourceUrlNotHttps', '#wurl-url'],
+  ['Abstand ausserhalb der Grenzen', fehler(400, 'waste_source_interval_invalid', { min: 60, max: 43200 }), 'waste.errorSourceInterval{"min":60,"max":43200}', '#wurl-interval'],
+  ['die erste Auswertung trifft eine Importgrenze', fehler(400, 'waste_import_label_cap_exceeded', { limit: 200 }), 'waste.errorImportTooManyLabels{"limit":200}', null],
+  ['400 ohne Grund', fehler(400), 'common.unknownError', null],
+]) {
+  test(`Quelle mit Adresse anlegen scheitert: der Satz im Dialog, der Fokus am gemeinten Feld - ${name}`, async () => {
+    zustand();
+    const d = await urlDialog();
+    const { calls, closed } = await mit({ post: async () => { throw err; } }, () => d.klick('#wurl-save'));
+    assert.deepEqual(calls, [['POST', '/waste/sources']]);
+    assert.equal(d.element('#wurl-error').textContent, satz);
+    assert.equal(d.element('#wurl-error').hidden, false);
+    assert.deepEqual(toasts, []);
+    assert.deepEqual(closed, []);
+    assert.deepEqual(d.fokus, feld ? [feld] : []);
+  });
+}
+
+const LETZTER_FEHLER = 'URL resolves to a private IP address: 10.0.0.5';
+const abruf = (extra) => ({ data: { outcome: 'error', source: { id: 4, last_error: LETZTER_FEHLER }, ...extra } });
+
+for (const [name, antwort, satz] of [
+  ['gesperrte Adresse', abruf({ reason: 'waste_source_fetch_blocked' }), 'waste.errorSourceFetchBlocked'],
+  ['Status der Gegenstelle', abruf({ reason: 'waste_source_fetch_http_status', params: { status: 404 } }), 'waste.errorSourceFetchStatus{"status":404}'],
+  ['zu gross', abruf({ reason: 'waste_source_fetch_too_large', params: { limit_mb: 5 } }), 'waste.errorSourceFetchTooLarge{"limit_mb":5}'],
+  ['nicht erreichbar', abruf({ reason: 'waste_source_fetch_unreachable' }), 'waste.errorSourceFetchUnreachable'],
+  ['ohne Grund (ein aelterer Server)', abruf({}), 'waste.errorSourceFetch'],
+  ['ein Grund, den die App nicht kennt', abruf({ reason: 'waste_source_fetch_future' }), 'waste.errorSourceFetch'],
+  ['die Zahl fehlt', abruf({ reason: 'waste_source_fetch_http_status' }), 'waste.errorSourceFetch'],
+]) {
+  test(`Der Abruf endet mit einem Fehler: der Toast sagt die Klasse, nie den gespeicherten Text - ${name}`, async () => {
+    // Von Hand abrufen ...
+    zustand();
+    await mit({ post: async () => antwort }, () => waste.triggerManualRefresh(4));
+    assert.deepEqual(toasts, [[satz, 'danger']]);
+    assert.ok(!toasts.some(([text]) => text.includes('private IP')));
+
+    // ... und beim Anlegen: die Quelle entsteht trotzdem, der Dialog geht zu.
+    zustand();
+    const d = await urlDialog();
+    const { closed } = await mit({ post: async () => antwort }, () => d.klick('#wurl-save'));
+    assert.deepEqual(toasts, [[satz, 'danger']]);
+    assert.deepEqual(closed, [{ force: true }]);
+  });
+}
+
+for (const [name, err, satz, laedt] of [
+  ['die Quelle wird gerade aktualisiert', fehler(409, 'refresh_in_progress'), 'waste.errorSourceRefreshRunning', false],
+  ['die Quelle stammt aus einer Datei', fehler(400, 'waste_source_not_url'), 'waste.errorSourceNotUrl', false],
+  ['die Auswertung trifft eine Importgrenze', fehler(400, 'waste_import_event_cap_exceeded', { limit: 5000 }), 'waste.errorImportTooManyEvents{"limit":5000}', false],
+  ['die Quelle gibt es nicht mehr', fehler(404, 'waste_source_not_found'), 'waste.errorSourceGone', true],
+  ['500', fehler(500), 'common.errorGeneric', false],
+]) {
+  test(`Von Hand abrufen scheitert: der Satz der App - ${name}`, async () => {
+    zustand();
+    const { gets } = await mit({ post: async () => { throw err; } }, () => waste.triggerManualRefresh(4));
+    assert.deepEqual(toasts, [[satz, 'danger']]);
+    assert.deepEqual(gets, laedt ? NACHLADEN : []);
+  });
+}
+
+// -------------------------------------------------------------------------
+// Jeder Grund, den die Seite erreichen kann, kommt am Toast als sein Satz an
+// -------------------------------------------------------------------------
+
 test('reportError: jeder Abfuhr-Grund ergibt seinen Satz, und genau die "gibt es nicht mehr" laden nach', async () => {
-  const { CASE_MESSAGES, GONE_REASONS } = await import('../public/utils/friendly-error.js');
-  const gruende = [...CASE_MESSAGES.keys()].filter((reason) => reason.startsWith('waste_'));
-  assert.ok(gruende.length >= 20);
+  const { CASE_MESSAGES, CASE_PARAMS, GONE_REASONS } = await import('../public/utils/friendly-error.js');
+  // Jeder Grund, dessen Satz ein Abfuhr-Satz ist - auch die drei ohne Praefix.
+  const gruende = [...CASE_MESSAGES].filter(([, key]) => key.startsWith('waste.')).map(([reason]) => reason);
+  assert.ok(gruende.length >= 40, `nur ${gruende.length} Gruende gelesen`);
   for (const reason of gruende) {
     zustand();
-    const { gets } = await mit({}, () => waste.reportError(fehler(400, reason)));
-    assert.deepEqual(toasts, [[CASE_MESSAGES.get(reason), 'danger']], reason);
+    const params = CASE_PARAMS.has(reason) ? Object.fromEntries(CASE_PARAMS.get(reason).map((name, i) => [name, 7 + i])) : undefined;
+    const { gets } = await mit({}, () => waste.reportError(fehler(400, reason, params)));
+    const satz = CASE_MESSAGES.get(reason) + (params ? JSON.stringify(params) : '');
+    assert.deepEqual(toasts, [[satz, 'danger']], reason);
     assert.match(toasts[0][0], /^waste\./, reason);
     assert.deepEqual(gets, GONE_REASONS.has(reason) ? NACHLADEN : [], reason);
   }

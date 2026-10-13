@@ -30,6 +30,7 @@ import { USER_COLORS } from '/utils/color.js';
 import { redrawList } from '/utils/list-motion.js';
 import { daysBetweenDateKeys, countdownPhrase } from '/utils/countdown.js';
 import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
+import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
 
 const UPCOMING_WINDOW_DAYS = 90;
 const WEEKDAY_CODES = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
@@ -825,10 +826,10 @@ async function reloadAndRender() {
  * die Quelle geloescht oder den Termin geaendert), ist der Stand der Seite
  * veraltet - sie holt ihn dann selbst neu, statt dazu zu raten.
  *
- * Noch NICHT hier: der Import-Assistent, das Zuordnungsprofil, die URL-Quelle
- * und ihr Handabruf. Deren Fehler tragen eine Ursache mit Daten (Dateigrenze,
- * HTTP-Status der Quelle), fuer die der Server noch keinen Grund nennt; sie
- * zeigen bis zu ihrer eigenen Scheibe den Text des Servers.
+ * Die Assistenten (Import, Quelle mit Adresse) zeigen ihren Fehler im Dialog
+ * statt im Toast und fragen `errorSentence` dafuer selbst; "gibt es nicht mehr"
+ * geben auch sie hierher. Wo nur die GEWAEHLTE Abfallart fehlt, bleibt der
+ * Dialog offen: `keepDialogForMissingType` und seine beiden Geschwister.
  *
  * @param {unknown} err
  * @param {string} [fallbackKey] - der allgemeine Satz der Stelle
@@ -849,6 +850,58 @@ async function reloadAfterGone() {
   await closeModal({ force: true });
   await reloadAndRender();
   refocusAfterRender();
+}
+
+/** Der Grund "die im Formular gewaehlte Abfallart gibt es nicht mehr". */
+const SELECTED_TYPE_GONE = 'waste_selected_type_not_found';
+
+function isSelectedTypeGone(err) {
+  return isGone(err) && err.data.reason === SELECTED_TYPE_GONE;
+}
+
+/** Die Optionen einer Abfallart-Auswahl: die aktiven, dazu `keepArchivedId`, wenn die Auswahl eine archivierte schon traegt. */
+function typeOptionsHtml(selectedId = null, keepArchivedId = null) {
+  return state.types.filter((t2) => !t2.archived || t2.id === keepArchivedId)
+    .map((t2) => `<option value="${t2.id}"${selectedId === t2.id ? ' selected' : ''}>${esc(t2.name)}</option>`).join('');
+}
+
+/**
+ * Baut eine Abfallart-Auswahl aus dem frischen Bestand neu. Gibt es die
+ * gewaehlte Art nicht mehr, steht danach KEINE andere an ihrer Stelle: eine
+ * leere Aufforderung ("Abfallart waehlen"), an der Speichern haelt - sonst
+ * laege der Termin nach einem zweiten Druck auf Speichern still bei der Art,
+ * die zufaellig als erste in der Liste steht.
+ */
+function refillTypeSelect(select, keepArchivedId = null) {
+  const chosen = Number(select.value);
+  const stillThere = state.types.some((t2) => t2.id === chosen && (!t2.archived || t2.id === keepArchivedId));
+  select.replaceChildren();
+  select.insertAdjacentHTML('beforeend',
+    (stillThere ? '' : `<option value="" disabled selected>${esc(t('waste.typeSelectPlaceholder'))}</option>`)
+    + typeOptionsHtml(stillThere ? chosen : null, keepArchivedId));
+  if (stillThere) select.removeAttribute('aria-invalid');
+  else select.setAttribute('aria-invalid', 'true');
+}
+
+/**
+ * SPEICHERN SCHEITERT NUR AN DER GEWAEHLTEN ABFALLART (#1909): jemand anderes
+ * im Haushalt hat sie geloescht, waehrend der Dialog offen war. Der Dialog
+ * bleibt, die Eingaben bleiben; die Seite holt den frischen Stand, die Auswahl
+ * zeigt ihn, und der Fokus steht auf ihr. Der Satz sagt, was los ist.
+ *
+ * Ohne Auswahl im Dialog (ein Termin, der aus der Zeile SEINER Abfallart
+ * angelegt wird) ist das kein Fall fuer hier: dann fehlt, worum der Dialog
+ * geht, und `reportError` schliesst ihn wie bisher.
+ *
+ * @returns {Promise<boolean>} true: behandelt, der Aufrufer meldet nichts mehr
+ */
+async function keepDialogForMissingType(err, select, keepArchivedId = null) {
+  if (!select || !isSelectedTypeGone(err)) return false;
+  window.yuvomi?.showToast(errorSentence(err), 'danger');
+  await reloadAndRender();
+  refillTypeSelect(select, keepArchivedId);
+  select.focus();
+  return true;
 }
 
 /**
@@ -1224,8 +1277,7 @@ function openScheduleModal(type, schedule = null) {
   const typeField = pickType ? `
     <div class="form-group">
       <label class="form-label" for="wsm-type">${t('waste.typeSelectLabel')}</label>
-      <select class="form-input" id="wsm-type">${state.types.filter((t2) => !t2.archived)
-        .map((t2) => `<option value="${t2.id}"${suggested?.id === t2.id ? ' selected' : ''}>${esc(t2.name)}</option>`).join('')}</select>
+      <select class="form-input" id="wsm-type">${typeOptionsHtml(suggested?.id ?? null)}</select>
     </div>` : '';
   const kind = schedule?.recurrence_kind ?? 'weekly';
   const isOrdinal = kind === 'monthly_ordinal_weekday';
@@ -1303,6 +1355,7 @@ function openScheduleModal(type, schedule = null) {
       const ordinalPositionSelect = panel.querySelector('#wsm-ordinal-position');
       const ordinalWeekdaySelect = panel.querySelector('#wsm-ordinal-weekday');
       const anchorInput = panel.querySelector('#wsm-anchor');
+      panel.querySelector('#wsm-type')?.addEventListener('change', (e) => e.target.removeAttribute('aria-invalid'));
 
       // Der Anker wird bei jeder Ordinal-/Wochentags-Aenderung neu berechnet
       // (naechstes passendes Datum ab heute, wie jeder andere "ab jetzt"-
@@ -1365,6 +1418,7 @@ function openScheduleModal(type, schedule = null) {
           refocusAfterRender();
           window.yuvomi?.showToast(t('waste.scheduleSavedToast'), 'success');
         } catch (err) {
+          if (await keepDialogForMissingType(err, typeSelect)) return;
           reportError(err);
         }
       });
@@ -1378,8 +1432,9 @@ function openScheduleModal(type, schedule = null) {
 
 function openPickupModal(pickup = null) {
   const isEdit = !!pickup;
-  const typeOptions = state.types.filter((t2) => !t2.archived || (isEdit && t2.id === pickup.type_id))
-    .map((t2) => `<option value="${t2.id}"${isEdit && pickup.type_id === t2.id ? ' selected' : ''}>${esc(t2.name)}</option>`).join('');
+  // Die eigene Abfallart einer Abholung bleibt waehlbar, auch wenn sie archiviert ist.
+  const ownTypeId = isEdit ? pickup.type_id : null;
+  const typeOptions = typeOptionsHtml(ownTypeId, ownTypeId);
 
   const content = `
     <div class="form-group">
@@ -1408,6 +1463,7 @@ function openPickupModal(pickup = null) {
     size: 'sm',
     onSave(panel) {
       panel.querySelector('#wpm-cancel').addEventListener('click', () => closeModal());
+      panel.querySelector('#wpm-type').addEventListener('change', (e) => e.target.removeAttribute('aria-invalid'));
 
       panel.querySelector('#wpm-delete')?.addEventListener('click', async () => {
         const ok = await confirmOverModal(t('waste.pickupDeleteConfirm'), { danger: true, confirmLabel: t('common.delete'), detail: t('waste.pickupDeleteConfirmDetail') });
@@ -1439,6 +1495,7 @@ function openPickupModal(pickup = null) {
           refocusAfterRender();
           window.yuvomi?.showToast(t('waste.pickupSavedToast'), 'success');
         } catch (err) {
+          if (await keepDialogForMissingType(err, typeSelect, ownTypeId)) return;
           reportError(err);
         }
       });
@@ -1518,20 +1575,25 @@ function importDiagnosticRowHtml(diag) {
   return `<p class="waste-import-diagnostic waste-import-diagnostic--info">${esc(importDiagnosticText(diag))}</p>`;
 }
 
+/** The options of one label's decision: ignore, every type, create a new one. `decision` is `'' | '__new__' | '<type id>'`. */
+function importDecisionOptionsHtml(decision) {
+  const typeOptions = state.types.filter((t2) => !t2.archived || decision === String(t2.id))
+    .map((t2) => `<option value="${t2.id}"${decision === String(t2.id) ? ' selected' : ''}>${esc(t2.name)}</option>`).join('');
+  return `<option value=""${decision === '' ? ' selected' : ''}>${esc(t('waste.importIgnoreLabel'))}</option>
+        ${typeOptions}
+        <option value="__new__"${decision === '__new__' ? ' selected' : ''}>${esc(t('waste.importCreateNewType'))}</option>`;
+}
+
 function importLabelRowHtml(label) {
   const decision = defaultLabelDecision(label);
   // Include an archived type only when it's the remembered/suggested decision
   // itself, so a since-archived mapping still renders as a real selected
   // option instead of silently falling back to "ignore" in the live DOM.
-  const typeOptions = state.types.filter((t2) => !t2.archived || decision === String(t2.id))
-    .map((t2) => `<option value="${t2.id}"${decision === String(t2.id) ? ' selected' : ''}>${esc(t2.name)}</option>`).join('');
   return `
     <div class="waste-import-label-row" data-label="${esc(label.normalized_label)}">
       <span class="waste-import-label-row__name">${esc(label.original_label)} <span class="waste-import-label-row__count">(${label.count})</span></span>
       <select class="form-input" data-role="label-decision-type">
-        <option value=""${decision === '' ? ' selected' : ''}>${esc(t('waste.importIgnoreLabel'))}</option>
-        ${typeOptions}
-        <option value="__new__"${decision === '__new__' ? ' selected' : ''}>${esc(t('waste.importCreateNewType'))}</option>
+        ${importDecisionOptionsHtml(decision)}
       </select>
       <input type="text" class="form-input waste-import-new-type-name" data-role="label-new-type-name"
         placeholder="${esc(t('waste.typeNameLabel'))}" value="${esc(label.original_label)}"${decision === '__new__' ? '' : ' hidden'}>
@@ -1547,17 +1609,38 @@ function importPreviewStepHtml(preview) {
     : `<p>${esc(t('waste.importNoLabels'))}</p>`}`;
 }
 
-// The import refusals the server names by `reason` (routes/waste/helpers.js),
-// each with its own sentence here. The server's own sentence is English and
-// stays the fallback for everything without an entry.
-const IMPORT_REFUSALS = new Map([
-  ['preview_changed', 'waste.importPreviewChangedError'],
-  ['source_changed', 'waste.importSourceChangedError'],
-]);
-
+/**
+ * The sentence an assistant shows inside its own dialog (#1909): the app's
+ * sentence for the case the server names by `reason` - a limit with its number,
+ * a calendar that changed since the preview, a failed fetch by its class - and
+ * the general one for everything else. Never the server's text.
+ */
 function importErrorText(err) {
-  const key = IMPORT_REFUSALS.get(err?.data?.reason);
-  return key ? t(key) : (err?.data?.error ?? t('common.unknownError'));
+  return errorSentence(err, 'common.unknownError');
+}
+
+/**
+ * The import commit failed only because a label was mapped to a type somebody
+ * deleted in the meantime: the assistant stays, every decision stays, and the
+ * selects are rebuilt from the fresh types. A row whose type is gone falls
+ * back to "create a new type" - the same default the assistant gives a label
+ * it knows no type for - and gets the focus.
+ */
+async function refreshImportTypeChoices(panel) {
+  await reloadAndRender();
+  let first = null;
+  for (const row of panel.querySelectorAll('.waste-import-label-row')) {
+    const select = row.querySelector('[data-role="label-decision-type"]');
+    const chosen = select.value;
+    const isType = chosen !== '' && chosen !== '__new__';
+    const stillThere = isType && state.types.some((t2) => String(t2.id) === chosen);
+    const decision = isType && !stillThere ? '__new__' : chosen;
+    select.replaceChildren();
+    select.insertAdjacentHTML('beforeend', importDecisionOptionsHtml(decision));
+    row.querySelector('[data-role="label-new-type-name"]').hidden = decision !== '__new__';
+    if (isType && !stillThere && !first) first = select;
+  }
+  first?.focus();
 }
 
 function openImportWizard(source = null) {
@@ -1615,6 +1698,10 @@ function openImportWizard(source = null) {
         if (!isUrlSource) {
           const file = panel.querySelector('#wiz-file').files?.[0];
           if (!file) { showError(t('waste.importNoFileError')); return; }
+          // Die Grenze kennt die Seite vom Server (/version). Ohne diese Probe
+          // scheitert eine deutlich zu grosse Datei schon am Rumpf der Anfrage
+          // (413), bevor die Route ihren Grund nennen kann.
+          if (file.size > maxUploadBytes()) { showError(t('waste.errorImportTooLarge', { limit_mb: maxUploadMb() })); return; }
           try { icsText = await file.text(); } catch { showError(t('waste.importReadError')); return; }
         }
 
@@ -1636,7 +1723,9 @@ function openImportWizard(source = null) {
           panel.querySelector('#wiz-commit').hidden = false;
           if (window.lucide) window.lucide.createIcons({ el: step2 });
         } catch (err) {
-          showError(err.data?.error ?? t('common.unknownError'));
+          // Die Quelle selbst ist weg: der Assistent hat nichts mehr zu tun.
+          if (isGone(err)) { reportError(err); return; }
+          showError(importErrorText(err));
         }
       });
 
@@ -1673,6 +1762,12 @@ function openImportWizard(source = null) {
           const { added, changed, removed } = res.data.diff;
           window.yuvomi?.showToast(t('waste.importCommittedToast', { added, changed, removed }), 'success');
         } catch (err) {
+          if (isSelectedTypeGone(err)) {
+            showError(importErrorText(err));
+            await refreshImportTypeChoices(panel);
+            return;
+          }
+          if (isGone(err)) { reportError(err); return; }
           showError(importErrorText(err));
         }
       });
@@ -1757,7 +1852,7 @@ function openMappingProfileImportModal(source) {
     try {
       preview = (await api.post(`/waste/sources/${source.id}/mapping-profile/import/preview`, { profile })).data;
     } catch (err) {
-      window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+      reportError(err);
       return;
     }
 
@@ -1792,7 +1887,7 @@ function openMappingProfileImportModal(source) {
             window.yuvomi?.showToast(t('waste.mappingProfileAppliedToast'), 'success');
           } catch (err) {
             stopLoading();
-            window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+            reportError(err);
           }
         });
       },
@@ -1871,10 +1966,12 @@ function openSourceModal(source) {
 
       panel.querySelector('#wsrc-save').addEventListener('click', async () => {
         const name = panel.querySelector('#wsrc-name').value.trim();
+        let failedMappingId = null;
         try {
           if (name && name !== source.name) await api.put(`/waste/sources/${source.id}`, { name });
           for (const row of panel.querySelectorAll('.waste-source-mapping-row')) {
             const mappingId = Number(row.dataset.mappingId);
+            failedMappingId = mappingId;
             const mapping = source.mappings.find((m) => m.id === mappingId);
             const value = row.querySelector('[data-role="mapping-type"]').value;
             const ignored = value === '';
@@ -1887,11 +1984,54 @@ function openSourceModal(source) {
           refocusAfterRender();
           window.yuvomi?.showToast(t('waste.sourceSavedToast'), 'success');
         } catch (err) {
+          if (failedMappingId !== null && await keepSourceDialogForMissingType(err, panel, source, failedMappingId)) return;
           reportError(err);
         }
       });
     },
   });
+}
+
+/**
+ * Wie `keepDialogForMissingType`, fuer die Zuordnungen einer Quelle: eine Zeile
+ * zeigt auf eine Abfallart, die inzwischen geloescht wurde. Der Dialog bleibt,
+ * der Name im Feld bleibt. Die Zeilen werden aus der frisch gelesenen Quelle neu
+ * gebaut - was vor der gescheiterten Zeile schon gespeichert wurde, steht damit
+ * als gespeichert da, und die gescheiterte zeigt wieder ihren Stand am Server
+ * statt still auf "Ignorieren" zu fallen. Der Fokus steht auf ihrer Auswahl.
+ *
+ * @returns {Promise<boolean>} true: behandelt
+ */
+async function keepSourceDialogForMissingType(err, panel, source, mappingId) {
+  if (!isSelectedTypeGone(err)) return false;
+  window.yuvomi?.showToast(errorSentence(err), 'danger');
+  await reloadAndRender();
+  let fresh;
+  try {
+    fresh = (await api.get(`/waste/sources/${source.id}`)).data;
+  } catch (reloadErr) {
+    // Auch die Quelle ist weg (oder nicht lesbar): dann der gewohnte Weg.
+    reportError(reloadErr);
+    return true;
+  }
+  source.mappings = fresh.mappings;
+  const host = panel.querySelector('#wsrc-mappings');
+  host.replaceChildren();
+  host.insertAdjacentHTML('beforeend', fresh.mappings.map(sourceMappingRowHtml).join(''));
+  const select = host.querySelector(`[data-mapping-id="${mappingId}"] [data-role="mapping-type"]`);
+  select?.setAttribute('aria-invalid', 'true');
+  select?.focus();
+  return true;
+}
+
+/**
+ * Der Satz zu einem Abruf, der mit `outcome: 'error'` endete (#1909): der
+ * Server nennt die Klasse des Fehlschlags in derselben Antwort (`reason`, dazu
+ * `params`), die Seite sagt ihren Satz dafuer. Der gespeicherte Text der Quelle
+ * (`last_error`) kommt nicht in den Toast.
+ */
+function fetchFailureSentence(data) {
+  return errorSentence({ data: { reason: data?.reason, params: data?.params } }, 'waste.errorSourceFetch');
 }
 
 async function loadSourceAndOpen(id) {
@@ -1920,12 +2060,12 @@ async function triggerManualRefresh(id) {
     } else if (res.data.outcome === 'needs_mapping') {
       window.yuvomi?.showToast(t('waste.sourceNeedsMappingToast'), 'default');
     } else if (res.data.outcome === 'error') {
-      window.yuvomi?.showToast(res.data.source.last_error ?? t('common.unknownError'), 'danger');
+      window.yuvomi?.showToast(fetchFailureSentence(res.data), 'danger');
     } else {
       window.yuvomi?.showToast(t('waste.sourceUnchangedToast'), 'default');
     }
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    reportError(err);
   }
 }
 
@@ -1933,6 +2073,13 @@ async function triggerManualRefresh(id) {
 const URL_SOURCE_MIN_INTERVAL_MINUTES = 60;
 const URL_SOURCE_MAX_INTERVAL_MINUTES = 43_200;
 const URL_SOURCE_DEFAULT_INTERVAL_MINUTES = 1440;
+
+/** Welches Feld des Dialogs ein Grund meint - dorthin geht nach dem Fehler der Fokus. */
+const URL_SOURCE_ERROR_FIELDS = new Map([
+  ['waste_source_url_invalid', '#wurl-url'],
+  ['waste_source_url_not_https', '#wurl-url'],
+  ['waste_source_interval_invalid', '#wurl-interval'],
+]);
 
 function openUrlSourceWizard() {
   const content = `
@@ -1988,11 +2135,14 @@ function openUrlSourceWizard() {
           } else if (res.data.outcome === 'needs_mapping') {
             window.yuvomi?.showToast(t('waste.sourceNeedsMappingToast'), 'default');
           } else if (res.data.outcome === 'error') {
-            window.yuvomi?.showToast(res.data.source.last_error ?? t('common.unknownError'), 'danger');
+            window.yuvomi?.showToast(fetchFailureSentence(res.data), 'danger');
           }
         } catch (err) {
           stopLoading();
-          showError(err.data?.error ?? t('common.unknownError'));
+          showError(errorSentence(err, 'common.unknownError'));
+          // Der Fokus geht an das Feld, das der Satz meint.
+          const field = URL_SOURCE_ERROR_FIELDS.get(err?.data?.reason);
+          if (field) panel.querySelector(field).focus();
         }
       });
     },
@@ -2533,4 +2683,5 @@ export const __test = {
   moveType, createPresetType, openTypeModal, openScheduleModal, openPickupModal, openSourceModal,
   loadSourceAndOpen, loadPickupAndEdit, deletePickup, openReminderSettingsModal,
   moveOccurrence, skipOccurrence, restoreOccurrence, exportMappingProfileFile,
+  openImportWizard, openUrlSourceWizard, openMappingProfileImportModal, triggerManualRefresh,
 };

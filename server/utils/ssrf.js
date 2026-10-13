@@ -138,6 +138,20 @@ export function readPrivateNetworkOptIn(envName) {
  * @param {boolean}  [opts.allowPrivate=false] Opt-in: Validierung überspringen.
  * @param {Function} [opts.lookup=dnsLookup]   Für Tests injizierbarer DNS-Lookup.
  */
+/**
+ * Die Ablehnung einer privaten oder gesperrten Adresse - von der Vorab-Pruefung
+ * (ics-subscription.js#checkSSRF) wie vom Lookup am Verbindungsaufbau. Eine
+ * eigene Klasse, damit ein Aufrufer den FALL erkennt, ohne den Wortlaut der
+ * Meldung zu lesen (#1909: die Abfuhr nennt ihn dem Client als Grund). Die
+ * Meldung bleibt, wie sie war.
+ */
+export class BlockedAddressError extends Error {
+  constructor(address) {
+    super(`URL resolves to a private IP address: ${address}`);
+    this.name = 'BlockedAddressError';
+  }
+}
+
 export function createGuardedLookup({ allowPrivate = false, lookup = dnsLookup } = {}) {
   return (hostname, options, callback) => {
     if (typeof options === 'function') {
@@ -150,7 +164,7 @@ export function createGuardedLookup({ allowPrivate = false, lookup = dnsLookup }
       if (!allowPrivate) {
         for (const entry of addresses) {
           if (isBlockedAddress(entry.address)) {
-            return callback(new Error(`URL resolves to a private IP address: ${entry.address}`));
+            return callback(new BlockedAddressError(entry.address));
           }
         }
       }

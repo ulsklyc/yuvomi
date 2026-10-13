@@ -21165,7 +21165,6 @@ const SERVER_TEXT_OPEN = new Map([
   ['pages/schedule.js', 1],
   ['pages/subscriptions.js', 8],
   ['pages/tasks.js', 1],
-  ['pages/waste.js', 6],
   ['settings/module-install-errors.js', 1],
   ['settings/pages/modules-health.js', 2],
   ['settings/pages/modules-kitchen.js', 1],
@@ -21227,7 +21226,7 @@ test('keine Seite zeigt den Text des Servers ohne Zuordnung, die offenen stehen 
   assert.deepEqual(shrunk, [],
     'Eine Datei liest den Servertext seltener als die Liste sagt - SERVER_TEXT_OPEN auf die neue Zahl senken '
     + '(bei 0 den Eintrag streichen), sonst darf die Zahl unbemerkt wieder steigen.');
-  for (const name of ['pages/shopping.js', 'utils/kitchen-transfer.js', 'components/category-manager.js']) {
+  for (const name of ['pages/shopping.js', 'pages/waste.js', 'utils/kitchen-transfer.js', 'components/category-manager.js']) {
     assert.equal(SERVER_TEXT_OPEN.has(name), false, `${name} steht auf 0 und gehoert nicht in die Liste`);
   }
 });

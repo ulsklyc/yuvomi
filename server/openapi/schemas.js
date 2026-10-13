@@ -151,6 +151,11 @@ export const schemas = {
             error: { type: 'string' },
             code: { type: 'integer' },
             reason: { type: 'string' },
+            params: {
+              type: 'object',
+              additionalProperties: { type: 'integer' },
+              description: 'Only next to a `reason` whose cause carries a number (waste import and URL sources): the limit or status itself, e.g. `{ "limit_mb": 5 }`, so a client can put it into its own sentence instead of parsing `error`.',
+            },
             storage_code: { $ref: '#/components/schemas/DocumentStorageErrorCode' },
           },
         },
@@ -1839,8 +1844,14 @@ export const schemas = {
             outcome: {
               type: 'string',
               enum: ['committed', 'unchanged', 'needs_mapping', 'error'],
-              description: 'committed: every label had a remembered decision, applied via the same atomic path as a file re-import. unchanged: a conditional GET reported no change (304). needs_mapping: content changed but at least one label (or blocking diagnostic) has no remembered decision - see source.needs_mapping and the preview field. error: the fetch failed - see source.last_error.',
+              description: 'committed: every label had a remembered decision, applied via the same atomic path as a file re-import. unchanged: a conditional GET reported no change (304). needs_mapping: content changed but at least one label (or blocking diagnostic) has no remembered decision - see source.needs_mapping and the preview field. error: the fetch failed - see reason for its class and source.last_error for the stored message.',
             },
+            reason: {
+              type: 'string',
+              enum: ['waste_source_fetch_http_status', 'waste_source_fetch_too_large', 'waste_source_fetch_blocked', 'waste_source_fetch_unreachable', 'waste_source_url_invalid', 'waste_source_url_not_https'],
+              description: 'Only with outcome=error: the class of the failed fetch. http_status: the other side answered, but not with a success (params.status). too_large: the response exceeds the upload limit (params.limit_mb). blocked: a private or blocked address. unreachable: everything else (DNS, refused or reset connection, TLS, timeout, a redirect that is not followed). url_invalid / url_not_https: the stored URL no longer passes validation. Not stored with the source - a later read knows only last_error.',
+            },
+            params: { type: 'object', additionalProperties: { type: 'integer' }, description: 'Only with a reason that carries a number: `{ "status": 404 }` or `{ "limit_mb": 5 }`.' },
             diff: { $ref: '#/components/schemas/WasteImportDiff' },
             preview: { $ref: '#/components/schemas/WasteImportPreview' },
           },

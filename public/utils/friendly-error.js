@@ -53,12 +53,17 @@ export const CASE_MESSAGES = new Map([
   // einen gibt); hier stehen die beiden ohne Zaehler, fuer jede andere Stelle.
   ['category_exists', 'category.errorExists'],
   ['category_last', 'category.errorLast'],
-  // Abfuhr (#1909). Die sieben "gibt es nicht mehr" stehen auch in GONE_REASONS.
+  // Abfuhr (#1909). Die acht "gibt es nicht mehr" stehen auch in GONE_REASONS.
   // `waste_occurrence_not_found`: der Termin wurde inzwischen geaendert, die
   // Abholung, die verschoben oder ausgesetzt werden sollte, steht nicht mehr
   // im Plan. `waste_override_not_found` sieht nur, wer ihn anders als ueber
   // "Zuruecksetzen" erreicht - dort ist er ein Erfolg (isAlreadyDeleted).
   ['waste_type_not_found', 'waste.errorTypeGone'],
+  // Nicht die Abfallart, um die es geht, sondern die im Formular GEWAEHLTE
+  // fehlt (Termin, Abholung, Zuordnung, Import): ein eigener Grund, damit
+  // `waste_type_not_found` nur eines heisst. Die Seite haelt den Dialog dann
+  // offen und frischt die Auswahl auf, statt ihn zu schliessen.
+  ['waste_selected_type_not_found', 'waste.errorSelectedTypeGone'],
   ['waste_schedule_not_found', 'waste.errorScheduleGone'],
   ['waste_pickup_not_found', 'waste.errorPickupGone'],
   ['waste_source_not_found', 'waste.errorSourceGone'],
@@ -81,7 +86,69 @@ export const CASE_MESSAGES = new Map([
   ['waste_override_same_date', 'waste.errorOverrideSameDate'],
   ['waste_reminder_offset_invalid', 'waste.errorReminderOffset'],
   ['waste_reminder_time_invalid', 'waste.errorReminderTime'],
+  // Import einer Datei oder einer Adresse. Die Grenzen tragen ihre Zahl als
+  // Parameter (CASE_PARAMS). Die drei ohne Praefix sind aelter als die Regel
+  // (#1795) und Teil der zugesagten API - sie bleiben, wie sie heissen.
+  ['waste_import_empty_file', 'waste.errorImportEmpty'],
+  ['waste_import_file_too_large', 'waste.errorImportTooLarge'],
+  ['waste_import_event_cap_exceeded', 'waste.errorImportTooManyEvents'],
+  ['waste_import_instance_cap_exceeded', 'waste.errorImportTooManyPickups'],
+  ['waste_import_label_cap_exceeded', 'waste.errorImportTooManyLabels'],
+  ['preview_changed', 'waste.importPreviewChangedError'],
+  ['source_changed', 'waste.importSourceChangedError'],
+  ['waste_profile_invalid', 'waste.mappingProfileInvalidFile'],
+  ['waste_profile_changed', 'waste.errorProfileChanged'],
+  // Quelle mit Adresse: Eingaben des Dialogs, der Handabruf, und je Klasse
+  // eines gescheiterten Abrufs EIN Grund (server/services/waste-url-source.js).
+  ['waste_source_url_invalid', 'waste.errorSourceUrlInvalid'],
+  ['waste_source_url_not_https', 'waste.errorSourceUrlNotHttps'],
+  ['waste_source_interval_invalid', 'waste.errorSourceInterval'],
+  ['waste_source_not_url', 'waste.errorSourceNotUrl'],
+  ['refresh_in_progress', 'waste.errorSourceRefreshRunning'],
+  ['waste_source_fetch_http_status', 'waste.errorSourceFetchStatus'],
+  ['waste_source_fetch_too_large', 'waste.errorSourceFetchTooLarge'],
+  ['waste_source_fetch_blocked', 'waste.errorSourceFetchBlocked'],
+  ['waste_source_fetch_unreachable', 'waste.errorSourceFetchUnreachable'],
 ]);
+
+/**
+ * Welche ZAHLEN ein Satz aus der Antwort einsetzen darf: Grund -> Namen (#1909).
+ * Der Server gibt sie strukturiert mit (`params` neben `reason`), der Satz
+ * traegt sie als `{{name}}`.
+ *
+ * Eine ALLOWLIST je Grund: nur diese Namen kommen in den Satz, nie ein
+ * beliebiges Feld der Antwort, und nur als ganze Zahl (readParams). Fehlt eine
+ * oder ist sie keine, sagt die App den allgemeinen Satz der Stelle - ein Satz
+ * mit einem leeren Platzhalter waere schlechter als keiner. `count` steht hier
+ * nie: der Name waehlt in t() die Pluralform.
+ */
+export const CASE_PARAMS = new Map([
+  ['waste_import_file_too_large', ['limit_mb']],
+  ['waste_import_event_cap_exceeded', ['limit']],
+  ['waste_import_instance_cap_exceeded', ['limit']],
+  ['waste_import_label_cap_exceeded', ['limit']],
+  ['waste_source_interval_invalid', ['min', 'max']],
+  ['waste_source_fetch_http_status', ['status']],
+  ['waste_source_fetch_too_large', ['limit_mb']],
+]);
+
+const PARAM_MAX = 1_000_000_000;
+
+/**
+ * Die erlaubten Zahlen aus `params`, oder null, wenn eine fehlt oder keine ist.
+ * Gelesen wird nur das eigene Feld eines schlichten Objekts; heraus kommt ein
+ * neues Objekt mit genau den erlaubten Namen.
+ */
+function readParams(given, names) {
+  if (given === null || typeof given !== 'object' || Array.isArray(given)) return null;
+  const out = {};
+  for (const name of names) {
+    const value = Object.prototype.hasOwnProperty.call(given, name) ? given[name] : undefined;
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > PARAM_MAX) return null;
+    out[name] = value;
+  }
+  return out;
+}
 
 /**
  * Gruende, die sagen: das Ding, auf das die Handlung zielte, gibt es nicht
@@ -100,6 +167,7 @@ export const GONE_REASONS = new Set([
   'shopping_store_not_found',
   'shopping_category_not_found',
   'waste_type_not_found',
+  'waste_selected_type_not_found',
   'waste_schedule_not_found',
   'waste_pickup_not_found',
   'waste_source_not_found',
@@ -162,17 +230,38 @@ function knownKey(err) {
 }
 
 /**
+ * Der Satz zu `knownKey`, fertig uebersetzt - oder nichts. Traegt der Fall
+ * Zahlen (CASE_PARAMS), setzt t() sie ein; fehlen sie, gibt es keinen Satz,
+ * und der Aufrufer sagt seinen allgemeinen.
+ *
+ * @param {unknown} err
+ * @returns {string|undefined}
+ */
+function knownSentence(err) {
+  const key = knownKey(err);
+  if (!key) return undefined;
+  const reason = err?.data?.reason;
+  // Nur am Fall selbst: eine Absage (403) oder Offline mit demselben `reason`
+  // im Rumpf hat einen anderen Satz bekommen und setzt nichts ein.
+  const names = CASE_MESSAGES.get(reason) === key ? CASE_PARAMS.get(reason) : undefined;
+  if (!names) return t(key);
+  const params = readParams(err?.data?.params, names);
+  return params ? t(key, params) : undefined;
+}
+
+/**
  * DER EINE WEG FUER DIE SEITEN (#1909): aus einem gefangenen Fehler der Satz,
  * den ein Toast zeigt. Bekannter Fall -> sein Satz, alles andere -> der
  * allgemeine Satz der Stelle. Der Text des Servers (`err.data.error`,
- * `err.message`) kommt hier nie heraus.
+ * `err.message`) kommt hier nie heraus; aus der Antwort stammen hoechstens die
+ * Zahlen, die CASE_PARAMS fuer den Fall freigibt.
  *
  * @param {unknown} err
  * @param {string} [fallbackKey] - der allgemeine Satz dieser Stelle
  * @returns {string} uebersetzter Satz
  */
 export function errorSentence(err, fallbackKey = 'common.errorGeneric') {
-  return t(knownKey(err) ?? fallbackKey);
+  return knownSentence(err) ?? t(fallbackKey);
 }
 
 /**
@@ -197,8 +286,8 @@ export function friendlyError(err) {
   // ("Zugriff verweigert. Bitte erneut anmelden."), und der riet zur Anmeldung,
   // wo die Sitzung in Ordnung war: eine abgelaufene Sitzung ist ein 401 und
   // laeuft ueber auth:expired, nie hier durch.
-  const known = knownKey(err);
-  if (known) return t(known);
+  const known = knownSentence(err);
+  if (known) return known;
   const status = err?.status ?? err?.response?.status;
   if (status === 404) return t('common.errorNotFound');
   if (status >= 500) return t('common.errorServer');

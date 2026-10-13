@@ -15,8 +15,8 @@ import * as db from '../../db.js';
 import * as store from '../../services/waste-store.js';
 import { id as validateId } from '../../middleware/validate.js';
 import { wasteErrorResponse, currentUserId, hasWasteWriteAccess, redactSourceForReader } from './helpers.js';
-import { MAX_ICS_BYTES } from '../../services/waste-import.js';
-import { createUrlSource, refreshUrlSource, fetchIcsText, minutesFromNow } from '../../services/waste-url-source.js';
+import { MAX_ICS_BYTES, MAX_ICS_MB } from '../../services/waste-import.js';
+import { createUrlSource, refreshUrlSource, fetchIcsText, minutesFromNow, classifyFetchFailure } from '../../services/waste-url-source.js';
 
 const log = createLogger('Waste');
 const router = express.Router();
@@ -105,7 +105,7 @@ router.post('/:id/refresh', async (req, res) => {
     const source = store.getSource(db.get(), vId.value);
     if (!source) return res.status(404).json({ error: 'Waste import source not found.', code: 404, reason: 'waste_source_not_found' });
     if (source.kind !== 'url') {
-      return res.status(400).json({ error: 'Manual refresh only applies to URL sources; use re-import for file sources.', code: 400 });
+      return res.status(400).json({ error: 'Manual refresh only applies to URL sources; use re-import for file sources.', code: 400, reason: 'waste_source_not_url' });
     }
     const result = await refreshUrlSource(db.get(), vId.value);
     res.json({ data: { ...result, source: redactSourceForReader(result.source, req) } });
@@ -174,11 +174,14 @@ router.put('/:id/mappings/:mappingId', (req, res) => {
 function icsFromBody(req, res) {
   const ics = req.body?.ics;
   if (typeof ics !== 'string' || !ics.trim()) {
-    res.status(400).json({ error: 'An ICS file is required.', code: 400 });
+    res.status(400).json({ error: 'An ICS file is required.', code: 400, reason: 'waste_import_empty_file' });
     return null;
   }
   if (Buffer.byteLength(ics, 'utf8') > MAX_ICS_BYTES) {
-    res.status(400).json({ error: `The file exceeds the ${Math.round(MAX_ICS_BYTES / (1024 * 1024))} MB upload limit.`, code: 400 });
+    res.status(400).json({
+      error: `The file exceeds the ${MAX_ICS_MB} MB upload limit.`, code: 400,
+      reason: 'waste_import_file_too_large', params: { limit_mb: MAX_ICS_MB },
+    });
     return null;
   }
   return ics;
@@ -205,7 +208,9 @@ async function icsTextForReimport(source, req, res) {
       }
       return fetched;
     } catch (err) {
-      res.status(502).json({ error: `Fetching the source URL failed: ${err.message}`, code: 502 });
+      // The class of the failure as `reason` (and its number as `params`), next
+      // to the sentence that carries the cause for logs and API consumers (#1909).
+      res.status(502).json({ error: `Fetching the source URL failed: ${err.message}`, code: 502, ...classifyFetchFailure(err) });
       return null;
     }
   }
