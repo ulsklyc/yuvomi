@@ -469,6 +469,32 @@ for (const name of Object.keys(PROVIDERS)) {
     assert.equal(row(imported.id).series_authored, 0, 'eine eingelesene Serie trägt keine Marke, auch nach der Bearbeitung');
   });
 
+  test(`${name} [${ZONE}] Sekunden im eingelesenen Start: das Formular kann sie nicht halten, verfasst ist damit nichts`, async () => {
+    // Der Dialog schickt `YYYY-MM-DDTHH:MM` (public/pages/calendar.js,
+    // `eventStartFromForm`). Ein eingelesener Start mit Sekunden kommt deshalb
+    // bei JEDER Bearbeitung ohne sie zurück. Das ist keine Entscheidung des
+    // Nutzers über den Start, und die Serie bleibt die des Anbieters.
+    const p = provider(name);
+    const atProvider = p.seedForeign({ start: '2035-01-15T14:00:30', end: '2035-01-15T15:00:30', rrule: LAST_DAY });
+    await p.sync();
+    const imported = db.prepare("SELECT * FROM calendar_events WHERE title = 'Fremd'").get();
+    assert.equal(storedToInstantMsPrecise(imported.start_datetime, ZONE), Date.parse(wall('2035-01-15T14:00:30')),
+      'die Sekunden stehen in der Zeile');
+
+    await editTitle(p, imported.id, {
+      title: 'Umbenannt', start_datetime: '2035-01-15T14:00', end_datetime: '2035-01-15T15:00',
+      all_day: false, recurrence_rule: LAST_DAY,
+    });
+    assert.equal(atProvider().start.slice(0, 16), wall('2035-01-15T14:00').slice(0, 16),
+      'der Start bleibt am 15., neben der Regel, wie er eingelesen wurde');
+    assert.equal(row(imported.id).series_authored, 0);
+
+    // Die Gegenrichtung: eine Minute ist eine Entscheidung über den Start.
+    await editTitle(p, imported.id, { start_datetime: '2035-01-15T14:01', end_datetime: '2035-01-15T15:00' });
+    assert.equal(row(imported.id).series_authored, 1, 'ein um eine Minute verlegter Start ist verfasst');
+    assert.equal(atProvider().start, wall('2035-01-31T14:01'));
+  });
+
   // ── Wer Start oder Regel in Yuvomi ändert, hat sie verfasst ────────────────────
 
   test(`${name} [${ZONE}] eine eingelesene Serie, deren Regel in Yuvomi geändert wird, ist ab dann verfasst`, async () => {

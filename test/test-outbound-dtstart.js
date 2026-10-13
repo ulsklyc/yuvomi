@@ -295,6 +295,24 @@ test('derselbe Beginn in anderer Schreibweise ist keine Startaenderung', () => {
   assert.equal(startOrRuleChanged(ganztags, { ...ganztags }, BERLIN), false);
 });
 
+test('Sekunden, die das Formular nicht halten kann, sind keine Startaenderung', () => {
+  // Der Dialog schickt HH:MM. Ein eingelesener Start mit Sekunden oder
+  // Bruchteilen kommt bei jeder Bearbeitung ohne sie zurueck.
+  for (const gespeichert of ['2035-01-15T13:00:30Z', '2035-01-15T14:00:59.999+01:00', '2035-01-15T14:00:30']) {
+    const zeile = { start_datetime: gespeichert, all_day: 0, recurrence_rule: MONATSLETZTER };
+    assert.equal(startOrRuleChanged(zeile, { ...zeile, start_datetime: '2035-01-15T14:00' }, BERLIN), false, gespeichert);
+    // Die Minute davor und danach bleiben eine Aenderung.
+    assert.equal(startOrRuleChanged(zeile, { ...zeile, start_datetime: '2035-01-15T14:01' }, BERLIN), true, gespeichert);
+    assert.equal(startOrRuleChanged(zeile, { ...zeile, start_datetime: '2035-01-15T13:59' }, BERLIN), true, gespeichert);
+  }
+});
+
+test('der Abruf vergleicht genau: Sekunden vom Anbieter sind ein anderer Start', () => {
+  const kommt = { start_datetime: '2035-01-31T13:00:30Z', end_datetime: '2035-01-31T14:00:30Z', all_day: false, recurrence_rule: MONATSLETZTER };
+  const zeile = { start_datetime: '2035-01-15T14:00', end_datetime: '2035-01-15T15:00', all_day: 0, recurrence_rule: MONATSLETZTER, tzid: null, series_authored: 1 };
+  assert.deepEqual(inboundSeriesVerdict(zeile, kommt, { zone: BERLIN }), { keep: false, authored: 0 });
+});
+
 test('dieselbe Regel in anderer Schreibweise ist keine Regelaenderung', () => {
   const zeile = { start_datetime: '2035-01-15T14:00', all_day: 0, recurrence_rule: 'RRULE:FREQ=MONTHLY;BYMONTHDAY=-1' };
   const danach = { ...zeile, recurrence_rule: 'bymonthday=-1;FREQ=MONTHLY' };

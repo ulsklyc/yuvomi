@@ -226,13 +226,17 @@ function ruleKey(rule) {
  * Bearbeitung eines eingelesenen Termins eine Startaenderung - das Formular
  * schickt die Wanduhrzeit zurueck, in der Zeile steht der Zeitpunkt.
  * Ganztaegig zaehlt der Tag, sonst der Zeitpunkt.
+ *
+ * `toMinute`: nur die Minute zaehlt, Sekunden und Bruchteile fallen weg
+ * (abgeschnitten, nicht gerundet - so zeigt sie auch das Formular).
  */
-function sameStart(a, b, zone, allDay) {
+function sameStart(a, b, zone, allDay, { toMinute = false } = {}) {
   if (a == null || b == null) return a == null && b == null;
   if (allDay) return String(a).slice(0, 10) === String(b).slice(0, 10);
   const links = storedToInstantMsPrecise(a, zone);
   const rechts = storedToInstantMsPrecise(b, zone);
-  return links !== null && links === rechts;
+  if (links === null || rechts === null) return false;
+  return toMinute ? Math.floor(links / 60000) === Math.floor(rechts / 60000) : links === rechts;
 }
 
 /**
@@ -244,6 +248,15 @@ function sameStart(a, b, zone, allDay) {
  * daran, wer den Start geschrieben hat, und die eingelesene Serie geht danach
  * weiter Wort fuer Wort zurueck (#756).
  *
+ * VERGLICHEN WIRD AUF DIE MINUTE. Der Dialog schickt `YYYY-MM-DDTHH:MM`, mehr
+ * kann er nicht halten. Ein eingelesener Start mit Sekunden (`14:00:30`) kommt
+ * deshalb bei jeder Bearbeitung als `14:00` zurueck, auch wenn nur der Titel
+ * geaendert wurde. Das ist der Verlust des Formulars und keine Entscheidung
+ * ueber den Start: auf die Millisekunde verglichen bekaeme die Serie die
+ * Marke und ginge mit einem anderen DTSTART zurueck. Eine Minute Unterschied
+ * bleibt eine Aenderung. Der Abruf (`inboundSeriesVerdict`) vergleicht
+ * dagegen genau: dort stehen sich zwei Zeitpunkte gegenueber, kein Formular.
+ *
  * @param {object} before  Zeile vor der Bearbeitung
  * @param {{start_datetime: string, all_day: number|boolean, recurrence_rule: ?string}} after
  * @param {string} zone    Zone des Haushalts (`householdTimeZone`)
@@ -252,7 +265,7 @@ function sameStart(a, b, zone, allDay) {
 export function startOrRuleChanged(before, after, zone) {
   if (ruleKey(before?.recurrence_rule) !== ruleKey(after?.recurrence_rule)) return true;
   if (!!before?.all_day !== !!after?.all_day) return true;
-  return !sameStart(before?.start_datetime, after?.start_datetime, zone, !!after?.all_day);
+  return !sameStart(before?.start_datetime, after?.start_datetime, zone, !!after?.all_day, { toMinute: true });
 }
 
 /**
