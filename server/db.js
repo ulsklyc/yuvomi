@@ -10860,17 +10860,34 @@ const MIGRATIONS = [
         `);
       }
 
-      const triggers = database.prepare(`
-        SELECT name, sql FROM sqlite_master
-        WHERE type = 'trigger' AND tbl_name = 'calendar_events' AND sql IS NOT NULL
-        ORDER BY rowid
-      `).all();
-      for (const trigger of triggers) database.exec(`DROP TRIGGER "${trigger.name}"`);
-      database.exec("UPDATE calendar_events SET series_authored = 1 WHERE external_source = 'local'");
-      for (const trigger of triggers) database.exec(trigger.sql);
+      backfillSeriesAuthored(database);
     },
   },
 ];
+
+/**
+ * Der Nachtrag zu Migration 246 (#1935): lokale Zeilen sind hier verfasst.
+ *
+ * Eine eigene Funktion, weil ZWEI Wege ihn brauchen - die Migration und
+ * `reconcileCriticalSchema()`. Legt die Selbstheilung die Spalte auf einer
+ * gedrifteten Datenbank neu an (Migration vermerkt, Spalte fehlt), stuende
+ * sonst jede Zeile auf 0, und die hier angelegten Serien gingen danach wie
+ * eingelesene hinaus.
+ *
+ * Die Trigger von calendar_events ruhen dabei (Begruendung an Migration 246)
+ * und werden mit ihrem gespeicherten Wortlaut wieder angelegt. Die Aufrufer
+ * sorgen fuer die Transaktion.
+ */
+function backfillSeriesAuthored(database) {
+  const triggers = database.prepare(`
+    SELECT name, sql FROM sqlite_master
+    WHERE type = 'trigger' AND tbl_name = 'calendar_events' AND sql IS NOT NULL
+    ORDER BY rowid
+  `).all();
+  for (const trigger of triggers) database.exec(`DROP TRIGGER "${trigger.name}"`);
+  database.exec("UPDATE calendar_events SET series_authored = 1 WHERE external_source = 'local'");
+  for (const trigger of triggers) database.exec(trigger.sql);
+}
 
 /**
  * Hat ein ANDERER Prozess genau diese Migration inzwischen verbucht? (#1331)
@@ -11080,6 +11097,10 @@ function allowNewerSchema() {
  * Kritische additive Spalten, die real vorhanden sein MÜSSEN, sobald ihre
  * Migration als angewendet gilt. Jede Spalte ist eine gefahrlos wiederholbare
  * `ADD COLUMN` (NULL-Default) - die einzige idempotente Reparaturform.
+ *
+ * `backfill` (optional): der Nachtrag, den die Migration der Spalte nach dem
+ * `ADD COLUMN` faehrt. Er laeuft nur, wenn die Spalte hier wirklich neu
+ * angelegt wurde, und in derselben Transaktion wie sie.
  */
 const CRITICAL_COLUMNS = [
   // #538: v54 trägt reminders.pushed_at nach; ohne die Spalte scheitert der
@@ -11107,8 +11128,13 @@ const CRITICAL_COLUMNS = [
   // #1935: v246 traegt nach, wer Start und Regel eines Termins verfasst hat;
   // ohne die Spalte scheitert das Anlegen jedes Termins und jeder Abruf von
   // Google, CalDAV und iCloud (er liest sie, bevor er die Zeile anfasst).
+  // MIT NACHTRAG: die Spalte allein stellte jede Zeile auf 0 ("unbekannt"),
+  // auch die hier angelegten, die Migration 246 auf 1 gesetzt hatte. Eine
+  // einst gesetzte Marke an einer gespiegelten Zeile ist mit der Spalte
+  // verloren und bleibt unbekannt.
   { table: 'calendar_events', column: 'series_authored',
-    type: 'INTEGER NOT NULL DEFAULT 0 CHECK(series_authored IN (0, 1))' },
+    type: 'INTEGER NOT NULL DEFAULT 0 CHECK(series_authored IN (0, 1))',
+    backfill: backfillSeriesAuthored },
 ];
 
 /**
@@ -11128,7 +11154,7 @@ const CRITICAL_COLUMNS = [
  */
 function reconcileCriticalSchema(database = db) {
   if (!database) return;
-  for (const { table, column, type } of CRITICAL_COLUMNS) {
+  for (const { table, column, type, backfill } of CRITICAL_COLUMNS) {
     let columns;
     try {
       columns = database.prepare(`PRAGMA table_info(${table})`).all();
@@ -11138,7 +11164,24 @@ function reconcileCriticalSchema(database = db) {
     if (!columns.length) continue;                          // Tabelle existiert nicht
     if (columns.some((c) => c.name === column)) continue;   // Spalte bereits vorhanden
     try {
-      database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+      if (backfill) {
+        // Spalte und Nachtrag zusammen oder gar nicht: eine Spalte ohne ihren
+        // Nachtrag gaelte beim naechsten Start als vorhanden, und der Nachtrag
+        // liefe nie mehr. SAVEPOINT, weil es unter better-sqlite3 und
+        // node:sqlite gleich geht und auch in einer offenen Transaktion.
+        database.exec('SAVEPOINT reconcile_column');
+        try {
+          database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+          backfill(database);
+          database.exec('RELEASE SAVEPOINT reconcile_column');
+        } catch (err) {
+          database.exec('ROLLBACK TO SAVEPOINT reconcile_column');
+          database.exec('RELEASE SAVEPOINT reconcile_column');
+          throw err;
+        }
+      } else {
+        database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+      }
       log.warn(`Schema-Drift behoben: ${table}.${column} fehlte trotz vermerkter Migration und wurde nachgetragen (#538).`);
     } catch (err) {
       log.error(`Schema-Reconciliation ${table}.${column} fehlgeschlagen:`, err?.message || err);
