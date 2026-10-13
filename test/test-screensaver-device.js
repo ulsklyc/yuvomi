@@ -7,7 +7,9 @@
  *          diagonally opposite the caption, turns it on the full minute and
  *          stops it with the overlay, reads both choices at every start (so a
  *          change applies without a reload), and the switches under Appearance
- *          store and confirm.
+ *          store and confirm. A start by hand (preview(), the wall footer
+ *          button and the admin preview) is not dismissed by the mouse that
+ *          started it: the cases at the end drive the gestures.
  * Run: npm run test:screensaver-device (needs test/test-browser-loader.mjs for
  *      the component's /api.js and /i18n.js)
  */
@@ -361,4 +363,180 @@ test('the stylesheet keeps contain as the default and crops only with the cover 
   assert.match(css, /\.photo-screensaver img \{[^}]*object-fit: contain;/);
   assert.match(css, /\.photo-screensaver--cover img \{ object-fit: cover; \}/);
   assert.match(css, /\.photo-screensaver p\.photo-screensaver__clock \{[^}]*font-variant-numeric: tabular-nums;/);
+});
+
+// ---------------------------------------------------------------------------
+// A start by hand (#1766: "the gesture that starts it does not dismiss it
+// again"). preview() is what the wall footer button and the admin preview
+// call. A mouse that rested before the click, then moves: that first counted
+// pointermove used to dismiss the screensaver, or to retire a start still
+// waiting for its photos (preview() answered false and the caller said "not
+// available"). Fixed times throughout, on the mocked clock.
+
+const fire = (name) => {
+  const event = { preventDefault() {}, stopImmediatePropagation() {} };
+  for (const handler of listeners[name] ?? []) handler(event);
+};
+const settle = async () => { for (let i = 0; i < 5; i += 1) await flush(); };
+
+/**
+ * A click on the start control, as the component sees it: the pointer comes to
+ * rest on the button (its last counted move), waits `rested` ms, presses - the
+ * pointerdown reaches the component BEFORE the click handler calls preview() -
+ * and 80 ms later the click calls preview(). A tap sends touchstart as well and
+ * no move at all.
+ */
+async function startByHand({ rested = 5000, touch = false } = {}) {
+  const { preview } = await page();
+  // Clean slate: nothing showing, nothing pending, the throttle long expired.
+  fire('pointerdown');
+  for (const request of requests) request.resolve({ data: { enabled: false, photos: [] } });
+  await settle();
+  mock.timers.tick(2000);
+  requests.length = 0;
+  if (!touch) fire('pointermove');
+  mock.timers.tick(rested);
+  fire('pointerdown');
+  if (touch) fire('touchstart');
+  mock.timers.tick(80);
+  assert.equal(overlay(), undefined, 'the press itself opens nothing');
+  const state = { result: 'pending' };
+  state.done = preview().then((value) => { state.result = value; });
+  assert.equal(requests.length, 1, 'preview() asked for photos');
+  state.answer = async (payload = PHOTOS) => { requests[0].resolve(payload); await settle(); };
+  return state;
+}
+
+test('by hand, mouse rested: a move 50 ms after it opened does not dismiss it', async () => {
+  const start = await startByHand({ rested: 5000 });
+  mock.timers.tick(30);
+  await start.answer();
+  assert.equal(start.result, true);
+  assert.ok(overlay(), 'open');
+  mock.timers.tick(50);
+  fire('pointermove');
+  await settle();
+  assert.ok(overlay(), 'the hand leaving the button does not close what it just opened');
+  mock.timers.tick(10_000);
+  assert.ok(overlay(), 'and it stays');
+  fire('pointerdown');
+});
+
+test('by hand, photos still loading: a move 50 ms after the click does not retire the start', async () => {
+  const start = await startByHand({ rested: 5000 });
+  mock.timers.tick(50);
+  fire('pointermove');
+  await settle();
+  mock.timers.tick(250);
+  await start.answer();
+  assert.equal(start.result, true, 'preview() answers true, so no caller says "not available"');
+  assert.ok(overlay(), 'and the screensaver is open');
+  assert.equal(requests.length, 1, 'one request, no second start');
+  fire('pointerdown');
+});
+
+test('by hand, photos slower than the throttle: a move while waiting still retires nothing', async () => {
+  // 1200 ms after the click is past the 1 s throttle: a grace period counted
+  // from the click alone would have run out before the photos arrived.
+  const start = await startByHand({ rested: 5000 });
+  mock.timers.tick(1200);
+  fire('pointermove');
+  await settle();
+  mock.timers.tick(300);
+  await start.answer();
+  assert.equal(start.result, true);
+  assert.ok(overlay(), 'open after 1500 ms of loading');
+  // The grace period counts from the opening, not from the click.
+  mock.timers.tick(50);
+  fire('pointermove');
+  await settle();
+  assert.ok(overlay(), 'and a move 50 ms after it opened does not dismiss it either');
+  fire('pointerdown');
+});
+
+test('by hand: a move 1500 ms after it opened dismisses it, as before', async () => {
+  const start = await startByHand({ rested: 5000 });
+  mock.timers.tick(30);
+  await start.answer();
+  assert.ok(overlay());
+  mock.timers.tick(1500);
+  fire('pointermove');
+  await settle();
+  assert.equal(overlay(), undefined, 'the grace period is the 1 s throttle, not longer');
+  // And the dismissal armed the idle timer like any other.
+  requests.length = 0;
+  mock.timers.tick(300_000);
+  assert.equal(requests.length, 1, 'the idle timer runs again');
+});
+
+test('by hand: a key, a press, a touch and the wheel dismiss it at once, grace period or not', async () => {
+  for (const name of ['keydown', 'pointerdown', 'touchstart', 'wheel']) {
+    const start = await startByHand({ rested: 5000 });
+    mock.timers.tick(30);
+    await start.answer();
+    assert.ok(overlay(), `open before ${name}`);
+    mock.timers.tick(50);
+    fire(name);
+    assert.equal(overlay(), undefined, `${name} 50 ms after it opened closes it`);
+  }
+});
+
+test('by hand: a press while the photos load still retires the start', async () => {
+  const start = await startByHand({ rested: 5000 });
+  mock.timers.tick(100);
+  fire('pointerdown');
+  mock.timers.tick(200);
+  await start.answer();
+  assert.equal(start.result, false, 'a deliberate gesture wins over a start that has not shown yet');
+  assert.equal(overlay(), undefined);
+});
+
+test('by hand, no photos: the start fails, and the next idle screensaver is dismissed by its first move', async () => {
+  // A failed start must not leave moves uncounted: the screensaver the idle
+  // timer opens afterwards closes on the first move, like every idle start.
+  const start = await startByHand({ rested: 5000 });
+  mock.timers.tick(30);
+  await start.answer({ data: { enabled: true, photos: [] } });
+  assert.equal(start.result, false);
+  assert.equal(overlay(), undefined);
+  requests.length = 0;
+  mock.timers.tick(300_000);
+  assert.equal(requests.length, 1, 'the idle timer asked');
+  requests[0].resolve(PHOTOS);
+  await settle();
+  assert.ok(overlay(), 'idle screensaver open');
+  mock.timers.tick(50);
+  fire('pointermove');
+  assert.equal(overlay(), undefined, 'first move closes it');
+});
+
+test('started by the idle timer: the first move dismisses it, exactly as before', async () => {
+  await openScreensaver();
+  mock.timers.tick(50);
+  fire('pointermove');
+  assert.equal(overlay(), undefined, 'no grace period for a screensaver nobody started by hand');
+});
+
+test('started by the idle timer after one by hand: still no grace period', async () => {
+  const start = await startByHand({ rested: 5000 });
+  mock.timers.tick(30);
+  await start.answer();
+  assert.ok(overlay());
+  await openScreensaver();
+  mock.timers.tick(50);
+  fire('pointermove');
+  assert.equal(overlay(), undefined);
+});
+
+test('by hand, a tap: no move follows, it stays open until the next tap', async () => {
+  const start = await startByHand({ rested: 5000, touch: true });
+  mock.timers.tick(300);
+  await start.answer();
+  assert.equal(start.result, true);
+  assert.ok(overlay());
+  mock.timers.tick(10_000);
+  assert.ok(overlay(), 'still open ten seconds later');
+  fire('pointerdown');
+  fire('touchstart');
+  assert.equal(overlay(), undefined, 'the next tap closes it');
 });
