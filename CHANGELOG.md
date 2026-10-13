@@ -128,6 +128,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   could happen with Google when an event gave up its Google calendar during the upload, and an
   event deleted in that moment stayed behind at Google. Now such an event stays local and keeps
   its calendar, and the copy that reached the provider is removed on the next sync.
+- **Google Calendar: an edit made while the event is uploading is sent afterwards** (#1932).
+  Sending a new event to Google takes a moment. If you changed its title, time or another
+  detail in that moment, Google kept the event as it was before the edit and Yuvomi recorded it
+  as up to date, so the change never reached Google - and the next sync could write Google's
+  older version back over your edit. Yuvomi now looks at the event again after Google has
+  answered and sends an edit made in the meantime with the next sync. CalDAV and iCloud already
+  did this (#1862).
 - **Shopping: an error message is in your language** (#1909). When something could not be
   saved, the note showed the server's own sentence, in English or German whatever the app was set
   to - "Unbekannte Liste." in an English session, when an item was moved to a list somebody had

@@ -775,12 +775,24 @@ async function runSync(createCalendar) {
         // lokalen Kalender und stünde bei Google, obwohl ihn dort niemand mehr
         // haben will. Der gerade angelegte Termin wird dann zum Löschen
         // vorgemerkt; die Löschroute tut das für eine lokale Zeile nicht.
+        //
+        // Wer inzwischen BEARBEITET wurde (#1932), wird Spiegel und im selben
+        // Schreibvorgang als geändert vorgemerkt: bei Google liegt der Stand,
+        // aus dem die Anfrage gebaut wurde, und eine lokale Zeile merkt in der
+        // Route nichts vor. Als sauberer Spiegel ginge die Bearbeitung nie
+        // hinaus, und der nächste Inbound überschriebe sie mit dem alten Stand.
+        // Verglichen wird wie bei CalDAV und Apple (`bookEventUpload`) über die
+        // gespiegelten Felder; zwischen Nachlesen und Schreiben liegt kein await.
+        const now    = outbound.reloadEvent(event.id);
+        const edited = now && outbound.mirroredFieldsChanged(event, now) ? 1 : 0;
         const booked = db.get().prepare(`
           UPDATE calendar_events
           SET external_calendar_id = ?, external_source = 'google', local_calendar_id = NULL, calendar_ref_id = ?,
-              color_modified = CASE WHEN color IS NOT NULL THEN 1 ELSE color_modified END
+              color_modified = CASE WHEN color IS NOT NULL THEN 1 ELSE color_modified END,
+              outbound_dirty = CASE WHEN ? = 1 THEN 1 ELSE outbound_dirty END,
+              outbound_attempts = CASE WHEN ? = 1 THEN 0 ELSE outbound_attempts END
           WHERE id = ? AND external_source = 'local' AND target_google_calendar_id = ?
-        `).run(created.data.id, calRefId, event.id, targetId).changes > 0;
+        `).run(created.data.id, calRefId, edited, edited, event.id, targetId).changes > 0;
         if (!booked) {
           outbound.queueDeletion({ source: 'google', calendarExternalId: targetId, eventExternalId: created.data.id });
           log.info(`Event ${event.id} stopped waiting for its upload to ${targetId} while it was in flight, queued the deletion of the created entry.`);

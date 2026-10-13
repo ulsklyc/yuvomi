@@ -1847,3 +1847,188 @@ test('#1875: meldet Google keine Kalenderzone, gilt die Haushaltszone', async ()
     assert.equal(calendar.patches[0].requestBody.start.timeZone, 'Europe/Amsterdam');
   });
 });
+
+// ── Bearbeitung während des Uploads (#1932) ─────────────────────────────────────
+// Ein lokaler Termin mit Google-Ziel geht per `events.insert` hinaus. Wird er
+// bearbeitet, während die Anfrage läuft, liegt bei Google der Stand von davor -
+// und die Route merkt nichts vor, weil die Zeile noch lokal ist. Die Buchung muss
+// deshalb selbst vergleichen, was hinausging und was jetzt in der Zeile steht.
+// Alles über den echten sync() und den echten PUT; nur Google ist eine Attrappe,
+// die festhält, was bei ihr liegt, und es auf Wunsch im Inbound zurückliefert.
+
+function fakeGoogleHolding() {
+  const held = new Map();
+  const inserts = [];
+  const patches = [];
+  // Google liefert einen Zeitpunkt mit Versatz; der Kalender der Attrappe liegt in UTC.
+  const asListed = (when) => (when?.dateTime && !/Z|[+-]\d\d:\d\d$/.test(when.dateTime)
+    ? { ...when, dateTime: `${when.dateTime}Z` } : when);
+  const state = { duringInsert: null, echo: false, patchFails: null };
+  return {
+    held, inserts, patches, state,
+    calendarList: {
+      get: async ({ calendarId }) => ({
+        data: { accessRole: 'owner', timeZone: 'UTC', summary: calendarId, backgroundColor: '#4285F4' },
+      }),
+    },
+    colors: { get: async () => ({ data: { event: {} } }) },
+    events: {
+      list: async () => ({
+        data: {
+          items: state.echo
+            ? [...held.values()].map((item) => ({ ...item, start: asListed(item.start), end: asListed(item.end) }))
+            : [],
+          nextSyncToken: 'token-1932',
+        },
+      }),
+      insert: async (params) => {
+        inserts.push(params);
+        const id = `created-1932-${inserts.length}`;
+        held.set(id, { id, status: 'confirmed', ...params.requestBody });
+        if (state.duringInsert) await state.duringInsert(params.requestBody.summary);
+        return { data: { id } };
+      },
+      patch: async (params) => {
+        patches.push(params);
+        if (state.patchFails) throw state.patchFails;
+        held.set(params.eventId, { ...held.get(params.eventId), ...params.requestBody });
+        return { data: {} };
+      },
+      delete: async () => ({}),
+    },
+  };
+}
+
+/** Termin mit Google-Ziel, angelegt über die Route wie im Betrieb. */
+async function createTargeted(title) {
+  const res = await callRoute('POST', '/', {
+    title, start_datetime: '2035-07-10T14:00', end_datetime: '2035-07-10T15:00', target_google_calendar_id: 'family',
+  });
+  assert.equal(res.status, 201);
+  return (await res.json()).data;
+}
+
+const EDIT_1932 = { title: 'Neuer Titel', start_datetime: '2035-07-11T16:00', end_datetime: '2035-07-11T17:00' };
+
+/** Lauf 1: `edited` wird in seinem eigenen events.insert bearbeitet, `untouched` nicht. */
+async function uploadWithEditInFlight() {
+  reset();
+  setHouseholdZone(null);
+  __test.setCalendarEnabled('family', true, { name: 'Family' });
+  const edited    = await createTargeted('Alter Titel');
+  const untouched = await createTargeted('Unberührt');
+  const calendar  = fakeGoogleHolding();
+
+  calendar.state.duringInsert = async (summary) => {
+    if (summary === 'Alter Titel') await put(edited.id, EDIT_1932);
+  };
+  await sync({ createCalendar: () => calendar });
+  calendar.state.duringInsert = null;
+
+  return { calendar, edited, untouched, run: () => sync({ createCalendar: () => calendar }) };
+}
+
+test('#1932: ein während des Uploads bearbeiteter Termin wird Spiegel und bleibt als geändert vorgemerkt', async () => {
+  const { calendar, edited, untouched } = await uploadWithEditInFlight();
+
+  assert.deepEqual(calendar.inserts.map((p) => p.requestBody.summary).sort(), ['Alter Titel', 'Unberührt'],
+    'hinaus ging der Stand von vor der Bearbeitung');
+  const row = reload(edited.id);
+  assert.equal(row.external_source, 'google');
+  assert.equal(row.external_calendar_id, 'created-1932-1');
+  assert.equal(row.title, 'Neuer Titel');
+  assert.equal(row.outbound_dirty, 1, 'bei Google liegt der alte Stand, die Bearbeitung muss noch hinaus');
+  assert.equal(row.outbound_attempts, 0);
+  assert.equal(calendar.held.get('created-1932-1').summary, 'Alter Titel');
+
+  const other = reload(untouched.id);
+  assert.equal(other.external_source, 'google');
+  assert.equal(other.outbound_dirty, 0, 'wer nicht bearbeitet wurde, ist ein sauberer Spiegel');
+});
+
+test('#1932: der nächste Lauf sendet genau einen Patch mit dem bearbeiteten Stand', async () => {
+  const { calendar, edited, untouched, run } = await uploadWithEditInFlight();
+
+  calendar.state.echo = true;
+  await run();
+
+  assert.equal(calendar.patches.length, 1, 'ein Patch, und keiner für den unberührten Termin');
+  const [patch] = calendar.patches;
+  assert.equal(patch.calendarId, 'family');
+  assert.equal(patch.eventId, 'created-1932-1');
+  assert.equal(patch.requestBody.summary, 'Neuer Titel');
+  assert.equal(patch.requestBody.start.dateTime, '2035-07-11T16:00:00');
+  assert.equal(patch.requestBody.end.dateTime, '2035-07-11T17:00:00');
+  assert.equal(calendar.inserts.length, 2, 'nichts wird ein zweites Mal angelegt');
+
+  const row = reload(edited.id);
+  assert.equal(row.outbound_dirty, 0);
+  assert.equal(row.title, 'Neuer Titel');
+  assert.equal(reload(untouched.id).outbound_dirty, 0);
+
+  await run();
+  assert.equal(calendar.patches.length, 1, 'danach ist nichts mehr zu senden');
+  assert.equal(reload(edited.id).title, 'Neuer Titel');
+});
+
+test('#1932: liefert der Inbound den angelegten Eintrag zurück, bevor der Patch durchgeht, bleibt die Bearbeitung', async () => {
+  const { calendar, edited, run } = await uploadWithEditInFlight();
+  const after = reload(edited.id);
+
+  // Der Patch scheitert vorübergehend, der Inbound desselben Laufs liefert den
+  // angelegten Eintrag im alten Stand.
+  calendar.state.echo = true;
+  calendar.state.patchFails = apiError(503);
+  await run();
+
+  const row = reload(edited.id);
+  assert.equal(row.title, 'Neuer Titel', 'der alte Google-Stand überschreibt die Bearbeitung nicht');
+  assert.equal(row.start_datetime, after.start_datetime);
+  assert.equal(row.end_datetime, after.end_datetime);
+  assert.equal(row.outbound_dirty, 1);
+  assert.equal(calendar.patches.length, 1);
+  assert.equal(calendar.held.get('created-1932-1').summary, 'Alter Titel', 'bei Google liegt weiter der alte Stand');
+
+  calendar.state.patchFails = null;
+  await run();
+  assert.equal(calendar.patches.length, 2);
+  assert.equal(calendar.held.get('created-1932-1').summary, 'Neuer Titel');
+  assert.equal(reload(edited.id).outbound_dirty, 0);
+  assert.equal(reload(edited.id).title, 'Neuer Titel');
+});
+
+test('#1932: ohne Bearbeitung während des Uploads wird sauber gebucht und nichts gepatcht', async () => {
+  reset();
+  setHouseholdZone(null);
+  __test.setCalendarEnabled('family', true, { name: 'Family' });
+  const event    = await createTargeted('Ohne Bearbeitung');
+  const calendar = fakeGoogleHolding();
+
+  await sync({ createCalendar: () => calendar });
+  const row = reload(event.id);
+  assert.equal(row.external_source, 'google');
+  assert.equal(row.outbound_dirty, 0);
+
+  calendar.state.echo = true;
+  await sync({ createCalendar: () => calendar });
+  assert.equal(calendar.inserts.length, 1);
+  assert.deepEqual(calendar.patches, [], 'kein Patch für einen Termin, der so bei Google liegt, wie er hinausging');
+  assert.equal(reload(event.id).outbound_dirty, 0);
+  assert.equal(reload(event.id).title, 'Ohne Bearbeitung');
+});
+
+test('#1932: eine Bearbeitung ausserhalb der gespiegelten Felder merkt nichts vor', async () => {
+  reset();
+  setHouseholdZone(null);
+  __test.setCalendarEnabled('family', true, { name: 'Family' });
+  const event    = await createTargeted('Nur intern geändert');
+  const calendar = fakeGoogleHolding();
+
+  calendar.state.duringInsert = () => put(event.id, { assigned_to: 1 });
+  await sync({ createCalendar: () => calendar });
+
+  const row = reload(event.id);
+  assert.equal(row.external_source, 'google');
+  assert.equal(row.assigned_to, 1, 'die Bearbeitung ist angekommen');
+  assert.equal(row.outbound_dirty, 0, 'die Zuweisung geht nicht zu Google, also ist nichts nachzusenden');
+});
