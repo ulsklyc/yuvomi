@@ -76,6 +76,22 @@
  * dessen Kopf). Die uebrigen bleiben im Dokument, zurueckgenommen
  * (`.toast--tucked`) und `inert`, und kommen wieder, sobald Platz ist.
  *
+ * SPERRZONEN AUSSERHALB VON DIALOGEN (#1917): `[data-toast-keepout]`. Eine
+ * Seite zeichnet damit aus, was eine Meldung nie verdecken darf, auch wenn kein
+ * Dialog offen ist - die Uhr und der Fuss der Wand. Anlass: der Hinweis beim
+ * Einschalten des Wand-Modus lag bis rund 834px Breite acht Sekunden auf der
+ * Uhr, also auf dem einen, wofuer die Flaeche da ist (gemessen 390x844: Uhrzeit
+ * und Datum zu 100 % verdeckt). Der Stapel steht dort seit #1559 oben, weil
+ * unten die Startknoepfe liegen; dass oben "nur die Uhr steht, die nichts
+ * annimmt", stimmte fuer den Tipp und nicht fuer das Auge.
+ * Die Regel sitzt hier und nicht an der Seite: das Modul kennt keinen
+ * Seitenselektor, es liest das Attribut, und jede kuenftige Meldung an jeder
+ * Flaeche, die es setzt, weicht ebenso. Eine Sperrzone zaehlt wie eine
+ * Bedienleiste; liegt der Stapel an seinem Platz auf einer, nimmt er die
+ * naechste freie Lage (Lage 6), in seiner eigenen Breite und Mitte - er springt
+ * nur senkrecht. Unter einem MODALEN Dialog zaehlt sie nicht: dessen Hintergrund
+ * deckt sie ab. Ohne das Attribut im Dokument aendert sich nichts.
+ *
  * Die Abstaende kommen aus tokens.css (`--toast-dock-gap` in layout.css), die
  * Lage schreibt dieses Modul als drei Variablen an den Stapel; die Regel, die
  * sie liest, steht bei `.shell-bottom-stack[data-dock]` in layout.css.
@@ -107,6 +123,12 @@ export const PANE_SELECTOR = '.split-view__detail';
 
 /** Dialog oder Detailspalte: jede Flaeche, deren Leisten der Stapel frei haelt. */
 const SURFACE_SELECTOR = `${DIALOG_SELECTOR}, ${PANE_SELECTOR}`;
+
+/**
+ * Sperrzone ausserhalb von Dialogen (#1917): was dieses Attribut traegt, haelt
+ * der Stapel frei wie eine Bedienleiste. Siehe Kopf.
+ */
+export const KEEPOUT_SELECTOR = '[data-toast-keepout]';
 
 /** Die ausgezeichneten Bedienleisten eines Dialogs (und der Detailspalte). */
 export const ACTION_ZONE_SELECTOR =
@@ -155,6 +177,10 @@ function overlapArea(a, b) {
  * @param {boolean} [input.beside=true] Lage 2 und 3 (ueber und unter dem
  *        Dialog) erlaubt. Nicht an der Detailspalte: ueber ihr steht der
  *        Seitenkopf mit seinen Werkzeugen, unter ihr nichts.
+ * @param {Array<DOMRect|object>} [input.keepout=[]] Sperrzonen ausserhalb von
+ *        Dialogen (`[data-toast-keepout]`, #1917). Sie zaehlen wie Bedienleisten,
+ *        und der Stapel weicht ihnen auch, wenn er keinen Dialog beruehrt -
+ *        dann ohne die Lagen am Dialog (2, 3 und 5), `primary` darf fehlen.
  * @returns {null | {top: number, covers: boolean}} null = der Stapel bleibt,
  *          wo er steht; `covers` = auch diese Lage beruehrt eine Leiste
  */
@@ -162,9 +188,11 @@ export function chooseToastPlacement({
   viewport, gap, safeTop = 0, safeBottom = 0,
   stack, dockedHeight, dockedWidth, dockedCenter,
   primary, dialogs, zones: marked, keepClear = [], focused = null, beside = true,
+  keepout = [],
 }) {
-  if (!dialogs.some((d) => intersects(stack, d))) return null;
-  const zones = focused ? [...marked, focused] : marked;
+  const atDialog = dialogs.some((d) => intersects(stack, d));
+  if (!atDialog && !keepout.some((k) => intersects(stack, k))) return null;
+  const zones = [...marked, ...(focused ? [focused] : []), ...keepout];
 
   const h = dockedHeight;
   const left = dockedCenter - dockedWidth / 2;
@@ -183,7 +211,7 @@ export function chooseToastPlacement({
   const result = (top) => ({ top, covers: !clear(top, zones) });
 
   // 2. und 3.: neben dem Dialog, ohne ihn zu beruehren.
-  for (const top of beside ? [primary.top - gap - h, primary.bottom + gap] : []) {
+  for (const top of atDialog && beside ? [primary.top - gap - h, primary.bottom + gap] : []) {
     if (inView(top) && clear(top, dialogs)) return result(top);
   }
 
@@ -191,8 +219,10 @@ export function chooseToastPlacement({
   if (!zones.some((z) => intersects(stack, z))) return null;
 
   // 5. Ueber der unteren Bedienleiste des Dialogs.
-  const middle = primary.top + primary.height / 2;
-  const lower = zones.filter((z) => z.top >= middle && z.left < primary.right && z.right > primary.left);
+  const middle = atDialog ? primary.top + primary.height / 2 : 0;
+  const lower = atDialog
+    ? zones.filter((z) => z.top >= middle && z.left < primary.right && z.right > primary.left)
+    : [];
   if (lower.length) {
     const top = Math.min(...lower.map((z) => z.top)) - gap - h;
     if (inView(top) && clear(top, zones)) return result(top);
@@ -387,6 +417,21 @@ function uncoveredChrome() {
   return hit && nav.contains(hit) ? [r] : [];
 }
 
+/**
+ * Die Sperrzonen der Seite (#1917), beschnitten auf ihren sichtbaren Ausschnitt:
+ * eine weggescrollte Uhr liegt hinter dem Rand, nicht unter dem Toast. Unter
+ * einem modalen Dialog zaehlen sie nicht (sein Hintergrund deckt sie ab), in
+ * einem `inert`-Zweig auch nicht.
+ */
+function keepoutElements(dialogEls) {
+  if (dialogEls.some(isModal)) return [];
+  return [...document.querySelectorAll(KEEPOUT_SELECTOR)].filter(isOpen);
+}
+
+function keepoutRects(elements) {
+  return visibleRects(elements, document.documentElement);
+}
+
 function pxProperty(el, name) {
   const value = parseFloat(getComputedStyle(el).getPropertyValue(name));
   return Number.isFinite(value) ? value : 0;
@@ -473,7 +518,8 @@ export function placeToastStack(stack) {
 
   const realDialogs = openDialogs();
   const dialogEls = [...realDialogs, ...openPanes(realDialogs)];
-  if (!dialogEls.length) return null;
+  const keepout = keepoutRects(keepoutElements(realDialogs));
+  if (!dialogEls.length && !keepout.length) return null;
   // Ausgerichtet wird am obersten MODALEN Dialog; eine Datumswahl oder ein
   // Popover in ihm bekommt keine eigene Lage, zaehlt aber als Bedienflaeche.
   // Ohne Dialog richtet sich der Stapel an der Detailspalte aus.
@@ -494,13 +540,20 @@ export function placeToastStack(stack) {
     height: document.documentElement.clientHeight,
   };
   const gap = pxProperty(stack, '--toast-dock-gap');
-  const primary = primaryEl.getBoundingClientRect();
-  const width = Math.min(rect.width, Math.max(primary.width - 2 * gap, 0)) || rect.width;
+  // AUSGERICHTET WIRD AM DIALOG NUR, WENN DER STAPEL IHN BERUEHRT. Weicht er
+  // allein einer Sperrzone (#1917), behaelt er Breite und Mitte seines Platzes
+  // und springt nur senkrecht - sonst wanderte der Hinweis der Wand quer durchs
+  // Bild. Ohne Sperrzone ist der Fall derselbe wie zuvor: beruehrt der Stapel
+  // keinen Dialog, bleibt er stehen, gleich in welcher Breite gemessen wurde.
+  const atDialog = dialogs.some((d) => intersects(rect, d));
+  const primary = atDialog ? primaryEl.getBoundingClientRect() : rect;
+  const width = atDialog
+    ? Math.min(rect.width, Math.max(primary.width - 2 * gap, 0)) || rect.width
+    : rect.width;
   const half = width / 2;
-  const center = Math.min(
-    Math.max(primary.left + primary.width / 2, gap + half),
-    viewport.width - gap - half,
-  );
+  const center = atDialog
+    ? Math.min(Math.max(primary.left + primary.width / 2, gap + half), viewport.width - gap - half)
+    : rect.left + half;
 
   // In der Dialogbreite messen: ein schmalerer Stapel bricht um und wird hoeher.
   stack.style.setProperty('--toast-dock-width', `${width}px`);
@@ -522,6 +575,7 @@ export function placeToastStack(stack) {
     keepClear: uncoveredChrome(),
     focused: focusedRect(dialogEls),
     beside: realDialogs.length > 0,
+    keepout,
   };
   let decision = chooseToastPlacement(input);
   // Kein freier Platz fuer den ganzen Stapel: nur der letzte Toast bleibt sichtbar.
@@ -582,12 +636,19 @@ export function watchToastPlacement(stack) {
   const resize = typeof ResizeObserver === 'function' ? new ResizeObserver(() => schedule()) : null;
   const dialogMutations = new MutationObserver(() => schedule());
   let observedDialogs = [];
+  let observedKeepouts = [];
   const occupied = () => Boolean(stack.querySelector(':scope > :not(:empty)'));
 
   function observeDialogs() {
     const current = occupied() ? openSurfaces() : [];
-    if (current.length === observedDialogs.length && current.every((d, i) => d === observedDialogs[i])) return;
+    // Sperrzonen (#1917) wachsen und wandern ohne Umbau des Dokuments: der Fuss
+    // der Wand bricht um, die Uhr scrollt mit der Flaeche weg. Ihre Groesse
+    // sieht derselbe Beobachter wie die der Dialoge, den Scroll `onScroll`.
+    const zones = occupied() ? keepoutElements(current) : [];
+    const same = (a, b) => a.length === b.length && a.every((el, i) => el === b[i]);
+    if (same(current, observedDialogs) && same(zones, observedKeepouts)) return;
     observedDialogs = current;
+    observedKeepouts = zones;
     dialogMutations.disconnect();
     resize?.disconnect();
     resize?.observe(stack);
@@ -599,6 +660,7 @@ export function watchToastPlacement(stack) {
       });
       resize?.observe(d);
     }
+    for (const zone of zones) resize?.observe(zone);
   }
 
   function run() {
@@ -637,9 +699,10 @@ export function watchToastPlacement(stack) {
   // den Stapel (Einkauf, Artikel-Details bei 1280x700). Scroll bubbelt nicht,
   // daher in der Capture-Phase; passiv und je Frame einmal.
   // Beim Scrollen der Seite ohne Dialog gibt es nichts zu messen: ohne offenen
-  // Dialog und ohne gesetzte Lage steigt der Beobachter vor jeder Messung aus.
+  // Dialog, ohne Sperrzone und ohne gesetzte Lage steigt der Beobachter vor
+  // jeder Messung aus.
   const onScroll = () => {
-    if (!stack.dataset.dock && !observedDialogs.length) return;
+    if (!stack.dataset.dock && !observedDialogs.length && !observedKeepouts.length) return;
     onSettled();
   };
   document.addEventListener('scroll', onScroll, { capture: true, passive: true });
