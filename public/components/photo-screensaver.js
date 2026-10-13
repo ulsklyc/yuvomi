@@ -34,6 +34,10 @@ let armed = false;
 
 function stop() {
   run += 1;
+  // A start by hand retired here (preview()) holds moves back no longer. Its
+  // request may stay open for as long as it likes; the hand on the mouse must
+  // keep the idle screensaver away from now on, not from the answer on.
+  if (lastMove === Infinity) lastMove = 0;
   clearInterval(slideTimer);
   slideTimer = undefined;
   clearTimeout(clockTimer);
@@ -196,8 +200,9 @@ export function disarmScreensaver() {
  * while the photos load - a move there would retire the start, and the caller
  * would say "not available" - and the first second after the answer belongs
  * to the opening. A key, a press, a touch or the wheel are deliberate and
- * dismiss at once, as always. The press of the click itself comes before this
- * call and finds nothing to dismiss.
+ * dismiss at once, as always; while the photos load they retire the start,
+ * and stop() ends the wait for moves with it. The press of the click itself
+ * comes before this call and finds nothing to dismiss.
  */
 export async function preview() {
   stop();

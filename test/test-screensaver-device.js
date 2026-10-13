@@ -491,6 +491,22 @@ test('by hand: a press while the photos load still retires the start', async () 
   assert.equal(overlay(), undefined);
 });
 
+test('by hand: a press while the photos load and never arrive leaves moves counting', async () => {
+  // The request is retired by the press but still open - it may stall for as
+  // long as it likes. Moves must count again from the press on, not from the
+  // answer: a hand on the mouse keeps the idle screensaver away.
+  await startByHand({ rested: 5000 });
+  mock.timers.tick(100);
+  fire('pointerdown');
+  requests.length = 0;
+  mock.timers.tick(200_000);
+  fire('pointermove');
+  mock.timers.tick(100_000);
+  assert.equal(requests.length, 0, 'the move 200 s after the press pushed the idle timer back');
+  mock.timers.tick(200_000);
+  assert.equal(requests.length, 1, 'and it runs out one idle period after that move');
+});
+
 test('by hand, no photos: the start fails, and the next idle screensaver is dismissed by its first move', async () => {
   // A failed start must not leave moves uncounted: the screensaver the idle
   // timer opens afterwards closes on the first move, like every idle start.
