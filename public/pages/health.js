@@ -9236,6 +9236,9 @@ export const __test = {
   nutritionRowMarkup,
   nutritionProgressRowMarkup,
   overviewDueRowMarkup,
+  // #1950: die Leser der Faelligkeit selbst, nicht nur ihre Zeile - an ihnen
+  // haengt, WELCHE Medikamente heute zaehlen.
+  dueTodayMarkup, overviewDueMarkup, overviewUpcomingMarkup, medListMarkup,
   // Einnahmetreue auf beiden Flaechen (R16): dieselbe Zahl, derselbe Zeitraum.
   adherenceMarkup, overviewAdherenceMarkup,
   // Uebersicht mobil (R16): Export im Kopf, drei Kernwerte.
