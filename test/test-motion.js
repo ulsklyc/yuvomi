@@ -253,6 +253,7 @@ const MOTION_EXCEPTIONS = new Map([
   ['layout.css: .swipe-reveal', 'folgt dem Finger: die Deckkraft wird je Frame gesetzt, linear glaettet nur'],
   ['layout.css: .swipe-row--hint > :first-child', 'einmaliger Wisch-Hinweis (Onboarding), nicht im Arbeitsfluss'],
   ['dashboard.css: .dashboard-icon-btn--hint', 'einmaliger Hinweis-Puls (3 Wiederholungen), nicht im Arbeitsfluss'],
+  ['dashboard.css: .wall__foot::before', 'Scroll-Kante der Wand (#1917): haengt am Scrollweg (animation-timeline: scroll()), nicht an der Zeit - linear haelt ihre Oberkante still auf dem Inhalt'],
   ['health.css: .cycle-ring__now', 'Hinweis-Puls am heutigen Tag (3 Wiederholungen), nicht im Arbeitsfluss'],
   ['screensaver.css: .photo-screensaver img', 'Bildschirmschoner: langsame Ueberblendung zwischen Fotos, kein Bedienmoment'],
 ]);

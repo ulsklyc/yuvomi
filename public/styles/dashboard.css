@@ -5413,8 +5413,17 @@ button.today-cockpit__more--link {
  * Ausstieg und Timer-Startknoepfen, und der Stapel rechnet dort mit einer
  * Tab-Leiste, die hier gar nicht steht: der Hinweis beim Einschalten lag am
  * Telefon acht Sekunden lang auf „5 Min" und nahm den Tipp. Oben steht nur die
- * Uhr, die nichts annimmt. Die Lage neben einem offenen Dialog
- * (`[data-dock]`, utils/toast-placement.js) bleibt dessen Sache. */
+ * Uhr, die nichts annimmt.
+ *
+ * DAS IST DIE AUSGANGSLAGE, NICHT DAS LETZTE WORT (#1917). Die Uhr nimmt
+ * keinen Tipp, aber sie ist das, wofuer die Flaeche da ist, und bis rund 834px
+ * Breite lag der Hinweis acht Sekunden auf ihr (390x844: Uhrzeit und Datum zu
+ * 100 % verdeckt). Uhr und Fuss tragen deshalb `data-toast-keepout`
+ * (pages/dashboard.js), und utils/toast-placement.js schiebt den Stapel von
+ * hier aus an die naechste freie Kante - am Telefon direkt unter das Datum,
+ * am Desktop bleibt er stehen, weil er neben der Uhr Platz hat. Gesetzt wird
+ * die Lage wie neben einem Dialog ueber `[data-dock]`; diese Regel gilt, solange
+ * der Platzierer nichts zu sagen hat. */
 [data-wall-mode] .shell-bottom-stack:not([data-dock]) {
   top: calc(var(--safe-area-inset-top) + var(--space-4));
   bottom: auto;
@@ -5450,9 +5459,13 @@ button.today-cockpit__more--link {
    * zwei Metern ablesbar sein, ohne der Uhr den Rang abzulaufen. */
   --wall-timer:      clamp(var(--text-4xl), 7vw, var(--text-5xl));
 
+  /* Der Abstand zwischen Uhr, Buehne und Fuss. Als Variable, weil die
+   * Scroll-Kante des Fusses genau diesen Streifen fuellt (`.wall__foot::before`). */
+  --wall-gap:        clamp(var(--space-4), 3vmin, var(--space-8));
+
   display: flex;
   flex-direction: column;
-  gap: clamp(var(--space-4), 3vmin, var(--space-8));
+  gap: var(--wall-gap);
   min-height: 100dvh;
   padding: var(--wall-pad);
   background: var(--color-bg);
@@ -6057,13 +6070,73 @@ button.today-cockpit__more--link {
    * Kante hindurch -, und unten haelt er den Abstand der Flaeche, mindestens
    * aber die Safe-Area (Home-Indikator). `--nav-tail` ist im Wandmodus 0
    * (layout.css, Leiste ausgeblendet) - dieselbe Regel wie jede klebende
-   * Fusszeile im Inhalt (test:mobile-chrome). */
+   * Fusszeile im Inhalt (test:mobile-chrome).
+   *
+   * OBEN HAT ER KEIN POLSTER MEHR (#1917): dort stand ein deckender Streifen
+   * von `--space-2` mit Gegenrand, und er machte die Oberkante hart. Den
+   * Streifen ueber den Knoepfen fuellt jetzt die Scroll-Kante darunter; die
+   * Knoepfe stehen, wo sie standen. */
   position: sticky;
   bottom: var(--nav-tail);
   z-index: 1;
-  margin-block: calc(-1 * var(--space-2)) calc(-1 * var(--wall-pad));
-  padding-block: var(--space-2) max(var(--wall-pad), var(--safe-area-inset-bottom));
+  margin-block: 0 calc(-1 * var(--wall-pad));
+  padding-block: 0 max(var(--wall-pad), var(--safe-area-inset-bottom));
   background: var(--color-bg);
+}
+
+/* DIE SCROLL-KANTE DES FUSSES (#1917). Am Telefon ist die Flaeche laenger als
+ * das Bild, der Fuss klebt, und sein deckender Grund schnitt "Wer heute dran
+ * ist" an einer unsichtbaren harten Kante ab: bei 390x844 ein Gesicht ganz
+ * und eines halb verdeckt, ohne jedes Zeichen, dass es darunter weitergeht.
+ * Abgeschnitten war nichts - es fehlte die Kante. Jetzt laeuft der Inhalt in
+ * einem Verlauf vom Grund der Flaeche unter die Leiste aus.
+ *
+ * DIE GRUNDFORM FUELLT GENAU DEN ABSTAND DER FLAECHE (`--wall-gap`) UEBER DEM
+ * FUSS, nicht mehr. Das ist der Streifen, in dem am Scrollende und bei
+ * passender Wand ohnehin nichts steht: dort liegt der Verlauf auf seinem
+ * eigenen Grund und ist unsichtbar. Sie braucht keinen Zustand und kein
+ * Skript, und sie verdeckt am Ende des Scrollwegs keine Zeile.
+ *
+ * Kein Tipp bleibt an ihm haengen (`pointer-events: none`). Die Farbe ist die
+ * des Grundes selbst, in beiden Themen und nachts dieselbe Variable; es
+ * entsteht keine neue Flaeche und kein Licht (DESIGN.md, Der Wand-Modus:
+ * genau ein gefuellter Traeger). Die Achse ist die Blockachse, in RTL gleich. */
+.wall__foot::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 100%;
+  block-size: var(--wall-gap);
+  background: linear-gradient(to bottom, transparent, var(--color-bg));
+  pointer-events: none;
+}
+
+/* SOLANGE ES WEITERGEHT, REICHT DIE KANTE HOEHER. Der Abstand allein ist am
+ * Telefon 16px: faellt die Kante des Fusses in eine Luecke zwischen zwei
+ * Zeilen, sieht man von ihr nichts (gemessen 390x844, die Kante lag unter der
+ * Aufgabenzeile der zweiten Person). `--wall-foot-edge` hebt den Verlauf
+ * deshalb auf die Hoehe eines Gesichts - und nimmt ihn auf den letzten Pixeln
+ * des Scrollwegs im Gleichschritt mit dem Scrollen auf die Grundform zurueck,
+ * damit er am Ende nichts verdeckt. Seine Oberkante steht dabei still auf dem
+ * Inhalt; es bewegt sich nichts, was nicht der Finger bewegt.
+ *
+ * Die Zeitachse ist der Scrollweg der Flaeche, keine Uhr. Passt die Wand ins
+ * Bild, gibt es keinen Scrollweg, die Achse ist inaktiv und es gilt die
+ * Grundform - also auch auf dem Wandtablet, fuer das die Flaeche gebaut ist.
+ * Ein Browser ohne scrollgetriebene Animationen (Firefox, Safari vor 26)
+ * behaelt ebenfalls die Grundform: eine Kante weniger hoch, kein Fehler. */
+@supports (animation-timeline: scroll()) {
+  .wall__foot::before {
+    --wall-foot-edge: var(--space-12);
+    animation: wall-foot-edge linear both;
+    animation-timeline: scroll(nearest block);
+    animation-range: calc(100% - (var(--wall-foot-edge) - var(--wall-gap))) 100%;
+  }
+}
+
+@keyframes wall-foot-edge {
+  from { block-size: var(--wall-foot-edge); }
+  to { block-size: var(--wall-gap); }
 }
 
 .wall__foot > :first-child {

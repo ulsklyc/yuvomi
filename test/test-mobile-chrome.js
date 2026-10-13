@@ -427,3 +427,71 @@ test('R16: die Kennzahl-Kurzzeile ist ein geteilter Baustein, und Inventar und H
     assert.match(src, new RegExp(`wireMetricGlance\\(\\w+, '${id}'`), `${file}: der Aufklapper ist verdrahtet`);
   }
 });
+
+// #1917: DIE SCROLL-KANTE AM KLEBENDEN FUSS DER WAND. Der Fuss klebt seit #1559
+// mit deckendem Grund und schnitt "Wer heute dran ist" an einer unsichtbaren
+// harten Kante ab (390x844: ein Gesicht ganz, eines halb verdeckt). Der Verlauf
+// darueber ist ein Pseudo-Element; hier steht, was an ihm nicht verhandelbar
+// ist. Dass er im gerenderten Dokument steht und am Scrollende nichts verdeckt,
+// ist Browserarbeit (gemessen im PR zu #1917: 48px in Ruhe, 0px am Ende).
+test('#1917: der Fuss der Wand hat eine Scroll-Kante - sie nimmt keinen Tipp und verdeckt am Ende nichts', () => {
+  const css = read('../public/styles/dashboard.css');
+  const all = rules(css);
+  const EDGE = '.wall__foot::before';
+
+  const wall = topLevel(css, '.wall');
+  assert.equal(wall.length, 1, 'Reichweite: genau eine Basisregel .wall');
+  assert.ok(decl(wall[0].body, '--wall-gap'), 'der Abstand der Flaeche ist eine Variable');
+  assert.equal(decl(wall[0].body, 'gap'), 'var(--wall-gap)', 'und die Flaeche nimmt ihn als ihren Abstand');
+
+  const foot = topLevel(css, '.wall__foot');
+  assert.equal(foot.length, 1, 'Reichweite: genau eine Basisregel .wall__foot');
+  assert.equal(decl(foot[0].body, 'position'), 'sticky');
+  // Ein deckendes Polster ueber den Knoepfen waere wieder die harte Kante, nur
+  // einen Streifen hoeher: der Verlauf endete an ihm statt an den Knoepfen.
+  assert.match(decl(foot[0].body, 'padding-block') ?? '', /^0\s/, 'der Fuss hat oben kein deckendes Polster');
+  assert.match(decl(foot[0].body, 'margin-block') ?? '', /^0\s/, 'und deshalb auch keinen Gegenrand');
+
+  const edges = all.filter((r) => r.selector === EDGE);
+  const base = edges.filter((r) => r.at.length === 0);
+  assert.equal(base.length, 1, `genau eine Grundregel ${EDGE}`);
+  const body = base[0].body;
+  assert.equal(decl(body, 'content'), '""', 'ohne `content` gibt es das Pseudo-Element nicht');
+  assert.equal(decl(body, 'position'), 'absolute');
+  assert.equal(decl(body, 'inset-block-end'), '100%', 'er liegt UEBER dem Fuss, nicht in ihm');
+  assert.equal(decl(body, 'pointer-events'), 'none', 'ein Verlauf ueber dem Inhalt nimmt keinen Tipp');
+  // Die Grundform fuellt genau den Abstand, in dem am Scrollende nichts steht.
+  assert.equal(decl(body, 'block-size'), 'var(--wall-gap)',
+    'hoeher als der Abstand laege die Grundform am Scrollende auf der letzten Zeile');
+  const background = decl(body, 'background') ?? '';
+  assert.match(background, /^linear-gradient\(to bottom, transparent, var\(--color-bg\)\)$/,
+    'vom Inhalt zum Grund der Flaeche, aus dem Token - in beiden Themen und nachts dieselbe Variable');
+  assert.equal(decl(foot[0].body, 'background'), 'var(--color-bg)', 'derselbe Grund wie der Fuss, in den er muendet');
+
+  // Nichts stellt ihn wieder ab, in keinem Block.
+  for (const r of edges) {
+    for (const prop of ['display', 'visibility', 'opacity']) {
+      assert.equal(decl(r.body, prop), null, `${r.at.join(' ')} ${EDGE} setzt ${prop}`);
+    }
+    if (r !== base[0]) assert.equal(decl(r.body, 'content'), null, `${r.at.join(' ')} ${EDGE} ueberschreibt content`);
+  }
+
+  // Hoeher wird er nur, solange es weitergeht: an den Scrollweg gebunden, und
+  // nur dort, wo der Browser das kann. Ausserhalb von @supports gilt die Grundform.
+  const grown = edges.filter((r) => r !== base[0]);
+  assert.equal(grown.length, 1, 'genau eine Erweiterung');
+  assert.deepEqual(grown[0].at, ['@supports (animation-timeline: scroll())'],
+    'ohne scrollgetriebene Animation bleibt die Grundform - sie braucht keinen Zustand');
+  assert.equal(decl(grown[0].body, 'block-size'), null, 'die Hoehe aendert nur die Animation, nie eine Regel');
+  assert.match(decl(grown[0].body, '--wall-foot-edge') ?? '', /^var\(--space-\w+\)$/, 'die Hoehe in Ruhe ist ein Abstands-Token');
+  assert.match(decl(grown[0].body, 'animation-timeline') ?? '', /^scroll\(/);
+  assert.equal(decl(grown[0].body, 'animation-range'),
+    'calc(100% - (var(--wall-foot-edge) - var(--wall-gap))) 100%',
+    'zurueckgenommen wird auf genau so vielen Pixeln, wie er hoeher ist - bis ans Ende des Scrollwegs');
+  const name = (decl(grown[0].body, 'animation') ?? '').split(/\s+/)[0];
+  assert.match(decl(grown[0].body, 'animation') ?? '', /\blinear\b.*\bboth\b/, 'im Gleichschritt mit dem Scrollen, vor dem Bereich die volle Hoehe');
+  // eachRule ueberspringt @keyframes mit Absicht; die Stufen stehen deshalb im Rohtext.
+  const frames = css.replace(/\/\*[\s\S]*?\*\//g, '').match(new RegExp(`@keyframes ${name}\\s*\\{([\\s\\S]*?\\})\\s*\\}`))?.[1] ?? '';
+  assert.match(frames, /from\s*\{\s*block-size:\s*var\(--wall-foot-edge\);?\s*\}/, 'in Ruhe die volle Hoehe');
+  assert.match(frames, /to\s*\{\s*block-size:\s*var\(--wall-gap\);?\s*\}/, 'am Scrollende wieder die Grundform');
+});
