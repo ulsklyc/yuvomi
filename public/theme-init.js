@@ -97,9 +97,10 @@
 
 // THE SCREENSAVER DELAY BELONGS TO THE INITIAL STATE TOO (#885).
 //
-// components/photo-screensaver.js arms its idle timer as soon as it loads, from
-// `data-screensaver-idle`. Set here, before any module, so the first idle period
-// already uses the delay chosen on this device. Only a step from
+// components/photo-screensaver.js arms its idle timer as soon as somebody is
+// signed in (#1919), from `data-screensaver-idle`. On a page that loads into a
+// running session that is the first answer of /auth/me. Set here, before any
+// module, so the first idle period already uses the delay chosen on this device. Only a step from
 // utils/screensaver-idle.js is applied; anything else leaves the attribute off
 // and the component keeps its five-minute default. The key and the steps are
 // literals because this classic script cannot import - a guard in
