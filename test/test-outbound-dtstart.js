@@ -409,6 +409,39 @@ test('derselbe Start ohne Verschiebung: der Anbieter gilt wie bisher, die Marke 
     { keep: false, authored: 1 });
 });
 
+test('eine andere Zone vom Anbieter ist seine Aenderung, auch bei denselben Zeitpunkten', () => {
+  // 15. Maerz, ausgerichtet auf den 31. Maerz 14:00 Berlin = 12:00Z.
+  const maerz = eigene({ start_datetime: '2035-03-15T14:00', end_datetime: '2035-03-15T15:00' });
+  const kommt = { start_datetime: '2035-03-31T12:00:00Z', end_datetime: '2035-03-31T13:00:00Z', all_day: false, recurrence_rule: MONATSLETZTER };
+  const fremd = { keep: false, authored: 0 };
+  const echo = { keep: true, authored: 1, end_datetime: '2035-03-15T15:00' };
+  assert.deepEqual(inboundSeriesVerdict(maerz, { ...kommt, tzid: 'America/New_York' }, { zone: BERLIN, sentZone: BERLIN }), fremd);
+  assert.deepEqual(inboundSeriesVerdict(maerz, { ...kommt, tzid: null }, { zone: BERLIN, sentZone: BERLIN }), fremd,
+    'keine Zone heisst UTC, und hinaus ging Berlin');
+  // Dieselbe Zone, anders geschrieben, ist kein Wechsel.
+  assert.deepEqual(inboundSeriesVerdict(maerz, { ...kommt, tzid: 'europe/berlin' }, { zone: BERLIN, sentZone: BERLIN }), echo);
+  const utcEcho = { keep: true, authored: 1, end_datetime: '2035-03-15T15:00' };
+  const utcKommt = { ...kommt, start_datetime: '2035-03-31T14:00:00Z', end_datetime: '2035-03-31T15:00:00Z' };
+  for (const [kommtZone, hinausZone] of [[null, null], ['Etc/UTC', null], [null, 'UTC'], ['GMT', 'Etc/UTC']]) {
+    assert.deepEqual(inboundSeriesVerdict(maerz, { ...utcKommt, tzid: kommtZone }, { zone: 'UTC', sentZone: hinausZone }), utcEcho,
+      `${kommtZone} gegen ${hinausZone}`);
+  }
+  // Die Zone, die ein frueherer Abruf in die Zeile geschrieben hat, ist ebenfalls nicht neu.
+  const zoniert = eigene({ start_datetime: '2035-03-15T18:00:00Z', end_datetime: '2035-03-15T19:00:00Z', tzid: 'America/New_York' });
+  const nyKommt = { start_datetime: '2035-03-31T18:00:00Z', end_datetime: '2035-03-31T19:00:00Z', all_day: false, recurrence_rule: MONATSLETZTER, tzid: 'America/New_York' };
+  assert.equal(inboundSeriesVerdict(zoniert, nyKommt, { zone: BERLIN, sentZone: BERLIN }).keep, true);
+  assert.deepEqual(inboundSeriesVerdict(zoniert, { ...nyKommt, tzid: 'Asia/Tokyo' }, { zone: BERLIN, sentZone: BERLIN }), fremd);
+  // Auch ohne Verschiebung: derselbe Start in einer anderen Zone nimmt die Marke.
+  const passend = eigene({ start_datetime: '2035-03-31T14:00', end_datetime: '2035-03-31T15:00' });
+  assert.deepEqual(inboundSeriesVerdict(passend, { ...kommt, tzid: 'America/New_York' }, { zone: BERLIN, sentZone: BERLIN }), fremd);
+  assert.deepEqual(inboundSeriesVerdict(passend, { ...kommt, tzid: BERLIN }, { zone: BERLIN, sentZone: BERLIN }), { keep: false, authored: 1 });
+  // Ganztaegig traegt keine Zone.
+  const ganztags = eigene({ start_datetime: '2035-03-15', end_datetime: null, all_day: 1 });
+  assert.equal(inboundSeriesVerdict(ganztags,
+    { start_datetime: '2035-03-31', end_datetime: '2035-03-31', all_day: true, recurrence_rule: MONATSLETZTER, tzid: null },
+    { zone: BERLIN, sentZone: BERLIN }).keep, true);
+});
+
 test('eine Zeile ohne Marke folgt dem Anbieter und bekommt keine', () => {
   const kommt = { start_datetime: '2035-01-31T13:00:00Z', end_datetime: '2035-01-31T14:00:00Z', all_day: false, recurrence_rule: MONATSLETZTER };
   assert.deepEqual(inboundSeriesVerdict(eigene({ series_authored: 0 }), kommt, { zone: BERLIN }), { keep: false, authored: 0 });

@@ -1051,12 +1051,13 @@ function upsertGoogleEvents(items, calRefId = null, calColor = GOOGLE_COLOR, col
       // Marke (`authored`) - alles in services/outbound-dtstart.js. Als
       // gesendete Schreibweise der Regel zaehlt die mit Googles `UNTIL`-Form.
       const verdict = inboundSeriesVerdict(existing, {
-        start_datetime: startDt, end_datetime: endDt, all_day: allDay, recurrence_rule: rrule,
+        start_datetime: startDt, end_datetime: endDt, all_day: allDay, recurrence_rule: rrule, tzid,
       }, {
         // Dieselbe Zone, in der dieser Kalender die Wanduhrzeit hinausbekommt -
         // und in der `localEventToGoogle` deshalb ausrichtet.
         zone: outboundTimeZone(calTimeZone),
         recurrenceZone: outboundTimeZone(calTimeZone),
+        sentZone: outboundTimeZone(calTimeZone),
         sentRules: existing.recurrence_rule
           ? [normalizeRecurrenceUntil(rruleValue(existing.recurrence_rule), !!existing.all_day)]
           : [],

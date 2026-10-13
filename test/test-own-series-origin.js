@@ -608,6 +608,29 @@ for (const name of Object.keys(PROVIDERS)) {
     assert.equal(row(event.id).end_datetime, '2035-01-15T16:30');
   });
 
+  // ── Der Anbieter ändert die Zone der Serie: das ist seine Änderung ─────────────
+
+  test(`${name} [${ZONE}] stellt der Anbieter die Serie in eine andere Zone, gilt der Anbieter und die Marke fällt`, async () => {
+    // 15. März, ausgerichtet auf den 31. März - nach der Zeitumstellung in
+    // Europa. Dieselben Zeitpunkte, aber in New York gerechnet, liegen über
+    // das Jahr eine Stunde anders als in Berlin.
+    const p = provider(name);
+    const event = await post({
+      title: 'Miete', start_datetime: '2035-03-15T14:00', end_datetime: '2035-03-15T15:00',
+      recurrence_rule: LAST_DAY, ...p.target,
+    });
+    await p.sync();
+    assert.deepEqual(p.first(), { start: wall('2035-03-31T14:00'), end: wall('2035-03-31T15:00') });
+
+    p.changeZoneAtProvider('America/New_York');
+    await p.sync();
+    const taken = row(event.id);
+    assert.equal(taken.tzid, 'America/New_York', 'die Zone des Anbieters steht in der Zeile');
+    assert.equal(storedToInstantMsPrecise(taken.start_datetime, ZONE), Date.parse(wall('2035-03-31T14:00')),
+      'mit dem Start, zu dem sie gehört');
+    assert.equal(taken.series_authored, 0, 'die Serie ist jetzt die des Anbieters');
+  });
+
   // ── Der Anbieter verlegt den Start: die Marke fällt ────────────────────────────
 
   test(`${name} [${ZONE}] übernimmt der Abruf einen anderen Start, gilt der Anbieter und die Marke fällt`, async () => {

@@ -240,6 +240,23 @@ function sameStart(a, b, zone, allDay, { toMinute = false } = {}) {
 }
 
 /**
+ * Eine Zone in der Form, in der zwei Schreibweisen derselben Zone gleich sind.
+ *
+ * Keine Zone heisst UTC: so kommt ein Zeitpunkt mit `Z` aus dem Abruf (der
+ * Parser nennt dann keine `tzid`), und so geht eine Serie des Haushalts in
+ * UTC hinaus (`anchorZone` gibt fuer UTC kein TZID). `Etc/UTC`, `GMT` und `Z`
+ * sind dasselbe. Sonst der Name, auf den die Laufzeit einen Alias aufloest,
+ * ohne Gross-/Kleinschreibung; ein Name, den sie nicht kennt, bleibt er selbst.
+ */
+function zoneKey(tzid) {
+  const roh = String(tzid ?? '').trim();
+  if (!roh || /^(UTC|GMT|Z|Etc\/(UTC|GMT|GMT0|GMT\+0|GMT-0|Zulu|Universal|Greenwich))$/i.test(roh)) return 'utc';
+  if (!isValidTimeZone(roh)) return roh.toLowerCase();
+  const name = new Intl.DateTimeFormat('en-US', { timeZone: roh }).resolvedOptions().timeZone;
+  return /^(UTC|GMT|Etc\/(UTC|GMT))$/i.test(name) ? 'utc' : name.toLowerCase();
+}
+
+/**
  * Hat eine Bearbeitung IN YUVOMI den Start oder die Regel geaendert?
  *
  * Die Antwort setzt die Marke - auch an einer eingelesenen Serie: wer dort den
@@ -287,8 +304,8 @@ export function startOrRuleChanged(before, after, zone) {
  *   - Marke bleibt, der Anbieter gilt: derselbe Beginn und dieselbe Regel wie
  *     in der Zeile (hoechstens anders geschrieben). Die Zeile folgt dem
  *     Anbieter wie bisher.
- *   - Marke faellt, der Anbieter gilt: ein anderer Start oder eine andere
- *     Regel. Ab dann ist die Serie die des Anbieters und geht Wort fuer Wort
+ *   - Marke faellt, der Anbieter gilt: ein anderer Start, eine andere Regel
+ *     oder eine andere Zone. Ab dann ist die Serie die des Anbieters und geht Wort fuer Wort
  *     zurueck (#756).
  *
  * `sentRules`: Schreibweisen der gespeicherten Regel, die der ausgehende Weg
@@ -299,15 +316,17 @@ export function startOrRuleChanged(before, after, zone) {
  *
  * @param {object} stored    Zeile (start_datetime, end_datetime, all_day,
  *   recurrence_rule, tzid, series_authored)
- * @param {{start_datetime: string, end_datetime: ?string, all_day: boolean|number, recurrence_rule: ?string}} incoming
- *   was der Abruf in die Zeile schreiben wuerde
- * @param {{ zone: string, sentRules?: Array<?string>, recurrenceZone?: string|null }} options
+ * @param {{start_datetime: string, end_datetime: ?string, all_day: boolean|number, recurrence_rule: ?string, tzid?: ?string}} incoming
+ *   was der Abruf in die Zeile schreiben wuerde; `tzid` wie er sie schriebe
+ *   (keine = UTC)
+ * @param {{ zone: string, sentRules?: Array<?string>, recurrenceZone?: string|null, sentZone?: ?string }} options
  *   `zone`: Zone des Haushalts; `recurrenceZone`: dieselbe Angabe, die der
- *   ausgehende Weg dieses Anbieters an `outboundDateRange` gibt
+ *   ausgehende Weg dieses Anbieters an `outboundDateRange` gibt; `sentZone`:
+ *   die Zone, die dieser Weg fuer die Zeile hinausgibt (null = UTC)
  * @returns {{ keep: boolean, authored: 0|1, end_datetime?: string|null }}
  *   `end_datetime` nur bei `keep`: das Ende, das in die Zeile gehoert
  */
-export function inboundSeriesVerdict(stored, incoming, { zone, sentRules = [], recurrenceZone = null } = {}) {
+export function inboundSeriesVerdict(stored, incoming, { zone, sentRules = [], recurrenceZone = null, sentZone } = {}) {
   const fremd = { keep: false, authored: 0 };
   if (!istEigen(stored)) return fremd;
   const allDay = !!stored.all_day;
@@ -315,6 +334,22 @@ export function inboundSeriesVerdict(stored, incoming, { zone, sentRules = [], r
   const kommt = ruleKey(incoming.recurrence_rule);
   const gleicheRegel = [stored.recurrence_rule, ...sentRules].some((regel) => ruleKey(regel) === kommt);
   if (!gleicheRegel) return fremd;
+  // EINE ANDERE ZONE IST EINE AENDERUNG DES ANBIETERS, auch wenn Start und Ende
+  // dieselben Zeitpunkte bleiben: in ihr rechnet er jedes weitere Vorkommen,
+  // und ueber eine Zeitumstellung liegen sie dann anders. Bekannt sind zwei
+  // Zonen, die NICHT seine Aenderung sind: die, die der ausgehende Weg dieser
+  // Zeile nennt (`sentZone`), und die, die ein frueherer Abruf in die Zeile
+  // geschrieben hat. Kommt eine dritte, gilt der Anbieter. Ohne bekannte Zone
+  // (der Aufrufer nennt keine, die Zeile traegt keine) wird nicht geurteilt -
+  // und ebenso, wenn der Aufrufer die eingehende gar nicht nennt (`undefined`;
+  // `null` ist eine Auskunft und heisst UTC).
+  if (!allDay && incoming.tzid !== undefined) {
+    const bekannt = [
+      ...(sentZone !== undefined ? [sentZone] : []),
+      ...(stored.tzid ? [stored.tzid] : []),
+    ].map(zoneKey);
+    if (bekannt.length > 0 && !bekannt.includes(zoneKey(incoming.tzid))) return fremd;
+  }
 
   const hinaus = outboundDateRange(stored, { zone: recurrenceZone });
   if (!sameStart(incoming.start_datetime, hinaus.start_datetime, zone, allDay)) return fremd;

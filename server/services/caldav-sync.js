@@ -1381,7 +1381,12 @@ async function runSync({ createClient } = {}) {
                 // Die Regel steht in services/outbound-dtstart.js.
                 const verdict = inboundSeriesVerdict(existing, {
                   start_datetime: ev.dtstart, end_datetime: ev.dtend, all_day: ev.allDay, recurrence_rule: ev.rrule,
-                }, { zone: inboundZone });
+                  tzid: ev.tzid ?? null,
+                }, {
+                  zone: inboundZone,
+                  // Die Zone, mit der diese Zeile hinausgeht - dieselbe Rechnung wie im Upload.
+                  sentZone: eventDateTimeFields(outboundEvent(existing), inboundZone).tzid,
+                });
                 const when = verdict.keep
                   ? [existing.start_datetime, verdict.end_datetime, existing.all_day, ev.location, existing.recurrence_rule, existing.tzid]
                   : [ev.dtstart, ev.dtend, ev.allDay ? 1 : 0, ev.location, ev.rrule, ev.tzid ?? null];
