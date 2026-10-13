@@ -139,10 +139,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   than Yuvomi does. The series now goes out with the same start on every upload. The same applies
   when you change the start date or the repeat rule of a series that is already synced, including
   one that came from the other calendar. A synced series whose start date and rule you did not
-  change in Yuvomi is still sent back exactly as it came in. In Yuvomi the series keeps the date
-  you entered, and its reminders no longer move to the end of the month after a sync. A series
-  that already shows the wrong start date in the other calendar is corrected the next time you
-  change its start date or its repeat rule in Yuvomi.
+  change in Yuvomi is still sent back exactly as it came in. A series that already shows the wrong
+  start date in the other calendar is corrected the next time you change its start date or its
+  repeat rule in Yuvomi.
 - **A photo screensaver started with the mouse stays open** (#1766). Started from the wall footer
   or as the preview in the Immich settings, it closed again as soon as the mouse left the button,
   if the pointer had rested on it for more than a second before the click. While the photos were

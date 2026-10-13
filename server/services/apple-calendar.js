@@ -33,7 +33,7 @@ import { vtimezoneFor } from '../utils/vtimezone.js';
 import { householdTimeZone } from '../utils/timezone.js';
 import { createCalDAVClient, createUploadGate } from '../utils/caldav-client.js';
 import { nearestIcalColorName } from '../utils/ical-color.js';
-import { inboundSeriesVerdict, outboundEvent } from './outbound-dtstart.js';
+import { authoredAfterInbound, outboundEvent } from './outbound-dtstart.js';
 import { followInboundStartChange } from './calendar-occurrence-overrides.js';
 
 const APPLE_COLOR = '#FC3C44';
@@ -476,8 +476,7 @@ async function runSync({ makeClient } = {}) {
           if (pendingDeletionUids.has(ev.uid)) continue;
 
           const selExisting = db.get().prepare(
-            `SELECT id, outbound_dirty, calendar_ref_id, start_datetime, end_datetime, all_day,
-                    recurrence_rule, tzid, series_authored
+            `SELECT id, outbound_dirty, calendar_ref_id, start_datetime, recurrence_rule, series_authored
              FROM calendar_events WHERE external_calendar_id = ? AND external_source = 'apple'`
           );
           let existing = selExisting.get(ev.uid);
@@ -500,24 +499,6 @@ async function runSync({ makeClient } = {}) {
             // Nicht `user_modified` (#899): das wird bei jeder Bearbeitung
             // gesetzt, eine Titeländerung hätte die Farbspalte also dauerhaft
             // eingefroren und eine Umfärbung auf dem Server nie mehr erreicht.
-            //
-            // START, ENDE UND REGEL EINER HIER VERFASSTEN SERIE (#1935), wie im
-            // CalDAV-Sync: liefert iCloud genau den ausgerichteten Start
-            // zurueck, den Yuvomi hinausgegeben hat, bleibt die Zeile bei der
-            // Eingabe (`keep`); uebernimmt der Abruf einen anderen Start oder
-            // eine andere Regel, faellt die Marke (`authored`). Die Regel steht
-            // in services/outbound-dtstart.js.
-            const verdict = inboundSeriesVerdict(existing, {
-              start_datetime: ev.dtstart, end_datetime: ev.dtend, all_day: ev.allDay, recurrence_rule: ev.rrule,
-              tzid: ev.tzid ?? null,
-            }, {
-              zone: householdTimeZone(db.get()),
-              // Die Zone, mit der diese Zeile hinausgeht - dieselbe Rechnung wie im Upload.
-              sentZone: eventDateTimeFields(outboundEvent(existing), householdTimeZone(db.get())).tzid,
-            });
-            const when = verdict.keep
-              ? [existing.start_datetime, verdict.end_datetime, existing.all_day, ev.location, existing.recurrence_rule, existing.tzid]
-              : [ev.dtstart, ev.dtend, ev.allDay ? 1 : 0, ev.location, ev.rrule, ev.tzid ?? null];
             db.get().prepare(`
               UPDATE calendar_events
               SET title = ?, description = ?, start_datetime = ?, end_datetime = ?,
@@ -528,13 +509,17 @@ async function runSync({ makeClient } = {}) {
                   series_authored = ?
               WHERE id = ?
             `).run(
-              ev.summary, ev.description, ...when, evColor, calRefId,
-              obj.url ?? null, verdict.authored, existing.id
+              ev.summary, ev.description, ev.dtstart, ev.dtend,
+              ev.allDay ? 1 : 0, ev.location, ev.rrule, ev.tzid ?? null, evColor, calRefId,
+              obj.url ?? null,
+              // Die Marke (#1935) faellt, wenn hier ein anderer Start oder eine
+              // andere Regel in die Zeile kommt, als dort stand - wie im CalDAV-Sync.
+              authoredAfterInbound(existing, { start_datetime: ev.dtstart, recurrence_rule: ev.rrule }),
+              existing.id
             );
             eventId = existing.id;
-            // In iCloud verschoben (#1377): die Erinnerungen ziehen mit. Beim Echo
-            // des eigenen Uploads (`keep`) hat sich der Start der Zeile nicht bewegt.
-            followInboundStartChange(db.get(), eventId, existing.start_datetime, when[0]);
+            // In iCloud verschoben (#1377): die Erinnerungen ziehen mit.
+            followInboundStartChange(db.get(), eventId, existing.start_datetime, ev.dtstart);
             // Von einem Kalender in einen anderen verschoben (#1270): die
             // unangetastete Standard-Zuweisung zieht mit um.
             reassignDefaultOnCalendarMove(db.get(), eventId, {

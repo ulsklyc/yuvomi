@@ -18,14 +18,20 @@
  *   - zeitgebunden, ganztägig, 23:30 und "letzter Tag, der ein Montag ist":
  *     der erste Upload und der Push nach einer Titeländerung tragen denselben
  *     Start und dasselbe Ende - mit der Bearbeitung VOR und NACH dem ersten Abruf;
- *   - der Abruf lässt die Eingabe (den 15.) in der Zeile stehen und verschiebt
- *     keine Erinnerung;
+ *   - der Abruf schreibt wie vor #1935: er übernimmt den ausgerichteten Start
+ *     in die Zeile, die Erinnerungen folgen (#1377), und die Marke fällt, weil
+ *     ein anderer Start in die Zeile kommt - der Push danach trägt trotzdem
+ *     dasselbe, weil die Zeile den ausgerichteten Start dann selbst hält. Dass
+ *     die Eingabe im Abruf stehen bleibt, ist #1956 und hier nicht gebaut;
  *   - Kontrollen: ein Start, der schon passt, und eine BYDAY-Regel (#549);
  *   - eine eingelesene Serie mit einem Start neben ihrer Regel geht nach einer
  *     Titeländerung Wort für Wort zurück (#756);
  *   - wer Start oder Regel einer gespiegelten Serie in Yuvomi ändert, hat sie
  *     ab dann verfasst - auch an einer eingelesenen;
- *   - übernimmt der Abruf vom Anbieter einen anderen Start, fällt die Marke.
+ *   - übernimmt der Abruf vom Anbieter einen anderen Start, fällt die Marke;
+ *     schreibt er denselben Start und dieselbe Regel, bleibt sie;
+ *   - eine aus einer ICS-Datei importierte Serie zählt als eigene, und der
+ *     Abruf wirft an einer markierten Zeile ohne `tzid` nicht.
  *
  * Prozess- und Haushaltszone sind dieselbe und stehen fest; das Skript fährt
  * die Datei einmal in UTC und einmal in Europe/Berlin. Die Tage liegen 2035.
@@ -112,7 +118,7 @@ function wall(value) {
 
 /**
  * Die Erinnerung eines Termins, wie sie der Dialog ablegt: ein Zeitpunkt. Sie
- * hängt am eingegebenen Tag und darf durch den Abruf nicht wandern.
+ * hängt am Start der Zeile und zieht mit, wenn der Abruf ihn verlegt (#1377).
  */
 function addReminder(eventId, remindAt = '2035-01-15T08:00:00.000Z') {
   db.prepare("INSERT INTO reminders (entity_type, entity_id, remind_at, created_by) VALUES ('event', ?, ?, 1)")
@@ -122,6 +128,13 @@ function addReminder(eventId, remindAt = '2035-01-15T08:00:00.000Z') {
 const reminderOf = (eventId) => db.prepare(
   "SELECT remind_at FROM reminders WHERE entity_type = 'event' AND entity_id = ?"
 ).get(eventId)?.remind_at;
+/** `remind_at` als Zeitpunkt: die Spalte führt UTC, mit oder ohne `Z`. */
+const reminderMs = (eventId) => {
+  const raw = String(reminderOf(eventId));
+  return Date.parse(/(?:Z|[+-]\d\d:\d\d)$/.test(raw) ? raw : `${raw}Z`);
+};
+/** Der Beginn einer Zeile als Zeitpunkt (ganztägig: Mitternacht des Haushalts). */
+const startMs = (value) => storedToInstantMsPrecise(value, ZONE);
 
 // ── Die drei Anbieter, jeder mit denselben Handgriffen ────────────────────────────
 
@@ -253,13 +266,10 @@ const PROVIDERS = {
       const [id, item] = [...this.calendar.held.entries()].at(-1);
       this.calendar.held.set(id, { ...item, end: { dateTime: end, timeZone: item.start.timeZone } });
     },
-    /** Stellt die Serie beim Anbieter in eine andere Zone; die Zeitpunkte bleiben. */
-    changeZoneAtProvider(zone) {
+    /** Ändert beim Anbieter NUR den Titel. */
+    renameAtProvider(summary) {
       const [id, item] = [...this.calendar.held.entries()].at(-1);
-      const instant = (when) => ({
-        dateTime: new Date(localToUTCPrecise(when.dateTime, when.timeZone)).toISOString(), timeZone: zone,
-      });
-      this.calendar.held.set(id, { ...item, start: instant(item.start), end: instant(item.end) });
+      this.calendar.held.set(id, { ...item, summary });
     },
     /** Verlegt den Eintrag beim Anbieter, als hätte es jemand in Google getan. */
     moveAtProvider(start, end) {
@@ -311,6 +321,9 @@ const PROVIDERS = {
       const at = stored.indexOf('BEGIN:VEVENT');
       dav.putObject(this.url, name, stored.slice(0, at) + change(stored.slice(at)));
     },
+    renameAtProvider(summary) {
+      this.rewriteVevent((vevent) => vevent.replace(/^SUMMARY:[^\r\n]*/m, `SUMMARY:${summary}`));
+    },
     changeEndAtProvider(end) {
       // In der Schreibweise, in der das Objekt liegt: mit TZID die Wanduhr, sonst UTC.
       this.rewriteVevent((vevent) => vevent.replace(/^DTEND([^:\r\n]*):[^\r\n]*/m, (_line, params) => (
@@ -318,16 +331,6 @@ const PROVIDERS = {
           ? `DTEND${params}:${end.replace(/[-:]/g, '')}00`
           : `DTEND${params}:${new Date(wall(end)).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}`
       )));
-    },
-    changeZoneAtProvider(zone) {
-      const digits = (prop, vevent) => {
-        const iso = icsWhen(vevent)[prop];
-        const w = utcToWall(iso, zone);
-        return `${w.date.replace(/-/g, '')}T${w.time.replace(/:/g, '')}`;
-      };
-      this.rewriteVevent((vevent) => vevent
-        .replace(/^DTSTART[^\r\n]*/m, `DTSTART;TZID=${zone}:${digits('start', vevent)}`)
-        .replace(/^DTEND[^\r\n]*/m, `DTEND;TZID=${zone}:${digits('end', vevent)}`));
     },
     moveAtProvider(start, end) {
       const [name] = dav.objectNames(this.url);
@@ -365,7 +368,7 @@ const PROVIDERS = {
     moveAtProvider(start, end) { return PROVIDERS.CalDAV.moveAtProvider.call(this, start, end); },
     rewriteVevent(change) { return PROVIDERS.CalDAV.rewriteVevent.call(this, change); },
     changeEndAtProvider(end) { return PROVIDERS.CalDAV.changeEndAtProvider.call(this, end); },
-    changeZoneAtProvider(zone) { return PROVIDERS.CalDAV.changeZoneAtProvider.call(this, zone); },
+    renameAtProvider(summary) { return PROVIDERS.CalDAV.renameAtProvider.call(this, summary); },
   },
 };
 
@@ -458,22 +461,34 @@ for (const name of Object.keys(PROVIDERS)) {
       const p = provider(name);
       const event = await post({ title: 'Miete', ...c.entered, ...p.target });
       const remindAt = addReminder(event.id);
+      const remindMs = reminderMs(event.id);
 
       await p.sync();
       assert.deepEqual(p.first(), expected(name, c), 'der erste Upload');
 
-      // Der Abruf liest den eigenen Eintrag zurück.
+      // Der Abruf liest den eigenen Eintrag zurück - und schreibt wie vor #1935:
+      // was beim Anbieter liegt, steht danach in der Zeile.
+      const beforeInbound = row(event.id);
       await p.sync();
       const afterInbound = row(event.id);
-      if (c.aligned) {
-        // Die Zeile bleibt bei der Eingabe, die Erinnerung am eingegebenen Tag.
-        assert.equal(afterInbound.start_datetime, c.entered.start_datetime, 'der Abruf schreibt das ausgerichtete Datum nicht zurück');
-        assert.equal(afterInbound.end_datetime, c.entered.end_datetime);
-        assert.equal(afterInbound.recurrence_rule, c.entered.recurrence_rule);
-      }
-      assert.equal(reminderOf(event.id), remindAt, 'der Abruf verschiebt keine Erinnerung');
-      assert.equal(afterInbound.series_authored, 1, 'das Echo des eigenen Uploads nimmt die Marke nicht');
+      const moved = startMs(c.sent) - startMs(c.entered.start_datetime);
+      assert.equal(startMs(afterInbound.start_datetime), startMs(c.sent), 'die Zeile trägt den Start des Anbieters');
+      assert.equal(reminderMs(event.id) - remindMs, moved, 'die Erinnerung folgt dem Start der Zeile (#1377)');
+      if (!c.aligned) assert.equal(reminderOf(event.id), remindAt, 'ohne Verschiebung bleibt die Erinnerung, wie sie war');
 
+      // Die Marke fällt genau dann, wenn ein anderer Start oder eine andere
+      // Regel in die Zeile gekommen ist - ohne Urteil darüber, ob es das
+      // eigene Echo war.
+      const sameText = afterInbound.start_datetime === beforeInbound.start_datetime
+        && afterInbound.recurrence_rule === beforeInbound.recurrence_rule;
+      assert.equal(beforeInbound.series_authored, 1, 'bis zum Abruf trägt die hier angelegte Serie die Marke');
+      assert.equal(afterInbound.series_authored, sameText ? 1 : 0,
+        `Start ${beforeInbound.start_datetime} -> ${afterInbound.start_datetime}, `
+        + `Regel ${beforeInbound.recurrence_rule} -> ${afterInbound.recurrence_rule}`);
+      if (c.aligned) assert.equal(afterInbound.series_authored, 0, 'der ausgerichtete Start ist ein anderer Start: die Marke fällt');
+
+      // Der Push nach der Bearbeitung trägt trotzdem dasselbe: die Zeile hält
+      // den ausgerichteten Start jetzt selbst.
       await editTitle(p, event.id);
       assert.deepEqual(p.last(), expected(name, c), 'der Push nach der Titeländerung');
       assert.deepEqual(p.last(), p.first(), 'erster Upload und Push nach der Bearbeitung tragen dasselbe');
@@ -481,8 +496,16 @@ for (const name of Object.keys(PROVIDERS)) {
       // Und der Abruf danach lässt es dabei.
       await p.sync();
       assert.equal(row(event.id).title, 'Neuer Titel');
-      if (c.aligned) assert.equal(row(event.id).start_datetime, c.entered.start_datetime);
-      assert.equal(reminderOf(event.id), remindAt);
+      assert.equal(startMs(row(event.id).start_datetime), startMs(c.sent));
+      assert.equal(reminderMs(event.id) - remindMs, moved);
+
+      // Das ganze Formular, wie es der Dialog nach dem Abruf schickt: der Start
+      // der Zeile als Wanduhrzeit des Haushalts, dieselbe Regel.
+      await editTitle(p, event.id, {
+        title: 'Noch einmal', start_datetime: c.sent, end_datetime: c.sentEnd,
+        all_day: c.entered.all_day ? 1 : 0, recurrence_rule: row(event.id).recurrence_rule,
+      });
+      assert.deepEqual(p.last(), p.first(), 'auch danach liegt beim Anbieter dasselbe');
     });
   }
 
@@ -578,57 +601,105 @@ for (const name of Object.keys(PROVIDERS)) {
     assert.equal(row(event.id).start_datetime, '2035-02-10T14:00', 'in der Zeile steht die Eingabe');
   });
 
-  // ── Der Anbieter ändert nur die Dauer: Start, Regel und Marke bleiben ──────────
+  // ── Derselbe Start, dieselbe Regel: die Marke bleibt ───────────────────────────
 
-  test(`${name} [${ZONE}] ändert der Anbieter nur das Ende, bleibt der eingegebene Start und die Marke`, async () => {
+  test(`${name} [${ZONE}] schreibt der Abruf denselben Start und dieselbe Regel, bleibt die Marke`, async () => {
+    // Ein ganztägiger Einzeltermin: der Anbieter liefert den Tag so zurück, wie
+    // er in der Zeile steht, und eine Regel gibt es auf beiden Seiten nicht.
+    // (Eine SERIE verliert die Marke beim ersten Abruf immer: hier angelegt
+    // steht die Regel ohne `RRULE:` in der Zeile, der Abruf schreibt sie mit -
+    // siehe der Test darunter.)
     const p = provider(name);
     const event = await post({
-      title: 'Miete', start_datetime: '2035-01-15T14:00', end_datetime: '2035-01-15T15:00',
-      recurrence_rule: LAST_DAY, ...p.target,
+      title: 'Umzug', start_datetime: '2035-01-31', end_datetime: '2035-01-31', all_day: 1, ...p.target,
     });
-    const remindAt = addReminder(event.id);
     await p.sync();
+    await p.sync();
+    assert.notEqual(row(event.id).external_source, 'local', 'der Termin ist gespiegelt');
 
-    // Beim Anbieter liegt die Serie am 31. Januar; jemand verlängert sie dort bis 16:30.
-    p.changeEndAtProvider('2035-01-31T16:30');
+    // Ändert der Anbieter nur den Titel, schreibt der Abruf die Zeile - mit
+    // demselben Start und derselben (keiner) Regel.
+    p.renameAtProvider('Umzug (neu)');
     await p.sync();
     const taken = row(event.id);
-    assert.equal(taken.start_datetime, '2035-01-15T14:00', 'den Start hat der Anbieter nicht angefasst: die Eingabe bleibt');
-    assert.equal(taken.end_datetime, '2035-01-15T16:30', 'das neue Ende gilt, in der Lage der Eingabe');
-    assert.equal(taken.recurrence_rule, LAST_DAY);
-    assert.equal(reminderOf(event.id), remindAt, 'keine Erinnerung wandert');
-    assert.equal(taken.series_authored, 1, 'Start und Regel sind weiter die aus Yuvomi');
-
-    // Der nächste Push trägt den ausgerichteten Start und das Ende des Anbieters.
-    await editTitle(p, event.id);
-    assert.deepEqual(p.last(), { start: wall('2035-01-31T14:00'), end: wall('2035-01-31T16:30') });
-    // Und der Abruf danach lässt es dabei.
-    await p.sync();
-    assert.equal(row(event.id).start_datetime, '2035-01-15T14:00');
-    assert.equal(row(event.id).end_datetime, '2035-01-15T16:30');
+    assert.equal(taken.title, 'Umzug (neu)', 'der Abruf hat die Zeile geschrieben');
+    assert.equal(taken.start_datetime, '2035-01-31');
+    assert.equal(taken.recurrence_rule, null);
+    assert.equal(taken.series_authored, 1, 'nichts anderes kam in Start und Regel: die Marke bleibt');
   });
 
-  // ── Der Anbieter ändert die Zone der Serie: das ist seine Änderung ─────────────
-
-  test(`${name} [${ZONE}] stellt der Anbieter die Serie in eine andere Zone, gilt der Anbieter und die Marke fällt`, async () => {
-    // 15. März, ausgerichtet auf den 31. März - nach der Zeitumstellung in
-    // Europa. Dieselben Zeitpunkte, aber in New York gerechnet, liegen über
-    // das Jahr eine Stunde anders als in Berlin.
+  test(`${name} [${ZONE}] die Schreibweise des Anbieters ist ein anderer Text: die Marke fällt, der Push bleibt richtig`, async () => {
+    // Ganztägig und schon am Monatsletzten. Der Abruf schreibt die Regel mit
+    // `RRULE:` davor in die Zeile; verglichen wird der Text, also fällt die
+    // Marke. Ausgerichtet werden muss an dieser Zeile nichts.
     const p = provider(name);
     const event = await post({
-      title: 'Miete', start_datetime: '2035-03-15T14:00', end_datetime: '2035-03-15T15:00',
+      title: 'Miete', start_datetime: '2035-01-31', end_datetime: '2035-01-31', all_day: 1,
       recurrence_rule: LAST_DAY, ...p.target,
     });
     await p.sync();
-    assert.deepEqual(p.first(), { start: wall('2035-03-31T14:00'), end: wall('2035-03-31T15:00') });
-
-    p.changeZoneAtProvider('America/New_York');
     await p.sync();
     const taken = row(event.id);
-    assert.equal(taken.tzid, 'America/New_York', 'die Zone des Anbieters steht in der Zeile');
-    assert.equal(storedToInstantMsPrecise(taken.start_datetime, ZONE), Date.parse(wall('2035-03-31T14:00')),
-      'mit dem Start, zu dem sie gehört');
-    assert.equal(taken.series_authored, 0, 'die Serie ist jetzt die des Anbieters');
+    assert.equal(taken.start_datetime, '2035-01-31');
+    assert.equal(taken.recurrence_rule, `RRULE:${LAST_DAY}`, 'die Regel in der Schreibweise des Abrufs');
+    assert.equal(taken.series_authored, 0);
+
+    await editTitle(p, event.id);
+    assert.deepEqual(p.last(), { start: '2035-01-31', end: '2035-02-01' });
+    assert.deepEqual(p.last(), p.first());
+
+    // Wer den Start danach in Yuvomi verlegt, hat ihn wieder verfasst.
+    await editTitle(p, event.id, { start_datetime: '2035-02-10', end_datetime: '2035-02-10', all_day: 1 });
+    assert.equal(row(event.id).series_authored, 1);
+    assert.deepEqual(p.last(), { start: '2035-02-28', end: '2035-03-01' });
+  });
+
+  // ── Aus einer ICS-Datei importiert: eine eigene Serie, ohne `tzid` ─────────────
+
+  test(`${name} [${ZONE}] eine markierte Zeile ohne tzid, deren Dauer der Anbieter ändert: der Abruf wirft nicht`, async () => {
+    // Der einmalige Import legt den Zeitpunkt der Datei ab, ohne Zone daneben,
+    // und die Serie zählt als eigene.
+    const p = provider(name);
+    await callRoute('POST', '/import', {
+      ics: [
+        'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Example//EN',
+        'BEGIN:VEVENT', 'UID:file-1935@example.org', 'DTSTAMP:20260101T090000Z', 'SUMMARY:Aus Datei',
+        'DTSTART:20350115T130000Z', 'DTEND:20350115T140000Z', `RRULE:${LAST_DAY}`,
+        'END:VEVENT', 'END:VCALENDAR',
+      ].join('\r\n'),
+    });
+    const imported = db.prepare("SELECT * FROM calendar_events WHERE title = 'Aus Datei'").get();
+    assert.ok(imported, 'die Datei wurde importiert');
+    assert.equal(imported.series_authored, 1, 'eine aus einer Datei importierte Serie zählt als eigene');
+    assert.equal(imported.tzid, null, 'der Import legt keine Zone ab');
+    assert.equal(startMs(imported.start_datetime), Date.parse('2035-01-15T13:00:00Z'));
+    assert.ok(/Z$/.test(imported.start_datetime), `der Start ist ein Zeitpunkt: ${imported.start_datetime}`);
+
+    if (Object.keys(p.target).length > 0) await put(imported.id, p.target);
+    // Die alte iCloud-Verbindung lädt nur hinauf, was keine fremde Kennung
+    // trägt, und der Import behält die UID der Datei: dort geht eine solche
+    // Zeile gar nicht hinauf. Damit der Abruf sie trotzdem zu sehen bekommt,
+    // nimmt die Probe ihr die Kennung - die Form der Zeile (Zeitpunkt, keine
+    // Zone, Marke) bleibt die des Imports.
+    if (name === 'iCloud') {
+      await p.sync();
+      assert.equal(p.pushes(), 0, 'mit der UID der Datei lädt die iCloud-Verbindung die Zeile nicht hinauf');
+      db.prepare('UPDATE calendar_events SET external_calendar_id = NULL WHERE id = ?').run(imported.id);
+    }
+    await p.sync();
+    assert.deepEqual(p.first(), { start: '2035-01-31T13:00:00.000Z', end: '2035-01-31T14:00:00.000Z' },
+      'hinauf geht sie ausgerichtet');
+
+    // Jemand verlängert die Serie beim Anbieter; Start und Regel bleiben.
+    p.changeEndAtProvider('2035-01-31T16:30');
+    await p.sync();
+    const taken = row(imported.id);
+    assert.equal(startMs(taken.end_datetime), startMs('2035-01-31T16:30'), 'der Abruf ist durchgelaufen und hat das neue Ende geschrieben');
+    assert.equal(startMs(taken.start_datetime), Date.parse('2035-01-31T13:00:00Z'), 'mit dem Start, der beim Anbieter liegt');
+    assert.equal(taken.series_authored, 0, 'ein anderer Start kam in die Zeile');
+
+    await editTitle(p, imported.id);
+    assert.deepEqual(p.last(), { start: '2035-01-31T13:00:00.000Z', end: wall('2035-01-31T16:30') });
   });
 
   // ── Der Anbieter verlegt den Start: die Marke fällt ────────────────────────────

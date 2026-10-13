@@ -24,7 +24,7 @@ import assert from 'node:assert/strict';
 // ('2026-01-15 09:00:00') laeuft durch `toICSDatetime` zu Unsinn und laesst die
 // Pruefung aus dem falschen Grund scheitern.
 const {
-  outboundStartDatetime, outboundDateRange, outboundEvent, startOrRuleChanged, inboundSeriesVerdict,
+  outboundStartDatetime, outboundDateRange, outboundEvent, startOrRuleChanged, authoredAfterInbound,
 } = await import('../server/services/outbound-dtstart.js');
 
 const MONATSLETZTER = 'FREQ=MONTHLY;BYMONTHDAY=-1';
@@ -251,18 +251,6 @@ test('ausgerichtet wird in der Zone, in der der Empfaenger die Serie rechnet', (
   assert.equal(outboundDateRange(naiv, { zone: 'America/New_York' }).start_datetime, '2035-01-31T23:30');
 });
 
-test('der Abruf erkennt das Echo in derselben Zone, in der hinaus ausgerichtet wurde', () => {
-  const zeile = {
-    start_datetime: '2035-01-16T04:30:00Z', end_datetime: '2035-01-16T04:45:00Z', all_day: 0, tzid: 'America/New_York',
-    recurrence_rule: MONATSLETZTER, series_authored: 1,
-  };
-  const kommt = { start_datetime: '2035-01-31T05:30:00+01:00', end_datetime: '2035-01-31T05:45:00+01:00', all_day: false, recurrence_rule: MONATSLETZTER };
-  assert.deepEqual(inboundSeriesVerdict(zeile, kommt, { zone: 'Europe/Berlin', recurrenceZone: 'Europe/Berlin' }),
-    { keep: true, authored: 1, end_datetime: '2035-01-16T04:45:00Z' });
-  assert.deepEqual(inboundSeriesVerdict(zeile, kommt, { zone: 'Europe/Berlin' }), { keep: false, authored: 0 },
-    'ohne die Angabe waere es der in New York ausgerichtete Start, und der kam nicht zurueck');
-});
-
 test('ein Zeitpunkt mit Zone bleibt ohne die Marke stehen (#756)', () => {
   const ev = {
     start_datetime: '2035-01-15T13:00:00Z', end_datetime: '2035-01-15T14:00:00Z', tzid: 'Europe/Berlin',
@@ -307,12 +295,6 @@ test('Sekunden, die das Formular nicht halten kann, sind keine Startaenderung', 
   }
 });
 
-test('der Abruf vergleicht genau: Sekunden vom Anbieter sind ein anderer Start', () => {
-  const kommt = { start_datetime: '2035-01-31T13:00:30Z', end_datetime: '2035-01-31T14:00:30Z', all_day: false, recurrence_rule: MONATSLETZTER };
-  const zeile = { start_datetime: '2035-01-15T14:00', end_datetime: '2035-01-15T15:00', all_day: 0, recurrence_rule: MONATSLETZTER, tzid: null, series_authored: 1 };
-  assert.deepEqual(inboundSeriesVerdict(zeile, kommt, { zone: BERLIN }), { keep: false, authored: 0 });
-});
-
 test('dieselbe Regel in anderer Schreibweise ist keine Regelaenderung', () => {
   const zeile = { start_datetime: '2035-01-15T14:00', all_day: 0, recurrence_rule: 'RRULE:FREQ=MONTHLY;BYMONTHDAY=-1' };
   const danach = { ...zeile, recurrence_rule: 'bymonthday=-1;FREQ=MONTHLY' };
@@ -331,133 +313,58 @@ test('ein anderer Start, eine andere Regel oder der Wechsel auf ganztaegig setze
 // --------------------------------------------------------
 // Wer die Marke nimmt: der Abruf
 // --------------------------------------------------------
+//
+// Ohne Echo-Erkennung (die ist #1956): die Marke faellt genau dann, wenn ein
+// anderer Start oder eine andere Regel in die Zeile kommt, als dort stand.
 
 const eigene = (felder = {}) => ({
   start_datetime: '2035-01-15T14:00', end_datetime: '2035-01-15T15:00', all_day: 0,
   recurrence_rule: MONATSLETZTER, tzid: null, series_authored: 1, ...felder,
 });
 
-test('das Echo des eigenen Uploads laesst die Eingabe stehen', () => {
-  // Der Anbieter liefert den 31. Januar - genau das, was hinausging.
-  for (const kommt of [
-    { start_datetime: '2035-01-31T14:00:00+01:00', end_datetime: '2035-01-31T15:00:00+01:00' },
-    { start_datetime: '2035-01-31T13:00:00Z', end_datetime: '2035-01-31T14:00:00Z' },
-  ]) {
-    assert.deepEqual(
-      inboundSeriesVerdict(eigene(), { ...kommt, all_day: false, recurrence_rule: `RRULE:${MONATSLETZTER}` }, { zone: BERLIN }),
-      { keep: true, authored: 1, end_datetime: '2035-01-15T15:00' }, kommt.start_datetime,
-    );
-  }
-  // Ganztaegig, und ohne gespeichertes Ende: hinaus geht der Start als Ende.
-  assert.deepEqual(
-    inboundSeriesVerdict(
-      eigene({ start_datetime: '2035-01-15', end_datetime: null, all_day: 1 }),
-      { start_datetime: '2035-01-31', end_datetime: '2035-01-31', all_day: true, recurrence_rule: MONATSLETZTER },
-      { zone: BERLIN },
-    ),
-    { keep: true, authored: 1, end_datetime: null },
-  );
+test('derselbe Start und dieselbe Regel lassen die Marke stehen', () => {
+  assert.equal(authoredAfterInbound(eigene(), { start_datetime: '2035-01-15T14:00', recurrence_rule: MONATSLETZTER }), 1);
+  // Ein Einzeltermin: keine Regel auf beiden Seiten, gleich ob null oder leer.
+  const einzeln = eigene({ start_datetime: '2035-01-31', all_day: 1, recurrence_rule: null });
+  assert.equal(authoredAfterInbound(einzeln, { start_datetime: '2035-01-31', recurrence_rule: null }), 1);
+  assert.equal(authoredAfterInbound(einzeln, { start_datetime: '2035-01-31', recurrence_rule: undefined }), 1);
+  assert.equal(authoredAfterInbound(einzeln, { start_datetime: '2035-01-31', recurrence_rule: '' }), 1);
 });
 
 test('ein anderer Start oder eine andere Regel vom Anbieter nimmt die Marke', () => {
-  const basis = { start_datetime: '2035-01-31T13:00:00Z', end_datetime: '2035-01-31T14:00:00Z', all_day: false, recurrence_rule: MONATSLETZTER };
-  const fremd = { keep: false, authored: 0 };
-  assert.deepEqual(inboundSeriesVerdict(eigene(), { ...basis, start_datetime: '2035-01-31T12:00:00Z' }, { zone: BERLIN }), fremd, 'andere Uhrzeit');
-  assert.deepEqual(inboundSeriesVerdict(eigene(), { ...basis, start_datetime: '2035-01-15T13:00:00Z', end_datetime: '2035-01-15T14:00:00Z' }, { zone: BERLIN }), fremd,
-    'der eingegebene Tag selbst: der Anbieter haelt nicht, was Yuvomi hinausgibt');
-  assert.deepEqual(inboundSeriesVerdict(eigene(), { ...basis, recurrence_rule: 'FREQ=MONTHLY' }, { zone: BERLIN }), fremd, 'andere Regel');
-  assert.deepEqual(inboundSeriesVerdict(eigene(), { ...basis, start_datetime: '2035-01-31', end_datetime: '2035-01-31', all_day: true }, { zone: BERLIN }), fremd, 'ganztaegig geworden');
+  const gleich = { start_datetime: '2035-01-15T14:00', recurrence_rule: MONATSLETZTER };
+  assert.equal(authoredAfterInbound(eigene(), { ...gleich, start_datetime: '2035-01-20T16:00' }), 0, 'anderer Tag');
+  assert.equal(authoredAfterInbound(eigene(), { ...gleich, start_datetime: '2035-01-15T14:30' }), 0, 'andere Uhrzeit');
+  assert.equal(authoredAfterInbound(eigene(), { ...gleich, recurrence_rule: 'FREQ=MONTHLY' }), 0, 'andere Regel');
+  assert.equal(authoredAfterInbound(eigene(), { ...gleich, recurrence_rule: null }), 0, 'Regel entfernt');
+  assert.equal(authoredAfterInbound(eigene(), { ...gleich, start_datetime: '2035-01-15' }), 0, 'ganztaegig geworden');
 });
 
-test('aendert der Anbieter nur das Ende, gilt es in der Lage der Eingabe, und die Marke bleibt', () => {
-  // Stand hier bis zur Review-Runde als "anderes Ende nimmt die Marke" - das
-  // hielt das Falsche fest: die Dauer sagt nichts darueber, wer Start und Regel
-  // verfasst hat, und die Zeile verlor den eingegebenen Tag samt Erinnerungen.
-  const kommt = { start_datetime: '2035-01-31T13:00:00Z', end_datetime: '2035-01-31T15:30:00Z', all_day: false, recurrence_rule: MONATSLETZTER };
-  assert.deepEqual(inboundSeriesVerdict(eigene(), kommt, { zone: BERLIN }),
-    { keep: true, authored: 1, end_datetime: '2035-01-15T16:30' }, 'die Dauer des Anbieters, am eingegebenen Tag');
-  // Mehrtaegig, mit Sekunden, ohne Ende beim Anbieter.
-  assert.equal(inboundSeriesVerdict(eigene(), { ...kommt, end_datetime: '2035-02-02T09:00:30Z' }, { zone: BERLIN }).end_datetime,
-    '2035-01-17T10:00:30');
-  assert.equal(inboundSeriesVerdict(eigene(), { ...kommt, end_datetime: null }, { zone: BERLIN }).end_datetime, null,
-    'der Anbieter fuehrt kein Ende: die Zeile dann auch nicht, hinaus geht der Start als Ende');
-  // Ganztaegig: Tage, keine Uhrzeit.
-  assert.deepEqual(
-    inboundSeriesVerdict(
-      eigene({ start_datetime: '2035-01-15', end_datetime: '2035-01-15', all_day: 1 }),
-      { start_datetime: '2035-01-31', end_datetime: '2035-02-02', all_day: true, recurrence_rule: MONATSLETZTER },
-      { zone: BERLIN },
-    ),
-    { keep: true, authored: 1, end_datetime: '2035-01-17' },
-  );
-  // Ueber die Zeitumstellung bleibt die Uhrzeit: 15. Maerz -> 31. Maerz.
-  const maerz = eigene({ start_datetime: '2035-03-15T14:00', end_datetime: '2035-03-15T15:00' });
-  assert.equal(inboundSeriesVerdict(maerz,
-    { start_datetime: '2035-03-31T12:00:00Z', end_datetime: '2035-03-31T14:30:00Z', all_day: false, recurrence_rule: MONATSLETZTER },
-    { zone: BERLIN }).end_datetime, '2035-03-15T16:30');
-  // Ein Zeitpunkt in der Zeile bleibt ein Zeitpunkt.
-  const zoniert = eigene({ start_datetime: '2035-01-15T13:00:00Z', end_datetime: '2035-01-15T14:00:00Z', tzid: BERLIN });
-  assert.equal(inboundSeriesVerdict(zoniert, kommt, { zone: BERLIN }).end_datetime, '2035-01-15T15:30:00Z');
-});
-
-test('derselbe Start ohne Verschiebung: der Anbieter gilt wie bisher, die Marke bleibt', () => {
-  const passend = eigene({ start_datetime: '2035-01-31T14:00', end_datetime: '2035-01-31T15:00' });
-  const kommt = { start_datetime: '2035-01-31T13:00:00Z', end_datetime: '2035-01-31T14:00:00Z', all_day: false, recurrence_rule: MONATSLETZTER };
-  assert.deepEqual(inboundSeriesVerdict(passend, kommt, { zone: BERLIN }), { keep: false, authored: 1 });
-  // Ein anderes Ende aendert nicht, wer Start und Regel verfasst hat.
-  assert.deepEqual(inboundSeriesVerdict(passend, { ...kommt, end_datetime: '2035-01-31T16:00:00Z' }, { zone: BERLIN }),
-    { keep: false, authored: 1 });
-});
-
-test('eine andere Zone vom Anbieter ist seine Aenderung, auch bei denselben Zeitpunkten', () => {
-  // 15. Maerz, ausgerichtet auf den 31. Maerz 14:00 Berlin = 12:00Z.
-  const maerz = eigene({ start_datetime: '2035-03-15T14:00', end_datetime: '2035-03-15T15:00' });
-  const kommt = { start_datetime: '2035-03-31T12:00:00Z', end_datetime: '2035-03-31T13:00:00Z', all_day: false, recurrence_rule: MONATSLETZTER };
-  const fremd = { keep: false, authored: 0 };
-  const echo = { keep: true, authored: 1, end_datetime: '2035-03-15T15:00' };
-  assert.deepEqual(inboundSeriesVerdict(maerz, { ...kommt, tzid: 'America/New_York' }, { zone: BERLIN, sentZone: BERLIN }), fremd);
-  assert.deepEqual(inboundSeriesVerdict(maerz, { ...kommt, tzid: null }, { zone: BERLIN, sentZone: BERLIN }), fremd,
-    'keine Zone heisst UTC, und hinaus ging Berlin');
-  // Dieselbe Zone, anders geschrieben, ist kein Wechsel.
-  assert.deepEqual(inboundSeriesVerdict(maerz, { ...kommt, tzid: 'europe/berlin' }, { zone: BERLIN, sentZone: BERLIN }), echo);
-  const utcEcho = { keep: true, authored: 1, end_datetime: '2035-03-15T15:00' };
-  const utcKommt = { ...kommt, start_datetime: '2035-03-31T14:00:00Z', end_datetime: '2035-03-31T15:00:00Z' };
-  for (const [kommtZone, hinausZone] of [[null, null], ['Etc/UTC', null], [null, 'UTC'], ['GMT', 'Etc/UTC']]) {
-    assert.deepEqual(inboundSeriesVerdict(maerz, { ...utcKommt, tzid: kommtZone }, { zone: 'UTC', sentZone: hinausZone }), utcEcho,
-      `${kommtZone} gegen ${hinausZone}`);
+test('das Echo des eigenen Uploads ist ein anderer Start und nimmt die Marke ebenfalls', () => {
+  // Der Anbieter liefert den 31. Januar - genau das, was hinausging. Geurteilt
+  // wird darueber nicht: in die Zeile kommt ein anderer Start, als dort stand.
+  for (const start of ['2035-01-31T14:00:00+01:00', '2035-01-31T13:00:00Z', '2035-01-31T14:00']) {
+    assert.equal(authoredAfterInbound(eigene(), { start_datetime: start, recurrence_rule: MONATSLETZTER }), 0, start);
   }
-  // Die Zone, die ein frueherer Abruf in die Zeile geschrieben hat, ist ebenfalls nicht neu.
-  const zoniert = eigene({ start_datetime: '2035-03-15T18:00:00Z', end_datetime: '2035-03-15T19:00:00Z', tzid: 'America/New_York' });
-  const nyKommt = { start_datetime: '2035-03-31T18:00:00Z', end_datetime: '2035-03-31T19:00:00Z', all_day: false, recurrence_rule: MONATSLETZTER, tzid: 'America/New_York' };
-  assert.equal(inboundSeriesVerdict(zoniert, nyKommt, { zone: BERLIN, sentZone: BERLIN }).keep, true);
-  assert.deepEqual(inboundSeriesVerdict(zoniert, { ...nyKommt, tzid: 'Asia/Tokyo' }, { zone: BERLIN, sentZone: BERLIN }), fremd);
-  // Auch ohne Verschiebung: derselbe Start in einer anderen Zone nimmt die Marke.
-  const passend = eigene({ start_datetime: '2035-03-31T14:00', end_datetime: '2035-03-31T15:00' });
-  assert.deepEqual(inboundSeriesVerdict(passend, { ...kommt, tzid: 'America/New_York' }, { zone: BERLIN, sentZone: BERLIN }), fremd);
-  assert.deepEqual(inboundSeriesVerdict(passend, { ...kommt, tzid: BERLIN }, { zone: BERLIN, sentZone: BERLIN }), { keep: false, authored: 1 });
-  // Ganztaegig traegt keine Zone.
-  const ganztags = eigene({ start_datetime: '2035-03-15', end_datetime: null, all_day: 1 });
-  assert.equal(inboundSeriesVerdict(ganztags,
-    { start_datetime: '2035-03-31', end_datetime: '2035-03-31', all_day: true, recurrence_rule: MONATSLETZTER, tzid: null },
-    { zone: BERLIN, sentZone: BERLIN }).keep, true);
-});
-
-test('eine Zeile ohne Marke folgt dem Anbieter und bekommt keine', () => {
-  const kommt = { start_datetime: '2035-01-31T13:00:00Z', end_datetime: '2035-01-31T14:00:00Z', all_day: false, recurrence_rule: MONATSLETZTER };
-  assert.deepEqual(inboundSeriesVerdict(eigene({ series_authored: 0 }), kommt, { zone: BERLIN }), { keep: false, authored: 0 });
-});
-
-test('eine gesendete Schreibweise der Regel ist dieselbe Regel', () => {
-  // Google bekommt `UNTIL` umgeformt; kommt genau diese Form zurueck, hat
-  // niemand die Regel geaendert.
-  const mitEnde = eigene({ recurrence_rule: `${MONATSLETZTER};UNTIL=20351231` });
-  const kommt = {
-    start_datetime: '2035-01-31T13:00:00Z', end_datetime: '2035-01-31T14:00:00Z', all_day: false,
-    recurrence_rule: `${MONATSLETZTER};UNTIL=20351231T225959Z`,
-  };
-  assert.deepEqual(inboundSeriesVerdict(mitEnde, kommt, { zone: BERLIN }), { keep: false, authored: 0 });
-  assert.deepEqual(
-    inboundSeriesVerdict(mitEnde, kommt, { zone: BERLIN, sentRules: [`${MONATSLETZTER};UNTIL=20351231T225959Z`] }),
-    { keep: true, authored: 1, end_datetime: '2035-01-15T15:00' },
+  assert.equal(
+    authoredAfterInbound(eigene({ start_datetime: '2035-01-15', all_day: 1 }), { start_datetime: '2035-01-31', recurrence_rule: MONATSLETZTER }),
+    0,
   );
+});
+
+test('verglichen wird der Text, der in die Spalte kommt', () => {
+  // Derselbe Beginn als Zeitpunkt des Anbieters, dieselbe Regel mit `RRULE:`
+  // davor: beides ist die Form des Anbieters und steht danach in der Zeile.
+  // Eine passend liegende Serie verliert die Marke damit auch - an ihr ist
+  // nichts auszurichten, und die naechste Aenderung in Yuvomi setzt sie wieder.
+  const passend = eigene({ start_datetime: '2035-01-31T14:00' });
+  assert.equal(authoredAfterInbound(passend, { start_datetime: '2035-01-31T13:00:00Z', recurrence_rule: MONATSLETZTER }), 0);
+  assert.equal(authoredAfterInbound(passend, { start_datetime: '2035-01-31T14:00', recurrence_rule: `RRULE:${MONATSLETZTER}` }), 0);
+});
+
+test('eine Zeile ohne Marke bekommt durch den Abruf keine', () => {
+  const gleich = { start_datetime: '2035-01-15T14:00', recurrence_rule: MONATSLETZTER };
+  assert.equal(authoredAfterInbound(eigene({ series_authored: 0 }), gleich), 0);
+  assert.equal(authoredAfterInbound(eigene({ series_authored: undefined }), gleich), 0, 'unbekannt heisst wie eingelesen');
+  assert.equal(authoredAfterInbound(null, gleich), 0);
 });

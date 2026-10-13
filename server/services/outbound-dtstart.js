@@ -38,17 +38,19 @@
  *   - gesetzt beim Anlegen in Yuvomi und bei jeder Aenderung von Start oder
  *     Regel in Yuvomi, auch an einer eingelesenen Serie (`startOrRuleChanged`);
  *   - zurueckgenommen, wenn der Abruf vom Anbieter einen ANDEREN Start oder
- *     eine andere Regel uebernimmt (`inboundSeriesVerdict`).
+ *     eine andere Regel in die Zeile schreibt (`authoredAfterInbound`).
  *
  * Traegt die Zeile die Marke, wird bei JEDEM ausgehenden Weg ausgerichtet;
  * ohne sie geht die Serie Wort fuer Wort zurueck, auch nach einer Bearbeitung,
  * die weder Start noch Regel anfasst.
  *
- * DER ABRUF SCHREIBT DAS AUSGERICHTETE DATUM NICHT ZURUECK. Liefert der
- * Anbieter genau das, was Yuvomi hinausgegeben hat, bleibt die Zeile bei der
- * Eingabe (dem 15.): sonst kaeme die Normalisierung beim Schreiben, die #984
- * zurueckgenommen hat, ueber den Sync wieder herein und zoege die Erinnerungen
- * vom 15. auf den 31. mit.
+ * DER ABRUF SCHREIBT WIE BISHER. Er uebernimmt, was beim Anbieter liegt - auch
+ * den ausgerichteten Start, den Yuvomi selbst hinaufgegeben hat: aus dem 15.
+ * in der Zeile wird der 31., und die Marke faellt dabei. Das schadet dem
+ * ausgehenden Weg nicht: die Zeile traegt den ausgerichteten Start danach
+ * selbst und geht Wort fuer Wort richtig hinaus, und die naechste Aenderung
+ * von Start oder Regel in Yuvomi setzt die Marke wieder. Dass die Eingabe im
+ * Abruf stehen bleibt, ist eine eigene Aufgabe (#1956) und hier nicht gebaut.
  */
 
 import { seriesStartFor } from './recurrence.js';
@@ -240,23 +242,6 @@ function sameStart(a, b, zone, allDay, { toMinute = false } = {}) {
 }
 
 /**
- * Eine Zone in der Form, in der zwei Schreibweisen derselben Zone gleich sind.
- *
- * Keine Zone heisst UTC: so kommt ein Zeitpunkt mit `Z` aus dem Abruf (der
- * Parser nennt dann keine `tzid`), und so geht eine Serie des Haushalts in
- * UTC hinaus (`anchorZone` gibt fuer UTC kein TZID). `Etc/UTC`, `GMT` und `Z`
- * sind dasselbe. Sonst der Name, auf den die Laufzeit einen Alias aufloest,
- * ohne Gross-/Kleinschreibung; ein Name, den sie nicht kennt, bleibt er selbst.
- */
-function zoneKey(tzid) {
-  const roh = String(tzid ?? '').trim();
-  if (!roh || /^(UTC|GMT|Z|Etc\/(UTC|GMT|GMT0|GMT\+0|GMT-0|Zulu|Universal|Greenwich))$/i.test(roh)) return 'utc';
-  if (!isValidTimeZone(roh)) return roh.toLowerCase();
-  const name = new Intl.DateTimeFormat('en-US', { timeZone: roh }).resolvedOptions().timeZone;
-  return /^(UTC|GMT|Etc\/(UTC|GMT))$/i.test(name) ? 'utc' : name.toLowerCase();
-}
-
-/**
  * Hat eine Bearbeitung IN YUVOMI den Start oder die Regel geaendert?
  *
  * Die Antwort setzt die Marke - auch an einer eingelesenen Serie: wer dort den
@@ -271,8 +256,7 @@ function zoneKey(tzid) {
  * geaendert wurde. Das ist der Verlust des Formulars und keine Entscheidung
  * ueber den Start: auf die Millisekunde verglichen bekaeme die Serie die
  * Marke und ginge mit einem anderen DTSTART zurueck. Eine Minute Unterschied
- * bleibt eine Aenderung. Der Abruf (`inboundSeriesVerdict`) vergleicht
- * dagegen genau: dort stehen sich zwei Zeitpunkte gegenueber, kein Formular.
+ * bleibt eine Aenderung.
  *
  * @param {object} before  Zeile vor der Bearbeitung
  * @param {{start_datetime: string, all_day: number|boolean, recurrence_rule: ?string}} after
@@ -286,124 +270,30 @@ export function startOrRuleChanged(before, after, zone) {
 }
 
 /**
- * Was der Abruf mit Start, Ende und Regel einer bestehenden Zeile tut.
+ * Die Marke einer Zeile, nachdem der Abruf sie geschrieben hat.
  *
- * DREI AUSGAENGE, und nur der erste ist neu:
+ * Sie faellt genau dann, wenn der Abruf einen ANDEREN Start oder eine andere
+ * Regel in die Zeile schreibt, als dort stand: ab dann stammen beide vom
+ * Anbieter, und die Serie geht Wort fuer Wort zurueck (#756). Verglichen wird
+ * der Text, der in die Spalte kommt, mit dem, der dort steht - dieselbe
+ * Gleichheit, an der `followInboundStartChange` einen verlegten Start erkennt.
+ * KEINE ECHO-ERKENNUNG: auch Yuvomis eigener ausgerichteter Start (der 31.
+ * statt des eingegebenen 15.) ist ein anderer Start und nimmt die Marke. Die
+ * Zeile traegt ihn danach selbst, ausgerichtet werden muss dann nichts mehr.
+ * Dasselbe gilt fuer eine andere Schreibweise desselben Beginns oder
+ * derselben Regel: was der Abruf hineinschreibt, ist die Form des Anbieters.
  *
- *   - `keep`: die Zeile traegt die Marke, ihr Start liegt neben der eigenen
- *     Regel, und der Anbieter liefert GENAU den Start, den Yuvomi daraus
- *     hinausgibt (`outboundDateRange`: der erste Tag der Regel), mit derselben
- *     Regel. Dann hat der Anbieter weder Start noch Regel angefasst: Start,
- *     Regel und Zone der Zeile bleiben, wie sie eingegeben wurden, und der
- *     Aufrufer ruft `followInboundStartChange` nicht - die Erinnerungen
- *     haengen am eingegebenen Tag. Das ENDE steht in `end_datetime`: beim
- *     Echo des eigenen Uploads das gespeicherte, und wenn der Anbieter nur
- *     die Dauer geaendert hat, sein Ende in der Lage der Eingabe
- *     (`endAtEnteredStart`). Eine andere Dauer nimmt die Marke nicht - sie
- *     sagt nichts darueber, wer Start und Regel verfasst hat.
- *   - Marke bleibt, der Anbieter gilt: derselbe Beginn und dieselbe Regel wie
- *     in der Zeile (hoechstens anders geschrieben). Die Zeile folgt dem
- *     Anbieter wie bisher.
- *   - Marke faellt, der Anbieter gilt: ein anderer Start, eine andere Regel
- *     oder eine andere Zone. Ab dann ist die Serie die des Anbieters und geht Wort fuer Wort
- *     zurueck (#756).
+ * Eine Zeile ohne Marke bekommt durch den Abruf nie eine.
  *
- * `sentRules`: Schreibweisen der gespeicherten Regel, die der ausgehende Weg
- * dieses Anbieters erzeugt (Google bekommt `UNTIL` umgeformt). Kommt eine
- * davon zurueck, ist das dieselbe Regel.
- *
- * Ohne Marke aendert sich nichts: `{ keep: false, authored: 0 }`.
- *
- * @param {object} stored    Zeile (start_datetime, end_datetime, all_day,
- *   recurrence_rule, tzid, series_authored)
- * @param {{start_datetime: string, end_datetime: ?string, all_day: boolean|number, recurrence_rule: ?string, tzid?: ?string}} incoming
- *   was der Abruf in die Zeile schreiben wuerde; `tzid` wie er sie schriebe
- *   (keine = UTC)
- * @param {{ zone: string, sentRules?: Array<?string>, recurrenceZone?: string|null, sentZone?: ?string }} options
- *   `zone`: Zone des Haushalts; `recurrenceZone`: dieselbe Angabe, die der
- *   ausgehende Weg dieses Anbieters an `outboundDateRange` gibt; `sentZone`:
- *   die Zone, die dieser Weg fuer die Zeile hinausgibt (null = UTC)
- * @returns {{ keep: boolean, authored: 0|1, end_datetime?: string|null }}
- *   `end_datetime` nur bei `keep`: das Ende, das in die Zeile gehoert
+ * @param {{start_datetime: ?string, recurrence_rule: ?string, series_authored: ?number}} stored
+ *   die Zeile vor dem Abruf
+ * @param {{start_datetime: ?string, recurrence_rule: ?string}} written
+ *   was der Abruf in die Zeile schreibt
+ * @returns {0|1}
  */
-export function inboundSeriesVerdict(stored, incoming, { zone, sentRules = [], recurrenceZone = null, sentZone } = {}) {
-  const fremd = { keep: false, authored: 0 };
-  if (!istEigen(stored)) return fremd;
-  const allDay = !!stored.all_day;
-  if (allDay !== !!incoming.all_day) return fremd;
-  const kommt = ruleKey(incoming.recurrence_rule);
-  const gleicheRegel = [stored.recurrence_rule, ...sentRules].some((regel) => ruleKey(regel) === kommt);
-  if (!gleicheRegel) return fremd;
-  // EINE ANDERE ZONE IST EINE AENDERUNG DES ANBIETERS, auch wenn Start und Ende
-  // dieselben Zeitpunkte bleiben: in ihr rechnet er jedes weitere Vorkommen,
-  // und ueber eine Zeitumstellung liegen sie dann anders. Bekannt sind zwei
-  // Zonen, die NICHT seine Aenderung sind: die, die der ausgehende Weg dieser
-  // Zeile nennt (`sentZone`), und die, die ein frueherer Abruf in die Zeile
-  // geschrieben hat. Kommt eine dritte, gilt der Anbieter. Ohne bekannte Zone
-  // (der Aufrufer nennt keine, die Zeile traegt keine) wird nicht geurteilt -
-  // und ebenso, wenn der Aufrufer die eingehende gar nicht nennt (`undefined`;
-  // `null` ist eine Auskunft und heisst UTC).
-  if (!allDay && incoming.tzid !== undefined) {
-    const bekannt = [
-      ...(sentZone !== undefined ? [sentZone] : []),
-      ...(stored.tzid ? [stored.tzid] : []),
-    ].map(zoneKey);
-    if (bekannt.length > 0 && !bekannt.includes(zoneKey(incoming.tzid))) return fremd;
-  }
-
-  const hinaus = outboundDateRange(stored, { zone: recurrenceZone });
-  if (!sameStart(incoming.start_datetime, hinaus.start_datetime, zone, allDay)) return fremd;
-  if (hinaus.start_datetime === stored.start_datetime) return { keep: false, authored: 1 };
-  // Ohne Ende gibt jeder ausgehende Weg den Start als Ende hinaus.
-  const endeHinaus = hinaus.end_datetime ?? hinaus.start_datetime;
-  const endeKommt = incoming.end_datetime ?? incoming.start_datetime;
-  if (sameStart(endeKommt, endeHinaus, zone, allDay)) {
-    return { keep: true, authored: 1, end_datetime: stored.end_datetime ?? null };
-  }
-  // NUR DAS ENDE IST ANDERS: der Anbieter hat die Dauer geaendert, Start und
-  // Regel sind weiter die aus Yuvomi. Das neue Ende gilt, die Eingabe bleibt.
-  return {
-    keep: true,
-    authored: 1,
-    end_datetime: endAtEnteredStart(stored, hinaus, incoming.end_datetime, { zone, recurrenceZone }),
-  };
-}
-
-/**
- * Das Ende des Anbieters, zurueckgerechnet in die Lage der Eingabe.
- *
- * Der Anbieter haelt die Serie am ausgerichteten Tag (dem 31.), die Zeile am
- * eingegebenen (dem 15.). Sein Ende roh zu uebernehmen hiesse, einen Termin
- * vom 15. bis zum 31. zu speichern. Uebernommen wird deshalb seine DAUER: das
- * Ende wandert um dieselben Tage zurueck, um die `outboundDateRange` es beim
- * Hinausgeben vorschiebt - auf der Wanduhr, nicht in Millisekunden, damit die
- * Uhrzeit ueber eine Zeitumstellung dieselbe bleibt. Heraus kommt die Form,
- * in der der Start der Zeile steht (Tag, Wanduhrzeit des Haushalts oder
- * Zeitpunkt), sodass der naechste Push genau das Ende des Anbieters ergibt.
- *
- * @returns {string|null} null, wenn der Anbieter kein Ende fuehrt
- */
-function endAtEnteredStart(stored, hinaus, endeKommt, { zone, recurrenceZone }) {
-  if (endeKommt == null) return null;
-  const start = String(stored.start_datetime);
-  if (stored.all_day) {
-    const tage = tagesDifferenz(start.slice(0, 10), String(hinaus.start_datetime).slice(0, 10));
-    return shiftDateKey(String(endeKommt).slice(0, 10), -tage);
-  }
-  // Die Zone, in der die Tage gezaehlt wurden: fuer einen Zeitpunkt die des
-  // Empfaengers (wie in `outboundDateRange`), fuer eine Wanduhrzeit die des Haushalts.
-  const zeitpunkt = hasExplicitZone(start);
-  const rechenZone = zeitpunkt ? (recurrenceZone || stored.tzid) : zone;
-  const wandVon = (wert) => (hasExplicitZone(wert)
-    ? utcToWall(new Date(wert).toISOString(), rechenZone)
-    : { date: String(wert).slice(0, 10), time: `${String(wert).slice(11)}:00`.slice(0, 8) });
-  const tage = zeitpunkt
-    ? tagesDifferenz(wandVon(start).date, wandVon(hinaus.start_datetime).date)
-    : tagesDifferenz(start.slice(0, 10), String(hinaus.start_datetime).slice(0, 10));
-  const wand = wandVon(endeKommt);
-  if (!wand) return endeKommt;
-  const tag = shiftDateKey(wand.date, -tage);
-  if (zeitpunkt) return localToUTCPrecise(`${tag}T${wand.time}`, rechenZone);
-  // Wie die Route speichert: ohne Sekunden, solange der Anbieter keine fuehrt.
-  return `${tag}T${wand.time.endsWith(':00') ? wand.time.slice(0, 5) : wand.time}`;
+export function authoredAfterInbound(stored, written) {
+  if (!istEigen(stored)) return 0;
+  const gleich = (a, b) => String(a ?? '') === String(b ?? '');
+  return gleich(stored.start_datetime, written?.start_datetime)
+    && gleich(stored.recurrence_rule, written?.recurrence_rule) ? 1 : 0;
 }
