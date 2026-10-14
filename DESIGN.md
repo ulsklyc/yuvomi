@@ -1520,7 +1520,11 @@ Toast, die uebrigen stehen `inert` als `.toast--tucked` bereit. Ein Dialog mit e
 Kopf- oder Fusszeile zeichnet sie mit `data-dialog-actions` aus; das Register dazu fuehrt
 `test:toast-placement`. Im Wand-Modus steht der Stapel ohne offenen Dialog OBEN statt unten
 (#1559, siehe „Der Wand-Modus"): dort gibt es keine Tab-Leiste, mit der er rechnet, und unten
-liegen Ausstieg und Timer-Knoepfe.
+liegen Ausstieg und Timer-Knoepfe. **Sperrzonen ohne Dialog (#1917):** was `data-toast-keepout`
+traegt, haelt der Stapel frei wie eine Bedienleiste, auch wenn kein Dialog offen ist - er nimmt
+dann die naechste freie Kante, in seiner eigenen Breite und Mitte. Die Regel haengt am Attribut,
+nicht an einer Seite; gesetzt ist es an Uhrzeit, Datum und Fuss der Wand, wo der Hinweis beim
+Einschalten bis rund 834px Breite acht Sekunden auf der Uhr lag.
 
 ## Shapes
 
@@ -3773,8 +3777,16 @@ er `--wall-pad`, mindestens die Safe-Area. Keine Regel nach Geraeteklasse: `stic
 wenn der Platz fehlt, und Polster und Gegenrand heben sich im Fluss auf (1280x800 passt weiter,
 `test:dashboard-surface-browser`). **Meldungen stehen auf der Wand OBEN**: unten liegen Ausstieg
 und Timer-Startknoepfe, und der Hinweis beim Einschalten lag am Telefon acht Sekunden auf „5 Min".
-Oben steht nur die Uhr, die nichts annimmt. Die Lage neben einem offenen Dialog (`[data-dock]`)
-bleibt Sache der Ausweich-Regel des Toast-Stapels.
+Oben steht die Uhr; sie nimmt keinen Tipp, ist aber Sperrzone (#1917), und wo der Stapel sie
+traefe, rueckt er direkt unter das Datum. Die Lage neben einem offenen Dialog (`[data-dock]`)
+bleibt Sache der Ausweich-Regel des Toast-Stapels. **Der klebende Fuss hat eine Scroll-Kante**
+(#1917): ueber ihm laeuft der Inhalt in einem Verlauf zum Grund der Flaeche aus, statt an einer
+unsichtbaren harten Kante mitten im Gesicht zu enden. Sie ist statisch, in jedem Browser
+dieselbe, und ihre Hoehe `--wall-foot-edge` ist zugleich der Endabstand vor dem Fuss: am
+Scrollende steht der letzte Eintrag frei ueber ihr. Auf der Wand ist sie der Abstand der
+Flaeche selbst (`--wall-gap`, die Flaeche wird keinen Pixel hoeher), am Telefon (Flaeche unter
+520px, dieselbe Grenze wie beim Zeilentitel) `--space-12`, die Hoehe eines Gesichts. Kein
+Zustand, kein Skript, keine Bewegung, kein Tipp bleibt an ihr haengen.
 
 **Die Startknoepfe der Kuechenuhr ruhen sichtbar, und die erste Beruehrung weckt nur**
 (2026-09-23). Unsichtbare Knoepfe, die trotzdem auf Beruehrung reagierten, waren eine Falle:

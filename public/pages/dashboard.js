@@ -5525,9 +5525,15 @@ function clockWidgetParts(now = new Date()) {
 function renderClockWidget({ wall = false } = {}) {
   const { time, date, machineTime } = clockWidgetParts();
   const cls = wall ? 'clock-widget clock-widget--wall' : 'widget widget--clock clock-widget';
+  // SPERRZONE FUER MELDUNGEN, NUR AN DER WAND (#1917): dort steht der Stapel
+  // oben (#1559) und lag bis rund 834px Breite auf Uhrzeit und Datum. Das
+  // Attribut liest utils/toast-placement.js; ausgezeichnet sind die beiden
+  // Zeilen selbst, nicht ihr Rahmen - der ist so breit wie die Flaeche, und
+  // der Hinweis wiche ihm auch dort, wo er neben der Uhr Platz hat.
+  const keepout = wall ? ' data-toast-keepout' : '';
   const body = `
-    <time class="clock-widget__time" id="clock-widget-time" datetime="${esc(machineTime)}">${esc(time)}</time>
-    <p class="clock-widget__date" id="clock-widget-date">${esc(date)}</p>`;
+    <time class="clock-widget__time" id="clock-widget-time" datetime="${esc(machineTime)}"${keepout}>${esc(time)}</time>
+    <p class="clock-widget__date" id="clock-widget-date"${keepout}>${esc(date)}</p>`;
   // Kachel-Form bekommt seit dem Polish-Batch (PLAN.md #7) denselben
   // Siegel+Titel-Kopf wie ihre 15 Geschwister-Widgets - vorher eines von zwei
   // Widgets ganz ohne Kopf (das andere war das Wetter). Die Wand-Form bleibt
@@ -6126,7 +6132,7 @@ function renderWallSurface(data, weather, { failed = false, loading = false, upd
       ${renderClockWidget({ wall: true })}
       <div class="wall__stage${failed || loading ? ' wall__stage--single' : ''}">${main}</div>
       ${timer.display}
-      <div class="wall__foot">
+      <div class="wall__foot" data-toast-keepout>
         ${stamp}
         ${timer.controls}
         <div class="wall__foot-end">${screensaverEnabled && !timer.display ? `

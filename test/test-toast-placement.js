@@ -25,7 +25,9 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { chooseToastPlacement, persistentToastMustYield, placeToastStack } from '../public/utils/toast-placement.js';
+import {
+  chooseToastPlacement, persistentToastMustYield, placeToastStack, KEEPOUT_SELECTOR,
+} from '../public/utils/toast-placement.js';
 import { PERSISTENT_TOAST_SELECTOR } from '../public/utils/toast-surface.js';
 import { eachRule } from './css-rules.js';
 
@@ -48,6 +50,9 @@ function bounds(input) {
   return { minTop, maxBottom };
 }
 
+/** Was der Stapel frei haelt: die Bedienleisten und die Sperrzonen (#1917). */
+const guarded = (input) => [...input.zones, ...(input.keepout ?? [])];
+
 /** Gibt es irgendeine Lage im Bild, die keine Bedienleiste verdeckt? Von Hand. */
 function someFreeTop(input) {
   const { minTop, maxBottom } = bounds(input);
@@ -55,7 +60,7 @@ function someFreeTop(input) {
   for (let top = Math.ceil(minTop); top + input.dockedHeight <= maxBottom; top += 1) {
     const r = box(top, left, input.dockedWidth, input.dockedHeight);
     if ((input.keepClear ?? []).some((c) => intersects(r, c))) continue;
-    if (!input.zones.some((z) => intersects(r, z))) return top;
+    if (!guarded(input).some((z) => intersects(r, z))) return top;
   }
   return null;
 }
@@ -64,7 +69,7 @@ function checkInvariant(input, label) {
   const decision = chooseToastPlacement(input);
   if (!decision) {
     // Stehen bleiben darf er nur, wo er keine Bedienleiste beruehrt.
-    const hit = input.zones.find((z) => intersects(input.stack, z));
+    const hit = guarded(input).find((z) => intersects(input.stack, z));
     assert.equal(hit, undefined, `${label}: bleibt stehen, verdeckt aber eine Bedienleiste`);
     return;
   }
@@ -93,7 +98,7 @@ function checkInvariant(input, label) {
     const hit = (input.keepClear ?? []).find((c) => intersects(r, c));
     assert.equal(hit, undefined, `${label}: Stapel ${Math.round(r.top)}..${Math.round(r.bottom)} liegt auf der Navigation`);
   }
-  if (input.zones.some((z) => intersects(r, z))) {
+  if (guarded(input).some((z) => intersects(r, z))) {
     assert.equal(someFreeTop(input), null,
       `${label}: verdeckt eine Bedienleiste, obwohl bei top=${someFreeTop(input)} Platz war`);
   }
@@ -651,12 +656,12 @@ function splitViewScene({ reminder = false } = {}) {
   return { body, pane, footer, deleteBtn, stack, toast };
 }
 
-function withDom(scene, fn) {
+function withDom(scene, fn, viewport = { clientWidth: 1280, clientHeight: 800 }) {
   const saved = { document: global.document, getComputedStyle: global.getComputedStyle };
   global.document = {
     body: scene.body,
     activeElement: scene.body,
-    documentElement: { clientWidth: 1280, clientHeight: 800 },
+    documentElement: viewport,
     querySelectorAll: (sel) => scene.body.querySelectorAll(sel),
     querySelector: (sel) => scene.body.querySelector(sel),
     elementFromPoint: () => null,
@@ -706,6 +711,199 @@ test('A3 P1-1: ohne Detailspalte (unter der Schwelle) bleibt der Stapel, wo er s
   const decision = withDom(scene, () => placeToastStack(scene.stack));
   assert.equal(decision, null);
   assert.equal(scene.stack.dataset.dock, undefined);
+});
+
+// --------------------------------------------------------
+// Sperrzonen ausserhalb von Dialogen (#1917)
+// --------------------------------------------------------
+
+/*
+ * Gemessen bei 390x844 im Wand-Modus (de): der Hinweis beim Einschalten stand
+ * bei 16..124/16..374, die Uhrzeit bei 16..64/16..150, das Datum bei
+ * 68..97/16..200 - beide zu 100 % verdeckt, acht Sekunden lang. Die Lage kannte
+ * nur Dialoge und stieg ohne einen sofort aus. Uhr und Fuss tragen jetzt
+ * `data-toast-keepout`; hier die reine Wahl mit genau dieser Geometrie, eine
+ * Zufallsreihe ohne Dialog, und das ECHTE `placeToastStack` gegen den DOM-Stub.
+ */
+const WALL_CLOCK = [box(16, 16, 133.9, 48), box(68, 16, 183.9, 29.4)];
+const wallPhone = (overrides = {}) => {
+  const stack = box(16, 16, 358, 108.3);
+  return {
+    viewport: { width: 390, height: 844 },
+    gap: 12,
+    safeTop: 0,
+    safeBottom: 0,
+    stack,
+    dockedHeight: stack.height,
+    dockedWidth: stack.width,
+    dockedCenter: 195,
+    primary: stack,
+    dialogs: [],
+    zones: [],
+    keepout: [...WALL_CLOCK, box(716, 16, 358, 128)],
+    ...overrides,
+  };
+};
+
+test('#1917: der Hinweis der Wand weicht der Uhr und bleibt oben (390x844)', () => {
+  const input = wallPhone();
+  const decision = chooseToastPlacement(input);
+  assert.ok(decision, 'der Stapel blieb auf der Uhr stehen - ohne Dialog zaehlte keine Sperrzone');
+  const r = placedRect(input, decision);
+  for (const zone of input.keepout) {
+    assert.ok(!intersects(r, zone), `der Stapel ${r.top}..${r.bottom} liegt auf der Sperrzone ${zone.top}..${zone.bottom}`);
+  }
+  assert.equal(decision.covers, false);
+  // Die naechste freie Kante zu seinem Platz: direkt unter dem Datum, mit
+  // Abstand. Meldungen stehen an der Wand oben (#1559) - nicht ueber dem Fuss.
+  assert.ok(Math.abs(decision.top - (97.4 + 12)) < 0.01, `Oberkante ${decision.top}, erwartet unter dem Datum`);
+  assert.equal(r.left, 16, 'er springt nur senkrecht: Breite und Mitte seines Platzes');
+  assert.equal(r.width, 358);
+});
+
+test('#1917: neben der Uhr bleibt der Stapel, wo er steht (1280x800)', () => {
+  const stack = box(16, 450, 380, 108.3);
+  const input = wallPhone({
+    viewport: { width: 1280, height: 800 },
+    stack,
+    dockedWidth: 380,
+    dockedCenter: 640,
+    primary: stack,
+    keepout: [...WALL_CLOCK, box(720, 24, 1232, 80)],
+  });
+  assert.equal(chooseToastPlacement(input), null, 'eine Meldung springt nicht ohne Grund');
+});
+
+test('#1917: ohne Sperrzone und ohne Dialog aendert sich nichts', () => {
+  assert.equal(chooseToastPlacement(wallPhone({ keepout: [] })), null);
+  assert.equal(chooseToastPlacement({ ...wallPhone(), keepout: undefined }), null, 'der Parameter ist optional');
+});
+
+test('#1917: kein Platz zwischen Uhr und Fuss - der Stapel bleibt im Bild und deckt so wenig wie moeglich', () => {
+  // 320x300 mit hohem Hinweis: zwischen Datum (97) und Fuss (172) passen keine 129px.
+  const stack = box(16, 16, 288, 128.9);
+  const input = wallPhone({
+    viewport: { width: 320, height: 300 },
+    stack,
+    dockedHeight: stack.height,
+    dockedWidth: stack.width,
+    dockedCenter: 160,
+    primary: stack,
+    keepout: [...WALL_CLOCK, box(172, 16, 288, 128)],
+  });
+  checkInvariant(input, 'enge Wand');
+  const decision = chooseToastPlacement(input);
+  assert.ok(decision && decision.covers, 'Reichweite: hier gibt es keine freie Lage');
+});
+
+test('#1917, jede Geometrie ohne Dialog: im Bild, und keine Sperrzone verdeckt, wo es eine freie Lage gibt', () => {
+  const rnd = lcg(1917);
+  const between = (a, b) => a + (b - a) * rnd();
+  let moved = 0;
+  for (let i = 0; i < 3000; i += 1) {
+    const vw = Math.round(between(320, 1600));
+    const vh = Math.round(between(320, 1100));
+    const gap = Math.round(between(8, 16));
+    const safeTop = rnd() < 0.4 ? Math.round(between(0, 50)) : 0;
+    const safeBottom = rnd() < 0.4 ? Math.round(between(0, 40)) : 0;
+    const width = Math.min(380, vw - 32);
+    const h = rnd() < 0.1 ? between(vh * 0.6, vh * 1.4) : between(40, 200);
+    // Der Stapel steht oben (Wand) oder unten (jede andere Seite).
+    const top = rnd() < 0.5 ? safeTop + 16 : vh - between(16, 120) - h;
+    const stack = box(top, (vw - width) / 2, width, h);
+    // Uhr oben links, Fuss unten ueber die Breite, dazu gelegentlich eine Zone irgendwo.
+    const keepout = [];
+    if (rnd() < 0.8) keepout.push(box(safeTop + 16, 16, between(100, 420), between(40, 120)));
+    if (rnd() < 0.8) {
+      const fh = between(64, 160);
+      keepout.push(box(vh - fh, 0, vw, fh));
+    }
+    if (rnd() < 0.3) {
+      const zh = between(30, 120);
+      keepout.push(box(between(0, vh - zh), between(0, vw / 2), between(60, vw / 2), zh));
+    }
+    const input = {
+      viewport: { width: vw, height: vh },
+      gap,
+      safeTop,
+      safeBottom,
+      stack,
+      dockedHeight: h,
+      dockedWidth: width,
+      dockedCenter: vw / 2,
+      primary: stack,
+      dialogs: [],
+      zones: [],
+      keepout,
+    };
+    if (chooseToastPlacement(input)) moved += 1;
+    checkInvariant(input, `Sperrzonen #${i}`);
+  }
+  assert.ok(moved > 300, `Reichweite: nur ${moved} von 3000 Geometrien bewegten den Stapel`);
+});
+
+const KEEPOUT_ATTR = KEEPOUT_SELECTOR.replace(/^\[|\]$/g, '');
+
+/** Die Wand bei 390x844: Uhr oben links, Fuss klebt unten, Hinweis auf der Uhr. */
+function wallScene({ marked = true, modal = false } = {}) {
+  const mark = marked ? { [KEEPOUT_ATTR]: '' } : {};
+  const body = new FakeEl('body');
+  const scroller = new FakeEl('main', { cls: 'app-content', rect: box(0, 0, 390, 844), overflow: 'auto' });
+  const time = new FakeEl('time', { cls: 'clock-widget__time', attrs: mark, rect: WALL_CLOCK[0] });
+  const date = new FakeEl('p', { cls: 'clock-widget__date', attrs: mark, rect: WALL_CLOCK[1] });
+  const clock = new FakeEl('div', { cls: 'clock-widget clock-widget--wall', rect: box(16, 16, 358, 81.4) }).add(time, date);
+  const exit = new FakeEl('button', { cls: 'wall__foot-btn', rect: box(780, 200, 174, 48) });
+  const foot = new FakeEl('div', { cls: 'wall__foot', attrs: mark, rect: box(716, 16, 358, 128) }).add(exit);
+  const wall = new FakeEl('div', { cls: 'wall', rect: box(0, 0, 390, 1215) }).add(clock, foot);
+  body.add(scroller.add(wall));
+  if (modal) {
+    // Ein kurzer modaler Dialog in der Bildmitte: er beruehrt den Stapel nicht.
+    body.add(new FakeEl('div', { cls: 'modal-panel', attrs: { role: 'dialog', 'aria-modal': 'true' }, rect: box(300, 20, 350, 240) })
+      .add(new FakeEl('button', { rect: box(480, 40, 120, 44) })));
+  }
+  const toast = new FakeEl('div', { cls: 'toast', rect: box(16, 16, 358, 108.3) });
+  const stack = new FakeEl('div', { cls: 'shell-bottom-stack', rect: box(16, 16, 358, 108.3) }).add(toast);
+  body.add(stack);
+  return { body, time, date, foot, stack, toast };
+}
+const PHONE = { clientWidth: 390, clientHeight: 844 };
+
+test('#1917: placeToastStack liest die Sperrzonen aus dem Dokument und setzt die Lage (390x844)', () => {
+  const scene = wallScene();
+  const decision = withDom(scene, () => placeToastStack(scene.stack), PHONE);
+  assert.ok(decision, 'der Stapel blieb auf der Uhr - `[data-toast-keepout]` wurde nicht gelesen');
+  assert.equal(scene.stack.dataset.dock, 'placed');
+  const width = parseFloat(scene.stack.props.get('--toast-dock-width'));
+  const center = parseFloat(scene.stack.props.get('--toast-dock-center'));
+  const placed = box(parseFloat(scene.stack.props.get('--toast-dock-top')), center - width / 2, width, 108.3);
+  for (const el of [scene.time, scene.date, scene.foot]) {
+    const zone = el.getBoundingClientRect();
+    assert.ok(!intersects(placed, zone), `der Stapel ${placed.top}..${placed.bottom} liegt auf .${[...el.cls][0]}`);
+  }
+  assert.equal(width, 358, 'in seiner eigenen Breite, nicht in der eines Dialogs');
+  assert.equal(center, 195);
+  assert.ok(placed.top < 150, `er bleibt oben (#1559), steht aber bei ${placed.top}`);
+});
+
+test('#1917: ohne Auszeichnung bleibt der Stapel stehen - die Regel haengt am Attribut, an keiner Seite', () => {
+  const scene = wallScene({ marked: false });
+  const decision = withDom(scene, () => placeToastStack(scene.stack), PHONE);
+  assert.equal(decision, null);
+  assert.equal(scene.stack.dataset.dock, undefined);
+});
+
+test('#1917: eine weggescrollte Uhr ist keine Sperrzone mehr', () => {
+  const scene = wallScene();
+  scene.time.rectBox = box(-355, 16, 133.9, 48);
+  scene.date.rectBox = box(-303, 16, 183.9, 29.4);
+  const decision = withDom(scene, () => placeToastStack(scene.stack), PHONE);
+  assert.equal(decision, null, 'der Stapel steht oben frei und springt nicht');
+});
+
+test('#1917: unter einem modalen Dialog zaehlen die Sperrzonen nicht', () => {
+  const scene = wallScene({ modal: true });
+  const decision = withDom(scene, () => placeToastStack(scene.stack), PHONE);
+  assert.equal(decision, null, 'der Hintergrund des Dialogs deckt Uhr und Fuss ab');
 });
 
 // --------------------------------------------------------

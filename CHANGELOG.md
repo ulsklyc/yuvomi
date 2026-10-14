@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.77.0] - 2026-10-14
+
 ### Added
 
 - **Organize events in several local calendars** (#1243, from D#1231). Create and rename household
@@ -72,7 +74,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to the automatic order. Grouping by due date, the board, selection mode, `tasks: read` and the
   wall display are unchanged. The API gets `PATCH /api/v1/tasks/reorder` and
   `POST /api/v1/tasks/reorder/reset`, and `sort_order` on each task (migration 242).
-
 - **Custom modules can be installed from Settings, from GitHub or as a ZIP file, where the operator
   allows it.** Until now a third-party module reached Yuvomi only as a folder copied into `modules/`
   on the server. The new page Settings → Modules → Add custom module (admin only) takes the address
@@ -382,6 +383,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   <name>". All four now name the shop, in every language; the category managers read as before.
   A deleted shopping list also no longer leaves its "Checked off is open" entry behind in the
   browser's storage.
+- **Health: a switched-off medication no longer shows a dose as due today** (#1950). The Health page
+  listed a dose under "Due today" and among the next reminders for a medication that was no longer
+  active, while the Overview tile and the reminders left it out. The page now leaves it out too,
+  so both show the same number, and adherence and the streak count only the medications still
+  being taken. The medication stays in the list, and the doses already logged stay in the intake
+  log.
+- **Wall mode on a phone: the note on entering no longer covers the clock, and the footer shows
+  that the list goes on** (#1917). Up to a width of about 834 px the note that explains wall mode
+  lay on the time and date for eight seconds; it now sits directly below them and still clear of
+  the timer buttons, and on wider screens it stays where it was, next to the clock. Any later
+  message on the wall keeps the clock and the footer free in the same way. "Who's up today" was
+  never cut off, but the footer that stays at the bottom covered faces behind a hard edge; on a
+  phone the content now fades out softly above the footer, and at the end of the list the last
+  entry stands clear of it. On a tablet or a wall display the layout is unchanged.
 
 ## [2.76.0] - 2026-10-11
 

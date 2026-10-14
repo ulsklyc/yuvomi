@@ -34,7 +34,7 @@ import {
   MOOD_SCALE, moodStep, splitDuration, durationToHours,
 } from '/utils/health-vitals.js';
 import {
-  computeDueDoses, computeAdherence, refillState,
+  computeDueDoses, computeAdherence, refillState, medicationCountsToday, currentSchedules,
   daysMaskToIndices, indicesToDaysMask, WEEKDAY_COUNT, weekdayIndex,
   prnDoseState, splitRemaining, toLocalStamp, parseLogInstant, scheduledLogs,
 } from '/utils/health-meds.js';
@@ -2606,8 +2606,11 @@ function medLogWindowDays(med, baseDays) {
   return Math.max(baseDays, Math.ceil(hours / 24) + 1);
 }
 
+// Nur die Plaene der Medikamente, die heute zaehlen (#1950): die Regel selbst
+// steht in `utils/health-meds.js`, die Uebersicht liest sie ueber
+// `overviewAllSchedules()` genauso.
 function allSchedules() {
-  return meds.list.flatMap((m) => meds.schedulesByMed[m.id] || []);
+  return currentSchedules(meds.list, meds.schedulesByMed);
 }
 
 /**
@@ -2618,10 +2621,16 @@ function allSchedules() {
  * mit #700: vorher fielen Bedarfsdosen schon am Zeitraumfilter der Route heraus,
  * seit dem Fix kommen sie mit - und drei von sieben geplanten Dosen plus acht
  * Kopfschmerztabletten haetten „100 %, 11 von 11" ergeben.
+ *
+ * Und nur die Dosen der Medikamente, deren Plaene im Nenner stehen (#1950):
+ * `allSchedules()` laesst ein abgeschaltetes Medikament aus, also darf seine
+ * frueher genommene Dosis nicht im Zaehler stehen - sonst deckt sie eine
+ * ausgelassene Dosis eines anderen Medikaments. Das Einnahmeprotokoll
+ * (`medLogHistoryMarkup`) zeigt sie weiter.
  */
 function allLogsInRange(from, to) {
   const out = [];
-  for (const m of meds.list) {
+  for (const m of meds.list.filter(medicationCountsToday)) {
     for (const l of scheduledLogs(meds.logsByMed[m.id])) {
       const key = String(l.scheduled_at || l.taken_at || l.created_at || '').slice(0, 10);
       if (key >= from && key <= to) out.push(l);
@@ -2756,7 +2765,7 @@ function prnScope(scope) {
 
 /** Die aktiven Bedarfsmedikamente eines Tabs. */
 function prnMeds(scope) {
-  return prnScope(scope).list.filter((m) => m.prn && m.active);
+  return prnScope(scope).list.filter((m) => m.prn && medicationCountsToday(m));
 }
 
 /** Zeitpunkt lesbar: die Uhrzeit allein nur, wenn sie noch heute liegt. */
@@ -5967,7 +5976,7 @@ async function loadOverview() {
 }
 
 function overviewAllSchedules() {
-  return overview.meds.flatMap((m) => overview.schedulesByMed[m.id] || []);
+  return currentSchedules(overview.meds, overview.schedulesByMed);
 }
 
 function overviewAllLogs() {
@@ -5979,9 +5988,14 @@ function overviewAllLogs() {
  * Adhaerenz misst die Einhaltung eines Plans, und eine Bedarfsdosis hat keinen;
  * seit sie nicht mehr am Zeitraumfilter haengenbleibt (#700), muss sie hier
  * ausdruecklich draussen bleiben. Auch der Streak rechnet nur mit ihnen.
+ *
+ * Und nur die der Medikamente, die heute zaehlen (#1950) - dieselbe Menge wie
+ * `overviewAllSchedules()`, damit Zaehler und Nenner dieselben Medikamente
+ * meinen.
  */
 function overviewScheduledLogs() {
-  return scheduledLogs(overviewAllLogs());
+  return scheduledLogs(overview.meds.filter(medicationCountsToday)
+    .flatMap((m) => overview.logsByMed[m.id] || []));
 }
 
 function overviewFindLog(dose) {
@@ -9236,6 +9250,9 @@ export const __test = {
   nutritionRowMarkup,
   nutritionProgressRowMarkup,
   overviewDueRowMarkup,
+  // #1950: die Leser der Faelligkeit selbst, nicht nur ihre Zeile - an ihnen
+  // haengt, WELCHE Medikamente heute zaehlen.
+  dueTodayMarkup, overviewDueMarkup, overviewUpcomingMarkup, medListMarkup,
   // Einnahmetreue auf beiden Flaechen (R16): dieselbe Zahl, derselbe Zeitraum.
   adherenceMarkup, overviewAdherenceMarkup,
   // Uebersicht mobil (R16): Export im Kopf, drei Kernwerte.

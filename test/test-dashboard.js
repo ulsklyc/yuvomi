@@ -2653,6 +2653,33 @@ test('Wand-Modus: der Fehlerzustand trägt keinen Retry-Knopf, aber die Uhr', as
   });
 });
 
+/* SPERRZONEN FUER MELDUNGEN (#1917). Der Hinweis beim Einschalten lag bis rund
+ * 834px Breite acht Sekunden auf der Uhr. Die Toast-Lage weicht jetzt allem,
+ * was ihr Attribut traegt - hier steht, DASS die Wand es setzt: an den beiden
+ * Zeilen der Uhr (nicht an ihrem Rahmen, der so breit ist wie die Flaeche) und
+ * am Fuss. Der Name kommt aus dem Modul, das ihn liest, nicht aus dem Test. */
+test('Wand-Modus: Uhrzeit, Datum und Fuss sind Sperrzonen der Toast-Lage, die Kachel-Uhr nicht (#1917)', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const { KEEPOUT_SELECTOR } = await import('../public/utils/toast-placement.js');
+  const attr = KEEPOUT_SELECTOR.replace(/^\[|\]$/g, '');
+  nodeAssert.match(attr, /^data-[\w-]+$/, 'Reichweite: die Lage liest ein Attribut');
+  await withWallWindow(() => {
+    for (const options of [{}, { failed: true }, { loading: true }]) {
+      const html = __test.renderWallSurface({ urgentTasks: wallTasks(1), users: [] }, null, options);
+      const marked = [...html.matchAll(/<(\w+)\b[^>]*>/g)].map((m) => m[0])
+        .filter((tag) => new RegExp(`\\s${attr}(?=[\\s>])`).test(tag))
+        .map((tag) => tag.match(/class="([^"]+)"/)?.[1] ?? '');
+      nodeAssert.deepEqual(marked.sort(), ['clock-widget__date', 'clock-widget__time', 'wall__foot'],
+        `in jedem Zustand der Wand (${JSON.stringify(options)})`);
+    }
+    // Ausserhalb der Wand steht die Uhr als Kachel im Raster; dort laege eine
+    // Sperrzone mitten im Inhalt und bewegte jede Meldung der Uebersicht.
+    const tile = __test.renderDashboardLayout([{ id: 'clock', visible: true, size: '1x1' }], {}, null, 'EUR');
+    nodeAssert.match(tile, /id="clock-widget-time"/, 'Reichweite: die Uhr steht als Kachel im Raster');
+    nodeAssert.ok(!tile.includes(attr), 'die Kachel-Uhr traegt keine Sperrzone');
+  });
+});
+
 /* EIN LAUFENDER TIMER NIMMT EINE ZEILE (Integration 2026-09-23, Browser-Abnahme
  * bei 1280x800). Der Deckel von vier Zeilen ist fuer eine Flaeche OHNE die
  * Timer-Anzeige gerechnet; die Anzeige kostet 64px plus Abstand, und an einem

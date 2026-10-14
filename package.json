@@ -1,6 +1,6 @@
 {
   "name": "yuvomi",
-  "version": "2.76.0",
+  "version": "2.77.0",
   "description": "Self-hosted family planner - calendar, tasks, shopping, meal planning, budget and more. Private, open-source, no subscription.",
   "main": "server/index.js",
   "type": "module",
@@ -238,7 +238,7 @@
     "test:health-vitals": "node --loader ./test/test-browser-loader.mjs --test test/test-health-vitals.js",
     "test:health-visibility-defaults": "node --test test/test-health-visibility-defaults.js",
     "test:settings-health-visibility": "node --loader ./test/test-browser-loader.mjs --test test/test-settings-health-visibility.js",
-    "test:health-meds": "node --loader ./test/test-browser-loader.mjs --test test/test-health-meds.js",
+    "test:health-meds": "node --loader ./test/test-browser-loader.mjs --test test/test-health-meds.js test/test-health-meds-inactive.js",
     "test:medication-scheduler": "DB_PATH=:memory: node --test test/test-medication-scheduler.js",
     "test:health-labs": "node --loader ./test/test-browser-loader.mjs --test test/test-health-labs.js",
     "test:health-activity": "node --loader ./test/test-browser-loader.mjs --test test/test-health-activity.js",

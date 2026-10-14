@@ -50,7 +50,48 @@ export function indicesToDaysMask(indices) {
 }
 
 /**
+ * DIE Regel "dieses Medikament zaehlt heute" (#1950).
+ *
+ * Ein abgeschaltetes Medikament (`medications.active = 0`) bleibt in der Liste
+ * und behaelt sein Protokoll, erzeugt aber keine faellige Dosis mehr. Die
+ * Gesundheitsseite sammelte die Plaene JEDES geladenen Medikaments ein und
+ * nannte deshalb eine offene Dosis, zu der die Startseite
+ * (`server/routes/dashboard.js`, `WHERE active = 1`) und der Erinnerungslauf
+ * (`server/services/medication-scheduler.js`, `m.active = 1`) schwiegen.
+ *
+ * Sie steht EINMAL hier und nicht an jedem Leser: wer wissen will, ob ein
+ * Medikament Dosen erzeugt, fragt diese Funktion oder nimmt `currentSchedules()`.
+ * Eine weitere Bedingung (etwa ein Enddatum) gehoert in diese Funktion.
+ *
+ * `active` am PLAN ist eine andere Frage und bleibt bei `computeDueDoses()`.
+ *
+ * @param {Object|null|undefined} med - Medikamenten-Zeile mit `active`.
+ * @returns {boolean}
+ */
+export function medicationCountsToday(med) {
+  return Boolean(med && med.active);
+}
+
+/**
+ * Die Einnahmeplaene der Medikamente, die heute zaehlen - der eine Eingang fuer
+ * jeden Leser der Faelligkeit (Heute faellig, naechste Erinnerungen,
+ * Einnahmetreue, Serie).
+ *
+ * @param {Array<Object>} meds - Medikamenten-Zeilen, wie die Seite sie laedt.
+ * @param {Object<string, Array<Object>>} schedulesByMed - Plaene je Medikamenten-Id.
+ * @returns {Array<Object>}
+ */
+export function currentSchedules(meds, schedulesByMed) {
+  return (Array.isArray(meds) ? meds : [])
+    .filter(medicationCountsToday)
+    .flatMap((m) => (schedulesByMed && schedulesByMed[m.id]) || []);
+}
+
+/**
  * Berechnet die fälligen Dosen aus aktiven Einnahmeplänen für einen Zeitraum.
+ *
+ * Welche MEDIKAMENTE dabei sind, entscheidet der Aufrufer ueber
+ * `currentSchedules()` - diese Funktion sieht nur Plaene.
  *
  * @param {Array<Object>} schedules - Einnahmeplan-Zeilen. Erwartete Felder:
  *        id, medication_id, time_of_day ('HH:MM'), days_mask (int|null),

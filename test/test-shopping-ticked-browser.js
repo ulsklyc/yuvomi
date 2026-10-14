@@ -318,7 +318,9 @@ test('Lehnt der Server nach dem Umzug ab, kommt die Zeile zurueck', async () => 
   const end = await snap();
   assert.deepEqual(rows(end, 'Obst'), [1, 2], 'zurueck an ihrem Rang');
   assert.equal(group(end, 'ABGEHAKT').shown, false);
-  assert.deepEqual(await page.evaluate(() => window.toasts), [['Nein.', 'danger']]);
+  // Der Hinweis ist der Satz der App, nicht der des Servers (#1909): eine Antwort
+  // ohne `reason` zeigt den allgemeinen, das "Nein." des Stubs darf nie ankommen.
+  assert.deepEqual(await page.evaluate(() => window.toasts), [['Ein Fehler ist aufgetreten.', 'danger']]);
 });
 
 test('Umsortieren in der Pause nennt auch die Zeile, die noch im Abschnitt wartet', async () => {

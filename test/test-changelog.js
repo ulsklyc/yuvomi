@@ -726,3 +726,205 @@ test('eine eingetragene Aenderung haelt genau ihre Fassung fest', () => {
   const again = addendum.replace('- Ein Fehler weniger.', '- Ein Fehler weniger.\n- Noch einer');
   assert.deepEqual(releasedSectionDrift(again, SAMPLE_CHANGELOG, '1.2.1', edits).offenders.map((o) => o.version), ['1.2.1']);
 });
+
+/* KONFLIKTMARKER UND DOPPELTE RUBRIKEN (#1918).
+ *
+ * Der Changelog ist die Datei, die hier am ehesten kollidiert: fast jeder PR
+ * traegt an derselben Stelle ein, und ein Release verschiebt den Block. Am
+ * 12.10.2026 lief die Suite mit drei stehengebliebenen Markerzeilen gruen
+ * durch - kein Guard dieser Datei und kein Workflow-Schritt sah sie. Aus dieser
+ * Datei werden die Release-Notes geschnitten, ein Marker stuende also dort.
+ *
+ * Dieselbe Naht hat eine zweite, leisere Form: git loest den Konflikt selbst
+ * und laesst unter `[Unreleased]` zwei `### Fixed` stehen. Das ist gueltiges
+ * Markdown, der Vorspann-Guard prueft das Format jedes Eintrags und nicht die
+ * Gliederung, und der Leser findet die Haelfte der Fixes nicht.
+ *
+ * Die drei Funktionen sind rein und nehmen Text: der Rot-Beleg laeuft so gegen
+ * ein Beispiel, ohne die echte Datei anzufassen. */
+
+// Zeilen, die git bei einem Konflikt schreibt. `|||||||` kommt mit
+// merge.conflictStyle=diff3/zdiff3 dazu. `=======` zaehlt nur exakt: eine
+// laengere oder kuerzere Reihe aus `=` ist kein Marker, sondern eine
+// Setext-Unterstreichung - die meldet setextUnderlines().
+function conflictMarkerLines(text) {
+  const hits = [];
+  lf(text).split('\n').forEach((line, i) => {
+    if (/^(<{7}|>{7}|\|{7})( |$)/.test(line) || line === '=======') {
+      hits.push(`${i + 1}: ${line.slice(0, 60)}`);
+    }
+  });
+  return hits;
+}
+
+// Jede Zeile nur aus `=`, die KEIN Marker ist. Zusammen mit conflictMarkerLines()
+// heisst das: in der Datei steht gar keine Zeile nur aus `=`.
+function setextUnderlines(text) {
+  const hits = [];
+  lf(text).split('\n').forEach((line, i) => {
+    if (/^ {0,3}=+[ \t]*$/.test(line) && line !== '=======') hits.push(`${i + 1}: ${line.slice(0, 60)}`);
+  });
+  return hits;
+}
+
+// Rubriken (`### Added`, `### Fixed`, ...), die in EINEM Block `## [..]` mehr
+// als einmal stehen. Gross-/Kleinschreibung und Leerraum am Ende zaehlen nicht,
+// sonst waere `### fixed` neben `### Fixed` kein Fund. Eine `## `-Zeile ohne
+// Klammer beendet den Block ebenfalls.
+function repeatedRubrics(text) {
+  const hits = [];
+  let block = null;
+  let seen = new Map();
+  const flush = () => {
+    for (const { title, lines } of seen.values()) {
+      if (lines.length > 1) hits.push(`[${block}] ### ${title} (Zeilen ${lines.join(', ')})`);
+    }
+    seen = new Map();
+  };
+  lf(text).split('\n').forEach((line, i) => {
+    if (/^## /.test(line)) {
+      flush();
+      const m = /^## \[([^\]]+)\]/.exec(line);
+      block = m ? m[1] : null;
+      return;
+    }
+    const m = /^###[ \t]+(.*?)[ \t]*$/.exec(line);
+    if (block === null || !m) return;
+    const key = m[1].toLowerCase();
+    if (!seen.has(key)) seen.set(key, { title: m[1], lines: [] });
+    seen.get(key).lines.push(i + 1);
+  });
+  flush();
+  return hits;
+}
+
+/* DER BESTAND HAT ACHT DOPPELUNGEN, alle in Bloecken vor 1.41.0 (gemessen am
+ * 13.10.2026 ueber alle 902 Bloecke). Ein veroeffentlichter Changelog wird
+ * nicht umgeschrieben, und der Abschnitts-Guard oben wuerde es auch nicht
+ * zulassen. Deshalb stehen sie hier mit Namen statt hinter einer Versionsgrenze:
+ * eine Grenze liesse jeden aelteren Block ungeprueft, die Liste laesst genau
+ * diese acht durch und haelt die Regel fuer alle anderen, `[Unreleased]` und
+ * jedes kuenftige Release eingeschlossen. Hier kommt nichts dazu.
+ *
+ * Die Zahl ist, wie oft die Rubrik in dem Block steht. Ohne sie waere ein
+ * dritter `### Fixed` in einem der acht Bloecke derselbe Fund wie der zweite,
+ * und die Ausnahme liesse dort beliebig viele neue durch. Zeilennummern taugen
+ * dafuer nicht: jeder neue Eintrag oben verschiebt sie. */
+const KNOWN_REPEATED_RUBRICS = new Map([
+  ['[1.40.6] ### Fixed', 2],
+  ['[1.40.3] ### Fixed', 2],
+  ['[1.31.3] ### Fixed', 2],
+  ['[1.24.0] ### Fixed', 2],
+  ['[1.6.0] ### Added', 2],
+  ['[1.2.0] ### Added', 2],
+  ['[0.99.0] ### Added', 2],
+  ['[0.54.10] ### Changed', 2],
+]);
+
+const readChangelog = () => readFileSync(new URL('../CHANGELOG.md', import.meta.url), 'utf8');
+
+test('CHANGELOG.md enthaelt keine Konfliktmarker (#1918)', () => {
+  const text = readChangelog();
+  // Ohne diese Zeile waere der Guard gruen, sobald die Datei leer gelesen wird.
+  assert.ok(text.split('\n').length > 100, 'CHANGELOG.md ist unerwartet kurz - gelesen wurde nicht die Datei');
+  assert.deepEqual(conflictMarkerLines(text), [],
+    'Konfliktmarker in CHANGELOG.md - der Merge ist nicht zu Ende aufgeloest');
+});
+
+test('CHANGELOG.md nutzt ATX-Ueberschriften, keine Unterstreichung aus = (#1918)', () => {
+  // Die Annahme hinter dem Marker-Guard: `=======` ist in dieser Datei nie eine
+  // Ueberschrift. Wer auf Setext umstellt, sieht hier rot statt dort einen
+  // Fehlalarm, der nach einem Konflikt aussieht.
+  const text = readChangelog();
+  assert.deepEqual(setextUnderlines(text), [],
+    'eine Zeile nur aus = - Ueberschriften in CHANGELOG.md sind ATX (`## `), sonst trifft der Marker-Guard sie');
+  assert.ok(/^## \[Unreleased\]/m.test(lf(text)) && /^### \S/m.test(lf(text)),
+    'keine ATX-Ueberschrift gefunden - die Gliederung der Datei hat sich geaendert');
+});
+
+test('der Marker-Guard erkennt jede Markerzeile und sonst nichts', () => {
+  const conflicted = [
+    '## [Unreleased]', '', '### Fixed', '',
+    '<<<<<<< HEAD',
+    '- **A** (#1). x',
+    '||||||| 1a2b3c4',
+    '=======',
+    '- **B** (#2). y',
+    '>>>>>>> origin/main',
+  ].join('\n');
+  assert.deepEqual(conflictMarkerLines(conflicted), [
+    '5: <<<<<<< HEAD', '7: ||||||| 1a2b3c4', '8: =======', '10: >>>>>>> origin/main',
+  ]);
+  // Jede Zeile einzeln: ein Guard, der nur das Trio findet, liesse eine halb
+  // aufgeloeste Datei durch - und genau die bleibt in der Praxis zurueck.
+  assert.equal(conflictMarkerLines('a\n<<<<<<< HEAD\nb').length, 1);
+  assert.equal(conflictMarkerLines('a\n=======\nb').length, 1);
+  assert.equal(conflictMarkerLines('a\n>>>>>>> origin/main\nb').length, 1);
+  // Ein Windows-Checkout liefert CRLF, die Zeile ist dann `=======\r`.
+  assert.equal(conflictMarkerLines('a\r\n=======\r\nb\r\n').length, 1);
+
+  // Kein Fund: Marker mitten in der Zeile, eingerueckt, zitiert oder zu kurz.
+  const harmless = [
+    '- **Merge left `<<<<<<< HEAD` behind** (#1918). The guard is new.',
+    '  <<<<<<< HEAD',
+    '`=======`',
+    '======',
+    '========',
+    '<<<<<<<HEAD',
+    '>> quoted',
+  ].join('\n');
+  assert.deepEqual(conflictMarkerLines(harmless), []);
+});
+
+test('der Setext-Guard erkennt eine Unterstreichung aus =', () => {
+  assert.deepEqual(setextUnderlines('Changelog\n=========\n\ntext'), ['2: =========']);
+  assert.deepEqual(setextUnderlines('Changelog\n===\n'), ['2: ===']);
+  assert.deepEqual(setextUnderlines('Changelog\n  ======== \n'), ['2:   ======== ']);
+  // Die exakte Siebenerreihe gehoert dem Marker-Guard, nicht diesem.
+  assert.deepEqual(setextUnderlines('a\n=======\nb'), []);
+  assert.deepEqual(setextUnderlines('# Changelog\n\n## [Unreleased]\n\n- a == b\n'), []);
+});
+
+test('keine Rubrik steht in einem Release-Block zweimal (#1918)', () => {
+  const found = repeatedRubrics(readChangelog());
+  // Ein Fund ist nur bekannt, wenn auch die Anzahl stimmt (siehe Liste).
+  const signature = (hit) => {
+    const m = /^(.*) \(Zeilen ([\d, ]+)\)$/.exec(hit);
+    return m ? { entry: m[1], count: m[2].split(', ').length } : { entry: hit, count: 0 };
+  };
+  const known = (hit) => {
+    const { entry, count } = signature(hit);
+    return KNOWN_REPEATED_RUBRICS.get(entry) === count;
+  };
+
+  assert.deepEqual(found.filter((hit) => !known(hit)), [],
+    'dieselbe Rubrik zweimal in einem Block - die Eintraege gehoeren unter EINE Ueberschrift');
+  // Die Liste darf nicht breiter sein als der Bestand: ein Eintrag, den die
+  // Datei nicht mehr deckt, waere eine Ausnahme ohne Anlass.
+  assert.deepEqual(
+    [...KNOWN_REPEATED_RUBRICS.keys()].filter((entry) => !found.some((hit) => signature(hit).entry === entry)), [],
+    'KNOWN_REPEATED_RUBRICS nennt eine Doppelung, die in CHANGELOG.md nicht steht');
+});
+
+test('der Rubrik-Guard erkennt eine doppelte Rubrik im selben Block', () => {
+  const twice = [
+    '# Changelog', '',
+    '## [Unreleased]', '',
+    '### Fixed', '', '- **A** (#1). x', '',
+    '### Added', '', '- **B** (#2). y', '',
+    '### Fixed', '', '- **C** (#3). z', '',
+    '## [1.0.0] - 2026-01-01', '',
+    '### Fixed', '', '- **D** (#4). w',
+  ].join('\n');
+  assert.deepEqual(repeatedRubrics(twice), ['[Unreleased] ### Fixed (Zeilen 5, 13)']);
+
+  // Dieselbe Rubrik in ZWEI Bloecken ist der Normalfall und kein Fund.
+  const once = twice.replace('### Fixed\n\n- **C**', '### Changed\n\n- **C**');
+  assert.deepEqual(repeatedRubrics(once), []);
+
+  // Schreibweise und Leerraum retten die Doppelung nicht, der letzte Block
+  // der Datei wird mitgezaehlt, und dreimal ist EIN Fund.
+  assert.deepEqual(
+    repeatedRubrics('## [2.0.0] - 2026-02-02\n### Fixed\n### fixed  \n###  Fixed\n'),
+    ['[2.0.0] ### Fixed (Zeilen 2, 3, 4)']);
+});

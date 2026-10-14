@@ -427,3 +427,74 @@ test('R16: die Kennzahl-Kurzzeile ist ein geteilter Baustein, und Inventar und H
     assert.match(src, new RegExp(`wireMetricGlance\\(\\w+, '${id}'`), `${file}: der Aufklapper ist verdrahtet`);
   }
 });
+
+// #1917: DIE SCROLL-KANTE AM KLEBENDEN FUSS DER WAND. Der Fuss klebt seit #1559
+// mit deckendem Grund und schnitt "Wer heute dran ist" an einer unsichtbaren
+// harten Kante ab (390x844: ein Gesicht ganz, eines halb verdeckt). Der Verlauf
+// darueber ist ein Pseudo-Element, statisch und in jedem Browser derselbe; hier
+// steht, was an ihm nicht verhandelbar ist. Dass er im gerenderten Dokument
+// steht und am Scrollende nichts verdeckt, ist Browserarbeit (gemessen im PR
+// zu #1917: am Telefon 48px in Ruhe, 0px verdeckt am Ende; 1280x800 unveraendert).
+test('#1917: der Fuss der Wand hat eine Scroll-Kante - kein Tipp, und sein Endabstand ist genau ihre Hoehe', () => {
+  const css = read('../public/styles/dashboard.css');
+  const all = rules(css);
+  const EDGE = '.wall__foot::before';
+  const HEIGHT = '--wall-foot-edge';
+
+  const wall = topLevel(css, '.wall');
+  assert.equal(wall.length, 1, 'Reichweite: genau eine Basisregel .wall');
+  assert.ok(decl(wall[0].body, '--wall-gap'), 'der Abstand der Flaeche ist eine Variable');
+  assert.equal(decl(wall[0].body, 'gap'), 'var(--wall-gap)', 'und die Flaeche nimmt ihn als ihren Abstand');
+
+  const foot = topLevel(css, '.wall__foot');
+  assert.equal(foot.length, 1, 'Reichweite: genau eine Basisregel .wall__foot');
+  assert.equal(decl(foot[0].body, 'position'), 'sticky');
+  // Ein deckendes Polster ueber den Knoepfen waere wieder die harte Kante, nur
+  // einen Streifen hoeher: der Verlauf endete an ihm statt an den Knoepfen.
+  assert.match(decl(foot[0].body, 'padding-block') ?? '', /^0\s/, 'der Fuss hat oben kein deckendes Polster');
+
+  const edges = all.filter((r) => r.selector === EDGE);
+  assert.equal(edges.length, 1, `genau eine Regel ${EDGE} - keine zweite Fassung in einem At-Block`);
+  assert.deepEqual(edges[0].at, [], 'sie gilt in jedem Browser, nicht hinter @supports');
+  const body = edges[0].body;
+  assert.equal(decl(body, 'content'), '""', 'ohne `content` gibt es das Pseudo-Element nicht');
+  assert.equal(decl(body, 'position'), 'absolute');
+  assert.equal(decl(body, 'inset-block-end'), '100%', 'sie liegt UEBER dem Fuss, nicht in ihm');
+  assert.equal(decl(body, 'pointer-events'), 'none', 'ein Verlauf ueber dem Inhalt nimmt keinen Tipp');
+  for (const prop of ['display', 'visibility', 'opacity', 'animation', 'animation-timeline']) {
+    assert.equal(decl(body, prop), null, `${EDGE} setzt ${prop} - die Kante ist da und steht still`);
+  }
+  const background = decl(body, 'background') ?? '';
+  assert.match(background, /^linear-gradient\(to bottom, transparent, var\(--color-bg\)\)$/,
+    'vom Inhalt zum Grund der Flaeche, aus dem Token - in beiden Themen und nachts dieselbe Variable');
+  assert.equal(decl(foot[0].body, 'background'), 'var(--color-bg)', 'derselbe Grund wie der Fuss, in den sie muendet');
+
+  // HOEHE UND ENDABSTAND LESEN DIESELBE ZAHL. Der Abstand der Flaeche (`gap`)
+  // plus der Rand des Fusses ergeben die Hoehe der Kante: am Scrollende steht
+  // der letzte Eintrag frei ueber ihr. Ein kleinerer Rand, und sie laege dort
+  // auf der letzten Zeile.
+  assert.equal(decl(body, 'block-size'), `var(${HEIGHT})`, 'die Hoehe der Kante ist die eine Variable');
+  assert.match(decl(foot[0].body, 'margin-block') ?? '', /^calc\(var\(--wall-foot-edge\) - var\(--wall-gap\)\)\s/,
+    'der Endabstand vor dem Fuss fuellt den Abstand der Flaeche auf die Hoehe der Kante auf');
+
+  // Gesetzt wird die Zahl nur am Fuss selbst (Kante und Rand lesen sie dort),
+  // und nirgends ueberschreibt jemand Rand oder Hoehe an ihr vorbei.
+  const setters = all.filter((r) => decl(r.body, HEIGHT) !== null);
+  assert.deepEqual([...new Set(setters.map((r) => r.selector))], ['.wall__foot'], `${HEIGHT} wohnt am Fuss`);
+  assert.equal(decl(foot[0].body, HEIGHT), 'var(--wall-gap)',
+    'auf der Wand ist die Kante der Abstand selbst: Rand 0, die Flaeche wird nicht hoeher (eine Wand scrollt nicht)');
+  const raised = setters.filter((r) => r.at.length > 0);
+  assert.equal(raised.length, 1, 'genau eine Stelle hebt die Kante');
+  assert.deepEqual(raised[0].at, ['@container wall (max-width: 519px)'],
+    'nur am Telefon, an derselben Grenze wie Zeilentitel und Zeitspanne - dort scrollt die Flaeche ohnehin');
+  assert.match(decl(raised[0].body, HEIGHT), /^var\(--space-\d+\)$/, 'die Hoehe am Telefon ist ein Abstands-Token');
+  const token = decl(raised[0].body, HEIGHT).match(/--space-\d+/)[0];
+  const px = (name) => parseFloat(read('../public/styles/tokens.css').match(new RegExp(`${name}:\\s*(\\d+)px`))?.[1] ?? 'NaN');
+  assert.ok(px(token) >= px('--space-12'),
+    `am Telefon traegt die Kante erst ab der Hoehe eines Gesichts (48px), ${token} sind ${px(token)}px`);
+  for (const r of all.filter((x) => x.selector === '.wall__foot' && x.at.length > 0)) {
+    assert.equal(decl(r.body, 'margin-block'), null, `${r.at.join(' ')} .wall__foot ueberschreibt den Endabstand`);
+    assert.equal(decl(r.body, 'margin-block-start'), null, `${r.at.join(' ')} .wall__foot ueberschreibt den Endabstand`);
+    assert.equal(decl(r.body, 'margin'), null, `${r.at.join(' ')} .wall__foot ueberschreibt den Endabstand`);
+  }
+});
