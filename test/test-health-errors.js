@@ -333,6 +333,34 @@ test('Seite: Periode heute beginnen, Server lehnt ohne bekannten Fall ab - der a
   assert.deepEqual([closed, gets], [[], []]);
 });
 
+test('Seite: zwei Messwerte in der Ruecknahmefrist, das erste Loeschen wird "nicht gefunden" - das zweite kommt beim Nachladen nicht zurueck', async () => {
+  const a = { id: 21, type: 'weight', value_num: 70, measured_at: '2026-01-05T08:00' };
+  const b = { id: 22, type: 'weight', value_num: 71, measured_at: '2026-01-06T08:00' };
+  page.setViewStateForTest('vitals', { rows: [a, b] });
+  const undo = [];
+  globalThis.__undoStub = (o) => { undo.push(o); };
+  try {
+    page.deleteVitalWithUndo(21);
+    page.deleteVitalWithUndo(22);
+  } finally {
+    delete globalThis.__undoStub;
+  }
+  assert.equal(undo.length, 2);
+  // Der Server kennt beide noch: 21 hat ein anderes Mitglied schon geloescht
+  // (Antwort: nicht gefunden), 22 steht bis zu seinem eigenen Loeschen.
+  await mit({ delete: async () => { throw fehler(404, 'health_vital_not_found'); } }, async () => {
+    const get = globalThis.__apiStub.get;
+    globalThis.__apiStub.get = async (path) => (path.startsWith('/health/vitals') ? { data: [b] } : get(path));
+    try { await undo[0].commit({ keepalive: false }); } catch (e) { undo[0].restore(e); }
+  });
+  assert.deepEqual(toasts, [['health.errorVitalGone', 'danger']]);
+  assert.deepEqual(page.vitalRowIdsForTest(), [], 'die zweite, noch nicht geloeschte Zeile bleibt verborgen');
+  // Ihr eigenes Loeschen laeuft danach durch und laedt nicht nach.
+  await mit({ delete: async () => ({}) }, () => undo[1].commit({ keepalive: false }));
+  assert.deepEqual(page.vitalRowIdsForTest(), []);
+  page.setViewStateForTest('vitals', { rows: [] });
+});
+
 const vorsorgeDialog = (row) => dialog(() => page.openPreventionModal(row), {
   '#prevention-type': { value: '12' }, '#prevention-name': { value: '' }, '#prevention-given-on': { value: '2026-01-05' },
   '#prevention-next-due': null,

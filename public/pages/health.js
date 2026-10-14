@@ -1276,7 +1276,7 @@ async function mountVitals() {
 async function loadVitals() {
   const query = vitals.personId ? `?user_id=${encodeURIComponent(vitals.personId)}` : '';
   const res = await api.get(`/health/vitals${query}`);
-  vitals.rows = res.data || [];
+  vitals.rows = withoutPendingDeletes('vitals', res.data || []);
 }
 
 function renderVitalsShell() {
@@ -1734,16 +1734,40 @@ function renderDetail() {
     }));
 }
 
+/**
+ * ZEILEN IN DER RUECKNAHMEFRIST (Codex an #1971): lokal schon entfernt, am
+ * Server noch da, bis ihr Loeschen nach fuenf Sekunden laeuft. Laedt ein
+ * Bereich in dieser Zeit nach (ein anderes Loeschen kam mit "gibt es nicht
+ * mehr" zurueck, ein Speichern, der Bilanz-Abruf der Naehrwerte), kaemen sie
+ * sonst zurueck - und blieben stehen, weil ihr eigenes Loeschen nicht nachlaedt.
+ * Je Bereich die Ids; sie gehen beim Ruecknehmen und nach dem Loeschversuch.
+ */
+const pendingDeletes = { vitals: new Set(), prevention: new Set(), nutrition: new Set() };
+
+function withoutPendingDeletes(area, rows) {
+  const pending = pendingDeletes[area];
+  return pending.size ? rows.filter((row) => !pending.has(row.id)) : rows;
+}
+
+async function commitPendingDelete(area, id, run) {
+  try {
+    await run();
+  } finally {
+    pendingDeletes[area].delete(id);
+  }
+}
+
 /** Loeschen einer Messung mit Undo-Toast statt Confirm (Hausmuster). */
 function deleteVitalWithUndo(id) {
   const idx = vitals.rows.findIndex((r) => r.id === id);
   if (idx === -1) return;
   const [row] = vitals.rows.splice(idx, 1);
+  pendingDeletes.vitals.add(id);
   renderVitalsShell();
   scheduleUndoableDelete({
-    commit: ({ keepalive } = {}) => api.delete(`/health/vitals/${id}`, { keepalive }),
+    commit: ({ keepalive } = {}) => commitPendingDelete('vitals', id, () => api.delete(`/health/vitals/${id}`, { keepalive })),
     restore: (err) => restoreOrReload(err, 'health.vitals.saveError', reloadVitals,
-      () => { vitals.rows.splice(idx, 0, row); renderVitalsShell(); }),
+      () => { pendingDeletes.vitals.delete(id); vitals.rows.splice(idx, 0, row); renderVitalsShell(); }),
     message: t('health.vitals.measurementDeleted'),
   });
 }
@@ -5094,7 +5118,7 @@ async function loadPreventionData() {
     api.get(`/health/prevention/records${query}`),
     api.get(`/health/prevention/due${query}`),
   ]);
-  prevention.records = records.data || [];
+  prevention.records = withoutPendingDeletes('prevention', records.data || []);
   prevention.due = due.data || [];
 }
 
@@ -5492,11 +5516,13 @@ async function deletePreventionRecord(row) {
   const idx = prevention.records.findIndex((r) => r.id === row.id);
   if (idx === -1) return;
   const [removed] = prevention.records.splice(idx, 1);
+  pendingDeletes.prevention.add(row.id);
   renderPreventionShell();
   scheduleUndoableDelete({
-    commit: ({ keepalive } = {}) => api.delete(`/health/prevention/records/${row.id}`, { keepalive }),
+    commit: ({ keepalive } = {}) => commitPendingDelete('prevention', row.id,
+      () => api.delete(`/health/prevention/records/${row.id}`, { keepalive })),
     restore: (err) => restoreOrReload(err, 'health.prevention.saveError', reloadPrevention,
-      () => { prevention.records.splice(idx, 0, removed); renderPreventionShell(); }),
+      () => { pendingDeletes.prevention.delete(row.id); prevention.records.splice(idx, 0, removed); renderPreventionShell(); }),
     message: t('health.prevention.deleted'),
   });
 }
@@ -5556,7 +5582,7 @@ async function loadNutritionData() {
     api.get(`/health/nutrition/entries${query}`),
     api.get(`/health/nutrition/summary${query}`),
   ]);
-  nutrition.entries = entries.data || [];
+  nutrition.entries = withoutPendingDeletes('nutrition', entries.data || []);
   nutrition.summary = summary.data || null;
 }
 
@@ -5950,6 +5976,7 @@ async function deleteNutritionEntry(row) {
   const idx = nutrition.entries.findIndex((r) => r.id === row.id);
   if (idx === -1) return;
   const [removed] = nutrition.entries.splice(idx, 1);
+  pendingDeletes.nutrition.add(row.id);
   renderNutritionShell();
   scheduleUndoableDelete({
     // DIE BILANZ OBEN KOMMT VOM SERVER und weiss von einer nur lokal
@@ -5959,11 +5986,11 @@ async function deleteNutritionEntry(row) {
     // `keepalive` ist der Weg beim Verlassen der Seite: dort gibt es nichts
     // mehr neu zu zeichnen.
     commit: async ({ keepalive } = {}) => {
-      await api.delete(`/health/nutrition/entries/${row.id}`, { keepalive });
+      await commitPendingDelete('nutrition', row.id, () => api.delete(`/health/nutrition/entries/${row.id}`, { keepalive }));
       if (!keepalive) await reloadNutrition();
     },
     restore: (err) => restoreOrReload(err, 'health.nutrition.saveError', reloadNutrition,
-      () => { nutrition.entries.splice(idx, 0, removed); renderNutritionShell(); }),
+      () => { pendingDeletes.nutrition.delete(row.id); nutrition.entries.splice(idx, 0, removed); renderNutritionShell(); }),
     message: t('health.nutrition.deleted'),
   });
 }
@@ -9399,6 +9426,8 @@ export const __test = {
   deleteMed, deleteMedLog, deleteLabReport, deleteActivity, deletePeriod, deleteDayLog, deleteVitalWithUndo,
   cycleStartPeriodToday, cycleEndPeriodToday,
   openPreventionModal, openCycleImportModal,
+  // Codex an #1971: welche Messungen die Seite gerade zeigt (nur die Ids).
+  vitalRowIdsForTest: () => vitals.rows.map((row) => row.id),
   /**
    * Testseam fuer die Tab-Zustaende: EIN benannter View, EIN Patch. Die Views
    * selbst bleiben drinnen - ein Test kann Felder setzen, nicht die Objekte
