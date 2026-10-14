@@ -682,11 +682,12 @@ function incompleteListing(body) {
 
 // `refused`: woran der Aufruf die Form erkennt. Eine Auflistung ohne
 // Collection löst zu einer leeren Liste auf; eine, in der jede Ressource mit
-// 403 abgelehnt ist, verwirft tsdav seit 2.4.0 selbst ("discovery failed").
+// 403 abgelehnt ist, ist eine Absage wie eine an der ganzen Anfrage - mit
+// Status und Nutzertext (tsdav 2.4.0 wirft hier selbst, aber ohne Status).
 // Beides ist keine Auskunft "es gibt keine" - die Collections bleiben.
 const INCOMPLETE = {
   'nur die Home-Collection':    { body: () => dav.homeOnlyListing(), refused: null },
-  '403 je Ressource':           { body: () => dav.forbiddenListing(), refused: /discovery failed: 403/ },
+  '403 je Ressource':           { body: () => dav.forbiddenListing(), refused: /refused to list the (calendars|address books) \(HTTP 403/ },
 };
 
 for (const [shape, { body, refused }] of Object.entries(INCOMPLETE)) {
@@ -701,7 +702,8 @@ for (const [shape, { body, refused }] of Object.entries(INCOMPLETE)) {
 
     const client = await createCalDAVClient({ caldav_url: dav.url, username: 'u', password: 'p' });
     if (refused) {
-      await assert.rejects(() => client.fetchCalendars(), refused, 'die Form wird nicht mehr abgelehnt - der Test misst etwas anderes');
+      await assert.rejects(() => client.fetchCalendars(), (err) => err.status === 403 && refused.test(err.message),
+        'die Form geht nicht als Absage mit Status hinaus');
     } else {
       assert.deepEqual(await client.fetchCalendars(), [], 'die Form löst nicht mehr zu einer leeren Liste auf - der Test misst etwas anderes');
     }

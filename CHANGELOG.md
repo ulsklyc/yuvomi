@@ -20,6 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   change in Yuvomi is still sent back exactly as it came in. A series that already shows the wrong
   start date in the other calendar is corrected the next time you change its start date or its
   repeat rule in Yuvomi.
+- **A contact or shopping item that is already gone from a CalDAV or CardDAV server no longer
+  blocks its sync.** On servers where Yuvomi lists the contacts of an address book before
+  downloading them (#529, for example mailbox.org), one contact deleted in between made the whole
+  address book fail. A shopping item moved to another list kept waiting for the move when its
+  original had already been deleted on the server. Both came from servers that report a single
+  entry as "not found", as standard CalDAV and CardDAV servers do. Such an entry now counts as gone.
+  Any other refusal still stops the sync with its HTTP status, and an entry the server sends
+  without its content is an error, not an empty contact or event.
 
 ## [2.77.0] - 2026-10-14
 

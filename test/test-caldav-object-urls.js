@@ -167,6 +167,8 @@ test('Abruf über Adressen: was nicht da ist, fehlt - jede andere Absage ist ein
   assert.deepEqual(found, [{ url: `${COLLECTION}a.ics`, etag: '"a"', data: 'A' }], '404/410 am Eintrag ist kein Fehler, sondern nichts');
 
   assert.deepEqual(await ask([{ raw: { multistatus: {} }, status: 207, ok: true }]), [], 'ein leerer Multistatus ist nichts');
+  await assert.rejects(() => ask([{ raw: { multistatus: { response: [{}] } }, status: 207, ok: true, props: {} }]),
+    /did not answer with the requested entries/, 'ein Eintrag ohne Adresse ging als "nicht da" durch');
 
   await assert.rejects(() => ask([entry('/dav/cal/haushalt/default/a.ics', 403)]), (err) => err.status === 403,
     'eine Absage am Eintrag ging als "nicht da" durch');
@@ -174,6 +176,10 @@ test('Abruf über Adressen: was nicht da ist, fehlt - jede andere Absage ist ein
     'eine Absage der ganzen Anfrage ging als "nicht da" durch');
   await assert.rejects(() => ask([{ href: COLLECTION, raw: '<html>Sign in</html>', status: 200, ok: true }]),
     /did not answer with the requested entries/, 'eine Antwort ohne Multistatus ging als "nicht da" durch');
+  // ETag ja, Inhalt nein: als Objekt ohne Daten läse `inspectObjectAt` "keine
+  // UID, also fort" - über ein Objekt, das da ist.
+  await assert.rejects(() => ask([entry('/dav/cal/haushalt/default/a.ics', 207, { getetag: '"a"' })]),
+    /did not return the content of an entry/, 'ein Eintrag ohne calendar-data ging als Objekt ohne Inhalt durch');
 });
 
 test('Die übrigen Client-Methoden bleiben erreichbar', () => {

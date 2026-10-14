@@ -41,7 +41,7 @@ export async function createCardDAVClient(account) {
     authMethod:         'Basic',
     defaultAccountType: 'carddav',
   });
-  return withHttpRefusalsAsErrors(client);
+  return withHttpRefusalsAsErrors(withVCardsByAddress(client));
 }
 
 /**
@@ -319,8 +319,9 @@ export function withHttpRefusalsAsErrors(client, { fetch: clientFetch } = {}) {
       let first = null;
       const recordingFetch = async (...args) => {
         const pending = baseFetch(...args);
-        // Nur die erste Anfrage: sie ist die Auflistung selbst.
-        if (first === null) first = pending;
+        // Nur die erste Anfrage: sie ist die Auflistung selbst. Gelesen wird
+        // eine Kopie, bevor tsdav den Körper verbraucht.
+        if (first === null) first = pending.then((res) => res.clone());
         return pending;
       };
       // Seit tsdav 2.4.0 wirft die Auflistung bei einer Absage selbst, als
@@ -341,7 +342,14 @@ export function withHttpRefusalsAsErrors(client, { fetch: clientFetch } = {}) {
           response.ok ? NOT_A_LISTING_TEXT[name] : null
         );
       }
-      if (failure) throw failure;
+      if (failure) {
+        // Ein Multistatus, in dem jede Ressource abgelehnt ist (403 je
+        // Ressource): tsdav 2.4.0 wirft "discovery failed" ohne Status. Es ist
+        // dieselbe Absage wie eine an der ganzen Anfrage.
+        const refusal = response ? refusalInMultistatus(await response.text().catch(() => '')) : null;
+        if (refusal) throw new DavHttpError(name, response.url, refusal);
+        throw failure;
+      }
       return result;
     };
   }
@@ -352,6 +360,18 @@ export function withHttpRefusalsAsErrors(client, { fetch: clientFetch } = {}) {
       name, { value, writable: true, enumerable: true, configurable: true },
     ])),
   });
+}
+
+/**
+ * Lehnt ein Multistatus JEDE genannte Ressource ab? Dann die erste Absage als
+ * `{status, statusText}`, sonst null. Ein Multistatus mit auch nur einem
+ * Erfolg ist keine Absage, und einer ohne jeden Status auch nicht.
+ */
+function refusalInMultistatus(text) {
+  const lines = [...String(text).matchAll(/<(?:[\w-]+:)?status>\s*HTTP\/[\d.]+\s+(\d{3})\s*([^<]*)</gi)]
+    .map((m) => ({ status: Number(m[1]), statusText: m[2].trim() }));
+  if (lines.length === 0 || lines.some((line) => line.status >= 200 && line.status < 300)) return null;
+  return lines[0];
 }
 
 /**
@@ -431,47 +451,78 @@ export function calendarObjectUrlFilter(collectionUrl) {
 /** Statuscodes, mit denen ein Server sagt: an dieser Adresse liegt nichts. */
 const ABSENT_STATUS = new Set([404, 410]);
 
+/** Die beiden Multiget-Berichte: Kalenderobjekte und vCards. */
+const MULTIGET = {
+  calendar: {
+    operation: 'fetchCalendarObjects',
+    report:    'calendar-multiget',
+    namespace: 'c',
+    nsUri:     'urn:ietf:params:xml:ns:caldav',
+    dataProp:  'c:calendar-data',
+    dataKey:   'calendarData',
+  },
+  addressbook: {
+    operation: 'fetchVCards',
+    report:    'addressbook-multiget',
+    namespace: 'card',
+    nsUri:     'urn:ietf:params:xml:ns:carddav',
+    dataProp:  'card:address-data',
+    dataKey:   'addressData',
+  },
+};
+
 /**
- * Holt Kalenderobjekte über ihre Adressen (`calendar-multiget`) und liefert,
- * was dort liegt. Was dort NICHT liegt, fehlt in der Rückgabe - es ist kein
- * Fehler.
+ * Holt Objekte einer Collection über ihre Adressen (`calendar-multiget` bzw.
+ * `addressbook-multiget`) und liefert, was dort liegt. Was dort NICHT liegt,
+ * fehlt in der Rückgabe - es ist kein Fehler.
  *
  * Diese Zusage tragen alle Aufrufer mit `objectUrls`: `inspectObjectAt`
  * (own-uid.js) liest aus einer leeren Rückgabe "das Objekt ist fort", die
- * Sofortversuche nehmen, was kam. tsdav hält sie nicht: 2.3.4 warf bei einem
- * 404-Eintrag in der Antwort (so antworten regelkonforme Server auf einen
- * fehlenden Namen) und gab nur dann leer zurück, wenn der Server den Namen
- * einfach ausliess; 2.4.0 wirft in beiden Fällen ("incomplete response").
- * Deshalb liest diese Stelle den Multistatus selbst, Eintrag für Eintrag:
+ * Sofortversuche nehmen, was kam, und der PROPFIND-Fallback der Kontakte
+ * (#529, `fetchVCardsResilient`) holt, was die Auflistung nannte - ein
+ * Kontakt, der dazwischen gelöscht wurde, darf nicht das ganze Adressbuch
+ * kippen. tsdav hält die Zusage nicht: 2.3.4 warf bei einem 404-Eintrag in der
+ * Antwort (so antworten regelkonforme Server auf einen fehlenden Namen) und gab
+ * nur dann ohne ihn zurück, wenn der Server den Namen einfach ausliess; 2.4.0
+ * wirft in beiden Fällen ("incomplete response"). Deshalb liest diese Stelle
+ * den Multistatus selbst, Eintrag für Eintrag:
  *
  *   - 404/410 am Eintrag, oder der Name fehlt in der Antwort: nichts da.
  *   - jede andere Absage am Eintrag oder an der ganzen Anfrage: Fehler mit
  *     Status (`DavHttpError`), denn sie sagt nichts darüber, was dort liegt.
  *   - eine Antwort, die kein Multistatus ist (Anmeldeseite eines Proxys):
  *     ebenfalls Fehler.
+ *   - ein Eintrag ohne Inhalt (ETag ja, Daten nein): Fehler. Als Objekt ohne
+ *     Daten weitergereicht, läse `inspectObjectAt` "keine UID, also nicht
+ *     unseres, also fort" - über ein Objekt, das da ist.
  *
- * Gesendet wird an `calendar.url`, wie bei tsdav; die Objekte stehen als Pfad
+ * Gesendet wird an die Collection, wie bei tsdav; die Objekte stehen als Pfad
  * im Körper.
+ *
+ * @param {object} client  tsdav-Client (für `davRequest` mit seinen Zugangsdaten)
+ * @param {'calendar'|'addressbook'} kind
+ * @param {{collectionUrl: string, objectUrls: string[], headers?: object}} params
+ * @returns {Promise<Array<{url: string, etag: string|undefined, data: string}>>}
  */
-async function fetchCalendarObjectsByAddress(client, params) {
-  const { calendar, objectUrls, headers } = params;
-  if (!calendar?.url) throw new Error('cannot fetch calendar objects without a calendar url');
-  const base = String(calendar.url).replace(/\/?$/, '/');
+async function multigetByAddress(client, kind, { collectionUrl, objectUrls, headers }) {
+  const spec = MULTIGET[kind];
+  if (!collectionUrl) throw new Error(`cannot run ${spec.report} without a collection url`);
+  const base = String(collectionUrl).replace(/\/?$/, '/');
   const hrefs = objectUrls
     .filter((url) => typeof url === 'string' && url.trim())
     .map((url) => { const parsed = new URL(url, base); return `${parsed.pathname}${parsed.search}`; });
   if (hrefs.length === 0) return [];
 
   const responses = await client.davRequest({
-    url: calendar.url,
+    url: collectionUrl,
     init: {
       method:    'REPORT',
-      namespace: 'c',
+      namespace: spec.namespace,
       headers:   { ...headers, depth: '1' },
       body: {
-        'calendar-multiget': {
-          _attributes: { 'xmlns:d': 'DAV:', 'xmlns:c': 'urn:ietf:params:xml:ns:caldav' },
-          'd:prop':    { 'd:getetag': {}, 'c:calendar-data': {} },
+        [spec.report]: {
+          _attributes: { 'xmlns:d': 'DAV:', [`xmlns:${spec.namespace}`]: spec.nsUri },
+          'd:prop':    { 'd:getetag': {}, [spec.dataProp]: {} },
           'd:href':    hrefs,
         },
       },
@@ -481,31 +532,59 @@ async function fetchCalendarObjectsByAddress(client, params) {
   const objects = [];
   for (const res of responses || []) {
     if (!res?.raw?.multistatus) {
-      throw new DavHttpError('fetchCalendarObjects', calendar.url, res,
+      throw new DavHttpError(spec.operation, collectionUrl, res,
         res?.ok ? 'The server did not answer with the requested entries' : 'The server refused to read entries');
     }
-    // Ein leerer Multistatus: keines der Objekte liegt dort.
-    if (!res.href) continue;
-    if (ABSENT_STATUS.has(res.status)) continue;
-    if (!res.ok) {
-      throw new DavHttpError('fetchCalendarObjects', new URL(res.href, base).href, res,
-        'The server refused to read an entry');
+    if (!res.href) {
+      // Ein leerer Multistatus: keines der Objekte liegt dort. Ein Eintrag ohne
+      // Adresse in einem gefüllten dagegen belegt nichts - als "fort" gelesen,
+      // verschwände ein Objekt, über das der Server gar nichts gesagt hat.
+      if (!res.raw.multistatus.response) continue;
+      throw new DavHttpError(spec.operation, collectionUrl, null, 'The server did not answer with the requested entries');
     }
-    const data = res.props?.calendarData?._cdata ?? res.props?.calendarData;
+    const url = new URL(res.href, base).href;
+    if (ABSENT_STATUS.has(res.status)) continue;
+    if (!res.ok) throw new DavHttpError(spec.operation, url, res, 'The server refused to read an entry');
+    const value = res.props?.[spec.dataKey];
+    const data = value?._cdata ?? value?._text ?? value;
+    if (typeof data !== 'string') {
+      throw new DavHttpError(spec.operation, url, null, 'The server did not return the content of an entry');
+    }
     const etag = res.props?.getetag;
     objects.push({
-      url:  new URL(res.href, base).href,
+      url,
       etag: etag == null ? undefined : String(etag?._cdata ?? etag?._text ?? etag),
-      data: typeof data === 'string' ? data : undefined,
+      data,
     });
   }
   return objects;
 }
 
 /**
+ * Leitet den Abruf von vCards über Adressen (`objectUrls`) an
+ * `multigetByAddress`; der Abruf eines ganzen Adressbuchs bleibt bei tsdav.
+ * Über den Prototyp gebaut, aus demselben Grund wie
+ * `withCalendarObjectUrlFilter`.
+ */
+export function withVCardsByAddress(client) {
+  const fetchVCards = client.fetchVCards.bind(client);
+  return Object.create(Object.getPrototypeOf(client), {
+    ...Object.getOwnPropertyDescriptors(client),
+    fetchVCards: {
+      value: (params = {}) => (Array.isArray(params?.objectUrls)
+        ? multigetByAddress(client, 'addressbook', {
+          collectionUrl: params.addressBook?.url, objectUrls: params.objectUrls, headers: params.headers,
+        })
+        : fetchVCards(params)),
+      writable: true, enumerable: true, configurable: true,
+    },
+  });
+}
+
+/**
  * Hängt `calendarObjectUrlFilter` als Default an `fetchCalendarObjects`, und
  * leitet den Abruf über Adressen (`objectUrls`) an
- * `fetchCalendarObjectsByAddress`.
+ * `multigetByAddress`.
  *
  * Der Filter sitzt am Client statt an den Aufrufstellen, weil er einen
  * Bibliotheks-Default neutralisiert: fünf Stellen holen Kalenderobjekte, und
@@ -526,7 +605,9 @@ export function withCalendarObjectUrlFilter(client) {
     ...Object.getOwnPropertyDescriptors(client),
     fetchCalendarObjects: {
       value: (params = {}) => (Array.isArray(params?.objectUrls)
-        ? fetchCalendarObjectsByAddress(client, params)
+        ? multigetByAddress(client, 'calendar', {
+          collectionUrl: params.calendar?.url, objectUrls: params.objectUrls, headers: params.headers,
+        })
         : fetchCalendarObjects({
           urlFilter: calendarObjectUrlFilter(params?.calendar?.url),
           ...params,
