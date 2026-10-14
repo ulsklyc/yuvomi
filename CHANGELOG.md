@@ -37,7 +37,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `recipes_ingredient_not_found`, `recipes_selected_pantry_item_not_found`,
   `shopping_list_not_found`), planning a meal with an unknown `recipe_id` on `/api/v1/meals`
   carries `meals_selected_recipe_not_found`, the German texts of those answers are now English,
-  and the status codes are unchanged.
+  and the status codes are unchanged. A late reload no longer replaces a recipe you have created
+  or changed in the meantime, and a reload that finishes after you have moved to another page
+  draws nothing and leaves the focus where it is.
 - **Documents: an error message is in your language and names the cause** (#1909). The
   documents page showed the server's own English sentence when something could not be saved,
   moved or deleted, whatever the app language, for example "Folder not found." when somebody else
@@ -65,7 +67,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `dms_document_already_stored`, `dms_unreachable`); a document with an unknown `folder_id` is a
   400 instead of a 500, also when the folder disappears while the file is being stored, an empty
   file is reported as empty instead of as an invalid data URL, a local failure while linking or
-  sending to a DMS is a 500 instead of a 502, and the other status codes are unchanged.
+  sending to a DMS is a 500 instead of a 502, and the other status codes are unchanged. A reload
+  or deletion that finishes after you have moved to another page draws nothing there and leaves
+  the focus where it is (#2001).
 - **Housekeeping: creating or editing a housekeeper profile saves again** (#1976). Since 2.75.0
   the "Add" button in the profile dialog did nothing: no message, no profile, and the dialog stayed
   open. Its buttons had lost the connection to the form they belong to, and find it again.

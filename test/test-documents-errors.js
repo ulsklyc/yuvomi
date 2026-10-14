@@ -335,7 +335,8 @@ async function mitSeite({ container: given = null, ...patch }, fn) {
     members: [], directory: [], dmsAccounts: [], status: 'active', query: '', queryText: '', category: '', folderId: '',
     expiringSoon: false, selectMode: false, selected: new Set(), view: 'list',
   }, patch);
-  const container = given ?? { querySelector: () => null, querySelectorAll: () => [], isConnected: false };
+  // Ohne eigenen Traeger: eine Seite, die gerade angezeigt wird (im DOM).
+  const container = given ?? { querySelector: () => null, querySelectorAll: () => [], isConnected: true };
   page.setContainerForTest(container);
   try {
     return await fn();
@@ -708,7 +709,8 @@ test('Seite: Ordner hochladen bis zur Ergebniszeile - Ordner und Datei, die am S
 /** Ein Seitentraeger, der mitschreibt, wonach gezeichnet wird. */
 function traeger() {
   const gefragt = [];
-  return { gefragt, isConnected: false, querySelector: (sel) => { gefragt.push(sel); return null; }, querySelectorAll: () => [] };
+  // Eine Seite, die gerade angezeigt wird: im DOM eingehaengt.
+  return { gefragt, isConnected: true, querySelector: (sel) => { gefragt.push(sel); return null; }, querySelectorAll: () => [] };
 }
 
 const BAUM = [{ id: 4, name: 'Auto', parent_id: 5 }, { id: 5, name: 'Zeta', parent_id: null }];
@@ -806,4 +808,61 @@ test('Seite: neuer Ordner, Elternordner weg - die neu aufgebaute Auswahl ist Zei
   delete beimOeffnen['3'];
   assert.equal(Object.keys(beimOeffnen).length, 3, content);
   assert.deepEqual(labels(panel.querySelector('#document-folder-parent').html), beimOeffnen);
+});
+
+// Codex an #2001, Nachtrag zu #1994: die Navigation in ein anderes Modul leert
+// `_container` nicht - die Variable zeigt weiter auf den abgehaengten Traeger.
+// "Derselbe Traeger" allein haelt dann nicht; er muss auch noch im DOM haengen.
+test('Seite: die Seite wird verlassen, waehrend das Nachladen laeuft (derselbe, nun abgehaengte Traeger) - kein Zeichnen, kein Fokus', async () => {
+  let refocus = 0;
+  globalThis.__refocusAfterRender = () => { refocus += 1; };
+  try {
+    const seite = traeger();
+    await mitSeite({ container: seite }, () => mit({
+      get: (path) => { if (path === '/documents/folders') seite.isConnected = false; return { data: [] }; },
+      patch: async () => { throw fehler(404, 'documents_document_not_found'); },
+    }, () => page.runDocumentAction('archive', { ...DOC })));
+    assert.deepEqual(toasts, [['documents.errorDocumentGone', 'danger']]);
+    assert.equal(seite.gefragt.includes('#documents-folder-browser'), false, 'die abgehaengte Seite wird nicht gezeichnet');
+    assert.equal(refocus, 0, 'der Fokus der neuen Seite bleibt, wo er ist');
+
+    // Gegenfall: die Seite bleibt eingehaengt - gezeichnet wird, der Fokus kommt.
+    const bleibt = traeger();
+    await mitSeite({ container: bleibt }, () => mit({ patch: async () => { throw fehler(404, 'documents_document_not_found'); } },
+      () => page.runDocumentAction('archive', { ...DOC })));
+    assert.ok(bleibt.gefragt.includes('#documents-folder-browser'));
+    assert.equal(refocus, 1);
+  } finally {
+    delete globalThis.__refocusAfterRender;
+  }
+});
+
+test('Seite: der gewaehlte Ordner ist weg und die Seite wird waehrenddessen verlassen - die abgehaengte Seite wird nicht gezeichnet', async () => {
+  const seite = traeger();
+  await mitSeite({ container: seite }, () => mit({
+    get: (path) => {
+      if (path === '/documents/folders') seite.isConnected = false;
+      return path === '/documents/folders' ? { data: BAUM } : { data: [] };
+    },
+    put: async () => { throw fehler(400, 'documents_selected_folder_not_found'); },
+  }, () => page.saveDocument({ target: formular(BEARBEITEN), preventDefault() {} }, { ...DOC }, formular())));
+  assert.equal(seite.gefragt.includes('#documents-folder-browser'), false);
+});
+
+test('Seite: loeschen mit Ruecknahme, und die Seite wurde inzwischen verlassen (abgehaengter Traeger) - kein Nachladen, kein Zurueckstellen', async () => {
+  for (const scheitert of [false, true]) {
+    const seite = traeger();
+    await mitSeite({ container: seite }, async () => {
+      let opts = null;
+      globalThis.__undoStub = (o) => { opts = o; };
+      try { page.deleteDocuments([{ ...DOC }]); } finally { delete globalThis.__undoStub; }
+      seite.isConnected = false;
+      const { gets } = await mit({ delete: async () => { if (scheitert) throw fehler(500); return {}; } }, async () => {
+        try { await opts.commit({ keepalive: false }); } catch (e) { opts.restore(e); }
+      });
+      assert.equal(gets.some((p) => p.startsWith('/documents?status=')), false, `${scheitert}: nachgeladen ${gets.join(', ')}`);
+      assert.deepEqual(toasts, [], `${scheitert}: kein Toast auf einer verlassenen Seite`);
+      assert.equal(page.state.allDocuments.some((d) => d.id === DOC.id), false, `${scheitert}: nicht zurueckgestellt`);
+    });
+  }
 });

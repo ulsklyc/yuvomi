@@ -200,7 +200,8 @@ async function mitSeite(patch, fn) {
   const s = page.state;
   const zuvor = { ...s };
   Object.assign(s, { recipes: [rezept()], lists: [{ id: 1, name: 'Wocheneinkauf' }], query: '', sourceFilter: 'all', loadError: null }, patch);
-  const container = { querySelector: () => null, querySelectorAll: () => [], isConnected: false };
+  // Eine Seite, die gerade angezeigt wird: im DOM eingehaengt.
+  const container = { querySelector: () => null, querySelectorAll: () => [], isConnected: true };
   page.setContainerForTest(container);
   try {
     return await fn();
@@ -665,4 +666,53 @@ test('Essensplan: eine Mahlzeit speichern, deren gewaehltes Rezept es nicht mehr
     assert.equal(felder['#modal-save'].disabled, false, 'Speichern geht wieder');
     assertNoServerText();
   }
+});
+
+// Codex an #2001: die Navigation in ein anderes Modul leert `_container`
+// nicht. "Derselbe Container" allein haelt dann nicht, er muss im DOM haengen.
+test('Seite: die Seite wird verlassen, waehrend das Nachladen laeuft (derselbe, nun abgehaengte Container) - kein Zeichnen, kein Fokus', async () => {
+  let refocus = 0;
+  globalThis.__refocusAfterRender = () => { refocus += 1; };
+  try {
+    await mitSeite({}, async () => {
+      const vorher = page.state.recipes;
+      const seite = { querySelector: () => null, querySelectorAll: () => [], isConnected: true };
+      page.setContainerForTest(seite);
+      await mit({
+        get: (path) => {
+          if (path === '/recipes') seite.isConnected = false;
+          return { data: [{ id: 99, title: 'Fremd', source: 'native', ingredients: [] }] };
+        },
+        post: async () => { throw fehler(404, 'recipes_recipe_not_found'); },
+      }, () => page.transferRecipe(rezept(), null));
+      assert.equal(page.state.recipes, vorher, 'der Zustand der verlassenen Seite bleibt');
+      assert.equal(refocus, 0, 'der Fokus der neuen Seite bleibt, wo er ist');
+    });
+  } finally {
+    delete globalThis.__refocusAfterRender;
+  }
+});
+
+// Codex an #2001: ein spaetes GET des Nachladens darf eine Aenderung, die
+// der Nutzer inzwischen gemacht hat, nicht mit einem aelteren Stand ueberschreiben.
+test('Seite: das Nachladen laeuft noch, da legt der Nutzer ein Rezept an - die verspaetete Antwort nimmt es nicht wieder weg', async () => {
+  await mitSeite({}, async () => {
+    let freigeben;
+    const tor = new Promise((r) => { freigeben = r; });
+    const kopie = { id: 42, title: 'Suppe (Kopie)', source: 'native', ingredients: [] };
+    await mit({
+      get: (path) => (path === '/recipes' ? tor.then(() => ({ data: [rezept()] })) : { data: [] }),
+      post: async (path) => {
+        if (path.endsWith('/to-shopping-list')) throw fehler(404, 'shopping_list_not_found');
+        return { data: kopie };
+      },
+    }, async () => {
+      await page.transferRecipe(rezept(), null);
+      // Das Nachladen wartet am Tor; jetzt dupliziert der Nutzer.
+      await page.duplicateRecipe(rezept());
+      assert.ok(page.state.recipes.some((r) => r.id === 42), 'Vorbedingung: die Kopie steht im Zustand');
+      freigeben();
+    });
+    assert.ok(page.state.recipes.some((r) => r.id === 42), 'die Kopie bleibt nach der verspaeteten Antwort');
+  });
 });

@@ -362,8 +362,10 @@ test('das Rückgängig-Löschen stellt die Server-Sortierung wieder her', () => 
   const del = page.slice(page.indexOf('function deleteDocuments'), page.indexOf('function deleteDocuments') + 2400);
   assert.doesNotMatch(del, /localeCompare/);
   assert.match(del, /applyFilters\(\)/);
-  // Kein Nachladen auf einen abgehängten Container nach Seitenwechsel.
-  assert.match(del, /if \(_container !== owner\) return/);
+  // Kein Nachladen auf einen abgehängten Container nach Seitenwechsel - auch
+  // nicht, wenn `_container` noch auf ihn zeigt (stillShown prueft das DOM,
+  // Codex an #2001; als Programm gefahren in test:documents-errors).
+  assert.match(del, /if \(!stillShown\(owner\)\) return/);
 });
 
 test('das Speichern referenziert den Submit-Button am Panel, nicht am Formular (#543)', () => {

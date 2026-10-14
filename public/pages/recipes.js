@@ -28,6 +28,15 @@ import { mayWritePath } from '/utils/module-access.js';
 import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
 
 let _container = null;
+/**
+ * Stand der Rezeptliste: steigt bei jeder Schreibhandlung auf `state.recipes`
+ * (laden, anlegen, duplizieren, bearbeiten, loeschen, zuordnen). Ein Nachladen
+ * nach "gibt es nicht mehr" uebernimmt sein Ergebnis nur, wenn der Stand seit
+ * seinem Start gleich blieb - sonst ueberschriebe eine verspaetete Antwort,
+ * was der Nutzer inzwischen getan hat (Codex an #2001).
+ */
+let _recipesVersion = 0;
+const touchRecipes = () => { _recipesVersion += 1; };
 /** Handle des geteilten Suchfelds (setValue/clear), gesetzt in render(). */
 let _search = null;
 /** Handle von Liste + Detail (utils/master-detail.js), gesetzt in render(). */
@@ -127,22 +136,36 @@ async function reportError(err, { fallbackKey = 'common.errorGeneric', dialog = 
  * @returns {Promise<boolean>} ob neu gezeichnet wurde
  */
 async function reloadAfterGone(owner) {
+  const version = _recipesVersion;
   const shoppingOff = window.yuvomi?.isModuleDisabled?.('shopping');
   const [recipes, lists] = await Promise.allSettled([
     api.get('/recipes'),
     shoppingOff ? Promise.resolve({ data: [] }) : api.get('/shopping'),
   ]);
-  if (!owner || _container !== owner) return false;
-  if (recipes.status === 'fulfilled') {
+  if (!stillShown(owner)) return false;
+  if (recipes.status === 'fulfilled' && version === _recipesVersion) {
     state.recipes = recipes.value?.data ?? [];
     state.loadError = null;
-  } else {
+    touchRecipes();
+  } else if (recipes.status === 'rejected') {
     console.warn('[Recipes] reload after a gone answer failed:', recipes.reason);
   }
   if (lists.status === 'fulfilled') state.lists = lists.value?.data ?? [];
   renderSourceFilter();
   renderRecipeList({ repaint: true });
   return true;
+}
+
+/**
+ * Zeigt die Seite noch diesen Container? Die Navigation in ein anderes Modul
+ * leert `_container` nicht, die Variable zeigt dann weiter auf den
+ * abgehaengten Container. "Derselbe Container" allein haelt deshalb nicht: er muss
+ * auch noch im DOM haengen (Codex an #2001). Sonst zeichnete ein spaetes
+ * Nachladen in eine Seite, die niemand mehr sieht, und zoege den Fokus auf
+ * der neuen Seite weg.
+ */
+function stillShown(owner) {
+  return Boolean(owner) && _container === owner && owner.isConnected === true;
 }
 
 const isSelectedPantryItemGone = (err) => isGone(err) && err.data.reason === 'recipes_selected_pantry_item_not_found';
@@ -219,10 +242,12 @@ async function loadRecipes() {
     const res = await api.get('/recipes');
     state.recipes = res.data ?? [];
     state.loadError = null;
+    touchRecipes();
   } catch (err) {
     console.error('[Recipes] loadRecipes Fehler:', err);
     state.recipes = [];
     state.loadError = err;
+    touchRecipes();
   }
 }
 
@@ -1469,6 +1494,7 @@ async function openPantryMatchModal(recipe, ingredientName) {
           // traegt genau die beiden Felder, die sich geaendert haben.
           ing.pantry_item_id = res.data.pantry_item_id;
           ing.pantry_item_name = res.data.pantry_item_name;
+          touchRecipes();
           // force: der Schreibvorgang ist durch, eine Verwerfen-Frage waere
           // eine Frage nach etwas, das schon gespeichert ist.
           closeSharedModal({ force: true });
@@ -1564,6 +1590,7 @@ async function openPantryBulkMatchModal(recipe) {
             const res = await api.put(`/recipes/${recipe.id}/ingredient-match`, { name: ing.name, pantryItemId });
             ing.pantry_item_id = res.data.pantry_item_id;
             ing.pantry_item_name = res.data.pantry_item_name;
+            touchRecipes();
             saved += 1;
           }
           closeSharedModal({ force: true });
@@ -1844,11 +1871,13 @@ async function saveRecipe(panel, mode, recipe) {
     if (mode === 'create') {
       const res = await api.post('/recipes', { title, notes, recipe_url, meal_types, ingredients, ...bildFeld });
       state.recipes.push(res.data);
+      touchRecipes();
       createdId = res.data?.id ?? null;
     } else {
       const res = await api.put(`/recipes/${recipe.id}`, { title, notes, recipe_url, meal_types, ingredients, ...bildFeld });
       const idx = state.recipes.findIndex((r) => r.id === recipe.id);
       if (idx >= 0) state.recipes[idx] = res.data;
+      touchRecipes();
     }
 
     closeModal({ force: true });
@@ -2053,6 +2082,7 @@ async function removeRecipe(recipe) {
       }
       if (keepalive) return; // Seite verschwindet — kein UI-Refresh mehr
       state.recipes = state.recipes.filter((r) => r.id !== recipe.id);
+      touchRecipes();
       renderRecipeList();
     },
     restore: (err) => {
@@ -2102,6 +2132,7 @@ async function duplicateRecipe(recipe) {
   try {
     const res = await api.post('/recipes', { title, notes, recipe_url, ingredients });
     state.recipes.push(res.data);
+    touchRecipes();
     renderRecipeList();
     // Die Kopie ist das, was man als Naechstes bearbeitet: in der Spalte steht
     // sie deshalb gleich rechts.

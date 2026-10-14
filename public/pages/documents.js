@@ -149,6 +149,18 @@ function errorText(err) {
  * Zeile steht noch. Ein Loeschen mit diesem Grund laeuft deshalb wie jede
  * andere Handlung hier durch: der Satz, und die Seite zeigt, was wirklich steht.
  */
+/**
+ * Zeigt die Seite noch diesen Traeger? Die Navigation in ein anderes Modul
+ * leert `_container` nicht, die Variable zeigt dann weiter auf den
+ * abgehaengten Traeger. "Derselbe Traeger" allein haelt deshalb nicht: er muss
+ * auch noch im DOM haengen (Codex an #2001). Sonst zeichnete ein spaetes
+ * Nachladen in eine Seite, die niemand mehr sieht, und zoege den Fokus auf
+ * der neuen Seite weg.
+ */
+function stillShown(owner) {
+  return Boolean(owner) && _container === owner && owner.isConnected === true;
+}
+
 async function reportError(err, { dialog = null } = {}) {
   window.yuvomi?.showToast(errorText(err), 'danger');
   if (!isGone(err)) return;
@@ -165,7 +177,7 @@ async function reportError(err, { dialog = null } = {}) {
     console.warn('[Documents] reload after a gone answer failed:', loadErr);
     return;
   }
-  if (_container !== owner) return;
+  if (!stillShown(owner)) return;
   renderDmsHeaderBtn();
   renderAll();
   refocusAfterRender();
@@ -193,7 +205,7 @@ async function offerCurrentFolders(select, rootKey, optionsHtml) {
   } catch (err) {
     console.warn('[Documents] folder reload failed:', err);
   }
-  if (_container === owner) renderAll();
+  if (stillShown(owner)) renderAll();
   select.replaceChildren();
   select.insertAdjacentHTML('beforeend', `<option value="">${esc(t(rootKey))}</option>${optionsHtml(goneId)}`);
   select.value = '';
@@ -2262,7 +2274,7 @@ function deleteDocuments(docs) {
       .filter((row) => ids.has(Number(row.dataset.id)))
     : [];
   Promise.all(leaving.map((row) => collapseRow(row))).then(() => {
-    if (_container === owner) renderAll({ motion: true });
+    if (stillShown(owner)) renderAll({ motion: true });
   });
 
   const restore = () => {
@@ -2285,12 +2297,12 @@ function deleteDocuments(docs) {
       if (failed) throw failed.reason;
       // Seite inzwischen verlassen: die Löschung ist durch, aber es gibt nichts
       // mehr zu zeichnen — kein Nachladen auf einen abgehängten Container.
-      if (keepalive || _container !== owner) return;
+      if (keepalive || !stillShown(owner)) return;
       await loadDocuments();
       renderAll();
     },
     restore: (err) => {
-      if (_container !== owner) return;
+      if (!stillShown(owner)) return;
       // "Gibt es nicht mehr": nicht zurueckstellen, was der Server nicht mehr
       // zeigt - reportError laedt nach, und die Liste sagt, was steht.
       if (err && isGone(err)) { reportError(err); return; }
