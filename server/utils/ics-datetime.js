@@ -32,7 +32,7 @@
  *                  server/utils/ics-format.js
  */
 
-import { isValidTimeZone } from './timezone.js';
+import { isValidTimeZone, storedToInstantIso } from './timezone.js';
 import { formatWall } from './vtimezone.js';
 import { toICSDatetime } from './ics-format.js';
 import { timedSeriesUntil } from './rrule-until.js';
@@ -103,11 +103,21 @@ export function eventDateTimeFields(event, householdZone = null) {
   // durch `formatWall`, das einen UTC-Instant erwartet: auf einem UTC-Server
   // wird aus einem gemeinten 11:00 in Berlin ein 13:00.
   //
-  // Ein Wert mit Offset ist ein Zeitpunkt und wird in die Zone gerechnet; ein
-  // naiver Wert IST bereits Wanduhrzeit und wird nur formatiert.
-  const wallIn = (zone) => (value) => (hasExplicitOffset(value)
-    ? formatWall(value, zone)
-    : toICSDatetime(value));
+  // Ein Wert mit Offset ist ein Zeitpunkt und wird in die Zone gerechnet.
+  //
+  // ZONENLOSE ZIFFERN NEBEN EINER TZID SIND WANDUHR DES HAUSHALTS (#1993). So
+  // schreibt sie PUT, wenn eine eingelesene Serie aus dem Formular gespeichert
+  // wird; die `tzid` bleibt dabei stehen. Bis hierher gingen die Ziffern roh
+  // mit `TZID=<tzid>` hinaus - in Berlin eingegebene 08:30 standen beim
+  // Empfaenger als 08:30 in Los Angeles. Jetzt werden sie in der
+  // Haushaltszone zum Zeitpunkt und von dort zur Wanduhr der Serienzone,
+  // dieselbe Lesart wie Expansion und Feed.
+  const inEventZone = (value) => {
+    if (hasExplicitOffset(value)) return formatWall(value, zoneOfEvent);
+    // Ohne Haushaltszone wirft `storedToInstantIso`: kein stiller Rueckfall.
+    const instant = storedToInstantIso(value, householdZone);
+    return instant ? formatWall(instant, zoneOfEvent) : toICSDatetime(value);
+  };
 
   // Dasselbe fuer den UTC-Pfad: ein naiver Wert neben einem Instant ist als UTC
   // gemeint (das sagt der Zweig, in dem er steht) und braucht sein eigenes Z.
@@ -121,10 +131,9 @@ export function eventDateTimeFields(event, householdZone = null) {
   //    springen (#549) - der Fehler, den der ICS-Feed schon hinter sich hat.
   if (zoneOfEvent && event.recurrence_rule && !naive) {
     const params = `;TZID=${zoneOfEvent}`;
-    const wall = wallIn(zoneOfEvent);
     return {
-      dtstart: { value: wall(event.start_datetime), params },
-      dtend:   { value: wall(endSource),            params },
+      dtstart: { value: inEventZone(event.start_datetime), params },
+      dtend:   { value: inEventZone(endSource),            params },
       tzid: zoneOfEvent,
     };
   }
@@ -139,10 +148,19 @@ export function eventDateTimeFields(event, householdZone = null) {
     };
   }
 
-  // 4. Naive Ziffern. Sie meinen eine Uhr - die des Events, wenn eine bekannt
-  //    ist, sonst die des Haushalts. Ohne diesen Zweig ging genau hier die
+  // 4. Naive Ziffern. Sie meinen die Uhr des Haushalts (#1993). Traegt das
+  //    Event eine eigene Zone, gehen sie in diese umgerechnet hinaus, sonst
+  //    mit der Zone des Haushalts. Ohne diesen Zweig ging genau hier die
   //    floating time aus #938 hinaus.
-  const zone = zoneOfEvent || anchorZone(householdZone);
+  if (zoneOfEvent) {
+    const params = `;TZID=${zoneOfEvent}`;
+    return {
+      dtstart: { value: inEventZone(event.start_datetime), params },
+      dtend:   { value: inEventZone(endSource),            params },
+      tzid: zoneOfEvent,
+    };
+  }
+  const zone = anchorZone(householdZone);
   const params = zone ? `;TZID=${zone}` : '';
   const suffix = zone ? '' : 'Z';
   return {

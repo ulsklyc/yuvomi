@@ -201,6 +201,73 @@ function readStoredInstant(value, tz, toUTC) {
 }
 
 /**
+ * Ein gespeicherter Wert als UTC-Zeitpunkt, fuer alles, was ihn auf die
+ * Wanduhr einer SERIENZONE (`tzid`) umrechnet (#1993).
+ *
+ * Eine eingelesene Serie traegt ihre `tzid`. Wird sie aus dem Formular
+ * gespeichert, schreibt PUT die Wanduhr-Ziffern des HAUSHALTS (`to: 'wall'`),
+ * die `tzid` bleibt stehen. Bis hierher las jede Stelle, die daraus die
+ * Wanduhr der Serienzone machte, die Ziffern mit `new Date()` - in der Zone
+ * des PROZESSES: derselbe Datensatz ergab unter TZ=UTC und TZ=Europe/Berlin
+ * zwei verschiedene Serien. Gemeint ist die Uhr, in der die Ziffern
+ * geschrieben wurden, dieselbe, in der `storedToInstantMs()` sie liest.
+ *
+ * Ein Wert mit eigener Zone kommt unveraendert zurueck.
+ *
+ * DIE ZONE IST PFLICHT. Fehlt sie bei zonenlosen Ziffern, wirft die Funktion:
+ * ein stiller Rueckfall waere wieder die Prozesszone, also genau der Fehler.
+ * Jeder Aufrufer hat die Haushaltszone zur Hand (`householdTimeZone(db)`).
+ * @param {string} value          Wert aus start_datetime/end_datetime
+ * @param {string} householdZone  IANA-Zone des Haushalts (`householdTimeZone`)
+ * @returns {string|null} Zeitpunkt, oder null bei unlesbarem Wert
+ */
+export function storedToInstantIso(value, householdZone) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  if (hasExplicitZone(raw)) return Number.isNaN(Date.parse(raw)) ? null : raw;
+  if (!isValidTimeZone(householdZone)) {
+    throw new TypeError(`storedToInstantIso(): "${raw}" carries no zone, and no household zone was passed to read it in.`);
+  }
+  const ms = storedToInstantMsPrecise(raw, householdZone);
+  return ms === null ? null : new Date(ms).toISOString().replace('.000Z', 'Z');
+}
+
+/**
+ * Die Wanduhr eines gespeicherten Werts in der Serienzone `tzid` (#1993):
+ * `utcToWall()` fuer beide Speicherformen. Zonenlose Ziffern werden zuerst in
+ * der Haushaltszone gelesen (`storedToInstantIso`), nie in der Prozesszone.
+ * @param {string} value
+ * @param {string} tzid           IANA-Zone der Serie
+ * @param {string} householdZone  IANA-Zone des Haushalts
+ * @returns {{ date: string, time: string }|null}
+ */
+export function storedToWall(value, tzid, householdZone) {
+  const iso = storedToInstantIso(value, householdZone);
+  return iso ? utcToWall(iso, tzid) : null;
+}
+
+/**
+ * Liegt der Tag, der im gespeicherten Start STEHT, neben dem Ortstag der
+ * Serienzone? Das `zonenUnsicher` der Expansion und ihrer Nachbarn (#549,
+ * #985) - eine Formel fuer alle, damit sie dieselbe Antwort geben.
+ *
+ * Gefragt wird der Text, weil die Fragenden mit dessen Datumsteil
+ * weiterrechnen (`hasAnyOccurrence`, `seriesStartFor`). Die Wanduhr daneben
+ * kommt aus `storedToWall()` und haengt so nie an der Prozesszone (#1993).
+ * Ohne `tzid` gibt es keine zweite Uhr: false.
+ * @param {string} value
+ * @param {string|null} tzid
+ * @param {string} householdZone
+ * @returns {boolean}
+ */
+export function storedDayDiffersFromSeriesDay(value, tzid, householdZone) {
+  if (!tzid) return false;
+  const raw = String(value ?? '');
+  const wall = storedToWall(raw, tzid, householdZone);
+  return !(wall && wall.date === raw.slice(0, 10));
+}
+
+/**
  * `todayKey` um `days` Tage verschoben - reine UTC-Arithmetik auf dem
  * Datums-Key, damit die Verschiebung nicht ihrerseits über eine DST-Grenze
  * kippt. Zwei aufeinanderfolgende Kalendertage liegen nicht immer 24 h

@@ -139,7 +139,8 @@ export function expandAndResolveEventRows(database, rows, from, to, options = {}
     from,
     to,
     exceptions,
-    { ...options.expansion, includeRecurrenceIdentity: true },
+    // Die Zone kommt von hier, die Expansion kennt keine Datenbank (#1993).
+    { householdZone: householdTimeZone(database), ...options.expansion, includeRecurrenceIdentity: true },
   );
   return resolveProjectedEventRows(database, expanded, options)
     .sort((a, b) => String(a.start_datetime).localeCompare(String(b.start_datetime)));

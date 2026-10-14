@@ -607,7 +607,8 @@ function toGraphDateTime(dt, tz = outlookTimeZone()) {
 function localEventToGraph(rawEvent, assigneeNames = [], tz = outlookTimeZone()) {
   // Wie bei Google (#986): erst begradigen, dann ableiten - der Anker fuer
   // rruleToGraphRecurrence haengt am selben Startdatum.
-  const event = outboundEvent(rawEvent);
+  // Keine Zeile mit Outlook-Ziel traegt heute eine `tzid`; wer kuenftig eine schreibt, aendert hier den Zweig in outboundDateRange (#1993).
+  const event = outboundEvent(rawEvent, { householdZone: tz });
   const allDay = !!event.all_day;
   const subject = assigneeNames.length
     ? `${event.title} (${assigneeNames.join(', ')})`
