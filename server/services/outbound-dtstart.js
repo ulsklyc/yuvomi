@@ -44,13 +44,13 @@
  * ohne sie geht die Serie Wort fuer Wort zurueck, auch nach einer Bearbeitung,
  * die weder Start noch Regel anfasst.
  *
- * DER ABRUF SCHREIBT WIE BISHER. Er uebernimmt, was beim Anbieter liegt - auch
- * den ausgerichteten Start, den Yuvomi selbst hinaufgegeben hat: aus dem 15.
- * in der Zeile wird der 31., und die Marke faellt dabei. Das schadet dem
- * ausgehenden Weg nicht: die Zeile traegt den ausgerichteten Start danach
- * selbst und geht Wort fuer Wort richtig hinaus, und die naechste Aenderung
- * von Start oder Regel in Yuvomi setzt die Marke wieder. Dass die Eingabe im
- * Abruf stehen bleibt, ist eine eigene Aufgabe (#1956) und hier nicht gebaut.
+ * DER ABRUF UND DAS ECHO. Der Abruf uebernimmt, was beim Anbieter liegt. Ist
+ * es genau das, was der letzte ausgerichtete Push gesendet hat, und hat sich
+ * die Zeile seitdem nicht geaendert, bleibt die Eingabe (der 15.) samt Marke
+ * stehen (#1956, services/outbound-echo.js). Sonst wird aus dem 15. in der
+ * Zeile der 31., und die Marke faellt (`authoredAfterInbound`). Das schadet
+ * dem ausgehenden Weg nicht: die Zeile traegt den ausgerichteten Start dann
+ * selbst und geht Wort fuer Wort richtig hinaus.
  */
 
 import { seriesStartFor } from './recurrence.js';
@@ -212,12 +212,25 @@ export function outboundEvent(event, options) {
 /**
  * Eine Regel in der Form, in der zwei Schreibweisen derselben Regel gleich
  * sind: ohne `RRULE:`-Praefix (eingelesene Serien tragen es, hier angelegte
- * nicht), gross geschrieben, die Teile sortiert. Verglichen wird damit nur,
- * gespeichert nie.
+ * nicht), gross geschrieben, die Teile UND ihre Wertlisten sortiert
+ * (`BYDAY=TU,MO` ist `BYDAY=MO,TU`, #1957). Sonst nichts: ein anders
+ * geschriebenes UNTIL oder ein ausgeschriebener Standardwert bleibt eine
+ * andere Regel. Verglichen wird damit nur, gespeichert nie - von
+ * `startOrRuleChanged` und von der Echo-Erkennung (services/outbound-echo.js).
+ *
+ * @param {string|null|undefined} rule
+ * @returns {string}
  */
-function ruleKey(rule) {
+export function ruleKey(rule) {
   return String(rule ?? '').trim().replace(/^RRULE:/i, '')
-    .split(';').map((teil) => teil.trim().toUpperCase()).filter(Boolean).sort().join(';');
+    .split(';').map((teil) => teil.trim().toUpperCase()).filter(Boolean)
+    .map((teil) => {
+      const eq = teil.indexOf('=');
+      if (eq === -1) return teil;
+      const werte = teil.slice(eq + 1).split(',').map((wert) => wert.trim()).sort();
+      return `${teil.slice(0, eq)}=${werte.join(',')}`;
+    })
+    .sort().join(';');
 }
 
 /**
@@ -289,9 +302,11 @@ export function startOrRuleChanged(before, after, zone) {
  * Anbieter, und die Serie geht Wort fuer Wort zurueck (#756). Verglichen wird
  * der Text, der in die Spalte kommt, mit dem, der dort steht - dieselbe
  * Gleichheit, an der `followInboundStartChange` einen verlegten Start erkennt.
- * KEINE ECHO-ERKENNUNG: auch Yuvomis eigener ausgerichteter Start (der 31.
- * statt des eingegebenen 15.) ist ein anderer Start und nimmt die Marke. Die
- * Zeile traegt ihn danach selbst, ausgerichtet werden muss dann nichts mehr.
+ * HIER KEINE ECHO-ERKENNUNG: die steht vor diesem Aufruf (`isEcho` in
+ * services/outbound-echo.js, #1956), und beim Echo fragen die Abrufe diese
+ * Funktion gar nicht. Was hier ankommt, ist kein Echo: auch Yuvomis eigener
+ * ausgerichteter Start ohne gueltigen Schnappschuss ist ein anderer Start und
+ * nimmt die Marke. Die Zeile traegt ihn danach selbst.
  * Dasselbe gilt fuer eine andere Schreibweise desselben Beginns oder
  * derselben Regel: was der Abruf hineinschreibt, ist die Form des Anbieters.
  *

@@ -77,6 +77,7 @@ function buildDb() {
       user_modified INTEGER NOT NULL DEFAULT 0, assigned_to INTEGER,
       color_modified INTEGER NOT NULL DEFAULT 0,
       series_authored INTEGER NOT NULL DEFAULT 0,
+      outbound_snapshot TEXT,
       target_caldav_account_id INTEGER, target_caldav_calendar_url TEXT,
       outbound_dirty INTEGER NOT NULL DEFAULT 0,
       outbound_attempts INTEGER NOT NULL DEFAULT 0,

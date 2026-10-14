@@ -10880,6 +10880,28 @@ const MIGRATIONS = [
       if (!columns.has('last_error_params')) database.exec('ALTER TABLE waste_sources ADD COLUMN last_error_params TEXT');
     },
   },
+  {
+    version: 248,
+    description: 'calendar: an event remembers what its last aligned push sent',
+    // DER ABRUF ERKENNT DAS ECHO DES EIGENEN PUSHS (#1956). Eine hier verfasste
+    // Serie geht mit einem Start hinaus, den ihre Regel trifft (#986, #1935):
+    // eingegeben am 15. Januar, beim Anbieter der 31. Der Abruf las genau das
+    // zurueck und schrieb es in die Zeile - die Eingabe war weg, die Marke fiel
+    // und die Erinnerungen zogen mit, ohne dass beim Anbieter jemand etwas
+    // getan hatte.
+    //
+    // `outbound_snapshot` haelt, was der letzte Push gesendet hat, in der
+    // Lesart des Abrufs, und den Zeilenstand, aus dem er entstand (JSON, Regel
+    // und Leser: services/outbound-echo.js). Geschrieben nur, wenn das
+    // Ausrichten den Start verschoben hat; sonst NULL. Bestandszeilen bleiben
+    // NULL und nehmen den Weg von vorher, bis ihr naechster Push sie schreibt -
+    // ein Nachtrag liesse sich nicht ableiten, denn was gesendet wurde, steht
+    // nirgends.
+    up(database) {
+      const columns = new Set(database.prepare('PRAGMA table_info(calendar_events)').all().map((c) => c.name));
+      if (!columns.has('outbound_snapshot')) database.exec('ALTER TABLE calendar_events ADD COLUMN outbound_snapshot TEXT');
+    },
+  },
 ];
 
 /**
@@ -11152,6 +11174,11 @@ const CRITICAL_COLUMNS = [
   { table: 'calendar_events', column: 'series_authored',
     type: 'INTEGER NOT NULL DEFAULT 0 CHECK(series_authored IN (0, 1))',
     backfill: backfillSeriesAuthored },
+  // #1956: v248 traegt den Sende-Schnappschuss nach; ohne die Spalte scheitert
+  // jeder Abruf von Google, CalDAV und iCloud (er liest sie, bevor er die
+  // Zeile anfasst) und jede Buchung eines Pushs. Kein Nachtrag: NULL heisst
+  // "kein Schnappschuss", der Abruf nimmt den Weg von vorher.
+  { table: 'calendar_events', column: 'outbound_snapshot', type: 'TEXT' },
 ];
 
 /**

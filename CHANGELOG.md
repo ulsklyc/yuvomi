@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A synced "last day of the month" series keeps the date you entered after the next sync**
+  (#1956). A series created in Yuvomi from a date in the middle of the month is sent to Google,
+  CalDAV or Apple Calendar with a start its rule accepts: entered on 15 January, it starts on 31
+  January over there. The next sync read that start back and wrote it into Yuvomi: the event then
+  showed 31 January as its start, and its reminders moved with it by 16 days, although nobody had
+  changed anything in the other calendar. Yuvomi now remembers what it sent. When the other
+  calendar returns exactly that and the event was not changed in Yuvomi since, the entered start,
+  end, repeat rule and time zone stay, and so do the reminders; a title changed over there still
+  comes in. Any other change in the other calendar is taken over as before. A series whose
+  start already came back before this update keeps that start: the date entered back then is not
+  known any more. A repeat rule sent
+  back by an API client with its values in another order (`BYDAY=TU,MO` for `BYDAY=MO,TU`) no
+  longer counts as a rule written in Yuvomi.
 - **Waste collection: the source dialog says why the last refresh failed in your language**
   (#1909). The dialog of a calendar address showed the server's own English text of the last
   failed refresh, for example "No calendar entries in the response". It now shows the same
