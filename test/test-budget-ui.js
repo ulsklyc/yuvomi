@@ -5086,6 +5086,92 @@ test('#1593: Unterkategorien zeigen den Gesamtwert und folgen der bekannten Reih
   }
 });
 
+/* Der Anteil an der Gesamtsumme steht MITTEN IN DER BAHN, nicht neben dem Namen.
+ * Kategorien rechnen gegen die Summe ihres Blocks (Ausgaben bzw. Einnahmen),
+ * Unterkategorien gegen die Summe ihrer Kategorie. */
+const pctTexts = (html) => [...html.matchAll(/<span class="budget-bar-row__pct">([^<]*)<\/span>/g)]
+  .map((m) => m[1]);
+
+test('Anteil in der Bahn: Kategorien rechnen gegen die Summe ihres Blocks', () => {
+  const html = budgetUi.renderCategoryBars(kategorien());
+  const expensesTotal = 1620.99 + 482.75 + 371.4 + 234.98;
+  const incomeTotal = 5050 + 500;
+  const percent = (part, total) => Math.round((part / total) * 100);
+
+  const expenses = pctTexts(html.match(/<section class="budget-chart-block budget-chart-block--expenses[\s\S]*?<\/section>/)[0])
+    .map((text) => Number.parseInt(text, 10));
+  assert.deepEqual(expenses, [1620.99, 482.75, 371.4, 234.98].map((v) => percent(v, expensesTotal)),
+    'Ausgaben: Anteil an der Summe der Ausgaben, nicht an Einnahmen plus Ausgaben');
+  const income = pctTexts(html.match(/<section class="budget-chart-block budget-chart-block--income[\s\S]*?<\/section>/)[0])
+    .map((text) => Number.parseInt(text, 10));
+  assert.deepEqual(income, [5050, 500].map((v) => percent(v, incomeTotal)));
+
+  for (const text of pctTexts(html)) assert.match(text, /^\d+\s?%$/, 'Prozentformat der Sprache');
+
+  const rows = [...html.matchAll(/<button\b[\s\S]*?<\/button>/g)].map(([row]) => row);
+  assert.equal(rows.length, 6);
+  for (const row of rows) {
+    const label = row.match(/<span class="budget-bar-row__label"[\s\S]*?<\/span>/)[0];
+    assert.doesNotMatch(label, /budget-bar-row__pct/, 'der Anteil steht nicht mehr beim Namen');
+    assert.match(row, /<span class="budget-bar-row__track"[^>]*>[\s\S]*<span class="budget-bar-row__pct">[^<]*<\/span>\s*<\/span>/,
+      'der Anteil steht in der Bahn');
+  }
+});
+
+test('Anteil in der Bahn: unter einem Prozent steht "<1 %", eine leere Summe teilt nicht durch null', () => {
+  const html = budgetUi.renderCategoryBars([
+    { category: 'rent', income: 0, expenses: -999, total: -999 },
+    { category: 'coffee', income: 0, expenses: -1, total: -1 },
+  ]);
+  const texts = pctTexts(html);
+  assert.match(texts[0], /^99\s?%$|^100\s?%$/);
+  assert.match(texts[1], /^&lt;1\s?%$/, 'ein Anteil unter 0,5 % wird nicht zu "0 %" gerundet und ist HTML-escaped');
+  assert.doesNotMatch(html, /NaN|Infinity/);
+});
+
+test('Anteil in der Bahn: Unterkategorien rechnen gegen die Summe ihrer Kategorie', () => {
+  const state = budgetUi.state;
+  const previous = { ...state };
+  try {
+    Object.assign(state, {
+      currency: 'EUR',
+      categoryFilter: 'salary',
+      subcategoryFilter: null,
+      responsibleFilterId: null,
+      meta: {
+        expenseCategories: [],
+        incomeCategories: [{ key: 'salary', name: 'Stipendio' }],
+        subcategories: { salary: [{ key: 'main' }, { key: 'bonus' }] },
+      },
+      entries: [
+        { category: 'salary', subcategory: 'main', amount: 900 },
+        { category: 'salary', subcategory: 'bonus', amount: 300 },
+        { category: 'other', subcategory: 'x', amount: 5000 },
+      ],
+      summary: { byCategory: [{ category: 'salary', income: 1200, expenses: 0, total: 1200 }] },
+    });
+    const html = budgetUi.renderSubcategoryBreakdowns();
+    assert.deepEqual(pctTexts(html).map((text) => Number.parseInt(text, 10)), [75, 25],
+      'Anteil an der Kategorie, Buchungen anderer Kategorien zaehlen nicht mit');
+    for (const text of pctTexts(html)) assert.match(text, /^\d+\s?%$/);
+  } finally {
+    Object.assign(state, previous);
+  }
+});
+
+test('Anteil in der Bahn: die Bahn ist hoch genug und der Text liegt zentriert darueber', () => {
+  const rules = [...eachRule(budgetCss)];
+  const track = rules.find((r) => /\.budget-bar-row__track:has\(> \.budget-bar-row__pct\)/.test(r.selector));
+  assert.ok(track, 'eine Bahn mit Anteil wird hoeher als die schmale Standardbahn');
+  assert.match(track.body, /height:\s*var\(--space-5\)/);
+  assert.match(track.body, /position:\s*relative/);
+  const pct = rules.find((r) => r.selector.trim() === '.budget-bar-row__pct');
+  assert.ok(pct, 'der Anteil hat eine eigene Regel');
+  assert.match(pct.body, /position:\s*absolute/);
+  assert.match(pct.body, /justify-content:\s*center/);
+  assert.match(pct.body, /pointer-events:\s*none/, 'der Text faengt keinen Tipp auf die Zeile ab');
+});
+
 // ---------------------------------------------------------------------------
 // Entscheidung R17 (E4): die Uebersicht zeigt "Geplant · n" und "Gebucht"
 // ---------------------------------------------------------------------------
