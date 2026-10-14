@@ -1280,11 +1280,19 @@ export function mountFooter(panel) {
   // scheinbar nichts (#543). Vor dem Verschieben die Formular-Zugehörigkeit
   // per form-Attribut festzurren; so submittet der Button das Formular auch
   // außerhalb des Formular-DOM (Standard-HTML-Assoziation).
+  // Die id ueber das ATTRIBUT lesen, nie ueber `form.id`: ein Feld mit
+  // name="id" ueberdeckt die Eigenschaft am <form>, `form.id` ist dann das
+  // Feld, und der Knopf zeigte auf form="[object HTMLInputElement]" - kein
+  // Formular, kein submit, der Haushaltshilfe-Dialog speicherte nie (#1976).
   const ownerForm = bodyFooter.closest('form');
   if (ownerForm) {
-    if (!ownerForm.id) ownerForm.id = `modal-form-${++_modalFormSeq}`;
+    let formId = ownerForm.getAttribute('id');
+    if (!formId) {
+      formId = `modal-form-${++_modalFormSeq}`;
+      ownerForm.setAttribute('id', formId);
+    }
     bodyFooter.querySelectorAll('button, input, select, textarea').forEach((el) => {
-      if (!el.hasAttribute('form')) el.setAttribute('form', ownerForm.id);
+      if (!el.hasAttribute('form')) el.setAttribute('form', formId);
     });
   }
 

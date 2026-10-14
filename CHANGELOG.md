@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Housekeeping: creating or editing a housekeeper profile saves again** (#1976). Since 2.75.0
+  the "Add" button in the profile dialog did nothing: no message, no profile, and the dialog stayed
+  open. Its buttons had lost the connection to the form they belong to, and find it again.
 - **Housekeeping: only admins are offered to create or edit a housekeeper profile.** A member
   with write access to Housekeeping saw "Create profile" and the edit button next to each
   housekeeper, and saving was refused, because profiles are an admin task. Members now open the
