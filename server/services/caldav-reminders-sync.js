@@ -475,7 +475,7 @@ async function runSync({ createClient: makeClient } = {}) {
   // Die Quelle einer Mitnahme (#1700) kann ein anderes Konto sein.
   const clientFor = async (id) => {
     const other = getAccountById(id);
-    return other ? clientFactory(other) : null;
+    return other ? todoOutbound.createTodoClient(other, clientFactory) : null;
   };
 
   let totalItems       = 0;
@@ -496,7 +496,8 @@ async function runSync({ createClient: makeClient } = {}) {
         || todoOutbound.movesWaitingForSelection(account.id) > 0;
       if (enabledLists.length === 0 && !waitsForSelection) continue;
 
-      const client     = await clientFactory(account);
+      // Gezielte Anfragen nur an den Server dieses Kontos (`createTodoClient`).
+      const client     = await todoOutbound.createTodoClient(account, clientFactory);
       const serverCals  = await client.fetchCalendars();
 
       if (enabledLists.length === 0) {

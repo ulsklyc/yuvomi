@@ -48,7 +48,7 @@ import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { outboundFailureAction, MAX_OUTBOUND_ATTEMPTS } from './calendar-outbound.js';
 import { patchICSTodo } from '../utils/ics-patch.js';
-import { createCalDAVClient, collectionUrlOf, createUploadGate } from '../utils/caldav-client.js';
+import { createCalDAVClient, collectionUrlOf, createUploadGate, withAccountOrigin } from '../utils/caldav-client.js';
 import {
   ownUid, isOwnUidOfRow, ownUploadRowId, parseOwnUid, findObjectWithUid, inspectObjectAt,
 } from '../utils/own-uid.js';
@@ -61,6 +61,28 @@ import { loadTags, tagsKey } from '../utils/task-tags.js';
 import { runSerialized } from '../utils/sync-lock.js';
 
 const log = createLogger('CalDAV-Todo-Outbound');
+
+/**
+ * Client eines Kontos für den VTODO-Weg: gezielte Anfragen (PUT, DELETE,
+ * Objektabruf) nur an den Server dieses Kontos - `caldav_url` und die Listen
+ * und Kalender seiner Auswahl -, wie bei den Terminen seit #1860
+ * (`withAccountOrigin`).
+ *
+ * Die Objekt-Adresse einer gespiegelten Zeile stammt aus der href der
+ * Server-Antwort, und tsdav übernimmt eine absolute href so, wie sie dasteht.
+ * Lauf, Sofortversuch und die Quelle einer Mitnahme bauen ihre Clients deshalb
+ * alle hier.
+ *
+ * @param {object}   account     Zeile aus `caldav_accounts`
+ * @param {Function} makeClient  Factory (`createCalDAVClient` oder Test-Factory)
+ */
+export async function createTodoClient(account, makeClient = createCalDAVClient) {
+  const selected = db.get().prepare(`
+    SELECT list_url AS url FROM caldav_reminder_selection WHERE account_id = ?
+    UNION SELECT calendar_url FROM caldav_calendar_selection WHERE account_id = ?
+  `).all(account.id, account.id).map((r) => r.url);
+  return withAccountOrigin(await makeClient(account), [account.caldav_url, ...selected]);
+}
 
 // --------------------------------------------------------
 // Module
@@ -2218,7 +2240,7 @@ async function runFlushOutbound({ createClient } = {}) {
   // Die Quelle einer Mitnahme kann ein anderes Konto sein (#1700).
   const clientFor = async (id) => {
     const other = db.get().prepare('SELECT * FROM caldav_accounts WHERE id = ?').get(id);
-    return other ? makeClient(other) : null;
+    return other ? createTodoClient(other, makeClient) : null;
   };
 
   for (const [accountId, modules] of work) {
@@ -2226,7 +2248,7 @@ async function runFlushOutbound({ createClient } = {}) {
     if (!account) continue;
 
     try {
-      const client = await makeClient(account);
+      const client = await createTodoClient(account, makeClient);
 
       // Vor allem anderen: die Reste nie bestätigter Uploads entfernen
       // (#1882), damit eine Zeile mit neuem Ziel nicht neben ihren Rest geht.
