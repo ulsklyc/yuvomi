@@ -125,10 +125,11 @@ const READ_SAFE_ACTIONS = new Set(['toggle-detail', 'to-shopping']);
  *
  * @param {unknown} err
  * @param {{ owner?: object|null, fallbackKey?: string, dialog?: object|null, recipeId?: number|null,
- *   ingredientName?: string|null, listId?: number|null }} [options]
+ *   recipeRef?: object|null, ingredientName?: string|null, listId?: number|null }} [options]
  */
 async function reportError(err, {
-  owner = null, fallbackKey = 'common.errorGeneric', dialog = null, recipeId = null, ingredientName = null, listId = null,
+  owner = null, fallbackKey = 'common.errorGeneric', dialog = null, recipeId = null, recipeRef = null,
+  ingredientName = null, listId = null,
 } = {}) {
   window.yuvomi?.showToast(errorSentence(err, fallbackKey), 'danger');
   if (!isGone(err)) return;
@@ -136,7 +137,7 @@ async function reportError(err, {
   // Wer die Seite inzwischen verlassen hat (oder neu betreten), bekommt weder
   // seinen Stand angefasst noch etwas gezeichnet.
   if (!stillShown(owner)) return;
-  if (!dropGone(err.data.reason, { recipeId, ingredientName, listId })) return;
+  if (!dropGone(err.data.reason, { recipeId, recipeRef, ingredientName, listId })) return;
   renderSourceFilter();
   renderRecipeList({ repaint: true });
   // Der Ausloeser ist mit der Liste neu gebaut: den Fokus auf seinen
@@ -162,7 +163,7 @@ async function reportError(err, {
  *
  * @returns {boolean} ob sich der Stand geaendert hat
  */
-function dropGone(reason, { recipeId, ingredientName, listId }) {
+function dropGone(reason, { recipeId, recipeRef, ingredientName, listId }) {
   if (reason === 'recipes_recipe_not_found' || reason === 'meals_selected_recipe_not_found') {
     if (recipeId == null) return false;
     const before = state.recipes.length;
@@ -170,8 +171,14 @@ function dropGone(reason, { recipeId, ingredientName, listId }) {
     return state.recipes.length !== before;
   }
   if (reason === 'recipes_ingredient_not_found') {
+    // NUR an dem Rezept-Objekt, an dem die Anfrage hing (`recipeRef`, vor
+    // der Anfrage gemerkt). Hat der Nutzer das Rezept inzwischen gespeichert,
+    // steht dort ein neues Objekt mit dem Stand des Servers - eine spaete
+    // Antwort nimmt ihm keine Zutat, die das Speichern wieder angelegt hat
+    // (Codex an #2001). Rezepte und Listen brauchen das nicht: eine ID, die
+    // es einmal nicht mehr gab, kommt nicht zurueck.
     const recipe = state.recipes.find((r) => r.id === recipeId);
-    if (!recipe || ingredientName == null) return false;
+    if (!recipe || recipe !== recipeRef || ingredientName == null) return false;
     const before = (recipe.ingredients ?? []).length;
     const key = ingredientMatchKey(ingredientName);
     recipe.ingredients = (recipe.ingredients ?? []).filter((i) => ingredientMatchKey(i.name) !== key);
@@ -1555,7 +1562,7 @@ async function openPantryMatchModal(recipe, ingredientName) {
             await offerCurrentPantryItems([panel.querySelector('#pantry-match-select')].filter(Boolean));
             return;
           }
-          reportError(err, { owner, dialog, recipeId: recipe.id, ingredientName });
+          reportError(err, { owner, dialog, recipeId: recipe.id, recipeRef: recipe, ingredientName });
         }
       });
     },
@@ -1646,7 +1653,7 @@ async function openPantryBulkMatchModal(recipe) {
             await offerCurrentPantryItems([...panel.querySelectorAll('select[data-ingredient-index]')]);
             return;
           }
-          reportError(err, { owner, dialog, recipeId: recipe.id, ingredientName: current?.name ?? null });
+          reportError(err, { owner, dialog, recipeId: recipe.id, recipeRef: recipe, ingredientName: current?.name ?? null });
         }
       });
     },

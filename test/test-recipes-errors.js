@@ -366,7 +366,7 @@ test('Seite: eine Zutat zuordnen - der Fall wird sein Satz; "gibt es nicht mehr"
       },
       put: async () => { throw err; },
     }, async () => {
-      content = await oeffne(panel, () => page.openPantryMatchModal(rezept(), 'Mehl'));
+      content = await oeffne(panel, () => page.openPantryMatchModal(page.state.recipes[0], 'Mehl'));
       await panel.querySelector('#pantry-match-save').handlers.click();
     }));
     const label = `${err.status} ${err.data.reason ?? ''}`;
@@ -428,7 +428,7 @@ test('Seite: mehrere Zutaten zuordnen - derselbe Weg; die weggefallene Vorratsze
       },
       put: async () => { throw err; },
     }, async () => {
-      content = await oeffne(panel, () => page.openPantryBulkMatchModal(rezept()));
+      content = await oeffne(panel, () => page.openPantryBulkMatchModal(page.state.recipes[0]));
       await panel.querySelector('#pantry-bulk-match-save').handlers.click();
     }));
     const label = `${err.status} ${err.data.reason ?? ''}`;
@@ -819,5 +819,38 @@ test('Seite: verlassen und zurueck (neuer Container), dann kommt eine spaete "gi
     }
   } finally {
     delete globalThis.__refocusAfterRender;
+  }
+});
+
+// Codex an #2001: das Zuordnen haengt, der Nutzer schliesst den Dialog,
+// bearbeitet das Rezept und speichert - die Zutat steht im gespeicherten
+// Stand wieder da. Die spaete "Zutat gibt es nicht mehr"-Antwort darf sie
+// diesem NEUEN Stand nicht nehmen.
+test('Seite: Zuordnen haengt, das Rezept wird inzwischen gespeichert - die spaete "Zutat weg"-Antwort laesst den gespeicherten Stand stehen', async () => {
+  for (const [name, oeffnen, speichernKnopf, panel] of [
+    ['einzeln', (r) => page.openPantryMatchModal(r, 'Mehl'), '#pantry-match-save', formular({ '#pantry-match-select': '7' })],
+    ['mehrere', (r) => page.openPantryBulkMatchModal(r), '#pantry-bulk-match-save',
+      formular({}, { 'select[data-ingredient-index]': [{ ...feld('7'), dataset: { ingredientIndex: '0' } }] })],
+  ]) {
+    const { stand } = await mitSeite({}, async () => {
+      let freigeben;
+      const tor = new Promise((r) => { freigeben = r; });
+      return mit({
+        get: (path) => (path === '/pantry' ? { data: PANTRY } : { data: [] }),
+        put: async (path) => {
+          if (path.endsWith('/ingredient-match')) { await tor; throw fehler(404, 'recipes_ingredient_not_found'); }
+          // Das Speichern des Rezepts: der Server legt Mehl wieder an.
+          return { data: rezept({ ingredients: [{ name: 'Mehl', pantry_item_id: null }, { name: 'Salz', pantry_item_id: null }] }) };
+        },
+      }, async () => {
+        await oeffne(panel, () => oeffnen(page.state.recipes[0]));
+        const zuordnen = panel.querySelector(speichernKnopf).handlers.click();
+        // Waehrend das Zuordnen haengt, speichert der Nutzer das Rezept.
+        await page.saveRecipe(formular({ '#recipe-title': 'Suppe' }), 'edit', page.state.recipes[0]);
+        freigeben();
+        await zuordnen;
+      });
+    });
+    assert.deepEqual(stand.zutaten, ['Mehl', 'Salz'], `${name}: die gespeicherte Zutat bleibt`);
   }
 });
