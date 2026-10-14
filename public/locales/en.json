@@ -3868,6 +3868,7 @@
         "noVisits": "No visits yet",
         "noWorkerTitle": "No housekeeper profile",
         "noWorkerHint": "Create the profile to define contacts, rate, and payment schedule.",
+        "noWorkerHintAdminOnly": "An admin creates the profile, with contacts, rate and payment schedule.",
         "taskTemplates": "Suggested chores",
         "addCustomTask": "Add custom chore",
         "noReports": "No reports yet.",

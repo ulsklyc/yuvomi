@@ -42,7 +42,7 @@ export function housekeepingPaths() {
       post: op({ summary: 'Create or update housekeeper profile', tag: 'Housekeeping', admin: true, stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/housekeeping/workers': {
-      get: op({ summary: 'List housekeeper profiles', tag: 'Housekeeping', description: RECEIPT_NOTE + HOUSEHOLD_DAY_NOTE }),
+      get: op({ summary: 'List housekeeper profiles', tag: 'Housekeeping', description: 'Next to `data`, `can_manage` is true when the caller may create and edit profiles (`POST /housekeeping/worker`): write access to the module and the admin role. ' + RECEIPT_NOTE + HOUSEHOLD_DAY_NOTE }),
     },
     '/api/v1/housekeeping/summary': {
       get: op({ summary: 'Get monthly housekeeping summary', tag: 'Housekeeping', description: RECEIPT_NOTE }),

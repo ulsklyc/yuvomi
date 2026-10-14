@@ -73,6 +73,28 @@ test('POST /worker: Nicht-Admin -> 403', async () => {
   assert.equal(r.status, 403);
 });
 
+test('GET /workers: can_manage folgt derselben Grenze wie POST /worker (#1976-Nebenbefund)', async () => {
+  // Die Seite blendet "Profil anlegen" und den Stift an diesem Feld aus. Das
+  // Schreib-Gate fuer Modulrecht und Token-Scope haengt in server/index.js und
+  // ist hier nicht montiert; `can_manage` rechnet beide trotzdem selbst ein.
+  const faelle = [
+    [ADM, true, 'Admin'],
+    [MEM, false, 'Mitglied mit Schreibrecht am Modul'],
+    [MEM_READ, false, 'Mitglied mit Leserecht'],
+    [TOKEN_READ, false, 'Admin-Token mit nur housekeeping:read'],
+    [{ id: ADMIN, role: 'admin', moduleAccess: { housekeeping: 'read' } }, false, 'Admin, dem das Modul nur lesend zusteht'],
+  ];
+  for (const [as, erwartet, wer] of faelle) {
+    const r = await call('GET', '/workers', { as });
+    assert.equal(r.status, 200, wer);
+    assert.equal(r.body.can_manage, erwartet, `${wer}: can_manage`);
+  }
+  // Der Fall, um den es geht: Schreibrecht am Modul, kein Admin - der Server
+  // lehnt ab, also darf das Feld es nicht anbieten.
+  const post = await call('POST', '/worker', { as: MEM, body: { display_name: 'Probe', daily_rate: 0 } });
+  assert.equal(post.status, 403);
+});
+
 test('POST /worker: fehlender daily_rate -> 400', async () => {
   const r = await call('POST', '/worker', { as: ADM, body: { display_name: 'Putzhilfe' } });
   assert.equal(r.status, 400);

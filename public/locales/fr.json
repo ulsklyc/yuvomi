@@ -3868,6 +3868,7 @@
         "noVisits": "Aucune visite",
         "noWorkerTitle": "Aucun profil de ménage",
         "noWorkerHint": "Créez le profil pour définir les contacts, le tarif et le rythme de paiement.",
+        "noWorkerHintAdminOnly": "Un admin crée le profil, avec les contacts, le tarif et le rythme de paiement.",
         "taskTemplates": "Tâches suggérées",
         "addCustomTask": "Ajouter une tâche personnalisée",
         "noReports": "Aucun signalement.",

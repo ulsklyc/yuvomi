@@ -3868,6 +3868,7 @@
         "noVisits": "Nenhuma visita ainda",
         "noWorkerTitle": "Nenhum perfil de faxineira",
         "noWorkerHint": "Crie o perfil para definir contatos, diária e agenda de pagamento.",
+        "noWorkerHintAdminOnly": "Um admin cria o perfil, com contactos, diária e agenda de pagamento.",
         "taskTemplates": "Tarefas sugeridas",
         "addCustomTask": "Adicionar tarefa personalizada",
         "noReports": "Nenhuma ocorrência ainda.",

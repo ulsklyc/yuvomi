@@ -3872,6 +3872,7 @@
         "noVisits": "Noch keine Besuche",
         "noWorkerTitle": "Noch keine Haushaltshilfe",
         "noWorkerHint": "Profil anlegen, um Kontakte, Tagessatz und Zahlungsrhythmus festzulegen.",
+        "noWorkerHintAdminOnly": "Ein Admin legt das Profil an, mit Kontakten, Tagessatz und Zahlungsrhythmus.",
         "taskTemplates": "Vorgeschlagene Aufgaben",
         "addCustomTask": "Eigene Aufgabe hinzufügen",
         "noReports": "Noch keine Meldungen.",

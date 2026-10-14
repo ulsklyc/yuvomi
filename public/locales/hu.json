@@ -3868,6 +3868,7 @@
         "noVisits": "Még nincs látogatás",
         "noWorkerTitle": "Nincs háztartási profil",
         "noWorkerHint": "Hozza létre a munkás profilját a kapcsolatok, díjak és fizetési ütemezés meghatározásához.",
+        "noWorkerHintAdminOnly": "A profilt egy admin hozza létre, a kapcsolatokkal, a díjjal és a fizetési ütemezéssel együtt.",
         "taskTemplates": "Javasolt házimunkák",
         "addCustomTask": "Egyéni házimunka hozzáadása",
         "noReports": "Még nincs jelentés.",

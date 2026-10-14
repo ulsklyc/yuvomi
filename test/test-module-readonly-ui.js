@@ -4016,6 +4016,9 @@ function hkState(patch) {
     tab: 'dashboard', dashboard: {}, tasks: [], templates: [], workers: [],
     recentVisits: [], reports: [], visitReport: null, selectedStaffId: null,
     staffVisits: [], currency: 'EUR', reportMonth: null, currentMonth: '2026-08',
+    // Wie ein Admin: die Faelle hier messen das Modulrecht. Ohne `can_manage`
+    // (Mitglied) eigene Faelle unten.
+    canManageWorkers: true,
   }, patch);
   return s;
 }
@@ -4489,6 +4492,70 @@ test('jeder Dialog-Einstieg fragt selbst: bei `read` kein Editor, ein bestehende
     const schreiben = mitModal(() => withAccess({ housekeeping: 'write' }, aufruf));
     assert.equal(schreiben.length, 1, `${name}() oeffnet mit Schreibrecht - sonst maesse die Zeile oben nichts`);
     assert.match(schreiben[0].content, /<form/, `${name}: mit Schreibrecht der Editor`);
+  }
+});
+
+// -------------------------------------------------------------------------
+// Profile: Schreibrecht am Modul reicht nicht, der Server verlangt einen Admin
+// (`assertAdmin` an POST /worker; `can_manage` an GET /workers). Gefunden bei
+// #1976: ein Mitglied mit Schreibrecht sah "Profil anlegen" und den Stift, und
+// jeder Weg endete am 403.
+// -------------------------------------------------------------------------
+
+test('Profil ohne `can_manage`: Schreibrecht am Modul, aber kein Anlegen und kein Bearbeiten', () => {
+  hkState({ workers: [], canManageWorkers: false });
+  const leer = withAccess({ housekeeping: 'write' }, () => hk.renderWorkerSummary());
+  assert.doesNotMatch(leer, /housekeeping-create-profile/, 'kein „Profil anlegen", das am 403 endet');
+  assert.match(leer, /housekeeping\.noWorkerHintAdminOnly/, 'die Auskunft sagt, wer es anlegt');
+  assert.doesNotMatch(leer, /housekeeping\.noWorkerHint</, 'statt zu etwas aufzufordern');
+  hkState({ workers: [], canManageWorkers: true });
+  const admin = withAccess({ housekeeping: 'write' }, () => hk.renderWorkerSummary());
+  assert.match(admin, /id="housekeeping-create-profile"/, 'mit `can_manage` bleibt die Aktion - sonst maesse die Zeile oben nichts');
+  assert.match(admin, /housekeeping\.noWorkerHint</);
+
+  hkState({ tab: 'staff', workers: [{ id: 7, display_name: 'Ana' }], canManageWorkers: false });
+  const personal = hkContainer();
+  withAccess({ housekeeping: 'write' }, () => hk.renderStaff(personal));
+  assert.doesNotMatch(personal.html, /data-edit-worker/, 'kein Stift an der Person');
+  assert.match(personal.html, /data-open-worker="7"/, 'statt dessen der Weg ins Profil, wie bei `read`');
+
+  const faelle = [
+    ['anlegen', () => hk.openStaffModal(null, hkContainer()), null],
+    ['bestehend', () => hk.openStaffModal({ id: 7, display_name: 'Ana', payment_schedule: 'monthly' }, hkContainer()), 'housekeeping.profileTitle'],
+  ];
+  for (const [name, aufruf, leseansicht] of faelle) {
+    const mitglied = mitModal(() => withAccess({ housekeeping: 'write' }, aufruf));
+    if (leseansicht) {
+      assert.equal(mitglied.length, 1, `openStaffModal (${name}): das Profil geht als Leseansicht auf`);
+      assert.equal(mitglied[0].title, leseansicht);
+      assert.doesNotMatch(mitglied[0].content, /<form|<input|type="submit"/, `openStaffModal (${name}): ohne Eingabefeld`);
+    } else {
+      assert.equal(mitglied.length, 0, `openStaffModal (${name}) oeffnet ohne can_manage nichts`);
+    }
+  }
+  // Der Seitenzustand ist geteilt: nachfolgende Faelle ohne eigenes hkState()
+  // erwarten den Admin-Grundzustand.
+  hkState({});
+});
+
+test('Profil: `can_manage` kommt aus der Antwort von GET /workers, fehlt es, gilt Nein', async () => {
+  const vorher = globalThis.__apiStub;
+  try {
+    for (const [antwort, erwartet] of [[true, true], [false, false], [undefined, false]]) {
+      const s = hkState({ canManageWorkers: !erwartet });
+      globalThis.__apiStub = {
+        get: async (url) => {
+          if (url.startsWith('/housekeeping/workers')) return { data: [], ...(antwort === undefined ? {} : { can_manage: antwort }) };
+          if (url.startsWith('/housekeeping/visits')) return { data: { visits: [], totals: {} } };
+          return { data: url === '/preferences' ? {} : [] };
+        },
+      };
+      await hk.loadData();
+      assert.equal(s.canManageWorkers, erwartet, `can_manage ${antwort} -> ${erwartet}`);
+    }
+  } finally {
+    globalThis.__apiStub = vorher;
+    hkState({});
   }
 });
 

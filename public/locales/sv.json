@@ -3868,6 +3868,7 @@
         "noVisits": "Inga besök ännu",
         "noWorkerTitle": "Ingen städprofil",
         "noWorkerHint": "Skapa profilen för kontakt, dagspris och betalningsschema.",
+        "noWorkerHintAdminOnly": "En admin skapar profilen, med kontakt, dagspris och betalningsschema.",
         "taskTemplates": "Föreslagna uppgifter",
         "addCustomTask": "Lägg till egen uppgift",
         "noReports": "Inga rapporter ännu.",

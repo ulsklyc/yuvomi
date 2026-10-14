@@ -3868,6 +3868,7 @@
         "noVisits": "Nog geen bezoeken",
         "noWorkerTitle": "Geen schoonmakerprofiel",
         "noWorkerHint": "Maak het medewerkersprofiel aan om contactgegevens, tarief en betalingsschema vast te leggen.",
+        "noWorkerHintAdminOnly": "Een beheerder maakt het profiel aan, met contactgegevens, tarief en betalingsschema.",
         "taskTemplates": "Voorgestelde klusjes",
         "addCustomTask": "Aangepast klusje toevoegen",
         "noReports": "Nog geen rapporten.",

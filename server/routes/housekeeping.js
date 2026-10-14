@@ -867,7 +867,15 @@ router.get('/workers', (req, res) => {
   try {
     const context = localDayContext(req.query);
     const receipts = receiptAccess(req);
-    res.json({ data: loadWorkers().map((worker) => publicWorker(worker, context, receipts)) });
+    // `can_manage`: darf der Aufrufer Profile anlegen und bearbeiten
+    // (POST /worker)? Dieselben zwei Pruefungen wie dort - Schreibrecht am
+    // Modul samt Token-Scope und die Admin-Rolle -, damit die Seite die
+    // Admin-Regel nicht nachbaut (wie `can_mark_unpaid`, #1136). Ohne das Feld
+    // bot sie einem Mitglied "Profil anlegen" an, das am 403 endete.
+    res.json({
+      data: loadWorkers().map((worker) => publicWorker(worker, context, receipts)),
+      can_manage: mayWriteHousekeeping(req) && isAdminRequest(req),
+    });
   } catch (err) {
     log.error('GET /workers error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });

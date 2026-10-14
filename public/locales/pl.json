@@ -4100,6 +4100,7 @@
         "noVisits": "Brak wizyt",
         "noWorkerTitle": "Brak profilu pomocy domowej",
         "noWorkerHint": "Utwórz profil, aby ustawić kontakty, stawkę dzienną i harmonogram płatności.",
+        "noWorkerHintAdminOnly": "Profil tworzy admin, razem z kontaktami, stawką dzienną i harmonogramem płatności.",
         "taskTemplates": "Sugerowane zadania",
         "addCustomTask": "Dodaj własne zadanie",
         "noReports": "Brak zgłoszeń.",

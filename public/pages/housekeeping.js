@@ -76,6 +76,9 @@ let state = {
   staffLogMonth: todayKey().slice(0, 7),
   staffVisits: [],
   currency: 'EUR',
+  // Vom Server (`can_manage` an GET /workers): darf dieser Nutzer Profile
+  // anlegen und bearbeiten? Siehe `mayManageWorkers()`.
+  canManageWorkers: false,
 };
 
 // --------------------------------------------------------
@@ -120,6 +123,26 @@ let state = {
  */
 function readOnly() {
   return isNavModuleReadOnly('housekeeping');
+}
+
+/**
+ * Darf dieser Nutzer ein Profil anlegen oder bearbeiten?
+ *
+ * Eine ZWEITE Grenze neben dem Modulrecht: `POST /housekeeping/worker` prueft
+ * `assertAdmin` (server/routes/housekeeping.js), denn das Profil traegt das
+ * Arbeitsverhaeltnis - Satz, Zahlungsrhythmus, Anmeldename. Ein Mitglied mit
+ * Schreibrecht am Modul checkt ein und aus und pflegt offene Besuche, aber kein
+ * Profil. Vorher fragte die Seite nur `readOnly()`: das Mitglied sah
+ * "Profil anlegen" und den Bearbeiten-Stift, und jeder Weg endete am 403
+ * (gefunden bei #1976). Ohne das Recht fuehrt die Personenzeile in die
+ * Leseansicht, wie bei `read`.
+ *
+ * Die Rolle entscheidet der Server (`can_manage`), die Seite baut sie nicht
+ * nach - wie `can_mark_unpaid` an den Besuchen. `readOnly()` fragt sie
+ * trotzdem selbst, weil ein Rechtewechsel ohne Neuladen ankommt.
+ */
+function mayManageWorkers() {
+  return !readOnly() && state.canManageWorkers;
 }
 
 /**
@@ -286,6 +309,7 @@ async function loadData() {
   }
   state.templates = templates.data || [];
   state.workers = workers.data || [];
+  state.canManageWorkers = workers.can_manage === true;
   state.worker = state.workers[0] || null;
   state.currency = prefs.data?.currency ?? 'EUR';
 }
@@ -324,7 +348,7 @@ function updateHousekeepingFab() {
       dockLabel: t('newLabel.tasks'),
       onClick: () => openTaskCreateModal(content()),
     });
-  } else if (state.tab === 'staff' && !readOnly()) {
+  } else if (state.tab === 'staff' && mayManageWorkers()) {
     setPageFabAction(fab, {
       label: t('housekeeping.addWorker'),
       dockLabel: t('newLabel.housekeepingWorker'),
@@ -499,13 +523,15 @@ function presenceSignHtml(checkedIn) {
 
 function renderWorkerSummary() {
   if (!state.workers.length) {
-    // Der Leerzustand bot „Profil anlegen" an; bei `read` faellt die Aktion
-    // weg, die Auskunft bleibt.
+    // Der Leerzustand bot „Profil anlegen" an; ohne das Recht dazu (`read`
+    // oder kein Admin) faellt die Aktion weg, und die Auskunft sagt, wer es
+    // anlegt, statt zu etwas aufzufordern, das am 403 endet.
+    const manage = mayManageWorkers();
     return emptyStateHTML({
       icon: 'user-plus',
       title: t('housekeeping.noWorkerTitle'),
-      description: t('housekeeping.noWorkerHint'),
-      action: readOnly() ? null : {
+      description: t(manage ? 'housekeeping.noWorkerHint' : 'housekeeping.noWorkerHintAdminOnly'),
+      action: !manage ? null : {
         label: t('housekeeping.setupProfileAction'),
         icon: 'plus',
         attrs: { id: 'housekeeping-create-profile' },
@@ -1703,7 +1729,7 @@ function renderStaff(content) {
         <strong>${esc(item.display_name)}</strong>
         <span>${esc(item.phone || item.email || '')}</span>
       </button>
-      ${readOnly() ? `
+      ${!mayManageWorkers() ? `
       <button class="row-action" type="button" data-open-worker="${item.id}"
               aria-label="${esc(t('housekeeping.openWorkerProfile'))}: ${esc(item.display_name)}">
         <i data-lucide="id-card" aria-hidden="true"></i>
@@ -2231,7 +2257,7 @@ function openStaffReadModal(worker) {
 function openStaffModal(worker, content, options = {}) {
   // Der Riegel steht VOR jeder Vorbereitung: der Anlegeweg entfaellt ganz, eine
   // bestehende Person geht als Leseansicht auf (wie `openNoteModal()`).
-  if (readOnly()) {
+  if (!mayManageWorkers()) {
     if (worker) openStaffReadModal(worker);
     return;
   }
@@ -2321,7 +2347,7 @@ function openStaffModal(worker, content, options = {}) {
     onSave: (panel) => {
       panel.querySelector('#housekeeping-worker-form')?.addEventListener('submit', async (event) => {
         event.preventDefault();
-        if (readOnly()) return;
+        if (!mayManageWorkers()) return;
         const form = event.currentTarget;
         const fields = form.elements;
         // Bei einem Bestandssatz neben dem Raster liefert amountStep "any" -

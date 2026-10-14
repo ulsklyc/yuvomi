@@ -3868,6 +3868,7 @@
         "noVisits": "訪問はまだありません",
         "noWorkerTitle": "ハウスキーパーのプロフィールなし",
         "noWorkerHint": "連絡先、日額、支払いスケジュールを設定するにはプロフィールを作成してください。",
+        "noWorkerHintAdminOnly": "プロフィールは管理者が作成します（連絡先、日額、支払いスケジュールを含む）。",
         "taskTemplates": "おすすめのタスク",
         "addCustomTask": "独自のタスクを追加",
         "noReports": "報告はまだありません。",

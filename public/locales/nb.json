@@ -3868,6 +3868,7 @@
         "noVisits": "Ingen besøk ennå",
         "noWorkerTitle": "Ingen profil for vaskehjelp",
         "noWorkerHint": "Opprett medarbeiderprofil for å angi kontakter, sats og betalingsplan.",
+        "noWorkerHintAdminOnly": "En administrator oppretter profilen, med kontakter, sats og betalingsplan.",
         "taskTemplates": "Foreslåtte oppgaver",
         "addCustomTask": "Legg til tilpasset oppgave",
         "noReports": "Ingen rapporter ennå.",

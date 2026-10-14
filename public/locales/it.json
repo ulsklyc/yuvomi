@@ -3868,6 +3868,7 @@
         "noVisits": "Nessuna visita",
         "noWorkerTitle": "Nessun profilo pulizie",
         "noWorkerHint": "Crea il profilo per definire contatti, tariffa e calendario pagamenti.",
+        "noWorkerHintAdminOnly": "Il profilo lo crea un admin, con contatti, tariffa e calendario pagamenti.",
         "taskTemplates": "Attività suggerite",
         "addCustomTask": "Aggiungi attività personalizzata",
         "noReports": "Nessuna segnalazione.",

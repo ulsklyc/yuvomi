@@ -3872,6 +3872,7 @@
         "noVisits": "Belum ada kunjungan",
         "noWorkerTitle": "Tidak ada profil asisten rumah tangga",
         "noWorkerHint": "Buat profil untuk menetapkan kontak, tarif harian, dan ritme pembayaran.",
+        "noWorkerHintAdminOnly": "Admin yang membuat profil, beserta kontak, tarif harian, dan ritme pembayaran.",
         "taskTemplates": "Tugas yang disarankan",
         "addCustomTask": "Tambah tugas kustom",
         "noReports": "Belum ada laporan.",

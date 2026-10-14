@@ -3868,6 +3868,7 @@
         "noVisits": "Henüz ziyaret yok",
         "noWorkerTitle": "Yardımcı profili yok",
         "noWorkerHint": "İletişim bilgilerini, ücreti ve ödeme planını belirlemek için profil oluşturun.",
+        "noWorkerHintAdminOnly": "Profili bir yönetici oluşturur; iletişim bilgileri, ücret ve ödeme planı ile birlikte.",
         "taskTemplates": "Önerilen görevler",
         "addCustomTask": "Kendi görevini ekle",
         "noReports": "Henüz bildirim yok.",

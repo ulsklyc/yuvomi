@@ -3872,6 +3872,7 @@
         "noVisits": "Wala pang pagbisita",
         "noWorkerTitle": "Walang profile ng katulong",
         "noWorkerHint": "Gumawa ng profile ng manggagawa para itakda ang mga kontak, bayad at iskedyul ng pagbabayad.",
+        "noWorkerHintAdminOnly": "Isang admin ang gumagawa ng profile, kasama ang mga kontak, bayad at iskedyul ng pagbabayad.",
         "taskTemplates": "Mga iminumungkahing gawain",
         "addCustomTask": "Magdagdag ng sariling gawain",
         "noReports": "Wala pang ulat.",

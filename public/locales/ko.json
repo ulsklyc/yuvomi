@@ -3872,6 +3872,7 @@
         "noVisits": "아직 방문 없음",
         "noWorkerTitle": "가사 관리 프로필 없음",
         "noWorkerHint": "프로필을 만들어 연락처, 일당, 결제 주기를 설정하세요.",
+        "noWorkerHintAdminOnly": "프로필은 관리자가 연락처, 일당, 결제 주기와 함께 만듭니다.",
         "taskTemplates": "추천 작업",
         "addCustomTask": "사용자 지정 작업 추가",
         "noReports": "아직 신고 없음.",

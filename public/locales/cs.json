@@ -3513,6 +3513,7 @@
         "noVisits": "Zatím žádné návštěvy",
         "noWorkerTitle": "Žádný profil domácí péče",
         "noWorkerHint": "Vytvořte profil pro nastavení kontaktů, denní sazby a platebního rytmu.",
+        "noWorkerHintAdminOnly": "Profil vytváří admin, včetně kontaktů, denní sazby a platebního rytmu.",
         "taskTemplates": "Navrhované úkoly",
         "addCustomTask": "Přidat vlastní úkol",
         "noReports": "Zatím žádná hlášení.",

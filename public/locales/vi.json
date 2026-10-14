@@ -3868,6 +3868,7 @@
         "noVisits": "Chưa có lượt đến nào",
         "noWorkerTitle": "Không có hồ sơ người dọn dẹp",
         "noWorkerHint": "Tạo hồ sơ người lao động để xác định liên hệ, giá cả và lịch thanh toán.",
+        "noWorkerHintAdminOnly": "Quản trị viên tạo hồ sơ, gồm liên hệ, giá cả và lịch thanh toán.",
         "taskTemplates": "Việc nhà gợi ý",
         "addCustomTask": "Thêm việc nhà tùy chỉnh",
         "noReports": "Chưa có báo cáo nào.",

@@ -3868,6 +3868,7 @@
         "noVisits": "Sin visitas todavía",
         "noWorkerTitle": "Sin perfil de limpieza",
         "noWorkerHint": "Crea el perfil para definir contactos, tarifa y calendario de pago.",
+        "noWorkerHintAdminOnly": "Un administrador crea el perfil, con contactos, tarifa y calendario de pago.",
         "taskTemplates": "Tareas sugeridas",
         "addCustomTask": "Agregar tarea personalizada",
         "noReports": "Aún no hay reportes.",

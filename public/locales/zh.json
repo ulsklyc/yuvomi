@@ -3868,6 +3868,7 @@
         "noVisits": "暂无上门记录",
         "noWorkerTitle": "没有家政人员档案",
         "noWorkerHint": "创建档案以设置联系方式、日薪和付款周期。",
+        "noWorkerHintAdminOnly": "档案由管理员创建，包括联系方式、日薪和付款周期。",
         "taskTemplates": "建议的任务",
         "addCustomTask": "添加自定义任务",
         "noReports": "暂无报告。",
