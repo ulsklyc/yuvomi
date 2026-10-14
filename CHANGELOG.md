@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Saving an event without touching its time no longer moves it** (#1958). With no household time
+  zone set and the app opened from a device in another time zone than the server, the event form
+  showed a synced event in the device's zone and sent those digits back on every save; the server
+  read them in its own zone, so renaming an event moved it by the difference between the two
+  zones, and an all-day event stored as midnight UTC could slip to the day before. The form now
+  leaves start and end out of the save when you did not change them, and the stored time stays as
+  it was. Setting a household time zone in Settings is still the way to make device and server
+  agree on times you type in.
+
 ## [2.77.0] - 2026-10-14
 
 ### Added
