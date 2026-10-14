@@ -2100,3 +2100,57 @@ test('#1784: isFormDirty() urteilt ohne Tausch exakt wie der Textvergleich davor
     }
   }
 });
+
+// --------------------------------------------------------
+// Die gehobene Fusszeile bindet ihre Knoepfe an das richtige Formular (#1976)
+// --------------------------------------------------------
+
+/**
+ * Baut ein Panel mit Rumpf > Formular > Fusszeile, wie `openModal()` es vor
+ * `mountFooter()` vorfindet. Die Attrappe aus `fussAttrappe()` kennt keinen
+ * Nachfahren-Selektor, darum beantwortet das Panel die beiden Abfragen von
+ * `mountFooter()`/`collapseEmptyBody()` selbst.
+ */
+function panelMitFormular({ formAttrs = {}, fields = [] } = {}) {
+  const { el, withText } = fussAttrappe();
+  const cancel = withText(el('button', { cls: ['btn', 'btn--secondary'], attrs: { type: 'button' } }), 'Abbrechen');
+  const save = withText(el('button', { cls: ['btn', 'btn--primary'], attrs: { type: 'submit' } }), 'Hinzufuegen');
+  const footer = el('div', { cls: ['modal-panel__footer'], kids: [cancel, save] });
+  footer.removeAttribute = (n) => { delete footer.attrs[n]; };
+  const form = el('form', { attrs: formAttrs, kids: [...fields, footer] });
+  const body = el('div', { cls: ['modal-panel__body'], kids: [form] });
+  body.children = body.childNodes;
+  const panel = el('div', { cls: ['modal-panel'], kids: [body] });
+  panel.children = panel.childNodes;
+  panel.querySelectorAll = (s) => (s === '.modal-panel__body .modal-panel__footer' ? [footer] : []);
+  panel.querySelector = (s) => (s === '.modal-panel__body' ? body : null);
+  return { el, panel, form, footer, buttons: [cancel, save] };
+}
+
+test('#1976: ein Feld name="id" ueberdeckt form.id - die Knoepfe zeigen trotzdem auf das Formular', async () => {
+  const { mountFooter } = await import('../public/components/modal.js');
+  const { el } = fussAttrappe();
+  const hidden = el('input', { attrs: { type: 'hidden', name: 'id', value: '' } });
+  const { panel, form, footer, buttons } = panelMitFormular({
+    formAttrs: { id: 'housekeeping-worker-form' }, fields: [hidden],
+  });
+  // So liefert der Browser es: benannte Felder ueberdecken gleichnamige
+  // Eigenschaften eines <form> (gemessen im Haushaltshilfe-Dialog).
+  Object.defineProperty(form, 'id', { get: () => hidden, set: () => {}, configurable: true });
+
+  assert.equal(mountFooter(panel), footer);
+  for (const b of buttons) {
+    assert.equal(b.getAttribute('form'), 'housekeeping-worker-form',
+      'der Knopf muss das Formular per id finden, nicht "[object HTMLInputElement]"');
+  }
+  assert.equal(form.getAttribute('id'), 'housekeeping-worker-form', 'die id des Formulars bleibt');
+});
+
+test('#1976: ein Formular ohne id bekommt eine, und die Knoepfe zeigen auf genau diese', async () => {
+  const { mountFooter } = await import('../public/components/modal.js');
+  const { panel, form, buttons } = panelMitFormular();
+  mountFooter(panel);
+  const id = form.getAttribute('id');
+  assert.match(id ?? '', /^modal-form-\d+$/);
+  for (const b of buttons) assert.equal(b.getAttribute('form'), id);
+});
