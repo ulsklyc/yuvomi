@@ -461,6 +461,9 @@ export async function render(container, context = {}) {
 
   await Promise.all([loadMembers(), loadFolders(), loadMetaOptions()]);
   await loadDocuments();
+  // Waehrend des ersten Ladens verlassen (oder schon neu betreten): die
+  // Antwort zeichnet nicht in eine Seite, die sie nicht mehr ist.
+  if (!stillShown(container)) return;
   renderDmsHeaderBtn();
   bindPageEvents();
   renderCategoryChips();
@@ -985,7 +988,9 @@ async function selectStatus(status) {
   state.status = status;
   exitSelectMode();
   showDocumentsLoading();
+  const owner = _container;
   await loadDocuments();
+  if (!stillShown(owner)) return;
   renderAll();
 }
 
@@ -1783,6 +1788,7 @@ async function applyFolderDeleteResult(
   selectedSubtree,
   { showSuccess = true, renderView = true } = {},
 ) {
+  const owner = _container;
   const hasNonConcurrencyFailure = result.failed_documents
     ?.some((failure) => failure.failure_stage !== 'concurrency');
   if (result.folder_deleted === false && result.contents_changed && hasNonConcurrencyFailure) {
@@ -1803,7 +1809,7 @@ async function applyFolderDeleteResult(
   }
   if (result.folder_deleted !== false && selectedSubtree.has(Number(state.folderId))) state.folderId = '';
   await Promise.all([loadFolders(), loadDocuments()]);
-  if (renderView) renderAll();
+  if (renderView && stillShown(owner)) renderAll();
 }
 
 async function handleFolderDeleteError(err, folder, { delayed = false } = {}) {
@@ -2218,10 +2224,12 @@ async function runDocumentAction(action, doc) {
   // Wie archiveSelected(): ein abgewiesener Schreibvorgang wird gemeldet,
   // nicht als unbehandelte Rejection verschluckt, und die Liste bleibt, wie sie war.
   if (action === 'archive') {
+    const owner = _container;
     try {
       await api.patch(`/documents/${doc.id}/archive`, { archived: doc.status !== 'archived' });
       window.yuvomi?.showToast(doc.status === 'archived' ? t('documents.restoredToast') : t('documents.archivedToast'), 'success');
       await loadDocuments();
+      if (!stillShown(owner)) return;
       renderAll({ motion: true });
     } catch (err) {
       reportError(err);
@@ -2299,6 +2307,9 @@ function deleteDocuments(docs) {
       // mehr zu zeichnen — kein Nachladen auf einen abgehängten Container.
       if (keepalive || !stillShown(owner)) return;
       await loadDocuments();
+      // Und noch einmal NACH dem Laden (Codex an #2001): waehrend des GET kann
+      // die Seite verlassen oder neu betreten worden sein.
+      if (!stillShown(owner)) return;
       renderAll();
     },
     restore: (err) => {
@@ -2397,6 +2408,7 @@ async function archiveSelected() {
   // sonst archivieren. Kein gemischter Zustand möglich, da beides nie zugleich sichtbar ist.
   const archived = state.status === 'archived';
   exitSelectMode();
+  const owner = _container;
   try {
     await Promise.all(docs.map((doc) => api.patch(`/documents/${doc.id}/archive`, { archived: !archived })));
     window.yuvomi?.showToast(
@@ -2406,6 +2418,7 @@ async function archiveSelected() {
       'success',
     );
     await loadDocuments();
+    if (!stillShown(owner)) return;
     renderAll();
   } catch (err) {
     reportError(err);
@@ -2421,6 +2434,7 @@ async function moveSelected() {
   ]);
   if (target === null) return;
   exitSelectMode();
+  const owner = _container;
   try {
     await Promise.all(docs.map((doc) => api.put(`/documents/${doc.id}`, {
       name: doc.name,
@@ -2433,6 +2447,7 @@ async function moveSelected() {
     })));
     window.yuvomi?.showToast(t('documents.bulkMovedToast', { count: docs.length }), 'success');
     await loadDocuments();
+    if (!stillShown(owner)) return;
     renderAll();
     refocusAfterRender();
   } catch (err) {
@@ -3092,6 +3107,7 @@ function renderFolderUploadResult(panel, plan, result) {
 async function saveFolderUpload(panel, payload) {
   const upload = panel._folderUpload;
   if (!upload?.ready) throw new PageProblem(t('common.unknownError'));
+  const owner = _container;
   const plan = renderFolderUploadPreview(panel);
   if (!plan || (plan.counts.upload < 1 && plan.counts.createFolders < 1)) {
     throw new PageProblem(t('documents.folderUpload.noUploadableFiles'));
@@ -3137,7 +3153,7 @@ async function saveFolderUpload(panel, payload) {
     await runRateLimitedOperation(
       () => Promise.all([loadFolders(), loadDocuments()]),
     );
-    renderAll();
+    if (stillShown(owner)) renderAll();
   } catch (refreshError) {
     // The writes have already completed. A failed refresh must not turn a
     // persisted upload into a reported upload failure.
@@ -3158,6 +3174,7 @@ async function saveDocument(event, doc, panel) {
   event.preventDefault();
   // Der Dialog dieser Handlung, vor jeder Anfrage gemerkt (reportError).
   const modalContext = captureModalContext();
+  const owner = _container;
   const form = event.target;
   const error = form.querySelector('#document-error');
   // Die Fußzeile mit dem Submit-Button wird beim Öffnen ans Panel gehoben
@@ -3233,6 +3250,7 @@ async function saveDocument(event, doc, panel) {
     }
     closeModal({ force: true });
     await loadDocuments();
+    if (!stillShown(owner)) return;
     renderAll({ motion: true });
     refocusAfterRender();
   } catch (err) {
@@ -3304,6 +3322,7 @@ function openFolderModal({ parentId = null } = {}) {
         const parentSelect = panel.querySelector('#document-folder-parent');
         const parent = parentSelect.value ? Number(parentSelect.value) : null;
         error.hidden = true;
+        const owner = _container;
         try {
           const res = await api.post('/documents/folders', { name: input.value.trim(), parent_id: parent });
           // Der Elternteil wird aufgeklappt - ein neuer Ordner, den man nicht
@@ -3317,6 +3336,7 @@ function openFolderModal({ parentId = null } = {}) {
           await loadFolders();
           await loadDocuments();
           closeModal({ force: true });
+          if (!stillShown(owner)) return;
           applyFilters();
           renderAll();
         } catch (err) {
@@ -3583,6 +3603,7 @@ function setMediaAffordance(el, label) {
 // damit der auslösende Button im Fehlerfall wieder bedienbar wird.
 async function linkDmsDocument(item, accountId) {
   const modalContext = captureModalContext();
+  const owner = _container;
   try {
     // Feste, vorhersagbare Kategorie: früher erbte das verknüpfte Dokument
     // stillschweigend das gerade aktive Filter-Chip, was nirgends stand.
@@ -3595,6 +3616,7 @@ async function linkDmsDocument(item, accountId) {
     });
     closeModal({ force: true });
     await loadDocuments();
+    if (!stillShown(owner)) return true;
     renderAll({ motion: true });
     refocusAfterRender();
     return true;

@@ -866,3 +866,44 @@ test('Seite: loeschen mit Ruecknahme, und die Seite wurde inzwischen verlassen (
     });
   }
 });
+
+// Codex an #2001: die Pruefung VOR dem Nachladen reicht nicht - waehrend des
+// GET kann die Seite verlassen werden. Jeder Weg, der nach `await
+// loadDocuments()` zeichnet, fragt danach noch einmal.
+test('Seite: die Seite wird WAEHREND des Nachladens nach einer Handlung verlassen - danach wird nichts mehr gezeichnet', async () => {
+  const faelle = [
+    ['loeschen (Ruecknahme abgelaufen)', {}, async () => {
+      let opts = null;
+      globalThis.__undoStub = (o) => { opts = o; };
+      try { page.deleteDocuments([{ ...DOC }]); } finally { delete globalThis.__undoStub; }
+      await opts.commit({ keepalive: false });
+    }],
+    ['archivieren (Menue)', {}, () => page.runDocumentAction('archive', { ...DOC })],
+    ['archivieren (Auswahl)', { selected: new Set([DOC.id]), selectMode: true }, () => page.archiveSelected()],
+    ['verschieben (Auswahl)', { selected: new Set([DOC.id]), selectMode: true }, () => page.moveSelected()],
+    ['speichern (Dialog)', {}, () => page.saveDocument({ target: formular(BEARBEITEN), preventDefault() {} }, { ...DOC }, formular())],
+    ['aus dem DMS verknuepfen', { dmsAccounts: [{ id: 1, name: 'Paperless' }] }, () => page.linkDmsDocument({ id: '7' }, 1)],
+  ];
+  let refocus = 0;
+  globalThis.__refocusAfterRender = () => { refocus += 1; };
+  try {
+    for (const [name, patch, lauf] of faelle) {
+      const seite = traeger();
+      let bisDahin = null;
+      refocus = 0;
+      const { gets } = await mitSeite({ container: seite, ...patch }, () => mit({
+        get: (path) => {
+          if (path.startsWith('/documents?status=')) { seite.isConnected = false; bisDahin = seite.gefragt.length; }
+          return { data: [] };
+        },
+        delete: async () => ({}), patch: async () => ({}), put: async () => ({}), post: async () => ({}),
+        select: '3',
+      }, lauf));
+      assert.ok(gets.some((p) => p.startsWith('/documents?status=')), `${name}: Vorbedingung, nachgeladen wurde (${gets.join(', ')})`);
+      assert.deepEqual(seite.gefragt.slice(bisDahin), [], `${name}: nach dem Verlassen nichts gezeichnet`);
+      assert.equal(refocus, 0, `${name}: kein Fokus`);
+    }
+  } finally {
+    delete globalThis.__refocusAfterRender;
+  }
+});
