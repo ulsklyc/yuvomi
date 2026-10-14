@@ -275,6 +275,10 @@ const LISTING_OPERATIONS = ['fetchCalendars', 'fetchAddressBooks'];
  *   sie in der Antwort nicht finden.
  * - `fetchCalendarObjects` und `fetchVCards` werfen selbst (`collectionQuery`).
  *
+ * Seit 2.4.0 werfen auch `fetchCalendars` und `fetchAddressBooks` bei einer
+ * Absage selbst, aber ohne Status. Der Wrapper liest deshalb die Antwort auch
+ * dann, wenn der Aufruf geworfen hat.
+ *
  * Geprüft wird auf den BELEGTEN Erfolg (`ok === true`), nicht auf die belegte
  * Absage: ändert tsdav die Rückgabeform, soll das hier laut werden statt
  * wieder als Erfolg durchzugehen.
@@ -319,14 +323,25 @@ export function withHttpRefusalsAsErrors(client, { fetch: clientFetch } = {}) {
         if (first === null) first = pending;
         return pending;
       };
-      const result = await call({ ...params, fetch: recordingFetch });
-      const response = await first;
+      // Seit tsdav 2.4.0 wirft die Auflistung bei einer Absage selbst, als
+      // Fehler ohne Status. Die Antwort der ersten Anfrage entscheidet trotzdem
+      // hier: eine Absage geht als `DavHttpError` mit Status hinaus, gleich ob
+      // tsdav aufgelöst oder geworfen hat.
+      let result;
+      let failure = null;
+      try {
+        result = await call({ ...params, fetch: recordingFetch });
+      } catch (err) {
+        failure = err;
+      }
+      const response = await (first ?? Promise.resolve(null)).catch(() => null);
       if (response && !isMultistatus(response)) {
         throw new DavHttpError(
           name, response.url, response,
           response.ok ? NOT_A_LISTING_TEXT[name] : null
         );
       }
+      if (failure) throw failure;
       return result;
     };
   }
@@ -413,13 +428,90 @@ export function calendarObjectUrlFilter(collectionUrl) {
   };
 }
 
+/** Statuscodes, mit denen ein Server sagt: an dieser Adresse liegt nichts. */
+const ABSENT_STATUS = new Set([404, 410]);
+
 /**
- * Hängt `calendarObjectUrlFilter` als Default an `fetchCalendarObjects`.
+ * Holt Kalenderobjekte über ihre Adressen (`calendar-multiget`) und liefert,
+ * was dort liegt. Was dort NICHT liegt, fehlt in der Rückgabe - es ist kein
+ * Fehler.
+ *
+ * Diese Zusage tragen alle Aufrufer mit `objectUrls`: `inspectObjectAt`
+ * (own-uid.js) liest aus einer leeren Rückgabe "das Objekt ist fort", die
+ * Sofortversuche nehmen, was kam. tsdav hält sie nicht: 2.3.4 warf bei einem
+ * 404-Eintrag in der Antwort (so antworten regelkonforme Server auf einen
+ * fehlenden Namen) und gab nur dann leer zurück, wenn der Server den Namen
+ * einfach ausliess; 2.4.0 wirft in beiden Fällen ("incomplete response").
+ * Deshalb liest diese Stelle den Multistatus selbst, Eintrag für Eintrag:
+ *
+ *   - 404/410 am Eintrag, oder der Name fehlt in der Antwort: nichts da.
+ *   - jede andere Absage am Eintrag oder an der ganzen Anfrage: Fehler mit
+ *     Status (`DavHttpError`), denn sie sagt nichts darüber, was dort liegt.
+ *   - eine Antwort, die kein Multistatus ist (Anmeldeseite eines Proxys):
+ *     ebenfalls Fehler.
+ *
+ * Gesendet wird an `calendar.url`, wie bei tsdav; die Objekte stehen als Pfad
+ * im Körper.
+ */
+async function fetchCalendarObjectsByAddress(client, params) {
+  const { calendar, objectUrls, headers } = params;
+  if (!calendar?.url) throw new Error('cannot fetch calendar objects without a calendar url');
+  const base = String(calendar.url).replace(/\/?$/, '/');
+  const hrefs = objectUrls
+    .filter((url) => typeof url === 'string' && url.trim())
+    .map((url) => { const parsed = new URL(url, base); return `${parsed.pathname}${parsed.search}`; });
+  if (hrefs.length === 0) return [];
+
+  const responses = await client.davRequest({
+    url: calendar.url,
+    init: {
+      method:    'REPORT',
+      namespace: 'c',
+      headers:   { ...headers, depth: '1' },
+      body: {
+        'calendar-multiget': {
+          _attributes: { 'xmlns:d': 'DAV:', 'xmlns:c': 'urn:ietf:params:xml:ns:caldav' },
+          'd:prop':    { 'd:getetag': {}, 'c:calendar-data': {} },
+          'd:href':    hrefs,
+        },
+      },
+    },
+  });
+
+  const objects = [];
+  for (const res of responses || []) {
+    if (!res?.raw?.multistatus) {
+      throw new DavHttpError('fetchCalendarObjects', calendar.url, res,
+        res?.ok ? 'The server did not answer with the requested entries' : 'The server refused to read entries');
+    }
+    // Ein leerer Multistatus: keines der Objekte liegt dort.
+    if (!res.href) continue;
+    if (ABSENT_STATUS.has(res.status)) continue;
+    if (!res.ok) {
+      throw new DavHttpError('fetchCalendarObjects', new URL(res.href, base).href, res,
+        'The server refused to read an entry');
+    }
+    const data = res.props?.calendarData?._cdata ?? res.props?.calendarData;
+    const etag = res.props?.getetag;
+    objects.push({
+      url:  new URL(res.href, base).href,
+      etag: etag == null ? undefined : String(etag?._cdata ?? etag?._text ?? etag),
+      data: typeof data === 'string' ? data : undefined,
+    });
+  }
+  return objects;
+}
+
+/**
+ * Hängt `calendarObjectUrlFilter` als Default an `fetchCalendarObjects`, und
+ * leitet den Abruf über Adressen (`objectUrls`) an
+ * `fetchCalendarObjectsByAddress`.
  *
  * Der Filter sitzt am Client statt an den Aufrufstellen, weil er einen
  * Bibliotheks-Default neutralisiert: fünf Stellen holen Kalenderobjekte, und
  * eine sechste würde die Regel sonst wieder verlieren. Ein explizit
- * übergebener `urlFilter` gewinnt weiterhin.
+ * übergebener `urlFilter` gewinnt weiterhin. Der Abruf über Adressen filtert
+ * gar nicht: wonach namentlich gefragt wird, kommt zurück, gleich wie es heisst.
  */
 export function withCalendarObjectUrlFilter(client) {
   const fetchCalendarObjects = client.fetchCalendarObjects.bind(client);
@@ -433,10 +525,12 @@ export function withCalendarObjectUrlFilter(client) {
   return Object.create(Object.getPrototypeOf(client), {
     ...Object.getOwnPropertyDescriptors(client),
     fetchCalendarObjects: {
-      value: (params = {}) => fetchCalendarObjects({
-        urlFilter: calendarObjectUrlFilter(params?.calendar?.url),
-        ...params,
-      }),
+      value: (params = {}) => (Array.isArray(params?.objectUrls)
+        ? fetchCalendarObjectsByAddress(client, params)
+        : fetchCalendarObjects({
+          urlFilter: calendarObjectUrlFilter(params?.calendar?.url),
+          ...params,
+        })),
       writable: true, enumerable: true, configurable: true,
     },
   });
