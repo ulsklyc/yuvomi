@@ -35,6 +35,7 @@ const {
   pendingDeletions, pendingDeletionUids, pendingUpdateUids,
   processPendingDeletions, processPendingUpdates, flushOutbound,
   pendingCreations, processPendingCreations, buildTodoICS, todoUidFor,
+  fetchObjectsByUrl,
 } = await import('../server/services/caldav-todo-outbound.js');
 const { patchICSTodo } = await import('../server/utils/ics-patch.js');
 const { mapVtodoPriority, mapVtodoStatus, splitDue, sync } =
@@ -1266,4 +1267,18 @@ test('Eine Liste, die auf Aufgaben zeigt, nimmt keine Einkaufsartikel an', async
 
   assert.strictEqual(client.calls.created.length, 0);
   assert.strictEqual(reloadItem(item.id).external_source, 'local');
+});
+
+// Der Sofortversuch ordnet ein Objekt der Antwort nur der Zeile zu, nach deren
+// Adresse gefragt war. Fehlt das angefragte (404) und nennt der Server dafuer
+// ein anderes Objekt mit Daten, galt dieses als "das einzige angefragte" - und
+// der Sofortversuch schrieb an seine Adresse.
+test('Sofortversuch: ein nicht angefragtes Objekt wird keiner Zeile zugeordnet, ein kodiertes schon', async () => {
+  const wanted = [{ uid: 'mine@test', url: 'https://dav.example/cal/todo/mine@test.ics', calendarUrl: 'https://dav.example/cal/todo/' }];
+  const answering = (objects) => ({ fetchCalendarObjects: async () => objects });
+  const stray = await fetchObjectsByUrl(answering([{ url: 'https://dav.example/cal/todo/someone-else.ics', etag: '"x"', data: 'BEGIN:VCALENDAR' }]), wanted);
+  assert.equal(stray.size, 0, 'ein fremdes Objekt wurde der angefragten Zeile zugeordnet');
+  const encoded = await fetchObjectsByUrl(answering([{ url: 'https://dav.example/cal/todo/mine%40test.ics', etag: '"y"', data: 'BEGIN:VCALENDAR' }]), wanted);
+  assert.equal(encoded.get('mine@test')?.etag, '"y"', 'dieselbe Adresse mit %40 wurde nicht erkannt');
+  assert.equal(encoded.get('mine@test')?.url, 'https://dav.example/cal/todo/mine@test.ics', 'geschrieben wird an die angefragte Adresse');
 });

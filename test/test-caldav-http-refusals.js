@@ -680,12 +680,17 @@ function incompleteListing(body) {
   dav.refuse({ method: 'PROPFIND', path: '/cal/', status: 207, contentType: 'application/xml; charset=utf-8', body });
 }
 
+// `refused`: woran der Aufruf die Form erkennt. Eine Auflistung ohne
+// Collection löst zu einer leeren Liste auf; eine, in der jede Ressource mit
+// 403 abgelehnt ist, ist eine Absage wie eine an der ganzen Anfrage - mit
+// Status und Nutzertext (tsdav 2.4.0 wirft hier selbst, aber ohne Status).
+// Beides ist keine Auskunft "es gibt keine" - die Collections bleiben.
 const INCOMPLETE = {
-  'nur die Home-Collection':    () => dav.homeOnlyListing(),
-  '403 je Ressource':           () => dav.forbiddenListing(),
+  'nur die Home-Collection':    { body: () => dav.homeOnlyListing(), refused: null },
+  '403 je Ressource':           { body: () => dav.forbiddenListing(), refused: /refused to list the (calendars|address books) \(HTTP 403/ },
 };
 
-for (const [shape, body] of Object.entries(INCOMPLETE)) {
+for (const [shape, { body, refused }] of Object.entries(INCOMPLETE)) {
   // Eine Auflistung, die ANKOMMT, aber keine Collection nennt, ist keine Absage:
   // der Wrapper lässt sie durch (ein leeres Konto sieht genauso aus). Die vier
   // Stellen, die daraus "verschwunden" lesen, brauchen ihren eigenen Leer-Guard.
@@ -696,7 +701,12 @@ for (const [shape, body] of Object.entries(INCOMPLETE)) {
     incompleteListing(body());
 
     const client = await createCalDAVClient({ caldav_url: dav.url, username: 'u', password: 'p' });
-    assert.deepEqual(await client.fetchCalendars(), [], 'die Form löst nicht mehr zu einer leeren Liste auf - der Test misst etwas anderes');
+    if (refused) {
+      await assert.rejects(() => client.fetchCalendars(), (err) => err.status === 403 && refused.test(err.message),
+        'die Form geht nicht als Absage mit Status hinaus');
+    } else {
+      assert.deepEqual(await client.fetchCalendars(), [], 'die Form löst nicht mehr zu einer leeren Liste auf - der Test misst etwas anderes');
+    }
 
     await caldavSync.sync();
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM caldav_calendar_selection WHERE enabled = 1').get().n, 2,
@@ -740,11 +750,12 @@ for (const [shape, body] of Object.entries(INCOMPLETE)) {
     `).run(cardAccount, book);
     incompleteListing(body());
 
-    await assert.rejects(() => cardavSync.syncAccount(cardAccount), /listed no address books/);
+    const reported = refused ?? /listed no address books/;
+    await assert.rejects(() => cardavSync.syncAccount(cardAccount), reported);
     assert.equal(db.prepare('SELECT enabled FROM carddav_addressbook_selection').get().enabled, 1,
       'eine Antwort ohne Adressbücher hat das Adressbuch abgeschaltet');
     assert.match(db.prepare('SELECT last_error FROM carddav_accounts WHERE id = ?').get(cardAccount).last_error,
-      /listed no address books/, 'der Fehler steht nicht am Konto');
+      reported, 'der Fehler steht nicht am Konto');
   });
 }
 

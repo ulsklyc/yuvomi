@@ -16,6 +16,8 @@ import {
   deriveScalarContactFields,
   resolveContactCategory,
 } from '../server/services/cardav-sync.js';
+import { createCardDAVClient } from '../server/utils/caldav-client.js';
+import { startFakeDavServer } from './caldav-fake-server.js';
 
 const TEST_DB = ':memory:';
 
@@ -3097,6 +3099,73 @@ describe('fetchVCardsResilient (#529 mailbox.org FN-filter fallback)', () => {
     };
     const out = await fetchVCardsResilient(client, addressBook);
     assert.deepStrictEqual(out, []);
+  });
+});
+
+// Derselbe Fallback gegen echtes tsdav und echtes HTTP: zwischen PROPFIND und
+// Multiget kann ein Kontakt verschwinden (eine andere App loescht ihn), oder der
+// PROPFIND nennt eine Ressource, die der Multiget nicht liefert. tsdav 2.4.0
+// wirft dann fuer das ganze Adressbuch ("incomplete response"); 2.3.4 warf bei
+// einem 404-Eintrag, wie ihn regelkonforme Server schicken. Was fehlt, fehlt -
+// der Rest des Adressbuchs kommt an.
+describe('fetchVCardsResilient gegen echtes tsdav: ein fehlendes Objekt kippt das Adressbuch nicht', () => {
+  let dav;
+  before(async () => { dav = await startFakeDavServer(); });
+  after(async () => { await dav.close(); });
+
+  const VCARD = 'BEGIN:VCARD\r\nVERSION:3.0\r\nUID:anna@test\r\nFN:Anna\r\nEND:VCARD';
+  const multistatus = (inner) => '<?xml version="1.0" encoding="utf-8"?>'
+    + '<d:multistatus xmlns:d="DAV:" xmlns:card="urn:ietf:params:xml:ns:carddav">' + inner + '</d:multistatus>';
+
+  /** Adressbuch mit einem Kontakt; die FN-Abfrage liefert nichts (#529), der PROPFIND nennt zusaetzlich `gone.vcf`. */
+  async function setup() {
+    dav.reset();
+    const url = dav.addCollection('book', { name: 'Kontakte', kind: 'addressbook' });
+    dav.putObject(url, 'anna.vcf', VCARD);
+    const path = new URL(url).pathname;
+    dav.refuse({ method: 'REPORT', path, once: true, status: 207, contentType: 'application/xml; charset=utf-8',
+      when: (req) => !/multiget/.test(req.body), body: multistatus('') });
+    dav.refuse({ method: 'PROPFIND', path, once: true, status: 207, contentType: 'application/xml; charset=utf-8',
+      body: multistatus(['', 'anna.vcf', 'gone.vcf'].map((name) =>
+        `<d:response><d:href>${path}${name}</d:href><d:propstat><d:prop><d:getetag>"x"</d:getetag></d:prop>`
+        + '<d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>').join('')) });
+    const client = await createCardDAVClient({ carddav_url: dav.url, username: 'u', password: 'p' });
+    return { client, url, path };
+  }
+
+  it('der Server laesst den fehlenden Namen aus', async () => {
+    const { client, url } = await setup();
+    const out = await fetchVCardsResilient(client, { url });
+    assert.deepEqual(out.map((o) => [o.url, o.data]), [[`${url}anna.vcf`, VCARD]]);
+  });
+
+  it('der Server nennt ihn mit 404, wie RFC-konforme Server', async () => {
+    const { client, url, path } = await setup();
+    dav.refuse({ method: 'REPORT', path, once: true, status: 207, contentType: 'application/xml; charset=utf-8',
+      when: (req) => /multiget/.test(req.body), body: multistatus(
+        `<d:response><d:href>${path}anna.vcf</d:href><d:propstat><d:prop><d:getetag>"e1"</d:getetag>`
+        + `<card:address-data>${VCARD}</card:address-data></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>`
+        + `<d:response><d:href>${path}gone.vcf</d:href><d:status>HTTP/1.1 404 Not Found</d:status></d:response>`) });
+    const out = await fetchVCardsResilient(client, { url });
+    assert.deepEqual(out.map((o) => [o.url, o.etag, o.data]), [[`${url}anna.vcf`, '"e1"', VCARD]]);
+  });
+
+  it('eine andere Absage am Eintrag bleibt ein Fehler mit Status', async () => {
+    const { client, url, path } = await setup();
+    dav.refuse({ method: 'REPORT', path, once: true, status: 207, contentType: 'application/xml; charset=utf-8',
+      when: (req) => /multiget/.test(req.body), body: multistatus(
+        `<d:response><d:href>${path}anna.vcf</d:href><d:status>HTTP/1.1 403 Forbidden</d:status></d:response>`) });
+    await assert.rejects(() => fetchVCardsResilient(client, { url }), (err) => err.status === 403);
+  });
+
+  it('ein Eintrag ohne address-data ist ein Fehler, kein leerer Kontakt', async () => {
+    const { client, url, path } = await setup();
+    dav.refuse({ method: 'REPORT', path, once: true, status: 207, contentType: 'application/xml; charset=utf-8',
+      when: (req) => /multiget/.test(req.body), body: multistatus(
+        `<d:response><d:href>${path}anna.vcf</d:href><d:propstat><d:prop><d:getetag>"e1"</d:getetag></d:prop>`
+        + '<d:status>HTTP/1.1 200 OK</d:status></d:propstat>'
+        + '<d:propstat><d:prop><card:address-data/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response>') });
+    await assert.rejects(() => fetchVCardsResilient(client, { url }), /content of an entry/);
   });
 });
 

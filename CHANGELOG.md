@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   leaves start and end out of the save when you did not change them, and the stored time stays as
   it was. Setting a household time zone in Settings is still the way to make device and server
   agree on times you type in.
+- **A contact or shopping item that is already gone from a CalDAV or CardDAV server no longer
+  blocks its sync.** On servers where Yuvomi lists the contacts of an address book before
+  downloading them (#529, for example mailbox.org), one contact deleted in between made the whole
+  address book fail. A shopping item moved to another list kept waiting for the move when its
+  original had already been deleted on the server. Both came from servers that report a single
+  entry as "not found", as standard CalDAV and CardDAV servers do. Such an entry now counts as gone.
+  Any other refusal still stops the sync with its HTTP status, and an entry the server sends
+  without its content is an error, not an empty contact or event.
 
 ### Security
 
