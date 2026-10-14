@@ -29,14 +29,12 @@ import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.j
 
 let _container = null;
 /**
- * Stand der Rezeptliste: steigt bei jeder Schreibhandlung auf `state.recipes`
- * (laden, anlegen, duplizieren, bearbeiten, loeschen, zuordnen). Ein Nachladen
- * nach "gibt es nicht mehr" uebernimmt sein Ergebnis nur, wenn der Stand seit
- * seinem Start gleich blieb - sonst ueberschriebe eine verspaetete Antwort,
- * was der Nutzer inzwischen getan hat (Codex an #2001).
+ * Rezepte, deren Loeschen gerade im Ruecknahme-Fenster steht: sie stehen noch
+ * in `state.recipes` (Rueckgaengig stellt sie zurueck), aber nicht mehr in der
+ * Liste. Ein Neuzeichnen in diesem Fenster - etwa nach "gibt es nicht mehr"
+ * an einem ANDEREN Rezept - baut die Liste ohne sie (Codex an #2001).
  */
-let _recipesVersion = 0;
-const touchRecipes = () => { _recipesVersion += 1; };
+const _pendingDeleteIds = new Set();
 /** Handle des geteilten Suchfelds (setValue/clear), gesetzt in render(). */
 let _search = null;
 /** Handle von Liste + Detail (utils/master-detail.js), gesetzt in render(). */
@@ -107,53 +105,74 @@ const READ_SAFE_ACTIONS = new Set(['toggle-detail', 'to-shopping']);
  * Sagt der Grund, dass es das Ziel der Handlung nicht mehr gibt (`isGone`: ein
  * anderes Haushaltsmitglied hat das Rezept oder die Einkaufsliste geloescht,
  * der Abgleich mit einer Rezeptquelle hat das Rezept entfernt oder seine
- * Zutaten ersetzt), ist der Stand der Seite veraltet: sie holt Rezepte und
- * Listen selbst neu. `dialog` ist der Modal-Kontext der Handlung
+ * Zutaten ersetzt), nimmt die Seite genau dieses Ding aus ihrem Stand
+ * (`dropGone`) und zeichnet neu. KEIN NACHLADEN der ganzen Liste: eine
+ * verspaetete Antwort ersetzte sonst, was der Nutzer inzwischen getan hat,
+ * und die Objekte, die ein offener Dialog haelt (Zuschnitt nach Codex an
+ * #2001). Die Aufrufstelle nennt, worum es ging (`recipeId`, `ingredientName`,
+ * `listId`). `dialog` ist der Modal-Kontext der Handlung
  * (`captureModalContext()` vor der Anfrage): geschlossen wird nur, wenn genau
  * dieser Dialog noch offen ist - einen inzwischen geoeffneten anderen laesst
  * die Antwort stehen (Codex an #1994).
  *
  * @param {unknown} err
- * @param {{ fallbackKey?: string, dialog?: object|null }} [options]
+ * @param {{ fallbackKey?: string, dialog?: object|null, recipeId?: number|null,
+ *   ingredientName?: string|null, listId?: number|null }} [options]
  */
-async function reportError(err, { fallbackKey = 'common.errorGeneric', dialog = null } = {}) {
+async function reportError(err, {
+  fallbackKey = 'common.errorGeneric', dialog = null, recipeId = null, ingredientName = null, listId = null,
+} = {}) {
   window.yuvomi?.showToast(errorSentence(err, fallbackKey), 'danger');
   if (!isGone(err)) return;
   const owner = _container;
   if (dialog && isModalContextCurrent(dialog)) await closeSharedModal({ force: true });
+  if (!dropGone(err.data.reason, { recipeId, ingredientName, listId })) return;
+  // Wer die Seite inzwischen verlassen hat, bekommt nichts mehr gezeichnet.
+  if (!stillShown(owner)) return;
+  renderSourceFilter();
+  renderRecipeList({ repaint: true });
   // Der Ausloeser ist mit der Liste neu gebaut: den Fokus auf seinen
   // Nachfolger tragen.
-  if (await reloadAfterGone(owner)) refocusAfterRender();
+  refocusAfterRender();
 }
 
 /**
- * Rezepte und Einkaufslisten frisch holen, weil der Server gemeldet hat, dass
- * etwas nicht mehr da ist. Beide Anfragen laufen zu Ende (`allSettled`), bevor
- * gezeichnet wird; was scheitert, laesst seinen letzten Stand stehen - die
- * Liste wird nicht zum Fehlerzustand, nur weil das Nachladen scheiterte. Wer
- * die Seite inzwischen verlassen hat, bekommt nichts mehr gezeichnet.
+ * Nimmt aus dem Stand der Seite, was der Server als "gibt es nicht mehr"
+ * gemeldet hat. Nur per ID bzw. Name, und `filter` statt Neuaufbau: die
+ * uebrigen Rezept- und Zutatenobjekte bleiben dieselben, ein offener
+ * Zuordnungsdialog schreibt also weiter in den aktuellen Stand.
  *
- * @returns {Promise<boolean>} ob neu gezeichnet wurde
+ * - Rezept weg (`recipes_recipe_not_found`, beim Einplanen
+ *   `meals_selected_recipe_not_found`): das Rezept faellt aus der Liste.
+ * - Zutat weg (`recipes_ingredient_not_found`): die Zutat faellt aus dem
+ *   Rezept. Hat der Abgleich die Zutaten ERSETZT, kennt die Seite die neuen
+ *   nicht - die zeigt erst das naechste Laden der Seite.
+ * - Einkaufsliste weg (`shopping_list_not_found`): die Liste faellt aus der
+ *   Auswahl.
+ *
+ * @returns {boolean} ob sich der Stand geaendert hat
  */
-async function reloadAfterGone(owner) {
-  const version = _recipesVersion;
-  const shoppingOff = window.yuvomi?.isModuleDisabled?.('shopping');
-  const [recipes, lists] = await Promise.allSettled([
-    api.get('/recipes'),
-    shoppingOff ? Promise.resolve({ data: [] }) : api.get('/shopping'),
-  ]);
-  if (!stillShown(owner)) return false;
-  if (recipes.status === 'fulfilled' && version === _recipesVersion) {
-    state.recipes = recipes.value?.data ?? [];
-    state.loadError = null;
-    touchRecipes();
-  } else if (recipes.status === 'rejected') {
-    console.warn('[Recipes] reload after a gone answer failed:', recipes.reason);
+function dropGone(reason, { recipeId, ingredientName, listId }) {
+  if (reason === 'recipes_recipe_not_found' || reason === 'meals_selected_recipe_not_found') {
+    if (recipeId == null) return false;
+    const before = state.recipes.length;
+    state.recipes = state.recipes.filter((r) => r.id !== recipeId);
+    return state.recipes.length !== before;
   }
-  if (lists.status === 'fulfilled') state.lists = lists.value?.data ?? [];
-  renderSourceFilter();
-  renderRecipeList({ repaint: true });
-  return true;
+  if (reason === 'recipes_ingredient_not_found') {
+    const recipe = state.recipes.find((r) => r.id === recipeId);
+    if (!recipe || ingredientName == null) return false;
+    const before = (recipe.ingredients ?? []).length;
+    recipe.ingredients = (recipe.ingredients ?? []).filter((i) => i.name !== ingredientName);
+    return recipe.ingredients.length !== before;
+  }
+  if (reason === 'shopping_list_not_found') {
+    if (listId == null) return false;
+    const before = state.lists.length;
+    state.lists = state.lists.filter((l) => l.id !== listId);
+    return state.lists.length !== before;
+  }
+  return false;
 }
 
 /**
@@ -170,11 +189,16 @@ function stillShown(owner) {
 
 const isSelectedPantryItemGone = (err) => isGone(err) && err.data.reason === 'recipes_selected_pantry_item_not_found';
 
+/** Die Rezepte der Liste: ohne die, deren Loeschen gerade laeuft. */
+function listedRecipes() {
+  return state.recipes.filter((r) => !_pendingDeleteIds.has(r.id));
+}
+
 // Client-seitige Suche über Titel, Notizen und Zutaten (Audit A1-21):
 // die Rezeptliste ist vollständig geladen, ein Server-Roundtrip wäre Umweg.
 function filteredRecipes() {
   const q = state.query.toLowerCase();
-  return state.recipes.filter((r) => {
+  return listedRecipes().filter((r) => {
     if (state.sourceFilter !== 'all' && r.source !== state.sourceFilter) return false;
     if (!q) return true;
     return r.title?.toLowerCase().includes(q)
@@ -242,12 +266,10 @@ async function loadRecipes() {
     const res = await api.get('/recipes');
     state.recipes = res.data ?? [];
     state.loadError = null;
-    touchRecipes();
   } catch (err) {
     console.error('[Recipes] loadRecipes Fehler:', err);
     state.recipes = [];
     state.loadError = err;
-    touchRecipes();
   }
 }
 
@@ -849,7 +871,7 @@ function buildRecipeList() {
     return;
   }
 
-  if (!state.recipes.length) {
+  if (!listedRecipes().length) {
     // Geteilter Renderer (utils/empty-state.js): erzwingt Reihenfolge und
     // ARIA-Rolle. Vorher fehlte hier als einzigem Küchen-Leerzustand das Icon.
     mountEmptyState(list, emptyListOptions());
@@ -1494,7 +1516,6 @@ async function openPantryMatchModal(recipe, ingredientName) {
           // traegt genau die beiden Felder, die sich geaendert haben.
           ing.pantry_item_id = res.data.pantry_item_id;
           ing.pantry_item_name = res.data.pantry_item_name;
-          touchRecipes();
           // force: der Schreibvorgang ist durch, eine Verwerfen-Frage waere
           // eine Frage nach etwas, das schon gespeichert ist.
           closeSharedModal({ force: true });
@@ -1521,7 +1542,7 @@ async function openPantryMatchModal(recipe, ingredientName) {
             await offerCurrentPantryItems([panel.querySelector('#pantry-match-select')].filter(Boolean));
             return;
           }
-          reportError(err, { dialog });
+          reportError(err, { dialog, recipeId: recipe.id, ingredientName });
         }
       });
     },
@@ -1584,13 +1605,16 @@ async function openPantryBulkMatchModal(recipe) {
         if (!mayMatchIngredient(recipe.id)) return;
         save.disabled = true;
         let saved = 0;
+        // Die Zutat, an der ein Fehler haengt: "gibt es nicht mehr" nimmt sie
+        // aus dem Stand (reportError).
+        let current = null;
         const dialog = captureModalContext();
         try {
           for (const { ing, pantryItemId } of chosen) {
+            current = ing;
             const res = await api.put(`/recipes/${recipe.id}/ingredient-match`, { name: ing.name, pantryItemId });
             ing.pantry_item_id = res.data.pantry_item_id;
             ing.pantry_item_name = res.data.pantry_item_name;
-            touchRecipes();
             saved += 1;
           }
           closeSharedModal({ force: true });
@@ -1607,7 +1631,7 @@ async function openPantryBulkMatchModal(recipe) {
             await offerCurrentPantryItems([...panel.querySelectorAll('select[data-ingredient-index]')]);
             return;
           }
-          reportError(err, { dialog });
+          reportError(err, { dialog, recipeId: recipe.id, ingredientName: current?.name ?? null });
         }
       });
     },
@@ -1871,13 +1895,11 @@ async function saveRecipe(panel, mode, recipe) {
     if (mode === 'create') {
       const res = await api.post('/recipes', { title, notes, recipe_url, meal_types, ingredients, ...bildFeld });
       state.recipes.push(res.data);
-      touchRecipes();
       createdId = res.data?.id ?? null;
     } else {
       const res = await api.put(`/recipes/${recipe.id}`, { title, notes, recipe_url, meal_types, ingredients, ...bildFeld });
       const idx = state.recipes.findIndex((r) => r.id === recipe.id);
       if (idx >= 0) state.recipes[idx] = res.data;
-      touchRecipes();
     }
 
     closeModal({ force: true });
@@ -1888,7 +1910,7 @@ async function saveRecipe(panel, mode, recipe) {
     window.yuvomi?.showToast(mode === 'create' ? t('recipes.created') : t('recipes.updated'), 'success');
   } catch (err) {
     saveBtn.disabled = false;
-    reportError(err, { dialog });
+    reportError(err, { dialog, recipeId: mode === 'create' ? null : recipe.id });
   }
 }
 
@@ -1984,7 +2006,7 @@ async function planRecipe(recipe, btn) {
           );
         } catch (err) {
           confirmBtn.disabled = false;
-          reportError(err, { dialog });
+          reportError(err, { dialog, recipeId: recipe.id });
         }
       });
     },
@@ -2046,7 +2068,7 @@ async function transferRecipe(recipe, btn) {
       window.yuvomi?.showToast(t('recipes.toShoppingNoIngredients'), 'info');
     }
   } catch (err) {
-    reportError(err);
+    reportError(err, { recipeId: recipe.id, listId: target.id });
   } finally {
     if (btn) btn.disabled = false;
   }
@@ -2058,6 +2080,8 @@ async function removeRecipe(recipe) {
   if (readOnly()) return;
   const itemEl = _container.querySelector(`.recipe-row-item[data-id="${recipe.id}"]`);
   if (itemEl) itemEl.style.display = 'none';
+  // Auch jedes Neuzeichnen im Ruecknahme-Fenster laesst das Rezept weg.
+  _pendingDeleteIds.add(recipe.id);
   // Steht das Rezept rechts in der Detailspalte, geht es dort mit: sonst
   // zeigte die Spalte ein Rezept, das die Liste schon nicht mehr fuehrt.
   // Rueckgaengig waehlt es wieder aus.
@@ -2073,6 +2097,7 @@ async function removeRecipe(recipe) {
       try {
         await api.delete(`/recipes/${recipe.id}`, { keepalive });
       } catch (err) {
+        _pendingDeleteIds.delete(recipe.id);
         // SCHON GELOESCHT IST EIN ERFOLG (#1909): ein anderes Haushaltsmitglied
         // war schneller. Rezepte haben keine Sichtbarkeit, und ein
         // gespiegeltes Rezept weist DELETE vorher mit 403 ab - die 404 heisst
@@ -2080,13 +2105,17 @@ async function removeRecipe(recipe) {
         // nicht zurueck. Alles andere bleibt ein Fehler.
         if (!isAlreadyDeleted(err, 'recipes_recipe_not_found')) throw err;
       }
+      _pendingDeleteIds.delete(recipe.id);
       if (keepalive) return; // Seite verschwindet — kein UI-Refresh mehr
       state.recipes = state.recipes.filter((r) => r.id !== recipe.id);
-      touchRecipes();
       renderRecipeList();
     },
     restore: (err) => {
+      _pendingDeleteIds.delete(recipe.id);
       if (itemEl) itemEl.style.display = '';
+      // Wurde die Liste im Fenster neu gebaut, haengt die alte Zeile nicht
+      // mehr: dann steht das Rezept erst mit dem naechsten Bau wieder da.
+      if (itemEl?.isConnected === false && stillShown(_container)) renderRecipeList();
       if (wasSelected && _md?.isSplit()) _md.select(recipe.id, { history: 'replace' });
       if (err) window.yuvomi?.showToast(errorSentence(err, 'common.unknownError'), 'danger');
     },
@@ -2132,7 +2161,6 @@ async function duplicateRecipe(recipe) {
   try {
     const res = await api.post('/recipes', { title, notes, recipe_url, ingredients });
     state.recipes.push(res.data);
-    touchRecipes();
     renderRecipeList();
     // Die Kopie ist das, was man als Naechstes bearbeitet: in der Spalte steht
     // sie deshalb gleich rechts.
