@@ -26,6 +26,7 @@ import { navModuleAccess } from '/permissions.js';
 import { mountMasterDetail, splitViewDetailHtml, detailPaneHeaderEl } from '/utils/master-detail.js';
 import { mayWritePath } from '/utils/module-access.js';
 import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
+import { ingredientMatchKey } from '/utils/ingredient-match-key.js';
 
 let _container = null;
 /**
@@ -115,20 +116,27 @@ const READ_SAFE_ACTIONS = new Set(['toggle-detail', 'to-shopping']);
  * dieser Dialog noch offen ist - einen inzwischen geoeffneten anderen laesst
  * die Antwort stehen (Codex an #1994).
  *
+ * `owner` ist der Container der Seite, VOR der Anfrage gemerkt (wie
+ * `dialog`). Erst nach der Antwort gelesen, waere es nach "Seite verlassen
+ * und zurueck" der NEUE Container - und eine spaete Antwort nahme etwas aus
+ * dem frisch geladenen Stand, das der Nutzer dort inzwischen wieder angelegt
+ * hat (Codex an #2001). Zeigt die Seite nicht mehr diesen Container, bleibt
+ * es beim Satz: kein Entfernen, kein Zeichnen.
+ *
  * @param {unknown} err
- * @param {{ fallbackKey?: string, dialog?: object|null, recipeId?: number|null,
+ * @param {{ owner?: object|null, fallbackKey?: string, dialog?: object|null, recipeId?: number|null,
  *   ingredientName?: string|null, listId?: number|null }} [options]
  */
 async function reportError(err, {
-  fallbackKey = 'common.errorGeneric', dialog = null, recipeId = null, ingredientName = null, listId = null,
+  owner = null, fallbackKey = 'common.errorGeneric', dialog = null, recipeId = null, ingredientName = null, listId = null,
 } = {}) {
   window.yuvomi?.showToast(errorSentence(err, fallbackKey), 'danger');
   if (!isGone(err)) return;
-  const owner = _container;
   if (dialog && isModalContextCurrent(dialog)) await closeSharedModal({ force: true });
-  if (!dropGone(err.data.reason, { recipeId, ingredientName, listId })) return;
-  // Wer die Seite inzwischen verlassen hat, bekommt nichts mehr gezeichnet.
+  // Wer die Seite inzwischen verlassen hat (oder neu betreten), bekommt weder
+  // seinen Stand angefasst noch etwas gezeichnet.
   if (!stillShown(owner)) return;
+  if (!dropGone(err.data.reason, { recipeId, ingredientName, listId })) return;
   renderSourceFilter();
   renderRecipeList({ repaint: true });
   // Der Ausloeser ist mit der Liste neu gebaut: den Fokus auf seinen
@@ -144,8 +152,10 @@ async function reportError(err, {
  *
  * - Rezept weg (`recipes_recipe_not_found`, beim Einplanen
  *   `meals_selected_recipe_not_found`): das Rezept faellt aus der Liste.
- * - Zutat weg (`recipes_ingredient_not_found`): die Zutat faellt aus dem
- *   Rezept. Hat der Abgleich die Zutaten ERSETZT, kennt die Seite die neuen
+ * - Zutat weg (`recipes_ingredient_not_found`): jede Zutat mit demselben
+ *   Schluessel faellt aus dem Rezept - der Server sucht mit
+ *   `ingredientMatchKey()` (getrimmt, Leerraum gefaltet, klein), "gibt es
+ *   nicht mehr" gilt also fuer "Salz" und "salz" zugleich. Hat der Abgleich die Zutaten ERSETZT, kennt die Seite die neuen
  *   nicht - die zeigt erst das naechste Laden der Seite.
  * - Einkaufsliste weg (`shopping_list_not_found`): die Liste faellt aus der
  *   Auswahl.
@@ -163,7 +173,8 @@ function dropGone(reason, { recipeId, ingredientName, listId }) {
     const recipe = state.recipes.find((r) => r.id === recipeId);
     if (!recipe || ingredientName == null) return false;
     const before = (recipe.ingredients ?? []).length;
-    recipe.ingredients = (recipe.ingredients ?? []).filter((i) => i.name !== ingredientName);
+    const key = ingredientMatchKey(ingredientName);
+    recipe.ingredients = (recipe.ingredients ?? []).filter((i) => ingredientMatchKey(i.name) !== key);
     return recipe.ingredients.length !== before;
   }
   if (reason === 'shopping_list_not_found') {
@@ -1468,11 +1479,12 @@ async function openPantryMatchModal(recipe, ingredientName) {
   if (!ing) return;
 
   let items = [];
+  const owner = _container;
   try {
     const res = await api.get('/pantry');
     items = res.data ?? [];
   } catch (err) {
-    reportError(err, { fallbackKey: 'recipes.ingredientMatchLoadError' });
+    reportError(err, { owner, fallbackKey: 'recipes.ingredientMatchLoadError' });
     return;
   }
 
@@ -1507,6 +1519,7 @@ async function openPantryMatchModal(recipe, ingredientName) {
         // Die Rechte koennen sich aendern, waehrend der Dialog offen steht.
         if (!mayMatchIngredient(recipe.id)) return;
         const dialog = captureModalContext();
+        const owner = _container;
         try {
           const res = await api.put(`/recipes/${recipe.id}/ingredient-match`, {
             name: ingredientName,
@@ -1542,7 +1555,7 @@ async function openPantryMatchModal(recipe, ingredientName) {
             await offerCurrentPantryItems([panel.querySelector('#pantry-match-select')].filter(Boolean));
             return;
           }
-          reportError(err, { dialog, recipeId: recipe.id, ingredientName });
+          reportError(err, { owner, dialog, recipeId: recipe.id, ingredientName });
         }
       });
     },
@@ -1562,11 +1575,12 @@ async function openPantryBulkMatchModal(recipe) {
   if (!open.length) return;
 
   let items = [];
+  const owner = _container;
   try {
     const res = await api.get('/pantry');
     items = res.data ?? [];
   } catch (err) {
-    reportError(err, { fallbackKey: 'recipes.ingredientMatchLoadError' });
+    reportError(err, { owner, fallbackKey: 'recipes.ingredientMatchLoadError' });
     return;
   }
   const fields = open.map((ing, i) => `
@@ -1609,6 +1623,7 @@ async function openPantryBulkMatchModal(recipe) {
         // aus dem Stand (reportError).
         let current = null;
         const dialog = captureModalContext();
+        const owner = _container;
         try {
           for (const { ing, pantryItemId } of chosen) {
             current = ing;
@@ -1631,7 +1646,7 @@ async function openPantryBulkMatchModal(recipe) {
             await offerCurrentPantryItems([...panel.querySelectorAll('select[data-ingredient-index]')]);
             return;
           }
-          reportError(err, { dialog, recipeId: recipe.id, ingredientName: current?.name ?? null });
+          reportError(err, { owner, dialog, recipeId: recipe.id, ingredientName: current?.name ?? null });
         }
       });
     },
@@ -1889,6 +1904,7 @@ async function saveRecipe(panel, mode, recipe) {
 
   saveBtn.disabled = true;
   const dialog = captureModalContext();
+  const owner = _container;
 
   try {
     let createdId = null;
@@ -1910,7 +1926,7 @@ async function saveRecipe(panel, mode, recipe) {
     window.yuvomi?.showToast(mode === 'create' ? t('recipes.created') : t('recipes.updated'), 'success');
   } catch (err) {
     saveBtn.disabled = false;
-    reportError(err, { dialog, recipeId: mode === 'create' ? null : recipe.id });
+    reportError(err, { owner, dialog, recipeId: mode === 'create' ? null : recipe.id });
   }
 }
 
@@ -1997,6 +2013,7 @@ async function planRecipe(recipe, btn) {
         if (!mayPlanRecipe()) return;
         confirmBtn.disabled = true;
         const dialog = captureModalContext();
+        const owner = _container;
         try {
           await api.post('/meals', mealPayloadFromRecipe(recipe, date, mealType));
           closeSharedModal({ force: true });
@@ -2006,7 +2023,7 @@ async function planRecipe(recipe, btn) {
           );
         } catch (err) {
           confirmBtn.disabled = false;
-          reportError(err, { dialog, recipeId: recipe.id });
+          reportError(err, { owner, dialog, recipeId: recipe.id });
         }
       });
     },
@@ -2045,6 +2062,7 @@ async function transferRecipe(recipe, btn) {
   if (!target) return;
 
   if (btn) btn.disabled = true;
+  const owner = _container;
   try {
     const res = await api.post(`/recipes/${recipe.id}/to-shopping-list`, { listId: target.id });
     const added = res.data?.transferred ?? 0;
@@ -2068,7 +2086,7 @@ async function transferRecipe(recipe, btn) {
       window.yuvomi?.showToast(t('recipes.toShoppingNoIngredients'), 'info');
     }
   } catch (err) {
-    reportError(err, { recipeId: recipe.id, listId: target.id });
+    reportError(err, { owner, recipeId: recipe.id, listId: target.id });
   } finally {
     if (btn) btn.disabled = false;
   }
@@ -2158,6 +2176,7 @@ async function duplicateRecipe(recipe) {
     category: ing.category || DEFAULT_CATEGORY_NAME,
   }));
 
+  const owner = _container;
   try {
     const res = await api.post('/recipes', { title, notes, recipe_url, ingredients });
     state.recipes.push(res.data);
@@ -2167,7 +2186,7 @@ async function duplicateRecipe(recipe) {
     if (res.data?.id != null) selectOwnRecipe(res.data.id);
     window.yuvomi?.showToast(t('recipes.duplicated'), 'success');
   } catch (err) {
-    reportError(err);
+    reportError(err, { owner });
   }
 }
 

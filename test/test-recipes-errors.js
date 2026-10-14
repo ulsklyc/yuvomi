@@ -759,3 +759,65 @@ test('Essensplan: eine Mahlzeit speichern, deren gewaehltes Rezept es nicht mehr
     assertNoServerText();
   }
 });
+
+// Codex an #2001: der Server sucht die Zutat mit `ingredientMatchKey()`.
+// "Gibt es nicht mehr" gilt also fuer jede Schreibweise mit demselben
+// Schluessel - die Seite nimmt sie mit derselben Funktion heraus.
+test('Seite: Zutat weg - jede Zutat mit demselben Schluessel wie beim Server faellt aus dem Stand, andere bleiben', async () => {
+  const zutaten = [{ name: 'Salz', pantry_item_id: null }, { name: '  salz ', pantry_item_id: null }, { name: 'SALZ  ', pantry_item_id: null }, { name: 'Salzbutter', pantry_item_id: null }, { name: 'Mehl', pantry_item_id: null }];
+  const panel = formular({ '#pantry-match-select': '7' });
+  const { stand } = await mitSeite({ recipes: [rezept({ ingredients: zutaten.map((z) => ({ ...z })) })] }, () => mit({
+    get: (path) => (path === '/pantry' ? { data: PANTRY } : { data: [] }),
+    put: async () => { throw fehler(404, 'recipes_ingredient_not_found'); },
+  }, async () => {
+    await oeffne(panel, () => page.openPantryMatchModal(page.state.recipes[0], 'Salz'));
+    await panel.querySelector('#pantry-match-save').handlers.click();
+  }));
+  assert.deepEqual(stand.zutaten, ['Salzbutter', 'Mehl']);
+});
+
+// Codex an #2001: `owner` wird VOR der Anfrage gemerkt. Wer die Seite
+// verlaesst und zurueckkehrt, hat einen NEUEN Container und einen frisch
+// geladenen Stand - eine spaete "gibt es nicht mehr"-Antwort der alten Seite
+// faesst ihn nicht an.
+test('Seite: verlassen und zurueck (neuer Container), dann kommt eine spaete "gibt es nicht mehr"-Antwort - der neue Stand bleibt unberuehrt', async () => {
+  let refocus = 0;
+  globalThis.__refocusAfterRender = () => { refocus += 1; };
+  try {
+    for (const [name, err, lauf] of [
+      ['Zutat zuordnen', fehler(404, 'recipes_ingredient_not_found'), async (panel) => {
+        await oeffne(panel, () => page.openPantryMatchModal(page.state.recipes[0], 'Mehl'));
+        await panel.querySelector('#pantry-match-save').handlers.click();
+      }],
+      ['auf die Einkaufsliste', fehler(404, 'recipes_recipe_not_found'), () => page.transferRecipe(page.state.recipes[0], null)],
+      ['Liste weg', fehler(404, 'shopping_list_not_found'), () => page.transferRecipe(page.state.recipes[0], null)],
+      ['einplanen', fehler(400, 'meals_selected_recipe_not_found'), async (panel) => {
+        await oeffne(panel, () => page.planRecipe(page.state.recipes[0], null));
+        const confirm = panel.querySelector('#plan-confirm');
+        await confirm.handlers.click({ currentTarget: confirm });
+      }],
+    ]) {
+      refocus = 0;
+      const gefragt = [];
+      const neu = { querySelector: (sel) => { gefragt.push(sel); return null; }, querySelectorAll: () => [], isConnected: true };
+      const zurueck = () => {
+        // Die alte Seite wird verlassen, die neue laedt frisch: das Rezept mit
+        // beiden Zutaten, die Liste steht.
+        page.setContainerForTest(neu);
+        page.state.recipes = [rezept()];
+        page.state.lists = [{ id: 1, name: 'Wocheneinkauf' }];
+        throw err;
+      };
+      const panel = formular({ '#pantry-match-select': '7', '#plan-date': '20.10.2026', '#plan-type': 'dinner' });
+      const { stand } = await mitSeite({}, () => mit({
+        get: (path) => (path === '/pantry' ? { data: PANTRY } : { data: [] }),
+        put: async () => zurueck(), post: async () => zurueck(),
+      }, () => lauf(panel)));
+      assert.deepEqual(stand, STAND_VORHER, `${name}: der neue Stand bleibt`);
+      assert.deepEqual(gefragt, [], `${name}: in die neue Seite wird nichts gezeichnet`);
+      assert.equal(refocus, 0, `${name}: kein Fokus`);
+    }
+  } finally {
+    delete globalThis.__refocusAfterRender;
+  }
+});
