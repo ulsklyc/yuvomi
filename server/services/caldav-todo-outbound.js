@@ -48,7 +48,7 @@ import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { outboundFailureAction, MAX_OUTBOUND_ATTEMPTS } from './calendar-outbound.js';
 import { patchICSTodo } from '../utils/ics-patch.js';
-import { createCalDAVClient, collectionUrlOf, createUploadGate } from '../utils/caldav-client.js';
+import { createCalDAVClient, collectionUrlOf, createUploadGate, sameObjectAddress } from '../utils/caldav-client.js';
 import {
   ownUid, isOwnUidOfRow, ownUploadRowId, parseOwnUid, findObjectWithUid, inspectObjectAt,
 } from '../utils/own-uid.js';
@@ -2166,7 +2166,7 @@ async function collectionsForTargets(client, targets) {
  *
  * @returns {Promise<Map>} UID → { url, etag, data }
  */
-async function fetchObjectsByUrl(client, wanted) {
+export async function fetchObjectsByUrl(client, wanted) {
   const index = new Map();
   if (!wanted.length) return index;
 
@@ -2185,9 +2185,9 @@ async function fetchObjectsByUrl(client, wanted) {
         objectUrls: items.map((i) => i.url),
       });
       for (const obj of objects || []) {
-        const match = items.find((i) => i.url === obj.url) || (items.length === 1 ? items[0] : null);
+        const match = items.find((i) => sameObjectAddress(i.url, obj.url));
         if (!match) continue;
-        index.set(match.uid, { url: obj.url || match.url, etag: obj.etag, data: obj.data });
+        index.set(match.uid, { url: match.url, etag: obj.etag, data: obj.data });
       }
     } catch (err) {
       // Kein Grund zur Sorge: der reguläre Sync-Lauf holt die Liste ohnehin.

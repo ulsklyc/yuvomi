@@ -448,6 +448,26 @@ export function calendarObjectUrlFilter(collectionUrl) {
   };
 }
 
+/**
+ * Dieselbe Objekt-Adresse? Verglichen werden Host, Pfad und Query, der Pfad
+ * dekodiert: ein Server darf `@` als `%40` zurückgeben. Die Sofortversuche
+ * ordnen ein Objekt aus einer Antwort nur so einer angefragten Zeile zu - nie
+ * "das einzige angefragte", denn eine Antwort darf auch Objekte nennen, nach
+ * denen nicht gefragt war, während das angefragte fehlt.
+ */
+export function sameObjectAddress(a, b) {
+  const key = (url) => {
+    try {
+      const parsed = new URL(String(url));
+      let path = parsed.pathname;
+      try { path = decodeURIComponent(path); } catch { /* bleibt roh */ }
+      return `${parsed.origin}${path}${parsed.search}`;
+    } catch { return null; }
+  };
+  const left = key(a);
+  return left !== null && left === key(b);
+}
+
 /** Statuscodes, mit denen ein Server sagt: an dieser Adresse liegt nichts. */
 const ABSENT_STATUS = new Set([404, 410]);
 
@@ -508,9 +528,22 @@ async function multigetByAddress(client, kind, { collectionUrl, objectUrls, head
   const spec = MULTIGET[kind];
   if (!collectionUrl) throw new Error(`cannot run ${spec.report} without a collection url`);
   const base = String(collectionUrl).replace(/\/?$/, '/');
+  const collection = new URL(base);
+  const decoded = (path) => { try { return decodeURIComponent(path); } catch { return path; } };
+  // Gefragt wird die Collection; im Körper steht nur der Pfad. Ein Objekt auf
+  // einem anderen Host oder ausserhalb der Collection wäre dann ein Pfad auf
+  // DIESEM Server, und ein 404 darauf läse sich als "fort" - über ein Objekt,
+  // nach dem gar nicht gefragt wurde. Solche Adressen gehen nicht hinaus.
   const hrefs = objectUrls
     .filter((url) => typeof url === 'string' && url.trim())
-    .map((url) => { const parsed = new URL(url, base); return `${parsed.pathname}${parsed.search}`; });
+    .map((url) => {
+      const parsed = new URL(url, base);
+      if (parsed.origin !== collection.origin) throw new DavOriginError(spec.operation, parsed.href);
+      if (!decoded(parsed.pathname).startsWith(decoded(collection.pathname))) {
+        throw new DavHttpError(spec.operation, parsed.href, null, 'The address of this entry is not in its collection');
+      }
+      return `${parsed.pathname}${parsed.search}`;
+    });
   if (hrefs.length === 0) return [];
 
   const responses = await client.davRequest({

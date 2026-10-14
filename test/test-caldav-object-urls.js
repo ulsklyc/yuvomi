@@ -150,6 +150,21 @@ test('Auch der Outbound-Pfad mit objectUrls filtert nichts weg', async () => {
   assert.deepEqual(objects, [{ url: `${COLLECTION}NZtPkIOMoK`, etag: '"1"', data: 'BEGIN:VCALENDAR' }]);
 });
 
+test('Abruf über Adressen: ein Objekt auf fremdem Host oder ausserhalb der Collection geht nicht hinaus', async () => {
+  // Im Körper steht nur der Pfad. Ohne die Prüfung ginge der Pfad eines fremden
+  // Objekts an DIESEN Server, und dessen 404 hiesse "fort".
+  for (const [foreign, check] of [
+    ['https://evil.example/dav/cal/haushalt/default/a.ics', (err) => err.code === 'origin_not_allowed'],
+    [`${new URL(COLLECTION).origin}/dav/cal/haushalt/other/a.ics`, /not in its collection/],
+  ]) {
+    const raw = multigetClient([entry('/dav/cal/haushalt/default/a.ics', 404)]);
+    await assert.rejects(() => withCalendarObjectUrlFilter(raw).fetchCalendarObjects({
+      calendar: { url: COLLECTION }, objectUrls: [`${COLLECTION}b.ics`, foreign],
+    }), check, `${foreign} wurde nicht abgewiesen`);
+    assert.deepEqual(raw.requests, [], `für ${foreign} ging eine Anfrage hinaus`);
+  }
+});
+
 test('Abruf über Adressen: was nicht da ist, fehlt - jede andere Absage ist ein Fehler', async () => {
   // tsdav 2.4.0 wirft, sobald ein genanntes Objekt fehlt; 2.3.4 warf bei einem
   // 404-Eintrag, wie ihn regelkonforme Server schicken. Die Aufrufer lesen aus
