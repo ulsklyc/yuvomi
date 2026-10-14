@@ -22,16 +22,11 @@
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 process.env.DB_PATH = ':memory:';
 process.env.TZ = 'UTC';
-// Das Testzertifikat unten ist selbst signiert.
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 delete process.env.LOG_LEVEL;
 delete process.env.NODE_ENV;
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import http from 'node:http';
-import https from 'node:https';
-import net from 'node:net';
 import { startFakeDavServer } from './caldav-fake-server.js';
 
 const dbmod = await import('../server/db.js');
@@ -164,81 +159,81 @@ test('Einkauf: Umzug in eine andere gespiegelte Liste nimmt nichts vom Host aus 
   assertForeignUntouched(foreignList);
 });
 
+// ── Eine abgelehnte Adresse ist keine Absage des Servers ───────────────────────
+
+test('Bearbeitung: die Absage der Adresse verbraucht keinen Versuch, die Änderung bleibt vorgemerkt', async () => {
+  const { home, row } = await mirrored('tasks');
+  db.prepare("UPDATE tasks SET title = 'Hafermilch', outbound_dirty = 1 WHERE id = ?").run(row.id);
+  for (let i = 0; i < 6; i++) {
+    await todoOutbound.flushOutbound();
+    answerWithForeignHref(home.url);
+    await remindersSync.sync();
+  }
+  const now = db.prepare('SELECT title, outbound_dirty, outbound_attempts FROM tasks WHERE id = ?').get(row.id);
+  assert.deepEqual(now, { title: 'Hafermilch', outbound_dirty: 1, outbound_attempts: 0 });
+});
+
+test('Löschung: der Sofortversuch zählt die Absage nicht, der Lauf räumt den Auftrag ab', async () => {
+  const { home, row } = await mirrored('tasks');
+  assert.equal(todoOutbound.queueTodoDeletion('tasks', row), true);
+  db.prepare('DELETE FROM tasks WHERE id = ?').run(row.id);
+  const orders = () => db.prepare('SELECT attempts FROM caldav_todo_pending_deletions').all();
+  for (let i = 0; i < 6; i++) await todoOutbound.flushOutbound();
+  assert.deepEqual(orders(), [{ attempts: 0 }], 'der Auftrag wartet ohne gezählten Versuch');
+  answerWithForeignHref(home.url);
+  await remindersSync.sync();
+  assert.deepEqual(orders(), [], 'der volle Lauf räumt den Auftrag ab');
+  assert.ok(dav.getObject(home.url, FILE), 'auf dem Server des Kontos wurde nichts gelöscht');
+});
+
 // ── Schema: dieselbe Adresse, nur http statt https ─────────────────────────────
 
-// Nur für diesen Test erzeugt (openssl, 100 Jahre gültig), schützt nichts.
-const TEST_KEY = `-----BEGIN PRIVATE KEY-----
-MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgXMxy6Hw0wKqAUlt0
-m8rsSih768vODmkBZ+0ajnx8NWKhRANCAATzj4TKPXJrXxM93eyCOgLkuqppfv6E
-CI1inP+UjcBmjuLUU3y7knDBLcfpohkW77qmfOQShKwYDIqE8KsWkjs3
------END PRIVATE KEY-----`;
-const TEST_CERT = `-----BEGIN CERTIFICATE-----
-MIIBXjCCAQSgAwIBAgIUBr1PQINuEViMMdeSYrhHS97X8rkwCgYIKoZIzj0EAwIw
-FDESMBAGA1UEAwwJMTI3LjAuMC4xMCAXDTI2MTAxNDExMDAxMFoYDzIxMjYwOTIw
-MTEwMDEwWjAUMRIwEAYDVQQDDAkxMjcuMC4wLjEwWTATBgcqhkjOPQIBBggqhkjO
-PQMBBwNCAATzj4TKPXJrXxM93eyCOgLkuqppfv6ECI1inP+UjcBmjuLUU3y7knDB
-LcfpohkW77qmfOQShKwYDIqE8KsWkjs3ozIwMDAdBgNVHQ4EFgQUh3JW2fqj8+pm
-p+eggCqzUvMDlsUwDwYDVR0TAQH/BAUwAwEB/zAKBggqhkjOPQQDAgNIADBFAiAv
-Gk/w1onmepl5P73J3Mej6iRBrnAAxZwg7VXzJcErtwIhANnYBfQFFiH+Kcc+hBEy
-MwgjC7amD7/sB72tyB8Tlllz
------END CERTIFICATE-----`;
+const { withHttpRefusalsAsErrors, withCalendarObjectUrlFilter } = await import('../server/utils/caldav-client.js');
+const { createDAVClient } = await import('tsdav');
 
 /**
- * Ein Port, zwei Schemata: TLS-Verbindungen (erstes Byte 0x16) und Klartext
- * laufen beide an `dav` weiter. Protokolliert wird, was im Klartext ankam.
+ * Anfragen, die der Client mit `http://` gestellt hat. Eine `https://`-Anfrage
+ * geht im Test ebenfalls im Klartext an den Fake-Server (er spricht kein TLS),
+ * wird aber nicht gezählt: gemessen wird, welches Schema der CLIENT wählt.
  */
-async function startDualSchemeFront(target) {
-  const plain = [];
-  const forward = (tls) => (req, res) => {
-    if (!tls) plain.push(`${req.method} ${req.url}`);
-    const upstream = http.request(`${target.origin}${req.url}`, { method: req.method, headers: req.headers }, (up) => {
-      res.writeHead(up.statusCode, up.headers);
-      up.pipe(res);
-    });
-    req.pipe(upstream);
-  };
-  const tlsSide   = https.createServer({ key: TEST_KEY, cert: TEST_CERT }, forward(true));
-  const plainSide = http.createServer(forward(false));
-  const front = net.createServer((socket) => {
-    socket.once('data', (chunk) => {
-      socket.pause();
-      socket.unshift(chunk);
-      (chunk[0] === 0x16 ? tlsSide : plainSide).emit('connection', socket);
-      process.nextTick(() => socket.resume());
-    });
-  });
-  await new Promise((resolve) => front.listen(0, '127.0.0.1', resolve));
-  const { port } = front.address();
-  return {
-    https: `https://127.0.0.1:${port}`,
-    http:  `http://127.0.0.1:${port}`,
-    plain,
-    close: () => new Promise((resolve) => {
-      tlsSide.closeAllConnections?.(); plainSide.closeAllConnections?.();
-      front.close(() => resolve());
-    }),
-  };
+const plainRequests = [];
+function schemeFetch(input, init) {
+  const url = new URL(typeof input === 'string' ? input : (input?.url ?? String(input)));
+  if (url.protocol === 'http:') plainRequests.push(`${init?.method ?? 'GET'} ${url.pathname}`);
+  else url.protocol = 'http:';
+  return fetch(url.href, init);
 }
 
-const front = await startDualSchemeFront(dav);
-test.after(() => front.close());
+/** Wie `createCalDAVClient`, nur mit `schemeFetch`. */
+async function schemeClient(account) {
+  const client = await createDAVClient({
+    serverUrl:          account.caldav_url,
+    credentials:        { username: account.username, password: account.password },
+    authMethod:         'Basic',
+    defaultAccountType: 'caldav',
+    fetch:              schemeFetch,
+  });
+  return withHttpRefusalsAsErrors(withCalendarObjectUrlFilter(client), { fetch: schemeFetch });
+}
+
+const httpsOrigin = dav.origin.replace(/^http:/, 'https:');
 
 /** Konto auf `https://`; der Server nennt das Objekt unter `http://` derselben Adresse. */
 async function mirroredOverHttps() {
   reset();
-  db.prepare('UPDATE caldav_accounts SET caldav_url = ? WHERE id = ?').run(`${front.https}/`, accountId);
+  db.prepare('UPDATE caldav_accounts SET caldav_url = ? WHERE id = ?').run(`${httpsOrigin}/`, accountId);
   const listUrl = dav.addCollection('home', { name: 'home', components: ['VTODO'] });
   const path = new URL(listUrl).pathname;
-  dav.putObject(listUrl, `neighbour-home.ics`, vtodo('neighbour-home@test', 'Nachbar'));
+  dav.putObject(listUrl, 'neighbour-home.ics', vtodo('neighbour-home@test', 'Nachbar'));
   dav.putObject(listUrl, FILE, vtodo(UID, 'Milch'));
   db.prepare(`
     INSERT INTO caldav_reminder_selection (account_id, list_url, list_name, target_module, enabled)
     VALUES (?, ?, 'home', 'tasks', 1)
-  `).run(accountId, `${front.https}${path}`);
+  `).run(accountId, `${httpsOrigin}${path}`);
   const own = dav.getObject(listUrl, FILE);
   const body = '<?xml version="1.0" encoding="utf-8"?>\n'
     + '<d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">'
-    + `<d:response><d:href>${xmlEscape(`${front.http}${path}${FILE}`)}</d:href><d:propstat><d:prop>`
+    + `<d:response><d:href>${xmlEscape(`${dav.origin}${path}${FILE}`)}</d:href><d:propstat><d:prop>`
     + `<d:getetag>${xmlEscape(own.etag)}</d:getetag><c:calendar-data>${xmlEscape(own.data)}</c:calendar-data>`
     + '</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>';
   const rule = {
@@ -246,28 +241,29 @@ async function mirroredOverHttps() {
     when: (req) => /multiget/.test(req.body) && req.body.includes(FILE),
   };
   dav.refuse(rule);
-  front.plain.length = 0;
-  await remindersSync.sync();
+  plainRequests.length = 0;
+  await remindersSync.sync({ createClient: schemeClient });
   const row = db.prepare('SELECT * FROM tasks WHERE external_uid = ?').get(UID);
   assert.ok(row, 'der Lauf hat die Aufgabe nicht gespiegelt - der Fall misst etwas anderes');
-  assert.deepEqual(front.plain, [], 'der Abruf selbst bleibt bei https');
+  assert.ok(dav.requests.length > 0, 'der Client hat den Fake-Server erreicht');
+  assert.deepEqual(plainRequests, [], 'der Abruf selbst bleibt bei https');
   return { rule, row };
 }
 
 test('https-Konto: Bearbeiten und Löschen stellen keine Anfrage über http', async () => {
   const { rule, row } = await mirroredOverHttps();
   db.prepare("UPDATE tasks SET title = 'Hafermilch', outbound_dirty = 1 WHERE id = ?").run(row.id);
-  await todoOutbound.flushOutbound();
+  await todoOutbound.flushOutbound({ createClient: schemeClient });
   dav.refuse(rule);
-  await remindersSync.sync();
-  assert.deepEqual(front.plain, [], 'Bearbeitung: nichts über http');
+  await remindersSync.sync({ createClient: schemeClient });
+  assert.deepEqual(plainRequests, [], 'Bearbeitung: nichts über http');
 
   const again = db.prepare('SELECT * FROM tasks WHERE id = ?').get(row.id);
   assert.equal(todoOutbound.queueTodoDeletion('tasks', again), true);
   db.prepare('DELETE FROM tasks WHERE id = ?').run(row.id);
-  await todoOutbound.flushOutbound();
+  await todoOutbound.flushOutbound({ createClient: schemeClient });
   dav.refuse(rule);
-  await remindersSync.sync();
-  assert.deepEqual(front.plain, [], 'Löschung: nichts über http');
+  await remindersSync.sync({ createClient: schemeClient });
+  assert.deepEqual(plainRequests, [], 'Löschung: nichts über http');
   assert.ok(dav.getObject(`${dav.origin}/cal/home/`, FILE), 'das Objekt liegt unverändert auf dem Server');
 });

@@ -49,7 +49,7 @@ import * as db from '../db.js';
 import { outboundFailureAction, MAX_OUTBOUND_ATTEMPTS } from './calendar-outbound.js';
 import { patchICSTodo } from '../utils/ics-patch.js';
 import {
-  createCalDAVClient, collectionUrlOf, createUploadGate, sameObjectAddress, withAccountOrigin,
+  createCalDAVClient, collectionUrlOf, createUploadGate, sameObjectAddress, withAccountOrigin, isOriginRefusal,
 } from '../utils/caldav-client.js';
 import {
   ownUid, isOwnUidOfRow, ownUploadRowId, parseOwnUid, findObjectWithUid, inspectObjectAt,
@@ -2001,6 +2001,19 @@ export async function processPendingDeletions(client, accountId, module, objectI
       dropDeletion(row.id);
       done++;
     } catch (err) {
+      // Die Adresse liegt nicht beim Konto (`createTodoClient`): gesendet
+      // wurde nichts, also zählt kein Versuch. Der volle Lauf räumt ab - das
+      // Konto führt das Objekt nicht -, der Sofortversuch lässt ihm den Auftrag.
+      if (isOriginRefusal(err)) {
+        if (complete) {
+          log.warn(`The stored address of VTODO ${row.uid} is not on the server of its account, dropping the pending deletion.`);
+          dropDeletion(row.id);
+          done++;
+        } else {
+          log.warn(`The stored address of VTODO ${row.uid} is not on the server of its account, leaving its deletion to the next sync run.`);
+        }
+        continue;
+      }
       const action = outboundFailureAction(err, row.attempts);
       if (action === 'settled') {
         dropDeletion(row.id);
@@ -2068,6 +2081,12 @@ export async function processPendingUpdates(client, accountId, module, objectInd
       settleOutbound(module, fresh);
       done++;
     } catch (err) {
+      // Gesendet wurde nichts (`createTodoClient`): kein Versuch, die
+      // Bearbeitung bleibt vorgemerkt und der Inbound überschreibt sie nicht.
+      if (isOriginRefusal(err)) {
+        log.warn(`The stored address of VTODO ${row.external_uid} is not on the server of its account, its update waits.`);
+        continue;
+      }
       const action = outboundFailureAction(err, row.outbound_attempts);
       if (action === 'settled') {
         log.warn(`VTODO ${row.external_uid} no longer exists on the server, dropping its update.`);
