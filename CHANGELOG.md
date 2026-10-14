@@ -7,9 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Budget category and subcategory bars show their share of the total.** Each bar in the budget
+  overview now carries a percentage in the middle of its track. A category is measured against the
+  total of its own block, expenses or income, because the two have separate scales and sums; a
+  subcategory against the total of its category. A share below one percent reads "<1 %" instead of
+  rounding down to "0 %", and the number follows the language and region. The bar grows from 8 to
+  20px to make room for it, only where a percentage is shown: the bars in the reports are unchanged.
+
 ## [2.77.0] - 2026-10-14
 
 ### Added
+
 
 - **Organize events in several local calendars** (#1243, from D#1231). Create and rename household
   calendars, reorder them through the manager's More menu, choose the destination when importing an ICS
