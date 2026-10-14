@@ -6976,6 +6976,47 @@ function eventStartFromForm(root) {
   return st ? `${sd}T${st}` : sd;
 }
 
+/** Das Ende, das das Formular gerade traegt - Gegenstueck zu eventStartFromForm. */
+function eventEndFromForm(root) {
+  if (root.querySelector('#modal-allday')?.checked) {
+    return readDateInput(root, '#modal-allday-end') || readDateInput(root, '#modal-end-date') || null;
+  }
+  const ed = readDateInput(root, '#modal-end-date');
+  const et = parseTimeInput(root.querySelector('#modal-end-time')?.value || '');
+  return ed ? (et ? `${ed}T${et}` : ed) : null;
+}
+
+/**
+ * Beginn, Ende und „ganztaegig", wie das Formular sie beim Oeffnen zeigte
+ * (#1958). Gegen diesen Stand prueft das Speichern, ob jemand die Zeit
+ * angefasst hat - siehe eventTimesUntouched().
+ */
+const eventTimeBaselines = new WeakMap();
+
+function eventTimesFromForm(root) {
+  return {
+    allDay: !!root.querySelector('#modal-allday')?.checked,
+    start: eventStartFromForm(root),
+    end: eventEndFromForm(root),
+  };
+}
+
+/**
+ * Zeigt das Formular noch dieselbe Zeit wie beim Oeffnen? (#1958)
+ *
+ * Gefragt wird nach den ZUSAMMENGESETZTEN Werten, nicht nach den einzelnen
+ * Feldern: die Datums- und Zeitfelder sind `<yuvomi-datepicker>`-Hosts, die
+ * der Feld-Ausgangsstand von #1284 (`input, select, textarea`) gar nicht
+ * sieht. Ohne Ausgangsstand gilt die Zeit als angefasst - im Zweifel geht sie
+ * mit, wie vor #1958.
+ */
+function eventTimesUntouched(root) {
+  const before = eventTimeBaselines.get(root);
+  if (!before) return false;
+  const now = eventTimesFromForm(root);
+  return now.allDay === before.allDay && now.start === before.start && now.end === before.end;
+}
+
 /**
  * Wie eine Zeile nach dem Beginn heissen muss, wenn der Beginn im Dialog
  * verschoben wurde.
@@ -7779,6 +7820,7 @@ function wireEventForm(panel, { mode, event = null, reminder = null }) {
   // es ueberhaupt etwas zu fragen gibt (#1284). Als Letztes: alles darueber
   // darf noch Werte setzen, die zum Ausgangsstand gehoeren.
   eventFormBaselines.set(panel, readEventFormState(panel));
+  eventTimeBaselines.set(panel, eventTimesFromForm(panel));
 }
 
 /**
@@ -8292,13 +8334,10 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
 
   if (allday) {
     start_datetime = eventStartFromForm(overlay);
-    end_datetime   = readDateInput(overlay, '#modal-allday-end')
-                   || readDateInput(overlay, '#modal-end-date');
-    end_datetime   = end_datetime || null;
+    end_datetime   = eventEndFromForm(overlay);
   } else {
     const stRaw = overlay.querySelector('#modal-start-time').value;
     const st = parseTimeInput(stRaw);
-    const ed = readDateInput(overlay, '#modal-end-date');
     const etRaw = overlay.querySelector('#modal-end-time').value;
     const et = parseTimeInput(etRaw);
     if ((stRaw && !st) || (etRaw && !et)) {
@@ -8311,7 +8350,7 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
     // Dieselbe Zusammensetzung, mit der die Erinnerungszeilen den Beginn im
     // Dialog verfolgen - zwei Schreibweisen koennten auseinanderlaufen.
     start_datetime = eventStartFromForm(overlay);
-    end_datetime   = ed ? (et ? `${ed}T${et}` : ed) : null;
+    end_datetime   = eventEndFromForm(overlay);
   }
 
   const visibleDateFields = allday
@@ -8539,6 +8578,19 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
           savePath = target.path;
           reminderBaseStart = newStart;
           reloadAfter = true;
+        } else if (eventTimesUntouched(overlay)) {
+          // EINE ZEIT, DIE NIEMAND ANGEFASST HAT, GEHT NICHT MIT (#1958). Das
+          // Formular zeigt einen Instant (`14:00:00Z`) in der Anzeigezone und
+          // schickt ihn als nackte Ziffern zurueck; die Route deutet die in der
+          // Haushaltszone. Ohne gesetzte Haushaltszone ist die Anzeigezone die
+          // des Browsers, die Haushaltszone die des Servers - und ein reiner
+          // Titel-Edit verschob den Termin um ihren Abstand. Fehlen Beginn und
+          // Ende, behaelt die Route die gespeicherten Werte (COALESCE). Beide
+          // fallen nur ZUSAMMEN weg: wer eines anfasst, schickt beide, damit
+          // eine Zeile nie zwei Speicherformen traegt.
+          seriesBody = { ...body };
+          delete seriesBody.start_datetime;
+          delete seriesBody.end_datetime;
         }
         const res = localRecurring
           ? await requestCalendarOccurrenceMutation({
