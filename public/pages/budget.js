@@ -27,7 +27,7 @@ import { renderPlans, openAddPlan } from '/pages/budget-plans.js';
 import { toLocalDateKey, parseLocalDateKey, addLocalDays,
          monthPeriodKeys, defaultDateInPeriod,
         todayKey} from '/utils/date.js';
-import { formatMoney, formatSignedAmount, amountPlaceholder, amountStep, amountMin, applyAmountFormat, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
+import { formatMoney, formatSignedAmount, amountPlaceholder, amountStep, amountMin, applyAmountFormat, amountIsSavable, smallestUnitLabel, sharePercent } from '/utils/money.js';
 import { budgetCategoryLabel } from '/utils/category-labels.js';
 import { trendMarkup, leadCardClass } from '/utils/metric-card.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
@@ -1699,15 +1699,9 @@ function blockTotal(rows) {
   return rows.reduce((sum, r) => sum + r.amount, 0);
 }
 
-/** Anteil an der Gesamtsumme als Prozenttext; unter 1 % als "<1 %". */
-function sharePercent(part, total) {
-  const share = Math.abs(total) > 0 ? Math.abs(part) / Math.abs(total) : 0;
-  const fmt = getNumberFormat({ style: 'percent', maximumFractionDigits: 0 });
-  return share > 0 && share < 0.005 ? `<${fmt.format(0.01)}` : fmt.format(share);
-}
-
-function sharePercentHtml(part, total) {
-  return `<span class="budget-bar-row__pct">${esc(sharePercent(part, total))}</span>`;
+/* Wie in der Statistik: der Anteil steht nur bei Ausgaben, leise hinter dem Betrag. */
+function shareHtml(part, total) {
+  return ` <span class="budget-bar-row__share">${esc(sharePercent(part, total))}</span>`;
 }
 
 // Screenreader-Zusammenfassung des Kategorie-Diagramms (Audit 1.7): je Block
@@ -1942,9 +1936,8 @@ function renderCategoryBars(byCategory) {
               <span class="budget-bar-row__label" title="${label}">${label}</span>
               <span class="budget-bar-row__track" style="--bar-visible:${r.amount !== 0 ? 1 : 0}">
                 <span class="budget-bar-row__fill budget-bar-row__fill--${kind}" style="--bar-scale:${scale.toFixed(4)}" data-bar-key="${kind}:${esc(String(r.category))}"></span>
-                ${sharePercentHtml(r.amount, total)}
               </span>
-              <span class="budget-bar-row__amount">${amountByRole(r.amount, 'flow').text}</span>
+              <span class="budget-bar-row__amount">${amountByRole(r.amount, 'flow').text}${kind === 'expenses' ? shareHtml(r.amount, total) : ''}</span>
             </button>`;
           }).join('')}
         </div>
@@ -2005,10 +1998,9 @@ function subcategoryRows(category, entries) {
         <span class="budget-bar-row__track">
           <span class="budget-bar-row__fill budget-bar-row__fill--${kind}"
                 style="--bar-scale:${scale}"></span>
-          ${sharePercentHtml(row.amount, categoryTotal)}
         </span>
         <span class="budget-bar-row__amount">
-          ${amountByRole(row.amount, 'flow').text}
+          ${amountByRole(row.amount, 'flow').text}${kind === 'expenses' && row.amount !== 0 ? shareHtml(row.amount, categoryTotal) : ''}
         </span>
       </button>`;
   }).join('');

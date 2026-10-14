@@ -5086,90 +5086,106 @@ test('#1593: Unterkategorien zeigen den Gesamtwert und folgen der bekannten Reih
   }
 });
 
-/* Der Anteil an der Gesamtsumme steht MITTEN IN DER BAHN, nicht neben dem Namen.
- * Kategorien rechnen gegen die Summe ihres Blocks (Ausgaben bzw. Einnahmen),
- * Unterkategorien gegen die Summe ihrer Kategorie. */
-const pctTexts = (html) => [...html.matchAll(/<span class="budget-bar-row__pct">([^<]*)<\/span>/g)]
+/* Der Anteil an der Gesamtsumme steht wie in der Statistik leise HINTER dem
+ * Betrag (`budget-bar-row__share`) und nur bei Ausgaben. Kategorien rechnen
+ * gegen die Summe ihres Blocks, Unterkategorien gegen die ihrer Kategorie. */
+const shareTexts = (html) => [...html.matchAll(/<span class="budget-bar-row__share">([^<]*)<\/span>/g)]
   .map((m) => m[1]);
 
-test('Anteil in der Bahn: Kategorien rechnen gegen die Summe ihres Blocks', () => {
+test('Anteil hinter dem Betrag: Ausgabenkategorien rechnen gegen die Summe der Ausgaben', () => {
   const html = budgetUi.renderCategoryBars(kategorien());
   const expensesTotal = 1620.99 + 482.75 + 371.4 + 234.98;
-  const incomeTotal = 5050 + 500;
-  const percent = (part, total) => Math.round((part / total) * 100);
+  const expensesBlock = html.match(/<section class="budget-chart-block budget-chart-block--expenses[\s\S]*?<\/section>/)[0];
+  const incomeBlock = html.match(/<section class="budget-chart-block budget-chart-block--income[\s\S]*?<\/section>/)[0];
 
-  const expenses = pctTexts(html.match(/<section class="budget-chart-block budget-chart-block--expenses[\s\S]*?<\/section>/)[0])
-    .map((text) => Number.parseInt(text, 10));
-  assert.deepEqual(expenses, [1620.99, 482.75, 371.4, 234.98].map((v) => percent(v, expensesTotal)),
-    'Ausgaben: Anteil an der Summe der Ausgaben, nicht an Einnahmen plus Ausgaben');
-  const income = pctTexts(html.match(/<section class="budget-chart-block budget-chart-block--income[\s\S]*?<\/section>/)[0])
-    .map((text) => Number.parseInt(text, 10));
-  assert.deepEqual(income, [5050, 500].map((v) => percent(v, incomeTotal)));
+  assert.deepEqual(
+    shareTexts(expensesBlock).map((text) => Number.parseInt(text, 10)),
+    [1620.99, 482.75, 371.4, 234.98].map((v) => Math.round((v / expensesTotal) * 100)),
+    'Anteil an der Summe der Ausgaben, nicht an Einnahmen plus Ausgaben',
+  );
+  for (const text of shareTexts(expensesBlock)) assert.match(text, /^\d+\s?%$/, 'Prozentformat der Sprache');
+  assert.deepEqual(shareTexts(incomeBlock), [], 'bei Einnahmen steht kein Anteil - wie in der Statistik');
 
-  for (const text of pctTexts(html)) assert.match(text, /^\d+\s?%$/, 'Prozentformat der Sprache');
-
-  const rows = [...html.matchAll(/<button\b[\s\S]*?<\/button>/g)].map(([row]) => row);
-  assert.equal(rows.length, 6);
-  for (const row of rows) {
+  for (const row of expensesBlock.match(/<button\b[\s\S]*?<\/button>/g)) {
+    assert.match(row, /<span class="budget-bar-row__amount">[^<]*<span class="budget-bar-row__share">[^<]*<\/span><\/span>/,
+      'der Anteil steht im Betragsfeld, hinter dem Betrag');
+    const track = row.match(/<span class="budget-bar-row__track"[\s\S]*?<\/span>\s*<\/span>/)[0];
+    assert.doesNotMatch(track, /__share/, 'die Bahn bleibt, wie sie ist');
     const label = row.match(/<span class="budget-bar-row__label"[\s\S]*?<\/span>/)[0];
-    assert.doesNotMatch(label, /budget-bar-row__pct/, 'der Anteil steht nicht mehr beim Namen');
-    assert.match(row, /<span class="budget-bar-row__track"[^>]*>[\s\S]*<span class="budget-bar-row__pct">[^<]*<\/span>\s*<\/span>/,
-      'der Anteil steht in der Bahn');
+    assert.doesNotMatch(label, /__share/, 'der Anteil steht nicht beim Namen');
   }
 });
 
-test('Anteil in der Bahn: unter einem Prozent steht "<1 %", eine leere Summe teilt nicht durch null', () => {
+test('Anteil hinter dem Betrag: sharePercent ist eine Stelle fuer Uebersicht und Statistik', async () => {
+  const { sharePercent } = await import('../public/utils/money.js');
+  assert.match(sharePercent(25, 100), /^25\s?%$/);
+  assert.match(sharePercent(-25, -100), /^25\s?%$/, 'das Vorzeichen spielt keine Rolle');
+  assert.match(sharePercent(1, 999), /^<1\s?%$/, 'unter einem halben Prozent steht "<1 %", nicht "0 %"');
+  assert.match(sharePercent(0, 100), /^0\s?%$/);
+  assert.match(sharePercent(5, 0), /^0\s?%$/, 'eine leere Summe teilt nicht durch null');
+  assert.doesNotMatch(sharePercent(5, 0), /NaN|Infinity/);
+
+  // Die Uebersicht maskiert den Text ("<" gehoert escaped).
   const html = budgetUi.renderCategoryBars([
     { category: 'rent', income: 0, expenses: -999, total: -999 },
     { category: 'coffee', income: 0, expenses: -1, total: -1 },
   ]);
-  const texts = pctTexts(html);
-  assert.match(texts[0], /^99\s?%$|^100\s?%$/);
-  assert.match(texts[1], /^&lt;1\s?%$/, 'ein Anteil unter 0,5 % wird nicht zu "0 %" gerundet und ist HTML-escaped');
-  assert.doesNotMatch(html, /NaN|Infinity/);
+  const texts = shareTexts(html);
+  assert.match(texts[1], /^&lt;1\s?%$/);
+
+  // Die Statistik rechnet nicht mehr selbst.
+  const code = withoutHtmlComments(stats);
+  assert.match(code, /import \{[^}]*\bsharePercent\b[^}]*\} from '\/utils\/money\.js'/, 'die Statistik nimmt dieselbe Funktion');
+  assert.match(code, /sharePercent\(r\.amount, absTotal\)/);
+  assert.doesNotMatch(code, /Math\.round\(\(Math\.abs\(r\.amount\) \/ absTotal\)/, 'keine zweite Prozentrechnung in der Statistik');
+  assert.doesNotMatch(withoutHtmlComments(budget), /function sharePercent/, 'keine zweite Kopie in der Uebersicht');
 });
 
-test('Anteil in der Bahn: Unterkategorien rechnen gegen die Summe ihrer Kategorie', () => {
+test('Anteil hinter dem Betrag: Ausgaben-Unterkategorien rechnen gegen die Summe ihrer Kategorie', () => {
   const state = budgetUi.state;
   const previous = { ...state };
   try {
     Object.assign(state, {
       currency: 'EUR',
-      categoryFilter: 'salary',
+      categoryFilter: 'housing',
       subcategoryFilter: null,
       responsibleFilterId: null,
       meta: {
-        expenseCategories: [],
+        expenseCategories: [{ key: 'housing', name: 'Abitazione' }],
         incomeCategories: [{ key: 'salary', name: 'Stipendio' }],
-        subcategories: { salary: [{ key: 'main' }, { key: 'bonus' }] },
+        subcategories: {
+          housing: [{ key: 'rent_mortgage' }, { key: 'utilities' }],
+          salary: [{ key: 'main' }, { key: 'bonus' }],
+        },
       },
       entries: [
+        { category: 'housing', subcategory: 'rent_mortgage', amount: -900 },
+        { category: 'housing', subcategory: 'utilities', amount: -300 },
+        { category: 'other', subcategory: 'x', amount: -5000 },
         { category: 'salary', subcategory: 'main', amount: 900 },
         { category: 'salary', subcategory: 'bonus', amount: 300 },
-        { category: 'other', subcategory: 'x', amount: 5000 },
       ],
-      summary: { byCategory: [{ category: 'salary', income: 1200, expenses: 0, total: 1200 }] },
+      summary: { byCategory: [{ category: 'housing', income: 0, expenses: -1200, total: -1200 }] },
     });
     const html = budgetUi.renderSubcategoryBreakdowns();
-    assert.deepEqual(pctTexts(html).map((text) => Number.parseInt(text, 10)), [75, 25],
+    assert.deepEqual(shareTexts(html).map((text) => Number.parseInt(text, 10)), [75, 25],
       'Anteil an der Kategorie, Buchungen anderer Kategorien zaehlen nicht mit');
-    for (const text of pctTexts(html)) assert.match(text, /^\d+\s?%$/);
+    assert.doesNotMatch(html.match(/<span class="budget-bar-row__track"[\s\S]*?<\/span>\s*<\/span>/)[0], /__share/);
+
+    state.categoryFilter = 'salary';
+    assert.deepEqual(shareTexts(budgetUi.renderSubcategoryBreakdowns()), [], 'bei Einnahmen steht kein Anteil');
   } finally {
     Object.assign(state, previous);
   }
 });
 
-test('Anteil in der Bahn: die Bahn ist hoch genug und der Text liegt zentriert darueber', () => {
+test('Anteil hinter dem Betrag: die Bahn behaelt ihre Hoehe, es gibt keine Regel fuer Text darin', () => {
   const rules = [...eachRule(budgetCss)];
-  const track = rules.find((r) => /\.budget-bar-row__track:has\(> \.budget-bar-row__pct\)/.test(r.selector));
-  assert.ok(track, 'eine Bahn mit Anteil wird hoeher als die schmale Standardbahn');
-  assert.match(track.body, /height:\s*var\(--space-5\)/);
-  assert.match(track.body, /position:\s*relative/);
-  const pct = rules.find((r) => r.selector.trim() === '.budget-bar-row__pct');
-  assert.ok(pct, 'der Anteil hat eine eigene Regel');
-  assert.match(pct.body, /position:\s*absolute/);
-  assert.match(pct.body, /justify-content:\s*center/);
-  assert.match(pct.body, /pointer-events:\s*none/, 'der Text faengt keinen Tipp auf die Zeile ab');
+  const track = rules.find((r) => r.at.length === 0 && r.selector.trim() === '.budget-bar-row__track' && /height:/.test(r.body));
+  assert.match(track.body, /height:\s*var\(--space-2\)/);
+  assert.equal(rules.some((r) => /__pct\b/.test(r.selector)), false, 'kein Anteil mitten in der Bahn');
+  const share = rules.find((r) => r.selector.trim() === '.budget-bar-row__share');
+  assert.ok(share, 'der Anteil traegt die Regel der Statistik');
 });
 
 // ---------------------------------------------------------------------------

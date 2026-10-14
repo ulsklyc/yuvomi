@@ -10,7 +10,7 @@ import { renderSkeletonChart } from '/utils/skeleton.js';
 import { growBars, drawChartOnce } from '/utils/ux.js';
 import { mountEmptyState, mountLoadError } from '/utils/empty-state.js';
 import { CHART, chartX, chartY, chartGridMarkup, chartXLabelsMarkup, calmDomain } from '/utils/chart.js';
-import { formatMoneyAxis, formatSignedAmount } from '/utils/money.js';
+import { formatMoneyAxis, formatSignedAmount, sharePercent } from '/utils/money.js';
 import { addLocalDays, todayKey } from '/utils/date.js';
 import { trendMarkup } from '/utils/metric-card.js';
 
@@ -335,7 +335,7 @@ function renderCatBars() {
       const colorIndex = kind === 'expenses' ? colors.get(r.category) : undefined;
       const fillColor = colorIndex != null ? `;--bar-fill:${DONUT_COLORS[colorIndex]}` : '';
       const share = kind === 'expenses' && absTotal > 0 && r.amount !== 0
-        ? ` <span class="budget-bar-row__share">${Math.round((Math.abs(r.amount) / absTotal) * 100)}%</span>`
+        ? ` <span class="budget-bar-row__share">${view.ctx.esc(sharePercent(r.amount, absTotal))}</span>`
         : '';
       return `
         <div class="budget-bar-row budget-bar-row--compare">
