@@ -47,12 +47,18 @@ function offsetMinutes(ms, zone) {
   return (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3]));
 }
 
-/** Wanduhrzeit `YYYY-MM-DDTHH:MM[:SS]` einer Zone -> ms seit Epoch. */
+/**
+ * Wanduhrzeit `YYYY-MM-DDTHH:MM[:SS]` einer Zone -> ms seit Epoch. Gibt es die
+ * Ortszeit zweimal (Uhr zurueckgestellt), der ERSTE der beiden Zeitpunkte -
+ * so liest RFC 5545 eine doppelte Ortszeit.
+ */
 function wallToMs(wall, zone) {
   const naive = Date.parse(`${wall.length === 16 ? `${wall}:00` : wall}Z`);
-  let guess = naive - offsetMinutes(naive, zone) * 60000;
-  guess = naive - offsetMinutes(guess, zone) * 60000;
-  return guess;
+  const offsets = new Set([-1, 0, 1].map((days) => offsetMinutes(naive + days * 86400000, zone)));
+  const fits = [...offsets].map((o) => naive - o * 60000).filter((ms) => offsetMinutes(ms, zone) * 60000 === naive - ms);
+  if (fits.length) return Math.min(...fits);
+  // Fruehjahrsluecke: die Ortszeit gibt es nicht; wie zuvor der Naeherungswert.
+  return naive - offsetMinutes(naive - offsetMinutes(naive, zone) * 60000, zone) * 60000;
 }
 
 /** `YYYYMMDDTHHMMSSZ` -> ms. */
@@ -95,7 +101,7 @@ function googleDays(body) {
 
 /** Yuvomis Vorkommen derselben Zeile, als lokale Tage. */
 function yuvomiDays(event) {
-  return expandRecurringEvents([{ id: 1, ...event }], '2035-01-01', '2036-12-31')
+  return expandRecurringEvents([{ id: 1, ...event }], '2020-01-01', '2036-12-31')
     .map((occ) => String(occ.start_datetime).slice(0, 10));
 }
 
@@ -161,6 +167,18 @@ test('Tagesgrenze am Tag der Zeitumstellung: der Versatz des UNTIL-Tags zaehlt',
     assert.equal(body.recurrence[0], `RRULE:FREQ=DAILY;UNTIL=${expected}`);
     assert.deepEqual(googleDays(body), yuvomiDays(event));
   }
+});
+
+test('die erste Stunde des Folgetags gibt es zweimal: die Grenze liegt vor der ersten', () => {
+  // Asia/Amman stellte am 29.10.2021 um 01:00 (+03) auf 00:00 (+02) zurueck:
+  // 00:00 bis 00:59 des 29. gibt es zweimal. Der 28. endet beim ERSTEN 00:00,
+  // 21:00Z - und das Vorkommen um 00:30 im ersten Durchgang (21:30Z) gehoert
+  // schon zum 29. (Review-Befund an #1975).
+  const event = timed('00:30', '20211028', '2021-10-20');
+  const body = localEventToGoogle(event, {}, 'Asia/Amman');
+  assert.equal(body.recurrence[0], 'RRULE:FREQ=DAILY;UNTIL=20211028T205959Z');
+  assert.deepEqual(googleDays(body), yuvomiDays(event));
+  assert.equal(googleDays(body).at(-1), '2021-10-28');
 });
 
 test('UNTIL folgt der gesendeten Zone, nicht der Zone des Prozesses', () => {
