@@ -1362,7 +1362,7 @@ function recurrenceIsEmptyAtAnchor(source, householdZone) {
   return !utcDiffersFromLocal && endsBeforeStart(start, source.recurrence_rule);
 }
 
-export function assertSuccessorHasOccurrence(source, householdZone = householdTimeZone(null)) {
+export function assertSuccessorHasOccurrence(source, householdZone) {
   if (recurrenceIsEmptyAtAnchor(source, householdZone)) {
     throw new CalendarOccurrenceError(
       'The successor recurrence rule has no occurrence on or after its start date.',

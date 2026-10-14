@@ -55,8 +55,8 @@
 
 import { seriesStartFor } from './recurrence.js';
 import {
-  hasExplicitZone, householdTimeZone, isValidTimeZone, localToUTCPrecise, shiftDateKey,
-  storedDayDiffersFromSeriesDay, storedToInstantMsPrecise, utcToWall,
+  hasExplicitZone, isValidTimeZone, localToUTCPrecise, shiftDateKey,
+  storedDayDiffersFromSeriesDay, storedToInstantIso, storedToInstantMsPrecise, utcToWall,
 } from '../utils/timezone.js';
 
 /**
@@ -76,7 +76,7 @@ function istEigen(event) {
  * zurueck, deren UTC-Tag vom lokalen abweicht, und wenn zwei Stellen diese
  * Frage verschieden beantworten, liefern sie verschiedene erste Vorkommen.
  */
-function zonenUnsicher(event, householdZone = householdTimeZone(null)) {
+function zonenUnsicher(event, householdZone) {
   // Zonenlose Ziffern sind Wanduhr des Haushalts, nie der Prozesszone (#1993).
   return storedDayDiffersFromSeriesDay(event?.start_datetime, event?.tzid, householdZone);
 }
@@ -90,8 +90,8 @@ function zonenUnsicher(event, householdZone = householdTimeZone(null)) {
  *   sonst derselbe Wert mit dem ersten Tag, den die Regel wirklich trifft.
  *   Uhrzeit und Format bleiben, `seriesStartFor` tauscht nur den Datumsteil.
  */
-export function outboundStartDatetime(event) {
-  return outboundDateRange(event).start_datetime;
+export function outboundStartDatetime(event, options) {
+  return outboundDateRange(event, options).start_datetime;
 }
 
 /**
@@ -174,9 +174,9 @@ function verschiebe(wert, tage) {
  *   `zone`: die Zone, in der der Empfaenger die Serie rechnet, wenn es nicht
  *   die `tzid` der Zeile ist (Google). Gelesen wird sie nur fuer einen Start,
  *   der ein Zeitpunkt ist; eine zonenlose Wanduhrzeit meint ihren Tag selbst.
- *   `householdZone`: in ihr sind zonenlose Ziffern geschrieben; die Frage, ob
- *   ihr Tag neben dem Ortstag der `tzid` liegt, liest sie dort (#1993).
- *   Fehlt sie, gilt der Rueckfall auf die Umgebung (Default von `zonenUnsicher`).
+ *   `householdZone`: in ihr sind zonenlose Ziffern geschrieben (#1993).
+ *   Pflicht, sobald eine eigene Serie zonenlose Ziffern neben einer `tzid`
+ *   traegt; fehlt sie dort, wirft `storedToInstantIso`.
  * @returns {{ start_datetime: string, end_datetime: string|null }}
  */
 export function outboundDateRange(event, { zone = null, householdZone = null } = {}) {
@@ -186,8 +186,30 @@ export function outboundDateRange(event, { zone = null, householdZone = null } =
   if (!roh || !event?.recurrence_rule || !istEigen(event)) return unveraendert;
   const rechenZone = zone || event.tzid;
   if (hasExplicitZone(roh) && isValidTimeZone(rechenZone)) return zonedDateRange(event, rechenZone) ?? unveraendert;
+  /* ZONENLOSE ZIFFERN NEBEN EINER TZID, OHNE FREMDE RECHENZONE (#1993).
+   *
+   * CalDAV, iCloud und der Feed geben eine solche Serie mit `TZID=<tzid>`
+   * hinaus, der Empfaenger rechnet ihre Vorkommen also auf der Wanduhr der
+   * `tzid`. Ausgerichtet wird deshalb dort, nicht am Tag im Text: der ist der
+   * Haushaltstag und kann neben dem Ortstag liegen. 05:30 am 15. November in
+   * Berlin ist 20:30 am 14. in Los Angeles; am Text ausgerichtet ging
+   * `20351114T203000` hinaus, und der Anbieter zaehlte diesen Tag als eigenes
+   * Vorkommen neben den Monatsletzten. Also erst der Zeitpunkt (in der
+   * Haushaltszone gelesen), dann dieselbe Ausrichtung wie fuer jeden anderen
+   * Zeitpunkt. Ohne Verschiebung bleibt die Zeile Wort fuer Wort.
+   *
+   * Mit `zone` (Google) rechnet der Empfaenger in einer anderen Zone; dort
+   * bleibt es beim Weg darunter, und Google bekommt, was es bisher bekam. */
+  if (event.tzid && !event.all_day && !zone && isValidTimeZone(event.tzid)) {
+    const alsZeitpunkt = {
+      ...event,
+      start_datetime: storedToInstantIso(roh, householdZone),
+      end_datetime: ende ? storedToInstantIso(ende, householdZone) : ende,
+    };
+    return zonedDateRange(alsZeitpunkt, event.tzid) ?? unveraendert;
+  }
   const start = seriesStartFor(roh, event.recurrence_rule, {
-    utcDiffersFromLocal: zonenUnsicher(event, householdZone || undefined),
+    utcDiffersFromLocal: zonenUnsicher(event, householdZone),
   });
   if (!start || start === roh) return unveraendert;
   const tage = tagesDifferenz(String(event.start_datetime).slice(0, 10), String(start).slice(0, 10));

@@ -80,15 +80,6 @@ export function loadEventExceptions(d, eventIds) {
 }
 
 /**
- * Die Zone, in der die Expansion zonenlose Ziffern neben einer `tzid` liest
- * (#1993). Die Leser reichen die Haushaltszone herein; ohne sie bleibt nur der
- * Rueckfall auf die Umgebung, als Default, wie bei jeder reinen Funktion hier.
- */
-function readingZone(zone = householdTimeZone(null)) {
-  return zone;
-}
-
-/**
  * Die Haushaltszone, wenn die Expansion sie fuer DIESE Zeile braucht - sonst
  * null (#1993). Gebraucht wird sie nur bei einem getimten, zonenlosen Start
  * neben einer `tzid`; Leser, die Zeile fuer Zeile aufloesen, sparen so das
@@ -119,7 +110,8 @@ export function seriesReadingZone(database, event) {
  *        householdZone: Zone des Haushalts (`householdTimeZone(db)`), in der
  *        zonenlose Start-Ziffern neben einer `tzid` gelesen werden (#1993).
  *        Der Aufrufer reicht sie herein, die Expansion kennt keine Datenbank;
- *        fehlt sie, gilt der Rueckfall auf die Umgebung (`readingZone`).
+ *        Pflicht fuer eine solche Zeile: fehlt sie, wirft die Expansion
+ *        (`storedToInstantIso`), statt still in der Prozesszone zu lesen.
  * @returns {object[]}  Expandiertes, sortiertes Array
  */
 export function expandRecurringEvents(
@@ -133,7 +125,6 @@ export function expandRecurringEvents(
     householdZone = null,
   } = {},
 ) {
-  const zoneOfHousehold = readingZone(householdZone || undefined);
   const result = [];
   const iterationLimit = Number.isInteger(maxIterations) && maxIterations > 0
     ? Math.min(maxIterations, MAX_EXPANSION_ITERATIONS)
@@ -164,10 +155,10 @@ export function expandRecurringEvents(
      * Ziffern laufen als Wanduhr durch und Start und Ende lesen dieselbe Zone. */
     const zonedNaive = !!event.tzid && !isAllDay && !hasExplicitZone(event.start_datetime);
     const startText = zonedNaive
-      ? (storedToInstantIso(event.start_datetime, zoneOfHousehold) ?? event.start_datetime)
+      ? (storedToInstantIso(event.start_datetime, householdZone) ?? event.start_datetime)
       : event.start_datetime;
     const endText = zonedNaive && event.end_datetime
-      ? (storedToInstantIso(event.end_datetime, zoneOfHousehold) ?? event.end_datetime)
+      ? (storedToInstantIso(event.end_datetime, householdZone) ?? event.end_datetime)
       : event.end_datetime;
 
     // Dauer des Events in ms (für End-Zeit-Berechnung der Instanzen)

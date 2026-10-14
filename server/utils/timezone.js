@@ -213,6 +213,10 @@ function readStoredInstant(value, tz, toUTC) {
  * geschrieben wurden, dieselbe, in der `storedToInstantMs()` sie liest.
  *
  * Ein Wert mit eigener Zone kommt unveraendert zurueck.
+ *
+ * DIE ZONE IST PFLICHT. Fehlt sie bei zonenlosen Ziffern, wirft die Funktion:
+ * ein stiller Rueckfall waere wieder die Prozesszone, also genau der Fehler.
+ * Jeder Aufrufer hat die Haushaltszone zur Hand (`householdTimeZone(db)`).
  * @param {string} value          Wert aus start_datetime/end_datetime
  * @param {string} householdZone  IANA-Zone des Haushalts (`householdTimeZone`)
  * @returns {string|null} Zeitpunkt, oder null bei unlesbarem Wert
@@ -221,6 +225,9 @@ export function storedToInstantIso(value, householdZone) {
   const raw = String(value ?? '').trim();
   if (!raw) return null;
   if (hasExplicitZone(raw)) return Number.isNaN(Date.parse(raw)) ? null : raw;
+  if (!isValidTimeZone(householdZone)) {
+    throw new TypeError(`storedToInstantIso(): "${raw}" carries no zone, and no household zone was passed to read it in.`);
+  }
   const ms = storedToInstantMsPrecise(raw, householdZone);
   return ms === null ? null : new Date(ms).toISOString().replace('.000Z', 'Z');
 }

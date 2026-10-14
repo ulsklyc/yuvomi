@@ -23,10 +23,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   series' own time zone. The calendar view and the ICS feed then read that time in the zone the
   server process runs in, so the same series could show at different times after a container was
   rebuilt with another `TZ`. The time is now always read in the household's time zone, and the
-  series continues on the clock of its own zone. Also affected: CalDAV and iCloud. They received
-  the household's digits unchanged, labelled with the series' zone. If your household time zone
-  differs from the zone of such a series, Yuvomi now sends a different clock time to CalDAV and
-  iCloud the next time the series is pushed - the one you saw in the form. Google is unchanged.
+  series continues on the clock of its own zone. The dashboard countdown now names the same day
+  as the calendar for such a series. Also affected: CalDAV and iCloud. They received the
+  household's digits unchanged, labelled with the event's own zone. This applied to imported
+  single events with their own zone as well as to series. If your household time zone differs from
+  the zone of such an event, Yuvomi now sends a different clock time to CalDAV and iCloud the next
+  time the event is pushed - the one you saw in the form. A series you edited in Yuvomi is lined up
+  with its rule on the clock of its own zone, so the provider no longer counts an extra occurrence
+  on the day before. Google is unchanged.
 - **Housekeeping: creating or editing a housekeeper profile saves again** (#1976). Since 2.75.0
   the "Add" button in the profile dialog did nothing: no message, no profile, and the dialog stayed
   open. Its buttons had lost the connection to the form they belong to, and find it again.

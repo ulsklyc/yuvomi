@@ -32,7 +32,7 @@
  *                  server/utils/ics-format.js
  */
 
-import { householdTimeZone, isValidTimeZone, storedToInstantIso } from './timezone.js';
+import { isValidTimeZone, storedToInstantIso } from './timezone.js';
 import { formatWall } from './vtimezone.js';
 import { toICSDatetime } from './ics-format.js';
 import { timedSeriesUntil } from './rrule-until.js';
@@ -56,15 +56,6 @@ export function anchorZone(tz) {
   if (!zone) return null;
   if (/^(UTC|GMT|Z|Etc\/(UTC|GMT|GMT0|GMT\+0|GMT-0|Zulu|Universal|Greenwich))$/i.test(zone)) return null;
   return isValidTimeZone(zone) ? zone : null;
-}
-
-/**
- * Die Zone, in der zonenlose Ziffern gelesen werden (#1993). Jeder Aufrufer
- * reicht die Haushaltszone herein; ohne sie bleibt nur der Rueckfall auf die
- * Umgebung, als Default, damit die Funktion ohne Verbindung aufrufbar bleibt.
- */
-function readingZone(zone = householdTimeZone(null)) {
-  return zone;
 }
 
 /** Ganztags-Datum 'YYYYMMDD' aus einem gespeicherten Wert. */
@@ -121,10 +112,10 @@ export function eventDateTimeFields(event, householdZone = null) {
   // Empfaenger als 08:30 in Los Angeles. Jetzt werden sie in der
   // Haushaltszone zum Zeitpunkt und von dort zur Wanduhr der Serienzone,
   // dieselbe Lesart wie Expansion und Feed.
-  const readZone = readingZone(isValidTimeZone(householdZone) ? householdZone : undefined);
   const inEventZone = (value) => {
     if (hasExplicitOffset(value)) return formatWall(value, zoneOfEvent);
-    const instant = storedToInstantIso(value, readZone);
+    // Ohne Haushaltszone wirft `storedToInstantIso`: kein stiller Rueckfall.
+    const instant = storedToInstantIso(value, householdZone);
     return instant ? formatWall(instant, zoneOfEvent) : toICSDatetime(value);
   };
 

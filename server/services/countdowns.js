@@ -43,7 +43,7 @@ import { loadEventExceptions } from './calendar-events.js';
 import { modulesLeftOut, notBirthdayEventSql } from './household-modules.js';
 import { eventProjectionSql, resolveProjectedEventRows } from './calendar-event-reader.js';
 import { icsSubscriptionVisibleWhere, visibilityWhere } from './visibility.js';
-import { householdTimeZone, storedDayDiffersFromSeriesDay, utcToWall } from '../utils/timezone.js';
+import { householdTimeZone, localToUTC, storedToWall, utcToWall } from '../utils/timezone.js';
 // Dieselbe Rangfolge wie im Kalender und auf der Uebersicht - eine Regel, eine
 // Datei. Der Server importiert oefter aus `public/utils/` (date, folder-tree,
 // currency-codes, ...), immer fuer abhaengigkeitsfreie geteilte Regeln.
@@ -165,19 +165,27 @@ export function nextEventDate(event, todayKey, exceptions = null, { graceDays = 
   // und der unveraenderte 15. saehe aus wie einer. "Nicht bewegt" und "nichts
   // gefunden" sind vom Rueckgabewert her nicht zu unterscheiden, deshalb wird
   // vorher gefragt.
-  // DIESELBE ZONENFRAGE WIE IN DER EXPANSION, SONST WIDERSPRECHEN SIE SICH.
+  // DIESELBE RECHNUNG WIE IN DER EXPANSION, SONST WIDERSPRECHEN SIE SICH.
   // Ein Termin mit eigener Zone kann in UTC an einem anderen Kalendertag liegen
   // als vor Ort: 31. Januar 20:00 in New York ist gespeichert als 1. Februar
-  // 01:00 UTC. Die Monatsletzten-Pruefung sah dort den Ersten, fand kein
-  // Vorkommen und gab `null` zurueck - der Kalender zeigte den Termin, die
-  // Kachel verschwieg ihn. `expandRecurringEvents` setzt die Pruefung in genau
-  // diesem Fall aus (`zonenUnsicher`); hier gilt dieselbe Ruecknahme, sonst
-  // beantworten zwei Stellen dieselbe Frage verschieden.
-  // Zonenlose Ziffern liest auch diese Frage in der Haushaltszone (#1993).
-  const zonenUnsicher = storedDayDiffersFromSeriesDay(String(event.start_datetime ?? ''), event.tzid, tz);
+  // 01:00 UTC. Bis #985 setzte die Expansion dort die Monatsletzten-Pruefung
+  // aus und diese Stelle mit ihr (`zonenUnsicher`).
+  //
+  // EINE GETIMTE SERIE MIT EIGENER ZONE RECHNET AUF DEREN WANDUHR (#1993), wie
+  // die Expansion: dort laufen die Vorkommen auf den Ortstagen der `tzid`, und
+  // erst der Zeitpunkt jedes Vorkommens sagt, auf welchen Tag des Haushalts es
+  // faellt. Mit dem Haushaltstag als Startpunkt und ausgesetzter
+  // Monatsletzten-Pruefung nannte der Countdown sonst einen Tag, an dem der
+  // Kalender nichts zeigt: 02.10. 08:30 Berlin neben tzid Los Angeles,
+  // "am Monatsletzten" - der Kalender zeigt den 01.11. 07:30, der Countdown
+  // sagte 02.10.
+  const serienWand = (!event.all_day && event.tzid)
+    ? storedToWall(String(event.start_datetime ?? ''), event.tzid, tz)
+    : null;
+  if (serienWand) return nextZonedSeriesDate(event, serienWand, todayKey, exceptions, tz);
 
-  if (!hasAnyOccurrence(startKey, event.recurrence_rule, { utcDiffersFromLocal: zonenUnsicher })) return null;
-  const ersterTreffer = seriesStartFor(startKey, event.recurrence_rule, { utcDiffersFromLocal: zonenUnsicher });
+  if (!hasAnyOccurrence(startKey, event.recurrence_rule)) return null;
+  const ersterTreffer = seriesStartFor(startKey, event.recurrence_rule);
   let candidate = ersterTreffer >= todayKey
     ? ersterTreffer
     : nextOccurrenceAfter(ersterTreffer, event.recurrence_rule, todayKey, { seriesStart: startKey });
@@ -192,6 +200,44 @@ export function nextEventDate(event, todayKey, exceptions = null, { graceDays = 
   // seit #877 springt das Aufholen, statt zu zaehlen.
   if (!candidate || candidate < todayKey) return null;
   return candidate;
+}
+
+/**
+ * Das naechste Vorkommen einer getimten Serie mit eigener Zone, als Tag des
+ * Haushalts (#1993). Die Regel laeuft auf den Ortstagen der `tzid`, wie in
+ * `expandRecurringEvents`; je Vorkommen wird der Zeitpunkt gebildet und auf
+ * die Haushaltszone gelesen. Ausnahmen (EXDATE) liegen auf dem UTC-Tag des
+ * Vorkommens, dort schlaegt auch die Expansion nach.
+ *
+ * Die untere Schranke liegt zwei Tage vor `todayKey`: Ortstag und Haushaltstag
+ * koennen bis zu zwei Kalendertage auseinanderliegen (Kiritimati gegen Niue),
+ * entschieden wird danach am Haushaltstag jedes Kandidaten.
+ *
+ * @param {object} event
+ * @param {{ date: string, time: string }} serienWand  Wanduhr des Starts in der `tzid`
+ * @param {string} todayKey
+ * @param {Set<string>|null} exceptions
+ * @param {string} tz  Haushaltszone
+ * @returns {string|null}
+ */
+function nextZonedSeriesDate(event, serienWand, todayKey, exceptions, tz) {
+  const rule = event.recurrence_rule;
+  const seriesStart = serienWand.date;
+  if (!hasAnyOccurrence(seriesStart, rule)) return null;
+  const floor = shiftKey(todayKey, -2);
+  let candidate = seriesStartFor(seriesStart, rule);
+  if (candidate && floor && candidate < floor) {
+    candidate = nextOccurrenceAfter(candidate, rule, floor, { seriesStart });
+  }
+  for (let steps = 0; candidate && steps <= MAX_EXCEPTION_SKIPS + 4; steps++) {
+    const instant = localToUTC(`${candidate}T${serienWand.time}`, event.tzid);
+    const householdDay = utcToWall(instant, tz)?.date ?? null;
+    if (householdDay && householdDay >= todayKey && !exceptions?.has(String(instant).slice(0, 10))) {
+      return householdDay;
+    }
+    candidate = nextOccurrenceAfter(candidate, rule, candidate, { seriesStart });
+  }
+  return null;
 }
 
 /**

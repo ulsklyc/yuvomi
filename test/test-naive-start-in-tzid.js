@@ -47,6 +47,10 @@ const { __test: apple } = await import('../server/services/apple-calendar.js');
 const { icsSnapshot } = await import('../server/services/outbound-echo.js');
 const { storedDayDiffersFromSeriesDay } = await import('../server/utils/timezone.js');
 const { default: calendarRouter } = await import('../server/routes/calendar.js');
+const { getCountdowns } = await import('../server/services/countdowns.js');
+const { resolveEventSearchRows } = await import('../server/services/search.js');
+const { __test: googleApi } = await import('../server/services/google-calendar.js');
+const { storedToInstantIso } = await import('../server/utils/timezone.js');
 
 const LA = 'America/Los_Angeles';
 const BERLIN = 'Europe/Berlin';
@@ -209,4 +213,125 @@ test(`TZ=${process.env.TZ}: PUT aus dem Formular schreibt Haushaltsziffern neben
   assert.equal(starts.length, 10);
   assert.equal(starts[0], FIRST);
   assert.equal(starts.at(-1), LAST);
+});
+
+// ── Review zu #1996 ─────────────────────────────────────────────────────────
+
+/** Ortstag und Uhrzeit eines Zeitpunkts in `zone`, `YYYY-MM-DD HH:MM`. */
+function localOf(iso, zone) {
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: zone, dateStyle: 'short', timeStyle: 'short' })
+    .format(new Date(iso));
+}
+
+/** Legt eine eingelesene Zeile an, wie sie nach PUT in der Tabelle steht. */
+function insertImported({ start, end = null, rule = null, tzid = LA, countdown = 0, authored = 0 }) {
+  return Number(db.prepare(`
+    INSERT INTO calendar_events (title, start_datetime, end_datetime, all_day, recurrence_rule, tzid,
+      external_source, external_calendar_id, created_by, countdown, series_authored)
+    VALUES ('Import', ?, ?, 0, ?, ?, 'caldav', ?, 1, ?, ?)
+  `).run(start, end, rule, tzid, `uid-${Math.random()}`, countdown, authored).lastInsertRowid);
+}
+
+test(`TZ=${process.env.TZ}: ohne Haushaltszone wirft, wer zonenlose Ziffern neben einer tzid liest`, () => {
+  assert.throws(() => storedToInstantIso('2035-10-02T08:30', null), TypeError);
+  assert.throws(() => expandRecurringEvents([rowFor(CASES[1])], '2035-09-01', '2035-12-31'), TypeError);
+  // Ohne tzid gibt es nichts umzurechnen: dort braucht die Expansion keine Zone.
+  const local = { ...rowFor(CASES[1]), tzid: null };
+  assert.equal(expandRecurringEvents([local], '2035-09-01', '2035-12-31').length, 10);
+});
+
+test(`TZ=${process.env.TZ}: der Serien-Guard im PUT liest den Starttag in der Haushaltszone`, async () => {
+  setHousehold(BERLIN);
+  // 01.11. 05:30 Berlin ist 31.10. 21:30 in Los Angeles: ein Monatsletzter vor
+  // Ort, und mit UNTIL am 05.11. das einzige Vorkommen. Wer den Text in der
+  // Zone des Prozesses liest (Los Angeles), sieht den 01.11. und haelt die
+  // Serie fuer leer.
+  const id = insertImported({ start: '2035-11-01T04:30:00Z', end: '2035-11-01T05:00:00Z', rule: 'RRULE:FREQ=DAILY;COUNT=1' });
+  const res = await fetch(`${baseUrl}/${id}`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      title: 'Import', all_day: false, recurrence_rule: 'FREQ=MONTHLY;BYMONTHDAY=-1;UNTIL=20351105',
+      start_datetime: '2035-11-01T05:30', end_datetime: '2035-11-01T06:00',
+    }),
+  });
+  assert.equal(res.status, 200, await res.text());
+});
+
+test(`TZ=${process.env.TZ}: der Countdown nennt den Tag, den der Kalender zeigt`, () => {
+  setHousehold(BERLIN);
+  db.prepare('UPDATE calendar_events SET countdown = 0').run();
+  const id = insertImported({
+    start: '2035-10-02T08:30', end: '2035-10-02T08:45', rule: 'RRULE:FREQ=MONTHLY;BYMONTHDAY=-1;COUNT=3', countdown: 1,
+  });
+  const shown = expandAndResolveEventRows(db, [db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(id)],
+    '2035-09-01', '2036-03-01');
+  assert.equal(localOf(shown[0].start_datetime, BERLIN), '2035-11-01 07:30', 'Vorbedingung: der Kalender');
+  const { items } = getCountdowns(db, { userId: 1, todayKey: '2035-09-01' });
+  const item = items.find((entry) => entry.source === 'event' && entry.id === id);
+  assert.ok(item, JSON.stringify(items));
+  assert.equal(item.date, '2035-11-01');
+  db.prepare('UPDATE calendar_events SET countdown = 0').run();
+});
+
+test(`TZ=${process.env.TZ}: Google bekommt weiter die Haushaltsziffern, die Tagesfrage liest sie in der Haushaltszone`, () => {
+  setHousehold(BERLIN);
+  // Eigene Serie, 01.11. 05:30 Berlin = 31.10. 21:30 Los Angeles. Der Tag im
+  // Text ist nicht der Ortstag der Serie, also richtet der Google-Weg nicht
+  // aus. Wer die Ziffern in der Prozesszone Los Angeles liest, sieht keinen
+  // Unterschied und schiebt den Start auf den 30.11.
+  const body = googleApi.localEventToGoogle({
+    id: 9, title: 'G', all_day: 0, tzid: LA, series_authored: 1,
+    start_datetime: '2035-11-01T05:30', end_datetime: '2035-11-01T06:00',
+    recurrence_rule: 'RRULE:FREQ=MONTHLY;BYMONTHDAY=-1;COUNT=3',
+  }, {}, BERLIN);
+  assert.deepEqual(body.start, { dateTime: '2035-11-01T05:30:00', timeZone: BERLIN });
+});
+
+test(`TZ=${process.env.TZ}: eine eigene Serie richtet CalDAV auf der Wanduhr der tzid aus`, () => {
+  // 15.11. 05:30 Berlin = 14.11. 20:30 Los Angeles. Am Text ausgerichtet ging
+  // 20351114T203000 hinaus, ein Tag, den der Anbieter als eigenes Vorkommen zaehlt.
+  const row = {
+    id: 3, title: 'A', all_day: 0, tzid: LA, series_authored: 1, external_source: 'caldav',
+    start_datetime: '2035-11-15T05:30', end_datetime: '2035-11-15T06:00',
+    recurrence_rule: 'RRULE:FREQ=MONTHLY;BYMONTHDAY=-1;COUNT=3',
+  };
+  const first = expandRecurringEvents([row], '2035-09-01', '2036-06-01', null, { householdZone: BERLIN })[0];
+  assert.equal(localOf(first.start_datetime, LA), '2035-11-30 20:30', 'Vorbedingung: der Kalender');
+  const { DTSTART, DTEND } = icsFieldsForEvent(row, BERLIN).fields;
+  assert.deepEqual(DTSTART, { value: '20351130T203000', params: `;TZID=${LA}` });
+  assert.deepEqual(DTEND, { value: '20351130T210000', params: `;TZID=${LA}` });
+  const lines = feed.buildVEvent(row, '20260101T000000Z', false, BERLIN);
+  assert.ok(lines.includes(`DTSTART;TZID=${LA}:20351130T203000`), lines.join('\n'));
+});
+
+test(`TZ=${process.env.TZ}: die Suche reicht die Haushaltszone herein`, () => {
+  setHousehold(BERLIN);
+  const [hit] = resolveEventSearchRows(db, [rowFor(CASES[1])], '2035-09-01', '2035-12-31');
+  assert.equal(hit.start_datetime, FIRST);
+});
+
+test(`TZ=${process.env.TZ}: ein eingelesener EINZELtermin mit tzid geht in deren Wanduhr hinaus`, () => {
+  // Zweig 4 gilt nicht nur Serien: auch ein Einzeltermin mit `tzid`, aus dem
+  // Formular gespeichert, traegt die Haushaltsziffern.
+  const single = { ...rowFor(CASES[1]), recurrence_rule: null };
+  const { DTSTART, DTEND } = icsFieldsForEvent(single, BERLIN).fields;
+  assert.deepEqual(DTSTART, { value: '20351001T233000', params: `;TZID=${LA}` });
+  assert.deepEqual(DTEND, { value: '20351001T234500', params: `;TZID=${LA}` });
+  assert.deepEqual(timeLines(caldav.buildCalDAVICS(single, BERLIN)), [`DTSTART;TZID=${LA}:20351001T233000`, `DTEND;TZID=${LA}:20351001T234500`]);
+  assert.deepEqual(timeLines(apple.buildICS(single, BERLIN)), [`DTSTART;TZID=${LA}:20351001T233000`, `DTEND;TZID=${LA}:20351001T234500`]);
+});
+
+test(`TZ=${process.env.TZ}: eine EXDATE des Anbieters trifft das Vorkommen, das sie meint`, () => {
+  setHousehold(BERLIN);
+  // Der Anbieter nimmt das Vorkommen am 03.10. 23:30 Los Angeles aus; abgelegt
+  // ist es beim Import als dessen UTC-Tag.
+  const id = insertImported({ start: '2035-10-02T08:30', rule: 'RRULE:FREQ=DAILY;COUNT=5' });
+  db.prepare('INSERT INTO calendar_event_exceptions (event_id, exception_date) VALUES (?, ?)')
+    .run(id, wallToUtc('2035-10-03T23:30', LA).slice(0, 10));
+  const out = expandAndResolveEventRows(db, [db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(id)],
+    '2035-09-01', '2035-12-31');
+  assert.deepEqual(out.map((o) => localOf(o.start_datetime, LA)), [
+    '2035-10-01 23:30', '2035-10-02 23:30', '2035-10-04 23:30', '2035-10-05 23:30',
+  ]);
 });

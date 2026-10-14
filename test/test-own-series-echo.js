@@ -675,6 +675,35 @@ for (const name of Object.keys(PROVIDERS)) {
     assertKept(s);
   });
 
+  // #1993: eine Zeile mit eigener `tzid` und zonenlosen Ziffern des Haushalts
+  // (so schreibt PUT an einer eingelesenen Serie). Der Schnappschuss muss in
+  // derselben Haushaltszone ausrichten wie der Bau des Objekts - jeder der
+  // Aufrufer (Neuanlage, Aenderung, Google) reicht sie herein. Haushalt Berlin
+  // neben der Prozesszone dieser Datei: unter TZ=UTC sieht nur die
+  // durchgereichte Zone den 30.11.
+  test(`${name} [${ZONE}] tzid und zonenlose Ziffern, Haushalt Berlin: Schnappschuss bei Upload und Aenderung, das Echo laesst Marke und Eingabe stehen (#1993)`, async () => {
+    const p = provider(name);
+    setHousehold('Europe/Berlin');
+    const entered = '2035-11-15T23:30';
+    const event = await post({
+      title: 'Miete', start_datetime: entered, end_datetime: '2035-11-15T23:45',
+      recurrence_rule: 'FREQ=MONTHLY;BYMONTHDAY=-1;COUNT=3', ...p.target,
+    });
+    db.prepare("UPDATE calendar_events SET tzid = 'Europe/Berlin' WHERE id = ?").run(event.id);
+    await p.sync();
+    assert.equal(row(event.id).series_authored, 1, 'Vorbedingung: eine eigene Serie');
+    assert.notEqual(row(event.id).outbound_snapshot, null, 'der Upload hat seinen Schnappschuss');
+    assert.equal(startMs(p.first().start), Date.parse('2035-11-30T22:30:00Z'), 'hinaus geht der Monatsletzte');
+    await p.sync();
+    assert.equal(row(event.id).series_authored, 1, 'das Echo laesst die Marke stehen');
+    assert.equal(row(event.id).start_datetime, entered, 'und die Eingabe');
+    await editTitle(p, event.id);
+    assert.notEqual(row(event.id).outbound_snapshot, null, 'die Aenderung hat ihren Schnappschuss');
+    await p.sync();
+    assert.equal(row(event.id).series_authored, 1, 'auch das Echo der Aenderung');
+    assert.equal(row(event.id).start_datetime, entered);
+  });
+
   test(`${name} [${ZONE}] eine Titelaenderung nach dem Echo schickt den ausgerichteten Start wieder`, async () => {
     const p = provider(name);
     const s = await pushedSeries(p);
