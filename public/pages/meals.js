@@ -30,6 +30,7 @@ import { readRowHtml, readRowHintHtml } from '/utils/read-row.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
 import { withChosenPeople } from '/utils/people-picker.js';
 import { isSoloHousehold } from '/utils/household.js';
+import { errorSentence } from '/utils/friendly-error.js';
 
 // --------------------------------------------------------
 // Konstanten
@@ -2665,7 +2666,9 @@ async function saveModal(overlay) {
     // Erfolgsmeldung liest sich wie eine Aufforderung (R16).
     window.yuvomi?.showToast(mode === 'create' ? t('meals.mealSaved') : t('meals.mealUpdated'), 'success');
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+    // Der Satz der App, nie der Text des Servers (#1909): ein inzwischen
+    // geloeschtes Rezept nennt der Server `meals_selected_recipe_not_found`.
+    window.yuvomi?.showToast(errorSentence(err), 'danger');
     saveBtn.disabled    = false;
     saveBtn.textContent = state.modal?.mode === 'edit' ? t('common.save') : t('common.add');
   }

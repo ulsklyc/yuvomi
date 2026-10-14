@@ -237,7 +237,9 @@ const STUBS = {
     export const btnLoading = () => () => {};
     export const btnSuccess = () => {};
     export const btnError = () => {};
-    export const refocusAfterRender = () => {};
+    // Wer sehen will, OB eine Seite den Fokus nach dem Neuzeichnen
+    // zuruecktraegt, setzt globalThis.__refocusAfterRender.
+    export const refocusAfterRender = () => { globalThis.__refocusAfterRender?.(); };
     export const renderKeepingFocus = (render) => { render(); return null; };
     export const forgetRestore = () => {};
     // Die Fokus-Merker der Detailansicht (Popover): ohne Browser nichts zu merken.

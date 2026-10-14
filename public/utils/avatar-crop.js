@@ -325,6 +325,18 @@ function openCropDialog(imageDataUrl) {
   });
 }
 
+/** Der Zuschnitt, den pickCroppedImage() oeffnet - ersetzbar nur fuer Tests. */
+let cropDialog = openCropDialog;
+
+/**
+ * NUR FUER TESTS: den Zuschnitt ersetzen. Ohne Browser gibt es weder Canvas
+ * noch `<dialog>`; so laesst sich die Pruefung NACH dem Zuschnitt
+ * (`dataTooLarge`) trotzdem als Programm fahren. `null` stellt zurueck.
+ */
+export function _setCropDialogForTest(fn) {
+  cropDialog = fn ?? openCropDialog;
+}
+
 /**
  * Eine Datei, die nicht taugt: traegt ihren schon uebersetzten Satz (#1909).
  * Ein eigener Typ, damit ein Aufrufer ihn von jedem anderen Wurf (ein
@@ -391,7 +403,7 @@ export async function pickCroppedImage(file, options = {}) {
    * nicht dekodierbares Bild dasselbe wie eines, das sich nicht lesen ließ. */
   let cropped;
   try {
-    cropped = await openCropDialog(dataUrl);
+    cropped = await cropDialog(dataUrl);
   } catch {
     throw new ImageProblem(t(keys.read));
   }

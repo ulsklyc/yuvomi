@@ -51,6 +51,8 @@ const { default: recipesRouter } = await import('../server/routes/recipes.js');
 const { default: mealsRouter } = await import('../server/routes/meals.js');
 const { setPermissions } = await import('../public/permissions.js');
 const { __test: page } = await import('../public/pages/recipes.js');
+const { __test: meals } = await import('../public/pages/meals.js');
+const crop = await import('../public/utils/avatar-crop.js');
 const { CASE_MESSAGES, GONE_REASONS } = await import('../public/utils/friendly-error.js');
 
 // ---------------------------------------------------------------------------
@@ -154,7 +156,12 @@ test('Server: ein Rezept einplanen, das es nicht mehr gibt - anlegen, Plan ueber
   }
 });
 
-test('Server: die beiden deutschen Saetze der Rezept-Routen sind englisch', async () => {
+// Der zweite deutsche Satz der Routen ("Zutat darf nicht leer sein.", jetzt
+// "Ingredient must not be empty.") ist ueber HTTP nicht erreichbar: `str()`
+// schneidet den Namen zu und lehnt einen leeren schon selbst ab, und ein
+// nicht leerer Name ergibt nie einen leeren Schluessel. Gemessen wird deshalb
+// nur dieser hier.
+test('Server: der deutsche Satz zur Rezept-ID ist englisch', async () => {
   const r = await call('PUT', '/recipes/abc', { title: 'x' });
   assert.deepEqual([r.status, r.body?.error], [400, 'Invalid recipe ID.']);
 });
@@ -553,5 +560,109 @@ test('Seite: ein eigenes Bild waehlen - die Pruefung des Bildes sagt ihren Satz,
     assert.equal(kind, 'danger', datei.type);
     assert.equal(text, expected, datei.type);
     assert.doesNotMatch(String(text), /FileReader/);
+  }
+});
+
+test('Seite: ein eigenes Bild, das zu gross ist - als Datei oder nach dem Zuschnitt - sagt den Satz seiner Pruefung', async () => {
+  // Lesen und Zuschnitt gibt es ohne Browser nicht: der FileReader liefert
+  // eine Data-URL, der Zuschnitt ein Ergebnis ueber der Grenze von 768 KB.
+  const zuvor = globalThis.FileReader;
+  globalThis.FileReader = class {
+    readAsDataURL() { this.result = 'data:image/png;base64,AAAA'; queueMicrotask(() => this.onload()); }
+  };
+  crop._setCropDialogForTest(async () => `data:image/jpeg;base64,${'A'.repeat(800 * 1024)}`);
+  try {
+    for (const [datei, expected] of [
+      [{ type: 'image/png', size: 5 * 1024 * 1024 + 1 }, 'settings.profilePictureFileTooLarge'],
+      // Die Rezepte nennen fuer den Zuschnitt ihren eigenen Satz.
+      [{ type: 'image/png', size: 10 }, 'recipes.imageTooLarge'],
+    ]) {
+      const panel = formular({ '#recipe-title': 'Suppe' });
+      await mitSeite({}, () => mit({}, async () => {
+        await oeffne(panel, () => page.openRecipeModal('create'));
+        await panel.querySelector('#recipe-image').handlers.change({ target: { files: [datei], value: 'x' } });
+      }));
+      assert.deepEqual(toasts, [[expected, 'danger']], `${datei.size}`);
+    }
+  } finally {
+    crop._setCropDialogForTest(null);
+    globalThis.FileReader = zuvor;
+  }
+});
+
+// --- Nachladen nach "gibt es nicht mehr" -----------------------------------
+
+test('Seite: nach dem Nachladen kommt der Fokus zurueck; wer die Seite waehrenddessen verlassen hat, bekommt nichts gezeichnet', async () => {
+  let refocus = 0;
+  globalThis.__refocusAfterRender = () => { refocus += 1; };
+  const weg = async () => { throw fehler(404, 'recipes_recipe_not_found'); };
+  try {
+    await mitSeite({}, () => mit({ post: weg }, () => page.transferRecipe(rezept(), null)));
+    assert.equal(refocus, 1, 'der Fokus geht auf den Nachfolger des Ausloesers');
+
+    refocus = 0;
+    await mitSeite({}, async () => {
+      const vorher = page.state.recipes;
+      await mit({
+        get: (path) => {
+          // Die Seite wird verlassen, waehrend die Antwort noch unterwegs ist.
+          if (path === '/recipes') page.setContainerForTest({ querySelector: () => null, querySelectorAll: () => [] });
+          return { data: [{ id: 99, title: 'Fremd', source: 'native', ingredients: [] }] };
+        },
+        post: weg,
+      }, () => page.transferRecipe(rezept(), null));
+      assert.equal(page.state.recipes, vorher, 'der Zustand der verlassenen Seite bleibt');
+      assert.deepEqual(page.state.lists, [{ id: 1, name: 'Wocheneinkauf' }]);
+      assert.equal(refocus, 0, 'kein Fokus auf einer Seite, die es nicht mehr gibt');
+    });
+  } finally {
+    delete globalThis.__refocusAfterRender;
+  }
+});
+
+test('Seite: ist der Einkauf abgeschaltet, fragt das Nachladen nur die Rezepte', async () => {
+  const zuvor = globalThis.window.yuvomi.isModuleDisabled;
+  globalThis.window.yuvomi.isModuleDisabled = (name) => name === 'shopping';
+  try {
+    await mitSeite({}, async () => {
+      const panel = formular({ '#recipe-title': 'Suppe' });
+      const { gets } = await mit({ put: async () => { throw fehler(404, 'recipes_recipe_not_found'); } },
+        () => page.saveRecipe(panel, 'edit', rezept()));
+      assert.deepEqual(toasts, [['recipes.errorRecipeGone', 'danger']]);
+      assert.ok(gets.includes('/recipes'), `nachgeladen: ${gets.join(', ')}`);
+      assert.equal(gets.includes('/shopping'), false, 'keine Anfrage an ein abgeschaltetes Modul');
+      assert.deepEqual(page.state.lists, [], 'ohne Einkauf keine Listen');
+    });
+  } finally {
+    globalThis.window.yuvomi.isModuleDisabled = zuvor;
+  }
+});
+
+// --- Essensplan: Mahlzeit speichern -----------------------------------------
+
+test('Essensplan: eine Mahlzeit speichern, deren gewaehltes Rezept es nicht mehr gibt - der Satz der App, nie der Text des Servers', async () => {
+  for (const [err, expected] of [
+    [fehler(400, 'meals_selected_recipe_not_found'), 'recipes.errorRecipeGone'],
+    [fehler(400), 'common.errorGeneric'],
+    [fehler(500), 'common.errorGeneric'],
+  ]) {
+    const felder = {
+      '#modal-save': { disabled: false, textContent: '' },
+      '#modal-date': { value: '2026-10-20' }, '#modal-type': { value: 'dinner' }, '#modal-title': { value: 'Curry' },
+      '#modal-notes': { value: '' }, '#modal-recipe-url': { value: '' }, '#modal-recipe-id': { value: '5' },
+    };
+    const form = { querySelector: (sel) => felder[sel] ?? null, querySelectorAll: () => [] };
+    meals.setContainerForTest({ querySelector: () => null, querySelectorAll: () => [] });
+    meals.state.modal = { mode: 'create' };
+    try {
+      const { calls } = await mit({ post: async () => { throw err; } }, () => meals.saveModal(form));
+      assert.ok(calls.some(([verb, path]) => verb === 'POST' && path === '/meals'), 'Vorbedingung: gespeichert wurde wirklich');
+    } finally {
+      meals.state.modal = null;
+      meals.setContainerForTest(null);
+    }
+    assert.deepEqual(toasts, [[expected, 'danger']], `${err.status} ${err.data.reason ?? ''}`);
+    assert.equal(felder['#modal-save'].disabled, false, 'Speichern geht wieder');
+    assertNoServerText();
   }
 });

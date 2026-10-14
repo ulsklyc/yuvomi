@@ -28,8 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   recipes and lists by itself and the dialog of the action closes. When only the chosen pantry
   item is gone, the matching dialog stays open with your choices and offers the current pantry.
   Deleting a recipe somebody else has already deleted counts as done instead of bringing the row
-  back with an error. A picture that cannot be used keeps its own message; any other failure shows
-  the general message instead of the server's text. For API clients: those answers of
+  back with an error. Saving a meal in the meal plan whose chosen recipe was deleted in the
+  meantime says so as well. When choosing a picture for a recipe, a picture that cannot be used
+  keeps its own message, and any other failure there shows the general message instead of the
+  browser's own, untranslated text. Any other failure on the page shows the general message
+  instead of the server's text. For API clients: those answers of
   `/api/v1/recipes` carry a `reason` next to `error` (`recipes_recipe_not_found`,
   `recipes_ingredient_not_found`, `recipes_selected_pantry_item_not_found`,
   `shopping_list_not_found`), planning a meal with an unknown `recipe_id` on `/api/v1/meals`
