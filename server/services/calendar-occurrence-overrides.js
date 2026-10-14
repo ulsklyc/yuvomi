@@ -1225,8 +1225,8 @@ export function upsertOccurrenceOverride(database, {
           color, icon, assigned_to, created_by, external_source, recurrence_rule,
           visibility, countdown, attachment_name, attachment_mime, attachment_size,
           attachment_data, attachment_document_id, recurrence_parent_id,
-          recurrence_id, overridden_fields, local_calendar_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local', NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          recurrence_id, overridden_fields, local_calendar_id, series_authored
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local', NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
       `).run(
         materialized.title,
         materialized.description ?? null,
@@ -1476,8 +1476,8 @@ function insertSeriesRow(database, source) {
       visibility, countdown, attachment_name, attachment_mime, attachment_size,
       attachment_data, attachment_document_id, tzid, target_google_calendar_id,
       target_caldav_account_id, target_caldav_calendar_url,
-      target_outlook_account_id, target_outlook_calendar_id, local_calendar_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      target_outlook_account_id, target_outlook_calendar_id, local_calendar_id, series_authored
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
   `).run(
     source.title,
     source.description ?? null,

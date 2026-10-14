@@ -53,6 +53,8 @@ db.exec(MIGRATIONS_SQL[85]);  // calendar_event_exceptions
 db.exec(MIGRATIONS_SQL[174]); // generated birthday/name-day joins
 db.exec(MIGRATIONS_SQL[44]); // search index rebuilt by migration 194
 db.exec(MIGRATIONS_SQL[245]);
+// Migration 246 (#1935) hat ein Funktions-up und steht nicht im Spiegel.
+db.exec('ALTER TABLE calendar_events ADD COLUMN series_authored INTEGER NOT NULL DEFAULT 0 CHECK(series_authored IN (0, 1));');
 db.exec(MIGRATIONS_SQL[194]); // linked occurrence overrides
 db.exec(MIGRATIONS_SQL[41]);  // tasks.start_date (geplante Aufgaben)
 db.exec(MIGRATIONS_SQL[74]);  // access_permissions (Modulrechte, #467)

@@ -239,8 +239,9 @@ function createEvent(db, actorId, args) {
 
   const result = db.prepare(`
     INSERT INTO calendar_events
-      (title, description, start_datetime, end_datetime, all_day, location, created_by, external_source)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 'local')
+      (title, description, start_datetime, end_datetime, all_day, location, created_by, external_source,
+       series_authored)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'local', 1)
   `).run(
     title.value,
     description.value,

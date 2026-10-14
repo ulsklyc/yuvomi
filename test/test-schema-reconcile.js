@@ -67,3 +67,56 @@ test('greift ohne database-Argument nicht auf eine nicht-initialisierte DB zu', 
   // Defensive: reconcileCriticalSchema(undefined) bei fehlender globaler DB darf nicht werfen.
   assert.doesNotThrow(() => reconcileCriticalSchema(null));
 });
+
+// --------------------------------------------------------------------------
+// Eine Spalte mit Nachtrag (#1935): calendar_events.series_authored
+// --------------------------------------------------------------------------
+// Migration 246 legt die Spalte an UND setzt sie fuer lokale Zeilen auf 1. Die
+// Spalte allein nachzutragen stellte jede Zeile auf 0 - die hier angelegten
+// Serien gingen danach wie eingelesene hinaus, ohne ausgerichteten Start.
+
+function driftedCalendar() {
+  const db = new DatabaseSync(':memory:');
+  db.exec(`
+    CREATE TABLE calendar_events (
+      id INTEGER PRIMARY KEY, title TEXT, tzid TEXT, caldav_account_id INTEGER,
+      external_source TEXT NOT NULL DEFAULT 'local', updated_at TEXT
+    );
+    CREATE TRIGGER trg_calendar_events_updated_at AFTER UPDATE ON calendar_events FOR EACH ROW
+      BEGIN UPDATE calendar_events SET updated_at = 'touched' WHERE id = OLD.id; END;
+    INSERT INTO calendar_events (id, title, external_source, updated_at) VALUES
+      (1, 'Eigen', 'local', 'original'), (2, 'Google', 'google', 'original'),
+      (3, 'CalDAV', 'caldav', 'original'), (4, 'Abo', 'ics', 'original');
+  `);
+  return db;
+}
+
+test('traegt series_authored MIT dem Nachtrag der Migration nach: lokale Zeilen sind verfasst', () => {
+  const db = driftedCalendar();
+  assert.equal(hasColumn(db, 'calendar_events', 'series_authored'), false);
+
+  reconcileCriticalSchema(db);
+
+  const rows = db.prepare('SELECT series_authored, updated_at FROM calendar_events ORDER BY id').all();
+  assert.deepEqual(rows.map((r) => r.series_authored), [1, 0, 0, 0],
+    'die lokale Zeile traegt die Marke wieder, bei gespiegelten wird nicht geraten');
+  assert.deepEqual(rows.map((r) => r.updated_at), Array(4).fill('original'),
+    'die Reparatur setzt keinen Termin auf "eben geaendert"');
+  // Die Trigger sind wieder da.
+  db.exec("UPDATE calendar_events SET title = 'Neu' WHERE id = 2");
+  assert.equal(db.prepare('SELECT updated_at FROM calendar_events WHERE id = 2').get().updated_at, 'touched');
+});
+
+test('der Nachtrag laeuft nur, wenn die Spalte neu angelegt wurde', () => {
+  // Steht die Spalte schon, ist jede 0 an einer lokalen Zeile eine Auskunft
+  // (der Abruf nimmt die Marke nie an lokalen Zeilen, aber die Reparatur hat
+  // dort nichts zu entscheiden) und bleibt stehen.
+  const db = driftedCalendar();
+  reconcileCriticalSchema(db);
+  db.exec('DROP TRIGGER trg_calendar_events_updated_at');
+  db.exec('UPDATE calendar_events SET series_authored = 0 WHERE id = 1');
+
+  reconcileCriticalSchema(db);
+
+  assert.equal(db.prepare('SELECT series_authored FROM calendar_events WHERE id = 1').get().series_authored, 0);
+});

@@ -383,12 +383,15 @@ async function importToLocal(userId, { ics, url, color, localCalendarId = null }
   // und `color` ist der Wert, den der Nutzer fuer genau diesen Import angegeben
   // hat. Das ist eine Wahl und gehoert deshalb in die Eigenfarb-Spalte.
   const fallbackColor = color || '#007AFF';
+  // `series_authored = 1`: die Termine gehoeren nach dem Import dem Nutzer und
+  // sind lokale Zeilen wie jede hier angelegte - so hat sie der ausgehende Weg
+  // schon behandelt, als er noch `external_source` las (#1935).
   const insert = db.get().prepare(`
     INSERT INTO calendar_events
       (title, description, start_datetime, end_datetime, all_day, location,
        color, external_calendar_id, external_source, subscription_id,
-       recurrence_rule, user_modified, created_by, local_calendar_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'local', NULL, ?, 0, ?, ?)
+       recurrence_rule, user_modified, created_by, local_calendar_id, series_authored)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'local', NULL, ?, 0, ?, ?, 1)
   `);
   const existsStmt = db.get().prepare(`
     SELECT 1 FROM calendar_events e
