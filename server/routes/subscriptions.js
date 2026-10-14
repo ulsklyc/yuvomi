@@ -200,44 +200,17 @@ function budgetCurrency() {
 // Betrag und Titel der Buchung rechnet services/subscription-budget-projection.js:
 // die gebuchte Zeile hier und die erwarteten Zeilen der Folgemonate (#1844)
 // muessen dasselbe sagen, also gibt es die Rechnung einmal.
-/** Die Kurse fuer die Buchung in der Budgetwaehrung; ohne await, wenn das Abo in ihr laeuft. */
-async function bookingRates(subscription, currency) {
-  if (subscription.currency === currency) return {};
+async function budgetExpenseAmount(subscription) {
+  const currency = budgetCurrency();
+  if (subscription.currency === currency) return subscriptionBudgetAmount(subscription, currency, {});
   const result = await ratesFor(currency, [subscription.currency]);
-  return result.rates;
+  return subscriptionBudgetAmount(subscription, currency, result.rates);
 }
 
 function budgetEntryTitle(subscription) {
   return subscriptionBudgetTitle(subscription, budgetCurrency());
 }
 
-/**
- * Die Buchung des Abos im Budget nachziehen.
- *
- * DIE BUCHUNG ENTSTEHT AUS DER ZEILE NACH DEM AWAIT (#1909, Review zu #2003).
- * In fremder Waehrung wartet der Sync auf den Kurs, und waehrenddessen kann
- * ein anderer Request das Abo loeschen, pausieren, verlaengern, seinen Betrag
- * oder seine Waehrung aendern. Deshalb wird nach dem await neu gelesen, ohne
- * Yield bis zum Schreiben, und alles - Betrag, Titel, Datum, Unterkategorie,
- * Eigentuemer, Sichtbarkeit, Verknuepfung - kommt aus dieser frischen Zeile:
- * - weg: SubscriptionGoneError, keine Buchung ohne Abo;
- * - pausiert oder abgeschlossen: nichts schreiben;
- * - Waehrung (oder Budgetwaehrung) inzwischen anders: der Kurs passt nicht mehr,
- *   nichts schreiben.
- *
- * WARUM DAS KONVERGIERT: jeder Request, der die Zeile aendert, faehrt danach
- * seinen eigenen Sync. Der LETZTE aendernde Request hat einen Schnappschuss mit
- * der endgueltigen Waehrung und liest nach seinem await die endgueltige Zeile -
- * er schreibt also den endgueltigen Stand (oder, pausiert, entfernt ihn ohne
- * await). Jeder Sync, der danach noch zurueckkommt, liest dieselbe Zeile und
- * schreibt dasselbe, oder er schreibt wegen veralteter Waehrung gar nicht. In
- * welcher Reihenfolge die Kurse zurueckkommen, spielt damit keine Rolle.
- *
- * VERLAENGERN (`preserveCurrent`) bucht die Zahlung, die es selbst vorgerueckt
- * hat: eine NEUE Zeile am Datum seines Schnappschusses. Verknuepft wird sie
- * nur, wenn dieses Datum noch die naechste Zahlung ist - hat ein zweites
- * Verlaengern inzwischen weitergerueckt, verknuepft dessen Sync seine Zeile.
- */
 async function syncBudgetExpense(subscription, { preserveCurrent = false } = {}) {
   const database = db.get();
   if (!subscription.enabled) {
@@ -248,23 +221,16 @@ async function syncBudgetExpense(subscription, { preserveCurrent = false } = {})
     return loadSubscription(subscription.id);
   }
 
-  const currency = budgetCurrency();
-  const rates = await bookingRates(subscription, currency);
-  // Ab hier kein await bis zum letzten Schreiben.
-  const fresh = loadSubscription(subscription.id);
-  if (!fresh) throw new SubscriptionGoneError();
-  if (!fresh.enabled || fresh.completed_at) return fresh;
-  if (fresh.currency !== subscription.currency || budgetCurrency() !== currency) return fresh;
-
-  const amount = subscriptionBudgetAmount(fresh, currency, rates);
-  const title = budgetEntryTitle(fresh);
-  const subcategory = fresh.budget_subcategory_key || '';
-  const ownerId = fresh.owner_id ?? fresh.created_by;
-  const visibility = fresh.visibility || 'shared';
-  const date = preserveCurrent ? subscription.next_payment_date : fresh.next_payment_date;
-  const link = !preserveCurrent || subscription.next_payment_date === fresh.next_payment_date;
-
-  let entryId = preserveCurrent ? null : fresh.budget_entry_id;
+  const amount = await budgetExpenseAmount(subscription);
+  // GIBT ES DAS ABO NOCH? (#1909) Der Kurs kann von Fixer kommen, und
+  // waehrenddessen kann ein anderes Haushaltsmitglied das Abo loeschen. Ohne
+  // diese Pruefung entstuende eine Buchung ohne Abo, und die Antwort waere ein
+  // 500. Bis zum Schreiben kein await mehr. Alles andere kommt bewusst aus dem
+  // Schnappschuss wie bisher - was andere Requests in dieser Luecke am Abo
+  // aendern, ist #2004.
+  if (!loadSubscription(subscription.id)) throw new SubscriptionGoneError();
+  const subcategory = subscription.budget_subcategory_key || '';
+  let entryId = preserveCurrent ? null : subscription.budget_entry_id;
   if (entryId) {
     // Eigentümer + Sichtbarkeit mitziehen (#476/#505): ohne das bliebe der
     // verknüpfte Ausgaben-Eintrag beim Umschalten des Abos (shared↔private) auf
@@ -275,7 +241,10 @@ async function syncBudgetExpense(subscription, { preserveCurrent = false } = {})
       SET title = ?, amount = ?, category = 'subscriptions', subcategory = ?, date = ?,
           owner_id = ?, visibility = ?
       WHERE id = ?
-    `).run(title, -amount, subcategory, date, ownerId, visibility, entryId);
+    `).run(
+      budgetEntryTitle(subscription), -amount, subcategory, subscription.next_payment_date,
+      subscription.owner_id ?? subscription.created_by, subscription.visibility || 'shared', entryId,
+    );
     if (!updated.changes) entryId = null;
   }
   if (!entryId) {
@@ -284,10 +253,18 @@ async function syncBudgetExpense(subscription, { preserveCurrent = false } = {})
       INSERT INTO budget_entries
         (title, amount, category, subcategory, date, is_recurring, created_by, owner_id, visibility)
       VALUES (?, ?, 'subscriptions', ?, ?, 0, ?, ?, ?)
-    `).run(title, -amount, subcategory, date, fresh.created_by, ownerId, visibility).lastInsertRowid;
-    if (link) database.prepare('UPDATE budget_subscriptions SET budget_entry_id = ? WHERE id = ?').run(entryId, fresh.id);
+    `).run(
+      budgetEntryTitle(subscription),
+      -amount,
+      subcategory,
+      subscription.next_payment_date,
+      subscription.created_by,
+      subscription.owner_id ?? subscription.created_by,
+      subscription.visibility || 'shared',
+    ).lastInsertRowid;
+    database.prepare('UPDATE budget_subscriptions SET budget_entry_id = ? WHERE id = ?').run(entryId, subscription.id);
   }
-  return loadSubscription(fresh.id);
+  return loadSubscription(subscription.id);
 }
 
 function validatePayload(body, { partial = false } = {}) {

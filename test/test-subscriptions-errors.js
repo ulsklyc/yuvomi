@@ -218,33 +218,15 @@ test('Server: das Abo verschwindet, waehrend seine Buchung den Kurs holt - 404 s
   }
 });
 
-test('Server: zwei Aenderungen treffen sich im await auf den Kurs - das Abo behaelt EINE Buchung', async () => {
-  const abo = await aboRow({ currency: 'USD', name: 'Doppelt', enabled: false });
-  assert.equal(count("SELECT COUNT(*) AS n FROM budget_entries WHERE title LIKE 'Doppelt%'"), 0, 'Vorbedingung: pausiert, ohne Buchung');
-  let release;
-  const gate = new Promise((r) => { release = r; });
-  let waiting = 0;
-  routes._setRatesForTest?.(async () => {
-    waiting += 1;
-    if (waiting === 2) release();
-    await gate;
-    return { rates: { EUR: 1, USD: 0.9 }, source: 'cache', fetchedAt: null };
-  });
-  const [a, b] = await Promise.all([
-    call('PUT', `/${abo.id}`, { enabled: true }),
-    call('PUT', `/${abo.id}`, { enabled: true, amount: 15 }),
-  ]);
-  assert.deepEqual([a.status, b.status], [200, 200], JSON.stringify([a.body, b.body]));
-  assert.equal(count("SELECT COUNT(*) AS n FROM budget_entries WHERE title LIKE 'Doppelt%'"), 1, 'eine Buchung, kein Duplikat');
-  const linked = db.prepare('SELECT budget_entry_id FROM budget_subscriptions WHERE id = ?').get(abo.id).budget_entry_id;
-  assert.equal(count('SELECT COUNT(*) AS n FROM budget_entries WHERE id = ?', linked), 1, 'und das Abo zeigt auf sie');
-});
-
 /**
- * Was waehrend des await auf den Kurs am Abo geschieht (Review zu #2003): die
- * Buchung entsteht aus der Zeile, wie sie NACH dem await steht, nicht aus dem
- * Schnappschuss davor. `vorDemKurs` laeuft im ersten Abruf des Kurses, also
- * genau in der Luecke zwischen Lesen und Schreiben des ersten Requests.
+ * Die Luecke im await auf den Kurs. Die Buchung entsteht wie auf main aus dem
+ * Schnappschuss vor dem await; dazu kommt nur die Pruefung, ob es das Abo
+ * danach noch gibt. Was andere Requests in der Luecke sonst am Abo aendern
+ * (Pause, zweiter Betrag, Waehrung, zweites Verlaengern), ist #2004. Gemessen
+ * wird hier, dass der Stand nicht schlechter ist als main: ein Verlaengern in
+ * der Luecke eines PUT liefert gegen main per Dateikopie dasselbe Ergebnis;
+ * rot war es nur, solange die Verknuepfung frisch gelesen wurde (Review zu
+ * #2003). `vorDemKurs` laeuft im ersten Abruf des Kurses.
  */
 const KURS = { rates: { EUR: 1, USD: 1 }, source: 'cache', fetchedAt: null };
 function mitLuecke(vorDemKurs) {
@@ -257,7 +239,7 @@ function mitLuecke(vorDemKurs) {
 const buchungen = (name) => db.prepare('SELECT id, amount, date FROM budget_entries WHERE title LIKE ? ORDER BY id').all(`${name}%`);
 const aboZeile = (id) => db.prepare('SELECT enabled, amount, next_payment_date, budget_entry_id FROM budget_subscriptions WHERE id = ?').get(id);
 
-test('Server: verlaengert jemand, waehrend eine Aenderung den Kurs holt, schreibt die Aenderung die neue Buchung nicht auf das alte Datum zurueck', async () => {
+test('Server: verlaengert jemand, waehrend eine Aenderung den Kurs holt, steht die Buchung wie auf main - die Aenderung schreibt die neue Buchung nicht auf das alte Datum zurueck', async () => {
   routes._setRatesForTest?.(async () => KURS);
   const a = await aboRow({ name: 'Luecke-Renew', currency: 'USD', amount: 10 });
   mitLuecke(async () => {
@@ -269,81 +251,6 @@ test('Server: verlaengert jemand, waehrend eine Aenderung den Kurs holt, schreib
   const zeilen = buchungen('Luecke-Renew');
   assert.deepEqual(zeilen.map((z) => z.date), ['2026-11-01', '2026-12-01'], 'je eine Buchung am alten und am neuen Zahlungstag');
   assert.equal(aboZeile(a.id).budget_entry_id, zeilen[1].id, 'das Abo zeigt auf die Buchung der naechsten Zahlung');
-});
-
-test('Server: pausiert jemand das Abo, waehrend eine Aenderung den Kurs holt, bekommt das pausierte Abo keine Buchung', async () => {
-  routes._setRatesForTest?.(async () => KURS);
-  const a = await aboRow({ name: 'Luecke-Pause', currency: 'USD', amount: 10 });
-  mitLuecke(async () => {
-    const r = await call('PUT', `/${a.id}`, { enabled: false });
-    assert.equal(r.status, 200, JSON.stringify(r.body));
-  });
-  const put = await call('PUT', `/${a.id}`, { notes: 'x' });
-  assert.equal(put.status, 200, JSON.stringify(put.body));
-  assert.equal(aboZeile(a.id).enabled, 0, 'Vorbedingung: pausiert');
-  assert.deepEqual(buchungen('Luecke-Pause'), [], 'keine Buchung fuer ein pausiertes Abo');
-  assert.equal(aboZeile(a.id).budget_entry_id, null);
-});
-
-test('Server: zwei Betraege, und der zuerst gestartete Request kommt zuletzt zurueck - die Buchung traegt den Betrag des Abos', async () => {
-  routes._setRatesForTest?.(async () => KURS);
-  const a = await aboRow({ name: 'Luecke-Betrag', currency: 'USD', amount: 10 });
-  const tore = [];
-  routes._setRatesForTest?.(() => new Promise((r) => tore.push(() => r(KURS))));
-  const warte = async (n) => { while (tore.length < n) await new Promise((r) => setTimeout(r, 5)); };
-  const erst = call('PUT', `/${a.id}`, { amount: 20 });
-  await warte(1);
-  const dann = call('PUT', `/${a.id}`, { amount: 30 });
-  await warte(2);
-  tore[1]();
-  assert.equal((await dann).status, 200);
-  tore[0]();
-  assert.equal((await erst).status, 200);
-  assert.equal(aboZeile(a.id).amount, 30, 'Vorbedingung: das Abo steht auf dem zuletzt gespeicherten Betrag');
-  assert.deepEqual(buchungen('Luecke-Betrag').map((z) => z.amount), [-30], 'eine Buchung, mit diesem Betrag');
-});
-
-test('Server: wechselt jemand die Waehrung, waehrend eine Aenderung den Kurs holt, schreibt die Aenderung nicht mit dem Kurs der alten Waehrung', async () => {
-  routes._setRatesForTest?.(async () => KURS);
-  const a = await aboRow({ name: 'Luecke-Waehrung', currency: 'USD', amount: 10 });
-  let gbpAbrufe = 0;
-  let erster = true;
-  routes._setRatesForTest?.(async (_base, [currency]) => {
-    if (currency === 'GBP') { gbpAbrufe += 1; return { rates: { EUR: 1, GBP: 0.5 }, source: 'cache', fetchedAt: null }; }
-    if (erster) {
-      erster = false;
-      const r = await call('PUT', `/${a.id}`, { currency: 'GBP' });
-      assert.equal(r.status, 200, JSON.stringify(r.body));
-    }
-    return KURS;
-  });
-  const put = await call('PUT', `/${a.id}`, { notes: 'x' });
-  assert.equal(put.status, 200, JSON.stringify(put.body));
-  assert.equal(gbpAbrufe, 1, 'Vorbedingung: der Waehrungswechsel hat seinen eigenen Kurs geholt');
-  // Die Buchung ist die des Waehrungswechsels (10 GBP zum Kurs des Stubs: 5);
-  // mit dem USD-Kurs der aelteren Aenderung stuende -10 da.
-  assert.deepEqual(buchungen('Luecke-Waehrung').map((z) => z.amount), [-5]);
-});
-
-test('Server: zwei Verlaengerungen treffen sich im await - jede bucht ihre eigene Zahlung, verknuepft ist die naechste', async () => {
-  routes._setRatesForTest?.(async () => KURS);
-  const a = await aboRow({ name: 'Luecke-Zweimal', currency: 'USD', amount: 10 });
-  const tore = [];
-  routes._setRatesForTest?.(() => new Promise((r) => tore.push(() => r(KURS))));
-  const warte = async (n) => { while (tore.length < n) await new Promise((r) => setTimeout(r, 5)); };
-  const erst = call('POST', `/${a.id}/renew`, {});
-  await warte(1);
-  const dann = call('POST', `/${a.id}/renew`, {});
-  await warte(2);
-  // Der zuerst gestartete kommt zuletzt zurueck.
-  tore[1]();
-  assert.equal((await dann).status, 200);
-  tore[0]();
-  assert.equal((await erst).status, 200);
-  const zeilen = buchungen('Luecke-Zweimal');
-  assert.deepEqual(zeilen.map((z) => z.date).sort(), ['2026-11-01', '2026-12-01', '2027-01-01'], 'je Zahlung eine Buchung');
-  assert.equal(aboZeile(a.id).next_payment_date, '2027-01-01');
-  assert.equal(aboZeile(a.id).budget_entry_id, zeilen.find((z) => z.date === '2027-01-01').id, 'verknuepft ist die Buchung der naechsten Zahlung');
 });
 
 const SERVER_REASONS = [
