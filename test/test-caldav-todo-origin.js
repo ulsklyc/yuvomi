@@ -53,6 +53,15 @@ function vtodo(uid, summary) {
 
 const xmlEscape = (value) => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+/** Ein `<d:response>` mit getetag und calendar-data. */
+const objectResponse = (href, obj) => `<d:response><d:href>${xmlEscape(href)}</d:href><d:propstat><d:prop>`
+  + `<d:getetag>${xmlEscape(obj.etag)}</d:getetag><c:calendar-data>${xmlEscape(obj.data)}</c:calendar-data>`
+  + '</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>';
+
+/** Jedes Objekt der Liste unter seiner richtigen Adresse, wie der Server es nennt. */
+const ownResponses = (listUrl) => dav.objectNames(listUrl)
+  .map((name) => objectResponse(`${new URL(listUrl).pathname}${name}`, dav.getObject(listUrl, name))).join('');
+
 let accountId;
 
 function reset() {
@@ -81,9 +90,11 @@ function list(slug, module) {
 }
 
 /**
- * Der eigene Server beantwortet den Multiget dieser Liste mit einer absoluten
- * href auf dem anderen Host - unter demselben Pfad, unter dem das Objekt bei
- * ihm liegt. Auf dem anderen Host liegt dort ein fremdes Objekt.
+ * Der eigene Server beantwortet den Multiget dieser Liste mit dem Objekt und
+ * ein zweites Mal mit einer absoluten href auf dem anderen Host - unter
+ * demselben Pfad, unter dem das Objekt bei ihm liegt (tsdav ab 2.4.0 verlangt
+ * jede angefragte Adresse in der Antwort, weist zusätzliche aber nicht ab).
+ * Auf dem anderen Host liegt dort ein fremdes Objekt.
  */
 function answerWithForeignHref(listUrl) {
   const path = new URL(listUrl).pathname;
@@ -92,9 +103,8 @@ function answerWithForeignHref(listUrl) {
   const own = dav.getObject(listUrl, FILE);
   const body = '<?xml version="1.0" encoding="utf-8"?>\n'
     + '<d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">'
-    + `<d:response><d:href>${xmlEscape(`${foreignList}${FILE}`)}</d:href><d:propstat><d:prop>`
-    + `<d:getetag>${xmlEscape(own.etag)}</d:getetag><c:calendar-data>${xmlEscape(own.data)}</c:calendar-data>`
-    + '</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>';
+    + ownResponses(listUrl) + objectResponse(`${foreignList}${FILE}`, own)
+    + '</d:multistatus>';
   dav.refuse({
     method: 'REPORT', path, status: 207, contentType: 'application/xml; charset=utf-8', body,
     when: (req) => /multiget/.test(req.body) && req.body.includes(FILE),
@@ -233,9 +243,8 @@ async function mirroredOverHttps() {
   const own = dav.getObject(listUrl, FILE);
   const body = '<?xml version="1.0" encoding="utf-8"?>\n'
     + '<d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">'
-    + `<d:response><d:href>${xmlEscape(`${dav.origin}${path}${FILE}`)}</d:href><d:propstat><d:prop>`
-    + `<d:getetag>${xmlEscape(own.etag)}</d:getetag><c:calendar-data>${xmlEscape(own.data)}</c:calendar-data>`
-    + '</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>';
+    + ownResponses(listUrl) + objectResponse(`${dav.origin}${path}${FILE}`, own)
+    + '</d:multistatus>';
   const rule = {
     method: 'REPORT', path, status: 207, contentType: 'application/xml; charset=utf-8', body,
     when: (req) => /multiget/.test(req.body) && req.body.includes(FILE),
