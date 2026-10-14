@@ -139,6 +139,32 @@ export const CASE_MESSAGES = new Map([
   ['health_cycle_import_too_large', 'health.errorCycleImportTooLarge'],
   ['health_cycle_import_no_rows', 'health.errorCycleImportNoRows'],
   ['health_cycle_import_too_many_rows', 'health.errorCycleImportTooManyRows'],
+  // Dokumente (#1909). Die "gibt es nicht mehr" stehen auch in GONE_REASONS.
+  // Die 404 eines Dokuments heisst auch "fuer dich nicht mehr sichtbar" (die
+  // Sichtbarkeit wurde geaendert); der Satz sagt deshalb "nicht mehr
+  // verfuegbar", und ein Loeschen mit diesem Grund ist kein Erfolg.
+  ['documents_folder_not_found', 'documents.errorFolderGone'],
+  // Nicht der Ordner, um den es geht, sondern der im Dialog oder in der
+  // Auswahl GEWAEHLTE (Elternordner, Zielordner): der Dialog bleibt offen und
+  // bietet die aktuellen Ordner an.
+  ['documents_selected_folder_not_found', 'documents.errorSelectedFolderGone'],
+  ['documents_folder_exists', 'documents.errorFolderExists'],
+  ['documents_folder_too_deep', 'documents.errorFolderTooDeep'],
+  // Aelter als die Regel und schon Teil der API: der Loeschdialog liest ihn
+  // selbst (utils/document-folder-delete.js), Anlegen, Umbenennen und
+  // Verschieben eines Ordners im selben Zweig erreichen ihn hier.
+  ['FOLDER_DELETE_IN_PROGRESS', 'documents.folderDeleteInProgressToast'],
+  ['documents_document_not_found', 'documents.errorDocumentGone'],
+  ['documents_file_type_not_allowed', 'documents.errorFileTypeNotAllowed'],
+  ['documents_file_content_mismatch', 'documents.errorFileContentMismatch'],
+  ['documents_file_empty', 'documents.errorFileEmpty'],
+  ['documents_storage_failed', 'documents.errorStorageFailed'],
+  // Ein DMS verknuepfen oder dorthin senden (server/routes/dms.js).
+  ['dms_account_not_found', 'documents.errorDmsAccountGone'],
+  ['dms_document_not_found', 'documents.errorDmsDocumentGone'],
+  ['dms_document_already_linked', 'documents.errorDmsAlreadyLinked'],
+  ['dms_document_already_stored', 'documents.errorDmsAlreadyStored'],
+  ['dms_unreachable', 'documents.dmsSearchError'],
 ]);
 
 /**
@@ -162,6 +188,7 @@ export const CASE_PARAMS = new Map([
   ['waste_source_fetch_too_large', ['limit_mb']],
   ['health_cycle_import_too_large', ['limit_kb']],
   ['health_cycle_import_too_many_rows', ['limit']],
+  ['documents_folder_too_deep', ['limit']],
 ]);
 
 const PARAM_MAX = 1_000_000_000;
@@ -219,6 +246,11 @@ export const GONE_REASONS = new Set([
   'health_nutrition_entry_not_found',
   'health_cycle_period_not_found',
   'health_cycle_log_not_found',
+  'documents_folder_not_found',
+  'documents_selected_folder_not_found',
+  'documents_document_not_found',
+  'dms_account_not_found',
+  'dms_document_not_found',
 ]);
 
 /**

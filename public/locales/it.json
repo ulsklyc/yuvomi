@@ -3746,7 +3746,20 @@
             "reasonTooDeep": "Il percorso supera il limite di cinque livelli di cartelle.",
             "reasonParentFailed": "Non è stato possibile creare la cartella superiore.",
             "reasonRateLimited": "Il server sta ricevendo troppe richieste. Riprova il caricamento più tardi."
-        }
+        },
+        "errorFolderGone": "Questa cartella non esiste più.",
+        "errorSelectedFolderGone": "La cartella scelta non esiste più.",
+        "errorFolderExists": "Qui esiste già una cartella con questo nome. Scegli un altro nome.",
+        "errorFolderTooDeep": "Le cartelle possono essere annidate al massimo su {{limit}} livelli.",
+        "errorDocumentGone": "Questo documento non è più disponibile.",
+        "errorFileTypeNotAllowed": "Questo tipo di file non può essere caricato.",
+        "errorFileContentMismatch": "Il contenuto del file non corrisponde al suo tipo.",
+        "errorFileEmpty": "Il file è vuoto.",
+        "errorStorageFailed": "L’archivio dei documenti non ha risposto. Riprova più tardi.",
+        "errorDmsAccountGone": "Questo account DMS non esiste più.",
+        "errorDmsDocumentGone": "Questo documento non esiste più nel DMS.",
+        "errorDmsAlreadyLinked": "Questo documento del DMS è già collegato.",
+        "errorDmsAlreadyStored": "Questo documento è già archiviato in un DMS."
     },
     "shortcuts": {
         "goKitchen": "Cucina",

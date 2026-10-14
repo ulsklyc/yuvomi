@@ -4067,7 +4067,20 @@
             "reasonTooDeep": "Cesta překračuje limit pěti úrovní složek.",
             "reasonParentFailed": "Nadřazenou složku se nepodařilo vytvořit.",
             "reasonRateLimited": "Server nyní přijímá příliš mnoho požadavků. Zkuste nahrávání později znovu."
-        }
+        },
+        "errorFolderGone": "Tato složka už neexistuje.",
+        "errorSelectedFolderGone": "Vybraná složka už neexistuje.",
+        "errorFolderExists": "Složka s tímto názvem už tady existuje. Zvolte jiný název.",
+        "errorFolderTooDeep": "Složky lze vnořit nejvýše do {{limit}} úrovní.",
+        "errorDocumentGone": "Tento dokument už není dostupný.",
+        "errorFileTypeNotAllowed": "Tento typ souboru nelze nahrát.",
+        "errorFileContentMismatch": "Obsah souboru neodpovídá jeho typu.",
+        "errorFileEmpty": "Soubor je prázdný.",
+        "errorStorageFailed": "Úložiště dokumentů neodpovědělo. Zkuste to později znovu.",
+        "errorDmsAccountGone": "Tento účet DMS už neexistuje.",
+        "errorDmsDocumentGone": "Tento dokument už v DMS neexistuje.",
+        "errorDmsAlreadyLinked": "Tento dokument z DMS je už propojený.",
+        "errorDmsAlreadyStored": "Tento dokument je už uložený v DMS."
     },
     "reminders": {
         "sectionTitle": "Připomínka",

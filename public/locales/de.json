@@ -3806,7 +3806,20 @@
             "reasonTooDeep": "Der Pfad überschreitet das Limit von fünf Ordnerebenen.",
             "reasonParentFailed": "Der übergeordnete Ordner konnte nicht erstellt werden.",
             "reasonRateLimited": "Der Server erhält gerade zu viele Anfragen. Versuche den Upload später erneut."
-        }
+        },
+        "errorFolderGone": "Diesen Ordner gibt es nicht mehr.",
+        "errorSelectedFolderGone": "Den gewählten Ordner gibt es nicht mehr.",
+        "errorFolderExists": "Hier gibt es schon einen Ordner mit diesem Namen. Wähle einen anderen Namen.",
+        "errorFolderTooDeep": "Ordner lassen sich höchstens {{limit}} Ebenen tief verschachteln.",
+        "errorDocumentGone": "Dieses Dokument ist nicht mehr verfügbar.",
+        "errorFileTypeNotAllowed": "Dieser Dateityp kann nicht hochgeladen werden.",
+        "errorFileContentMismatch": "Der Inhalt der Datei passt nicht zu ihrem Dateityp.",
+        "errorFileEmpty": "Die Datei ist leer.",
+        "errorStorageFailed": "Der Dokumentenspeicher hat nicht geantwortet. Versuche es später noch einmal.",
+        "errorDmsAccountGone": "Dieses DMS-Konto gibt es nicht mehr.",
+        "errorDmsDocumentGone": "Dieses Dokument gibt es im DMS nicht mehr.",
+        "errorDmsAlreadyLinked": "Dieses DMS-Dokument ist schon verknüpft.",
+        "errorDmsAlreadyStored": "Dieses Dokument liegt schon in einem DMS."
     },
     "userMultiSelect": {
         "nobody": "Niemand",

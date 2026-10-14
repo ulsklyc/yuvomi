@@ -172,7 +172,7 @@ router.post('/link', async (req, res) => {
   try {
     if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
     const account = getAccount(Number(req.body.account_id));
-    if (!account) return res.status(404).json({ error: 'DMS account not found.', code: 404 });
+    if (!account) return res.status(404).json({ error: 'DMS account not found.', code: 404, reason: 'dms_account_not_found' });
     const dmsId = String(req.body.dms_document_id || '').trim();
     if (!dmsId) return res.status(400).json({ error: 'dms_document_id is required.', code: 400 });
 
@@ -180,7 +180,7 @@ router.post('/link', async (req, res) => {
       SELECT id FROM family_documents
       WHERE storage_backend = 'dms' AND dms_account_id = ? AND storage_key = ?
     `).get(account.id, dmsId);
-    if (dupe) return res.status(409).json({ error: 'This DMS document is already linked.', code: 409 });
+    if (dupe) return res.status(409).json({ error: 'This DMS document is already linked.', code: 409, reason: 'dms_document_already_linked' });
 
     const doc = await adapterFactory(account).getDocument(dmsId);
     const category = CATEGORIES.includes(req.body.category) ? req.body.category : 'other';
@@ -202,9 +202,9 @@ router.post('/link', async (req, res) => {
     const row = db.get().prepare('SELECT * FROM family_documents WHERE id = ?').get(result.lastInsertRowid);
     res.status(201).json({ data: row });
   } catch (err) {
-    if (err.status === 404) return res.status(404).json({ error: 'DMS document not found.', code: 404 });
+    if (err.status === 404) return res.status(404).json({ error: 'DMS document not found.', code: 404, reason: 'dms_document_not_found' });
     log.error('POST /link error:', err);
-    res.status(502).json({ error: 'Failed to link DMS document.', code: 502 });
+    res.status(502).json({ error: 'Failed to link DMS document.', code: 502, reason: 'dms_unreachable' });
   }
 });
 
@@ -212,15 +212,15 @@ router.post('/push', async (req, res) => {
   try {
     if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
     const account = getAccount(Number(req.body.account_id));
-    if (!account) return res.status(404).json({ error: 'DMS account not found.', code: 404 });
+    if (!account) return res.status(404).json({ error: 'DMS account not found.', code: 404, reason: 'dms_account_not_found' });
     const docId = Number(req.body.document_id);
     const doc = db.get().prepare(`
       SELECT d.* FROM family_documents d
       WHERE d.id = @id AND ${documentVisibleSql('d')}
     `).get({ id: docId, userId: userId(req) });
-    if (!doc) return res.status(404).json({ error: 'Document not found.', code: 404 });
+    if (!doc) return res.status(404).json({ error: 'Document not found.', code: 404, reason: 'documents_document_not_found' });
     if (doc.storage_backend === 'dms') {
-      return res.status(400).json({ error: 'Document is already stored in a DMS.', code: 400 });
+      return res.status(400).json({ error: 'Document is already stored in a DMS.', code: 400, reason: 'dms_document_already_stored' });
     }
 
     const content = await readDocumentContent(doc, {
@@ -244,9 +244,10 @@ router.post('/push', async (req, res) => {
         error: 'Failed to read document from storage.',
         code: 502,
         storage_code: err.storageCode,
+        reason: 'documents_storage_failed',
       });
     }
-    res.status(502).json({ error: 'Failed to upload document to DMS.', code: 502 });
+    res.status(502).json({ error: 'Failed to upload document to DMS.', code: 502, reason: 'dms_unreachable' });
   }
 });
 

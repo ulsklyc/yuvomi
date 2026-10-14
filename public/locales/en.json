@@ -3806,7 +3806,20 @@
             "reasonTooDeep": "The path exceeds the five-level folder limit.",
             "reasonParentFailed": "Its parent folder could not be created.",
             "reasonRateLimited": "The server is receiving too many requests. Try the upload again later."
-        }
+        },
+        "errorFolderGone": "This folder no longer exists.",
+        "errorSelectedFolderGone": "The chosen folder no longer exists.",
+        "errorFolderExists": "A folder with this name already exists here. Choose a different name.",
+        "errorFolderTooDeep": "Folders can be nested at most {{limit}} levels deep.",
+        "errorDocumentGone": "This document is no longer available.",
+        "errorFileTypeNotAllowed": "This file type cannot be uploaded.",
+        "errorFileContentMismatch": "The file content does not match its file type.",
+        "errorFileEmpty": "The file is empty.",
+        "errorStorageFailed": "The document storage did not respond. Try again later.",
+        "errorDmsAccountGone": "This DMS account no longer exists.",
+        "errorDmsDocumentGone": "This document no longer exists in the DMS.",
+        "errorDmsAlreadyLinked": "This DMS document is already linked.",
+        "errorDmsAlreadyStored": "This document is already stored in a DMS."
     },
     "housekeeping": {
         "title": "Housekeeping",

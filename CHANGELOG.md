@@ -18,6 +18,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Documents: an error message is in your language and names the cause** (#1909). The
+  documents page showed the server's own English sentence when something could not be saved,
+  moved or deleted, whatever the app language, for example "Folder not found." when somebody else
+  in the household had deleted the folder in the meantime. Folders and documents that no longer
+  exist, a folder name that is already taken, a folder that would be nested too deep, a file type
+  that is not allowed, a file whose content does not match its type, an empty file and a document
+  storage that does not respond now get a sentence in the language of the app. When the folder or
+  document is gone, the page fetches folders and documents by itself and an open dialog closes,
+  also when a deletion meets a document that is gone (it may only have become invisible to you,
+  so this is not reported as deleted). If the folder chosen in an open dialog was deleted, the
+  dialog stays open with your input and offers the current folders. Linking a document from a DMS
+  or sending one to it names a removed DMS account, a document gone in the DMS, an already linked
+  or already stored document and an unreachable DMS. The failures listed after uploading a folder
+  use the same sentences. Uploading into or moving a document to a folder deleted in the meantime
+  answered with a server error and now says that the folder is gone. Any other failure shows the
+  general message instead of the server's text. For API clients: those answers of
+  `/api/v1/documents` carry a `reason` next to `error` (`documents_folder_not_found`,
+  `documents_selected_folder_not_found`, `documents_folder_exists`, `documents_folder_too_deep`
+  with `params.limit`, `documents_document_not_found`, `documents_file_type_not_allowed`,
+  `documents_file_content_mismatch`, `documents_file_empty`, `documents_storage_failed`,
+  `dms_account_not_found`, `dms_document_not_found`, `dms_document_already_linked`,
+  `dms_document_already_stored`, `dms_unreachable`); a document with an unknown `folder_id` is a
+  400 instead of a 500, an empty file is reported as empty instead of as an invalid data URL, and
+  the other status codes are unchanged.
 - **Housekeeping: creating or editing a housekeeper profile saves again** (#1976). Since 2.75.0
   the "Add" button in the profile dialog did nothing: no message, no profile, and the dialog stayed
   open. Its buttons had lost the connection to the form they belong to, and find it again.

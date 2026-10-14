@@ -414,7 +414,9 @@ export async function executeFolderUploadPlan(plan, {
       }
       failedRefs.add(folder.targetRef);
       const reason = error?.status === 429 ? 'rate-limited' : (error?.message || String(error));
-      result.failed.push({ kind: 'folder', item: folder, reason });
+      // `error` mit, damit die Seite den Satz der App sagt (#1909): `reason`
+      // traegt sonst den Text des Servers oder eine Entwicklermeldung.
+      result.failed.push({ kind: 'folder', item: folder, reason, error });
       onProgress({ phase: 'folder', status: 'failed', item: folder, reason });
     }
   }
@@ -453,7 +455,9 @@ export async function executeFolderUploadPlan(plan, {
         return result;
       }
       const reason = error?.status === 429 ? 'rate-limited' : (error?.message || String(error));
-      result.failed.push({ kind: 'file', item, reason });
+      // `error` mit, damit die Seite den Satz der App sagt (#1909): `reason`
+      // traegt sonst den Text des Servers oder eine Entwicklermeldung.
+      result.failed.push({ kind: 'file', item, reason, error });
       onProgress({ phase: 'file', status: 'failed', item, reason });
     }
   }

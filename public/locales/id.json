@@ -3806,7 +3806,20 @@
             "reasonTooDeep": "Jalur melebihi batas lima tingkat folder.",
             "reasonParentFailed": "Folder induk tidak dapat dibuat.",
             "reasonRateLimited": "Server sedang menerima terlalu banyak permintaan. Coba unggah lagi nanti."
-        }
+        },
+        "errorFolderGone": "Folder ini sudah tidak ada.",
+        "errorSelectedFolderGone": "Folder yang dipilih sudah tidak ada.",
+        "errorFolderExists": "Sudah ada folder dengan nama ini di sini. Pilih nama lain.",
+        "errorFolderTooDeep": "Folder dapat bersarang paling banyak {{limit}} tingkat.",
+        "errorDocumentGone": "Dokumen ini sudah tidak tersedia.",
+        "errorFileTypeNotAllowed": "Jenis file ini tidak dapat diunggah.",
+        "errorFileContentMismatch": "Isi file tidak sesuai dengan jenisnya.",
+        "errorFileEmpty": "File kosong.",
+        "errorStorageFailed": "Penyimpanan dokumen tidak merespons. Coba lagi nanti.",
+        "errorDmsAccountGone": "Akun DMS ini sudah tidak ada.",
+        "errorDmsDocumentGone": "Dokumen ini sudah tidak ada di DMS.",
+        "errorDmsAlreadyLinked": "Dokumen DMS ini sudah ditautkan.",
+        "errorDmsAlreadyStored": "Dokumen ini sudah tersimpan di DMS."
     },
     "userMultiSelect": {
         "nobody": "Tidak ada",

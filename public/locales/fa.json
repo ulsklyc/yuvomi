@@ -3806,7 +3806,20 @@
             "reasonTooDeep": "مسیر از محدودیت پنج سطح پوشه فراتر می‌رود.",
             "reasonParentFailed": "پوشه بالادست ایجاد نشد.",
             "reasonRateLimited": "سرور در حال دریافت درخواست‌های زیادی است. بعداً دوباره بارگذاری را امتحان کنید."
-        }
+        },
+        "errorFolderGone": "این پوشه دیگر وجود ندارد.",
+        "errorSelectedFolderGone": "پوشهٔ انتخاب‌شده دیگر وجود ندارد.",
+        "errorFolderExists": "اینجا پوشه‌ای با این نام از قبل وجود دارد. نام دیگری انتخاب کنید.",
+        "errorFolderTooDeep": "پوشه‌ها حداکثر تا {{limit}} سطح تودرتو می‌شوند.",
+        "errorDocumentGone": "این سند دیگر در دسترس نیست.",
+        "errorFileTypeNotAllowed": "این نوع فایل قابل بارگذاری نیست.",
+        "errorFileContentMismatch": "محتوای فایل با نوع آن مطابقت ندارد.",
+        "errorFileEmpty": "فایل خالی است.",
+        "errorStorageFailed": "فضای ذخیره‌سازی اسناد پاسخ نداد. بعداً دوباره امتحان کنید.",
+        "errorDmsAccountGone": "این حساب DMS دیگر وجود ندارد.",
+        "errorDmsDocumentGone": "این سند دیگر در DMS وجود ندارد.",
+        "errorDmsAlreadyLinked": "این سند DMS از قبل پیوند داده شده است.",
+        "errorDmsAlreadyStored": "این سند از قبل در یک DMS ذخیره شده است."
     },
     "userMultiSelect": {
         "nobody": "هیچ‌کس",

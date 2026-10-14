@@ -3746,7 +3746,20 @@
             "reasonTooDeep": "Le chemin dépasse la limite de cinq niveaux de dossiers.",
             "reasonParentFailed": "Le dossier parent n’a pas pu être créé.",
             "reasonRateLimited": "Le serveur reçoit trop de requêtes. Réessayez l’importation plus tard."
-        }
+        },
+        "errorFolderGone": "Ce dossier n’existe plus.",
+        "errorSelectedFolderGone": "Le dossier choisi n’existe plus.",
+        "errorFolderExists": "Un dossier portant ce nom existe déjà ici. Choisissez un autre nom.",
+        "errorFolderTooDeep": "Les dossiers peuvent être imbriqués sur {{limit}} niveaux au maximum.",
+        "errorDocumentGone": "Ce document n’est plus disponible.",
+        "errorFileTypeNotAllowed": "Ce type de fichier ne peut pas être importé.",
+        "errorFileContentMismatch": "Le contenu du fichier ne correspond pas à son type.",
+        "errorFileEmpty": "Le fichier est vide.",
+        "errorStorageFailed": "Le stockage des documents n’a pas répondu. Réessayez plus tard.",
+        "errorDmsAccountGone": "Ce compte de GED n’existe plus.",
+        "errorDmsDocumentGone": "Ce document n’existe plus dans la GED.",
+        "errorDmsAlreadyLinked": "Ce document de la GED est déjà lié.",
+        "errorDmsAlreadyStored": "Ce document est déjà stocké dans une GED."
     },
     "shortcuts": {
         "goKitchen": "Cuisine",

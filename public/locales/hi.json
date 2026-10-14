@@ -3746,7 +3746,20 @@
             "reasonTooDeep": "पथ पाँच फ़ोल्डर स्तर की सीमा से अधिक है।",
             "reasonParentFailed": "मूल फ़ोल्डर नहीं बनाया जा सका।",
             "reasonRateLimited": "सर्वर को अभी बहुत अधिक अनुरोध मिल रहे हैं। बाद में फिर से अपलोड करें।"
-        }
+        },
+        "errorFolderGone": "यह फ़ोल्डर अब मौजूद नहीं है।",
+        "errorSelectedFolderGone": "चुना गया फ़ोल्डर अब मौजूद नहीं है।",
+        "errorFolderExists": "यहाँ इस नाम का फ़ोल्डर पहले से है। कोई दूसरा नाम चुनें।",
+        "errorFolderTooDeep": "फ़ोल्डर अधिकतम {{limit}} स्तर तक एक-दूसरे के अंदर रखे जा सकते हैं।",
+        "errorDocumentGone": "यह दस्तावेज़ अब उपलब्ध नहीं है।",
+        "errorFileTypeNotAllowed": "इस प्रकार की फ़ाइल अपलोड नहीं की जा सकती।",
+        "errorFileContentMismatch": "फ़ाइल की सामग्री उसके प्रकार से मेल नहीं खाती।",
+        "errorFileEmpty": "फ़ाइल खाली है।",
+        "errorStorageFailed": "दस्तावेज़ भंडारण ने जवाब नहीं दिया। बाद में फिर से कोशिश करें।",
+        "errorDmsAccountGone": "यह DMS खाता अब मौजूद नहीं है।",
+        "errorDmsDocumentGone": "यह दस्तावेज़ अब DMS में मौजूद नहीं है।",
+        "errorDmsAlreadyLinked": "यह DMS दस्तावेज़ पहले से जुड़ा हुआ है।",
+        "errorDmsAlreadyStored": "यह दस्तावेज़ पहले से किसी DMS में संग्रहीत है।"
     },
     "shortcuts": {
         "goKitchen": "रसोई",

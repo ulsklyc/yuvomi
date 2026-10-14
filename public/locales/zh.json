@@ -3746,7 +3746,20 @@
             "reasonTooDeep": "路径超过五层文件夹限制。",
             "reasonParentFailed": "无法创建上级文件夹。",
             "reasonRateLimited": "服务器当前收到的请求过多。请稍后重试上传。"
-        }
+        },
+        "errorFolderGone": "此文件夹已不存在。",
+        "errorSelectedFolderGone": "所选文件夹已不存在。",
+        "errorFolderExists": "此处已有同名文件夹。请换一个名称。",
+        "errorFolderTooDeep": "文件夹最多只能嵌套 {{limit}} 层。",
+        "errorDocumentGone": "此文档已不可用。",
+        "errorFileTypeNotAllowed": "无法上传此类型的文件。",
+        "errorFileContentMismatch": "文件内容与其文件类型不符。",
+        "errorFileEmpty": "文件为空。",
+        "errorStorageFailed": "文档存储没有响应。请稍后再试。",
+        "errorDmsAccountGone": "此 DMS 账户已不存在。",
+        "errorDmsDocumentGone": "此文档在 DMS 中已不存在。",
+        "errorDmsAlreadyLinked": "此 DMS 文档已关联。",
+        "errorDmsAlreadyStored": "此文档已存储在 DMS 中。"
     },
     "shortcuts": {
         "goKitchen": "厨房",

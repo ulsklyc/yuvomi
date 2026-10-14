@@ -1356,7 +1356,9 @@ test('Einzel-Archivieren meldet einen Fehler statt ihn zu verschlucken', () => {
   // als unbehandelte Rejection durch, ohne Meldung, mit Erfolgs-Annahme.
   const run = fnBody('runDocumentAction', 'deleteDocuments');
   const branch = run.slice(run.indexOf("if (action === 'archive')"), run.indexOf("if (action === 'push-dms')"));
-  assert.match(branch, /try \{[\s\S]*api\.patch\(`\/documents\/\$\{doc\.id\}\/archive`[\s\S]*\} catch \(err\) \{[\s\S]*showToast\(err\.data\?\.error \?\? t\('common\.unknownError'\), 'danger'\)/);
+  // Seit #1909 sagt reportError den Satz der App statt des Servertexts; was
+  // der Toast dann zeigt, faehrt test:documents-errors am echten Handler.
+  assert.match(branch, /try \{[\s\S]*api\.patch\(`\/documents\/\$\{doc\.id\}\/archive`[\s\S]*\} catch \(err\) \{[\s\S]*reportError\(err\)/);
 });
 
 test('die Leermeldung nennt den Suchbegriff so, wie er getippt wurde', () => {

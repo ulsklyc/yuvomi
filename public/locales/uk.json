@@ -3974,7 +3974,20 @@
             "reasonTooDeep": "Шлях перевищує обмеження у п’ять рівнів папок.",
             "reasonParentFailed": "Не вдалося створити батьківську папку.",
             "reasonRateLimited": "Сервер отримує забагато запитів. Повторіть завантаження пізніше."
-        }
+        },
+        "errorFolderGone": "Цієї папки більше немає.",
+        "errorSelectedFolderGone": "Вибраної папки більше немає.",
+        "errorFolderExists": "Тут уже є папка з такою назвою. Виберіть іншу назву.",
+        "errorFolderTooDeep": "Папки можна вкладати не глибше ніж на {{limit}} рівнів.",
+        "errorDocumentGone": "Цей документ більше недоступний.",
+        "errorFileTypeNotAllowed": "Файли цього типу не можна завантажити.",
+        "errorFileContentMismatch": "Вміст файлу не відповідає його типу.",
+        "errorFileEmpty": "Файл порожній.",
+        "errorStorageFailed": "Сховище документів не відповіло. Спробуйте пізніше.",
+        "errorDmsAccountGone": "Цього облікового запису DMS більше немає.",
+        "errorDmsDocumentGone": "Цього документа більше немає в DMS.",
+        "errorDmsAlreadyLinked": "Цей документ із DMS уже пов’язано.",
+        "errorDmsAlreadyStored": "Цей документ уже зберігається в DMS."
     },
     "shortcuts": {
         "goKitchen": "Кухня",
