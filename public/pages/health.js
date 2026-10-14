@@ -67,7 +67,7 @@ import { renderSkeletonList, renderSkeletonChart } from '/utils/skeleton.js';
 import { formatFastingDuration } from '/utils/health-fasting.js';
 import { canUseFasting, isNavModuleReadOnly } from '/permissions.js';
 import { emptyStateHTML, emptyHintHTML, mountLoadError } from '/utils/empty-state.js';
-import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
+import { errorSentence, isGone } from '/utils/friendly-error.js';
 import { intervalMonthsToInput, intervalInputToMonths } from '/utils/health-prevention.js';
 import { NUTRIENTS, MEAL_TYPES, nutrientProgress } from '/utils/health-nutrition.js';
 
@@ -1741,8 +1741,9 @@ function deleteVitalWithUndo(id) {
   const [row] = vitals.rows.splice(idx, 1);
   renderVitalsShell();
   scheduleUndoableDelete({
-    commit: ({ keepalive } = {}) => deleteOrAlreadyGone(`/health/vitals/${id}`, 'health_vital_not_found', { keepalive }),
-    restore: () => { vitals.rows.splice(idx, 0, row); renderVitalsShell(); },
+    commit: ({ keepalive } = {}) => api.delete(`/health/vitals/${id}`, { keepalive }),
+    restore: (err) => restoreOrReload(err, 'health.vitals.saveError', reloadVitals,
+      () => { vitals.rows.splice(idx, 0, row); renderVitalsShell(); }),
     message: t('health.vitals.measurementDeleted'),
   });
 }
@@ -2440,17 +2441,20 @@ async function reloadAfterGone(reload) {
 }
 
 /**
- * LOESCHEN, auch wenn es schon erledigt ist (#1909): wer etwas loescht, das ein
- * anderes Haushaltsmitglied schon geloescht hat, hat damit, was er wollte. Der
- * Aufrufer laeuft dann seinen Erfolgsweg; nur der Grund des Dings selbst zaehlt
- * (`isAlreadyDeleted`), alles andere bleibt ein Fehler.
+ * LOESCHEN AUF ETWAS, DAS "NICHT GEFUNDEN" WIRD, IST HIER KEIN ERFOLG (#1909).
+ * Anders als in Einkauf und Abfuhr sagt die 404 der Gesundheit zweierlei:
+ * geloescht, ODER die Betreuung fuer diese Person wurde entzogen und die Zeile
+ * steht noch. Ein "geloescht" waere im zweiten Fall falsch. Deshalb laeuft ein
+ * Loeschen mit diesem Grund wie jede andere Handlung durch reportError: der
+ * Satz, und der Bereich kommt frisch vom Server, der zeigt, was wirklich steht.
+ *
+ * Fuer die Loeschwege mit Ruecknahme-Toast (Messwert, Vorsorge, Naehrwerte):
+ * scheitert das Loeschen nach Ablauf der Frist an "gibt es nicht mehr", wird
+ * nicht die alte Zeile zurueckgestellt, sondern nachgeladen.
  */
-async function deleteOrAlreadyGone(path, goneReason, options) {
-  try {
-    await (options ? api.delete(path, options) : api.delete(path));
-  } catch (err) {
-    if (!isAlreadyDeleted(err, goneReason)) throw err;
-  }
+function restoreOrReload(err, fallbackKey, reload, restore) {
+  if (err && isGone(err)) { reportError(err, fallbackKey, reload); return; }
+  restore();
 }
 
 /** Werte-Tab neu laden, ohne gewaehlte Metrik und Zeitraum zu verstellen. */
@@ -3325,7 +3329,7 @@ async function deleteMedLog(entry) {
   if (!(await confirmOverModal(t('health.meds.log.deleteConfirm'),
     { danger: true, confirmLabel: t('common.delete'), detail: t('health.meds.log.deleteConfirmDetail') }))) return;
   try {
-    await deleteOrAlreadyGone(`/health/logs/${entry.id}`, 'health_dose_not_found');
+    await api.delete(`/health/logs/${entry.id}`);
     closeModal({ force: true });
     window.yuvomi?.showToast(t('health.meds.log.deleted'), 'success');
     await reloadMedViews();
@@ -3662,7 +3666,7 @@ async function deleteMed(med) {
   if (!(await confirmOverModal(t('health.meds.deleteConfirm'),
     { danger: true, confirmLabel: t('common.delete'), detail: t('health.meds.deleteConfirmDetail') }))) return;
   try {
-    await deleteOrAlreadyGone(`/health/medications/${med.id}`, 'health_medication_not_found');
+    await api.delete(`/health/medications/${med.id}`);
     window.yuvomi?.showToast(t('health.meds.deleted'), 'success');
     await reloadMedViews();
     refocusAfterRender();
@@ -3772,7 +3776,7 @@ function wireSchedEditor(panel, med) {
       const id = Number(btn.dataset.schedDel);
       btn.disabled = true;
       try {
-        await deleteOrAlreadyGone(`/health/schedules/${id}`, 'health_schedule_not_found');
+        await api.delete(`/health/schedules/${id}`);
         meds.schedulesByMed[med.id] = (meds.schedulesByMed[med.id] || []).filter((s) => s.id !== id);
         renderSchedEditor(panel, med);
       } catch (err) {
@@ -4302,7 +4306,7 @@ async function deleteLabReport(report) {
   if (!(await confirmOverModal(t('health.labs.deleteConfirm'),
     { danger: true, confirmLabel: t('common.delete'), detail: t('health.labs.deleteConfirmDetail') }))) return;
   try {
-    await deleteOrAlreadyGone(`/health/labs/${report.id}`, 'health_lab_report_not_found');
+    await api.delete(`/health/labs/${report.id}`);
     window.yuvomi?.showToast(t('health.labs.deleted'), 'success');
     if (labs.selectedReportId === report.id) labs.selectedReportId = null;
     await reloadLabs();
@@ -4489,7 +4493,7 @@ function wireResultEditor(panel, report, editing = null) {
       const id = Number(btn.dataset.resultDel);
       btn.disabled = true;
       try {
-        await deleteOrAlreadyGone(`/health/results/${id}`, 'health_lab_result_not_found');
+        await api.delete(`/health/results/${id}`);
         report.results = (report.results || []).filter((r) => r.id !== id);
         renderResultEditor(panel, report);
         syncLabsAfterResultChange();
@@ -4996,7 +5000,7 @@ async function deleteActivity(row) {
   if (!(await confirmOverModal(t('health.activity.deleteConfirm'),
     { danger: true, confirmLabel: t('common.delete'), detail: t('health.activity.deleteConfirmDetail') }))) return;
   try {
-    await deleteOrAlreadyGone(`/health/activities/${row.id}`, 'health_activity_not_found');
+    await api.delete(`/health/activities/${row.id}`);
     window.yuvomi?.showToast(t('health.activity.deleted'), 'success');
     await reloadActivity();
     refocusAfterRender();
@@ -5457,8 +5461,9 @@ async function deletePreventionRecord(row) {
   const [removed] = prevention.records.splice(idx, 1);
   renderPreventionShell();
   scheduleUndoableDelete({
-    commit: ({ keepalive } = {}) => deleteOrAlreadyGone(`/health/prevention/records/${row.id}`, 'health_prevention_record_not_found', { keepalive }),
-    restore: () => { prevention.records.splice(idx, 0, removed); renderPreventionShell(); },
+    commit: ({ keepalive } = {}) => api.delete(`/health/prevention/records/${row.id}`, { keepalive }),
+    restore: (err) => restoreOrReload(err, 'health.prevention.saveError', reloadPrevention,
+      () => { prevention.records.splice(idx, 0, removed); renderPreventionShell(); }),
     message: t('health.prevention.deleted'),
   });
 }
@@ -5921,10 +5926,11 @@ async function deleteNutritionEntry(row) {
     // `keepalive` ist der Weg beim Verlassen der Seite: dort gibt es nichts
     // mehr neu zu zeichnen.
     commit: async ({ keepalive } = {}) => {
-      await deleteOrAlreadyGone(`/health/nutrition/entries/${row.id}`, 'health_nutrition_entry_not_found', { keepalive });
+      await api.delete(`/health/nutrition/entries/${row.id}`, { keepalive });
       if (!keepalive) await reloadNutrition();
     },
-    restore: () => { nutrition.entries.splice(idx, 0, removed); renderNutritionShell(); },
+    restore: (err) => restoreOrReload(err, 'health.nutrition.saveError', reloadNutrition,
+      () => { nutrition.entries.splice(idx, 0, removed); renderNutritionShell(); }),
     message: t('health.nutrition.deleted'),
   });
 }
@@ -8639,7 +8645,7 @@ async function deletePeriod(period) {
   if (!(await confirmOverModal(t('health.cycle.deleteConfirm'),
     { danger: true, confirmLabel: t('common.delete'), detail: t('health.cycle.periodDeleteConfirmDetail') }))) return;
   try {
-    await deleteOrAlreadyGone(`/health/cycle/periods/${period.id}`, 'health_cycle_period_not_found');
+    await api.delete(`/health/cycle/periods/${period.id}`);
     window.yuvomi?.showToast(t('health.cycle.deleted'), 'success');
     await reloadCycle();
     refocusAfterRender();
@@ -9035,7 +9041,7 @@ async function deleteDayLog(log) {
   if (!(await confirmOverModal(t('health.cycle.deleteConfirm'),
     { danger: true, confirmLabel: t('common.delete'), detail: t('health.cycle.logDeleteConfirmDetail') }))) return;
   try {
-    await deleteOrAlreadyGone(`/health/cycle/logs/${log.id}`, 'health_cycle_log_not_found');
+    await api.delete(`/health/cycle/logs/${log.id}`);
     window.yuvomi?.showToast(t('health.cycle.deleted'), 'success');
     await reloadCycle();
     refocusAfterRender();
@@ -9357,7 +9363,7 @@ export const __test = {
   cycleFooterMarkup,
   // #1909: die Fehlerwege bis in ihr catch - Loeschen, Zyklus heute, und die
   // Dialoge mit eigenem Fall (gewaehlte Vorsorgeart, Import der Historie).
-  deleteMed, deleteMedLog, deleteLabReport, deleteActivity, deletePeriod, deleteDayLog,
+  deleteMed, deleteMedLog, deleteLabReport, deleteActivity, deletePeriod, deleteDayLog, deleteVitalWithUndo,
   cycleStartPeriodToday, cycleEndPeriodToday,
   openPreventionModal, openCycleImportModal,
   /**

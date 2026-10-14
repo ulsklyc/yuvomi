@@ -239,21 +239,26 @@ const assertNoServerText = () => {
   for (const [text] of toasts) assert.doesNotMatch(String(text), /Server sentence/, 'der Text des Servers im Toast');
 };
 
-// Loeschen: was schon weg ist, ist erledigt.
+// Loeschen: die 404 der Gesundheit heisst "geloescht" ODER "Betreuung entzogen,
+// die Zeile steht noch" - deshalb nie ein Erfolg, sondern der Satz und frischer
+// Stand vom Server (Codex an #1971).
 const LOESCHEN = [
-  ['Medikament', () => page.deleteMed({ id: 3 }), '/health/medications/3', 'health_medication_not_found', 'health.meds.deleted', 'health.meds.deleteError'],
-  ['Dosis-Eintrag', () => page.deleteMedLog({ id: 4 }), '/health/logs/4', 'health_dose_not_found', 'health.meds.log.deleted', 'health.meds.log.saveError'],
-  ['Befund', () => page.deleteLabReport({ id: 5 }), '/health/labs/5', 'health_lab_report_not_found', 'health.labs.deleted', 'health.labs.deleteError'],
-  ['Aktivitaet', () => page.deleteActivity({ id: 6 }), '/health/activities/6', 'health_activity_not_found', 'health.activity.deleted', 'health.activity.deleteError'],
-  ['Periode', () => page.deletePeriod({ id: 7 }), '/health/cycle/periods/7', 'health_cycle_period_not_found', 'health.cycle.deleted', 'health.cycle.deleteError'],
-  ['Tageseintrag', () => page.deleteDayLog({ id: 8 }), '/health/cycle/logs/8', 'health_cycle_log_not_found', 'health.cycle.deleted', 'health.cycle.deleteError'],
+  ['Medikament', () => page.deleteMed({ id: 3 }), '/health/medications/3', 'health_medication_not_found', 'health.errorMedicationGone', 'health.meds.deleteError', null],
+  ['Dosis-Eintrag', () => page.deleteMedLog({ id: 4 }), '/health/logs/4', 'health_dose_not_found', 'health.errorDoseGone', 'health.meds.log.saveError', null],
+  ['Befund', () => page.deleteLabReport({ id: 5 }), '/health/labs/5', 'health_lab_report_not_found', 'health.errorLabReportGone', 'health.labs.deleteError', '/health/labs'],
+  ['Aktivitaet', () => page.deleteActivity({ id: 6 }), '/health/activities/6', 'health_activity_not_found', 'health.errorActivityGone', 'health.activity.deleteError', '/health/activities'],
+  ['Periode', () => page.deletePeriod({ id: 7 }), '/health/cycle/periods/7', 'health_cycle_period_not_found', 'health.errorPeriodGone', 'health.cycle.deleteError', '/health/cycle/periods'],
+  ['Tageseintrag', () => page.deleteDayLog({ id: 8 }), '/health/cycle/logs/8', 'health_cycle_log_not_found', 'health.errorCycleDayGone', 'health.cycle.deleteError', '/health/cycle/logs'],
 ];
 
-for (const [name, loesche, path, reason, okKey, fallbackKey] of LOESCHEN) {
-  test(`Seite: ${name} loeschen, das schon geloescht ist, ist ein Erfolg`, async () => {
-    const { calls } = await mit({ delete: async () => { throw fehler(404, reason); } }, loesche);
+for (const [name, loesche, path, reason, goneKey, fallbackKey, reloadPrefix] of LOESCHEN) {
+  test(`Seite: ${name} loeschen, das "nicht gefunden" wird - kein Erfolg, sein Satz, der Dialog geht zu, der Bereich kommt frisch`, async () => {
+    const { calls, closed, gets } = await mit({ delete: async () => { throw fehler(404, reason); } }, loesche);
     assert.deepEqual(calls[0], ['DELETE', path]);
-    assert.deepEqual(toasts, [[okKey, 'success']]);
+    assert.deepEqual(toasts, [[goneKey, 'danger']]);
+    assert.equal(closed.length, 1);
+    // Die Medikamente laden nur, was gemountet ist - ohne Wurzel ist das nichts.
+    if (reloadPrefix) assert.ok(gets.some((p) => p.startsWith(reloadPrefix)), `nachgeladen: ${gets.join(', ')}`);
   });
 
   test(`Seite: ${name} loeschen scheitert an etwas anderem - der allgemeine Satz der Stelle, nie der des Servers`, async () => {
@@ -264,6 +269,32 @@ for (const [name, loesche, path, reason, okKey, fallbackKey] of LOESCHEN) {
     }
   });
 }
+
+test('Seite: ein Messwert mit Ruecknahme-Toast, dessen Loeschen "nicht gefunden" wird - nicht zurueckgestellt, sondern Satz und frischer Stand', async () => {
+  const row = { id: 11, type: 'weight', value_num: 70, measured_at: '2026-01-05T08:00' };
+  for (const [err, expected, restored] of [
+    [fehler(404, 'health_vital_not_found'), [['health.errorVitalGone', 'danger']], false],
+    [fehler(500), [], true],
+  ]) {
+    page.setViewStateForTest('vitals', { rows: [row] });
+    let opts = null;
+    globalThis.__undoStub = (o) => { opts = o; };
+    try {
+      page.deleteVitalWithUndo(11);
+    } finally {
+      delete globalThis.__undoStub;
+    }
+    assert.ok(opts, 'der Ruecknahme-Weg wurde gestartet');
+    // Wie utils/ux.js nach Ablauf der Frist: commit, und scheitert er, restore(err).
+    const { calls, gets } = await mit({ delete: async () => { throw err; } }, async () => {
+      try { await opts.commit({ keepalive: false }); } catch (e) { opts.restore(e); }
+    });
+    assert.deepEqual(calls[0], ['DELETE', '/health/vitals/11']);
+    assert.deepEqual(toasts, expected);
+    assert.equal(gets.some((p) => p.startsWith('/health/vitals')), !restored, `nachgeladen: ${gets.join(', ')}`);
+    page.setViewStateForTest('vitals', { rows: [] });
+  }
+});
 
 test('Seite: das Medikament ist weg, waehrend der Dialog offen ist - sein Satz, der Dialog geht zu, die Seite laedt nach', async () => {
   // Ein anderer Fall des "gibt es nicht mehr" am Loeschweg: nicht das Ding selbst.

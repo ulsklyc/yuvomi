@@ -34,12 +34,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   else in the household had deleted the medication in the meantime. Measurements, medications,
   time slots, dose entries, lab reports and analytes, activities, preventive care, nutrition
   entries, periods and day entries now say in the language of the app that the entry no longer
-  exists; an open dialog closes and the area fetches the current state by itself. Deleting
-  something that is already deleted simply succeeds. If the preventive care type chosen in an
+  exists; an open dialog closes and the area fetches the current state by itself, also when a
+  deletion meets an entry that is gone. If the preventive care type chosen in an
   open dialog was deleted in Settings, the dialog stays open with your input and offers the
   current types. Importing period history names the cause when the text is too large, has only
   a header row or holds too many periods. Any other failure shows the general message of the
-  place instead of the server's text. The same holds for preventive care types in Settings. Not
+  place instead of the server's text. The same holds for preventive care types in Settings, where
+  deleting a type another admin already deleted simply succeeds. Not
   covered: the list of invalid rows of a period import still shows the server's row messages.
   For API clients: those answers of `/api/v1/health` carry a `reason` next to `error`
   (`health_*_not_found`, `health_prevention_selected_type_not_found`,
