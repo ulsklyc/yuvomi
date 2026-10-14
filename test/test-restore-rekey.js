@@ -322,18 +322,19 @@ test('nach jedem Restore mit Backup-Schluessel bleibt kein Arbeitsverzeichnis im
   // selben Zeit in einem anderen Prozess laeuft (zweiter Testlauf in einem
   // anderen Worktree, lokale Instanz). Ein Vorher/Nachher ueber den geteilten
   // Temp-Ordner zaehlte dessen Arbeitsverzeichnis als Rest dieses Tests. Die
-  // Restores laufen deshalb unter einem eigenen TMPDIR (`os.tmpdir()` liest ihn
-  // bei jedem Aufruf). Das zweite Verzeichnis steht fuer den anderen Prozess:
-  // es liegt waehrend der Restores mit demselben Praefix im geteilten Ordner
-  // und darf das Urteil nicht beruehren.
+  // Restores laufen deshalb unter einem eigenen Temp-Ordner (`os.tmpdir()` liest
+  // ihn bei jedem Aufruf: TMPDIR unter Linux, TMP/TEMP unter Windows, darum
+  // werden alle drei gesetzt). Das zweite Verzeichnis steht fuer den anderen
+  // Prozess: es liegt waehrend der Restores mit demselben Praefix im geteilten
+  // Ordner und darf das Urteil nicht beruehren.
   const eigenes = tmpDir();
   tempDir('yuvomi-rekey-');
-  const vorherTmp = process.env.TMPDIR;
+  const vorherTmp = Object.fromEntries(['TMPDIR', 'TMP', 'TEMP'].map((name) => [name, process.env[name]]));
   // Reichweite: ohne diesen Nachweis waere ein leeres `eigenes` auch dann
   // gruen, wenn db.js seinen Ordner woanders anlegte.
   const angelegt = mock.method(fsp, 'mkdtemp');
   try {
-    process.env.TMPDIR = eigenes;
+    for (const name of Object.keys(vorherTmp)) process.env[name] = eigenes;
     const gut = await backupWithMarker(KEY_ALT, 'gut');
     const { mod } = await targetWithMarker(KEY_NEU, 'x');
     await mod.restoreFromFile(gut, { backupKey: KEY_ALT });
@@ -345,8 +346,10 @@ test('nach jedem Restore mit Backup-Schluessel bleibt kein Arbeitsverzeichnis im
     await assert.rejects(() => mod.restoreFromFile(kaputt, { backupKey: KEY_ALT }));
     mod.get().close();
   } finally {
-    if (vorherTmp === undefined) delete process.env.TMPDIR;
-    else process.env.TMPDIR = vorherTmp;
+    for (const [name, wert] of Object.entries(vorherTmp)) {
+      if (wert === undefined) delete process.env[name];
+      else process.env[name] = wert;
+    }
     angelegt.mock.restore();
   }
 
