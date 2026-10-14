@@ -434,8 +434,8 @@ const setTaskPoints = db.prepare('UPDATE tasks SET points = ? WHERE id = ?');
 
 console.log('Inserting calendar events…');
 const insertEvent = db.prepare(`
-  INSERT INTO calendar_events (title, description, start_datetime, end_datetime, all_day, location, color, icon, recurrence_rule, assigned_to, created_by)
-  VALUES (@title, @description, @start, @end, @all_day, @location, @color, @icon, @rrule, @assigned_to, @created_by)
+  INSERT INTO calendar_events (title, description, start_datetime, end_datetime, all_day, location, color, icon, recurrence_rule, assigned_to, created_by, series_authored)
+  VALUES (@title, @description, @start, @end, @all_day, @location, @color, @icon, @rrule, @assigned_to, @created_by, 1)
 `);
 const insertEventAssign = db.prepare('INSERT OR IGNORE INTO event_assignments (event_id, user_id) VALUES (?, ?)');
 

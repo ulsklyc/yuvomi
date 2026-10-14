@@ -429,8 +429,9 @@ function createVisitCalendarEvent(database, worker, checkIn, actorId, title = nu
   const visitDate = visitDateOverride || checkIn.slice(0, 10);
   const result = database.prepare(`
     INSERT INTO calendar_events
-      (title, start_datetime, end_datetime, all_day, color, icon, assigned_to, created_by, external_source)
-    VALUES (?, ?, NULL, 1, ?, ?, ?, ?, 'local')
+      (title, start_datetime, end_datetime, all_day, color, icon, assigned_to, created_by, external_source,
+       series_authored)
+    VALUES (?, ?, NULL, 1, ?, ?, ?, ?, 'local', 1)
   `).run(
     title || visitTitleFallback(database, worker),
     visitDate,

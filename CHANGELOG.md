@@ -16,6 +16,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the Statistics tab now also writes a share below one percent as "<1 %" instead of "0%", and
   formats the number in the language and region you have chosen.
 
+### Fixed
+
+- **A "last day of the month" series keeps its start date in Google, CalDAV and Apple Calendar after
+  an edit** (#1935). A series you create in Yuvomi from a date in the middle of the month is sent
+  with a start date its own rule accepts: entered on 15 January, it starts on 31 January over there.
+  That only held for the first upload. After any later edit, even one that only changed the title,
+  the other calendar got 15 January as the start and could show that day as one occurrence more
+  than Yuvomi does. The series now goes out with the same start on every upload. The same applies
+  when you change the start date or the repeat rule of a series that is already synced, including
+  one that came from the other calendar. A synced series whose start date and rule you did not
+  change in Yuvomi is still sent back exactly as it came in. A series that already shows the wrong
+  start date in the other calendar is corrected the next time you change its start date or its
+  repeat rule in Yuvomi.
+
 ## [2.77.0] - 2026-10-14
 
 ### Added
