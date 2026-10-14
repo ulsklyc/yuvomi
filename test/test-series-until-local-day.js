@@ -37,6 +37,9 @@
 
 process.env.TZ = process.env.TZ || 'UTC';
 process.env.DB_PATH = ':memory:';
+// calendar.js (Verdrahtungstest unten) greift beim Laden nach window.yuvomi.
+globalThis.window = globalThis.window ?? {};
+globalThis.window.yuvomi = globalThis.window.yuvomi ?? { showToast() {} };
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -49,6 +52,10 @@ const { __test: apple } = await import('../server/services/apple-calendar.js');
 const { icsFieldsForEvent } = await import('../server/services/caldav-outbound.js');
 const { __test: feed } = await import('../server/services/ics-export.js');
 const { expandRecurringEvents } = await import('../server/services/calendar-events.js');
+// Ueber den Loader: calendar.js bekommt den rrule-ui-Stub, dessen Haken
+// (__renderRRuleFields, __recurrenceRow) hier die ECHTEN Funktionen bedienen.
+const { __test: calendarPage } = await import('../public/pages/calendar.js');
+const realRRule = await import('../public/rrule-ui.js');
 
 // ── Unabhaengige Uhr ────────────────────────────────────────────────────────
 
@@ -323,4 +330,88 @@ test('(b) die Ortszeit wird in der Zone der Serie gelesen, auch wenn Google eine
   };
   const body = google.localEventToGoogle(event, {}, 'America/New_York');
   assert.equal(body.recurrence[0], 'RRULE:FREQ=DAILY;UNTIL=20351010T070000Z');
+});
+
+// ── Review zu #1989 ─────────────────────────────────────────────────────────
+
+/**
+ * Googles Vorkommen einer taeglichen Serie, auch wenn `start.dateTime` einen
+ * Zeitpunkt traegt: Google nimmt dessen Wanduhrzeit in `start.timeZone` und
+ * wiederholt sie dort.
+ */
+function googleCount(body) {
+  const zone = body.start.timeZone;
+  const rule = body.recurrence[0].replace(/^RRULE:/, '');
+  const untilMs = utcStampToMs(/(?:^|;)UNTIL=([^;]+)/.exec(rule)[1]);
+  const wall = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  }).format(new Date(body.start.dateTime)).replace(' ', 'T');
+  return dailyDays(wall.slice(0, 10), wall.slice(11), zone, untilMs).length;
+}
+
+test('Review 1: ein Datums-UNTIL einer Serie mit eigener Zone endet bei Google am Ortstag DIESER Zone', () => {
+  // Haushalt Berlin, Serie aus Los Angeles: Google bekommt timeZone Berlin,
+  // Yuvomi expandiert in Los Angeles.
+  setHousehold('Europe/Berlin');
+  const event = {
+    title: 'LA', all_day: 0, tzid: 'America/Los_Angeles',
+    start_datetime: '2035-10-02T06:30:00Z', end_datetime: '2035-10-02T06:45:00Z',
+    recurrence_rule: 'FREQ=DAILY;UNTIL=20351010',
+  };
+  const yuvomi = expandRecurringEvents([{ id: 1, ...event }], '2020-01-01', '2036-12-31');
+  assert.equal(yuvomi.length, 10, 'Vorbedingung: Yuvomi zeigt 1. bis 10.10. Ortszeit');
+  const body = google.localEventToGoogle(event, {}, google.outboundTimeZone(null));
+  assert.equal(body.start.timeZone, 'Europe/Berlin');
+  assert.equal(googleCount(body), 10, body.recurrence[0]);
+});
+
+test('Review 2: ein UTC-UNTIL an einem Zeitpunkt-Start ohne Zone liest das Formular wie der Server in UTC', () => {
+  const event = {
+    title: 'Z', all_day: 0, tzid: null,
+    start_datetime: '2026-09-10T15:00:00Z', end_datetime: '2026-09-10T16:00:00Z',
+    recurrence_rule: 'FREQ=DAILY;UNTIL=20260918T145959Z',
+  };
+  const last = expandRecurringEvents([{ id: 1, ...event }], '2026-01-01', '2026-12-31').at(-1);
+  assert.equal(String(last.start_datetime).slice(0, 10), '2026-09-17', 'Vorbedingung: der Server endet am 17.');
+  const opts = { seriesZone: null, seriesStart: event.start_datetime };
+  assert.equal(parseRRule(event.recurrence_rule, opts).until, '2026-09-17');
+  // Eine Ortszeit ohne Zone hat ohne Serienzone keinen Zeitpunkt: der Tag.
+  assert.equal(parseRRule('FREQ=DAILY;UNTIL=20260918T145959', opts).until, '2026-09-18');
+});
+
+test('Review 3: der Kalender reicht Zone und Start der Serie an Formular und Detailzeile', () => {
+  const event = {
+    id: 7, title: 'LA', all_day: 0, tzid: 'America/Los_Angeles',
+    start_datetime: '2035-10-02T06:30:00Z', end_datetime: '2035-10-02T06:45:00Z',
+    recurrence_rule: 'FREQ=DAILY;UNTIL=20351011T065959Z', assigned_users: [],
+  };
+  let rowValue = null;
+  globalThis.__renderRRuleFields = (...args) => realRRule.renderRRuleFields(...args);
+  globalThis.__recurrenceRow = (...args) => {
+    rowValue = realRRule.parseRRule(args[0], args[1] ?? {}).until;
+    return realRRule.recurrenceRow(...args);
+  };
+  try {
+    const html = calendarPage.buildEventModalContent({ mode: 'edit', event });
+    assert.match(html, /id="event-rrule-source-until" value="2035-10-10"/, 'das Formular zeigt den 10.10. Ortszeit');
+    calendarPage.renderEventDetail(event);
+    assert.equal(rowValue, '2035-10-10', 'die Detailzeile endet am 10.10. Ortszeit');
+  } finally {
+    delete globalThis.__renderRRuleFields;
+    delete globalThis.__recurrenceRow;
+  }
+});
+
+test('Review 4: eine Ortszeit ohne Zone an einer Serie ohne Zone endet bei Google wie in Yuvomi am Tag', () => {
+  setHousehold('Europe/Berlin');
+  const event = {
+    title: 'Floating', all_day: 0, tzid: null,
+    start_datetime: '2035-10-01T18:00', end_datetime: '2035-10-01T19:00',
+    recurrence_rule: 'FREQ=DAILY;UNTIL=20351010T120000',
+  };
+  const yuvomi = yuvomiDays(event);
+  assert.equal(yuvomi.length, 10, 'Vorbedingung: Yuvomi liest das Ende als Tag');
+  const body = google.localEventToGoogle(event, {}, 'Europe/Berlin');
+  assert.deepEqual(googleDays(body), yuvomi, body.recurrence[0]);
 });

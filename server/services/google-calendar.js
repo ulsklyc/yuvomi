@@ -1244,12 +1244,19 @@ function toRfc3339(dt) {
 // `timeZone` (`localDayEndUtc`, utils/rrule-until.js - dort auch, warum nicht
 // 23:59:59 als Wanduhr).
 //
+// TRAEGT DIE SERIE EINE EIGENE ZONE, IST ES DIE IHRE (Review zu #1989). Yuvomi
+// expandiert eine Serie mit `tzid` in dieser Zone, auch wenn `timeZone` die
+// Haushaltszone ist: eine Serie aus Los Angeles in einem Berliner Haushalt
+// endete bei Google sonst am Berliner Tagesende, ein Vorkommen zu frueh.
+//
 // EINE UHRZEIT OHNE ZONE IST EINE ORTSZEIT (#1974). Yuvomi liest sie in der
 // Zone der Serie (`untilInstantMs`, services/recurrence.js). Hier bekam sie
 // bisher ein `Z` angehaengt und wurde damit zu einem anderen Zeitpunkt -
-// westlich von UTC frueher, oestlich spaeter. Ohne eigene Zone der Serie gilt
-// die gesendete `timeZone`, in der Google auch die Startzeit liest.
+// westlich von UTC frueher, oestlich spaeter. Ohne eigene Zone hat sie fuer
+// Yuvomi keinen Zeitpunkt, und es bleibt beim Tag (`nextOccurrence`): dann
+// geht wie bei einem reinen Datum das Ende dieses Ortstags hinaus.
 function normalizeRecurrenceUntil(rule, allDay, timeZone, seriesZone = null) {
+  const ownZone = isValidTimeZone(seriesZone) ? seriesZone : null;
   return rule.split(';').map((segment) => {
     const eq = segment.indexOf('=');
     if (eq === -1) return segment;
@@ -1261,13 +1268,13 @@ function normalizeRecurrenceUntil(rule, allDay, timeZone, seriesZone = null) {
     if (digits.length > 8) {
       const time = digits.slice(8, 14).padEnd(6, '0');
       if (/Z$/i.test(raw)) return `UNTIL=${datePart}T${time}Z`;
-      const zone = isValidTimeZone(seriesZone) ? seriesZone : timeZone;
+      if (!ownZone) return `UNTIL=${localDayEndUtc(datePart, timeZone)}`;
       const wall = `${datePart.slice(0, 4)}-${datePart.slice(4, 6)}-${datePart.slice(6, 8)}`
         + `T${time.slice(0, 2)}:${time.slice(2, 4)}:${time.slice(4, 6)}`;
-      const ms = zone ? Date.parse(localToUTCPrecise(wall, zone)) : NaN;
+      const ms = Date.parse(localToUTCPrecise(wall, ownZone));
       return Number.isFinite(ms) ? `UNTIL=${utcStamp(ms)}` : `UNTIL=${datePart}T${time}Z`;
     }
-    return `UNTIL=${localDayEndUtc(datePart, timeZone)}`;
+    return `UNTIL=${localDayEndUtc(datePart, ownZone ?? timeZone)}`;
   }).join(';');
 }
 

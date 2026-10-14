@@ -158,8 +158,11 @@ export function eventDateTimeFields(event, householdZone = null) {
  * Ein reines Datum als UNTIL ist Yuvomis kanonische Form (utils/rrule-until.js)
  * und neben einem DTSTART mit Uhrzeit laut RFC 5545 §3.3.10 ungueltig. Es wird
  * zum Ende dieses Ortstags in der Zone des DTSTART, ohne TZID in UTC - dort, wo
- * der Empfaenger die Vorkommen rechnet. Neben VALUE=DATE bleibt das Datum, und
- * jede andere Regel geht Wort fuer Wort hinaus (#756).
+ * der Empfaenger die Vorkommen rechnet. Das gilt fuer JEDE Regel mit einem
+ * Datums-UNTIL neben getimtem DTSTART, also auch fuer eine eingelesene: sie ist
+ * in dieser Form ungueltig, und Yuvomi liest sie als genau diesen Tag. Neben
+ * VALUE=DATE bleibt das Datum, und jede andere Regel geht Wort fuer Wort
+ * hinaus (#756).
  *
  * @param {string} rule  Regel mit oder ohne `RRULE:`
  * @param {{ dtstart: {params: string}, tzid: string|null }} when  aus eventDateTimeFields

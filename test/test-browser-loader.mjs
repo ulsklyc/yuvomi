@@ -159,7 +159,8 @@ const STUBS = {
     // dasselbe Muster wie __apiStub in /api.js.
     export const getRRuleValues = () => globalThis.__rruleValues ?? ({});
     export const describeRRule = () => '';
-    export const recurrenceRow = () => ({ icon: 'repeat', label: '', value: '' });
+    // Wer die Verdrahtung der Detailzeile pruefen will, setzt globalThis.__recurrenceRow.
+    export const recurrenceRow = (...args) => globalThis.__recurrenceRow?.(...args) ?? ({ icon: 'repeat', label: '', value: '' });
     export const intervalUnitLabel = () => '';
   `,
   '/components/modal.js': `

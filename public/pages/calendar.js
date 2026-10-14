@@ -6141,6 +6141,8 @@ export const __test = {
   readOnly, openEventModal,
   periodStepOf, periodArrowLabels, openCalendarFilters,
   buildEventModalContent, eventAdvancedTopics, wireVisibilityWarning,
+  // #1974: die Detailzeile der Wiederholung, gemessen an der echten Verdrahtung.
+  renderEventDetail,
   calendarSaveErrorMessage,
   hasCurrentAttachment,
   attachmentNode,

@@ -49,14 +49,17 @@ function weekdayCodeOf(startDate) {
  * wie der Server ihn liest (#1974).
  *
  * Ein reines Datum ist dieser Tag. Ein Wert mit Uhrzeit ist ein Zeitpunkt
- * (`Z`) oder eine Ortszeit ohne Zone, und der Server vergleicht ihn nur bei
- * einer Serie mit eigener Zone und Zeitpunkt-Start mit den Vorkommen
+ * (`Z`) oder eine Ortszeit ohne Zone, und der Server vergleicht ihn nur dann
+ * mit den Vorkommen, wenn deren Start selbst einen Zeitpunkt traegt
  * (`untilInstantMs`, `services/calendar-events.js`); sonst zieht auch er nur
  * den Tag. Genau so hier:
  *
- *   - ohne diese Zone der Datumsteil - so liest auch der Server die Bestands-
- *     regeln aus diesem Formular (`T235959Z`) an einer Serie ohne Zone;
- *   - mit ihr der Ortstag des Zeitpunkts in der Zone der Serie. Ein Anbieter,
+ *   - bei einem zonenlosen Start (Wanduhrzeit) der Datumsteil - so liest auch
+ *     der Server die Bestandsregeln aus diesem Formular (`T235959Z`);
+ *   - bei einem Zeitpunkt-Start ohne Serienzone wird ein `Z`-Wert in UTC
+ *     gelesen (der Server expandiert eine solche Serie in UTC-Tagen); eine
+ *     Ortszeit ohne Zone hat dort keinen Zeitpunkt und bleibt beim Tag;
+ *   - mit Serienzone der Ortstag des Zeitpunkts in dieser Zone. Ein Anbieter,
  *     der das Ende eines Tages in Los Angeles zurueckliefert, schreibt
  *     `20351011T065959Z` fuer den 10. Oktober; der Datumsteil zeigte den 11.,
  *     und wer dann die Wiederholung anfasste, verlaengerte die Serie um einen
@@ -76,10 +79,13 @@ function untilDayOf(value, { seriesZone = null, seriesStart = null } = {}) {
   }
   const day = `${m[1]}-${m[2]}-${m[3]}`;
   if (m[4] === undefined) return day;
-  if (!isValidTimeZone(seriesZone) || !hasExplicitZone(seriesStart)) return day;
+  if (!hasExplicitZone(seriesStart)) return day;
+  const ownZone = isValidTimeZone(seriesZone) ? seriesZone : null;
+  if (!ownZone && !m[7]) return day;
+  const zone = ownZone ?? 'UTC';
   const time = `${m[4]}:${m[5]}:${m[6]}`;
-  const untilWall = m[7] ? wallTimeValue(`${day}T${time}Z`, seriesZone) : `${day}T${time}`;
-  const startWall = wallTimeValue(seriesStart, seriesZone);
+  const untilWall = m[7] ? wallTimeValue(`${day}T${time}Z`, zone) : `${day}T${time}`;
+  const startWall = wallTimeValue(seriesStart, zone);
   if (!untilWall || !startWall) return day;
   const untilDay = untilWall.slice(0, 10);
   if (untilWall.slice(11) >= startWall.slice(11)) return untilDay;
