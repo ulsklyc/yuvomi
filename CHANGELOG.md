@@ -19,9 +19,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   end, repeat rule and time zone stay, and so do the reminders; a title changed over there still
   comes in. Any other change in the other calendar is taken over as before. A series whose
   start already came back before this update keeps that start: the date entered back then is not
-  known any more. A repeat rule sent
-  back by an API client with its values in another order (`BYDAY=TU,MO` for `BYDAY=MO,TU`) no
-  longer counts as a rule written in Yuvomi.
+  known any more. A repeat rule sent back by an API client with its values in another order
+  (`BYDAY=TU,MO` for `BYDAY=MO,TU`) no longer counts as a rule written in Yuvomi.
+- **A timed series that ends on a date ends on the same occurrence in Google as in Yuvomi** (#1974).
+  When a series with a time of day ends on a date - for example after "this and all following"
+  cut it off - Yuvomi shows it up to and including that day in your time zone. Google got the end
+  of that day in UTC instead. East of UTC Google could show one occurrence more (a daily 00:30 in
+  Berlin also on the morning after the last day), west of UTC one fewer (a daily 23:30 in Los
+  Angeles was missing on the last day). The end now goes to Google as the end of that day in the
+  time zone the series is sent with. This applies to what is sent from now on: once Google's
+  answer has come back into Yuvomi, a series keeps the end both sides already agree on.
 - **Waste collection: the source dialog says why the last refresh failed in your language**
   (#1909). The dialog of a calendar address showed the server's own English text of the last
   failed refresh, for example "No calendar entries in the response". It now shows the same

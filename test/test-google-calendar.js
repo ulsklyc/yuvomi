@@ -225,6 +225,9 @@ test('localEventToGoogle: bereits vorhandene Sekunden bleiben unverändert', () 
 });
 
 test('localEventToGoogle: getimtes UNTIL ohne Zeitteil wird zu UTC date-time', () => {
+  // Das Tagesende in der gesendeten Zone, nach UTC umgerechnet (#1974); die
+  // Zonenfaelle stehen in test:google-until-local-day. Hier die Zone UTC, damit
+  // die Form nicht an der Zone des Rechners haengt.
   const event = {
     title: 'Wöchentlich bis',
     all_day: 0,
@@ -232,7 +235,7 @@ test('localEventToGoogle: getimtes UNTIL ohne Zeitteil wird zu UTC date-time', (
     end_datetime:   '2026-06-03T15:00',
     recurrence_rule: 'FREQ=WEEKLY;UNTIL=20260831',
   };
-  const g = localEventToGoogle(event);
+  const g = localEventToGoogle(event, {}, 'UTC');
   assertEqual(g.recurrence[0], 'RRULE:FREQ=WEEKLY;UNTIL=20260831T235959Z');
 });
 

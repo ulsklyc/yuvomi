@@ -565,7 +565,11 @@ for (const name of Object.keys(PROVIDERS)) {
     const c = { ...TIMED, entered: { ...TIMED.entered, recurrence_rule: `${LAST_DAY};UNTIL=20351231` } };
     const s = await pushedSeries(p, c);
     if (name === 'Google') {
-      assert.match(p.ruleAtProvider(), /UNTIL=20351231T\d{6}Z/, 'Vorbedingung: Google bekam das UNTIL umgeschrieben');
+      // Das Ende des Ortstags in der gesendeten Zone (#1974): diese Form steht
+      // im Schnappschuss, sonst waere das Echo einer Serie mit Datums-UNTIL nie gleich.
+      const localDayEnd = { UTC: '20351231T235959Z', 'Europe/Berlin': '20351231T225959Z' }[ZONE];
+      assert.equal(p.ruleAtProvider(), `${LAST_DAY};UNTIL=${localDayEnd}`,
+        'Vorbedingung: Google bekam das UNTIL als Ende des Ortstags');
     }
     await p.sync();
     assertKept(s);
