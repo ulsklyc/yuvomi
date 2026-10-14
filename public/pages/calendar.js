@@ -6141,6 +6141,8 @@ export const __test = {
   readOnly, openEventModal,
   periodStepOf, periodArrowLabels, openCalendarFilters,
   buildEventModalContent, eventAdvancedTopics, wireVisibilityWarning,
+  // #1974: die Detailzeile der Wiederholung, gemessen an der echten Verdrahtung.
+  renderEventDetail,
   calendarSaveErrorMessage,
   hasCurrentAttachment,
   attachmentNode,
@@ -6546,7 +6548,8 @@ function renderEventDetail(ev, reminders = []) {
     // WANN und WER stehen seit R18 im Kopf (eventDetailHead): die Zeit in
     // Worten, die Personen als Avatare. Eine Zeile bleibt nur fuer den frei
     // eingetragenen Namen ohne Konto - er hat kein Bild fuer den Kopf.
-    recurrenceRow(ev.recurrence_rule),
+    // Zone und Start der Serie: ein UNTIL mit Uhrzeit endet an ihrem Ortstag (#1974).
+    recurrenceRow(ev.recurrence_rule, { seriesZone: ev.tzid, seriesStart: ev.start_datetime }),
     { icon: 'map-pin', label: t('calendar.locationLabel'), value: ev.location ? fmtLocation(ev.location) : '', action: mapRowAction(ev) },
     ev.assigned_users?.length ? null : assignedRow([], t('calendar.assignedLabel'), ev.assigned_name || ''),
     {
@@ -8214,6 +8217,10 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
       // Kanonischer Datums-Key aus dem Kalenderzustand. Das Widget formatiert
       // ihn nur; es kennt weder die Zeit- noch die Ganztags-Feldnamen.
       startDate,
+      // Ein UNTIL mit Uhrzeit endet am Ortstag der Serie, so wie der Server es
+      // liest (#1974) - dafuer braucht das Formular ihre Zone und ihren Start.
+      seriesZone: isEdit ? event.tzid : null,
+      seriesStart: isEdit ? event.start_datetime : null,
     })}
 
     ${isEdit && requiresWholeSeriesConfirmation(event) ? `

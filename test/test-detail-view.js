@@ -369,7 +369,7 @@ test('die Termin-Verdrahtung ist zweigeteilt', async () => {
 test('die Termin-Detailansicht zeigt, was das alte Popup verschwieg', async () => {
   const src = await calendarJs();
   const fn = src.slice(src.indexOf('function renderEventDetail'), src.indexOf('async function openEventDetail'));
-  assert.match(fn, /recurrenceRow\(ev\.recurrence_rule\)/, 'Wiederholung im Klartext');
+  assert.match(fn, /recurrenceRow\(ev\.recurrence_rule[,)]/, 'Wiederholung im Klartext');
   assert.match(fn, /reminderSummary\(/, 'Erinnerungen im Klartext');
   assert.match(fn, /visibilityRow\(ev\.visibility\)/, 'Sichtbarkeit');
   // Seit R18 stehen WANN und WER im Kopf (eventDetailHead); die geteilte Zeile

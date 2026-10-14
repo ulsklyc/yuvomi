@@ -22,7 +22,7 @@
 import { createLogger } from '../logger.js';
 import * as outbound from './calendar-outbound.js';
 import { patchICSEvent } from '../utils/ics-patch.js';
-import { eventDateTimeFields } from '../utils/ics-datetime.js';
+import { eventDateTimeFields, rruleForDtstart } from '../utils/ics-datetime.js';
 import { householdTimeZone } from '../utils/timezone.js';
 import * as db from '../db.js';
 import { nearestIcalColorName } from '../utils/ical-color.js';
@@ -206,7 +206,8 @@ export function icsFieldsForEvent(event, householdZone = null) {
     SUMMARY:     event.title,
     DESCRIPTION: event.description || null,
     LOCATION:    event.location || null,
-    RRULE:       event.recurrence_rule || null,
+    // Reines Datum als UNTIL neben getimtem DTSTART -> Ende des Ortstags (#1974).
+    RRULE:       event.recurrence_rule ? rruleForDtstart(event.recurrence_rule, when) : null,
     DTSTART:     when.dtstart,
     DTEND:       when.dtend,
   };

@@ -56,6 +56,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the profile. Checking in and out and keeping open visits stay with every member who may write.
   For API clients: `GET /api/v1/housekeeping/workers` carries `can_manage` next to `data`, true
   when the caller may create and edit profiles.
+- **A series end set in the repeat options ends on the same occurrence in every calendar**
+  (#1974). The end date was saved as the end of that day in UTC. Google, CalDAV and iCloud read
+  that moment: east of UTC they showed one occurrence more (a daily series at 00:30 in Berlin also
+  on the day after the end), west of UTC one fewer (at 23:30 in Los Angeles the last day was
+  missing), and a synced series with its own time zone ended early in Yuvomi as well. The end is
+  now saved as the date you picked, and each calendar receives the end of that day in the time
+  zone it computes the series in - as a UTC time next to a timed start, as RFC 5545 requires, and
+  as a date for all-day series. Series saved before this update keep the end they have; it is
+  applied the next time the repeat options are changed. Two smaller cases from the same report: an
+  end that came back from another calendar as a UTC time showed the following day in the edit form
+  west of UTC, and an end with a time but no time zone reached Google as UTC instead of the
+  series' local time.
 
 ## [2.77.1] - 2026-10-14
 

@@ -28,7 +28,7 @@ import * as outbound from './calendar-outbound.js';
 import { dropUploadAttemptsOf } from './caldav-upload-attempts.js';
 import { processPendingDeletions, processPendingUpdates, flushAccount } from './caldav-outbound.js';
 import { rruleLine } from './recurrence.js';
-import { eventDateTimeFields } from '../utils/ics-datetime.js';
+import { eventDateTimeFields, rruleForDtstart } from '../utils/ics-datetime.js';
 import { vtimezoneFor } from '../utils/vtimezone.js';
 import { householdTimeZone } from '../utils/timezone.js';
 import { createCalDAVClient, createUploadGate } from '../utils/caldav-client.js';
@@ -255,8 +255,10 @@ function buildICS(event, householdZone = null) {
   // ICS-Zeile, lokal angelegte nur den Regelkörper (#756). Roh übernommen ergab
   // letzteres eine Zeile ohne Property-Namen - ein VEVENT, das kein Server als
   // Serie liest. patchICSEvent normalisiert an seiner Stelle genauso.
+  // Ein reines Datum als UNTIL wird neben einem getimten DTSTART zum Ende des
+  // Ortstags in UTC (#1974, utils/rrule-until.js).
   if (event.recurrence_rule) {
-    lines.push(rruleLine(event.recurrence_rule));
+    lines.push(rruleLine(rruleForDtstart(event.recurrence_rule, when)));
   }
 
   lines.push('END:VEVENT', 'END:VCALENDAR');

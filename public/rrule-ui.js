@@ -5,6 +5,7 @@
  */
 
 import { t, formatDate, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
+import { hasExplicitZone, isValidTimeZone, wallTimeValue } from '/utils/timezone.js';
 
 const FREQ_OPTIONS = () => [
   { value: '',        label: t('rrule.freqNone') },
@@ -44,6 +45,56 @@ function weekdayCodeOf(startDate) {
 }
 
 /**
+ * Der Kalendertag, an dem eine Serie mit diesem UNTIL zuletzt stattfindet - so,
+ * wie der Server ihn liest (#1974).
+ *
+ * Ein reines Datum ist dieser Tag. Ein Wert mit Uhrzeit ist ein Zeitpunkt
+ * (`Z`) oder eine Ortszeit ohne Zone, und der Server vergleicht ihn nur dann
+ * mit den Vorkommen, wenn deren Start selbst einen Zeitpunkt traegt
+ * (`untilInstantMs`, `services/calendar-events.js`); sonst zieht auch er nur
+ * den Tag. Genau so hier:
+ *
+ *   - bei einem zonenlosen Start (Wanduhrzeit) der Datumsteil - so liest auch
+ *     der Server die Bestandsregeln aus diesem Formular (`T235959Z`);
+ *   - bei einem Zeitpunkt-Start ohne Serienzone wird ein `Z`-Wert in UTC
+ *     gelesen (der Server expandiert eine solche Serie in UTC-Tagen); eine
+ *     Ortszeit ohne Zone hat dort keinen Zeitpunkt und bleibt beim Tag;
+ *   - mit Serienzone der Ortstag des Zeitpunkts in dieser Zone. Ein Anbieter,
+ *     der das Ende eines Tages in Los Angeles zurueckliefert, schreibt
+ *     `20351011T065959Z` fuer den 10. Oktober; der Datumsteil zeigte den 11.,
+ *     und wer dann die Wiederholung anfasste, verlaengerte die Serie um einen
+ *     Tag. Liegt der Zeitpunkt vor der Startzeit der Serie an diesem Tag, ist
+ *     das letzte Vorkommen das am Vortag - so schneidet Open-Xchange eine Serie
+ *     (eine Sekunde vor dem Start am Schnitttag, #1269).
+ *
+ * @param {string} value  UNTIL-Wert
+ * @param {{ seriesZone?: string|null, seriesStart?: string|null }} [series]
+ * @returns {string} YYYY-MM-DD
+ */
+function untilDayOf(value, { seriesZone = null, seriesStart = null } = {}) {
+  const m = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z)?)?$/i.exec(String(value).trim());
+  if (!m) {
+    const c = String(value).replace(/[TZ]/g, '');
+    return `${c.slice(0, 4)}-${c.slice(4, 6)}-${c.slice(6, 8)}`;
+  }
+  const day = `${m[1]}-${m[2]}-${m[3]}`;
+  if (m[4] === undefined) return day;
+  if (!hasExplicitZone(seriesStart)) return day;
+  const ownZone = isValidTimeZone(seriesZone) ? seriesZone : null;
+  if (!ownZone && !m[7]) return day;
+  const zone = ownZone ?? 'UTC';
+  const time = `${m[4]}:${m[5]}:${m[6]}`;
+  const untilWall = m[7] ? wallTimeValue(`${day}T${time}Z`, zone) : `${day}T${time}`;
+  const startWall = wallTimeValue(seriesStart, zone);
+  if (!untilWall || !startWall) return day;
+  const untilDay = untilWall.slice(0, 10);
+  if (untilWall.slice(11) >= startWall.slice(11)) return untilDay;
+  const [y, mo, d] = untilDay.split('-').map(Number);
+  const prev = new Date(Date.UTC(y, mo - 1, d - 1));
+  return [prev.getUTCFullYear(), String(prev.getUTCMonth() + 1).padStart(2, '0'), String(prev.getUTCDate()).padStart(2, '0')].join('-');
+}
+
+/**
  * Parsed einen RRULE-String in ein Objekt für die UI.
  *
  * Nimmt die Regel mit und ohne „RRULE:"-Präfix. Beide Schreibweisen stehen
@@ -56,9 +107,11 @@ function weekdayCodeOf(startDate) {
  * macht dasselbe seit jeher (`server/services/recurrence.js`).
  *
  * @param {string|null} rule - z.B. "FREQ=WEEKLY;BYDAY=MO,TH;INTERVAL=2;COUNT=10"
+ * @param {{ seriesZone?: string|null, seriesStart?: string|null }} [series]
+ *        Zone und Start der Serie, fuer ein UNTIL mit Uhrzeit (`untilDayOf`).
  * @returns {{ freq: string, interval: number, byday: string[], until: string, count: number|null }}
  */
-export function parseRRule(rule) {
+export function parseRRule(rule, series = {}) {
   const result = { freq: '', interval: 1, byday: [], until: '', count: null, lastDay: false };
   if (!rule) return result;
 
@@ -71,11 +124,7 @@ export function parseRRule(rule) {
     if (key === 'FREQ')     result.freq     = val;
     if (key === 'INTERVAL') result.interval  = parseInt(val, 10) || 1;
     if (key === 'BYDAY')    result.byday     = val.split(',').map(d => d.trim());
-    if (key === 'UNTIL') {
-      // YYYYMMDD → YYYY-MM-DD
-      const c = val.replace(/[TZ]/g, '');
-      result.until = `${c.slice(0, 4)}-${c.slice(4, 6)}-${c.slice(6, 8)}`;
-    }
+    if (key === 'UNTIL') result.until = untilDayOf(val, series);
     if (key === 'COUNT') {
       const n = parseInt(val, 10);
       if (Number.isInteger(n) && n > 0) result.count = n;
@@ -93,6 +142,15 @@ export function parseRRule(rule) {
 /**
  * Baut einen RRULE-String aus den UI-Werten. UNTIL und COUNT schließen sich
  * gegenseitig aus (RFC 5545); COUNT hat Vorrang, falls beide gesetzt sind (#513).
+ *
+ * UNTIL IST EIN REINES DATUM (#1974). Bis hierher stand `T235959Z` dahinter,
+ * das Ende des UTC-Tags: eine Serie mit eigener Zone endete damit schon in
+ * Yuvomi am falschen Vorkommen, und jeder Anbieter las den Zeitpunkt statt des
+ * Tags - oestlich von UTC ein Vorkommen mehr, westlich eines weniger. Das Datum
+ * ist der Tag, den hier jemand eingetragen hat; in den Zeitpunkt, den ein
+ * Empfaenger neben einem getimten DTSTART verlangt, rechnet es der Server erst
+ * beim Hinausgehen um, in der Zone, in der dieser Empfaenger die Vorkommen
+ * rechnet (`server/utils/rrule-until.js`).
  * @param {{ freq: string, interval: number, byday: string[], until: string, count?: number|null }} opts
  * @returns {string|null} - RRULE-String oder null (keine Wiederholung)
  */
@@ -110,7 +168,7 @@ export function buildRRule({ freq, interval, byday, until, count = null, lastDay
   if (count && count > 0) {
     parts.push(`COUNT=${count}`);
   } else if (until) {
-    parts.push(`UNTIL=${until.replace(/-/g, '')}T235959Z`);
+    parts.push(`UNTIL=${until.replace(/-/g, '')}`);
   }
   return parts.join(';');
 }
@@ -132,6 +190,9 @@ export function buildRRule({ freq, interval, byday, until, count = null, lastDay
  *        Nur davon haengt ab, welcher Monatsletzten-Hinweis stimmt.
  *        startDate ist ein explizit vom aufrufenden Modul gelieferter
  *        kanonischer Datums-Key für die konkrete Kalender-Vorschau.
+ *        seriesZone/seriesStart sind Zone (`tzid`) und gespeicherter Start der
+ *        bestehenden Serie; ohne sie zeigt ein UNTIL mit Uhrzeit seinen
+ *        Datumsteil (`untilDayOf`).
  * @returns {string} HTML-String
  */
 function canShowConcreteMonthEnd(rule, firstDate) {
@@ -212,7 +273,8 @@ export function renderRRuleFields(prefix, existingRule, opts = {}) {
   const expandsFromStart = !!opts.expandsFromStart;
   const allowFromCompletion = !!opts.allowFromCompletion;
   const fromCompletion = !!opts.fromCompletion;
-  const parsed = parseRRule(existingRule);
+  const series = { seriesZone: opts.seriesZone ?? null, seriesStart: opts.seriesStart ?? null };
+  const parsed = parseRRule(existingRule, series);
 
   // aria-describedby haengt am SELBEN Zustand wie der Hinweis, nicht nur dessen
   // hidden-Attribut: ein direkt referenzierter Knoten zaehlt zur Beschreibung,
@@ -258,8 +320,11 @@ export function renderRRuleFields(prefix, existingRule, opts = {}) {
   // Validator des Servers, und ein RRULE-Zeichenvorrat kennt keine Anführungs-
   // zeichen. Trotzdem attributsicher quoten - der Wert kommt aus einem
   // Fremdkalender, nicht aus dieser Oberfläche.
+  // Daneben das Ende, wie es das Formular zeigt: getRRuleValues vergleicht
+  // gegen dieselbe Lesart, ohne Zone und Start der Serie noch einmal zu kennen.
   const sourceRule = existingRule
     ? `<input type="hidden" id="${prefix}-rrule-source" value="${String(existingRule).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)}">`
+      + `<input type="hidden" id="${prefix}-rrule-source-until" value="${parsed.until.replace(/[^0-9-]/g, '')}">`
     : '';
 
   return `
@@ -390,14 +455,16 @@ export function intervalUnitLabel(unit, count = 1) {
  * Leseinformation zu bekommen.
  *
  * @param {string|null} rule
- * @param {{ fromCompletion?: boolean }} [opts] Der Anker steht nicht in der
+ * @param {{ fromCompletion?: boolean, seriesZone?: string|null, seriesStart?: string|null }} [opts]
+ *        Der Anker steht nicht in der
  *        RRULE (RFC 5545 kennt ihn nicht) und muss deshalb hier hereingereicht
  *        werden. Ohne ihn läse sich „Jede Woche" für zwei verschiedene Serien
  *        gleich, obwohl sie an verschiedenen Tagen wiederkommen (#658).
+ *        seriesZone/seriesStart wie bei renderRRuleFields.
  * @returns {string} leerer String, wenn keine Wiederholung
  */
 export function describeRRule(rule, opts = {}) {
-  const p = parseRRule(rule);
+  const p = parseRRule(rule, opts);
   if (!p.freq) return '';
 
   // Die Beschriftungen kommen aus denselben Listen, die auch das Formular füllt.
@@ -635,7 +702,10 @@ export function getRRuleValues(root, prefix) {
   // Wiederholung gedreht - dann geht die Regel im Wortlaut zurück.
   // Eine bewusst geleerte Wiederholung (built === null) fällt nicht darunter.
   const source = root.querySelector(`#${prefix}-rrule-source`)?.value || '';
-  const rule = (built && source && buildRRule(parseRRule(source)) === built) ? source : built;
+  const sourceParsed = parseRRule(source);
+  const shownUntil = root.querySelector(`#${prefix}-rrule-source-until`)?.value;
+  if (shownUntil) sourceParsed.until = shownUntil;
+  const rule = (built && source && buildRRule(sourceParsed) === built) ? source : built;
 
   // Ohne Regel ist der Anker bedeutungslos: sonst bliebe der Schalter an einer
   // Aufgabe hängen, die gar nicht mehr wiederkehrt, und käme beim nächsten
