@@ -23,14 +23,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   series' own time zone. The calendar view and the ICS feed then read that time in the zone the
   server process runs in, so the same series could show at different times after a container was
   rebuilt with another `TZ`. The time is now always read in the household's time zone, and the
-  series continues on the clock of its own zone. The dashboard countdown counts such a series on
-  that clock as well, including an end with a time of day. Also affected: CalDAV and iCloud. They
-  received the household's digits unchanged, labelled with the event's own zone. This applied to
-  imported single events with their own zone as well as to series. If your household time zone
-  differs from the zone of such an event, Yuvomi now sends a different clock time to CalDAV and
-  iCloud the next time the event is pushed - the one you saw in the form. A series you edited in
-  Yuvomi is lined up with its rule on the clock of its own zone, so the provider no longer counts an
-  extra occurrence on the day before. Google is unchanged.
+  series continues on the clock of its own zone. Also affected: CalDAV and iCloud. They received
+  the household's digits unchanged, labelled with the event's own zone. This applied to imported
+  single events with their own zone as well as to series. If your household time zone differs from
+  the zone of such an event, Yuvomi now sends a different clock time to CalDAV and iCloud the next
+  time the event is pushed - the one you saw in the form. A series you edited in Yuvomi is lined up
+  with its rule on the clock of its own zone, so the provider no longer counts an extra occurrence
+  on the day before. Google is unchanged. Not yet covered: the dashboard countdown of an imported
+  series whose own zone differs from the household's can still name a day next to the one the
+  calendar shows (#1998).
 - **Documents: an error message is in your language and names the cause** (#1909). The
   documents page showed the server's own English sentence when something could not be saved,
   moved or deleted, whatever the app language, for example "Folder not found." when somebody else

@@ -47,7 +47,6 @@ const { __test: apple } = await import('../server/services/apple-calendar.js');
 const { icsSnapshot } = await import('../server/services/outbound-echo.js');
 const { storedDayDiffersFromSeriesDay } = await import('../server/utils/timezone.js');
 const { default: calendarRouter } = await import('../server/routes/calendar.js');
-const { getCountdowns, nextEventDate } = await import('../server/services/countdowns.js');
 const { resolveEventSearchRows } = await import('../server/services/search.js');
 const { __test: googleApi } = await import('../server/services/google-calendar.js');
 const { storedToInstantIso } = await import('../server/utils/timezone.js');
@@ -224,12 +223,12 @@ function localOf(iso, zone) {
 }
 
 /** Legt eine eingelesene Zeile an, wie sie nach PUT in der Tabelle steht. */
-function insertImported({ start, end = null, rule = null, tzid = LA, countdown = 0, authored = 0 }) {
+function insertImported({ start, end = null, rule = null, tzid = LA, authored = 0 }) {
   return Number(db.prepare(`
     INSERT INTO calendar_events (title, start_datetime, end_datetime, all_day, recurrence_rule, tzid,
-      external_source, external_calendar_id, created_by, countdown, series_authored)
-    VALUES ('Import', ?, ?, 0, ?, ?, 'caldav', ?, 1, ?, ?)
-  `).run(start, end, rule, tzid, `uid-${Math.random()}`, countdown, authored).lastInsertRowid);
+      external_source, external_calendar_id, created_by, series_authored)
+    VALUES ('Import', ?, ?, 0, ?, ?, 'caldav', ?, 1, ?)
+  `).run(start, end, rule, tzid, `uid-${Math.random()}`, authored).lastInsertRowid);
 }
 
 test(`TZ=${process.env.TZ}: ohne Haushaltszone wirft, wer zonenlose Ziffern neben einer tzid liest`, () => {
@@ -256,22 +255,6 @@ test(`TZ=${process.env.TZ}: der Serien-Guard im PUT liest den Starttag in der Ha
     }),
   });
   assert.equal(res.status, 200, await res.text());
-});
-
-test(`TZ=${process.env.TZ}: der Countdown nennt den Tag, den der Kalender zeigt`, () => {
-  setHousehold(BERLIN);
-  db.prepare('UPDATE calendar_events SET countdown = 0').run();
-  const id = insertImported({
-    start: '2035-10-02T08:30', end: '2035-10-02T08:45', rule: 'RRULE:FREQ=MONTHLY;BYMONTHDAY=-1;COUNT=3', countdown: 1,
-  });
-  const shown = expandAndResolveEventRows(db, [db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(id)],
-    '2035-09-01', '2036-03-01');
-  assert.equal(localOf(shown[0].start_datetime, BERLIN), '2035-11-01 07:30', 'Vorbedingung: der Kalender');
-  const { items } = getCountdowns(db, { userId: 1, todayKey: '2035-09-01' });
-  const item = items.find((entry) => entry.source === 'event' && entry.id === id);
-  assert.ok(item, JSON.stringify(items));
-  assert.equal(item.date, '2035-11-01');
-  db.prepare('UPDATE calendar_events SET countdown = 0').run();
 });
 
 test(`TZ=${process.env.TZ}: Google bekommt weiter die Haushaltsziffern, die Tagesfrage liest sie in der Haushaltszone`, () => {
@@ -334,67 +317,4 @@ test(`TZ=${process.env.TZ}: eine EXDATE des Anbieters trifft das Vorkommen, das 
   assert.deepEqual(out.map((o) => localOf(o.start_datetime, LA)), [
     '2035-10-01 23:30', '2035-10-02 23:30', '2035-10-04 23:30', '2035-10-05 23:30',
   ]);
-});
-
-// ── Review zu #1996, Runde 2: Countdown auf der Wanduhr der tzid ─────────────
-
-const DAILY_LA = { all_day: 0, tzid: LA, start_datetime: '2035-10-02T08:30', recurrence_rule: 'RRULE:FREQ=DAILY' };
-
-test(`TZ=${process.env.TZ}: der Countdown endet an einem UNTIL mit Uhrzeit wie der Kalender`, () => {
-  // Taeglich 23:30 Los Angeles; UNTIL ist 02.10. 23:59:59 dort. Das letzte
-  // Vorkommen liegt im Haushalt Berlin am 03.10., am 04.10. kommt keines mehr.
-  for (const start of ['2035-10-02T06:30:00Z', '2035-10-02T08:30']) {
-    const ev = { ...DAILY_LA, start_datetime: start, recurrence_rule: 'RRULE:FREQ=DAILY;UNTIL=20351003T065959Z' };
-    const shown = expandRecurringEvents([{ id: 7, ...ev }], '2035-09-01', '2035-12-31', null, { householdZone: BERLIN });
-    assert.equal(localOf(shown.at(-1).start_datetime, BERLIN), '2035-10-03 08:30', `Vorbedingung (${start})`);
-    assert.equal(nextEventDate(ev, '2035-10-03', null, { tz: BERLIN }), '2035-10-03', start);
-    assert.equal(nextEventDate(ev, '2035-10-04', null, { tz: BERLIN }), null, start);
-  }
-});
-
-test(`TZ=${process.env.TZ}: der Countdown sucht ab dem Ortstag vor heute`, () => {
-  // Heute (Berlin) ist der 04.10.; das Vorkommen am 03.10. 23:30 Los Angeles
-  // liegt im Haushalt am 04.10. 08:30 und ist das naechste.
-  assert.equal(nextEventDate(DAILY_LA, '2035-10-04', null, { tz: BERLIN }), '2035-10-04');
-});
-
-test(`TZ=${process.env.TZ}: der Countdown ueberspringt eine Ausnahme auf dem UTC-Tag des Vorkommens`, () => {
-  // 03.10. 23:30 PDT ist 04.10. 06:30Z: die Ausnahme traegt den 04.10.
-  assert.equal(nextEventDate(DAILY_LA, '2035-10-04', new Set(['2035-10-04']), { tz: BERLIN }), '2035-10-05');
-});
-
-// ── Codex zu #1996: COUNT im zonierten Countdown ─────────────────────────────
-
-/** Der naechste Tag, den der Kalender zeigt (Haushaltstag), oder null. */
-function calendarNextDay(ev, todayKey, household) {
-  const out = expandRecurringEvents([{ id: 8, ...ev }], '2034-01-01', '2045-12-31', null,
-    { householdZone: household, maxIterations: 100000 });
-  return out.map((o) => localOf(o.start_datetime, household).slice(0, 10)).find((day) => day >= todayKey) ?? null;
-}
-
-test(`TZ=${process.env.TZ}: der Countdown zaehlt COUNT wie der Kalender, auch nach dem 28.`, () => {
-  // 01.01. 00:30 Berlin ist der 31.12. in Los Angeles: ein Monatsanker nach
-  // dem 28. Fuenf Vorkommen, das letzte im Haushalt am 01.05.
-  const ev = { all_day: 0, tzid: LA, start_datetime: '2035-01-01T00:30', recurrence_rule: 'RRULE:FREQ=MONTHLY;COUNT=5' };
-  assert.equal(calendarNextDay(ev, '2035-10-02', BERLIN), null, 'Vorbedingung: der Kalender');
-  assert.equal(nextEventDate(ev, '2035-10-02', null, { tz: BERLIN }), null);
-});
-
-test(`TZ=${process.env.TZ}: Countdown und Kalender nennen denselben Tag (Monatsletzter, 29.2., woechentlich, mit COUNT)`, () => {
-  const cases = [
-    { start: '2035-01-01T00:30', rule: 'RRULE:FREQ=MONTHLY;COUNT=5' },
-    { start: '2035-01-15T05:30', rule: 'RRULE:FREQ=MONTHLY;BYMONTHDAY=-1;COUNT=4' },
-    { start: '2035-11-01T05:30', rule: 'RRULE:FREQ=MONTHLY;BYMONTHDAY=-1;COUNT=3' },
-    { start: '2036-03-01T07:30', rule: 'RRULE:FREQ=YEARLY;COUNT=3' },
-    { start: '2035-10-02T08:30', rule: 'RRULE:FREQ=WEEKLY;COUNT=4' },
-    { start: '2035-10-02T08:30', rule: 'RRULE:FREQ=WEEKLY;BYDAY=MO,TH;COUNT=5' },
-  ];
-  const todays = ['2035-01-01', '2035-03-15', '2035-10-01', '2035-10-20', '2035-12-31', '2036-03-01', '2040-02-28', '2044-03-01'];
-  for (const c of cases) {
-    const ev = { all_day: 0, tzid: LA, start_datetime: c.start, recurrence_rule: c.rule };
-    for (const today of todays) {
-      assert.equal(nextEventDate(ev, today, null, { tz: BERLIN }), calendarNextDay(ev, today, BERLIN),
-        `${c.start} ${c.rule} heute ${today}`);
-    }
-  }
 });
