@@ -42,6 +42,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the status codes are unchanged. A recipe you have just deleted stays hidden while you can
   still undo it, an open matching dialog saves into the list you see, and an answer that arrives
   after you have moved to another page draws nothing and leaves the focus where it is.
+- **Calendar: an imported series saved from the form keeps its times on every server** (#1993).
+  Saving an imported series stores the time as you see it in the household's time zone, next to the
+  series' own time zone. The calendar view and the ICS feed then read that time in the zone the
+  server process runs in, so the same series could show at different times after a container was
+  rebuilt with another `TZ`. The time is now always read in the household's time zone, and the
+  series continues on the clock of its own zone. Also affected: CalDAV and iCloud. They received
+  the household's digits unchanged, labelled with the event's own zone. This applied to imported
+  single events with their own zone as well as to series. If your household time zone differs from
+  the zone of such an event, Yuvomi now sends a different clock time to CalDAV and iCloud the next
+  time the event is pushed - the one you saw in the form. A series you edited in Yuvomi is lined up
+  with its rule on the clock of its own zone, so the provider no longer counts an extra occurrence
+  on the day before. Google is unchanged. Not yet covered: the dashboard countdown of an imported
+  series whose own zone differs from the household's can still name a day next to the one the
+  calendar shows (#1998).
 - **Documents: an error message is in your language and names the cause** (#1909). The
   documents page showed the server's own English sentence when something could not be saved,
   moved or deleted, whatever the app language, for example "Folder not found." when somebody else

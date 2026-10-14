@@ -7,13 +7,13 @@
 
 import { endsBeforeStart, hasAnyOccurrence, parseRRule } from './recurrence.js';
 import {
-  ASSIGNED_USERS_SQL, expandRecurringEvents, MAX_EXPANSION_ITERATIONS,
+  ASSIGNED_USERS_SQL, expandRecurringEvents, MAX_EXPANSION_ITERATIONS, seriesReadingZone,
 } from './calendar-events.js';
 import {
   dropInheritedEventReminders, eventAuthorId, fanOutEventReminders,
 } from './event-reminder-fanout.js';
 import {
-  hasExplicitZone, householdTimeZone, shiftDateKey, storedToInstantMsPrecise, utcToWall,
+  hasExplicitZone, householdTimeZone, shiftDateKey, storedDayDiffersFromSeriesDay, storedToInstantMsPrecise,
 } from '../utils/timezone.js';
 import { createLogger } from '../logger.js';
 import { applyDocumentAccess, attachmentAccessMode, eventAudienceChanged } from './document-access.js';
@@ -155,8 +155,12 @@ function exactLookupIterationLimit(master, recurrenceId) {
 /**
  * Expands one original recurrence slot without applying the master's EXDATEs.
  * The displayed child start is deliberately irrelevant to this lookup.
+ *
+ * `householdZone`: in ihr liest die Expansion einen zonenlosen Start neben
+ * einer `tzid` (#1993). Dieselbe Zone wie beim Lesen des Kalenders, sonst
+ * verfehlt die Suche das Vorkommen, das der Kalender gezeigt hat.
  */
-export function baseOccurrenceFor(master, recurrenceId) {
+export function baseOccurrenceFor(master, recurrenceId, householdZone = null) {
   if (!master?.recurrence_rule || !isDateKey(recurrenceId)) {
     throw invalidRecurrenceIdentity('recurrence_id must identify a recurring series date.');
   }
@@ -181,6 +185,7 @@ export function baseOccurrenceFor(master, recurrenceId) {
     {
       includeRecurrenceIdentity: true,
       maxIterations: exactLookupIterationLimit(master, recurrenceId),
+      householdZone,
     },
   );
   const occurrence = occurrences.find((candidate) => candidate.recurrence_identity === recurrenceId);
@@ -278,7 +283,7 @@ export function resolveOccurrence(database, child, master = null) {
   }
 
   const fields = parseOverrideFields(child.overridden_fields);
-  const base = baseOccurrenceFor(parent, child.recurrence_id);
+  const base = baseOccurrenceFor(parent, child.recurrence_id, seriesReadingZone(database, parent));
   const resolved = {
     ...base,
     id: child.id,
@@ -1108,7 +1113,7 @@ export function upsertOccurrenceOverride(database, {
 }) {
   return runTransaction(database, () => {
     const master = loadSeriesForMutation(database, seriesId, actorId, isAdmin);
-    const base = baseOccurrenceFor(master, recurrenceId);
+    const base = baseOccurrenceFor(master, recurrenceId, householdTimeZone(database));
     assertOccurrenceSlotCanBeMutated(database, master.id, recurrenceId);
     const existing = database.prepare(`
       SELECT * FROM calendar_events
@@ -1346,11 +1351,10 @@ function previousDateKey(dateKey) {
   return date.toISOString().slice(0, 10);
 }
 
-function recurrenceIsEmptyAtAnchor(source) {
+function recurrenceIsEmptyAtAnchor(source, householdZone) {
   const start = String(source.start_datetime ?? '');
-  const wall = source.tzid ? utcToWall(start, source.tzid) : null;
-  const utcDiffersFromLocal = Boolean(source.tzid)
-    && !(wall && wall.date === start.slice(0, 10));
+  // Dieselbe Zonenfrage wie die Expansion, ueber denselben Leser (#1993).
+  const utcDiffersFromLocal = storedDayDiffersFromSeriesDay(start, source.tzid, householdZone);
   if (!hasAnyOccurrence(start, source.recurrence_rule, { utcDiffersFromLocal })) return true;
   // Ein Nachfolger, dessen Regel vor seinem eigenen Start endet (#1607). Nur
   // hier, wo eine Folgeserie GESCHRIEBEN wird - nicht in `hasAnyOccurrence`,
@@ -1358,8 +1362,8 @@ function recurrenceIsEmptyAtAnchor(source) {
   return !utcDiffersFromLocal && endsBeforeStart(start, source.recurrence_rule);
 }
 
-export function assertSuccessorHasOccurrence(source) {
-  if (recurrenceIsEmptyAtAnchor(source)) {
+export function assertSuccessorHasOccurrence(source, householdZone) {
+  if (recurrenceIsEmptyAtAnchor(source, householdZone)) {
     throw new CalendarOccurrenceError(
       'The successor recurrence rule has no occurrence on or after its start date.',
       { status: 400, code: 'empty_successor_series' },
@@ -1367,7 +1371,7 @@ export function assertSuccessorHasOccurrence(source) {
   }
 }
 
-function remainingCountRule(master, recurrenceId) {
+function remainingCountRule(master, recurrenceId, householdZone = null) {
   const count = parseRRule(master.recurrence_rule)?.count ?? null;
   if (count === null) return master.recurrence_rule;
   const occurrences = expandRecurringEvents(
@@ -1378,6 +1382,7 @@ function remainingCountRule(master, recurrenceId) {
     {
       includeRecurrenceIdentity: true,
       maxIterations: exactLookupIterationLimit(master, recurrenceId),
+      householdZone,
     },
   );
   const selectedIndex = occurrences.findIndex((row) => row.recurrence_identity === recurrenceId);
@@ -1421,7 +1426,7 @@ export function deleteOccurrence(database, {
 }) {
   return runTransaction(database, () => {
     const master = loadSeriesForMutation(database, seriesId, actorId, isAdmin);
-    baseOccurrenceFor(master, recurrenceId);
+    baseOccurrenceFor(master, recurrenceId, householdTimeZone(database));
     const child = database.prepare(`
       SELECT id FROM calendar_events
       WHERE recurrence_parent_id = ? AND recurrence_id = ?
@@ -1447,7 +1452,7 @@ export function truncateSeries(database, {
 }) {
   return runTransaction(database, () => {
     const master = loadSeriesForMutation(database, seriesId, actorId, isAdmin);
-    const selected = baseOccurrenceFor(master, recurrenceId);
+    const selected = baseOccurrenceFor(master, recurrenceId, householdTimeZone(database));
     const futureChildren = linkedChildren(database, master.id, recurrenceId);
     if (selected.is_series_start) {
       const allChildren = linkedChildren(database, master.id);
@@ -1515,7 +1520,7 @@ function refreshReparentedChild(database, child, oldResolved, successor, success
   database.prepare('UPDATE calendar_events SET local_calendar_id = ? WHERE id = ?').run(successor.local_calendar_id ?? null, child.id);
   let newBase;
   try {
-    newBase = baseOccurrenceFor(successor, child.recurrence_id);
+    newBase = baseOccurrenceFor(successor, child.recurrence_id, tz);
   } catch {
     throw new CalendarOccurrenceError(
       'A linked occurrence cannot belong to the successor recurrence rule.',
@@ -1632,7 +1637,8 @@ export function splitSeries(database, {
 }) {
   return runTransaction(database, () => {
     const master = loadSeriesForMutation(database, seriesId, actorId, isAdmin);
-    const selectedBase = baseOccurrenceFor(master, recurrenceId);
+    const seriesZone = householdTimeZone(database);
+    const selectedBase = baseOccurrenceFor(master, recurrenceId, seriesZone);
     assertOccurrenceSlotCanBeMutated(database, master.id, recurrenceId);
     if (selectedBase.is_series_start) {
       const normalizedChanges = firstSlotSeriesChanges(master, selectedBase, changes);
@@ -1679,7 +1685,7 @@ export function splitSeries(database, {
     successorValues.recurrence_rule = Object.hasOwn(changes, 'recurrence_rule')
       && changes.recurrence_rule !== master.recurrence_rule
       ? changes.recurrence_rule
-      : remainingCountRule(master, recurrenceId);
+      : remainingCountRule(master, recurrenceId, seriesZone);
     successorValues.recurrence_parent_id = null;
     successorValues.recurrence_id = null;
     successorValues.overridden_fields = null;
@@ -1700,7 +1706,7 @@ export function splitSeries(database, {
       : requestedAssignments[0] ?? null;
 
     assertValidEffectiveInterval(successorValues);
-    assertSuccessorHasOccurrence(successorValues);
+    assertSuccessorHasOccurrence(successorValues, seriesZone);
     const futureChildren = children.filter((child) =>
       !selectedChild || Number(child.id) !== Number(selectedChild.id));
     const orphans = classifyOrphans(
@@ -1708,6 +1714,7 @@ export function splitSeries(database, {
       successorValues,
       hasOutboundTarget(successorValues)
         || hasConfiguredOutlookAutoSyncTarget(database, successorValues, successorAssignments),
+      seriesZone,
     );
     const confirmationSupplied = confirmedOrphanCount !== undefined;
     if ((orphans.length > 0 || confirmationSupplied)
@@ -1896,11 +1903,11 @@ function orphanConflict(count) {
   );
 }
 
-function classifyOrphans(children, proposed, detachAll) {
+function classifyOrphans(children, proposed, detachAll, householdZone = null) {
   if (detachAll) return children;
   return children.filter((child) => {
     try {
-      baseOccurrenceFor(proposed, child.recurrence_id);
+      baseOccurrenceFor(proposed, child.recurrence_id, householdZone);
       return false;
     } catch {
       return true;
@@ -2144,7 +2151,7 @@ export function followInboundStartChange(database, eventId, oldStart, newStart, 
 
 function refreshInheritedChild(database, child, oldResolved, updatedMaster, tz, mayWidenAttachment = () => false) {
   const fields = parseOverrideFields(child.overridden_fields);
-  const newBase = baseOccurrenceFor(updatedMaster, child.recurrence_id);
+  const newBase = baseOccurrenceFor(updatedMaster, child.recurrence_id, tz);
   const values = { ...newBase };
   for (const field of fields) {
     if (SCALAR_OVERRIDE_FIELDS.includes(field)) values[field] = oldResolved[field];
@@ -2244,7 +2251,7 @@ export function updateSeriesWithOverrides(database, {
     const detachAll = (!hasOutboundTarget(current) && hasOutboundTarget(proposed))
       || (!hasConfiguredOutlookAutoSyncTarget(database, current, currentAssignments)
         && hasConfiguredOutlookAutoSyncTarget(database, proposed, proposedAssignments));
-    const orphans = classifyOrphans(children, proposed, detachAll);
+    const orphans = classifyOrphans(children, proposed, detachAll, householdTimeZone(database));
     const confirmationSupplied = confirmedOrphanCount !== undefined;
     if ((orphans.length > 0 || confirmationSupplied)
         && confirmedOrphanCount !== orphans.length) {
