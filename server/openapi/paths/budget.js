@@ -1,7 +1,7 @@
 import { op, jsonBody, idParam, stringPathParam, langParam, DOCUMENT_LINKS_READ_NOTE } from '../helpers.js';
 
 export function budgetPaths() {
-  return {
+  return withCaseReasons({
     '/api/v1/budget/summary': { get: op({ summary: 'Get budget summary', tag: 'Budget', description: '`pending` (`count`, `income`, `expenses`) reports what is expected and in no total: expected bookings and the subscription payments projected for the month (see `GET /api/v1/budget`). `pending.expected_omitted: true` appears only when the projection hit its limit of 5000 lines; the figures then contain no subscription payment.' }) },
     '/api/v1/budget/plans': {
       get: op({ summary: 'Get planned budget vs. actual for a month (category caps + savings goal)', tag: 'Budget', description: 'In personal budget mode the actual figures count what you can see, like the summary: `scope` (`mine`|`household`, default `mine`) picks the view, private entries of others do not count, and the amount of an entry of someone else whose details are hidden (`shared_amount`) counts only toward income and balance of the savings goal, never toward a category. Shared mode counts every entry.' }),
@@ -138,5 +138,42 @@ export function budgetPaths() {
       put: op({ summary: 'Update subscription', description: 'Optional boolean `reminder_enabled`: false removes the payment reminder; true schedules it using `reminder_days`. Omitting the field preserves its current value. Changing it does not pause the subscription or remove its budget expense.', tag: 'Budget', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
       delete: op({ summary: 'Delete subscription', tag: 'Budget', params: [idParam()], stateChanging: true }),
     },
-  };
+  });
+}
+
+// #1909: die Faelle, die ein Nutzer bei den Abos erreicht, tragen einen
+// `reason` neben dem englischen `error` - je Operation der Satz, der sie nennt.
+const SUBSCRIPTION_GONE = '`subscriptions_subscription_not_found` (404, the subscription does not exist)';
+const SELECTED_META_GONE = '`subscriptions_selected_category_not_found`, `subscriptions_selected_payment_method_not_found` (400, the chosen category or payment method does not exist)';
+const SUBSCRIPTION_CHECKS = '`subscriptions_end_before_next_payment`, `subscriptions_occurrence_count_too_low`, `subscriptions_logo_content_mismatch` (400, only when it is the single finding)';
+const CASE_REASONS = {
+  '/api/v1/budget/subscriptions': { post: `${SELECTED_META_GONE}, ${SUBSCRIPTION_CHECKS}` },
+  '/api/v1/budget/subscriptions/{id}': {
+    put: `${SUBSCRIPTION_GONE}, ${SELECTED_META_GONE}, ${SUBSCRIPTION_CHECKS}`,
+    delete: SUBSCRIPTION_GONE,
+  },
+  '/api/v1/budget/subscriptions/{id}/renew': { post: SUBSCRIPTION_GONE },
+  '/api/v1/budget/subscriptions/categories': { post: '`subscriptions_category_exists` (409)' },
+  '/api/v1/budget/subscriptions/categories/{id}': {
+    put: '`subscriptions_category_not_found` (404), `subscriptions_category_exists` (409)',
+    delete: '`subscriptions_category_not_found` (404)',
+  },
+  '/api/v1/budget/subscriptions/payment-methods': { post: '`subscriptions_payment_method_exists` (409)' },
+  '/api/v1/budget/subscriptions/payment-methods/{id}': {
+    put: '`subscriptions_payment_method_not_found` (404), `subscriptions_payment_method_exists` (409)',
+    delete: '`subscriptions_payment_method_not_found` (404)',
+  },
+  '/api/v1/budget/subscriptions/logo-search': { post: '`subscriptions_no_logo_found` (404, no supported logo was found)' },
+};
+
+function withCaseReasons(paths) {
+  for (const [path, operations] of Object.entries(CASE_REASONS)) {
+    for (const [method, reasons] of Object.entries(operations)) {
+      const operation = paths[path]?.[method];
+      if (!operation) throw new Error(`openapi budget: ${method} ${path} is not documented`);
+      const note = `A refusal a user can reach carries a \`reason\` next to \`error\` (#1909): ${reasons}.`;
+      operation.description = operation.description ? `${operation.description}\n\n${note}` : note;
+    }
+  }
+  return paths;
 }

@@ -18,6 +18,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Subscriptions: an error message is in your language and names the cause** (#1909). The
+  subscriptions tab showed the server's own English sentence when something could not be saved,
+  renewed or deleted, whatever the app language, for example "Subscription not found." when
+  somebody else in the household had deleted the subscription in the meantime. A subscription,
+  category or payment method that no longer exists, a category or payment method name that is
+  already taken, an end date before the next payment, a number of payments that is not above the
+  payments already made, a logo file whose content does not match its type and a logo search
+  without result now get a sentence in the language of the app. When the subscription, category
+  or payment method is gone, the page fetches the list by itself and the dialog of the action
+  closes (the manage dialog opens again with the current entries); deleting something that is
+  already gone counts as deleted. If the category or payment method chosen in the subscription
+  dialog was deleted in the meantime, the dialog stays open with your input and offers the
+  current ones; saving answered with a server error before. Adding a category or payment method
+  and reordering them in the manage dialog showed no message of its own when it failed and now
+  does. A subscription deleted while its payment was being booked into the budget no longer
+  leaves a budget entry without subscription behind, and two saves at the same moment no longer
+  book the payment twice. Any other failure shows the general message instead of the server's
+  text. For API clients: those answers of `/api/v1/budget/subscriptions` carry a `reason` next to
+  `error` (`subscriptions_subscription_not_found`, `subscriptions_category_not_found`,
+  `subscriptions_payment_method_not_found`, `subscriptions_selected_category_not_found`,
+  `subscriptions_selected_payment_method_not_found`, `subscriptions_category_exists`,
+  `subscriptions_payment_method_exists`, `subscriptions_end_before_next_payment`,
+  `subscriptions_occurrence_count_too_low`, `subscriptions_logo_content_mismatch`,
+  `subscriptions_no_logo_found`); a subscription with an unknown `category_id` or
+  `payment_method_id` is a 400 instead of a 500, and the other status codes are unchanged.
 - **Documents: an error message is in your language and names the cause** (#1909). The
   documents page showed the server's own English sentence when something could not be saved,
   moved or deleted, whatever the app language, for example "Folder not found." when somebody else

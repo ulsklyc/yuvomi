@@ -27,6 +27,55 @@ const log = createLogger('Subscriptions');
 const router = express.Router();
 const URL_RE = /^https?:\/\/[^\s]+$/i;
 
+// Die Kurse fuer die Buchung des Abos, austauschbar fuer test:subscriptions-errors:
+// dort verschwindet das Abo genau waehrend dieses await.
+let ratesFor = getRates;
+export function _setRatesForTest(fn) { ratesFor = fn || getRates; }
+// Die Logo-Suche geht ins Netz; test:subscriptions-errors setzt das Ergebnis.
+let logoFinder = findLogoOptions;
+export function _setLogoFinderForTest(fn) { logoFinder = fn || findLogoOptions; }
+
+/** Das Abo verschwand, waehrend seine Buchung berechnet wurde (#1909). */
+class SubscriptionGoneError extends Error {}
+
+// #1909: die Faelle, die ein Nutzer erreicht, nennen sich mit `reason`; den
+// Satz dazu besitzt die App. `error` bleibt der englische Text fuer die API.
+function subscriptionGone(res) {
+  return res.status(404).json({ error: 'Subscription not found.', code: 404, reason: 'subscriptions_subscription_not_found' });
+}
+
+/**
+ * Die Antwort auf eine oder mehrere Pruefungen. Ein Eintrag ist ein Satz oder
+ * `{ error, reason }`. Ein Grund steht nur an einer Absage mit GENAU einem
+ * Befund - mehrere zugleich erreicht nur ein Aufrufer der API, und der Satz
+ * eines einzelnen Falls waere dort nur die halbe Antwort.
+ */
+function problemBody(problems) {
+  const items = problems.map((item) => (typeof item === 'string' ? { error: item } : item));
+  return {
+    error: items.map((item) => item.error).join(' '),
+    code: 400,
+    ...(items.length === 1 && items[0].reason ? { reason: items[0].reason } : {}),
+  };
+}
+
+/**
+ * Gibt es die im Dialog GEWAEHLTE Kategorie und Zahlungsart noch? Wer sie
+ * zwischen dem Oeffnen und dem Speichern im Verwalten-Dialog loescht, liess das
+ * Schreiben bis #1909 am Fremdschluessel scheitern - als 500. Jetzt ist es der
+ * Fall, den der Dialog erklaert: er bleibt offen und bietet die aktuellen an.
+ */
+function selectedMetaGone(categoryId, paymentMethodId) {
+  const database = db.get();
+  if (categoryId && !database.prepare('SELECT 1 FROM subscription_categories WHERE id = ?').get(Number(categoryId))) {
+    return { error: 'Category not found.', code: 400, reason: 'subscriptions_selected_category_not_found' };
+  }
+  if (paymentMethodId && !database.prepare('SELECT 1 FROM subscription_payment_methods WHERE id = ?').get(Number(paymentMethodId))) {
+    return { error: 'Payment method not found.', code: 400, reason: 'subscriptions_selected_payment_method_not_found' };
+  }
+  return null;
+}
+
 function actorId(req) {
   return req.authUserId || req.session.userId;
 }
@@ -128,7 +177,7 @@ function endConfigErrors({ end_type, end_date, occurrence_count, next_payment_da
     if (!end_date) { errors.push('An end date is required.'); return errors; }
     try {
       if (parseDateKey(end_date).getTime() < parseDateKey(next_payment_date).getTime()) {
-        errors.push('The end date must not be before the next payment date.');
+        errors.push({ error: 'The end date must not be before the next payment date.', reason: 'subscriptions_end_before_next_payment' });
       }
     } catch (err) { errors.push(err.message); }
   } else if (end_type === 'after_count') {
@@ -136,7 +185,9 @@ function endConfigErrors({ end_type, end_date, occurrence_count, next_payment_da
     if (!Number.isInteger(count) || count < 1 || count > 1200) {
       errors.push('Occurrence count must be between 1 and 1200.');
     } else if (count <= Number(occurrences_done || 0)) {
-      errors.push('Occurrence count must be greater than the number of payments already made.');
+      // Erreichbar im Dialog: ein Abo mit drei geleisteten Zahlungen auf "nach
+      // zwei Zahlungen" stellen.
+      errors.push({ error: 'Occurrence count must be greater than the number of payments already made.', reason: 'subscriptions_occurrence_count_too_low' });
     }
   }
   return errors;
@@ -152,7 +203,7 @@ function budgetCurrency() {
 async function budgetExpenseAmount(subscription) {
   const currency = budgetCurrency();
   if (subscription.currency === currency) return subscriptionBudgetAmount(subscription, currency, {});
-  const result = await getRates(currency, [subscription.currency]);
+  const result = await ratesFor(currency, [subscription.currency]);
   return subscriptionBudgetAmount(subscription, currency, result.rates);
 }
 
@@ -171,8 +222,15 @@ async function syncBudgetExpense(subscription, { preserveCurrent = false } = {})
   }
 
   const amount = await budgetExpenseAmount(subscription);
+  // NOCHMAL, OHNE YIELD BIS ZUM SCHREIBEN (#1909): der Kurs kann von Fixer
+  // kommen, und waehrenddessen kann ein anderes Haushaltsmitglied das Abo
+  // loeschen. Die Buchung entstuende dann ohne Abo - ein Waise im Budget, und
+  // die Antwort ein 500. Die Verknuepfung kommt ebenfalls frisch: eine zweite
+  // Anfrage kann inzwischen eine Buchung angelegt haben.
+  const fresh = loadSubscription(subscription.id);
+  if (!fresh) throw new SubscriptionGoneError();
   const subcategory = subscription.budget_subcategory_key || '';
-  let entryId = preserveCurrent ? null : subscription.budget_entry_id;
+  let entryId = preserveCurrent ? null : fresh.budget_entry_id;
   if (entryId) {
     // Eigentümer + Sichtbarkeit mitziehen (#476/#505): ohne das bliebe der
     // verknüpfte Ausgaben-Eintrag beim Umschalten des Abos (shared↔private) auf
@@ -255,7 +313,8 @@ function validatePayload(body, { partial = false } = {}) {
     // Case-insensitiv, weil ein data-URL-Leser `;BASE64,` genauso dekodiert:
     // ein exakter Substring-Test haette sich mit einer Grossschreibung umgehen
     // lassen, und zwar genau von dem, der etwas zu verbergen hat.
-    errors.push('Logo content does not match its image type.');
+    // Erreichbar mit einer umbenannten Datei (#1909).
+    errors.push({ error: 'Logo content does not match its image type.', reason: 'subscriptions_logo_content_mismatch' });
   }
   for (const key of ['category_id', 'payment_method_id']) {
     if (body[key] !== undefined && body[key] !== null && (!Number.isInteger(Number(body[key])) || Number(body[key]) < 1)) {
@@ -360,7 +419,7 @@ router.post('/categories', (req, res) => {
     })();
     res.status(201).json({ data: category });
   } catch (err) {
-    if (String(err.message).includes('UNIQUE')) return res.status(409).json({ error: 'Category already exists.', code: 409 });
+    if (String(err.message).includes('UNIQUE')) return res.status(409).json({ error: 'Category already exists.', code: 409, reason: 'subscriptions_category_exists' });
     throw err;
   }
 });
@@ -374,7 +433,7 @@ router.post('/payment-methods', (req, res) => {
       .run(name.value, order);
     res.status(201).json({ data: db.get().prepare('SELECT * FROM subscription_payment_methods WHERE id = ?').get(result.lastInsertRowid) });
   } catch (err) {
-    if (String(err.message).includes('UNIQUE')) return res.status(409).json({ error: 'Payment method already exists.', code: 409 });
+    if (String(err.message).includes('UNIQUE')) return res.status(409).json({ error: 'Payment method already exists.', code: 409, reason: 'subscriptions_payment_method_exists' });
     throw err;
   }
 });
@@ -409,7 +468,7 @@ router.put('/categories/:id', (req, res) => {
   try {
     const id = Number(req.params.id);
     const existing = db.get().prepare('SELECT * FROM subscription_categories WHERE id = ?').get(id);
-    if (!existing) return res.status(404).json({ error: 'Category not found.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'subscriptions_category_not_found' });
     const name = str(req.body.name, 'Name', { max: MAX_SHORT });
     const categoryColor = color(req.body.color ?? existing.color, 'Color');
     const errors = collectErrors([name, categoryColor]);
@@ -441,7 +500,7 @@ router.put('/categories/:id', (req, res) => {
     })();
     res.json({ data: database.prepare('SELECT * FROM subscription_categories WHERE id = ?').get(id) });
   } catch (err) {
-    if (String(err.message).includes('UNIQUE')) return res.status(409).json({ error: 'Category already exists.', code: 409 });
+    if (String(err.message).includes('UNIQUE')) return res.status(409).json({ error: 'Category already exists.', code: 409, reason: 'subscriptions_category_exists' });
     log.error('PUT /categories/:id error:', err);
     res.status(500).json({ error: 'Subscription category could not be saved.', code: 500 });
   }
@@ -451,7 +510,7 @@ router.delete('/categories/:id', (req, res) => {
   try {
     const id = Number(req.params.id);
     const existing = db.get().prepare('SELECT * FROM subscription_categories WHERE id = ?').get(id);
-    if (!existing) return res.status(404).json({ error: 'Category not found.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'subscriptions_category_not_found' });
     const database = db.get();
     const affected = database.transaction(() => {
       const count = database.prepare('SELECT COUNT(*) AS n FROM budget_subscriptions WHERE category_id = ?').get(id).n;
@@ -477,7 +536,7 @@ router.put('/payment-methods/:id', (req, res) => {
   try {
     const id = Number(req.params.id);
     const existing = db.get().prepare('SELECT * FROM subscription_payment_methods WHERE id = ?').get(id);
-    if (!existing) return res.status(404).json({ error: 'Payment method not found.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Payment method not found.', code: 404, reason: 'subscriptions_payment_method_not_found' });
     const name = str(req.body.name, 'Name', { max: MAX_SHORT });
     if (name.error) return res.status(400).json({ error: name.error, code: 400 });
     // Wie bei den Kategorien: ein eigener Name schlaegt den uebersetzten - aber
@@ -489,7 +548,7 @@ router.put('/payment-methods/:id', (req, res) => {
                       WHERE id = ?`).run(name.value, id);
     res.json({ data: db.get().prepare('SELECT * FROM subscription_payment_methods WHERE id = ?').get(id) });
   } catch (err) {
-    if (String(err.message).includes('UNIQUE')) return res.status(409).json({ error: 'Payment method already exists.', code: 409 });
+    if (String(err.message).includes('UNIQUE')) return res.status(409).json({ error: 'Payment method already exists.', code: 409, reason: 'subscriptions_payment_method_exists' });
     log.error('PUT /payment-methods/:id error:', err);
     res.status(500).json({ error: 'Payment method could not be saved.', code: 500 });
   }
@@ -499,7 +558,7 @@ router.delete('/payment-methods/:id', (req, res) => {
   try {
     const id = Number(req.params.id);
     const existing = db.get().prepare('SELECT * FROM subscription_payment_methods WHERE id = ?').get(id);
-    if (!existing) return res.status(404).json({ error: 'Payment method not found.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Payment method not found.', code: 404, reason: 'subscriptions_payment_method_not_found' });
     const affected = db.get().prepare('SELECT COUNT(*) AS n FROM budget_subscriptions WHERE payment_method_id = ?').get(id).n;
     // FK ON DELETE SET NULL entkoppelt betroffene Abos von der Zahlungsart.
     db.get().prepare('DELETE FROM subscription_payment_methods WHERE id = ?').run(id);
@@ -529,14 +588,14 @@ router.post('/logo-search', async (req, res) => {
       return res.status(400).json({ error: query.error, code: 400 });
     }
     logoQuery = query.value;
-    const options = await findLogoOptions(logoQuery, { diagnostics });
+    const options = await logoFinder(logoQuery, { diagnostics });
     if (!options.length) {
       log.warn('Subscription logo search returned no supported logos', {
         query: logoQuery,
         elapsed_ms: Date.now() - started,
         diagnostics,
       });
-      return res.status(404).json({ error: 'No supported logo could be found.', code: 404 });
+      return res.status(404).json({ error: 'No supported logo could be found.', code: 404, reason: 'subscriptions_no_logo_found' });
     }
     res.json({ data: { logo_data: options[0].logo_data, options } });
   } catch (err) {
@@ -647,7 +706,7 @@ router.get('/', refuseWhileRestoring, async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const validated = validatePayload(req.body);
-    if (validated.errors.length) return res.status(400).json({ error: validated.errors.join(' '), code: 400 });
+    if (validated.errors.length) return res.status(400).json(problemBody(validated.errors));
     const endType = req.body.end_type || 'never';
     const endDate = endType === 'on_date' ? req.body.end_date : null;
     const occurrenceCount = endType === 'after_count' ? Number(req.body.occurrence_count) : null;
@@ -655,7 +714,9 @@ router.post('/', async (req, res) => {
       end_type: endType, end_date: endDate, occurrence_count: occurrenceCount,
       next_payment_date: req.body.next_payment_date, occurrences_done: 0,
     });
-    if (endErrors.length) return res.status(400).json({ error: endErrors.join(' '), code: 400 });
+    if (endErrors.length) return res.status(400).json(problemBody(endErrors));
+    const metaGone = selectedMetaGone(req.body.category_id, req.body.payment_method_id);
+    if (metaGone) return res.status(400).json(metaGone);
     const me = actorId(req);
     const visibility = normalizeObjectVisibility(
       req.body.visibility,
@@ -683,6 +744,7 @@ router.post('/', async (req, res) => {
     syncReminder(row);
     res.status(201).json({ data: decorate(row) });
   } catch (err) {
+    if (err instanceof SubscriptionGoneError) return subscriptionGone(res);
     log.error('POST / error:', err);
     res.status(500).json({ error: 'Subscription could not be created.', code: 500 });
   }
@@ -692,10 +754,10 @@ router.put('/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);
     const current = loadSubscription(id);
-    if (!current) return res.status(404).json({ error: 'Subscription not found.', code: 404 });
+    if (!current) return subscriptionGone(res);
     if (!mayEditSub(req, current)) return res.status(403).json({ error: 'You cannot modify this subscription.', code: 403 });
     const validated = validatePayload(req.body, { partial: true });
-    if (validated.errors.length) return res.status(400).json({ error: validated.errors.join(' '), code: 400 });
+    if (validated.errors.length) return res.status(400).json(problemBody(validated.errors));
     const value = (key, fallback) => req.body[key] === undefined ? fallback : req.body[key];
     // Sichtbarkeit umschaltbar; owner_id bleibt fix (#476/#505).
     const nextVisibility = req.body.visibility !== undefined
@@ -715,7 +777,9 @@ router.put('/:id', async (req, res) => {
       end_type: endType, end_date: endDate, occurrence_count: occurrenceCount,
       next_payment_date: nextPaymentDate, occurrences_done: current.occurrences_done,
     });
-    if (endErrors.length) return res.status(400).json({ error: endErrors.join(' '), code: 400 });
+    if (endErrors.length) return res.status(400).json(problemBody(endErrors));
+    const metaGone = selectedMetaGone(value('category_id', current.category_id), value('payment_method_id', current.payment_method_id));
+    if (metaGone) return res.status(400).json(metaGone);
     // Reaktivieren (enabled -> true) hebt einen Abschluss auf.
     const nextEnabled = value('enabled', Boolean(current.enabled)) ? 1 : 0;
     const completedAt = nextEnabled ? null : current.completed_at;
@@ -744,6 +808,7 @@ router.put('/:id', async (req, res) => {
     syncReminder(row);
     res.json({ data: decorate(row) });
   } catch (err) {
+    if (err instanceof SubscriptionGoneError) return subscriptionGone(res);
     log.error('PUT /:id error:', err);
     res.status(500).json({ error: 'Subscription could not be updated.', code: 500 });
   }
@@ -753,7 +818,7 @@ router.post('/:id/renew', async (req, res) => {
   try {
     const id = Number(req.params.id);
     const current = loadSubscription(id);
-    if (!current) return res.status(404).json({ error: 'Subscription not found.', code: 404 });
+    if (!current) return subscriptionGone(res);
     // Verlaengern SCHREIBT: es rueckt den Zahlungstag vor, zaehlt eine Zahlung,
     // legt eine Buchung an und schliesst ein endliches Abo ab. Es folgt
     // deshalb derselben Regel wie PUT und DELETE - sie fehlte hier.
@@ -778,6 +843,7 @@ router.post('/:id/renew', async (req, res) => {
     syncReminder(row);
     res.json({ data: decorate(row) });
   } catch (err) {
+    if (err instanceof SubscriptionGoneError) return subscriptionGone(res);
     log.error('POST /:id/renew error:', err);
     res.status(500).json({ error: 'Subscription renewal could not be saved.', code: 500 });
   }
@@ -786,8 +852,10 @@ router.post('/:id/renew', async (req, res) => {
 router.delete('/:id', (req, res) => {
   try {
     const id = Number(req.params.id);
+    // Die 404 heisst hier nur "gibt es nicht mehr": loadSubscription liest
+    // ohne Sichtbarkeitsfilter, ein fremdes privates Abo endet unten mit 403.
     const existing = loadSubscription(id);
-    if (!existing) return res.status(404).json({ error: 'Subscription not found.', code: 404 });
+    if (!existing) return subscriptionGone(res);
     if (!mayEditSub(req, existing)) return res.status(403).json({ error: 'You cannot modify this subscription.', code: 403 });
     db.get().transaction(() => {
       const subscription = loadSubscription(id);

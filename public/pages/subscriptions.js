@@ -4,7 +4,7 @@
  */
 
 import { api } from '/api.js';
-import { closeModal, confirmModal, confirmOverModal, openModal, advancedSection, reportFieldError, refocusAfterRender } from '/components/modal.js';
+import { closeModal, confirmModal, confirmOverModal, openModal, advancedSection, reportFieldError, refocusAfterRender, captureModalContext, isModalContextCurrent } from '/components/modal.js';
 import {
   formatDate,
   getLocale,
@@ -29,6 +29,7 @@ import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
 import { toggleRowHtml } from '/settings/components.js';
 import { leadCardClass } from '/utils/metric-card.js';
+import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
 
 // Auslastung, ab der ein Budget „knapp" ist - dieselbe Zahl wie im Plan
 // (budget-plans.js `toneForRatio`), damit beide Tabs dieselbe Grenze ziehen.
@@ -51,6 +52,79 @@ let state = {
 let container = null;
 /** Handle des geteilten Suchfelds (wirePageSearch) - Zuruecksetzen leert es mit. */
 let searchField = null;
+
+/**
+ * KEIN AELTERER STAND UEBER EINEM NEUEREN (#1909, Codex an #2001). Jede
+ * Schreibhandlung zaehlt `listVersion` hoch, sobald der Server sie angenommen
+ * hat, und jedes Laden zieht eine Nummer. Ein Laden uebernimmt sein Ergebnis
+ * nur, wenn seither weder geschrieben noch neu geladen wurde - sonst kaeme z. B.
+ * das Nachladen nach "gibt es nicht mehr", das vor einer Anlage startete und
+ * nach ihr antwortet, mit der Liste OHNE das neue Abo zurueck.
+ */
+let listVersion = 0;
+let loadTicket = 0;
+function markWritten() { listVersion += 1; }
+
+/**
+ * Steht die Seite, fuer die eine Antwort gedacht war, noch da? Die Variable
+ * `container` leert beim Verlassen niemand (Codex an #2001): verglichen wird
+ * deshalb auch, ob der Knoten noch im Dokument haengt.
+ */
+function isCurrentOwner(owner) {
+  return Boolean(owner) && container === owner && owner.isConnected === true;
+}
+
+/**
+ * Eine Pruefung der Seite selbst (Logo-Datei: Typ, Groesse, nicht lesbar):
+ * traegt ihren schon uebersetzten Satz. Ein eigener Typ, damit die Fehlerstelle
+ * ihn von einer Antwort des Servers unterscheidet, ohne den Text irgendeines
+ * Fehlers zu lesen.
+ */
+class PageProblem extends Error {
+  constructor(sentence) {
+    super(sentence);
+    this.name = 'PageProblem';
+    this.sentence = sentence;
+  }
+}
+
+/**
+ * DER SATZ EINES FEHLERS IN DEN ABOS (#1909). Die eigene Pruefung sagt ihren
+ * Satz; alles andere den Satz der App (`errorSentence`): den Fall, den der
+ * Server mit `reason` nennt, sonst den allgemeinen der Stelle. Der Text des
+ * Servers kommt nie an.
+ */
+function errorText(err, fallbackKey = 'common.unknownError') {
+  if (err instanceof PageProblem) return err.sentence;
+  return errorSentence(err, fallbackKey);
+}
+
+/**
+ * EIN WEG FUER DIE FEHLER-TOASTS DER SEITE (#1909). Sagt der Grund, dass es das
+ * Ziel der Handlung nicht mehr gibt (ein anderes Haushaltsmitglied hat das Abo,
+ * die Kategorie oder die Zahlungsart geloescht), ist der Stand der Seite
+ * veraltet: sie laedt selbst nach. `dialog` ist der Modal-Kontext der Handlung
+ * (`captureModalContext()` vor der Anfrage): geschlossen wird nur, wenn genau
+ * dieser Dialog noch offen ist (Codex an #1994). `reopen` baut ihn mit dem
+ * frischen Stand neu auf (Verwalten-Dialog) - ebenfalls nur dann.
+ */
+async function reportError(err, { fallbackKey = 'common.unknownError', dialog = null, reopen = null } = {}) {
+  window.yuvomi?.showToast(errorText(err, fallbackKey), 'danger');
+  if (!isGone(err)) return;
+  const owner = container;
+  const wasOpen = Boolean(dialog) && isModalContextCurrent(dialog);
+  if (wasOpen) await closeModal({ force: true });
+  // Ein scheiterndes Nachladen meldet nichts weiter - der Satz steht schon da.
+  if (!await reload(undefined, { quiet: true, owner })) return;
+  refocusAfterRender();
+  if (wasOpen && reopen) reopen();
+}
+
+const SELECTED_META_GONE = new Map([
+  ['subscriptions_selected_category_not_found', 'subscription-category'],
+  ['subscriptions_selected_payment_method_not_found', 'subscription-method'],
+]);
+const selectedMetaGone = (err) => (isGone(err) ? SELECTED_META_GONE.get(err.data.reason) : undefined);
 
 // --------------------------------------------------------
 // Nur-lesen (#467, #1265 P7)
@@ -198,16 +272,29 @@ async function load({ refreshRates = false } = {}) {
   if (state.status !== 'all') params.set('status', state.status);
   if (refreshRates) params.set('refresh_rates', 'true');
 
-  const [list, meta, settings] = await Promise.all([
-    api.get(`/budget/subscriptions?${params}`),
-    api.get('/budget/subscriptions/meta'),
-    api.get('/budget/subscriptions/settings'),
-  ]);
+  // Siehe listVersion: ein ueberholtes Laden uebernimmt nichts, auch keinen Fehler.
+  const ticket = ++loadTicket;
+  const version = listVersion;
+  const outdated = () => ticket !== loadTicket || version !== listVersion;
+  let answers;
+  try {
+    answers = await Promise.all([
+      api.get(`/budget/subscriptions?${params}`),
+      api.get('/budget/subscriptions/meta'),
+      api.get('/budget/subscriptions/settings'),
+    ]);
+  } catch (err) {
+    if (outdated()) return false;
+    throw err;
+  }
+  if (outdated()) return false;
+  const [list, meta, settings] = answers;
   state.subscriptions = list.data?.subscriptions || [];
   state.summary = list.data?.summary || null;
   state.rates = list.data?.rates || null;
   state.meta = meta.data || state.meta;
   state.settings = settings.data || state.settings;
+  return true;
 }
 
 export async function render(target, { user } = {}) {
@@ -549,14 +636,27 @@ function bindToolbar() {
   });
 }
 
-async function reload(options, { motion = false } = {}) {
+/**
+ * Neu laden und zeichnen - nur, solange die Seite noch dieselbe ist und kein
+ * neuerer Stand inzwischen gekommen ist (listVersion).
+ *
+ * @returns {Promise<boolean>} ob die Seite noch steht (dann darf der Aufrufer
+ *   den Fokus zuruecktragen oder einen Dialog neu aufbauen)
+ */
+async function reload(options, { motion = false, quiet = false, owner = container } = {}) {
   try {
-    await load(options);
-    renderFilters();
-    renderContent({ motion });
+    const applied = await load(options);
+    if (!isCurrentOwner(owner)) return false;
+    if (applied) {
+      renderFilters();
+      renderContent({ motion });
+    }
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error || t('subscriptions.loadError'), 'danger');
+    if (!isCurrentOwner(owner)) return false;
+    if (quiet) console.warn('[Subscriptions] reload failed:', err);
+    else window.yuvomi?.showToast(errorSentence(err, 'subscriptions.loadError'), 'danger');
   }
+  return true;
 }
 
 function sortedSubscriptions() {
@@ -1236,6 +1336,61 @@ function openSubscriptionReadView(subscription) {
   });
 }
 
+/**
+ * Kategorie und Zahlungsart im Abo-Dialog: EIN Helfer fuer Beschriftung und
+ * Optionen, beim Oeffnen wie beim Neuaufbau nach "die gewaehlte gibt es nicht
+ * mehr" - damit beide nicht auseinanderlaufen (#1909, Codex an #1994).
+ */
+const META_COMBOBOXES = {
+  'subscription-category': {
+    label: 'subscriptions.categoryLabel',
+    placeholder: 'subscriptions.categorySearchPlaceholder',
+    items: () => [
+      { value: '', label: t('subscriptions.uncategorized') },
+      ...state.meta.categories.map((item) => ({ value: item.id, label: categoryLabel(item) })),
+    ],
+  },
+  'subscription-method': {
+    label: 'subscriptions.paymentMethodLabel',
+    placeholder: 'subscriptions.paymentMethodSearchPlaceholder',
+    items: () => [
+      { value: '', label: t('subscriptions.unspecified') },
+      ...state.meta.payment_methods.map((item) => ({ value: item.id, label: paymentMethodLabel(item) })),
+    ],
+  },
+};
+
+function metaComboboxMarkup(id, value = '', { without = null } = {}) {
+  const config = META_COMBOBOXES[id];
+  const items = config.items().filter((item) => without === null || String(item.value) !== without);
+  return comboboxMarkup({ id, label: t(config.label), items, value, placeholder: t(config.placeholder) });
+}
+
+/**
+ * Die im Abo-Dialog GEWAEHLTE Kategorie oder Zahlungsart ist weg (#1909): der
+ * Dialog bleibt mit der Eingabe offen, die Auswahl bekommt den aktuellen Stand,
+ * steht auf "keine" und traegt den Fokus. Scheitert das Nachladen, faellt
+ * wenigstens die verschwundene aus der Auswahl.
+ */
+async function offerCurrentMeta(panel, id) {
+  const owner = container;
+  const goneId = String(panel.querySelector(`#${id}`)?.value ?? '');
+  try {
+    const response = await api.get('/budget/subscriptions/meta');
+    if (response?.data) state.meta = response.data;
+  } catch (err) {
+    console.warn('[Subscriptions] metadata reload failed:', err);
+  }
+  const root = panel.querySelector(`[data-combobox="${id}"]`);
+  if (!root) return;
+  root.insertAdjacentHTML('afterend', metaComboboxMarkup(id, '', { without: goneId }));
+  root.remove();
+  wireCombobox(panel, id);
+  panel.querySelector(`#${id}-search`)?.focus();
+  // Die Filter hinter dem Dialog nennen dieselben Kategorien und Zahlungsarten.
+  if (isCurrentOwner(owner)) renderFilters();
+}
+
 export function openSubscriptionModal(subscription = null) {
   // Der Riegel steht VOR jeder Vorbereitung: der Anlegeweg entfaellt ganz, ein
   // bestehendes Abo geht als Leseansicht auf (P1-Muster wie openNoteModal).
@@ -1251,14 +1406,6 @@ export function openSubscriptionModal(subscription = null) {
     value: cycle,
     label: t(`subscriptions.cycle.${cycle}`),
   }));
-  const categoryItems = [
-    { value: '', label: t('subscriptions.uncategorized') },
-    ...state.meta.categories.map((item) => ({ value: item.id, label: categoryLabel(item) })),
-  ];
-  const methodItems = [
-    { value: '', label: t('subscriptions.unspecified') },
-    ...state.meta.payment_methods.map((item) => ({ value: item.id, label: paymentMethodLabel(item) })),
-  ];
   const initialLogo = subscription?.logo_data || '';
   const initialName = subscription?.name || '';
 
@@ -1276,20 +1423,8 @@ export function openSubscriptionModal(subscription = null) {
       <section class="subscription-form__section">
         <h3><i data-lucide="tags" aria-hidden="true"></i>${t('subscriptions.organizationDetails')}</h3>
         <div class="subscription-form__organization-grid">
-          ${comboboxMarkup({
-            id: 'subscription-category',
-            label: t('subscriptions.categoryLabel'),
-            items: categoryItems,
-            value: subscription?.category_id || '',
-            placeholder: t('subscriptions.categorySearchPlaceholder'),
-          })}
-          ${comboboxMarkup({
-            id: 'subscription-method',
-            label: t('subscriptions.paymentMethodLabel'),
-            items: methodItems,
-            value: subscription?.payment_method_id || '',
-            placeholder: t('subscriptions.paymentMethodSearchPlaceholder'),
-          })}
+          ${metaComboboxMarkup('subscription-category', subscription?.category_id || '')}
+          ${metaComboboxMarkup('subscription-method', subscription?.payment_method_id || '')}
           <div class="form-group subscription-form__color">
             <label class="form-label" for="subscription-color">${t('subscriptions.brandColorLabel')}</label>
             <input class="form-input form-input--color" id="subscription-color" type="color" value="${esc(subscription?.brand_color || '#0F766E')}">
@@ -1487,7 +1622,7 @@ export function openSubscriptionModal(subscription = null) {
           showLogo(searchedLogoData);
         } catch (err) {
           event.target.value = '';
-          window.yuvomi?.showToast(err.message, 'danger');
+          window.yuvomi?.showToast(errorText(err), 'danger');
         }
       });
       panel.querySelector('#subscription-name').addEventListener('input', () => {
@@ -1516,14 +1651,14 @@ const LOGO_ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg
 
 async function fileToDataUrl(file) {
   if (!file) return null;
-  if (!LOGO_ACCEPTED_TYPES.includes(file.type)) throw new Error(t('subscriptions.logoTypeError'));
-  if (file.size > 500000) throw new Error(t('subscriptions.logoTooLarge'));
+  if (!LOGO_ACCEPTED_TYPES.includes(file.type)) throw new PageProblem(t('subscriptions.logoTypeError'));
+  if (file.size > 500000) throw new PageProblem(t('subscriptions.logoTooLarge'));
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result);
     // Roh weitergereicht war das der ProgressEvent - `err.message` im Toast
     // des Aufrufers zeigte dann `undefined`.
-    reader.onerror = () => reject(new Error(t('documents.fileReadError')));
+    reader.onerror = () => reject(new PageProblem(t('documents.fileReadError')));
     reader.readAsDataURL(file);
   });
 }
@@ -1583,6 +1718,8 @@ async function saveSubscription(panel, existing, searchedLogoData = null) {
 
   const submit = panel.querySelector('[type="submit"]');
   submit.disabled = true;
+  // Der Dialog dieser Handlung, vor jeder Anfrage gemerkt (reportError).
+  const dialog = captureModalContext();
   try {
     const file = panel.querySelector('#subscription-logo').files[0];
     const logoData = searchedLogoData || (file ? await fileToDataUrl(file) : existing?.logo_data || null);
@@ -1612,12 +1749,18 @@ async function saveSubscription(panel, existing, searchedLogoData = null) {
     };
     if (existing) await api.put(`/budget/subscriptions/${existing.id}`, payload);
     else await api.post('/budget/subscriptions', payload);
+    markWritten();
     await closeModal({ force: true });
-    await reload(undefined, { motion: true });
-    refocusAfterRender();
+    if (await reload(undefined, { motion: true })) refocusAfterRender();
     window.yuvomi?.showToast(t(existing ? 'subscriptions.savedToast' : 'subscriptions.addedToast'), 'success');
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error || err.message || t('common.unknownError'), 'danger');
+    const goneSelect = selectedMetaGone(err);
+    if (goneSelect) {
+      window.yuvomi?.showToast(errorText(err), 'danger');
+      await offerCurrentMeta(panel, goneSelect);
+      return;
+    }
+    reportError(err, { dialog });
   } finally {
     submit.disabled = false;
   }
@@ -1677,7 +1820,7 @@ function openLogoPickerModal(panel, initialQuery, onSelect) {
       options = response.data?.options || [];
       setHtml(results, logoOptionsMarkup(options));
     } catch (err) {
-      const message = err.data?.error || t('subscriptions.logoSearchError');
+      const message = errorSentence(err, 'subscriptions.logoSearchError');
       options = [];
       setHtml(results, `<p class="subscriptions-logo-empty">${esc(message)}</p>`);
       window.yuvomi?.showToast(message, 'danger');
@@ -1721,12 +1864,12 @@ async function renewSubscription(subscription) {
   if (!confirmed) return;
   try {
     const response = await api.post(`/budget/subscriptions/${subscription.id}/renew`, {});
-    await reload(undefined, { motion: true });
-    refocusAfterRender();
+    markWritten();
+    if (await reload(undefined, { motion: true })) refocusAfterRender();
     const completed = response.data?.status === 'completed';
     window.yuvomi?.showToast(t(completed ? 'subscriptions.completedToast' : 'subscriptions.renewedToast'), 'success');
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error || t('common.unknownError'), 'danger');
+    reportError(err);
   }
 }
 
@@ -1737,16 +1880,23 @@ async function deleteSubscription(subscription) {
   if (!confirmed) return;
   try {
     await api.delete(`/budget/subscriptions/${subscription.id}`);
-    // Die Zeile klappt aus, die Nachbarn ruecken nach - erst dann steht die
-    // Liste ohne sie neu (der Server hat schon geloescht; ohne Bewegung loest
-    // collapseRow sofort auf).
-    await collapseRow(container.querySelector(`#subscriptions-list .swipe-row[data-swipe-id="${subscription.id}"]`));
-    await reload(undefined, { motion: true });
-    refocusAfterRender();
-    window.yuvomi?.showToast(t('subscriptions.deletedToast'), 'success');
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error || t('common.unknownError'), 'danger');
+    // SCHON GELOESCHT IST EIN ERFOLG (#1909): ein anderes Haushaltsmitglied war
+    // schneller. Die 404 eines Abos heisst nur das - die Route liest es ohne
+    // Sichtbarkeitsfilter, ein fremdes privates Abo endet dort mit 403.
+    if (!isAlreadyDeleted(err, 'subscriptions_subscription_not_found')) {
+      reportError(err);
+      return;
+    }
   }
+  markWritten();
+  const owner = container;
+  // Die Zeile klappt aus, die Nachbarn ruecken nach - erst dann steht die
+  // Liste ohne sie neu (der Server hat schon geloescht; ohne Bewegung loest
+  // collapseRow sofort auf).
+  await collapseRow(owner?.querySelector(`#subscriptions-list .swipe-row[data-swipe-id="${subscription.id}"]`));
+  if (await reload(undefined, { motion: true, owner })) refocusAfterRender();
+  window.yuvomi?.showToast(t('subscriptions.deletedToast'), 'success');
 }
 
 async function openSettingsModal() {
@@ -1812,12 +1962,12 @@ async function openSettingsModal() {
             monthly_budget: Number(panel.querySelector('#subscriptions-budget').value),
             base_currency: baseCurrency,
           });
+          markWritten();
           await closeModal({ force: true });
-          await reload({ refreshRates: true });
-          refocusAfterRender();
+          if (await reload({ refreshRates: true })) refocusAfterRender();
           window.yuvomi?.showToast(t('subscriptions.settingsSaved'), 'success');
         } catch (err) {
-          window.yuvomi?.showToast(err.data?.error || t('common.unknownError'), 'danger');
+          reportError(err);
         }
       });
     },
@@ -1862,6 +2012,33 @@ function metadataRows(items, kind) {
   }).join('');
 }
 
+/**
+ * Eine Schreibhandlung im Verwalten-Dialog: nach dem Erfolg schliessen, neu
+ * laden und den Dialog mit dem frischen Stand neu aufbauen. Scheitert sie,
+ * sagt der Toast den Satz der App; "gibt es nicht mehr" baut den Dialog
+ * ebenfalls frisch auf, eine vergebene Bezeichnung laesst ihn mit der Eingabe
+ * stehen.
+ *
+ * @returns {Promise<boolean>} ob der Server die Handlung angenommen hat
+ */
+async function saveMetadata(write) {
+  const dialog = captureModalContext();
+  try {
+    await write();
+  } catch (err) {
+    reportError(err, { dialog, reopen: openMetadataModal });
+    return false;
+  }
+  markWritten();
+  const owner = container;
+  await closeModal({ force: true });
+  if (await reload(undefined, { owner })) {
+    refocusAfterRender();
+    openMetadataModal();
+  }
+  return true;
+}
+
 function openMetadataModal() {
   if (readOnly()) return;
   const content = `
@@ -1898,24 +2075,18 @@ function openMetadataModal() {
         if (readOnly()) return;
         const name = panel.querySelector('#subscription-new-category').value.trim();
         if (!name) return;
-        await api.post('/budget/subscriptions/categories', {
+        // Bis #1909 ohne catch: eine vergebene Kategorie lief als unbehandelte
+        // Ablehnung bis in den Router und zeigte dort den Text des Servers.
+        await saveMetadata(() => api.post('/budget/subscriptions/categories', {
           name,
           color: panel.querySelector('#subscription-new-category-color').value,
-        });
-        await closeModal({ force: true });
-        await reload();
-        refocusAfterRender();
-        openMetadataModal();
+        }));
       });
       panel.querySelector('#subscription-add-method').addEventListener('click', async () => {
         if (readOnly()) return;
         const name = panel.querySelector('#subscription-new-method').value.trim();
         if (!name) return;
-        await api.post('/budget/subscriptions/payment-methods', { name });
-        await closeModal({ force: true });
-        await reload();
-        refocusAfterRender();
-        openMetadataModal();
+        await saveMetadata(() => api.post('/budget/subscriptions/payment-methods', { name }));
       });
       panel.querySelectorAll('[data-move]').forEach((button) => {
         button.addEventListener('click', async () => {
@@ -1929,11 +2100,7 @@ function openMetadataModal() {
           const target = index + Number(button.dataset.move);
           [rows[index], rows[target]] = [rows[target], rows[index]];
           const key = list.id.includes('category') ? 'categories' : 'payment_methods';
-          await api.put('/budget/subscriptions/meta/order', { [key]: rows.map((row) => Number(row.dataset.id)) });
-          await closeModal({ force: true });
-          await reload();
-          refocusAfterRender();
-          openMetadataModal();
+          await saveMetadata(() => api.put('/budget/subscriptions/meta/order', { [key]: rows.map((row) => Number(row.dataset.id)) }));
         });
       });
 
@@ -1990,20 +2157,10 @@ function openMetadataModal() {
             ? (nameInput.dataset.originalName ?? typed)
             : typed;
           const colorInput = editRow.querySelector('.subscriptions-metadata-edit-color');
-          try {
-            if (li.dataset.kind === 'categories') {
-              await api.put(`/budget/subscriptions/categories/${id}`, { name, color: colorInput.value });
-            } else {
-              await api.put(`/budget/subscriptions/payment-methods/${id}`, { name });
-            }
-            await closeModal({ force: true });
-            await reload();
-            refocusAfterRender();
-            openMetadataModal();
-            window.yuvomi?.showToast(t('subscriptions.metaSavedToast'), 'success');
-          } catch (err) {
-            window.yuvomi?.showToast(err.data?.error || err.message || t('common.unknownError'), 'danger');
-          }
+          const saved = await saveMetadata(() => (li.dataset.kind === 'categories'
+            ? api.put(`/budget/subscriptions/categories/${id}`, { name, color: colorInput.value })
+            : api.put(`/budget/subscriptions/payment-methods/${id}`, { name })));
+          if (saved) window.yuvomi?.showToast(t('subscriptions.metaSavedToast'), 'success');
         });
       });
       panel.querySelectorAll('[data-act="delete"]').forEach((button) => {
@@ -2034,14 +2191,22 @@ function openMetadataModal() {
             },
           );
           if (!confirmed) return;
+          const owner = container;
           try {
             await api.delete(`/budget/subscriptions/${isCat ? 'categories' : 'payment-methods'}/${id}`);
-            await reload();
-            refocusAfterRender();
-            window.yuvomi?.showToast(t('subscriptions.metaDeletedToast'), 'success');
           } catch (err) {
-            window.yuvomi?.showToast(err.data?.error || err.message || t('common.unknownError'), 'danger');
+            // Schon geloescht ist ein Erfolg (#1909): Kategorien und
+            // Zahlungsarten haben keine Sichtbarkeit, die 404 heisst nur das.
+            if (!isAlreadyDeleted(err, isCat ? 'subscriptions_category_not_found' : 'subscriptions_payment_method_not_found')) {
+              window.yuvomi?.showToast(errorText(err), 'danger');
+              if (isCurrentOwner(owner)) openMetadataModal();
+              return;
+            }
           }
+          markWritten();
+          if (!await reload(undefined, { owner })) return;
+          refocusAfterRender();
+          window.yuvomi?.showToast(t('subscriptions.metaDeletedToast'), 'success');
           openMetadataModal();
         });
       });
@@ -2057,4 +2222,7 @@ export const __test = {
   readOnly, READ_SAFE_ACTIONS, renderCard, renderEmpty, renderSummary, state, toolsMenuHtml, activeFilters,
   renderBreakdown, renderAreaChart,
   subscriptionReadSections, openSubscriptionModal, saveSubscription,
+  // #1909: die Fehlerwege der Seite (test:subscriptions-errors).
+  reload, renewSubscription, deleteSubscription, openSettingsModal, openMetadataModal, openLogoPickerModal,
+  setContainerForTest: (target) => { container = target; },
 };

@@ -877,6 +877,8 @@ const REASONS_PASSED_THROUGH = new Map([
   ['routes/family.js: problem.reason', { sites: 1, at403: [], why: 'memberOrderProblem: feste 400; die 403 daneben traegt ein Literal' }],
   // parseDataUrl (#1909): der Fall einer gewaehlten Datei (Typ, Inhalt, leer).
   ['routes/documents.js: parsed.reason', { sites: 1, at403: [], why: 'parseDataUrl: feste 400' }],
+  // problemBody (#1909): der Grund einer Abo-Pruefung, nur bei genau einem Befund.
+  ['routes/subscriptions.js: items[0].reason', { sites: 1, at403: [], why: 'problemBody: feste 400' }],
   ['routes/tasks.js: result.reason', { sites: 1, at403: [], why: 'feste 409' }],
   ['routes/backup.js: err.reason', { sites: 1, at403: [], why: 'Restore: 409, 503 oder 400' }],
   // wasteErrorResponse (#1795, #1909): der Grund eines getypten Abfuhr-Fehlers
