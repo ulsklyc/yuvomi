@@ -362,3 +362,39 @@ test(`TZ=${process.env.TZ}: der Countdown ueberspringt eine Ausnahme auf dem UTC
   // 03.10. 23:30 PDT ist 04.10. 06:30Z: die Ausnahme traegt den 04.10.
   assert.equal(nextEventDate(DAILY_LA, '2035-10-04', new Set(['2035-10-04']), { tz: BERLIN }), '2035-10-05');
 });
+
+// ── Codex zu #1996: COUNT im zonierten Countdown ─────────────────────────────
+
+/** Der naechste Tag, den der Kalender zeigt (Haushaltstag), oder null. */
+function calendarNextDay(ev, todayKey, household) {
+  const out = expandRecurringEvents([{ id: 8, ...ev }], '2034-01-01', '2045-12-31', null,
+    { householdZone: household, maxIterations: 100000 });
+  return out.map((o) => localOf(o.start_datetime, household).slice(0, 10)).find((day) => day >= todayKey) ?? null;
+}
+
+test(`TZ=${process.env.TZ}: der Countdown zaehlt COUNT wie der Kalender, auch nach dem 28.`, () => {
+  // 01.01. 00:30 Berlin ist der 31.12. in Los Angeles: ein Monatsanker nach
+  // dem 28. Fuenf Vorkommen, das letzte im Haushalt am 01.05.
+  const ev = { all_day: 0, tzid: LA, start_datetime: '2035-01-01T00:30', recurrence_rule: 'RRULE:FREQ=MONTHLY;COUNT=5' };
+  assert.equal(calendarNextDay(ev, '2035-10-02', BERLIN), null, 'Vorbedingung: der Kalender');
+  assert.equal(nextEventDate(ev, '2035-10-02', null, { tz: BERLIN }), null);
+});
+
+test(`TZ=${process.env.TZ}: Countdown und Kalender nennen denselben Tag (Monatsletzter, 29.2., woechentlich, mit COUNT)`, () => {
+  const cases = [
+    { start: '2035-01-01T00:30', rule: 'RRULE:FREQ=MONTHLY;COUNT=5' },
+    { start: '2035-01-15T05:30', rule: 'RRULE:FREQ=MONTHLY;BYMONTHDAY=-1;COUNT=4' },
+    { start: '2035-11-01T05:30', rule: 'RRULE:FREQ=MONTHLY;BYMONTHDAY=-1;COUNT=3' },
+    { start: '2036-03-01T07:30', rule: 'RRULE:FREQ=YEARLY;COUNT=3' },
+    { start: '2035-10-02T08:30', rule: 'RRULE:FREQ=WEEKLY;COUNT=4' },
+    { start: '2035-10-02T08:30', rule: 'RRULE:FREQ=WEEKLY;BYDAY=MO,TH;COUNT=5' },
+  ];
+  const todays = ['2035-01-01', '2035-03-15', '2035-10-01', '2035-10-20', '2035-12-31', '2036-03-01', '2040-02-28', '2044-03-01'];
+  for (const c of cases) {
+    const ev = { all_day: 0, tzid: LA, start_datetime: c.start, recurrence_rule: c.rule };
+    for (const today of todays) {
+      assert.equal(nextEventDate(ev, today, null, { tz: BERLIN }), calendarNextDay(ev, today, BERLIN),
+        `${c.start} ${c.rule} heute ${today}`);
+    }
+  }
+});

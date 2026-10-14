@@ -38,14 +38,12 @@
 
 import { localCalendarColorSql, localCalendarIdSql } from './local-calendars.js';
 
-import {
-  hasAnyOccurrence, nextOccurrenceAfter, parseRRule, seriesStartFor, untilInstantMs,
-} from './recurrence.js';
-import { loadEventExceptions } from './calendar-events.js';
+import { hasAnyOccurrence, nextOccurrenceAfter, seriesStartFor } from './recurrence.js';
+import { expandRecurringEvents, loadEventExceptions, MAX_EXPANSION_ITERATIONS } from './calendar-events.js';
 import { modulesLeftOut, notBirthdayEventSql } from './household-modules.js';
 import { eventProjectionSql, resolveProjectedEventRows } from './calendar-event-reader.js';
 import { icsSubscriptionVisibleWhere, visibilityWhere } from './visibility.js';
-import { householdTimeZone, localToUTC, storedToWall, utcToWall } from '../utils/timezone.js';
+import { householdTimeZone, storedToWall, utcToWall } from '../utils/timezone.js';
 // Dieselbe Rangfolge wie im Kalender und auf der Uebersicht - eine Regel, eine
 // Datei. Der Server importiert oefter aus `public/utils/` (date, folder-tree,
 // currency-codes, ...), immer fuer abhaengigkeitsfreie geteilte Regeln.
@@ -71,6 +69,9 @@ export const DEFAULT_OVERDUE_GRACE_DAYS = 7;
 // (EXDATE, #489). Eine Serie, die mehr als das an aufeinanderfolgenden
 // Ausnahmen trägt, hat kein nächstes Vorkommen, das dieses Widget zeigen müsste.
 const MAX_EXCEPTION_SKIPS = 50;
+// Wie weit der zonierte Countdown voraussucht (#1993): neun Jahre fassen auch
+// einen 29. Februar, dessen naechstes Vorkommen ein Schaltjahr ueberspringt.
+const ZONED_SEARCH_DAYS = 9 * 366;
 
 /**
  * Ganze Tage zwischen zwei Datumsschlüsseln (YYYY-MM-DD).
@@ -184,7 +185,7 @@ export function nextEventDate(event, todayKey, exceptions = null, { graceDays = 
   const serienWand = (!event.all_day && event.tzid)
     ? storedToWall(String(event.start_datetime ?? ''), event.tzid, tz)
     : null;
-  if (serienWand) return nextZonedSeriesDate(event, serienWand, todayKey, exceptions, tz);
+  if (serienWand) return nextZonedSeriesDate(event, todayKey, exceptions, tz);
 
   if (!hasAnyOccurrence(startKey, event.recurrence_rule)) return null;
   const ersterTreffer = seriesStartFor(startKey, event.recurrence_rule);
@@ -206,51 +207,45 @@ export function nextEventDate(event, todayKey, exceptions = null, { graceDays = 
 
 /**
  * Das naechste Vorkommen einer getimten Serie mit eigener Zone, als Tag des
- * Haushalts (#1993). Die Regel laeuft auf den Ortstagen der `tzid`, wie in
- * `expandRecurringEvents`; je Vorkommen wird der Zeitpunkt gebildet und auf
- * die Haushaltszone gelesen. Ausnahmen (EXDATE) werden auf dem UTC-Tag des
- * Vorkommens nachgeschlagen; so legt der Import sie ab, und so sucht die
- * Expansion, wenn sie auf den Ortstagen rechnet (`lokalRechnen`). Rechnet sie
- * dagegen auf dem UTC-Tag des Masters (`tzAware`), fragt sie den Schleifentag,
- * und der kann bei einem Vorkommen jenseits einer Zeitumstellung neben dessen
- * UTC-Tag liegen - dort koennen Countdown und Kalender verschieden antworten
- * (tracked in #2000).
+ * Haushalts (#1993) - ueber DIESELBE Expansion, die der Kalender zeigt.
  *
- * UNTIL mit Uhrzeit ist ein Zeitpunkt und wird gegen den Zeitpunkt des
- * Vorkommens geprueft, wie in der Expansion (#1269); ein reines Datum bleibt
- * beim Tagesgatter der Regel.
+ * Eine zweite Zaehlung hier war schon zweimal falsch: erst fehlte ein UNTIL
+ * mit Uhrzeit, dann COUNT bei einem Monatsanker nach dem 28. (`lastOccurrenceOf`
+ * laesst die COUNT-Grenze fuer solche Anker absichtlich weg, und
+ * `nextOccurrenceAfter` lief ueber das fuenfte Vorkommen hinaus). Die Expansion
+ * rechnet auf den Ortstagen der `tzid`, zaehlt COUNT vor EXDATE, prueft UNTIL
+ * als Zeitpunkt und schlaegt Ausnahmen so nach, wie der Kalender sie
+ * ueberspringt. Gefragt wird sie nach dem ersten Vorkommen, dessen Haushaltstag
+ * nicht vor `todayKey` liegt.
  *
- * Die untere Schranke liegt zwei Tage vor `todayKey`: Ortstag und Haushaltstag
- * koennen bis zu zwei Kalendertage auseinanderliegen (Kiritimati gegen Niue),
- * entschieden wird danach am Haushaltstag jedes Kandidaten.
+ * Das Fenster beginnt zwei Tage vor `todayKey` (Ortstag, UTC-Tag und
+ * Haushaltstag koennen so weit auseinanderliegen; entschieden wird am
+ * Haushaltstag) und reicht neun Jahre voraus, damit auch ein 29. Februar mit
+ * ausgelassenen Jahren gefunden wird. Die Schleife beginnt am Serienstart,
+ * deshalb die hohe Iterationsgrenze; sie endet beim ersten Treffer.
  *
  * @param {object} event
- * @param {{ date: string, time: string }} serienWand  Wanduhr des Starts in der `tzid`
  * @param {string} todayKey
  * @param {Set<string>|null} exceptions
  * @param {string} tz  Haushaltszone
  * @returns {string|null}
  */
-function nextZonedSeriesDate(event, serienWand, todayKey, exceptions, tz) {
-  const rule = event.recurrence_rule;
-  const seriesStart = serienWand.date;
-  if (!hasAnyOccurrence(seriesStart, rule)) return null;
-  const floor = shiftKey(todayKey, -2);
-  const untilMs = untilInstantMs(parseRRule(rule), { tzid: event.tzid, toUTC: localToUTC });
-  let candidate = seriesStartFor(seriesStart, rule);
-  if (candidate && floor && candidate < floor) {
-    candidate = nextOccurrenceAfter(candidate, rule, floor, { seriesStart });
-  }
-  for (let steps = 0; candidate && steps <= MAX_EXCEPTION_SKIPS + 4; steps++) {
-    const instant = localToUTC(`${candidate}T${serienWand.time}`, event.tzid);
-    if (untilMs !== null && Date.parse(instant) > untilMs) return null;
-    const householdDay = utcToWall(instant, tz)?.date ?? null;
-    if (householdDay && householdDay >= todayKey && !exceptions?.has(String(instant).slice(0, 10))) {
-      return householdDay;
-    }
-    candidate = nextOccurrenceAfter(candidate, rule, candidate, { seriesStart });
-  }
-  return null;
+function nextZonedSeriesDate(event, todayKey, exceptions, tz) {
+  const key = event.id ?? 0;
+  const householdDay = (occurrence) => utcToWall(occurrence.start_datetime, tz)?.date ?? null;
+  const [next] = expandRecurringEvents(
+    [{ ...event, id: key }],
+    shiftKey(todayKey, -2),
+    shiftKey(todayKey, ZONED_SEARCH_DAYS),
+    exceptions ? new Map([[key, exceptions]]) : null,
+    {
+      householdZone: tz,
+      maxIterations: MAX_EXPANSION_ITERATIONS,
+      maxOccurrencesPerSeries: 1,
+      occurrenceFilter: (occurrence) => (householdDay(occurrence) ?? '') >= todayKey,
+    },
+  );
+  return next ? householdDay(next) : null;
 }
 
 /**
