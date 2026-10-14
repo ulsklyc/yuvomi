@@ -1275,8 +1275,9 @@ async function mountVitals() {
 
 async function loadVitals() {
   const query = vitals.personId ? `?user_id=${encodeURIComponent(vitals.personId)}` : '';
+  const load = beginLoad('vitals');
   const res = await api.get(`/health/vitals${query}`);
-  vitals.rows = withoutPendingDeletes('vitals', res.data || []);
+  vitals.rows = withoutPendingDeletes('vitals', res.data || [], load);
 }
 
 function renderVitalsShell() {
@@ -1740,21 +1741,46 @@ function renderDetail() {
  * Bereich in dieser Zeit nach (ein anderes Loeschen kam mit "gibt es nicht
  * mehr" zurueck, ein Speichern, der Bilanz-Abruf der Naehrwerte), kaemen sie
  * sonst zurueck - und blieben stehen, weil ihr eigenes Loeschen nicht nachlaedt.
- * Je Bereich die Ids; sie gehen beim Ruecknehmen und nach dem Loeschversuch.
+ *
+ * Je Bereich: Id -> Ladenummer, ab der die Zeile nicht mehr zu filtern ist.
+ * Solange das Loeschen aussteht, Infinity. Ist es gelungen, die Nummer des
+ * letzten BEGONNENEN Ladens: eine Antwort, die vorher losging, kann die Zeile
+ * noch tragen und bleibt gefiltert; erst ein Laden, das danach beginnt, ist
+ * massgeblich und raeumt den Eintrag ab (eine spaeter vergebene gleiche Id
+ * bliebe sonst unsichtbar). Scheitert das Loeschen oder wird es
+ * zurueckgenommen, geht der Eintrag sofort.
  */
-const pendingDeletes = { vitals: new Set(), prevention: new Set(), nutrition: new Set() };
+const pendingDeletes = { vitals: new Map(), prevention: new Map(), nutrition: new Map() };
+const loadCounter = { vitals: 0, prevention: 0, nutrition: 0 };
 
-function withoutPendingDeletes(area, rows) {
+/** Nummer eines Ladens, das JETZT beginnt (vor dem Abruf zu ziehen). */
+function beginLoad(area) {
+  loadCounter[area] += 1;
+  return loadCounter[area];
+}
+
+function withoutPendingDeletes(area, rows, load) {
   const pending = pendingDeletes[area];
-  return pending.size ? rows.filter((row) => !pending.has(row.id)) : rows;
+  if (!pending.size) return rows;
+  const kept = rows.filter((row) => !pending.has(row.id));
+  for (const [id, until] of pending) {
+    if (load > until) pending.delete(id);
+  }
+  return kept;
 }
 
 async function commitPendingDelete(area, id, run) {
   try {
     await run();
-  } finally {
+  } catch (err) {
     pendingDeletes[area].delete(id);
+    throw err;
   }
+  pendingDeletes[area].set(id, loadCounter[area]);
+}
+
+function markPendingDelete(area, id) {
+  pendingDeletes[area].set(id, Infinity);
 }
 
 /** Loeschen einer Messung mit Undo-Toast statt Confirm (Hausmuster). */
@@ -1762,7 +1788,7 @@ function deleteVitalWithUndo(id) {
   const idx = vitals.rows.findIndex((r) => r.id === id);
   if (idx === -1) return;
   const [row] = vitals.rows.splice(idx, 1);
-  pendingDeletes.vitals.add(id);
+  markPendingDelete('vitals', id);
   renderVitalsShell();
   scheduleUndoableDelete({
     commit: ({ keepalive } = {}) => commitPendingDelete('vitals', id, () => api.delete(`/health/vitals/${id}`, { keepalive })),
@@ -5114,11 +5140,12 @@ async function loadPreventionTypes() {
 
 async function loadPreventionData() {
   const query = prevention.personId ? `?user_id=${encodeURIComponent(prevention.personId)}` : '';
+  const load = beginLoad('prevention');
   const [records, due] = await Promise.all([
     api.get(`/health/prevention/records${query}`),
     api.get(`/health/prevention/due${query}`),
   ]);
-  prevention.records = withoutPendingDeletes('prevention', records.data || []);
+  prevention.records = withoutPendingDeletes('prevention', records.data || [], load);
   prevention.due = due.data || [];
 }
 
@@ -5516,7 +5543,7 @@ async function deletePreventionRecord(row) {
   const idx = prevention.records.findIndex((r) => r.id === row.id);
   if (idx === -1) return;
   const [removed] = prevention.records.splice(idx, 1);
-  pendingDeletes.prevention.add(row.id);
+  markPendingDelete('prevention', row.id);
   renderPreventionShell();
   scheduleUndoableDelete({
     commit: ({ keepalive } = {}) => commitPendingDelete('prevention', row.id,
@@ -5578,11 +5605,12 @@ async function loadNutritionData() {
   // folgt der Geraetezone, der Server folgt der Haushaltszone - und die Zeile
   // im Tagebuch traegt die Haushaltszone. Ohne `date` antwortet die Route mit
   // ihrem eigenen `todayKey()`, und das ist der richtige Tag.
+  const load = beginLoad('nutrition');
   const [entries, summary] = await Promise.all([
     api.get(`/health/nutrition/entries${query}`),
     api.get(`/health/nutrition/summary${query}`),
   ]);
-  nutrition.entries = withoutPendingDeletes('nutrition', entries.data || []);
+  nutrition.entries = withoutPendingDeletes('nutrition', entries.data || [], load);
   nutrition.summary = summary.data || null;
 }
 
@@ -5976,7 +6004,7 @@ async function deleteNutritionEntry(row) {
   const idx = nutrition.entries.findIndex((r) => r.id === row.id);
   if (idx === -1) return;
   const [removed] = nutrition.entries.splice(idx, 1);
-  pendingDeletes.nutrition.add(row.id);
+  markPendingDelete('nutrition', row.id);
   renderNutritionShell();
   scheduleUndoableDelete({
     // DIE BILANZ OBEN KOMMT VOM SERVER und weiss von einer nur lokal

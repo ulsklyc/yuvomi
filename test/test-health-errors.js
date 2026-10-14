@@ -361,6 +361,40 @@ test('Seite: zwei Messwerte in der Ruecknahmefrist, das erste Loeschen wird "nic
   page.setViewStateForTest('vitals', { rows: [] });
 });
 
+test('Seite: ein Nachladen, das vor dem gelungenen Loeschen losging, bringt die geloeschte Zeile nicht zurueck', async () => {
+  const a = { id: 31, type: 'weight', value_num: 70, measured_at: '2026-01-05T08:00' };
+  const b = { id: 32, type: 'weight', value_num: 71, measured_at: '2026-01-06T08:00' };
+  page.setViewStateForTest('vitals', { rows: [a, b] });
+  const undo = [];
+  globalThis.__undoStub = (o) => { undo.push(o); };
+  try {
+    page.deleteVitalWithUndo(31);
+    page.deleteVitalWithUndo(32);
+  } finally {
+    delete globalThis.__undoStub;
+  }
+  let release;
+  const held = new Promise((r) => { release = r; });
+  await mit({ delete: async (path) => {
+    if (path === '/health/vitals/31') throw fehler(404, 'health_vital_not_found');
+    return {};
+  } }, async () => {
+    const get = globalThis.__apiStub.get;
+    // Die Antwort des Nachladens kommt erst, nachdem das zweite Loeschen
+    // gelungen ist - sie traegt die Zeile 32 noch (Codex an #1971).
+    globalThis.__apiStub.get = async (path) => {
+      if (!path.startsWith('/health/vitals')) return get(path);
+      await held;
+      return { data: [b] };
+    };
+    try { await undo[0].commit({ keepalive: false }); } catch (e) { undo[0].restore(e); }
+    await undo[1].commit({ keepalive: false });
+    release();
+  });
+  assert.deepEqual(page.vitalRowIdsForTest(), [], 'die veraltete Antwort bringt die geloeschte Zeile nicht zurueck');
+  page.setViewStateForTest('vitals', { rows: [] });
+});
+
 const vorsorgeDialog = (row) => dialog(() => page.openPreventionModal(row), {
   '#prevention-type': { value: '12' }, '#prevention-name': { value: '' }, '#prevention-given-on': { value: '2026-01-05' },
   '#prevention-next-due': null,
