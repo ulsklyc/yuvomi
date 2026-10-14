@@ -739,7 +739,7 @@ test('Seite: der gewaehlte Ordner ist weg - die Auswahl behaelt ihre Reihenfolge
   }));
   const baum = panel.querySelector('#document-folder-parent').html;
   assert.ok(baum.indexOf('Zeta') < baum.indexOf('Auto'), `Reihenfolge des Baums: ${baum}`);
-  assert.match(baum, />  Auto</, 'der Unterordner steht eingerueckt');
+  assert.match(baum, />\u00a0\u00a0Auto</, 'der Unterordner steht eingerueckt, mit geschuetzten Leerzeichen');
 });
 
 test('Seite: "gibt es nicht mehr", und die Seite wurde inzwischen verlassen - nichts wird mehr gezeichnet', async () => {
@@ -782,4 +782,28 @@ test('Seite: "gibt es nicht mehr", und inzwischen ist ein anderer Dialog offen -
   } finally {
     delete globalThis.__modalContextId;
   }
+});
+
+test('Seite: neuer Ordner, Elternordner weg - die neu aufgebaute Auswahl ist Zeichen fuer Zeichen die beim Oeffnen', async () => {
+  // Codex an #1994: der Neuaufbau rueckte mit gewoehnlichen Leerzeichen ein,
+  // die eine Option zusammenfasst - Unterordner standen dann auf der obersten
+  // Ebene. Drei Ebenen, damit eine falsche Tiefe auffaellt.
+  const tief = [{ id: 5, name: 'Zeta', parent_id: null }, { id: 4, name: 'Auto', parent_id: 5 }, { id: 6, name: 'Reifen', parent_id: 4 }];
+  const labels = (html) => Object.fromEntries([...String(html).matchAll(/<option value="(\d+)"[^>]*>([^<]*)<\/option>/g)].map((m) => [m[1], m[2]]));
+  const panel = formular({ '#document-folder-name': 'Belege', '#document-folder-parent': '3' });
+  let submit = null;
+  let content = '';
+  panel.querySelector('#document-folder-form').addEventListener = (type, fn) => { if (type === 'submit') submit = fn; };
+  await mitSeite({ folders: [...tief, { id: 3, name: 'Wohnung', parent_id: null }] }, () => mit({
+    get: (path) => (path === '/documents/folders' ? { data: tief } : { data: [] }),
+    post: async () => { throw fehler(400, 'documents_selected_folder_not_found'); },
+  }, async () => {
+    globalThis.__openModal = (opts) => { content = opts.content; opts.onSave(panel); };
+    try { page.openFolderModal(); } finally { delete globalThis.__openModal; }
+    await submit({ preventDefault() {} });
+  }));
+  const beimOeffnen = labels(content);
+  delete beimOeffnen['3'];
+  assert.equal(Object.keys(beimOeffnen).length, 3, content);
+  assert.deepEqual(labels(panel.querySelector('#document-folder-parent').html), beimOeffnen);
 });

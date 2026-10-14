@@ -1227,6 +1227,17 @@ function visibleAllFolderRows() {
   return flattenFolderTree(state.folders);
 }
 
+/**
+ * Beschriftung eines Ordners in einer Auswahl: eingerueckt nach seiner Tiefe.
+ * Mit geschuetzten Leerzeichen - gewoehnliche fasst eine <option> zusammen,
+ * und der Unterordner stuende auf der obersten Ebene (Codex an #1994). EIN
+ * Helfer fuer jede Ordner-Auswahl, auch fuer den Neuaufbau nach "gibt es nicht
+ * mehr", damit beide nicht auseinanderlaufen.
+ */
+function folderOptionLabel(row) {
+  return `${'  '.repeat(row.depth)}${row.folder.name}`;
+}
+
 /** Dieser Ordner und alles darunter - dieselbe Regel wie im Server. */
 function folderSubtree(folderId) {
   return subtreeIds(state.folders, folderId);
@@ -1533,7 +1544,7 @@ async function moveFolder(folder) {
     { value: '', label: t('documents.folderRootLevel') },
     ...visibleAllFolderRows()
       .filter((row) => !forbidden.has(row.folder.id))
-      .map((row) => ({ value: String(row.folder.id), label: `${'  '.repeat(row.depth)}${row.folder.name}` })),
+      .map((row) => ({ value: String(row.folder.id), label: folderOptionLabel(row) })),
   ];
 
   const chosen = await selectModal(t('documents.moveFolderTo', { name: folder.name }), options);
@@ -3247,7 +3258,7 @@ function openFolderModal({ parentId = null } = {}) {
     ? Number(state.folderId)
     : null);
   const options = visibleAllFolderRows()
-    .map((row) => `<option value="${row.folder.id}" ${row.folder.id === preselected ? 'selected' : ''}>${esc(`${'  '.repeat(row.depth)}${row.folder.name}`)}</option>`)
+    .map((row) => `<option value="${row.folder.id}" ${row.folder.id === preselected ? 'selected' : ''}>${esc(folderOptionLabel(row))}</option>`)
     .join('');
 
   openSharedModal({
@@ -3303,7 +3314,7 @@ function openFolderModal({ parentId = null } = {}) {
             // Dieselbe Reihenfolge wie beim Oeffnen: der Baum, eingerueckt.
             await offerCurrentFolders(parentSelect, 'documents.folderRootLevel',
               (goneId) => visibleAllFolderRows().filter((row) => String(row.folder.id) !== goneId)
-                .map((row) => `<option value="${row.folder.id}">${esc(`${'  '.repeat(row.depth)}${row.folder.name}`)}</option>`).join(''));
+                .map((row) => `<option value="${row.folder.id}">${esc(folderOptionLabel(row))}</option>`).join(''));
           }
         }
       });
