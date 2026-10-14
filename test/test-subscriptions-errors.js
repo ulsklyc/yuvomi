@@ -5,9 +5,9 @@
  * Der Server nennt den Fall (`reason`), die Seite sagt den Satz der App - nie
  * den des Servers. Sagt der Grund, dass es das Ziel der Handlung nicht mehr
  * gibt (ein anderes Haushaltsmitglied hat das Abo, die Kategorie oder die
- * Zahlungsart geloescht), nimmt die Seite genau dieses Ding aus ihrem Stand -
- * ohne GET (Zuschnitt vom 15.10.) -, und der Dialog der Handlung geht zu - nur
- * wenn er noch der offene ist. Fehlt nur die im Abo-Dialog GEWAEHLTE Kategorie oder Zahlungsart, bleibt
+ * Zahlungsart geloescht), laedt die Seite ueber das normale Laden mit
+ * Ladenummer neu - Liste, Kennzahlen und Filter rechnet der Server -, und der
+ * Dialog der Handlung geht zu, nur wenn er noch der offene ist. Fehlt nur die im Abo-Dialog GEWAEHLTE Kategorie oder Zahlungsart, bleibt
  * der Dialog offen und bietet den aktuellen Stand an.
  *
  * LOESCHEN AUF "GIBT ES NICHT MEHR" IST HIER EIN ERFOLG. Abos tragen zwar eine
@@ -411,6 +411,34 @@ async function mit(antworten, lauf) {
 
 const reloaded = (gets) => gets.some((p) => LIST_PATH.test(p)) && gets.includes('/budget/subscriptions/meta');
 
+/**
+ * Der Stand des Servers NACH "gibt es nicht mehr": Abo 3 ist weg, Abo 4 da,
+ * und die Kennzahlen rechnet er selbst. Die Seite muss genau das zeigen.
+ */
+const NACHHER = {
+  subscriptions: [{ id: 4, name: 'Spotify', amount: 9.99, currency: 'EUR', billing_cycle: 'monthly', cycle_interval: 1,
+    next_payment_date: '2026-11-05', enabled: true, status: 'active', category_id: 5, payment_method_id: null }],
+  summary: { active_count: 1, disabled_count: 0, completed_count: 0, monthly_total: 9.99, monthly_budget: 0, remaining_budget: -9.99, base_currency: 'EUR', by_category: [], by_payment_method: [] },
+  rates: null,
+};
+const metaNachher = (ohne = []) => ({
+  ...structuredClone(META),
+  categories: META.categories.filter((c) => !ohne.includes(c.id)),
+  payment_methods: META.payment_methods.filter((m) => !ohne.includes(m.id)),
+});
+/** Antworten des Servers fuer das Laden danach. */
+const serverDanach = (ohne = []) => (path) => {
+  if (LIST_PATH.test(path)) return { data: structuredClone(NACHHER) };
+  if (path === '/budget/subscriptions/meta') return { data: metaNachher(ohne) };
+  return undefined;
+};
+/** Genau EIN Laden: Liste, Kategorien und Einstellungen je einmal. */
+const einmalGeladen = (gets) => gets.filter((p) => LIST_PATH.test(p)).length === 1
+  && gets.filter((p) => p === '/budget/subscriptions/meta').length === 1
+  && gets.filter((p) => p === '/budget/subscriptions/settings').length === 1
+  && gets.length === 3;
+const listenAnfrage = (gets) => gets.find((p) => LIST_PATH.test(p)) ?? '';
+
 const assertNoServerText = () => {
   for (const [text] of toasts) assert.doesNotMatch(String(text), /Server sentence/, 'der Text des Servers im Toast');
 };
@@ -423,7 +451,7 @@ const optionen = (html, id) => {
 
 // --- Abo speichern ----------------------------------------------------------
 
-test('Seite: ein Abo speichern - der Fall wird sein Satz; "gibt es nicht mehr" schliesst, nimmt das Abo aus der Liste und laedt NICHT nach', async () => {
+test('Seite: ein Abo speichern - der Fall wird sein Satz; "gibt es nicht mehr" schliesst und laedt EINMAL ueber die Ladenummer - Liste und Kennzahlen kommen vom Server', async () => {
   for (const [err, expected, gone] of [
     [fehler(404, 'subscriptions_subscription_not_found'), 'subscriptions.errorSubscriptionGone', true],
     [fehler(400, 'subscriptions_end_before_next_payment'), 'subscriptions.errorEndBeforeNextPayment', false],
@@ -435,18 +463,22 @@ test('Seite: ein Abo speichern - der Fall wird sein Satz; "gibt es nicht mehr" s
   ]) {
     const panel = formular(ABO_FORM);
     let liste = null;
+    let summe = null;
     let draws = 0;
     const { gets, closed } = await mitSeite(async (container) => {
-      const lauf = await mit({ put: async () => { throw err; } }, () => page.saveSubscription(panel, abo()));
+      const lauf = await mit({ get: serverDanach(), put: async () => { throw err; } }, () => page.saveSubscription(panel, abo()));
       liste = page.state.subscriptions.map((s) => s.id);
+      summe = page.state.summary?.active_count ?? null;
       draws = container.draws;
       return lauf;
     });
     const label = `${err.status} ${err.data.reason ?? ''}`;
     assert.deepEqual(toasts, [[expected, 'danger']], label);
     assert.equal(closed.length, gone ? 1 : 0, `${label}: geschlossen`);
-    assert.deepEqual(gets, [], `${label}: kein GET`);
-    assert.deepEqual(liste, gone ? [] : [3], `${label}: das Abo faellt aus der Liste`);
+    if (gone) assert.ok(einmalGeladen(gets), `${label}: genau ein Laden: ${gets.join(', ')}`);
+    else assert.deepEqual(gets, [], `${label}: kein Laden`);
+    assert.deepEqual(liste, gone ? [4] : [3], `${label}: die Liste des Servers`);
+    assert.equal(summe, gone ? 1 : null, `${label}: die Kennzahlen des Servers`);
     assert.equal(draws, gone ? 1 : 0, `${label}: neu gezeichnet`);
     assert.equal(panel.querySelector('[type="submit"]').disabled, false, `${label}: Speichern geht wieder`);
     assertNoServerText();
@@ -460,33 +492,34 @@ test('Seite: ein Abo speichern - wechselt der Dialog zwischen Anfrage und Antwor
     const panel = formular(ABO_FORM);
     await mitSeite(async () => {
       const { closed, gets } = await mit({
+        get: serverDanach(),
         put: async () => { kontext = 'ein-anderer-dialog'; throw fehler(404, 'subscriptions_subscription_not_found'); },
       }, () => page.saveSubscription(panel, abo()));
       assert.deepEqual(toasts, [['subscriptions.errorSubscriptionGone', 'danger']]);
       assert.deepEqual(closed, [], 'der andere Dialog bleibt offen');
-      assert.deepEqual(gets, []);
-      assert.deepEqual(page.state.subscriptions, [], 'das Abo faellt trotzdem aus der Liste');
+      assert.ok(einmalGeladen(gets), gets.join(', '));
+      assert.deepEqual(page.state.subscriptions.map((s) => s.id), [4], 'die Seite zeigt trotzdem den Stand des Servers');
     });
   } finally {
     delete globalThis.__modalContextId;
   }
 });
 
-test('Seite: beim Anlegen kennt die Seite keine id - "gibt es nicht mehr" sagt seinen Satz und laesst die Liste stehen', async () => {
+test('Seite: beim Anlegen braucht die Seite keine id - "gibt es nicht mehr" laedt wie ueberall', async () => {
   const panel = formular(ABO_FORM);
   await mitSeite(async () => {
-    const { gets } = await mit({ post: async () => { throw fehler(404, 'subscriptions_subscription_not_found'); } },
+    const { gets } = await mit({ get: serverDanach(), post: async () => { throw fehler(404, 'subscriptions_subscription_not_found'); } },
       () => page.saveSubscription(panel, null));
     assert.deepEqual(toasts, [['subscriptions.errorSubscriptionGone', 'danger']]);
-    assert.deepEqual(gets, []);
-    assert.deepEqual(page.state.subscriptions.map((s) => s.id), [3]);
+    assert.ok(einmalGeladen(gets), gets.join(', '));
+    assert.deepEqual(page.state.subscriptions.map((s) => s.id), [4]);
   });
 });
 
-test('Seite: die gewaehlte Kategorie oder Zahlungsart ist weg - der Dialog bleibt offen, die Auswahl ohne sie kommt ueber denselben Helfer wie beim Oeffnen, ohne GET', async () => {
-  for (const [reason, id, expected, goneId] of [
-    ['subscriptions_selected_category_not_found', 'subscription-category', 'subscriptions.errorSelectedCategoryGone', '6'],
-    ['subscriptions_selected_payment_method_not_found', 'subscription-method', 'subscriptions.errorSelectedPaymentMethodGone', '8'],
+test('Seite: die gewaehlte Kategorie oder Zahlungsart ist weg - der Dialog bleibt offen, die Seite laedt einmal, die Auswahl kommt aus dem frischen Stand ueber denselben Helfer wie beim Oeffnen', async () => {
+  for (const [reason, id, expected, goneId, filterKey] of [
+    ['subscriptions_selected_category_not_found', 'subscription-category', 'subscriptions.errorSelectedCategoryGone', '6', 'categoryId'],
+    ['subscriptions_selected_payment_method_not_found', 'subscription-method', 'subscriptions.errorSelectedPaymentMethodGone', '8', 'paymentMethodId'],
   ]) {
     // Beim Oeffnen stehen beide Kategorien und die Zahlungsart zur Wahl.
     let content = null;
@@ -500,21 +533,20 @@ test('Seite: die gewaehlte Kategorie oder Zahlungsart ist weg - der Dialog bleib
 
     const panel = formular({ ...ABO_FORM });
     const altesRoot = panel.querySelector(`[data-combobox="${id}"]`);
-    let meta = null;
-    let karte = null;
+    let filter = null;
     const { gets, closed } = await mitSeite(async () => {
-      const lauf = await mit({ put: async () => { throw fehler(400, reason); } }, () => page.saveSubscription(panel, abo()));
-      meta = page.state.meta;
-      karte = page.state.subscriptions[0];
+      // Die Seite ist auf genau die geloeschte gefiltert.
+      page.state[filterKey] = goneId;
+      const lauf = await mit({ get: serverDanach([Number(goneId)]), put: async () => { throw fehler(400, reason); } },
+        () => page.saveSubscription(panel, abo()));
+      filter = page.state[filterKey];
       return lauf;
     });
     assert.deepEqual(toasts, [[expected, 'danger']], reason);
     assert.deepEqual(closed, [], `${reason}: der Dialog bleibt offen`);
-    assert.deepEqual(gets, [], `${reason}: kein GET, der Stand wird lokal nachgezogen`);
-    const liste = id === 'subscription-category' ? meta.categories : meta.payment_methods;
-    assert.equal(liste.some((item) => String(item.id) === goneId), false, `${reason}: aus dem Stand der Seite`);
-    const feldName = id === 'subscription-category' ? 'category_id' : 'payment_method_id';
-    assert.equal(karte[feldName], null, `${reason}: das Abo, das sie trug, verliert sie wie am Server (ON DELETE SET NULL)`);
+    assert.ok(einmalGeladen(gets), `${reason}: genau ein Laden: ${gets.join(', ')}`);
+    assert.equal(filter, '', `${reason}: der Filter auf die geloeschte geht auf "alle"`);
+    assert.doesNotMatch(listenAnfrage(gets), /category_id=|payment_method_id=/, `${reason}: und zwar VOR dem Laden`);
     assert.equal(altesRoot.removed, true, `${reason}: die alte Auswahl ist ersetzt`);
     const neu = optionen(altesRoot.html, id);
     assert.equal(neu.some(([value]) => value === goneId), false, `${reason}: die geloeschte steht nicht mehr zur Wahl`);
@@ -530,6 +562,18 @@ test('Seite: die gewaehlte Kategorie oder Zahlungsart ist weg - der Dialog bleib
   }
 });
 
+test('Seite: die gewaehlte Kategorie ist weg und das Laden scheitert - wenigstens die geloeschte faellt aus der Auswahl, ohne zweiten Toast', async () => {
+  const panel = formular({ ...ABO_FORM });
+  const root = panel.querySelector('[data-combobox="subscription-category"]');
+  await mitSeite(() => mit({
+    get: (path) => { if (path === '/budget/subscriptions/meta') throw fehler(500); return undefined; },
+    put: async () => { throw fehler(400, 'subscriptions_selected_category_not_found'); },
+  }, () => page.saveSubscription(panel, abo())));
+  assert.deepEqual(toasts, [['subscriptions.errorSelectedCategoryGone', 'danger']]);
+  const neu = optionen(root.html, 'subscription-category').map(([value]) => value);
+  assert.deepEqual(neu, ['', '5'], 'Musik (6) ist weg, Streaming bleibt');
+});
+
 test('Seite: eine Logo-Datei, die die Seite ablehnt, sagt ihren eigenen Satz', async () => {
   const panel = formular(ABO_FORM);
   panel.querySelector('#subscription-logo').files = [{ type: 'text/plain', size: 10 }];
@@ -539,37 +583,39 @@ test('Seite: eine Logo-Datei, die die Seite ablehnt, sagt ihren eigenen Satz', a
 
 // --- Verlaengern und Loeschen ----------------------------------------------
 
-test('Seite: verlaengern - "gibt es nicht mehr" nimmt das Abo aus der Liste, ohne GET; alles andere sagt den Satz der App', async () => {
+test('Seite: verlaengern - "gibt es nicht mehr" laedt einmal, die Seite zeigt den Stand des Servers; alles andere sagt den Satz der App', async () => {
   for (const [err, expected, gone] of [
     [fehler(404, 'subscriptions_subscription_not_found'), 'subscriptions.errorSubscriptionGone', true],
     [fehler(403), 'common.errorNoPermission', false],
     [fehler(500), 'common.unknownError', false],
   ]) {
     await mitSeite(async () => {
-      const { gets } = await mit({ post: async () => { throw err; } }, () => page.renewSubscription(abo()));
+      const { gets } = await mit({ get: serverDanach(), post: async () => { throw err; } }, () => page.renewSubscription(abo()));
       const label = `${err.status} ${err.data.reason ?? ''}`;
       assert.deepEqual(toasts, [[expected, 'danger']], label);
-      assert.deepEqual(gets, [], `${label}: kein GET`);
-      assert.deepEqual(page.state.subscriptions.map((s) => s.id), gone ? [] : [3], label);
+      if (gone) assert.ok(einmalGeladen(gets), `${label}: ${gets.join(', ')}`);
+      else assert.deepEqual(gets, [], `${label}: kein Laden`);
+      assert.deepEqual(page.state.subscriptions.map((s) => s.id), gone ? [4] : [3], label);
+      assert.equal(page.state.summary?.monthly_total ?? null, gone ? 9.99 : null, `${label}: Kennzahlen`);
       assertNoServerText();
     });
   }
 });
 
-test('Seite: loeschen - "schon geloescht" ist ein Erfolg ohne GET; alles andere bleibt ein Fehler und laesst die Liste stehen', async () => {
-  for (const [err, expectedToasts, removed] of [
+test('Seite: loeschen - "schon geloescht" ist ein Erfolg und laedt wie ein Erfolg; alles andere bleibt ein Fehler und laesst die Liste stehen', async () => {
+  for (const [err, expectedToasts, gone] of [
     [fehler(404, 'subscriptions_subscription_not_found'), [['subscriptions.deletedToast', 'success']], true],
     [fehler(403), [['common.errorNoPermission', 'danger']], false],
     [fehler(404), [['common.unknownError', 'danger']], false],
     [fehler(500), [['common.unknownError', 'danger']], false],
   ]) {
-    await mitSeite(async (container) => {
-      const { gets } = await mit({ delete: async () => { throw err; } }, () => page.deleteSubscription(abo()));
+    await mitSeite(async () => {
+      const { gets } = await mit({ get: serverDanach(), delete: async () => { throw err; } }, () => page.deleteSubscription(abo()));
       const label = `${err.status} ${err.data.reason ?? ''}`;
       assert.deepEqual(toasts, expectedToasts, label);
-      assert.deepEqual(gets, [], `${label}: kein GET`);
-      assert.deepEqual(page.state.subscriptions.map((s) => s.id), removed ? [] : [3], label);
-      assert.equal(container.draws, removed ? 1 : 0, `${label}: neu gezeichnet`);
+      if (gone) assert.ok(einmalGeladen(gets), `${label}: ${gets.join(', ')}`);
+      else assert.deepEqual(gets, [], `${label}: kein Laden`);
+      assert.deepEqual(page.state.subscriptions.map((s) => s.id), gone ? [4] : [3], label);
       assertNoServerText();
     });
   }
@@ -687,7 +733,7 @@ test('Seite: im Verwalten-Dialog anlegen - vergeben sagt seinen Satz und laesst 
   }
 });
 
-test('Seite: im Verwalten-Dialog umbenennen - weg nimmt sie aus dem Stand und baut den Dialog neu auf, ohne GET; vergeben laesst ihn stehen', async () => {
+test('Seite: im Verwalten-Dialog umbenennen - weg laedt einmal und baut den Dialog danach aus dem frischen Stand neu auf; vergeben laesst ihn stehen', async () => {
   for (const [kind, err, expected, gone] of [
     ['categories', fehler(404, 'subscriptions_category_not_found'), 'subscriptions.errorCategoryGone', true],
     ['methods', fehler(404, 'subscriptions_payment_method_not_found'), 'subscriptions.errorPaymentMethodGone', true],
@@ -695,28 +741,27 @@ test('Seite: im Verwalten-Dialog umbenennen - weg nimmt sie aus dem Stand und ba
     ['methods', fehler(500), 'common.unknownError', false],
   ]) {
     const rowId = kind === 'categories' ? 6 : 8;
-    const { li, knopf } = zeile(kind, rowId, 'Neu');
+    const { knopf } = zeile(kind, rowId, 'Neu');
     const panel = verwalten({}, { '[data-act="save"]': [knopf] });
     let opened = 0;
-    globalThis.__openModal = (opts) => { opened += 1; if (opened === 1) opts.onSave(panel); };
+    let metaBeimNeuaufbau = null;
+    globalThis.__openModal = (opts) => {
+      opened += 1;
+      if (opened === 1) opts.onSave(panel);
+      else metaBeimNeuaufbau = structuredClone(page.state.meta);
+    };
     try {
-      let meta = null;
-      const { closed, gets } = await mitSeite(async () => {
-        const lauf = await mit({ put: async () => { throw err; } }, async () => {
-          page.openMetadataModal();
-          await knopf.handlers.click();
-        });
-        meta = page.state.meta;
-        return lauf;
-      });
+      const { closed, gets } = await mitSeite(() => mit({ get: serverDanach([rowId]), put: async () => { throw err; } }, async () => {
+        page.openMetadataModal();
+        await knopf.handlers.click();
+      }));
       const label = `${kind} ${err.status} ${err.data.reason ?? ''}`;
-      assert.ok(li, label);
       assert.deepEqual(toasts, [[expected, 'danger']], label);
       assert.equal(closed.length, gone ? 1 : 0, `${label}: geschlossen`);
-      assert.deepEqual(gets, [], `${label}: kein GET`);
-      const liste = kind === 'categories' ? meta.categories : meta.payment_methods;
-      assert.equal(liste.some((item) => item.id === rowId), !gone, `${label}: aus dem Stand (nur bei weg)`);
-      assert.equal(opened, gone ? 2 : 1, `${label}: frisch aufgebaut`);
+      if (gone) assert.ok(einmalGeladen(gets), `${label}: ${gets.join(', ')}`);
+      else assert.deepEqual(gets, [], `${label}: kein Laden`);
+      assert.equal(opened, gone ? 2 : 1, `${label}: neu aufgebaut`);
+      if (gone) assert.deepEqual(metaBeimNeuaufbau, metaNachher([rowId]), `${label}: mit dem frischen Stand`);
       assertNoServerText();
     } finally {
       delete globalThis.__openModal;
@@ -724,8 +769,8 @@ test('Seite: im Verwalten-Dialog umbenennen - weg nimmt sie aus dem Stand und ba
   }
 });
 
-test('Seite: im Verwalten-Dialog loeschen - schon geloescht ist ein Erfolg, alles andere sagt den Satz der App', async () => {
-  for (const [kind, err, expected, removed] of [
+test('Seite: im Verwalten-Dialog loeschen - schon geloescht ist ein Erfolg und laedt; alles andere sagt den Satz der App', async () => {
+  for (const [kind, err, expected, gone] of [
     ['categories', fehler(404, 'subscriptions_category_not_found'), ['subscriptions.metaDeletedToast', 'success'], true],
     ['methods', fehler(404, 'subscriptions_payment_method_not_found'), ['subscriptions.metaDeletedToast', 'success'], true],
     // Der Grund der ANDEREN Art ist kein "schon geloescht" fuer diese Zeile.
@@ -738,20 +783,26 @@ test('Seite: im Verwalten-Dialog loeschen - schon geloescht ist ein Erfolg, alle
     let opened = 0;
     globalThis.__openModal = (opts) => { opened += 1; if (opened === 1) opts.onSave(panel); };
     try {
-      let meta = null;
+      let filter = null;
+      const filterKey = kind === 'categories' ? 'categoryId' : 'paymentMethodId';
       const { gets } = await mitSeite(async () => {
-        const lauf = await mit({ delete: async () => { throw err; } }, async () => {
+        page.state[filterKey] = String(rowId);
+        const lauf = await mit({ get: serverDanach([rowId]), delete: async () => { throw err; } }, async () => {
           page.openMetadataModal();
           await knopf.handlers.click();
         });
-        meta = page.state.meta;
+        filter = page.state[filterKey];
         return lauf;
       });
       const label = `${kind} ${err.status} ${err.data.reason ?? ''}`;
       assert.deepEqual(toasts, [expected], label);
-      assert.deepEqual(gets, [], `${label}: kein GET`);
-      const liste = kind === 'categories' ? meta.categories : meta.payment_methods;
-      assert.equal(liste.some((item) => item.id === rowId), !removed, `${label}: aus dem Stand (nur bei schon geloescht)`);
+      if (gone) {
+        assert.ok(einmalGeladen(gets), `${label}: ${gets.join(', ')}`);
+        assert.equal(filter, '', `${label}: der Filter auf die geloeschte geht vor dem Laden auf "alle"`);
+        assert.doesNotMatch(listenAnfrage(gets), /category_id=|payment_method_id=/, label);
+      } else {
+        assert.deepEqual(gets, [], `${label}: kein Laden`);
+      }
       assert.equal(opened, 2, `${label}: der Dialog steht wieder`);
       assertNoServerText();
     } finally {
@@ -934,7 +985,8 @@ test('Seite: eine spaete "gibt es nicht mehr"-Antwort nach "weg und zurueck" lae
           page.state.paymentMethodId = '8';
           throw fehler(verb === 'put' && reason.includes('selected') ? 400 : 404, reason);
         };
-        await mit({ [verb]: weg }, lauf);
+        const { gets } = await mit({ [verb]: weg }, lauf);
+        assert.deepEqual(gets, [], `${label}: die neue Seite laedt nicht wegen einer fremden Antwort`);
         assert.deepEqual(page.state.subscriptions.map((s) => [s.id, s.category_id, s.payment_method_id]), [[3, 6, 8], [4, 6, 8]], `${label}: Abos der neuen Seite`);
         assert.deepEqual(page.state.meta, META, `${label}: Kategorien und Zahlungsarten der neuen Seite`);
         assert.deepEqual([page.state.categoryId, page.state.paymentMethodId], ['6', '8'], `${label}: Filter der neuen Seite`);
@@ -961,15 +1013,27 @@ test('Seite: steht der Filter auf einer Kategorie oder Zahlungsart, die es nicht
         // Ein anderer Filter bleibt stehen.
         const anderer = filterKey === 'categoryId' ? 'paymentMethodId' : 'categoryId';
         page.state[anderer] = filterKey === 'categoryId' ? '8' : '6';
-        await mit({ put: async () => { throw fehler(404, reason); } }, async () => {
+        const { gets } = await mit({ get: serverDanach([rowId]), put: async () => { throw fehler(404, reason); } }, async () => {
           page.openMetadataModal();
           await knopf.handlers.click();
         });
         assert.equal(page.state[filterKey], '', `${kind}: der Filter auf die geloeschte zeigt auf "alle"`);
+        const param = filterKey === 'categoryId' ? 'category_id' : 'payment_method_id';
+        assert.doesNotMatch(listenAnfrage(gets), new RegExp(`${param}=`), `${kind}: das Laden fragt ohne die geloeschte`);
         assert.notEqual(page.state[anderer], '', `${kind}: der andere Filter bleibt`);
       });
     } finally {
       delete globalThis.__openModal;
     }
   }
+});
+
+test('Seite: scheitert das Laden nach "gibt es nicht mehr", bleibt es bei dem einen Satz', async () => {
+  await mitSeite(async () => {
+    await mit({
+      get: (path) => { if (LIST_PATH.test(path)) throw fehler(500); return undefined; },
+      post: async () => { throw fehler(404, 'subscriptions_subscription_not_found'); },
+    }, () => page.renewSubscription(abo()));
+    assert.deepEqual(toasts, [['subscriptions.errorSubscriptionGone', 'danger']], 'kein zweiter Toast fuer das Laden');
+  });
 });

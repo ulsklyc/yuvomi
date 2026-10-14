@@ -26,19 +26,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   already taken, an end date before the next payment, a number of payments that is not above the
   payments already made, a logo file whose content does not match its type and a logo search
   without result now get a sentence in the language of the app. When the subscription, category
-  or payment method is gone, the page removes it from what it shows and the dialog of the action
-  closes (the manage dialog opens again without it), and a filter on a category or payment method
-  that is gone goes back to all; deleting something that is already gone counts as deleted. If the category or payment method chosen in the subscription dialog was
-  deleted in the meantime, the dialog stays open with your input and offers the others; saving
-  answered with a server error before. Adding a category or payment method
-  and reordering them in the manage dialog showed no message of its own when it failed and now
-  does. A subscription deleted while its payment was being booked into the budget no longer
-  leaves a budget entry without subscription behind. When another change to the same
-  subscription - a second save, a renewal, a pause or a new currency - arrives while a payment in
-  a foreign currency is being booked, the budget entry now follows the subscription as it is
-  saved last: no second booking, no booking for a paused subscription, no older amount or date. Any other failure shows the general message instead of the server's
-  text. For API clients: those answers of `/api/v1/budget/subscriptions` carry a `reason` next to
-  `error` (`subscriptions_subscription_not_found`, `subscriptions_category_not_found`,
+  or payment method is gone, the page fetches the list, the figures and the categories again and
+  the dialog of the action closes (the manage dialog opens again with the current entries); a
+  filter on a category or payment method that is gone goes back to all first, and deleting
+  something that is already gone counts as deleted. If the category or payment method chosen in
+  the subscription dialog was deleted in the meantime, the dialog stays open with your input and
+  offers the current ones; saving answered with a server error before. Adding a category or
+  payment method and reordering them in the manage dialog showed no message of its own when it
+  failed and now does. A subscription deleted while its payment in a foreign currency was being
+  booked into the budget no longer leaves a budget entry without subscription behind. Any other
+  failure shows the general message instead of the server's text. For API clients: those answers
+  of `/api/v1/budget/subscriptions` carry a `reason` next to `error`
+  (`subscriptions_subscription_not_found`, `subscriptions_category_not_found`,
   `subscriptions_payment_method_not_found`, `subscriptions_selected_category_not_found`,
   `subscriptions_selected_payment_method_not_found`, `subscriptions_category_exists`,
   `subscriptions_payment_method_exists`, `subscriptions_end_before_next_payment`,
