@@ -308,14 +308,16 @@ test('Seite: das Medikament ist weg, waehrend der Dialog offen ist - sein Satz, 
   assert.equal(closed.length, 1);
 });
 
-test('Seite: Periode heute beenden, die es nicht mehr gibt - ihr Satz statt des Servertexts, und der Zyklus kommt frisch', async () => {
+test('Seite: Periode heute beenden, die es nicht mehr gibt - ihr Satz statt des Servertexts, der Zyklus kommt frisch, und ein spaeter geoeffneter Dialog bleibt', async () => {
   page.setViewStateForTest('cycle', { periods: [{ id: 9, start_date: '2020-01-05', end_date: null }], logs: [] });
   try {
     const { calls, closed, gets } = await mit({ patch: async () => { throw fehler(404, 'health_cycle_period_not_found'); } },
       () => page.cycleEndPeriodToday());
     assert.deepEqual(calls[0], ['PATCH', '/health/cycle/periods/9']);
     assert.deepEqual(toasts, [['health.errorPeriodGone', 'danger']]);
-    assert.equal(closed.length, 1);
+    // Kein Dialog gehoert zu dieser Handlung: was jetzt offen ist, wurde
+    // spaeter geoeffnet und bleibt (Codex an #1971).
+    assert.deepEqual(closed, []);
     assert.ok(gets.some((p) => p.startsWith('/health/cycle/periods')), `nachgeladen: ${gets.join(', ')}`);
     // Die 404 kann "Betreuung entzogen" heissen: die Betreuungen kommen mit
     // (Codex an #1971), sonst boeten die Knoepfe das Schreiben weiter an.

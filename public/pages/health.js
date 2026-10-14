@@ -2424,9 +2424,14 @@ function collectVitalBody(panel, type) {
  * @param {string} fallbackKey - der allgemeine Satz der Stelle
  * @param {() => Promise<void>} reload - laedt den betroffenen Bereich neu
  */
-function reportError(err, fallbackKey, reload) {
+function reportError(err, fallbackKey, reload, { fromDialog = true } = {}) {
   window.yuvomi?.showToast(errorSentence(err, fallbackKey), 'danger');
-  if (isGone(err)) reloadAfterGone(reload);
+  if (!isGone(err)) return;
+  // Eine Handlung ohne Dialog (Dosis abhaken, Periode heute) laesst die Seite
+  // bedienbar: ein Dialog, der offen ist, wenn ihre Antwort kommt, gehoert zu
+  // einer spaeteren Handlung und bleibt (Codex an #1971).
+  if (fromDialog) reloadAfterGone(reload);
+  else refreshAfterGone(reload);
 }
 
 /**
@@ -3057,7 +3062,7 @@ async function handlePrnDose(btn) {
   } catch (err) {
     console.error('[Health] prn dose error:', err);
     setDoseBusy(medId, false);
-    reportError(err, 'health.meds.doseError', reloadMedViews);
+    reportError(err, 'health.meds.doseError', reloadMedViews, { fromDialog: false });
     return;
   }
 
@@ -3506,7 +3511,7 @@ async function handleDose(btn, action) {
   } catch (err) {
     console.error('[Health] dose error:', err);
     setDoseBusy(medId, false);
-    reportError(err, 'health.meds.doseError', reloadMedViews);
+    reportError(err, 'health.meds.doseError', reloadMedViews, { fromDialog: false });
   }
 }
 
@@ -6424,7 +6429,7 @@ async function handleOverviewDose(btn, action) {
   } catch (err) {
     console.error('[Health] overview dose error:', err);
     setDoseBusy(medId, false);
-    reportError(err, 'health.meds.doseError', reloadMedViews);
+    reportError(err, 'health.meds.doseError', reloadMedViews, { fromDialog: false });
   }
 }
 
@@ -7487,7 +7492,7 @@ async function cycleStartPeriodToday() {
     await reloadCycle();
   } catch (err) {
     console.error('[Health] cycle start error:', err);
-    reportError(err, 'health.cycle.saveError', reloadCycle);
+    reportError(err, 'health.cycle.saveError', reloadCycle, { fromDialog: false });
   }
 }
 
@@ -7501,7 +7506,7 @@ async function cycleEndPeriodToday() {
     await reloadCycle();
   } catch (err) {
     console.error('[Health] cycle end error:', err);
-    reportError(err, 'health.cycle.saveError', reloadCycle);
+    reportError(err, 'health.cycle.saveError', reloadCycle, { fromDialog: false });
   }
 }
 
