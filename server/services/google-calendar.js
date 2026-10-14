@@ -1327,7 +1327,7 @@ function localEventToGoogle(rawEvent, colorMap = {}, timeZone = outboundTimeZone
  */
 function buildGoogleRequest(rawEvent, colorMap = {}, timeZone = outboundTimeZone(null)) {
   const body = googleBody(rawEvent, colorMap, timeZone);
-  const aligned = alignmentMoved(rawEvent, { zone: timeZone });
+  const aligned = alignmentMoved(rawEvent, { zone: timeZone, householdZone: householdTimeZone(db.get()) });
   return { body, snapshot: sentSnapshot(rawEvent, googleReading(inboundFields(body, null)), { aligned }) };
 }
 
@@ -1337,7 +1337,7 @@ function googleBody(rawEvent, colorMap, timeZone) {
   // unberuehrt (#756). Begruendung in services/outbound-dtstart.js.
   // Ausgerichtet wird in der Zone, die unten als `timeZone` hinausgeht: in
   // ihr rechnet Google die Vorkommen, nicht in der `tzid` der Zeile (#1935).
-  const event = outboundEvent(rawEvent, { zone: timeZone });
+  const event = outboundEvent(rawEvent, { zone: timeZone, householdZone: householdTimeZone(db.get()) });
   const allDay = !!event.all_day;
   const gEvent = {
     summary:     event.title,

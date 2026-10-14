@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Calendar: an imported series saved from the form keeps its times on every server** (#1993).
+  Saving an imported series stores the time as you see it in the household's time zone, next to the
+  series' own time zone. The calendar view and the ICS feed then read that time in the zone the
+  server process runs in, so the same series could show at different times after a container was
+  rebuilt with another `TZ`. The time is now always read in the household's time zone, and the
+  series continues on the clock of its own zone. Also affected: CalDAV and iCloud. They received
+  the household's digits unchanged, labelled with the series' zone. If your household time zone
+  differs from the zone of such a series, Yuvomi now sends a different clock time to CalDAV and
+  iCloud the next time the series is pushed - the one you saw in the form. Google is unchanged.
 - **Housekeeping: creating or editing a housekeeper profile saves again** (#1976). Since 2.75.0
   the "Add" button in the profile dialog did nothing: no message, no profile, and the dialog stayed
   open. Its buttons had lost the connection to the form they belong to, and find it again.

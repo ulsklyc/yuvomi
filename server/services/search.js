@@ -11,7 +11,7 @@ import { documentVisibleSql } from './document-access.js';
 import { budgetDetailsVisibleWhere, resolveBudgetMode } from './budget-visibility.js';
 
 import {
-  expandRecurringEvents, loadEventExceptions,
+  expandRecurringEvents, loadEventExceptions, seriesReadingZone,
 } from './calendar-events.js';
 import { eventProjectionSql, resolveProjectedEventRows } from './calendar-event-reader.js';
 import { notBirthdayEventSql } from './household-modules.js';
@@ -333,7 +333,7 @@ export function resolveEventSearchRows(database, rows, from = null, to = null, o
       from,
       to,
       exceptions,
-      { includeRecurrenceIdentity: true },
+      { includeRecurrenceIdentity: true, householdZone: seriesReadingZone(database, row) },
     )[0] || row;
   });
   return resolveProjectedEventRows(database, displayRows, options)

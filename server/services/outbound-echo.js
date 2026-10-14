@@ -58,7 +58,7 @@ const VERSION = 1;
  * mit denen der ausgehende Weg sie ausrichtet (`zone` nur bei Google).
  *
  * @param {object} row
- * @param {{ zone?: string|null }} [options]
+ * @param {{ zone?: string|null, householdZone?: string|null }} [options]
  */
 export function alignmentMoved(row, options) {
   if (!row?.start_datetime) return false;
@@ -189,9 +189,10 @@ export function icsSentReading(ics, uid) {
  * @param {object} row  die Zeile, aus der das Objekt gebaut wurde
  * @param {string} ics  das gesendete Objekt
  * @param {string} uid
+ * @param {string|null} [householdZone]  dieselbe Zone wie beim Bauen (#1993)
  */
-export function icsSnapshot(row, ics, uid) {
-  const aligned = alignmentMoved(row);
+export function icsSnapshot(row, ics, uid, householdZone = null) {
+  const aligned = alignmentMoved(row, { householdZone });
   if (!aligned) return null;
   return sentSnapshot(row, icsSentReading(ics, uid), { aligned });
 }

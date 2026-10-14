@@ -55,7 +55,8 @@
 
 import { seriesStartFor } from './recurrence.js';
 import {
-  hasExplicitZone, isValidTimeZone, localToUTCPrecise, shiftDateKey, storedToInstantMsPrecise, utcToWall,
+  hasExplicitZone, householdTimeZone, isValidTimeZone, localToUTCPrecise, shiftDateKey,
+  storedDayDiffersFromSeriesDay, storedToInstantMsPrecise, utcToWall,
 } from '../utils/timezone.js';
 
 /**
@@ -75,11 +76,9 @@ function istEigen(event) {
  * zurueck, deren UTC-Tag vom lokalen abweicht, und wenn zwei Stellen diese
  * Frage verschieden beantworten, liefern sie verschiedene erste Vorkommen.
  */
-function zonenUnsicher(event) {
-  if (!event?.tzid) return false;
-  const roh = String(event.start_datetime ?? '');
-  const wandUhr = utcToWall(roh, event.tzid);
-  return !(wandUhr && wandUhr.date === roh.slice(0, 10));
+function zonenUnsicher(event, householdZone = householdTimeZone(null)) {
+  // Zonenlose Ziffern sind Wanduhr des Haushalts, nie der Prozesszone (#1993).
+  return storedDayDiffersFromSeriesDay(event?.start_datetime, event?.tzid, householdZone);
 }
 
 /**
@@ -171,20 +170,25 @@ function verschiebe(wert, tage) {
  * wie in der Expansion: die DAUER gehoert dem Termin, das Datum der Regel.
  *
  * @param {object} event
- * @param {{ zone?: string|null }} [options]  `zone`: die Zone, in der der
- *   Empfaenger die Serie rechnet, wenn es nicht die `tzid` der Zeile ist
- *   (Google). Gelesen wird sie nur fuer einen Start, der ein Zeitpunkt ist;
- *   eine zonenlose Wanduhrzeit meint ihren Tag selbst.
+ * @param {{ zone?: string|null, householdZone?: string|null }} [options]
+ *   `zone`: die Zone, in der der Empfaenger die Serie rechnet, wenn es nicht
+ *   die `tzid` der Zeile ist (Google). Gelesen wird sie nur fuer einen Start,
+ *   der ein Zeitpunkt ist; eine zonenlose Wanduhrzeit meint ihren Tag selbst.
+ *   `householdZone`: in ihr sind zonenlose Ziffern geschrieben; die Frage, ob
+ *   ihr Tag neben dem Ortstag der `tzid` liegt, liest sie dort (#1993).
+ *   Fehlt sie, gilt der Rueckfall auf die Umgebung (Default von `zonenUnsicher`).
  * @returns {{ start_datetime: string, end_datetime: string|null }}
  */
-export function outboundDateRange(event, { zone = null } = {}) {
+export function outboundDateRange(event, { zone = null, householdZone = null } = {}) {
   const roh = event?.start_datetime;
   const ende = event?.end_datetime ?? null;
   const unveraendert = { start_datetime: roh, end_datetime: ende };
   if (!roh || !event?.recurrence_rule || !istEigen(event)) return unveraendert;
   const rechenZone = zone || event.tzid;
   if (hasExplicitZone(roh) && isValidTimeZone(rechenZone)) return zonedDateRange(event, rechenZone) ?? unveraendert;
-  const start = seriesStartFor(roh, event.recurrence_rule, { utcDiffersFromLocal: zonenUnsicher(event) });
+  const start = seriesStartFor(roh, event.recurrence_rule, {
+    utcDiffersFromLocal: zonenUnsicher(event, householdZone || undefined),
+  });
   if (!start || start === roh) return unveraendert;
   const tage = tagesDifferenz(String(event.start_datetime).slice(0, 10), String(start).slice(0, 10));
   return { start_datetime: start, end_datetime: ende ? verschiebe(ende, tage) : ende };

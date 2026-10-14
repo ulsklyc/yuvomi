@@ -43,7 +43,7 @@ import { loadEventExceptions } from './calendar-events.js';
 import { modulesLeftOut, notBirthdayEventSql } from './household-modules.js';
 import { eventProjectionSql, resolveProjectedEventRows } from './calendar-event-reader.js';
 import { icsSubscriptionVisibleWhere, visibilityWhere } from './visibility.js';
-import { householdTimeZone, utcToWall } from '../utils/timezone.js';
+import { householdTimeZone, storedDayDiffersFromSeriesDay, utcToWall } from '../utils/timezone.js';
 // Dieselbe Rangfolge wie im Kalender und auf der Uebersicht - eine Regel, eine
 // Datei. Der Server importiert oefter aus `public/utils/` (date, folder-tree,
 // currency-codes, ...), immer fuer abhaengigkeitsfreie geteilte Regeln.
@@ -173,9 +173,8 @@ export function nextEventDate(event, todayKey, exceptions = null, { graceDays = 
   // Kachel verschwieg ihn. `expandRecurringEvents` setzt die Pruefung in genau
   // diesem Fall aus (`zonenUnsicher`); hier gilt dieselbe Ruecknahme, sonst
   // beantworten zwei Stellen dieselbe Frage verschieden.
-  const wandUhr = event.tzid ? utcToWall(String(event.start_datetime ?? ''), event.tzid) : null;
-  const zonenUnsicher = !!event.tzid
-    && !(wandUhr && wandUhr.date === String(event.start_datetime ?? '').slice(0, 10));
+  // Zonenlose Ziffern liest auch diese Frage in der Haushaltszone (#1993).
+  const zonenUnsicher = storedDayDiffersFromSeriesDay(String(event.start_datetime ?? ''), event.tzid, tz);
 
   if (!hasAnyOccurrence(startKey, event.recurrence_rule, { utcDiffersFromLocal: zonenUnsicher })) return null;
   const ersterTreffer = seriesStartFor(startKey, event.recurrence_rule, { utcDiffersFromLocal: zonenUnsicher });

@@ -10,7 +10,7 @@ import { visibilityWhere } from './visibility.js';
 
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import {
-  householdTimeZone, isValidTimeZone, localToUTC, shiftDateKey, utcToWall,
+  householdTimeZone, isValidTimeZone, localToUTC, shiftDateKey, storedToInstantIso, utcToWall,
 } from '../utils/timezone.js';
 import { formatWall, vtimezoneFor } from '../utils/vtimezone.js';
 import { outboundDateRange } from './outbound-dtstart.js';
@@ -132,6 +132,14 @@ function usesTzid(ev) {
 // Die Zone, an der naive Werte verankert werden. null, wenn sie UTC-gleich oder
 // nicht auflösbar ist: dann sind die Ziffern bereits UTC und ein 'Z' ist eindeutiger
 // als ein VTIMEZONE über eine Zone, die viele Clients nicht als solche führen.
+/**
+ * Die Zone, in der zonenlose Ziffern geschrieben sind, aus der Feed-Zone: null
+ * heisst dort "UTC-gleich", und genau so sind die Ziffern dann gemeint.
+ */
+function householdReadingZone(feedZone) {
+  return feedZone || 'UTC';
+}
+
 function resolveFeedZone(tz) {
   const zone = (tz || '').trim();
   if (!zone || /^(UTC|GMT|Z|Etc\/(UTC|GMT|GMT0|GMT\+0|GMT-0|Zulu|Universal|Greenwich))$/i.test(zone)) return null;
@@ -161,7 +169,7 @@ function usesFeedZone(ev) {
 function recurrenceSlotProp(prop, master, dateKey, feedZone) {
   if (master.all_day) return `${prop};VALUE=DATE:${formatDate(dateKey)}`;
   if (usesTzid(master)) {
-    const baseOccurrence = baseOccurrenceFor(master, dateKey);
+    const baseOccurrence = baseOccurrenceFor(master, dateKey, householdReadingZone(feedZone));
     return `${prop};TZID=${master.tzid}:${formatWall(baseOccurrence.start_datetime, master.tzid)}`;
   }
   const timeSuffix = master.start_datetime.slice(10);
@@ -177,9 +185,13 @@ function recurrenceSlotProp(prop, master, dateKey, feedZone) {
 function exceptionSlotProp(master, dateKey, feedZone) {
   if (master.all_day) return `EXDATE;VALUE=DATE:${formatDate(dateKey)}`;
   if (usesTzid(master)) {
-    const wall = utcToWall(master.start_datetime, master.tzid);
-    let instant = dateKey + master.start_datetime.slice(10);
-    if (wall?.date === master.start_datetime.slice(0, 10)) {
+    // Zonenlose Ziffern zuerst in der Haushaltszone zum Zeitpunkt (#1993):
+    // dieselbe Lesart wie die Expansion, deren UTC-Tag die Ausnahme traegt.
+    const masterStart = storedToInstantIso(master.start_datetime, householdReadingZone(feedZone))
+      ?? master.start_datetime;
+    const wall = utcToWall(masterStart, master.tzid);
+    let instant = dateKey + masterStart.slice(10);
+    if (wall?.date === masterStart.slice(0, 10)) {
       instant = localToUTC(`${dateKey}T${wall.time}`, master.tzid);
     } else if (wall) {
       for (const offset of [0, -1, 1]) {
@@ -215,7 +227,8 @@ function buildVEvent(
   // A replacement inherits the master's rule for effective reads, but its own
   // DTSTART/DTEND are concrete moves and must never be snapped to that rule.
   const outboundEvent = recurrenceMaster ? { ...ev, recurrence_rule: null } : ev;
-  const { start_datetime: dtstart, end_datetime: dtende } = outboundDateRange(outboundEvent);
+  const readZone = householdReadingZone(feedZone);
+  const { start_datetime: dtstart, end_datetime: dtende } = outboundDateRange(outboundEvent, { householdZone: readZone });
 
   if (recurrenceMaster) {
     lines.push(recurrenceSlotProp(
@@ -230,8 +243,13 @@ function buildVEvent(
   } else if (usesTzid(ev)) {
     // Wiederkehrende Serie mit Zone: lokale Wanduhrzeit + TZID, damit der Abonnent
     // pro Vorkommen DST-korrekt expandiert (statt fixem UTC-Suffix → Winter-Drift, #549).
-    lines.push(`DTSTART;TZID=${ev.tzid}:${formatWall(dtstart, ev.tzid)}`);
-    if (dtende) lines.push(`DTEND;TZID=${ev.tzid}:${formatWall(dtende, ev.tzid)}`);
+    //
+    // Zonenlose Ziffern sind Wanduhr des Haushalts (#1993): erst in dessen
+    // Zone zum Zeitpunkt, dann zur Wanduhr der Serienzone. `formatWall` direkt
+    // auf den Ziffern las sie in der Zone des PROZESSES.
+    const inSeriesZone = (value) => formatWall(storedToInstantIso(value, readZone) ?? value, ev.tzid);
+    lines.push(`DTSTART;TZID=${ev.tzid}:${inSeriesZone(dtstart)}`);
+    if (dtende) lines.push(`DTEND;TZID=${ev.tzid}:${inSeriesZone(dtende)}`);
   } else {
     // Extern synchronisierte Events tragen ein explizites Z/Offset → echte UTC-Konvertierung.
     // Lokal angelegte Events sind naiv (keine Z/Offset) → Wanduhrzeit des Haushalts,
