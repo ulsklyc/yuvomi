@@ -1,12 +1,10 @@
-<!-- version: 2.77.0 -->
-This update brings several local calendars, a calmer shopping list and a wall mode that says more, and it makes calendar and reminder sync considerably more careful.
+<!-- version: 2.77.1 -->
+This update fixes calendar sync details, makes error messages on the health pages speak your language, and tightens how reminder and task sync talk to a CalDAV server.
 
-Events can now be kept in several local calendars, each with its own subscription link, and an ICS import asks which calendar it should go to. On the shopping list, checked-off items collect in one collapsed section at the end, and an item can be moved to another list without typing it again. Tasks can be dragged into an order of your own within a category, tapping a category in the budget overview filters the transactions, and the Netherlands get the date format DD-MM-YYYY.
+A "last day of the month" series now keeps the date you entered: it goes out with the same start on every upload, and the next sync no longer writes the start that came back into Yuvomi or moves its reminders. A timed series that ends on a date ends on the same occurrence in Google as in Yuvomi. Renaming an event no longer shifts it when the app and the server run in different time zones and no household time zone is set.
 
-Wall mode now names today's tasks under each person and shows only what the whole household may see, whoever opened it. The photo screensaver can show the time and fill the screen, can be started by hand from the wall footer, and works on a paired wall tablet once an administrator switches it on for that tablet.
+The health pages and the waste source dialog now explain a failed save or refresh in the language of the app instead of showing the server's text. A contact or shopping item already deleted on a CalDAV or CardDAV server no longer blocks its sync, and reminder and task sync check every request against the account's address, as event sync already did.
 
-Sync with CalDAV, iCloud and Google loses fewer changes: an entry edited, moved or deleted while it is being uploaded ends up where you last put it, a deleted entry no longer comes back after an interrupted upload, and with several CalDAV accounts an event belongs to the account that brought it. A waste calendar address that stops serving its calendar no longer wipes your pickups, and error messages on the shopping and waste pages are in your language.
+The update runs three database migrations on first start. They add columns the calendar sync and the waste sources need; no action is needed. As always, a backup before updating is a good idea.
 
-The update runs eight database migrations on first start. They add the new calendars and the columns the sync needs, and assign existing CalDAV events to their account; no action is needed. With more than one CalDAV account, an event that cannot be assigned with certainty stays without an account until the next sync delivers it. As always, a backup before updating is a good idea.
-
-Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.77.0
+Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.77.1

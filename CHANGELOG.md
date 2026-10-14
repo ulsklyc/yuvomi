@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.77.1] - 2026-10-14
+
 ### Fixed
 
 - **A synced "last day of the month" series keeps the date you entered after the next sync**
@@ -88,8 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - **Reminder and task sync with CalDAV checks every request against the account's address**, as
-  event sync does since #1860. This applies to the sync run, the immediate update after an edit and
-  moving a shopping item between synced lists.
+  event sync does since #1860. This applies to the sync run and the immediate update after an edit.
 
 ## [2.77.0] - 2026-10-14
 

@@ -3281,6 +3281,8 @@ applied as before. To empty a source, delete it.
 | last_import_at | TEXT | ISO 8601, nullable - set on every commit or fetch attempt |
 | last_success_at | TEXT | ISO 8601, nullable - set only on a successful commit |
 | last_error | TEXT | nullable |
+| last_error_reason | TEXT | nullable (migration v247, #1909) - the `reason` of the same failed fetch (`waste_source_fetch_*`), written together with `last_error` and cleared with it, so the source dialog builds the sentence in the app's language instead of showing the server's English text. Rows whose last failure predates the column stay NULL and show the general sentence until the next fetch |
+| last_error_params | TEXT | nullable JSON object (migration v247, #1909) - the numbers of that reason (status, limit); returned to API clients as an object or `null`. Like `last_error` and `last_error_reason` it is left out of the answer for a caller without write access |
 | url | TEXT | nullable - kind='url' only; the subscription URL |
 | etag | TEXT | nullable - kind='url' only; conditional-GET cache validator |
 | last_modified | TEXT | nullable - kind='url' only; conditional-GET cache validator |
