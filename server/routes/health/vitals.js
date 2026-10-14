@@ -83,7 +83,7 @@ router.patch('/vitals/:id', (req, res) => {
 
     const w = writableClause('', viewer);
     const existing = db.get().prepare(`SELECT * FROM health_vitals WHERE id = ? AND ${w.sql}`).get(id, ...w.params);
-    if (!existing) return res.status(404).json({ error: 'Vitalwert nicht gefunden.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Measurement not found.', code: 404, reason: 'health_vital_not_found' });
 
     const b = req.body || {};
     const fields = {};
@@ -118,7 +118,7 @@ router.delete('/vitals/:id', (req, res) => {
 
     const w = writableClause('', viewer);
     const existing = db.get().prepare(`SELECT id FROM health_vitals WHERE id = ? AND ${w.sql}`).get(id, ...w.params);
-    if (!existing) return res.status(404).json({ error: 'Vitalwert nicht gefunden.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Measurement not found.', code: 404, reason: 'health_vital_not_found' });
 
     db.get().prepare('DELETE FROM health_vitals WHERE id = ?').run(id);
     res.status(204).end();

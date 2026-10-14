@@ -5429,7 +5429,23 @@
                 "kcal": "kcal",
                 "g": "g"
             }
-        }
+        },
+        "errorVitalGone": "Esta medição já não existe.",
+        "errorMedicationGone": "Este medicamento já não existe.",
+        "errorScheduleGone": "Este horário já não existe.",
+        "errorDoseGone": "Este registo de dose já não existe.",
+        "errorLabReportGone": "Este relatório já não existe.",
+        "errorLabResultGone": "Este parâmetro já não existe.",
+        "errorActivityGone": "Esta atividade já não existe.",
+        "errorPreventionTypeGone": "Este tipo de prevenção já não existe.",
+        "errorSelectedPreventionTypeGone": "O tipo escolhido já não existe.",
+        "errorPreventionRecordGone": "Este registo de prevenção já não existe.",
+        "errorNutritionEntryGone": "Este registo já não existe.",
+        "errorPeriodGone": "Este período já não existe.",
+        "errorCycleDayGone": "Este registo do dia já não existe.",
+        "errorCycleImportTooLarge": "O texto tem mais de {{limit_kb}} KB. Importa os períodos em partes mais pequenas.",
+        "errorCycleImportNoRows": "O ficheiro tem só a linha de cabeçalho e nenhum período.",
+        "errorCycleImportTooManyRows": "Uma importação pode ter no máximo {{limit}} períodos. Divide o ficheiro."
     },
     "waste": {
         "title": "Recolha de lixo",

@@ -5687,7 +5687,23 @@
                 "kcal": "ккал",
                 "g": "г"
             }
-        }
+        },
+        "errorVitalGone": "Цього вимірювання більше немає.",
+        "errorMedicationGone": "Цих ліків більше немає.",
+        "errorScheduleGone": "Цього часу прийому більше немає.",
+        "errorDoseGone": "Цього запису про прийом більше немає.",
+        "errorLabReportGone": "Цього результату більше немає.",
+        "errorLabResultGone": "Цього показника більше немає.",
+        "errorActivityGone": "Цієї активності більше немає.",
+        "errorPreventionTypeGone": "Цього виду профілактики більше немає.",
+        "errorSelectedPreventionTypeGone": "Вибраного виду більше немає.",
+        "errorPreventionRecordGone": "Цього запису про профілактику більше немає.",
+        "errorNutritionEntryGone": "Цього запису більше немає.",
+        "errorPeriodGone": "Цієї менструації більше немає.",
+        "errorCycleDayGone": "Цього запису за день більше немає.",
+        "errorCycleImportTooLarge": "Текст більший за {{limit_kb}} КБ. Імпортуйте менструації меншими частинами.",
+        "errorCycleImportNoRows": "У файлі лише рядок заголовка і жодної менструації.",
+        "errorCycleImportTooManyRows": "Один імпорт може містити не більше {{limit}} менструацій. Розділіть файл."
     },
     "waste": {
         "title": "Вивезення сміття",

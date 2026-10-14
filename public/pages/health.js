@@ -67,6 +67,7 @@ import { renderSkeletonList, renderSkeletonChart } from '/utils/skeleton.js';
 import { formatFastingDuration } from '/utils/health-fasting.js';
 import { canUseFasting, isNavModuleReadOnly } from '/permissions.js';
 import { emptyStateHTML, emptyHintHTML, mountLoadError } from '/utils/empty-state.js';
+import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
 import { intervalMonthsToInput, intervalInputToMonths } from '/utils/health-prevention.js';
 import { NUTRIENTS, MEAL_TYPES, nutrientProgress } from '/utils/health-nutrition.js';
 
@@ -1740,7 +1741,7 @@ function deleteVitalWithUndo(id) {
   const [row] = vitals.rows.splice(idx, 1);
   renderVitalsShell();
   scheduleUndoableDelete({
-    commit: ({ keepalive } = {}) => api.delete(`/health/vitals/${id}`, { keepalive }),
+    commit: ({ keepalive } = {}) => deleteOrAlreadyGone(`/health/vitals/${id}`, 'health_vital_not_found', { keepalive }),
     restore: () => { vitals.rows.splice(idx, 0, row); renderVitalsShell(); },
     message: t('health.vitals.measurementDeleted'),
   });
@@ -2318,7 +2319,7 @@ function openVitalModal(opts = {}) {
         } catch (err) {
           console.error('[Health] vitals save error:', err);
           submitBtn.disabled = false;
-          window.yuvomi?.showToast(err?.data?.error || t('health.vitals.saveError'), 'danger');
+          reportError(err, 'health.vitals.saveError', reloadVitals);
         }
       });
     },
@@ -2405,6 +2406,63 @@ function collectVitalBody(panel, type) {
     body.unit = panel.querySelector('#vital-unit')?.value || undefined;
   }
   return body;
+}
+
+/**
+ * EIN WEG FUER DIE FEHLER-TOASTS DER SEITE (#1909).
+ *
+ * Der Toast sagt den Satz der App (`errorSentence`): den des Falls, den der
+ * Server mit `reason` nennt, sonst den allgemeinen der Stelle. Der Text des
+ * Servers kommt hier nie an. Sagt der Grund, dass es das Ziel der Handlung
+ * nicht mehr gibt (ein anderes Haushaltsmitglied hat den Eintrag geloescht,
+ * oder die Betreuung wurde entzogen), ist der Stand der Seite veraltet: ein
+ * offener Dialog geht zu, und `reload` holt den Bereich selbst neu, statt dazu
+ * zu raten.
+ *
+ * @param {unknown} err
+ * @param {string} fallbackKey - der allgemeine Satz der Stelle
+ * @param {() => Promise<void>} reload - laedt den betroffenen Bereich neu
+ */
+function reportError(err, fallbackKey, reload) {
+  window.yuvomi?.showToast(errorSentence(err, fallbackKey), 'danger');
+  if (isGone(err)) reloadAfterGone(reload);
+}
+
+/**
+ * Nachladen nach "gibt es nicht mehr". Die reload-Wege melden ihre eigenen
+ * Fehler im Bereich (Ladefehler-Zustand), nie ueber reportError - ein
+ * scheiterndes Nachladen kann also kein weiteres ausloesen.
+ */
+async function reloadAfterGone(reload) {
+  await closeModal({ force: true });
+  await reload();
+  refocusAfterRender();
+}
+
+/**
+ * LOESCHEN, auch wenn es schon erledigt ist (#1909): wer etwas loescht, das ein
+ * anderes Haushaltsmitglied schon geloescht hat, hat damit, was er wollte. Der
+ * Aufrufer laeuft dann seinen Erfolgsweg; nur der Grund des Dings selbst zaehlt
+ * (`isAlreadyDeleted`), alles andere bleibt ein Fehler.
+ */
+async function deleteOrAlreadyGone(path, goneReason, options) {
+  try {
+    await (options ? api.delete(path, options) : api.delete(path));
+  } catch (err) {
+    if (!isAlreadyDeleted(err, goneReason)) throw err;
+  }
+}
+
+/** Werte-Tab neu laden, ohne gewaehlte Metrik und Zeitraum zu verstellen. */
+async function reloadVitals() {
+  try {
+    await loadVitals();
+    vitals.error = false;
+  } catch (err) {
+    console.error('[Health] vitals reload error:', err);
+    vitals.error = err;
+  }
+  renderVitalsShell();
 }
 
 async function reloadAfterSave(savedType) {
@@ -2975,7 +3033,7 @@ async function handlePrnDose(btn) {
   } catch (err) {
     console.error('[Health] prn dose error:', err);
     setDoseBusy(medId, false);
-    window.yuvomi?.showToast(err?.data?.error || t('health.meds.doseError'), 'danger');
+    reportError(err, 'health.meds.doseError', reloadMedViews);
     return;
   }
 
@@ -3256,7 +3314,7 @@ function openMedLogModal(logId) {
         } catch (err) {
           console.error('[Health] med log save error:', err);
           submitBtn.disabled = false;
-          window.yuvomi?.showToast(err?.data?.error || t('health.meds.log.saveError'), 'danger');
+          reportError(err, 'health.meds.log.saveError', reloadMedViews);
         }
       });
     },
@@ -3267,14 +3325,14 @@ async function deleteMedLog(entry) {
   if (!(await confirmOverModal(t('health.meds.log.deleteConfirm'),
     { danger: true, confirmLabel: t('common.delete'), detail: t('health.meds.log.deleteConfirmDetail') }))) return;
   try {
-    await api.delete(`/health/logs/${entry.id}`);
+    await deleteOrAlreadyGone(`/health/logs/${entry.id}`, 'health_dose_not_found');
     closeModal({ force: true });
     window.yuvomi?.showToast(t('health.meds.log.deleted'), 'success');
     await reloadMedViews();
     refocusAfterRender();
   } catch (err) {
     console.error('[Health] med log delete error:', err);
-    window.yuvomi?.showToast(err?.data?.error || t('health.meds.log.saveError'), 'danger');
+    reportError(err, 'health.meds.log.saveError', reloadMedViews);
   }
 }
 
@@ -3424,7 +3482,7 @@ async function handleDose(btn, action) {
   } catch (err) {
     console.error('[Health] dose error:', err);
     setDoseBusy(medId, false);
-    window.yuvomi?.showToast(err?.data?.error || t('health.meds.doseError'), 'danger');
+    reportError(err, 'health.meds.doseError', reloadMedViews);
   }
 }
 
@@ -3561,7 +3619,7 @@ function openMedModal(med) {
         } catch (err) {
           console.error('[Health] med save error:', err);
           submitBtn.disabled = false;
-          window.yuvomi?.showToast(err?.data?.error || t('health.meds.saveError'), 'danger');
+          reportError(err, 'health.meds.saveError', reloadMedViews);
         }
       });
     },
@@ -3604,13 +3662,13 @@ async function deleteMed(med) {
   if (!(await confirmOverModal(t('health.meds.deleteConfirm'),
     { danger: true, confirmLabel: t('common.delete'), detail: t('health.meds.deleteConfirmDetail') }))) return;
   try {
-    await api.delete(`/health/medications/${med.id}`);
+    await deleteOrAlreadyGone(`/health/medications/${med.id}`, 'health_medication_not_found');
     window.yuvomi?.showToast(t('health.meds.deleted'), 'success');
     await reloadMedViews();
     refocusAfterRender();
   } catch (err) {
     console.error('[Health] med delete error:', err);
-    window.yuvomi?.showToast(err?.data?.error || t('health.meds.deleteError'), 'danger');
+    reportError(err, 'health.meds.deleteError', reloadMedViews);
   }
 }
 
@@ -3705,7 +3763,7 @@ function wireSchedEditor(panel, med) {
     } catch (err) {
       console.error('[Health] schedule add error:', err);
       addBtn.disabled = false;
-      window.yuvomi?.showToast(err?.data?.error || t('health.meds.saveError'), 'danger');
+      reportError(err, 'health.meds.saveError', reloadMedViews);
     }
   });
 
@@ -3714,13 +3772,13 @@ function wireSchedEditor(panel, med) {
       const id = Number(btn.dataset.schedDel);
       btn.disabled = true;
       try {
-        await api.delete(`/health/schedules/${id}`);
+        await deleteOrAlreadyGone(`/health/schedules/${id}`, 'health_schedule_not_found');
         meds.schedulesByMed[med.id] = (meds.schedulesByMed[med.id] || []).filter((s) => s.id !== id);
         renderSchedEditor(panel, med);
       } catch (err) {
         console.error('[Health] schedule delete error:', err);
         btn.disabled = false;
-        window.yuvomi?.showToast(err?.data?.error || t('health.meds.saveError'), 'danger');
+        reportError(err, 'health.meds.saveError', reloadMedViews);
       }
     }));
 }
@@ -4220,7 +4278,7 @@ function openLabModal(report) {
         } catch (err) {
           console.error('[Health] lab save error:', err);
           submitBtn.disabled = false;
-          window.yuvomi?.showToast(err?.data?.error || t('health.labs.saveError'), 'danger');
+          reportError(err, 'health.labs.saveError', reloadLabs);
         }
       });
     },
@@ -4244,14 +4302,14 @@ async function deleteLabReport(report) {
   if (!(await confirmOverModal(t('health.labs.deleteConfirm'),
     { danger: true, confirmLabel: t('common.delete'), detail: t('health.labs.deleteConfirmDetail') }))) return;
   try {
-    await api.delete(`/health/labs/${report.id}`);
+    await deleteOrAlreadyGone(`/health/labs/${report.id}`, 'health_lab_report_not_found');
     window.yuvomi?.showToast(t('health.labs.deleted'), 'success');
     if (labs.selectedReportId === report.id) labs.selectedReportId = null;
     await reloadLabs();
     refocusAfterRender();
   } catch (err) {
     console.error('[Health] lab delete error:', err);
-    window.yuvomi?.showToast(err?.data?.error || t('health.labs.deleteError'), 'danger');
+    reportError(err, 'health.labs.deleteError', reloadLabs);
   }
 }
 
@@ -4422,7 +4480,7 @@ function wireResultEditor(panel, report, editing = null) {
     } catch (err) {
       console.error('[Health] lab result add error:', err);
       addBtn.disabled = false;
-      window.yuvomi?.showToast(err?.data?.error || t('health.labs.saveError'), 'danger');
+      reportError(err, 'health.labs.saveError', reloadLabs);
     }
   });
 
@@ -4431,14 +4489,14 @@ function wireResultEditor(panel, report, editing = null) {
       const id = Number(btn.dataset.resultDel);
       btn.disabled = true;
       try {
-        await api.delete(`/health/results/${id}`);
+        await deleteOrAlreadyGone(`/health/results/${id}`, 'health_lab_result_not_found');
         report.results = (report.results || []).filter((r) => r.id !== id);
         renderResultEditor(panel, report);
         syncLabsAfterResultChange();
       } catch (err) {
         console.error('[Health] lab result delete error:', err);
         btn.disabled = false;
-        window.yuvomi?.showToast(err?.data?.error || t('health.labs.saveError'), 'danger');
+        reportError(err, 'health.labs.saveError', reloadLabs);
       }
     }));
 }
@@ -4888,7 +4946,7 @@ function openActivityModal(row, opts = {}) {
         } catch (err) {
           console.error('[Health] activity save error:', err);
           submitBtn.disabled = false;
-          window.yuvomi?.showToast(err?.data?.error || t('health.activity.saveError'), 'danger');
+          reportError(err, 'health.activity.saveError', reloadActivity);
         }
       });
     },
@@ -4938,13 +4996,13 @@ async function deleteActivity(row) {
   if (!(await confirmOverModal(t('health.activity.deleteConfirm'),
     { danger: true, confirmLabel: t('common.delete'), detail: t('health.activity.deleteConfirmDetail') }))) return;
   try {
-    await api.delete(`/health/activities/${row.id}`);
+    await deleteOrAlreadyGone(`/health/activities/${row.id}`, 'health_activity_not_found');
     window.yuvomi?.showToast(t('health.activity.deleted'), 'success');
     await reloadActivity();
     refocusAfterRender();
   } catch (err) {
     console.error('[Health] activity delete error:', err);
-    window.yuvomi?.showToast(err?.data?.error || t('health.activity.deleteError'), 'danger');
+    reportError(err, 'health.activity.deleteError', reloadActivity);
   }
 }
 
@@ -5175,6 +5233,31 @@ function wirePrevention() {
 // Erfassungs-Modal (Anlegen/Bearbeiten inkl. Löschen)
 // --------------------------------------------------------
 
+/**
+ * SPEICHERN SCHEITERT NUR AN DER GEWAEHLTEN ART (#1909): jemand hat sie in den
+ * Einstellungen geloescht, waehrend der Dialog offen war. Der Dialog bleibt,
+ * die Eingaben bleiben; die Seite holt den frischen Stand, die Auswahl steht
+ * danach auf "keine Art" (nie still auf einer anderen), das Namensfeld ist
+ * wieder da, und der Fokus steht auf der Auswahl. Dasselbe Muster wie in der
+ * Abfuhr (`waste_selected_type_not_found`).
+ *
+ * @returns {Promise<boolean>} true: behandelt, der Aufrufer meldet nichts mehr
+ */
+async function keepDialogForMissingType(err, select, syncName) {
+  if (!select || !isGone(err) || err.data.reason !== 'health_prevention_selected_type_not_found') return false;
+  window.yuvomi?.showToast(errorSentence(err), 'danger');
+  // Die Arten zuerst: reloadPrevention() holt nur Eintraege und Faelligkeiten,
+  // und die Auswahl boete sonst die geloeschte Art weiter an.
+  try { await loadPreventionTypes(); } catch (loadErr) { console.error('[Health] prevention types reload error:', loadErr); }
+  await reloadPrevention();
+  select.replaceChildren();
+  select.insertAdjacentHTML('beforeend', preventionTypeSelectMarkup(null));
+  select.value = '';
+  syncName?.();
+  select.focus();
+  return true;
+}
+
 function preventionTypeSelectMarkup(current) {
   const options = prevention.types.map((type) =>
     `<option value="${esc(type.id)}"${type.id === current ? ' selected' : ''}>${esc(type.name)}</option>`).join('');
@@ -5304,7 +5387,8 @@ function openPreventionModal(row) {
         } catch (err) {
           console.error('[Health] prevention save error:', err);
           submitBtn.disabled = false;
-          window.yuvomi?.showToast(err?.data?.error || t('health.prevention.saveError'), 'danger');
+          if (await keepDialogForMissingType(err, typeSelect, syncName)) return;
+          reportError(err, 'health.prevention.saveError', reloadPrevention);
         }
       });
     },
@@ -5373,7 +5457,7 @@ async function deletePreventionRecord(row) {
   const [removed] = prevention.records.splice(idx, 1);
   renderPreventionShell();
   scheduleUndoableDelete({
-    commit: ({ keepalive } = {}) => api.delete(`/health/prevention/records/${row.id}`, { keepalive }),
+    commit: ({ keepalive } = {}) => deleteOrAlreadyGone(`/health/prevention/records/${row.id}`, 'health_prevention_record_not_found', { keepalive }),
     restore: () => { prevention.records.splice(idx, 0, removed); renderPreventionShell(); },
     message: t('health.prevention.deleted'),
   });
@@ -5709,7 +5793,7 @@ function openNutritionTargetModal() {
         } catch (err) {
           console.error('[Health] nutrition target save error:', err);
           submitBtn.disabled = false;
-          window.yuvomi?.showToast(err?.data?.error || t('health.nutrition.targetSaveError'), 'danger');
+          reportError(err, 'health.nutrition.targetSaveError', reloadNutrition);
         }
       });
     },
@@ -5795,7 +5879,7 @@ function openNutritionModal(row) {
         } catch (err) {
           console.error('[Health] nutrition save error:', err);
           submitBtn.disabled = false;
-          window.yuvomi?.showToast(err?.data?.error || t('health.nutrition.saveError'), 'danger');
+          reportError(err, 'health.nutrition.saveError', reloadNutrition);
         }
       });
     },
@@ -5837,7 +5921,7 @@ async function deleteNutritionEntry(row) {
     // `keepalive` ist der Weg beim Verlassen der Seite: dort gibt es nichts
     // mehr neu zu zeichnen.
     commit: async ({ keepalive } = {}) => {
-      await api.delete(`/health/nutrition/entries/${row.id}`, { keepalive });
+      await deleteOrAlreadyGone(`/health/nutrition/entries/${row.id}`, 'health_nutrition_entry_not_found', { keepalive });
       if (!keepalive) await reloadNutrition();
     },
     restore: () => { nutrition.entries.splice(idx, 0, removed); renderNutritionShell(); },
@@ -6306,7 +6390,7 @@ async function handleOverviewDose(btn, action) {
   } catch (err) {
     console.error('[Health] overview dose error:', err);
     setDoseBusy(medId, false);
-    window.yuvomi?.showToast(err?.data?.error || t('health.meds.doseError'), 'danger');
+    reportError(err, 'health.meds.doseError', reloadMedViews);
   }
 }
 
@@ -6627,8 +6711,11 @@ function maybeMountFasting(activeRoute) {
   if (!root) return;
   root.dataset.fastingMounted = 'true';
   import('/pages/health-fasting.js').then(({ mountFasting }) => mountFasting(root, { userId: vitals.meId })).catch((error) => {
+    // Die Ueberschrift ist der Satz. `error.message` ist der Text des Browsers
+    // oder des Servers, unuebersetzt (#1909) - er gehoert in die Konsole.
+    console.error('[Health] fasting mount error:', error);
     root.replaceChildren();
-    root.insertAdjacentHTML('beforeend', `<div class="fasting-panel__error" role="alert"><h3>${esc(t('health.fasting.loadError'))}</h3><p>${esc(error?.message || '')}</p></div>`);
+    root.insertAdjacentHTML('beforeend', `<div class="fasting-panel__error" role="alert"><h3>${esc(t('health.fasting.loadError'))}</h3></div>`);
   });
 }
 
@@ -7366,7 +7453,7 @@ async function cycleStartPeriodToday() {
     await reloadCycle();
   } catch (err) {
     console.error('[Health] cycle start error:', err);
-    window.yuvomi?.showToast(err?.data?.error || t('health.cycle.saveError'), 'danger');
+    reportError(err, 'health.cycle.saveError', reloadCycle);
   }
 }
 
@@ -7380,7 +7467,7 @@ async function cycleEndPeriodToday() {
     await reloadCycle();
   } catch (err) {
     console.error('[Health] cycle end error:', err);
-    window.yuvomi?.showToast(err?.data?.error || t('health.cycle.saveError'), 'danger');
+    reportError(err, 'health.cycle.saveError', reloadCycle);
   }
 }
 
@@ -8538,7 +8625,7 @@ function openPeriodModal(period) {
         } catch (err) {
           console.error('[Health] cycle period save error:', err);
           submitBtn.disabled = false;
-          window.yuvomi?.showToast(err?.data?.error || t('health.cycle.saveError'), 'danger');
+          reportError(err, 'health.cycle.saveError', reloadCycle);
         }
       });
     },
@@ -8552,13 +8639,13 @@ async function deletePeriod(period) {
   if (!(await confirmOverModal(t('health.cycle.deleteConfirm'),
     { danger: true, confirmLabel: t('common.delete'), detail: t('health.cycle.periodDeleteConfirmDetail') }))) return;
   try {
-    await api.delete(`/health/cycle/periods/${period.id}`);
+    await deleteOrAlreadyGone(`/health/cycle/periods/${period.id}`, 'health_cycle_period_not_found');
     window.yuvomi?.showToast(t('health.cycle.deleted'), 'success');
     await reloadCycle();
     refocusAfterRender();
   } catch (err) {
     console.error('[Health] cycle period delete error:', err);
-    window.yuvomi?.showToast(err?.data?.error || t('health.cycle.deleteError'), 'danger');
+    reportError(err, 'health.cycle.deleteError', reloadCycle);
   }
 }
 
@@ -8646,7 +8733,7 @@ function openCycleImportModal() {
             errorsBox.hidden = false;
           } else {
             console.error('[Health] cycle import error:', err);
-            window.yuvomi?.showToast(err?.data?.error || t('health.cycle.import.error'), 'danger');
+            reportError(err, 'health.cycle.import.error', reloadCycle);
           }
         }
       });
@@ -8936,7 +9023,7 @@ function openDayLogModal(dateKey) {
         } catch (err) {
           console.error('[Health] cycle log save error:', err);
           submitBtn.disabled = false;
-          window.yuvomi?.showToast(err?.data?.error || t('health.cycle.saveError'), 'danger');
+          reportError(err, 'health.cycle.saveError', reloadCycle);
         }
       });
     },
@@ -8948,13 +9035,13 @@ async function deleteDayLog(log) {
   if (!(await confirmOverModal(t('health.cycle.deleteConfirm'),
     { danger: true, confirmLabel: t('common.delete'), detail: t('health.cycle.logDeleteConfirmDetail') }))) return;
   try {
-    await api.delete(`/health/cycle/logs/${log.id}`);
+    await deleteOrAlreadyGone(`/health/cycle/logs/${log.id}`, 'health_cycle_log_not_found');
     window.yuvomi?.showToast(t('health.cycle.deleted'), 'success');
     await reloadCycle();
     refocusAfterRender();
   } catch (err) {
     console.error('[Health] cycle log delete error:', err);
-    window.yuvomi?.showToast(err?.data?.error || t('health.cycle.deleteError'), 'danger');
+    reportError(err, 'health.cycle.deleteError', reloadCycle);
   }
 }
 
@@ -9149,7 +9236,7 @@ function openCycleSettingsModal() {
           await reloadCycle();
         } catch (err) {
           console.error('[Health] cycle bulk visibility error:', err);
-          window.yuvomi?.showToast(err?.data?.error || t('health.cycle.saveError'), 'danger');
+          reportError(err, 'health.cycle.saveError', reloadCycle);
         } finally {
           bulkRun.disabled = false;
         }
@@ -9192,7 +9279,7 @@ function openCycleSettingsModal() {
         } catch (err) {
           console.error('[Health] cycle settings save error:', err);
           submitBtn.disabled = false;
-          window.yuvomi?.showToast(err?.data?.error || t('health.cycle.saveError'), 'danger');
+          reportError(err, 'health.cycle.saveError', reloadCycle);
         }
       });
     },
@@ -9268,6 +9355,11 @@ export const __test = {
   cycleDayLabel,
   cycleHistoryMarkup,
   cycleFooterMarkup,
+  // #1909: die Fehlerwege bis in ihr catch - Loeschen, Zyklus heute, und die
+  // Dialoge mit eigenem Fall (gewaehlte Vorsorgeart, Import der Historie).
+  deleteMed, deleteMedLog, deleteLabReport, deleteActivity, deletePeriod, deleteDayLog,
+  cycleStartPeriodToday, cycleEndPeriodToday,
+  openPreventionModal, openCycleImportModal,
   /**
    * Testseam fuer die Tab-Zustaende: EIN benannter View, EIN Patch. Die Views
    * selbst bleiben drinnen - ein Test kann Felder setzen, nicht die Objekte

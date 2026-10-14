@@ -114,6 +114,31 @@ export const CASE_MESSAGES = new Map([
   // #1938: die Adresse hat geantwortet, aber ohne einen Kalendereintrag. Die
   // bisherigen Abholungen bleiben, der Satz sagt das.
   ['waste_source_fetch_no_events', 'waste.errorSourceFetchNoEvents'],
+  // Gesundheit (#1909). Die "gibt es nicht mehr" stehen auch in GONE_REASONS.
+  // Der Server sagt 404 auch, wenn die Betreuung fuer diese Person inzwischen
+  // entzogen wurde; die Seite laedt dann nach und zeigt den Eintrag nur noch
+  // lesend. Unterschieden wird das bewusst nicht (dieselbe Antwort wie fuer
+  // einen fremden privaten Eintrag).
+  ['health_vital_not_found', 'health.errorVitalGone'],
+  ['health_medication_not_found', 'health.errorMedicationGone'],
+  ['health_schedule_not_found', 'health.errorScheduleGone'],
+  ['health_dose_not_found', 'health.errorDoseGone'],
+  ['health_lab_report_not_found', 'health.errorLabReportGone'],
+  ['health_lab_result_not_found', 'health.errorLabResultGone'],
+  ['health_activity_not_found', 'health.errorActivityGone'],
+  ['health_prevention_type_not_found', 'health.errorPreventionTypeGone'],
+  // Die im Vorsorge-Dialog GEWAEHLTE Art fehlt: der Dialog bleibt offen und
+  // frischt die Auswahl auf (wie `waste_selected_type_not_found`).
+  ['health_prevention_selected_type_not_found', 'health.errorSelectedPreventionTypeGone'],
+  ['health_prevention_record_not_found', 'health.errorPreventionRecordGone'],
+  ['health_nutrition_entry_not_found', 'health.errorNutritionEntryGone'],
+  ['health_cycle_period_not_found', 'health.errorPeriodGone'],
+  ['health_cycle_log_not_found', 'health.errorCycleDayGone'],
+  // Import der Perioden-Historie: was eine eingefuegte oder gewaehlte Datei
+  // erreicht. Die Zeilenfehler zeigt der Dialog selbst als Liste.
+  ['health_cycle_import_too_large', 'health.errorCycleImportTooLarge'],
+  ['health_cycle_import_no_rows', 'health.errorCycleImportNoRows'],
+  ['health_cycle_import_too_many_rows', 'health.errorCycleImportTooManyRows'],
 ]);
 
 /**
@@ -135,6 +160,8 @@ export const CASE_PARAMS = new Map([
   ['waste_source_interval_invalid', ['min', 'max']],
   ['waste_source_fetch_http_status', ['status']],
   ['waste_source_fetch_too_large', ['limit_mb']],
+  ['health_cycle_import_too_large', ['limit_kb']],
+  ['health_cycle_import_too_many_rows', ['limit']],
 ]);
 
 const PARAM_MAX = 1_000_000_000;
@@ -179,6 +206,19 @@ export const GONE_REASONS = new Set([
   'waste_mapping_not_found',
   'waste_override_not_found',
   'waste_occurrence_not_found',
+  'health_vital_not_found',
+  'health_medication_not_found',
+  'health_schedule_not_found',
+  'health_dose_not_found',
+  'health_lab_report_not_found',
+  'health_lab_result_not_found',
+  'health_activity_not_found',
+  'health_prevention_type_not_found',
+  'health_prevention_selected_type_not_found',
+  'health_prevention_record_not_found',
+  'health_nutrition_entry_not_found',
+  'health_cycle_period_not_found',
+  'health_cycle_log_not_found',
 ]);
 
 /**

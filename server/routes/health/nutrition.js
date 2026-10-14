@@ -228,7 +228,7 @@ router.patch('/nutrition/entries/:id', (req, res) => {
 
     const w = writableClause('', viewer);
     const existing = db.get().prepare(`SELECT id FROM health_nutrition_entries WHERE id = ? AND ${w.sql}`).get(id, ...w.params);
-    if (!existing) return res.status(404).json({ error: 'Entry not found.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Entry not found.', code: 404, reason: 'health_nutrition_entry_not_found' });
 
     const b = req.body || {};
     const fields = {};
@@ -272,7 +272,7 @@ router.delete('/nutrition/entries/:id', (req, res) => {
 
     const w = writableClause('', viewer);
     const existing = db.get().prepare(`SELECT id FROM health_nutrition_entries WHERE id = ? AND ${w.sql}`).get(id, ...w.params);
-    if (!existing) return res.status(404).json({ error: 'Entry not found.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Entry not found.', code: 404, reason: 'health_nutrition_entry_not_found' });
 
     db.get().prepare('DELETE FROM health_nutrition_entries WHERE id = ?').run(id);
     res.status(204).end();

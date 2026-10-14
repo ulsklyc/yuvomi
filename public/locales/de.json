@@ -5429,7 +5429,23 @@
                 "kcal": "kcal",
                 "g": "g"
             }
-        }
+        },
+        "errorVitalGone": "Diesen Messwert gibt es nicht mehr.",
+        "errorMedicationGone": "Dieses Medikament gibt es nicht mehr.",
+        "errorScheduleGone": "Dieses Zeitfenster gibt es nicht mehr.",
+        "errorDoseGone": "Diesen Einnahme-Eintrag gibt es nicht mehr.",
+        "errorLabReportGone": "Diesen Befund gibt es nicht mehr.",
+        "errorLabResultGone": "Diesen Analyten gibt es nicht mehr.",
+        "errorActivityGone": "Diese Aktivität gibt es nicht mehr.",
+        "errorPreventionTypeGone": "Diese Vorsorgeart gibt es nicht mehr.",
+        "errorSelectedPreventionTypeGone": "Die gewählte Art gibt es nicht mehr.",
+        "errorPreventionRecordGone": "Diesen Vorsorge-Eintrag gibt es nicht mehr.",
+        "errorNutritionEntryGone": "Diesen Eintrag gibt es nicht mehr.",
+        "errorPeriodGone": "Diese Periode gibt es nicht mehr.",
+        "errorCycleDayGone": "Diesen Tageseintrag gibt es nicht mehr.",
+        "errorCycleImportTooLarge": "Der Text ist größer als {{limit_kb}} KB. Importiere die Perioden in kleineren Teilen.",
+        "errorCycleImportNoRows": "Die Datei enthält nur eine Kopfzeile und keine Perioden.",
+        "errorCycleImportTooManyRows": "Ein Import darf höchstens {{limit}} Perioden enthalten. Teile die Datei auf."
     },
     "waste": {
         "title": "Entsorgung",

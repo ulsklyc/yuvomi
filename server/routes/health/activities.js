@@ -81,7 +81,7 @@ router.patch('/activities/:id', (req, res) => {
 
     const w = writableClause('', viewer);
     const existing = db.get().prepare(`SELECT * FROM health_activities WHERE id = ? AND ${w.sql}`).get(id, ...w.params);
-    if (!existing) return res.status(404).json({ error: 'Aktivität nicht gefunden.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Activity not found.', code: 404, reason: 'health_activity_not_found' });
 
     const b = req.body || {};
     const fields = {};
@@ -116,7 +116,7 @@ router.delete('/activities/:id', (req, res) => {
 
     const w = writableClause('', viewer);
     const existing = db.get().prepare(`SELECT id FROM health_activities WHERE id = ? AND ${w.sql}`).get(id, ...w.params);
-    if (!existing) return res.status(404).json({ error: 'Aktivität nicht gefunden.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Activity not found.', code: 404, reason: 'health_activity_not_found' });
 
     db.get().prepare('DELETE FROM health_activities WHERE id = ?').run(id);
     res.status(204).end();

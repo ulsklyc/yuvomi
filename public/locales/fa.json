@@ -5429,7 +5429,23 @@
                 "kcal": "کیلوکالری",
                 "g": "گرم"
             }
-        }
+        },
+        "errorVitalGone": "این اندازه‌گیری دیگر وجود ندارد.",
+        "errorMedicationGone": "این دارو دیگر وجود ندارد.",
+        "errorScheduleGone": "این بازه زمانی دیگر وجود ندارد.",
+        "errorDoseGone": "این رکورد دوز دیگر وجود ندارد.",
+        "errorLabReportGone": "این نتیجه دیگر وجود ندارد.",
+        "errorLabResultGone": "این آنالیت دیگر وجود ندارد.",
+        "errorActivityGone": "این فعالیت دیگر وجود ندارد.",
+        "errorPreventionTypeGone": "این نوع مراقبت پیشگیرانه دیگر وجود ندارد.",
+        "errorSelectedPreventionTypeGone": "نوع انتخاب‌شده دیگر وجود ندارد.",
+        "errorPreventionRecordGone": "این رکورد مراقبت پیشگیرانه دیگر وجود ندارد.",
+        "errorNutritionEntryGone": "این رکورد دیگر وجود ندارد.",
+        "errorPeriodGone": "این دوره دیگر وجود ندارد.",
+        "errorCycleDayGone": "رکورد این روز دیگر وجود ندارد.",
+        "errorCycleImportTooLarge": "متن بزرگ‌تر از {{limit_kb}} کیلوبایت است. دوره‌ها را در بخش‌های کوچک‌تر درون‌ریزی کنید.",
+        "errorCycleImportNoRows": "فایل فقط سطر عنوان دارد و هیچ دوره‌ای ندارد.",
+        "errorCycleImportTooManyRows": "هر درون‌ریزی حداکثر {{limit}} دوره می‌تواند داشته باشد. فایل را تقسیم کنید."
     },
     "waste": {
         "title": "جمع‌آوری زباله",

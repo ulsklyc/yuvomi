@@ -5429,7 +5429,23 @@
                 "kcal": "kcal",
                 "g": "g"
             }
-        }
+        },
+        "errorVitalGone": "Cette mesure n’existe plus.",
+        "errorMedicationGone": "Ce médicament n’existe plus.",
+        "errorScheduleGone": "Ce créneau horaire n’existe plus.",
+        "errorDoseGone": "Cette prise n’existe plus.",
+        "errorLabReportGone": "Ce compte rendu n’existe plus.",
+        "errorLabResultGone": "Cet analyte n’existe plus.",
+        "errorActivityGone": "Cette activité n’existe plus.",
+        "errorPreventionTypeGone": "Ce type de prévention n’existe plus.",
+        "errorSelectedPreventionTypeGone": "Le type choisi n’existe plus.",
+        "errorPreventionRecordGone": "Cette entrée de prévention n’existe plus.",
+        "errorNutritionEntryGone": "Cette entrée n’existe plus.",
+        "errorPeriodGone": "Ces règles n’existent plus.",
+        "errorCycleDayGone": "Cette entrée du jour n’existe plus.",
+        "errorCycleImportTooLarge": "Le texte dépasse {{limit_kb}} Ko. Importe les règles en plus petites parties.",
+        "errorCycleImportNoRows": "Le fichier ne contient qu’une ligne d’en-tête et aucune période de règles.",
+        "errorCycleImportTooManyRows": "Un import peut contenir au plus {{limit}} périodes de règles. Divise le fichier."
     },
     "waste": {
         "title": "Collecte des déchets",

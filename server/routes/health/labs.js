@@ -60,7 +60,7 @@ router.get('/labs/:id', (req, res) => {
     if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
 
     const report = reportForRead(id, viewer);
-    if (!report) return res.status(404).json({ error: 'Befund nicht gefunden.', code: 404 });
+    if (!report) return res.status(404).json({ error: 'Lab report not found.', code: 404, reason: 'health_lab_report_not_found' });
     res.json({ data: attachResults(report) });
   } catch (err) {
     log.error('Error loading lab report:', err.message);
@@ -154,7 +154,7 @@ router.patch('/labs/:id', (req, res) => {
     if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
 
     const existing = reportWritable(id, viewer);
-    if (!existing) return res.status(404).json({ error: 'Befund nicht gefunden.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Lab report not found.', code: 404, reason: 'health_lab_report_not_found' });
 
     const b = req.body || {};
     const fields = {};
@@ -184,7 +184,7 @@ router.delete('/labs/:id', (req, res) => {
     if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
 
     const existing = reportWritable(id, viewer);
-    if (!existing) return res.status(404).json({ error: 'Befund nicht gefunden.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Lab report not found.', code: 404, reason: 'health_lab_report_not_found' });
 
     db.get().prepare('DELETE FROM health_lab_reports WHERE id = ?').run(id);
     res.status(204).end();
@@ -200,7 +200,7 @@ router.post('/labs/:id/results', (req, res) => {
     const viewer = viewerId(req);
     const reportId = parseInt(req.params.id, 10);
     if (!reportId) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
-    if (!reportWritable(reportId, viewer)) return res.status(404).json({ error: 'Befund nicht gefunden.', code: 404 });
+    if (!reportWritable(reportId, viewer)) return res.status(404).json({ error: 'Lab report not found.', code: 404, reason: 'health_lab_report_not_found' });
 
     const { row, error } = validateResult(req.body || {});
     if (error) return badRequest(res, [error]);
@@ -241,7 +241,7 @@ router.patch('/results/:id', (req, res) => {
       JOIN health_lab_reports r ON r.id = res.report_id
       WHERE res.id = ?
     `, 'r', id, viewer);
-    if (!existing) return res.status(404).json({ error: 'Analyt nicht gefunden.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Analyte not found.', code: 404, reason: 'health_lab_result_not_found' });
 
     const b = req.body || {};
     if ((b.value_num === null || b.value_num === '') && existing.value_num !== null) {
@@ -285,7 +285,7 @@ router.delete('/results/:id', (req, res) => {
       JOIN health_lab_reports r ON r.id = res.report_id
       WHERE res.id = ?
     `, 'r', id, viewer);
-    if (!existing) return res.status(404).json({ error: 'Analyt nicht gefunden.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Analyte not found.', code: 404, reason: 'health_lab_result_not_found' });
 
     db.get().prepare('DELETE FROM health_lab_results WHERE id = ?').run(id);
     res.status(204).end();

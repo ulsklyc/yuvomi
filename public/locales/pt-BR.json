@@ -5429,7 +5429,23 @@
                 "kcal": "kcal",
                 "g": "g"
             }
-        }
+        },
+        "errorVitalGone": "Esta medição não existe mais.",
+        "errorMedicationGone": "Este medicamento não existe mais.",
+        "errorScheduleGone": "Este horário não existe mais.",
+        "errorDoseGone": "Este registro de dose não existe mais.",
+        "errorLabReportGone": "Este relatório não existe mais.",
+        "errorLabResultGone": "Este parâmetro não existe mais.",
+        "errorActivityGone": "Esta atividade não existe mais.",
+        "errorPreventionTypeGone": "Este tipo de prevenção não existe mais.",
+        "errorSelectedPreventionTypeGone": "O tipo escolhido não existe mais.",
+        "errorPreventionRecordGone": "Este registro de prevenção não existe mais.",
+        "errorNutritionEntryGone": "Este registro não existe mais.",
+        "errorPeriodGone": "Este período não existe mais.",
+        "errorCycleDayGone": "Este registro do dia não existe mais.",
+        "errorCycleImportTooLarge": "O texto tem mais de {{limit_kb}} KB. Importe os períodos em partes menores.",
+        "errorCycleImportNoRows": "O arquivo tem só a linha de cabeçalho e nenhum período.",
+        "errorCycleImportTooManyRows": "Uma importação pode ter no máximo {{limit}} períodos. Divida o arquivo."
     },
     "datepicker": {
         "openCalendar": "Abrir calendário",

@@ -128,7 +128,7 @@ const SERVER_TEXT = 'Ein Satz des Servers, den kein Nutzer lesen soll.';
 // Ein Fall mit Zahlen (CASE_PARAMS) bekommt sie in der Antwort mit; der
 // Test-Loader haengt sie als JSON an den Schluessel. `withParams` baut die
 // Antwort so, wie der Server sie schickt, `sentenceOf` den erwarteten Satz.
-const SAMPLE = { limit_mb: 5, limit: 5000, min: 60, max: 43200, status: 404 };
+const SAMPLE = { limit_mb: 5, limit_kb: 100, limit: 5000, min: 60, max: 43200, status: 404 };
 const paramsFor = (names) => Object.fromEntries(names.map((name) => [name, SAMPLE[name]]));
 function withParams(err, CASE_PARAMS) {
   const names = CASE_PARAMS.get(err.data.reason);
@@ -258,7 +258,11 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
   // ihn ueber ihren eigenen Code: der Store baut `waste_import_<code>` daraus.
   const importCodes = [...read('../server/services/waste-import.js').matchAll(/new WasteImportError\([^\n]*?,\s*'([a-z_]+)'\s*[,)]/g)]
     .map((m) => `reason: 'waste_import_${m[1]}'`).join('\n');
-  const routes = `${read('../server/routes/shopping.js')}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
+  // Die Gesundheit nennt ihre Faelle in den Routen selbst; dass eine ECHTE
+  // Antwort sie traegt, misst test:health-errors.
+  const healthServer = readdirSync(new URL('../server/routes/health/', import.meta.url))
+    .map((name) => read(`../server/routes/health/${name}`)).join('\n');
+  const routes = `${read('../server/routes/shopping.js')}\n${healthServer}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
   return load().then(({ CASE_MESSAGES, REFUSAL_MESSAGES }) => {
     for (const [reason, key] of CASE_MESSAGES) {
       assert.equal(REFUSAL_MESSAGES.has(reason), false, `${reason} steht in beiden Listen`);
@@ -281,7 +285,11 @@ test('isGone: nur die bekannten "gibt es nicht mehr"-Gruende, nie der blanke Sta
     'shopping_category_not_found', 'shopping_item_not_found', 'shopping_list_not_found', 'shopping_store_not_found',
     'waste_mapping_not_found', 'waste_occurrence_not_found', 'waste_override_not_found', 'waste_pickup_not_found',
     'waste_schedule_not_found', 'waste_selected_type_not_found', 'waste_source_not_found', 'waste_type_not_found',
-  ]);
+    'health_vital_not_found', 'health_medication_not_found', 'health_schedule_not_found', 'health_dose_not_found',
+    'health_lab_report_not_found', 'health_lab_result_not_found', 'health_activity_not_found',
+    'health_prevention_type_not_found', 'health_prevention_selected_type_not_found', 'health_prevention_record_not_found',
+    'health_nutrition_entry_not_found', 'health_cycle_period_not_found', 'health_cycle_log_not_found',
+  ].sort());
   for (const reason of GONE_REASONS) {
     assert.ok(CASE_MESSAGES.has(reason), `${reason}: ohne Satz`);
     for (const status of [400, 404]) assert.equal(isGone(answer(status, SERVER_TEXT, reason)), true, `${reason} @${status}`);
@@ -434,7 +442,8 @@ test('CASE_PARAMS: jeder Eintrag gehoert zu einem Fall, kein Name waehlt die Plu
   const { CASE_PARAMS, CASE_MESSAGES } = await load();
   assert.ok(CASE_PARAMS.size >= 7);
   const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
-  const server = ['../server/services/waste-import.js', '../server/services/waste-url-source.js', '../server/routes/waste/sources.js'].map(read).join('\n');
+  const server = ['../server/services/waste-import.js', '../server/services/waste-url-source.js', '../server/routes/waste/sources.js',
+    '../server/routes/health/cycle.js'].map(read).join('\n');
   for (const [reason, names] of CASE_PARAMS) {
     assert.ok(CASE_MESSAGES.has(reason), `${reason}: Zahlen ohne Satz`);
     assert.ok(Array.isArray(names) && names.length > 0, reason);
@@ -443,7 +452,7 @@ test('CASE_PARAMS: jeder Eintrag gehoert zu einem Fall, kein Name waehlt die Plu
       assert.notEqual(name, 'count', `${reason}: \`count\` waehlt in t() die Pluralform`);
       // Der Name steht am Server als Feld eines `params`-Objekts (`{ limit_mb: ...`,
       // `{ status: ...`, `{ min: ..., max: ...`). Dass eine ECHTE Antwort ihn
-      // traegt, misst test:waste-routes je Grund.
+      // traegt, misst test:waste-routes und test:health-errors je Grund.
       assert.match(server, new RegExp(`[{,]\\s*${name}:`), `${reason}: kein Server schickt ${name}`);
     }
   }

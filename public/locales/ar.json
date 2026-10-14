@@ -5817,7 +5817,23 @@
                 "kcal": "سعرة",
                 "g": "غ"
             }
-        }
+        },
+        "errorVitalGone": "لم يعد هذا القياس موجودًا.",
+        "errorMedicationGone": "لم يعد هذا الدواء موجودًا.",
+        "errorScheduleGone": "لم يعد هذا الوقت موجودًا.",
+        "errorDoseGone": "لم يعد سجل الجرعة هذا موجودًا.",
+        "errorLabReportGone": "لم يعد هذا التقرير موجودًا.",
+        "errorLabResultGone": "لم يعد هذا المؤشر موجودًا.",
+        "errorActivityGone": "لم يعد هذا النشاط موجودًا.",
+        "errorPreventionTypeGone": "لم يعد نوع الرعاية الوقائية هذا موجودًا.",
+        "errorSelectedPreventionTypeGone": "النوع المختار لم يعد موجودًا.",
+        "errorPreventionRecordGone": "لم يعد سجل الرعاية الوقائية هذا موجودًا.",
+        "errorNutritionEntryGone": "لم يعد هذا السجل موجودًا.",
+        "errorPeriodGone": "لم تعد هذه الدورة موجودة.",
+        "errorCycleDayGone": "لم يعد سجل هذا اليوم موجودًا.",
+        "errorCycleImportTooLarge": "النص أكبر من {{limit_kb}} كيلوبايت. استورد الدورات على أجزاء أصغر.",
+        "errorCycleImportNoRows": "يحتوي الملف على سطر العناوين فقط ولا يحتوي على دورات.",
+        "errorCycleImportTooManyRows": "يمكن أن يحتوي الاستيراد على {{limit}} دورة كحد أقصى. قسّم الملف."
     },
     "waste": {
         "title": "جمع النفايات",

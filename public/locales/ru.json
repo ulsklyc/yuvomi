@@ -5687,7 +5687,23 @@
                 "kcal": "ккал",
                 "g": "г"
             }
-        }
+        },
+        "errorVitalGone": "Этого измерения больше нет.",
+        "errorMedicationGone": "Этого лекарства больше нет.",
+        "errorScheduleGone": "Этого времени приёма больше нет.",
+        "errorDoseGone": "Этой записи о приёме больше нет.",
+        "errorLabReportGone": "Этого результата больше нет.",
+        "errorLabResultGone": "Этого показателя больше нет.",
+        "errorActivityGone": "Этой активности больше нет.",
+        "errorPreventionTypeGone": "Этого вида профилактики больше нет.",
+        "errorSelectedPreventionTypeGone": "Выбранного вида больше нет.",
+        "errorPreventionRecordGone": "Этой записи о профилактике больше нет.",
+        "errorNutritionEntryGone": "Этой записи больше нет.",
+        "errorPeriodGone": "Этой менструации больше нет.",
+        "errorCycleDayGone": "Этой записи за день больше нет.",
+        "errorCycleImportTooLarge": "Текст больше {{limit_kb}} КБ. Импортируйте менструации частями поменьше.",
+        "errorCycleImportNoRows": "В файле только строка заголовка и нет ни одной менструации.",
+        "errorCycleImportTooManyRows": "В одном импорте может быть не более {{limit}} менструаций. Разделите файл."
     },
     "waste": {
         "title": "Вывоз мусора",

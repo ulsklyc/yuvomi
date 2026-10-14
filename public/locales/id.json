@@ -5429,7 +5429,23 @@
                 "kcal": "kkal",
                 "g": "g"
             }
-        }
+        },
+        "errorVitalGone": "Pengukuran ini sudah tidak ada.",
+        "errorMedicationGone": "Obat ini sudah tidak ada.",
+        "errorScheduleGone": "Slot waktu ini sudah tidak ada.",
+        "errorDoseGone": "Entri dosis ini sudah tidak ada.",
+        "errorLabReportGone": "Hasil ini sudah tidak ada.",
+        "errorLabResultGone": "Analit ini sudah tidak ada.",
+        "errorActivityGone": "Aktivitas ini sudah tidak ada.",
+        "errorPreventionTypeGone": "Jenis perawatan pencegahan ini sudah tidak ada.",
+        "errorSelectedPreventionTypeGone": "Jenis yang dipilih sudah tidak ada.",
+        "errorPreventionRecordGone": "Catatan perawatan pencegahan ini sudah tidak ada.",
+        "errorNutritionEntryGone": "Catatan ini sudah tidak ada.",
+        "errorPeriodGone": "Menstruasi ini sudah tidak ada.",
+        "errorCycleDayGone": "Catatan hari ini sudah tidak ada.",
+        "errorCycleImportTooLarge": "Teks lebih besar dari {{limit_kb}} KB. Impor menstruasi dalam bagian yang lebih kecil.",
+        "errorCycleImportNoRows": "File hanya berisi baris judul tanpa menstruasi.",
+        "errorCycleImportTooManyRows": "Satu impor boleh berisi paling banyak {{limit}} menstruasi. Bagi file-nya."
     },
     "waste": {
         "title": "Pengumpulan sampah",

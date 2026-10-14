@@ -5429,7 +5429,23 @@
                 "kcal": "kcal",
                 "g": "g"
             }
-        }
+        },
+        "errorVitalGone": "Αυτή η μέτρηση δεν υπάρχει πλέον.",
+        "errorMedicationGone": "Αυτό το φάρμακο δεν υπάρχει πλέον.",
+        "errorScheduleGone": "Αυτή η ώρα δεν υπάρχει πλέον.",
+        "errorDoseGone": "Αυτή η καταχώριση δόσης δεν υπάρχει πλέον.",
+        "errorLabReportGone": "Αυτό το αποτέλεσμα δεν υπάρχει πλέον.",
+        "errorLabResultGone": "Αυτός ο αναλυτής δεν υπάρχει πλέον.",
+        "errorActivityGone": "Αυτή η δραστηριότητα δεν υπάρχει πλέον.",
+        "errorPreventionTypeGone": "Αυτός ο τύπος πρόληψης δεν υπάρχει πλέον.",
+        "errorSelectedPreventionTypeGone": "Ο επιλεγμένος τύπος δεν υπάρχει πλέον.",
+        "errorPreventionRecordGone": "Αυτή η καταχώριση πρόληψης δεν υπάρχει πλέον.",
+        "errorNutritionEntryGone": "Αυτή η καταχώριση δεν υπάρχει πλέον.",
+        "errorPeriodGone": "Αυτή η περίοδος δεν υπάρχει πλέον.",
+        "errorCycleDayGone": "Αυτή η ημερήσια καταχώριση δεν υπάρχει πλέον.",
+        "errorCycleImportTooLarge": "Το κείμενο είναι μεγαλύτερο από {{limit_kb}} KB. Κάνε εισαγωγή των περιόδων σε μικρότερα τμήματα.",
+        "errorCycleImportNoRows": "Το αρχείο έχει μόνο γραμμή κεφαλίδας και καμία περίοδο.",
+        "errorCycleImportTooManyRows": "Μια εισαγωγή μπορεί να έχει έως {{limit}} περιόδους. Χώρισε το αρχείο."
     },
     "waste": {
         "title": "Αποκομιδή απορριμμάτων",

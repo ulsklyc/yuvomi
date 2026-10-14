@@ -5429,7 +5429,23 @@
                 "kcal": "kcal",
                 "g": "g"
             }
-        }
+        },
+        "errorVitalGone": "Bu ölçüm artık yok.",
+        "errorMedicationGone": "Bu ilaç artık yok.",
+        "errorScheduleGone": "Bu saat artık yok.",
+        "errorDoseGone": "Bu doz kaydı artık yok.",
+        "errorLabReportGone": "Bu sonuç artık yok.",
+        "errorLabResultGone": "Bu parametre artık yok.",
+        "errorActivityGone": "Bu aktivite artık yok.",
+        "errorPreventionTypeGone": "Bu koruyucu bakım türü artık yok.",
+        "errorSelectedPreventionTypeGone": "Seçilen tür artık yok.",
+        "errorPreventionRecordGone": "Bu koruyucu bakım kaydı artık yok.",
+        "errorNutritionEntryGone": "Bu kayıt artık yok.",
+        "errorPeriodGone": "Bu adet dönemi artık yok.",
+        "errorCycleDayGone": "Bu günün kaydı artık yok.",
+        "errorCycleImportTooLarge": "Metin {{limit_kb}} KB'tan büyük. Adet dönemlerini daha küçük parçalar halinde içe aktar.",
+        "errorCycleImportNoRows": "Dosyada yalnızca başlık satırı var ve hiç adet dönemi yok.",
+        "errorCycleImportTooManyRows": "Bir içe aktarma en fazla {{limit}} adet dönemi içerebilir. Dosyayı böl."
     },
     "waste": {
         "title": "Atık toplama",

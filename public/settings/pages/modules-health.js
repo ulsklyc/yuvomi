@@ -12,6 +12,7 @@ import { esc } from '/utils/html.js';
 import { openModal, closeModal, confirmOverModal, refocusAfterRender } from '/components/modal.js';
 import { intervalMonthsToInput, intervalInputToMonths } from '/utils/health-prevention.js';
 import { rowActionHtml } from '/utils/row-action.js';
+import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
 
 const KINDS = ['vaccination', 'checkup'];
 const MAX_INTERVAL_MONTHS = 600;
@@ -111,6 +112,17 @@ async function reload() {
   wire(_container);
 }
 
+/**
+ * Fehler-Toast der Seite (#1909): der Satz der App, nie der des Servers. Gibt
+ * es die bearbeitete Art nicht mehr, geht der Dialog zu und die Liste kommt
+ * frisch vom Server.
+ */
+function reportError(err) {
+  window.yuvomi?.showToast(errorSentence(err), 'danger');
+  if (!isGone(err)) return;
+  closeModal({ force: true }).then(() => reload()).then(() => refocusAfterRender()).catch(() => {});
+}
+
 function openTypeModal(type) {
   const isEdit = !!type;
   const val = (v) => (v == null ? '' : String(v));
@@ -181,13 +193,18 @@ function openTypeModal(type) {
         });
         if (!confirmed) return;
         try {
-          await api.delete(`/health/prevention/types/${type.id}`);
+          // Schon geloescht (ein anderer Admin war schneller): erledigt (#1909).
+          try {
+            await api.delete(`/health/prevention/types/${type.id}`);
+          } catch (err) {
+            if (!isAlreadyDeleted(err, 'health_prevention_type_not_found')) throw err;
+          }
           closeModal({ force: true });
           window.yuvomi?.showToast(t('settings.healthPreventionTypeDeleted'), 'success');
           await reload();
           refocusAfterRender();
         } catch (err) {
-          window.yuvomi?.showToast(err?.data?.error || t('common.errorGeneric'), 'danger');
+          reportError(err);
         }
       });
 
@@ -225,12 +242,14 @@ function openTypeModal(type) {
           refocusAfterRender();
         } catch (err) {
           submitBtn.disabled = false;
-          window.yuvomi?.showToast(err?.data?.error || t('common.errorGeneric'), 'danger');
+          reportError(err);
         }
       });
     },
   });
 }
+
+export const __test = { openTypeModal };
 
 export async function render(container) {
   _container = container;

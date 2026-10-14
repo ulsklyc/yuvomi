@@ -112,7 +112,7 @@ router.patch('/prevention/types/:id', requireAdmin, (req, res) => {
     if (!id) return res.status(400).json({ error: 'Invalid ID.', code: 400 });
 
     const existing = db.get().prepare('SELECT id FROM health_prevention_types WHERE id = ?').get(id);
-    if (!existing) return res.status(404).json({ error: 'Type not found.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Type not found.', code: 404, reason: 'health_prevention_type_not_found' });
 
     const b = req.body || {};
     const fields = {};
@@ -148,7 +148,7 @@ router.delete('/prevention/types/:id', requireAdmin, (req, res) => {
     if (!id) return res.status(400).json({ error: 'Invalid ID.', code: 400 });
 
     const type = db.get().prepare('SELECT * FROM health_prevention_types WHERE id = ?').get(id);
-    if (!type) return res.status(404).json({ error: 'Type not found.', code: 404 });
+    if (!type) return res.status(404).json({ error: 'Type not found.', code: 404, reason: 'health_prevention_type_not_found' });
 
     const affectedUserIds = db.get().prepare(
       'SELECT DISTINCT user_id FROM health_prevention_records WHERE type_id = ?'
@@ -175,6 +175,15 @@ router.delete('/prevention/types/:id', requireAdmin, (req, res) => {
     res.status(500).json({ error: 'Internal error.', code: 500 });
   }
 });
+
+/**
+ * Die gewaehlte Art gibt es nicht (mehr): jemand hat sie geloescht, waehrend der
+ * Dialog offen war (#1909). Status 400 wie bisher; der Grund laesst die Seite
+ * die Auswahl auffrischen, statt den Text des Servers zu zeigen.
+ */
+function unknownSelectedType(res) {
+  return res.status(400).json({ error: 'Unknown type.', code: 400, reason: 'health_prevention_selected_type_not_found' });
+}
 
 // --------------------------------------------------------
 // Protokoll (health_prevention_records)
@@ -212,7 +221,8 @@ router.post('/prevention/records', (req, res) => {
     if (b.type_id != null && b.type_id !== '') {
       if (!typeId) return badRequest(res, ['type_id is invalid.']);
       type = db.get().prepare('SELECT * FROM health_prevention_types WHERE id = ?').get(typeId);
-      if (!type) return badRequest(res, ['Unknown type.']);
+      // Die im Formular gewaehlte Art wurde inzwischen geloescht (#1909).
+      if (!type) return unknownSelectedType(res);
     }
 
     const name          = v.str(b.name, 'name', { max: v.MAX_TITLE, required: !type });
@@ -270,7 +280,7 @@ router.patch('/prevention/records/:id', (req, res) => {
 
     const w = writableClause('', viewer);
     const existing = db.get().prepare(`SELECT * FROM health_prevention_records WHERE id = ? AND ${w.sql}`).get(id, ...w.params);
-    if (!existing) return res.status(404).json({ error: 'Record not found.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Record not found.', code: 404, reason: 'health_prevention_record_not_found' });
 
     const b = req.body || {};
     const fields = {};
@@ -282,8 +292,8 @@ router.patch('/prevention/records/:id', (req, res) => {
       } else {
         const typeId = parseInt(b.type_id, 10);
         const type = typeId ? db.get().prepare('SELECT id FROM health_prevention_types WHERE id = ?').get(typeId) : null;
-        if (!type) checks.push({ value: null, error: 'Unknown type.' });
-        else fields.type_id = typeId;
+        if (!type) return unknownSelectedType(res);
+        fields.type_id = typeId;
       }
     }
     if (b.name !== undefined) { const r = v.str(b.name, 'name', { max: v.MAX_TITLE, required: false }); checks.push(r); if (!r.error) fields.name = r.value; }
@@ -321,7 +331,7 @@ router.delete('/prevention/records/:id', (req, res) => {
 
     const w = writableClause('', viewer);
     const existing = db.get().prepare(`SELECT * FROM health_prevention_records WHERE id = ? AND ${w.sql}`).get(id, ...w.params);
-    if (!existing) return res.status(404).json({ error: 'Record not found.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Record not found.', code: 404, reason: 'health_prevention_record_not_found' });
 
     db.get().transaction(() => {
       // Explizit abraeumen statt sich allein auf den periodischen Sync zu

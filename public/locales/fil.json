@@ -5429,7 +5429,23 @@
                 "kcal": "kcal",
                 "g": "g"
             }
-        }
+        },
+        "errorVitalGone": "Wala na ang sukat na ito.",
+        "errorMedicationGone": "Wala na ang gamot na ito.",
+        "errorScheduleGone": "Wala na ang oras na ito.",
+        "errorDoseGone": "Wala na ang tala ng dosis na ito.",
+        "errorLabReportGone": "Wala na ang ulat na ito.",
+        "errorLabResultGone": "Wala na ang analyte na ito.",
+        "errorActivityGone": "Wala na ang aktibidad na ito.",
+        "errorPreventionTypeGone": "Wala na ang uri ng pang-iwas na pangangalaga na ito.",
+        "errorSelectedPreventionTypeGone": "Wala na ang napiling uri.",
+        "errorPreventionRecordGone": "Wala na ang tala ng pang-iwas na pangangalaga na ito.",
+        "errorNutritionEntryGone": "Wala na ang tala na ito.",
+        "errorPeriodGone": "Wala na ang regla na ito.",
+        "errorCycleDayGone": "Wala na ang tala para sa araw na ito.",
+        "errorCycleImportTooLarge": "Mas malaki sa {{limit_kb}} KB ang teksto. I-import ang mga regla nang mas maliliit na bahagi.",
+        "errorCycleImportNoRows": "Header row lang ang laman ng file at walang regla.",
+        "errorCycleImportTooManyRows": "Hanggang {{limit}} regla lang ang kaya ng isang import. Hatiin ang file."
     },
     "waste": {
         "title": "Koleksyon ng basura",

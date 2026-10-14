@@ -5429,7 +5429,23 @@
                 "kcal": "kcal",
                 "g": "g"
             }
-        }
+        },
+        "errorVitalGone": "Denne målingen finnes ikke lenger.",
+        "errorMedicationGone": "Denne medisinen finnes ikke lenger.",
+        "errorScheduleGone": "Dette tidsrommet finnes ikke lenger.",
+        "errorDoseGone": "Denne doseoppføringen finnes ikke lenger.",
+        "errorLabReportGone": "Denne rapporten finnes ikke lenger.",
+        "errorLabResultGone": "Denne analytten finnes ikke lenger.",
+        "errorActivityGone": "Denne aktiviteten finnes ikke lenger.",
+        "errorPreventionTypeGone": "Denne forebyggingstypen finnes ikke lenger.",
+        "errorSelectedPreventionTypeGone": "Den valgte typen finnes ikke lenger.",
+        "errorPreventionRecordGone": "Denne forebyggingsoppføringen finnes ikke lenger.",
+        "errorNutritionEntryGone": "Denne oppføringen finnes ikke lenger.",
+        "errorPeriodGone": "Denne mensen finnes ikke lenger.",
+        "errorCycleDayGone": "Denne dagsoppføringen finnes ikke lenger.",
+        "errorCycleImportTooLarge": "Teksten er større enn {{limit_kb}} KB. Importer mensene i mindre deler.",
+        "errorCycleImportNoRows": "Filen har bare en overskriftsrad og ingen mens.",
+        "errorCycleImportTooManyRows": "En import kan inneholde høyst {{limit}} menser. Del opp filen."
     },
     "waste": {
         "title": "Avfallshåndtering",

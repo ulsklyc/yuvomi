@@ -5429,7 +5429,23 @@
                 "kcal": "kcal",
                 "g": "g"
             }
-        }
+        },
+        "errorVitalGone": "이 측정값은 더 이상 없습니다.",
+        "errorMedicationGone": "이 약은 더 이상 없습니다.",
+        "errorScheduleGone": "이 시간대는 더 이상 없습니다.",
+        "errorDoseGone": "이 복용 기록은 더 이상 없습니다.",
+        "errorLabReportGone": "이 소견은 더 이상 없습니다.",
+        "errorLabResultGone": "이 분석물질은 더 이상 없습니다.",
+        "errorActivityGone": "이 활동은 더 이상 없습니다.",
+        "errorPreventionTypeGone": "이 예방 관리 종류는 더 이상 없습니다.",
+        "errorSelectedPreventionTypeGone": "선택한 종류는 더 이상 없습니다.",
+        "errorPreventionRecordGone": "이 예방 관리 기록은 더 이상 없습니다.",
+        "errorNutritionEntryGone": "이 기록은 더 이상 없습니다.",
+        "errorPeriodGone": "이 생리 기간은 더 이상 없습니다.",
+        "errorCycleDayGone": "이 날의 기록은 더 이상 없습니다.",
+        "errorCycleImportTooLarge": "텍스트가 {{limit_kb}}KB보다 큽니다. 생리 기간을 더 작게 나누어 가져오세요.",
+        "errorCycleImportNoRows": "파일에 머리글 행만 있고 생리 기간이 없습니다.",
+        "errorCycleImportTooManyRows": "한 번에 최대 {{limit}}개의 생리 기간만 가져올 수 있습니다. 파일을 나누세요."
     },
     "waste": {
         "title": "쓰레기 수거",

@@ -5429,7 +5429,23 @@
                 "kcal": "kcal",
                 "g": "g"
             }
-        }
+        },
+        "errorVitalGone": "This measurement no longer exists.",
+        "errorMedicationGone": "This medication no longer exists.",
+        "errorScheduleGone": "This time slot no longer exists.",
+        "errorDoseGone": "This dose entry no longer exists.",
+        "errorLabReportGone": "This report no longer exists.",
+        "errorLabResultGone": "This analyte no longer exists.",
+        "errorActivityGone": "This activity no longer exists.",
+        "errorPreventionTypeGone": "This preventive care type no longer exists.",
+        "errorSelectedPreventionTypeGone": "The chosen type no longer exists.",
+        "errorPreventionRecordGone": "This preventive care entry no longer exists.",
+        "errorNutritionEntryGone": "This entry no longer exists.",
+        "errorPeriodGone": "This period no longer exists.",
+        "errorCycleDayGone": "This day entry no longer exists.",
+        "errorCycleImportTooLarge": "The text is larger than {{limit_kb}} KB. Import the periods in smaller parts.",
+        "errorCycleImportNoRows": "The file only has a header row and no periods.",
+        "errorCycleImportTooManyRows": "An import can hold at most {{limit}} periods. Split the file."
     },
     "waste": {
         "title": "Waste collection",

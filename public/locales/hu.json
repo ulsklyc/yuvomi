@@ -5429,7 +5429,23 @@
                 "kcal": "kcal",
                 "g": "g"
             }
-        }
+        },
+        "errorVitalGone": "Ez a mérés már nem létezik.",
+        "errorMedicationGone": "Ez a gyógyszer már nem létezik.",
+        "errorScheduleGone": "Ez az időpont már nem létezik.",
+        "errorDoseGone": "Ez az adagbejegyzés már nem létezik.",
+        "errorLabReportGone": "Ez a lelet már nem létezik.",
+        "errorLabResultGone": "Ez a paraméter már nem létezik.",
+        "errorActivityGone": "Ez a tevékenység már nem létezik.",
+        "errorPreventionTypeGone": "Ez a megelőzési típus már nem létezik.",
+        "errorSelectedPreventionTypeGone": "A kiválasztott típus már nem létezik.",
+        "errorPreventionRecordGone": "Ez a megelőzési bejegyzés már nem létezik.",
+        "errorNutritionEntryGone": "Ez a bejegyzés már nem létezik.",
+        "errorPeriodGone": "Ez a menstruáció már nem létezik.",
+        "errorCycleDayGone": "Ez a napi bejegyzés már nem létezik.",
+        "errorCycleImportTooLarge": "A szöveg nagyobb, mint {{limit_kb}} KB. Importáld a menstruációkat kisebb részekben.",
+        "errorCycleImportNoRows": "A fájlban csak fejlécsor van, menstruáció nincs.",
+        "errorCycleImportTooManyRows": "Egy importálás legfeljebb {{limit}} menstruációt tartalmazhat. Oszd fel a fájlt."
     },
     "waste": {
         "title": "Hulladékgyűjtés",

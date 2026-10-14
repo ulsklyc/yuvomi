@@ -5687,7 +5687,23 @@
                 "kcal": "kcal",
                 "g": "g"
             }
-        }
+        },
+        "errorVitalGone": "Ten pomiar już nie istnieje.",
+        "errorMedicationGone": "Ten lek już nie istnieje.",
+        "errorScheduleGone": "Ta pora już nie istnieje.",
+        "errorDoseGone": "Ten wpis dawki już nie istnieje.",
+        "errorLabReportGone": "Ten wynik już nie istnieje.",
+        "errorLabResultGone": "Ten analit już nie istnieje.",
+        "errorActivityGone": "Ta aktywność już nie istnieje.",
+        "errorPreventionTypeGone": "Ten rodzaj profilaktyki już nie istnieje.",
+        "errorSelectedPreventionTypeGone": "Wybrany rodzaj już nie istnieje.",
+        "errorPreventionRecordGone": "Ten wpis profilaktyki już nie istnieje.",
+        "errorNutritionEntryGone": "Ten wpis już nie istnieje.",
+        "errorPeriodGone": "Ta miesiączka już nie istnieje.",
+        "errorCycleDayGone": "Ten wpis dnia już nie istnieje.",
+        "errorCycleImportTooLarge": "Tekst jest większy niż {{limit_kb}} KB. Importuj miesiączki w mniejszych częściach.",
+        "errorCycleImportNoRows": "Plik zawiera tylko wiersz nagłówka i żadnej miesiączki.",
+        "errorCycleImportTooManyRows": "Jeden import może zawierać najwyżej {{limit}} miesiączek. Podziel plik."
     },
     "waste": {
         "title": "Odbiór odpadów",

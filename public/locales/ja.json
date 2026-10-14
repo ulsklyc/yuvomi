@@ -5429,7 +5429,23 @@
                 "kcal": "kcal",
                 "g": "g"
             }
-        }
+        },
+        "errorVitalGone": "この測定値はもう存在しません。",
+        "errorMedicationGone": "この薬はもう存在しません。",
+        "errorScheduleGone": "この時間帯はもう存在しません。",
+        "errorDoseGone": "この服用記録はもう存在しません。",
+        "errorLabReportGone": "この検査結果はもう存在しません。",
+        "errorLabResultGone": "この項目はもう存在しません。",
+        "errorActivityGone": "このアクティビティはもう存在しません。",
+        "errorPreventionTypeGone": "この予防ケアの種類はもう存在しません。",
+        "errorSelectedPreventionTypeGone": "選択した種類はもう存在しません。",
+        "errorPreventionRecordGone": "この予防ケアの記録はもう存在しません。",
+        "errorNutritionEntryGone": "この記録はもう存在しません。",
+        "errorPeriodGone": "この生理期間はもう存在しません。",
+        "errorCycleDayGone": "この日の記録はもう存在しません。",
+        "errorCycleImportTooLarge": "テキストが{{limit_kb}}KBを超えています。生理期間を小さく分けてインポートしてください。",
+        "errorCycleImportNoRows": "ファイルには見出し行しかなく生理期間がありません。",
+        "errorCycleImportTooManyRows": "一度にインポートできる生理期間は最大{{limit}}件です。ファイルを分けてください。"
     },
     "waste": {
         "title": "ゴミ収集",

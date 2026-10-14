@@ -5429,7 +5429,23 @@
                 "kcal": "千卡",
                 "g": "克"
             }
-        }
+        },
+        "errorVitalGone": "该测量值已不存在。",
+        "errorMedicationGone": "该药物已不存在。",
+        "errorScheduleGone": "该时间已不存在。",
+        "errorDoseGone": "该服药记录已不存在。",
+        "errorLabReportGone": "该报告已不存在。",
+        "errorLabResultGone": "该指标已不存在。",
+        "errorActivityGone": "该活动已不存在。",
+        "errorPreventionTypeGone": "该预防保健类型已不存在。",
+        "errorSelectedPreventionTypeGone": "所选类型已不存在。",
+        "errorPreventionRecordGone": "该预防保健记录已不存在。",
+        "errorNutritionEntryGone": "该记录已不存在。",
+        "errorPeriodGone": "该经期已不存在。",
+        "errorCycleDayGone": "当天的记录已不存在。",
+        "errorCycleImportTooLarge": "文本超过 {{limit_kb}} KB。请分成更小的部分导入经期。",
+        "errorCycleImportNoRows": "文件只有标题行没有任何经期。",
+        "errorCycleImportTooManyRows": "一次导入最多 {{limit}} 个经期。请拆分文件。"
     },
     "waste": {
         "title": "垃圾收集",

@@ -5429,7 +5429,23 @@
                 "kcal": "kcal",
                 "g": "g"
             }
-        }
+        },
+        "errorVitalGone": "Esta medición ya no existe.",
+        "errorMedicationGone": "Este medicamento ya no existe.",
+        "errorScheduleGone": "Esta franja horaria ya no existe.",
+        "errorDoseGone": "Esta entrada de dosis ya no existe.",
+        "errorLabReportGone": "Este informe ya no existe.",
+        "errorLabResultGone": "Este parámetro ya no existe.",
+        "errorActivityGone": "Esta actividad ya no existe.",
+        "errorPreventionTypeGone": "Este tipo de prevención ya no existe.",
+        "errorSelectedPreventionTypeGone": "El tipo elegido ya no existe.",
+        "errorPreventionRecordGone": "Este registro de prevención ya no existe.",
+        "errorNutritionEntryGone": "Este registro ya no existe.",
+        "errorPeriodGone": "Este periodo ya no existe.",
+        "errorCycleDayGone": "Esta entrada del día ya no existe.",
+        "errorCycleImportTooLarge": "El texto ocupa más de {{limit_kb}} KB. Importa los periodos en partes más pequeñas.",
+        "errorCycleImportNoRows": "El archivo solo tiene la fila de encabezado y ningún periodo.",
+        "errorCycleImportTooManyRows": "Una importación puede tener como máximo {{limit}} periodos. Divide el archivo."
     },
     "waste": {
         "title": "Recogida de basura",

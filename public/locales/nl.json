@@ -5429,7 +5429,23 @@
                 "kcal": "kcal",
                 "g": "g"
             }
-        }
+        },
+        "errorVitalGone": "Deze meting bestaat niet meer.",
+        "errorMedicationGone": "Dit medicijn bestaat niet meer.",
+        "errorScheduleGone": "Dit tijdstip bestaat niet meer.",
+        "errorDoseGone": "Deze innamevermelding bestaat niet meer.",
+        "errorLabReportGone": "Deze uitslag bestaat niet meer.",
+        "errorLabResultGone": "Deze analyt bestaat niet meer.",
+        "errorActivityGone": "Deze activiteit bestaat niet meer.",
+        "errorPreventionTypeGone": "Dit type preventieve zorg bestaat niet meer.",
+        "errorSelectedPreventionTypeGone": "Het gekozen type bestaat niet meer.",
+        "errorPreventionRecordGone": "Dit preventie-item bestaat niet meer.",
+        "errorNutritionEntryGone": "Dit item bestaat niet meer.",
+        "errorPeriodGone": "Deze menstruatie bestaat niet meer.",
+        "errorCycleDayGone": "Dit dagitem bestaat niet meer.",
+        "errorCycleImportTooLarge": "De tekst is groter dan {{limit_kb}} KB. Importeer de menstruaties in kleinere delen.",
+        "errorCycleImportNoRows": "Het bestand bevat alleen een kopregel en geen menstruaties.",
+        "errorCycleImportTooManyRows": "Eén import mag hoogstens {{limit}} menstruaties bevatten. Splits het bestand."
     },
     "waste": {
         "title": "Afvalinzameling",

@@ -141,7 +141,7 @@ router.patch('/medications/:id', (req, res) => {
     if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
 
     const existing = medicationWritable(id, viewer);
-    if (!existing) return res.status(404).json({ error: 'Medikament nicht gefunden.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Medication not found.', code: 404, reason: 'health_medication_not_found' });
 
     const b = req.body || {};
     const fields = {};
@@ -179,7 +179,7 @@ router.delete('/medications/:id', (req, res) => {
     if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
 
     const existing = medicationWritable(id, viewer);
-    if (!existing) return res.status(404).json({ error: 'Medikament nicht gefunden.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Medication not found.', code: 404, reason: 'health_medication_not_found' });
 
     db.get().prepare('DELETE FROM medications WHERE id = ?').run(id);
     res.status(204).end();
@@ -197,7 +197,7 @@ router.get('/medications/:id/schedules', (req, res) => {
     const viewer = viewerId(req);
     const medId = parseInt(req.params.id, 10);
     if (!medId) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
-    if (!medicationForRead(medId, viewer)) return res.status(404).json({ error: 'Medikament nicht gefunden.', code: 404 });
+    if (!medicationForRead(medId, viewer)) return res.status(404).json({ error: 'Medication not found.', code: 404, reason: 'health_medication_not_found' });
 
     const rows = db.get().prepare(
       'SELECT * FROM medication_schedules WHERE medication_id = ? ORDER BY time_of_day ASC, id ASC'
@@ -215,7 +215,7 @@ router.post('/medications/:id/schedules', (req, res) => {
     const viewer = viewerId(req);
     const medId = parseInt(req.params.id, 10);
     if (!medId) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
-    if (!medicationWritable(medId, viewer)) return res.status(404).json({ error: 'Medikament nicht gefunden.', code: 404 });
+    if (!medicationWritable(medId, viewer)) return res.status(404).json({ error: 'Medication not found.', code: 404, reason: 'health_medication_not_found' });
 
     const b = req.body || {};
     const timeOfDay = v.time(b.time_of_day, 'time_of_day');
@@ -263,7 +263,7 @@ router.patch('/schedules/:id', (req, res) => {
       JOIN medications m ON m.id = s.medication_id
       WHERE s.id = ?
     `, 'm', id, viewer);
-    if (!existing) return res.status(404).json({ error: 'Einnahmeplan nicht gefunden.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Schedule not found.', code: 404, reason: 'health_schedule_not_found' });
 
     const b = req.body || {};
     const fields = {};
@@ -306,7 +306,7 @@ router.delete('/schedules/:id', (req, res) => {
       JOIN medications m ON m.id = s.medication_id
       WHERE s.id = ?
     `, 'm', id, viewer);
-    if (!existing) return res.status(404).json({ error: 'Einnahmeplan nicht gefunden.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Schedule not found.', code: 404, reason: 'health_schedule_not_found' });
 
     db.get().prepare('DELETE FROM medication_schedules WHERE id = ?').run(id);
     res.status(204).end();
@@ -324,7 +324,7 @@ router.get('/medications/:id/logs', (req, res) => {
     const viewer = viewerId(req);
     const medId = parseInt(req.params.id, 10);
     if (!medId) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
-    if (!medicationForRead(medId, viewer)) return res.status(404).json({ error: 'Medikament nicht gefunden.', code: 404 });
+    if (!medicationForRead(medId, viewer)) return res.status(404).json({ error: 'Medication not found.', code: 404, reason: 'health_medication_not_found' });
 
     // Gefiltert wird ueber denselben Ausdruck, nach dem auch sortiert wird.
     // Vorher stand hier `scheduled_at`, und weil eine Bedarfsdosis keinen
@@ -359,7 +359,7 @@ router.post('/medications/:id/logs', (req, res) => {
     const viewer = viewerId(req);
     const medId = parseInt(req.params.id, 10);
     if (!medId) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
-    if (!medicationWritable(medId, viewer)) return res.status(404).json({ error: 'Medikament nicht gefunden.', code: 404 });
+    if (!medicationWritable(medId, viewer)) return res.status(404).json({ error: 'Medication not found.', code: 404, reason: 'health_medication_not_found' });
 
     const b = req.body || {};
     const wall        = wallClockInput();
@@ -412,7 +412,7 @@ function updateLogStatus(req, res, newStatus) {
   if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
 
   const logRow = ownLogRow(id, viewer);
-  if (!logRow) return res.status(404).json({ error: 'Dosis-Eintrag nicht gefunden.', code: 404 });
+  if (!logRow) return res.status(404).json({ error: 'Dose entry not found.', code: 404, reason: 'health_dose_not_found' });
 
   const b = req.body || {};
   if (newStatus === 'taken') {
@@ -465,7 +465,7 @@ router.patch('/logs/:id', (req, res) => {
     if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
 
     const logRow = ownLogRow(id, viewer);
-    if (!logRow) return res.status(404).json({ error: 'Dosis-Eintrag nicht gefunden.', code: 404 });
+    if (!logRow) return res.status(404).json({ error: 'Dose entry not found.', code: 404, reason: 'health_dose_not_found' });
 
     const b = req.body || {};
     const status  = v.oneOf(b.status, LOG_STATUS, 'status');
@@ -524,11 +524,11 @@ router.delete('/logs/:id', (req, res) => {
     if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
 
     const logRow = ownLogRow(id, viewer);
-    if (!logRow) return res.status(404).json({ error: 'Dosis-Eintrag nicht gefunden.', code: 404 });
+    if (!logRow) return res.status(404).json({ error: 'Dose entry not found.', code: 404, reason: 'health_dose_not_found' });
 
     if (logRow.schedule_id) {
       return res.status(409).json({
-        error: 'Ein geplanter Dosis-Eintrag lässt sich nicht löschen, nur zurücknehmen.',
+        error: 'A scheduled dose entry cannot be deleted, only reset to pending.',
         code: 409,
       });
     }

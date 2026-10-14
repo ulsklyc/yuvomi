@@ -5429,7 +5429,23 @@
                 "kcal": "kcal",
                 "g": "g"
             }
-        }
+        },
+        "errorVitalGone": "Chỉ số đo này không còn tồn tại.",
+        "errorMedicationGone": "Thuốc này không còn tồn tại.",
+        "errorScheduleGone": "Giờ này không còn tồn tại.",
+        "errorDoseGone": "Mục liều này không còn tồn tại.",
+        "errorLabReportGone": "Kết quả này không còn tồn tại.",
+        "errorLabResultGone": "Chỉ số này không còn tồn tại.",
+        "errorActivityGone": "Hoạt động này không còn tồn tại.",
+        "errorPreventionTypeGone": "Loại chăm sóc phòng ngừa này không còn tồn tại.",
+        "errorSelectedPreventionTypeGone": "Loại đã chọn không còn tồn tại.",
+        "errorPreventionRecordGone": "Mục chăm sóc phòng ngừa này không còn tồn tại.",
+        "errorNutritionEntryGone": "Mục này không còn tồn tại.",
+        "errorPeriodGone": "Kỳ kinh này không còn tồn tại.",
+        "errorCycleDayGone": "Mục của ngày này không còn tồn tại.",
+        "errorCycleImportTooLarge": "Văn bản lớn hơn {{limit_kb}} KB. Hãy nhập các kỳ kinh thành nhiều phần nhỏ hơn.",
+        "errorCycleImportNoRows": "Tệp chỉ có dòng tiêu đề và không có kỳ kinh nào.",
+        "errorCycleImportTooManyRows": "Mỗi lần nhập chỉ được tối đa {{limit}} kỳ kinh. Hãy chia nhỏ tệp."
     },
     "waste": {
         "title": "Thu gom rác",

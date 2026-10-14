@@ -28,6 +28,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   leaves start and end out of the save when you did not change them, and the stored time stays as
   it was. Setting a household time zone in Settings is still the way to make device and server
   agree on times you type in.
+- **Health: an error message is in your language and names the cause** (#1909). The health
+  pages showed the server's own sentence when something could not be saved or deleted, in German
+  or English whatever the app language, for example "Medikament nicht gefunden." when somebody
+  else in the household had deleted the medication in the meantime. Measurements, medications,
+  time slots, dose entries, lab reports and analytes, activities, preventive care, nutrition
+  entries, periods and day entries now say in the language of the app that the entry no longer
+  exists; an open dialog closes and the area fetches the current state by itself. Deleting
+  something that is already deleted simply succeeds. If the preventive care type chosen in an
+  open dialog was deleted in Settings, the dialog stays open with your input and offers the
+  current types. Importing period history names the cause when the text is too large, has only
+  a header row or holds too many periods. Any other failure shows the general message of the
+  place instead of the server's text. The same holds for preventive care types in Settings. Not
+  covered: the list of invalid rows of a period import still shows the server's row messages.
+  For API clients: those answers of `/api/v1/health` carry a `reason` next to `error`
+  (`health_*_not_found`, `health_prevention_selected_type_not_found`,
+  `health_cycle_import_too_large`, `health_cycle_import_no_rows`,
+  `health_cycle_import_too_many_rows`, the import limits in `params`); status codes are unchanged,
+  and the `error` texts that were German are now English.
 
 ## [2.77.0] - 2026-10-14
 

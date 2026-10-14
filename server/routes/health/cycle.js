@@ -236,7 +236,7 @@ router.patch('/cycle/periods/:id', (req, res) => {
     if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
 
     const existing = db.get().prepare('SELECT * FROM cycle_periods WHERE id = ? AND user_id = ?').get(id, viewer);
-    if (!existing) return res.status(404).json({ error: 'Periode nicht gefunden.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Period not found.', code: 404, reason: 'health_cycle_period_not_found' });
 
     const b = req.body || {};
     const fields = {};
@@ -269,7 +269,7 @@ router.delete('/cycle/periods/:id', (req, res) => {
     if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
 
     const existing = db.get().prepare('SELECT id FROM cycle_periods WHERE id = ? AND user_id = ?').get(id, viewer);
-    if (!existing) return res.status(404).json({ error: 'Periode nicht gefunden.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Period not found.', code: 404, reason: 'health_cycle_period_not_found' });
 
     db.get().prepare('DELETE FROM cycle_periods WHERE id = ?').run(id);
     res.status(204).end();
@@ -422,7 +422,7 @@ router.delete('/cycle/logs/:id', (req, res) => {
     if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
 
     const existing = db.get().prepare('SELECT id FROM cycle_day_logs WHERE id = ? AND user_id = ?').get(id, viewer);
-    if (!existing) return res.status(404).json({ error: 'Eintrag nicht gefunden.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Day entry not found.', code: 404, reason: 'health_cycle_log_not_found' });
 
     db.get().prepare('DELETE FROM cycle_day_logs WHERE id = ?').run(id);
     res.status(204).end();
@@ -729,7 +729,12 @@ router.post('/cycle/import', (req, res) => {
       return badRequest(res, ['csv is required.']);
     }
     if (Buffer.byteLength(csv, 'utf8') > IMPORT_MAX_BYTES) {
-      return badRequest(res, [`csv must be at most ${IMPORT_MAX_BYTES} bytes.`]);
+      // Was ein Nutzer mit seiner Datei erreicht, nennt seinen Fall (#1909),
+      // die Grenze steht als Zahl in `params` - den Satz baut die App.
+      return res.status(400).json({
+        error: `csv must be at most ${IMPORT_MAX_BYTES} bytes.`, code: 400,
+        reason: 'health_cycle_import_too_large', params: { limit_kb: IMPORT_MAX_BYTES / 1024 },
+      });
     }
 
     const lines = csv.split(/\r\n|\r|\n/).filter((line) => line.trim() !== '');
@@ -743,9 +748,14 @@ router.post('/cycle/import', (req, res) => {
     const hasHeader = String(firstCells[0] || '').toLowerCase() === 'start_date';
     const dataLines = hasHeader ? lines.slice(1) : lines;
 
-    if (!dataLines.length) return badRequest(res, ['csv contains no data rows.']);
+    if (!dataLines.length) {
+      return res.status(400).json({ error: 'csv contains no data rows.', code: 400, reason: 'health_cycle_import_no_rows' });
+    }
     if (dataLines.length > IMPORT_MAX_ROWS) {
-      return badRequest(res, [`csv may contain at most ${IMPORT_MAX_ROWS} data rows.`]);
+      return res.status(400).json({
+        error: `csv may contain at most ${IMPORT_MAX_ROWS} data rows.`, code: 400,
+        reason: 'health_cycle_import_too_many_rows', params: { limit: IMPORT_MAX_ROWS },
+      });
     }
 
     const parsedRows = [];
