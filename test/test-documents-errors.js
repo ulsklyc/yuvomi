@@ -753,3 +753,33 @@ test('Seite: "gibt es nicht mehr", und die Seite wurde inzwischen verlassen - ni
   assert.deepEqual(neu.gefragt, [], 'in den neuen Traeger zeichnet das alte Nachladen nicht');
   assert.equal(alt.gefragt.includes('#documents-folder-browser'), false, 'in den alten auch nicht');
 });
+
+test('Seite: "gibt es nicht mehr", und inzwischen ist ein anderer Dialog offen - der bleibt offen', async () => {
+  // Codex an #1994: der Dialog der Handlung wird nur geschlossen, wenn er noch
+  // der offene ist. Zwischen Anfrage und Antwort wechselt hier das Modal.
+  let modal = 'dialog-der-handlung';
+  globalThis.__modalContextId = () => modal;
+  try {
+    const form = formular(BEARBEITEN);
+    const speichern = await mitSeite({}, () => mit({
+      put: async () => { modal = 'ein-anderer-dialog'; throw fehler(404, 'documents_document_not_found'); },
+    }, () => page.saveDocument({ target: form, preventDefault() {} }, { ...DOC }, formular())));
+    assert.deepEqual(toasts, [['documents.errorDocumentGone', 'danger']]);
+    assert.deepEqual(speichern.closed, [], 'Speichern: der fremde Dialog bleibt offen');
+    assert.ok(reloaded(speichern.gets), 'nachgeladen wird trotzdem');
+
+    modal = 'dialog-der-handlung';
+    const verknuepfen = await mitSeite({ dmsAccounts: [{ id: 1, name: 'Paperless' }] }, () => mit({
+      post: async () => { modal = 'ein-anderer-dialog'; throw fehler(404, 'dms_document_not_found'); },
+    }, () => page.linkDmsDocument({ id: '7' }, 1)));
+    assert.deepEqual(verknuepfen.closed, [], 'Verknuepfen: der fremde Dialog bleibt offen');
+
+    // Gegenfall: derselbe Dialog ist noch offen - er geht zu.
+    modal = 'dialog-der-handlung';
+    const gleich = await mitSeite({}, () => mit({ put: async () => { throw fehler(404, 'documents_document_not_found'); } },
+      () => page.saveDocument({ target: formular(BEARBEITEN), preventDefault() {} }, { ...DOC }, formular())));
+    assert.equal(gleich.closed.length, 1);
+  } finally {
+    delete globalThis.__modalContextId;
+  }
+});

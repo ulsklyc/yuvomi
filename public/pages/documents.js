@@ -5,7 +5,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, selectModal, advancedSection, promptModal, confirmModal, refocusAfterRender } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, selectModal, advancedSection, promptModal, confirmModal, refocusAfterRender, captureModalContext, isModalContextCurrent } from '/components/modal.js';
 import { t, formatDate, getLocale } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
@@ -139,15 +139,17 @@ function errorText(err) {
  * Ziel der Handlung nicht mehr gibt (ein anderes Haushaltsmitglied hat den
  * Ordner oder das Dokument geloescht, oder es ist fuer dich nicht mehr
  * sichtbar), ist der Stand der Seite veraltet: sie holt Ordner und Dokumente
- * selbst neu, statt dazu zu raten. `fromDialog` schliesst dabei den Dialog, zu
- * dem die Handlung gehoerte.
+ * selbst neu, statt dazu zu raten. `dialog` ist der Modal-Kontext der Handlung
+ * (`captureModalContext()` vor der Anfrage): geschlossen wird nur, wenn genau
+ * dieser Dialog noch offen ist. Hat der Nutzer ihn inzwischen geschlossen, die
+ * Seite gewechselt oder einen anderen geoeffnet, bleibt das so (Codex an #1994).
  *
  * KEIN "SCHON GELOESCHT" ALS ERFOLG. Anders als im Einkauf sagt die 404 eines
  * Dokuments zweierlei: geloescht, ODER die Sichtbarkeit wurde geaendert und die
  * Zeile steht noch. Ein Loeschen mit diesem Grund laeuft deshalb wie jede
  * andere Handlung hier durch: der Satz, und die Seite zeigt, was wirklich steht.
  */
-async function reportError(err, { fromDialog = false } = {}) {
+async function reportError(err, { dialog = null } = {}) {
   window.yuvomi?.showToast(errorText(err), 'danger');
   if (!isGone(err)) return;
   // Nachladen nach "gibt es nicht mehr". Die DMS-Konten kommen mit: ein Konto,
@@ -156,7 +158,7 @@ async function reportError(err, { fromDialog = false } = {}) {
   // Wie deleteDocuments: wer die Seite inzwischen verlassen hat, bekommt
   // nichts mehr gezeichnet (Review zu #1994).
   const owner = _container;
-  if (fromDialog) await closeModal({ force: true });
+  if (dialog && isModalContextCurrent(dialog)) await closeModal({ force: true });
   try {
     await Promise.all([loadFolders(), loadDocuments(), loadMetaOptions()]);
   } catch (loadErr) {
@@ -3131,6 +3133,8 @@ async function saveFolderUpload(panel, payload) {
 async function saveDocument(event, doc, panel) {
   if (doc ? !mayManage(doc) : readOnly()) { event?.preventDefault?.(); return; }
   event.preventDefault();
+  // Der Dialog dieser Handlung, vor jeder Anfrage gemerkt (reportError).
+  const modalContext = captureModalContext();
   const form = event.target;
   const error = form.querySelector('#document-error');
   // Die Fußzeile mit dem Submit-Button wird beim Öffnen ans Panel gehoben
@@ -3212,7 +3216,7 @@ async function saveDocument(event, doc, panel) {
     // Das Dokument gibt es nicht mehr: der Dialog bearbeitet etwas Veraltetes,
     // er geht zu, und die Liste kommt frisch.
     if (isGone(err) && !isSelectedFolderGone(err)) {
-      reportError(err, { fromDialog: true });
+      reportError(err, { dialog: modalContext });
       return;
     }
     error.textContent = errorText(err);
@@ -3555,6 +3559,7 @@ function setMediaAffordance(el, label) {
 // Verknüpft ein DMS-Dokument mit der Dokumentenliste. Gibt true bei Erfolg zurück,
 // damit der auslösende Button im Fehlerfall wieder bedienbar wird.
 async function linkDmsDocument(item, accountId) {
+  const modalContext = captureModalContext();
   try {
     // Feste, vorhersagbare Kategorie: früher erbte das verknüpfte Dokument
     // stillschweigend das gerade aktive Filter-Chip, was nirgends stand.
@@ -3573,7 +3578,7 @@ async function linkDmsDocument(item, accountId) {
   } catch (err) {
     // Der Verknuepfen-Dialog zeigt einen veralteten Stand, wenn das Konto
     // oder das Dokument im DMS fehlt: dann geht er zu.
-    reportError(err, { fromDialog: true });
+    reportError(err, { dialog: modalContext });
     return false;
   }
 }
