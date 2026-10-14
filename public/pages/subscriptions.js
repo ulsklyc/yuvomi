@@ -54,16 +54,15 @@ let container = null;
 let searchField = null;
 
 /**
- * KEIN AELTERER STAND UEBER EINEM NEUEREN (#1909, Codex an #2001). Jede
- * Schreibhandlung zaehlt `listVersion` hoch, sobald der Server sie angenommen
- * hat, und jedes Laden zieht eine Nummer. Ein Laden uebernimmt sein Ergebnis
- * nur, wenn seither weder geschrieben noch neu geladen wurde - sonst kaeme z. B.
- * das Nachladen nach "gibt es nicht mehr", das vor einer Anlage startete und
- * nach ihr antwortet, mit der Liste OHNE das neue Abo zurueck.
+ * KEIN AELTERER STAND UEBER EINEM NEUEREN (#1909, Codex an #2001). Jedes Laden
+ * zieht eine Nummer und uebernimmt sein Ergebnis nur, wenn seither kein
+ * neueres gestartet ist. Ein ueberholtes Laden wartet auf das neueste und
+ * meldet dessen Ergebnis: wer danach zeichnet oder einen Dialog neu aufbaut,
+ * tut das mit dem frischen Stand, nicht mit dem, der beim Ueberholen noch da
+ * war (Review zu #2003).
  */
-let listVersion = 0;
 let loadTicket = 0;
-function markWritten() { listVersion += 1; }
+let latestLoad = null;
 
 /**
  * Steht die Seite, fuer die eine Antwort gedacht war, noch da? Die Variable
@@ -99,23 +98,68 @@ function errorText(err, fallbackKey = 'common.unknownError') {
   return errorSentence(err, fallbackKey);
 }
 
+// Welcher Grund welches Ding meint, das es nicht mehr gibt.
+const GONE_KINDS = new Map([
+  ['subscriptions_subscription_not_found', 'subscription'],
+  ['subscriptions_category_not_found', 'category'],
+  ['subscriptions_selected_category_not_found', 'category'],
+  ['subscriptions_payment_method_not_found', 'method'],
+  ['subscriptions_selected_payment_method_not_found', 'method'],
+]);
+
+/**
+ * "GIBT ES NICHT MEHR" WIRD LOKAL NACHGEZOGEN, NICHT NACHGELADEN (#1909,
+ * Zuschnitt vom 15.10.). Die Seite kennt das Ding, auf das die Handlung
+ * zielte, und nimmt genau dieses aus ihrem Stand: das Abo aus der Liste, die
+ * Kategorie oder Zahlungsart aus `state.meta` - und, wie der Server es mit ON
+ * DELETE SET NULL tut, aus jedem Abo, das sie trug. Kein GET: ein Nachladen
+ * liefe gegen jedes andere Laden und Schreiben dieser Seite um die Wette.
+ *
+ * @param {string} reason - der Grund der Antwort
+ * @param {{ subscription?: number, category?: number, method?: number }} gone
+ *   die ids, die der Aufrufer kennt; fehlt die passende, aendert sich nichts
+ * @returns {boolean} ob etwas entfernt wurde
+ */
+function forgetGone(reason, gone = {}) {
+  const kind = GONE_KINDS.get(reason);
+  const id = kind ? Number(gone?.[kind]) : NaN;
+  if (!Number.isFinite(id)) return false;
+  if (kind === 'subscription') {
+    const before = state.subscriptions.length;
+    state.subscriptions = state.subscriptions.filter((row) => row.id !== id);
+    return state.subscriptions.length !== before;
+  }
+  const isCat = kind === 'category';
+  const listKey = isCat ? 'categories' : 'payment_methods';
+  state.meta = { ...state.meta, [listKey]: (state.meta[listKey] || []).filter((item) => item.id !== id) };
+  const idKey = isCat ? 'category_id' : 'payment_method_id';
+  const cleared = isCat
+    ? { category_id: null, category_name: null, category_color: null, category_label_key: null, budget_subcategory_key: null }
+    : { payment_method_id: null, payment_method_name: null, payment_method_label_key: null };
+  state.subscriptions = state.subscriptions.map((row) => (row[idKey] === id ? { ...row, ...cleared } : row));
+  return true;
+}
+
 /**
  * EIN WEG FUER DIE FEHLER-TOASTS DER SEITE (#1909). Sagt der Grund, dass es das
  * Ziel der Handlung nicht mehr gibt (ein anderes Haushaltsmitglied hat das Abo,
- * die Kategorie oder die Zahlungsart geloescht), ist der Stand der Seite
- * veraltet: sie laedt selbst nach. `dialog` ist der Modal-Kontext der Handlung
- * (`captureModalContext()` vor der Anfrage): geschlossen wird nur, wenn genau
- * dieser Dialog noch offen ist (Codex an #1994). `reopen` baut ihn mit dem
- * frischen Stand neu auf (Verwalten-Dialog) - ebenfalls nur dann.
+ * die Kategorie oder die Zahlungsart geloescht), nimmt die Seite es aus ihrem
+ * Stand (`forgetGone`) und zeichnet neu. `dialog` ist der Modal-Kontext der
+ * Handlung (`captureModalContext()` vor der Anfrage): geschlossen wird nur,
+ * wenn genau dieser Dialog noch offen ist (Codex an #1994). `reopen` baut ihn
+ * mit dem nachgezogenen Stand neu auf (Verwalten-Dialog) - ebenfalls nur dann.
+ * Nach jedem await fragt die Seite, ob sie noch dieselbe ist.
  */
-async function reportError(err, { fallbackKey = 'common.unknownError', dialog = null, reopen = null } = {}) {
+async function reportError(err, { fallbackKey = 'common.unknownError', dialog = null, gone = null, reopen = null } = {}) {
   window.yuvomi?.showToast(errorText(err, fallbackKey), 'danger');
   if (!isGone(err)) return;
   const owner = container;
   const wasOpen = Boolean(dialog) && isModalContextCurrent(dialog);
   if (wasOpen) await closeModal({ force: true });
-  // Ein scheiterndes Nachladen meldet nichts weiter - der Satz steht schon da.
-  if (!await reload(undefined, { quiet: true, owner })) return;
+  if (!isCurrentOwner(owner)) return;
+  forgetGone(err.data.reason, gone ?? {});
+  renderFilters();
+  renderContent();
   refocusAfterRender();
   if (wasOpen && reopen) reopen();
 }
@@ -264,7 +308,13 @@ function dueLabel(subscription) {
   return t('subscriptions.dueInDays', { count: days });
 }
 
-async function load({ refreshRates = false } = {}) {
+function load(options) {
+  const run = loadOnce(options);
+  latestLoad = run;
+  return run;
+}
+
+async function loadOnce({ refreshRates = false } = {}) {
   const params = new URLSearchParams();
   if (state.query) params.set('q', state.query);
   if (state.categoryId) params.set('category_id', state.categoryId);
@@ -272,10 +322,12 @@ async function load({ refreshRates = false } = {}) {
   if (state.status !== 'all') params.set('status', state.status);
   if (refreshRates) params.set('refresh_rates', 'true');
 
-  // Siehe listVersion: ein ueberholtes Laden uebernimmt nichts, auch keinen Fehler.
+  // Siehe loadTicket: ein ueberholtes Laden uebernimmt nichts, auch keinen
+  // Fehler, und meldet das Ergebnis des neuesten (false, wenn das scheitert -
+  // dessen Aufrufer sagt es dann).
   const ticket = ++loadTicket;
-  const version = listVersion;
-  const outdated = () => ticket !== loadTicket || version !== listVersion;
+  const outdated = () => ticket !== loadTicket;
+  const newest = () => latestLoad.then(() => true, () => false);
   let answers;
   try {
     answers = await Promise.all([
@@ -284,10 +336,10 @@ async function load({ refreshRates = false } = {}) {
       api.get('/budget/subscriptions/settings'),
     ]);
   } catch (err) {
-    if (outdated()) return false;
+    if (outdated()) return newest();
     throw err;
   }
-  if (outdated()) return false;
+  if (outdated()) return newest();
   const [list, meta, settings] = answers;
   state.subscriptions = list.data?.subscriptions || [];
   state.summary = list.data?.summary || null;
@@ -361,7 +413,10 @@ export async function render(target, { user } = {}) {
   `);
   if (window.lucide) window.lucide.createIcons({ el: container });
   try {
-    await load();
+    // Ein Ergebnis, das nicht uebernommen wurde, oder eine Seite, die
+    // inzwischen verlassen oder neu aufgebaut ist: nichts zeichnen, nichts
+    // binden (Review zu #2003).
+    if (!await load() || !isCurrentOwner(target)) return;
     renderFilters();
     renderContent();
     bindToolbar();
@@ -637,26 +692,22 @@ function bindToolbar() {
 }
 
 /**
- * Neu laden und zeichnen - nur, solange die Seite noch dieselbe ist und kein
- * neuerer Stand inzwischen gekommen ist (listVersion).
+ * Neu laden und zeichnen - nur, solange die Seite noch dieselbe ist.
  *
- * @returns {Promise<boolean>} ob die Seite noch steht (dann darf der Aufrufer
- *   den Fokus zuruecktragen oder einen Dialog neu aufbauen)
+ * @returns {Promise<boolean>} ob ein frischer Stand gezeichnet wurde (dann darf
+ *   der Aufrufer den Fokus zuruecktragen oder einen Dialog neu aufbauen)
  */
-async function reload(options, { motion = false, quiet = false, owner = container } = {}) {
+async function reload(options, { motion = false, owner = container } = {}) {
   try {
     const applied = await load(options);
-    if (!isCurrentOwner(owner)) return false;
-    if (applied) {
-      renderFilters();
-      renderContent({ motion });
-    }
+    if (!applied || !isCurrentOwner(owner)) return false;
+    renderFilters();
+    renderContent({ motion });
+    return true;
   } catch (err) {
-    if (!isCurrentOwner(owner)) return false;
-    if (quiet) console.warn('[Subscriptions] reload failed:', err);
-    else window.yuvomi?.showToast(errorSentence(err, 'subscriptions.loadError'), 'danger');
+    if (isCurrentOwner(owner)) window.yuvomi?.showToast(errorSentence(err, 'subscriptions.loadError'), 'danger');
+    return false;
   }
-  return true;
 }
 
 function sortedSubscriptions() {
@@ -1368,27 +1419,26 @@ function metaComboboxMarkup(id, value = '', { without = null } = {}) {
 
 /**
  * Die im Abo-Dialog GEWAEHLTE Kategorie oder Zahlungsart ist weg (#1909): der
- * Dialog bleibt mit der Eingabe offen, die Auswahl bekommt den aktuellen Stand,
- * steht auf "keine" und traegt den Fokus. Scheitert das Nachladen, faellt
- * wenigstens die verschwundene aus der Auswahl.
+ * Dialog bleibt mit der Eingabe offen, die gewaehlte faellt aus dem Stand der
+ * Seite (`forgetGone`, ohne GET), die Auswahl wird ueber denselben Helfer wie
+ * beim Oeffnen neu gebaut, steht auf "keine" und traegt den Fokus. Die Seite
+ * hinter dem Dialog zeichnet mit - Filter und Karten nennen dieselben
+ * Kategorien und Zahlungsarten.
  */
-async function offerCurrentMeta(panel, id) {
+function offerCurrentMeta(panel, id, reason) {
   const owner = container;
   const goneId = String(panel.querySelector(`#${id}`)?.value ?? '');
-  try {
-    const response = await api.get('/budget/subscriptions/meta');
-    if (response?.data) state.meta = response.data;
-  } catch (err) {
-    console.warn('[Subscriptions] metadata reload failed:', err);
-  }
+  forgetGone(reason, { [id === 'subscription-category' ? 'category' : 'method']: goneId === '' ? NaN : Number(goneId) });
   const root = panel.querySelector(`[data-combobox="${id}"]`);
   if (!root) return;
   root.insertAdjacentHTML('afterend', metaComboboxMarkup(id, '', { without: goneId }));
   root.remove();
   wireCombobox(panel, id);
   panel.querySelector(`#${id}-search`)?.focus();
-  // Die Filter hinter dem Dialog nennen dieselben Kategorien und Zahlungsarten.
-  if (isCurrentOwner(owner)) renderFilters();
+  if (isCurrentOwner(owner)) {
+    renderFilters();
+    renderContent();
+  }
 }
 
 export function openSubscriptionModal(subscription = null) {
@@ -1749,7 +1799,6 @@ async function saveSubscription(panel, existing, searchedLogoData = null) {
     };
     if (existing) await api.put(`/budget/subscriptions/${existing.id}`, payload);
     else await api.post('/budget/subscriptions', payload);
-    markWritten();
     await closeModal({ force: true });
     if (await reload(undefined, { motion: true })) refocusAfterRender();
     window.yuvomi?.showToast(t(existing ? 'subscriptions.savedToast' : 'subscriptions.addedToast'), 'success');
@@ -1757,10 +1806,12 @@ async function saveSubscription(panel, existing, searchedLogoData = null) {
     const goneSelect = selectedMetaGone(err);
     if (goneSelect) {
       window.yuvomi?.showToast(errorText(err), 'danger');
-      await offerCurrentMeta(panel, goneSelect);
+      offerCurrentMeta(panel, goneSelect, err.data.reason);
       return;
     }
-    reportError(err, { dialog });
+    // Beim Anlegen kennt die Seite keine id: das neue Abo, das waehrend seiner
+    // Buchung geloescht wurde, stand nie in ihrer Liste.
+    reportError(err, { dialog, gone: { subscription: existing?.id } });
   } finally {
     submit.disabled = false;
   }
@@ -1864,12 +1915,11 @@ async function renewSubscription(subscription) {
   if (!confirmed) return;
   try {
     const response = await api.post(`/budget/subscriptions/${subscription.id}/renew`, {});
-    markWritten();
     if (await reload(undefined, { motion: true })) refocusAfterRender();
     const completed = response.data?.status === 'completed';
     window.yuvomi?.showToast(t(completed ? 'subscriptions.completedToast' : 'subscriptions.renewedToast'), 'success');
   } catch (err) {
-    reportError(err);
+    reportError(err, { gone: { subscription: subscription.id } });
   }
 }
 
@@ -1878,6 +1928,7 @@ async function deleteSubscription(subscription) {
   const confirmed = await confirmModal(t('subscriptions.deleteConfirm', { name: subscription.name }),
     { danger: true, detail: t('subscriptions.deleteConfirmDetail') });
   if (!confirmed) return;
+  let alreadyGone = false;
   try {
     await api.delete(`/budget/subscriptions/${subscription.id}`);
   } catch (err) {
@@ -1888,14 +1939,22 @@ async function deleteSubscription(subscription) {
       reportError(err);
       return;
     }
+    alreadyGone = true;
   }
-  markWritten();
   const owner = container;
   // Die Zeile klappt aus, die Nachbarn ruecken nach - erst dann steht die
   // Liste ohne sie neu (der Server hat schon geloescht; ohne Bewegung loest
   // collapseRow sofort auf).
   await collapseRow(container.querySelector(`#subscriptions-list .swipe-row[data-swipe-id="${subscription.id}"]`));
-  if (await reload(undefined, { motion: true, owner })) refocusAfterRender();
+  if (alreadyGone) {
+    // Ohne GET (Zuschnitt vom 15.10.): die Zeile faellt aus dem Stand.
+    if (isCurrentOwner(owner)) {
+      forgetGone('subscriptions_subscription_not_found', { subscription: subscription.id });
+      renderFilters();
+      renderContent({ motion: true });
+      refocusAfterRender();
+    }
+  } else if (await reload(undefined, { motion: true, owner })) refocusAfterRender();
   window.yuvomi?.showToast(t('subscriptions.deletedToast'), 'success');
 }
 
@@ -1962,7 +2021,6 @@ async function openSettingsModal() {
             monthly_budget: Number(panel.querySelector('#subscriptions-budget').value),
             base_currency: baseCurrency,
           });
-          markWritten();
           await closeModal({ force: true });
           if (await reload({ refreshRates: true })) refocusAfterRender();
           window.yuvomi?.showToast(t('subscriptions.settingsSaved'), 'success');
@@ -2021,15 +2079,14 @@ function metadataRows(items, kind) {
  *
  * @returns {Promise<boolean>} ob der Server die Handlung angenommen hat
  */
-async function saveMetadata(write) {
+async function saveMetadata(write, gone = null) {
   const dialog = captureModalContext();
   try {
     await write();
   } catch (err) {
-    reportError(err, { dialog, reopen: openMetadataModal });
+    reportError(err, { dialog, gone, reopen: openMetadataModal });
     return false;
   }
-  markWritten();
   const owner = container;
   await closeModal({ force: true });
   if (await reload(undefined, { owner })) {
@@ -2157,9 +2214,10 @@ function openMetadataModal() {
             ? (nameInput.dataset.originalName ?? typed)
             : typed;
           const colorInput = editRow.querySelector('.subscriptions-metadata-edit-color');
-          const saved = await saveMetadata(() => (li.dataset.kind === 'categories'
+          const isCat = li.dataset.kind === 'categories';
+          const saved = await saveMetadata(() => (isCat
             ? api.put(`/budget/subscriptions/categories/${id}`, { name, color: colorInput.value })
-            : api.put(`/budget/subscriptions/payment-methods/${id}`, { name })));
+            : api.put(`/budget/subscriptions/payment-methods/${id}`, { name })), { [isCat ? 'category' : 'method']: id });
           if (saved) window.yuvomi?.showToast(t('subscriptions.metaSavedToast'), 'success');
         });
       });
@@ -2192,6 +2250,7 @@ function openMetadataModal() {
           );
           if (!confirmed) return;
           const owner = container;
+          let gone = false;
           try {
             await api.delete(`/budget/subscriptions/${isCat ? 'categories' : 'payment-methods'}/${id}`);
           } catch (err) {
@@ -2202,10 +2261,19 @@ function openMetadataModal() {
               if (isCurrentOwner(owner)) openMetadataModal();
               return;
             }
+            gone = true;
           }
-          markWritten();
-          if (!await reload(undefined, { owner })) return;
-          refocusAfterRender();
+          if (gone) {
+            // Ohne GET (Zuschnitt vom 15.10.): sie faellt aus dem Stand.
+            if (!isCurrentOwner(owner)) return;
+            forgetGone(isCat ? 'subscriptions_category_not_found' : 'subscriptions_payment_method_not_found', { [isCat ? 'category' : 'method']: id });
+            renderFilters();
+            renderContent();
+            refocusAfterRender();
+          } else {
+            if (!await reload(undefined, { owner })) return;
+            refocusAfterRender();
+          }
           window.yuvomi?.showToast(t('subscriptions.metaDeletedToast'), 'success');
           openMetadataModal();
         });
