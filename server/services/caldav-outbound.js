@@ -27,6 +27,7 @@ import { householdTimeZone } from '../utils/timezone.js';
 import * as db from '../db.js';
 import { nearestIcalColorName } from '../utils/ical-color.js';
 import { outboundEvent } from './outbound-dtstart.js';
+import { icsSnapshot } from './outbound-echo.js';
 import { findObjectWithUid } from '../utils/own-uid.js';
 import { upsertExternalCalendar } from './external-calendars.js';
 import { isOriginRefusal, sameObjectAddress } from '../utils/caldav-client.js';
@@ -694,7 +695,8 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
           outbound.dropDeletionsIn({
             source, calendarExternalId: moveTo, eventExternalId: event.external_calendar_id, accountId,
           });
-          outbound.settleOutbound(fresh, moveTo);
+          // Mit dem Anlegen ging der Patch hinaus: sein Schnappschuss (#1956).
+          outbound.settleOutbound(fresh, moveTo, fresh, { snapshot: icsSnapshot(fresh, patched, event.external_calendar_id) });
           done++;
           continue; // der Patch ist mit dem Anlegen bereits geschrieben
         } catch (err) {
@@ -723,7 +725,7 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
       // Die Adresse kam aus dem Abruf; die Zeile merkt sich die, an der ihr
       // Objekt wirklich liegt.
       if (index && url !== event.external_object_url) outbound.recordObjectUrl(event.id, url);
-      outbound.settleOutbound(fresh);
+      outbound.settleOutbound(fresh, null, fresh, { snapshot: icsSnapshot(fresh, patched, event.external_calendar_id) });
       done++;
     } catch (err) {
       outbound.handleUpdateError(err, event, 'update', label(source));

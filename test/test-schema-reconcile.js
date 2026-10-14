@@ -120,3 +120,22 @@ test('der Nachtrag laeuft nur, wenn die Spalte neu angelegt wurde', () => {
 
   assert.equal(db.prepare('SELECT series_authored FROM calendar_events WHERE id = 1').get().series_authored, 0);
 });
+
+// --------------------------------------------------------------------------
+// Der Sende-Schnappschuss (#1956): calendar_events.outbound_snapshot
+// --------------------------------------------------------------------------
+// Ohne die Spalte scheitert jeder Abruf von Google, CalDAV und iCloud. Ein
+// Nachtrag gibt es nicht: was ein frueherer Push gesendet hat, steht nirgends,
+// und NULL heisst "der Weg von vorher".
+
+test('traegt outbound_snapshot nach und laesst jede Zeile bei NULL', () => {
+  const db = driftedCalendar();
+  assert.equal(hasColumn(db, 'calendar_events', 'outbound_snapshot'), false);
+
+  reconcileCriticalSchema(db);
+
+  assert.equal(hasColumn(db, 'calendar_events', 'outbound_snapshot'), true);
+  const rows = db.prepare('SELECT outbound_snapshot, updated_at FROM calendar_events ORDER BY id').all();
+  assert.deepEqual(rows.map((r) => r.outbound_snapshot), [null, null, null, null]);
+  assert.deepEqual(rows.map((r) => r.updated_at), Array(4).fill('original'));
+});

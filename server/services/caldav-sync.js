@@ -33,6 +33,7 @@ import { sameCredentialOrigin } from '../utils/credential-origin.js';
 import { rruleLine } from './recurrence.js';
 import { nearestIcalColorName } from '../utils/ical-color.js';
 import { authoredAfterInbound, outboundEvent } from './outbound-dtstart.js';
+import { icsReading, icsSnapshot, isEcho } from './outbound-echo.js';
 import { followInboundStartChange } from './calendar-occurrence-overrides.js';
 
 // Reused functions from apple-calendar.js
@@ -942,8 +943,8 @@ async function runSync({ createClient } = {}) {
   // großen Kalendern spürbar Zeit und verkürzt damit das synchrone Verarbeitungsfenster.
   const conn = db.get();
   const selEventsWithUid = conn.prepare(`
-    SELECT id, outbound_dirty, calendar_ref_id, start_datetime, color, color_modified,
-           caldav_account_id, external_object_url, recurrence_rule, series_authored
+    SELECT id, outbound_dirty, calendar_ref_id, start_datetime, end_datetime, all_day, color, color_modified,
+           caldav_account_id, external_object_url, recurrence_rule, tzid, series_authored, outbound_snapshot
     FROM calendar_events
     WHERE external_calendar_id = ? AND external_source = 'caldav'
     ORDER BY id
@@ -1373,12 +1374,25 @@ async function runSync({ createClient } = {}) {
                 // anderer Start oder eine andere Regel in die Zeile kommt, als
                 // dort stand - auch der ausgerichtete Start, den Yuvomi selbst
                 // hinaufgegeben hat (services/outbound-dtstart.js).
-                // Geschrieben wird wie bisher.
+                //
+                // AUSSER BEIM ECHO DES EIGENEN PUSHS (#1956,
+                // services/outbound-echo.js): dann bleiben Start, Ende,
+                // ganztaegig, Regel und Zone wie eingegeben, die Marke bleibt,
+                // und die Erinnerungen wandern nicht (derselbe Start).
+                const echo = isEcho(existing, icsReading(ev));
+                const when = echo
+                  ? {
+                    dtstart: existing.start_datetime, dtend: existing.end_datetime, allDay: !!existing.all_day,
+                    rrule: existing.recurrence_rule, tzid: existing.tzid,
+                  }
+                  : ev;
                 const values = [
-                  ev.summary, ev.description, ev.dtstart, ev.dtend,
-                  ev.allDay ? 1 : 0, ev.location, ev.rrule, ev.tzid ?? null, evColor, calRefId,
+                  ev.summary, ev.description, when.dtstart, when.dtend,
+                  when.allDay ? 1 : 0, ev.location, when.rrule, when.tzid ?? null, evColor, calRefId,
                   obj.url ?? null,
-                  authoredAfterInbound(existing, { start_datetime: ev.dtstart, recurrence_rule: ev.rrule }),
+                  echo
+                    ? existing.series_authored
+                    : authoredAfterInbound(existing, { start_datetime: ev.dtstart, recurrence_rule: ev.rrule }),
                 ];
                 // `hasColor`, nicht `evColor`: auch eine COLOR-Zeile mit einem
                 // unlesbaren Wert (etwa #RRGGBBAA) sagt, dass der Server ueber
@@ -1393,7 +1407,7 @@ async function runSync({ createClient } = {}) {
                 changed = updEvent.run(...values, existing.id, ...values).changes > 0;
                 eventId = existing.id;
                 // Auf dem Server verschoben (#1377): die Erinnerungen ziehen mit.
-                if (changed) followInboundStartChange(conn, eventId, existing.start_datetime, ev.dtstart);
+                if (changed) followInboundStartChange(conn, eventId, existing.start_datetime, when.dtstart);
                 // Von einem Kalender in einen anderen verschoben (#1270): die
                 // unangetastete Standard-Zuweisung zieht mit um.
                 reassignDefaultOnCalendarMove(db.get(), eventId, {
@@ -1557,6 +1571,7 @@ async function runSync({ createClient } = {}) {
           const booked = outbound.bookEventUpload(event, {
             source: 'caldav', uid, objectUrl, calRefId, adopted, accountId: account.id,
             calendarUrl: event.target_caldav_calendar_url,
+            snapshot: icsSnapshot(event, icsData, uid),
           });
           if (booked !== 'mirrored') continue;
 

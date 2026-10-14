@@ -684,8 +684,12 @@ export function reloadEvent(eventId) {
  * @param {object}      requested      die Zeile, auf deren Ziel der Umzug beruhte.
  *   Gleich `sent`, wenn Umzug und Änderung ein Aufruf sind (CalDAV); älter, wenn
  *   ein Provider erst verschiebt und danach getrennt patcht (Google).
+ * @param {{ snapshot?: string|null }} [booking]  `snapshot`: der Sende-
+ *   Schnappschuss dieses Aufrufs (#1956, services/outbound-echo.js), im selben
+ *   Schreibvorgang gebucht. Fehlt er (ein Umzug ohne gesendete Felder), bleibt
+ *   die Spalte, wie sie ist.
  */
-export function settleOutbound(sent, handledMoveTo = null, requested = sent) {
+export function settleOutbound(sent, handledMoveTo = null, requested = sent, { snapshot } = {}) {
   const now = reloadEvent(sent.id);
   if (!now) return;
   const edited = mirroredFieldsChanged(sent, now);
@@ -706,15 +710,17 @@ export function settleOutbound(sent, handledMoveTo = null, requested = sent) {
     const current = currentCalendarId(now) ?? handledMoveTo;
     nextMove = target && target !== current ? target : null;
   }
-  if (!edited && !nextMove) {
+  const withSnapshot = snapshot !== undefined;
+  if (!edited && !nextMove && !withSnapshot) {
     clearOutbound(sent.id);
     return;
   }
   db.get().prepare(`
     UPDATE calendar_events
-    SET outbound_dirty = ?, outbound_move_to = ?, outbound_attempts = 0
+    SET outbound_dirty = ?, outbound_move_to = ?, outbound_attempts = 0,
+        outbound_snapshot = CASE WHEN ? = 1 THEN ? ELSE outbound_snapshot END
     WHERE id = ?
-  `).run(edited ? 1 : 0, nextMove, sent.id);
+  `).run(edited ? 1 : 0, nextMove, withSnapshot ? 1 : 0, withSnapshot ? snapshot : null, sent.id);
 }
 
 export function recordObjectUrl(eventId, objectUrl) {
@@ -981,7 +987,7 @@ export async function uploadNewEvent(client, calendar, uid, ics, { source, event
  *
  * @returns {boolean} true, wenn die Zeile umgeschrieben wurde
  */
-export function markEventUploaded(eventId, { source, uid, objectUrl, calRefId, adopted = false, onlyIfLocal = false, accountId = null, moveTo = null }) {
+export function markEventUploaded(eventId, { source, uid, objectUrl, calRefId, adopted = false, onlyIfLocal = false, accountId = null, moveTo = null, snapshot }) {
   // Ein CalDAV-Upload macht die Zeile zum Termin DIESES Kontos (#1860). Die
   // Spalte steht nur im CalDAV-Statement: Apple kennt kein Konto und lässt sie
   // unberührt.
@@ -997,12 +1003,14 @@ export function markEventUploaded(eventId, { source, uid, objectUrl, calRefId, a
         color_modified = CASE WHEN color IS NOT NULL THEN 1 ELSE color_modified END,
         outbound_dirty = CASE WHEN ? = 1 THEN 1 ELSE outbound_dirty END,
         outbound_move_to = COALESCE(?, outbound_move_to),
-        outbound_attempts = CASE WHEN ? = 1 THEN 0 ELSE outbound_attempts END
+        outbound_attempts = CASE WHEN ? = 1 THEN 0 ELSE outbound_attempts END,
+        outbound_snapshot = CASE WHEN ? = 1 THEN ? ELSE outbound_snapshot END
     WHERE id = ?
       AND (? = 0 OR external_source = 'local')
   `).run(
     source, uid, objectUrl, calRefId, ...(forCaldav ? [accountId] : []),
-    adopted ? 1 : 0, moveTo, adopted || moveTo ? 1 : 0, eventId, onlyIfLocal ? 1 : 0
+    adopted ? 1 : 0, moveTo, adopted || moveTo ? 1 : 0,
+    snapshot !== undefined ? 1 : 0, snapshot ?? null, eventId, onlyIfLocal ? 1 : 0
   ).changes > 0;
 }
 
@@ -1069,7 +1077,7 @@ export function markEventUploaded(eventId, { source, uid, objectUrl, calRefId, a
  *   dessen Antwort nie ankam). Ohne sie entscheidet allein das Ziel.
  * @returns {'mirrored'|'deleted'|'released'|'unchanged'}
  */
-export function bookEventUpload(sent, { source, uid, objectUrl, calRefId, calendarUrl, adopted = false, accountId = null, wantsUploadHere = null }) {
+export function bookEventUpload(sent, { source, uid, objectUrl, calRefId, calendarUrl, adopted = false, accountId = null, wantsUploadHere = null, snapshot }) {
   const booked = () => settleUploadAttempt({ source, accountId, kind: 'event', rowId: sent.id, collectionUrl: calendarUrl });
   const now = reloadEvent(sent.id);
   if (!now) {
@@ -1091,9 +1099,12 @@ export function bookEventUpload(sent, { source, uid, objectUrl, calRefId, calend
   // Spiegel und Umzug in EINEM Schreibvorgang: ein Spiegel ohne den Umzug
   // wäre genau der Zustand, den #1881 beschreibt.
   const edited = mirroredFieldsChanged(sent, now);
+  // Der Sende-Schnappschuss (#1956) nur, wenn das Objekt oben unseres ist:
+  // nach einer Uebernahme (412 auf den eigenen Namen) liegt dort ein frueherer
+  // Upload, und der naechste Push schreibt ihn ohnehin neu.
   const mirrored = markEventUploaded(sent.id, {
     source, uid, objectUrl, calRefId, adopted: adopted || edited, onlyIfLocal: true, accountId,
-    moveTo: wanted.moveTo,
+    moveTo: wanted.moveTo, snapshot: adopted ? null : (snapshot ?? null),
   });
   if (!mirrored) return 'unchanged';
   keepOwnUpload({ source, calendarUrl, uid });

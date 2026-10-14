@@ -34,6 +34,7 @@ import { householdTimeZone } from '../utils/timezone.js';
 import { createCalDAVClient, createUploadGate } from '../utils/caldav-client.js';
 import { nearestIcalColorName } from '../utils/ical-color.js';
 import { authoredAfterInbound, outboundEvent } from './outbound-dtstart.js';
+import { icsReading, icsSnapshot, isEcho } from './outbound-echo.js';
 import { followInboundStartChange } from './calendar-occurrence-overrides.js';
 
 const APPLE_COLOR = '#FC3C44';
@@ -476,7 +477,8 @@ async function runSync({ makeClient } = {}) {
           if (pendingDeletionUids.has(ev.uid)) continue;
 
           const selExisting = db.get().prepare(
-            `SELECT id, outbound_dirty, calendar_ref_id, start_datetime, recurrence_rule, series_authored
+            `SELECT id, outbound_dirty, calendar_ref_id, start_datetime, end_datetime, all_day, recurrence_rule, tzid,
+                    series_authored, outbound_snapshot
              FROM calendar_events WHERE external_calendar_id = ? AND external_source = 'apple'`
           );
           let existing = selExisting.get(ev.uid);
@@ -499,6 +501,17 @@ async function runSync({ makeClient } = {}) {
             // Nicht `user_modified` (#899): das wird bei jeder Bearbeitung
             // gesetzt, eine Titeländerung hätte die Farbspalte also dauerhaft
             // eingefroren und eine Umfärbung auf dem Server nie mehr erreicht.
+            //
+            // Beim Echo des eigenen Pushs (#1956, services/outbound-echo.js)
+            // bleiben Start, Ende, ganztaegig, Regel und Zone wie eingegeben,
+            // die Marke bleibt, die Erinnerungen wandern nicht.
+            const echo = isEcho(existing, icsReading(ev));
+            const when = echo
+              ? {
+                dtstart: existing.start_datetime, dtend: existing.end_datetime, allDay: !!existing.all_day,
+                rrule: existing.recurrence_rule, tzid: existing.tzid,
+              }
+              : ev;
             db.get().prepare(`
               UPDATE calendar_events
               SET title = ?, description = ?, start_datetime = ?, end_datetime = ?,
@@ -509,17 +522,19 @@ async function runSync({ makeClient } = {}) {
                   series_authored = ?
               WHERE id = ?
             `).run(
-              ev.summary, ev.description, ev.dtstart, ev.dtend,
-              ev.allDay ? 1 : 0, ev.location, ev.rrule, ev.tzid ?? null, evColor, calRefId,
+              ev.summary, ev.description, when.dtstart, when.dtend,
+              when.allDay ? 1 : 0, ev.location, when.rrule, when.tzid ?? null, evColor, calRefId,
               obj.url ?? null,
               // Die Marke (#1935) faellt, wenn hier ein anderer Start oder eine
               // andere Regel in die Zeile kommt, als dort stand - wie im CalDAV-Sync.
-              authoredAfterInbound(existing, { start_datetime: ev.dtstart, recurrence_rule: ev.rrule }),
+              echo
+                ? existing.series_authored
+                : authoredAfterInbound(existing, { start_datetime: ev.dtstart, recurrence_rule: ev.rrule }),
               existing.id
             );
             eventId = existing.id;
             // In iCloud verschoben (#1377): die Erinnerungen ziehen mit.
-            followInboundStartChange(db.get(), eventId, existing.start_datetime, ev.dtstart);
+            followInboundStartChange(db.get(), eventId, existing.start_datetime, when.dtstart);
             // Von einem Kalender in einen anderen verschoben (#1270): die
             // unangetastete Standard-Zuweisung zieht mit um.
             reassignDefaultOnCalendarMove(db.get(), eventId, {
@@ -643,7 +658,7 @@ async function runSync({ makeClient } = {}) {
       // wurde, bleibt lokal, und sein Objekt wird wieder entfernt.
       outbound.bookEventUpload(event, {
         source: 'apple', uid, objectUrl, calRefId, adopted, calendarUrl: defaultCal.url,
-        wantsUploadHere: stillWantsUpload,
+        wantsUploadHere: stillWantsUpload, snapshot: icsSnapshot(event, icsData, uid),
       });
     } catch (err) {
       if (!uploadGate.refused(defaultCal.url, err)) {

@@ -18,11 +18,10 @@
  *   - zeitgebunden, ganztägig, 23:30 und "letzter Tag, der ein Montag ist":
  *     der erste Upload und der Push nach einer Titeländerung tragen denselben
  *     Start und dasselbe Ende - mit der Bearbeitung VOR und NACH dem ersten Abruf;
- *   - der Abruf schreibt wie vor #1935: er übernimmt den ausgerichteten Start
- *     in die Zeile, die Erinnerungen folgen (#1377), und die Marke fällt, weil
- *     ein anderer Start in die Zeile kommt - der Push danach trägt trotzdem
- *     dasselbe, weil die Zeile den ausgerichteten Start dann selbst hält. Dass
- *     die Eingabe im Abruf stehen bleibt, ist #1956 und hier nicht gebaut;
+ *   - der Abruf erkennt das Echo des ausgerichteten Pushs (#1956): die Zeile
+ *     behaelt die Eingabe, die Marke und die Erinnerungen, und der Push danach
+ *     traegt wieder denselben Start; die einzelnen Echo-Faelle stehen in
+ *     test:own-series-echo;
  *   - Kontrollen: ein Start, der schon passt, und eine BYDAY-Regel (#549);
  *   - eine eingelesene Serie mit einem Start neben ihrer Regel geht nach einer
  *     Titeländerung Wort für Wort zurück (#756);
@@ -466,29 +465,36 @@ for (const name of Object.keys(PROVIDERS)) {
       await p.sync();
       assert.deepEqual(p.first(), expected(name, c), 'der erste Upload');
 
-      // Der Abruf liest den eigenen Eintrag zurück - und schreibt wie vor #1935:
-      // was beim Anbieter liegt, steht danach in der Zeile.
+      // Der Abruf liest den eigenen Eintrag zurück. Ist es das Echo des
+      // ausgerichteten Pushs (#1956), bleibt die Zeile, wie sie eingegeben
+      // wurde; sonst schreibt er wie vor #1935: was beim Anbieter liegt,
+      // steht danach in der Zeile. Die Faelle dazu stehen in
+      // test:own-series-echo.
       const beforeInbound = row(event.id);
       await p.sync();
       const afterInbound = row(event.id);
-      const moved = startMs(c.sent) - startMs(c.entered.start_datetime);
-      assert.equal(startMs(afterInbound.start_datetime), startMs(c.sent), 'die Zeile trägt den Start des Anbieters');
-      assert.equal(reminderMs(event.id) - remindMs, moved, 'die Erinnerung folgt dem Start der Zeile (#1377)');
-      if (!c.aligned) assert.equal(reminderOf(event.id), remindAt, 'ohne Verschiebung bleibt die Erinnerung, wie sie war');
-
-      // Die Marke fällt genau dann, wenn ein anderer Start oder eine andere
-      // Regel in die Zeile gekommen ist - ohne Urteil darüber, ob es das
-      // eigene Echo war.
-      const sameText = afterInbound.start_datetime === beforeInbound.start_datetime
-        && afterInbound.recurrence_rule === beforeInbound.recurrence_rule;
+      // Der Start, den die Zeile danach traegt: die Eingabe beim Echo, sonst der des Anbieters.
+      const held = c.aligned ? c.entered.start_datetime : c.sent;
+      const heldEnd = c.aligned ? c.entered.end_datetime : c.sentEnd;
+      const moved = startMs(held) - startMs(c.entered.start_datetime);
+      assert.equal(startMs(afterInbound.start_datetime), startMs(held), 'die Zeile traegt den erwarteten Start');
+      assert.equal(reminderOf(event.id), remindAt, 'die Erinnerung bleibt, wie sie war');
       assert.equal(beforeInbound.series_authored, 1, 'bis zum Abruf trägt die hier angelegte Serie die Marke');
-      assert.equal(afterInbound.series_authored, sameText ? 1 : 0,
-        `Start ${beforeInbound.start_datetime} -> ${afterInbound.start_datetime}, `
-        + `Regel ${beforeInbound.recurrence_rule} -> ${afterInbound.recurrence_rule}`);
-      if (c.aligned) assert.equal(afterInbound.series_authored, 0, 'der ausgerichtete Start ist ein anderer Start: die Marke fällt');
+      if (c.aligned) {
+        assert.equal(afterInbound.start_datetime, beforeInbound.start_datetime, 'das Echo laesst die Eingabe stehen');
+        assert.equal(afterInbound.series_authored, 1, 'das Echo laesst die Marke');
+      } else {
+        // Ohne Schnappschuss faellt die Marke genau dann, wenn ein anderer
+        // Start oder eine andere Regel in die Zeile gekommen ist.
+        const sameText = afterInbound.start_datetime === beforeInbound.start_datetime
+          && afterInbound.recurrence_rule === beforeInbound.recurrence_rule;
+        assert.equal(afterInbound.series_authored, sameText ? 1 : 0,
+          `Start ${beforeInbound.start_datetime} -> ${afterInbound.start_datetime}, `
+          + `Regel ${beforeInbound.recurrence_rule} -> ${afterInbound.recurrence_rule}`);
+      }
 
-      // Der Push nach der Bearbeitung trägt trotzdem dasselbe: die Zeile hält
-      // den ausgerichteten Start jetzt selbst.
+      // Der Push nach der Bearbeitung trägt dasselbe: beim Echo richtet er die
+      // Eingabe wieder aus, sonst hält die Zeile den Start des Anbieters selbst.
       await editTitle(p, event.id);
       assert.deepEqual(p.last(), expected(name, c), 'der Push nach der Titeländerung');
       assert.deepEqual(p.last(), p.first(), 'erster Upload und Push nach der Bearbeitung tragen dasselbe');
@@ -496,13 +502,13 @@ for (const name of Object.keys(PROVIDERS)) {
       // Und der Abruf danach lässt es dabei.
       await p.sync();
       assert.equal(row(event.id).title, 'Neuer Titel');
-      assert.equal(startMs(row(event.id).start_datetime), startMs(c.sent));
+      assert.equal(startMs(row(event.id).start_datetime), startMs(held));
       assert.equal(reminderMs(event.id) - remindMs, moved);
 
       // Das ganze Formular, wie es der Dialog nach dem Abruf schickt: der Start
       // der Zeile als Wanduhrzeit des Haushalts, dieselbe Regel.
       await editTitle(p, event.id, {
-        title: 'Noch einmal', start_datetime: c.sent, end_datetime: c.sentEnd,
+        title: 'Noch einmal', start_datetime: held, end_datetime: heldEnd,
         all_day: c.entered.all_day ? 1 : 0, recurrence_rule: row(event.id).recurrence_rule,
       });
       assert.deepEqual(p.last(), p.first(), 'auch danach liegt beim Anbieter dasselbe');

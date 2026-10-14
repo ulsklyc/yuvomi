@@ -84,7 +84,10 @@ test('body-free event projection mirrors every calendar_events column but the in
   const { get } = await import('../server/db.js');
   // Deliberate exclusion, not an oversight: legacy inline attachment bodies can
   // be megabytes and never belong in a compact read path.
-  const EXCLUDED = ['attachment_data'];
+  // outbound_snapshot (#1956): what the last aligned push sent. Its only reader
+  // is the inbound sync, with its own SELECT; no read path needs it, and an API
+  // answer should not carry it.
+  const EXCLUDED = ['attachment_data', 'outbound_snapshot'];
   const schema = get().prepare('PRAGMA table_info(calendar_events)').all()
     .map((column) => column.name);
   assert.ok(EXCLUDED.every((name) => schema.includes(name)),
