@@ -286,12 +286,16 @@ test('Seite: ein Messwert mit Ruecknahme-Toast, dessen Loeschen "nicht gefunden"
     }
     assert.ok(opts, 'der Ruecknahme-Weg wurde gestartet');
     // Wie utils/ux.js nach Ablauf der Frist: commit, und scheitert er, restore(err).
-    const { calls, gets } = await mit({ delete: async () => { throw err; } }, async () => {
+    const { calls, gets, closed } = await mit({ delete: async () => { throw err; } }, async () => {
       try { await opts.commit({ keepalive: false }); } catch (e) { opts.restore(e); }
     });
     assert.deepEqual(calls[0], ['DELETE', '/health/vitals/11']);
     assert.deepEqual(toasts, expected);
     assert.equal(gets.some((p) => p.startsWith('/health/vitals')), !restored, `nachgeladen: ${gets.join(', ')}`);
+    // Das Loeschen laeuft nach der Frist: ein Dialog, der jetzt offen ist,
+    // gehoert zu einer spaeteren Handlung und bleibt (Codex an #1971).
+    assert.deepEqual(closed, [], 'kein Dialog wird geschlossen');
+    assert.equal(gets.includes('/health/caregivers/me'), !restored, 'die Betreuungen kommen mit');
     page.setViewStateForTest('vitals', { rows: [] });
   }
 });
@@ -313,6 +317,9 @@ test('Seite: Periode heute beenden, die es nicht mehr gibt - ihr Satz statt des 
     assert.deepEqual(toasts, [['health.errorPeriodGone', 'danger']]);
     assert.equal(closed.length, 1);
     assert.ok(gets.some((p) => p.startsWith('/health/cycle/periods')), `nachgeladen: ${gets.join(', ')}`);
+    // Die 404 kann "Betreuung entzogen" heissen: die Betreuungen kommen mit
+    // (Codex an #1971), sonst boeten die Knoepfe das Schreiben weiter an.
+    assert.ok(gets.includes('/health/caregivers/me'), `Betreuungen nachgeladen: ${gets.join(', ')}`);
   } finally {
     page.setViewStateForTest('cycle', { periods: [], logs: [] });
   }
@@ -344,6 +351,29 @@ test('Seite: die gewaehlte Vorsorgeart ist weg - der Dialog bleibt, die Auswahl 
     assert.doesNotMatch(select.html, /Tetanus/, 'die geloeschte Art steht nicht mehr zur Wahl');
     assert.equal(d.element('#prevention-name-field').hidden, false, 'das Namensfeld ist wieder da');
     assert.deepEqual(d.fokus, ['#prevention-type']);
+  } finally {
+    page.setViewStateForTest('prevention', { types: [], records: [] });
+  }
+});
+
+test('Seite: die gewaehlte Vorsorgeart ist weg und das Nachladen der Arten scheitert - die geloeschte Art steht trotzdem nicht mehr zur Wahl', async () => {
+  page.setViewStateForTest('prevention', { types: [{ id: 12, name: 'Tetanus' }, { id: 13, name: 'Grippe' }], records: [] });
+  try {
+    const d = await vorsorgeDialog(null);
+    const { closed } = await mit({ post: async () => { throw fehler(400, 'health_prevention_selected_type_not_found'); } },
+      async () => {
+        const get = globalThis.__apiStub.get;
+        globalThis.__apiStub.get = async (path) => {
+          if (path === '/health/prevention/types') throw fehler(500);
+          return get(path);
+        };
+        await d.absenden('#prevention-form');
+      });
+    assert.deepEqual(toasts, [['health.errorSelectedPreventionTypeGone', 'danger']]);
+    assert.deepEqual(closed, []);
+    const select = d.element('#prevention-type');
+    assert.doesNotMatch(select.html, /Tetanus/, 'die geloeschte Art steht nicht mehr zur Wahl');
+    assert.match(select.html, /Grippe/, 'die anderen bleiben');
   } finally {
     page.setViewStateForTest('prevention', { types: [], records: [] });
   }

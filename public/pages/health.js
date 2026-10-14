@@ -2436,8 +2436,22 @@ function reportError(err, fallbackKey, reload) {
  */
 async function reloadAfterGone(reload) {
   await closeModal({ force: true });
+  await loadCareGrants();
   await reload();
   refocusAfterRender();
+}
+
+/**
+ * Der frische Stand nach "gibt es nicht mehr", ohne einen Dialog anzufassen
+ * (derselbe Weg wie in reloadAfterGone, dort ausgeschrieben fuer den Fokus-Guard).
+ * Die Betreuungen kommen mit (Codex an #1971): die 404 kann auch heissen,
+ * dass die Betreuung fuer diese Person entzogen wurde, und `careFor` stammt
+ * sonst vom ersten Aufbau der Seite - die Knoepfe boten das Schreiben weiter an.
+ * `loadCareGrants` meldet nichts und faellt im Zweifel auf "keine Betreuung".
+ */
+async function refreshAfterGone(reload) {
+  await loadCareGrants();
+  await reload();
 }
 
 /**
@@ -2453,7 +2467,13 @@ async function reloadAfterGone(reload) {
  * nicht die alte Zeile zurueckgestellt, sondern nachgeladen.
  */
 function restoreOrReload(err, fallbackKey, reload, restore) {
-  if (err && isGone(err)) { reportError(err, fallbackKey, reload); return; }
+  if (err && isGone(err)) {
+    // Das Loeschen laeuft erst nach der Ruecknahmefrist; ein Dialog, der jetzt
+    // offen ist, gehoert zu einer spaeteren Handlung und bleibt (Codex an #1971).
+    window.yuvomi?.showToast(errorSentence(err, fallbackKey), 'danger');
+    refreshAfterGone(reload);
+    return;
+  }
   restore();
 }
 
@@ -5251,8 +5271,16 @@ async function keepDialogForMissingType(err, select, syncName) {
   if (!select || !isGone(err) || err.data.reason !== 'health_prevention_selected_type_not_found') return false;
   window.yuvomi?.showToast(errorSentence(err), 'danger');
   // Die Arten zuerst: reloadPrevention() holt nur Eintraege und Faelligkeiten,
-  // und die Auswahl boete sonst die geloeschte Art weiter an.
-  try { await loadPreventionTypes(); } catch (loadErr) { console.error('[Health] prevention types reload error:', loadErr); }
+  // und die Auswahl boete sonst die geloeschte Art weiter an. Scheitert das
+  // Nachladen, faellt wenigstens die gewaehlte Art heraus - der Server hat
+  // gerade gesagt, dass es sie nicht mehr gibt (Codex an #1971).
+  const chosen = Number(select.value);
+  try {
+    await loadPreventionTypes();
+  } catch (loadErr) {
+    console.error('[Health] prevention types reload error:', loadErr);
+    prevention.types = prevention.types.filter((type) => type.id !== chosen);
+  }
   await reloadPrevention();
   select.replaceChildren();
   select.insertAdjacentHTML('beforeend', preventionTypeSelectMarkup(null));
