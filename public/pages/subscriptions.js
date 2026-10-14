@@ -65,12 +65,20 @@ let loadTicket = 0;
 let latestLoad = null;
 
 /**
- * Steht die Seite, fuer die eine Antwort gedacht war, noch da? Die Variable
- * `container` leert beim Verlassen niemand (Codex an #2001): verglichen wird
- * deshalb auch, ob der Knoten noch im Dokument haengt.
+ * WEM EINE ANTWORT GEHOERT (#1909, Codex an #2001). Jeder Aufbau der Seite
+ * (`render()`) ist eine eigene Instanz mit eigener Nummer. Eine Handlung haelt
+ * ihre Instanz VOR dem Request fest (`pageOwner()`) und reicht sie durch: wer
+ * sie erst nach der Antwort liest, bekommt nach "weg und zurueck" die NEUE
+ * Seite, und eine spaete Antwort raeumte dort auf. Verglichen werden Nummer
+ * und Knoten, und ob der Knoten noch im Dokument haengt - die Variable
+ * `container` leert beim Verlassen niemand.
  */
+let pageGeneration = 0;
+function pageOwner() {
+  return { el: container, gen: pageGeneration };
+}
 function isCurrentOwner(owner) {
-  return Boolean(owner) && container === owner && owner.isConnected === true;
+  return Boolean(owner?.el) && container === owner.el && pageGeneration === owner.gen && owner.el.isConnected === true;
 }
 
 /**
@@ -132,6 +140,12 @@ function forgetGone(reason, gone = {}) {
   const isCat = kind === 'category';
   const listKey = isCat ? 'categories' : 'payment_methods';
   state.meta = { ...state.meta, [listKey]: (state.meta[listKey] || []).filter((item) => item.id !== id) };
+  // Ein Filter auf genau dieses Ding wuerde ins Leere zeigen: zurueck auf "alle".
+  const filterKey = isCat ? 'categoryId' : 'paymentMethodId';
+  if (state[filterKey] !== '' && Number(state[filterKey]) === id) {
+    state[filterKey] = '';
+    syncFilterSheet();
+  }
   const idKey = isCat ? 'category_id' : 'payment_method_id';
   const cleared = isCat
     ? { category_id: null, category_name: null, category_color: null, category_label_key: null, budget_subcategory_key: null }
@@ -150,10 +164,11 @@ function forgetGone(reason, gone = {}) {
  * mit dem nachgezogenen Stand neu auf (Verwalten-Dialog) - ebenfalls nur dann.
  * Nach jedem await fragt die Seite, ob sie noch dieselbe ist.
  */
-async function reportError(err, { fallbackKey = 'common.unknownError', dialog = null, gone = null, reopen = null } = {}) {
+async function reportError(err, { fallbackKey = 'common.unknownError', owner = null, dialog = null, gone = null, reopen = null } = {}) {
   window.yuvomi?.showToast(errorText(err, fallbackKey), 'danger');
   if (!isGone(err)) return;
-  const owner = container;
+  // Ohne die vor dem Request festgehaltene Instanz wird nichts nachgezogen.
+  if (!isCurrentOwner(owner)) return;
   const wasOpen = Boolean(dialog) && isModalContextCurrent(dialog);
   if (wasOpen) await closeModal({ force: true });
   if (!isCurrentOwner(owner)) return;
@@ -351,6 +366,8 @@ async function loadOnce({ refreshRates = false } = {}) {
 
 export async function render(target, { user } = {}) {
   container = target;
+  pageGeneration += 1;
+  const owner = pageOwner();
   state.user = user || null;
   // `full`, nicht `reading`: die Seite ist nicht auf das Mass migriert. Ihr
   // Analytik-Raster (drei Spalten, zusammen mindestens 724px) und die Liste
@@ -416,7 +433,7 @@ export async function render(target, { user } = {}) {
     // Ein Ergebnis, das nicht uebernommen wurde, oder eine Seite, die
     // inzwischen verlassen oder neu aufgebaut ist: nichts zeichnen, nichts
     // binden (Review zu #2003).
-    if (!await load() || !isCurrentOwner(target)) return;
+    if (!await load() || !isCurrentOwner(owner)) return;
     renderFilters();
     renderContent();
     bindToolbar();
@@ -697,7 +714,7 @@ function bindToolbar() {
  * @returns {Promise<boolean>} ob ein frischer Stand gezeichnet wurde (dann darf
  *   der Aufrufer den Fokus zuruecktragen oder einen Dialog neu aufbauen)
  */
-async function reload(options, { motion = false, owner = container } = {}) {
+async function reload(options, { motion = false, owner = pageOwner() } = {}) {
   try {
     const applied = await load(options);
     if (!applied || !isCurrentOwner(owner)) return false;
@@ -1425,17 +1442,19 @@ function metaComboboxMarkup(id, value = '', { without = null } = {}) {
  * hinter dem Dialog zeichnet mit - Filter und Karten nennen dieselben
  * Kategorien und Zahlungsarten.
  */
-function offerCurrentMeta(panel, id, reason) {
-  const owner = container;
+function offerCurrentMeta(panel, id, reason, owner) {
   const goneId = String(panel.querySelector(`#${id}`)?.value ?? '');
-  forgetGone(reason, { [id === 'subscription-category' ? 'category' : 'method']: goneId === '' ? NaN : Number(goneId) });
+  const current = isCurrentOwner(owner);
+  // Der Stand der Seite gehoert der Instanz, die gefragt hat - eine neue
+  // bleibt unberuehrt. Die Auswahl im Dialog verliert die geloeschte so oder so.
+  if (current) forgetGone(reason, { [id === 'subscription-category' ? 'category' : 'method']: goneId === '' ? NaN : Number(goneId) });
   const root = panel.querySelector(`[data-combobox="${id}"]`);
   if (!root) return;
   root.insertAdjacentHTML('afterend', metaComboboxMarkup(id, '', { without: goneId }));
   root.remove();
   wireCombobox(panel, id);
   panel.querySelector(`#${id}-search`)?.focus();
-  if (isCurrentOwner(owner)) {
+  if (current) {
     renderFilters();
     renderContent();
   }
@@ -1768,8 +1787,9 @@ async function saveSubscription(panel, existing, searchedLogoData = null) {
 
   const submit = panel.querySelector('[type="submit"]');
   submit.disabled = true;
-  // Der Dialog dieser Handlung, vor jeder Anfrage gemerkt (reportError).
+  // Der Dialog und die Seite dieser Handlung, vor jeder Anfrage gemerkt (reportError).
   const dialog = captureModalContext();
+  const owner = pageOwner();
   try {
     const file = panel.querySelector('#subscription-logo').files[0];
     const logoData = searchedLogoData || (file ? await fileToDataUrl(file) : existing?.logo_data || null);
@@ -1800,18 +1820,18 @@ async function saveSubscription(panel, existing, searchedLogoData = null) {
     if (existing) await api.put(`/budget/subscriptions/${existing.id}`, payload);
     else await api.post('/budget/subscriptions', payload);
     await closeModal({ force: true });
-    if (await reload(undefined, { motion: true })) refocusAfterRender();
+    if (await reload(undefined, { motion: true, owner })) refocusAfterRender();
     window.yuvomi?.showToast(t(existing ? 'subscriptions.savedToast' : 'subscriptions.addedToast'), 'success');
   } catch (err) {
     const goneSelect = selectedMetaGone(err);
     if (goneSelect) {
       window.yuvomi?.showToast(errorText(err), 'danger');
-      offerCurrentMeta(panel, goneSelect, err.data.reason);
+      offerCurrentMeta(panel, goneSelect, err.data.reason, owner);
       return;
     }
     // Beim Anlegen kennt die Seite keine id: das neue Abo, das waehrend seiner
     // Buchung geloescht wurde, stand nie in ihrer Liste.
-    reportError(err, { dialog, gone: { subscription: existing?.id } });
+    reportError(err, { owner, dialog, gone: { subscription: existing?.id } });
   } finally {
     submit.disabled = false;
   }
@@ -1913,13 +1933,14 @@ async function renewSubscription(subscription) {
     t('subscriptions.renewConfirm', { name: subscription.name }),
     { detail: t('subscriptions.renewConfirmDetail', { date: formatDate(subscription.next_payment_date) }) });
   if (!confirmed) return;
+  const owner = pageOwner();
   try {
     const response = await api.post(`/budget/subscriptions/${subscription.id}/renew`, {});
-    if (await reload(undefined, { motion: true })) refocusAfterRender();
+    if (await reload(undefined, { motion: true, owner })) refocusAfterRender();
     const completed = response.data?.status === 'completed';
     window.yuvomi?.showToast(t(completed ? 'subscriptions.completedToast' : 'subscriptions.renewedToast'), 'success');
   } catch (err) {
-    reportError(err, { gone: { subscription: subscription.id } });
+    reportError(err, { owner, gone: { subscription: subscription.id } });
   }
 }
 
@@ -1928,6 +1949,7 @@ async function deleteSubscription(subscription) {
   const confirmed = await confirmModal(t('subscriptions.deleteConfirm', { name: subscription.name }),
     { danger: true, detail: t('subscriptions.deleteConfirmDetail') });
   if (!confirmed) return;
+  const owner = pageOwner();
   let alreadyGone = false;
   try {
     await api.delete(`/budget/subscriptions/${subscription.id}`);
@@ -1936,16 +1958,16 @@ async function deleteSubscription(subscription) {
     // schneller. Die 404 eines Abos heisst nur das - die Route liest es ohne
     // Sichtbarkeitsfilter, ein fremdes privates Abo endet dort mit 403.
     if (!isAlreadyDeleted(err, 'subscriptions_subscription_not_found')) {
-      reportError(err);
+      reportError(err, { owner });
       return;
     }
     alreadyGone = true;
   }
-  const owner = container;
   // Die Zeile klappt aus, die Nachbarn ruecken nach - erst dann steht die
   // Liste ohne sie neu (der Server hat schon geloescht; ohne Bewegung loest
-  // collapseRow sofort auf).
-  await collapseRow(container.querySelector(`#subscriptions-list .swipe-row[data-swipe-id="${subscription.id}"]`));
+  // collapseRow sofort auf). Ist die Seite inzwischen eine andere Instanz,
+  // bleibt sie unberuehrt; der Toast sagt trotzdem, dass geloescht ist.
+  if (isCurrentOwner(owner)) await collapseRow(container.querySelector(`#subscriptions-list .swipe-row[data-swipe-id="${subscription.id}"]`));
   if (alreadyGone) {
     // Ohne GET (Zuschnitt vom 15.10.): die Zeile faellt aus dem Stand.
     if (isCurrentOwner(owner)) {
@@ -2016,16 +2038,17 @@ async function openSettingsModal() {
           }));
           return;
         }
+        const owner = pageOwner();
         try {
           await api.put('/budget/subscriptions/settings', {
             monthly_budget: Number(panel.querySelector('#subscriptions-budget').value),
             base_currency: baseCurrency,
           });
           await closeModal({ force: true });
-          if (await reload({ refreshRates: true })) refocusAfterRender();
+          if (await reload({ refreshRates: true }, { owner })) refocusAfterRender();
           window.yuvomi?.showToast(t('subscriptions.settingsSaved'), 'success');
         } catch (err) {
-          reportError(err);
+          reportError(err, { owner });
         }
       });
     },
@@ -2081,13 +2104,13 @@ function metadataRows(items, kind) {
  */
 async function saveMetadata(write, gone = null) {
   const dialog = captureModalContext();
+  const owner = pageOwner();
   try {
     await write();
   } catch (err) {
-    reportError(err, { dialog, gone, reopen: openMetadataModal });
+    reportError(err, { owner, dialog, gone, reopen: openMetadataModal });
     return false;
   }
-  const owner = container;
   await closeModal({ force: true });
   if (await reload(undefined, { owner })) {
     refocusAfterRender();
@@ -2249,7 +2272,7 @@ function openMetadataModal() {
             },
           );
           if (!confirmed) return;
-          const owner = container;
+          const owner = pageOwner();
           let gone = false;
           try {
             await api.delete(`/budget/subscriptions/${isCat ? 'categories' : 'payment-methods'}/${id}`);
@@ -2292,5 +2315,6 @@ export const __test = {
   subscriptionReadSections, openSubscriptionModal, saveSubscription,
   // #1909: die Fehlerwege der Seite (test:subscriptions-errors).
   reload, renewSubscription, deleteSubscription, openSettingsModal, openMetadataModal, openLogoPickerModal,
-  setContainerForTest: (target) => { container = target; },
+  // Eine neue Instanz der Seite, wie ein render() sie anlegt.
+  setContainerForTest: (target) => { container = target; pageGeneration += 1; },
 };

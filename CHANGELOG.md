@@ -27,8 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   payments already made, a logo file whose content does not match its type and a logo search
   without result now get a sentence in the language of the app. When the subscription, category
   or payment method is gone, the page removes it from what it shows and the dialog of the action
-  closes (the manage dialog opens again without it); deleting something that is already gone
-  counts as deleted. If the category or payment method chosen in the subscription dialog was
+  closes (the manage dialog opens again without it), and a filter on a category or payment method
+  that is gone goes back to all; deleting something that is already gone counts as deleted. If the category or payment method chosen in the subscription dialog was
   deleted in the meantime, the dialog stays open with your input and offers the others; saving
   answered with a server error before. Adding a category or payment method
   and reordering them in the manage dialog showed no message of its own when it failed and now

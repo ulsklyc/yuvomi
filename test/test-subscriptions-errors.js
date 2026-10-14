@@ -979,3 +979,90 @@ test('Seite: baut sich die Seite waehrend des Schliessens neu auf (anderer Conta
     delete globalThis.__refocusAfterRender;
   }
 });
+
+test('Seite: eine spaete "gibt es nicht mehr"-Antwort nach "weg und zurueck" laesst die NEUE Seite unberuehrt - an jeder Aufrufstelle', async () => {
+  const faelle = [
+    ['Abo speichern', 'put', 'subscriptions_subscription_not_found', () => page.saveSubscription(formular(ABO_FORM), abo())],
+    ['gewaehlte Kategorie', 'put', 'subscriptions_selected_category_not_found', () => page.saveSubscription(formular(ABO_FORM), abo())],
+    ['verlaengern', 'post', 'subscriptions_subscription_not_found', () => page.renewSubscription(abo())],
+    ['loeschen', 'delete', 'subscriptions_subscription_not_found', () => page.deleteSubscription(abo())],
+  ];
+  for (const kind of ['categories', 'methods']) {
+    faelle.push([`umbenennen ${kind}`, 'put', kind === 'categories' ? 'subscriptions_category_not_found' : 'subscriptions_payment_method_not_found', async () => {
+      const { knopf } = zeile(kind, kind === 'categories' ? 6 : 8, 'Neu');
+      const panel = verwalten({}, { '[data-act="save"]': [knopf] });
+      globalThis.__openModal = (opts) => opts.onSave(panel);
+      try { page.openMetadataModal(); } finally { delete globalThis.__openModal; }
+      await knopf.handlers.click();
+    }]);
+    faelle.push([`loeschen ${kind}`, 'delete', kind === 'categories' ? 'subscriptions_category_not_found' : 'subscriptions_payment_method_not_found', async () => {
+      const { knopf } = zeile(kind, kind === 'categories' ? 6 : 8, 'Musik');
+      const panel = verwalten({}, { '[data-act="delete"]': [knopf] });
+      let opened = 0;
+      globalThis.__openModal = (opts) => { opened += 1; if (opened === 1) opts.onSave(panel); };
+      try {
+        page.openMetadataModal();
+        await knopf.handlers.click();
+      } finally { delete globalThis.__openModal; }
+    }]);
+  }
+  let refocus = 0;
+  globalThis.__refocusAfterRender = () => { refocus += 1; };
+  try {
+    // Der Router kann die Seite in einen neuen Knoten bauen oder in DENSELBEN:
+    // auch dann ist es eine neue Instanz.
+    for (const [label, verb, reason, lauf, derselbe] of faelle.flatMap((f) => [[...f, false], [...f, true]])) {
+      refocus = 0;
+      await mitSeite(async (alt) => {
+        const neu = derselbe ? alt : seite();
+        const drawsVorher = neu.draws;
+        // Waehrend der Request unterwegs ist: Seite verlassen und wieder
+        // geoeffnet - eine neue Instanz, die das Abo 3 und die Kategorie 6
+        // (wieder) zeigt, dazu ein neues Abo 4.
+        const weg = async () => {
+          page.setContainerForTest?.(neu);
+          page.state.subscriptions = [abo(), abo({ id: 4, name: 'Spotify', category_id: 6 })];
+          page.state.meta = structuredClone(META);
+          page.state.categoryId = '6';
+          page.state.paymentMethodId = '8';
+          throw fehler(verb === 'put' && reason.includes('selected') ? 400 : 404, reason);
+        };
+        await mit({ [verb]: weg }, lauf);
+        assert.deepEqual(page.state.subscriptions.map((s) => [s.id, s.category_id, s.payment_method_id]), [[3, 6, 8], [4, 6, 8]], `${label}: Abos der neuen Seite`);
+        assert.deepEqual(page.state.meta, META, `${label}: Kategorien und Zahlungsarten der neuen Seite`);
+        assert.deepEqual([page.state.categoryId, page.state.paymentMethodId], ['6', '8'], `${label}: Filter der neuen Seite`);
+        assert.equal(neu.draws, drawsVorher, `${label}${derselbe ? ' (derselbe Knoten)' : ''}: die neue Seite wird nicht gezeichnet`);
+        assert.equal(refocus, 0, `${label}: kein Fokus`);
+      });
+    }
+  } finally {
+    delete globalThis.__refocusAfterRender;
+  }
+});
+
+test('Seite: steht der Filter auf einer Kategorie oder Zahlungsart, die es nicht mehr gibt, geht er auf "alle" zurueck', async () => {
+  for (const [kind, rowId, reason, filterKey] of [
+    ['categories', 6, 'subscriptions_category_not_found', 'categoryId'],
+    ['methods', 8, 'subscriptions_payment_method_not_found', 'paymentMethodId'],
+  ]) {
+    const { knopf } = zeile(kind, rowId, 'Neu');
+    const panel = verwalten({}, { '[data-act="save"]': [knopf] });
+    globalThis.__openModal = (opts) => opts.onSave(panel);
+    try {
+      await mitSeite(async () => {
+        page.state[filterKey] = String(rowId);
+        // Ein anderer Filter bleibt stehen.
+        const anderer = filterKey === 'categoryId' ? 'paymentMethodId' : 'categoryId';
+        page.state[anderer] = filterKey === 'categoryId' ? '8' : '6';
+        await mit({ put: async () => { throw fehler(404, reason); } }, async () => {
+          page.openMetadataModal();
+          await knopf.handlers.click();
+        });
+        assert.equal(page.state[filterKey], '', `${kind}: der Filter auf die geloeschte zeigt auf "alle"`);
+        assert.notEqual(page.state[anderer], '', `${kind}: der andere Filter bleibt`);
+      });
+    } finally {
+      delete globalThis.__openModal;
+    }
+  }
+});
