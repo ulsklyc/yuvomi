@@ -535,6 +535,7 @@ const FOLDER_GONE = '`documents_folder_not_found` (404, the folder does not exis
 const SELECTED_FOLDER_GONE = '`documents_selected_folder_not_found` (400, the chosen parent or target folder does not exist)';
 const FOLDER_TREE = '`documents_folder_exists` (409, a sibling has this name), `documents_folder_too_deep` (400, `params.limit` is the maximum depth)';
 const DOCUMENT_GONE = '`documents_document_not_found` (404, the document does not exist or is not visible to the caller)';
+const STORAGE_FAILED = '`documents_storage_failed` (502, the storage backend failed)';
 const FILE_CASES = '`documents_file_type_not_allowed`, `documents_file_content_mismatch`, `documents_file_empty` (400), `documents_storage_failed` (502, the storage backend failed)';
 const CASE_REASONS = {
   '/api/v1/documents/folders': { post: `${SELECTED_FOLDER_GONE}, ${FOLDER_TREE}` },
@@ -549,6 +550,13 @@ const CASE_REASONS = {
     delete: `${DOCUMENT_GONE}, \`documents_storage_failed\` (502)`,
   },
   '/api/v1/documents/{id}/archive': { patch: DOCUMENT_GONE },
+  '/api/v1/documents/storage/config': {
+    get: STORAGE_FAILED,
+    put: STORAGE_FAILED,
+  },
+  '/api/v1/documents/storage/test': { post: STORAGE_FAILED },
+  '/api/v1/documents/{id}/preview': { get: STORAGE_FAILED },
+  '/api/v1/documents/{id}/download': { get: STORAGE_FAILED },
   '/api/v1/documents/dms/link': {
     post: '`dms_account_not_found` (404), `dms_document_not_found` (404, gone in the DMS), `dms_document_already_linked` (409), `dms_unreachable` (502)',
   },

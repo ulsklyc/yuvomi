@@ -153,6 +153,9 @@ async function reportError(err, { fromDialog = false } = {}) {
   // Nachladen nach "gibt es nicht mehr". Die DMS-Konten kommen mit: ein Konto,
   // das ein Admin entfernt hat, stuende sonst weiter im Menue. Ein scheiterndes
   // Nachladen meldet nichts weiter - der Satz steht schon da.
+  // Wie deleteDocuments: wer die Seite inzwischen verlassen hat, bekommt
+  // nichts mehr gezeichnet (Review zu #1994).
+  const owner = _container;
   if (fromDialog) await closeModal({ force: true });
   try {
     await Promise.all([loadFolders(), loadDocuments(), loadMetaOptions()]);
@@ -160,6 +163,7 @@ async function reportError(err, { fromDialog = false } = {}) {
     console.warn('[Documents] reload after a gone answer failed:', loadErr);
     return;
   }
+  if (_container !== owner) return;
   renderDmsHeaderBtn();
   renderAll();
   refocusAfterRender();
@@ -169,23 +173,27 @@ async function reportError(err, { fromDialog = false } = {}) {
  * Der im Dialog GEWAEHLTE Ordner ist weg (#1909): der Dialog bleibt mit der
  * Eingabe offen, die Auswahl bekommt die aktuellen Ordner, steht auf der
  * Wurzel und traegt den Fokus. Scheitert das Nachladen, faellt wenigstens der
- * verschwundene Ordner aus der Auswahl.
+ * verschwundene Ordner aus der Auswahl. Die Seite hinter dem Dialog zeichnet
+ * den frischen Stand mit - wer den Dialog danach abbricht, saehe sonst den
+ * geloeschten Ordner weiter in der Seitenleiste.
  *
  * @param {HTMLSelectElement|null} select
  * @param {string} rootKey - Beschriftung der Wurzel ("kein Ordner", "oberste Ebene")
- * @param {(rows: Array<{folder: object, depth: number}>) => string} optionsHtml
+ * @param {(goneId: string) => string} optionsHtml - die Optionen in der
+ *   Reihenfolge, die der Dialog beim Oeffnen hatte, ohne `goneId`
  */
 async function offerCurrentFolders(select, rootKey, optionsHtml) {
   if (!select) return;
   const goneId = String(select.value);
+  const owner = _container;
   try {
-    await loadFolders();
+    await Promise.all([loadFolders(), loadDocuments()]);
   } catch (err) {
     console.warn('[Documents] folder reload failed:', err);
   }
-  const rows = visibleAllFolderRows().filter((row) => String(row.folder.id) !== goneId);
+  if (_container === owner) renderAll();
   select.replaceChildren();
-  select.insertAdjacentHTML('beforeend', `<option value="">${esc(t(rootKey))}</option>${optionsHtml(rows)}`);
+  select.insertAdjacentHTML('beforeend', `<option value="">${esc(t(rootKey))}</option>${optionsHtml(goneId)}`);
   select.value = '';
   select.focus();
 }
@@ -2256,7 +2264,12 @@ function deleteDocuments(docs) {
   scheduleUndoableDelete({
     message,
     commit: async ({ keepalive }) => {
-      await Promise.all(docs.map((doc) => api.delete(`/documents/${doc.id}`, { keepalive })));
+      // ALLE abwarten, auch wenn eines scheitert (Review zu #1994): sonst laedt
+      // die Seite nach, waehrend ein anderes Loeschen noch laeuft, und dessen
+      // Dokument kaeme zurueck. Gemeldet wird der erste Fehler.
+      const outcomes = await Promise.allSettled(docs.map((doc) => api.delete(`/documents/${doc.id}`, { keepalive })));
+      const failed = outcomes.find((outcome) => outcome.status === 'rejected');
+      if (failed) throw failed.reason;
       // Seite inzwischen verlassen: die Löschung ist durch, aber es gibt nichts
       // mehr zu zeichnen — kein Nachladen auf einen abgehängten Container.
       if (keepalive || _container !== owner) return;
@@ -3205,8 +3218,10 @@ async function saveDocument(event, doc, panel) {
     error.textContent = errorText(err);
     error.hidden = false;
     if (isSelectedFolderGone(err)) {
+      // Dieselbe Reihenfolge wie beim Oeffnen (openDocumentModal): die Liste.
       await offerCurrentFolders(form.querySelector('#document-folder'), 'documents.noFolder',
-        (rows) => rows.map(({ folder }) => `<option value="${folder.id}">${esc(folder.name)}</option>`).join(''));
+        (goneId) => state.folders.filter((folder) => String(folder.id) !== goneId)
+          .map((folder) => `<option value="${folder.id}">${esc(folder.name)}</option>`).join(''));
     }
   } finally {
     submit.disabled = panel._folderUpload?.completed === true;
@@ -3281,8 +3296,10 @@ function openFolderModal({ parentId = null } = {}) {
           error.textContent = errorText(err);
           error.hidden = false;
           if (isSelectedFolderGone(err)) {
+            // Dieselbe Reihenfolge wie beim Oeffnen: der Baum, eingerueckt.
             await offerCurrentFolders(parentSelect, 'documents.folderRootLevel',
-              (rows) => rows.map((row) => `<option value="${row.folder.id}">${esc(`${'  '.repeat(row.depth)}${row.folder.name}`)}</option>`).join(''));
+              (goneId) => visibleAllFolderRows().filter((row) => String(row.folder.id) !== goneId)
+                .map((row) => `<option value="${row.folder.id}">${esc(`${'  '.repeat(row.depth)}${row.folder.name}`)}</option>`).join(''));
           }
         }
       });

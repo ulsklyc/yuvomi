@@ -28,17 +28,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import express from 'express';
 import Database from 'better-sqlite3-multiple-ciphers';
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'documents-errors-test-secret';
-const storageRoot = mkdtempSync(join(tmpdir(), 'yuvomi-documents-errors-'));
+const { tempDir } = await import('./tmp-dir.js');
+const storageRoot = tempDir('yuvomi-documents-errors-');
 process.env.DOCUMENT_STORAGE_LOCAL_PATH = storageRoot;
-test.after(() => rmSync(storageRoot, { recursive: true, force: true }));
 
 globalThis.localStorage = globalThis.localStorage ?? { getItem: () => null, setItem() {}, removeItem() {}, clear() {} };
 const { installMiniDom } = await import('./mini-dom.js');
@@ -49,7 +48,8 @@ globalThis.window.matchMedia = globalThis.window.matchMedia
   ?? (() => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
-const { default: documentsRouter } = await import('../server/routes/documents.js');
+const { default: documentsRouter, _setStageUploadForTest } = await import('../server/routes/documents.js');
+const { stageDocumentUpload } = await import('../server/services/document-storage.js');
 const { default: dmsRouter, _setAdapterFactory } = await import('../server/routes/dms.js');
 const { __test: page } = await import('../public/pages/documents.js');
 const { CASE_MESSAGES, CASE_PARAMS, GONE_REASONS } = await import('../public/utils/friendly-error.js');
@@ -151,6 +151,30 @@ test('Server: ein Dokument in einen inzwischen geloeschten Ordner - hochladen un
   }
 });
 
+test('Server: der Zielordner verschwindet WAEHREND des Hochladens - 400 mit dem Fall statt 500, und die abgelegte Datei wird weggeraeumt', async () => {
+  // Zwischen der Pruefung und dem Einfuegen liegt das Ablegen der Datei, ein
+  // await: dort kommt ein anderes Loeschen dazwischen (Review zu #1994).
+  // Gefahren mit der Ordner-Ablage, damit die abgelegte Datei sichtbar ist.
+  const { readdirSync } = await import('node:fs');
+  const target = await folder('Verschwindet beim Hochladen');
+  const files = () => readdirSync(storageRoot, { recursive: true }).filter((name) => String(name).endsWith('.pdf'));
+  process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = 'true';
+  const before = files().length;
+  _setStageUploadForTest(async (args) => {
+    const staged = await stageDocumentUpload(args);
+    db.prepare('DELETE FROM family_document_folders WHERE id = ?').run(target);
+    return staged;
+  });
+  try {
+    const r = await call('POST', '', upload({ folder_id: target }));
+    assert.deepEqual([r.status, r.body?.reason, r.body?.error], [400, 'documents_selected_folder_not_found', 'Folder not found.'], JSON.stringify(r.body));
+    assert.equal(files().length, before, 'die schon abgelegte Datei bleibt nicht liegen');
+  } finally {
+    _setStageUploadForTest(null);
+    delete process.env.DOCUMENT_STORAGE_LOCAL_ENABLED;
+  }
+});
+
 test('Server: ein Name, den es unter den Geschwistern schon gibt - anlegen, umbenennen und verschieben nennen den Fall', async () => {
   const parent = await folder('Eltern');
   await folder('Doppelt', parent);
@@ -243,6 +267,31 @@ test('Server: DMS verknuepfen und senden nennen ihre Faelle', async () => {
   }
 });
 
+test('Server: DMS verknuepfen - was NACH der Antwort des DMS lokal scheitert, ist kein "DMS nicht erreichbar"', async () => {
+  // Codex an #1994: das catch der Route deckte auch das lokale Einfuegen.
+  const account = db.prepare(`INSERT INTO dms_accounts (provider, name, base_url, api_token)
+    VALUES ('paperless', 'Lokal', 'https://dms-local.test', 'token')`).run().lastInsertRowid;
+  let during = null;
+  _setAdapterFactory(() => ({
+    async getDocument(id) {
+      during?.();
+      // Ohne Titel scheitert das Einfuegen an NOT NULL - ein lokaler Fehler.
+      return { title: id === 'ohne-titel' ? null : `DMS ${id}`, filename: 'a.pdf', url: 'https://dms-local.test/a' };
+    },
+  }));
+  try {
+    let r = await call('POST', '/dms/link', { account_id: account, dms_document_id: 'ohne-titel' });
+    assert.equal(r.status, 500, JSON.stringify(r.body));
+    assert.equal(r.body?.reason, undefined, 'kein Grund, der dem DMS die Schuld gibt');
+    // Das Konto verschwindet, waehrend das DMS antwortet.
+    during = () => db.prepare('DELETE FROM dms_accounts WHERE id = ?').run(account);
+    r = await call('POST', '/dms/link', { account_id: account, dms_document_id: '1' });
+    assert.deepEqual([r.status, r.body?.reason], [404, 'dms_account_not_found'], JSON.stringify(r.body));
+  } finally {
+    _setAdapterFactory(null);
+  }
+});
+
 const SERVER_REASONS = [
   ...new Set(SERVER_GONE.map((c) => c[3])),
   'documents_selected_folder_not_found', 'documents_folder_exists', 'documents_folder_too_deep',
@@ -278,7 +327,7 @@ const FOLDERS = [{ id: 3, name: 'Wohnung', parent_id: null }, { id: 4, name: 'Au
 const DOC = { id: 10, name: 'Vertrag', category: 'home', visibility: 'family', status: 'active', folder_id: null, created_by: 1, storage_backend: 'local' };
 
 /** Den Seitenzustand fuer einen Fall herstellen und danach zuruecksetzen. */
-async function mitSeite(patch, fn) {
+async function mitSeite({ container: given = null, ...patch }, fn) {
   const s = page.state;
   const zuvor = { ...s, selected: new Set(s.selected) };
   Object.assign(s, {
@@ -286,7 +335,7 @@ async function mitSeite(patch, fn) {
     members: [], directory: [], dmsAccounts: [], status: 'active', query: '', queryText: '', category: '', folderId: '',
     expiringSoon: false, selectMode: false, selected: new Set(), view: 'list',
   }, patch);
-  const container = { querySelector: () => null, querySelectorAll: () => [], isConnected: false };
+  const container = given ?? { querySelector: () => null, querySelectorAll: () => [], isConnected: false };
   page.setContainerForTest(container);
   try {
     return await fn();
@@ -512,6 +561,32 @@ test('Seite: loeschen mit Ruecknahme, das "nicht gefunden" wird - kein Erfolg un
   }
 });
 
+test('Seite: mehrere loeschen, eines ist schon weg - nachgeladen wird erst, wenn auch die anderen Loeschungen durch sind', async () => {
+  // Review zu #1994: Promise.all brach beim ersten "gibt es nicht mehr" ab,
+  // und das Nachladen holte das zweite Dokument zurueck, dessen Loeschen noch lief.
+  const zweites = { ...DOC, id: 11, name: 'Rechnung' };
+  const log = [];
+  await mitSeite({ allDocuments: [{ ...DOC }, zweites], documents: [{ ...DOC }, zweites] }, async () => {
+    let opts = null;
+    globalThis.__undoStub = (o) => { opts = o; };
+    try { page.deleteDocuments([{ ...DOC }, zweites]); } finally { delete globalThis.__undoStub; }
+    await mit({
+      get: (path) => { log.push(`GET ${path}`); return { data: [] }; },
+      delete: async (path) => {
+        if (path.endsWith('/10')) throw fehler(404, 'documents_document_not_found');
+        for (let i = 0; i < 3; i += 1) await new Promise((r) => setImmediate(r));
+        log.push(`geloescht ${path}`);
+        return {};
+      },
+    }, async () => {
+      try { await opts.commit({ keepalive: false }); } catch (e) { opts.restore(e); }
+    });
+    assert.deepEqual(toasts, [['documents.errorDocumentGone', 'danger']]);
+    const firstGet = log.findIndex((x) => x.startsWith('GET '));
+    assert.ok(firstGet > log.indexOf('geloescht /documents/11') && log.includes('geloescht /documents/11'), log.join(' | '));
+  });
+});
+
 test('Seite: an ein DMS senden und aus einem DMS verknuepfen - die Faelle des DMS als Satz der App', async () => {
   const account = { id: 1, name: 'Paperless' };
   for (const [err, expected, gone] of [
@@ -609,4 +684,72 @@ test('Seite: Ordner hochladen - eine gescheiterte Datei nennt den Fall der App, 
   assert.equal(page.folderUploadFailureText({ reason: SERVER_TEXT, error: fehler(500) }), 'common.unknownError');
   assert.equal(page.folderUploadFailureText({ reason: 'Folder creation returned no id.' }), 'common.unknownError');
   assert.equal(page.folderUploadFailureText({ reason: 'rate-limited' }), 'documents.folderUpload.reasonRateLimited');
+});
+
+test('Seite: Ordner hochladen bis zur Ergebniszeile - Ordner und Datei, die am Server scheitern, nennen den Fall der App', async () => {
+  // Gefahren wird der echte Ablauf (executeFolderUploadPlan) bis in die
+  // Fehlerliste, die renderFolderUploadResult zeigt: nur wenn der gefangene
+  // Fehler dort ankommt, kann die Zeile seinen Fall nennen (Review zu #1994).
+  const { executeFolderUploadPlan } = await import('../public/utils/folder-upload.js');
+  const plan = {
+    folders: [{ action: 'create', targetRef: 'new:House', parentRef: 'root', name: 'House', key: 'House' }],
+    files: [{ action: 'upload', targetRef: 'root', relativePath: 'scan.exe', uploadName: 'scan', uploadOriginalName: 'scan.exe' }],
+  };
+  const result = await executeFolderUploadPlan(plan, {
+    createFolder: async () => { throw fehler(400, 'documents_folder_too_deep', { limit: 5 }); },
+    uploadFile: async () => { throw fehler(400, 'documents_file_type_not_allowed'); },
+  });
+  assert.deepEqual(result.failed.map((failure) => [failure.kind, page.folderUploadFailureText(failure)]), [
+    ['folder', 'documents.errorFolderTooDeep{"limit":5}'],
+    ['file', 'documents.errorFileTypeNotAllowed'],
+  ]);
+});
+
+/** Ein Seitentraeger, der mitschreibt, wonach gezeichnet wird. */
+function traeger() {
+  const gefragt = [];
+  return { gefragt, isConnected: false, querySelector: (sel) => { gefragt.push(sel); return null; }, querySelectorAll: () => [] };
+}
+
+const BAUM = [{ id: 4, name: 'Auto', parent_id: 5 }, { id: 5, name: 'Zeta', parent_id: null }];
+
+test('Seite: der gewaehlte Ordner ist weg - die Auswahl behaelt ihre Reihenfolge, und die Seitenleiste zeigt den frischen Stand', async () => {
+  // Dokument-Dialog: die Liste, wie openDocumentModal sie baut.
+  const form = formular(BEARBEITEN);
+  const seite = traeger();
+  await mitSeite({ container: seite }, () => mit({
+    get: (path) => (path === '/documents/folders' ? { data: BAUM } : { data: [] }),
+    put: async () => { throw fehler(400, 'documents_selected_folder_not_found'); },
+  }, () => page.saveDocument({ target: form, preventDefault() {} }, { ...DOC }, formular())));
+  const liste = form.querySelector('#document-folder').html;
+  assert.ok(liste.indexOf('Auto') < liste.indexOf('Zeta'), `Reihenfolge der Liste: ${liste}`);
+  assert.ok(seite.gefragt.includes('#documents-folder-browser'), 'die Seitenleiste wurde neu gezeichnet');
+
+  // Neuer Ordner: der Baum, eingerueckt, wie openFolderModal ihn baut.
+  const panel = formular({ '#document-folder-name': 'Belege', '#document-folder-parent': '3' });
+  let submit = null;
+  panel.querySelector('#document-folder-form').addEventListener = (type, fn) => { if (type === 'submit') submit = fn; };
+  await mitSeite({}, () => mit({
+    get: (path) => (path === '/documents/folders' ? { data: BAUM } : { data: [] }),
+    post: async () => { throw fehler(400, 'documents_selected_folder_not_found'); },
+  }, async () => {
+    globalThis.__openModal = (opts) => opts.onSave(panel);
+    try { page.openFolderModal(); } finally { delete globalThis.__openModal; }
+    await submit({ preventDefault() {} });
+  }));
+  const baum = panel.querySelector('#document-folder-parent').html;
+  assert.ok(baum.indexOf('Zeta') < baum.indexOf('Auto'), `Reihenfolge des Baums: ${baum}`);
+  assert.match(baum, />  Auto</, 'der Unterordner steht eingerueckt');
+});
+
+test('Seite: "gibt es nicht mehr", und die Seite wurde inzwischen verlassen - nichts wird mehr gezeichnet', async () => {
+  const alt = traeger();
+  const neu = traeger();
+  await mitSeite({ container: alt }, () => mit({
+    get: (path) => { if (path === '/documents/folders') page.setContainerForTest(neu); return { data: [] }; },
+    patch: async () => { throw fehler(404, 'documents_document_not_found'); },
+  }, () => page.runDocumentAction('archive', { ...DOC })));
+  assert.deepEqual(toasts, [['documents.errorDocumentGone', 'danger']]);
+  assert.deepEqual(neu.gefragt, [], 'in den neuen Traeger zeichnet das alte Nachladen nicht');
+  assert.equal(alt.gefragt.includes('#documents-folder-browser'), false, 'in den alten auch nicht');
 });

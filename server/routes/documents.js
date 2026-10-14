@@ -61,7 +61,15 @@ function loadDmsAccount(id) {
 
 class DmsDocumentUnavailableError extends Error {}
 
+/** Der Zielordner verschwand, waehrend die Datei abgelegt wurde (#1909). */
+class SelectedFolderGoneError extends Error {}
+
 const log = createLogger('Documents');
+
+// Das Ablegen einer hochgeladenen Datei, austauschbar fuer test:documents-errors:
+// dort verschwindet der Zielordner genau waehrend dieses await.
+let stageUpload = stageDocumentUpload;
+export function _setStageUploadForTest(fn) { stageUpload = fn || stageDocumentUpload; }
 const router = express.Router();
 
 // External storage deletion yields back to Express between documents. Keep the
@@ -1279,7 +1287,7 @@ router.post('/', async (req, res) => {
     // Freigeben laesst sich ein neues Dokument nur Haushaltsmitgliedern (#1207).
     const strangers = newNonMembers(allowedIds);
     if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
-    stagedUpload = await stageDocumentUpload({
+    stagedUpload = await stageUpload({
       buffer: parsed.buffer,
       mime: parsed.mime,
       category,
@@ -1287,6 +1295,10 @@ router.post('/', async (req, res) => {
     });
     const database = db.get();
     const row = database.transaction(() => {
+      // NOCHMAL, OHNE YIELD DAZWISCHEN: die Pruefung oben lag vor dem await des
+      // Ablegens, und dort kann ein anderes Loeschen den Ordner nehmen (Review
+      // zu #1994). Erst hier ist das Ergebnis bis zum INSERT verbindlich.
+      if (selectedFolderMissing(vFolderId.value)) throw new SelectedFolderGoneError();
       const folderId = vFolderId.value ?? ensureFolder(folderKey, vFolderName.value, userId(req));
       const expiresAt = vExpiresAtField.value ?? null;
       const expiryReminderDays = vExpiryReminderDaysField.value ?? null;
@@ -1332,7 +1344,8 @@ router.post('/', async (req, res) => {
       log.error('POST / storage error:', err);
       return sendStorageError(res, err, 'Document storage upload failed.');
     }
-    log.error('POST / error:', err);
+    const folderGone = err instanceof SelectedFolderGoneError;
+    if (!folderGone) log.error('POST / error:', err);
     if (stagedUpload) {
       try {
         await cleanupStagedUpload(stagedUpload);
@@ -1345,6 +1358,7 @@ router.post('/', async (req, res) => {
         );
       }
     }
+    if (folderGone) return selectedFolderGone(res);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });

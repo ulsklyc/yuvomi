@@ -27,8 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   storage that does not respond now get a sentence in the language of the app. When the folder or
   document is gone, the page fetches folders and documents by itself and an open dialog closes,
   also when a deletion meets a document that is gone (it may only have become invisible to you,
-  so this is not reported as deleted). If the folder chosen in an open dialog was deleted, the
-  dialog stays open with your input and offers the current folders. Linking a document from a DMS
+  so this is not reported as deleted). If the folder chosen when uploading or editing a document,
+  or the parent chosen for a new folder, was deleted in the meantime, the dialog stays open with
+  your input and offers the current folders. Not covered: uploading a whole folder into a folder
+  deleted in the meantime still lists the failure per file and needs the dialog to be opened
+  again, as before. Linking a document from a DMS
   or sending one to it names a removed DMS account, a document gone in the DMS, an already linked
   or already stored document and an unreachable DMS. The failures listed after uploading a folder
   use the same sentences. Uploading into or moving a document to a folder deleted in the meantime
@@ -40,8 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `documents_file_content_mismatch`, `documents_file_empty`, `documents_storage_failed`,
   `dms_account_not_found`, `dms_document_not_found`, `dms_document_already_linked`,
   `dms_document_already_stored`, `dms_unreachable`); a document with an unknown `folder_id` is a
-  400 instead of a 500, an empty file is reported as empty instead of as an invalid data URL, and
-  the other status codes are unchanged.
+  400 instead of a 500, also when the folder disappears while the file is being stored, an empty
+  file is reported as empty instead of as an invalid data URL, a local failure while linking or
+  sending to a DMS is a 500 instead of a 502, and the other status codes are unchanged.
 - **Housekeeping: creating or editing a housekeeper profile saves again** (#1976). Since 2.75.0
   the "Add" button in the profile dialog did nothing: no message, no profile, and the dialog stayed
   open. Its buttons had lost the connection to the form they belong to, and find it again.
