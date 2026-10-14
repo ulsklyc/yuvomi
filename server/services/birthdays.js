@@ -286,8 +286,8 @@ function syncBirthdayCalendarEvent(database, birthday, kind = 'birthday') {
   const result = database.prepare(`
     INSERT INTO calendar_events
       (title, description, start_datetime, end_datetime, all_day, location, color,
-       icon, assigned_to, created_by, recurrence_rule, external_source)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local')
+       icon, assigned_to, created_by, recurrence_rule, external_source, series_authored)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local', 1)
   `).run(
     payload.title,
     payload.description,
