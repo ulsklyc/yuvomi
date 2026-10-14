@@ -265,7 +265,10 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
   // Die Dokumente ebenso, dazu Verknuepfen und Senden an ein DMS; dass eine
   // ECHTE Antwort sie traegt, misst test:documents-errors.
   const documentsServer = ['../server/routes/documents.js', '../server/routes/dms.js'].map(read).join('\n');
-  const routes = `${read('../server/routes/shopping.js')}\n${healthServer}\n${documentsServer}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
+  // Die Rezepte ebenso, dazu das Einplanen eines Rezepts in den Essensplan;
+  // dass eine ECHTE Antwort sie traegt, misst test:recipes-errors.
+  const recipesServer = ['../server/routes/recipes.js', '../server/routes/meals.js'].map(read).join('\n');
+  const routes = `${read('../server/routes/shopping.js')}\n${healthServer}\n${documentsServer}\n${recipesServer}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
   return load().then(({ CASE_MESSAGES, REFUSAL_MESSAGES }) => {
     for (const [reason, key] of CASE_MESSAGES) {
       assert.equal(REFUSAL_MESSAGES.has(reason), false, `${reason} steht in beiden Listen`);
@@ -294,6 +297,8 @@ test('isGone: nur die bekannten "gibt es nicht mehr"-Gruende, nie der blanke Sta
     'health_nutrition_entry_not_found', 'health_cycle_period_not_found', 'health_cycle_log_not_found',
     'documents_folder_not_found', 'documents_selected_folder_not_found', 'documents_document_not_found',
     'dms_account_not_found', 'dms_document_not_found',
+    'recipes_recipe_not_found', 'recipes_ingredient_not_found', 'recipes_selected_pantry_item_not_found',
+    'meals_selected_recipe_not_found',
   ].sort());
   for (const reason of GONE_REASONS) {
     assert.ok(CASE_MESSAGES.has(reason), `${reason}: ohne Satz`);

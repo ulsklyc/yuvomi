@@ -18,6 +18,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Recipes: an error message is in your language and names the cause** (#1909). The recipes
+  page showed the server's own text when something could not be saved, planned, matched or put on
+  a shopping list, whatever the app language, in English or in German - for example "Recipe not
+  found" when somebody else in the household had deleted the recipe in the meantime. A recipe
+  that no longer exists, an ingredient that is no longer in the recipe, a pantry item chosen for
+  an ingredient that was deleted in the meantime and a shopping list that is gone now get a
+  sentence in the language of the app. When the recipe or the list is gone, the page fetches
+  recipes and lists by itself and the dialog of the action closes. When only the chosen pantry
+  item is gone, the matching dialog stays open with your choices and offers the current pantry.
+  Deleting a recipe somebody else has already deleted counts as done instead of bringing the row
+  back with an error. A picture that cannot be used keeps its own message; any other failure shows
+  the general message instead of the server's text. For API clients: those answers of
+  `/api/v1/recipes` carry a `reason` next to `error` (`recipes_recipe_not_found`,
+  `recipes_ingredient_not_found`, `recipes_selected_pantry_item_not_found`,
+  `shopping_list_not_found`), planning a meal with an unknown `recipe_id` on `/api/v1/meals`
+  carries `meals_selected_recipe_not_found`, the German texts of those answers are now English,
+  and the status codes are unchanged.
 - **Documents: an error message is in your language and names the cause** (#1909). The
   documents page showed the server's own English sentence when something could not be saved,
   moved or deleted, whatever the app language, for example "Folder not found." when somebody else

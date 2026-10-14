@@ -46,7 +46,7 @@ function mealBody({ required = [], create = false } = {}) {
 }
 
 export function mealsPaths() {
-  return {
+  return withCaseReasons({
     '/api/v1/meals': {
       get: op({
         summary: 'List meal plan entries',
@@ -186,5 +186,26 @@ export function mealsPaths() {
         },
       }),
     },
-  };
+  });
+}
+
+// #1909: die Faelle, die ein Nutzer erreicht, tragen einen `reason` neben dem
+// englischen `error` - je Operation der Satz, der sie nennt.
+const SELECTED_RECIPE_GONE = '`meals_selected_recipe_not_found` (400, the chosen `recipe_id` does not exist)';
+const CASE_REASONS = {
+  '/api/v1/meals': { post: SELECTED_RECIPE_GONE },
+  '/api/v1/meals/{id}': { put: SELECTED_RECIPE_GONE },
+  '/api/v1/meals/apply-plan': { post: SELECTED_RECIPE_GONE },
+};
+
+function withCaseReasons(paths) {
+  for (const [path, operations] of Object.entries(CASE_REASONS)) {
+    for (const [method, reasons] of Object.entries(operations)) {
+      const operation = paths[path]?.[method];
+      if (!operation) throw new Error(`openapi meals: ${method} ${path} is not documented`);
+      const note = `A refusal a user can reach carries a \`reason\` next to \`error\` (#1909): ${reasons}.`;
+      operation.description = operation.description ? `${operation.description}\n\n${note}` : note;
+    }
+  }
+  return paths;
 }

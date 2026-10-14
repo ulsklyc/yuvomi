@@ -229,10 +229,10 @@ router.post('/', (req, res) => {
 router.put('/:id', (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'Ungueltige Rezept-ID', code: 400 });
+    if (!id) return res.status(400).json({ error: 'Invalid recipe ID.', code: 400 });
 
     const existing = db.get().prepare('SELECT id, provider_account_id, meal_types FROM recipes WHERE id = ?').get(id);
-    if (!existing) return res.status(404).json({ error: 'Recipe not found', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Recipe not found.', code: 404, reason: 'recipes_recipe_not_found' });
     // KEIN Besitzer-Riegel (#1577, Entscheidung 30.09.2026): Rezepte gehoeren
     // dem Haushalt wie Aufgaben, Einkauf und Notizen. Wer das Modulrecht
     // `meals: write` hat, bearbeitet und loescht jedes Rezept - das prueft der
@@ -378,7 +378,7 @@ router.delete('/:id', (req, res) => {
     if (!id) return res.status(400).json({ error: 'Invalid recipe ID.', code: 400 });
 
     const existing = db.get().prepare('SELECT id, provider_account_id FROM recipes WHERE id = ?').get(id);
-    if (!existing) return res.status(404).json({ error: 'Recipe not found.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Recipe not found.', code: 404, reason: 'recipes_recipe_not_found' });
     // Siehe PUT /:id: kein Besitzer-Riegel, das Modulrecht `meals: write`
     // genuegt (#1577). Mirror-Rezepte lassen sich nur durch Löschen des
     // Provider-Accounts entfernen (DELETE /recipe-providers/accounts/:id), nicht
@@ -386,7 +386,7 @@ router.delete('/:id', (req, res) => {
     if (existing.provider_account_id) return res.status(403).json({ error: 'Mirrored recipes are managed by their source provider and cannot be deleted here.', code: 403, reason: 'recipe_mirrored' });
 
     const result = db.get().prepare('DELETE FROM recipes WHERE id = ?').run(id);
-    if (result.changes === 0) return res.status(404).json({ error: 'Recipe not found', code: 404 });
+    if (result.changes === 0) return res.status(404).json({ error: 'Recipe not found.', code: 404, reason: 'recipes_recipe_not_found' });
 
     res.status(204).end();
   } catch (err) {
@@ -475,14 +475,15 @@ router.post('/:id/to-shopping-list', (req, res) => {
     if (!id) return res.status(400).json({ error: 'Invalid recipe ID.', code: 400 });
 
     const recipe = db.get().prepare('SELECT id FROM recipes WHERE id = ?').get(id);
-    if (!recipe) return res.status(404).json({ error: 'Recipe not found.', code: 404 });
+    if (!recipe) return res.status(404).json({ error: 'Recipe not found.', code: 404, reason: 'recipes_recipe_not_found' });
 
     const vList = num(req.body.listId, 'Listen-ID', { required: true });
     const errors = collectErrors([vList]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
     const list = db.get().prepare('SELECT id FROM shopping_lists WHERE id = ?').get(vList.value);
-    if (!list) return res.status(404).json({ error: 'Shopping list not found.', code: 404 });
+    // Derselbe Grund wie im Einkauf: die Liste wurde inzwischen geloescht.
+    if (!list) return res.status(404).json({ error: 'Shopping list not found.', code: 404, reason: 'shopping_list_not_found' });
 
     const ingredients = db.get().prepare(
       'SELECT name, quantity, category FROM recipe_ingredients WHERE recipe_id = ? ORDER BY id ASC',
@@ -564,17 +565,19 @@ router.put('/:id/ingredient-match', (req, res) => {
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
     const key = ingredientMatchKey(vName.value);
-    if (!key) return res.status(400).json({ error: 'Zutat darf nicht leer sein.', code: 400 });
+    if (!key) return res.status(400).json({ error: 'Ingredient must not be empty.', code: 400 });
 
     const recipe = db.get().prepare('SELECT id FROM recipes WHERE id = ?').get(id);
-    if (!recipe) return res.status(404).json({ error: 'Recipe not found.', code: 404 });
+    if (!recipe) return res.status(404).json({ error: 'Recipe not found.', code: 404, reason: 'recipes_recipe_not_found' });
 
     // DIE ZUTAT MUSS ES GEBEN. Sonst stuende eine Aussage ueber etwas in der
     // Tabelle, das in diesem Rezept nicht vorkommt - und sie bliebe dort
     // liegen, bis zufaellig jemand eine Zutat genau so nennt.
     const ingredients = db.get().prepare('SELECT name FROM recipe_ingredients WHERE recipe_id = ?').all(id);
     const treffer = ingredients.find((i) => ingredientMatchKey(i.name) === key);
-    if (!treffer) return res.status(404).json({ error: 'Ingredient not found in this recipe.', code: 404 });
+    // Ein Grund fuer sich (#1909): das Rezept wurde inzwischen geaendert, oder
+    // der Abgleich mit der Rezeptquelle hat seine Zutaten ersetzt.
+    if (!treffer) return res.status(404).json({ error: 'Ingredient not found in this recipe.', code: 404, reason: 'recipes_ingredient_not_found' });
 
     const raw = req.body.pantryItemId;
     if (raw === null || raw === undefined || raw === '') {
@@ -591,7 +594,9 @@ router.put('/:id/ingredient-match', (req, res) => {
     if (itemErrors.length) return res.status(400).json({ error: itemErrors.join(' '), code: 400 });
 
     const item = db.get().prepare('SELECT id, name FROM pantry_items WHERE id = ?').get(vItem.value);
-    if (!item) return res.status(404).json({ error: 'Pantry item not found.', code: 404 });
+    // Nicht das Rezept, sondern die im Dialog GEWAEHLTE Vorratszeile fehlt
+    // (#1909): die Seite haelt den Dialog offen und bietet den aktuellen Vorrat an.
+    if (!item) return res.status(404).json({ error: 'Pantry item not found.', code: 404, reason: 'recipes_selected_pantry_item_not_found' });
 
     // Ein erneutes Bestaetigen ERSETZT die alte Aussage (Primaerschluessel
     // recipe_id + ingredient_key), statt eine zweite danebenzulegen.
