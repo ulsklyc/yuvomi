@@ -3806,7 +3806,20 @@
             "reasonTooDeep": "Đường dẫn vượt quá giới hạn năm cấp thư mục.",
             "reasonParentFailed": "Không thể tạo thư mục cha.",
             "reasonRateLimited": "Máy chủ đang nhận quá nhiều yêu cầu. Hãy thử tải lên lại sau."
-        }
+        },
+        "errorFolderGone": "Thư mục này không còn tồn tại.",
+        "errorSelectedFolderGone": "Thư mục đã chọn không còn tồn tại.",
+        "errorFolderExists": "Ở đây đã có thư mục cùng tên. Hãy chọn tên khác.",
+        "errorFolderTooDeep": "Thư mục chỉ có thể lồng nhau tối đa {{limit}} cấp.",
+        "errorDocumentGone": "Tài liệu này không còn khả dụng.",
+        "errorFileTypeNotAllowed": "Không thể tải lên loại tệp này.",
+        "errorFileContentMismatch": "Nội dung tệp không khớp với loại tệp.",
+        "errorFileEmpty": "Tệp trống.",
+        "errorStorageFailed": "Kho lưu trữ tài liệu không phản hồi. Hãy thử lại sau.",
+        "errorDmsAccountGone": "Tài khoản DMS này không còn tồn tại.",
+        "errorDmsDocumentGone": "Tài liệu này không còn tồn tại trong DMS.",
+        "errorDmsAlreadyLinked": "Tài liệu DMS này đã được liên kết.",
+        "errorDmsAlreadyStored": "Tài liệu này đã được lưu trong một DMS."
     },
     "housekeeping": {
         "title": "Dọn dẹp",

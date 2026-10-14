@@ -3746,7 +3746,20 @@
             "reasonTooDeep": "パスがフォルダー5階層の上限を超えています。",
             "reasonParentFailed": "親フォルダーを作成できませんでした。",
             "reasonRateLimited": "サーバーへのリクエストが多すぎます。しばらくしてからもう一度アップロードしてください。"
-        }
+        },
+        "errorFolderGone": "このフォルダーはもう存在しません。",
+        "errorSelectedFolderGone": "選択したフォルダーはもう存在しません。",
+        "errorFolderExists": "この場所には同じ名前のフォルダーがすでにあります。別の名前を選んでください。",
+        "errorFolderTooDeep": "フォルダーは最大 {{limit}} 階層までしか入れ子にできません。",
+        "errorDocumentGone": "このドキュメントはもう利用できません。",
+        "errorFileTypeNotAllowed": "この種類のファイルはアップロードできません。",
+        "errorFileContentMismatch": "ファイルの内容がファイルの種類と一致しません。",
+        "errorFileEmpty": "ファイルが空です。",
+        "errorStorageFailed": "ドキュメントの保存先が応答しませんでした。しばらくしてからもう一度お試しください。",
+        "errorDmsAccountGone": "この DMS アカウントはもう存在しません。",
+        "errorDmsDocumentGone": "このドキュメントは DMS にもう存在しません。",
+        "errorDmsAlreadyLinked": "この DMS ドキュメントはすでにリンクされています。",
+        "errorDmsAlreadyStored": "このドキュメントはすでに DMS に保存されています。"
     },
     "shortcuts": {
         "goKitchen": "キッチン",

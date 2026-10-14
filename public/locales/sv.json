@@ -3746,7 +3746,20 @@
             "reasonTooDeep": "Sökvägen överskrider gränsen på fem mappnivåer.",
             "reasonParentFailed": "Den överordnade mappen kunde inte skapas.",
             "reasonRateLimited": "Servern tar emot för många förfrågningar. Försök ladda upp igen senare."
-        }
+        },
+        "errorFolderGone": "Den här mappen finns inte längre.",
+        "errorSelectedFolderGone": "Den valda mappen finns inte längre.",
+        "errorFolderExists": "Det finns redan en mapp med det här namnet här. Välj ett annat namn.",
+        "errorFolderTooDeep": "Mappar kan kapslas högst {{limit}} nivåer djupt.",
+        "errorDocumentGone": "Det här dokumentet är inte längre tillgängligt.",
+        "errorFileTypeNotAllowed": "Den här filtypen kan inte laddas upp.",
+        "errorFileContentMismatch": "Filens innehåll stämmer inte med dess filtyp.",
+        "errorFileEmpty": "Filen är tom.",
+        "errorStorageFailed": "Dokumentlagringen svarade inte. Försök igen senare.",
+        "errorDmsAccountGone": "Det här DMS-kontot finns inte längre.",
+        "errorDmsDocumentGone": "Det här dokumentet finns inte längre i DMS.",
+        "errorDmsAlreadyLinked": "Det här DMS-dokumentet är redan länkat.",
+        "errorDmsAlreadyStored": "Det här dokumentet är redan lagrat i ett DMS."
     },
     "shortcuts": {
         "goKitchen": "Kök",

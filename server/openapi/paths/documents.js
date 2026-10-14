@@ -1,7 +1,7 @@
 import { op, jsonBody, idParam } from '../helpers.js';
 
 export function documentsPaths() {
-  return {
+  return withCaseReasons({
     '/api/v1/documents/meta/options': {
       get: op({
         summary: 'Get family document options',
@@ -526,5 +526,53 @@ export function documentsPaths() {
     '/api/v1/documents/dms/thumbnail': {
       get: op({ summary: 'Fetch a thumbnail from the connected DMS', tag: 'Documents', description: 'Proxies the image from Paperless/Papra so the browser never needs the DMS credentials.' }),
     },
-  };
+  });
+}
+
+// #1909: die Faelle, die ein Nutzer erreicht, tragen einen `reason` neben dem
+// englischen `error` - je Operation der Satz, der sie nennt.
+const FOLDER_GONE = '`documents_folder_not_found` (404, the folder does not exist)';
+const SELECTED_FOLDER_GONE = '`documents_selected_folder_not_found` (400, the chosen parent or target folder does not exist)';
+const FOLDER_TREE = '`documents_folder_exists` (409, a sibling has this name), `documents_folder_too_deep` (400, `params.limit` is the maximum depth)';
+const DOCUMENT_GONE = '`documents_document_not_found` (404, the document does not exist or is not visible to the caller)';
+const STORAGE_FAILED = '`documents_storage_failed` (502, the storage backend failed)';
+const FILE_CASES = '`documents_file_type_not_allowed`, `documents_file_content_mismatch`, `documents_file_empty` (400), `documents_storage_failed` (502, the storage backend failed)';
+const CASE_REASONS = {
+  '/api/v1/documents/folders': { post: `${SELECTED_FOLDER_GONE}, ${FOLDER_TREE}` },
+  '/api/v1/documents/folders/{id}': {
+    put: `${FOLDER_GONE}, ${SELECTED_FOLDER_GONE}, ${FOLDER_TREE}`,
+    delete: FOLDER_GONE,
+  },
+  '/api/v1/documents/folders/{id}/delete-impact': { get: FOLDER_GONE },
+  '/api/v1/documents': { post: `${SELECTED_FOLDER_GONE}, ${FILE_CASES}` },
+  '/api/v1/documents/{id}': {
+    put: `${DOCUMENT_GONE}, ${SELECTED_FOLDER_GONE}`,
+    delete: `${DOCUMENT_GONE}, \`documents_storage_failed\` (502)`,
+  },
+  '/api/v1/documents/{id}/archive': { patch: DOCUMENT_GONE },
+  '/api/v1/documents/storage/config': {
+    get: STORAGE_FAILED,
+    put: STORAGE_FAILED,
+  },
+  '/api/v1/documents/storage/test': { post: STORAGE_FAILED },
+  '/api/v1/documents/{id}/preview': { get: STORAGE_FAILED },
+  '/api/v1/documents/{id}/download': { get: STORAGE_FAILED },
+  '/api/v1/documents/dms/link': {
+    post: '`dms_account_not_found` (404), `dms_document_not_found` (404, gone in the DMS), `dms_document_already_linked` (409), `dms_unreachable` (502)',
+  },
+  '/api/v1/documents/dms/push': {
+    post: `\`dms_account_not_found\` (404), ${DOCUMENT_GONE}, \`dms_document_already_stored\` (400), \`documents_storage_failed\` (502, reading the document failed), \`dms_unreachable\` (502)`,
+  },
+};
+
+function withCaseReasons(paths) {
+  for (const [path, operations] of Object.entries(CASE_REASONS)) {
+    for (const [method, reasons] of Object.entries(operations)) {
+      const operation = paths[path]?.[method];
+      if (!operation) throw new Error(`openapi documents: ${method} ${path} is not documented`);
+      const note = `A refusal a user can reach carries a \`reason\` next to \`error\` (#1909): ${reasons}.`;
+      operation.description = operation.description ? `${operation.description}\n\n${note}` : note;
+    }
+  }
+  return paths;
 }

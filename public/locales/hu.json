@@ -3806,7 +3806,20 @@
             "reasonTooDeep": "Az elérési út meghaladja az öt mappaszint korlátját.",
             "reasonParentFailed": "A szülőmappát nem sikerült létrehozni.",
             "reasonRateLimited": "A szerver túl sok kérést kap. Próbáld meg később újra a feltöltést."
-        }
+        },
+        "errorFolderGone": "Ez a mappa már nem létezik.",
+        "errorSelectedFolderGone": "A kiválasztott mappa már nem létezik.",
+        "errorFolderExists": "Itt már van ilyen nevű mappa. Válassz másik nevet.",
+        "errorFolderTooDeep": "A mappák legfeljebb {{limit}} szint mélyen ágyazhatók egymásba.",
+        "errorDocumentGone": "Ez a dokumentum már nem érhető el.",
+        "errorFileTypeNotAllowed": "Ez a fájltípus nem tölthető fel.",
+        "errorFileContentMismatch": "A fájl tartalma nem egyezik a típusával.",
+        "errorFileEmpty": "A fájl üres.",
+        "errorStorageFailed": "A dokumentumtár nem válaszolt. Próbáld újra később.",
+        "errorDmsAccountGone": "Ez a DMS-fiók már nem létezik.",
+        "errorDmsDocumentGone": "Ez a dokumentum már nem létezik a DMS-ben.",
+        "errorDmsAlreadyLinked": "Ez a DMS-dokumentum már össze van kapcsolva.",
+        "errorDmsAlreadyStored": "Ez a dokumentum már egy DMS-ben van tárolva."
     },
     "housekeeping": {
         "title": "Háztartás",

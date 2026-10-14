@@ -61,7 +61,15 @@ function loadDmsAccount(id) {
 
 class DmsDocumentUnavailableError extends Error {}
 
+/** Der Zielordner verschwand, waehrend die Datei abgelegt wurde (#1909). */
+class SelectedFolderGoneError extends Error {}
+
 const log = createLogger('Documents');
+
+// Das Ablegen einer hochgeladenen Datei, austauschbar fuer test:documents-errors:
+// dort verschwindet der Zielordner genau waehrend dieses await.
+let stageUpload = stageDocumentUpload;
+export function _setStageUploadForTest(fn) { stageUpload = fn || stageDocumentUpload; }
 const router = express.Router();
 
 // External storage deletion yields back to Express between documents. Keep the
@@ -233,20 +241,23 @@ function parseMemberIds(value) {
 
 function parseDataUrl(dataUrl) {
   const raw = String(dataUrl || '');
-  const match = raw.match(/^data:([^;,]+);base64,([A-Za-z0-9+/=\s]+)$/);
+  // Der Inhalt darf leer sein: eine leere Datei liest der Browser als
+  // `data:<typ>;base64,` - das ist der Fall "Datei ist leer" (#1909), keine
+  // kaputte Data-URL.
+  const match = raw.match(/^data:([^;,]+);base64,([A-Za-z0-9+/=\s]*)$/);
   if (!match) return { error: 'File content must be a valid base64 data URL.' };
   const mime = match[1].toLowerCase();
-  if (!ALLOWED_MIME.has(mime)) return { error: 'File type is not allowed.' };
+  if (!ALLOWED_MIME.has(mime)) return { error: 'File type is not allowed.', reason: 'documents_file_type_not_allowed' };
   const base64 = match[2].replace(/\s/g, '');
   const buffer = Buffer.from(base64, 'base64');
-  if (!buffer.length) return { error: 'File content is empty.' };
+  if (!buffer.length) return { error: 'File content is empty.', reason: 'documents_file_empty' };
   if (buffer.length > MAX_FILE_BYTES) return { error: `File may be at most ${MAX_UPLOAD_MB} MB.` };
   // Bis hier war nur GEPRUEFT, was der Absender BEHAUPTET: der Typ steht im
   // data-URL-Praefix und kommt aus seinem Browser. Ein Dokument, das sich als
   // PDF ausgibt und keins ist, faellt sonst erst auf, wenn es jemand braucht
   // (#937). Typen ohne Signatur - text/plain, text/csv - passieren weiter.
   if (!contentMatchesMime(buffer, mime)) {
-    return { error: 'File content does not match its declared type.' };
+    return { error: 'File content does not match its declared type.', reason: 'documents_file_content_mismatch' };
   }
   return { mime, base64, size: buffer.length, buffer };
 }
@@ -349,6 +360,10 @@ function sendStorageError(res, error, fallbackMessage) {
     error: fallbackMessage,
     code: status,
     storage_code: error.storageCode,
+    // Der Speicher hat nicht mitgespielt (#1909): ein Fall, den jeder Nutzer
+    // beim Hochladen oder Loeschen erreicht, wenn WebDAV, Google Drive oder
+    // der Mount ausfallen. Eine Fehlkonfiguration (400/409) bleibt ohne Grund.
+    ...(status === 502 ? { reason: 'documents_storage_failed' } : {}),
   });
   return true;
 }
@@ -740,21 +755,30 @@ function folderDeleteLinkedRecords(state) {
   };
 }
 
-/** Die Absage der Baumpruefung als Satz, den jemand lesen kann. */
-const MOVE_ISSUE_MESSAGES = {
-  'self':           'A folder cannot be inside itself.',
-  'descendant':     'A folder cannot be moved into its own subfolder.',
-  'missing-parent': 'Parent folder not found.',
-  'too-deep':       `Folders can be nested at most ${MAX_FOLDER_DEPTH} levels deep.`,
+/**
+ * Die Absage der Baumpruefung als Antwortrumpf. Was ein Nutzer erreicht, nennt
+ * seinen Fall (#1909): der gewaehlte Elternordner wurde inzwischen geloescht,
+ * oder der Zweig waere zu tief. "In sich selbst" bietet die Auswahl gar nicht
+ * an - das erreicht nur ein Aufrufer der API und bleibt ohne Grund.
+ */
+const MOVE_ISSUES = {
+  'self':           { error: 'A folder cannot be inside itself.' },
+  'descendant':     { error: 'A folder cannot be moved into its own subfolder.' },
+  'missing-parent': { error: 'Parent folder not found.', reason: 'documents_selected_folder_not_found' },
+  'too-deep':       {
+    error: `Folders can be nested at most ${MAX_FOLDER_DEPTH} levels deep.`,
+    reason: 'documents_folder_too_deep',
+    params: { limit: MAX_FOLDER_DEPTH },
+  },
 };
 
 /**
- * Darf dieser Ordner dorthin? Gibt die Meldung, oder null.
- * @returns {string|null}
+ * Darf dieser Ordner dorthin? Gibt den Rumpf der Absage, oder null.
+ * @returns {{ error: string, reason?: string, params?: object }|null}
  */
 function folderMoveError(folderId, parentId) {
   const issue = folderMoveIssue(allFolders(), folderId, parentId);
-  return issue ? MOVE_ISSUE_MESSAGES[issue] : null;
+  return issue ? MOVE_ISSUES[issue] : null;
 }
 
 /**
@@ -797,7 +821,7 @@ router.get('/folders/:id/delete-impact', (req, res) => {
       return res.status(400).json({ error: 'Invalid folder id.', code: 400 });
     }
     const existing = db.get().prepare('SELECT id FROM family_document_folders WHERE id = ?').get(id);
-    if (!existing) return res.status(404).json({ error: 'Folder not found.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Folder not found.', code: 404, reason: 'documents_folder_not_found' });
 
     const subtree = [...subtreeIds(allFolders(), id)];
     const visibleDocuments = visibleFolderDocuments(req, subtree);
@@ -831,6 +855,21 @@ router.get('/folders/:id/delete-impact', (req, res) => {
   }
 });
 
+/**
+ * Gibt es den Ordner, in den ein Dokument soll? Ein Ordner, der zwischen dem
+ * Oeffnen des Dialogs und dem Speichern geloescht wurde, liess das Einfuegen
+ * bis #1909 am Fremdschluessel scheitern - als 500. Jetzt ist es der Fall, den
+ * der Dialog erklaert (der gewaehlte Ordner fehlt).
+ */
+function selectedFolderMissing(folderId) {
+  if (folderId === null || folderId === undefined) return false;
+  return !db.get().prepare('SELECT 1 FROM family_document_folders WHERE id = ?').get(folderId);
+}
+
+function selectedFolderGone(res) {
+  return res.status(400).json({ error: 'Folder not found.', code: 400, reason: 'documents_selected_folder_not_found' });
+}
+
 /** Die Spalten, die eine Ordner-Antwort traegt - eine Schreibweise fuer alle Wege. */
 const FOLDER_COLUMNS = 'id, name, parent_id, module_key, created_by, created_at, updated_at';
 
@@ -845,7 +884,7 @@ router.post('/folders', (req, res) => {
     }
 
     const moveError = folderMoveError(null, vParent.value);
-    if (moveError) return res.status(400).json({ error: moveError, code: 400 });
+    if (moveError) return res.status(400).json({ ...moveError, code: 400 });
 
     const result = db.get().prepare('INSERT INTO family_document_folders (name, parent_id, created_by) VALUES (?, ?, ?)')
       .run(vName.value, vParent.value, userId(req));
@@ -856,7 +895,7 @@ router.post('/folders', (req, res) => {
     if (err.message?.includes('UNIQUE constraint')) {
       // Der Name kollidiert ab jetzt nur noch mit den GESCHWISTERN (Migration
       // v164) - "Rechnungen" darf unter "Auto" und unter "Wohnung" stehen.
-      return res.status(409).json({ error: 'A folder with this name already exists here.', code: 409 });
+      return res.status(409).json({ error: 'A folder with this name already exists here.', code: 409, reason: 'documents_folder_exists' });
     }
     log.error('POST /folders error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -871,7 +910,7 @@ router.put('/folders/:id', (req, res) => {
     }
     if (activeFolderTreeDeletes.has(id)) return deletionInProgress(res);
     const existing = db.get().prepare('SELECT id, name, parent_id FROM family_document_folders WHERE id = ?').get(id);
-    if (!existing) return res.status(404).json({ error: 'Folder not found.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Folder not found.', code: 404, reason: 'documents_folder_not_found' });
 
     // Umbenennen und Verschieben sind derselbe Schreibvorgang, und beide sind
     // einzeln weglassbar: ein Feld, das nicht mitkommt, ist keine Ansage.
@@ -892,7 +931,7 @@ router.put('/folders/:id', (req, res) => {
         return deletionInProgress(res);
       }
       const moveError = folderMoveError(id, vParent.value);
-      if (moveError) return res.status(400).json({ error: moveError, code: 400 });
+      if (moveError) return res.status(400).json({ ...moveError, code: 400 });
       parent = vParent.value;
     }
 
@@ -902,7 +941,7 @@ router.put('/folders/:id', (req, res) => {
     res.json({ data: row });
   } catch (err) {
     if (err.message?.includes('UNIQUE constraint')) {
-      return res.status(409).json({ error: 'A folder with this name already exists here.', code: 409 });
+      return res.status(409).json({ error: 'A folder with this name already exists here.', code: 409, reason: 'documents_folder_exists' });
     }
     log.error('PUT /folders/:id error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -937,7 +976,7 @@ router.delete('/folders/:id', async (req, res) => {
       return res.status(400).json({ error: 'Invalid expected folder snapshot.', code: 400 });
     }
     const existing = db.get().prepare('SELECT id FROM family_document_folders WHERE id = ?').get(id);
-    if (!existing) return res.status(404).json({ error: 'Folder not found.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Folder not found.', code: 404, reason: 'documents_folder_not_found' });
 
     // WAS MITGEHT, WIRD VORHER GEZAEHLT UND NICHT NUR GELOESCHT. Ein Ordner
     // nimmt seinen ganzen Teilbaum mit (ON DELETE CASCADE, Migration v164),
@@ -1238,14 +1277,17 @@ router.post('/', async (req, res) => {
         && activeFolderTreeDeletes.has(vFolderId.value)) {
       return deletionInProgress(res);
     }
+    if (selectedFolderMissing(vFolderId.value)) return selectedFolderGone(res);
     const parsed = parseDataUrl(req.body.content_data);
-    if (parsed.error) return res.status(400).json({ error: parsed.error, code: 400 });
+    if (parsed.error) {
+      return res.status(400).json({ error: parsed.error, code: 400, ...(parsed.reason ? { reason: parsed.reason } : {}) });
+    }
 
     const allowedIds = visibility === 'restricted' ? parseMemberIds(req.body.allowed_member_ids) : [];
     // Freigeben laesst sich ein neues Dokument nur Haushaltsmitgliedern (#1207).
     const strangers = newNonMembers(allowedIds);
     if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
-    stagedUpload = await stageDocumentUpload({
+    stagedUpload = await stageUpload({
       buffer: parsed.buffer,
       mime: parsed.mime,
       category,
@@ -1253,6 +1295,10 @@ router.post('/', async (req, res) => {
     });
     const database = db.get();
     const row = database.transaction(() => {
+      // NOCHMAL, OHNE YIELD DAZWISCHEN: die Pruefung oben lag vor dem await des
+      // Ablegens, und dort kann ein anderes Loeschen den Ordner nehmen (Review
+      // zu #1994). Erst hier ist das Ergebnis bis zum INSERT verbindlich.
+      if (selectedFolderMissing(vFolderId.value)) throw new SelectedFolderGoneError();
       const folderId = vFolderId.value ?? ensureFolder(folderKey, vFolderName.value, userId(req));
       const expiresAt = vExpiresAtField.value ?? null;
       const expiryReminderDays = vExpiryReminderDaysField.value ?? null;
@@ -1298,7 +1344,8 @@ router.post('/', async (req, res) => {
       log.error('POST / storage error:', err);
       return sendStorageError(res, err, 'Document storage upload failed.');
     }
-    log.error('POST / error:', err);
+    const folderGone = err instanceof SelectedFolderGoneError;
+    if (!folderGone) log.error('POST / error:', err);
     if (stagedUpload) {
       try {
         await cleanupStagedUpload(stagedUpload);
@@ -1311,6 +1358,7 @@ router.post('/', async (req, res) => {
         );
       }
     }
+    if (folderGone) return selectedFolderGone(res);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
@@ -1319,7 +1367,7 @@ router.put('/:id', (req, res) => {
   try {
     const id = Number(req.params.id);
     const existing = getVisibleDocument(id, req);
-    if (!existing) return res.status(404).json({ error: 'Document not found.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Document not found.', code: 404, reason: 'documents_document_not_found' });
     if (!mayManage(req, existing)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
     if (documentDeleteIsActive(id)) return documentDeletionInProgress(res);
 
@@ -1341,6 +1389,7 @@ router.put('/:id', (req, res) => {
         && activeFolderTreeDeletes.has(vFolderId.value)) {
       return deletionInProgress(res);
     }
+    if (selectedFolderMissing(vFolderId.value)) return selectedFolderGone(res);
     const allowedIds = (visibility || existing.visibility) === 'restricted' ? parseMemberIds(req.body.allowed_member_ids) : [];
     // Neu freigeben laesst sich nur Haushaltsmitgliedern (#1207). Wer schon
     // freigegeben ist - auch Hauspersonal oder ein Gast -, bleibt speicherbar.
@@ -1396,7 +1445,7 @@ router.patch('/:id/archive', (req, res) => {
   try {
     const id = Number(req.params.id);
     const existing = getVisibleDocument(id, req);
-    if (!existing) return res.status(404).json({ error: 'Document not found.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Document not found.', code: 404, reason: 'documents_document_not_found' });
     if (!mayManage(req, existing)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
     if (documentDeleteIsActive(id)) return documentDeletionInProgress(res);
     const status = req.body.archived === false ? 'active' : 'archived';
@@ -1513,7 +1562,7 @@ router.delete('/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);
     const existing = getVisibleDocument(id, req, true);
-    if (!existing) return res.status(404).json({ error: 'Document not found.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Document not found.', code: 404, reason: 'documents_document_not_found' });
     if (!mayManage(req, existing)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
     if (documentDeleteIsActive(id)) return documentDeletionInProgress(res);
     lockDocumentDeletes([id]);

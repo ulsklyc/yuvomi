@@ -50,6 +50,7 @@ export async function handleFolderDeleteFailure({
   translate,
   showToast,
   refreshImpact,
+  reportOther,
 }) {
   if (err?.status === 409 && err.data?.reason === 'FOLDER_CONTENT_CHANGED') {
     if (delayed) {
@@ -73,7 +74,14 @@ export async function handleFolderDeleteFailure({
     showToast?.(translate('documents.folderDeleteNotManageableToast'), 'warning');
     return;
   }
-  showToast?.(err?.data?.error ?? translate('common.unknownError'), 'danger');
+  // Jeder andere Fall geht an die Seite (#1909): sie sagt den Satz der App
+  // (der Ordner ist inzwischen weg, der Speicher antwortet nicht) und laedt
+  // nach, wo der Stand veraltet ist. Den Text des Servers zeigt hier nichts.
+  if (reportOther) {
+    reportOther(err);
+    return;
+  }
+  showToast?.(translate('common.unknownError'), 'danger');
 }
 
 function pendingState(state) {

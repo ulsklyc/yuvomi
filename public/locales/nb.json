@@ -3806,7 +3806,20 @@
             "reasonTooDeep": "Stien overstiger grensen på fem mappenivåer.",
             "reasonParentFailed": "Overordnet mappe kunne ikke opprettes.",
             "reasonRateLimited": "Serveren mottar for mange forespørsler. Prøv opplastingen på nytt senere."
-        }
+        },
+        "errorFolderGone": "Denne mappen finnes ikke lenger.",
+        "errorSelectedFolderGone": "Den valgte mappen finnes ikke lenger.",
+        "errorFolderExists": "Det finnes allerede en mappe med dette navnet her. Velg et annet navn.",
+        "errorFolderTooDeep": "Mapper kan nestes høyst {{limit}} nivåer dypt.",
+        "errorDocumentGone": "Dette dokumentet er ikke lenger tilgjengelig.",
+        "errorFileTypeNotAllowed": "Denne filtypen kan ikke lastes opp.",
+        "errorFileContentMismatch": "Innholdet i filen stemmer ikke med filtypen.",
+        "errorFileEmpty": "Filen er tom.",
+        "errorStorageFailed": "Dokumentlagringen svarte ikke. Prøv igjen senere.",
+        "errorDmsAccountGone": "Denne DMS-kontoen finnes ikke lenger.",
+        "errorDmsDocumentGone": "Dette dokumentet finnes ikke lenger i DMS-systemet.",
+        "errorDmsAlreadyLinked": "Dette DMS-dokumentet er allerede koblet til.",
+        "errorDmsAlreadyStored": "Dette dokumentet er allerede lagret i et DMS."
     },
     "housekeeping": {
         "title": "Husarbeid",

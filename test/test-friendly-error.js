@@ -262,7 +262,10 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
   // Antwort sie traegt, misst test:health-errors.
   const healthServer = readdirSync(new URL('../server/routes/health/', import.meta.url))
     .map((name) => read(`../server/routes/health/${name}`)).join('\n');
-  const routes = `${read('../server/routes/shopping.js')}\n${healthServer}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
+  // Die Dokumente ebenso, dazu Verknuepfen und Senden an ein DMS; dass eine
+  // ECHTE Antwort sie traegt, misst test:documents-errors.
+  const documentsServer = ['../server/routes/documents.js', '../server/routes/dms.js'].map(read).join('\n');
+  const routes = `${read('../server/routes/shopping.js')}\n${healthServer}\n${documentsServer}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
   return load().then(({ CASE_MESSAGES, REFUSAL_MESSAGES }) => {
     for (const [reason, key] of CASE_MESSAGES) {
       assert.equal(REFUSAL_MESSAGES.has(reason), false, `${reason} steht in beiden Listen`);
@@ -289,6 +292,8 @@ test('isGone: nur die bekannten "gibt es nicht mehr"-Gruende, nie der blanke Sta
     'health_lab_report_not_found', 'health_lab_result_not_found', 'health_activity_not_found',
     'health_prevention_type_not_found', 'health_prevention_selected_type_not_found', 'health_prevention_record_not_found',
     'health_nutrition_entry_not_found', 'health_cycle_period_not_found', 'health_cycle_log_not_found',
+    'documents_folder_not_found', 'documents_selected_folder_not_found', 'documents_document_not_found',
+    'dms_account_not_found', 'dms_document_not_found',
   ].sort());
   for (const reason of GONE_REASONS) {
     assert.ok(CASE_MESSAGES.has(reason), `${reason}: ohne Satz`);
@@ -443,7 +448,7 @@ test('CASE_PARAMS: jeder Eintrag gehoert zu einem Fall, kein Name waehlt die Plu
   assert.ok(CASE_PARAMS.size >= 7);
   const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
   const server = ['../server/services/waste-import.js', '../server/services/waste-url-source.js', '../server/routes/waste/sources.js',
-    '../server/routes/health/cycle.js'].map(read).join('\n');
+    '../server/routes/health/cycle.js', '../server/routes/documents.js'].map(read).join('\n');
   for (const [reason, names] of CASE_PARAMS) {
     assert.ok(CASE_MESSAGES.has(reason), `${reason}: Zahlen ohne Satz`);
     assert.ok(Array.isArray(names) && names.length > 0, reason);

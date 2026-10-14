@@ -3746,7 +3746,20 @@
             "reasonTooDeep": "O caminho excede o limite de cinco níveis de pastas.",
             "reasonParentFailed": "Não foi possível criar a pasta superior.",
             "reasonRateLimited": "O servidor está a receber demasiados pedidos. Tente carregar novamente mais tarde."
-        }
+        },
+        "errorFolderGone": "Esta pasta já não existe.",
+        "errorSelectedFolderGone": "A pasta escolhida já não existe.",
+        "errorFolderExists": "Já existe aqui uma pasta com este nome. Escolha outro nome.",
+        "errorFolderTooDeep": "As pastas podem ser aninhadas no máximo em {{limit}} níveis.",
+        "errorDocumentGone": "Este documento já não está disponível.",
+        "errorFileTypeNotAllowed": "Este tipo de ficheiro não pode ser carregado.",
+        "errorFileContentMismatch": "O conteúdo do ficheiro não corresponde ao seu tipo.",
+        "errorFileEmpty": "O ficheiro está vazio.",
+        "errorStorageFailed": "O armazenamento de documentos não respondeu. Tente novamente mais tarde.",
+        "errorDmsAccountGone": "Esta conta de DMS já não existe.",
+        "errorDmsDocumentGone": "Este documento já não existe no DMS.",
+        "errorDmsAlreadyLinked": "Este documento do DMS já está associado.",
+        "errorDmsAlreadyStored": "Este documento já está guardado num DMS."
     },
     "shortcuts": {
         "goKitchen": "Cozinha",

@@ -3746,7 +3746,20 @@
             "reasonTooDeep": "La ruta supera el límite de cinco niveles de carpetas.",
             "reasonParentFailed": "No se pudo crear la carpeta superior.",
             "reasonRateLimited": "El servidor está recibiendo demasiadas solicitudes. Intenta cargar de nuevo más tarde."
-        }
+        },
+        "errorFolderGone": "Esta carpeta ya no existe.",
+        "errorSelectedFolderGone": "La carpeta elegida ya no existe.",
+        "errorFolderExists": "Ya existe aquí una carpeta con este nombre. Elige otro nombre.",
+        "errorFolderTooDeep": "Las carpetas se pueden anidar como máximo {{limit}} niveles.",
+        "errorDocumentGone": "Este documento ya no está disponible.",
+        "errorFileTypeNotAllowed": "Este tipo de archivo no se puede subir.",
+        "errorFileContentMismatch": "El contenido del archivo no coincide con su tipo.",
+        "errorFileEmpty": "El archivo está vacío.",
+        "errorStorageFailed": "El almacenamiento de documentos no respondió. Inténtalo de nuevo más tarde.",
+        "errorDmsAccountGone": "Esta cuenta de DMS ya no existe.",
+        "errorDmsDocumentGone": "Este documento ya no existe en el DMS.",
+        "errorDmsAlreadyLinked": "Este documento del DMS ya está vinculado.",
+        "errorDmsAlreadyStored": "Este documento ya está guardado en un DMS."
     },
     "shortcuts": {
         "goKitchen": "Cocina",

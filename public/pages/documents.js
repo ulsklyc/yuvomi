@@ -5,7 +5,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, selectModal, advancedSection, promptModal, confirmModal, refocusAfterRender } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, selectModal, advancedSection, promptModal, confirmModal, refocusAfterRender, captureModalContext, isModalContextCurrent } from '/components/modal.js';
 import { t, formatDate, getLocale } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
@@ -41,6 +41,7 @@ import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { firstRovingStop, repairRovingStops, wireRovingToolbars } from '/utils/roving-toolbar.js';
 import { isPermAdmin } from '/permissions.js';
+import { errorSentence, isGone } from '/utils/friendly-error.js';
 import { mayWritePath } from '/utils/module-access.js';
 import { readRowHtml } from '/utils/read-row.js';
 import {
@@ -107,15 +108,99 @@ function categoryLabels() {
   return Object.fromEntries(CATEGORIES.map((category) => [category, t(`documents.category.${category}`)]));
 }
 
-// Nutzerfreundliche Fehlermeldung: strukturierte Server-Meldung (err.data.error)
-// bevorzugt; lokalisierte Client-Validierungsfehler (plain Error mit t()-Text)
-// bleiben erhalten; technische ApiError-Strings („HTTP 500"/„offline") werden auf
-// eine generische Copy gemappt statt roh angezeigt.
-function friendlyError(err) {
-  return err?.data?.error
-    || (err?.name === 'ApiError' ? t('common.unknownError') : err?.message)
-    || t('common.unknownError');
+/**
+ * Eine Pruefung der Seite selbst (leerer Name, keine Datei, zu gross, nicht
+ * lesbar): traegt ihren schon uebersetzten Satz. Ein eigener Typ, damit die
+ * Fehlerstelle ihn von einer Antwort des Servers unterscheidet, ohne den Text
+ * irgendeines Fehlers zu lesen.
+ */
+class PageProblem extends Error {
+  constructor(sentence) {
+    super(sentence);
+    this.name = 'PageProblem';
+    this.sentence = sentence;
+  }
 }
+
+/**
+ * DER SATZ EINES FEHLERS IN DEN DOKUMENTEN (#1909). Die eigene Pruefung sagt
+ * ihren Satz; alles andere sagt den Satz der App (`errorSentence`): den Fall,
+ * den der Server mit `reason` nennt, sonst den allgemeinen. Der Text des
+ * Servers kommt nie an - bis #1909 stand er hier vorn, auf Englisch, was auch
+ * immer die Sprache der App war.
+ */
+function errorText(err) {
+  if (err instanceof PageProblem) return err.sentence;
+  return errorSentence(err, 'common.unknownError');
+}
+
+/**
+ * EIN WEG FUER DIE FEHLER-TOASTS DER SEITE (#1909). Sagt der Grund, dass es das
+ * Ziel der Handlung nicht mehr gibt (ein anderes Haushaltsmitglied hat den
+ * Ordner oder das Dokument geloescht, oder es ist fuer dich nicht mehr
+ * sichtbar), ist der Stand der Seite veraltet: sie holt Ordner und Dokumente
+ * selbst neu, statt dazu zu raten. `dialog` ist der Modal-Kontext der Handlung
+ * (`captureModalContext()` vor der Anfrage): geschlossen wird nur, wenn genau
+ * dieser Dialog noch offen ist. Hat der Nutzer ihn inzwischen geschlossen, die
+ * Seite gewechselt oder einen anderen geoeffnet, bleibt das so (Codex an #1994).
+ *
+ * KEIN "SCHON GELOESCHT" ALS ERFOLG. Anders als im Einkauf sagt die 404 eines
+ * Dokuments zweierlei: geloescht, ODER die Sichtbarkeit wurde geaendert und die
+ * Zeile steht noch. Ein Loeschen mit diesem Grund laeuft deshalb wie jede
+ * andere Handlung hier durch: der Satz, und die Seite zeigt, was wirklich steht.
+ */
+async function reportError(err, { dialog = null } = {}) {
+  window.yuvomi?.showToast(errorText(err), 'danger');
+  if (!isGone(err)) return;
+  // Nachladen nach "gibt es nicht mehr". Die DMS-Konten kommen mit: ein Konto,
+  // das ein Admin entfernt hat, stuende sonst weiter im Menue. Ein scheiterndes
+  // Nachladen meldet nichts weiter - der Satz steht schon da.
+  // Wie deleteDocuments: wer die Seite inzwischen verlassen hat, bekommt
+  // nichts mehr gezeichnet (Review zu #1994).
+  const owner = _container;
+  if (dialog && isModalContextCurrent(dialog)) await closeModal({ force: true });
+  try {
+    await Promise.all([loadFolders(), loadDocuments(), loadMetaOptions()]);
+  } catch (loadErr) {
+    console.warn('[Documents] reload after a gone answer failed:', loadErr);
+    return;
+  }
+  if (_container !== owner) return;
+  renderDmsHeaderBtn();
+  renderAll();
+  refocusAfterRender();
+}
+
+/**
+ * Der im Dialog GEWAEHLTE Ordner ist weg (#1909): der Dialog bleibt mit der
+ * Eingabe offen, die Auswahl bekommt die aktuellen Ordner, steht auf der
+ * Wurzel und traegt den Fokus. Scheitert das Nachladen, faellt wenigstens der
+ * verschwundene Ordner aus der Auswahl. Die Seite hinter dem Dialog zeichnet
+ * den frischen Stand mit - wer den Dialog danach abbricht, saehe sonst den
+ * geloeschten Ordner weiter in der Seitenleiste.
+ *
+ * @param {HTMLSelectElement|null} select
+ * @param {string} rootKey - Beschriftung der Wurzel ("kein Ordner", "oberste Ebene")
+ * @param {(goneId: string) => string} optionsHtml - die Optionen in der
+ *   Reihenfolge, die der Dialog beim Oeffnen hatte, ohne `goneId`
+ */
+async function offerCurrentFolders(select, rootKey, optionsHtml) {
+  if (!select) return;
+  const goneId = String(select.value);
+  const owner = _container;
+  try {
+    await Promise.all([loadFolders(), loadDocuments()]);
+  } catch (err) {
+    console.warn('[Documents] folder reload failed:', err);
+  }
+  if (_container === owner) renderAll();
+  select.replaceChildren();
+  select.insertAdjacentHTML('beforeend', `<option value="">${esc(t(rootKey))}</option>${optionsHtml(goneId)}`);
+  select.value = '';
+  select.focus();
+}
+
+const isSelectedFolderGone = (err) => isGone(err) && err.data.reason === 'documents_selected_folder_not_found';
 
 // Sortierschlüssel der Liste (utils/document-facets.js). `updated` spiegelt
 // die Server-Reihenfolge (ORDER BY updated_at DESC) und bleibt daher der Default.
@@ -1142,6 +1227,17 @@ function visibleAllFolderRows() {
   return flattenFolderTree(state.folders);
 }
 
+/**
+ * Beschriftung eines Ordners in einer Auswahl: eingerueckt nach seiner Tiefe.
+ * Mit geschuetzten Leerzeichen - gewoehnliche fasst eine <option> zusammen,
+ * und der Unterordner stuende auf der obersten Ebene (Codex an #1994). EIN
+ * Helfer fuer jede Ordner-Auswahl, auch fuer den Neuaufbau nach "gibt es nicht
+ * mehr", damit beide nicht auseinanderlaufen.
+ */
+function folderOptionLabel(row) {
+  return `${'  '.repeat(row.depth)}${row.folder.name}`;
+}
+
 /** Dieser Ordner und alles darunter - dieselbe Regel wie im Server. */
 function folderSubtree(folderId) {
   return subtreeIds(state.folders, folderId);
@@ -1448,7 +1544,7 @@ async function moveFolder(folder) {
     { value: '', label: t('documents.folderRootLevel') },
     ...visibleAllFolderRows()
       .filter((row) => !forbidden.has(row.folder.id))
-      .map((row) => ({ value: String(row.folder.id), label: `${'  '.repeat(row.depth)}${row.folder.name}` })),
+      .map((row) => ({ value: String(row.folder.id), label: folderOptionLabel(row) })),
   ];
 
   const chosen = await selectModal(t('documents.moveFolderTo', { name: folder.name }), options);
@@ -1464,7 +1560,7 @@ async function moveFolder(folder) {
     renderAll();
     refocusAfterRender();
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    reportError(err);
   }
 }
 
@@ -1522,7 +1618,7 @@ async function renameFolder(folder) {
     renderAll();
     refocusAfterRender();
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    reportError(err);
   }
 }
 
@@ -1594,7 +1690,7 @@ async function deleteFolder(folder) {
     const response = await api.get(`/documents/folders/${folder.id}/delete-impact`);
     impact = response.data;
   } catch (err) {
-    window.yuvomi?.showToast(friendlyError(err), 'danger');
+    reportError(err);
     return;
   }
 
@@ -1636,7 +1732,7 @@ async function deleteFolder(folder) {
       // The server deletion has already succeeded at this point. A failed
       // refresh must not restore records that no longer exist server-side.
       handleApplyError: (err) => {
-        window.yuvomi?.showToast(friendlyError(err), 'danger');
+        reportError(err);
       },
       render: () => {
         persistExpandedFolders();
@@ -1705,6 +1801,7 @@ async function handleFolderDeleteError(err, folder, { delayed = false } = {}) {
     translate: t,
     showToast: (...args) => window.yuvomi?.showToast(...args),
     refreshImpact: () => deleteFolder(folder),
+    reportOther: (error) => reportError(error),
   });
 }
 
@@ -2115,7 +2212,7 @@ async function runDocumentAction(action, doc) {
       await loadDocuments();
       renderAll({ motion: true });
     } catch (err) {
-      window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+      reportError(err);
     }
   }
   if (action === 'push-dms') {
@@ -2134,7 +2231,7 @@ async function runDocumentAction(action, doc) {
       await api.post('/documents/dms/push', { account_id: accountId, document_id: doc.id });
       window.yuvomi?.showToast(t('documents.pushToDmsQueued'), 'success');
     } catch (err) {
-      window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+      reportError(err);
     }
     return;
   }
@@ -2180,7 +2277,12 @@ function deleteDocuments(docs) {
   scheduleUndoableDelete({
     message,
     commit: async ({ keepalive }) => {
-      await Promise.all(docs.map((doc) => api.delete(`/documents/${doc.id}`, { keepalive })));
+      // ALLE abwarten, auch wenn eines scheitert (Review zu #1994): sonst laedt
+      // die Seite nach, waehrend ein anderes Loeschen noch laeuft, und dessen
+      // Dokument kaeme zurueck. Gemeldet wird der erste Fehler.
+      const outcomes = await Promise.allSettled(docs.map((doc) => api.delete(`/documents/${doc.id}`, { keepalive })));
+      const failed = outcomes.find((outcome) => outcome.status === 'rejected');
+      if (failed) throw failed.reason;
       // Seite inzwischen verlassen: die Löschung ist durch, aber es gibt nichts
       // mehr zu zeichnen — kein Nachladen auf einen abgehängten Container.
       if (keepalive || _container !== owner) return;
@@ -2189,8 +2291,11 @@ function deleteDocuments(docs) {
     },
     restore: (err) => {
       if (_container !== owner) return;
+      // "Gibt es nicht mehr": nicht zurueckstellen, was der Server nicht mehr
+      // zeigt - reportError laedt nach, und die Liste sagt, was steht.
+      if (err && isGone(err)) { reportError(err); return; }
       restore();
-      if (err) window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+      if (err) reportError(err);
     },
   });
 }
@@ -2291,7 +2396,7 @@ async function archiveSelected() {
     await loadDocuments();
     renderAll();
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    reportError(err);
   }
 }
 
@@ -2319,7 +2424,7 @@ async function moveSelected() {
     renderAll();
     refocusAfterRender();
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    reportError(err);
   }
 }
 
@@ -2374,6 +2479,8 @@ export const __test = {
   openDocumentModal, openFolderModal, openFolderMenu, openDocumentMenu,
   renameFolder, moveFolder, deleteFolder, enterSelectMode, toggleSelectAll,
   archiveSelected, moveSelected, selectedDocuments, viewerDetailsHtml, saveDocument,
+  // #1909: die Fehlerwege der Seite (test:documents-errors).
+  linkDmsDocument, folderUploadFailureText,
 };
 
 function openDocumentModal(doc = null) {
@@ -2597,6 +2704,18 @@ const FOLDER_UPLOAD_REASON_KEYS = {
 function folderUploadReason(reason) {
   const key = FOLDER_UPLOAD_REASON_KEYS[reason];
   return key ? t(key) : (reason || t('common.unknownError'));
+}
+
+/**
+ * Warum eine Datei oder ein Ordner beim Hochladen eines Ordners scheiterte.
+ * Ein Code der Planung hat seinen Satz; sonst sagt der gefangene Fehler den
+ * Satz der App (#1909). `reason` traegt dann den Text des Fehlers - der
+ * Server-Satz oder eine Entwicklermeldung - und wird nie gezeigt.
+ */
+function folderUploadFailureText(failure) {
+  const key = FOLDER_UPLOAD_REASON_KEYS[failure?.reason];
+  if (key) return t(key);
+  return failure?.error ? errorText(failure.error) : t('common.unknownError');
 }
 
 async function loadUploadConflictDocuments() {
@@ -2877,7 +2996,7 @@ function bindFolderUpload(panel) {
       if (submit) submit.disabled = false;
     } catch (error) {
       const formError = form.querySelector('#document-error');
-      formError.textContent = friendlyError(error);
+      formError.textContent = errorText(error);
       formError.hidden = false;
     }
   });
@@ -2947,7 +3066,7 @@ function renderFolderUploadResult(panel, plan, result) {
         <section class="folder-upload-result__failures">
           <h4>${t('documents.folderUpload.failedTitle')}</h4>
           <ul>${failures.map((failure) => `
-            <li><span>${esc(failure.item?.relativePath || failure.item?.key || '')}</span><span>${esc(folderUploadReason(failure.reason))}</span></li>`).join('')}</ul>
+            <li><span>${esc(failure.item?.relativePath || failure.item?.key || '')}</span><span>${esc(folderUploadFailureText(failure))}</span></li>`).join('')}</ul>
         </section>` : ''}
       ${plan.rejected.length ? `
         <section class="folder-upload-result__failures">
@@ -2960,10 +3079,10 @@ function renderFolderUploadResult(panel, plan, result) {
 
 async function saveFolderUpload(panel, payload) {
   const upload = panel._folderUpload;
-  if (!upload?.ready) throw new Error(t('common.unknownError'));
+  if (!upload?.ready) throw new PageProblem(t('common.unknownError'));
   const plan = renderFolderUploadPreview(panel);
   if (!plan || (plan.counts.upload < 1 && plan.counts.createFolders < 1)) {
-    throw new Error(t('documents.folderUpload.noUploadableFiles'));
+    throw new PageProblem(t('documents.folderUpload.noUploadableFiles'));
   }
   upload.running = true;
   upload.cancelled = false;
@@ -3025,6 +3144,8 @@ async function saveFolderUpload(panel, payload) {
 async function saveDocument(event, doc, panel) {
   if (doc ? !mayManage(doc) : readOnly()) { event?.preventDefault?.(); return; }
   event.preventDefault();
+  // Der Dialog dieser Handlung, vor jeder Anfrage gemerkt (reportError).
+  const modalContext = captureModalContext();
   const form = event.target;
   const error = form.querySelector('#document-error');
   // Die Fußzeile mit dem Submit-Button wird beim Öffnen ans Panel gehoben
@@ -3055,7 +3176,7 @@ async function saveDocument(event, doc, panel) {
         : [],
     };
     if (doc) {
-      if (!payload.name) throw new Error(t('common.required'));
+      if (!payload.name) throw new PageProblem(t('common.required'));
       await api.put(`/documents/${doc.id}`, payload);
       window.yuvomi?.showToast(t('documents.savedToast'), 'success');
     } else {
@@ -3065,10 +3186,10 @@ async function saveDocument(event, doc, panel) {
         return;
       }
       const files = Array.from(form.querySelector('#document-file').files || []);
-      if (!files.length) throw new Error(t('documents.fileRequired'));
+      if (!files.length) throw new PageProblem(t('documents.fileRequired'));
       const maxSize = state.maxFileSize || maxUploadBytes();
       const tooBig = files.find((file) => file.size > maxSize);
-      if (tooBig) throw new Error(t('documents.fileTooLargeNamed', { name: tooBig.name }));
+      if (tooBig) throw new PageProblem(t('documents.fileTooLargeNamed', { name: tooBig.name }));
 
       // Fortschritt sichtbar machen: das Einlesen einer mehrere MB großen Datei
       // als Data-URL dauert spürbar, und bei Mehrfachauswahl erst recht. Ein
@@ -3103,8 +3224,20 @@ async function saveDocument(event, doc, panel) {
     renderAll({ motion: true });
     refocusAfterRender();
   } catch (err) {
-    error.textContent = friendlyError(err);
+    // Das Dokument gibt es nicht mehr: der Dialog bearbeitet etwas Veraltetes,
+    // er geht zu, und die Liste kommt frisch.
+    if (isGone(err) && !isSelectedFolderGone(err)) {
+      reportError(err, { dialog: modalContext });
+      return;
+    }
+    error.textContent = errorText(err);
     error.hidden = false;
+    if (isSelectedFolderGone(err)) {
+      // Dieselbe Reihenfolge wie beim Oeffnen (openDocumentModal): die Liste.
+      await offerCurrentFolders(form.querySelector('#document-folder'), 'documents.noFolder',
+        (goneId) => state.folders.filter((folder) => String(folder.id) !== goneId)
+          .map((folder) => `<option value="${folder.id}">${esc(folder.name)}</option>`).join(''));
+    }
   } finally {
     submit.disabled = panel._folderUpload?.completed === true;
   }
@@ -3125,7 +3258,7 @@ function openFolderModal({ parentId = null } = {}) {
     ? Number(state.folderId)
     : null);
   const options = visibleAllFolderRows()
-    .map((row) => `<option value="${row.folder.id}" ${row.folder.id === preselected ? 'selected' : ''}>${esc(`${'  '.repeat(row.depth)}${row.folder.name}`)}</option>`)
+    .map((row) => `<option value="${row.folder.id}" ${row.folder.id === preselected ? 'selected' : ''}>${esc(folderOptionLabel(row))}</option>`)
     .join('');
 
   openSharedModal({
@@ -3175,8 +3308,14 @@ function openFolderModal({ parentId = null } = {}) {
           applyFilters();
           renderAll();
         } catch (err) {
-          error.textContent = friendlyError(err);
+          error.textContent = errorText(err);
           error.hidden = false;
+          if (isSelectedFolderGone(err)) {
+            // Dieselbe Reihenfolge wie beim Oeffnen: der Baum, eingerueckt.
+            await offerCurrentFolders(parentSelect, 'documents.folderRootLevel',
+              (goneId) => visibleAllFolderRows().filter((row) => String(row.folder.id) !== goneId)
+                .map((row) => `<option value="${row.folder.id}">${esc(folderOptionLabel(row))}</option>`).join(''));
+          }
         }
       });
     },
@@ -3431,6 +3570,7 @@ function setMediaAffordance(el, label) {
 // Verknüpft ein DMS-Dokument mit der Dokumentenliste. Gibt true bei Erfolg zurück,
 // damit der auslösende Button im Fehlerfall wieder bedienbar wird.
 async function linkDmsDocument(item, accountId) {
+  const modalContext = captureModalContext();
   try {
     // Feste, vorhersagbare Kategorie: früher erbte das verknüpfte Dokument
     // stillschweigend das gerade aktive Filter-Chip, was nirgends stand.
@@ -3447,7 +3587,9 @@ async function linkDmsDocument(item, accountId) {
     refocusAfterRender();
     return true;
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    // Der Verknuepfen-Dialog zeigt einen veralteten Stand, wenn das Konto
+    // oder das Dokument im DMS fehlt: dann geht er zu.
+    reportError(err, { dialog: modalContext });
     return false;
   }
 }
@@ -3545,7 +3687,7 @@ function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(new Error(t('documents.fileReadError')));
+    reader.onerror = () => reject(new PageProblem(t('documents.fileReadError')));
     reader.readAsDataURL(file);
   });
 }

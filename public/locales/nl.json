@@ -3806,7 +3806,20 @@
             "reasonTooDeep": "Het pad overschrijdt de limiet van vijf mapniveaus.",
             "reasonParentFailed": "De bovenliggende map kon niet worden gemaakt.",
             "reasonRateLimited": "De server ontvangt te veel verzoeken. Probeer de upload later opnieuw."
-        }
+        },
+        "errorFolderGone": "Deze map bestaat niet meer.",
+        "errorSelectedFolderGone": "De gekozen map bestaat niet meer.",
+        "errorFolderExists": "Hier bestaat al een map met deze naam. Kies een andere naam.",
+        "errorFolderTooDeep": "Mappen kunnen maximaal {{limit}} niveaus diep worden genest.",
+        "errorDocumentGone": "Dit document is niet meer beschikbaar.",
+        "errorFileTypeNotAllowed": "Dit bestandstype kan niet worden geüpload.",
+        "errorFileContentMismatch": "De inhoud van het bestand past niet bij het bestandstype.",
+        "errorFileEmpty": "Het bestand is leeg.",
+        "errorStorageFailed": "De documentopslag reageerde niet. Probeer het later opnieuw.",
+        "errorDmsAccountGone": "Dit DMS-account bestaat niet meer.",
+        "errorDmsDocumentGone": "Dit document bestaat niet meer in het DMS.",
+        "errorDmsAlreadyLinked": "Dit DMS-document is al gekoppeld.",
+        "errorDmsAlreadyStored": "Dit document staat al in een DMS."
     },
     "housekeeping": {
         "title": "Huishouden",

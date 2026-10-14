@@ -4034,7 +4034,20 @@
             "reasonTooDeep": "Ścieżka przekracza limit pięciu poziomów folderów.",
             "reasonParentFailed": "Nie udało się utworzyć folderu nadrzędnego.",
             "reasonRateLimited": "Serwer otrzymuje zbyt wiele żądań. Spróbuj przesłać ponownie później."
-        }
+        },
+        "errorFolderGone": "Ten folder już nie istnieje.",
+        "errorSelectedFolderGone": "Wybrany folder już nie istnieje.",
+        "errorFolderExists": "Folder o tej nazwie już tu istnieje. Wybierz inną nazwę.",
+        "errorFolderTooDeep": "Foldery można zagnieżdżać najwyżej na {{limit}} poziomach.",
+        "errorDocumentGone": "Ten dokument nie jest już dostępny.",
+        "errorFileTypeNotAllowed": "Tego typu pliku nie można przesłać.",
+        "errorFileContentMismatch": "Zawartość pliku nie pasuje do jego typu.",
+        "errorFileEmpty": "Plik jest pusty.",
+        "errorStorageFailed": "Magazyn dokumentów nie odpowiedział. Spróbuj ponownie później.",
+        "errorDmsAccountGone": "To konto DMS już nie istnieje.",
+        "errorDmsDocumentGone": "Ten dokument już nie istnieje w systemie DMS.",
+        "errorDmsAlreadyLinked": "Ten dokument z systemu DMS jest już połączony.",
+        "errorDmsAlreadyStored": "Ten dokument jest już zapisany w systemie DMS."
     },
     "userMultiSelect": {
         "nobody": "Nikt",
