@@ -21269,6 +21269,48 @@ test('die umgestellten Module lesen auch err.message nicht (#1909)', () => {
   }
 });
 
+/* DER GESPEICHERTE FEHLERTEXT EINER ABFUHR-QUELLE (#1909, dritte Abfuhr-Scheibe).
+ *
+ * `source.last_error` ist der englische Text des Servers ("No calendar entries
+ * in the response") - er traegt denselben Satz wie `err.data.error`, nur auf
+ * einem Datensatz statt an einem Fehler, und der Leser darueber sieht ihn
+ * nicht. Die Seite darf ihn als Wahrheitswert lesen (gibt es einen
+ * Fehlschlag?), aber nie ausgeben: den Satz baut sie aus
+ * `last_error_reason`/`last_error_params`.
+ */
+function countLastErrorOutputs(source) {
+  const code = withoutCommentsKeepingLines(source);
+  const blank = withoutCommentsKeepingLines(source, { blankLiterals: true });
+  let count = 0;
+  for (const hit of code.matchAll(/(?:\besc\s*\(|\$\{|textContent\s*=|showToast\s*\()\s*[\w$.?\s]*\b(last_error)\s*(?:[)};,]|\|\||\?\?)/g)) {
+    // `last_error` selbst muss Code sein, kein Text in einem Literal.
+    const at = hit.index + hit[0].lastIndexOf('last_error');
+    if (blank[at] === code[at]) count += 1;
+  }
+  return count;
+}
+
+test('der Zaehler fuer last_error sieht die Ausgabe, nicht die Frage (#1909)', () => {
+  for (const [source, expected] of [
+    ['`<p>${esc(source.last_error)}</p>`', 1],
+    ['el.textContent = source?.last_error;', 1],
+    ['`${source.last_error}`', 1],
+    ['showToast(source.last_error || fallback);', 1],
+    ["`${source.last_error ? `<p>${esc(lastFailureSentence(source))}</p>` : ''}`", 0],
+    ["if (source.last_error) return { code: 'error' };", 0],
+    ['// esc(source.last_error)', 0],
+    ["const hint = 'esc(source.last_error)';", 0],
+    ['const { last_error_reason } = source;', 0],
+  ]) {
+    assert.equal(countLastErrorOutputs(source), expected, source);
+  }
+});
+
+test('die Abfuhr-Seite gibt den gespeicherten Fehlertext einer Quelle nie aus (#1909)', () => {
+  assert.equal(countLastErrorOutputs(read('../public/pages/waste.js')), 0,
+    'pages/waste.js gibt `last_error` aus - den Satz aus last_error_reason/last_error_params bauen (lastFailureSentence)');
+});
+
 /* WER NOCH UEBER friendlyError FRAGT, STEHT ALS ZAHL DA (#1909, Uebergang).
  *
  * `utils/friendly-error.js` ist oben ausgenommen, und `friendlyError()` reicht

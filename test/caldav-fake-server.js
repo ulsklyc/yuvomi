@@ -58,6 +58,8 @@ export async function startFakeDavServer() {
   let etagCounter = 0;
   // Ein Server, der kein getetag nennt: der Client kennt dann keinen Stand.
   let announceEtags = true;
+  // Wie nennt ein Multiget einen fehlenden Namen? `false`: gar nicht.
+  let missingAs404 = false;
   const etagProp = (obj) => (announceEtags ? `<d:getetag>${xmlEscape(obj.etag)}</d:getetag>` : '');
   const nextEtag = () => `"e${++etagCounter}"`;
 
@@ -134,7 +136,14 @@ export async function startFakeDavServer() {
         .map((m) => decodeURIComponent(new URL(m[1].trim(), 'http://fake.invalid').pathname.split('/').pop()));
       const isMultiget = /multiget/.test(body);
       const entries = [...col.objects].filter(([filename]) => !isMultiget || wanted.includes(filename));
-      return sendXml(multistatus(entries.map(([filename, obj]) => objectResponse(pathname, filename, obj, dataTag))));
+      // Ein Name, der fehlt: ausgelassen, oder - wie regelkonforme Server
+      // (RFC 4791 §7.9, sabre/dav) - als eigener Eintrag mit 404.
+      const missing = isMultiget && missingAs404 ? wanted.filter((name) => !col.objects.has(name)) : [];
+      return sendXml(multistatus([
+        ...entries.map(([filename, obj]) => objectResponse(pathname, filename, obj, dataTag)),
+        ...missing.map((name) => `<d:response><d:href>${xmlEscape(`${pathname}${encodeSegment(name)}`)}</d:href>`
+          + '<d:status>HTTP/1.1 404 Not Found</d:status></d:response>'),
+      ]));
     }
 
     if (req.method === 'PUT') {
@@ -233,6 +242,8 @@ export async function startFakeDavServer() {
     },
     /** Nennt der Server ETags? `false`: weder im Abruf noch in der Auflistung. */
     announceEtags(on) { announceEtags = !!on; },
+    /** Nennt ein Multiget fehlende Namen als 404-Eintrag? `false` (Vorgabe): er lässt sie aus. */
+    missingAs404(on) { missingAs404 = !!on; },
     refuse(rule) { rules.push(rule); },
     /** Ein Multistatus, der nur die Home-Collection nennt - gültig, aber leer. */
     homeOnlyListing: () => multistatus([propResponse(homePath, '<d:resourcetype><d:collection/></d:resourcetype>')]),
@@ -245,7 +256,7 @@ export async function startFakeDavServer() {
       + `<s:exception>Sabre\\DAV\\Exception</s:exception><s:message>${xmlEscape(message)}</s:message></d:error>`,
     allowAll() { rules = []; },
     /** Alles zurück auf leer: Collections, Regeln, Protokoll. */
-    reset() { collections.clear(); rules = []; requests.length = 0; announceEtags = true; },
+    reset() { collections.clear(); rules = []; requests.length = 0; announceEtags = true; missingAs404 = false; },
     /** Anfragen einer Methode seit dem letzten `reset()`. */
     seen(method) { return requests.filter((r) => r.method === method); },
     close: () => new Promise((resolve) => { server.closeAllConnections?.(); server.close(resolve); }),

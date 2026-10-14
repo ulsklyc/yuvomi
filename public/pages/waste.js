@@ -1914,7 +1914,7 @@ function openSourceModal(source) {
       ${isUrl && source.url ? `<p>${esc(t('waste.sourceUrlLabel'))}: ${esc(source.url)}</p>` : ''}
       ${source.coverage_start ? `<p>${esc(t('waste.sourceCoverageLabel'))}: ${esc(formatDate(source.coverage_start))} - ${esc(formatDate(source.coverage_end))}</p>` : ''}
       ${source.last_success_at ? `<p>${esc(t('waste.sourceLastImportedLabel'))}: ${esc(formatDate(source.last_success_at.slice(0, 10)))}</p>` : ''}
-      ${source.last_error ? `<p class="waste-source-detail__error">${esc(source.last_error)}</p>` : ''}
+      ${source.last_error ? `<p class="waste-source-detail__error">${esc(lastFailureSentence(source))}</p>` : ''}
       ${badge ? `<span class="waste-badge waste-badge--${badge.code}">${esc(t(badge.labelKey))}</span>` : ''}
     </div>
     <h3 class="waste-section-title u-section-title u-compact">
@@ -2034,6 +2034,18 @@ async function keepSourceDialogForMissingType(err, panel, source, mappingId) {
  */
 function fetchFailureSentence(data) {
   return errorSentence({ data: { reason: data?.reason, params: data?.params } }, 'waste.errorSourceFetch');
+}
+
+/**
+ * Der Satz zum letzten gescheiterten Abruf einer Quelle (#1909): derselbe Fall,
+ * den der Handabruf in seiner Antwort nennt, steht seit Migration 247 an der
+ * Quelle (`last_error_reason`, `last_error_params`). `last_error` selbst ist der
+ * englische Text des Servers und kommt nie in den Dialog; eine Quelle ohne
+ * gespeicherten Fall (aelter als die Migration, oder ein Fehlschlag ohne
+ * getypten Grund) bekommt den allgemeinen Satz.
+ */
+function lastFailureSentence(source) {
+  return fetchFailureSentence({ reason: source.last_error_reason, params: source.last_error_params });
 }
 
 async function loadSourceAndOpen(id) {

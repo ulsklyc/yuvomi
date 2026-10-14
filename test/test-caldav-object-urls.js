@@ -119,16 +119,82 @@ test('Ein explizit übergebener urlFilter gewinnt', async () => {
   assert.ok(raw.calls[0].urlFilter === own, 'eigener Filter wurde überschrieben');
 });
 
-test('Auch der Outbound-Pfad mit objectUrls bekommt den Filter', async () => {
-  // tsdav filtert `objectUrls` mit derselben Funktion wie die hrefs aus der
-  // Abfrage: ohne Fix verschwand hier dasselbe Objekt ein zweites Mal.
+/**
+ * Attrappe für den Abruf über Adressen: `davRequest` antwortet mit Einträgen in
+ * der Form, in der tsdav einen Multistatus zerlegt.
+ */
+function multigetClient(entries) {
   const raw = fakeClient();
+  raw.requests = [];
+  raw.davRequest = async (params) => { raw.requests.push(params); return entries; };
+  return raw;
+}
+const MULTISTATUS = { multistatus: { response: [] } };
+const entry = (href, status, props = {}) => ({ raw: MULTISTATUS, href, status, ok: status >= 200 && status < 300, statusText: '', props });
+
+test('Auch der Outbound-Pfad mit objectUrls filtert nichts weg', async () => {
+  // tsdav filtert `objectUrls` mit derselben Funktion wie die hrefs aus der
+  // Abfrage: ohne Fix verschwand hier dasselbe Objekt ein zweites Mal. Der
+  // Abruf über Adressen läuft am tsdav-Filter vorbei und fragt nach jedem
+  // genannten Objekt, als Pfad.
+  const raw = multigetClient([entry('/dav/cal/haushalt/default/NZtPkIOMoK', 200, { getetag: '"1"', calendarData: 'BEGIN:VCALENDAR' })]);
   const client = withCalendarObjectUrlFilter(raw);
-  await client.fetchCalendarObjects({
+  const objects = await client.fetchCalendarObjects({
     calendar:   { url: COLLECTION },
     objectUrls: [`${COLLECTION}NZtPkIOMoK`],
   });
-  assert.ok(raw.calls[0].urlFilter(`${COLLECTION}NZtPkIOMoK`), 'objectUrl würde weggefiltert');
+  assert.deepEqual(raw.calls, [], 'der Abruf über Adressen ging durch tsdavs fetchCalendarObjects');
+  assert.equal(raw.requests.length, 1);
+  assert.equal(raw.requests[0].url, COLLECTION);
+  assert.deepEqual(raw.requests[0].init.body['calendar-multiget']['d:href'], ['/dav/cal/haushalt/default/NZtPkIOMoK']);
+  assert.deepEqual(objects, [{ url: `${COLLECTION}NZtPkIOMoK`, etag: '"1"', data: 'BEGIN:VCALENDAR' }]);
+});
+
+test('Abruf über Adressen: ein Objekt auf fremdem Host oder ausserhalb der Collection geht nicht hinaus', async () => {
+  // Im Körper steht nur der Pfad. Ohne die Prüfung ginge der Pfad eines fremden
+  // Objekts an DIESEN Server, und dessen 404 hiesse "fort".
+  for (const [foreign, check] of [
+    ['https://evil.example/dav/cal/haushalt/default/a.ics', (err) => err.code === 'origin_not_allowed'],
+    [`${new URL(COLLECTION).origin}/dav/cal/haushalt/other/a.ics`, /not in its collection/],
+  ]) {
+    const raw = multigetClient([entry('/dav/cal/haushalt/default/a.ics', 404)]);
+    await assert.rejects(() => withCalendarObjectUrlFilter(raw).fetchCalendarObjects({
+      calendar: { url: COLLECTION }, objectUrls: [`${COLLECTION}b.ics`, foreign],
+    }), check, `${foreign} wurde nicht abgewiesen`);
+    assert.deepEqual(raw.requests, [], `für ${foreign} ging eine Anfrage hinaus`);
+  }
+});
+
+test('Abruf über Adressen: was nicht da ist, fehlt - jede andere Absage ist ein Fehler', async () => {
+  // tsdav 2.4.0 wirft, sobald ein genanntes Objekt fehlt; 2.3.4 warf bei einem
+  // 404-Eintrag, wie ihn regelkonforme Server schicken. Die Aufrufer lesen aus
+  // einer Rückgabe ohne das Objekt "es ist fort" (`inspectObjectAt`).
+  const ask = (entries) => withCalendarObjectUrlFilter(multigetClient(entries)).fetchCalendarObjects({
+    calendar:   { url: COLLECTION },
+    objectUrls: [`${COLLECTION}a.ics`, `${COLLECTION}b.ics`, `${COLLECTION}c.ics`],
+  });
+
+  const found = await ask([
+    entry('/dav/cal/haushalt/default/a.ics', 200, { getetag: '"a"', calendarData: { _cdata: 'A' } }),
+    entry('/dav/cal/haushalt/default/b.ics', 404),
+    entry('/dav/cal/haushalt/default/c.ics', 410),
+  ]);
+  assert.deepEqual(found, [{ url: `${COLLECTION}a.ics`, etag: '"a"', data: 'A' }], '404/410 am Eintrag ist kein Fehler, sondern nichts');
+
+  assert.deepEqual(await ask([{ raw: { multistatus: {} }, status: 207, ok: true }]), [], 'ein leerer Multistatus ist nichts');
+  await assert.rejects(() => ask([{ raw: { multistatus: { response: [{}] } }, status: 207, ok: true, props: {} }]),
+    /did not answer with the requested entries/, 'ein Eintrag ohne Adresse ging als "nicht da" durch');
+
+  await assert.rejects(() => ask([entry('/dav/cal/haushalt/default/a.ics', 403)]), (err) => err.status === 403,
+    'eine Absage am Eintrag ging als "nicht da" durch');
+  await assert.rejects(() => ask([{ href: COLLECTION, raw: '<html>', status: 503, ok: false }]), (err) => err.status === 503,
+    'eine Absage der ganzen Anfrage ging als "nicht da" durch');
+  await assert.rejects(() => ask([{ href: COLLECTION, raw: '<html>Sign in</html>', status: 200, ok: true }]),
+    /did not answer with the requested entries/, 'eine Antwort ohne Multistatus ging als "nicht da" durch');
+  // ETag ja, Inhalt nein: als Objekt ohne Daten läse `inspectObjectAt` "keine
+  // UID, also fort" - über ein Objekt, das da ist.
+  await assert.rejects(() => ask([entry('/dav/cal/haushalt/default/a.ics', 207, { getetag: '"a"' })]),
+    /did not return the content of an entry/, 'ein Eintrag ohne calendar-data ging als Objekt ohne Inhalt durch');
 });
 
 test('Die übrigen Client-Methoden bleiben erreichbar', () => {

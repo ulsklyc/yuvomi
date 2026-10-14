@@ -950,7 +950,10 @@ test('Nach dem Umzug geloescht, das Entfernen am alten Platz steht noch aus: bei
   assert.deepEqual(named('Milch'), []);
 });
 
-test('Das Original ist am Server schon fort: der Umzug faellt, statt etwas zu erfinden', async () => {
+// Zwei Formen, wie ein Server "fort" sagt: er laesst den Namen im Multiget aus,
+// oder er nennt ihn mit 404 (RFC 4791, sabre/dav). tsdav 2.4.0 warf in beiden
+// Faellen, 2.3.4 bei der zweiten; der Umzug wartete dann, statt zu fallen.
+for (const [shape, as404] of [['ausgelassen', false], ['404-Eintrag', true]]) test(`Das Original ist am Server schon fort (${shape}): der Umzug faellt, statt etwas zu erfinden`, async () => {
   const { a, b, item } = await mirroredItem();
   dav.refuse({ method: 'PUT', status: 500, when: () => false });
   // Eine andere App hat den Artikel geloescht.
@@ -960,11 +963,16 @@ test('Das Original ist am Server schon fort: der Umzug faellt, statt etwas zu er
   dav.putObject(a2, 'neighbour-alt.ics', neighbour('alt'));
   const b2 = dav.addCollection('neu', { name: 'neu', components: ['VTODO'] });
   dav.putObject(b2, 'neighbour-neu.ics', neighbour('neu'));
+  dav.missingAs404(as404);
   assert.equal(before, 2);
   assert.equal(a2, a.url);
 
   await patch(item.id, { list_id: b.listId });
 
+  if (as404) {
+    assert.ok(dav.seen('REPORT').some((r) => /multiget/.test(r.body) && r.path === new URL(a.url).pathname),
+      'das Original wurde nicht per Multiget gelesen - der Fall misst etwas anderes');
+  }
   assert.equal(dav.seen('PUT').length, 0, 'ohne Original wird nichts abgelegt');
   assert.equal(row(item.id).outbound_move, 0);
   await remindersSync.sync();

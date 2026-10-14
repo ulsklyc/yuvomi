@@ -48,7 +48,9 @@ import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { outboundFailureAction, MAX_OUTBOUND_ATTEMPTS } from './calendar-outbound.js';
 import { patchICSTodo } from '../utils/ics-patch.js';
-import { createCalDAVClient, collectionUrlOf, createUploadGate } from '../utils/caldav-client.js';
+import {
+  createCalDAVClient, collectionUrlOf, createUploadGate, sameObjectAddress, withAccountOrigin, isOriginRefusal,
+} from '../utils/caldav-client.js';
 import {
   ownUid, isOwnUidOfRow, ownUploadRowId, parseOwnUid, findObjectWithUid, inspectObjectAt,
 } from '../utils/own-uid.js';
@@ -61,6 +63,28 @@ import { loadTags, tagsKey } from '../utils/task-tags.js';
 import { runSerialized } from '../utils/sync-lock.js';
 
 const log = createLogger('CalDAV-Todo-Outbound');
+
+/**
+ * Client eines Kontos für den VTODO-Weg: gezielte Anfragen (PUT, DELETE,
+ * Objektabruf) nur an den Server dieses Kontos - `caldav_url` und die Listen
+ * und Kalender seiner Auswahl -, wie bei den Terminen seit #1860
+ * (`withAccountOrigin`).
+ *
+ * Die Objekt-Adresse einer gespiegelten Zeile stammt aus der href der
+ * Server-Antwort, und tsdav übernimmt eine absolute href so, wie sie dasteht.
+ * Lauf, Sofortversuch und die Quelle einer Mitnahme bauen ihre Clients deshalb
+ * alle hier.
+ *
+ * @param {object}   account     Zeile aus `caldav_accounts`
+ * @param {Function} makeClient  Factory (`createCalDAVClient` oder Test-Factory)
+ */
+export async function createTodoClient(account, makeClient = createCalDAVClient) {
+  const selected = db.get().prepare(`
+    SELECT list_url AS url FROM caldav_reminder_selection WHERE account_id = ?
+    UNION SELECT calendar_url FROM caldav_calendar_selection WHERE account_id = ?
+  `).all(account.id, account.id).map((r) => r.url);
+  return withAccountOrigin(await makeClient(account), [account.caldav_url, ...selected]);
+}
 
 // --------------------------------------------------------
 // Module
@@ -1977,6 +2001,19 @@ export async function processPendingDeletions(client, accountId, module, objectI
       dropDeletion(row.id);
       done++;
     } catch (err) {
+      // Die Adresse liegt nicht beim Konto (`createTodoClient`): gesendet
+      // wurde nichts, also zählt kein Versuch. Der volle Lauf räumt ab - das
+      // Konto führt das Objekt nicht -, der Sofortversuch lässt ihm den Auftrag.
+      if (isOriginRefusal(err)) {
+        if (complete) {
+          log.warn(`The stored address of VTODO ${row.uid} is not on the server of its account, dropping the pending deletion.`);
+          dropDeletion(row.id);
+          done++;
+        } else {
+          log.warn(`The stored address of VTODO ${row.uid} is not on the server of its account, leaving its deletion to the next sync run.`);
+        }
+        continue;
+      }
       const action = outboundFailureAction(err, row.attempts);
       if (action === 'settled') {
         dropDeletion(row.id);
@@ -2044,6 +2081,12 @@ export async function processPendingUpdates(client, accountId, module, objectInd
       settleOutbound(module, fresh);
       done++;
     } catch (err) {
+      // Gesendet wurde nichts (`createTodoClient`): kein Versuch, die
+      // Bearbeitung bleibt vorgemerkt und der Inbound überschreibt sie nicht.
+      if (isOriginRefusal(err)) {
+        log.warn(`The stored address of VTODO ${row.external_uid} is not on the server of its account, its update waits.`);
+        continue;
+      }
       const action = outboundFailureAction(err, row.outbound_attempts);
       if (action === 'settled') {
         log.warn(`VTODO ${row.external_uid} no longer exists on the server, dropping its update.`);
@@ -2166,7 +2209,7 @@ async function collectionsForTargets(client, targets) {
  *
  * @returns {Promise<Map>} UID → { url, etag, data }
  */
-async function fetchObjectsByUrl(client, wanted) {
+export async function fetchObjectsByUrl(client, wanted) {
   const index = new Map();
   if (!wanted.length) return index;
 
@@ -2185,9 +2228,9 @@ async function fetchObjectsByUrl(client, wanted) {
         objectUrls: items.map((i) => i.url),
       });
       for (const obj of objects || []) {
-        const match = items.find((i) => i.url === obj.url) || (items.length === 1 ? items[0] : null);
+        const match = items.find((i) => sameObjectAddress(i.url, obj.url));
         if (!match) continue;
-        index.set(match.uid, { url: obj.url || match.url, etag: obj.etag, data: obj.data });
+        index.set(match.uid, { url: match.url, etag: obj.etag, data: obj.data });
       }
     } catch (err) {
       // Kein Grund zur Sorge: der reguläre Sync-Lauf holt die Liste ohnehin.
@@ -2218,7 +2261,7 @@ async function runFlushOutbound({ createClient } = {}) {
   // Die Quelle einer Mitnahme kann ein anderes Konto sein (#1700).
   const clientFor = async (id) => {
     const other = db.get().prepare('SELECT * FROM caldav_accounts WHERE id = ?').get(id);
-    return other ? makeClient(other) : null;
+    return other ? createTodoClient(other, makeClient) : null;
   };
 
   for (const [accountId, modules] of work) {
@@ -2226,7 +2269,7 @@ async function runFlushOutbound({ createClient } = {}) {
     if (!account) continue;
 
     try {
-      const client = await makeClient(account);
+      const client = await createTodoClient(account, makeClient);
 
       // Vor allem anderen: die Reste nie bestätigter Uploads entfernen
       // (#1882), damit eine Zeile mit neuem Ziel nicht neben ihren Rest geht.

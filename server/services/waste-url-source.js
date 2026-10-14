@@ -270,6 +270,11 @@ function recordFailureAndRethrow(d, source, err) {
   try {
     store.recordUrlSourceAttempt(d, source.id, {
       errorMessage: err?.message || 'Import failed.',
+      // Der Fall, den die Antwort auf den Handabruf auch nennt (wasteErrorResponse):
+      // nur ein getypter Fehler traegt einen; alles andere bekommt den
+      // allgemeinen Satz (#1909).
+      errorReason: typeof err?.reason === 'string' ? err.reason : null,
+      errorParams: typeof err?.reason === 'string' ? (err.params ?? null) : null,
       consecutiveFailures: failures,
       nextAttemptAt: minutesFromNow(backoffMinutes(failures)),
     });
@@ -295,16 +300,20 @@ function recordFailureAndRethrow(d, source, err) {
  */
 function recordFetchFailure(d, source, err) {
   const failures = (source.consecutive_failures ?? 0) + 1;
+  const failure = classifyFetchFailure(err);
+  // The class of the failure travels with THIS answer (#1909), so the page
+  // can say why in its own sentence, and it is stored next to the message
+  // (`last_error_reason`, `last_error_params`): the source dialog says the
+  // same sentence later, never the message itself.
   const updated = store.recordUrlSourceAttempt(d, source.id, {
     errorMessage: err.message || 'Fetch failed.',
+    errorReason: failure.reason,
+    errorParams: failure.params ?? null,
     consecutiveFailures: failures,
     nextAttemptAt: minutesFromNow(backoffMinutes(failures)),
   });
   log.warn(`Waste source ${source.id} (${source.name}): fetch failed - ${err.message}`);
-  // The class of the failure travels with THIS answer (#1909), so the page
-  // can say why in its own sentence. It is not stored: `last_error` keeps
-  // the message, and a later read of the source knows only that.
-  return { source: updated, outcome: 'error', ...classifyFetchFailure(err) };
+  return { source: updated, outcome: 'error', ...failure };
 }
 
 export function minutesFromNow(minutes) {

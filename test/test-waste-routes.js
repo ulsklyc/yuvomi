@@ -725,7 +725,11 @@ test('hasWasteWriteAccess/redactSourceForReader: a session with write module acc
 });
 
 test('hasWasteWriteAccess/redactSourceForReader: a read-only session never sees url/last_error, regardless of an unscoped or write-scoped token', () => {
-  const source = { id: 1, kind: 'url', url: 'https://example.com/cal.ics', last_error: 'boom' };
+  // #1909: Fall und Zahlen des letzten Fehlschlags gehen mit dem Text.
+  const source = {
+    id: 1, kind: 'url', url: 'https://example.com/cal.ics', last_error: 'boom',
+    last_error_reason: 'waste_source_fetch_http_status', last_error_params: { status: 503 },
+  };
   const readOnlySession = { authMethod: 'session', sessionModuleAccess: { waste: 'read' } };
   assert.equal(helpers.hasWasteWriteAccess(readOnlySession), false);
   assert.deepEqual(helpers.redactSourceForReader(source, readOnlySession), { id: 1, kind: 'url' });

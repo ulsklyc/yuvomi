@@ -833,3 +833,43 @@ test('reportError: jeder Abfuhr-Grund ergibt seinen Satz, und genau die "gibt es
     assert.deepEqual(gets, GONE_REASONS.has(reason) ? NACHLADEN : [], reason);
   }
 });
+
+// -------------------------------------------------------------------------
+// Dritte Scheibe (#1909): der letzte Fehlschlag im Quellen-Dialog ist der Satz
+// seines Falls, nie der gespeicherte Text des Servers (`last_error`)
+// -------------------------------------------------------------------------
+
+async function quellenDialogText(quelle) {
+  let opts = null;
+  globalThis.__openModal = (o) => { opts = o; };
+  try {
+    await waste.openSourceModal(quelle);
+  } finally {
+    delete globalThis.__openModal;
+  }
+  assert.ok(opts, 'der Dialog wurde geoeffnet');
+  return String(opts.content);
+}
+
+for (const [name, fall, satz] of [
+  ['eine Antwort ohne Kalendereintrag', { last_error_reason: 'waste_source_fetch_no_events', last_error_params: null }, 'waste.errorSourceFetchNoEvents'],
+  ['ein Status, der kein Erfolg ist', { last_error_reason: 'waste_source_fetch_http_status', last_error_params: { status: 503 } }, 'waste.errorSourceFetchStatus{"status":503}'],
+  ['eine Quelle von vor der Migration, ohne gespeicherten Fall', { last_error_reason: null, last_error_params: null }, 'waste.errorSourceFetch'],
+  ['ein Fall mit Zahl, deren Zahl fehlt', { last_error_reason: 'waste_source_fetch_http_status', last_error_params: null }, 'waste.errorSourceFetch'],
+]) {
+  test(`Quellen-Dialog: der letzte Fehlschlag in der Sprache der App - ${name}`, async () => {
+    zustand();
+    const text = await quellenDialogText({
+      ...SOURCE(), kind: 'url', url: 'https://example.com/cal.ics',
+      last_error: 'No calendar entries in the response', ...fall,
+    });
+    assert.ok(text.includes(`<p class="waste-source-detail__error">${satz.replace(/"/g, '&quot;')}</p>`), text.slice(0, 2000));
+    assert.doesNotMatch(text, /No calendar entries in the response/);
+  });
+}
+
+test('Quellen-Dialog: ohne Fehlschlag steht keine Fehlerzeile da', async () => {
+  zustand();
+  const text = await quellenDialogText({ ...SOURCE(), last_error: null, last_error_reason: null, last_error_params: null });
+  assert.doesNotMatch(text, /waste-source-detail__error/);
+});
