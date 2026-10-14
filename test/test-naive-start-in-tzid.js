@@ -47,7 +47,7 @@ const { __test: apple } = await import('../server/services/apple-calendar.js');
 const { icsSnapshot } = await import('../server/services/outbound-echo.js');
 const { storedDayDiffersFromSeriesDay } = await import('../server/utils/timezone.js');
 const { default: calendarRouter } = await import('../server/routes/calendar.js');
-const { getCountdowns } = await import('../server/services/countdowns.js');
+const { getCountdowns, nextEventDate } = await import('../server/services/countdowns.js');
 const { resolveEventSearchRows } = await import('../server/services/search.js');
 const { __test: googleApi } = await import('../server/services/google-calendar.js');
 const { storedToInstantIso } = await import('../server/utils/timezone.js');
@@ -334,4 +334,31 @@ test(`TZ=${process.env.TZ}: eine EXDATE des Anbieters trifft das Vorkommen, das 
   assert.deepEqual(out.map((o) => localOf(o.start_datetime, LA)), [
     '2035-10-01 23:30', '2035-10-02 23:30', '2035-10-04 23:30', '2035-10-05 23:30',
   ]);
+});
+
+// ── Review zu #1996, Runde 2: Countdown auf der Wanduhr der tzid ─────────────
+
+const DAILY_LA = { all_day: 0, tzid: LA, start_datetime: '2035-10-02T08:30', recurrence_rule: 'RRULE:FREQ=DAILY' };
+
+test(`TZ=${process.env.TZ}: der Countdown endet an einem UNTIL mit Uhrzeit wie der Kalender`, () => {
+  // Taeglich 23:30 Los Angeles; UNTIL ist 02.10. 23:59:59 dort. Das letzte
+  // Vorkommen liegt im Haushalt Berlin am 03.10., am 04.10. kommt keines mehr.
+  for (const start of ['2035-10-02T06:30:00Z', '2035-10-02T08:30']) {
+    const ev = { ...DAILY_LA, start_datetime: start, recurrence_rule: 'RRULE:FREQ=DAILY;UNTIL=20351003T065959Z' };
+    const shown = expandRecurringEvents([{ id: 7, ...ev }], '2035-09-01', '2035-12-31', null, { householdZone: BERLIN });
+    assert.equal(localOf(shown.at(-1).start_datetime, BERLIN), '2035-10-03 08:30', `Vorbedingung (${start})`);
+    assert.equal(nextEventDate(ev, '2035-10-03', null, { tz: BERLIN }), '2035-10-03', start);
+    assert.equal(nextEventDate(ev, '2035-10-04', null, { tz: BERLIN }), null, start);
+  }
+});
+
+test(`TZ=${process.env.TZ}: der Countdown sucht ab dem Ortstag vor heute`, () => {
+  // Heute (Berlin) ist der 04.10.; das Vorkommen am 03.10. 23:30 Los Angeles
+  // liegt im Haushalt am 04.10. 08:30 und ist das naechste.
+  assert.equal(nextEventDate(DAILY_LA, '2035-10-04', null, { tz: BERLIN }), '2035-10-04');
+});
+
+test(`TZ=${process.env.TZ}: der Countdown ueberspringt eine Ausnahme auf dem UTC-Tag des Vorkommens`, () => {
+  // 03.10. 23:30 PDT ist 04.10. 06:30Z: die Ausnahme traegt den 04.10.
+  assert.equal(nextEventDate(DAILY_LA, '2035-10-04', new Set(['2035-10-04']), { tz: BERLIN }), '2035-10-05');
 });

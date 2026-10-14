@@ -38,7 +38,9 @@
 
 import { localCalendarColorSql, localCalendarIdSql } from './local-calendars.js';
 
-import { hasAnyOccurrence, nextOccurrenceAfter, seriesStartFor } from './recurrence.js';
+import {
+  hasAnyOccurrence, nextOccurrenceAfter, parseRRule, seriesStartFor, untilInstantMs,
+} from './recurrence.js';
 import { loadEventExceptions } from './calendar-events.js';
 import { modulesLeftOut, notBirthdayEventSql } from './household-modules.js';
 import { eventProjectionSql, resolveProjectedEventRows } from './calendar-event-reader.js';
@@ -206,8 +208,17 @@ export function nextEventDate(event, todayKey, exceptions = null, { graceDays = 
  * Das naechste Vorkommen einer getimten Serie mit eigener Zone, als Tag des
  * Haushalts (#1993). Die Regel laeuft auf den Ortstagen der `tzid`, wie in
  * `expandRecurringEvents`; je Vorkommen wird der Zeitpunkt gebildet und auf
- * die Haushaltszone gelesen. Ausnahmen (EXDATE) liegen auf dem UTC-Tag des
- * Vorkommens, dort schlaegt auch die Expansion nach.
+ * die Haushaltszone gelesen. Ausnahmen (EXDATE) werden auf dem UTC-Tag des
+ * Vorkommens nachgeschlagen; so legt der Import sie ab, und so sucht die
+ * Expansion, wenn sie auf den Ortstagen rechnet (`lokalRechnen`). Rechnet sie
+ * dagegen auf dem UTC-Tag des Masters (`tzAware`), fragt sie den Schleifentag,
+ * und der kann bei einem Vorkommen jenseits einer Zeitumstellung neben dessen
+ * UTC-Tag liegen - dort koennen Countdown und Kalender verschieden antworten
+ * (tracked in #2000).
+ *
+ * UNTIL mit Uhrzeit ist ein Zeitpunkt und wird gegen den Zeitpunkt des
+ * Vorkommens geprueft, wie in der Expansion (#1269); ein reines Datum bleibt
+ * beim Tagesgatter der Regel.
  *
  * Die untere Schranke liegt zwei Tage vor `todayKey`: Ortstag und Haushaltstag
  * koennen bis zu zwei Kalendertage auseinanderliegen (Kiritimati gegen Niue),
@@ -225,12 +236,14 @@ function nextZonedSeriesDate(event, serienWand, todayKey, exceptions, tz) {
   const seriesStart = serienWand.date;
   if (!hasAnyOccurrence(seriesStart, rule)) return null;
   const floor = shiftKey(todayKey, -2);
+  const untilMs = untilInstantMs(parseRRule(rule), { tzid: event.tzid, toUTC: localToUTC });
   let candidate = seriesStartFor(seriesStart, rule);
   if (candidate && floor && candidate < floor) {
     candidate = nextOccurrenceAfter(candidate, rule, floor, { seriesStart });
   }
   for (let steps = 0; candidate && steps <= MAX_EXCEPTION_SKIPS + 4; steps++) {
     const instant = localToUTC(`${candidate}T${serienWand.time}`, event.tzid);
+    if (untilMs !== null && Date.parse(instant) > untilMs) return null;
     const householdDay = utcToWall(instant, tz)?.date ?? null;
     if (householdDay && householdDay >= todayKey && !exceptions?.has(String(instant).slice(0, 10))) {
       return householdDay;

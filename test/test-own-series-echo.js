@@ -799,6 +799,35 @@ for (const name of Object.keys(PROVIDERS)) {
 
 // ── Nur Google ──────────────────────────────────────────────────────────────
 
+// #1993, Umzugsweg (caldav-outbound.js, Anlegen im Zielkalender): auch dort
+// richtet der Schnappschuss in der Haushaltszone aus, die der Bau genommen hat.
+test(`CalDAV [${ZONE}] tzid und zonenlose Ziffern, Haushalt Berlin: der Umzug in einen anderen Kalender schreibt seinen Schnappschuss, das Echo laesst die Marke stehen (#1993)`, async () => {
+  const p = provider('CalDAV');
+  setHousehold('Europe/Berlin');
+  const url2 = dav.addCollection('family2', { name: 'Familie 2', components: ['VEVENT'] });
+  db.prepare(`
+    INSERT INTO caldav_calendar_selection (account_id, calendar_url, calendar_name, calendar_color, enabled)
+    VALUES (?, ?, 'Familie 2', '#50E3C2', 1)
+  `).run(p.target.target_caldav_account_id, url2);
+  const entered = '2035-11-15T23:30';
+  const event = await post({
+    title: 'Miete', start_datetime: entered, end_datetime: '2035-11-15T23:45',
+    recurrence_rule: 'FREQ=MONTHLY;BYMONTHDAY=-1;COUNT=3', ...p.target,
+  });
+  db.prepare("UPDATE calendar_events SET tzid = 'Europe/Berlin' WHERE id = ?").run(event.id);
+  await p.sync();
+  db.prepare('UPDATE calendar_events SET outbound_snapshot = NULL WHERE id = ?').run(event.id);
+  await put(event.id, { title: 'Miete', target_caldav_account_id: p.target.target_caldav_account_id, target_caldav_calendar_url: url2 });
+  assert.equal(row(event.id).outbound_move_to, url2, 'Vorbedingung: der Umzug ist vorgemerkt');
+  await p.push();
+  assert.equal(row(event.id).outbound_move_to, null, 'der Umzug ist vollzogen');
+  assert.equal(dav.objectNames(url2).length, 1, 'das Objekt liegt im Zielkalender');
+  assert.notEqual(row(event.id).outbound_snapshot, null, 'der Umzug hat seinen Schnappschuss');
+  await p.sync();
+  assert.equal(row(event.id).series_authored, 1, 'das Echo laesst die Marke stehen');
+  assert.equal(row(event.id).start_datetime, entered, 'und die Eingabe');
+});
+
 test(`Google [${ZONE}] Zone der Zeile und gesendete Zone verschieden: Echo in der gesendeten, New York zurueck ist ein Wechsel`, async () => {
   const p = provider('Google');
   p.seedForeign({
