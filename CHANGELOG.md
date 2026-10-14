@@ -29,6 +29,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it was. Setting a household time zone in Settings is still the way to make device and server
   agree on times you type in.
 
+### Security
+
+- **Reminder and task sync with CalDAV checks every request against the account's address**, as
+  event sync does since #1860. This applies to the sync run, the immediate update after an edit and
+  moving a shopping item between synced lists.
+
 ## [2.77.0] - 2026-10-14
 
 ### Added
