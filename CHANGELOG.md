@@ -40,8 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `shopping_list_not_found`), planning a meal with an unknown `recipe_id` on `/api/v1/meals`
   carries `meals_selected_recipe_not_found`, the German texts of those answers are now English,
   and the status codes are unchanged. A recipe you have just deleted stays hidden while you can
-  still undo it, an open matching dialog saves into the list you see, and an answer that arrives
-  after you have moved to another page draws nothing and leaves the focus where it is.
+  still undo it, an open matching dialog saves into the list you see, an ingredient that is gone
+  goes in every spelling the server treats as the same, and an answer that arrives after you have
+  moved to another page - even if you have come back since - changes and draws nothing and leaves
+  the focus where it is.
 - **Calendar: an imported series saved from the form keeps its times on every server** (#1993).
   Saving an imported series stores the time as you see it in the household's time zone, next to the
   series' own time zone. The calendar view and the ICS feed then read that time in the zone the
@@ -85,7 +87,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   file is reported as empty instead of as an invalid data URL, a local failure while linking or
   sending to a DMS is a 500 instead of a 502, and the other status codes are unchanged. A reload
   after an action - deleting, archiving, moving, saving, linking from a DMS - that finishes after
-  you have moved to another page draws nothing there and leaves the focus where it is (#2001).
+  you have moved to another page, even if you have come back since, draws nothing there and leaves
+  the focus where it is (#2001).
 - **Housekeeping: creating or editing a housekeeper profile saves again** (#1976). Since 2.75.0
   the "Add" button in the profile dialog did nothing: no message, no profile, and the dialog stayed
   open. Its buttons had lost the connection to the form they belong to, and find it again.

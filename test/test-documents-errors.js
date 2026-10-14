@@ -907,3 +907,42 @@ test('Seite: die Seite wird WAEHREND des Nachladens nach einer Handlung verlasse
     delete globalThis.__refocusAfterRender;
   }
 });
+
+// Codex an #2001: `owner` merkt die Aufrufstelle VOR der Anfrage. Erst in
+// reportError gelesen, waere es nach "verlassen und zurueck" der NEUE
+// Container - die spaete Antwort der alten Seite luede nach und zeichnete in
+// die neue, bevor die ihren eigenen Aufbau beendet hat.
+test('Seite: verlassen und zurueck (neuer Traeger), dann kommt eine spaete "gibt es nicht mehr"-Antwort - kein Nachladen, nichts in die neue Seite', async () => {
+  const faelle = [
+    ['speichern', 'put', fehler(404, 'documents_document_not_found'), () => page.saveDocument({ target: formular(BEARBEITEN), preventDefault() {} }, { ...DOC }, formular())],
+    ['speichern, Ordner weg', 'put', fehler(400, 'documents_selected_folder_not_found'), () => page.saveDocument({ target: formular(BEARBEITEN), preventDefault() {} }, { ...DOC }, formular())],
+    ['archivieren', 'patch', fehler(404, 'documents_document_not_found'), () => page.runDocumentAction('archive', { ...DOC })],
+    ['Ordner umbenennen', 'put', fehler(404, 'documents_folder_not_found'), () => page.renameFolder(FOLDERS[0])],
+    ['Ordner verschieben', 'put', fehler(404, 'documents_folder_not_found'), () => page.moveFolder(FOLDERS[0])],
+    ['Ordner loeschen (Vorschau)', 'get', fehler(404, 'documents_folder_not_found'), () => page.deleteFolder(FOLDERS[0])],
+  ];
+  let refocus = 0;
+  globalThis.__refocusAfterRender = () => { refocus += 1; };
+  try {
+    for (const [name, verb, err, lauf] of faelle) {
+      refocus = 0;
+      const neu = traeger();
+      const zurueck = () => { page.setContainerForTest(neu); throw err; };
+      let nachher = [];
+      await mitSeite({}, async () => {
+        const { calls } = await mit({
+          get: (path) => (verb === 'get' && path.includes('/delete-impact') ? zurueck() : { data: [] }),
+          [verb === 'get' ? 'x' : verb]: async () => zurueck(),
+          prompt: 'Neu', select: '',
+        }, lauf);
+        const i = calls.findIndex(([v]) => v === verb.toUpperCase());
+        nachher = calls.slice(i + 1).filter(([v]) => v === 'GET').map(([, p]) => p);
+      });
+      assert.deepEqual(nachher, [], `${name}: kein Nachladen nach der spaeten Antwort`);
+      assert.deepEqual(neu.gefragt, [], `${name}: in die neue Seite wird nichts gezeichnet`);
+      assert.equal(refocus, 0, `${name}: kein Fokus`);
+    }
+  } finally {
+    delete globalThis.__refocusAfterRender;
+  }
+});

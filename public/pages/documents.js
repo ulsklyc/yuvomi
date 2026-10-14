@@ -161,16 +161,18 @@ function stillShown(owner) {
   return Boolean(owner) && _container === owner && owner.isConnected === true;
 }
 
-async function reportError(err, { dialog = null } = {}) {
+async function reportError(err, { owner = null, dialog = null } = {}) {
   window.yuvomi?.showToast(errorText(err), 'danger');
   if (!isGone(err)) return;
   // Nachladen nach "gibt es nicht mehr". Die DMS-Konten kommen mit: ein Konto,
   // das ein Admin entfernt hat, stuende sonst weiter im Menue. Ein scheiterndes
   // Nachladen meldet nichts weiter - der Satz steht schon da.
   // Wie deleteDocuments: wer die Seite inzwischen verlassen hat, bekommt
-  // nichts mehr gezeichnet (Review zu #1994).
-  const owner = _container;
+  // nichts mehr gezeichnet (Review zu #1994). `owner` merkt die Aufrufstelle
+  // VOR ihrer Anfrage: hier gelesen, waere es nach "verlassen und zurueck"
+  // schon der neue Container (Codex an #2001).
   if (dialog && isModalContextCurrent(dialog)) await closeModal({ force: true });
+  if (!stillShown(owner)) return;
   try {
     await Promise.all([loadFolders(), loadDocuments(), loadMetaOptions()]);
   } catch (loadErr) {
@@ -195,11 +197,13 @@ async function reportError(err, { dialog = null } = {}) {
  * @param {string} rootKey - Beschriftung der Wurzel ("kein Ordner", "oberste Ebene")
  * @param {(goneId: string) => string} optionsHtml - die Optionen in der
  *   Reihenfolge, die der Dialog beim Oeffnen hatte, ohne `goneId`
+ * @param {object|null} owner - der Container der Seite, VOR der Anfrage gemerkt
  */
-async function offerCurrentFolders(select, rootKey, optionsHtml) {
+async function offerCurrentFolders(select, rootKey, optionsHtml, owner) {
   if (!select) return;
+  // Der Dialog gehoert zu einer Seite, die nicht mehr angezeigt wird.
+  if (!stillShown(owner)) return;
   const goneId = String(select.value);
-  const owner = _container;
   try {
     await Promise.all([loadFolders(), loadDocuments()]);
   } catch (err) {
@@ -1566,6 +1570,7 @@ async function moveFolder(folder) {
 
   const chosen = await selectModal(t('documents.moveFolderTo', { name: folder.name }), options);
   if (chosen === null) return;
+  const owner = _container;
   try {
     await api.put(`/documents/folders/${folder.id}`, { parent_id: chosen === '' ? null : Number(chosen) });
     window.yuvomi?.showToast(t('documents.folderMovedToast'), 'success');
@@ -1574,10 +1579,11 @@ async function moveFolder(folder) {
     if (chosen !== '') state.expanded.add(Number(chosen));
     persistExpandedFolders();
     await Promise.all([loadFolders(), loadDocuments()]);
+    if (!stillShown(owner)) return;
     renderAll();
     refocusAfterRender();
   } catch (err) {
-    reportError(err);
+    reportError(err, { owner });
   }
 }
 
@@ -1626,16 +1632,18 @@ async function renameFolder(folder) {
   if (readOnly()) return;
   const newName = await promptModal(t('documents.renameFolder'), folder.name);
   if (!newName || newName === folder.name) return;
+  const owner = _container;
   try {
     await api.put(`/documents/folders/${folder.id}`, { name: newName });
     window.yuvomi?.showToast(t('documents.folderRenamedToast'), 'success');
     // Dokumente mitladen: `folder_name` steckt im Server-Join und stünde sonst
     // auf den Karten weiter mit dem alten Namen.
     await Promise.all([loadFolders(), loadDocuments()]);
+    if (!stillShown(owner)) return;
     renderAll();
     refocusAfterRender();
   } catch (err) {
-    reportError(err);
+    reportError(err, { owner });
   }
 }
 
@@ -1702,12 +1710,13 @@ function folderDeleteChoice(folder, impact) {
 
 async function deleteFolder(folder) {
   if (readOnly()) return;
+  const owner = _container;
   let impact;
   try {
     const response = await api.get(`/documents/folders/${folder.id}/delete-impact`);
     impact = response.data;
   } catch (err) {
-    reportError(err);
+    reportError(err, { owner });
     return;
   }
 
@@ -1738,18 +1747,19 @@ async function deleteFolder(folder) {
       requestDelete: ({ keepalive }) => (
         commitFolderDeletion(folder, impact, choice, { keepalive })
       ),
-      isViewActive: () => Boolean(_container?.isConnected),
+      isViewActive: () => stillShown(owner),
       applyResult: (result, { viewActive }) => (
         applyFolderDeleteResult(result, choice, selectedSubtree, {
+          owner,
           showSuccess: false,
           renderView: viewActive,
         })
       ),
-      handleError: (err) => handleFolderDeleteError(err, folder, { delayed: true }),
+      handleError: (err) => handleFolderDeleteError(err, folder, { delayed: true, owner }),
       // The server deletion has already succeeded at this point. A failed
       // refresh must not restore records that no longer exist server-side.
       handleApplyError: (err) => {
-        reportError(err);
+        reportError(err, { owner });
       },
       render: () => {
         persistExpandedFolders();
@@ -1762,10 +1772,10 @@ async function deleteFolder(folder) {
 
   try {
     const result = await commitFolderDeletion(folder, impact, choice);
-    await applyFolderDeleteResult(result, choice, selectedSubtree);
+    await applyFolderDeleteResult(result, choice, selectedSubtree, { owner });
     refocusAfterRender();
   } catch (err) {
-    await handleFolderDeleteError(err, folder);
+    await handleFolderDeleteError(err, folder, { owner });
   }
 }
 
@@ -1786,9 +1796,8 @@ async function applyFolderDeleteResult(
   result,
   choice,
   selectedSubtree,
-  { showSuccess = true, renderView = true } = {},
+  { owner = null, showSuccess = true, renderView = true } = {},
 ) {
-  const owner = _container;
   const hasNonConcurrencyFailure = result.failed_documents
     ?.some((failure) => failure.failure_stage !== 'concurrency');
   if (result.folder_deleted === false && result.contents_changed && hasNonConcurrencyFailure) {
@@ -1812,14 +1821,14 @@ async function applyFolderDeleteResult(
   if (renderView && stillShown(owner)) renderAll();
 }
 
-async function handleFolderDeleteError(err, folder, { delayed = false } = {}) {
+async function handleFolderDeleteError(err, folder, { delayed = false, owner = null } = {}) {
   await handleFolderDeleteFailure({
     err,
     delayed,
     translate: t,
     showToast: (...args) => window.yuvomi?.showToast(...args),
     refreshImpact: () => deleteFolder(folder),
-    reportOther: (error) => reportError(error),
+    reportOther: (error) => reportError(error, { owner }),
   });
 }
 
@@ -2232,7 +2241,7 @@ async function runDocumentAction(action, doc) {
       if (!stillShown(owner)) return;
       renderAll({ motion: true });
     } catch (err) {
-      reportError(err);
+      reportError(err, { owner });
     }
   }
   if (action === 'push-dms') {
@@ -2247,11 +2256,12 @@ async function runDocumentAction(action, doc) {
       );
       if (!accountId) return;
     }
+    const owner = _container;
     try {
       await api.post('/documents/dms/push', { account_id: accountId, document_id: doc.id });
       window.yuvomi?.showToast(t('documents.pushToDmsQueued'), 'success');
     } catch (err) {
-      reportError(err);
+      reportError(err, { owner });
     }
     return;
   }
@@ -2316,9 +2326,9 @@ function deleteDocuments(docs) {
       if (!stillShown(owner)) return;
       // "Gibt es nicht mehr": nicht zurueckstellen, was der Server nicht mehr
       // zeigt - reportError laedt nach, und die Liste sagt, was steht.
-      if (err && isGone(err)) { reportError(err); return; }
+      if (err && isGone(err)) { reportError(err, { owner }); return; }
       restore();
-      if (err) reportError(err);
+      if (err) reportError(err, { owner });
     },
   });
 }
@@ -2421,7 +2431,7 @@ async function archiveSelected() {
     if (!stillShown(owner)) return;
     renderAll();
   } catch (err) {
-    reportError(err);
+    reportError(err, { owner });
   }
 }
 
@@ -2451,7 +2461,7 @@ async function moveSelected() {
     renderAll();
     refocusAfterRender();
   } catch (err) {
-    reportError(err);
+    reportError(err, { owner });
   }
 }
 
@@ -3257,7 +3267,7 @@ async function saveDocument(event, doc, panel) {
     // Das Dokument gibt es nicht mehr: der Dialog bearbeitet etwas Veraltetes,
     // er geht zu, und die Liste kommt frisch.
     if (isGone(err) && !isSelectedFolderGone(err)) {
-      reportError(err, { dialog: modalContext });
+      reportError(err, { owner, dialog: modalContext });
       return;
     }
     error.textContent = errorText(err);
@@ -3266,7 +3276,7 @@ async function saveDocument(event, doc, panel) {
       // Dieselbe Reihenfolge wie beim Oeffnen (openDocumentModal): die Liste.
       await offerCurrentFolders(form.querySelector('#document-folder'), 'documents.noFolder',
         (goneId) => state.folders.filter((folder) => String(folder.id) !== goneId)
-          .map((folder) => `<option value="${folder.id}">${esc(folder.name)}</option>`).join(''));
+          .map((folder) => `<option value="${folder.id}">${esc(folder.name)}</option>`).join(''), owner);
     }
   } finally {
     submit.disabled = panel._folderUpload?.completed === true;
@@ -3346,7 +3356,7 @@ function openFolderModal({ parentId = null } = {}) {
             // Dieselbe Reihenfolge wie beim Oeffnen: der Baum, eingerueckt.
             await offerCurrentFolders(parentSelect, 'documents.folderRootLevel',
               (goneId) => visibleAllFolderRows().filter((row) => String(row.folder.id) !== goneId)
-                .map((row) => `<option value="${row.folder.id}">${esc(folderOptionLabel(row))}</option>`).join(''));
+                .map((row) => `<option value="${row.folder.id}">${esc(folderOptionLabel(row))}</option>`).join(''), owner);
           }
         }
       });
@@ -3623,7 +3633,7 @@ async function linkDmsDocument(item, accountId) {
   } catch (err) {
     // Der Verknuepfen-Dialog zeigt einen veralteten Stand, wenn das Konto
     // oder das Dokument im DMS fehlt: dann geht er zu.
-    reportError(err, { dialog: modalContext });
+    reportError(err, { owner, dialog: modalContext });
     return false;
   }
 }
