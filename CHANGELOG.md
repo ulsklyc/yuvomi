@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Waste collection: the source dialog says why the last refresh failed in your language**
+  (#1909). The dialog of a calendar address showed the server's own English text of the last
+  failed refresh, for example "No calendar entries in the response". It now shows the same
+  sentence the manual refresh shows, in the language of the app: no calendar with entries came
+  from the address, the address answered with an error status, the calendar is too large, the
+  address is blocked or could not be reached. A source whose last failure happened before this
+  update shows the general sentence until its next refresh. For API clients: a source carries
+  `last_error_reason` and `last_error_params` next to `last_error` (the same `reason` and `params`
+  the refresh answer has), omitted for a caller without write access like `last_error` itself.
 - **A "last day of the month" series keeps its start date in Google, CalDAV and Apple Calendar after
   an edit** (#1935). A series you create in Yuvomi from a date in the middle of the month is sent
   with a start date its own rule accepts: entered on 15 January, it starts on 31 January over there.

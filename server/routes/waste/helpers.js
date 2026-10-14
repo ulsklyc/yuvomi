@@ -73,7 +73,8 @@ export function hasWasteWriteAccess(req) {
  */
 export function redactSourceForReader(source, req) {
   if (!source || hasWasteWriteAccess(req)) return source;
-  const { url, last_error, ...rest } = source;
+  // Mit dem Text gehen Fall und Zahlen: sie gehoeren zu derselben Auskunft.
+  const { url, last_error, last_error_reason, last_error_params, ...rest } = source;
   return rest;
 }
 

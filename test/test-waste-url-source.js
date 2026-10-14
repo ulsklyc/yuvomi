@@ -1221,3 +1221,59 @@ test('#1938 the scheduler path is still off while the module is off - the cases 
     await h.close();
   }
 });
+
+// ---------------------------------------------------------------------------
+// #1909, dritte Scheibe der Abfuhr: der Fall des letzten Fehlschlags steht an
+// der Quelle. Der Quellen-Dialog las bisher `last_error`, den englischen Text
+// des Servers ("No calendar entries in the response"); jetzt baut er seinen
+// Satz aus `last_error_reason`/`last_error_params` - denselben, die der
+// Handabruf in seiner Antwort traegt.
+// ---------------------------------------------------------------------------
+
+const lastFailure = (id) => {
+  const row = get().prepare('SELECT last_error, last_error_reason, last_error_params FROM waste_sources WHERE id = ?').get(id);
+  return { ...row, last_error_params: row.last_error_params === null ? null : JSON.parse(row.last_error_params) };
+};
+
+test('#1909 scheduler: an answer without calendar entries stores its case next to the message, and the recovery clears both', async () => {
+  const h = await emptyFeedHousehold();
+  try {
+    h.feed.serve = h.feed.html;
+    await h.runScheduler();
+    assert.deepEqual(lastFailure(h.id), {
+      last_error: NO_EVENTS_ERROR, last_error_reason: 'waste_source_fetch_no_events', last_error_params: null,
+    });
+    // Ein Fehlschlag einer anderen Klasse ersetzt den Fall, er haengt ihn nicht an.
+    h.feed.serve = h.feed.unavailable;
+    h.makeDue();
+    await h.runScheduler();
+    const unavailable = lastFailure(h.id);
+    assert.equal(unavailable.last_error_reason, 'waste_source_fetch_http_status');
+    assert.deepEqual(unavailable.last_error_params, { status: 503 });
+    h.feed.serve = h.feed.more;
+    h.makeDue();
+    await h.runScheduler();
+    assert.deepEqual(lastFailure(h.id), { last_error: null, last_error_reason: null, last_error_params: null });
+  } finally {
+    await h.close();
+  }
+});
+
+test('#1909 manual refresh: the stored case is what the answer names, and a later read of the source carries it, params as an object', async () => {
+  const h = await emptyFeedHousehold();
+  try {
+    h.feed.serve = h.feed.unavailable;
+    const r = await apiCall('POST', `/waste/sources/${h.id}/refresh`, { body: {} });
+    assert.equal(r.body.data.outcome, 'error', JSON.stringify(r.body.data));
+    assert.equal(r.body.data.source.last_error_reason, r.body.data.reason);
+    assert.deepEqual(r.body.data.source.last_error_params, r.body.data.params);
+    for (const path of [`/waste/sources/${h.id}`, '/waste/sources']) {
+      const read = await apiCall('GET', path);
+      const source = Array.isArray(read.body.data) ? read.body.data.find((s) => s.id === h.id) : read.body.data;
+      assert.equal(source.last_error_reason, 'waste_source_fetch_http_status', path);
+      assert.deepEqual(source.last_error_params, { status: 503 }, path);
+    }
+  } finally {
+    await h.close();
+  }
+});

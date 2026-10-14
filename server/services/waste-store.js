@@ -471,7 +471,23 @@ function decorateSourceHealth(d, source, today) {
   if (!source) return source;
   const n = d.prepare('SELECT COUNT(*) AS n FROM waste_imported_pickups WHERE source_id = ? AND date_key >= ?')
     .get(source.id, today).n;
-  return { ...source, needs_refresh: n === 0 };
+  return { ...withLastErrorParams(source), needs_refresh: n === 0 };
+}
+
+/**
+ * Die Zahlen des letzten Fehlschlags kommen als Objekt heraus, nicht als der
+ * JSON-Text, in dem die Spalte sie haelt (#1909). Ein unlesbarer Wert wird
+ * null: die App sagt dann den allgemeinen Satz statt eines mit Luecke.
+ */
+function withLastErrorParams(source) {
+  let params = null;
+  if (typeof source.last_error_params === 'string') {
+    try {
+      const parsed = JSON.parse(source.last_error_params);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) params = parsed;
+    } catch { /* bleibt null */ }
+  }
+  return { ...source, last_error_params: params };
 }
 
 /**
@@ -496,7 +512,7 @@ export function listSources(d) {
       WHERE date_key >= ? GROUP BY source_id
     `).all(today).map((r) => [r.source_id, r.n]),
   );
-  return rows.map((s) => ({ ...s, needs_refresh: (futureBySource.get(s.id) ?? 0) === 0 }));
+  return rows.map((s) => ({ ...withLastErrorParams(s), needs_refresh: (futureBySource.get(s.id) ?? 0) === 0 }));
 }
 
 export function getSource(d, id) {
@@ -563,14 +579,22 @@ export function createUrlSourcePlaceholder(d, { name, url, refreshIntervalMinute
  */
 export function recordUrlSourceAttempt(d, id, {
   etag = undefined, lastModified = undefined, needsMapping = undefined,
-  errorMessage = undefined, nextAttemptAt = undefined, consecutiveFailures = undefined,
+  errorMessage = undefined, errorReason = null, errorParams = null,
+  nextAttemptAt = undefined, consecutiveFailures = undefined,
 } = {}) {
   const sets = ["last_import_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')"];
   const params = [];
   if (etag !== undefined) { sets.push('etag = ?'); params.push(etag); }
   if (lastModified !== undefined) { sets.push('last_modified = ?'); params.push(lastModified); }
   if (needsMapping !== undefined) { sets.push('needs_mapping = ?'); params.push(needsMapping ? 1 : 0); }
-  if (errorMessage !== undefined) { sets.push('last_error = ?'); params.push(errorMessage); }
+  // Text, Fall und Zahlen gehen immer ZUSAMMEN (#1909): ein neuer Text ohne
+  // Grund raeumt den alten Grund mit ab, sonst sagte der Dialog den Satz eines
+  // frueheren Fehlschlags.
+  if (errorMessage !== undefined) {
+    sets.push('last_error = ?', 'last_error_reason = ?', 'last_error_params = ?');
+    params.push(errorMessage, errorMessage === null ? null : errorReason,
+      errorMessage === null || !errorParams ? null : JSON.stringify(errorParams));
+  }
   if (nextAttemptAt !== undefined) { sets.push('next_attempt_at = ?'); params.push(nextAttemptAt); }
   if (consecutiveFailures !== undefined) { sets.push('consecutive_failures = ?'); params.push(consecutiveFailures); }
   params.push(id);
@@ -788,7 +812,8 @@ export function commitImport(d, {
         UPDATE waste_sources SET
           name = ?, content_hash = ?, version = ?, coverage_start = ?, coverage_end = ?,
           last_import_at = strftime('%Y-%m-%dT%H:%M:%SZ','now'),
-          last_success_at = strftime('%Y-%m-%dT%H:%M:%SZ','now'), last_error = NULL
+          last_success_at = strftime('%Y-%m-%dT%H:%M:%SZ','now'), last_error = NULL,
+          last_error_reason = NULL, last_error_params = NULL
         WHERE id = ? AND version = ?
       `).run(nameValidation.value, digest, newVersion, preview.coverage.start, preview.coverage.end, source.id, source.version);
       // Wirft INNERHALB der Transaktion, rollt also alles bereits Geschriebene
