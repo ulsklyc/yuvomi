@@ -1894,7 +1894,7 @@ async function deleteSubscription(subscription) {
   // Die Zeile klappt aus, die Nachbarn ruecken nach - erst dann steht die
   // Liste ohne sie neu (der Server hat schon geloescht; ohne Bewegung loest
   // collapseRow sofort auf).
-  await collapseRow(owner?.querySelector(`#subscriptions-list .swipe-row[data-swipe-id="${subscription.id}"]`));
+  await collapseRow(container.querySelector(`#subscriptions-list .swipe-row[data-swipe-id="${subscription.id}"]`));
   if (await reload(undefined, { motion: true, owner })) refocusAfterRender();
   window.yuvomi?.showToast(t('subscriptions.deletedToast'), 'success');
 }
