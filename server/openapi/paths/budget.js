@@ -147,7 +147,9 @@ const SUBSCRIPTION_GONE = '`subscriptions_subscription_not_found` (404, the subs
 const SELECTED_META_GONE = '`subscriptions_selected_category_not_found`, `subscriptions_selected_payment_method_not_found` (400, the chosen category or payment method does not exist)';
 const SUBSCRIPTION_CHECKS = '`subscriptions_end_before_next_payment`, `subscriptions_occurrence_count_too_low`, `subscriptions_logo_content_mismatch` (400, only when it is the single finding)';
 const CASE_REASONS = {
-  '/api/v1/budget/subscriptions': { post: `${SELECTED_META_GONE}, ${SUBSCRIPTION_CHECKS}` },
+  // Anlegen nennt den Fall auch: wird das neue Abo geloescht, waehrend seine
+  // Buchung den Kurs holt, antwortet es 404 statt eine Buchung ohne Abo zu hinterlassen.
+  '/api/v1/budget/subscriptions': { post: `${SELECTED_META_GONE}, ${SUBSCRIPTION_CHECKS}, ${SUBSCRIPTION_GONE}` },
   '/api/v1/budget/subscriptions/{id}': {
     put: `${SUBSCRIPTION_GONE}, ${SELECTED_META_GONE}, ${SUBSCRIPTION_CHECKS}`,
     delete: SUBSCRIPTION_GONE,
