@@ -15,6 +15,7 @@ import {
 import { formatWall, vtimezoneFor } from '../utils/vtimezone.js';
 import { outboundDateRange } from './outbound-dtstart.js';
 import { rruleLine } from './recurrence.js';
+import { timedSeriesUntil } from '../utils/rrule-until.js';
 import { activeAccountSql } from './account-state.js';
 import { icsSubscriptionVisibleWhere } from './visibility.js';
 import { birthdaysSwitchedOff, notBirthdayEventSql } from './household-modules.js';
@@ -252,7 +253,15 @@ function buildVEvent(
   // rruleLine statt Handarbeit: eine eingelesene Serie bringt ihr `RRULE:` schon
   // mit, ein blindes Praefix erzeugte `RRULE:RRULE:FREQ=...` und liess strikte
   // Abonnenten das ganze Event verwerfen (#761).
-  if (ev.recurrence_rule && !recurrenceMaster) lines.push(rruleLine(ev.recurrence_rule));
+  //
+  // Ein reines Datum als UNTIL ist neben einem getimten DTSTART ungueltig und
+  // wird zum Ende des Ortstags in der Zone, in der DTSTART oben steht (#1974,
+  // utils/rrule-until.js): TZID der Serie, sonst die Feed-Zone fuer naive
+  // Werte, sonst UTC.
+  if (ev.recurrence_rule && !recurrenceMaster) {
+    const untilZone = usesTzid(ev) ? ev.tzid : (hasExplicitOffset(dtstart) ? null : feedZone);
+    lines.push(rruleLine(ev.all_day ? ev.recurrence_rule : timedSeriesUntil(ev.recurrence_rule, untilZone)));
+  }
   // Einzeln ausgenommene Vorkommen (EXDATE, #489). Zeit-Teil = Master-Startzeit,
   // damit die EXDATE-Instanz exakt auf ein RRULE-Vorkommen trifft.
   if (!recurrenceMaster && ev.recurrence_rule
@@ -475,3 +484,5 @@ export {
   getFeedShowAssignees, setFeedShowAssignees,
   resolveFeedZone, stampProp,
 };
+
+export const __test = { buildVEvent };

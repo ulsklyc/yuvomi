@@ -35,6 +35,7 @@
 import { isValidTimeZone } from './timezone.js';
 import { formatWall } from './vtimezone.js';
 import { toICSDatetime } from './ics-format.js';
+import { timedSeriesUntil } from './rrule-until.js';
 
 /** Traegt der gespeicherte Wert selbst ein Z oder ein +hh:mm? */
 export function hasExplicitOffset(value) {
@@ -149,4 +150,22 @@ export function eventDateTimeFields(event, householdZone = null) {
     dtend:   { value: toICSDatetime(endSource) + suffix,            params },
     tzid: zone,
   };
+}
+
+/**
+ * Die Regel, wie sie neben diesem DTSTART hinausgeht (#1974).
+ *
+ * Ein reines Datum als UNTIL ist Yuvomis kanonische Form (utils/rrule-until.js)
+ * und neben einem DTSTART mit Uhrzeit laut RFC 5545 §3.3.10 ungueltig. Es wird
+ * zum Ende dieses Ortstags in der Zone des DTSTART, ohne TZID in UTC - dort, wo
+ * der Empfaenger die Vorkommen rechnet. Neben VALUE=DATE bleibt das Datum, und
+ * jede andere Regel geht Wort fuer Wort hinaus (#756).
+ *
+ * @param {string} rule  Regel mit oder ohne `RRULE:`
+ * @param {{ dtstart: {params: string}, tzid: string|null }} when  aus eventDateTimeFields
+ * @returns {string}
+ */
+export function rruleForDtstart(rule, when) {
+  if (/VALUE=DATE(?!-)/i.test(when?.dtstart?.params ?? '')) return rule;
+  return timedSeriesUntil(rule, when?.tzid ?? null);
 }
