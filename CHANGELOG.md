@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A timed series that ends on a date ends on the same occurrence in Google as in Yuvomi** (#1974).
+  When a series with a time of day ends on a date - for example after "this and all following"
+  cut it off - Yuvomi shows it up to and including that day in your time zone. Google got the end
+  of that day in UTC instead. East of UTC Google could show one occurrence more (a daily 00:30 in
+  Berlin also on the morning after the last day), west of UTC one fewer (a daily 23:30 in Los
+  Angeles was missing on the last day). The end now goes to Google as the end of that day in the
+  time zone the series is sent with. This applies to what is sent from now on: once Google's
+  answer has come back into Yuvomi, a series keeps the end both sides already agree on.
 - **Waste collection: the source dialog says why the last refresh failed in your language**
   (#1909). The dialog of a calendar address showed the server's own English text of the last
   failed refresh, for example "No calendar entries in the response". It now shows the same

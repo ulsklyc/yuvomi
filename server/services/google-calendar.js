@@ -24,7 +24,7 @@ import * as outbound from './calendar-outbound.js';
 import { decodeHtmlEntities } from '../utils/html-entities.js';
 import { nearestColorId } from '../utils/ical-color.js';
 // Fallback-Zone für den Outbound-Sync, wenn Google für den Zielkalender keine liefert.
-import { configuredHouseholdTimeZone, householdTimeZone } from '../utils/timezone.js';
+import { configuredHouseholdTimeZone, householdTimeZone, localToUTCPrecise, shiftDateKey } from '../utils/timezone.js';
 import { authoredAfterInbound, outboundEvent } from './outbound-dtstart.js';
 import { assignDefaultToEvent, reassignDefaultOnCalendarMove } from './sync-assignment.js';
 import { countSourceEvents, deleteSourceEvents } from './calendar-prune.js';
@@ -1204,7 +1204,18 @@ function toRfc3339(dt) {
 //   - all-day-Events (start.date):    UNTIL muss DATE sein (YYYYMMDD)
 //   - getimte Events (start.dateTime): UNTIL muss UTC DATE-TIME sein
 // Andernfalls lehnt Google die Recurrence ab ("Invalid recurrence rule").
-function normalizeRecurrenceUntil(rule, allDay) {
+//
+// EIN REINES DATUM AN EINER GETIMTEN SERIE IST DAS ENDE EINES ORTSTAGS (#1974).
+// Yuvomi liest `UNTIL=20351010` als Tag: das letzte Vorkommen ist das am 10.
+// Oktober, in der Zone, in der die Serie expandiert wird. Google rechnet die
+// Vorkommen in der mitgesendeten `timeZone` und vergleicht sie mit einem
+// UTC-Zeitpunkt. Bis hierher ging `T235959Z` hinaus, das Tagesende in UTC:
+// oestlich von UTC zeigte Google damit ein Vorkommen mehr (00:30 am 11. in
+// Berlin ist 22:30Z am 10.), westlich eines weniger. Die Grenze ist deshalb das
+// Ende des UNTIL-Tags in `timeZone` - eine Sekunde vor Mitternacht des Folgetags,
+// nicht 23:59:59 als Wanduhr, damit ein Tag, an dem die Uhr um Mitternacht
+// springt, richtig endet.
+function normalizeRecurrenceUntil(rule, allDay, timeZone) {
   return rule.split(';').map((segment) => {
     const eq = segment.indexOf('=');
     if (eq === -1) return segment;
@@ -1212,9 +1223,22 @@ function normalizeRecurrenceUntil(rule, allDay) {
     const digits   = segment.slice(eq + 1).replace(/\D/g, '');
     const datePart = digits.slice(0, 8);
     if (allDay) return `UNTIL=${datePart}`;
-    const timePart = digits.length > 8 ? digits.slice(8, 14).padEnd(6, '0') : '235959';
-    return `UNTIL=${datePart}T${timePart}Z`;
+    if (digits.length > 8) return `UNTIL=${datePart}T${digits.slice(8, 14).padEnd(6, '0')}Z`;
+    return `UNTIL=${localDayEndUtc(datePart, timeZone)}`;
   }).join(';');
+}
+
+/**
+ * Das Ende des Ortstags `YYYYMMDD` in `timeZone` als `YYYYMMDDTHHMMSSZ`.
+ * Ohne lesbares Datum oder Zone bleibt es beim Tagesende in UTC.
+ */
+function localDayEndUtc(datePart, timeZone) {
+  const fallback = `${datePart}T235959Z`;
+  if (!/^\d{8}$/.test(datePart) || !timeZone) return fallback;
+  const dayKey = `${datePart.slice(0, 4)}-${datePart.slice(4, 6)}-${datePart.slice(6, 8)}`;
+  const nextMidnightMs = Date.parse(localToUTCPrecise(`${shiftDateKey(dayKey, 1)}T00:00:00`, timeZone));
+  if (!Number.isFinite(nextMidnightMs)) return fallback;
+  return new Date(nextMidnightMs - 1000).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
 }
 
 /**
@@ -1314,7 +1338,7 @@ function localEventToGoogle(rawEvent, colorMap = {}, timeZone = outboundTimeZone
   }
 
   if (event.recurrence_rule) {
-    gEvent.recurrence = [`RRULE:${normalizeRecurrenceUntil(rruleValue(event.recurrence_rule), allDay)}`];
+    gEvent.recurrence = [`RRULE:${normalizeRecurrenceUntil(rruleValue(event.recurrence_rule), allDay, timeZone)}`];
   }
 
   return gEvent;
