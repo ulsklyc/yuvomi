@@ -1,6 +1,6 @@
 ## Summary
 
-<!-- What does this PR do? Link the related issue: Closes #123 -->
+<!-- What does this PR do? Link the related issue: Closes #123 for a bug fixed completely, Refs #123 for a feature or a partial fix (a feature issue stays open until its release). -->
 
 ## Changes
 
