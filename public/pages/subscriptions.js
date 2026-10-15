@@ -1063,7 +1063,12 @@ function renderCard(subscription) {
   const converted = subscription.monthly_base === null
     ? t('subscriptions.conversionUnavailable')
     : (sameAsMonthly ? '' : t('subscriptions.monthlyEquivalent', { amount: money(subscription.monthly_base) }));
-  const overdue = daysUntil(subscription.next_payment_date) < 0 && status.cardClass !== 'subscription-card--completed';
+  // EIN ABGESCHLOSSENES ABO HAT KEINE FAELLIGKEIT (#2009). Sein Datum ist das
+  // der Zahlung, die nach dem Abschluss kaeme - es zaehlt erst wieder, wenn das
+  // Abo reaktiviert wird, und der Dialog bietet es dann an. Auf der Karte stand
+  // es als „in 30 Tagen"; die Ende-Zeile sagt stattdessen „Abgeschlossen am".
+  const completed = status.cardClass === 'subscription-card--completed';
+  const overdue = !completed && daysUntil(subscription.next_payment_date) < 0;
   return `
     <div class="swipe-row${ro ? ' swipe-row--static' : ''}" data-swipe-id="${subscription.id}">
       ${ro ? '' : `<div class="swipe-reveal swipe-reveal--done swipe-reveal--leading" aria-hidden="true">
@@ -1090,7 +1095,7 @@ function renderCard(subscription) {
             ${status.badgeClass === 'subscription-status--active' ? '' : `<span class="subscription-status ${status.badgeClass}">${status.label}</span>`}
           </span>
           <span class="subscription-card__meta">
-            <span class="subscription-card__due${overdue ? ' subscription-card__due--overdue' : ''}"><i data-lucide="${overdue ? 'triangle-alert' : 'calendar-clock'}" aria-hidden="true"></i><span>${formatDate(subscription.next_payment_date)} ·</span> <span>${dueLabel(subscription)}</span></span>
+            ${completed ? '' : `<span class="subscription-card__due${overdue ? ' subscription-card__due--overdue' : ''}"><i data-lucide="${overdue ? 'triangle-alert' : 'calendar-clock'}" aria-hidden="true"></i><span>${formatDate(subscription.next_payment_date)} ·</span> <span>${dueLabel(subscription)}</span></span>`}
             <span class="subscription-card__meta-cycle">${cycleLabel(subscription)}</span>
             <span class="subscription-card__meta-extra">${esc(rowPaymentMethodLabel(subscription))}</span>
             <span class="subscription-card__meta-extra"><i data-lucide="${subscription.reminder_enabled === false ? 'bell-off' : 'bell'}" aria-hidden="true"></i>${subscription.reminder_enabled === false ? t('subscriptions.noReminder') : t('subscriptions.reminderMeta', { count: subscription.reminder_days })}</span>
@@ -1362,7 +1367,9 @@ function subscriptionReadSections(subscription) {
     { icon: 'align-left', label: t('subscriptions.descriptionLabel'), value: subscription.description || '', multiline: true },
     { icon: 'repeat-2', label: t('subscriptions.billingCycleLabel'), value: cycleLabel(subscription) },
     { icon: 'calendar-clock', label: t('subscriptions.detailNextPaymentLabel'),
-      value: subscription.next_payment_date ? `${formatDate(subscription.next_payment_date)} · ${dueLabel(subscription)}` : '' },
+      // Abgeschlossen: keine naechste Zahlung (#2009, wie die Karte).
+      value: subscription.next_payment_date && subscription.status !== 'completed'
+        ? `${formatDate(subscription.next_payment_date)} · ${dueLabel(subscription)}` : '' },
     { icon: subscription.reminder_enabled === false ? 'bell-off' : 'bell', label: t('subscriptions.reminderDaysLabel'),
       value: subscription.reminder_enabled === false ? t('subscriptions.noReminder') : t('subscriptions.reminderMeta', { count: subscription.reminder_days }) },
     { icon: endInfo?.icon || 'calendar-x', label: t('subscriptions.endLabel'), value: endInfo?.text || '' },

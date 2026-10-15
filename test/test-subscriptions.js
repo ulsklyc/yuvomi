@@ -475,6 +475,64 @@ try {
     const datedRenew = await jsonReq('POST', `/${dated.body.data.id}/renew`, {});
     assert.equal(datedRenew.body.data.status, 'completed');
 
+    // Reaktivieren nach dem Abschluss (#2009): der bezahlte Tag ist bezahlt.
+    // Der Abschluss rueckte das Datum nicht vor, also buchte eine Reaktivierung
+    // den letzten bezahlten Tag ein zweites Mal - seit #2008 sichtbar, weil die
+    // letzte Buchung beim Abschluss stehen bleibt; davor zaehlte der Tag
+    // unsichtbar doppelt. Danach: genau eine Buchung je bezahltem Tag, und die
+    // erste neue faellt auf den naechsten Tag.
+    const paidDays = (name) => database.prepare(
+      'SELECT date, COUNT(*) AS n FROM budget_entries WHERE title = ? GROUP BY date ORDER BY date',
+    ).all(name).map((row) => [row.date, row.n]);
+    const reactivationCases = [
+      { name: 'Kurs 2009 count', create: { end_type: 'after_count', occurrence_count: 1 }, reactivate: { enabled: true, occurrence_count: 3 } },
+      { name: 'Kurs 2009 date', create: { end_type: 'on_date', end_date: '2028-01-20' }, reactivate: { enabled: true, end_date: '2028-03-31' } },
+      { name: 'Kurs 2009 never', create: { end_type: 'after_count', occurrence_count: 1 }, reactivate: { enabled: true, end_type: 'never' } },
+    ];
+    for (const { name, create, reactivate } of reactivationCases) {
+      const made = await jsonReq('POST', '', { ...endBase, name, next_payment_date: '2028-01-15', ...create });
+      assert.equal(made.status, 201, name);
+      const subId = made.body.data.id;
+      const done = await jsonReq('POST', `/${subId}/renew`, {});
+      assert.equal(done.body.data.status, 'completed', `${name}: die einzige Zahlung schliesst ab`);
+      assert.ok(done.body.data.completed_at, `${name}: completed_at`);
+      assert.equal(done.body.data.occurrences_done, 1, `${name}: eine Zahlung geleistet`);
+      assert.equal(done.body.data.next_payment_date, '2028-02-15', `${name}: der Abschluss rueckt hinter den bezahlten Tag vor`);
+      assert.equal(done.body.data.budget_entry_id, null, `${name}: keine verknuepfte naechste Buchung`);
+      assert.deepEqual(paidDays(name), [['2028-01-15', 1]], `${name}: die letzte bezahlte Buchung steht einmal`);
+      if (create.end_type === 'on_date') {
+        // Das vorgerueckte Datum liegt nach dem Ende. Daraus folgt keine Zahlung,
+        // und ohne spaeteres Ende laesst es sich nicht reaktivieren.
+        const plain = await jsonReq('PUT', `/${subId}`, { enabled: true });
+        assert.equal(plain.status, 400, `${name}: Reaktivieren ohne spaeteres Ende`);
+        assert.equal(plain.body.reason, 'subscriptions_end_before_next_payment');
+        const still = database.prepare('SELECT enabled, completed_at FROM budget_subscriptions WHERE id = ?').get(subId);
+        assert.ok(!still.enabled && still.completed_at, `${name}: bleibt abgeschlossen`);
+        assert.deepEqual(paidDays(name), [['2028-01-15', 1]], `${name}: die Absage bucht nichts`);
+      }
+      const back = await jsonReq('PUT', `/${subId}`, reactivate);
+      assert.equal(back.status, 200, `${name}: ${JSON.stringify(back.body)}`);
+      assert.equal(back.body.data.status, 'active', name);
+      assert.equal(back.body.data.completed_at, null, name);
+      assert.equal(back.body.data.next_payment_date, '2028-02-15', `${name}: die Reaktivierung beginnt nach dem bezahlten Tag`);
+      assert.equal(back.body.data.occurrences_done, 1, `${name}: der Zaehler bleibt`);
+      assert.deepEqual(paidDays(name), [['2028-01-15', 1], ['2028-02-15', 1]],
+        `${name}: genau eine Buchung je Tag, die erste neue am naechsten`);
+      const again = await jsonReq('POST', `/${subId}/renew`, {});
+      assert.equal(again.body.data.occurrences_done, 2, `${name}: der 15.02. ist die zweite Zahlung`);
+      assert.equal(again.body.data.next_payment_date, '2028-03-15', name);
+      assert.deepEqual(paidDays(name), [['2028-01-15', 1], ['2028-02-15', 1], ['2028-03-15', 1]], name);
+      if (reactivate.end_type !== 'never') {
+        // Die dritte Zahlung schliesst wieder ab - am richtigen Tag, mit dem richtigen Zaehler.
+        const last = await jsonReq('POST', `/${subId}/renew`, {});
+        assert.equal(last.body.data.status, 'completed', `${name}: die dritte Zahlung schliesst ab`);
+        assert.equal(last.body.data.occurrences_done, 3, name);
+        assert.equal(last.body.data.occurrences_remaining, reactivate.occurrence_count ? 0 : null, name);
+        assert.deepEqual(paidDays(name), [['2028-01-15', 1], ['2028-02-15', 1], ['2028-03-15', 1]],
+          `${name}: der Abschluss bucht keine vierte`);
+      }
+    }
+
     // --- account_username (#1004): Kontoangabe ohne das Geheimnis ---
     // Anders als im Inventar liegt das Feld hier in einer Zeile, die owner_id
     // und visibility schon traegt - es braucht also keine eigene Sichtbarkeit,

@@ -354,15 +354,24 @@ async function syncBudgetExpense(id, fetched = null) {
  * (Entscheidung zu #2008; bis dahin loeschte er sie, seit #594). Aus der
  * Monatssumme der Abos und aus der Vorschau faellt das Abo trotzdem, denn
  * beide lesen nur laufende Abos.
+ *
+ * Auch der Abschluss rueckt das Datum vor (#2009): der bezahlte Tag ist
+ * bezahlt. Blieb er stehen, buchte eine Reaktivierung (PUT enabled, hoeherer
+ * Zaehler, spaeteres Ende) ihn ein zweites Mal und zaehlte ihn doppelt. Das
+ * vorgerueckte Datum liegt bei `on_date` immer nach dem Ende; ein
+ * abgeschlossenes Abo leitet daraus nichts ab - es bucht nicht, erinnert
+ * nicht, steht in keiner Vorschau, und die Karte zeigt es nicht als faellig.
+ * Reaktivieren ohne spaeteres Ende lehnt endConfigErrors ab.
  */
 const renewBooking = (current, { completed, nextDate, occurrencesDone }) => db.get().transaction(() => {
   const database = db.get();
   if (completed) {
     database.prepare(`
       UPDATE budget_subscriptions
-      SET occurrences_done = ?, enabled = 0, completed_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+      SET next_payment_date = ?, occurrences_done = ?, enabled = 0,
+          completed_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
       WHERE id = ?
-    `).run(occurrencesDone, current.id);
+    `).run(nextDate, occurrencesDone, current.id);
   } else {
     database.prepare('UPDATE budget_subscriptions SET next_payment_date = ?, occurrences_done = ? WHERE id = ?')
       .run(nextDate, occurrencesDone, current.id);
