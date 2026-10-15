@@ -1170,6 +1170,16 @@
   }
 }
 
+/* Ein abgeschlossenes Abo traegt keine Zeilenaktion (#2011). Auf Zeigergeraeten
+ * haelt es ihre Spalte trotzdem frei, damit sein Betrag in derselben Flucht
+ * steht wie die der anderen Karten. Bei `hover: none` liegt die Aktion ohnehin
+ * ausserhalb des Flusses; in der Nur-lesen-Liste fehlt sie allen Karten. */
+@media (hover: hover) {
+  .swipe-row:not(.swipe-row--static) > .subscription-card--completed {
+    padding-inline-end: calc(var(--space-2) + var(--target-lg));
+  }
+}
+
 /* Hover-/Fokus-Feedback der Logo-Auswahl blendet (R16, Bewegung): Rahmen und
  * Hof sprangen - die Datei fuehrte keine einzige Transition. */
 .subscriptions-logo-option {
