@@ -22,6 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Documents: leaving and coming back no longer leaves stale data on the page** (#2005). An
+  answer that arrived only after you had left Documents and opened it again could overwrite the
+  members, the DMS accounts or the admin state the new page had just loaded, and the next dialog
+  or menu used the old values. Now only the newest answer counts. A folder deletion that finished
+  in that window, or deleted only part of the folder's documents, now shows up on the new page
+  right away instead of the deleted folder staying in the list until the next reload, and it no
+  longer moves the keyboard focus on the new page.
+
 - **A server whose `TZ` names an unknown time zone now runs in UTC.** Without a household time zone
   in Settings, the server falls back to `TZ` and then to the zone the system reports. With `TZ` set
   to a name the system does not know, some systems (Windows, for example) report `Etc/Unknown`,

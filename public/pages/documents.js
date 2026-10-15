@@ -83,8 +83,13 @@ const SHARE_NOTE_KEYS = {
 
 const CATEGORIES = ['medical', 'school', 'identity', 'insurance', 'finance', 'home', 'vehicle', 'legal', 'travel', 'pets', 'warranty', 'taxes', 'work', 'other'];
 
+// Jeder Ladeweg in den modulweiten Stand nimmt nur seine JUENGSTE Antwort an.
+// Mitglieder und Metadaten gehoeren dazu (#2005): sonst ueberschriebe die spaete
+// Antwort einer verlassenen Seite, was die neu betretene schon geladen hat.
 const applyLatestDocumentsResponse = createLatestResponseApplier();
 const applyLatestFoldersResponse = createLatestResponseApplier();
+const applyLatestMembersResponse = createLatestResponseApplier();
+const applyLatestMetaOptionsResponse = createLatestResponseApplier();
 
 
 const CATEGORY_ICONS = {
@@ -161,6 +166,28 @@ function stillShown(owner) {
   return Boolean(owner) && _container === owner && owner.isConnected === true;
 }
 
+/**
+ * NACH EINEM LADEN: WELCHE SEITE ZEICHNET (#2005). Der Stand (`state`) ist
+ * modulweit, nicht je Seite: was ein Weg nach "verlassen und zurueck" noch
+ * laedt - das Nachladen nach einem Ordner-Loeschen etwa -, ist danach auch der
+ * Stand der neu betretenen Seite. Gezeichnet wird deshalb die Seite, die jetzt
+ * zu sehen ist: die ausloesende, solange sie gezeigt wird, sonst die neu
+ * betretene, sobald deren eigener Aufbau fertig ist (vorher zeichnet der ihn
+ * selbst, aus demselben Stand). Fokus und Dialoge bleiben Sache der
+ * ausloesenden Seite - dafuer die Rueckgabe.
+ *
+ * @param {object|null} owner - der Container der Seite, VOR der Anfrage gemerkt
+ * @returns {boolean} ob die ausloesende Seite noch gezeigt wird
+ */
+function drawLoaded(owner, { motion = false } = {}) {
+  if (stillShown(owner)) {
+    renderAll({ motion });
+    return true;
+  }
+  if (_built === _container && stillShown(_container)) renderAll({ motion });
+  return false;
+}
+
 async function reportError(err, { owner = null, dialog = null } = {}) {
   window.yuvomi?.showToast(errorText(err), 'danger');
   if (!isGone(err)) return;
@@ -179,9 +206,8 @@ async function reportError(err, { owner = null, dialog = null } = {}) {
     console.warn('[Documents] reload after a gone answer failed:', loadErr);
     return;
   }
-  if (!stillShown(owner)) return;
+  if (!drawLoaded(owner)) return;
   renderDmsHeaderBtn();
-  renderAll();
   refocusAfterRender();
 }
 
@@ -209,7 +235,7 @@ async function offerCurrentFolders(select, rootKey, optionsHtml, owner) {
   } catch (err) {
     console.warn('[Documents] folder reload failed:', err);
   }
-  if (stillShown(owner)) renderAll();
+  drawLoaded(owner);
   select.replaceChildren();
   select.insertAdjacentHTML('beforeend', `<option value="">${esc(t(rootKey))}</option>${optionsHtml(goneId)}`);
   select.value = '';
@@ -302,6 +328,8 @@ function persistExpandedFolders() {
   }
 }
 let _container = null;
+// Der Container, dessen erster Aufbau fertig ist (drawLoaded, #2005).
+let _built = null;
 let _search = null;
 let _statusTablist = null;
 // Seitenleben (utils/page-lifecycle.js): faellt mit dem Router-Signal, wenn die
@@ -468,6 +496,7 @@ export async function render(container, context = {}) {
   // Waehrend des ersten Ladens verlassen (oder schon neu betreten): die
   // Antwort zeichnet nicht in eine Seite, die sie nicht mehr ist.
   if (!stillShown(container)) return;
+  _built = container;
   renderDmsHeaderBtn();
   bindPageEvents();
   renderCategoryChips();
@@ -523,9 +552,13 @@ function renderBreadcrumb() {
  * fehlte das Kaestchen einer bestehenden Freigabe, und Speichern entzoege sie.
  */
 async function loadMembers() {
-  const [members, directory] = await Promise.all([api.get('/family/members'), api.get('/auth/users')]);
-  state.members = members.data || [];
-  state.directory = directory.data || [];
+  return applyLatestMembersResponse(
+    () => Promise.all([api.get('/family/members'), api.get('/auth/users')]),
+    ([members, directory]) => {
+      state.members = members.data || [];
+      state.directory = directory.data || [];
+    },
+  );
 }
 
 // Nur der Status wird serverseitig gefiltert: Kategorie und Ordner sind
@@ -554,15 +587,17 @@ async function loadFolders() {
 
 async function loadMetaOptions() {
   try {
-    const res = await api.get('/documents/meta/options');
-    state.dmsAccounts = res.data?.dms_accounts || [];
-    state.activeUploadBackend = res.data?.active_upload_backend || 'local';
-    state.isAdmin = res.data?.is_admin === true;
-    // Grenzwerte vom Server übernehmen, statt sie im Client zu duplizieren —
-    // sonst driften Hinweistext und tatsächliche Annahme auseinander.
-    state.maxFileSize = Number(res.data?.max_file_size) || maxUploadBytes();
-    state.allowedMimeTypes = Array.isArray(res.data?.allowed_mime_types) ? res.data.allowed_mime_types : [];
+    return await applyLatestMetaOptionsResponse(() => api.get('/documents/meta/options'), (res) => {
+      state.dmsAccounts = res.data?.dms_accounts || [];
+      state.activeUploadBackend = res.data?.active_upload_backend || 'local';
+      state.isAdmin = res.data?.is_admin === true;
+      // Grenzwerte vom Server übernehmen, statt sie im Client zu duplizieren -
+      // sonst driften Hinweistext und tatsächliche Annahme auseinander.
+      state.maxFileSize = Number(res.data?.max_file_size) || maxUploadBytes();
+      state.allowedMimeTypes = Array.isArray(res.data?.allowed_mime_types) ? res.data.allowed_mime_types : [];
+    });
   } catch {
+    // Hier kommt nur die juengste Anfrage an: eine ueberholte scheitert still.
     state.dmsAccounts = [];
     state.activeUploadBackend = 'local';
     state.isAdmin = false;
@@ -994,8 +1029,7 @@ async function selectStatus(status) {
   showDocumentsLoading();
   const owner = _container;
   await loadDocuments();
-  if (!stillShown(owner)) return;
-  renderAll();
+  drawLoaded(owner);
 }
 
 // Über den page-search-Handle leeren, damit auch der Lösch-Knopf im Feld
@@ -1579,8 +1613,7 @@ async function moveFolder(folder) {
     if (chosen !== '') state.expanded.add(Number(chosen));
     persistExpandedFolders();
     await Promise.all([loadFolders(), loadDocuments()]);
-    if (!stillShown(owner)) return;
-    renderAll();
+    if (!drawLoaded(owner)) return;
     refocusAfterRender();
   } catch (err) {
     reportError(err, { owner });
@@ -1639,8 +1672,7 @@ async function renameFolder(folder) {
     // Dokumente mitladen: `folder_name` steckt im Server-Join und stünde sonst
     // auf den Karten weiter mit dem alten Namen.
     await Promise.all([loadFolders(), loadDocuments()]);
-    if (!stillShown(owner)) return;
-    renderAll();
+    if (!drawLoaded(owner)) return;
     refocusAfterRender();
   } catch (err) {
     reportError(err, { owner });
@@ -1748,12 +1780,8 @@ async function deleteFolder(folder) {
         commitFolderDeletion(folder, impact, choice, { keepalive })
       ),
       isViewActive: () => stillShown(owner),
-      applyResult: (result, { viewActive }) => (
-        applyFolderDeleteResult(result, choice, selectedSubtree, {
-          owner,
-          showSuccess: false,
-          renderView: viewActive,
-        })
+      applyResult: (result) => (
+        applyFolderDeleteResult(result, choice, selectedSubtree, { owner, showSuccess: false })
       ),
       handleError: (err) => handleFolderDeleteError(err, folder, { delayed: true, owner }),
       // The server deletion has already succeeded at this point. A failed
@@ -1772,8 +1800,7 @@ async function deleteFolder(folder) {
 
   try {
     const result = await commitFolderDeletion(folder, impact, choice);
-    await applyFolderDeleteResult(result, choice, selectedSubtree, { owner });
-    refocusAfterRender();
+    if (await applyFolderDeleteResult(result, choice, selectedSubtree, { owner })) refocusAfterRender();
   } catch (err) {
     await handleFolderDeleteError(err, folder, { owner });
   }
@@ -1796,7 +1823,7 @@ async function applyFolderDeleteResult(
   result,
   choice,
   selectedSubtree,
-  { owner = null, showSuccess = true, renderView = true } = {},
+  { owner = null, showSuccess = true } = {},
 ) {
   const hasNonConcurrencyFailure = result.failed_documents
     ?.some((failure) => failure.failure_stage !== 'concurrency');
@@ -1818,7 +1845,10 @@ async function applyFolderDeleteResult(
   }
   if (result.folder_deleted !== false && selectedSubtree.has(Number(state.folderId))) state.folderId = '';
   await Promise.all([loadFolders(), loadDocuments()]);
-  if (renderView && stillShown(owner)) renderAll();
+  // Auch nach "verlassen und zurueck": der Stand ohne den Ordner ist jetzt der
+  // der neuen Seite, und die zeigt ihn (#2005). Den Fokus bekommt nur die
+  // ausloesende Seite zurueck - die Rueckgabe sagt, ob sie noch gezeigt wird.
+  return drawLoaded(owner);
 }
 
 async function handleFolderDeleteError(err, folder, { delayed = false, owner = null } = {}) {
@@ -2238,8 +2268,7 @@ async function runDocumentAction(action, doc) {
       await api.patch(`/documents/${doc.id}/archive`, { archived: doc.status !== 'archived' });
       window.yuvomi?.showToast(doc.status === 'archived' ? t('documents.restoredToast') : t('documents.archivedToast'), 'success');
       await loadDocuments();
-      if (!stillShown(owner)) return;
-      renderAll({ motion: true });
+      drawLoaded(owner, { motion: true });
     } catch (err) {
       reportError(err, { owner });
     }
@@ -2319,8 +2348,7 @@ function deleteDocuments(docs) {
       await loadDocuments();
       // Und noch einmal NACH dem Laden (Codex an #2001): waehrend des GET kann
       // die Seite verlassen oder neu betreten worden sein.
-      if (!stillShown(owner)) return;
-      renderAll();
+      drawLoaded(owner);
     },
     restore: (err) => {
       if (!stillShown(owner)) return;
@@ -2428,8 +2456,7 @@ async function archiveSelected() {
       'success',
     );
     await loadDocuments();
-    if (!stillShown(owner)) return;
-    renderAll();
+    drawLoaded(owner);
   } catch (err) {
     reportError(err, { owner });
   }
@@ -2457,8 +2484,7 @@ async function moveSelected() {
     })));
     window.yuvomi?.showToast(t('documents.bulkMovedToast', { count: docs.length }), 'success');
     await loadDocuments();
-    if (!stillShown(owner)) return;
-    renderAll();
+    if (!drawLoaded(owner)) return;
     refocusAfterRender();
   } catch (err) {
     reportError(err, { owner });
@@ -2508,7 +2534,11 @@ export const __test = {
   memberOptions, loadMembers, documentVisibilityFieldHtml, openDocumentViewer,
   // R8 H14: der Auswahlkreis als Programm (Markup und Tipp).
   state, renderSelectBox, toggleDocumentSelection,
-  setContainerForTest(container) { _container = container; },
+  setContainerForTest(container, { built = false } = {}) {
+    _container = container;
+    if (built) _built = container;
+  },
+  loadMetaOptions,
   // #1265: Nur-lesen und Besitzregel. Die Suite faehrt Markup und Handler.
   readOnly, mayManage, READ_SAFE_ACTIONS,
   renderActions, renderGridCard, renderListItem, emptyStateFor,
@@ -3163,7 +3193,7 @@ async function saveFolderUpload(panel, payload) {
     await runRateLimitedOperation(
       () => Promise.all([loadFolders(), loadDocuments()]),
     );
-    if (stillShown(owner)) renderAll();
+    drawLoaded(owner);
   } catch (refreshError) {
     // The writes have already completed. A failed refresh must not turn a
     // persisted upload into a reported upload failure.
@@ -3260,8 +3290,7 @@ async function saveDocument(event, doc, panel) {
     }
     closeModal({ force: true });
     await loadDocuments();
-    if (!stillShown(owner)) return;
-    renderAll({ motion: true });
+    if (!drawLoaded(owner, { motion: true })) return;
     refocusAfterRender();
   } catch (err) {
     // Das Dokument gibt es nicht mehr: der Dialog bearbeitet etwas Veraltetes,
@@ -3346,9 +3375,8 @@ function openFolderModal({ parentId = null } = {}) {
           await loadFolders();
           await loadDocuments();
           closeModal({ force: true });
-          if (!stillShown(owner)) return;
           applyFilters();
-          renderAll();
+          drawLoaded(owner);
         } catch (err) {
           error.textContent = errorText(err);
           error.hidden = false;
@@ -3626,8 +3654,7 @@ async function linkDmsDocument(item, accountId) {
     });
     closeModal({ force: true });
     await loadDocuments();
-    if (!stillShown(owner)) return true;
-    renderAll({ motion: true });
+    if (!drawLoaded(owner, { motion: true })) return true;
     refocusAfterRender();
     return true;
   } catch (err) {
