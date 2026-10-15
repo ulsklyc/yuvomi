@@ -257,8 +257,8 @@ test('Ordnerlöschung bietet Behalten oder Mitlöschen mit exakten Server-Zahlen
   assert.match(block, /expected_folders=\$\{impact\.removed_folders\}/);
   assert.match(block, /choice === 'delete'[\s\S]*expected_snapshot=\$\{encodeURIComponent\(impact\.snapshot\)\}/);
   assert.match(block, /const expectedSnapshot = choice === 'delete'[\s\S]*: '';/);
-  assert.match(block, /handleError: \(err\) => handleFolderDeleteError\(err, folder, \{ delayed: true \}\)/);
-  assert.match(block, /catch \(err\) \{\s*await handleFolderDeleteError\(err, folder\);\s*\}/);
+  assert.match(block, /handleError: \(err\) => handleFolderDeleteError\(err, folder, \{ delayed: true, owner \}\)/);
+  assert.match(block, /catch \(err\) \{\s*await handleFolderDeleteError\(err, folder, \{ owner \}\);\s*\}/);
   assert.match(block, /function handleFolderDeleteError[\s\S]{0,260}handleFolderDeleteFailure\(\{/);
   assert.match(block, /result\.contents_changed[\s\S]*folderDeleteContentsChangedToast/);
   assert.match(block, /failed_documents[\s\S]*failure_stage !== 'concurrency'/);
@@ -362,8 +362,10 @@ test('das Rückgängig-Löschen stellt die Server-Sortierung wieder her', () => 
   const del = page.slice(page.indexOf('function deleteDocuments'), page.indexOf('function deleteDocuments') + 2400);
   assert.doesNotMatch(del, /localeCompare/);
   assert.match(del, /applyFilters\(\)/);
-  // Kein Nachladen auf einen abgehängten Container nach Seitenwechsel.
-  assert.match(del, /if \(_container !== owner\) return/);
+  // Kein Nachladen auf einen abgehängten Container nach Seitenwechsel - auch
+  // nicht, wenn `_container` noch auf ihn zeigt (stillShown prueft das DOM,
+  // Codex an #2001; als Programm gefahren in test:documents-errors).
+  assert.match(del, /if \(!stillShown\(owner\)\) return/);
 });
 
 test('das Speichern referenziert den Submit-Button am Panel, nicht am Formular (#543)', () => {
@@ -1358,7 +1360,7 @@ test('Einzel-Archivieren meldet einen Fehler statt ihn zu verschlucken', () => {
   const branch = run.slice(run.indexOf("if (action === 'archive')"), run.indexOf("if (action === 'push-dms')"));
   // Seit #1909 sagt reportError den Satz der App statt des Servertexts; was
   // der Toast dann zeigt, faehrt test:documents-errors am echten Handler.
-  assert.match(branch, /try \{[\s\S]*api\.patch\(`\/documents\/\$\{doc\.id\}\/archive`[\s\S]*\} catch \(err\) \{[\s\S]*reportError\(err\)/);
+  assert.match(branch, /try \{[\s\S]*api\.patch\(`\/documents\/\$\{doc\.id\}\/archive`[\s\S]*\} catch \(err\) \{[\s\S]*reportError\(err, \{ owner \}\)/);
 });
 
 test('die Leermeldung nennt den Suchbegriff so, wie er getippt wurde', () => {

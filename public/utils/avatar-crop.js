@@ -325,6 +325,33 @@ function openCropDialog(imageDataUrl) {
   });
 }
 
+/** Der Zuschnitt, den pickCroppedImage() oeffnet - ersetzbar nur fuer Tests. */
+let cropDialog = openCropDialog;
+
+/**
+ * NUR FUER TESTS: den Zuschnitt ersetzen. Ohne Browser gibt es weder Canvas
+ * noch `<dialog>`; so laesst sich die Pruefung NACH dem Zuschnitt
+ * (`dataTooLarge`) trotzdem als Programm fahren. `null` stellt zurueck.
+ */
+export function _setCropDialogForTest(fn) {
+  cropDialog = fn ?? openCropDialog;
+}
+
+/**
+ * Eine Datei, die nicht taugt: traegt ihren schon uebersetzten Satz (#1909).
+ * Ein eigener Typ, damit ein Aufrufer ihn von jedem anderen Wurf (ein
+ * Ladefehler, ein Programmfehler) unterscheidet, ohne den Text eines Fehlers zu
+ * lesen. `message` traegt denselben Satz - wer noch `err.message` zeigt, sagt
+ * damit nichts anderes als vorher.
+ */
+export class ImageProblem extends Error {
+  constructor(sentence) {
+    super(sentence);
+    this.name = 'ImageProblem';
+    this.sentence = sentence;
+  }
+}
+
 /**
  * DER EINE WEG VON EINER DATEI ZU EINEM ZUGESCHNITTENEN BILD.
  *
@@ -352,20 +379,21 @@ function openCropDialog(imageDataUrl) {
  * @param {{maxDataLength?: number, messageKeys?: Record<string,string>}} [options]
  * @returns {Promise<string|undefined>} das zugeschnittene Bild als Data-URL,
  *   oder `undefined`, wenn nichts gewählt oder der Zuschnitt abgebrochen wurde.
- *   Wirft mit einer übersetzten Meldung, wenn die Datei nicht taugt.
+ *   Wirft ein `ImageProblem` mit einer übersetzten Meldung, wenn die Datei
+ *   nicht taugt.
  */
 export async function pickCroppedImage(file, options = {}) {
   const maxDataLength = options.maxDataLength ?? MAX_PORTRAIT_DATA_LENGTH;
   const keys = { ...DEFAULT_MESSAGE_KEYS, ...(options.messageKeys || {}) };
 
   if (!file) return undefined;
-  if (!ACCEPTED_TYPES.includes(file.type)) throw new Error(t(keys.type));
-  if (file.size > MAX_FILE_BYTES) throw new Error(t(keys.fileTooLarge));
+  if (!ACCEPTED_TYPES.includes(file.type)) throw new ImageProblem(t(keys.type));
+  if (file.size > MAX_FILE_BYTES) throw new ImageProblem(t(keys.fileTooLarge));
 
   const dataUrl = await new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result || ''));
-    reader.onerror = () => reject(new Error(t(keys.read)));
+    reader.onerror = () => reject(new ImageProblem(t(keys.read)));
     reader.readAsDataURL(file);
   });
 
@@ -375,11 +403,11 @@ export async function pickCroppedImage(file, options = {}) {
    * nicht dekodierbares Bild dasselbe wie eines, das sich nicht lesen ließ. */
   let cropped;
   try {
-    cropped = await openCropDialog(dataUrl);
+    cropped = await cropDialog(dataUrl);
   } catch {
-    throw new Error(t(keys.read));
+    throw new ImageProblem(t(keys.read));
   }
   if (cropped === null) return undefined;
-  if (cropped.length > maxDataLength) throw new Error(t(keys.dataTooLarge));
+  if (cropped.length > maxDataLength) throw new ImageProblem(t(keys.dataTooLarge));
   return cropped;
 }

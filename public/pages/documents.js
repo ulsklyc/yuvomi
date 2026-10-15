@@ -149,23 +149,37 @@ function errorText(err) {
  * Zeile steht noch. Ein Loeschen mit diesem Grund laeuft deshalb wie jede
  * andere Handlung hier durch: der Satz, und die Seite zeigt, was wirklich steht.
  */
-async function reportError(err, { dialog = null } = {}) {
+/**
+ * Zeigt die Seite noch diesen Traeger? Die Navigation in ein anderes Modul
+ * leert `_container` nicht, die Variable zeigt dann weiter auf den
+ * abgehaengten Traeger. "Derselbe Traeger" allein haelt deshalb nicht: er muss
+ * auch noch im DOM haengen (Codex an #2001). Sonst zeichnete ein spaetes
+ * Nachladen in eine Seite, die niemand mehr sieht, und zoege den Fokus auf
+ * der neuen Seite weg.
+ */
+function stillShown(owner) {
+  return Boolean(owner) && _container === owner && owner.isConnected === true;
+}
+
+async function reportError(err, { owner = null, dialog = null } = {}) {
   window.yuvomi?.showToast(errorText(err), 'danger');
   if (!isGone(err)) return;
   // Nachladen nach "gibt es nicht mehr". Die DMS-Konten kommen mit: ein Konto,
   // das ein Admin entfernt hat, stuende sonst weiter im Menue. Ein scheiterndes
   // Nachladen meldet nichts weiter - der Satz steht schon da.
   // Wie deleteDocuments: wer die Seite inzwischen verlassen hat, bekommt
-  // nichts mehr gezeichnet (Review zu #1994).
-  const owner = _container;
+  // nichts mehr gezeichnet (Review zu #1994). `owner` merkt die Aufrufstelle
+  // VOR ihrer Anfrage: hier gelesen, waere es nach "verlassen und zurueck"
+  // schon der neue Container (Codex an #2001).
   if (dialog && isModalContextCurrent(dialog)) await closeModal({ force: true });
+  if (!stillShown(owner)) return;
   try {
     await Promise.all([loadFolders(), loadDocuments(), loadMetaOptions()]);
   } catch (loadErr) {
     console.warn('[Documents] reload after a gone answer failed:', loadErr);
     return;
   }
-  if (_container !== owner) return;
+  if (!stillShown(owner)) return;
   renderDmsHeaderBtn();
   renderAll();
   refocusAfterRender();
@@ -183,17 +197,19 @@ async function reportError(err, { dialog = null } = {}) {
  * @param {string} rootKey - Beschriftung der Wurzel ("kein Ordner", "oberste Ebene")
  * @param {(goneId: string) => string} optionsHtml - die Optionen in der
  *   Reihenfolge, die der Dialog beim Oeffnen hatte, ohne `goneId`
+ * @param {object|null} owner - der Container der Seite, VOR der Anfrage gemerkt
  */
-async function offerCurrentFolders(select, rootKey, optionsHtml) {
+async function offerCurrentFolders(select, rootKey, optionsHtml, owner) {
   if (!select) return;
+  // Der Dialog gehoert zu einer Seite, die nicht mehr angezeigt wird.
+  if (!stillShown(owner)) return;
   const goneId = String(select.value);
-  const owner = _container;
   try {
     await Promise.all([loadFolders(), loadDocuments()]);
   } catch (err) {
     console.warn('[Documents] folder reload failed:', err);
   }
-  if (_container === owner) renderAll();
+  if (stillShown(owner)) renderAll();
   select.replaceChildren();
   select.insertAdjacentHTML('beforeend', `<option value="">${esc(t(rootKey))}</option>${optionsHtml(goneId)}`);
   select.value = '';
@@ -449,6 +465,9 @@ export async function render(container, context = {}) {
 
   await Promise.all([loadMembers(), loadFolders(), loadMetaOptions()]);
   await loadDocuments();
+  // Waehrend des ersten Ladens verlassen (oder schon neu betreten): die
+  // Antwort zeichnet nicht in eine Seite, die sie nicht mehr ist.
+  if (!stillShown(container)) return;
   renderDmsHeaderBtn();
   bindPageEvents();
   renderCategoryChips();
@@ -973,7 +992,9 @@ async function selectStatus(status) {
   state.status = status;
   exitSelectMode();
   showDocumentsLoading();
+  const owner = _container;
   await loadDocuments();
+  if (!stillShown(owner)) return;
   renderAll();
 }
 
@@ -1549,6 +1570,7 @@ async function moveFolder(folder) {
 
   const chosen = await selectModal(t('documents.moveFolderTo', { name: folder.name }), options);
   if (chosen === null) return;
+  const owner = _container;
   try {
     await api.put(`/documents/folders/${folder.id}`, { parent_id: chosen === '' ? null : Number(chosen) });
     window.yuvomi?.showToast(t('documents.folderMovedToast'), 'success');
@@ -1557,10 +1579,11 @@ async function moveFolder(folder) {
     if (chosen !== '') state.expanded.add(Number(chosen));
     persistExpandedFolders();
     await Promise.all([loadFolders(), loadDocuments()]);
+    if (!stillShown(owner)) return;
     renderAll();
     refocusAfterRender();
   } catch (err) {
-    reportError(err);
+    reportError(err, { owner });
   }
 }
 
@@ -1609,16 +1632,18 @@ async function renameFolder(folder) {
   if (readOnly()) return;
   const newName = await promptModal(t('documents.renameFolder'), folder.name);
   if (!newName || newName === folder.name) return;
+  const owner = _container;
   try {
     await api.put(`/documents/folders/${folder.id}`, { name: newName });
     window.yuvomi?.showToast(t('documents.folderRenamedToast'), 'success');
     // Dokumente mitladen: `folder_name` steckt im Server-Join und stünde sonst
     // auf den Karten weiter mit dem alten Namen.
     await Promise.all([loadFolders(), loadDocuments()]);
+    if (!stillShown(owner)) return;
     renderAll();
     refocusAfterRender();
   } catch (err) {
-    reportError(err);
+    reportError(err, { owner });
   }
 }
 
@@ -1685,12 +1710,13 @@ function folderDeleteChoice(folder, impact) {
 
 async function deleteFolder(folder) {
   if (readOnly()) return;
+  const owner = _container;
   let impact;
   try {
     const response = await api.get(`/documents/folders/${folder.id}/delete-impact`);
     impact = response.data;
   } catch (err) {
-    reportError(err);
+    reportError(err, { owner });
     return;
   }
 
@@ -1721,18 +1747,19 @@ async function deleteFolder(folder) {
       requestDelete: ({ keepalive }) => (
         commitFolderDeletion(folder, impact, choice, { keepalive })
       ),
-      isViewActive: () => Boolean(_container?.isConnected),
+      isViewActive: () => stillShown(owner),
       applyResult: (result, { viewActive }) => (
         applyFolderDeleteResult(result, choice, selectedSubtree, {
+          owner,
           showSuccess: false,
           renderView: viewActive,
         })
       ),
-      handleError: (err) => handleFolderDeleteError(err, folder, { delayed: true }),
+      handleError: (err) => handleFolderDeleteError(err, folder, { delayed: true, owner }),
       // The server deletion has already succeeded at this point. A failed
       // refresh must not restore records that no longer exist server-side.
       handleApplyError: (err) => {
-        reportError(err);
+        reportError(err, { owner });
       },
       render: () => {
         persistExpandedFolders();
@@ -1745,10 +1772,10 @@ async function deleteFolder(folder) {
 
   try {
     const result = await commitFolderDeletion(folder, impact, choice);
-    await applyFolderDeleteResult(result, choice, selectedSubtree);
+    await applyFolderDeleteResult(result, choice, selectedSubtree, { owner });
     refocusAfterRender();
   } catch (err) {
-    await handleFolderDeleteError(err, folder);
+    await handleFolderDeleteError(err, folder, { owner });
   }
 }
 
@@ -1769,7 +1796,7 @@ async function applyFolderDeleteResult(
   result,
   choice,
   selectedSubtree,
-  { showSuccess = true, renderView = true } = {},
+  { owner = null, showSuccess = true, renderView = true } = {},
 ) {
   const hasNonConcurrencyFailure = result.failed_documents
     ?.some((failure) => failure.failure_stage !== 'concurrency');
@@ -1791,17 +1818,17 @@ async function applyFolderDeleteResult(
   }
   if (result.folder_deleted !== false && selectedSubtree.has(Number(state.folderId))) state.folderId = '';
   await Promise.all([loadFolders(), loadDocuments()]);
-  if (renderView) renderAll();
+  if (renderView && stillShown(owner)) renderAll();
 }
 
-async function handleFolderDeleteError(err, folder, { delayed = false } = {}) {
+async function handleFolderDeleteError(err, folder, { delayed = false, owner = null } = {}) {
   await handleFolderDeleteFailure({
     err,
     delayed,
     translate: t,
     showToast: (...args) => window.yuvomi?.showToast(...args),
     refreshImpact: () => deleteFolder(folder),
-    reportOther: (error) => reportError(error),
+    reportOther: (error) => reportError(error, { owner }),
   });
 }
 
@@ -2206,13 +2233,15 @@ async function runDocumentAction(action, doc) {
   // Wie archiveSelected(): ein abgewiesener Schreibvorgang wird gemeldet,
   // nicht als unbehandelte Rejection verschluckt, und die Liste bleibt, wie sie war.
   if (action === 'archive') {
+    const owner = _container;
     try {
       await api.patch(`/documents/${doc.id}/archive`, { archived: doc.status !== 'archived' });
       window.yuvomi?.showToast(doc.status === 'archived' ? t('documents.restoredToast') : t('documents.archivedToast'), 'success');
       await loadDocuments();
+      if (!stillShown(owner)) return;
       renderAll({ motion: true });
     } catch (err) {
-      reportError(err);
+      reportError(err, { owner });
     }
   }
   if (action === 'push-dms') {
@@ -2227,11 +2256,12 @@ async function runDocumentAction(action, doc) {
       );
       if (!accountId) return;
     }
+    const owner = _container;
     try {
       await api.post('/documents/dms/push', { account_id: accountId, document_id: doc.id });
       window.yuvomi?.showToast(t('documents.pushToDmsQueued'), 'success');
     } catch (err) {
-      reportError(err);
+      reportError(err, { owner });
     }
     return;
   }
@@ -2262,7 +2292,7 @@ function deleteDocuments(docs) {
       .filter((row) => ids.has(Number(row.dataset.id)))
     : [];
   Promise.all(leaving.map((row) => collapseRow(row))).then(() => {
-    if (_container === owner) renderAll({ motion: true });
+    if (stillShown(owner)) renderAll({ motion: true });
   });
 
   const restore = () => {
@@ -2285,17 +2315,20 @@ function deleteDocuments(docs) {
       if (failed) throw failed.reason;
       // Seite inzwischen verlassen: die Löschung ist durch, aber es gibt nichts
       // mehr zu zeichnen — kein Nachladen auf einen abgehängten Container.
-      if (keepalive || _container !== owner) return;
+      if (keepalive || !stillShown(owner)) return;
       await loadDocuments();
+      // Und noch einmal NACH dem Laden (Codex an #2001): waehrend des GET kann
+      // die Seite verlassen oder neu betreten worden sein.
+      if (!stillShown(owner)) return;
       renderAll();
     },
     restore: (err) => {
-      if (_container !== owner) return;
+      if (!stillShown(owner)) return;
       // "Gibt es nicht mehr": nicht zurueckstellen, was der Server nicht mehr
       // zeigt - reportError laedt nach, und die Liste sagt, was steht.
-      if (err && isGone(err)) { reportError(err); return; }
+      if (err && isGone(err)) { reportError(err, { owner }); return; }
       restore();
-      if (err) reportError(err);
+      if (err) reportError(err, { owner });
     },
   });
 }
@@ -2385,6 +2418,7 @@ async function archiveSelected() {
   // sonst archivieren. Kein gemischter Zustand möglich, da beides nie zugleich sichtbar ist.
   const archived = state.status === 'archived';
   exitSelectMode();
+  const owner = _container;
   try {
     await Promise.all(docs.map((doc) => api.patch(`/documents/${doc.id}/archive`, { archived: !archived })));
     window.yuvomi?.showToast(
@@ -2394,9 +2428,10 @@ async function archiveSelected() {
       'success',
     );
     await loadDocuments();
+    if (!stillShown(owner)) return;
     renderAll();
   } catch (err) {
-    reportError(err);
+    reportError(err, { owner });
   }
 }
 
@@ -2409,6 +2444,7 @@ async function moveSelected() {
   ]);
   if (target === null) return;
   exitSelectMode();
+  const owner = _container;
   try {
     await Promise.all(docs.map((doc) => api.put(`/documents/${doc.id}`, {
       name: doc.name,
@@ -2421,10 +2457,11 @@ async function moveSelected() {
     })));
     window.yuvomi?.showToast(t('documents.bulkMovedToast', { count: docs.length }), 'success');
     await loadDocuments();
+    if (!stillShown(owner)) return;
     renderAll();
     refocusAfterRender();
   } catch (err) {
-    reportError(err);
+    reportError(err, { owner });
   }
 }
 
@@ -3080,6 +3117,7 @@ function renderFolderUploadResult(panel, plan, result) {
 async function saveFolderUpload(panel, payload) {
   const upload = panel._folderUpload;
   if (!upload?.ready) throw new PageProblem(t('common.unknownError'));
+  const owner = _container;
   const plan = renderFolderUploadPreview(panel);
   if (!plan || (plan.counts.upload < 1 && plan.counts.createFolders < 1)) {
     throw new PageProblem(t('documents.folderUpload.noUploadableFiles'));
@@ -3125,7 +3163,7 @@ async function saveFolderUpload(panel, payload) {
     await runRateLimitedOperation(
       () => Promise.all([loadFolders(), loadDocuments()]),
     );
-    renderAll();
+    if (stillShown(owner)) renderAll();
   } catch (refreshError) {
     // The writes have already completed. A failed refresh must not turn a
     // persisted upload into a reported upload failure.
@@ -3146,6 +3184,7 @@ async function saveDocument(event, doc, panel) {
   event.preventDefault();
   // Der Dialog dieser Handlung, vor jeder Anfrage gemerkt (reportError).
   const modalContext = captureModalContext();
+  const owner = _container;
   const form = event.target;
   const error = form.querySelector('#document-error');
   // Die Fußzeile mit dem Submit-Button wird beim Öffnen ans Panel gehoben
@@ -3221,13 +3260,14 @@ async function saveDocument(event, doc, panel) {
     }
     closeModal({ force: true });
     await loadDocuments();
+    if (!stillShown(owner)) return;
     renderAll({ motion: true });
     refocusAfterRender();
   } catch (err) {
     // Das Dokument gibt es nicht mehr: der Dialog bearbeitet etwas Veraltetes,
     // er geht zu, und die Liste kommt frisch.
     if (isGone(err) && !isSelectedFolderGone(err)) {
-      reportError(err, { dialog: modalContext });
+      reportError(err, { owner, dialog: modalContext });
       return;
     }
     error.textContent = errorText(err);
@@ -3236,7 +3276,7 @@ async function saveDocument(event, doc, panel) {
       // Dieselbe Reihenfolge wie beim Oeffnen (openDocumentModal): die Liste.
       await offerCurrentFolders(form.querySelector('#document-folder'), 'documents.noFolder',
         (goneId) => state.folders.filter((folder) => String(folder.id) !== goneId)
-          .map((folder) => `<option value="${folder.id}">${esc(folder.name)}</option>`).join(''));
+          .map((folder) => `<option value="${folder.id}">${esc(folder.name)}</option>`).join(''), owner);
     }
   } finally {
     submit.disabled = panel._folderUpload?.completed === true;
@@ -3292,6 +3332,7 @@ function openFolderModal({ parentId = null } = {}) {
         const parentSelect = panel.querySelector('#document-folder-parent');
         const parent = parentSelect.value ? Number(parentSelect.value) : null;
         error.hidden = true;
+        const owner = _container;
         try {
           const res = await api.post('/documents/folders', { name: input.value.trim(), parent_id: parent });
           // Der Elternteil wird aufgeklappt - ein neuer Ordner, den man nicht
@@ -3305,6 +3346,7 @@ function openFolderModal({ parentId = null } = {}) {
           await loadFolders();
           await loadDocuments();
           closeModal({ force: true });
+          if (!stillShown(owner)) return;
           applyFilters();
           renderAll();
         } catch (err) {
@@ -3314,7 +3356,7 @@ function openFolderModal({ parentId = null } = {}) {
             // Dieselbe Reihenfolge wie beim Oeffnen: der Baum, eingerueckt.
             await offerCurrentFolders(parentSelect, 'documents.folderRootLevel',
               (goneId) => visibleAllFolderRows().filter((row) => String(row.folder.id) !== goneId)
-                .map((row) => `<option value="${row.folder.id}">${esc(folderOptionLabel(row))}</option>`).join(''));
+                .map((row) => `<option value="${row.folder.id}">${esc(folderOptionLabel(row))}</option>`).join(''), owner);
           }
         }
       });
@@ -3571,6 +3613,7 @@ function setMediaAffordance(el, label) {
 // damit der auslösende Button im Fehlerfall wieder bedienbar wird.
 async function linkDmsDocument(item, accountId) {
   const modalContext = captureModalContext();
+  const owner = _container;
   try {
     // Feste, vorhersagbare Kategorie: früher erbte das verknüpfte Dokument
     // stillschweigend das gerade aktive Filter-Chip, was nirgends stand.
@@ -3583,13 +3626,14 @@ async function linkDmsDocument(item, accountId) {
     });
     closeModal({ force: true });
     await loadDocuments();
+    if (!stillShown(owner)) return true;
     renderAll({ motion: true });
     refocusAfterRender();
     return true;
   } catch (err) {
     // Der Verknuepfen-Dialog zeigt einen veralteten Stand, wenn das Konto
     // oder das Dokument im DMS fehlt: dann geht er zu.
-    reportError(err, { dialog: modalContext });
+    reportError(err, { owner, dialog: modalContext });
     return false;
   }
 }

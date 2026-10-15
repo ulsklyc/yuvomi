@@ -18,6 +18,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Recipes: an error message is in your language and names the cause** (#1909). The recipes
+  page showed the server's own text when something could not be saved, planned, matched or put on
+  a shopping list, whatever the app language, in English or in German - for example "Recipe not
+  found" when somebody else in the household had deleted the recipe in the meantime. A recipe
+  that no longer exists, an ingredient that is no longer in the recipe, a pantry item chosen for
+  an ingredient that was deleted in the meantime and a shopping list that is gone now get a
+  sentence in the language of the app. When the recipe, the ingredient or the list is gone, the
+  page takes exactly that out of what it shows, without reloading the whole list, and the dialog
+  of the action closes; if a recipe source has replaced the ingredients, the new ones show the
+  next time you open the page. When only the chosen pantry
+  item is gone, the matching dialog stays open with your choices and offers the current pantry.
+  Deleting a recipe somebody else has already deleted counts as done instead of bringing the row
+  back with an error. Saving a meal in the meal plan whose chosen recipe was deleted in the
+  meantime says so as well. When choosing a picture for a recipe, a picture that cannot be used
+  keeps its own message, and any other failure there shows the general message instead of the
+  browser's own, untranslated text. Any other failure on the page shows the general message
+  instead of the server's text. For API clients: those answers of
+  `/api/v1/recipes` carry a `reason` next to `error` (`recipes_recipe_not_found`,
+  `recipes_ingredient_not_found`, `recipes_selected_pantry_item_not_found`,
+  `shopping_list_not_found`), planning a meal with an unknown `recipe_id` on `/api/v1/meals`
+  carries `meals_selected_recipe_not_found`, the German texts of those answers are now English,
+  and the status codes are unchanged. A recipe you have just deleted stays hidden while you can
+  still undo it, an open matching dialog saves into the list you see, an ingredient that is gone
+  goes in every spelling the server treats as the same, and an answer that arrives after you have
+  moved to another page - even if you have come back since - changes and draws nothing and leaves
+  the focus where it is.
 - **Subscriptions: an error message is in your language and names the cause** (#1909). The
   subscriptions tab showed the server's own English sentence when something could not be saved,
   renewed or deleted, whatever the app language, for example "Subscription not found." when
@@ -85,7 +111,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `dms_document_already_stored`, `dms_unreachable`); a document with an unknown `folder_id` is a
   400 instead of a 500, also when the folder disappears while the file is being stored, an empty
   file is reported as empty instead of as an invalid data URL, a local failure while linking or
-  sending to a DMS is a 500 instead of a 502, and the other status codes are unchanged.
+  sending to a DMS is a 500 instead of a 502, and the other status codes are unchanged. A reload
+  after an action - deleting, archiving, moving, saving, linking from a DMS - that finishes after
+  you have moved to another page, even if you have come back since, draws nothing there and leaves
+  the focus where it is (#2001).
 - **Housekeeping: creating or editing a housekeeper profile saves again** (#1976). Since 2.75.0
   the "Add" button in the profile dialog did nothing: no message, no profile, and the dialog stayed
   open. Its buttons had lost the connection to the form they belong to, and find it again.

@@ -390,9 +390,12 @@ router.post('/', (req, res) => {
     }
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
+    // Das GEWAEHLTE Rezept fehlt (#1909): jemand hat es inzwischen geloescht,
+    // oder der Abgleich mit einer Rezeptquelle hat es entfernt. Der Grund nennt
+    // den Fall, den Satz sagt die Seite (`meals_selected_recipe_not_found`).
     if (vRecipeId.value !== null) {
       const recipeExists = db.get().prepare('SELECT id FROM recipes WHERE id = ?').get(vRecipeId.value);
-      if (!recipeExists) return res.status(400).json({ error: 'Rezept nicht gefunden.', code: 400 });
+      if (!recipeExists) return res.status(400).json({ error: 'Recipe not found.', code: 400, reason: 'meals_selected_recipe_not_found' });
     }
 
     // Kochen kann nur ein Haushaltsmitglied (#1679) - dieselbe Liste, die der
@@ -509,7 +512,7 @@ router.post('/apply-plan', (req, res) => {
 
     for (const recipeId of recipeIds) {
       const recipeExists = db.get().prepare('SELECT id FROM recipes WHERE id = ?').get(recipeId);
-      if (!recipeExists) return res.status(400).json({ error: 'Rezept nicht gefunden.', code: 400 });
+      if (!recipeExists) return res.status(400).json({ error: 'Recipe not found.', code: 400, reason: 'meals_selected_recipe_not_found' });
     }
 
     // Jede Zuweisung legt eine NEUE Mahlzeit an, auch mit replace_existing: ein
@@ -589,7 +592,7 @@ router.put('/:id', (req, res) => {
 
     if (req.body.recipe_id !== undefined && req.body.recipe_id !== null && req.body.recipe_id !== '') {
       const recipeExists = db.get().prepare('SELECT id FROM recipes WHERE id = ?').get(req.body.recipe_id);
-      if (!recipeExists) return res.status(400).json({ error: 'Rezept nicht gefunden.', code: 400 });
+      if (!recipeExists) return res.status(400).json({ error: 'Recipe not found.', code: 400, reason: 'meals_selected_recipe_not_found' });
     }
 
     // scope=series schreibt die inhaltlichen Felder (nicht das Datum) auf das Template

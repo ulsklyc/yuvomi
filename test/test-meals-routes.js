@@ -101,7 +101,8 @@ test('POST /: ungültiges Datum → 400', async () => {
 test('POST /: unbekannte recipe_id → 400', async () => {
   const r = await createMeal({ recipe_id: 99999 });
   assert.equal(r.status, 400);
-  assert.match(r.body.error, /Rezept nicht gefunden/);
+  assert.equal(r.body.error, 'Recipe not found.');
+  assert.equal(r.body.reason, 'meals_selected_recipe_not_found');
 });
 
 test('POST /: Erfolg persistiert Mahlzeit + Zutaten, created_by gesetzt', async () => {
@@ -198,7 +199,8 @@ test('POST /apply-plan: unbekannte recipe_id → 400', async () => {
     assignments: [{ date: '2026-04-01', meal_type: 'lunch', title: 'x', recipe_id: 99999 }],
   });
   assert.equal(r.status, 400);
-  assert.match(r.body.error, /Rezept nicht gefunden/);
+  assert.equal(r.body.error, 'Recipe not found.');
+  assert.equal(r.body.reason, 'meals_selected_recipe_not_found');
 });
 
 test('POST /apply-plan: legt mehrere Mahlzeiten an', async () => {

@@ -171,6 +171,7 @@ const APP_SHELL = [
   '/utils/household.js',
   '/utils/html-escape.js',
   '/utils/html.js',
+  '/utils/ingredient-match-key.js',
   '/utils/ingredient-row.js',
   '/utils/initials.js',
   '/utils/inventory-warranty.js',

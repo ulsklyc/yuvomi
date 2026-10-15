@@ -335,7 +335,8 @@ async function mitSeite({ container: given = null, ...patch }, fn) {
     members: [], directory: [], dmsAccounts: [], status: 'active', query: '', queryText: '', category: '', folderId: '',
     expiringSoon: false, selectMode: false, selected: new Set(), view: 'list',
   }, patch);
-  const container = given ?? { querySelector: () => null, querySelectorAll: () => [], isConnected: false };
+  // Ohne eigenen Traeger: eine Seite, die gerade angezeigt wird (im DOM).
+  const container = given ?? { querySelector: () => null, querySelectorAll: () => [], isConnected: true };
   page.setContainerForTest(container);
   try {
     return await fn();
@@ -708,7 +709,8 @@ test('Seite: Ordner hochladen bis zur Ergebniszeile - Ordner und Datei, die am S
 /** Ein Seitentraeger, der mitschreibt, wonach gezeichnet wird. */
 function traeger() {
   const gefragt = [];
-  return { gefragt, isConnected: false, querySelector: (sel) => { gefragt.push(sel); return null; }, querySelectorAll: () => [] };
+  // Eine Seite, die gerade angezeigt wird: im DOM eingehaengt.
+  return { gefragt, isConnected: true, querySelector: (sel) => { gefragt.push(sel); return null; }, querySelectorAll: () => [] };
 }
 
 const BAUM = [{ id: 4, name: 'Auto', parent_id: 5 }, { id: 5, name: 'Zeta', parent_id: null }];
@@ -806,4 +808,141 @@ test('Seite: neuer Ordner, Elternordner weg - die neu aufgebaute Auswahl ist Zei
   delete beimOeffnen['3'];
   assert.equal(Object.keys(beimOeffnen).length, 3, content);
   assert.deepEqual(labels(panel.querySelector('#document-folder-parent').html), beimOeffnen);
+});
+
+// Codex an #2001, Nachtrag zu #1994: die Navigation in ein anderes Modul leert
+// `_container` nicht - die Variable zeigt weiter auf den abgehaengten Traeger.
+// "Derselbe Traeger" allein haelt dann nicht; er muss auch noch im DOM haengen.
+test('Seite: die Seite wird verlassen, waehrend das Nachladen laeuft (derselbe, nun abgehaengte Traeger) - kein Zeichnen, kein Fokus', async () => {
+  let refocus = 0;
+  globalThis.__refocusAfterRender = () => { refocus += 1; };
+  try {
+    const seite = traeger();
+    await mitSeite({ container: seite }, () => mit({
+      get: (path) => { if (path === '/documents/folders') seite.isConnected = false; return { data: [] }; },
+      patch: async () => { throw fehler(404, 'documents_document_not_found'); },
+    }, () => page.runDocumentAction('archive', { ...DOC })));
+    assert.deepEqual(toasts, [['documents.errorDocumentGone', 'danger']]);
+    assert.equal(seite.gefragt.includes('#documents-folder-browser'), false, 'die abgehaengte Seite wird nicht gezeichnet');
+    assert.equal(refocus, 0, 'der Fokus der neuen Seite bleibt, wo er ist');
+
+    // Gegenfall: die Seite bleibt eingehaengt - gezeichnet wird, der Fokus kommt.
+    const bleibt = traeger();
+    await mitSeite({ container: bleibt }, () => mit({ patch: async () => { throw fehler(404, 'documents_document_not_found'); } },
+      () => page.runDocumentAction('archive', { ...DOC })));
+    assert.ok(bleibt.gefragt.includes('#documents-folder-browser'));
+    assert.equal(refocus, 1);
+  } finally {
+    delete globalThis.__refocusAfterRender;
+  }
+});
+
+test('Seite: der gewaehlte Ordner ist weg und die Seite wird waehrenddessen verlassen - die abgehaengte Seite wird nicht gezeichnet', async () => {
+  const seite = traeger();
+  await mitSeite({ container: seite }, () => mit({
+    get: (path) => {
+      if (path === '/documents/folders') seite.isConnected = false;
+      return path === '/documents/folders' ? { data: BAUM } : { data: [] };
+    },
+    put: async () => { throw fehler(400, 'documents_selected_folder_not_found'); },
+  }, () => page.saveDocument({ target: formular(BEARBEITEN), preventDefault() {} }, { ...DOC }, formular())));
+  assert.equal(seite.gefragt.includes('#documents-folder-browser'), false);
+});
+
+test('Seite: loeschen mit Ruecknahme, und die Seite wurde inzwischen verlassen (abgehaengter Traeger) - kein Nachladen, kein Zurueckstellen', async () => {
+  for (const scheitert of [false, true]) {
+    const seite = traeger();
+    await mitSeite({ container: seite }, async () => {
+      let opts = null;
+      globalThis.__undoStub = (o) => { opts = o; };
+      try { page.deleteDocuments([{ ...DOC }]); } finally { delete globalThis.__undoStub; }
+      seite.isConnected = false;
+      const { gets } = await mit({ delete: async () => { if (scheitert) throw fehler(500); return {}; } }, async () => {
+        try { await opts.commit({ keepalive: false }); } catch (e) { opts.restore(e); }
+      });
+      assert.equal(gets.some((p) => p.startsWith('/documents?status=')), false, `${scheitert}: nachgeladen ${gets.join(', ')}`);
+      assert.deepEqual(toasts, [], `${scheitert}: kein Toast auf einer verlassenen Seite`);
+      assert.equal(page.state.allDocuments.some((d) => d.id === DOC.id), false, `${scheitert}: nicht zurueckgestellt`);
+    });
+  }
+});
+
+// Codex an #2001: die Pruefung VOR dem Nachladen reicht nicht - waehrend des
+// GET kann die Seite verlassen werden. Jeder Weg, der nach `await
+// loadDocuments()` zeichnet, fragt danach noch einmal.
+test('Seite: die Seite wird WAEHREND des Nachladens nach einer Handlung verlassen - danach wird nichts mehr gezeichnet', async () => {
+  const faelle = [
+    ['loeschen (Ruecknahme abgelaufen)', {}, async () => {
+      let opts = null;
+      globalThis.__undoStub = (o) => { opts = o; };
+      try { page.deleteDocuments([{ ...DOC }]); } finally { delete globalThis.__undoStub; }
+      await opts.commit({ keepalive: false });
+    }],
+    ['archivieren (Menue)', {}, () => page.runDocumentAction('archive', { ...DOC })],
+    ['archivieren (Auswahl)', { selected: new Set([DOC.id]), selectMode: true }, () => page.archiveSelected()],
+    ['verschieben (Auswahl)', { selected: new Set([DOC.id]), selectMode: true }, () => page.moveSelected()],
+    ['speichern (Dialog)', {}, () => page.saveDocument({ target: formular(BEARBEITEN), preventDefault() {} }, { ...DOC }, formular())],
+    ['aus dem DMS verknuepfen', { dmsAccounts: [{ id: 1, name: 'Paperless' }] }, () => page.linkDmsDocument({ id: '7' }, 1)],
+  ];
+  let refocus = 0;
+  globalThis.__refocusAfterRender = () => { refocus += 1; };
+  try {
+    for (const [name, patch, lauf] of faelle) {
+      const seite = traeger();
+      let bisDahin = null;
+      refocus = 0;
+      const { gets } = await mitSeite({ container: seite, ...patch }, () => mit({
+        get: (path) => {
+          if (path.startsWith('/documents?status=')) { seite.isConnected = false; bisDahin = seite.gefragt.length; }
+          return { data: [] };
+        },
+        delete: async () => ({}), patch: async () => ({}), put: async () => ({}), post: async () => ({}),
+        select: '3',
+      }, lauf));
+      assert.ok(gets.some((p) => p.startsWith('/documents?status=')), `${name}: Vorbedingung, nachgeladen wurde (${gets.join(', ')})`);
+      assert.deepEqual(seite.gefragt.slice(bisDahin), [], `${name}: nach dem Verlassen nichts gezeichnet`);
+      assert.equal(refocus, 0, `${name}: kein Fokus`);
+    }
+  } finally {
+    delete globalThis.__refocusAfterRender;
+  }
+});
+
+// Codex an #2001: `owner` merkt die Aufrufstelle VOR der Anfrage. Erst in
+// reportError gelesen, waere es nach "verlassen und zurueck" der NEUE
+// Container - die spaete Antwort der alten Seite luede nach und zeichnete in
+// die neue, bevor die ihren eigenen Aufbau beendet hat.
+test('Seite: verlassen und zurueck (neuer Traeger), dann kommt eine spaete "gibt es nicht mehr"-Antwort - kein Nachladen, nichts in die neue Seite', async () => {
+  const faelle = [
+    ['speichern', 'put', fehler(404, 'documents_document_not_found'), () => page.saveDocument({ target: formular(BEARBEITEN), preventDefault() {} }, { ...DOC }, formular())],
+    ['speichern, Ordner weg', 'put', fehler(400, 'documents_selected_folder_not_found'), () => page.saveDocument({ target: formular(BEARBEITEN), preventDefault() {} }, { ...DOC }, formular())],
+    ['archivieren', 'patch', fehler(404, 'documents_document_not_found'), () => page.runDocumentAction('archive', { ...DOC })],
+    ['Ordner umbenennen', 'put', fehler(404, 'documents_folder_not_found'), () => page.renameFolder(FOLDERS[0])],
+    ['Ordner verschieben', 'put', fehler(404, 'documents_folder_not_found'), () => page.moveFolder(FOLDERS[0])],
+    ['Ordner loeschen (Vorschau)', 'get', fehler(404, 'documents_folder_not_found'), () => page.deleteFolder(FOLDERS[0])],
+  ];
+  let refocus = 0;
+  globalThis.__refocusAfterRender = () => { refocus += 1; };
+  try {
+    for (const [name, verb, err, lauf] of faelle) {
+      refocus = 0;
+      const neu = traeger();
+      const zurueck = () => { page.setContainerForTest(neu); throw err; };
+      let nachher = [];
+      await mitSeite({}, async () => {
+        const { calls } = await mit({
+          get: (path) => (verb === 'get' && path.includes('/delete-impact') ? zurueck() : { data: [] }),
+          [verb === 'get' ? 'x' : verb]: async () => zurueck(),
+          prompt: 'Neu', select: '',
+        }, lauf);
+        const i = calls.findIndex(([v]) => v === verb.toUpperCase());
+        nachher = calls.slice(i + 1).filter(([v]) => v === 'GET').map(([, p]) => p);
+      });
+      assert.deepEqual(nachher, [], `${name}: kein Nachladen nach der spaeten Antwort`);
+      assert.deepEqual(neu.gefragt, [], `${name}: in die neue Seite wird nichts gezeichnet`);
+      assert.equal(refocus, 0, `${name}: kein Fokus`);
+    }
+  } finally {
+    delete globalThis.__refocusAfterRender;
+  }
 });

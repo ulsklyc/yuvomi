@@ -1,7 +1,7 @@
 import { op, jsonBody, idParam } from '../helpers.js';
 
 export function recipesPaths() {
-  return {
+  return withCaseReasons({
     '/api/v1/recipes': {
       get: op({ summary: 'List recipes', tag: 'Recipes', description: 'Every ingredient carries `pantry_item_id` and `pantry_item_name`, the household\'s own confirmed match to one row of its pantry, both `null` when there is none. They name a row of the `pantry` module although this path belongs to `meals`, so they are also `null` for a member whose pantry access is `none` and for a token that carries no pantry scope - the ingredient itself stays, simply unmatched.' }),
       post: op({ summary: 'Create recipe', tag: 'Recipes', stateChanging: true, requestBody: jsonBody(null) }),
@@ -57,5 +57,30 @@ export function recipesPaths() {
     '/api/v1/recipes/{id}/provider-thumbnail': {
       get: op({ summary: 'Fetch the image of an imported recipe', tag: 'Recipes', params: [idParam()], description: 'Proxies the bytes from the recipe provider. A direct <img src> to the provider is not possible: its media route wants the same bearer token as every other endpoint, and that token must never reach the client. Same arrangement as the DMS preview proxy.' }),
     },
-  };
+  });
+}
+
+// #1909: die Faelle, die ein Nutzer erreicht, tragen einen `reason` neben dem
+// englischen `error` - je Operation der Satz, der sie nennt.
+const RECIPE_GONE = '`recipes_recipe_not_found` (404, the recipe does not exist - deleted, or removed by the sync with its recipe provider)';
+const CASE_REASONS = {
+  '/api/v1/recipes/{id}': { put: RECIPE_GONE, delete: RECIPE_GONE },
+  '/api/v1/recipes/{id}/to-shopping-list': {
+    post: `${RECIPE_GONE}, \`shopping_list_not_found\` (404, the chosen shopping list does not exist)`,
+  },
+  '/api/v1/recipes/{id}/ingredient-match': {
+    put: `${RECIPE_GONE}, \`recipes_ingredient_not_found\` (404, the recipe no longer has this ingredient), \`recipes_selected_pantry_item_not_found\` (404, the chosen pantry item does not exist)`,
+  },
+};
+
+function withCaseReasons(paths) {
+  for (const [path, operations] of Object.entries(CASE_REASONS)) {
+    for (const [method, reasons] of Object.entries(operations)) {
+      const operation = paths[path]?.[method];
+      if (!operation) throw new Error(`openapi recipes: ${method} ${path} is not documented`);
+      const note = `A refusal a user can reach carries a \`reason\` next to \`error\` (#1909): ${reasons}.`;
+      operation.description = operation.description ? `${operation.description}\n\n${note}` : note;
+    }
+  }
+  return paths;
 }
