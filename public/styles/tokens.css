@@ -1699,6 +1699,12 @@
    * Tab. */
   --nav-bar-gutter: var(--space-2);
   --nav-capsule-inset: max(var(--nav-bar-gutter), calc((100% - var(--nav-capsule-max)) / 2));
+  /* Abstand des FAB zur Kapselkante, an allen drei Seiten derselbe: die halbe
+   * Differenz aus Kapselhoehe und Knopf - dieselbe Rechnung, die
+   * --fab-offset-bottom fuer oben und unten macht. Hinten stand ein festes
+   * --space-1, gemessen 4px gegen 6px oben/unten (Touch, --fab-size 48px);
+   * der Knopf sass nicht konzentrisch in der Rundung (Nav-Polish 2026-10-15). */
+  --nav-fab-inset: calc((var(--nav-height-mobile) - var(--fab-size)) / 2);
 
   /* --------------------------------------------------------
    * 13. Sidebar
@@ -1846,6 +1852,26 @@
    * Glas-Weiss (Dark-Bloecke unten). */
   --_sheet-grabber:     var(--color-border-strong);
   --sheet-grabber:      var(--_sheet-grabber);
+  /* Kachel im Mehr-Blatt (Nav-Polish 2026-10-15). Hell bleibt sie Surface auf
+   * Surface - dort trennt sie --shadow-xs, und eine getoente Stufe (raised
+   * #FBFAF7) waere DUNKLER als das weisse Blatt. Dunkel trug sie rgb(43,40,37)
+   * auf rgb(43,40,37), 1,00:1, und die Schatten (rgba 0,0,0) sind auf dieser
+   * Flaeche wirkungslos: die Kacheln lasen als ein Feld. Dort steht sie eine
+   * Stufe ueber dem Blatt (Dark-Bloecke unten, --_color-surface-raised #37332E,
+   * 1,17:1 gegen #2B2825, dieselbe Sprosse wie die Leiter der Flaechen). */
+  --_sheet-tile-bg:     var(--_color-surface);
+  --sheet-tile-bg:      var(--_sheet-tile-bg);
+  /* Toenung der gleitenden Pille in der mobilen Tab-Leiste (Nav-Polish
+   * 2026-10-15). Hell die Objekt-Stufe. Dunkel liegt die Pille auf dem
+   * duennen Kapselglas (0.50 + Ton-Filter), und dort stand sie mit 16 % bei
+   * gemessen 1,28-1,32:1 gegen die Kapsel - der aktive Tab war vor allem an
+   * der Labelfarbe zu erkennen. Die Dark-Bloecke heben sie um eine halbe
+   * Objekt-Stufe (+8 % = 24 %); gemessen per Pixelprobe 390x844 siehe
+   * DESIGN.md "Navigation". Die Fassung ohne Glas (reduzierte Transparenz,
+   * glass.css §7/§39) rechnet weiter mit --tint-surface: sie ist opak und
+   * eigens kalibriert. */
+  --_nav-indicator-tint: var(--tint-surface);
+  --nav-indicator-tint:  var(--_nav-indicator-tint);
 
   /* a2) Glass-Hintergründe: Vibrancy-Stufe (transparenter, mehr Durchschein) */
   --_glass-bg-card:       var(--_color-surface-glass);
@@ -2423,6 +2449,8 @@
     --_glass-capsule-rim-edge: 0.10;
     --_glass-border:           rgba(255, 255, 255, 0.12);
     --_sheet-grabber:         var(--glass-border);
+    --_sheet-tile-bg:         var(--_color-surface-raised);
+    --_nav-indicator-tint:    calc(var(--tint-surface) + 8%);
     --_glass-border-subtle:    rgba(255, 255, 255, 0.14);
     --_glass-highlight:        rgba(255, 255, 255, 0.09);
     --_glass-highlight-subtle: rgba(255, 255, 255, 0.05);
@@ -2653,6 +2681,8 @@
     --_glass-capsule-rim-edge: 0.10;
     --_glass-border:          rgba(255, 255, 255, 0.12);
     --_sheet-grabber:         var(--glass-border);
+    --_sheet-tile-bg:         var(--_color-surface-raised);
+    --_nav-indicator-tint:    calc(var(--tint-surface) + 8%);
     --_glass-border-subtle:   rgba(255, 255, 255, 0.14);
     --_glass-highlight:       rgba(255, 255, 255, 0.09);
     --_glass-highlight-subtle: rgba(255, 255, 255, 0.05);

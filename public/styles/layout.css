@@ -791,7 +791,10 @@ html.page-swapping .fab-layer .page-fab {
  * sonst kurz fallen - die Tabs sprangen zweimal um rund 11px (R18). */
 .app-shell:has(.fab-layer .page-fab:not([hidden])) .nav-bottom__items,
 html.fab-holding .nav-bottom__items {
-  padding-inline-end: calc(var(--fab-size) + var(--space-1));
+  /* Die Reserve waechst mit dem Abstand des Knopfs zur Kante (--nav-fab-inset,
+   * tokens.css): so bleibt die Fuge zwischen letztem Tab und Knopf dieselbe,
+   * wo immer er sitzt. */
+  padding-inline-end: calc(var(--fab-size) + var(--nav-fab-inset));
 }
 
 /* ── More-Button (Button-Basis, ansonsten wie nav-item) ── */
@@ -809,7 +812,19 @@ html.fab-holding .nav-bottom__items {
 
 /* ── More-Backdrop ── */
 .more-backdrop {
-  display: none;
+  /* BLENDET AUS, STATT ZU SPRINGEN (Nav-Polish 2026-10-15). Hier stand
+   * `display: none` und am offenen Zustand eine Einblend-Animation: beim
+   * Schliessen verschwand die Abdunklung im ersten Frame, waehrend das Blatt
+   * noch `--sheet-out` lang ausfuhr. Jetzt geht sie im selben Paar wie das
+   * Blatt (`--sheet-out`). `visibility` laeuft in derselben Transition mit
+   * und kippt erst an ihrem Ende - geschlossen ist der Backdrop unsichtbar,
+   * nimmt keinen Zeiger (`pointer-events: none`) und malt nichts. Fokus kann
+   * er nie tragen: ein leeres `div` mit `aria-hidden`. */
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity var(--sheet-out),
+    visibility var(--sheet-out);
   position: fixed;
   inset: 0;
   background-color: var(--color-overlay);
@@ -819,13 +834,26 @@ html.fab-holding .nav-bottom__items {
   /* DIE ABDUNKLUNG FOLGT DEM ZUG (R18): utils/sheet-drag.js schreibt den Anteil
    * des Zugs an der Blatthoehe als `--sheet-pull` (0..1). Vorher blieb sie voll,
    * waehrend das Blatt schon halb aus dem Bild war. Nur `opacity`; ohne Zug
-   * steht die Eigenschaft nicht und der Wert ist 1. */
-  opacity: calc(1 - var(--sheet-pull, 0));
+   * steht die Eigenschaft nicht und der Wert ist 1. Geschlossen 0. */
+  opacity: 0;
 }
 
 .more-backdrop--visible {
-  display: block;
-  animation: fade-in var(--duration-sm) var(--ease-out);
+  opacity: calc(1 - var(--sheet-pull, 0));
+  visibility: visible;
+  pointer-events: auto;
+  /* Die Einfahrt behaelt ihre Blende (vorher die Animation `fade-in`, dieselben
+   * Werte; die Keyframes sind mit ihr entfallen). */
+  transition:
+    opacity var(--duration-sm) var(--ease-out),
+    visibility 0s;
+}
+
+/* Waehrend der Finger zieht, folgt die Abdunklung ihm ohne Verzug - wie das
+ * Blatt selbst (`[data-sheet-drag="drag"]` unten). Mit der Transition liefe
+ * sie dem Zug `--duration-sm` hinterher. */
+html:has(.more-sheet[data-sheet-drag="drag"]) .more-backdrop {
+  transition: none;
 }
 
 /* DIE KAPSEL BLEIBT HELL, SOLANGE IHR EIGENES BLATT OFFEN IST (A1, Kleinkram
@@ -842,11 +870,6 @@ html:has(.more-sheet[aria-hidden="false"]) .nav-bottom {
  * Ordnung wie sonst (--z-nav + 1 ueber --z-nav), nur beide gehoben. */
 html:has(.more-sheet[aria-hidden="false"]) :is(.page-fab, .page-fab-group) {
   z-index: calc(var(--z-nav) + 3);
-}
-
-@keyframes fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
 }
 
 /* Der persistente Install-Promo-Banner (z-toast) weicht JEDEM fokussierten
@@ -913,6 +936,13 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
    * Oberkante. Die Unterkante bleibt ueber der Leiste (Absatz darueber). */
   left: max(var(--space-3), env(safe-area-inset-left));
   right: max(var(--space-3), env(safe-area-inset-right));
+  /* SO BREIT WIE DIE KAPSEL, AUF DER ES STEHT (Nav-Polish 2026-10-15). Bei
+   * 768px mass das Blatt 744px ueber einer 560px-Kapsel und las als zweite,
+   * fremde Flaeche statt als ihr Ueberlauf. Gedeckelt auf --nav-capsule-max
+   * und ueber die Auto-Raender zwischen left/right zentriert, wie die Kapsel
+   * selbst; unter 584px greift die Grenze nicht (390px: unveraendert 366px). */
+  max-inline-size: var(--nav-capsule-max);
+  margin-inline: auto;
   background-color: var(--color-surface);
   border: 1px solid var(--glass-border);
   /* Dieselbe Stufe wie der Dialog (R18, Begruendung an `.modal-panel`). */
@@ -1284,7 +1314,9 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
    * seitlich statt --space-1h gibt dem Namen 4px zurueck, ohne dass die
    * Kachelkante das Siegel beruehrt (das misst 40px in einer ~83px-Zelle). */
   padding: var(--space-2h) var(--space-1) var(--space-2);
-  background-color: var(--color-surface);
+  /* Hell Surface wie das Blatt (der Schatten trennt), dunkel eine Stufe
+   * darueber - die Rechnung steht an --sheet-tile-bg (tokens.css). */
+  background-color: var(--sheet-tile-bg);
   /* Konzentrisch zum Blatt: 26px aussen minus 12px Seitenpolster. */
   border-radius: calc(var(--radius-xl) - var(--space-3));
   box-shadow: var(--shadow-xs);
@@ -2317,7 +2349,9 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
 /* Solange die Bottom-Nav steht, sitzt der FAB IN ihrer Kapsel statt darueber.
  * Er ist fixiert, sein enthaltender Block ist damit der Viewport - deshalb
  * rechnet --nav-capsule-inset dieselbe Zentrierung nach, die die Kapsel ueber
- * `margin-inline: auto` bekommt, plus 4px Innenabstand an ihrer Rundung.
+ * `margin-inline: auto` bekommt, plus --nav-fab-inset: hinten derselbe Abstand
+ * zur Kante wie oben und unten, konzentrisch in der Rundung (vorher 4px hinten
+ * gegen 6px oben/unten, Nav-Polish 2026-10-15).
  * Wer die Kapselbreite aendert, aendert beide: der Wert steht einmal.
  *
  * z-index UEBER der Nav (statt darunter): der Knopf liegt jetzt auf dem Glas,
@@ -2326,7 +2360,7 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
 @media (max-width: 1023px) {
   .page-fab,
   .page-fab-group {
-    inset-inline-end: calc(var(--nav-capsule-inset) + var(--space-1));
+    inset-inline-end: calc(var(--nav-capsule-inset) + var(--nav-fab-inset));
     z-index: calc(var(--z-nav) + 1);
   }
 }
@@ -9715,8 +9749,11 @@ textarea.input { resize: vertical; }
   height: var(--target-md);
   border-radius: var(--radius-full);
   pointer-events: none;
+  /* `--duration-lg` + `--ease-out`: dieselbe Bewegung wie jede gleitende
+   * Kapsel einer Segment-/Tab-Leiste (DESIGN.md, Bedien-Tabelle). Hier stand
+   * --duration-md - die Pille der Leiste war die eine, die schneller lief. */
   transition:
-    transform var(--duration-md) var(--ease-out),
+    transform var(--duration-lg) var(--ease-out),
     opacity var(--transition-fast);
   will-change: transform;
   z-index: 0;
@@ -9773,6 +9810,14 @@ textarea.input { resize: vertical; }
     opacity: 1;
     transform: none;
     transition-property: opacity;
+  }
+
+  /* Der Backdrop bewegt sich nie, er blendet nur - dieselbe Ersatz-Blende wie
+   * das Blatt (Abmeldung in reset.css). `visibility` laeuft dort nicht mit:
+   * geschlossen ist er dann sofort weg, geoeffnet blendet er ein. */
+  .more-backdrop,
+  .more-backdrop--visible {
+    transition: opacity var(--transition-fast);
   }
 
   .more-sheet__search:active,

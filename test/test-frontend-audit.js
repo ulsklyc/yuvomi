@@ -2759,6 +2759,25 @@ test('More button active state keeps visible More identity and accessible active
   assert.doesNotMatch(source, /moreBtn\.toggleAttribute\('aria-current',\s*inMoreSheet\)/);
 });
 
+test('Mehr-Knopf in Ruhe traegt keinen Ton: der Zustand nimmt den Modulton zurueck, statt ihn auf Akzent zu setzen', () => {
+  // Der Aufbau (`moreNavButtonEl`) liess den Knopf tertiaer, `setMoreButtonState`
+  // setzte ihn nach JEDER Navigation auf `var(--color-accent)` - der Ueberlauf
+  // sah aus wie der aktive Tab (Nav-Polish 2026-10-15, M1). In Ruhe muss die
+  // Angabe wegfallen, damit layout.css auf `--color-text-tertiary` faellt.
+  const source = read('../public/router.js').replace(/^\s*\/\/.*$/gm, '');
+  const body = functionBody(source, 'setMoreButtonState');
+  assert.ok(body, 'setMoreButtonState fehlt');
+  const rest = body.slice(body.indexOf('} else {'));
+  const elseBranch = rest.slice(0, rest.indexOf('\n  }') + 1);
+  assert.ok(elseBranch.length > 10, 'der Ruhe-Zweig von setMoreButtonState ist nicht zu finden - der Guard waere blind');
+  assert.match(elseBranch, /moreBtn\.style\.removeProperty\('--item-module-accent'\)/, 'in Ruhe faellt der Modulton weg');
+  assert.doesNotMatch(elseBranch, /setProperty\('--item-module-accent'/, 'in Ruhe setzt niemand einen Ton');
+  // Und nirgends im Router bekommt ein Nav-Eintrag den App-Akzent als Modulton.
+  assert.doesNotMatch(source, /setProperty\('--item-module-accent',\s*'var\(--color-accent\)'\)/);
+  // Liegt die aktive Route im Blatt, traegt der Knopf weiter ihren Ton.
+  assert.match(body, /if \(inMoreSheet\) \{[\s\S]*?setProperty\('--item-module-accent', moduleAccentVar\(activeSecondary\.module\)\)/);
+});
+
 test('wer die Zahl der Mitleser aendert, holt othersCanRead nach', () => {
   // `othersCanRead` entscheidet, ob Aufgaben und Kalender ihre
   // Sichtbarkeitsfelder ueberhaupt zeigen. Der Wert kommt aus /auth/me und

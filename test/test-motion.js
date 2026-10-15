@@ -1955,7 +1955,8 @@ test('Blatt-Geste: ohne animate oder unter reduzierter Bewegung bleibt es beim A
 
 test('Blatt-Geste: Verdrahtung - das Mehr-Blatt reicht seinen Backdrop durch, dessen Deckkraft folgt der Custom Property', () => {
   assert.match(publicSource('router.js'), /wireSheetDrag\(sheet, \{[\s\S]{0,200}resetAfterDismiss: true,[\s\S]{0,160}dim: \(\) => backdrop,/);
-  const backdrop = ruleBodies('layout.css', '.more-backdrop').join(';');
+  // Der Zug wirkt am OFFENEN Backdrop; geschlossen steht er auf 0 (Nav-Polish 2026-10-15).
+  const backdrop = ruleBodies('layout.css', '.more-backdrop--visible').join(';');
   assert.match(backdrop, /opacity:\s*calc\(1 - var\(--sheet-pull, 0\)\)/, 'nur opacity - kein Layout, kein Neuzeichnen der Flaeche');
   // Der Tipp-/Esc-Ausgang bleibt der kurze Hub (Entscheidung 05.10.).
   assert.match(keyframesBody('sheet-out'), /translateY\(var\(--sheet-lift\)\)/);
@@ -1965,6 +1966,34 @@ test('Blatt-Geste: Verdrahtung - das Mehr-Blatt reicht seinen Backdrop durch, de
   // Und er mutiert das DOM nicht im touchend: Marke und Versatz fallen im rAF.
   const end = src.slice(src.indexOf('const end = (e) => {'), src.indexOf("sheet.addEventListener('touchend', end);"));
   assert.match(end, /raf\(\(\) => settle\(/);
+});
+
+test('mobiler Tab-Indikator gleitet wie jede Kapsel einer Leiste: --duration-lg + --ease-out', () => {
+  // DESIGN.md, Bedien-Tabelle "Auswahl in einer Segment-/Tab-Leiste zeigen".
+  // Die Pille der Tab-Leiste lief mit --duration-md als einzige schneller
+  // (Nav-Polish 2026-10-15, M3).
+  const ind = ruleBodies('layout.css', '.nav-bottom__indicator').join(';');
+  assert.match(ind, /transition:\s*transform var\(--duration-lg\) var\(--ease-out\),\s*opacity var\(--transition-fast\)/);
+});
+
+test('Mehr-Blatt: der Backdrop blendet mit dem Blatt aus, statt im ersten Frame zu verschwinden', () => {
+  // Nav-Polish 2026-10-15 (M2). `display: none` am geschlossenen Backdrop schnitt
+  // die Abdunklung beim Schliessen sofort ab, waehrend das Blatt noch
+  // `--sheet-out` lang ausfuhr. Geschlossen: unsichtbar per Deckkraft und
+  // visibility, ohne Zeiger; der Ausgang laeuft im Paar des Blatts.
+  const closed = ruleBodies('layout.css', '.more-backdrop').join(';');
+  assert.doesNotMatch(closed, /display:\s*none/, 'kein display:none - es schneidet die Blende ab');
+  assert.match(closed, /opacity:\s*0\s*(;|$)/);
+  assert.match(closed, /visibility:\s*hidden/);
+  assert.match(closed, /pointer-events:\s*none/, 'geschlossen faengt er keinen Tipp ab');
+  assert.match(closed, /transition:\s*opacity var\(--sheet-out\),\s*visibility var\(--sheet-out\)/, 'Ausgang = Ausgang des Blatts');
+  const open = ruleBodies('layout.css', '.more-backdrop--visible').join(';');
+  assert.match(open, /visibility:\s*visible/);
+  assert.match(open, /pointer-events:\s*auto/);
+  assert.match(open, /visibility 0s/, 'beim Oeffnen sofort sichtbar');
+  assert.doesNotMatch(open, /animation:/);
+  // Waehrend des Zugs folgt die Deckkraft dem Finger ohne Transition.
+  assert.match(css('layout.css'), /html:has\(\.more-sheet\[data-sheet-drag="drag"\]\) \.more-backdrop \{\s*transition: none;/);
 });
 
 // --------------------------------------------------------------------------

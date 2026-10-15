@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The phone tab bar reads more calmly.** "More" no longer looks like the active tab after you
+  switch pages, and the dimmed page behind the More sheet now fades out with the sheet instead of
+  vanishing at once. In dark mode the active tab and the module tiles in the More sheet stand out
+  more clearly; on tablets the More sheet is as wide as the tab bar below it.
+
 - **Documents: leaving and coming back no longer leaves stale data on the page** (#2005). An
   answer that arrived only after you had left Documents and opened it again could overwrite the
   members, the DMS accounts or the admin state the new page had just loaded, and the next dialog

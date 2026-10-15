@@ -4268,7 +4268,11 @@ function setMoreButtonState(moreBtn, activeSecondary) {
     }
   } else {
     moreBtn.removeAttribute('aria-current');
-    moreBtn.style.setProperty('--item-module-accent', 'var(--color-accent)');
+    // In Ruhe OHNE Modulton: die Angabe faellt weg, und das Zeichen steht
+    // tertiaer wie nach `moreNavButtonEl()` (Begruendung dort). Hier stand
+    // `var(--color-accent)` - nach jeder Navigation sah der Ueberlauf damit
+    // aus wie der aktive Tab, obwohl der Aufbau es richtig machte.
+    moreBtn.style.removeProperty('--item-module-accent');
   }
 
   // Der Änderungsverlauf liegt auf Mobil im „Mehr"-Sheet: steht ein Update an,
