@@ -4390,6 +4390,7 @@
         "billingCycleLabel": "Faktureringssyklus",
         "intervalLabel": "Hver",
         "nextPaymentLabel": "Neste betaling",
+        "nextPaymentCompletedHint": "Gjelder først når du inkluderer abonnementet i budsjettet igjen.",
         "reminderDaysLabel": "Påminnelsesdager",
         "reminderEnabledLabel": "Betalingspåminnelse",
         "noReminder": "Ingen påminnelse",

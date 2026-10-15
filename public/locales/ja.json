@@ -4390,6 +4390,7 @@
         "billingCycleLabel": "請求周期",
         "intervalLabel": "毎",
         "nextPaymentLabel": "次回支払い",
+        "nextPaymentCompletedHint": "サブスクリプションを再び予算に含めたときにのみ適用されます。",
         "reminderDaysLabel": "リマインダー日数",
         "reminderEnabledLabel": "支払いのリマインダー",
         "noReminder": "リマインダーなし",

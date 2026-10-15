@@ -4390,6 +4390,7 @@
         "billingCycleLabel": "Abrechnungszyklus",
         "intervalLabel": "Alle",
         "nextPaymentLabel": "Nächste Zahlung",
+        "nextPaymentCompletedHint": "Gilt erst, wenn du das Abo wieder ins Budget aufnimmst.",
         "reminderDaysLabel": "Erinnerungstage",
         "reminderEnabledLabel": "Zahlungserinnerung",
         "noReminder": "Keine Erinnerung",

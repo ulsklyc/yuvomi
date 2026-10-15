@@ -997,6 +997,11 @@ function renderBreakdown(title, rows) {
   `;
 }
 
+/** Abgeschlossen (#594)? Karte, Leseansicht und Dialog fragen dasselbe (#2009). */
+function isCompleted(subscription) {
+  return subscription?.status === 'completed';
+}
+
 function statusMeta(subscription) {
   const status = subscription.status || (subscription.enabled ? 'active' : 'paused');
   if (status === 'completed') return { cardClass: 'subscription-card--completed', badgeClass: 'subscription-status--completed', label: t('subscriptions.completed') };
@@ -1063,7 +1068,12 @@ function renderCard(subscription) {
   const converted = subscription.monthly_base === null
     ? t('subscriptions.conversionUnavailable')
     : (sameAsMonthly ? '' : t('subscriptions.monthlyEquivalent', { amount: money(subscription.monthly_base) }));
-  const overdue = daysUntil(subscription.next_payment_date) < 0 && status.cardClass !== 'subscription-card--completed';
+  // EIN ABGESCHLOSSENES ABO HAT KEINE FAELLIGKEIT (#2009). Sein Datum ist das
+  // der Zahlung, die nach dem Abschluss kaeme - es zaehlt erst wieder, wenn das
+  // Abo reaktiviert wird, und der Dialog bietet es dann an. Auf der Karte stand
+  // es als „in 30 Tagen"; die Ende-Zeile sagt stattdessen „Abgeschlossen am".
+  const completed = isCompleted(subscription);
+  const overdue = !completed && daysUntil(subscription.next_payment_date) < 0;
   return `
     <div class="swipe-row${ro ? ' swipe-row--static' : ''}" data-swipe-id="${subscription.id}">
       ${ro ? '' : `<div class="swipe-reveal swipe-reveal--done swipe-reveal--leading" aria-hidden="true">
@@ -1090,7 +1100,7 @@ function renderCard(subscription) {
             ${status.badgeClass === 'subscription-status--active' ? '' : `<span class="subscription-status ${status.badgeClass}">${status.label}</span>`}
           </span>
           <span class="subscription-card__meta">
-            <span class="subscription-card__due${overdue ? ' subscription-card__due--overdue' : ''}"><i data-lucide="${overdue ? 'triangle-alert' : 'calendar-clock'}" aria-hidden="true"></i><span>${formatDate(subscription.next_payment_date)} ·</span> <span>${dueLabel(subscription)}</span></span>
+            ${completed ? '' : `<span class="subscription-card__due${overdue ? ' subscription-card__due--overdue' : ''}"><i data-lucide="${overdue ? 'triangle-alert' : 'calendar-clock'}" aria-hidden="true"></i><span>${formatDate(subscription.next_payment_date)} ·</span> <span>${dueLabel(subscription)}</span></span>`}
             <span class="subscription-card__meta-cycle">${cycleLabel(subscription)}</span>
             <span class="subscription-card__meta-extra">${esc(rowPaymentMethodLabel(subscription))}</span>
             <span class="subscription-card__meta-extra"><i data-lucide="${subscription.reminder_enabled === false ? 'bell-off' : 'bell'}" aria-hidden="true"></i>${subscription.reminder_enabled === false ? t('subscriptions.noReminder') : t('subscriptions.reminderMeta', { count: subscription.reminder_days })}</span>
@@ -1362,7 +1372,9 @@ function subscriptionReadSections(subscription) {
     { icon: 'align-left', label: t('subscriptions.descriptionLabel'), value: subscription.description || '', multiline: true },
     { icon: 'repeat-2', label: t('subscriptions.billingCycleLabel'), value: cycleLabel(subscription) },
     { icon: 'calendar-clock', label: t('subscriptions.detailNextPaymentLabel'),
-      value: subscription.next_payment_date ? `${formatDate(subscription.next_payment_date)} · ${dueLabel(subscription)}` : '' },
+      // Abgeschlossen: keine naechste Zahlung (#2009, wie die Karte).
+      value: subscription.next_payment_date && !isCompleted(subscription)
+        ? `${formatDate(subscription.next_payment_date)} · ${dueLabel(subscription)}` : '' },
     { icon: subscription.reminder_enabled === false ? 'bell-off' : 'bell', label: t('subscriptions.reminderDaysLabel'),
       value: subscription.reminder_enabled === false ? t('subscriptions.noReminder') : t('subscriptions.reminderMeta', { count: subscription.reminder_days }) },
     { icon: endInfo?.icon || 'calendar-x', label: t('subscriptions.endLabel'), value: endInfo?.text || '' },
@@ -1580,6 +1592,7 @@ export function openSubscriptionModal(subscription = null) {
             <label class="form-label" for="subscription-next-date">${t('subscriptions.nextPaymentLabel')}${REQUIRED_MARK}</label>
             <yuvomi-datepicker id="subscription-next-date" type="date"
                    value="${esc(subscription?.next_payment_date || todayKey())}"></yuvomi-datepicker>
+            ${isCompleted(subscription) ? `<p class="form-hint" id="subscription-next-date-hint">${t('subscriptions.nextPaymentCompletedHint')}</p>` : ''}
           </div>
           <div class="form-group">
             <label class="form-label" for="subscription-reminder">${t('subscriptions.reminderDaysLabel')}</label>
@@ -1730,6 +1743,7 @@ async function saveSubscription(panel, existing, searchedLogoData = null) {
   }
   // Ende-Bedingung (#594): nur das aktive Zusatzfeld liefert einen Wert.
   const endType = panel.querySelector('#subscription-end-type').value;
+  const staysCompleted = isCompleted(existing) && !panel.querySelector('#subscription-enabled').checked;
   let endDate = null;
   let occurrenceCount = null;
   if (endType === 'on_date') {
@@ -1739,11 +1753,23 @@ async function saveSubscription(panel, existing, searchedLogoData = null) {
       return;
     }
     endDate = parseDateInput(endDateInput.value);
+    // Dieselbe Regel wie der Server (endConfigErrors), vor dem Absenden und am
+    // Feld statt als Toast (Review-Runde 1 zu #2010). Ein abgeschlossenes Abo
+    // mit Enddatum steht immer nach seinem Ende: wer es wieder aufnimmt,
+    // braucht ein spaeteres. Bleibt es abgeschlossen, gilt der Vergleich nicht.
+    if (!staysCompleted && endDate < parseDateInput(dateInput.value)) {
+      reportFieldError(endDateInput, t('subscriptions.errorEndBeforeNextPayment'));
+      return;
+    }
   } else if (endType === 'after_count') {
     const countInput = panel.querySelector('#subscription-end-count');
     const count = Number(countInput.value);
     if (!Number.isInteger(count) || count < 1) {
       reportFieldError(countInput, t('subscriptions.endCountInvalid'));
+      return;
+    }
+    if (!staysCompleted && count <= Number(existing?.occurrences_done || 0)) {
+      reportFieldError(countInput, t('subscriptions.errorOccurrenceCountTooLow'));
       return;
     }
     occurrenceCount = count;

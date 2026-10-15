@@ -4511,6 +4511,7 @@
         "billingCycleLabel": "Fakturační cyklus",
         "intervalLabel": "Každých",
         "nextPaymentLabel": "Další platba",
+        "nextPaymentCompletedHint": "Platí až po opětovném zahrnutí předplatného do rozpočtu.",
         "reminderDaysLabel": "Dny připomenutí",
         "reminderEnabledLabel": "Připomenutí platby",
         "noReminder": "Bez připomínky",

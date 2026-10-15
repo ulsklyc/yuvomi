@@ -4390,6 +4390,7 @@
         "billingCycleLabel": "청구 주기",
         "intervalLabel": "매",
         "nextPaymentLabel": "다음 결제",
+        "nextPaymentCompletedHint": "구독을 다시 예산에 포함할 때만 적용됩니다.",
         "reminderDaysLabel": "알림 일수",
         "reminderEnabledLabel": "결제 알림",
         "noReminder": "알림 없음",

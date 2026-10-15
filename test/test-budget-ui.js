@@ -3140,6 +3140,55 @@ test('Abo-Zeile: Metaangaben brechen um statt unter den Betrag zu laufen', async
   assert.deepEqual(loose, [], 'ausserhalb der beiden Einheiten steht kein loser Text');
 });
 
+/**
+ * Ein abgeschlossenes Abo hat keine Faelligkeit (#2009). Der Abschluss rueckt
+ * `next_payment_date` auf die Zahlung NACH der letzten vor, damit eine
+ * Reaktivierung den bezahlten Tag nicht noch einmal bucht. Dieses Datum kommt
+ * nie, solange das Abo abgeschlossen ist - Karte und Leseansicht zeigen es
+ * deshalb nicht als „in 30 Tagen"; die Ende-Zeile sagt „Abgeschlossen am".
+ * Ein laufendes Abo zeigt seine Faelligkeit weiter.
+ */
+test('Abo-Zeile: ein abgeschlossenes Abo zeigt keine naechste Zahlung', async () => {
+  const { __test: abos } = await import('../public/pages/subscriptions.js');
+  const sub = (extra) => ({
+    id: 8, name: 'Kurs', description: '', amount: 10, currency: 'EUR', monthly_base: 10,
+    next_payment_date: '2099-02-15', billing_cycle: 'monthly', cycle_interval: 1, reminder_days: 3,
+    end_type: 'after_count', occurrence_count: 1, occurrences_done: 1, ...extra,
+  });
+  const completed = sub({ status: 'completed', enabled: false, completed_at: '2099-01-15T08:00:00Z', occurrences_remaining: 0 });
+  const active = sub({ status: 'active', enabled: true, completed_at: null, occurrence_count: 3, occurrences_remaining: 2 });
+  const nextRow = (s) => abos.subscriptionReadSections(s).find((row) => row.label === 'subscriptions.detailNextPaymentLabel');
+
+  const doneCard = abos.renderCard(completed);
+  assert.doesNotMatch(doneCard, /subscription-card__due/, 'abgeschlossen: keine Faelligkeit auf der Karte');
+  assert.doesNotMatch(doneCard, /subscriptions\.dueInDays/, 'abgeschlossen: kein „in N Tagen"');
+  assert.match(doneCard, /subscriptions\.completedOn/, 'die Ende-Zeile sagt, wann es endete');
+  assert.equal(nextRow(completed).value, '', 'abgeschlossen: die Leseansicht laesst die naechste Zahlung weg');
+
+  const liveCard = abos.renderCard(active);
+  assert.match(liveCard, /subscription-card__due/, 'laufend: die Faelligkeit bleibt');
+  assert.match(liveCard, /subscriptions\.dueInDays/);
+  assert.notEqual(nextRow(active).value, '', 'laufend: die Leseansicht nennt die naechste Zahlung');
+
+  // Der Bearbeiten-Dialog zeigt das Datum weiter - es ist der Tag, an dem ein
+  // wieder aufgenommenes Abo weiterlaeuft. Damit es dort nicht wie eine
+  // angekuendigte Zahlung wirkt, sagt ein Hinweis am Feld, wann es gilt
+  // (Review-Runde 1 zu #2010). Nur am abgeschlossenen Abo.
+  const dialog = (s) => {
+    const vorher = globalThis.__openModal;
+    let letzte = null;
+    globalThis.__openModal = (o) => { letzte = o; };
+    try { abos.openSubscriptionModal(s); } finally { globalThis.__openModal = vorher; }
+    return letzte?.content ?? '';
+  };
+  const field = (html) => html.slice(html.indexOf('id="subscription-next-date"'), html.indexOf('id="subscription-reminder"'));
+  const doneField = field(dialog(completed));
+  assert.match(doneField, /value="2099-02-15"/, 'abgeschlossen: der Dialog bietet das naechste Datum an');
+  assert.match(doneField, /<p class="form-hint"[^>]*>subscriptions\.nextPaymentCompletedHint<\/p>/, 'abgeschlossen: der Hinweis steht am Feld');
+  assert.doesNotMatch(field(dialog(active)), /nextPaymentCompletedHint/, 'laufend: kein Hinweis');
+  assert.doesNotMatch(dialog(null), /nextPaymentCompletedHint/, 'neu: kein Hinweis');
+});
+
 test('die Statistik steht ab 960px Container auf der Budget-Bahn: Verlauf und Vergleich links, Anteile rechts (A5 P2-5)', () => {
   // Die drei Diagramme standen untereinander auf 720px und endeten 404px vor
   // der Bahn, an der jeder andere Reiter endet (Critique 2026-09-26). Die

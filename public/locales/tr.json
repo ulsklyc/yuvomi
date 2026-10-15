@@ -4390,6 +4390,7 @@
         "billingCycleLabel": "Faturalama döngüsü",
         "intervalLabel": "Her",
         "nextPaymentLabel": "Sonraki ödeme",
+        "nextPaymentCompletedHint": "Yalnızca aboneliği yeniden bütçeye dahil ettiğinizde geçerli olur.",
         "reminderDaysLabel": "Hatırlatma günleri",
         "reminderEnabledLabel": "Ödeme hatırlatıcısı",
         "noReminder": "Hatırlatıcı yok",

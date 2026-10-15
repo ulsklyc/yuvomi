@@ -45,6 +45,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with an error that invites marking it twice. The last payment of a subscription with an end now
   stays in the budget; until now completing the subscription removed it. The completed
   subscription still leaves the monthly total of subscriptions and the preview of coming months.
+- **Subscriptions: reactivating a completed subscription no longer books its last payment a
+  second time** (#2009). When a subscription with an end had its last payment marked as made and
+  was then switched back on with more payments or a later end date, the last paid day was booked
+  and counted again. Completing a subscription now moves its next payment past the paid day, so a
+  reactivated subscription continues with the payment after it. A completed subscription no longer
+  shows a due date in the list or in its details, and its dialog notes that the next payment date
+  only applies once you include it in the budget again. To switch it back on, it needs a later end
+  date or more payments, and the dialog says so at that field before saving. A completed
+  subscription with a number of payments could not be edited at all until now, not even its notes,
+  without asking for more payments; it can now be edited and stays completed.
 - **Recipes: an error message is in your language and names the cause** (#1909). The recipes
   page showed the server's own text when something could not be saved, planned, matched or put on
   a shopping list, whatever the app language, in English or in German - for example "Recipe not

@@ -4390,6 +4390,7 @@
         "billingCycleLabel": "Faktureringscykel",
         "intervalLabel": "Varje",
         "nextPaymentLabel": "Nästa betalning",
+        "nextPaymentCompletedHint": "Gäller först när du inkluderar prenumerationen i budgeten igen.",
         "reminderDaysLabel": "Påminnelsedagar",
         "reminderEnabledLabel": "Betalningspåminnelse",
         "noReminder": "Ingen påminnelse",

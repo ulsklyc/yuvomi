@@ -4751,6 +4751,7 @@
         "billingCycleLabel": "دورة الفوترة",
         "intervalLabel": "كل",
         "nextPaymentLabel": "الدفعة التالية",
+        "nextPaymentCompletedHint": "لا يسري إلا عند تضمين الاشتراك في الميزانية مرة أخرى.",
         "reminderDaysLabel": "أيام التذكير",
         "reminderEnabledLabel": "تذكير بالدفع",
         "noReminder": "بدون تذكير",

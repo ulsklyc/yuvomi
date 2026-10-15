@@ -4390,6 +4390,7 @@
         "billingCycleLabel": "Billing cycle",
         "intervalLabel": "Every",
         "nextPaymentLabel": "Next payment",
+        "nextPaymentCompletedHint": "Only applies once you include the subscription in the budget again.",
         "reminderDaysLabel": "Reminder days",
         "reminderEnabledLabel": "Payment reminder",
         "noReminder": "No reminder",

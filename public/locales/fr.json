@@ -4390,6 +4390,7 @@
         "billingCycleLabel": "Cycle de facturation",
         "intervalLabel": "Tous les",
         "nextPaymentLabel": "Prochain paiement",
+        "nextPaymentCompletedHint": "Ne s'applique que lorsque vous réintégrez l'abonnement au budget.",
         "reminderDaysLabel": "Jours de rappel",
         "reminderEnabledLabel": "Rappel de paiement",
         "noReminder": "Aucun rappel",

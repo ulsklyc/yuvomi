@@ -4630,6 +4630,7 @@
         "billingCycleLabel": "Платежный цикл",
         "intervalLabel": "Каждые",
         "nextPaymentLabel": "Следующий платеж",
+        "nextPaymentCompletedHint": "Действует, только когда вы снова включите подписку в бюджет.",
         "reminderDaysLabel": "Дни напоминания",
         "reminderEnabledLabel": "Напоминание об оплате",
         "noReminder": "Без напоминания",

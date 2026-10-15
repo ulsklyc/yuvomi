@@ -4390,6 +4390,7 @@
         "billingCycleLabel": "Ciclo de facturación",
         "intervalLabel": "Cada",
         "nextPaymentLabel": "Próximo pago",
+        "nextPaymentCompletedHint": "Solo se aplica cuando vuelvas a incluir la suscripción en el presupuesto.",
         "reminderDaysLabel": "Días de recordatorio",
         "reminderEnabledLabel": "Recordatorio de pago",
         "noReminder": "Sin recordatorio",

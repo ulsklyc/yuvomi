@@ -4390,6 +4390,7 @@
         "billingCycleLabel": "Számlázási ciklus",
         "intervalLabel": "Minden",
         "nextPaymentLabel": "Következő fizetés",
+        "nextPaymentCompletedHint": "Csak akkor érvényes, ha az előfizetést újra beleveszed a költségvetésbe.",
         "reminderDaysLabel": "Emlékeztető napok",
         "reminderEnabledLabel": "Fizetési emlékeztető",
         "noReminder": "Nincs emlékeztető",
