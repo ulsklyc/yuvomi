@@ -450,3 +450,51 @@ test('letzte Zahlung ohne Rennen, fremde Waehrung - die bezahlte Buchung bleibt 
   assert.deepEqual(bookings(a).map((x) => [x.id, x.date, x.amount]), [[paidId, '2030-01-15', -15]]);
   assert.equal(subRow(a.id).budget_entry_id, null);
 });
+
+// --- Codex-Befunde zu ca8bc9329 (#2008) ------------------------------------------
+
+test('von privat auf geteilt mit neuem Namen und Betrag - kein alter privater Inhalt wird geteilt, auch nicht im await oder nach erschoepftem Neuversuch', async () => {
+  for (const exhaust of [false, true]) {
+    const a = await abo({ visibility: 'private', name: `Geheim${exhaust ? 'X' : 'Y'}${seq}` });
+    const vorher = bookings(a)[0];
+    assert.equal(vorher.visibility, 'private');
+    const seen = [];
+    let n = 0;
+    routes._setRatesForTest(async (base, list) => {
+      seen.push(...db.prepare('SELECT title, amount, visibility FROM budget_entries WHERE id = ?').all(vorher.id));
+      if (exhaust) setBudgetCurrency(['GBP', 'EUR'][n++ % 2]);
+      return ratesAnswer(base, list);
+    });
+    const r = await call('PUT', `/${a.id}`, { visibility: 'shared', name: `${a.name}-neu`, amount: 20 });
+    routes._setRatesForTest(null);
+    setBudgetCurrency('EUR');
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    for (const row of seen) {
+      assert.ok(row.visibility === 'private' || (row.title === `${a.name}-neu (USD)` && row.amount === -10),
+        `${exhaust ? 'erschoepft' : 'im await'}: geteilt mit altem Inhalt ${JSON.stringify(row)}`);
+    }
+    const after = db.prepare('SELECT title, amount, visibility FROM budget_entries WHERE id = ?').get(vorher.id);
+    if (exhaust) {
+      assert.deepEqual({ ...after }, { title: vorher.title, amount: vorher.amount, visibility: 'private' }, 'erschoepft: die Buchung bleibt auf der engeren Sichtbarkeit');
+    } else {
+      assert.deepEqual({ ...after }, { title: `${a.name}-neu (USD)`, amount: -10, visibility: 'shared' }, 'mit dem Kurs: alles zusammen');
+    }
+  }
+});
+
+test('Verlaengern laesst Sichtbarkeit und Eigentuemer der bezahlten Buchung, wie sie der Nutzer gesetzt hat', async () => {
+  const BEN = db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('ben', 'ben', 'x', 'member')").run().lastInsertRowid;
+  for (const [label, patch] of [['privat gestellt', { visibility: 'private', owner_id: ADA }], ['anderer Eigentuemer', { visibility: 'private', owner_id: BEN }]]) {
+    const a = await abo();
+    const paidId = subRow(a.id).budget_entry_id;
+    db.prepare('UPDATE budget_entries SET visibility = ?, owner_id = ? WHERE id = ?').run(patch.visibility, patch.owner_id, paidId);
+    routes._setRatesForTest(plainRates);
+    const r = await call('POST', `/${a.id}/renew`, {});
+    routes._setRatesForTest(null);
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    const paid = db.prepare('SELECT visibility, owner_id FROM budget_entries WHERE id = ?').get(paidId);
+    assert.deepEqual({ ...paid }, patch, `${label}: die bezahlte Zahlung wird beim Abkoppeln nicht fuer den Haushalt sichtbar`);
+    const next = db.prepare('SELECT visibility, owner_id FROM budget_entries WHERE id = ?').get(subRow(a.id).budget_entry_id);
+    assert.deepEqual({ ...next }, { visibility: 'shared', owner_id: ADA }, `${label}: die naechste folgt dem Abo`);
+  }
+});

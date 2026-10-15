@@ -302,18 +302,17 @@ const applyBooking = (id, fetched) => db.get().transaction(() => {
   const budgetCur = budgetCurrency();
   const amount = bookingAmount(row, budgetCur, fetched);
   if (amount === undefined) {
-    // Nur Betrag und Titel warten auf den Kurs. Datum, Eigentuemer und
-    // Sichtbarkeit stehen in der Zeile und gelten SOFORT: eine eben privat
-    // gestellte Buchung ist nicht fuer die Dauer eines Kursabrufs geteilt,
-    // und auch nicht, wenn der Neuversuch sich erschoepft (Review zu #2008).
-    if (row.budget_entry_id) {
-      db.get().prepare(`
-        UPDATE budget_entries SET category = 'subscriptions', subcategory = ?, date = ?, owner_id = ?, visibility = ?
-        WHERE id = ?
-      `).run(
-        row.budget_subcategory_key || '', row.next_payment_date, row.owner_id ?? row.created_by,
-        row.visibility || 'shared', row.budget_entry_id,
-      );
+    // Bis der Kurs da ist, wird die Buchung nur ENGER, nie weiter: steht das
+    // Abo auf privat, ist sie es SOFORT - nicht erst nach dem Kursabruf und
+    // auch nicht erst, wenn der Neuversuch gelingt (Review zu #2008). Eine
+    // Erweiterung auf geteilt wird erst mit dem vollstaendigen Schreiben
+    // wirksam, zusammen mit Titel und Betrag: sonst saehe der Haushalt fuer
+    // die Dauer des Kursabrufs den alten privaten Inhalt (Codex zu #2008).
+    // Der Eigentuemer bleibt bis dahin stehen; ein neuer bekaeme sonst den
+    // alten Inhalt einer privaten Buchung zu sehen.
+    if (row.budget_entry_id && row.visibility === 'private') {
+      db.get().prepare("UPDATE budget_entries SET visibility = 'private' WHERE id = ? AND visibility <> 'private'")
+        .run(row.budget_entry_id);
     }
     return { needs: { currency: row.currency, budgetCurrency: budgetCur } };
   }
@@ -380,14 +379,20 @@ const renewBooking = (current, { completed, nextDate, occurrencesDone }) => db.g
     : null;
   const known = amount ?? (linked ? Math.abs(Number(linked.amount)) : subscriptionBudgetAmount(current, budgetCur, {}));
   if (linked) {
-    // Die bezahlte Buchung: Stand des Abos am bezahlten Tag, dann abgekoppelt.
+    // Die bezahlte Buchung: Betrag, Titel und Tag nach dem Stand des Abos am
+    // bezahlten Tag, dann abgekoppelt. Eigentuemer und Sichtbarkeit bleiben,
+    // wie sie sind - wie auf main: wer die Buchung selbst privat gestellt
+    // hat, bekommt die bezahlte Zahlung nicht fuer den Haushalt geoeffnet
+    // (Codex zu #2008). Enger als das Abo ist sie damit hoechstens; weiter
+    // nicht, denn jedes Privatstellen des Abos engt sie im selben synchronen
+    // Schritt ein (applyBooking).
     database.prepare(`
       UPDATE budget_entries
-      SET title = ?, amount = ?, category = 'subscriptions', subcategory = ?, date = ?, owner_id = ?, visibility = ?
+      SET title = ?, amount = ?, category = 'subscriptions', subcategory = ?, date = ?
       WHERE id = ?
     `).run(
       subscriptionBudgetTitle(current, budgetCur), -known, current.budget_subcategory_key || '', current.next_payment_date,
-      current.owner_id ?? current.created_by, current.visibility || 'shared', linked.id,
+      linked.id,
     );
   }
   if (!completed) writeLinkedBooking({ ...current, next_payment_date: nextDate, budget_entry_id: null }, budgetCur, known);
