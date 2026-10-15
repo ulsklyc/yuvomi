@@ -138,6 +138,11 @@ async function reportError(err, {
   // seinen Stand angefasst noch etwas gezeichnet.
   if (!stillShown(owner)) return;
   if (!dropGone(err.data.reason, { recipeId, recipeRef, ingredientName, listId })) return;
+  // War das das letzte Rezept der gewaehlten Quelle, gibt es die Quelle im
+  // Filter nicht mehr: sonst stuende eine leere Liste unter einem leeren Label.
+  if (state.sourceFilter !== 'all' && !state.recipes.some((r) => r.source === state.sourceFilter)) {
+    state.sourceFilter = 'all';
+  }
   renderSourceFilter();
   renderRecipeList({ repaint: true });
   // Der Ausloeser ist mit der Liste neu gebaut: den Fokus auf seinen
@@ -1559,6 +1564,8 @@ async function openPantryMatchModal(recipe, ingredientName) {
         } catch (err) {
           if (isSelectedPantryItemGone(err)) {
             window.yuvomi?.showToast(errorSentence(err), 'danger');
+            // Wie reportError: nur, solange Seite und Dialog noch dieselben sind.
+            if (!stillShown(owner) || !isModalContextCurrent(dialog)) return;
             await offerCurrentPantryItems([panel.querySelector('#pantry-match-select')].filter(Boolean));
             return;
           }
@@ -1646,10 +1653,12 @@ async function openPantryBulkMatchModal(recipe) {
         } catch (err) {
           // Was bis zum Fehler gespeichert ist, bleibt gespeichert und steht
           // gleich in der Liste; der Dialog bleibt fuer den Rest offen.
-          if (saved) renderIngredientSections(recipe);
+          if (saved && stillShown(owner)) renderIngredientSections(recipe);
           save.disabled = false;
           if (isSelectedPantryItemGone(err)) {
             window.yuvomi?.showToast(errorSentence(err), 'danger');
+            // Wie reportError: nur, solange Seite und Dialog noch dieselben sind.
+            if (!stillShown(owner) || !isModalContextCurrent(dialog)) return;
             await offerCurrentPantryItems([...panel.querySelectorAll('select[data-ingredient-index]')]);
             return;
           }

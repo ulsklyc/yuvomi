@@ -854,3 +854,63 @@ test('Seite: Zuordnen haengt, das Rezept wird inzwischen gespeichert - die spaet
     assert.deepEqual(stand.zutaten, ['Mehl', 'Salz'], `${name}: die gespeicherte Zutat bleibt`);
   }
 });
+
+// Codex an #2001: der Sonderweg "die GEWAEHLTE Vorratszeile ist weg" laeuft
+// am reportError vorbei - er prueft Seite und Dialog genauso, bevor er den
+// Vorrat neu holt und den Fokus setzt.
+test('Seite: gewaehlte Vorratszeile weg, aber Seite verlassen und zurueck oder Dialog ersetzt - kein frischer Vorrat, kein Fokus', async () => {
+  const wege = [
+    ['einzeln', (r) => page.openPantryMatchModal(r, 'Mehl'), '#pantry-match-save', () => {
+      const panel = formular({ '#pantry-match-select': '8' });
+      return { panel, auswahl: [panel.querySelector('#pantry-match-select')] };
+    }],
+    ['mehrere', (r) => page.openPantryBulkMatchModal(r), '#pantry-bulk-match-save', () => {
+      const mehl = { ...feld('8'), dataset: { ingredientIndex: '0' } };
+      return { panel: formular({}, { 'select[data-ingredient-index]': [mehl] }), auswahl: [mehl] };
+    }],
+  ];
+  for (const [name, oeffnen, knopf, bau] of wege) {
+    for (const art of ['seite', 'dialog']) {
+      const { panel, auswahl } = bau();
+      let kontext = 'zuordnen';
+      globalThis.__modalContextId = () => kontext;
+      try {
+        const neu = { querySelector: () => null, querySelectorAll: () => [], isConnected: true };
+        const { gets } = await mitSeite({}, () => mit({
+          get: (path) => (path === '/pantry' ? { data: PANTRY } : { data: [] }),
+          put: async () => {
+            if (art === 'seite') page.setContainerForTest(neu); else kontext = 'ein-anderer-dialog';
+            throw fehler(404, 'recipes_selected_pantry_item_not_found');
+          },
+        }, async () => {
+          await oeffne(panel, () => oeffnen(page.state.recipes[0]));
+          await panel.querySelector(knopf).handlers.click();
+        }));
+        const label = `${name}, ${art}`;
+        assert.deepEqual(toasts, [['recipes.errorSelectedPantryItemGone', 'danger']], `${label}: der Satz kommt`);
+        assert.equal(gets.filter((p) => p === '/pantry').length, 1, `${label}: kein frischer Vorrat`);
+        for (const select of auswahl) {
+          assert.equal(select.html, null, `${label}: die Auswahl bleibt`);
+          assert.equal(select.focused, 0, `${label}: kein Fokus`);
+        }
+      } finally {
+        delete globalThis.__modalContextId;
+      }
+    }
+  }
+});
+
+// Codex an #2001: faellt das letzte Rezept der gewaehlten Quelle weg, gibt es
+// die Quelle im Filter nicht mehr - der Filter geht auf "Alle".
+test('Seite: das letzte Rezept der gewaehlten Quelle ist weg - der Quellenfilter geht auf "Alle"; bleibt eins, bleibt der Filter', async () => {
+  for (const [mealie, erwartet] of [[[6], 'all'], [[6, 7], 'mealie']]) {
+    const rezepte = [rezept(), ...mealie.map((id) => rezept({ id, title: `M${id}`, source: 'mealie' }))];
+    let filter = null;
+    await mitSeite({ recipes: rezepte, sourceFilter: 'mealie' }, async () => {
+      await mit({ post: async () => { throw fehler(404, 'recipes_recipe_not_found'); } },
+        () => page.transferRecipe(page.state.recipes[1], null));
+      filter = page.state.sourceFilter;
+    });
+    assert.equal(filter, erwartet, `${mealie.length} Mealie-Rezept(e)`);
+  }
+});
