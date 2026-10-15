@@ -946,3 +946,200 @@ test('Seite: verlassen und zurueck (neuer Traeger), dann kommt eine spaete "gibt
     delete globalThis.__refocusAfterRender;
   }
 });
+
+// ---------------------------------------------------------------------------
+// #2005: spaete Antworten einer verlassenen Seite
+// ---------------------------------------------------------------------------
+
+/** Eine Antwort, die erst kommt, wenn der Test es sagt. */
+function spaet() {
+  let settle;
+  const promise = new Promise((resolve, reject) => { settle = { resolve, reject }; });
+  return { promise, ...settle };
+}
+
+// Die erste Seite laedt beim Aufbau Mitglieder und Metadaten, wird verlassen
+// und neu betreten; die neue Seite laedt dasselbe und ist fertig. Erst danach
+// kommt die Antwort der alten - sie darf den Stand der neuen nicht ersetzen.
+test('Seite (#2005): die spaete Mitglieder-Antwort einer verlassenen Seite ueberschreibt die der neuen nicht', async () => {
+  const alt = traeger();
+  const neu = traeger();
+  await mitSeite({ container: alt }, async () => {
+    const altMitglieder = spaet();
+    const altVerzeichnis = spaet();
+    let runde = 0;
+    await mit({
+      get: (path) => {
+        if (runde === 0) return path === '/family/members' ? altMitglieder.promise : altVerzeichnis.promise;
+        return { data: [{ id: path === '/family/members' ? 2 : 3, display_name: 'Neu' }] };
+      },
+    }, async () => {
+      const ersteSeite = page.loadMembers();
+      runde = 1;
+      page.setContainerForTest(neu, { built: true });
+      await page.loadMembers();
+      altMitglieder.resolve({ data: [{ id: 1, display_name: 'Alt' }] });
+      altVerzeichnis.resolve({ data: [{ id: 1, display_name: 'Alt' }] });
+      await ersteSeite;
+    });
+    assert.deepEqual(page.state.members.map((m) => m.id), [2], 'die Mitglieder der neuen Seite');
+    assert.deepEqual(page.state.directory.map((m) => m.id), [3], 'das Verzeichnis der neuen Seite');
+  });
+});
+
+test('Seite (#2005): die spaete Metadaten-Antwort einer verlassenen Seite - weder ihr Stand noch ihr Scheitern ersetzt den der neuen', async () => {
+  for (const ausgang of ['antwortet', 'scheitert']) {
+    const neu = traeger();
+    await mitSeite({ container: traeger() }, async () => {
+      const altMeta = spaet();
+      let runde = 0;
+      await mit({
+        get: () => (runde === 0 ? altMeta.promise : {
+          data: { dms_accounts: [{ id: 9, name: 'Paperless' }], active_upload_backend: 'dms', is_admin: false },
+        }),
+      }, async () => {
+        const ersteSeite = page.loadMetaOptions();
+        runde = 1;
+        page.setContainerForTest(neu, { built: true });
+        await page.loadMetaOptions();
+        if (ausgang === 'antwortet') {
+          altMeta.resolve({ data: { dms_accounts: [], active_upload_backend: 'local', is_admin: true } });
+        } else {
+          altMeta.reject(fehler(500));
+        }
+        await ersteSeite;
+      });
+      assert.deepEqual(
+        [page.state.dmsAccounts.map((a) => a.id), page.state.activeUploadBackend, page.state.isAdmin],
+        [[9], 'dms', false],
+        `${ausgang}: der Stand der neuen Seite`,
+      );
+    });
+  }
+});
+
+// Codex an #2001: ein Ordner-Loeschen, dessen Antwort oder Nachladen erst nach
+// "verlassen und zurueck" ankommt, schreibt den Stand ohne den Ordner in den
+// modulweiten Zustand. Die neue Seite muss ihn dann auch zeigen - sonst steht
+// der geloeschte Ordner dort bis zum naechsten Neuzeichnen.
+test('Seite (#2005): Ordner loeschen, die Antwort kommt nach "verlassen und zurueck" - die neue Seite zeigt den Stand ohne den Ordner', async () => {
+  const impact = { data: { id: 3, removed_folders: 1, documents: 0, can_delete_documents: true, linked_records: {}, snapshot: 'a'.repeat(64) } };
+  let refocus = 0;
+  let mitFokus = 0;
+  globalThis.__refocusAfterRender = () => { refocus += 1; };
+  globalThis.__renderKeepingFocus = () => { mitFokus += 1; };
+  try {
+    for (const fertig of [true, false]) {
+      refocus = 0;
+      mitFokus = 0;
+      const alt = traeger();
+      const neu = traeger();
+      let ordner = null;
+      await mitSeite({ container: alt }, async () => {
+        await mit({
+          get: (path) => {
+            if (path.includes('/delete-impact')) return impact;
+            return path === '/documents/folders' ? { data: [FOLDERS[1]] } : { data: [] };
+          },
+          delete: async () => { page.setContainerForTest(neu, { built: fertig }); return { data: { folder_deleted: true } }; },
+        }, () => page.deleteFolder({ ...FOLDERS[0] }));
+        ordner = page.state.folders.map((f) => f.id);
+      });
+      assert.deepEqual(ordner, [4], 'Vorbedingung: der Stand ohne den Ordner ist geladen');
+      if (fertig) {
+        assert.ok(neu.gefragt.includes('#documents-folder-browser'), 'die neue, fertig aufgebaute Seite zeichnet den Stand ohne den Ordner');
+        // Codex an #2020: renderAll() tauscht Zeilen, Chips und Ordner aus -
+        // der Fokus der neuen Seite muss ueber das Neuzeichnen getragen werden.
+        assert.equal(mitFokus, 1, 'die neue Seite wird mit ihrem Fokus neu gezeichnet');
+      } else {
+        // Wie bei der spaeten "gibt es nicht mehr"-Antwort: in eine Seite, die
+        // noch aufbaut, zeichnet der alte Weg nicht - das tut ihr Aufbau.
+        assert.deepEqual(neu.gefragt, [], 'in eine noch aufbauende Seite wird nicht gezeichnet');
+      }
+      assert.equal(alt.gefragt.includes('#documents-folder-browser'), false, 'die verlassene Seite wird nicht gezeichnet');
+      assert.equal(refocus, 0, 'der Fokus der neuen Seite bleibt, wo er ist');
+    }
+  } finally {
+    delete globalThis.__refocusAfterRender;
+    delete globalThis.__renderKeepingFocus;
+  }
+});
+
+// Codex an #2020: laedt die neue Seite inzwischen selbst neuer (Status-Reiter),
+// nimmt der Applier die alte Antwort nicht an - und die alte Handlung darf dann
+// nicht aus dem ueberholten Stand zeichnen, sie ersetzte das Lade-Skelett der
+// neuen Seite mit Dokumenten des falschen Status.
+test('Seite (#2005): Ordner loeschen nach "verlassen und zurueck", die neue Seite laedt inzwischen selbst - die ueberholte Antwort zeichnet nicht', async () => {
+  const impact = { data: { id: 3, removed_folders: 1, documents: 0, can_delete_documents: true, linked_records: {}, snapshot: 'a'.repeat(64) } };
+  const alt = traeger();
+  const neu = traeger();
+  let eigenesLaden = null;
+  let dokumente = 0;
+  await mitSeite({ container: alt }, async () => {
+    await mit({
+      get: (path) => {
+        if (path.includes('/delete-impact')) return impact;
+        if (path.startsWith('/documents?status=') && dokumente++ === 0) {
+          // Die neue Seite wechselt den Reiter, waehrend das alte Nachladen laeuft.
+          eigenesLaden = page.loadDocuments();
+        }
+        return { data: [] };
+      },
+      delete: async () => { page.setContainerForTest(neu, { built: true }); return { data: { folder_deleted: true } }; },
+    }, () => page.deleteFolder({ ...FOLDERS[0] }));
+    assert.equal(await eigenesLaden, true, 'Vorbedingung: das Laden der neuen Seite ist das juengste');
+  });
+  assert.equal(dokumente, 2, 'Vorbedingung: zwei Dokument-Anfragen');
+  assert.deepEqual(neu.gefragt, [], 'die ueberholte Antwort zeichnet nicht in die neue Seite');
+});
+
+// Codex an #2020: ein Ordner, angelegt auf der alten Seite und erst nach
+// "verlassen und zurueck" bestaetigt, waehlt sich nicht in die neue Seite.
+test('Seite (#2005): neuer Ordner, die Antwort kommt nach "verlassen und zurueck" - die Ordnerauswahl der neuen Seite bleibt', async () => {
+  const panel = formular({ '#document-folder-name': 'Belege', '#document-folder-parent': '' });
+  let submit = null;
+  panel.querySelector('#document-folder-form').addEventListener = (type, fn) => { if (type === 'submit') submit = fn; };
+  const neu = traeger();
+  let auswahl = null;
+  await mitSeite({ container: traeger() }, async () => {
+    await mit({
+      post: async () => {
+        page.setContainerForTest(neu, { built: true });
+        page.state.folderId = '4';
+        return { data: { id: 77 } };
+      },
+    }, async () => {
+      globalThis.__openModal = (opts) => opts.onSave(panel);
+      try { page.openFolderModal(); } finally { delete globalThis.__openModal; }
+      await submit({ preventDefault() {} });
+    });
+    auswahl = page.state.folderId;
+  });
+  assert.equal(auswahl, '4', 'die Auswahl der neuen Seite');
+});
+
+test('Seite (#2005): Ordner samt Dokumenten loeschen mit Ruecknahme, Teilergebnis nach "verlassen und zurueck" - die neue Seite zeigt den Stand', async () => {
+  const impact = { data: { id: 3, removed_folders: 1, documents: 2, can_delete_documents: true, linked_records: {}, snapshot: 'a'.repeat(64) } };
+  const alt = traeger();
+  const neu = traeger();
+  await mitSeite({ container: alt }, async () => {
+    let opts = null;
+    const knopf = (id) => ({ addEventListener: (type, fn) => { if (id === '#documents-folder-delete-documents' && type === 'click') fn(); } });
+    await mit({ get: (path) => (path.includes('/delete-impact') ? impact : { data: [] }) }, async () => {
+      globalThis.__openModal = (o) => o.onSave({ querySelector: knopf });
+      globalThis.__undoStub = (o) => { opts = o; };
+      try { await page.deleteFolder({ ...FOLDERS[0] }); } finally {
+        delete globalThis.__openModal;
+        delete globalThis.__undoStub;
+      }
+    });
+    assert.ok(opts, 'Vorbedingung: das Loeschen wartet auf die Ruecknahme');
+    page.setContainerForTest(neu, { built: true });
+    const { gets } = await mit({
+      get: (path) => (path === '/documents/folders' ? { data: FOLDERS } : { data: [] }),
+      delete: async () => ({ data: { folder_deleted: false, deleted_documents: 1, failed_documents: [{ id: 11, failure_stage: 'storage' }] } }),
+    }, () => opts.commit({ keepalive: false }));
+    assert.ok(reloaded(gets), `Vorbedingung: das Teilergebnis laedt nach (${gets.join(', ')})`);
+    assert.ok(neu.gefragt.includes('#documents-folder-browser'), 'die neue Seite zeichnet den Stand nach dem Teilergebnis');
+  });
+});

@@ -22,6 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Documents: leaving and coming back no longer leaves stale data on the page** (#2005). An
+  answer that arrived only after you had left Documents and opened it again could overwrite the
+  members, the DMS accounts or the admin state the new page had just loaded, and the next dialog
+  or menu used the old values. Now only the newest answer counts. A folder deletion that finished
+  in that window, or deleted only part of the folder's documents, now shows up on the new page
+  right away instead of the deleted folder staying in the list until the next reload, and it no
+  longer moves the keyboard focus on the new page.
+
 - **A save that answers late no longer closes a dialog you opened in the meantime** (#1997). On
   Recipes (saving a recipe, planning it, linking ingredients to the pantry) and Subscriptions
   (saving a subscription, the monthly budget, categories and payment methods), the success of a
