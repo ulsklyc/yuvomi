@@ -22,6 +22,14 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 
+# Jede Laufzeit-Abhaengigkeit muss hier laden, auf jeder Plattform einzeln.
+# 2.77.1 ging auf linux/arm64 ohne googleapis raus: npm hatte das damals
+# optionale Paket still verworfen (120 statt 137 Pakete), der Build war gruen
+# und der Container startete nie (#2006). Das Skript laedt alles aus
+# `dependencies` per import() und bricht den Build ab, wenn eines fehlt.
+COPY scripts/check-runtime-deps.mjs ./scripts/
+RUN node scripts/check-runtime-deps.mjs
+
 # ---- Runtime stage ----
 FROM node:24-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20
 

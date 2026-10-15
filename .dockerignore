@@ -47,6 +47,9 @@ podman-compose.yml
 
 # Scripts (dev-only)
 scripts/
+# Exception: the build stage loads every runtime dependency with this script
+# and fails the image when one is missing (#2006).
+!scripts/check-runtime-deps.mjs
 
 # Markdown files (README etc.)
 *.md

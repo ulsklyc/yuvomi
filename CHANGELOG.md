@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Docker: the image starts again on every platform, and an image without a runtime package is
+  no longer published** (#2006). The 2.77.1 image for 64-bit ARM (linux/arm64) stopped at startup
+  with "Cannot find package 'googleapis'": the Google and CalDAV libraries were declared as
+  optional, and the install in the build dropped them without a word on that platform (120
+  instead of 137 packages) while the build still passed. Both are now regular dependencies, and
+  the build loads every runtime package on each platform and fails instead of shipping an image
+  that cannot start. The public-holiday lookup no longer relies on a package that only came along
+  with the Google library.
+
 - **Budget: a private subscription no longer keeps a shared expense, and its bookings stay right
   when two changes meet** (#2004). A subscription in another currency waits for the exchange rate
   before it books its expense, and another change to the same subscription could land in that

@@ -3,11 +3,10 @@
  * Zweck: Fetch von der OpenHolidays API, Caching in holiday_cache-Tabelle,
  *        periodischer Sync. Kein API-Key erforderlich.
  * Quelle: https://openholidaysapi.org (open source, kostenlos)
- * Abhängigkeiten: node-fetch, server/db.js
+ * Abhängigkeiten: server/db.js (HTTP über das fetch von Node)
  */
 
 import { runExternalJob } from '../utils/restore-state.js';
-import nodeFetch from 'node-fetch';
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { resolveHouseholdLocale } from '../utils/i18n.js';
@@ -25,10 +24,13 @@ const THROTTLE_MS       = 30 * 24 * 60 * 60 * 1000;
 // SYNC_INTERVAL_MINUTES (Voreinstellung 15) ein neuer Anlauf.
 const LANGUAGE_RETRY_MS = 60 * 60 * 1000;
 
-// Injizierbare fetch-Implementierung (Default: node-fetch). Nur Tests
+// Injizierbare fetch-Implementierung (Default: das fetch von Node). Nur Tests
 // überschreiben dies via __setFetchImpl, um die OpenHolidays-API zu mocken.
-let fetchImpl = nodeFetch;
-function __setFetchImpl(fn) { fetchImpl = fn ?? nodeFetch; }
+// node-fetch stand hier noch, als es 38264f575 aus package.json nahm - es kam
+// nur noch als Abhängigkeit von googleapis mit (#2006).
+const nativeFetch = (...args) => globalThis.fetch(...args);
+let fetchImpl = nativeFetch;
+function __setFetchImpl(fn) { fetchImpl = fn ?? nativeFetch; }
 
 // --------------------------------------------------------
 // API-Abfragen
