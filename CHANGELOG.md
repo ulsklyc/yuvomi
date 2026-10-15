@@ -18,6 +18,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Budget: a private subscription no longer keeps a shared expense, and its bookings stay right
+  when two changes meet** (#2004). A subscription in another currency waits for the exchange rate
+  before it books its expense, and another change to the same subscription could land in that
+  moment. When somebody switched it to private while another save was still waiting, the expense
+  came back as shared and showed in the household budget. A paused subscription could keep an
+  expense, an earlier amount or the old currency could win over the one you saved last, marking
+  a payment as made while somebody saved or paused the subscription could move the paid expense
+  to the next due date or remove it, and marking it as made twice in a row could leave the
+  subscription pointing at the wrong expense. Each booking is now written from the subscription
+  as it is at that moment, after the rate is in, and a paid expense is handed over the moment
+  you mark the payment as made, so it stays on the day you paid. The result no longer depends on
+  which rate arrives first. If a subscription is deleted while you mark a payment as made, the
+  paid expense stays in the budget, as it does when you delete it afterwards.
 - **Recipes: an error message is in your language and names the cause** (#1909). The recipes
   page showed the server's own text when something could not be saved, planned, matched or put on
   a shopping list, whatever the app language, in English or in German - for example "Recipe not

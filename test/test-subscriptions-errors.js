@@ -213,20 +213,33 @@ test('Server: das Abo verschwindet, waehrend seine Buchung den Kurs holt - 404 s
     const r = await call(method, path(abo.id), body);
     routes._setRatesForTest?.(null);
     assert.deepEqual([r.status, r.body?.reason], [404, 'subscriptions_subscription_not_found'], `${label}: ${JSON.stringify(r.body)}`);
-    assert.equal(count('SELECT COUNT(*) AS n FROM budget_entries'), buchungenVorher - 1, `${label}: keine neue Buchung ohne Abo`);
-    assert.equal(count("SELECT COUNT(*) AS n FROM budget_entries WHERE title LIKE 'Weg beim%'"), 0, `${label}: kein Waise im Budget`);
+    if (label === 'verlaengern') {
+      // Verlaengern gibt die bezahlte Buchung ab, bevor es auf den Kurs wartet
+      // (#2004): sie ist Verlauf wie nach jedem Verlaengern und ueberlebt das
+      // Loeschen des Abos - wie in der Folge "verlaengern, dann loeschen". Die
+      // Buchung der naechsten Zahlung ging mit dem Abo.
+      assert.equal(count('SELECT COUNT(*) AS n FROM budget_entries'), buchungenVorher, `${label}: nur die bezahlte Buchung bleibt`);
+      assert.deepEqual(
+        db.prepare("SELECT id, date FROM budget_entries WHERE title LIKE 'Weg beim verlaengern%'").all(),
+        [{ id: abo.budget_entry_id, date: abo.next_payment_date }],
+        `${label}: die bezahlte Buchung, keine fuer die naechste Zahlung`,
+      );
+    } else {
+      assert.equal(count('SELECT COUNT(*) AS n FROM budget_entries'), buchungenVorher - 1, `${label}: keine neue Buchung ohne Abo`);
+      assert.equal(count("SELECT COUNT(*) AS n FROM budget_entries WHERE title LIKE 'Weg beim%'"), 0, `${label}: kein Waise im Budget`);
+    }
   }
 });
 
 /**
- * Die Luecke im await auf den Kurs. Die Buchung entsteht wie auf main aus dem
- * Schnappschuss vor dem await; dazu kommt nur die Pruefung, ob es das Abo
- * danach noch gibt. Was andere Requests in der Luecke sonst am Abo aendern
- * (Pause, zweiter Betrag, Waehrung, zweites Verlaengern), ist #2004. Gemessen
- * wird hier, dass der Stand nicht schlechter ist als main: ein Verlaengern in
- * der Luecke eines PUT liefert gegen main per Dateikopie dasselbe Ergebnis;
- * rot war es nur, solange die Verknuepfung frisch gelesen wurde (Review zu
- * #2003). `vorDemKurs` laeuft im ersten Abruf des Kurses.
+ * Die Luecke im await auf den Kurs. Seit #2004 schreibt jede Buchung aus der
+ * Zeile, die NACH dem await frisch gelesen wird, und Verlaengern gibt seine
+ * bezahlte Buchung vor dem await ab; die Rennen dazu (Pause, Sichtbarkeit,
+ * zwei Betraege, Waehrung, zweimal Verlaengern) misst
+ * `test:subscription-booking-races`. Hier bleibt der Fall aus dem Review zu
+ * #2003: ein Verlaengern in der Luecke eines PUT darf die neue Buchung nicht
+ * auf das alte Datum zurueckschreiben. `vorDemKurs` laeuft im ersten Abruf des
+ * Kurses.
  */
 const KURS = { rates: { EUR: 1, USD: 1 }, source: 'cache', fetchedAt: null };
 function mitLuecke(vorDemKurs) {
