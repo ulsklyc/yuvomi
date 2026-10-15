@@ -444,8 +444,16 @@ try {
     assert.equal(renew2.body.data.enabled, false);
     assert.equal(renew2.body.data.occurrences_remaining, 0);
     assert.ok(renew2.body.data.completed_at, 'completed_at gesetzt');
-    // Abschluss entfernt Budget-Eintrag und Erinnerung.
-    assert.equal(database.prepare('SELECT COUNT(*) AS n FROM budget_entries WHERE id = ?').get(countedEntryId).n, 0);
+    // Abschluss behaelt die letzte bezahlte Buchung (#2004, Entscheidung zu #2008):
+    // sie bleibt am bezahlten Tag stehen und ist nicht mehr verknuepft; eine
+    // naechste entsteht nicht. Die Erinnerung geht (#594).
+    assert.deepEqual(
+      { ...database.prepare('SELECT date, amount FROM budget_entries WHERE id = ?').get(countedEntryId) },
+      { date: '2027-02-15', amount: -100 },
+      'die letzte bezahlte Zahlung steht im Budget',
+    );
+    assert.equal(renew2.body.data.budget_entry_id, null, 'nicht mehr verknuepft');
+    assert.equal(database.prepare("SELECT COUNT(*) AS n FROM budget_entries WHERE title = 'Rate' AND date > '2027-02-15'").get().n, 0, 'keine naechste Buchung');
     assert.equal(database.prepare("SELECT COUNT(*) AS n FROM reminders WHERE entity_type = 'subscription' AND entity_id = ?").get(countedId).n, 0);
 
     // Status-Filter: completed sieht das Abo, active nicht.

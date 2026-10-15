@@ -105,7 +105,17 @@ function rateGate() {
 }
 
 const ORDERS = [['zweiter zuerst', [1, 0]], ['erster zuerst', [0, 1]]];
-const settle = () => new Promise((r) => setTimeout(r, 30));
+
+/**
+ * Nach dem Freigeben eines Kurses: warten, bis DIESER Request fertig ist oder
+ * einen weiteren Kurs anfragt (Neuversuch nach Waehrungswechsel). Keine feste
+ * Wartezeit - sonst waeren "beide Reihenfolgen" nur ein Wettlauf mit der Uhr.
+ */
+async function released(promise, gate, before) {
+  let done = false;
+  promise.then(() => { done = true; }, () => { done = true; });
+  while (!done && gate.pending.length <= before) await new Promise((r) => setTimeout(r, 2));
+}
 
 /**
  * Zwei Requests in der Luecke: `first` wartet auf seinen Kurs, dann kommt
@@ -115,24 +125,31 @@ const settle = () => new Promise((r) => setTimeout(r, 30));
  */
 async function race({ first, second, order, secondAwaits = true }) {
   const gate = rateGate();
-  const pFirst = first();
-  await gate.waitFor(1);
-  const pSecond = second();
-  if (secondAwaits) await gate.waitFor(2);
   const results = [];
-  if (secondAwaits) {
-    for (const index of order) {
-      gate.release(index);
-      await settle();
+  let pFirst; let pSecond;
+  try {
+    pFirst = first();
+    await gate.waitFor(1);
+    pSecond = second();
+    if (secondAwaits) await gate.waitFor(2);
+    if (secondAwaits) {
+      const promises = [pFirst, pSecond];
+      for (const index of order) {
+        const before = gate.pending.length;
+        gate.release(index);
+        await released(promises[index], gate, before);
+      }
+    } else {
+      results[1] = await pSecond;
+      gate.release(0);
     }
-  } else {
-    results[1] = await pSecond;
-    gate.release(0);
+  } finally {
+    // Auch wenn eine Vorbedingung scheitert: nichts bleibt am Tor haengen.
+    gate.autoRelease();
+    results[0] = await pFirst;
+    if (pSecond) results[1] = await pSecond;
+    routes._setRatesForTest(null);
   }
-  gate.autoRelease();
-  results[0] = await pFirst;
-  if (secondAwaits) results[1] = await pSecond;
-  routes._setRatesForTest(null);
   for (const r of results) assert.ok([200, 201].includes(r.status), JSON.stringify(r.body));
   return results;
 }
@@ -184,7 +201,9 @@ test('6. privat geschaltet, waehrend das Anlegen auf den Kurs wartet - die erste
   // Sichtbarkeit direkt umschalten: ein PUT in gleicher Waehrung liefe ohne Kurs.
   const put = call('PUT', `/${id}`, { visibility: 'private' });
   await gate.waitFor(2);
-  gate.release(1); await settle();
+  const before = gate.pending.length;
+  gate.release(1);
+  await released(put, gate, before);
   gate.release(0);
   gate.autoRelease();
   const [post, after] = [await pPost, await put];
@@ -339,4 +358,95 @@ test('ohne Rennen: Verlaengern in fremder Waehrung bucht wie bisher - bezahlte Z
   const rows = bookings(a);
   assert.deepEqual(rows.map((x) => [x.date, x.amount, x.title]), [['2030-01-15', -5, `${a.name} (USD)`], ['2030-02-15', -5, `${a.name} (USD)`]]);
   assert.equal(r.body.data.budget_entry_id, rows[1].id);
+});
+
+// --- Review-Runde 1 zu #2008 ---------------------------------------------------
+
+const setBudgetCurrency = (c) => db.prepare(`INSERT INTO sync_config (key, value) VALUES ('currency', ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(c);
+
+test('6. privat geschaltet - die Buchung ist privat, schon waehrend der Kurs geholt wird', async () => {
+  const a = await abo();
+  let seen = null;
+  routes._setRatesForTest(async (base, list) => {
+    seen = bookings(a).map((r) => r.visibility);
+    return ratesAnswer(base, list);
+  });
+  const r = await call('PUT', `/${a.id}`, { visibility: 'private' });
+  routes._setRatesForTest(null);
+  assert.equal(r.status, 200);
+  assert.deepEqual(seen, ['private'], 'im await ist die Buchung schon privat, nicht erst danach');
+  assert.deepEqual(bookings(a).map((x) => x.visibility), ['private']);
+});
+
+test('6. privat geschaltet, und die Budget-Waehrung kippt bei jedem Kursabruf - die Buchung ist privat, Betrag und Titel bleiben unberuehrt', async () => {
+  const a = await abo();
+  const vorher = bookings(a)[0];
+  const flips = ['GBP', 'EUR', 'GBP', 'EUR', 'GBP'];
+  let n = 0;
+  routes._setRatesForTest(async (base, list) => {
+    // Der Kurs passt beim Zurueckkommen nie mehr: der Neuversuch erschoepft sich.
+    setBudgetCurrency(flips[n++ % flips.length]);
+    return ratesAnswer(base, list);
+  });
+  const r = await call('PUT', `/${a.id}`, { visibility: 'private' });
+  routes._setRatesForTest(null);
+  setBudgetCurrency('EUR');
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.ok(n >= 3, `der Neuversuch lief (${n} Abrufe)`);
+  const rows = bookings(a);
+  assert.equal(rows.length, 1, JSON.stringify(rows));
+  assert.equal(rows[0].visibility, 'private', 'ein privates Abo hat nach dem erschoepften Neuversuch eine geteilte Buchung');
+  assert.deepEqual([rows[0].title, rows[0].amount], [vorher.title, vorher.amount], 'nichts mit einem unpassenden Kurs geschrieben');
+});
+
+test('pausiert, aber noch verknuepft (Altbestand), dann verlaengert - die Buchung geht wie auf main, keine Waise', async () => {
+  const a = await abo();
+  db.prepare('UPDATE budget_subscriptions SET enabled = 0 WHERE id = ?').run(a.id);
+  routes._setRatesForTest(plainRates);
+  const r = await call('POST', `/${a.id}/renew`, {});
+  routes._setRatesForTest(null);
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.deepEqual(bookings(a), [], 'die verknuepfte Buchung eines pausierten Abos bleibt nicht unverknuepft liegen');
+  assert.equal(subRow(a.id).budget_entry_id, null);
+});
+
+test('Verlaengern, und der Kurs scheitert danach - 200 mit dem festgeschriebenen Stand, kein zweites Verlaengern durch einen Neuversuch', async () => {
+  const a = await abo();
+  const paidId = subRow(a.id).budget_entry_id;
+  routes._setRatesForTest(async () => { throw new Error('rates down'); });
+  const r = await call('POST', `/${a.id}/renew`, {});
+  routes._setRatesForTest(null);
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.deepEqual([r.body.data.next_payment_date, r.body.data.occurrences_done], ['2030-02-15', 1], 'die Antwort traegt den Stand, der schon gespeichert ist');
+  const rows = bookings(a);
+  assert.deepEqual(rows.map((x) => [x.id === paidId, x.date]), [[true, '2030-01-15'], [false, '2030-02-15']], JSON.stringify(rows));
+  assert.equal(subRow(a.id).budget_entry_id, rows[1].id);
+});
+
+test('letzte Zahlung im await eines anderen Verlaengerns - das Budget zeigt alle bezahlten Zahlungen, das Abo ist abgeschlossen', async () => {
+  for (const [label, order] of ORDERS) {
+    const a = await abo({ end_type: 'after_count', occurrence_count: 2 });
+    await race({
+      first: () => call('POST', `/${a.id}/renew`, {}),
+      second: () => call('POST', `/${a.id}/renew`, {}),
+      order,
+    });
+    const s = subRow(a.id);
+    assert.deepEqual([s.enabled, s.occurrences_done, s.budget_entry_id, Boolean(s.completed_at)], [0, 2, null, true], label);
+    const rows = bookings(a);
+    assert.deepEqual(rows.map((x) => [x.date, x.amount]), [['2030-01-15', -5], ['2030-02-15', -5]], `${label}: ${JSON.stringify(rows)}`);
+  }
+});
+
+test('letzte Zahlung ohne Rennen, fremde Waehrung - die bezahlte Buchung bleibt mit umgerechnetem Betrag, unverknuepft, keine naechste', async () => {
+  const a = await abo({ end_type: 'after_count', occurrence_count: 1, amount: 30 });
+  const paidId = subRow(a.id).budget_entry_id;
+  routes._setRatesForTest(plainRates);
+  const r = await call('POST', `/${a.id}/renew`, {});
+  routes._setRatesForTest(null);
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.status, 'completed');
+  assert.deepEqual(bookings(a).map((x) => [x.id, x.date, x.amount]), [[paidId, '2030-01-15', -15]]);
+  assert.equal(subRow(a.id).budget_entry_id, null);
 });

@@ -301,7 +301,22 @@ const applyBooking = (id, fetched) => db.get().transaction(() => {
   }
   const budgetCur = budgetCurrency();
   const amount = bookingAmount(row, budgetCur, fetched);
-  if (amount === undefined) return { needs: { currency: row.currency, budgetCurrency: budgetCur } };
+  if (amount === undefined) {
+    // Nur Betrag und Titel warten auf den Kurs. Datum, Eigentuemer und
+    // Sichtbarkeit stehen in der Zeile und gelten SOFORT: eine eben privat
+    // gestellte Buchung ist nicht fuer die Dauer eines Kursabrufs geteilt,
+    // und auch nicht, wenn der Neuversuch sich erschoepft (Review zu #2008).
+    if (row.budget_entry_id) {
+      db.get().prepare(`
+        UPDATE budget_entries SET category = 'subscriptions', subcategory = ?, date = ?, owner_id = ?, visibility = ?
+        WHERE id = ?
+      `).run(
+        row.budget_subcategory_key || '', row.next_payment_date, row.owner_id ?? row.created_by,
+        row.visibility || 'shared', row.budget_entry_id,
+      );
+    }
+    return { needs: { currency: row.currency, budgetCurrency: budgetCur } };
+  }
   writeLinkedBooking(row, budgetCur, amount);
   return { row: loadSubscription(id) };
 })();
@@ -328,19 +343,36 @@ async function syncBudgetExpense(id, fetched = null) {
 }
 
 /**
- * Verlaengern, synchron: Datum und Zaehler vorruecken, die bezahlte Buchung
- * auf den Stand des Abos bringen und abkoppeln, die naechste anlegen und
+ * Verlaengern, synchron: Datum und Zaehler vorruecken (oder bei der letzten
+ * Zahlung abschliessen), die bezahlte Buchung auf den Stand des Abos bringen
+ * und abkoppeln, und - ausser beim Abschluss - die naechste anlegen und
  * verknuepfen. Kennt die bezahlte ihren Betrag noch nicht (fremde Waehrung),
  * traegt sie den der letzten Buchung, und `paid` sagt, welche Zeile nach dem
  * Kurs nachzutragen ist. Die naechste traegt ihn vorlaeufig auch; ihren
  * eigenen schreibt der Sync danach aus der frischen Zeile.
+ *
+ * Der Abschluss behaelt die letzte bezahlte Buchung wie jedes Verlaengern
+ * (Entscheidung zu #2008; bis dahin loeschte er sie, seit #594). Aus der
+ * Monatssumme der Abos und aus der Vorschau faellt das Abo trotzdem, denn
+ * beide lesen nur laufende Abos.
  */
-const renewBooking = (current, nextDate, occurrencesDone) => db.get().transaction(() => {
+const renewBooking = (current, { completed, nextDate, occurrencesDone }) => db.get().transaction(() => {
   const database = db.get();
-  database.prepare('UPDATE budget_subscriptions SET next_payment_date = ?, occurrences_done = ?, budget_entry_id = NULL WHERE id = ?')
-    .run(nextDate, occurrencesDone, current.id);
-  // Ein pausiertes Abo bucht nichts; der Sync danach raeumt wie bisher.
+  if (completed) {
+    database.prepare(`
+      UPDATE budget_subscriptions
+      SET occurrences_done = ?, enabled = 0, completed_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+      WHERE id = ?
+    `).run(occurrencesDone, current.id);
+  } else {
+    database.prepare('UPDATE budget_subscriptions SET next_payment_date = ?, occurrences_done = ? WHERE id = ?')
+      .run(nextDate, occurrencesDone, current.id);
+  }
+  // Ein pausiertes Abo bucht nichts und gibt nichts ab: eine Verknuepfung
+  // aus dem Altbestand bleibt stehen, und der Sync danach loescht ihre
+  // Buchung wie auf main - abgekoppelt bliebe sie als Waise liegen.
   if (!current.enabled) return { paid: null };
+  database.prepare('UPDATE budget_subscriptions SET budget_entry_id = NULL WHERE id = ?').run(current.id);
   const budgetCur = budgetCurrency();
   const amount = bookingAmount(current, budgetCur, null);
   const linked = current.budget_entry_id
@@ -358,7 +390,7 @@ const renewBooking = (current, nextDate, occurrencesDone) => db.get().transactio
       current.owner_id ?? current.created_by, current.visibility || 'shared', linked.id,
     );
   }
-  writeLinkedBooking({ ...current, next_payment_date: nextDate, budget_entry_id: null }, budgetCur, known);
+  if (!completed) writeLinkedBooking({ ...current, next_payment_date: nextDate, budget_entry_id: null }, budgetCur, known);
   return { paid: linked && amount === undefined ? { id: linked.id, budgetCurrency: budgetCur } : null };
 })();
 
@@ -916,31 +948,30 @@ router.post('/:id/renew', async (req, res) => {
     // legt eine Buchung an und schliesst ein endliches Abo ab. Es folgt
     // deshalb derselben Regel wie PUT und DELETE - sie fehlte hier.
     if (!mayEditSub(req, current)) return res.status(403).json({ error: 'You cannot modify this subscription.', code: 403 });
-    const { completed, nextDate, occurrencesDone } = resolveRenewal(current);
-    if (completed) {
-      // Letzte Zahlung durch: abschließen. enabled = 0 lässt syncBudgetExpense den
-      // Ausgaben-Eintrag entfernen und syncReminder die Erinnerung löschen.
-      db.get().prepare(`
-        UPDATE budget_subscriptions
-        SET occurrences_done = ?, enabled = 0, completed_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
-        WHERE id = ?
-      `).run(occurrencesDone, id);
-      const done = await syncBudgetExpense(id);
-      syncReminder(done);
-      return res.json({ data: decorate(done) });
+    // Bis hierher kein await: Datum, Zaehler, Abschluss und die Uebergabe der
+    // bezahlten Buchung stehen im selben synchronen Schritt wie das Lesen
+    // oben (#2004).
+    const { paid } = renewBooking(current, resolveRenewal(current));
+    let row;
+    try {
+      let fetched = null;
+      if (paid) {
+        // Die bezahlte Buchung gehoert jetzt nur noch diesem Request: ihr Betrag
+        // kommt aus dem Schnappschuss `current`, dem Stand im Moment der Zahlung.
+        fetched = await fetchBookingRates(current.currency, paid.budgetCurrency);
+        db.get().prepare('UPDATE budget_entries SET amount = ? WHERE id = ?')
+          .run(-bookingAmount(current, paid.budgetCurrency, fetched), paid.id);
+      }
+      row = await syncBudgetExpense(id, fetched);
+    } catch (err) {
+      if (err instanceof SubscriptionGoneError) throw err;
+      // Die Zahlung ist schon festgeschrieben. Ein 500 liesse den Client es
+      // noch einmal versuchen - und ein zweites Mal verlaengern. Die Betraege
+      // bleiben vorlaeufig, bis der naechste Sync den Kurs hat.
+      log.warn(`Renewal of subscription ${id} saved; its booking amounts wait for the exchange rate:`, err.message);
+      row = loadSubscription(id);
+      if (!row) throw new SubscriptionGoneError();
     }
-    // Bis hierher kein await: Datum, Zaehler und die Uebergabe der bezahlten
-    // Buchung stehen im selben synchronen Schritt wie das Lesen oben (#2004).
-    const { paid } = renewBooking(current, nextDate, occurrencesDone);
-    let fetched = null;
-    if (paid) {
-      // Die bezahlte Buchung gehoert jetzt nur noch diesem Request: ihr Betrag
-      // kommt aus dem Schnappschuss `current`, dem Stand im Moment der Zahlung.
-      fetched = await fetchBookingRates(current.currency, paid.budgetCurrency);
-      db.get().prepare('UPDATE budget_entries SET amount = ? WHERE id = ?')
-        .run(-bookingAmount(current, paid.budgetCurrency, fetched), paid.id);
-    }
-    const row = await syncBudgetExpense(id, fetched);
     syncReminder(row);
     res.json({ data: decorate(row) });
   } catch (err) {

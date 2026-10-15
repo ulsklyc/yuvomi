@@ -27,10 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a payment as made while somebody saved or paused the subscription could move the paid expense
   to the next due date or remove it, and marking it as made twice in a row could leave the
   subscription pointing at the wrong expense. Each booking is now written from the subscription
-  as it is at that moment, after the rate is in, and a paid expense is handed over the moment
-  you mark the payment as made, so it stays on the day you paid. The result no longer depends on
-  which rate arrives first. If a subscription is deleted while you mark a payment as made, the
-  paid expense stays in the budget, as it does when you delete it afterwards.
+  as it is at that moment; who can see it follows a change right away, and only the amount waits
+  for the rate. A paid expense is handed over the moment you mark the payment as made, so it stays
+  on the day you paid. As long as the rate of a currency does not change in between, it no longer
+  matters which rate arrives first. If a subscription is deleted while you mark a payment as made,
+  the paid expense stays in the budget, as it does when you delete it afterwards, and if the rate
+  cannot be fetched after a payment was marked, the payment is still saved instead of answering
+  with an error that invites marking it twice. The last payment of a subscription with an end now
+  stays in the budget; until now completing the subscription removed it. The completed
+  subscription still leaves the monthly total of subscriptions and the preview of coming months.
 - **Recipes: an error message is in your language and names the cause** (#1909). The recipes
   page showed the server's own text when something could not be saved, planned, matched or put on
   a shopping list, whatever the app language, in English or in German - for example "Recipe not
