@@ -764,10 +764,11 @@ html.page-swapping .fab-layer .page-fab {
    * die Reserve nicht von der Knopfgroesse wegdriften kann.
    *
    * VORNE STEHT DIE RUNDUNG IM WEG, und das ist Geometrie, kein Geschmack.
-   * Die Kapsel ist eine Pille (Radius = halbe Hoehe = 30px). Ein Label sitzt
-   * rund 10px ueber ihrer Unterkante, und dort liegt ihre linke Begrenzung
-   * nicht bei 0, sondern bei 30 - sqrt(30^2 - 20^2) = 7,6px. „Übersicht"
-   * begann bei 5px und ragte damit sichtbar aus der Rundung heraus.
+   * Die Kapsel ist eine Pille (Radius = halbe Hoehe = 32px bei 64px). Ein
+   * Label sitzt mit seiner Mitte rund 11px ueber ihrer Unterkante, und dort
+   * liegt ihre linke Begrenzung nicht bei 0, sondern bei
+   * 32 - sqrt(32^2 - 21^2) = 7,9px (bei 60px Hoehe waren es 7,6). „Übersicht"
+   * begann frueher bei 5px und ragte damit sichtbar aus der Rundung heraus.
    * --space-2 (8px) raeumt genau diese Sehne frei. Hinten braucht es nichts:
    * dort deckt die FAB-Reserve die Kurve laengst ab. */
   padding-inline-start: var(--space-2);
@@ -928,7 +929,7 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
    * Bedienelement des Blattes steht mehr dort, wo ein Ziel der Leiste war.
    * Das ist zugleich das native Muster: der More-Tab legt sich nicht auf seine
    * eigene Leiste. Ein Sicherheitsabstand als padding-bottom haette dieselben
-   * 76px gekostet und den Fehler nur eine Zeile weiter geschoben. */
+   * 80px (64px Kapsel plus 16px Luft) gekostet und den Fehler nur eine Zeile weiter geschoben. */
   bottom: var(--nav-bottom-height);
   /* EIN BLATT, EINE FORM (Re-Critique 2026-09-27, A1 P2-3): Einrueckung,
    * Material und Radius wie das Dialog-Sheet (`.modal-overlay`-Polster,

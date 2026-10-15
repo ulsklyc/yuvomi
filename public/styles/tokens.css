@@ -1508,7 +1508,13 @@
   /* --------------------------------------------------------
    * 12. Layout
    * -------------------------------------------------------- */
-  --nav-height-mobile: 60px;
+  /* 64 statt 60 (Entscheidung Ulas 2026-10-15): zwischen Kapselkante und
+   * Icon-Pille oben bzw. Label unten standen 3px (1px Rand + 2px Polster), die
+   * Inhalte lasen an die Kante gedrueckt. 64px geben 5/5px, und der Touch-FAB
+   * (48px) sitzt mit 8px rundum konzentrisch (--nav-fab-inset). Alles
+   * Abhaengige (Zone, Nachlauf, Mehr-Blatt, Toasts, Banner) rechnet ueber
+   * --nav-bottom-height mit. */
+  --nav-height-mobile: 64px;
   /* Schwebende Kapsel (Liquid Glass): Zone = Kapsel + 8px Luft oben und unten.
    * Die Kapsel ist MINDESTENS --nav-height-mobile hoch und waechst mit
    * umbrechenden Labels (lange Sprachen, enge Geraete). Ihre echte Hoehe misst
@@ -2119,11 +2125,11 @@
      *
      * 52px waren die Groesse eines Knopfes, der FREI ueber der Seite schwebte -
      * dort ist er das einzige Objekt seiner Groessenklasse und darf gross sein.
-     * In einer 60px hohen Kapsel laesst derselbe Wert 4px Luft und liest sich,
+     * In einer 60px hohen Kapsel liess derselbe Wert 4px Luft und las sich,
      * als platze er heraus. --target-base ist die Zielgroesse der Geraetewelt
      * (44px am Zeiger, 48 am Finger) und damit die richtige Antwort auf beides:
-     * 8 bzw. 6px Luft in der Kapsel, und die Reserve, die er der Leiste
-     * abnimmt, faellt von 60 auf 52px - gut 1,5px je Tab zurueck.
+     * in der heute 64px hohen Kapsel 10 bzw. 8px Luft rundum
+     * (--nav-fab-inset).
      *
      * Das allein haette den zweizeiligen Umbruch der Labels NICHT geloest:
      * „Übersicht" will bei 12px 58px und bekommt auch danach nur 55,4. Geloest

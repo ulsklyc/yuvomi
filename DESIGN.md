@@ -1126,7 +1126,7 @@ das Verhaeltnis haelt.
   Spalte, in der Namen nicht ganz stehen, ist keine Spalte; drei ruhige tragen dieselben
   fuenf Karten besser als vier gedraengte, und ab ~1700px kommt die vierte von selbst
   zurueck.
-- **Navigation:** mobil eine schwebende Glas-Tab-Bar-Kapsel (60px hoch plus 8px Luft und
+- **Navigation:** mobil eine schwebende Glas-Tab-Bar-Kapsel (64px hoch plus 8px Luft und
   safe-area; die Bar-Zone selbst ist transparent, das Glas traegt die Kapsel), die UEBER dem
   Inhalt liegt - der Scrollport reicht bis zur Unterkante (Kopfregel mobil). Ab 1024px
   Glas-Sidebar (56px kollabiert / 220px expandiert) mit gleitender Aktiv-Pille.
@@ -2319,8 +2319,16 @@ Gemessen am echten Markup: `test:module-readonly-ui`, `test:budget-readonly-ui`,
   (`--sheet-tile-bg` = `--color-surface-raised` #37332E auf #2B2825, 1,00 -> 1,17:1); hell
   bleiben sie Surface, dort trennt `--shadow-xs`.
 - **Der FAB sitzt konzentrisch in der Kapsel:** hinten derselbe Abstand wie oben und unten
-  (`--nav-fab-inset` = (Kapselhoehe - Knopf) / 2; Touch 6/6/6px statt 4px hinten), die
-  Reserve der Kapsel waechst mit, die Fuge zum letzten Tab bleibt 1px.
+  (`--nav-fab-inset` = (Kapselhoehe - Knopf) / 2; Touch heute 8/8/8px, bei 60px Kapsel
+  6/6/6 statt 4px hinten), die Reserve der Kapsel waechst mit, die Fuge zum letzten Tab
+  bleibt 1px.
+- **Die Kapsel ist 64px hoch (Entscheidung Ulas 2026-10-15, vorher 60):** zwischen
+  Kapselkante und Icon-Pille oben bzw. Label unten standen 3/3px (1px Rand + 2px Polster), jetzt
+  5/5px (gemessen 4,95). Alles Abhaengige rechnet ueber `--nav-bottom-height` mit: Nachlauf
+  `.app-content` 76 -> 80px, Mehr-Blatt weiter 8px ueber der Kapsel, Toast-Unterkante weiter
+  24px ueber ihr. Gemessen 360x780, 390x844, 768x1024 (hell und dunkel, Geometrie gleich):
+  Labels einzeilig, Slot 56/62px unveraendert. Wachsen die Labels zweizeilig (el, fil bei
+  360px), misst `watchNavCapsuleHeight` weiter 72,19px - die Mindesthoehe greift dort nicht.
 - **Filled Variant, app-weit:** JEDER ausgewaehlte Zustand traegt sein Icon gefuellt
   (`fill: color-mix(in srgb, currentColor 30%, transparent)`) - Tab-Bar, Sub-Tabs,
   Listen-Tabs, Filterchips, Segmente, View-Toggles. Lucide bleibt Stroke-Bibliothek; die
