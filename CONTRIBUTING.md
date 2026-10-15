@@ -228,7 +228,9 @@ chore(deps): bump puppeteer to 25.11.0
 
 - Target branch: `main`
 - Title: follows the same Conventional Commits format as your commits
-- Description: explain what the PR does, why, and link the related issue (`Closes #123`)
+- Description: explain what the PR does, why, and link the related issue: `Closes #123` for a bug
+  the PR fixes completely, `Refs #123` for a feature or for part of a fix - a feature issue stays
+  open until the release that ships it, and a partial fix must not close what is still broken
 - Keep PRs focused - one feature or fix per PR
 
 **On size.** "One feature" is not a line count, but a branch carrying several
