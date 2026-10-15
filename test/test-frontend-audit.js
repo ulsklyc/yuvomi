@@ -15,6 +15,7 @@ import {
   dialogSegments, submitOutsideFooter, footerWithoutCancel, saveBranchPartners,
   fixedSaveOnTwoCaseDialog, foreignCreateVerbs, aliasFieldClasses,
 } from './dialog-grammar.js';
+import { lateModalCloses } from './late-modal-close.js';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8').replace(/\r/g, '');
 
@@ -295,6 +296,75 @@ test('kein HTML-Kommentar im Markup enthält ein Backtick', () => {
     + 'und macht aus dem Rest ein Tagged Template - die Seite rendert dann gar nicht '
     + 'mehr. Klassennamen dort ohne Backticks schreiben.',
   );
+});
+
+// #1997: eine spaete Antwort schliesst nur ihren EIGENEN Dialog. Die Regel steht
+// in components/modal.js (`closeModal({ force, context })`); hier zaehlt der
+// Bestand der Stellen, die nach einem `await` noch ohne Kontext schliessen
+// (Scanner und seine Grenzen: late-modal-close.js). Die Zahl je Datei darf nur
+// SINKEN - wer eine Stelle umstellt, senkt sie hier mit; eine neue Datei steht
+// bei 0.
+const LATE_MODAL_CLOSE_BESTAND = {
+  'components/quick-links-manager.js': 1,
+  'pages/birthdays.js': 2,
+  'pages/budget-plans.js': 2,
+  'pages/budget.js': 7,
+  'pages/calendar.js': 2,
+  'pages/contacts.js': 2,
+  'pages/documents.js': 3,
+  'pages/health.js': 13,
+  'pages/housekeeping.js': 4,
+  'pages/inventory.js': 2,
+  'pages/meals.js': 4,
+  'pages/pantry.js': 1,
+  'pages/rewards.js': 7,
+  'pages/schedule.js': 4,
+  'pages/shopping.js': 8,
+  'pages/split-expenses.js': 6,
+  'pages/tasks.js': 2,
+  'pages/waste.js': 15,
+  'settings/pages/admin-family.js': 2,
+  'settings/pages/modules-health.js': 2,
+  'settings/pages/modules-kitchen.js': 2,
+  'settings/pages/personal-calendar-subscriptions.js': 1,
+  'settings/pages/sync-calendar.js': 1,
+  'settings/pages/sync-contacts.js': 1,
+};
+
+test('kein neues closeModal() nach einem await ohne den Kontext des eigenen Dialogs (#1997, Ratsche)', () => {
+  const ist = {};
+  for (const path of walkJsFiles('../public/')) {
+    if (path.includes('/vendor/') || path.endsWith('/components/modal.js')) continue;
+    const offen = lateModalCloses(read(path)).filter((call) => !call.guarded);
+    if (offen.length) ist[path.slice('../public/'.length)] = offen.map((call) => call.line);
+  }
+  const files = new Set([...Object.keys(ist), ...Object.keys(LATE_MODAL_CLOSE_BESTAND)]);
+  for (const file of [...files].sort()) {
+    const lines = ist[file] ?? [];
+    const erlaubt = LATE_MODAL_CLOSE_BESTAND[file] ?? 0;
+    assert.ok(lines.length <= erlaubt,
+      `${file}: ${lines.length} closeModal() nach einem await ohne context (erlaubt ${erlaubt}), Zeilen ${lines.join(', ')} - `
+      + 'den Kontext VOR der Anfrage festhalten (captureModalContext()) und closeModal({ force: true, context }) geben');
+    assert.equal(lines.length, erlaubt,
+      `${file}: nur noch ${lines.length} statt ${erlaubt} - die Zahl in LATE_MODAL_CLOSE_BESTAND mitsenken`);
+  }
+});
+
+test('der Spaet-Schliessen-Scanner erkennt das Muster, das er zaehlt', () => {
+  const zaehle = (src) => lateModalCloses(src).map((call) => call.guarded);
+  // Ungeschuetzt: Speichern, dann schliessen.
+  assert.deepEqual(zaehle('async function s() { await api.put(1); closeModal({ force: true }); }'), [false]);
+  // Alias aus dem Import, Pfeilfunktion als Handler, await in einem try-Block davor.
+  assert.deepEqual(zaehle(`import { closeModal as closeSharedModal } from '/components/modal.js';
+    btn.addEventListener('click', async () => { try { await api.post(2); closeSharedModal({ force: true }); } catch {} });`), [false]);
+  // Geschuetzt: mit Kontext, oder hinter isModalContextCurrent seit dem letzten await.
+  assert.deepEqual(zaehle('async function s() { const d = captureModalContext(); await api.put(1); closeModal({ force: true, context: d }); }'), [true]);
+  assert.deepEqual(zaehle('async function s() { await api.put(1); if (isModalContextCurrent(d)) await closeModal({ force: true }); }'), [true]);
+  // Nicht spaet: kein await davor, das await auf das Schliessen selbst, ein
+  // await nur in einer verschachtelten Funktion, ein Kommentar.
+  assert.deepEqual(zaehle('async function s() { if (x) return; await closeModal({ force: true }); }'), []);
+  assert.deepEqual(zaehle('function s() { const f = async () => { await api.put(1); }; closeModal({ force: true }); }'), []);
+  assert.deepEqual(zaehle('async function s() { await api.put(1); // closeModal({ force: true })\n}'), []);
 });
 
 test('kein __test-Export listet denselben Namen zweimal', () => {

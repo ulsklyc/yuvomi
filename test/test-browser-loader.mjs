@@ -225,6 +225,11 @@ const STUBS = {
         ? true
         : globalThis.__modalContextId() === context
     );
+    // Ob der festgehaltene Dialog noch offen ist (#1997). Ohne Sonde: ja - wer
+    // die spaete Antwort messen will, setzt globalThis.__isOwnModalOpen.
+    export const isOwnModalOpen = (context) => (
+      typeof globalThis.__isOwnModalOpen === 'function' ? globalThis.__isOwnModalOpen(context) : true
+    );
     export const focusFirstField = () => null;
     export const updateHeaderAction = () => null;
     export const validateAll = () => true;

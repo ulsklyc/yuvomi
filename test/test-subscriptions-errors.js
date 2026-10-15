@@ -1116,3 +1116,74 @@ test('Seite: ein abgeschlossenes Abo wieder aufnehmen - ein zu fruehes Ende steh
     delete globalThis.__reportFieldError;
   }
 });
+
+// #1997: die ERFOLGSWEGE. Ob der Slot noch den eigenen Dialog haelt, entscheidet
+// closeModal({ context }) in components/modal.js (am echten Modul gemessen in
+// test-modal-dead-time.js); hier zaehlt die Verdrahtung: jeder Erfolgsweg reicht
+// den VOR der Anfrage gemerkten Kontext hinein, und der Verwalten-Dialog baut
+// sich nur neu auf, wenn es sein eigener war, der eben zuging - sonst schloesse
+// openMetadataModal() den Dialog, den der Nutzer inzwischen geoeffnet hat.
+test('Seite: Erfolg nach Dialogwechsel - jeder Erfolgsweg schliesst nur mit dem Kontext von VOR der Anfrage (#1997)', async () => {
+  const wege = [
+    ['Abo speichern', () => page.saveSubscription(formular(ABO_FORM), abo())],
+    ['Monatsbudget', async () => {
+      const panel = formular({ '#subscriptions-base-currency': 'EUR', '#subscriptions-budget': '50' });
+      globalThis.__openModal = (opts) => opts.onSave(panel);
+      try {
+        await page.openSettingsModal();
+        await panel.querySelector('#subscriptions-settings-form').handlers.submit({ preventDefault() {} });
+      } finally {
+        delete globalThis.__openModal;
+      }
+    }],
+    ['Verwalten: anlegen', async () => {
+      const panel = verwalten({ '#subscription-new-category': 'Musik' });
+      let opened = 0;
+      globalThis.__openModal = (opts) => { opened += 1; if (opened === 1) opts.onSave(panel); };
+      try {
+        page.openMetadataModal();
+        await panel.querySelector('#subscription-add-category').handlers.click();
+      } finally {
+        delete globalThis.__openModal;
+      }
+    }],
+  ];
+  for (const [name, lauf] of wege) {
+    let kontext = 'eigener-dialog';
+    globalThis.__modalContextId = () => kontext;
+    const wechsel = async (antwort) => { kontext = 'ein-anderer-dialog'; return antwort; };
+    try {
+      const { closed } = await mitSeite(() => mit({
+        put: () => wechsel({ data: abo() }),
+        post: () => wechsel({ data: { id: 99, name: 'Musik' } }),
+      }, lauf));
+      assert.equal(closed.length, 1, `${name}: genau ein Schliessen`);
+      assert.equal(closed[0].force, true, `${name}: force wie bisher`);
+      assert.equal(closed[0].context, 'eigener-dialog',
+        `${name}: geschlossen wird ohne den Kontext von vor der Anfrage - die spaete Antwort traefe den Dialog, der jetzt offen ist`);
+    } finally {
+      delete globalThis.__modalContextId;
+    }
+  }
+});
+
+test('Seite: Verwalten-Erfolg - neu aufgebaut nur, wenn der eigene Dialog noch offen war (#1997)', async () => {
+  for (const [eigenerOffen, erwartet] of [[true, 2], [false, 1]]) {
+    const panel = verwalten({ '#subscription-new-category': 'Musik' });
+    let opened = 0;
+    globalThis.__openModal = (opts) => { opened += 1; if (opened === 1) opts.onSave(panel); };
+    globalThis.__isOwnModalOpen = () => eigenerOffen;
+    try {
+      await mitSeite(() => mit({ post: async () => ({ data: { id: 99, name: 'Musik' } }) }, async () => {
+        page.openMetadataModal();
+        await panel.querySelector('#subscription-add-category').handlers.click();
+      }));
+    } finally {
+      delete globalThis.__openModal;
+      delete globalThis.__isOwnModalOpen;
+    }
+    assert.equal(opened, erwartet, eigenerOffen
+      ? 'der eigene Dialog wird nach dem Speichern nicht mehr neu aufgebaut'
+      : 'der Neuaufbau ersetzt den Dialog, den der Nutzer inzwischen geoeffnet hat');
+  }
+});

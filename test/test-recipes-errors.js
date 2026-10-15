@@ -914,3 +914,114 @@ test('Seite: das letzte Rezept der gewaehlten Quelle ist weg - der Quellenfilter
     assert.equal(filter, erwartet, `${mealie.length} Mealie-Rezept(e)`);
   }
 });
+
+// #1997: die ERFOLGSWEGE. Eine Antwort, die erst kommt, nachdem der Nutzer den
+// Dialog geschlossen und einen anderen geoeffnet hat, darf nur den EIGENEN
+// schliessen. Ob der Slot noch denselben Dialog haelt, entscheidet
+// closeModal({ context }) in components/modal.js (dort am echten Modul
+// gemessen, test-modal-dead-time.js); hier zaehlt die Verdrahtung: jeder
+// Erfolgsweg reicht den VOR der Anfrage gemerkten Kontext hinein, und die
+// Zuordnen-Wege zeichnen nur auf der Seite, die noch steht, und tragen den
+// Fokus nur zurueck, wenn es ihr Dialog war, der zuging.
+// renderIngredientSections sucht die Abschnitte per CSS.escape; Node kennt es nicht.
+globalThis.CSS ??= { escape: (value) => String(value) };
+
+test('Seite: Erfolg nach Dialogwechsel - jeder Erfolgsweg schliesst nur mit dem Kontext von VOR der Anfrage (#1997)', async () => {
+  const wege = [
+    ['zuordnen', async () => {
+      const panel = formular({ '#pantry-match-select': '7' });
+      await oeffne(panel, () => page.openPantryMatchModal(page.state.recipes[0], 'Mehl'));
+      await panel.querySelector('#pantry-match-save').handlers.click();
+    }],
+    ['mehrere zuordnen', async () => {
+      const mehl = { ...feld('7'), dataset: { ingredientIndex: '0' } };
+      const panel = formular({}, { 'select[data-ingredient-index]': [mehl] });
+      await oeffne(panel, () => page.openPantryBulkMatchModal(page.state.recipes[0]));
+      await panel.querySelector('#pantry-bulk-match-save').handlers.click();
+    }],
+    ['speichern', () => page.saveRecipe(formular({ '#recipe-title': 'Suppe' }), 'edit', page.state.recipes[0])],
+    ['einplanen', async () => {
+      const panel = formular({ '#plan-date': '20.10.2026', '#plan-type': 'dinner' });
+      await oeffne(panel, () => page.planRecipe(page.state.recipes[0], null));
+      const confirm = panel.querySelector('#plan-confirm');
+      await confirm.handlers.click({ currentTarget: confirm });
+    }],
+  ];
+  for (const [name, lauf] of wege) {
+    let kontext = 'eigener-dialog';
+    globalThis.__modalContextId = () => kontext;
+    const wechsel = async (antwort) => { kontext = 'ein-anderer-dialog'; return antwort; };
+    try {
+      const { closed } = await mitSeite({}, () => mit({
+        get: (path) => (path === '/pantry' ? { data: PANTRY } : { data: [] }),
+        put: (path) => wechsel({ data: path.endsWith('/ingredient-match')
+          ? { pantry_item_id: 7, pantry_item_name: 'Mehl' } : rezept() }),
+        post: () => wechsel({ data: {} }),
+      }, lauf));
+      assert.equal(closed.length, 1, `${name}: genau ein Schliessen`);
+      assert.equal(closed[0].force, true, `${name}: force wie bisher`);
+      assert.equal(closed[0].context, 'eigener-dialog',
+        `${name}: geschlossen wird ohne den Kontext von vor der Anfrage - die spaete Antwort traefe den Dialog, der jetzt offen ist`);
+      assert.equal(toasts.some(([, art]) => art === 'success'), true, `${name}: der Erfolg wird trotzdem gemeldet`);
+    } finally {
+      delete globalThis.__modalContextId;
+    }
+  }
+});
+
+test('Seite: Zuordnen-Erfolg - gezeichnet nur auf der Seite, die noch steht; Fokus nur, wenn der eigene Dialog zuging (#1997)', async () => {
+  const wege = [
+    ['einzeln', async () => {
+      const panel = formular({ '#pantry-match-select': '7' });
+      await oeffne(panel, () => page.openPantryMatchModal(page.state.recipes[0], 'Mehl'));
+      await panel.querySelector('#pantry-match-save').handlers.click();
+    }],
+    ['mehrere', async () => {
+      const mehl = { ...feld('7'), dataset: { ingredientIndex: '0' } };
+      const panel = formular({}, { 'select[data-ingredient-index]': [mehl] });
+      await oeffne(panel, () => page.openPantryBulkMatchModal(page.state.recipes[0]));
+      await panel.querySelector('#pantry-bulk-match-save').handlers.click();
+    }],
+  ];
+  let refocus = 0;
+  globalThis.__refocusAfterRender = () => { refocus += 1; };
+  try {
+    for (const [name, lauf] of wege) {
+      // [Fall, Seite bleibt?, eigener Dialog noch offen?, gezeichnet?, Fokus?]
+      for (const [fall, seiteBleibt, eigenerOffen, zeichnet, fokus] of [
+        ['alles wie vorher', true, true, true, 1],
+        ['anderer Dialog offen', true, false, true, 0],
+        ['Seite verlassen', false, true, false, 0],
+      ]) {
+        refocus = 0;
+        const gezeichnet = [];
+        const seite = {
+          querySelector: () => null,
+          querySelectorAll: (sel) => { gezeichnet.push(sel); return []; },
+          isConnected: true,
+        };
+        globalThis.__isOwnModalOpen = () => eigenerOffen;
+        try {
+          await mitSeite({}, async () => {
+            page.setContainerForTest(seite);
+            await mit({
+              get: (path) => (path === '/pantry' ? { data: PANTRY } : { data: [] }),
+              put: async () => {
+                if (!seiteBleibt) seite.isConnected = false;
+                gezeichnet.length = 0;
+                return { data: { pantry_item_id: 7, pantry_item_name: 'Mehl' } };
+              },
+            }, lauf);
+          });
+        } finally {
+          delete globalThis.__isOwnModalOpen;
+        }
+        const label = `${name}, ${fall}`;
+        assert.equal(gezeichnet.some((sel) => sel.includes('recipe-detail__ingredients-section')), zeichnet, `${label}: gezeichnet`);
+        assert.equal(refocus, fokus, `${label}: Fokus zurueckgetragen`);
+      }
+    }
+  } finally {
+    delete globalThis.__refocusAfterRender;
+  }
+});

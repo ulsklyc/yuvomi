@@ -22,6 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A save that answers late no longer closes a dialog you opened in the meantime** (#1997). On
+  Recipes (saving a recipe, planning it, linking ingredients to the pantry) and Subscriptions
+  (saving a subscription, the monthly budget, categories and payment methods), the success of a
+  slow request closes only the dialog it came from. If you had closed that dialog and opened
+  another one, the other one now stays open with what you typed in it. Linking ingredients no
+  longer redraws the recipe or moves focus once you have left the page, and the category dialog
+  no longer reopens over a dialog you opened while it was saving. Other pages follow.
+
 - **A server whose `TZ` names an unknown time zone now runs in UTC.** Without a household time zone
   in Settings, the server falls back to `TZ` and then to the zone the system reports. With `TZ` set
   to a name the system does not know, some systems (Windows, for example) report `Etc/Unknown`,

@@ -6,7 +6,7 @@
 import { api } from '/api.js';
 import { t, formatDate, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
-import { openModal as openSharedModal, closeModal as closeSharedModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender, captureModalContext, isModalContextCurrent } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal as closeSharedModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender, captureModalContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
 import { resolveShoppingTarget, announceTransfer, mayTransferRecipeToShopping } from '/utils/kitchen-transfer.js';
@@ -1542,8 +1542,18 @@ async function openPantryMatchModal(recipe, ingredientName) {
           ing.pantry_item_id = res.data.pantry_item_id;
           ing.pantry_item_name = res.data.pantry_item_name;
           // force: der Schreibvorgang ist durch, eine Verwerfen-Frage waere
-          // eine Frage nach etwas, das schon gespeichert ist.
-          closeSharedModal({ force: true });
+          // eine Frage nach etwas, das schon gespeichert ist. `context`: nur
+          // DIESEN Dialog - einen inzwischen geoeffneten anderen laesst die
+          // spaete Antwort stehen, samt allem, was darin getippt ist (#1997).
+          const ownDialog = isOwnModalOpen(dialog);
+          closeSharedModal({ force: true, context: dialog });
+          window.yuvomi?.showToast(
+            pantryItemId === null ? t('recipes.ingredientMatchCleared') : t('recipes.ingredientMatchSaved'),
+            'success',
+          );
+          // Seite verlassen (oder neu betreten): nichts zeichnen, keinen Fokus
+          // ziehen - wie reportError.
+          if (!stillShown(owner)) return;
           // NUR DEN ZUTATEN-ABSCHNITT NEU BAUEN, kein renderRecipeList(): das
           // Zutaten-Detail ist gerade aufgeklappt, und ein Neuaufbau der Liste
           // klappte es zu - der Nutzer stuende nach dem Speichern vor der
@@ -1555,12 +1565,10 @@ async function openPantryMatchModal(recipe, ingredientName) {
           // Abschnitt, weil der Sammelknopf darunter seine Zahl mitaendert.
           renderIngredientSections(recipe);
           // Der Ausloeser ist mit dem Abschnitt ersetzt: den Fokus auf seinen
-          // Nachfolger tragen (gleiches data-action/data-id).
-          refocusAfterRender();
-          window.yuvomi?.showToast(
-            pantryItemId === null ? t('recipes.ingredientMatchCleared') : t('recipes.ingredientMatchSaved'),
-            'success',
-          );
+          // Nachfolger tragen (gleiches data-action/data-id) - nur, wenn es
+          // dieser Dialog war, der eben zuging. Sonst gehoert der Fokus dem,
+          // was der Nutzer inzwischen tut.
+          if (ownDialog) refocusAfterRender();
         } catch (err) {
           if (isSelectedPantryItemGone(err)) {
             window.yuvomi?.showToast(errorSentence(err), 'danger');
@@ -1646,10 +1654,14 @@ async function openPantryBulkMatchModal(recipe) {
             ing.pantry_item_name = res.data.pantry_item_name;
             saved += 1;
           }
-          closeSharedModal({ force: true });
-          renderIngredientSections(recipe);
-          refocusAfterRender();
+          // Wie im Einzeldialog: nur diesen Dialog schliessen, nur auf dieser
+          // Seite zeichnen und den Fokus nur zurueckgeben, wenn er es war (#1997).
+          const ownDialog = isOwnModalOpen(dialog);
+          closeSharedModal({ force: true, context: dialog });
           window.yuvomi?.showToast(t('recipes.ingredientMatchSaved'), 'success');
+          if (!stillShown(owner)) return;
+          renderIngredientSections(recipe);
+          if (ownDialog) refocusAfterRender();
         } catch (err) {
           // Was bis zum Fehler gespeichert ist, bleibt gespeichert und steht
           // gleich in der Liste; der Dialog bleibt fuer den Rest offen.
@@ -1886,8 +1898,10 @@ function openRecipeModal(mode, recipe = null) {
   });
 }
 
-function closeModal({ force = false } = {}) {
-  closeSharedModal({ force });
+// Reicht `context` durch (#1997): ein Wrapper, der nur `force` weitergibt,
+// schloesse nach einer spaeten Antwort wieder den Dialog, der gerade offen ist.
+function closeModal({ force = false, context = null } = {}) {
+  return closeSharedModal({ force, context });
 }
 
 async function saveRecipe(panel, mode, recipe) {
@@ -1934,7 +1948,9 @@ async function saveRecipe(panel, mode, recipe) {
       if (idx >= 0) state.recipes[idx] = res.data;
     }
 
-    closeModal({ force: true });
+    // Nur diesen Dialog: einen inzwischen geoeffneten anderen laesst die
+    // spaete Antwort stehen (#1997).
+    closeModal({ force: true, context: dialog });
     renderRecipeList({ repaint: true });
     // In der Spalte steht das neue Rezept gleich rechts - wie eine neue Notiz
     // in Notizen. Darunter bleibt die Liste, wie sie war.
@@ -2032,7 +2048,7 @@ async function planRecipe(recipe, btn) {
         const owner = _container;
         try {
           await api.post('/meals', mealPayloadFromRecipe(recipe, date, mealType));
-          closeSharedModal({ force: true });
+          closeSharedModal({ force: true, context: dialog });
           window.yuvomi?.showToast(
             t('recipes.planSuccess', { name: recipe.title, date: formatDate(date) }),
             'success',
