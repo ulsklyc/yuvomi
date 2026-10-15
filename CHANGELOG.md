@@ -27,8 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a payment as made while somebody saved or paused the subscription could move the paid expense
   to the next due date or remove it, and marking it as made twice in a row could leave the
   subscription pointing at the wrong expense. Each booking is now written from the subscription
-  as it is at that moment; who can see it follows a change right away, and only the amount waits
-  for the rate. A paid expense is handed over the moment you mark the payment as made, so it stays
+  as it is at that moment; a switch to private takes effect right away, and everything else,
+  including a switch to shared, waits until the rate is in. A paid expense is handed over the moment you mark the payment as made, so it stays
   on the day you paid. As long as the rate of a currency does not change in between, it no longer
   matters which rate arrives first. If a subscription is deleted while you mark a payment as made,
   the paid expense stays in the budget, as it does when you delete it afterwards, and if the rate
