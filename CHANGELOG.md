@@ -33,7 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   at the end of the row when the sidebar is open instead of covering the module icon, section
   names line up with the icons, and on windows up to 800px tall every module fits without
   scrolling. Pressing an entry darkens its row instead of shrinking it. When a page opens, the
-  highlight already sits on its entry instead of sliding in from the first one.
+  highlight already sits on its entry instead of sliding in from the first one. The highlight
+  looks the same in light and dark mode: a violet pill with a violet edge that now stands out
+  clearly from the sidebar in both.
 
 - **Documents: leaving and coming back no longer leaves stale data on the page** (#2005). An
   answer that arrived only after you had left Documents and opened it again could overwrite the

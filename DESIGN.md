@@ -2239,6 +2239,16 @@ Gemessen am echten Markup: `test:module-readonly-ui`, `test:budget-readonly-ui`,
   tokens.css (a1).
 - **Desktop:** Glas-Sidebar mit gleitender Aktiv-Pille; Toolbar ohne Akzentstreifen, Titel in
   Title 2.
+- **Die Aktiv-Pille der Seitenleiste ist in hell und dunkel EIN Material (Entscheidung Ulas
+  2026-10-15):** eine violette Pille, `--sidebar-indicator-tint` 24 % Akzent im Kartenglas
+  (vorher 12 %), Rand aus Akzent-Tint (`--sidebar-indicator-rim-tint` 18 %, mehr Kontrast:
+  100 %) statt Weiss, dezente Glanzkante oben (`--glass-inset-soft`), Schatten nur mit Versatz
+  und Weichzeichnung (`--sidebar-indicator-shadow`, hell 0.06, dunkel 0.35; kein Weissring
+  mehr). Vorher las sie hell als blasser Fleck mit unsichtbarem Weissrand und dunkel als
+  grau-violette Glasplatte - zwei Stimmen. Pixelprobe 1440 breit gegen das Sidebar-Glas: hell
+  1,19 -> 1,45:1, dunkel 1,22 -> 1,51:1; aktives Label darauf 5,69 / 4,74:1; die neutrale
+  Hover-Flaeche bleibt leiser (1,14 / 1,17:1). Ohne Glas (reduzierte Transparenz) bleibt sie
+  bei `--tint-surface`: 24 % auf dem opaken #37332E gaebe dem Label nur 4,19:1.
 - **Die Seitenleiste ist eine schwebende Tafel (R18, 2026-10-07)** - die Form der mobilen
   Kapsel am Desktop: 8px Abstand zur Fensterkante oben, unten und an der Startkante
   (`--sidebar-float-gap`), `--radius-glass-card`, `--glass-shadow-md`, Lichtkante

@@ -2799,6 +2799,28 @@ test('Mehr-Knopf in Ruhe traegt keinen Ton: der Zustand nimmt den Modulton zurue
   assert.match(body, /if \(inMoreSheet\) \{[\s\S]*?setProperty\('--item-module-accent', moduleAccentVar\(activeSecondary\.module\)\)/);
 });
 
+test('Sidebar-Pille: EIN Material in hell und dunkel - Akzent-Toenung, Akzent-Rand, Schatten ohne Weissring', () => {
+  // Entscheidung Ulas 2026-10-15: hell 12 % Akzent mit Weissraendern (auf hellem
+  // Glas unsichtbar, Pille 1,19:1 gegen die Sidebar), dunkel eine grau-violette
+  // Glasplatte - zwei Stimmen. Messung in tokens.css an --sidebar-indicator-*.
+  const glass = read('../public/styles/glass.css');
+  const tokens = read('../public/styles/tokens.css');
+  const body = cssRuleBody(glass, '.nav-sidebar__indicator');
+  assert.match(body, /background:\s*color-mix\(in srgb, var\(--color-accent\) var\(--sidebar-indicator-tint\), var\(--glass-bg-card\)\)/,
+    'die Toenung kommt aus --sidebar-indicator-tint');
+  assert.match(body, /border:\s*1px solid color-mix\(in srgb, var\(--color-accent\) var\(--sidebar-indicator-rim-tint\), transparent\)/,
+    'der Rand ist Akzent-Tint, kein Glas-Weiss');
+  assert.doesNotMatch(body, /--glass-border-subtle|--glass-shadow-sm/, 'kein Weissrand und kein Weissring mehr');
+  assert.match(body, /var\(--sidebar-indicator-shadow\)/);
+  const shadows = [...tokens.matchAll(/--_sidebar-indicator-shadow:\s*([^;]+);/g)].map((m) => m[1]);
+  assert.equal(shadows.length, 3, 'hell plus beide Dark-Pfade setzen den Schatten');
+  for (const value of shadows) {
+    assert.doesNotMatch(value, /255,\s*255,\s*255/, `Schatten ohne Weissring: ${value}`);
+    assert.match(value, /^0 [1-9]\d*px [1-9]\d*px /, `Schatten mit Versatz und Weichzeichnung: ${value}`);
+  }
+  assert.match(tokens, /--sidebar-indicator-tint:\s*24%/);
+});
+
 test('wer die Zahl der Mitleser aendert, holt othersCanRead nach', () => {
   // `othersCanRead` entscheidet, ob Aufgaben und Kalender ihre
   // Sichtbarkeitsfelder ueberhaupt zeigen. Der Wert kommt aus /auth/me und

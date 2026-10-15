@@ -1880,6 +1880,24 @@
    * eigens kalibriert. */
   --_nav-indicator-tint: var(--tint-surface);
   --nav-indicator-tint:  var(--_nav-indicator-tint);
+  /* Aktiv-Pille der Desktop-Sidebar (glass.css §38): EIN Material in hell und
+   * dunkel, eine violette Pille mit Akzent-Rand (Entscheidung Ulas
+   * 2026-10-15). Vorher mischte sie 12 % Akzent ins Kartenglas, und die
+   * Raender waren Weiss (hell 38 % plus 55 %-Ring, auf hellem Glas
+   * unsichtbar; dunkel 14 %) - gemessen per Pixelprobe 1440x900 stand die
+   * Pille hell 1,19:1, dunkel 1,22:1 gegen das Sidebar-Glas, kaum mehr als
+   * die neutrale Hover-Flaeche (1,14 / 1,17:1). Mit 24 % Akzent: hell 1,45:1,
+   * dunkel 1,51:1, Label darauf 5,69 / 4,74:1; die Hover-Flaeche bleibt
+   * leiser. Der Rand ist Akzent-Tint statt Weiss, damit er hell erstmals
+   * sichtbar ist (prefers-contrast: more zieht ihn auf vollen Akzent). Der
+   * Schatten traegt keinen Weissring mehr, nur Versatz und Weichzeichnung;
+   * dunkel kraeftiger (Dark-Bloecke). Die Fassung ohne Glas (reduzierte
+   * Transparenz) bleibt bei --tint-surface: auf dem opaken #37332E gaebe
+   * 24 % nur 4,19:1 fuers Label. */
+  --sidebar-indicator-tint:     24%;
+  --sidebar-indicator-rim-tint: 18%;
+  --_sidebar-indicator-shadow:  0 2px 10px rgba(0, 0, 0, 0.06);
+  --sidebar-indicator-shadow:   var(--_sidebar-indicator-shadow);
 
   /* a2) Glass-Hintergründe: Vibrancy-Stufe (transparenter, mehr Durchschein) */
   --_glass-bg-card:       var(--_color-surface-glass);
@@ -2459,6 +2477,7 @@
     --_sheet-grabber:         var(--glass-border);
     --_sheet-tile-bg:         var(--_color-surface-raised);
     --_nav-indicator-tint:    calc(var(--tint-surface) + 8%);
+    --_sidebar-indicator-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
     --_glass-border-subtle:    rgba(255, 255, 255, 0.14);
     --_glass-highlight:        rgba(255, 255, 255, 0.09);
     --_glass-highlight-subtle: rgba(255, 255, 255, 0.05);
@@ -2691,6 +2710,7 @@
     --_sheet-grabber:         var(--glass-border);
     --_sheet-tile-bg:         var(--_color-surface-raised);
     --_nav-indicator-tint:    calc(var(--tint-surface) + 8%);
+    --_sidebar-indicator-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
     --_glass-border-subtle:   rgba(255, 255, 255, 0.14);
     --_glass-highlight:       rgba(255, 255, 255, 0.09);
     --_glass-highlight-subtle: rgba(255, 255, 255, 0.05);
@@ -2752,6 +2772,7 @@
     --glass-bg-capsule:  var(--color-surface);
     --glass-border:      var(--color-text-primary);
     --glass-border-subtle: var(--color-text-secondary);
+    --sidebar-indicator-rim-tint: 100%; /* Sidebar-Pille: voller Akzent-Rand */
     --glass-highlight:        transparent;
     --glass-highlight-subtle: transparent;
     --glass-sheen:            transparent;
