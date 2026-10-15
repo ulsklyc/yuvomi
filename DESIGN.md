@@ -1155,12 +1155,16 @@ das Verhaeltnis haelt.
   Zettel (`sticky-note`) und im Widget-Kopf eine Stecknadel (`pin`), Haushaltshilfe ein Pinsel
   und auf der Kachel Funkeln (`sparkles`). Jetzt gibt es `MODULE_ICON`, und die Koepfe
   bekommen ihre WIDGET-ID statt eines Icon-Namens: die Abweichung ist nicht mehr schreibbar.
-- **Die Strichstaerke ist die Handschrift, nicht ein Zufall** (`--icon-stroke`, 1.35 gerenderte
+- **Die Strichstaerke ist die Handschrift, nicht ein Zufall** (`--icon-stroke`, 1.5 gerenderte
   px plus `vector-effect: non-scaling-stroke` auf Siegel- und Nav-Zeichen). Der eigene Satz
   zeichnet mit 1.6 auf viewBox 24, Lucide mit 2; bei 20px bzw. 16px ergab beides zufaellig
   1,333px - die Uebereinstimmung hing an den GROESSEN, nicht an einer Regel, und fiel, sobald
   ein eigenes Zeichen bei 16px stand. CSS schlaegt das `stroke-width`-Attribut, deshalb gilt
-  der Wert fuer beide Haende.
+  der Wert fuer beide Haende. **Der Wert ist die Mitte der Lucide-Spanne** (Entscheidung Ulas
+  2026-10-15, A/B-Probe): Lucide zeichnet bei 16-20px 1,33-1,67px, die Modulzeichen standen mit
+  1.35 als duennste Linie daneben (Mehr-Blatt: 1,35er Kacheln ueber 1,67er Icons; Kopf: Siegel
+  neben 2,0er Werkzeugen; auf 1x im Dunkel blass). 1.5 liegt in der Mitte; der Guard in
+  `test:frontend-audit` rechnet die Mitte aus `--icon-md`/`--icon-lg`, statt die Zahl festzunageln.
 - **Motion:** Dauern kanonisch 80-400ms (`--duration-2xs..2xl`), immer in ms. `--ease-out`
   cubic-bezier(0.16,1,0.3,1) fuer Einblendungen; Feder mit Overshoot `--ease-glass`
   cubic-bezier(0.34,1.56,0.64,1) fuer Glas-Elemente; die Sidebar-Pille bekommt die sanftere

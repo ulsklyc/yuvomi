@@ -1452,8 +1452,15 @@
    * dass die Übereinstimmung an den GRÖSSEN hing und nicht an einer Regel.
    * Sobald ein Zeichen des eigenen Satzes bei 16px stand (Widget-Kopf), fiel
    * es auf 1,07px und wurde neben seinen Nachbarn dünn. Der Wert hält den
-   * gemessenen Bestand fest, jetzt als Zusicherung statt als Koinzidenz. */
-  --icon-stroke: 1.35;
+   * gemessenen Bestand fest, jetzt als Zusicherung statt als Koinzidenz.
+   *
+   * 1.35 -> 1.5 (Entscheidung Ulas 2026-10-15, A/B-Probe am Demo-Haushalt):
+   * Lucide zeichnet bei --icon-md..--icon-lg (16-20px) 1,33-1,67px, und die
+   * Modulzeichen standen mit 1,35 als duennste Linie der Oberflaeche neben
+   * ihnen - im Mehr-Blatt 1,35er Kacheln ueber 1,67er Icons, im Kopf das
+   * Siegel neben 2,0er Werkzeugen, auf 1x im Dunkel blass. 1.5 ist die MITTE
+   * dieser Spanne; der Guard prueft die Mitte, nicht die Zahl. */
+  --icon-stroke: 1.5;
 
   /* --------------------------------------------------------
    * 11c. Breakpoints — verbindlicher Kontrakt

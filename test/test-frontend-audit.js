@@ -2759,6 +2759,29 @@ test('More button active state keeps visible More identity and accessible active
   assert.doesNotMatch(source, /moreBtn\.toggleAttribute\('aria-current',\s*inMoreSheet\)/);
 });
 
+test('Strich der Modulzeichen liegt in der Mitte der Lucide-Spanne von --icon-md bis --icon-lg', () => {
+  // Lucide zeichnet 2 auf viewBox 24 und skaliert mit der Groesse; die
+  // Modulzeichen tragen --icon-stroke als feste, gerenderte Breite
+  // (non-scaling-stroke). Mit 1.35 waren sie die duennste Linie neben Lucide
+  // (A/B-Probe 2026-10-15, Entscheidung Ulas: 1.5). Gesichert ist die Regel
+  // "Mitte der Spanne", nicht die Zahl.
+  const tokens = read('../public/styles/tokens.css');
+  const px = (name) => {
+    const m = tokens.match(new RegExp(`${name}:\\s*([\\d.]+)px`));
+    assert.ok(m, `${name} fehlt in tokens.css`);
+    return Number(m[1]);
+  };
+  const stroke = tokens.match(/--icon-stroke:\s*([\d.]+)\s*;/);
+  assert.ok(stroke, '--icon-stroke fehlt in tokens.css');
+  const lucideAt = (size) => (2 * size) / 24;
+  const mid = (lucideAt(px('--icon-md')) + lucideAt(px('--icon-lg'))) / 2;
+  assert.ok(Math.abs(Number(stroke[1]) - mid) <= 0.05,
+    `--icon-stroke ${stroke[1]} liegt nicht in der Mitte der Lucide-Spanne (${mid.toFixed(2)})`);
+  const layout = read('../public/styles/layout.css');
+  assert.match(layout, /\.module-glyph,\s*\.nav-item__icon,\s*\.more-item__icon\s*\{\s*stroke-width:\s*var\(--icon-stroke\);\s*vector-effect:\s*non-scaling-stroke;/,
+    'die Modulzeichen tragen --icon-stroke als feste gerenderte Breite');
+});
+
 test('Aktiv-Indikatoren erscheinen am Ziel: die erste Platzierung gleitet nicht vom ersten Eintrag herein', () => {
   // Ein frisch gebauter Indikator steht bei translate 0, also auf dem ersten
   // Eintrag, und glitt beim Laden sichtbar zum aktiven (gemessen 150ms von
