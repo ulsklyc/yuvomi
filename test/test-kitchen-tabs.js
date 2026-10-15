@@ -289,7 +289,7 @@ test('Seitenleiste: Pille <= 300ms aus Tokens, Hover-Absicht 150-250ms aus einem
   // von .nav-sidebar__hover eine zweite mit eigener transition, und indexOf
   // las nur sie.
   const transitionsOf = (sel) => {
-    const esc = sel.replace(/[.]/g, '\\.');
+    const esc = sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const rules = [...layout.matchAll(new RegExp(`${esc}\\s*\\{([^}]*)\\}`, 'g'))]
       .map((m) => m[1].match(/transition:([^;]*);/)?.[1])
       .filter(Boolean);
