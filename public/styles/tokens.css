@@ -1670,10 +1670,13 @@
   --swipe-threshold: 80px;
   --fab-size: 52px;
   --fab-gap: var(--space-6);
-  /* Mitte der Nav-Kapsel: safe-area + Bar-Polster + halbe Resthoehe. */
+  /* Mitte der Nav-Kapsel: safe-area + Bar-Polster + halbe Resthoehe. Die
+   * Hoehe ist die GEMESSENE (--nav-capsule-height, wie --nav-bottom-height):
+   * mit zweizeiligen Labels (el, fil) waechst die Kapsel auf 72px, und der
+   * Knopf sass mit der Sollhoehe 16/8px statt mittig (Nav-Polish 2026-10-15). */
   --fab-offset-bottom: calc(
     var(--safe-area-inset-bottom) + var(--space-2) +
-    (var(--nav-height-mobile) - var(--fab-size)) / 2
+    (var(--nav-capsule-height, var(--nav-height-mobile)) - var(--fab-size)) / 2
   );
   /* Basis ist der SCHWEBENDE Fall (Desktop, keine Bottom-Nav). Wo die Leiste
    * existiert, faellt die Zone auf 0 - siehe den Block unter --bp-desktop.
@@ -1718,7 +1721,7 @@
    * --fab-offset-bottom fuer oben und unten macht. Hinten stand ein festes
    * --space-1, gemessen 4px gegen 6px oben/unten (Touch, --fab-size 48px);
    * der Knopf sass nicht konzentrisch in der Rundung (Nav-Polish 2026-10-15). */
-  --nav-fab-inset: calc((var(--nav-height-mobile) - var(--fab-size)) / 2);
+  --nav-fab-inset: calc((var(--nav-capsule-height, var(--nav-height-mobile)) - var(--fab-size)) / 2);
 
   /* --------------------------------------------------------
    * 13. Sidebar

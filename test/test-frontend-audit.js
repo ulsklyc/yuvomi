@@ -4548,8 +4548,16 @@ test('der FAB weicht der Zeile, statt eine Gasse zu reservieren', () => {
   // und an seiner eigenen Groesse.
   assert.match(
     tokens,
-    /--fab-offset-bottom:\s*calc\([^;]*--nav-height-mobile[^;]*--fab-size[^;]*\)/s,
-    'der eingesetzte FAB zentriert sich aus --nav-height-mobile und --fab-size'
+    /--fab-offset-bottom:\s*calc\([^;]*var\(--nav-capsule-height,\s*var\(--nav-height-mobile\)\)[^;]*--fab-size[^;]*\)/s,
+    'der eingesetzte FAB zentriert sich aus der GEMESSENEN Kapselhoehe (Fallback --nav-height-mobile) und --fab-size'
+  );
+  // Dieselbe Hoehe fuer den hinteren Abstand: mit zweizeiligen Labels (el,
+  // fil) waechst die Kapsel auf 72px, und mit der Sollhoehe sass der Knopf
+  // 16/8px statt mittig (Nav-Polish 2026-10-15).
+  assert.match(
+    tokens,
+    /--nav-fab-inset:\s*calc\(\(var\(--nav-capsule-height,\s*var\(--nav-height-mobile\)\)\s*-\s*var\(--fab-size\)\)\s*\/\s*2\)/,
+    'der hintere FAB-Abstand rechnet aus derselben gemessenen Kapselhoehe'
   );
   // Und die Kapsel macht ihm denselben Platz frei, aus derselben Groesse -
   // sonst stuende der Knopf halb auf dem letzten Tab.

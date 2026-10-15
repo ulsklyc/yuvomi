@@ -26,7 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   switch pages, and the dimmed page behind the More sheet now fades out with the sheet instead of
   vanishing at once. In dark mode the active tab and the module tiles in the More sheet stand out
   more clearly; on tablets the More sheet is as wide as the tab bar below it. The tab bar is a
-  little taller, so its icons and labels no longer sit tight against its edge.
+  little taller, so its icons and labels no longer sit tight against its edge, and the add button
+  stays centered in it even when longer labels wrap onto two lines.
 
 - **The desktop sidebar holds still.** When the collapsed sidebar opens under the pointer, every
   entry now stays at the same height, so the pointer lands on the entry it was aiming for; the
