@@ -4472,6 +4472,7 @@
         "logoSearchEmpty": "未找到支持的标志。",
         "logoSearchError": "无法加载标志。",
         "errorSubscriptionGone": "此订阅已不存在。",
+        "errorSubscriptionCompleted": "此订阅已完成。只有在重新启用后才能记录下一笔付款。",
         "errorCategoryGone": "此类别已不存在。",
         "errorPaymentMethodGone": "此付款方式已不存在。",
         "errorSelectedCategoryGone": "所选类别已不存在。",

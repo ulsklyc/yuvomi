@@ -267,7 +267,7 @@ test('Server: verlaengert jemand, waehrend eine Aenderung den Kurs holt, steht d
 });
 
 const SERVER_REASONS = [
-  'subscriptions_subscription_not_found', 'subscriptions_category_not_found', 'subscriptions_payment_method_not_found',
+  'subscriptions_subscription_not_found', 'subscriptions_subscription_completed', 'subscriptions_category_not_found', 'subscriptions_payment_method_not_found',
   'subscriptions_selected_category_not_found', 'subscriptions_selected_payment_method_not_found',
   'subscriptions_category_exists', 'subscriptions_payment_method_exists',
   'subscriptions_end_before_next_payment', 'subscriptions_occurrence_count_too_low', 'subscriptions_logo_content_mismatch',
@@ -596,9 +596,12 @@ test('Seite: eine Logo-Datei, die die Seite ablehnt, sagt ihren eigenen Satz', a
 
 // --- Verlaengern und Loeschen ----------------------------------------------
 
-test('Seite: verlaengern - "gibt es nicht mehr" laedt einmal, die Seite zeigt den Stand des Servers; alles andere sagt den Satz der App', async () => {
+test('Seite: verlaengern - "gibt es nicht mehr" und "schon abgeschlossen" laden einmal, die Seite zeigt den Stand des Servers; alles andere sagt den Satz der App', async () => {
   for (const [err, expected, gone] of [
     [fehler(404, 'subscriptions_subscription_not_found'), 'subscriptions.errorSubscriptionGone', true],
+    // #2011: die Karte war veraltet - ein anderes Haushaltsmitglied hat die
+    // letzte Zahlung gebucht. Der Satz sagt es, das Laden nimmt den Knopf weg.
+    [fehler(409, 'subscriptions_subscription_completed'), 'subscriptions.errorSubscriptionCompleted', true],
     [fehler(403), 'common.errorNoPermission', false],
     [fehler(500), 'common.unknownError', false],
   ]) {
@@ -612,6 +615,23 @@ test('Seite: verlaengern - "gibt es nicht mehr" laedt einmal, die Seite zeigt de
       assert.equal(page.state.summary?.monthly_total ?? null, gone ? 9.99 : null, `${label}: Kennzahlen`);
       assertNoServerText();
     });
+  }
+});
+
+test('Seite: verlaengern auf einem abgeschlossenen Abo (#2011) - weder Knopf noch Wischgeste fragen nach oder schreiben', async () => {
+  let gefragt = 0;
+  const zuvor = globalThis.__confirmModal;
+  globalThis.__confirmModal = async () => { gefragt += 1; return true; };
+  try {
+    await mitSeite(async () => {
+      const fertig = abo({ status: 'completed', enabled: false, completed_at: '2026-10-01T08:00:00Z' });
+      const { calls } = await mit({ post: async () => ({ data: fertig }) }, () => page.renewSubscription(fertig));
+      assert.deepEqual(calls, [], 'kein Request');
+      assert.equal(gefragt, 0, 'keine Rueckfrage');
+      assert.deepEqual(toasts, []);
+    });
+  } finally {
+    globalThis.__confirmModal = zuvor;
   }
 });
 

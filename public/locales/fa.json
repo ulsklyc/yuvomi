@@ -4472,6 +4472,7 @@
         "logoSearchEmpty": "لوگوی پشتیبانی‌شده‌ای یافت نشد.",
         "logoSearchError": "لوگوها بارگذاری نشدند.",
         "errorSubscriptionGone": "این اشتراک دیگر وجود ندارد.",
+        "errorSubscriptionCompleted": "این اشتراک تکمیل شده است. پرداخت دیگری تنها زمانی ثبت می‌شود که دوباره فعال شود.",
         "errorCategoryGone": "این دسته دیگر وجود ندارد.",
         "errorPaymentMethodGone": "این روش پرداخت دیگر وجود ندارد.",
         "errorSelectedCategoryGone": "دستهٔ انتخاب‌شده دیگر وجود ندارد.",

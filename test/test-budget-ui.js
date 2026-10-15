@@ -3165,7 +3165,21 @@ test('Abo-Zeile: ein abgeschlossenes Abo zeigt keine naechste Zahlung', async ()
   assert.match(doneCard, /subscriptions\.completedOn/, 'die Ende-Zeile sagt, wann es endete');
   assert.equal(nextRow(completed).value, '', 'abgeschlossen: die Leseansicht laesst die naechste Zahlung weg');
 
+  // #2011: auch keine naechste ZAHLUNG und keine Erinnerung - der Server lehnt
+  // "Bezahlt" ab, syncReminder hat die Erinnerung entfernt. Weder Knopf noch
+  // Wischpanel noch Erinnerungs-Chip; die Leseansicht laesst die Zeile weg.
+  const reminderRow = (s) => abos.subscriptionReadSections(s).find((row) => row.label === 'subscriptions.reminderDaysLabel');
+  assert.doesNotMatch(doneCard, /data-action="renew"/, 'abgeschlossen: kein Bezahlt-Knopf');
+  assert.doesNotMatch(doneCard, /swipe-reveal--done/, 'abgeschlossen: kein Bezahlt-Panel der Wischgeste');
+  assert.doesNotMatch(doneCard, /subscriptions\.reminderMeta|subscriptions\.noReminder|data-lucide="bell/, 'abgeschlossen: kein Erinnerungs-Chip');
+  assert.match(doneCard, /swipe-reveal--delete/, 'Loeschen per Geste bleibt');
+  assert.equal(reminderRow(completed).value, '', 'abgeschlossen: die Leseansicht laesst die Erinnerung weg');
+
   const liveCard = abos.renderCard(active);
+  assert.match(liveCard, /data-action="renew"/, 'laufend: der Bezahlt-Knopf bleibt');
+  assert.match(liveCard, /swipe-reveal--done/, 'laufend: das Bezahlt-Panel bleibt');
+  assert.match(liveCard, /subscriptions\.reminderMeta/, 'laufend: der Erinnerungs-Chip bleibt');
+  assert.notEqual(reminderRow(active).value, '', 'laufend: die Leseansicht nennt die Erinnerung');
   assert.match(liveCard, /subscription-card__due/, 'laufend: die Faelligkeit bleibt');
   assert.match(liveCard, /subscriptions\.dueInDays/);
   assert.notEqual(nextRow(active).value, '', 'laufend: die Leseansicht nennt die naechste Zahlung');

@@ -4833,6 +4833,7 @@
         "logoSearchEmpty": "لم يتم العثور على شعارات مدعومة.",
         "logoSearchError": "تعذر تحميل الشعارات.",
         "errorSubscriptionGone": "لم يعد هذا الاشتراك موجودًا.",
+        "errorSubscriptionCompleted": "هذا الاشتراك مكتمل. لا يمكن تسجيل دفعة أخرى إلا بعد أن يصبح نشطًا مجددًا.",
         "errorCategoryGone": "لم تعد هذه الفئة موجودة.",
         "errorPaymentMethodGone": "لم تعد طريقة الدفع هذه موجودة.",
         "errorSelectedCategoryGone": "لم تعد الفئة المحددة موجودة.",

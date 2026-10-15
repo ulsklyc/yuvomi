@@ -475,6 +475,31 @@ try {
     const datedRenew = await jsonReq('POST', `/${dated.body.data.id}/renew`, {});
     assert.equal(datedRenew.body.data.status, 'completed');
 
+    // "Bezahlt" auf einem abgeschlossenen Abo (#2011): 409 mit seinem Grund,
+    // und nichts aendert sich - kein weiterer Zaehler, kein neuer Abschluss,
+    // kein weiter vorgerueckter Tag, keine Buchung. Vorher zaehlte jeder Klick
+    // eine Zahlung, die es nie gab, und ein spaeteres Reaktivieren begann zu spaet.
+    const subRow = (id) => ({ ...database.prepare(
+      'SELECT occurrences_done, completed_at, next_payment_date, enabled, budget_entry_id FROM budget_subscriptions WHERE id = ?',
+    ).get(id) });
+    const entryCount = () => database.prepare('SELECT COUNT(*) AS n FROM budget_entries').get().n;
+    const once = await jsonReq('POST', '', { ...endBase, name: 'Einmal', next_payment_date: '2027-01-20', end_type: 'after_count', occurrence_count: 1 });
+    assert.equal((await jsonReq('POST', `/${once.body.data.id}/renew`, {})).body.data.status, 'completed');
+    for (const id of [once.body.data.id, dated.body.data.id]) {
+      assert.ok(subRow(id).completed_at, `${id} ist abgeschlossen`);
+      // Ein frueherer Abschlusszeitpunkt, damit ein neu gesetztes completed_at
+      // auffiele (strftime hat Sekundenaufloesung).
+      database.prepare("UPDATE budget_subscriptions SET completed_at = '2020-01-01T00:00:00Z' WHERE id = ?").run(id);
+      const before = subRow(id);
+      const entriesBefore = entryCount();
+      const refused = await jsonReq('POST', `/${id}/renew`, {});
+      assert.equal(refused.status, 409, `abgeschlossen ${id}: ${JSON.stringify(refused.body)}`);
+      assert.equal(refused.body.reason, 'subscriptions_subscription_completed');
+      assert.deepEqual(subRow(id), before, `abgeschlossen ${id}: Zaehler, Abschluss und Datum unveraendert`);
+      assert.equal(entryCount(), entriesBefore, `abgeschlossen ${id}: keine Buchung`);
+      assert.equal(database.prepare("SELECT COUNT(*) AS n FROM reminders WHERE entity_type = 'subscription' AND entity_id = ?").get(id).n, 0, 'keine Erinnerung');
+    }
+
     // Reaktivieren nach dem Abschluss (#2009): der bezahlte Tag ist bezahlt.
     // Der Abschluss rueckte das Datum nicht vor, also buchte eine Reaktivierung
     // den letzten bezahlten Tag ein zweites Mal - seit #2008 sichtbar, weil die

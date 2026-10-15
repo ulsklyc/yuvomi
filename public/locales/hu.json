@@ -4472,6 +4472,7 @@
         "logoSearchEmpty": "Nem található támogatott logó.",
         "logoSearchError": "A logók betöltése sikertelen.",
         "errorSubscriptionGone": "Ez az előfizetés már nem létezik.",
+        "errorSubscriptionCompleted": "Ez az előfizetés befejeződött. Újabb fizetést csak akkor lehet rögzíteni, ha ismét aktív.",
         "errorCategoryGone": "Ez a kategória már nem létezik.",
         "errorPaymentMethodGone": "Ez a fizetési mód már nem létezik.",
         "errorSelectedCategoryGone": "A kiválasztott kategória már nem létezik.",

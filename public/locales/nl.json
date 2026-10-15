@@ -4472,6 +4472,7 @@
         "logoSearchEmpty": "Geen ondersteunde logo’s gevonden.",
         "logoSearchError": "Logo’s konden niet worden geladen.",
         "errorSubscriptionGone": "Dit abonnement bestaat niet meer.",
+        "errorSubscriptionCompleted": "Dit abonnement is voltooid. Een volgende betaling kan pas worden geboekt als het weer actief is.",
         "errorCategoryGone": "Deze categorie bestaat niet meer.",
         "errorPaymentMethodGone": "Deze betaalmethode bestaat niet meer.",
         "errorSelectedCategoryGone": "De gekozen categorie bestaat niet meer.",

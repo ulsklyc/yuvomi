@@ -4472,6 +4472,7 @@
         "logoSearchEmpty": "Tidak ada logo yang didukung ditemukan.",
         "logoSearchError": "Logo tidak dapat dimuat.",
         "errorSubscriptionGone": "Langganan ini sudah tidak ada.",
+        "errorSubscriptionCompleted": "Langganan ini sudah selesai. Pembayaran berikutnya baru bisa dicatat setelah langganan aktif kembali.",
         "errorCategoryGone": "Kategori ini sudah tidak ada.",
         "errorPaymentMethodGone": "Metode pembayaran ini sudah tidak ada.",
         "errorSelectedCategoryGone": "Kategori yang dipilih sudah tidak ada.",

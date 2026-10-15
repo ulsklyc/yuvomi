@@ -183,6 +183,8 @@ export const CASE_MESSAGES = new Map([
   // Sichtbarkeitsfilter, ein fremdes privates Abo endet mit 403. Ein Loeschen
   // mit diesem Grund ist deshalb ein Erfolg (isAlreadyDeleted).
   ['subscriptions_subscription_not_found', 'subscriptions.errorSubscriptionGone'],
+  // Ein abgeschlossenes Abo laesst sich nicht als bezahlt markieren (#2011).
+  ['subscriptions_subscription_completed', 'subscriptions.errorSubscriptionCompleted'],
   ['subscriptions_category_not_found', 'subscriptions.errorCategoryGone'],
   ['subscriptions_payment_method_not_found', 'subscriptions.errorPaymentMethodGone'],
   // Nicht die Kategorie, um die es geht, sondern die im Abo-Dialog GEWAEHLTE:

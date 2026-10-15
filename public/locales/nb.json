@@ -4472,6 +4472,7 @@
         "logoSearchEmpty": "Ingen støttede logoer funnet.",
         "logoSearchError": "Logoer kunne ikke lastes.",
         "errorSubscriptionGone": "Dette abonnementet finnes ikke lenger.",
+        "errorSubscriptionCompleted": "Dette abonnementet er fullført. En ny betaling kan først registreres når det er aktivt igjen.",
         "errorCategoryGone": "Denne kategorien finnes ikke lenger.",
         "errorPaymentMethodGone": "Denne betalingsmetoden finnes ikke lenger.",
         "errorSelectedCategoryGone": "Den valgte kategorien finnes ikke lenger.",

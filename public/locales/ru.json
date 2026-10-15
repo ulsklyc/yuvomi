@@ -4712,6 +4712,7 @@
         "logoSearchEmpty": "Поддерживаемые логотипы не найдены.",
         "logoSearchError": "Не удалось загрузить логотипы.",
         "errorSubscriptionGone": "Этой подписки больше нет.",
+        "errorSubscriptionCompleted": "Эта подписка завершена. Следующий платёж можно записать, только когда она снова станет активной.",
         "errorCategoryGone": "Этой категории больше нет.",
         "errorPaymentMethodGone": "Этого способа оплаты больше нет.",
         "errorSelectedCategoryGone": "Выбранной категории больше нет.",

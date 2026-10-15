@@ -4472,6 +4472,7 @@
         "logoSearchEmpty": "Desteklenen logo bulunamadı.",
         "logoSearchError": "Logolar yüklenemedi.",
         "errorSubscriptionGone": "Bu abonelik artık mevcut değil.",
+        "errorSubscriptionCompleted": "Bu abonelik tamamlandı. Yeni bir ödeme ancak abonelik yeniden etkin olduğunda kaydedilebilir.",
         "errorCategoryGone": "Bu kategori artık mevcut değil.",
         "errorPaymentMethodGone": "Bu ödeme yöntemi artık mevcut değil.",
         "errorSelectedCategoryGone": "Seçilen kategori artık mevcut değil.",

@@ -4712,6 +4712,7 @@
         "logoSearchEmpty": "Nie znaleziono obsługiwanych logo.",
         "logoSearchError": "Nie udało się załadować logo.",
         "errorSubscriptionGone": "Ta subskrypcja już nie istnieje.",
+        "errorSubscriptionCompleted": "Ta subskrypcja jest zakończona. Kolejną płatność można zapisać dopiero, gdy znów będzie aktywna.",
         "errorCategoryGone": "Ta kategoria już nie istnieje.",
         "errorPaymentMethodGone": "Ta metoda płatności już nie istnieje.",
         "errorSelectedCategoryGone": "Wybrana kategoria już nie istnieje.",

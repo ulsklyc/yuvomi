@@ -4593,6 +4593,7 @@
         "logoSearchEmpty": "Nebyla nalezena žádná podporovaná loga.",
         "logoSearchError": "Loga se nepodařilo načíst.",
         "errorSubscriptionGone": "Toto předplatné už neexistuje.",
+        "errorSubscriptionCompleted": "Toto předplatné je dokončené. Další platbu lze zaznamenat, až bude znovu aktivní.",
         "errorCategoryGone": "Tato kategorie už neexistuje.",
         "errorPaymentMethodGone": "Tato platební metoda už neexistuje.",
         "errorSelectedCategoryGone": "Vybraná kategorie už neexistuje.",

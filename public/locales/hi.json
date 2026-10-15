@@ -4472,6 +4472,7 @@
         "logoSearchEmpty": "कोई समर्थित लोगो नहीं मिला।",
         "logoSearchError": "लोगो लोड नहीं हो सके।",
         "errorSubscriptionGone": "यह सदस्यता अब मौजूद नहीं है।",
+        "errorSubscriptionCompleted": "यह सदस्यता पूर्ण हो चुकी है। अगला भुगतान तभी दर्ज किया जा सकता है जब यह फिर से सक्रिय हो।",
         "errorCategoryGone": "यह श्रेणी अब मौजूद नहीं है।",
         "errorPaymentMethodGone": "यह भुगतान विधि अब मौजूद नहीं है।",
         "errorSelectedCategoryGone": "चुनी गई श्रेणी अब मौजूद नहीं है।",

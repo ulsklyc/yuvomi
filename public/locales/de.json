@@ -4472,6 +4472,7 @@
         "logoSearchEmpty": "Keine unterstützten Logos gefunden.",
         "logoSearchError": "Logos konnten nicht geladen werden.",
         "errorSubscriptionGone": "Dieses Abonnement gibt es nicht mehr.",
+        "errorSubscriptionCompleted": "Dieses Abonnement ist abgeschlossen. Eine weitere Zahlung lässt sich erst buchen, wenn es wieder aktiv ist.",
         "errorCategoryGone": "Diese Kategorie gibt es nicht mehr.",
         "errorPaymentMethodGone": "Diese Zahlungsart gibt es nicht mehr.",
         "errorSelectedCategoryGone": "Die gewählte Kategorie gibt es nicht mehr.",

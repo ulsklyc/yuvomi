@@ -4472,6 +4472,7 @@
         "logoSearchEmpty": "No supported logos found.",
         "logoSearchError": "Logos could not be loaded.",
         "errorSubscriptionGone": "This subscription no longer exists.",
+        "errorSubscriptionCompleted": "This subscription is completed. Another payment can only be recorded once it is active again.",
         "errorCategoryGone": "This category no longer exists.",
         "errorPaymentMethodGone": "This payment method no longer exists.",
         "errorSelectedCategoryGone": "The selected category no longer exists.",

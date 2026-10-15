@@ -154,7 +154,7 @@ const CASE_REASONS = {
     put: `${SUBSCRIPTION_GONE}, ${SELECTED_META_GONE}, ${SUBSCRIPTION_CHECKS}`,
     delete: SUBSCRIPTION_GONE,
   },
-  '/api/v1/budget/subscriptions/{id}/renew': { post: SUBSCRIPTION_GONE },
+  '/api/v1/budget/subscriptions/{id}/renew': { post: `${SUBSCRIPTION_GONE}, \`subscriptions_subscription_completed\` (409, the subscription is completed; reactivate it first)` },
   '/api/v1/budget/subscriptions/categories': { post: '`subscriptions_category_exists` (409)' },
   '/api/v1/budget/subscriptions/categories/{id}': {
     put: '`subscriptions_category_not_found` (404), `subscriptions_category_exists` (409)',

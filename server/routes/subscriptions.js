@@ -972,6 +972,14 @@ router.post('/:id/renew', async (req, res) => {
     // legt eine Buchung an und schliesst ein endliches Abo ab. Es folgt
     // deshalb derselben Regel wie PUT und DELETE - sie fehlte hier.
     if (!mayEditSub(req, current)) return res.status(403).json({ error: 'You cannot modify this subscription.', code: 403 });
+    // Ein abgeschlossenes Abo hat keine naechste Zahlung (#2011). Ohne diese
+    // Absage zaehlte jedes "Bezahlt" eine Zahlung, die es nie gab, setzte den
+    // Abschluss neu und rueckte das Datum weiter - ein spaeteres Reaktivieren
+    // begann zu spaet. Die Pruefung liest `current` aus demselben synchronen
+    // Schritt, in dem renewBooking schreibt: kein await dazwischen.
+    if (current.completed_at) {
+      return res.status(409).json({ error: 'A completed subscription cannot be renewed.', code: 409, reason: 'subscriptions_subscription_completed' });
+    }
     // Bis hierher kein await: Datum, Zaehler, Abschluss und die Uebergabe der
     // bezahlten Buchung stehen im selben synchronen Schritt wie das Lesen
     // oben (#2004).

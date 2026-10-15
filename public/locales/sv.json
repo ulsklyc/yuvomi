@@ -4472,6 +4472,7 @@
         "logoSearchEmpty": "Inga logotyper som stöds hittades.",
         "logoSearchError": "Logotyper kunde inte läsas in.",
         "errorSubscriptionGone": "Den här prenumerationen finns inte längre.",
+        "errorSubscriptionCompleted": "Den här prenumerationen är avslutad. En ny betalning kan registreras först när den är aktiv igen.",
         "errorCategoryGone": "Den här kategorin finns inte längre.",
         "errorPaymentMethodGone": "Den här betalningsmetoden finns inte längre.",
         "errorSelectedCategoryGone": "Den valda kategorin finns inte längre.",

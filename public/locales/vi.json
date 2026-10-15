@@ -4472,6 +4472,7 @@
         "logoSearchEmpty": "Không tìm thấy logo được hỗ trợ.",
         "logoSearchError": "Không thể tải logo.",
         "errorSubscriptionGone": "Đăng ký này không còn tồn tại.",
+        "errorSubscriptionCompleted": "Gói đăng ký này đã hoàn tất. Chỉ có thể ghi nhận khoản thanh toán tiếp theo khi gói hoạt động trở lại.",
         "errorCategoryGone": "Danh mục này không còn tồn tại.",
         "errorPaymentMethodGone": "Phương thức thanh toán này không còn tồn tại.",
         "errorSelectedCategoryGone": "Danh mục đã chọn không còn tồn tại.",

@@ -4472,6 +4472,7 @@
         "logoSearchEmpty": "対応しているロゴが見つかりません。",
         "logoSearchError": "ロゴを読み込めませんでした。",
         "errorSubscriptionGone": "このサブスクリプションはもう存在しません。",
+        "errorSubscriptionCompleted": "このサブスクリプションは完了しています。再び有効にするまで、次の支払いは記録できません。",
         "errorCategoryGone": "このカテゴリはもう存在しません。",
         "errorPaymentMethodGone": "この支払い方法はもう存在しません。",
         "errorSelectedCategoryGone": "選択したカテゴリはもう存在しません。",

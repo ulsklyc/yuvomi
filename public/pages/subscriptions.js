@@ -1072,15 +1072,21 @@ function renderCard(subscription) {
   // der Zahlung, die nach dem Abschluss kaeme - es zaehlt erst wieder, wenn das
   // Abo reaktiviert wird, und der Dialog bietet es dann an. Auf der Karte stand
   // es als „in 30 Tagen"; die Ende-Zeile sagt stattdessen „Abgeschlossen am".
+  //
+  // Es hat auch keine naechste ZAHLUNG und keine Erinnerung (#2011): der Server
+  // lehnt "Bezahlt" ab, syncReminder hat die Erinnerung entfernt. Knopf,
+  // Wischgeste und Erinnerungs-Chip fallen deshalb weg, statt eine Handlung
+  // und einen Termin anzubieten, die es nicht gibt.
   const completed = isCompleted(subscription);
   const overdue = !completed && daysUntil(subscription.next_payment_date) < 0;
+  const canRenew = !ro && !completed;
   return `
     <div class="swipe-row${ro ? ' swipe-row--static' : ''}" data-swipe-id="${subscription.id}">
-      ${ro ? '' : `<div class="swipe-reveal swipe-reveal--done swipe-reveal--leading" aria-hidden="true">
+      ${canRenew ? `<div class="swipe-reveal swipe-reveal--done swipe-reveal--leading" aria-hidden="true">
         <i data-lucide="calendar-check" class="icon-md"></i>
         <span>${t('subscriptions.markRenewed')}</span>
-      </div>
-      <div class="swipe-reveal swipe-reveal--delete swipe-reveal--trailing" aria-hidden="true">
+      </div>` : ''}
+      ${ro ? '' : `<div class="swipe-reveal swipe-reveal--delete swipe-reveal--trailing" aria-hidden="true">
         <i data-lucide="trash-2" class="icon-md"></i>
         <span>${t('common.delete')}</span>
       </div>`}
@@ -1103,7 +1109,7 @@ function renderCard(subscription) {
             ${completed ? '' : `<span class="subscription-card__due${overdue ? ' subscription-card__due--overdue' : ''}"><i data-lucide="${overdue ? 'triangle-alert' : 'calendar-clock'}" aria-hidden="true"></i><span>${formatDate(subscription.next_payment_date)} ·</span> <span>${dueLabel(subscription)}</span></span>`}
             <span class="subscription-card__meta-cycle">${cycleLabel(subscription)}</span>
             <span class="subscription-card__meta-extra">${esc(rowPaymentMethodLabel(subscription))}</span>
-            <span class="subscription-card__meta-extra"><i data-lucide="${subscription.reminder_enabled === false ? 'bell-off' : 'bell'}" aria-hidden="true"></i>${subscription.reminder_enabled === false ? t('subscriptions.noReminder') : t('subscriptions.reminderMeta', { count: subscription.reminder_days })}</span>
+            ${completed ? '' : `<span class="subscription-card__meta-extra"><i data-lucide="${subscription.reminder_enabled === false ? 'bell-off' : 'bell'}" aria-hidden="true"></i>${subscription.reminder_enabled === false ? t('subscriptions.noReminder') : t('subscriptions.reminderMeta', { count: subscription.reminder_days })}</span>`}
             ${endInfo ? `<span><i data-lucide="${endInfo.icon}" aria-hidden="true"></i>${esc(endInfo.text)}</span>` : ''}
           </span>
         </span>
@@ -1114,9 +1120,9 @@ function renderCard(subscription) {
         </span>
         ${ro ? '' : `<span class="sr-only">${t('common.edit')}</span>`}
       </button>
-      ${ro ? '' : `<div class="row-actions subscription-card__actions">
+      ${canRenew ? `<div class="row-actions subscription-card__actions">
         ${rowActionHtml({ icon: 'calendar-check', action: 'renew', label: t('subscriptions.markRenewedNamed', { name: subscription.name }) })}
-      </div>`}
+      </div>` : ''}
     </article>
     </div>
   `;
@@ -1140,6 +1146,8 @@ function wireSubscriptionSwipe(host) {
       reveal: '.swipe-reveal--done',
       run: (row) => {
         const subscription = subscriptionFor(row);
+        // Eine abgeschlossene Zeile hat kein Panel am Anfang (#2011); der Wisch
+        // dorthin federt zurueck, renewSubscription fragt gar nicht erst.
         if (subscription) renewSubscription(subscription);
       },
     },
@@ -1375,8 +1383,9 @@ function subscriptionReadSections(subscription) {
       // Abgeschlossen: keine naechste Zahlung (#2009, wie die Karte).
       value: subscription.next_payment_date && !isCompleted(subscription)
         ? `${formatDate(subscription.next_payment_date)} · ${dueLabel(subscription)}` : '' },
+    // Abgeschlossen: keine Erinnerung (#2011) - syncReminder hat sie entfernt.
     { icon: subscription.reminder_enabled === false ? 'bell-off' : 'bell', label: t('subscriptions.reminderDaysLabel'),
-      value: subscription.reminder_enabled === false ? t('subscriptions.noReminder') : t('subscriptions.reminderMeta', { count: subscription.reminder_days }) },
+      value: isCompleted(subscription) ? '' : subscription.reminder_enabled === false ? t('subscriptions.noReminder') : t('subscriptions.reminderMeta', { count: subscription.reminder_days }) },
     { icon: endInfo?.icon || 'calendar-x', label: t('subscriptions.endLabel'), value: endInfo?.text || '' },
     { icon: 'tags', label: t('subscriptions.categoryLabel'), value: subscription.category_id ? rowCategoryLabel(subscription) : '' },
     { icon: 'wallet-cards', label: t('subscriptions.paymentMethodLabel'),
@@ -1934,6 +1943,9 @@ function openLogoPickerModal(panel, initialQuery, onSelect) {
 // eine Eigenschaft des Wegs.
 async function renewSubscription(subscription) {
   if (readOnly()) return;
+  // Ein abgeschlossenes Abo hat keine naechste Zahlung (#2011): weder Knopf
+  // noch Geste fragen nach, der Server lehnt es ohnehin ab.
+  if (isCompleted(subscription)) return;
   const confirmed = await confirmModal(
     t('subscriptions.renewConfirm', { name: subscription.name }),
     { detail: t('subscriptions.renewConfirmDetail', { date: formatDate(subscription.next_payment_date) }) });
@@ -1945,7 +1957,13 @@ async function renewSubscription(subscription) {
     const completed = response.data?.status === 'completed';
     window.yuvomi?.showToast(t(completed ? 'subscriptions.completedToast' : 'subscriptions.renewedToast'), 'success');
   } catch (err) {
-    reportError(err, { owner });
+    await reportError(err, { owner });
+    // Schon abgeschlossen (#2011): die Karte war veraltet - ein anderes
+    // Haushaltsmitglied hat die letzte Zahlung gebucht. Neu laden, damit der
+    // Knopf verschwindet; der Satz steht schon da.
+    if (err?.status !== 403 && err?.data?.reason === 'subscriptions_subscription_completed' && isCurrentOwner(owner)) {
+      if (await reload(undefined, { owner, quiet: true })) refocusAfterRender();
+    }
   }
 }
 

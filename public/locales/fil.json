@@ -4472,6 +4472,7 @@
         "logoSearchEmpty": "Walang natagpuang suportadong logo.",
         "logoSearchError": "Hindi ma-load ang mga logo.",
         "errorSubscriptionGone": "Wala na ang subscription na ito.",
+        "errorSubscriptionCompleted": "Natapos na ang subscription na ito. Makakapagtala lang ng isa pang bayad kapag aktibo na ulit ito.",
         "errorCategoryGone": "Wala na ang kategoryang ito.",
         "errorPaymentMethodGone": "Wala na ang paraan ng pagbabayad na ito.",
         "errorSelectedCategoryGone": "Wala na ang napiling kategorya.",

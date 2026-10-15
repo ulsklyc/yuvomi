@@ -4472,6 +4472,7 @@
         "logoSearchEmpty": "No se encontraron logotipos compatibles.",
         "logoSearchError": "No se pudieron cargar los logotipos.",
         "errorSubscriptionGone": "Esta suscripción ya no existe.",
+        "errorSubscriptionCompleted": "Esta suscripción está completada. Solo se puede registrar otro pago cuando vuelva a estar activa.",
         "errorCategoryGone": "Esta categoría ya no existe.",
         "errorPaymentMethodGone": "Este método de pago ya no existe.",
         "errorSelectedCategoryGone": "La categoría seleccionada ya no existe.",
