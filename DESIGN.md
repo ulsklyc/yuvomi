@@ -2311,6 +2311,10 @@ Gemessen am echten Markup: `test:module-readonly-ui`, `test:budget-readonly-ui`,
   beim Aufbau (`--color-text-tertiary`, hell #6B675F); vorher setzte der Zustand nach jeder
   Navigation den App-Akzent, und der Ueberlauf sah aus wie der aktive Tab. Liegt die aktive
   Route im Blatt, traegt er ihren Modulton. Guard: `test:frontend-audit`.
+- **Bei offenem Mehr-Blatt bleibt die Pille auf der aktuellen Seite und Mehr neutral
+  (Entscheidung Ulas 2026-10-15):** das Blatt liegt modal ueber dem Ort, wie ein iOS-Sheet, das
+  die Tab-Auswahl nicht aendert; eine zweite Markierung in der Leiste waere eine zweite
+  Pillen-Sprache.
 - **Die Pille der Leiste ist dunkel eine halbe Stufe kraeftiger** (`--nav-indicator-tint`: hell
   16 %, dunkel 24 %). Pixelprobe 390x844 gegen die Kapsel: 1,32/1,28:1 -> 1,51/1,48:1;
   Akzentzeichen auf der Pille 3,70:1 (Grafik, >= 3:1), Labelton 4,93:1.
