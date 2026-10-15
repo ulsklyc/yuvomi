@@ -1187,3 +1187,27 @@ test('Seite: Verwalten-Erfolg - neu aufgebaut nur, wenn der eigene Dialog noch o
       : 'der Neuaufbau ersetzt den Dialog, den der Nutzer inzwischen geoeffnet hat');
   }
 });
+
+test('Seite: Verwalten-Erfolg - oeffnet der Nutzer WAEHREND des Ladens danach einen anderen Dialog, wird nicht neu aufgebaut (#1997)', async () => {
+  // Codex an #2021: der eigene Dialog war beim Schliessen noch offen, das
+  // Laden danach dauert - was der Nutzer in dieser Zeit oeffnet, ersetzte
+  // openMetadataModal() sonst samt Eingabe.
+  const panel = verwalten({ '#subscription-new-category': 'Musik' });
+  let opened = 0;
+  let kontext = 'nach-dem-schliessen';
+  globalThis.__modalContextId = () => kontext;
+  globalThis.__openModal = (opts) => { opened += 1; if (opened === 1) opts.onSave(panel); };
+  try {
+    await mitSeite(() => mit({
+      post: async () => ({ data: { id: 99, name: 'Musik' } }),
+      get: (path) => { if (path === '/budget/subscriptions/meta') kontext = 'ein-anderer-dialog'; return undefined; },
+    }, async () => {
+      page.openMetadataModal();
+      await panel.querySelector('#subscription-add-category').handlers.click();
+    }));
+  } finally {
+    delete globalThis.__openModal;
+    delete globalThis.__modalContextId;
+  }
+  assert.equal(opened, 1, 'der Neuaufbau ersetzt den Dialog, der waehrend des Ladens aufging');
+});

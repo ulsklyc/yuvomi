@@ -641,3 +641,26 @@ test('Erfolgsantwort nach einer Rueckfrage ueber dem Dialog: der zurueckgeholte 
   await save.answer();
   assert.equal(a.closed, true, 'der zurueckgeholte eigene Dialog blieb nach dem Erfolg offen');
 });
+
+test('Erfolgsantwort, waehrend der eigene Dialog unter einer Rueckfrage geparkt liegt: die Rueckfrage bleibt, beim Zurueckholen geht er zu', async () => {
+  // Codex an #2021: der geparkte Dialog ist nicht der aktive, aber auch nicht
+  // ersetzt. Als „weg" behandelt, blieb er nach „Abbrechen" offen, obwohl er
+  // gespeichert war - mit gesperrtem Speichern-Knopf.
+  await freshDocument({ width: 1024 });
+  withLocation();
+  globalThis.matchMedia = () => ({ matches: true });
+  const a = openDialog({ openedAt: 0 });
+  const save = startSave();
+  let frage = null;
+  let frageZuDurchAntwort = null;
+  const answer = await askOverModal(async () => {
+    frage = openDialog({ openedAt: 1000 });
+    await save.answer();
+    frageZuDurchAntwort = frage.closed;
+    await closeModal({ force: true }); // „Abbrechen"
+    return 'abgebrochen';
+  });
+  assert.equal(answer, 'abgebrochen');
+  assert.equal(frageZuDurchAntwort, false, 'die spaete Antwort hat die Rueckfrage geschlossen');
+  assert.equal(a.closed, true, 'der gespeicherte Dialog blieb nach dem Abbrechen der Rueckfrage offen');
+});

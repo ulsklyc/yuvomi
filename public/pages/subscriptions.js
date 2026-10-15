@@ -2133,7 +2133,11 @@ async function saveMetadata(write, goneId = null) {
   // ebenso wie ein closeModal() ohne Kontext (#1997).
   const own = isOwnModalOpen(dialog);
   await closeModal({ force: true, context: dialog });
-  if (await reload(undefined, { owner }) && own) {
+  // Auch das Laden danach braucht Zeit: was der Nutzer IN DIESER Zeit oeffnet,
+  // gehoert ebenso ihm. Der Kontext von jetzt (eigener Dialog zu) muss nach dem
+  // Laden noch gelten - sonst hat inzwischen ein anderer Dialog den Slot.
+  const afterClose = captureModalContext();
+  if (await reload(undefined, { owner }) && own && isModalContextCurrent(afterClose)) {
     refocusAfterRender();
     openMetadataModal();
   }
