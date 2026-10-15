@@ -5,7 +5,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, selectModal, advancedSection, promptModal, confirmModal, refocusAfterRender, captureModalContext, isModalContextCurrent } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, selectModal, advancedSection, promptModal, confirmModal, refocusAfterRender, renderKeepingFocus, captureModalContext, isModalContextCurrent } from '/components/modal.js';
 import { t, formatDate, getLocale } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
@@ -166,28 +166,6 @@ function stillShown(owner) {
   return Boolean(owner) && _container === owner && owner.isConnected === true;
 }
 
-/**
- * NACH EINEM LADEN: WELCHE SEITE ZEICHNET (#2005). Der Stand (`state`) ist
- * modulweit, nicht je Seite: was ein Weg nach "verlassen und zurueck" noch
- * laedt - das Nachladen nach einem Ordner-Loeschen etwa -, ist danach auch der
- * Stand der neu betretenen Seite. Gezeichnet wird deshalb die Seite, die jetzt
- * zu sehen ist: die ausloesende, solange sie gezeigt wird, sonst die neu
- * betretene, sobald deren eigener Aufbau fertig ist (vorher zeichnet der ihn
- * selbst, aus demselben Stand). Fokus und Dialoge bleiben Sache der
- * ausloesenden Seite - dafuer die Rueckgabe.
- *
- * @param {object|null} owner - der Container der Seite, VOR der Anfrage gemerkt
- * @returns {boolean} ob die ausloesende Seite noch gezeigt wird
- */
-function drawLoaded(owner, { motion = false } = {}) {
-  if (stillShown(owner)) {
-    renderAll({ motion });
-    return true;
-  }
-  if (_built === _container && stillShown(_container)) renderAll({ motion });
-  return false;
-}
-
 async function reportError(err, { owner = null, dialog = null } = {}) {
   window.yuvomi?.showToast(errorText(err), 'danger');
   if (!isGone(err)) return;
@@ -206,8 +184,9 @@ async function reportError(err, { owner = null, dialog = null } = {}) {
     console.warn('[Documents] reload after a gone answer failed:', loadErr);
     return;
   }
-  if (!drawLoaded(owner)) return;
+  if (!stillShown(owner)) return;
   renderDmsHeaderBtn();
+  renderAll();
   refocusAfterRender();
 }
 
@@ -235,7 +214,7 @@ async function offerCurrentFolders(select, rootKey, optionsHtml, owner) {
   } catch (err) {
     console.warn('[Documents] folder reload failed:', err);
   }
-  drawLoaded(owner);
+  if (stillShown(owner)) renderAll();
   select.replaceChildren();
   select.insertAdjacentHTML('beforeend', `<option value="">${esc(t(rootKey))}</option>${optionsHtml(goneId)}`);
   select.value = '';
@@ -328,7 +307,7 @@ function persistExpandedFolders() {
   }
 }
 let _container = null;
-// Der Container, dessen erster Aufbau fertig ist (drawLoaded, #2005).
+// Der Container, dessen erster Aufbau fertig ist (applyFolderDeleteResult, #2005).
 let _built = null;
 let _search = null;
 let _statusTablist = null;
@@ -1029,7 +1008,8 @@ async function selectStatus(status) {
   showDocumentsLoading();
   const owner = _container;
   await loadDocuments();
-  drawLoaded(owner);
+  if (!stillShown(owner)) return;
+  renderAll();
 }
 
 // Über den page-search-Handle leeren, damit auch der Lösch-Knopf im Feld
@@ -1613,7 +1593,8 @@ async function moveFolder(folder) {
     if (chosen !== '') state.expanded.add(Number(chosen));
     persistExpandedFolders();
     await Promise.all([loadFolders(), loadDocuments()]);
-    if (!drawLoaded(owner)) return;
+    if (!stillShown(owner)) return;
+    renderAll();
     refocusAfterRender();
   } catch (err) {
     reportError(err, { owner });
@@ -1672,7 +1653,8 @@ async function renameFolder(folder) {
     // Dokumente mitladen: `folder_name` steckt im Server-Join und stünde sonst
     // auf den Karten weiter mit dem alten Namen.
     await Promise.all([loadFolders(), loadDocuments()]);
-    if (!drawLoaded(owner)) return;
+    if (!stillShown(owner)) return;
+    renderAll();
     refocusAfterRender();
   } catch (err) {
     reportError(err, { owner });
@@ -1844,11 +1826,23 @@ async function applyFolderDeleteResult(
     window.yuvomi?.showToast(t('documents.folderDeletedToast'), 'default');
   }
   if (result.folder_deleted !== false && selectedSubtree.has(Number(state.folderId))) state.folderId = '';
-  await Promise.all([loadFolders(), loadDocuments()]);
-  // Auch nach "verlassen und zurueck": der Stand ohne den Ordner ist jetzt der
-  // der neuen Seite, und die zeigt ihn (#2005). Den Fokus bekommt nur die
-  // ausloesende Seite zurueck - die Rueckgabe sagt, ob sie noch gezeigt wird.
-  return drawLoaded(owner);
+  const applied = await Promise.all([loadFolders(), loadDocuments()]);
+  if (stillShown(owner)) {
+    renderAll();
+    return true;
+  }
+  // VERLASSEN UND ZURUECK (#2005). Der Stand ist modulweit: ohne den Ordner
+  // ist er jetzt auch der der neu betretenen Seite, und die soll den
+  // geloeschten Ordner nicht weiter zeigen. Gezeichnet wird nur,
+  //  - wenn beide Antworten angenommen wurden - hat die neue Seite inzwischen
+  //    selbst neuer geladen (Status-Reiter), zeichnet sie das selbst;
+  //  - wenn ihr erster Aufbau fertig ist - vorher zeichnet der aus demselben Stand;
+  //  - mit ihrem Fokus: die Zeile, der Chip, auf dem sie steht, bleibt es.
+  // Die Rueckgabe sagt dem Aufrufer, dass der Fokus nicht ihm gehoert.
+  if (applied.every(Boolean) && _built === _container && stillShown(_container)) {
+    renderKeepingFocus(() => renderAll());
+  }
+  return false;
 }
 
 async function handleFolderDeleteError(err, folder, { delayed = false, owner = null } = {}) {
@@ -2268,7 +2262,8 @@ async function runDocumentAction(action, doc) {
       await api.patch(`/documents/${doc.id}/archive`, { archived: doc.status !== 'archived' });
       window.yuvomi?.showToast(doc.status === 'archived' ? t('documents.restoredToast') : t('documents.archivedToast'), 'success');
       await loadDocuments();
-      drawLoaded(owner, { motion: true });
+      if (!stillShown(owner)) return;
+      renderAll({ motion: true });
     } catch (err) {
       reportError(err, { owner });
     }
@@ -2348,7 +2343,8 @@ function deleteDocuments(docs) {
       await loadDocuments();
       // Und noch einmal NACH dem Laden (Codex an #2001): waehrend des GET kann
       // die Seite verlassen oder neu betreten worden sein.
-      drawLoaded(owner);
+      if (!stillShown(owner)) return;
+      renderAll();
     },
     restore: (err) => {
       if (!stillShown(owner)) return;
@@ -2456,7 +2452,8 @@ async function archiveSelected() {
       'success',
     );
     await loadDocuments();
-    drawLoaded(owner);
+    if (!stillShown(owner)) return;
+    renderAll();
   } catch (err) {
     reportError(err, { owner });
   }
@@ -2484,7 +2481,8 @@ async function moveSelected() {
     })));
     window.yuvomi?.showToast(t('documents.bulkMovedToast', { count: docs.length }), 'success');
     await loadDocuments();
-    if (!drawLoaded(owner)) return;
+    if (!stillShown(owner)) return;
+    renderAll();
     refocusAfterRender();
   } catch (err) {
     reportError(err, { owner });
@@ -2538,7 +2536,7 @@ export const __test = {
     _container = container;
     if (built) _built = container;
   },
-  loadMetaOptions,
+  loadMetaOptions, loadDocuments,
   // #1265: Nur-lesen und Besitzregel. Die Suite faehrt Markup und Handler.
   readOnly, mayManage, READ_SAFE_ACTIONS,
   renderActions, renderGridCard, renderListItem, emptyStateFor,
@@ -3193,7 +3191,7 @@ async function saveFolderUpload(panel, payload) {
     await runRateLimitedOperation(
       () => Promise.all([loadFolders(), loadDocuments()]),
     );
-    drawLoaded(owner);
+    if (stillShown(owner)) renderAll();
   } catch (refreshError) {
     // The writes have already completed. A failed refresh must not turn a
     // persisted upload into a reported upload failure.
@@ -3290,7 +3288,8 @@ async function saveDocument(event, doc, panel) {
     }
     closeModal({ force: true });
     await loadDocuments();
-    if (!drawLoaded(owner, { motion: true })) return;
+    if (!stillShown(owner)) return;
+    renderAll({ motion: true });
     refocusAfterRender();
   } catch (err) {
     // Das Dokument gibt es nicht mehr: der Dialog bearbeitet etwas Veraltetes,
@@ -3371,12 +3370,15 @@ function openFolderModal({ parentId = null } = {}) {
             persistExpandedFolders();
           }
           window.yuvomi?.showToast(t('documents.folderCreatedToast'), 'success');
-          state.folderId = String(res.data?.id || '');
+          // Den neuen Ordner waehlt nur die Seite, die ihn angelegt hat: nach
+          // "verlassen und zurueck" gehoert die Auswahl der neuen Seite (#2005).
+          if (stillShown(owner)) state.folderId = String(res.data?.id || '');
           await loadFolders();
           await loadDocuments();
           closeModal({ force: true });
+          if (!stillShown(owner)) return;
           applyFilters();
-          drawLoaded(owner);
+          renderAll();
         } catch (err) {
           error.textContent = errorText(err);
           error.hidden = false;
@@ -3654,7 +3656,8 @@ async function linkDmsDocument(item, accountId) {
     });
     closeModal({ force: true });
     await loadDocuments();
-    if (!drawLoaded(owner, { motion: true })) return true;
+    if (!stillShown(owner)) return true;
+    renderAll({ motion: true });
     refocusAfterRender();
     return true;
   } catch (err) {

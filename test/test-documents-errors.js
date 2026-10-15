@@ -1025,10 +1025,13 @@ test('Seite (#2005): die spaete Metadaten-Antwort einer verlassenen Seite - wede
 test('Seite (#2005): Ordner loeschen, die Antwort kommt nach "verlassen und zurueck" - die neue Seite zeigt den Stand ohne den Ordner', async () => {
   const impact = { data: { id: 3, removed_folders: 1, documents: 0, can_delete_documents: true, linked_records: {}, snapshot: 'a'.repeat(64) } };
   let refocus = 0;
+  let mitFokus = 0;
   globalThis.__refocusAfterRender = () => { refocus += 1; };
+  globalThis.__renderKeepingFocus = () => { mitFokus += 1; };
   try {
     for (const fertig of [true, false]) {
       refocus = 0;
+      mitFokus = 0;
       const alt = traeger();
       const neu = traeger();
       let ordner = null;
@@ -1045,6 +1048,9 @@ test('Seite (#2005): Ordner loeschen, die Antwort kommt nach "verlassen und zuru
       assert.deepEqual(ordner, [4], 'Vorbedingung: der Stand ohne den Ordner ist geladen');
       if (fertig) {
         assert.ok(neu.gefragt.includes('#documents-folder-browser'), 'die neue, fertig aufgebaute Seite zeichnet den Stand ohne den Ordner');
+        // Codex an #2020: renderAll() tauscht Zeilen, Chips und Ordner aus -
+        // der Fokus der neuen Seite muss ueber das Neuzeichnen getragen werden.
+        assert.equal(mitFokus, 1, 'die neue Seite wird mit ihrem Fokus neu gezeichnet');
       } else {
         // Wie bei der spaeten "gibt es nicht mehr"-Antwort: in eine Seite, die
         // noch aufbaut, zeichnet der alte Weg nicht - das tut ihr Aufbau.
@@ -1055,7 +1061,61 @@ test('Seite (#2005): Ordner loeschen, die Antwort kommt nach "verlassen und zuru
     }
   } finally {
     delete globalThis.__refocusAfterRender;
+    delete globalThis.__renderKeepingFocus;
   }
+});
+
+// Codex an #2020: laedt die neue Seite inzwischen selbst neuer (Status-Reiter),
+// nimmt der Applier die alte Antwort nicht an - und die alte Handlung darf dann
+// nicht aus dem ueberholten Stand zeichnen, sie ersetzte das Lade-Skelett der
+// neuen Seite mit Dokumenten des falschen Status.
+test('Seite (#2005): Ordner loeschen nach "verlassen und zurueck", die neue Seite laedt inzwischen selbst - die ueberholte Antwort zeichnet nicht', async () => {
+  const impact = { data: { id: 3, removed_folders: 1, documents: 0, can_delete_documents: true, linked_records: {}, snapshot: 'a'.repeat(64) } };
+  const alt = traeger();
+  const neu = traeger();
+  let eigenesLaden = null;
+  let dokumente = 0;
+  await mitSeite({ container: alt }, async () => {
+    await mit({
+      get: (path) => {
+        if (path.includes('/delete-impact')) return impact;
+        if (path.startsWith('/documents?status=') && dokumente++ === 0) {
+          // Die neue Seite wechselt den Reiter, waehrend das alte Nachladen laeuft.
+          eigenesLaden = page.loadDocuments();
+        }
+        return { data: [] };
+      },
+      delete: async () => { page.setContainerForTest(neu, { built: true }); return { data: { folder_deleted: true } }; },
+    }, () => page.deleteFolder({ ...FOLDERS[0] }));
+    assert.equal(await eigenesLaden, true, 'Vorbedingung: das Laden der neuen Seite ist das juengste');
+  });
+  assert.equal(dokumente, 2, 'Vorbedingung: zwei Dokument-Anfragen');
+  assert.deepEqual(neu.gefragt, [], 'die ueberholte Antwort zeichnet nicht in die neue Seite');
+});
+
+// Codex an #2020: ein Ordner, angelegt auf der alten Seite und erst nach
+// "verlassen und zurueck" bestaetigt, waehlt sich nicht in die neue Seite.
+test('Seite (#2005): neuer Ordner, die Antwort kommt nach "verlassen und zurueck" - die Ordnerauswahl der neuen Seite bleibt', async () => {
+  const panel = formular({ '#document-folder-name': 'Belege', '#document-folder-parent': '' });
+  let submit = null;
+  panel.querySelector('#document-folder-form').addEventListener = (type, fn) => { if (type === 'submit') submit = fn; };
+  const neu = traeger();
+  let auswahl = null;
+  await mitSeite({ container: traeger() }, async () => {
+    await mit({
+      post: async () => {
+        page.setContainerForTest(neu, { built: true });
+        page.state.folderId = '4';
+        return { data: { id: 77 } };
+      },
+    }, async () => {
+      globalThis.__openModal = (opts) => opts.onSave(panel);
+      try { page.openFolderModal(); } finally { delete globalThis.__openModal; }
+      await submit({ preventDefault() {} });
+    });
+    auswahl = page.state.folderId;
+  });
+  assert.equal(auswahl, '4', 'die Auswahl der neuen Seite');
 });
 
 test('Seite (#2005): Ordner samt Dokumenten loeschen mit Ruecknahme, Teilergebnis nach "verlassen und zurueck" - die neue Seite zeigt den Stand', async () => {
