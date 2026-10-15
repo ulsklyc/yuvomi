@@ -77,6 +77,9 @@ function normalizeSubject(raw) {
   }
 }
 
+/** Eine Pause laeuft nach dieser Zeit ab und heilt sich ohne Erneuerung (#1904). */
+const WALL_PAUSE_MAX_AGE_HOURS = 12;
+
 export function createPushService({ db, webpush = webpushDefault } = {}) {
   const getDb = () => (db || dbModule.get());
   // ensureVapid() läuft bei jedem Versand - der Hinweis auf den Platzhalter soll
@@ -152,7 +155,9 @@ export function createPushService({ db, webpush = webpushDefault } = {}) {
     // Deaktivieren noch dasteht. Synchron vor dem ersten `await`.
     if (!isActiveAccount(userId, { db: getDb() })) return 0;
     const { subject } = ensureVapid();
-    const subs = getDb().prepare('SELECT * FROM push_subscriptions WHERE user_id = ?').all(userId);
+    const subs = getDb().prepare(
+      `SELECT * FROM push_subscriptions WHERE user_id = ? AND (wall_paused_at IS NULL OR wall_paused_at < datetime('now', '-${WALL_PAUSE_MAX_AGE_HOURS} hours'))`,
+    ).all(userId);
     let sent = 0;
     for (const sub of subs) {
       const subscription = { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } };

@@ -106,6 +106,17 @@ function safeRemove(key) {
   }
 }
 
+/**
+ * Callback, der bei jeder Aenderung des Wand-Aktivzustands aufgerufen wird.
+ * Wird einmal von router.js mit `reportWallPauseState` aus push.js belegt.
+ */
+let _wallActiveChangeHook = null;
+
+/** Registriert einen Callback fuer Aenderungen des Wand-Zustands (#1904). */
+export function onWallActiveChange(cb) {
+  _wallActiveChangeHook = cb;
+}
+
 /** Ist der Modus auf DIESEM Geraet eingeschaltet? */
 export function isWallModeEnabled() {
   return safeGet(WALL_KEY) === '1';
@@ -187,6 +198,7 @@ function restoreUserTheme() {
  */
 export function syncWallMode(path = location.pathname) {
   const root = document.documentElement;
+  const wasActive = root.hasAttribute('data-wall-mode');
   const active = wallShowsOn(path);
   const night = active && isWallNight();
   const wasNight = root.hasAttribute('data-wall-night');
@@ -217,6 +229,8 @@ export function syncWallMode(path = location.pathname) {
   if (night !== wasNight || root.getAttribute('data-theme') !== themeBefore) {
     window.yuvomi?.restoreThemeColor?.();
   }
+
+  if (active !== wasActive && _wallActiveChangeHook) _wallActiveChangeHook(active);
 
   return active;
 }

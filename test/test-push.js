@@ -142,7 +142,8 @@ function makeDb() {
       endpoint TEXT NOT NULL UNIQUE,
       p256dh TEXT NOT NULL, auth TEXT NOT NULL, user_agent TEXT,
       created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-      last_used_at TEXT
+      last_used_at TEXT,
+      wall_paused_at TEXT
     );
   `);
   db.exec(MIGRATIONS.find((m) => m.version === 60).up);
@@ -304,6 +305,65 @@ test('sendPushToUser keeps sub on transient (500) error', async () => {
   assert.equal(db.prepare('SELECT COUNT(*) c FROM push_subscriptions').get().c, 1);
 });
 
+test('sendPushToUser skips wall-paused sub, delivers to others of the same user (#1904)', async () => {
+  const db = makeDb();
+  const webpush = makeWebpushMock();
+  // wall_paused_at auf jetzt setzen - innerhalb der 12-Stunden-Grenze.
+  db.prepare(`
+    INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, wall_paused_at)
+    VALUES (1,'https://push/wall','p','a', datetime('now')),(1,'https://push/phone','p','a',NULL)
+  `).run();
+  const svc = createPushService({ db, webpush });
+  const sent = await svc.sendPushToUser(1, { title: 'T' });
+  assert.equal(sent, 1, 'nur das nicht-pausierte Abo wird bedient');
+  assert.equal(webpush.calls[0].endpoint, 'https://push/phone');
+});
+
+test('sendPushToUser delivers after wall_paused_at expires (>12h ago) (#1904)', async () => {
+  const db = makeDb();
+  const webpush = makeWebpushMock();
+  db.prepare(`
+    INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, wall_paused_at)
+    VALUES (1,'https://push/wall','p','a', datetime('now', '-13 hours'))
+  `).run();
+  const svc = createPushService({ db, webpush });
+  const sent = await svc.sendPushToUser(1, { title: 'T' });
+  assert.equal(sent, 1, 'abgelaufene Pause wird ignoriert');
+});
+
+test('PUT /wall-mode setzt und loescht wall_paused_at fuer das eigene Abo (#1904)', async () => {
+  const db = makeDb();
+  const app = await startApp(db, makeWebpushMock());
+  db.prepare("INSERT INTO push_subscriptions (user_id,endpoint,p256dh,auth) VALUES (1,'https://push/tab','p','a')").run();
+  const put = (active) => fetchRetry(`${app.baseUrl}/wall-mode`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ endpoint: 'https://push/tab', active }),
+  });
+  const r1 = await put(true);
+  assert.equal(r1.status, 204);
+  const row1 = db.prepare("SELECT wall_paused_at FROM push_subscriptions WHERE endpoint = 'https://push/tab'").get();
+  assert.ok(typeof row1.wall_paused_at === 'string' && row1.wall_paused_at.length > 0, 'wall_paused_at ist ein Zeitstempel');
+  const r2 = await put(false);
+  assert.equal(r2.status, 204);
+  const row2 = db.prepare("SELECT wall_paused_at FROM push_subscriptions WHERE endpoint = 'https://push/tab'").get();
+  assert.equal(row2.wall_paused_at, null, 'wall_paused_at ist NULL nach dem Aufheben');
+});
+
+test('PUT /wall-mode aendert nur das eigene Abo - nicht das eines anderen Nutzers (#1904)', async () => {
+  const db = makeDb();
+  const app = await startApp(db, makeWebpushMock(), 1);
+  db.prepare("INSERT INTO push_subscriptions (user_id,endpoint,p256dh,auth) VALUES (2,'https://push/bob','p','a')").run();
+  const r = await fetchRetry(`${app.baseUrl}/wall-mode`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ endpoint: 'https://push/bob', active: true }),
+  });
+  assert.equal(r.status, 204);
+  const row = db.prepare("SELECT wall_paused_at FROM push_subscriptions WHERE endpoint = 'https://push/bob'").get();
+  assert.equal(row.wall_paused_at, null, 'AND user_id = ? verhindert, dass Nutzer 1 das Abo von Nutzer 2 pausiert');
+});
+
 /**
  * Startet die Push-Routen hinter einem echten Listener und meldet die Basis-URL.
  *
@@ -456,4 +516,59 @@ test('scheduler marks pushed_at even when user has no subscriptions', async () =
   db.prepare("INSERT INTO reminders (entity_type,entity_id,remind_at,created_by) VALUES ('task',1,?,1)").run(pastIso());
   await processDuePushes({ database: db, pushService });
   assert.equal(db.prepare('SELECT pushed_at FROM reminders').get().pushed_at !== null, true);
+});
+
+// ---------------------------------------------------------------------------
+// Client-seitige Verdrahtung: wall-mode.js ruft den Hook nur bei Uebergaengen.
+// isWallActive() liefert den Zustand fuer den einmaligen Boot-Report in router.js.
+// wall-mode.js hat nur einen Browser-Import (timezone.js) - Stubs fuer document
+// und localStorage genuegen (#1904).
+// ---------------------------------------------------------------------------
+test('wall-mode: syncWallMode ruft den Hook nur bei Uebergaengen, isWallActive meldet den gesetzten Zustand (#1904)', async () => {
+  const attrs = new Map();
+  const root = {
+    hasAttribute: (k) => attrs.has(k),
+    toggleAttribute: (k, v) => { if (v) attrs.set(k, ''); else attrs.delete(k); },
+    getAttribute: (k) => attrs.get(k) ?? null,
+    setAttribute: (k, v) => attrs.set(k, v),
+    removeAttribute: (k) => attrs.delete(k),
+  };
+  const storage = new Map();
+  global.document = { documentElement: root };
+  global.localStorage = { getItem: (k) => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, v), removeItem: (k) => storage.delete(k) };
+  global.window = { yuvomi: {} };
+
+  const { syncWallMode, onWallActiveChange, isWallActive, setWallModeEnabled } = await import('../public/utils/wall-mode.js');
+  const calls = [];
+  onWallActiveChange((v) => calls.push(v));
+
+  // Kaltstart auf `/`: theme-init.js setzt data-wall-mode schon VOR syncWallMode.
+  // Der Hook bleibt stumm (kein Uebergang), aber isWallActive() liefert true
+  // fuer den einmaligen Boot-Report in router.js (initPushAndReport).
+  setWallModeEnabled(true);
+  root.toggleAttribute('data-wall-mode', true);
+  syncWallMode('/');
+  assert.deepEqual(calls, [], 'Kaltstart auf `/` ohne Uebergang: Hook bleibt stumm');
+  assert.equal(isWallActive(), true, 'isWallActive() liefert true - Boot-Report setzt Pause');
+
+  // Kaltstart ABSEITS von `/` mit veralteter Pause (wall-mode an, path != `/`).
+  root.toggleAttribute('data-wall-mode', false);
+  syncWallMode('/calendar');
+  assert.deepEqual(calls, [], 'Kaltstart auf `/calendar`: kein Uebergang, kein Aufruf');
+  assert.equal(isWallActive(), false, 'isWallActive() liefert false - Boot-Report hebt Pause auf');
+
+  // Uebergang waehrend der Sitzung: Wand verlassen.
+  root.toggleAttribute('data-wall-mode', true);
+  syncWallMode('/calendar');
+  assert.deepEqual(calls, [false], 'Verlassen der Wand: Hook mit false');
+
+  // Uebergang waehrend der Sitzung: zur Wand zurueck.
+  calls.length = 0;
+  syncWallMode('/');
+  assert.deepEqual(calls, [true], 'Rueckkehr zur Wand: Hook mit true');
+
+  onWallActiveChange(null);
+  delete global.document;
+  delete global.localStorage;
+  delete global.window;
 });

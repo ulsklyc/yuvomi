@@ -166,8 +166,23 @@ function stopPush() {
   _subscribedCache = false;
 }
 
+/**
+ * Teilt dem Server mit, ob dieses Geraet gerade die Wand zeigt (#1904).
+ * Wird von wall-mode.js aufgerufen, wenn sich der aktive Zustand aendert.
+ * Fire-and-forget: ein Fehler darf die Wand nicht stoeren.
+ */
+async function reportWallPauseState(active) {
+  if (!pushSupported() || Notification.permission !== 'granted') return;
+  try {
+    const reg = await serviceWorkerReady();
+    const sub = await reg.pushManager.getSubscription();
+    if (!sub) return;
+    await api.put('/push/wall-mode', { endpoint: sub.endpoint, active }, { quietExpiry: true });
+  } catch { /* ignoriert: die Wand laeuft weiter, auch wenn die Meldung scheitert */ }
+}
+
 export {
   SW_READY_TIMEOUT_MS,
   pushSupported, pushStatus, isPushSubscribed, enablePush, disablePush,
-  resyncSubscription, repairPush, initPush, stopPush,
+  resyncSubscription, repairPush, initPush, stopPush, reportWallPauseState,
 };
