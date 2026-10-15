@@ -4390,6 +4390,7 @@
         "billingCycleLabel": "Κύκλος χρέωσης",
         "intervalLabel": "Κάθε",
         "nextPaymentLabel": "Επόμενη πληρωμή",
+        "nextPaymentCompletedHint": "Ισχύει μόνο όταν συμπεριλάβεις ξανά τη συνδρομή στον προϋπολογισμό.",
         "reminderDaysLabel": "Ημέρες υπενθύμισης",
         "reminderEnabledLabel": "Υπενθύμιση πληρωμής",
         "noReminder": "Χωρίς υπενθύμιση",

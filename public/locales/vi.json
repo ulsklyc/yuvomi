@@ -4390,6 +4390,7 @@
         "billingCycleLabel": "Chu kỳ thanh toán",
         "intervalLabel": "Mỗi",
         "nextPaymentLabel": "Khoản thanh toán tiếp theo",
+        "nextPaymentCompletedHint": "Chỉ áp dụng khi bạn tính lại gói đăng ký vào ngân sách.",
         "reminderDaysLabel": "Số ngày nhắc",
         "reminderEnabledLabel": "Nhắc thanh toán",
         "noReminder": "Không có lời nhắc",

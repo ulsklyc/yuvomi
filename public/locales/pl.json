@@ -4630,6 +4630,7 @@
         "billingCycleLabel": "Cykl rozliczeniowy",
         "intervalLabel": "Co",
         "nextPaymentLabel": "Następna płatność",
+        "nextPaymentCompletedHint": "Obowiązuje dopiero po ponownym uwzględnieniu subskrypcji w budżecie.",
         "reminderDaysLabel": "Dni przypomnienia",
         "reminderEnabledLabel": "Przypomnienie o płatności",
         "noReminder": "Brak przypomnienia",

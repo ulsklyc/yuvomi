@@ -171,12 +171,22 @@ function decorate(row) {
 }
 
 // Prüft die Ende-Bedingung gegen die zusammengeführten Effektivwerte (#594).
-function endConfigErrors({ end_type, end_date, occurrence_count, next_payment_date, occurrences_done }) {
+//
+// `stillCompleted`: die Zeile ist abgeschlossen und bleibt es (#2009). Dann
+// faellt nur der Vergleich mit dem Stand weg - Ende vor der naechsten Zahlung,
+// Zaehler nicht ueber den geleisteten -, die Form der Felder gilt weiter. Ein
+// abgeschlossenes Abo hat seine Zahlungen hinter sich: bei `on_date` liegt sein
+// naechstes Datum immer nach dem Ende, bei `after_count` ist der Zaehler
+// erreicht. Der Dialog schickt bei jedem Speichern alle Felder, also lehnte
+// der Vergleich JEDE Bearbeitung ab, auch die einer Notiz. Erst das
+// Reaktivieren braucht ein Ende, das noch Zahlungen zulaesst.
+function endConfigErrors({ end_type, end_date, occurrence_count, next_payment_date, occurrences_done }, { stillCompleted = false } = {}) {
   const errors = [];
   if (end_type === 'on_date') {
     if (!end_date) { errors.push('An end date is required.'); return errors; }
     try {
-      if (parseDateKey(end_date).getTime() < parseDateKey(next_payment_date).getTime()) {
+      parseDateKey(end_date);
+      if (!stillCompleted && parseDateKey(end_date).getTime() < parseDateKey(next_payment_date).getTime()) {
         errors.push({ error: 'The end date must not be before the next payment date.', reason: 'subscriptions_end_before_next_payment' });
       }
     } catch (err) { errors.push(err.message); }
@@ -184,7 +194,7 @@ function endConfigErrors({ end_type, end_date, occurrence_count, next_payment_da
     const count = Number(occurrence_count);
     if (!Number.isInteger(count) || count < 1 || count > 1200) {
       errors.push('Occurrence count must be between 1 and 1200.');
-    } else if (count <= Number(occurrences_done || 0)) {
+    } else if (!stillCompleted && count <= Number(occurrences_done || 0)) {
       // Erreichbar im Dialog: ein Abo mit drei geleisteten Zahlungen auf "nach
       // zwei Zahlungen" stellen.
       errors.push({ error: 'Occurrence count must be greater than the number of payments already made.', reason: 'subscriptions_occurrence_count_too_low' });
@@ -913,16 +923,16 @@ router.put('/:id', async (req, res) => {
     const occurrenceCount = endType === 'after_count'
       ? (req.body.occurrence_count !== undefined ? Number(req.body.occurrence_count) : current.occurrence_count)
       : null;
-    const endErrors = endConfigErrors({
-      end_type: endType, end_date: endDate, occurrence_count: occurrenceCount,
-      next_payment_date: nextPaymentDate, occurrences_done: current.occurrences_done,
-    });
-    if (endErrors.length) return res.status(400).json(problemBody(endErrors));
-    const metaGone = selectedMetaGone(value('category_id', current.category_id), value('payment_method_id', current.payment_method_id));
-    if (metaGone) return res.status(400).json(metaGone);
     // Reaktivieren (enabled -> true) hebt einen Abschluss auf.
     const nextEnabled = value('enabled', Boolean(current.enabled)) ? 1 : 0;
     const completedAt = nextEnabled ? null : current.completed_at;
+    const endErrors = endConfigErrors({
+      end_type: endType, end_date: endDate, occurrence_count: occurrenceCount,
+      next_payment_date: nextPaymentDate, occurrences_done: current.occurrences_done,
+    }, { stillCompleted: Boolean(completedAt) });
+    if (endErrors.length) return res.status(400).json(problemBody(endErrors));
+    const metaGone = selectedMetaGone(value('category_id', current.category_id), value('payment_method_id', current.payment_method_id));
+    if (metaGone) return res.status(400).json(metaGone);
     db.get().prepare(`
       UPDATE budget_subscriptions SET
         name = ?, description = ?, amount = ?, currency = ?, billing_cycle = ?, cycle_interval = ?,

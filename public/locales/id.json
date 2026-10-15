@@ -4390,6 +4390,7 @@
         "billingCycleLabel": "Siklus penagihan",
         "intervalLabel": "Setiap",
         "nextPaymentLabel": "Pembayaran berikutnya",
+        "nextPaymentCompletedHint": "Baru berlaku saat Anda memasukkan langganan ke anggaran lagi.",
         "reminderDaysLabel": "Hari pengingat",
         "reminderEnabledLabel": "Pengingat pembayaran",
         "noReminder": "Tanpa pengingat",

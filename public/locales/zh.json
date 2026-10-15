@@ -4390,6 +4390,7 @@
         "billingCycleLabel": "账单周期",
         "intervalLabel": "每",
         "nextPaymentLabel": "下次付款",
+        "nextPaymentCompletedHint": "仅在你再次将订阅计入预算时生效。",
         "reminderDaysLabel": "提醒天数",
         "reminderEnabledLabel": "付款提醒",
         "noReminder": "无提醒",

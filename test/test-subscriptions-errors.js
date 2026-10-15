@@ -1050,3 +1050,49 @@ test('Seite: scheitert das Laden nach "gibt es nicht mehr", bleibt es bei dem ei
     assert.deepEqual(toasts, [['subscriptions.errorSubscriptionGone', 'danger']], 'kein zweiter Toast fuer das Laden');
   });
 });
+
+// Review-Runde 1 zu #2010 (#2009): ein abgeschlossenes Abo steht nach seinem
+// Ende - bei `on_date` liegt das naechste Datum hinter dem Enddatum, bei
+// `after_count` ist der Zaehler erreicht. Wer es wieder ins Budget aufnimmt,
+// braucht ein spaeteres Ende. Das sagt die Seite VOR dem Absenden am Feld,
+// mit dem Satz, den sonst die Absage des Servers als Toast braeuchte. Bleibt
+// das Abo abgeschlossen (nur eine Notiz geaendert), gilt der Vergleich nicht,
+// wie am Server.
+test('Seite: ein abgeschlossenes Abo wieder aufnehmen - ein zu fruehes Ende steht am Feld, nicht im Toast', async () => {
+  const marks = [];
+  globalThis.__reportFieldError = (input, message) => marks.push([input, message]);
+  const done = { status: 'completed', enabled: false, completed_at: '2028-01-15T08:00:00Z', next_payment_date: '2028-02-15', occurrences_done: 1 };
+  const cases = [
+    ['on_date', { end_type: 'on_date', end_date: '2028-01-20' }, { '#subscription-end-type': 'on_date', '#subscription-end-date': '2028-01-20' }, '#subscription-end-date', 'subscriptions.errorEndBeforeNextPayment'],
+    ['after_count', { end_type: 'after_count', occurrence_count: 1 }, { '#subscription-end-type': 'after_count', '#subscription-end-count': '1' }, '#subscription-end-count', 'subscriptions.errorOccurrenceCountTooLow'],
+  ];
+  try {
+    for (const [label, row, fields, fieldId, sentence] of cases) {
+      const existing = abo({ ...done, ...row });
+      const form = { ...ABO_FORM, '#subscription-next-date': '2028-02-15', ...fields };
+      // Wieder aufnehmen: abgelehnt am Feld, kein Request, kein Toast.
+      const panel = formular(form);
+      panel.querySelector('#subscription-enabled').checked = true;
+      marks.length = 0;
+      const lauf = await mitSeite(() => mit({ put: async () => ({ data: existing }) }, () => page.saveSubscription(panel, existing)));
+      assert.deepEqual(marks.map(([input, message]) => [input === panel.querySelector(fieldId), message]), [[true, sentence]], label);
+      assert.equal(lauf.calls.some(([verb]) => verb === 'PUT'), false, `${label}: nichts gesendet`);
+      assert.deepEqual(toasts, [], `${label}: kein Toast`);
+      // Abgeschlossen lassen und nur speichern: geht durch.
+      const still = formular(form);
+      marks.length = 0;
+      const ok = await mitSeite(() => mit({ put: async () => ({ data: existing }) }, () => page.saveSubscription(still, existing)));
+      assert.deepEqual(marks, [], `${label}: abgeschlossen bleibt ohne Feldfehler`);
+      assert.equal(ok.calls.some(([verb]) => verb === 'PUT'), true, `${label}: gespeichert`);
+      // Mit spaeterem Ende wieder aufnehmen: geht durch.
+      const later = formular({ ...form, '#subscription-end-date': '2028-06-30', '#subscription-end-count': '4' });
+      later.querySelector('#subscription-enabled').checked = true;
+      marks.length = 0;
+      const back = await mitSeite(() => mit({ put: async () => ({ data: existing }) }, () => page.saveSubscription(later, existing)));
+      assert.deepEqual(marks, [], `${label}: spaeteres Ende ohne Feldfehler`);
+      assert.equal(back.calls.some(([verb]) => verb === 'PUT'), true, `${label}: reaktiviert`);
+    }
+  } finally {
+    delete globalThis.__reportFieldError;
+  }
+});

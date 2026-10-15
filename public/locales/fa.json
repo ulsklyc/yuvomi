@@ -4390,6 +4390,7 @@
         "billingCycleLabel": "چرخه صورت‌حساب",
         "intervalLabel": "هر",
         "nextPaymentLabel": "پرداخت بعدی",
+        "nextPaymentCompletedHint": "فقط زمانی اعمال می‌شود که اشتراک را دوباره به بودجه اضافه کنید.",
         "reminderDaysLabel": "روزهای یادآوری",
         "reminderEnabledLabel": "یادآوری پرداخت",
         "noReminder": "بدون یادآور",

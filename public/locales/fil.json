@@ -4390,6 +4390,7 @@
         "billingCycleLabel": "Siklo ng pagsingil",
         "intervalLabel": "Tuwing",
         "nextPaymentLabel": "Susunod na bayad",
+        "nextPaymentCompletedHint": "Magkakabisa lang kapag isinama mo ulit ang subscription sa badyet.",
         "reminderDaysLabel": "Mga araw ng paalala",
         "reminderEnabledLabel": "Paalala sa pagbabayad",
         "noReminder": "Walang paalala",

@@ -500,6 +500,32 @@ try {
       assert.equal(done.body.data.next_payment_date, '2028-02-15', `${name}: der Abschluss rueckt hinter den bezahlten Tag vor`);
       assert.equal(done.body.data.budget_entry_id, null, `${name}: keine verknuepfte naechste Buchung`);
       assert.deepEqual(paidDays(name), [['2028-01-15', 1]], `${name}: die letzte bezahlte Buchung steht einmal`);
+      // Bearbeiten, ohne zu reaktivieren (Review-Runde 1 zu #2010): der Dialog
+      // schickt bei jedem Speichern ALLE Felder, hier mit nur einer neuen Notiz.
+      // Das vorgerueckte Datum liegt bei `on_date` nach dem Ende, der Zaehler
+      // bei `after_count` ist erreicht - beides darf das Speichern nicht
+      // ablehnen, solange das Abo abgeschlossen bleibt.
+      const row = done.body.data;
+      const dialogPayload = {
+        name: row.name, description: row.description, amount: row.amount, currency: row.currency,
+        billing_cycle: row.billing_cycle, cycle_interval: row.cycle_interval,
+        next_payment_date: row.next_payment_date, reminder_days: row.reminder_days,
+        reminder_enabled: row.reminder_enabled, category_id: row.category_id, payment_method_id: row.payment_method_id,
+        website_url: row.website_url, brand_color: row.brand_color || '#0F766E', logo_data: row.logo_data,
+        notes: 'nur die Notiz', account_username: row.account_username, enabled: false,
+        end_type: row.end_type, end_date: row.end_date, occurrence_count: row.occurrence_count,
+      };
+      const noted = await jsonReq('PUT', `/${subId}`, dialogPayload);
+      assert.equal(noted.status, 200, `${name}: eine Notiz am abgeschlossenen Abo: ${JSON.stringify(noted.body)}`);
+      assert.equal(noted.body.data.notes, 'nur die Notiz', name);
+      assert.equal(noted.body.data.status, 'completed', `${name}: bleibt abgeschlossen`);
+      assert.equal(noted.body.data.completed_at, row.completed_at, `${name}: der Abschlusstag bleibt`);
+      assert.equal(noted.body.data.next_payment_date, '2028-02-15', name);
+      assert.deepEqual(paidDays(name), [['2028-01-15', 1]], `${name}: das Bearbeiten bucht nichts`);
+      // Die Form der Felder gilt weiter: ein Zaehler ausserhalb 1..1200 bleibt 400.
+      if (create.end_type === 'after_count') {
+        assert.equal((await jsonReq('PUT', `/${subId}`, { ...dialogPayload, occurrence_count: 0 })).status, 400, `${name}: Zaehler 0`);
+      }
       if (create.end_type === 'on_date') {
         // Das vorgerueckte Datum liegt nach dem Ende. Daraus folgt keine Zahlung,
         // und ohne spaeteres Ende laesst es sich nicht reaktivieren.

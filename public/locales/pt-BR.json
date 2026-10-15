@@ -4390,6 +4390,7 @@
         "billingCycleLabel": "Ciclo de cobrança",
         "intervalLabel": "A cada",
         "nextPaymentLabel": "Próximo pagamento",
+        "nextPaymentCompletedHint": "Só vale quando você incluir a assinatura no orçamento novamente.",
         "reminderDaysLabel": "Dias de lembrete",
         "reminderEnabledLabel": "Lembrete de pagamento",
         "noReminder": "Sem lembrete",

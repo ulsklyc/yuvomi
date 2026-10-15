@@ -4390,6 +4390,7 @@
         "billingCycleLabel": "Ciclo di fatturazione",
         "intervalLabel": "Ogni",
         "nextPaymentLabel": "Prossimo pagamento",
+        "nextPaymentCompletedHint": "Vale solo quando includi di nuovo l'abbonamento nel budget.",
         "reminderDaysLabel": "Giorni di promemoria",
         "reminderEnabledLabel": "Promemoria di pagamento",
         "noReminder": "Nessun promemoria",

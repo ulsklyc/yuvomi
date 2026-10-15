@@ -3169,6 +3169,24 @@ test('Abo-Zeile: ein abgeschlossenes Abo zeigt keine naechste Zahlung', async ()
   assert.match(liveCard, /subscription-card__due/, 'laufend: die Faelligkeit bleibt');
   assert.match(liveCard, /subscriptions\.dueInDays/);
   assert.notEqual(nextRow(active).value, '', 'laufend: die Leseansicht nennt die naechste Zahlung');
+
+  // Der Bearbeiten-Dialog zeigt das Datum weiter - es ist der Tag, an dem ein
+  // wieder aufgenommenes Abo weiterlaeuft. Damit es dort nicht wie eine
+  // angekuendigte Zahlung wirkt, sagt ein Hinweis am Feld, wann es gilt
+  // (Review-Runde 1 zu #2010). Nur am abgeschlossenen Abo.
+  const dialog = (s) => {
+    const vorher = globalThis.__openModal;
+    let letzte = null;
+    globalThis.__openModal = (o) => { letzte = o; };
+    try { abos.openSubscriptionModal(s); } finally { globalThis.__openModal = vorher; }
+    return letzte?.content ?? '';
+  };
+  const field = (html) => html.slice(html.indexOf('id="subscription-next-date"'), html.indexOf('id="subscription-reminder"'));
+  const doneField = field(dialog(completed));
+  assert.match(doneField, /value="2099-02-15"/, 'abgeschlossen: der Dialog bietet das naechste Datum an');
+  assert.match(doneField, /<p class="form-hint"[^>]*>subscriptions\.nextPaymentCompletedHint<\/p>/, 'abgeschlossen: der Hinweis steht am Feld');
+  assert.doesNotMatch(field(dialog(active)), /nextPaymentCompletedHint/, 'laufend: kein Hinweis');
+  assert.doesNotMatch(dialog(null), /nextPaymentCompletedHint/, 'neu: kein Hinweis');
 });
 
 test('die Statistik steht ab 960px Container auf der Budget-Bahn: Verlauf und Vergleich links, Anteile rechts (A5 P2-5)', () => {

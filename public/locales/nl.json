@@ -4390,6 +4390,7 @@
         "billingCycleLabel": "Facturatiecyclus",
         "intervalLabel": "Elke",
         "nextPaymentLabel": "Volgende betaling",
+        "nextPaymentCompletedHint": "Geldt pas als je het abonnement weer in het budget opneemt.",
         "reminderDaysLabel": "Herinneringsdagen",
         "reminderEnabledLabel": "Betalingsherinnering",
         "noReminder": "Geen herinnering",

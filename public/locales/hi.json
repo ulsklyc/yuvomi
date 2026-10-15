@@ -4390,6 +4390,7 @@
         "billingCycleLabel": "बिलिंग चक्र",
         "intervalLabel": "हर",
         "nextPaymentLabel": "अगला भुगतान",
+        "nextPaymentCompletedHint": "यह तभी लागू होगा जब आप सदस्यता को फिर से बजट में शामिल करेंगे।",
         "reminderDaysLabel": "रिमाइंडर दिन",
         "reminderEnabledLabel": "भुगतान का रिमाइंडर",
         "noReminder": "कोई रिमाइंडर नहीं",
