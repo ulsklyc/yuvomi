@@ -106,7 +106,10 @@ export function captureModalContext() {
  * Fokus nach dem Schliessen zurueckzutragen).
  */
 export function isOwnModalOpen(context) {
-  return Boolean(context?.overlay) && context.overlay === activeOverlay;
+  // Schliessend zaehlt nicht als offen: activeOverlay zeigt bis _doClose()
+  // noch auf den Knoten, waehrend er schon ausfaehrt - der Nutzer hat ihn
+  // dann bewusst zugemacht, und nichts soll ihn danach neu aufbauen (Codex an #2021).
+  return Boolean(context?.overlay) && context.overlay === activeOverlay && modalState !== 'closing';
 }
 
 /** Ob seit captureModalContext() weder Dialog noch Seiteninstanz wechselte. */

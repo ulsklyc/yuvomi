@@ -120,7 +120,7 @@ const pointerClick = (target, pointerType = 'mouse') => makeEvent('click', { tar
 /** Ein per Tastatur ausgeloester Klick: leere Zeigerart, detail 0. */
 const keyboardClick = (target) => makeEvent('click', { target, pointerType: '', detail: 0 });
 
-const { armPointerDeadTime, openModal, closeModal, whenModalClosed, captureModalContext, askOverModal } = await import('../public/components/modal.js');
+const { armPointerDeadTime, openModal, closeModal, whenModalClosed, captureModalContext, askOverModal, isOwnModalOpen } = await import('../public/components/modal.js');
 
 // --------------------------------------------------------
 // 1) Die Sperre selbst - mit eigener Uhr, ohne openModal
@@ -663,4 +663,21 @@ test('Erfolgsantwort, waehrend der eigene Dialog unter einer Rueckfrage geparkt 
   assert.equal(answer, 'abgebrochen');
   assert.equal(frageZuDurchAntwort, false, 'die spaete Antwort hat die Rueckfrage geschlossen');
   assert.equal(a.closed, true, 'der gespeicherte Dialog blieb nach dem Abbrechen der Rueckfrage offen');
+});
+
+test('ein Dialog in seiner Schliess-Animation gehoert dem Ablauf nicht mehr (#1997, Codex an #2021)', async () => {
+  // Der Nutzer schliesst den Verwalten-Dialog bewusst; die Antwort kommt
+  // waehrend des Ausgangs. activeOverlay zeigt bis _doClose() noch auf den
+  // Knoten - als "offen" gelesen, baute die Seite ihn nach dem Laden neu auf.
+  await freshDocument({ width: 1024 });
+  withLocation();
+  globalThis.matchMedia = () => ({ matches: false }); // mit Ausgang
+  const a = openDialog({ openedAt: 0 });
+  const ctx = captureModalContext();
+  assert.equal(isOwnModalOpen(ctx), true, 'Vorbedingung: offen gehoert er dem Ablauf');
+  await closeModal({ force: true });
+  assert.equal(a.overlay.isConnected, true, 'Vorbedingung: der Ausgang laeuft noch');
+  assert.equal(isOwnModalOpen(ctx), false, 'der schliessende Dialog gilt weiter als offen');
+  fireAnimationEnd(a.overlay);
+  await settled(whenModalClosed());
 });
