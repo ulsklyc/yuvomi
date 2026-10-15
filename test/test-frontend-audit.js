@@ -2759,6 +2759,27 @@ test('More button active state keeps visible More identity and accessible active
   assert.doesNotMatch(source, /moreBtn\.toggleAttribute\('aria-current',\s*inMoreSheet\)/);
 });
 
+test('Aktiv-Indikatoren erscheinen am Ziel: die erste Platzierung gleitet nicht vom ersten Eintrag herein', () => {
+  // Ein frisch gebauter Indikator steht bei translate 0, also auf dem ersten
+  // Eintrag, und glitt beim Laden sichtbar zum aktiven (gemessen 150ms von
+  // "Uebersicht" zu "Kalender", Nav-Polish 2026-10-15). Gleiten antwortet auf
+  // einen Wechsel; beide Positionierer gehen deshalb durch placeNavIndicator,
+  // und beide Indikatoren entstehen unsichtbar.
+  const source = read('../public/router.js').replace(/^\s*\/\/.*$/gm, '');
+  const place = functionBody(source, 'placeNavIndicator');
+  assert.ok(place, 'placeNavIndicator fehlt');
+  assert.match(place, /style\.transition = 'none'/, 'die erste Platzierung schaltet den Uebergang ab');
+  assert.match(place, /dataset\.placed/, 'nur die ERSTE Platzierung springt');
+  for (const name of ['positionSidebarIndicator', 'positionTabIndicator']) {
+    const body = functionBody(source, name);
+    assert.ok(body, `${name} fehlt`);
+    assert.match(body, /placeNavIndicator\(indicator,/, `${name} platziert ueber placeNavIndicator`);
+    assert.doesNotMatch(body.replace(/placeNavIndicator\(indicator, \(\) => \{[\s\S]*?\n  \}\);/, ''), /indicator\.style\.transform =/, `${name} setzt transform nur in placeNavIndicator`);
+  }
+  assert.match(source, /indicator\.className = 'nav-sidebar__indicator';\s*indicator\.setAttribute\('aria-hidden', 'true'\);\s*indicator\.style\.opacity = '0';/);
+  assert.match(source, /tabIndicator\.className = 'nav-bottom__indicator';\s*tabIndicator\.setAttribute\('aria-hidden', 'true'\);\s*tabIndicator\.style\.opacity = '0';/);
+});
+
 test('Mehr-Knopf in Ruhe traegt keinen Ton: der Zustand nimmt den Modulton zurueck, statt ihn auf Akzent zu setzen', () => {
   // Der Aufbau (`moreNavButtonEl`) liess den Knopf tertiaer, `setMoreButtonState`
   // setzte ihn nach JEDER Navigation auf `var(--color-accent)` - der Ueberlauf
