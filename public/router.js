@@ -1848,9 +1848,10 @@ function renderAppShell(container) {
   const syncSidebarIndicator = () => {
     requestAnimationFrame(() => positionSidebarIndicator());
   };
-  // In collapsed mode the section headers are hidden. Expanding the rail on
-  // hover/focus puts them back into layout, which shifts the nav items down.
-  // Re-sync the active pill after those layout changes.
+  // Seit dem Nav-Polish 2026-10-15 stehen die Zeilen eingeklappt und
+  // ausgeklappt auf derselben Hoehe (Sektionslabels behalten ihre Zeile).
+  // Das Nachziehen der Aktiv-Pille bleibt als Sicherung, falls sich die
+  // Zeilen beim Auf- und Zuklappen doch einmal verschieben.
   sidebar.addEventListener('mouseenter', syncSidebarIndicator);
   sidebar.addEventListener('mouseleave', syncSidebarIndicator);
   sidebar.addEventListener('focusin', syncSidebarIndicator);

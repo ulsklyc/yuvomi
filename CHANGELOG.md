@@ -27,6 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   vanishing at once. In dark mode the active tab and the module tiles in the More sheet stand out
   more clearly; on tablets the More sheet is as wide as the tab bar below it.
 
+- **The desktop sidebar holds still.** When the collapsed sidebar opens under the pointer, every
+  entry now stays at the same height, so the pointer lands on the entry it was aiming for; the
+  collapsed sidebar shows a thin line between its groups instead. Counts such as overdue tasks sit
+  at the end of the row when the sidebar is open instead of covering the module icon, section
+  names line up with the icons, and on windows up to 800px tall every module fits without
+  scrolling. Pressing an entry darkens its row instead of shrinking it.
+
 - **Documents: leaving and coming back no longer leaves stale data on the page** (#2005). An
   answer that arrived only after you had left Documents and opened it again could overwrite the
   members, the DMS accounts or the admin state the new page had just loaded, and the next dialog

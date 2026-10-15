@@ -2262,8 +2262,39 @@ Gemessen am echten Markup: `test:module-readonly-ui`, `test:budget-readonly-ui`,
   Rollen und Pfeiltasten wie das Werkzeugmenue, oeffnet nach oben). Gemessen mit 15 Modulen:
   Modulliste 614px, fester Rahmen 157px - 771px von 800; seit die Leiste schwebt (R18),
   kommen 2 x 8px Abstand und 2 x 1px Kante dazu: 789px von 800. Die Kontozeile nennt, wer angemeldet
-  ist, und traegt den Update-Punkt, solange „Aenderungen" etwas Neues hat. Eingeklappt stapelt
-  die Logo-Zeile (Logo, Einklappen, Suche) auf der Icon-Flucht X=28.
+  ist, und traegt den Update-Punkt, solange „Aenderungen" etwas Neues hat. **Kurze Fenster
+  (bis 800px Hoehe, Nav-Polish 2026-10-15):** Sektionslabels 18,5 statt 22,5px (4px Luft
+  darueber, keine darunter), unter Logo-Zeile 0 statt 4px und unter der Liste 4 statt 8px -
+  auch 1024x768 zeigt jedes Modul. Eine Container-Abfrage an der Tafel
+  (`@container nav-sidebar (max-height: 758px)` = 800px Fenster), keine Media-Query: die
+  Hoehen-Achse kennt nur --bp-short. Gemessen Liste/Sicht: 1440x900 614/725 (unveraendert),
+  1280x800 594/629 (vorher 614/625), 1024x768 594/597 (vorher 614/584, Budget hinter dem Fade).
+  Guard: `test:frontend-audit` (Rechnung fuer 800 und 768px, Schwelle gegen 800px).
+- **Eingeklappt springt keine Zeile (Nav-Polish 2026-10-15).** Jede Modulzeile steht in der
+  56px-Kapsel, im Hover-/Fokus-Ausklappen und ausgeklappt auf derselben Hoehe (1440x900:
+  Uebersicht y=69 in allen drei Zustaenden; vorher eingeklappt 127, Kalender 163 statt 127,5 -
+  der Zeiger lag nach der Hover-Absicht auf einer anderen Zeile). Die Logo-Zeile hat in beiden
+  Zustaenden ihre Zeilenform (44px); eingeklappt steht die Bildmarke allein, Suche und
+  Einklappen liegen dahinter an der Clip-Kante der Kapsel (kein Deckkraft-Reveal), bleiben aber
+  fokussierbar:
+  Tab klappt die Tafel per `:focus-within` auf, der Zeiger erreicht sie ueber das
+  Hover-Ausklappen, die Suche dazu ueber ⌘K / Ctrl+K und `/`. Sektionslabels behalten
+  eingeklappt ihre Hoehe und zeigen statt Text eine Haarlinie `--color-border-subtle` in
+  Muldenbreite auf der Icon-Flucht - die Gruppentrennung der Kapsel. Guard:
+  `test:frontend-audit` (keine Eingeklappt-Regel fasst die Hoehe von Logo-Zeile oder Label an).
+- **Icon-Flucht als Token:** `--sidebar-icon-inset` (15px) und `--sidebar-icon-well` (26px);
+  Zeilen, Einstellungen/Konto und Sektionslabels rechnen damit. Die Labelkante steht auf der
+  Muldenkante (x=24 bei 1440x900, vorher 21).
+- **Zaehl-Badge in der Seitenleiste:** ausgeklappt am Zeilenende, wie der Zaehler einer
+  Mac-Seitenleiste (die Icon-Huelle tritt per `display: contents` aus dem Layout, das Badge
+  wird Flex-Kind hinter dem Label; Tonvarianten unveraendert). Vorher an der Mulden-Ecke: es
+  deckte die rechte obere Icon-Ecke, ragte 1px ueber die Zeile und stiess zweistellig ans Label.
+  Eingeklappt (auch im Flyout) und mobil bleibt es an der Ecke.
+- **Druck in der Seitenleiste skaliert nicht.** `scale(0.97)` an der Zeile ist weg (Text und
+  Mulde schrumpften, die Hover-Flaeche stand - es wackelte); stattdessen wird die Hover-Flaeche
+  unter der gedrueckten Zeile eine Tintenstufe kraeftiger (`--color-text-primary` mit
+  `--tint-wash` in `--color-surface-3`: hell #EDEAE3 -> ~#DCD9D3, dunkel #37332E -> ~#46423D),
+  hinein `--duration-2xs`, heraus `--duration-sm` (Press-Baustein). Mobil unveraendert.
 - Labels mobil in 11px (`--type-micro`, Caption 2 - der iOS-Wert fuer Tab-Bar-Titel; Begruendung
   an `.nav-bottom .nav-item__label`); lange Locales duerfen die Kapsel wachsen lassen, nie clippen.
 - **"Mehr" ist kein Modul (Nav-Polish 2026-10-15):** in Ruhe steht sein Zeichen tertiaer wie

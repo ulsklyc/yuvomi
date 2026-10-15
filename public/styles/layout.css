@@ -2103,8 +2103,8 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
  * Statt der oberen Lichtkante der Basisregel die Vertiefung eines Felds -
  * eine Mulde faengt oben kein Licht. */
 .nav-sidebar .nav-item__icon-well {
-  width: 26px;
-  height: 26px;
+  width: var(--sidebar-icon-well);
+  height: var(--sidebar-icon-well);
   background: color-mix(in srgb, var(--color-text-primary) var(--tint-wash), transparent);
   box-shadow: var(--glass-inset-input);
 }
@@ -5166,6 +5166,10 @@ p.field-hint--warn[hidden] {
      * ohne Scrollen zeigen (Critique 2026-09-26, P1-2, Rechnung an
      * --sidebar-row-height in tokens.css). */
     padding: var(--space-3) 0;
+    /* Groessen-Container fuer die Kurzfenster-Verdichtung (Abfrage bei
+     * `.nav-section-label`): Breite und Hoehe stehen fest (width, top/bottom),
+     * die Eindaemmung aendert also keine Masse. */
+    container: nav-sidebar / size;
     /* Bewusste Layout-Transition (Detector layout-transition, geprüft):
      * der Collapse ändert echte Inhaltsbreite - transform kann Breite nicht
      * animieren, ein Overlay-Umbau stünde in keinem Verhältnis. Läuft nur
@@ -5373,8 +5377,8 @@ p.field-hint--warn[hidden] {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 26px;
-    height: 26px;
+    width: var(--sidebar-icon-well);
+    height: var(--sidebar-icon-well);
     border-radius: var(--radius-full);
     overflow: hidden;
     /* Ohne eigene Farbe steht die Scheibe auf dem Akzent, und dessen Tinte
@@ -5428,9 +5432,9 @@ p.field-hint--warn[hidden] {
     justify-content: flex-start;
     align-items: center;
     border-radius: var(--radius-sm);
-    /* padding-left 15px zentriert das 26px-Icon-Well auf X=28 — fluchtet mit
-     * dem Logomark. Krumm, weil exakte Zentrierung neben der 4px-Token-Skala liegt. */
-    padding: var(--space-0h) var(--space-3) var(--space-0h) 15px;
+    /* Der Einzug zentriert die Mulde auf der Icon-Flucht und fluchtet mit der
+     * Bildmarke (Rechnung am Token in tokens.css). */
+    padding: var(--space-0h) var(--space-3) var(--space-0h) var(--sidebar-icon-inset);
     gap: var(--space-3);
     /* Zeilenhoehe der Seitenleiste statt --target-md (Critique 2026-09-26,
      * P1-2): mit 40px lagen auf 1440x900 drei Module unter der Falz, auf
@@ -5507,9 +5511,20 @@ p.field-hint--warn[hidden] {
     background: var(--color-accent);
   }
 
-  /* Active-Press auf Desktop */
-  .nav-sidebar .nav-item:active {
-    transform: scale(0.97);
+  /* DRUCK OHNE SCHRUMPFEN (Nav-Polish 2026-10-15). Hier stand `scale(0.97)`
+   * an der Zeile: sie zog Text und Mulde zusammen, waehrend die Hover-Flaeche
+   * (`.nav-sidebar__hover`, ein eigenes Element) stehen blieb - das las sich
+   * als Wackeln. Eine Mac-Seitenleiste skaliert ihre Zeilen nicht; der Druck
+   * ist dort eine Flaeche, die eine Stufe kraeftiger wird. Genau das tut jetzt
+   * die Hover-Flaeche unter der gedrueckten Zeile (Press-Baustein: hinein
+   * `--duration-2xs`, heraus die Dauer der Ruhe-Regel). Mobil bleibt der
+   * Druck an der Mulde (`.nav-bottom .nav-item:active`). */
+  .nav-sidebar__items:has(.nav-item:active:not([aria-current="page"])) .nav-sidebar__hover {
+    background: color-mix(in srgb, var(--color-text-primary) var(--tint-wash), var(--color-surface-3));
+    transition:
+      transform var(--duration-lg) var(--ease-sidebar-glide),
+      opacity var(--duration-sm) var(--ease-out),
+      background-color var(--duration-2xs) var(--ease-out);
   }
 
   /* ── Einstellungen ans Ende ──
@@ -5541,7 +5556,7 @@ p.field-hint--warn[hidden] {
   .nav-sidebar > .nav-item--pinned-end,
   .nav-sidebar .nav-item.nav-sidebar__account-trigger {
     margin-inline: var(--space-1);
-    padding-inline: calc(15px - var(--space-1)) calc(var(--space-3) - var(--space-1));
+    padding-inline: calc(var(--sidebar-icon-inset) - var(--space-1)) calc(var(--space-3) - var(--space-1));
   }
 
   /* UND EINE KANTE, SOBALD DIE LISTE UEBERLAEUFT. Ohne sie liest sich der
@@ -5565,30 +5580,31 @@ p.field-hint--warn[hidden] {
     --sidebar-width: 56px;
   }
 
-  html.sidebar-collapsed .nav-sidebar .nav-sidebar__logo {
-    padding-right: 14px;
-  }
-
   html.sidebar-collapsed .nav-sidebar .nav-sidebar__brand-text {
     display: none;
   }
 
-  /* Eingeklappt hat die Logo-Zeile 56px Breite - zu wenig fuer Logo UND zwei
-   * Werkzeuge. Sie stapelt dann: Logo, darunter Einklappen und Suche auf der
-   * Icon-Flucht der Module (X=28). Der Platz dafuer ist da, weil die vier
-   * Sektionslabels eingeklappt auf null Hoehe fallen. */
-  html.sidebar-collapsed .nav-sidebar .nav-sidebar__logo {
-    flex-direction: column;
-    align-items: flex-start;
-    height: auto;
-    gap: var(--space-1);
-    padding-block: var(--space-1h) 0;
-  }
-
-  html.sidebar-collapsed .nav-sidebar .nav-sidebar__logo-actions {
-    flex-direction: column-reverse;
-    margin-inline-start: calc(-1 * var(--space-0h));
-  }
+  /* JEDE ZEILE STEHT EINGEKLAPPT DORT, WO SIE AUSGEKLAPPT STEHT (Nav-Polish
+   * 2026-10-15). Eingeklappt stapelte die Logo-Zeile Logo, Einklappen und
+   * Suche (102px statt 44px), und die vier Sektionslabels fielen auf null
+   * Hoehe. Das Ausklappen per Hover setzte beides zurueck - die Zeilen
+   * sprangen (gemessen 1440x900: Uebersicht y=127 -> 69, Kalender 163 ->
+   * 127,5), und der Zeiger lag nach der Hover-Absicht auf einer anderen
+   * Zeile als der, die er angesteuert hatte.
+   *
+   * Jetzt hat die Logo-Zeile in beiden Zustaenden ihre Zeilenform und Hoehe
+   * (`--target-base`): eingeklappt steht die Bildmarke allein darin. Die zwei
+   * Werkzeuge stehen dahinter genau an der Clip-Kante der 56px-Tafel
+   * (14px Polster + 28px Marke + 12px Luecke = 54px Innenbreite) - nicht
+   * sichtbar, nicht treffbar, aber FOKUSSIERBAR: Tab erreicht sie,
+   * `:focus-within` klappt die Tafel auf, und sie fahren mit der Kante herein
+   * wie der Name daneben. Der Zeiger erreicht sie ueber das Hover-Ausklappen,
+   * die Suche zusaetzlich ueber ⌘K / Ctrl+K und `/`. Kein Einblenden per
+   * Deckkraft: Aktionen werden nicht per :hover aufgedeckt (Kanon,
+   * test:control-dialect), sie liegen nur ausserhalb der schmalen Kapsel.
+   * Das eigene rechte Polster der eingeklappten Zeile (14px) ist weg: im
+   * Flyout standen die Werkzeuge damit 6px links von ihrem Platz in der
+   * ausgeklappten Tafel. */
 
   /* Eingeklappt: Labels bleiben im Layout (Sidebar-Breite ist fix, overflow:hidden
    * beschneidet den Überhang), nur per Opacity verborgen. So kein „display:block"-
@@ -5605,16 +5621,26 @@ p.field-hint--warn[hidden] {
     transition: opacity var(--duration-xs) var(--ease-out);
   }
 
-  /* Eingeklappt: anders als die Nav-Item-Labels (die neben ihrem Icon in
-   * derselben Zeile sitzen und nur ausgeblendet werden müssen) belegt ein
-   * Sektionslabel eine eigene Zeile — bliebe es nur per opacity verborgen,
-   * klaffte zwischen den Icon-Gruppen eine leere Zeile (#501). Daher zusätzlich
-   * die Box auf null Höhe kollabieren; der Flyout (Hover/Fokus) stellt sie her. */
+  /* Eingeklappt behaelt ein Sektionslabel seine Hoehe - sonst springen die
+   * Zeilen beim Ausklappen (siehe Logo-Zeile oben). Die Zeile ist trotzdem
+   * nicht leer (#501: eine verborgene Beschriftung liess eine Luecke ohne
+   * Aussage): statt des Texts steht eine Haarlinie in der Breite der Mulde auf
+   * der Icon-Flucht und trennt die Gruppen der Kapsel, wie die Trennlinie
+   * einer Mac-Werkzeugleiste. Der Text bleibt im Baum (aria-labelledby der
+   * Gruppe), nur seine Tinte ist durchsichtig. */
   html.sidebar-collapsed .nav-sidebar .nav-section-label {
-    opacity: 0;
-    height: 0;
-    padding-block: 0;
-    overflow: hidden;
+    color: transparent;
+    transition: color var(--duration-xs) var(--ease-out);
+  }
+
+  html.sidebar-collapsed .nav-sidebar .nav-section-label::after {
+    content: '';
+    position: absolute;
+    inset-inline-start: var(--sidebar-icon-inset);
+    inline-size: var(--sidebar-icon-well);
+    inset-block-start: 50%;
+    block-size: var(--space-px);
+    background: var(--color-border-subtle);
     transition: opacity var(--duration-xs) var(--ease-out);
   }
 
@@ -5657,23 +5683,6 @@ p.field-hint--warn[hidden] {
     display: flex;
   }
 
-  /* Flyout: die Logo-Zeile nimmt wieder ihre Zeilenform an - Logo, Name und
-   * die zwei Werkzeuge nebeneinander, wie ausgeklappt. */
-  html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover .nav-sidebar__logo,
-  html.sidebar-collapsed .nav-sidebar:focus-within .nav-sidebar__logo {
-    flex-direction: row;
-    align-items: center;
-    height: var(--target-base);
-    gap: var(--space-3);
-    padding-block: 0;
-  }
-
-  html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover .nav-sidebar__logo-actions,
-  html.sidebar-collapsed .nav-sidebar:focus-within .nav-sidebar__logo-actions {
-    flex-direction: row;
-    margin-inline-start: auto;
-  }
-
   /* Beim Aufklappen die Labels erst einblenden, NACHDEM die Breite gewachsen ist
    * (Delay ≈ Dauer der width-Transition 0.4s). So erscheint der Text bei voller
    * Breite statt beschnitten mitzuwachsen. Ausblenden (un-hover) läuft ohne Delay
@@ -5681,20 +5690,45 @@ p.field-hint--warn[hidden] {
   html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover .nav-item__label,
   html.sidebar-collapsed .nav-sidebar:focus-within .nav-item__label,
   html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover .nav-sidebar__account-chevron,
-  html.sidebar-collapsed .nav-sidebar:focus-within .nav-sidebar__account-chevron,
-  html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover .nav-section-label,
-  html.sidebar-collapsed .nav-sidebar:focus-within .nav-section-label {
+  html.sidebar-collapsed .nav-sidebar:focus-within .nav-sidebar__account-chevron {
     opacity: 1;
     /* Nach Absicht UND Breite: erst wenn die Leiste steht, kommt der Text. */
     transition: opacity var(--duration-sm) var(--ease-out) calc(var(--sidebar-hover-intent) + var(--duration-md));
   }
 
-  /* Flyout: die eingeklappt auf null Höhe kollabierten Sektionslabels wieder
-   * als eigene Zeile aufspannen (Gegenstück zur Kollaps-Regel oben). */
+  /* Die Sektionslabels tauschen im selben Takt die Haarlinie gegen den Text:
+   * die Linie geht sofort, die Tinte kommt, wenn die Leiste steht. Die Hoehe
+   * aendert sich dabei nicht. */
   html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover .nav-section-label,
   html.sidebar-collapsed .nav-sidebar:focus-within .nav-section-label {
-    height: auto;
-    padding-block: var(--space-1h) var(--space-0h);
+    color: var(--color-text-tertiary);
+    transition: color var(--duration-sm) var(--ease-out) calc(var(--sidebar-hover-intent) + var(--duration-md));
+  }
+
+  html.sidebar-collapsed:not(.sidebar-collapse-pointer-lock) .nav-sidebar:hover .nav-section-label::after,
+  html.sidebar-collapsed .nav-sidebar:focus-within .nav-section-label::after {
+    opacity: 0;
+  }
+
+  /* DAS ZAEHL-BADGE STEHT AUSGEKLAPPT AM ZEILENENDE (Nav-Polish 2026-10-15),
+   * wie der Zaehler einer Mac-Seitenleiste. An der Mulden-Ecke (top/right -4px)
+   * deckte es in der breiten Leiste die rechte obere Ecke des Modulzeichens,
+   * ragte 1px ueber die Zeile, und zweistellig stiess es ans Label. Der Knoten
+   * bleibt, wo nav-badges.js ihn einhaengt (in der Icon-Huelle): die Huelle
+   * tritt aus dem Layout (`display: contents`, ein div ohne Rolle), das Badge
+   * wird ein Flex-Kind der Zeile hinter dem Label. Nur wo ein Badge haengt -
+   * der Update-Punkt der Kontozeile braucht die Huelle als Anker. Eingeklappt
+   * (auch im Flyout) bleibt es an der Ecke: dort gibt es kein Zeilenende, und
+   * es soll beim Ausklappen nicht wandern. Mobil gilt die Basisregel. */
+  html:not(.sidebar-collapsed) .nav-sidebar .nav-item__icon-wrap:has(> .nav-badge) {
+    display: contents;
+  }
+
+  html:not(.sidebar-collapsed) .nav-sidebar .nav-item__icon-wrap > .nav-badge {
+    position: static;
+    order: 1;
+    flex-shrink: 0;
+    margin-inline-start: auto;
   }
 
   /* ── Fokus-Ring der Nav-Items/Toggle nach innen versetzt ──
@@ -9682,7 +9716,8 @@ textarea.input { resize: vertical; }
   pointer-events: none;
   transition:
     transform var(--duration-lg) var(--ease-sidebar-glide),
-    opacity var(--duration-sm) var(--ease-out);
+    opacity var(--duration-sm) var(--ease-out),
+    background-color var(--duration-sm) var(--ease-out);
   will-change: transform, opacity;
   z-index: 0;
 }
@@ -9727,12 +9762,47 @@ textarea.input { resize: vertical; }
 .nav-section-label {
   color: var(--color-text-tertiary);
   /* 22px Zeile statt 27 (Critique 2026-09-26, P1-2): 6px Luft ueber dem
-   * Label trennt die Gruppe, 2px darunter binden es an seine Zeilen. */
-  padding: var(--space-1h) var(--space-3) var(--space-0h);
+   * Label trennt die Gruppe, 2px darunter binden es an seine Zeilen. Die
+   * Textkante steht auf der Kante der Mulde (`--sidebar-icon-inset`, x=24 bei
+   * 1440x900); mit `--space-3` stand sie 3px davor. */
+  padding: var(--space-1h) var(--space-3) var(--space-0h) var(--sidebar-icon-inset);
+  /* Eine Zeile, auch waehrend die eingeklappte Kapsel aufklappt: ein Umbruch
+   * in der 56px-Breite aenderte die Hoehe und schoebe die Zeilen. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   user-select: none;
   pointer-events: none;
   position: relative;
   z-index: 1;
+}
+
+/* KURZE FENSTER (Nav-Polish 2026-10-15): auf 1024x768 brauchte die Modulliste
+ * 614px und sah 584 - Budget lag hinter dem Fade. In einer kurzen Tafel ruecken
+ * die Sektionslabels an ihre Gruppe (4px Luft darueber statt 6, keine
+ * darunter: 18,5 statt 22,5px), unter der Logo-Zeile und unter der Liste
+ * fallen je 4px Polster weg - zusammen 24px; 1024x768 behaelt 3px Luft.
+ *
+ * Eine CONTAINER-Abfrage an der Tafel, keine Media-Query: die Hoehen-Achse
+ * der Groessenklasse kennt genau eine Grenze (--bp-short, tokens.css §11c),
+ * und eine private Hoehen-Schwelle verbietet `test:frontend-audit`. Die
+ * Abfrage liest die Inhaltshoehe der Tafel; 758px entsprechen einem 800px
+ * hohen Fenster (800 - 2 x 8 Abstand - 2 x 1 Kante - 2 x 12 Polster).
+ * `@container` kann keine Variable lesen, deshalb die Zahl. Darueber bleibt
+ * alles beim Alten (1440x900 unveraendert). Die Rechnung haelt
+ * `SHELL: die Seitenleiste fasst 15 Module` in test-frontend-audit.js. */
+@container nav-sidebar (max-height: 758px) {
+  .nav-sidebar__logo {
+    margin-bottom: 0;
+  }
+
+  .nav-sidebar__items {
+    padding-bottom: var(--space-1);
+  }
+
+  .nav-section-label {
+    padding-block: var(--space-1) 0;
+  }
 }
 
 /* ── Mobile: Tab-Indikator (Strukturell) ──

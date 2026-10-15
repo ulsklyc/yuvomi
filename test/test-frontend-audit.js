@@ -18595,6 +18595,42 @@ test('SHELL: die Seitenleiste fasst 15 Module ohne Scrollen auf 800px Fensterhoe
     + `auf 1280x800 fehlen ${Math.round(total - 800)}px, Budget und Gesundheit rutschen unter die Falz`);
   assert.ok(row >= 24, `Seitenleiste: ${row}px Zeilen unterschreiten WCAG 2.5.8 (24px)`);
 
+  // KURZE FENSTER (Nav-Polish 2026-10-15): auf 1024x768 brauchte die Liste
+  // 614px und sah 584 - Budget lag hinter dem Fade. Eine Container-Abfrage an
+  // der Tafel verdichtet Labels und Polster; dieselbe Rechnung mit ihren
+  // Werten muss auf 768px aufgehen, und ihre Schwelle muss einem 800px hohen
+  // Fenster entsprechen (die Abfrage liest die Inhaltshoehe der Tafel).
+  const shortAt = layout.match(/@container nav-sidebar \(max-height:\s*(\d+)px\)/);
+  assert.ok(shortAt, 'layout.css: @container nav-sidebar (max-height: ...) fehlt - auf 1024x768 scrollt die Modulliste');
+  assert.match(prop(sidebar, 'container'), /^nav-sidebar \/ size$/, '.nav-sidebar ist kein Groessen-Container');
+  const contentAt800 = 800 - floatGap - 2 * tok('--space-px') - sidebarPad.top - sidebarPad.bottom;
+  assert.equal(Number(shortAt[1]), contentAt800,
+    `Kurzfenster-Schwelle ${shortAt[1]}px entspricht nicht 800px Fensterhoehe (${contentAt800}px Inhalt)`);
+  const shortRule = (selector) => {
+    for (const r of eachRule(layout)) {
+      if (r.selector.trim() === selector && r.at.some((a) => /@container nav-sidebar/.test(a))) return r.body;
+    }
+    assert.fail(`layout.css: Regel ${selector} fehlt in @container nav-sidebar - auf 1024x768 scrollt die Modulliste`);
+  };
+  const pair = (shorthand) => {
+    const [a, b = a] = shorthand.split(/\s+(?![^(]*\))/).map(val);
+    return { top: a, bottom: b };
+  };
+  const shortLabelPad = pair(prop(shortRule('.nav-section-label'), 'padding-block'));
+  const shortLabel = tok('--text-xs') * tok('--line-height-tight') + shortLabelPad.top + shortLabelPad.bottom;
+  const shortList = 15 * row + 4 * shortLabel + 14 * groupGap + 4 * gap
+    + val(prop(shortRule('.nav-sidebar__items'), 'padding-bottom'));
+  const shortFrame = frame
+    - val(prop(logo, 'margin-bottom')) + val(prop(shortRule('.nav-sidebar__logo'), 'margin-bottom'));
+  const shortTotal = shortList + shortFrame;
+  assert.ok(shortTotal <= 768,
+    `Seitenleiste kurz: ${Math.round(shortList)}px Module + ${Math.round(shortFrame)}px Rahmen = `
+    + `${Math.round(shortTotal)}px - auf 1024x768 fehlen ${Math.round(shortTotal - 768)}px`);
+  // Die Abfrage wirkt nur, wenn sie in der Kaskade NACH den Basisregeln steht
+  // (gleiche Spezifitaet; `.nav-section-label` steht ausserhalb jeder Media-Query).
+  assert.ok(shortAt.index > layout.indexOf('\n.nav-section-label {'),
+    'die Kurzfenster-Abfrage steht vor .nav-section-label und wird ueberschrieben');
+
   // Der Rahmen hat keine Zeilen mehr fuer Werkzeuge und Fuss-Aktionen: Suche
   // und Einklappen stehen IN der Logo-Zeile, Hilfe/Aenderungen/Abmelden im
   // Konto-Menue. Ein Rueckbau in eigene Zeilen waere die alte Rechnung.
@@ -18611,6 +18647,38 @@ test('SHELL: die Seitenleiste fasst 15 Module ohne Scrollen auf 800px Fensterhoe
   }
   assert.match(accountEl, /setAttribute\('role', 'menu'\)/);
   assert.match(accountEl, /setAttribute\('popovertarget', 'nav-account-menu'\)/);
+});
+
+/* DIE ZEILEN STEHEN EINGEKLAPPT DORT, WO SIE AUSGEKLAPPT STEHEN (Nav-Polish
+ * 2026-10-15). Eingeklappt stapelte die Logo-Zeile (102 statt 44px) und die
+ * Sektionslabels fielen auf null Hoehe; beim Hover-Ausklappen sprangen die
+ * Zeilen (Uebersicht y=127 -> 69), und der Zeiger lag auf einer anderen Zeile.
+ * Keine Regel unter `html.sidebar-collapsed` darf deshalb die Hoehe der
+ * Logo-Zeile oder eines Sektionslabels anfassen - weder direkt noch ueber
+ * Polster, Anzeige oder Stapelrichtung. */
+test('SHELL: eingeklappt behalten Logo-Zeile und Sektionslabels ihre Hoehe', () => {
+  const layout = read('../public/styles/layout.css');
+  const HEIGHT = /(?:^|[;{\s])(height|min-height|max-height|padding|padding-block|padding-top|padding-bottom|display|flex-direction|line-height|font-size)\s*:/;
+  const findings = [];
+  let seen = 0;
+  for (const r of eachRule(layout)) {
+    for (const sel of r.selector.split(',').map((s) => s.trim())) {
+      if (!/sidebar-collapsed/.test(sel)) continue;
+      if (!/\.(nav-sidebar__logo|nav-section-label)$/.test(sel)) continue;
+      seen += 1;
+      const hit = r.body.match(HEIGHT);
+      if (hit) findings.push(`${sel} { ${hit[1]} }`);
+    }
+  }
+  assert.ok(seen > 0, 'keine Eingeklappt-Regel fuer Logo-Zeile oder Sektionslabel gefunden - Guard misst nichts');
+  assert.deepEqual(findings, [], `eingeklappt aendert sich die Hoehe, die Zeilen springen beim Ausklappen:\n${findings.join('\n')}`);
+
+  // Das Badge steht in der ausgeklappten Leiste am Zeilenende, eingeklappt an der Mulde.
+  const badge = [...eachRule(layout)].find((r) => r.selector.trim()
+    === 'html:not(.sidebar-collapsed) .nav-sidebar .nav-item__icon-wrap > .nav-badge');
+  assert.ok(badge, 'kein Zeilenende-Badge fuer die ausgeklappte Leiste');
+  assert.match(badge.body, /position:\s*static/);
+  assert.match(badge.body, /margin-inline-start:\s*auto/);
 });
 
 // ---------------------------------------------------------------------------

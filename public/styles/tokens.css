@@ -1545,6 +1545,14 @@
    * Zielgroessen-Regel (DESIGN.md) WCAG 2.5.8 ansetzt, nicht --target-md;
    * Apples Mac-Seitenleiste fuehrt dieselbe Dichte. */
   --sidebar-row-height: 32px;
+  /* Die Icon-Flucht der Seitenleiste (Nav-Polish 2026-10-15): die Mulde ist
+   * 26px breit und beginnt 15px hinter der Innenkante der Tafel, ihre Mitte
+   * steht damit 28px hinter der Kante - dieselbe Mitte wie die 28px-Bildmarke
+   * (14px Polster). Krumm, weil exakte Zentrierung neben der 4px-Skala liegt.
+   * Zeilen, Sektionslabels und die Haarlinie der eingeklappten Labels rechnen
+   * damit; die Labelkante stand vorher 3px davor (x=21 statt 24 bei 1440x900). */
+  --sidebar-icon-inset: 15px;
+  --sidebar-icon-well: 26px;
   --content-max-width: 1280px;
   --content-max-width-narrow: 720px;
   /* Page Composition System width tokens (PAGE-COMPOSITION.md) */
