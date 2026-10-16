@@ -706,9 +706,16 @@
    * (4.92-6.49:1). Trägt weiter den Namen budget.colorTeal. */
   --_chart-series-2: #297989;   /* Petrol   */
   --_chart-series-3: #C2410C;   /* Orange   */
-  --_chart-series-4: #0663C7;   /* Blau     */
-  --_chart-series-5: #A16207;   /* Ocker    */
-  --_chart-series-6: #BE185D;   /* Magenta  */
+  /* FARBFEHLSICHT (R19, Critique 2026-10-16). Simuliert (Machado 2009,
+   * Schwere 1,0) lagen Orange/Ocker bei Deuteranopie dE2000 0,9 auseinander,
+   * Indigo/Blau bei 1,9 - im Donut nebeneinander nicht zu trennen. Blau wird
+   * heller (Sky, 3,66:1 auf der Karte, Grafikkontrast >= 3), Ocker dunkler
+   * (Umbra), Magenta heller; das schlechteste Paar liegt jetzt bei dE 8,4
+   * (Protanopie, Orange/Gruen), normalsichtig bei >= 15. Dunkel unveraendert
+   * (dort war das schlechteste Paar schon 8,1). */
+  --_chart-series-4: #0284C7;   /* Blau     */
+  --_chart-series-5: #713F12;   /* Ocker    */
+  --_chart-series-6: #DB2777;   /* Magenta  */
   --_chart-series-7: #1E7B35;   /* Grün     */
   --chart-series-1: var(--_chart-series-1);
   --chart-series-2: var(--_chart-series-2);

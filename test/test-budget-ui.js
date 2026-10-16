@@ -559,7 +559,69 @@ test('Donut-Palette wiederholt keine Farbe und borgt keine Modul-Akzente', () =>
   // Segmente über die Palettengröße hinaus werden gebündelt statt eingefärbt.
   assert.match(stats, /const DONUT_SEGMENTS = DONUT_COLORS\.length/);
   assert.match(stats, /statsOtherCategories/);
-  assert.match(stats, /stroke="\$\{DONUT_COLORS\[i\]\}"/, 'kein Modulo-Recycling mehr');
+  // R19: das Segment traegt die Farbe SEINER Kategorie (Katalogstelle), die
+  // Sammelscheibe die neutrale - kein Rang, kein Modulo-Recycling.
+  assert.match(stats, /stroke="\$\{e\.color\}"/, 'jedes Segment in der Farbe seiner Kategorie');
+  assert.match(stats, /color: categoryColor\(colors, c\.category\)/);
+  assert.match(stats, /value: restValue, color: CATEGORY_OTHER_COLOR/, 'die Sammelscheibe ist neutral');
+  assert.match(stats, /Math\.max\(frac \* C - gap, 0\.5\)/, '2px-Fugen zwischen den Segmenten');
+});
+
+/* R19 (Critique 2026-10-16, Ringpalette): bei Deuteranopie lagen Orange und
+ * Ocker (dE2000 0,9) sowie Indigo und Blau (1,9) im hellen Thema praktisch
+ * aufeinander. Simuliert wird nach Machado et al. (2009, Schwere 1,0) auf
+ * linearem RGB; jedes Paar der Palette muss bei Deuteranopie UND Protanopie
+ * mindestens dE 8 auseinanderliegen, in beiden Themes. */
+test('R19: die Datenreihen bleiben bei Rot-Gruen-Schwaeche unterscheidbar', () => {
+  const toLin = (c) => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+  const toSrgb = (c) => { c = Math.min(1, Math.max(0, c)); return 255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055); };
+  const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const M = {
+    deut: [[0.367322, 0.860646, -0.227968], [0.280085, 0.672501, 0.047413], [-0.011820, 0.042940, 0.968881]],
+    prot: [[0.152286, 1.052583, -0.204868], [0.114503, 0.786281, 0.099216], [-0.003882, -0.048116, 1.051998]],
+  };
+  const sim = (c, m) => { const l = c.map(toLin); return m.map((r) => toSrgb(r[0] * l[0] + r[1] * l[1] + r[2] * l[2])); };
+  function lab(c) {
+    const [r, g, b] = c.map(toLin);
+    let x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047, y = r * 0.2126 + g * 0.7152 + b * 0.0722, z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883;
+    const f = (t) => (t > 216 / 24389 ? Math.cbrt(t) : (24389 / 27 * t + 16) / 116);
+    [x, y, z] = [f(x), f(y), f(z)];
+    return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
+  }
+  function de2000([L1, a1, b1], [L2, a2, b2]) {
+    const rad = Math.PI / 180, C1 = Math.hypot(a1, b1), C2 = Math.hypot(a2, b2), Cb = (C1 + C2) / 2;
+    const G = 0.5 * (1 - Math.sqrt(Cb ** 7 / (Cb ** 7 + 25 ** 7)));
+    const a1p = a1 * (1 + G), a2p = a2 * (1 + G), C1p = Math.hypot(a1p, b1), C2p = Math.hypot(a2p, b2);
+    const h = (b, a) => { const v = Math.atan2(b, a) / rad; return v < 0 ? v + 360 : v; };
+    const h1p = h(b1, a1p), h2p = h(b2, a2p);
+    const dL = L2 - L1, dC = C2p - C1p;
+    let dh = h2p - h1p; if (C1p * C2p === 0) dh = 0; else if (dh > 180) dh -= 360; else if (dh < -180) dh += 360;
+    const dH = 2 * Math.sqrt(C1p * C2p) * Math.sin(dh / 2 * rad);
+    const Lb = (L1 + L2) / 2, Cbp = (C1p + C2p) / 2;
+    let hb = h1p + h2p; if (C1p * C2p !== 0) { if (Math.abs(h1p - h2p) > 180) hb += h1p + h2p < 360 ? 360 : -360; hb /= 2; }
+    const T = 1 - 0.17 * Math.cos((hb - 30) * rad) + 0.24 * Math.cos(2 * hb * rad) + 0.32 * Math.cos((3 * hb + 6) * rad) - 0.2 * Math.cos((4 * hb - 63) * rad);
+    const Sl = 1 + 0.015 * (Lb - 50) ** 2 / Math.sqrt(20 + (Lb - 50) ** 2), Sc = 1 + 0.045 * Cbp, Sh = 1 + 0.015 * Cbp * T;
+    const Rt = -2 * Math.sqrt(Cbp ** 7 / (Cbp ** 7 + 25 ** 7)) * Math.sin(60 * Math.exp(-(((hb - 275) / 25) ** 2)) * rad);
+    return Math.sqrt((dL / Sl) ** 2 + (dC / Sc) ** 2 + (dH / Sh) ** 2 + Rt * (dC / Sc) * (dH / Sh));
+  }
+  const block = (re) => {
+    const m = tokensCss.match(re);
+    assert.ok(m, `Block fehlt: ${re}`);
+    return Array.from({ length: 7 }, (_, i) => m[0].match(new RegExp(`--_chart-series-${i + 1}:\\s*(#[0-9A-Fa-f]{6})`))[1]);
+  };
+  const themes = {
+    hell: block(/--_chart-series-1: #4F4DC9[\s\S]*?--_chart-series-7: #[0-9A-Fa-f]{6}/),
+    dunkel: block(/--_chart-series-1: #7D7AFF;[\s\S]*?--_chart-series-7: #[0-9A-Fa-f]{6}/),
+  };
+  for (const [name, pal] of Object.entries(themes)) {
+    for (let i = 0; i < pal.length; i++) for (let j = i + 1; j < pal.length; j++) {
+      const a = rgb(pal[i]), b = rgb(pal[j]);
+      for (const kind of ['deut', 'prot']) {
+        const d = de2000(lab(sim(a, M[kind])), lab(sim(b, M[kind])));
+        assert.ok(d >= 8, `${name}: Serie ${i + 1}/${j + 1} bei ${kind} nur dE ${d.toFixed(1)}`);
+      }
+    }
+  }
 });
 
 test('die Datenreihen-Tokens existieren in beiden Themes', () => {
@@ -3987,16 +4049,26 @@ test('Budget: Reiterwechsel und Blaettern tauschen ueber die geteilten Helfer (R
  * Donut-Legende, die alles ein zweites Mal aufzaehlte, entfaellt. */
 test('Statistik: Ausgabenbalken tragen Donut-Farbe und Anteil, keine zweite Legende (R14 P8)', async () => {
   const { __test: st } = await import('../public/pages/budget-stats.js');
-  const farben = st.categoryColorIndex([
-    { category: 'a', expenses: -100 }, { category: 'b', expenses: -300 }, { category: 'c', expenses: 0, income: 50 },
+  // R19 (Critique 2026-10-16): die Farbe folgt der Stelle im Katalog, nicht
+  // dem Rang im Zeitraum. Nur wer im selben Zeitraum dieselbe Farbe haette,
+  // weicht auf die naechste freie aus; sind alle vergeben, die Sammelfarbe.
+  const katalog = ['a', 'b', 'c', ...Array.from({ length: 8 }, (_, i) => `x${i}`)];
+  const zeitraum = (bigB) => [
+    { category: 'a', expenses: -100 }, { category: 'b', expenses: bigB ? -300 : -50 }, { category: 'c', expenses: 0, income: 50 },
     ...Array.from({ length: 8 }, (_, i) => ({ category: `x${i}`, expenses: -(10 - i) })),
-  ]);
-  assert.equal(farben.get('b'), 0, 'die groesste Ausgabe nimmt die erste Serienfarbe - wie ihr Donut-Segment');
-  assert.equal(farben.get('a'), 1);
+  ];
+  const farben = st.categoryColorIndex(zeitraum(true), katalog);
+  assert.equal(farben.get('a'), 0, 'a steht im Katalog vorn und behaelt Serie 1, obwohl b mehr kostet');
+  assert.equal(farben.get('b'), 1);
   assert.equal(farben.has('c'), false, 'ohne Ausgabe kein Segment');
-  assert.equal(farben.get('x7'), st.DONUT_SEGMENTS - 1, 'jenseits der Palette: die Farbe der Sammelscheibe');
+  assert.equal(farben.get('x0'), 3, 'Katalogstelle 4');
+  assert.equal(farben.get('x4'), 2, 'Stelle 8 haette Serie 1 (vergeben) - sie weicht auf die naechste freie aus');
+  assert.equal(farben.get('x7'), -1, 'jenseits der Palette: die Sammelfarbe');
+  const anders = st.categoryColorIndex(zeitraum(false), katalog);
+  assert.equal(anders.get('a'), 0, 'ein anderer Monat, dieselbe Farbe');
+  assert.equal(anders.get('b'), 1);
   const code = withoutHtmlComments(stats);
-  assert.match(code, /--bar-fill:\$\{DONUT_COLORS\[/, 'der Balken nimmt die Segmentfarbe');
+  assert.match(code, /const color = kind === 'expenses' \? categoryColor\(colors, r\.category\) : null;\s*const fillColor = color \? `;--bar-fill:\$\{color\}` : '';/, 'der Balken nimmt die Farbe seiner Kategorie');
   assert.match(code, /budget-bar-row__share/, 'der Balken nennt seinen Anteil');
   assert.doesNotMatch(code, /budget-stats__legend budget-stats__legend--wrap/, 'die Donut-Legende zaehlt nicht alles ein zweites Mal auf');
   const barFill = [...eachRule(budgetCss)].find((r) => r.selector.trim() === '.budget-bar-row__fill');
@@ -6405,21 +6477,25 @@ test('Critique 2026-10-16: Kurzzeile einzeilig bis aufgeklappt, Startsaldo beim 
   assert.ok(css.some((r) => phone(r) && r.selector.trim() === '.budget-account__starting' && /grid-column:\s*2/.test(r.body)),
     'mobil steht der Startsaldo in der Textspalte');
 
-  // D9: die Uebersicht faerbt mit der geteilten Zuordnung (groesste Ausgabe zuerst).
-  const bars = budgetUi.renderCategoryBars(summe.byCategory);
+  // D9: die Uebersicht faerbt mit der geteilten Zuordnung - seit R19 nach der
+  // Stelle im Katalog (state.meta), nicht nach der groessten Ausgabe.
+  const vorherMeta = budgetUi.state.meta;
+  budgetUi.state.meta = { ...vorherMeta, expenseCategories: [{ key: 'housing', name: 'Housing' }, { key: 'food', name: 'Food' }] };
+  let bars;
+  try { bars = budgetUi.renderCategoryBars(summe.byCategory); } finally { budgetUi.state.meta = vorherMeta; }
   assert.match(bars, /style="--bar-scale:[\d.]+;--bar-fill:var\(--chart-series-1\)" data-bar-key="expenses:housing"/, 'Wohnen: Serie 1');
   assert.match(bars, /style="--bar-scale:[\d.]+;--bar-fill:var\(--chart-series-2\)" data-bar-key="expenses:food"/, 'Ernaehrung: Serie 2');
   // Plan: der Balken traegt die Kategoriefarbe, nicht den Zustand.
   const plans = read('../public/pages/budget-plans.js');
   assert.match(plans, /const fill = view\.ctx\.categoryColor\?\.\(p\.category\);/);
   assert.match(plans, /style="--plan-fill:\$\{fill\}"/);
-  assert.match(budgetJs, /categoryColor: \(category\) => categoryColor\(categoryColorIndex\(state\.summary\?\.byCategory\), category\)/,
+  assert.match(budgetJs, /categoryColor: \(category\) => categoryColor\(categoryColors\(state\.summary\?\.byCategory\), category\)/,
     'der Plan bekommt dieselbe Zuordnung wie die Uebersicht');
   const fillRule = css.find((r) => r.selector.trim() === '.budget-plan-row__fill');
   assert.match(fillRule?.body ?? '', /background-color:\s*var\(--plan-fill/, 'Planbalken: Kategoriefarbe');
   assert.doesNotMatch(fillRule?.body ?? '', /--plan-tone-color/, 'der Zustand faerbt den Balken nicht mehr um');
   assert.match(plans, /data-lucide="\$\{stateIcon\}"/, 'der Zustand spricht mit Icon und Text');
-  assert.match(stats, /import \{ CATEGORY_SERIES_COLORS, categoryColorIndex \} from '\/utils\/budget-category-colors\.js';/,
+  assert.match(stats, /import \{ CATEGORY_SERIES_COLORS, CATEGORY_OTHER_COLOR, categoryColorIndex, categoryColor \} from '\/utils\/budget-category-colors\.js';/,
     'die Statistik nimmt dieselbe Zuordnung');
 });
 
@@ -6515,3 +6591,4 @@ test('Statistik: das Ziel steht als Text, und seine Marke klemmt nicht an der Ka
   assert.match(html, /class="sr-only">budget\.planTargetSr\{"amount":"1700 €","percent":"[^"]+"\}/);
   assert.doesNotMatch(html, /title="budget\.planTarget/, 'das Ziel ist wieder nur per title erklaert');
 });
+

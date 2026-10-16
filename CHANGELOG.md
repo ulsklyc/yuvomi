@@ -36,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A budget category keeps its colour in every month.** Colours follow a category's place in your
+  category list instead of how much it cost this month, so "Housing" no longer turns from violet to
+  teal when another category is more expensive. The ring in Reports leaves a small gap between
+  segments, groups the rest in grey, and the light chart colours were adjusted so that no two of
+  them look alike with red-green colour blindness.
 - **The Health settings page names the cycle plainly.** The switches say "Show cycle" for yourself
   and "Offer the cycle in the household" for everyone instead of "Show cycle tab" twice, so a
   search for "cycle" finds each once, and the jump links at the top carry the headings they lead

@@ -142,6 +142,11 @@ function expenseCategories() {
   return state.meta.expenseCategories ?? [];
 }
 
+/** Farbzuordnung des gezeigten Zeitraums - die Farbe kommt aus der Katalogstelle (R19). */
+function categoryColors(byCategory) {
+  return categoryColorIndex(byCategory, expenseCategories().map((c) => c.key));
+}
+
 function incomeCategories() {
   return state.meta.incomeCategories ?? [];
 }
@@ -1215,6 +1220,8 @@ function renderBody() {
       user: _user, currency: state.currency,
       budgetMode: state.budgetMode, scope: state.scope,
       formatAmount, categoryLabel, esc,
+      // Die Katalog-Reihenfolge traegt die Farbe der Kategorie (R19).
+      expenseCategoryKeys: expenseCategories().map((c) => c.key),
       // Zeitraum und Auflösung gehören dem Modul, nicht dem Panel: der Stepper
       // sitzt im geteilten Kopf, das Panel wählt nur noch die Auflösung.
       range: state.range,
@@ -1253,7 +1260,7 @@ function renderBody() {
       formatAmount, categoryLabel, esc,
       expenseCategories: expenseCategories(),
       // Identitaetsfarbe je Kategorie wie in Uebersicht und Statistik (D9).
-      categoryColor: (category) => categoryColor(categoryColorIndex(state.summary?.byCategory), category),
+      categoryColor: (category) => categoryColor(categoryColors(state.summary?.byCategory), category),
     }).catch((err) => console.error('[Budget] plans render error:', err));
     return;
   }
@@ -2023,7 +2030,7 @@ function renderCategoryBars(byCategory) {
   // DIE KATEGORIE TRAEGT IHRE FARBE (Critique 2026-10-16, D9): dieselbe wie
   // im Plan und in der Statistik (utils/budget-category-colors.js), statt
   // aller Ausgabenbalken im Modulton.
-  const colors = categoryColorIndex(byCategory);
+  const colors = categoryColors(byCategory);
 
   return CHART_BLOCKS.filter(({ kind }) => blocks[kind].length).map(({ kind, labelKey }) => {
     const rows = blocks[kind];
@@ -2115,7 +2122,7 @@ function subcategoryRows(category, entries) {
     0
   );
   // Die Unterkategorien tragen die Farbe ihrer Kategorie (D9).
-  const parentFill = kind === 'expenses' ? categoryColor(categoryColorIndex(state.summary?.byCategory), category) : null;
+  const parentFill = kind === 'expenses' ? categoryColor(categoryColors(state.summary?.byCategory), category) : null;
   return rows.map((row) => {
     const selected = state.subcategoryFilter?.category === category
       && state.subcategoryFilter.key === row.key;

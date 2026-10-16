@@ -2,7 +2,7 @@
  * Modul: Budget-Statistik-View
  * Zweck: Statistik-Tab (Zeitraum-Filter, Summary-Cards, Trendlinie, Donut, CSV-Export).
  */
-import { CATEGORY_SERIES_COLORS, categoryColorIndex } from '/utils/budget-category-colors.js';
+import { CATEGORY_SERIES_COLORS, CATEGORY_OTHER_COLOR, categoryColorIndex, categoryColor } from '/utils/budget-category-colors.js';
 import { api } from '/api.js';
 import { t, formatDate, getLocale } from '/i18n.js';
 import { wireTablist } from '/utils/tablist.js';
@@ -297,7 +297,7 @@ function renderCatBars() {
   }).filter((b) => b.rows.some((r) => r.amount !== 0));
   if (!blocks.length) return;
 
-  const colors = categoryColorIndex(view.data.byCategory);
+  const colors = categoryColorIndex(view.data.byCategory, view.ctx.expenseCategoryKeys);
   const html = blocks.map(({ kind, labelKey, betterWhen, rows }) => {
     // DAS EIGENE MAXIMUM DES BLOCKS, wie im Monats-Diagramm - samt der Ziele
     // (Critique R19): eine Zielmarke ueber dem groessten Betrag klemmte vorher
@@ -334,8 +334,8 @@ function renderCatBars() {
         : '');
       // Ausgaben: Farbe des Donut-Segments und der Anteil als Text - die Farbe
       // ist Zuordnung, der Anteil die Aussage (auch ohne Farbsehen lesbar).
-      const colorIndex = kind === 'expenses' ? colors.get(r.category) : undefined;
-      const fillColor = colorIndex != null ? `;--bar-fill:${DONUT_COLORS[colorIndex]}` : '';
+      const color = kind === 'expenses' ? categoryColor(colors, r.category) : null;
+      const fillColor = color ? `;--bar-fill:${color}` : '';
       const share = kind === 'expenses' && absTotal > 0 && r.amount !== 0
         ? ` <span class="budget-bar-row__share">${view.ctx.esc(sharePercent(r.amount, absTotal))}</span>`
         : '';
@@ -377,16 +377,26 @@ function renderCatBars() {
 // Segmente auf die Palettengröße begrenzen: alles jenseits davon fließt in eine
 // „Sonstige"-Sammelscheibe. Ein Donut mit 15 Kategorien ist ohnehin nicht mehr
 // ablesbar, und ohne Deckel bekämen Segment 1 und 8 dieselbe Farbe.
+//
+// Jedes Segment traegt die Farbe SEINER Kategorie (R19: nach Katalogstelle,
+// nicht nach Rang - categoryColorIndex), die Sammelscheibe die neutrale.
 function donutSlices(byCategory) {
+  const colors = categoryColorIndex(byCategory, view.ctx.expenseCategoryKeys);
   const exp = byCategory
     .filter((c) => c.expenses < 0)
-    .map((c) => ({ label: view.ctx.categoryLabel(c.category), value: Math.abs(c.expenses) }))
+    .map((c) => ({ label: view.ctx.categoryLabel(c.category), value: Math.abs(c.expenses), color: categoryColor(colors, c.category) }))
     .sort((a, b) => b.value - a.value);
   if (exp.length <= DONUT_SEGMENTS) return exp;
   const head = exp.slice(0, DONUT_SEGMENTS - 1);
   const restValue = exp.slice(DONUT_SEGMENTS - 1).reduce((s, e) => s + e.value, 0);
-  return [...head, { label: t('budget.statsOtherCategories'), value: restValue }];
+  return [...head, { label: t('budget.statsOtherCategories'), value: restValue, color: CATEGORY_OTHER_COLOR }];
 }
+
+/* FUGEN ZWISCHEN DEN SEGMENTEN (R19, Critique 2026-10-16): Segmente stiessen
+ * ohne Abstand aneinander, und zwei Toene, die eine Farbfehlsicht angleicht,
+ * flossen ineinander. 2 Einheiten (bei 160 Einheiten Breite rund 2px) bleiben
+ * zwischen je zwei Segmenten frei; ein einziges Segment schliesst den Ring. */
+const DONUT_GAP = 2;
 
 function renderDonut() {
   const host = view.root.querySelector('#budget-stats-donut');
@@ -397,11 +407,12 @@ function renderDonut() {
   const pctOf = (value) => Math.round((value / total) * 100);
   const C = 2 * Math.PI * 60; // r=60
   let offset = 0;
-  const segs = exp.map((e, i) => {
+  const gap = exp.length > 1 ? DONUT_GAP : 0;
+  const segs = exp.map((e) => {
     const frac = e.value / total;
     const seg = `
-      <circle r="60" cx="80" cy="80" fill="none" stroke="${DONUT_COLORS[i]}"
-        stroke-width="16" stroke-dasharray="${(frac * C).toFixed(2)} ${C.toFixed(2)}"
+      <circle r="60" cx="80" cy="80" fill="none" stroke="${e.color}"
+        stroke-width="16" stroke-dasharray="${Math.max(frac * C - gap, 0.5).toFixed(2)} ${C.toFixed(2)}"
         stroke-dashoffset="${(-offset).toFixed(2)}" transform="rotate(-90 80 80)" />`;
     offset += frac * C;
     return seg;
