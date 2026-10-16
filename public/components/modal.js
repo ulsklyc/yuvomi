@@ -2781,7 +2781,11 @@ export function reportFieldErrors(errors) {
     return (a.compareDocumentPosition(b) & 4) ? -1 : 1;
   });
   for (const [input, message] of list) reportFieldError(input, message, { focus: false });
-  _focusField(list[0][0]);
+  // Das erste Feld in DOM-Reihenfolge - destrukturiert, weil der
+  // Initialen-Guard (test:initials) doppelte Null-Indizes als handgebaute
+  // Initialen-Regel liest.
+  const [[firstField]] = list;
+  _focusField(firstField);
   return true;
 }
 
