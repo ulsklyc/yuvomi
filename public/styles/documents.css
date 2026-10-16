@@ -142,7 +142,7 @@
 /* Traegt keine Gruppe einen Chip (leere Ansicht, documents.js
  * renderCategoryChips), geht die Spur samt Haarlinie: ein Strich neben dem
  * Segment, hinter dem nichts kommt, waere Moebel ohne Zweck. */
-.documents-filters__chips:not(:has(.filter-chip)) {
+.documents-filters__chips:not(:has(.filter-chip:not(.documents-folder-chip))) {
   display: none;
 }
 
@@ -248,35 +248,10 @@
   font-weight: var(--font-weight-semibold);
 }
 
-/* Der Auslöser der aufklappbaren Auswahl - nur unterhalb Tablet sichtbar
- * (Regel im @media-Block weiter unten). Er trägt den Ordner, in dem man steht. */
-.documents-folder-browser__toggle {
-  display: none;
-  align-items: center;
-  gap: var(--space-2);
-  flex: 1;
-  min-width: 0;
-  min-height: var(--target-base);
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-sm);
-  color: var(--color-text-primary);
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
-  text-align: start;
-  transition: background-color var(--transition-fast);
-}
-
-.documents-folder-browser__toggle:hover {
-  background-color: var(--color-surface-hover);
-}
-
-.documents-folder-browser__toggle svg {
-  width: var(--icon-md);
-  height: var(--icon-md);
-  flex-shrink: 0;
-  color: var(--module-accent);
-}
-
+/* Der Auslöser der aufklappbaren Auswahl stand hier als eigene Zeile im Kopf
+ * der Ordnerspalte; seit der Critique 2026-10-16 ist er der erste Chip der
+ * Filterzeile (`.documents-folder-chip`, Regeln weiter unten). Name und Pfeil
+ * behalten ihre Klassen. */
 .documents-folder-browser__toggle-label {
   flex: 1;
   min-width: 0;
@@ -288,12 +263,18 @@
   transition: transform var(--transition-fast);
 }
 
-.documents-folder-browser__toggle[aria-expanded="true"] .documents-folder-browser__chevron {
+.documents-folder-chip[aria-expanded="true"] .documents-folder-browser__chevron {
   transform: rotate(180deg);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .documents-folder-browser__chevron { transition: none; }
+}
+
+/* Der Ordner-Chip (documents.js, erster Chip der Filterzeile) gibt es nur
+ * unterhalb Tablet - am Desktop steht die Ordnerspalte offen. */
+.documents-folder-chip {
+  display: none;
 }
 
 /* Freistehendes Ziel im Kopf der Ordnerliste - kein gleichartiges Ziel engt es
@@ -1438,6 +1419,9 @@
    * der geteilten Grammatik, die keinen Namen kappen. */
   .documents-folder-browser__head {
     padding-inline-start: 0;
+    /* Aufgeklappt traegt der Kopf nur noch „Ordner anlegen" (der Titel ist
+     * unsichtbar, der Auslöser steht als Chip in der Filterzeile). */
+    justify-content: flex-end;
   }
 
   /* Die Ueberschrift bleibt fuer Screenreader und wandert aus dem Bild: der
@@ -1455,8 +1439,40 @@
     white-space: nowrap;
   }
 
-  .documents-folder-browser__toggle {
+  .documents-folder-chip {
+    display: inline-flex;
+  }
+
+  /* DER ORDNER-CHIP FUEHRT DIE SPUR (Critique 2026-10-16): die Spur steht
+   * damit auch ohne Facetten, und der Chip schrumpft nicht unter seinen
+   * Namen. Er traegt den gewaehlten Ordner; sein Pfeil sagt „klappt auf". */
+  .documents-filters__chips:has(.documents-folder-chip) {
     display: flex;
+  }
+
+  .documents-folder-chip {
+    flex-shrink: 0;
+    max-inline-size: 16rem;
+  }
+
+  .documents-folder-chip .documents-folder-browser__toggle-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Ein gewaehlter Ordner ist ein aktiver Filter - der Chip sagt es wie
+   * jede Facette (Aktivton), solange nicht „Alle Dokumente" gilt. */
+  .documents-folder-chip[data-folder-active] {
+    background-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-state), transparent);
+    border-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-hint), transparent);
+    color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-ink), var(--color-text-primary));
+  }
+
+  /* Zugeklappt belegt die Ordnerauswahl KEINE Zeile mehr: ihr Kopf (Titel
+   * und „Ordner anlegen") erscheint erst mit der aufgeklappten Liste. */
+  .documents-folder-browser:not(.documents-folder-browser--open) {
+    display: none;
   }
 
   .documents-folder-browser__list {
