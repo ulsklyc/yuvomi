@@ -426,8 +426,10 @@ test('R18: das Marken-Lichtfeld steht still, ohne Filter, und faellt unter den a
   assert.equal(DARK_ATTR.get('--_brand-field-opacity'), DARK_MEDIA.get('--_brand-field-opacity'), 'beide Dark-Bloecke gleich');
   assert.ok(DARK_ATTR.get('--_brand-field-opacity'), 'das Feld hat einen Dark-Wert');
 
-  // Traeger: die Shell der Zugangsseiten und das Ladebild - und nichts, was
-  // sich bewegt.
+  // Traeger: die Shell der Zugangsseiten, das Ladebild und der Zustand, der
+  // das Ladebild ersetzt, wenn die Sitzung gerade nicht pruefbar ist
+  // (Critique R19, utils/session-unreachable.js) - alle drei VOR der App -
+  // und nichts, was sich bewegt.
   const carriers = [];
   for (const file of styleFiles()) {
     for (const rule of eachRule(read(`../public/styles/${file}`))) {
@@ -436,7 +438,7 @@ test('R18: das Marken-Lichtfeld steht still, ohne Filter, und faellt unter den a
       assert.doesNotMatch(rule.body, /animation|(?:^|;)\s*filter\s*:|transform\s*:/, `${rule.selector}: das Feld steht still`);
     }
   }
-  assert.deepEqual(carriers.sort(), ['.app-loading', '.app-shell:has(.auth-page)'], 'das Feld lebt nur vor der App');
+  assert.deepEqual(carriers.sort(), ['.app-loading', '.app-shell:has(.auth-page)', '.app-shell:has(> .session-unreachable)'].sort(), 'das Feld lebt nur vor der App');
 });
 
 /**
