@@ -6,7 +6,7 @@
 import { email } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { createInlineError } from '/settings/components.js';
+import { createInlineError, settingRowHtml } from '/settings/components.js';
 
 const DEFAULTS = {
   host: '', port: 587, secure: 'starttls', user: '',
@@ -37,58 +37,62 @@ export async function render(container, { user } = {}) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <section class="settings-section">
-      <div class="settings-card">
-        <p class="form-hint">${esc(t('email.purposeHint'))}</p>
-        <form class="settings-form" id="email-form" novalidate>
-          <div class="form-group">
-            <label class="label" for="email-host">${esc(t('email.host'))}</label>
-            <input class="input" id="email-host" name="host" value="${esc(cfg.host)}" autocomplete="off" />
-            <p class="form-hint" data-env-hint="host" hidden>${esc(t('settings.documentStorageEnvHint'))}</p>
-          </div>
-          <div class="form-group">
-            <label class="label" for="email-port">${esc(t('email.port'))}</label>
-            <input class="input" id="email-port" name="port" type="number" inputmode="numeric"
-              value="${esc(String(cfg.port))}" />
-            <p class="form-hint" data-env-hint="port" hidden>${esc(t('settings.documentStorageEnvHint'))}</p>
-          </div>
-          <div class="form-group">
-            <label class="label" for="email-secure">${esc(t('email.security'))}</label>
-            <select class="input" id="email-secure" name="secure">
+      ${/* EIN FORMULAR-DIALEKT (R19, Critique 2026-10-16, Einstellungen B7):
+           hier standen sieben Felder UNTER ihren Etiketten in einer Karte -
+           der zweite Dialekt neben den gruppierten Zeilen der anderen Blaetter
+           (Kueche, Darstellung). Jetzt Zeilen im Traeger: Etikett links, Feld
+           rechts, Hinweise darunter; der Zweck steht als Fuss der Gruppe. */ ''}
+      <form class="settings-form" id="email-form" novalidate>
+        <div class="row-carrier settings-group">
+          ${settingRowHtml({
+            label: t('email.host'), labelFor: 'email-host',
+            control: `<input class="form-input" id="email-host" name="host" value="${esc(cfg.host)}" autocomplete="off" />`,
+            extra: `<p class="form-hint" data-env-hint="host" hidden>${esc(t('settings.documentStorageEnvHint'))}</p>`,
+          })}
+          ${settingRowHtml({
+            label: t('email.port'), labelFor: 'email-port',
+            control: `<input class="form-input" id="email-port" name="port" type="number" inputmode="numeric" value="${esc(String(cfg.port))}" />`,
+            extra: `<p class="form-hint" data-env-hint="port" hidden>${esc(t('settings.documentStorageEnvHint'))}</p>`,
+          })}
+          ${settingRowHtml({
+            label: t('email.security'), labelFor: 'email-secure',
+            control: `<select class="form-input" id="email-secure" name="secure">
               <option value="ssl">${esc(t('email.securitySsl'))}</option>
               <option value="starttls">${esc(t('email.securityStarttls'))}</option>
               <option value="none">${esc(t('email.securityNone'))}</option>
-            </select>
-            <p class="form-hint" data-env-hint="secure" hidden>${esc(t('settings.documentStorageEnvHint'))}</p>
-          </div>
-          <div class="form-group">
-            <label class="label" for="email-user">${esc(t('email.user'))}</label>
-            <input class="input" id="email-user" name="user" value="${esc(cfg.user)}" autocomplete="off" />
-            <p class="form-hint" data-env-hint="user" hidden>${esc(t('settings.documentStorageEnvHint'))}</p>
-          </div>
-          <div class="form-group">
-            <label class="label" for="email-pass">${esc(t('email.password'))}</label>
-            <input class="input" id="email-pass" name="pass" type="password" autocomplete="new-password"
-              placeholder="${cfg.passwordSet ? '••••••••' : ''}" />
-            <p class="form-hint">${esc(t('email.passwordKeep'))}</p>
-            <p class="form-hint" data-env-hint="pass" hidden>${esc(t('settings.documentStorageEnvHint'))}</p>
-          </div>
-          <div class="form-group">
-            <label class="label" for="email-from">${esc(t('email.fromAddress'))}</label>
-            <input class="input" id="email-from" name="fromAddress" type="email" value="${esc(cfg.fromAddress)}" />
-            <p class="form-hint" data-env-hint="fromAddress" hidden>${esc(t('settings.documentStorageEnvHint'))}</p>
-          </div>
-          <div class="form-group">
-            <label class="label" for="email-fromname">${esc(t('email.fromName'))}</label>
-            <input class="input" id="email-fromname" name="fromName" value="${esc(cfg.fromName)}" />
-            <p class="form-hint" data-env-hint="fromName" hidden>${esc(t('settings.documentStorageEnvHint'))}</p>
-          </div>
-          <div id="email-notice"></div>
-          <div class="settings-form-actions">
-            <button type="button" class="btn btn--secondary" id="email-test">${esc(t('email.test'))}</button>
-            <button type="submit" class="btn btn--primary" id="email-save">${esc(t('email.save'))}</button>
-          </div>
-        </form>
-      </div>
+            </select>`,
+            extra: `<p class="form-hint" data-env-hint="secure" hidden>${esc(t('settings.documentStorageEnvHint'))}</p>`,
+          })}
+          ${settingRowHtml({
+            label: t('email.user'), labelFor: 'email-user',
+            control: `<input class="form-input" id="email-user" name="user" value="${esc(cfg.user)}" autocomplete="off" />`,
+            extra: `<p class="form-hint" data-env-hint="user" hidden>${esc(t('settings.documentStorageEnvHint'))}</p>`,
+          })}
+          ${settingRowHtml({
+            label: t('email.password'), labelFor: 'email-pass',
+            description: t('email.passwordKeep'),
+            descriptionId: 'email-pass-hint',
+            control: `<input class="form-input" id="email-pass" name="pass" type="password" autocomplete="new-password" aria-describedby="email-pass-hint" placeholder="${cfg.passwordSet ? '••••••••' : ''}" />`,
+            extra: `<p class="form-hint" data-env-hint="pass" hidden>${esc(t('settings.documentStorageEnvHint'))}</p>`,
+          })}
+          ${settingRowHtml({
+            label: t('email.fromAddress'), labelFor: 'email-from',
+            control: `<input class="form-input" id="email-from" name="fromAddress" type="email" value="${esc(cfg.fromAddress)}" />`,
+            extra: `<p class="form-hint" data-env-hint="fromAddress" hidden>${esc(t('settings.documentStorageEnvHint'))}</p>`,
+          })}
+          ${settingRowHtml({
+            label: t('email.fromName'), labelFor: 'email-fromname',
+            control: `<input class="form-input" id="email-fromname" name="fromName" value="${esc(cfg.fromName)}" />`,
+            extra: `<p class="form-hint" data-env-hint="fromName" hidden>${esc(t('settings.documentStorageEnvHint'))}</p>`,
+          })}
+        </div>
+        <p class="form-hint settings-group__footer">${esc(t('email.purposeHint'))}</p>
+        <div id="email-notice"></div>
+        <div class="settings-form-actions">
+          <button type="button" class="btn btn--secondary" id="email-test">${esc(t('email.test'))}</button>
+          <button type="submit" class="btn btn--primary" id="email-save">${esc(t('email.save'))}</button>
+        </div>
+      </form>
     </section>
   `);
 

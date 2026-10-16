@@ -20805,7 +20805,7 @@ const ALIAS_PENDING = new Set([
   '../public/pages/rewards.js', '../public/pages/calendar.js', '../public/pages/setup.js',
   '../public/pages/join.js', '../public/pages/login.js', '../public/pages/reset-password.js',
   '../public/pages/forgot-password.js', '../public/components/user-multi-select.js',
-  '../public/components/tag-manager.js', '../public/settings/pages/admin-email.js',
+  '../public/components/tag-manager.js',
   '../public/settings/pages/modules-health.js',
 ]);
 

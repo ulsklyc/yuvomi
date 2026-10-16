@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The e-mail settings read like the other settings pages.** Server, port, encryption, login and
+  sender stand as rows with the label on the left and the field on the right, instead of seven fields
+  stacked under their labels.
 - **Settings for this device are in one place.** Wall mode and the screensaver options moved from
   Appearance to "This device", next to installing the app, because all of them apply only to the
   device you are holding.

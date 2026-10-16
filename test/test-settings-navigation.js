@@ -3978,6 +3978,20 @@ test('R19: Wand-Modus und Bildschirmschoner stehen im Blatt "Dieses Geraet"', as
   assert.doesNotMatch(page, /wall-mode-toggle|screensaver-idle-select/, 'Darstellung zeigt die Geraete-Zeilen nicht mehr');
 });
 
+// R19 (Critique 2026-10-16, Einstellungen B7 "EIN Formular-Dialekt"): ein
+// Blatt fuehrt seine Einstellungen als Zeilen im Traeger (settingRowHtml),
+// nicht als gestapelte Felder unter Etiketten in einer Karte. Umgestellt:
+// Kueche (Schritt 5) und E-Mail (SMTP). Die Liste waechst je umgestelltem Blatt.
+test('R19: umgestellte Blaetter sprechen den Zeilen-Dialekt', async () => {
+  // Die Kueche bleibt hier aussen vor: ihre Anbieter-Dialoge tragen zu Recht Felder unter Etiketten.
+  for (const file of ['admin-email.js']) {
+    const src = await readFile(new URL(`../public/settings/pages/${file}`, import.meta.url), 'utf8');
+    assert.match(src, /settingRowHtml\(/, `${file}: Zeilen im Traeger`);
+    assert.doesNotMatch(src, /class="form-group"/, `${file}: keine gestapelten Felder mehr`);
+    assert.match(src, /class="row-carrier settings-group/, `${file}: der Traeger der Gruppe`);
+  }
+});
+
 test('R17: die Standard-Erinnerungen sind Chips des Kanons mit aria-pressed, keine Checkbox in einer Pille', async () => {
   const rendered = await probeSheets();
   const html = rendered.get('personal-calendar') ?? '';
