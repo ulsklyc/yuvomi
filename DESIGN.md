@@ -1463,6 +1463,11 @@ eigene Links zeigen direkt auf das neue Blatt (test:settings-navigation). Ab der
 steht links die Liste (`--layout-nav-list`, 320px, Suche klebt an ihrer Kante), rechts das
 Blatt im Lesemass, das erste Blatt vorgewaehlt. Eigene Shell statt Baustein, weil jedes Blatt
 eine Router-Route mit Dirty-Guard ist - PAGE-017 fuehrt sie in `OWN_LIST_DETAIL_SHELL`.
+Geprueft in R19 (2026-10-16, Befund „1920: rechts 426px leer“): die Liste fluchtet mit dem
+Kopf (x 430) wie jedes Modul, das Blatt ist ein Formular und bleibt im Lesemass (774-1494). Der
+Rest rechts ist das Lesemass, kein Loch - ein breiteres Blatt zoege die Felder auf 900px, und eine
+dritte Spalte haette keinen Inhalt, den es schon gibt (Regel „ein Reiter ohne zweiten Inhalt
+laesst die Spur leer“). Die Listenbreite bleibt `--layout-nav-list`, gemeinsam mit der Gesundheit.
 
 **Gesundheit (R10, 2026-09-27).** Keine Tab-Leiste mehr: die Uebersicht ist die Navigation -
 Zusammenfassung plus eine Liste "Alle Bereiche" (Icon, Name, letzter Wert oder Status, Muster
