@@ -1106,6 +1106,12 @@ function renderCard(subscription) {
             ${status.badgeClass === 'subscription-status--active' ? '' : `<span class="subscription-status ${status.badgeClass}">${status.label}</span>`}
           </span>
           <span class="subscription-card__meta">
+            ${/* SCHMAL STEHT DIE BESCHREIBUNG IN DER META-ZEILE (R19, Critique
+                 2026-10-16): hinter dem Namen blieben ihr bei 390px 40-60px
+                 ("Lind...", "Bis zu 6 Ko..."), der Name selbst kuerzte mit
+                 ("Microsoft 365 Fa..."). Immer genau eine der beiden Fassungen
+                 (subscriptions.css), wie beim Turnus. */ ''}
+            <span class="subscription-card__meta-desc">${esc(subscription.description || rowCategoryLabel(subscription))}</span>
             ${completed ? '' : `<span class="subscription-card__due${overdue ? ' subscription-card__due--overdue' : ''}"><i data-lucide="${overdue ? 'triangle-alert' : 'calendar-clock'}" aria-hidden="true"></i><span>${formatDate(subscription.next_payment_date)} ·</span> <span>${dueLabel(subscription)}</span></span>`}
             <span class="subscription-card__meta-cycle">${cycleLabel(subscription)}</span>
             <span class="subscription-card__meta-extra">${esc(rowPaymentMethodLabel(subscription))}</span>

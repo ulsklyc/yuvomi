@@ -41,6 +41,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   each person's open tasks as a number (166px instead of 427px), the current weather sits under
   the greeting even when the weather card is further down, and wall mode moved into the Customize
   menu next to "Customize widgets".
+- **Budget lists on a phone no longer cut off what tells rows apart.** Loan installments are titled
+  with the lender or borrower instead of "Loan repayment: ..." on every row, with the date and
+  "Installment x of y" below. A subscription's description moves to its own line under the name,
+  and the plan shows long category names in full.
 - **Module headers on phones and tablets take less room.** Shift plan, Rewards and Household help
   show their tabs in the title row (one row instead of two, 65px on a phone). The budget header
   folds to one row while you scroll, with the tabs beside the month. On a tablet the title, search

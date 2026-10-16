@@ -3111,6 +3111,44 @@ test('Statistik wiederholt die Uebersicht nicht: Vergleich je Kategorie und aufs
  * die allein breiter ist als die Spalte, bricht in sich statt zu ueberlaufen.
  * Der Ueberfaellig-Hinweis ist eine Warnung und wird nie abgeschnitten.
  */
+/* R19 (Critique 2026-10-16 P2 mobil): DIE BUDGET-LISTEN KAPPEN SCHMAL NICHT
+ * MEHR, WAS SIE UNTERSCHEIDET. Darlehen: jede Rate hiess "Darlehensrueckzahlu..."
+ * (32 gekappte Texte). Abos: die Beschreibung hatte hinter dem Namen 40-60px.
+ * Plan: "Koerperpflege / Gesun..." und "Freizeit und Unterhalt...". */
+test('R19: eine Ratenzeile nennt den Partner, die Meta-Zeile Datum und Rate', () => {
+  const sparkasse = { id: 1, title: 'Baufinanzierung', borrower: 'Sparkasse', installment_count: 312, direction: 'borrowed' };
+  const mike = { id: 2, title: 'Darlehen an Mike', borrower: 'Onkel Mike', installment_count: 6 };
+  const auto = { id: 3, title: 'Autokredit', borrower: 'sparkasse ', installment_count: 48, direction: 'borrowed' };
+  assert.equal(budgetUi.loanRowTitle(sparkasse, [sparkasse, mike]), 'Sparkasse', 'der Gegenpartner ist der Titel');
+  assert.equal(budgetUi.loanRowTitle(sparkasse, [sparkasse, mike, auto]), 'Baufinanzierung',
+    'teilen zwei Darlehen den Partner, unterscheidet sie ihr Name');
+  assert.equal(budgetUi.loanRowTitle({ id: 4, title: 'Privat', borrower: '' }, []), 'Privat', 'ohne Partner der Name des Darlehens');
+  const row = budget.slice(budget.indexOf('function renderLoanPaymentEntry('), budget.indexOf('function renderLoansPage('));
+  assert.match(row, /const rowTitle = loanRowTitle\(loan\);/);
+  assert.doesNotMatch(row, /loanPaymentTitle/, 'kein generiertes Praefix in der Zeile');
+  assert.match(row, /const meta = `\$\{formatEntryDate\(payment\.paid_date\)\} · <span class="budget-entry__installment">\$\{esc\(installment\)\}<\/span>`;/,
+    'Datum · Rate x von y - das Darlehen steht schon im Titel');
+  const rules = [...eachRule(budgetCss)];
+  assert.ok(rules.some((r) => r.selector.trim() === '.budget-entry--loan .budget-entry__meta' && /white-space:\s*normal/.test(r.body)),
+    'die Rate wird nicht gekappt, die Zeile bricht zwischen Datum und Rate');
+  assert.ok(rules.some((r) => r.selector.trim() === '.budget-entry__installment' && /white-space:\s*nowrap/.test(r.body)));
+});
+
+test('R19: die Abo-Beschreibung steht schmal in der Metazeile, der Plan kappt keinen Kategorienamen', async () => {
+  const src = read('../public/pages/subscriptions.js');
+  assert.match(src, /<span class="subscription-card__meta-desc">\$\{esc\(subscription\.description \|\| rowCategoryLabel\(subscription\)\)\}<\/span>/);
+  const narrow = [...eachRule(subscriptionsCss)].filter((r) => r.at.some((a) => /subscriptions-list \(max-width:\s*559px\)/.test(a)));
+  assert.ok(narrow.some((r) => r.selector.trim() === '.subscription-card__title-row > .subscription-card__desc' && /display:\s*none/.test(r.body)),
+    'schmal weicht die Beschreibung aus der Titelzeile');
+  const desc = narrow.find((r) => r.selector.trim() === '.subscription-card__meta > .subscription-card__meta-desc');
+  assert.match(desc?.body ?? '', /flex:\s*1 0 100%/, 'als eigene erste Metazeile');
+  const base = [...eachRule(subscriptionsCss)].find((r) => r.at.length === 0 && r.selector.includes('.subscription-card__meta-desc'));
+  assert.match(base?.body ?? '', /display:\s*none/, 'breit genau eine Fassung: die in der Titelzeile');
+  const label = [...eachRule(budgetCss)].find((r) => r.selector.trim() === '.budget-plan-row__label');
+  assert.doesNotMatch(label.body, /white-space:\s*nowrap|text-overflow:\s*ellipsis/, 'der Plan kappt keinen Kategorienamen');
+  assert.match(label.body, /overflow-wrap:\s*anywhere/);
+});
+
 test('Abo-Zeile: Metaangaben brechen um statt unter den Betrag zu laufen', async () => {
   const rules = [...eachRule(subscriptionsCss)];
   const parts = (selector) => selector.split(',').map((part) => part.trim());
@@ -3118,6 +3156,11 @@ test('Abo-Zeile: Metaangaben brechen um statt unter den Betrag zu laufen', async
     .some((sel) => /\.subscription-card__(?:meta|due)\b/.test(sel)));
   assert.ok(meta.length >= 3, 'Regeln der Metazeile nicht gefunden');
   for (const { selector, body } of meta) {
+    // Die Beschreibung (R19: schmal die erste Metazeile) ist keine Warnung,
+    // sondern Freitext bis 5000 Zeichen - sie ist EINE Zeile mit Ellipse, und
+    // weil sie die ganze Spaltenbreite nimmt (`flex: 1 0 100%`) und abschneidet,
+    // laeuft auch sie nie unter den Betrag. Geprueft unten.
+    if (/__meta-desc\b/.test(selector)) continue;
     assert.doesNotMatch(body, /white-space:\s*(?:nowrap|pre)\b/,
       `${selector}: ein unzerbrechliches Stueck in der Metazeile laeuft unter den Betrag`);
     assert.doesNotMatch(body, /text-overflow:\s*ellipsis|overflow:\s*hidden/,

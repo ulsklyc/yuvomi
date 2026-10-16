@@ -3305,14 +3305,39 @@ function loanPaymentToEntry(loan, payment) {
   };
 }
 
+/**
+ * Der Titel einer Ratenzeile im Darlehen-Reiter: der Gegenpartner, oder der
+ * Name des Darlehens, wenn der Partner fehlt oder ein zweites Darlehen ihn
+ * teilt (zwei Kredite bei derselben Bank waeren sonst wieder ununterscheidbar).
+ * @param {{id: number, title?: string, borrower?: string}} loan
+ * @param {Array<{id: number, borrower?: string}>} [loans]
+ * @returns {string}
+ */
+function loanRowTitle(loan, loans = state.loans?.loans ?? []) {
+  const partner = String(loan?.borrower ?? '').trim();
+  if (!partner) return loan?.title ?? '';
+  const key = partner.toLocaleLowerCase();
+  const shared = loans.some((other) => other.id !== loan.id
+    && String(other.borrower ?? '').trim().toLocaleLowerCase() === key);
+  return shared ? (loan.title || partner) : partner;
+}
+
 function renderLoanPaymentEntry(loan, payment) {
   const entry = loanPaymentToEntry(loan, payment);
   const installment = t('budget.loanInstallmentNumber', {
     number: payment.installment_number,
     total: loan.installment_count,
   });
-  const meta = `${formatEntryDate(payment.paid_date)} · ${esc(loan.title)} · ${installment}`;
-  const rowTitle = payment.entry_title || t('budget.loanPaymentTitle', { borrower: loan.borrower });
+  // DIE ZEILE NENNT DEN PARTNER, NICHT DIE GATTUNG (R19, Critique 2026-10-16 P2).
+  // Der Titel des gekoppelten Eintrags beginnt immer mit dem generierten
+  // "Darlehensrueckzahlung: " (server/routes/budget/loans.js) - mobil stand in
+  // jeder Zeile "Darlehensrueckzahlu...", 32 Texte gekappt, die Zeilen waren
+  // ununterscheidbar. Hier steht der Gegenpartner; teilen sich zwei Darlehen
+  // denselben, der Name des Darlehens. Die Meta-Zeile sagt Datum und Rate,
+  // das Darlehen steht schon im Titel. Der Eintrag im Hauptbuch behaelt seinen
+  // Titel - dort braucht die Zeile die Gattung, hier steht sie im Abschnitt.
+  const meta = `${formatEntryDate(payment.paid_date)} · <span class="budget-entry__installment">${esc(installment)}</span>`;
+  const rowTitle = loanRowTitle(loan);
   // Alle Raten tragen denselben Titel - der Name des Loeschknopfs nennt die Rate mit.
   const deleteName = t('budget.deleteLabel', { title: `${rowTitle} · ${installment}` });
   const editName = t('common.editNamed', { name: `${rowTitle} · ${installment}` });
@@ -6085,6 +6110,7 @@ export const __test = {
   // R15 A5 P1-1: der Titelknopf oeffnet den Bericht - gemessen als Programm.
   wireLoanCards,
   renderLoanPaymentEntry,
+  loanRowTitle,
   renderLoanTransactions,
   // Die Leseansichten (#1265 P7): die Zeilen als reine Funktionen, und der
   // Einstieg, dessen Aussage KEIN Markup ist - welche Optionen er

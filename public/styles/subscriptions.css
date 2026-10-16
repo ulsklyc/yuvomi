@@ -533,6 +533,10 @@
   display: none;
 }
 
+.subscription-card__meta-desc {
+  display: none;
+}
+
 @container subscriptions-list (max-width: 559px) {
   .subscription-card__meta .subscription-card__meta-cycle {
     display: none;
@@ -540,6 +544,20 @@
 
   .subscription-card__cost .subscription-card__cost-cycle {
     display: block;
+  }
+
+  /* DIE BESCHREIBUNG IST SCHMAL DIE ERSTE META-ZEILE (R19): eine eigene Zeile
+   * der Textspalte, einzeilig mit Ellipse - der Name hat die Titelzeile allein. */
+  .subscription-card__title-row > .subscription-card__desc {
+    display: none;
+  }
+
+  .subscription-card__meta > .subscription-card__meta-desc {
+    display: block;
+    flex: 1 0 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 

@@ -2292,6 +2292,18 @@ button.budget-entry__title {
   text-overflow: ellipsis;
 }
 
+/* EINE RATENZEILE KAPPT IHRE RATE NICHT (R19): sie traegt nur Datum und
+ * "Rate 10 von 312" - beides ist die Auskunft, nichts davon darf hinten
+ * wegfallen. Die Zeile bricht zwischen den beiden Angaben um (die Rate ist
+ * in sich unumbrechbar, budget.js renderLoanPaymentEntry). */
+.budget-entry--loan .budget-entry__meta {
+  white-space: normal;
+}
+
+.budget-entry__installment {
+  white-space: nowrap;
+}
+
 /* DAS KONTO IST EINE FRAGE DER BREITE, NICHT DES GERÄTS - deshalb der
  * Container (`budget-page` an #budget-body) und nicht der Viewport.
  *
@@ -3001,7 +3013,12 @@ button.budget-entry__title {
 .budget-plan-row--tone-over { --plan-tone-color: var(--color-danger);  }
 
 .budget-plan-row__top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
-.budget-plan-row__label { font-weight: var(--font-weight-medium); color: var(--color-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* UMBRECHEN, NICHT KUERZEN (R19, Critique 2026-10-16): bei 390px blieben dem
+ * Namen neben "371,40 € / 400,00 €" rund 170px, und "Koerperpflege / Gesun..."
+ * und "Freizeit und Unterhalt..." waren gekappt - dieselbe Regel, die die
+ * Statistik daneben schon traegt (`.budget-bar-row__label`). Der Betrag steht
+ * auf der ersten Zeile des Namens (baseline). */
+.budget-plan-row__label { flex: 1 1 auto; min-width: 0; font-weight: var(--font-weight-medium); color: var(--color-text-primary); overflow-wrap: anywhere; hyphens: auto; }
 .budget-plan-row__amounts { font-size: var(--text-sm); color: var(--color-text-secondary); font-variant-numeric: tabular-nums; flex-shrink: 0; }
 .budget-plan-row__amounts strong { color: var(--color-text-primary); font-weight: var(--font-weight-semibold); }
 
