@@ -790,7 +790,7 @@ function buildGoogleProvider(googleStatus, user) {
   // Status oben ist dann veraltet, also neu holen und die Karte im neuen Zustand
   // aufbauen. Jeder Aufruf der Karte läuft über `googleCall` und damit hier
   // vorbei (Kalenderauswahl, Kalender an/aus, Jetzt synchronisieren,
-  // Schreibschutz, Trennen). Der Fehler geht danach mit `reauthHandled` weiter:
+  // Schreibschutz). Status und Trennen fragen Google nicht. Der Fehler geht danach mit `reauthHandled` weiter:
   // der Aufrufer nimmt seinen Zustand zurück, zeigt aber keinen Toast mehr.
   const handleReauth = async (err) => {
     if (err?.data?.reason !== GOOGLE_REAUTH_REASON) return false;
@@ -849,7 +849,7 @@ function buildGoogleProvider(googleStatus, user) {
       reconnect.className = 'btn btn--primary';
       reconnect.textContent = t('settings.outlookReconnect');
       actions.appendChild(reconnect);
-      actions.appendChild(buildGoogleDisconnectButton(googleStatus, googleCall));
+      actions.appendChild(buildGoogleDisconnectButton(googleStatus));
     } else {
       section.appendChild(buildProviderHint(t('settings.googleOnlyAdmin')));
     }
@@ -875,7 +875,7 @@ function buildGoogleProvider(googleStatus, user) {
     actions.appendChild(syncBtn);
 
     if (user?.role === 'admin') {
-      actions.appendChild(buildGoogleDisconnectButton(googleStatus, googleCall));
+      actions.appendChild(buildGoogleDisconnectButton(googleStatus));
     }
   } else if (user?.role === 'admin') {
     const connect = document.createElement('a');
@@ -893,7 +893,7 @@ function buildGoogleProvider(googleStatus, user) {
 }
 
 /** Trennen-Knopf der Google-Karte: im verbundenen wie im abgelehnten Zustand. */
-function buildGoogleDisconnectButton(googleStatus, googleCall) {
+function buildGoogleDisconnectButton(googleStatus) {
   const disconnectBtn = document.createElement('button');
   disconnectBtn.type = 'button';
   disconnectBtn.className = 'btn btn--danger-outline';
@@ -905,7 +905,7 @@ function buildGoogleDisconnectButton(googleStatus, googleCall) {
     try {
       // Die Zahl statt der blossen Trennmeldung, wenn geraeumt wurde: sonst
       // bliebe der zweite Teil der Aktion unbestaetigt (#820). Wie bei CalDAV.
-      const res = await googleCall(() => api.delete(`/calendar/google/disconnect?deleteEvents=${deleteEvents ? 'true' : 'false'}`));
+      const res = await api.delete(`/calendar/google/disconnect?deleteEvents=${deleteEvents ? 'true' : 'false'}`);
       const removed = res?.removed ?? 0;
       showToast(
         removed
@@ -915,7 +915,7 @@ function buildGoogleDisconnectButton(googleStatus, googleCall) {
       );
       window.yuvomi?.navigate(SYNC_CALENDAR_HREF);
     } catch (err) {
-      if (!err.reauthHandled) showToast(err.message || t('common.errorGeneric'), 'danger');
+      showToast(err.message || t('common.errorGeneric'), 'danger');
     }
   });
   return disconnectBtn;
