@@ -191,9 +191,10 @@ function exceptionSlotProp(master, dateKey, feedZone) {
       ?? master.start_datetime;
     const wall = utcToWall(masterStart, master.tzid);
     let instant = dateKey + masterStart.slice(10);
-    if (wall?.date === masterStart.slice(0, 10)) {
-      instant = localToUTC(`${dateKey}T${wall.time}`, master.tzid);
-    } else if (wall) {
+    // Die Ausnahme traegt den UTC-Tag des Vorkommens, auch wenn lokaler und
+    // UTC-Tag am Serienstart gleich sind (#2000): ueber eine Zeitumstellung
+    // hinweg koennen sie bei spaeteren Vorkommen auseinandergehen.
+    if (wall) {
       for (const offset of [0, -1, 1]) {
         const candidate = localToUTC(`${shiftDateKey(dateKey, offset)}T${wall.time}`, master.tzid);
         if (candidate.slice(0, 10) === dateKey) {

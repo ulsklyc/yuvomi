@@ -758,6 +758,20 @@ for (const { zone, start, dateKey, expected } of [
   });
 }
 
+test('buildFeed: EXDATE nach der Zeitumstellung nennt das Vorkommen ihres UTC-Tags (#2000)', () => {
+  // New York 19:30 ab 01.10.2035: am Start lokal und UTC derselbe Tag, im
+  // November 00:30Z am Folgetag. Die Ausnahme `2035-11-13` ist das Vorkommen
+  // vom 12. November 19:30 EST, nicht das vom 13.
+  const id = d2.prepare(`INSERT INTO calendar_events (title,start_datetime,all_day,external_source,recurrence_rule,tzid,created_by) VALUES ('NYEx','2035-10-01T23:30:00Z',0,'apple','FREQ=WEEKLY',?, ?)`).run('America/New_York', u1).lastInsertRowid;
+  try {
+    d2.prepare(`INSERT INTO calendar_event_exceptions (event_id,exception_date) VALUES (?, '2035-11-13')`).run(id);
+    const ics = buildFeed(d2, u1, NOW, FEED_TZ);
+    assert(ics.includes('EXDATE;TZID=America/New_York:20351112T193000'), 'EXDATE muss den 12. November nennen: ' + ics);
+  } finally {
+    d2.prepare(`DELETE FROM calendar_events WHERE id = ?`).run(id);
+  }
+});
+
 test('buildFeed: unerreichbare TZID-EXDATE bleibt exportierbar statt den Feed zu beenden', () => {
   const id = d2.prepare(`INSERT INTO calendar_events (title,start_datetime,all_day,external_source,recurrence_rule,tzid,created_by) VALUES ('LegacyTZEx','2025-09-26T05:25:00Z',0,'apple','FREQ=WEEKLY;COUNT=1',?, ?)`).run('Europe/Berlin', u1).lastInsertRowid;
   d2.prepare(`INSERT INTO calendar_event_exceptions (event_id,exception_date) VALUES (?, '2025-12-20')`).run(id);

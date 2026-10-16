@@ -28,8 +28,10 @@ import { RESTORE_IN_PROGRESS_MESSAGE, RESTORE_IN_PROGRESS_REASON } from './utils
 import { setRestoreRunning, activeWriters, restoreWaitTimeoutMs, waitUntilIdle } from './utils/restore-state.js';
 import { decodeHtmlEntities } from './utils/html-entities.js';
 import { toE164, defaultCountryFromConfig } from './utils/phone.js';
-import { todayKey } from './utils/timezone.js';
+import { householdTimeZone, isValidTimeZone, todayKey } from './utils/timezone.js';
 import { addMonthsClamped, liftToAnchorDay } from './utils/interval-date.js';
+import { occurrenceClock } from './services/calendar-events.js';
+import { nextOccurrenceAfter } from './services/recurrence.js';
 
 const log = createLogger('DB');
 
@@ -10913,7 +10915,130 @@ const MIGRATIONS = [
         WHERE birthday_feed_token IS NOT NULL;
     `,
   },
+  {
+    version: 250,
+    description: 'calendar: occurrence keys of zoned series name the utc day',
+    // EIN SCHLUESSEL FUER "DIESES VORKOMMEN" (#2000). Die Expansion fuehrt ein
+    // Vorkommen mit eigener Zone seither unter seinem UTC-Tag, auch dort, wo
+    // lokaler und UTC-Tag nur am Serienstart uebereinstimmen. Zwei Schreiber
+    // hatten bis dahin den LOKALEN Tag abgelegt: der Google-Abruf und die
+    // Ausnahmen und verknuepften Einzeltermine einer hier gefuehrten Serie.
+    //
+    // Umgerechnet wird, nichts geloescht und nichts neu abgerufen: ein Abruf
+    // liefert alte Absagen nur bis zu seinem `timeMax` und nicht fuer Master,
+    // deren lokale Aenderung noch auf den Push wartet (Codex-Reviews zu #2031).
+    // Rechnung und Auswahl in rekeyZonedOccurrenceDays().
+    //
+    // ICS, CalDAV und Apple schrieben schon immer den UTC-Tag; ihre Zeilen
+    // bleiben unberuehrt.
+    up(database) {
+      rekeyZonedOccurrenceDays(database);
+    },
+  },
 ];
+
+/**
+ * Der Nachtrag zu Migration 250 (#2000): Schluessel, die den lokalen Tag eines
+ * Vorkommens nennen, auf dessen UTC-Tag bringen. Die Rechnung ist die der
+ * Expansion (`occurrenceClock` in services/calendar-events.js): der Tag auf
+ * der Schleife ist der Tag in der Serienzone, `utcTagFuer` macht daraus den
+ * Schluessel.
+ *
+ * HIER GEFUEHRTE SERIEN mit `tzid`, deren erstes Vorkommen lokal und in UTC
+ * auf denselben Tag faellt: nur dort lief die alte Expansion auf dem lokalen
+ * Tag, und die Schluessel kamen nur aus der Oberflaeche - jeder ist ein
+ * lokaler Tag und wird umgerechnet, Ausnahmen wie verknuepfte Einzeltermine.
+ *
+ * GOOGLE-SERIEN (getimt, mit `tzid`): der Abruf legte je nach Form den lokalen
+ * Tag (`originalStartTime` mit Offset, `EXDATE;TZID=`) oder schon den UTC-Tag
+ * (`EXDATE:...Z`) ab, und welche Form es war, steht nirgends. Entschieden wird
+ * an der Regel: ein Schluessel K ist lokal gemeint, wenn K ein Vorkommen der
+ * Serie in ihrer Zone ist, dessen UTC-Tag nicht K ist, und KEIN Vorkommen K
+ * als UTC-Tag hat. Dann wird er umgerechnet. Passt er auf beide Lesarten (nur
+ * bei Regeln auf aufeinanderfolgenden Tagen moeglich), bleibt er stehen - er
+ * ist nicht zu entscheiden (#2034). Ein UTC-Schluessel bleibt ohnehin.
+ *
+ * Zweiphasig, weil sich die Schluessel einer taeglichen Serie gegenseitig
+ * verdraengen (K -> K+1, K+1 -> K+2): erst alle alten weg, dann alle neuen
+ * hinein. Die Aufrufer sorgen fuer die Transaktion.
+ */
+function rekeyZonedOccurrenceDays(database) {
+  const hasColumn = (table, column) => database.prepare(`PRAGMA table_info(${table})`).all()
+    .some((c) => c.name === column);
+  if (!hasColumn('calendar_events', 'tzid')) return;
+  const withChildren = hasColumn('calendar_events', 'recurrence_parent_id')
+    && hasColumn('calendar_events', 'recurrence_id');
+  const householdZone = householdTimeZone(database);
+  const series = database.prepare(`
+    SELECT id, start_datetime, end_datetime, all_day, recurrence_rule, tzid, external_source
+    FROM calendar_events
+    WHERE recurrence_rule IS NOT NULL AND recurrence_rule <> ''
+      AND tzid IS NOT NULL AND tzid <> '' AND all_day = 0
+      AND external_source IN ('google', 'local')
+      ${withChildren ? 'AND recurrence_parent_id IS NULL' : ''}
+  `).all();
+  const exceptionsOf = database.prepare('SELECT exception_date FROM calendar_event_exceptions WHERE event_id = ?');
+  const dropException = database.prepare('DELETE FROM calendar_event_exceptions WHERE event_id = ? AND exception_date = ?');
+  const addException = database.prepare('INSERT OR IGNORE INTO calendar_event_exceptions (event_id, exception_date) VALUES (?, ?)');
+  const childrenOf = withChildren
+    ? database.prepare('SELECT id, recurrence_id FROM calendar_events WHERE recurrence_parent_id = ? AND recurrence_id IS NOT NULL')
+    : null;
+  const setChildKey = withChildren
+    ? database.prepare('UPDATE calendar_events SET recurrence_id = ? WHERE id = ?')
+    : null;
+  const isDay = (key) => /^\d{4}-\d{2}-\d{2}$/.test(String(key));
+  const shiftDay = (key, days) => {
+    const d = new Date(`${key}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().slice(0, 10);
+  };
+
+  for (const row of series) {
+    if (!isValidTimeZone(row.tzid)) continue;
+    let clock;
+    try { clock = occurrenceClock(row, householdZone); } catch { continue; }
+    if (!clock.wall) continue;
+
+    let newKeyFor;
+    if (row.external_source === 'local') {
+      // Mit verschiedenen Tagen am Start lief die Serie schon auf dem UTC-Tag.
+      if (!clock.tzAware) continue;
+      newKeyFor = (key) => (isDay(key) ? clock.utcTagFuer(key) : null);
+    } else {
+      const isOccurrence = (tag) => tag >= clock.seriesStart
+        && nextOccurrenceAfter(clock.seriesStart, row.recurrence_rule, tag, { seriesStart: clock.seriesStart }) === tag;
+      newKeyFor = (key) => {
+        if (!isDay(key) || !isOccurrence(key)) return null;
+        const next = clock.utcTagFuer(key);
+        if (next === key) return null;
+        const alsoUtc = [-1, 0, 1].some((offset) => {
+          const tag = shiftDay(key, offset);
+          return isOccurrence(tag) && clock.utcTagFuer(tag) === key;
+        });
+        return alsoUtc ? null : next;
+      };
+    }
+
+    const moves = [];
+    for (const { exception_date: key } of exceptionsOf.all(row.id)) {
+      const next = newKeyFor(key);
+      if (next && next !== key) moves.push([key, next]);
+    }
+    for (const [key] of moves) dropException.run(row.id, key);
+    for (const [, next] of moves) addException.run(row.id, next);
+
+    if (!withChildren || row.external_source !== 'local') continue;
+    const childMoves = [];
+    for (const child of childrenOf.all(row.id)) {
+      const next = newKeyFor(child.recurrence_id);
+      if (next && next !== child.recurrence_id) childMoves.push([child.id, next]);
+    }
+    // Ueber einen Zwischenwert, sonst stoesst K -> K+1 an den eindeutigen
+    // Index (recurrence_parent_id, recurrence_id), solange K+1 noch steht.
+    for (const [id, next] of childMoves) setChildKey.run(`~${next}`, id);
+    for (const [id, next] of childMoves) setChildKey.run(next, id);
+  }
+}
 
 /**
  * Der Nachtrag zu Migration 246 (#1935): lokale Zeilen sind hier verfasst.

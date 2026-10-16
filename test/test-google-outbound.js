@@ -961,6 +961,87 @@ test('ein abgesagtes Vorkommen nimmt sein Datum aus der Serie, ohne sie zu lösc
   assert.deepEqual(exceptionDates(rows[0].id), ['2035-03-17']);
 });
 
+test('#2000: Absage und EXDATE einer Abendserie landen auf dem UTC-Tag des Vorkommens', () => {
+  reset();
+  const calRefId = __test.upsertExternalCalendar('google', 'primary', 'Primär', '#4285F4');
+
+  // New York 19:30: im Winter 00:30Z am Folgetag. Google nennt den Slot mit
+  // dem Offset der Serienzone, dessen erste zehn Zeichen der LOKALE Tag sind.
+  __test.upsertGoogleEvents([
+    seriesMaster('chor', {
+      recurrence: ['RRULE:FREQ=WEEKLY', 'EXDATE;TZID=America/New_York:20351119T193000'],
+      start: { dateTime: '2035-10-01T19:30:00-04:00', timeZone: 'America/New_York' },
+      end:   { dateTime: '2035-10-01T20:30:00-04:00', timeZone: 'America/New_York' },
+    }),
+    occurrence('chor', '20351113T003000Z', {
+      status: 'cancelled',
+      originalStartTime: { dateTime: '2035-11-12T19:30:00-05:00' },
+    }),
+  ], calRefId);
+
+  const master = googleRows().find((r) => r.external_calendar_id === 'chor');
+  assert.deepEqual(exceptionDates(master.id), ['2035-11-13', '2035-11-20'],
+    'der Schluessel, den ICS, CalDAV und Apple ablegen und die Expansion nachschlaegt');
+});
+
+test('#2000: originalStartTime ohne Offset wird in seiner timeZone gelesen, nicht in der Prozesszone', () => {
+  reset();
+  const calRefId = __test.upsertExternalCalendar('google', 'primary', 'Primär', '#4285F4');
+
+  // Google erlaubt `dateTime` ohne Offset, wenn `timeZone` daneben steht.
+  // Tokio 08:00 am 13.11. ist 23:00Z am 12.; New York 19:30 am 12.11. ist
+  // 00:30Z am 13. In der Prozesszone gelesen (UTC wie Chicago) kaemen beide
+  // auf den falschen Tag.
+  __test.upsertGoogleEvents([
+    seriesMaster('tokio', {
+      start: { dateTime: '2035-10-02T08:00:00+09:00', timeZone: 'Asia/Tokyo' },
+      end:   { dateTime: '2035-10-02T09:00:00+09:00', timeZone: 'Asia/Tokyo' },
+    }),
+    occurrence('tokio', '20351112T230000Z', {
+      status: 'cancelled',
+      originalStartTime: { dateTime: '2035-11-13T08:00:00', timeZone: 'Asia/Tokyo' },
+    }),
+    seriesMaster('chor', {
+      start: { dateTime: '2035-10-01T19:30:00-04:00', timeZone: 'America/New_York' },
+      end:   { dateTime: '2035-10-01T20:30:00-04:00', timeZone: 'America/New_York' },
+    }),
+    occurrence('chor', '20351113T003000Z', {
+      status: 'cancelled',
+      originalStartTime: { dateTime: '2035-11-12T19:30:00', timeZone: 'America/New_York' },
+    }),
+  ], calRefId);
+
+  const rows = googleRows();
+  assert.deepEqual(exceptionDates(rows.find((r) => r.external_calendar_id === 'tokio').id), ['2035-11-12']);
+  assert.deepEqual(exceptionDates(rows.find((r) => r.external_calendar_id === 'chor').id), ['2035-11-13']);
+});
+
+test('#2000: Migration 250 rechnet die Ausnahmen eines wartenden Masters um, ohne Neuabruf', () => {
+  reset();
+  const calRefId = __test.upsertExternalCalendar('google', 'family2000', 'Family', '#4285F4');
+  __test.setCalendarEnabled('family2000', true, { name: 'Family' });
+  __test.upsertGoogleEvents([seriesMaster('chor2000', {
+    start: { dateTime: '2035-10-01T19:30:00-04:00', timeZone: 'America/New_York' },
+    end:   { dateTime: '2035-10-01T20:30:00-04:00', timeZone: 'America/New_York' },
+  })], calRefId);
+  const row = googleRows().find((r) => r.external_calendar_id === 'chor2000');
+  // Lokal bearbeitet, der Push steht aus: ein Abruf ueberginge diesen Master
+  // (#593) und schriebe seine EXDATEs nicht neu.
+  db.prepare('UPDATE calendar_events SET outbound_dirty = 1 WHERE id = ?').run(row.id);
+  // Der Stand vor dem Fix: lokale Tage, dazu einer mehr als ein Jahr voraus.
+  db.prepare('DELETE FROM calendar_event_exceptions WHERE event_id = ?').run(row.id);
+  for (const day of ['2035-11-12', '2036-11-03']) {
+    db.prepare('INSERT INTO calendar_event_exceptions (event_id, exception_date) VALUES (?, ?)').run(row.id, day);
+  }
+  __test.recordSyncToken('family2000', 'token-vor-2000');
+
+  dbmod.MIGRATIONS.find((m) => m.version === 250).up(db);
+
+  assert.deepEqual(exceptionDates(row.id), ['2035-11-13', '2036-11-04'],
+    'beide umgerechnet - nichts haengt an einem Abruf, der sie nicht wieder liefert');
+  assert.equal(__test.getSyncToken('family2000'), 'token-vor-2000', 'kein erzwungener Full-Resync');
+});
+
 test('die Reihenfolge in Googles Antwort spielt keine Rolle', () => {
   reset();
   const calRefId = __test.upsertExternalCalendar('google', 'primary', 'Primär', '#4285F4');

@@ -22,6 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A cancelled occurrence stays cancelled after a clock change** (#2000). When a calendar provider
+  cancelled one occurrence of a series with its own time zone, the calendar could keep showing it
+  once daylight saving time had changed, most often for evening events in the Americas and early
+  morning events in Europe. The calendar, search, countdowns and the calendar feed now all agree on
+  which occurrence was cancelled, and occurrences already cancelled from Google Calendar stay hidden
+  after the update.
+
 - **A dropdown's open list stays dark in dark mode** (#2022). In Chrome on Windows the list
   of a dropdown inside a form row, such as the type of a health measurement, turned white once
   the pointer left it, with light text on it that was hard to read. The list now keeps the

@@ -39,7 +39,7 @@
 import { localCalendarColorSql, localCalendarIdSql } from './local-calendars.js';
 
 import { hasAnyOccurrence, nextOccurrenceAfter, seriesStartFor } from './recurrence.js';
-import { loadEventExceptions } from './calendar-events.js';
+import { loadEventExceptions, occurrenceKeyOnDay } from './calendar-events.js';
 import { modulesLeftOut, notBirthdayEventSql } from './household-modules.js';
 import { eventProjectionSql, resolveProjectedEventRows } from './calendar-event-reader.js';
 import { icsSubscriptionVisibleWhere, visibilityWhere } from './visibility.js';
@@ -121,6 +121,21 @@ function eventStartDateKey(event, tz) {
 }
 
 /**
+ * Der Schluessel, unter dem eine Ausnahme das Vorkommen am Haushaltstag
+ * `dayKey` fuehrt (#2000).
+ *
+ * Die Kachel rechnet auf Tagen der Haushaltszone, die Ausnahmen tragen den
+ * UTC-Tag des Vorkommens. Den kennt nur die Expansion sicher - ueber eine
+ * Zeitumstellung und bei verschiedener Haushalts- und Serienzone liegt er
+ * nicht dort, wo die Wanduhr des Masters ihn vermuten liesse. Deshalb fragt
+ * die Kachel dieselbe Funktion wie der Kalender (`occurrenceKeyOnDay`);
+ * beginnt an dem Tag kein Vorkommen, bleibt es beim Tag selbst.
+ */
+function exceptionKeyFor(event, dayKey, tz) {
+  return occurrenceKeyOnDay(event, dayKey, tz, { householdZone: tz }) ?? dayKey;
+}
+
+/**
  * Das nächste Vorkommen eines Termins ab (einschliesslich) `todayKey`.
  *
  * Ein einmaliger Termin ist sein eigenes Vorkommen; liegt er hinter uns, bleibt
@@ -184,7 +199,7 @@ export function nextEventDate(event, todayKey, exceptions = null, { graceDays = 
     : nextOccurrenceAfter(ersterTreffer, event.recurrence_rule, todayKey, { seriesStart: startKey });
 
   let skips = 0;
-  while (candidate && exceptions?.has(candidate) && skips++ < MAX_EXCEPTION_SKIPS) {
+  while (candidate && exceptions?.has(exceptionKeyFor(event, candidate, tz)) && skips++ < MAX_EXCEPTION_SKIPS) {
     candidate = nextOccurrenceAfter(candidate, event.recurrence_rule, candidate, { seriesStart: startKey });
   }
   // Ein Datum in der Vergangenheit ist kein Countdown, sondern ein falscher -

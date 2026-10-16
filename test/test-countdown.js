@@ -16,9 +16,11 @@ import Database from 'better-sqlite3-multiple-ciphers';
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'countdown-test-secret';
-// Feste Zone, sonst haengt der Termin-mit-Uhrzeit-Fall unten am Rechner, auf dem
-// die Suite laeuft. `serverTimeZone()` liest genau diese Variable.
-process.env.TZ = 'Europe/Berlin';
+// Nur als Rueckfall: package.json startet die Suite unter TZ=UTC und
+// TZ=America/Chicago, und genau das soll sie messen (#2000, Codex-Review zu
+// #2031). Faelle, die eine bestimmte Zone brauchen, nennen sie selbst
+// (`tz`-Option bzw. `household_timezone`), statt an der Prozesszone zu haengen.
+process.env.TZ ||= 'Europe/Berlin';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { getCountdowns, nextEventDate, daysBetween } = await import('../server/services/countdowns.js');
@@ -492,18 +494,22 @@ test('eine markierte Aufgabe ohne Fälligkeit hat nichts, worauf sie zeigen kön
   assert.deepEqual(cd({ userId: ALICE, todayKey: '2026-08-17' }), []);
 });
 
+// Die Zone der Faelle, die einen Haushalt in Berlin meinen - ausdruecklich,
+// nicht ueber die Prozesszone (die Suite laeuft unter UTC und Chicago).
+const BERLIN = 'Europe/Berlin';
+
 test('ein Termin mit Uhrzeit zählt auf SEINEN Kalendertag, nicht auf den UTC-Tag', () => {
   // 20.09. 23:00Z ist in Europe/Berlin der 21.09. um 01:00 - der Kalender zeigt
   // den 21., und der Countdown muss denselben Tag meinen. Der rohe Datumsanteil
   // (`slice(0,10)`) hätte hier einen Tag zu wenig gezählt.
   assert.equal(
-    nextEventDate({ start_datetime: '2026-09-20T23:00:00Z', all_day: 0 }, '2026-08-17'),
+    nextEventDate({ start_datetime: '2026-09-20T23:00:00Z', all_day: 0 }, '2026-08-17', null, { tz: BERLIN }),
     '2026-09-21',
   );
   // Ein ganztägiger Termin trägt sein Datum ohne Zeitanteil - da gibt es nichts
   // umzurechnen, und wer es täte, verschöbe ihn.
   assert.equal(
-    nextEventDate({ start_datetime: '2026-09-20', all_day: 1 }, '2026-08-17'),
+    nextEventDate({ start_datetime: '2026-09-20', all_day: 1 }, '2026-08-17', null, { tz: BERLIN }),
     '2026-09-20',
   );
   // Und die Serie erbt den lokalen Tag als Anker, sonst läge jedes Vorkommen
@@ -511,7 +517,7 @@ test('ein Termin mit Uhrzeit zählt auf SEINEN Kalendertag, nicht auf den UTC-Ta
   assert.equal(
     nextEventDate(
       { start_datetime: '2023-09-20T23:00:00Z', all_day: 0, recurrence_rule: 'FREQ=YEARLY;INTERVAL=1' },
-      '2026-08-17',
+      '2026-08-17', null, { tz: BERLIN },
     ),
     '2026-09-21',
   );
@@ -528,13 +534,13 @@ test('eine Serie mit eigener Zone wird nicht verschwiegen', () => {
     start_datetime: '2026-02-01T01:00:00Z',
     recurrence_rule: 'FREQ=MONTHLY;BYMONTHDAY=-1;UNTIL=20260220',
   };
-  assert.equal(nextEventDate(ev, '2026-01-15'), '2026-02-01');
+  assert.equal(nextEventDate(ev, '2026-01-15', null, { tz: BERLIN }), '2026-02-01');
 
   // GEGENPROBE IN DIE ANDERE RICHTUNG: ohne eigene Zone bleibt die Pruefung
   // scharf. Sonst waere der Fix eine Abschaltung mit Umweg - dieselbe Regel
   // haette dann gar keine Wirkung mehr.
   const ohneZone = { ...ev, tzid: null };
-  assert.equal(nextEventDate(ohneZone, '2026-01-15'), null,
+  assert.equal(nextEventDate(ohneZone, '2026-01-15', null, { tz: BERLIN }), null,
     'ohne Zonenhinweis ist der 1. Februar kein Monatsletzter');
 });
 
@@ -923,4 +929,69 @@ test('ein Countdown auf einem Termin aus fremdem ungeteiltem ICS-Abo bleibt bei 
   assert.deepEqual(cd({ userId: ALICE, todayKey: '2026-08-17' }).map((c) => c.title), ['Abo privat', 'Abo geteilt', 'Lokal']);
   get().prepare('DELETE FROM calendar_events').run();
   get().prepare('DELETE FROM ics_subscriptions').run();
+});
+
+test('#2000: eine abgesagte Instanz ist auch ueber die Zeitumstellung kein naechster Termin', () => {
+  // New York 19:30 ab 01.10.2035, im Winter 00:30Z am Folgetag. Die Ausnahme
+  // traegt den UTC-Tag (13.) des Vorkommens vom 12. November - wie im Kalender.
+  const ev = {
+    start_datetime: '2035-10-01T23:30:00Z', all_day: 0,
+    recurrence_rule: 'FREQ=WEEKLY', tzid: 'America/New_York',
+  };
+  const tz = 'America/New_York';
+  assert.equal(nextEventDate(ev, '2035-11-10', new Set(['2035-11-13']), { tz }), '2035-11-19',
+    'der abgesagte 12. November darf nicht der naechste Termin sein');
+  assert.equal(nextEventDate(ev, '2035-11-10', new Set(['2035-11-12']), { tz }), '2035-11-12',
+    'der lokale Tag ist nicht der Schluessel dieses Vorkommens');
+  // Vor der Umstellung: 15. Oktober 19:30 EDT = 23:30Z am selben Tag.
+  assert.equal(nextEventDate(ev, '2035-10-14', new Set(['2035-10-15']), { tz }), '2035-10-22');
+  // Dieselbe Serie aus Google: Start mit dem Offset der Serienzone.
+  const google = { ...ev, start_datetime: '2035-10-01T19:30:00-04:00' };
+  assert.equal(nextEventDate(google, '2035-11-10', new Set(['2035-11-13']), { tz }), '2035-11-19');
+});
+
+test('#2000: Haushalt in UTC, Serie in Berlin - der Schluessel kommt aus dem Vorkommen, nicht aus der Wanduhr des Masters', () => {
+  // Taeglich 01:30 Berlin ab Winter: 00:30Z. Nach dem 25. Maerz 2035 ist
+  // 01:30 MESZ 23:30Z am Vortag - das Vorkommen vom 27. (Berlin) beginnt am
+  // 26. (UTC) und traegt den Schluessel `2035-03-26` (Codex-Review zu #2031).
+  const ev = {
+    start_datetime: '2035-03-01T00:30:00Z', all_day: 0,
+    recurrence_rule: 'FREQ=DAILY', tzid: 'Europe/Berlin',
+  };
+  const tz = 'UTC';
+  assert.equal(nextEventDate(ev, '2035-03-26', new Set(['2035-03-26']), { tz }), '2035-03-27',
+    'das abgesagte Vorkommen (Berlin 27., UTC 26.) darf nicht der naechste Termin sein');
+  assert.equal(nextEventDate(ev, '2035-03-26', new Set(['2035-03-25']), { tz }), '2035-03-26',
+    'eine Ausnahme fuer den Vortag laesst den 26. stehen');
+});
+
+test('#2000: der Schluessel eines Vorkommens kostet nicht die ganze Historie der Serie', () => {
+  // Taeglich seit 1750 (New York, damals Ortszeit -4:56): bis 2035 mehr
+  // Vorkommen, als die Expansion je ausrollt (MAX_EXPANSION_ITERATIONS). Der
+  // Schluessel muss trotzdem stimmen - er wird aus dem Kandidatentag gerechnet,
+  // nicht durch Ausrollen ab DTSTART (Codex-Review zu #2031).
+  const ev = {
+    start_datetime: '1750-01-01T00:30:00Z', all_day: 0,
+    recurrence_rule: 'FREQ=DAILY', tzid: 'America/New_York',
+  };
+  const tz = 'America/New_York';
+  // 12.11.2035 19:33:58 EST = 13.11. 00:33:58Z.
+  assert.equal(nextEventDate(ev, '2035-11-12', new Set(['2035-11-13']), { tz }), '2035-11-13',
+    'das abgesagte Vorkommen vom 12. November wird uebersprungen');
+});
+
+test('#2000: woechentlich Berlin, Haushalt in UTC - der Nachbartag muss auf der Regel liegen', () => {
+  // Montags 01:30 Berlin ab 05.03.2035: 00:30Z. Ab dem 25. Maerz ist 01:30
+  // MESZ 23:30Z am Sonntag - das Vorkommen vom Montag, 2. April, beginnt in
+  // UTC am 1. und traegt den Schluessel `2035-04-01`. Der Dienstag daneben ist
+  // kein Vorkommen, auch wenn sein Zeitpunkt auf den Montag faellt
+  // (Codex-Review zu #2031).
+  const ev = {
+    start_datetime: '2035-03-05T00:30:00Z', all_day: 0,
+    recurrence_rule: 'FREQ=WEEKLY', tzid: 'Europe/Berlin',
+  };
+  const tz = 'UTC';
+  assert.equal(nextEventDate(ev, '2035-03-30', new Set(['2035-04-01']), { tz }), '2035-04-09',
+    'das abgesagte Vorkommen vom 2. April darf nicht der naechste Termin sein');
+  assert.equal(nextEventDate(ev, '2035-03-30', null, { tz }), '2035-04-02', 'ohne Absage steht es da');
 });

@@ -4,7 +4,9 @@
  * Abhängigkeiten: server/services/recurrence.js
  */
 
-import { nextOccurrence, parseRRule, matchesRRuleByday, untilInstantMs } from './recurrence.js';
+import {
+  nextOccurrence, nextOccurrenceAfter, parseRRule, matchesRRuleByday, untilInstantMs,
+} from './recurrence.js';
 import {
   hasExplicitZone, householdTimeZone, localToUTC, storedToInstantIso, utcToWall,
 } from '../utils/timezone.js';
@@ -93,6 +95,108 @@ export function seriesReadingZone(database, event) {
   return householdTimeZone(database);
 }
 
+/**
+ * Die Uhr einer Serie: wie aus dem Tag eines Vorkommens sein Start und sein
+ * Schluessel werden (#2000). EINE Rechnung fuer die Expansion und fuer jeden
+ * Leser, der den Schluessel eines Vorkommens kennen muss, ohne die Serie
+ * auszurollen (`occurrenceKeyOnDay`).
+ *
+ * `tag` ist der Tag, auf dem die Expansionsschleife laeuft: im lokalen Modus
+ * der Tag in der Serienzone, sonst der gespeicherte Tag.
+ * @param {object} event          Serienzeile
+ * @param {string|null} householdZone  wie bei expandRecurringEvents
+ */
+export function occurrenceClock(event, householdZone = null) {
+  const isAllDay     = !!event.all_day;
+  /* ZONENLOSE ZIFFERN NEBEN EINER TZID SIND WANDUHR DES HAUSHALTS (#1993).
+   *
+   * So entsteht die Zeile: eine eingelesene Serie wird aus dem Formular
+   * gespeichert, PUT schreibt die Ziffern des Haushalts (`to: 'wall'`), die
+   * `tzid` bleibt. Alles darunter las den Start mit `new Date()` und
+   * `utcToWall()`, also in der Zone des PROZESSES - dieselbe Zeile ergab
+   * unter TZ=UTC als letztes Vorkommen 23:30Z, unter TZ=Europe/Berlin 21:30Z.
+   *
+   * Hier wird der Start deshalb EINMAL zum Zeitpunkt, in der Haushaltszone
+   * gelesen, und der Rest der Funktion rechnet auf diesem Zeitpunkt weiter:
+   * Wanduhr der Serienzone, UTC-Tag fuer Identitaet und EXDATE, Dauer. Ohne
+   * `tzid` bleibt es beim Bisherigen: dort gibt es keine zweite Uhr, die
+   * Ziffern laufen als Wanduhr durch und Start und Ende lesen dieselbe Zone. */
+  const zonedNaive = !!event.tzid && !isAllDay && !hasExplicitZone(event.start_datetime);
+  const startText = zonedNaive
+    ? (storedToInstantIso(event.start_datetime, householdZone) ?? event.start_datetime)
+    : event.start_datetime;
+  const endText = zonedNaive && event.end_datetime
+    ? (storedToInstantIso(event.end_datetime, householdZone) ?? event.end_datetime)
+    : event.end_datetime;
+
+  // Original-Zeit-Teil erhalten (z.B. 'T14:30:00' oder '' bei All-Day)
+  const timeSuffix = startText.slice(10);
+
+  // DST-korrekte Expansion: bei bekannter TZID (CalDAV/Apple-Serie) pro Vorkommen
+  // die lokale Wanduhrzeit des Masters neu nach UTC rechnen, statt den festen
+  // UTC-Suffix zu wiederholen (sonst driftet die Uhrzeit über die Sommer-/
+  // Winterzeit-Grenze, #549). Nur für Tagtermine, deren lokales Datum == UTC-Datum
+  // ist (kein Mitternachts-Überlauf) - sonst alte Fixe-Suffix-Logik.
+  const wall = (event.tzid && !isAllDay) ? utcToWall(startText, event.tzid) : null;
+  const tzAware = wall && wall.date === startText.slice(0, 10);
+  // Einmal bestimmt, an beide Stellen gereicht: Filter UND Berechnung muessen
+  // dieselbe Antwort bekommen, sonst ist der Schutz halb.
+  const zonenUnsicher = !!event.tzid && !tzAware;
+
+  /* IN DER EREIGNISZONE RECHNEN, WENN UTC-TAG UND LOKALER TAG AUSEINANDERGEHEN
+   * (#985).
+   *
+   * Bis hierher lief die Schleife auf UTC-Tagen und setzte `BYMONTHDAY` aus,
+   * sobald die beiden nicht uebereinstimmten - die Serie lief dann auf ihrem
+   * festen UTC-Tag weiter. Dieser feste Versatz trifft den lokalen
+   * Monatsletzten nur, solange der UTC-Offset gleich bleibt; ueber eine
+   * Sommerzeitumstellung hinweg tut er es nicht mehr. Gemessen an einer New
+   * Yorker Serie um 23:30 lokal: nach der Maerz-Umstellung lagen ALLE
+   * folgenden Vorkommen auf dem Ersten statt auf dem Monatsletzten.
+   *
+   * Also wird die REGEL auf dem lokalen Datum fortgeschrieben, und je
+   * Vorkommen wird nach UTC zurueckgerechnet. `BYMONTHDAY` gilt dabei wieder,
+   * denn jetzt ist das Datum, auf dem gerechnet wird, dasselbe, das die Regel
+   * meint.
+   *
+   * WAS WEITER AM UTC-TAG HAENGT, und das ist der Grund fuer die zwei Daten
+   * nebeneinander: EXDATE-Ausnahmen sind beim Import auf das UTC-Datum
+   * normalisiert (`formatICSDate(...).slice(0, 10)` in ics-parser.js), und das
+   * Anzeigefenster [from, to] wird ebenso in UTC-Tagen gefuehrt. Wer nur die
+   * Schleifenvariable umstellt, laesst genau bei diesen Terminen die
+   * Ausnahmen ins Leere laufen - dieselben Termine, um die es hier geht.
+   */
+  const lokalRechnen = zonenUnsicher && !!wall && !isAllDay;
+
+  // DTSTART ist zugleich Startpunkt und ANKER: ohne ihn leitet nextOccurrence
+  // den gemeinten Tag aus dem vorigen Vorkommen ab, und eine Klemmung in einem
+  // kurzen Monat wuerde damit festgeschrieben (#978).
+  const seriesStartUtc = startText.slice(0, 10);
+  const seriesStart = lokalRechnen ? wall.date : seriesStartUtc;
+
+  /** Der UTC-Zeitpunkt eines Vorkommens - im lokalen Modus zurueckgerechnet. */
+  const instantFuer = (tag) => (lokalRechnen
+    ? localToUTC(`${tag}T${wall.time}`, event.tzid)
+    : (tzAware ? localToUTC(`${tag}T${wall.time}`, event.tzid) : tag + timeSuffix));
+  /** Der UTC-TAG eines Vorkommens - fuer Fenster, EXDATE und Ausgabe.
+   *
+   * AUCH IM TZID-PFAD MIT GLEICHEM TAG AM SERIENSTART (#2000). `tzAware`
+   * fragt nur, ob lokaler und UTC-Tag am ERSTEN Vorkommen uebereinstimmen.
+   * Ein spaeteres kann trotzdem auf einen anderen UTC-Tag fallen: New York
+   * 19:30 ist im Oktober 23:30Z am selben Tag, im November 00:30Z am
+   * Folgetag. Hier stand bis dahin der lokale Tag, die Importe legen EXDATE
+   * aber auf dem UTC-Tag ab - die abgesagte Instanz blieb stehen. Wo das
+   * Vorkommen als Zeitpunkt entsteht, kommt der Tag deshalb aus diesem
+   * Zeitpunkt; nur zonenlose Vorkommen behalten ihren Tag. */
+  const utcTagFuer = (tag) => ((lokalRechnen || tzAware)
+    ? String(instantFuer(tag)).slice(0, 10)
+    : tag);
+  return {
+    isAllDay, startText, endText, timeSuffix, wall, tzAware, zonenUnsicher, lokalRechnen,
+    seriesStart, seriesStartUtc, instantFuer, utcTagFuer,
+  };
+}
+
 // --------------------------------------------------------
 // RRULE-Expansion: alle Vorkommen eines wiederkehrenden Events
 // innerhalb [from, to] generieren (inklusive beider Grenzen).
@@ -139,27 +243,10 @@ export function expandRecurringEvents(
       continue;
     }
 
-    const isAllDay     = !!event.all_day;
-    /* ZONENLOSE ZIFFERN NEBEN EINER TZID SIND WANDUHR DES HAUSHALTS (#1993).
-     *
-     * So entsteht die Zeile: eine eingelesene Serie wird aus dem Formular
-     * gespeichert, PUT schreibt die Ziffern des Haushalts (`to: 'wall'`), die
-     * `tzid` bleibt. Alles darunter las den Start mit `new Date()` und
-     * `utcToWall()`, also in der Zone des PROZESSES - dieselbe Zeile ergab
-     * unter TZ=UTC als letztes Vorkommen 23:30Z, unter TZ=Europe/Berlin 21:30Z.
-     *
-     * Hier wird der Start deshalb EINMAL zum Zeitpunkt, in der Haushaltszone
-     * gelesen, und der Rest der Funktion rechnet auf diesem Zeitpunkt weiter:
-     * Wanduhr der Serienzone, UTC-Tag fuer Identitaet und EXDATE, Dauer. Ohne
-     * `tzid` bleibt es beim Bisherigen: dort gibt es keine zweite Uhr, die
-     * Ziffern laufen als Wanduhr durch und Start und Ende lesen dieselbe Zone. */
-    const zonedNaive = !!event.tzid && !isAllDay && !hasExplicitZone(event.start_datetime);
-    const startText = zonedNaive
-      ? (storedToInstantIso(event.start_datetime, householdZone) ?? event.start_datetime)
-      : event.start_datetime;
-    const endText = zonedNaive && event.end_datetime
-      ? (storedToInstantIso(event.end_datetime, householdZone) ?? event.end_datetime)
-      : event.end_datetime;
+    const {
+      isAllDay, startText, endText, zonenUnsicher, lokalRechnen,
+      seriesStart, instantFuer, utcTagFuer,
+    } = occurrenceClock(event, householdZone);
 
     // Dauer des Events in ms (für End-Zeit-Berechnung der Instanzen)
     const startMs    = new Date(startText).getTime();
@@ -168,57 +255,10 @@ export function expandRecurringEvents(
     // Duration in days for all-day events (for date-only end calculation)
     const durationDays = isAllDay && durationMs !== null ? Math.round(durationMs / 86400000) : 0;
 
-    // Original-Zeit-Teil erhalten (z.B. 'T14:30:00' oder '' bei All-Day)
-    const timeSuffix = startText.slice(10);
-
-    // DST-korrekte Expansion: bei bekannter TZID (CalDAV/Apple-Serie) pro Vorkommen
-    // die lokale Wanduhrzeit des Masters neu nach UTC rechnen, statt den festen
-    // UTC-Suffix zu wiederholen (sonst driftet die Uhrzeit über die Sommer-/
-    // Winterzeit-Grenze, #549). Nur für Tagtermine, deren lokales Datum == UTC-Datum
-    // ist (kein Mitternachts-Überlauf) - sonst alte Fixe-Suffix-Logik.
-    const wall = (event.tzid && !isAllDay) ? utcToWall(startText, event.tzid) : null;
-    const tzAware = wall && wall.date === startText.slice(0, 10);
-    // Einmal bestimmt, an beide Stellen gereicht: Filter UND Berechnung muessen
-    // dieselbe Antwort bekommen, sonst ist der Schutz halb.
-    const zonenUnsicher = !!event.tzid && !tzAware;
-
-    /* IN DER EREIGNISZONE RECHNEN, WENN UTC-TAG UND LOKALER TAG AUSEINANDERGEHEN
-     * (#985).
-     *
-     * Bis hierher lief die Schleife auf UTC-Tagen und setzte `BYMONTHDAY` aus,
-     * sobald die beiden nicht uebereinstimmten - die Serie lief dann auf ihrem
-     * festen UTC-Tag weiter. Dieser feste Versatz trifft den lokalen
-     * Monatsletzten nur, solange der UTC-Offset gleich bleibt; ueber eine
-     * Sommerzeitumstellung hinweg tut er es nicht mehr. Gemessen an einer New
-     * Yorker Serie um 23:30 lokal: nach der Maerz-Umstellung lagen ALLE
-     * folgenden Vorkommen auf dem Ersten statt auf dem Monatsletzten.
-     *
-     * Also wird die REGEL auf dem lokalen Datum fortgeschrieben, und je
-     * Vorkommen wird nach UTC zurueckgerechnet. `BYMONTHDAY` gilt dabei wieder,
-     * denn jetzt ist das Datum, auf dem gerechnet wird, dasselbe, das die Regel
-     * meint.
-     *
-     * WAS WEITER AM UTC-TAG HAENGT, und das ist der Grund fuer die zwei Daten
-     * nebeneinander: EXDATE-Ausnahmen sind beim Import auf das UTC-Datum
-     * normalisiert (`formatICSDate(...).slice(0, 10)` in ics-parser.js), und das
-     * Anzeigefenster [from, to] wird ebenso in UTC-Tagen gefuehrt. Wer nur die
-     * Schleifenvariable umstellt, laesst genau bei diesen Terminen die
-     * Ausnahmen ins Leere laufen - dieselben Termine, um die es hier geht.
-     */
-    const lokalRechnen = zonenUnsicher && !!wall && !isAllDay;
-
-    // DTSTART ist zugleich Startpunkt und ANKER: ohne ihn leitet nextOccurrence
-    // den gemeinten Tag aus dem vorigen Vorkommen ab, und eine Klemmung in einem
-    // kurzen Monat wuerde damit festgeschrieben (#978).
-    const seriesStartUtc = startText.slice(0, 10);
-    const seriesStart = lokalRechnen ? wall.date : seriesStartUtc;
-
-    /** Der UTC-Zeitpunkt eines Vorkommens - im lokalen Modus zurueckgerechnet. */
-    const instantFuer = (tag) => (lokalRechnen
-      ? localToUTC(`${tag}T${wall.time}`, event.tzid)
-      : (tzAware ? localToUTC(`${tag}T${wall.time}`, event.tzid) : tag + timeSuffix));
-    /** Der UTC-TAG eines Vorkommens - fuer Fenster, EXDATE und Ausgabe. */
-    const utcTagFuer = (tag) => (lokalRechnen ? String(instantFuer(tag)).slice(0, 10) : tag);
+    // Der UTC-Tag des ersten Vorkommens, auf derselben Rechnung: ein Start mit
+    // Offset (`T19:30:00-05:00` aus Google) traegt in seinen ersten zehn
+    // Zeichen den lokalen Tag, nicht den UTC-Tag.
+    const seriesStartUtcTag = utcTagFuer(seriesStart);
 
     let currentDate = seriesStart; // YYYY-MM-DD, lokal oder UTC je nach Modus
     let iterations  = 0;
@@ -372,7 +412,7 @@ export function expandRecurringEvents(
           // oben ebenfalls im UTC-Raum nachgeschlagen
           // (`exceptions?.has(utcTagFuer(currentDate))`).
           ...(includeRecurrenceIdentity ? { recurrence_identity: utcTagFuer(currentDate) } : {}),
-          is_recurring_instance: utcTagFuer(currentDate) !== seriesStartUtc ? 1 : 0,
+          is_recurring_instance: utcTagFuer(currentDate) !== seriesStartUtcTag ? 1 : 0,
           // "IST DAS DER ERSTE TERMIN DER SERIE?" IST NICHT "WEICHT ER VOM
           // GESPEICHERTEN DATUM AB?" - seit ein Start auf der Regel liegen darf,
           // ohne ihr Raster zu treffen (#960), sind das zwei Fragen. Ein Termin
@@ -402,4 +442,50 @@ export function expandRecurringEvents(
   }
 
   return result.sort((a, b) => a.start_datetime.localeCompare(b.start_datetime));
+}
+
+/**
+ * Der Schluessel (EXDATE, `recurrence_identity`) des Vorkommens einer Serie,
+ * das in der Zone `zone` am Tag `dayKey` beginnt (#2000).
+ *
+ * Fuer Leser, die auf Kalendertagen statt auf Vorkommen rechnen (die
+ * Countdown-Kachel). Gerechnet mit derselben Uhr wie die Expansion
+ * (`occurrenceClock`), aber ohne die Serie auszurollen: der Tag des Vorkommens
+ * auf der Schleife liegt hoechstens einen Tag neben `dayKey`, also werden die
+ * drei Kandidaten gestartet und der genommen, der ein Vorkommen der Regel ist
+ * und dessen Start in `zone` auf `dayKey` faellt. Konstanter Aufwand, egal wie
+ * alt die Serie ist: ob ein Tag auf der Regel liegt, beantwortet
+ * `nextOccurrenceAfter` mit seinem Sprung, nicht durch Ausrollen.
+ *
+ * Faellt kein Vorkommen auf `dayKey`, aber `dayKey` selbst ist ein Tag der
+ * Regel in der Serienzone, gilt dessen Schluessel: die Kachel zaehlt ihre
+ * Kandidaten auf der Regel weiter, und wo Haushalts- und Serienzone nach einer
+ * Umstellung auseinanderliegen, ist ihr Kandidat dieser Serientag
+ * (Codex-Review zu #2031).
+ *
+ * @param {object} event   Serienzeile (start_datetime, all_day, tzid, ...)
+ * @param {string} dayKey  YYYY-MM-DD in `zone`
+ * @param {string} zone    IANA-Zone, in der `dayKey` gemeint ist
+ * @param {{householdZone?: string}} [options]  wie bei expandRecurringEvents
+ * @returns {string} der Schluessel; `dayKey` selbst, wo es nichts umzurechnen gibt
+ */
+export function occurrenceKeyOnDay(event, dayKey, zone, { householdZone = null } = {}) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dayKey)) || event?.all_day) return dayKey;
+  let clock;
+  try { clock = occurrenceClock(event, householdZone); } catch { return dayKey; }
+  const shift = (key, days) => {
+    const d = new Date(`${key}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().slice(0, 10);
+  };
+  const isOccurrence = (tag) => tag >= clock.seriesStart
+    && nextOccurrenceAfter(clock.seriesStart, event.recurrence_rule, tag, { seriesStart: clock.seriesStart }) === tag;
+  for (const offset of [0, -1, 1]) {
+    const tag = shift(dayKey, offset);
+    if (!isOccurrence(tag)) continue;
+    const start = String(clock.instantFuer(tag));
+    const day = hasExplicitZone(start) ? utcToWall(start, zone)?.date : start.slice(0, 10);
+    if (day === dayKey) return clock.utcTagFuer(tag);
+  }
+  return isOccurrence(dayKey) ? clock.utcTagFuer(dayKey) : dayKey;
 }
