@@ -37,6 +37,7 @@ import { emptyStateEl, mountLoadError } from '/utils/empty-state.js';
 import { t } from '/i18n.js';
 import { swapContent } from '/utils/content-swap.js';
 import { setBulkPill, clearBulkPill, setBulkPane } from '/utils/bulk-pill.js';
+import { dockNextModal } from '/components/modal.js';
 
 /** Die eine lebende Instanz. Es gibt je Seite hoechstens eine Liste + Detail. */
 let active = null;
@@ -74,7 +75,11 @@ export function splitViewDetailHtml({ id, label, empty = {} }) {
  * @param {object} opts
  * @param {string} opts.title
  * @param {Array<{label: string, icon?: string, variant?: string, id?: string,
- *   iconOnly?: boolean, onClick?: Function}>} [opts.actions]
+ *   iconOnly?: boolean, dock?: boolean, onClick?: Function}>} [opts.actions]
+ *   `dock`: die Aktion oeffnet ein Formular, das sich in DIESE Spalte legt
+ *   statt als Fenster darueber („Bearbeiten", Critique R19; components/modal.js,
+ *   dockNextModal). Unter der Schwelle steht die Spalte nicht - dann bleibt es
+ *   das Modal.
  * @returns {HTMLElement}
  */
 export function detailPaneHeaderEl({ title = '', actions = [] } = {}) {
@@ -106,7 +111,12 @@ export function detailPaneHeaderEl({ title = '', actions = [] } = {}) {
       } else {
         btn.append(document.createTextNode(action.label ?? ''));
       }
-      if (typeof action.onClick === 'function') btn.addEventListener('click', () => action.onClick({ button: btn }));
+      if (typeof action.onClick === 'function') {
+        btn.addEventListener('click', () => {
+          if (action.dock) dockNextModal(btn.closest('.split-view__detail'));
+          action.onClick({ button: btn });
+        });
+      }
       bar.appendChild(btn);
     }
     head.appendChild(bar);
@@ -553,8 +563,12 @@ export function mountMasterDetail({
       // Aktivierung (Klick/Enter auf eine andere Zeile) waehlt nur aus - das
       // uebernimmt der Klick-Handler des Moduls ueber open().
       event.preventDefault();
-      if (typeof onEnter === 'function') onEnter(selected);
-      else detailEl.focus();
+      if (typeof onEnter === 'function') {
+        // Enter heisst bei den Modulen „bearbeiten": das Formular legt sich in
+        // die Spalte wie nach dem Knopf in ihrem Kopf (R19, dockNextModal).
+        dockNextModal(detailEl);
+        onEnter(selected);
+      } else detailEl.focus();
       return;
     }
     if (event.key === 'Escape' && selected != null) {

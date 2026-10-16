@@ -40,7 +40,7 @@ function makeNode(name, { tag = 'DIV' } = {}) {
     id: '',
     isConnected: true,
     inert: false,
-    style: {},
+    style: { setProperty(name, value) { this[name] = value; } },
     dataset: {},
     parentElement: null,
     children: [],
@@ -48,7 +48,7 @@ function makeNode(name, { tag = 'DIV' } = {}) {
       add: (c) => classes.add(c),
       remove: (c) => classes.delete(c),
       contains: (c) => classes.has(c),
-      toggle() {},
+      toggle(c, on) { if (on ?? !classes.has(c)) classes.add(c); else classes.delete(c); },
     },
     addEventListener(type, handler) { listeners.push({ type, handler }); },
     removeEventListener(type, handler) {
@@ -164,7 +164,7 @@ function installDocument() {
 }
 
 installDocument();
-const { openModal, closeModal } = await import('../public/components/modal.js');
+const { openModal, closeModal, dockNextModal } = await import('../public/components/modal.js');
 const { overlayHost } = await import('../public/utils/overlay-host.js');
 
 async function fresh() {
@@ -297,4 +297,60 @@ test('overlayHost: eine schwebende Ebene haengt im Dialog, aus dem sie aufgeht',
   assert.equal(overlayHost(outside), overlay, 'ohne eigenen Dialog: der oberste modale');
   await closeModal({ force: true });
   assert.equal(overlayHost(outside), document.body, 'ohne Dialog bleibt es document.body');
+});
+
+// --------------------------------------------------------
+// Bearbeiten in der Detailspalte (Critique R19): derselbe Dialog, nur sein Ort
+// --------------------------------------------------------
+function makeDock({ display = 'flex', rect = { top: 101, left: 738, width: 670, height: 783 } } = {}) {
+  const dock = makeNode('.split-view__detail');
+  dock.display = display;
+  dock.getBoundingClientRect = () => rect;
+  return dock;
+}
+
+test('dockNextModal: der naechste Dialog legt sich deckungsgleich auf die Spalte - und bleibt ein Dialog', async () => {
+  await fresh();
+  globalThis.getComputedStyle = (node) => ({ display: node.display ?? 'block' });
+  const dock = makeDock();
+  dockNextModal(dock);
+  const overlay = open();
+  assert.equal(overlay.classList.contains('modal-overlay--docked'), true, 'das Formular liegt in der Spalte');
+  assert.deepEqual(
+    ['--dock-top', '--dock-left', '--dock-width', '--dock-height'].map((k) => overlay.style[k]),
+    ['101px', '738px', '670px', '783px'],
+    'die Lage ist die gemessene Spalte',
+  );
+  assert.deepEqual(overlay.calls, ['showModal'], 'weiter showModal(): Fokusfalle, inerter Hintergrund, Escape und Dirty-Guard bleiben');
+  await closeModal({ force: true });
+  assert.equal(overlay._undock, null, 'beim Schliessen haengt der Dialog sich von der Spalte ab');
+
+  // Die Anmeldung gilt EINEM Dialog: der naechste oeffnet wie immer.
+  await fresh();
+  const next = open();
+  assert.equal(next.classList.contains('modal-overlay--docked'), false, 'eine verbrauchte Anmeldung dockt nichts mehr an');
+  await closeModal({ force: true });
+});
+
+test('dockNextModal: keine Spalte (unter der Schwelle), keine Anmeldung oder eine alte - dann das Modal wie immer', async () => {
+  globalThis.getComputedStyle = (node) => ({ display: node.display ?? 'block' });
+  await fresh();
+  dockNextModal(makeDock({ display: 'none' }));
+  assert.equal(open().classList.contains('modal-overlay--docked'), false, 'unter der Schwelle steht die Spalte nicht');
+  await closeModal({ force: true });
+
+  await fresh();
+  const realNow = Date.now;
+  try {
+    dockNextModal(makeDock());
+    Date.now = () => realNow() + 60_000;
+    assert.equal(open().classList.contains('modal-overlay--docked'), false, 'eine Minute alte Anmeldung gilt nicht mehr');
+  } finally {
+    Date.now = realNow;
+  }
+  await closeModal({ force: true });
+
+  await fresh();
+  assert.equal(open().classList.contains('modal-overlay--docked'), false, 'ohne Anmeldung kein Andocken');
+  await closeModal({ force: true });
 });

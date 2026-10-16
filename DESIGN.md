@@ -1341,6 +1341,17 @@ Die Uebersicht steht seit R19 (2026-10-16) auf derselben Spalte: sie polstert am
 begann sie bei 1920 bei x 270 und jedes Modul bei x 430; jetzt 252 / 252 / 430 bei 1280 / 1440 /
 1920 auf allen Seiten (`test:dashboard-clarity`).
 
+**Bearbeiten geschieht in der Detailspalte** (R19, 2026-10-16). Ab der Schwelle legt sich das
+Formular deckungsgleich auf die Spalte (gleiche Flaeche, Radius `--radius-lg`, leiser Schatten,
+kein abgedunkelter Grund, Blende statt Hub); darunter bleibt es das Modal. Es IST weiter der
+Dialog: Fokusfalle, Escape/Abbrechen, die Frage nach ungespeicherten Aenderungen (ein Klick auf die
+Liste schliesst und fragt), der eine History-Marker und die Serien-Rueckfragen bleiben, wie sie
+sind. Wird die Spalte waehrenddessen zu schmal, wird es wieder das Fenster. EIN Weg: die
+Kopf-Aktion mit `dock: true` (`detailPaneHeaderEl`) bzw. Enter auf der gewaehlten Zeile meldet die
+Spalte an (`dockNextModal`, components/modal.js), das naechste `openModal()` nimmt sie - Aufgaben,
+Kontakte, Inventar, Geburtstage (ueber detail-view.js) und Rezepte (`test:modal-dialog`,
+`test:master-detail`).
+
 **Mehrfachauswahl steht in der Detailspalte** (R19, 2026-10-16, Muster Apple Mail). Ab der
 Schwelle zeigt die Spalte waehrend einer Auswahl „N ausgewaehlt" mit den Sammelaktionen als
 Knoepfe (Rueckfrage, Fokus auf Abbrechen und Esc wie in der Pille); Detail und Leerzustand bleiben

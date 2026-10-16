@@ -747,6 +747,8 @@ function renderRecipePane(id, body) {
   const actions = readOnly() ? [] : [
     !isMirrored && {
       label: t('common.edit'), icon: 'pencil', id: 'recipes-detail-edit',
+      // In der Spalte bearbeiten, nicht in einem Fenster darueber (R19).
+      dock: true,
       onClick: () => openRecipeModal('edit', recipe),
     },
     {

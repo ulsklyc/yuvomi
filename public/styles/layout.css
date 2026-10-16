@@ -3391,8 +3391,10 @@ html.fab-steady .page-fab {
   color: var(--color-ink-on-vivid);
 }
 
-.selection-pane.selection-pane--confirming .selection-pane__action--danger:hover:not(:disabled) {
-  background-color: var(--color-danger-hover);
+@media (hover: hover) {
+  .selection-pane.selection-pane--confirming .selection-pane__action--danger:hover:not(:disabled) {
+    background-color: var(--color-danger-hover);
+  }
 }
 
 .selection-pane__detail {
@@ -6168,6 +6170,60 @@ dialog.modal-overlay::backdrop {
    * Scroll-Container, erst dann greift overscroll-behavior). */
   overflow: hidden;
   overscroll-behavior: contain;
+}
+
+/* DAS FORMULAR IN DER DETAILSPALTE (Critique R19). Ab der Split-Schwelle legt
+ * sich der Bearbeiten-Dialog deckungsgleich auf die Detailspalte
+ * (components/modal.js, dockNextModal): dieselbe Flaeche, derselbe Radius,
+ * derselbe leise Schatten wie `.split-view__detail`, und kein abgedunkelter
+ * Grund - man bearbeitet, wo man liest. Es bleibt der Dialog (Fokus, Escape,
+ * Ungespeichert-Frage, History-Marker); ein Klick daneben schliesst ihn wie
+ * immer. Die Lage kommt aus der gemessenen Spalte (`--dock-*`, vom Skript
+ * gesetzt); `left` ist der gemessene Wert und deshalb physisch.
+ * Die Einfahrt ist eine Blende ohne Hub: das Formular ersetzt den Inhalt der
+ * Spalte, es kommt nicht von irgendwo her. */
+dialog.modal-overlay.modal-overlay--docked {
+  padding: 0;
+  cursor: default;
+}
+
+dialog.modal-overlay.modal-overlay--docked::backdrop {
+  background-color: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.modal-overlay--docked .modal-panel {
+  position: fixed;
+  top: var(--dock-top);
+  left: var(--dock-left);
+  width: var(--dock-width);
+  height: var(--dock-height);
+  max-width: none;
+  max-height: none;
+  border-color: transparent;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.modal-overlay--docked .modal-panel::after {
+  content: none;
+}
+
+.modal-overlay--docked .modal-panel:not(.modal-panel--closing) {
+  animation: modal-overlay-in var(--duration-md) var(--ease-out) forwards;
+}
+
+.modal-overlay--docked .modal-panel.modal-panel--closing {
+  animation: modal-overlay-out var(--duration-sm) var(--ease-out) forwards;
+}
+
+/* Unter reduzierter Bewegung blendet modal.js das Ganze selbst (_fade). */
+@media (prefers-reduced-motion: reduce) {
+  .modal-overlay--docked .modal-panel:not(.modal-panel--closing),
+  .modal-overlay--docked .modal-panel.modal-panel--closing {
+    animation: none;
+  }
 }
 
 /* EIGENE NATIVE DIALOGE IM BILD DES MODALS (D7): Symbolauswahl und

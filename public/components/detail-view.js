@@ -928,9 +928,10 @@ function openAsPopover(opts) {
  * fremdes, gerade offenes Modal.
  *
  * Kopf wie in Mail: Titel links, „Bearbeiten" rechts. „Bearbeiten" fuehrt ins
- * regulaere Formular-Modal (`edit.standalone`), wie aus dem Popover - eine
- * Spalte neben der Liste ist ein Leseort, und das Formular hat im Modal seine
- * Fusszeile, seinen Dirty-Check und seine Fokusfuehrung.
+ * regulaere Formular-Modal (`edit.standalone`) - seit R19 legt es sich dabei
+ * deckungsgleich in diese Spalte (`dock`, components/modal.js dockNextModal):
+ * man bearbeitet, wo man liest, und das Formular behaelt seine Fusszeile,
+ * seinen Dirty-Check, seine Fokusfuehrung und den einen History-Marker.
  */
 function openInPane(opts, token) {
   const pane = opts.pane;
@@ -943,6 +944,8 @@ function openInPane(opts, token) {
     label: opts.edit.label ?? t('common.edit'),
     id: 'detail-pane-edit',
     icon: 'pencil',
+    // Das Formular legt sich in diese Spalte (R19), statt als Fenster darueber.
+    dock: true,
     onClick: () => opts.edit.standalone(),
   } : null;
 

@@ -224,6 +224,9 @@ const STUBS = {
       return any;
     };
     export const mountFooter = () => null;
+    // Wer sehen will, WOHIN ein Formular sich legt (R19, Bearbeiten in der
+    // Detailspalte), setzt globalThis.__dockNextModal.
+    export const dockNextModal = (...args) => globalThis.__dockNextModal?.(...args);
     export const refreshDirtySnapshot = () => {};
     // Der Tausch selbst muss laufen, genau einmal und synchron. Wer die
     // Dirty-Basis dahinter messen will, haengt die ECHTE Funktion aus

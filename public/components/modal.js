@@ -1441,6 +1441,7 @@ function _doClose(overlayEl) {
   const target = overlayEl ?? activeOverlay;
   if (!target) return;
 
+  target._undock?.();
   _removeOverlay(target);
 
   // Globalen State nur zurücksetzen wenn kein neues Modal zwischenzeitlich geöffnet wurde.
@@ -1815,11 +1816,90 @@ export function armPointerDeadTime(root, { now = () => performance.now(), durati
  *   ungelesen antwortet (siehe POINTER_DEAD_TIME_MS). Ein Formular, das jemand
  *   selbst aufgemacht hat, bekommt das NICHT: dort ist der erste Klick Absicht.
  */
+// --------------------------------------------------------
+// Bearbeiten IN der Detailspalte (Critique R19)
+// --------------------------------------------------------
+
+/**
+ * AB DER SPLIT-SCHWELLE BEARBEITET MAN IN DER DETAILSPALTE, darunter bleibt es
+ * das Modal (Entscheidung Ulas, 2026-10-16). Bei Aufgaben (680px) und Rezepten
+ * (520px) lag das Formular als zweites Fenster ueber Liste und Detail.
+ *
+ * DAS FORMULAR BLEIBT DIESER DIALOG - nur sein Ort wechselt. Das Panel legt
+ * sich deckungsgleich auf die Detailspalte (`.modal-overlay--docked`,
+ * layout.css), der Grund daneben wird nicht abgedunkelt. Alles, was der Dialog
+ * zusagt, bleibt damit unveraendert erhalten, ohne zweite Fassung: Fokus und
+ * Fokusfalle, Escape und Abbrechen, die Frage nach ungespeicherten Aenderungen
+ * (ein Klick auf die Liste ist ein Schliessen und fragt sie), der EINE
+ * History-Marker der Zurueck-Geste und die Serien-Rueckfragen, die sich als
+ * eigene Dialoge darueberlegen. Die Liste ist waehrenddessen inert wie hinter
+ * jedem Dialog - wie in Kontakte am Mac, wo der Bearbeiten-Modus erst endet,
+ * bevor eine andere Karte gewaehlt wird.
+ *
+ * EIN WEG: der Knopf „Bearbeiten" im Kopf der Detailspalte meldet seine Spalte
+ * an (`detailPaneHeaderEl`, Aktion mit `dock: true`, utils/master-detail.js),
+ * bevor er den Dialog des Moduls oeffnet. Das naechste openModal() nimmt die
+ * Anmeldung, wenn sie frisch ist und die Spalte steht; sonst oeffnet es wie
+ * immer. Wird die Spalte waehrend des Bearbeitens schmaler als die Schwelle
+ * (Fenster, Seitenleiste), wird der Dialog wieder ein gewoehnlicher.
+ */
+let _dockIntent = null;
+/** Wie lange eine Anmeldung gilt: lang genug fuer ein Modul, das vor dem Dialog noch laedt. */
+const DOCK_INTENT_MS = 3000;
+
+/**
+ * Meldet die Spalte an, in die der naechste Dialog sich legt.
+ * @param {HTMLElement|null} el  die Detailspalte (`.split-view__detail`)
+ */
+export function dockNextModal(el) {
+  _dockIntent = el ? { el, until: Date.now() + DOCK_INTENT_MS } : null;
+}
+
+function _dockVisible(el) {
+  if (!el?.isConnected || getComputedStyle(el).display === 'none') return null;
+  const rect = el.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0 ? rect : null;
+}
+
+function _takeDockIntent() {
+  const intent = _dockIntent;
+  _dockIntent = null;
+  if (!intent || Date.now() > intent.until) return null;
+  return _dockVisible(intent.el) ? intent.el : null;
+}
+
+/** Legt das Panel auf die Spalte und haelt es dort, solange sie steht. */
+function _dockOverlay(overlay, dock) {
+  if (!overlay || !dock) return;
+  const place = () => {
+    const rect = _dockVisible(dock);
+    if (!rect) { overlay.classList.remove('modal-overlay--docked'); return; }
+    overlay.classList.add('modal-overlay--docked');
+    overlay.style.setProperty('--dock-top', `${rect.top}px`);
+    overlay.style.setProperty('--dock-left', `${rect.left}px`);
+    overlay.style.setProperty('--dock-width', `${rect.width}px`);
+    overlay.style.setProperty('--dock-height', `${rect.height}px`);
+  };
+  place();
+  const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(place) : null;
+  ro?.observe(dock);
+  window.addEventListener?.('resize', place);
+  overlay._undock = () => {
+    ro?.disconnect();
+    window.removeEventListener?.('resize', place);
+    overlay._undock = null;
+  };
+}
+
 export function openModal({
   title, content, onSave, onDelete, onClose, size = 'md',
   initialFocus = 'first-field', headerAction = null, dirtyGuard = true,
   pointerDeadTime = false,
 } = {}) {
+  // Die Anmeldung gilt diesem Aufruf - auch wenn er gleich ein voriges Modal
+  // ablöst, und auch wenn die Spalte nicht (mehr) steht.
+  const dock = _takeDockIntent();
+
   // Vorheriges Modal schließen (kein Stacking).
   if (activeOverlay) {
     activeOverlay.removeAttribute('id');
@@ -1895,6 +1975,9 @@ export function openModal({
   // eigentlichen Einstieg (erstes Feld). Ab hier ist der Hintergrund inert:
   // Tab verlaesst den Dialog nicht mehr, Screenreader lesen die Seite
   // dahinter nicht mit.
+  // In der Spalte, wenn „Bearbeiten" dort aufgerufen hat (siehe dockNextModal).
+  // Vor dem Eintritt in die Top-Layer: die Einfahrt ist dann schon die der Spalte.
+  _dockOverlay(activeOverlay, dock);
   _enterTopLayer(activeOverlay);
   if (_reducedMotion()) _fade(activeOverlay, 0, 1);
 

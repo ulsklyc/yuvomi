@@ -1064,3 +1064,49 @@ test('Aufgaben und Kontakte setzen ihre Auswahl ueber den Baustein, nicht an ihm
   const hide = [...eachRule(css)].find((r) => r.selector.trim() === '.split-view__detail.is-selecting > :not(.split-view__selection)');
   assert.match(hide?.body ?? '', /display:\s*none/, 'waehrend der Auswahl tritt das Detail zurueck');
 });
+
+// ── Bearbeiten in der Spalte (R19): Kopf-Aktion und Enter melden die Spalte an ──
+test('„Bearbeiten" im Kopf der Spalte und Enter auf der Zeile legen das Formular in die Spalte', () => {
+  const docked = [];
+  globalThis.__dockNextModal = (el) => docked.push(el);
+  const vorher = { createElement: document.createElement, createTextNode: document.createTextNode };
+  document.createElement = (tag) => new El(tag);
+  document.createTextNode = (text) => { const n = new El('#text'); n.textContent = text; return n; };
+  try {
+    const p = makePage();
+    const opened = [];
+    const head = md.detailPaneHeaderEl({
+      title: 'Kuchen',
+      actions: [
+        { label: 'Bearbeiten', id: 'edit', dock: true, onClick: () => opened.push(docked.length) },
+        { label: 'Loeschen', id: 'del', onClick: () => opened.push('del') },
+      ],
+    });
+    p.body.append(head);
+    const [edit, del] = head.querySelectorAll('.btn');
+    edit.listeners.find((l) => l.type === 'click').handler();
+    assert.deepEqual(docked, [p.detail], 'die Spalte, in der der Knopf steht, ist angemeldet');
+    assert.deepEqual(opened, [1], 'VOR dem Oeffnen - sonst kaeme der Dialog als Fenster');
+    del.listeners.find((l) => l.type === 'click').handler();
+    assert.equal(docked.length, 1, 'eine Aktion ohne `dock` meldet nichts an');
+
+    // Enter auf der gewaehlten Zeile ruft onEnter (Bearbeiten) - angedockt.
+    const handle = p.mount();
+    handle.open('2');
+    docked.length = 0;
+    key(p.focusOf(1), 'Enter');
+    assert.deepEqual(p.calls.enter, ['2']);
+    assert.deepEqual(docked, [p.detail], 'Enter oeffnet das Formular in der Spalte wie der Knopf');
+    handle.destroy();
+  } finally {
+    delete globalThis.__dockNextModal;
+    Object.assign(document, vorher);
+  }
+});
+
+test('Detailansicht und Rezepte geben „Bearbeiten" den Weg in die Spalte', () => {
+  const view = readFileSync(new URL('../public/components/detail-view.js', import.meta.url), 'utf8');
+  assert.match(view, /id: 'detail-pane-edit',[\s\S]{0,200}?dock: true,/, 'detail-view (Aufgaben, Kontakte, Inventar, Geburtstage)');
+  const recipes = readFileSync(new URL('../public/pages/recipes.js', import.meta.url), 'utf8');
+  assert.match(recipes, /id: 'recipes-detail-edit',[\s\S]{0,200}?dock: true,/, 'Rezepte bauen ihren Kopf selbst');
+});
