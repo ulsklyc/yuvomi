@@ -60,6 +60,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Calendar: creating a calendar on a phone shows a usable name field.** In "Manage calendars"
+  on a narrow screen, the name field was squeezed to a sliver and the color picker stretched into a
+  wide bar. Name and color now sit side by side, with "Create calendar" below them.
+
 - **Too many requests are explained in your language.** When the server asks to slow down, the
   app says so in the interface language instead of showing an English server message.
 

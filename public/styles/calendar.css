@@ -3293,12 +3293,23 @@
 }
 
 @media (max-width: 639px) {
-  .cal-calendar-create,
   .cal-calendar-row {
     grid-template-columns: var(--space-4) minmax(0, 1fr) var(--space-12);
   }
 
-  .cal-calendar-create .btn,
+  /* Das Formular hat KEINE Farbscheibe vorn: mit der Zeilenvorlage fiel sein
+   * Namensfeld in die 16px der Scheibenspalte und das Farbfeld in die freie
+   * Breite - ein blauer Balken neben einem Feld ohne lesbaren Platzhalter.
+   * Name und Farbe stehen deshalb in eigener Vorlage, „Erstellen" darunter
+   * ueber die volle Breite. */
+  .cal-calendar-create {
+    grid-template-columns: minmax(0, 1fr) var(--space-12);
+  }
+
+  .cal-calendar-create .btn {
+    grid-column: 1 / -1;
+  }
+
   .cal-calendar-row__count,
   .cal-calendar-row__actions {
     grid-column: 2 / -1;

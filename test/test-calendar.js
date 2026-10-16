@@ -2144,6 +2144,27 @@ test('Filterblatt (D2): Kalender und Aufgaben fahren EINEN Baustein - Personen a
   assert(/resetLabel = t\('common\.filtersResetDefault'\)/.test(sheet), 'der Baustein traegt den einen Text als Vorgabe');
 });
 
+// Das Anlegen-Formular im Dialog „Kalender verwalten" teilte sich unter 640px
+// die Spaltenvorlage der Kalenderzeilen - erste Spalte die 16px der
+// Farbscheibe. Das Formular hat aber keine Scheibe: sein Namensfeld fiel in
+// die 16px, das Farbfeld in die freie Breite und lag als blauer Balken da.
+test('Kalender verwalten: unter 640px steht das Namensfeld des Anlegen-Formulars in der freien Spalte, nicht in der Scheibenspalte', () => {
+  const calSrc = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const open = 'id="local-calendar-create"';
+  const at = calSrc.indexOf(open) + open.length;
+  const form = calSrc.slice(at, calSrc.indexOf('</form>', at));
+  const fields = [...form.matchAll(/id="(local-calendar-[a-z]+)"/g)].map((m) => m[1]);
+  assert(JSON.stringify(fields) === JSON.stringify(['local-calendar-name', 'local-calendar-color']), 'das Formular traegt Name, dann Farbe - keine Scheibe davor');
+  const phone = [...eachRule(calendarCss)].filter((r) =>
+    r.at.some((a) => /max-width:\s*639px/.test(a))
+    && r.selector.split(',').some((sel) => sel.trim() === '.cal-calendar-create')
+    && /grid-template-columns/.test(r.body));
+  assert(phone.length > 0, 'unter 640px legt eine Regel die Spalten des Formulars fest');
+  const tracks = phone.at(-1).body.match(/grid-template-columns:\s*([^;]+)/)[1].trim();
+  assert(/^minmax\(0,\s*1fr\)/.test(tracks),
+    `die erste Spalte gehoert dem Namensfeld und waechst (minmax(0, 1fr)), nicht der Scheibe - steht: ${tracks}`);
+});
+
 test('Filterblatt (D2): „Mir zugewiesen" steht in beiden Blaettern als erster Schalter der Personengruppe, die Personen sind Chips', () => {
   const calSrc = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
   const taskSrc = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
