@@ -2247,6 +2247,14 @@ test('#2019: GET /google/calendars meldet ein abgelehntes Token mit eigenem Grun
   assert.equal((await res.json()).reason, 'google_reauth_required');
 });
 
+test('#2019: POST /google/sync meldet ein abgelehntes Token mit demselben Grund', async () => {
+  reset();
+  db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('google_needs_reauth', '1')").run();
+  const res = await callRoute('POST', '/google/sync', {});
+  assert.equal(res.status, 409);
+  assert.equal((await res.json()).reason, 'google_reauth_required');
+});
+
 // Sicherheitsprüfung zu #2029: geteilt wird nur ein Refresh mit DEMSELBEN Token.
 async function parallelRefresh(tokens) {
   let open;

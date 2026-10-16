@@ -36,6 +36,23 @@ Object.defineProperty(MiniElement.prototype, 'childElementCount', {
 MiniElement.prototype.querySelector = function querySelector() {
   return { addEventListener() {}, checked: false };
 };
+// Der Mini-DOM merkt sich nur, DASS ein Listener hängt; zum Klicken braucht
+// diese Suite auch welchen.
+MiniElement.prototype.addEventListener = function addEventListener(type, handler) {
+  this.listener = type;
+  (this.handlers ??= []).push({ type, handler });
+};
+
+/** Der erste Knopf unter `root`, dessen Text `text` ist. */
+function findButton(root, text) {
+  for (const node of root.childNodes ?? []) {
+    if (!(node instanceof MiniElement)) continue;
+    if (node.tagName === 'button' && node.textContent === text) return node;
+    const hit = findButton(node, text);
+    if (hit) return hit;
+  }
+  return null;
+}
 
 const { __test } = await import('../public/settings/pages/sync-calendar.js');
 
@@ -90,4 +107,32 @@ test('#2019: ein anderer Fehler beim Kalenderabruf lässt die Karte stehen', asy
   __test.buildGoogleProvider(connected, admin);
   await settle();
   assert.equal(replaced.length, 0);
+});
+
+test('#2019: meldet "Jetzt synchronisieren" das abgelehnte Token, baut sich die Karte im Zustand "neu verbinden" neu auf', async () => {
+  replaced.length = 0;
+  globalThis.__apiStub = {
+    get: async (path) => {
+      if (path === '/calendar/google/status') return { ...connected, needsReauth: true };
+      return { data: [] };
+    },
+    post: async (path) => {
+      if (path === '/calendar/google/sync') {
+        throw apiError(409, { error: 'reconnect required', code: 409, reason: 'google_reauth_required' });
+      }
+      return {};
+    },
+  };
+
+  const card = __test.buildGoogleProvider(connected, admin);
+  await settle();
+  const syncButton = findButton(card, 'settings.syncNow');
+  assert.ok(syncButton, 'Ausgangslage: die Karte bietet "Jetzt synchronisieren"');
+  await Promise.all(syncButton.handlers.filter((h) => h.type === 'click').map((h) => h.handler({ type: 'click' })));
+  await settle();
+
+  assert.equal(replaced.length, 1, 'die Karte wird ersetzt');
+  const html = replaced[0].to.outerHTML;
+  assert.match(html, /settings\.outlookReauthRequired/);
+  assert.match(html, /settings\.outlookReconnect/);
 });

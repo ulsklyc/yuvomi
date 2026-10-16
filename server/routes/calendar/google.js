@@ -86,6 +86,12 @@ router.post('/google/sync', requireAdmin, async (req, res) => {
     const { lastSync } = googleCalendar.getStatus();
     res.json({ ok: true, lastSync });
   } catch (err) {
+    // Wie GET /google/calendars (#2019): die Karte stellt auf "neu verbinden" um.
+    if (err?.reauthRequired) {
+      return res.status(409).json({
+        error: 'Google sign-in expired - reconnect required.', code: 409, reason: 'google_reauth_required',
+      });
+    }
     log.error('', err);
     res.status(500).json({ error: err.message, code: 500 });
   }

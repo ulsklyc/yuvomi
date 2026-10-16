@@ -76,7 +76,7 @@ export function calendarPaths() {
     '/api/v1/calendar/holidays': { get: op({ summary: 'List public & school holidays in a date range', tag: 'Calendar', description: 'Reads cached OpenHolidays entries that overlap `from`/`to` (both `YYYY-MM-DD`, required). Returns `{ data: [{ id, type (`public`|`school`), start_date, end_date, name, color }] }`. Empty when no holiday country is configured.' }) },
     '/api/v1/calendar/google/auth': { get: op({ summary: 'Start Google Calendar OAuth', tag: 'Calendar', admin: true }) },
     '/api/v1/calendar/google/callback': { get: op({ summary: 'Google Calendar OAuth callback', tag: 'Calendar' }) },
-    '/api/v1/calendar/google/sync': { post: op({ summary: 'Run Google Calendar sync', tag: 'Calendar', admin: true, stateChanging: true }) },
+    '/api/v1/calendar/google/sync': { post: op({ summary: 'Run Google Calendar sync', tag: 'Calendar', admin: true, stateChanging: true, description: 'When Google no longer accepts the stored sign-in (`invalid_grant`), the answer is `409` with reason `google_reauth_required`, and syncing pauses until the account is connected again (#2019).' }) },
     '/api/v1/calendar/google/status': { get: op({ summary: 'Get Google Calendar status', tag: 'Calendar' }) },
     '/api/v1/calendar/google/calendars': {
       get: op({ summary: 'List available Google calendars', tag: 'Calendar', admin: true, description: 'Calendars of the connected Google account. When Google no longer accepts the stored sign-in (`invalid_grant`), the answer is `409` with reason `google_reauth_required` instead of a list, and nothing is sent to Google until the account is connected again (#2019).' }),

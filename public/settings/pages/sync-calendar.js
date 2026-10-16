@@ -785,6 +785,17 @@ function buildGoogleProvider(googleStatus, user) {
   // Google hat das Token abgelehnt (#2019): derselbe Text wie bei Outlook statt
   // "Verbunden", denn ohne neues OAuth synchronisiert hier nichts mehr.
   const reauth = Boolean(googleStatus?.connected && googleStatus.needsReauth);
+
+  // EINE Stelle für jede Google-Antwort, die das abgelehnte Token meldet
+  // (Kalenderauswahl, "Jetzt synchronisieren"): der Status oben ist dann
+  // veraltet, also neu holen und die Karte im neuen Zustand aufbauen.
+  // @returns {Promise<boolean>} true, wenn die Antwort das war
+  const handleReauth = async (err) => {
+    if (err?.data?.reason !== GOOGLE_REAUTH_REASON) return false;
+    const fresh = await api.get('/calendar/google/status').catch(() => null);
+    if (fresh?.needsReauth) section.replaceWith(buildGoogleProvider(fresh, user));
+    return true;
+  };
   status.textContent = reauth
     ? t('settings.outlookReauthRequired')
     : providerConnectionStatus(googleStatus);
@@ -815,12 +826,7 @@ function buildGoogleProvider(googleStatus, user) {
   if (googleStatus.connected && !reauth && user?.role === 'admin') {
     // Stellt erst der Kalenderabruf fest, dass Google das Token ablehnt, ist der
     // Status oben veraltet: neu holen und die Karte im neuen Zustand aufbauen.
-    section.appendChild(buildGoogleCalendarPicker({
-      onReauth: async () => {
-        const fresh = await api.get('/calendar/google/status').catch(() => null);
-        if (fresh?.needsReauth) section.replaceWith(buildGoogleProvider(fresh, user));
-      },
-    }));
+    section.appendChild(buildGoogleCalendarPicker({ onError: handleReauth }));
     section.appendChild(buildGoogleReadonlyToggle(googleStatus));
   }
 
@@ -849,6 +855,7 @@ function buildGoogleProvider(googleStatus, user) {
         await api.post('/calendar/google/sync', {});
         showToast(t('settings.syncSuccess', { provider: 'Google Calendar' }), 'success');
       } catch (err) {
+        if (await handleReauth(err)) return;
         showToast(err.message || t('common.errorGeneric'), 'danger');
       } finally {
         syncBtn.disabled = false;
@@ -1017,7 +1024,7 @@ function buildProviderHint(text) {
 /** Grund, mit dem /calendar/google/calendars ein abgelehntes Token meldet (#2019). */
 const GOOGLE_REAUTH_REASON = 'google_reauth_required';
 
-function buildGoogleCalendarPicker({ onReauth } = {}) {
+function buildGoogleCalendarPicker({ onError } = {}) {
   const group = document.createElement('div');
   group.className = 'form-group settings-google-calendars';
 
@@ -1096,10 +1103,7 @@ function buildGoogleCalendarPicker({ onReauth } = {}) {
         });
       }
     } catch (err) {
-      if (err?.data?.reason === GOOGLE_REAUTH_REASON && onReauth) {
-        await onReauth();
-        return;
-      }
+      if (await onError?.(err)) return;
       const p = document.createElement('p');
       p.className = 'form-hint';
       p.textContent = err.message || t('common.errorGeneric');
