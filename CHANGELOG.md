@@ -60,6 +60,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Calendar: "Manage calendars" is reachable on tablets and phones again.** Below 1024px the
+  button was hidden along with the empty header slot, so calendars could not be created, recolored
+  or reordered there. The calendar filter now lists "Manage calendars" under its calendars, at
+  every width and even before the first calendar exists.
+
 - **Calendar: creating a calendar on a phone shows a usable name field.** In "Manage calendars"
   on a narrow screen, the name field was squeezed to a sliver and the color picker stretched into a
   wide bar. Name and color now sit side by side, with "Create calendar" below them.
