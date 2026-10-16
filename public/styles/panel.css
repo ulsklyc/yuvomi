@@ -572,7 +572,10 @@
 .metric-card__progress {
   height: 6px;
   border-radius: var(--radius-full);
-  background: var(--color-surface-2);
+  /* Die Bahn ist eine Mulde in der Karte (--color-fill-well), kein Loch
+   * (R19, Critique 2026-10-16): dunkel war --color-surface-2 das Fast-Schwarz
+   * #0F0E0D, die leere Bahn las sich lauter als ihre Fuellung. */
+  background: var(--color-fill-well);
   overflow: hidden;
   margin-top: var(--space-1);
 }

@@ -1698,7 +1698,9 @@ button.budget-bar-row:focus-visible {
   height: 6px;
   overflow: hidden;
   border-radius: var(--radius-full);
-  background: var(--color-surface-2);
+  /* Die Bahn ist eine Mulde (--color-fill-well), kein Loch (R19): dunkel war
+   * --color-surface-2 das Fast-Schwarz #0F0E0D unter der Karte. */
+  background: var(--color-fill-well);
 }
 
 .budget-loan-card__progress span {
@@ -3016,7 +3018,8 @@ button.budget-entry__title {
 
 .budget-plan-row__track {
   height: var(--space-2);
-  background-color: var(--color-surface-2);
+  /* Mulde statt Loch (R19, siehe .budget-loan-card__progress). */
+  background-color: var(--color-fill-well);
   border-radius: var(--radius-full);
   overflow: hidden;
 }

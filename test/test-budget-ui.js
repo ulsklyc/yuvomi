@@ -6592,3 +6592,23 @@ test('Statistik: das Ziel steht als Text, und seine Marke klemmt nicht an der Ka
   assert.doesNotMatch(html, /title="budget\.planTarget/, 'das Ziel ist wieder nur per title erklaert');
 });
 
+// R19 (Critique 2026-10-16): "Dark-Fortschrittsspur #0F0E0D wirkt wie ein
+// Loch". Bahnen und Mulden stehen auf --color-fill-well (dunkel #37332E,
+// 1,17:1 ueber der Karte), nicht auf --color-surface-2 (dunkel das Fast-Schwarz
+// unter der Buehne).
+test('R19: Fortschrittsbahnen sind Mulden, keine Loecher', () => {
+  const sheets = { budget: budgetCss, panel: read('../public/styles/panel.css'), dashboard: read('../public/styles/dashboard.css'), rewards: read('../public/styles/rewards.css') };
+  const wanted = {
+    budget: ['.budget-loan-card__progress', '.budget-plan-row__track'],
+    panel: ['.metric-card__progress'],
+    dashboard: ['.budget-widget__share'],
+    rewards: ['.rw-ledger-row__icon'],
+  };
+  for (const [sheet, selectors] of Object.entries(wanted)) {
+    const rules = [...eachRule(sheets[sheet])].filter((r) => !r.at.length);
+    for (const sel of selectors) {
+      const body = rules.find((r) => r.selector.trim() === sel)?.body ?? '';
+      assert.match(body, /background(-color)?:\s*var\(--color-fill-well\)/, `${sel}: ${body.match(/background[^;]*/)?.[0]}`);
+    }
+  }
+});

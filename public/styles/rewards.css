@@ -490,7 +490,8 @@
   width: 34px;
   height: 34px;
   border-radius: var(--radius-full);
-  background: var(--color-surface-2);
+  /* Mulde statt Loch (R19): dunkel war --color-surface-2 #0F0E0D. */
+  background: var(--color-fill-well);
   color: var(--color-text-secondary);
 }
 

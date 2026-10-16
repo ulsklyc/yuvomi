@@ -4372,7 +4372,8 @@ button.today-cockpit__more--link {
   margin-top: var(--space-2);
   border-radius: var(--radius-full);
   overflow: hidden;
-  background: var(--color-surface-2);
+  /* Mulde statt Loch (R19): dunkel war --color-surface-2 #0F0E0D. */
+  background: var(--color-fill-well);
 }
 
 .budget-widget__share-saved {

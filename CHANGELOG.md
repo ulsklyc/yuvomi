@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Empty progress bars no longer look like holes in dark mode.** The track behind budget plans,
+  loans, subscriptions, Health goals and the overview's budget card, and the circle behind reward
+  history icons, sit as a soft well in the card instead of near-black.
 - **A budget category keeps its colour in every month.** Colours follow a category's place in your
   category list instead of how much it cost this month, so "Housing" no longer turns from violet to
   teal when another category is more expensive. The ring in Reports leaves a small gap between
