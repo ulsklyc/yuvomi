@@ -1610,10 +1610,12 @@ async function runRandomize(panel) {
 // --------------------------------------------------------
 
 let _suppressNextClick = false;
+// Ab so viel Weg wird aus einem Druecken ein Zug; darunter ist es ein Klick.
+const DRAG_THRESHOLD_PX = 5;
 
 function wireDragDrop(grid) {
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let dragging = null; // { mealId, sourceDate, sourceType, ghost, startX, startY }
+  let dragging = null; // { mealId, sourceDate, sourceType, ghost, card, slot }
 
   grid.addEventListener('pointerdown', (e) => {
     // Am ANFANG der Geste (siehe wireGrid): verdrahtet wurde mit Schreibrecht,
@@ -1647,25 +1649,43 @@ function wireDragDrop(grid) {
     const sourceType = slot.dataset.type;
 
     e.preventDefault();
-    card.setPointerCapture(e.pointerId);
+    // Der Zeiger wird am GEDRUECKTEN Element gefangen, nicht an der Karte
+    // (Critique 2026-10-16, P1): ein `click` geht an das gemeinsame Ziel von
+    // Druecken und Loslassen, und mit der Karte als Faenger war das das
+    // `.meal-card`-div - der Oeffnen-Knopf bekam den Klick nie, ein Mausklick
+    // oeffnete keinen Dialog. Die Ereignisse steigen vom Faenger weiter zur
+    // Karte auf, die Listener unten bleiben deshalb dort.
+    e.target.setPointerCapture(e.pointerId);
 
+    // Ein Zug beginnt erst mit Weg. Vorher legte jeder Klick einen Geist und
+    // die Zieh-Markierung an; ein Druecken ohne Weg ist ein Klick.
+    const startX = e.clientX;
+    const startY = e.clientY;
     let ghost = null;
-    if (!reducedMotion) {
-      ghost = card.cloneNode(true);
-      ghost.classList.add('meal-card--ghost');
-      ghost.style.width  = card.offsetWidth + 'px';
-      ghost.style.height = card.offsetHeight + 'px';
-      ghost.style.left   = (e.clientX - card.offsetWidth / 2) + 'px';
-      ghost.style.top    = (e.clientY - card.offsetHeight / 2) + 'px';
-      document.body.appendChild(ghost);
-    }
+    let pending = { mealId, sourceDate, sourceType, card, slot };
 
-    slot.classList.add('meal-slot--dragging');
-    dragging = { mealId, sourceDate, sourceType, ghost, card, slot };
+    function beginDrag(ev) {
+      if (!reducedMotion) {
+        ghost = card.cloneNode(true);
+        ghost.classList.add('meal-card--ghost');
+        ghost.style.width  = card.offsetWidth + 'px';
+        ghost.style.height = card.offsetHeight + 'px';
+        ghost.style.left   = (ev.clientX - card.offsetWidth / 2) + 'px';
+        ghost.style.top    = (ev.clientY - card.offsetHeight / 2) + 'px';
+        document.body.appendChild(ghost);
+      }
+      slot.classList.add('meal-slot--dragging');
+      dragging = { ...pending, ghost };
+      pending = null;
+    }
 
     let lastTarget = null;
 
     function onMove(ev) {
+      if (pending) {
+        if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < DRAG_THRESHOLD_PX) return;
+        beginDrag(ev);
+      }
       if (!dragging) return;
       if (ghost) {
         ghost.style.left = (ev.clientX - ghost.offsetWidth / 2) + 'px';
@@ -1686,9 +1706,15 @@ function wireDragDrop(grid) {
     }
 
     async function onUp(ev) {
-      if (!dragging) return;
+      if (!dragging) { cleanup(); return; } // ohne Weg: ein Klick, er geht durch
       const { mealId, sourceDate, sourceType, slot: sourceSlot } = dragging;
       cleanup(); // setzt dragging = null - Werte daher vorher destrukturieren
+
+      // Nach einem echten Zug ist der folgende Klick keine Bitte zum
+      // Bearbeiten - auch dann nicht, wenn die Karte im eigenen Slot landet.
+      // Seit der Faenger der Oeffnen-Knopf ist, erreichte ihn dieser Klick sonst.
+      _suppressNextClick = true;
+      setTimeout(() => { _suppressNextClick = false; }, 300);
 
       if (ghost) ghost.style.display = 'none';
       const el = document.elementFromPoint(ev.clientX, ev.clientY);
@@ -1698,8 +1724,6 @@ function wireDragDrop(grid) {
       if (targetSlot && targetSlot !== sourceSlot) {
         const targetDate = targetSlot.dataset.date;
         const targetType = targetSlot.dataset.type;
-        _suppressNextClick = true;
-        setTimeout(() => { _suppressNextClick = false; }, 300);
         await moveMeal(mealId, targetDate, targetType);
       }
     }
@@ -1711,6 +1735,7 @@ function wireDragDrop(grid) {
       dragging?.slot?.classList.remove('meal-slot--dragging');
       lastTarget?.classList.remove('meal-slot--drop-target');
       dragging = null;
+      pending = null;
       card.removeEventListener('pointermove',   onMove);
       card.removeEventListener('pointerup',     onUp);
       card.removeEventListener('pointercancel', onCancel);

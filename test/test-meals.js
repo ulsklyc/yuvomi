@@ -1411,8 +1411,8 @@ function dragFakeEl(classes, { parent = null, dataset = {}, shown = true } = {})
     },
     getClientRects: () => (el.shown ? [{ width: 48, height: 48 }] : []),
     addEventListener(type, fn) { (el.listeners[type] ||= []).push(fn); },
-    removeEventListener() {},
-    setPointerCapture() {},
+    removeEventListener(type, fn) { el.listeners[type] = (el.listeners[type] ?? []).filter((f) => f !== fn); },
+    setPointerCapture() { el.captured = true; },
   };
   if (parent) parent.children.push(el);
   return el;
@@ -1433,15 +1433,35 @@ function dragFixture({ handleShown = true } = {}) {
   globalThis.window = { matchMedia: () => ({ matches: true }) };
   try { mealsUi.wireDragDrop(grid); } finally { globalThis.window = zuvorWindow; }
 
-  const down = (target, pointerType) => {
+  // Ein Zug beginnt erst mit Weg (Mausklick, Critique 2026-10-16): `down`
+  // faehrt deshalb standardmaessig einen Schritt ueber die Schwelle nach,
+  // `move: 0` laesst den Zeiger stehen. elementFromPoint findet hier nichts -
+  // der Zug endet also im eigenen Slot.
+  const dispatch = (type, ev) => {
+    for (const fn of [...(card.listeners[type] ?? [])]) fn(ev);
+  };
+  const withDocument = (fn) => {
+    const zuvorDocument = globalThis.document;
+    globalThis.document = { elementFromPoint: () => null };
+    try { return fn(); } finally { globalThis.document = zuvorDocument; }
+  };
+  const down = (target, pointerType, { move = 12 } = {}) => {
     let prevented = false;
     for (const fn of grid.listeners.pointerdown ?? []) {
       fn({ target, pointerType, pointerId: 1, clientX: 10, clientY: 10,
         preventDefault: () => { prevented = true; } });
     }
+    if (move) withDocument(() => dispatch('pointermove', { target, pointerId: 1, clientX: 10 + move, clientY: 10 }));
     return { dragging: slot.classes.has('meal-slot--dragging'), prevented };
   };
-  return { slot, card, open, handle, icon, actions, down };
+  const up = (target, { x = 10 } = {}) => withDocument(() => dispatch('pointerup', { target, pointerId: 1, clientX: x, clientY: 10 }));
+  /** Faehrt den Klick-Riegel des Gitters; true = der Klick wurde verschluckt. */
+  const click = (target) => {
+    let swallowed = false;
+    for (const fn of grid.listeners.click ?? []) fn({ target, stopImmediatePropagation: () => { swallowed = true; } });
+    return swallowed;
+  };
+  return { grid, slot, card, open, handle, icon, actions, down, up, click };
 }
 
 test('#1317: die Mahlzeit-Zeile traegt einen Ziehgriff mit benanntem Label, ausserhalb der Aktionsleiste', () => {
@@ -1486,6 +1506,43 @@ test('#1317: ohne sichtbaren Griff (breites Board auf Touch) bleibt es beim bish
   assert(f.down(f.open, 'touch').dragging, 'Touch auf dem Board ohne Griff beginnt keinen Zug mehr - dort gibt es keinen anderen Ort');
   const g = dragFixture();
   assert(!g.down(g.actions, 'touch').dragging, 'die Aktionsleiste ist weiterhin kein Griff');
+});
+
+// --------------------------------------------------------
+// Mausklick auf die Karte (Critique 2026-10-16, P1)
+//
+// Ein Mausklick oeffnete keinen Dialog. `pointerdown` fing den Zeiger sofort
+// per setPointerCapture an der KARTE: der Browser schickt den folgenden `click`
+// dann an das gemeinsame Ziel von Druecken und Loslassen, also an das
+// `.meal-card`-div statt an `.meal-card__open[data-action="edit-meal"]`, und
+// onGridClick fand kein `[data-action]`. Dazu legte jeder Klick einen Geist
+// und die Zieh-Markierung an. Gemessen im echten Chrome: `mouse.click` ohne
+// Dialog, `element.click()` auf denselben Knopf mit Dialog.
+// --------------------------------------------------------
+
+test('Mausklick: Druecken und Loslassen ohne Weg beginnt keinen Zug und faengt den Zeiger nicht an der Karte', () => {
+  const f = dragFixture();
+  const r = f.down(f.open, 'mouse', { move: 0 });
+  assert(!r.dragging, 'ein Mausklick ohne Weg hat einen Zug begonnen - die Karte zeigt bei jedem Klick Geist und Zieh-Markierung');
+  assert(!f.card.captured,
+    'der Zeiger wurde an der KARTE gefangen - der Klick geht dann an das div statt an den Oeffnen-Knopf, und der Dialog bleibt zu');
+  f.up(f.open);
+  assert(!f.click(f.open), 'der Klick nach einem Klick ohne Weg wurde verschluckt');
+});
+
+test('Mausklick: ein Zittern unter der Schwelle bleibt ein Klick', () => {
+  const f = dragFixture();
+  assert(!f.down(f.open, 'mouse', { move: 2 }).dragging, '2px Weg haben einen Zug begonnen - ein Klick mit unruhiger Hand oeffnet dann nichts');
+  f.up(f.open, { x: 12 });
+  assert(!f.click(f.open), 'der Klick nach 2px Weg wurde verschluckt');
+});
+
+test('Mausklick: ein echter Zug verschluckt den Klick danach, auch wenn er im eigenen Slot endet', () => {
+  const f = dragFixture();
+  assert(f.down(f.open, 'mouse').dragging, 'ein Zug ueber die Schwelle hat nicht begonnen');
+  f.up(f.open, { x: 22 });
+  assert(!f.slot.classes.has('meal-slot--dragging'), 'die Zieh-Markierung bleibt nach dem Loslassen stehen');
+  assert(f.click(f.open), 'nach einem Zug zurueck in den eigenen Slot oeffnet der Klick den Dialog - der Zug war keine Bitte zum Bearbeiten');
 });
 
 test('#1317: touch-action: none sitzt am Griff der schmalen Zeile und NUR dort, sichtbar nur in der schmalen Fassung', () => {
