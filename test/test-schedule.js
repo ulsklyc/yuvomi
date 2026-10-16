@@ -3223,3 +3223,32 @@ test('#1777: die Meldung an "Bis" faellt, wenn "Von" den Zeitraum richtigstellt'
   c.from.pick('2026-10-01');
   assert.deepEqual(heard, ['2026-10-10'], 'ein frueheres "Von" ohne Meldung meldet an "Bis" nichts');
 });
+
+// R19 (Critique 2026-10-16): unter 429 warf load() durch render() in den
+// Fehlerbildschirm des Routers. Jetzt fangt die Seite den Ladefehler selbst und
+// zeigt den geteilten Ladefehler mit "Erneut versuchen" (mountLoadError).
+test('R19: ein Ladefehler (429) bleibt in der Seite - Ladefehler mit Wiederholen, kein Wurf', async () => {
+  const { installMiniDom } = await import('./mini-dom.js');
+  const restore = installMiniDom();
+  const prevStub = globalThis.__apiStub;
+  let calls = 0;
+  globalThis.__apiStub = {
+    get: async () => {
+      calls += 1;
+      const err = new Error('Too many requests');
+      err.status = 429;
+      throw err;
+    },
+  };
+  try {
+    const page = await import('../public/pages/schedule.js');
+    const container = document.createElement('div');
+    await assert.doesNotReject(() => page.render(container, { user: { id: 1, role: 'admin' } }), 'render wirft nicht in den Router');
+    assert.ok(calls > 0, 'geladen wurde');
+    const html = container.innerHTML ?? container.outerHTML ?? '';
+    assert.ok(container.querySelector?.('.schedule-page') || /schedule-page/.test(html), 'die Seite traegt den Fehler selbst');
+  } finally {
+    if (prevStub === undefined) delete globalThis.__apiStub; else globalThis.__apiStub = prevStub;
+    restore();
+  }
+});

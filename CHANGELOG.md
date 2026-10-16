@@ -243,6 +243,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The shift schedule shows its own loading error.** When the server answers "too many requests"
+  or is briefly unreachable, the Shift schedule now says so in the page with a "Try again" button,
+  instead of falling back to the app's general error screen.
 - **A busy or restarting server no longer signs you out.** When Yuvomi could not check the
   session on start - too many requests, a server error, a restarting NAS or no network - it showed
   the sign-in form although the session was still valid. Only a real "not signed in" answer leads

@@ -10,7 +10,7 @@ import { openModal, closeModal, confirmModal, confirmOverModal, advancedSection,
 import { makeSortable } from '/utils/sortable.js';
 import { memberRanks, memberRankOf } from '/utils/member-order.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
-import { emptyStateHTML, loadErrorHTML } from '/utils/empty-state.js';
+import { emptyStateHTML, loadErrorHTML, mountLoadError } from '/utils/empty-state.js';
 import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { wireScrollFade } from '/utils/ux.js';
@@ -3371,7 +3371,26 @@ export async function render(container, { user } = {}) {
   root = container;
   currentUserId = user?.id ?? null;
   canManageOthers = user?.role === 'admin';
-  await load();
+  // EIN LADEFEHLER IST EIN ZUSTAND DER SEITE (R19, Critique 2026-10-16).
+  // load() warf bis hierher durch render() in den Fehlerbildschirm des
+  // Routers - unter 429 (Rate-Limit hinter einem Proxy) stand der Schichtplan
+  // als "Seite konnte nicht geladen werden" da. Jetzt zeigt die Seite selbst
+  // den geteilten Ladefehler (Ursache aus dem Fehler, Status in den Details)
+  // mit "Erneut versuchen", wie Haushaltshilfe und Abos.
+  try {
+    await load();
+  } catch (error) {
+    if (root !== container) return;
+    container.replaceChildren();
+    container.insertAdjacentHTML('beforeend', '<div class="schedule-page app-page app-page--full" data-composition="full"></div>');
+    mountLoadError(container.querySelector('.schedule-page'), {
+      title: t('common.errorOccurred'),
+      error,
+      retryLabel: t('common.retry'),
+      onRetry: () => render(container, { user }),
+    });
+    return;
+  }
   // S-10: ein ausdruecklicher Tab-Deep-Link (Dashboard-Kachel, Erinnerung,
   // ein gemerkter Browser-Verlaufseintrag) gewinnt IMMER - er ist eine
   // explizite Anfrage, keine geerbte Sitzungsvorgabe. Nur die nackte Wurzel
