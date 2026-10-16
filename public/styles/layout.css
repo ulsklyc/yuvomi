@@ -3707,14 +3707,6 @@ html.fab-steady .page-fab {
      * ihm eine eigene Zeile gegeben: die Lead-Zone waere um eine Zeile
      * gewachsen und das Siegel stuende allein ueber dem Titel. */
     flex-basis: calc(100% - var(--seal-head-lead));
-    /* EINE TITELLAGE IN JEDEM MODUL (D8, Critique 2026-10-16): die Zeile des
-     * Titels ist mindestens ein Ziel hoch, und der Titel steht darin mittig.
-     * Ohne das richtete sich seine Lage nach den Nachbarn - neben 48px-
-     * Knoepfen stand die Schrift 3px tiefer als allein (y 11 gegen 8), und
-     * beim Modulwechsel sprang der Large Title. `align-content` zentriert im
-     * Block, die Ellipse der Basisregel bleibt. */
-    min-block-size: var(--target-base);
-    align-content: center;
     /* NOWRAP BLEIBT, DIE ELLIPSE DER BASISREGEL IST DIE ANTWORT - gemessen,
      * nicht geraten (Runde 6, Phase 0). Bei 375px stehen 343px zur Verfügung;
      * von 360 Paaren aus 24 Locales und 15 Modultiteln reisst GENAU EINES die
@@ -4164,6 +4156,21 @@ html.fab-steady .page-fab {
     display: inline-flex;
   }
 
+}
+
+/* EINE TITELLAGE IN JEDEM MODUL (D8, Critique 2026-10-16). Unter 768px ist
+ * die Zeile des Titels mindestens ein Ziel hoch, und der Titel steht darin
+ * mittig. Ohne das richtete sich seine Lage nach den Nachbarn: neben den
+ * 48px-Knoepfen der Titelzeile stand die Schrift 3px tiefer als allein
+ * (y 11 gegen 8), und beim Modulwechsel sprang der Large Title.
+ * `align-content` zentriert im Block, die Ellipse der Basisregel bleibt.
+ * NUR UNTER 768px, gemessen: ab dort steht neben dem Titel nichts (ausser
+ * im Kalender), und die Mindesthoehe kostete jeden Kopf 7px (122 -> 129). */
+@media (max-width: 767px) {
+  .page-toolbar:not(.page-toolbar--in-group) > .page-toolbar__title {
+    min-block-size: var(--target-base);
+    align-content: center;
+  }
 }
 
 /* WERKZEUGE IN DER TITELZEILE (R16, Critique 2026-10-05 P1 mobil; DESIGN.md,

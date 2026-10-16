@@ -516,8 +516,8 @@ test('#1917: der Fuss der Wand hat eine Scroll-Kante - kein Tipp, und sein Endab
 // wie jedes Modul (vorher keinen), und "Mein Konto" wiederholt "Konto" nicht.
 test('D8: die Titelzeile hat eine feste Mindesthoehe, die Einstellungen tragen am Desktop den Modulkopf', () => {
   const title = rules(layoutCss).find((r) => r.selector === '.page-toolbar:not(.page-toolbar--in-group) > .page-toolbar__title'
-    && r.at.some((a) => /max-width:\s*1023px/.test(a)) && decl(r.body, 'min-block-size'));
-  assert.ok(title, 'die Large-Title-Regel unter 1024px traegt eine Mindesthoehe');
+    && r.at.some((a) => /max-width:\s*767px/.test(a)) && decl(r.body, 'min-block-size'));
+  assert.ok(title, 'die Titelzeile traegt unter 768px eine Mindesthoehe');
   assert.equal(decl(title.body, 'min-block-size'), 'var(--target-base)', 'ein Ziel hoch, wie die Knoepfe daneben');
   assert.equal(decl(title.body, 'align-content'), 'center', 'der Titel steht in der Zeile mittig');
 
