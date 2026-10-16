@@ -136,3 +136,15 @@ test('#2019: meldet "Jetzt synchronisieren" das abgelehnte Token, baut sich die 
   assert.match(html, /settings\.outlookReauthRequired/);
   assert.match(html, /settings\.outlookReconnect/);
 });
+
+test('#2019: jeder Google-Aufruf der Karte läuft über googleCall (nur der Status nicht)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/settings/pages/sync-calendar.js', import.meta.url), 'utf8');
+  const calls = [...src.matchAll(/api\.(?:get|post|put|patch|delete)\(\s*['`]\/calendar\/google\/([^'`?]*)/g)];
+  assert.ok(calls.length >= 6, `zu wenige Google-Aufrufe gefunden (${calls.length})`);
+  const unwrapped = calls
+    .filter((m) => m[1] !== 'status')
+    .filter((m) => !/googleCall\(\(\) => $/.test(src.slice(Math.max(0, m.index - 20), m.index)))
+    .map((m) => m[0]);
+  assert.deepEqual(unwrapped, [], 'ein Google-Aufruf der Karte umgeht handleReauth');
+});

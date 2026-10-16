@@ -25,6 +25,24 @@ import {
 import { getUserId } from './helpers.js';
 
 const log = createLogger('Calendar');
+
+/**
+ * EINE Stelle für die Fehlerantwort jeder Google-Route, die Google anspricht
+ * oder einen Sync anstößt (#2019): ein abgelehntes Token wird zum 409 mit dem
+ * Grund `google_reauth_required`, auf den die Einstellungen die Karte auf
+ * "neu verbinden" umstellen; alles andere bleibt ein 500. Welche Routen das
+ * sind, zählt test:google-outbound auf - eine neue Google-Route ohne Eintrag
+ * dort ist rot.
+ */
+function sendGoogleError(res, err) {
+  if (err?.reauthRequired) {
+    return res.status(409).json({
+      error: 'Google sign-in expired - reconnect required.', code: 409, reason: 'google_reauth_required',
+    });
+  }
+  log.error('', err);
+  return res.status(500).json({ error: err.message, code: 500 });
+}
 const router = express.Router();
 
 // --------------------------------------------------------
@@ -86,14 +104,7 @@ router.post('/google/sync', requireAdmin, async (req, res) => {
     const { lastSync } = googleCalendar.getStatus();
     res.json({ ok: true, lastSync });
   } catch (err) {
-    // Wie GET /google/calendars (#2019): die Karte stellt auf "neu verbinden" um.
-    if (err?.reauthRequired) {
-      return res.status(409).json({
-        error: 'Google sign-in expired - reconnect required.', code: 409, reason: 'google_reauth_required',
-      });
-    }
-    log.error('', err);
-    res.status(500).json({ error: err.message, code: 500 });
+    sendGoogleError(res, err);
   }
 });
 
@@ -125,20 +136,14 @@ router.get('/google/status', (req, res) => {
  * dem Warten auf Google - deshalb `refuseWhileRestoring` (#1551).
  */
 router.get('/google/calendars', requireAdmin, refuseWhileRestoring, async (req, res) => {
-  // Google nimmt das Token nicht mehr an (#2019): ein eigener Grund statt einer
-  // leeren Liste oder eines 500, damit die Einstellungen die Karte auf
-  // "neu verbinden" umstellen, auch wenn ihr Status von davor stammt.
-  const reauthRequired = () => res.status(409).json({
-    error: 'Google sign-in expired - reconnect required.', code: 409, reason: 'google_reauth_required',
-  });
   try {
     const data = await googleCalendar.listCalendars();
-    if (googleCalendar.getStatus().needsReauth) return reauthRequired();
+    // Bei abgelehntem Token liefert der Dienst keine Ziele, ohne Google zu
+    // fragen (#2019) - hier ist das kein leerer Kalender, sondern "neu verbinden".
+    if (googleCalendar.getStatus().needsReauth) return sendGoogleError(res, { reauthRequired: true });
     res.json({ data });
   } catch (err) {
-    if (err?.reauthRequired) return reauthRequired();
-    log.error('', err);
-    res.status(500).json({ error: err.message, code: 500 });
+    sendGoogleError(res, err);
   }
 });
 
@@ -157,13 +162,15 @@ router.patch('/google/calendars', requireAdmin, async (req, res) => {
     return res.status(400).json({ error: 'enabled muss ein Boolean sein.', code: 400 });
   }
   try {
+    // Abgelehntes Token (#2019): nichts an der Auswahl ändern, was der Sync
+    // danach doch nicht abholen kann - die Karte stellt auf "neu verbinden" um.
+    if (googleCalendar.getStatus().needsReauth) return sendGoogleError(res, { reauthRequired: true });
     googleCalendar.setCalendarEnabled(calendarId, enabled);
     await googleCalendar.sync();
     const { lastSync } = googleCalendar.getStatus();
     res.json({ ok: true, lastSync });
   } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: err.message, code: 500 });
+    sendGoogleError(res, err);
   }
 });
 

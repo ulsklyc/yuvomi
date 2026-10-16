@@ -2247,6 +2247,58 @@ test('#2019: GET /google/calendars meldet ein abgelehntes Token mit eigenem Grun
   assert.equal((await res.json()).reason, 'google_reauth_required');
 });
 
+// Guard (#2019): JEDE Google-Route des Kalender-Routers ist eingeordnet. Wer
+// Google anspricht oder einen Sync anstößt, meldet ein abgelehntes Token als 409
+// mit Grund; wer es nicht tut, steht mit Begründung in der zweiten Liste. Eine
+// neue /google/-Route in keiner der beiden ist rot.
+const GOOGLE_ROUTES_REACHING_GOOGLE = {
+  'GET /google/calendars': null,
+  'PATCH /google/calendars': { calendarId: 'primary', enabled: true },
+  'POST /google/sync': {},
+};
+const GOOGLE_ROUTES_LOCAL_ONLY = {
+  'GET /google/auth': 'baut nur die OAuth-Adresse',
+  'GET /google/callback': 'Weiterleitung zurück in die Einstellungen; das neue Token löscht den Marker vor dem Sync',
+  'GET /google/status': 'liest sync_config',
+  'DELETE /google/disconnect': 'löscht lokal',
+  'DELETE /google/mirrored-events': 'löscht lokal',
+  'PUT /google/readonly': 'Schalter in sync_config',
+};
+
+function routesOf(router, prefix = '') {
+  const found = [];
+  for (const layer of router.stack ?? []) {
+    if (layer.route) {
+      for (const method of Object.keys(layer.route.methods)) {
+        found.push(`${method.toUpperCase()} ${prefix}${layer.route.path}`);
+      }
+    } else if (layer.handle?.stack) {
+      found.push(...routesOf(layer.handle, prefix));
+    }
+  }
+  return found;
+}
+
+test('#2019: jede Google-Route ist eingeordnet, und jede, die Google anspricht, meldet ein abgelehntes Token als 409', async () => {
+  const google = [...new Set(routesOf(calendarRouter).filter((r) => r.split(' ')[1].startsWith('/google/')))].sort();
+  assert.ok(google.length >= 9, `zu wenige Google-Routen gefunden (${google.length}) - die Aufzählung greift nicht`);
+  assert.deepEqual(google,
+    [...Object.keys(GOOGLE_ROUTES_REACHING_GOOGLE), ...Object.keys(GOOGLE_ROUTES_LOCAL_ONLY)].sort(),
+    'eine Google-Route ist in keiner Liste (oder eine gelistete gibt es nicht mehr)');
+
+  for (const [route, body] of Object.entries(GOOGLE_ROUTES_REACHING_GOOGLE)) {
+    reset();
+    db.prepare('DELETE FROM google_calendar_selection').run();
+    db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('google_needs_reauth', '1')").run();
+    const [method, path] = route.split(' ');
+    const res = await callRoute(method, path, body ?? undefined);
+    assert.equal(res.status, 409, `${route}: Status`);
+    assert.equal((await res.json()).reason, 'google_reauth_required', `${route}: Grund`);
+  }
+  assert.deepEqual(__test.listSelection().filter((r) => r.enabled), [],
+    'PATCH ändert bei abgelehntem Token die Auswahl nicht');
+});
+
 test('#2019: POST /google/sync meldet ein abgelehntes Token mit demselben Grund', async () => {
   reset();
   db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('google_needs_reauth', '1')").run();
