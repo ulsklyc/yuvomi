@@ -314,13 +314,14 @@ async function loadData() {
   state.currency = prefs.data?.currency ?? 'EUR';
 }
 
-function renderTabButton(tab, icon, label) {
+// TEXT-REITER OHNE ICON (Critique 2026-10-16, D3): bis zu sieben Bereiche
+// sind Text-Reiter wie im Budget, ohne Glyphe davor.
+function renderTabButton(tab, label) {
   const on = state.tab === tab;
   return `
     <button class="housekeeping-tab sub-tab${on ? ' sub-tab--active' : ''}" type="button" role="tab"
             data-tab-id="${esc(tab)}" aria-controls="housekeeping-content"
             aria-selected="${on ? 'true' : 'false'}"${on ? ' aria-current="page"' : ''} tabindex="${on ? '0' : '-1'}">
-      <i class="sub-tab__icon" data-lucide="${esc(icon)}" aria-hidden="true"></i>
       <span class="sub-tab__label">${esc(label)}</span>
     </button>
   `;
@@ -396,10 +397,10 @@ function renderShell(container) {
         <h1 class="page-toolbar__title" id="housekeeping-title">${esc(t('housekeeping.title'))}</h1>
         <div class="page-toolbar__actions"></div>
         <nav class="housekeeping-tabs page-toolbar__bar" role="tablist" aria-label="${esc(t('housekeeping.bottomNav'))}">
-          ${renderTabButton('dashboard', 'layout-dashboard', t('housekeeping.dashboard'))}
-          ${renderTabButton('tasks', 'list-checks', t('housekeeping.tasks'))}
-          ${renderTabButton('reports', 'file-text', t('housekeeping.reports'))}
-          ${renderTabButton('staff', 'users-round', t('housekeeping.staffTitle'))}
+          ${renderTabButton('dashboard', t('housekeeping.dashboard'))}
+          ${renderTabButton('tasks', t('housekeeping.tasks'))}
+          ${renderTabButton('reports', t('housekeeping.reports'))}
+          ${renderTabButton('staff', t('housekeeping.staffTitle'))}
         </nav>
       </header>
       <div class="housekeeping-period" id="housekeeping-period" hidden></div>

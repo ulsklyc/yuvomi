@@ -21703,3 +21703,16 @@ test('die offene Auswahlliste traegt Flaeche und Farbschema des Themes (#2022)',
   assert.equal(decl(option.body, 'color'), 'var(--color-text-primary)',
     'die Option traegt ihre Schrift selbst, sonst erbt sie die Sekundaerfarbe der randlosen Auswahl');
 });
+
+// D3 (Critique 2026-10-16): bis zu sieben Bereiche sind Text-Reiter OHNE Icon.
+// Die Belohnungen und die Haushaltshilfe trugen als einzige Module eine Glyphe
+// vor jedem Reiter - dieselbe Leiste wie im Budget und im Schichtplan in einer
+// zweiten Form. (Der Lese-/Bearbeiten-Umschalter im Notizdialog ist keine
+// Unternavigation und bleibt aussen vor.)
+test('D3: die Unternavigation der Module ist Text, keine Icon-Reiter', () => {
+  for (const page of ['budget', 'rewards', 'housekeeping', 'schedule']) {
+    const src = read(`../public/pages/${page}.js`);
+    assert.match(src, /class="[^"]*\bsub-tab\b/, `Vorbedingung: ${page} rendert Reiter`);
+    assert.doesNotMatch(src, /sub-tab__icon/, `${page}: Reiter tragen nur ihr Wort`);
+  }
+});

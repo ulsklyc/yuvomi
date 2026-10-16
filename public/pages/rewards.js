@@ -265,13 +265,15 @@ function balanceOf(userId) {
 // Shell + Tabs
 // --------------------------------------------------------
 
-function tabButton(tab, icon, label) {
+// TEXT-REITER OHNE ICON (Critique 2026-10-16, D3): bis zu sieben Bereiche
+// sind Text-Reiter wie im Budget. Die Belohnungen trugen als einziges Modul
+// Pokal, Geschenk und Uhr davor - dieselbe Leiste in zweiter Form.
+function tabButton(tab, label) {
   const on = state.tab === tab;
   return `
     <button class="rw-tab sub-tab${on ? ' sub-tab--active' : ''}" type="button" role="tab"
             data-tab-id="${esc(tab)}" aria-controls="rewards-content"
             aria-selected="${on ? 'true' : 'false'}"${on ? ' aria-current="page"' : ''} tabindex="${on ? '0' : '-1'}">
-      <i class="sub-tab__icon" data-lucide="${esc(icon)}" aria-hidden="true"></i>
       <span class="sub-tab__label">${esc(label)}</span>
     </button>`;
 }
@@ -303,9 +305,9 @@ function renderShell(container) {
         <h1 class="page-toolbar__title" id="rewards-title">${esc(t('rewards.title'))}</h1>
         <div class="page-toolbar__actions"></div>
         <nav class="rewards-tabs page-toolbar__bar" role="tablist" aria-label="${esc(t('rewards.title'))}">
-          ${tabButton('overview', 'trophy', t('rewards.tabOverview'))}
-          ${tabButton('catalog', 'gift', t('rewards.tabCatalog'))}
-          ${tabButton('ledger', 'history', t('rewards.tabLedger'))}
+          ${tabButton('overview', t('rewards.tabOverview'))}
+          ${tabButton('catalog', t('rewards.tabCatalog'))}
+          ${tabButton('ledger', t('rewards.tabLedger'))}
         </nav>
       </header>
       <div class="rewards-content" id="rewards-content"></div>
