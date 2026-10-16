@@ -59,6 +59,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   button for rename, move up, move down and delete instead of four icons, so names such as
   "Vorratsschrank" are no longer cut to five letters on a phone. Tapping the name still renames,
   and dragging still reorders.
+- **The calendar on a phone no longer shows half-cut rows.** In the agenda, a day heading that sticks
+  to the top covers the event card scrolling beneath it instead of letting a strip of its text show
+  above. The week view opens with a full hour at the top, also late in the day.
 - **Module headers on phones and tablets take less room.** Shift plan, Rewards and Household help
   show their tabs in the title row (one row instead of two, 65px on a phone). The budget header
   folds to one row while you scroll, with the tabs beside the month. On a tablet the title, search

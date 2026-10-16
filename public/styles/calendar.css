@@ -1846,6 +1846,24 @@
   z-index: var(--z-sticky);
 }
 
+/* DIE LUECKE UEBER DEM ANGEDOCKTEN KOPF IST DECKEND (R19, Critique 2026-10-16).
+ * Der Port (`.agenda-view`) traegt oben --space-2 Polster, und ein klebendes
+ * Element haelt an der Polsterkante, nicht an der Portkante: zwischen Kopf
+ * (Bildschirm y 65) und Tageskopf (y 73) lief die halb gescrollte Karte
+ * darueber durch, ihre Textzeilen angeschnitten. Die Flaeche des Kopfs reicht
+ * deshalb um genau dieses Polster nach oben - Malerei, kein Layout: die Zeile
+ * steht, wo sie stand, und ungedockt faellt das Band in den Abstand zum Tag
+ * davor (mindestens --space-3). */
+.agenda-day__header::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 100%;
+  block-size: var(--space-2);
+  background-color: inherit;
+  pointer-events: none;
+}
+
 .agenda-day__date {
   font-size: var(--text-sm);
   font-weight: var(--font-weight-bold);

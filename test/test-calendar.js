@@ -6070,6 +6070,28 @@ test('Seitenleiste: erst ab 86.25rem Kalenderflaeche, nur mit Leiste rueckt die 
   assert(/syncHeadToScrollport\(body\);\s*renderSidebar\(\);\s*\}/.test(src), 'jede Ansicht zeichnet die Leiste mit');
 });
 
+// R19 (Critique 2026-10-16, Kalender mobil): zwei Anschnitte.
+test('R19 Agenda: ueber dem angedockten Tageskopf laeuft keine Karte durch', () => {
+  const rules = [...eachRule(calendarCss)];
+  const head = rules.find((r) => r.selector.trim() === '.agenda-day__header' && !r.at.length);
+  assert(/position:\s*sticky/.test(head?.body ?? '') && /background-color:\s*var\(--color-bg\)/.test(head.body), 'der Kopf klebt deckend');
+  const band = rules.find((r) => r.selector.trim() === '.agenda-day__header::before');
+  assert(band, 'die Flaeche reicht nicht ueber den Kopf hinaus - im Polster des Ports (8px) lief die Karte durch');
+  assert(/bottom:\s*100%/.test(band.body) && /block-size:\s*var\(--space-2\)/.test(band.body) && /background-color:\s*inherit/.test(band.body),
+    'das Band ist genau das Polster des Ports hoch, in der Farbe des Kopfs');
+  const port = rules.find((r) => r.selector.trim() === '.agenda-view' && !r.at.length);
+  assert(/padding:\s*var\(--space-2\)/.test(port?.body ?? ''), 'Vorbedingung: der Port polstert oben --space-2 - aendert sich das, zieht das Band mit');
+});
+
+test('R19 Woche: die erste sichtbare Stunde steht ganz da, auch am Scrollende', () => {
+  const h = 56;
+  assert(calendarHelpers.alignedHourScroll({ hour: 9, hourHeight: h, max: 2000 }) === 7 * h, 'eine gute Stunde vor jetzt, auf die volle Stunde abgerundet');
+  assert(calendarHelpers.alignedHourScroll({ hour: 22, hourHeight: h, max: 806 }) === 14 * h,
+    'am Abend deckelt das Scrollende - und auch dort beginnt die Ansicht mit einer vollen Stunde (vorher 806px = 14:23)');
+  assert(calendarHelpers.alignedHourScroll({ hour: 0, hourHeight: h, max: 806 }) === 0);
+  assert(calendarHelpers.alignedHourScroll({ hour: 5, hourHeight: 0, max: 806 }) === 0, 'ohne Hoehe kein Sprung');
+});
+
 // --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------

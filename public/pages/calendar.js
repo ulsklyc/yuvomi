@@ -4475,7 +4475,29 @@ function wireTimeGridCreate(surface, {
 function scrollToHour(scroll, body) {
   if (!scroll || !body) return;
   const hourHeight = body.getBoundingClientRect().height / 24;
-  scroll.scrollTop = Math.max(0, nowFields().hour * hourHeight - 80);
+  scroll.scrollTop = alignedHourScroll({
+    hour: nowFields().hour,
+    hourHeight,
+    max: scroll.scrollHeight - scroll.clientHeight,
+  });
+}
+
+/**
+ * DIE ERSTE SICHTBARE STUNDE STEHT GANZ DA (R19, Critique 2026-10-16). Der
+ * Raster-Scroller sprang auf "jetzt minus 80px" - mitten in eine Stunde, und
+ * am Abend auf das Scrollende, das genauso mitten in einer Stunde liegt: mobil
+ * stand die Reihe 14/15 Uhr halb unter der Ganztagszone, ihre Uhrzeit und
+ * Terminkoepfe angeschnitten. Jetzt rundet der Startpunkt auf die volle
+ * Stunde ab, auch dort, wo das Scrollende ihn deckelt. Die Wahl, WELCHE
+ * Stunde oben steht, bleibt (eine gute Stunde vor jetzt).
+ * @param {{hour: number, hourHeight: number, max: number}} opts
+ * @returns {number} scrollTop in px, ein Vielfaches der Stundenhoehe
+ */
+function alignedHourScroll({ hour, hourHeight, max }) {
+  if (!(hourHeight > 0)) return 0;
+  const wanted = Math.max(0, hour * hourHeight - 80);
+  const capped = Math.min(wanted, Math.max(0, max));
+  return Math.floor(capped / hourHeight + 1e-6) * hourHeight;
 }
 
 /**
@@ -6430,6 +6452,7 @@ async function openFoundEvent(ev) {
 }
 
 export const __test = {
+  alignedHourScroll,
   // R19: die Seitenleiste ab ca. 1600px - Mini-Monat, Filter aus EINER Quelle, Als Naechstes.
   miniMonthHtml, sidebarFiltersHtml, calendarFilterParts, upNextEvents,
   // Sonde 19 (#882): eine Zeile nur, wenn sie passt.
