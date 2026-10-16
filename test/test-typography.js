@@ -1005,7 +1005,7 @@ test('R19 Gesundheit: keine Schrift unter Caption 2, eine Flag-Sprache, ein Diag
     const m = rule.body.match(/font-size:\s*(\d+(?:\.\d+)?)px/);
     if (m) assert.ok(Number(m[1]) >= 11, `${rule.selector}: ${m[0]}`);
   }
-  const body = (sel) => [...eachRule(css)].find((r) => r.selector.trim() === sel && !r.at.length)?.body ?? '';
+  const body = (sel) => [...eachRule(css)].find((r) => !r.at.length && r.selector.split(',').map((x) => x.trim()).includes(sel))?.body ?? '';
   for (const sel of ['.health-lab-flag--low', '.health-lab-flag--high', '.health-lab-rows__row--low .health-lab-rows__value', '.health-lab-rows__row--high .health-lab-rows__value']) {
     assert.match(body(sel), /color:\s*var\(--color-warning-ink\)/, `${sel} spricht nicht die Flag-Sprache der Befundkarte`);
   }

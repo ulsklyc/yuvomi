@@ -1500,10 +1500,7 @@ button.health-med-card:hover {
   font-size: var(--text-sm);
 }
 
-.health-lab-rows__row--low .health-lab-rows__value {
-  color: var(--color-warning-ink);
-}
-
+.health-lab-rows__row--low .health-lab-rows__value,
 .health-lab-rows__row--high .health-lab-rows__value {
   color: var(--color-warning-ink);
 }
@@ -1557,9 +1554,9 @@ button.health-med-card:hover {
   white-space: nowrap;
 }
 
-.health-lab-flag--low    { color: var(--color-warning-ink); }
-.health-lab-flag--normal { color: var(--color-success); }
+.health-lab-flag--low,
 .health-lab-flag--high   { color: var(--color-warning-ink); }
+.health-lab-flag--normal { color: var(--color-success); }
 .health-lab-flag--none   { color: var(--color-text-tertiary, var(--color-text-secondary)); }
 
 /* Analyt-Trend */
