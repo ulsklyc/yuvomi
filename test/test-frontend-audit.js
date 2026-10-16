@@ -21494,3 +21494,43 @@ test('friendlyError hat keinen neuen Aufrufer, die verbliebenen stehen als Zahl 
     assert.equal(FRIENDLY_ERROR_CALLERS.has(name), false, `${name} steht auf 0 und gehoert nicht in die Liste`);
   }
 });
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Die offene Auswahlliste bleibt im Theme (#2022)
+ *
+ * Die randlose Auswahl der Formularzeile (layout.css, `.form-row__control >
+ * select`) ist in Ruhe durchsichtig. Chrome unter Windows malt die offene
+ * Liste mit der Flaeche des `select`, und wo die durchsichtig ist, mit der
+ * Vorgabe seines Farbschemas - weiss, solange niemand `color-scheme` setzt.
+ * Der Text der Optionen erbt dagegen die helle Dark-Schrift: hell auf weiss,
+ * unlesbar, sobald die Maus die Zeile verlaesst (dann faellt die
+ * Hover-Flaeche weg). Zwei Zusagen halten das: das Farbschema folgt beiden
+ * Dark-Wegen (System und ausdrueckliche Wahl), und die Option traegt selbst
+ * eine deckende Flaeche samt Schrift aus den Tokens.
+ * ──────────────────────────────────────────────────────────────────────────── */
+test('die offene Auswahlliste traegt Flaeche und Farbschema des Themes (#2022)', () => {
+  const tokensCss = readFileSync(new URL('../public/styles/tokens.css', import.meta.url), 'utf8');
+  const decl = (body, prop) => body.match(new RegExp(`(?:^|[;{\\s])${prop}\\s*:\\s*([^;]+)`))?.[1].trim();
+
+  const baseRoot = [...eachRule(tokensCss)].find((rule) => rule.at.length === 0 && rule.selector.trim() === ':root');
+  assert.ok(baseRoot, 'die Basisregel `:root` in tokens.css wurde nicht gefunden');
+  assert.equal(decl(baseRoot.body, 'color-scheme'), 'light',
+    'die Basis von tokens.css nennt ihr Farbschema nicht (`color-scheme: light`)');
+
+  for (const [name, block] of [['System-Dark', darkSchemeBlock(tokensCss)], ['data-theme="dark"', darkAttrBlock(tokensCss)]]) {
+    assert.ok(block, `der Dark-Block (${name}) in tokens.css wurde nicht gefunden`);
+    assert.equal(decl(block[1], 'color-scheme'), 'dark',
+      `der Dark-Block (${name}) setzt kein \`color-scheme: dark\` - die offene Auswahlliste und andere native Teile bleiben hell`);
+  }
+
+  const layoutCss = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const parts = (rule) => rule.selector.split(',').map((s) => s.trim().replace(/\s+/g, ' '));
+  const optionRules = [...eachRule(layoutCss)].filter((rule) => rule.at.length === 0
+    && parts(rule).includes('select.form-input option') && parts(rule).includes('select.input option'));
+  assert.equal(optionRules.length, 1, 'layout.css hat keine (oder mehr als eine) Regel `select.form-input option, select.input option`');
+  const [option] = optionRules;
+  assert.match(decl(option.body, 'background-color') ?? '', /^var\(--color-[\w-]+\)$/,
+    'die Option braucht eine deckende Flaeche aus einem Token - durchsichtig malt Chrome sie weiss');
+  assert.equal(decl(option.body, 'color'), 'var(--color-text-primary)',
+    'die Option traegt ihre Schrift selbst, sonst erbt sie die Sekundaerfarbe der randlosen Auswahl');
+});

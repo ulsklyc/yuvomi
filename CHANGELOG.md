@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A dropdown's open list stays dark in dark mode** (#2022). In Chrome on Windows the list
+  of a dropdown inside a form row, such as the type of a health measurement, turned white once
+  the pointer left it, with light text on it that was hard to read. The list now keeps the
+  colors of the current theme, and scrollbars and other built-in browser controls follow dark
+  mode as well.
+
 - **Documents: leaving and coming back no longer leaves stale data on the page** (#2005). An
   answer that arrived only after you had left Documents and opened it again could overwrite the
   members, the DMS accounts or the admin state the new page had just loaded, and the next dialog
