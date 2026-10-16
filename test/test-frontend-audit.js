@@ -2721,7 +2721,7 @@ test('settings shell falls back to the domains overview for orphaned active leav
   // Ein Blatt ohne verfuegbaren Bereich meldet sich und faellt auf die Wurzel
   // (die gruppierte Liste) zurueck, statt ein Blatt ohne Rueckweg zu rendern.
   assert.match(source, /if \(activeLeaf && !leafDomain\)\s*\{[\s\S]*?console\.error\(/);
-  assert.match(source, /if \(activeLeaf && leafDomain\)\s*\{[\s\S]*?await renderLeafContent\(content,\s*activeLeaf,\s*leafDomain,\s*user,\s*query\)[\s\S]*?return;\s*\}\s*renderOverview\(content,\s*domains,\s*user\)/);
+  assert.match(source, /if \(activeLeaf && leafDomain\)\s*\{[\s\S]*?await renderLeafContent\(content,\s*activeLeaf,\s*leafDomain,\s*user,\s*query\)[\s\S]*?return;\s*\}\s*(?:const paintOverview = \(\) => \{\s*)?renderOverview\(content,\s*domains,\s*user\)/);
 });
 
 test('router hides inactive overlays from keyboard focus', () => {
