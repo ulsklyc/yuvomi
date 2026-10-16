@@ -1795,7 +1795,12 @@
         "loanDueDayInvalid": "Masukkan tanggal dari 1 sampai 31, atau kosongkan",
         "loanPaymentAddedOnToast": "Pembayaran dicatat per {{date}}",
         "planTargetOf": "dari {{amount}}",
-        "planTargetSr": "Target {{amount}}, terpakai {{percent}}"
+        "planTargetSr": "Target {{amount}}, terpakai {{percent}}",
+        "ledgerSortLabel": "Urutan",
+        "ledgerSortDate": "Menurut tanggal",
+        "ledgerSortAmount": "Menurut jumlah",
+        "ledgerSortActive": "Urutan: {{sort}}",
+        "ledgerAccountsAll": "Semua akun"
     },
     "settings": {
         "healthCycleEnableLabel": "Tampilkan tab siklus",

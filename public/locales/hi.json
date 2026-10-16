@@ -1781,7 +1781,12 @@
         "loanDueDayInvalid": "1 से 31 तक का दिन दर्ज करें या खाली छोड़ें",
         "loanPaymentAddedOnToast": "भुगतान {{date}} की तारीख पर दर्ज किया गया",
         "planTargetOf": "{{amount}} में से",
-        "planTargetSr": "लक्ष्य {{amount}}, {{percent}} उपयोग हुआ"
+        "planTargetSr": "लक्ष्य {{amount}}, {{percent}} उपयोग हुआ",
+        "ledgerSortLabel": "क्रम",
+        "ledgerSortDate": "तारीख के अनुसार",
+        "ledgerSortAmount": "राशि के अनुसार",
+        "ledgerSortActive": "क्रम: {{sort}}",
+        "ledgerAccountsAll": "सभी खाते"
     },
     "settings": {
         "healthCycleEnableLabel": "चक्र टैब दिखाएँ",

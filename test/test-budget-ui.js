@@ -2751,7 +2751,8 @@ test('Listenkopf: Kategorien verwalten und CSV stehen in EINEM Menue, nicht als 
     });
     const html = budgetUi.listToolsMenuHtml();
     assert.equal((html.match(/popovertarget="budget-list-tools-menu"/g) ?? []).length, 1, 'genau ein Ausloeser');
-    assert.equal((html.match(/<button\b/g) ?? []).length, 3, 'Ausloeser + Gruppierung + Kategorien, nichts sonst als Knopf');
+    // Ohne die Einfachauswahlen fuer Sortierung und Konto (R19, test:budget-ledger-order).
+    assert.equal((html.match(/<button\b(?![^>]*role="menuitemradio")/g) ?? []).length, 3, 'Ausloeser + Gruppierung + Kategorien, nichts sonst als Knopf');
     const menu = html.slice(html.indexOf('<div class="popover-menu'));
     assert.match(menu, /role="menu"/);
     assert.match(menu, /id="budget-manage-categories"[\s\S]*budget\.manageCategories/, 'Kategorien verwalten im Menue');

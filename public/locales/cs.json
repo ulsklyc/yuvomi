@@ -1859,7 +1859,12 @@
         "loanDueDayInvalid": "Zadejte den od 1 do 31, nebo pole nechte prázdné",
         "loanPaymentAddedOnToast": "Platba zaznamenána k datu {{date}}",
         "planTargetOf": "z {{amount}}",
-        "planTargetSr": "Cíl {{amount}}, vyčerpáno {{percent}}"
+        "planTargetSr": "Cíl {{amount}}, vyčerpáno {{percent}}",
+        "ledgerSortLabel": "Řazení",
+        "ledgerSortDate": "Podle data",
+        "ledgerSortAmount": "Podle částky",
+        "ledgerSortActive": "Řazení: {{sort}}",
+        "ledgerAccountsAll": "Všechny účty"
     },
     "settings": {
         "healthCycleEnableLabel": "Zobrazit kartu cyklu",

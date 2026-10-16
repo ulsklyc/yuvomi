@@ -2016,7 +2016,12 @@
         "loanDueDayInvalid": "أدخل يوماً من 1 إلى 31 أو اترك الحقل فارغاً",
         "loanPaymentAddedOnToast": "تم تسجيل الدفع بتاريخ {{date}}",
         "planTargetOf": "من {{amount}}",
-        "planTargetSr": "الهدف {{amount}}، تم استخدام {{percent}}"
+        "planTargetSr": "الهدف {{amount}}، تم استخدام {{percent}}",
+        "ledgerSortLabel": "الترتيب",
+        "ledgerSortDate": "حسب التاريخ",
+        "ledgerSortAmount": "حسب المبلغ",
+        "ledgerSortActive": "الترتيب: {{sort}}",
+        "ledgerAccountsAll": "كل الحسابات"
     },
     "settings": {
         "healthCycleEnableLabel": "إظهار علامة تبويب الدورة",

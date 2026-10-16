@@ -1795,7 +1795,12 @@
         "loanDueDayInvalid": "Maglagay ng araw mula 1 hanggang 31, o iwanang blangko",
         "loanPaymentAddedOnToast": "Naitala ang bayad sa petsang {{date}}",
         "planTargetOf": "sa {{amount}}",
-        "planTargetSr": "Target {{amount}}, nagamit ang {{percent}}"
+        "planTargetSr": "Target {{amount}}, nagamit ang {{percent}}",
+        "ledgerSortLabel": "Pagkakasunod",
+        "ledgerSortDate": "Ayon sa petsa",
+        "ledgerSortAmount": "Ayon sa halaga",
+        "ledgerSortActive": "Pagkakasunod: {{sort}}",
+        "ledgerAccountsAll": "Lahat ng account"
     },
     "settings": {
         "healthCycleEnableLabel": "Ipakita ang tab ng siklo",

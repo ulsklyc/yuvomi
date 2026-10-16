@@ -1795,7 +1795,12 @@
         "loanDueDayInvalid": "Tag von 1 bis 31 eingeben oder leer lassen",
         "loanPaymentAddedOnToast": "Zahlung erfasst zum {{date}}",
         "planTargetOf": "von {{amount}}",
-        "planTargetSr": "Ziel {{amount}}, zu {{percent}} ausgeschöpft"
+        "planTargetSr": "Ziel {{amount}}, zu {{percent}} ausgeschöpft",
+        "ledgerSortLabel": "Sortierung",
+        "ledgerSortDate": "Nach Datum",
+        "ledgerSortAmount": "Nach Betrag",
+        "ledgerSortActive": "Sortierung: {{sort}}",
+        "ledgerAccountsAll": "Alle Konten"
     },
     "settings": {
         "healthCycleEnableLabel": "Zyklus-Tab anzeigen",

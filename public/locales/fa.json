@@ -1795,7 +1795,12 @@
         "loanDueDayInvalid": "روزی از 1 تا 31 وارد کنید یا خالی بگذارید",
         "loanPaymentAddedOnToast": "پرداخت با تاریخ {{date}} ثبت شد",
         "planTargetOf": "از {{amount}}",
-        "planTargetSr": "هدف {{amount}}، {{percent}} مصرف شده"
+        "planTargetSr": "هدف {{amount}}، {{percent}} مصرف شده",
+        "ledgerSortLabel": "مرتب‌سازی",
+        "ledgerSortDate": "بر اساس تاریخ",
+        "ledgerSortAmount": "بر اساس مبلغ",
+        "ledgerSortActive": "مرتب‌سازی: {{sort}}",
+        "ledgerAccountsAll": "همه حساب‌ها"
     },
     "settings": {
         "healthCycleEnableLabel": "نمایش برگهٔ چرخه",

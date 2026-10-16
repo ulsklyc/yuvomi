@@ -1781,7 +1781,12 @@
         "loanDueDayInvalid": "Voer een dag van 1 tot en met 31 in of laat het veld leeg",
         "loanPaymentAddedOnToast": "Betaling vastgelegd op {{date}}",
         "planTargetOf": "van {{amount}}",
-        "planTargetSr": "Doel {{amount}}, {{percent}} gebruikt"
+        "planTargetSr": "Doel {{amount}}, {{percent}} gebruikt",
+        "ledgerSortLabel": "Sortering",
+        "ledgerSortDate": "Op datum",
+        "ledgerSortAmount": "Op bedrag",
+        "ledgerSortActive": "Sortering: {{sort}}",
+        "ledgerAccountsAll": "Alle rekeningen"
     },
     "settings": {
         "healthCycleEnableLabel": "Cyclustabblad tonen",

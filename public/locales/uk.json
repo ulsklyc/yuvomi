@@ -1937,7 +1937,12 @@
         "loanDueDayInvalid": "Вкажіть день від 1 до 31 або залиште поле порожнім",
         "loanPaymentAddedOnToast": "Платіж записано на дату {{date}}",
         "planTargetOf": "з {{amount}}",
-        "planTargetSr": "Ціль {{amount}}, використано {{percent}}"
+        "planTargetSr": "Ціль {{amount}}, використано {{percent}}",
+        "ledgerSortLabel": "Сортування",
+        "ledgerSortDate": "За датою",
+        "ledgerSortAmount": "За сумою",
+        "ledgerSortActive": "Сортування: {{sort}}",
+        "ledgerAccountsAll": "Усі рахунки"
     },
     "settings": {
         "healthCycleEnableLabel": "Показати вкладку циклу",

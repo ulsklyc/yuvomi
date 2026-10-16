@@ -1781,7 +1781,12 @@
         "loanDueDayInvalid": "1から31の日付を入力するか、空欄にしてください",
         "loanPaymentAddedOnToast": "{{date}}付で返済を記録しました",
         "planTargetOf": "{{amount}} 中",
-        "planTargetSr": "目標 {{amount}}、{{percent}} 使用済み"
+        "planTargetSr": "目標 {{amount}}、{{percent}} 使用済み",
+        "ledgerSortLabel": "並べ替え",
+        "ledgerSortDate": "日付順",
+        "ledgerSortAmount": "金額順",
+        "ledgerSortActive": "並べ替え: {{sort}}",
+        "ledgerAccountsAll": "すべての口座"
     },
     "settings": {
         "healthCycleEnableLabel": "周期タブを表示",

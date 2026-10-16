@@ -1781,7 +1781,12 @@
         "loanDueDayInvalid": "Nhập ngày từ 1 đến 31 hoặc để trống",
         "loanPaymentAddedOnToast": "Đã ghi nhận thanh toán vào ngày {{date}}",
         "planTargetOf": "trên {{amount}}",
-        "planTargetSr": "Mục tiêu {{amount}}, đã dùng {{percent}}"
+        "planTargetSr": "Mục tiêu {{amount}}, đã dùng {{percent}}",
+        "ledgerSortLabel": "Sắp xếp",
+        "ledgerSortDate": "Theo ngày",
+        "ledgerSortAmount": "Theo số tiền",
+        "ledgerSortActive": "Sắp xếp: {{sort}}",
+        "ledgerAccountsAll": "Tất cả tài khoản"
     },
     "settings": {
         "healthCycleEnableLabel": "Hiện tab chu kỳ",

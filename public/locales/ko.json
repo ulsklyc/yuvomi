@@ -1795,7 +1795,12 @@
         "loanDueDayInvalid": "1에서 31 사이의 날짜를 입력하거나 비워 두세요",
         "loanPaymentAddedOnToast": "{{date}} 날짜로 결제가 기록되었습니다",
         "planTargetOf": "{{amount}} 중",
-        "planTargetSr": "목표 {{amount}}, {{percent}} 사용"
+        "planTargetSr": "목표 {{amount}}, {{percent}} 사용",
+        "ledgerSortLabel": "정렬",
+        "ledgerSortDate": "날짜순",
+        "ledgerSortAmount": "금액순",
+        "ledgerSortActive": "정렬: {{sort}}",
+        "ledgerAccountsAll": "모든 계좌"
     },
     "settings": {
         "healthCycleEnableLabel": "주기 탭 표시",

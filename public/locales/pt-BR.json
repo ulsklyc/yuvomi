@@ -1781,7 +1781,12 @@
         "loanDueDayInvalid": "Informe um dia de 1 a 31 ou deixe o campo vazio",
         "loanPaymentAddedOnToast": "Pagamento registrado com data de {{date}}",
         "planTargetOf": "de {{amount}}",
-        "planTargetSr": "Meta {{amount}}, {{percent}} usado"
+        "planTargetSr": "Meta {{amount}}, {{percent}} usado",
+        "ledgerSortLabel": "Ordenação",
+        "ledgerSortDate": "Por data",
+        "ledgerSortAmount": "Por valor",
+        "ledgerSortActive": "Ordenação: {{sort}}",
+        "ledgerAccountsAll": "Todas as contas"
     },
     "settings": {
         "healthCycleEnableLabel": "Mostrar a aba de ciclo",

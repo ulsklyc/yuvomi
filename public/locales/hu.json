@@ -1781,7 +1781,12 @@
         "loanDueDayInvalid": "Adjon meg egy napot 1 és 31 között, vagy hagyja üresen",
         "loanPaymentAddedOnToast": "Fizetés rögzítve ezzel a dátummal: {{date}}",
         "planTargetOf": "/ {{amount}}",
-        "planTargetSr": "Cél: {{amount}}, {{percent}} felhasználva"
+        "planTargetSr": "Cél: {{amount}}, {{percent}} felhasználva",
+        "ledgerSortLabel": "Rendezés",
+        "ledgerSortDate": "Dátum szerint",
+        "ledgerSortAmount": "Összeg szerint",
+        "ledgerSortActive": "Rendezés: {{sort}}",
+        "ledgerAccountsAll": "Minden számla"
     },
     "settings": {
         "healthCycleEnableLabel": "Ciklus fül megjelenítése",

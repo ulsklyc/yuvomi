@@ -1781,7 +1781,12 @@
         "loanDueDayInvalid": "Ange en dag från 1 till 31, eller lämna fältet tomt",
         "loanPaymentAddedOnToast": "Betalning registrerad med datum {{date}}",
         "planTargetOf": "av {{amount}}",
-        "planTargetSr": "Mål {{amount}}, {{percent}} använt"
+        "planTargetSr": "Mål {{amount}}, {{percent}} använt",
+        "ledgerSortLabel": "Sortering",
+        "ledgerSortDate": "Efter datum",
+        "ledgerSortAmount": "Efter belopp",
+        "ledgerSortActive": "Sortering: {{sort}}",
+        "ledgerAccountsAll": "Alla konton"
     },
     "settings": {
         "healthCycleEnableLabel": "Visa cykelfliken",

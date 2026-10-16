@@ -1781,7 +1781,12 @@
         "loanDueDayInvalid": "Εισαγάγετε ημέρα από 1 έως 31 ή αφήστε το πεδίο κενό",
         "loanPaymentAddedOnToast": "Η πληρωμή καταγράφηκε με ημερομηνία {{date}}",
         "planTargetOf": "από {{amount}}",
-        "planTargetSr": "Στόχος {{amount}}, χρησιμοποιήθηκε το {{percent}}"
+        "planTargetSr": "Στόχος {{amount}}, χρησιμοποιήθηκε το {{percent}}",
+        "ledgerSortLabel": "Ταξινόμηση",
+        "ledgerSortDate": "Κατά ημερομηνία",
+        "ledgerSortAmount": "Κατά ποσό",
+        "ledgerSortActive": "Ταξινόμηση: {{sort}}",
+        "ledgerAccountsAll": "Όλοι οι λογαριασμοί"
     },
     "settings": {
         "healthCycleEnableLabel": "Εμφάνιση καρτέλας κύκλου",

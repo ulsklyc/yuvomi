@@ -1937,7 +1937,12 @@
         "loanDueDayInvalid": "Укажите день от 1 до 31 или оставьте поле пустым",
         "loanPaymentAddedOnToast": "Платёж записан на дату {{date}}",
         "planTargetOf": "из {{amount}}",
-        "planTargetSr": "Цель {{amount}}, израсходовано {{percent}}"
+        "planTargetSr": "Цель {{amount}}, израсходовано {{percent}}",
+        "ledgerSortLabel": "Сортировка",
+        "ledgerSortDate": "По дате",
+        "ledgerSortAmount": "По сумме",
+        "ledgerSortActive": "Сортировка: {{sort}}",
+        "ledgerAccountsAll": "Все счета"
     },
     "settings": {
         "healthCycleEnableLabel": "Показать вкладку цикла",

@@ -32,6 +32,7 @@ import { budgetCategoryLabel } from '/utils/category-labels.js';
 import { trendMarkup, leadCardClass } from '/utils/metric-card.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { LOAN_SORTS, DEFAULT_LOAN_SORT, normalizeLoanSort, sortLoans, groupLoans } from '/utils/loan-order.js';
+import { LEDGER_SORTS, DEFAULT_LEDGER_SORT, normalizeLedgerSort, sortLedger } from '/utils/ledger-order.js';
 import { rowMenuHtml } from '/utils/row-action.js';
 import { categoryColorIndex, categoryColor } from '/utils/budget-category-colors.js';
 import { metricGlanceHtml, wireMetricGlance, glanceLeadClass } from '/utils/metric-glance.js';
@@ -62,6 +63,7 @@ const GROUP_RESPONSIBLE_KEY = 'yuvomi:budget:group-responsible';
 // Geraeteweit wie die beiden Ansichten darueber: in welcher Reihenfolge die
 // Darlehen stehen, ist eine Frage des Lesens, kein Datum des Haushalts (#1706).
 const LOAN_SORT_KEY = 'yuvomi:budget:loan-sort';
+const LEDGER_SORT_KEY = 'yuvomi:budget:ledger-sort';
 
 const SUBCATEGORY_I18N = () => ({
   rent_mortgage:            t('budget.subcatRentMortgage'),
@@ -248,6 +250,7 @@ let state = {
   loanFilterId: null,
   loanStatusFilter: 'active',
   loanSort: null,              // 'start' | 'rate' | 'balance'; null = noch nicht gelesen (loanSort())
+  ledgerSort: null,            // 'date' | 'amount'; null = noch nicht gelesen (ledgerSort())
   currency:    'EUR',
   budgetMode:  'shared',      // 'shared' (Altverhalten) | 'personal' (#476/#505)
   members:     [],            // Haushaltsmitglieder fuer den Zustaendigen-Picker (#1057)
@@ -1456,6 +1459,7 @@ function renderBody() {
             <i data-lucide="x" class="icon-sm" aria-hidden="true"></i>
           </button>` : ''}
           ${budgetChipHtml()}
+          ${ledgerSortNoteHtml()}
         </div>
         <!-- Suche im Hauptbuch (C6): das geteilte Feld im Kopf der Liste, die es
              filtert - mobil in seiner Icon-Form (layout.css, .section-toolbar),
@@ -1506,6 +1510,31 @@ function renderBody() {
     state.accountFilterId = null;
     await reloadMonth();
     renderBody();
+  });
+  // Sortierung und Konto aus dem Werkzeug-Menue des Listenkopfs (R19). Die
+  // Sortierzeile oeffnet dasselbe Menue (wie bei den Darlehen: kein zweites
+  // `popovertarget`, das Menue richtet sich am ersten Ausloeser aus).
+  _container.querySelector('#budget-ledger-sort-note')?.addEventListener('click', () => {
+    _container.querySelector('#budget-list-tools-menu')?.showPopover?.();
+  });
+  _container.querySelector('#budget-list-tools-menu')?.addEventListener('click', async (e) => {
+    const sortItem = e.target.closest('[data-ledger-sort]');
+    const accountItem = e.target.closest('[data-ledger-account]');
+    if (!sortItem && !accountItem) return;
+    if (sortItem) {
+      state.ledgerSort = normalizeLedgerSort(sortItem.dataset.ledgerSort);
+      try { localStorage.setItem(LEDGER_SORT_KEY, state.ledgerSort); } catch (_) { /* Private-Mode: nur diese Sitzung */ }
+    } else {
+      const id = accountItem.dataset.ledgerAccount ? parseInt(accountItem.dataset.ledgerAccount, 10) : null;
+      if (id === state.accountFilterId) return;
+      state.accountFilterId = id;
+      // Der Kontoauszug kommt vom Server (`account_id`), wie beim Drilldown.
+      await reloadMonth();
+    }
+    renderBody();
+    // Der Eintrag lag im Menue, das mit dem Neuaufbau verschwindet - der Fokus
+    // geht an dessen Knopf zurueck statt auf <body>.
+    _container.querySelector('.budget-list-tools')?.focus();
   });
 
   // Zustaendigen-Filter und Gruppierung arbeiten auf den SCHON geladenen Zeilen
@@ -1881,8 +1910,75 @@ function toggleBalanceDetails() {
  * ein Link: der Server liefert die Datei, das Menue schliesst beim Klick
  * (popover-menu.js). Ohne einen einzigen Eintrag (Nur-lesen, leerer Monat,
  * niemand zustaendig) gibt es auch keinen Knopf. */
+/**
+ * Die gewaehlte Sortierung des Hauptbuchs (Critique R19, Persona Alex) - wie
+ * loanSort(): beim ersten Zeichnen aus dem Geraetespeicher, danach aus dem State.
+ */
+function ledgerSort() {
+  if (state.ledgerSort == null) {
+    let stored = null;
+    try { stored = localStorage.getItem(LEDGER_SORT_KEY); } catch (_) { /* Private-Mode: Voreinstellung */ }
+    state.ledgerSort = normalizeLedgerSort(stored);
+  }
+  return state.ledgerSort;
+}
+
+const LEDGER_SORT_LABELS = {
+  date: 'budget.ledgerSortDate',
+  amount: 'budget.ledgerSortAmount',
+};
+
+/**
+ * Die leise Zeile im Listenkopf, solange nicht nach Datum sortiert ist - dasselbe
+ * Muster wie die Sortierzeile der Darlehen (loanSortNoteHtml): die Wahl wird
+ * gemerkt, die Zeile sagt, wonach, und ein Tipp oeffnet das Menue.
+ */
+function ledgerSortNoteHtml() {
+  const sort = ledgerSort();
+  if (sort === DEFAULT_LEDGER_SORT) return '';
+  return `<button type="button" class="budget-list-header__filter budget-ledger-sort-note" id="budget-ledger-sort-note"
+                  aria-haspopup="menu" aria-controls="budget-list-tools-menu">${esc(t('budget.ledgerSortActive', { sort: t(LEDGER_SORT_LABELS[sort]) }))}</button>`;
+}
+
+/** Ein Eintrag einer Einfachauswahl im Werkzeug-Menue, mit Haken. */
+function menuRadioHtml({ on, attr, value, label }) {
+  return `
+        <button type="button" role="menuitemradio" aria-checked="${on ? 'true' : 'false'}" class="popover-menu__item" ${attr}="${esc(String(value))}">
+          <i data-lucide="check" class="icon-md popover-menu__item-check${on ? '' : ' popover-menu__item-check--hidden'}" aria-hidden="true"></i><span>${esc(label)}</span>
+        </button>`;
+}
+
+/**
+ * SORTIEREN UND KONTO IM KOPF DER LISTE (Critique R19, Persona Alex: "Das
+ * Hauptbuch hat weder Sortierung noch Kontofilter"). Beides steht im
+ * Werkzeug-Menue des Listenkopfs, als Einfachauswahl mit Haken wie die
+ * Sortierung der Darlehen und der Abos - kein neuer Bedienstil. Der Kontofilter
+ * ist derselbe Zustand wie der Drilldown aus dem Reiter Konten
+ * (`accountFilterId`, Chip mit x im Kopf); bis R19 kam man nur ueber jenen Umweg
+ * an einen Kontoauszug. Beides ordnet bzw. filtert nur und bleibt bei
+ * `budget: read` stehen.
+ */
+function ledgerViewMenuHtml() {
+  const sort = ledgerSort();
+  const groups = [`
+      <div class="popover-menu__group" role="group" aria-labelledby="budget-ledger-sort-label">
+        <div class="popover-menu__label" id="budget-ledger-sort-label">${esc(t('budget.ledgerSortLabel'))}</div>
+        ${LEDGER_SORTS.map((id) => menuRadioHtml({ on: sort === id, attr: 'data-ledger-sort', value: id, label: t(LEDGER_SORT_LABELS[id]) })).join('')}
+      </div>`];
+  const accounts = (state.accounts ?? []).filter((a) => !a.archived || a.id === state.accountFilterId);
+  if (accounts.length) {
+    groups.push(`
+      <div class="popover-menu__group" role="group" aria-labelledby="budget-ledger-account-label">
+        <div class="popover-menu__label" id="budget-ledger-account-label">${esc(t('budget.accountLabel'))}</div>
+        ${menuRadioHtml({ on: state.accountFilterId == null, attr: 'data-ledger-account', value: '', label: t('budget.ledgerAccountsAll') })}
+        ${accounts.map((a) => menuRadioHtml({ on: state.accountFilterId === a.id, attr: 'data-ledger-account', value: a.id, label: a.name })).join('')}
+      </div>`);
+  }
+  return groups.join('');
+}
+
 function listToolsMenuHtml() {
-  const items = [];
+  const items = [ledgerViewMenuHtml()];
   if (state.entries.some((e) => e.responsible_users?.length)) {
     const on = state.groupByResponsible;
     items.push(`
@@ -1907,7 +2003,8 @@ function listToolsMenuHtml() {
         <span>${esc(t('budget.csvExport'))}</span>
       </a>`);
   }
-  if (!items.length) return '';
+  // Ansicht (Sortierung, Konto) und Werkzeuge getrennt, wie im Dokumente-Menue.
+  if (items.length > 1) items.splice(1, 0, '<div class="popover-menu__separator" role="separator"></div>');
   const label = t('common.moreActions');
   return `
     <button type="button" class="btn btn--secondary btn--icon budget-list-tools popover-menu__trigger"
@@ -2261,7 +2358,7 @@ function renderEntries() {
       return emptyStateHTML({ icon: 'search-x', title: t('budget.ledgerSearchEmpty', { query: state.ledgerQuery }) });
     }
     // Treffer aus vielen Monaten: die Zeile nennt das volle Datum.
-    return entryRows(state.ledgerResults, { fullDate: true });
+    return entryRows(sortLedger(state.ledgerResults, ledgerSort()), { fullDate: true });
   }
   if (!state.entries.length) {
     // BEI `budget: read` BLEIBT NUR DER TITEL. Beschreibung und Hinweis sind
@@ -2281,7 +2378,7 @@ function renderEntries() {
     });
   }
 
-  const rows = visibleEntries();
+  const rows = sortLedger(visibleEntries(), ledgerSort());
   if (!rows.length) {
     const activeFilters = [];
     if (state.categoryFilter) {
@@ -2384,6 +2481,9 @@ function ledgerSectionsHtml(rows) {
   // zwei gleich grosse Ueberschriften uebereinander. `u-compact` ist die Stufe
   // darunter (typography.css, Kartentitel).
   if (isForecastMonth(state.month)) return entryRows(rows);
+  // Nach Betrag ist die Liste EINE Rangfolge: getrennt nach Geplant und Gebucht
+  // stuende der groesste Betrag nicht oben, sondern im zweiten Abschnitt.
+  if (ledgerSort() === 'amount') return entryRows(rows);
   const { planned, booked } = splitLedger(rows);
   if (!planned.length) return entryRows(rows);
   const expanded = state.plannedExpandedMonth === state.month;

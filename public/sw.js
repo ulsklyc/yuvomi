@@ -183,6 +183,7 @@ const APP_SHELL = [
   '/utils/leave-guard.js',
   '/utils/live-feed.js',
   '/utils/loan-order.js',
+  '/utils/ledger-order.js',
   '/utils/markdown-checklist.js',
   '/utils/markdown-toolbar.js',
   '/utils/master-detail.js',

@@ -1781,7 +1781,12 @@
         "loanDueDayInvalid": "请输入 1 到 31 之间的日期，或留空",
         "loanPaymentAddedOnToast": "还款已记录，日期为 {{date}}",
         "planTargetOf": "共 {{amount}}",
-        "planTargetSr": "目标 {{amount}}，已用 {{percent}}"
+        "planTargetSr": "目标 {{amount}}，已用 {{percent}}",
+        "ledgerSortLabel": "排序",
+        "ledgerSortDate": "按日期",
+        "ledgerSortAmount": "按金额",
+        "ledgerSortActive": "排序：{{sort}}",
+        "ledgerAccountsAll": "所有账户"
     },
     "settings": {
         "healthCycleEnableLabel": "显示周期标签页",

@@ -1781,7 +1781,12 @@
         "loanDueDayInvalid": "Enter a day from 1 to 31, or leave it empty",
         "loanPaymentAddedOnToast": "Payment recorded for {{date}}",
         "planTargetOf": "of {{amount}}",
-        "planTargetSr": "Target {{amount}}, {{percent}} used"
+        "planTargetSr": "Target {{amount}}, {{percent}} used",
+        "ledgerSortLabel": "Sort",
+        "ledgerSortDate": "By date",
+        "ledgerSortAmount": "By amount",
+        "ledgerSortActive": "Sorted: {{sort}}",
+        "ledgerAccountsAll": "All accounts"
     },
     "settings": {
         "healthCycleEnableLabel": "Show cycle tab",

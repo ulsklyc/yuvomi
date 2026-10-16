@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without changing other calendar subscriptions. A personal "Include birthdays" switch on the
   existing calendar feed is on by default; turn it off when using both feeds to avoid duplicates.
 
+- **Sort the budget ledger and filter it by account.** The menu at the head of the transaction list
+  sorts by date or by amount (largest first, remembered on this device) and shows one account's
+  statement, the same filter the Accounts tab opens. A note under the title says when the list is
+  sorted by amount; a tap on it opens the menu.
+
 ### Changed
 
 - **The overview appears sooner on a cold start.** The browser now asks for every module the start
