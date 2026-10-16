@@ -356,6 +356,12 @@ function updateHousekeepingFab() {
       onClick: () => openStaffModal(null, content()),
     });
   } else {
+    // BEWUSST OHNE FAB auf „Uebersicht" und „Berichte" (Critique 2026-10-16,
+    // D5 geprueft): dort gibt es nichts anzulegen. Ein Besuch entsteht nur
+    // ueber Ein- und Auschecken - ein Zustandswechsel an der Karte der
+    // Haushaltshilfe, kein Anlegen -, und die Berichte lesen. Ein FAB, der dort
+    // „Aufgabe" anlegte, waere ein Weg in einen anderen Reiter; einer, der
+    // eincheckte, ein zweiter Weg neben dem Knopf an der Karte.
     setPageFabAction(fab, { hidden: true, dockLabel: fab.dataset?.dockLabel || t('newLabel.tasks') });
   }
 }
