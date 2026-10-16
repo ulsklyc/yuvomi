@@ -84,7 +84,10 @@
             "privateAssignedHint": "Tuto položku vidí jen ten, kdo ji vytvořil - ostatní přiřazené osoby ne. Zvol „Pouze přiřazení“, pokud ji mají vidět."
         },
         "toShoppingListNamed": "Přidat {{title}} na nákupní seznam",
-        "emailInUse": "Tato e-mailová adresa již patří jinému účtu."
+        "emailInUse": "Tato e-mailová adresa již patří jinému účtu.",
+        "sessionUnreachableTitle": "Spojení přerušeno",
+        "sessionRetryHint": "Přihlášení zůstává zachováno. Další pokus za {{seconds}} s.",
+        "sessionRetrying": "Zkouším to znovu…"
     },
     "kitchen": {
         "noShoppingLists": "Nákupní seznam ještě neexistuje.",

@@ -83,7 +83,10 @@
             "privateAssignedHint": "Chỉ người tạo mục này mới thấy nó - những người được giao khác thì không. Chọn \"Chỉ người được giao\" nếu muốn họ thấy."
         },
         "toShoppingListNamed": "Thêm {{title}} vào danh sách mua sắm",
-        "emailInUse": "Địa chỉ email này đã thuộc về một tài khoản khác."
+        "emailInUse": "Địa chỉ email này đã thuộc về một tài khoản khác.",
+        "sessionUnreachableTitle": "Mất kết nối",
+        "sessionRetryHint": "Bạn vẫn được đăng nhập. Thử lại sau {{seconds}} giây.",
+        "sessionRetrying": "Đang thử lại…"
     },
     "kitchen": {
         "noShoppingLists": "Chưa có danh sách mua sắm.",

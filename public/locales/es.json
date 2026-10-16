@@ -83,7 +83,10 @@
             "privateAssignedHint": "Esta entrada solo la ve quien la creó - las demás personas asignadas no. Elige «Solo asignados» si quieres que la vean."
         },
         "toShoppingListNamed": "Añadir {{title}} a la lista de la compra",
-        "emailInUse": "Esta dirección de correo ya pertenece a otra cuenta."
+        "emailInUse": "Esta dirección de correo ya pertenece a otra cuenta.",
+        "sessionUnreachableTitle": "Conexión interrumpida",
+        "sessionRetryHint": "Tu sesión sigue abierta. Nuevo intento en {{seconds}} s.",
+        "sessionRetrying": "Reintentando…"
     },
     "kitchen": {
         "noShoppingLists": "Todavía no hay lista de la compra.",

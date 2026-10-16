@@ -36,6 +36,7 @@ export const HARNESS_ROUTES = Object.freeze([
  * @param {object} [options]
  * @param {object|null} [options.user] - schon angemeldet (laufende Sitzung)
  * @param {object|null} [options.sessionUser] - was `auth.me()` beim Kaltstart liefert; null: 401
+ * @param {unknown} [options.sessionError] - statt des 401: dieser Fehler (429, 503, Netz)
  * @param {boolean} [options.preferencesLoaded] - Vorgabe: ob `user` gesetzt ist
  * @param {boolean} [options.setupRequired]
  * @param {(module: string) => boolean} [options.canAccess]
@@ -48,6 +49,7 @@ export const HARNESS_ROUTES = Object.freeze([
 export function createNavigateHarness({
   user = null,
   sessionUser = null,
+  sessionError = null,
   preferencesLoaded = Boolean(user),
   setupRequired = false,
   canAccess = () => true,
@@ -59,7 +61,7 @@ export function createNavigateHarness({
   routes = HARNESS_ROUTES,
 } = {}) {
   /** Was nach aussen sichtbar wurde, in der Reihenfolge des Geschehens. */
-  const log = { rendered: [], history: [], toasts: [], leaveAsked: [], authCalls: 0 };
+  const log = { rendered: [], history: [], toasts: [], leaveAsked: [], authCalls: 0, unreachable: [] };
   let shell = false;
 
   const env = {
@@ -101,10 +103,15 @@ export function createNavigateHarness({
     auth: {
       me: async () => {
         log.authCalls += 1;
+        if (env.sessionError) throw env.sessionError;
         if (!sessionUser) throw Object.assign(new Error('Sitzung abgelaufen.'), { status: 401 });
         return { user: sessionUser };
       },
     },
+    // Fehlerzustand der Shell (utils/session-unreachable.js): mitschreiben,
+    // der Test ruft `retry` selbst.
+    sessionError,
+    showSessionUnreachable: (error, retry) => { log.unreachable.push({ error, retry }); },
     syncPreferencesOnce: async () => {
       if (env._preferencesLoaded) return;
       env._preferencesLoaded = true;

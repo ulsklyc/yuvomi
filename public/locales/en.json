@@ -83,7 +83,10 @@
             "privateAssignedHint": "Only the person who created this entry can see it - the other assigned people cannot. Choose \"Assignees only\" if they should see it."
         },
         "toShoppingListNamed": "Add {{title}} to the shopping list",
-        "emailInUse": "This email address already belongs to another account."
+        "emailInUse": "This email address already belongs to another account.",
+        "sessionUnreachableTitle": "Connection interrupted",
+        "sessionRetryHint": "You stay signed in. Trying again in {{seconds}} s.",
+        "sessionRetrying": "Trying again…"
     },
     "kitchen": {
         "noShoppingLists": "There is no shopping list yet.",

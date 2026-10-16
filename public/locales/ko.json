@@ -83,7 +83,10 @@
             "privateAssignedHint": "이 항목은 만든 사람만 볼 수 있으며, 지정된 다른 사람은 볼 수 없습니다. 볼 수 있게 하려면 \"할당된 사람만\"을 선택하세요."
         },
         "toShoppingListNamed": "{{title}} 장보기 목록에 추가",
-        "emailInUse": "이 이메일 주소는 이미 다른 계정에서 사용 중입니다."
+        "emailInUse": "이 이메일 주소는 이미 다른 계정에서 사용 중입니다.",
+        "sessionUnreachableTitle": "연결이 끊겼습니다",
+        "sessionRetryHint": "로그인 상태는 유지됩니다. {{seconds}}초 후 다시 시도합니다.",
+        "sessionRetrying": "다시 시도하는 중…"
     },
     "kitchen": {
         "noShoppingLists": "아직 장보기 목록이 없습니다.",

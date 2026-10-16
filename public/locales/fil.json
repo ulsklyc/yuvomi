@@ -83,7 +83,10 @@
             "privateAssignedHint": "Ang gumawa lang ng entry na ito ang makakakita nito - hindi ang ibang mga naatasan. Piliin ang \"Mga naatasan lamang\" kung dapat nila itong makita."
         },
         "toShoppingListNamed": "Idagdag ang {{title}} sa listahan ng pamimili",
-        "emailInUse": "Ang email address na ito ay pag-aari na ng ibang account."
+        "emailInUse": "Ang email address na ito ay pag-aari na ng ibang account.",
+        "sessionUnreachableTitle": "Naputol ang koneksyon",
+        "sessionRetryHint": "Naka-sign in ka pa rin. Susubukang muli sa loob ng {{seconds}} s.",
+        "sessionRetrying": "Sinusubukang muli…"
     },
     "kitchen": {
         "noShoppingLists": "Wala pang listahan ng pamimili.",

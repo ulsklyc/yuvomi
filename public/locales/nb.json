@@ -83,7 +83,10 @@
             "privateAssignedHint": "Bare den som opprettet denne oppføringen, ser den - de andre tildelte personene gjør det ikke. Velg «Kun tildelte» hvis de skal se den."
         },
         "toShoppingListNamed": "Legg til {{title}} i handlelisten",
-        "emailInUse": "Denne e-postadressen tilhører allerede en annen konto."
+        "emailInUse": "Denne e-postadressen tilhører allerede en annen konto.",
+        "sessionUnreachableTitle": "Tilkoblingen ble brutt",
+        "sessionRetryHint": "Du forblir pålogget. Nytt forsøk om {{seconds}} s.",
+        "sessionRetrying": "Prøver på nytt…"
     },
     "kitchen": {
         "noShoppingLists": "Det finnes ingen handleliste ennå.",

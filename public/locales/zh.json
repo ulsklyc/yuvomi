@@ -83,7 +83,10 @@
             "privateAssignedHint": "只有创建者能看到此条目，其他被分配的人看不到。如果希望他们看到，请选择“仅限被分配者”。"
         },
         "toShoppingListNamed": "将{{title}}加入购物清单",
-        "emailInUse": "此电子邮件地址已属于另一个账户。"
+        "emailInUse": "此电子邮件地址已属于另一个账户。",
+        "sessionUnreachableTitle": "连接中断",
+        "sessionRetryHint": "你仍保持登录状态。{{seconds}} 秒后重试。",
+        "sessionRetrying": "正在重试…"
     },
     "kitchen": {
         "noShoppingLists": "还没有购物清单。",

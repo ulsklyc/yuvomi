@@ -83,7 +83,10 @@
             "privateAssignedHint": "この項目は作成した人にしか表示されず、ほかの割り当てられた人には表示されません。表示したい場合は「割り当て先のみ」を選んでください。"
         },
         "toShoppingListNamed": "{{title}}を買い物リストへ追加",
-        "emailInUse": "このメールアドレスはすでに別のアカウントで使われています。"
+        "emailInUse": "このメールアドレスはすでに別のアカウントで使われています。",
+        "sessionUnreachableTitle": "接続が中断されました",
+        "sessionRetryHint": "ログイン状態は保たれています。{{seconds}} 秒後に再試行します。",
+        "sessionRetrying": "再試行しています…"
     },
     "kitchen": {
         "noShoppingLists": "買い物リストがまだありません。",

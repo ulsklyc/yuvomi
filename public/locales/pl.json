@@ -85,7 +85,10 @@
             "privateAssignedHint": "Ten wpis widzi tylko osoba, która go utworzyła - pozostałe przypisane osoby nie. Wybierz „Tylko przypisani”, jeśli mają go widzieć."
         },
         "toShoppingListNamed": "Dodaj {{title}} na listę zakupów",
-        "emailInUse": "Ten adres e-mail należy już do innego konta."
+        "emailInUse": "Ten adres e-mail należy już do innego konta.",
+        "sessionUnreachableTitle": "Połączenie przerwane",
+        "sessionRetryHint": "Sesja pozostaje aktywna. Kolejna próba za {{seconds}} s.",
+        "sessionRetrying": "Ponawianie…"
     },
     "kitchen": {
         "noShoppingLists": "Nie ma jeszcze listy zakupów.",

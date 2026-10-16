@@ -233,6 +233,7 @@ const APP_SHELL = [
   '/utils/screensaver-idle.js',
   '/utils/scroll-restore.js',
   '/utils/seal-pair.js',
+  '/utils/session-unreachable.js',
   '/utils/segment-indicator.js',
   '/utils/sheet-drag.js',
   '/utils/shopping-categories.js',

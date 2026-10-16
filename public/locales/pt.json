@@ -83,7 +83,10 @@
             "privateAssignedHint": "Só quem criou esta entrada a vê - as outras pessoas atribuídas não. Escolha «Apenas atribuídos» se a devem ver."
         },
         "toShoppingListNamed": "Adicionar {{title}} à lista de compras",
-        "emailInUse": "Este endereço de e-mail já pertence a outra conta."
+        "emailInUse": "Este endereço de e-mail já pertence a outra conta.",
+        "sessionUnreachableTitle": "Ligação interrompida",
+        "sessionRetryHint": "A sessão mantém-se ativa. Nova tentativa dentro de {{seconds}} s.",
+        "sessionRetrying": "A tentar novamente…"
     },
     "kitchen": {
         "noShoppingLists": "Ainda não existe lista de compras.",

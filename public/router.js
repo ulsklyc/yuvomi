@@ -47,6 +47,7 @@ import { triggerPageFab } from '/utils/fab.js';
 import { hasLeaveGuard, mayLeave } from '/utils/leave-guard.js';
 import { createUpdateFlow, isUserBusy } from '/utils/app-update.js';
 import { createStartHandoff } from '/utils/start-handoff.js';
+import { showSessionUnreachable } from '/utils/session-unreachable.js';
 import { wireSheetDrag } from '/utils/sheet-drag.js';
 import {
   handleBackNavigation, closeAllOverlays, consumeOverlayMarker,
@@ -686,6 +687,9 @@ const navigate = createNavigate(routerState, {
   hasLeaveGuard, mayLeave, whenHistorySettled, consumeOverlayMarker,
   auth: startHandoff.auth, syncPreferencesOnce, startThirdPartyModulePolling, loadReminderStyles, initReminders, initPush,
   armScreensaver,
+  // Nur ein 401 fuehrt zur Anmeldung; jeder andere Fehler der Sitzungspruefung
+  // zeichnet diesen Zustand in #app und versucht selbst erneut (Critique R19).
+  showSessionUnreachable: (err, retry) => showSessionUnreachable(document.getElementById('app'), err, retry),
   rememberScrollPosition, scrollPositionFor, renderPage, adoptPageFab, updateNav, topLevelSection,
   syncWallMode, applyModuleAccentForRoute, updateThemeColorForRoute, updateBranding,
   focusMainContentAfterNavigation, showToast, t,

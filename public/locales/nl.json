@@ -83,7 +83,10 @@
             "privateAssignedHint": "Alleen wie dit item heeft aangemaakt, ziet het - de andere toegewezen personen niet. Kies \"Alleen toegewezenen\" als ze het moeten zien."
         },
         "toShoppingListNamed": "{{title}} op de boodschappenlijst zetten",
-        "emailInUse": "Dit e-mailadres hoort al bij een ander account."
+        "emailInUse": "Dit e-mailadres hoort al bij een ander account.",
+        "sessionUnreachableTitle": "Verbinding onderbroken",
+        "sessionRetryHint": "Je blijft ingelogd. Nieuwe poging over {{seconds}} s.",
+        "sessionRetrying": "Opnieuw proberen…"
     },
     "kitchen": {
         "noShoppingLists": "Er is nog geen boodschappenlijst.",

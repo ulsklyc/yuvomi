@@ -83,7 +83,10 @@
             "privateAssignedHint": "Questa voce la vede solo chi l'ha creata - le altre persone assegnate no. Scegli «Solo assegnatari» se devono vederla."
         },
         "toShoppingListNamed": "Aggiungi {{title}} alla lista della spesa",
-        "emailInUse": "Questo indirizzo email appartiene già a un altro account."
+        "emailInUse": "Questo indirizzo email appartiene già a un altro account.",
+        "sessionUnreachableTitle": "Connessione interrotta",
+        "sessionRetryHint": "La sessione resta attiva. Nuovo tentativo tra {{seconds}} s.",
+        "sessionRetrying": "Nuovo tentativo in corso…"
     },
     "kitchen": {
         "noShoppingLists": "Non c'è ancora una lista della spesa.",

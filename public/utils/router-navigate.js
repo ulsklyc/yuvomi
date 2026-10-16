@@ -44,7 +44,7 @@ export const NAVIGATE_DEPS = Object.freeze([
   'hasLeaveGuard', 'mayLeave', 'whenHistorySettled', 'consumeOverlayMarker',
   // Sitzung
   'auth', 'syncPreferencesOnce', 'startThirdPartyModulePolling', 'loadReminderStyles', 'initReminders', 'initPush',
-  'armScreensaver',
+  'armScreensaver', 'showSessionUnreachable',
   // Seite
   'rememberScrollPosition', 'scrollPositionFor', 'renderPage', 'adoptPageFab', 'updateNav', 'topLevelSection',
   'syncWallMode', 'applyModuleAccentForRoute', 'updateThemeColorForRoute', 'updateBranding',
@@ -137,7 +137,7 @@ export function createNavigate(state, deps) {
     location, history, window, document,
     hasLeaveGuard, mayLeave, whenHistorySettled, consumeOverlayMarker,
     auth, syncPreferencesOnce, startThirdPartyModulePolling, loadReminderStyles, initReminders, initPush,
-    armScreensaver,
+    armScreensaver, showSessionUnreachable,
     rememberScrollPosition, scrollPositionFor, renderPage, adoptPageFab, updateNav, topLevelSection,
     syncWallMode, applyModuleAccentForRoute, updateThemeColorForRoute, updateBranding,
     focusMainContentAfterNavigation, showToast, t,
@@ -361,13 +361,26 @@ export function createNavigate(state, deps) {
             initReminders();
             initPush();
           }
-        } catch {
+        } catch (err) {
           state.currentPath = null; // Reset damit navigate('/login') nicht geblockt wird
           state.isNavigating = false;
           // _pendingLoginRedirect leeren: der catch ruft navigate('/login') direkt auf,
           // der finally soll keinen zweiten Aufruf starten (würde isNavigating=true setzen,
           // während die Login-Seite rendert, und so post-login navigate blockieren).
           state._pendingLoginRedirect = false;
+          // NUR EIN 401 HEISST "NICHT ANGEMELDET" (Critique R19, 2026-10-16).
+          // Bis hierher fuehrte jeder Fehler zur Anmeldung: eine Bremse (429),
+          // ein Serverfehler, ein Netzabbruch beim Kaltstart - mit gueltigen
+          // Cookies. Alles ausser dem 401 zeigt jetzt den Fehlerzustand der
+          // Shell, der selbst erneut versucht (utils/session-unreachable.js).
+          // Derselbe Pfad und dieselbe Art wie dieser Aufruf, damit ein Erfolg
+          // dort landet, wo die Navigation hinwollte.
+          if (err?.status !== 401) {
+            const retryPath = path;
+            const retryPush = pushState;
+            showSessionUnreachable(err, () => navigate(retryPath, retryPush));
+            return;
+          }
           navigate(state._setupRequired ? '/setup' : '/login');
           return;
         }

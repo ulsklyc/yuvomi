@@ -75,6 +75,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A busy or restarting server no longer signs you out.** When Yuvomi could not check the
+  session on start - too many requests, a server error, a restarting NAS or no network - it showed
+  the sign-in form although the session was still valid. Only a real "not signed in" answer leads
+  there now; anything else shows "Connection interrupted" with the cause, a "Try again" button and
+  an automatic retry that waits longer each time and respects the server's `Retry-After`.
+
 - **Calendar: "Manage calendars" is reachable on tablets and phones again.** Below 1024px the
   button was hidden along with the empty header slot, so calendars could not be created, recolored
   or reordered there. The calendar filter now lists "Manage calendars" under its calendars, at

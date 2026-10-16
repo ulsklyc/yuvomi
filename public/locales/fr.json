@@ -83,7 +83,10 @@
             "privateAssignedHint": "Seule la personne qui a créé cette entrée la voit - les autres personnes assignées ne la voient pas. Choisissez « Personnes assignées uniquement » pour qu'elles la voient."
         },
         "toShoppingListNamed": "Ajouter {{title}} à la liste de courses",
-        "emailInUse": "Cette adresse e-mail appartient déjà à un autre compte."
+        "emailInUse": "Cette adresse e-mail appartient déjà à un autre compte.",
+        "sessionUnreachableTitle": "Connexion interrompue",
+        "sessionRetryHint": "Votre session reste ouverte. Nouvel essai dans {{seconds}} s.",
+        "sessionRetrying": "Nouvel essai en cours…"
     },
     "kitchen": {
         "noShoppingLists": "Il n'y a encore aucune liste de courses.",

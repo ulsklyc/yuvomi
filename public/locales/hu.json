@@ -83,7 +83,10 @@
             "privateAssignedHint": "Ezt a bejegyzést csak az látja, aki létrehozta - a többi hozzárendelt személy nem. Válaszd a „Csak a hozzárendeltek” lehetőséget, ha látniuk kell."
         },
         "toShoppingListNamed": "{{title}} hozzáadása a bevásárlólistához",
-        "emailInUse": "Ez az e-mail-cím már egy másik fiókhoz tartozik."
+        "emailInUse": "Ez az e-mail-cím már egy másik fiókhoz tartozik.",
+        "sessionUnreachableTitle": "Megszakadt a kapcsolat",
+        "sessionRetryHint": "Bejelentkezve maradsz. Új próbálkozás {{seconds}} mp múlva.",
+        "sessionRetrying": "Újrapróbálkozás…"
     },
     "kitchen": {
         "noShoppingLists": "Még nincs bevásárlólista.",

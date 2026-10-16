@@ -83,7 +83,10 @@
         },
         "toShoppingListNamed": "Adicionar {{title}} à lista de compras",
         "emailInUse": "Este endereço de e-mail já está em uso.",
-        "errorRestoreInProgress": "Não é possível concluir esta ação enquanto uma restauração estiver em andamento."
+        "errorRestoreInProgress": "Não é possível concluir esta ação enquanto uma restauração estiver em andamento.",
+        "sessionUnreachableTitle": "Conexão interrompida",
+        "sessionRetryHint": "Sua sessão continua ativa. Nova tentativa em {{seconds}} s.",
+        "sessionRetrying": "Tentando novamente…"
     },
     "kitchen": {
         "noShoppingLists": "Ainda não existe lista de compras.",

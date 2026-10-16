@@ -79,9 +79,13 @@ async function apiFetch(path, options = {}, _retried = false) {
     // "der Wartezustand ist abgelaufen" - beides gehört auf die Anmeldeseite
     // gesagt und nicht in einen Sitzungsabbruch übersetzt (#672).
     if (path !== '/auth/login' && path !== '/auth/2fa/verify') {
-      if (quietExpiry) throw Object.assign(new Error('Sitzung abgelaufen.'), { status: 401 });
+      // Der Wurf traegt seinen Status in BEIDEN Faellen (Critique R19): nur
+      // ein 401 schickt den Auth-Guard in navigate() zur Anmeldung, jeder
+      // andere Fehler der Sitzungspruefung zeigt den Fehlerzustand der Shell.
+      const expired = Object.assign(new Error('Sitzung abgelaufen.'), { status: 401 });
+      if (quietExpiry) throw expired;
       window.dispatchEvent(new CustomEvent('auth:expired'));
-      throw new Error('Sitzung abgelaufen.');
+      throw expired;
     }
     // Für beide: fall-through zum generischen !response.ok-Handler unten.
   }
@@ -114,7 +118,7 @@ async function apiFetch(path, options = {}, _retried = false) {
     const meRes = await fetch(`${API_BASE}/auth/me`, { credentials: 'same-origin', cache: 'no-store' });
     if (meRes.status === 401) {
       window.dispatchEvent(new CustomEvent('auth:expired'));
-      throw new Error('Sitzung abgelaufen.');
+      throw Object.assign(new Error('Sitzung abgelaufen.'), { status: 401 });
     }
     const meData = await meRes.json().catch(() => null);
     if (meData?.csrfToken) _csrfToken = meData.csrfToken;

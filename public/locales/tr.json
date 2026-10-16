@@ -83,7 +83,10 @@
             "privateAssignedHint": "Bu kaydı yalnızca oluşturan kişi görür - atanan diğer kişiler görmez. Görmeleri gerekiyorsa \"Yalnızca atananlar\" seçeneğini seç."
         },
         "toShoppingListNamed": "{{title}} yemeğini alışveriş listesine ekle",
-        "emailInUse": "Bu e-posta adresi zaten başka bir hesaba ait."
+        "emailInUse": "Bu e-posta adresi zaten başka bir hesaba ait.",
+        "sessionUnreachableTitle": "Bağlantı kesildi",
+        "sessionRetryHint": "Oturumun açık kalır. {{seconds}} sn sonra yeniden denenecek.",
+        "sessionRetrying": "Yeniden deneniyor…"
     },
     "kitchen": {
         "noShoppingLists": "Henüz alışveriş listesi yok.",

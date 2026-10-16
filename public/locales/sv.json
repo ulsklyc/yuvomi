@@ -83,7 +83,10 @@
             "privateAssignedHint": "Bara den som skapade den här posten ser den - de andra tilldelade personerna gör det inte. Välj ”Endast tilldelade” om de ska se den."
         },
         "toShoppingListNamed": "Lägg till {{title}} i inköpslistan",
-        "emailInUse": "Den här e-postadressen hör redan till ett annat konto."
+        "emailInUse": "Den här e-postadressen hör redan till ett annat konto.",
+        "sessionUnreachableTitle": "Anslutningen bröts",
+        "sessionRetryHint": "Du förblir inloggad. Nytt försök om {{seconds}} s.",
+        "sessionRetrying": "Försöker igen…"
     },
     "kitchen": {
         "noShoppingLists": "Det finns ingen inköpslista än.",

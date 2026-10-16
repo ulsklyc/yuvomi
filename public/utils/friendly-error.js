@@ -425,3 +425,38 @@ export function friendlyError(err) {
   // Aufrufer umgestellt ist und der Server den Fall mit einem `reason` benennt.
   return err?.data?.error || err?.message || t('common.errorGeneric');
 }
+
+/**
+ * DER SATZ FUER EINEN FEHLGESCHLAGENEN LADEVORGANG (Critique R19, 2026-10-16) -
+ * oder nichts, wenn die Ursache unbekannt ist.
+ *
+ * Bis hierher sagte jeder Ladefehler fest "Bitte pruefe die Verbindung", auch
+ * bei einer Bremse (429) oder einem Serverfehler: die Familie suchte den Fehler
+ * am eigenen WLAN, waehrend der Server nur kurz warten wollte. Die Zuordnung
+ * ist die von friendlyError, mit EINEM Unterschied: der Text des Servers kommt
+ * hier nie heraus. Bei einer unbekannten Ursache (400, 409 ohne Grund) bleibt
+ * der allgemeine Satz des Aufrufers stehen - `mountLoadError` und der
+ * Fehlerzustand der Shell nehmen ihn als Rueckfall.
+ *
+ * Der Statuscode steht NICHT im Satz: er gehoert in die aufklappbaren Details.
+ *
+ * @param {unknown} err
+ * @returns {string|undefined}
+ */
+export function loadErrorSentence(err) {
+  const status = err?.status ?? err?.response?.status;
+  // Ohne Netz: der Browser weiss es (onLine), oder der Service Worker hat fuer
+  // eine nicht gecachte Abfrage sein 503 `{ error: 'offline' }` geantwortet
+  // (sw.js, networkFirstApi) - das ist kein Serverfehler.
+  if (status === 0 || !navigator.onLine) return t('common.errorOffline');
+  if (status === 503 && err?.data?.error === 'offline') return t('common.errorOffline');
+  const known = knownSentence(err);
+  if (known) return known;
+  if (status === 404) return t('common.errorNotFound');
+  if (status >= 500) return t('common.errorServer');
+  if (err?.name === 'AbortError' || err?.name === 'TimeoutError') return t('common.errorTimeout');
+  // Keine Antwort, obwohl der Browser sich fuer online haelt: das Netz auf dem
+  // Weg (WLAN, Proxy, Server aus). Genau dafuer ist der Verbindungssatz da.
+  if (/Failed to fetch|NetworkError|Load failed/i.test(err?.message || '')) return t('common.loadErrorDescription');
+  return undefined;
+}

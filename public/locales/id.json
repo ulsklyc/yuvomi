@@ -83,7 +83,10 @@
             "privateAssignedHint": "Entri ini hanya terlihat oleh pembuatnya - orang lain yang ditugaskan tidak melihatnya. Pilih \"Hanya yang ditugaskan\" jika mereka perlu melihatnya."
         },
         "toShoppingListNamed": "Tambahkan {{title}} ke daftar belanja",
-        "emailInUse": "Alamat email ini sudah dimiliki akun lain."
+        "emailInUse": "Alamat email ini sudah dimiliki akun lain.",
+        "sessionUnreachableTitle": "Koneksi terputus",
+        "sessionRetryHint": "Kamu tetap masuk. Mencoba lagi dalam {{seconds}} dtk.",
+        "sessionRetrying": "Mencoba lagi…"
     },
     "kitchen": {
         "noShoppingLists": "Belum ada daftar belanja.",

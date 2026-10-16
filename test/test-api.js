@@ -1309,6 +1309,24 @@ test('auth.me() ohne die Option meldet das Sitzungsende wie bisher', async () =>
   assert.equal(dispatchedEvents.filter((e) => e.type === 'auth:expired').length, 1);
 });
 
+// Critique R19: der Auth-Guard schickt NUR bei einem 401 zur Anmeldung. Ohne den
+// Status am Wurf waere ein Sitzungsende von einem Netzabbruch nicht zu trennen.
+test('auth.me() ohne die Option traegt den Status 401 auch am Wurf', async () => {
+  setup();
+  _mockFetch = () => mockResponse(401, { error: 'Not authenticated.' });
+
+  await assert.rejects(auth.me(), (err) => err.status === 401);
+});
+
+test('auth.me(): 429 und 503 tragen ihren Status und Retry-After, kein auth:expired', async () => {
+  for (const status of [429, 503]) {
+    setup();
+    _mockFetch = () => mockResponse(status, { error: 'Busy.' }, { 'Retry-After': '7' });
+    await assert.rejects(auth.me(), (err) => err.status === status && err.retryAfter === '7');
+    assert.equal(dispatchedEvents.filter((e) => e.type === 'auth:expired').length, 0, String(status));
+  }
+});
+
 test('quietExpiry ist keine fetch-Option und erreicht fetch nicht', async () => {
   setup();
   let seen;
