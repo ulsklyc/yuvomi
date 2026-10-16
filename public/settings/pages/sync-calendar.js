@@ -813,7 +813,14 @@ function buildGoogleProvider(googleStatus, user) {
   // Auswahl und Schreibschutz brauchen ein gültiges Token - bis zum neuen
   // Verbinden bleiben sie weg, statt mit einem Fehler zu laden.
   if (googleStatus.connected && !reauth && user?.role === 'admin') {
-    section.appendChild(buildGoogleCalendarPicker());
+    // Stellt erst der Kalenderabruf fest, dass Google das Token ablehnt, ist der
+    // Status oben veraltet: neu holen und die Karte im neuen Zustand aufbauen.
+    section.appendChild(buildGoogleCalendarPicker({
+      onReauth: async () => {
+        const fresh = await api.get('/calendar/google/status').catch(() => null);
+        if (fresh?.needsReauth) section.replaceWith(buildGoogleProvider(fresh, user));
+      },
+    }));
     section.appendChild(buildGoogleReadonlyToggle(googleStatus));
   }
 
@@ -1007,7 +1014,10 @@ function buildProviderHint(text) {
   return hint;
 }
 
-function buildGoogleCalendarPicker() {
+/** Grund, mit dem /calendar/google/calendars ein abgelehntes Token meldet (#2019). */
+const GOOGLE_REAUTH_REASON = 'google_reauth_required';
+
+function buildGoogleCalendarPicker({ onReauth } = {}) {
   const group = document.createElement('div');
   group.className = 'form-group settings-google-calendars';
 
@@ -1086,6 +1096,10 @@ function buildGoogleCalendarPicker() {
         });
       }
     } catch (err) {
+      if (err?.data?.reason === GOOGLE_REAUTH_REASON && onReauth) {
+        await onReauth();
+        return;
+      }
       const p = document.createElement('p');
       p.className = 'form-hint';
       p.textContent = err.message || t('common.errorGeneric');
@@ -1688,3 +1702,6 @@ export async function render(container, { user, query } = {}) {
 
   window.lucide?.createIcons({ el: container });
 }
+
+// Für die Suite: die Google-Karte für sich, ohne die ganze Seite (#2019).
+export const __test = { buildGoogleProvider };

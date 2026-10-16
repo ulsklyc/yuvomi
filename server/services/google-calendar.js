@@ -671,10 +671,42 @@ function loadAuthorizedClient() {
         client.credentials.refresh_token = tokens.refresh_token;
       }
       if (tokens.expiry_date)   cfgSet('google_token_expiry', String(tokens.expiry_date));
+      // Ein Refresh der aktuellen Generation ist gelungen: das Token gilt. Ein
+      // Marker aus einer überholten Ablehnung fällt im selben Schritt.
+      cfgDel('google_needs_reauth');
     })();
   });
 
+  shareRefreshes(client);
   return client;
+}
+
+// Höchstens EIN Refresh je Prozess (#2019). Sync, Sofortversuch und
+// Kalenderliste bauen je einen eigenen Client; refreshten zwei davon zugleich
+// mit demselben Token, könnte Google eine Anfrage annehmen und rotieren, die
+// andere ablehnen - kommt die Ablehnung zuerst an, stünde "neu verbinden" bei
+// gültigem Token. Ein zweiter Client wartet deshalb auf den laufenden Refresh
+// und übernimmt dessen Ergebnis, statt selbst zu fragen.
+let refreshInFlight = null;
+
+function shareRefreshes(client) {
+  client.refreshTokenNoCache = function sharedRefresh(refreshToken) {
+    if (!refreshInFlight) {
+      const own = Object.getPrototypeOf(this).refreshTokenNoCache.call(this, refreshToken);
+      // Der geteilte Ausgang lehnt nie ab: ohne Wartende bliebe eine Ablehnung
+      // sonst unbehandelt. Wer wartet, wirft sie selbst wieder.
+      refreshInFlight = own
+        .then((r) => ({ r }), (err) => ({ err }))
+        .finally(() => { refreshInFlight = null; });
+      return own.then((r) => ({ ...r, tokens: { ...r.tokens } }));
+    }
+    return refreshInFlight.then(({ r, err }) => {
+      if (err) throw err;
+      // Rotiert: auch dieser Client arbeitet ab jetzt mit dem neuen Token.
+      if (r.tokens?.refresh_token) this.credentials.refresh_token = r.tokens.refresh_token;
+      return { ...r, tokens: { ...r.tokens } };
+    });
+  };
 }
 
 /**
@@ -1592,6 +1624,7 @@ export const __test = {
   listSelection, setCalendarEnabled, recordSyncToken, getSyncToken, enabledCalendarIds,
   fetchEventColorMap, householdTimeZone, outboundTimeZone,
   loadAuthorizedClient, isInvalidGrant,
+  needsReauth,
   processPendingDeletions, pendingDeletionCount,
   processPendingUpdates, pendingUpdateCount,
   googleCalendarIdForEvent, currentGoogleCalendarId, loadCalendarMeta,

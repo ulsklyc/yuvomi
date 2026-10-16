@@ -25,6 +25,9 @@ import {
 import { getUserId } from './helpers.js';
 
 const log = createLogger('Calendar');
+
+/** Grund in der Antwort, wenn Google das gespeicherte Token abgelehnt hat (#2019). */
+const GOOGLE_REAUTH_REASON = 'google_reauth_required';
 const router = express.Router();
 
 // --------------------------------------------------------
@@ -119,10 +122,18 @@ router.get('/google/status', (req, res) => {
  * dem Warten auf Google - deshalb `refuseWhileRestoring` (#1551).
  */
 router.get('/google/calendars', requireAdmin, refuseWhileRestoring, async (req, res) => {
+  // Google nimmt das Token nicht mehr an (#2019): ein eigener Grund statt einer
+  // leeren Liste oder eines 500, damit die Einstellungen die Karte auf
+  // "neu verbinden" umstellen, auch wenn ihr Status von davor stammt.
+  const reauthRequired = () => res.status(409).json({
+    error: 'Google sign-in expired - reconnect required.', code: 409, reason: GOOGLE_REAUTH_REASON,
+  });
   try {
     const data = await googleCalendar.listCalendars();
+    if (googleCalendar.getStatus().needsReauth) return reauthRequired();
     res.json({ data });
   } catch (err) {
+    if (err?.reauthRequired) return reauthRequired();
     log.error('', err);
     res.status(500).json({ error: err.message, code: 500 });
   }

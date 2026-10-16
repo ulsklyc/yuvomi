@@ -2214,6 +2214,39 @@ test('#2019: lehnt Google r1 ab, während schon r3 gespeichert ist, bleibt die V
   assert.equal(cfg('google_refresh_token'), 'r3');
 });
 
+// Codex-Runde 4 auf #2029: Refreshes laufen single-flight.
+test('#2019: zwei gleichzeitige Kalenderlisten teilen sich EINEN Refresh', async () => {
+  reset();
+  let open;
+  const gate = new Promise((r) => { open = r; });
+  await withRefresh(async () => { await gate; throw invalidGrant(); }, async (calls) => {
+    const first  = listCalendars();
+    const second = listCalendars();
+    await new Promise((r) => setImmediate(r));
+    open();
+    await assert.rejects(first);
+    await assert.rejects(second);
+    assert.equal(calls.n, 1, 'ein Refresh-Request für beide');
+  });
+});
+
+test('#2019: ein gelungener Refresh der aktuellen Generation nimmt "neu verbinden" zurück', async () => {
+  reset();
+  db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('google_needs_reauth', '1')").run();
+  const client = realClient(() => ({ data: { access_token: 'a-ok', expires_in: 3600 } }));
+  await client.getAccessToken();
+  assert.equal(cfg('google_needs_reauth'), null);
+  assert.equal(getStatus().needsReauth, false);
+});
+
+test('#2019: GET /google/calendars meldet ein abgelehntes Token mit eigenem Grund', async () => {
+  reset();
+  db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('google_needs_reauth', '1')").run();
+  const res = await callRoute('GET', '/google/calendars');
+  assert.equal(res.status, 409);
+  assert.equal((await res.json()).reason, 'google_reauth_required');
+});
+
 // Codex-Runde 2 auf #2029.
 
 test('#2019: invalid_grant aus einem einzelnen Patch verwirft die Änderung nicht und meldet "neu verbinden"', async () => {
