@@ -580,14 +580,19 @@ function renderSummary() {
   const glance = _container.querySelector('#split-glance');
   if (glance) {
     const expanded = summary?.classList?.contains('is-expanded') ?? false;
+    // DIE KURZZEILE NENNT DIE GRUPPE NICHT (R19, Critique 2026-10-16). Sie steht
+    // nur schmal, und dort direkt ueber der Gruppenwahl, die den Namen schon
+    // traegt; mit ihm brach "Du bekommst in Haushalt" bei 390px in zwei Zeilen
+    // und "Du schuldest in Haushalt 24,14 €" stand daneben gedraengt. Die
+    // Karten (breit, und aufgeklappt) behalten das Label mit Gruppe.
     setHtml(glance, metricGlanceHtml({
       id: 'split-glance-more',
       controls: 'split-summary',
       expanded,
-      label: owedLabel,
+      label: t('splitExpenses.youAreOwed'),
       value: owedText,
       tone: owed.length ? 'positive' : 'neutral',
-      flows: [{ label: owingLabel, amount: owingText, tone: owing.length ? 'negative' : '' }],
+      flows: [{ label: t('splitExpenses.youOwe'), amount: owingText, tone: owing.length ? 'negative' : '' }],
     }));
     wireMetricGlance(glance, 'split-glance-more');
   }

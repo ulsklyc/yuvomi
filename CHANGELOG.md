@@ -44,7 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Budget lists on a phone no longer cut off what tells rows apart.** Loan installments are titled
   with the lender or borrower instead of "Loan repayment: ..." on every row, with the date and
   "Installment x of y" below. A subscription's description moves to its own line under the name,
-  and the plan shows long category names in full.
+  and the plan shows long category names in full. The summary line of Split no longer repeats the
+  group name that the group picker right below already shows, so it fits on one line.
 - **Module headers on phones and tablets take less room.** Shift plan, Rewards and Household help
   show their tabs in the title row (one row instead of two, 65px on a phone). The budget header
   folds to one row while you scroll, with the tabs beside the month. On a tablet the title, search

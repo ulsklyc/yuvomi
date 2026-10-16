@@ -490,6 +490,7 @@ test('die Gruppenzahl steht am Kopf der Liste, die Kennzahlen nennen ihre Gruppe
   // Betraege nennen jetzt ihre Gruppe, die Zahl steht nur am Kopf der Liste.
   const summary = { html: '', replaceChildren() { this.html = ''; }, insertAdjacentHTML(_p, h) { this.html += h; } };
   const zaehler = { textContent: '' };
+  const glance = { html: '', replaceChildren() { this.html = ''; }, insertAdjacentHTML(_p, h) { this.html += h; }, querySelector: () => null };
   const vorher = { ...split.state };
   const render = (extra) => {
     summary.html = '';
@@ -498,7 +499,8 @@ test('die Gruppenzahl steht am Kopf der Liste, die Kennzahlen nennen ihre Gruppe
       balances: { balances: [{ user_id: 7, net: '-24.14', net_minor: -2414, currency: 'EUR' }] }, user: { id: 7 },
       dashboard: { total_owed: [], total_owing: [] }, meta: { currencies: ['EUR'], default_currency: 'EUR' }, ...extra,
     });
-    split.renderSummaryForTest({ querySelector: (sel) => (sel === '#split-summary' ? summary : sel === '#split-group-count' ? zaehler : null) });
+    glance.html = '';
+    split.renderSummaryForTest({ querySelector: (sel) => (sel === '#split-summary' ? summary : sel === '#split-group-count' ? zaehler : sel === '#split-glance' ? glance : null) });
   };
   try {
     render();
@@ -507,6 +509,11 @@ test('die Gruppenzahl steht am Kopf der Liste, die Kennzahlen nennen ihre Gruppe
     assert.equal((summary.html.match(/class="metric-card[ "]/g) ?? []).length, 2, 'zwei Kacheln: bekommen und schulden');
     assert.match(summary.html, /metric-card__label">splitExpenses\.youAreOwedInGroup\{&quot;group&quot;:&quot;Haus &lt;&amp;&gt;&quot;\}</, 'der Name der Gruppe steht escaped im Label');
     assert.match(summary.html, /metric-card__label">splitExpenses\.youOweInGroup\{&quot;group&quot;:&quot;Haus &lt;&amp;&gt;&quot;\}</);
+    // R19: die Kurzzeile (nur schmal, direkt ueber der Gruppenwahl) nennt die
+    // Gruppe NICHT - mit ihr brach "Du bekommst in Haushalt" bei 390px um.
+    assert.match(glance.html, /budget-glance__label">splitExpenses\.youAreOwed</, 'die Kurzzeile sagt nur die Richtung');
+    assert.match(glance.html, /budget-glance__flow[^"]*">splitExpenses\.youOwe </);
+    assert.doesNotMatch(glance.html, /InGroup/, 'kein Gruppenname in der Kurzzeile');
     render({ activeGroupId: null, groups: [] });
     assert.match(summary.html, /metric-card__label">splitExpenses\.youOwe</, 'ohne Gruppe das schlichte Label');
   } finally {
