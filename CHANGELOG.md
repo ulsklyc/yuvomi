@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The housekeeping payment chart always shows six months.** Months without a visit appear
+  with 0 € instead of being left out, and the bars share the width of the card, so two payments no
+  longer sit alone at its left edge.
 - **A PDF preview shows the whole first page.** On a computer the preview fitted the page to its
   width and showed less than half of it; it now fits the full page, and "Open in new tab" stays the
   way to read it in detail.

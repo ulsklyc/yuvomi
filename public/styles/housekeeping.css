@@ -329,6 +329,10 @@
   }
 }
 
+/* DIE SECHS MONATE FUELLEN DIE KARTE (R19, Critique 2026-10-16): zwei 24px-
+ * Balken standen links in 570px, der Rest war leer. Jetzt immer sechs Monate
+ * (Server), jeder nimmt seinen Anteil der Breite; der Balken wird mit ihm
+ * breiter, bis --space-10. */
 .housekeeping-chart {
   min-height: 126px;
   display: flex;
@@ -339,6 +343,7 @@
 }
 
 .housekeeping-chart__bar-wrap {
+  flex: 1 1 0;
   min-width: 44px;
   display: grid;
   justify-items: center;
@@ -349,7 +354,7 @@
 }
 
 .housekeeping-chart__value {
-  font-size: var(--text-2xs);
+  font-size: var(--type-micro);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -369,7 +374,7 @@
 }
 
 .housekeeping-chart__track {
-  width: 24px;
+  width: min(100%, var(--space-10));
   height: var(--chart-bar-height);
   display: flex;
   align-items: flex-end;

@@ -649,7 +649,14 @@ function housekeepingDashboard(receipts = MASKED_RECEIPTS, daySource = {}) {
     if (!row.paid_at) bucket.pending += amount;
     chartByMonth.set(key, bucket);
   }
-  const chart = [...chartByMonth.values()].sort((a, b) => (a.month < b.month ? -1 : a.month > b.month ? 1 : 0));
+  // ALLE SECHS MONATE DES FENSTERS (R19, Critique 2026-10-16): mit nur den
+  // Monaten, in denen gezahlt wurde, standen zwei Balken links in einer
+  // 570px-Karte, ohne Zeitachse dazwischen. Ein Monat ohne Besuch ist eine
+  // Auskunft (0), keine Luecke.
+  const chart = Array.from({ length: 6 }, (_, i) => {
+    const key = addMonthsClamped(`${chartFirstMonth}-01`, i).slice(0, 7);
+    return chartByMonth.get(key) ?? { month: key, total: 0, pending: 0 };
+  });
 
   return {
     worker,

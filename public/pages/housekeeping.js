@@ -621,8 +621,10 @@ function renderDashboard(content) {
     // Balken skalierte deshalb nicht mit seiner Karte. Der Wert ist DATEN
     // (0..1), die Geometrie gehoert dem Stylesheet; dieselbe Bauart wie
     // `--span-from/--span-to` am Wetterbalken und `--bar-scale` im Budget.
-    // Der Mindestanteil haelt einen Monat ohne Zahlung sichtbar.
-    const scale = Math.max(0.06, row.total / maxPayment);
+    // Der Mindestanteil haelt einen kleinen Betrag sichtbar. Ein Monat OHNE
+    // Zahlung bleibt leer (R19): seit der Server alle sechs Monate liefert,
+    // stuende sonst ueber jeder Null ein Stummel, als waere etwas gezahlt.
+    const scale = row.total > 0 ? Math.max(0.06, row.total / maxPayment) : 0;
     // Wert sichtbar am Balken statt nur im Hover-title: das Chart trug sonst
     // keine ablesbare Achse oder Zahl (Audit A2-23).
     return `

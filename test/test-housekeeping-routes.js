@@ -410,6 +410,16 @@ test('GET /dashboard: liefert Kennzahlen-Shape', async () => {
   assert.equal(typeof d.pending_payments, 'number');
   assert.equal(typeof d.paid_this_month, 'number');
   assert.ok(Array.isArray(d.monthly_payments));
+  // R19 (Critique 2026-10-16): immer sechs aufeinanderfolgende Monate, auch
+  // ohne Zahlung - zwei Balken allein in 570px hatten keine Zeitachse.
+  assert.equal(d.monthly_payments.length, 6, 'sechs Monate, auch leere');
+  const months = d.monthly_payments.map((row) => row.month);
+  for (let i = 1; i < months.length; i++) {
+    const [y, m] = months[i - 1].split('-').map(Number);
+    const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
+    assert.equal(months[i], next, `lueckenlos: ${months.join(', ')}`);
+  }
+  assert.ok(d.monthly_payments.every((row) => typeof row.total === 'number'), 'ein leerer Monat traegt 0');
 });
 
 // --------------------------------------------------------------------------
