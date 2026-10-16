@@ -20,7 +20,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without changing other calendar subscriptions. A personal "Include birthdays" switch on the
   existing calendar feed is on by default; turn it off when using both feeds to avoid duplicates.
 
+### Changed
+
+- **One set of controls in every module header.** Search, view, filter and more sit in the same order
+  and look the same everywhere, and every view picker is the same segmented control. The calendar
+  header on a desktop is one row with a real search field (two rows instead of three on a tablet);
+  on a phone the view picker names the current view and "Today" sits on the period label. Tasks on a
+  phone keep search, filter and more beside the title, so the list starts about 50px higher. Settings
+  on a desktop shows the module header like every other module.
+- **Task and calendar filters open the same sheet.** People are chips, layers and calendars are
+  switches, "Assigned to me" is in the same place in both, and there is one "Reset filters".
+- **Tabs and adding work the same way across modules.** Rewards and household-help tabs are plain
+  text like every other module. Health areas, fasting included, add through their one button and
+  empty states no longer repeat it; an empty shift plan opens on Shift types with one way to add one;
+  the week planner shows a plus only in empty cells; the waste first-run screen offers import once.
+  Shopping quick-add fields match the search field, and the More sheet groups modules like the sidebar.
+- **Rows offer the same more button everywhere.** Tasks and birthdays show it on phones too, and
+  swiping stays as a shortcut. Housekeeping visits open their report on tap with edit, pay and delete
+  in one menu, as the same row in overview, reports and staff log; all four tabs now fit on a phone.
+  Budget accounts and loans, and notes, moved their extra actions into the row's more menu; pinned
+  notes keep the same card with a filled pin. Group headings in contacts and notes share one style,
+  and Settings in the desktop sidebar gets the same gliding highlight as every other entry.
+- **More room for content on phones.** The budget balance row stays one line until you open it, so
+  bookings start about 100px higher; the documents folder picker is the first chip of the filter row;
+  all-day entries in the calendar week take one line with "+n". Lab results read as rows with
+  abnormal values first, and fasting no longer shows an empty ring before your first fast.
+- **Dialogs ask in a clearer order.** The meal dialog starts with the name and offers meal types as
+  chips, the inventory dialog folds purchase, warranty, photo and documents behind "More details",
+  the measured-at date in health looks like a field, and activity intensity is a translated choice.
+  A budget category keeps one color in overview, plan and statistics; the plan says "tight" or "over"
+  in words with an icon.
+- **Dialogs are real dialogs.** The page behind a dialog can no longer be reached by keyboard or
+  screen reader, Esc and the back gesture ask before discarding unsaved input, and the icon picker and
+  image cropper look and move like every other dialog.
+- **Smoother motion.** View-switch pills glide instead of jumping while the new view builds, page
+  changes finish their fade sooner so the next tap lands earlier, charts in health draw in like the
+  budget reports, and an empty state no longer fades in twice. With reduced motion, dialogs, page
+  changes and theme switches crossfade instead of cutting hard.
+
 ### Fixed
+
+- **Too many requests are explained in your language.** When the server asks to slow down, the
+  app says so in the interface language instead of showing an English server message.
 
 - **Meals: clicking a meal with the mouse opens it again.** In the weekly planner a mouse click
   on a meal did nothing except flash a drag preview, so on a desktop or trackpad a meal could only
