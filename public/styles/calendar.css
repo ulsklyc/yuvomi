@@ -1510,10 +1510,24 @@
   font-size: var(--text-sm);
 }
 
+/* DER TAGESKOPF DER AGENDA IST EINE EIGENE STUFE, BEGRUENDET (D8, Critique
+ * 2026-10-16). Listen-Gruppenkoepfe sind sonst EIN Stil: das Versal-Mikro-
+ * Label `.list-group__title` (Aufgaben, Kontakte, Notizen, Einkauf). Dieser
+ * Kopf ist keiner davon: er ist der Anker einer ZEITACHSE - klebt beim
+ * Scrollen oben, nennt einen relativen Tag und das volle Datum („Heute ·
+ * Freitag, 16. Oktober") und traegt die Heute-Farbe. Ein Datum in Versalien
+ * mit Tracking liest sich als Ruf, und der Wochentag wuerde zur Abkuerzung
+ * gezwungen. Darum Satzschreibung, 14px fett + sekundaer - eine Stufe ueber
+ * dem Mikro-Label, unter dem Abschnittstitel (20px).
+ *
+ * Die Schriftgroesse steht auch am Kopf selbst, nicht nur an seinen zwei
+ * Spans: er ist ein h2/h3, und dessen Rolle (24px) bestimmte die Hoehe der
+ * Zeilenbox - gemessen 24px am Kopf bei 14px Text darin. */
 .agenda-day__header {
   display: flex;
   align-items: baseline;
   gap: var(--space-3);
+  font-size: var(--text-sm);
   padding: var(--space-2) 0 var(--space-1);
   /* 1px, nicht 2: der Tageskopf war die einzige 2px-Trennung neben lauter
    * 1px-Linien, und über einem randlosen Träger las sie als zweite Trennung.

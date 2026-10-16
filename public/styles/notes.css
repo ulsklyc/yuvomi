@@ -266,11 +266,11 @@
   box-shadow: var(--shadow-md);
 }
 
-/* Gepinnt: voller Ring (kein Seitenstreifen) aus der eigenen Textfarbe —
- * deutlich sichtbar auf jeder Zettelfarbe, zusätzlich zum stärkeren Schatten. */
-.note-card--pinned {
-  box-shadow: var(--shadow-md), 0 0 0 2px color-mix(in srgb, currentColor 22%, transparent);
-}
+/* EINE KARTENHAUT (Critique 2026-10-16). Angepinnt trug die Karte einen
+ * 2px-Ring, den staerkeren Schatten und eine Nadel auf eigener Scheibe - eine
+ * zweite Haut neben der normalen. Den Zustand sagen jetzt die Nadel in voller
+ * Tinte (statt tertiaer) und die Gruppe „Angepinnt" darueber; Flaeche,
+ * Schatten und Nadelgroesse sind fuer beide gleich. */
 
 .note-card__pin {
   position: absolute;
@@ -303,8 +303,11 @@
 
 .note-card--pinned .note-card__pin {
   pointer-events: auto;
-  background: var(--note-action-bg);
   color: inherit;
+}
+
+.note-card--pinned .note-card__pin svg {
+  fill: currentColor;
 }
 
 .note-card__pin:not(.note-card__pin--static):hover,
@@ -590,36 +593,13 @@
   gap: var(--space-1);
 }
 
-.note-card__delete {
+/* Der Mehr-Knopf (R18, D6) ist die geteilte `.row-action`; auf der Karte
+ * steht er im Mass der Nadel. */
+.note-card__more {
   width: var(--target-base);
   height: var(--target-base);
-  /* Loeschen traegt seit Runde 5 die geteilte `.row-action` (48px-Minimum);
-   * auf der Karte gilt dasselbe Mass wie fuer die Nadel. */
   min-width: var(--target-base);
   min-height: var(--target-base);
-  border-radius: var(--radius-full);
-  /* Dauerhaft sichtbar und ruhig wie die Nadel (D7): keine Flaeche, die
-   * Tertiaerfarbe der geteilten `.row-action`. */
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  color: var(--color-text-tertiary);
-  transition: background-color var(--transition-fast), color var(--transition-fast);
-}
-
-.note-card__delete::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-}
-
-.note-card__delete:hover {
-  background: var(--color-danger-light);
-  color: var(--color-danger-ink);
 }
 
 /* DIE KARTE IST DER OEFFNEN-KNOPF (R9 M13). Der Knopf liegt unsichtbar ueber
@@ -687,18 +667,8 @@
     padding-top: var(--space-1);
   }
 
-  .note-card__delete {
+  .note-card__more {
     margin-block: calc((var(--space-6) - var(--target-base)) / 2);
-  }
-
-  /* Die Nadel einer angepinnten Notiz traegt ihre Flaeche als kleine Scheibe
-   * (32px) in der vollen Trefflaeche - vorher fuellte die Scheibe die ganzen
-   * 48px und war das groesste Zeichen der Karte. Zwei Klassen, weil die
-   * Kurzschrift `background` der angepinnten Nadel (0,2,0) den Clip sonst
-   * zuruecksetzt. */
-  .note-card .note-card__pin {
-    padding: var(--space-2);
-    background-clip: content-box;
   }
 }
 

@@ -11,7 +11,7 @@ import { stagger, vibrate, scheduleUndoableDelete, wireScrollFade, acknowledgeCh
 import { redrawList } from '/utils/list-motion.js';
 import { t } from '/i18n.js';
 import { esc, renderMarkdownLight } from '/utils/html.js';
-import { rowActionHtml } from '/utils/row-action.js';
+import { rowMenuHtml } from '/utils/row-action.js';
 import { splitKeepingLineEndings } from '/utils/markdown-checklist.js';
 import { renderMarkdownToolbar, wireMarkdownToolbar } from '/utils/markdown-toolbar.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -117,11 +117,16 @@ function readOnly() {
  * und verspraeche „Anpinnen aufheben" fuer eine Beruehrung, die nichts tut
  * (dieselbe Begruendung wie am Statushaken der Aufgaben, #1209).
  */
+// EIN ZEICHEN, ZWEI ZUSTAENDE (Critique 2026-10-16): angepinnt stand hier
+// `pin-off` - auf der Scheibe las es sich als Knopf "loesen", ohne Scheibe als
+// "nicht angepinnt". Jetzt immer die Nadel: gefuellt in voller Tinte heisst
+// angepinnt (notes.css), offen in Tertiaerfarbe heisst nicht; die Beschriftung
+// nennt weiter die Handlung.
 function pinMarkup(note) {
   if (!readOnly()) {
     return `<button class="note-card__pin" data-action="pin" data-id="${note.id}"
               aria-label="${note.pinned ? t('notes.unpinAction') : t('notes.pinAction')}">
-        <i data-lucide="${note.pinned ? 'pin-off' : 'pin'}" class="icon-sm" aria-hidden="true"></i>
+        <i data-lucide="pin" class="icon-sm" aria-hidden="true"></i>
       </button>`;
   }
   if (!note.pinned) return '';
@@ -331,6 +336,10 @@ export async function render(container, { user, signal }) {
       if (owner) await toggleCheck(parseInt(owner.dataset.id, 10), box);
       return;
     }
+
+    // Der Mehr-Knopf und sein Menue haengen im DOM der Karte: ein Tipp auf
+    // Ausloeser oder Menuepolster oeffnet nicht die Notiz.
+    if (e.target.closest('.popover-menu, .popover-menu__trigger')) return;
 
     // [data-action="open"] fällt bewusst durch auf den Karten-Zweig darunter —
     // der Button liegt in der Karte, ein Treffer reicht.
@@ -542,7 +551,11 @@ function drawGrid(grid) {
   // nur, wenn es tatsächlich beide Gruppen gibt.
   const pinned = visible.filter((n) => n.pinned);
   const rest   = visible.filter((n) => !n.pinned);
-  const heading = (label) => `<h2 class="notes-group__title u-section-title">${label}</h2>`;
+  // EIN LISTEN-GRUPPENKOPF (D8, Critique 2026-10-16): „Angepinnt" stand als
+  // 20px-Abschnittstitel ueber den Karten - eine Stufe, die DESIGN.md dem
+  // Titel einer Flaeche gibt, nicht der Gruppe in einer Liste. Jetzt das
+  // Versal-Mikro-Label aus list-row.css wie in Aufgaben und Kontakten.
+  const heading = (label) => `<h2 class="notes-group__title list-group__title">${label}</h2>`;
 
   // Der Notiztitel ist eine echte Ueberschrift (R8 H15), eine Ebene unter
   // dem, was darueber steht: unter den Gruppenkoepfen (h2) ein h3, sonst
@@ -716,7 +729,15 @@ function renderNoteCard(note, { headingLevel = 2 } = {}) {
           <span>${esc(note.creator_name || '')}</span>
         </div>
         <div class="note-card__actions">
-          ${readOnly() ? '' : rowActionHtml({ icon: 'trash-2', tone: 'danger', action: 'delete', className: 'note-card__delete', label: t('common.deleteNamed', { name: noteName(note) }), attrs: { 'data-id': note.id } })}
+          ${/* LOESCHEN IM MEHR-KNOPF (R18, D6, Critique 2026-10-16): der
+              * Papierkorb stand offen auf jeder Karte - die lauteste Farbe
+              * der Wand gehoerte der seltensten Handlung. */ ''}
+          ${readOnly() ? '' : rowMenuHtml({
+    id: `note-menu-${note.id}`,
+    label: t('common.moreActionsNamed', { name: noteName(note) }),
+    className: 'note-card__more',
+    items: [{ action: 'delete', id: note.id, icon: 'trash-2', label: t('common.delete'), danger: true }],
+  })}
         </div>
       </div>
     </div>
