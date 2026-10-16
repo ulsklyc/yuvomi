@@ -1115,10 +1115,12 @@ test('redrawList: eine neue Zeile klappt ein (ohne FLIP darueber), eine reine Um
     const a2 = motionEl('a', 0); const c2 = motionEl('c', 48); const b2 = motionEl('b', 96);
     const entered = redrawList(host, () => { host.rows = [a2, c2, b2]; }, opts);
     assert.deepEqual(entered, { first: false, entered: 1, moved: 0 });
-    assert.equal(c2.calls.length, 1, 'die neue Zeile zieht ihre Hoehe auf');
-    assert.equal(c2.calls[0].keyframes[0].height, '0px');
-    assert.equal(c2.calls[0].keyframes[1].height, '48px');
-    assert.equal(b2.calls.length, 0, 'der Nachbar folgt dem Layout - kein zweiter Versatz per FLIP');
+    // Seit R19 ohne Hoehenanimation (expandIn, test:ux-utils): die neue Zeile
+    // blendet ein, ihre Nachbarn im DOM gleiten per FLIP aus der Lage ohne sie.
+    assert.equal(c2.calls.length, 1, 'die neue Zeile tritt ein');
+    assert.equal(c2.calls[0].keyframes[0].opacity, 0);
+    assert.ok(c2.calls[0].keyframes.every((f) => !('height' in f)), 'keine Hoehe in den Keyframes');
+    assert.equal(b2.calls.length, 0, 'kein zweiter Versatz aus dem Listen-FLIP obendrauf');
 
     // Reine Umsortierung: b vor a.
     const b3 = motionEl('b', 0); const a3 = motionEl('a', 48); const c3 = motionEl('c', 96);

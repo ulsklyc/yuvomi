@@ -2641,7 +2641,7 @@ function _validateField(input) {
   // den der Zeiger gerade zielt (R18). `expandIn` ist der Baustein dafuer.
   if (!hasValue && !wasShown) {
     const el = typeof group?.querySelector === 'function' ? group.querySelector('.form-field__error') : null;
-    if (el) expandIn(el, { duration: durationToken('--duration-md', 200), absorbGap: true });
+    if (el) expandIn(el, { duration: durationToken('--duration-md', 200) });
   }
 
   if (!hasValue && group) {
@@ -2725,7 +2725,7 @@ export function reportFieldError(input, message, { focus = true } = {}) {
   // Dieselbe Bewegung wie in _validateField: die Meldung zieht auf.
   if (!wasShown && typeof group.querySelector === 'function') {
     const el = group.querySelector('.form-field__error');
-    if (el) expandIn(el, { duration: durationToken('--duration-md', 200), absorbGap: true });
+    if (el) expandIn(el, { duration: durationToken('--duration-md', 200) });
   }
   input.setAttribute?.('aria-invalid', 'true');
   if (focus) _focusField(input);

@@ -268,6 +268,50 @@ test('collapseOut/expandIn: Blende, Nachruecken und Aufziehen laufen auf der sym
     `--ease-in-out ist nicht symmetrisch: ${m[1]}`);
 });
 
+// R19 (Critique 2026-10-16, "expandIn ohne Hoehenanimation"): das Element
+// steht sofort in voller Hoehe und blendet per opacity/transform ein; die
+// Nachbarn gleiten per FLIP nur mit transform. Gemessen am Aufruf: kein
+// Keyframe mit Hoehe oder Abstand, und die Nachbarn bekommen eine
+// translate-Animation aus der Lage OHNE das Element (display: none).
+test('expandIn R19: keine Hoehenanimation - Blende am Element, FLIP an den Nachbarn', async () => {
+  const prevGcs = global.getComputedStyle;
+  const prevDoc = global.document;
+  global.document = { documentElement: {}, body: {} };
+  global.getComputedStyle = () => ({ getPropertyValue: () => '', opacity: '1', overflowY: 'visible' });
+  const calls = [];
+  const parent = { nextElementSibling: null, parentElement: null };
+  const el = { style: {}, isConnected: true, parentElement: parent, animate: (k, o) => { calls.push({ who: 'el', k, o }); return { finished: Promise.resolve() }; } };
+  let hiddenWhileMeasured = null;
+  const neighbour = {
+    style: {},
+    nextElementSibling: null,
+    getBoundingClientRect: () => {
+      if (hiddenWhileMeasured === null) hiddenWhileMeasured = el.style.display === 'none';
+      return { left: 0, top: el.style.display === 'none' ? 100 : 140, width: 300, height: 40 };
+    },
+    animate: (k, o) => { calls.push({ who: 'n', k, o }); return { finished: Promise.resolve(), cancel() {} }; },
+    getAnimations: () => [],
+  };
+  el.nextElementSibling = neighbour;
+  try {
+    await expandIn(el, { duration: 10 });
+  } finally {
+    global.getComputedStyle = prevGcs;
+    global.document = prevDoc;
+  }
+  const layoutKeys = ['height', 'paddingTop', 'paddingBottom', 'marginTop', 'marginBottom', 'borderTopWidth', 'borderBottomWidth'];
+  const own = calls.filter((c) => c.who === 'el');
+  assert.equal(own.length, 1, 'eine Animation am Element');
+  assert.ok(own[0].k.every((f) => Object.keys(f).every((key) => !layoutKeys.includes(key))), `keine Hoehe/Abstaende: ${JSON.stringify(own[0].k)}`);
+  assert.equal(own[0].k[0].opacity, 0, 'blendet von 0 ein');
+  assert.equal(hiddenWhileMeasured, true, 'die alte Lage der Nachbarn ist die ohne das Element');
+  assert.equal(el.style.display, undefined, 'das Element steht danach wie vorher (kein display-Rest)');
+  const glide = calls.filter((c) => c.who === 'n');
+  assert.ok(glide.length >= 1, 'die Nachbarn gleiten');
+  assert.ok(glide.every((c) => c.k.every((f) => Object.keys(f).every((key) => key === 'transform' || key === 'offset' || key === 'composite'))),
+    `Nachbarn nur per transform: ${JSON.stringify(glide.map((c) => c.k))}`);
+});
+
 test('vibrate: tut nichts wenn API nicht vorhanden', () => {
   Object.defineProperty(global, 'navigator', { value: { vibrate: null }, writable: true, configurable: true });
   assert.doesNotThrow(() => vibrate(10));

@@ -179,13 +179,6 @@ export function easingToken(name, fallback = 'ease-out') {
 /** Die Blockmasse, die beim Einklappen mit auf null gehen: Hoehe, Innen- und Aussenabstand, Rahmen. */
 const BLOCK_PROPS = ['height', 'paddingTop', 'paddingBottom', 'marginTop', 'marginBottom', 'borderTopWidth', 'borderBottomWidth'];
 
-function blockFrame(el) {
-  const cs = getComputedStyle(el);
-  const frame = { height: `${el.getBoundingClientRect().height}px`, opacity: cs.opacity };
-  for (const p of BLOCK_PROPS.slice(1)) frame[p] = cs[p];
-  return frame;
-}
-
 function closedFrame() {
   const frame = { opacity: '0' };
   for (const p of BLOCK_PROPS) frame[p] = '0px';
@@ -277,30 +270,43 @@ function followingNeighbours(el, limit = 60) {
 }
 
 /**
- * Das Gegenstueck: ein gerade eingesetztes Element von null auf seine Hoehe
- * aufziehen (aufgeklappte Gruppe, eine per „Rueckgaengig" zurueckgekehrte
- * Zeile). Ohne `fill` - am Ende gilt wieder das Stylesheet.
+ * Das Gegenstueck: ein gerade eingesetztes Element erscheinen lassen
+ * (aufgeklappte Gruppe, eine per „Rueckgaengig" zurueckgekehrte Zeile, eine
+ * Feldmeldung). Ohne `fill` - am Ende gilt wieder das Stylesheet.
  *
- * `absorbGap`: das Element ist Kind eines Flex- oder Grid-Traegers mit `gap`.
- * Der Abstand gehoert dem Traeger und steht im selben Frame da, in dem das
- * Kind erscheint - die Nachbarn spraengen um genau diesen Betrag, bevor die
- * Hoehe ueberhaupt waechst. Ein negativer Aussenabstand im ersten Frame nimmt
- * ihn mit auf null (Feldmeldung im `.form-field`, gap 4px, R18).
+ * OHNE HOEHENANIMATION (R19, Critique 2026-10-16), gespiegelt zu collapseOut:
+ * bis hierher zog die Hoehe samt Innen- und Aussenabstand per Web Animations
+ * von null auf ihr Mass - Layout in jedem Frame fuer das Element und alles
+ * darunter. Jetzt steht das Element sofort in seiner vollen Hoehe und blendet
+ * mit einer kleinen Skalierung ein (opacity, transform); die Nachbarn gleiten
+ * per FLIP (utils/flip.js) nur mit `transform` von dort, wo sie ohne das
+ * Element standen, an ihre neue Stelle. Die alte Lage misst EIN Frame mit
+ * `display: none` am Element - darin faellt auch der `gap` des Traegers weg,
+ * den die alte Option `absorbGap` von Hand mitnehmen musste.
+ * `interpolate-size`/`calc-size()` (Guide animate-to-intrinsic-sizes) waere
+ * wieder eine Hoehenanimation und damit Layout je Frame.
+ *
+ * Unter `prefers-reduced-motion` steht das Element ohne Bewegung da.
  */
-export function expandIn(el, { duration = durationToken('--duration-lg', 250), absorbGap = false } = {}) {
+export function expandIn(el, { duration = durationToken('--duration-lg', 250) } = {}) {
   if (!el || typeof el.animate !== 'function') return Promise.resolve();
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return Promise.resolve();
-  const prevOverflow = el.style.overflow;
-  el.style.overflow = 'hidden';
-  const closed = closedFrame();
-  if (absorbGap && el.parentElement) {
-    const gap = parseFloat(getComputedStyle(el.parentElement).rowGap);
-    if (gap > 0) closed.marginTop = `${-gap}px`;
+  const easing = easingToken('--ease-in-out', 'ease-in-out');
+  const neighbours = el.style && el.isConnected !== false ? followingNeighbours(el) : [];
+  let before = null;
+  if (neighbours.length) {
+    const prevDisplay = el.style.display;
+    el.style.display = 'none';
+    before = flipSnapshotElements(neighbours);
+    el.style.display = prevDisplay;
   }
-  const anim = el.animate([closed, blockFrame(el)], {
-    duration, easing: easingToken('--ease-in-out', 'ease-in-out'),
-  });
-  return settleAnimation(anim, duration).then(() => { el.style.overflow = prevOverflow; });
+  const opacity = getComputedStyle(el).opacity || '1';
+  const anim = el.animate([
+    { opacity: 0, transform: 'scale(0.97)' },
+    { opacity, transform: 'none' },
+  ], { duration, easing });
+  if (before) flipPlayElements(before, { duration, easing });
+  return settleAnimation(anim, duration);
 }
 
 /** Letzte Absicht je Region (offen/zu): ein Zuklappen, das ein Oeffnen ueberholt hat, raeumt nicht ab. */

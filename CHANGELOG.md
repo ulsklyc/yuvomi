@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **New rows and messages appear without the list jerking.** A row that comes back after "Undo",
+  an unfolded group or a field message now fades in at its full size while the rows below glide
+  down, instead of growing its height frame by frame, which stuttered on slower phones.
 - **Switching calendar views and opening a settings page now move in a direction.** Choosing
   Week after Month slides the new view in from the right and back the other way; opening a
   settings page slides it over the list, and going back slides it away again. With reduced motion

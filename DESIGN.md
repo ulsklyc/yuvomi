@@ -1181,7 +1181,10 @@ das Verhaeltnis haelt.
   (`flipPlayElements` in `utils/flip.js`) nur mit `transform` nach - keine Hoehe, kein Abstand
   je Frame (am 4x gedrosselten Telefon sprang die Hoehenanimation in Stufen). Unter reduzierter
   Bewegung blendet die Zeile aus und die Nachbarn blenden an ihrer neuen Stelle ein, statt um
-  die Zeilenhoehe zu springen. `expandIn` zieht weiter ueber die Hoehe auf.
+  die Zeilenhoehe zu springen. **`expandIn` spiegelt das seit R19:** das Element steht sofort in
+  voller Hoehe und blendet mit 3 % Skalierung ein, die Nachbarn gleiten per FLIP aus der Lage,
+  die ein Frame mit `display: none` am Element misst (damit faellt auch der `gap` des Traegers
+  weg - die Option `absorbGap` ist entfallen). `interpolate-size` waere wieder Layout je Frame.
   prefers-reduced-motion schaltet Signature-Animationen ab.
 - **Eine Kurvenfamilie (R16):** Interaktions-Motion nimmt Dauer UND Kurve aus Tokens. Die drei
   Shorthands `--transition-fast/base/slow` bestehen aus `var(--duration-*) var(--ease-out)` -
@@ -1208,7 +1211,7 @@ das Verhaeltnis haelt.
   `allow-discrete`: wo der Browser es nicht kennt, schliesst das Menue hart wie zuvor.
 - **Listenbewegung - der Standard (`utils/list-motion.js`):** eine Liste, die ihre Zeilen neu
   baut, zeichnet ueber `redrawList(host, render, { selector, keyAttr })`: der Aufbau aus dem
-  Leeren blendet einmal gestaffelt ein, eine neue Zeile zieht auf (`expandIn`), eine reine
+  Leeren blendet einmal gestaffelt ein, eine neue Zeile tritt ein (`expandIn`), eine reine
   Umsortierung gleitet (FLIP) - nie zwei Bewegungen uebereinander. Eine Zeile, die geht, klappt
   VOR dem Neuzeichnen aus (`collapseRow`). Nutzer: Aufgaben und Einkauf (Bestand),
   Haushaltshilfe, Entsorgung (drei Listen), Vorrat, Belohnungen; seit R17 auch Notizen,
