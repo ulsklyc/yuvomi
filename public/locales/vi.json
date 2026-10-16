@@ -3248,7 +3248,8 @@
         "unsavedChanges": "Bỏ qua các thay đổi?",
         "unsavedChangesDetail": "Nội dung bạn đã nhập trong biểu mẫu này sẽ bị mất.",
         "discardChanges": "Bỏ qua",
-        "moreSettings": "Cài đặt khác"
+        "moreSettings": "Cài đặt khác",
+        "moreDetails": "Thông tin thêm"
     },
     "rrule": {
         "freqNone": "Không lặp lại",
@@ -5044,6 +5045,12 @@
             },
             "col": {
                 "day": "Ngày"
+            },
+            "intensity": {
+                "none": "Không chỉ định",
+                "low": "Nhẹ",
+                "moderate": "Vừa",
+                "high": "Cao"
             }
         },
         "export": {
@@ -6087,7 +6094,8 @@
         "odometerChartTitle": "Đồng hồ đo quãng đường theo thời gian",
         "detailPaneLabel": "Chi tiết đồ vật",
         "pickOne": "Chọn một đồ vật",
-        "pickOneHint": "Thông tin, thời hạn và lịch sử hiển thị ở đây."
+        "pickOneHint": "Thông tin, thời hạn và lịch sử hiển thị ở đây.",
+        "moreDetailsHint": "Mua, bảo hành, ảnh, tài liệu"
     },
     "documentAttach": {
         "label": "Tệp đính kèm",

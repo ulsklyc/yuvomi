@@ -1715,7 +1715,9 @@ test('eine Ansicht ohne ein einziges Dokument zeigt keine Facetten-Moebel', () =
   assert.match(tree, /const showCounts = state\.allDocuments\.length > 0;/);
   assert.match(tree, /\$\{showCounts \? `<span class="documents-folder-item__count">/);
   // Und die Spur verschwindet samt Haarlinie, wenn keine Gruppe einen Chip traegt.
-  const spur = [...eachRule(css)].find((r) => r.at.length === 0 && r.selector === '.documents-filters__chips:not(:has(.filter-chip))');
+  // Der Ordner-Chip (Critique 2026-10-16) zaehlt dabei nicht als Facette: am
+  // Desktop ist er ausgeblendet, unter 1024px traegt er die Spur allein.
+  const spur = [...eachRule(css)].find((r) => r.at.length === 0 && r.selector === '.documents-filters__chips:not(:has(.filter-chip:not(.documents-folder-chip)))');
   assert.ok(spur && /display:\s*none/.test(spur.body), 'leere Chip-Spur ausblenden');
 });
 
@@ -1971,4 +1973,26 @@ test('R18: der PDF-Betrachter am Desktop blendet die Leiste des Browsers aus, de
 test('R18: zwischen Filterleiste und Inhalt steht Luft', () => {
   const layout = topRules(css).find((rule) => rule.selector === '.documents-browser-layout');
   assert.match(layout.body, /padding-top:\s*var\(--space-4\)/, 'Ordnerspalte und erste Kartenreihe beginnen nicht auf der Trennlinie');
+});
+
+// Critique 2026-10-16 (P2 mobil): der Ordner-Umschalter stand unter 1024px als
+// eigene 48px-Zeile zwischen Filterzeile und Liste (erstes Dokument y=216). Er
+// ist jetzt der erste Chip der Chip-Spur; zugeklappt belegt die Ordnerauswahl
+// keine Zeile (erstes Dokument y=152 bei 390x844).
+test('Dokumente mobil: der Ordner-Umschalter ist der erste Chip der Filterzeile (Critique 2026-10-16)', () => {
+  const spur = page.slice(page.indexOf('<div class="documents-filters__chips">'), page.indexOf('<div class="documents-browser-layout">'));
+  const chip = spur.indexOf('id="documents-folder-toggle"');
+  assert.ok(chip > -1, 'der Auslöser steht in der Chip-Spur');
+  assert.ok(chip < spur.indexOf('id="documents-expiring-filter"') && chip < spur.indexOf('id="documents-category"'), 'und zwar als erster Chip');
+  assert.match(spur, /class="filter-chip filter-chip--sm documents-folder-chip" id="documents-folder-toggle" type="button"\s+aria-expanded="false" aria-controls="documents-folder-browser">/,
+    'Chip-Haut, Zustand und Ziel des Aufklappens');
+  assert.equal((page.match(/id="documents-folder-toggle"/g) ?? []).length, 1, 'genau EIN Auslöser');
+  assert.match(page, /toggleAttribute\('data-folder-active', Boolean\(state\.folderId\)\)/, 'ein gewaehlter Ordner zeigt sich am Chip');
+  const rules = [...eachRule(css)];
+  const tablet = (r) => r.at.some((a) => /max-width:\s*1023px/.test(a));
+  assert.ok(rules.some((r) => r.at.length === 0 && r.selector.trim() === '.documents-folder-chip' && /display:\s*none/.test(r.body)),
+    'am Desktop kein Ordner-Chip - dort steht die Spalte');
+  assert.ok(rules.some((r) => tablet(r) && r.selector.trim() === '.documents-folder-chip' && /display:\s*inline-flex/.test(r.body)));
+  assert.ok(rules.some((r) => tablet(r) && r.selector.trim() === '.documents-folder-browser:not(.documents-folder-browser--open)' && /display:\s*none/.test(r.body)),
+    'zugeklappt belegt die Ordnerauswahl keine Zeile');
 });

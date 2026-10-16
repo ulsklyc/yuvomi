@@ -2372,9 +2372,16 @@ svg.weather-forecast__icon {
   to   { opacity: 0; }
 }
 
+/* DIE SCHWEBENDE TAFEL, NICHT KARTE MIT RAND (Critique 2026-10-16; Detektor
+ * `gpt-thin-border-wide-shadow`). Die Karte trug eine 1px-Haarlinie UND den
+ * 28px-Schatten `--shadow-lg` - zwei Kanten fuer eine Flaeche. Sie schwebt
+ * ueber dem verschwommenen Grund wie Dialog und Mehr-Blatt und nimmt deren
+ * Material: `--glass-shadow-lg` bringt Tiefe und den feinen Lichtring in
+ * einem, `--glass-inset-elevated` die Lichtkante oben (glass.css, R18). Keine
+ * eigene Linie mehr. */
 .onboarding-card {
   background: var(--color-surface);
-  border: 1px solid var(--color-border-subtle);
+  border: none;
   border-radius: var(--radius-xl);
   padding: var(--space-8);
   max-width: 360px;
@@ -2384,7 +2391,7 @@ svg.weather-forecast__icon {
   align-items: center;
   gap: var(--space-4);
   text-align: center;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--glass-shadow-lg), var(--glass-inset-elevated);
 }
 
 /* Der Schritt in der stehenden Karte (dashboard.js, showOnboarding): er traegt

@@ -825,3 +825,19 @@ test('R14: auf dem Telefon bleibt der Speed-Dial in der Kapsel', () => withStage
   assert.match(__test.renderFab(), /class="page-fab-group"/);
   assert.doesNotMatch(renderDashboardOverview({ display_name: 'Linda' }, false, null, {}), /id="fab-main"/);
 }));
+
+// Critique 2026-10-16: jede Kachel fuehrt mit „Alle" zu ihrer Seite, nur die
+// Familie sagte „Verwalten" fuer denselben Weg. Und die Onboarding-Karte trug
+// Haarlinie plus 28px-Schatten (Detektor gpt-thin-border-wide-shadow): sie
+// nimmt jetzt das Material der schwebenden Tafel (glass.css).
+test('Dashboard: ein Wort fuer den Kopf-Link, Onboarding-Karte als schwebende Tafel (Critique 2026-10-16)', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const { readFileSync } = await import('node:fs');
+  assert.match(dashboardSource, /widgetHeader\('family', t\('dashboard\.familyTitle'\), null, manageHref, null, 'contacts'\)/,
+    'die Familie nimmt das gemeinsame Link-Wort');
+  assert.doesNotMatch(dashboardSource, /t\('dashboard\.manage'\)/);
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const card = [...eachRule(css)].find((r) => !r.at.length && r.selector.trim() === '.onboarding-card');
+  assert.match(card?.body ?? '', /border:\s*none/, 'keine Haarlinie');
+  assert.match(card?.body ?? '', /box-shadow:\s*var\(--glass-shadow-lg\), var\(--glass-inset-elevated\)/, 'Tiefe und Lichtkante der schwebenden Tafel');
+});

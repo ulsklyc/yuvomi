@@ -3450,7 +3450,8 @@
         "unsavedChanges": "Відхилити зміни?",
         "unsavedChangesDetail": "Введені у форму дані буде втрачено.",
         "discardChanges": "Відхилити",
-        "moreSettings": "Додаткові налаштування"
+        "moreSettings": "Додаткові налаштування",
+        "moreDetails": "Додатково"
     },
     "rrule": {
         "freqNone": "Без повторення",
@@ -5294,6 +5295,12 @@
             },
             "col": {
                 "day": "День"
+            },
+            "intensity": {
+                "none": "Не вказано",
+                "low": "Низька",
+                "moderate": "Середня",
+                "high": "Висока"
             }
         },
         "export": {
@@ -6391,7 +6398,8 @@
         "odometerChartTitle": "Пробіг у часі",
         "detailPaneLabel": "Відомості про предмет",
         "pickOne": "Виберіть предмет",
-        "pickOneHint": "Тут з’являться дані, терміни та історія."
+        "pickOneHint": "Тут з’являться дані, терміни та історія.",
+        "moreDetailsHint": "Купівля, гарантія, фото, документи"
     },
     "documentAttach": {
         "label": "Вкладення",

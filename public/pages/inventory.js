@@ -1803,24 +1803,6 @@ function buildItemForm({ mode, item = null }) {
           <select id="inv-location" class="form-input">${locationOptions.join('')}</select>
         </div>
       </div>
-      <div class="form-pair form-pair--wide">
-        <div class="form-group">
-          <label class="form-label" for="inv-purchase-date">${esc(t('inventory.purchaseDateLabel'))}</label>
-          <yuvomi-datepicker id="inv-purchase-date" type="date"
-                             value="${esc(isEdit && item.purchase_date ? item.purchase_date : '')}"></yuvomi-datepicker>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="inv-purchase-price">${esc(t('inventory.purchasePriceLabel'))}</label>
-          <input id="inv-purchase-price" class="form-input" type="number" min="0" step="0.01" inputmode="decimal">
-        </div>
-      </div>
-      ${!isEdit && showsBookings ? `
-      <div class="form-group">
-        <button class="btn btn--secondary btn--sm" type="button" data-action="link-booking">
-          <i data-lucide="link" aria-hidden="true"></i> ${esc(t('inventory.linkBooking'))}
-        </button>
-        <div data-picked-booking-chip hidden></div>
-      </div>` : ''}
       <div class="form-group">
         <label class="form-label" for="inv-status">${esc(t('inventory.statusLabel'))}</label>
         <select id="inv-status" class="form-input">${statusOptions}</select>
@@ -1833,7 +1815,30 @@ function buildItemForm({ mode, item = null }) {
           <i data-lucide="plus" aria-hidden="true"></i> ${esc(t('inventory.addBooking'))}
         </button>
       </div>` : ''}
+      ${/* SELTENES HINTER „WEITERE ANGABEN" (Critique 2026-10-16, D4). Der
+           Dialog zeigte bis zu 22 Felder; vorn stehen jetzt Name, Kategorie,
+           Ort und Status (beim Bearbeiten dazu die verknuepften Buchungen).
+           Kauf, Garantie, Foto und Dokumente stehen dahinter, und die zweite
+           Zeile des Aufklappers nennt sie, damit man sie findet. */ ''}
       ${advancedSection(`
+        <div class="form-pair form-pair--wide">
+          <div class="form-group">
+            <label class="form-label" for="inv-purchase-date">${esc(t('inventory.purchaseDateLabel'))}</label>
+            <yuvomi-datepicker id="inv-purchase-date" type="date"
+                               value="${esc(isEdit && item.purchase_date ? item.purchase_date : '')}"></yuvomi-datepicker>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="inv-purchase-price">${esc(t('inventory.purchasePriceLabel'))}</label>
+            <input id="inv-purchase-price" class="form-input" type="number" min="0" step="0.01" inputmode="decimal">
+          </div>
+        </div>
+        ${!isEdit && showsBookings ? `
+        <div class="form-group">
+          <button class="btn btn--secondary btn--sm" type="button" data-action="link-booking">
+            <i data-lucide="link" aria-hidden="true"></i> ${esc(t('inventory.linkBooking'))}
+          </button>
+          <div data-picked-booking-chip hidden></div>
+        </div>` : ''}
         <div class="form-group">
           <span class="form-label">${esc(t('inventory.photoLabel'))}</span>
           <div class="inventory-photo-wrap">
@@ -1933,6 +1938,8 @@ function buildItemForm({ mode, item = null }) {
           hint: t('inventory.attachmentsHint'),
         })}`,
       {
+        label: t('modal.moreDetails'),
+        hint: t('inventory.moreDetailsHint'),
         open: isEdit && (!!item.brand || !!item.model || !!item.serial_number || !!item.notes
           || !!item.photo_data || (item.attachments?.length ?? 0) > 0
           // Kilometerstand auf einen Blick zeigen: entweder schon gesetzt,

@@ -5756,6 +5756,27 @@ test('am Display bietet das Filterblatt „Mir zugewiesen" nicht an (#1808)', ()
   assert(!/data-filter-mine/.test(blatt({ id: 9, access_scope: 'display' })), 'am Display steht der Schalter nicht im Blatt');
 });
 
+// Critique 2026-10-16 (P2 mobil): das Ganztags-Band der Woche stand bei vier
+// Eintraegen an einem Tag 104px hoch, der erste Termin bei y=266. Mobil zeigt
+// jede Zelle eingeklappt EINEN Eintrag plus „+n"; Zahl und Beschriftung
+// klappen die Zeile auf (gemessen: Band 105 -> 56px, Raster ab y=218).
+test('Woche mobil: Ganztaegiges als EINE Zeile plus „+n", aufklappbar (Critique 2026-10-16)', () => {
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const week = src.slice(src.indexOf('function renderWeekView(container)'), src.indexOf('function chronological(items)'));
+  assert(/const alldayFolds = isMobile && alldayCounts\.some\(\(n\) => n > 1\);/.test(week), 'nur mobil und nur wenn eine Zelle mehr als einen Eintrag hat');
+  assert(/class="allday-more" data-allday-toggle aria-expanded="\$\{alldayOpen\}"\s+aria-label="\$\{esc\(t\('calendar\.moreEvents', \{ count: n - 1 \}\)\)\}">\+\$\{n - 1\}<\/button>/.test(week),
+    '„+n" ist ein Knopf mit Zustand und ausgeschriebenem Namen');
+  assert(/calendar-all-day-label--toggle" data-allday-toggle aria-expanded=/.test(week), 'die Beschriftung klappt auf und zu');
+  assert(/\$\{alldayMore\(alldayCounts\[i\]\)\}/.test(week), 'jede Zelle traegt ihren Zaehler');
+  assert(/state\.alldayExpanded = !alldayRow\.classList\.contains\('is-expanded'\);/.test(week), 'der Zustand gilt fuer die Sitzung');
+  const rules = [...eachRule(calendarCss)];
+  const rule = (sel) => rules.find((r) => r.selector.trim() === sel);
+  assert(/display:\s*none/.test(rule('.allday-row--fold:not(.is-expanded) .allday-cell > :not(:first-child):not(.allday-more)')?.body ?? ''),
+    'eingeklappt nur der erste Eintrag je Zelle');
+  assert(/display:\s*none/.test(rule('.allday-more')?.body ?? ''), 'aufgeklappt (und am Desktop) kein Zaehler');
+  assert(/display:\s*inline-flex/.test(rule('.allday-row--fold:not(.is-expanded) .allday-more')?.body ?? ''));
+});
+
 // --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------

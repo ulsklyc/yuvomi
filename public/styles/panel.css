@@ -1239,6 +1239,40 @@ svg.chart {
   margin-inline-start: 0;
 }
 
+/* EINZEILIG BIS AUFGEKLAPPT (Critique 2026-10-16, P2 mobil; budget.js
+ * `balanceGlanceHtml`). Die Budget-Uebersicht stellte Saldo, Ein/Aus und
+ * „Alle Kategorien" in drei Zeilen vor die erste Buchung (y=354). Eingeklappt
+ * stehen jetzt Etikett und Saldo in EINER Zeile, auf der Grundlinie; Ein/Aus
+ * und die Kategorien-Zeile kommen mit dem Aufklappen. Die Zahl fuehrt weiter
+ * (Title 1 statt Display), damit sie neben dem Etikett in die Zeile passt -
+ * die Stufen der Leiter gelten wie oben, nur eine Stufe tiefer. */
+.budget-glance--fold.budget-glance--lead .budget-glance__lead {
+  flex-direction: row;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.budget-glance--fold.budget-glance--lead .budget-glance__label {
+  font-size: var(--text-sm);
+}
+
+.budget-glance--fold.budget-glance--lead .budget-glance__value {
+  font-size: var(--text-3xl);
+}
+
+.budget-glance--fold.budget-glance--lead-xlong .budget-glance__value {
+  font-size: var(--text-2xl);
+}
+
+.budget-glance--fold.budget-glance--lead-xxlong .budget-glance__value {
+  font-size: var(--text-xl);
+}
+
+.budget-glance--fold .budget-glance__balance[aria-expanded="false"] .budget-glance__flows,
+.budget-glance--fold:has(.budget-glance__balance[aria-expanded="false"]) .budget-glance__categories {
+  display: none;
+}
+
 .budget-glance__title {
   font-weight: var(--font-weight-medium);
 }

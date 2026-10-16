@@ -1413,6 +1413,87 @@ button.health-med-card:hover {
   overflow-x: auto;
 }
 
+/* LABORWERTE MOBIL ALS ZEILEN (Critique 2026-10-16; health.js
+ * `resultListMarkup`). Unter 640px ersetzt die Zeilenliste die seitlich
+ * scrollende Tabelle: Analyt links, Wert rechts, darunter Referenz und
+ * Bewertung. Ein auffaelliger Wert steht vorn und sagt es dreifach - Pfeil,
+ * Wort („Niedrig"), Ton -, die Farbe allein traegt nichts. Die Zeilen liegen
+ * IN der Befundkarte, also ohne eigene Flaeche, nur mit Trennlinien. */
+.health-lab-rows {
+  display: none;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 639px) {
+  .health-lab-table-wrap {
+    display: none;
+  }
+
+  .health-lab-rows {
+    display: block;
+  }
+}
+
+.health-lab-rows__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--space-3);
+  row-gap: var(--space-0h);
+  align-items: baseline;
+  padding-block: var(--space-3);
+}
+
+.health-lab-rows__row + .health-lab-rows__row {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.health-lab-rows__analyte {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
+}
+
+.health-lab-rows__value {
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-primary);
+  text-align: end;
+  white-space: nowrap;
+}
+
+.health-lab-rows__meta {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.health-lab-rows__ref {
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.health-lab-rows__meta .health-lab-flag {
+  margin-inline-start: auto;
+  font-size: var(--text-sm);
+}
+
+.health-lab-rows__row--low .health-lab-rows__value {
+  color: var(--color-info);
+}
+
+.health-lab-rows__row--high .health-lab-rows__value {
+  color: var(--color-danger);
+}
+
 .health-lab-table {
   width: 100%;
   border-collapse: collapse;
@@ -3744,6 +3825,12 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 .fasting-hero__remaining { font-weight: var(--font-weight-semibold); }
 .fasting-hero__meta { margin-block: var(--space-2) var(--space-4); color: var(--color-text-secondary); font-size: var(--text-sm); }
 .fasting-hero__actions { display: flex; justify-content: center; gap: var(--space-2); flex-wrap: wrap; }
+/* Vor dem ersten Fasten (health-fasting.js `idle`): kein leerer Ring, keine
+ * Umschaltung der Uhr - Satz und Knoepfe, darunter gleich der Leerzustand
+ * des Verlaufs (Critique 2026-10-16). */
+.fasting-hero--idle .fasting-dial,
+.fasting-hero--idle .fasting-clock-switch { display: none; }
+.fasting-hero--idle .u-section-title { margin-block-end: var(--space-3); }
 .fasting-history-more { display: grid; justify-items: center; gap: var(--space-2); padding-block-start: var(--space-3); }
 .fasting-history-more [hidden] { display: none; }
 .fasting-card__heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-block-end: var(--space-3); flex-wrap: wrap; }
@@ -3796,6 +3883,23 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   justify-content: space-between;
   gap: var(--space-3);
   flex-wrap: wrap;
+}
+
+/* Kein Tagesziel: zwei Saetze in der Flucht des Abschnittstitels (health.js
+ * `nutritionTodaySectionMarkup`, Critique 2026-10-16). */
+.health-nutrition-today__none {
+  display: grid;
+  gap: var(--space-1);
+  margin-block-start: var(--space-2);
+}
+
+.health-nutrition-today__none > p {
+  margin: 0;
+}
+
+.health-nutrition-today__none-title {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
 }
 
 .health-nutrition-progress {

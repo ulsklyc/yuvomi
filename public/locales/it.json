@@ -3248,7 +3248,8 @@
         "unsavedChanges": "Scartare le modifiche?",
         "unsavedChangesDetail": "I dati inseriti in questo modulo andranno persi.",
         "discardChanges": "Scarta",
-        "moreSettings": "Altre impostazioni"
+        "moreSettings": "Altre impostazioni",
+        "moreDetails": "Altri dettagli"
     },
     "rrule": {
         "freqNone": "Nessuna ripetizione",
@@ -5044,6 +5045,12 @@
             },
             "col": {
                 "day": "Giorno"
+            },
+            "intensity": {
+                "none": "Non indicata",
+                "low": "Bassa",
+                "moderate": "Moderata",
+                "high": "Alta"
             }
         },
         "export": {
@@ -6087,7 +6094,8 @@
         "odometerChartTitle": "Contachilometri nel tempo",
         "detailPaneLabel": "Dettagli dell'oggetto",
         "pickOne": "Scegli un oggetto",
-        "pickOneHint": "Qui compaiono dettagli, scadenze e cronologia."
+        "pickOneHint": "Qui compaiono dettagli, scadenze e cronologia.",
+        "moreDetailsHint": "Acquisto, garanzia, foto, documenti"
     },
     "documentAttach": {
         "label": "Allegati",

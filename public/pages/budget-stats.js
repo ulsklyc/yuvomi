@@ -2,6 +2,7 @@
  * Modul: Budget-Statistik-View
  * Zweck: Statistik-Tab (Zeitraum-Filter, Summary-Cards, Trendlinie, Donut, CSV-Export).
  */
+import { CATEGORY_SERIES_COLORS, categoryColorIndex } from '/utils/budget-category-colors.js';
 import { api } from '/api.js';
 import { t, formatDate, getLocale } from '/i18n.js';
 import { wireTablist } from '/utils/tablist.js';
@@ -233,11 +234,9 @@ function renderBodyContent(body) {
 // --module-shopping/--module-meals tragen eine andere Bedeutung und garantieren
 // keinen Kontrast gegen die Kartenfläche. Die Zahl der Segmente ist auf
 // DONUT_SEGMENTS begrenzt, damit sich keine zwei Segmente dieselbe Farbe teilen.
-const DONUT_COLORS = [
-  'var(--chart-series-1)', 'var(--chart-series-2)', 'var(--chart-series-3)',
-  'var(--chart-series-4)', 'var(--chart-series-5)', 'var(--chart-series-6)',
-  'var(--chart-series-7)',
-];
+// Die Palette steht seit der Critique 2026-10-16 an EINER Stelle
+// (utils/budget-category-colors.js): Uebersicht und Plan faerben mit ihr.
+const DONUT_COLORS = CATEGORY_SERIES_COLORS;
 const DONUT_SEGMENTS = DONUT_COLORS.length;
 
 function signed(n) {
@@ -273,18 +272,10 @@ function previousPeriodLabel(prev) {
  * mehr Einnahmen besser) - dieselbe Trend-Sprache wie die Kennzahl-Karten.
  * Eine Kategorie, die nur im Vorzeitraum vorkam, steht mit null da: ihr
  * Wegfall ist genau die Veraenderung, nach der man hier sucht. */
-/* EINE FARBE JE KATEGORIE IN BEIDEN DIAGRAMMEN (R14 P8, A5 P2-8). Die
- * Ausgabenbalken standen alle im Modulton, der Donut daneben in sieben
- * Serienfarben - dieselben Betraege in zwei Farbsystemen. Jetzt nimmt jeder
- * Balken die Farbe seines Donut-Segments (dieselbe Reihenfolge wie
- * donutSlices: groesste Ausgabe zuerst, jenseits der Palette die Farbe der
- * Sammelscheibe). */
-function categoryColorIndex(byCategory) {
-  const order = (byCategory ?? [])
-    .filter((c) => c.expenses < 0)
-    .sort((a, b) => Math.abs(b.expenses) - Math.abs(a.expenses));
-  return new Map(order.map((c, i) => [c.category, Math.min(i, DONUT_SEGMENTS - 1)]));
-}
+/* EINE FARBE JE KATEGORIE IN BEIDEN DIAGRAMMEN (R14 P8, A5 P2-8) - und seit
+ * der Critique 2026-10-16 in jeder Budget-Ansicht: `categoryColorIndex` kommt
+ * aus utils/budget-category-colors.js, dieselbe Zuordnung wie Uebersicht und
+ * Plan (groesste Ausgabe zuerst, jenseits der Palette die Sammelscheibe). */
 
 function renderCatBars() {
   const host = view.root.querySelector('#budget-stats-cat');

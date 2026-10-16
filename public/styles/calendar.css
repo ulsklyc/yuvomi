@@ -2277,6 +2277,79 @@
   border-inline-start: 0;
 }
 
+/* EINE ZEILE GANZTAEGIGES, DER REST HINTER „+n" (Critique 2026-10-16, P2
+ * mobil; calendar.js `renderWeekView`). Eingeklappt zeigt jede Zelle ihren
+ * ersten Eintrag und daneben die Zahl der uebrigen - das Band ist eine Zeile
+ * hoch statt 104px. Die Zahl und die Beschriftung klappen die ganze Zeile auf
+ * (`.is-expanded`), die Beschriftung klappt sie wieder zu. Nur mobil
+ * (`--fold` setzt calendar.js nur dort). */
+.allday-row--fold:not(.is-expanded) .allday-cell {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-0h);
+}
+
+.allday-row--fold:not(.is-expanded) .allday-cell > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.allday-row--fold:not(.is-expanded) .allday-cell > :not(:first-child):not(.allday-more) {
+  display: none;
+}
+
+.allday-more {
+  display: none;
+  flex: 0 0 auto;
+  min-width: var(--space-6);
+  min-height: var(--space-6);
+  padding-inline: var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-2);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.allday-row--fold:not(.is-expanded) .allday-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.allday-more:focus-visible,
+.calendar-all-day-label--toggle:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset-inset);
+}
+
+/* Die Beschriftung als Schalter: dieselbe Spalte, dieselbe Schrift, dazu der
+ * Pfeil, der sagt, dass sie die Zeile auf- und zuklappt. */
+.calendar-all-day-label--toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-0h);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.calendar-all-day-label--toggle svg {
+  color: var(--color-text-tertiary);
+  transition: transform var(--transition-fast);
+}
+
+.calendar-all-day-label--toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .calendar-all-day-label--toggle svg { transition: none; }
+}
+
 .allday-row--week > .cal-band {
   min-width: 0;
   margin: var(--space-0h) var(--space-0h) 0;

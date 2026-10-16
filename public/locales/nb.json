@@ -3248,7 +3248,8 @@
         "unsavedChanges": "Forkast endringer?",
         "unsavedChangesDetail": "Inntastinger i dette skjemaet vil gå tapt.",
         "discardChanges": "Forkast",
-        "moreSettings": "Flere innstillinger"
+        "moreSettings": "Flere innstillinger",
+        "moreDetails": "Flere detaljer"
     },
     "rrule": {
         "freqNone": "Ingen gjentakelse",
@@ -5044,6 +5045,12 @@
             },
             "col": {
                 "day": "Dag"
+            },
+            "intensity": {
+                "none": "Ikke angitt",
+                "low": "Lav",
+                "moderate": "Middels",
+                "high": "Høy"
             }
         },
         "export": {
@@ -6087,7 +6094,8 @@
         "odometerChartTitle": "Kilometerstand over tid",
         "detailPaneLabel": "Elementdetaljer",
         "pickOne": "Velg et element",
-        "pickOneHint": "Detaljer, frister og historikk vises her."
+        "pickOneHint": "Detaljer, frister og historikk vises her.",
+        "moreDetailsHint": "Kjøp, garanti, bilde, dokumenter"
     },
     "documentAttach": {
         "label": "Vedlegg",

@@ -362,6 +362,13 @@
   --pantry-step-btn: var(--target-md);
 }
 
+/* RUHIG WIE `.row-action` (Critique 2026-10-16). Zwei beringte 48px-Kreise
+ * je Zeile machten den Stepper zum lautesten Element der Liste - vierzehn
+ * Zeilen, achtundzwanzig Ringe. Er traegt jetzt die Haut der Zeilenaktion:
+ * keine Kante, keine Flaeche, Flaeche erst im Hover. Die Trefferflaeche
+ * bleibt dieselbe (`--pantry-step-btn`, mobil --target-base). Das Zeichen
+ * steht sekundaer statt tertiaer: es ist hier die Bedienung selbst, nicht
+ * eine Nebenaktion. */
 .pantry-stepper__btn {
   display: inline-flex;
   align-items: center;
@@ -369,18 +376,21 @@
   width: var(--pantry-step-btn);
   height: var(--pantry-step-btn);
   flex-shrink: 0;
-  border: 1px solid var(--color-border);
+  border: none;
   border-radius: var(--radius-full);
-  background-color: var(--color-surface);
+  background-color: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
-  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
 .pantry-stepper__btn:hover:not(:disabled) {
-  background-color: color-mix(in srgb, var(--module-accent) var(--tint-state), transparent);
-  border-color: var(--module-accent);
+  background-color: var(--color-surface-hover);
   color: var(--color-text-primary);
+}
+
+.pantry-stepper__btn:active:not(:disabled) {
+  background-color: var(--color-surface-hover);
 }
 
 .pantry-stepper__btn:focus-visible {

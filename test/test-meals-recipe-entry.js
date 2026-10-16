@@ -199,7 +199,7 @@ test('Spalte: Klick auf den Knopf oeffnet "Mahlzeit hinzufuegen" mit gesetztem R
 
     assert.ok(opened, 'der Klick oeffnet den Dialog');
     assert.match(opened.content, /<option value="7" selected>/, 'das Rezept ist im Dialog gewaehlt');
-    assert.match(opened.content, /class="form-input" id="modal-type">[\s\S]*value="dinner" selected/,
+    assert.match(opened.content, /data-meal-type="dinner" aria-checked="true"/,
       'Mahlzeit nach Rezept und Uhrzeit (Pizza ist nur Abendessen)');
 
     const panel = dialogPanel();

@@ -829,3 +829,25 @@ test('R18: die Kennzahlkarte hat vier feste Zeilen - Kopf, Wert, Trendlinie, Met
     assert.match(body(`.metric-card__${part}`), /font-variant-numeric:\s*tabular-nums/, `.metric-card__${part}`);
   }
 });
+
+// Critique 2026-10-16: (1) „Gemessen am" stand im Messwert-Dialog als nackter
+// Text in der Zeile - Datum und Uhrzeit sehen in beiden Formular-Dialekten wie
+// ein Feld aus (D4). (2) Die Kachel trennte bei 1280px „Sauerstoffsaetti-gung":
+// das deutsche Etikett traegt einen weichen Trennstrich an der Wortfuge, und
+// `hyphens: auto` haelt sich dann an ihn („Sauerstoff-saettigung", im Browser
+// gesehen). (3) Naehrwerte ohne Tagesziel: ein zentrierter Leerhinweis ueber
+// einer linksbuendigen Erklaerung - jetzt beide Saetze in einer Flucht.
+test('Messwert-Dialog, Vital-Kachel, Naehrwerte-Leerzustand (Critique 2026-10-16)', () => {
+  const layout = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const field = [...eachRule(layout)].find((r) => !r.at.length && r.selector.trim() === '.form-row__control > yuvomi-datepicker .ydp__input');
+  assert.ok(field, 'die Zeilenregel des Datumsfelds steht');
+  assert.doesNotMatch(field.body, /border-color:\s*transparent|background-color:\s*transparent/, 'das Datumsfeld behaelt Kante und Flaeche');
+
+  const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
+  assert.equal(de.health.vitals.metric.spo2, 'Sauerstoff­sättigung', 'Trennstelle an der Wortfuge, nicht in der Silbe');
+
+  const health = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  const today = health.slice(health.indexOf('function nutritionTodaySectionMarkup(own)'), health.indexOf('function nutritionProgressRowMarkup('));
+  assert.doesNotMatch(today, /emptyHintHTML\(t\('health\.nutrition\.targetNone'\)\)/, 'kein zentrierter Leerhinweis mehr');
+  assert.match(today, /<div class="health-nutrition-today__none">/);
+});

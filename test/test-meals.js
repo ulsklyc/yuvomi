@@ -1829,16 +1829,25 @@ test('Kueche: "Zutat hinzufuegen" ist in beiden Editoren derselbe Knopf, Dialog-
 
 // Re-Critique 2026-09-28 (P7 / A4 P2-9): "Mahlzeit hinzufuegen" aus einem
 // Slot fragte zuerst Datum und Mahlzeit - genau das, was der Slot schon weiss;
-// der Name lag bei 427px Hoehe unter dem Falz.
-test('Mahlzeit aus dem Slot: Name zuerst, Tag und Mahlzeit als Zusammenfassung darunter', () => {
+// der Name lag bei 427px Hoehe unter dem Falz. Critique 2026-10-16 (D4): auch
+// ohne Slot (FAB) fuehrte das Datum und bekam den Fokus - der Name steht jetzt
+// auf JEDEM Weg zuerst, die Mahlzeitart ist eine Chip-Reihe wie im Rezept.
+test('Mahlzeit-Dialog: Name zuerst auf jedem Weg, Mahlzeitart als Chips wie im Rezept (D4)', () => {
   const at = (html, id) => html.indexOf(`id="${id}"`);
-  const slot = mealsUi.buildModalContent({ mode: 'create', date: '2026-09-28', mealType: 'lunch', fromSlot: true });
-  assert(at(slot, 'modal-title') > -1 && at(slot, 'modal-date') > -1, 'beide Felder stehen da');
-  assert(at(slot, 'modal-title') < at(slot, 'modal-date'), 'aus dem Slot steht der Name vor dem Datum');
-  assert(at(slot, 'modal-title') < at(slot, 'modal-type'), 'und vor der Mahlzeit');
-  assert(/class="[^"]*\bmeal-modal__when\b/.test(slot), 'Tag und Mahlzeit stehen als eigene, ruhige Zeile');
-  const plain = mealsUi.buildModalContent({ mode: 'create', date: '2026-09-28', mealType: 'lunch' });
-  assert(at(plain, 'modal-date') < at(plain, 'modal-title'), 'ohne Slot (FAB) bleibt die Reihenfolge: erst wann, dann was');
+  for (const fromSlot of [true, false]) {
+    const html = mealsUi.buildModalContent({ mode: 'create', date: '2026-09-28', mealType: 'lunch', fromSlot });
+    assert(at(html, 'modal-title') > -1 && at(html, 'modal-date') > -1, 'beide Felder stehen da');
+    assert(at(html, 'modal-title') < at(html, 'modal-type-chips'), `Name vor der Mahlzeitart (fromSlot=${fromSlot})`);
+    assert(at(html, 'modal-type-chips') < at(html, 'modal-date'), `Mahlzeitart vor dem Tag (fromSlot=${fromSlot})`);
+  }
+  const html = mealsUi.buildModalContent({ mode: 'create', date: '2026-09-28', mealType: 'lunch' });
+  assert(!/<select[^>]*id="modal-type"/.test(html), 'keine Auswahlliste mehr');
+  assert(/id="modal-type-chips" role="radiogroup"/.test(html), 'Einfachauswahl als Radiogruppe');
+  assert(/class="filter-chip meal-type-chip filter-chip--active" role="radio"\s+data-meal-type="lunch" aria-checked="true" tabindex="0"/.test(html),
+    'der gewaehlte Chip ist aktiv und der eine Tab-Halt');
+  assert(/<input type="hidden" id="modal-type" value="lunch">/.test(html), 'das versteckte Feld traegt den Wert fuer Speichern und Dirty-Check');
+  assert((html.match(/aria-checked="true"/g) ?? []).length === 1, 'genau einer gewaehlt');
+  assert(/onSave\(panel\) \{\s*wireMealTypeChips\(panel\);/.test(mealsSource), 'die Chips werden beim Oeffnen verdrahtet');
   assert(/openMealModal\(\{ mode: 'create', date: btn\.dataset\.date, mealType: btn\.dataset\.type, fromSlot: true \}\)/.test(mealsSource),
     'der Slot-Knopf sagt, dass er aus dem Slot kommt');
 });

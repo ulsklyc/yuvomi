@@ -186,3 +186,25 @@ test('analyteTrend: leerer Name oder leere Eingabe → []', () => {
   assert.deepEqual(analyteTrend(null, 'Hb'), []);
   assert.deepEqual(analyteTrend(undefined, 'Hb'), []);
 });
+
+// Critique 2026-10-16: Laborwerte mobil waren eine seitlich scrollende Tabelle,
+// die Bewertung („Niedrig") lag rechts ausserhalb des Bilds. Unter 640px steht
+// jeder Analyt jetzt als Zeile (Name links, Wert rechts, Referenz und
+// Bewertung darunter), auffaellige zuerst.
+test('Laborwerte mobil: Zeilen statt seitlich scrollender Tabelle, auffaellige zuerst (Critique 2026-10-16)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  const fn = src.slice(src.indexOf('function resultListMarkup(results)'), src.indexOf('function referenceLabel('));
+  assert.match(fn, /const ordered = \[\.\.\.results\.filter\(abnormal\), \.\.\.results\.filter\(\(r\) => !abnormal\(r\)\)\];/, 'auffaellige Werte vorn');
+  assert.match(fn, /const abnormal = \(r\) => r\.flag === 'low' \|\| r\.flag === 'high';/);
+  assert.match(fn, /health-lab-rows__ref">\$\{esc\(t\('health\.labs\.col\.reference'\)\)\}/, 'die Referenz ist beschriftet');
+  assert.match(fn, /flagIndicatorMarkup\(r\.flag\)/, 'die Bewertung kommt als Pfeil plus Wort, wie in der Tabelle');
+  assert.match(src, /\$\{resultListMarkup\(results\)\}/, 'der Befund rendert beide Fassungen');
+  const css = readFileSync(new URL('../public/styles/health.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const phone = (r) => r.at.some((a) => /max-width:\s*639px/.test(a));
+  assert.ok(rules.some((r) => phone(r) && r.selector.trim() === '.health-lab-table-wrap' && /display:\s*none/.test(r.body)), 'mobil keine Tabelle');
+  assert.ok(rules.some((r) => phone(r) && r.selector.trim() === '.health-lab-rows' && /display:\s*block/.test(r.body)), 'mobil die Zeilen');
+  assert.ok(rules.some((r) => !r.at.length && r.selector.trim() === '.health-lab-rows' && /display:\s*none/.test(r.body)), 'ab 640px die Tabelle');
+});

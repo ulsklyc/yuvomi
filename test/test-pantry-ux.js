@@ -644,3 +644,17 @@ test('R16: ein Werkzeugmenue mit einem einzigen Eintrag ist ein direkter Knopf',
   const schalter = pageToolsMenuHtml({ id: 'x-menu', label: 'Mehr', items: [{ action: 'a', label: 'A', icon: 'tag', checked: true }] });
   assert.match(schalter, /role="menuitemcheckbox"/, 'ein Schalter bleibt im Menue - sein Zustand braucht den Haken');
 });
+
+// Critique 2026-10-16: zwei beringte 48px-Kreise je Zeile machten den Stepper
+// zum lautesten Element der Vorratsliste. Er traegt die Haut der Zeilenaktion
+// (keine Kante, keine Flaeche in Ruhe), die Trefferflaeche bleibt.
+test('Vorrat: der Mengen-Stepper ist ruhig wie die Zeilenaktion, Trefferflaeche unveraendert (Critique 2026-10-16)', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/pantry.css', import.meta.url), 'utf8');
+  const btn = [...eachRule(css)].find((r) => !r.at.length && r.selector.trim() === '.pantry-stepper__btn');
+  assert.match(btn?.body ?? '', /border:\s*none/, 'kein Ring');
+  assert.match(btn?.body ?? '', /background-color:\s*transparent/, 'keine Flaeche in Ruhe');
+  assert.match(btn?.body ?? '', /width:\s*var\(--pantry-step-btn\);\s*height:\s*var\(--pantry-step-btn\)/, 'Trefferflaeche bleibt');
+  assert.ok([...eachRule(css)].some((r) => r.at.some((a) => /hover:\s*none/.test(a)) && /--pantry-step-btn:\s*var\(--target-base\)/.test(r.body)),
+    'am Finger weiter das Fingermass');
+});

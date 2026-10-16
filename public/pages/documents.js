@@ -418,6 +418,20 @@ export async function render(container, context = {}) {
              schwersten erreichbare. Er steht nur, wenn er etwas findet, und
              eine Haarlinie trennt ihn von der Kategoriegruppe. */ ''}
         <div class="documents-filters__chips">
+          ${/* DER ORDNER IST DER ERSTE CHIP (Critique 2026-10-16, P2 mobil).
+               Unter 1024px stand der Auslöser der Ordnerauswahl als eigene
+               48px-Zeile zwischen Filterzeile und Liste - erstes Dokument bei
+               y=216. Jetzt fuehrt er die Chip-Spur an: dieselbe Kapsel wie die
+               Facetten, mit Pfeil, weil er aufklappt statt umzuschalten. Die
+               Liste klappt weiter an ihrem Ort auf (aria-controls). KEIN
+               `aria-label` - Begruendung am alten Ort, siehe unten. Am Desktop
+               ist er ausgeblendet; dort steht die Ordnerspalte. */ ''}
+          <button class="filter-chip filter-chip--sm documents-folder-chip" id="documents-folder-toggle" type="button"
+                  aria-expanded="false" aria-controls="documents-folder-browser">
+            <i data-lucide="folders" class="icon-md" aria-hidden="true"></i>
+            <span class="documents-folder-browser__toggle-label">${esc(t('documents.allDocuments'))}</span>
+            <i data-lucide="chevron-down" aria-hidden="true" class="icon-sm documents-folder-browser__chevron"></i>
+          </button>
           <div class="documents-filter-chips documents-filter-chips--deadlines" id="documents-expiring-filter" role="group" aria-label="${t('documents.expiringFilterGroupLabel')}"></div>
           <div class="documents-filter-chips" id="documents-category" role="group" aria-label="${t('documents.categoryFilterLabel')}"></div>
         </div>
@@ -426,7 +440,9 @@ export async function render(container, context = {}) {
         <aside class="documents-folder-browser" aria-label="${t('documents.folderFilterLabel')}">
           <div class="documents-folder-browser__head">
             <h2 class="documents-folder-browser__title" id="documents-folder-browser-title">${t('documents.folderBrowserTitle')}</h2>
-            ${/* KEIN `aria-label` hier. Es trug "Ordner durchsuchen", waehrend der
+            ${/* Der Auslöser der Auswahl (unter 1024px) steht seit der Critique
+                2026-10-16 als erster Chip in der Filterzeile (`#documents-folder-toggle`).
+                KEIN `aria-label` dort. Es trug "Ordner durchsuchen", waehrend der
                 Knopf sichtbar den AKTUELLEN Ordner zeigt: der sichtbare Text stand
                 damit nicht im zugaenglichen Namen (WCAG 2.5.3 - Sprachsteuerung
                 kann den Knopf nicht ansprechen), und der gewaehlte Ordner, unter
@@ -437,12 +453,6 @@ export async function render(container, context = {}) {
                 (PR-Review #754). Die Beschriftung startet mit dem Standardordner,
                 damit der Knopf nie namenlos ist - `renderFolderBrowser` schreibt
                 sie danach bei jedem Rendern fort. */ ''}
-            <button class="documents-folder-browser__toggle" id="documents-folder-toggle" type="button"
-                    aria-expanded="false" aria-controls="documents-folder-browser">
-              <i data-lucide="folders" aria-hidden="true"></i>
-              <span class="documents-folder-browser__toggle-label">${esc(t('documents.allDocuments'))}</span>
-              <i data-lucide="chevron-down" aria-hidden="true" class="documents-folder-browser__chevron"></i>
-            </button>
             ${readOnly() ? '' : `
             <button class="documents-folder-browser__add" id="documents-folder-add" type="button" aria-label="${t('documents.addFolderButton')}" title="${t('documents.addFolderButton')}">
               <i data-lucide="folder-plus" aria-hidden="true"></i>
@@ -1437,6 +1447,9 @@ function renderFolderBrowser() {
   if (toggleLabel) {
     toggleLabel.textContent = items.find((i) => String(state.folderId) === i.id)?.name ?? items[0].name;
   }
+  // Ein gewaehlter Ordner ist ein aktiver Filter: der Chip traegt den Aktivton.
+  _container?.querySelector('#documents-folder-toggle')
+    ?.toggleAttribute('data-folder-active', Boolean(state.folderId));
 }
 
 // Rand-Fade horizontal scrollender Leisten: geteilte has-fade-*-Konvention via

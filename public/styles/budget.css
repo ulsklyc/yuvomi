@@ -792,6 +792,52 @@
   text-align: end;
 }
 
+/* DER STARTSALDO BLEIBT BEI SEINEM BETRAG (Critique 2026-10-16). Bei 390px
+ * gab die Saldo-Spalte genau so viel her, dass „Start:" in einer Zeile und
+ * „2.480,00 €" in der naechsten stand - vier von sechs Konten. Unter 640px
+ * zieht die Startzeile deshalb in die Textspalte, unter Name und Kontoart:
+ * dort ist sie eine Angabe ueber das Konto wie die Art, und rechts steht der
+ * Saldo allein. `display: contents` loest die Saldo-Spalte auf, ihre zwei
+ * Kinder nehmen je eine Zelle des Rasters. Der Betrag bricht nie
+ * (`__starting-amount`); bei 320px darf das Etikett zur Not vor ihm umbrechen. */
+@media (max-width: 639px) {
+  .budget-account__main {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    row-gap: var(--space-0h);
+  }
+
+  .budget-account__icon {
+    grid-row: 1 / span 2;
+  }
+
+  .budget-account__body {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .budget-account__figures {
+    display: contents;
+  }
+
+  .budget-account__balance {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    align-self: center;
+  }
+
+  .budget-account__starting {
+    grid-column: 2;
+    grid-row: 2;
+    text-align: start;
+  }
+}
+
+.budget-account__starting-amount {
+  white-space: nowrap;
+}
+
 /* Der Chevron ist entfallen (Redesign Runde 6, Phase 1) - dieselbe Bauart wie
  * bei den Kontaktzeilen: letztes Kind des Öffnen-Knopfes, Bearbeiten-Knopf als
  * Geschwister daneben. Regel und Guard stehen bei den Kontakten. */
@@ -2933,15 +2979,19 @@ button.budget-entry__title {
   border-radius: var(--radius-full);
   overflow: hidden;
 }
+/* Der Balken traegt die Farbe der KATEGORIE (`--plan-fill`, budget-plans.js;
+ * Critique 2026-10-16, D9), der Zustand steht in der Fusszeile. Ohne Ausgaben
+ * im Monat hat die Kategorie keine Farbe - der Balken ist dann leer. */
 .budget-plan-row__fill {
   height: 100%;
   border-radius: var(--radius-full);
-  background-color: var(--plan-tone-color);
+  background-color: var(--plan-fill, var(--module-accent));
   transform: scaleX(var(--plan-scale, 0));
   transform-origin: left center;
   transition: transform var(--transition-slow);
 }
-.budget-plan-row__foot { font-size: var(--text-xs); color: var(--plan-tone-color); font-weight: var(--font-weight-medium); font-variant-numeric: tabular-nums; }
+.budget-plan-row__foot { display: flex; align-items: center; gap: var(--space-1); font-size: var(--text-xs); color: var(--plan-tone-color); font-weight: var(--font-weight-medium); font-variant-numeric: tabular-nums; }
+.budget-plan-row__foot svg { flex: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .budget-plan-savings,
@@ -3006,6 +3056,7 @@ button.budget-entry__title {
  * tabular-Regel) gedeckt sein. */
 .budget-account__balance,
 .budget-account__starting,
+.budget-account__starting-amount,
 .budget-account__meta,
 .budget-account__figures,
 .budget-loan-card__amounts span,

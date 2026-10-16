@@ -3450,7 +3450,8 @@
         "unsavedChanges": "Сбросить изменения?",
         "unsavedChangesDetail": "Введённые в форму данные будут потеряны.",
         "discardChanges": "Сбросить",
-        "moreSettings": "Дополнительные настройки"
+        "moreSettings": "Дополнительные настройки",
+        "moreDetails": "Дополнительно"
     },
     "rrule": {
         "freqNone": "Без повтора",
@@ -5294,6 +5295,12 @@
             },
             "col": {
                 "day": "День"
+            },
+            "intensity": {
+                "none": "Не указано",
+                "low": "Низкая",
+                "moderate": "Средняя",
+                "high": "Высокая"
             }
         },
         "export": {
@@ -6391,7 +6398,8 @@
         "odometerChartTitle": "Пробег с течением времени",
         "detailPaneLabel": "Сведения о предмете",
         "pickOne": "Выберите предмет",
-        "pickOneHint": "Здесь появятся данные, сроки и история."
+        "pickOneHint": "Здесь появятся данные, сроки и история.",
+        "moreDetailsHint": "Покупка, гарантия, фото, документы"
     },
     "documentAttach": {
         "label": "Вложения",

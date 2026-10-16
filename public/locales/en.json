@@ -3248,7 +3248,8 @@
         "unsavedChanges": "Discard changes?",
         "unsavedChangesDetail": "Your entries in this form will be lost.",
         "discardChanges": "Discard",
-        "moreSettings": "More settings"
+        "moreSettings": "More settings",
+        "moreDetails": "More details"
     },
     "rrule": {
         "freqNone": "No recurrence",
@@ -5044,6 +5045,12 @@
             },
             "col": {
                 "day": "Day"
+            },
+            "intensity": {
+                "none": "Not specified",
+                "low": "Light",
+                "moderate": "Moderate",
+                "high": "High"
             }
         },
         "export": {
@@ -6087,7 +6094,8 @@
         "odometerChartTitle": "Odometer over time",
         "detailPaneLabel": "Item details",
         "pickOne": "Choose an item",
-        "pickOneHint": "Details, deadlines and history appear here."
+        "pickOneHint": "Details, deadlines and history appear here.",
+        "moreDetailsHint": "Purchase, warranty, photo, documents"
     },
     "documentAttach": {
         "label": "Attachments",

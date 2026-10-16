@@ -3262,7 +3262,8 @@
         "unsavedChanges": "변경 사항을 버릴까요?",
         "unsavedChangesDetail": "이 양식에 입력한 내용이 사라집니다.",
         "discardChanges": "버리기",
-        "moreSettings": "추가 설정"
+        "moreSettings": "추가 설정",
+        "moreDetails": "추가 정보"
     },
     "rrule": {
         "freqNone": "반복 없음",
@@ -5044,6 +5045,12 @@
             },
             "col": {
                 "day": "요일"
+            },
+            "intensity": {
+                "none": "지정 안 함",
+                "low": "가벼움",
+                "moderate": "보통",
+                "high": "높음"
             }
         },
         "export": {
@@ -6087,7 +6094,8 @@
         "odometerChartTitle": "시간에 따른 주행거리",
         "detailPaneLabel": "물품 세부 정보",
         "pickOne": "물품을 선택하세요",
-        "pickOneHint": "세부 정보, 기한, 기록이 여기에 표시됩니다."
+        "pickOneHint": "세부 정보, 기한, 기록이 여기에 표시됩니다.",
+        "moreDetailsHint": "구매, 보증, 사진, 문서"
     },
     "documentAttach": {
         "label": "첨부",

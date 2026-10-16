@@ -325,3 +325,24 @@ test('R18 Aktivitaet: der getoente Balken haelt 3:1 gegen die Karte, hell und du
   // Gegenprobe: bei der blanken Tinten-Stufe (70 %) reisst der dunkle Balken die 3:1.
   assert.ok(contrastRatio(mix('#DB60CB', '#2B2825', 0.7), '#2B2825') < 3, 'deshalb die fuenf Punkte darueber');
 });
+
+// Critique 2026-10-16: die Intensitaet war ein Freitextfeld, der Bestand
+// schreibt aber `low`/`moderate`/`high` - in der Liste stand englisches
+// „high". Jetzt eine Auswahl mit uebersetzten Stufen; ein freier Altwert
+// bleibt als eigene Option erhalten und wird wie geschrieben gezeigt.
+test('Aktivitaet: Intensitaet ist eine uebersetzte Auswahl, kein Freitext (Critique 2026-10-16)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /id="activity-intensity" type="text"/, 'kein Freitextfeld mehr');
+  assert.match(src, /<select class="input" id="activity-intensity">\$\{intensityOptionsHtml\(row\?\.intensity\)\}<\/select>/);
+  assert.match(src, /const INTENSITY_LEVELS = \['low', 'moderate', 'high'\];/);
+  assert.match(src, /if \(row\.intensity\) meta\.push\(intensityLabel\(row\.intensity\)\);/, 'die Liste zeigt die Uebersetzung');
+  assert.match(src, /const legacy = raw && !known \? `<option value="\$\{esc\(raw\)\}" selected>\$\{esc\(raw\)\}<\/option>` : '';/,
+    'ein freier Altwert bleibt gewaehlt und lesbar');
+  for (const file of ['de', 'en', 'fr']) {
+    const loc = JSON.parse(readFileSync(new URL(`../public/locales/${file}.json`, import.meta.url), 'utf8'));
+    for (const key of ['none', 'low', 'moderate', 'high']) {
+      assert.ok(loc.health.activity.intensity?.[key], `${file}: health.activity.intensity.${key}`);
+    }
+  }
+});

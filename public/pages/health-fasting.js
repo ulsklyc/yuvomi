@@ -184,7 +184,13 @@ function renderBody(view, stats, statsError = false) {
   const sections = fastingSections({ active, stats, statsError, rows: view.rows, filtered: Boolean(view.from || view.to) });
   const body = root.querySelector('[data-fasting-body]');
   body.replaceChildren();
-  body.insertAdjacentHTML('beforeend', `<section class="metric-card fasting-hero">
+  // OHNE FASTEN KEIN LEERER RING ALS HELD (Critique 2026-10-16). Vor dem
+  // ersten Fasten stand ein 254px-Ring ohne Wert ueber allem, und der
+  // Leerzustand des Verlaufs lag unter der Tab-Leiste. Ohne laufendes UND ohne
+  // letztes Fasten hat der Ring nichts zu zeigen: die Karte traegt dann nur
+  // Satz und Knoepfe (`fasting-hero--idle`, health.css).
+  const idle = !active && !last;
+  body.insertAdjacentHTML('beforeend', `<section class="metric-card fasting-hero${idle ? ' fasting-hero--idle' : ''}">
     <h3 class="u-section-title" data-fasting-clock-label></h3>${fastingClockSwitchHtml()}
     <div class="fasting-dial fasting-dial--segmented" data-fasting-progress><div data-fasting-segments></div><div class="fasting-dial__content"><div class="fasting-hero__timer" data-fasting-timer>00:00:00</div><span class="fasting-dial__days" data-fasting-days></span></div></div>
     <p class="sr-only" role="status" aria-live="polite" data-fasting-announcement></p>

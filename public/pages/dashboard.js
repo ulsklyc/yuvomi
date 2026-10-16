@@ -2194,7 +2194,10 @@ function renderFamilyWidget(users, data, { manageHref = null } = {}) {
     : esc(t('dashboard.familyDayCalm'));
 
   return `<div class="widget widget--family">
-    ${widgetHeader('family', t('dashboard.familyTitle'), null, manageHref, manageHref ? t('dashboard.manage') : null, 'contacts')}
+    ${/* EIN WORT FUER DEN KOPF-LINK (Critique 2026-10-16): jede Kachel fuehrt
+         mit „Alle" zu ihrer Seite, nur die Familie sagte „Verwalten" - fuer
+         denselben Weg, die ganze Liste. */ ''}
+    ${widgetHeader('family', t('dashboard.familyTitle'), null, manageHref, null, 'contacts')}
     <div class="family-widget">
       <div class="family-widget__list">
         ${sharedRow}

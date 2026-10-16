@@ -3248,7 +3248,8 @@
         "unsavedChanges": "¿Descartar cambios?",
         "unsavedChangesDetail": "Tus datos introducidos en este formulario se perderán.",
         "discardChanges": "Descartar",
-        "moreSettings": "Más ajustes"
+        "moreSettings": "Más ajustes",
+        "moreDetails": "Más datos"
     },
     "rrule": {
         "freqNone": "Sin repetición",
@@ -5044,6 +5045,12 @@
             },
             "col": {
                 "day": "Día"
+            },
+            "intensity": {
+                "none": "Sin indicar",
+                "low": "Baja",
+                "moderate": "Moderada",
+                "high": "Alta"
             }
         },
         "export": {
@@ -6087,7 +6094,8 @@
         "odometerChartTitle": "Cuentakilómetros a lo largo del tiempo",
         "detailPaneLabel": "Detalles del objeto",
         "pickOne": "Elige un objeto",
-        "pickOneHint": "Aquí aparecen los datos, los plazos y el historial."
+        "pickOneHint": "Aquí aparecen los datos, los plazos y el historial.",
+        "moreDetailsHint": "Compra, garantía, foto, documentos"
     },
     "documentAttach": {
         "label": "Adjuntos",

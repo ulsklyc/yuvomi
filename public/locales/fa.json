@@ -3262,7 +3262,8 @@
         "unsavedChanges": "تغییرات نادیده گرفته شوند؟",
         "unsavedChangesDetail": "ورودی‌های تو در این فرم از بین می‌روند.",
         "discardChanges": "نادیده گرفتن",
-        "moreSettings": "تنظیمات بیشتر"
+        "moreSettings": "تنظیمات بیشتر",
+        "moreDetails": "جزئیات بیشتر"
     },
     "rrule": {
         "freqNone": "بدون تکرار",
@@ -5044,6 +5045,12 @@
             },
             "col": {
                 "day": "روز"
+            },
+            "intensity": {
+                "none": "مشخص نشده",
+                "low": "کم",
+                "moderate": "متوسط",
+                "high": "زیاد"
             }
         },
         "export": {
@@ -6087,7 +6094,8 @@
         "odometerChartTitle": "کیلومتر شمار در طول زمان",
         "detailPaneLabel": "جزئیات وسیله",
         "pickOne": "یک وسیله انتخاب کنید",
-        "pickOneHint": "جزئیات، مهلت‌ها و سابقه اینجا نمایش داده می‌شوند."
+        "pickOneHint": "جزئیات، مهلت‌ها و سابقه اینجا نمایش داده می‌شوند.",
+        "moreDetailsHint": "خرید، ضمانت، عکس، اسناد"
     },
     "documentAttach": {
         "label": "پیوست‌ها",

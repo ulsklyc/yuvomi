@@ -524,6 +524,9 @@ let state = {
   // falsche Art, eine zweite Lesart anzubieten.
   monthTitles: false,      // Monat am Telefon: Titelzeilen statt Punkte
   scheduleDisplay: 'compact',
+  // Woche mobil: Ganztags-Zeile aufgeklappt (renderWeekView). Gilt fuer die
+  // Sitzung, damit Blaettern den gewaehlten Zustand behaelt.
+  alldayExpanded: false,
   offlineSince:  null,     // Date des letzten Cache-Stands, wenn offline bedient
   defaultDuration: 60,     // Standard-Termindauer (Minuten) aus den Präferenzen
   currentUserId: null,     // eigene User-ID für „Mir zugewiesen"-Filter
@@ -4026,6 +4029,25 @@ function renderWeekView(container) {
   const scheduleBlocks = schedule.map((items) => state.scheduleDisplay === 'blocks' ? items.filter((entry) => scheduleHasTimes(entry) && !scheduleIsFullDayShift(entry)) : []);
   const scheduleLayouts = scheduleBlocks.map((items) => layoutScheduleBlocks(items));
   const waste = days.map((d) => wasteOccurrencesOnDay(d));
+  // EINE ZEILE GANZTAEGIGES, DER REST HINTER „+n" (Critique 2026-10-16, P2
+  // mobil). Das Band stand bei vier Eintraegen an einem Tag 104px hoch und
+  // schob 08:00 aus dem Bild (erster Termin y=266). Mobil zeigt jede Zelle
+  // eingeklappt ihren ersten Eintrag und daneben „+n"; die Zahl und die
+  // Beschriftung „ganztaegig" klappen die ganze Zeile auf und wieder zu.
+  // Am Desktop (sieben Spalten, Platz in der Hoehe) bleibt alles offen.
+  const alldayCounts = days.map((d, i) => holidaysOnDay(d).length + scheduleChips[i].length
+    + waste[i].length + alldayEvs[i].length + tasksOnDay(d).length);
+  const alldayFolds = isMobile && alldayCounts.some((n) => n > 1);
+  const alldayOpen = alldayFolds && state.alldayExpanded;
+  const alldayMore = (n) => (alldayFolds && n > 1
+    ? `<button type="button" class="allday-more" data-allday-toggle aria-expanded="${alldayOpen}"
+         aria-label="${esc(t('calendar.moreEvents', { count: n - 1 }))}">+${n - 1}</button>`
+    : '');
+  const alldayLabel = alldayFolds
+    ? `<button type="button" class="calendar-all-day-label calendar-all-day-label--toggle" data-allday-toggle aria-expanded="${alldayOpen}" style="grid-row:1 / -1">
+         <span>${t('calendar.allDayShort')}</span><i data-lucide="chevron-down" class="icon-sm" aria-hidden="true"></i>
+       </button>`
+    : `<div class="calendar-all-day-label" style="grid-row:1 / -1">${t('calendar.allDayShort')}</div>`;
 
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
@@ -4044,8 +4066,8 @@ function renderWeekView(container) {
         }).join('')}
       </div>
       <!-- Ganztägige Ereignisse -->
-      <div class="allday-row allday-row--week" style="display:grid;grid-template-columns:var(--cal-gutter-width) repeat(${colCount},1fr);grid-template-rows:repeat(${band.laneCount + 1},auto);">
-        <div class="calendar-all-day-label" style="grid-row:1 / -1">${t('calendar.allDayShort')}</div>
+      <div class="allday-row allday-row--week${alldayFolds ? ' allday-row--fold' : ''}${alldayOpen ? ' is-expanded' : ''}" style="display:grid;grid-template-columns:var(--cal-gutter-width) repeat(${colCount},1fr);grid-template-rows:repeat(${band.laneCount + 1},auto);">
+        ${alldayLabel}
         ${days.map((d, i) => `<div class="allday-col" style="grid-column:${i + 2};grid-row:1 / -1" aria-hidden="true"></div>`).join('')}
         ${band.bands.map(renderWeekBand).join('')}
         ${days.map((d, i) => `
@@ -4059,6 +4081,7 @@ function renderWeekView(container) {
             ${waste[i].map((occ) => renderWasteChip(occ)).join('')}
             ${alldayEvs[i].map((ev) => renderAllDayEvent(ev, d)).join('')}
             ${tasksOnDay(d).map(renderTaskChip).join('')}
+            ${alldayMore(alldayCounts[i])}
           </div>
         `).join('')}
       </div>
@@ -4125,7 +4148,20 @@ function renderWeekView(container) {
     },
   });
 
-  container.querySelector('.allday-row').addEventListener('click', (e) => {
+  const alldayRow = container.querySelector('.allday-row');
+  alldayRow.addEventListener('click', (e) => {
+    const foldToggle = e.target.closest('[data-allday-toggle]');
+    if (foldToggle) {
+      state.alldayExpanded = !alldayRow.classList.contains('is-expanded');
+      alldayRow.classList.toggle('is-expanded', state.alldayExpanded);
+      for (const btn of alldayRow.querySelectorAll('[data-allday-toggle]')) {
+        btn.setAttribute('aria-expanded', String(state.alldayExpanded));
+      }
+      // Die „+n"-Knoepfe verschwinden beim Aufklappen: der Fokus bleibt bei
+      // der Beschriftung, die die Zeile wieder zuklappt.
+      if (foldToggle.classList.contains('allday-more')) alldayRow.querySelector('.calendar-all-day-label--toggle')?.focus();
+      return;
+    }
     const taskChip = e.target.closest('.cal-task-chip');
     if (taskChip) {
       openTaskFromCalendar(taskChip.dataset.taskId);

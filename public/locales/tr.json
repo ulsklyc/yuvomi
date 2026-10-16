@@ -3248,7 +3248,8 @@
         "unsavedChanges": "Değişiklikler atılsın mı?",
         "unsavedChangesDetail": "Bu formdaki girişlerin kaybolacak.",
         "discardChanges": "At",
-        "moreSettings": "Diğer ayarlar"
+        "moreSettings": "Diğer ayarlar",
+        "moreDetails": "Diğer bilgiler"
     },
     "rrule": {
         "freqNone": "Tekrar yok",
@@ -5044,6 +5045,12 @@
             },
             "col": {
                 "day": "Gün"
+            },
+            "intensity": {
+                "none": "Belirtilmedi",
+                "low": "Hafif",
+                "moderate": "Orta",
+                "high": "Yüksek"
             }
         },
         "export": {
@@ -6087,7 +6094,8 @@
         "odometerChartTitle": "Zaman içinde kilometre sayacı",
         "detailPaneLabel": "Eşya ayrıntıları",
         "pickOne": "Bir eşya seçin",
-        "pickOneHint": "Ayrıntılar, süreler ve geçmiş burada görünür."
+        "pickOneHint": "Ayrıntılar, süreler ve geçmiş burada görünür.",
+        "moreDetailsHint": "Satın alma, garanti, fotoğraf, belgeler"
     },
     "documentAttach": {
         "label": "Ekler",
