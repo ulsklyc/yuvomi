@@ -200,8 +200,14 @@ function renderRows(plans) {
       : p.over
         ? t('budget.planOverBy', { amount: fmt(Math.abs(p.remaining)) })
         : t('budget.planLeft', { amount: fmt(Math.max(0, p.remaining)) });
+    // DIE KATEGORIE BEHAELT IHRE FARBE (Critique 2026-10-16, D9): der Balken
+    // traegt die Identitaetsfarbe der Kategorie wie in Uebersicht und
+    // Statistik; der ZUSTAND (knapp, ueber Plan) steht als Text mit Icon in der
+    // Fusszeile, nicht als umgefaerbter Balken. Vorher war „Wohnen" hier amber.
+    const fill = view.ctx.categoryColor?.(p.category);
+    const stateIcon = p.over === null ? '' : p.over ? 'circle-alert' : tone === 'near' ? 'triangle-alert' : '';
     return `
-      <${Tag} ${ro ? '' : 'type="button" '}class="budget-plan-row budget-plan-row--tone-${tone}${ro ? ' budget-plan-row--static' : ''}" data-category="${view.ctx.esc(p.category)}">
+      <${Tag} ${ro ? '' : 'type="button" '}class="budget-plan-row budget-plan-row--tone-${tone}${ro ? ' budget-plan-row--static' : ''}" data-category="${view.ctx.esc(p.category)}"${fill ? ` style="--plan-fill:${fill}"` : ''}>
         <div class="budget-plan-row__top">
           <span class="budget-plan-row__label">${view.ctx.esc(view.ctx.categoryLabel(p.category))}</span>
           <span class="budget-plan-row__amounts"><strong>${fmt(p.actual)}</strong> / ${fmt(p.planned)}</span>
@@ -209,7 +215,7 @@ function renderRows(plans) {
         <div class="budget-plan-row__track">
           <div class="budget-plan-row__fill" style="--plan-scale:${pct / 100}"></div>
         </div>
-        ${foot ? `<div class="budget-plan-row__foot">${foot}</div>` : ''}
+        ${foot ? `<div class="budget-plan-row__foot">${stateIcon ? `<i data-lucide="${stateIcon}" class="icon-sm" aria-hidden="true"></i>` : ''}<span>${foot}</span></div>` : ''}
         ${ro ? '' : `<span class="sr-only">${t('budget.planEditAction')}</span>`}
       </${Tag}>`;
   }).join('');

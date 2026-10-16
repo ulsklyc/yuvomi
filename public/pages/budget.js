@@ -33,6 +33,7 @@ import { trendMarkup, leadCardClass } from '/utils/metric-card.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { LOAN_SORTS, DEFAULT_LOAN_SORT, normalizeLoanSort, sortLoans, groupLoans } from '/utils/loan-order.js';
 import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
+import { categoryColorIndex, categoryColor } from '/utils/budget-category-colors.js';
 import { metricGlanceHtml, wireMetricGlance, glanceLeadClass } from '/utils/metric-glance.js';
 import { intervalUnitLabel } from '/rrule-ui.js';
 import { appendCurrencyOptions } from '/settings/currency.js';
@@ -1228,6 +1229,8 @@ function renderBody() {
       budgetMode: state.budgetMode, scope: state.scope,
       formatAmount, categoryLabel, esc,
       expenseCategories: expenseCategories(),
+      // Identitaetsfarbe je Kategorie wie in Uebersicht und Statistik (D9).
+      categoryColor: (category) => categoryColor(categoryColorIndex(state.summary?.byCategory), category),
     }).catch((err) => console.error('[Budget] plans render error:', err));
     return;
   }
@@ -1801,7 +1804,13 @@ function toggleCategoryChart() {
  * die eingeklappten Bereiche aus. Ab 640px bleibt alles wie es war (Karten,
  * Top 3, Zweispalter ab 960px Container). Der Traeger ist `.row-carrier`,
  * keine Kennzahl-Karte: eine Zeile, die zusammenfasst und aufklappt, wie die
- * Gruppenzeilen in Apple Wallet und Einstellungen. */
+ * Gruppenzeilen in Apple Wallet und Einstellungen.
+ *
+ * EINZEILIG BIS AUFGEKLAPPT (Critique 2026-10-16, P2 mobil): Saldo-Zeile plus
+ * Ein/Aus-Zeile plus Kategorien-Zeile standen zusammen 136px hoch, die erste
+ * Buchung bei y=354. `budget-glance--fold` stellt Etikett und Saldo in EINE
+ * Zeile; Ein/Aus und die Kategorien-Zeile erscheinen erst, wenn die Bilanz
+ * aufgeklappt ist (panel.css). Die Zahl fuehrt weiter, eine Stufe kleiner. */
 function balanceGlanceHtml(s, { expensesOnly, forecast, balanceTone }) {
   const tone = forecast ? 'forecast'
     : balanceTone === 'metric-card--balance-positive' ? 'positive'
@@ -1816,7 +1825,7 @@ function balanceGlanceHtml(s, { expensesOnly, forecast, balanceTone }) {
         </span>`;
   const count = s.byCategory?.length ?? 0;
   return `
-    <div class="row-carrier budget-glance ${glanceLeadClass(lead.value)}">
+    <div class="row-carrier budget-glance budget-glance--fold ${glanceLeadClass(lead.value)}">
       <button type="button" class="budget-glance__row budget-glance__balance" id="budget-balance-more"
               aria-expanded="${state.balanceExpanded ? 'true' : 'false'}" aria-controls="budget-balance-details">
         <span class="budget-glance__lead">
@@ -1894,6 +1903,10 @@ function listToolsMenuHtml() {
 function renderCategoryBars(byCategory) {
   const blocks = categoryBlocks(byCategory);
   const leadKind = chartLeadKind(blocks);
+  // DIE KATEGORIE TRAEGT IHRE FARBE (Critique 2026-10-16, D9): dieselbe wie
+  // im Plan und in der Statistik (utils/budget-category-colors.js), statt
+  // aller Ausgabenbalken im Modulton.
+  const colors = categoryColorIndex(byCategory);
 
   return CHART_BLOCKS.filter(({ kind }) => blocks[kind].length).map(({ kind, labelKey }) => {
     const rows = blocks[kind];
@@ -1935,7 +1948,7 @@ function renderCategoryBars(byCategory) {
               >
               <span class="budget-bar-row__label" title="${label}">${label}</span>
               <span class="budget-bar-row__track" style="--bar-visible:${r.amount !== 0 ? 1 : 0}">
-                <span class="budget-bar-row__fill budget-bar-row__fill--${kind}" style="--bar-scale:${scale.toFixed(4)}" data-bar-key="${kind}:${esc(String(r.category))}"></span>
+                <span class="budget-bar-row__fill budget-bar-row__fill--${kind}" style="--bar-scale:${scale.toFixed(4)}${kind === 'expenses' && categoryColor(colors, r.category) ? `;--bar-fill:${categoryColor(colors, r.category)}` : ''}" data-bar-key="${kind}:${esc(String(r.category))}"></span>
               </span>
               <span class="budget-bar-row__amount">${amountByRole(r.amount, 'flow').text}${kind === 'expenses' ? shareHtml(r.amount, total) : ''}</span>
             </button>`;
@@ -1984,6 +1997,8 @@ function subcategoryRows(category, entries) {
     (total, row) => total + Math.abs(row.amount),
     0
   );
+  // Die Unterkategorien tragen die Farbe ihrer Kategorie (D9).
+  const parentFill = kind === 'expenses' ? categoryColor(categoryColorIndex(state.summary?.byCategory), category) : null;
   return rows.map((row) => {
     const selected = state.subcategoryFilter?.category === category
       && state.subcategoryFilter.key === row.key;
@@ -1997,7 +2012,7 @@ function subcategoryRows(category, entries) {
         <span class="budget-bar-row__label">${esc(row.label)}</span>
         <span class="budget-bar-row__track">
           <span class="budget-bar-row__fill budget-bar-row__fill--${kind}"
-                style="--bar-scale:${scale}"></span>
+                style="--bar-scale:${scale}${parentFill ? `;--bar-fill:${parentFill}` : ''}"></span>
         </span>
         <span class="budget-bar-row__amount">
           ${amountByRole(row.amount, 'flow').text}${kind === 'expenses' && row.amount !== 0 ? shareHtml(row.amount, categoryTotal) : ''}
@@ -2674,7 +2689,7 @@ function renderAccountsPage() {
           </span>
           <span class="budget-account__figures">
             <span class="budget-account__balance ${balClass}">${formatAmount(a.current_balance)}</span>
-            <span class="budget-account__starting">${t('budget.startingBalanceShort')} ${formatAmount(a.starting_balance)}</span>
+            <span class="budget-account__starting">${t('budget.startingBalanceShort')} <span class="budget-account__starting-amount">${formatAmount(a.starting_balance)}</span></span>
           </span>
         </button>
         ${ro ? '' : `<div class="row-actions budget-account__actions">${rowActionHtml({
