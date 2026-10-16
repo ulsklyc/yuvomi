@@ -283,6 +283,30 @@ const STUBS = {
       return { update: () => true, isOpen: () => true };
     };
     export const closeDetailView = () => {};
+    // Dieselbe Regel wie im Original (R19): Bearbeiten als der eine
+    // Primaerknopf am Ende, andere Primaerknoepfe treten zurueck.
+    export const withPrimaryEdit = (actions = [], edit = null) => {
+      const list = (actions ?? []).filter(Boolean);
+      if (!edit) return list;
+      return [...list.map((a) => (a.variant === 'primary' ? { ...a, variant: 'secondary' } : a)), { icon: 'pencil', ...edit, variant: 'primary' }];
+    };
+    // Der Fuss als schlichte Knopfreihe - genug fuer Tests, die nach einer
+    // id oder einem Primaerknopf fragen.
+    export const detailFooterEl = (actions = []) => {
+      const visible = (actions ?? []).filter((a) => a && !a.hidden);
+      if (!visible.length || typeof document === 'undefined') return null;
+      const footer = document.createElement('div');
+      footer.className = 'detail-view__footer';
+      for (const action of visible) {
+        const btn = document.createElement('button');
+        btn.className = 'btn btn--' + (action.variant ?? 'secondary');
+        if (action.id) btn.id = action.id;
+        btn.textContent = action.label ?? '';
+        if (typeof action.onClick === 'function') btn.addEventListener('click', () => action.onClick({ close: () => {}, button: btn }));
+        footer.appendChild(btn);
+      }
+      return footer;
+    };
     export const detailRowEl = () => null;
     export const visibilityRow = () => ({ icon: 'users', label: '', value: '' });
     export const assignedRow = () => ({ icon: 'user', label: '', value: '' });

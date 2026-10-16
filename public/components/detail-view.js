@@ -22,6 +22,7 @@ import { t } from '/i18n.js';
 import {
   openModal, closeModal, mountFooter, refreshDirtySnapshot, forgetRestore,
   focusFirstField, updateHeaderAction, rememberFocus, restoreFocusAfterClose,
+  dockNextModal,
 } from '/components/modal.js';
 import { pushOverlay, dropOverlay } from '/utils/overlay-history.js';
 import { durationToken } from '/utils/ux.js';
@@ -389,7 +390,30 @@ function detailGroupEl({ group, rows = [] }) {
  * Sheet-Modus vom Fußzeilen-Umzug in modal.js erfasst wird und unter der Falz
  * stehen bleibt statt mitzuscrollen.
  */
-function detailFooterEl(actions = [], close = closeDetailView) {
+/**
+ * BEARBEITEN IST UEBERALL DER PRIMAERKNOPF AM FUSS (R19, Ulas 2026-10-16).
+ * Die Critique fand es mal gefuellt am Fuss (Kontakte, Inventar, Termine,
+ * Notizen), mal umrandet im Kopf (Aufgaben-Blatt, jede Detailspalte, Abos,
+ * Geburtstage am Desktop) - dieselbe Handlung in zwei Gewichten an zwei
+ * Orten. Jetzt steht sie in Blatt, Popover und Detailspalte als EIN
+ * gefuellter Knopf am Ende der Fusszeile, und weil ein Fuss nur EINE
+ * Hauptaktion hat, treten andere Primaerknoepfe dort zurueck (sekundaer).
+ * `edit.primary: false` gibt es nicht mehr als Ausweg.
+ *
+ * @param {Array} actions   die Objektaktionen der Ansicht
+ * @param {object|null} edit der Bearbeiten-Knopf ({ id, label, onClick, dock? })
+ * @returns {Array}
+ */
+export function withPrimaryEdit(actions = [], edit = null) {
+  const list = (actions ?? []).filter(Boolean);
+  if (!edit) return list;
+  return [
+    ...list.map((action) => (action.variant === 'primary' ? { ...action, variant: 'secondary' } : action)),
+    { icon: 'pencil', ...edit, variant: 'primary' },
+  ];
+}
+
+export function detailFooterEl(actions = [], close = closeDetailView) {
   const visible = actions.filter((a) => a && !a.hidden);
   if (!visible.length) return null;
 
@@ -421,7 +445,11 @@ function detailFooterEl(actions = [], close = closeDetailView) {
       if (action.icon) btn.title = action.label;
     }
     if (typeof action.onClick === 'function') {
-      btn.addEventListener('click', () => action.onClick({ close, button: btn }));
+      btn.addEventListener('click', () => {
+        // In der Detailspalte legt sich das Formular IN die Spalte (R19).
+        if (action.dock) dockNextModal(btn.closest('.split-view__detail'));
+        action.onClick({ close, button: btn });
+      });
     }
     footer.appendChild(btn);
   });
@@ -674,7 +702,8 @@ function openAsSheet(opts, token) {
     mode: 'detail',
     detailPane: null, formPane: null,
     detailFooter: null, formFooter: null,
-    primaryEdit: Boolean(opts.edit?.primary),
+    // Immer, sobald es ein Bearbeiten gibt (R19, withPrimaryEdit).
+    primaryEdit: Boolean(opts.edit),
   };
   let panelRef = null;
   // BEARBEITEN ALS HAUPTAKTION UNTEN (Critique 2026-09-24, Persona Casey).
@@ -683,8 +712,9 @@ function openAsSheet(opts, token) {
   // erreichbarste. Mit `edit.primary` wandert Bearbeiten als Primaerknopf an
   // das Ende der Fusszeile (Daumenzone), Löschen bleibt zurueckgenommen am
   // Anfang, und der Kopfknopf erscheint erst im Formular - als „Zurück".
-  // Opt-in, weil nicht jedes Blatt Bearbeiten als Hauptabsicht hat: in der
-  // Aufgabe ist es das Erledigen.
+  // Seit R19 fuer JEDES Blatt mit Bearbeiten (withPrimaryEdit): vorher
+  // Opt-in, und die Aufgabe trug Erledigen als Primaerknopf und Bearbeiten
+  // umrandet im Kopf.
   const { primaryEdit } = state;
 
   openModal({
@@ -716,15 +746,11 @@ function openAsSheet(opts, token) {
       body.replaceChildren(pane);
       state.detailPane = pane;
 
-      const footer = detailFooterEl(primaryEdit
-        ? [...(opts.actions ?? []), {
-          id: 'detail-view-edit',
-          label: opts.edit.label ?? t('common.edit'),
-          variant: 'primary',
-          icon: 'pencil',
-          onClick: () => switchToForm(panel, opts, state),
-        }]
-        : opts.actions);
+      const footer = detailFooterEl(withPrimaryEdit(opts.actions, primaryEdit ? {
+        id: 'detail-view-edit',
+        label: opts.edit.label ?? t('common.edit'),
+        onClick: () => switchToForm(panel, opts, state),
+      } : null));
       if (footer) {
         body.appendChild(footer);
         // Die Fußzeile entstand erst jetzt, nach dem Umzug in openModal - also
@@ -831,18 +857,14 @@ function openAsPopover(opts) {
   // allein in eine zweite Zeile. Jetzt folgt es derselben Reihenfolge - in
   // 286px Innenbreite teilen sich Löschen und Maps die erste Zeile, Bearbeiten
   // steht als Hauptaktion unten am Ende, so weit von Löschen weg wie im Sheet.
-  // Ohne `edit.primary` bleibt Bearbeiten der Sekundaerknopf vorne.
+  // Seit R19 immer so (withPrimaryEdit), nicht mehr nur mit `edit.primary`.
   const edit = opts.edit?.standalone ? {
     label: opts.edit.label ?? t('common.edit'),
     id: 'detail-popover-edit',
     onClick: () => { closeDetailView(); opts.edit.standalone(); },
-    ...(opts.edit.primary ? { variant: 'primary', icon: 'pencil' } : { variant: 'secondary' }),
   } : null;
-  const actions = opts.edit?.primary
-    ? [...(opts.actions ?? []), edit]
-    : [edit, ...(opts.actions ?? [])];
 
-  const footer = detailFooterEl(actions);
+  const footer = detailFooterEl(withPrimaryEdit(opts.actions, edit));
   if (footer) {
     footer.classList.add('detail-popover__footer');
     popover.appendChild(footer);
@@ -967,7 +989,6 @@ function openInPane(opts, token) {
   const edit = opts.edit?.standalone ? {
     label: opts.edit.label ?? t('common.edit'),
     id: 'detail-pane-edit',
-    icon: 'pencil',
     // Das Formular legt sich in diese Spalte (R19), statt als Fenster darueber.
     dock: true,
     onClick: () => opts.edit.standalone(),
@@ -975,10 +996,11 @@ function openInPane(opts, token) {
 
   const view = document.createElement('div');
   view.className = 'detail-view__pane detail-view--in-pane';
-  view.appendChild(detailPaneHeaderEl({ title: opts.title ?? '', actions: edit ? [edit] : [] }));
+  view.appendChild(detailPaneHeaderEl({ title: opts.title ?? '' }));
   let bodyEl = detailBodyEl(opts);
   view.appendChild(bodyEl);
-  const footer = detailFooterEl(opts.actions, close);
+  // Bearbeiten als Primaerknopf am Ende des (klebenden) Fusses - wie im Blatt.
+  const footer = detailFooterEl(withPrimaryEdit(opts.actions, edit), close);
   if (footer) {
     // In der Spalte ist die Fusszeile Teil des Inhalts, kein Modal-Fuss: die
     // Klassen des Modal-Fusses holte sonst dessen Umzug- und Sticky-Logik an.

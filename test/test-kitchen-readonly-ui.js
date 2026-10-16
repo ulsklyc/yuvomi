@@ -578,9 +578,10 @@ const listeZeichnen = (modules, liste = [rezept(), kahl()]) => withAccess(module
   return { aktionen: aktionenImBaum(knoten), html: knoten.outerHTML };
 }));
 
-test('Rezepte bei `read`: die Zeile klappt auf und traegt keine Handlung', async () => {
+test('Rezepte bei `read`: die Zeile oeffnet das Rezept und traegt keine Handlung', async () => {
   const lesend = await listeZeichnen(LESEN);
-  assert.deepEqual([...new Set(lesend.aktionen)], ['toggle-detail'],
+  // R19: die Zeile oeffnet ein Leseblatt (`open-detail`) statt aufzuklappen.
+  assert.deepEqual([...new Set(lesend.aktionen)], ['open-detail'],
     'jede Zeile fuehrt ins Detail - auch die ohne Zutaten, Notiz und Link, die sonst das Formular oeffnete');
   assert.equal(lesend.aktionen.length, 2);
   assert.doesNotMatch(lesend.html, /list-row__actions|recipe-row__more|popover-menu/, 'keine Bedienzone, kein Ueberlaufmenue');
@@ -591,7 +592,9 @@ test('Rezepte bei `read`: die Zeile klappt auf und traegt keine Handlung', async
   }
 
   const voll = await listeZeichnen(SCHREIBEN);
-  for (const erwartet of ['edit', 'duplicate', 'delete', 'add-to-meals', 'to-shopping', 'match-ingredient', 'match-ingredients']) {
+  // Die Kreislauf-Ausgaenge (Einplanen, Einkauf, Vorrat) stehen seit R19 nur
+  // noch im Detail (Leseblatt/Spalte), nicht als Aufklapper in der Liste.
+  for (const erwartet of ['edit', 'duplicate', 'delete', 'open-detail']) {
     assert.ok(voll.aktionen.includes(erwartet), `Gegenfall: ${erwartet} steht mit Schreibrecht da`);
   }
   assert.match(voll.html, /list-row__actions/);
@@ -649,7 +652,7 @@ test('Rezepte: „Auf die Einkaufsliste" folgt dem Einkaufsrecht, nicht dem Kuec
   assert.deepEqual(await klicken(LESEN), [], 'ohne Einkaufsrecht geht auch er nicht raus');
 });
 
-test('Rezepte bei `read`: die Detailspalte traegt nur den Titel', async () => {
+test('Rezepte bei `read`: die Detailspalte traegt nur den Titel, keinen Fuss', async () => {
   const kopf = (modules) => withAccess(modules, () => mitRezepten([rezept()], () => {
     const body = new MiniElement('div');
     recipes.renderRecipePane(21, body);
@@ -657,11 +660,13 @@ test('Rezepte bei `read`: die Detailspalte traegt nur den Titel', async () => {
   }));
   const lesend = await kopf(LESEN);
   assert.match(lesend, /split-view__detail-title">Pfannkuchen</);
-  assert.doesNotMatch(lesend, /split-view__detail-actions|<button/);
+  assert.doesNotMatch(lesend, /split-view__detail-footer|recipes-detail-edit/);
   const voll = await kopf(SCHREIBEN);
-  assert.match(voll, /split-view__detail-actions/, 'Gegenfall');
-  assert.match(voll, /common\.edit/);
-  assert.equal((voll.split('</header>')[0].match(/<button /g) ?? []).length, 3, 'Bearbeiten, Duplizieren, Loeschen');
+  // R19: Bearbeiten, Duplizieren, Loeschen stehen im Fuss, Bearbeiten primaer am Ende.
+  assert.match(voll, /split-view__detail-footer/, 'Gegenfall');
+  assert.match(voll, /id="recipes-detail-edit"[^>]*>common\.edit|common\.edit/);
+  const fuss = voll.slice(voll.indexOf('split-view__detail-footer'));
+  assert.equal((fuss.match(/<button /g) ?? []).length, 3, 'Loeschen, Duplizieren, Bearbeiten');
 });
 
 test('Rezepte bei `read`: kein FAB, und der Leerzustand laedt zu nichts ein', async () => {

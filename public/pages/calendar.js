@@ -6993,10 +6993,9 @@ async function openEventDetail(ev, anchor = null, { pane = null } = {}) {
     edit: readOnly() ? undefined : {
       label: t('common.edit'),
       title: t('calendar.editEvent'),
-      // Im Sheet ist Bearbeiten die Hauptaktion und steht unten in der
-      // Daumenzone; Löschen bleibt zurückgenommen am Anfang (Critique
+      // Bearbeiten ist die Hauptaktion unten (detail-view.js,
+      // withPrimaryEdit); Löschen bleibt zurückgenommen am Anfang (Critique
       // 2026-09-24, Persona Casey).
-      primary: true,
       // Das Formular wartet auf die Erinnerungen, die Leseansicht nicht. Ohne
       // diese Sperre baute ein sofortiger Klick auf „Bearbeiten" das Formular
       // ohne Erinnerungszeilen auf - und saveEvent löscht die Erinnerungen des

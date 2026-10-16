@@ -18,6 +18,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
 
@@ -202,8 +203,9 @@ test('im Sheet steht Bearbeiten als Hauptaktion unten, Löschen zurückgenommen 
   const sheet = src.slice(src.indexOf('function openAsSheet'), src.indexOf('// Präsentation: Popover'));
   // Der Knopf entsteht in der FUSSZEILE, als Primaerknopf, NACH den Aktionen
   // des Aufrufers - also am Ende, in der Daumenzone.
-  assert.match(sheet, /\[\.\.\.\(opts\.actions \?\? \[\]\), \{\s*id: 'detail-view-edit',[\s\S]{0,120}variant: 'primary'/,
-    'mit edit.primary gehört Bearbeiten als Primärknopf ans Ende der Fußzeile');
+  assert.match(sheet, /detailFooterEl\(withPrimaryEdit\(opts\.actions, primaryEdit \? \{\s*id: 'detail-view-edit',/,
+    'Bearbeiten gehört als Primärknopf ans Ende der Fußzeile');
+  assert.match(sheet, /primaryEdit: Boolean\(opts\.edit\)/, 'R19: in jedem Blatt mit Bearbeiten, nicht mehr als Option');
   // Oben bleibt kein zweites Bearbeiten stehen; der Kopfknopf erscheint erst im
   // Formular, als „Zurück".
   assert.match(sheet, /hidden: primaryEdit/, 'der Kopfknopf muss in der Leseansicht verborgen sein');
@@ -212,28 +214,21 @@ test('im Sheet steht Bearbeiten als Hauptaktion unten, Löschen zurückgenommen 
   // Löschen steht am ANFANG - logisch, damit RTL es nicht an das Ende schiebt.
   const css = await detailCss();
   assert.match(css, /\.detail-view__action--start \{\s*margin-inline-end: auto;/, 'Löschen muss am Anfang stehen, auch in RTL');
-  // Der Kalender nimmt die Option; sein Löschen bleibt zurückgenommen.
+  // Der Kalender: sein Löschen bleibt zurückgenommen.
   const cal = await calendarJs();
   const detail = cal.slice(cal.indexOf('async function openEventDetail('), cal.indexOf('async function loadReminderForEvent('));
-  assert.match(detail, /primary: true,/, 'der Termin-Sheet setzt Bearbeiten nicht als Hauptaktion');
   assert.match(detail, /id: 'detail-delete',[\s\S]{0,80}variant: 'danger-ghost',[\s\S]{0,40}align: 'start'/,
     'Löschen bleibt destruktiv gestylt und am Anfang, nicht an der Primärposition');
 });
 
 test('im Popover gilt dieselbe Ordnung wie im Sheet: Löschen am Anfang, Bearbeiten primär am Ende (Re-Kritik 2026-09-25)', async () => {
   const src = await detailJs();
-  const popover = src.slice(src.indexOf('function openAsPopover'), src.indexOf('const footer = detailFooterEl(actions)'));
-  // Mit edit.primary kommt Bearbeiten NACH den Aktionen des Aufrufers - sonst
-  // steht Löschen direkt daneben und sein `--start` wirkt nicht, weil es nicht
-  // mehr das erste Element ist.
-  assert.match(popover, /opts\.edit\?\.primary\s*\?\s*\[\.\.\.\(opts\.actions \?\? \[\]\), edit\]/,
-    'mit edit.primary gehört Bearbeiten ans Ende der Popover-Fußzeile');
-  assert.match(popover, /opts\.edit\.primary \? \{ variant: 'primary'/,
-    'mit edit.primary ist Bearbeiten auch im Popover der Primärknopf');
-  // Ohne die Option bleibt alles wie bisher (Kontakte, Inventar, Budget ...).
-  assert.match(popover, /:\s*\[edit, \.\.\.\(opts\.actions \?\? \[\]\)\]/,
-    'ohne edit.primary steht Bearbeiten weiter vorne');
-  assert.match(popover, /: \{ variant: 'secondary' \}/, 'ohne edit.primary bleibt Bearbeiten sekundär');
+  const popover = src.slice(src.indexOf('function openAsPopover'), src.indexOf("footer.classList.add('detail-popover__footer')"));
+  // Bearbeiten kommt NACH den Aktionen des Aufrufers - sonst steht Löschen
+  // direkt daneben und sein `--start` wirkt nicht. Seit R19 immer, nicht mehr
+  // nur mit `edit.primary`.
+  assert.match(popover, /detailFooterEl\(withPrimaryEdit\(opts\.actions, edit\)\)/,
+    'Bearbeiten gehört als Primärknopf ans Ende der Popover-Fußzeile');
 });
 
 test('beide Fußzeilen werden aufbewahrt statt verworfen', async () => {
@@ -1234,4 +1229,44 @@ test('R19: im Formular einer Leseansicht fuehrt Abbrechen zurueck, der Kopf trae
   assert.match(tasks, /\$\{countdownTucked \? '' : countdownHtml\}/, 'ein gesetzter Countdown bleibt im Hauptteil');
   assert.match(tasks, /\$\{countdownTucked \? `<div class="task-form__tucked">\$\{countdownHtml\}<\/div>` : ''\}/, 'ausgeschaltet hinter dem Aufklapper');
   assert.match(tasks, /countdown \? t\('dashboard\.countdownTitle'\) : null,/, 'und die Zeile des Aufklappers nennt ihn');
+});
+
+// R19 (Critique 2026-10-16, "Bearbeiten: mal gefuellt primaer, mal umrandet
+// sekundaer"): Bearbeiten ist in Blatt, Popover und Detailspalte EIN
+// gefuellter Knopf am Ende des Fusses; ein anderer Primaerknopf (Aufgabe:
+// Erledigen) tritt dort zurueck.
+test('R19: Bearbeiten ist ueberall der eine Primaerknopf am Ende des Fusses', async () => {
+  const src = await detailJs();
+  // withPrimaryEdit als Programm: die Funktion ist rein und haengt an keinem
+  // Import, also laeuft ihr Quelltext hier fuer sich.
+  const fnSrc = src.slice(src.indexOf('export function withPrimaryEdit('), src.indexOf('export function detailFooterEl('));
+  const withPrimaryEdit = new Function(`${fnSrc.replace('export function', 'function')}; return withPrimaryEdit;`)();
+  const out = withPrimaryEdit([
+    { id: 'finish', variant: 'primary' }, { id: 'archive', variant: 'ghost' }, null,
+  ], { id: 'edit', label: 'Bearbeiten', onClick() {} });
+  assert.deepEqual(out.map((a) => [a.id, a.variant]), [['finish', 'secondary'], ['archive', 'ghost'], ['edit', 'primary']]);
+  assert.equal(out.at(-1).icon, 'pencil');
+  assert.deepEqual(withPrimaryEdit([{ id: 'finish', variant: 'primary' }], null).map((a) => a.variant), ['primary'],
+    'ohne Bearbeiten bleibt der Primaerknopf des Aufrufers');
+  const pane = src.slice(src.indexOf('function openInPane('), src.indexOf('// Öffentliche API'));
+  assert.match(pane, /detailPaneHeaderEl\(\{ title: opts\.title \?\? '' \}\)/, 'die Detailspalte traegt Bearbeiten nicht mehr im Kopf');
+  assert.match(pane, /detailFooterEl\(withPrimaryEdit\(opts\.actions, edit\), close\)/, 'sondern am Ende ihres Fusses');
+  assert.match(src, /if \(action\.dock\) dockNextModal\(btn\.closest\('\.split-view__detail'\)\)/, 'das Formular legt sich weiter in die Spalte');
+  assert.doesNotMatch(src, /opts\.edit\??\.primary/, 'keine Option mehr, die Bearbeiten zuruecknimmt');
+  for (const page of ['inventory', 'contacts', 'calendar']) {
+    const js = readFileSync(new URL(`../public/pages/${page}.js`, import.meta.url), 'utf8');
+    assert.doesNotMatch(js, /^\s*primary: true,$/m, `${page}: tote Option edit.primary`);
+  }
+  // Die Aufgabe auf dem Telefon: mit Bearbeiten am Ende bleibt der Fuss EINE
+  // Reihe - Loeschen tritt zu Starten und Archivieren ins Mehr-Menue (dort
+  // weiter destruktiv gefaerbt), Erledigen steht als Haken.
+  const task = readFileSync(new URL('../public/components/task-detail.js', import.meta.url), 'utf8');
+  assert.match(task, /const overflowIds = \['task-detail-start', 'task-detail-archive', 'task-detail-delete'\];/);
+  const more = task.slice(task.indexOf('function wireDetailMoreMenu('), task.indexOf('const DOER_BUTTON_ID'));
+  assert.match(more, /popover-menu__item--danger/, 'Loeschen bleibt im Menue destruktiv');
+  const css = await detailCss();
+  assert.match(css, /\.detail-view__footer > #task-detail-finish > \.btn__label \{/, 'Erledigen mobil als Haken ohne Wort');
+  const recipes = readFileSync(new URL('../public/pages/recipes.js', import.meta.url), 'utf8');
+  const recipePane = recipes.slice(recipes.indexOf('function renderRecipePane('), recipes.indexOf('function openRecipeNarrow('));
+  assert.match(recipePane, /withPrimaryEdit\(/, 'die Rezeptspalte folgt derselben Regel');
 });

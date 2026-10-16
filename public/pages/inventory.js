@@ -1291,10 +1291,9 @@ async function openItemDetail(item, { pane = null, signal = null } = {}) {
     edit: ro ? null : {
       label: t('common.edit'),
       title: t('common.editItem'),
-      // Im Sheet ist Bearbeiten die Hauptaktion und steht unten in der
-      // Daumenzone; Loeschen bleibt zurueckgenommen am Anfang und fragt
+      // Bearbeiten steht als Hauptaktion unten (detail-view.js,
+      // withPrimaryEdit); Loeschen bleibt zurueckgenommen am Anfang und fragt
       // weiter nach (removeItem), wie im Kalender (#1460, #1463).
-      primary: true,
       mount: (panel, editPane) => {
         const form = buildItemForm({ mode: 'edit', item });
         editPane.insertAdjacentHTML('beforeend', form.content);

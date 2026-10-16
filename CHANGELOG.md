@@ -36,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Edit is the same filled button at the bottom of every detail view.** Tasks, recipes, contacts,
+  inventory, birthdays and events show "Edit" as the main button at the end of the bottom bar, on a
+  phone, in a popover and in the detail column on a computer. Before, it sometimes sat outlined at
+  the top. On a phone, deleting a task moved into the "..." menu so the bar stays one row.
+- **Tapping a recipe on a phone opens it.** The recipe opens as a sheet with its ingredients, notes
+  and the buttons to plan or shop it, like a contact or a task, instead of unfolding inside the
+  list.
 - **Long names in lists get two lines everywhere.** Task, contact, birthday, budget, subscription,
   agenda and shopping rows all show a name on up to two lines and end it with an ellipsis after
   that. Some lists cut names after one line, others let them run on without limit.

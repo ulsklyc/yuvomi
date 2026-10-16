@@ -269,7 +269,9 @@ test('Inventar bei `read`: die Detailansicht bietet weder Bearbeiten noch Loesch
 
 test('Inventar (#1463): Bearbeiten ist im Blatt der Primaerknopf, Loeschen bleibt zurueckgenommen', async () => {
   const voll = await detailOeffnen(SCHREIBEN);
-  assert.equal(voll.edit.primary, true, '`edit.primary` - Bearbeiten steht unten in der Daumenzone');
+  // Bearbeiten steht unten in der Daumenzone - seit R19 in jedem Blatt
+  // (withPrimaryEdit, test:detail-view), keine Option mehr.
+  assert.ok(voll.edit?.mount, 'das Blatt traegt Bearbeiten');
   const [loeschen] = voll.actions;
   assert.equal(loeschen.variant, 'danger-ghost');
   assert.equal(loeschen.align, 'start', 'Loeschen steht am Anfang der Fusszeile, weg vom Daumen');

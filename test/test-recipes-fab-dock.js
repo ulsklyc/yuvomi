@@ -636,18 +636,20 @@ test('Liste + Detail, ab der Schwelle: ?open= waehlt aus, das Rezept steht recht
   assert.equal(paneTitle(doc), 'Gericht 2', 'der Deep-Link zeichnet das Rezept nicht in die Spalte');
   assert.equal(doc.querySelector('[data-md-empty]').hidden, true, 'der Leerzustand steht noch');
   assert.ok(doc.querySelector('.recipe-row-item[data-md-id="2"]').classList.contains('is-selected'), 'die Zeile ist nicht markiert');
-  assert.equal(doc.querySelector('#recipe-detail-2').hidden, true, 'in der Spalte darf der Aufklapper nicht aufgehen');
-  // Der Inhalt ist der des Aufklappers - dieselbe Quelle, dieselben Aktionen.
+  assert.equal(doc.querySelector('#recipe-detail-2'), null, 'R19: in der Liste steht kein Aufklapper mehr');
+  // Der Inhalt ist der des Leseblatts - dieselbe Quelle, dieselben Aktionen.
   assert.ok(doc.querySelector('#recipes-detail .recipe-detail--pane [data-action="add-to-meals"][data-id="2"]') !== null,
     'der Kreislauf-Ausgang fehlt in der Spalte');
-  assert.ok(doc.querySelector('#recipes-detail #recipes-detail-edit') !== null, 'ein eigenes Rezept braucht Bearbeiten im Kopf');
+  // R19: Bearbeiten ist der Primaerknopf am Ende des Fusses der Spalte.
+  const edit = doc.querySelector('#recipes-detail .split-view__detail-footer #recipes-detail-edit');
+  assert.ok(edit !== null, 'ein eigenes Rezept braucht Bearbeiten am Fuss');
+  assert.match(edit.className, /btn--primary/);
 
   clickBubbling(toggleOf(doc, 1));
   await settle();
   assert.equal(location.search, '?open=1', 'die Auswahl steht nicht in der Adresse');
   assert.equal(history.length, 2, 'ein Klick ist ein Schritt fuer die Zurueck-Taste (pushState)');
   assert.equal(paneTitle(doc), 'Gericht 1');
-  assert.equal(doc.querySelector('#recipe-detail-1').hidden, true, 'der Klick klappte auf, statt auszuwaehlen');
 });
 
 test('Liste + Detail, ab der Schwelle ohne ?open=: das erste Rezept steht gleich rechts, ohne History-Eintrag', async () => {
@@ -661,11 +663,18 @@ test('Liste + Detail, ab der Schwelle ohne ?open=: das erste Rezept steht gleich
   assert.equal(history.length, 1, 'die Vorwahl ersetzt, sie stapelt nicht');
 });
 
-test('Liste + Detail, unter der Schwelle: keine Vorwahl, kein Aufklapper', async () => {
-  const doc = await renderFresh(DISHES, { split: false });
-  await settle();
-  assert.equal(location.search, '', 'mobil waehlt der Einstieg nichts');
-  assert.equal(doc.querySelector('#recipe-detail-1').hidden, true);
+test('Liste + Detail, unter der Schwelle: keine Vorwahl, kein Blatt beim Einstieg', async () => {
+  let opened = 0;
+  globalThis.__openDetailView = () => { opened += 1; };
+  try {
+    const doc = await renderFresh(DISHES, { split: false });
+    await settle();
+    assert.equal(location.search, '', 'mobil waehlt der Einstieg nichts');
+    assert.equal(opened, 0, 'ohne ?open= geht kein Blatt auf');
+    assert.equal(doc.querySelector('#recipe-detail-1'), null, 'kein Aufklapper in der Liste');
+  } finally {
+    delete globalThis.__openDetailView;
+  }
 });
 
 test('Liste + Detail, ab der Schwelle: der Hauptknopf sagt nicht "eingeklappt", wenn er auswaehlt', async () => {
@@ -682,7 +691,7 @@ test('Liste + Detail, ab der Schwelle: ein gespiegeltes Rezept ist schreibgeschu
   await settle();
   assert.equal(paneTitle(doc), 'Gericht 3');
   assert.equal(doc.querySelector('#recipes-detail #recipes-detail-edit') === null, true, 'Bearbeiten an einem Mealie-Rezept - der Server weist es ab');
-  const labels = doc.querySelectorAll('#recipes-detail .split-view__detail-actions button')
+  const labels = doc.querySelectorAll('#recipes-detail .split-view__detail-footer button')
     .map((b) => b.getAttribute('aria-label') ?? b.textContent);
   assert.deepEqual(labels, ['recipes.duplicate'], 'gespiegelt bleibt nur Duplizieren');
 });
@@ -694,21 +703,31 @@ test('Liste + Detail: eine unbekannte ID faellt auf den Leerzustand zurueck und 
   assert.equal(location.search, '', 'die Adresse nennt ein Rezept, das es nicht gibt');
 });
 
-test('Liste + Detail, unter der Schwelle: alles wie bisher - ?open= klappt auf, ein Klick klappt auf', async () => {
-  const doc = await renderFresh(DISHES, { split: false, path: '/recipes?open=2' });
-  await settle();
-  assert.equal(doc.querySelector('#recipe-detail-2').hidden, false, 'der Deep-Link klappt das Rezept nicht mehr auf (#936)');
-  assert.equal(toggleOf(doc, 2).getAttribute('aria-expanded'), 'true');
-  assert.equal(toggleOf(doc, 2).getAttribute('aria-controls'), 'recipe-detail-2');
-  assert.equal(paneTitle(doc), null, 'unter der Schwelle wird in die (unsichtbare) Spalte nichts gezeichnet');
-  assert.equal(doc.querySelector('#recipes-list').classList.contains('recipes-list--split'), false);
+// R19 (Critique 2026-10-16, "Zeilentipp hat vier Bedeutungen"): unter der
+// Schwelle OEFFNET die Zeile das Rezept als Leseblatt, statt aufzuklappen -
+// wie Kontakte, Inventar und Aufgaben. Der Deep-Link (#936) tut dasselbe.
+test('Liste + Detail, unter der Schwelle: ?open= und ein Tipp oeffnen das Rezept als Leseblatt', async () => {
+  const opened = [];
+  globalThis.__openDetailView = (opts) => { opened.push(opts); };
+  try {
+    const doc = await renderFresh(DISHES, { split: false, path: '/recipes?open=2' });
+    await settle();
+    assert.deepEqual(opened.map((o) => o.title), ['Gericht 2'], 'der Deep-Link oeffnet das Rezept nicht (#936)');
+    assert.equal(opened[0].key, 'recipe:2');
+    const actions = opened[0].actions.map((a) => [a.id, a.variant]);
+    assert.deepEqual(actions.at(-1), ['recipe-sheet-edit', 'primary'], 'Bearbeiten ist der Primaerknopf am Ende');
+    assert.equal(toggleOf(doc, 2).getAttribute('aria-expanded'), null, 'kein Aufklapper mehr');
+    assert.equal(toggleOf(doc, 2).getAttribute('aria-haspopup'), 'dialog', 'der Knopf oeffnet ein Blatt');
+    assert.equal(paneTitle(doc), null, 'unter der Schwelle wird in die (unsichtbare) Spalte nichts gezeichnet');
+    assert.equal(doc.querySelector('#recipes-list').classList.contains('recipes-list--split'), false);
 
-  clickBubbling(toggleOf(doc, 1));
-  await settle();
-  assert.equal(doc.querySelector('#recipe-detail-1').hidden, false, 'der Klick klappt nicht mehr auf');
-  assert.equal(toggleOf(doc, 1).getAttribute('aria-expanded'), 'true');
-  assert.equal(location.search, '?open=2', 'unter der Schwelle schreibt ein Aufklappen keine Adresse');
-  assert.equal(history.length, 1);
+    clickBubbling(toggleOf(doc, 1));
+    await settle();
+    assert.deepEqual(opened.map((o) => o.title), ['Gericht 2', 'Gericht 1'], 'ein Tipp oeffnet das Rezept');
+    assert.equal(doc.querySelector('#recipe-detail-1'), null, 'und klappt nichts auf');
+  } finally {
+    delete globalThis.__openDetailView;
+  }
 });
 
 test('Liste + Detail: in der schmalen Zeile stehen Zutatenzahl und "Diese Woche geplant" zusammen unter dem Namen', async () => {
@@ -753,9 +772,9 @@ test('Liste + Detail: die Kopie eines gespiegelten Rezepts unter dem Quellenfilt
     assert.equal(url, '/recipes');
     return { data: { ...dish(4), title: body.title } };
   };
-  const duplicate = doc.querySelectorAll('#recipes-detail .split-view__detail-actions button')
-    .find((b) => b.getAttribute('aria-label') === 'recipes.duplicate');
-  assert.ok(duplicate, 'kein Duplizieren im Kopf der Spalte');
+  const duplicate = doc.querySelectorAll('#recipes-detail .split-view__detail-footer button')
+    .find((b) => (b.getAttribute('aria-label') ?? b.textContent) === 'recipes.duplicate');
+  assert.ok(duplicate, 'kein Duplizieren im Fuss der Spalte');
   clickBubbling(duplicate);
   await settle();
   await settle();
@@ -776,18 +795,23 @@ test('Liste + Detail: die Kopie eines gespiegelten Rezepts unter dem Quellenfilt
  * Adresse nannte ein Rezept, das nirgends zu sehen war. Dieselbe Einloesung
  * wie beim Laden (openRecipeFromQuery): aufklappen, ins Bild holen.
  */
-test('Liste + Detail, unter der Schwelle: Zurueck/Vor auf ?open= klappt das Rezept auf', async () => {
-  const doc = await renderFresh(DISHES, { split: false, path: '/recipes' });
-  await settle();
-  assert.equal(doc.querySelector('#recipe-detail-2').hidden, true, 'vorher zu - sonst misst der Test nichts');
-  const { handleMasterDetailPopstate } = await import('../public/utils/master-detail.js');
-  history.pushState(null, '', '/recipes?open=2');
-  assert.equal(handleMasterDetailPopstate(), true, 'die Geste gehoert dem Baustein - sonst misst der Test den Seitenneubau');
-  await settle();
-  assert.equal(doc.querySelector('#recipe-detail-2').hidden, false, 'die Adresse nennt Rezept 2, das Akkordeon blieb zu');
-  assert.equal(toggleOf(doc, 2).getAttribute('aria-expanded'), 'true');
-  assert.equal(doc.querySelector('#recipes-detail [data-md-body] .split-view__detail-title'), null,
-    'unter der Schwelle zeichnet nichts in die unsichtbare Spalte');
+test('Liste + Detail, unter der Schwelle: Zurueck/Vor auf ?open= oeffnet das Rezept', async () => {
+  const opened = [];
+  globalThis.__openDetailView = (opts) => { opened.push(opts.title); };
+  try {
+    const doc = await renderFresh(DISHES, { split: false, path: '/recipes' });
+    await settle();
+    assert.deepEqual(opened, [], 'vorher zu - sonst misst der Test nichts');
+    const { handleMasterDetailPopstate } = await import('../public/utils/master-detail.js');
+    history.pushState(null, '', '/recipes?open=2');
+    assert.equal(handleMasterDetailPopstate(), true, 'die Geste gehoert dem Baustein - sonst misst der Test den Seitenneubau');
+    await settle();
+    assert.deepEqual(opened, ['Gericht 2'], 'die Adresse nennt Rezept 2, nichts ging auf');
+    assert.equal(doc.querySelector('#recipes-detail [data-md-body] .split-view__detail-title'), null,
+      'unter der Schwelle zeichnet nichts in die unsichtbare Spalte');
+  } finally {
+    delete globalThis.__openDetailView;
+  }
 });
 
 /*

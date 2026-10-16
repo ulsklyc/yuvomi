@@ -1200,10 +1200,8 @@ function openContactDetail(contact, { inPane = null } = {}) {
     edit: readOnly() ? null : {
       label: t('common.edit'),
       title: t('contacts.editContact'),
-      // Im Blatt ist Bearbeiten die Hauptaktion und steht unten am Ende des
-      // Fusses, wie im Termin und im Inventar (R17, E7: EINE Stelle). In der
-      // Detailspalte bleibt es die Kopfaktion - dort gibt es keine Daumenzone.
-      primary: true,
+      // Bearbeiten ist ueberall die Hauptaktion am Ende des Fusses - im
+      // Blatt, im Popover und in der Detailspalte (R19, withPrimaryEdit).
       ready,
       mount: (panel, pane) => {
         const form = buildContactForm({ mode: 'edit', contact: full });

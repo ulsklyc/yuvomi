@@ -667,6 +667,24 @@
   .detail-view__footer > .task-detail__more {
     display: inline-flex;
   }
+
+  /* Erledigen steht neben dem Primaerknopf Bearbeiten (R19) als Haken ohne
+   * Wort: der Name bleibt fuer Screenreader und als Tooltip, der Fuss bleibt
+   * EINE Reihe. */
+  .detail-view__footer > #task-detail-finish > .btn__label {
+    position: absolute;
+    width: var(--space-px);
+    height: var(--space-px);
+    margin: calc(-1 * var(--space-px));
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .detail-view__footer > #task-detail-finish {
+    min-width: var(--target-base);
+    padding-inline: var(--space-2);
+  }
 }
 
 /* DER FUSS DES LESEBLATTS AUF DEM TELEFON (R17, E7). Mit Bearbeiten als

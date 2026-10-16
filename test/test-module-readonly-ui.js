@@ -2219,7 +2219,8 @@ test('Kontakt-Detailansicht mit `contacts: read`: kein Bearbeiten, kein Loeschen
   // R17 (E7): Bearbeiten sitzt im Blatt an EINER Stelle - als Primaerknopf am
   // Ende des Fusses, wie im Termin und im Inventar; bis dahin stand es im
   // Kontakt als Kopfaktion.
-  assert.equal(schreibend.edit.primary, true, 'Bearbeiten ist im Blatt die Hauptaktion unten');
+  // Seit R19 ist Bearbeiten in JEDEM Blatt die Hauptaktion unten
+  // (withPrimaryEdit, test:detail-view) - keine Option mehr am Aufrufer.
   assert.ok(ids(schreibend).includes('contact-detail-delete'));
 
   const lesend = withAccess({ contacts: 'read' }, () => (

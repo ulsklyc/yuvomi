@@ -173,10 +173,12 @@ export async function addSubtask(parentId, title, { onChanged = () => {} } = {})
 // keine Durchgangsstation. Es steht nur nicht mehr im Weg.
 const STATUS_ACTIONS = {
   open: [
-    // ERLEDIGEN IST DIE HAUPTAKTION (Critique R18, 2026-10-07). Der haeufigste
-    // Grund, eine Aufgabe zu oeffnen, ist sie abzuhaken - und der Knopf dafuer
-    // stand als einer von vier gleich leisen im Fuss. Er ist jetzt der EINE
-    // Primaerknopf des Blatts (Bearbeiten steht hier im Kopf, nicht im Fuss).
+    // ERLEDIGEN STEHT VORN (Critique R18, 2026-10-07): der haeufigste Grund,
+    // eine Aufgabe zu oeffnen, ist sie abzuhaken. Primaer ist er nur, solange
+    // es kein Bearbeiten gibt (Nur-lesen-Ansicht mit Statusrecht): seit R19
+    // ist Bearbeiten in JEDEM Blatt der eine Primaerknopf am Ende des Fusses,
+    // und withPrimaryEdit (detail-view.js) nimmt Erledigen dann auf sekundaer
+    // zurueck - zwei gefuellte Knoepfe in einem Fuss gibt es nicht.
     { id: 'task-detail-finish', status: 'done',        labelKey: 'tasks.detailFinish', icon: 'check',      variant: 'primary' },
     { id: 'task-detail-start',  status: 'in_progress', labelKey: 'tasks.detailStart',  icon: 'circle-dot', variant: 'ghost' },
   ],
@@ -1165,7 +1167,10 @@ export function openTaskDetail({
   // MOBIL EINE REIHE (Re-Critique 2026-09-28, P8 / A3 P3-2): Starten und
   // Archivieren treten auf dem Telefon in EIN Mehr-Menue (detail-view.css);
   // am Desktop stehen sie weiter im Fuss, und dort gibt es den Knopf nicht.
-  const overflowIds = ['task-detail-start', 'task-detail-archive'];
+  // Seit R19 auch Loeschen: Bearbeiten steht als Primaerknopf am Ende des
+  // Fusses (withPrimaryEdit), und mit Loeschen, Erledigen, Wer, Mehr und
+  // Bearbeiten brach der Fuss auf dem Telefon wieder auf zwei Reihen.
+  const overflowIds = ['task-detail-start', 'task-detail-archive', 'task-detail-delete'];
   if (actions.some((a) => overflowIds.includes(a.id))) {
     actions.push({ id: MORE_BUTTON_ID, label: '', variant: 'ghost', icon: 'more-horizontal' });
   }
@@ -1229,7 +1234,9 @@ function wireDetailMoreMenu(task, overflowIds, pane = null) {
     target.classList.add('task-detail__overflow');
     const item = document.createElement('button');
     item.type = 'button';
-    item.className = 'popover-menu__item';
+    // Loeschen bleibt im Menue als destruktiv erkennbar.
+    item.className = target.classList.contains('btn--danger-ghost')
+      ? 'popover-menu__item popover-menu__item--danger' : 'popover-menu__item';
     item.setAttribute('role', 'menuitem');
     const icon = document.createElement('i');
     icon.dataset.lucide = target.querySelector('[data-lucide]')?.dataset.lucide

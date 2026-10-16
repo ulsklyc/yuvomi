@@ -12,7 +12,7 @@ import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
 import { resolveShoppingTarget, announceTransfer, mayTransferRecipeToShopping } from '/utils/kitchen-transfer.js';
 import { popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 import { ingredientRowHTML } from '/utils/ingredient-row.js';
-import { scheduleUndoableDelete, expandIn, collapseOut } from '/utils/ux.js';
+import { scheduleUndoableDelete } from '/utils/ux.js';
 import { normalizeRecipeMealTypes, RECIPE_MEAL_TYPE_KEYS } from '/utils/recipe-meal-types.js';
 import { mealPayloadFromRecipe } from '/utils/recipe-to-meal.js';
 import { todayKey } from '/utils/date.js';
@@ -24,6 +24,7 @@ import { mealTypeList, ensureMealTypeNames } from '/utils/meal-types.js';
 import { recipeThumbEl, recipeHeroEl, recipeBandEl } from '/utils/recipe-thumb.js';
 import { navModuleAccess } from '/permissions.js';
 import { mountMasterDetail, splitViewDetailHtml, detailPaneHeaderEl } from '/utils/master-detail.js';
+import { openDetailView, closeDetailView, detailFooterEl, withPrimaryEdit } from '/components/detail-view.js';
 import { mayWritePath } from '/utils/module-access.js';
 import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
 import { ingredientMatchKey } from '/utils/ingredient-match-key.js';
@@ -96,7 +97,7 @@ function mayPlanRecipe() {
  * `read` zu, bis sie hier ausdruecklich steht. `to-shopping` schreibt in den
  * Einkauf und traegt seinen eigenen Riegel (`transferRecipe`).
  */
-const READ_SAFE_ACTIONS = new Set(['toggle-detail', 'to-shopping']);
+const READ_SAFE_ACTIONS = new Set(['open-detail', 'to-shopping']);
 
 /**
  * EIN WEG FUER DIE FEHLER-TOASTS DER SEITE (#1909). Der Toast sagt den Satz der
@@ -342,12 +343,14 @@ async function loadPlannedRecipes() {
 /**
  * Oeffnet das per ?open=<id> benannte Rezept, wenn es in der geladenen Liste steht.
  *
- * Aufklappen statt Bearbeiten: wer aus dem Essensplan kommt, will kochen, nicht
- * aendern - dieselbe Entscheidung wie beim Antippen einer Zeile.
+ * Lesen statt Bearbeiten: wer aus dem Essensplan kommt, will kochen, nicht
+ * aendern - dieselbe Entscheidung wie beim Antippen einer Zeile. Unter der
+ * Schwelle oeffnet das Rezept seit R19 als Leseblatt (wie Kontakte, Inventar,
+ * Aufgaben), nicht mehr als Aufklapper in der Liste.
  *
  * Ein Rezept ohne Detailinhalt (keine Zutaten, keine Notiz, keine Quelle) hat
- * gar kein Aufklapp-Panel. Dann bleibt das Scrollen als das, was zu holen ist:
- * die Zeile zeigen, statt still nichts zu tun.
+ * kein Leseblatt. Dann bleibt das Scrollen als das, was zu holen ist: die
+ * Zeile zeigen, statt still nichts zu tun.
  */
 function openRecipeFromQuery() {
   const raw = new URLSearchParams(window.location.search).get('open');
@@ -356,23 +359,15 @@ function openRecipeFromQuery() {
 
   const row = _container?.querySelector(`.recipe-row-item[data-id="${id}"]`);
   if (!row) return;
+  row.scrollIntoView({ block: 'nearest' });
 
   // In der Detailspalte hat der Baustein das Rezept beim Einhaengen schon
   // ausgewaehlt - er liest denselben Parameter (`param: 'open'` in
-  // mountRecipeDetail). Aufzuklappen gibt es dort nichts: die Liste zeigt
-  // keine Aufklapper, das Detail steht rechts.
-  if (_md?.isSplit()) {
-    row.scrollIntoView({ block: 'nearest' });
-    return;
-  }
+  // mountRecipeDetail).
+  if (_md?.isSplit()) return;
 
-  const toggle = row.querySelector('[data-action="toggle-detail"]');
-  const panel = _container.querySelector(`#recipe-detail-${id}`);
-  if (toggle && panel) {
-    toggle.setAttribute('aria-expanded', 'true');
-    panel.hidden = false;
-  }
-  row.scrollIntoView({ block: 'nearest' });
+  const recipe = state.recipes.find((r) => r.id === id);
+  if (recipe && row.querySelector('[data-action="open-detail"]')) openRecipeSheet(recipe);
 }
 
 /**
@@ -563,9 +558,9 @@ export async function render(container, { signal } = {}) {
 }
 
 async function onSplitClick(e, list) {
-  // Der Hauptknopf der Zeile: in der Spalte waehlt er aus, darunter klappt
-  // er auf oder oeffnet das Formular - der Baustein entscheidet ueber open().
-  // Auswaehlen und Aufklappen sind Lesen; den Weg ins Formular schliesst
+  // Der Hauptknopf der Zeile: in der Spalte waehlt er aus, darunter oeffnet
+  // er das Leseblatt oder das Formular - der Baustein entscheidet ueber open().
+  // Auswaehlen und Oeffnen sind Lesen; den Weg ins Formular schliesst
   // openRecipeModal() selbst.
   const main = e.target.closest('.recipe-row__toggle');
   if (main && list.contains(main)) {
@@ -596,7 +591,7 @@ async function onSplitClick(e, list) {
  * Was eine `data-action` der Seite TUT - eine Tabelle statt einer Kette aus
  * `if`, damit der Riegel davor (`READ_SAFE_ACTIONS` in onSplitClick) an EINER
  * Stelle ueber alle Eintraege urteilt, auch ueber einen, der morgen dazukommt
- * und noch keinen eigenen Riegel traegt. `toggle-detail` fehlt hier: der
+ * und noch keinen eigenen Riegel traegt. `open-detail` fehlt hier: der
  * Hauptknopf der Zeile ist vorher abgezweigt.
  */
 const SPLIT_ACTIONS = {
@@ -706,14 +701,14 @@ function mountRecipeDetail(root, signal) {
     renderDetail: (id, body) => renderRecipePane(id, body),
     openNarrow: (id, trigger) => openRecipeNarrow(id, trigger),
     // Unter der Schwelle loest openRecipeFromQuery() den Link ein, NACH dem
-    // Listenbau - beim Einhaengen gibt es noch keine Zeile zum Aufklappen.
+    // Listenbau - beim Einhaengen sind die Rezepte noch nicht geladen.
     deepLinkNarrow: false,
-    // Darunter ist die Zeile ein Aufklapper, kein Blatt: mehrere Rezepte
-    // stehen offen, und Aufklappen schreibt keine Adresse.
-    narrow: 'accordion',
+    // Darunter oeffnet die Zeile ein LESEBLATT (R19, "Zeilentipp oeffnet"):
+    // vorher klappte sie in der Liste auf, als einziges Modul neben Aufgaben,
+    // Kontakten und Inventar, die ihr Element oeffnen.
+    narrow: 'sheet',
     // Und bei Zurueck/Vor auf `?open=` (Eintraege aus der Spalte, Fenster
-    // inzwischen schmal) dieselbe Einloesung: die Zeilen stehen, der
-    // Aufklapper geht auf (Codex an #1477).
+    // inzwischen schmal) dieselbe Einloesung (Codex an #1477).
     onNarrowSync: () => openRecipeFromQuery(),
   });
   // Der Moduswechsel (Fenster, Seitenleiste) aendert, was der Hauptknopf der
@@ -743,85 +738,95 @@ function renderRecipePane(id, body) {
   // Dieselbe Regel wie die Zeilenaktionen: gespiegelte Rezepte sind
   // schreibgeschuetzt, Duplizieren legt eine eigene Kopie an.
   const isMirrored = recipe.source !== 'native';
-  // Bei `read` traegt der Kopf nur den Titel: alle drei Knoepfe schreiben.
-  const actions = readOnly() ? [] : [
-    !isMirrored && {
-      label: t('common.edit'), icon: 'pencil', id: 'recipes-detail-edit',
-      // In der Spalte bearbeiten, nicht in einem Fenster darueber (R19).
-      dock: true,
-      onClick: () => openRecipeModal('edit', recipe),
-    },
-    {
-      label: t('recipes.duplicate'), icon: 'copy', variant: 'ghost', iconOnly: true,
-      onClick: () => duplicateRecipe(recipe),
-    },
-    !isMirrored && {
-      label: t('common.delete'), icon: 'trash-2', variant: 'ghost', iconOnly: true,
-      onClick: () => removeRecipe(recipe),
-    },
-  ].filter(Boolean);
+  // Bei `read` gibt es keinen Fuss: alle drei Knoepfe schreiben.
+  // BEARBEITEN IST DER PRIMAERKNOPF AM ENDE DES FUSSES (R19, withPrimaryEdit) -
+  // wie in jeder anderen Detailspalte; vorher stand es umrandet im Kopf.
+  const footer = readOnly() ? null : detailFooterEl(recipeActions(recipe, {
+    // In der Spalte bearbeiten, nicht in einem Fenster darueber (R19).
+    edit: { id: 'recipes-detail-edit', dock: true, onClick: () => openRecipeModal('edit', recipe) },
+    duplicate: () => duplicateRecipe(recipe),
+    remove: () => removeRecipe(recipe),
+  }));
+  if (footer) footer.className = 'detail-view__footer split-view__detail-footer';
 
   const detail = document.createElement('div');
   detail.className = 'recipe-detail recipe-detail--pane';
   fillRecipeDetail(detail, recipe);
-  body.replaceChildren(detailPaneHeaderEl({ title: recipe.title, actions }), detail);
+  body.replaceChildren(...[detailPaneHeaderEl({ title: recipe.title }), detail, footer].filter(Boolean));
   return undefined;
 }
 
 /**
- * Unter der Schwelle: der bisherige Weg der Zeile. Aufklappen, wenn es ein
- * Detail gibt, sonst das Formular - ein gespiegeltes Rezept ohne Detail tut
- * nichts (siehe buildRecipeList).
+ * Die Aktionen eines Rezepts im Fuss von Leseblatt und Detailspalte: Loeschen
+ * zurueckgenommen am Anfang, Duplizieren leise, Bearbeiten als Primaerknopf
+ * am Ende (withPrimaryEdit). Ein gespiegeltes Rezept ist schreibgeschuetzt:
+ * nur Duplizieren (legt eine eigene Kopie an).
+ */
+function recipeActions(recipe, { edit, duplicate, remove }) {
+  const isMirrored = recipe.source !== 'native';
+  return withPrimaryEdit([
+    !isMirrored && {
+      id: 'recipe-detail-delete', label: t('common.delete'), icon: 'trash-2',
+      variant: 'danger-ghost', align: 'start', onClick: remove,
+    },
+    { id: 'recipe-detail-duplicate', label: t('recipes.duplicate'), icon: 'copy', variant: 'ghost', onClick: duplicate },
+  ], isMirrored ? null : { label: t('common.edit'), ...edit });
+}
+
+/**
+ * Das Rezept als LESEBLATT unter der Schwelle (R19, Critique 2026-10-16:
+ * "Zeilentipp hat vier Bedeutungen"). Derselbe Inhalt wie die Detailspalte
+ * (fillRecipeDetail), dasselbe Blatt wie Kontakte und Inventar
+ * (openDetailView), Bearbeiten unten als Hauptaktion. Die Knoepfe IM Detail
+ * (Einplanen, Einkauf, Vorrat zuordnen) laufen ueber dieselbe Tabelle wie in
+ * der Liste (SPLIT_ACTIONS) samt Nur-lesen-Riegel.
+ */
+function openRecipeSheet(recipe) {
+  const detail = document.createElement('div');
+  detail.className = 'recipe-detail recipe-detail--sheet';
+  fillRecipeDetail(detail, recipe);
+  detail.addEventListener('click', (e) => onSplitClick(e, detail));
+  // Erst das Blatt schliessen, dann das naechste Fenster: das geteilte Modal
+  // kennt kein Stapeln (closeDetailView).
+  const leave = (next) => async ({ close } = {}) => {
+    await (close ?? closeDetailView)({ force: true });
+    next();
+  };
+  openDetailView({
+    title: recipe.title,
+    key: `recipe:${recipe.id}`,
+    sections: [{ node: detail }],
+    actions: readOnly() ? [] : recipeActions(recipe, {
+      edit: { id: 'recipe-sheet-edit', onClick: leave(() => openRecipeModal('edit', recipe)) },
+      duplicate: leave(() => duplicateRecipe(recipe)),
+      remove: leave(() => removeRecipe(recipe)),
+    }),
+  });
+}
+
+/**
+ * Unter der Schwelle: das Leseblatt, wenn es ein Detail gibt, sonst das
+ * Formular - ein gespiegeltes Rezept ohne Detail tut nichts (siehe
+ * buildRecipeList).
  */
 function openRecipeNarrow(id, trigger) {
   const btn = trigger
     ?? _container?.querySelector(`.recipe-row__toggle[data-id="${CSS.escape(String(id))}"]`);
   if (!btn) return;
-
-  // Aufklappen: der Zustand lebt am Button (aria-expanded) und am Panel
-  // (hidden). `hidden` statt max-height-Transition, weil ein per Transition
-  // versteckter Inhalt in headless-Renderern und auf inaktiven Tabs nie
-  // erscheint - der Reveal muss einen sichtbaren Default verbessern, nicht
-  // Sichtbarkeit an eine Animation binden.
-  // BEWEGUNG OBENDRAUF (Re-Critique 2026-09-28, A4 P2-8): der Aufklapper
-  // oeffnete hart. Der Zustand bleibt `hidden` (siehe oben), die Bewegung kommt
-  // aus dem geteilten Paar expandIn/collapseOut (utils/ux.js, reduzierte
-  // Bewegung springt): Oeffnen macht sichtbar und zieht auf, Schliessen klappt
-  // erst ein und versteckt dann.
-  if (btn.dataset.action === 'toggle-detail') {
-    const panel = _container?.querySelector(`#recipe-detail-${btn.dataset.id}`);
-    if (!panel) return;
-    const open = btn.getAttribute('aria-expanded') === 'true';
-    btn.setAttribute('aria-expanded', String(!open));
-    if (!open) {
-      panel.getAnimations?.().forEach((a) => a.cancel());
-      panel.hidden = false;
-      expandIn(panel);
-      return;
-    }
-    collapseOut(panel).then(() => {
-      // Nur verstecken, wenn inzwischen niemand wieder aufgeklappt hat.
-      if (btn.getAttribute('aria-expanded') !== 'true') panel.hidden = true;
-      // collapseOut haelt die Hoehe 0 (fill: forwards) - verwerfen, sonst
-      // oeffnete das Panel beim naechsten Mal auf Hoehe 0.
-      panel.getAnimations?.().forEach((a) => a.cancel());
-      panel.style.overflow = '';
-    });
+  const recipe = state.recipes.find((r) => String(r.id) === String(id));
+  if (!recipe) return;
+  if (btn.dataset.action === 'open-detail') {
+    openRecipeSheet(recipe);
     return;
   }
-
-  if (btn.dataset.action === 'edit') {
-    const recipe = state.recipes.find((r) => String(r.id) === String(id));
-    if (recipe) openRecipeModal('edit', recipe);
-  }
+  if (btn.dataset.action === 'edit') openRecipeModal('edit', recipe);
 }
 
 /**
- * ARIA des Hauptknopfs je Darstellung. Unter der Schwelle ist er ein
- * Aufklapper (`aria-expanded` + `aria-controls` aufs Panel); in der Spalte
- * waehlt er aus - ein „eingeklappt", das nie aufklappt, waere eine falsche
- * Ansage. Dort zeigt `aria-controls` auf die Detailspalte, und die Auswahl
- * traegt der Baustein als `aria-current`.
+ * ARIA des Hauptknopfs je Darstellung. Unter der Schwelle oeffnet er ein
+ * Leseblatt (`aria-haspopup="dialog"`, seit R19 statt eines Aufklappers); in
+ * der Spalte waehlt er aus - dort zeigt `aria-controls` auf die Detailspalte,
+ * und die Auswahl traegt der Baustein als `aria-current`.
  */
 function syncRowMode() {
   const list = _container?.querySelector('#recipes-list');
@@ -833,16 +838,14 @@ function syncRowMode() {
   // layout.css davon, und PAGE-019 bewacht nur die eine.
   list.classList.toggle('recipes-list--split', split);
   for (const btn of list.querySelectorAll('.recipe-row__toggle')) {
+    // In der Spalte steuert der Knopf die Detailspalte; darunter oeffnet er
+    // ein Blatt (aria-haspopup) oder das Formular.
     if (split) {
-      btn.removeAttribute('aria-expanded');
       btn.setAttribute('aria-controls', 'recipes-detail');
-    } else if (btn.dataset.action === 'toggle-detail') {
-      const panelId = `recipe-detail-${btn.dataset.id}`;
-      const panel = list.querySelector(`#${CSS.escape(panelId)}`);
-      btn.setAttribute('aria-expanded', String(Boolean(panel && !panel.hidden)));
-      btn.setAttribute('aria-controls', panelId);
+      btn.removeAttribute('aria-haspopup');
     } else {
       btn.removeAttribute('aria-controls');
+      if (btn.dataset.action === 'open-detail') btn.setAttribute('aria-haspopup', 'dialog');
     }
     if ('narrowInert' in btn.dataset) {
       btn.tabIndex = split ? 0 : -1;
@@ -938,7 +941,6 @@ function buildRecipeList() {
     const isMirrored = recipe.source !== 'native';
     const ro = readOnly();
     const ingredients = recipe.ingredients ?? [];
-    const detailId = `recipe-detail-${recipe.id}`;
     // Bei `read` hat JEDE Zeile ein Detail: dort stehen dann immer die
     // Mahlzeiten (fillRecipeDetail), und der Weg „ohne Detail direkt ins
     // Formular" ist zu - die Zeile waere sonst ein Knopf, der nichts tut.
@@ -964,7 +966,7 @@ function buildRecipeList() {
     const toggle = document.createElement('button');
     toggle.type = 'button';
     toggle.className = 'list-row__main--interactive recipe-row__toggle';
-    toggle.dataset.action = 'toggle-detail';
+    toggle.dataset.action = 'open-detail';
     toggle.dataset.id = String(recipe.id);
     toggle.dataset.mdFocus = "";
 
@@ -1027,10 +1029,10 @@ function buildRecipeList() {
     toggle.appendChild(sub);
 
     if (hasDetail) {
-      toggle.setAttribute('aria-expanded', 'false');
-      toggle.setAttribute('aria-controls', detailId);
+      // Ein Wegweiser, kein Aufklapp-Winkel: die Zeile oeffnet das Rezept.
+      toggle.setAttribute('aria-haspopup', 'dialog');
       toggle.insertAdjacentHTML('beforeend',
-        '<i data-lucide="chevron-down" class="icon-sm recipe-row__chevron" aria-hidden="true"></i>');
+        '<i data-lucide="chevron-right" class="icon-sm recipe-row__chevron" aria-hidden="true"></i>');
     } else if (!isMirrored) {
       // Ohne Detail kein Versprechen: kein Chevron, kein aria-expanded. Der
       // Button öffnet dann direkt das Bearbeiten-Formular.
@@ -1055,7 +1057,7 @@ function buildRecipeList() {
       // vor ihm rutscht gegenüber jeder anderen gespiegelten Zeile nach
       // rechts - derselbe Mechanismus wie bei der Zutatenzahl oben.
       toggle.insertAdjacentHTML('beforeend',
-        '<i data-lucide="chevron-down" class="icon-sm recipe-row__chevron recipe-row__chevron--placeholder" aria-hidden="true"></i>');
+        '<i data-lucide="chevron-right" class="icon-sm recipe-row__chevron recipe-row__chevron--placeholder" aria-hidden="true"></i>');
     }
 
     heading.appendChild(toggle);
@@ -1116,16 +1118,6 @@ function buildRecipeList() {
 
     if (ROW_ACTIONS.length) row.appendChild(actions);
     li.appendChild(row);
-
-    if (hasDetail) {
-      const detail = document.createElement('div');
-      detail.className = 'recipe-detail';
-      detail.id = detailId;
-      detail.hidden = true;
-
-      fillRecipeDetail(detail, recipe);
-      li.appendChild(detail);
-    }
 
     rows.appendChild(li);
   }
@@ -1217,9 +1209,12 @@ function fillRecipeDetail(detail, recipe) {
 
   // „In den Essensplan" legt eine Mahlzeit an - ohne Schreibrecht entfaellt
   // der Knopf (Regel 2), der Riegel dazu steht in planRecipe().
+  // SEKUNDAER (R19): der Fuss von Leseblatt und Detailspalte traegt
+  // Bearbeiten als den EINEN Primaerknopf (withPrimaryEdit); zwei gefuellte
+  // Knoepfe in einer Ansicht stritten um die Hauptaktion.
   if (mayPlanRecipe()) {
     const addToMeals = document.createElement('button');
-    addToMeals.className = 'btn btn--primary';
+    addToMeals.className = 'btn btn--secondary';
     addToMeals.type = 'button';
     addToMeals.dataset.action = 'add-to-meals';
     addToMeals.dataset.id = String(recipe.id);
