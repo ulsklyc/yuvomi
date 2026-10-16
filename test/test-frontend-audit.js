@@ -8236,7 +8236,7 @@ test('Feldkanten tragen --color-border-control und halten 3:1 auf jedem Feldgrun
     // Die Icon-Form der Kopfsuche (D1): ohne Fokus und ohne Begriff ist die
     // Huelle ein Knopf in der Kopf-Icon-Haut (Ring wie `.btn--secondary`), das
     // Feld darin traegt weder Kante noch Grund. Mit Fokus wird sie wieder Feld.
-    ['.page-toolbar .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))', 'Icon-Form der Kopfsuche; ein Knopf in der Kopf-Icon-Haut, kein Feld'],
+    ['.page-toolbar .page-search:not(.page-search--field):not(:focus-within):not(:has(input:not(:placeholder-shown)))', 'Icon-Form der Kopfsuche; ein Knopf in der Kopf-Icon-Haut, kein Feld (ausser --field, R19)'],
     ['.section-toolbar .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))', 'Icon-Form der Abschnittssuche; derselbe Knopf'],
     ['.search-overlay__header', 'Kopf des Such-Overlays; Trennlinie zur Trefferliste'],
     // `.search-overlay__panel` stand hier bis R18 (2026-10-07): die Palette traegt

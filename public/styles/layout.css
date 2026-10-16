@@ -4718,6 +4718,10 @@ html.fab-steady .page-fab {
  * Title), aber sein Feld kostet mobil dieselbe Zeile - also dieselbe Form.
  * -------------------------------------------------------- */
 @media (max-width: 767px), (max-width: 1023px) and (max-height: 499px) {
+  /* `.page-search--field` BLEIBT FELD (R19, Critique 2026-10-16): wo die
+   * Kopfzeile NUR die Suche traegt (Rezepte unter der Kuechen-Leiste), stand
+   * eine 65px-Zeile fuer eine Lupe. Dort fuellt das Feld die Zeile, wie die
+   * Suchleiste unter einem iOS-Titel - die Zeile gibt es ohnehin. */
   /* Die Bauart ist die Label-Verlust-Regel: ein Bedienelement, dem der Platz
    * ausgeht, wird zum Einstieg seiner Familie und behaelt --target-base. Kein
    * neues Markup und kein JS - `.page-search` IST ein `<label for>`, ein Klick
@@ -4728,7 +4732,7 @@ html.fab-steady .page-fab {
    * die einem beim Scrollen der eigenen Treffer unter den Haenden
    * verschwindet, waere der falsche Gehorsam gegenueber der Regel. Also nur
    * ohne Fokus UND ohne Wert. */
-  .page-toolbar .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown))),
+  .page-toolbar .page-search:not(.page-search--field):not(:focus-within):not(:has(input:not(:placeholder-shown))),
   .section-toolbar .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown))) {
     flex: 0 0 auto;
     width: var(--target-base);
@@ -4752,7 +4756,7 @@ html.fab-steady .page-fab {
   }
 
   .page-toolbar
-    .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
+    .page-search:not(.page-search--field):not(:focus-within):not(:has(input:not(:placeholder-shown)))
     .page-search__input,
   .section-toolbar
     .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
@@ -4774,7 +4778,7 @@ html.fab-steady .page-fab {
   }
 
   .page-toolbar
-    .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
+    .page-search:not(.page-search--field):not(:focus-within):not(:has(input:not(:placeholder-shown)))
     .page-search__input::placeholder,
   .section-toolbar
     .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
@@ -4792,7 +4796,7 @@ html.fab-steady .page-fab {
    * `inset-inline: 0` plus `margin-inline: auto` zentriert in beiden
    * Richtungen und braucht die X-Achse des Translates gar nicht. */
   .page-toolbar
-    .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
+    .page-search:not(.page-search--field):not(:focus-within):not(:has(input:not(:placeholder-shown)))
     .page-search__icon,
   .section-toolbar
     .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
@@ -4818,7 +4822,8 @@ html.fab-steady .page-fab {
   /* Im aufgeklappten Zustand nimmt die Suche die Zeile, die sie braucht - sie
    * ist dann das, was der Nutzer gerade tut. */
   .page-toolbar .page-search:focus-within,
-  .section-toolbar .page-search:focus-within {
+  .section-toolbar .page-search:focus-within,
+  .page-toolbar .page-search.page-search--field {
     flex: 1 1 auto;
   }
 }

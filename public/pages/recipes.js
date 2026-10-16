@@ -447,7 +447,8 @@ export async function render(container, { signal } = {}) {
     placeholder: t('recipes.searchPlaceholder'),
     value: state.query,
     clearLabel: t('common.searchClear'),
-    className: 'recipes-search page-toolbar__center',
+    // Feld statt Lupe auch mobil (R19): die Zeile traegt nur die Suche.
+    className: 'recipes-search page-toolbar__center page-search--field',
   }));
 
   // Trigger im __actions-Slot statt einer eigenen Pillen-Zeile darunter -

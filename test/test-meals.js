@@ -1909,6 +1909,24 @@ test('Zutatenzeile: Name allein in Zeile eins, Menge und Kategorie teilen Zeile 
     'der Entfernen-Knopf steht in Zeile eins neben dem Namen');
 });
 
+// R19 (Critique 2026-10-16): "Rezepte-Werkzeugzeile mobil 65px nur fuer die
+// Lupe". Die Zeile unter der Kuechen-Leiste traegt nur die Suche - dort bleibt
+// sie ein Feld (`.page-search--field`), statt zur Icon-Form zu schrumpfen.
+test('R19: die Rezeptsuche ist mobil ein Feld, keine Lupe in einer eigenen Zeile', () => {
+  const recipes = readFileSync(new URL('../public/pages/recipes.js', import.meta.url), 'utf8');
+  assert(/className: 'recipes-search page-toolbar__center page-search--field'/.test(recipes), 'die Rezeptsuche traegt --field');
+  const layout = [...eachRule(readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8'))];
+  const phone = layout.filter((r) => r.at.some((a) => /max-width:\s*767px/.test(a)));
+  const iconForm = phone.filter((r) => /\.page-toolbar \.page-search:[^,{]*:not\(:focus-within\)/.test(r.selector));
+  assert(iconForm.length >= 4, `Icon-Form-Regeln gefunden: ${iconForm.length}`);
+  for (const r of iconForm) {
+    for (const part of r.selector.split(',').filter((x) => /\.page-toolbar/.test(x))) {
+      assert(/\.page-search:not\(\.page-search--field\)/.test(part), `Icon-Form ohne Ausnahme: ${part.trim()}`);
+    }
+  }
+  assert(phone.some((r) => /\.page-toolbar \.page-search\.page-search--field/.test(r.selector) && /flex:\s*1 1 auto/.test(r.body)), 'das Feld fuellt die Zeile');
+});
+
 // --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
