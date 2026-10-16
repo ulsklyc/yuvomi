@@ -3262,7 +3262,8 @@
         "unsavedChanges": "Buang perubahan?",
         "unsavedChangesDetail": "Isian kamu di formulir ini akan hilang.",
         "discardChanges": "Buang",
-        "moreSettings": "Pengaturan lain"
+        "moreSettings": "Pengaturan lain",
+        "moreDetails": "Detail lainnya"
     },
     "rrule": {
         "freqNone": "Tanpa pengulangan",
@@ -5044,6 +5045,12 @@
             },
             "col": {
                 "day": "Hari"
+            },
+            "intensity": {
+                "none": "Tidak ditentukan",
+                "low": "Ringan",
+                "moderate": "Sedang",
+                "high": "Tinggi"
             }
         },
         "export": {
@@ -6087,7 +6094,8 @@
         "odometerChartTitle": "Odometer dari waktu ke waktu",
         "detailPaneLabel": "Detail barang",
         "pickOne": "Pilih barang",
-        "pickOneHint": "Detail, tenggat, dan riwayat muncul di sini."
+        "pickOneHint": "Detail, tenggat, dan riwayat muncul di sini.",
+        "moreDetailsHint": "Pembelian, garansi, foto, dokumen"
     },
     "documentAttach": {
         "label": "Lampiran",

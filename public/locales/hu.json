@@ -3248,7 +3248,8 @@
         "unsavedChanges": "Módosítások elvetése?",
         "unsavedChangesDetail": "Az űrlapon megadott adataid elvesznek.",
         "discardChanges": "Elvetés",
-        "moreSettings": "További beállítások"
+        "moreSettings": "További beállítások",
+        "moreDetails": "További adatok"
     },
     "rrule": {
         "freqNone": "Nincs ismétlés",
@@ -5044,6 +5045,12 @@
             },
             "col": {
                 "day": "Nap"
+            },
+            "intensity": {
+                "none": "Nincs megadva",
+                "low": "Alacsony",
+                "moderate": "Közepes",
+                "high": "Magas"
             }
         },
         "export": {
@@ -6087,7 +6094,8 @@
         "odometerChartTitle": "Kilométeróra időbeli alakulása",
         "detailPaneLabel": "Tárgy részletei",
         "pickOne": "Válassz egy tárgyat",
-        "pickOneHint": "Az adatok, határidők és az előzmények itt jelennek meg."
+        "pickOneHint": "Az adatok, határidők és az előzmények itt jelennek meg.",
+        "moreDetailsHint": "Vásárlás, garancia, fotó, dokumentumok"
     },
     "documentAttach": {
         "label": "Mellékletek",

@@ -3248,7 +3248,8 @@
         "unsavedChanges": "Ignorera ändringar?",
         "unsavedChangesDetail": "Dina uppgifter i formuläret går förlorade.",
         "discardChanges": "Ignorera",
-        "moreSettings": "Fler inställningar"
+        "moreSettings": "Fler inställningar",
+        "moreDetails": "Fler uppgifter"
     },
     "rrule": {
         "freqNone": "Ingen upprepning",
@@ -5044,6 +5045,12 @@
             },
             "col": {
                 "day": "Dag"
+            },
+            "intensity": {
+                "none": "Inte angiven",
+                "low": "Låg",
+                "moderate": "Måttlig",
+                "high": "Hög"
             }
         },
         "export": {
@@ -6087,7 +6094,8 @@
         "odometerChartTitle": "Vägmätare över tid",
         "detailPaneLabel": "Detaljer om saken",
         "pickOne": "Välj en sak",
-        "pickOneHint": "Uppgifter, tidsfrister och historik visas här."
+        "pickOneHint": "Uppgifter, tidsfrister och historik visas här.",
+        "moreDetailsHint": "Köp, garanti, foto, dokument"
     },
     "documentAttach": {
         "label": "Bilagor",

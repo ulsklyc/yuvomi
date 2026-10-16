@@ -21311,7 +21311,9 @@ test('R18: die Formularzeile haelt in RTL den Platz des Datumsknopfs und die Rei
       if (hit) logical.push(`${file}: ${rule.selector.replace(/\s+/g, ' ').slice(0, 120)}  ${hit[1]}${rule.at.length ? `  [${rule.at.join(' ')}]` : ''}`);
     }
   }
-  assert.ok(seen >= 6, `Nur ${seen} Regeln an .ydp__input gefunden - der Scan greift nicht mehr.`);
+  // 5 seit der Critique 2026-10-16: das Datumsfeld in der Formularzeile traegt
+  // wieder seinen Kasten (D4), seine randlose Fokus- und Stapel-Regel entfielen.
+  assert.ok(seen >= 5, `Nur ${seen} Regeln an .ydp__input gefunden - der Scan greift nicht mehr.`);
   assert.deepEqual(logical, [],
     'Eine Regel setzt das Polster des Datumsfelds logisch oder als Kurzform. In RTL liegt der Wert dann unter '
     + 'dem Kalenderknopf: das Feld ist physisch gebaut, also padding-left/padding-right.');

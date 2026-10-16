@@ -3262,7 +3262,8 @@
         "unsavedChanges": "Änderungen verwerfen?",
         "unsavedChangesDetail": "Deine Eingaben in diesem Formular gehen verloren.",
         "discardChanges": "Verwerfen",
-        "moreSettings": "Weitere Einstellungen"
+        "moreSettings": "Weitere Einstellungen",
+        "moreDetails": "Weitere Angaben"
     },
     "rrule": {
         "freqNone": "Keine Wiederholung",
@@ -4697,7 +4698,7 @@
                 "weight": "Gewicht",
                 "height": "Größe",
                 "headCircumference": "Kopfumfang",
-                "spo2": "Sauerstoffsättigung",
+                "spo2": "Sauerstoff­sättigung",
                 "temp": "Temperatur",
                 "sleep": "Schlaf",
                 "mood": "Stimmung"
@@ -5044,6 +5045,12 @@
             },
             "col": {
                 "day": "Tag"
+            },
+            "intensity": {
+                "none": "Keine Angabe",
+                "low": "Leicht",
+                "moderate": "Mittel",
+                "high": "Hoch"
             }
         },
         "export": {
@@ -6087,7 +6094,8 @@
         "odometerChartTitle": "Kilometerstand über die Zeit",
         "detailPaneLabel": "Gegenstandsdetails",
         "pickOne": "Wähle einen Gegenstand",
-        "pickOneHint": "Angaben, Fristen und Verlauf erscheinen hier."
+        "pickOneHint": "Angaben, Fristen und Verlauf erscheinen hier.",
+        "moreDetailsHint": "Kauf, Garantie, Foto, Dokumente"
     },
     "documentAttach": {
         "label": "Anhänge",

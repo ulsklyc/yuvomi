@@ -7616,16 +7616,9 @@ textarea::placeholder {
     justify-content: flex-start;
   }
 
-  /* PHYSISCH, nicht logisch (R18, Schritt 7): der Datepicker ist physisch
-   * gebaut - Knopf rechts, `padding-right` haelt ihm Platz (datepicker.css),
-   * in jeder Schreibrichtung. `padding-inline-start: 0` nahm in `ar` und `fa`
-   * genau dieses rechte Polster: Datum und Uhrzeit lagen unter ihrem Knopf
-   * (gesehen bei 390x844). Links faellt das Polster, damit der Wert in LTR in
-   * der Flucht des Etiketts beginnt; in RTL beginnt er neben dem Knopf. */
-  .form-rows > .form-row--wide:not(.form-row--stacked) > .form-row__control > yuvomi-datepicker .ydp__input {
-    padding-left: 0;
-    text-align: start;
-  }
+  /* (Hier fiel das linke Polster des Datumsfelds, damit der randlose Wert in
+   * der Flucht des Etiketts begann. Seit das Feld seinen Kasten traegt
+   * (Critique 2026-10-16), behaelt es sein Polster.) */
 }
 
 @container form-rows (max-width: 20rem) {
@@ -7759,10 +7752,13 @@ textarea::placeholder {
   border-color: var(--color-danger);
 }
 
-/* ── In der Zeile: Datum und Uhrzeit als Wert ──
- * Der Datepicker bleibt, was er ist (getipptes Feld + Kalender-Knopf), nur
- * ohne Kasten: der Wert steht rechtsbuendig vor seinem Zeichen. Die Breite ist
- * die des Werts, nicht die der Zeile. */
+/* ── In der Zeile: Datum und Uhrzeit als FELD ──
+ * Der Datepicker bleibt, was er ist (getipptes Feld + Kalender-Knopf), und
+ * seit der Critique 2026-10-16 (D4) auch MIT Kasten: „Gemessen am" stand als
+ * nackter Text in der Zeile und las sich wie eine Angabe, nicht wie ein Feld.
+ * Datum und Uhrzeit sehen in beiden Formular-Dialekten wie ein Eingabefeld
+ * aus; nur die randlose Auswahl (select) traegt ihr Zeichen statt einer Kante.
+ * Die Breite ist die des Werts, nicht die der Zeile. */
 .form-row__control > yuvomi-datepicker {
   flex: 0 1 auto;
   inline-size: 10rem;
@@ -7796,15 +7792,6 @@ textarea::placeholder {
 
 .form-row__control > yuvomi-datepicker .ydp__input {
   min-height: var(--target-md);
-  border-color: transparent;
-  background-color: transparent;
-  color: var(--color-text-secondary);
-  text-align: end;
-}
-
-.form-row__control > yuvomi-datepicker .ydp__input:focus {
-  border-color: var(--color-accent);
-  color: var(--color-text-primary);
 }
 
 /* Gesperrt wie die randlose Auswahl darueber, aus demselben Grund: in Ruhe

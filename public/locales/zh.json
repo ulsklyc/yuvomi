@@ -3248,7 +3248,8 @@
         "unsavedChanges": "放弃更改？",
         "unsavedChangesDetail": "你在此表单中的输入将丢失。",
         "discardChanges": "放弃",
-        "moreSettings": "更多设置"
+        "moreSettings": "更多设置",
+        "moreDetails": "更多信息"
     },
     "rrule": {
         "freqNone": "不重复",
@@ -5044,6 +5045,12 @@
             },
             "col": {
                 "day": "日"
+            },
+            "intensity": {
+                "none": "未指定",
+                "low": "低",
+                "moderate": "中",
+                "high": "高"
             }
         },
         "export": {
@@ -6087,7 +6094,8 @@
         "odometerChartTitle": "里程随时间变化",
         "detailPaneLabel": "物品详情",
         "pickOne": "选择一个物品",
-        "pickOneHint": "详细信息、期限和历史记录会显示在这里。"
+        "pickOneHint": "详细信息、期限和历史记录会显示在这里。",
+        "moreDetailsHint": "购买、保修、照片、文档"
     },
     "documentAttach": {
         "label": "附件",

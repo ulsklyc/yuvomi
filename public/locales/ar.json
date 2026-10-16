@@ -3552,7 +3552,8 @@
         "unsavedChanges": "تجاهل التغييرات؟",
         "unsavedChangesDetail": "ستفقد إدخالاتك في هذا النموذج.",
         "discardChanges": "تجاهل",
-        "moreSettings": "المزيد من الإعدادات"
+        "moreSettings": "المزيد من الإعدادات",
+        "moreDetails": "تفاصيل إضافية"
     },
     "rrule": {
         "freqNone": "بدون تكرار",
@@ -5420,6 +5421,12 @@
             },
             "col": {
                 "day": "اليوم"
+            },
+            "intensity": {
+                "none": "غير محدد",
+                "low": "خفيفة",
+                "moderate": "متوسطة",
+                "high": "عالية"
             }
         },
         "export": {
@@ -6544,7 +6551,8 @@
         "odometerChartTitle": "عداد المسافة عبر الزمن",
         "detailPaneLabel": "تفاصيل الغرض",
         "pickOne": "اختر غرضًا",
-        "pickOneHint": "تظهر هنا التفاصيل والمواعيد والسجل."
+        "pickOneHint": "تظهر هنا التفاصيل والمواعيد والسجل.",
+        "moreDetailsHint": "الشراء، الضمان، الصورة، المستندات"
     },
     "documentAttach": {
         "label": "المرفقات",

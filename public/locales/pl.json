@@ -3464,7 +3464,8 @@
         "unsavedChanges": "Odrzucić zmiany?",
         "unsavedChangesDetail": "Twoje wpisy w tym formularzu zostaną utracone.",
         "discardChanges": "Odrzuć",
-        "moreSettings": "Więcej ustawień"
+        "moreSettings": "Więcej ustawień",
+        "moreDetails": "Więcej informacji"
     },
     "rrule": {
         "freqNone": "Bez powtarzania",
@@ -5294,6 +5295,12 @@
             },
             "col": {
                 "day": "Dzień"
+            },
+            "intensity": {
+                "none": "Nie podano",
+                "low": "Niska",
+                "moderate": "Umiarkowana",
+                "high": "Wysoka"
             }
         },
         "export": {
@@ -6391,7 +6398,8 @@
         "odometerChartTitle": "Przebieg w czasie",
         "detailPaneLabel": "Szczegóły przedmiotu",
         "pickOne": "Wybierz przedmiot",
-        "pickOneHint": "Tutaj pojawią się szczegóły, terminy i historia."
+        "pickOneHint": "Tutaj pojawią się szczegóły, terminy i historia.",
+        "moreDetailsHint": "Zakup, gwarancja, zdjęcie, dokumenty"
     },
     "documentAttach": {
         "label": "Załączniki",

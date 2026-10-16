@@ -399,3 +399,15 @@ test('R14 P3: Ziel als .segmented, Einstellungen im Blatt, Verlauf mit row-actio
     'die Einstellungen stehen nicht mehr mitten im Inhalt');
   assert.match(fastingPage, /data-fasting-settings/, 'ein Weg ins Einstellungsblatt');
 });
+
+// Critique 2026-10-16: vor dem ersten Fasten stand ein 254px-Ring ohne Wert als
+// Held, der Leerzustand des Verlaufs lag unter der Tab-Leiste (y=676). Ohne
+// laufendes und ohne letztes Fasten faellt der Ring weg (Verlauf bei y=366).
+test('Fasten leer: kein leerer Ring als Held (Critique 2026-10-16)', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  assert.match(fastingPage, /const idle = !active && !last;/);
+  assert.match(fastingPage, /<section class="metric-card fasting-hero\$\{idle \? ' fasting-hero--idle' : ''\}">/);
+  const css = readFileSync(new URL('../public/styles/health.css', import.meta.url), 'utf8');
+  const rule = [...eachRule(css)].find((r) => r.selector.includes('.fasting-hero--idle .fasting-dial'));
+  assert.ok(rule && /display:\s*none/.test(rule.body), 'im Leerlauf kein Ring');
+});

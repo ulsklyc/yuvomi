@@ -3248,7 +3248,8 @@
         "unsavedChanges": "Descartar alterações?",
         "unsavedChangesDetail": "Seus dados neste formulário serão perdidos.",
         "discardChanges": "Descartar",
-        "moreSettings": "Mais configurações"
+        "moreSettings": "Mais configurações",
+        "moreDetails": "Mais detalhes"
     },
     "rrule": {
         "freqNone": "Sem repetição",
@@ -5044,6 +5045,12 @@
             },
             "col": {
                 "day": "Dia"
+            },
+            "intensity": {
+                "none": "Não informada",
+                "low": "Leve",
+                "moderate": "Moderada",
+                "high": "Alta"
             }
         },
         "export": {
@@ -5658,7 +5665,8 @@
         "odometerChartTitle": "Histórico do odômetro",
         "detailPaneLabel": "Detalhes do item",
         "pickOne": "Escolha um item",
-        "pickOneHint": "Os detalhes, os prazos e o histórico aparecem aqui."
+        "pickOneHint": "Os detalhes, os prazos e o histórico aparecem aqui.",
+        "moreDetailsHint": "Compra, garantia, foto, documentos"
     },
     "join": {
         "title": "Configure sua conta",

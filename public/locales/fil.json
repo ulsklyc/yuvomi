@@ -3262,7 +3262,8 @@
         "unsavedChanges": "Itapon ang mga pagbabago?",
         "unsavedChangesDetail": "Mawawala ang mga inilagay mo sa form na ito.",
         "discardChanges": "Itapon",
-        "moreSettings": "Higit pang setting"
+        "moreSettings": "Higit pang setting",
+        "moreDetails": "Iba pang detalye"
     },
     "rrule": {
         "freqNone": "Walang pag-uulit",
@@ -5044,6 +5045,12 @@
             },
             "col": {
                 "day": "Araw"
+            },
+            "intensity": {
+                "none": "Hindi tinukoy",
+                "low": "Magaan",
+                "moderate": "Katamtaman",
+                "high": "Mataas"
             }
         },
         "export": {
@@ -6087,7 +6094,8 @@
         "odometerChartTitle": "Odometer sa paglipas ng panahon",
         "detailPaneLabel": "Detalye ng gamit",
         "pickOne": "Pumili ng gamit",
-        "pickOneHint": "Dito lalabas ang mga detalye, deadline at kasaysayan."
+        "pickOneHint": "Dito lalabas ang mga detalye, deadline at kasaysayan.",
+        "moreDetailsHint": "Pagbili, warranty, larawan, mga dokumento"
     },
     "documentAttach": {
         "label": "Mga kalakip",

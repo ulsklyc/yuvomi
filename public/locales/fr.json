@@ -3248,7 +3248,8 @@
         "unsavedChanges": "Abandonner les modifications ?",
         "unsavedChangesDetail": "Tes saisies dans ce formulaire seront perdues.",
         "discardChanges": "Abandonner",
-        "moreSettings": "Plus de paramètres"
+        "moreSettings": "Plus de paramètres",
+        "moreDetails": "Plus de détails"
     },
     "rrule": {
         "freqNone": "Pas de répétition",
@@ -5044,6 +5045,12 @@
             },
             "col": {
                 "day": "Jour"
+            },
+            "intensity": {
+                "none": "Non précisée",
+                "low": "Faible",
+                "moderate": "Modérée",
+                "high": "Élevée"
             }
         },
         "export": {
@@ -6087,7 +6094,8 @@
         "odometerChartTitle": "Compteur kilométrique dans le temps",
         "detailPaneLabel": "Détails de l'objet",
         "pickOne": "Choisissez un objet",
-        "pickOneHint": "Les détails, échéances et l’historique s’affichent ici."
+        "pickOneHint": "Les détails, échéances et l’historique s’affichent ici.",
+        "moreDetailsHint": "Achat, garantie, photo, documents"
     },
     "documentAttach": {
         "label": "Pièces jointes",

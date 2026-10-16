@@ -3248,7 +3248,8 @@
         "unsavedChanges": "Descartar alterações?",
         "unsavedChangesDetail": "Os teus dados neste formulário serão perdidos.",
         "discardChanges": "Descartar",
-        "moreSettings": "Mais definições"
+        "moreSettings": "Mais definições",
+        "moreDetails": "Mais detalhes"
     },
     "rrule": {
         "freqNone": "Sem repetição",
@@ -5044,6 +5045,12 @@
             },
             "col": {
                 "day": "Dia"
+            },
+            "intensity": {
+                "none": "Não indicada",
+                "low": "Ligeira",
+                "moderate": "Moderada",
+                "high": "Alta"
             }
         },
         "export": {
@@ -6087,7 +6094,8 @@
         "odometerChartTitle": "Odômetro ao longo do tempo",
         "detailPaneLabel": "Detalhes do objeto",
         "pickOne": "Escolha um objeto",
-        "pickOneHint": "Os detalhes, prazos e o histórico aparecem aqui."
+        "pickOneHint": "Os detalhes, prazos e o histórico aparecem aqui.",
+        "moreDetailsHint": "Compra, garantia, fotografia, documentos"
     },
     "documentAttach": {
         "label": "Anexos",

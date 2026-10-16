@@ -3248,7 +3248,8 @@
         "unsavedChanges": "बदलाव छोड़ें?",
         "unsavedChangesDetail": "इस फ़ॉर्म में तुम्हारी प्रविष्टियाँ खो जाएँगी।",
         "discardChanges": "छोड़ें",
-        "moreSettings": "अधिक सेटिंग्स"
+        "moreSettings": "अधिक सेटिंग्स",
+        "moreDetails": "और विवरण"
     },
     "rrule": {
         "freqNone": "कोई दोहराव नहीं",
@@ -5044,6 +5045,12 @@
             },
             "col": {
                 "day": "दिन"
+            },
+            "intensity": {
+                "none": "निर्दिष्ट नहीं",
+                "low": "हल्की",
+                "moderate": "मध्यम",
+                "high": "उच्च"
             }
         },
         "export": {
@@ -6087,7 +6094,8 @@
         "odometerChartTitle": "समय के साथ ओडोमीटर",
         "detailPaneLabel": "वस्तु का विवरण",
         "pickOne": "कोई वस्तु चुनें",
-        "pickOneHint": "विवरण, समय-सीमाएँ और इतिहास यहाँ दिखेंगे।"
+        "pickOneHint": "विवरण, समय-सीमाएँ और इतिहास यहाँ दिखेंगे।",
+        "moreDetailsHint": "खरीद, वारंटी, फ़ोटो, दस्तावेज़"
     },
     "documentAttach": {
         "label": "अनुलग्नक",

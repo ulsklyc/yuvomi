@@ -3248,7 +3248,8 @@
         "unsavedChanges": "Wijzigingen verwerpen?",
         "unsavedChangesDetail": "Je invoer in dit formulier gaat verloren.",
         "discardChanges": "Verwerpen",
-        "moreSettings": "Meer instellingen"
+        "moreSettings": "Meer instellingen",
+        "moreDetails": "Meer gegevens"
     },
     "rrule": {
         "freqNone": "Geen herhaling",
@@ -5044,6 +5045,12 @@
             },
             "col": {
                 "day": "Dag"
+            },
+            "intensity": {
+                "none": "Niet opgegeven",
+                "low": "Licht",
+                "moderate": "Gemiddeld",
+                "high": "Hoog"
             }
         },
         "export": {
@@ -6087,7 +6094,8 @@
         "odometerChartTitle": "Kilometerstand in de tijd",
         "detailPaneLabel": "Voorwerpdetails",
         "pickOne": "Kies een voorwerp",
-        "pickOneHint": "Gegevens, termijnen en geschiedenis verschijnen hier."
+        "pickOneHint": "Gegevens, termijnen en geschiedenis verschijnen hier.",
+        "moreDetailsHint": "Aankoop, garantie, foto, documenten"
     },
     "documentAttach": {
         "label": "Bijlagen",

@@ -4033,7 +4033,8 @@ function labDetailMarkup() {
           </thead>
           <tbody>${results.map(resultRowMarkup).join('')}</tbody>
         </table>
-      </div>`
+      </div>
+      ${resultListMarkup(results)}`
     : emptyHintHTML(t('health.labs.noAnalytes'));
 
   return `
@@ -4064,6 +4065,34 @@ function resultRowMarkup(r) {
       <td class="health-lab-table__ref">${esc(refText)}</td>
       <td class="health-lab-table__flag">${flagIndicatorMarkup(r.flag)}</td>
     </tr>`;
+}
+
+/* LABORWERTE MOBIL ALS ZEILEN (Critique 2026-10-16). Unter 640px war der
+ * Befund eine Tabelle, die seitlich scrollte: Analyt, Wert und Referenz
+ * passten, die Bewertung („Niedrig") lag rechts ausserhalb des Bilds - genau
+ * die Angabe, fuer die man den Befund oeffnet. Mobil steht jeder Analyt jetzt
+ * als Zeile: links der Name, rechts der Wert, darunter Referenz und
+ * Bewertung als Text mit Pfeil. Auffaellige Werte (niedrig/hoch) stehen
+ * vorn, sonst bleibt die Reihenfolge des Befunds. Die Tabelle bleibt ab
+ * 640px; beide Fassungen stehen im Markup, CSS zeigt je Breite eine
+ * (`display: none` nimmt die andere auch aus dem Accessibility-Baum). */
+function resultListMarkup(results) {
+  const abnormal = (r) => r.flag === 'low' || r.flag === 'high';
+  const ordered = [...results.filter(abnormal), ...results.filter((r) => !abnormal(r))];
+  return `
+    <ul class="health-lab-rows">${ordered.map((r) => {
+    const unit = r.unit ? ` ${esc(r.unit)}` : '';
+    const refText = referenceLabel(r.ref_low, r.ref_high);
+    const ref = refText === '-' ? '' : `<span class="health-lab-rows__ref">${esc(t('health.labs.col.reference'))} ${esc(refText)}</span>`;
+    const flag = r.flag && LAB_FLAGS.includes(r.flag) ? flagIndicatorMarkup(r.flag) : '';
+    return `
+      <li class="health-lab-rows__row${abnormal(r) ? ` health-lab-rows__row--${esc(r.flag)}` : ''}">
+        <span class="health-lab-rows__analyte">${esc(r.analyte)}</span>
+        <span class="health-lab-rows__value">${esc(fmtNum(r.value_num))}${unit}</span>
+        ${ref || flag ? `<span class="health-lab-rows__meta">${ref}${flag}</span>` : ''}
+      </li>`;
+  }).join('')}
+    </ul>`;
 }
 
 function referenceLabel(refLow, refHigh) {
@@ -4843,6 +4872,29 @@ function activityLogMarkup(rows) {
     <ul class="health-activity-list">${rows.map((r) => activityRowMarkup(r, own)).join('')}</ul>`;
 }
 
+/* INTENSITAET IST EINE AUSWAHL, KEIN FREITEXT (Critique 2026-10-16). Das
+ * Feld war ein Textfeld, der Bestand (Demo, Import) schreibt aber die Werte
+ * `low`/`moderate`/`high` - in der Liste stand dann englisches „high" in
+ * deutscher Oberflaeche. Jetzt waehlt man aus drei uebersetzten Stufen und
+ * speichert weiter genau diese Schluessel. Ein freier Altwert, der keine
+ * Stufe ist, bleibt als eigene Option stehen und gewaehlt - Speichern
+ * verliert ihn nicht, die Liste zeigt ihn wie geschrieben. */
+const INTENSITY_LEVELS = ['low', 'moderate', 'high'];
+
+function intensityLabel(value) {
+  const key = String(value ?? '').trim().toLowerCase();
+  return INTENSITY_LEVELS.includes(key) ? t(`health.activity.intensity.${key}`) : String(value ?? '');
+}
+
+function intensityOptionsHtml(current) {
+  const raw = String(current ?? '').trim();
+  const known = INTENSITY_LEVELS.includes(raw.toLowerCase()) ? raw.toLowerCase() : '';
+  const legacy = raw && !known ? `<option value="${esc(raw)}" selected>${esc(raw)}</option>` : '';
+  return `<option value=""${raw ? '' : ' selected'}>${esc(t('health.activity.intensity.none'))}</option>`
+    + INTENSITY_LEVELS.map((level) => `<option value="${level}"${known === level ? ' selected' : ''}>${esc(t(`health.activity.intensity.${level}`))}</option>`).join('')
+    + legacy;
+}
+
 function activityRowMarkup(row, own) {
   const preset = activityType(row.type);
   const icon = preset ? preset.icon : 'activity';
@@ -4857,7 +4909,7 @@ function activityRowMarkup(row, own) {
   if (row.duration_min != null) meta.push(t('health.activity.unit.min', { value: fmtNum(row.duration_min) }));
   if (row.distance_km != null) meta.push(t('health.activity.unit.km', { value: fmtNum(row.distance_km) }));
   if (row.calories != null) meta.push(t('health.activity.unit.kcal', { value: fmtNum(row.calories) }));
-  if (row.intensity) meta.push(row.intensity);
+  if (row.intensity) meta.push(intensityLabel(row.intensity));
   const metaHtml = meta.length
     ? `<span class="health-activity-row__meta">${meta.map((m) => `<span class="health-activity-row__chip">${esc(m)}</span>`).join('')}</span>`
     : '';
@@ -4966,7 +5018,7 @@ function openActivityModal(row, opts = {}) {
         <div class="modal-grid modal-grid--2">
           <div class="form-field">
             <label class="label" for="activity-intensity">${esc(t('health.activity.field.intensity'))}</label>
-            <input class="input" id="activity-intensity" type="text" maxlength="30" value="${esc(val(row?.intensity))}">
+            <select class="input" id="activity-intensity">${intensityOptionsHtml(row?.intensity)}</select>
           </div>
           <div class="form-field">
             <label class="label" for="activity-visibility">${esc(t('health.activity.field.visibility'))}</label>
@@ -5694,8 +5746,13 @@ function nutritionTodaySectionMarkup(own) {
   // was wie ein erreichtes Ziel aussaehe.
   const body = target
     ? `<ul class="health-nutrition-progress">${NUTRIENTS.map((n) => nutritionProgressRowMarkup(n, summary)).join('')}</ul>`
-    : `${emptyHintHTML(t('health.nutrition.targetNone'))}
-       <p class="form-hint">${esc(t('health.nutrition.targetNoneHint'))}</p>`;
+    // EINE FLUCHT (Critique 2026-10-16): der zentrierte Leerhinweis stand
+    // ueber einer linksbuendigen Erklaerung - zwei Achsen in drei Zeilen. Beide
+    // Saetze stehen jetzt links unter dem Abschnittstitel.
+    : `<div class="health-nutrition-today__none">
+         <p class="health-nutrition-today__none-title">${esc(t('health.nutrition.targetNone'))}</p>
+         <p class="form-hint">${esc(t('health.nutrition.targetNoneHint'))}</p>
+       </div>`;
 
   const editBtn = own
     ? `<button type="button" class="btn btn--secondary btn--sm" data-nutrition-target
