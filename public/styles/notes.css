@@ -164,29 +164,6 @@
   margin-top: var(--space-4);
 }
 
-/* KEINE ERZWUNGENE LEERZEILE ZWISCHEN DEN GRUPPEN (Critique R17; notes.js,
- * syncGroupFlow). Fuellen die angepinnten Notizen ihre letzte Zeile nicht,
- * beginnt der Kopf der naechsten Gruppe in der ersten freien Spalte dieser
- * Zeile statt eine neue aufzumachen, und ihre Karten fliessen darunter weiter.
- * Die angepinnten Nachzuegler nehmen dafuer zwei Zeilen ein (Kopf + erste
- * Kartenzeile). Der Kopf sitzt UNTEN in seiner Zeile: ist der Nachzuegler
- * hoeher als Kopf plus Karten, waechst die Kopfzeile mit - der Kopf bleibt bei
- * seinen Karten statt bei der Oberkante des Nachbarn.
- *
- * Nur im Zeilenraster: natives Masonry (unten) kennt keine Zeilen, in die ein
- * Kopf sich einreihen koennte, und packt die Luecke ohnehin anders. */
-@supports not (grid-template-rows: masonry) {
-  .notes-group__title.notes-group__title--inline {
-    grid-column: var(--notes-label-start, 1) / -1;
-    align-self: end;
-    margin-top: 0;
-  }
-
-  .note-card--trailing {
-    grid-row: span 2;
-  }
-}
-
 /* Lade-Zustand: Grid aufheben, damit die geteilte Skeleton-Liste
  * (Flex-Spalte) full-width erscheint — eine Lade-Sprache über alle Module. */
 .notes-grid[aria-busy="true"] {
@@ -216,6 +193,16 @@
  * kein Intrinsic-Width-Risiko. */
 @supports (grid-template-rows: masonry) {
   .notes-grid { grid-template-rows: masonry; }
+}
+
+/* DER NAME, UNTER DEM MASONRY KOMMT (R19, Guide css-layout §8): die
+ * Spezifikation heisst inzwischen "grid lanes" (`display: grid-lanes`, Safari
+ * 26.4); `grid-template-rows: masonry` war der fruehere Prototyp. Die Spalten
+ * bleiben die der Container-Abfragen, die Gruppenkoepfe spannen ueber alle
+ * Bahnen und trennen die Gruppen. Der Lade-Zustand (`aria-busy`, oben) schlaegt
+ * die Regel per Spezifitaet. */
+@supports (display: grid-lanes) {
+  .notes-grid { display: grid-lanes; }
 }
 
 /* --------------------------------------------------------
