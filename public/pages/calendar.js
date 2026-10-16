@@ -4110,10 +4110,18 @@ function renderWeekView(container) {
   // eingeklappt ihren ersten Eintrag und daneben „+n"; die Zahl und die
   // Beschriftung „ganztaegig" klappen die ganze Zeile auf und wieder zu.
   // Am Desktop (sieben Spalten, Platz in der Hoehe) bleibt alles offen.
+  // Mehrtaegige Baender zaehlen mit: jedes stand in einer eigenen Zeile ueber
+  // den Zellen, und drei davon schoben das Raster ebenso weit hinunter wie drei
+  // Eintraege an einem Tag. Eingeklappt stehen sie deshalb als Eintrag in jeder
+  // Zelle, die sie beruehren (`bandEvs`); erst aufgeklappt laufen sie wieder
+  // als ein Band ueber ihre Spalten.
+  const bandEvs = days.map((d) => eventsOnDay(d).filter((ev) => isAllDayLike(ev) && band.events.has(ev)));
   const alldayCounts = days.map((d, i) => holidaysOnDay(d).length + scheduleChips[i].length
-    + waste[i].length + alldayEvs[i].length + tasksOnDay(d).length);
-  const alldayFolds = isMobile && alldayCounts.some((n) => n > 1);
+    + waste[i].length + bandEvs[i].length + alldayEvs[i].length + tasksOnDay(d).length);
+  const alldayFolds = isMobile && (alldayCounts.some((n) => n > 1) || band.laneCount > 1);
   const alldayOpen = alldayFolds && state.alldayExpanded;
+  const bandsFolded = alldayFolds && !alldayOpen;
+  const laneCount = bandsFolded ? 0 : band.laneCount;
   const alldayMore = (n) => (alldayFolds && n > 1
     ? `<button type="button" class="allday-more" data-allday-toggle aria-expanded="${alldayOpen}"
          aria-label="${esc(t('calendar.moreEvents', { count: n - 1 }))}">+${n - 1}</button>`
@@ -4141,12 +4149,12 @@ function renderWeekView(container) {
         }).join('')}
       </div>
       <!-- Ganztägige Ereignisse -->
-      <div class="allday-row allday-row--week${alldayFolds ? ' allday-row--fold' : ''}${alldayOpen ? ' is-expanded' : ''}" style="display:grid;grid-template-columns:var(--cal-gutter-width) repeat(${colCount},1fr);grid-template-rows:repeat(${band.laneCount + 1},auto);">
+      <div class="allday-row allday-row--week${alldayFolds ? ' allday-row--fold' : ''}${alldayOpen ? ' is-expanded' : ''}" style="display:grid;grid-template-columns:var(--cal-gutter-width) repeat(${colCount},1fr);grid-template-rows:repeat(${laneCount + 1},auto);">
         ${alldayLabel}
         ${days.map((d, i) => `<div class="allday-col" style="grid-column:${i + 2};grid-row:1 / -1" aria-hidden="true"></div>`).join('')}
-        ${band.bands.map(renderWeekBand).join('')}
+        ${bandsFolded ? '' : band.bands.map(renderWeekBand).join('')}
         ${days.map((d, i) => `
-          <div class="allday-cell" style="grid-column:${i + 2};grid-row:${band.laneCount + 1}">
+          <div class="allday-cell" style="grid-column:${i + 2};grid-row:${laneCount + 1}">
             ${holidaysOnDay(d).map((h) => `
               <div class="allday-holiday" style="--holi-color:${esc(h.color)};--holi-ink:${esc(getReadableTextColor(h.color))}" title="${esc(h.name)}">
                 <span>${esc(h.name)}</span>
@@ -4154,6 +4162,7 @@ function renderWeekView(container) {
             `).join('')}
             ${scheduleChips[i].map((entry) => renderScheduleChip(entry, 'allday-holiday', { showFullRange: true, clickable: true })).join('')}
             ${waste[i].map((occ) => renderWasteChip(occ)).join('')}
+            ${bandsFolded ? bandEvs[i].map((ev) => renderAllDayEvent(ev, d)).join('') : ''}
             ${alldayEvs[i].map((ev) => renderAllDayEvent(ev, d)).join('')}
             ${tasksOnDay(d).map(renderTaskChip).join('')}
             ${alldayMore(alldayCounts[i])}

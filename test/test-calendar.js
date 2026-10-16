@@ -5886,7 +5886,8 @@ test('am Display bietet das Filterblatt „Mir zugewiesen" nicht an (#1808)', ()
 test('Woche mobil: Ganztaegiges als EINE Zeile plus „+n", aufklappbar (Critique 2026-10-16)', () => {
   const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
   const week = src.slice(src.indexOf('function renderWeekView(container)'), src.indexOf('function chronological(items)'));
-  assert(/const alldayFolds = isMobile && alldayCounts\.some\(\(n\) => n > 1\);/.test(week), 'nur mobil und nur wenn eine Zelle mehr als einen Eintrag hat');
+  assert(/const alldayFolds = isMobile && \(alldayCounts\.some\(\(n\) => n > 1\) \|\| band\.laneCount > 1\);/.test(week),
+    'nur mobil, und nur wenn eine Zelle mehr als einen Eintrag hat oder Baender mehr als eine Zeile brauchen');
   assert(/class="allday-more" data-allday-toggle aria-expanded="\$\{alldayOpen\}"\s+aria-label="\$\{esc\(t\('calendar\.moreEvents', \{ count: n - 1 \}\)\)\}">\+\$\{n - 1\}<\/button>/.test(week),
     '„+n" ist ein Knopf mit Zustand und ausgeschriebenem Namen');
   assert(/calendar-all-day-label--toggle" data-allday-toggle aria-expanded=/.test(week), 'die Beschriftung klappt auf und zu');

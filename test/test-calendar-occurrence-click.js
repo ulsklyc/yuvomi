@@ -282,3 +282,39 @@ test('keine Ansicht loest einen Chip mehr nur ueber seine id auf', () => {
   const hits = src.match(/events\.find\(\(\w+\) => \w+\.id === parseInt\(\w+\.dataset\.id/g) ?? [];
   assert.deepEqual(hits, [], 'ein Chip nennt sein Vorkommen ueber eventForChip()');
 });
+
+// Re-Critique 2026-10-16 (Codex auf #2040): mobil wanderten mehrtaegige
+// Ganztagstermine in Baender, aber die Faltung zaehlte nur die Zellen. Drei
+// Baender standen in drei eigenen Zeilen ueber dem Raster, und die Faltung
+// sprang gar nicht erst an. Eingeklappt stehen sie jetzt als Eintrag in jeder
+// Zelle, die sie beruehren; aufgeklappt laufen sie wieder als Band.
+test('Woche mobil: mehrtaegige Ganztagstermine falten mit in die eine Zeile', async () => {
+  const multi = (id, from, to) => ({
+    id, title: `Reise ${id}`, start_datetime: from, end_datetime: to, all_day: 1,
+    external_source: 'local', assigned_users: [],
+  });
+  const events = [multi(501, '2026-06-16', '2026-06-18'), multi(502, '2026-06-16', '2026-06-18'), multi(503, '2026-06-16', '2026-06-18')];
+  const prevMatch = globalThis.window.matchMedia;
+  globalThis.window.matchMedia = () => ({ matches: true });
+  try {
+    for (const expanded of [false, true]) {
+      await withState({ view: 'week', events, alldayExpanded: expanded }, () => {
+        const html = mount((c) => calendar.renderWeekView(c)).html();
+        const row = /<div class="allday-row allday-row--week([^"]*)"[^>]*grid-template-rows:repeat\((\d+),auto\)/.exec(html);
+        assert.ok(row, 'die Ganztagszeile fehlt');
+        assert.match(row[1], /allday-row--fold/, 'drei Baender falten die Zeile');
+        const bands = (html.match(/grid-column:\d+ \/ span \d+;grid-row:\d+/g) || []).length;
+        if (!expanded) {
+          assert.equal(row[2], '1', 'eingeklappt hat die Zeile genau eine Reihe');
+          assert.equal(bands, 0, 'eingeklappt steht kein Band in eigener Zeile');
+          assert.match(html, /class="allday-more"[^>]*>\+2</, 'die Zelle nennt die zwei weiteren Termine');
+        } else {
+          assert.equal(Number(row[2]), 4, 'aufgeklappt drei Bandzeilen plus die Zellen');
+          assert.equal(bands, 3, 'aufgeklappt laufen die Termine wieder als Band');
+        }
+      });
+    }
+  } finally {
+    globalThis.window.matchMedia = prevMatch;
+  }
+});
