@@ -79,7 +79,7 @@ export function calendarPaths() {
     '/api/v1/calendar/google/sync': { post: op({ summary: 'Run Google Calendar sync', tag: 'Calendar', admin: true, stateChanging: true }) },
     '/api/v1/calendar/google/status': { get: op({ summary: 'Get Google Calendar status', tag: 'Calendar' }) },
     '/api/v1/calendar/google/calendars': {
-      get: op({ summary: 'List available Google calendars', tag: 'Calendar', admin: true }),
+      get: op({ summary: 'List available Google calendars', tag: 'Calendar', admin: true, description: 'Calendars of the connected Google account. When Google no longer accepts the stored sign-in (`invalid_grant`), the answer is `409` with reason `google_reauth_required` instead of a list, and nothing is sent to Google until the account is connected again (#2019).' }),
       patch: op({ summary: 'Enable/disable a Google calendar to sync', tag: 'Calendar', admin: true, stateChanging: true }),
     },
     '/api/v1/calendar/google/disconnect': { delete: op({ summary: 'Disconnect Google Calendar', tag: 'Calendar', admin: true, stateChanging: true }) },
