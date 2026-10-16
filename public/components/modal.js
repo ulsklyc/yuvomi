@@ -606,6 +606,7 @@ export function swapFieldsKeepingDirtyBase(panel, swap) {
  * der Datepicker), hat Vorrang.
  */
 function onEscape(e) {
+  if (e === _escKeptBelow) _escKeptBelow = null;
   if (e.key !== 'Escape' || e.defaultPrevented || !activeOverlay) return;
   const owner = e.target?.closest?.('[popover], dialog, .modal-overlay') ?? null;
   if (owner && owner !== activeOverlay) {
@@ -615,6 +616,38 @@ function onEscape(e) {
   }
   e.preventDefault();
   closeModal();
+}
+
+/**
+ * EIN ESC, DAS EIN HANDLER DARUNTER FUER SICH BEHAELT, SCHLIESST AUCH PER
+ * `cancel` NICHT. Die Fasten-Hilfe, die Anhang-Auswahl und Menues schliessen
+ * ihre eigene Ebene auf Esc mit `stopPropagation()`; beim div-Overlay erreichte
+ * das Esc `onEscape` darum nie, und das Formular blieb stehen. Der native
+ * Dialog bekommt danach aber noch den Close-Request des Browsers - gemessen
+ * ging der ganze Einstellungsdialog mit dem Tooltip zu. Der Capture-Listener
+ * merkt sich jedes Esc; kommt es nicht bis `onEscape`, gehoert der folgende
+ * `cancel` desselben Tastendrucks nicht dem Modal. Der Browser schickt ihn
+ * in derselben Aufgabe, deshalb verfaellt die Marke mit der naechsten: die
+ * Zurueck-Geste (ein `cancel` ohne Esc) schliesst weiter.
+ */
+let _escKeptBelow = null;
+function onEscapeCapture(e) {
+  if (e.key !== 'Escape') return;
+  _escKeptBelow = e;
+  setTimeout(() => { if (_escKeptBelow === e) _escKeptBelow = null; }, 0);
+}
+
+function bindEscape() {
+  document.removeEventListener('keydown', onEscapeCapture, true);
+  document.addEventListener('keydown', onEscapeCapture, true);
+  document.removeEventListener('keydown', onEscape);
+  document.addEventListener('keydown', onEscape);
+}
+
+function unbindEscape() {
+  document.removeEventListener('keydown', onEscapeCapture, true);
+  document.removeEventListener('keydown', onEscape);
+  _escKeptBelow = null;
 }
 
 // --------------------------------------------------------
@@ -757,6 +790,7 @@ function _fade(el, from, to) {
 /** Close-Request (Esc ohne unseren Handler, Zurueck-Geste): durch closeModal(). */
 function _onCancel(event) {
   event.preventDefault();
+  if (_escKeptBelow) { _escKeptBelow = null; return; }
   if (event.currentTarget === activeOverlay && modalState === 'open') closeModal();
 }
 
@@ -911,8 +945,7 @@ function _resumeSuspendedModal({ overlay, id, title, titleId, snapshot, dirtyGua
   modalState = 'open';
   // Der Dialog hat den Escape-Handler beim Schließen abgemeldet; ohne das
   // erneute Anmelden reagiert das wiederhergestellte Modal nicht mehr auf Esc.
-  document.removeEventListener('keydown', onEscape);
-  document.addEventListener('keydown', onEscape);
+  bindEscape();
   // Das Formular ist wieder da - und damit auch sein Anspruch auf die
   // Zurueck-Geste (#871). Hat der Bestaetigungsdialog den Eintrag beim
   // Schliessen mitgenommen, kommt er hier zurueck.
@@ -1924,8 +1957,7 @@ export function openModal({
   });
 
   // Escape (nur einmal binden)
-  document.removeEventListener('keydown', onEscape);
-  document.addEventListener('keydown', onEscape);
+  bindEscape();
 
   // Callback für Aufrufer
   if (typeof onSave === 'function') onSave(panel);
@@ -2037,7 +2069,7 @@ export async function closeModal({ force = false, context = null } = {}) {
   // ihn wieder anhaben, wenn es nichts anderes sagt.
   _dirtyGuardEnabled = true;
 
-  document.removeEventListener('keydown', onEscape);
+  unbindEscape();
 
   const capturedOverlay = activeOverlay;
   const panel = capturedOverlay.querySelector('.modal-panel');

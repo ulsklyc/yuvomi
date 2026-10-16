@@ -132,9 +132,10 @@ function installDocument() {
     body,
     documentElement: makeNode('html'),
     activeElement: null,
-    addEventListener(type, handler) { docListeners.push({ type, handler }); },
-    removeEventListener(type, handler) {
-      const i = docListeners.findIndex((l) => l.type === type && l.handler === handler);
+    addEventListener(type, handler, opts) { docListeners.push({ type, handler, capture: opts === true || opts?.capture === true }); },
+    removeEventListener(type, handler, opts) {
+      const capture = opts === true || opts?.capture === true;
+      const i = docListeners.findIndex((l) => l.type === type && l.handler === handler && l.capture === capture);
       if (i !== -1) docListeners.splice(i, 1);
     },
     getElementById: (id) => overlays.find((o) => o.id === id) ?? null,
@@ -145,8 +146,13 @@ function installDocument() {
       if (selector === 'dialog[open]') return overlays.filter((o) => o.open);
       return [];
     },
+    // Wie der Browser: erst die Capture-Listener am Dokument, dann das Ziel,
+    // dann die Bubble-Listener. `stoppedBelow` spielt einen Handler am Ziel
+    // nach, der `stopPropagation()` ruft - die Bubble-Phase am Dokument faellt aus.
     _fire(type, event) {
-      for (const l of [...docListeners]) if (l.type === type) l.handler(event);
+      for (const l of [...docListeners]) if (l.type === type && l.capture) l.handler(event);
+      if (event.stoppedBelow) return event;
+      for (const l of [...docListeners]) if (l.type === type && !l.capture) l.handler(event);
       return event;
     },
   };
@@ -221,6 +227,26 @@ test('ein Close-Request (cancel) laeuft durch closeModal(), nicht am Dirty-Guard
   const cancel = overlay._fire('cancel', makeEvent('cancel', { currentTarget: overlay }));
   assert.equal(cancel.defaultPrevented, true, 'cancel nicht abgefangen: der Browser schliesst hart');
   assert.equal(closed, true, 'cancel lief nicht durch closeModal()');
+});
+
+test('ein Esc, das ein Handler darunter fuer sich behaelt, schliesst das Modal auch per cancel nicht', async () => {
+  // Die Fasten-Hilfe (und Anhang-Auswahl, Menues) schliesst ihr Tooltip auf Esc
+  // mit stopPropagation() - beim div-Overlay blieb das Formular darum stehen.
+  // Der native Dialog bekommt danach aber noch den Close-Request des Browsers:
+  // gemessen ging der ganze Einstellungsdialog mit dem Tooltip zu.
+  await fresh();
+  let closed = false;
+  const overlay = open({ onClose: () => { closed = true; } });
+  const target = makeNode('button');
+  target.closest = () => overlay;
+  document._fire('keydown', makeEvent('keydown', { key: 'Escape', target, stoppedBelow: true }));
+  const cancel = overlay._fire('cancel', makeEvent('cancel', { currentTarget: overlay }));
+  assert.equal(cancel.defaultPrevented, true, 'cancel nicht abgefangen: der Browser schliesst hart');
+  assert.equal(closed, false, 'das Esc gehoerte dem Tooltip, das Formular ging trotzdem zu');
+  // Die Zurueck-Geste danach (cancel ohne Esc) schliesst wieder.
+  await new Promise((r) => setTimeout(r, 5));
+  overlay._fire('cancel', makeEvent('cancel', { currentTarget: overlay }));
+  assert.equal(closed, true, 'nach dem behaltenen Esc schliesst die Zurueck-Geste nicht mehr');
 });
 
 test('der Ausgang verlaesst die Top-Layer sofort - die Seite ist waehrend der Animation bedienbar', async () => {
