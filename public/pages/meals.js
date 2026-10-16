@@ -2010,6 +2010,7 @@ function openMealModal(opts) {
     content,
     size: 'md',
     onSave(panel) {
+      wireMealTypeChips(panel);
       // Zutaten
       const ingList   = panel.querySelector('#ingredient-list');
       const addIngBtn = panel.querySelector('#add-ingredient-btn');
@@ -2356,12 +2357,58 @@ function wireIngredientCount(panel) {
   }).observe(list, { childList: true });
 }
 
-function buildModalContent({ mode, date, mealType, meal, fromSlot = false, recipeId = null }) {
+/* Die Mahlzeitart als Radiogruppe aus Chips (buildModalContent): Klick und
+ * Pfeiltasten waehlen, das versteckte `#modal-type` haelt den Wert. Roving
+ * tabindex wie beim Segment: EIN Tab-Halt, die Pfeile wandern. */
+function wireMealTypeChips(panel) {
+  const group = panel.querySelector?.('#modal-type-chips');
+  const field = panel.querySelector?.('#modal-type');
+  if (!group || !field) return;
+  const chips = () => [...group.querySelectorAll('[data-meal-type]')];
+  const select = (chip, { focus = false } = {}) => {
+    for (const other of chips()) {
+      const on = other === chip;
+      other.setAttribute('aria-checked', String(on));
+      other.tabIndex = on ? 0 : -1;
+      other.classList.toggle('filter-chip--active', on);
+    }
+    if (field.value !== chip.dataset.mealType) {
+      field.value = chip.dataset.mealType;
+      field.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    if (focus) chip.focus();
+  };
+  group.addEventListener('click', (e) => {
+    const chip = e.target.closest('[data-meal-type]');
+    if (chip) select(chip);
+  });
+  group.addEventListener('keydown', (e) => {
+    const list = chips();
+    const i = list.indexOf(document.activeElement);
+    if (i < 0) return;
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+    if (!step) return;
+    e.preventDefault();
+    const dir = getComputedStyle(group).direction === 'rtl' && (e.key === 'ArrowRight' || e.key === 'ArrowLeft') ? -step : step;
+    select(list[(i + dir + list.length) % list.length], { focus: true });
+  });
+}
+
+function buildModalContent({ mode, date, mealType, meal, recipeId = null }) {
   const isEdit   = mode === 'edit';
   const isRecurring = isEdit && meal.recurrence_template_id;
-  const typeOpts = MEAL_TYPES().map((mt) =>
-    `<option value="${mt.key}" ${mt.key === mealType ? 'selected' : ''}>${mt.label}</option>`
-  ).join('');
+  // MAHLZEITART ALS CHIPS WIE IM REZEPT-DIALOG (Critique 2026-10-16, D4).
+  // Rezept und Mahlzeit fragten dieselbe Sache einmal als Chips, einmal als
+  // Auswahlliste. Hier ist es eine Einfachauswahl: dieselben Chips, als
+  // Radiogruppe (genau einer gewaehlt). Das versteckte Feld `#modal-type`
+  // traegt den Wert - Speichern, Dirty-Check und Tests lesen es wie vorher.
+  const types = MEAL_TYPES();
+  const chosenType = types.some((mt) => mt.key === mealType) ? mealType : types[0]?.key;
+  const typeChips = types.map((mt) => {
+    const on = mt.key === chosenType;
+    return `<button type="button" class="filter-chip meal-type-chip${on ? ' filter-chip--active' : ''}" role="radio"
+              data-meal-type="${mt.key}" aria-checked="${on}" tabindex="${on ? '0' : '-1'}">${esc(mt.label)}</button>`;
+  }).join('');
 
   const listOpts = state.lists.map((l) => `<option value="${l.id}">${esc(l.name)}</option>`).join('');
 
@@ -2474,15 +2521,14 @@ function buildModalContent({ mode, date, mealType, meal, fromSlot = false, recip
     </div>`}`;
 
   const whenHtml = `
-    <div class="modal-grid modal-grid--2${fromSlot && !isEdit ? ' meal-modal__when' : ''}">
-      <div class="form-group">
-        <label class="form-label" for="modal-date">${t('meals.dateLabel')}</label>
-        <yuvomi-datepicker type="date" id="modal-date" value="${formatDateInput(date)}"></yuvomi-datepicker>
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="modal-type">${t('meals.mealTypeLabel')}</label>
-        <select class="form-input" id="modal-type">${typeOpts}</select>
-      </div>
+    <div class="form-group">
+      <span class="form-label" id="modal-type-label">${t('meals.mealTypeLabel')}</span>
+      <div class="meal-type-chips" id="modal-type-chips" role="radiogroup" aria-labelledby="modal-type-label">${typeChips}</div>
+      <input type="hidden" id="modal-type" value="${esc(chosenType ?? '')}">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="modal-date">${t('meals.dateLabel')}</label>
+      <yuvomi-datepicker type="date" id="modal-date" value="${formatDateInput(date)}"></yuvomi-datepicker>
     </div>
 `;
   const nameHtml = `
@@ -2497,12 +2543,12 @@ function buildModalContent({ mode, date, mealType, meal, fromSlot = false, recip
            aria-label="${esc(t('meals.suggestionsLabel'))}" hidden></div>
     </div>
 `;
-  // AUS DEM SLOT: NAME ZUERST (Re-Critique 2026-09-28, A4 P2-9). Der Slot
-  // weiss Tag und Mahlzeit schon; oben standen trotzdem genau diese zwei
-  // Felder, und der Name lag bei 427px Hoehe unter dem Falz. Aus dem Slot
-  // fuehrt jetzt der Name (mit den Rezeptvorschlaegen des Autocompletes), Tag
-  // und Mahlzeit stehen als ruhige, weiter editierbare Zeile darunter. Ohne
-  // Slot (FAB, Kurzbefehl) bleibt "erst wann, dann was".
+  // NAME ZUERST, IMMER (Re-Critique 2026-09-28 A4 P2-9 fuer den Slot;
+  // Critique 2026-10-16 D4 fuer jeden Weg). Der Name ist das Pflichtfeld und
+  // traegt die Rezeptvorschlaege des Autocompletes; er steht oben und bekommt
+  // den Fokus. Vorher fuehrte ohne Slot (FAB, Kurzbefehl) das Datum - der
+  // Dialog fokussierte "Datum", das Pflichtfeld stand an dritter Stelle.
+  // Darunter Mahlzeitart (Chips) und Tag.
   // ZUTATEN BEIM BEARBEITEN EINGEKLAPPT, MIT ZAEHLER (R17 Schritt 5). Eine
   // Zutatenzeile misst mobil 104px; mit sechs Zutaten lag alles Weitere zwei
   // Bildschirme tiefer. Wer eine bestehende Mahlzeit oeffnet, aendert meist
@@ -2527,7 +2573,7 @@ function buildModalContent({ mode, date, mealType, meal, fromSlot = false, recip
 
   return `
     ${scopeHtml}
-    ${fromSlot && !isEdit ? nameHtml + whenHtml : whenHtml + nameHtml}
+    ${nameHtml + whenHtml}
     ${cookPickerHtml(isEdit ? meal : null)}
 
     ${ingredientsHtml}

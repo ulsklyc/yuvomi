@@ -520,3 +520,27 @@ test('R17: nach dem Loeschen raeumt die Liste die Adresse erst, wenn die Rueckfr
   assert.ok(redraw > settled, 'und zeichnet die Liste (samt Adresse der Auswahl) erst danach');
   assert.match(src, /import \{[^}]*\bwhenHistorySettled\b[^}]*\} from '\/utils\/overlay-history\.js'/);
 });
+
+// Critique 2026-10-16 (D4): der Inventar-Dialog zeigte bis zu 22 Felder. Vorn
+// stehen jetzt Name, Kategorie, Ort und Status; Kauf, Garantie, Foto und
+// Dokumente stehen hinter „Weitere Angaben", dessen zweite Zeile sie nennt
+// (gemessen: 8 -> 4 sichtbare Felder beim Anlegen). Dazu Luft zwischen
+// Chipzeile und Kurzzeile.
+test('Inventar-Dialog: Kauf, Garantie, Foto, Dokumente hinter „Weitere Angaben" (Critique 2026-10-16)', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const src = readFileSync(new URL('../public/pages/inventory.js', import.meta.url), 'utf8');
+  const form = src.slice(src.indexOf('function buildItemForm('), src.indexOf('<div class="modal-panel__footer modal-panel__footer--plain">', src.indexOf('function buildItemForm(')));
+  const fold = form.indexOf('${advancedSection(`');
+  assert.ok(fold > -1, 'der Aufklapper steht');
+  for (const id of ['inv-purchase-date', 'inv-purchase-price', 'inv-warranty', 'inv-photo', 'inv-attachment-category']) {
+    assert.ok(form.indexOf(`id="${id}"`) > fold, `${id} steht hinter dem Aufklapper`);
+  }
+  for (const id of ['inv-name', 'inv-category', 'inv-location', 'inv-status']) {
+    assert.ok(form.indexOf(`id="${id}"`) > -1 && form.indexOf(`id="${id}"`) < fold, `${id} steht vorn`);
+  }
+  assert.ok(form.indexOf('data-action="link-booking"') > fold, 'die Kaufbuchung gehoert zum Kauf');
+  assert.match(form, /label: t\('modal\.moreDetails'\),\s*hint: t\('inventory\.moreDetailsHint'\),/, 'der Aufklapper nennt, was hinter ihm liegt');
+  const css = readFileSync(new URL('../public/styles/inventory.css', import.meta.url), 'utf8');
+  const filters = [...eachRule(css)].find((r) => !r.at.length && r.selector.trim() === '.inventory-filters');
+  assert.match(filters?.body ?? '', /padding-block:\s*var\(--space-3\);/, 'Abstand oben UND unten');
+});
