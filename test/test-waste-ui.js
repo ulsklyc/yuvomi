@@ -1029,3 +1029,18 @@ test('importErrorText: a named refusal gets its own sentence, anything else the 
   const wizard = WASTE_SRC.slice(WASTE_SRC.indexOf('function openImportWizard('), WASTE_SRC.indexOf('function sourceMappingRowHtml('));
   assert.match(wizard, /api\.post\(endpoint, body\);[\s\S]*?catch \(err\) \{[\s\S]*?showError\(importErrorText\(err\)\);/, 'the commit step of the wizard uses it');
 });
+
+// D5 (Critique 2026-10-16): im Onboarding standen FAB, Leerzustand UND Menue
+// mit demselben ersten Schritt (Abfallart / Import). Der Import steht dort nur
+// im Leerzustand, als leiser Link - das Menue nimmt ihn erst danach auf.
+test('D5: im Onboarding steht der Import nur im Leerzustand, nicht zusaetzlich im Menue', () => {
+  const css = readFileSync(new URL('../public/styles/waste.css', import.meta.url), 'utf8');
+  const hidden = [...eachRule(css)].filter((r) => /display:\s*none/.test(r.body) && !r.at.length)
+    .flatMap((r) => r.selector.split(',').map((x) => x.trim()));
+  for (const action of ['add-type', 'open-import']) {
+    assert.ok(hidden.includes(`.waste-page--onboarding #waste-page-menu [data-action="${action}"]`),
+      `${action}: im Onboarding nicht ein zweites Mal im Menue`);
+  }
+  assert.match(WASTE_SRC, /class="btn btn--ghost waste-onboarding__import" data-action="open-import"/,
+    'der Leerzustand behaelt den Import als leisen Link');
+});
