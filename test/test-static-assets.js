@@ -341,12 +341,31 @@ test('files are compressed one after the other, not all at once', async (t) => {
 // nimmt Symlinks, weil die auch auf dem Linux der CI zwei Namen fuer eine
 // Datei sind.
 
+/**
+ * Legt einen Symlink an oder ueberspringt den Test, wenn das System keinen
+ * erlaubt: unter Windows brauchen Symlinks auf Dateien den Entwicklermodus
+ * oder Adminrechte (EPERM). Unter Linux gelingt er immer.
+ */
+function symlinkOrSkip(t, target, linkPath) {
+  try {
+    symlinkSync(target, linkPath);
+    return true;
+  } catch (err) {
+    if (err.code !== 'EPERM' && err.code !== 'EACCES') throw err;
+    t.skip(`Symlink nicht anlegbar (${err.code}) - unter Windows braucht er den Entwicklermodus`);
+    return false;
+  }
+}
+
 test('many names for one file are one stored version, compressed once', async (t) => {
   const fx = fixture();
   fx.write('app.js', SCRIPT);
   const names = ['/app.js'];
   for (let i = 0; i < 5; i += 1) {
-    symlinkSync(path.join(fx.dir, 'app.js'), path.join(fx.dir, `alias-${i}.js`));
+    if (!symlinkOrSkip(t, path.join(fx.dir, 'app.js'), path.join(fx.dir, `alias-${i}.js`))) {
+      fx.cleanup();
+      return;
+    }
     names.push(`/alias-${i}.js`);
   }
   let runs = 0;
@@ -369,7 +388,11 @@ test('a link that leaves the folder is never read into memory', async (t) => {
   const fx = fixture();
   const outside = fixture();
   const secret = outside.write('outside.js', SCRIPT);
-  symlinkSync(secret, path.join(fx.dir, 'leak.js'));
+  if (!symlinkOrSkip(t, secret, path.join(fx.dir, 'leak.js'))) {
+    fx.cleanup();
+    outside.cleanup();
+    return;
+  }
   let runs = 0;
   const compress = (buffer, _options, cb) => { runs += 1; cb(null, buffer.subarray(0, 10)); };
   const srv = await serve(fx.dir, { compress });

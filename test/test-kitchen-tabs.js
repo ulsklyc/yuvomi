@@ -284,16 +284,24 @@ test('Kueche: nutzt den geteilten Indikator und baut keinen eigenen mehr', () =>
 test('Seitenleiste: Pille <= 300ms aus Tokens, Hover-Absicht 150-250ms aus einem Token (A1 P2-2 / P3-1)', () => {
   const layout = readSrc('../public/styles/layout.css');
   const tokens = readSrc('../public/styles/tokens.css');
-  const ruleBody = (sel) => {
-    const i = layout.indexOf(`${sel} {`);
-    assert.ok(i >= 0, `${sel} fehlt`);
-    return layout.slice(i, layout.indexOf('}', i));
+  // JEDE Regel, deren Subjekt das Element ist, nicht nur die erste: seit der
+  // Druck-Regel der Sidebar (Nav-Polish 2026-10-15) steht vor der Grundregel
+  // von .nav-sidebar__hover eine zweite mit eigener transition, und indexOf
+  // las nur sie.
+  const transitionsOf = (sel) => {
+    const esc = sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const rules = [...layout.matchAll(new RegExp(`${esc}\\s*\\{([^}]*)\\}`, 'g'))]
+      .map((m) => m[1].match(/transition:([^;]*);/)?.[1])
+      .filter(Boolean);
+    assert.ok(rules.length, `${sel}: keine Regel mit transition`);
+    return rules;
   };
   for (const sel of ['.nav-sidebar__indicator', '.nav-sidebar__hover']) {
-    const transition = ruleBody(sel).match(/transition:([^;]*);/)[1];
-    assert.doesNotMatch(transition, /\d+m?s\b/, `${sel}: keine Literal-Dauer (vorher 450ms/280ms/180ms)`);
-    const durs = [...transition.matchAll(/var\(--duration-(\w+)\)/g)].map((m) => m[1]);
-    assert.ok(durs.length && durs.every((d) => ['xs', 'sm', 'md', 'lg', 'xl'].includes(d)), `${sel}: Dauern <= --duration-xl (${durs})`);
+    for (const transition of transitionsOf(sel)) {
+      assert.doesNotMatch(transition, /\d+m?s\b/, `${sel}: keine Literal-Dauer (vorher 450ms/280ms/180ms)`);
+      const durs = [...transition.matchAll(/var\(--duration-(\w+)\)/g)].map((m) => m[1]);
+      assert.ok(durs.length && durs.every((d) => ['2xs', 'xs', 'sm', 'md', 'lg', 'xl'].includes(d)), `${sel}: Dauern <= --duration-xl (${durs})`);
+    }
   }
   const intent = Number(tokens.match(/--sidebar-hover-intent:\s*(\d+)ms/)?.[1]);
   assert.ok(intent >= 150 && intent <= 250, `--sidebar-hover-intent ${intent}ms`);

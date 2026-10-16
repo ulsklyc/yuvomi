@@ -36,6 +36,16 @@ const KEY = 'schluessel-dieser-instanz-0123456789';
 const PAGE = 4096;
 const DB_MODULE = new URL('../server/db.js', import.meta.url).href;
 
+// Was nur unter POSIX herstellbar ist, ueberspringt Windows mit Grund, wie
+// root die chown-Faelle: chown ist dort ein No-op, chmod setzt nur den
+// Schreibschutz, und der dokumentierte Compose-Restore ist ein sh-Befehl.
+const BESITZER_FEST = (process.getuid?.() === 0 && 'root darf jeden Besitzer setzen')
+  || (process.platform === 'win32' && 'unter Windows scheitert chown nie und 0660 gibt es nicht - der Fall ist so nicht herstellbar');
+const OHNE_DATEIRECHTE = process.platform === 'win32' && 'chmod setzt unter Windows nur den Schreibschutz, 0640 und uid gibt es nicht';
+const OHNE_SH = process.platform === 'win32' && 'der Compose-Restore ist ein sh-Befehl fuer den Linux-Container (/bin/sh, cp, mv, sync)';
+const LESEND_OHNE_FSYNC = process.platform === 'win32'
+  && 'unter Windows bringt ein nur lesender Handle nichts auf die Platte (FlushFileBuffers verlangt Schreibrecht)';
+
 // Vor jedem Import von db.js: ohne wirksames DB_PATH legte der Import eine
 // Datenbank im Arbeitsbaum an (test:db-isolation).
 process.env.DB_PATH = join(tempDir('yuvomi-test-swap-'), 'yuvomi.db');
@@ -158,6 +168,16 @@ function restoreKilledMidCopy(backupPath, { dbPath, key }) {
   });
 }
 
+/**
+ * Der Kindprozess starb an seinem `process.kill(process.pid, 'SIGKILL')`.
+ * Windows kennt keine Signale: dort beendet der Aufruf den Prozess per
+ * TerminateProcess, ohne Signal und mit Exit-Code 1.
+ */
+function assertKilled(run, message) {
+  if (process.platform === 'win32') assert.deepEqual([run.signal, run.status], [null, 1], message);
+  else assert.equal(run.signal, 'SIGKILL', message);
+}
+
 for (const [fall, key] of [['mit Schluessel', KEY], ['ohne Schluessel', null]]) {
   test(`#1422 Restore stirbt mitten im Kopieren (${fall}): DB_PATH ist danach die alte Datenbank, heil`, async () => {
     const backupPath = await bigBackup(key, 'aus dem Backup');
@@ -165,7 +185,7 @@ for (const [fall, key] of [['mit Schluessel', KEY], ['ohne Schluessel', null]]) 
     target.mod.get().close();
 
     const run = restoreKilledMidCopy(backupPath, { dbPath: target.dbPath, key });
-    assert.equal(run.signal, 'SIGKILL', `der Kindprozess muss am Kopieren gestorben sein: ${run.stderr}`);
+    assertKilled(run, `der Kindprozess muss am Kopieren gestorben sein: ${run.stderr}`);
     assert.match(run.stdout, /half-written/, 'Vorbedingung: der Abbruch traf das Kopieren des Backups');
     assert.doesNotMatch(run.stdout, /restored/);
 
@@ -195,7 +215,7 @@ test('#1422 die Arbeitsdatei entsteht NEBEN DB_PATH und ist nach dem Restore weg
   const target = await frozenTarget(KEY, 'vor dem Restore');
   target.mod.get().close();
   const run = restoreKilledMidCopy(backupPath, { dbPath: target.dbPath, key: KEY });
-  assert.equal(run.signal, 'SIGKILL');
+  assertKilled(run);
   assert.equal(
     readdirSync(target.dir).filter((name) => name.startsWith('yuvomi.db.restore-tmp')).length,
     1,
@@ -382,7 +402,7 @@ test('#1431 stirbt der Restore beim Anlegen der Rollback-Kopie, liegt unter .pre
   const run = spawnSync(process.execPath, ['--input-type=module', '-e', KILL_MID_ROLLBACK_COPY], {
     cwd: tempDir('yuvomi-test-swap-cwd-'), env, encoding: 'utf8',
   });
-  assert.equal(run.signal, 'SIGKILL', `der Kindprozess muss beim Kopieren gestorben sein: ${run.stderr}`);
+  assertKilled(run, `der Kindprozess muss beim Kopieren gestorben sein: ${run.stderr}`);
   assert.match(run.stdout, /half-written/, 'Vorbedingung: der Abbruch traf die Rollback-Kopie');
 
   const names = readdirSync(target.dir);
@@ -612,7 +632,7 @@ function runComposeRestore(backupPath, dbPath, { killMidCopy = false, refuseChmo
   return spawnSync('/bin/sh', ['-c', script], { env, encoding: 'utf8', cwd: fileURLToPath(new URL('..', import.meta.url)) });
 }
 
-test('#1431 der dokumentierte Compose-Restore: stirbt er mitten im Kopieren, bleibt die alte Datenbank heil', async () => {
+test('#1431 der dokumentierte Compose-Restore: stirbt er mitten im Kopieren, bleibt die alte Datenbank heil', { skip: OHNE_SH }, async () => {
   const backupPath = await bigBackup(null, 'aus dem Backup');
   const target = await frozenTarget(null, 'vor dem Restore');
   target.mod.get().close();
@@ -636,7 +656,7 @@ test('#1431 der dokumentierte Compose-Restore: stirbt er mitten im Kopieren, ble
   );
 });
 
-test('#1431 der dokumentierte Compose-Restore: ein vollstaendiger Lauf tauscht ein und behaelt die Rollback-Kopie', async () => {
+test('#1431 der dokumentierte Compose-Restore: ein vollstaendiger Lauf tauscht ein und behaelt die Rollback-Kopie', { skip: OHNE_SH }, async () => {
   const backupPath = await bigBackup(null, 'aus dem Backup');
   const target = await frozenTarget(null, 'vor dem Restore');
   target.mod.get().close();
@@ -667,7 +687,7 @@ function hasNote(filePath, note) {
   }
 }
 
-test('#1431 der dokumentierte Compose-Restore behaelt das Write-Ahead-Log bei der Rollback-Kopie', async () => {
+test('#1431 der dokumentierte Compose-Restore behaelt das Write-Ahead-Log bei der Rollback-Kopie', { skip: OHNE_SH }, async () => {
   // `docker compose stop` ohne Checkpoint: die letzte Transaktion steht nur im -wal.
   const laufend = join(tempDir('yuvomi-test-swap-'), 'laufend.db');
   const mod = await bootDb(laufend, null);
@@ -738,7 +758,7 @@ test('#1431 scheitert die Rollback-Kopie und dann das Aufraeumen, wird die alte 
 });
 
 for (const art of ['derselbe Pfad', 'harter Link', 'Symlink']) {
-  test(`#1431 die laufende Datenbank auf sich selbst zurueckspielen wird abgelehnt (${art})`, async () => {
+  test(`#1431 die laufende Datenbank auf sich selbst zurueckspielen wird abgelehnt (${art})`, async (t) => {
     const target = await frozenTarget(KEY, 'vor dem Restore');
     // Nur im -wal: ohne Ablehnung haengte das rename den Stand davor ein.
     target.mod.get().pragma('wal_autocheckpoint = 0');
@@ -749,7 +769,15 @@ for (const art of ['derselbe Pfad', 'harter Link', 'Symlink']) {
       linkSync(target.dbPath, source);
     } else if (art === 'Symlink') {
       source = join(tempDir('yuvomi-test-swap-'), 'symlink.db');
-      symlinkSync(target.dbPath, source);
+      try {
+        symlinkSync(target.dbPath, source);
+      } catch (err) {
+        // Symlinks auf Dateien brauchen unter Windows den Entwicklermodus.
+        if (err.code !== 'EPERM' && err.code !== 'EACCES') throw err;
+        target.mod.get().close();
+        t.skip(`Symlink nicht anlegbar (${err.code}) - unter Windows braucht er den Entwicklermodus`);
+        return;
+      }
     }
     await assert.rejects(
       () => target.mod.restoreFromFile(source),
@@ -787,7 +815,7 @@ test('#1431 Klartext-Backup mit kaputter Schemaseite: backup_corrupt statt „no
 // Fuenfte Runde #1431
 // ---------------------------------------------------------------------------
 
-test('#1431 Compose-Restore auf eine leere Datenbankdatei: das Journal ueberlebt das Oeffnen der Rollback-Kopie', async () => {
+test('#1431 Compose-Restore auf eine leere Datenbankdatei: das Journal ueberlebt das Oeffnen der Rollback-Kopie', { skip: OHNE_SH }, async () => {
   // SQLite verwirft ein -wal neben einer 0-Byte-Datei beim ersten Oeffnen,
   // auch lesend - deshalb legt es db.js als `.wal-kept` ab (#1282).
   const laufend = join(tempDir('yuvomi-test-swap-'), 'laufend.db');
@@ -837,7 +865,7 @@ test('#1431 der Compose-Restore in der App ist derselbe Befehl wie in docs/insta
   assert.equal(shown, documented, 'App und Doku zeigen denselben Befehl');
 });
 
-test('#1431 ein schreibgeschuetztes Backup (0444) laesst sich einspielen, DB_PATH behaelt seine Rechte', async () => {
+test('#1431 ein schreibgeschuetztes Backup (0444) laesst sich einspielen, DB_PATH behaelt seine Rechte', { skip: OHNE_DATEIRECHTE }, async () => {
   const backupPath = await bigBackup(KEY, 'aus dem Backup');
   chmodSync(backupPath, 0o444);
   const target = await frozenTarget(KEY, 'vor dem Restore');
@@ -1004,7 +1032,7 @@ test('#1431 lehnt das Dateisystem chmod ab und bleibt die Datei schreibgeschuetz
   target.mod.get().close();
 });
 
-test('#1431 der dokumentierte Compose-Restore mit schreibgeschuetztem Backup (0444): die Datenbank bleibt schreibbar', async () => {
+test('#1431 der dokumentierte Compose-Restore mit schreibgeschuetztem Backup (0444): die Datenbank bleibt schreibbar', { skip: OHNE_SH }, async () => {
   const backupPath = await bigBackup(null, 'aus dem Backup');
   chmodSync(backupPath, 0o444);
   const target = await frozenTarget(null, 'vor dem Restore');
@@ -1018,7 +1046,7 @@ test('#1431 der dokumentierte Compose-Restore mit schreibgeschuetztem Backup (04
   mod.get().close();
 });
 
-test('#1431 der dokumentierte Compose-Restore laeuft auch auf einem Mount, der chmod ablehnt', async () => {
+test('#1431 der dokumentierte Compose-Restore laeuft auch auf einem Mount, der chmod ablehnt', { skip: OHNE_SH }, async () => {
   const backupPath = await bigBackup(null, 'aus dem Backup');
   const target = await frozenTarget(null, 'vor dem Restore');
   target.mod.get().close();
@@ -1274,7 +1302,7 @@ test('#1431 kann das Dateisystem keinen fsync auf Verzeichnisse (EINVAL), laeuft
 
 test(
   '#1431 laesst sich der Besitzer der bisherigen Datenbank nicht uebernehmen, wird vor dem Tausch abgebrochen',
-  { skip: process.getuid?.() === 0 && 'root darf jeden Besitzer setzen' },
+  { skip: BESITZER_FEST },
   async () => {
     const backupPath = await bigBackup(KEY, 'aus dem Backup');
     const target = await frozenTarget(KEY, 'vor dem Restore');
@@ -1424,7 +1452,7 @@ test('#1431 Outlook- und CardDAV-Sync beginnen waehrend eines Restores nicht', a
 
 test(
   '#1431 scheitert chown, bleibt die Datei aber ueber die Gruppe schreibbar (root:node 0660), laeuft der Restore',
-  { skip: process.getuid?.() === 0 && 'root darf jeden Besitzer setzen' },
+  { skip: BESITZER_FEST },
   async () => {
     const backupPath = await bigBackup(KEY, 'aus dem Backup');
     const target = await frozenTarget(KEY, 'vor dem Restore');
@@ -1571,7 +1599,7 @@ test('#1431 gehoert die Arbeitsdatei dem laufenden Prozess, der die alte Datenba
   target.mod.get().close();
 });
 
-test('#1431 der dokumentierte Compose-Restore prueft das Backup und tauscht ein beschaedigtes nicht ein', async () => {
+test('#1431 der dokumentierte Compose-Restore prueft das Backup und tauscht ein beschaedigtes nicht ein', { skip: OHNE_SH }, async () => {
   const backupPath = await bigBackup(null, 'aus dem Backup');
   const kaputt = join(tempDir('yuvomi-test-swap-'), 'kaputt.db');
   const bytes = Buffer.from(readFileSync(backupPath));
@@ -1595,7 +1623,7 @@ test('#1431 der dokumentierte Compose-Restore prueft das Backup und tauscht ein 
 
 test(
   '#1431 das Restore-CLI als anderer Nutzer: scheitert chown, zaehlt die eigene euid nicht',
-  { skip: process.getuid?.() === 0 && 'root darf jeden Besitzer setzen' },
+  { skip: BESITZER_FEST },
   async () => {
     const backupPath = await bigBackup(KEY, 'aus dem Backup');
     const target = await frozenTarget(KEY, 'vor dem Restore');
@@ -1781,7 +1809,7 @@ test('#1441 alle vier Anbieter-Callbacks laufen durch refuseWhileRestoring und w
   }
 });
 
-test('#1441 der dokumentierte Compose-Restore bringt das Beiseitelegen von -wal und -shm auf die Platte, bevor er die Datenbank ersetzt', async () => {
+test('#1441 der dokumentierte Compose-Restore bringt das Beiseitelegen von -wal und -shm auf die Platte, bevor er die Datenbank ersetzt', { skip: OHNE_SH }, async () => {
   // Ein Stromausfall direkt nach dem letzten `mv` darf den Tausch nicht
   // behalten und das Wegraeumen des alten Journals verlieren: SQLite wendete
   // das -wal der alten Datenbank sonst auf die eingespielte an (#1267).
@@ -1864,7 +1892,7 @@ test('#1441 wie unter Windows: fsync auf einem nur lesend geoeffneten Handle sch
   target.mod.get().close();
 });
 
-test('#1441 ist die Arbeitsdatei schreibgeschuetzt, wird sie lesend geoeffnet und trotzdem auf die Platte gebracht', async () => {
+test('#1441 ist die Arbeitsdatei schreibgeschuetzt, wird sie lesend geoeffnet und trotzdem auf die Platte gebracht', { skip: LESEND_OHNE_FSYNC }, async () => {
   // Kein Schreibrecht auf die Datei (etwa eine Datenbank mit 0444): dann
   // bleibt es beim lesenden Handle, wie bisher - er genuegt ausserhalb von Windows.
   const backupPath = await bigBackup(null, 'aus dem Backup');
