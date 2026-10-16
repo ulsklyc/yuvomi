@@ -109,11 +109,14 @@ test('extension settings sheet renders each section once inside its scope block'
       const leaf = registry.findSettingsLeaf(path, user);
       await __test.renderLeafContent(content, leaf, domain, user, new URLSearchParams('source=direct'));
       const scopes = [...content.querySelectorAll('.settings-scope')];
-      assert.deepEqual(scopes.map((group) => group.className), expected.map((scope) => `settings-scope settings-scope--${scope}`));
-      for (const [index, group] of scopes.entries()) {
-        const hosts = group.querySelectorAll('.settings-sheet-section');
-        assert.equal(hosts.length, 1, 'each declared section renders once');
-        assert.deepEqual(JSON.parse(hosts[0].textContent), { section: expected[index], userId: user.id, source: 'direct' });
+      // R19: scope blocks (and their headings) only when the sheet has two
+      // scopes - a member sees one, and a single scope heading only stacked.
+      const blocks = expected.length > 1 ? expected : [];
+      assert.deepEqual(scopes.map((group) => group.className), blocks.map((scope) => `settings-scope settings-scope--${scope}`));
+      const hosts = content.querySelectorAll('.settings-sheet-section');
+      assert.equal(hosts.length, expected.length, 'each declared section renders once');
+      for (const [index, host] of hosts.entries()) {
+        assert.deepEqual(JSON.parse(host.textContent), { section: expected[index], userId: user.id, source: 'direct' });
       }
       assert.equal(content.querySelector('.settings-leaf-header__description'), null,
         'a module without description gets no empty paragraph');
@@ -3007,8 +3010,9 @@ test('S1: ein Modul geht nur in Aktive Module an und aus - die Modulblaetter zei
   assert.match(status, /if \(user\?\.role === 'admin'\) \{\s*const link = createLink\(ACTIVE_MODULES_PATH/);
   assert.match(shell, /const ACTIVE_MODULES_PATH = '\/settings\/modules\/active';/);
   assert.equal(findSettingsLeaf('/settings/modules/active', admin)?.id, 'modules-active');
-  // Reichweiten-Ueberschriften stehen auf Modulblaettern.
-  assert.match(shell, /const scoped = Boolean\(leaf\.module\);/);
+  // Reichweiten-Ueberschriften stehen auf Modulblaettern - seit R19 nur, wo
+  // es zwei Reichweiten gibt (eine einzige gliedert nichts, sie stapelt nur).
+  assert.match(shell, /const scoped = Boolean\(leaf\.module\) && new Set\(sections\.map\(\(section\) => section\.scope\)\)\.size > 1;/);
   assert.match(shell, /t\(scope === 'mine' \? 'settings\.scopeMine' : 'settings\.scopeHousehold'\)/);
 });
 
@@ -4233,4 +4237,19 @@ test('R19: der Schichtplan hat eine eigene Glyphe, keine Kalenderform', async ()
   assert.match(lucide, new RegExp(`\\b${pascal}\\b`), `${pascal} fehlt im gebuendelten Lucide (public/lucide.min.js)`);
   const reminders = await readFile(new URL('../public/reminders.js', import.meta.url), 'utf8');
   assert.match(reminders, new RegExp(`schedule_entry:[^\\n]*icon: '${glyph}'`), 'die Erinnerung des Schichtplans traegt sein Zeichen');
+});
+
+// R19 (Critique 2026-10-16, "Einstellungen: zwei Formular-Dialekte"): das
+// Kuechenblatt stand als Karte mit zwei Kartentiteln, Schaltern ohne
+// Haarlinien und Namen-Feldern UNTER ihrem Etikett. Jetzt der Dialekt der
+// uebrigen Blaetter: gruppierte Zeilen im Traeger, Hinweis als Gruppenfuss.
+test('R19: das Kuechenblatt spricht den Zeilen-Dialekt der Einstellungen', async () => {
+  const src = await readFile(new URL('../public/settings/pages/modules-kitchen.js', import.meta.url), 'utf8');
+  const meals = src.slice(src.indexOf("settings.sectionMeals"), src.indexOf("settings.recipeProvidersTitle"));
+  assert.match(meals, /class="row-carrier settings-group meal-type-toggles" id="meal-type-toggles"/);
+  assert.match(meals, /settingSwitchRowHtml\(\{/, 'die Schalter als Zeilen der Gruppe');
+  assert.match(meals, /class="row-carrier settings-group meal-type-names" id="meal-type-names"/);
+  assert.match(meals, /settingRowHtml\(\{\s*label: builtInMealTypeLabel\(mealType\),\s*labelFor: `meal-name-\$\{mealType\}`/, 'Etikett links, Feld rechts');
+  assert.doesNotMatch(meals, /class="settings-card"|class="form-field"|class="form-label"/, 'keine Karte und kein gestapeltes Feld mehr');
+  assert.match(meals, /settings-group__footer">\$\{t\('settings\.mealTypesHint'\)\}/, 'der Hinweis als Gruppenfuss');
 });

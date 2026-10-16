@@ -5,7 +5,8 @@ import {
   createInlineError,
   createRetryState,
   createStatusSummary,
-  toggleRowHtml,
+  settingRowHtml,
+  settingSwitchRowHtml,
 } from '/settings/components.js';
 import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
 import { esc } from '/utils/html.js';
@@ -83,32 +84,36 @@ function renderPage(container, preferences) {
   container.insertAdjacentHTML('beforeend', `
     <section class="settings-section">
       <h2 class="settings-section__title">${t('settings.sectionMeals')}</h2>
-      <div class="settings-card">
-        <h3 class="settings-card__title">${t('settings.mealTypesLabel')}</h3>
-        <p class="form-hint">${t('settings.mealTypesHint')}</p>
-        <div class="meal-type-toggles" id="meal-type-toggles">
-          ${MEAL_TYPES.map((mealType) => toggleRowHtml({
-            control: 'switch',
-            label: builtInMealTypeLabel(mealType),
-            checked: visibleMealTypes.includes(mealType),
-            attrs: { value: mealType },
-          })).join('')}
-        </div>
-        <h3 class="settings-card__title">${t('settings.mealTypeNamesLabel')}</h3>
-        <p class="form-hint">${t('settings.mealTypeNamesHint')}</p>
-        <div class="meal-type-names" id="meal-type-names">
-          ${MEAL_TYPES.map((mealType) => `
-            <div class="form-field">
-              <label class="form-label" for="meal-name-${mealType}">${builtInMealTypeLabel(mealType)}</label>
-              <input class="form-input" type="text" id="meal-name-${mealType}"
+      <!-- EIN FORMULAR-DIALEKT (R19, Critique 2026-10-16): hier stand eine
+           Karte mit zwei Kartentiteln, die Schalter ohne Haarlinien und die
+           Namen als Felder UNTER ihrem Etikett - ein zweiter Dialekt neben
+           den gruppierten Zeilen der anderen Blaetter, und vier Ueberschriften
+           uebereinander ("Fuer den Haushalt", "Essensplan", "Sichtbare
+           Mahlzeiten", "Eigene Namen"). Jetzt zwei Gruppen in der Form der
+           iOS-Einstellungen: Zeilen im Traeger, ein leiser Gruppentitel, der
+           Hinweis als Gruppenfuss. -->
+      <h3 class="settings-card__title settings-group__title">${t('settings.mealTypesLabel')}</h3>
+      <div class="row-carrier settings-group meal-type-toggles" id="meal-type-toggles">
+        ${MEAL_TYPES.map((mealType) => settingSwitchRowHtml({
+          label: builtInMealTypeLabel(mealType),
+          checked: visibleMealTypes.includes(mealType),
+          attrs: { value: mealType },
+        })).join('')}
+      </div>
+      <p class="form-hint settings-group__footer">${t('settings.mealTypesHint')}</p>
+      <h3 class="settings-card__title settings-group__title">${t('settings.mealTypeNamesLabel')}</h3>
+      <div class="row-carrier settings-group meal-type-names" id="meal-type-names">
+        ${MEAL_TYPES.map((mealType) => settingRowHtml({
+          label: builtInMealTypeLabel(mealType),
+          labelFor: `meal-name-${mealType}`,
+          control: `<input class="form-input" type="text" id="meal-name-${mealType}"
                      data-meal-name="${mealType}" maxlength="${MAX_MEAL_TYPE_NAME}"
                      value="${esc(mealTypeNames[mealType] ?? '')}"
-                     placeholder="${esc(builtInMealTypeLabel(mealType))}">
-            </div>
-          `).join('')}
-        </div>
-        <p class="form-hint">${t('settings.kitchenExternalHint')}</p>
+                     placeholder="${esc(builtInMealTypeLabel(mealType))}">`,
+        })).join('')}
       </div>
+      <p class="form-hint settings-group__footer">${t('settings.mealTypeNamesHint')}</p>
+      <p class="form-hint settings-group__footer">${t('settings.kitchenExternalHint')}</p>
     </section>
 
     <section class="settings-section">

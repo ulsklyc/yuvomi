@@ -2190,27 +2190,9 @@
    Meal-Type-Toggles
    -------------------------------------------------------- */
 
-.meal-type-toggles {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-/* Die Haushaltsnamen der vier Slots (#1058) - zweiter Block derselben Karte,
-   weil "welche Slots" und "wie sie heissen" eine Einstellung sind.
-   Der Titel darueber braucht einen eigenen Abstand: `.settings-card__title`
-   traegt `margin: 0 0 space-3` und ist auf den ERSTEN Titel einer Karte
-   gerechnet. Als zweiter sass er sonst buendig auf der letzten Schalterzeile
-   (gemessen: 0px Luecke). */
-.meal-type-names {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.meal-type-toggles + .settings-card__title {
-  margin-top: var(--space-5);
-}
+/* Schalter und Namen der vier Slots (#1058) stehen seit R19 als gruppierte
+   Zeilen (`.settings-group`, oben) - die eigenen Abstaende der frueheren
+   Karte sind entfallen. */
 
 /* Die Schalterzeile `.toggle-row` stand hier und ist 2026-08-28 nach
    layout.css gezogen. GRUND, gemessen: `settings.css` wird nur auf der

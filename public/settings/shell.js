@@ -964,7 +964,13 @@ async function renderLeafContent(content, leaf, domain, user, query) {
   }
 
   const sections = settingsSheetSections(leaf, user);
-  const scoped = Boolean(leaf.module);
+  // REICHWEITEN-UEBERSCHRIFTEN NUR, WO ES ZWEI REICHWEITEN GIBT (R19,
+  // Critique 2026-10-16: "gestapelte Ueberschriften"). Ein Modulblatt mit nur
+  // EINER Reichweite trug sie trotzdem - "Fuer den Haushalt" ueber
+  // "Essensplan" ueber "Sichtbare Mahlzeiten": drei Koepfe, von denen der
+  // oberste nichts unterschied. Ob ein Blatt ganz dem Haushalt gehoert, sagt
+  // dort schon die Statuszeile darueber.
+  const scoped = Boolean(leaf.module) && new Set(sections.map((section) => section.scope)).size > 1;
   const status = createModuleStatus(leaf, user);
   if (status) leafContainer.appendChild(status);
   // Sprungmarken (R16): nur in Blaettern mit mehr als drei Abschnitten.
