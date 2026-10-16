@@ -831,8 +831,10 @@ app.use(createErrorHandler(log));
 const SYNC_INTERVAL_MS = (parseInt(process.env.SYNC_INTERVAL_MINUTES, 10) || 15) * 60_000;
 
 async function runSync() {
-  const { connected: googleConnected } = googleCalendar.getStatus();
-  if (googleConnected) {
+  // Ein abgelehntes Token (#2019) steht auf der Karte; jeder Takt schriebe
+  // sonst denselben Fehler ins Log, ohne dass ein Lauf etwas ändern könnte.
+  const { connected: googleConnected, needsReauth: googleNeedsReauth } = googleCalendar.getStatus();
+  if (googleConnected && !googleNeedsReauth) {
     googleCalendar.sync().catch((e) => logSync.error('Google error:', e.message));
   }
 

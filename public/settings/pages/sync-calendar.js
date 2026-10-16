@@ -782,7 +782,12 @@ function buildGoogleProvider(googleStatus, user) {
 
   const status = document.createElement('p');
   status.className = 'settings-sync-info__status';
-  status.textContent = providerConnectionStatus(googleStatus);
+  // Google hat das Token abgelehnt (#2019): derselbe Text wie bei Outlook statt
+  // "Verbunden", denn ohne neues OAuth synchronisiert hier nichts mehr.
+  const reauth = Boolean(googleStatus?.connected && googleStatus.needsReauth);
+  status.textContent = reauth
+    ? t('settings.outlookReauthRequired')
+    : providerConnectionStatus(googleStatus);
   section.appendChild(status);
   appendSyncError(status, googleStatus?.lastError);
 
@@ -805,14 +810,27 @@ function buildGoogleProvider(googleStatus, user) {
     return section;
   }
 
-  if (googleStatus.connected && user?.role === 'admin') {
+  // Auswahl und Schreibschutz brauchen ein gültiges Token - bis zum neuen
+  // Verbinden bleiben sie weg, statt mit einem Fehler zu laden.
+  if (googleStatus.connected && !reauth && user?.role === 'admin') {
     section.appendChild(buildGoogleCalendarPicker());
     section.appendChild(buildGoogleReadonlyToggle(googleStatus));
   }
 
   const actions = document.createElement('div');
   actions.className = 'settings-sync-actions';
-  if (googleStatus.connected) {
+  if (googleStatus.connected && reauth) {
+    if (user?.role === 'admin') {
+      const reconnect = document.createElement('a');
+      reconnect.href = '/api/v1/calendar/google/auth';
+      reconnect.className = 'btn btn--primary';
+      reconnect.textContent = t('settings.outlookReconnect');
+      actions.appendChild(reconnect);
+      actions.appendChild(buildGoogleDisconnectButton(googleStatus));
+    } else {
+      section.appendChild(buildProviderHint(t('settings.googleOnlyAdmin')));
+    }
+  } else if (googleStatus.connected) {
     const syncBtn = document.createElement('button');
     syncBtn.type = 'button';
     syncBtn.className = 'btn btn--secondary';
@@ -833,31 +851,7 @@ function buildGoogleProvider(googleStatus, user) {
     actions.appendChild(syncBtn);
 
     if (user?.role === 'admin') {
-      const disconnectBtn = document.createElement('button');
-      disconnectBtn.type = 'button';
-      disconnectBtn.className = 'btn btn--danger-outline';
-      disconnectBtn.textContent = t('settings.disconnect');
-      disconnectBtn.addEventListener('click', async () => {
-        if (!await confirmModal(t('settings.googleDisconnectConfirm'),
-          { danger: true, detail: t('settings.googleDisconnectConfirmDetail') })) return;
-        const deleteEvents = await askDeleteMirrored(googleStatus.mirroredEvents);
-        try {
-          // Die Zahl statt der blossen Trennmeldung, wenn geraeumt wurde: sonst
-          // bliebe der zweite Teil der Aktion unbestaetigt (#820). Wie bei CalDAV.
-          const res = await api.delete(`/calendar/google/disconnect?deleteEvents=${deleteEvents ? 'true' : 'false'}`);
-          const removed = res?.removed ?? 0;
-          showToast(
-            removed
-              ? t('settings.syncCleanup.removed', { count: removed })
-              : t('settings.disconnectedToast', { provider: 'Google Calendar' }),
-            'default',
-          );
-          window.yuvomi?.navigate(SYNC_CALENDAR_HREF);
-        } catch (err) {
-          showToast(err.message || t('common.errorGeneric'), 'danger');
-        }
-      });
-      actions.appendChild(disconnectBtn);
+      actions.appendChild(buildGoogleDisconnectButton(googleStatus));
     }
   } else if (user?.role === 'admin') {
     const connect = document.createElement('a');
@@ -872,6 +866,35 @@ function buildGoogleProvider(googleStatus, user) {
   if (cleanup) section.appendChild(cleanup);
 
   return section;
+}
+
+/** Trennen-Knopf der Google-Karte: im verbundenen wie im abgelehnten Zustand. */
+function buildGoogleDisconnectButton(googleStatus) {
+  const disconnectBtn = document.createElement('button');
+  disconnectBtn.type = 'button';
+  disconnectBtn.className = 'btn btn--danger-outline';
+  disconnectBtn.textContent = t('settings.disconnect');
+  disconnectBtn.addEventListener('click', async () => {
+    if (!await confirmModal(t('settings.googleDisconnectConfirm'),
+      { danger: true, detail: t('settings.googleDisconnectConfirmDetail') })) return;
+    const deleteEvents = await askDeleteMirrored(googleStatus.mirroredEvents);
+    try {
+      // Die Zahl statt der blossen Trennmeldung, wenn geraeumt wurde: sonst
+      // bliebe der zweite Teil der Aktion unbestaetigt (#820). Wie bei CalDAV.
+      const res = await api.delete(`/calendar/google/disconnect?deleteEvents=${deleteEvents ? 'true' : 'false'}`);
+      const removed = res?.removed ?? 0;
+      showToast(
+        removed
+          ? t('settings.syncCleanup.removed', { count: removed })
+          : t('settings.disconnectedToast', { provider: 'Google Calendar' }),
+        'default',
+      );
+      window.yuvomi?.navigate(SYNC_CALENDAR_HREF);
+    } catch (err) {
+      showToast(err.message || t('common.errorGeneric'), 'danger');
+    }
+  });
+  return disconnectBtn;
 }
 
 /**

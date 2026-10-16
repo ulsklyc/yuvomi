@@ -2032,3 +2032,92 @@ test('#1932: eine Bearbeitung ausserhalb der gespiegelten Felder merkt nichts vo
   assert.equal(row.assigned_to, 1, 'die Bearbeitung ist angekommen');
   assert.equal(row.outbound_dirty, 0, 'die Zuweisung geht nicht zu Google, also ist nichts nachzusenden');
 });
+
+// ── #2019: ein von Google abgelehntes oder rotiertes Refresh-Token ─────────────
+// Gefahren über den ECHTEN OAuth2-Client aus loadAuthorizedClient(); ersetzt ist
+// nur sein Transport zum Token-Endpunkt. So laufen Refresh, 'tokens'-Ereignis
+// und Fehler genau wie in der Produktion, ohne Netz.
+const { google } = await import('googleapis');
+const { getStatus } = await import('../server/services/google-calendar.js');
+const { queueDeletion } = await import('../server/services/calendar-outbound.js');
+
+const OAUTH_ENV = {
+  GOOGLE_CLIENT_ID: 'test-client', GOOGLE_CLIENT_SECRET: 'test-client-secret',
+  GOOGLE_REDIRECT_URI: 'http://localhost/api/v1/calendar/google/callback',
+};
+
+/** Der echte Client mit abgelaufenem Access-Token; `answer` ersetzt den Token-Endpunkt. */
+function realClient(answer) {
+  const saved = Object.fromEntries(Object.keys(OAUTH_ENV).map((k) => [k, process.env[k]]));
+  Object.assign(process.env, OAUTH_ENV);
+  try {
+    db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('google_token_expiry', '1')").run();
+    const client = __test.loadAuthorizedClient();
+    client.tokenRequests = 0;
+    client.transporter.request = async (opts) => { client.tokenRequests++; return answer(opts); };
+    return client;
+  } finally {
+    // Die Suite verlässt sich darauf, dass die Routen ohne Credentials keinen Client bauen.
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  }
+}
+
+function cfg(key) {
+  return db.prepare('SELECT value FROM sync_config WHERE key = ?').get(key)?.value ?? null;
+}
+
+test('#2019: invalid_grant meldet "neu verbinden", verbraucht keine Vormerkung und pausiert den Sync', async () => {
+  reset();
+  __test.setCalendarEnabled('primary', true, { name: 'Primary' });
+  queueDeletion({ source: 'google', calendarExternalId: 'primary', eventExternalId: 'gev-2019' });
+  assert.equal(tombstones().length, 1);
+
+  const client = realClient(() => {
+    // So meldet gaxios die Ablehnung am Token-Endpunkt.
+    const err = new Error('invalid_grant');
+    err.response = { status: 400, config: {}, data: { error: 'invalid_grant', error_description: 'Token has been expired or revoked.' } };
+    throw err;
+  });
+  let built = 0;
+  const createCalendar = () => { built++; return google.calendar({ version: 'v3', auth: client }); };
+
+  await assert.rejects(sync({ createCalendar }), (err) => err.reauthRequired === true);
+
+  const status = getStatus();
+  assert.equal(status.connected, true, 'die Tokens stehen noch');
+  assert.equal(status.needsReauth, true, 'die Karte sagt "neu verbinden" statt verbunden');
+  assert.match(status.lastError, /Reconnect required/);
+  assert.equal(tombstones().length, 1,
+    'die Löschung wartet auf das neue Token - invalid_grant kommt als 400 und darf sie nicht verwerfen');
+
+  // Weitere Läufe greifen nicht mehr zu: kein Client, keine Anfrage an Google.
+  const requestsBefore = client.tokenRequests;
+  queueDeletion({ source: 'google', calendarExternalId: 'primary', eventExternalId: 'gev-2019-b' });
+  await assert.rejects(sync({ createCalendar }), (err) => err.reauthRequired === true);
+  assert.deepEqual(await flushOutbound({ createCalendar }), { deleted: 0, updated: 0 });
+  assert.equal(built, 1, 'nach der Ablehnung baut weder Sync noch Sofortversuch einen Client');
+  assert.equal(client.tokenRequests, requestsBefore);
+  assert.equal(tombstones().length, 2);
+
+  disconnect();
+  assert.equal(cfg('google_needs_reauth'), null, 'Trennen nimmt den Zustand mit');
+});
+
+test('#2019: ein von Google rotiertes Refresh-Token ersetzt das gespeicherte', async () => {
+  reset();
+  const client = realClient(() => ({
+    data: { access_token: 'a-new', refresh_token: 'r-rotated', expires_in: 3600 },
+  }));
+  await client.getAccessToken();
+  assert.equal(client.tokenRequests, 1, 'der Refresh lief über den Token-Endpunkt');
+  assert.equal(cfg('google_access_token'), 'a-new');
+  assert.equal(cfg('google_refresh_token'), 'r-rotated');
+
+  // Ohne refresh_token in der Antwort bleibt das gespeicherte stehen.
+  const plain = realClient(() => ({ data: { access_token: 'a-third', expires_in: 3600 } }));
+  await plain.getAccessToken();
+  assert.equal(cfg('google_access_token'), 'a-third');
+  assert.equal(cfg('google_refresh_token'), 'r-rotated');
+});

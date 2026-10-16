@@ -22,6 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Google Calendar: a connection Google no longer accepts asks to reconnect** (#2019). When
+  Google refused the stored sign-in, for example after the seven days a project in the publishing
+  status Testing allows, Settings still showed Google as connected while nothing synced, and
+  deletions waiting for Google could be dropped. The card now says the sign-in has expired and
+  offers **Reconnect**, syncing pauses until then, and pending changes stay queued. A new sign-in
+  token that Google hands out during a refresh is now kept as well.
+
 - **Documents: leaving and coming back no longer leaves stale data on the page** (#2005). An
   answer that arrived only after you had left Documents and opened it again could overwrite the
   members, the DMS accounts or the admin state the new page had just loaded, and the next dialog

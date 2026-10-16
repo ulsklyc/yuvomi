@@ -12,6 +12,8 @@
  *   google_calendar_id    - ID des zu synchronisierenden Kalenders (Default: 'primary')
  *   google_last_error     - Fehlermeldung des letzten Laufs, fehlt nach einem sauberen (#820)
  *   google_last_error_at  - ISO-8601-Timestamp dieses Fehlers
+ *   google_needs_reauth   - '1', wenn Google das Refresh-Token abgelehnt hat
+ *                           (invalid_grant); fällt erst mit einem neuen OAuth (#2019)
  */
 
 import { createLogger } from '../logger.js';
@@ -111,6 +113,58 @@ function isWritableRole(role) {
 /** Ist überhaupt ein Google-Konto verbunden? (Refresh-Token = dauerhafte Verbindung) */
 function isConnected() {
   return !!cfgGet('google_refresh_token');
+}
+
+// --------------------------------------------------------
+// Abgelehntes Refresh-Token (#2019)
+// Dasselbe Muster wie needs_reauth bei Outlook: Google hat das Token verworfen
+// (abgelaufen im Status "Testing", widerrufen, Passwortwechsel), und kein
+// weiterer Lauf ändert daran etwas. Die Karte sagt "neu verbinden", statt
+// verbunden auszusehen, und der Sync fasst Google bis zum neuen OAuth nicht an.
+// --------------------------------------------------------
+
+class GoogleReauthRequiredError extends Error {
+  constructor(detail = 'invalid_grant') {
+    super(`Reconnect required: ${detail}`);
+    this.name = 'GoogleReauthRequiredError';
+    this.reauthRequired = true;
+  }
+}
+
+/** Hat Google das Refresh-Token abgelehnt? gaxios meldet es als `invalid_grant`. */
+function isInvalidGrant(err) {
+  return err?.response?.data?.error === 'invalid_grant' || err?.message === 'invalid_grant';
+}
+
+function needsReauth() {
+  return cfgGet('google_needs_reauth') === '1';
+}
+
+/**
+ * Führt einen Google-Zugriff aus und hält ein abgelehntes Token fest. Der
+ * Fehler geht als GoogleReauthRequiredError weiter, damit der Lauf ihn als
+ * letzten Fehler verbucht.
+ */
+async function withReauthGuard(run) {
+  try {
+    return await run();
+  } catch (err) {
+    if (!isInvalidGrant(err)) throw err;
+    cfgSet('google_needs_reauth', '1');
+    log.warn('Google refused the refresh token (invalid_grant). Sync paused until the account is reconnected.');
+    throw new GoogleReauthRequiredError(err?.response?.data?.error_description || 'invalid_grant');
+  }
+}
+
+/**
+ * Holt das Access-Token VOR dem ersten API-Aufruf. Sonst träfe ein abgelehntes
+ * Token zuerst die vorgemerkten Löschungen und Änderungen: invalid_grant kommt
+ * als 400, und 400 gilt dort als endgültig abgelehnt - die Vormerkung fiele.
+ * Eine Attrappe ohne Auth-Client (Suiten) bleibt unberührt.
+ */
+async function ensureAccessToken(calendar) {
+  const auth = calendar?.context?._options?.auth;
+  if (typeof auth?.getAccessToken === 'function') await auth.getAccessToken();
 }
 
 // --------------------------------------------------------
@@ -383,13 +437,18 @@ async function flushOutbound({ createCalendar = authorizedCalendar } = {}) {
 
 async function runFlushOutbound(createCalendar) {
   const idle = { deleted: 0, updated: 0 };
-  if (!isConnected() || isReadonly()) return idle;
+  if (!isConnected() || isReadonly() || needsReauth()) return idle;
 
   const hasDeletions = pendingDeletionCount() > 0;
   const hasUpdates   = pendingUpdateCount() > 0;
   if (!hasDeletions && !hasUpdates) return idle;
 
+  return withReauthGuard(() => runFlushWith(createCalendar, hasDeletions, hasUpdates));
+}
+
+async function runFlushWith(createCalendar, hasDeletions, hasUpdates) {
   const calendar = createCalendar();
+  await ensureAccessToken(calendar);
   const deleted = hasDeletions ? await processPendingDeletions(calendar) : 0;
   const updated = hasUpdates
     ? await processPendingUpdates(calendar, await fetchEventColorMap(calendar), new Map())
@@ -474,6 +533,10 @@ function getSyncToken(calendarId) {
  * @returns {Promise<Array<{id,summary,primary,backgroundColor,enabled,accessRole,writable}>>}
  */
 async function listCalendars() {
+  return withReauthGuard(listCalendarsWith);
+}
+
+async function listCalendarsWith() {
   const client   = loadAuthorizedClient();
   const calendar = google.calendar({ version: 'v3', auth: client });
   const enabledSet = new Set(enabledCalendarIds());
@@ -525,10 +588,13 @@ function loadAuthorizedClient() {
     expiry_date:   cfgGet('google_token_expiry') ? parseInt(cfgGet('google_token_expiry'), 10) : undefined,
   });
 
-  // Token-Refresh automatisch speichern
+  // Token-Refresh automatisch speichern. Liefert Google beim Refresh ein neues
+  // Refresh-Token mit, ersetzt es das alte: das alte kann Google danach
+  // verwerfen, und der nächste Start schickte ein totes Token (#2019).
   client.on('tokens', (tokens) => {
-    if (tokens.access_token) cfgSet('google_access_token', tokens.access_token);
-    if (tokens.expiry_date)  cfgSet('google_token_expiry', String(tokens.expiry_date));
+    if (tokens.access_token)  cfgSet('google_access_token', tokens.access_token);
+    if (tokens.refresh_token) cfgSet('google_refresh_token', tokens.refresh_token);
+    if (tokens.expiry_date)   cfgSet('google_token_expiry', String(tokens.expiry_date));
   });
 
   return client;
@@ -585,6 +651,8 @@ async function handleCallback(code) {
   cfgSet('google_access_token',  tokens.access_token);
   cfgSet('google_refresh_token', tokens.refresh_token);
   if (tokens.expiry_date) cfgSet('google_token_expiry', String(tokens.expiry_date));
+  // Das neue Token gilt wieder: der Sync darf Google erneut ansprechen (#2019).
+  cfgDel('google_needs_reauth');
 
   log.info('OAuth successful - tokens saved.');
 }
@@ -601,6 +669,8 @@ function getStatus() {
     configured,
     connected,
     lastSync,
+    // Tokens stehen noch, aber Google nimmt sie nicht mehr an (#2019).
+    needsReauth: connected && needsReauth(),
     selectedCount: enabledCalendarIds().length,
     readonly: isReadonly(),
     // Reist mit dem Status, damit die Rückfrage vor dem Löschen die Zahl sofort
@@ -635,7 +705,7 @@ function disconnect({ deleteEvents = false } = {}) {
   return db.get().transaction(() => {
     const removed = deleteEvents ? clearMirroredEvents() : 0;
     ['google_access_token', 'google_refresh_token', 'google_token_expiry',
-     'google_last_sync', 'google_readonly',
+     'google_last_sync', 'google_readonly', 'google_needs_reauth',
      // Der Fehlerstand gehoert zur Verbindung: bliebe er stehen, meldete die
      // Karte nach dem Trennen einen Ausfall, den es nicht mehr gibt (#820).
      'google_last_error', 'google_last_error_at'].forEach(cfgDel);
@@ -659,12 +729,20 @@ function disconnect({ deleteEvents = false } = {}) {
  * Werfen bei fehlendem Token, das ohne Verbindung der wahrscheinlichste Fall ist.
  */
 async function sync({ createCalendar = authorizedCalendar } = {}) {
-  return runSerialized('google', 'sync',
-    () => withSyncOutcome(db.get(), 'google', () => runSync(createCalendar)));
+  // Abgelehntes Token: kein Zugriff, kein neuer Fehlereintrag. Der bleibt vom
+  // Lauf stehen, der die Ablehnung bemerkt hat, und die Karte sagt
+  // "neu verbinden". Der Scheduler ruft gar nicht erst (#2019). Geprüft wird
+  // in der Sperre: ein Lauf, der davor wartete, kann die Ablehnung gerade
+  // festgehalten haben.
+  return runSerialized('google', 'sync', async () => {
+    if (needsReauth()) throw new GoogleReauthRequiredError();
+    return withSyncOutcome(db.get(), 'google', () => withReauthGuard(() => runSync(createCalendar)));
+  });
 }
 
 async function runSync(createCalendar) {
   const calendar = createCalendar();
+  await ensureAccessToken(calendar);
 
   // Event-Farbpalette (colorId → Hex) einmalig für den ganzen Sync laden.
   const eventColorMap = await fetchEventColorMap(calendar);
@@ -1407,6 +1485,7 @@ export const __test = {
   upsertGoogleEvents, upsertExternalCalendar, setReadonly, isReadonly, isWritableRole,
   listSelection, setCalendarEnabled, recordSyncToken, getSyncToken, enabledCalendarIds,
   fetchEventColorMap, householdTimeZone, outboundTimeZone,
+  loadAuthorizedClient, isInvalidGrant,
   processPendingDeletions, pendingDeletionCount,
   processPendingUpdates, pendingUpdateCount,
   googleCalendarIdForEvent, currentGoogleCalendarId, loadCalendarMeta,

@@ -954,7 +954,9 @@ account's Google calendar list. If Google returns no refresh token when connecti
 fails: remove Yuvomi's access in the settings of that Google account and connect again. And while
 the consent screen is in the publishing status Testing, Google lets the authorization, refresh
 token included, expire seven days after consent, so Yuvomi has to be connected again every week.
-Google documents this expiry for the Testing status only
+Once Google refuses the token, the Google card under Settings shows "Sign-in expired - please
+reconnect" with a **Reconnect** button, and syncing pauses until you connect again; a redeploy
+does not cause this, the token lives in the database. Google documents this expiry for the Testing status only
 ([Manage App Audience](https://support.google.com/cloud/answer/15549945)); a project switched to
 "In production" may show Google's unverified-app warning when connecting.
 
