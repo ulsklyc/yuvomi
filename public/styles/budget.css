@@ -190,9 +190,18 @@
     line-height: var(--line-height-tight);
     text-wrap: balance;
   }
+}
 
+/* Bis 1023px (R19, Tablet): Titel und Zeitraum teilen die Zeile auch bei
+ * 834px (layout.css `--period-inline`), die Notiz der Reiter ohne Zeitraum
+ * steht am Zeilenende. Vorher mass der Kopf dort 170-174px in drei Zeilen. */
+@media (max-width: 1023px) {
   .page-toolbar.page-toolbar--period-inline.page-toolbar--wrap:not(.page-toolbar--in-group) > .budget-nav__month:has(.budget-nav__note:not([hidden])) {
     flex: 1 1 0;
+  }
+
+  .page-toolbar.page-toolbar--period-inline:not(.page-toolbar--in-group):has(.budget-nav__note:not([hidden])) > .page-toolbar__title {
+    flex: 0 1 auto;
   }
 
   .page-toolbar--period-inline .budget-nav__note:not([hidden]) {
@@ -204,8 +213,13 @@
     line-height: var(--line-height-tight);
   }
 
-  .page-toolbar.page-toolbar--period-inline:not(.page-toolbar--in-group):has(.budget-nav__note:not([hidden])) > .page-toolbar__title {
-    flex: 0 1 auto;
+  /* EINGEKLAPPT (R19): die Reiter teilen die Zeile mit dem Stepper. Eine
+   * Notiz statt Stepper ist eine Bildunterschrift - sie weicht, und die
+   * Leiste nimmt die ganze Zeile. Ebenso die Wippe "Mein Budget / Haushalt":
+   * oben kommt beides wieder. */
+  .page-toolbar.budget-nav.page-toolbar--capped.is-collapsed > .budget-nav__month:has(.budget-nav__note:not([hidden])),
+  .page-toolbar.budget-nav.page-toolbar--capped.is-collapsed > .budget-scope {
+    display: none;
   }
 }
 

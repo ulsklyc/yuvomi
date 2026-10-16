@@ -402,7 +402,7 @@ function renderShell(container) {
   // Liste auf dem Lesemass, daneben Kennzahlen bzw. das Protokoll.
   container.insertAdjacentHTML('beforeend', `
     <section class="housekeeping-page app-page app-page--dashboard app-page--columns" data-composition="dashboard" aria-labelledby="housekeeping-title">
-      <header class="page-toolbar page-toolbar--narrow housekeeping-toolbar">
+      <header class="page-toolbar page-toolbar--narrow page-toolbar--tabs-title housekeeping-toolbar">
         <h1 class="page-toolbar__title" id="housekeeping-title">${esc(t('housekeeping.title'))}</h1>
         <div class="page-toolbar__actions"></div>
         <nav class="housekeeping-tabs page-toolbar__bar" role="tablist" aria-label="${esc(t('housekeeping.bottomNav'))}">

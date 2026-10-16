@@ -395,8 +395,11 @@ test('R16: Werkzeuge in der Titelzeile - nur markiert, nur mobil, nie neben eine
   assert.ok(own.length >= 1, 'die Regel fehlt in layout.css');
   for (const r of own) {
     assert.equal(r.file, 'layout.css', `${r.file}: die Variante gehoert der Shell (${r.selector})`);
-    assert.ok(r.at.some((a) => /max-width:\s*767px/.test(a)),
-      `${r.selector}: nur unter 768px - ab dort hat die Titelzeile Feld und angedockte Pille`);
+    // Bis 1023px (R19): auch das Tablet (834px) traegt die Werkzeuge in der
+    // Titelzeile - vorher 118px Kopf in zwei Zeilen, jetzt 69px. Ab 1024px hat
+    // die Titelzeile Feld und angedockte Pille.
+    assert.ok(r.at.some((a) => /max-width:\s*1023px/.test(a)),
+      `${r.selector}: nur unter 1024px - ab dort hat die Titelzeile Feld und angedockte Pille`);
   }
   const title = own.find((r) => r.selector.endsWith(':not(.page-toolbar--in-group) > .page-toolbar__title')
     && /flex:\s*1 1 0/.test(r.body));
@@ -596,4 +599,26 @@ test('R19: die Kapsel minimiert beim Abwaertsscrollen - flacher, ohne Labels, Zi
   assert.match(router, /navMinimizer = watchNavMinimize\(nav\)/, 'der Router verdrahtet die Minimierung an der Kapsel');
   assert.match(router, /function updateNav\(rawPath\) \{\n[^\n]*\n\s*navMinimizer\?\.expand\(\);/,
     'jeder Seitenwechsel beginnt mit ausgefahrener Kapsel');
+});
+
+// R19 (Critique 2026-10-16 P2 mobil): DIE TAB-LEISTE IST DIE TITELZEILE.
+// Schichtplan, Belohnungen und Haushaltshilfe massen 121/121/129px bei 390px
+// (Large Title ueber den Reitern), jetzt 65px; bei 834px 118-130 -> 69px.
+const TABS_TITLE_MODULES = ['pages/housekeeping.js', 'pages/rewards.js', 'pages/schedule.js'];
+test('R19: Schichtplan, Belohnungen und Haushaltshilfe fuehren ihre Reiter in der Titelzeile', () => {
+  for (const f of TABS_TITLE_MODULES) {
+    assert.match(read(`../public/${f}`), /<header class="page-toolbar [^"]*\bpage-toolbar--tabs-title\b/, `${f}: der Kopf traegt die Variante`);
+  }
+  const own = rules(layoutCss).filter((r) => r.selector.includes('.page-toolbar--tabs-title'));
+  const at = (r, px) => r.at.some((a) => new RegExp(`max-width:\\s*${px}px`).test(a));
+  const bar = own.find((r) => at(r, 1023) && r.selector.endsWith('> .page-toolbar__bar'));
+  assert.equal(bar && decl(bar.body, 'flex'), '1 1 0', 'die Leiste nimmt den Rest der Titelzeile und scrollt dort');
+  assert.equal(decl(bar.body, 'block-size'), 'auto', 'so hoch wie ihre Reiter, nicht wie eine eigene Leistenzeile');
+  assert.ok(own.every((r) => at(r, 1023) || at(r, 767)), 'nur unter 1024px - am Desktop bleibt die Bar-Zeile eine eigene Zeile');
+  const title = own.find((r) => at(r, 767) && r.selector.endsWith('> .page-toolbar__title'));
+  assert.equal(title && decl(title.body, 'clip-path'), 'inset(50%)', 'unter 768px weicht der Titel aus dem Bild ...');
+  assert.equal(decl(title.body, 'display'), null, '... nicht aus dem Baum: das <h1> bleibt die Seitenueberschrift');
+  assert.ok(own.some((r) => at(r, 767) && r.selector.endsWith('> .module-seal--head') && decl(r.body, 'display') === 'none'),
+    'das Siegel geht mit (die vier Reiter der Haushaltshilfe brauchen 351 von 358px)');
+  assert.ok(read('../DESIGN.md').includes('page-toolbar--tabs-title'), 'DESIGN.md nennt die Variante');
 });

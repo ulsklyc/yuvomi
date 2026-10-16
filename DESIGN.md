@@ -2697,6 +2697,10 @@ Kontakten und Vorrat (Port erst bei y179), und unter der Glas-Kapsel lief nie In
    Titelzeile: Lupe, Filter als Icon mit Zaehler (D2) und „...", die Ansicht Liste/Brett
    unter 768px als Einfachauswahl im Menue. Gemessen 390px: Kopf 120 -> 65px, erste
    Gruppe y 132 -> 78. Drei Icon-Knoepfe lassen „Aufgaben" bei 390px 166px.
+   **Seit R19 gilt 1a bis 1023px**, also auch auf dem Tablet: bei 834px stand die Suche als
+   Feld in einer eigenen Zeile unter dem Titel (Aufgaben, Kontakte, Inventar, Notizen,
+   Dokumente 118px). Jetzt teilen Titel (natuerliche Breite, Ellipse), Suchfeld und Werkzeuge
+   die Zeile: 118 -> 69px. Dasselbe gilt fuer `--period-inline` (Budget 174 -> 129px).
    NICHT Traeger sind Koepfe mit Stepper oder Tab-Leiste in Zeile 2
    (Budget, Kalender als eigene Variante) und die
    Kuechen-Koepfe: dort IST die Tab-Leiste die Titelzeile und laeuft bei 390px ohne Werkzeug
@@ -2825,6 +2829,16 @@ unter den Falz schob. Vier Antworten, je eine Bauart, gemessen bei 390x844:
 - **Kacheln werden mobil kompakte Karten.** Praemien: 358x218 -> rund 130px (Zeichen und Text
   nebeneinander, Preis und Aktion darunter). Ein Abschnittstitel, der den Reiter wiederholt,
   steht mobil nur im Baum.
+**Variante: die Reiter sind die Titelzeile (R19, Critique 2026-10-16 P2).** Schichtplan,
+Belohnungen und Haushaltshilfe trugen unter 1024px den Large Title ueber ihrer Reiterleiste:
+121/121/129px bei 390px, 118-130px bei 834px. `page-toolbar--tabs-title` stellt die Leiste in
+die Titelzeile, wie iOS ein Segment als Titel der Navigationsleiste fuehrt. Ab 768px stehen
+Large Title und Reiter nebeneinander (Titel gibt nach, Leiste scrollt mit Fade); unter 768px
+weicht der Titel samt Siegel aus dem Bild, nicht aus dem Baum - wie die Kuechen-Leiste seit R9:
+die vier Reiter der Haushaltshilfe brauchen 351 der 358px, mit Titel oder Siegel davor lief der
+vierte in den Fade („Hau..."). Den Ort sagen die Reiter, ihr Segment im Modulton und der
+Mehr-Tab in derselben Farbe. Gemessen: 65px (390) und 69px (834) auf jedem Reiter. Am Desktop
+bleibt die Bar-Zeile eine eigene Zeile. Guard: `test:mobile-chrome`.
 Was hier NICHT umgezogen ist und warum, steht in der Messmatrix der Umsetzung: Vorrat (die
 Kuechen-Leiste hat keine Titelzeile, die Werkzeugzeile faltet beim Scrollen), Rezepte
 (ebenso), Gesundheit-Startseite, Einstellungsblaetter, Budget/Statistik.
@@ -2865,10 +2879,14 @@ blieben 68). Ein AKTIVER Filter faltet nicht, seine Zahl bleibt (Regel 3), dann 
 Label; "Heute" ist nur ein Eintrag, wenn ein anderer Zeitraum offen ist. Nur unter 640px -
 darueber gibt es kein Menue, in das gefaltet wird. Die Reserve-Regel des Kopfs rechnet seither
 mit der ausgeklappten Hoehe (sonst pendelt eine Liste, deren Reserve zwischen Schwelle und
-Schwelle + 52px liegt). **Das Budget bleibt zweizeilig (117px in jedem Zustand):** Zeile 1
-traegt Titel und Monat ohne freien Platz, Zeile 2 sieben Reiter (550px in 358px, scrollend) -
-Reiter und Stepper passen nicht in eine Zeile, und eine Reiterleiste faltet nicht in ein Menue
-(Werkzeugzeilen-Regel). `test:mobile-chrome` haelt die Kalender-Regeln.
+Schwelle + 52px liegt). **Eingeklappt ist auch der Budgetkopf EINE Zeile (R19, Critique 2026-10-16 P2):** bis R19
+blieb er in jedem Zustand bei 117px, weil der Titel eingeklappt stehen blieb und Zeile 1 mit dem
+Stepper offen hielt. Jetzt verlaesst der Titel samt Siegel das Bild (nicht den Baum), die
+Reiter ruecken in die Zeile des Zeitraums und scrollen dort, der Stepper bleibt am Zeilenende
+stehen (er wandert nur hoch). Reiter ohne Zeitraum geben ihre Notiz ab, die Wippe „Mein Budget
+/ Haushalt" weicht ebenso; oben kommt beides wieder. Gemessen 390px 117 -> 65px, 834px 129 ->
+73px. Das ist keine gefaltete Reiterleiste im Menue (Werkzeugzeilen-Regel), die Leiste bleibt
+sichtbar. `test:mobile-chrome` haelt die Kalender-Regeln.
 
 Pruefebene: **Struktur** (`test:mobile-chrome` - Kapsel ausser Fluss, `--nav-tail` im
 Nachlauf, keine klebende Chipreihe, kein `sticky; bottom: 0`, Icon-Form im Wrapper, die

@@ -379,7 +379,9 @@ test('Belohnungen: eine Kante fuer alle Reiter - die Seite fuehrt das breite Mas
     .replace(/\/\*[\s\S]*?\*\//g, '');
   assert.match(page, /class="rewards-page app-page app-page--dashboard app-page--columns" data-composition="dashboard"/,
     'die Seitenwurzel fuehrt das breite Mass und ist der Container der Spalten');
-  assert.match(page, /<header class="page-toolbar page-toolbar--narrow rewards-toolbar">/,
+  // R19: dazu `page-toolbar--tabs-title` (die Reiter stehen unter 1024px in
+  // der Titelzeile) - die Kante haengt weiter an --narrow.
+  assert.match(page, /<header class="page-toolbar page-toolbar--narrow\b[^"]*\brewards-toolbar">/,
     '--narrow bleibt: der Kopf endet am Mass der Seite, in jedem Reiter am selben');
   assert.equal(rewardsPage.syncToolbarMeasure, undefined, 'kein Umschalter am Kopf mehr');
   assert.doesNotMatch(page, /rewards-toolbar--wide/, 'der Kopf-Modifier je Reiter ist weg');

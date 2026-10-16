@@ -4246,11 +4246,9 @@ html.fab-steady .page-fab {
  * - Kalender: die Regel allein sparte seit R17 Z1 NICHTS (117 -> 117px) - die
  *   Werkzeuge stehen dort in der Titelzeile und hielten sie offen. Erst
  *   calendar.css holt eingeklappt den Stepper in diese Zeile: 117 -> 65px.
- * - Budget: die Regel greift nicht mehr. Seit R16 teilt der Stepper die
- *   Titelzeile (`--period-inline`, unten), der Titel bleibt im Inline-Schnitt
- *   und der Kopf misst in jedem Zustand 117px - Zeile 1 traegt Titel und
- *   Monat (0px frei), Zeile 2 die sieben Reiter (550px in 358px, scrollend).
- *   Reiter und Stepper passen nicht in eine Zeile; der Kopf bleibt zweizeilig. */
+ * - Budget: seit R19 greift sie wieder. Der Stepper teilt die Titelzeile
+ *   (`--period-inline`, unten); eingeklappt geht der Titel, und die Reiter
+ *   ruecken in die Zeile des Zeitraums: 117 -> 65px (390px). */
 @media (max-width: 1023px) {
   .page-toolbar--period.page-toolbar--capped.is-collapsed > .page-toolbar__title {
     position: absolute;
@@ -4354,10 +4352,10 @@ html.fab-steady .page-fab {
  * steht, sagt der Wert im Modulton (`.period-stepper__value--away`). Kein
  * Pfeil bewegt sich, und der Titel bleibt stehen.
  *
- * EINGEKLAPPT BLEIBT DER TITEL STEHEN: er teilt die Zeile mit dem Stepper,
- * sein Verschwinden sparte keine Hoehe mehr. Er faellt nur auf den
- * Inline-Schnitt (typography.css). */
-@media (max-width: 767px) {
+ * EINGEKLAPPT GEHT DER TITEL (R19, bis dahin blieb er stehen und hielt Zeile 1
+ * offen): die Reiter ruecken in die Zeile des Zeitraums - Regel am Ende dieses
+ * Blocks. Bis 1023px, seit R19 auch auf dem Tablet (834px: 174 -> 129px). */
+@media (max-width: 1023px) {
   .page-toolbar.page-toolbar--period-inline:not(.page-toolbar--in-group) > .page-toolbar__title {
     flex: 1 1 0;
     min-width: 0;
@@ -4403,17 +4401,23 @@ html.fab-steady .page-fab {
     color: var(--module-accent);
   }
 
-  .page-toolbar.page-toolbar--period-inline.page-toolbar--capped.is-collapsed > .page-toolbar__title {
-    position: static;
-    width: auto;
-    height: auto;
-    clip-path: none;
+  /* EINGEKLAPPT IST DER KOPF EINE ZEILE (R19, Critique 2026-10-16 P2): die
+   * Reiter ruecken in die Zeile des Zeitraums, der Titel verlaesst das Bild
+   * (nicht den Baum; die Regel `--period ... is-collapsed` oben), das Siegel
+   * geht mit. Der Stepper bleibt am Zeilenende stehen, wo er ausgeklappt
+   * stand - er wandert nur hoch -, und die Leiste nimmt den Rest und scrollt
+   * (der aktive Reiter bleibt im Bild, wireTablist). Bis R19 blieb der Titel
+   * stehen und der Kopf mass in jedem Zustand 117px (390px): Zeile 1 Titel +
+   * Monat, Zeile 2 die sieben Reiter. Reiter ohne Zeitraum geben ihre Notiz
+   * dafuer ab (budget.css). */
+  .page-toolbar.page-toolbar--period-inline.page-toolbar--capped.is-collapsed > .page-toolbar__bar {
+    flex: 1 1 0;
+    order: 2;
   }
 
-  .page-toolbar.page-toolbar--period-inline.page-toolbar--capped.is-collapsed > .module-seal--head {
-    display: inline-flex;
+  .page-toolbar.page-toolbar--period-inline.page-toolbar--capped.is-collapsed > .page-toolbar__center {
+    order: 3;
   }
-
 }
 
 /* EINE TITELLAGE IN JEDEM MODUL (D8, Critique 2026-10-16). Unter 768px ist
@@ -4455,7 +4459,7 @@ html.fab-steady .page-fab {
  * Die Klasse ist markiert, nicht geraten, und `test:mobile-chrome` laesst sie
  * nur in einem Kopf durch, der keine Bar-Zeile, keine Tab-Leiste und kein
  * Segment traegt. */
-@media (max-width: 767px) {
+@media (max-width: 1023px) {
   .page-toolbar.page-toolbar--title-tools:not(.page-toolbar--in-group) > .page-toolbar__title {
     flex: 1 1 0;
     min-width: 0;
@@ -4489,6 +4493,62 @@ html.fab-steady .page-fab {
 
   .page-toolbar.page-toolbar--title-tools:not(.page-toolbar--in-group) > .page-toolbar__actions {
     flex: 0 0 auto;
+  }
+}
+
+/* DIE TAB-LEISTE IST DIE TITELZEILE (R19, Critique 2026-10-16 P2 mobil).
+ *
+ * Schichtplan, Belohnungen und Haushaltshilfe trugen unter 1024px zwei
+ * Kopfzeilen: den Large Title und darunter ihre Reiter - 121/121/129px bei
+ * 390px, 118-130px bei 834px, waehrend elf Module mit 65px auskommen.
+ * `--tabs-title` stellt die Leiste in die Titelzeile, wie iOS ein Segment als
+ * Titel der Navigationsleiste fuehrt:
+ * - ab 768px stehen Large Title und Reiter nebeneinander; der Titel gibt nach
+ *   (Ellipse), die Leiste scrollt, wenn sie nicht passt (Werkzeugzeilen-Regel 2);
+ * - unter 768px weicht der Titel samt Siegel aus dem Bild, nicht aus dem Baum
+ *   (das <h1> bleibt die Seitenueberschrift) - dasselbe, was die Kuechen-Leiste
+ *   seit R9 tut. Die vier Reiter der Haushaltshilfe brauchen 351 der 358px;
+ *   mit Titel oder Siegel davor liefe der vierte in den Fade ("Hau...").
+ *   Wo man ist, sagen die Reiter selbst, ihr Segment im Modulton und der
+ *   Mehr-Tab der Kapsel in derselben Farbe.
+ * Der Kopf ist damit einzeilig: keine Lead-Zone, nichts dockt, die Linie steht
+ * durchgehend (wie `--title-tools`). Am Desktop (ab 1024px) bleibt die
+ * Bar-Zeile eine eigene Zeile unter dem Inline-Titel - dort traegt die
+ * Titelzeile die angedockte Kopf-Pille. */
+@media (max-width: 1023px) {
+  .page-toolbar.page-toolbar--tabs-title:not(.page-toolbar--in-group) > .page-toolbar__title {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Die Leiste ist so hoch wie ihre Reiter: die feste Leistenhoehe der
+   * eigenen Zeile (--sub-tabs-height, Haushaltshilfe) haette die Titelzeile
+   * um 8px gestreckt. */
+  .page-toolbar.page-toolbar--tabs-title:not(.page-toolbar--in-group) > .page-toolbar__bar {
+    flex: 1 1 0;
+    block-size: auto;
+  }
+
+  .page-toolbar.page-toolbar--tabs-title:not(.page-toolbar--in-group) > .page-toolbar__actions:empty {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .page-toolbar.page-toolbar--tabs-title:not(.page-toolbar--in-group) > .page-toolbar__title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    min-block-size: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .page-toolbar.page-toolbar--tabs-title:not(.page-toolbar--in-group) > .module-seal--head {
+    display: none;
   }
 }
 

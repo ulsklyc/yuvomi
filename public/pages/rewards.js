@@ -301,7 +301,7 @@ function renderShell(container) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <div class="rewards-page app-page app-page--dashboard app-page--columns" data-composition="dashboard">
-      <header class="page-toolbar page-toolbar--narrow rewards-toolbar">
+      <header class="page-toolbar page-toolbar--narrow page-toolbar--tabs-title rewards-toolbar">
         <h1 class="page-toolbar__title" id="rewards-title">${esc(t('rewards.title'))}</h1>
         <div class="page-toolbar__actions"></div>
         <nav class="rewards-tabs page-toolbar__bar" role="tablist" aria-label="${esc(t('rewards.title'))}">

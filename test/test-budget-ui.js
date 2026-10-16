@@ -4659,7 +4659,9 @@ test('#1668: der Dialog nennt beim Pruefen am Feld, wie viele Raten das Darlehen
 test('R16: der Budgetkopf fuehrt den Zeitraum mobil in der Titelzeile', () => {
   assert.match(budget, /<div class="page-toolbar[^"]*\bpage-toolbar--period-inline\b[^"]*\bbudget-nav\b[^"]*">/,
     'der Budgetkopf traegt `page-toolbar--period-inline`');
-  const mobile = [...eachRule(layoutCss)].filter((r) => r.at.some((a) => /max-width:\s*767px/.test(a))
+  // Bis 1023px (R19): auch bei 834px teilen Titel und Zeitraum die Zeile
+  // (Kopf 174 -> 129px).
+  const mobile = [...eachRule(layoutCss)].filter((r) => r.at.some((a) => /max-width:\s*1023px/.test(a))
     && r.selector.includes('.page-toolbar--period-inline'));
   const of = (tail) => mobile.filter((r) => r.selector.trim().endsWith(tail)).map((r) => r.body).join(';');
   assert.match(of(':not(.page-toolbar--in-group) > .page-toolbar__title'), /flex:\s*1 1 0/,
@@ -4685,6 +4687,28 @@ test('R16: der Budgetkopf fuehrt den Zeitraum mobil in der Titelzeile', () => {
   const label = [...eachRule(budgetCss)].filter((r) => r.at.some((a) => /max-width:\s*767px/.test(a))
     && r.selector.trim() === '.page-toolbar--period-inline .budget-nav__label');
   assert.ok(label.some((r) => /inline-size:/.test(r.body)), 'feste Labelbreite - sonst wandern die Pfeile beim Blaettern');
+});
+
+/* R19 (Critique 2026-10-16 P2): EINGEKLAPPT IST DER BUDGETKOPF EINE ZEILE.
+ * Bis R19 mass er in jedem Scrollstand 117px (390px): der Titel blieb
+ * eingeklappt stehen und hielt Zeile 1 mit dem Stepper offen, die sieben
+ * Reiter standen darunter. Jetzt ruecken die Reiter in die Zeile des
+ * Zeitraums (Stepper am Ende, wo er stand): 117 -> 65px, bei 834px 129 -> 73. */
+test('R19: eingeklappt teilen Reiter und Zeitraum eine Zeile, der Titel weicht aus dem Bild', () => {
+  const compact = [...eachRule(layoutCss)].filter((r) => r.at.some((a) => /max-width:\s*1023px/.test(a)));
+  const collapsed = (tail) => compact.filter((r) => r.selector.includes('.page-toolbar--period-inline')
+    && r.selector.includes('.is-collapsed') && r.selector.trim().endsWith(tail)).map((r) => r.body).join(';');
+  assert.match(collapsed('> .page-toolbar__bar'), /flex:\s*1 1 0/, 'die Leiste nimmt den Rest der Zeile');
+  assert.match(collapsed('> .page-toolbar__bar'), /order:\s*2/, 'vor dem Stepper ...');
+  assert.match(collapsed('> .page-toolbar__center'), /order:\s*3/, '... der am Zeilenende stehen bleibt');
+  assert.doesNotMatch(collapsed('> .page-toolbar__title'), /position:\s*static/,
+    'der Titel bleibt eingeklappt NICHT stehen - sonst haelt er Zeile 1 offen');
+  const period = compact.find((r) => r.selector.trim() === '.page-toolbar--period.page-toolbar--capped.is-collapsed > .page-toolbar__title');
+  assert.match(period?.body ?? '', /clip-path:\s*inset\(50%\)/, 'aus dem Bild, nicht aus dem Baum');
+  const hides = [...eachRule(budgetCss)].filter((r) => r.at.some((a) => /max-width:\s*1023px/.test(a))
+    && r.selector.includes('.budget-nav.page-toolbar--capped.is-collapsed') && /display:\s*none/.test(r.body)).map((r) => r.selector).join(' ');
+  assert.match(hides, /budget-nav__month:has\(\.budget-nav__note:not\(\[hidden\]\)\)/, 'eine Notiz statt Stepper weicht eingeklappt');
+  assert.match(hides, /> \.budget-scope/, 'ebenso die Wippe Mein Budget / Haushalt');
 });
 
 test('R16: formatMonthYear kennt die Kurzform des Monats', async () => {
