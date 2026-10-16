@@ -811,7 +811,7 @@ function renderSummary() {
   // dann „0,00 €" mit leerem Balken, direkt neben „Kein Budgetlimit -
   // Unbegrenzt". Wo kein Budget gesetzt ist, gibt es keine Zahl dafuer; den
   // Zustand nennt die Karte daneben. Drei Karten sind die Grundform der Reihe
-  // (panel.css), `--quad` traegt die Reihe nur mit vier.
+  // (panel.css) - seit R19 auch MIT Budget: es steht in der Kostenkarte.
   const budgetFlow = hasBudget
     ? { label: t(isOverBudget ? 'subscriptions.overBudget' : 'subscriptions.remainingBudget'),
       amount: money(Math.abs(summary.remaining_budget)), tone: isOverBudget ? 'negative' : '' }
@@ -826,21 +826,22 @@ function renderSummary() {
     lead: true,
     flows: [{ label: t('subscriptions.activeCount', { count: summary.active_count }) }, budgetFlow],
   })}
-    <section class="metric-grid metric-grid--led${hasBudget ? ' metric-grid--quad' : ''} budget-glance-details${state.summaryExpanded ? ' is-expanded' : ''}" id="subscriptions-summary-details">
+    <section class="metric-grid metric-grid--led budget-glance-details${state.summaryExpanded ? ' is-expanded' : ''}" id="subscriptions-summary-details">
+      ${/* KOSTEN UND BUDGET IN EINER KARTE (R19, Critique 2026-10-16). Zwei
+         Karten sagten "113,60 €" und "90,00 €" nebeneinander, den Vergleich
+         musste man selbst ziehen. Jetzt "113,60 € von 90,00 €" mit dem Balken
+         darunter - dieselbe Form wie das Ziel im Plan (budget.planTargetOf);
+         die Reihe hat damit immer drei Karten. */ ''}
       <article class="metric-card ${leadCardClass(money(used))}">
         <div class="metric-card__label">${t('subscriptions.monthlyCost')}</div>
-        <div class="metric-card__value">${money(used)}</div>
-        <div class="metric-card__note">${t('subscriptions.activeCount', { count: summary.active_count })}</div>
-      </article>
-      ${hasBudget ? `<article class="metric-card">
-        <div class="metric-card__label">${t('subscriptions.monthlyBudget')}</div>
-        <div class="metric-card__value">${money(budget)}</div>
-        <div class="metric-card__progress${isOverBudget ? ' metric-card__progress--over' : isNearBudget ? ' metric-card__progress--near' : ''}"
+        <div class="metric-card__value">${money(used)}${hasBudget ? ` <span class="metric-card__of">${esc(t('budget.planTargetOf', { amount: money(budget) }))}</span>` : ''}</div>
+        ${hasBudget ? `<div class="metric-card__progress${isOverBudget ? ' metric-card__progress--over' : isNearBudget ? ' metric-card__progress--near' : ''}"
              role="progressbar" aria-label="${esc(t('subscriptions.monthlyBudget'))}"
              aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percentage}" aria-valuetext="${realPercentage}%">
           <span style="--fill:${percentage / 100}"></span>
-        </div>
-      </article>` : ''}
+        </div>` : ''}
+        <div class="metric-card__note">${t('subscriptions.activeCount', { count: summary.active_count })}</div>
+      </article>
       <article class="metric-card${isOverBudget ? ' metric-card--over' : ''}">
         <div class="metric-card__label">${isOverBudget ? '<i data-lucide="triangle-alert" class="icon-sm" aria-hidden="true"></i>' : ''}${hasBudget ? (isOverBudget ? t('subscriptions.overBudget') : t('subscriptions.remainingBudget')) : t('subscriptions.noBudgetLimit')}</div>
         <div class="metric-card__value">${hasBudget ? money(Math.abs(summary.remaining_budget)) : t('subscriptions.unlimited')}</div>

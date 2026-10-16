@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Subscription costs and their budget share one card.** The summary reads "113.60 € of 90.00 €"
+  with the budget bar underneath instead of two cards side by side, so the row always has three
+  cards. On a wide screen each subscription's description now appears once, next to its name.
 - **Empty progress bars no longer look like holes in dark mode.** The track behind budget plans,
   loans, subscriptions, Health goals and the overview's budget card, and the circle behind reward
   history icons, sit as a soft well in the card instead of near-black.

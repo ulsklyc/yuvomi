@@ -3923,13 +3923,13 @@ test('Abos, Darlehen, Aufteilung mobil: EINE Glance-Zeile, die Karten klappen au
     Object.assign(budgetUi.state, { loans: vorher.loans, loanStatusFilter: vorher.filter });
   }
 
-  // Mit Monatsbudget: vier Karten. Ohne sind es drei (#1607, eigener Test unten).
+  // Mit und ohne Monatsbudget drei Karten (R19: das Budget steht in der Kostenkarte).
   const abosVorher = abosGlance.state.summary;
   abosGlance.state.summary = { active_count: 2, monthly_total: 40, monthly_budget: 100, remaining_budget: 60, base_currency: 'EUR' };
   let abos;
   try { abos = abosGlance.renderSummary(); } finally { abosGlance.state.summary = abosVorher; }
   const abosRest = glanceVorDetails(abos, 'subscriptions-glance-more', 'subscriptions-summary-details');
-  assert.match(abosRest, /class="metric-grid metric-grid--led metric-grid--quad/, 'Abos: die vier Karten im aufklappbaren Bereich');
+  assert.match(abosRest, /class="metric-grid metric-grid--led budget-glance-details/, 'Abos: die Karten im aufklappbaren Bereich');
   assert.match(abos, /budget-glance__label">subscriptions\.monthlyCost</, 'Leitwert sind die Monatskosten');
 
   const summary = { html: '' };
@@ -3981,12 +3981,15 @@ test('Abo-Kennzahlen ohne Monatsbudget: keine Karte „Monatsbudget 0", drei Kar
     assert.doesNotMatch(ohne, /metric-grid--quad/, 'drei Karten in einer Vierer-Reihe liessen eine Leerzelle');
     assert.match(ohne, /class="metric-grid metric-grid--led budget-glance-details/, 'der aufklappbare Bereich bleibt derselbe');
 
+    // R19 (Critique 2026-10-16, "113,60 € von 90 €"): mit Budget steht es IN
+    // der Kostenkarte - Wert, "von"-Ziel und Balken -, keine eigene Karte.
     abosGlance.state.summary = { active_count: 1, monthly_total: 12.99, monthly_budget: 50, remaining_budget: 37.01, base_currency: 'EUR' };
     const mit = abosGlance.renderSummary();
-    assert.match(mit, /metric-card__label">subscriptions\.monthlyBudget</, 'Gegenfall: mit Budget steht die Karte');
-    assert.match(mit, /role="progressbar"/);
-    assert.equal(karten(mit), 4);
-    assert.match(mit, /metric-grid--quad/);
+    assert.doesNotMatch(mit, /metric-card__label">subscriptions\.monthlyBudget</, 'keine eigene Budget-Karte mehr');
+    assert.match(mit, /metric-card__label">subscriptions\.monthlyCost<\/div>\s*<div class="metric-card__value">[^<]*<span class="metric-card__of">budget\.planTargetOf/, 'Kosten "von" Budget in einer Karte');
+    assert.match(mit, /role="progressbar" aria-label="subscriptions\.monthlyBudget"/, 'der Balken misst weiter das Budget');
+    assert.equal(karten(mit), 3);
+    assert.doesNotMatch(mit, /metric-grid--quad/);
   } finally { abosGlance.state.summary = vorher; }
 });
 
@@ -6611,4 +6614,16 @@ test('R19: Fortschrittsbahnen sind Mulden, keine Loecher', () => {
       assert.match(body, /background(-color)?:\s*var\(--color-fill-well\)/, `${sel}: ${body.match(/background[^;]*/)?.[0]}`);
     }
   }
+});
+
+// R19: breit stand die Abo-Beschreibung zweimal (hinter dem Namen UND vorn in
+// der Meta-Zeile), weil `.subscription-card__meta > span { display:
+// inline-flex }` die versteckende Einzelklasse per Spezifitaet schlug. Die
+// Regel, die sie breit verbirgt, ist mindestens so spezifisch.
+test('R19: die Abo-Beschreibung steht breit nur einmal', () => {
+  const css = [...eachRule(read('../public/styles/subscriptions.css'))];
+  const hide = css.find((r) => !r.at.length && /display:\s*none/.test(r.body) && /subscription-card__meta-desc/.test(r.selector));
+  assert.ok(hide, 'keine Regel verbirgt die Meta-Fassung breit');
+  assert.equal(hide.selector.trim(), '.subscription-card__meta > .subscription-card__meta-desc',
+    'gleich spezifisch wie .subscription-card__meta > span und spaeter - sonst gewinnt inline-flex');
 });

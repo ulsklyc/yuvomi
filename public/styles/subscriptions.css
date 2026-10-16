@@ -538,7 +538,10 @@
   display: none;
 }
 
-.subscription-card__meta-desc {
+/* Mit Kombinator: `.subscription-card__meta > span` (inline-flex) schlug die
+ * einfache Klasse per Spezifitaet, und breit stand die Beschreibung zweimal -
+ * hinter dem Namen und vorn in der Meta-Zeile (R19, gemessen bei 1440). */
+.subscription-card__meta > .subscription-card__meta-desc {
   display: none;
 }
 

@@ -540,6 +540,16 @@
   }
 }
 
+/* DAS ZIEL NEBEN DEM WERT (R19, Abos: "113,60 € von 90,00 €"). Leiser und
+ * kleiner als die Kennzahl, auf ihrer Grundlinie; umbricht als Ganzes. */
+.metric-card__of {
+  font-size: var(--type-secondary);
+  font-weight: var(--font-weight-regular);
+  letter-spacing: normal;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
 /* Fußnote unter dem Betrag: „7 aktiv", „121% des Budgets genutzt", „EUR".
  * Löst die frühere <small>-Sonderbehandlung in subscriptions.css ab. */
 .metric-card__note {
