@@ -57,7 +57,7 @@ import {
   applyNavBadges, setNavBadge, resetNavBadges, navBadgeRoutes,
   moduleCountsFrom, navBadgeCountsFrom,
 } from '/utils/nav-badges.js';
-import { isNewerVersion, displayVersion, releasesNewForMe } from '/utils/version.js';
+import { isNewerVersion, displayVersion, releasesNewForMe, pendingUpdateFor } from '/utils/version.js';
 import { setMaxUploadBytes } from '/utils/upload-limit.js';
 import { syncWallMode } from '/utils/wall-mode.js';
 import {
@@ -2785,12 +2785,13 @@ const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 /** Neuere Version, die noch niemand angesehen hat - oder '' wenn alles gesehen/aktuell. */
 function pendingUpdateVersion() {
-  const latest = localStorage.getItem(UPDATE_LATEST_KEY) || '';
-  if (!latest) return '';
-  if (!isNewerVersion(latest, getAppVersion())) return '';
-  const seen = changelogSeen().latest || '';
-  if (seen && !isNewerVersion(latest, seen)) return '';
-  return latest;
+  // Nur fuer Admins (Critique R19, Regel und Begruendung in utils/version.js).
+  return pendingUpdateFor({
+    latest: localStorage.getItem(UPDATE_LATEST_KEY) || '',
+    current: getAppVersion(),
+    seen: changelogSeen().latest || '',
+    isAdmin: routerState.currentUser?.role === 'admin',
+  });
 }
 
 /**

@@ -928,3 +928,21 @@ test('der Rubrik-Guard erkennt eine doppelte Rubrik im selben Block', () => {
     repeatedRubrics('## [2.0.0] - 2026-02-02\n### Fixed\n### fixed  \n###  Fixed\n'),
     ['[2.0.0] ### Fixed (Zeilen 2, 3, 4)']);
 });
+
+// Critique R19: der Update-Punkt samt Screenreader-Zusatz an "Mehr", Konto und
+// "Aenderungen" erschien fuer jedes Mitglied - handeln kann nur, wer den
+// Server betreibt.
+test('pendingUpdateFor: der Update-Hinweis gilt nur fuer Admins', async () => {
+  const { pendingUpdateFor } = await import('../public/utils/version.js');
+  const base = { latest: '2.80.0', current: '2.77.2', seen: '' };
+  assert.equal(pendingUpdateFor({ ...base, isAdmin: true }), '2.80.0');
+  assert.equal(pendingUpdateFor({ ...base, isAdmin: false }), '', 'ein Mitglied ohne Adminrolle sieht den Punkt');
+  assert.equal(pendingUpdateFor({ ...base, seen: '2.80.0', isAdmin: true }), '', 'schon angesehen');
+  assert.equal(pendingUpdateFor({ ...base, latest: '2.77.2', isAdmin: true }), '', 'nichts Neueres');
+  assert.equal(pendingUpdateFor({ ...base, latest: '', isAdmin: true }), '');
+  // Der Router fragt nur noch hier - alle drei Einstiege (Konto, Mehr,
+  // Aenderungen) lesen pendingUpdateVersion().
+  const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  const fn = router.slice(router.indexOf('function pendingUpdateVersion()'), router.indexOf('function toggleUpdateDot'));
+  assert.match(fn, /pendingUpdateFor\(\{[\s\S]*isAdmin: routerState\.currentUser\?\.role === 'admin'/);
+});

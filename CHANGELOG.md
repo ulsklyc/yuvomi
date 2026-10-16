@@ -112,6 +112,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are created with the + button at the bottom right; on a wide screen that button sits at the top
   right of each module's header, and the tour now says so in every language.
 
+- **Only administrators see the "update available" dot.** The dot on "More", the account menu and
+  "What's new", and the matching screen reader note, appeared for every family member although only
+  whoever runs the server can update. Other members still find the change log as before.
+
 - **Calendar: "Manage calendars" is reachable on tablets and phones again.** Below 1024px the
   button was hidden along with the empty header slot, so calendars could not be created, recolored
   or reordered there. The calendar filter now lists "Manage calendars" under its calendars, at

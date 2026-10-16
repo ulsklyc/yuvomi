@@ -83,3 +83,27 @@ export function releasesNewForMe(releases, currentVersion, seenInstalled) {
     return isNewerVersion(v, seenInstalled) && !isNewerVersion(v, currentVersion);
   });
 }
+
+/**
+ * Die Version, auf die der Update-Hinweis zeigt - oder '' (Critique R19).
+ *
+ * Der Punkt am Konto, an "Mehr" und an "Aenderungen" samt dem Zusatz im
+ * Screenreader-Namen sagt: es gibt eine neuere Yuvomi-Version, die du noch
+ * nicht angesehen hast. Handeln kann darauf nur, wer den Server betreibt -
+ * ein Kind oder Gast sah einen Punkt, der zu nichts fuehrte, und hoerte bei
+ * jedem Tab auf "Mehr" einen Satz ueber ein Update. Er gilt deshalb nur fuer
+ * Admins; der Aenderungsverlauf selbst bleibt fuer alle lesbar.
+ *
+ * @param {object} opts
+ * @param {string} opts.latest - neueste bekannte Version (GitHub)
+ * @param {string} opts.current - laufende Version
+ * @param {string} [opts.seen] - zuletzt angesehene neueste Version
+ * @param {boolean} opts.isAdmin
+ * @returns {string}
+ */
+export function pendingUpdateFor({ latest, current, seen = '', isAdmin }) {
+  if (!isAdmin || !latest) return '';
+  if (!isNewerVersion(latest, current)) return '';
+  if (seen && !isNewerVersion(latest, seen)) return '';
+  return latest;
+}
