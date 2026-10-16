@@ -74,11 +74,19 @@ function createIcon(name, className) {
  * @param {string} className Klasse der Marke in ihrem Umfeld (Geometrie)
  * @returns {HTMLElement}
  */
+/* EINE FORM FUER JEDE MARKE (R19, Critique 2026-10-16: "gemischte Icon-Stile
+ * in der Einstellungsliste"). Module standen als gefuellte Kachel im Vollton,
+ * alles andere (Konto, Haushalt, System) als blasse Mulde mit grauer Glyphe -
+ * zwei Formen in einer Liste. Jetzt ist jede Marke eine gefuellte Kachel wie
+ * in den iOS-Einstellungen; die FARBE bleibt die Aussage der Vollton-Regel:
+ * ein Modul traegt seinen Ton, Konfiguration ohne Modul das Grau der
+ * Einstellungen (--module-settings). */
 function createLeafMark(entry, className) {
   const mark = document.createElement('span');
-  mark.className = entry.module ? `${className} vivid-mark` : className;
+  mark.className = `${className} vivid-mark`;
   if (entry.extensionModule) mark.style.setProperty('--seal-accent', entry.extensionModule.accent);
   else if (entry.module) mark.style.setProperty('--seal-accent', moduleAccentVar(entry.module));
+  else mark.style.setProperty('--seal-accent', 'var(--module-settings)');
   mark.setAttribute('aria-hidden', 'true');
   mark.appendChild(createIcon(entry.icon, `${className}-glyph`));
   return mark;

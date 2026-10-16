@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Every entry in Settings has the same kind of icon.** Account, household and system pages now
+  show a filled grey tile like the coloured module tiles next to them, instead of a pale outline
+  icon, as in the iPhone's Settings.
 - **Children see their own points first.** On the Rewards overview a member who collects points
   and is not a parent now finds "Your points" at the top, with how far it is to the next reward and
   the request button; everyone else's points follow below.

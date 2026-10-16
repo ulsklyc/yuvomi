@@ -3944,6 +3944,18 @@ test('R19: das Gesundheitsblatt spricht vom Zyklus, nicht vom Tab, und die beide
   }
 });
 
+// R19 (Critique 2026-10-16, "gemischte Icon-Stile in der Einstellungsliste"):
+// Module standen als gefuellte Kachel, alles andere als blasse Mulde. Jetzt
+// ist jede Marke eine gefuellte Kachel; ohne Modul im Grau der Einstellungen.
+test('R19: jede Marke der Einstellungsliste ist eine gefuellte Kachel, ohne Modul im Einstellungsgrau', async () => {
+  const shell = await readFile(new URL('../public/settings/shell.js', import.meta.url), 'utf8');
+  const fn = shell.slice(shell.indexOf('function createLeafMark('), shell.indexOf('function hydrateIcons('));
+  assert.match(fn, /mark\.className = `\$\{className\} vivid-mark`;/, 'immer vivid-mark');
+  assert.match(fn, /else mark\.style\.setProperty\('--seal-accent', 'var\(--module-settings\)'\);/, 'ohne Modul: Einstellungsgrau');
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  assert.doesNotMatch(css, /(?:navigation-link-icon|row-mark):not\(\.vivid-mark\)/, 'keine zweite, blasse Form mehr');
+});
+
 test('R17: die Standard-Erinnerungen sind Chips des Kanons mit aria-pressed, keine Checkbox in einer Pille', async () => {
   const rendered = await probeSheets();
   const html = rendered.get('personal-calendar') ?? '';

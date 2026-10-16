@@ -124,7 +124,10 @@
   border-radius: var(--radius-xs);
 }
 
-/* Die neutrale Grundform gilt nur, WO keine Marke sie traegt: `.vivid-mark`
+/* SEIT R19 TRAEGT JEDE MARKE `.vivid-mark` (shell.js createLeafMark): die
+ * neutrale Grundform unten ist entfallen, Konfiguration ohne Modul steht im
+ * Grau der Einstellungen. Was folgt, ist die Geschichte der Mulde:
+ * Die neutrale Grundform galt nur, WO keine Marke sie traegt: `.vivid-mark`
  * steht in layout.css, diese Datei laedt danach, und bei gleicher Spezifitaet
  * gewinnt die spaetere - die Marke waere eine Klasse ohne Wirkung.
  *
@@ -136,18 +139,9 @@
  * Kacheln neben 25 nackten Glyphen und dunkel als 29 gleichwertige Zeilen.
  * Ein Licht/Dunkel-Paritaetsbruch, und die Vollton-Regel benennt fuer ihre
  * neutrale Gegenrichtung ausdruecklich `--color-fill-well`. */
-.settings-shell__navigation-link-icon:not(.vivid-mark) {
-  color: var(--color-text-secondary);
-  background: var(--color-fill-well);
-}
-
 .settings-shell__navigation-link-icon-glyph {
   width: var(--space-4);
   height: var(--space-4);
-}
-
-.settings-shell__navigation-link--active .settings-shell__navigation-link-icon:not(.vivid-mark) {
-  color: var(--color-accent);
 }
 
 /* EINE Spalte, die schrumpfen darf. Ohne `minmax(0, 1fr)` war die Spalte
@@ -309,11 +303,6 @@
   width: var(--target-md);
   height: var(--target-md);
   border-radius: var(--radius-sm);
-}
-
-.settings-overview__row-mark:not(.vivid-mark) {
-  color: var(--module-settings);
-  background: var(--color-surface-2);
 }
 
 .settings-overview__row-mark-glyph {
