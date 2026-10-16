@@ -188,6 +188,9 @@
   background-color: var(--seg-active-bg);
   box-shadow: var(--seg-active-shadow);
   pointer-events: none;
+  /* Das Gleiten traegt einen Breitenwechsel als `scale()` (segment-indicator.js,
+   * glideKeyframes) - er setzt an derselben Ecke an wie `translate()`. */
+  transform-origin: 0 0;
 }
 
 .seg-indicator[hidden] {
