@@ -276,6 +276,45 @@ async function visitViews(page, where, visit) {
   }
 }
 
+/**
+ * Die Sichten, die nur im Werkzeugmenue waehlbar sind (D1, Critique 2026-10-16).
+ *
+ * Unter 768px steht die Ansichtswahl einiger Module nicht als Segment im Kopf,
+ * sondern als Einfachauswahl im "..."-Menue (Aufgaben Liste/Brett, Dokumente
+ * Raster/Liste) - der Umschalter ist dort ausgeblendet, und `visitViews` sieht
+ * nur, was sichtbar ist. Ohne diesen Weg erreichte Sonde 7 das Board mobil nie
+ * mehr, und die Ausnahme `kanban-card` stand ohne Fundstelle da.
+ *
+ * Geklickt wird der Menue-Eintrag selbst (`[data-view-choice]`), also derselbe
+ * Weg, den die App geht - ueber den delegierten Handler des Kopfs, nicht ueber
+ * Speicher-Schluessel. Nur Eintraege, deren Gruppe in dieser Breite gilt (ab
+ * 768px blendet das Modul die Gruppe aus, dann waehlt das Segment). Danach
+ * zurueck auf die Ausgangssicht: die Wahl wird gespeichert und traefe sonst die
+ * naechste Route.
+ */
+async function visitMenuViews(page, where, visit) {
+  const choices = await page.evaluate(() => [...document.querySelectorAll('.popover-menu__item[data-view-choice]')]
+    .filter((item) => {
+      const group = item.closest('.popover-menu__group') ?? item;
+      return getComputedStyle(group).display !== 'none';
+    })
+    .map((item) => ({ view: item.dataset.viewChoice, on: item.getAttribute('aria-checked') === 'true' })));
+  const start = choices.find((c) => c.on)?.view;
+  if (!start) return;
+  const pick = (view) => page.evaluate((v) => {
+    const item = document.querySelector(`.popover-menu__item[data-view-choice="${CSS.escape(v)}"]`);
+    if (!item) return false;
+    item.click();
+    return true;
+  }, view);
+  for (const { view, on } of choices) {
+    if (on || !(await pick(view))) continue;
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await visit(`${where}:menu-${view}`);
+  }
+  if (await pick(start)) await new Promise((resolve) => setTimeout(resolve, 600));
+}
+
 before(async () => {
   harness = await startHarness();
 });
@@ -2229,7 +2268,12 @@ test('Sonde 7 - eine Zeilenfolge ist keine Spalte aus Karten', async () => {
       // Auf einem Blatt nur der Zustand selbst - siehe `isLeaf`: zwei der drei
       // Umschaltergruppen in den Einstellungen schreiben eine Einstellung.
       if (isLeaf(name)) await note(name);
-      else await visitViews(page, name, note);
+      else {
+        await visitViews(page, name, note);
+        // Mobil steht Liste/Brett der Aufgaben im Menue (D1) - ohne diesen
+        // Weg saehe die Sonde das Board nur am Desktop.
+        await visitMenuViews(page, name, note);
+      }
     }
     await page.close();
     perDevice.set(device, found);
@@ -2437,8 +2481,16 @@ test('Sonde 8 - ein Kopf mit Lead-Zone traegt seine Linie erst angedockt, und do
   // die triviale Haelfte der Regel, und genau die andere war kaputt.
   assert.ok(headsSeen >= ROUTE_NAMES.length - 3,
     `Nur ${headsSeen} Modulkoepfe von ${ROUTE_NAMES.length} Routen gesehen - die Sonde erreicht die Koepfe nicht mehr.`);
-  assert.ok(leadHeads >= 5,
-    `Nur ${leadHeads} Koepfe mit Lead-Zone gesehen (gemessen: 10). Ohne sie prueft diese Sonde nur, `
+  // DIE ZAHL IST GEMESSEN UND SIE SINKT MIT ABSICHT. Die "10" stammte aus der
+  // Zeit vor der Kopfregel 1a (R16): seither stehen die Werkzeuge vieler Koepfe
+  // in der Titelzeile, und ein einzeiliger Kopf hat keine Lead-Zone. Mit D1
+  // (Critique 2026-10-16) wurde auch der Aufgabenkopf einzeilig (120 -> 65px).
+  // Gemessen 2026-10-16 bei 375px: vier Koepfe mit Lead-Zone - Kalender,
+  // Budget (Zeitraum-Kopf, gedeckelt), Belohnungen, Haushaltshilfe (Band ueber
+  // der Reiterleiste). Das sind beide Andock-Bauarten; faellt eine davon weg,
+  // wird die Sonde rot statt still trivial.
+  assert.ok(leadHeads >= 4,
+    `Nur ${leadHeads} Koepfe mit Lead-Zone gesehen (gemessen 2026-10-16: 4). Ohne sie prueft diese Sonde nur, `
     + 'dass einzeilige Koepfe eine Linie tragen.');
 
   assert.deepEqual(findings, [],
