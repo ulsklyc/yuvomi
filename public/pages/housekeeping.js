@@ -1627,7 +1627,7 @@ function renderReports(content) {
   wireVisitRows(content, visits, async () => {
     await loadData();
     if (content.isConnected) renderReports(content);
-  });
+  }, { onEdit: (visit) => openVisitEditModal(visit, content, { onDone: renderReports }) });
 }
 
 /* DER EINSATZBERICHT IST DIE LESEANSICHT EINES BESUCHS (#1265 P6). Bei

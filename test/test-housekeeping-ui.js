@@ -741,6 +741,22 @@ test('Listenreiter am Desktop: Liste im Spaltenraster, Kennzahlen bzw. Protokoll
     'in der 360px-Spalte stehen Titel und Monatswahl untereinander wie am Telefon');
 });
 
+test('Bearbeiten eines Besuchs zeichnet danach den Reiter neu, auf dem es lag', () => {
+  // wireVisitRows faellt ohne `onEdit` auf openVisitEditModal(visit, content)
+  // zurueck, und das zeichnet nach dem Speichern renderStaff - im Reiter
+  // Berichte stand danach die Personal-Liste unter dem Reiter "Berichte".
+  // Jeder Aufrufer ausser Personal selbst gibt seinen eigenen Neuzeichner mit.
+  const HK_SRC = readFileSync(new URL('../public/pages/housekeeping.js', import.meta.url), 'utf8');
+  const calls = [...HK_SRC.matchAll(/^function (render\w+)\(content\)[\s\S]*?^}/gm)]
+    .filter(([body]) => /wireVisitRows\(/.test(body));
+  assert.deepEqual(calls.map(([, name]) => name).sort(), ['renderDashboard', 'renderReports', 'renderStaff']);
+  for (const [body, name] of calls) {
+    if (name === 'renderStaff') continue;
+    assert.match(body, new RegExp(`onEdit: \\(visit\\) => openVisitEditModal\\(visit, content, \\{ onDone: ${name} \\}\\)`),
+      `${name}: Bearbeiten zeichnet nach dem Speichern ${name}, nicht renderStaff`);
+  }
+});
+
 test('Haushaltshilfe spricht EINEN Namen: Reiter "Uebersicht", Kennzahlen mit Zeitbezug, Geldschein statt Dollar', () => {
   const HK_SRC = readFileSync(new URL('../public/pages/housekeeping.js', import.meta.url), 'utf8');
   assert.doesNotMatch(HK_SRC, /badge-dollar-sign/, 'Dollar-Icon bei Euro-Betraegen');
