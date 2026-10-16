@@ -1174,7 +1174,7 @@
   /* Die Grundform der Seitenleiste; sichtbar wird sie erst an der Schwelle. */
   .settings-shell__navigation {
     position: sticky;
-    top: calc(var(--space-4) + var(--safe-area-inset-top));
+    top: calc(var(--settings-head-block, 0px) + var(--space-4) + var(--safe-area-inset-top));
     align-self: start;
   }
 }
@@ -1191,10 +1191,11 @@
   .settings-shell__navigation {
     display: block;
     position: sticky;
-    top: calc(var(--space-4) + var(--safe-area-inset-top));
+    top: calc(var(--settings-head-block, 0px) + var(--space-4) + var(--safe-area-inset-top));
     /* Minus `--shell-tail`: die klebende Liste endet ueber dem, was unten
-     * fest steht (Installationsbanner), wie jede klebende Spalte. */
-    max-height: calc(var(--viewport-height) - var(--space-8) - var(--shell-tail, 0px));
+     * fest steht (Installationsbanner), wie jede klebende Spalte. Minus
+     * `--settings-head-block`: oben klebt der Kopf (shell.js, watchHeadBlock). */
+    max-height: calc(var(--viewport-height) - var(--settings-head-block, 0px) - var(--space-8) - var(--shell-tail, 0px));
     overflow-y: auto;
     overscroll-behavior: contain;
   }

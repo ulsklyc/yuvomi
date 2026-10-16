@@ -3003,6 +3003,15 @@ test('S3: Liste + Detail ab der Split-Schwelle aus tokens.css, erstes Blatt per 
   // bis an den Fensterrand gerechnet laegen ihre letzten Zeilen darunter und
   // waeren auch mit dem eigenen Bildlauf nicht zu erreichen.
   assert.match(nav, /max-height:\s*calc\([^;]*var\(--shell-tail/, 'die Liste zieht --shell-tail ab');
+  // Seit der Kopf am Desktop den Modulnamen traegt (D8), klebt er 69px hoch
+  // ueber dem Scrollport: die Leiste klebt darunter und zieht ihn von ihrer
+  // Hoehe ab. Gemessen ohne beides: gescrollt lagen ihre ersten 53px unter dem
+  // Kopf, in Ruhe stand der aktive Link eines Modul-Blatts bei y=929 von 900.
+  const baseNav = ruleBody(rules, '.settings-shell__navigation', /min-width:\s*1024px/);
+  for (const [label, body] of [['Grundform', baseNav], ['Seitenleiste', nav]]) {
+    assert.match(body, /top:\s*calc\([^;]*var\(--settings-head-block/, `${label}: die Leiste klebt unter dem Kopf`);
+  }
+  assert.match(nav, /max-height:\s*calc\([^;]*var\(--settings-head-block/, 'die Liste zieht den klebenden Kopf ab');
   assert.match(ruleBody(rules, '.settings-shell', containerQuery), /grid-template-columns:\s*var\(--settings-list-width\)\s+minmax\(0,\s*1fr\)/);
   // Das Blatt liest im Lesemass.
   assert.match(ruleBody(rules, '.settings-shell__content'), /max-inline-size:\s*var\(--layout-reading\)/);
@@ -3010,6 +3019,7 @@ test('S3: Liste + Detail ab der Split-Schwelle aus tokens.css, erstes Blatt per 
   const shell = await settingsShellSource();
   // Ob die Spalte steht, sagt das CSS: keine zweite Schwelle im Skript.
   assert.doesNotMatch(shell, /matchMedia\([^)]*min-width/);
+  assert.match(shell, /setProperty\('--settings-head-block'/, 'shell.js misst den Kopf fuer die klebende Leiste');
   assert.match(shell, /getComputedStyle\(navigation\)\.display !== 'none'/);
   // Vorwahl: replaceState, kein neuer History-Eintrag, kein Fokuswechsel - der
   // Fokus wandert nur, wenn er schon in den Einstellungen lag.

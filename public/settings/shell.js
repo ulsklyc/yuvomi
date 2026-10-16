@@ -1138,6 +1138,34 @@ function watchSplit(container, page, { user, domainId }) {
   splitObserver.observe(page);
 }
 
+/**
+ * DIE SEITENLEISTE KLEBT UNTER DEM KOPF, NICHT DARUNTER (Re-Critique
+ * 2026-10-16). Seit der Kopf am Desktop den Modulnamen traegt (D8), klebt er
+ * 69px hoch ueber dem Scrollport. Die Leiste klebte weiter bei `--space-4`:
+ * gescrollt lagen ihre ersten 53px unter dem Kopf, in Ruhe ragte sie 69px
+ * unter das Fenster, und der aktive Link eines Modul-Blatts stand bei y=929
+ * von 900 - `revealActiveNavigationLink` hielt ihn nur in der Leiste sichtbar,
+ * nicht im Fenster. Gemessen statt als Token, wie im Inventar: der Kopf
+ * bricht in langen Locales um und ist unter 1024px ein anderer.
+ */
+let headObserver = null;
+function watchHeadBlock(page, toolbar) {
+  headObserver?.disconnect();
+  headObserver = null;
+  const sync = () => page.style.setProperty('--settings-head-block', `${toolbar.offsetHeight}px`);
+  sync();
+  if (typeof ResizeObserver !== 'function') return;
+  headObserver = new ResizeObserver(() => {
+    if (!page.isConnected) {
+      headObserver?.disconnect();
+      headObserver = null;
+      return;
+    }
+    sync();
+  });
+  headObserver.observe(toolbar);
+}
+
 export async function renderSettingsShell(container, {
   user,
   leaf = null,
@@ -1188,6 +1216,7 @@ export async function renderSettingsShell(container, {
     body.appendChild(shell);
     page.append(toolbar, body);
     container.replaceChildren(page);
+    watchHeadBlock(page, toolbar);
     // Sidebar-Icons einmalig bei der Montage hydrieren; die Detail-Icons werden
     // pro Render separat (nur im Content-Bereich) hydriert.
     hydrateIcons(navigation);
