@@ -10794,6 +10794,29 @@ test('priority badges and meal labels meet WCAG AA contrast in both themes', () 
   }
 });
 
+// R19 (Critique 2026-10-16): Fruehstueck #A85D00 und Snack #C2410C waren kaum
+// zu trennen, Abendessen trug das Markenviolett. Die vier Mahlzeittoene liegen
+// jetzt in beiden Themes deutlich auseinander (Rotanteil-Abstand als grobe
+// Huerde), und keiner ist der Akzent.
+test('R19: Mahlzeittoene sind vier Toene, und keiner ist der Akzent', () => {
+  const tokens = read('../public/styles/tokens.css');
+  const rootBlock = tokens.match(/:root\s*\{([\s\S]*?)\n\}/);
+  const light = parseTokenMap(rootBlock[1]);
+  const dark = new Map(light);
+  for (const [key, value] of parseTokenMap(darkAttrBlock(tokens)[1])) dark.set(key, value);
+  const meals = ['--meal-breakfast', '--meal-lunch', '--meal-dinner', '--meal-snack'];
+  for (const [theme, map] of [['light', light], ['dark', dark]]) {
+    const rgb = (name) => { const h = resolveColor(name, map).replace('#', ''); return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)); };
+    const accent = resolveColor('--color-accent', map).toLowerCase();
+    for (const m of meals) assert.notEqual(resolveColor(m, map).toLowerCase(), accent, `${theme}: ${m} ist der Akzent`);
+    for (let i = 0; i < meals.length; i++) for (let j = i + 1; j < meals.length; j++) {
+      const [a, b] = [rgb(meals[i]), rgb(meals[j])];
+      const dist = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+      assert.ok(dist >= 80, `${theme}: ${meals[i]} und ${meals[j]} liegen nur ${dist.toFixed(0)} auseinander`);
+    }
+  }
+});
+
 /**
  * Locks in the Tandoor badge contrast fix from the recipe-provider-adapter
  * review (was 4.24:1, below WCAG AA). Discovers the provider list from the

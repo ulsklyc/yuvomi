@@ -861,13 +861,19 @@
   --meal-lunch:            var(--_meal-lunch);
   --_meal-lunch-light:     #DFF6E4;
   --meal-lunch-light:      var(--_meal-lunch-light);
-  --_meal-dinner:          #6C3AED;
-  --meal-dinner:           var(--_meal-dinner);          /* Violett — Abend (= --color-accent) */
-  --_meal-dinner-light:    #F3EFFE;
+  /* ABENDESSEN IST INDIGO, SNACK IST BEERE (R19, Critique 2026-10-16).
+   * Abendessen trug das Markenviolett (= --color-accent) und las sich wie eine
+   * Aktion; Fruehstueck #A85D00 und Snack #C2410C lagen normalsichtig nur
+   * dE2000 13 auseinander, bei Deuteranopie 0,4 (Machado 2009). Jetzt Abend-
+   * Indigo und Beere: das schlechteste Paar der vier ist Fruehstueck/Mittag
+   * (Protanopie 6,6, unveraendert), dunkel 12,3. */
+  --_meal-dinner:          #3949AB;
+  --meal-dinner:           var(--_meal-dinner);          /* Indigo — Abend */
+  --_meal-dinner-light:    #ECEEFB;
   --meal-dinner-light:     var(--_meal-dinner-light);
-  --_meal-snack:           #C2410C;
-  --meal-snack:            var(--_meal-snack);           /* = --module-meals — Snack ist Sub-Domain */
-  --_meal-snack-light:     #FFECE3;
+  --_meal-snack:           #BE185D;
+  --meal-snack:            var(--_meal-snack);           /* Beere — zwischendurch */
+  --_meal-snack-light:     #FCE7F0;
   --meal-snack-light:      var(--_meal-snack-light);
 
   /* Dieselbe lesbare Stufe wie bei der Semantik oben - die Mahlzeitenfarben
@@ -883,14 +889,14 @@
   --meal-breakfast-ink:    var(--_meal-breakfast-ink);
   --_meal-lunch-ink:       #1A6831;
   --meal-lunch-ink:        var(--_meal-lunch-ink);
-  --_meal-dinner-ink:      #5B2FD4;
+  --_meal-dinner-ink:      #2F3C93;
   --meal-dinner-ink:       var(--_meal-dinner-ink);
-  --_meal-snack-ink:       #A5370A;
+  --_meal-snack-ink:       #9D174D;
   --meal-snack-ink:        var(--_meal-snack-ink);
 
   /* GEPRÜFT UND BEWUSST SO GELASSEN (2026-07-30, gilt fort): drei der vier
    * Mahlzeit-Farben teilen den Wert eines semantischen/strukturellen Tokens
-   * (breakfast=warning, dinner=accent, snack=kitchen). Die Farbe erscheint
+   * (breakfast=warning; dinner=accent und snack=kitchen bis R19). Die Farbe erscheint
    * ausschließlich als 8px-Punkt NEBEN dem ausgeschriebenen Wort — Scanhilfe,
    * nie alleiniger Bedeutungsträger. Die Zeitmetapher (Morgen-Amber,
    * Mittag-Grün, Abend-Indigo) bleibt erhalten. */
@@ -2450,15 +2456,15 @@
     --_meal-breakfast-light: #33230A;
     --_meal-lunch:           #4ADE80;
     --_meal-lunch-light:     #0E2E17;
-    --_meal-dinner:          #A78BFA;
-    --_meal-dinner-light:    #241A45;
-    --_meal-snack:           #FB923C;
-    --_meal-snack-light:     #3D2010;
+    --_meal-dinner:          #8C9EFF;
+    --_meal-dinner-light:    #1A1F45;
+    --_meal-snack:           #F472B6;
+    --_meal-snack-light:     #3D1426;
     /* Die lesbare Stufe geht im Dark nach oben, wie bei der Semantik. */
     --_meal-breakfast-ink:   #FFB84A;
     --_meal-lunch-ink:       #89EAAC;
-    --_meal-dinner-ink:      #BCA6FC;
-    --_meal-snack-ink:       #FCAA67;
+    --_meal-dinner-ink:      #AEBBFF;
+    --_meal-snack-ink:       #F9A8D4;
 
     --_source-mealie:        #2DD4BF;
     --_source-mealie-light:  #0F2E2A;
@@ -2697,15 +2703,15 @@
     --_meal-breakfast-light: #33230A;
     --_meal-lunch:           #4ADE80;
     --_meal-lunch-light:     #0E2E17;
-    --_meal-dinner:          #A78BFA;
-    --_meal-dinner-light:    #241A45;
-    --_meal-snack:           #FB923C;
-    --_meal-snack-light:     #3D2010;
+    --_meal-dinner:          #8C9EFF;
+    --_meal-dinner-light:    #1A1F45;
+    --_meal-snack:           #F472B6;
+    --_meal-snack-light:     #3D1426;
     /* Die lesbare Stufe geht im Dark nach oben, wie bei der Semantik. */
     --_meal-breakfast-ink:   #FFB84A;
     --_meal-lunch-ink:       #89EAAC;
-    --_meal-dinner-ink:      #BCA6FC;
-    --_meal-snack-ink:       #FCAA67;
+    --_meal-dinner-ink:      #AEBBFF;
+    --_meal-snack-ink:       #F9A8D4;
 
     --_source-mealie:        #2DD4BF;
     --_source-mealie-light:  #0F2E2A;
