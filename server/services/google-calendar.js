@@ -144,13 +144,31 @@ function needsReauth() {
  * Führt einen Google-Zugriff aus und hält ein abgelehntes Token fest. Der
  * Fehler geht als GoogleReauthRequiredError weiter, damit der Lauf ihn als
  * letzten Fehler verbucht.
+ *
+ * Festgehalten wird nur gegen das Token, mit dem `run` angetreten ist: der
+ * Client wird synchron zu Beginn von `run` aus sync_config gebaut, also mit dem
+ * hier gelesenen Wert. Hat inzwischen ein Refresh rotiert oder ein neues OAuth
+ * ein anderes Token gespeichert, betrifft die Ablehnung ein abgelöstes Token,
+ * und die Verbindung bleibt stehen. Vergleich und Schreiben sind EINE
+ * Anweisung, ohne await dazwischen.
  */
 async function withReauthGuard(run) {
+  const usedToken = cfgGet('google_refresh_token');
   try {
     return await run();
   } catch (err) {
     if (!isInvalidGrant(err)) throw err;
-    cfgSet('google_needs_reauth', '1');
+    const marked = db.get().prepare(`
+      INSERT INTO sync_config (key, value)
+      SELECT 'google_needs_reauth', '1'
+      WHERE (SELECT value FROM sync_config WHERE key = 'google_refresh_token') = ?
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value,
+                                     updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+    `).run(usedToken).changes > 0;
+    if (!marked) {
+      log.warn('Google refused a refresh token that has since been replaced; the current connection stays active.');
+      throw err;
+    }
     log.warn('Google refused the refresh token (invalid_grant). Sync paused until the account is reconnected.');
     throw new GoogleReauthRequiredError(err?.response?.data?.error_description || 'invalid_grant');
   }
@@ -533,6 +551,10 @@ function getSyncToken(calendarId) {
  * @returns {Promise<Array<{id,summary,primary,backgroundColor,enabled,accessRole,writable}>>}
  */
 async function listCalendars() {
+  // Abgelehntes Token (#2019): keine aussichtslose Anfrage an Google, egal wer
+  // fragt - Terminformular (sync-targets), Kalenderauswahl. Die Karte sagt
+  // "neu verbinden"; Ziele gibt es bis dahin keine.
+  if (needsReauth()) return [];
   return withReauthGuard(listCalendarsWith);
 }
 

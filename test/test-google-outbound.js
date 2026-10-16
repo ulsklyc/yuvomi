@@ -2121,3 +2121,62 @@ test('#2019: ein von Google rotiertes Refresh-Token ersetzt das gespeicherte', a
   assert.equal(cfg('google_access_token'), 'a-third');
   assert.equal(cfg('google_refresh_token'), 'r-rotated');
 });
+
+// Codex-Runde 1 auf #2029: die Kalenderliste läuft ohne die Sperre 'google' -
+// vom Terminformular (sync-targets) und von der Kalenderauswahl aus.
+const { listCalendars } = await import('../server/services/google-calendar.js');
+
+/** Ersetzt den Refresh JEDES OAuth2-Clients, auch des intern gebauten. */
+async function withRefresh(answer, fn) {
+  const proto = google.auth.OAuth2.prototype;
+  const original = proto.refreshTokenNoCache;
+  const saved = Object.fromEntries(Object.keys(OAUTH_ENV).map((k) => [k, process.env[k]]));
+  const calls = { n: 0 };
+  proto.refreshTokenNoCache = async function refreshStub() { calls.n++; return answer(); };
+  Object.assign(process.env, OAUTH_ENV);
+  db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('google_token_expiry', '1')").run();
+  try {
+    return await fn(calls);
+  } finally {
+    proto.refreshTokenNoCache = original;
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  }
+}
+
+function invalidGrant() {
+  const err = new Error('invalid_grant');
+  err.response = { status: 400, config: {}, data: { error: 'invalid_grant' } };
+  return err;
+}
+
+test('#2019: steht "neu verbinden", fragt die Kalenderliste Google nicht mehr', async () => {
+  reset();
+  db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('google_needs_reauth', '1')").run();
+  await withRefresh(() => { throw invalidGrant(); }, async (calls) => {
+    assert.deepEqual(await listCalendars(), [], 'keine Ziele, bis neu verbunden ist');
+    assert.equal(calls.n, 0, 'kein Refresh-Versuch bei Google');
+  });
+});
+
+test('#2019: die Ablehnung eines inzwischen ersetzten Tokens hält die Verbindung nicht an', async () => {
+  reset();
+  await withRefresh(() => {
+    // Während diese Anfrage läuft, speichert ein Refresh nebenan oder ein neues
+    // OAuth ein anderes Token; Google lehnt das alte ab.
+    db.prepare("UPDATE sync_config SET value = 'r-replaced' WHERE key = 'google_refresh_token'").run();
+    throw invalidGrant();
+  }, async (calls) => {
+    await assert.rejects(listCalendars());
+    assert.equal(calls.n, 1);
+  });
+  assert.equal(cfg('google_needs_reauth'), null, 'das gültige neue Token bleibt in Betrieb');
+  assert.equal(getStatus().needsReauth, false);
+
+  // Gegenstück: dasselbe mit dem noch gespeicherten Token hält an.
+  await withRefresh(() => { throw invalidGrant(); }, async () => {
+    await assert.rejects(listCalendars(), (err) => err.reauthRequired === true);
+  });
+  assert.equal(cfg('google_needs_reauth'), '1');
+});
