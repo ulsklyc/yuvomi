@@ -795,7 +795,10 @@ function buildGoogleProvider(googleStatus, user) {
   const handleReauth = async (err) => {
     if (err?.data?.reason !== GOOGLE_REAUTH_REASON) return false;
     const fresh = await api.get('/calendar/google/status').catch(() => null);
-    if (fresh?.needsReauth) section.replaceWith(buildGoogleProvider(fresh, user));
+    // Nur wenn die Karte wirklich neu steht: sonst zeigt der Aufrufer den
+    // ursprünglichen Fehler, statt still auf einer veralteten Karte zu bleiben.
+    if (!fresh?.needsReauth) return false;
+    section.replaceWith(buildGoogleProvider(fresh, user));
     return true;
   };
   const googleCall = async (request) => {

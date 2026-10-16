@@ -20,7 +20,8 @@ import assert from 'node:assert/strict';
 import { installMiniDom, MiniElement } from './mini-dom.js';
 
 installMiniDom();
-globalThis.window.yuvomi = { showToast() {} };
+const toasts = [];
+globalThis.window.yuvomi = { showToast: (message, kind) => toasts.push({ message, kind }) };
 
 const replaced = [];
 MiniElement.prototype.replaceWith = function replaceWith(next) { replaced.push({ from: this, to: next }); };
@@ -148,4 +149,28 @@ test('#2019: jeder Google-Aufruf der Karte läuft über googleCall (Status und T
     .filter((m) => !/googleCall\(\(\) => $/.test(src.slice(Math.max(0, m.index - 20), m.index)))
     .map((m) => m[0]);
   assert.deepEqual(unwrapped, [], 'ein Google-Aufruf der Karte umgeht handleReauth');
+});
+
+test('#2019: scheitert nach dem 409 der Status-Abruf, kommt der Fehler als Toast', async () => {
+  replaced.length = 0;
+  toasts.length = 0;
+  globalThis.__apiStub = {
+    get: async (path) => {
+      if (path === '/calendar/google/status') throw apiError(503, { error: 'offline', code: 503 });
+      return { data: [] };
+    },
+    post: async () => {
+      throw apiError(409, { error: 'Google sign-in expired - reconnect required.', code: 409, reason: 'google_reauth_required' });
+    },
+  };
+
+  const card = __test.buildGoogleProvider(connected, admin);
+  await settle();
+  const syncButton = findButton(card, 'settings.syncNow');
+  await Promise.all(syncButton.handlers.filter((h) => h.type === 'click').map((h) => h.handler({ type: 'click' })));
+  await settle();
+
+  assert.equal(replaced.length, 0, 'ohne frischen Status keine neue Karte');
+  assert.deepEqual(toasts.map((x) => x.message), ['Google sign-in expired - reconnect required.'],
+    'der ursprüngliche Fehler erscheint, statt still zu verschwinden');
 });
