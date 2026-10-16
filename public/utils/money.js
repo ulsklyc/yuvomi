@@ -81,6 +81,25 @@ export function currencyFractionDigits(currency) {
 }
 
 /**
+ * Ein Betrag, gerundet auf die Nachkommastellen seiner Währung - fuer
+ * VERGLEICHE, nicht zum Speichern (Critique R19, 2026-10-16).
+ *
+ * Eine Differenz zweier Summen ist ein Float: 1700,10 - 1700,00 ergibt
+ * 0,0999999…, und 300,30 - 300,20 - 0,10 ergibt 2,8e-14 statt 0. Wer darauf
+ * `delta === 0` fragt, bekommt "nein" und zeichnet einen steigenden roten
+ * Pfeil neben "0,00 €". Vor dem Vergleich auf die Waehrung runden; aus -0
+ * wird 0, damit kein Vorzeichen uebrig bleibt.
+ *
+ * @param {number} amount
+ * @param {string} currency ISO-Code
+ * @returns {number}
+ */
+export function roundToCurrency(amount, currency) {
+  const factor = 10 ** currencyFractionDigits(currency);
+  return (Math.round(Number(amount) * factor) / factor) || 0;
+}
+
+/**
  * Eingabe-Platzhalter für ein Betragsfeld: die Null im Zahlformat der
  * Format-Locale, mit den Nachkommastellen der Währung.
  * EUR/de -> "0,00", EUR/de-CH -> "0.00", JPY -> "0".

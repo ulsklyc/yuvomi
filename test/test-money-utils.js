@@ -424,3 +424,13 @@ test('amountToInput: der Dezimaltext des Servers geht nicht durch ein Gleitkomma
   }
   withFormatLocale('fa', () => assert.equal(amountToInput('90071992547409.91', 'EUR'), '۹۰۰۷۱۹۹۲۵۴۷۴۰۹٫۹۱'));
 });
+
+// Critique R19: Vergleiche auf Geld erst nach dem Runden auf die Waehrung.
+test('roundToCurrency: Float-Rest wird 0, -0 wird 0, die Nachkommastellen folgen der Waehrung', async () => {
+  const { roundToCurrency } = await import('../public/utils/money.js');
+  assert.equal(roundToCurrency(300.30 - 300.20 - 0.10, 'EUR'), 0);
+  assert.ok(Object.is(roundToCurrency(-0.0000001, 'EUR'), 0), '-0 bleibt als Vorzeichen stehen');
+  assert.equal(roundToCurrency(1700.10 - 1700.00, 'EUR'), 0.1);
+  assert.equal(roundToCurrency(12.4, 'JPY'), 12);
+  assert.equal(roundToCurrency(1.23456, 'KWD'), 1.235);
+});

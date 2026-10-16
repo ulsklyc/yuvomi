@@ -1660,7 +1660,6 @@
         "planMonthlyAmount": "Monthly amount",
         "planSavedToast": "Budget saved",
         "planRemovedToast": "Budget removed",
-        "planTarget": "Target: {{amount}}",
         "planEditAction": "Edit",
         "planDeleteConfirm": "Delete the budget for “{{category}}”?",
         "planSavingsDeleteConfirm": "Delete the savings goal?",
@@ -1780,7 +1779,9 @@
         "loanDueDayLabel": "Due day",
         "loanDueDayHint": "Optional: day of the month, 1 to 31. Installments marked as paid are then dated on this day instead of today. In shorter months the last day applies.",
         "loanDueDayInvalid": "Enter a day from 1 to 31, or leave it empty",
-        "loanPaymentAddedOnToast": "Payment recorded for {{date}}"
+        "loanPaymentAddedOnToast": "Payment recorded for {{date}}",
+        "planTargetOf": "of {{amount}}",
+        "planTargetSr": "Target {{amount}}, {{percent}} used"
     },
     "settings": {
         "healthCycleEnableLabel": "Show cycle tab",

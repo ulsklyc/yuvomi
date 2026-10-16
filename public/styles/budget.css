@@ -2601,6 +2601,24 @@ button.budget-entry__title {
   white-space: nowrap;
 }
 
+/* Das Ziel als Text (Critique R19): "von 1.700 €" unter dem Betrag, vor der
+ * Veraenderung. Die Marke auf der Bahn war bis dahin nur per `title` erklaert -
+ * am Touchgeraet gar nicht, fuer Screenreader nie. */
+.budget-bar-row--compare .budget-bar-row__delta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: baseline;
+  column-gap: var(--space-2);
+}
+
+.budget-bar-row__of {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 @container budget-page (min-width: 480px) {
   .budget-bar-row--compare {
     row-gap: var(--space-0h);

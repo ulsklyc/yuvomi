@@ -1660,7 +1660,6 @@
         "planMonthlyAmount": "Aylık tutar",
         "planSavedToast": "Bütçe kaydedildi",
         "planRemovedToast": "Bütçe kaldırıldı",
-        "planTarget": "Hedef: {{amount}}",
         "planEditAction": "Düzenle",
         "planDeleteConfirm": "“{{category}}” bütçesi silinsin mi?",
         "planSavingsDeleteConfirm": "Tasarruf hedefi silinsin mi?",
@@ -1780,7 +1779,9 @@
         "loanDueDayLabel": "Vade günü",
         "loanDueDayHint": "İsteğe bağlı: ayın günü, 1 ile 31 arası. Ödendi olarak işaretlenen taksitler bugün yerine bu günün tarihiyle kaydedilir. Daha kısa aylarda son gün geçerlidir.",
         "loanDueDayInvalid": "1 ile 31 arasında bir gün girin veya boş bırakın",
-        "loanPaymentAddedOnToast": "Ödeme {{date}} tarihiyle kaydedildi"
+        "loanPaymentAddedOnToast": "Ödeme {{date}} tarihiyle kaydedildi",
+        "planTargetOf": "{{amount}} hedefinden",
+        "planTargetSr": "Hedef {{amount}}, {{percent}} kullanıldı"
     },
     "settings": {
         "healthCycleEnableLabel": "Döngü sekmesini göster",

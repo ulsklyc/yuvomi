@@ -1892,7 +1892,6 @@
         "planMonthlyAmount": "المبلغ الشهري",
         "planSavedToast": "تم حفظ الميزانية",
         "planRemovedToast": "تمت إزالة الميزانية",
-        "planTarget": "الهدف: {{amount}}",
         "planEditAction": "تحرير",
         "planDeleteConfirm": "حذف ميزانية «{{category}}»؟",
         "planSavingsDeleteConfirm": "حذف هدف الادخار؟",
@@ -2015,7 +2014,9 @@
         "loanDueDayLabel": "يوم الاستحقاق",
         "loanDueDayHint": "اختياري: يوم من الشهر، من 1 إلى 31. تُؤرَّخ الأقساط التي تُسجَّل كمدفوعة بهذا اليوم بدلاً من اليوم الحالي. في الأشهر الأقصر يُعتمد اليوم الأخير.",
         "loanDueDayInvalid": "أدخل يوماً من 1 إلى 31 أو اترك الحقل فارغاً",
-        "loanPaymentAddedOnToast": "تم تسجيل الدفع بتاريخ {{date}}"
+        "loanPaymentAddedOnToast": "تم تسجيل الدفع بتاريخ {{date}}",
+        "planTargetOf": "من {{amount}}",
+        "planTargetSr": "الهدف {{amount}}، تم استخدام {{percent}}"
     },
     "settings": {
         "healthCycleEnableLabel": "إظهار علامة تبويب الدورة",

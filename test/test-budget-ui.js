@@ -6399,3 +6399,51 @@ test('der Buchungsdialog meldet ueber reportFieldErrors(entryFormErrors(...)) un
     assert.ok(readFileSync(new URL(`../public/pages/${file}`, import.meta.url), 'utf8').includes(marker), `${file}: ${marker}`);
   }
 });
+
+// ── Statistik: Trend auf die Waehrung gerundet, Ziel als Text (Critique R19) ─
+async function renderCatBarsWith({ byCategory, prevByCategory, plans = {} }) {
+  const { __test: st } = await import('../public/pages/budget-stats.js');
+  const view = st.statsView();
+  const saved = { root: view.root, data: view.data, prev: view.prev, ctx: view.ctx };
+  let html = '';
+  const host = { replaceChildren() { html = ''; }, insertAdjacentHTML(_where, markup) { html += markup; } };
+  Object.assign(view, {
+    root: { querySelector: (sel) => (sel === '#budget-stats-cat' ? host : null) },
+    data: { range: 'month', plans, byCategory },
+    prev: prevByCategory ? { byCategory: prevByCategory } : null,
+    ctx: {
+      esc: (s) => String(s), currency: 'EUR',
+      formatAmount: (n) => `${n} €`, categoryLabel: (c) => c,
+    },
+  });
+  try {
+    st.renderCatBars();
+    return html;
+  } finally {
+    Object.assign(view, saved);
+  }
+}
+
+test('Statistik: eine Differenz, die nur ein Rundungsrest ist, zeigt keinen Pfeil (Critique R19)', async () => {
+  // 300,30 - 300,20 - 0,10 ist im Float 2,8e-14, nicht 0.
+  const html = await renderCatBarsWith({
+    byCategory: [{ category: 'food', expenses: -(300.30 - 300.20 - 0.10 + 50) }],
+    prevByCategory: [{ category: 'food', expenses: -50 }],
+  });
+  assert.match(html, /metric-card__trend--neutral/, 'die Null-Differenz traegt eine Valenz');
+  assert.match(html, /data-lucide="minus"/);
+  assert.doesNotMatch(html, /trending-up|trending-down/);
+});
+
+test('Statistik: das Ziel steht als Text, und seine Marke klemmt nicht an der Kante (Critique R19)', async () => {
+  const html = await renderCatBarsWith({
+    byCategory: [{ category: 'food', expenses: -1200 }, { category: 'rent', expenses: -600 }],
+    plans: { food: 1700 },
+  });
+  // Skala ueber max(Betrag, Ziel): das Ziel 1700 ist der Rand, 1200 bleibt darunter.
+  assert.match(html, /budget-bar-row__target" style="--target-pos:1\.0000" aria-hidden="true"/);
+  assert.match(html, /--bar-scale:0\.7059/, 'der Betrag skaliert gegen das Ziel, nicht gegen sich selbst');
+  assert.match(html, /<span aria-hidden="true">budget\.planTargetOf\{"amount":"1700 €"\}<\/span>/);
+  assert.match(html, /class="sr-only">budget\.planTargetSr\{"amount":"1700 €","percent":"[^"]+"\}/);
+  assert.doesNotMatch(html, /title="budget\.planTarget/, 'das Ziel ist wieder nur per title erklaert');
+});

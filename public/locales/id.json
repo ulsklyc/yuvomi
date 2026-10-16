@@ -1674,7 +1674,6 @@
         "planMonthlyAmount": "Jumlah bulanan",
         "planSavedToast": "Anggaran disimpan",
         "planRemovedToast": "Anggaran dihapus",
-        "planTarget": "Target: {{amount}}",
         "planEditAction": "Edit",
         "planDeleteConfirm": "Hapus anggaran untuk “{{category}}”?",
         "planSavingsDeleteConfirm": "Hapus target tabungan?",
@@ -1794,7 +1793,9 @@
         "loanDueDayLabel": "Hari jatuh tempo",
         "loanDueDayHint": "Opsional: tanggal dalam bulan, 1 sampai 31. Cicilan yang ditandai terbayar akan diberi tanggal ini, bukan hari ini. Pada bulan yang lebih pendek berlaku hari terakhir.",
         "loanDueDayInvalid": "Masukkan tanggal dari 1 sampai 31, atau kosongkan",
-        "loanPaymentAddedOnToast": "Pembayaran dicatat per {{date}}"
+        "loanPaymentAddedOnToast": "Pembayaran dicatat per {{date}}",
+        "planTargetOf": "dari {{amount}}",
+        "planTargetSr": "Target {{amount}}, terpakai {{percent}}"
     },
     "settings": {
         "healthCycleEnableLabel": "Tampilkan tab siklus",

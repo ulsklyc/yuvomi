@@ -1674,7 +1674,6 @@
         "planMonthlyAmount": "Buwanang halaga",
         "planSavedToast": "Na-save ang badyet",
         "planRemovedToast": "Naalis ang badyet",
-        "planTarget": "Target: {{amount}}",
         "planEditAction": "I-edit",
         "planDeleteConfirm": "Tanggalin ang badyet para sa \"{{category}}\"?",
         "planSavingsDeleteConfirm": "Tanggalin ang layunin sa pag-iipon?",
@@ -1794,7 +1793,9 @@
         "loanDueDayLabel": "Araw ng taning",
         "loanDueDayHint": "Opsyonal: araw ng buwan, 1 hanggang 31. Ang mga hulog na minarkahang bayad ay itatala sa araw na ito sa halip na ngayong araw. Sa mas maiikling buwan, ang huling araw ang gagamitin.",
         "loanDueDayInvalid": "Maglagay ng araw mula 1 hanggang 31, o iwanang blangko",
-        "loanPaymentAddedOnToast": "Naitala ang bayad sa petsang {{date}}"
+        "loanPaymentAddedOnToast": "Naitala ang bayad sa petsang {{date}}",
+        "planTargetOf": "sa {{amount}}",
+        "planTargetSr": "Target {{amount}}, nagamit ang {{percent}}"
     },
     "settings": {
         "healthCycleEnableLabel": "Ipakita ang tab ng siklo",

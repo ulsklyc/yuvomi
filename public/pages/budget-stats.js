@@ -11,7 +11,7 @@ import { renderSkeletonChart } from '/utils/skeleton.js';
 import { growBars, drawChartOnce } from '/utils/ux.js';
 import { mountEmptyState, mountLoadError } from '/utils/empty-state.js';
 import { CHART, chartX, chartY, chartGridMarkup, chartXLabelsMarkup, calmDomain } from '/utils/chart.js';
-import { formatMoneyAxis, formatSignedAmount, sharePercent } from '/utils/money.js';
+import { formatMoneyAxis, formatSignedAmount, sharePercent, roundToCurrency } from '/utils/money.js';
 import { addLocalDays, todayKey } from '/utils/date.js';
 import { trendMarkup } from '/utils/metric-card.js';
 
@@ -299,8 +299,11 @@ function renderCatBars() {
 
   const colors = categoryColorIndex(view.data.byCategory);
   const html = blocks.map(({ kind, labelKey, betterWhen, rows }) => {
-    // DAS EIGENE MAXIMUM DES BLOCKS, wie im Monats-Diagramm.
-    const max = Math.max(...rows.map((r) => Math.abs(r.amount)), 1);
+    // DAS EIGENE MAXIMUM DES BLOCKS, wie im Monats-Diagramm - samt der Ziele
+    // (Critique R19): eine Zielmarke ueber dem groessten Betrag klemmte vorher
+    // per Math.min an der Kante und sagte damit "Ziel erreicht", wo noch Luft war.
+    const targetOf = (r) => (kind === 'expenses' && plans[r.category] != null ? Number(plans[r.category]) : null);
+    const max = Math.max(...rows.map((r) => Math.abs(r.amount)), ...rows.map((r) => targetOf(r) ?? 0), 1);
     const total = rows.reduce((sum, r) => sum + r.amount, 0);
     const absTotal = rows.reduce((sum, r) => sum + Math.abs(r.amount), 0);
     const titleId = `budget-stats-${kind}-title`;
@@ -308,19 +311,27 @@ function renderCatBars() {
       // Der Anteil ist der Anteil: kein Boden (Critique 2026-08-13, Guard in
       // test:frontend-audit) - der Mindeststummel steht als Laenge im CSS.
       const scale = Math.abs(r.amount) / max;
-      const target = kind === 'expenses' ? plans[r.category] : undefined;
-      const targetPos = target != null ? Math.min(1, target / max) : null;
-      const targetMarker = targetPos != null
-        ? `<div class="budget-bar-row__target" style="--target-pos:${targetPos.toFixed(4)}"
-               title="${view.ctx.esc(t('budget.planTarget', { amount: view.ctx.formatAmount(target) }))}"></div>`
+      const target = targetOf(r);
+      // Die Marke ist nur noch Bild: was sie sagt, steht als Text unter dem
+      // Betrag ("von 1.700 €") und fuer Screenreader samt Ausschoepfung.
+      const targetMarker = target != null
+        ? `<div class="budget-bar-row__target" style="--target-pos:${(target / max).toFixed(4)}" aria-hidden="true"></div>`
+        : '';
+      const targetText = target != null
+        ? `<span class="budget-bar-row__of"><span aria-hidden="true">${view.ctx.esc(t('budget.planTargetOf', { amount: view.ctx.formatAmount(target) }))}</span><span class="sr-only">${view.ctx.esc(t('budget.planTargetSr', {
+          amount: view.ctx.formatAmount(target),
+          percent: target > 0 ? sharePercent(Math.abs(r.amount), target) : '-',
+        }))}</span></span>`
         : '';
       const catLabel = view.ctx.esc(view.ctx.categoryLabel(r.category));
       // Betragsraum wie auf den Karten: Ausgaben als Betrag, damit „+" mehr
       // ausgegeben heisst und nicht weniger.
-      const delta = Math.abs(r.amount) - Math.abs(r.prev);
-      const deltaHtml = hasPrev
+      // Auf die Waehrung gerundet (Critique R19): sonst trug eine Differenz
+      // von 2e-14 einen roten Pfeil neben "0,00 €".
+      const delta = roundToCurrency(Math.abs(r.amount) - Math.abs(r.prev), view.ctx.currency);
+      const deltaHtml = (hasPrev
         ? trendMarkup({ delta, betterWhen, text: view.ctx.esc(signed(delta)) })
-        : '';
+        : '');
       // Ausgaben: Farbe des Donut-Segments und der Anteil als Text - die Farbe
       // ist Zuordnung, der Anteil die Aussage (auch ohne Farbsehen lesbar).
       const colorIndex = kind === 'expenses' ? colors.get(r.category) : undefined;
@@ -336,7 +347,7 @@ function renderCatBars() {
             ${targetMarker}
           </div>
           <div class="budget-bar-row__amount">${view.ctx.esc(signed(r.amount))}${share}</div>
-          ${deltaHtml ? `<div class="budget-bar-row__delta">${deltaHtml}</div>` : ''}
+          ${deltaHtml || targetText ? `<div class="budget-bar-row__delta">${targetText}${deltaHtml}</div>` : ''}
         </div>`;
     }).join('');
     return `
@@ -783,7 +794,7 @@ function periodLabel(period) {
  * Kennzahl-Karten - die Karten selbst stehen auf der Uebersicht. */
 function totalTrend(current, previous, betterWhen) {
   if (previous == null) return '';
-  const delta = current - previous;
+  const delta = roundToCurrency(current - previous, view.ctx.currency);
   return ` ${trendMarkup({ delta, betterWhen, text: view.ctx.esc(signed(delta)) })}`;
 }
 
@@ -864,4 +875,4 @@ function updatePeriodLabel() {
 }
 
 // Nur fuer Tests: die Farbzuordnung von Balken und Donut (R14 P8).
-export const __test = { fetchStats, statsView: () => view, categoryColorIndex, DONUT_SEGMENTS, futureStartIndex, TREND_CHART_NARROW, calmAxis, markLabelPlan, todayAnchor, axisLabels };
+export const __test = { fetchStats, statsView: () => view, renderCatBars, categoryColorIndex, DONUT_SEGMENTS, futureStartIndex, TREND_CHART_NARROW, calmAxis, markLabelPlan, todayAnchor, axisLabels };

@@ -1660,7 +1660,6 @@
         "planMonthlyAmount": "Số tiền hằng tháng",
         "planSavedToast": "Đã lưu ngân sách",
         "planRemovedToast": "Đã xoá ngân sách",
-        "planTarget": "Mục tiêu: {{amount}}",
         "planEditAction": "Chỉnh sửa",
         "planDeleteConfirm": "Xoá ngân sách cho “{{category}}”?",
         "planSavingsDeleteConfirm": "Xoá mục tiêu tiết kiệm?",
@@ -1780,7 +1779,9 @@
         "loanDueDayLabel": "Ngày đáo hạn",
         "loanDueDayHint": "Tùy chọn: ngày trong tháng, từ 1 đến 31. Các kỳ được đánh dấu đã trả sẽ được ghi vào ngày này thay vì hôm nay. Với tháng ngắn hơn, ngày cuối tháng được áp dụng.",
         "loanDueDayInvalid": "Nhập ngày từ 1 đến 31 hoặc để trống",
-        "loanPaymentAddedOnToast": "Đã ghi nhận thanh toán vào ngày {{date}}"
+        "loanPaymentAddedOnToast": "Đã ghi nhận thanh toán vào ngày {{date}}",
+        "planTargetOf": "trên {{amount}}",
+        "planTargetSr": "Mục tiêu {{amount}}, đã dùng {{percent}}"
     },
     "settings": {
         "healthCycleEnableLabel": "Hiện tab chu kỳ",

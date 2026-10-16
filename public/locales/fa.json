@@ -1674,7 +1674,6 @@
         "planMonthlyAmount": "مبلغ ماهانه",
         "planSavedToast": "بودجه ذخیره شد",
         "planRemovedToast": "بودجه حذف شد",
-        "planTarget": "هدف: {{amount}}",
         "planEditAction": "ویرایش",
         "planDeleteConfirm": "بودجهٔ «{{category}}» حذف شود؟",
         "planSavingsDeleteConfirm": "هدف پس‌انداز حذف شود؟",
@@ -1794,7 +1793,9 @@
         "loanDueDayLabel": "روز سررسید",
         "loanDueDayHint": "اختیاری: روزی از ماه، از 1 تا 31. اقساطی که پرداخت‌شده علامت می‌خورند به جای امروز با این روز ثبت می‌شوند. در ماه‌های کوتاه‌تر آخرین روز ماه در نظر گرفته می‌شود.",
         "loanDueDayInvalid": "روزی از 1 تا 31 وارد کنید یا خالی بگذارید",
-        "loanPaymentAddedOnToast": "پرداخت با تاریخ {{date}} ثبت شد"
+        "loanPaymentAddedOnToast": "پرداخت با تاریخ {{date}} ثبت شد",
+        "planTargetOf": "از {{amount}}",
+        "planTargetSr": "هدف {{amount}}، {{percent}} مصرف شده"
     },
     "settings": {
         "healthCycleEnableLabel": "نمایش برگهٔ چرخه",

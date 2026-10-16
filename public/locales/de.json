@@ -1674,7 +1674,6 @@
         "planMonthlyAmount": "Monatlicher Betrag",
         "planSavedToast": "Budget gespeichert",
         "planRemovedToast": "Budget entfernt",
-        "planTarget": "Ziel: {{amount}}",
         "planEditAction": "Bearbeiten",
         "planDeleteConfirm": "Budget für „{{category}}\" wirklich löschen?",
         "planSavingsDeleteConfirm": "Sparziel wirklich löschen?",
@@ -1794,7 +1793,9 @@
         "loanDueDayLabel": "Fälligkeitstag",
         "loanDueDayHint": "Optional: Tag im Monat, 1 bis 31. Als bezahlt markierte Raten werden dann auf diesen Tag gebucht statt auf heute. In kürzeren Monaten gilt der letzte Tag.",
         "loanDueDayInvalid": "Tag von 1 bis 31 eingeben oder leer lassen",
-        "loanPaymentAddedOnToast": "Zahlung erfasst zum {{date}}"
+        "loanPaymentAddedOnToast": "Zahlung erfasst zum {{date}}",
+        "planTargetOf": "von {{amount}}",
+        "planTargetSr": "Ziel {{amount}}, zu {{percent}} ausgeschöpft"
     },
     "settings": {
         "healthCycleEnableLabel": "Zyklus-Tab anzeigen",

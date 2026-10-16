@@ -1660,7 +1660,6 @@
         "planMonthlyAmount": "Montant mensuel",
         "planSavedToast": "Budget enregistré",
         "planRemovedToast": "Budget supprimé",
-        "planTarget": "Objectif : {{amount}}",
         "planEditAction": "Modifier",
         "planDeleteConfirm": "Supprimer le budget de « {{category}} » ?",
         "planSavingsDeleteConfirm": "Supprimer l’objectif d’épargne ?",
@@ -1780,7 +1779,9 @@
         "loanDueDayLabel": "Jour d’échéance",
         "loanDueDayHint": "Facultatif : jour du mois, de 1 à 31. Les échéances marquées comme payées sont alors datées de ce jour et non d’aujourd’hui. Les mois plus courts prennent leur dernier jour.",
         "loanDueDayInvalid": "Indiquez un jour de 1 à 31 ou laissez le champ vide",
-        "loanPaymentAddedOnToast": "Paiement enregistré au {{date}}"
+        "loanPaymentAddedOnToast": "Paiement enregistré au {{date}}",
+        "planTargetOf": "sur {{amount}}",
+        "planTargetSr": "Objectif {{amount}}, utilisé à {{percent}}"
     },
     "settings": {
         "healthCycleEnableLabel": "Afficher l’onglet cycle",

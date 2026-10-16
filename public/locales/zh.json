@@ -1660,7 +1660,6 @@
         "planMonthlyAmount": "每月金额",
         "planSavedToast": "预算已保存",
         "planRemovedToast": "预算已删除",
-        "planTarget": "目标：{{amount}}",
         "planEditAction": "编辑",
         "planDeleteConfirm": "删除“{{category}}”的预算？",
         "planSavingsDeleteConfirm": "删除储蓄目标？",
@@ -1780,7 +1779,9 @@
         "loanDueDayLabel": "还款日",
         "loanDueDayHint": "可选：每月的日期，1 到 31。标记为已还的期数将记在这一天，而不是今天。天数较少的月份取最后一天。",
         "loanDueDayInvalid": "请输入 1 到 31 之间的日期，或留空",
-        "loanPaymentAddedOnToast": "还款已记录，日期为 {{date}}"
+        "loanPaymentAddedOnToast": "还款已记录，日期为 {{date}}",
+        "planTargetOf": "共 {{amount}}",
+        "planTargetSr": "目标 {{amount}}，已用 {{percent}}"
     },
     "settings": {
         "healthCycleEnableLabel": "显示周期标签页",

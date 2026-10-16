@@ -1828,7 +1828,6 @@
         "planMonthlyAmount": "Kwota miesięczna",
         "planSavedToast": "Budżet zapisany",
         "planRemovedToast": "Budżet usunięty",
-        "planTarget": "Cel: {{amount}}",
         "planEditAction": "Edytuj",
         "planDeleteConfirm": "Usunąć budżet dla „{{category}}”?",
         "planSavingsDeleteConfirm": "Usunąć cel oszczędności?",
@@ -1950,7 +1949,9 @@
         "loanDueDayLabel": "Dzień płatności",
         "loanDueDayHint": "Opcjonalnie: dzień miesiąca, od 1 do 31. Raty oznaczone jako zapłacone otrzymują wtedy datę tego dnia zamiast dzisiejszej. W krótszych miesiącach obowiązuje ostatni dzień.",
         "loanDueDayInvalid": "Podaj dzień od 1 do 31 albo zostaw pole puste",
-        "loanPaymentAddedOnToast": "Płatność zarejestrowana z datą {{date}}"
+        "loanPaymentAddedOnToast": "Płatność zarejestrowana z datą {{date}}",
+        "planTargetOf": "z {{amount}}",
+        "planTargetSr": "Cel {{amount}}, wykorzystano {{percent}}"
     },
     "settings": {
         "healthCycleEnableLabel": "Pokaż kartę cyklu",

@@ -1660,7 +1660,6 @@
         "planMonthlyAmount": "月額",
         "planSavedToast": "予算を保存しました",
         "planRemovedToast": "予算を削除しました",
-        "planTarget": "目標: {{amount}}",
         "planEditAction": "編集",
         "planDeleteConfirm": "「{{category}}」の予算を削除しますか？",
         "planSavingsDeleteConfirm": "貯蓄目標を削除しますか？",
@@ -1780,7 +1779,9 @@
         "loanDueDayLabel": "支払日",
         "loanDueDayHint": "任意：毎月の日付（1から31）。返済済みにした回は、今日ではなくこの日付で記録されます。日数の少ない月は末日になります。",
         "loanDueDayInvalid": "1から31の日付を入力するか、空欄にしてください",
-        "loanPaymentAddedOnToast": "{{date}}付で返済を記録しました"
+        "loanPaymentAddedOnToast": "{{date}}付で返済を記録しました",
+        "planTargetOf": "{{amount}} 中",
+        "planTargetSr": "目標 {{amount}}、{{percent}} 使用済み"
     },
     "settings": {
         "healthCycleEnableLabel": "周期タブを表示",

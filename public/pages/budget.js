@@ -27,7 +27,7 @@ import { renderPlans, openAddPlan } from '/pages/budget-plans.js';
 import { toLocalDateKey, parseLocalDateKey, addLocalDays,
          monthPeriodKeys, defaultDateInPeriod,
         todayKey} from '/utils/date.js';
-import { formatMoney, formatSignedAmount, amountPlaceholder, amountStep, amountMin, applyAmountFormat, amountIsSavable, smallestUnitLabel, sharePercent } from '/utils/money.js';
+import { formatMoney, formatSignedAmount, amountPlaceholder, amountStep, amountMin, applyAmountFormat, amountIsSavable, smallestUnitLabel, sharePercent, roundToCurrency } from '/utils/money.js';
 import { budgetCategoryLabel } from '/utils/category-labels.js';
 import { trendMarkup, leadCardClass } from '/utils/metric-card.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
@@ -3686,8 +3686,10 @@ function renderLoanCard(loan) {
  * @param {'higher'|'lower'} betterWhen Welche Richtung die gute ist
  */
 function renderTrend(current, prev, prevLabel, betterWhen = 'higher') {
-  const delta = current - prev;
-  if (Math.abs(delta) < 0.005) {
+  // Auf die Waehrung gerundet (Critique R19, roundToCurrency): die feste
+  // Schwelle 0,005 kannte nur Waehrungen mit zwei Nachkommastellen.
+  const delta = roundToCurrency(current - prev, state.currency);
+  if (delta === 0) {
     return trendMarkup({
       delta: 0, text: esc(t('budget.trendNeutral', { month: prevLabel })), icon: false,
     });

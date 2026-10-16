@@ -1660,7 +1660,6 @@
         "planMonthlyAmount": "Havi összeg",
         "planSavedToast": "Költségkeret mentve",
         "planRemovedToast": "Költségkeret törölve",
-        "planTarget": "Cél: {{amount}}",
         "planEditAction": "Szerkesztés",
         "planDeleteConfirm": "Törli a(z) „{{category}}” költségkeretét?",
         "planSavingsDeleteConfirm": "Törli a megtakarítási célt?",
@@ -1780,7 +1779,9 @@
         "loanDueDayLabel": "Esedékesség napja",
         "loanDueDayHint": "Nem kötelező: a hónap napja, 1 és 31 között. A fizetettként jelölt részletek ekkor erre a napra kerülnek a mai nap helyett. Rövidebb hónapokban az utolsó nap érvényes.",
         "loanDueDayInvalid": "Adjon meg egy napot 1 és 31 között, vagy hagyja üresen",
-        "loanPaymentAddedOnToast": "Fizetés rögzítve ezzel a dátummal: {{date}}"
+        "loanPaymentAddedOnToast": "Fizetés rögzítve ezzel a dátummal: {{date}}",
+        "planTargetOf": "/ {{amount}}",
+        "planTargetSr": "Cél: {{amount}}, {{percent}} felhasználva"
     },
     "settings": {
         "healthCycleEnableLabel": "Ciklus fül megjelenítése",

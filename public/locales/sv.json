@@ -1660,7 +1660,6 @@
         "planMonthlyAmount": "Månadsbelopp",
         "planSavedToast": "Budget sparad",
         "planRemovedToast": "Budget borttagen",
-        "planTarget": "Mål: {{amount}}",
         "planEditAction": "Redigera",
         "planDeleteConfirm": "Ta bort budgeten för ”{{category}}”?",
         "planSavingsDeleteConfirm": "Ta bort sparmålet?",
@@ -1780,7 +1779,9 @@
         "loanDueDayLabel": "Förfallodag",
         "loanDueDayHint": "Valfritt: dag i månaden, 1 till 31. Delbetalningar som markeras som betalda dateras då på den här dagen i stället för i dag. I kortare månader gäller den sista dagen.",
         "loanDueDayInvalid": "Ange en dag från 1 till 31, eller lämna fältet tomt",
-        "loanPaymentAddedOnToast": "Betalning registrerad med datum {{date}}"
+        "loanPaymentAddedOnToast": "Betalning registrerad med datum {{date}}",
+        "planTargetOf": "av {{amount}}",
+        "planTargetSr": "Mål {{amount}}, {{percent}} använt"
     },
     "settings": {
         "healthCycleEnableLabel": "Visa cykelfliken",

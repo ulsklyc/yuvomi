@@ -101,6 +101,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   by the server, with the possible range in the API description); values that are possible but
   unusual show a short "please check" note while you type and can still be saved.
 
+- **Budget statistics: a zero change looks like one, and plan targets are spelled out.** A
+  category whose total did not change could show a red rising arrow next to "0.00 €" because of a
+  rounding remainder; changes are now rounded to the currency first. The plan target on each
+  category bar was explained only in a hover tooltip and stuck to the bar's end when it exceeded the
+  largest amount: the scale now covers both, and the target reads "of 1,700.00 €" under the amount,
+  with how much of it is used for screen readers.
+
 - **Calendar: "Manage calendars" is reachable on tablets and phones again.** Below 1024px the
   button was hidden along with the empty header slot, so calendars could not be created, recolored
   or reordered there. The calendar filter now lists "Manage calendars" under its calendars, at

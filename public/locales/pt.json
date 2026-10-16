@@ -1660,7 +1660,6 @@
         "planMonthlyAmount": "Valor mensal",
         "planSavedToast": "Orçamento salvo",
         "planRemovedToast": "Orçamento removido",
-        "planTarget": "Meta: {{amount}}",
         "planEditAction": "Editar",
         "planDeleteConfirm": "Excluir o orçamento de “{{category}}”?",
         "planSavingsDeleteConfirm": "Excluir a meta de poupança?",
@@ -1780,7 +1779,9 @@
         "loanDueDayLabel": "Dia de vencimento",
         "loanDueDayHint": "Opcional: dia do mês, de 1 a 31. As parcelas marcadas como pagas passam a ser datadas neste dia, e não hoje. Nos meses mais curtos vale o último dia.",
         "loanDueDayInvalid": "Introduza um dia de 1 a 31 ou deixe o campo vazio",
-        "loanPaymentAddedOnToast": "Pagamento registado com data de {{date}}"
+        "loanPaymentAddedOnToast": "Pagamento registado com data de {{date}}",
+        "planTargetOf": "de {{amount}}",
+        "planTargetSr": "Objetivo {{amount}}, {{percent}} utilizado"
     },
     "settings": {
         "healthCycleEnableLabel": "Mostrar a aba de ciclo",

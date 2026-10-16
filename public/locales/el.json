@@ -1660,7 +1660,6 @@
         "planMonthlyAmount": "Μηνιαίο ποσό",
         "planSavedToast": "Ο προϋπολογισμός αποθηκεύτηκε",
         "planRemovedToast": "Ο προϋπολογισμός αφαιρέθηκε",
-        "planTarget": "Στόχος: {{amount}}",
         "planEditAction": "Επεξεργασία",
         "planDeleteConfirm": "Διαγραφή του προϋπολογισμού για «{{category}}»;",
         "planSavingsDeleteConfirm": "Διαγραφή του στόχου αποταμίευσης;",
@@ -1780,7 +1779,9 @@
         "loanDueDayLabel": "Ημέρα λήξης",
         "loanDueDayHint": "Προαιρετικό: ημέρα του μήνα, 1 έως 31. Οι δόσεις που σημειώνονται ως πληρωμένες παίρνουν τότε αυτή την ημέρα αντί για τη σημερινή. Στους μικρότερους μήνες ισχύει η τελευταία ημέρα.",
         "loanDueDayInvalid": "Εισαγάγετε ημέρα από 1 έως 31 ή αφήστε το πεδίο κενό",
-        "loanPaymentAddedOnToast": "Η πληρωμή καταγράφηκε με ημερομηνία {{date}}"
+        "loanPaymentAddedOnToast": "Η πληρωμή καταγράφηκε με ημερομηνία {{date}}",
+        "planTargetOf": "από {{amount}}",
+        "planTargetSr": "Στόχος {{amount}}, χρησιμοποιήθηκε το {{percent}}"
     },
     "settings": {
         "healthCycleEnableLabel": "Εμφάνιση καρτέλας κύκλου",
