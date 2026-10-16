@@ -173,20 +173,20 @@ export async function addSubtask(parentId, title, { onChanged = () => {} } = {})
 // keine Durchgangsstation. Es steht nur nicht mehr im Weg.
 const STATUS_ACTIONS = {
   open: [
-    // ERLEDIGEN STEHT VORN (Critique R18, 2026-10-07): der haeufigste Grund,
-    // eine Aufgabe zu oeffnen, ist sie abzuhaken. Primaer ist er nur, solange
-    // es kein Bearbeiten gibt (Nur-lesen-Ansicht mit Statusrecht): seit R19
-    // ist Bearbeiten in JEDEM Blatt der eine Primaerknopf am Ende des Fusses,
-    // und withPrimaryEdit (detail-view.js) nimmt Erledigen dann auf sekundaer
-    // zurueck - zwei gefuellte Knoepfe in einem Fuss gibt es nicht.
+    // ERLEDIGEN IST DIE HAUPTAKTION DER AUFGABE (Critique R18, 2026-10-07;
+    // Ulas 2026-10-16). Der haeufigste Grund, eine Aufgabe zu oeffnen, ist sie
+    // abzuhaken. Deshalb ist die Aufgabe die EINE benannte Ausnahme von
+    // "Bearbeiten ist ueberall primaer" (withPrimaryEdit, `keepPrimary`):
+    // Erledigen bleibt gefuellt, Bearbeiten tritt sekundaer davor.
     { id: 'task-detail-finish', status: 'done',        labelKey: 'tasks.detailFinish', icon: 'check',      variant: 'primary' },
     { id: 'task-detail-start',  status: 'in_progress', labelKey: 'tasks.detailStart',  icon: 'circle-dot', variant: 'ghost' },
   ],
   in_progress: [
     { id: 'task-detail-finish', status: 'done',        labelKey: 'tasks.detailFinish', icon: 'check',      variant: 'primary' },
   ],
+  // Fuer eine erledigte Aufgabe ist der Rueckweg dasselbe: Wieder oeffnen.
   done: [
-    { id: 'task-detail-reopen', status: 'open',        labelKey: 'tasks.detailReopen', icon: 'rotate-ccw', variant: 'secondary' },
+    { id: 'task-detail-reopen', status: 'open',        labelKey: 'tasks.detailReopen', icon: 'rotate-ccw', variant: 'primary' },
   ],
 };
 
@@ -1119,6 +1119,18 @@ export function openTaskDetail({
     },
   }] : [];
 
+  // Ablegen und Zurückholen sind derselbe Schalter - was er tut, hängt daran, wo
+  // die Aufgabe gerade liegt.
+  if (canEdit) {
+    actions.push({
+      id: 'task-detail-archive',
+      label: archived ? t('tasks.unarchiveButton') : t('tasks.archiveButton'),
+      variant: 'ghost',
+      icon: archived ? 'archive-restore' : 'archive',
+      onClick: ({ button, close }) => toggleTaskArchive(task, button, ctx, close),
+    });
+  }
+
   // Der häufigste Grund, eine Aufgabe zu öffnen, ist sie abzuhaken. Bisher
   // führte dieser Weg durch ein Formular mit sieben Auswahlfeldern.
   //
@@ -1132,7 +1144,10 @@ export function openTaskDetail({
   let viewClose = closeDetailView;
   const doers = doerChoices(task, ctx, archived);
   if (!isNavModuleReadOnly('tasks')) {
-    statusActions.forEach((step) => {
+    // Der Primaerknopf (Erledigen/Wieder oeffnen) steht zuletzt, direkt vor
+    // seinem Personenknopf: am Ende des Fusses, wo der Daumen liegt, und
+    // Bearbeiten tritt sekundaer davor (withPrimaryEdit, `keepPrimary`).
+    [...statusActions].sort((a, b) => (a.variant === 'primary') - (b.variant === 'primary')).forEach((step) => {
       actions.push({
         id: step.id,
         label: t(step.labelKey),
@@ -1152,24 +1167,11 @@ export function openTaskDetail({
     });
   }
 
-  // Ablegen und Zurückholen sind derselbe Schalter - was er tut, hängt daran, wo
-  // die Aufgabe gerade liegt.
-  if (canEdit) {
-    actions.push({
-      id: 'task-detail-archive',
-      label: archived ? t('tasks.unarchiveButton') : t('tasks.archiveButton'),
-      variant: 'ghost',
-      icon: archived ? 'archive-restore' : 'archive',
-      onClick: ({ button, close }) => toggleTaskArchive(task, button, ctx, close),
-    });
-  }
-
   // MOBIL EINE REIHE (Re-Critique 2026-09-28, P8 / A3 P3-2): Starten und
   // Archivieren treten auf dem Telefon in EIN Mehr-Menue (detail-view.css);
   // am Desktop stehen sie weiter im Fuss, und dort gibt es den Knopf nicht.
-  // Seit R19 auch Loeschen: Bearbeiten steht als Primaerknopf am Ende des
-  // Fusses (withPrimaryEdit), und mit Loeschen, Erledigen, Wer, Mehr und
-  // Bearbeiten brach der Fuss auf dem Telefon wieder auf zwei Reihen.
+  // Seit R19 auch Loeschen: mit Loeschen, Bearbeiten, Erledigen, Wer und
+  // Mehr brach der Fuss auf dem Telefon wieder auf zwei Reihen.
   const overflowIds = ['task-detail-start', 'task-detail-archive', 'task-detail-delete'];
   if (actions.some((a) => overflowIds.includes(a.id))) {
     actions.push({ id: MORE_BUTTON_ID, label: '', variant: 'ghost', icon: 'more-horizontal' });
@@ -1188,6 +1190,8 @@ export function openTaskDetail({
     onClose: onClose ?? undefined,
     sections: renderTaskDetail(task, reminder, ctx),
     actions,
+    // Erledigen bzw. Wieder oeffnen bleibt der Primaerknopf (siehe STATUS_ACTIONS).
+    keepPrimary: true,
     edit: canEdit && edit ? {
       label: t('common.edit'),
       title: t('tasks.editTask'),

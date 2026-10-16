@@ -50,10 +50,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Avatars of several people no longer overlap.** Where a task, event or meal shows who is
   involved, the faces stand side by side with a small gap in reading order, so no initials are cut
   off, and "+N" comes last.
-- **Edit is the same filled button at the bottom of every detail view.** Tasks, recipes, contacts,
+- **Edit is the same filled button at the bottom of every detail view.** Recipes, contacts,
   inventory, birthdays and events show "Edit" as the main button at the end of the bottom bar, on a
   phone, in a popover and in the detail column on a computer. Before, it sometimes sat outlined at
-  the top. On a phone, deleting a task moved into the "..." menu so the bar stays one row.
+  the top. Tasks are the one exception: there "Done" (or "Reopen" for a finished task) stays the
+  filled button, because ticking a task off is why you open it most; "Edit" sits next to it as a
+  quieter button, a pencil on a phone, and deleting a task moved into the "..." menu so the bar
+  stays one row.
 - **Tapping a recipe on a phone opens it.** The recipe opens as a sheet with its ingredients, notes
   and the buttons to plan or shop it, like a contact or a task, instead of unfolding inside the
   list.

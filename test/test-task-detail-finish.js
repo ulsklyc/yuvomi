@@ -84,10 +84,42 @@ test('eine offene Aufgabe bietet das Erledigen direkt an, nicht erst nach dem St
     `das Starten bleibt daneben stehen, gefunden: ${ids.join(', ')}`);
 });
 
-test('die Reihenfolge stellt das Erledigen vor das Starten', () => {
+// Bis R19 stand Erledigen VOR Starten, weil "vorn" die Hauptaktion hiess.
+// Seit Ulas' Entscheidung (2026-10-16) ist Erledigen der gefuellte
+// Primaerknopf, und der steht in jedem Fuss am ENDE (withPrimaryEdit,
+// detail-view.js) - Starten ist ein leiser Knopf davor.
+test('die Reihenfolge stellt das Erledigen als Hauptaktion hinter das Starten', () => {
   const ids = zieleVon(aktionenBei('open'));
-  assert.ok(ids.indexOf('task-detail-finish') < ids.indexOf('task-detail-start'),
-    `Erledigen steht vor Starten, gefunden: ${ids.join(', ')}`);
+  assert.ok(ids.indexOf('task-detail-finish') > ids.indexOf('task-detail-start'),
+    `Erledigen steht hinter Starten, gefunden: ${ids.join(', ')}`);
+});
+
+// R19 (Ulas 2026-10-16): Im Aufgaben-Blatt bleibt Erledigen der EINE
+// gefuellte Knopf, Bearbeiten tritt zurueck - die benannte Ausnahme von
+// "Bearbeiten ist ueberall primaer". Gemessen wird die Option, die die Ansicht
+// an openDetailView gibt, und welcher Knopf je Status primaer ist.
+function optionenBei(status, extra = {}) {
+  let gesehen = null;
+  globalThis.__openDetailView = (options) => { gesehen = options; };
+  try {
+    openTaskDetail({ task: { ...BASIS, status, ...extra }, currentUserId: 2, edit: { standalone() {} } });
+  } finally {
+    delete globalThis.__openDetailView;
+  }
+  return gesehen;
+}
+
+test('R19: Erledigen bzw. Wieder oeffnen ist der eine Primaerknopf, Bearbeiten tritt zurueck', () => {
+  for (const [status, id] of [['open', 'task-detail-finish'], ['in_progress', 'task-detail-finish'], ['done', 'task-detail-reopen']]) {
+    const opts = optionenBei(status);
+    assert.equal(opts.keepPrimary, true, `${status}: die Aufgabe behaelt ihren eigenen Primaerknopf`);
+    assert.ok(opts.edit, `${status}: Bearbeiten gibt es weiter`);
+    const primaries = opts.actions.filter((a) => a.variant === 'primary').map((a) => a.id);
+    assert.deepEqual(primaries, [id], `${status}: genau ein Primaerknopf, und zwar ${id}`);
+  }
+  // Abgelegt gibt es keinen Statusknopf - dann ist Bearbeiten wie ueberall primaer.
+  const archived = optionenBei('open', { archived_at: '2026-10-01T10:00:00Z' });
+  assert.deepEqual(archived.actions.filter((a) => a.variant === 'primary'), [], 'abgelegt: kein eigener Primaerknopf');
 });
 
 test('eine laufende Aufgabe fuehrt weiter genau einen Statusknopf', () => {

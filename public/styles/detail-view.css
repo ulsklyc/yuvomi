@@ -666,12 +666,17 @@
 
   .detail-view__footer > .task-detail__more {
     display: inline-flex;
+    /* Das Mehr-Menue nimmt den Platz von Loeschen am Anfang ein; Bearbeiten,
+     * Erledigen und Wer bilden die Gruppe am Ende, in der Daumenzone. */
+    order: -1;
+    margin-inline-end: auto;
   }
 
-  /* Erledigen steht neben dem Primaerknopf Bearbeiten (R19) als Haken ohne
+  /* Erledigen ist in der Aufgabe der volle Primaerknopf (Ulas 2026-10-16,
+   * withPrimaryEdit `keepPrimary`); Bearbeiten steht davor als Stift ohne
    * Wort: der Name bleibt fuer Screenreader und als Tooltip, der Fuss bleibt
    * EINE Reihe. */
-  .detail-view__footer > #task-detail-finish > .btn__label {
+  .detail-view__footer:has(> .task-detail__more) > #detail-view-edit > .btn__label {
     position: absolute;
     width: var(--space-px);
     height: var(--space-px);
@@ -681,7 +686,7 @@
     white-space: nowrap;
   }
 
-  .detail-view__footer > #task-detail-finish {
+  .detail-view__footer:has(> .task-detail__more) > #detail-view-edit {
     min-width: var(--target-base);
     padding-inline: var(--space-2);
   }

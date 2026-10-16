@@ -400,17 +400,25 @@ function detailGroupEl({ group, rows = [] }) {
  * Hauptaktion hat, treten andere Primaerknoepfe dort zurueck (sekundaer).
  * `edit.primary: false` gibt es nicht mehr als Ausweg.
  *
+ * DIE AUSNAHME HEISST `keepPrimary` (Ulas 2026-10-16, nur Aufgaben): wer
+ * eine Aufgabe oeffnet, will sie meist abhaken. Dort bleibt der EIGENE
+ * Primaerknopf des Aufrufers (Erledigen bzw. Wieder oeffnen) gefuellt, und
+ * Bearbeiten tritt als sekundaerer Knopf direkt davor. Auch dann gibt es genau
+ * EINEN Primaerknopf: weitere treten zurueck. Hat der Aufrufer keinen (etwa
+ * eine abgelegte Aufgabe), wird Bearbeiten wie ueberall der Primaerknopf.
+ *
  * @param {Array} actions   die Objektaktionen der Ansicht
  * @param {object|null} edit der Bearbeiten-Knopf ({ id, label, onClick, dock? })
+ * @param {{ keepPrimary?: boolean }} [opts]
  * @returns {Array}
  */
-export function withPrimaryEdit(actions = [], edit = null) {
+export function withPrimaryEdit(actions = [], edit = null, { keepPrimary = false } = {}) {
   const list = (actions ?? []).filter(Boolean);
+  const keep = keepPrimary ? list.findIndex((action) => action.variant === 'primary') : -1;
   if (!edit) return list;
-  return [
-    ...list.map((action) => (action.variant === 'primary' ? { ...action, variant: 'secondary' } : action)),
-    { icon: 'pencil', ...edit, variant: 'primary' },
-  ];
+  const stepped = list.map((action, i) => (action.variant === 'primary' && i !== keep ? { ...action, variant: 'secondary' } : action));
+  if (keep < 0) return [...stepped, { icon: 'pencil', ...edit, variant: 'primary' }];
+  return [...stepped.slice(0, keep), { icon: 'pencil', ...edit, variant: 'secondary' }, ...stepped.slice(keep)];
 }
 
 export function detailFooterEl(actions = [], close = closeDetailView) {
@@ -750,7 +758,7 @@ function openAsSheet(opts, token) {
         id: 'detail-view-edit',
         label: opts.edit.label ?? t('common.edit'),
         onClick: () => switchToForm(panel, opts, state),
-      } : null));
+      } : null, { keepPrimary: opts.keepPrimary }));
       if (footer) {
         body.appendChild(footer);
         // Die Fußzeile entstand erst jetzt, nach dem Umzug in openModal - also
@@ -864,7 +872,7 @@ function openAsPopover(opts) {
     onClick: () => { closeDetailView(); opts.edit.standalone(); },
   } : null;
 
-  const footer = detailFooterEl(withPrimaryEdit(opts.actions, edit));
+  const footer = detailFooterEl(withPrimaryEdit(opts.actions, edit, { keepPrimary: opts.keepPrimary }));
   if (footer) {
     footer.classList.add('detail-popover__footer');
     popover.appendChild(footer);
@@ -1000,7 +1008,7 @@ function openInPane(opts, token) {
   let bodyEl = detailBodyEl(opts);
   view.appendChild(bodyEl);
   // Bearbeiten als Primaerknopf am Ende des (klebenden) Fusses - wie im Blatt.
-  const footer = detailFooterEl(withPrimaryEdit(opts.actions, edit), close);
+  const footer = detailFooterEl(withPrimaryEdit(opts.actions, edit, { keepPrimary: opts.keepPrimary }), close);
   if (footer) {
     // In der Spalte ist die Fusszeile Teil des Inhalts, kein Modal-Fuss: die
     // Klassen des Modal-Fusses holte sonst dessen Umzug- und Sticky-Logik an.
@@ -1035,7 +1043,9 @@ function openInPane(opts, token) {
  * @param {HTMLElement} [opts.pane]      - Koerper der Detailspalte (Liste + Detail); hat Vorrang
  * @param {Array}  [opts.sections]       - Metazeilen, siehe detailRowEl
  * @param {Array}  [opts.actions]        - Objektaktionen in der Fußzeile
- * @param {Object} [opts.edit]           - { label?, title?, ready?, primary?, mount(panel, pane), standalone() }
+ * @param {Object} [opts.edit]           - { label?, title?, ready?, mount(panel, pane), standalone() }
+ * @param {boolean} [opts.keepPrimary]  - der eigene Primaerknopf der Aktionen bleibt, Bearbeiten
+ *                                         tritt sekundaer davor (nur Aufgaben, withPrimaryEdit)
  *                                         `primary`: im Sheet als Primaerknopf am Ende der Fusszeile statt im Kopf,
  *                                         im Popover ebenso am Ende statt als Sekundaerknopf vorne
  *                                         `ready` ist ein Promise, auf das der

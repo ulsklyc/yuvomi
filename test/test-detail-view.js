@@ -227,7 +227,7 @@ test('im Popover gilt dieselbe Ordnung wie im Sheet: Löschen am Anfang, Bearbei
   // Bearbeiten kommt NACH den Aktionen des Aufrufers - sonst steht Löschen
   // direkt daneben und sein `--start` wirkt nicht. Seit R19 immer, nicht mehr
   // nur mit `edit.primary`.
-  assert.match(popover, /detailFooterEl\(withPrimaryEdit\(opts\.actions, edit\)\)/,
+  assert.match(popover, /detailFooterEl\(withPrimaryEdit\(opts\.actions, edit, \{ keepPrimary: opts\.keepPrimary \}\)\)/,
     'Bearbeiten gehört als Primärknopf ans Ende der Popover-Fußzeile');
 });
 
@@ -669,10 +669,12 @@ test('die Aufgaben-Detailansicht führt die Leseinformationen der Karte', async 
   assert.match(head, /subtitleLabel: t\('tasks\.dueDateLabel'\)/);
   assert.match(head, /people: task\.assigned_users \?\? \[\]/, 'Zugewiesene als Avatare im Kopf');
   assert.match(src, /head: taskDetailHead\(task\),/);
-  // Erledigen ist die Hauptaktion: der EINE Primaerknopf im Fuss.
+  // Erledigen ist die Hauptaktion: der EINE Primaerknopf im Fuss - fuer eine
+  // erledigte Aufgabe seit R19 (Ulas 2026-10-16) entsprechend Wieder oeffnen.
   const steps = src.slice(src.indexOf('const STATUS_ACTIONS = {'), src.indexOf('/** Prioritätsbadge'));
   assert.equal(steps.match(/id: 'task-detail-finish'[^}]*variant: 'primary'/g)?.length, 2, 'offen und in Arbeit');
-  assert.equal(steps.match(/variant: 'primary'/g)?.length, 2, 'nur Erledigen ist primaer');
+  assert.equal(steps.match(/id: 'task-detail-reopen'[^}]*variant: 'primary'/g)?.length, 1, 'erledigt: Wieder oeffnen');
+  assert.equal(steps.match(/variant: 'primary'/g)?.length, 3, 'sonst ist nichts primaer');
 });
 
 /* DETAILANSICHTEN MIT KOPF (Critique R18, 2026-10-07). Termin, Aufgabe und
@@ -1248,9 +1250,19 @@ test('R19: Bearbeiten ist ueberall der eine Primaerknopf am Ende des Fusses', as
   assert.equal(out.at(-1).icon, 'pencil');
   assert.deepEqual(withPrimaryEdit([{ id: 'finish', variant: 'primary' }], null).map((a) => a.variant), ['primary'],
     'ohne Bearbeiten bleibt der Primaerknopf des Aufrufers');
+  // DIE AUSNAHME DER AUFGABE (Ulas 2026-10-16): `keepPrimary` laesst den
+  // eigenen Primaerknopf stehen, Bearbeiten tritt sekundaer DAVOR - und auch
+  // dann gibt es genau einen gefuellten Knopf.
+  const kept = withPrimaryEdit([
+    { id: 'archive', variant: 'ghost' }, { id: 'finish', variant: 'primary' }, { id: 'other', variant: 'primary' },
+  ], { id: 'edit', onClick() {} }, { keepPrimary: true });
+  assert.deepEqual(kept.map((a) => [a.id, a.variant]),
+    [['archive', 'ghost'], ['edit', 'secondary'], ['finish', 'primary'], ['other', 'secondary']]);
+  assert.deepEqual(withPrimaryEdit([{ id: 'archive', variant: 'ghost' }], { id: 'edit' }, { keepPrimary: true }).map((a) => [a.id, a.variant]),
+    [['archive', 'ghost'], ['edit', 'primary']], 'ohne eigenen Primaerknopf wird Bearbeiten primaer');
   const pane = src.slice(src.indexOf('function openInPane('), src.indexOf('// Öffentliche API'));
   assert.match(pane, /detailPaneHeaderEl\(\{ title: opts\.title \?\? '' \}\)/, 'die Detailspalte traegt Bearbeiten nicht mehr im Kopf');
-  assert.match(pane, /detailFooterEl\(withPrimaryEdit\(opts\.actions, edit\), close\)/, 'sondern am Ende ihres Fusses');
+  assert.match(pane, /detailFooterEl\(withPrimaryEdit\(opts\.actions, edit, \{ keepPrimary: opts\.keepPrimary \}\), close\)/, 'sondern am Ende ihres Fusses');
   assert.match(src, /if \(action\.dock\) dockNextModal\(btn\.closest\('\.split-view__detail'\)\)/, 'das Formular legt sich weiter in die Spalte');
   assert.doesNotMatch(src, /opts\.edit\??\.primary/, 'keine Option mehr, die Bearbeiten zuruecknimmt');
   for (const page of ['inventory', 'contacts', 'calendar']) {
@@ -1259,13 +1271,16 @@ test('R19: Bearbeiten ist ueberall der eine Primaerknopf am Ende des Fusses', as
   }
   // Die Aufgabe auf dem Telefon: mit Bearbeiten am Ende bleibt der Fuss EINE
   // Reihe - Loeschen tritt zu Starten und Archivieren ins Mehr-Menue (dort
-  // weiter destruktiv gefaerbt), Erledigen steht als Haken.
+  // weiter destruktiv gefaerbt), Bearbeiten steht als Stift vor dem vollen
+  // Erledigen (Ulas 2026-10-16).
   const task = readFileSync(new URL('../public/components/task-detail.js', import.meta.url), 'utf8');
   assert.match(task, /const overflowIds = \['task-detail-start', 'task-detail-archive', 'task-detail-delete'\];/);
   const more = task.slice(task.indexOf('function wireDetailMoreMenu('), task.indexOf('const DOER_BUTTON_ID'));
   assert.match(more, /popover-menu__item--danger/, 'Loeschen bleibt im Menue destruktiv');
   const css = await detailCss();
-  assert.match(css, /\.detail-view__footer > #task-detail-finish > \.btn__label \{/, 'Erledigen mobil als Haken ohne Wort');
+  assert.doesNotMatch(css, /#task-detail-finish > \.btn__label/, 'Erledigen mobil wieder als voller Knopf');
+  assert.match(css, /\.detail-view__footer:has\(> \.task-detail__more\) > #detail-view-edit > \.btn__label \{/, 'Bearbeiten mobil als Stift ohne Wort');
+  assert.match(task, /keepPrimary: true,/, 'die Aufgabe behaelt ihren Primaerknopf');
   const recipes = readFileSync(new URL('../public/pages/recipes.js', import.meta.url), 'utf8');
   const recipePane = recipes.slice(recipes.indexOf('function renderRecipePane('), recipes.indexOf('function openRecipeNarrow('));
   assert.match(recipePane, /withPrimaryEdit\(/, 'die Rezeptspalte folgt derselben Regel');
