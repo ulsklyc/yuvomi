@@ -1179,9 +1179,8 @@ const PENDING = {
   // Kommentare, Einstellungslisten. Wer eine anfasst, zieht sie auf
   // `rowMenuHtml()` um und senkt die Zahl.
   // 2026-10-16 (Critique D6): Notizen und Haushaltshilfe-Besuche loeschen
-  // ueber ihren Mehr-Knopf.
+  // ueber ihren Mehr-Knopf. R19 Schritt 4: der Kategorien-Verwalter auch.
   'row-danger-visible': {
-    'public/components/category-manager.js': 1,
     'public/components/tag-manager.js': 1,
     'public/components/task-detail.js': 1,
     'public/pages/contacts.js': 1,

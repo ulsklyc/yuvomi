@@ -654,12 +654,26 @@ async function successToasts(options) {
   return toasts;
 }
 
-/** Die Namen (`aria-label`) der Zeilenknoepfe, wie `t` aus dem Loader sie schreibt. */
+/** Die Namen der Zeilenaktionen, wie `t` aus dem Loader sie schreibt. Seit R19
+ *  stehen sie als Eintraege im Mehr-Menue der Zeile (Text des Eintrags). */
 function rowActionLabels(options, rowOptions = {}) {
   const manager = managerWithCategory(options);
   const html = manager._rowActionsHtml('Rewe', { isFirst: false, isLast: false, ...rowOptions });
-  return [...html.matchAll(/aria-label="([a-zA-Z.]+)\{/g)].map((m) => m[1]);
+  return [...html.matchAll(/class="popover-menu__item[^"]*"[\s\S]*?<span>([a-zA-Z.]+)\{/g)].map((m) => m[1]);
 }
+
+// R19 (Critique 2026-10-16): "Lagerorte verwalten" kuerzte die Namen mobil auf
+// fuenf Zeichen - vier 48px-Icons standen in jeder Zeile. Jetzt EIN Mehr-Knopf
+// (Regel R18: hoechstens zwei sichtbare Zeilenaktionen plus Mehr); der Name
+// bleibt das Umbenennen-Ziel, Auf/Ab stehen fuer Tastatur und Schalter im Menue.
+test('R19: eine Kategoriezeile traegt einen Mehr-Knopf statt vier Icons', () => {
+  const manager = managerWithCategory({});
+  const html = manager._rowActionsHtml('Rewe', { isFirst: true, isLast: false });
+  assert.equal((html.match(/class="row-action /g) ?? []).length, 1, 'genau ein sichtbarer Zeilenknopf');
+  assert.match(html, /class="row-action row-action--more[^"]*"[^>]*aria-label="common\.moreActionsNamed\{/);
+  assert.match(html, /data-action="up"[^>]*disabled|disabled[^>]*data-action="up"/, 'an der Kante ist der Schritt gesperrt');
+  assert.match(html, /popover-menu__item--danger[^"]*"\s*data-action="delete"/, 'Loeschen bleibt als Gefahr markiert');
+});
 
 test('wording options: a manager configured for stores names the store in all three toasts', async () => {
   assert.deepEqual(await successToasts(STORE_WORDING), [

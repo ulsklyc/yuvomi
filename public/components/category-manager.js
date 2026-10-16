@@ -53,7 +53,8 @@ import { t, getLocale } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { makeSortable, isDragActive } from '/utils/sortable.js';
 import { wireTablist } from '/utils/tablist.js';
-import { rowActionHtml } from '/utils/row-action.js';
+import { rowMenuHtml } from '/utils/row-action.js';
+import { installPopoverMenus } from '/utils/popover-menu.js';
 import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
 import { holdUntilStyled, warmStyle } from '/utils/component-style.js';
 
@@ -235,6 +236,8 @@ class CategoryManagerElement extends HTMLElement {
     this._announceEl = this.querySelector('#cat-manager-announce');
     this._root.addEventListener('click', this._onClick);
     this._root.addEventListener('submit', this._onSubmit);
+    // Die Mehr-Menues der Zeilen (R19): Lage, Schliessen nach der Wahl, Pfeiltasten.
+    installPopoverMenus(this._root);
   }
 
   // Der Pfad der Listenanfrage. Uebersetzt die Route ihre Labels selbst
@@ -487,8 +490,13 @@ class CategoryManagerElement extends HTMLElement {
       const el = row.querySelector(`[data-action="${action}"]`);
       return el && !el.disabled ? el : null;
     };
+    // Seit R19 stehen Auf/Ab im Mehr-Menue der Zeile, das nach der Wahl zu
+    // ist: der Fokus geht an dessen Knopf (die bewegte Zeile), nie auf <body>.
+    const own = (el) => el?.closest('.cat-row, .cat-subrow') === row;
+    const more = [...row.querySelectorAll('.row-action--more')].find(own);
     const opposite = dir === 'down' ? 'up' : 'down';
-    const target = pick(`${prefix}${dir}`)
+    const target = more
+      || pick(`${prefix}${dir}`)
       || pick(`${prefix}${opposite}`)
       || row.querySelector(`[data-action="${prefix}rename"]`);
     target?.focus();
@@ -567,17 +575,29 @@ class CategoryManagerElement extends HTMLElement {
    */
   _rowActionsHtml(name, { isFirst, isLast, sub = false }) {
     const prefix = sub ? 'sub-' : '';
-    return [
-      rowActionHtml({ icon: 'pencil', action: `${prefix}rename`, label: t('category.renameNamed', { name }) }),
-      rowActionHtml({ icon: 'chevron-up', action: `${prefix}up`, label: t('category.moveUpNamed', { name }), attrs: { disabled: isFirst } }),
-      rowActionHtml({ icon: 'chevron-down', action: `${prefix}down`, label: t('category.moveDownNamed', { name }), attrs: { disabled: isLast } }),
-      rowActionHtml({
-        icon: 'trash-2',
-        tone: 'danger',
-        action: `${prefix}delete`,
-        label: t(sub ? 'category.deleteSubNamed' : this._deleteNamedKey, { name }),
-      }),
-    ].join('');
+    // EIN MEHR-KNOPF STATT VIER ICONS (R19, Critique 2026-10-16; Regel R18 in
+    // ignore.md und DESIGN.md: hoechstens zwei sichtbare Zeilenaktionen plus
+    // Mehr). Vier 48px-Ziele liessen dem Namen bei 390px 5 Zeichen
+    // ("Vorrat...", "Kuehls..."). Der Name selbst bleibt das Umbenennen-Ziel,
+    // der Griff das Ziehen; im Menue stehen Umbenennen, die zwei Schritte fuer
+    // Tastatur und Schalter und das Loeschen - mit denselben `data-action`, auf
+    // die `_onClick` hoert.
+    this._menuSeq = (this._menuSeq ?? 0) + 1;
+    return rowMenuHtml({
+      id: `cat-row-menu-${this._menuSeq}`,
+      label: t('common.moreActionsNamed', { name }),
+      items: [
+        { action: `${prefix}rename`, icon: 'pencil', label: t('category.renameNamed', { name }) },
+        { action: `${prefix}up`, icon: 'chevron-up', label: t('category.moveUpNamed', { name }), disabled: isFirst },
+        { action: `${prefix}down`, icon: 'chevron-down', label: t('category.moveDownNamed', { name }), disabled: isLast },
+        {
+          action: `${prefix}delete`,
+          icon: 'trash-2',
+          danger: true,
+          label: t(sub ? 'category.deleteSubNamed' : this._deleteNamedKey, { name }),
+        },
+      ],
+    });
   }
 
   /**

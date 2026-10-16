@@ -55,6 +55,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Editing from a detail sheet has one way back.** "Cancel" returns to the details instead of
   closing the sheet, and the extra "Back" button in the header is gone; the close button still
   closes. A task's countdown switch sits under "More settings" while it is off.
+- **Managing categories, storage places and stores shows the full names.** Each row has one "More"
+  button for rename, move up, move down and delete instead of four icons, so names such as
+  "Vorratsschrank" are no longer cut to five letters on a phone. Tapping the name still renames,
+  and dragging still reorders.
 - **Module headers on phones and tablets take less room.** Shift plan, Rewards and Household help
   show their tabs in the title row (one row instead of two, 65px on a phone). The budget header
   folds to one row while you scroll, with the tabs beside the month. On a tablet the title, search

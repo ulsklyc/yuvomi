@@ -5029,6 +5029,22 @@ a.popover-menu__item {
   color: var(--color-text-secondary);
 }
 
+/* Ein gesperrter Eintrag sieht gesperrt aus (R19: "nach oben" an der ersten
+ * Kategorie) - Tertiaertinte, keine Hover-Flaeche. Der Knopf ist `disabled`,
+ * er nimmt also weder Klick noch Fokus. */
+.popover-menu__item:disabled,
+.popover-menu__item:disabled i,
+.popover-menu__item:disabled svg {
+  color: var(--color-text-tertiary);
+  cursor: default;
+}
+
+@media (hover: hover) {
+  .popover-menu__item:disabled:hover {
+    background-color: transparent;
+  }
+}
+
 .popover-menu__item--danger,
 .popover-menu__item--danger i,
 .popover-menu__item--danger svg {
