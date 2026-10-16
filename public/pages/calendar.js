@@ -2365,6 +2365,62 @@ function renderToolbar() {
   // jedem Filterwechsel NEU gebaut - der Schluessel laesst die neue Kapsel
   // dort ansetzen, wo die alte stand, statt aufzuspringen.
   attachSegmentIndicator(bar.querySelector('.cal-toolbar__views'), { key: 'calendar-views' });
+  watchToolbarFit(bar);
+}
+
+/**
+ * EINE ZEILE NUR, WENN SIE PASST (D1; Sonde 19, #882).
+ *
+ * Ab 1024px traegt der Kalenderkopf Zeitraum, Segment, Suchfeld, Filter,
+ * Verwalten und die Pille in EINER Zeile - aber nur, wenn die Content-Spalte
+ * sie hergibt. Neben der Seitenleiste (1024-1279px) und in langen Locales (uk:
+ * "Порядок денний") reicht sie nicht. CSS allein kann das nicht entscheiden:
+ * per `order` steht die Bar-Zeile vor den Aktionen, und bricht sie um, nimmt
+ * sie Verwalten und Pille mit in Zeile 2 - die Titelzeile baut dann zwei
+ * Zeilen, genau der #882-Fall. Darum misst dieser Waechter: passt die Summe
+ * der Titelzeile plus dem MINDESTMASS der Bar-Zeile (Segment, Filter, ein
+ * schmales Suchfeld), setzt er `cal-toolbar--one-row`; sonst steht die
+ * Bar-Zeile kontrolliert als eigene, volle zweite Zeile unter Titel, Zeitraum
+ * und Aktionen (die Werkzeugzeilen-Regel der Shell). Die Breiten, die er
+ * liest, haengen nicht vom Modus ab - die Entscheidung pendelt nicht.
+ */
+const ONE_ROW_MEDIA = '(min-width: 1024px)';
+// Das schmalste Suchfeld, das in der einen Zeile noch eins ist (Lupe, Polster,
+// "Suchen…" lesbar). Schmaler waere es ein Feld, das man nicht lesen kann.
+const SEARCH_MIN_PX = 160;
+let toolbarFitObserver = null;
+
+function syncToolbarFit(bar) {
+  if (!bar?.isConnected) return;
+  const wide = window.matchMedia?.(ONE_ROW_MEDIA).matches;
+  if (!wide) {
+    bar.classList.remove('cal-toolbar--one-row');
+    return;
+  }
+  const cs = getComputedStyle(bar);
+  const inner = bar.clientWidth - parseFloat(cs.paddingInlineStart || 0) - parseFloat(cs.paddingInlineEnd || 0);
+  const gap = parseFloat(cs.columnGap) || 0;
+  const row = [...bar.children].filter((c) => !c.classList.contains('page-toolbar__bar')
+    && getComputedStyle(c).display !== 'none' && c.getBoundingClientRect().width > 0);
+  const views = bar.querySelector('.cal-toolbar__views');
+  const filter = bar.querySelector('#cal-filters');
+  const toolsGap = parseFloat(getComputedStyle(bar.querySelector('.cal-toolbar__tools') ?? bar).columnGap) || 0;
+  const barGap = parseFloat(getComputedStyle(bar.querySelector('.page-toolbar__bar') ?? bar).columnGap) || 0;
+  const barMin = (views?.scrollWidth ?? 0) + barGap + SEARCH_MIN_PX + toolsGap + (filter?.getBoundingClientRect().width ?? 0);
+  const need = row.reduce((sum, c) => sum + c.getBoundingClientRect().width, 0) + barMin + gap * row.length;
+  bar.classList.toggle('cal-toolbar--one-row', need <= inner);
+}
+
+function watchToolbarFit(bar) {
+  syncToolbarFit(bar);
+  if (typeof ResizeObserver !== 'function') return;
+  // EIN Beobachter je Kopf: renderToolbar() laeuft bei jedem Filterwechsel,
+  // der Kopf-Knoten bleibt derselbe.
+  if (toolbarFitObserver?.target === bar) return;
+  toolbarFitObserver?.observer.disconnect();
+  const observer = new ResizeObserver(() => syncToolbarFit(bar));
+  observer.observe(bar);
+  toolbarFitObserver = { target: bar, observer };
 }
 
 function updateLabel() {
@@ -6070,6 +6126,8 @@ async function openFoundEvent(ev) {
 }
 
 export const __test = {
+  // Sonde 19 (#882): eine Zeile nur, wenn sie passt.
+  syncToolbarFit,
   // R17 Schritt 8: der Fokus nach der Suche, wenn ihr Knopf gefaltet ist.
   closeSearchForTest(container) { _container = container; searchActive = true; closeCalendarSearch({ restoreView: false }); },
   // #1504: der Wechsel ueber die Telefonschwelle, gemessen am echten Renderer.

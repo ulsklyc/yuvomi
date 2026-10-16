@@ -218,22 +218,38 @@
   display: none;
 }
 
-/* AB 1024px IST DER KOPF EINE ZEILE (D1, Critique 2026-10-16: 125px in zwei
- * Zeilen, ~540px Leerraum neben dem Stepper). Die Bar-Zeile verliert ihre
- * volle Breite und steht als Gruppe hinter dem Zeitraum; der Aktions-Slot
- * (Verwalten, angedockte Pille) bleibt am Zeilenende. Reicht die Breite nicht
- * (Seitenleiste offen, 1024-1279px), bricht die Gruppe als Ganzes um - nie
- * mitten zwischen Segment und Suche. */
+/* AB 1024px IST DER KOPF EINE ZEILE, WENN SIE PASST (D1, Critique 2026-10-16:
+ * 125px in zwei Zeilen, ~540px Leerraum neben dem Stepper; Sonde 19).
+ *
+ * Ob sie passt, misst calendar.js (`syncToolbarFit`) und setzt dann
+ * `cal-toolbar--one-row`: die Bar-Zeile verliert ihre volle Breite und steht
+ * als Gruppe hinter dem Zeitraum, der Aktions-Slot (Verwalten, angedockte
+ * Pille) am Zeilenende. Ohne die Klasse - neben der Seitenleiste, in langen
+ * Locales - gilt die Werkzeugzeilen-Regel der Shell: Titel, Zeitraum und
+ * Aktionen in EINER Zeile, die Bar-Zeile als eigene volle zweite. Ein reiner
+ * CSS-Umbruch haette die Aktionen hinter der Bar-Zeile mit in Zeile 2
+ * genommen (#882: die Titelzeile baute zwei Zeilen).
+ *
+ * Das Label hat in beiden Faellen seine feste Breite (11rem: "KW 42 ·
+ * Oktober 2026" misst 169px), damit die Pfeile in allen vier Ansichten
+ * stillstehen; das Segment gibt in der einen Zeile nicht nach (das Suchfeld
+ * tut es). */
 @media (min-width: 1024px) {
   .page-toolbar.cal-toolbar > .page-toolbar__center {
     flex: 0 0 auto;
   }
 
-  /* Basis 0 mit `min-content` als Untergrenze: die Gruppe meldet fuer den
-   * Zeilenumbruch nur, was sie mindestens braucht (Segment, Filter, die Lupe
-   * des Felds), und waechst real in den Rest - das Suchfeld bis zu seiner
-   * Kanonbreite. Mit fester Basis brach bei 1440px Verwalten unter die Zeile. */
-  .page-toolbar.cal-toolbar > .page-toolbar__bar {
+  .cal-toolbar__label {
+    flex: 0 0 11rem;
+  }
+
+  .cal-toolbar__views {
+    flex-shrink: 0;
+  }
+
+  /* Basis 0 mit `min-content` als Untergrenze: die Gruppe waechst real in den
+   * Rest - das Suchfeld bis zu seiner Kanonbreite. */
+  .page-toolbar.cal-toolbar.cal-toolbar--one-row > .page-toolbar__bar {
     order: 0;
     flex: 1 1 0;
     min-width: min-content;
@@ -241,19 +257,8 @@
     border-block-start: 0;
   }
 
-  .page-toolbar.cal-toolbar > .page-toolbar__actions {
+  .page-toolbar.cal-toolbar.cal-toolbar--one-row > .page-toolbar__actions {
     order: 1;
-  }
-
-  /* Das Segment gibt in dieser Zeile nicht nach (das Suchfeld tut es), und
-   * das Label hat seine feste Breite (11rem: "KW 42 · Oktober 2026" misst 169px), damit die Pfeile in
-   * allen vier Ansichten stillstehen. */
-  .cal-toolbar__views {
-    flex-shrink: 0;
-  }
-
-  .cal-toolbar__label {
-    flex: 0 0 11rem;
   }
 }
 
@@ -357,20 +362,38 @@
   }
 
   /* Zeitraum + Ansicht: der Stepper nimmt den Rest, der Knopf seine Breite. */
+  /* `contain: inline-size`: der Stepper meldet keine Inhaltsbreite nach
+   * aussen. Die Shell gibt dem Center-Slot `min-width: min-content` (gegen
+   * Ueberlappung im eingeklappten Kopf), und darin zaehlte das ungekuerzte
+   * Zeitraumlabel mit - in uk ragte die Zeile 42px ueber die Kante (Sonde 1).
+   * Der Stepper nimmt den Rest der Zeile, das Label kuerzt mit Ellipse. */
   .cal-toolbar__stepper {
     display: flex;
     align-items: center;
     flex: 1 1 0;
     min-width: 0;
+    contain: inline-size;
     position: relative;
   }
 
+  /* Das Wort der Ansicht hat eine Obergrenze: "Порядок денний" (uk) schob die
+   * Zeitraumzeile bei 375px 42px ueber die Kante (Sonde 1). Laenger kuerzt
+   * es mit Ellipse; der Name des Knopfs nennt die Ansicht vollstaendig. */
   .cal-toolbar__view-menu {
     display: inline-flex;
-    flex: 0 0 auto;
+    flex: 0 1 auto;
     gap: var(--space-1);
+    max-inline-size: 7.5rem;
+    min-width: 0;
     padding-inline: var(--space-3);
     min-height: var(--target-base);
+  }
+
+  .cal-toolbar__view-menu-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   /* DER RESET LIEGT AUF DEM WERT (Muster Budget, layout.css `--period-inline`):

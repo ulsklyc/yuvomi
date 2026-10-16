@@ -3685,6 +3685,69 @@ test('Kalenderkopf (D1): Suchfeld und Filter stehen in der Werkzeuggruppe hinter
 });
 
 /* DIE ANSICHTSWAHL IST DAS KANON-SEGMENT (D1). */
+/* EINE ZEILE NUR, WENN SIE PASST (Sonde 19, #882). Per `order` steht die
+ * Bar-Zeile vor den Aktionen; bricht sie um, naehme sie Verwalten und Pille mit
+ * in Zeile 2, und die Titelzeile baute zwei Zeilen. Deshalb entscheidet eine
+ * Messung: Titelzeile plus Mindestmass der Bar-Zeile gegen die Innenbreite.
+ * Gefahren wird die echte Funktion gegen ein Kopf-Modell mit festen Breiten. */
+test('Kalenderkopf (Sonde 19): die eine Zeile gilt nur, wenn Titelzeile und Mindest-Bar hineinpassen', () => {
+  const box = (width, extra = {}) => ({ getBoundingClientRect: () => ({ width }), classList: { contains: () => false }, ...extra });
+  const make = (inner) => {
+    const classes = new Set();
+    const kids = [box(36), box(120), box(340), box(160)];
+    const barEl = { classList: { contains: (c) => c === 'page-toolbar__bar' }, getBoundingClientRect: () => ({ width: 600 }) };
+    const views = { scrollWidth: 280 };
+    const filter = box(40);
+    return {
+      isConnected: true,
+      clientWidth: inner + 64,
+      children: [...kids, barEl],
+      classList: { toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)), remove: (c) => classes.delete(c) },
+      querySelector: (sel) => ({ '.cal-toolbar__views': views, '#cal-filters': filter }[sel] ?? null),
+      classes,
+    };
+  };
+  const prevWindow = globalThis.window;
+  const prevGcs = globalThis.getComputedStyle;
+  try {
+    globalThis.window = { matchMedia: () => ({ matches: true }) };
+    globalThis.getComputedStyle = () => ({ paddingInlineStart: '32', paddingInlineEnd: '32', columnGap: '8', display: 'flex' });
+    // Titelzeile 656 + Mindest-Bar (280 + 8 + 160 + 8 + 40 = 496) + 4 Luecken (32) = 1184.
+    const wide = make(1184);
+    calendarHelpers.syncToolbarFit(wide);
+    assert(wide.classes.has('cal-toolbar--one-row'), 'passt genau: eine Zeile');
+    const narrow = make(1183);
+    calendarHelpers.syncToolbarFit(narrow);
+    assert(!narrow.classes.has('cal-toolbar--one-row'), 'ein Pixel zu wenig: die Bar-Zeile steht als eigene Zeile');
+    globalThis.window = { matchMedia: () => ({ matches: false }) };
+    const phone = make(5000);
+    phone.classes.add('cal-toolbar--one-row');
+    calendarHelpers.syncToolbarFit(phone);
+    assert(!phone.classes.has('cal-toolbar--one-row'), 'unter 1024px gibt es die eine Zeile nicht');
+  } finally {
+    globalThis.window = prevWindow;
+    globalThis.getComputedStyle = prevGcs;
+  }
+  // Die Regeln der einen Zeile haengen an der Klasse, nicht an der Breite allein.
+  const oneRow = [...eachRule(calendarCss)].filter((r) => r.at.some((a) => /min-width:\s*1024px/.test(a))
+    && /\.page-toolbar__(?:bar|actions)$/.test(r.selector.trim()) && /order:/.test(r.body));
+  assert(oneRow.length === 2 && oneRow.every((r) => r.selector.includes('.cal-toolbar--one-row')),
+    `Bar vor Aktionen nur mit cal-toolbar--one-row: ${oneRow.map((r) => r.selector.trim()).join(' | ')}`);
+});
+
+/* SONDE 1 (uk, 375px): der Stepper meldet keine Inhaltsbreite nach aussen,
+ * und das Wort der Ansicht hat eine Obergrenze - sonst schob "Порядок денний"
+ * die Zeitraumzeile ueber die Kante. */
+test('Kalenderkopf (Sonde 1): Stepper und Ansichts-Knopf laufen mobil nie ueber die Kante', () => {
+  const rules = [...eachRule(calendarCss)].filter((r) => r.at.some((a) => /max-width:\s*639px/.test(a)));
+  const stepper = rules.find((r) => r.selector.trim() === '.cal-toolbar__stepper');
+  assert(/contain:\s*inline-size/.test(stepper?.body ?? ''), 'der Stepper ist in der Breite eingeschlossen');
+  const menu = rules.find((r) => r.selector.trim() === '.cal-toolbar__view-menu');
+  assert(/max-inline-size:/.test(menu?.body ?? '') && /min-width:\s*0/.test(menu?.body ?? ''), 'der Ansichts-Knopf hat eine Obergrenze');
+  const word = rules.find((r) => r.selector.trim() === '.cal-toolbar__view-menu-label');
+  assert(/text-overflow:\s*ellipsis/.test(word?.body ?? ''), 'ein langes Wort kuerzt mit Ellipse');
+});
+
 test('Kalenderkopf (D1): die Ansichtswahl ist `.segmented` mit `.segmented__item`, aktiv per `is-active`', () => {
   const html = calendarHelpers.toolbarHtml();
   assert(/<div class="segmented cal-toolbar__views" role="tablist"/.test(html), 'das Segment der Shell traegt die Tablist');
