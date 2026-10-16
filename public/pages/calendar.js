@@ -2170,7 +2170,9 @@ function toolbarHtml({ filterCount = 0, scheduleWarningHtml = '', searchValue = 
         ${renderPageSearch({
           id: 'cal-search-input',
           label: t('calendar.searchOpen'),
-          placeholder: t('calendar.searchOpen'),
+          // Kurz, weil das Feld in der einen Kopfzeile schmal werden darf; der
+          // Name des Felds ("Termine suchen") steht im Label.
+          placeholder: t('search.placeholder'),
           value: searchValue,
           clearLabel: t('common.searchClear'),
           className: 'cal-toolbar__search',

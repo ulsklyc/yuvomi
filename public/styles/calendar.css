@@ -246,7 +246,7 @@
   }
 
   /* Das Segment gibt in dieser Zeile nicht nach (das Suchfeld tut es), und
-   * das Label hat seine feste Breite (KW-Label 160px), damit die Pfeile in
+   * das Label hat seine feste Breite (11rem: "KW 42 · Oktober 2026" misst 169px), damit die Pfeile in
    * allen vier Ansichten stillstehen. */
   .cal-toolbar__views {
     flex-shrink: 0;
