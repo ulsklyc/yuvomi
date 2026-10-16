@@ -539,9 +539,19 @@ function renderToolbar(toolbar, content, { activeLeaf, domain }) {
     label.className = 'settings-toolbar__back-label';
     label.textContent = t('settings.title');
     back.append(createIcon('chevron-left', 'settings-toolbar__back-icon'), label);
+    // DER MODULKOPF WIE UEBERALL (D8, Critique 2026-10-16). Am Desktop stand
+    // ueber einem Blatt kein Kopf - die Einstellungen waren das einzige Modul
+    // ohne Siegel und Titelzeile, und ihr Blatt begann 12px hoeher als jedes
+    // andere Modul. Ab 1024px traegt der Kopf jetzt den Modulnamen (settings.css
+    // blendet je Breite Rueckweg ODER Titel aus). Kein <h1>: auf einem Blatt
+    // ist der Blatt-Titel die eine Hauptueberschrift (test:typography); der
+    // Name hier ist die Ortsangabe der Shell wie in jedem Modul.
+    const moduleTitle = document.createElement('p');
+    moduleTitle.className = 'page-toolbar__title settings-toolbar__module-title';
+    moduleTitle.textContent = t('settings.title');
     toolbar.dataset.mode = 'leaf';
     toolbar.classList.remove('page-toolbar--title-tools');
-    toolbar.replaceChildren(back);
+    toolbar.replaceChildren(back, moduleTitle);
     hydrateIcons(toolbar);
     return;
   }

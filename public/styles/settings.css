@@ -436,8 +436,27 @@
    der Blatt-Titel die einzige sichtbare Hauptueberschrift (test:typography).
    -------------------------------------------------------- */
 
-@media (min-width: 768px) {
+@media (min-width: 768px) and (max-width: 1023px) {
   .settings-page--leaf .settings-shell-header {
+    display: none;
+  }
+}
+
+/* AB 1024px TRAEGT DER KOPF EINES BLATTS DEN MODULNAMEN (D8, Critique
+ * 2026-10-16): Siegel und Titel wie in jedem Modul, der Rueckweg ist dort
+ * die Seitenleiste. Darunter ist der Kopf der Rueckweg allein. */
+.settings-toolbar__module-title {
+  margin: 0;
+}
+
+@media (max-width: 1023px) {
+  .settings-toolbar__module-title {
+    display: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .settings-shell-header .settings-toolbar__back {
     display: none;
   }
 }

@@ -1239,15 +1239,20 @@ test('die Karte: Blatt-Rahmen 3:4, Titel zweizeilig, Meta einzeilig, kein Mindes
   assert.match(card, /doc\.description \? `<p class="document-card__description">\$\{esc\(doc\.description\)\}<\/p>` : ''/);
 });
 
-test('der Kopf hat EINE Hoehe: Ansichtsumschalter so hoch wie Suche und Knoepfe', () => {
-  // Gemessen vorher bei 1280px: Suche 44, Umschalter 48, Menueknopf 44; mobil
-  // 48 / 52 / 48. Der Umschalter ist ein Well mit 2px Rand - seine Knoepfe
-  // muessen um genau diesen Rand kleiner sein als --target-base.
-  const toggle = topRules(css).find((rule) => rule.selector === '.documents-view-toggle');
-  assert.match(toggle.body, /padding:\s*var\(--space-0h\)/);
-  const btn = topRules(css).find((rule) => rule.selector === '.documents-view-toggle__btn');
-  assert.match(btn.body, /width:\s*calc\(var\(--target-base\) - 2 \* var\(--space-0h\)\)/);
-  assert.match(btn.body, /height:\s*calc\(var\(--target-base\) - 2 \* var\(--space-0h\)\)/);
+test('der Ansichtsumschalter ist das Kanon-Segment (D1) und so hoch wie Suche und Knoepfe', () => {
+  // Gemessen vorher bei 1280px: Suche 44, Umschalter 48, Menueknopf 44. Seit
+  // D1 (Critique 2026-10-16) ist der Umschalter `.segmented` in der Icon-
+  // Variante; die Kopfhoehe rechnet panel.css fuer jedes Kopf-Segment (Naht +
+  // Rand von --target-base bzw. --target-md abgezogen), nicht dieses Modul.
+  const page = readFileSync(new URL('../public/pages/documents.js', import.meta.url), 'utf8');
+  assert.match(page, /<div class="segmented segmented--icons documents-view-toggle" role="group"/, 'das Segment der Shell');
+  assert.match(page, /class="segmented__item documents-view-toggle__btn\$\{state\.view === 'grid' \? ' is-active' : ''\}"/, 'Eintraege der Shell, aktiv per is-active');
+  const own = [...eachRule(css)].filter((rule) => /\.documents-view-toggle(?:__btn(?:--active)?)?$/.test(rule.selector.trim())
+    && /(?:^|[;{\s])(?:background|box-shadow|border-radius|padding|width|height)\s*:/.test(rule.body));
+  assert.deepEqual(own.map((r) => r.selector.trim()), [], 'keine eigene Pille, Flaeche oder Hoehe mehr');
+  const panel = readFileSync(new URL('../public/styles/panel.css', import.meta.url), 'utf8');
+  const item = [...eachRule(panel)].find((r) => r.selector.trim() === '.page-toolbar .segmented__item' && !r.at.length);
+  assert.match(item?.body ?? '', /min-height:\s*calc\(var\(--target-base\) - 4 \* var\(--space-px\)\)/, 'Kopf-Segment aussen so hoch wie ein Kopfknopf');
 });
 
 test('der Ordner-Kebab ist immer sichtbar, ruhig in Tertiaerfarbe', () => {

@@ -3809,7 +3809,16 @@ function statusDeviationCount() {
  */
 function toolsMenuItems() {
   const isList = state.viewMode === 'list';
-  const items = [];
+  // DIE ANSICHT IM MENUE, NUR UNTER 768px (D1; tasks.css blendet je Breite
+  // EINEN der beiden Wege aus, wie in den Dokumenten). Darueber waehlt das
+  // Segment im Kopf.
+  const items = [{
+    group: t('tasks.viewToggleLabel'),
+    items: [
+      { action: 'view-list', label: t('tasks.listView'), icon: 'list', checked: isList, attrs: { 'data-view-choice': 'list' } },
+      { action: 'view-kanban', label: t('tasks.kanbanView'), icon: 'columns', checked: state.viewMode === 'kanban', attrs: { 'data-view-choice': 'kanban' } },
+    ],
+  }, { separator: true }];
   if (!readOnly()) {
     items.push({ action: 'bulk-select', label: t('tasks.bulkSelect'), icon: 'list-checks',
       checked: state.bulkSelectMode, disabled: !isList });
@@ -4691,7 +4700,7 @@ function syncViewChrome(container) {
 
   container.querySelectorAll('#view-toggle [data-view]').forEach((b) => {
     const on = b.dataset.view === mode;
-    b.classList.toggle('group-toggle__btn--active', on);
+    b.classList.toggle('is-active', on);
     b.setAttribute('aria-pressed', String(on));
   });
 
@@ -4739,6 +4748,8 @@ function syncViewChrome(container) {
   // Sperre der beiden Eintraege, die an der Ansicht haengen, zieht es nach.
   const menu = container.querySelector('#tasks-tools-menu');
   syncPopoverMenuItem(menu, 'toggle-history', isHistory);
+  syncPopoverMenuItem(menu, 'view-list', mode === 'list');
+  syncPopoverMenuItem(menu, 'view-kanban', mode === 'kanban');
   syncPopoverMenuItem(menu, 'bulk-select', state.bulkSelectMode);
   const bulkItem = menu?.querySelector('.popover-menu__item[data-action="bulk-select"]');
   if (bulkItem) bulkItem.disabled = !isList;
@@ -4836,6 +4847,12 @@ function wireToolbar(container) {
     switch (item.dataset.action) {
       case 'toggle-history':
         setViewMode(container, state.viewMode === 'history' ? (state.viewBeforeHistory || 'list') : 'history');
+        break;
+      case 'view-list':
+        setViewMode(container, 'list');
+        break;
+      case 'view-kanban':
+        setViewMode(container, 'kanban');
         break;
       case 'bulk-select':
         toggleBulkSelect(container);
@@ -5973,7 +5990,7 @@ export async function render(container, { user, signal } = {}) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <div class="tasks-page app-page app-page--full${state.viewMode !== 'kanban' ? ' app-page--list-detail' : ''}" data-composition="full">
-      <div class="page-toolbar page-toolbar--wrap tasks-toolbar">
+      <div class="page-toolbar page-toolbar--wrap page-toolbar--title-tools tasks-toolbar">
         <h1 class="page-toolbar__title">${t('tasks.title')}</h1>
         ${renderPageSearch({
           id: 'tasks-search',
@@ -5995,19 +6012,28 @@ export async function render(container, { user, signal } = {}) {
                beschriftet, die ZAHL am Knopf sagt, dass etwas gesetzt ist
                (Kalender-Muster). Der Verlauf ist keine dritte Ansicht der
                Aufgaben, sondern eine Liste von Vorgaengen: er steht im Menue. -->
-          <div class="group-toggle group-toggle--icons" id="view-toggle" role="group" aria-label="${t('tasks.viewToggleLabel')}">
-            <button type="button" class="group-toggle__btn ${isKanban || isHistory ? '' : 'group-toggle__btn--active'}" data-view="list"
+          ${/* DIE ANSICHTSWAHL IST DAS KANON-SEGMENT (D1, Critique 2026-10-16):
+                `.segmented` in der Icon-Variante mit gleitender Kapsel statt des
+                eigenen `.group-toggle`. Unter 768px steht sie als Einfachauswahl
+                im Werkzeugmenue (wie in den Dokumenten): Lupe, Filter und Menue
+                passen dann neben den Large Title, und die zweite Kopfzeile
+                entfaellt (Kopfregel mobil 1a). */ ''}
+          <div class="segmented segmented--icons tasks-view-toggle" id="view-toggle" role="group" aria-label="${t('tasks.viewToggleLabel')}">
+            <button type="button" class="segmented__item${isKanban || isHistory ? '' : ' is-active'}" data-view="list"
                     title="${t('tasks.listView')}" aria-label="${t('tasks.listView')}" aria-pressed="${!isKanban && !isHistory}">
-              <i data-lucide="list" class="icon-md group-toggle__icon" aria-hidden="true"></i>
-              <span class="group-toggle__label">${t('tasks.listView')}</span>
+              <i data-lucide="list" class="icon-md" aria-hidden="true"></i>
+              <span class="tasks-view-toggle__label">${t('tasks.listView')}</span>
             </button>
-            <button type="button" class="group-toggle__btn ${isKanban ? 'group-toggle__btn--active' : ''}" data-view="kanban"
+            <button type="button" class="segmented__item${isKanban ? ' is-active' : ''}" data-view="kanban"
                     title="${t('tasks.kanbanView')}" aria-label="${t('tasks.kanbanView')}" aria-pressed="${isKanban}">
-              <i data-lucide="columns" class="icon-md group-toggle__icon" aria-hidden="true"></i>
-              <span class="group-toggle__label">${t('tasks.kanbanView')}</span>
+              <i data-lucide="columns" class="icon-md" aria-hidden="true"></i>
+              <span class="tasks-view-toggle__label">${t('tasks.kanbanView')}</span>
             </button>
           </div>
-          ${filterButtonHtml({ id: 'tasks-filter-btn', count: activeFilterCount(), showLabel: true, className: 'tasks-toolbar__filter' })}
+          ${/* D2: der Ausloeser ist ein Kopf-Icon-Knopf, die Zahl aktiver Filter
+                steht als Badge daran - kein Wort "Filter" mehr, das mobil die
+                Titelzeile sprengte. */ ''}
+          ${filterButtonHtml({ id: 'tasks-filter-btn', count: activeFilterCount(), className: 'tasks-toolbar__filter' })}
           ${/* Alles, was die Seite VERWALTET statt zeigt, steht beschriftet
                 im Menue (documents-tools-btn). Die schreibenden Eintraege
                 fehlen bei Nur-lesen (#467), der Verlauf bleibt: er zeigt nur. */ ''}

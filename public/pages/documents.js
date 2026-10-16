@@ -386,12 +386,15 @@ export async function render(container, context = {}) {
             <i data-lucide="link" class="icon-md" aria-hidden="true"></i>
             <span class="documents-dms-link-btn__label">${t('documents.linkFromDms')}</span>
           </button>
-          <div class="documents-view-toggle" role="group" aria-label="${t('documents.viewToggle')}">
-            <button class="documents-view-toggle__btn ${state.view === 'grid' ? 'documents-view-toggle__btn--active' : ''}" data-view="grid" aria-label="${t('documents.gridView')}" aria-pressed="${state.view === 'grid'}">
-              <i data-lucide="layout-grid" aria-hidden="true"></i>
+          ${/* DIE ANSICHTSWAHL IST DAS KANON-SEGMENT (D1, Critique 2026-10-16):
+                `.segmented` in der Icon-Variante statt einer runden Eigen-Pille
+                - dieselbe Form wie Aufgaben und Kalender. */ ''}
+          <div class="segmented segmented--icons documents-view-toggle" role="group" aria-label="${t('documents.viewToggle')}">
+            <button type="button" class="segmented__item documents-view-toggle__btn${state.view === 'grid' ? ' is-active' : ''}" data-view="grid" aria-label="${t('documents.gridView')}" title="${t('documents.gridView')}" aria-pressed="${state.view === 'grid'}">
+              <i data-lucide="layout-grid" class="icon-md" aria-hidden="true"></i>
             </button>
-            <button class="documents-view-toggle__btn ${state.view === 'list' ? 'documents-view-toggle__btn--active' : ''}" data-view="list" aria-label="${t('documents.listView')}" aria-pressed="${state.view === 'list'}">
-              <i data-lucide="list" aria-hidden="true"></i>
+            <button type="button" class="segmented__item documents-view-toggle__btn${state.view === 'list' ? ' is-active' : ''}" data-view="list" aria-label="${t('documents.listView')}" title="${t('documents.listView')}" aria-pressed="${state.view === 'list'}">
+              <i data-lucide="list" class="icon-md" aria-hidden="true"></i>
             </button>
           </div>
           ${documentsToolsMenuHtml()}
@@ -909,7 +912,7 @@ function bindPageEvents() {
     localStorage.setItem('yuvomi-documents-view', state.view);
     _container.querySelectorAll('.documents-view-toggle__btn').forEach((el) => {
       const active = el === btn;
-      el.classList.toggle('documents-view-toggle__btn--active', active);
+      el.classList.toggle('is-active', active);
       el.setAttribute('aria-pressed', String(active));
     });
     syncToolsMenu();

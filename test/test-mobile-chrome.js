@@ -369,7 +369,7 @@ test('R17 Z1: die Variante steht nur im Markup der Module, die DESIGN.md nennt',
 // Messarbeit (Handoff/Messmatrix), nicht dieser Guard.
 const TITLE_TOOLS = 'page-toolbar--title-tools';
 const TITLE_TOOLS_MODULES = [
-  'pages/birthdays.js', 'pages/contacts.js', 'pages/documents.js', 'pages/health.js', 'pages/inventory.js', 'pages/notes.js', 'pages/waste.js', 'settings/shell.js',
+  'pages/birthdays.js', 'pages/contacts.js', 'pages/documents.js', 'pages/health.js', 'pages/inventory.js', 'pages/notes.js', 'pages/tasks.js', 'pages/waste.js', 'settings/shell.js',
 ];
 
 test('R16: Werkzeuge in der Titelzeile - nur markiert, nur mobil, nie neben einer Bar-Zeile', () => {
@@ -507,4 +507,29 @@ test('#1917: der Fuss der Wand hat eine Scroll-Kante - kein Tipp, und sein Endab
     assert.equal(decl(r.body, 'margin-block-start'), null, `${r.at.join(' ')} .wall__foot ueberschreibt den Endabstand`);
     assert.equal(decl(r.body, 'margin'), null, `${r.at.join(' ')} .wall__foot ueberschreibt den Endabstand`);
   }
+});
+
+// D8 (Critique 2026-10-16): der Large Title sprang beim Modulwechsel 2-3px
+// (mobil y 8 gegen 11, je nachdem ob 48px-Knoepfe neben ihm standen). Die
+// Titelzeile ist jetzt mindestens ein Ziel hoch und zentriert den Titel - in
+// jedem Kopf derselbe Ort. Am Desktop tragen die Einstellungen ihren Modulkopf
+// wie jedes Modul (vorher keinen), und "Mein Konto" wiederholt "Konto" nicht.
+test('D8: die Titelzeile hat eine feste Mindesthoehe, die Einstellungen tragen am Desktop den Modulkopf', () => {
+  const title = rules(layoutCss).find((r) => r.selector === '.page-toolbar:not(.page-toolbar--in-group) > .page-toolbar__title'
+    && r.at.some((a) => /max-width:\s*1023px/.test(a)) && decl(r.body, 'min-block-size'));
+  assert.ok(title, 'die Large-Title-Regel unter 1024px traegt eine Mindesthoehe');
+  assert.equal(decl(title.body, 'min-block-size'), 'var(--target-base)', 'ein Ziel hoch, wie die Knoepfe daneben');
+  assert.equal(decl(title.body, 'align-content'), 'center', 'der Titel steht in der Zeile mittig');
+
+  const shell = read('../public/settings/shell.js');
+  const leaf = shell.match(/if \(activeLeaf && domain\) \{[\s\S]*?\n    return;\n  \}/)?.[0] ?? '';
+  assert.match(leaf, /className = 'page-toolbar__title settings-toolbar__module-title'/, 'der Blattkopf traegt den Modultitel der Shell');
+  assert.match(leaf, /replaceChildren\(back, moduleTitle\)/);
+  assert.doesNotMatch(leaf, /createElement\('h1'\)/, 'kein zweites h1 neben dem Blatt-Titel');
+  const settingsCss = read('../public/styles/settings.css');
+  const hidden = rules(settingsCss).filter((r) => r.selector === '.settings-page--leaf .settings-shell-header' && decl(r.body, 'display') === 'none');
+  assert.ok(hidden.length && hidden.every((r) => r.at.some((a) => /max-width:\s*1023px/.test(a))),
+    'der Blattkopf verschwindet nur zwischen 768 und 1023px (dort traegt der Breadcrumb den Rueckweg), nicht am Desktop');
+  assert.match(read('../public/settings/pages/personal-account.js'), /<h2 class="settings-section__title sr-only">\$\{t\('settings\.sectionAccount'\)\}/,
+    '"Mein Konto" bleibt in der Gliederung, aber unsichtbar');
 });

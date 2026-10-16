@@ -2142,7 +2142,6 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
 .filter-chip--active svg,
 .contact-filter-chip--active svg,
 .group-toggle__btn--active svg,
-.documents-view-toggle__btn--active svg,
 .segmented__item.is-active svg,
 .perm-seg__opt.is-active svg {
   /* 30 % statt 16 %: auf Tab-Bar-Größe (20px) las die schwächere Füllung
@@ -3708,6 +3707,14 @@ html.fab-steady .page-fab {
      * ihm eine eigene Zeile gegeben: die Lead-Zone waere um eine Zeile
      * gewachsen und das Siegel stuende allein ueber dem Titel. */
     flex-basis: calc(100% - var(--seal-head-lead));
+    /* EINE TITELLAGE IN JEDEM MODUL (D8, Critique 2026-10-16): die Zeile des
+     * Titels ist mindestens ein Ziel hoch, und der Titel steht darin mittig.
+     * Ohne das richtete sich seine Lage nach den Nachbarn - neben 48px-
+     * Knoepfen stand die Schrift 3px tiefer als allein (y 11 gegen 8), und
+     * beim Modulwechsel sprang der Large Title. `align-content` zentriert im
+     * Block, die Ellipse der Basisregel bleibt. */
+    min-block-size: var(--target-base);
+    align-content: center;
     /* NOWRAP BLEIBT, DIE ELLIPSE DER BASISREGEL IST DIE ANTWORT - gemessen,
      * nicht geraten (Runde 6, Phase 0). Bei 375px stehen 343px zur Verfügung;
      * von 360 Paaren aus 24 Locales und 15 Modultiteln reisst GENAU EINES die

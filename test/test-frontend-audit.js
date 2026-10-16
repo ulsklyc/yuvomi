@@ -6430,7 +6430,7 @@ test('Tasks toolbar follows the mobile header rule: one tools menu, "Filter (n)"
   // Critique 2026-08-13).
   assert.match(tasksPage, /class="page-toolbar[^"]*\bpage-toolbar--wrap\b[^"]*\btasks-toolbar\b/);
 
-  const markup = tasksPage.slice(tasksPage.indexOf('class="page-toolbar page-toolbar--wrap tasks-toolbar"'),
+  const markup = tasksPage.slice(tasksPage.indexOf('class="page-toolbar page-toolbar--wrap page-toolbar--title-tools tasks-toolbar"'),
     tasksPage.indexOf('<div class="tasks-body">'));
   assert.ok(markup.length > 200, 'der Aufgabenkopf ist nicht mehr auffindbar - der Guard misst nichts');
   const actions = markup.slice(markup.indexOf('<div class="page-toolbar__actions">'));
@@ -6444,6 +6444,17 @@ test('Tasks toolbar follows the mobile header rule: one tools menu, "Filter (n)"
     assert.match(tasksPage, new RegExp(`action: '${action}'`), `das Werkzeugmenue bietet "${action}" nicht an`);
   }
   assert.doesNotMatch(markup, /data-view="history"/, 'der Verlauf ist ein Menue-Schalter, keine dritte Ansicht im Segment');
+  // D1/D2 (Critique 2026-10-16): die Ansichtswahl ist das Kanon-Segment, der
+  // Filter ein Kopf-Icon mit Zaehler, und mobil steht der Kopf in EINER Zeile
+  // (`page-toolbar--title-tools`) - die Ansicht dann als Einfachauswahl im Menue.
+  assert.match(markup, /<div class="segmented segmented--icons tasks-view-toggle" id="view-toggle"/, 'Ansichtswahl = .segmented');
+  assert.doesNotMatch(markup, /class="group-toggle/, 'kein eigenes .group-toggle mehr als Ansichtswahl');
+  assert.doesNotMatch(markup, /showLabel:\s*true/, 'der Filter ist ein Icon-Knopf mit Zaehler, keine Text-Pille');
+  for (const action of ['view-list', 'view-kanban']) {
+    assert.match(tasksPage, new RegExp(`action: '${action}'`), `das Werkzeugmenue bietet "${action}" (mobil) an`);
+  }
+  assert.ok([...eachRule(tasksCss)].some((r) => r.selector.trim() === '.tasks-view-toggle' && r.at.some((a) => /max-width:\s*767px/.test(a)) && /display:\s*none/.test(r.body)),
+    'unter 768px steht die Ansicht im Menue, nicht als Segment');
   // Die Chipzeile unter dem Kopf ist weg - ins Blatt, nicht versteckt.
   assert.doesNotMatch(tasksPage, /tasks-filters-row|id="filter-panel"|id="filter-bar"/);
   assert.doesNotMatch(tasksCss, /\.tasks-filters-row|\.filter-toggle-btn|\.filter-panel:not/);
@@ -10041,8 +10052,13 @@ test('audited profile, birthday, navigation, and budget controls meet mobile tou
    * hoch war (Critique 2026-08-13). Geprüft wird deshalb die ÜBERNAHME der
    * geteilten Klasse plus deren Zusage, nicht mehr die alte Schreibweise im
    * Modul-Stylesheet - und dass das Modul die Zahl nicht wieder unterbietet. */
-  assert.match(read('../public/pages/contacts.js'), /class="filter-chip contact-filter-chip/);
+  // D2 (Critique 2026-10-16): Chips einer Filterzeile sind immer `--sm` -
+  // 40px am Zeiger wie in Notizen, Inventar und Dokumenten, am Finger
+  // --target-base (48px) ueber die `(hover: none)`-Regel der Variante.
+  assert.match(read('../public/pages/contacts.js'), /class="filter-chip filter-chip--sm contact-filter-chip/);
+  assert.match(read('../public/pages/pantry.js'), /class="filter-chip filter-chip--sm\$\{chip\.id === state\.filter/);
   assert.match(read('../public/styles/filter-chip.css'), /\.filter-chip\s*\{[\s\S]*min-height:\s*var\(--target-lg\)/);
+  assert.match(read('../public/styles/filter-chip.css'), /@media \(hover: none\)\s*\{\s*\.filter-chip--sm\s*\{\s*min-height:\s*var\(--target-base\)/);
   assert.doesNotMatch(contacts, /\.contact-filter-chip\s*\{[^}]*min-height/);
   /* Die Besuchszeilen der Haushaltshilfe trugen ihre Zielgroesse selbst
    * (`.housekeeping-log-action { min-height: var(--target-lg) }`) und dazu ein
