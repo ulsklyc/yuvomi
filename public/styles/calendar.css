@@ -610,7 +610,7 @@
 .allday-event .avatar-stack__item,
 .week-event__time .avatar-stack__item {
   border-width: 1.5px;
-  margin-left: calc(-1 * var(--space-1));
+  margin-inline-start: calc(-1 * var(--space-1));
 }
 
 /* DIE GLYPHEN TRAGEN DIE TINTE DES TITELS, nicht den Vollton der Terminfarbe

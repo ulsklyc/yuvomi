@@ -23,6 +23,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
+import { eachRule } from './css-rules.js';
 
 globalThis.HTMLElement = globalThis.HTMLElement ?? class {};
 globalThis.customElements = globalThis.customElements ?? { define() {}, get() {} };
@@ -338,6 +339,34 @@ const assertShows = (html, text, where) => {
   assert.ok(SHOWS(html, text), `${where}: zeigt ${text}\n${html.slice(0, 600)}`);
   assert.ok(!SHOWS(html, '김'), `${where}: nicht mehr nur den Familiennamen`);
 };
+
+test('Avatar-Stapel kippt mit der Schreibrichtung (alle Stylesheets)', () => {
+  // row-reverse legt den ersten Avatar ans Zeilenende, jeder weitere steht
+  // davor und wird ueber den Rand am Zeilenanfang hineingezogen. Mit
+  // margin-left ragte in RTL der erste Avatar ueber die Kante, und das letzte
+  // Paar ueberlappte nicht; mit margin-left: auto klebte der Stapel im
+  // Dashboard am Titel statt am Zeilenende. Jede Regel, die den Stapel
+  // anfasst, bleibt deshalb bei logischen Seiten.
+  const physical = /(?:^|[;\s])(?:margin|padding|border)-(?:left|right)\b|(?:^|[;\s])(?:left|right)\s*:|text-align:\s*(?:left|right)\b/;
+  const files = readdirSync(new URL('styles/', PUBLIC)).filter((f) => f.endsWith('.css'));
+  let seen = 0;
+  for (const file of files) {
+    for (const r of eachRule(read(`styles/${file}`))) {
+      // .avatar-stack selbst und seine Elemente (__item, __overflow)
+      if (!/\.avatar-stack(?:__|\b)/.test(r.selector)) continue;
+      seen += 1;
+      assert.doesNotMatch(r.body, physical, `${file}: ${r.selector} haengt an einer physischen Seite`);
+    }
+  }
+  assert.ok(seen >= 8, `zu wenige Avatar-Stapel-Regeln gefunden (${seen}) - umbenannt?`);
+
+  const css = read('styles/user-multi-select.css');
+  const rules = [...eachRule(css)];
+  const body = (sel) => rules.find((r) => r.at.length === 0 && r.selector === sel)?.body ?? '';
+  assert.match(body('.avatar-stack'), /flex-direction:\s*row-reverse/, 'die Ueberlappung rechnet mit row-reverse');
+  assert.match(body('.avatar-stack__item'), /margin-inline-start:\s*-6px/, 'der naechste Avatar wird ueber den Zeilenanfang gezogen');
+  assert.match(body('.avatar-stack__item:last-child'), /margin-inline-start:\s*0/, 'der letzte ragt nicht ueber die Kante');
+});
 
 test('Avatar-Stapel und Personenauswahl (components/user-multi-select.js)', async () => {
   const ums = await import('../public/components/user-multi-select.js');
