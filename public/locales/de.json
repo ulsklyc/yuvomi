@@ -4025,7 +4025,6 @@
         "groups": "Gruppen",
         "searchGroups": "Gruppen suchen",
         "members": "Mitglieder",
-        "activeGroups": "Aktive Gruppen",
         "allGroups": "Alle Gruppen",
         "youAreOwed": "Du bekommst",
         "youOwe": "Du schuldest",
@@ -4191,7 +4190,9 @@
         "reversePaymentConfirm": "Diese Zahlung stornieren?",
         "reversePaymentConfirmDetail": "{{payer}} an {{payee}}, {{amount}}. Eine Gegenbuchung hebt die Zahlung auf, die Salden stehen danach wie vorher. Die Zahlung bleibt als storniert im Verlauf.",
         "loadMoreActivity": "Mehr laden",
-        "expenseDeleted": "Gelöscht"
+        "expenseDeleted": "Gelöscht",
+        "youAreOwedInGroup": "Du bekommst in {{group}}",
+        "youOweInGroup": "Du schuldest in {{group}}"
     },
     "wmo": {
         "0": "Klarer Himmel",

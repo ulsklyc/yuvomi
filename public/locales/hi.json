@@ -4025,7 +4025,6 @@
         "groups": "समूह",
         "searchGroups": "समूह खोजें",
         "members": "सदस्य",
-        "activeGroups": "सक्रिय समूह",
         "allGroups": "सभी समूह",
         "youAreOwed": "आपको मिलना है",
         "youOwe": "आपको देना है",
@@ -4191,7 +4190,9 @@
         "reversePaymentConfirm": "यह भुगतान रद्द करें?",
         "reversePaymentConfirmDetail": "{{payer}} से {{payee}}, {{amount}}. एक उलटी प्रविष्टि भुगतान को रद्द करती है और शेष पहले जैसे हो जाते हैं. भुगतान गतिविधि में रद्द के रूप में बना रहता है.",
         "loadMoreActivity": "और लोड करें",
-        "expenseDeleted": "हटाया गया"
+        "expenseDeleted": "हटाया गया",
+        "youAreOwedInGroup": "{{group}} में तुम्हें मिलना है",
+        "youOweInGroup": "{{group}} में तुम्हें देना है"
     },
     "wmo": {
         "0": "साफ आकाश",

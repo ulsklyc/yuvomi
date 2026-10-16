@@ -4253,7 +4253,6 @@
         "groups": "Групи",
         "searchGroups": "Пошук груп",
         "members": "учасники",
-        "activeGroups": "Активні групи",
         "allGroups": "Усі групи",
         "youAreOwed": "Вам винні",
         "youOwe": "Ви винні",
@@ -4425,7 +4424,9 @@
         "reversePaymentConfirm": "Сторнувати цей платіж?",
         "reversePaymentConfirmDetail": "{{payer}} → {{payee}}, {{amount}}. Зворотний запис скасовує платіж, і баланси повертаються до попередніх. Платіж залишається в активності з позначкою «сторновано».",
         "loadMoreActivity": "Завантажити ще",
-        "expenseDeleted": "Видалено"
+        "expenseDeleted": "Видалено",
+        "youAreOwedInGroup": "Тобі винні в {{group}}",
+        "youOweInGroup": "Ти винен у {{group}}"
     },
     "wmo": {
         "0": "Ясне небо",

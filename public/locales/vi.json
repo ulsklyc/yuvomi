@@ -4025,7 +4025,6 @@
         "groups": "Các nhóm",
         "searchGroups": "Tìm kiếm nhóm",
         "members": "thành viên",
-        "activeGroups": "Các nhóm đang hoạt động",
         "allGroups": "Tất cả các nhóm",
         "youAreOwed": "Bạn được nợ",
         "youOwe": "Bạn đang nợ",
@@ -4191,7 +4190,9 @@
         "reversePaymentConfirm": "Hoàn tác khoản thanh toán này?",
         "reversePaymentConfirmDetail": "{{payer}} cho {{payee}}, {{amount}}. Một bút toán đảo sẽ hủy khoản thanh toán và số dư trở lại như trước. Khoản thanh toán vẫn nằm trong hoạt động, được đánh dấu đã hoàn tác.",
         "loadMoreActivity": "Tải thêm",
-        "expenseDeleted": "Đã xóa"
+        "expenseDeleted": "Đã xóa",
+        "youAreOwedInGroup": "Bạn được nhận trong {{group}}",
+        "youOweInGroup": "Bạn nợ trong {{group}}"
     },
     "wmo": {
         "0": "Trời quang",

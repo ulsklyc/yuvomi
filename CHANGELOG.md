@@ -79,6 +79,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The overview starts at the same left edge as every module.** On wide screens it used to be
   wider than the modules, so switching between the overview and a module moved everything sideways
   by up to 160px.
+- **Shared expenses say which group a balance belongs to.** "You are owed" and "You owe" now name
+  the selected group, and the "Active groups" tile, which counted all groups right next to them, is
+  gone; the number of groups stays at the head of the group list.
 
 ### Fixed
 

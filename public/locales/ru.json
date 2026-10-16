@@ -4253,7 +4253,6 @@
         "groups": "Группы",
         "searchGroups": "Поиск групп",
         "members": "участники",
-        "activeGroups": "Активные группы",
         "allGroups": "Все группы",
         "youAreOwed": "Вам должны",
         "youOwe": "Вы должны",
@@ -4425,7 +4424,9 @@
         "reversePaymentConfirm": "Сторнировать этот платеж?",
         "reversePaymentConfirmDetail": "{{payer}} → {{payee}}, {{amount}}. Обратная проводка отменяет платеж, и балансы возвращаются к прежним. Платеж остается в активности с пометкой «сторнирован».",
         "loadMoreActivity": "Загрузить ещё",
-        "expenseDeleted": "Удален"
+        "expenseDeleted": "Удален",
+        "youAreOwedInGroup": "Тебе должны в {{group}}",
+        "youOweInGroup": "Ты должен в {{group}}"
     },
     "wmo": {
         "0": "Ясное небо",

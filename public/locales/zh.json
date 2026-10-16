@@ -4025,7 +4025,6 @@
         "groups": "群组",
         "searchGroups": "搜索群组",
         "members": "成员",
-        "activeGroups": "活跃群组",
         "allGroups": "全部群组",
         "youAreOwed": "别人欠你",
         "youOwe": "你欠别人",
@@ -4191,7 +4190,9 @@
         "reversePaymentConfirm": "冲销这笔付款？",
         "reversePaymentConfirmDetail": "{{payer}} 付给 {{payee}}，{{amount}}。一笔反向记账会抵消该付款，余额恢复到之前的状态。该付款仍保留在动态中，并标记为已冲销。",
         "loadMoreActivity": "加载更多",
-        "expenseDeleted": "已删除"
+        "expenseDeleted": "已删除",
+        "youAreOwedInGroup": "在{{group}}中你应收",
+        "youOweInGroup": "在{{group}}中你应付"
     },
     "wmo": {
         "0": "晴天",

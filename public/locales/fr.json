@@ -4025,7 +4025,6 @@
         "groups": "Groupes",
         "searchGroups": "Rechercher des groupes",
         "members": "membres",
-        "activeGroups": "Groupes actifs",
         "allGroups": "Tous les groupes",
         "youAreOwed": "On vous doit",
         "youOwe": "Vous devez",
@@ -4191,7 +4190,9 @@
         "reversePaymentConfirm": "Annuler ce paiement ?",
         "reversePaymentConfirmDetail": "{{payer}} à {{payee}}, {{amount}}. Une contre-écriture annule le paiement et les soldes reviennent à leur état précédent. Le paiement reste dans l’activité, marqué comme annulé.",
         "loadMoreActivity": "Charger plus",
-        "expenseDeleted": "Supprimée"
+        "expenseDeleted": "Supprimée",
+        "youAreOwedInGroup": "On te doit dans {{group}}",
+        "youOweInGroup": "Tu dois dans {{group}}"
     },
     "wmo": {
         "0": "Ciel dégagé",

@@ -4253,7 +4253,6 @@
         "groups": "Grupy",
         "searchGroups": "Szukaj grup",
         "members": "członkowie",
-        "activeGroups": "Aktywne grupy",
         "allGroups": "Wszystkie grupy",
         "youAreOwed": "Należy ci się",
         "youOwe": "Jesteś winny",
@@ -4425,7 +4424,9 @@
         "reversePaymentConfirm": "Stornować tę płatność?",
         "reversePaymentConfirmDetail": "{{payer}} dla {{payee}}, {{amount}}. Zapis przeciwny anuluje płatność, a salda wracają do poprzedniego stanu. Płatność pozostaje w aktywności oznaczona jako stornowana.",
         "loadMoreActivity": "Wczytaj więcej",
-        "expenseDeleted": "Usunięto"
+        "expenseDeleted": "Usunięto",
+        "youAreOwedInGroup": "Należy ci się w {{group}}",
+        "youOweInGroup": "Jesteś winien w {{group}}"
     },
     "wmo": {
         "0": "Bezchmurnie",

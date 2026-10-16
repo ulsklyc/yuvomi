@@ -4025,7 +4025,6 @@
         "groups": "Mga Grupo",
         "searchGroups": "Maghanap ng grupo",
         "members": "miyembro",
-        "activeGroups": "Mga aktibong grupo",
         "allGroups": "Lahat ng grupo",
         "youAreOwed": "May utang sa iyo",
         "youOwe": "May utang ka",
@@ -4191,7 +4190,9 @@
         "reversePaymentConfirm": "Bawiin ang bayad na ito?",
         "reversePaymentConfirmDetail": "{{payer}} kay {{payee}}, {{amount}}. Kinakansela ng kabaligtarang entry ang bayad at babalik ang mga balanse sa dati. Mananatili ang bayad sa aktibidad na may markang binawi.",
         "loadMoreActivity": "Mag-load pa",
-        "expenseDeleted": "Natanggal"
+        "expenseDeleted": "Natanggal",
+        "youAreOwedInGroup": "May utang sa iyo sa {{group}}",
+        "youOweInGroup": "May utang ka sa {{group}}"
     },
     "wmo": {
         "0": "Maaliwalas na langit",

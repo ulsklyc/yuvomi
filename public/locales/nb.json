@@ -4025,7 +4025,6 @@
         "groups": "Grupper",
         "searchGroups": "Søk etter grupper",
         "members": "medlemmer",
-        "activeGroups": "Aktive grupper",
         "allGroups": "Alle grupper",
         "youAreOwed": "Du skal ha",
         "youOwe": "Du skylder",
@@ -4191,7 +4190,9 @@
         "reversePaymentConfirm": "Revers denne betalingen?",
         "reversePaymentConfirmDetail": "{{payer}} til {{payee}}, {{amount}}. En motpost kansellerer betalingen og saldoene går tilbake til det de var. Betalingen blir værende i aktiviteten, markert som reversert.",
         "loadMoreActivity": "Last mer",
-        "expenseDeleted": "Slettet"
+        "expenseDeleted": "Slettet",
+        "youAreOwedInGroup": "Du har til gode i {{group}}",
+        "youOweInGroup": "Du skylder i {{group}}"
     },
     "wmo": {
         "0": "Skyfri",

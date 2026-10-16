@@ -484,27 +484,38 @@ test('der Verlauf nennt die Ausgabe und den Betrag von damals - nicht fuenfmal �
   }
 });
 
-test('die Gruppenzahl steht am Kopf der Liste, mobil entfaellt ihre Kennzahlkarte', async () => {
+test('die Gruppenzahl steht am Kopf der Liste, die Kennzahlen nennen ihre Gruppe', async () => {
+  // Critique R19: „Du schuldest 24,14 €" galt der gewaehlten Gruppe, die
+  // Nachbarkachel „Aktive Gruppen 2" allen Gruppen - ohne Bereichsangabe. Die
+  // Betraege nennen jetzt ihre Gruppe, die Zahl steht nur am Kopf der Liste.
   const summary = { html: '', replaceChildren() { this.html = ''; }, insertAdjacentHTML(_p, h) { this.html += h; } };
   const zaehler = { textContent: '' };
   const vorher = { ...split.state };
-  Object.assign(split.state, {
-    groupStatus: 'active', groups: [{ id: 1 }, { id: 2 }],
-    dashboard: { total_owed: [], total_owing: [] }, meta: { currencies: ['EUR'], default_currency: 'EUR' },
-  });
-  try {
+  const render = (extra) => {
+    summary.html = '';
+    Object.assign(split.state, {
+      groupStatus: 'active', groups: [{ id: 1, name: 'Haus <&>' }, { id: 2, name: 'Urlaub' }], activeGroupId: 1,
+      balances: { balances: [{ user_id: 7, net: '-24.14', net_minor: -2414, currency: 'EUR' }] }, user: { id: 7 },
+      dashboard: { total_owed: [], total_owing: [] }, meta: { currencies: ['EUR'], default_currency: 'EUR' }, ...extra,
+    });
     split.renderSummaryForTest({ querySelector: (sel) => (sel === '#split-summary' ? summary : sel === '#split-group-count' ? zaehler : null) });
+  };
+  try {
+    render();
+    assert.equal(zaehler.textContent, '2', 'der Kopf „Gruppen" traegt die Zahl');
+    assert.doesNotMatch(summary.html, /split-summary-groups|splitExpenses\.activeGroups/, 'keine Kachel ueber alle Gruppen neben denen der gewaehlten');
+    assert.equal((summary.html.match(/class="metric-card[ "]/g) ?? []).length, 2, 'zwei Kacheln: bekommen und schulden');
+    assert.match(summary.html, /metric-card__label">splitExpenses\.youAreOwedInGroup\{&quot;group&quot;:&quot;Haus &lt;&amp;&gt;&quot;\}</, 'der Name der Gruppe steht escaped im Label');
+    assert.match(summary.html, /metric-card__label">splitExpenses\.youOweInGroup\{&quot;group&quot;:&quot;Haus &lt;&amp;&gt;&quot;\}</);
+    render({ activeGroupId: null, groups: [] });
+    assert.match(summary.html, /metric-card__label">splitExpenses\.youOwe</, 'ohne Gruppe das schlichte Label');
   } finally {
     Object.assign(split.state, vorher);
   }
-  assert.equal(zaehler.textContent, '2', 'der Kopf „Gruppen" traegt die Zahl');
-  assert.match(summary.html, /class="metric-card split-summary-groups"/, 'die Karte ist benennbar, damit mobil nur sie entfaellt');
   const { readFileSync } = await import('node:fs');
   const { eachRule } = await import('./css-rules.js');
   const css = readFileSync(new URL('../public/styles/split-expenses.css', import.meta.url), 'utf8');
-  const regel = [...eachRule(css)].find((r) => r.selector.trim() === '.split-summary-groups');
-  assert.ok(regel?.at.includes('@container split-page (max-width: 639px)'), 'nur schmal - am Desktop bleibt die Dreierreihe');
-  assert.match(regel.body, /display:\s*none/, 'keine volle Zeile fuer eine Ziffer (59px fuer „2", 390x844)');
+  assert.ok(![...eachRule(css)].some((r) => r.selector.includes('.split-summary-groups')), 'keine Regel fuer eine Karte, die es nicht mehr gibt');
   const src = readFileSync(new URL('../public/pages/split-expenses.js', import.meta.url), 'utf8');
   assert.match(src, /class="split-panel-title u-section-title">\$\{t\('splitExpenses\.groups'\)\}<span class="list-group__count split-panel-count" id="split-group-count">/);
 });

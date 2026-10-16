@@ -3650,7 +3650,6 @@
         "groups": "Skupiny",
         "searchGroups": "Hledat skupiny",
         "members": "Členové",
-        "activeGroups": "Aktivní skupiny",
         "allGroups": "Všechny skupiny",
         "youAreOwed": "Dostanete",
         "youOwe": "Dlužíte",
@@ -3819,7 +3818,9 @@
         "reversePaymentConfirm": "Stornovat tuto platbu?",
         "reversePaymentConfirmDetail": "{{payer}} pro {{payee}}, {{amount}}. Protizápis platbu zruší a zůstatky se vrátí na předchozí stav. Platba zůstane v aktivitě označená jako stornovaná.",
         "loadMoreActivity": "Načíst další",
-        "expenseDeleted": "Smazáno"
+        "expenseDeleted": "Smazáno",
+        "youAreOwedInGroup": "Dostaneš v {{group}}",
+        "youOweInGroup": "Dlužíš v {{group}}"
     },
     "documents": {
         "title": "Dokumenty",

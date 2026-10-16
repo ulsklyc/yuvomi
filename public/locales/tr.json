@@ -4025,7 +4025,6 @@
         "groups": "Gruplar",
         "searchGroups": "Grup ara",
         "members": "üye",
-        "activeGroups": "Aktif gruplar",
         "allGroups": "Tüm gruplar",
         "youAreOwed": "Sana borçlu",
         "youOwe": "Sen borçlusun",
@@ -4191,7 +4190,9 @@
         "reversePaymentConfirm": "Bu ödeme iptal edilsin mi?",
         "reversePaymentConfirmDetail": "{{payer}} → {{payee}}, {{amount}}. Ters kayıt ödemeyi geçersiz kılar ve bakiyeler önceki haline döner. Ödeme, iptal edildi olarak etkinlikte kalır.",
         "loadMoreActivity": "Daha fazla yükle",
-        "expenseDeleted": "Silindi"
+        "expenseDeleted": "Silindi",
+        "youAreOwedInGroup": "{{group}} içinde alacağın",
+        "youOweInGroup": "{{group}} içinde borcun"
     },
     "wmo": {
         "0": "Açık",

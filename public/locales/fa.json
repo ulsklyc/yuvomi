@@ -4025,7 +4025,6 @@
         "groups": "گروه‌ها",
         "searchGroups": "جستجوی گروه‌ها",
         "members": "اعضا",
-        "activeGroups": "گروه‌های فعال",
         "allGroups": "همه گروه‌ها",
         "youAreOwed": "طلب شما",
         "youOwe": "بدهی شما",
@@ -4191,7 +4190,9 @@
         "reversePaymentConfirm": "این پرداخت برگشت بخورد؟",
         "reversePaymentConfirmDetail": "{{payer}} به {{payee}}، {{amount}}. یک ثبت معکوس پرداخت را لغو می‌کند و مانده‌ها به حالت قبل برمی‌گردند. پرداخت با علامت برگشت‌خورده در فعالیت می‌ماند.",
         "loadMoreActivity": "بارگذاری بیشتر",
-        "expenseDeleted": "حذف‌شده"
+        "expenseDeleted": "حذف‌شده",
+        "youAreOwedInGroup": "طلب تو در {{group}}",
+        "youOweInGroup": "بدهی تو در {{group}}"
     },
     "wmo": {
         "0": "آسمان صاف",

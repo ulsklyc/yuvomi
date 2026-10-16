@@ -4025,7 +4025,6 @@
         "groups": "Grupper",
         "searchGroups": "Sök grupper",
         "members": "medlemmar",
-        "activeGroups": "Aktiva grupper",
         "allGroups": "Alla grupper",
         "youAreOwed": "Du har att få",
         "youOwe": "Du är skyldig",
@@ -4191,7 +4190,9 @@
         "reversePaymentConfirm": "Återföra den här betalningen?",
         "reversePaymentConfirmDetail": "{{payer}} till {{payee}}, {{amount}}. En motbokning häver betalningen och saldona blir som förut. Betalningen finns kvar i aktiviteten, markerad som återförd.",
         "loadMoreActivity": "Läs in fler",
-        "expenseDeleted": "Borttagen"
+        "expenseDeleted": "Borttagen",
+        "youAreOwedInGroup": "Du får tillbaka i {{group}}",
+        "youOweInGroup": "Du är skyldig i {{group}}"
     },
     "wmo": {
         "0": "Klart",

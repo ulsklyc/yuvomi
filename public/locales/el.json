@@ -4025,7 +4025,6 @@
         "groups": "Ομάδες",
         "searchGroups": "Αναζήτηση ομάδων",
         "members": "μέλη",
-        "activeGroups": "Ενεργές ομάδες",
         "allGroups": "Όλες οι ομάδες",
         "youAreOwed": "Σου οφείλουν",
         "youOwe": "Οφείλεις",
@@ -4191,7 +4190,9 @@
         "reversePaymentConfirm": "Ακύρωση αυτής της πληρωμής;",
         "reversePaymentConfirmDetail": "{{payer}} προς {{payee}}, {{amount}}. Μια αντίθετη εγγραφή ακυρώνει την πληρωμή και τα υπόλοιπα επιστρέφουν όπως ήταν. Η πληρωμή παραμένει στη δραστηριότητα, σημειωμένη ως ακυρωμένη.",
         "loadMoreActivity": "Φόρτωση περισσότερων",
-        "expenseDeleted": "Διαγράφηκε"
+        "expenseDeleted": "Διαγράφηκε",
+        "youAreOwedInGroup": "Σου οφείλουν στο {{group}}",
+        "youOweInGroup": "Χρωστάς στο {{group}}"
     },
     "wmo": {
         "0": "Αίθριος καιρός",

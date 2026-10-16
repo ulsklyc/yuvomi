@@ -4025,7 +4025,6 @@
         "groups": "Grup",
         "searchGroups": "Cari grup",
         "members": "Anggota",
-        "activeGroups": "Grup aktif",
         "allGroups": "Semua grup",
         "youAreOwed": "Anda menerima",
         "youOwe": "Anda berutang",
@@ -4191,7 +4190,9 @@
         "reversePaymentConfirm": "Batalkan pembayaran ini?",
         "reversePaymentConfirmDetail": "{{payer}} ke {{payee}}, {{amount}}. Entri balik membatalkan pembayaran dan saldo kembali seperti semula. Pembayaran tetap ada di aktivitas dengan tanda dibatalkan.",
         "loadMoreActivity": "Muat lebih banyak",
-        "expenseDeleted": "Dihapus"
+        "expenseDeleted": "Dihapus",
+        "youAreOwedInGroup": "Kamu dapat di {{group}}",
+        "youOweInGroup": "Kamu berutang di {{group}}"
     },
     "wmo": {
         "0": "Langit cerah",

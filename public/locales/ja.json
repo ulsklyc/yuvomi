@@ -4025,7 +4025,6 @@
         "groups": "グループ",
         "searchGroups": "グループを検索",
         "members": "メンバー",
-        "activeGroups": "有効なグループ",
         "allGroups": "すべてのグループ",
         "youAreOwed": "受け取る金額",
         "youOwe": "支払う金額",
@@ -4191,7 +4190,9 @@
         "reversePaymentConfirm": "この支払いを取り消しますか?",
         "reversePaymentConfirmDetail": "{{payer}} から {{payee}}、{{amount}}。反対仕訳で支払いが打ち消され、残高は元に戻ります。支払いは取り消し済みとしてアクティビティに残ります。",
         "loadMoreActivity": "さらに読み込む",
-        "expenseDeleted": "削除済み"
+        "expenseDeleted": "削除済み",
+        "youAreOwedInGroup": "{{group}}で受け取る額",
+        "youOweInGroup": "{{group}}で支払う額"
     },
     "wmo": {
         "0": "快晴",

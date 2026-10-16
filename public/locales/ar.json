@@ -4368,7 +4368,6 @@
         "groups": "المجموعات",
         "searchGroups": "بحث في المجموعات",
         "members": "أعضاء",
-        "activeGroups": "المجموعات النشطة",
         "allGroups": "كل المجموعات",
         "youAreOwed": "مستحق لك",
         "youOwe": "أنت مدين",
@@ -4543,7 +4542,9 @@
         "reversePaymentConfirm": "عكس هذه الدفعة؟",
         "reversePaymentConfirmDetail": "{{payer}} إلى {{payee}}، {{amount}}. قيد معاكس يلغي الدفعة وتعود الأرصدة كما كانت. تبقى الدفعة في النشاط مع علامة معكوسة.",
         "loadMoreActivity": "تحميل المزيد",
-        "expenseDeleted": "محذوف"
+        "expenseDeleted": "محذوف",
+        "youAreOwedInGroup": "مستحق لك في {{group}}",
+        "youOweInGroup": "عليك في {{group}}"
     },
     "wmo": {
         "0": "سماء صافية",

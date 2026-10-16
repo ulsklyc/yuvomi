@@ -4025,7 +4025,6 @@
         "groups": "Grupos",
         "searchGroups": "Buscar grupos",
         "members": "membros",
-        "activeGroups": "Grupos ativos",
         "allGroups": "Todos os grupos",
         "youAreOwed": "Devem a você",
         "youOwe": "Você deve",
@@ -4191,7 +4190,9 @@
         "reversePaymentConfirm": "Estornar este pagamento?",
         "reversePaymentConfirmDetail": "{{payer}} para {{payee}}, {{amount}}. Um lançamento inverso anula o pagamento e os saldos voltam ao que eram. O pagamento continua na atividade, marcado como estornado.",
         "loadMoreActivity": "Carregar mais",
-        "expenseDeleted": "Excluída"
+        "expenseDeleted": "Excluída",
+        "youAreOwedInGroup": "Recebes em {{group}}",
+        "youOweInGroup": "Deves em {{group}}"
     },
     "wmo": {
         "0": "Céu limpo",
