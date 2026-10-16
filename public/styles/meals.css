@@ -317,7 +317,8 @@
    * Spezifitaet), und die spaetere Regel gewinnt - der gestrichelte Slot stand
    * mobil wieder neben dem .day-add (Critique 2026-08-27, gemessen: 1 leerer
    * Slot sichtbar bei 375px). Genau die Falle, die der Abschnitt „Schmale
-   * Fassung" fuer add-more-btn schon dokumentiert; die Regel steht jetzt dort,
+   * Fassung" fuer den Plus-Knopf belegter Slots dokumentierte (den es seit
+   * D5, 2026-10-16, nicht mehr gibt); die Regel steht jetzt dort,
    * hinter ihrem Bauteil. */
 
   .day-add {
@@ -373,8 +374,8 @@
    * seine Zeile nicht trug: gemessen bei 1366x650 waren 27 von 27 belegten
    * Slots 100px hoch bei 139-161px Inhalt, das "+" jeder Karte unsichtbar
    * (die Zeilenhoehe selbst richtet `grid-auto-rows` am Wochenraster). Den
-   * Radius beschneidet, wer eine eigene Flaeche an die Slot-Ecke malt
-   * (`.meal-slot__add-more-btn` unten), nicht der Slot.
+   * Radius beschneidet, wer eine eigene Flaeche an die Slot-Ecke malt, nicht
+   * der Slot.
    * `min-width: 0` haelt, was der Beschnitt nebenbei tat: ohne ihn meldet
    * der Slot seine Inhaltsbreite als Mindestbreite und drueckt die Spalten
    * des Tablet-Rasters auseinander (gemessen bei 768: 834px in 736px). */
@@ -476,37 +477,6 @@
 
 .meal-slot__add-btn:hover {
   color: var(--module-accent);
-}
-
-.meal-slot__add-more-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  background: none;
-  border: none;
-  border-top: 1px dashed var(--color-border);
-  cursor: pointer;
-  /* tertiary, nicht disabled - siehe .meal-slot__add-btn. */
-  color: var(--color-text-tertiary);
-  padding: var(--space-1) var(--space-2);
-  /* 28px lagen unter --target-md; der Button ist auf Desktop der Weg, eine
-   * zweite Mahlzeit in denselben Slot zu legen (Critique 2026-07-29). */
-  min-height: var(--target-md);
-  /* Die Hover-Flaeche endet an den unteren Slot-Ecken; seit der Slot nicht
-   * mehr beschneidet, traegt der Knopf deren Radius selbst. */
-  border-end-start-radius: inherit;
-  border-end-end-radius: inherit;
-  /* Dauerhaft sichtbar, auch mit Zeiger (Re-Critique 2026-09-27, D7): eine
-   * Aktion, die erst beim Ueberfahren erscheint, findet auf Tablet und
-   * Trackpad niemand (ignore.md sanktioniert sichtbare Zeilenaktionen). Ruhig
-   * haelt sie die Tertiaerfarbe und die gestrichelte Kante, keine Flaeche. */
-  transition: color var(--transition-fast), background-color var(--transition-fast);
-}
-
-.meal-slot__add-more-btn:hover {
-  color: var(--module-accent);
-  background-color: color-mix(in srgb, var(--module-accent) var(--tint-state), transparent);
 }
 
 /* --------------------------------------------------------
@@ -731,31 +701,12 @@
  * -------------------------------------------------------- */
 
 @media (max-width: 639px) {
-  /* DER ZWEITE ANLEGEWEG FÄLLT WEG, UND ZWAR UNTER DERSELBEN BEDINGUNG, UNTER
-   * DER DER ERSTE ERSCHEINT.
-   *
-   * Genau bei 640px schaltet `.day-add` ein - der gesammelte „+ Mahlzeit" je
-   * Tag, den es gibt, weil die leeren Slots hier ausgeblendet sind. Daneben
-   * blieb der Per-Slot-Knopf dauerhaft stehen: gemessen 27 Slot-Knöpfe plus 7
-   * Tagesknöpfe für 27 Mahlzeiten, also 34 Anlege-Affordanzen für eine Woche,
-   * jede --target-lg hoch. Zwei sichtbare Wege zu derselben Handlung sind einer
-   * zu viel (DESIGN.md, Don't „einen zweiten Anlege-Weg neben einem sichtbaren
-   * stehen lassen"), und der teurere von beiden war der, der jede belegte Zeile
-   * um eine gestrichelte Leerzeile verlängert hat.
-   *
-   * Auf Zeigergeräten und breiten Touch-Flächen bleibt er: dort sind die leeren
-   * Slots sichtbar, `.day-add` gibt es nicht, und er ist der einzige Weg, eine
-   * ZWEITE Mahlzeit in denselben Slot zu legen. */
-  .meal-slot__add-more-btn {
-    display: none;
-  }
-
   /* Kernentschaerfung: leere Slots nicht als grosse gestrichelte Boxen stapeln
    * (7 Tage x 4 Typen = bis zu 28). Belegte Slots bleiben; pro Tag ein
    * gesammelter Add-Button (.day-add), der das Modal mit Typ-Auswahl oeffnet.
    * Die Regel stand bis 2026-08-27 im Mobil-Block VOR der .meal-slot-Basisregel
    * (display: flex, gleiche Spezifitaet) und war damit still wirkungslos -
-   * dieselbe Kaskade-Falle wie beim add-more-btn darueber, nur eine Runde
+   * dieselbe Kaskade-Falle wie beim frueheren Plus belegter Slots, nur eine Runde
    * spaeter zurueckgekehrt. */
   .meal-slot--empty {
     display: none;
@@ -1244,8 +1195,7 @@
     opacity: 1;
   }
 
-  .week-nav__today,
-  .meal-slot__add-more-btn {
+  .week-nav__today {
     opacity: 1;
   pointer-events: auto;
     min-height: var(--target-lg);

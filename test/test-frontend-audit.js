@@ -9995,7 +9995,9 @@ test('mobile meal actions remain visible and touch-safe after the full cascade',
   );
   assert.match(
     meals,
-    /@media \(hover:\s*none\),\s*\(max-width:\s*639px\)[\s\S]*?\.week-nav__today,[\s\S]*?\.meal-slot__add-more-btn\s*\{[\s\S]*?min-height:\s*var\(--target-lg\)/,
+    // Seit D5 (2026-10-16) gibt es unter belegten Zellen kein Plus mehr -
+    // der Heute-Knopf behaelt seine Touch-Hoehe allein.
+    /@media \(hover:\s*none\),\s*\(max-width:\s*639px\)[\s\S]*?\.week-nav__today\s*\{[\s\S]*?min-height:\s*var\(--target-lg\)/,
   );
   assert.match(
     meals,
