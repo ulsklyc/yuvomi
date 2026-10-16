@@ -32,6 +32,7 @@ import { esc } from '/utils/html.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { iconNames, iconElement } from '/utils/lucide-icons.js';
 import { attachOverlay, dropOverlay } from '/utils/overlay-history.js';
+import { dismissDialog, revealDialog } from '/utils/dialog-surface.js';
 
 /**
  * So viele Treffer zeigt das Raster auf einmal.
@@ -125,7 +126,8 @@ function tile(name, isCurrent) {
 
 function buildDialog(current, resolve, suggestions) {
   const dialog = document.createElement('dialog');
-  dialog.className = 'icon-picker';
+  // `.dialog-surface`: Tafel, Grund, Ein- und Ausgang wie das geteilte Modal (D7).
+  dialog.className = 'icon-picker dialog-surface';
   dialog.setAttribute('aria-label', t('iconPicker.title'));
 
   dialog.insertAdjacentHTML('afterbegin', `
@@ -161,8 +163,9 @@ function buildDialog(current, resolve, suggestions) {
     if (settled) return;
     settled = true;
     if (token !== null) dropOverlay(token);
-    dialog.remove();
-    resolve(value);
+    // Erst nach dem Ausgang aufloesen: der Aufrufer fokussiert danach im
+    // Formular darunter, und das ist bis dahin noch inert.
+    dismissDialog(dialog).then(() => resolve(value));
   }
 
   /* Ein Ergebnis ist EIN Zustand und wird als Ganzes neu gezeichnet. Einzelne
@@ -240,6 +243,7 @@ export function openIconPicker(current = null, { suggestions = SUGGESTIONS } = {
     // Kacheln baut iconElement() selbst und brauchen das nicht.
     window.lucide?.createIcons?.({ el: picker.dialog });
     picker.dialog.showModal();
+    revealDialog(picker.dialog);
     picker.register();
     picker.focus();
   });
