@@ -76,3 +76,49 @@ export function renderSkeletonChart({ charts = 2 } = {}) {
   }
   return `<div class="skeleton-list" aria-hidden="true">${cards}</div>`;
 }
+
+/**
+ * Legt ein Skelett in einen LEEREN Traeger, das von selbst geht, sobald der
+ * Inhalt kommt (Critique R19, 2026-10-16).
+ *
+ * Das Muster, das es ablöst: die Einstellungs-Shell legte nach 120 ms ein
+ * Skelett in jeden noch leeren Abschnitt. Ein Abschnitt, der sich zuerst
+ * leert, dann wartet und danach per `insertAdjacentHTML('beforeend')` anhaengt
+ * (modules-active.js), haengte seinen Inhalt HINTER das Skelett - es blieb ueber
+ * dem fertigen Inhalt stehen, natuerlich in etwa 2 von 10 Laeufen, mit
+ * verzoegerter Antwort fast immer. Den Fehler im Abschnitt zu beheben hiesse,
+ * jeden Abschnitt einzeln zu kennen; hier raeumt das Skelett sich selbst.
+ *
+ * WIE: ein MutationObserver am Traeger. Sobald irgendein anderer Knoten darin
+ * steht, nimmt er das Skelett heraus. Sein Rueckruf laeuft als Mikrotask, also
+ * vor dem naechsten Bild: Skelett und Inhalt stehen nie gemeinsam auf dem
+ * Schirm. Leert der Abschnitt den Traeger selbst (`replaceChildren`), ist das
+ * Skelett ohnehin weg und der Beobachter hoert auf.
+ *
+ * @param {Element} host - der Traeger; nur wenn er im Dokument steht und leer ist
+ * @param {string} html - Markup mit GENAU einem Wurzelelement (renderSkeletonList)
+ * @param {object} [env]
+ * @param {typeof MutationObserver} [env.Observer] - fuer Tests
+ * @returns {Element|null} das gelegte Skelett, oder null
+ */
+export function placeSkeletonUntilContent(host, html, { Observer = globalThis.MutationObserver } = {}) {
+  if (!host?.isConnected || host.firstChild) return null;
+  host.insertAdjacentHTML('beforeend', html);
+  const skeleton = host.lastElementChild;
+  if (!skeleton || typeof Observer !== 'function') return skeleton ?? null;
+  const observer = new Observer(() => {
+    if (skeleton.parentNode !== host) {
+      observer.disconnect();
+      return;
+    }
+    for (const node of host.childNodes) {
+      if (node !== skeleton) {
+        skeleton.remove();
+        observer.disconnect();
+        return;
+      }
+    }
+  });
+  observer.observe(host, { childList: true });
+  return skeleton;
+}

@@ -1,6 +1,6 @@
 import { t } from '/i18n.js';
 import { moduleAccentVar } from '/utils/module-accent.js';
-import { renderSkeletonList } from '/utils/skeleton.js';
+import { renderSkeletonList, placeSkeletonUntilContent } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { swapContent } from '/utils/content-swap.js';
 import { createRetryState } from './components.js';
@@ -1012,13 +1012,12 @@ async function renderLeafContent(content, leaf, domain, user, query) {
   // Der Blattwechsel laedt Module und danach deren Daten. aria-busy gilt
   // sofort; das Skelett kommt erst nach einer kurzen Frist, damit ein Blatt aus
   // dem Modul-Cache nicht kurz aufblitzt.
+  // Das Skelett raeumt sich selbst, sobald ein Abschnitt Inhalt hat - auch
+  // wenn der Abschnitt seinen Inhalt HINTER das Skelett haengt, statt den
+  // Traeger zu ersetzen (Critique R19, placeSkeletonUntilContent).
   leafContainer.setAttribute('aria-busy', 'true');
   const skeletonTimer = setTimeout(() => {
-    for (const [host] of hosts) {
-      if (host.isConnected && !host.firstChild) {
-        host.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 2, lines: 3 }));
-      }
-    }
+    for (const [host] of hosts) placeSkeletonUntilContent(host, renderSkeletonList({ rows: 2, lines: 3 }));
   }, SKELETON_DELAY_MS);
 
   const finishLeaf = () => {

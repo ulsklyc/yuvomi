@@ -86,6 +86,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   status code under "Technical details" rather than as a raw "HTTP 429" label. Budget and the shift
   planner no longer add a second error message on top of the page's own.
 
+- **Settings: no loading placeholder left above a finished section.** When a section such as
+  Modules -> Active took a moment to load, its grey placeholder could stay on screen above the
+  loaded content. Placeholders now disappear the moment a section shows its content.
+
 - **Calendar: "Manage calendars" is reachable on tablets and phones again.** Below 1024px the
   button was hidden along with the empty header slot, so calendars could not be created, recolored
   or reordered there. The calendar filter now lists "Manage calendars" under its calendars, at

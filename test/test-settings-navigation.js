@@ -1249,7 +1249,9 @@ test('der Blattwechsel zeigt einen Ladezustand statt eines leeren Kastens', asyn
   const source = await readFile(new URL('../public/settings/shell.js', import.meta.url), 'utf8');
   // Zwischen dem leeren Blatt und dem fertigen lagen der dynamische Import und
   // der erste Datenabruf (Critique 2026-07-27).
-  assert.match(source, /import\s*\{\s*renderSkeletonList\s*\}\s*from\s*'\/utils\/skeleton\.js'/);
+  // Seit R19 kommt placeSkeletonUntilContent mit: das Skelett raeumt sich
+  // selbst, sobald ein Abschnitt Inhalt hat (test:skeleton-utils).
+  assert.match(source, /import\s*\{\s*renderSkeletonList,\s*placeSkeletonUntilContent\s*\}\s*from\s*'\/utils\/skeleton\.js'/);
   assert.match(source, /setAttribute\('aria-busy',\s*'true'\)/, 'aria-busy muss den Ladezustand ansagen');
   assert.match(source, /renderSkeletonList\(/, 'das Skelett muss aus dem geteilten Helfer kommen');
   // Seit R10 rendert ein Blatt mehrere Abschnitte, und ein Fehler bleibt im
