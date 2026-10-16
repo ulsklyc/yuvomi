@@ -302,6 +302,19 @@ function loadPageStyle(moduleName, routeStyle = null) {
   };
 }
 
+/**
+ * Loest auf, sobald keine Navigation mehr laeuft - hoechstens nach 2 s, damit
+ * ein haengender Seitenaufbau nichts festhaelt. Fuer den nachgereichten Tipp
+ * aus utils/view-transition.js.
+ */
+function navigationIdle() {
+  const until = Date.now() + 2000;
+  return new Promise((resolve) => {
+    const check = () => (!routerState.isNavigating || Date.now() > until ? resolve() : setTimeout(check, 16));
+    check();
+  });
+}
+
 // --------------------------------------------------------
 // Modul-Cache: verhindert redundante dynamic imports bei Navigation
 // --------------------------------------------------------
@@ -1672,6 +1685,10 @@ async function renderPage(route, previousPath = null, scrollTarget = 0) {
       content,
       from: previousPath,
       animate: shouldAnimate,
+      // Ein Tipp, der die Blende abbrach, wird nachgereicht (R19) - aber erst,
+      // wenn diese Navigation durch ist: navigate() verwirft jeden Aufruf,
+      // solange `isNavigating` steht.
+      whenSettled: navigationIdle,
     });
 
     // Mit View Transition macht der Browser die Blende - seit 2026-10-16 auch

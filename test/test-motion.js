@@ -504,6 +504,60 @@ test('swapPage: der erste Tipp waehrend der Blende bricht sie ab, danach haengt 
   }
 });
 
+test('swapPage R19: der Tipp, der die Blende abbricht, kommt nach ihrem Ende an seinem Ziel an', async () => {
+  // Er traf <html>, sein `click` ebenfalls (gemeinsamer Vorfahr von Druck und
+  // Loslassen) - in schneller Folge ging so etwa jeder achte Tipp verloren.
+  const { swapPage } = await import('../public/utils/view-transition.js');
+  const env = stubDocument();
+  const html = { tag: 'html', classList: { add: () => {}, remove: () => {}, contains: () => false } };
+  const clicked = [];
+  const button = { click: () => clicked.push('nav') };
+  env.doc.documentElement = html;
+  env.doc.body = { tag: 'body' };
+  env.doc.elementFromPoint = (x, y) => (x === 30 && y === 700 ? button : null);
+  globalThis.document = env.doc;
+  globalThis.matchMedia = () => ({ matches: false });
+  try {
+    const { finished } = await swapPage(() => { env.content.current = env.toolbarNew; }, { content: env.content, from: '/tasks', animate: true });
+    const down = env.listeners.find((l) => l.type === 'pointerdown' && l.capture);
+    const click = env.listeners.find((l) => l.type === 'click' && l.capture);
+    assert.ok(click, 'kein Zuhoerer fuer den verlorenen click');
+    down.fn({ target: html, button: 0, isPrimary: true, clientX: 30, clientY: 700 });
+    let stopped = false;
+    click.fn({ target: html, preventDefault: () => {}, stopImmediatePropagation: () => { stopped = true; } });
+    assert.ok(stopped, 'der click auf <html> geht nicht weiter');
+    await finished;
+    await Promise.resolve();
+    assert.deepEqual(clicked, ['nav'], 'der Tipp kommt nicht am Element unter dem Finger an');
+    assert.equal(env.listeners.filter((l) => l.type === 'click').length, 0, 'der Zuhoerer bleibt nach dem Nachreichen');
+
+    // Fand der click sein Ziel selbst, wird nichts nachgereicht.
+    const again = await swapPage(() => {}, { content: env.content, from: '/notes', animate: true });
+    env.listeners.find((l) => l.type === 'pointerdown').fn({ target: html, button: 0, clientX: 30, clientY: 700 });
+    env.listeners.find((l) => l.type === 'click').fn({ target: button, preventDefault: () => { throw new Error('angehalten'); } });
+    await again.finished;
+    await Promise.resolve();
+    assert.deepEqual(clicked, ['nav'], 'ein click mit eigenem Ziel wurde ein zweites Mal ausgeloest');
+
+    // Ohne click (gewischt): der Zuhoerer geht nach dem Fenster von selbst.
+    const swipe = await swapPage(() => {}, { content: env.content, from: '/meals', animate: true });
+    env.listeners.find((l) => l.type === 'pointerdown').fn({ target: html, button: 0, clientX: 30, clientY: 700 });
+    await swipe.finished;
+    await new Promise((r) => setTimeout(r, 1100));
+    assert.equal(env.listeners.filter((l) => l.type === 'click').length, 0, 'ein Zuhoerer ohne click haengt weiter');
+
+    // Der Router reicht erst nach, wenn seine Navigation durch ist: navigate()
+    // verwirft jeden Aufruf, solange `isNavigating` steht (im Browser gemessen:
+    // ohne das kam der erste Tipp einer Runde nicht an).
+    const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+    assert.match(router, /await swapPage\(swap, \{[^}]*whenSettled: navigationIdle,/);
+    assert.match(router, /function navigationIdle\(\) \{[\s\S]*?routerState\.isNavigating/);
+  } finally {
+    delete globalThis.document;
+    delete globalThis.matchMedia;
+  }
+});
+
 test('swapPage: ein zweiter Wechsel vor dem Ende des ersten behaelt den Kopfnamen', async () => {
   // Zwei Tipps innerhalb der Transition: der Browser verwirft die erste, ihr
   // `finished` loest auf, waehrend die zweite ihr altes Bild noch nicht

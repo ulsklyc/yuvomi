@@ -35,7 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   glide up instead of the list being re-laid out on every frame; with reduced motion they fade in
   at their new place instead of jumping. Loading placeholders appear only if loading takes longer
   than a moment, their shimmer no longer repaints every frame, and the overview fades from the
-  placeholder to its content.
+  placeholder to its content. A tap during a page change is no longer lost: it reaches what was
+  under the finger once the page has switched.
 - **One set of controls in every module header.** Search, view, filter and more sit in the same order
   and look the same everywhere, and every view picker is the same segmented control. The calendar
   header on a desktop is one row with a real search field (two rows instead of three on a tablet);

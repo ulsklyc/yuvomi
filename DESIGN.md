@@ -1258,7 +1258,10 @@ das Verhaeltnis haelt.
   zur Backdrop Root, das Glas fiel fuer die Dauer der Blende aus), ihre Pille und der
   schwebende FAB haben eigene Namen und stehen. `fab-in` ist die Ankunft EINES FAB, nicht jeder
   Seite: es spielt nur, wenn die Vorseite keinen hatte (`html.fab-steady`). Unter der Blende
-  staffelt keine Liste (`stagger` schweigt waehrend `html.page-swapping`).
+  staffelt keine Liste (`stagger` schweigt waehrend `html.page-swapping`). Ein Tipp waehrend der
+  Blende bricht sie ab UND kommt an (R19): Chromium trifft ihn auf `<html>`, `swapPage` haelt
+  seinen `click` dort an und reicht ihn nach dem Ende der Blende und der Navigation an das
+  Element an derselben Stelle (vorher ging er verloren, gemessen 0 von 12 Doppeltipps).
 - **Bewegung haengt an der Beruehrung, nicht am Zustand (R18):** eine Zustandsklasse
   (`--checked`, `--done`, `.is-*`) traegt Aussehen, nie eine `animation` - sie spielte bei jedem
   Neuzeichnen auf Zeilen, die niemand beruehrt hat. Die Quittung eines Hakens startet der
