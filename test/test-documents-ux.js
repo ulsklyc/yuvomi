@@ -1969,7 +1969,8 @@ test('der Betrachter ist schmal vollflaechig, und der Meta-Block klappt hinter d
 // R18 (2026-10-07): Betrachter ohne fremde Werkzeugleiste, Luft unter der Filterleiste
 
 test('R18: der PDF-Betrachter am Desktop blendet die Leiste des Browsers aus, der neue Tab behaelt sie', () => {
-  assert.match(page, /const PDF_EMBED_FRAGMENT = '#toolbar=0&navpanes=0&view=FitH';/);
+  // R19: die ganze Seite statt der Breite (FitH zeigte am Desktop ~44 % der Seite).
+  assert.match(page, /const PDF_EMBED_FRAGMENT = '#toolbar=0&navpanes=0&view=Fit&zoom=page-fit';/);
   const viewer = page.slice(page.indexOf('function renderViewerContent('), page.indexOf('function renderViewerContent(') + 2200);
   assert.match(viewer, /<iframe class="document-viewer__pdf" src="\$\{previewUrl\}\$\{PDF_EMBED_FRAGMENT\}"/,
     'das Fragment haengt an der Adresse des eingebetteten Betrachters');

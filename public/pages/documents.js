@@ -4032,7 +4032,7 @@ function openDocumentViewer(doc) {
   }
 }
 
-const PDF_EMBED_FRAGMENT = '#toolbar=0&navpanes=0&view=FitH';
+const PDF_EMBED_FRAGMENT = '#toolbar=0&navpanes=0&view=Fit&zoom=page-fit';
 
 function renderViewerContent(doc, previewUrl, downloadUrl) {
   const kind = previewKind(doc.mime_type);
@@ -4047,7 +4047,11 @@ function renderViewerContent(doc, previewUrl, downloadUrl) {
       // Betrachter von Chromium und Firefox liest die PDF-Open-Parameter im
       // Fragment. `toolbar=0` nimmt seine Leiste (zweite Kopfzeile mit Zoom,
       // Druck, Download in fremder Optik unter der eigenen), `navpanes=0` die
-      // Seitenleiste, `view=FitH` passt die Seite in die Breite. Safari kennt
+      // Seitenleiste. SEITE EINPASSEN (R19, Critique 2026-10-16): `view=FitH`
+      // passte die Seite in die Breite, und am Desktop standen davon rund 44 %
+      // im Bild - eine Vorschau, die man erst scrollen muss. `view=Fit`
+      // (Chromium) und `zoom=page-fit` (pdf.js in Firefox) zeigen die ganze
+      // erste Seite; Lesen im Detail bleibt "In neuem Tab oeffnen". Safari kennt
       // sie nicht - der Rueckfall ist der Stand davor. Zoom und Druck bleiben
       // ueber "In neuem Tab oeffnen" (dort MIT Leiste: die Adresse traegt das
       // Fragment nicht) und den Download der eigenen Leiste.
