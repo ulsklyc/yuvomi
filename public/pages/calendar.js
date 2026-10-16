@@ -8326,6 +8326,7 @@ function eventAttachmentFieldHtml(event) {
  */
 function eventAdvancedTopics({ visibilityOffered = true, attachment = true } = {}) {
   const topics = [
+    t('calendar.descriptionLabel'),
     visibilityOffered ? t('common.visibility.label') : null,
     t('dashboard.countdownTitle'),
     t('calendar.colorLabel'),
@@ -8377,7 +8378,8 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
   const visibilityOffered = state.users.length > 1 || othersCanRead('calendar');
   const attachmentHtml = eventAttachmentFieldHtml(isEdit ? event : null);
   const advancedFieldsOpen = isEdit && (
-    (visibilityOffered && visibility !== 'all')
+    Boolean(event.description?.trim())
+    || (visibilityOffered && visibility !== 'all')
     || !!event.countdown
     || hasAttachment(event)
     || event.attachment_locked === true
@@ -8387,7 +8389,17 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
   // wie die Felder, damit Liste und Inhalt nicht auseinanderlaufen.
   const advancedTopics = eventAdvancedTopics({ visibilityOffered, attachment: Boolean(attachmentHtml) });
 
+  // DIE BESCHREIBUNG STEHT HINTER DEM AUFKLAPPER (R19, Critique 2026-10-16:
+  // der Dialog war mobil 1,6 Bildschirme lang). Notizen sind am Termin das
+  // Seltenste der sichtbaren Felder - Apple Kalender stellt sie ans Ende. Ein
+  // Termin MIT Beschreibung oeffnet den Aufklapper (advancedFieldsOpen).
   const advancedFieldsHtml = `
+    <div class="form-group">
+      <label class="form-label" for="modal-description">${t('calendar.descriptionLabel')}</label>
+      <textarea class="form-input" id="modal-description" rows="2"
+                placeholder="${t('calendar.descriptionPlaceholder')}">${esc(isEdit && event.description ? event.description : '')}</textarea>
+    </div>
+
     <!-- Verborgen, nicht entfernt: der Speicherpfad liest
          "#modal-visibility?.value || 'all'". Ohne den Knoten machte jedes
          Speichern einen privaten Termin fuer alle sichtbar, sobald die Liste
@@ -8546,12 +8558,6 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
       <label class="form-label" for="modal-location">${t('calendar.locationLabel')}</label>
       <input type="text" class="form-input" id="modal-location"
              placeholder="${t('calendar.locationPlaceholder')}" value="${esc(isEdit && event.location ? event.location : '')}">
-    </div>
-
-    <div class="form-group">
-      <label class="form-label" for="modal-description">${t('calendar.descriptionLabel')}</label>
-      <textarea class="form-input" id="modal-description" rows="2"
-                placeholder="${t('calendar.descriptionPlaceholder')}">${esc(isEdit && event.description ? event.description : '')}</textarea>
     </div>
 
     ${advancedSection(advancedFieldsHtml, { open: advancedFieldsOpen, hint: advancedTopics })}

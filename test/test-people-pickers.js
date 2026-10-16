@@ -594,3 +594,24 @@ test('task dialog: whoever created the entry does not count as an assigned perso
     delete globalThis.__getSelectedUserIds;
   }
 });
+
+// R19 (Critique 2026-10-16, Termin-Dialog mobil 1,6 Bildschirme): der geteilte
+// Nachname steht nicht in jedem Chip. "Alex Johnson ... Linda Johnson" brauchte
+// bei 390px drei Chip-Zeilen; der Vorname reicht, wenn ALLE ihn teilen, und der
+// volle Name bleibt der zugaengliche Name des Chips.
+test('R19: tragen alle denselben Nachnamen, zeigt der Chip den Vornamen - der volle Name bleibt im Namen', async () => {
+  const { sharedSurname } = await import('../public/components/user-multi-select.js');
+  const family = [
+    { id: 1, display_name: 'Alex Johnson' }, { id: 2, display_name: 'Leo Johnson' }, { id: 3, display_name: 'Linda Johnson' },
+  ];
+  assert.equal(sharedSurname(family), 'Johnson');
+  assert.equal(sharedSurname([...family, { id: 4, display_name: 'Maria Silva' }]), '', 'wer anders heisst, unterscheidet - dann bleiben alle Namen voll');
+  assert.equal(sharedSurname([{ id: 1, display_name: 'Anna' }, { id: 2, display_name: 'Ben' }]), '', 'Vornamen allein haben keinen Nachnamen');
+  assert.equal(sharedSurname([family[0]]), '', 'eine Person allein kuerzt nichts');
+  const html = renderUserMultiSelect(family, [], 'x', 'calendar.assignedLabel');
+  assert.match(html, /<span class="user-ms__name">Alex<span class="sr-only"> Johnson<\/span><\/span>/);
+  const mixed = renderUserMultiSelect([...family, { id: 4, display_name: 'Maria Silva' }], [], 'x', 'calendar.assignedLabel');
+  assert.match(mixed, /<span class="user-ms__name">Alex Johnson<\/span>/);
+  assert.match(renderUserMultiSelect([{ id: 1, display_name: 'A <b> Johnson' }, { id: 2, display_name: 'B Johnson' }], [], 'x', 'l'),
+    /<span class="user-ms__name">A &lt;b&gt;<span class="sr-only"> Johnson<\/span>/, 'escaped');
+});

@@ -4511,9 +4511,12 @@ const EDIT_BASE = {
 test('Termin-Dialog: die Felder stehen nach Haeufigkeit, Seltenes hinter „Weitere Einstellungen"', () => {
   const { html, advanced } = renderEventDialog();
   assert(advanced, 'der Dialog baut „Weitere Einstellungen" nicht mehr ueber advancedSection()');
-  // Titel, Wann, Wer, Wiederholung, Erinnerung, Ort, Beschreibung - dann der Aufklapper.
+  // Titel, Wann, Wer, Wiederholung, Erinnerung, Ort - dann der Aufklapper.
+  // R19 (Critique 2026-10-16, mobil 1,6 Bildschirme): die Beschreibung steht
+  // seither als erstes Feld HINTER dem Aufklapper, wie die Notizen in Apple
+  // Kalender am Ende.
   const main = ['id="modal-title"', 'id="modal-allday"', 'id="modal-start-date"', 'data-ms-name="cal_assigned"',
-    'id="modal-reminder-toggle"', 'id="modal-location"', 'id="modal-description"',
+    'id="modal-reminder-toggle"', 'id="modal-location"',
     '<details class="form-advanced"'];
   const at = main.map((m) => html.indexOf(m));
   assert(at.every((i) => i >= 0), `nicht gerendert: ${main.filter((_, i) => at[i] < 0).join(', ')}`);
@@ -4530,8 +4533,8 @@ test('Termin-Dialog: die Felder stehen nach Haeufigkeit, Seltenes hinter „Weit
   const ret = body.slice(body.indexOf('return `'));
   const [who, rrule, remind] = ["renderUserMultiSelect(", "renderRRuleFields('event'", 'renderCalendarReminderSection('].map((m) => ret.indexOf(m));
   assert(who > 0 && who < rrule && rrule < remind, `Wiederholung steht nicht zwischen Wer und Erinnerung (${who}/${rrule}/${remind})`);
-  // Sichtbarkeit, Stichtag, Farbe, Icon, Sync-Ziel, Anhang - in dieser Folge.
-  const rare = ['id="modal-visibility"', 'id="modal-countdown"', 'id="event-color-picker"', 'id="modal-icon-trigger"',
+  // Beschreibung, Sichtbarkeit, Stichtag, Farbe, Icon, Sync-Ziel, Anhang - in dieser Folge.
+  const rare = ['id="modal-description"', 'id="modal-visibility"', 'id="modal-countdown"', 'id="event-color-picker"', 'id="modal-icon-trigger"',
     'id="event-sync-target"', 'id="modal-attachment"'];
   const inner = rare.map((m) => advanced.inner.indexOf(m));
   assert(inner.every((i) => i >= 0), `nicht hinter dem Aufklapper: ${rare.filter((_, i) => inner[i] < 0).join(', ')}`);
@@ -4539,7 +4542,7 @@ test('Termin-Dialog: die Felder stehen nach Haeufigkeit, Seltenes hinter „Weit
   // Der Aufklapper nennt, was hinter ihm liegt - aus den Beschriftungen der Felder.
   assert(advanced.opts?.hint === calendarHelpers.eventAdvancedTopics({ visibilityOffered: true, attachment: true }),
     `der Aufklapper nennt seinen Inhalt nicht: ${JSON.stringify(advanced.opts)}`);
-  for (const key of ['common.visibility.label', 'calendar.colorLabel', 'calendar.iconLabel', 'calendar.syncTargetLabel', 'calendar.attachmentLabel']) {
+  for (const key of ['calendar.descriptionLabel', 'common.visibility.label', 'calendar.colorLabel', 'calendar.iconLabel', 'calendar.syncTargetLabel', 'calendar.attachmentLabel']) {
     assert(advanced.inner.includes(key), `${key} steht in der Zeile des Aufklappers, aber kein Feld dahinter traegt es`);
   }
   assert(advanced.opts.open === false, 'ein neuer Termin oeffnet „Weitere Einstellungen"');
@@ -4562,7 +4565,9 @@ test('Termin-Dialog: beim Bearbeiten geht der Aufklapper nur fuer Unsichtbares a
   const open = (event) => renderEventDialog({ mode: 'edit', event: { ...EDIT_BASE, ...event } }).advanced.opts.open;
   assert(open({}) === false, 'ein schlichter Termin oeffnet „Weitere Einstellungen"');
   assert(open({ color: '#3B82F6', icon: 'star' }) === false, 'Farbe und Icon zeigt der Termin selbst - kein Grund aufzuklappen');
-  assert(open({ description: 'Mitbringen: Stifte' }) === false, 'die Beschreibung steht im Hauptteil und oeffnet nichts mehr');
+  // R19: die Beschreibung steht hinter dem Aufklapper - gesetzt haelt sie ihn offen.
+  assert(open({ description: 'Mitbringen: Stifte' }) === true, 'eine Beschreibung bleibt zugeklappt versteckt');
+  assert(open({ description: '   ' }) === false, 'Leerzeichen sind keine Beschreibung');
   assert(open({ countdown: 1 }) === true, 'ein Stichtag bleibt zugeklappt versteckt');
   assert(open({ visibility: 'private' }) === true, 'eine eingeschraenkte Sichtbarkeit bleibt zugeklappt versteckt');
   assert(open({ attachment_document_id: 3, attachment_name: 'a.pdf' }) === true, 'ein Anhang bleibt zugeklappt versteckt');

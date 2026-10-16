@@ -3865,6 +3865,14 @@ Stichtag standen VOR Wiederholung und Erinnerung. Die Reihenfolge folgt jetzt de
 Titel, Ganztaegig, Von, Bis, Wer, Wiederholung, Erinnerung, Ort, Beschreibung; hinter
 „Weitere Einstellungen" Sichtbarkeit, Stichtag, Farbe, Icon, Sync-Ziel, Anhang - und die
 Zeile des Aufklappers nennt sie.
+- **Seit R19 steht auch die Beschreibung hinter dem Aufklapper** (erstes Feld dort, wie die
+  Notizen bei Apple am Ende), und eine gesetzte Beschreibung oeffnet ihn beim Bearbeiten.
+  Mobil mass der Dialog 933px Inhalt in 591px (1,58 Bildschirme), jetzt 776px (1,31).
+- **Der geteilte Nachname steht nicht in jedem Personen-Chip** (`sharedSurname`,
+  components/user-multi-select.js): tragen ALLE Personen der Wahl denselben Nachnamen, zeigt
+  der Chip den Vornamen, der volle Name bleibt der zugaengliche Name (`.sr-only`). Ein Konto
+  mit anderem Nachnamen laesst alle Namen voll. Gilt in jeder Personenwahl (Termin, Aufgabe,
+  Budget); bei 390px drei Chip-Zeilen -> zwei.
 - **Von und Bis sind je eine Zeile** (`.cal-when`): EINE Beschriftung, Datum und Uhrzeit
   daneben, die Beschriftungsspalte `max-content` in einem Raster fuer beide Zeilen. Das Datum
   heisst wie seine Zeile, die Uhrzeit bringt ihren Namen ueber `label` mit.

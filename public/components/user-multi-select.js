@@ -70,6 +70,32 @@ export function renderAvatarStack(users, { size = 28, maxVisible = 3, minFont = 
 }
 
 /**
+ * DER GETEILTE NACHNAME STEHT NICHT IN JEDEM CHIP (R19, Critique 2026-10-16:
+ * Termin-Dialog mobil 1,6 Bildschirme). "Alex Johnson, Emma Johnson, Leo
+ * Johnson, Linda Johnson" brauchten bei 390px drei Chip-Zeilen, und das
+ * vierfache "Johnson" unterscheidet niemanden. Tragen ALLE Personen der Wahl
+ * denselben Nachnamen, zeigt der Chip den Vornamen; der volle Name bleibt sein
+ * zugaenglicher Name (`.sr-only`). Ein Konto mit anderem Nachnamen (Hilfe,
+ * Grosseltern) laesst alle Namen voll stehen - dann unterscheidet er.
+ * @param {Array<{display_name?: string}>} users
+ * @returns {string} der geteilte Nachname, sonst ''
+ */
+export function sharedSurname(users) {
+  if (!Array.isArray(users) || users.length < 2) return '';
+  const lasts = users.map((u) => String(u?.display_name ?? '').trim().split(/\s+/))
+    .map((parts) => (parts.length >= 2 ? parts[parts.length - 1] : ''));
+  const [first] = lasts;
+  return first && lasts.every((l) => l === first) ? first : '';
+}
+
+function userChipName(displayName, surname) {
+  const full = String(displayName ?? '').trim();
+  if (!surname || !full.endsWith(` ${surname}`)) return esc(full);
+  const given = full.slice(0, -(surname.length + 1));
+  return `${esc(given)}<span class="sr-only"> ${esc(surname)}</span>`;
+}
+
+/**
  * Rendert das Multi-Select-Widget als Dropdown-Checkbox-Liste.
  * @param {Array<{id, display_name, avatar_color}>} allUsers  Alle verfügbaren Benutzer
  * @param {number[]} selectedIds                               Bereits ausgewählte IDs
@@ -83,6 +109,7 @@ export function renderAvatarStack(users, { size = 28, maxVisible = 3, minFont = 
  */
 export function renderUserMultiSelect(allUsers, selectedIds, inputName, labelKey, noneLabelKey = 'userMultiSelect.nobody') {
   const selectedSet = new Set(selectedIds ?? []);
+  const surname = sharedSurname(allUsers);
   const items = allUsers.map((u) => {
     const checked = selectedSet.has(u.id) ? 'checked' : '';
     const inner = u.avatar_data
@@ -95,7 +122,7 @@ export function renderUserMultiSelect(allUsers, selectedIds, inputName, labelKey
         <span class="user-ms__avatar" style="background-color:${esc(u.avatar_color ?? AVATAR_FALLBACK_COLOR)};color:${getReadableTextColor(u.avatar_color ?? AVATAR_FALLBACK_COLOR)}">
           ${inner}
         </span>
-        <span class="user-ms__name">${esc(u.display_name)}</span>
+        <span class="user-ms__name">${userChipName(u.display_name, surname)}</span>
       </label>`;
   });
 

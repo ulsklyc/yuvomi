@@ -49,6 +49,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **An inventory item's details fit on a phone screen.** Short details such as brand, model,
   purchase date and price show their label and value side by side, like an info list, so the
   warranty is visible without scrolling.
+- **The event dialog is shorter on a phone.** The description moved behind "More settings" (it
+  opens by itself when an event has one), and when everyone in the household shares a last name,
+  the people to pick show first names only, so the choice takes two rows instead of three.
 - **Module headers on phones and tablets take less room.** Shift plan, Rewards and Household help
   show their tabs in the title row (one row instead of two, 65px on a phone). The budget header
   folds to one row while you scroll, with the tabs beside the month. On a tablet the title, search
