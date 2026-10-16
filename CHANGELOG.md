@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Avatars of several people no longer overlap.** Where a task, event or meal shows who is
+  involved, the faces stand side by side with a small gap in reading order, so no initials are cut
+  off, and "+N" comes last.
 - **Edit is the same filled button at the bottom of every detail view.** Tasks, recipes, contacts,
   inventory, birthdays and events show "Edit" as the main button at the end of the bottom bar, on a
   phone, in a popover and in the detail column on a computer. Before, it sometimes sat outlined at

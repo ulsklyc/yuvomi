@@ -2,10 +2,18 @@
 /* Avatar-Stack (Mehrfach-Zuweisung Anzeige)                           */
 /* ------------------------------------------------------------------ */
 
+/* 2PX LUFT STATT UEBERLAPPUNG (R19, Critique 2026-10-16). Bei 22px schnitt
+ * die Ueberlappung von 6px die Initialen des Nachbarn an ("LE", "EJ" lasen
+ * sich als halbe Buchstaben). Der Stapel zeigt hoechstens drei Gesichter plus
+ * "+N" (renderAvatarStack, maxVisible 3) - dafuer reicht die Breite, und
+ * jede Scheibe bleibt ganz. `gap` statt Rand: logisch, also auch in RTL.
+ * Ohne Ueberlappung braucht es auch keine umgekehrte Reihenfolge mehr (sie
+ * legte die erste Scheibe oben auf): die Gesichter stehen in Lesereihenfolge,
+ * "+N" am Ende. */
 .avatar-stack {
   display: inline-flex;
   align-items: center;
-  flex-direction: row-reverse;
+  gap: var(--space-0h);
 }
 
 .avatar-stack__item {
@@ -17,7 +25,6 @@
   color: var(--color-text-on-accent);
   border: 2px solid var(--color-surface);
   flex-shrink: 0;
-  margin-left: -6px;
   overflow: hidden;
 }
 
@@ -25,10 +32,6 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-
-.avatar-stack__item:last-child {
-  margin-left: 0;
 }
 
 /* Der Grund ist ein Textton und kippt daher mit dem Theme (Light #6C6B67,

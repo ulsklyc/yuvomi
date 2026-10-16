@@ -805,3 +805,17 @@ test('die kleine Scheibe: jede aufloesbare Kollisionsgruppe ist auch dort aufgel
   assert.ok(changed > 10, `und darunter solche, in denen das letzte Zeichen nicht reicht (${changed})`);
   assert.ok(neitherSide > 0, `und solche, in denen keine Seite fuer sich alle unterscheidet (${neitherSide})`);
 });
+
+// R19 (Critique 2026-10-16): Avatar-Stapel mit 2px Luft statt Ueberlappung -
+// die 6px Ueberlappung bei 22px schnitt die Initialen des Nachbarn an.
+test('R19: der Avatar-Stapel ueberlappt nicht, die Scheiben stehen mit 2px Luft', () => {
+  const sheets = ['user-multi-select.css', 'calendar.css', 'dashboard.css', 'tasks.css', 'meals.css'];
+  for (const name of sheets) {
+    const css = read(`styles/${name}`);
+    for (const m of css.matchAll(/([^{}]*\.avatar-stack[^{}]*)\{([^}]*)\}/g)) {
+      assert.doesNotMatch(m[2], /margin-(?:left|right|inline-start|inline-end):\s*(?:-|calc\(\s*-)/, `${name}: ${m[1].trim()} ueberlappt wieder`);
+    }
+  }
+  const stack = read('styles/user-multi-select.css');
+  assert.match(stack, /\.avatar-stack \{[^}]*gap:\s*var\(--space-0h\)/, '2px Luft als logische Luecke');
+});

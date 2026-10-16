@@ -941,13 +941,13 @@
   flex-shrink: 0;
 }
 
-/* Im kompakten Gitter-Kontext (Woche/Tag) trägt ein dünnerer Ring die
- * Überlappung - die 2px-Trennung der Agenda wäre bei 14px-Avataren zu
- * schwer. Die Monats-Bars rendern keinen Avatar-Stack mehr (Kanon). */
+/* Im kompakten Gitter-Kontext (Woche/Tag) ein duennerer Ring. Die
+ * Ueberlappung, die er hier trug, ist entfallen (R19): auch im Gitter stehen
+ * die Scheiben mit 2px Luft nebeneinander wie ueberall (user-multi-select.css).
+ * Die Monats-Bars rendern keinen Avatar-Stack mehr (Kanon). */
 .allday-event .avatar-stack__item,
 .week-event__time .avatar-stack__item {
   border-width: 1.5px;
-  margin-left: calc(-1 * var(--space-1));
 }
 
 /* DIE GLYPHEN TRAGEN DIE TINTE DES TITELS, nicht den Vollton der Terminfarbe
