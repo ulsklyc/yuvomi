@@ -7215,6 +7215,30 @@ select.form-input:not([multiple]):not([size]) {
   background-position: left var(--space-3) center;
 }
 
+/* DIE OFFENE LISTE TRAEGT IHRE FLAECHE SELBST (#2022). Chrome unter Windows
+ * und Linux malt das Auswahlblatt mit der Flaeche des `select` - und wo die
+ * durchsichtig ist (die randlose Auswahl der Formularzeile, unten), mit der
+ * Vorgabe des Farbschemas. Die Optionen erben dagegen die Schrift der
+ * Auswahl. Bis v2.77 stand so helle Dark-Schrift auf weissem Blatt, sobald die
+ * Maus die Zeile verliess und die Hover-Flaeche wegfiel. `color-scheme`
+ * (tokens.css) stellt die Vorgabe richtig; diese Regel macht das Blatt
+ * unabhaengig davon, welche Flaeche die Auswahl in Ruhe gerade hat: die
+ * Feldhaut, die jede umrandete Auswahl schon zeigt, und die Primaerschrift
+ * statt der Sekundaerfarbe des Zeilenwerts. Eine gesperrte Option (der
+ * Platzhalter "Bitte waehlen") bleibt als solche lesbar zurueckgenommen.
+ * Systeme mit eigenem Menue (macOS, iOS) ignorieren beides und folgen dem
+ * Farbschema. Guard: test-frontend-audit.js, "#2022". */
+select.form-input option,
+select.input option {
+  background-color: var(--color-field-bg);
+  color: var(--color-text-primary);
+}
+
+select.form-input option:disabled,
+select.input option:disabled {
+  color: var(--color-text-tertiary);
+}
+
 /* ZAHLFELDER OHNE SPIN-PFEILE. Die zwei nativen Pfeile sind 7px hoch, liegen
  * in jedem Browser anders, nehmen dem Wert am Ende der Zeile den Platz und
  * verstellen ihn beim Scrollen ueber dem Feld. Tastatur (Pfeil hoch/runter)

@@ -29,6 +29,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   offers **Reconnect**, syncing pauses until then, and pending changes stay queued. A new sign-in
   token that Google hands out during a refresh is now kept as well.
 
+- **A dropdown's open list stays dark in dark mode** (#2022). In Chrome on Windows the list
+  of a dropdown inside a form row, such as the type of a health measurement, turned white once
+  the pointer left it, with light text on it that was hard to read. The list now keeps the
+  colors of the current theme, and scrollbars and other built-in browser controls follow dark
+  mode as well.
+
 - **A task's due time on the calendar follows your time format** (#2018). With a region that uses
   the 12-hour clock, such as American English, tasks in the month, week, day and agenda views
   still showed their due time as "14:30". They now show "2:30 PM", like events and the rest of

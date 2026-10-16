@@ -36,6 +36,17 @@
  */
 
 :root {
+  /* DAS FARBSCHEMA GEHT MIT DEN TOKENS (#2022). Was der Browser selbst malt -
+   * die offene Liste einer Auswahl, Scrollbalken, Datums- und Zeitwaehler,
+   * Fuellungen ohne eigene Farbe - fragt nicht nach den Tokens, sondern nach
+   * `color-scheme`. Ohne die Angabe blieb das alles hell, auch im Dark: Chrome
+   * unter Windows malte die offene Liste der randlosen Zeilen-Auswahl weiss,
+   * waehrend ihre Optionen die helle Dark-Schrift erbten. Beide Dark-Bloecke
+   * unten setzen `dark`, genau dort, wo auch die Dark-Werte greifen - also nie
+   * ein dunkles Schema unter hellen Tokens (data-theme="light" am dunklen
+   * System) und auf Papier nie (beide stehen unter `@media screen`). */
+  color-scheme: light;
+
   /* --------------------------------------------------------
    * 1. Farben - Neutral-Skala
    *    Yuvomis WARME Neutral-Rampe. Private --_neutral-* für
@@ -2212,6 +2223,9 @@
  * ================================================================ */
 @media screen and (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    /* Native Teile im Dark - Begruendung an der Basis `:root` oben (#2022). */
+    color-scheme: dark;
+
     /* Neutral-Skala — Apple Dark.
      *
      * DIE FLAECHEN SIND 2026-08-17 GESTIEGEN, DIE BUEHNE NICHT (Dark-Kur,
@@ -2512,6 +2526,9 @@
  * Wahl des Nutzers gilt für sein Display, nicht für seinen Drucker. */
 @media screen {
   [data-theme="dark"] {
+    /* Zwilling des System-Dark-Blocks (#2022). */
+    color-scheme: dark;
+
     /* Neutral-Skala — Apple Dark. Flaechen-Kur 2026-08-17: Werte und
      * Begruendung im Media-Block oben. */
     --_neutral-50:  #0F0E0D;
