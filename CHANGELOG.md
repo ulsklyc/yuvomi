@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A task's due time on the calendar follows your time format** (#2018). With a region that uses
+  the 12-hour clock, such as American English, tasks in the month, week, day and agenda views
+  still showed their due time as "14:30". They now show "2:30 PM", like events and the rest of
+  the app.
+
 - **Documents: leaving and coming back no longer leaves stale data on the page** (#2005). An
   answer that arrived only after you had left Documents and opened it again could overwrite the
   members, the DMS accounts or the admin state the new page had just loaded, and the next dialog
