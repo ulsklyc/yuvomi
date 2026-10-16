@@ -4739,7 +4739,9 @@
                 "okay": "Geht so",
                 "good": "Gut",
                 "veryGood": "Sehr gut"
-            }
+            },
+            "unusualHigh": "Ungewöhnlich hoch. Bitte prüfe den Wert, speichern kannst du ihn trotzdem.",
+            "unusualLow": "Ungewöhnlich niedrig. Bitte prüfe den Wert, speichern kannst du ihn trotzdem."
         },
         "meds": {
             "doseQty": "{{count}}×",
@@ -5488,7 +5490,9 @@
         "errorCycleDayGone": "Diesen Tageseintrag gibt es nicht mehr.",
         "errorCycleImportTooLarge": "Der Text ist größer als {{limit_kb}} KB. Importiere die Perioden in kleineren Teilen.",
         "errorCycleImportNoRows": "Die Datei enthält nur eine Kopfzeile und keine Perioden.",
-        "errorCycleImportTooManyRows": "Ein Import darf höchstens {{limit}} Perioden enthalten. Teile die Datei auf."
+        "errorCycleImportTooManyRows": "Ein Import darf höchstens {{limit}} Perioden enthalten. Teile die Datei auf.",
+        "errorVitalImpossible": "Dieser Wert ist nicht möglich. Bitte prüfe die Eingabe.",
+        "errorVitalBpOrder": "Der systolische Wert muss größer sein als der diastolische."
     },
     "waste": {
         "title": "Entsorgung",

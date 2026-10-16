@@ -120,6 +120,11 @@ export const CASE_MESSAGES = new Map([
   // lesend. Unterschieden wird das bewusst nicht (dieselbe Antwort wie fuer
   // einen fremden privaten Eintrag).
   ['health_vital_not_found', 'health.errorVitalGone'],
+  // Harte Grenzen der Vitalwerte (Critique R19, server/routes/health/vital-limits.js).
+  // Das Formular prueft dieselben vorher; diese Saetze sieht, wer per Import
+  // oder einem aelteren Tab an ihm vorbei schreibt.
+  ['health_vital_out_of_range', 'health.errorVitalImpossible'],
+  ['health_vital_bp_order', 'health.errorVitalBpOrder'],
   ['health_medication_not_found', 'health.errorMedicationGone'],
   ['health_schedule_not_found', 'health.errorScheduleGone'],
   ['health_dose_not_found', 'health.errorDoseGone'],

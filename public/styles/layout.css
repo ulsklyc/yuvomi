@@ -7654,6 +7654,9 @@ textarea::placeholder {
    Wert am Token vorbei ins Markup schrieb. */
 .form-hint--success { color: var(--color-success); }
 .form-hint--danger { color: var(--color-danger); }
+/* Nachfrage ohne Sperre (Vitalwerte, Critique R19): ungewoehnlich, aber
+ * speicherbar. Die Tinte der Warnung haelt AA auf jeder Flaeche (tokens.css). */
+.form-hint--warning { color: var(--color-warning-ink); }
 
 .required-marker {
   color: var(--color-danger);

@@ -4739,7 +4739,9 @@
                 "okay": "Sådär",
                 "good": "Bra",
                 "veryGood": "Mycket bra"
-            }
+            },
+            "unusualHigh": "Ovanligt högt. Kontrollera värdet; du kan ändå spara det.",
+            "unusualLow": "Ovanligt lågt. Kontrollera värdet; du kan ändå spara det."
         },
         "meds": {
             "doseQty": "{{count}}×",
@@ -5488,7 +5490,9 @@
         "errorCycleDayGone": "Den här dagsposten finns inte längre.",
         "errorCycleImportTooLarge": "Texten är större än {{limit_kb}} KB. Importera menscyklerna i mindre delar.",
         "errorCycleImportNoRows": "Filen har bara en rubrikrad och ingen mens.",
-        "errorCycleImportTooManyRows": "En import får innehålla högst {{limit}} menscykler. Dela upp filen."
+        "errorCycleImportTooManyRows": "En import får innehålla högst {{limit}} menscykler. Dela upp filen.",
+        "errorVitalImpossible": "Det här värdet är inte möjligt. Kontrollera det du skrev.",
+        "errorVitalBpOrder": "Det systoliska värdet måste vara högre än det diastoliska."
     },
     "waste": {
         "title": "Avfallshämtning",

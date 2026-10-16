@@ -4739,7 +4739,9 @@
                 "okay": "Katamtaman",
                 "good": "Mabuti",
                 "veryGood": "Napakabuti"
-            }
+            },
+            "unusualHigh": "Hindi karaniwang mataas. Pakisuri ang halaga; maaari mo pa rin itong i-save.",
+            "unusualLow": "Hindi karaniwang mababa. Pakisuri ang halaga; maaari mo pa rin itong i-save."
         },
         "meds": {
             "doseQty": "{{count}}×",
@@ -5488,7 +5490,9 @@
         "errorCycleDayGone": "Wala na ang tala para sa araw na ito.",
         "errorCycleImportTooLarge": "Mas malaki sa {{limit_kb}} KB ang teksto. I-import ang mga regla nang mas maliliit na bahagi.",
         "errorCycleImportNoRows": "Header row lang ang laman ng file at walang regla.",
-        "errorCycleImportTooManyRows": "Hanggang {{limit}} regla lang ang kaya ng isang import. Hatiin ang file."
+        "errorCycleImportTooManyRows": "Hanggang {{limit}} regla lang ang kaya ng isang import. Hatiin ang file.",
+        "errorVitalImpossible": "Hindi posible ang halagang ito. Pakisuri ang inilagay mo.",
+        "errorVitalBpOrder": "Dapat mas mataas ang systolic kaysa sa diastolic."
     },
     "waste": {
         "title": "Koleksyon ng basura",

@@ -4739,7 +4739,9 @@
                 "okay": "Okay",
                 "good": "Good",
                 "veryGood": "Very good"
-            }
+            },
+            "unusualHigh": "Unusually high. Please check the value; you can still save it.",
+            "unusualLow": "Unusually low. Please check the value; you can still save it."
         },
         "meds": {
             "doseQty": "{{count}}×",
@@ -5488,7 +5490,9 @@
         "errorCycleDayGone": "This day entry no longer exists.",
         "errorCycleImportTooLarge": "The text is larger than {{limit_kb}} KB. Import the periods in smaller parts.",
         "errorCycleImportNoRows": "The file only has a header row and no periods.",
-        "errorCycleImportTooManyRows": "An import can hold at most {{limit}} periods. Split the file."
+        "errorCycleImportTooManyRows": "An import can hold at most {{limit}} periods. Split the file.",
+        "errorVitalImpossible": "This value is not possible. Please check what you entered.",
+        "errorVitalBpOrder": "The systolic value must be higher than the diastolic one."
     },
     "waste": {
         "title": "Waste collection",

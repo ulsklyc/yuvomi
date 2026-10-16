@@ -22,7 +22,7 @@ import { zonedDateKey } from '/utils/timezone.js';
 import { DATE_STATUS_ALERT_DAYS } from '/utils/date-status.js';
 import { nowFields } from '/utils/timezone.js';
 import { trendMarkup } from '/utils/metric-card.js';
-import { openModal, closeModal, confirmModal, confirmOverModal, reportFieldError, advancedSection, refocusAfterRender } from '/components/modal.js';
+import { openModal, closeModal, confirmModal, confirmOverModal, reportFieldError, reportFieldErrors, advancedSection, refocusAfterRender } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { formRowsHtml, formRowHtml, formCompositeHtml } from '/utils/form-row.js';
@@ -31,7 +31,7 @@ import { personSwitcherMarkup } from '/utils/health-person-switcher.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import {
   computeVitalSeries, stepVitalAnchor, VITAL_METRICS, vitalMetric,
-  MOOD_SCALE, moodStep, splitDuration, durationToHours,
+  MOOD_SCALE, moodStep, splitDuration, durationToHours, vitalPlausibility,
 } from '/utils/health-vitals.js';
 import {
   computeDueDoses, computeAdherence, refillState, medicationCountsToday, currentSchedules,
@@ -2289,6 +2289,7 @@ function openVitalModal(opts = {}) {
           control: `<select class="form-input" id="vital-type"${isEdit ? ' disabled' : ''}>${typeOptions}</select>`,
         }))}
         <div class="form-rows" id="vital-value-fields">${valueFieldsMarkup(currentType, row)}</div>
+        <p class="form-hint form-hint--warning" id="vital-plausibility" role="status" hidden></p>
         ${formRowsHtml([
           formRowHtml({
             label: t('health.vitals.field.measuredAt'),
@@ -2341,10 +2342,25 @@ function openVitalModal(opts = {}) {
       let visibilityTouched = isEdit;
       visibilitySelect?.addEventListener('change', () => { visibilityTouched = true; });
 
+      // Weicher Hinweis beim Tippen (Critique R19): ungewoehnlich, aber
+      // speicherbar - 650 kg statt 65 kg faellt auf, bevor gespeichert ist.
+      const plausibilityHint = panel.querySelector('#vital-plausibility');
+      const typeNow = () => (isEdit ? row.type : typeSelect.value);
+      const updatePlausibility = () => {
+        const text = vitalPlausibilityText(readVitalValues(panel, typeNow()));
+        if (!plausibilityHint) return;
+        plausibilityHint.textContent = text ?? '';
+        plausibilityHint.hidden = !text;
+      };
+      fieldsHost.addEventListener('input', updatePlausibility);
+      fieldsHost.addEventListener('change', updatePlausibility);
+      updatePlausibility();
+
       typeSelect.addEventListener('change', () => {
         fieldsHost.replaceChildren();
         fieldsHost.insertAdjacentHTML('beforeend', valueFieldsMarkup(typeSelect.value));
         paintFields();
+        updatePlausibility();
         if (!visibilityTouched && visibilitySelect) {
           visibilitySelect.value = defaultVisibility(vitalScopeKey(typeSelect.value));
         }
@@ -2382,6 +2398,15 @@ function openVitalModal(opts = {}) {
             fieldsHost.querySelector('input:not([type="hidden"])') || fieldsHost.querySelector('.health-choice'),
             t('health.vitals.invalidValue'),
           );
+          return;
+        }
+        // Unmoegliches gar nicht erst senden (Critique R19): dieselben harten
+        // Grenzen wie am Server, der Fehler steht am Feld, das ihn traegt.
+        if (reportFieldErrors(vitalPlausibility(body).hard.map(({ channel, issue }) => [
+          fieldsHost.querySelector(VITAL_CHANNEL_INPUT[channel]),
+          t(issue === 'bpOrder' ? 'health.errorVitalBpOrder' : 'health.errorVitalImpossible'),
+        ]))) {
+          submitBtn.disabled = false;
           return;
         }
         submitBtn.disabled = true;
@@ -2434,6 +2459,38 @@ function vitalPatchBody(body, { unitEditable = false, unitBefore } = {}) {
 function vitalUnitEditable(metric) {
   if (!metric || ['duration', 'scale', 'pair'].includes(metric.format)) return false;
   return (metric.units?.length ?? 0) > 1;
+}
+
+/** Kanal der Plausibilitaet -> Eingabefeld im Vitalwerte-Dialog. */
+const VITAL_CHANNEL_INPUT = Object.freeze({
+  value: '#vital-value', sys: '#vital-sys', dia: '#vital-dia', pulse: '#vital-pulse',
+});
+
+/**
+ * Die Zahlen, die gerade im Dialog stehen - auch halb ausgefuellt, fuer den
+ * Hinweis beim Tippen. Leere oder unlesbare Felder sind null.
+ */
+function readVitalValues(panel, type) {
+  const num = (selector) => {
+    const n = numOrNull(panel.querySelector(selector));
+    return Number.isFinite(n) ? n : null;
+  };
+  const metric = vitalMetric(type);
+  if (metric?.format === 'pair') {
+    return { type, unit: 'mmHg', value_num: num('#vital-sys'), value_num2: num('#vital-dia'), value_num3: num('#vital-pulse') };
+  }
+  return { type, unit: panel.querySelector('#vital-unit')?.value, value_num: num('#vital-value') };
+}
+
+/**
+ * Der eine Satz unter den Wertefeldern, oder null: zuerst Unmoegliches (das
+ * dann auch das Speichern anhaelt), sonst Ungewoehnliches (das nur nachfragt).
+ */
+function vitalPlausibilityText(values) {
+  const { hard, soft } = vitalPlausibility(values);
+  if (hard.length) return t(hard[0].issue === 'bpOrder' ? 'health.errorVitalBpOrder' : 'health.errorVitalImpossible');
+  if (soft.length) return t(soft[0].issue === 'high' ? 'health.vitals.unusualHigh' : 'health.vitals.unusualLow');
+  return null;
 }
 
 function numOrNull(input) {

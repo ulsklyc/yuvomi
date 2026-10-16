@@ -4739,7 +4739,9 @@
                 "okay": "Elmegy",
                 "good": "Jó",
                 "veryGood": "Nagyon jó"
-            }
+            },
+            "unusualHigh": "Szokatlanul magas. Ellenőrizd az értéket, de így is mentheted.",
+            "unusualLow": "Szokatlanul alacsony. Ellenőrizd az értéket, de így is mentheted."
         },
         "meds": {
             "doseQty": "{{count}}×",
@@ -5488,7 +5490,9 @@
         "errorCycleDayGone": "Ez a napi bejegyzés már nem létezik.",
         "errorCycleImportTooLarge": "A szöveg nagyobb, mint {{limit_kb}} KB. Importáld a menstruációkat kisebb részekben.",
         "errorCycleImportNoRows": "A fájlban csak fejlécsor van, menstruáció nincs.",
-        "errorCycleImportTooManyRows": "Egy importálás legfeljebb {{limit}} menstruációt tartalmazhat. Oszd fel a fájlt."
+        "errorCycleImportTooManyRows": "Egy importálás legfeljebb {{limit}} menstruációt tartalmazhat. Oszd fel a fájlt.",
+        "errorVitalImpossible": "Ez az érték nem lehetséges. Ellenőrizd a bevitelt.",
+        "errorVitalBpOrder": "A szisztolés értéknek nagyobbnak kell lennie a diasztolésnál."
     },
     "waste": {
         "title": "Hulladékgyűjtés",

@@ -4739,7 +4739,9 @@
                 "okay": "Così così",
                 "good": "Bene",
                 "veryGood": "Molto bene"
-            }
+            },
+            "unusualHigh": "Insolitamente alto. Controlla il valore; puoi comunque salvarlo.",
+            "unusualLow": "Insolitamente basso. Controlla il valore; puoi comunque salvarlo."
         },
         "meds": {
             "doseQty": "{{count}}×",
@@ -5488,7 +5490,9 @@
         "errorCycleDayGone": "Questa voce del giorno non esiste più.",
         "errorCycleImportTooLarge": "Il testo supera {{limit_kb}} KB. Importa i cicli in parti più piccole.",
         "errorCycleImportNoRows": "Il file contiene solo la riga di intestazione e nessun ciclo.",
-        "errorCycleImportTooManyRows": "Un’importazione può contenere al massimo {{limit}} cicli. Dividi il file."
+        "errorCycleImportTooManyRows": "Un’importazione può contenere al massimo {{limit}} cicli. Dividi il file.",
+        "errorVitalImpossible": "Questo valore non è possibile. Controlla quanto inserito.",
+        "errorVitalBpOrder": "Il valore sistolico deve essere maggiore di quello diastolico."
     },
     "waste": {
         "title": "Raccolta rifiuti",

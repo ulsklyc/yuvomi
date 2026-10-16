@@ -139,9 +139,19 @@ test('Server: was ein Import der Perioden-Historie erreicht, traegt Grund und Gr
   assert.deepEqual([r.status, r.body?.reason, r.body?.params], [400, 'health_cycle_import_too_many_rows', { limit: 500 }]);
 });
 
+// Critique R19: unmoegliche Vitalwerte nennen ihren Fall (server/routes/health/vital-limits.js).
+test('Server: ein unmoeglicher Vitalwert nennt seinen Fall, Status 400', async () => {
+  const at = '2026-06-05T08:00';
+  let r = await call('POST', '/vitals', { type: 'bp', value_num: 80, value_num2: 120, unit: 'mmHg', measured_at: at });
+  assert.deepEqual([r.status, r.body?.reason], [400, 'health_vital_bp_order']);
+  r = await call('POST', '/vitals', { type: 'spo2', value_num: 101, unit: '%', measured_at: at });
+  assert.deepEqual([r.status, r.body?.reason], [400, 'health_vital_out_of_range']);
+});
+
 test('Server: jeder Gesundheits-Grund hat einen Satz, und jeder "gibt es nicht mehr" laedt nach', () => {
   const reasons = new Set([...SERVER_GONE.map((c) => c[3]), 'health_prevention_selected_type_not_found',
-    'health_cycle_import_too_large', 'health_cycle_import_no_rows', 'health_cycle_import_too_many_rows']);
+    'health_cycle_import_too_large', 'health_cycle_import_no_rows', 'health_cycle_import_too_many_rows',
+    'health_vital_bp_order', 'health_vital_out_of_range']);
   for (const reason of reasons) {
     assert.ok(CASE_MESSAGES.has(reason), `${reason}: kein Satz`);
     assert.equal(GONE_REASONS.has(reason), reason.endsWith('_not_found'), reason);

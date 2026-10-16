@@ -175,6 +175,87 @@ export function splitDuration(value) {
   return { hours: Math.floor(totalMinutes / 60), minutes: totalMinutes % 60 };
 }
 
+// --------------------------------------------------------
+// Plausibilitaet (Critique R19, 2026-10-16)
+// --------------------------------------------------------
+// Zwei Stufen, beide je Messart und Einheit:
+//
+//   HART  - unmoeglich. Gleiche Zahlen wie der Server
+//           (server/routes/health/vital-limits.js, dort mit Belegen je Rand);
+//           test:health-vitals haelt beide Tabellen gleich. Das Formular
+//           speichert dann nicht, der Fehler steht am Feld.
+//   WEICH - moeglich, aber ungewoehnlich: ein Hinweis unter dem Feld, der beim
+//           Tippen erscheint und das Speichern NICHT verhindert. Er faengt den
+//           Tippfehler (65 kg als 650 kg, 37,5 °C als 375), nicht den Befund -
+//           die App bewertet keine Gesundheit, sie fragt nur nach.
+//
+// Die weichen Raender, grosszuegig gewaehlt und bewusst keine Normbereiche:
+//   Blutdruck   systolisch 70-220, diastolisch 40-130 mmHg; Puls 40-180 /min
+//               (darueber und darunter liegt der Bereich, in dem man ohnehin
+//               nachmisst - Krise, Schock, Leistungssportler-Ruhepuls).
+//   Blutzucker  50-350 mg/dL bzw. 2,8-19,4 mmol/L (Unterzucker-Grenze bis
+//               deutlich entgleist).
+//   Gewicht     2-250 kg bzw. 4,5-550 lb.
+//   SpO2        88-100 % (unter 88 % misst man nach).
+//   Temperatur  35-41 °C bzw. 95-105,8 °F (Unterkuehlung bis hohes Fieber).
+
+/** Typ -> Einheit -> Raender. Blutdruck nach Kanal (sys, dia, pulse). */
+export const VITAL_HARD_LIMITS = Object.freeze({
+  bp: Object.freeze({ mmHg: Object.freeze({ sys: [40, 300], dia: [20, 200] }) }),
+  glucose: Object.freeze({ 'mg/dL': [10, 2000], 'mmol/L': [0.5, 111] }),
+  weight: Object.freeze({ kg: [0.2, 700], lb: [0.4, 1550] }),
+  spo2: Object.freeze({ '%': [1, 100] }),
+  temp: Object.freeze({ '°C': [10, 46], '°F': [50, 115] }),
+});
+export const PULSE_HARD_LIMITS = Object.freeze([20, 300]);
+
+export const VITAL_SOFT_RANGES = Object.freeze({
+  bp: Object.freeze({ mmHg: Object.freeze({ sys: [70, 220], dia: [40, 130] }) }),
+  glucose: Object.freeze({ 'mg/dL': [50, 350], 'mmol/L': [2.8, 19.4] }),
+  weight: Object.freeze({ kg: [2, 250], lb: [4.5, 550] }),
+  spo2: Object.freeze({ '%': [88, 100] }),
+  temp: Object.freeze({ '°C': [35, 41], '°F': [95, 105.8] }),
+});
+export const PULSE_SOFT_RANGE = Object.freeze([40, 180]);
+
+const isFiniteNum = (value) => typeof value === 'number' && Number.isFinite(value);
+
+/**
+ * Wie plausibel ist diese Messung? Je Kanal hoechstens ein Befund.
+ *
+ * @param {{type: string, unit?: string, value_num?: number|null, value_num2?: number|null, value_num3?: number|null}} m
+ * @returns {{hard: Array<{channel: 'value'|'sys'|'dia'|'pulse', issue: 'impossible'|'bpOrder'}>,
+ *            soft: Array<{channel: 'value'|'sys'|'dia'|'pulse', issue: 'low'|'high'}>}}
+ */
+export function vitalPlausibility({ type, unit, value_num: v1, value_num2: v2, value_num3: v3 }) {
+  const hard = [];
+  const soft = [];
+  const check = (channel, value, hardRange, softRange) => {
+    if (!isFiniteNum(value)) return;
+    if (hardRange && (value < hardRange[0] || value > hardRange[1])) {
+      hard.push({ channel, issue: 'impossible' });
+      return;
+    }
+    if (softRange && value < softRange[0]) soft.push({ channel, issue: 'low' });
+    else if (softRange && value > softRange[1]) soft.push({ channel, issue: 'high' });
+  };
+  if (type === 'bp') {
+    const hardBp = VITAL_HARD_LIMITS.bp[unit ?? 'mmHg'];
+    const softBp = VITAL_SOFT_RANGES.bp[unit ?? 'mmHg'];
+    check('sys', v1, hardBp?.sys, softBp?.sys);
+    check('dia', v2, hardBp?.dia, softBp?.dia);
+    // Systolisch ueber diastolisch gilt ohne Einheit - am unteren Feld, weil
+    // meist das vertauscht oder vertippt ist. Nur, wenn beide fuer sich gehen.
+    if (isFiniteNum(v1) && isFiniteNum(v2) && v1 <= v2 && !hard.length) hard.push({ channel: 'dia', issue: 'bpOrder' });
+    check('pulse', v3, PULSE_HARD_LIMITS, PULSE_SOFT_RANGE);
+    return { hard, soft };
+  }
+  // SpO2 ueber 100 % ist in jeder Schreibweise unmoeglich.
+  const hardRange = VITAL_HARD_LIMITS[type]?.[unit] ?? (type === 'spo2' ? [-Infinity, 100] : null);
+  check('value', v1, hardRange, VITAL_SOFT_RANGES[type]?.[unit]);
+  return { hard, soft };
+}
+
 /** Stunden + Minuten in Dezimalstunden. Umkehrung von splitDuration(). */
 export function durationToHours(hours, minutes) {
   const h = Number(hours) || 0;

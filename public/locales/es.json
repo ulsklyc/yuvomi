@@ -4739,7 +4739,9 @@
                 "okay": "Regular",
                 "good": "Bien",
                 "veryGood": "Muy bien"
-            }
+            },
+            "unusualHigh": "Inusualmente alto. Revisa el valor; aun así puedes guardarlo.",
+            "unusualLow": "Inusualmente bajo. Revisa el valor; aun así puedes guardarlo."
         },
         "meds": {
             "doseQty": "{{count}}×",
@@ -5488,7 +5490,9 @@
         "errorCycleDayGone": "Esta entrada del día ya no existe.",
         "errorCycleImportTooLarge": "El texto ocupa más de {{limit_kb}} KB. Importa los periodos en partes más pequeñas.",
         "errorCycleImportNoRows": "El archivo solo tiene la fila de encabezado y ningún periodo.",
-        "errorCycleImportTooManyRows": "Una importación puede tener como máximo {{limit}} periodos. Divide el archivo."
+        "errorCycleImportTooManyRows": "Una importación puede tener como máximo {{limit}} periodos. Divide el archivo.",
+        "errorVitalImpossible": "Este valor no es posible. Revisa lo que has introducido.",
+        "errorVitalBpOrder": "El valor sistólico debe ser mayor que el diastólico."
     },
     "waste": {
         "title": "Recogida de basura",

@@ -4985,7 +4985,9 @@
                 "okay": "Tak sobie",
                 "good": "Dobrze",
                 "veryGood": "Bardzo dobrze"
-            }
+            },
+            "unusualHigh": "Nietypowo wysoka. Sprawdź wartość; nadal możesz ją zapisać.",
+            "unusualLow": "Nietypowo niska. Sprawdź wartość; nadal możesz ją zapisać."
         },
         "meds": {
             "doseQty": "{{count}}×",
@@ -5746,7 +5748,9 @@
         "errorCycleDayGone": "Ten wpis dnia już nie istnieje.",
         "errorCycleImportTooLarge": "Tekst jest większy niż {{limit_kb}} KB. Importuj miesiączki w mniejszych częściach.",
         "errorCycleImportNoRows": "Plik zawiera tylko wiersz nagłówka i żadnej miesiączki.",
-        "errorCycleImportTooManyRows": "Jeden import może zawierać najwyżej {{limit}} miesiączek. Podziel plik."
+        "errorCycleImportTooManyRows": "Jeden import może zawierać najwyżej {{limit}} miesiączek. Podziel plik.",
+        "errorVitalImpossible": "Ta wartość jest niemożliwa. Sprawdź wprowadzone dane.",
+        "errorVitalBpOrder": "Wartość skurczowa musi być wyższa niż rozkurczowa."
     },
     "waste": {
         "title": "Odbiór odpadów",

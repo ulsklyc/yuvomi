@@ -4739,7 +4739,9 @@
                 "okay": "Bình thường",
                 "good": "Tốt",
                 "veryGood": "Rất tốt"
-            }
+            },
+            "unusualHigh": "Cao bất thường. Hãy kiểm tra giá trị; bạn vẫn có thể lưu.",
+            "unusualLow": "Thấp bất thường. Hãy kiểm tra giá trị; bạn vẫn có thể lưu."
         },
         "meds": {
             "doseQty": "{{count}}×",
@@ -5488,7 +5490,9 @@
         "errorCycleDayGone": "Mục của ngày này không còn tồn tại.",
         "errorCycleImportTooLarge": "Văn bản lớn hơn {{limit_kb}} KB. Hãy nhập các kỳ kinh thành nhiều phần nhỏ hơn.",
         "errorCycleImportNoRows": "Tệp chỉ có dòng tiêu đề và không có kỳ kinh nào.",
-        "errorCycleImportTooManyRows": "Mỗi lần nhập chỉ được tối đa {{limit}} kỳ kinh. Hãy chia nhỏ tệp."
+        "errorCycleImportTooManyRows": "Mỗi lần nhập chỉ được tối đa {{limit}} kỳ kinh. Hãy chia nhỏ tệp.",
+        "errorVitalImpossible": "Giá trị này không thể có. Vui lòng kiểm tra lại.",
+        "errorVitalBpOrder": "Huyết áp tâm thu phải cao hơn tâm trương."
     },
     "waste": {
         "title": "Thu gom rác",

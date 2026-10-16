@@ -4863,7 +4863,9 @@
                 "okay": "Ujde to",
                 "good": "Dobrá",
                 "veryGood": "Velmi dobrá"
-            }
+            },
+            "unusualHigh": "Neobvykle vysoká hodnota. Zkontrolujte ji, uložit ji přesto můžete.",
+            "unusualLow": "Neobvykle nízká hodnota. Zkontrolujte ji, uložit ji přesto můžete."
         },
         "meds": {
             "doseQty": "{{count}}×",
@@ -5618,7 +5620,9 @@
         "errorCycleDayGone": "Tento denní záznam už neexistuje.",
         "errorCycleImportTooLarge": "Text je větší než {{limit_kb}} KB. Importuj menstruace po menších částech.",
         "errorCycleImportNoRows": "Soubor obsahuje jen řádek záhlaví a žádné menstruace.",
-        "errorCycleImportTooManyRows": "Jeden import smí obsahovat nejvýše {{limit}} menstruací. Rozděl soubor."
+        "errorCycleImportTooManyRows": "Jeden import smí obsahovat nejvýše {{limit}} menstruací. Rozděl soubor.",
+        "errorVitalImpossible": "Tato hodnota není možná. Zkontrolujte prosím zadání.",
+        "errorVitalBpOrder": "Systolická hodnota musí být vyšší než diastolická."
     },
     "waste": {
         "title": "Svoz odpadu",

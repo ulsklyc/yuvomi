@@ -4739,7 +4739,9 @@
                 "okay": "Ok",
                 "good": "God",
                 "veryGood": "Veldig god"
-            }
+            },
+            "unusualHigh": "Uvanlig høy. Sjekk verdien; du kan lagre den likevel.",
+            "unusualLow": "Uvanlig lav. Sjekk verdien; du kan lagre den likevel."
         },
         "meds": {
             "doseQty": "{{count}}×",
@@ -5488,7 +5490,9 @@
         "errorCycleDayGone": "Denne dagsoppføringen finnes ikke lenger.",
         "errorCycleImportTooLarge": "Teksten er større enn {{limit_kb}} KB. Importer mensene i mindre deler.",
         "errorCycleImportNoRows": "Filen har bare en overskriftsrad og ingen mens.",
-        "errorCycleImportTooManyRows": "En import kan inneholde høyst {{limit}} menser. Del opp filen."
+        "errorCycleImportTooManyRows": "En import kan inneholde høyst {{limit}} menser. Del opp filen.",
+        "errorVitalImpossible": "Denne verdien er ikke mulig. Sjekk det du skrev inn.",
+        "errorVitalBpOrder": "Den systoliske verdien må være høyere enn den diastoliske."
     },
     "waste": {
         "title": "Avfallshåndtering",

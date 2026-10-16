@@ -166,6 +166,57 @@ test('Vitals: DELETE durch Eigentümer, danach 404', async () => {
   assert.equal(patch.status, 404);
 });
 
+// Critique R19: was kein Mensch messen kann, speichert der Server nicht.
+// Die Grenzen sind grosszuegig (server/routes/health/vital-limits.js) - ein
+// ungewoehnlicher, aber moeglicher Wert geht durch.
+test('Vitals: unmoegliche Werte -> 400 mit Grund, moegliche Extremwerte gehen durch', async () => {
+  asA();
+  const at = '2026-06-05T08:00';
+  for (const [body, reason] of [
+    [{ type: 'bp', value_num: 80, value_num2: 120, unit: 'mmHg' }, 'health_vital_bp_order'],
+    [{ type: 'bp', value_num: 120, value_num2: 120, unit: 'mmHg' }, 'health_vital_bp_order'],
+    [{ type: 'bp', value_num: 400, value_num2: 80, unit: 'mmHg' }, 'health_vital_out_of_range'],
+    [{ type: 'bp', value_num: 120, value_num2: 80, value_num3: 400, unit: 'mmHg' }, 'health_vital_out_of_range'],
+    [{ type: 'weight', value_num: 6500, unit: 'kg' }, 'health_vital_out_of_range'],
+    [{ type: 'weight', value_num: 0, unit: 'kg' }, 'health_vital_out_of_range'],
+    [{ type: 'spo2', value_num: 101, unit: '%' }, 'health_vital_out_of_range'],
+    [{ type: 'spo2', value_num: 101 }, 'health_vital_out_of_range'],
+    [{ type: 'temp', value_num: 60, unit: '°C' }, 'health_vital_out_of_range'],
+    [{ type: 'glucose', value_num: 5000, unit: 'mg/dL' }, 'health_vital_out_of_range'],
+    [{ type: 'glucose', value_num: 150, unit: 'mmol/L' }, 'health_vital_out_of_range'],
+  ]) {
+    const res = await call('POST', '/vitals', { ...body, measured_at: at });
+    assert.equal(res.status, 400, JSON.stringify(body));
+    assert.equal(res.body.reason, reason, JSON.stringify(body));
+  }
+  for (const body of [
+    { type: 'weight', value_num: 650, unit: 'kg' },
+    { type: 'weight', value_num: 0.6, unit: 'kg' },
+    { type: 'temp', value_num: 104, unit: '°F' },
+    { type: 'glucose', value_num: 600, unit: 'mg/dL' },
+    { type: 'spo2', value_num: 100, unit: '%' },
+    { type: 'bp', value_num: 220, value_num2: 130, value_num3: 180, unit: 'mmHg' },
+    // Eine fremde Einheit hat keine Zahlenraender.
+    { type: 'weight', value_num: 90, unit: 'stone' },
+  ]) {
+    const res = await call('POST', '/vitals', { ...body, measured_at: at });
+    assert.equal(res.status, 201, JSON.stringify(body));
+  }
+});
+
+test('Vitals: PATCH prueft die Messung, wie sie danach stuende', async () => {
+  asA();
+  const created = await call('POST', '/vitals', {
+    type: 'bp', value_num: 130, value_num2: 85, unit: 'mmHg', measured_at: '2026-06-06T08:00',
+  });
+  assert.equal(created.status, 201);
+  const res = await call('PATCH', `/vitals/${created.body.data.id}`, { value_num2: 140 });
+  assert.equal(res.status, 400);
+  assert.equal(res.body.reason, 'health_vital_bp_order');
+  const ok = await call('PATCH', `/vitals/${created.body.data.id}`, { value_num2: 90 });
+  assert.equal(ok.status, 200);
+});
+
 // ========================================================
 // Medikamente + Schedules + Logs
 // ========================================================

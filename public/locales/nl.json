@@ -4739,7 +4739,9 @@
                 "okay": "Gaat wel",
                 "good": "Goed",
                 "veryGood": "Heel goed"
-            }
+            },
+            "unusualHigh": "Ongewoon hoog. Controleer de waarde; opslaan kan toch.",
+            "unusualLow": "Ongewoon laag. Controleer de waarde; opslaan kan toch."
         },
         "meds": {
             "doseQty": "{{count}}×",
@@ -5488,7 +5490,9 @@
         "errorCycleDayGone": "Dit dagitem bestaat niet meer.",
         "errorCycleImportTooLarge": "De tekst is groter dan {{limit_kb}} KB. Importeer de menstruaties in kleinere delen.",
         "errorCycleImportNoRows": "Het bestand bevat alleen een kopregel en geen menstruaties.",
-        "errorCycleImportTooManyRows": "Eén import mag hoogstens {{limit}} menstruaties bevatten. Splits het bestand."
+        "errorCycleImportTooManyRows": "Eén import mag hoogstens {{limit}} menstruaties bevatten. Splits het bestand.",
+        "errorVitalImpossible": "Deze waarde is niet mogelijk. Controleer je invoer.",
+        "errorVitalBpOrder": "De systolische waarde moet hoger zijn dan de diastolische."
     },
     "waste": {
         "title": "Afvalinzameling",

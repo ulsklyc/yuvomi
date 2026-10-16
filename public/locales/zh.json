@@ -4739,7 +4739,9 @@
                 "okay": "一般",
                 "good": "不错",
                 "veryGood": "很好"
-            }
+            },
+            "unusualHigh": "异常偏高。请检查数值，仍然可以保存。",
+            "unusualLow": "异常偏低。请检查数值，仍然可以保存。"
         },
         "meds": {
             "doseQty": "{{count}}×",
@@ -5488,7 +5490,9 @@
         "errorCycleDayGone": "当天的记录已不存在。",
         "errorCycleImportTooLarge": "文本超过 {{limit_kb}} KB。请分成更小的部分导入经期。",
         "errorCycleImportNoRows": "文件只有标题行没有任何经期。",
-        "errorCycleImportTooManyRows": "一次导入最多 {{limit}} 个经期。请拆分文件。"
+        "errorCycleImportTooManyRows": "一次导入最多 {{limit}} 个经期。请拆分文件。",
+        "errorVitalImpossible": "这个数值不可能。请检查输入。",
+        "errorVitalBpOrder": "收缩压必须高于舒张压。"
     },
     "waste": {
         "title": "垃圾收集",

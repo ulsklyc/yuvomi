@@ -4739,7 +4739,9 @@
                 "okay": "İdare eder",
                 "good": "İyi",
                 "veryGood": "Çok iyi"
-            }
+            },
+            "unusualHigh": "Alışılmadık derecede yüksek. Değeri kontrol et; yine de kaydedebilirsin.",
+            "unusualLow": "Alışılmadık derecede düşük. Değeri kontrol et; yine de kaydedebilirsin."
         },
         "meds": {
             "doseQty": "{{count}}×",
@@ -5488,7 +5490,9 @@
         "errorCycleDayGone": "Bu günün kaydı artık yok.",
         "errorCycleImportTooLarge": "Metin {{limit_kb}} KB'tan büyük. Adet dönemlerini daha küçük parçalar halinde içe aktar.",
         "errorCycleImportNoRows": "Dosyada yalnızca başlık satırı var ve hiç adet dönemi yok.",
-        "errorCycleImportTooManyRows": "Bir içe aktarma en fazla {{limit}} adet dönemi içerebilir. Dosyayı böl."
+        "errorCycleImportTooManyRows": "Bir içe aktarma en fazla {{limit}} adet dönemi içerebilir. Dosyayı böl.",
+        "errorVitalImpossible": "Bu değer mümkün değil. Lütfen girdiğini kontrol et.",
+        "errorVitalBpOrder": "Sistolik değer diyastolikten büyük olmalı."
     },
     "waste": {
         "title": "Atık toplama",

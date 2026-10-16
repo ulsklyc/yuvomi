@@ -4739,7 +4739,9 @@
                 "okay": "Razoável",
                 "good": "Bom",
                 "veryGood": "Muito bom"
-            }
+            },
+            "unusualHigh": "Invulgarmente alto. Verifique o valor; pode guardá-lo na mesma.",
+            "unusualLow": "Invulgarmente baixo. Verifique o valor; pode guardá-lo na mesma."
         },
         "meds": {
             "doseQty": "{{count}}×",
@@ -5488,7 +5490,9 @@
         "errorCycleDayGone": "Este registo do dia já não existe.",
         "errorCycleImportTooLarge": "O texto tem mais de {{limit_kb}} KB. Importa os períodos em partes mais pequenas.",
         "errorCycleImportNoRows": "O ficheiro tem só a linha de cabeçalho e nenhum período.",
-        "errorCycleImportTooManyRows": "Uma importação pode ter no máximo {{limit}} períodos. Divide o ficheiro."
+        "errorCycleImportTooManyRows": "Uma importação pode ter no máximo {{limit}} períodos. Divide o ficheiro.",
+        "errorVitalImpossible": "Este valor não é possível. Verifique o que introduziu.",
+        "errorVitalBpOrder": "O valor sistólico tem de ser superior ao diastólico."
     },
     "waste": {
         "title": "Recolha de lixo",

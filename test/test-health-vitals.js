@@ -851,3 +851,58 @@ test('Messwert-Dialog, Vital-Kachel, Naehrwerte-Leerzustand (Critique 2026-10-16
   assert.doesNotMatch(today, /emptyHintHTML\(t\('health\.nutrition\.targetNone'\)\)/, 'kein zentrierter Leerhinweis mehr');
   assert.match(today, /<div class="health-nutrition-today__none">/);
 });
+
+// ── Plausibilitaet (Critique R19, 2026-10-16) ──────────────────────────────
+//
+// 650 kg, SpO2 ueber 100 % und ein systolischer Wert unter dem diastolischen
+// gingen durch. Unmoegliches haelt das Formular an (dieselben Grenzen wie der
+// Server), Ungewoehnliches fragt nur nach.
+test('vitalPlausibility: Unmoegliches ist hart, Ungewoehnliches weich, Normales still', async () => {
+  const { vitalPlausibility } = await import('../public/utils/health-vitals.js');
+  const p = (m) => vitalPlausibility(m);
+  assert.deepEqual(p({ type: 'weight', unit: 'kg', value_num: 650 }), { hard: [], soft: [{ channel: 'value', issue: 'high' }] });
+  assert.deepEqual(p({ type: 'weight', unit: 'kg', value_num: 6500 }).hard, [{ channel: 'value', issue: 'impossible' }]);
+  assert.deepEqual(p({ type: 'weight', unit: 'kg', value_num: 72 }), { hard: [], soft: [] });
+  assert.deepEqual(p({ type: 'spo2', unit: '%', value_num: 101 }).hard, [{ channel: 'value', issue: 'impossible' }]);
+  assert.deepEqual(p({ type: 'spo2', unit: '%', value_num: 84 }).soft, [{ channel: 'value', issue: 'low' }]);
+  assert.deepEqual(p({ type: 'temp', unit: '°C', value_num: 375 }).hard, [{ channel: 'value', issue: 'impossible' }]);
+  assert.deepEqual(p({ type: 'temp', unit: '°F', value_num: 98.6 }), { hard: [], soft: [] });
+  assert.deepEqual(p({ type: 'glucose', unit: 'mmol/L', value_num: 25 }).soft, [{ channel: 'value', issue: 'high' }]);
+  assert.deepEqual(p({ type: 'bp', unit: 'mmHg', value_num: 80, value_num2: 120 }).hard, [{ channel: 'dia', issue: 'bpOrder' }]);
+  assert.deepEqual(p({ type: 'bp', unit: 'mmHg', value_num: 120, value_num2: 80, value_num3: 190 }), { hard: [], soft: [{ channel: 'pulse', issue: 'high' }] });
+  // Halb ausgefuellt: nur, was dasteht.
+  assert.deepEqual(p({ type: 'bp', unit: 'mmHg', value_num: 120, value_num2: null }), { hard: [], soft: [] });
+  // Metriken ohne Grenzen (Schlaf, Stimmung, Groesse) bleiben unberuehrt.
+  assert.deepEqual(p({ type: 'height', unit: 'cm', value_num: 999 }), { hard: [], soft: [] });
+});
+
+test('die harten Grenzen von Formular und Server sind dieselben, und weich liegt innerhalb von hart', async () => {
+  const client = await import('../public/utils/health-vitals.js');
+  const server = await import('../server/routes/health/vital-limits.js');
+  assert.deepEqual(client.VITAL_HARD_LIMITS, server.VITAL_HARD_LIMITS);
+  assert.deepEqual(client.PULSE_HARD_LIMITS, server.PULSE_HARD_LIMITS);
+  const inside = ([lo, hi], [hardLo, hardHi], label) => assert.ok(lo >= hardLo && hi <= hardHi, label);
+  for (const [type, units] of Object.entries(client.VITAL_SOFT_RANGES)) {
+    for (const [unit, range] of Object.entries(units)) {
+      const hard = client.VITAL_HARD_LIMITS[type][unit];
+      if (Array.isArray(range)) inside(range, hard, `${type} ${unit}`);
+      else for (const ch of Object.keys(range)) inside(range[ch], hard[ch], `${type} ${unit} ${ch}`);
+    }
+  }
+  inside(client.PULSE_SOFT_RANGE, client.PULSE_HARD_LIMITS, 'Puls');
+  // Was der Server ablehnt, haelt auch das Formular an - und umgekehrt.
+  for (const m of [
+    { type: 'weight', unit: 'kg', value_num: 701 }, { type: 'spo2', unit: '%', value_num: 100.5 },
+    { type: 'bp', unit: 'mmHg', value_num: 90, value_num2: 90 }, { type: 'bp', unit: 'mmHg', value_num: 120, value_num2: 80, value_num3: 10 },
+    { type: 'weight', unit: 'kg', value_num: 650 }, { type: 'temp', unit: '°C', value_num: 41.5 },
+  ]) {
+    assert.equal(client.vitalPlausibility(m).hard.length > 0, server.vitalLimitError(m) !== null, JSON.stringify(m));
+  }
+});
+
+test('der Vitalwerte-Dialog haelt Unmoegliches an und zeigt Ungewoehnliches als Hinweis', () => {
+  const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  assert.match(src, /if \(reportFieldErrors\(vitalPlausibility\(body\)\.hard\.map\(/, 'Speichern prueft die harten Grenzen nicht');
+  assert.match(src, /<p class="form-hint form-hint--warning" id="vital-plausibility" role="status" hidden><\/p>/);
+  assert.match(src, /fieldsHost\.addEventListener\('input', updatePlausibility\)/, 'der Hinweis folgt dem Tippen nicht');
+});

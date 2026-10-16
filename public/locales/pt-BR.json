@@ -4739,7 +4739,9 @@
                 "okay": "Razoável",
                 "good": "Bom",
                 "veryGood": "Muito bom"
-            }
+            },
+            "unusualHigh": "Incomumente alto. Verifique o valor; você ainda pode salvá-lo.",
+            "unusualLow": "Incomumente baixo. Verifique o valor; você ainda pode salvá-lo."
         },
         "meds": {
             "doseQty": "{{count}}×",
@@ -5488,7 +5490,9 @@
         "errorCycleDayGone": "Este registro do dia não existe mais.",
         "errorCycleImportTooLarge": "O texto tem mais de {{limit_kb}} KB. Importe os períodos em partes menores.",
         "errorCycleImportNoRows": "O arquivo tem só a linha de cabeçalho e nenhum período.",
-        "errorCycleImportTooManyRows": "Uma importação pode ter no máximo {{limit}} períodos. Divida o arquivo."
+        "errorCycleImportTooManyRows": "Uma importação pode ter no máximo {{limit}} períodos. Divida o arquivo.",
+        "errorVitalImpossible": "Este valor não é possível. Verifique o que foi digitado.",
+        "errorVitalBpOrder": "O valor sistólico deve ser maior que o diastólico."
     },
     "datepicker": {
         "openCalendar": "Abrir calendário",

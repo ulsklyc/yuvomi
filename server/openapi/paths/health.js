@@ -55,6 +55,8 @@ export function healthPaths() {
   // heisst, nennt ihren Fall - angehaengt an jede Operation auf einer Zeile
   // (Pfad mit `{id}`), siehe withNotFoundReasons() am Ende.
   const NOT_FOUND = 'A 404 for a row that does not exist or is not writable for the caller carries a `reason` naming the row: `health_vital_not_found`, `health_medication_not_found`, `health_schedule_not_found`, `health_dose_not_found`, `health_lab_report_not_found`, `health_lab_result_not_found`, `health_activity_not_found`, `health_prevention_type_not_found`, `health_prevention_record_not_found`, `health_nutrition_entry_not_found`, `health_cycle_period_not_found` or `health_cycle_log_not_found` (#1909).';
+  // Critique R19: unmoegliche Vitalwerte (server/routes/health/vital-limits.js).
+  const VITAL_LIMITS = ' A measurement no person can have is refused with 400 and a `reason`: `health_vital_bp_order` when systolic is not above diastolic, `health_vital_out_of_range` outside the possible range of its type and unit (weight 0.2-700 kg / 0.4-1550 lb, SpO2 at most 100 %, temperature 10-46 °C / 50-115 °F, glucose 10-2000 mg/dL / 0.5-111 mmol/L, blood pressure 40-300 / 20-200 mmHg, pulse 20-300). A PATCH is checked as the row would stand afterwards; units outside this list have no numeric bounds.';
   const TAKEN_NOW = ' A dose that ends up `taken` without a `taken_at` gets the current minute in household wall-clock time, so no path stores `taken` without a time.';
   // Der kanonische Satz aus docs/DECISIONS.md Abschnitt 5, nicht das Paar
   // private/family der uebrigen Gesundheit. Der benannte Satz ('assignees')
@@ -65,10 +67,10 @@ export function healthPaths() {
   return withNotFoundReasons(NOT_FOUND, {
     '/api/v1/health/vitals': {
       get: op({ summary: 'List vital measurements', tag: 'Health', description: 'Scoped to the viewer; `?user_id=` filters to a family member (only their `family`-visible rows). Optional `type`, `from`, `to` filters.' }),
-      post: op({ summary: 'Create a vital measurement', tag: 'Health', stateChanging: true, requestBody: jsonBody(null), description: WALL_CLOCK_INPUT.trim() }),
+      post: op({ summary: 'Create a vital measurement', tag: 'Health', stateChanging: true, requestBody: jsonBody(null), description: (WALL_CLOCK_INPUT + VITAL_LIMITS).trim() }),
     },
     '/api/v1/health/vitals/{id}': {
-      patch: op({ summary: 'Update a vital measurement', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: WALL_CLOCK_INPUT.trim() }),
+      patch: op({ summary: 'Update a vital measurement', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: (WALL_CLOCK_INPUT + VITAL_LIMITS).trim() }),
       delete: op({ summary: 'Delete a vital measurement', tag: 'Health', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/health/medications': {
