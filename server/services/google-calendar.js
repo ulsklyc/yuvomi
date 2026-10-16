@@ -681,26 +681,30 @@ function loadAuthorizedClient() {
   return client;
 }
 
-// Höchstens EIN Refresh je Prozess (#2019). Sync, Sofortversuch und
+// Höchstens EIN Refresh je Token und Prozess (#2019). Sync, Sofortversuch und
 // Kalenderliste bauen je einen eigenen Client; refreshten zwei davon zugleich
 // mit demselben Token, könnte Google eine Anfrage annehmen und rotieren, die
 // andere ablehnen - kommt die Ablehnung zuerst an, stünde "neu verbinden" bei
-// gültigem Token. Ein zweiter Client wartet deshalb auf den laufenden Refresh
-// und übernimmt dessen Ergebnis, statt selbst zu fragen.
-let refreshInFlight = null;
+// gültigem Token. Ein zweiter Client mit DEMSELBEN Token wartet deshalb auf den
+// laufenden Refresh und übernimmt dessen Ergebnis. Geschlüsselt nach dem Token:
+// ein Client mit einem anderen (älteres Token, anderes Konto nach dem
+// Neuverbinden) bekäme sonst das Access-Token einer fremden Verbindung.
+const refreshesInFlight = new Map();
 
 function shareRefreshes(client) {
   client.refreshTokenNoCache = function sharedRefresh(refreshToken) {
-    if (!refreshInFlight) {
+    const running = refreshesInFlight.get(refreshToken);
+    if (!running) {
       const own = Object.getPrototypeOf(this).refreshTokenNoCache.call(this, refreshToken);
       // Der geteilte Ausgang lehnt nie ab: ohne Wartende bliebe eine Ablehnung
       // sonst unbehandelt. Wer wartet, wirft sie selbst wieder.
-      refreshInFlight = own
+      const shared = own
         .then((r) => ({ r }), (err) => ({ err }))
-        .finally(() => { refreshInFlight = null; });
+        .finally(() => { refreshesInFlight.delete(refreshToken); });
+      refreshesInFlight.set(refreshToken, shared);
       return own.then((r) => ({ ...r, tokens: { ...r.tokens } }));
     }
-    return refreshInFlight.then(({ r, err }) => {
+    return running.then(({ r, err }) => {
       if (err) throw err;
       // Rotiert: auch dieser Client arbeitet ab jetzt mit dem neuen Token.
       if (r.tokens?.refresh_token) this.credentials.refresh_token = r.tokens.refresh_token;

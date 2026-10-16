@@ -2132,7 +2132,7 @@ async function withRefresh(answer, fn) {
   const original = proto.refreshTokenNoCache;
   const saved = Object.fromEntries(Object.keys(OAUTH_ENV).map((k) => [k, process.env[k]]));
   const calls = { n: 0 };
-  proto.refreshTokenNoCache = async function refreshStub() { calls.n++; return answer(); };
+  proto.refreshTokenNoCache = async function refreshStub(token) { calls.n++; return answer(token); };
   Object.assign(process.env, OAUTH_ENV);
   db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('google_token_expiry', '1')").run();
   try {
@@ -2245,6 +2245,40 @@ test('#2019: GET /google/calendars meldet ein abgelehntes Token mit eigenem Grun
   const res = await callRoute('GET', '/google/calendars');
   assert.equal(res.status, 409);
   assert.equal((await res.json()).reason, 'google_reauth_required');
+});
+
+// Sicherheitsprüfung zu #2029: geteilt wird nur ein Refresh mit DEMSELBEN Token.
+async function parallelRefresh(tokens) {
+  let open;
+  const gate = new Promise((r) => { open = r; });
+  return withRefresh(async (token) => {
+    await gate;
+    return { tokens: { access_token: `access-for-${token}`, expiry_date: Date.UTC(2099, 0, 1) }, res: {} };
+  }, async (calls) => {
+    const clients = tokens.map((token) => {
+      db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('google_refresh_token', ?)").run(token);
+      return __test.loadAuthorizedClient();
+    });
+    const pending = clients.map((c) => c.getAccessToken());
+    await new Promise((r) => setImmediate(r));
+    open();
+    const results = await Promise.all(pending);
+    return { requests: calls.n, access: results.map((r) => r.token) };
+  });
+}
+
+test('#2019: zwei Clients mit verschiedenen Tokens refreshen getrennt und bekommen je ihr Ergebnis', async () => {
+  reset();
+  const { requests, access } = await parallelRefresh(['r-old', 'r-other-account']);
+  assert.equal(requests, 2, 'kein geteilter Refresh über Tokengrenzen');
+  assert.deepEqual(access, ['access-for-r-old', 'access-for-r-other-account']);
+});
+
+test('#2019: zwei Clients mit demselben Token teilen sich einen Refresh', async () => {
+  reset();
+  const { requests, access } = await parallelRefresh(['r-same', 'r-same']);
+  assert.equal(requests, 1);
+  assert.deepEqual(access, ['access-for-r-same', 'access-for-r-same']);
 });
 
 // Codex-Runde 2 auf #2029.
