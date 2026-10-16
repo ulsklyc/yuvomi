@@ -2024,6 +2024,15 @@ Kontextselektor der Karte, nie in der Basisregel (Muster
 zentrierter Sekundaertext, kein Rahmen, kein Well - sonst muesste jeder Leerzustand seinen
 Traeger kennen.
 
+**Der Ladefehler nennt die Ursache (R19, 2026-10-16).** `mountLoadError()` (bzw.
+`loadErrorHTML()` fuer Templates) nimmt seinen Satz aus dem Fehler (`loadErrorSentence`:
+Bremse, Serverfehler, offline, keine Verbindung) - die Beschreibung des Aufrufers ist nur der
+Rueckfall. Der Statuscode steht zugeklappt unter "Technische Details", nie als sichtbarer Chip.
+Zeigt die Flaeche den Fehler, gibt es keinen Toast daneben. Die Sitzungspruefung beim Start
+hat denselben Zustand als Shell-Fassung (`utils/session-unreachable.js`, im Lichtfeld des
+Ladebilds): nur ein 401 fuehrt zur Anmeldung, alles andere versucht mit wachsendem Abstand
+und nach `Retry-After` selbst erneut.
+
 **Die Fusszeilen-Regel (v2.6.0). Ueberschuessige Hoehe wird Atem, nicht Loch.** Eine Karte
 mit Fusszeile streckt ihren Koerper (`flex: 1`) und verankert die Fusszeile unten
 (`margin-block-start: auto`), damit der Ueberschuss ZWISCHEN Inhalt und Abschluss faellt
@@ -2216,7 +2225,13 @@ nur das gerenderte Dokument sieht, ob eine Liste ueberhaupt verdrahtet ist.
   Betrag 42px/16/500, kein Stern), der Schichtplan schreibt die Kanon-Klassen. Wochentage sind
   `.filter-chip` mit `aria-pressed`, ein Boolean im Dialog ist `.toggle` (Termin der Entsorgung).
   Die uebrigen Dateien mit `.input`/`.label` fuehrt `ALIAS_PENDING` in `test:frontend-audit`.
-- **Hinweiszeile:** `.form-hint` (14px, Sekundaertext, Tonlagen `--success`/`--danger`) steht
+- **Alle Feldfehler auf einmal (R19):** ein Speicherpfad meldet mit `reportFieldErrors()`
+  (components/modal.js) JEDEN Fehler an seinem Feld und fokussiert das erste in
+  Dokumentreihenfolge - nie einen Fehler je Klick in der Reihenfolge der Pruefung.
+- **Nachfragen ohne Sperre (R19):** `.form-hint--warning` (Tinte `--color-warning-ink`) fuer
+  ungewoehnliche, aber speicherbare Werte (Vitalwerte: 650 kg). Unmoegliches ist ein
+  Feldfehler, nicht diese Zeile.
+- **Hinweiszeile:** `.form-hint` (14px, Sekundaertext, Tonlagen `--success`/`--danger`/`--warning`) steht
   in layout.css, weil fast jedes Modul sie benutzt - bis 2026-09-24 lebte sie in settings.css
   und renderte ueberall sonst als 16px-Koerpertext. Eine geteilte Klasse gehoert in ein Blatt,
   das index.html verlinkt; eine Kopie oder Ersatzklasse im Seiten-Blatt ist der Fehler, nicht
