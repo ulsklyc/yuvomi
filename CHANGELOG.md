@@ -20,6 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without changing other calendar subscriptions. A personal "Include birthdays" switch on the
   existing calendar feed is on by default; turn it off when using both feeds to avoid duplicates.
 
+- **Stock: every batch now belongs to a household product** (part 1 of #1448). Nothing changes on
+  the page yet. Batches with the same name, compared trimmed, case-insensitive and with collapsed
+  whitespace, and the same unit share one product; existing stock is grouped once on update. The
+  product is the groundwork for a minimum over all batches, recipe matches that survive the last
+  bottle, and a grouped stock page. For API clients, pantry items additionally return
+  `product_id`; a batch whose name or unit is edited moves to the matching product.
+
 ### Fixed
 
 - **Google Calendar: a connection Google no longer accepts asks to reconnect** (#2019). When

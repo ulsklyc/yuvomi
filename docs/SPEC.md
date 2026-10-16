@@ -975,9 +975,10 @@ and translated for the seeded names only, so a household that renames one keeps 
 | icon | TEXT | NOT NULL (default 'package') |
 | sort_order | INTEGER | NOT NULL (default 0) |
 
-### Pantry Items (migration v108, v109)
+### Pantry Items (migration v108, v109, v250)
 What is actually in the house. One row is one batch: two packs of milk with different best-before
-dates are two rows, which keeps the model flat instead of nesting batches under a product.
+dates are two rows. Since v250 (#1448) every batch belongs to a household product (Pantry Products
+below); the pages and the API still read the batch.
 
 | Column | Type | Constraint |
 |--------|------|-----------|
@@ -990,6 +991,7 @@ dates are two rows, which keeps the model flat instead of nesting batches under 
 | min_quantity | REAL | nullable; at or below this amount the item counts as running low |
 | notes | TEXT | |
 | created_by | INTEGER | FK → Users (**SET NULL**, nullable since v109) — the pantry is household property, not private property, so removing a member must not delete the household's stock (v1.55.0) |
+| product_id | INTEGER | FK → Pantry Products (**CASCADE**), nullable (v250) - set in the same transaction by every write of name, unit or category (`assignPantryProduct()` in `server/services/pantry-products.js`); a changed name or unit moves the batch to the matching product. Deleting a product deletes its batches; nothing deletes a product yet |
 
 Expiry and stock status are derived in the client, not stored: "expired" depends on the user's local
 calendar day, and the server reasons in UTC. The threshold for "expiring soon" is seven days.
@@ -1021,6 +1023,29 @@ clamp, so an upgrade cannot fire every soon-expiring item at once on the first m
 
 `pantry_item` reminders are **derived, not entered**: `POST`, `PUT` and both `DELETE` paths reject
 them with 400 (see the Reminders section), because the run would recreate them within a minute.
+
+### Pantry Products (migration v250, #1448)
+A household product above the batches. Identity is the household's own wording, not a guess
+(DECISIONS.md, section 7): a batch whose name and unit match a product joins it, a new name or unit
+creates one. A product outlives its last batch. The minimum, the target and the preferred shop move
+here in later steps of #1448.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| name | TEXT | NOT NULL - set when the product is created; a batch write does not rename it (renaming one batch moves it to another product, a case or whitespace change keeps it) |
+| name_key | TEXT | nullable - the name trimmed, whitespace collapsed, lower-cased in JS (`ingredientMatchKey()`; SQLite's `lower()` folds ASCII only). NULL for a name with nothing left: such a batch gets a product of its own |
+| unit | TEXT | NOT NULL - compared as stored; "Rice, kg" and "Rice, g" are two products |
+| category | TEXT | NOT NULL (default 'Sonstiges') - the category a new batch brought or an edit last changed (an edit that leaves the category as it was does not touch it); until a product can be edited on its own, the batch dialog is the only place to change it |
+| created_by | INTEGER | FK → Users (SET NULL) |
+| | | UNIQUE (name_key, unit) |
+
+Migration 250 grouped the existing batches with a frozen copy of the key and of the grouping, kept
+inside the migration entry; name and category came from the most recently updated batch of each
+group. Batches that arrive without a product, or whose name or unit no longer match their product
+(written or renamed by an older version under `DB_ALLOW_NEWER_SCHEMA`), are grouped at start by the
+live function, `groupBatchesIntoProducts()`, with the key the writers use; a product left without
+batches stays. This runs only when the build knows every applied migration, never as the older
+version on a newer database.
 
 ### Calendar Events
 | Column | Type | Constraint |

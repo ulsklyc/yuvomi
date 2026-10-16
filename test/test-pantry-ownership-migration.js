@@ -49,6 +49,8 @@ test('der Rebuild hat Indizes und Trigger wieder angelegt', () => {
     'idx_pantry_items_expires',
     'idx_pantry_items_location',
     'idx_pantry_items_name',
+    // Migration 250 (#1448): the batch's product, not part of the rebuild.
+    'idx_pantry_items_product',
   ]);
 
   const triggers = db.prepare(`

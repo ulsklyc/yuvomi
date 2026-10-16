@@ -3,7 +3,14 @@ import { op, jsonBody, idParam } from '../helpers.js';
 export function pantryPaths() {
   return {
     '/api/v1/pantry': {
-      get: op({ summary: 'List pantry items with storage locations and categories', tag: 'Pantry' }),
+      get: op({
+        summary: 'List pantry items with storage locations and categories',
+        description: 'Each pantry item is one batch (a quantity with its own location and best-before date). `product_id` names the household product the batch belongs to: '
+          + 'batches with the same name, compared trimmed, case-insensitive and with collapsed whitespace, and the same unit share one product. '
+          + 'The server sets it on every write that changes the name, unit or category, and moves the batch to another product when the name or unit no longer matches; '
+          + 'a `product_id` in a request body is ignored. Every pantry item response carries it.',
+        tag: 'Pantry',
+      }),
       post: op({ summary: 'Create pantry item', tag: 'Pantry', stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/pantry/locations': {

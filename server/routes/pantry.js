@@ -11,6 +11,9 @@
  * nicht Privatbesitz wie ein Rezept. Wer die Milch aus dem Kühlschrank nimmt,
  * muss sie auch ausbuchen dürfen, egal wer sie eingetragen hat. `created_by`
  * bleibt als Herkunftsnachweis erhalten.
+ *
+ * Every write of a batch's name, unit or category puts the batch into its
+ * household product in the same transaction (assignPantryProduct, #1448).
  */
 
 import express from 'express';
@@ -19,6 +22,7 @@ import { createLogger } from '../logger.js';
 import { str, oneOf, num, date, id as idParam, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../middleware/validate.js';
 import { normalizePantryUnit, normalizePantryQuantity } from '../../public/utils/pantry-units.js';
 import { syncPantryExpiryReminder, resolvePantryAccess } from '../services/pantry-reminders.js';
+import { assignPantryProduct } from '../services/pantry-products.js';
 import { todayKey as householdToday } from '../utils/timezone.js';
 import { mayReadModule } from '../permissions.js';
 
@@ -400,6 +404,7 @@ router.post('/import-shopping', (req, res) => {
           merged += 1;
         } else {
           const inserted = insert.run(source.name, quantity, unit, locationId, category, expiresOn, userId);
+          assignPantryProduct(db.get(), inserted.lastInsertRowid, { userId });
           syncReminder(getItem(inserted.lastInsertRowid), access, today);
           added += 1;
         }
@@ -454,6 +459,7 @@ router.post('/', (req, res) => {
         values.category, values.expires_on, values.min_quantity, values.notes,
         req.authUserId || req.session.userId
       );
+      assignPantryProduct(db.get(), result.lastInsertRowid, { userId: req.authUserId || req.session.userId });
       const item = getItem(result.lastInsertRowid);
       syncReminder(item);
       return item;
@@ -492,6 +498,14 @@ router.put('/:itemId', (req, res) => {
         values.name, values.quantity, values.unit, values.location_id,
         values.category, values.expires_on, values.min_quantity, values.notes, item.id
       );
+      // A changed name or unit moves the batch to the matching product (#1448).
+      // The category reaches the product only when this edit changed it: the
+      // form sends every field, and an expiry edit must not push the batch's
+      // old category over one set later through another batch.
+      assignPantryProduct(db.get(), item.id, {
+        userId: req.authUserId || req.session.userId,
+        syncCategory: values.category !== item.category,
+      });
       const fresh = getItem(item.id);
       syncReminder(fresh);
       return fresh;
@@ -530,6 +544,16 @@ router.patch('/:itemId', (req, res) => {
       db.get().prepare(`
         UPDATE pantry_items SET ${fields.map((f) => `${f} = ?`).join(', ')} WHERE id = ?
       `).run(...fields.map((f) => values[f]), item.id);
+
+      // The stepper writes only the quantity and leaves the product alone. A
+      // name or unit moves the batch to the matching product, a category is
+      // the product's too (#1448).
+      if (fields.some((f) => f === 'name' || f === 'unit' || f === 'category')) {
+        assignPantryProduct(db.get(), item.id, {
+          userId: req.authUserId || req.session.userId,
+          syncCategory: fields.includes('category') && values.category !== item.category,
+        });
+      }
 
       // Auch der ±-Stepper landet hier: wer den letzten Joghurt ausbucht, soll
       // nicht in fünf Tagen an sein Ablaufdatum erinnert werden.

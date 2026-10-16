@@ -40,6 +40,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { computeLoanSchedule } from '../server/services/loan-amortization.js';
 import { buildDemoPdf } from './seed-demo-pdf.js';
+import { assignPantryProduct } from '../server/services/pantry-products.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -173,8 +174,9 @@ const WIPE = [
   // Nur der Bestand, NICHT pantry_locations: die Lagerorte sind Referenzdaten
   // aus der Migration (wie shopping_categories, das hier ebenfalls fehlt).
   // Sie zu leeren ließ den Haushalt ohne einen einzigen Lagerort zurück -
-  // niemand legt sie danach wieder an.
-  'pantry_items',
+  // niemand legt sie danach wieder an. Die Produkte (#1448) sind Bestand wie
+  // die Chargen und gehen mit.
+  'pantry_items', 'pantry_products',
   // inventory_item_documents haengt per CASCADE an inventory_items, steht aber
   // bewusst zuerst: foreign_keys ist hier aus, CASCADE greift also nicht.
   // inventory_categories fehlt aus demselben Grund wie pantry_locations und
@@ -702,9 +704,12 @@ const insertPantry = db.prepare(`
   [L('Potatoes',         'Kartoffeln'),           4,   'kg',     LOC.cellar,  CAT.produce,   40,   2,    null],
   [L('Kitchen roll',     'Küchenrolle'),          2,   'pkg',    LOC.other,   CAT.household, null, 2,    null],
   [L('Washing powder',   'Waschmittel'),          1,   'pkg',    LOC.other,   CAT.household, null, 1,    null],
-].forEach(([name, qty, unit, loc, cat, expiresInDays, min, note]) =>
-  insertPantry.run(name, qty, unit, locId[loc] ?? null, cat,
-    expiresInDays === null ? null : daysFromNow(expiresInDays), min, note, alexId));
+].forEach(([name, qty, unit, loc, cat, expiresInDays, min, note]) => {
+  const { lastInsertRowid } = insertPantry.run(name, qty, unit, locId[loc] ?? null, cat,
+    expiresInDays === null ? null : daysFromNow(expiresInDays), min, note, alexId);
+  // Jede Charge gehoert einem Produkt, wie auf jedem Schreibweg der App.
+  assignPantryProduct(db, lastInsertRowid, { userId: alexId });
+});
 
 // ── Contacts ─────────────────────────────────────────────────────────────────
 
