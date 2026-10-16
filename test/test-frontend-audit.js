@@ -21718,3 +21718,23 @@ test('D3: die Unternavigation der Module ist Text, keine Icon-Reiter', () => {
     assert.doesNotMatch(src, /sub-tab__icon/, `${page}: Reiter tragen nur ihr Wort`);
   }
 });
+
+// D5 (Critique 2026-10-16): Quick-Add im Einkauf ist die benannte Ausnahme vom
+// FAB - und seine Felder tragen die Kapsel-Haut der Suche statt Kante auf
+// Feldgrund. EINE Regel fuer beide, keine zweite Fassung in shopping.css.
+test('D5: die Schnellzeile des Einkaufs traegt die Kapsel+Fill-Haut der Suche', () => {
+  const search = [...eachRule(read('../public/styles/page-search.css'))].filter((r) => !r.at.length);
+  const skin = search.find((r) => r.selector.split(',').map((x) => x.trim()).includes('.page-search__input')
+    && /border-radius:\s*var\(--radius-full\)/.test(r.body));
+  assert.ok(skin && /background-color:\s*var\(--color-fill-field\)/.test(skin.body), 'Vorbedingung: die Suchhaut steht in page-search.css');
+  const sel = skin.selector.split(',').map((x) => x.trim());
+  for (const cls of ['.quick-add__input', '.quick-add__qty', '.quick-add__cat']) {
+    assert.ok(sel.includes(cls), `${cls} teilt die Haut der Suche`);
+    const focus = search.find((r) => r.selector.split(',').map((x) => x.trim()).includes(`${cls}:focus`));
+    assert.ok(focus, `${cls}: der Fokus kommt mit der Haut`);
+  }
+  const shopping = [...eachRule(read('../public/styles/shopping.css'))];
+  for (const r of shopping.filter((x) => /\.quick-add__(?:input|qty|cat)\b/.test(x.selector))) {
+    assert.doesNotMatch(r.body, /(?:^|[;\s{])(?:border(?:-radius)?|background-color)\s*:/, `${r.selector}: keine eigene Kante/Ecke/Flaeche mehr`);
+  }
+});

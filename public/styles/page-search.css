@@ -42,27 +42,47 @@
  * einfaerben koennen, ohne dass das Feld springt.
  * Die globale Suche (`.search-overlay__input`, router.js) teilt diese Regel,
  * statt eine sechste Handschrift zu fuehren; sie hat keine Lupe, nur ihr
- * Innenabstand weicht ab (layout.css). */
+ * Innenabstand weicht ab (layout.css).
+ *
+ * DIE SCHNELLZEILE DES EINKAUFS TRAEGT DIESELBE HAUT (Critique 2026-10-16,
+ * D5). Quick-Add ist die benannte Ausnahme vom FAB als Anlege-Weg - und
+ * stand als einziges Feld im Modulkopf in der Formular-Haut (Kante, 10px-Ecke,
+ * Feldgrund) direkt unter der Kapsel der Suche. Ein Feld, das man tippt und
+ * mit Enter abschickt, ist ein Bedienelement wie die Suche, kein Formular.
+ * `background-color` statt der Kurzform: die Kategorie-Auswahl malt ihren
+ * Chevron als Hintergrundbild (shopping.css), und die Kurzform hier setzte es
+ * je nach Ladereihenfolge zurueck. */
 .page-search__input,
-.search-overlay__input {
+.search-overlay__input,
+.quick-add__input,
+.quick-add__qty,
+.quick-add__cat {
   border: 1.5px solid transparent;
   border-radius: var(--radius-full);
-  background: var(--color-fill-field);
+  background-color: var(--color-fill-field);
   color: var(--color-text-primary);
 }
 
 .page-search__input::placeholder,
-.search-overlay__input::placeholder {
+.search-overlay__input::placeholder,
+.quick-add__input::placeholder,
+.quick-add__qty::placeholder {
   color: var(--color-text-secondary);
 }
 
 .page-search__input:hover,
-.search-overlay__input:hover {
+.search-overlay__input:hover,
+.quick-add__input:hover,
+.quick-add__qty:hover,
+.quick-add__cat:hover {
   border-color: var(--color-border-control);
 }
 
 .page-search__input:focus,
-.search-overlay__input:focus {
+.search-overlay__input:focus,
+.quick-add__input:focus,
+.quick-add__qty:focus,
+.quick-add__cat:focus {
   outline: none;
   border-color: var(--color-accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) var(--tint-shadow), transparent);
@@ -70,7 +90,10 @@
 
 @media (prefers-contrast: more) {
   .page-search__input,
-  .search-overlay__input {
+  .search-overlay__input,
+  .quick-add__input,
+  .quick-add__qty,
+  .quick-add__cat {
     border-color: var(--color-border-control);
   }
 }
