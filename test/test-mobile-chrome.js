@@ -533,3 +533,18 @@ test('D8: die Titelzeile hat eine feste Mindesthoehe, die Einstellungen tragen a
   assert.match(read('../public/settings/pages/personal-account.js'), /<h2 class="settings-section__title sr-only">\$\{t\('settings\.sectionAccount'\)\}/,
     '"Mein Konto" bleibt in der Gliederung, aber unsichtbar');
 });
+
+// Critique R19: auf /settings/personal/notifications stand "Mehr" nach einem
+// Kaltstart ohne Aktivzustand - der Router markierte das Ziel erst nach dem
+// Rendern der Seite (gemessen 3,3 s), und ein Neuaufbau der Leiste reichte
+// den rohen Pfad herein, zu dem es kein Ziel gibt. Ein Text-Guard; der Lauf im
+// Browser steht im Handoff der Runde (vorher false, nachher aria-current=page).
+test('"Mehr" ist auf einem Einstellungsblatt sofort aktiv, auch nach dem Kaltstart (Critique R19)', () => {
+  const router = read('../public/router.js');
+  const nav = router.slice(router.indexOf('function updateNav('), router.indexOf('const kitchenDestination = currentKitchenDestination();', router.indexOf('function updateNav(')));
+  assert.match(nav, /const path = topLevelSection\(rawPath\);/, 'updateNav kuerzt den Pfad nicht auf seine Sektion');
+  const render = router.slice(router.indexOf('async function renderPage('));
+  const shell = render.slice(0, render.indexOf('checkForUpdate();'));
+  assert.match(shell, /renderAppShell\(app\);[\s\S]*updateNav\(routerState\.currentPath\);/,
+    'beim Kaltstart wird das Ziel erst nach dem Rendern der Seite markiert');
+});

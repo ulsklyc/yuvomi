@@ -116,6 +116,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "What's new", and the matching screen reader note, appeared for every family member although only
   whoever runs the server can update. Other members still find the change log as before.
 
+- **"More" shows where you are when the app opens on a settings page.** Opening Yuvomi directly on
+  a settings page such as Notifications left the "More" tab unmarked until the slowest section had
+  loaded; it is now marked as soon as the navigation appears.
+
 - **Calendar: "Manage calendars" is reachable on tablets and phones again.** Below 1024px the
   button was hidden along with the empty header slot, so calendars could not be created, recolored
   or reordered there. The calendar filter now lists "Manage calendars" under its calendars, at

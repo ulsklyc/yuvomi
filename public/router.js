@@ -1555,6 +1555,12 @@ async function renderPage(route, previousPath = null, scrollTarget = 0) {
     else if (!document.querySelector('.nav-bottom') && routerState.currentUser) {
       renderAppShell(app);
       _navBuiltForUserId = routerState.currentUser.id;
+      // Das Ziel ist schon beim Kaltstart markiert, nicht erst nach dem Rendern
+      // der Seite (Critique R19): auf /settings/personal/notifications stand
+      // "Mehr" sonst ohne Aktivzustand, bis der langsamste Abschnitt fertig
+      // war (gemessen 3,3 s). Bei einem Wechsel macht navigate() das schon vor
+      // renderPage - beim Kaltstart gab es da noch keine Leiste.
+      updateNav(routerState.currentPath);
       // Nebenläufig und still: der Hinweis darf das erste Rendern nicht aufhalten.
       checkForUpdate();
       /* Und die Zahlen an den Nav-Zielen (#868).
@@ -4451,7 +4457,14 @@ function setMoreButtonState(moreBtn, activeSecondary) {
   replaceNavIcon(moreBtn, '.nav-item__icon', 'more-horizontal');
 }
 
-function updateNav(path) {
+function updateNav(rawPath) {
+  // EINE SEKTION JE ZIEL, an jedem Aufruf (Critique R19). Die Navigation
+  // reicht `topLevelSection()` schon herein, der Neuaufbau der Leiste
+  // (rebuildNavigation, nach Sprache, Modulen oder dem Nachladen der
+  // Erweiterungen beim Kaltstart) aber den rohen Pfad: auf
+  // /settings/personal/notifications fand "Mehr" dann kein Ziel und stand
+  // ohne Aktivzustand da. Idempotent - ein schon gekuerzter Pfad bleibt.
+  const path = topLevelSection(rawPath);
   const kitchenDestination = currentKitchenDestination();
   document.querySelectorAll('[data-route]').forEach((el) => {
     if (el.dataset.navId === 'kitchen' && kitchenDestination) {
