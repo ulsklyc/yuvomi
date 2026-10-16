@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   them, and no longer waits for the date picker, category, icon picker, attachment, screensaver and
   sign-in styles before the first frame; each of those loads its styles when it is first shown. On
   a throttled phone (4x CPU, fast 4G) the overview's content arrived after 4.8 s instead of 5.6 s.
+- **Less to download on every start.** The server leaves the explanatory comments in Yuvomi's own
+  scripts and stylesheets out of what it sends; the files on disk keep them, and line numbers in
+  error reports still match the source. Compressed, the app's scripts shrink from 2.0 to 0.9 MB
+  and its stylesheets from 621 to 129 KB.
 - **One set of controls in every module header.** Search, view, filter and more sit in the same order
   and look the same everywhere, and every view picker is the same segmented control. The calendar
   header on a desktop is one row with a real search field (two rows instead of three on a tablet);
