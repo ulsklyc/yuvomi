@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   offers **Reconnect**, syncing pauses until then, and pending changes stay queued. A new sign-in
   token that Google hands out during a refresh is now kept as well.
 
+- **A task's due time on the calendar follows your time format** (#2018). With a region that uses
+  the 12-hour clock, such as American English, tasks in the month, week, day and agenda views
+  still showed their due time as "14:30". They now show "2:30 PM", like events and the rest of
+  the app.
+
 - **The phone tab bar reads more calmly.** "More" no longer looks like the active tab after you
   switch pages, and the dimmed page behind the More sheet now fades out with the sheet instead of
   vanishing at once. In dark mode the active tab and the module tiles in the More sheet stand out
