@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Long names in lists get two lines everywhere.** Task, contact, birthday, budget, subscription,
+  agenda and shopping rows all show a name on up to two lines and end it with an ellipsis after
+  that. Some lists cut names after one line, others let them run on without limit.
 - **The week arrows in the meal plan look like the ones in Calendar and Budget.** They were tinted in
   the accent colour; now every period switcher has the same neutral arrows.
 - **Task history is a view like List and Kanban.** It sits as the third choice in the view switcher

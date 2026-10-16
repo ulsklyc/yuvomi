@@ -340,6 +340,37 @@
 }
 
 /* --------------------------------------------------------------------------
+ * DIE TITELREGEL DER LISTENZEILE: hoechstens ZWEI Zeilen, dann Ellipse
+ * (R19, Critique 2026-10-16, "Titel-Kuerzung: vier Regeln").
+ *
+ * Gemessen standen vier Antworten fuer dieselbe Stelle: Aufgaben, Kontakte,
+ * Geburtstage, Belohnungen und Agenda am Desktop EINZEILIG mit Ellipse,
+ * Einkauf/Vorrat/Rezepte/Budget (`.list-row__name`) UNBEGRENZT umbrechend,
+ * die Agenda mobil wieder unbegrenzt. Jede war fuer sich begruendet - der
+ * Artikelname im Laden darf nicht auf vier Zeichen schrumpfen, eine Liste
+ * braucht einen Takt -, und beide Begruendungen haben dieselbe Antwort: eine
+ * zweite Zeile, keine dritte. Was darueber liegt, steht vollstaendig im
+ * Detail, das ein Tipp auf die Zeile oeffnet.
+ *
+ * Wo der Titel Zeichen neben dem Text traegt (Agenda: Glyphen vor dem Titel),
+ * kappt die Regel das Text-Element, nicht den Behaelter. Die Trennung im Wort
+ * (`hyphens: auto`, list-row.css) bleibt. Guard: test-typography.js.
+ * ------------------------------------------------------------------------ */
+.list-row__name,
+.task-card__title,
+.contact-item__name,
+.subscription-card__name,
+.rw-standing__name,
+.agenda-event__title > span {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  white-space: normal;
+}
+
+/* --------------------------------------------------------------------------
  * Generische Rollen für neuen Code (Markup trägt u-* direkt)
  * ------------------------------------------------------------------------ */
 .u-body {

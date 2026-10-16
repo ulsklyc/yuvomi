@@ -727,8 +727,9 @@
    * kostete hier 4px je Zeile ohne eine zweite Zeile, die ihn braucht.
    * Ist ein <button>: der Titel öffnet die Aufgabe und muss fokussierbar sein.
    * Die Reset-Regeln (font/border/background) kommen aus reset.css, hier nur
-   * die Block-Geometrie, damit der Button wie der frühere Div fließt. */
-  display: block;
+   * die Block-Geometrie, damit der Button wie der frühere Div fließt; die
+   * Anzeige (`-webkit-box`, hoechstens zwei Zeilen) setzt die Titelregel in
+   * typography.css. */
   position: relative;
   width: 100%;
   padding-inline: 0;
@@ -746,21 +747,11 @@
   margin-block-start: calc(-1 * var(--list-row-pad, var(--space-3)));
   margin-block-end: 0;
   cursor: pointer;
-  /* EINZEILIG MIT ELLIPSE, und das ist die Ausnahme von der Regel nebenan
-   * (list-row.css: „UMBRECHEN, NICHT ABSCHNEITEN"). Die Regel gilt dem
-   * ARTIKELNAMEN im Laden: dort ist der Name der einzige Zweck der Zeile und
-   * nirgends sonst zu haben. Ein Aufgabentitel steht vollstaendig in der
-   * Detailflaeche, die ein Tipp auf genau diesen Knopf oeffnet.
-   *
-   * Gemessen bei 390x844: von zwoelf Zeilen brachen zwei zweizeilig um
-   * („Tropfenden Wasserhahn reparieren", „Geburtstagsgeschenk fuer Mama") und
-   * standen mit 80,6px gegen 61,1px der uebrigen zehn - eine Streuung von
-   * 19,5px in einer Liste, die einen Takt haben soll. Die 228px Titelspalte
-   * fassen rund 28 Zeichen; was darueber liegt, endet jetzt in einer Ellipse
-   * statt in einer zweiten Zeile. */
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* HOECHSTENS ZWEI ZEILEN (R19): die Titelregel aller Listenzeilen steht in
+   * typography.css. Hier stand eine eigene Fassung - einzeilig mit Ellipse,
+   * weil zwei von zwoelf Titeln umbrachen und die Liste ihren Takt verlor.
+   * Die Critique vom 2026-10-16 fand vier solcher Fassungen fuer dieselbe
+   * Stelle; eine zweite Zeile ist der Preis der einen Regel. */
   text-decoration: line-through;
   text-decoration-color: transparent;
   transition:

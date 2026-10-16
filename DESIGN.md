@@ -968,9 +968,13 @@ Subheadline 15, Footnote 13, Caption 2 11.
   dieser Stelle vier Schnitte: 15/600 (Aufgaben), 16/400 (Buchung, Abo - ein
   `font: inherit` am Knopf hatte das Gewicht mitgenommen), 16/500 (vierzehn Module) und
   17/600 (Agenda, Kontakte, Geburtstage). Benannte Ausnahmen: die Dokumentzeile bleibt
-  Headline, weil Raster und Liste dasselbe Objekt in zwei Ansichten zeigen; der einzeilige
-  Aufgabentitel behaelt die enge Zeilenhoehe (kein Umbruch, also kein Body-Abstand).
+  Headline, weil Raster und Liste dasselbe Objekt in zwei Ansichten zeigen; der
+  Aufgabentitel behaelt die enge Zeilenhoehe.
   Guard: `test:typography`, "der Zeilentitel ist eine Rolle".
+  **Titelregel (R19): hoechstens ZWEI Zeilen, dann Ellipse** - fuer jeden Zeilentitel
+  (`.list-row__name`, Aufgabe, Kontakt, Abo, Buchung, Belohnungen, Agenda-Text) aus EINER
+  Regel in typography.css; vorher vier (einzeilig, unbegrenzt, mobil anders als Desktop).
+  Kein Modulblatt setzt dort `nowrap` oder eine andere Zeilenzahl (Guard `test:typography`).
 - **Body** (regular, 17px, lh 1.47 = Apples 17/25): Fliesstext, Listenzellen.
 - **Subheadline** (regular, 15px): Sekundaerzeilen.
 - **Footnote** (medium, 13px, lh 1.21): Metazeilen, Label ueber Feldern, das Versal-Datum

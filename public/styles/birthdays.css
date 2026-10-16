@@ -76,23 +76,13 @@
   background: color-mix(in srgb, var(--module-accent) var(--tint-surface), var(--color-surface));
 }
 
-/* DER NAME WIRD GEKAPPT, NICHT UMGEBROCHEN - und das ist die Antwort, die das
- * Personen-Vokabular der App schon gibt: `.contact-item__name` steht seit
- * jeher auf `nowrap` plus Ellipse. Ein umbrechender Name macht die Zeile
- * zweizeilig und nimmt der Liste ihren Takt; ein gekappter Personenname bleibt
- * erkennbar („Tante Claire Beck…"), anders als ein gekappter Artikelname im
- * Einkauf, wo `.list-row__name` aus genau diesem Grund umbricht.
- *
- * `unicode-bidi: plaintext` bleibt: ein arabischer Name in einer sonst
- * lateinischen Liste muss seine eigene Leserichtung behalten. */
+/* `unicode-bidi: plaintext`: ein arabischer Name in einer sonst lateinischen
+ * Liste muss seine eigene Leserichtung behalten. */
 .birthday-item__name {
   min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Hoechstens zwei Zeilen, dann Ellipse: die Titelregel (typography.css,
+   * R19) - hier stand eine eigene einzeilige Fassung. Die Torte steht als
+   * Zeichen im Textfluss hinter dem Namen. */
   unicode-bidi: plaintext;
 }
 
@@ -100,6 +90,8 @@
   width: 18px;
   height: 18px;
   flex-shrink: 0;
+  margin-inline-start: var(--space-1h);
+  vertical-align: text-bottom;
   color: var(--module-accent);
 }
 

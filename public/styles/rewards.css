@@ -209,11 +209,8 @@
  * schon in derselben Zeile und ist handlungsfaehig. */
 .rw-standing__idtext { min-width: 0; display: flex; flex-direction: column; }
 .rw-standing__name {
-  /* Schnitt aus der Rolle Zeilentitel (typography.css). */
+  /* Schnitt und Titelregel (hoechstens zwei Zeilen) aus typography.css. */
   color: var(--color-text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   transition: color var(--transition-fast);
 }
 .rw-standing__points { font-size: var(--text-sm); color: var(--color-text-secondary); }

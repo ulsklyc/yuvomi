@@ -6874,7 +6874,10 @@ test('polished rounded cards use subtle full borders instead of thick accent cap
 test('hardening keeps Birthday rows on one line with extreme localized content', () => {
   const birthdays = read('../public/styles/birthdays.css');
 
-  for (const part of ['__name', '__meta', '__notes']) {
+  // Der NAME folgt seit R19 der einen Titelregel (typography.css: hoechstens
+  // zwei Zeilen, dann Ellipse; Guard in test:typography) - die Metazeile und
+  // die Notiz bleiben einzeilig gekappt.
+  for (const part of ['__meta', '__notes']) {
     const body = cssRuleBody(birthdays, `.birthday-item${part}`);
     assert.ok(body, `.birthday-item${part} muss eine Regel haben`);
     assert.match(body, /overflow:\s*hidden/,
@@ -6887,8 +6890,7 @@ test('hardening keeps Birthday rows on one line with extreme localized content',
   for (const part of ['__name', '__meta', '__notes']) {
     assert.match(cssRuleBody(birthdays, `.birthday-item${part}`), /unicode-bidi:\s*plaintext/);
   }
-  // Der Name darf nicht umbrechen, sonst ist die Zeile wieder zweizeilig.
-  assert.match(cssRuleBody(birthdays, '.birthday-item__name'), /white-space:\s*nowrap/);
+  assert.doesNotMatch(cssRuleBody(birthdays, '.birthday-item__name'), /white-space:\s*nowrap/, 'keine eigene einzeilige Fassung mehr');
   // Und die Notiz haengt an der BREITE, nicht am Geraet.
   assert.match(birthdays, /@container birthdays-list \(min-width:[^)]+\)\s*\{\s*\.birthday-item__notes/,
     'die Notiz erscheint ueber einen Container-Query am Traeger, nicht ueber einen Viewport-Breakpoint');

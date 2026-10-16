@@ -2190,11 +2190,10 @@ button.budget-bar-row:focus-visible {
  *
  * ZWEI ECHTE ABWEICHUNGEN BLEIBEN, und beide haben einen Grund:
  *
- * 1. Der TITEL bricht nicht um. `.list-row__name` erlaubt das
- *    (`overflow-wrap: anywhere`), weil ein Artikelname im Einkauf vollständig
- *    lesbar sein muss. Eine Buchungsliste wird dagegen an ihrem rechten Rand
- *    gelesen - die Beträge müssen auf einer Rasterlinie stehen, und eine Zeile,
- *    die wegen ihres Titels zweizeilig wird, verschiebt den Takt.
+ * 1. (Bis R19 brach der TITEL hier nie um - eine eigene, vierte Titelregel.
+ *    Seit der Critique vom 2026-10-16 gilt auch hier die eine Titelregel aus
+ *    typography.css: hoechstens zwei Zeilen, dann Ellipse. Die Betraege
+ *    stehen in ihrer eigenen Spalte und bleiben auf ihrer Rasterlinie.)
  * 2. Der BETRAG steht rechts vom Text und links von der Bedienzone. Das ist
  *    eine dritte Spalte, die keine andere Zeile der App hat.
  *
@@ -2234,18 +2233,11 @@ button.budget-bar-row:focus-visible {
 .budget-entry--upcoming .budget-entry__indicator--income   { color: var(--color-success); }
 .budget-entry--upcoming .budget-entry__indicator--expenses { color: var(--color-text-tertiary); }
 
-/* Siehe Abweichung 1 über `.budget-entry`. */
-.budget-entry__title {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 /* Der Titel ist ein BUTTON (Tastatur-/SR-Zugang der Edit-Fläche; role=button
  * auf der Zeile war axe nested-interactive, siehe budget.js). Optisch bleibt
  * er die Textzeile - der Reset gilt nur dem Button-UA-Stylesheet. */
 button.budget-entry__title {
-  display: block;
+  /* Anzeige und Kappung (hoechstens zwei Zeilen) aus der Titelregel. */
   width: 100%;
   background: none;
   border: 0;

@@ -424,11 +424,16 @@
 /* Name und Beschreibung sind SPANs, keine Überschrift und kein Absatz: der
  * Zeilenkörper ist ein `<button>`, dessen Content-Model Phrasing Content ist -
  * dieselbe Angleichung, die `pantry.js` und `contacts.js` schon tragen. */
+/* Der NAME folgt der Titelregel (hoechstens zwei Zeilen, typography.css,
+ * R19); die Beschreibung daneben bleibt einzeilig und kuerzt sich zuerst. */
 .subscription-card__name,
 .subscription-card__desc {
-  display: block;
   margin: 0;
   min-width: 0;
+}
+
+.subscription-card__desc {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

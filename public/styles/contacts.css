@@ -293,12 +293,7 @@ html:has(.contacts-page.is-selecting) {
   flex-direction: column;
 }
 
-.contact-item__name {
-  display: block;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+/* Hoechstens zwei Zeilen, dann Ellipse: die Titelregel (typography.css, R19). */
 
 /* Meta: Telefon zuerst, darf nicht schrumpfen; E-Mail füllt den Rest und wird
  * bei Bedarf gekürzt — die Telefonnummer bleibt so immer vollständig sichtbar. */
