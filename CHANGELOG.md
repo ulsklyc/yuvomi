@@ -36,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Contacts show who they are.** Every contact in the list carries its initials instead of the
+  icon of its category, like in the Contacts app; household members keep their photo and colour.
 - **Numbers line up everywhere in the calendar.** Day numbers in the month, times and dates in the
   agenda and the period label use equal-width digits, so columns and the arrows next to the period
   no longer shift as you page through.

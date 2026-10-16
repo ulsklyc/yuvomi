@@ -274,6 +274,21 @@ html:has(.contacts-page.is-selecting) {
  * Hier stand bis 2026-08-18 `--cat: var(--c-accent)`, also der Modul-Ton -
  * dieselbe Scheibe für jedes Mitglied, während dieselben Menschen zwei Klicks
  * weiter ihre eigene trugen. */
+/* Kontakte ohne Konto: Initialen auf neutraler Flaeche (R19) - statt des
+ * Kategoriezeichens. Die Personenfarbe gehoert den Haushaltsmitgliedern
+ * (oben); ein ausgedachter Ton je Kontakt waere eine zweite Farbsprache. */
+.contact-item__icon--initials {
+  --seal-accent: var(--color-fill-well);
+  background-color: var(--color-fill-well);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.contact-card .contact-item__icon--initials {
+  font-size: var(--text-xl);
+}
+
 .contact-item__icon--member {
   overflow: hidden;
   font-size: var(--text-sm);

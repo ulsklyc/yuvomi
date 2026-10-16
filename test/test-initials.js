@@ -450,6 +450,17 @@ test('Kontakte: ein verknuepftes Haushaltsmitglied', async () => {
   assert.ok(SHOWS(latin, 'AS'), 'drei Woerter: das erste und das letzte, wie ueberall');
 });
 
+// R19 (Critique 2026-10-16): "Die Kontakte-Avatare zeigen die Kategorie statt
+// der Person." Ein Kontakt ohne Konto traegt jetzt seine Initialen.
+test('R19: Kontakte ohne Konto - die Scheibe zeigt die Person, nicht die Kategorie', async () => {
+  const { __test: contacts } = await import('../public/pages/contacts.js');
+  const html = contacts.renderContactItem({ id: 3, name: 'Anna Maria Schmidt', category: 'doctor' });
+  assert.ok(SHOWS(html, 'AS'), 'die Initialen der Person');
+  assert.match(html, /class="contact-item__icon contact-item__icon--initials" aria-hidden="true">AS</);
+  assert.doesNotMatch(html.slice(0, html.indexOf('contact-item__body')), /data-lucide|contact-cat-icon|<svg/, 'kein Kategoriezeichen in der Scheibe');
+  assertShows(contacts.renderContactItem({ id: 4, name: MINSU, category: 'family' }), '민수', 'Kontaktzeile ohne Konto');
+});
+
 test('Geburtstage: Zeile und Vorschau', async () => {
   const { __test: birthdays } = await import('../public/pages/birthdays.js');
   const row = {

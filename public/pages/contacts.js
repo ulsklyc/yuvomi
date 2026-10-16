@@ -98,8 +98,13 @@ function catTintStyle(key) {
 // Vollton-Scheibe; hat sie keinen (benutzerdefinierte Kategorie), bleibt die
 // Marke neutral. Beides steht in contacts.css an den Kategorie-Toenen.
 function contactAvatar(c) {
+  // DIE PERSON, NICHT IHRE KATEGORIE (R19, Critique 2026-10-16): hier stand
+  // das Kategoriezeichen, und eine Liste aus zwoelf Arzt- und Familien-Glyphen
+  // sagte, in welcher Schublade jemand liegt, nicht wer es ist. Wie in Apples
+  // Kontakten traegt jede Scheibe die Initialen, ruhig auf neutraler Flaeche;
+  // die Kategorie steht als Filter darueber und im Detail.
   if (!c.family_user_id) {
-    return `<span class="contact-item__icon vivid-mark">${categoryIcon(c.category, 'icon-lg')}</span>`;
+    return `<span class="contact-item__icon contact-item__icon--initials" aria-hidden="true">${esc(initials(c.name, '?'))}</span>`;
   }
   const color = c.family_avatar_color || AVATAR_FALLBACK_COLOR;
   const name  = c.family_display_name || c.name;
