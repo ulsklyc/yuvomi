@@ -5493,23 +5493,17 @@ p.field-hint--warn[hidden] {
     background-color: var(--color-surface-3);
   }
 
-  /* ── Aktiv: Hintergrund-Highlight + Akzent-Indikator ── */
+  /* ── Aktiv: Schrift in der Stimme, die FLAECHE traegt die Pille ──
+   *
+   * Hier standen eine statische Toenung und ein 3px-Akzentstreifen links. In
+   * der Liste schaltete `.nav-sidebar__items--liquid` beide ab, der gepinnte
+   * Eintrag (Einstellungen) liegt aber ausserhalb der Liste und trug sie
+   * weiter - als einzige Zeile der Leiste (Critique 2026-10-16). Seit er eine
+   * eigene Pille mitbringt (router.js, `nav-sidebar__indicator--pinned`),
+   * hat keine Zeile mehr Bedarf an Streifen oder Toenung. */
   .nav-sidebar .nav-item[aria-current="page"] {
     color: var(--color-accent);
     font-weight: var(--font-weight-semibold);
-    background-color: color-mix(in srgb, var(--color-accent) var(--tint-state), transparent);
-  }
-
-  /* Akzentstreifen links */
-  .nav-sidebar .nav-item[aria-current="page"]::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: var(--space-2);
-    bottom: var(--space-2);
-    width: 3px;
-    border-radius: 0 var(--radius-full) var(--radius-full) 0;
-    background: var(--color-accent);
   }
 
   /* DRUCK OHNE SCHRUMPFEN (Nav-Polish 2026-10-15). Hier stand `scale(0.97)`
@@ -9323,6 +9317,15 @@ textarea::placeholder {
   content: none;
 }
 
+/* EINE ZEILE MIT SICHTBAREM MEHR-KNOPF ZEIGT KEINEN WISCH-CHEVRON (R18, D6).
+ * Das ">" am Rand heisst auf dem Telefon "tippe fuer Detail" (Re-Critique
+ * 2026-09-28, A4 P2-5) - neben dem Mehr-Knopf waere es ein drittes Zeichen am
+ * Zeilenende fuer einen Weg, den der Knopf schon sichtbar traegt. Wischen
+ * bleibt Zusatzweg; der einmalige Nudge (`swipe-row--hint`) lehrt ihn. */
+.swipe-row:has(.row-action--more)::after {
+  content: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .swipe-row::after { display: none; }
 }
@@ -9761,11 +9764,6 @@ textarea.input { resize: vertical; }
   z-index: 1;
 }
 
-/* Kein linker Akzentbalken wenn Liquid-Indikator aktiv */
-.nav-sidebar__items--liquid .nav-item[aria-current="page"]::before {
-  display: none;
-}
-
 /* Kein statischer Hintergrund und kein Shadow-Highlight wenn Indikator aktiv */
 .nav-sidebar__items--liquid .nav-item[aria-current="page"] {
   background: transparent !important;
@@ -9777,6 +9775,22 @@ textarea.input { resize: vertical; }
 .nav-sidebar__items--liquid .nav-item:hover:not([aria-current="page"]) {
   background: transparent !important;
   box-shadow: none !important;
+}
+
+/* DIE PILLE DES GEPINNTEN EINTRAGS (Critique 2026-10-16). Dieselbe Klasse wie
+ * die Listenpille, also dasselbe Material (glass.css) und derselbe Uebergang;
+ * nur die Geometrie ist die der Zeile selbst - der Eintrag traegt den Einzug
+ * der Pille schon als Rand (Regel "Geometrie der Pille", oben). Hinter Zeichen
+ * und Wort per eigenem Stapelkontext; aufgerufen und hergeglitten von
+ * positionSidebarIndicator() (router.js). */
+.nav-sidebar > .nav-item--pinned-end {
+  isolation: isolate;
+}
+
+.nav-sidebar__indicator--pinned {
+  inset: 0;
+  height: auto;
+  z-index: -1;
 }
 
 /* ── Sidebar: Abschnittsbezeichnung (z.B. "Haushalt") ──

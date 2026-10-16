@@ -3881,6 +3881,17 @@ function sidebarNavItems() {
       // ":last-child a". Der Aufrufer erkennt sie und hängt den Eintrag
       // ausserhalb des Scrollers ein.
       el.classList.add('nav-item--pinned-end');
+      // DIESELBE PILLE AUCH HIER (Critique 2026-10-16, R18/D6). Der Eintrag
+      // liegt ausserhalb des Scrollers, die Pille der Liste erreicht ihn also
+      // nie - er trug deshalb noch den alten 3px-Streifen und eine statische
+      // Toenung. Jetzt bringt er eine eigene Pille mit (dieselbe Klasse, also
+      // dasselbe Material), und positionSidebarIndicator() laesst sie von der
+      // Stelle der Listenpille hergleiten.
+      const pill = document.createElement('span');
+      pill.className = 'nav-sidebar__indicator nav-sidebar__indicator--pinned';
+      pill.setAttribute('aria-hidden', 'true');
+      pill.style.opacity = '0';
+      el.prepend(pill);
       elements.push(el);
       return;
     }
@@ -4121,6 +4132,30 @@ function placeNavIndicator(indicator, apply) {
 }
 
 /**
+ * Laesst die Pille des gepinnten Eintrags von einer Bildschirmhoehe her an
+ * ihren Platz gleiten (FLIP): erst ohne Uebergang auf den Startpunkt, dann
+ * mit dem Uebergang der Pille (layout.css, reduced-motion schaltet ihn ab)
+ * zurueck auf null. `fromTop` null heisst: ohne Weg einblenden.
+ */
+function glidePillFrom(pill, fromTop) {
+  if (pill.style.opacity !== '0') return;
+  if (fromTop != null) {
+    pill.style.opacity = '';
+    startGlideAt(pill, fromTop - pill.getBoundingClientRect().top);
+  }
+  pill.style.transform = '';
+  pill.style.opacity = '';
+}
+
+/** Setzt eine Pille ohne Uebergang auf einen Startpunkt; der naechste Wert gleitet. */
+function startGlideAt(pill, y) {
+  pill.style.transition = 'none';
+  pill.style.transform = `translateY(${y}px)`;
+  pill.getBoundingClientRect();
+  pill.style.transition = '';
+}
+
+/**
  * Positioniert den morphenden Indikator in der Sidebar auf dem aktiven Nav-Item.
  */
 function positionSidebarIndicator() {
@@ -4128,10 +4163,28 @@ function positionSidebarIndicator() {
   const indicator = container?.querySelector('.nav-sidebar__indicator');
   if (!indicator) return;
   const active = container.querySelector('.nav-item[aria-current="page"]');
+  const pinnedPill = document.querySelector('.nav-sidebar > .nav-item--pinned-end > .nav-sidebar__indicator--pinned');
   if (!active) {
+    // Der gepinnte Eintrag (Einstellungen) ist aktiv: seine eigene Pille
+    // gleitet von dort her, wo die Listenpille gerade stand, und die
+    // Listenpille tritt ab. Ohne sichtbare Vorgaengerin erscheint sie still.
+    if (pinnedPill?.parentElement?.getAttribute('aria-current') === 'page') {
+      const from = indicator.style.opacity !== '0' && indicator.getClientRects().length
+        ? indicator.getBoundingClientRect().top : null;
+      glidePillFrom(pinnedPill, from);
+    }
     indicator.style.opacity = '0';
     return;
   }
+  // Zurueck in die Liste: die Listenpille startet an der Stelle der
+  // gepinnten (unterhalb der Liste, vom Scroller beschnitten) und gleitet
+  // herauf - dieselbe Bewegung in die Gegenrichtung.
+  // Nur ein schon platzierter Indikator gleitet - die erste Platzierung
+  // springt weiter (placeNavIndicator).
+  if (pinnedPill && pinnedPill.style.opacity !== '0' && indicator.dataset.placed === '1') {
+    startGlideAt(indicator, pinnedPill.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop);
+  }
+  if (pinnedPill) pinnedPill.style.opacity = '0';
   // Aktives Item in den Sichtbereich holen (Audit F-01): bei überlaufender
   // Liste lagen Item UND Pille sonst unsichtbar unterhalb der Falte — die
   // Navigation verlor ihren „Du bist hier"-Anker. Manuelles Scrollen statt

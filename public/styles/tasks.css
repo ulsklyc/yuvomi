@@ -87,17 +87,10 @@
   --scrollport-pad: var(--space-6);
 }
 
-/* DIE LISTENBAHN FUEHRT KEINE INLINE-AKTIONEN - dasselbe Reminders-Muster wie
- * unter 640px (Regel weiter unten). In der 420-520px-Bahn quetschten die drei
- * 44px-Knoepfe den Titel auf 116px (gemessen 1440x900, „Kinderzimmer…");
- * Bearbeiten, Ablegen und Teilaufgabe stehen im Detail direkt daneben, und
- * der Stift waere dort ein zweiter Weg zu demselben Formular. Ausgeblendet
- * per `display: none`, nicht per Deckkraft (ignore.md: Aktionen werden
- * weniger, nicht unsichtbar-klickbar). An der Klasse der Hoehenkette statt an
- * einer zweiten Container-Abfrage: EINE Schwelle, die in layout.css steht. */
-.tasks-page--split .task-card__inline-action {
-  display: none;
-}
+/* DIE LISTENBAHN ZEIGT IHREN MEHR-KNOPF (R18, D6). Bis 2026-10-16 stand hier
+ * `display: none` - aus der Zeit, als drei 44px-Knoepfe den Titel in der
+ * 420-520px-Bahn auf 116px quetschten. Seit R18 ist es EIN Knopf, und "nur
+ * im Detail" ist genau der versteckte Weg, den D6 ausschliesst. */
 
 /* Platzhalter, solange eine Aufgabe fuer die Spalte laedt (tasks.js,
  * renderTaskPane) - erst nach 150ms, ein schneller Wechsel blinkt nicht. */
@@ -468,12 +461,12 @@
 /* Gasse für den Wisch-Chevron (.swipe-row::after, layout.css): 8px Abstand vom
  * Rand + 12px Glyph + 8px Luft. Der Einkauf reservierte sie an .shopping-item
  * schon immer, die Aufgaben nicht - dort lag der Chevron über dem Zeilenende.
- * Unauffällig unter 640px (Inline-Aktionen sind dort ausgeblendet), sichtbar
- * auf Touch-Tablets zwischen 641 und 1023px, wo Chevron UND Inline-Aktionen
- * gleichzeitig da sind. Ab 1024px blendet layout.css den Chevron aus, die
- * Reserve kostet dort nichts, weil (hover: none) am Zeigergerät nicht greift. */
+ * Seit R18 (D6) traegt eine Zeile mit Mehr-Knopf keinen Chevron mehr
+ * (layout.css), also auch keine Gasse: die gilt nur noch der Zeile ohne
+ * Knopf, die trotzdem wischt. Ab 1024px blendet layout.css den Chevron aus,
+ * die Reserve kostet dort nichts, weil (hover: none) am Zeigergerät nicht greift. */
 @media (hover: none) {
-  .task-card__main {
+  .swipe-row:not(.swipe-row--static) .task-card__main:not(:has(> .row-action--more)) {
     padding-inline-end: calc(var(--space-2) + var(--space-3) + var(--space-2));
   }
 }
@@ -953,13 +946,11 @@
     --list-row-pad: var(--space-2);
   }
 
-  /* HIG-Dichte (Reminders-Muster): auf Touch KEINE Inline-Action-Buttons -
-   * Tippen öffnet die Lese-Ansicht (mit allen Aktionen), Wischen erledigt/
-   * bearbeitet. Drei 44px-Buttons pro Zeile quetschten den Titel auf ~115px
-   * und brachen jede Aufgabe zweizeilig um. */
-  .task-card__inline-action {
-    display: none;
-  }
+  /* DER MEHR-KNOPF BLEIBT AUCH AUF DEM TELEFON (R18, D6). Hier stand bis
+   * 2026-10-16 `display: none` aus der Zeit der drei Inline-Knoepfe (Titel auf
+   * ~115px). Seit R18 ist es EIN Knopf; versteckt blieb nur Wischen und das
+   * Detail - und "nur per Geste" schliesst D6 aus. Die Breite holt die Zeile
+   * mit dem Rezept des Griffs zurueck: schmal, aber hoch (Raster unten). */
 }
 
 /* MOBIL GEHOERT DIE ZEILE DEM TITEL (R9 M1, Re-Critique 2026-09-27 A3 P1-1).
@@ -1057,6 +1048,43 @@
   .task-card__main > .list-row__drag {
     grid-column: 4;
     grid-row: 1 / span 2;
+  }
+
+  /* DER MEHR-KNOPF (R18, D6) bekommt dieselbe Endspalte ueber beide Zeilen
+   * wie der Griff - und dasselbe Mass: schmal, aber hoch (list-row.css,
+   * `.list-row__drag`). Ein 48er-Quadrat kostete den Titel 14px mehr; die
+   * Trefferflaeche bleibt ueber die volle Zeilenhoehe 34x58, also ueber dem
+   * Touch-Minimum. Steht ein Griff daneben, rueckt der eine Spalte weiter. */
+  .task-card__main:has(> .row-action--more) {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+  }
+
+  .task-card__main:has(> .row-action--more) .task-card__title,
+  .task-card__main:has(> .row-action--more):not(:has(> .avatar-stack)) .task-card__meta {
+    grid-column: 2 / 4;
+  }
+
+  .task-card__main > .row-action--more {
+    grid-column: 4;
+    grid-row: 1 / span 2;
+    width: auto;
+    min-width: 0;
+    height: auto;
+    align-self: stretch;
+    min-height: var(--target-md);
+    padding-inline: var(--space-2);
+    /* Gleiche Kante wie der Titel: das Polster der Zeile gehoert hier zur
+     * Trefferflaeche, der Knopf reicht bis an ihren Rand. */
+    margin-block: calc(-1 * var(--list-row-pad, var(--space-3)));
+    border-radius: var(--radius-md);
+  }
+
+  .swipe-row:not(:only-child) .task-card__main:has(> .row-action--more):has(> .list-row__drag) {
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  }
+
+  .task-card__main > .row-action--more ~ .list-row__drag {
+    grid-column: 5;
   }
 
   /* Ein Long-Press ist hier eine Frage nach der Person, kein Markieren und
