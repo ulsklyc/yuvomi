@@ -1565,15 +1565,24 @@ function taskChipAriaLabel(task) {
   return [
     t('calendar.taskChipAriaLabel', { title: task.title }),
     priority ? `${t('tasks.priorityLabel')}: ${t(priority)}` : '',
-    // Reine Wanduhrzeit: formatTime faengt sie vor jeder Zonenrechnung ab.
-    task.due_time ? formatTime(task.due_time.slice(0, 5)) : '',
+    taskTimeLabel(task),
   ].filter(Boolean).join(', ');
+}
+
+/**
+ * Die Faelligkeit einer Aufgabe im Zeitformat der Region (#2018): der Chip
+ * zeigte `due_time` roh und damit auch im 12-Stunden-Format „14:30". Reine
+ * Wanduhrzeit: formatTime faengt sie vor jeder Zonenrechnung ab.
+ */
+function taskTimeLabel(task) {
+  return task.due_time ? formatTime(String(task.due_time).slice(0, 5)) : '';
 }
 
 function renderTaskChip(task, { interactive = true, icon = true } = {}) {
   const priority = task.priority || 'none';
   const label    = esc(task.title);
-  const timeStr  = task.due_time ? ` · ${task.due_time.slice(0, 5)}` : '';
+  const time     = taskTimeLabel(task);
+  const timeStr  = time ? ` · ${time}` : '';
   const button   = interactive
     ? ` role="button" tabindex="0" aria-label="${esc(taskChipAriaLabel(task))}"`
     : '';

@@ -1126,7 +1126,7 @@ das Verhaeltnis haelt.
   Spalte, in der Namen nicht ganz stehen, ist keine Spalte; drei ruhige tragen dieselben
   fuenf Karten besser als vier gedraengte, und ab ~1700px kommt die vierte von selbst
   zurueck.
-- **Navigation:** mobil eine schwebende Glas-Tab-Bar-Kapsel (60px hoch plus 8px Luft und
+- **Navigation:** mobil eine schwebende Glas-Tab-Bar-Kapsel (64px hoch plus 8px Luft und
   safe-area; die Bar-Zone selbst ist transparent, das Glas traegt die Kapsel), die UEBER dem
   Inhalt liegt - der Scrollport reicht bis zur Unterkante (Kopfregel mobil). Ab 1024px
   Glas-Sidebar (56px kollabiert / 220px expandiert) mit gleitender Aktiv-Pille.
@@ -1155,12 +1155,16 @@ das Verhaeltnis haelt.
   Zettel (`sticky-note`) und im Widget-Kopf eine Stecknadel (`pin`), Haushaltshilfe ein Pinsel
   und auf der Kachel Funkeln (`sparkles`). Jetzt gibt es `MODULE_ICON`, und die Koepfe
   bekommen ihre WIDGET-ID statt eines Icon-Namens: die Abweichung ist nicht mehr schreibbar.
-- **Die Strichstaerke ist die Handschrift, nicht ein Zufall** (`--icon-stroke`, 1.35 gerenderte
+- **Die Strichstaerke ist die Handschrift, nicht ein Zufall** (`--icon-stroke`, 1.5 gerenderte
   px plus `vector-effect: non-scaling-stroke` auf Siegel- und Nav-Zeichen). Der eigene Satz
   zeichnet mit 1.6 auf viewBox 24, Lucide mit 2; bei 20px bzw. 16px ergab beides zufaellig
   1,333px - die Uebereinstimmung hing an den GROESSEN, nicht an einer Regel, und fiel, sobald
   ein eigenes Zeichen bei 16px stand. CSS schlaegt das `stroke-width`-Attribut, deshalb gilt
-  der Wert fuer beide Haende.
+  der Wert fuer beide Haende. **Der Wert ist die Mitte der Lucide-Spanne** (Entscheidung Ulas
+  2026-10-15, A/B-Probe): Lucide zeichnet bei 16-20px 1,33-1,67px, die Modulzeichen standen mit
+  1.35 als duennste Linie daneben (Mehr-Blatt: 1,35er Kacheln ueber 1,67er Icons; Kopf: Siegel
+  neben 2,0er Werkzeugen; auf 1x im Dunkel blass). 1.5 liegt in der Mitte; der Guard in
+  `test:frontend-audit` rechnet die Mitte aus `--icon-md`/`--icon-lg`, statt die Zahl festzunageln.
 - **Motion:** Dauern kanonisch 80-400ms (`--duration-2xs..2xl`), immer in ms. `--ease-out`
   cubic-bezier(0.16,1,0.3,1) fuer Einblendungen; Feder mit Overshoot `--ease-glass`
   cubic-bezier(0.34,1.56,0.64,1) fuer Glas-Elemente; die Sidebar-Pille bekommt die sanftere
@@ -1578,8 +1582,8 @@ sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der B
 | Speichern in den Einstellungen (R17, E8) | **Schalter und Auswahl wirken sofort; ein Formular (Konto, Passwort, CalDAV, SMTP ...) speichert per Knopf (und Enter), und der sitzt rechts im Kartenfuss** - als Letzter im Markup, Nebenaktionen (Testen, Entfernen) davor, wie im Dialogfuss. Ein langes Blatt darf die Zeile kleben lassen (`.perm-actions`), aber rechts. **Ein einzelnes Zahl- oder Kurzfeld ohne Formular drumherum speichert beim Verlassen und mit Enter, quittiert per Toast, Escape nimmt die Eingabe zurueck** (H12 vom 2026-09-27, "ein Speichermodell auf der Seite"): Standard-Punkte der Belohnungen und Nachfrist der Uebersicht. R17 Schritt 4 hatte beiden kurz einen Knopf gegeben; Schritt 5 hat H12 wiederhergestellt und auf die Uebersicht ausgedehnt | `.settings-form-actions` (settings.css; `:has(> .btn--primary)` schliesst rechts ab); `bindDefaultPoints`, `bindGraceDays`; `test:frontend-audit`, `test:settings-navigation` | 99px linksbuendig, 612px vollbreit ("Passwort speichern" nackt in der Formularspalte), ein Speichern-Knopf fuer EIN Zahlfeld neben sofort wirkenden Schaltern |
 | Boolean in den Einstellungen | Schalter (`.toggle`-Bahn, `role="switch"`), Label links, Zustand rechts; Bahn aus = `--color-switch-off` (3:1, siehe Kanten), der Knopf startet per `inset-inline-start` und laeuft in RTL nach links wie bei Apple (#1572) | `toggleRowHtml({ ..., control: 'switch' })` (settings/components.js) | native 18px-Checkbox, "Aktiviert"-Badge neben dem Haken |
 | Auswahl aus 2-4 Werten (Theme) | `.segmented` im Well (Abschnitt "Segmented Controls") | panel.css | drei getrennte Rahmenknoepfe |
-| Auswahl in einer Segment-/Tab-Leiste zeigen | EINE Bewegung: eine Kapsel hinter den Labels gleitet (`--duration-lg` + `--ease-out`, nur `transform`, Breite nur wenn sie sich aendert; reduzierte Bewegung springt); die Sidebar-Pille behaelt ihre Feder, hoechstens `--duration-xl` | `attachSegmentIndicator(bar)` (utils/segment-indicator.js; folgt jedem Wechsel des aktiven Eintrags selbst), `renderSubTabs({ indicator })`, `{ key }` fuer Leisten, die neu gebaut werden | springende Flaeche am aktiven Tab; eigene WAAPI-Kapseln; Literal-Dauern (450ms) |
-| Mobiles Blatt (Dialog, Mehr) | EINE Grammatik: Griff 36x5 in der Kopfzone (`--sheet-grabber`: hell `--color-border-strong`, dunkel Glas-Weiss), Griff-Oberkante bis Titel 16px; 1:1 mitgehen, schliessen ab 80px Weg ODER Flick > 0.5px/ms, sonst zurueckfedern (`--duration-lg` + `--ease-out`), nach oben Gummiband; der Zug liegt auf `translate`. Ein- und Ausfahrt aus EINEM Paar (`--sheet-in`/`--sheet-out`, Hub `--sheet-lift`), auch die mobile Suche | `wireSheetDrag(sheet, { scroller, onDismiss })` (utils/sheet-drag.js) | leerer Griff-Streifen, Glas-Weiss auf weisser Tafel, Faktor 0.6, Schliessen erst bei `touchend`, Zurueckspringen ohne Transition |
+| Auswahl in einer Segment-/Tab-Leiste zeigen | EINE Bewegung: eine Kapsel hinter den Labels gleitet (`--duration-lg` + `--ease-out`, nur `transform`, Breite nur wenn sie sich aendert; reduzierte Bewegung springt); die Sidebar-Pille behaelt ihre Feder, hoechstens `--duration-xl`. Die Pille der mobilen Tab-Leiste folgt derselben Regel (bis 2026-10-15 `--duration-md`). Gleiten antwortet auf einen WECHSEL: die erste Platzierung eines frisch gebauten Indikators (Laden, Neubau der Leiste) springt ans Ziel, sonst glitt er sichtbar vom ersten Eintrag herein (`placeNavIndicator` in router.js, 2026-10-15) | `attachSegmentIndicator(bar)` (utils/segment-indicator.js; folgt jedem Wechsel des aktiven Eintrags selbst), `renderSubTabs({ indicator })`, `{ key }` fuer Leisten, die neu gebaut werden | springende Flaeche am aktiven Tab; eigene WAAPI-Kapseln; Literal-Dauern (450ms) |
+| Mobiles Blatt (Dialog, Mehr) | EINE Grammatik: Griff 36x5 in der Kopfzone (`--sheet-grabber`: hell `--color-border-strong`, dunkel Glas-Weiss), Griff-Oberkante bis Titel 16px; 1:1 mitgehen, schliessen ab 80px Weg ODER Flick > 0.5px/ms, sonst zurueckfedern (`--duration-lg` + `--ease-out`), nach oben Gummiband; der Zug liegt auf `translate`. Ein- und Ausfahrt aus EINEM Paar (`--sheet-in`/`--sheet-out`, Hub `--sheet-lift`), auch die mobile Suche. Der Backdrop des Mehr-Blatts blendet im Ausgang des Blatts aus (`opacity` + `visibility` ueber `--sheet-out`, geschlossen ohne Zeiger), statt per `display: none` im ersten Frame zu verschwinden | `wireSheetDrag(sheet, { scroller, onDismiss })` (utils/sheet-drag.js) | leerer Griff-Streifen, Glas-Weiss auf weisser Tafel, Faktor 0.6, Schliessen erst bei `touchend`, Zurueckspringen ohne Transition |
 | Mehrfachauswahl in einer Liste | Auswahlkreis ERSETZT Statuskreis und Zeilen-Picker (Apple Erinnerungen); Leiste = Bulk-Pille mit "Fertig"; Name je Zeile mit Objekt ("<Titel> auswaehlen"); Loeschen im Pillen-Stil, Rueckfrage in der Pille, eine Folge, die die Frage nicht traegt, als Detailzeile darunter (Dokumente: kein Papierkorb) | `.select-circle` (layout.css) + `setBulkPill({ label, actions })` / `clearBulkPill()` (utils/bulk-pill.js), `confirm: { question, detail? }` | native blaue Checkbox neben dem Statuskreis, eigene Aktionsleiste, gefuellte rote Loeschen-Kapsel |
 | Aktionen an Karte oder Zeile | dauerhaft sichtbar, ruhig per Tertiaerfarbe; reduziert wird ihre ZAHL (hoechstens zwei + Mehr-Knopf, Zeile oben), nie ihre Sichtbarkeit | `.row-action`, `rowMenuHtml()` | Einblenden erst per `:hover`/`:focus-within` |
 | Erledigen an einer Zeile | EIN Abhakkreis: 20px, 2px, in Ruhe `--color-text-tertiary`; unter dem Zeiger laedt der Modulton ein, erledigt ist `--color-success` (Gruen bestaetigt, es steht nie in Ruhe da); `--static` = Zeichen ohne Einladung. Das Kaestchen des Einkaufs (`.item-check`) ist ein Kaestchen und bleibt eigen | `.check-ring` (list-row.css) an `.task-status-btn` und `.housekeeping-task__check`; Trefferflaeche und Zustand beim Modul | zweiter Ring je Modul (24px, in Ruhe gruen) |
@@ -2239,6 +2243,16 @@ Gemessen am echten Markup: `test:module-readonly-ui`, `test:budget-readonly-ui`,
   tokens.css (a1).
 - **Desktop:** Glas-Sidebar mit gleitender Aktiv-Pille; Toolbar ohne Akzentstreifen, Titel in
   Title 2.
+- **Die Aktiv-Pille der Seitenleiste ist in hell und dunkel EIN Material (Entscheidung Ulas
+  2026-10-15):** eine violette Pille, `--sidebar-indicator-tint` 24 % Akzent im Kartenglas
+  (vorher 12 %), Rand aus Akzent-Tint (`--sidebar-indicator-rim-tint` 18 %, mehr Kontrast:
+  100 %) statt Weiss, dezente Glanzkante oben (`--glass-inset-soft`), Schatten nur mit Versatz
+  und Weichzeichnung (`--sidebar-indicator-shadow`, hell 0.06, dunkel 0.35; kein Weissring
+  mehr). Vorher las sie hell als blasser Fleck mit unsichtbarem Weissrand und dunkel als
+  grau-violette Glasplatte - zwei Stimmen. Pixelprobe 1440 breit gegen das Sidebar-Glas: hell
+  1,19 -> 1,45:1, dunkel 1,22 -> 1,51:1; aktives Label darauf 5,69 / 4,74:1; die neutrale
+  Hover-Flaeche bleibt leiser (1,14 / 1,17:1). Ohne Glas (reduzierte Transparenz) bleibt sie
+  bei `--tint-surface`: 24 % auf dem opaken #37332E gaebe dem Label nur 4,19:1.
 - **Die Seitenleiste ist eine schwebende Tafel (R18, 2026-10-07)** - die Form der mobilen
   Kapsel am Desktop: 8px Abstand zur Fensterkante oben, unten und an der Startkante
   (`--sidebar-float-gap`), `--radius-glass-card`, `--glass-shadow-md`, Lichtkante
@@ -2262,9 +2276,67 @@ Gemessen am echten Markup: `test:module-readonly-ui`, `test:budget-readonly-ui`,
   Rollen und Pfeiltasten wie das Werkzeugmenue, oeffnet nach oben). Gemessen mit 15 Modulen:
   Modulliste 614px, fester Rahmen 157px - 771px von 800; seit die Leiste schwebt (R18),
   kommen 2 x 8px Abstand und 2 x 1px Kante dazu: 789px von 800. Die Kontozeile nennt, wer angemeldet
-  ist, und traegt den Update-Punkt, solange „Aenderungen" etwas Neues hat. Eingeklappt stapelt
-  die Logo-Zeile (Logo, Einklappen, Suche) auf der Icon-Flucht X=28.
-- Labels in 12px; lange Locales duerfen die Kapsel wachsen lassen, nie clippen.
+  ist, und traegt den Update-Punkt, solange „Aenderungen" etwas Neues hat. **Kurze Fenster
+  (bis 800px Hoehe, Nav-Polish 2026-10-15):** Sektionslabels 18,5 statt 22,5px (4px Luft
+  darueber, keine darunter), unter Logo-Zeile 0 statt 4px und unter der Liste 4 statt 8px -
+  auch 1024x768 zeigt jedes Modul. Eine Container-Abfrage an der Tafel
+  (`@container nav-sidebar (max-height: 758px)` = 800px Fenster), keine Media-Query: die
+  Hoehen-Achse kennt nur --bp-short. Gemessen Liste/Sicht: 1440x900 614/725 (unveraendert),
+  1280x800 594/629 (vorher 614/625), 1024x768 594/597 (vorher 614/584, Budget hinter dem Fade).
+  Guard: `test:frontend-audit` (Rechnung fuer 800 und 768px, Schwelle gegen 800px).
+- **Eingeklappt springt keine Zeile (Nav-Polish 2026-10-15).** Jede Modulzeile steht in der
+  56px-Kapsel, im Hover-/Fokus-Ausklappen und ausgeklappt auf derselben Hoehe (1440x900:
+  Uebersicht y=69 in allen drei Zustaenden; vorher eingeklappt 127, Kalender 163 statt 127,5 -
+  der Zeiger lag nach der Hover-Absicht auf einer anderen Zeile). Die Logo-Zeile hat in beiden
+  Zustaenden ihre Zeilenform (44px); eingeklappt steht die Bildmarke allein, Suche und
+  Einklappen liegen dahinter an der Clip-Kante der Kapsel (kein Deckkraft-Reveal), bleiben aber
+  fokussierbar:
+  Tab klappt die Tafel per `:focus-within` auf, der Zeiger erreicht sie ueber das
+  Hover-Ausklappen, die Suche dazu ueber ⌘K / Ctrl+K und `/`. Sektionslabels behalten
+  eingeklappt ihre Hoehe und zeigen statt Text eine Haarlinie `--color-border-subtle` in
+  Muldenbreite auf der Icon-Flucht - die Gruppentrennung der Kapsel. Guard:
+  `test:frontend-audit` (keine Eingeklappt-Regel fasst die Hoehe von Logo-Zeile oder Label an).
+- **Icon-Flucht als Token:** `--sidebar-icon-inset` (15px) und `--sidebar-icon-well` (26px);
+  Zeilen, Einstellungen/Konto und Sektionslabels rechnen damit. Die Labelkante steht auf der
+  Muldenkante (x=24 bei 1440x900, vorher 21).
+- **Zaehl-Badge in der Seitenleiste:** ausgeklappt am Zeilenende, wie der Zaehler einer
+  Mac-Seitenleiste (die Icon-Huelle tritt per `display: contents` aus dem Layout, das Badge
+  wird Flex-Kind hinter dem Label; Tonvarianten unveraendert). Vorher an der Mulden-Ecke: es
+  deckte die rechte obere Icon-Ecke, ragte 1px ueber die Zeile und stiess zweistellig ans Label.
+  Eingeklappt (auch im Flyout) und mobil bleibt es an der Ecke.
+- **Druck in der Seitenleiste skaliert nicht.** `scale(0.97)` an der Zeile ist weg (Text und
+  Mulde schrumpften, die Hover-Flaeche stand - es wackelte); stattdessen wird die Hover-Flaeche
+  unter der gedrueckten Zeile eine Tintenstufe kraeftiger (`--color-text-primary` mit
+  `--tint-wash` in `--color-surface-3`: hell #EDEAE3 -> ~#DCD9D3, dunkel #37332E -> ~#46423D),
+  hinein `--duration-2xs`, heraus `--duration-sm` (Press-Baustein). Mobil unveraendert.
+- Labels mobil in 11px (`--type-micro`, Caption 2 - der iOS-Wert fuer Tab-Bar-Titel; Begruendung
+  an `.nav-bottom .nav-item__label`); lange Locales duerfen die Kapsel wachsen lassen, nie clippen.
+- **"Mehr" ist kein Modul (Nav-Polish 2026-10-15):** in Ruhe steht sein Zeichen tertiaer wie
+  beim Aufbau (`--color-text-tertiary`, hell #6B675F); vorher setzte der Zustand nach jeder
+  Navigation den App-Akzent, und der Ueberlauf sah aus wie der aktive Tab. Liegt die aktive
+  Route im Blatt, traegt er ihren Modulton. Guard: `test:frontend-audit`.
+- **Bei offenem Mehr-Blatt bleibt die Pille auf der aktuellen Seite und Mehr neutral
+  (Entscheidung Ulas 2026-10-15):** das Blatt liegt modal ueber dem Ort, wie ein iOS-Sheet, das
+  die Tab-Auswahl nicht aendert; eine zweite Markierung in der Leiste waere eine zweite
+  Pillen-Sprache.
+- **Die Pille der Leiste ist dunkel eine halbe Stufe kraeftiger** (`--nav-indicator-tint`: hell
+  16 %, dunkel 24 %). Pixelprobe 390x844 gegen die Kapsel: 1,32/1,28:1 -> 1,51/1,48:1;
+  Akzentzeichen auf der Pille 3,70:1 (Grafik, >= 3:1), Labelton 4,93:1.
+- **Mehr-Blatt:** so breit wie die Kapsel (`max-inline-size: --nav-capsule-max`, zentriert;
+  768px: 744 -> 560px, 390px unveraendert 366px). Kacheln dunkel eine Stufe ueber dem Blatt
+  (`--sheet-tile-bg` = `--color-surface-raised` #37332E auf #2B2825, 1,00 -> 1,17:1); hell
+  bleiben sie Surface, dort trennt `--shadow-xs`.
+- **Der FAB sitzt konzentrisch in der Kapsel:** hinten derselbe Abstand wie oben und unten
+  (`--nav-fab-inset` = (Kapselhoehe - Knopf) / 2; Touch heute 8/8/8px, bei 60px Kapsel
+  6/6/6 statt 4px hinten), die Reserve der Kapsel waechst mit, die Fuge zum letzten Tab
+  bleibt 1px.
+- **Die Kapsel ist 64px hoch (Entscheidung Ulas 2026-10-15, vorher 60):** zwischen
+  Kapselkante und Icon-Pille oben bzw. Label unten standen 3/3px (1px Rand + 2px Polster), jetzt
+  5/5px (gemessen 4,95). Alles Abhaengige rechnet ueber `--nav-bottom-height` mit: Nachlauf
+  `.app-content` 76 -> 80px, Mehr-Blatt weiter 8px ueber der Kapsel, Toast-Unterkante weiter
+  24px ueber ihr. Gemessen 360x780, 390x844, 768x1024 (hell und dunkel, Geometrie gleich):
+  Labels einzeilig, Slot 56/62px unveraendert. Wachsen die Labels zweizeilig (el, fil bei
+  360px), misst `watchNavCapsuleHeight` weiter 72,19px - die Mindesthoehe greift dort nicht.
 - **Filled Variant, app-weit:** JEDER ausgewaehlte Zustand traegt sein Icon gefuellt
   (`fill: color-mix(in srgb, currentColor 30%, transparent)`) - Tab-Bar, Sub-Tabs,
   Listen-Tabs, Filterchips, Segmente, View-Toggles. Lucide bleibt Stroke-Bibliothek; die

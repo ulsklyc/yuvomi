@@ -921,11 +921,15 @@ textarea.form-input {
  * ================================================================ */
 @media (min-width: 1024px) {
   .nav-sidebar__indicator {
-    background: color-mix(in srgb, var(--color-accent) calc(var(--tint-surface) - 4%), var(--glass-bg-card));
-    border: 1px solid var(--glass-border-subtle);
+    /* Ein Material in hell und dunkel (Entscheidung Ulas 2026-10-15):
+     * violette Toenung, Akzent-Rand statt Weiss, dezente Glanzkante oben,
+     * Schatten ohne Weissring. Werte und Messung: tokens.css
+     * --sidebar-indicator-*. */
+    background: color-mix(in srgb, var(--color-accent) var(--sidebar-indicator-tint), var(--glass-bg-card));
+    border: 1px solid color-mix(in srgb, var(--color-accent) var(--sidebar-indicator-rim-tint), transparent);
     box-shadow:
       var(--glass-inset-soft),
-      var(--glass-shadow-sm);
+      var(--sidebar-indicator-shadow);
   }
 
   @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
@@ -950,7 +954,9 @@ textarea.form-input {
 /* iOS-Tab-Pille: crisp und randlos — solide Tönung statt Blur+Border,
  * die auf der Kapsel als verschwommener Fleck lasen. */
 .nav-bottom__indicator {
-  background: color-mix(in srgb, var(--color-accent) var(--tint-surface), transparent);
+  /* Hell die Objekt-Stufe, dunkel eine halbe darueber (--nav-indicator-tint,
+   * tokens.css: auf dem duennen Kapselglas las 16 % mit 1,3:1 kaum). */
+  background: color-mix(in srgb, var(--color-accent) var(--nav-indicator-tint), transparent);
   border: none;
   box-shadow: none;
 }
