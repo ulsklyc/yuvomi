@@ -31,7 +31,7 @@
     <img src="docs/screenshots/de/dashboard-light-web.webp" alt="Die Yuvomi-Übersicht: Termine, Aufgaben und Einkauf des Tages für die ganze Familie, darunter Familie, Budget und Geburtstage" width="820">
   </picture>
 
-  <sub><b>20</b> Module&nbsp;&nbsp;·&nbsp; <b>26</b> Sprachen&nbsp;&nbsp;·&nbsp; <b>0</b> Tracker&nbsp;&nbsp;·&nbsp; optionale&nbsp;<b>AES&#8209;256</b>&#8209;Datenbankverschlüsselung</sub>
+  <sub><b>21</b> Module&nbsp;&nbsp;·&nbsp; <b>26</b> Sprachen&nbsp;&nbsp;·&nbsp; <b>0</b> Tracker&nbsp;&nbsp;·&nbsp; optionale&nbsp;<b>AES&#8209;256</b>&#8209;Datenbankverschlüsselung</sub>
 </div>
 
 Die meisten Haushalte kleben ihren Alltag aus einem Dutzend Bezahl-Apps zusammen, jede mit eigenem
@@ -75,14 +75,14 @@ Das ist der Teil, den ein Ordner voller Einzel-Apps nicht kann:
 
 [Mehr auf yuvomi.cloud](https://yuvomi.cloud/#family)
 
-## Die zwanzig Module
+## Die einundzwanzig Module
 
 Schaltet ab, was euer Haushalt nicht braucht, und es verschwindet für alle aus dem Menü. Inventar,
 Entsorgung und Schichtplan sind anfangs aus.
 
 - **Planen** - Aufgaben · Kalender · Schichtplan · Notizen
 - **Haushalt** - Mahlzeiten · Rezepte · Einkauf · Vorrat · Haushaltshilfe · Entsorgung · Dokumente · Inventar · Belohnungen
-- **Menschen** - Gesundheit · Kontakte · Geburtstage
+- **Menschen** - Gesundheit · Kontakte · Geburtstage · Routinen
 - **Finanzen** - Budget
 - **Einstellungen** - Familie · Erinnerungen · API-Tokens · Backup
 
@@ -107,6 +107,7 @@ Entsorgung und Schichtplan sind anfangs aus.
 | **Schichtplan** | Rotierende Schichten und feste Wochenpläne, als Ebene im Kalender eingeblendet. Standardmäßig aus. |
 | **Notizen &amp; Kontakte** | Markdown-Haftnotizen mit antippbaren Checklisten, dazu Kontakte mit CardDAV-Sync und vCard-Import/-Export. |
 | **Geburtstage** | Geburtstage und optionale Namenstage, mit Kalendereinträgen, Alter und Erinnerungen. |
+| **Routinen** | Morgendliche und abendliche Checklisten pro Haushaltsmitglied, mit schrittweisem Abhaken und admin-verwalteten Routinen-Vorlagen. |
 | **Familie** | Mitgliedsprofile mit Rollen und Einladungslinks, über die neue Mitglieder ihr Passwort selbst wählen. |
 | **Erinnerungen** | An Aufgaben, Termine, Medikamente, Garantien, Mindesthaltbarkeit, ablaufende Dokumente und Abfuhr - in der App, per Push, Gotify, ntfy, Webhook oder E-Mail. |
 | **API-Tokens** | Bearer-Tokens mit OpenAPI-3.1-Spezifikation und eingebautem MCP-Endpunkt für KI-Agenten. |

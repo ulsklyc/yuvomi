@@ -188,8 +188,8 @@ function moduleRows(md) {
 }
 
 const NUMBER_WORDS = {
-  sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20,
-  sechzehn: 16, siebzehn: 17, achtzehn: 18, neunzehn: 19, zwanzig: 20,
+  sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, 'twenty-one': 21, twenty: 20,
+  sechzehn: 16, siebzehn: 17, achtzehn: 18, neunzehn: 19, einundzwanzig: 21, zwanzig: 20,
 };
 
 /** Das Zahlwort aus der Ueberschrift ueber der Modultabelle. */

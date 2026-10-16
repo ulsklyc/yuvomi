@@ -120,6 +120,7 @@ const ROUTES = [
   { path: '/housekeeping', page: '/pages/housekeeping.js', requiresAuth: true, module: 'housekeeping', titleKey: 'nav.housekeeping' },
   { path: '/waste', page: '/pages/waste.js', requiresAuth: true, module: 'waste', titleKey: 'nav.waste' },
   { path: '/rewards',  page: '/pages/rewards.js',    requiresAuth: true, module: 'rewards',   titleKey: 'nav.rewards' },
+  { path: '/routines', page: '/pages/routines.js',  requiresAuth: true, module: 'routines',  titleKey: 'nav.routines' },
 ];
 
 // Settings ist eine Sektion mit einer Wurzel und je einer exakten Route pro
@@ -3758,6 +3759,7 @@ function navItems({ catalog = false } = {}) {
     { path: '/contacts',  label: t('nav.contacts'),  module: 'contacts',    section: NAV_SECTION.people },
     { path: '/birthdays', label: t('nav.birthdays'), module: 'birthdays',   section: NAV_SECTION.people },
     { path: '/health',    label: t('nav.health'),    module: 'health',      section: NAV_SECTION.people },
+    { path: '/routines',  label: t('nav.routines'),  module: 'routines',    section: NAV_SECTION.people },
     // Finanzen
     { path: '/budget',    label: t('nav.budget'),    module: 'budget',      section: NAV_SECTION.finance },
     // Settings ist am Ende gepinnt (siehe unten).

@@ -138,7 +138,8 @@
         "rewards": "पुरस्कार",
         "pantry": "भंडार",
         "inventory": "इन्वेंटरी",
-        "schedule": "शिफ़्ट शेड्यूल"
+        "schedule": "शिफ़्ट शेड्यूल",
+        "routines": "Routines"
     },
     "dashboard": {
         "title": "डैशबोर्ड",
@@ -2085,7 +2086,8 @@
             "dashboard": "डैशबोर्ड",
             "search": "खोज",
             "inventory": "इन्वेंटरी",
-            "waste": "कचरा संग्रहण"
+            "waste": "कचरा संग्रहण",
+            "routines": "Routines"
         },
         "ics": {
             "title": "ICS सदस्यताएं",
@@ -6357,5 +6359,27 @@
         "labelHint": "बाद में पहचानने में मदद करता है कि कौन सा डिवाइस है।",
         "submit": "जोड़ें",
         "failed": "यह कोड मान्य नहीं है।"
+    },
+    "routines": {
+        "emptyTitle": "No routines yet",
+        "emptyDescription": "Routines haven't been set up for your household yet.",
+        "noRoutinesInSlot": "No routines in this slot yet.",
+        "addRoutine": "Add routine",
+        "editRoutine": "Edit routine",
+        "deleteRoutineConfirm": "Delete routine \"{{name}}\"?",
+        "addStep": "Add step",
+        "editStep": "Edit step",
+        "deleteStepConfirm": "Delete this step?",
+        "allMembers": "All members",
+        "slot": {
+            "morning": "Morning",
+            "evening": "Evening"
+        },
+        "fields": {
+            "name": "Name",
+            "slot": "Time of day",
+            "label": "Step",
+            "member": "Member"
+        }
     }
 }

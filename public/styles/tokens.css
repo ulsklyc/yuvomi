@@ -791,6 +791,7 @@
   --module-notes:     var(--_family-records);
   --module-contacts:  var(--_family-people);
   --module-birthdays: var(--_family-people);
+  --module-routines:  var(--_family-people);
   --module-budget:    var(--_family-money);
   --module-split-expenses: var(--_family-money);
   --module-documents: var(--_family-records);

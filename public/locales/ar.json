@@ -150,7 +150,8 @@
         "rewards": "المكافآت",
         "pantry": "المؤن",
         "inventory": "المقتنيات",
-        "schedule": "جدول المناوبات"
+        "schedule": "جدول المناوبات",
+        "routines": "Routines"
     },
     "dashboard": {
         "title": "لوحة التحكم",
@@ -2329,7 +2330,8 @@
             "dashboard": "لوحة التحكم",
             "search": "بحث",
             "inventory": "المقتنيات",
-            "waste": "جمع النفايات"
+            "waste": "جمع النفايات",
+            "routines": "Routines"
         },
         "ics": {
             "title": "اشتراكات ICS",
@@ -6829,5 +6831,27 @@
         "labelHint": "يساعد لاحقًا على معرفة الجهاز المقصود.",
         "submit": "اقتران",
         "failed": "رمز الاقتران هذا غير صالح."
+    },
+    "routines": {
+        "emptyTitle": "No routines yet",
+        "emptyDescription": "Routines haven't been set up for your household yet.",
+        "noRoutinesInSlot": "No routines in this slot yet.",
+        "addRoutine": "Add routine",
+        "editRoutine": "Edit routine",
+        "deleteRoutineConfirm": "Delete routine \"{{name}}\"?",
+        "addStep": "Add step",
+        "editStep": "Edit step",
+        "deleteStepConfirm": "Delete this step?",
+        "allMembers": "All members",
+        "slot": {
+            "morning": "Morning",
+            "evening": "Evening"
+        },
+        "fields": {
+            "name": "Name",
+            "slot": "Time of day",
+            "label": "Step",
+            "member": "Member"
+        }
     }
 }

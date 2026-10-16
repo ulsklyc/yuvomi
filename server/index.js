@@ -103,6 +103,7 @@ import scheduleRouter from './routes/schedule.js';
 import scheduleFeedRouter from './routes/schedule-feed.js';
 import schedulePreferencesRouter from './routes/schedule-preferences.js';
 import scheduleExtrasRouter from './routes/schedule-extras.js';
+import routinesRouter from './routes/routines.js';
 import { sessionModuleAccessRequirement, tokenAccessRequirement, tokenAllows } from './scopes.js';
 import { moduleAccessVerdict, MODULE_ACCESS_DENIED, MODULE_ACCESS_READ_ONLY } from './permissions.js';
 import { BODY_LIMIT, MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from './utils/upload-limit.js';
@@ -780,6 +781,7 @@ app.use('/api/v1/schedule/feed', scheduleFeedRouter);
 app.use('/api/v1/schedule/preferences', schedulePreferencesRouter);
 app.use('/api/v1/schedule/extras', scheduleExtrasRouter);
 app.use('/api/v1/schedule', scheduleRouter);
+app.use('/api/v1/routines', routinesRouter);
 app.use('/api/v1/permissions', permissionsRouter);
 
 // --------------------------------------------------------

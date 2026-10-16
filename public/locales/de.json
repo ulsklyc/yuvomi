@@ -136,6 +136,7 @@
         "sectionCustomModules": "Benutzerdefinierte Module",
         "health": "Gesundheit",
         "rewards": "Belohnungen",
+        "routines": "Routinen",
         "pantry": "Vorrat",
         "inventory": "Inventar",
         "schedule": "Schichtplan"
@@ -2254,6 +2255,7 @@
             "documents": "Dokumente",
             "health": "Gesundheit",
             "rewards": "Belohnungen",
+            "routines": "Routinen",
             "housekeeping": "Haushaltshilfe",
             "weather": "Wetter",
             "family": "Familie",
@@ -6357,5 +6359,27 @@
         "labelHint": "Hilft später zu erkennen, welches Gerät gemeint ist.",
         "submit": "Koppeln",
         "failed": "Dieser Kopplungscode gilt nicht."
+    },
+    "routines": {
+        "emptyTitle": "Noch keine Routinen",
+        "emptyDescription": "Für deinen Haushalt wurden noch keine Routinen angelegt.",
+        "noRoutinesInSlot": "In diesem Zeitabschnitt gibt es noch keine Routinen.",
+        "addRoutine": "Routine anlegen",
+        "editRoutine": "Routine bearbeiten",
+        "deleteRoutineConfirm": "Routine „{{name}}“ löschen?",
+        "addStep": "Schritt hinzufügen",
+        "editStep": "Schritt bearbeiten",
+        "deleteStepConfirm": "Diesen Schritt löschen?",
+        "allMembers": "Alle Mitglieder",
+        "slot": {
+            "morning": "Morgens",
+            "evening": "Abends"
+        },
+        "fields": {
+            "name": "Name",
+            "slot": "Tageszeit",
+            "label": "Schritt",
+            "member": "Mitglied"
+        }
     }
 }

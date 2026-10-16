@@ -35,6 +35,7 @@ import { quickLinksPaths } from './quicklinks.js';
 import { screensaverPaths } from './screensaver.js';
 import { recipeProvidersPaths } from './recipeproviders.js';
 import { permissionsPaths } from './permissions.js';
+import { routinesPaths } from './routines.js';
 
 export function buildPaths() {
   return {
@@ -75,5 +76,6 @@ export function buildPaths() {
     ...screensaverPaths(),
     ...recipeProvidersPaths(),
     ...permissionsPaths(),
+    ...routinesPaths(),
   };
 }

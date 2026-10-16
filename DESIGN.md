@@ -1408,6 +1408,7 @@ Kernseite fuehrt es. Die Zuordnung aller Seiten:
 | `budget-stats.js` Budget-Statistik | Flaeche | Reiter des Budgets |
 | `budget-plans.js` Budget-Plan | Flaeche | Reiter des Budgets |
 | `subscriptions.js` Abos | Flaeche | `full` |
+| `routines.js` Routinen | Lesemass | `reading` |
 
 **Einstellungen (R10, 2026-09-27).** Drei Bereiche: Konto (fuer alle), Haushalt (Admin) und
 Module. Je Modul EIN Blatt wie Apples "Einstellungen > App": oben eine Statuszeile (Zustand

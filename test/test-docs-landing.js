@@ -1573,6 +1573,7 @@ const PAGE_MODULE = {
   f_meals: 'meals', m_recipes: 'recipes', m_shop: 'shopping', m_pantry: 'pantry',
   m_house: 'housekeeping', m_waste: 'waste', m_docs: 'documents', m_inv: 'inventory', m_rewards: 'rewards',
   f_health: 'health', m_bday: 'birthdays', f_budget: 'budget',
+  m_routines: 'routines',
   m_family: null, m_rem: null, m_api: null, m_backup: null,
 };
 /**
@@ -1681,7 +1682,7 @@ test('der Menuegruppen-Guard erkennt den Schaden, gegen den er gebaut ist', () =
   const healthy = page([
     ['plan', ['f_tasks', 'm_cal', 'm_sched', 'm_notes']],
     ['household', ['f_meals', 'm_recipes', 'm_shop', 'm_pantry', 'm_house', 'm_waste', 'm_docs', 'm_inv', 'm_rewards']],
-    ['people', ['f_health', 'm_contacts', 'm_bday']],
+    ['people', ['f_health', 'm_contacts', 'm_bday', 'm_routines']],
     ['finance', ['f_budget']],
     ['settings', ['m_family', 'm_rem', 'm_api', 'm_backup']],
   ]);

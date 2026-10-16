@@ -10913,6 +10913,36 @@ const MIGRATIONS = [
         WHERE birthday_feed_token IS NOT NULL;
     `,
   },
+  {
+    version: 250,
+    description: 'Routines: morning/evening checklists per household member',
+    up: `
+      CREATE TABLE routines (
+        id         INTEGER PRIMARY KEY,
+        name       TEXT    NOT NULL,
+        slot       TEXT    NOT NULL DEFAULT 'morning'
+                           CHECK(slot IN ('morning', 'evening')),
+        user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        position   INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE routine_steps (
+        id         INTEGER PRIMARY KEY,
+        routine_id INTEGER NOT NULL REFERENCES routines(id) ON DELETE CASCADE,
+        label      TEXT    NOT NULL,
+        position   INTEGER NOT NULL DEFAULT 0
+      );
+
+      CREATE TABLE routine_checks (
+        id           INTEGER PRIMARY KEY,
+        step_id      INTEGER NOT NULL REFERENCES routine_steps(id) ON DELETE CASCADE,
+        user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        checked_date TEXT    NOT NULL,
+        UNIQUE(step_id, user_id, checked_date)
+      );
+    `,
+  },
 ];
 
 /**

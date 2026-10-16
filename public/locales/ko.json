@@ -138,7 +138,8 @@
         "rewards": "보상",
         "pantry": "재고",
         "inventory": "소지품",
-        "schedule": "근무표"
+        "schedule": "근무표",
+        "routines": "Routines"
     },
     "search": {
         "emptyHint": "입력해서 영역으로 이동하거나 새로 만드세요. 2자부터는 내 항목도 찾을 수 있고, 단어의 일부로도 됩니다.",
@@ -2237,7 +2238,8 @@
             "dashboard": "개요",
             "search": "검색",
             "inventory": "소지품",
-            "waste": "쓰레기 수거"
+            "waste": "쓰레기 수거",
+            "routines": "Routines"
         },
         "ics": {
             "title": "ICS 구독",
@@ -6357,5 +6359,27 @@
         "labelHint": "나중에 어떤 기기인지 알아보는 데 도움이 됩니다.",
         "submit": "페어링",
         "failed": "이 페어링 코드는 유효하지 않습니다."
+    },
+    "routines": {
+        "emptyTitle": "No routines yet",
+        "emptyDescription": "Routines haven't been set up for your household yet.",
+        "noRoutinesInSlot": "No routines in this slot yet.",
+        "addRoutine": "Add routine",
+        "editRoutine": "Edit routine",
+        "deleteRoutineConfirm": "Delete routine \"{{name}}\"?",
+        "addStep": "Add step",
+        "editStep": "Edit step",
+        "deleteStepConfirm": "Delete this step?",
+        "allMembers": "All members",
+        "slot": {
+            "morning": "Morning",
+            "evening": "Evening"
+        },
+        "fields": {
+            "name": "Name",
+            "slot": "Time of day",
+            "label": "Step",
+            "member": "Member"
+        }
     }
 }

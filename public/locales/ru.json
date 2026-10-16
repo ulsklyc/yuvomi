@@ -146,7 +146,8 @@
         "rewards": "Награды",
         "pantry": "Запасы",
         "inventory": "Инвентарь",
-        "schedule": "График смен"
+        "schedule": "График смен",
+        "routines": "Routines"
     },
     "dashboard": {
         "title": "Обзор",
@@ -2247,7 +2248,8 @@
             "dashboard": "Обзор",
             "search": "Поиск",
             "inventory": "Инвентарь",
-            "waste": "Вывоз мусора"
+            "waste": "Вывоз мусора",
+            "routines": "Routines"
         },
         "ics": {
             "title": "ICS-подписки",
@@ -6671,5 +6673,27 @@
         "labelHint": "Поможет позже понять, о каком устройстве идёт речь.",
         "submit": "Подключить",
         "failed": "Этот код подключения недействителен."
+    },
+    "routines": {
+        "emptyTitle": "No routines yet",
+        "emptyDescription": "Routines haven't been set up for your household yet.",
+        "noRoutinesInSlot": "No routines in this slot yet.",
+        "addRoutine": "Add routine",
+        "editRoutine": "Edit routine",
+        "deleteRoutineConfirm": "Delete routine \"{{name}}\"?",
+        "addStep": "Add step",
+        "editStep": "Edit step",
+        "deleteStepConfirm": "Delete this step?",
+        "allMembers": "All members",
+        "slot": {
+            "morning": "Morning",
+            "evening": "Evening"
+        },
+        "fields": {
+            "name": "Name",
+            "slot": "Time of day",
+            "label": "Step",
+            "member": "Member"
+        }
     }
 }

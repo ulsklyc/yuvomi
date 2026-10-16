@@ -31,7 +31,7 @@
     <img src="docs/screenshots/dashboard-light-web.webp" alt="The Yuvomi overview: today's events, tasks and shopping for the whole family, with the family, budget and birthdays below" width="820">
   </picture>
 
-  <sub><b>20</b> modules&nbsp;&nbsp;·&nbsp; <b>26</b> languages&nbsp;&nbsp;·&nbsp; <b>0</b> trackers&nbsp;&nbsp;·&nbsp; optional&nbsp;<b>AES&#8209;256</b>&nbsp;database&nbsp;encryption</sub>
+  <sub><b>21</b> modules&nbsp;&nbsp;·&nbsp; <b>26</b> languages&nbsp;&nbsp;·&nbsp; <b>0</b> trackers&nbsp;&nbsp;·&nbsp; optional&nbsp;<b>AES&#8209;256</b>&nbsp;database&nbsp;encryption</sub>
 </div>
 
 Most households glue their life together from a dozen paid apps, each with its own account, its
@@ -75,14 +75,14 @@ This is the part a folder full of separate apps cannot do:
 
 [More on yuvomi.cloud](https://yuvomi.cloud/#family)
 
-## The twenty modules
+## The twenty-one modules
 
 Switch off what your household doesn't need, and it disappears from everyone's menu. Inventory,
 Waste collection and Schedule start switched off.
 
 - **Plan** - Tasks · Calendar · Schedule · Notes
 - **Household** - Meals · Recipes · Shopping · Pantry · Housekeeping · Waste collection · Documents · Inventory · Rewards
-- **People** - Health · Contacts · Birthdays
+- **People** - Health · Contacts · Birthdays · Routines
 - **Finance** - Budget
 - **Settings** - Family · Reminders · API Tokens · Backup
 
@@ -107,6 +107,7 @@ Waste collection and Schedule start switched off.
 | **Schedule** | Rotating shifts and fixed weekly timetables, shown as an overlay in the calendar. Off by default. |
 | **Notes &amp; Contacts** | Markdown sticky notes with tappable checklists, plus contacts with CardDAV sync and vCard import/export. |
 | **Birthdays** | Birthdays and optional name days, with calendar entries, ages and reminders. |
+| **Routines** | Morning and evening checklists per household member, with step-by-step check-off and admin-managed routine templates. |
 | **Family** | Member profiles with roles, and invite links where new members pick their own password. |
 | **Reminders** | For tasks, events, medications, warranties, best-before dates, expiring documents and pickups - in-app, push, Gotify, ntfy, webhook or email. |
 | **API Tokens** | Bearer tokens with an OpenAPI 3.1 spec and a built-in MCP endpoint for AI agents. |

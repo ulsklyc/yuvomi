@@ -138,7 +138,8 @@
         "rewards": "Phần thưởng",
         "pantry": "Kho dự trữ",
         "inventory": "Tài sản",
-        "schedule": "Lịch làm việc"
+        "schedule": "Lịch làm việc",
+        "routines": "Routines"
     },
     "dashboard": {
         "title": "Tổng quan",
@@ -2196,7 +2197,8 @@
             "dashboard": "Tổng quan",
             "search": "Tìm kiếm",
             "inventory": "Tài sản",
-            "waste": "Thu gom rác"
+            "waste": "Thu gom rác",
+            "routines": "Routines"
         },
         "ics": {
             "title": "Đăng ký ICS",
@@ -6357,5 +6359,27 @@
         "labelHint": "Giúp nhận ra sau này đây là thiết bị nào.",
         "submit": "Ghép nối",
         "failed": "Mã ghép nối này không hợp lệ."
+    },
+    "routines": {
+        "emptyTitle": "No routines yet",
+        "emptyDescription": "Routines haven't been set up for your household yet.",
+        "noRoutinesInSlot": "No routines in this slot yet.",
+        "addRoutine": "Add routine",
+        "editRoutine": "Edit routine",
+        "deleteRoutineConfirm": "Delete routine \"{{name}}\"?",
+        "addStep": "Add step",
+        "editStep": "Edit step",
+        "deleteStepConfirm": "Delete this step?",
+        "allMembers": "All members",
+        "slot": {
+            "morning": "Morning",
+            "evening": "Evening"
+        },
+        "fields": {
+            "name": "Name",
+            "slot": "Time of day",
+            "label": "Step",
+            "member": "Member"
+        }
     }
 }

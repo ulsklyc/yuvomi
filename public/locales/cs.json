@@ -142,7 +142,8 @@
         "rewards": "Odměny",
         "pantry": "Spíž",
         "inventory": "Inventář",
-        "schedule": "Rozpis směn"
+        "schedule": "Rozpis směn",
+        "routines": "Routines"
     },
     "dashboard": {
         "title": "Přehled",
@@ -2305,7 +2306,8 @@
             "dashboard": "Přehled",
             "search": "Hledat",
             "inventory": "Inventář",
-            "waste": "Svoz odpadu"
+            "waste": "Svoz odpadu",
+            "routines": "Routines"
         },
         "ics": {
             "title": "ICS odběry",
@@ -6519,5 +6521,27 @@
         "labelHint": "Pomůže později poznat, o které zařízení jde.",
         "submit": "Spárovat",
         "failed": "Tento párovací kód neplatí."
+    },
+    "routines": {
+        "emptyTitle": "No routines yet",
+        "emptyDescription": "Routines haven't been set up for your household yet.",
+        "noRoutinesInSlot": "No routines in this slot yet.",
+        "addRoutine": "Add routine",
+        "editRoutine": "Edit routine",
+        "deleteRoutineConfirm": "Delete routine \"{{name}}\"?",
+        "addStep": "Add step",
+        "editStep": "Edit step",
+        "deleteStepConfirm": "Delete this step?",
+        "allMembers": "All members",
+        "slot": {
+            "morning": "Morning",
+            "evening": "Evening"
+        },
+        "fields": {
+            "name": "Name",
+            "slot": "Time of day",
+            "label": "Step",
+            "member": "Member"
+        }
     }
 }
