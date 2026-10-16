@@ -65,6 +65,21 @@
   border-top: 1px solid var(--color-border-subtle);
 }
 
+/* MONATSKOEPFE IN DER LISTE (R19): Gruppentitel IN einer Liste ist
+ * `.list-group__title` (DESIGN.md "Ueberschrift ueber Inhalt"); hier steht nur
+ * die Einrueckung auf der Zeilenkante und die Luft ueber und unter ihm. */
+.birthdays-month {
+  padding: var(--space-3) var(--space-3) var(--space-1);
+}
+
+/* DER NAECHSTE GEBURTSTAG (R19): sein Countdown traegt die Modulton-Tinte und
+ * fuehrt - auch wenn er weiter als eine Woche weg ist. Heute behaelt seine
+ * eigene, lautere Form (`--today`). */
+.birthday-item--next .birthday-chip {
+  color: color-mix(in srgb, var(--module-accent) var(--tint-ink), var(--color-text-primary));
+  font-weight: var(--font-weight-semibold);
+}
+
 /* Dass der Wischwrapper weder Radius noch Abstand traegt, steht jetzt in seiner
  * Basisregel (layout.css) - hier war es der Modul-Reset, den die Aufgaben und
  * der Einkauf nicht hatten. */

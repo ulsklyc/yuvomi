@@ -2,7 +2,7 @@ import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, advancedSection } from '/components/modal.js';
 import { stagger, scheduleUndoableDelete } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
-import { t, formatDate, parseDateInput, isDateInputValid, getLocale, formatUnit } from '/i18n.js';
+import { t, formatDate, formatMonthYear, parseDateInput, isDateInputValid, getLocale, formatUnit } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 import { rowMenuHtml } from '/utils/row-action.js';
@@ -380,7 +380,7 @@ function updateBirthdayBadge() {
   setNavBadge('/birthdays', countBirthdaysSoon(state.birthdays), undefined, 'accent');
 }
 
-export function birthdayItemHtml(birthday) {
+export function birthdayItemHtml(birthday, { next = false } = {}) {
   const chip = countdownChip(birthday);
   const isToday = chip.mod === 'today';
   const hasNameDay = birthday.next_name_day && Number.isInteger(birthday.name_day_days_until);
@@ -439,7 +439,7 @@ export function birthdayItemHtml(birthday) {
         <i data-lucide="trash-2" class="icon-md"></i>
         <span>${t('common.delete')}</span>
       </div>`}
-    <article class="list-row birthday-item ${isToday ? 'birthday-item--today' : ''}" data-id="${birthday.id}" data-md-id="${birthday.id}">
+    <article class="list-row birthday-item ${isToday ? 'birthday-item--today' : ''}${next && !isToday ? ' birthday-item--next' : ''}" data-id="${birthday.id}" data-md-id="${birthday.id}">
       <div class="birthday-item__media">${photoAvatar(birthday)}</div>
       <button type="button" class="list-row__main list-row__main--interactive" data-open="${birthday.id}" data-md-focus>${hauptspalte}${ro ? readRowHintHtml() : ''}</button>
       ${ro ? '' : `
@@ -459,6 +459,28 @@ ${/* EIN MEHR-KNOPF (Entscheidung 2026-10-07, utils/row-action.js): der
       </div>`}
     </article>
     </div>`;
+}
+
+/**
+ * MONATSGRUPPEN UND DER NAECHSTE (R19, Critique 2026-10-16). Die Liste war
+ * eine flache Folge, in der "in 16 Tagen" und "in 330 Tagen" gleich laut
+ * standen. Jetzt traegt jeder Monat einen Kopf ("November 2026", wie die
+ * Gruppenkoepfe der Aufgaben IN der Liste), und der naechste Geburtstag
+ * (`birthday-item--next`) hebt seinen Countdown im Modulton hervor - die
+ * Antwort auf die Frage, mit der man die Seite oeffnet.
+ * @param {Array} list nach Naehe sortiert (sortByProximity)
+ * @returns {string}
+ */
+function birthdayListHtml(list) {
+  let month = '';
+  return list.map((birthday, i) => {
+    const key = String(birthday.next_birthday ?? '').slice(0, 7);
+    const head = key && key !== month
+      ? `<h2 class="list-group__title birthdays-month">${esc(formatMonthYear(key.slice(0, 4), key.slice(5, 7)))}</h2>`
+      : '';
+    if (key) month = key;
+    return head + birthdayItemHtml(birthday, { next: i === 0 });
+  }).join('');
 }
 
 function emptyStateHtml() {
@@ -529,7 +551,7 @@ function drawList(host, { repaint = false } = {}) {
   }
 
   host.replaceChildren();
-  host.insertAdjacentHTML('beforeend', list.map(birthdayItemHtml).join(''));
+  host.insertAdjacentHTML('beforeend', birthdayListHtml(list));
 
   if (window.lucide) window.lucide.createIcons({ el: host });
   // Der Nudge-Hinweis gehoert zur GESTE und steht deshalb in deren Verdrahtung:
@@ -1234,20 +1256,16 @@ function deleteBirthday(id) {
  * (components/detail-view.js), damit die Spalte aussieht wie in Kontakten.
  */
 function birthdayPaneSections(birthday) {
-  const days = birthday.days_until;
-  let ageNote = '';
-  if (Number.isInteger(days)) {
-    if (days === 0) ageNote = t('birthdays.ageNoteToday', { age: birthday.next_age });
-    else if (days === 1) ageNote = t('birthdays.ageNoteTomorrow', { age: birthday.next_age });
-    else ageNote = t('birthdays.ageNoteDays', { days, age: birthday.next_age });
-  }
   const nameDay = nameDayReadText(birthday.name_day);
   const nameDayNext = nameDay && Number.isInteger(birthday.name_day_days_until)
     ? `${nameDay} · ${countdownLabel(birthday.name_day_days_until)}` : nameDay;
   return [
     // Das Bild steht seit R18 im Kopf (birthdayDetailHead), gross und immer -
     // auch als Monogramm, wo kein Foto hinterlegt ist.
-    { icon: 'party-popper', label: birthday.next_birthday ? formatDate(birthday.next_birthday) : '', value: ageNote },
+    // DIE ZEILE "02.11.2026 - Wird in 16 Tagen 41 Jahre alt." ENTFAELLT (R19,
+    // Critique 2026-10-16: "das Geburtstagsdetail sagt dasselbe dreimal").
+    // Alter und Abstand stehen als Kennzahlen im Kopf, das Datum als seine
+    // Unterzeile (birthdayDetailHead).
     { icon: 'cake', label: t('birthdays.birthDateLabel'), value: birthday.birth_date ? formatDate(birthday.birth_date) : '' },
     { icon: 'calendar-heart', label: t('birthdays.nameDay'), value: nameDayNext },
     { icon: 'align-left', label: t('birthdays.notesLabel'), value: birthday.notes || '', multiline: true },
@@ -1269,6 +1287,9 @@ function birthdayDetailHead(birthday) {
   const days = birthday.days_until;
   return {
     media,
+    // Das Datum des naechsten Geburtstags, einmal: unter dem Bild, ueber Alter
+    // und Abstand (vorher zusaetzlich als erste Zeile darunter, R19).
+    subtitle: birthday.next_birthday ? formatDate(birthday.next_birthday) : '',
     facts: [
       birthday.next_age != null ? t('birthdays.turnsAge', { age: birthday.next_age }) : '',
       Number.isInteger(days) ? countdownLabel(days) : '',
@@ -1471,6 +1492,7 @@ export async function render(container, { signal } = {}) {
  * verdrahtet werden, und was der Leerzustand anbietet.
  */
 export const __test = {
+  birthdayListHtml,
   birthdayItemHtml, emptyStateHtml, importActionHtml, wireBirthdaySwipe,
   readOnly, state,
   // Der Weg zur Leseansicht (#1348): wohin ein Tipp fuehrt und welcher Dialog

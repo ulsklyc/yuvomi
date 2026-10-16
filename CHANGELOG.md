@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Birthdays are grouped by month, and the next one stands out.** The list carries a heading for
+  each month, the countdown of the next birthday is in the module colour, and a birthday's details
+  say its date, age and countdown once at the top instead of three times.
 - **Inviting someone is the first choice on the Members page.** "Create invitation" now sits as the
   main button right under the member list, next to "Add member", instead of in a card further down;
   both carry an icon instead of a "+" sign, and your own row says "Me" after your name.
