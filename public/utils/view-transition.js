@@ -30,9 +30,15 @@
  *     zweiten Kopf (`.page-toolbar--in-group` unter der Kuechen-Leiste).
  *     Sein Inhalt blendet ueber, der Kopf selbst gleitet nicht.
  *
- * OHNE API (oder unter reduzierter Bewegung, oder im verdeckten Tab) tauscht
- * der Router direkt; der Rueckfall ist eine reine Blende ohne Versatz
- * (`.page-transition--in` in layout.css).
+ * OHNE API (oder im verdeckten Tab) tauscht der Router direkt; der Rueckfall
+ * ist eine reine Blende ohne Versatz (`.page-transition--in` in layout.css).
+ *
+ * UNTER REDUZIERTER BEWEGUNG LAEUFT DIE TRANSITION (Critique 2026-10-16, A5):
+ * sie ist eine Blende, keine Bewegung - und "Bewegung faellt weg, Ueberblenden
+ * bleibt" (reset.css). Bis dahin tauschte der Router dort direkt, der
+ * Rueckfall war eine Animation, die reset.css auf 0s setzt, und der Wechsel
+ * schnitt hart, waehrend Mehr-Blatt und Popover blendeten. Die Gruppen (Lage,
+ * Groesse) stehen dort per CSS still, die Bilder blenden `--duration-sm`.
  */
 
 const TOOLBAR_NAME = 'page-toolbar';
@@ -58,7 +64,9 @@ export function navigationFrom() {
 }
 
 /**
- * Ob der Browser den Wechsel als View Transition zeigen kann und soll.
+ * Ob der Browser den Wechsel als View Transition zeigen kann. Reduzierte
+ * Bewegung ist KEIN Ausschluss: die Transition ist eine Blende (layout.css
+ * haelt dort ihre Gruppen still).
  * @returns {boolean}
  */
 export function canViewTransition() {
@@ -66,7 +74,6 @@ export function canViewTransition() {
   // Verdeckt ueberspringt der Browser ohnehin (InvalidStateError); die Abfrage
   // spart nur die Ausnahme.
   if (document.visibilityState === 'hidden') return false;
-  if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
   return true;
 }
 
@@ -157,9 +164,10 @@ export async function swapPage(update, { content, from = null, animate = true } 
  * (utils/wall-mode.js) schaltet ohne Blende: dort schaut niemand hin, und eine
  * Blende an einem Wandtablett ist eine Bewegung ohne Anlass.
  *
- * `update` laeuft genau einmal. Ohne API, im verdeckten Tab und unter
- * reduzierter Bewegung synchron (ein Fehler daraus kommt beim Aufrufer an),
- * sonst im Callback der Transition.
+ * `update` laeuft genau einmal. Ohne API und im verdeckten Tab synchron (ein
+ * Fehler daraus kommt beim Aufrufer an), sonst im Callback der Transition -
+ * auch unter reduzierter Bewegung: ein Farbwechsel als Blende ist dort die
+ * gewollte Alternative zum harten Umschlag, nicht eine Bewegung.
  *
  * @param {() => void} update  setzt das Theme
  * @returns {Promise<void>} aufgeloest, wenn die Blende durch ist

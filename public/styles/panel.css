@@ -821,6 +821,14 @@
   stroke-width: 1;
 }
 
+/* Ein Balken waechst aus SEINER Grundlinie (drawChartOnce in utils/ux.js,
+ * `transform: scaleY()`): ohne `fill-box` laege der Ursprung in der Ecke des
+ * SVG, und der Balken floege von oben links herein. */
+.chart__bar {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
 /* DIE FLAECHE IST IHR EIGENER CONTAINER (Critique 2026-09-26).
  *
  * Die Geometrie skaliert proportional (viewBox CHART.W x CHART.H, Breite 100%),

@@ -248,7 +248,6 @@ const LITERAL_TIME = /(?<![\w.-])(\d*\.?\d+)(ms|s)\b/g;
 /** `datei: selektor` -> Grund. Gilt fuer Keyword-Kurve UND Literal-Dauer der Stelle. */
 const MOTION_EXCEPTIONS = new Map([
   ['calendar.css: .cal-press-ghost', 'Fortschritt des Langdrucks: laeuft linear mit der Haltezeit (--cal-press-ms), keine Bewegungskurve'],
-  ['layout.css: .app-content', 'sanktionierte Layout-Transition des Offline-Banners (ignore.md) - nicht angefasst'],
   ['layout.css: .search-overlay', '`visibility 0s linear <Verzoegerung>`: diskreter Schalter nach der Blende, keine Bewegung'],
   ['layout.css: .swipe-reveal', 'folgt dem Finger: die Deckkraft wird je Frame gesetzt, linear glaettet nur'],
   ['layout.css: .swipe-row--hint > :first-child', 'einmaliger Wisch-Hinweis (Onboarding), nicht im Arbeitsfluss'],
@@ -540,12 +539,11 @@ test('swapPage: ein zweiter Wechsel vor dem Ende des ersten behaelt den Kopfname
   }
 });
 
-test('swapPage: ohne API, verdeckt, unter reduzierter Bewegung oder beim Kaltstart tauscht es direkt', async () => {
+test('swapPage: ohne API, verdeckt oder beim Kaltstart tauscht es direkt', async () => {
   const { swapPage } = await import('../public/utils/view-transition.js');
   const cases = [
     { name: 'ohne API', env: stubDocument({ api: false }), reduce: false, animate: true },
     { name: 'verdeckt', env: stubDocument({ visibility: 'hidden' }), reduce: false, animate: true },
-    { name: 'reduzierte Bewegung', env: stubDocument(), reduce: true, animate: true },
     { name: 'Kaltstart', env: stubDocument(), reduce: false, animate: false },
   ];
   for (const { name, env, reduce, animate } of cases) {
@@ -563,6 +561,50 @@ test('swapPage: ohne API, verdeckt, unter reduzierter Bewegung oder beim Kaltsta
       delete globalThis.matchMedia;
     }
   }
+});
+
+// --------------------------------------------------------
+// Critique 2026-10-16 (A5): die Blende laeuft auf dem Token - auch die Gruppe -
+// und blendet unter reduzierter Bewegung, statt hart zu schneiden.
+// --------------------------------------------------------
+test('View Transition: die Gruppen laufen auf --duration-md/--ease-out, nicht auf dem UA-Default', () => {
+  // Gemessen vorher: ::view-transition-group(root) 250ms (UA), die Bilder
+  // 200ms - die Transition stand 306-316ms und schluckte so lange Tipps.
+  const top = [...eachRule(css('layout.css'))].filter((r) => !r.at.length);
+  const bySel = (needle) => top.filter((r) => selectorList(r.selector).some((x) => x.replace(/\s+/g, '') === needle));
+  const groups = bySel('::view-transition-group(*)');
+  assert.ok(groups.some((r) => /animation-duration:\s*var\(--duration-md\)/.test(r.body) && /animation-timing-function:\s*var\(--ease-out\)/.test(r.body)), 'jede Gruppe auf dem Token');
+  // Die Bilder erben von ihrer Gruppe: eine Dauer an `(*)` liesse die stehenden
+  // Namen (Gruppe `animation: none` = 0s) mit sich selbst blenden.
+  for (const img of ['::view-transition-old(*)', '::view-transition-new(*)']) {
+    assert.ok(bySel(img).every((r) => !/animation-duration/.test(r.body)), `${img}: keine eigene Dauer`);
+  }
+});
+
+test('reduzierte Bewegung: der Seitenwechsel blendet - die Gruppen stehen, die Bilder blenden kurz', async () => {
+  const { swapPage, swapTheme } = await import('../public/utils/view-transition.js');
+  for (const [name, run] of [['swapPage', (env) => swapPage(() => {}, { content: env.content })], ['swapTheme', () => swapTheme(() => {})]]) {
+    const env = stubDocument();
+    env.doc.documentElement = { classList: { add() {}, remove() {}, contains: () => false } };
+    globalThis.document = env.doc;
+    globalThis.matchMedia = () => ({ matches: true });
+    try {
+      const pending = run(env);
+      await Promise.resolve(); await Promise.resolve();
+      assert.equal(env.log.filter((l) => l.startsWith('start')).length, 1, `${name}: unter reduzierter Bewegung startet die Blende`);
+      env.finish();
+      await pending;
+    } finally { delete globalThis.document; delete globalThis.matchMedia; }
+  }
+  const reduced = [...eachRule(css('layout.css'))].filter((r) => r.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a)));
+  const bySel = (needle) => reduced.filter((r) => selectorList(r.selector).some((x) => x.replace(/\s+/g, '') === needle));
+  assert.ok(bySel('::view-transition-group(*)').some((r) => /animation:\s*none\s*!important/.test(r.body)), 'die Gruppen tragen Lage und Groesse - sie stehen');
+  for (const img of ['::view-transition-old(root)', '::view-transition-new(root)', '::view-transition-old(page-toolbar)', '::view-transition-new(page-toolbar)']) {
+    const rules = bySel(img);
+    assert.ok(rules.length && rules.every((r) => !/animation:\s*none/.test(r.body)), `${img}: blendet weiter`);
+    assert.ok(rules.some((r) => /animation-duration:\s*var\(--duration-sm\)/.test(r.body)), `${img}: kurze Ersatz-Blende`);
+  }
+  assert.deepEqual([...bySel('::view-transition-old(*)'), ...bySel('::view-transition-new(*)')], [], 'die stehenden Namen erben weiter 0s');
 });
 
 /** Quelltext ohne Kommentare - ein "Daten-await" in einem Kommentar ist kein Warten. */
@@ -2102,8 +2144,9 @@ test('R18: der Theme-Wechsel blendet ueber die Wurzel - nur der gewaehlte, nicht
     await done;
     assert.equal(classes.has('theme-swapping'), false);
   } finally { delete globalThis.document; delete globalThis.matchMedia; }
-  // Ohne API, verdeckt oder unter reduzierter Bewegung: direkt und synchron.
-  for (const [name, e, reduce] of [['ohne API', stubDocument({ api: false }), false], ['verdeckt', stubDocument({ visibility: 'hidden' }), false], ['reduzierte Bewegung', stubDocument(), true]]) {
+  // Ohne API oder verdeckt: direkt und synchron. (Reduzierte Bewegung blendet
+  // seit 2026-10-16 mit - siehe den Test "reduzierte Bewegung: der Seitenwechsel blendet".)
+  for (const [name, e, reduce] of [['ohne API', stubDocument({ api: false }), false], ['verdeckt', stubDocument({ visibility: 'hidden' }), false]]) {
     globalThis.document = e.doc;
     globalThis.matchMedia = () => ({ matches: reduce });
     try {
@@ -2140,4 +2183,98 @@ test('tasks: a failing reload after the dialog closed is reported on the page, n
   assert.match(reload[2], /showToast\([\s\S]*?'danger'\)/, 'der Fehler steht als Toast auf der Seite');
   assert.doesNotMatch(reload[2], /resetSubmit|btnError/, 'nicht an Bedienelementen des geschlossenen Dialogs');
   assert.match(reload[2], /return;/, 'ohne frische Liste wird keine neue Zeile gesucht');
+});
+
+// --------------------------------------------------------
+// Kein toter Keyframe (Critique 2026-10-16, A5): `list-item-in` stand mit
+// einem Kommentar, der einen Nutzer behauptete, den es nicht gab.
+// --------------------------------------------------------
+test('jede @keyframes hat einen Nutzer - im Stylesheet oder im Skript', () => {
+  const stripCss = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '');
+  const sheets = allSheets.map((f) => stripCss(css(f)).replace(/@keyframes\s+[\w-]+/g, ''));
+  const scripts = [];
+  const walk = (dir) => {
+    for (const ent of readdirSync(dir, { withFileTypes: true })) {
+      const url = new URL(ent.name + (ent.isDirectory() ? '/' : ''), dir);
+      if (ent.isDirectory()) { if (ent.name !== 'vendor') walk(url); } else if (/\.(?:js|html)$/.test(ent.name)) scripts.push(readFileSync(url, 'utf8'));
+    }
+  };
+  walk(new URL('../public/', import.meta.url));
+  const used = (name) => {
+    const word = new RegExp(`(?<![\\w-])${name}(?![\\w-])`);
+    return sheets.some((s) => word.test(s)) || scripts.some((s) => word.test(s));
+  };
+  const dead = [...keyframeNames()].filter((name) => !used(name));
+  assert.deepEqual(dead, [], 'Keyframes ohne Nutzer - loeschen statt mit einem Kommentar am Leben halten');
+});
+
+test('Mehr-Blatt und Suche: der Hub federt, die Blende der Einfahrt nicht (Critique 2026-10-16, A5)', () => {
+  const tokens = shorthandTokens();
+  assert.match(tokens.find((tok) => tok.name === '--sheet-fade-in')?.value ?? '', /^var\(--duration-xl\) var\(--ease-out\)$/, 'Dauer wie --sheet-in, ruhige Kurve');
+  // Die Grundregeln (mobil: das Blatt von unten); die Desktop-Palette der Suche blendet nur.
+  const base = [...eachRule(css('layout.css'))].filter((r) => !r.at.length);
+  for (const sel of ['.more-sheet[aria-hidden="false"]', '.search-overlay--visible']) {
+    const body = base.find((r) => r.selector === sel && /transition\s*:/.test(r.body))?.body ?? '';
+    const opacity = splitCommas(body.match(/transition\s*:\s*([^;]+)/)?.[1] ?? '').filter((item) => /^opacity\b/.test(item));
+    assert.ok(opacity.length, `${sel}: Blende gefunden`);
+    for (const item of opacity) assert.match(item, /var\(--sheet-fade-in\)/, `${sel}: ${item} - die Deckkraft federt nicht`);
+  }
+  // Unter reduzierter Bewegung: ein eigener Shorthand. `transition-property:
+  // opacity` allein nahm Dauer und Kurve vom ersten Listeneintrag der offenen
+  // Regel - dem federnden Hub.
+  const reduced = [...eachRule(css('layout.css'))].filter((r) => r.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a)) && r.selector === '.more-sheet[aria-hidden="false"]');
+  assert.ok(reduced.length, 'Vorbedingung: die Regel ist gefunden');
+  for (const r of reduced) {
+    assert.doesNotMatch(r.body, /transition-property\s*:/, 'keine Eigenschaft ohne eigene Kurve');
+    assert.match(r.body, /transition:\s*opacity var\(--transition-fast\)/);
+  }
+});
+
+test('Diagramme der Gesundheit zeichnen sich einmal ein: Mini-Trends, Aktivitaet, Laborwerte, Zyklus-Trends (Critique 2026-10-16, A5)', () => {
+  const health = pageSource('health');
+  // Der Helfer: Linien an `.health-chart__lines`, Balken an `.chart__bar`, Merker = Diagrammname.
+  const helper = health.slice(health.indexOf('function drawHealthCharts('), health.indexOf('function sparklineMarkup('));
+  assert.match(helper, /drawChartOnce\(`\$\{prefix\}:\$\{svg\.getAttribute\('aria-label'\)/);
+  assert.match(helper, /lines: svg\.querySelector\('\.health-chart__lines'\)/);
+  assert.match(helper, /bars: svg\.querySelectorAll\('\.chart__bar'\)/);
+  // Jeder Bereich ruft ihn nach dem Einsetzen seines Markups.
+  for (const [fn, prefix] of [['function wireLabs()', 'health-labs'], ['function wireLabsDetail()', 'health-labs'], ['function wireCycle()', 'health-cycle']]) {
+    const body = health.slice(health.indexOf(fn), health.indexOf(fn) + 200);
+    assert.match(body, new RegExp(`drawHealthCharts\\((?:labs|cycle)\\.root, '${prefix}'\\)`), `${fn}: zeichnet ein`);
+  }
+  assert.match(health, /createIcons\(\{ el: activity\.root \}\);\s*drawHealthCharts\(activity\.root, 'health-activity'\);/);
+  assert.match(health, /\.metric-card__spark'\)\.forEach\(\(spark\) =>\s*drawChartOnce\(`health-spark-/, 'die Mini-Trends der Kacheln');
+  // Die Marken stehen in Gruppen bzw. tragen die Balkenklasse.
+  const labs = health.slice(health.indexOf('function labTrendChart('), health.indexOf('const FLAG_DOT_COLORS'));
+  assert.match(labs, /<g class="health-chart__lines">\s*<polyline[\s\S]*?\$\{dots\}\s*<\/g>/);
+  const simple = health.slice(health.indexOf('function simpleLineChartMarkup('), health.indexOf('function cycleLengthTrendChartMarkup('));
+  assert.match(simple, /<g class="health-chart__lines">\s*\$\{area\}\s*\$\{polylines\}\s*\$\{dots\}\s*<\/g>/);
+  assert.equal((health.match(/<rect class="chart__bar"/g) ?? []).length, 2, 'Zykluslaenge und Blutungslast');
+  assert.match(health, /class="health-activity-chart__bar\$\{[^}]+\} chart__bar"/);
+  // Der Balken waechst aus seiner Grundlinie.
+  const bar = [...eachRule(css('panel.css'))].find((r) => r.selector === '.chart__bar' && !r.at.length)?.body ?? '';
+  assert.match(bar, /transform-box:\s*fill-box/);
+  assert.match(bar, /transform-origin:\s*50% 100%/);
+});
+
+test('Leerzustand: unter der Seitenblende spielt empty-state-in nicht noch einmal (Critique 2026-10-16, A5)', () => {
+  // Textguard; der Lauf steht im Browserbeleg (impl-G5/measure-after.json:
+  // /tasks nach dem Wechsel `animationName: none`, vorher `empty-state-in`).
+  const src = publicSource('utils/empty-state.js');
+  const el = src.slice(src.indexOf('export function emptyStateEl('), src.indexOf('export function mountEmptyState('));
+  assert.match(el, /classList\?\.contains\('page-swapping'\)\)\s*\{\s*box\.style\.animationName = 'none';/,
+    'entsteht der Leerzustand unter der Seitenblende, ist sie sein Einblenden');
+  // Die Regel ist dieselbe wie bei stagger - und die Grundregel blendet weiter.
+  assert.match(publicSource('utils/ux.js'), /classList\?\.contains\('page-swapping'\)\) return;/);
+  const base = [...eachRule(css('layout.css'))].find((r) => r.selector === '.empty-state' && !r.at.length)?.body ?? '';
+  assert.match(base, /animation:\s*empty-state-in var\(--duration-lg\) var\(--ease-out\) both/);
+});
+
+test('Kalender: die Ansicht baut erst, wenn die Kapsel gleitet (afterGlideStart vor dem Neuladen)', () => {
+  const src = pageSource('calendar');
+  assert.match(src, /import \{[^}]*\bafterGlideStart\b[^}]*\} from '\/utils\/segment-indicator\.js';/);
+  const change = src.slice(src.indexOf('viewTabs = wireTablist('), src.indexOf("attachSegmentIndicator(bar.querySelector('.cal-toolbar__views')"));
+  const glide = change.indexOf('await afterGlideStart();');
+  assert.ok(glide > -1, 'der Wechsel wartet den Start der Gleitbewegung ab');
+  assert.ok(glide < change.indexOf('await reloadForView();') && glide < change.indexOf('renderView();'), 'vor dem teuren Aufbau, nicht danach');
 });

@@ -1617,9 +1617,10 @@ async function renderPage(route, previousPath = null, scrollTarget = 0) {
       animate: shouldAnimate,
     });
 
-    // Mit View Transition macht der Browser die Blende. Ohne sie (keine API,
-    // reduzierte Bewegung, verdeckter Tab) eine reine Blende ohne Versatz und
-    // ohne Feder: `.page-transition--in`.
+    // Mit View Transition macht der Browser die Blende - seit 2026-10-16 auch
+    // unter reduzierter Bewegung (utils/view-transition.js). Ohne sie (keine
+    // API, verdeckter Tab) eine reine Blende ohne Versatz und ohne Feder:
+    // `.page-transition--in`.
     if (shouldAnimate && !transition) {
       pageWrapper.classList.add('page-transition--in');
 
