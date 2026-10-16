@@ -6297,7 +6297,6 @@
         "customRange": "自定义时间段",
         "monthFrom": "起始月",
         "monthTo": "结束月",
-        "applyStatistics": "显示统计",
         "print": "打印",
         "shiftCounts": "班次数量",
         "shiftCountsDescription": "按类型统计的计划班次数量。",

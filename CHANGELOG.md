@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Shift statistics update as you choose.** Picking a person or a period recalculates right away,
+  so the "Show statistics" button is gone. Both lists start on the same line, and a period without
+  shifts shows one empty message instead of zeros and two empty cards.
 - **The housekeeping payment chart always shows six months.** Months without a visit appear
   with 0 € instead of being left out, and the bars share the width of the card, so two payments no
   longer sit alone at its left edge.

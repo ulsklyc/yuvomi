@@ -2646,6 +2646,8 @@ test('statistics range: a narrow field shows a select with the same choices inst
 // Einstellungen waren einer zu viel, und der eine war versteckt.
 test('Auswertung oeffnet mit den Zahlen, und "Meine Einstellungen" stehen im Modulblatt statt im Tab', async () => {
   const { __test } = await import('../public/pages/schedule.js');
+  // Seit R19 zeigt ein leerer Zeitraum EINEN Leerzustand - die Zahlen brauchen einen Eintrag.
+  __test.setStatisticsEntries([{ date: '2026-10-01', shift_type: { id: 1, name: 'Frueh', short_code: 'F', color: '#0E7490', start_time: '06:00', end_time: '14:00' } }]);
   const html = __test.renderStatistics();
   const at = (needle) => html.indexOf(needle);
   assert.ok(at('schedule-stat-metrics') > 0, 'Vorbedingung: die Kennzahlen stehen im Markup');
@@ -2873,12 +2875,35 @@ test('P12: statistics show each total once, and the hours tile is named for the 
   const { installMiniDom } = await import('./mini-dom.js');
   installMiniDom();
   const { __test } = await import('../public/pages/schedule.js');
+  __test.setStatisticsEntries([{ date: '2026-10-01', shift_type: { id: 1, name: 'Frueh', short_code: 'F', color: '#0E7490', start_time: '06:00', end_time: '14:00' } }]);
   const html = __test.renderStatistics();
   assert.match(html, /schedule-stat-metrics/, 'Vorbedingung: die Kennzahlen stehen im Markup');
   assert.doesNotMatch(html, /schedule-stat-total/, 'keine zweite Summenzeile unter den Karten');
   const labels = [...html.matchAll(/class="metric-card__label">([^<]+)</g)].map((m) => m[1]);
   assert.ok(labels.includes('schedule.totalHours'), `die Stunden-Kachel heisst "Stunden gesamt" (${labels.join(', ')})`);
   assert.ok(!labels.includes('schedule.workedHours'), 'nicht "je Schichtart" ueber einer Summe');
+});
+
+// R19 (Critique 2026-10-16, Schichtplan-Auswertung): kein Anwenden-Knopf
+// (jede Aenderung rechnet neu), eine Grundlinie fuer nebeneinanderstehende
+// Karten, keine Karte in der Karte, und ein leerer Zeitraum ist EIN Zustand.
+test('R19: die Auswertung rechnet ohne Anwenden-Knopf, leer ist ein Zustand, Karten fluchten', async () => {
+  const { installMiniDom } = await import('./mini-dom.js');
+  installMiniDom();
+  const { __test } = await import('../public/pages/schedule.js');
+  __test.setStatisticsEntries([]);
+  const leer = __test.renderStatistics();
+  assert.doesNotMatch(leer, /schedule-stat-metrics|schedule-stat-card/, 'leer: keine Null-Kacheln und keine leeren Karten');
+  assert.match(leer, /class="empty-state/, 'leer: ein Leerzustand');
+  assert.doesNotMatch(leer, /schedule\.applyStatistics|<button class="btn btn--primary">/, 'kein Anwenden-Knopf');
+  const src = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  assert.match(src, /function applyStatistics\(\) \{\s*root\?\.querySelector\('form\[data-form="statistics"\]'\)\?\.requestSubmit\?\.\(\);/);
+  assert.match(src, /renderPage\(\);\s*applyStatistics\(\);\s*\}/, 'der Zeitraum-Wechsel rechnet sofort');
+  assert.match(src, /event\.target\.closest\('form\[data-form="statistics"\]'\)\) \{[\s\S]{0,120}applyStatistics\(\);/, 'Person und Daten ebenso');
+  const css = readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8');
+  assert.match(css, /\.schedule-stat-card \{\s*align-content: start;/, 'die Zeilen stehen oben, nebeneinander auf einer Linie');
+  const list = css.match(/\.schedule-stat-list \{[^}]*\}/)?.[0] ?? '';
+  assert.doesNotMatch(list, /background|padding/, 'keine zweite Flaeche in der Karte');
 });
 
 // P12 (Re-Critique 2026-09-28, A2 P2-5): der Vergleich passte am Desktop nicht

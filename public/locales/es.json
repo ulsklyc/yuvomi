@@ -6297,7 +6297,6 @@
         "customRange": "Periodo personalizado",
         "monthFrom": "Desde el mes",
         "monthTo": "Hasta el mes",
-        "applyStatistics": "Mostrar estadísticas",
         "print": "Imprimir",
         "shiftCounts": "Recuento de turnos",
         "shiftCountsDescription": "Número de turnos planificados por tipo.",

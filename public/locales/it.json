@@ -6297,7 +6297,6 @@
         "customRange": "Periodo personalizzato",
         "monthFrom": "Dal mese",
         "monthTo": "Al mese",
-        "applyStatistics": "Mostra statistiche",
         "print": "Stampa",
         "shiftCounts": "Conteggio turni",
         "shiftCountsDescription": "Numero di turni pianificati per tipo.",

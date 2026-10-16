@@ -1415,6 +1415,17 @@ function setStatisticsRange(range) {
   statistics = { ...statistics, range, entries: [], bounds: null, loading: false, error: false };
   ++statisticsRequestId;
   renderPage();
+  applyStatistics();
+}
+
+/**
+ * KEIN ANWENDEN-KNOPF (R19, Critique 2026-10-16): wer Person oder Zeitraum
+ * wechselte, sah bis zum Tipp auf "Auswertung anzeigen" die alten oder gar
+ * keine Zahlen. Jede Aenderung im Filter rechnet jetzt sofort neu - ueber
+ * denselben Weg wie vorher das Absenden (submitForm, Generationszaehler).
+ */
+function applyStatistics() {
+  root?.querySelector('form[data-form="statistics"]')?.requestSubmit?.();
 }
 
 function renderStatistics() {
@@ -1457,6 +1468,12 @@ function renderStatistics() {
       ? loadErrorHTML({ title: t('common.errorGeneric'), error: statistics.error, attrs: { 'data-action': 'retry-statistics' } })
       : !bounds
       ? '<p class="card card--padded schedule-stat-empty" role="status">' + esc(t('schedule.invalidRange')) + '</p>'
+      : !statistics.entries.length
+      // LEER IST EIN ZUSTAND, KEINE ZWEI LEEREN KARTEN (R19): ohne einen
+      // Eintrag im Zeitraum standen "0 Schichten", "0 h" und zwei Karten mit
+      // "Keine Daten". Jetzt EIN Leerzustand, der Zeitraum und Person nennt.
+      ? '<p class="schedule-stat-period u-meta">' + esc(t('schedule.statisticsFor', { user: userName(selectedUser), from: formatDate(bounds.from), to: formatDate(bounds.to) })) + '</p>'
+        + emptyStateHTML({ icon: 'chart-column', title: t('schedule.noStatistics') })
       : '<p class="schedule-stat-period u-meta">' + esc(t('schedule.statisticsFor', { user: userName(selectedUser), from: formatDate(bounds.from), to: formatDate(bounds.to) })) + '</p>'
       + '<div class="metric-grid schedule-stat-metrics' + (overtime?.over ? ' schedule-stat-metrics--with-overtime' : '') + '">'
       + '<article class="metric-card"><div class="metric-card__label">' + esc(t('schedule.shiftCounts')) + '</div><div class="metric-card__value">' + esc(String(summary.totalCount)) + '</div><div class="metric-card__note">' + esc(t('schedule.shifts')) + '</div></article>'
@@ -1499,7 +1516,7 @@ function renderStatistics() {
     + '<select class="form-input schedule-stat-range__select" name="statistics_range" aria-label="' + esc(t('schedule.statisticsRange')) + '">'
     + STATISTICS_RANGES.map(([value, label]) => '<option value="' + value + '"' + (range === value ? ' selected' : '') + '>' + esc(t(label)) + '</option>').join('')
     + '</select></div>' + (controls ? '<div class="schedule-stat-dates">' + controls + '</div>' : '')
-    + '<div class="schedule-stat-filter-actions"><button class="btn btn--primary">' + esc(t('schedule.applyStatistics')) + '</button>'
+    + '<div class="schedule-stat-filter-actions">'
     + '<button type="button" class="btn btn--secondary" data-action="print-statistics"><i data-lucide="printer" aria-hidden="true"></i>' + esc(t('schedule.print')) + '</button></div></form>'
     + results + '</section>';
 }
@@ -2092,6 +2109,9 @@ function renderShell() {
     if (event.target.matches('.schedule-stat-range__select')) {
       // Das schmale Gegenstueck zum Segment (R9 M11) - derselbe Wechsel.
       setStatisticsRange(event.target.value);
+    } else if (event.target.closest('form[data-form="statistics"]')) {
+      // Person, Monate oder Tage: sofort neu rechnen (applyStatistics).
+      applyStatistics();
     } else if (event.target.closest('[data-ms-input="overview-people"]')) {
       // Auswahl ist rein clientseitig - kein Fetch, nur eine Neuzeichnung
       // (siehe Kommentar an overview weiter oben).
@@ -3435,4 +3455,4 @@ export async function update({ path } = {}) {
 // bereits pur bzw. nehmen ihre Eingabe jetzt als Parameter statt sie fest aus
 // `state` zu lesen - ein Test kann so echte Tage hineingeben und das Ergebnis
 // pruefen, statt nur zu belegen, dass der Funktionsname im Quelltext steht.
-export const __test = { availableTypeFields, shiftTypeFieldsEditor, syncTypeFieldPicker, editorAction, shiftTypeRow, patternRow, patternDaysEditorHtml, patternSaveOrder, initialOverviewSelection, renderOverview, renderToday, overviewLaneHeader, planningPanel, scheduleFabIntent, renderStatistics, patternFields, formField, shiftFields, reminderOffsetField, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, patternsInMemberOrder, rangeDifference, wireRangeFollow, reportReversedRange, saveCreatedSchedule, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };
+export const __test = { setStatisticsEntries: (entries) => { statistics = { ...statistics, entries }; }, availableTypeFields, shiftTypeFieldsEditor, syncTypeFieldPicker, editorAction, shiftTypeRow, patternRow, patternDaysEditorHtml, patternSaveOrder, initialOverviewSelection, renderOverview, renderToday, overviewLaneHeader, planningPanel, scheduleFabIntent, renderStatistics, patternFields, formField, shiftFields, reminderOffsetField, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, patternsInMemberOrder, rangeDifference, wireRangeFollow, reportReversedRange, saveCreatedSchedule, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };

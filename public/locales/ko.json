@@ -6297,7 +6297,6 @@
         "customRange": "직접 지정",
         "monthFrom": "시작 월",
         "monthTo": "종료 월",
-        "applyStatistics": "통계 보기",
         "print": "인쇄",
         "shiftCounts": "근무 횟수",
         "shiftCountsDescription": "유형별 예정 근무 횟수.",

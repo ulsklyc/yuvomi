@@ -6297,7 +6297,6 @@
         "customRange": "Egyéni időszak",
         "monthFrom": "Hónaptól",
         "monthTo": "Hónapig",
-        "applyStatistics": "Statisztika megjelenítése",
         "print": "Nyomtatás",
         "shiftCounts": "Műszakok száma",
         "shiftCountsDescription": "A tervezett műszakok száma típusonként.",

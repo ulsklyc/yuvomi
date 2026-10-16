@@ -481,6 +481,14 @@
   gap: var(--space-3);
 }
 
+/* EINE GRUNDLINIE NEBENEINANDER (R19, Critique 2026-10-16): die Karten einer
+ * Reihe sind gleich hoch, und die kuerzere verteilte die Resthoehe auf ihre
+ * Zeilen - "Stunden je Schichtart" begann ihre Liste 24px tiefer als
+ * "Schichtanzahl". Die Zeilen stehen oben, die Luft bleibt unten. */
+.schedule-stat-card {
+  align-content: start;
+}
+
 .schedule-stat-filters {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -615,12 +623,11 @@
   flex: 0 0 auto;
 }
 
+/* Keine Karte in der Karte (R19): die Liste stand auf einer zweiten,
+ * gehobenen Flaeche in der Karte. Die Zeilen stehen direkt in ihr. */
 .schedule-stat-list {
   display: grid;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-raised);
+  gap: var(--space-3);
 }
 
 .schedule-stat-row {

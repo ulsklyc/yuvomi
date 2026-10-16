@@ -6297,7 +6297,6 @@
         "customRange": "カスタム期間",
         "monthFrom": "開始月",
         "monthTo": "終了月",
-        "applyStatistics": "集計を表示",
         "print": "印刷",
         "shiftCounts": "シフト数",
         "shiftCountsDescription": "種類ごとの予定シフト数。",

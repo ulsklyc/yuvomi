@@ -6297,7 +6297,6 @@
         "customRange": "Egen period",
         "monthFrom": "Från månad",
         "monthTo": "Till månad",
-        "applyStatistics": "Visa statistik",
         "print": "Skriv ut",
         "shiftCounts": "Antal skift",
         "shiftCountsDescription": "Antal schemalagda skift per typ.",

@@ -6297,7 +6297,6 @@
         "customRange": "Custom range",
         "monthFrom": "Month from",
         "monthTo": "Month to",
-        "applyStatistics": "Show statistics",
         "print": "Print",
         "shiftCounts": "Shift count",
         "shiftCountsDescription": "Number of scheduled shifts by type.",

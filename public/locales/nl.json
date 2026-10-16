@@ -6297,7 +6297,6 @@
         "customRange": "Eigen periode",
         "monthFrom": "Maand van",
         "monthTo": "Maand tot",
-        "applyStatistics": "Statistieken tonen",
         "print": "Afdrukken",
         "shiftCounts": "Aantal diensten",
         "shiftCountsDescription": "Aantal geplande diensten per type.",
