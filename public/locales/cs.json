@@ -5881,6 +5881,7 @@
         "redeemError": "Vyzvednutí se nezdařilo.",
         "pendingApprovals": "Čekající žádosti",
         "yourPending": "Vaše čekající žádosti",
+        "yourPoints": "Tvoje body",
         "approve": "Schválit",
         "reject": "Zamítnout",
         "confirmReject": "Zamítnout tuto žádost o vyzvednutí? Body budou vráceny.",

@@ -5745,6 +5745,7 @@
         "redeemError": "Innløsning mislyktes.",
         "pendingApprovals": "Venter på godkjenning",
         "yourPending": "Dine ventende forespørsler",
+        "yourPoints": "Poengene dine",
         "approve": "Godkjenn",
         "reject": "Avvis",
         "confirmReject": "Avvis denne innløsningsforespørselen? Poengene vil bli refundert.",

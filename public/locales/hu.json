@@ -5745,6 +5745,7 @@
         "redeemError": "A beváltás sikertelen.",
         "pendingApprovals": "Függőben lévő kérések",
         "yourPending": "Az Ön függőben lévő kérései",
+        "yourPoints": "A pontjaid",
         "approve": "Jóváhagyás",
         "reject": "Elutasítás",
         "confirmReject": "Elutasítja ezt a beváltási kérést? A pontok visszakerülnek.",

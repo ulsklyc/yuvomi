@@ -5745,6 +5745,7 @@
         "redeemError": "Falha ao resgatar.",
         "pendingApprovals": "Solicitações pendentes",
         "yourPending": "Suas solicitações pendentes",
+        "yourPoints": "Os teus pontos",
         "approve": "Aprovar",
         "reject": "Recusar",
         "confirmReject": "Recusar esta solicitação de resgate? Os pontos serão devolvidos.",

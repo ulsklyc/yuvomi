@@ -5745,6 +5745,7 @@
         "redeemError": "Redemption failed.",
         "pendingApprovals": "Pending requests",
         "yourPending": "Your pending requests",
+        "yourPoints": "Your points",
         "approve": "Approve",
         "reject": "Reject",
         "confirmReject": "Reject this redemption request? The points will be refunded.",

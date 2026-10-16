@@ -5745,6 +5745,7 @@
         "redeemError": "Kullanma başarısız.",
         "pendingApprovals": "Bekleyen istekler",
         "yourPending": "Bekleyen istekleriniz",
+        "yourPoints": "Puanların",
         "approve": "Onayla",
         "reject": "Reddet",
         "confirmReject": "Bu kullanım isteği reddedilsin mi? Puanlar iade edilecek.",

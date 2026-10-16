@@ -5745,6 +5745,7 @@
         "redeemError": "Riscatto non riuscito.",
         "pendingApprovals": "Richieste in sospeso",
         "yourPending": "Le tue richieste in sospeso",
+        "yourPoints": "I tuoi punti",
         "approve": "Approva",
         "reject": "Rifiuta",
         "confirmReject": "Rifiutare questa richiesta di riscatto? I punti verranno restituiti.",

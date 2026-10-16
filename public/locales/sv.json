@@ -5745,6 +5745,7 @@
         "redeemError": "Inlösen misslyckades.",
         "pendingApprovals": "Väntande förfrågningar",
         "yourPending": "Dina väntande förfrågningar",
+        "yourPoints": "Dina poäng",
         "approve": "Godkänn",
         "reject": "Avslå",
         "confirmReject": "Avslå denna inlösenförfrågan? Poängen återförs.",

@@ -5745,6 +5745,7 @@
         "redeemError": "Échec de l’échange.",
         "pendingApprovals": "Demandes en attente",
         "yourPending": "Vos demandes en attente",
+        "yourPoints": "Tes points",
         "approve": "Approuver",
         "reject": "Refuser",
         "confirmReject": "Refuser cette demande d’échange ? Les points seront remboursés.",

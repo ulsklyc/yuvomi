@@ -5745,6 +5745,7 @@
         "redeemError": "Einlösen fehlgeschlagen.",
         "pendingApprovals": "Offene Anfragen",
         "yourPending": "Deine offenen Anfragen",
+        "yourPoints": "Deine Punkte",
         "approve": "Freigeben",
         "reject": "Ablehnen",
         "confirmReject": "Diese Einlöse-Anfrage ablehnen? Die Punkte werden zurückgebucht.",

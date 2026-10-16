@@ -5846,6 +5846,7 @@
         "redeemError": "Não foi possível realizar o resgate.",
         "pendingApprovals": "Solicitações pendentes",
         "yourPending": "Suas solicitações pendentes",
+        "yourPoints": "Seus pontos",
         "approve": "Aprovar",
         "reject": "Recusar",
         "confirmReject": "Deseja recusar esta solicitação de resgate? Os pontos serão devolvidos.",

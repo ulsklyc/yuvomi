@@ -5745,6 +5745,7 @@
         "redeemError": "交換に失敗しました。",
         "pendingApprovals": "保留中のリクエスト",
         "yourPending": "あなたの保留中のリクエスト",
+        "yourPoints": "あなたのポイント",
         "approve": "承認",
         "reject": "却下",
         "confirmReject": "この交換リクエストを却下しますか？ポイントは返却されます。",

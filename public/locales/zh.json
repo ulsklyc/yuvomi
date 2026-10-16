@@ -5745,6 +5745,7 @@
         "redeemError": "兑换失败。",
         "pendingApprovals": "待处理请求",
         "yourPending": "您的待处理请求",
+        "yourPoints": "你的积分",
         "approve": "批准",
         "reject": "拒绝",
         "confirmReject": "拒绝此兑换请求？积分将退回。",

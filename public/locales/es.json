@@ -5745,6 +5745,7 @@
         "redeemError": "Error al canjear.",
         "pendingApprovals": "Solicitudes pendientes",
         "yourPending": "Tus solicitudes pendientes",
+        "yourPoints": "Tus puntos",
         "approve": "Aprobar",
         "reject": "Rechazar",
         "confirmReject": "¿Rechazar esta solicitud de canje? Se devolverán los puntos.",

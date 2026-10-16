@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Children see their own points first.** On the Rewards overview a member who collects points
+  and is not a parent now finds "Your points" at the top, with how far it is to the next reward and
+  the request button; everyone else's points follow below.
 - **Birthdays are grouped by month, and the next one stands out.** The list carries a heading for
   each month, the countdown of the next birthday is in the module colour, and a birthday's details
   say its date, age and countdown once at the top instead of three times.

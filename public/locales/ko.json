@@ -5745,6 +5745,7 @@
         "redeemError": "교환에 실패했습니다.",
         "pendingApprovals": "대기 중인 요청",
         "yourPending": "대기 중인 내 요청",
+        "yourPoints": "내 포인트",
         "approve": "승인",
         "reject": "거절",
         "confirmReject": "이 교환 요청을 거절할까요? 포인트가 환급됩니다.",
