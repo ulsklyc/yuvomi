@@ -3900,8 +3900,10 @@ test('R17: keine Abschnittsueberschrift steht in einem Blatt zweimal ("Termine",
 test('R17: die Sprungmarken heissen wie die Ueberschriften der Abschnitte, nicht wie die Registry', async () => {
   const shell = await readFile(new URL('../public/settings/shell.js', import.meta.url), 'utf8');
   const fn = shell.slice(shell.indexOf('function syncJumpLabels('), shell.indexOf('async function renderSheetSection('));
-  assert.match(fn, /host\?\.querySelector\('\.settings-section__title, \.settings-navigation-panel__title'\)/,
-    'gelesen wird die erste sichtbare Abschnittsueberschrift im Traeger');
+  // R19: auch ein Kartentitel ist eine Ueberschrift - im Gesundheitsblatt hiess
+  // die Marke ueber "Vorsorge-Arten" sonst "Gesundheit".
+  assert.match(fn, /host\?\.querySelector\('\.settings-section__title, \.settings-navigation-panel__title, \.settings-card__title'\)/,
+    'gelesen wird die erste sichtbare Abschnittsueberschrift im Traeger, auch ein Kartentitel');
   assert.match(fn, /link\.textContent = text/);
   assert.match(shell, /link\.dataset\.jumpSection = target\.id/, 'die Marke weiss, zu welchem Traeger sie gehoert');
   const section = shell.slice(shell.indexOf('async function renderSheetSection('), shell.indexOf('async function renderLeafContent('));
@@ -3910,6 +3912,21 @@ test('R17: die Sprungmarken heissen wie die Ueberschriften der Abschnitte, nicht
   const leaf = shell.slice(shell.indexOf('async function renderLeafContent('), shell.indexOf('function levelScopedHeadings('));
   assert.match(leaf, /await awaitSections\([\s\S]*?\);[\s\S]*?jump\?\.classList\.remove\('settings-sheet-jump--pending'\)/,
     'nach der Frist stehen die Marken in jedem Fall');
+});
+
+// R19 (Critique 2026-10-16, Modulblatt Gesundheit): "Zyklus-Tab" ist
+// veraltet - die Gesundheit hat Bereiche, keine Reiter -, und die Suche nach
+// "Zyklus" fand zweimal "Zyklus-Tab anzeigen" (fuer mich, fuer den Haushalt).
+test('R19: das Gesundheitsblatt spricht vom Zyklus, nicht vom Tab, und die beiden Schalter heissen verschieden', async () => {
+  const locales = (await import('node:fs')).readdirSync(new URL('../public/locales/', import.meta.url)).filter((f) => f.endsWith('.json'));
+  const keys = ['healthCycleEnableLabel', 'healthCyclePersonalLabel', 'healthCycleHint', 'healthCyclePersonalHint', 'healthCyclePersonalHouseholdOff', 'sheetHealthDescription'];
+  for (const file of locales) {
+    const json = JSON.parse(await readFile(new URL(`../public/locales/${file}`, import.meta.url), 'utf8'));
+    assert.notEqual(json.settings.healthCycleEnableLabel, json.settings.healthCyclePersonalLabel, `${file}: zwei gleiche Treffer in der Suche`);
+    if (file === 'de.json' || file === 'en.json') {
+      for (const key of keys) assert.doesNotMatch(json.settings[key], /\btab\b|-Tab/i, `${file} ${key}: ${json.settings[key]}`);
+    }
+  }
 });
 
 test('R17: die Standard-Erinnerungen sind Chips des Kanons mit aria-pressed, keine Checkbox in einer Pille', async () => {

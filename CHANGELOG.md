@@ -36,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The Health settings page names the cycle plainly.** The switches say "Show cycle" for yourself
+  and "Offer the cycle in the household" for everyone instead of "Show cycle tab" twice, so a
+  search for "cycle" finds each once, and the jump links at the top carry the headings they lead
+  to ("Prevention types" instead of "Health").
 - **Health speaks one colour for an out-of-range lab value.** A report card's "1 out of range" and
   the "Low" or "High" next to a value now share the same warning colour, with the arrow and the
   word telling the direction, and the badge's warning sign matches its text. No text in Health is

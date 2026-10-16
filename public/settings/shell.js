@@ -884,7 +884,10 @@ function syncJumpLabels(leafContainer) {
     const host = leafContainer.querySelector(`#${CSS.escape(sheetSectionId(link.dataset.jumpSection))}`);
     // Ein Abschnitt ohne eigene Ueberschrift (ein Feed: ein Schalter, der
     // seinen Namen selbst traegt) heisst wie seine erste Zeile.
-    const heading = host?.querySelector('.settings-section__title, .settings-navigation-panel__title')
+    // `.settings-card__title` gehoert dazu (R19): ein Abschnitt, dessen erste
+    // Ueberschrift ein Kartentitel ist (Gesundheit: "Vorsorge-Arten"), hiess
+    // in der Marke noch wie sein Registry-Blatt ("Gesundheit").
+    const heading = host?.querySelector('.settings-section__title, .settings-navigation-panel__title, .settings-card__title')
       ?? host?.querySelector('.settings-group .toggle-row__label, .settings-group .settings-setting-row__label');
     const text = collapseText(heading?.textContent);
     if (text && link.textContent !== text) link.textContent = text;
