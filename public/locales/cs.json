@@ -2159,7 +2159,8 @@
         "syncErrorGoogle": "Připojení k Google selhalo. Zkuste to prosím znovu.",
         "syncErrorOutlook": "Připojení k Outlook selhalo. Zkuste to prosím znovu.",
         "syncErrorApple": "Připojení k Apple selhalo. Zkuste to prosím znovu.",
-        "addMember": "+ Přidat člena",
+        "addMember": "Přidat člena",
+        "memberYou": "Já",
         "newMemberTitle": "Nový člen rodiny",
         "usernameLabel": "Uživatelské jméno",
         "displayNameLabel": "Zobrazované jméno",
@@ -3069,7 +3070,7 @@
         "invites": {
             "title": "Pozvánky",
             "intro": "Pozvi nové členy odkazem. Heslo si zvolí sami.",
-            "add": "+ Vytvořit pozvánku",
+            "add": "Vytvořit pozvánku",
             "submit": "Vytvořit pozvánku",
             "usernameHint": "Nepovinné. Když pole necháš prázdné, jméno si zvolí pozvaná osoba sama.",
             "sendEmail": "Odeslat pozvánku e-mailem",

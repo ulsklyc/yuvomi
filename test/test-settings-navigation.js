@@ -3300,7 +3300,22 @@ test('R14: Familie legt im Blatt-Dialog an, Fuss [Abbrechen][Primaer], Zeilen mi
   assert.match(src, /content: addMemberFormHtml\(\)/);
   assert.match(src, /content: addInviteFormHtml\(\)/);
   assert.match(src, /<ul class="settings-members row-divided" id="members-list">/, 'Haarlinien zwischen den Mitgliedern');
-  assert.doesNotMatch(src, /btn--primary settings-add-btn/, 'kein violetter Balken ueber die volle Breite');
+  // R19 (Critique 2026-10-16, "Einladen prominenter"): Einladen ist der
+  // EINE gefuellte Knopf unter der Liste - ein Knopf in seiner Breite neben
+  // "Mitglied hinzufuegen", kein Balken ueber die volle Breite (R14).
+  assert.match(src, /<div class="settings-member-actions">\s*<button class="btn btn--primary settings-add-btn" id="add-invite-btn" hidden><i data-lucide="mail-plus" aria-hidden="true"><\/i>\$\{t\('settings\.invites\.add'\)\}<\/button>\s*<button class="btn btn--secondary settings-add-btn" id="add-member-btn" hidden><i data-lucide="user-plus"/,
+    'Einladen gefuellt vorn, Anlegen ruhig daneben, beide mit Icon');
+  assert.equal((src.match(/btn--primary settings-add-btn/g) ?? []).length, 1, 'genau ein gefuellter Knopf');
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  assert.match(css, /\.settings-add-btn \{\s*align-self: flex-start;/, 'kein Balken ueber die volle Breite');
+  assert.match(css, /\.settings-member-actions \{\s*display: flex;/);
+  // Die eigene Zeile traegt "Ich", und kein Knopf malt ein "+" als Zeichen.
+  assert.match(src, /u\.id === currentUserId \? ` <span class="settings-member__self">\$\{esc\(t\('settings\.memberYou'\)\)\}<\/span>`/);
+  for (const lang of ['de', 'en']) {
+    const json = JSON.parse(await readFile(new URL(`../public/locales/${lang}.json`, import.meta.url), 'utf8'));
+    assert.doesNotMatch(json.settings.addMember, /^\+/, `${lang}: "+" als Text-Icon`);
+    assert.doesNotMatch(json.settings.invites.add, /^\+/, `${lang}: "+" als Text-Icon`);
+  }
   // Seit #1381 heisst der Knopf "entfernen", nicht "loeschen": ein Konto mit
   // Spuren in geteilten Daten wird deaktiviert. Sein Objekt nennt er weiter.
   assert.match(src, /t\('settings\.removeMemberNamed', \{ name: u\.display_name \}\)/, 'der Entfernen-Knopf nennt sein Objekt');

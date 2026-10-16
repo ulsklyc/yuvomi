@@ -1940,7 +1940,8 @@
         "syncErrorGoogle": "La connexion à Google a échoué. Veuillez réessayer.",
         "syncErrorOutlook": "La connexion à Outlook a échoué. Veuillez réessayer.",
         "syncErrorApple": "La connexion à Apple a échoué. Veuillez réessayer.",
-        "addMember": "+ Ajouter un membre",
+        "addMember": "Ajouter un membre",
+        "memberYou": "Moi",
         "newMemberTitle": "Nouveau membre de la famille",
         "usernameLabel": "Nom d'utilisateur",
         "displayNameLabel": "Nom affiché",
@@ -2973,7 +2974,7 @@
         "invites": {
             "title": "Invitations",
             "intro": "Invitez de nouveaux membres par lien. Ils choisissent eux-mêmes leur mot de passe.",
-            "add": "+ Créer une invitation",
+            "add": "Créer une invitation",
             "submit": "Créer l'invitation",
             "usernameHint": "Facultatif. Laissez vide et la personne invitée choisira son nom.",
             "sendEmail": "Envoyer l'invitation par e-mail",

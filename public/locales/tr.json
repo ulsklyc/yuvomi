@@ -1940,7 +1940,8 @@
         "syncErrorGoogle": "Google'a bağlanılamadı. Lütfen tekrar deneyin.",
         "syncErrorOutlook": "Outlook'a bağlanılamadı. Lütfen tekrar deneyin.",
         "syncErrorApple": "Apple'a bağlanılamadı. Lütfen tekrar deneyin.",
-        "addMember": "+ Üye ekle",
+        "addMember": "Üye ekle",
+        "memberYou": "Ben",
         "newMemberTitle": "Yeni Aile Üyesi",
         "usernameLabel": "Kullanıcı adı",
         "displayNameLabel": "Görünen ad",
@@ -2973,7 +2974,7 @@
         "invites": {
             "title": "Davetler",
             "intro": "Yeni üyeleri bağlantıyla davet et. Parolalarını kendileri belirler.",
-            "add": "+ Davet oluştur",
+            "add": "Davet oluştur",
             "submit": "Davet oluştur",
             "usernameHint": "İsteğe bağlı. Boş bırakırsan davet edilen kişi adını kendi seçer.",
             "sendEmail": "Daveti e-posta ile gönder",

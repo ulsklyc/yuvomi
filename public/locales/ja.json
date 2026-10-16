@@ -1940,7 +1940,8 @@
         "syncErrorGoogle": "Google への接続に失敗しました。もう一度お試しください。",
         "syncErrorOutlook": "Outlook への接続に失敗しました。もう一度お試しください。",
         "syncErrorApple": "Apple への接続に失敗しました。もう一度お試しください。",
-        "addMember": "+ メンバーを追加",
+        "addMember": "メンバーを追加",
+        "memberYou": "自分",
         "newMemberTitle": "新しい家族メンバー",
         "usernameLabel": "ユーザー名",
         "displayNameLabel": "表示名",
@@ -2973,7 +2974,7 @@
         "invites": {
             "title": "招待",
             "intro": "リンクで新しいメンバーを招待します。パスワードは本人が設定します。",
-            "add": "+ 招待を作成",
+            "add": "招待を作成",
             "submit": "招待を作成",
             "usernameHint": "任意。空欄にすると、招待された人が自分で名前を選びます。",
             "sendEmail": "招待をメールで送る",

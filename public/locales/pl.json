@@ -2255,7 +2255,8 @@
         "syncErrorGoogle": "Połączenie z Google nie powiodło się. Spróbuj ponownie.",
         "syncErrorOutlook": "Połączenie z Outlook nie powiodło się. Spróbuj ponownie.",
         "syncErrorApple": "Połączenie z Apple nie powiodło się. Spróbuj ponownie.",
-        "addMember": "+ Dodaj członka",
+        "addMember": "Dodaj członka",
+        "memberYou": "Ja",
         "newMemberTitle": "Nowy członek rodziny",
         "usernameLabel": "Nazwa użytkownika",
         "displayNameLabel": "Wyświetlana nazwa",
@@ -3180,7 +3181,7 @@
         "invites": {
             "title": "Zaproszenia",
             "intro": "Zapraszaj nowych członków linkiem. Hasło ustalają sami.",
-            "add": "+ Utwórz zaproszenie",
+            "add": "Utwórz zaproszenie",
             "submit": "Utwórz zaproszenie",
             "usernameHint": "Opcjonalne. Jeśli zostawisz puste, zaproszona osoba sama wybierze nazwę.",
             "sendEmail": "Wyślij zaproszenie e-mailem",

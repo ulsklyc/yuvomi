@@ -1863,6 +1863,21 @@
   align-self: flex-start;
 }
 
+/* Einladen und Anlegen nebeneinander unter der Mitgliederliste (R19). */
+.settings-member-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* DIE EIGENE ZEILE (R19): "Ich" hinter dem eigenen Namen, leise wie die
+ * Meta-Zeile - wie "(Ich)" in der Familienfreigabe. */
+.settings-member__self {
+  font-size: var(--type-caption);
+  font-weight: var(--font-weight-regular);
+  color: var(--color-text-secondary);
+}
+
 .settings-token-output {
   padding: var(--space-3);
   /* Inset-Well statt Kasten in der Karte (tokens.css). */

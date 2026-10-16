@@ -198,7 +198,7 @@ function memberHtml(u, currentUserId, { orderable = false, aligned = false } = {
     <li class="settings-member${former ? ' settings-member--former' : ''}${orderable ? ' settings-member--orderable' : ''}" data-id="${u.id}">${handle}
       ${avatarHtml(u, 'settings-avatar settings-avatar--sm')}
       <div class="settings-member__info">
-        <span class="settings-member__name" data-member-name>${esc(u.display_name)}</span>
+        <span class="settings-member__name" data-member-name>${esc(u.display_name)}${u.id === currentUserId ? ` <span class="settings-member__self">${esc(t('settings.memberYou'))}</span>` : ''}</span>
         <span class="settings-member__meta">@${esc(u.username)} · ${esc(familyRole)}${systemRole}${formerBadge}</span>
         ${profileMeta ? `<span class="settings-member__meta">${profileMeta}</span>` : ''}
       </div>${editBtn}${deleteBtn}
@@ -348,7 +348,22 @@ function renderPage(container) {
         <ul class="settings-members row-divided" id="members-list"></ul>
         <p class="form-hint" id="members-order-hint" hidden>${t('settings.memberOrderHint')}</p>
         <div class="sr-only" role="status" aria-live="polite" id="members-order-announce"></div>
-        <button class="btn btn--secondary settings-add-btn" id="add-member-btn" hidden>${t('settings.addMember')}</button>
+        ${/* EINLADEN IST DER WEG (R19, Critique 2026-10-16). Einladen stand
+             als ruhiger Knopf in einer eigenen Karte UNTER der Zwei-Faktor-
+             Pflicht, das direkte Anlegen (mit vergebenem Passwort) oben an der
+             Liste - der seltenere Weg war der sichtbarere. Jetzt stehen beide
+             unter der Liste, Einladen gefuellt vorn: die eingeladene Person
+             waehlt ihr Passwort selbst. Beide mit Icon statt "+"-Zeichen. */ ''}
+        <div class="settings-member-actions">
+          <button class="btn btn--primary settings-add-btn" id="add-invite-btn" hidden><i data-lucide="mail-plus" aria-hidden="true"></i>${t('settings.invites.add')}</button>
+          <button class="btn btn--secondary settings-add-btn" id="add-member-btn" hidden><i data-lucide="user-plus" aria-hidden="true"></i>${t('settings.addMember')}</button>
+        </div>
+      </div>
+
+      <div class="settings-card" id="invites-card">
+        <h3 class="settings-card__title">${t('settings.invites.title')}</h3>
+        <p class="form-hint">${t('settings.invites.intro')}</p>
+        <ul class="settings-members row-divided" id="invites-list"></ul>
       </div>
 
       <!-- Zeilen im Traeger (R17, E9): der Schalter, darunter als zweite Zeile
@@ -369,13 +384,6 @@ function renderPage(container) {
             <ul class="settings-setting-row__control settings-2fa__members" id="two-factor-members"></ul>
           </div>
         </div>
-      </div>
-
-      <div class="settings-card" id="invites-card">
-        <h3 class="settings-card__title">${t('settings.invites.title')}</h3>
-        <p class="form-hint">${t('settings.invites.intro')}</p>
-        <ul class="settings-members row-divided" id="invites-list"></ul>
-        <button class="btn btn--secondary settings-add-btn" id="add-invite-btn" hidden>${t('settings.invites.add')}</button>
       </div>
 
     </section>

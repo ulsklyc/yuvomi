@@ -2093,7 +2093,8 @@
         "syncErrorGoogle": "Nabigo ang koneksyon sa Google. Pakisubukang muli.",
         "syncErrorOutlook": "Nabigo ang koneksyon sa Outlook. Pakisubukang muli.",
         "syncErrorApple": "Nabigo ang koneksyon sa Apple. Pakisubukang muli.",
-        "addMember": "+ Magdagdag ng miyembro",
+        "addMember": "Magdagdag ng miyembro",
+        "memberYou": "Ako",
         "newMemberTitle": "Bagong Miyembro ng Pamilya",
         "usernameLabel": "Username",
         "displayNameLabel": "Pangalang ipapakita",
@@ -2988,7 +2989,7 @@
         "invites": {
             "title": "Mga Imbitasyon",
             "intro": "Mag-imbita ng bagong miyembro sa pamamagitan ng link. Sila mismo ang pipili ng kanilang password.",
-            "add": "+ Gumawa ng imbitasyon",
+            "add": "Gumawa ng imbitasyon",
             "submit": "Gumawa ng imbitasyon",
             "usernameHint": "Opsyonal. Iwanang blangko at ang inimbitahan ang pipili ng sarili niyang pangalan.",
             "sendEmail": "Ipadala ang imbitasyon sa email",

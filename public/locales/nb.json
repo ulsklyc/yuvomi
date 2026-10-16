@@ -2051,7 +2051,8 @@
         "syncErrorGoogle": "Tilkobling til Google feilet. Vennligst prøv igjen.",
         "syncErrorOutlook": "Tilkobling til Outlook feilet. Vennligst prøv igjen.",
         "syncErrorApple": "Tilkobling til Apple feilet. Vennligst prøv igjen.",
-        "addMember": "+ Legg til medlem",
+        "addMember": "Legg til medlem",
+        "memberYou": "Meg",
         "newMemberTitle": "Nyt familiemedlem",
         "usernameLabel": "Brukernavn",
         "displayNameLabel": "Visningsnavn",
@@ -2973,7 +2974,7 @@
         "invites": {
             "title": "Invitasjoner",
             "intro": "Inviter nye medlemmer med en lenke. De velger sitt eget passord.",
-            "add": "+ Opprett invitasjon",
+            "add": "Opprett invitasjon",
             "submit": "Opprett invitasjon",
             "usernameHint": "Valgfritt. La det stå tomt, så velger den inviterte personen sitt eget navn.",
             "sendEmail": "Send invitasjonen via e-post",

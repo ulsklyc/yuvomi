@@ -1940,7 +1940,8 @@
         "syncErrorGoogle": "Anslutningen till Google misslyckades. Försök igen.",
         "syncErrorOutlook": "Anslutningen till Outlook misslyckades. Försök igen.",
         "syncErrorApple": "Anslutningen till Apple misslyckades. Försök igen.",
-        "addMember": "+ Lägg till medlem",
+        "addMember": "Lägg till medlem",
+        "memberYou": "Jag",
         "newMemberTitle": "Ny familjemedlem",
         "usernameLabel": "Användarnamn",
         "displayNameLabel": "Visningsnamn",
@@ -2973,7 +2974,7 @@
         "invites": {
             "title": "Inbjudningar",
             "intro": "Bjud in nya medlemmar med en länk. Lösenordet väljer de själva.",
-            "add": "+ Skapa inbjudan",
+            "add": "Skapa inbjudan",
             "submit": "Skapa inbjudan",
             "usernameHint": "Valfritt. Lämnar du fältet tomt väljer den inbjudna sitt eget namn.",
             "sendEmail": "Skicka inbjudan via e-post",

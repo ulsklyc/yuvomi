@@ -2051,7 +2051,8 @@
         "syncErrorGoogle": "Verbinding met Google mislukt. Probeer het opnieuw.",
         "syncErrorOutlook": "Verbinding met Outlook mislukt. Probeer het opnieuw.",
         "syncErrorApple": "Verbinding met Apple mislukt. Probeer het opnieuw.",
-        "addMember": "+ Lid toevoegen",
+        "addMember": "Lid toevoegen",
+        "memberYou": "Ik",
         "newMemberTitle": "Nieuw gezinslid",
         "usernameLabel": "Gebruikersnaam",
         "displayNameLabel": "Weergavenaam",
@@ -2973,7 +2974,7 @@
         "invites": {
             "title": "Uitnodigingen",
             "intro": "Nodig nieuwe leden uit via een link. Hun wachtwoord kiezen ze zelf.",
-            "add": "+ Uitnodiging maken",
+            "add": "Uitnodiging maken",
             "submit": "Uitnodiging maken",
             "usernameHint": "Optioneel. Laat je het leeg, dan kiest de uitgenodigde persoon zelf een naam.",
             "sendEmail": "Uitnodiging per e-mail versturen",

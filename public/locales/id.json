@@ -2093,7 +2093,8 @@
         "syncErrorGoogle": "Koneksi dengan Google gagal. Silakan coba lagi.",
         "syncErrorOutlook": "Koneksi dengan Outlook gagal. Silakan coba lagi.",
         "syncErrorApple": "Koneksi dengan Apple gagal. Silakan coba lagi.",
-        "addMember": "+ Tambah anggota",
+        "addMember": "Tambah anggota",
+        "memberYou": "Saya",
         "newMemberTitle": "Anggota keluarga baru",
         "usernameLabel": "Nama pengguna",
         "displayNameLabel": "Nama tampilan",
@@ -2988,7 +2989,7 @@
         "invites": {
             "title": "Undangan",
             "intro": "Undang anggota baru lewat tautan. Kata sandi mereka tentukan sendiri.",
-            "add": "+ Buat undangan",
+            "add": "Buat undangan",
             "submit": "Buat undangan",
             "usernameHint": "Opsional. Jika dikosongkan, orang yang diundang memilih namanya sendiri.",
             "sendEmail": "Kirim undangan lewat email",

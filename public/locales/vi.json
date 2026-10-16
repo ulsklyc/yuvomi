@@ -2051,7 +2051,8 @@
         "syncErrorGoogle": "Kết nối với Google không thành công. Vui lòng thử lại.",
         "syncErrorOutlook": "Kết nối với Outlook không thành công. Vui lòng thử lại.",
         "syncErrorApple": "Kết nối với Apple không thành công. Vui lòng thử lại.",
-        "addMember": "+ Thêm thành viên",
+        "addMember": "Thêm thành viên",
+        "memberYou": "Tôi",
         "newMemberTitle": "Thành viên Gia đình mới",
         "usernameLabel": "Tên người dùng",
         "displayNameLabel": "Tên hiển thị",
@@ -2973,7 +2974,7 @@
         "invites": {
             "title": "Lời mời",
             "intro": "Mời thành viên mới bằng liên kết. Họ tự đặt mật khẩu.",
-            "add": "+ Tạo lời mời",
+            "add": "Tạo lời mời",
             "submit": "Tạo lời mời",
             "usernameHint": "Không bắt buộc. Để trống thì người được mời tự chọn tên.",
             "sendEmail": "Gửi lời mời qua e-mail",

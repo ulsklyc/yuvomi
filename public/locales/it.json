@@ -1940,7 +1940,8 @@
         "syncErrorGoogle": "Connessione a Google fallita. Riprova.",
         "syncErrorOutlook": "Connessione a Outlook fallita. Riprova.",
         "syncErrorApple": "Connessione ad Apple fallita. Riprova.",
-        "addMember": "+ Aggiungi membro",
+        "addMember": "Aggiungi membro",
+        "memberYou": "Io",
         "newMemberTitle": "Nuovo membro familiare",
         "usernameLabel": "Nome utente",
         "displayNameLabel": "Nome visualizzato",
@@ -2973,7 +2974,7 @@
         "invites": {
             "title": "Inviti",
             "intro": "Invita nuovi membri con un link. La password la scelgono loro.",
-            "add": "+ Crea invito",
+            "add": "Crea invito",
             "submit": "Crea invito",
             "usernameHint": "Facoltativo. Se lo lasci vuoto, la persona invitata sceglie il proprio nome.",
             "sendEmail": "Invia l'invito via e-mail",

@@ -2093,7 +2093,8 @@
         "syncErrorGoogle": "Google 연결에 실패했습니다. 다시 시도해 주세요.",
         "syncErrorOutlook": "Outlook 연결에 실패했습니다. 다시 시도해 주세요.",
         "syncErrorApple": "Apple 연결에 실패했습니다. 다시 시도해 주세요.",
-        "addMember": "+ 구성원 추가",
+        "addMember": "구성원 추가",
+        "memberYou": "나",
         "newMemberTitle": "새 가족 구성원",
         "usernameLabel": "사용자 이름",
         "displayNameLabel": "표시 이름",
@@ -2988,7 +2989,7 @@
         "invites": {
             "title": "초대",
             "intro": "링크로 새 구성원을 초대하세요. 비밀번호는 본인이 정합니다.",
-            "add": "+ 초대 만들기",
+            "add": "초대 만들기",
             "submit": "초대 만들기",
             "usernameHint": "선택 사항입니다. 비워 두면 초대받은 사람이 이름을 직접 정합니다.",
             "sendEmail": "초대를 이메일로 보내기",

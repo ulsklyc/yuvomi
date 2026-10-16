@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Inviting someone is the first choice on the Members page.** "Create invitation" now sits as the
+  main button right under the member list, next to "Add member", instead of in a card further down;
+  both carry an icon instead of a "+" sign, and your own row says "Me" after your name.
 - **Shift statistics update as you choose.** Picking a person or a period recalculates right away,
   so the "Show statistics" button is gone. Both lists start on the same line, and a period without
   shifts shows one empty message instead of zeros and two empty cards.

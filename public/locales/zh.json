@@ -1940,7 +1940,8 @@
         "syncErrorGoogle": "连接 Google 失败，请重试。",
         "syncErrorOutlook": "连接 Outlook 失败，请重试。",
         "syncErrorApple": "连接 Apple 失败，请重试。",
-        "addMember": "+ 添加成员",
+        "addMember": "添加成员",
+        "memberYou": "我",
         "newMemberTitle": "新建家庭成员",
         "usernameLabel": "用户名",
         "displayNameLabel": "显示名称",
@@ -2973,7 +2974,7 @@
         "invites": {
             "title": "邀请",
             "intro": "用链接邀请新成员，密码由他们自己设置。",
-            "add": "+ 创建邀请",
+            "add": "创建邀请",
             "submit": "创建邀请",
             "usernameHint": "可选。留空时由受邀者自行选择名称。",
             "sendEmail": "通过电子邮件发送邀请",

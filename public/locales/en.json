@@ -2051,7 +2051,8 @@
         "syncErrorGoogle": "Connection to Google failed. Please try again.",
         "syncErrorOutlook": "Connection to Outlook failed. Please try again.",
         "syncErrorApple": "Connection to Apple failed. Please try again.",
-        "addMember": "+ Add member",
+        "addMember": "Add member",
+        "memberYou": "Me",
         "newMemberTitle": "New Family Member",
         "usernameLabel": "Username",
         "displayNameLabel": "Display name",
@@ -2973,7 +2974,7 @@
         "invites": {
             "title": "Invitations",
             "intro": "Invite new members by link. They choose their own password.",
-            "add": "+ Create invitation",
+            "add": "Create invitation",
             "submit": "Create invitation",
             "usernameHint": "Optional. Leave empty and the invited person picks their own name.",
             "sendEmail": "Send the invitation by email",

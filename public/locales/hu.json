@@ -2051,7 +2051,8 @@
         "syncErrorGoogle": "A Google-lal való kapcsolat sikertelen. Kérjük, próbálja újra.",
         "syncErrorOutlook": "A Outlook-lal való kapcsolat sikertelen. Kérjük, próbálja újra.",
         "syncErrorApple": "Az Apple-lal való kapcsolat sikertelen. Kérjük, próbálja újra.",
-        "addMember": "+ Tag hozzáadása",
+        "addMember": "Tag hozzáadása",
+        "memberYou": "Én",
         "newMemberTitle": "Új családtag",
         "usernameLabel": "Felhasználónév",
         "displayNameLabel": "Megjelenítendő név",
@@ -2973,7 +2974,7 @@
         "invites": {
             "title": "Meghívók",
             "intro": "Hívj meg új tagokat linkkel. A jelszavukat maguk választják.",
-            "add": "+ Meghívó létrehozása",
+            "add": "Meghívó létrehozása",
             "submit": "Meghívó létrehozása",
             "usernameHint": "Nem kötelező. Ha üresen hagyod, a meghívott maga választ nevet.",
             "sendEmail": "Meghívó küldése e-mailben",

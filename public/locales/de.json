@@ -2093,7 +2093,8 @@
         "syncErrorGoogle": "Verbindung mit Google fehlgeschlagen. Bitte erneut versuchen.",
         "syncErrorOutlook": "Verbindung mit Outlook fehlgeschlagen. Bitte erneut versuchen.",
         "syncErrorApple": "Verbindung mit Apple fehlgeschlagen. Bitte erneut versuchen.",
-        "addMember": "+ Mitglied hinzufügen",
+        "addMember": "Mitglied hinzufügen",
+        "memberYou": "Ich",
         "newMemberTitle": "Neues Familienmitglied",
         "usernameLabel": "Benutzername",
         "displayNameLabel": "Anzeigename",
@@ -2988,7 +2989,7 @@
         "invites": {
             "title": "Einladungen",
             "intro": "Lade neue Mitglieder per Link ein. Ihr Passwort legen sie selbst fest.",
-            "add": "+ Einladung erstellen",
+            "add": "Einladung erstellen",
             "submit": "Einladung erstellen",
             "usernameHint": "Optional. Bleibt das Feld leer, wählt die eingeladene Person den Namen selbst.",
             "sendEmail": "Einladung per E-Mail senden",

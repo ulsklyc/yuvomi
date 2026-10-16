@@ -1940,7 +1940,8 @@
         "syncErrorGoogle": "Error al conectar con Google. Por favor, inténtalo de nuevo.",
         "syncErrorOutlook": "Error al conectar con Outlook. Por favor, inténtalo de nuevo.",
         "syncErrorApple": "Error al conectar con Apple. Por favor, inténtalo de nuevo.",
-        "addMember": "+ Añadir miembro",
+        "addMember": "Añadir miembro",
+        "memberYou": "Yo",
         "newMemberTitle": "Nuevo miembro de la familia",
         "usernameLabel": "Nombre de usuario",
         "displayNameLabel": "Nombre para mostrar",
@@ -2973,7 +2974,7 @@
         "invites": {
             "title": "Invitaciones",
             "intro": "Invita a nuevos miembros con un enlace. Ellos eligen su propia contraseña.",
-            "add": "+ Crear invitación",
+            "add": "Crear invitación",
             "submit": "Crear invitación",
             "usernameHint": "Opcional. Si lo dejas vacío, la persona invitada elige su nombre.",
             "sendEmail": "Enviar la invitación por correo",
