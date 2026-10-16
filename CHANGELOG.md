@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Settings for this device are in one place.** Wall mode and the screensaver options moved from
+  Appearance to "This device", next to installing the app, because all of them apply only to the
+  device you are holding.
 - **Every entry in Settings has the same kind of icon.** Account, household and system pages now
   show a filled grey tile like the coloured module tiles next to them, instead of a pale outline
   icon, as in the iPhone's Settings.

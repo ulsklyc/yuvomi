@@ -130,10 +130,6 @@ export const SETTINGS_SECTIONS = freezeEntries([
     descriptionKey: 'settings.pageAppearanceDescription',
     options: [
       { key: 'settings.sectionDesign', also: ['settings.themeSystem', 'settings.themeLight', 'settings.themeDark'] },
-      'settings.wallModeLabel',
-      'settings.screensaverIdleLabel',
-      'settings.screensaverClockLabel',
-      'settings.screensaverCoverLabel',
       'settings.localeLabel',
       'settings.dataLanguageLabel',
       'settings.regionLabel',
@@ -156,6 +152,24 @@ export const SETTINGS_SECTIONS = freezeEntries([
     ],
     adminOnly: false,
     loader: () => import('/settings/pages/personal-device.js'),
+  },
+  {
+    // Geraetelokal wie die Installation (R19): Wand-Modus und Bildschirmschoner
+    // stehen im Blatt "Dieses Geraet", gerendert von personal-appearance.js.
+    id: 'device-display',
+    sheetId: 'personal-device',
+    scope: 'mine',
+    labelKey: 'settings.sectionDeviceDisplay',
+    descriptionKey: 'settings.wallModeHint',
+    options: [
+      'settings.wallModeLabel',
+      'settings.screensaverIdleLabel',
+      'settings.screensaverClockLabel',
+      'settings.screensaverCoverLabel',
+    ],
+    adminOnly: false,
+    loader: () => import('/settings/pages/personal-appearance.js'),
+    props: { part: 'device' },
   },
   {
     id: 'personal-notifications',

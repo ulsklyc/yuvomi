@@ -1206,10 +1206,12 @@ test('die Suche findet einzelne Optionen, nicht nur Blaetter', async () => {
   assert.ok(optionOn('Einladung', 'admin-family'));
   assert.ok(optionOn('mealie', 'modules-kitchen'), 'Produktnamen stehen als terms im Index');
   assert.ok(optionOn('Zwei-Faktor', 'personal-account'));
-  assert.ok(optionOn('Wand', 'personal-appearance'), 'Wand findet den Wand-Modus, nicht nur die Wandtabletts');
+  // R19: Wand-Modus und Bildschirmschoner stehen geraetelokal im Blatt
+  // "Dieses Geraet" (Abschnitt device-display), nicht mehr unter Darstellung.
+  assert.ok(optionOn('Wand', 'device-display'), 'Wand findet den Wand-Modus, nicht nur die Wandtabletts');
   // #1665-Review: ein Mitglied, das "Bildschirmschoner" sucht, landet bei der
-  // Wartezeit unter Darstellung - nicht im Immich-Blatt, wo sie nicht steht.
-  assert.ok(optionOn('Bildschirmschoner', 'personal-appearance', { role: 'member' }), 'Bildschirmschoner findet die Wartezeit');
+  // Wartezeit - nicht im Immich-Blatt, wo sie nicht steht.
+  assert.ok(optionOn('Bildschirmschoner', 'device-display', { role: 'member' }), 'Bildschirmschoner findet die Wartezeit');
   // Diakritika und Gross-/Kleinschreibung zaehlen nicht.
   assert.ok(optionOn('wahrung', 'personal-appearance'), 'waehrung ohne Umlaut findet Waehrung');
 
@@ -1217,7 +1219,7 @@ test('die Suche findet einzelne Optionen, nicht nur Blaetter', async () => {
   // eines adminOnly-Abschnitts, wohl aber seine eigenen.
   const member = { role: 'member' };
   assert.equal(optionOn('Einladung', 'admin-family', member), false);
-  assert.ok(optionOn('Wand', 'personal-appearance', member));
+  assert.ok(optionOn('Wand', 'device-display', member));
 
   // Blatt-Treffer bleiben, und eine leere Eingabe findet nichts.
   assert.ok(searchSettings('Wetter', { user: admin, translate }).leaves.some((leaf) => leaf.id === 'personal-weather'));
@@ -2743,6 +2745,9 @@ function sectionsOfOldLeaf(oldId) {
   if (oldId === 'modules-options') return SETTINGS_SECTIONS.filter((s) => String(s.loader).includes('modules-options.js'));
   // Feed-Abos: seit R14 ein Feed je Modulblatt, dieselbe Datei (A7 P2-3).
   if (oldId === 'personal-feeds') return SETTINGS_SECTIONS.filter((s) => String(s.loader).includes('personal-feeds.js'));
+  // Darstellung: seit R19 stehen Wand-Modus und Bildschirmschoner im Blatt
+  // "Dieses Geraet" (Abschnitt device-display), dieselbe Datei.
+  if (oldId === 'personal-appearance') return SETTINGS_SECTIONS.filter((s) => String(s.loader).includes('personal-appearance.js'));
   return SETTINGS_SECTIONS.filter((s) => s.id === oldId);
 }
 
@@ -3954,6 +3959,23 @@ test('R19: jede Marke der Einstellungsliste ist eine gefuellte Kachel, ohne Modu
   assert.match(fn, /else mark\.style\.setProperty\('--seal-accent', 'var\(--module-settings\)'\);/, 'ohne Modul: Einstellungsgrau');
   const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
   assert.doesNotMatch(css, /(?:navigation-link-icon|row-mark):not\(\.vivid-mark\)/, 'keine zweite, blasse Form mehr');
+});
+
+// R19 (Critique 2026-10-16, "Geraete-Einstellungen buendeln"): alles, was nur
+// fuer dieses Geraet gilt, steht im Blatt "Dieses Geraet" - nicht verstreut.
+test('R19: Wand-Modus und Bildschirmschoner stehen im Blatt "Dieses Geraet"', async () => {
+  const section = SETTINGS_SECTIONS.find((s) => s.id === 'device-display');
+  assert.ok(section, 'der Abschnitt device-display fehlt');
+  assert.equal(section.sheetId, 'personal-device');
+  assert.equal(section.props?.part, 'device');
+  for (const key of ['settings.wallModeLabel', 'settings.screensaverIdleLabel', 'settings.screensaverClockLabel', 'settings.screensaverCoverLabel']) {
+    assert.ok(section.options.includes(key), `${key} im Geraete-Abschnitt`);
+    assert.ok(!SETTINGS_SECTIONS.find((s) => s.id === 'personal-appearance').options.includes(key), `${key} nicht mehr unter Darstellung`);
+  }
+  const src = await readFile(new URL('../public/settings/pages/personal-appearance.js', import.meta.url), 'utf8');
+  assert.match(src, /if \(container\.dataset\?\.part === 'device'\) \{\s*renderDeviceDisplay\(container\);\s*return;/);
+  const page = src.slice(src.indexOf('function renderPage('), src.indexOf('function deviceDisplayRowsHtml('));
+  assert.doesNotMatch(page, /wall-mode-toggle|screensaver-idle-select/, 'Darstellung zeigt die Geraete-Zeilen nicht mehr');
 });
 
 test('R17: die Standard-Erinnerungen sind Chips des Kanons mit aria-pressed, keine Checkbox in einer Pille', async () => {
