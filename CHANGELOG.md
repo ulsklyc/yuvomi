@@ -76,6 +76,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the "Expiring soon" panel takes the rest up to the header's edge. On a 1920px screen the panel had
   110px left for names ("Greek yo-gurt" broke mid-word) while list rows stretched to 1146px, with the
   quantity buttons far from the name.
+- **The overview starts at the same left edge as every module.** On wide screens it used to be
+  wider than the modules, so switching between the overview and a module moved everything sideways
+  by up to 160px.
 
 ### Fixed
 

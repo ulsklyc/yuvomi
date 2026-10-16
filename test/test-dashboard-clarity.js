@@ -1332,3 +1332,25 @@ test('Onboarding Schritt 3 nennt am Desktop den Knopf oben rechts, nicht unten (
     if (top[loc]) assert.match(text, top[loc], `${loc}: ${text}`);
   }
 });
+
+// --------------------------------------------------------
+// Critique R19 (layout): die Uebersicht steht auf derselben Inhaltsspalte wie
+// jedes Modul. Bis R19 war sie bis 1680px breit mit eigenem Polster; bei 1920
+// begann sie bei x 270, die Module bei x 430. Ein eigenes Hoechstmass oder ein
+// fester Seitenrand am Desktop liesse die Kante wieder springen.
+// --------------------------------------------------------
+test('die Uebersicht polstert am Desktop mit --page-inline-pad und kennt kein eigenes Hoechstmass', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const root = [...eachRule(css)].filter((r) => r.selector.trim() === '.dashboard');
+  const desktop = root.filter((r) => r.at.some((a) => /min-width:\s*(\d+)px/.test(a) && Number(/min-width:\s*(\d+)px/.exec(a)[1]) >= 1024));
+  assert.ok(desktop.length >= 1, 'keine Desktop-Regel fuer .dashboard');
+  for (const rule of desktop) {
+    const pad = /padding(?:-inline)?:\s*([^;]+);/.exec(rule.body)?.[1] ?? '';
+    assert.match(pad, /var\(--page-inline-pad\)/, `${rule.at.join(' ')}: die Uebersicht polstert mit "${pad}" statt mit der Kante der Module`);
+  }
+  // Die zuletzt geltende Breite ohne At-Regel: kein festes Mass.
+  const widths = root.filter((r) => !r.at.length && /max-width:/.test(r.body)).map((r) => /max-width:\s*([^;]+);/.exec(r.body)[1].trim());
+  assert.equal(widths.at(-1), 'none', `die Uebersicht deckelt sich auf ${widths.at(-1)} - ihre Kante wiche von den Modulen ab`);
+});

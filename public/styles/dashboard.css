@@ -28,15 +28,17 @@
   margin: 0 auto;
 }
 
+/* EINE LINKE KANTE FUER ALLE SEITEN (Critique R19). Die Uebersicht stand bis
+ * 1680px breit mit eigenem Polster (32px, ab 1440 40px): bei 1920 begann sie
+ * bei x 270, jedes Modul bei x 430 - beim Wechsel sprang der Blick um 160px,
+ * bei 1440 um 8px. Jetzt polstert sie wie jeder Modulkopf mit
+ * `--page-inline-pad` (tokens.css) und steht damit auf derselben
+ * Inhaltsspalte (`--content-max-width`): 252 / 252 / 430 bei 1280 / 1440 /
+ * 1920, rechts bis zur Kopfkante der Module. Vier Kachelspalten bleiben bei
+ * 1920 rund 305px breit - so breit wie bei 1440. */
 @media (min-width: 1024px) {
   .dashboard {
-    padding: var(--space-6) var(--space-8);
-  }
-}
-
-@media (min-width: 1440px) {
-  .dashboard {
-    padding: var(--space-6) var(--space-10);
+    padding: var(--space-6) var(--page-inline-pad);
   }
 }
 
@@ -2896,7 +2898,9 @@ button.today-cockpit__more--link {
  * Dashboard-Layout-Wurzel + Scroll-Invariante (Issue #166)
  * -------------------------------------------------------- */
 .dashboard {
-  max-width: min(1680px, 100%);
+  /* Die Breite gibt das Polster vor (oben, `--page-inline-pad`): ein eigenes
+   * Hoechstmass liesse die Uebersicht wieder an einer anderen Kante stehen. */
+  max-width: none;
   /* Scroll-Invariante (Issue #166): isolation:isolate + overflow:clip auf .dashboard
    * lösen auf iOS WebKit Blank-Screen beim Scrollen aus — daher hier explizit auf den
    * Default belassen und NICHT überschreiben. Scroll läuft über .app-content (wie auf
