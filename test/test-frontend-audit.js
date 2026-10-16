@@ -2759,6 +2759,97 @@ test('More button active state keeps visible More identity and accessible active
   assert.doesNotMatch(source, /moreBtn\.toggleAttribute\('aria-current',\s*inMoreSheet\)/);
 });
 
+test('Strich der Modulzeichen liegt in der Mitte der Lucide-Spanne von --icon-md bis --icon-lg', () => {
+  // Lucide zeichnet 2 auf viewBox 24 und skaliert mit der Groesse; die
+  // Modulzeichen tragen --icon-stroke als feste, gerenderte Breite
+  // (non-scaling-stroke). Mit 1.35 waren sie die duennste Linie neben Lucide
+  // (A/B-Probe 2026-10-15, Entscheidung Ulas: 1.5). Gesichert ist die Regel
+  // "Mitte der Spanne", nicht die Zahl.
+  const tokens = read('../public/styles/tokens.css');
+  const px = (name) => {
+    const m = tokens.match(new RegExp(`${name}:\\s*([\\d.]+)px`));
+    assert.ok(m, `${name} fehlt in tokens.css`);
+    return Number(m[1]);
+  };
+  const stroke = tokens.match(/--icon-stroke:\s*([\d.]+)\s*;/);
+  assert.ok(stroke, '--icon-stroke fehlt in tokens.css');
+  const lucideAt = (size) => (2 * size) / 24;
+  const mid = (lucideAt(px('--icon-md')) + lucideAt(px('--icon-lg'))) / 2;
+  assert.ok(Math.abs(Number(stroke[1]) - mid) <= 0.05,
+    `--icon-stroke ${stroke[1]} liegt nicht in der Mitte der Lucide-Spanne (${mid.toFixed(2)})`);
+  const layout = read('../public/styles/layout.css');
+  assert.match(layout, /\.module-glyph,\s*\.nav-item__icon,\s*\.more-item__icon\s*\{\s*stroke-width:\s*var\(--icon-stroke\);\s*vector-effect:\s*non-scaling-stroke;/,
+    'die Modulzeichen tragen --icon-stroke als feste gerenderte Breite');
+});
+
+test('Aktiv-Indikatoren erscheinen am Ziel: die erste Platzierung gleitet nicht vom ersten Eintrag herein', () => {
+  // Ein frisch gebauter Indikator steht bei translate 0, also auf dem ersten
+  // Eintrag, und glitt beim Laden sichtbar zum aktiven (gemessen 150ms von
+  // "Uebersicht" zu "Kalender", Nav-Polish 2026-10-15). Gleiten antwortet auf
+  // einen Wechsel; beide Positionierer gehen deshalb durch placeNavIndicator,
+  // und beide Indikatoren entstehen unsichtbar.
+  const source = read('../public/router.js').replace(/^\s*\/\/.*$/gm, '');
+  const place = functionBody(source, 'placeNavIndicator');
+  assert.ok(place, 'placeNavIndicator fehlt');
+  assert.match(place, /style\.transition = 'none'/, 'die erste Platzierung schaltet den Uebergang ab');
+  assert.match(place, /dataset\.placed/, 'nur die ERSTE Platzierung springt');
+  // ... und "erste" heisst die erste GEZEICHNETE: der verborgene Indikator der
+  // anderen Groessenklasse hat keine Geometrie und darf nicht als platziert
+  // gelten, sonst glitt er nach dem Drehen ueber die Schwelle aus der
+  // Nullposition herein (Codex-Review zu #2025).
+  assert.match(place, /if \(indicator\.getClientRects\(\)\.length\) indicator\.dataset\.placed = '1';/,
+    'markiert wird nur ein Indikator mit gezeichneter Box');
+  for (const name of ['positionSidebarIndicator', 'positionTabIndicator']) {
+    const body = functionBody(source, name);
+    assert.ok(body, `${name} fehlt`);
+    assert.match(body, /placeNavIndicator\(indicator,/, `${name} platziert ueber placeNavIndicator`);
+    assert.doesNotMatch(body.replace(/placeNavIndicator\(indicator, \(\) => \{[\s\S]*?\n  \}\);/, ''), /indicator\.style\.transform =/, `${name} setzt transform nur in placeNavIndicator`);
+  }
+  assert.match(source, /indicator\.className = 'nav-sidebar__indicator';\s*indicator\.setAttribute\('aria-hidden', 'true'\);\s*indicator\.style\.opacity = '0';/);
+  assert.match(source, /tabIndicator\.className = 'nav-bottom__indicator';\s*tabIndicator\.setAttribute\('aria-hidden', 'true'\);\s*tabIndicator\.style\.opacity = '0';/);
+});
+
+test('Mehr-Knopf in Ruhe traegt keinen Ton: der Zustand nimmt den Modulton zurueck, statt ihn auf Akzent zu setzen', () => {
+  // Der Aufbau (`moreNavButtonEl`) liess den Knopf tertiaer, `setMoreButtonState`
+  // setzte ihn nach JEDER Navigation auf `var(--color-accent)` - der Ueberlauf
+  // sah aus wie der aktive Tab (Nav-Polish 2026-10-15, M1). In Ruhe muss die
+  // Angabe wegfallen, damit layout.css auf `--color-text-tertiary` faellt.
+  const source = read('../public/router.js').replace(/^\s*\/\/.*$/gm, '');
+  const body = functionBody(source, 'setMoreButtonState');
+  assert.ok(body, 'setMoreButtonState fehlt');
+  const rest = body.slice(body.indexOf('} else {'));
+  const elseBranch = rest.slice(0, rest.indexOf('\n  }') + 1);
+  assert.ok(elseBranch.length > 10, 'der Ruhe-Zweig von setMoreButtonState ist nicht zu finden - der Guard waere blind');
+  assert.match(elseBranch, /moreBtn\.style\.removeProperty\('--item-module-accent'\)/, 'in Ruhe faellt der Modulton weg');
+  assert.doesNotMatch(elseBranch, /setProperty\('--item-module-accent'/, 'in Ruhe setzt niemand einen Ton');
+  // Und nirgends im Router bekommt ein Nav-Eintrag den App-Akzent als Modulton.
+  assert.doesNotMatch(source, /setProperty\('--item-module-accent',\s*'var\(--color-accent\)'\)/);
+  // Liegt die aktive Route im Blatt, traegt der Knopf weiter ihren Ton.
+  assert.match(body, /if \(inMoreSheet\) \{[\s\S]*?setProperty\('--item-module-accent', moduleAccentVar\(activeSecondary\.module\)\)/);
+});
+
+test('Sidebar-Pille: EIN Material in hell und dunkel - Akzent-Toenung, Akzent-Rand, Schatten ohne Weissring', () => {
+  // Entscheidung Ulas 2026-10-15: hell 12 % Akzent mit Weissraendern (auf hellem
+  // Glas unsichtbar, Pille 1,19:1 gegen die Sidebar), dunkel eine grau-violette
+  // Glasplatte - zwei Stimmen. Messung in tokens.css an --sidebar-indicator-*.
+  const glass = read('../public/styles/glass.css');
+  const tokens = read('../public/styles/tokens.css');
+  const body = cssRuleBody(glass, '.nav-sidebar__indicator');
+  assert.match(body, /background:\s*color-mix\(in srgb, var\(--color-accent\) var\(--sidebar-indicator-tint\), var\(--glass-bg-card\)\)/,
+    'die Toenung kommt aus --sidebar-indicator-tint');
+  assert.match(body, /border:\s*1px solid color-mix\(in srgb, var\(--color-accent\) var\(--sidebar-indicator-rim-tint\), transparent\)/,
+    'der Rand ist Akzent-Tint, kein Glas-Weiss');
+  assert.doesNotMatch(body, /--glass-border-subtle|--glass-shadow-sm/, 'kein Weissrand und kein Weissring mehr');
+  assert.match(body, /var\(--sidebar-indicator-shadow\)/);
+  const shadows = [...tokens.matchAll(/--_sidebar-indicator-shadow:\s*([^;]+);/g)].map((m) => m[1]);
+  assert.equal(shadows.length, 3, 'hell plus beide Dark-Pfade setzen den Schatten');
+  for (const value of shadows) {
+    assert.doesNotMatch(value, /255,\s*255,\s*255/, `Schatten ohne Weissring: ${value}`);
+    assert.match(value, /^0 [1-9]\d*px [1-9]\d*px /, `Schatten mit Versatz und Weichzeichnung: ${value}`);
+  }
+  assert.match(tokens, /--sidebar-indicator-tint:\s*24%/);
+});
+
 test('wer die Zahl der Mitleser aendert, holt othersCanRead nach', () => {
   // `othersCanRead` entscheidet, ob Aufgaben und Kalender ihre
   // Sichtbarkeitsfelder ueberhaupt zeigen. Der Wert kommt aus /auth/me und
@@ -4486,8 +4577,16 @@ test('der FAB weicht der Zeile, statt eine Gasse zu reservieren', () => {
   // und an seiner eigenen Groesse.
   assert.match(
     tokens,
-    /--fab-offset-bottom:\s*calc\([^;]*--nav-height-mobile[^;]*--fab-size[^;]*\)/s,
-    'der eingesetzte FAB zentriert sich aus --nav-height-mobile und --fab-size'
+    /--fab-offset-bottom:\s*calc\([^;]*var\(--nav-capsule-height,\s*var\(--nav-height-mobile\)\)[^;]*--fab-size[^;]*\)/s,
+    'der eingesetzte FAB zentriert sich aus der GEMESSENEN Kapselhoehe (Fallback --nav-height-mobile) und --fab-size'
+  );
+  // Dieselbe Hoehe fuer den hinteren Abstand: mit zweizeiligen Labels (el,
+  // fil) waechst die Kapsel auf 72px, und mit der Sollhoehe sass der Knopf
+  // 16/8px statt mittig (Nav-Polish 2026-10-15).
+  assert.match(
+    tokens,
+    /--nav-fab-inset:\s*calc\(\(var\(--nav-capsule-height,\s*var\(--nav-height-mobile\)\)\s*-\s*var\(--fab-size\)\)\s*\/\s*2\)/,
+    'der hintere FAB-Abstand rechnet aus derselben gemessenen Kapselhoehe'
   );
   // Und die Kapsel macht ihm denselben Platz frei, aus derselben Groesse -
   // sonst stuende der Knopf halb auf dem letzten Tab.
@@ -18576,6 +18675,42 @@ test('SHELL: die Seitenleiste fasst 15 Module ohne Scrollen auf 800px Fensterhoe
     + `auf 1280x800 fehlen ${Math.round(total - 800)}px, Budget und Gesundheit rutschen unter die Falz`);
   assert.ok(row >= 24, `Seitenleiste: ${row}px Zeilen unterschreiten WCAG 2.5.8 (24px)`);
 
+  // KURZE FENSTER (Nav-Polish 2026-10-15): auf 1024x768 brauchte die Liste
+  // 614px und sah 584 - Budget lag hinter dem Fade. Eine Container-Abfrage an
+  // der Tafel verdichtet Labels und Polster; dieselbe Rechnung mit ihren
+  // Werten muss auf 768px aufgehen, und ihre Schwelle muss einem 800px hohen
+  // Fenster entsprechen (die Abfrage liest die Inhaltshoehe der Tafel).
+  const shortAt = layout.match(/@container nav-sidebar \(max-height:\s*(\d+)px\)/);
+  assert.ok(shortAt, 'layout.css: @container nav-sidebar (max-height: ...) fehlt - auf 1024x768 scrollt die Modulliste');
+  assert.match(prop(sidebar, 'container'), /^nav-sidebar \/ size$/, '.nav-sidebar ist kein Groessen-Container');
+  const contentAt800 = 800 - floatGap - 2 * tok('--space-px') - sidebarPad.top - sidebarPad.bottom;
+  assert.equal(Number(shortAt[1]), contentAt800,
+    `Kurzfenster-Schwelle ${shortAt[1]}px entspricht nicht 800px Fensterhoehe (${contentAt800}px Inhalt)`);
+  const shortRule = (selector) => {
+    for (const r of eachRule(layout)) {
+      if (r.selector.trim() === selector && r.at.some((a) => /@container nav-sidebar/.test(a))) return r.body;
+    }
+    assert.fail(`layout.css: Regel ${selector} fehlt in @container nav-sidebar - auf 1024x768 scrollt die Modulliste`);
+  };
+  const pair = (shorthand) => {
+    const [a, b = a] = shorthand.split(/\s+(?![^(]*\))/).map(val);
+    return { top: a, bottom: b };
+  };
+  const shortLabelPad = pair(prop(shortRule('.nav-section-label'), 'padding-block'));
+  const shortLabel = tok('--text-xs') * tok('--line-height-tight') + shortLabelPad.top + shortLabelPad.bottom;
+  const shortList = 15 * row + 4 * shortLabel + 14 * groupGap + 4 * gap
+    + val(prop(shortRule('.nav-sidebar__items'), 'padding-bottom'));
+  const shortFrame = frame
+    - val(prop(logo, 'margin-bottom')) + val(prop(shortRule('.nav-sidebar__logo'), 'margin-bottom'));
+  const shortTotal = shortList + shortFrame;
+  assert.ok(shortTotal <= 768,
+    `Seitenleiste kurz: ${Math.round(shortList)}px Module + ${Math.round(shortFrame)}px Rahmen = `
+    + `${Math.round(shortTotal)}px - auf 1024x768 fehlen ${Math.round(shortTotal - 768)}px`);
+  // Die Abfrage wirkt nur, wenn sie in der Kaskade NACH den Basisregeln steht
+  // (gleiche Spezifitaet; `.nav-section-label` steht ausserhalb jeder Media-Query).
+  assert.ok(shortAt.index > layout.indexOf('\n.nav-section-label {'),
+    'die Kurzfenster-Abfrage steht vor .nav-section-label und wird ueberschrieben');
+
   // Der Rahmen hat keine Zeilen mehr fuer Werkzeuge und Fuss-Aktionen: Suche
   // und Einklappen stehen IN der Logo-Zeile, Hilfe/Aenderungen/Abmelden im
   // Konto-Menue. Ein Rueckbau in eigene Zeilen waere die alte Rechnung.
@@ -18592,6 +18727,38 @@ test('SHELL: die Seitenleiste fasst 15 Module ohne Scrollen auf 800px Fensterhoe
   }
   assert.match(accountEl, /setAttribute\('role', 'menu'\)/);
   assert.match(accountEl, /setAttribute\('popovertarget', 'nav-account-menu'\)/);
+});
+
+/* DIE ZEILEN STEHEN EINGEKLAPPT DORT, WO SIE AUSGEKLAPPT STEHEN (Nav-Polish
+ * 2026-10-15). Eingeklappt stapelte die Logo-Zeile (102 statt 44px) und die
+ * Sektionslabels fielen auf null Hoehe; beim Hover-Ausklappen sprangen die
+ * Zeilen (Uebersicht y=127 -> 69), und der Zeiger lag auf einer anderen Zeile.
+ * Keine Regel unter `html.sidebar-collapsed` darf deshalb die Hoehe der
+ * Logo-Zeile oder eines Sektionslabels anfassen - weder direkt noch ueber
+ * Polster, Anzeige oder Stapelrichtung. */
+test('SHELL: eingeklappt behalten Logo-Zeile und Sektionslabels ihre Hoehe', () => {
+  const layout = read('../public/styles/layout.css');
+  const HEIGHT = /(?:^|[;{\s])(height|min-height|max-height|padding|padding-block|padding-top|padding-bottom|display|flex-direction|line-height|font-size)\s*:/;
+  const findings = [];
+  let seen = 0;
+  for (const r of eachRule(layout)) {
+    for (const sel of r.selector.split(',').map((s) => s.trim())) {
+      if (!/sidebar-collapsed/.test(sel)) continue;
+      if (!/\.(nav-sidebar__logo|nav-section-label)$/.test(sel)) continue;
+      seen += 1;
+      const hit = r.body.match(HEIGHT);
+      if (hit) findings.push(`${sel} { ${hit[1]} }`);
+    }
+  }
+  assert.ok(seen > 0, 'keine Eingeklappt-Regel fuer Logo-Zeile oder Sektionslabel gefunden - Guard misst nichts');
+  assert.deepEqual(findings, [], `eingeklappt aendert sich die Hoehe, die Zeilen springen beim Ausklappen:\n${findings.join('\n')}`);
+
+  // Das Badge steht in der ausgeklappten Leiste am Zeilenende, eingeklappt an der Mulde.
+  const badge = [...eachRule(layout)].find((r) => r.selector.trim()
+    === 'html:not(.sidebar-collapsed) .nav-sidebar .nav-item__icon-wrap > .nav-badge');
+  assert.ok(badge, 'kein Zeilenende-Badge fuer die ausgeklappte Leiste');
+  assert.match(badge.body, /position:\s*static/);
+  assert.match(badge.body, /margin-inline-start:\s*auto/);
 });
 
 // ---------------------------------------------------------------------------

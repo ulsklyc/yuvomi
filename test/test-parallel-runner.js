@@ -32,6 +32,12 @@ import { isRunning, parseProcStat, processState, runningGroupMembers } from '../
 const RUNNER = fileURLToPath(new URL('../scripts/run-tests-parallel.mjs', import.meta.url));
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
+/* Der Runner ist nur POSIX (siehe scripts/run-tests-parallel.mjs): jeder
+ * Schritt startet ueber /bin/sh in einer eigenen Prozessgruppe. Was Schritte
+ * faehrt oder selbst /bin/sh, Signale oder einen Datei-Symlink braucht, laeuft
+ * unter Windows nicht; Parser, Argumentpruefung und Aufraeumen laufen dort mit. */
+const NUR_POSIX = process.platform === 'win32' && 'nur POSIX: /bin/sh und Prozessgruppen, wie der Runner selbst';
+
 /*
  * Die Attrappe schreibt je Aufruf einen Datensatz: Programmname, jedes Argument
  * einzeln und die exportierte Umgebung - so zaehlt ein verlorenes
@@ -101,7 +107,7 @@ const agrees = (result) => result.wholeStatus === 0
   && result.broken.length === 0
   && isDeepStrictEqual(result.split, result.whole);
 
-test('der Runner findet jeden Schritt der test-Kette, so wie sh ihn ausfuehrt', () => {
+test('der Runner findet jeden Schritt der test-Kette, so wie sh ihn ausfuehrt', { skip: NUR_POSIX }, () => {
   const { steps } = loadSteps();
   const result = compare(pkg.scripts.test, steps);
 
@@ -136,7 +142,7 @@ const TRICKY_STEPS = [
 ];
 const TRICKY = TRICKY_STEPS.join(' && ');
 
-test('Gegenprobe: der Vergleich wird rot, wenn das Parsen einen Schritt verliert', () => {
+test('Gegenprobe: der Vergleich wird rot, wenn das Parsen einen Schritt verliert', { skip: NUR_POSIX }, () => {
   assert.deepEqual(parseChain(TRICKY), TRICKY_STEPS);
   assert.ok(agrees(compare(TRICKY, parseChain(TRICKY))), 'der Parser muss die schwierige Kette halten');
 
@@ -210,7 +216,7 @@ test('SERIAL nennt nur Schritte der Kette, jeden mit Grund', () => {
  * Was die Liste traegt, steht in `runSteps`: ein veralteter Eintrag bricht ab,
  * ein gueltiger laeuft allein nach dem parallelen Teil. Beides hier mit einer
  * eigenen Liste, damit es nicht erst mit dem ersten echten Eintrag auffaellt. */
-test('SERIAL: ein veralteter Eintrag bricht ab, ein gueltiger laeuft allein danach', async () => {
+test('SERIAL: ein veralteter Eintrag bricht ab, ein gueltiger laeuft allein danach', { skip: NUR_POSIX }, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'yuvomi-runner-serial-'));
   try {
     const opts = { cwd: dir, logDir: dir, jobs: 2, timeoutMs: 0 };
@@ -250,7 +256,7 @@ function runRunner(chainSteps, args = [], { runner = RUNNER, logs = true } = {})
  * aufgeloest): ueber einen Symlink gestartet - unter macOS schon `/tmp` statt
  * `/private/tmp` - endete der Runner mit Exit 0 und ohne ein Byte Ausgabe,
  * auch bei roter Kette (Review auf #1229). */
-test('ueber einen Symlink gestartet laeuft der Runner trotzdem, rot bleibt rot', () => {
+test('ueber einen Symlink gestartet laeuft der Runner trotzdem, rot bleibt rot', { skip: NUR_POSIX }, () => {
   const linkDir = mkdtempSync(join(tmpdir(), 'yuvomi-runner-link-'));
   const link = join(linkDir, 'runner-link.mjs');
   symlinkSync(RUNNER, link);
@@ -264,7 +270,7 @@ test('ueber einen Symlink gestartet laeuft der Runner trotzdem, rot bleibt rot',
   }
 });
 
-test('ein roter Schritt haelt den Lauf nicht an, der Exit-Code kommt aus dem Kind', () => {
+test('ein roter Schritt haelt den Lauf nicht an, der Exit-Code kommt aus dem Kind', { skip: NUR_POSIX }, () => {
   // --jobs 1: der dritte Schritt startet erst NACH dem roten - laeuft er, lief der Runner weiter.
   const r = runRunner([
     'node -e "process.exit(0)"',
@@ -285,7 +291,7 @@ test('ein roter Schritt haelt den Lauf nicht an, der Exit-Code kommt aus dem Kin
   }
 });
 
-test('alle gruen ergibt Exit 0', () => {
+test('alle gruen ergibt Exit 0', { skip: NUR_POSIX }, () => {
   const green = runRunner(['node -e "1"', 'node -e "2"', 'node -e "3"'], ['--jobs', '3']);
   try {
     assert.equal(green.run.status, 0, green.run.stdout + green.run.stderr);
@@ -322,7 +328,7 @@ async function waitForFile(file, ms, what) {
  * Hintergrund und ersetzt sich dann durch `sleep`, das nie `wait()` ruft. Das
  * Kind endet und bleibt als `Z` stehen, bis `sleep` endet. `process.kill(pid,
  * 0)` gelingt darauf - genau das hielt die erste Fassung fuer "lebt noch". */
-test('ein Zombie zaehlt als beendet', async () => {
+test('ein Zombie zaehlt als beendet', { skip: NUR_POSIX }, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'yuvomi-runner-zombie-'));
   const parent = spawn('/bin/sh', ['-c', 'sleep 0.3 & echo $! > z.pid; exec sleep 5'], { cwd: dir, stdio: 'ignore' });
   try {
@@ -383,7 +389,7 @@ test('Prozesszustand aus /proc und aus ps, mit Zombie in der Gruppe', () => {
  * gruen (Review auf #1229). Hier haengt ein ENKEL - das `; :` hinter dem Aufruf
  * zwingt die innere Shell zu forken statt sich zu ersetzen -, und geprueft wird,
  * dass er nach dem Lauf nicht mehr lebt. */
-test('ein haengender Schritt faellt ueber den Timeout, samt seiner Enkelprozesse', () => {
+test('ein haengender Schritt faellt ueber den Timeout, samt seiner Enkelprozesse', { skip: NUR_POSIX }, () => {
   const grandchild = 'node -e "require(\\"node:fs\\").writeFileSync(\\"hang.pid\\", String(process.pid)); setTimeout(() => {}, 60000)"';
   const hung = runRunner([`sh -c '${grandchild}; :'`, 'node -e "1"'], ['--jobs', '2', '--timeout', '2']);
   let pid = null;
@@ -421,7 +427,7 @@ const logsLine = (out) => out.match(/^Logs: (.+)$/m)?.[1];
  * des laufenden ersten, und beide schrieben ihre `summary.json` an dieselbe
  * Stelle. Angelegt wurde der Ordner mit 0755, die Logs mit 0644 - unter Linux
  * liegt `/tmp` fuer alle Nutzer offen (Review auf #1229). */
-test('ohne --logs bekommt jeder Lauf einen eigenen Ordner mit 0700, auch gleichzeitig', async () => {
+test('ohne --logs bekommt jeder Lauf einen eigenen Ordner mit 0700, auch gleichzeitig', { skip: NUR_POSIX }, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'yuvomi-runner-logs-'));
   writeFileSync(join(dir, 'package.json'), JSON.stringify({
     scripts: { test: 'node -e "setTimeout(() => console.log(process.env.RUN_MARK), 400)"' },
@@ -563,7 +569,7 @@ const STUBBORN = [
 ].join('\n');
 const GRACE_ARGS = ['--grace', '1'];
 
-test('ein Abbruch wartet auf die Gruppen und toetet, was SIGTERM ignoriert', async () => {
+test('ein Abbruch wartet auf die Gruppen und toetet, was SIGTERM ignoriert', { skip: NUR_POSIX }, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'yuvomi-runner-stop-'));
   writeFileSync(join(dir, 'stur.cjs'), STUBBORN);
   writeFileSync(join(dir, 'package.json'), JSON.stringify({
@@ -611,7 +617,7 @@ async function startStubborn(args) {
  * zweimal an, vom Terminal und von npm weitergereicht. Die Fassung davor nahm
  * das zweite als "nicht mehr warten" und toetete sofort: Exit 130 nach 53 ms
  * (Review auf #1229). Nachgestellt mit zwei SIGINT im Abstand von 5 ms. */
-test('zwei Signale kurz nacheinander behalten die Karenz', async () => {
+test('zwei Signale kurz nacheinander behalten die Karenz', { skip: NUR_POSIX }, async () => {
   const s = await startStubborn(['--grace', '2']);
   try {
     const t0 = Date.now();
@@ -632,7 +638,7 @@ test('zwei Signale kurz nacheinander behalten die Karenz', async () => {
   }
 });
 
-test('ein zweites Signal mehr als eine Sekunde spaeter toetet sofort', async () => {
+test('ein zweites Signal mehr als eine Sekunde spaeter toetet sofort', { skip: NUR_POSIX }, async () => {
   const s = await startStubborn(['--grace', '30']);
   try {
     s.run.child.kill('SIGINT');
@@ -713,7 +719,7 @@ test('ein Schritt, der den Shell-Zustand aendert, wird abgelehnt, Env-Praefixe n
 /* `setTimeout` kennt hoechstens 2^31-1 ms. Darueber setzt Node den Timer mit
  * einer Warnung auf 1 ms: `--timeout 2147484` hiess "jeder Schritt faellt sofort
  * ueber den Timeout". `0` ist "ohne Limit". */
-test('--timeout und --grace ueber dem Timer-Maximum enden mit Exit 2', () => {
+test('--timeout und --grace ueber dem Timer-Maximum enden mit Exit 2', { skip: NUR_POSIX }, () => {
   for (const args of [['--timeout', '2147484'], ['--grace', '2147484']]) {
     const r = runRunner(['node -e "1"'], args);
     try {
@@ -755,7 +761,7 @@ const WAIT_FOR_FILE = [
 ].join('\n');
 const HEARTBEAT_ARGS = ['--heartbeat', '1'];
 
-test('ein aktiver Lauf mit alter Ordner-mtime ueberlebt das Aufraeumen eines zweiten Laufs', async () => {
+test('ein aktiver Lauf mit alter Ordner-mtime ueberlebt das Aufraeumen eines zweiten Laufs', { skip: NUR_POSIX }, async () => {
   const { cleanupOldRuns } = runnerModule;
   const tmp = mkdtempSync(join(tmpdir(), 'yuvomi-runner-aktiv-'));
   const pkgDir = mkdtempSync(join(tmpdir(), 'yuvomi-runner-run-'));

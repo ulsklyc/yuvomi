@@ -1463,8 +1463,15 @@
    * dass die Übereinstimmung an den GRÖSSEN hing und nicht an einer Regel.
    * Sobald ein Zeichen des eigenen Satzes bei 16px stand (Widget-Kopf), fiel
    * es auf 1,07px und wurde neben seinen Nachbarn dünn. Der Wert hält den
-   * gemessenen Bestand fest, jetzt als Zusicherung statt als Koinzidenz. */
-  --icon-stroke: 1.35;
+   * gemessenen Bestand fest, jetzt als Zusicherung statt als Koinzidenz.
+   *
+   * 1.35 -> 1.5 (Entscheidung Ulas 2026-10-15, A/B-Probe am Demo-Haushalt):
+   * Lucide zeichnet bei --icon-md..--icon-lg (16-20px) 1,33-1,67px, und die
+   * Modulzeichen standen mit 1,35 als duennste Linie der Oberflaeche neben
+   * ihnen - im Mehr-Blatt 1,35er Kacheln ueber 1,67er Icons, im Kopf das
+   * Siegel neben 2,0er Werkzeugen, auf 1x im Dunkel blass. 1.5 ist die MITTE
+   * dieser Spanne; der Guard prueft die Mitte, nicht die Zahl. */
+  --icon-stroke: 1.5;
 
   /* --------------------------------------------------------
    * 11c. Breakpoints — verbindlicher Kontrakt
@@ -1519,7 +1526,13 @@
   /* --------------------------------------------------------
    * 12. Layout
    * -------------------------------------------------------- */
-  --nav-height-mobile: 60px;
+  /* 64 statt 60 (Entscheidung Ulas 2026-10-15): zwischen Kapselkante und
+   * Icon-Pille oben bzw. Label unten standen 3px (1px Rand + 2px Polster), die
+   * Inhalte lasen an die Kante gedrueckt. 64px geben 5/5px, und der Touch-FAB
+   * (48px) sitzt mit 8px rundum konzentrisch (--nav-fab-inset). Alles
+   * Abhaengige (Zone, Nachlauf, Mehr-Blatt, Toasts, Banner) rechnet ueber
+   * --nav-bottom-height mit. */
+  --nav-height-mobile: 64px;
   /* Schwebende Kapsel (Liquid Glass): Zone = Kapsel + 8px Luft oben und unten.
    * Die Kapsel ist MINDESTENS --nav-height-mobile hoch und waechst mit
    * umbrechenden Labels (lange Sprachen, enge Geraete). Ihre echte Hoehe misst
@@ -1556,6 +1569,14 @@
    * Zielgroessen-Regel (DESIGN.md) WCAG 2.5.8 ansetzt, nicht --target-md;
    * Apples Mac-Seitenleiste fuehrt dieselbe Dichte. */
   --sidebar-row-height: 32px;
+  /* Die Icon-Flucht der Seitenleiste (Nav-Polish 2026-10-15): die Mulde ist
+   * 26px breit und beginnt 15px hinter der Innenkante der Tafel, ihre Mitte
+   * steht damit 28px hinter der Kante - dieselbe Mitte wie die 28px-Bildmarke
+   * (14px Polster). Krumm, weil exakte Zentrierung neben der 4px-Skala liegt.
+   * Zeilen, Sektionslabels und die Haarlinie der eingeklappten Labels rechnen
+   * damit; die Labelkante stand vorher 3px davor (x=21 statt 24 bei 1440x900). */
+  --sidebar-icon-inset: 15px;
+  --sidebar-icon-well: 26px;
   --content-max-width: 1280px;
   --content-max-width-narrow: 720px;
   /* Page Composition System width tokens (PAGE-COMPOSITION.md) */
@@ -1667,10 +1688,13 @@
   --swipe-threshold: 80px;
   --fab-size: 52px;
   --fab-gap: var(--space-6);
-  /* Mitte der Nav-Kapsel: safe-area + Bar-Polster + halbe Resthoehe. */
+  /* Mitte der Nav-Kapsel: safe-area + Bar-Polster + halbe Resthoehe. Die
+   * Hoehe ist die GEMESSENE (--nav-capsule-height, wie --nav-bottom-height):
+   * mit zweizeiligen Labels (el, fil) waechst die Kapsel auf 72px, und der
+   * Knopf sass mit der Sollhoehe 16/8px statt mittig (Nav-Polish 2026-10-15). */
   --fab-offset-bottom: calc(
     var(--safe-area-inset-bottom) + var(--space-2) +
-    (var(--nav-height-mobile) - var(--fab-size)) / 2
+    (var(--nav-capsule-height, var(--nav-height-mobile)) - var(--fab-size)) / 2
   );
   /* Basis ist der SCHWEBENDE Fall (Desktop, keine Bottom-Nav). Wo die Leiste
    * existiert, faellt die Zone auf 0 - siehe den Block unter --bp-desktop.
@@ -1710,6 +1734,12 @@
    * Tab. */
   --nav-bar-gutter: var(--space-2);
   --nav-capsule-inset: max(var(--nav-bar-gutter), calc((100% - var(--nav-capsule-max)) / 2));
+  /* Abstand des FAB zur Kapselkante, an allen drei Seiten derselbe: die halbe
+   * Differenz aus Kapselhoehe und Knopf - dieselbe Rechnung, die
+   * --fab-offset-bottom fuer oben und unten macht. Hinten stand ein festes
+   * --space-1, gemessen 4px gegen 6px oben/unten (Touch, --fab-size 48px);
+   * der Knopf sass nicht konzentrisch in der Rundung (Nav-Polish 2026-10-15). */
+  --nav-fab-inset: calc((var(--nav-capsule-height, var(--nav-height-mobile)) - var(--fab-size)) / 2);
 
   /* --------------------------------------------------------
    * 13. Sidebar
@@ -1857,6 +1887,44 @@
    * Glas-Weiss (Dark-Bloecke unten). */
   --_sheet-grabber:     var(--color-border-strong);
   --sheet-grabber:      var(--_sheet-grabber);
+  /* Kachel im Mehr-Blatt (Nav-Polish 2026-10-15). Hell bleibt sie Surface auf
+   * Surface - dort trennt sie --shadow-xs, und eine getoente Stufe (raised
+   * #FBFAF7) waere DUNKLER als das weisse Blatt. Dunkel trug sie rgb(43,40,37)
+   * auf rgb(43,40,37), 1,00:1, und die Schatten (rgba 0,0,0) sind auf dieser
+   * Flaeche wirkungslos: die Kacheln lasen als ein Feld. Dort steht sie eine
+   * Stufe ueber dem Blatt (Dark-Bloecke unten, --_color-surface-raised #37332E,
+   * 1,17:1 gegen #2B2825, dieselbe Sprosse wie die Leiter der Flaechen). */
+  --_sheet-tile-bg:     var(--_color-surface);
+  --sheet-tile-bg:      var(--_sheet-tile-bg);
+  /* Toenung der gleitenden Pille in der mobilen Tab-Leiste (Nav-Polish
+   * 2026-10-15). Hell die Objekt-Stufe. Dunkel liegt die Pille auf dem
+   * duennen Kapselglas (0.50 + Ton-Filter), und dort stand sie mit 16 % bei
+   * gemessen 1,28-1,32:1 gegen die Kapsel - der aktive Tab war vor allem an
+   * der Labelfarbe zu erkennen. Die Dark-Bloecke heben sie um eine halbe
+   * Objekt-Stufe (+8 % = 24 %); gemessen per Pixelprobe 390x844 siehe
+   * DESIGN.md "Navigation". Die Fassung ohne Glas (reduzierte Transparenz,
+   * glass.css §7/§39) rechnet weiter mit --tint-surface: sie ist opak und
+   * eigens kalibriert. */
+  --_nav-indicator-tint: var(--tint-surface);
+  --nav-indicator-tint:  var(--_nav-indicator-tint);
+  /* Aktiv-Pille der Desktop-Sidebar (glass.css §38): EIN Material in hell und
+   * dunkel, eine violette Pille mit Akzent-Rand (Entscheidung Ulas
+   * 2026-10-15). Vorher mischte sie 12 % Akzent ins Kartenglas, und die
+   * Raender waren Weiss (hell 38 % plus 55 %-Ring, auf hellem Glas
+   * unsichtbar; dunkel 14 %) - gemessen per Pixelprobe 1440x900 stand die
+   * Pille hell 1,19:1, dunkel 1,22:1 gegen das Sidebar-Glas, kaum mehr als
+   * die neutrale Hover-Flaeche (1,14 / 1,17:1). Mit 24 % Akzent: hell 1,45:1,
+   * dunkel 1,51:1, Label darauf 5,69 / 4,74:1; die Hover-Flaeche bleibt
+   * leiser. Der Rand ist Akzent-Tint statt Weiss, damit er hell erstmals
+   * sichtbar ist (prefers-contrast: more zieht ihn auf vollen Akzent). Der
+   * Schatten traegt keinen Weissring mehr, nur Versatz und Weichzeichnung;
+   * dunkel kraeftiger (Dark-Bloecke). Die Fassung ohne Glas (reduzierte
+   * Transparenz) bleibt bei --tint-surface: auf dem opaken #37332E gaebe
+   * 24 % nur 4,19:1 fuers Label. */
+  --sidebar-indicator-tint:     24%;
+  --sidebar-indicator-rim-tint: 18%;
+  --_sidebar-indicator-shadow:  0 2px 10px rgba(0, 0, 0, 0.06);
+  --sidebar-indicator-shadow:   var(--_sidebar-indicator-shadow);
 
   /* a2) Glass-Hintergründe: Vibrancy-Stufe (transparenter, mehr Durchschein) */
   --_glass-bg-card:       var(--_color-surface-glass);
@@ -2078,11 +2146,11 @@
      *
      * 52px waren die Groesse eines Knopfes, der FREI ueber der Seite schwebte -
      * dort ist er das einzige Objekt seiner Groessenklasse und darf gross sein.
-     * In einer 60px hohen Kapsel laesst derselbe Wert 4px Luft und liest sich,
+     * In einer 60px hohen Kapsel liess derselbe Wert 4px Luft und las sich,
      * als platze er heraus. --target-base ist die Zielgroesse der Geraetewelt
      * (44px am Zeiger, 48 am Finger) und damit die richtige Antwort auf beides:
-     * 8 bzw. 6px Luft in der Kapsel, und die Reserve, die er der Leiste
-     * abnimmt, faellt von 60 auf 52px - gut 1,5px je Tab zurueck.
+     * in der heute 64px hohen Kapsel 10 bzw. 8px Luft rundum
+     * (--nav-fab-inset).
      *
      * Das allein haette den zweizeiligen Umbruch der Labels NICHT geloest:
      * „Übersicht" will bei 12px 58px und bekommt auch danach nur 55,4. Geloest
@@ -2437,6 +2505,9 @@
     --_glass-capsule-rim-edge: 0.10;
     --_glass-border:           rgba(255, 255, 255, 0.12);
     --_sheet-grabber:         var(--glass-border);
+    --_sheet-tile-bg:         var(--_color-surface-raised);
+    --_nav-indicator-tint:    calc(var(--tint-surface) + 8%);
+    --_sidebar-indicator-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
     --_glass-border-subtle:    rgba(255, 255, 255, 0.14);
     --_glass-highlight:        rgba(255, 255, 255, 0.09);
     --_glass-highlight-subtle: rgba(255, 255, 255, 0.05);
@@ -2670,6 +2741,9 @@
     --_glass-capsule-rim-edge: 0.10;
     --_glass-border:          rgba(255, 255, 255, 0.12);
     --_sheet-grabber:         var(--glass-border);
+    --_sheet-tile-bg:         var(--_color-surface-raised);
+    --_nav-indicator-tint:    calc(var(--tint-surface) + 8%);
+    --_sidebar-indicator-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
     --_glass-border-subtle:   rgba(255, 255, 255, 0.14);
     --_glass-highlight:       rgba(255, 255, 255, 0.09);
     --_glass-highlight-subtle: rgba(255, 255, 255, 0.05);
@@ -2731,6 +2805,7 @@
     --glass-bg-capsule:  var(--color-surface);
     --glass-border:      var(--color-text-primary);
     --glass-border-subtle: var(--color-text-secondary);
+    --sidebar-indicator-rim-tint: 100%; /* Sidebar-Pille: voller Akzent-Rand */
     --glass-highlight:        transparent;
     --glass-highlight-subtle: transparent;
     --glass-sheen:            transparent;

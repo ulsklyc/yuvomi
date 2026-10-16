@@ -28,6 +28,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   colors of the current theme, and scrollbars and other built-in browser controls follow dark
   mode as well.
 
+- **The phone tab bar reads more calmly.** "More" no longer looks like the active tab after you
+  switch pages, and the dimmed page behind the More sheet now fades out with the sheet instead of
+  vanishing at once. In dark mode the active tab and the module tiles in the More sheet stand out
+  more clearly; on tablets the More sheet is as wide as the tab bar below it. The tab bar is a
+  little taller, so its icons and labels no longer sit tight against its edge, and the add button
+  stays centered in it even when longer labels wrap onto two lines. Module icons in the tab bar,
+  sidebar and More sheet are drawn with a slightly stronger line that matches the icons around them.
+
+- **The desktop sidebar holds still.** When the collapsed sidebar opens under the pointer, every
+  entry now stays at the same height, so the pointer lands on the entry it was aiming for; the
+  collapsed sidebar shows a thin line between its groups instead. Counts such as overdue tasks sit
+  at the end of the row when the sidebar is open instead of covering the module icon, section
+  names line up with the icons, and on windows up to 800px tall every module fits without
+  scrolling. Pressing an entry darkens its row instead of shrinking it. When a page opens, the
+  highlight already sits on its entry instead of sliding in from the first one. The highlight
+  looks the same in light and dark mode: a violet pill with a violet edge that now stands out
+  clearly from the sidebar in both.
+
 - **Documents: leaving and coming back no longer leaves stale data on the page** (#2005). An
   answer that arrived only after you had left Documents and opened it again could overwrite the
   members, the DMS accounts or the admin state the new page had just loaded, and the next dialog

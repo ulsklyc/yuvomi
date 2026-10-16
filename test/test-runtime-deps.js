@@ -142,7 +142,8 @@ test('the check script fails the build when googleapis is missing from node_modu
   writeFileSync(join(dir, 'package.json'), JSON.stringify(pkg));
   for (const entry of readdirSync(join(ROOT, 'node_modules'))) {
     if (entry === 'googleapis' || entry.startsWith('.')) continue;
-    symlinkSync(join(ROOT, 'node_modules', entry), join(dir, 'node_modules', entry));
+    // 'junction': unter Windows ein Ordner-Link ohne Sonderrechte, sonst ignoriert.
+    symlinkSync(join(ROOT, 'node_modules', entry), join(dir, 'node_modules', entry), 'junction');
   }
   const run = spawnSync(process.execPath, [join(dir, 'scripts', 'check-runtime-deps.mjs')], { cwd: dir, encoding: 'utf8' });
   assert.equal(run.status, 1, `the check must fail without googleapis; stdout: ${run.stdout} stderr: ${run.stderr}`);
