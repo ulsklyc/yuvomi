@@ -810,7 +810,10 @@ test('eventWhenRelative: der eintägige Termin nennt den Tag in Worten, die Span
   assert(!/common\./.test(dayHeadingLabel(far)) && dayHeadingLabel(far) === dayHeading(far).full, `sonst Wochentag mit Datum: ${dayHeadingLabel(far)}`);
   assert(dayHeading(today).full && dayHeading(today).full !== 'common.today', 'auch heute kennt seinen Wochentag mit Datum');
 
-  const timed = eventWhenRelative({ start_datetime: `${today}T20:00`, end_datetime: `${today}T22:00`, all_day: 0 });
+  // Die Spanne steht seit R19 mit geschuetzten Leerzeichen und Wortverbinder
+  // (unbreakable, Test unten) - verglichen wird der Text dahinter.
+  const timed = eventWhenRelative({ start_datetime: `${today}T20:00`, end_datetime: `${today}T22:00`, all_day: 0 })
+    .replace(/\u2060/g, '').replace(/\u00a0/g, ' ');
   assert(timed.startsWith('common.today, calendar.dayRangeLabel'), `"Heute, 20:00 - 22:00": ${timed}`);
   assert(whenRange(timed).from === `${today}T20:00` && whenRange(timed).to === `${today}T22:00`, timed);
   assert(!timed.startsWith(today), 'kein Tagesschluessel vorn - der Tag steht in Worten');
@@ -821,7 +824,7 @@ test('eventWhenRelative: der eintägige Termin nennt den Tag in Worten, die Span
 
   // Der Kopf: Farbpunkt, Zeit, Personen - und "Wann" fuer Screenreader.
   const head = eventDetailHead({ start_datetime: `${today}T20:00`, end_datetime: `${today}T22:00`, all_day: 0, color: '#00668F', assigned_users: [{ display_name: 'Emma' }] });
-  assert(head.subtitle === timed && head.subtitleLabel === 'calendar.detailWhen', JSON.stringify(head));
+  assert(head.subtitle.replace(/\u2060/g, '').replace(/\u00a0/g, ' ') === timed && head.subtitleLabel === 'calendar.detailWhen', JSON.stringify(head));
   assert(typeof head.dot === 'string' && head.dot.length > 0, 'der Punkt traegt die Kalenderfarbe');
   assert(head.people.length === 1 && head.peopleLabel === 'calendar.assignedLabel', 'Personen als Avatare');
 
@@ -5281,45 +5284,22 @@ test('Wochenblock-Titel trennen mit Strich statt mitten im Wort (A2 P2-1)', () =
 });
 
 // Re-Critique 2026-09-28 (A2 P3, R14 P11): der Wechsel Monat/Woche/Tag/Agenda
-// war ein harter Schnitt nach dem Fetch. Die neue Ansicht blendet jetzt kurz
-// ein (Tokens, ohne Versatz - sie antwortet auf einen Tipp, nicht auf eine
-// Geste); unter reduzierter Bewegung bleibt es beim Schnitt.
-test('Ansichtswechsel blendet die neue Ansicht ein, reduzierte Bewegung schneidet (A2 P3)', () => {
-  const play = calendarHelpers.playViewSwap;
-  assert(typeof play === 'function', 'playViewSwap() ist die EINE Stelle fuer den Ansichtswechsel');
-  const fakeBody = () => {
-    const classes = new Set();
-    const listeners = {};
-    return {
-      classes,
-      listeners,
-      classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c), contains: (c) => classes.has(c) },
-      addEventListener: (type, fn) => { listeners[type] = fn; },
-    };
-  };
-  const savedMatch = globalThis.matchMedia;
-  try {
-    globalThis.matchMedia = () => ({ matches: false });
-    const body = fakeBody();
-    play(body);
-    assert(body.classes.has('cal-view-swap-in'), 'die neue Ansicht traegt die Einblende-Klasse');
-    body.listeners.animationend?.();
-    assert(!body.classes.has('cal-view-swap-in'), 'nach der Animation raeumt sie ab');
-    globalThis.matchMedia = () => ({ matches: true });
-    const still = fakeBody();
-    play(still);
-    assert(!still.classes.has('cal-view-swap-in'), 'reduzierte Bewegung: kein Einblenden');
-  } finally {
-    if (savedMatch === undefined) delete globalThis.matchMedia; else globalThis.matchMedia = savedMatch;
-  }
-  const rules = [...eachRule(calendarCss)];
-  const swap = rules.find((r) => r.selector.trim() === '.cal-view-swap-in' && !r.at.length);
-  assert(swap && /animation:\s*cal-view-swap-in var\(--duration-[a-z]+\) var\(--ease-[a-z-]+\)/.test(swap.body), `Einblenden mit Tokens: ${swap?.body}`);
-  assert(rules.some((r) => r.selector.trim() === '.cal-view-swap-in' && r.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a)) && /animation:\s*none/.test(r.body)),
-    'das Netz unter reduzierter Bewegung');
+// war ein harter Schnitt, danach eine reine Blende. R19 (Critique 2026-10-16):
+// er ist raeumlich - die Richtung folgt der Leiste, und die Mechanik ist der
+// geteilte Helfer swapRegion (test:motion haelt seine Regeln und die
+// reduzierte Bewegung).
+test('Ansichtswechsel ist raeumlich: Richtung nach der Leiste, Tausch per swapRegion (R19)', () => {
+  const dir = calendarHelpers.viewSwapDirection;
+  assert(typeof dir === 'function', 'viewSwapDirection() ist die EINE Stelle fuer die Richtung');
+  assert(dir('month', 'week') === 1, 'nach rechts in der Leiste kommt die Ansicht von rechts');
+  assert(dir('agenda', 'month') === -1, 'nach links von links');
+  assert(dir('day', 'day') === 0);
   const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
   const onChange = src.slice(src.indexOf("activeClass: 'is-active'"), src.indexOf("attachSegmentIndicator(bar.querySelector('.cal-toolbar__views')"));
-  assert(/renderView\(\);\s*\n\s*playViewSwap\(/.test(onChange), 'der Tab-Wechsel spielt die Einblende nach dem Neuaufbau');
+  assert(/const direction = viewSwapDirection\(state\.view, view\);\s*state\.view = view;/.test(onChange), 'die Richtung kommt aus der Ansicht VOR dem Wechsel');
+  assert(/await swapRegion\(_container\.querySelector\('#cal-body'\), \(\) => \{\s*updateLabel\(\);\s*renderView\(\);\s*\}, \{ direction \}\);/.test(onChange),
+    'der Neuaufbau laeuft im Wechsel, nicht davor');
+  assert(!/cal-view-swap-in/.test(calendarCss), 'die alte Blende ist weg');
 });
 
 // Re-Critique 2026-09-28 (A2 P2-7, R14 P12): am Desktop oeffneten die Filter
@@ -6085,6 +6065,49 @@ test('R19 Woche: die erste sichtbare Stunde steht ganz da, auch am Scrollende', 
     'am Abend deckelt das Scrollende - und auch dort beginnt die Ansicht mit einer vollen Stunde (vorher 806px = 14:23)');
   assert(calendarHelpers.alignedHourScroll({ hour: 0, hourHeight: h, max: 806 }) === 0);
   assert(calendarHelpers.alignedHourScroll({ hour: 5, hourHeight: 0, max: 806 }) === 0, 'ohne Hoehe kein Sprung');
+});
+
+// R19 (Critique 2026-10-16): "Die Desktop-Woche startet zur aktuellen Uhrzeit
+// minus 80px, der Morgen bleibt unsichtbar." Mit der Hoehe des Scrollers
+// beginnt das Raster um 7 Uhr, solange jetzt darunter ganz hineinpasst.
+test('R19 Woche: der Morgen steht da, solange jetzt daneben Platz hat', () => {
+  const h = 56;
+  const at = (hour, visible, max = 24 * h - visible) => calendarHelpers.alignedHourScroll({ hour, hourHeight: h, max, visible }) / h;
+  assert(at(15, 665) === 7, `1440 um 15 Uhr: ab 7 Uhr (vorher 12), war ${at(15, 665)}`);
+  assert(at(10, 845) === 7, 'vormittags ebenso');
+  assert(at(20, 618) === 10, `mobil am Abend so spaet wie noetig, damit 20 Uhr ganz unten steht: ${at(20, 618)}`);
+  assert(at(0, 665) === 0 && at(5, 665) === 4, 'nachts eine Stunde vor jetzt');
+  assert(at(23, 845) === 8, `das Scrollende (845px fassen 15,1 Stunden) deckelt auf volle Stunden: ${at(23, 845)}`);
+});
+
+// R19 (Critique 2026-10-16): "Die Popover-Zeitspanne bricht mitten im
+// Bereich um" ("Donnerstag, 22. Oktober, 09:00 - | 10:30 Uhr" in 320px), der
+// Ort brach "Zahnarztpraxi|s Mueller", das Popover erbte keine gleich breiten
+// Ziffern, und die Liste unter dem Monat nannte "17.10.2026 Samstag", wo die
+// Agenda "Heute Samstag, 17. Oktober" sagt.
+test('R19 Popover und Tageskopf: Spanne bricht nicht, Ort nicht im Wort, ein Kopf fuer Liste und Agenda', () => {
+  const keep = calendarHelpers.unbreakable;
+  assert(typeof keep === 'function', 'unbreakable() haelt die Spanne zusammen');
+  const span = keep('09:00 - 10:30 Uhr');
+  assert(!/ /.test(span), `kein normales Leerzeichen mehr: ${JSON.stringify(span)}`);
+  assert(span.includes('-⁠'), 'hinter dem Bindestrich ein Wortverbinder (UAX 14 LB12a erlaubt sonst den Bruch)');
+  assert(span.replace(/⁠/g, '').replace(/ /g, ' ') === '09:00 - 10:30 Uhr', 'der Text bleibt derselbe');
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const rel = src.slice(src.indexOf('function eventWhenRelative('), src.indexOf('function unbreakable('));
+  assert(/\$\{day\}, \$\{unbreakable\(timeSpanText\(/.test(rel), 'der Kopf der Leseansicht schuetzt die Spanne');
+  const monthStart = src.indexOf('function renderMonthList(');
+  const monthList = src.slice(monthStart, src.indexOf('const group = dayGroup(date);', monthStart));
+  assert(/\$\{agendaDayHeadHtml\(date\)\}/.test(monthList), 'die Liste unter dem Monat traegt den Agenda-Kopf');
+  assert(!/formatDate\(date\)\)\}<\/span>/.test(monthList), 'keine Zahl-Schreibweise mehr');
+  assert(!/DAY_NAMES_LONG\(\)\[new Date\(date \+ 'T00:00:00'\)/.test(src), 'auch die Suchtreffer bauen kein Date aus dem Key');
+  const detailCss = readFileSync(new URL('../public/styles/detail-view.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(detailCss)].filter((r) => !r.at.length);
+  const pop = rules.find((r) => r.selector.trim() === '.detail-popover');
+  assert(/font-variant-numeric:\s*tabular-nums/.test(pop?.body ?? ''), 'das Popover am <body> hat gleich breite Ziffern');
+  const wrap = rules.find((r) => r.selector.trim() === '.detail-row:has(> .detail-row__action)');
+  assert(/flex-wrap:\s*wrap/.test(wrap?.body ?? ''), 'die Aktion einer Zeile rueckt bei Platzmangel darunter');
+  const text = rules.find((r) => r.selector.trim() === '.detail-row:has(> .detail-row__action) > .detail-row__text');
+  assert(/flex:\s*1 1 10rem/.test(text?.body ?? ''), 'der Wert beansprucht seine Mindestbreite');
 });
 
 // --------------------------------------------------------

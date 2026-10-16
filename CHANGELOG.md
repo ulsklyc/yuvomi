@@ -36,6 +36,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Switching calendar views and opening a settings page now move in a direction.** Choosing
+  Week after Month slides the new view in from the right and back the other way; opening a
+  settings page slides it over the list, and going back slides it away again. With reduced motion
+  turned on, views only fade.
+- **Week and day views start in the morning.** The calendar opens the time grid at 7 am as long as
+  the current hour still fits on screen, instead of an hour before now, so the morning stays
+  visible on a computer.
+- **Event details keep times and places readable.** In the event popover a time range such as
+  "09:00 - 10:30" no longer breaks across two lines, a place name no longer breaks in the middle
+  of a word next to "Open in Maps", and digits line up. The list under the month now names the
+  day the same way as the agenda ("Today Saturday, 17 October").
 - **Settings stack fewer headings.** A module page that only has household settings (or only
   personal ones) no longer repeats "For the household" above its sections. The Kitchen page uses the
   same grouped rows as the other settings pages: meal toggles and custom meal names sit in lists with

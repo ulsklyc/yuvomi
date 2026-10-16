@@ -1278,6 +1278,18 @@ das Verhaeltnis haelt.
   Wechsel ueber `swapContent` mit `direction` +1 hinein, -1 zurueck. Das ist die benannte
   Ausnahme zur Regel "Seiteninhalt blendet nur": die gilt dem Tab-Wechsel zwischen
   Geschwistern. Neben einer Seitenleiste bzw. in der Split-Ansicht bleibt es bei der Blende.
+  **Seit R19 mit altem Bild (`swapRegion(host, update, { direction })`, utils/content-swap.js):**
+  eine View Transition mit Typ `region-forward`/`region-back`/`region-fade` (Regeln in
+  layout.css, Name `region-swap` nur fuer die Dauer). Vorwaerts schiebt sich die neue Ebene von
+  der Seite herein (24 %, `--duration-lg`), die alte tritt um ein Drittel zurueck und blendet
+  aus; zurueck schiebt sich die alte Ebene hinaus und liegt dabei oben. Die Gruppe steht und
+  schneidet auf die Region zu, die Wurzel zeigt nur ihr lebendes Bild (eine gleitende
+  Segment-Kapsel im Kopf friert nicht ein), Navigation/Kapsel/FAB stehen wie beim
+  Seitenwechsel. Reduzierte Bewegung: nur Blende (`--duration-sm`). Ohne
+  `:active-view-transition-type()` faellt es auf `swapContent` zurueck. Nutzer: Einstellungen
+  (Uebersicht <-> Blatt) und der Kalender-Ansichtswechsel (Richtung nach der Leiste Monat ->
+  Woche -> Tag -> Agenda; vorher eine richtungslose Blende). Die Gesundheit bleibt bei
+  `swapContent` (ihr Wechsel ist synchron in `activateArea` verankert).
 - **Druck und Hover (R18):** Zeilen und Karten, die als Ganzes ein Ziel sind, teilen EINEN
   Press-Baustein (`list-row.css`): `--color-surface-hover`, hinein `--duration-2xs`, heraus die
   Dauer der Ruhe-Regel. Ein Knopf in der Zeile drueckt die Zeile nicht mit, eine gezogene

@@ -14,6 +14,7 @@ import { stagger, wireScrollFade, scheduleUndoableDelete, vibrate, durationToken
 import { t, getLocale, formatDate as formatPreferredDate, formatDayMonth, formatMonthYear, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, fmtLocation, REQUIRED_MARK } from '/utils/html.js';
 import { periodStepperHtml, syncPeriodReset, swapPeriod } from '/utils/period-stepper.js';
+import { swapRegion } from '/utils/content-swap.js';
 import { initials } from '/utils/initials.js';
 import { shiftEndDateKey, isEndBeforeStart, weekStartIndex, weekdayOrder,
          monthPeriodKeys, startOfLocalWeekKey, addLocalDays, defaultDateInPeriod,
@@ -2358,6 +2359,7 @@ function renderToolbar() {
     activeClass: 'is-active',
     onChange: async (view) => {
       if (searchActive) closeCalendarSearch({ restoreView: false });
+      const direction = viewSwapDirection(state.view, view);
       state.view = view;
       setSavedCalendarView(view);
       // ERST GLEITET DIE KAPSEL, DANN BAUT DIE ANSICHT (Critique 2026-10-16,
@@ -2366,9 +2368,10 @@ function renderToolbar() {
       // Frame Vorlauf, danach laeuft sie im Compositor weiter.
       await afterGlideStart();
       await reloadForView();
-      updateLabel();
-      renderView();
-      playViewSwap(_container.querySelector('#cal-body'));
+      await swapRegion(_container.querySelector('#cal-body'), () => {
+        updateLabel();
+        renderView();
+      }, { direction });
     },
   });
   // Die Ansichtswahl gleitet wie jede Segment-Leiste (D8). Der Kopf wird bei
@@ -2879,22 +2882,20 @@ function scheduleMonthFit(grid) {
 }
 
 /**
- * Der Wechsel Monat/Woche/Tag/Agenda blendet die neue Ansicht kurz ein
- * (Re-Critique 2026-09-28, A2 P3): vorher ein harter Schnitt nach dem Fetch.
- * Ohne Versatz - anders als der Periodenwechsel (period-swipe.js) antwortet
- * er auf einen Tipp, nicht auf eine Wischrichtung. Die Blende setzt bei 0,4
- * Deckkraft an, nie bei 0: ein leerer Frame dazwischen saehe aus wie ein
- * Neuladen. Unter reduzierter Bewegung bleibt es beim Schnitt (die CSS-Regel
- * in calendar.css ist das Netz dafuer).
+ * DER ANSICHTSWECHSEL IST RAEUMLICH (R19, Critique 2026-10-16). Bis dahin
+ * blendete die neue Ansicht nur ein (Re-Critique 2026-09-28, A2 P3) - ohne
+ * Fortfuehrung, Monat und Agenda kamen aus dem Nichts. Jetzt folgt die Bewegung
+ * der Leiste: wer nach rechts waehlt (Monat -> Woche -> Tag -> Agenda), dem
+ * schiebt sich die neue Ansicht von rechts herein, die alte tritt zurueck;
+ * nach links umgekehrt (utils/content-swap.js swapRegion, Regeln in
+ * layout.css). Unter reduzierter Bewegung blenden die Bilder nur. Ohne View
+ * Transition bleibt die 8px-Einblende in Schrittrichtung (swapContent).
+ * @param {string} from  die Ansicht vor dem Wechsel
+ * @param {string} to    die gewaehlte Ansicht
+ * @returns {number} +1 nach rechts in der Leiste, -1 nach links, 0 gleich
  */
-function playViewSwap(body) {
-  if (!body) return;
-  if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  body.classList.remove('cal-view-swap-in');
-  // Reflow, damit ein zweiter Wechsel waehrend der Blende sie neu startet.
-  void body.offsetWidth;
-  body.classList.add('cal-view-swap-in');
-  body.addEventListener('animationend', () => body.classList.remove('cal-view-swap-in'), { once: true });
+function viewSwapDirection(from, to) {
+  return Math.sign(VIEWS.indexOf(to) - VIEWS.indexOf(from));
 }
 
 function renderView() {
@@ -3364,18 +3365,20 @@ function monthListHtml() {
  * zu Punkten ohne Titel geschrumpft. Die Wischgeste bewegt ausserdem nur das
  * erste Kind von #cal-body - das Raster wechselt den Monat, die Liste steht.
  */
+// EIN TAGESKOPF (R19, Critique 2026-10-16): Die Liste unter dem Monat nannte
+// "17.10.2026 Samstag", die Agenda "Heute Samstag, 17. Oktober" - derselbe Tag
+// in zwei Schreibweisen. Liste, Agenda und Suchtreffer tragen jetzt denselben
+// Kopf aus agendaDayHeadHtml (utils/day-label.js dayHeading).
 function renderMonthList(list = _container?.querySelector('#month-list')) {
   if (!list) return;
   const date = state.cursor;
-  const weekday = DAY_NAMES_LONG()[new Date(date + 'T00:00:00').getDay()];
 
   const open = list.querySelector('#month-open-day');
   open.classList.toggle('month-list__open--today', date === state.today);
-  open.setAttribute('aria-label', t('calendar.monthOpenDay', { date: `${weekday}, ${formatDate(date)}` }));
+  open.setAttribute('aria-label', t('calendar.monthOpenDay', { date: dayHeading(date).full }));
   open.replaceChildren();
   open.insertAdjacentHTML('beforeend', `
-    <span class="agenda-day__date">${esc(formatDate(date))}</span>
-    <span class="agenda-day__weekday">${esc(weekday)}</span>
+    ${agendaDayHeadHtml(date)}
     <i data-lucide="chevron-right" class="icon-sm month-list__chevron" aria-hidden="true"></i>
   `);
 
@@ -4479,8 +4482,12 @@ function scrollToHour(scroll, body) {
     hour: nowFields().hour,
     hourHeight,
     max: scroll.scrollHeight - scroll.clientHeight,
+    visible: scroll.clientHeight,
   });
 }
+
+/** Ab dieser Stunde zeigt das Zeitraster den Tag, wenn jetzt dabei Platz hat. */
+const MORNING_HOUR = 7;
 
 /**
  * DIE ERSTE SICHTBARE STUNDE STEHT GANZ DA (R19, Critique 2026-10-16). Der
@@ -4488,14 +4495,28 @@ function scrollToHour(scroll, body) {
  * am Abend auf das Scrollende, das genauso mitten in einer Stunde liegt: mobil
  * stand die Reihe 14/15 Uhr halb unter der Ganztagszone, ihre Uhrzeit und
  * Terminkoepfe angeschnitten. Jetzt rundet der Startpunkt auf die volle
- * Stunde ab, auch dort, wo das Scrollende ihn deckelt. Die Wahl, WELCHE
- * Stunde oben steht, bleibt (eine gute Stunde vor jetzt).
- * @param {{hour: number, hourHeight: number, max: number}} opts
+ * Stunde ab, auch dort, wo das Scrollende ihn deckelt.
+ *
+ * DER MORGEN STEHT DA, WO JETZT DANEBEN PLATZ HAT (R19, Critique 2026-10-16).
+ * "Eine gute Stunde vor jetzt" liess am Desktop den Vormittag unsichtbar: um
+ * 15 Uhr begann die Woche bei 13 Uhr, obwohl das Raster 18 Stunden fasst.
+ * Mit `visible` (Hoehe des Scrollers) beginnt die Ansicht um MORNING_HOUR,
+ * solange die laufende Stunde darunter noch ganz hineinpasst; sonst so spaet
+ * wie noetig, damit sie unten steht. Nachts (vor dem Morgen) beginnt sie eine
+ * Stunde vor jetzt. Ohne `visible` bleibt es bei "eine gute Stunde vor jetzt".
+ * @param {{hour: number, hourHeight: number, max: number, visible?: number}} opts
  * @returns {number} scrollTop in px, ein Vielfaches der Stundenhoehe
  */
-function alignedHourScroll({ hour, hourHeight, max }) {
+function alignedHourScroll({ hour, hourHeight, max, visible }) {
   if (!(hourHeight > 0)) return 0;
-  const wanted = Math.max(0, hour * hourHeight - 80);
+  let wanted;
+  if (visible > 0) {
+    const fits = Math.floor(visible / hourHeight + 1e-6);
+    const topHour = Math.max(hour + 1 - fits, Math.min(MORNING_HOUR, Math.max(0, hour - 1)));
+    wanted = Math.max(0, topHour) * hourHeight;
+  } else {
+    wanted = Math.max(0, hour * hourHeight - 80);
+  }
   const capped = Math.min(wanted, Math.max(0, max));
   return Math.floor(capped / hourHeight + 1e-6) * hourHeight;
 }
@@ -6391,8 +6412,7 @@ function renderCalendarSearchResults(body) {
       ${groups.map(({ date, events }) => `
         <div class="agenda-day" data-date="${esc(date)}">
           <h2 class="agenda-day__header ${date === state.today ? 'agenda-day__header--today' : ''}">
-            <span class="agenda-day__date">${formatDate(date, { long: true })}</span>
-            <span class="agenda-day__weekday">${DAY_NAMES_LONG()[new Date(date + 'T00:00:00').getDay()]}</span>
+            ${agendaDayHeadHtml(date)}
           </h2>
           <div class="row-carrier">${events.map((ev) => renderAgendaEvent(ev, date)).join('')}</div>
         </div>
@@ -6464,7 +6484,7 @@ export const __test = {
   setContainerForTest(container) { _container = container; },
   // test:initials: die Scheibe einer Person im Filterblatt.
   personFilterChipsHtml,
-  playViewSwap,
+  viewSwapDirection, unbreakable,
   eventBlockAttrs,
   // R10 L5: Liste + Detail der Agenda - Auswahl-ID und ihr Termin.
   agendaMdId, eventForAgendaMdId,
@@ -6815,7 +6835,20 @@ function eventWhenRelative(ev) {
   if (isMultiDayEvent(ev)) return eventWhenText(ev);
   const day = dayHeadingLabel(localDate(ev.start_datetime));
   if (ev.all_day) return `${day} · ${t('calendar.allDay')}`;
-  return `${day}, ${timeSpanText(ev.start_datetime, ev.end_datetime)}`;
+  // DIE SPANNE BRICHT NICHT (R19, Critique 2026-10-16): im 320px-Popover
+  // brach "Donnerstag, 22. Oktober, 09:00 - | 10:30 Uhr" mitten im Bereich.
+  // Geschuetzte Leerzeichen halten die Spanne zusammen, umbrechen darf die
+  // Zeile nur nach dem Tag.
+  return `${day}, ${unbreakable(timeSpanText(ev.start_datetime, ev.end_datetime))}`;
+}
+
+/**
+ * Leerzeichen als geschuetzte, und nach einem Bindestrich ein Wortverbinder
+ * (U+2060): hinter "-" darf eine Zeile sonst auch vor einem geschuetzten
+ * Leerzeichen brechen (UAX #14, LB12a). Der Text bricht nicht in sich um.
+ */
+function unbreakable(text) {
+  return String(text).replace(/ /g, '\u00a0').replace(/-/g, '-\u2060');
 }
 
 /**

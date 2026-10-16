@@ -272,6 +272,19 @@
   margin-inline-start: auto;
 }
 
+/* DER WERT WIRD NICHT ZERHACKT (R19, Critique 2026-10-16). Im 320px-Popover
+ * liess "In Maps oeffnen" dem Ort 130px, und `overflow-wrap: anywhere` brach
+ * "Zahnarztpraxi|s Mueller" mitten im Wort. Der Text beansprucht jetzt
+ * mindestens 10rem; passt die Aktion daneben nicht mehr, rueckt sie in eine
+ * eigene Zeile darunter (am Ende, wie zuvor). */
+.detail-row:has(> .detail-row__action) {
+  flex-wrap: wrap;
+}
+
+.detail-row:has(> .detail-row__action) > .detail-row__text {
+  flex: 1 1 10rem;
+}
+
 /* Benannte Gruppe von Metazeilen (`{ group, rows }`): Abschnittstitel wie in
  * einer Kontaktkarte, darunter die Zeilen im selben Takt wie ungegliedert. */
 .detail-group {
@@ -543,6 +556,10 @@
 .detail-popover {
   position: fixed;
   z-index: calc(var(--z-modal) - 1);
+  /* Das Termin-Popover haengt am <body>, nicht in `.calendar-page`, und erbte
+   * deren gleich breite Ziffern nicht (R19): Wiederholung "bis 31.12.",
+   * Erinnerungen und Zeiten standen proportional. */
+  font-variant-numeric: tabular-nums;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
