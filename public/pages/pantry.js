@@ -27,7 +27,7 @@ import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { pageToolsMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 // Alias, weil dieses Modul selbst eine `emptyStateEl()`-Funktion hat, die den
 // Renderer mit den Vorrats-Texten füllt.
-import { emptyStateEl as emptyStateComponentEl, mountLoadError } from '/utils/empty-state.js';
+import { emptyStateEl as emptyStateComponentEl, mountLoadError, searchEmptyEl } from '/utils/empty-state.js';
 import { scheduleUndoableDelete, vibrate, wireScrollFade, collapseOut, expandIn } from '/utils/ux.js';
 import { redrawList } from '/utils/list-motion.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
@@ -799,29 +799,23 @@ function onWatchClick(e) {
  * und der Nutzer suchte den Fehler beim Suchbegriff.
  */
 function noResultsEl() {
-  const active = [];
-  if (state.query) active.push(`„${state.query}"`);
-  if (state.filter !== 'all') {
-    active.push(t({ expired: 'pantry.filterExpired', soon: 'pantry.filterSoon', low: 'pantry.filterLow' }[state.filter]));
-  }
-
-  return emptyStateComponentEl({
-    variant: 'no-results',
-    title: t('pantry.noResultsTitle'),
-    description: t('pantry.noResultsDescription'),
-    hint: active.length ? active.join(' · ') : undefined,
-    action: {
-      label: t('pantry.resetFilters'),
-      onClick: () => {
-        state.query = '';
-        state.filter = 'all';
-        // clear() versteckt zugleich den Leeren-Knopf des geteilten Suchfelds;
-        // ein blankes `value = ''` ließe ihn über dem leeren Feld stehen.
-        _search?.clear();
-        renderFilters();
-        renderList();
-        _search?.input.focus();
-      },
+  // Der geteilte Leerzustand einer leeren Suche (R19): Begriff und Filter als
+  // Chips, EIN Knopf hebt beide auf.
+  const filters = state.filter !== 'all'
+    ? [t({ expired: 'pantry.filterExpired', soon: 'pantry.filterSoon', low: 'pantry.filterLow' }[state.filter])]
+    : [];
+  return searchEmptyEl({
+    query: state.query,
+    filters,
+    onReset: () => {
+      state.query = '';
+      state.filter = 'all';
+      // clear() versteckt zugleich den Leeren-Knopf des geteilten Suchfelds;
+      // ein blankes `value = ''` ließe ihn über dem leeren Feld stehen.
+      _search?.clear();
+      renderFilters();
+      renderList();
+      _search?.input.focus();
     },
   });
 }

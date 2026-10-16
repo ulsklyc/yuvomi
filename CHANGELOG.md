@@ -31,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A search that finds nothing looks and works the same in every module.** Tasks, Pantry, Recipes,
+  Documents, Inventory, Contacts, Notes and Birthdays now say "No results", show what you searched
+  for (and any active filter) as a chip, and offer one "Reset search" button. Before, some had no
+  way back and each used its own wording.
 - **The menu groups your planning in one place.** Calendar, Tasks, Rewards, Notes and Schedule now
   sit together under Plan, and Budget stands on its own without a "Finance" heading over a single
   entry. Schedule has its own briefcase symbol instead of a second calendar. Your own module order

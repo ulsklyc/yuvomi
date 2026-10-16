@@ -21,7 +21,7 @@ import {
   refocusAfterRender,
 } from '/components/modal.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
-import { emptyStateEl } from '/utils/empty-state.js';
+import { emptyStateEl, searchEmptyOptions } from '/utils/empty-state.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { pageToolsMenuHtml, pageToolsActionEl, installPopoverMenus } from '/utils/popover-menu.js';
 import { formatMoney } from '/utils/money.js';
@@ -749,13 +749,12 @@ function renderListBody() {
   if (!groups.length) {
     list.appendChild(emptyStateEl(
       state.query
-        ? {
-            variant: 'no-results',
-            title: t('inventory.noResultsTitle'),
-            description: t('inventory.noResultsDescription'),
-            hint: [`"${state.query}"`, state.filterAttention ? t('inventory.metricAttentionLabel') : null].filter(Boolean).join(' · '),
-            action: { label: t('inventory.resetSearch'), onClick: resetFilters },
-          }
+        // Der EINE Leerzustand einer leeren Suche (R19): Begriff und Filter als Chips.
+        ? searchEmptyOptions({
+          query: state.query,
+          filters: state.filterAttention ? [t('inventory.metricAttentionLabel')] : [],
+          onReset: resetFilters,
+        })
         : {
             variant: 'no-results',
             title: t('inventory.attentionEmptyTitle'),

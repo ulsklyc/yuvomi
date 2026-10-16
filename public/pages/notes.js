@@ -19,7 +19,7 @@ import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { pageToolsMenuHtml, pageToolsActionEl, installPopoverMenus } from '/utils/popover-menu.js';
 import { findPageFab } from '/utils/fab.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
-import { emptyStateHTML } from '/utils/empty-state.js';
+import { emptyStateHTML, searchEmptyHTML } from '/utils/empty-state.js';
 import { AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 import {
   noteMatchesCategories,
@@ -78,6 +78,8 @@ let state = {
   filterCategoryIds: [],
 };
 let _container = null;
+/** Das Suchfeld (wirePageSearch) - der Leerzustand einer leeren Suche leert es. */
+let _search = null;
 
 // --------------------------------------------------------
 // Nur-lesen (#467, #1265 P1)
@@ -374,7 +376,7 @@ export async function render(container, { user, signal }) {
   });
   findPageFab('fab-new-note').addEventListener('click', addHandler);
 
-  wirePageSearch(_container, {
+  _search = wirePageSearch(_container, {
     id: 'notes-search',
     delay: 0,
     onQuery: (value) => {
@@ -542,6 +544,14 @@ function drawGrid(grid) {
     grid.querySelector('#empty-cta-notes')?.addEventListener('click', () => {
       document.querySelector('.page-fab')?.click();
     });
+    grid.querySelector('#notes-reset-search')?.addEventListener('click', () => {
+      state.filterQuery = '';
+      state.filterCreator = '';
+      state.filterCategoryIds = [];
+      _search?.clear();
+      renderNotesAndFilters();
+      _search?.input?.focus();
+    });
     return;
   }
 
@@ -645,15 +655,16 @@ function groupFlow(pinnedCount, columns) {
  */
 function notesEmptyStateHtml(isFiltered) {
   const q = state.filterQuery.trim().toLowerCase();
+  // Der EINE Leerzustand einer leeren Suche (R19): Begriff, Person und
+  // Kategorien als Chips, „Suche zuruecksetzen" hebt alles auf.
   if (isFiltered) {
-    return emptyStateHTML({
-      variant: 'no-results',
-      title: t('notes.noResultsTitle'),
-      description: q
-        ? t('notes.noResultsDescription', { query: state.filterQuery })
-        : state.filterCategoryIds.length
-          ? t('noteCategories.noResults')
-          : t('notes.noResultsCreatorDescription', { name: state.filterCreator }),
+    const categories = state.filterCategoryIds
+      .map((id) => state.categories.find((category) => category.id === id)?.name)
+      .filter(Boolean);
+    return searchEmptyHTML({
+      query: q ? state.filterQuery : '',
+      filters: [state.filterCreator, ...categories].filter(Boolean),
+      resetAttrs: { id: 'notes-reset-search' },
     });
   }
   const ro = readOnly();

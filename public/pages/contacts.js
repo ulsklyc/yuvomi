@@ -18,7 +18,7 @@ import { parseVCards } from '/utils/vcard.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 import { composeDisplayName, contactSortKey, splitDisplayName } from '/utils/contact-name.js';
 import { getPhoneFormatter, createAsYouType, countryFromRegion } from '/utils/phone.js';
-import { emptyStateHTML } from '/utils/empty-state.js';
+import { emptyStateHTML, searchEmptyHTML } from '/utils/empty-state.js';
 import { splitViewDetailHtml, mountMasterDetail, setSelectionBulk } from '/utils/master-detail.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
 import '/components/category-manager.js';
@@ -636,17 +636,13 @@ function filterContacts() {
  * die Auskunft ueber den Zustand (Regel fuer alle Pakete aus #1265).
  */
 function contactsEmptyStateHtml(filtered) {
+  // Der EINE Leerzustand einer leeren Suche (R19): Begriff und Kategorie als
+  // Chips, „Suche zuruecksetzen" hebt beide auf (reset-filters).
   if (filtered) {
-    return emptyStateHTML({
-      variant: 'no-results',
-      icon: 'search',
-      title: t('contacts.noResultsTitle'),
-      description: t('contacts.noResultsDescription'),
-      action: {
-        label: t('contacts.resetSearch'),
-        icon: 'x',
-        attrs: { 'data-action': 'reset-filters' },
-      },
+    return searchEmptyHTML({
+      query: state.searchQuery,
+      filters: state.activeCategory ? [catLabel(state.activeCategory)] : [],
+      resetAttrs: { 'data-action': 'reset-filters' },
     });
   }
   const ro = readOnly();

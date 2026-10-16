@@ -8716,6 +8716,48 @@ textarea::placeholder {
   line-height: var(--line-height-base);
 }
 
+/* Die Begriffe einer leeren Suche (searchEmptyOptions, utils/empty-state.js):
+ * der Suchbegriff und gesetzte Filter als Chips - der Gegenstand der Suche
+ * steht als Ding da, nicht in Anfuehrungszeichen im Satz. Ein Chip ist eine
+ * Auskunft, kein Knopf: Fuellung `--color-fill-well`, keine Kante, kein
+ * Zeiger. Ein langer Begriff endet in einer Ellipse statt die Spalte zu
+ * sprengen. */
+.empty-state__terms {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-1h);
+  max-width: min(100%, 360px);
+}
+
+.empty-state__term {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  padding: var(--space-1) var(--space-2h);
+  border-radius: var(--radius-full);
+  background-color: var(--color-fill-well);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-tight);
+}
+
+.empty-state__term-icon {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  flex-shrink: 0;
+  color: var(--color-text-tertiary);
+}
+
+.empty-state__term-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .empty-state__hint {
   font-size: var(--text-xs);
   color: var(--color-text-tertiary);

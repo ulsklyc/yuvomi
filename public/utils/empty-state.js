@@ -67,7 +67,7 @@ const VARIANTS = {
  */
 export function emptyStateEl({
   variant = 'empty', icon, title, description, hint, action, actions, details,
-  className, compact = false,
+  className, compact = false, terms,
 } = {}) {
   const spec = VARIANTS[variant] ?? VARIANTS.empty;
 
@@ -128,6 +128,16 @@ export function emptyStateEl({
   // immer als <p>; bis sie hierher delegierte, war das der einzige Unterschied
   // zwischen den beiden Fassungen.)
   if (description) parts.push(`<p class="empty-state__description">${esc(description)}</p>`);
+  // Die Begriffe einer leeren Suche als Chips (searchEmptyOptions): WAS gesucht
+  // wurde, steht als Gegenstand da, nicht in Anfuehrungszeichen im Satz.
+  const chips = (Array.isArray(terms) ? terms : [])
+    .map((term) => ({ text: plainText(term?.text), icon: plainText(term?.icon) }))
+    .filter((term) => term.text);
+  if (chips.length) {
+    parts.push(`<p class="empty-state__terms">${chips.map((term) => `<span class="empty-state__term">${
+      term.icon ? `<i data-lucide="${esc(term.icon)}" class="empty-state__term-icon" aria-hidden="true"></i>` : ''
+    }<span class="empty-state__term-text">${esc(term.text)}</span></span>`).join('')}</p>`);
+  }
   if (hint) parts.push(`<p class="empty-state__hint">${esc(hint)}</p>`);
   box.insertAdjacentHTML('beforeend', parts.join(''));
 
@@ -371,6 +381,67 @@ export function emptyStateHTML(opts = {}) {
     );
   }
   return emptyStateEl(opts).outerHTML;
+}
+
+/**
+ * DER LEERZUSTAND „SUCHE OHNE TREFFER" - EINER FUER ALLE MODULE (R19).
+ *
+ * Die Critique vom 2026-10-16 fand ihn in drei Dialekten: „Keine Treffer"
+ * ohne Ausweg (Aufgaben-Liste), „Nichts gefunden" mit dem Begriff in
+ * Anfuehrungszeichen und „zuruecksetzen" (Vorrat, Inventar, Rezepte) und
+ * „Suche leeren" mit dem Begriff im Satz (Aufgaben-Brett, Dokumente). Jeder
+ * Modulwechsel hiess neu lesen. Jetzt baut ihn EINE Stelle: Titel „Keine
+ * Treffer", ein Satz, der Suchbegriff (und gesetzte Filter) als Chips, und
+ * EINE Aktion „Suche zuruecksetzen". Sie setzt alles zurueck, was die Chips
+ * nennen - die Chips sind die Auskunft, was der Knopf aufhebt.
+ *
+ * Deshalb steht hier `t()`: der Text ist in allen Modulen derselbe, und eine
+ * Aufrufstelle, die ihn selbst uebersetzt, ist genau die Stelle, an der der
+ * naechste Dialekt entsteht.
+ *
+ * @param {object}   opts
+ * @param {string}   [opts.query]        Der rohe Suchbegriff (escapt der Renderer).
+ * @param {string[]} [opts.filters]      Aufgeloeste Namen gesetzter Filter.
+ * @param {Function} [opts.onReset]      Setzt Suche (und Filter) zurueck.
+ * @param {object}   [opts.resetAttrs]   Attribute am Knopf fuer die String-Ausgabe.
+ * @param {object[]} [opts.actions]      Weitere, nachrangige Wege (Dokumente:
+ *                                       im Archiv suchen).
+ * @param {string}   [opts.className]
+ * @returns {object} Optionen fuer emptyStateEl / emptyStateHTML / mountEmptyState
+ */
+export function searchEmptyOptions({ query = '', filters = [], onReset, resetAttrs, actions = [], className } = {}) {
+  const term = plainText(query)?.trim();
+  const filterNames = (Array.isArray(filters) ? filters : []).map(plainText).filter(Boolean);
+  return {
+    variant: 'no-results',
+    icon: 'search-x',
+    title: t('common.searchNoResultsTitle'),
+    description: t(filterNames.length ? 'common.searchNoResultsFilteredDescription' : 'common.searchNoResultsDescription'),
+    terms: [
+      ...(term ? [{ text: term, icon: 'search' }] : []),
+      ...filterNames.map((name) => ({ text: name, icon: 'list-filter' })),
+    ],
+    actions: [
+      { label: t('common.searchReset'), icon: 'x', onClick: onReset, attrs: resetAttrs },
+      ...(Array.isArray(actions) ? actions : []),
+    ],
+    className,
+  };
+}
+
+/** `searchEmptyOptions` als Element. */
+export function searchEmptyEl(opts) {
+  return emptyStateEl(searchEmptyOptions(opts));
+}
+
+/** `searchEmptyOptions` als String - fuer Listen, die als Markup entstehen. */
+export function searchEmptyHTML(opts = {}) {
+  return emptyStateHTML(searchEmptyOptions(opts));
+}
+
+/** `searchEmptyOptions` eingehaengt (ersetzt den Inhalt von `target`). */
+export function mountSearchEmpty(target, opts) {
+  return mountEmptyState(target, searchEmptyOptions(opts));
 }
 
 /**

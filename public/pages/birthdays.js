@@ -20,7 +20,7 @@ import { openDetailView } from '/components/detail-view.js';
 // Alias: dieses Modul fuehrt selbst eine `emptyStateHtml()`, die den Renderer
 // mit den Geburtstags-Texten fuellt. Zwei Namen, die sich nur in der
 // Gross-Schreibung unterscheiden, waeren im Modul nicht auseinanderzuhalten.
-import { emptyStateHTML as sharedEmptyStateHTML, emptyHintHTML } from '/utils/empty-state.js';
+import { emptyStateHTML as sharedEmptyStateHTML, emptyHintHTML, searchEmptyHTML } from '/utils/empty-state.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 import {
   renderAppPage,
@@ -40,6 +40,8 @@ let _container = null;
 // Liste + Detail (R10 L5): ab der Schwelle steht rechts der gewaehlte
 // Geburtstag. Ein Aufbau je Seitenaufbau (render), abgebaut mit dem Signal.
 let _md = null;
+/** Das Suchfeld (wirePageSearch) - der Leerzustand einer leeren Suche leert es. */
+let _search = null;
 
 /**
  * Darf dieser Nutzer Geburtstage schreiben?
@@ -463,12 +465,10 @@ function emptyStateHtml() {
   // `cake` ist dasselbe Zeichen wie CAKE_SVG - das Inline-SVG oben ist die
   // Lucide-Torte, von Hand kopiert, damit sie neben einem Namen stehen kann.
   // Im Leerzustand nimmt der Renderer den Lucide-Namen direkt.
+  // Der EINE Leerzustand einer leeren Suche (R19) - hier stand nur der Satz
+  // „Keine Ergebnisse gefunden." ohne Begriff und ohne Ausweg.
   if (state.query.trim()) {
-    return sharedEmptyStateHTML({
-      variant: 'no-results',
-      icon: 'cake',
-      title: t('search.noResults'),
-    });
+    return searchEmptyHTML({ query: state.query, resetAttrs: { id: 'birthdays-reset-search' } });
   }
   // Bei `calendar: read` gehen mit dem CTA auch Beschreibung und Hinweis
   // (#1348): „Füge einen Geburtstag hinzu" und „Trage Geburtstage ein" laden
@@ -517,6 +517,12 @@ function drawList(host, { repaint = false } = {}) {
     host.replaceChildren();
     host.insertAdjacentHTML('beforeend', emptyStateHtml());
     host.querySelector('#birthdays-empty-cta')?.addEventListener('click', () => openBirthdayModal({ mode: 'create' }));
+    host.querySelector('#birthdays-reset-search')?.addEventListener('click', () => {
+      state.query = '';
+      _search?.clear();
+      renderList();
+      _search?.input?.focus();
+    });
     if (window.lucide) window.lucide.createIcons({ el: host });
     _md?.refresh();
     return;
@@ -695,7 +701,7 @@ function bindEvents() {
     }
   } catch { /* sessionStorage evtl. nicht verfügbar */ }
 
-  wirePageSearch(_container, {
+  _search = wirePageSearch(_container, {
     id: 'birthdays-search',
     delay: 0,
     onQuery: (value) => {

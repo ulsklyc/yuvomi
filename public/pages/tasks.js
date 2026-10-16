@@ -21,7 +21,7 @@ import { resolveReminderPreset, remindAtFromPreset, parseRemindAtAsUtc } from '/
 import { navModuleAccess } from '/permissions.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { renderDocumentAttachField, bindDocumentAttachField } from '/components/document-attach.js';
-import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
+import { emptyStateHTML, mountLoadError, searchEmptyHTML } from '/utils/empty-state.js';
 import '/components/category-manager.js';
 import '/components/tag-manager.js';
 import { findPageFab } from '/utils/fab.js';
@@ -766,6 +766,18 @@ function taskResetButtonHtml(id, label) {
         </button>`;
 }
 
+/** „Suche zuruecksetzen" im Leerzustand einer leeren Suche (Liste und Brett). */
+function wireTaskSearchReset(container, listEl) {
+  listEl.querySelector('[data-tasks-reset-search]')?.addEventListener('click', () => {
+    state.searchQuery = '';
+    const input = container.querySelector('#tasks-search');
+    if (input) input.value = '';
+    container.querySelector('[data-page-search-clear]')?.setAttribute('hidden', '');
+    renderTaskList(container);
+    input?.focus();
+  });
+}
+
 function renderTaskGroups(tasks, groupMode) {
   if (!tasks.length) {
     // Leere Suche ≠ leeres Modul: bei aktiver Suche wäre „Noch keine Aufgaben"
@@ -775,12 +787,10 @@ function renderTaskGroups(tasks, groupMode) {
     // hier ein `esc()` vor der Uebergabe, weil das Ergebnis in ein
     // Template-Literal floss - ueber den Renderer waere daraus eine zweite
     // Maskierung geworden und „a&b" haette als „a&amp;b" auf dem Schirm gestanden.
+    // EIN Leerzustand fuer jede leere Suche (searchEmptyHTML, R19): hier stand
+    // "Keine Treffer" OHNE Ausweg, im Brett daneben "Suche leeren".
     return isFiltered
-      ? emptyStateHTML({
-        variant: 'no-results',
-        title: t('tasks.noResultsTitle'),
-        description: t('tasks.noResultsDescription', { query: state.searchQuery }),
-      })
+      ? searchEmptyHTML({ query: state.searchQuery, resetAttrs: { 'data-tasks-reset-search': '' } })
       : emptyStateHTML({
         icon: 'circle-check-big',
         title: t('tasks.emptyTitle'),
@@ -2967,24 +2977,9 @@ function renderKanban(container) {
   const totalVisible = cols.reduce((n, c) => n + grouped[c.status].length, 0);
   if (isFiltered && totalVisible === 0) {
     listEl.replaceChildren();
-    listEl.insertAdjacentHTML('beforeend', emptyStateHTML({
-      variant: 'no-results',
-      title: t('tasks.noResultsTitle'),
-      description: t('tasks.noResultsDescription', { query: state.searchQuery }),
-      action: {
-        label: t('common.searchClear'),
-        icon: 'x',
-        attrs: { id: 'kanban-reset-search' },
-      },
-    }));
+    listEl.insertAdjacentHTML('beforeend', searchEmptyHTML({ query: state.searchQuery, resetAttrs: { 'data-tasks-reset-search': '' } }));
     if (window.lucide) window.lucide.createIcons({ el: listEl });
-    listEl.querySelector('#kanban-reset-search')?.addEventListener('click', () => {
-      state.searchQuery = '';
-      const input = container.querySelector('#tasks-search');
-      if (input) input.value = '';
-      container.querySelector('[data-page-search-clear]')?.setAttribute('hidden', '');
-      renderTaskList(container);
-    });
+    wireTaskSearchReset(container, listEl);
     return;
   }
 
@@ -3760,6 +3755,7 @@ function renderTaskList(container, { paneQuiet = false } = {}) {
   wireTaskReorder(container);
   // Kein Hinweis auf eine Geste, die der Auswahlmodus gerade abschaltet.
   if (!state.bulkSelectMode) maybeShowSwipeHint(container);
+  wireTaskSearchReset(container, listEl);
   listEl.querySelector('#empty-cta-tasks')?.addEventListener('click', () => {
     document.querySelector('.page-fab')?.click();
   });

@@ -18,7 +18,7 @@ import { mealPayloadFromRecipe } from '/utils/recipe-to-meal.js';
 import { todayKey } from '/utils/date.js';
 import '/components/datepicker.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
-import { mountEmptyState, mountLoadError } from '/utils/empty-state.js';
+import { mountEmptyState, mountLoadError, mountSearchEmpty } from '/utils/empty-state.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { mealTypeList, ensureMealTypeNames } from '/utils/meal-types.js';
 import { recipeThumbEl, recipeHeroEl, recipeBandEl } from '/utils/recipe-thumb.js';
@@ -910,25 +910,16 @@ function buildRecipeList() {
     // Stelle im Modul, die den erzwingenden Baustein umging, während die
     // Schwester im Vorrat im identischen Zustand Icon, Überschrift, den
     // Suchbegriff und einen Zurücksetzen-Pfad lieferte (Critique 2026-07-30).
-    mountEmptyState(list, {
-      variant: 'no-results',
-      title: t('recipes.noResultsTitle'),
-      description: t('recipes.searchNoResults'),
-      hint: state.query ? `„${state.query}"` : undefined,
-      action: {
-        // Geteilter Key: „Suche leeren" existiert in allen 23 Locales. Der
-        // Vorrat sagt „Suche und Filter zurücksetzen", weil er beides hat -
-        // Rezepte haben nur die Suche, und das Label soll nicht mehr versprechen
-        // als es tut.
-        label: t('common.searchClear'),
-        onClick: () => {
-          state.query = '';
-          // clear() versteckt zugleich den Leeren-Knopf; ein blankes
-          // `value = ''` ließe ihn über dem leeren Feld stehen.
-          _search?.clear();
-          renderRecipeList();
-          _search?.input.focus();
-        },
+    // Seit R19 der EINE Leerzustand einer leeren Suche (mountSearchEmpty).
+    mountSearchEmpty(list, {
+      query: state.query,
+      onReset: () => {
+        state.query = '';
+        // clear() versteckt zugleich den Leeren-Knopf; ein blankes
+        // `value = ''` ließe ihn über dem leeren Feld stehen.
+        _search?.clear();
+        renderRecipeList();
+        _search?.input.focus();
       },
     });
     return;
