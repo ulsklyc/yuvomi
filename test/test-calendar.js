@@ -3990,6 +3990,29 @@ test('Aufgabe im Kalender: der Name nennt die Prioritaet und die Uhrzeit, nicht 
     `der gerenderte Chip traegt die Prioritaet nicht im aria-label: ${html.slice(0, 200)}`);
 });
 
+/* #2018: im 12-Stunden-Format stand am Chip „Steuer · 14:30", nur der
+ * gesprochene Name lief durch formatTime. Der Stub reicht die Zeit sonst
+ * unveraendert durch und saehe beide gleich; hier formatiert er wie i18n.js
+ * im 12-Stunden-Format. Monat, Woche, Tag und Agenda rendern alle diesen Chip. */
+test('Aufgabe im Kalender: die Uhrzeit am Chip folgt dem Zeitformat (#2018)', () => {
+  globalThis.__formatTime = (value) => {
+    const [h, m] = String(value).split(':').map(Number);
+    return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+  };
+  try {
+    const task = { id: 1, title: 'Steuer', priority: 'high', due_time: '14:30:00' };
+    for (const opts of [{}, { interactive: false, icon: false }]) {
+      const html = calendarHelpers.renderTaskChip(task, opts);
+      assert(!html.includes('14:30'), `der Chip zeigt die Rohzeit statt des Zeitformats: ${html}`);
+      assert(/title="Steuer · 2:30 PM"/.test(html), `der Tooltip nennt die Zeit nicht im Zeitformat: ${html}`);
+      assert(/<span>Steuer · 2:30 PM<\/span>/.test(html), `der Chiptext nennt die Zeit nicht im Zeitformat: ${html}`);
+    }
+    assert(calendarHelpers.taskChipAriaLabel(task).endsWith(', 2:30 PM'), 'der gesprochene Name nennt dieselbe Zeit');
+  } finally {
+    delete globalThis.__formatTime;
+  }
+});
+
 test('Kopf: die Tablist heisst „Ansicht", die Knoepfe nennen ihre Kuerzel', () => {
   const html = calendarHelpers.toolbarHtml();
   assert(/role="tablist" aria-label="calendar\.viewSwitcher"/.test(html), 'die Tablist muss „Ansicht" heissen, nicht wie die H1');
