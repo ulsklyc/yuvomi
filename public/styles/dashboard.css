@@ -3103,6 +3103,35 @@ button.today-cockpit__more--link {
   min-width: 0;
 }
 
+/* DAS ANPASSEN-MENUE (R19, Entscheidung Ulas 2026-10-16). Unter 768px stehen
+ * Anpassen und Wand-Modus als Eintraege EINES Menues (settings-2), ab 768px als
+ * die zwei Knoepfe wie bisher. Je Breite genau ein Weg; die Eintraege klicken
+ * die Knoepfe (dashboard.js), die dafuer im Baum bleiben. Ein Display hat kein
+ * Anpassen und damit kein Menue - dort bleibt der Wand-Knopf stehen. */
+.dashboard-tools-btn {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .dashboard-tools-btn {
+    display: inline-flex;
+  }
+
+  .dashboard-overview__tools:has(> .dashboard-tools-btn) > #dashboard-wall-enter,
+  .dashboard-overview__tools:has(> .dashboard-tools-btn) > #dashboard-customize-btn {
+    display: none;
+  }
+}
+
+/* DIE WETTERZEILE STEHT MOBIL AUCH NEBEN DER KARTE (R19): die Karte liegt dort
+ * weit unten (390px: y 1438), die Zeile unterm Gruss sagt das Jetzt sofort.
+ * Ab 768px schliessen sich beide aus wie bisher. */
+@media (min-width: 768px) {
+  .dashboard-overview__weather--card {
+    display: none;
+  }
+}
+
 /* DIE KOPF-ICON-HAUT DER SHELL (D1, Critique 2026-10-16): Haut, Tinte und
  * Hover kommen aus `.btn.btn--secondary.btn--icon` im Markup, wie Lupe,
  * Filter und „..." in jedem Modulkopf. Hier standen bis dahin graue Kreise
@@ -4151,6 +4180,124 @@ button.today-cockpit__more--link {
 .family-widget-avatar--group svg {
   width: var(--icon-lg);
   height: var(--icon-lg);
+}
+
+/* Zahl und Vorname gehoeren der Avatar-Reihe (unten); in der Zeilenform traegt
+ * der Satz beides. */
+.family-member__face {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.family-member__count,
+.family-member__short {
+  display: none;
+}
+
+/* MOBIL IST DIE FAMILIE EINE AVATAR-REIHE (R19, Entscheidung Ulas 2026-10-16;
+ * Critique 2026-10-16 P2: 427px, 51 % des Viewports, fuer fuenf Zeilen
+ * "1 Aufgabe"). Je Person das Gesicht, die Zahl offener Aufgaben als Marke
+ * und der Vorname darunter; der naechste gemeinsame Termin bleibt dieselbe
+ * Zeile wie breit, nur als eine Textzeile unter der Reihe (keine zweite Kopie
+ * - der Satz steht genau einmal da). Name und Satz jeder Person bleiben im
+ * Baum (geclippt) und sind ihr Name fuer Screenreader; die Tagesbilanz der
+ * Fusszeile steht in den Marken. Gemessen 390px: Karte 427 -> 166px. */
+@media (max-width: 639px) {
+  .family-widget__list {
+    flex-flow: row wrap;
+    justify-content: space-around;
+    gap: var(--space-2) var(--space-1);
+  }
+
+  .family-member {
+    flex: 1 1 0;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+    padding: 0;
+  }
+
+  .family-member + .family-member {
+    border-top: 0;
+  }
+
+  .family-member:not(.family-member--shared) > .family-member__body {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .family-member--shared {
+    order: 1;
+    flex: 1 0 100%;
+    flex-direction: row;
+    justify-content: center;
+  }
+
+  .family-member--shared > .family-widget-avatar {
+    display: none;
+  }
+
+  .family-member--shared > .family-member__body {
+    flex-direction: row;
+    gap: var(--space-1);
+    max-inline-size: 100%;
+  }
+
+  .family-member--shared .family-member__name {
+    flex: 0 0 auto;
+    color: var(--color-text-secondary);
+    font-size: var(--type-caption);
+    font-weight: var(--font-weight-regular);
+  }
+
+  .family-member--shared .family-member__name::after {
+    content: "·" / "";
+    margin-inline-start: var(--space-1);
+  }
+
+  .family-member__short {
+    display: block;
+    max-inline-size: 100%;
+    overflow: hidden;
+    color: var(--color-text-secondary);
+    font-size: var(--type-caption);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .family-member__count {
+    position: absolute;
+    inset-block-start: calc(-1 * var(--space-1));
+    inset-inline-end: calc(-1 * var(--space-1));
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-inline-size: var(--space-5);
+    block-size: var(--space-5);
+    padding-inline: var(--space-1);
+    border: 2px solid var(--color-surface);
+    border-radius: var(--radius-full);
+    background: var(--color-accent);
+    color: var(--color-ink-on-vivid);
+    font-size: var(--text-xs);
+    font-weight: var(--font-weight-bold);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+
+  .family-member--more {
+    flex: 0 0 auto;
+    align-self: center;
+  }
+
+  .family-widget__footer {
+    display: none;
+  }
 }
 
 /* DER REST, DER NICHT IN DIE KACHEL PASST (Aufgaben, Geburtstage, Notizen,

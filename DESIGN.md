@@ -3535,6 +3535,16 @@ abgeschaltetes Modul; ist es eingerichtet und der Anbieter scheitert, bleibt die
 `.widget__empty` und dem Aktualisieren-Knopf, und die automatische Aktualisierung laeuft weiter.
 Ein unbekannter Grund zaehlt als eingerichtet: im Zweifel bleibt die Kachel.
 
+**DIE UEBERSICHT AUF DEM TELEFON (R19, Entscheidung Ulas 2026-10-16).** Unter 768px steht die
+Wetterzeile im Masthead auch dann, wenn die Karte im Raster steht - die Karte lag bei 390px erst
+bei y 1438 und behaelt die Vorhersage; ab 768px schliessen sich beide aus wie bisher
+(`.dashboard-overview__weather--card`). Die Familie ist unter 640px EINE Avatar-Reihe: Gesicht,
+Zahl offener Aufgaben als Marke im Akzent, Vorname darunter, der naechste gemeinsame Termin als
+Textzeile unter der Reihe (Karte 427 -> 166px); Name und Satz jeder Person bleiben geclippt im
+Baum, die Tagesbilanz der Fusszeile entfaellt (sie steht in den Marken). Der Wand-Modus steht
+unter 768px mit „Widgets anpassen" in EINEM Anpassen-Menue (`settings-2`), ab 768px bleiben die
+zwei Knoepfe; die Eintraege klicken die Knoepfe, ein Display behaelt seinen Wand-Knopf.
+
 ### Anmeldeseite
 Die erste Seite der App ist Teil derselben Welt, keine Ausnahme - und sie hat einen Ort
 (R18, 2026-10-07; gilt fuer Anmeldung, Einrichtung, Einladung, Passwort-Reset und das

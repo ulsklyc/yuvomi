@@ -37,6 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The tabs also stay in the same place in every module: on a page without an add button the bar
   ends before its spot instead of spreading the tabs wider, so a tab no longer moves under your
   finger when you switch budget tabs or open Rewards.
+- **The overview on a phone gets to the point sooner.** The family card is one row of faces with
+  each person's open tasks as a number (166px instead of 427px), the current weather sits under
+  the greeting even when the weather card is further down, and wall mode moved into the Customize
+  menu next to "Customize widgets".
 - **Module headers on phones and tablets take less room.** Shift plan, Rewards and Household help
   show their tabs in the title row (one row instead of two, 65px on a phone). The budget header
   folds to one row while you scroll, with the tabs beside the month. On a tablet the title, search

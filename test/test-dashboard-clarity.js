@@ -553,7 +553,9 @@ test('#1821 Fokus: der Neuaufbau der Seite ruft Erfassen und Wiederfokus, um das
   const body = fn.slice(0, fn.indexOf('\n  }\n')).split('\n').filter((line) => !/^\s*(\/\/|\/?\*)/.test(line)).join('\n');
   const capture = body.indexOf('const { key: keepFocus, had: hadFocus } = captureRebuildFocus(shell, document.activeElement, document.body);');
   const paint = body.indexOf('setHtml(shell, `\n      <section class="dashboard-masthead');
-  const restore = body.search(/^ {4}restoreFocusAfterRebuild\(container, \[\n {6}keepFocus,\n {6}\.\.\.\(focusAfterRebuild \?\? \[\]\),\n {6}\.\.\.\(hadFocus && modeChanged \? \['#dashboard-customize-btn'\] : \[\]\),\n {4}\]\);$/m);
+  // R19: mobil steht der Anpassen-Einstieg im Menue (`.dashboard-tools-btn`) -
+  // der Knopf ist dort nicht gerendert, das Menue ist der Rueckweg.
+  const restore = body.search(/^ {4}restoreFocusAfterRebuild\(container, \[\n {6}keepFocus,\n {6}\.\.\.\(focusAfterRebuild \?\? \[\]\),\n {6}\.\.\.\(hadFocus && modeChanged \? \['#dashboard-customize-btn', '\.dashboard-tools-btn'\] : \[\]\),\n {4}\]\);$/m);
   assert.ok(capture > 0, 'erfasst wird vor dem Aufbau');
   assert.ok(paint > capture, 'dann wird gebaut');
   assert.ok(restore > paint, 'und danach wieder fokussiert: eigener Schluessel, Nachfolger der Geste, Anpassen-Knopf');
@@ -1353,4 +1355,57 @@ test('die Uebersicht polstert am Desktop mit --page-inline-pad und kennt kein ei
   // Die zuletzt geltende Breite ohne At-Regel: kein festes Mass.
   const widths = root.filter((r) => !r.at.length && /max-width:/.test(r.body)).map((r) => /max-width:\s*([^;]+);/.exec(r.body)[1].trim());
   assert.equal(widths.at(-1), 'none', `die Uebersicht deckelt sich auf ${widths.at(-1)} - ihre Kante wiche von den Modulen ab`);
+});
+
+/* R19 (Entscheidung Ulas 2026-10-16, Critique P2 mobil): DIE UEBERSICHT AUF DEM
+ * TELEFON. Die Familie belegte 427px (51 % des Viewports) fuer fuenf Zeilen
+ * "1 Aufgabe", das Wetter begann bei y 1438, ueber dem Gruss standen drei
+ * Icon-Knoepfe. Jetzt: eine Avatar-Reihe mit Zaehler, die Wetterzeile im
+ * Masthead auch neben der Karte, der Wand-Modus im Anpassen-Menue. */
+test('R19 mobil: die Familie ist eine Avatar-Reihe mit Zaehler, Name und Satz bleiben im Baum', async () => {
+  const { readFileSync } = await import('node:fs');
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const html = __test.renderFamilyWidget([ALEX, LEO, LINDA], { memberTodayTasks: [{ user_id: 1, open_count: 2 }] });
+  assert.match(html, /<span class="family-member__face">[\s\S]*?class="family-widget-avatar"[\s\S]*?<span class="family-member__count" aria-hidden="true">2<\/span>/,
+    'die Zahl offener Aufgaben steht als Marke am Gesicht');
+  assert.equal((html.match(/family-member__count/g) || []).length, 1, 'nur wer offene Aufgaben hat, traegt eine Marke');
+  assert.match(html, /<span class="family-member__short" aria-hidden="true">Alex<\/span>/, 'der Vorname unter dem Gesicht');
+  assert.match(html, /<span class="family-member__name">Alex<\/span>/, 'der volle Name bleibt der Name fuer Screenreader');
+  const phone = css.slice(css.indexOf('MOBIL IST DIE FAMILIE EINE AVATAR-REIHE'));
+  const block = phone.slice(phone.indexOf('@media (max-width: 639px) {'), phone.indexOf('\n}\n') + 2);
+  assert.match(block, /\.family-widget__list \{[^}]*flex-flow:\s*row wrap/, 'eine Reihe statt einer Liste');
+  assert.match(block, /\.family-member:not\(\.family-member--shared\) > \.family-member__body \{[^}]*clip-path:\s*inset\(50%\)/,
+    'Name und Satz geclippt, nicht entfernt');
+  assert.doesNotMatch(block, /\.family-member__body \{[^}]*display:\s*none/);
+  assert.match(block, /\.family-member--shared \{[^}]*order:\s*1;[^}]*flex:\s*1 0 100%/, 'der gemeinsame Termin als Zeile unter der Reihe');
+  assert.match(block, /\.family-widget__footer \{\s*display:\s*none/, 'die Tagesbilanz steht in den Marken');
+});
+
+test('R19 mobil: die Wetterzeile steht im Masthead auch neben der Karte, breit schliessen sich beide aus', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  assert.match(src, /renderDashboardOverview\(user, isCustomizing, weather, \{ followsDefault, canPublish, weatherCard: weatherCardShown \}\)/,
+    'das Wetter geht immer in den Kopf, die Karte nur als Merkmal');
+  const weather = { current: { temp: 18, desc: 'Sonnig', icon: '01d' }, units: 'metric' };
+  const head = __test.renderDashboardOverview({ display_name: 'Linda' }, false, weather, { weatherCard: true });
+  assert.match(head, /class="dashboard-overview__weather dashboard-overview__weather--card"/);
+  assert.match(css, /@media \(min-width: 768px\) \{\s*\.dashboard-overview__weather--card \{\s*display: none;/,
+    'ab 768px steht die Karte im Bild - dort nur sie');
+});
+
+test('R19 mobil: der Wand-Modus steht im Anpassen-Menue, je Breite ein Weg', async () => {
+  const { readFileSync } = await import('node:fs');
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
+  const head = __test.renderDashboardOverview({ display_name: 'Linda' }, false, null, {});
+  assert.match(head, /class="btn btn--secondary btn--icon dashboard-icon-btn dashboard-tools-btn popover-menu__trigger"/);
+  assert.match(head, /data-action="dashboard-customize"[\s\S]*data-action="dashboard-wall"/, 'Anpassen und Wand-Modus als Eintraege');
+  assert.match(head, /id="dashboard-wall-enter"/, 'der Wand-Knopf bleibt im Baum - die Eintraege klicken ihn');
+  const display = __test.renderDashboardOverview({ display_name: 'Wand', access_scope: 'display' }, false, null, {});
+  assert.doesNotMatch(display, /dashboard-tools-btn/, 'ein Display hat kein Anpassen und damit kein Menue');
+  assert.match(css, /\.dashboard-tools-btn \{\s*display: none;\s*\}/, 'breit gibt es das Menue nicht');
+  assert.match(css, /@media \(max-width: 767px\) \{\s*\.dashboard-tools-btn \{\s*display: inline-flex;\s*\}\s*\.dashboard-overview__tools:has\(> \.dashboard-tools-btn\) > #dashboard-wall-enter,\s*\.dashboard-overview__tools:has\(> \.dashboard-tools-btn\) > #dashboard-customize-btn \{\s*display: none;/,
+    'schmal ersetzt das Menue die zwei Knoepfe');
+  assert.match(src, /if \(action === 'dashboard-wall'\) container\.querySelector\('#dashboard-wall-enter'\)\?\.click\(\);/);
 });
