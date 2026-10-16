@@ -260,6 +260,7 @@ let state = {
   balanceExpanded: false,     // mobil: Bilanz-Karten unter der Kopfzeile aufgeklappt (balanceGlanceHtml)
   loansExpanded: false,       // mobil: Darlehens-Karten unter der Glance-Zeile aufgeklappt (metricGlanceHtml)
   meta:        { expenseCategories: [], incomeCategories: [], subcategories: {} },
+  metaError:   null,
   // Zeitachse der Berichte: dieselbe Kopfleiste wie der Monat, nur mit
   // umschaltbarer Auflösung. Der Anker lebt hier statt in budget-stats.js, damit
   // beide Enden beim Tabwechsel aneinander angeglichen werden können.
@@ -713,8 +714,22 @@ async function loadBudgetMeta() {
   } catch (err) {
     console.error('[Budget] meta Fehler:', err);
     state.meta = { expenseCategories: [], incomeCategories: [], subcategories: {} };
-    window.yuvomi?.showToast(t('budget.metaLoadError'), 'danger');
+    // Gemeldet wird erst, wenn klar ist, ob die Seite ohnehin ihren
+    // Fehlerzustand zeigt (reportMetaError) - dann waere der Toast derselbe
+    // Fehler ein zweites Mal (Critique R19: zwei Meldungen bei einem 429).
+    state.metaError = err;
+    return;
   }
+  state.metaError = null;
+}
+
+/**
+ * Die Kategorien fehlen, die Seite steht aber: dann und nur dann ein Toast.
+ * Zeigt die Seite ihren Ladefehler, sagt der schon alles - und sein
+ * "Erneut versuchen" holt die Kategorien mit (renderBody, Zweig loadError).
+ */
+function reportMetaError() {
+  if (state.metaError && !state.loadError) window.yuvomi?.showToast(t('budget.metaLoadError'), 'danger');
 }
 
 // --------------------------------------------------------
@@ -929,6 +944,7 @@ export async function render(container, { user }) {
   }
   renderBody();
   wireNav();
+  reportMetaError();
 }
 
 // --------------------------------------------------------
@@ -1178,7 +1194,11 @@ function renderBody() {
       description: t('common.loadErrorDescription'),
       error: state.loadError,
       retryLabel: t('common.retry'),
-      onRetry: async () => { await reloadMonth(); renderBody(); },
+      onRetry: async () => {
+        await Promise.all([reloadMonth(), state.metaError ? loadBudgetMeta() : null]);
+        renderBody();
+        reportMetaError();
+      },
     });
     return;
   }

@@ -11,7 +11,9 @@
  *
  * Der Renderer bleibt absichtlich i18n-frei: Aufrufer übergeben schon
  * aufgelöste Strings aus ihrem eigenen `t()`. Eine zweite Übersetzungsschicht
- * hier würde nur Key-Namen über Modulgrenzen schleppen.
+ * hier würde nur Key-Namen über Modulgrenzen schleppen. Die eine Ausnahme ist
+ * der Fehlerzustand nach einem Ladevorgang (`mountLoadError`): sein Satz kommt
+ * aus der Ursache, und die kennt nur der Fehler, nicht der Aufrufer.
  *
  * Die drei Varianten und ihre ARIA-Rollen sind aus `pantry.js` übernommen, das
  * sie als einziges Modul korrekt unterschieden hat:
@@ -28,6 +30,10 @@
  */
 
 import { esc } from '/utils/html.js';
+// Nur fuer `mountLoadError` (Critique R19): der Satz zur Ursache und das Wort
+// fuer die Details. Der Rest des Renderers bleibt i18n-frei, siehe oben.
+import { t } from '/i18n.js';
+import { loadErrorSentence } from '/utils/friendly-error.js';
 
 const VARIANTS = {
   'empty':      { role: null,     icon: 'inbox',          tone: 'primary'   },
@@ -125,9 +131,10 @@ export function emptyStateEl({
   if (hint) parts.push(`<p class="empty-state__hint">${esc(hint)}</p>`);
   box.insertAdjacentHTML('beforeend', parts.join(''));
 
-  // Aufklappbare technische Details. Nur der globale Fehlerbildschirm des
-  // Routers nutzt sie: dort ist der Stack die einzige verwertbare Information
-  // und lag vorher ausschliesslich in der Browserkonsole. Als Textknoten
+  // Aufklappbare technische Details: der Stack im globalen Fehlerbildschirm
+  // des Routers, der Statuscode im Ladefehler (`mountLoadError`) und im
+  // Fehlerzustand der Sitzungspruefung. Zugeklappt stoeren sie niemanden,
+  // aufgeklappt sind sie das, was ein Bugreport braucht. Als Textknoten
   // gesetzt, nie als Markup - der Inhalt ist eine rohe Fehlermeldung.
   if (plainText(details?.text)) {
     const box2 = document.createElement('details');
@@ -236,29 +243,80 @@ export function mountEmptyState(target, opts) {
  *      für den Selbsthoster - der hier oft der Nutzer selbst ist - die einzig
  *      brauchbare Information.
  *
- * Bleibt i18n-frei wie der Rest der Datei: Aufrufer übergeben aufgelöste Strings.
+ *   3. **Die Ursache, nicht eine Vermutung** (Critique R19, 2026-10-16). Bis
+ *      hierher sagte jeder Ladefehler, was der Aufrufer fest mitgab - an 17
+ *      Stellen "Bitte pruefe die Verbindung", auch bei einer Bremse (429) oder
+ *      einem Serverfehler -, und darunter stand ein roher Chip "HTTP 429".
+ *      Jetzt kommt der Satz aus dem Fehler (`loadErrorSentence`, dieselbe
+ *      Zuordnung wie friendlyError, aber nie der Servertext). Die
+ *      `description` des Aufrufers ist nur noch der Rueckfall fuer eine
+ *      Ursache ohne eigenen Satz. Der Statuscode wandert in die aufklappbaren
+ *      Details - fuer den Selbsthoster da, fuer alle anderen kein Raetsel.
+ *
+ * Die einzige Stelle der Datei mit `t()`: der Satz zur Ursache und das Wort
+ * "Technische Details" gehoeren dem Fehlerzustand, nicht dem Aufrufer.
+ *
+ * Einen Toast zum selben Fehler gibt es nicht: der Zustand steht, bis jemand
+ * handelt, ein Toast daneben sagte dasselbe ein zweites Mal und verginge.
  *
  * @param {HTMLElement} target
  * @param {object}      opts
  * @param {string}      opts.title        Aufgelöst, modulspezifisch („Vorrat
  *                                        konnte nicht geladen werden").
- * @param {string}      opts.description  Aufgelöst, was der Nutzer tun kann.
- * @param {unknown}     [opts.error]      Das gefangene Fehlerobjekt. Nur der
- *                                        Statuscode wird gelesen.
- * @param {string}      opts.retryLabel   Aufgelöstes CTA-Label.
+ * @param {string}      [opts.description] Aufgelöster Rueckfall, wenn die
+ *                                        Ursache keinen eigenen Satz hat.
+ * @param {unknown}     [opts.error]      Das gefangene Fehlerobjekt.
+ * @param {string}      [opts.retryLabel] Aufgelöstes CTA-Label; Vorgabe
+ *                                        "Erneut versuchen".
  * @param {Function}    opts.onRetry      Wiederholt den Ladevorgang.
  * @returns {HTMLDivElement|null}
  */
-export function mountLoadError(target, { title, description, error, retryLabel, onRetry } = {}) {
-  return mountEmptyState(target, {
+export function mountLoadError(target, opts = {}) {
+  if (!target) return null;
+  const box = loadErrorEl(opts);
+  target.replaceChildren(box);
+  if (window.lucide) window.lucide.createIcons({ el: box });
+  return box;
+}
+
+/**
+ * Der Fehlerzustand als Element, ohne ihn einzuhaengen - fuer Aufrufer, die
+ * ihn in ein Template setzen (`loadErrorHTML`). Dieselben Optionen wie
+ * `mountLoadError`.
+ *
+ * @returns {HTMLDivElement}
+ */
+export function loadErrorEl({ title, description, error, retryLabel, onRetry, attrs } = {}) {
+  const detail = errorDetail(error);
+  const label = retryLabel || t('common.retry');
+  return emptyStateEl({
     variant: 'error',
     title,
-    description,
-    hint: errorDetail(error),
-    action: typeof onRetry === 'function'
-      ? { label: retryLabel, icon: 'refresh-cw', onClick: onRetry }
+    description: loadErrorSentence(error) ?? description ?? t('common.loadErrorDescription'),
+    details: detail ? { summary: t('common.errorDetails'), text: detail } : undefined,
+    action: typeof onRetry === 'function' || attrs
+      ? {
+        label,
+        icon: 'refresh-cw',
+        ...(typeof onRetry === 'function' ? { onClick: onRetry } : {}),
+        ...(attrs ? { attrs } : {}),
+      }
       : undefined,
   });
+}
+
+/**
+ * `loadErrorEl` als HTML-String, fuer Template-Literale - dieselbe Begruendung
+ * wie `emptyStateHTML`. Der Knopf wird ueber `attrs` (`data-action`)
+ * verdrahtet, ein `onRetry` ueberlebte die Serialisierung nicht.
+ *
+ * @returns {string}
+ */
+export function loadErrorHTML(opts = {}) {
+  if (typeof opts.onRetry === 'function') {
+    throw new TypeError('loadErrorHTML(): onRetry ueberlebt die String-Ausgabe nicht. attrs setzen.');
+  }
+  return loadErrorEl(opts).outerHTML;
 }
 
 /**
@@ -327,14 +385,21 @@ export function emptyHintHTML(text, opts) {
 }
 
 /**
- * Sprachneutrale Kurzform der Ursache, oder `null`.
+ * Sprachneutrale Kurzform der Ursache fuer die Details, oder `null`.
  *
  * `status === 0` ist in `api.js` der Netzfehler ohne Antwort - dafür gibt es
- * keinen Code zu nennen, und „HTTP 0" wäre schlechter als nichts.
+ * keinen Code zu nennen, und „HTTP 0" wäre schlechter als nichts. Ein Fehler
+ * ohne Status (Netzabbruch: `TypeError: Failed to fetch`) nennt Name und
+ * Meldung - roh, wie im Fehlerbildschirm des Routers: zum Weitergeben gedacht.
  */
 function errorDetail(error) {
   const status = Number(error?.status);
-  return Number.isInteger(status) && status > 0 ? `HTTP ${status}` : null;
+  if (Number.isInteger(status) && status > 0) {
+    const retry = plainText(error?.retryAfter);
+    return retry ? `HTTP ${status} (Retry-After: ${retry})` : `HTTP ${status}`;
+  }
+  if (error instanceof Error && error.message) return `${error.name}: ${error.message}`;
+  return null;
 }
 
 /**

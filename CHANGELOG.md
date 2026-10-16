@@ -81,6 +81,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   there now; anything else shows "Connection interrupted" with the cause, a "Try again" button and
   an automatic retry that waits longer each time and respects the server's `Retry-After`.
 
+- **A page that cannot load says why.** Instead of always asking you to check your connection,
+  the error now names the cause - too many requests, a server error, no network - and keeps the
+  status code under "Technical details" rather than as a raw "HTTP 429" label. Budget and the shift
+  planner no longer add a second error message on top of the page's own.
+
 - **Calendar: "Manage calendars" is reachable on tablets and phones again.** Below 1024px the
   button was hidden along with the empty header slot, so calendars could not be created, recolored
   or reordered there. The calendar filter now lists "Manage calendars" under its calendars, at

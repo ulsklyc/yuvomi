@@ -10,7 +10,7 @@ import { openModal, closeModal, confirmModal, confirmOverModal, advancedSection,
 import { makeSortable } from '/utils/sortable.js';
 import { memberRanks, memberRankOf } from '/utils/member-order.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
-import { emptyStateHTML } from '/utils/empty-state.js';
+import { emptyStateHTML, loadErrorHTML } from '/utils/empty-state.js';
 import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { wireScrollFade } from '/utils/ux.js';
@@ -712,8 +712,10 @@ async function activateView(view, { step = null } = {}) {
     try { await refreshOverview(); }
     catch (error) {
       if (requestId !== overviewRequestId) return; // eine juengere Anfrage entscheidet, nicht diese veraltete
-      overview = { ...overview, loading: false, error: true };
-      window.yuvomi?.showToast(scheduleErrorMessage(error), 'danger');
+      // Das Fehlerobjekt selbst, und KEIN Toast (Critique R19): der
+      // Fehlerzustand der Flaeche nennt die Ursache aus dem Fehler und bleibt
+      // stehen - ein Toast daneben sagte dasselbe ein zweites Mal.
+      overview = { ...overview, loading: false, error };
     }
     if (requestId === overviewRequestId) {
       if (hold) swapPeriod(bodyEl(), step, renderPage);
@@ -728,8 +730,7 @@ async function activateView(view, { step = null } = {}) {
   try { await refreshStatistics(); }
   catch (error) {
     if (requestId !== statisticsRequestId) return;
-    statistics = { ...statistics, loading: false, error: true };
-    window.yuvomi?.showToast(scheduleErrorMessage(error), 'danger');
+    statistics = { ...statistics, loading: false, error };
   }
   if (requestId === statisticsRequestId) renderPage();
 }
@@ -1453,7 +1454,7 @@ function renderStatistics() {
   const results = statistics.loading
     ? scheduleLoadingHtml({ rows: 3, lines: 2 })
     : statistics.error
-      ? emptyStateHTML({ variant: 'error', title: t('common.errorGeneric'), description: t('common.loadErrorDescription'), action: { label: t('common.retry'), icon: 'refresh-cw', attrs: { 'data-action': 'retry-statistics' } } })
+      ? loadErrorHTML({ title: t('common.errorGeneric'), error: statistics.error, attrs: { 'data-action': 'retry-statistics' } })
       : !bounds
       ? '<p class="card card--padded schedule-stat-empty" role="status">' + esc(t('schedule.invalidRange')) + '</p>'
       : '<p class="schedule-stat-period u-meta">' + esc(t('schedule.statisticsFor', { user: userName(selectedUser), from: formatDate(bounds.from), to: formatDate(bounds.to) })) + '</p>'
@@ -1956,7 +1957,7 @@ function renderOverview() {
     return `<section class="schedule-overview">${header}${scheduleLoadingHtml({ rows: Math.max(2, overview.selectedIds.length), lines: 1 })}</section>`;
   }
   if (overview.error) {
-    return `<section class="schedule-overview">${header}${emptyStateHTML({ variant: 'error', title: t('common.errorGeneric'), description: t('common.loadErrorDescription'), action: { label: t('common.retry'), icon: 'refresh-cw', attrs: { 'data-action': 'retry-overview' } } })}</section>`;
+    return `<section class="schedule-overview">${header}${loadErrorHTML({ title: t('common.errorGeneric'), error: overview.error, attrs: { 'data-action': 'retry-overview' } })}</section>`;
   }
 
   if (!overview.selectedIds.length) {
@@ -3057,9 +3058,14 @@ async function submitForm(event) {
     // (saveCreatedSchedule(), saveShiftTypeEdit(), savePatternEdit()). Dieser
     // Delegierte an `root` sieht nur noch den Filter der Auswertung.
   } catch (error) {
-    if (form.dataset.form === 'statistics' && statisticsRequest === statisticsRequestId) {
-      statistics = { ...statistics, loading: false, error: true };
-      renderPage();
+    if (form.dataset.form === 'statistics') {
+      // Die Flaeche zeigt den Fehler selbst - kein Toast daneben (Critique R19).
+      // Eine ueberholte Anfrage schweigt: die juengere entscheidet.
+      if (statisticsRequest === statisticsRequestId) {
+        statistics = { ...statistics, loading: false, error };
+        renderPage();
+      }
+      return;
     }
     window.yuvomi?.showToast(scheduleErrorMessage(error), 'danger');
   }
@@ -3336,8 +3342,8 @@ async function reloadAfterWrite() {
   if (activeView !== 'overview') return;
   const requestId = ++overviewRequestId;
   try { await refreshOverview(); }
-  catch {
-    if (requestId === overviewRequestId) overview = { ...overview, loading: false, error: true };
+  catch (error) {
+    if (requestId === overviewRequestId) overview = { ...overview, loading: false, error };
   }
 }
 
