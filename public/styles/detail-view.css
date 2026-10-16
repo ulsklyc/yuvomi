@@ -225,6 +225,37 @@
   max-width: 100%;
 }
 
+/* INFO-LISTEN-FORM (R19, Critique 2026-10-16: Inventar-Detail mobil 57px je
+ * Feld). Schmal steht eine Textzeile als Label vorn, Wert am Ende, in EINER
+ * Zeile - wie "Info" in den iOS-Einstellungen. Ein langer Wert bricht unter das
+ * Label, statt es zu verdraengen (flex-wrap), und steht dann am Ende seiner
+ * Zeile. Fliesstext (`--multiline`) und Knoten (Chips, Listen, Bild) bleiben
+ * untereinander. Opt-in je Leseansicht (`rowLayout: 'inline'`). */
+@media (max-width: 767px) {
+  .detail-view--inline-rows .detail-row--text:not(.detail-row--multiline) > .detail-row__text {
+    flex-flow: row wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    column-gap: var(--space-3);
+  }
+
+  .detail-view--inline-rows .detail-row--text:not(.detail-row--multiline) .detail-row__label {
+    font-size: var(--type-body);
+    font-weight: var(--font-weight-regular);
+    color: var(--color-text-secondary);
+  }
+
+  .detail-view--inline-rows .detail-row--text:not(.detail-row--multiline) .detail-row__value {
+    margin-inline-start: auto;
+    text-align: end;
+  }
+
+  /* Das Icon steht auf der Mitte der einen Zeile, nicht auf dem Label darueber. */
+  .detail-view--inline-rows .detail-row--text:not(.detail-row--multiline) > .detail-row__icon {
+    margin-block-start: var(--space-0h);
+  }
+}
+
 /* Beschreibungen und andere Fließtexte: Zeilenumbrüche der Quelle behalten,
  * damit eine notierte Adresse ihre Zeilen behält. */
 .detail-row--multiline .detail-row__value {

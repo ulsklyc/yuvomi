@@ -1270,6 +1270,9 @@ async function openItemDetail(item, { pane = null, signal = null } = {}) {
     key: `inventory:${item.id}`,
     accentColor: 'var(--module-inventory)',
     size: 'md',
+    // Schmal Label und Wert in einer Zeile (R19, Critique 2026-10-16): 57px je
+    // Feld fuer "Kaufdatum / 12.03.2024" schoben die Garantie unter den Falz.
+    rowLayout: 'inline',
     pane,
     sections: renderItemDetail(item, history, onDoneTrackedDate, historyLoadFailed),
     // OHNE SCHREIBRECHT WEDER „LOESCHEN" NOCH „BEARBEITEN": `openDetailView`

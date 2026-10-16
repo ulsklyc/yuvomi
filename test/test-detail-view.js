@@ -1196,3 +1196,22 @@ test('Klick neben das Popover schliesst es und loest darunter nichts aus', async
     }
   }
 });
+
+// R19 (Critique 2026-10-16): Inventar-Detail mobil - Label ueber dem Wert,
+// 45px je Feld (565px fuer zwoelf Zeilen). Die Info-Listen-Form stellt Label
+// und Wert einer Textzeile schmal in EINE Zeile (371px); opt-in je Leseansicht.
+test('R19: schmal stehen Label und Wert einer Textzeile in einer Zeile, wo die Ansicht es waehlt', async () => {
+  const dv = await read('public/components/detail-view.js');
+  const css = await read('public/styles/detail-view.css');
+  const inv = await read('public/pages/inventory.js');
+  assert.match(dv, /function detailBodyEl\(\{ accentColor, head, sections = \[\], rowLayout = 'stacked' \}\)/);
+  assert.match(dv, /rowLayout === 'inline' \? 'detail-view detail-view--inline-rows' : 'detail-view'/);
+  assert.match(dv, /!\(node instanceof HTMLElement\) && 'detail-row--text'/, 'nur reine Textwerte - Chips, Listen und Bild bleiben untereinander');
+  assert.match(inv, /rowLayout: 'inline',/, 'das Inventar waehlt die Form');
+  const { eachRule } = await import('./css-rules.js');
+  const inline = [...eachRule(css)].filter((r) => r.at.some((a) => /max-width:\s*767px/.test(a))
+    && r.selector.includes('.detail-view--inline-rows .detail-row--text:not(.detail-row--multiline)'));
+  const text = inline.find((r) => r.selector.trim().endsWith('> .detail-row__text'));
+  assert.match(text?.body ?? '', /flex-flow:\s*row wrap/, 'eine Zeile, ein langer Wert bricht unter das Label');
+  assert.ok(inline.some((r) => r.selector.trim().endsWith('.detail-row__value') && /text-align:\s*end/.test(r.body)), 'der Wert am Ende');
+});

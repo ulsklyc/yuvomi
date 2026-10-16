@@ -92,7 +92,10 @@ export function detailRowEl({ icon, label, value, node, multiline = false, actio
   if (!hasContent) return null;
 
   const row = document.createElement('div');
-  row.className = multiline ? 'detail-row detail-row--multiline' : 'detail-row';
+  // `--text`: der Wert ist reiner Text (kein Knoten mit Chips, Liste, Bild) -
+  // nur solche Zeilen duerfen in der Info-Listen-Form nebeneinander stehen.
+  row.className = ['detail-row', multiline && 'detail-row--multiline', !(node instanceof HTMLElement) && 'detail-row--text']
+    .filter(Boolean).join(' ');
 
   if (icon) {
     const i = document.createElement('i');
@@ -320,9 +323,13 @@ function personAvatarEl(person) {
  * Zeilen ohne Inhalt fallen weg, statt als leere Zeile dazustehen - eine
  * Detailansicht zeigt, was da ist, und schweigt über den Rest.
  */
-function detailBodyEl({ accentColor, head, sections = [] }) {
+function detailBodyEl({ accentColor, head, sections = [], rowLayout = 'stacked' }) {
   const view = document.createElement('div');
-  view.className = 'detail-view';
+  // `rowLayout: 'inline'` (R19): schmal stehen Label und Wert einer Textzeile
+  // in EINER Zeile, Label vorn, Wert am Ende - wie eine Info-Liste in iOS.
+  // Opt-in je Modul (Inventar), weil die anderen Leseansichten Fliesstext und
+  // Termine tragen, fuer die das Untereinander die richtige Form ist.
+  view.className = rowLayout === 'inline' ? 'detail-view detail-view--inline-rows' : 'detail-view';
 
   const headEl = detailHeadEl(head);
   if (headEl) view.appendChild(headEl);
