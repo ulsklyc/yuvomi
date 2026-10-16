@@ -2793,6 +2793,12 @@ test('Aktiv-Indikatoren erscheinen am Ziel: die erste Platzierung gleitet nicht 
   assert.ok(place, 'placeNavIndicator fehlt');
   assert.match(place, /style\.transition = 'none'/, 'die erste Platzierung schaltet den Uebergang ab');
   assert.match(place, /dataset\.placed/, 'nur die ERSTE Platzierung springt');
+  // ... und "erste" heisst die erste GEZEICHNETE: der verborgene Indikator der
+  // anderen Groessenklasse hat keine Geometrie und darf nicht als platziert
+  // gelten, sonst glitt er nach dem Drehen ueber die Schwelle aus der
+  // Nullposition herein (Codex-Review zu #2025).
+  assert.match(place, /if \(indicator\.getClientRects\(\)\.length\) indicator\.dataset\.placed = '1';/,
+    'markiert wird nur ein Indikator mit gezeichneter Box');
   for (const name of ['positionSidebarIndicator', 'positionTabIndicator']) {
     const body = functionBody(source, name);
     assert.ok(body, `${name} fehlt`);

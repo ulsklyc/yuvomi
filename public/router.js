@@ -4104,6 +4104,11 @@ function replaceNavIcon(container, selector, lucideIconName) {
  * und glitt beim Laden (und nach jedem Neubau der Leiste) sichtbar vom ersten
  * Eintrag zum aktiven - gemessen 150ms von "Uebersicht" zu "Kalender". Gleiten
  * ist die Antwort auf einen Wechsel, nicht auf das Erscheinen.
+ *
+ * "Platziert" ist nur ein GEZEICHNETER Indikator. Die Sidebar ist unter 1024px
+ * ausgeblendet, die Tab-Leiste darueber; der jeweils verborgene Indikator hat
+ * keine Geometrie. Wurde er trotzdem markiert, glitt er beim Drehen eines
+ * Tablets ueber die Schwelle aus der Nullposition herein (Codex-Review zu #2025).
  */
 function placeNavIndicator(indicator, apply) {
   const first = indicator.dataset.placed !== '1';
@@ -4112,7 +4117,7 @@ function placeNavIndicator(indicator, apply) {
   if (!first) return;
   indicator.getBoundingClientRect();
   indicator.style.transition = '';
-  indicator.dataset.placed = '1';
+  if (indicator.getClientRects().length) indicator.dataset.placed = '1';
 }
 
 /**
