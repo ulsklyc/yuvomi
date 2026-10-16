@@ -1590,7 +1590,7 @@ test('der Ordner-Kebab nennt seinen Ordner', () => {
   // Re-Critique P2: sieben Mal "Ordneraktionen" ohne Namen hintereinander.
   const tree = page.slice(page.indexOf('function renderFolderBrowser()'), page.indexOf('// Der Auslöser trägt den Ordner, in dem man steht'));
   // rowActionHtml escaped label und Attribute selbst.
-  assert.match(tree, /rowActionHtml\(\{ icon: 'more-vertical', className: 'documents-folder-item__menu', label: t\('documents\.folderActionsFor', \{ name: item\.name \}\), attrs: \{ 'data-folder-menu': item\.id, title: t\('documents\.folderActionsFor', \{ name: item\.name \}\)/);
+  assert.match(tree, /rowActionHtml\(\{ icon: 'ellipsis', className: 'documents-folder-item__menu', label: t\('documents\.folderActionsFor', \{ name: item\.name \}\), attrs: \{ 'data-folder-menu': item\.id, title: t\('documents\.folderActionsFor', \{ name: item\.name \}\)/);
   assert.doesNotMatch(page, /t\('documents\.folderActions'\)/);
   for (const file of LOCALES) {
     const docs = localeData(file).documents;

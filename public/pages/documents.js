@@ -1426,7 +1426,7 @@ function renderFolderBrowser() {
         ${showCounts ? `<span class="documents-folder-item__count">${counts.get(item.id) || 0}</span>` : ''}
       </button>
       ${item.managed && !readOnly() ? `
-      ${rowActionHtml({ icon: 'more-vertical', className: 'documents-folder-item__menu', label: t('documents.folderActionsFor', { name: item.name }), attrs: { 'data-folder-menu': item.id, title: t('documents.folderActionsFor', { name: item.name }), 'aria-haspopup': 'menu', 'aria-expanded': 'false' } })}` : ''}
+      ${rowActionHtml({ icon: 'ellipsis', className: 'documents-folder-item__menu', label: t('documents.folderActionsFor', { name: item.name }), attrs: { 'data-folder-menu': item.id, title: t('documents.folderActionsFor', { name: item.name }), 'aria-haspopup': 'menu', 'aria-expanded': 'false' } })}` : ''}
     </li>`;
   }).join(''));
   if (window.lucide) lucide.createIcons({ el: browser });
@@ -2111,7 +2111,7 @@ function renderActions(doc) {
   return `
     ${rowActionHtml({ icon: 'eye', action: 'view', label: t('documents.viewNamed', { name: doc.name }), attrs: { 'data-id': doc.id, tabindex: '0', title: t('documents.viewAction') } })}
     ${rowActionHtml({ icon: 'download', href: `/api/v1/documents/${doc.id}/download`, label: t('documents.downloadNamed', { name: doc.name }), attrs: { download: true, tabindex: '-1', title: t('documents.downloadAction') } })}
-    ${mayManage(doc) ? rowActionHtml({ icon: 'more-vertical', action: 'menu', label: t('common.moreActionsNamed', { name: doc.name }), attrs: { 'data-id': doc.id, tabindex: '-1', title: t('nav.more'), 'aria-haspopup': 'menu', 'aria-expanded': 'false' } }) : ''}
+    ${mayManage(doc) ? rowActionHtml({ icon: 'ellipsis', action: 'menu', label: t('common.moreActionsNamed', { name: doc.name }), attrs: { 'data-id': doc.id, tabindex: '-1', title: t('nav.more'), 'aria-haspopup': 'menu', 'aria-expanded': 'false' } }) : ''}
   `;
 }
 
