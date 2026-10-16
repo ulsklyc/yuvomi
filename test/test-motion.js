@@ -1435,7 +1435,8 @@ test('Diagramme: Kurven und Ring der Berichte zeichnen sich einmal ein (drawChar
   assert.match(stats, /drawChartOnce\('budget-stats-trend', \{ lines: host\.querySelector\('\.budget-stats__lines'\) \}\);/);
   assert.match(stats, /drawChartOnce\('budget-stats-donut', \{ arcs: host\.querySelectorAll\('\.budget-stats__donut circle'\) \}\);/);
   // Das Ringsegment traegt "Laenge Umfang" - daraus liest der Helfer den Startwert.
-  assert.match(stats, /stroke-dasharray="\$\{\(frac \* C\)\.toFixed\(2\)\} \$\{C\.toFixed\(2\)\}"/);
+  // R19: je Segment 2 Einheiten Fuge (DONUT_GAP), der Strich bleibt ein Bogen.
+  assert.match(stats, /stroke-dasharray="\$\{Math\.max\(frac \* C - gap, 0\.5\)\.toFixed\(2\)\} \$\{C\.toFixed\(2\)\}"/);
   // Der Helfer selbst: ohne fill (Endzustand = Markup), einmal je Sitzung.
   const ux = publicSource('utils/ux.js');
   const fn = ux.slice(ux.indexOf('export function drawChartOnce('), ux.indexOf('function settleAnimation('));
