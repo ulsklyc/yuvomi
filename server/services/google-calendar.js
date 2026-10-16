@@ -141,6 +141,28 @@ function needsReauth() {
 }
 
 /**
+ * Ist `token` noch das gespeicherte Refresh-Token? Die Identitätsprobe für alles,
+ * was ein Client NACH einem await über die Verbindung schreibt: abgelehnt
+ * (withReauthGuard) wie erneuert (`tokens`-Listener). Hat inzwischen ein
+ * Trennen, ein neues OAuth oder eine Rotation nebenan ein anderes Token
+ * gespeichert, gehört das Ergebnis zu einer abgelösten Verbindung. Aufrufer
+ * prüfen und schreiben synchron, ohne await dazwischen.
+ */
+function isCurrentRefreshToken(token) {
+  return token != null && cfgGet('google_refresh_token') === token;
+}
+
+/**
+ * Lässt eine Ablehnung des Tokens durch, bevor ein Handler den Fehler selbst
+ * einordnet. invalid_grant kommt als 400, und 400 gilt bei Vormerkungen als
+ * endgültig: die Löschung oder Änderung fiele, und der Lauf meldete nie
+ * "neu verbinden". Durchgereicht landet sie in withReauthGuard.
+ */
+function passOnRefusal(err) {
+  if (isInvalidGrant(err)) throw err;
+}
+
+/**
  * Führt einen Google-Zugriff aus und hält ein abgelehntes Token fest. Der
  * Fehler geht als GoogleReauthRequiredError weiter, damit der Lauf ihn als
  * letzten Fehler verbucht.
@@ -149,8 +171,8 @@ function needsReauth() {
  * Client wird synchron zu Beginn von `run` aus sync_config gebaut, also mit dem
  * hier gelesenen Wert. Hat inzwischen ein Refresh rotiert oder ein neues OAuth
  * ein anderes Token gespeichert, betrifft die Ablehnung ein abgelöstes Token,
- * und die Verbindung bleibt stehen. Vergleich und Schreiben sind EINE
- * Anweisung, ohne await dazwischen.
+ * und die Verbindung bleibt stehen. Vergleich und Schreiben laufen in einer
+ * Transaktion, ohne await dazwischen.
  */
 async function withReauthGuard(run) {
   const usedToken = cfgGet('google_refresh_token');
@@ -158,13 +180,11 @@ async function withReauthGuard(run) {
     return await run();
   } catch (err) {
     if (!isInvalidGrant(err)) throw err;
-    const marked = db.get().prepare(`
-      INSERT INTO sync_config (key, value)
-      SELECT 'google_needs_reauth', '1'
-      WHERE (SELECT value FROM sync_config WHERE key = 'google_refresh_token') = ?
-      ON CONFLICT(key) DO UPDATE SET value = excluded.value,
-                                     updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
-    `).run(usedToken).changes > 0;
+    const marked = db.get().transaction(() => {
+      if (!isCurrentRefreshToken(usedToken)) return false;
+      cfgSet('google_needs_reauth', '1');
+      return true;
+    })();
     if (!marked) {
       log.warn('Google refused a refresh token that has since been replaced; the current connection stays active.');
       throw err;
@@ -213,6 +233,7 @@ async function loadCalendarMeta(calendar, calendarId, cache) {
       refId:    upsertExternalCalendar('google', calendarId, name, color),
     };
   } catch (err) {
+    passOnRefusal(err);
     log.warn(`Calendar metadata is not accessible (${calendarId}):`, err.message);
     let failures = metaFailures.get(cache);
     if (!failures) metaFailures.set(cache, failures = new Map());
@@ -276,6 +297,7 @@ async function processPendingDeletions(calendar) {
       outbound.dropDeletion(row.id);
       done++;
     } catch (err) {
+      passOnRefusal(err);
       // 404/410 zählen als erledigt (bei Google bereits weg), alles andere
       // wandert in den Retry bis zum gemeinsamen Versuchslimit.
       if (outbound.handleDeletionError(err, row, 'Google')
@@ -391,6 +413,7 @@ async function processPendingUpdates(calendar, colorMap = {}, metaCache = new Ma
           applyMove.run(destMeta.refId, eventId, moveTo, event.id);
           movedTo = moveTo;
         } catch (err) {
+          passOnRefusal(err);
           // Der Umzug ist die Voraussetzung für den Patch im Zielkalender -
           // hier abbrechen, statt im alten Kalender zu patchen. Wird der Umzug
           // aufgegeben, bleibt eine vorgemerkte Feldänderung für den nächsten
@@ -435,6 +458,7 @@ async function processPendingUpdates(calendar, colorMap = {}, metaCache = new Ma
       outbound.settleOutbound(fresh, movedTo, event, { snapshot });
       done++;
     } catch (err) {
+      passOnRefusal(err);
       // Mit dem Zähler des nachgeladenen Stands: eine Bearbeitung seit der Auswahl
       // hat ihn zurückgesetzt und bekommt ihre eigenen Versuche.
       handleError(err, fresh, 'update', clear);
@@ -613,10 +637,24 @@ function loadAuthorizedClient() {
   // Token-Refresh automatisch speichern. Liefert Google beim Refresh ein neues
   // Refresh-Token mit, ersetzt es das alte: das alte kann Google danach
   // verwerfen, und der nächste Start schickte ein totes Token (#2019).
+  //
+  // Geschrieben wird nur, solange das Token, mit dem dieser Client arbeitet,
+  // noch das gespeicherte ist: ein Refresh, der erst nach einem Trennen oder
+  // neuen Verbinden zurückkommt, stellte sonst die alte Verbindung wieder her.
+  let ownToken = refreshToken;
   client.on('tokens', (tokens) => {
-    if (tokens.access_token)  cfgSet('google_access_token', tokens.access_token);
-    if (tokens.refresh_token) cfgSet('google_refresh_token', tokens.refresh_token);
-    if (tokens.expiry_date)   cfgSet('google_token_expiry', String(tokens.expiry_date));
+    db.get().transaction(() => {
+      if (!isCurrentRefreshToken(ownToken)) {
+        log.debug('Refreshed Google token belongs to a replaced connection, not stored.');
+        return;
+      }
+      if (tokens.access_token)  cfgSet('google_access_token', tokens.access_token);
+      if (tokens.refresh_token) {
+        cfgSet('google_refresh_token', tokens.refresh_token);
+        ownToken = tokens.refresh_token;
+      }
+      if (tokens.expiry_date)   cfgSet('google_token_expiry', String(tokens.expiry_date));
+    })();
   });
 
   return client;
@@ -670,6 +708,10 @@ async function handleCallback(code) {
     throw new Error('[Google] No refresh token received. Revoke access in your Google account and connect again.');
   }
 
+  // Neu verbinden ohne Trennen (#2019, Knopf "Neu verbinden"): Auswahl und
+  // syncTokens stehen noch. Gelesen nach dem await, im selben Schritt wie das
+  // Schreiben der Tokens.
+  const reconnect = isConnected();
   cfgSet('google_access_token',  tokens.access_token);
   cfgSet('google_refresh_token', tokens.refresh_token);
   if (tokens.expiry_date) cfgSet('google_token_expiry', String(tokens.expiry_date));
@@ -677,6 +719,29 @@ async function handleCallback(code) {
   cfgDel('google_needs_reauth');
 
   log.info('OAuth successful - tokens saved.');
+  if (reconnect) await dropUnreachableSelection();
+}
+
+/**
+ * Nach einem Neuverbinden kann ein anderes Google-Konto dahinterstehen. Dessen
+ * Liste kennt die Kalender des alten nicht: events.list liefe für sie in ein
+ * 404, an dem jeder Lauf scheitert, und die Auswahl zeigt sie nicht mehr an -
+ * abwählen ginge nicht. Was das verbundene Konto nicht anbietet, fällt deshalb
+ * aus der Auswahl; gespiegelte Termine bleiben wie beim Trennen liegen.
+ * Scheitert der Abruf, bleibt die Auswahl, wie sie ist.
+ */
+async function dropUnreachableSelection() {
+  let offered;
+  try {
+    offered = new Set((await listCalendarsWith()).map((cal) => cal.id));
+  } catch (err) {
+    log.warn('Calendar list after reconnecting is not available, selection kept:', err.message);
+    return;
+  }
+  const del = db.get().prepare('DELETE FROM google_calendar_selection WHERE calendar_id = ?');
+  const gone = listSelection().map((row) => row.calendar_id).filter((id) => !offered.has(id));
+  for (const id of gone) del.run(id);
+  if (gone.length) log.info(`${gone.length} calendar(s) not offered by the reconnected account removed from the selection.`);
 }
 
 /**
@@ -904,6 +969,7 @@ async function runSync(createCalendar) {
           log.info(`Event ${event.id} stopped waiting for its upload to ${targetId} while it was in flight, queued the deletion of the created entry.`);
         }
       } catch (err) {
+        passOnRefusal(err);
         log.error(`Outbound error for event ${event.id}:`, err.message);
       }
     }
@@ -966,6 +1032,7 @@ async function fetchEventColorMap(calendar) {
     _eventColorCache = { map, ts: Date.now() };
     return map;
   } catch (err) {
+    passOnRefusal(err);
     log.warn('Event color palette not available:', err.message);
     return _eventColorCache?.map || {};
   }

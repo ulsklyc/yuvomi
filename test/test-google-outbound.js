@@ -2180,3 +2180,82 @@ test('#2019: die Ablehnung eines inzwischen ersetzten Tokens hält die Verbindun
   });
   assert.equal(cfg('google_needs_reauth'), '1');
 });
+
+// Codex-Runde 2 auf #2029.
+
+test('#2019: invalid_grant aus einem einzelnen Patch verwirft die Änderung nicht und meldet "neu verbinden"', async () => {
+  reset();
+  const event = seedDirty({ title: 'Zahnarzt' });
+  // Die Attrappe hat keinen Auth-Client: die Vorabprobe greift nicht, die
+  // Ablehnung kommt erst aus dem Patch - wie bei einem widerrufenen Token,
+  // dessen Access-Token lokal noch gültig aussah.
+  const calendar = fakeCalendar({ calendars: writableCalendars(), onPatch: () => { throw invalidGrant(); } });
+
+  await assert.rejects(flushOutbound({ createCalendar: () => calendar }), (err) => err.reauthRequired === true);
+  assert.equal(calendar.patches.length, 1);
+  assert.equal(reload(event.id).outbound_dirty, 1, 'die Änderung bleibt vorgemerkt');
+  assert.equal(reload(event.id).outbound_attempts, 0, 'und verbraucht keinen Versuch');
+  assert.equal(cfg('google_needs_reauth'), '1');
+});
+
+test('#2019: invalid_grant aus einer einzelnen Löschung verwirft den Tombstone nicht', async () => {
+  reset();
+  queueDeletion({ source: 'google', calendarExternalId: 'primary', eventExternalId: 'gev-2019-del' });
+  const calendar = fakeCalendar({ onDelete: () => { throw invalidGrant(); } });
+
+  await assert.rejects(flushOutbound({ createCalendar: () => calendar }), (err) => err.reauthRequired === true);
+  assert.equal(tombstones().length, 1);
+  assert.equal(tombstones()[0].attempts, 0);
+  assert.equal(cfg('google_needs_reauth'), '1');
+});
+
+test('#2019: ein spätes tokens-Ereignis nach dem Trennen verbindet nicht wieder', () => {
+  reset();
+  const client = realClient(() => { throw new Error('unused'); });
+  disconnect();
+  client.emit('tokens', { access_token: 'late', refresh_token: 'r-late', expiry_date: 42 });
+  assert.equal(getStatus().connected, false, 'getrennt bleibt getrennt');
+  assert.equal(cfg('google_refresh_token'), null);
+});
+
+test('#2019: ein spätes tokens-Ereignis überschreibt die Tokens eines neuen Verbindens nicht', () => {
+  reset();
+  const client = realClient(() => { throw new Error('unused'); });
+  db.prepare("UPDATE sync_config SET value = 'r-reconnected' WHERE key = 'google_refresh_token'").run();
+  db.prepare("UPDATE sync_config SET value = 'a-reconnected' WHERE key = 'google_access_token'").run();
+  client.emit('tokens', { access_token: 'late', refresh_token: 'r-late', expiry_date: 42 });
+  assert.equal(cfg('google_refresh_token'), 'r-reconnected');
+  assert.equal(cfg('google_access_token'), 'a-reconnected');
+});
+
+test('#2019: Neu verbinden mit einem anderen Konto nimmt die Kalender des alten aus der Auswahl', async () => {
+  reset();
+  __test.setCalendarEnabled('old-account-cal', true, { name: 'Alt' });
+  __test.setCalendarEnabled('shared-cal', true, { name: 'Geteilt' });
+  db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('google_needs_reauth', '1')").run();
+
+  const proto = google.auth.OAuth2.prototype;
+  const { getToken, request } = proto;
+  const saved = Object.fromEntries(Object.keys(OAUTH_ENV).map((k) => [k, process.env[k]]));
+  proto.getToken = async () => ({
+    tokens: { access_token: 'a-other', refresh_token: 'r-other', expiry_date: Date.UTC(2099, 0, 1) },
+  });
+  // Die Kalenderliste des neu verbundenen Kontos: der geteilte Kalender ja, der alte nicht.
+  proto.request = async () => ({ data: { items: [{ id: 'shared-cal', accessRole: 'owner' }, { id: 'other-own' }] } });
+  Object.assign(process.env, OAUTH_ENV);
+  try {
+    const { handleCallback } = await import('../server/services/google-calendar.js');
+    await handleCallback('code-2019');
+  } finally {
+    proto.getToken = getToken;
+    proto.request = request;
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  }
+
+  assert.deepEqual(__test.listSelection().map((r) => r.calendar_id).sort(), ['shared-cal'],
+    'der Kalender des alten Kontos fällt, der weiter angebotene bleibt');
+  assert.equal(cfg('google_refresh_token'), 'r-other');
+  assert.equal(cfg('google_needs_reauth'), null);
+});
