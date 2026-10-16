@@ -1533,6 +1533,11 @@
    * Abhaengige (Zone, Nachlauf, Mehr-Blatt, Toasts, Banner) rechnet ueber
    * --nav-bottom-height mit. */
   --nav-height-mobile: 64px;
+  /* Minimiert beim Lesen (R19, iOS-26-Muster, utils/ux.js watchNavMinimize):
+   * ohne Labels, ein Ziel hoch plus 4px Luft je Seite. Touch 56px (Ziel 48,
+   * der FAB sitzt mit 4px konzentrisch), Zeiger 52px. Die Zone darunter
+   * (--nav-bottom-height) rechnet weiter mit der ausgefahrenen Hoehe. */
+  --nav-height-minimized: calc(var(--target-base) + var(--space-2));
   /* Schwebende Kapsel (Liquid Glass): Zone = Kapsel + 8px Luft oben und unten.
    * Die Kapsel ist MINDESTENS --nav-height-mobile hoch und waechst mit
    * umbrechenden Labels (lange Sprachen, enge Geraete). Ihre echte Hoehe misst

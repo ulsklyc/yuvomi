@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { eachRule } from './css-rules.js';
 
 // Minimales Window/Navigator-Mock für Node
-const { stagger, vibrate, withBusy, scheduleUndoableDelete, wireSwipeToDismiss, wireCollapsingHeader, collapseOut, expandIn, watchNavCapsuleHeight, wireScrollFade } = await (async () => {
+const { stagger, vibrate, withBusy, scheduleUndoableDelete, wireSwipeToDismiss, wireCollapsingHeader, collapseOut, expandIn, watchNavCapsuleHeight, wireScrollFade, nextNavMinimized, NAV_MINIMIZE_DOWN, NAV_MINIMIZE_UP } = await (async () => {
   global.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
@@ -1708,5 +1708,65 @@ test('toggleRegion: auf faellt hidden sofort, zu erst nach dem Einklappen - auch
   } finally {
     if (savedGcs === undefined) delete global.getComputedStyle; else global.getComputedStyle = savedGcs;
     if (savedDoc === undefined) delete global.document; else global.document = savedDoc;
+  }
+});
+
+/*
+ * R19 (Entscheidung Ulas 2026-10-16): DIE KAPSEL MINIMIERT BEIM LESEN.
+ * Die Entscheidung ist eine reine Funktion - Schwellen, Richtung und die
+ * Ausnahmen oben/Ende/ohne Geste stehen hier ohne DOM.
+ */
+test('nextNavMinimized: abwaerts aus einer Geste minimiert, aufwaerts, oben und am Ende faehrt sie aus', () => {
+  const open = { minimized: false, travel: 0 };
+  const step = (s, top, delta, { max = 2000, gesture = true } = {}) => nextNavMinimized(s, { top, max, delta, gesture });
+  // Kleine Strecken summieren sich in einer Richtung.
+  let s = step(open, 100, 10);
+  assert.equal(s.minimized, false);
+  s = step(s, 120, NAV_MINIMIZE_DOWN - 10);
+  assert.equal(s.minimized, true, `ab ${NAV_MINIMIZE_DOWN}px abwaerts`);
+  // Ein Zittern gegen die Richtung setzt die Strecke zurueck, faehrt aber nicht aus.
+  s = step(s, 117, -3);
+  assert.equal(s.minimized, true, 'drei Pixel zurueck sind kein Aufwaertsscrollen');
+  s = step(s, 100, -(NAV_MINIMIZE_UP - 3));
+  assert.equal(s.minimized, false, `ab ${NAV_MINIMIZE_UP}px aufwaerts`);
+  // Ohne Geste (Scroll-Restore, scrollIntoView) minimiert nichts ...
+  assert.equal(step(open, 500, 400, { gesture: false }).minimized, false, 'ein Restore liest nicht');
+  // ... aber zurueck geht es immer, auch im Nachschwung ohne Finger.
+  assert.equal(step({ minimized: true, travel: 40 }, 300, -40, { gesture: false }).minimized, false);
+  // Oben und am Seitenende ist sie ganz da.
+  assert.deepEqual(step({ minimized: true, travel: 80 }, 4, 0), open, 'oben');
+  assert.deepEqual(step({ minimized: true, travel: 80 }, 1999, 30), open, 'am Ende');
+  // Ohne Bewegung (waagerechte Leiste) aendert sich nichts.
+  const held = { minimized: true, travel: 30 };
+  assert.equal(step(held, 300, 0), held);
+});
+
+test('watchNavCapsuleHeight: minimiert oder auf dem Rueckweg misst die Kapsel nicht - die Zone steht still (R19)', () => {
+  const saved = globalThis.ResizeObserver;
+  const observers = [];
+  globalThis.ResizeObserver = class {
+    constructor(cb) { this.cb = cb; observers.push(this); }
+    observe() {}
+    disconnect() {}
+  };
+  const props = new Map();
+  const root = { style: { setProperty: (k, v) => props.set(k, v), removeProperty: (k) => props.delete(k) } };
+  let state = '';
+  const items = { isConnected: true, closest: (sel) => (state && sel.includes(state) ? {} : null) };
+  try {
+    watchNavCapsuleHeight(items, root);
+    const fire = (blockSize) => observers[0].cb([{ target: items, borderBoxSize: [{ blockSize }] }]);
+    fire(64);
+    state = 'nav-bottom--minimized';
+    fire(56);
+    assert.equal(props.get('--nav-capsule-height'), '64px', 'minimiert gilt die ausgefahrene Hoehe weiter');
+    state = 'nav-bottom--settling';
+    fire(60);
+    assert.equal(props.get('--nav-capsule-height'), '64px', 'Zwischenhoehen auf dem Rueckweg zaehlen nicht');
+    state = '';
+    fire(72);
+    assert.equal(props.get('--nav-capsule-height'), '72px', 'ausgefahren misst sie wieder');
+  } finally {
+    globalThis.ResizeObserver = saved;
   }
 });

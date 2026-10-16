@@ -14,7 +14,7 @@ import { initI18n, getLocale, t, formatDate, formatTime } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 import { emptyHintEl, emptyStateEl } from '/utils/empty-state.js';
-import { wireScrollFade, wireCollapsingHeader, watchNavCapsuleHeight } from '/utils/ux.js';
+import { wireScrollFade, wireCollapsingHeader, watchNavCapsuleHeight, watchNavMinimize } from '/utils/ux.js';
 import { TOAST_SURFACES } from '/utils/toast-surface.js';
 import { showToast } from '/utils/toast-show.js';
 import { unknownPathDetour, publicPathDetour, detourPaths } from '/utils/unknown-route.js';
@@ -80,6 +80,9 @@ import {
   resolveMobileNavOrder,
   sortNavigationItems,
 } from '/settings/module-order.js';
+
+/** Haelt die Minimier-Logik der Kapsel (watchNavMinimize); jeder Seitenwechsel faehrt sie aus. */
+let navMinimizer = null;
 
 // --------------------------------------------------------
 // Routen-Definitionen
@@ -4458,6 +4461,8 @@ function setMoreButtonState(moreBtn, activeSecondary) {
 }
 
 function updateNav(rawPath) {
+  // Ein neuer Ort beginnt oben - mit ausgefahrener Kapsel (R19).
+  navMinimizer?.expand();
   // EINE SEKTION JE ZIEL, an jedem Aufruf (Critique R19). Die Navigation
   // reicht `topLevelSection()` schon herein, der Neuaufbau der Leiste
   // (rebuildNavigation, nach Sprache, Modulen oder dem Nachladen der
@@ -4904,6 +4909,10 @@ function observeNavCapsule() {
   // Dieselbe Kapsel, ihre HOEHE: umbrechende Labels machen sie hoeher als
   // --nav-height-mobile, und die Zone darunter muss mitwachsen (Review zu #1475).
   watchNavCapsuleHeight(items);
+  // Und sie minimiert sich beim Lesen (iOS-26-Muster, R19): abwaerts flacher
+  // und ohne Labels, aufwaerts, oben und am Seitenende wieder ganz.
+  const nav = items.closest('.nav-bottom');
+  if (nav && !navMinimizer) navMinimizer = watchNavMinimize(nav);
 }
 observeNavCapsule();
 

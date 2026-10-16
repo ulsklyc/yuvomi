@@ -1480,6 +1480,10 @@ export function watchNavCapsuleHeight(items, root = document.documentElement) {
       observer.disconnect();
       return;
     }
+    // Minimiert (watchNavMinimize) oder auf dem Rueckweg zaehlt die Kapsel
+    // nicht: die Zone darunter haelt die ausgefahrene Hoehe, sonst rueckten
+    // Nachlauf und Toasts bei jedem Scroll um 8px.
+    if (items.closest?.('.nav-bottom--minimized, .nav-bottom--settling')) return;
     const height = entry?.borderBoxSize?.[0]?.blockSize ?? entry?.target?.offsetHeight ?? 0;
     // 0 heisst: nicht gerendert (Desktop mit Sidebar, Wand-Modus).
     // Ungerundet: aufgerundet reservierte die Zone bei 60,09px schon 61, und
@@ -1489,4 +1493,105 @@ export function watchNavCapsuleHeight(items, root = document.documentElement) {
   });
   observer.observe(items);
   return observer;
+}
+
+/**
+ * DIE KAPSEL MACHT BEIM LESEN PLATZ (iOS-26-Muster, Critique R19 / Entscheidung
+ * Ulas 2026-10-16). Wer im Inhalt abwaerts scrollt, liest: die Kapsel minimiert
+ * sich - Labels blenden aus, sie wird flacher, der FAB bleibt. Aufwaerts, oben
+ * und am Seitenende faehrt sie wieder aus; dort sucht man den naechsten Ort.
+ *
+ * Die Entscheidung ist eine reine Funktion, damit Schwellen und Ausnahmen ohne
+ * DOM pruefbar sind. `travel` sammelt die Strecke in EINER Richtung - ein
+ * Zittern von 3px gegen die Leserichtung setzt sie zurueck, statt die Kapsel
+ * pendeln zu lassen.
+ *   - oben (`top` <= 8) und am Ende (Rest <= 2): immer ausgefahren
+ *   - abwaerts >= NAV_MINIMIZE_DOWN, und nur aus einer Nutzergeste (`gesture`):
+ *     ein Scroll-Restore oder `scrollIntoView` liest nicht
+ *   - aufwaerts >= NAV_MINIMIZE_UP: ausgefahren, auch im Nachschwung ohne
+ *     Geste - sonst bliebe die Kapsel nach einem Wisch an den Anfang klein
+ *
+ * @param {{minimized: boolean, travel: number}} state
+ * @param {{top: number, max: number, delta: number, gesture: boolean}} step
+ * @returns {{minimized: boolean, travel: number}}
+ */
+export const NAV_MINIMIZE_DOWN = 24;
+export const NAV_MINIMIZE_UP = 16;
+export function nextNavMinimized(state, { top, max, delta, gesture }) {
+  if (top <= 8 || max - top <= 2) return { minimized: false, travel: 0 };
+  if (!delta) return state;
+  const travel = Math.sign(delta) === Math.sign(state.travel) ? state.travel + delta : delta;
+  if (travel <= -NAV_MINIMIZE_UP) return { minimized: false, travel };
+  if (travel >= NAV_MINIMIZE_DOWN && gesture) return { minimized: true, travel };
+  return { minimized: state.minimized, travel };
+}
+
+/**
+ * Verdrahtet `nextNavMinimized` an die Bottom-Nav. Zugehoert wird jedem
+ * senkrechten Scrollport im Inhalt (`.app-content` und die eigenen Ports der
+ * gedeckelten Module) - Dialoge, Blaetter und Popover zaehlen nicht, sie
+ * liegen ueber der Seite. Waagerechte Leisten aendern `scrollTop` nicht und
+ * fallen damit von selbst heraus.
+ *
+ * KEIN LAYOUT-SHIFT: die Kapsel liegt ausser Fluss, und ihre Hoehe zaehlt nur
+ * ausgefahren - `watchNavCapsuleHeight` misst nicht, solange sie minimiert ist
+ * oder zurueckgleitet (`--settling`). Nachlauf, Toasts und Mehr-Blatt stehen
+ * also still; nur der FAB rueckt in die flachere Kapsel nach (layout.css).
+ *
+ * @param {Element} nav - `.nav-bottom`
+ * @param {{ doc?: Document, settleMs?: number }} [opts]
+ * @returns {{ expand: () => void, destroy: () => void }|null}
+ */
+export function watchNavMinimize(nav, { doc = document, settleMs = 450 } = {}) {
+  if (!nav) return null;
+  const last = new WeakMap();
+  let state = { minimized: false, travel: 0 };
+  let gestureAt = -Infinity;
+  let settleTimer = 0;
+  const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+
+  const apply = (minimized) => {
+    if (minimized === nav.classList.contains('nav-bottom--minimized')) return;
+    clearTimeout(settleTimer);
+    nav.classList.toggle('nav-bottom--minimized', minimized);
+    doc.documentElement.classList.toggle('nav-minimized', minimized);
+    // Zurueck gleitet sie ueber Zwischenhoehen - die duerfen die Zone nicht
+    // verschieben. Nach der Transition gilt wieder die Messung.
+    nav.classList.toggle('nav-bottom--settling', !minimized);
+    if (!minimized) settleTimer = setTimeout(() => nav.classList.remove('nav-bottom--settling'), settleMs);
+  };
+
+  const inContent = (el) => el instanceof Element
+    && Boolean(el.closest('.app-content'))
+    && !el.closest('dialog, [popover], .modal-overlay, .more-sheet');
+
+  const onGesture = (e) => { if (inContent(e.target)) gestureAt = now(); };
+  const onScroll = (e) => {
+    const port = e.target;
+    if (!inContent(port)) return;
+    // Nur wo die Kapsel steht (unter 1024px); am Desktop gibt es nichts zu minimieren.
+    if (!nav.getClientRects().length) return;
+    const top = port.scrollTop;
+    const prev = last.get(port) ?? top;
+    last.set(port, top);
+    state = nextNavMinimized(state, {
+      top,
+      max: port.scrollHeight - port.clientHeight,
+      delta: top - prev,
+      gesture: now() - gestureAt < 1200,
+    });
+    apply(state.minimized);
+  };
+  const GESTURES = ['wheel', 'touchstart', 'touchmove', 'pointerdown', 'keydown'];
+  doc.addEventListener('scroll', onScroll, { capture: true, passive: true });
+  for (const type of GESTURES) doc.addEventListener(type, onGesture, { capture: true, passive: true });
+
+  return {
+    expand: () => { state = { minimized: false, travel: 0 }; apply(false); },
+    destroy: () => {
+      clearTimeout(settleTimer);
+      doc.removeEventListener('scroll', onScroll, { capture: true });
+      for (const type of GESTURES) doc.removeEventListener(type, onGesture, { capture: true });
+    },
+  };
 }

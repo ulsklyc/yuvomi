@@ -31,6 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The tab bar on a phone makes room while you read.** Scrolling down shrinks it to its icons and
+  makes it flatter; scrolling up, reaching the top or the end of a page brings the labels back. The
+  add button stays, nothing on the page moves, and with reduced motion it switches without sliding.
+  The tabs also stay in the same place in every module: on a page without an add button the bar
+  ends before its spot instead of spreading the tabs wider, so a tab no longer moves under your
+  finger when you switch budget tabs or open Rewards.
 - **The overview appears sooner on a cold start.** The browser now asks for every module the start
   needs at once instead of discovering them level by level, fetches the language file alongside
   them, and no longer waits for the date picker, category, icon picker, attachment, screensaver and

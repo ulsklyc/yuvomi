@@ -548,3 +548,52 @@ test('"Mehr" ist auf einem Einstellungsblatt sofort aktiv, auch nach dem Kaltsta
   assert.match(shell, /renderAppShell\(app\);[\s\S]*updateNav\(routerState\.currentPath\);/,
     'beim Kaltstart wird das Ziel erst nach dem Rendern der Seite markiert');
 });
+
+// R19 (Critique 2026-10-16, Persona Casey): DIE TABS STEHEN STILL. Ohne FAB
+// verteilten sich die fuenf Tabs auf die volle Kapsel (62 gegen 73px bei
+// 390px) - jeder Wechsel auf einen Budget-Reiter ohne Neu-Aktion, nach
+// Belohnungen oder in die Einstellungen schob die Ziele unter dem Daumen.
+// Jetzt endet die Kapsel ohne Knopf vor seinem Platz: dieselbe Innenbreite,
+// dieselben Tab-Koordinaten.
+test('R19: ohne FAB endet die Kapsel vor seinem Platz, die Tabs behalten ihre Breite', () => {
+  const all = rules(layoutCss);
+  const without = all.filter((r) => r.selector.includes(':not(:has(.fab-layer .page-fab:not([hidden])))')
+    && r.selector.endsWith('.nav-bottom__items'));
+  assert.equal(without.length, 1, 'genau eine Regel fuer die Kapsel ohne FAB');
+  const body = without[0].body;
+  assert.match(without[0].selector, /html:not\(\.fab-holding\)/, 'im Seitenwechsel haelt die Reserve, bis die neue Seite steht');
+  assert.match(decl(body, 'inline-size') ?? '', /min\(100%, var\(--nav-capsule-max\)\) - var\(--fab-size\) - var\(--nav-fab-inset\)/,
+    'die Kapsel ist genau um die FAB-Reserve schmaler - Tab-Innenbreite wie mit Knopf');
+  assert.match(decl(body, 'margin-inline') ?? '', /^max\(0px, \(100% - var\(--nav-capsule-max\)\) \/ 2\) auto$/,
+    'sie beginnt, wo sie mit Knopf beginnt (nicht zentriert)');
+  const reserve = all.find((r) => r.selector.includes('.app-shell:has(.fab-layer .page-fab:not([hidden])) .nav-bottom__items'));
+  assert.match(decl(reserve.body, 'padding-inline-end') ?? '', /var\(--fab-size\) \+ var\(--nav-fab-inset\)/);
+});
+
+// R19 (Entscheidung Ulas 2026-10-16): DIE KAPSEL MINIMIERT BEIM LESEN.
+test('R19: die Kapsel minimiert beim Abwaertsscrollen - flacher, ohne Labels, Ziele und Zone bleiben', () => {
+  const all = rules(layoutCss);
+  const tokens = read('../public/styles/tokens.css');
+  assert.match(tokens, /--nav-height-minimized:\s*calc\(var\(--target-base\) \+ var\(--space-2\)\);/,
+    'minimiert ist die Kapsel ein Ziel hoch plus Luft - die Tabs behalten ihre Trefferflaeche');
+  const compact = (r) => r.at.some((a) => /max-width:\s*1023px/.test(a));
+  const capsule = all.find((r) => compact(r) && r.selector === '.nav-bottom--minimized:not(:focus-within) .nav-bottom__items');
+  assert.equal(capsule && decl(capsule.body, 'min-height'), 'var(--nav-height-minimized)');
+  const label = all.find((r) => compact(r) && r.selector === '.nav-bottom--minimized:not(:focus-within) .nav-item__label');
+  assert.ok(label, 'die Labels blenden minimiert aus');
+  assert.equal(decl(label.body, 'opacity'), '0');
+  assert.equal(decl(label.body, 'display'), null, 'unsichtbar, nicht entfernt - der Name des Tabs bleibt im Baum');
+  assert.equal(decl(label.body, 'visibility'), null);
+  const fab = all.find((r) => compact(r) && r.selector.startsWith('html.nav-minimized') && r.selector.includes('.page-fab-group')
+    && !r.selector.includes('rtl'));
+  assert.match(decl(fab?.body ?? '', 'translate') ?? '', /var\(--nav-fab-shift\) var\(--nav-fab-shift\)/,
+    'der FAB rueckt konzentrisch nach - per translate, ohne Layout');
+  assert.ok(all.some((r) => r.selector.includes('rtl') && r.selector.includes('nav-minimized')), 'auch unter dir=rtl');
+  const calm = all.filter((r) => r.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a))
+    && r.selector.includes('.nav-bottom__items') && r.selector.includes('.nav-item__label'));
+  assert.ok(calm.some((r) => decl(r.body, 'transition') === 'none'), 'reduzierte Bewegung: Zustandswechsel ohne Gleiten');
+  const router = read('../public/router.js');
+  assert.match(router, /navMinimizer = watchNavMinimize\(nav\)/, 'der Router verdrahtet die Minimierung an der Kapsel');
+  assert.match(router, /function updateNav\(rawPath\) \{\n[^\n]*\n\s*navMinimizer\?\.expand\(\);/,
+    'jeder Seitenwechsel beginnt mit ausgefahrener Kapsel');
+});

@@ -2380,6 +2380,22 @@ Gemessen am echten Markup: `test:module-readonly-ui`, `test:budget-readonly-ui`,
   unter der gedrueckten Zeile eine Tintenstufe kraeftiger (`--color-text-primary` mit
   `--tint-wash` in `--color-surface-3`: hell #EDEAE3 -> ~#DCD9D3, dunkel #37332E -> ~#46423D),
   hinein `--duration-2xs`, heraus `--duration-sm` (Press-Baustein). Mobil unveraendert.
+- **Die Kapsel minimiert beim Lesen (R19, Entscheidung Ulas 2026-10-16, iOS-26-Muster):**
+  abwaerts aus einer Nutzergeste (ab 24px Strecke) blenden die Labels aus und die Kapsel wird
+  flacher (`--nav-height-minimized`: Touch 64 -> 56px, Ziel 48px + 4px Luft); aufwaerts
+  (ab 16px), oben und am Seitenende faehrt sie aus, jeder Seitenwechsel beginnt ausgefahren,
+  Fokus in der Kapsel holt die Labels sofort zurueck. Die Unterkante steht, der FAB bleibt und
+  rueckt per `translate` konzentrisch nach (8 -> 4px rundum). Kein Layout-Shift:
+  `--nav-bottom-height` rechnet weiter mit der ausgefahrenen Hoehe (`watchNavCapsuleHeight`
+  misst minimiert und auf dem Rueckweg nicht), Nachlauf, Toasts und Mehr-Blatt stehen still.
+  Reduzierte Bewegung: derselbe Wechsel ohne Gleiten. Entscheidung: `nextNavMinimized`,
+  Verdrahtung `watchNavMinimize` (utils/ux.js). Guards: `test:ux-utils`, `test:mobile-chrome`.
+- **Die Tabs stehen in jedem Modul auf denselben Koordinaten (R19, Persona Casey).** Ohne
+  FAB verteilten sich die fuenf Tabs auf die volle Kapsel (62 gegen 73px bei 390px) - ein
+  Budget-Reiterwechsel nach „Statistik", Belohnungen, Haushaltshilfe oder die Einstellungen
+  schoben jedes Ziel um bis zu 44px. Jetzt endet die Kapsel ohne Knopf vor seinem Platz
+  (Breite minus FAB-Reserve plus 8px Sehne, Anfang wie mit Knopf); nur das Kapselende folgt
+  dem FAB, kein leeres Glas.
 - Labels mobil in 11px (`--type-micro`, Caption 2 - der iOS-Wert fuer Tab-Bar-Titel; Begruendung
   an `.nav-bottom .nav-item__label`); lange Locales duerfen die Kapsel wachsen lassen, nie clippen.
 - **"Mehr" ist kein Modul (Nav-Polish 2026-10-15):** in Ruhe steht sein Zeichen tertiaer wie

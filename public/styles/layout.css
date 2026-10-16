@@ -841,6 +841,27 @@ html.fab-holding .nav-bottom__items {
   padding-inline-end: calc(var(--fab-size) + var(--nav-fab-inset));
 }
 
+/* OHNE FAB ENDET DIE KAPSEL VOR SEINEM PLATZ, die Tabs bleiben stehen (R19,
+ * Critique 2026-10-16, Persona Casey). Bis hier verteilten sich die fuenf
+ * Tabs ohne FAB auf die volle Breite: 62 gegen 73px je Tab bei 390px, und
+ * ein Budget-Reiterwechsel nach "Statistik" (ohne Neu-Aktion) schob jedes
+ * Ziel unter dem Daumen um bis zu 44px - ebenso jeder Wechsel nach
+ * Belohnungen, Haushaltshilfe oder in die Einstellungen. Jetzt ist der Platz
+ * des Knopfs reserviert, aber nicht als leeres Glas (die 52px-Luecke, die die
+ * Regel oben verhinderte): die Kapsel ist um genau die Reserve schmaler und
+ * beginnt, wo sie mit FAB beginnt. Tabs und Indikator stehen in jedem Modul
+ * und jedem Reiter auf denselben Koordinaten; nur das Kapselende folgt dem
+ * Knopf. Gilt nur, wo die Kapsel steht (unter 1024px), und nie im
+ * Wechsel (`fab-holding` haelt die Reserve, bis die neue Seite steht). */
+html:not(.fab-holding) .app-shell:not(:has(.fab-layer .page-fab:not([hidden]))) .nav-bottom__items {
+  /* Hinten dieselbe Sehne wie vorne (--space-2): ohne Knopf liegt das letzte
+   * Label sonst in der Rundung. Die 8px kommen auf die Breite, die Tabs
+   * behalten ihre Koordinaten. */
+  inline-size: calc(min(100%, var(--nav-capsule-max)) - var(--fab-size) - var(--nav-fab-inset) + var(--space-2));
+  padding-inline-end: var(--space-2);
+  margin-inline: max(0px, (100% - var(--nav-capsule-max)) / 2) auto;
+}
+
 /* ── More-Button (Button-Basis, ansonsten wie nav-item) ── */
 .nav-item--more,
 .nav-item--kitchen {
@@ -2428,6 +2449,83 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   .page-fab-group {
     inset-inline-end: calc(var(--nav-capsule-inset) + var(--nav-fab-inset));
     z-index: calc(var(--z-nav) + 1);
+  }
+}
+
+/* DIE KAPSEL MINIMIERT SICH BEIM LESEN (R19, iOS-26-Muster; Entscheidung Ulas
+ * 2026-10-16). Abwaerts gescrollt (utils/ux.js watchNavMinimize) blenden die
+ * Labels aus, die Kapsel wird flacher (--nav-height-minimized: 64 -> 56px
+ * Touch), der FAB bleibt und rueckt konzentrisch nach. Aufwaerts, oben und am
+ * Seitenende faehrt sie wieder aus; Fokus in der Kapsel holt sie sofort ganz
+ * zurueck (Tastatur sieht immer Labels).
+ *
+ * DIE ZIELE BLEIBEN: ein Tab ist auch minimiert ein volles Ziel hoch
+ * (`.nav-item { min-height: --target-lg }`, die Kapsel hat 54px Innenhoehe),
+ * und sein Name bleibt im Baum - die Labels werden unsichtbar, nicht entfernt.
+ *
+ * KEIN LAYOUT-SHIFT: die Kapsel liegt ausser Fluss, die Unterkante steht
+ * still, und --nav-bottom-height rechnet weiter mit der ausgefahrenen Hoehe
+ * (watchNavCapsuleHeight misst minimiert nicht). Nachlauf, Toasts und das
+ * Mehr-Blatt bleiben stehen. Nur der FAB rueckt per `translate` um die halbe
+ * Hoehendifferenz nach unten und zur Endkante - derselbe Abstand rundum wie
+ * ausgefahren, nur kleiner (8 -> 4px).
+ *
+ * Reduzierte Bewegung: derselbe Zustandswechsel ohne Gleiten (unten). */
+@media (max-width: 1023px) {
+  .nav-bottom__items {
+    transition: min-height var(--duration-md) var(--ease-out);
+  }
+
+  .nav-bottom .nav-item__label {
+    max-block-size: 3em;
+    transition:
+      opacity var(--duration-sm) var(--ease-out),
+      max-block-size var(--duration-md) var(--ease-out);
+  }
+
+  .nav-bottom--minimized:not(:focus-within) .nav-bottom__items {
+    min-height: var(--nav-height-minimized);
+  }
+
+  /* Ohne Label steht die Mulde in der Mitte - die Fuge zum Label faellt mit. */
+  .nav-bottom--minimized:not(:focus-within) .nav-item {
+    row-gap: 0;
+  }
+
+  .nav-bottom--minimized:not(:focus-within) .nav-item__label {
+    max-block-size: 0;
+    overflow: hidden;
+    opacity: 0;
+  }
+
+  .page-fab:not(.page-fab-group > .page-fab),
+  .page-fab-group {
+    --nav-fab-shift: calc((var(--nav-capsule-height, var(--nav-height-mobile)) - var(--nav-height-minimized)) / 2);
+    transition:
+      transform var(--transition-base),
+      background-color var(--transition-fast),
+      translate var(--duration-md) var(--ease-out);
+  }
+
+  html.nav-minimized:not(:has(.nav-bottom:focus-within)) .page-fab:not(.page-fab-group > .page-fab),
+  html.nav-minimized:not(:has(.nav-bottom:focus-within)) .page-fab-group {
+    translate: var(--nav-fab-shift) var(--nav-fab-shift);
+  }
+
+  html.nav-minimized:not(:has(.nav-bottom:focus-within)) [dir="rtl"] .page-fab:not(.page-fab-group > .page-fab),
+  html.nav-minimized:not(:has(.nav-bottom:focus-within)) [dir="rtl"] .page-fab-group,
+  html[dir="rtl"].nav-minimized:not(:has(.nav-bottom:focus-within)) .page-fab:not(.page-fab-group > .page-fab),
+  html[dir="rtl"].nav-minimized:not(:has(.nav-bottom:focus-within)) .page-fab-group {
+    translate: calc(-1 * var(--nav-fab-shift)) var(--nav-fab-shift);
+  }
+}
+
+@media (max-width: 1023px) and (prefers-reduced-motion: reduce) {
+  .nav-bottom__items,
+  .nav-bottom .nav-item__label,
+  .page-fab:not(.page-fab-group > .page-fab),
+  .page-fab-group {
+    transition: none;
   }
 }
 
