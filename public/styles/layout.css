@@ -270,6 +270,114 @@ html.page-swapping .fab-layer .page-fab {
   animation: none;
 }
 
+/* GERICHTETER WECHSEL EINER REGION (R19, utils/content-swap.js swapRegion).
+ * Kalender-Ansichten und Drill-down: die Region traegt fuer die Dauer den
+ * Namen `region-swap`, Navigation/Kapsel/FAB stehen (`html.page-swapping`
+ * oben). Die Wurzel zeigt NUR ihr lebendes neues Bild - im Kopf gleitet die
+ * Segment-Kapsel weiter, ein eingefrorenes altes Bild darueber waere ihr
+ * Geist. Die Gruppe steht (`animation: none`) und schneidet ihre Bilder auf
+ * den Kasten der Region zu: nichts gleitet ueber Seitenleiste oder Kopf.
+ * `mix-blend-mode: normal`: die UA-Blende addiert sonst zwei deckende Bilder.
+ * Richtung in RTL gespiegelt ueber `--region-sign`. */
+html {
+  --region-sign: 1;
+  --region-shift: 24%;
+}
+
+html[dir='rtl'] {
+  --region-sign: -1;
+}
+
+html:active-view-transition-type(region-forward, region-back, region-fade)::view-transition-old(root) {
+  display: none;
+}
+
+html:active-view-transition-type(region-forward, region-back, region-fade)::view-transition-new(root) {
+  animation: none;
+}
+
+::view-transition-group(region-swap) {
+  animation: none;
+  overflow: clip;
+}
+
+::view-transition-old(region-swap),
+::view-transition-new(region-swap) {
+  mix-blend-mode: normal;
+  animation-duration: var(--duration-lg);
+  animation-timing-function: var(--ease-out);
+  animation-fill-mode: both;
+}
+
+/* Vorwaerts: die neue Ebene kommt von der Seite herein und liegt oben, die
+ * alte tritt um ein Drittel des Wegs zurueck und blendet aus. */
+html:active-view-transition-type(region-forward)::view-transition-old(region-swap) {
+  animation-name: region-recede;
+  --region-dir: -1;
+}
+
+html:active-view-transition-type(region-forward)::view-transition-new(region-swap) {
+  animation-name: region-arrive;
+  --region-dir: 1;
+}
+
+/* Zurueck: die alte Ebene schiebt sich zur Seite hinaus und liegt dabei
+ * oben, die vorige kommt von leicht dahinter. */
+html:active-view-transition-type(region-back)::view-transition-old(region-swap) {
+  animation-name: region-leave;
+  --region-dir: 1;
+  z-index: 1;
+}
+
+html:active-view-transition-type(region-back)::view-transition-new(region-swap) {
+  animation-name: region-return;
+  --region-dir: -1;
+}
+
+html:active-view-transition-type(region-fade)::view-transition-old(region-swap) {
+  animation-name: region-fade-out;
+}
+
+html:active-view-transition-type(region-fade)::view-transition-new(region-swap) {
+  animation-name: region-fade-in;
+}
+
+@keyframes region-arrive {
+  from {
+    translate: calc(var(--region-dir) * var(--region-sign) * var(--region-shift)) 0;
+    opacity: 0;
+  }
+}
+
+@keyframes region-recede {
+  to {
+    translate: calc(var(--region-dir) * var(--region-sign) * var(--region-shift) / 3) 0;
+    opacity: 0;
+  }
+}
+
+@keyframes region-leave {
+  to {
+    translate: calc(var(--region-dir) * var(--region-sign) * var(--region-shift)) 0;
+    opacity: 0;
+  }
+}
+
+@keyframes region-return {
+  from {
+    translate: calc(var(--region-dir) * var(--region-sign) * var(--region-shift) / 3) 0;
+    opacity: 0;
+  }
+}
+
+@keyframes region-fade-out {
+  to { opacity: 0; }
+}
+
+@keyframes region-fade-in {
+  from { opacity: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .page-transition--in {
     animation: none;
@@ -287,6 +395,15 @@ html.page-swapping .fab-layer .page-fab {
    * Groesse, also Bewegung); die Bilder blenden kurz ueber. */
   ::view-transition-group(*) {
     animation: none !important;
+  }
+  /* Der gerichtete Wechsel einer Region blendet nur, ohne Versatz. */
+  html:active-view-transition-type(region-forward, region-back, region-fade)::view-transition-old(region-swap) {
+    animation-name: region-fade-out;
+    animation-duration: var(--duration-sm);
+  }
+  html:active-view-transition-type(region-forward, region-back, region-fade)::view-transition-new(region-swap) {
+    animation-name: region-fade-in;
+    animation-duration: var(--duration-sm);
   }
   /* Nur Wurzel und Kopf: die stehenden Namen erben weiter 0s (oben). */
   ::view-transition-old(root),

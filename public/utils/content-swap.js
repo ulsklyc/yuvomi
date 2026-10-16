@@ -92,3 +92,87 @@ export function swapContent(host, update, { direction = 0, animate = true } = {}
   anim.finished?.then(release, release);
   return anim;
 }
+
+/* --------------------------------------------------------
+ * GERICHTETER WECHSEL MIT ALTEM BILD (R19, Critique 2026-10-16)
+ *
+ * swapContent blendet nur den NEUEN Inhalt ein - das alte Bild ist da schon
+ * weg. Fuer einen Ebenen- oder Ansichtswechsel reicht das nicht: der
+ * Kalender-Ansichtswechsel war eine reine Blende ohne raeumliche Fortfuehrung,
+ * und der Drill-down (Einstellungen, Gesundheit) liess die alte Ebene einfach
+ * verschwinden. swapRegion nimmt das alte Bild per View Transition auf:
+ *   - vorwaerts (+1) schiebt sich die neue Ebene von der Seite herein, die
+ *     alte tritt leicht zurueck und blendet aus;
+ *   - zurueck (-1) schiebt sich die alte Ebene zur Seite hinaus, die
+ *     vorige kommt von leicht dahinter.
+ * Regeln in layout.css (`region-swap`). Navigation, Kapsel und FAB stehen
+ * (`html.page-swapping` traegt ihre Namen wie beim Seitenwechsel), der Rest
+ * der Seite zeigt nur sein lebendes neues Bild - eine gleitende
+ * Segment-Kapsel im Kopf laeuft also weiter, statt als Geist einzufrieren.
+ *
+ * Reduzierte Bewegung: kein Versatz, die Bilder blenden nur (layout.css).
+ * Ohne API, ohne `:active-view-transition-type()` oder im verdeckten Tab:
+ * swapContent mit derselben Richtung (8px, nur der neue Inhalt).
+ * -------------------------------------------------------- */
+
+/** Name der Region fuer die Dauer des Wechsels (layout.css). */
+export const REGION_NAME = 'region-swap';
+
+/** Ob der Browser den gerichteten Wechsel kann (Typen fuer die Richtung). */
+export function canSwapRegion() {
+  if (typeof document === 'undefined' || typeof document.startViewTransition !== 'function') return false;
+  if (document.visibilityState === 'hidden') return false;
+  try {
+    return typeof CSS !== 'undefined' && CSS.supports('selector(:active-view-transition-type(a))');
+  } catch {
+    return false;
+  }
+}
+
+/** Typ der Transition je Richtung - die Namen liest layout.css. */
+export function regionSwapType(direction) {
+  const step = Math.sign(Number(direction) || 0);
+  return step > 0 ? 'region-forward' : step < 0 ? 'region-back' : 'region-fade';
+}
+
+/**
+ * Tauscht den Inhalt einer Region mit gerichtetem Uebergang.
+ *
+ * `update` laeuft genau einmal; mit View Transition im Callback (also einen
+ * Frame spaeter), sonst sofort. Ein Fehler daraus kommt beim Aufrufer an.
+ *
+ * @param {Element|null} host            die Region, deren Inhalt wechselt
+ * @param {() => (void|Promise<void>)} update tauscht den Inhalt
+ * @param {object} [opts]
+ * @param {number} [opts.direction=0]    > 0 vorwaerts/weiter, < 0 zurueck, 0 Blende
+ * @returns {Promise<{ transition: boolean, finished: Promise<void> }>}
+ */
+export async function swapRegion(host, update, { direction = 0 } = {}) {
+  if (!host || !host.isConnected || !canSwapRegion()) {
+    swapContent(host, update, { direction });
+    return { transition: false, finished: Promise.resolve() };
+  }
+  const html = document.documentElement;
+  const mark = (on) => {
+    host.style.viewTransitionName = on ? REGION_NAME : '';
+    html.classList.toggle('page-swapping', on);
+  };
+  mark(true);
+  const transition = document.startViewTransition({
+    update: () => update?.(),
+    types: [regionSwapType(direction)],
+  });
+  transition.ready.catch(() => {});
+  // Ein Tipp beendet den Wechsel: solange er laeuft, trifft Chromium nur <html>
+  // (siehe utils/view-transition.js) - der naechste Tipp erreicht die Seite.
+  const skip = () => transition.skipTransition();
+  document.addEventListener('pointerdown', skip, { capture: true, once: true });
+  const finished = Promise.resolve(transition.finished)
+    .catch(() => {})
+    .finally(() => {
+      document.removeEventListener('pointerdown', skip, { capture: true });
+      mark(false);
+    });
+  await transition.updateCallbackDone;
+  return { transition: true, finished };
+}

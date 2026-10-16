@@ -2,7 +2,7 @@ import { t } from '/i18n.js';
 import { moduleAccentVar } from '/utils/module-accent.js';
 import { renderSkeletonList, placeSkeletonUntilContent } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
-import { swapContent } from '/utils/content-swap.js';
+import { swapRegion } from '/utils/content-swap.js';
 import { createRetryState } from './components.js';
 import { watchLeafForms } from './dirty-guard.js';
 import { KITCHEN_CHILD_IDS } from './module-order.js';
@@ -1266,15 +1266,32 @@ export async function renderSettingsShell(container, {
     // Teil von renderLeafContent setzt Kopf und Blatt noch in diesem Takt ein,
     // das Blatt gleitet also mit seinem Geruest herein, nicht erst nach den
     // Abschnitten.
-    if (drill) swapContent(content, null, { direction: drill });
+    //
+    // SEIT R19 MIT ALTEM BILD (swapRegion, utils/content-swap.js): hinein
+    // schiebt sich das Blatt ueber die Uebersicht, zurueck schiebt es sich
+    // hinaus - vorher kam nur das neue Bild 8px von der Seite, die alte Ebene
+    // war schlagartig weg. Der synchrone Teil laeuft im Wechsel, das Laden
+    // danach wie bisher.
+    if (drill) {
+      let loading = null;
+      await swapRegion(content, () => {
+        if (toolbar) renderToolbar(toolbar, content, { activeLeaf, domain: leafDomain });
+        loading = renderLeafContent(content, activeLeaf, leafDomain, user, query);
+      }, { direction: drill });
+      await loading;
+      return;
+    }
     if (toolbar) renderToolbar(toolbar, content, { activeLeaf, domain: leafDomain });
     await renderLeafContent(content, activeLeaf, leafDomain, user, query);
     return;
   }
-  renderOverview(content, domains, user);
-  hydrateIcons(content);
-  if (drill) swapContent(content, null, { direction: drill });
-  if (toolbar) renderToolbar(toolbar, content, {});
+  const paintOverview = () => {
+    renderOverview(content, domains, user);
+    hydrateIcons(content);
+    if (toolbar) renderToolbar(toolbar, content, {});
+  };
+  if (drill) await swapRegion(content, paintOverview, { direction: drill });
+  else paintOverview();
   revealOverviewSection(content, focusDomain?.id);
   if (page) watchSplit(container, page, { user, domainId: focusDomain?.id ?? null });
 }

@@ -354,6 +354,14 @@ const STUBS = {
       if (typeof update === 'function') update();
       return null;
     }
+    export const REGION_NAME = 'region-swap';
+    export function canSwapRegion() { return false; }
+    export function regionSwapType(d) { return d > 0 ? 'region-forward' : d < 0 ? 'region-back' : 'region-fade'; }
+    export async function swapRegion(host, update, opts = {}) {
+      globalThis.__motionStub?.('swapRegion', host, opts);
+      if (typeof update === 'function') await update();
+      return { transition: false, finished: Promise.resolve() };
+    }
   `,
   '/utils/list-motion.js': `
     export function redrawList(host, render, opts = {}) {

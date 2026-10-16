@@ -1680,8 +1680,10 @@ test('R18: der Aufgaben-Dialog schliesst mit dem Speichern - die aufziehende Zei
 // --------------------------------------------------------------------------
 const DRILL_DOWN_HOSTS = [
   ['settings/shell.js', /const drill = existingShell && !isSplit\(shell\) && wasLeaf !== Boolean\(activeLeaf\)\s*\? \(activeLeaf \? 1 : -1\)\s*: 0;/, 'Einstellungen: Uebersicht <-> Blatt, nur ohne Seitenleiste'],
-  ['settings/shell.js', /if \(drill\) swapContent\(content, null, \{ direction: drill \}\);\s*if \(toolbar\) renderToolbar\(toolbar, content, \{ activeLeaf, domain: leafDomain \}\);\s*await renderLeafContent\(/, 'Einstellungen: das Blatt gleitet mit seinem Geruest herein - vor dem Laden gestartet, nicht danach'],
-  ['settings/shell.js', /renderOverview\(content, domains, user\);[\s\S]{0,200}if \(drill\) swapContent\(content, null, \{ direction: drill \}\);/, 'Einstellungen: zurueck zur Uebersicht'],
+  // R19: mit ALTEM Bild (swapRegion) - hinein schiebt sich das Blatt darueber,
+  // zurueck schiebt es sich hinaus; der synchrone Teil laeuft im Wechsel.
+  ['settings/shell.js', /await swapRegion\(content, \(\) => \{\s*if \(toolbar\) renderToolbar\(toolbar, content, \{ activeLeaf, domain: leafDomain \}\);\s*loading = renderLeafContent\(content, activeLeaf, leafDomain, user, query\);\s*\}, \{ direction: drill \}\);\s*await loading;/, 'Einstellungen: das Blatt gleitet mit seinem Geruest herein - vor dem Laden gestartet, nicht danach'],
+  ['settings/shell.js', /if \(drill\) await swapRegion\(content, paintOverview, \{ direction: drill \}\);/, 'Einstellungen: zurueck zur Uebersicht'],
   ['pages/health.js', /const drill = !narrow \? 0 : id === HEALTH_OVERVIEW_ID \? -1 : previous === HEALTH_OVERVIEW_ID \? 1 : 0;\s*if \(previous && previous !== id\) markAreaEntering\(route, drill\);/, 'Gesundheit: Uebersicht <-> Bereich, nur schmal'],
   ['pages/health.js', /if \(panel\) swapContent\(panel, null, \{ direction \}\);/, 'Gesundheit: ueber den geteilten Helfer'],
 ];
@@ -2394,4 +2396,109 @@ test('R19: die Uebersicht blendet vom Skelett zum Inhalt ueber swapContent', () 
   const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
   assert.match(src, /const fromSkeleton = Boolean\(shell\.querySelector\('\.widget-skeleton'\)\)\s*&& !document\.documentElement\.classList\.contains\('page-swapping'\);/);
   assert.match(src, /swapContent\(shell, \(\) => setHtml\(shell, `[\s\S]*?`\), \{ animate: fromSkeleton \}\);/);
+});
+
+/* 12. GERICHTETER WECHSEL EINER REGION (R19, Critique 2026-10-16): der
+ *     Kalender-Ansichtswechsel war eine reine Blende ohne raeumliche
+ *     Fortfuehrung, der Drill-down (Einstellungen, Gesundheit) zeigte nur den
+ *     neuen Inhalt. swapRegion (utils/content-swap.js) nimmt das alte Bild per
+ *     View Transition auf und gibt die Richtung als Typ an layout.css. */
+function regionEnv({ api = true, types = true } = {}) {
+  const log = [];
+  const classes = new Set();
+  const listeners = [];
+  let resolveFinished;
+  const host = motionEl('region');
+  host.isConnected = true;
+  host.closest = () => null;
+  const doc = {
+    visibilityState: 'visible',
+    documentElement: {
+      dir: '',
+      classList: { toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)), contains: (c) => classes.has(c) },
+    },
+    addEventListener: (type, fn, opts) => listeners.push({ type, fn, capture: Boolean(opts?.capture) }),
+    removeEventListener: (type, fn) => {
+      const i = listeners.findIndex((l) => l.type === type && l.fn === fn);
+      if (i >= 0) listeners.splice(i, 1);
+    },
+    startViewTransition: api ? (arg) => {
+      log.push(`start name=${host.style.viewTransitionName} chrome=${classes.has('page-swapping')} types=${arg.types.join(',')}`);
+      const updateCallbackDone = Promise.resolve().then(arg.update);
+      return {
+        updateCallbackDone,
+        ready: updateCallbackDone,
+        finished: new Promise((r) => { resolveFinished = r; }),
+        skipTransition: () => { log.push('skip'); resolveFinished(); },
+      };
+    } : undefined,
+  };
+  const saved = { document: globalThis.document, CSS: globalThis.CSS, window: globalThis.window };
+  globalThis.document = doc;
+  globalThis.CSS = { supports: (q) => types && /active-view-transition-type/.test(q) };
+  globalThis.window = { matchMedia: () => ({ matches: false }) };
+  return {
+    host, log, classes, listeners,
+    finish: () => resolveFinished(),
+    restore: () => { for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete globalThis[k]; else globalThis[k] = v; } },
+  };
+}
+
+test('swapRegion: altes Bild per View Transition, Richtung als Typ, Name nur fuer die Dauer', async () => {
+  const env = regionEnv();
+  try {
+    const { swapRegion, regionSwapType } = await import('../public/utils/content-swap.js');
+    assert.deepEqual([1, -1, 0, 3, -2].map(regionSwapType), ['region-forward', 'region-back', 'region-fade', 'region-forward', 'region-back']);
+    let ran = 0;
+    const { transition, finished } = await swapRegion(env.host, () => { ran += 1; env.log.push('update'); }, { direction: 1 });
+    assert.equal(transition, true);
+    assert.equal(ran, 1, 'der Tausch laeuft genau einmal');
+    assert.deepEqual(env.log, ['start name=region-swap chrome=true types=region-forward', 'update'],
+      'Name und stehendes Chrome VOR dem alten Bild, der Tausch im Callback');
+    assert.equal(env.host.calls.length, 0, 'keine zweite Blende per WAAPI obendrauf');
+    // Ein Tipp waehrend des Wechsels beendet ihn.
+    env.listeners.find((l) => l.type === 'pointerdown' && l.capture)?.fn();
+    await finished;
+    assert.ok(env.log.includes('skip'), 'der erste Tipp bricht den Wechsel ab');
+    assert.equal(env.host.style.viewTransitionName, '', 'danach ist der Name frei');
+    assert.equal(env.classes.has('page-swapping'), false, 'und das Glas der Kapsel blurrt wieder');
+    assert.equal(env.listeners.length, 0, 'kein Zuhoerer bleibt haengen');
+  } finally {
+    env.restore();
+  }
+});
+
+test('swapRegion: ohne Typen-Unterstuetzung oder API faellt es auf swapContent zurueck', async () => {
+  for (const opts of [{ types: false }, { api: false }]) {
+    const env = regionEnv(opts);
+    try {
+      const { swapRegion } = await import('../public/utils/content-swap.js');
+      let ran = 0;
+      const { transition } = await swapRegion(env.host, () => { ran += 1; }, { direction: -1 });
+      assert.equal(transition, false, JSON.stringify(opts));
+      assert.equal(ran, 1, 'der Inhalt steht trotzdem');
+      assert.equal(env.host.calls.length, 1, 'die 8px-Einblende in Schrittrichtung');
+      assert.equal(env.host.style.viewTransitionName ?? '', '', 'kein Name ohne Transition');
+    } finally {
+      env.restore();
+    }
+  }
+});
+
+test('swapRegion CSS: vorwaerts schiebt herein, zurueck schiebt hinaus, reduzierte Bewegung blendet nur', () => {
+  const rules = [...eachRule(css('layout.css'))];
+  const top = rules.filter((r) => !r.at.length);
+  const find = (sel) => top.find((r) => r.selector.replace(/\s+/g, ' ').trim() === sel);
+  assert.match(find('html:active-view-transition-type(region-forward)::view-transition-new(region-swap)')?.body ?? '', /animation-name:\s*region-arrive/);
+  assert.match(find('html:active-view-transition-type(region-back)::view-transition-old(region-swap)')?.body ?? '', /animation-name:\s*region-leave[\s\S]*z-index:\s*1/,
+    'zurueck liegt die alte Ebene oben und schiebt sich hinaus');
+  assert.match(find('::view-transition-group(region-swap)')?.body ?? '', /overflow:\s*clip/, 'nichts gleitet ueber die Region hinaus');
+  assert.match(find('::view-transition-old(region-swap), ::view-transition-new(region-swap)')?.body ?? '', /mix-blend-mode:\s*normal/);
+  assert.match(find('html:active-view-transition-type(region-forward, region-back, region-fade)::view-transition-old(root)')?.body ?? '', /display:\s*none/,
+    'die Wurzel zeigt nur ihr lebendes Bild - keine eingefrorene Segment-Kapsel');
+  const reduced = rules.filter((r) => r.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a)) && /region-swap/.test(r.selector));
+  assert.equal(reduced.length, 2, 'reduzierte Bewegung: alte und neue Ebene');
+  for (const r of reduced) assert.match(r.body, /animation-name:\s*region-fade-(in|out)/, `nur Blende: ${r.body}`);
+  const keyframes = css('layout.css');
+  assert.match(keyframes, /@keyframes region-fade-in \{\s*from \{ opacity: 0; \}/, 'die Blende hat keinen Versatz');
 });
