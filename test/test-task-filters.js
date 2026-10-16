@@ -333,15 +333,21 @@ test('das Blatt: Filter zuerst, Kategorie und Tag eingeklappt, „Ansicht" abges
     'tasks.filterGroupPerson', 'tasks.categoryLabel', 'tasks.filterGroupTag', 'tasks.viewToggleLabel',
   ]);
   const show = htmlOf('tasks.filterGroupShow');
-  assert.match(show, /type="checkbox"[^>]*data-filter-mine/, '„Mir zugewiesen" ist ein Schalter im Blatt');
+  assert.match(show, /role="switch"[^>]*data-filter-due-today/, '„Bis heute faellig" ist ein Schalter (D2), kein Haken');
   assert.doesNotMatch(show, /data-filter-future/, '„Geplante anzeigen" ist eine Ansichtsoption, kein Filter der ersten Gruppe');
+  // D2 (Critique 2026-10-16): „Mir zugewiesen" steht wie im Kalender als
+  // erster Schalter der Personengruppe, darueber nichts, darunter die Chips.
+  const person = htmlOf('tasks.filterGroupPerson');
+  assert.match(person, /role="switch"[^>]*data-filter-mine/, '„Mir zugewiesen" ist ein Schalter in der Personengruppe');
+  assert.ok(person.indexOf('data-filter-mine') < person.indexOf('data-filter="assigned_to"'), 'der Schalter steht vor den Personen-Chips');
+  assert.doesNotMatch(show, /data-filter-mine/, 'nicht mehr unter „Anzeigen"');
 
   // „Ansicht": Gruppierung und „Geplante anzeigen", abgesetzt.
   const view = groupOf('tasks.viewToggleLabel');
   assert.equal(view.variant, 'view');
   assert.match(view.html, /role="radiogroup"/, 'die Gruppierung ist EINE Wahl aus zwei, kein Paar von Schaltern');
   assert.match(view.html, /data-tab-id="category"[^>]*aria-checked="true"|aria-checked="true"[^>]*data-tab-id="category"/);
-  assert.match(view.html, /type="checkbox"[^>]*data-filter-future/);
+  assert.match(view.html, /role="switch"[^>]*data-filter-future/);
   assert.match(htmlOf('tasks.filterGroupStatus'), /data-filter="status" data-value="open" aria-pressed="true"/,
     'der gewaehlte Status traegt seinen Zustand als aria-pressed');
 
@@ -1053,7 +1059,7 @@ test('am Display: kein Schalter „Mir zugewiesen", und ein gespeicherter Wert w
   // Liste bei fuenfzehn offenen Aufgaben.
   const KEY = 'yuvomi:taskAssignedToMe';
   const vorher = tasks.state.user;
-  const showHtml = () => tasks.filterSheetGroups().find((g) => g.heading === 'tasks.filterGroupShow')?.html ?? '';
+  const showHtml = () => tasks.filterSheetGroups().find((g) => g.heading === 'tasks.filterGroupPerson')?.html ?? '';
   try {
     // DER MENSCH ZUERST - sonst waeren beide Abwesenheiten unten auch dann
     // gruen, wenn der Schalter oder das Wiederherstellen ganz verschwunden ist.

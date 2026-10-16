@@ -21,11 +21,12 @@ const pendingDeletes = new Map();
 const currentOwners = new Map();
 const deleteKey = (owner, id) => `${owner}:${id}`;
 
-export async function mountFasting(root, { userId } = {}) {
+export async function mountFasting(root, { userId, onCreateAction } = {}) {
   if (!root) return;
   let view = panels.get(root);
+  if (view && onCreateAction) view.onCreateAction = onCreateAction;
   if (!view) {
-    view = { root, self: userId, subject: userId, members: [], from: '', to: '', generation: 0, stop: null, state: null, stats: undefined, statsError: false, displayTzid: '' };
+    view = { root, self: userId, subject: userId, members: [], from: '', to: '', generation: 0, stop: null, state: null, stats: undefined, statsError: false, displayTzid: '', onCreateAction };
     panels.set(root, view);
     root.replaceChildren();
     root.insertAdjacentHTML('beforeend', `<div class="fasting-container"><div data-fasting-shell></div><p role="alert" data-fasting-load-error></p><div class="fasting-panel" data-fasting-body><p role="status">${esc(t('common.loading'))}</p></div></div>`);
@@ -200,12 +201,15 @@ function renderBody(view, stats, statsError = false) {
     ${state.settings?.zone_mode === 'educational' ? fastingEducationMarkup() : ''}
   </section>
   ${sections.stats ? renderFastingStats(stats, { error: statsError }) : ''}
+  ${/* DER NACHTRAG IST DER FAB (Critique 2026-10-16, D5): „Abgeschlossenes
+        Fasten eintragen" stand im Leerzustand UND im Kopf des Verlaufs, ohne
+        FAB - zwei Orte je nach Datenlage. Die Gesundheit setzt den FAB ueber
+        `onCreateAction` (unten). */ ''}
   ${sections.empty ? `<section id="history">${emptyStateHTML({
     icon: 'timer',
     title: t('health.fasting.noHistory'),
     description: t('health.fasting.emptyDesc'),
-    action: writable ? { label: t('health.fasting.backfill'), icon: 'plus', tone: 'secondary', attrs: { 'data-fasting-backfill': '' } } : null,
-  })}</section>` : `<section id="history"><div class="fasting-card__heading"><h3 class="u-section-title">${esc(t('health.fasting.history'))}</h3><a href="/api/v1/health/export/fasting${esc(fastingHistoryQuery(view))}" class="btn btn--secondary btn--sm" download>${esc(t('health.fasting.export'))}</a>${writable ? `<button class="btn btn--secondary" data-fasting-backfill>${esc(t('health.fasting.backfill'))}</button>` : ''}</div>
+  })}</section>` : `<section id="history"><div class="fasting-card__heading"><h3 class="u-section-title">${esc(t('health.fasting.history'))}</h3><a href="/api/v1/health/export/fasting${esc(fastingHistoryQuery(view))}" class="btn btn--secondary btn--sm" download>${esc(t('health.fasting.export'))}</a></div>
     ${filtersMarkup(view)}
     <div class="fasting-card" data-fasting-history></div><div class="fasting-history-more"><button class="btn btn--secondary" type="button" data-fasting-more ${view.more ? '' : 'hidden'}>${esc(t('health.fasting.loadMore'))}</button><p class="form-hint" role="alert" data-fasting-history-error></p></div>
   </section>`}`);
@@ -226,7 +230,9 @@ function renderBody(view, stats, statsError = false) {
     root.querySelector('[data-fasting-edit-start]')?.addEventListener('click', () => openFastingEditor(active, reload));
     const creator = async (completed) => { try { await openFastingCreator(completed ? reloadStats : reload, completed); } catch (error) { window.yuvomi?.showToast(fastingError(error), 'danger'); } };
     root.querySelector('[data-fasting-earlier]')?.addEventListener('click', () => void creator(false));
-    root.querySelector('[data-fasting-backfill]')?.addEventListener('click', () => void creator(true));
+    view.onCreateAction?.(() => void creator(true));
+  } else {
+    view.onCreateAction?.(null);
   }
   root.querySelector('[data-fasting-education]')?.addEventListener('click', () => openModal({ title: t('health.fasting.zoneDetails'), content: `<p>${esc(t('health.fasting.zoneVariability'))}</p><ul>${['zoneMeal', 'zoneStored', 'zoneKetones', 'zoneLater'].map((key) => `<li>${esc(t(`health.fasting.${key}`))}</li>`).join('')}</ul><p>${esc(t('health.fasting.safetyDialog'))}</p>`, size: 'lg' }));
   wireFilters(view, body);

@@ -569,6 +569,15 @@
   display: none;
 }
 
+/* DER IMPORT STEHT IM ONBOARDING EINMAL (Critique 2026-10-16, D5): der
+   Leerzustand bietet ihn als leisen Link unter den Vorlagen an, wo jemand ohne
+   Abfallart nach einem Anfang sucht. Im "..."-Menue stand er im selben Moment
+   ein zweites Mal - drei Orte (FAB, Leerzustand, Menue) fuer den ersten
+   Schritt. Sobald es Abfallarten gibt, ist das Menue sein fester Ort. */
+.waste-page--onboarding #waste-page-menu [data-action="open-import"] {
+  display: none;
+}
+
 /* Ohne AKTIVE Abfallart gibt es nichts, wofuer man eine Einzelabholung
    eintraegt (waste.js, pageModeClasses): der Eintrag fehlt im Onboarding und
    ebenso, wenn alle Abfallarten archiviert sind (#1775). */

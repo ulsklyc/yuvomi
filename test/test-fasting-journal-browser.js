@@ -268,9 +268,9 @@ test('journal earlier start, active edit, recorded target, end undo and manual h
     await page.waitForFunction(() => document.querySelector('[data-fasting-edit-start]'));
     active = (await call(page, 'get', '/health/fasting/state')).data.active;
     assert.equal(active.id, edited.id);
-    assert.ok(await page.$('[data-fasting-backfill]'));
+    assert.ok(await page.$('#health-fab:not([hidden])'));
     assert.equal(await page.$('[data-fasting-from]'), null, 'ohne abgeschlossenes Fasten kein Filter');
-    await page.click('[data-fasting-backfill]');
+    await page.click('#health-fab:not([hidden])');
     await page.waitForSelector('#fast-start'); await settle(page);
     await fill(page, '#fast-start', '2025-01-01T06:00:00');
     await fill(page, '#fast-end', '2025-01-01T08:00:00');
@@ -296,7 +296,7 @@ test('completed-entry default uses server time while the phone clock stays ahead
       await harness.reset();
       const page = await openPage(harness, { locale: 'cs' });
       await gotoRoute(page, '/health/fasting');
-      await page.waitForSelector('[data-fasting-backfill]');
+      await page.waitForSelector('#health-fab:not([hidden])');
       await call(page, 'post', '/health/fasting/acknowledge-safety', {});
       await page.evaluate((offset) => {
         const RealDate = Date;
@@ -306,7 +306,7 @@ test('completed-entry default uses server time while the phone clock stays ahead
           static now() { return RealDate.now() + offset; }
         };
       }, offsetMinutes * 60 * 1000);
-      await page.click('[data-fasting-backfill]');
+      await page.click('#health-fab:not([hidden])');
       await page.waitForSelector('[data-fasting-edit-form]');
       await page.$eval('[data-fasting-edit-form]', (form) => form.requestSubmit());
       await settle(page);

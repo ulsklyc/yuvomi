@@ -1578,14 +1578,14 @@ function emptyShiftTypesState() {
     icon: 'calendar-clock',
     title: t('schedule.emptyShiftTypesTitle'),
     description: t('schedule.emptyShiftTypesDescription'),
-    // EIN PRIMAERKNOPF JE TAB (Re-Critique 2026-09-27, A2 P2): das ist der FAB
-    // mit seinem Nomen. Die Vorlagen und der Leerzustand-Weg sind Angebote
-    // daneben und tragen den Sekundaerton - vorher standen hier drei violette
-    // Knoepfe gleichzeitig (Kopf-FAB, "Arbeit", "Feld anlegen").
-    actions: readOnly() ? [] : [
-      ...visibleQuickstartTemplates().map(([key, labelKey]) => ({ label: t(labelKey), icon: 'sparkles', tone: 'secondary', attrs: { 'data-action': 'quick-start-shifts', 'data-template': key } })),
-      { label: t('schedule.createShiftType'), icon: 'plus', attrs: { 'data-action': 'open-create', 'data-view': 'shifts' } },
-    ],
+    // DER FAB IST DER EINE ANLEGE-WEG (Critique 2026-10-16, D5): „+ Schichtart"
+    // steht auf diesem Reiter immer da. Hier stand er ein zweites Mal als
+    // vierte gleichrangige Pille neben den drei Vorlagen; die Vorlagen bleiben
+    // als kleine Sekundaerknoepfe - ein Angebot neben dem Weg, kein zweiter.
+    actions: readOnly() ? [] : visibleQuickstartTemplates().map(([key, labelKey]) => ({
+      label: t(labelKey), icon: 'sparkles', tone: 'secondary', className: 'btn--sm',
+      attrs: { 'data-action': 'quick-start-shifts', 'data-template': key },
+    })),
   });
 }
 
@@ -1905,7 +1905,9 @@ function renderOverview() {
   // derselbe wie auf "Schichtarten" (Vorlagen + "Schichtart hinzufuegen") bzw.
   // wie auf "Planung" ("Schichtplan hinzufuegen"). Nach dem Speichern steht
   // man weiter hier (reloadAfterWrite()) und sieht den naechsten Schritt.
-  if (planningNeedsShiftTypes()) return `<section class="schedule-overview schedule-overview--start">${emptyShiftTypesState()}</section>`;
+  // Der Vergleich ist eine Leseansicht ohne FAB: ohne Schichtart fuehrt EIN
+  // Weg dorthin, wo sie entsteht - derselbe Leerzustand wie in der Planung.
+  if (planningNeedsShiftTypes()) return `<section class="schedule-overview schedule-overview--start">${emptyPlanningNeedsTypesState()}</section>`;
   if (!state.patterns.length && !state.overrides.length && !state.extras.length && !overview.loading && !overview.error && !overview.entries.length) {
     return `<section class="schedule-overview schedule-overview--start">${emptyPatternState()}</section>`;
   }
@@ -3363,7 +3365,13 @@ export async function render(container, { user } = {}) {
     // allerersten Laden entschieden (initialViewDecided), niemals danach - ein
     // spaeterer Besuch soll die eigene Tab-Wahl der Person nicht
     // ueberschreiben (siehe Kommentar an `activeView` oben).
-    activeView = 'overview';
+    //
+    // LEER STARTET ER AUF „SCHICHTARTEN" (Critique 2026-10-16, D3/D5): ohne
+    // eine einzige Schichtart und ohne Geplantes landete ein Erstnutzer auf
+    // „Vergleich" - einer Leseansicht ohne FAB, mit vier gleichrangigen
+    // Knoepfen im Leerzustand. Auf „Schichtarten" ist der FAB „+ Schichtart"
+    // der eine Anlege-Weg, die Vorlagen stehen leiser darunter.
+    activeView = planningNeedsShiftTypes() ? 'shifts' : 'overview';
     initialViewDecided = true;
   }
   // `statistics`/`overview`/`activeView` sind Modul-globaler Zustand, der eine

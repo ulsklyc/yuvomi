@@ -305,20 +305,16 @@ const DIALOG_REGISTRY = {
   'public/components/document-attach.js': [{ bars: ['doc-attach-picker__header', 'doc-attach-picker__footer'] }],
   'public/components/datepicker.js': [{ none: true, why: 'Monatsraster ohne Leiste; jeder Tag ist ein Knopf und damit selbst Leiste' }],
   'public/pages/budget.js': [{ bars: ['budget-inline-modal__header', 'budget-inline-modal__footer'] }],
-  'public/pages/calendar.js': [
-    { panel: ['modal-panel__header'] },
-    // R14 (Re-Critique 2026-09-28, A2 P2-7): die Filter am Desktop als natives
-    // Popover am Knopf. Den Inhalt samt Fuss (Aufheben) baut das Filterblatt
-    // vor der Rolle; die Platzierung nimmt jeden sichtbaren Knopf ohnehin dazu.
-    { none: true, why: 'Filter-Popover: Haken und Fuss kommen fertig aus dem Filterblatt, ausgezeichnet wird nichts eigenes' },
-  ],
+  // Das eigene Filter-Popover des Kalenders ist seit D2 (Critique 2026-10-16)
+  // weg: der Kalender oeffnet das geteilte Filterblatt (utils/filter-sheet.js).
+  'public/pages/calendar.js': [{ panel: ['modal-panel__header'] }],
   'public/pages/dashboard.js': [{ bars: ['onboarding-actions'] }],
   'public/pages/documents.js': [{ bars: ['dms-preview__header', 'dms-preview__actions'] }],
   'public/pages/inventory.js': [{ bars: ['inventory-booking-picker__header', 'inventory-booking-picker__nav', 'inventory-booking-picker__role-footer'] }],
   'public/pages/subscriptions.js': [{ bars: ['subscriptions-logo-picker-head', 'subscriptions-logo-search'] }],
   // R17 (E13): das Filter-Popover am Desktop baut das Filterblatt selbst, fuer
-  // jedes Modul, das es am Knopf oeffnet (Aufgaben; der Kalender traegt seins
-  // noch im eigenen Modul). Inhalt und Fuss sind die des Blatts.
+  // jedes Modul, das es am Knopf oeffnet (Aufgaben, Kalender). Inhalt und Fuss
+  // sind die des Blatts.
   'public/utils/filter-sheet.js': [
     { none: true, why: 'Filter-Popover: Haken und Fuss kommen fertig aus dem Filterblatt, ausgezeichnet wird nichts eigenes' },
   ],

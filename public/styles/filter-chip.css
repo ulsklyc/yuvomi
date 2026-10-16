@@ -111,6 +111,30 @@
   }
 }
 
+/* Personen-Scheibe im Chip (utils/filter-sheet.js, filterChipHtml): Farbe
+ * und Initialen der Person vor dem Namen, dieselbe Scheibe wie in den
+ * Schalterzeilen (.toggle-row__swatch), eine Stufe kleiner fuer die Chiphoehe.
+ * Der Chip rueckt an der Scheibenseite naeher an die Kante, damit Scheibe und
+ * Kapselrundung konzentrisch stehen. */
+.filter-chip:has(> .filter-chip__swatch) {
+  padding-inline-start: var(--space-1);
+}
+
+.filter-chip__swatch {
+  inline-size: var(--space-5);
+  block-size: var(--space-5);
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+  background-color: var(--swatch-color);
+  box-shadow: inset 0 0 0 var(--space-px) var(--color-border-strong);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-bold);
+  overflow: hidden;
+}
+
 /* Trefferzahl im Chip: macht vor dem Klick sichtbar, ob sich der Filter lohnt. */
 .filter-chip__count {
   min-width: 1.25em;

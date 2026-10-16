@@ -2197,14 +2197,17 @@ test('every write reloads through reloadAfterWrite(), which also refreshes the c
   assert.ok((schedulePage.match(/await reloadAfterWrite\(\);/g) || []).length >= 6, 'the save, delete and quick-start paths all go through it');
 });
 
-test('R17/E1: the first visit lands on the comparison view, whatever the data (replaces S-07)', () => {
+test('R17/E1 + D3: the first visit lands on the comparison view - an empty household on "Shift types" (Critique 2026-10-16)', () => {
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
   const renderFn = schedulePage.slice(schedulePage.indexOf('export async function render'), schedulePage.indexOf('export async function update'));
   const branchStart = renderFn.indexOf('} else if (!initialViewDecided) {');
   assert.ok(branchStart !== -1, 'the fallback branch must exist for a bare-root visit with no explicit deep link');
   const fallbackBranch = renderFn.slice(branchStart, renderFn.indexOf('initialViewDecided = true;', branchStart) + 30);
-  assert.match(fallbackBranch, /\n\s*activeView = 'overview';\n/);
-  assert.doesNotMatch(fallbackBranch, /state\.types\.length \?/, 'no data-dependent start tab any more: the comparison view carries its own empty state');
+  // An empty household (nothing to compare, nothing planned) starts where the
+  // FAB "+ Shift type" is the one way forward - the comparison view is a
+  // read-only tab without a FAB, and landed a first-time user on four equal
+  // buttons (Critique 2026-10-16, Jordan).
+  assert.match(fallbackBranch, /\n\s*activeView = planningNeedsShiftTypes\(\) \? 'shifts' : 'overview';\n/);
   assert.match(fallbackBranch, /initialViewDecided = true;/);
 
   // The comparison view is the first tab; the tab addresses stay.
@@ -2239,7 +2242,8 @@ test('R17/E1: without anything to compare the start tab leads to the first actio
   try {
     Object.assign(st, { types: [], patterns: [], overrides: [], extras: [] });
     const empty = __test.renderOverview();
-    assert.match(empty, /data-action="open-create"[^>]*data-view="shifts"|data-view="shifts"[^>]*data-action="open-create"/, 'empty household: the button adds a shift type');
+    assert.match(empty, /data-action="go-to-shift-types"/, 'empty household: ONE way, to the tab where the FAB adds a shift type');
+    assert.equal((empty.match(/empty-state__cta/g) || []).length, 1, 'one action instead of four equal pills (D5)');
     assert.doesNotMatch(empty, /schedule-overview__toolbar|data-action="overview-week"/, 'no person picker and no week stepper above nothing');
 
     st.types = [{ id: 1, name: 'Frueh', color: '#0891b2', start_time: '06:00', end_time: '14:00', fields: [] }];
@@ -2673,6 +2677,10 @@ test('ein Primaerknopf je Tab: jeder Schichtplan-Leerzustand bietet seine Wege i
     assert.match(html, /empty-state__cta/, `Vorbedingung: ${name} bietet einen Weg an (der Stub rendert Knoepfe)`);
     assert.doesNotMatch(html, /btn--primary/, `${name}: der Primaerknopf des Tabs ist der FAB, nicht der Leerzustand`);
   }
+  // D5 (Critique 2026-10-16): auf „Schichtarten" legt der FAB an - der
+  // Leerzustand bietet nur die Vorlagen, klein, keinen zweiten Anlege-Knopf.
+  assert.doesNotMatch(states.shiftTypes, /data-action="open-create"/, 'kein zweites „Schichtart hinzufuegen" neben dem FAB');
+  assert.match(states.shiftTypes, /btn--sm[^"]*"[^>]*data-action="quick-start-shifts"|data-action="quick-start-shifts"[^>]*btn--sm/, 'die Vorlagen stehen leiser als der FAB');
 });
 
 test('eigene Felder erscheinen erst, wenn es eine Schichtart gibt', async () => {

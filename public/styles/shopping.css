@@ -284,7 +284,18 @@
  * denselben Weg (Critique 2026-07-30, P1).
  *
  * `display: none`, nicht `height: 0`: ein eingeklapptes Feld darf keinen
- * Tabstop und keine Autocomplete-Fläche hinterlassen. */
+ * Tabstop und keine Autocomplete-Flaeche hinterlassen.
+ *
+ * WARUM DAS FELD OBEN AUFGEHT UND NICHT IM DAUMENBEREICH (geprueft Critique
+ * 2026-10-16, D5): der FAB oeffnet es unter dem Kopf (y~129 bei 390px). Unten
+ * angedockt stuende es nach dem Tipp hinter der Bildschirmtastatur: die
+ * Mittel, ein festes Feld ueber ihr zu halten (`interactive-widget` im
+ * Viewport-Meta, VirtualKeyboard-API mit `keyboard-inset-*`), kennt nur
+ * Chromium - Safari auf dem iPhone verschiebt den sichtbaren Ausschnitt und
+ * laesst `position: fixed; bottom` unter der Tastatur. Dazu klappt die
+ * Vorschlagsliste (#autocomplete-dropdown) nach unten auf. Sobald das Feld
+ * fokussiert ist, IST die Tastatur der Daumenbereich; das Feld steht direkt
+ * ueber der Liste, in die der Artikel faellt. */
 @media (hover: none) {
   .quick-add {
     display: none;
@@ -374,29 +385,17 @@
 .quick-add__input {
   width: 100%;
   padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-sm);
-  /* --color-border-control wie die beiden Nachbarfelder, nicht --glass-border-subtle.
-   * Das Glas-Token ist ein weißes Alpha (35 % hell / 12 % dunkel) und erreichte
-   * auf der opaken Arbeitsfläche 1.03:1 gegen den Grund - die schwächste
-   * Feldkante der ganzen App und als Glas auf einer Arbeitsfläche zusätzlich
-   * gegen die Hausregel „Glas bleibt der Shell" (Critique 2026-07-29). */
-  border: 1px solid var(--color-border-control);
-  background-color: var(--color-field-bg);
-  color: var(--color-text-primary);
+  /* HAUT, ECKE UND FOKUS SIND DIE DER SUCHE (page-search.css, D5 2026-10-16):
+   * gefuellte Kapsel statt Kante auf Feldgrund. Hier bleiben nur Mass und
+   * Polster der Schnellzeile. */
   font-size: var(--text-base);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
   min-height: var(--target-base);
 }
 
-/* DER FOKUS IST DIE EINE STIMME (R18, 2026-10-07): die drei Felder der
- * Schnellzeile zogen ihren Fokus aus dem Kuechenton (Orange) - der einzige
- * Fokusring der App, der nicht violett war. Modultoene gehoeren an Siegel und
- * Daten, nicht an den Zustand eines Bedienelements. */
-.quick-add__input:focus {
-  outline: none;
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) var(--tint-shadow), transparent);
-}
+/* DER FOKUS IST DIE EINE STIMME (R18, 2026-10-07): die Felder der
+ * Schnellzeile zogen ihren Fokus aus dem Kuechenton (Orange). Seit D5 kommt er
+ * mit der Haut aus page-search.css - violett wie jede Suche. */
 
 /* Nur `min-height`, keine `height` (#1372). Die Zeile ist ein Grid mit
  * `align-items: stretch`: Namensfeld und Kategorie wachsen mit ihrem Polster
@@ -411,10 +410,6 @@
   width: 100%;
   min-width: 0;
   padding: var(--space-2);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border-control);
-  background-color: var(--color-field-bg);
-  color: var(--color-text-primary);
   font-size: var(--text-base);
   font-variant-numeric: tabular-nums;
   text-align: center;
@@ -422,22 +417,12 @@
   min-height: var(--target-base);
 }
 
-/* Sichtbarer Fokus-Ring wie beim Namensfeld (Audit F-10): der reine
- * 1.5px-Border-Farbwechsel war als Fokus-Indikator zu schwach. */
-.quick-add__qty:focus {
-  outline: none;
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) var(--tint-shadow), transparent);
-}
 
 .quick-add__cat {
   width: 100%;
   min-width: 0;
   max-width: none;
   padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border-control);
-  background-color: var(--color-field-bg);
   color: var(--color-text-secondary);
   font-size: var(--text-base);
   /* Eine eigene, laengere Kategorie endet sichtbar vor dem Chevron statt
@@ -459,11 +444,6 @@
   background-position: left var(--space-3) center;
 }
 
-.quick-add__cat:focus {
-  outline: none;
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) var(--tint-shadow), transparent);
-}
 
 @media (min-width: 1024px) {
   .quick-add__form {

@@ -1286,13 +1286,11 @@ ${/* KEIN PAPIERKORB AUF DER KARTE (Entscheidung 2026-10-07, benannte
     <div class="meal-slot meal-slot--has-meal" data-date="${date}" data-type="${type.key}" style="${gridPos}">
       <div class="meal-slot__type-label"><span class="meal-slot__type-text">${type.label}</span></div>
       ${cardsHTML}
-      ${ro ? '' : `<button
-        class="meal-slot__add-more-btn"
-        data-action="add-meal"
-        data-date="${date}"
-        data-type="${type.key}"
-        aria-label="${esc(t('meals.addMealTypeOnDay', { type: type.label, day: dayLongName(date) }))}"
-      ><i data-lucide="plus" class="icon-sm" aria-hidden="true"></i></button>`}
+      ${/* DAS PLUS STEHT NUR IN LEEREN ZELLEN (Critique 2026-10-16, D5). Unter
+            jeder belegten Zelle lag eine gestrichelte „+"-Leiste: am Desktop
+            28 Plus in einer Woche, eins je Zelle, belegt oder nicht. Eine
+            zweite Mahlzeit in denselben Platz legt der FAB - sein Dialog
+            fragt Tag und Mahlzeit. */ ''}
     </div>
   `;
 }

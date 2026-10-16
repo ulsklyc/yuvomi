@@ -1305,28 +1305,14 @@ test('Zeitraum-Wisch: das Budget blaettert seine Monats-Reiter wie der Kalender,
   assert.doesNotMatch(css('calendar.css').replace(/\/\*[\s\S]*?\*\//g, ''), /period-swipe-in/, 'keine zweite Fassung im Modul-Blatt');
 });
 
-test('Kalender: das Filter-Popover hat Ein- und Ausgang wie das Popover-Menue', () => {
-  const base = ruleBodies('calendar.css', '.cal-filters-popover').join(';');
-  assert.match(base, /opacity:\s*0/);
-  assert.match(base, /transform:\s*scale\(0\.96\)/);
-  assert.match(base, /overlay var\(--duration-xs\) allow-discrete,\s*display var\(--duration-xs\) allow-discrete/, 'der Ausgang haelt es im Top-Layer');
-  // Rueckfall: die erste transition-Deklaration kommt ohne allow-discrete aus.
-  const transitions = [...base.matchAll(/transition:\s*([^;]+)/g)].map((m) => m[1]);
-  assert.equal(transitions.length, 2);
-  assert.doesNotMatch(transitions[0], /allow-discrete/);
-  const open = ruleBodies('calendar.css', '.cal-filters-popover:popover-open').join(';');
-  assert.match(open, /opacity:\s*1/);
-  assert.match(open, /transform:\s*none/);
-  assert.match(open, /opacity var\(--duration-md\) var\(--ease-out\)/, 'die Einfahrt ist laenger als der Ausgang');
-  assert.match(css('calendar.css'), /@starting-style \{\s*\.cal-filters-popover:popover-open \{\s*opacity: 0;\s*transform: scale\(0\.96\);/);
-  // Der Ursprung kommt mit der Position aus JS (keine physische Seite im Blatt, RTL-Guard in test:calendar).
-  assert.doesNotMatch(base, /transform-origin/);
-  assert.match(pageSource('calendar'), /pop\.style\.transformOrigin = `\$\{Math\.round\(Math\.min\(Math\.max\(0, rect\.right - left\), width\)\)\}px 0`;/);
-  // Ein sofortiges remove() im toggle schnitt den Ausgang ab.
+test('Kalender: das Filter-Popover ist das geteilte - Ein- und Ausgang aus layout.css (D2)', () => {
+  // Bis zum EINEN Filterblatt-Baustein (Critique 2026-10-16) trug der Kalender
+  // eine Kopie (`.cal-filters-popover`, eigene Ein-/Ausgangs-Regeln). Die
+  // Bewegung des geteilten `.filter-popover` haelt test:mobile-chrome.
+  assert.equal(ruleBodies('calendar.css', '.cal-filters-popover').length, 0, 'keine zweite Popover-Bewegung im Modul-Blatt');
   const cal = pageSource('calendar');
-  const toggle = cal.slice(cal.indexOf("pop.addEventListener('toggle'"), cal.indexOf('pop.showPopover();'));
-  assert.doesNotMatch(toggle.replace(/\/\/.*$/gm, ''), /^\s*pop\.remove\(\);/m, 'das Popover geht erst nach dem Ausgang aus dem Baum');
-  assert.match(toggle, /setTimeout\(\(\) => pop\.remove\(\), durationToken\('--duration-xs', 120\) \+ 40\);/);
+  assert.doesNotMatch(cal, /pop\.showPopover\(\)/, 'kein eigenes Popover im Kalender');
+  assert.match(cal, /openFilterSheet\(\{[\s\S]{0,200}anchor: \(\) => _container\?\.querySelector\('#cal-filters'\)/, 'der Kalender verankert das geteilte Popover am Knopf');
 });
 
 test('Erststart: die Karte steht, der Schritt wechselt ueber swapContent mit fester Hoehe', () => {

@@ -31,6 +31,7 @@ import { esc } from '/utils/html.js';
 import { t } from '/i18n.js';
 import { openModal, closeModal } from '/components/modal.js';
 import { durationToken } from '/utils/ux.js';
+import { getReadableTextColor } from '/utils/color.js';
 
 /**
  * @typedef {object} FilterLabels
@@ -38,7 +39,7 @@ import { durationToken } from '/utils/ux.js';
  * @property {string} open    Zugaenglicher Name ohne aktive Filter, z.B. t('common.filtersOpen').
  * @property {(count: number) => string} active  Zugaenglicher Name mit Zaehler,
  *   z.B. `(n) => t('common.filtersActive', { count: n })`.
- * @property {string} [reset] „Alle Filter aufheben".
+ * @property {string} [reset] „Filter zuruecksetzen" - EIN Text fuer jedes Blatt.
  */
 
 /**
@@ -52,7 +53,7 @@ export function defaultFilterLabels() {
     title: t('common.filters'),
     open: t('common.filtersOpen'),
     active: (count) => t('common.filtersActive', { count }),
-    reset: t('common.filtersReset'),
+    reset: t('common.filtersResetDefault'),
   };
 }
 
@@ -115,9 +116,62 @@ export function syncFilterButton(button, count, labels = defaultFilterLabels()) 
   }
 }
 
+// --------------------------------------------------------
+// DER EINE FILTERBLATT-BAUSTEIN (Critique 2026-10-16, D2)
+//
+// Aufgaben und Kalender hatten zwei Blaetter fuer dieselbe Frage: Chips hier,
+// Haken dort, „Mir zugewiesen" einmal oben unter „Anzeigen", einmal mitten in
+// den Personen, und zwei Texte fuer das Zuruecksetzen. Die Regel jetzt:
+// - Personen und Kategorien (Werte einer Achse, Mehrfachauswahl) sind CHIPS
+//   (`filterChipsHtml`); ein leeres Set heisst „alle", kein Chip ist an.
+// - Ebenen, Quellen und Ansichtsoptionen (an/aus, sofort wirksam) sind
+//   SCHALTER (`toggleRowHtml({ control: 'switch' })`).
+// - „Mir zugewiesen" ist der erste Schalter der Personengruppe, darunter die
+//   Personen-Chips.
+// - EIN Reset-Text: `common.filtersResetDefault`, der Standard dieses Blatts.
+//   Jedes Blatt stellt damit seine Vorgabe her, kein „alles aus".
+// --------------------------------------------------------
+
 /**
- * Das Blatt: benannte Gruppen, darunter in der Fusszeile „Alle Filter
- * aufheben". Ein ANSICHTSBLATT, kein Formular - jeder Schalter wirkt beim
+ * Ein Filter-Chip: Button mit `aria-pressed`, Achse und Wert am Knoten.
+ *
+ * Eine Person traegt ihre Scheibe (Farbe + Initialen) VOR dem Namen - die
+ * Vollton-Regel fuer freie Nutzerfarben (DESIGN.md): die Farbe steht als
+ * Scheibe neben dem Text, nie als Flaeche darunter; die Tinte darin wird
+ * gerechnet wie in `toggleRowHtml()`.
+ *
+ * @param {{filter: string, value: string|number, label: string, active: boolean,
+ *          swatchColor?: string|null, swatchLabel?: string}} chip
+ * @returns {string}
+ */
+export function filterChipHtml({ filter, value, label, active, swatchColor = null, swatchLabel = '' }) {
+  const swatch = swatchColor
+    ? `<span class="filter-chip__swatch" aria-hidden="true"`
+      + ` style="--swatch-color:${esc(String(swatchColor))};color:${getReadableTextColor(String(swatchColor))}">`
+      + `${esc(String(swatchLabel ?? ''))}</span>`
+    : '';
+  return `<button type="button" class="filter-chip filter-chip--sm${active ? ' filter-chip--active' : ''}"
+    data-filter="${esc(filter)}" data-value="${esc(String(value))}" aria-pressed="${active}">${swatch}<span>${esc(label)}</span></button>`;
+}
+
+/**
+ * Die Chipzeile EINER Achse als benannte Gruppe.
+ *
+ * @param {string} filter  Achse (`data-filter`), z.B. 'assigned_to'.
+ * @param {string} label   Zugaenglicher Gruppenname.
+ * @param {Array<{value: string|number, label: string, active: boolean}>} items
+ * @returns {string}
+ */
+export function filterChipsHtml(filter, label, items) {
+  return `
+    <div class="filter-panel__chips" role="group" aria-label="${esc(label)}">
+      ${items.map((item) => filterChipHtml({ filter, ...item })).join('')}
+    </div>`;
+}
+
+/**
+ * Das Blatt: benannte Gruppen, darunter in der Fusszeile „Filter
+ * zuruecksetzen". Ein ANSICHTSBLATT, kein Formular - jeder Schalter wirkt beim
  * Umlegen sofort (`onChange`), deshalb ohne Speichern-Knopf und ohne
  * „Aenderungen verwerfen?"-Waechter (Begruendung an openCalendarFilters).
  *
@@ -128,7 +182,7 @@ export function syncFilterButton(button, count, labels = defaultFilterLabels()) 
  * @param {object} opts
  * @param {string} [opts.title=t('common.filters')]
  * @param {Array<{heading: string, html: string}>} opts.groups
- * @param {string|null} [opts.resetLabel=t('common.filtersReset')]  `null`
+ * @param {string|null} [opts.resetLabel=t('common.filtersResetDefault')]  `null`
  *        laesst die Fusszeile weg.
  * @param {(target: HTMLElement, panel: HTMLElement) => void} [opts.onChange]
  *        `change`-Ereignis aus dem Blatt (Checkbox, Radio, Select).
@@ -143,7 +197,7 @@ export function syncFilterButton(button, count, labels = defaultFilterLabels()) 
  *        `click`-Ereignisse, `isConnected` solange es offen ist.
  */
 export function openFilterSheet({
-  title = t('common.filters'), groups = [], resetLabel = t('common.filtersReset'), onChange, onReset, anchor = null,
+  title = t('common.filters'), groups = [], resetLabel = t('common.filtersResetDefault'), onChange, onReset, anchor = null,
 }) {
   // ZWEI ANGABEN JE GRUPPE (Critique 2026-10-05, R16):
   // - `fold: 'closed' | 'open'` macht die Gruppe zum Aufklapper (<details>),
@@ -244,7 +298,7 @@ export function filtersAsPopover() {
  */
 export function dismissFilterPopovers() {
   releaseResize();
-  for (const id of [FILTER_POPOVER_ID, 'cal-filters-popover']) {
+  for (const id of [FILTER_POPOVER_ID]) {
     document.getElementById(id)?.remove();
   }
 }

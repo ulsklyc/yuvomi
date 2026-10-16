@@ -3796,7 +3796,9 @@ test('renderCycleShell() reicht beide Antworten getrennt weiter', () => {
   assert.match(fn, /cycleHistoryMarkup\(darf\)/);
   assert.match(fn, /cycleFooterMarkup\(darf\)/);
   assert.match(fn, /cyclePregnancyMarkup\(prediction, darf\)/);
-  assert.match(fn, /action: darf/, 'auch der Leerzustands-CTA');
+  // Der Leerzustand traegt seit D5 (Critique 2026-10-16) keinen CTA mehr - der
+  // FAB legt an, und der haengt an cycleCanEdit() (updateHealthFab).
+  assert.doesNotMatch(fn, /data-action': 'cycle-first'/, 'kein zweiter Anlege-Weg im Leerzustand');
   assert.ok(!/cycleHistoryMarkup\(own\)|cycleFooterMarkup\(own\)|cycleTodayActionsMarkup\(own\)/.test(fn),
     'kein Rest, der noch die alte Frage stellt');
 });

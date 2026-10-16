@@ -542,6 +542,13 @@ function updateHealthFab(activeRoute) {
       setPageFabAction(_fab, { hidden: !canEditFor(activity.personId, activity.meId), label: t('health.activity.add'), dockLabel: t('newLabel.healthActivity'), onClick: () => openActivityModal(null) }); break;
     case '/health/nutrition':
       setPageFabAction(_fab, { hidden: !canEditFor(nutrition.personId, nutrition.meId), label: t('health.nutrition.add'), dockLabel: t('newLabel.healthNutrition'), onClick: () => openNutritionModal(null) }); break;
+    case '/health/fasting':
+      // EIN WEG JE BEREICH (Critique 2026-10-16, D5): ein abgeschlossenes
+      // Fasten trug man ueber einen Knopf im Leerzustand ODER im Kopf des
+      // Verlaufs nach, ohne FAB. Jetzt ist es der FAB wie in jedem Bereich
+      // (am Desktop die Pille „+ Fasten"). Der Timer bleibt, was er ist: ein
+      // Bedienelement des laufenden Fastens, kein Anlege-Weg.
+      setPageFabAction(_fab, { hidden: !_fastingCreate, label: t('health.fasting.backfill'), dockLabel: t('health.fasting.title'), onClick: () => _fastingCreate?.() }); break;
     default:
       // Das Nomen bleibt stehen: der Router dockt den Knopf am Desktop nur beim
       // Seitenaufbau an und nur mit `data-dock-label`. Wer auf der Uebersicht
@@ -5290,13 +5297,14 @@ function renderPreventionShell() {
     ${preventionDueSectionMarkup()}
     ${groups.length
       ? `<div class="health-prevention__records">${groups.map((rows) => preventionGroupMarkup(rows, own)).join('')}</div>`
-      // EIN LEERZUSTAND MIT WEG (R14 P4, A6 P2-7): vorher „Noch keine
-      // Eintraege." als Zeile, ohne Weg und ohne zu sagen, was hier erscheint.
+      // EIN LEERZUSTAND, DER SAGT, WAS HIER ERSCHEINT (R14 P4, A6 P2-7) -
+      // OHNE ZWEITEN ANLEGE-KNOPF (Critique 2026-10-16, D5): der FAB
+      // „+ Vorsorge" ist der eine Weg, hier stand er ein zweites Mal als
+      // Primaerknopf direkt daneben.
       : emptyStateHTML({
         icon: 'syringe',
         title: t('health.prevention.emptyTitle'),
         description: t('health.prevention.emptyDesc'),
-        action: own && !readOnly() ? { label: t('health.prevention.add'), icon: 'plus', attrs: { id: 'health-prevention-empty-add' } } : null,
       })}
   `);
   if (window.lucide) window.lucide.createIcons({ el: prevention.root });
@@ -5382,7 +5390,6 @@ function wirePrevention() {
   // Der Riegel vor der einen schreibenden Verdrahtung dieses Tabs (#1265).
   if (readOnly()) return;
 
-  prevention.root.querySelector('#health-prevention-empty-add')?.addEventListener('click', () => openPreventionModal(null));
   prevention.root.querySelectorAll('[data-prevention-edit]').forEach((btn) =>
     btn.addEventListener('click', () => {
       const id = Number(btn.dataset.preventionEdit);
@@ -5752,12 +5759,12 @@ function renderNutritionShell() {
     ${entries.length
       ? `<h3 class="health-nutrition__entries-title u-section-title">${esc(t('health.nutrition.entriesTitle'))}</h3>
       <ul class="health-nutrition-row-list">${entries.map((row) => nutritionRowMarkup(row, own)).join('')}</ul>`
-      // EIN LEERZUSTAND MIT WEG (R14 P4, A6 P2-7) statt Titel plus Hinweiszeile.
+      // EIN LEERZUSTAND (R14 P4, A6 P2-7) statt Titel plus Hinweiszeile -
+      // ohne zweiten Anlege-Knopf neben dem FAB „+ Mahlzeit" (D5, 2026-10-16).
       : emptyStateHTML({
         icon: 'salad',
         title: t('health.nutrition.emptyTitle'),
         description: t('health.nutrition.emptyDesc'),
-        action: own && !readOnly() ? { label: t('health.nutrition.add'), icon: 'plus', attrs: { id: 'health-nutrition-empty-add' } } : null,
       })}
   `);
   if (window.lucide) window.lucide.createIcons({ el: nutrition.root });
@@ -5880,7 +5887,6 @@ function wireNutrition() {
   if (readOnly()) return;
 
   nutrition.root.querySelector('[data-nutrition-target]')?.addEventListener('click', () => openNutritionTargetModal());
-  nutrition.root.querySelector('#health-nutrition-empty-add')?.addEventListener('click', () => openNutritionModal(null));
 
   nutrition.root.querySelectorAll('[data-nutrition-edit]').forEach((btn) =>
     btn.addEventListener('click', () => {
@@ -6886,12 +6892,19 @@ function maybeMountCycle(activeRoute) {
   mountCycle();
 }
 
+// Der Nachtrag des Fastens, wie ihn das Fasten-Modul freigibt (nur in der
+// eigenen Ansicht mit Schreibrecht) - `null` heisst: kein FAB.
+let _fastingCreate = null;
+
 function maybeMountFasting(activeRoute) {
   if (activeRoute !== '/health/fasting' || !fastingEnabled) return;
   const root = _container?.querySelector('[data-fasting-root]');
   if (!root) return;
   root.dataset.fastingMounted = 'true';
-  import('/pages/health-fasting.js').then(({ mountFasting }) => mountFasting(root, { userId: vitals.meId })).catch((error) => {
+  import('/pages/health-fasting.js').then(({ mountFasting }) => mountFasting(root, {
+    userId: vitals.meId,
+    onCreateAction: (fn) => { _fastingCreate = fn; refreshHealthFab(); },
+  })).catch((error) => {
     // Die Ueberschrift ist der Satz. `error.message` ist der Text des Browsers
     // oder des Servers, unuebersetzt (#1909) - er gehoert in die Konsole.
     console.error('[Health] fasting mount error:', error);
@@ -7060,11 +7073,8 @@ function renderCycleShell() {
     icon: 'droplet',
     title: t('health.cycle.emptyTitle'),
     description: t('health.cycle.emptyDesc'),
-    // Ohne eigenen Zyklus - und ohne Schreibrecht auf das Modul - gibt es hier
-    // nichts einzutragen: der CTA entfaellt, die Aussage bleibt.
-    action: darf
-      ? { label: t('health.cycle.emptyCta'), icon: 'plus', attrs: { 'data-action': 'cycle-first' } }
-      : undefined,
+    // KEIN ZWEITER ANLEGE-KNOPF (Critique 2026-10-16, D5): „Erste Periode
+    // erfassen" oeffnete denselben Dialog wie der FAB „+ Periode" daneben.
   })}`);
     if (window.lucide) window.lucide.createIcons({ el: cycle.root });
     wireCycle();
@@ -8679,7 +8689,6 @@ function wireCycle() {
       if (p) openPeriodModal(p);
     }));
 
-  cycle.root.querySelector('[data-action="cycle-first"]')?.addEventListener('click', () => openPeriodModal(null));
   cycle.root.querySelector('[data-action="cycle-start-period"]')?.addEventListener('click', () => cycleStartPeriodToday());
   cycle.root.querySelector('[data-action="cycle-end-period"]')?.addEventListener('click', () => cycleEndPeriodToday());
   cycle.root.querySelector('[data-action="cycle-log-today"]')?.addEventListener('click', () => openDayLogModal(todayKey()));

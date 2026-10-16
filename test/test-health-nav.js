@@ -631,7 +631,7 @@ test('R14 P3: vor den hochgezogenen Karten steht eine Ueberschrift eine Ebene da
 // R14 P4 (A6 P2-7): „Noch keine Eintraege." zentriert oben, ohne Weg - in der
 // 676px-Detailspalte 21 % genutzt. Jetzt der geteilte Leerzustand mit Titel,
 // Satz und dem Anlege-Weg (nur mit Schreibrecht).
-test('R14 P4: Vorsorge und Naehrwerte leer = EIN Leerzustand mit Aktion statt einer Hinweiszeile', () => {
+test('R14 P4 + D5: Vorsorge, Naehrwerte und Zyklus leer = EIN Leerzustand, der FAB ist der eine Anlege-Weg', () => {
   const fnBody = (name) => {
     const start = HEALTH_JS.indexOf(`function ${name}(`);
     assert.ok(start >= 0, `${name} fehlt`);
@@ -639,13 +639,24 @@ test('R14 P4: Vorsorge und Naehrwerte leer = EIN Leerzustand mit Aktion statt ei
   };
   const prev = fnBody('renderPreventionShell');
   assert.doesNotMatch(prev, /emptyHintHTML\(t\('health\.prevention\.noRecords'\)\)/, 'Vorsorge: keine nackte Hinweiszeile mehr');
-  assert.match(prev, /emptyStateHTML\(\{[\s\S]*?title: t\('health\.prevention\.emptyTitle'\)[\s\S]*?id: 'health-prevention-empty-add'/,
-    'Vorsorge: Leerzustand mit Titel und Anlege-Knopf');
-  assert.match(fnBody('wirePrevention'), /#health-prevention-empty-add'\)\?\.addEventListener\('click', \(\) => openPreventionModal\(null\)\)/);
+  assert.match(prev, /emptyStateHTML\(\{[\s\S]*?title: t\('health\.prevention\.emptyTitle'\)/, 'Vorsorge: Leerzustand mit Titel');
+  // D5 (Critique 2026-10-16): der Leerzustand stand mit einem violetten
+  // „Eintrag hinzufuegen" direkt neben dem FAB, der dasselbe oeffnet.
+  assert.doesNotMatch(HEALTH_JS, /health-prevention-empty-add|health-nutrition-empty-add|data-action': 'cycle-first'/,
+    'kein zweiter Anlege-Knopf neben dem FAB');
+  const fab = fnBody('updateHealthFab');
+  for (const [route, opener] of [['prevention', 'openPreventionModal'], ['nutrition', 'openNutritionModal'], ['cycle', 'openPeriodModal']]) {
+    const at = fab.indexOf(`case '/health/${route}':`);
+    assert.ok(at >= 0 && fab.slice(at, fab.indexOf('break;', at)).includes(`${opener}(null)`), `${route}: der FAB legt an`);
+  }
+  assert.match(fab, /case '\/health\/fasting':[\s\S]*?hidden: !_fastingCreate[\s\S]*?dockLabel: t\('health\.fasting\.title'\)/,
+    'Fasten: der Nachtrag ist der FAB (am Desktop „+ Fasten"), nur wo er erlaubt ist');
+  const fasting = readFileSync(new URL('../public/pages/health-fasting.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(fasting, /data-fasting-backfill/, 'Fasten: kein Nachtragen-Knopf mehr in Leerzustand und Verlaufskopf');
+  assert.match(fasting, /view\.onCreateAction\?\.\(\(\) => void creator\(true\)\);/, 'Fasten: gibt seinen Nachtrag an den FAB');
   const nut = fnBody('renderNutritionShell');
   assert.doesNotMatch(nut, /emptyHintHTML\(t\('health\.nutrition\.noEntries'\)\)/, 'Naehrwerte: keine nackte Hinweiszeile mehr');
-  assert.match(nut, /emptyStateHTML\(\{[\s\S]*?title: t\('health\.nutrition\.emptyTitle'\)[\s\S]*?id: 'health-nutrition-empty-add'/);
-  assert.match(fnBody('wireNutrition'), /#health-nutrition-empty-add'\)\?\.addEventListener\('click', \(\) => openNutritionModal\(null\)\)/);
+  assert.match(nut, /emptyStateHTML\(\{[\s\S]*?title: t\('health\.nutrition\.emptyTitle'\)/);
 });
 
 // R14 P8 (A6 P2-5): die Vorsorge trug zwei native Datumsfelder, direkt neben

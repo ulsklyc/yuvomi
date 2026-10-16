@@ -239,7 +239,9 @@ test('Essensplan bei `read`: die Karte oeffnet die Leseansicht und traegt keine 
   // `delete-meal` stand hier bis R18 (2026-10-07): die Karte traegt keinen
   // Papierkorb mehr, Loeschen lebt im Dialog (deleteMeal, unten geprueft).
   assert.doesNotMatch(voll, /delete-meal/, 'die Karte traegt auch mit Schreibrecht keinen Papierkorb');
-  for (const erwartet of ['edit-meal', 'transfer-meal', 'add-meal']) {
+  // `add-meal` steht seit D5 (Critique 2026-10-16) nur noch in LEEREN Zellen -
+  // dort prueft ihn „ein leerer Platz ist nur Zustand" unten im Gegenfall.
+  for (const erwartet of ['edit-meal', 'transfer-meal']) {
     assert.match(voll, new RegExp(`data-action="${erwartet}"`), `Gegenfall: ${erwartet} steht mit Schreibrecht da`);
   }
   assert.match(voll, /meal-card__drag/, 'Gegenfall: der Ziehgriff');

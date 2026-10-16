@@ -6487,9 +6487,12 @@ test('Tasks and Notes expose every click target as a real control', () => {
 
   // Filter-Chips waren <span> ohne Tastaturzugang, während Dokumente und
   // Kontakte dieselbe .filter-chip-Klasse als <button aria-pressed> rendern.
-  // Seit der Kopfregel mobil stehen sie im Filterblatt - als Buttons.
-  assert.match(tasksPage, /function filterChipHtml\(/);
-  assert.match(tasksPage, /return `<button type="button" class="filter-chip[\s\S]{0,160}aria-pressed="\$\{active\}"/);
+  // Seit der Kopfregel mobil stehen sie im Filterblatt - als Buttons, seit
+  // D2 (2026-10-16) aus dem geteilten Baustein, den auch der Kalender nutzt.
+  const filterSheet = read('../public/utils/filter-sheet.js');
+  assert.match(tasksPage, /filterChipsHtml\(/);
+  assert.match(filterSheet, /export function filterChipHtml\(/);
+  assert.match(filterSheet, /return `<button type="button" class="filter-chip[\s\S]{0,160}aria-pressed="\$\{active\}"/);
   assert.doesNotMatch(tasksPage, /<span[^>]*class="filter-chip/);
 
   // Titel öffnet die Aufgabe, Fortschrittsbalken klappt die Unteraufgaben auf,
@@ -10005,7 +10008,9 @@ test('mobile meal actions remain visible and touch-safe after the full cascade',
   );
   assert.match(
     meals,
-    /@media \(hover:\s*none\),\s*\(max-width:\s*639px\)[\s\S]*?\.week-nav__today,[\s\S]*?\.meal-slot__add-more-btn\s*\{[\s\S]*?min-height:\s*var\(--target-lg\)/,
+    // Seit D5 (2026-10-16) gibt es unter belegten Zellen kein Plus mehr -
+    // der Heute-Knopf behaelt seine Touch-Hoehe allein.
+    /@media \(hover:\s*none\),\s*\(max-width:\s*639px\)[\s\S]*?\.week-nav__today\s*\{[\s\S]*?min-height:\s*var\(--target-lg\)/,
   );
   assert.match(
     meals,
@@ -21806,4 +21811,53 @@ test('D3: die Reiter der Haushaltshilfe sind Text-Reiter ohne Icon', () => {
   const tab = functionBody(page, 'renderTabButton');
   assert.ok(tab, 'renderTabButton fehlt');
   assert.doesNotMatch(tab, /sub-tab__icon|data-lucide/, 'kein Zeichen vor dem Reiter-Wort');
+});
+
+// D3 (Critique 2026-10-16): bis zu sieben Bereiche sind Text-Reiter OHNE Icon.
+// Die Belohnungen und die Haushaltshilfe trugen als einzige Module eine Glyphe
+// vor jedem Reiter - dieselbe Leiste wie im Budget und im Schichtplan in einer
+// zweiten Form. (Der Lese-/Bearbeiten-Umschalter im Notizdialog ist keine
+// Unternavigation und bleibt aussen vor.)
+test('D3: die Unternavigation der Module ist Text, keine Icon-Reiter', () => {
+  for (const page of ['budget', 'rewards', 'housekeeping', 'schedule']) {
+    const src = read(`../public/pages/${page}.js`);
+    assert.match(src, /class="[^"]*\bsub-tab\b/, `Vorbedingung: ${page} rendert Reiter`);
+    assert.doesNotMatch(src, /sub-tab__icon/, `${page}: Reiter tragen nur ihr Wort`);
+  }
+});
+
+// D5 (Critique 2026-10-16): Quick-Add im Einkauf ist die benannte Ausnahme vom
+// FAB - und seine Felder tragen die Kapsel-Haut der Suche statt Kante auf
+// Feldgrund. EINE Regel fuer beide, keine zweite Fassung in shopping.css.
+test('D5: die Schnellzeile des Einkaufs traegt die Kapsel+Fill-Haut der Suche', () => {
+  const search = [...eachRule(read('../public/styles/page-search.css'))].filter((r) => !r.at.length);
+  const skin = search.find((r) => r.selector.split(',').map((x) => x.trim()).includes('.page-search__input')
+    && /border-radius:\s*var\(--radius-full\)/.test(r.body));
+  assert.ok(skin && /background-color:\s*var\(--color-fill-field\)/.test(skin.body), 'Vorbedingung: die Suchhaut steht in page-search.css');
+  const sel = skin.selector.split(',').map((x) => x.trim());
+  for (const cls of ['.quick-add__input', '.quick-add__qty', '.quick-add__cat']) {
+    assert.ok(sel.includes(cls), `${cls} teilt die Haut der Suche`);
+    const focus = search.find((r) => r.selector.split(',').map((x) => x.trim()).includes(`${cls}:focus`));
+    assert.ok(focus, `${cls}: der Fokus kommt mit der Haut`);
+  }
+  const shopping = [...eachRule(read('../public/styles/shopping.css'))];
+  for (const r of shopping.filter((x) => /\.quick-add__(?:input|qty|cat)\b/.test(x.selector))) {
+    assert.doesNotMatch(r.body, /(?:^|[;\s{])(?:border(?:-radius)?|background-color)\s*:/, `${r.selector}: keine eigene Kante/Ecke/Flaeche mehr`);
+  }
+});
+
+// Critique 2026-10-16 (Jordan): das Mehr-Blatt zeigte 16 Ziele als flaches
+// Raster ohne die Sektionen der Seitenleiste. Jetzt je Sektion eine benannte
+// Gruppe mit ihrem Raster - dieselben Namen (NAV_SECTION_LABEL_KEYS) und
+// dieselbe Schriftrolle wie die Seitenleiste.
+test('Mehr-Blatt: die Module stehen in den Sektionen der Seitenleiste', () => {
+  const router = read('../public/router.js');
+  const body = router.slice(router.indexOf('function buildMoreSheetBody()'), router.indexOf('\n}\n', router.indexOf('function buildMoreSheetBody()')));
+  assert.match(body, /nodes\.push\(\.\.\.moreSheetSections\(modules\)\);/, 'das Blatt baut seine Module ueber die Sektionen');
+  const fn = router.slice(router.indexOf('function moreSheetSections('), router.indexOf('function buildMoreSheetBody()'));
+  assert.match(fn, /NAV_SECTION_LABEL_KEYS\[section\]/, 'die Namen der Seitenleiste');
+  assert.match(fn, /setAttribute\('role', 'group'\)[\s\S]*?setAttribute\('aria-labelledby', labelId\)/, 'hoerbar gruppiert wie die Seitenleiste');
+  const typo = [...eachRule(read('../public/styles/typography.css'))];
+  const role = typo.find((r) => r.selector.split(',').map((x) => x.trim()).includes('.nav-section-label'));
+  assert.ok(role && role.selector.includes('.more-sheet__section-label'), 'dieselbe Schriftrolle wie die Sektionsnamen der Seitenleiste');
 });

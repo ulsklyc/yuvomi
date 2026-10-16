@@ -1661,10 +1661,13 @@ test('Critique 2026-09-26: die Anlege-Knoepfe nennen ihren Tag, sieben Tage sind
   assert(new Set(empty).size === 7, `sieben Tage, aber ${new Set(empty).size} verschiedene Namen: ${empty.join(' | ')}`);
   const monday = pageEsc(pageT('meals.addMealTypeOnDay', { type: type.label, day: pageT('calendar.dayLongMonday') }));
   assert(empty[0] === monday, `Montag heisst „${empty[0]}", erwartet „${monday}"`);
+  // D5 (Critique 2026-10-16): das Plus steht nur in LEEREN Zellen. Unter einer
+  // belegten lag eine gestrichelte „+"-Leiste - am Desktop 28 Plus je Woche.
+  // Die zweite Mahlzeit in denselben Platz legt der FAB (Dialog mit Tag und Typ).
   const filled = labelsOf(mealsUi.renderSlot('2026-09-27', type,
     [{ id: 3, date: '2026-09-27', meal_type: 'breakfast', title: 'Porridge', ingredients: [] }], 2, 2));
-  assert(filled.length === 1 && filled[0].includes(pageT('calendar.dayLongSunday')),
-    `das Plus unter der Karte nennt seinen Tag nicht: ${filled.join(' | ')}`);
+  assert(filled.length === 0, `eine belegte Zelle traegt wieder ein Plus: ${filled.join(' | ')}`);
+  assert(!/meal-slot__add-more-btn/.test(mealsSource), 'kein Plus-Knopf fuer belegte Zellen mehr im Markup');
   // Der Tagesknopf (mobil) zieht denselben Namen, nur ohne Mahlzeittyp.
   assert(/class="day-add"[^>]*aria-label="\$\{esc\(t\('meals\.addMealOnDay', \{ day: dayLongName\(date\) \}\)\)\}"/.test(mealsSource),
     'der Tagesknopf .day-add muss meals.addMealOnDay mit dem Tagesnamen tragen');
@@ -1673,7 +1676,7 @@ test('Critique 2026-09-26: die Anlege-Knoepfe nennen ihren Tag, sieben Tage sind
 test('Critique 2026-09-26: die Kartenaktionen tragen mobil die Stufe der Zeilenaktionen, nicht 12px', () => {
   const html = mealsUi.renderSlot('2026-09-21', { key: 'dinner', label: 'Abendessen' },
     [{ id: 9, date: '2026-09-21', meal_type: 'dinner', title: 'Suppe', ingredients: [{ id: 1, name: 'Lauch', on_shopping_list: 0 }] }], 2, 2);
-  const actions = html.slice(html.indexOf('class="meal-card__actions"'), html.indexOf('meal-slot__add-more-btn'));
+  const actions = html.slice(html.indexOf('class="meal-card__actions"'));
   // Probe, dass der Test die Karte liest: seit R18 (2026-10-07) traegt sie
   // keinen Papierkorb mehr - das wiederkehrende Zeichen der Leiste ist der
   // Einkaufswagen (die Mahlzeit hier hat Zutaten).
