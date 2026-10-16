@@ -979,3 +979,15 @@ test('R19: die Titelregel - Zeilentitel hoechstens zwei Zeilen, kein Modul weich
   }
   assert.deepStrictEqual(funde, [], 'eigene Titel-Kuerzung in einem Modul');
 });
+
+// R19 (Critique 2026-10-16, "Ziffern: tabular-nums nur im Zeitraster"): im
+// ganzen Kalender stehen gleich breite Ziffern - Monat, Agenda, Zeitraum-Label.
+// Die Wurzel der Seite traegt sie, alles darunter erbt; keine Regel darunter
+// schaltet sie zurueck.
+test('R19: der Kalender setzt Ziffern ueberall gleich breit', () => {
+  const css = readFileSync(new URL('calendar.css', STYLES_DIR), 'utf8');
+  const root = [...eachRule(css)].filter((r) => !r.at.length && r.selector.trim() === '.calendar-page');
+  assert.ok(root.some((r) => /font-variant-numeric:\s*tabular-nums/.test(r.body)), '.calendar-page traegt tabular-nums');
+  const back = [...eachRule(css)].filter((r) => /font-variant-numeric:\s*(?:normal|proportional-nums)/.test(r.body)).map((r) => r.selector.trim());
+  assert.deepStrictEqual(back, [], 'eine Regel im Kalender schaltet die gleich breiten Ziffern zurueck');
+});

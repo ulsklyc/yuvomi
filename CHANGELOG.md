@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Numbers line up everywhere in the calendar.** Day numbers in the month, times and dates in the
+  agenda and the period label use equal-width digits, so columns and the arrows next to the period
+  no longer shift as you page through.
 - **Avatars of several people no longer overlap.** Where a task, event or meal shows who is
   involved, the faces stand side by side with a small gap in reading order, so no initials are cut
   off, and "+N" comes last.

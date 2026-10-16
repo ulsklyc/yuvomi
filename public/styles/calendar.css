@@ -7,7 +7,15 @@
 /* --------------------------------------------------------
  * Modul-Akzent
  * -------------------------------------------------------- */
-.calendar-page { --module-accent: var(--module-calendar); }
+.calendar-page {
+  --module-accent: var(--module-calendar);
+  /* GLEICH BREITE ZIFFERN IM GANZEN KALENDER (R19, Critique 2026-10-16). Sie
+   * standen nur im Zeitraster; im Monat (Tageszahlen), in der Agenda (Zeiten,
+   * Daten) und im Zeitraum-Label sprangen die Spalten mit der Ziffernbreite,
+   * und der Weiter-Pfeil wanderte beim Blaettern. Vererbt an alles darunter -
+   * die einzelnen Regeln weiter unten bleiben als Absicht ihrer Stelle. */
+  font-variant-numeric: tabular-nums;
+}
 
 /* --------------------------------------------------------
  * Offline-Hinweis (Read-only-Offline: letzter Cache-Stand)
