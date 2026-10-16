@@ -67,6 +67,7 @@
         "errorServer": "サーバーエラーが発生しました。後でもう一度お試しください。",
         "errorRestoreInProgress": "現在バックアップを復元しています。変更は保存されませんでした。1分後にもう一度お試しください。",
         "errorTimeout": "接続に時間がかかりすぎました。もう一度お試しください。",
+        "errorRateLimited": "現在リクエストが多すぎます。少し待ってから、もう一度お試しください。",
         "requiredFields": "必須項目をすべて入力してください。",
         "invalidInput": "無効な入力です。",
         "togglePasswordVisibility": "パスワードを表示/非表示",

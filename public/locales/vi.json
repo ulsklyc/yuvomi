@@ -67,6 +67,7 @@
         "errorServer": "Lỗi máy chủ. Vui lòng thử lại sau.",
         "errorRestoreInProgress": "Một bản sao lưu đang được khôi phục. Thay đổi của bạn chưa được lưu, hãy thử lại sau một phút.",
         "errorTimeout": "Kết nối quá lâu. Vui lòng thử lại.",
+        "errorRateLimited": "Hiện có quá nhiều yêu cầu. Vui lòng đợi một lát rồi thử lại.",
         "requiredFields": "Vui lòng điền tất cả các trường bắt buộc.",
         "invalidInput": "Đầu vào không hợp lệ.",
         "togglePasswordVisibility": "Hiện/ẩn mật khẩu",

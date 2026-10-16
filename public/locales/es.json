@@ -67,6 +67,7 @@
         "errorServer": "Error del servidor. Por favor, inténtalo más tarde.",
         "errorRestoreInProgress": "Se está restaurando una copia de seguridad en este momento. Tu cambio no se ha guardado, inténtalo de nuevo en un minuto.",
         "errorTimeout": "La conexión tardó demasiado. Por favor, inténtalo de nuevo.",
+        "errorRateLimited": "Hay demasiadas solicitudes en este momento. Espera un momento y vuelve a intentarlo.",
         "requiredFields": "Completa todos los campos obligatorios.",
         "invalidInput": "Entrada no válida.",
         "togglePasswordVisibility": "Mostrar/ocultar contraseña",

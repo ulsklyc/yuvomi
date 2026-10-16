@@ -67,6 +67,7 @@
         "errorServer": "Serverfout. Probeer het later opnieuw.",
         "errorRestoreInProgress": "Er wordt nu een back-up hersteld. Je wijziging is niet opgeslagen, probeer het over een minuut opnieuw.",
         "errorTimeout": "De verbinding duurde te lang. Probeer het opnieuw.",
+        "errorRateLimited": "Er komen nu te veel verzoeken binnen. Wacht even en probeer het dan opnieuw.",
         "requiredFields": "Vul alle verplichte velden in.",
         "invalidInput": "Ongeldige invoer.",
         "togglePasswordVisibility": "Wachtwoord tonen/verbergen",

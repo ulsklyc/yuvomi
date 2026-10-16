@@ -157,7 +157,7 @@ test('errorSentence: ein bekannter Fall bekommt seinen Satz, an jedem Status', a
 
 test('errorSentence: unbekannter oder fehlender Grund ergibt den allgemeinen Satz, nie den des Servers', async () => {
   const { errorSentence } = await load();
-  for (const status of [400, 404, 409, 422, 429, 500, 502]) {
+  for (const status of [400, 404, 409, 422, 500, 502]) {
     for (const reason of [undefined, 'some_future_reason', '__proto__', 'constructor', 'toString', '', 7, null, {}]) {
       const err = answer(status, SERVER_TEXT, reason);
       assert.equal(errorSentence(err), 'common.errorGeneric', `${status} ${String(reason)}`);
@@ -189,6 +189,25 @@ test('errorSentence: Absage, Offline und Restore sagen dasselbe wie friendlyErro
   }
 });
 
+// 429 HAT EINEN EIGENEN SATZ (Critique 2026-10-16, Schritt 6). Vorher reichte
+// friendlyError den Text der Bremse durch - "Too many requests. Please wait a
+// moment." mitten in der deutschen Oberflaeche -, und errorSentence sagte den
+// allgemeinen Satz, der verschweigt, dass Warten hilft. Ein Grund mit eigenem
+// Satz (etwa install_rate_limited) bleibt bei diesem.
+test('429: friendlyError und errorSentence sagen common.errorRateLimited, nie den Text des Servers', async () => {
+  const { friendlyError, errorSentence, CASE_MESSAGES } = await load();
+  for (const reason of [undefined, 'some_future_reason', '__proto__', 'constructor', '', 7, null, {}]) {
+    const err = answer(429, 'Too many requests. Please wait a moment.', reason);
+    assert.equal(friendlyError(err), 'common.errorRateLimited', String(reason));
+    assert.equal(errorSentence(err), 'common.errorRateLimited', String(reason));
+    assert.equal(errorSentence(err, 'shopping.sendListError'), 'common.errorRateLimited', String(reason));
+  }
+  for (const [reason, key] of CASE_MESSAGES) {
+    if (reason !== 'install_rate_limited' && reason !== 'gravatar_rate_limited') continue;
+    assert.equal(errorSentence(answer(429, SERVER_TEXT, reason)), key, reason);
+  }
+});
+
 // UEBERGANG: #1916 hatte den letzten Rueckfall von friendlyError fuer ALLE
 // Aufrufer auf den allgemeinen Satz verengt - auch fuer die, die noch nicht
 // umgestellt sind (Kontakt-Import, Essensplan, Fehlerbildschirm, unbehandelte
@@ -197,7 +216,7 @@ test('errorSentence: Absage, Offline und Restore sagen dasselbe wie friendlyErro
 // Weg ist errorSentence, friendlyError behaelt den Text des Servers.
 test('friendlyError: ein Status ohne eigenen Satz behaelt den Text des Servers, errorSentence nie', async () => {
   const { friendlyError, errorSentence } = await load();
-  for (const status of [400, 401, 409, 422, 429]) {
+  for (const status of [400, 401, 409, 422]) {
     for (const reason of [undefined, 'some_future_reason', '__proto__']) {
       const err = answer(status, SERVER_TEXT, reason);
       assert.equal(friendlyError(err), SERVER_TEXT, `friendlyError ${status} ${String(reason)}`);

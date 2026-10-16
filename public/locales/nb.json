@@ -67,6 +67,7 @@
         "errorServer": "Serverfeil. Vennligst prøv igjen senere.",
         "errorRestoreInProgress": "En sikkerhetskopi blir gjenopprettet akkurat nå. Endringen din ble ikke lagret, prøv igjen om et minutt.",
         "errorTimeout": "Tilkoblingen tok for lang tid. Vennligst prøv igjen.",
+        "errorRateLimited": "For mange forespørsler akkurat nå. Vent litt, og prøv igjen.",
         "requiredFields": "Vennligst fyll ut alle påkrevde felt.",
         "invalidInput": "Ugyldig inndata.",
         "togglePasswordVisibility": "Veksle passordvisning",

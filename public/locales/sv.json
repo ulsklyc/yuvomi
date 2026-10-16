@@ -67,6 +67,7 @@
         "errorServer": "Serverfel. Försök igen senare.",
         "errorRestoreInProgress": "En säkerhetskopia återställs just nu. Din ändring sparades inte, försök igen om en minut.",
         "errorTimeout": "Anslutningen tog för lång tid. Försök igen.",
+        "errorRateLimited": "För många förfrågningar just nu. Vänta en stund och försök sedan igen.",
         "requiredFields": "Fyll i alla obligatoriska fält.",
         "invalidInput": "Ogiltig inmatning.",
         "togglePasswordVisibility": "Visa/dölj lösenord",

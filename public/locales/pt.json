@@ -67,6 +67,7 @@
         "errorServer": "Erro no servidor. Por favor, tente mais tarde.",
         "errorRestoreInProgress": "Está a ser restaurado um backup neste momento. A sua alteração não foi guardada, tente novamente dentro de um minuto.",
         "errorTimeout": "A ligação demorou demasiado. Por favor, tente novamente.",
+        "errorRateLimited": "Demasiados pedidos neste momento. Aguarde um instante e tente novamente.",
         "requiredFields": "Preencha todos os campos obrigatórios.",
         "invalidInput": "Entrada inválida.",
         "togglePasswordVisibility": "Mostrar/ocultar senha",

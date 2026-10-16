@@ -66,6 +66,7 @@
         "errorNotFound": "O registro não foi encontrado.",
         "errorServer": "Erro no servidor. Por favor, tente mais tarde.",
         "errorTimeout": "A conexão demorou demais. Por favor, tente novamente.",
+        "errorRateLimited": "Muitas solicitações no momento. Aguarde um instante e tente novamente.",
         "requiredFields": "Preencha todos os campos obrigatórios.",
         "invalidInput": "Entrada inválida.",
         "togglePasswordVisibility": "Mostrar/ocultar senha",
