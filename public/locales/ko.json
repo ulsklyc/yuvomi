@@ -3494,7 +3494,7 @@
         "done": "시작하기",
         "skip": "건너뛰기",
         "step2BodyDesktop": "왼쪽 사이드바에서 모든 모듈로 이동할 수 있습니다 - 캘린더와 할 일부터 주방, 문서, 설정까지.",
-        "step3BodyDesktop": "하단의 + 버튼으로 어디서든 새 항목을 만들 수 있습니다.",
+        "step3BodyDesktop": "각 모듈 상단 오른쪽의 + 버튼으로 새 항목을 만들 수 있습니다.",
         "stepProgress": "{{total}}단계 중 {{current}}단계"
     },
     "offline": {

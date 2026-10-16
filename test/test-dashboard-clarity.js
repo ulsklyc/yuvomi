@@ -1307,3 +1307,28 @@ test('R18: die umgestellten Inhaltsklassen der Uebersicht stehen auf der Lese-Le
     assert.match(body, /font-weight:\s*var\(--font-weight-semibold\)/, selector);
   }
 });
+
+// Critique R19: das Onboarding nannte am Desktop einen "+-Knopf unten rechts".
+// Ab der Breite, ab der die Seitenleiste steht, dockt der Router den FAB als
+// Pille in den Modulkopf oben rechts (dockFabIntoToolbar/isDesktopViewport).
+// Die Desktop-Fassung beschreibt diesen Ort, in jeder Sprache, und beide Seiten
+// schalten an derselben Breite.
+test('Onboarding Schritt 3 nennt am Desktop den Knopf oben rechts, nicht unten (Critique R19)', async () => {
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const dashboard = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
+  const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  const steps = dashboard.slice(dashboard.indexOf('function getOnboardingSteps'), dashboard.indexOf('function showOnboarding'));
+  const onboardingBreak = /matchMedia\('\(min-width: (\d+)px\)'\)/.exec(steps)?.[1];
+  const dockBreak = /function isDesktopViewport\(\) \{\s*return window\.matchMedia\('\(min-width: (\d+)px\)'\)/.exec(router)?.[1];
+  assert.ok(onboardingBreak && dockBreak, 'Breakpoints nicht gefunden');
+  assert.equal(onboardingBreak, dockBreak, 'Onboarding und angedockter Knopf schalten an verschiedenen Breiten');
+  const bottom = { de: /unten/, en: /bottom/, fr: /\ben bas\b/, es: /inferior/, nl: /onder/, it: /in basso/ };
+  const top = { de: /oben rechts/, en: /top right/, fr: /en haut/, es: /arriba/, nl: /rechtsboven/, it: /in alto/ };
+  const dir = new URL('../public/locales/', import.meta.url);
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
+    const loc = file.slice(0, -5);
+    const text = JSON.parse(readFileSync(new URL(file, dir), 'utf8')).onboarding.step3BodyDesktop;
+    if (bottom[loc]) assert.doesNotMatch(text, bottom[loc], `${loc}: ${text}`);
+    if (top[loc]) assert.match(text, top[loc], `${loc}: ${text}`);
+  }
+});

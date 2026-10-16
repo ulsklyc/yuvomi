@@ -3455,7 +3455,7 @@
         "done": "Začít",
         "skip": "Přeskočit",
         "step2BodyDesktop": "Postranní panel vlevo tě zavede do všech modulů - od kalendáře a úkolů po kuchyni, dokumenty a nastavení.",
-        "step3BodyDesktop": "Tlačítkem + v dolním rohu vytvoříš nové záznamy kdekoli.",
+        "step3BodyDesktop": "Tlačítkem + vpravo nahoře v záhlaví každého modulu vytvoříš nové záznamy.",
         "stepProgress": "Krok {{current}} z {{total}}"
     },
     "userMultiSelect": {

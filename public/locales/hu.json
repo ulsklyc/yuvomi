@@ -3494,7 +3494,7 @@
         "done": "Kezdés",
         "skip": "Kihagyás",
         "step2BodyDesktop": "A bal oldali oldalsáv minden modulhoz elvezet - a naptártól és a feladatoktól a konyháig, a dokumentumokig és a beállításokig.",
-        "step3BodyDesktop": "A jobb alsó + gombbal bárhol új bejegyzést hozhatsz létre.",
+        "step3BodyDesktop": "Minden modul fejlécében a jobb felső + gombbal hozhatsz létre új bejegyzést.",
         "stepProgress": "{{current}}. lépés a(z) {{total}}-ból"
     },
     "offline": {

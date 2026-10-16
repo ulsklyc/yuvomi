@@ -3494,7 +3494,7 @@
         "done": "Inizia",
         "skip": "Salta",
         "step2BodyDesktop": "La barra laterale a sinistra porta a tutti i moduli: dal calendario e le attività fino a cucina, documenti e impostazioni.",
-        "step3BodyDesktop": "Con il pulsante + in basso crei nuove voci ovunque.",
+        "step3BodyDesktop": "Con il pulsante + in alto a destra di ogni modulo crei nuove voci.",
         "stepProgress": "Passaggio {{current}} di {{total}}"
     },
     "offline": {

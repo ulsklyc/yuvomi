@@ -108,6 +108,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   largest amount: the scale now covers both, and the target reads "of 1,700.00 €" under the amount,
   with how much of it is used for screen readers.
 
+- **The welcome tour points to the right button on a computer.** Its last step said new entries
+  are created with the + button at the bottom right; on a wide screen that button sits at the top
+  right of each module's header, and the tour now says so in every language.
+
 - **Calendar: "Manage calendars" is reachable on tablets and phones again.** Below 1024px the
   button was hidden along with the empty header slot, so calendars could not be created, recolored
   or reordered there. The calendar filter now lists "Manage calendars" under its calendars, at

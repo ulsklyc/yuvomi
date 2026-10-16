@@ -3704,7 +3704,7 @@
         "done": "Zaczynamy",
         "skip": "Pomiń",
         "step2BodyDesktop": "Pasek boczny po lewej prowadzi do wszystkich modułów - od kalendarza i zadań po kuchnię, dokumenty i ustawienia.",
-        "step3BodyDesktop": "Przycisk + w dolnym rogu tworzy nowe wpisy w każdym miejscu.",
+        "step3BodyDesktop": "Przycisk + w prawym górnym rogu każdego modułu tworzy nowe wpisy.",
         "stepProgress": "Krok {{current}} z {{total}}"
     },
     "offline": {

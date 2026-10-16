@@ -3494,7 +3494,7 @@
         "done": "Commencer",
         "skip": "Passer",
         "step2BodyDesktop": "La barre latérale à gauche mène à tous les modules - du calendrier et des tâches à la cuisine, aux documents et aux réglages.",
-        "step3BodyDesktop": "Le bouton + en bas de l'écran crée de nouvelles entrées partout.",
+        "step3BodyDesktop": "Le bouton + en haut à droite de chaque module crée de nouvelles entrées.",
         "stepProgress": "Étape {{current}} sur {{total}}"
     },
     "offline": {

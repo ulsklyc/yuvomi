@@ -3494,7 +3494,7 @@
         "done": "Get started",
         "skip": "Skip",
         "step2BodyDesktop": "The sidebar on the left takes you to every module - from calendar and tasks to kitchen, documents and settings.",
-        "step3BodyDesktop": "The + button in the bottom corner creates new entries anywhere.",
+        "step3BodyDesktop": "The + button at the top right of each module's header creates new entries.",
         "stepProgress": "Step {{current}} of {{total}}"
     },
     "offline": {

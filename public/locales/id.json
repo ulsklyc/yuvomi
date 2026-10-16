@@ -3494,7 +3494,7 @@
         "done": "Mulai",
         "skip": "Lewati",
         "step2BodyDesktop": "Bilah samping di kiri membawamu ke semua modul - dari kalender dan tugas hingga dapur, dokumen, dan pengaturan.",
-        "step3BodyDesktop": "Tombol + di sudut bawah membuat entri baru di mana saja.",
+        "step3BodyDesktop": "Tombol + di kanan atas kepala setiap modul membuat entri baru.",
         "stepProgress": "Langkah {{current}} dari {{total}}"
     },
     "offline": {

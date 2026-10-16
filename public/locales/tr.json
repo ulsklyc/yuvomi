@@ -3494,7 +3494,7 @@
         "done": "Başla",
         "skip": "Atla",
         "step2BodyDesktop": "Soldaki kenar çubuğu seni tüm modüllere götürür - takvim ve görevlerden mutfağa, belgelere ve ayarlara.",
-        "step3BodyDesktop": "Alt köşedeki + düğmesiyle her yerde yeni kayıt oluşturursun.",
+        "step3BodyDesktop": "Her modülün sağ üstündeki + düğmesiyle yeni kayıt oluşturursun.",
         "stepProgress": "Adım {{current}}/{{total}}"
     },
     "offline": {

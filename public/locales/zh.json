@@ -3494,7 +3494,7 @@
         "done": "开始使用",
         "skip": "跳过",
         "step2BodyDesktop": "左侧边栏可进入所有模块：日历、任务、厨房、文档和设置。",
-        "step3BodyDesktop": "右下角的 + 按钮可随处创建新条目。",
+        "step3BodyDesktop": "每个模块右上角的 + 按钮可创建新条目。",
         "stepProgress": "第{{current}}步，共{{total}}步"
     },
     "offline": {

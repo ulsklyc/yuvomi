@@ -3494,7 +3494,7 @@
         "done": "Kom i gang",
         "skip": "Hopp over",
         "step2BodyDesktop": "Sidefeltet til venstre tar deg til alle moduler - fra kalender og oppgaver til kjøkken, dokumenter og innstillinger.",
-        "step3BodyDesktop": "Pluss-knappen i hjørnet nederst oppretter nye oppføringer hvor som helst.",
+        "step3BodyDesktop": "Pluss-knappen øverst til høyre i hver modul oppretter nye oppføringer.",
         "stepProgress": "Trinn {{current}} av {{total}}"
     },
     "offline": {

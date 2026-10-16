@@ -3494,7 +3494,7 @@
         "done": "Aan de slag",
         "skip": "Overslaan",
         "step2BodyDesktop": "De zijbalk links brengt je naar alle modules - van agenda en taken tot keuken, documenten en instellingen.",
-        "step3BodyDesktop": "Met de +-knop rechtsonder maak je overal nieuwe items aan.",
+        "step3BodyDesktop": "Met de +-knop rechtsboven in elke module maak je nieuwe items aan.",
         "stepProgress": "Stap {{current}} van {{total}}"
     },
     "offline": {

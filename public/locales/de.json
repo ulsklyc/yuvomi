@@ -3494,7 +3494,7 @@
         "done": "Loslegen",
         "skip": "Überspringen",
         "step2BodyDesktop": "Links in der Seitenleiste erreichst du alle Module - von Kalender und Aufgaben bis Küche, Dokumente und Einstellungen.",
-        "step3BodyDesktop": "Mit dem +-Knopf unten rechts erstellst du überall neue Einträge.",
+        "step3BodyDesktop": "Mit dem +-Knopf oben rechts im Kopf jedes Moduls erstellst du neue Einträge.",
         "stepProgress": "Schritt {{current}} von {{total}}"
     },
     "offline": {

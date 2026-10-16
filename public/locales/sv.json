@@ -3494,7 +3494,7 @@
         "done": "Kom igång",
         "skip": "Skippa",
         "step2BodyDesktop": "Sidofältet till vänster tar dig till alla moduler - från kalender och uppgifter till kök, dokument och inställningar.",
-        "step3BodyDesktop": "Med +-knappen i nedre hörnet skapar du nya poster överallt.",
+        "step3BodyDesktop": "Med +-knappen uppe till höger i varje modul skapar du nya poster.",
         "stepProgress": "Steg {{current}} av {{total}}"
     },
     "offline": {

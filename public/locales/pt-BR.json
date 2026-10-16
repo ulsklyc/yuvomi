@@ -3494,7 +3494,7 @@
         "done": "Começar",
         "skip": "Pular",
         "step2BodyDesktop": "A barra lateral à esquerda leva você a todos os módulos - do calendário e das tarefas à cozinha, aos documentos e às configurações.",
-        "step3BodyDesktop": "Com o botão + no canto inferior você cria novas entradas em qualquer lugar.",
+        "step3BodyDesktop": "Com o botão + no canto superior direito de cada módulo você cria novas entradas.",
         "stepProgress": "Etapa {{current}} de {{total}}"
     },
     "offline": {

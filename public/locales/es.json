@@ -3494,7 +3494,7 @@
         "done": "Empezar",
         "skip": "Omitir",
         "step2BodyDesktop": "La barra lateral izquierda te lleva a todos los módulos: del calendario y las tareas a la cocina, los documentos y los ajustes.",
-        "step3BodyDesktop": "Con el botón + de la esquina inferior creas nuevas entradas en cualquier parte.",
+        "step3BodyDesktop": "Con el botón + arriba a la derecha de cada módulo creas nuevas entradas.",
         "stepProgress": "Paso {{current}} de {{total}}"
     },
     "offline": {

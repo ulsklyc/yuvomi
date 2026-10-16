@@ -3494,7 +3494,7 @@
         "done": "Magsimula",
         "skip": "Laktawan",
         "step2BodyDesktop": "Ang sidebar sa kaliwa ang magdadala sa iyo sa bawat module - mula sa kalendaryo at mga gawain hanggang sa kusina, mga dokumento at mga setting.",
-        "step3BodyDesktop": "Ang + na button sa ibabang sulok ay gumagawa ng bagong entry kahit saan.",
+        "step3BodyDesktop": "Ang + na button sa kanang itaas ng header ng bawat module ay gumagawa ng bagong entry.",
         "stepProgress": "Hakbang {{current}} ng {{total}}"
     },
     "offline": {

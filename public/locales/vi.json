@@ -3494,7 +3494,7 @@
         "done": "Bắt đầu",
         "skip": "Bỏ qua",
         "step2BodyDesktop": "Thanh bên trái đưa bạn đến mọi phân hệ - từ lịch và công việc đến bếp, tài liệu và cài đặt.",
-        "step3BodyDesktop": "Nút + ở góc dưới tạo mục mới ở mọi nơi.",
+        "step3BodyDesktop": "Nút + ở góc trên bên phải mỗi mô-đun tạo mục mới.",
         "stepProgress": "Bước {{current}}/{{total}}"
     },
     "offline": {

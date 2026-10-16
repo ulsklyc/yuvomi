@@ -3494,7 +3494,7 @@
         "done": "はじめる",
         "skip": "スキップ",
         "step2BodyDesktop": "左のサイドバーからすべてのモジュールに移動できます。カレンダーやタスクからキッチン、書類、設定まで。",
-        "step3BodyDesktop": "右下の＋ボタンでどこでも新しい項目を作成できます。",
+        "step3BodyDesktop": "各モジュールのヘッダー右上の＋ボタンで新しい項目を作成できます。",
         "stepProgress": "ステップ {{current}}/{{total}}"
     },
     "offline": {
