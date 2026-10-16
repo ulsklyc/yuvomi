@@ -3990,6 +3990,14 @@ test('R19: umgestellte Blaetter sprechen den Zeilen-Dialekt', async () => {
     assert.doesNotMatch(src, /class="form-group"/, `${file}: keine gestapelten Felder mehr`);
     assert.match(src, /class="row-carrier settings-group/, `${file}: der Traeger der Gruppe`);
   }
+  // Konto: Kontaktdaten und Passwort als Zeilen (das Profil oben bleibt der
+  // Kopf mit Bild); in der Karte legt die Gruppe ihre eigene Flaeche ab.
+  const account = await readFile(new URL('../public/settings/pages/personal-account.js', import.meta.url), 'utf8');
+  for (const id of ['profile-phone', 'profile-email', 'profile-birth-date', 'current-password', 'new-password', 'confirm-password']) {
+    assert.match(account, new RegExp(`settingRowHtml\\(\\{\\s*label: t\\('settings\\.[a-zA-Z]+'\\), labelFor: '${id}'`), `Konto: ${id} als Zeile`);
+  }
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  assert.match(css, /\.settings-card \.row-carrier\.settings-group \{\s*background: none;\s*box-shadow: none;/, 'keine Karte in der Karte');
 });
 
 test('R17: die Standard-Erinnerungen sind Chips des Kanons mit aria-pressed, keine Checkbox in einer Pille', async () => {

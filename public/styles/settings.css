@@ -799,6 +799,20 @@
   margin-bottom: var(--space-3);
 }
 
+/* KEINE KARTE IN DER KARTE (R19): steht eine Zeilengruppe IN einer Karte
+ * (Konto: Kontaktdaten, Passwort), traegt die Karte die Flaeche - die Gruppe
+ * legt ihren eigenen Grund, Schatten und Radius ab und fluchtet mit dem
+ * Kartentext; die Haarlinien zwischen den Zeilen bleiben. */
+.settings-card .row-carrier.settings-group {
+  background: none;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.settings-card .settings-group > .settings-setting-row {
+  padding-inline: 0;
+}
+
 .settings-group > .settings-setting-row {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-1) var(--space-4);

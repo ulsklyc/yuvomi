@@ -8,6 +8,7 @@ import { esc } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 import { confirmModal } from '/components/modal.js';
 import { prefersInkText } from '/utils/contrast.js';
+import { settingRowHtml } from '/settings/components.js';
 
 function avatarHtml(user, className = 'settings-avatar') {
   const safeName = esc(user?.display_name || '');
@@ -627,23 +628,27 @@ function renderPage(container, user, refreshFailed, accessNotice, oidcState, oid
             </div>
           </div>
           ${gravatarHintHtml(gravatarAvailable)}
+          ${/* KONTAKTDATEN ALS ZEILEN (R19, Einstellungen B7): Telefon, E-Mail und
+               Geburtstag standen als drei gestapelte Felder (zwei davon im
+               Raster) unter ihrer Legende. Jetzt eine Gruppe im Zeilen-Dialekt
+               der Einstellungen - Etikett links, Feld rechts. */ ''}
           <fieldset class="settings-fieldset">
             <legend class="settings-fieldset__legend">${t('settings.contactDetailsLegend')}</legend>
-            <div class="modal-grid modal-grid--2">
-              <div class="form-group">
-                <label class="form-label" for="profile-phone">${t('settings.memberPhoneLabel')}</label>
-                <input class="form-input" type="tel" id="profile-phone" value="${esc(user?.phone || '')}" autocomplete="tel" aria-describedby="profile-error">
-              </div>
-              <div class="form-group">
-                <label class="form-label" for="profile-email">${t('settings.memberEmailLabel')}</label>
-                <input class="form-input" type="email" id="profile-email" value="${esc(user?.email || '')}" autocomplete="email" aria-describedby="profile-error">
-              </div>
+            <div class="row-carrier settings-group">
+              ${settingRowHtml({
+                label: t('settings.memberPhoneLabel'), labelFor: 'profile-phone',
+                control: `<input class="form-input" type="tel" id="profile-phone" value="${esc(user?.phone || '')}" autocomplete="tel" aria-describedby="profile-error">`,
+              })}
+              ${settingRowHtml({
+                label: t('settings.memberEmailLabel'), labelFor: 'profile-email',
+                control: `<input class="form-input" type="email" id="profile-email" value="${esc(user?.email || '')}" autocomplete="email" aria-describedby="profile-error">`,
+              })}
+              ${settingRowHtml({
+                label: t('settings.memberBirthDateLabel'), labelFor: 'profile-birth-date',
+                control: `<yuvomi-datepicker type="date" id="profile-birth-date" value="${esc(user?.birth_date || '')}" aria-describedby="profile-error"></yuvomi-datepicker>`,
+              })}
             </div>
-            <div class="form-group">
-              <label class="form-label" for="profile-birth-date">${t('settings.memberBirthDateLabel')}</label>
-              <yuvomi-datepicker type="date" id="profile-birth-date" value="${esc(user?.birth_date || '')}" aria-describedby="profile-error"></yuvomi-datepicker>
-              <p class="form-hint">${t('settings.memberContactBirthdayHint')}</p>
-            </div>
+            <p class="form-hint settings-group__footer">${t('settings.memberContactBirthdayHint')}</p>
           </fieldset>
           <div id="profile-error" class="form-error" role="alert" hidden></div>
           <div class="settings-form-actions">
@@ -655,17 +660,19 @@ function renderPage(container, user, refreshFailed, accessNotice, oidcState, oid
       <div class="settings-card">
         <h3 class="settings-card__title">${t('settings.changePassword')}</h3>
         <form id="password-form" class="settings-form">
-          <div class="form-group">
-            <label class="form-label" for="current-password">${t('settings.currentPasswordLabel')}</label>
-            <input class="form-input" type="password" id="current-password" autocomplete="current-password" aria-describedby="password-error" required>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="new-password">${t('settings.newPasswordLabel')}</label>
-            <input class="form-input" type="password" id="new-password" autocomplete="new-password" minlength="8" aria-describedby="password-error" required>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="confirm-password">${t('settings.confirmPasswordLabel')}</label>
-            <input class="form-input" type="password" id="confirm-password" autocomplete="new-password" minlength="8" aria-describedby="password-error" required>
+          <div class="row-carrier settings-group">
+            ${settingRowHtml({
+              label: t('settings.currentPasswordLabel'), labelFor: 'current-password',
+              control: '<input class="form-input" type="password" id="current-password" autocomplete="current-password" aria-describedby="password-error" required>',
+            })}
+            ${settingRowHtml({
+              label: t('settings.newPasswordLabel'), labelFor: 'new-password',
+              control: '<input class="form-input" type="password" id="new-password" autocomplete="new-password" minlength="8" aria-describedby="password-error" required>',
+            })}
+            ${settingRowHtml({
+              label: t('settings.confirmPasswordLabel'), labelFor: 'confirm-password',
+              control: '<input class="form-input" type="password" id="confirm-password" autocomplete="new-password" minlength="8" aria-describedby="password-error" required>',
+            })}
           </div>
           <div id="password-error" class="form-error" role="alert" hidden></div>
           <div class="settings-form-actions">
