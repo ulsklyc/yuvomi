@@ -83,4 +83,19 @@
   var locale = resolve();
   document.documentElement.lang = locale;
   document.documentElement.dir = (locale === 'ar' || locale === 'fa') ? 'rtl' : 'ltr';
+
+  // Die Sprachdatei schon jetzt anfordern (Critique R19): i18n.js fragt sie erst,
+  // wenn der ganze Modulgraph geladen ist, und vor ihr zeichnet nichts. Die
+  // deutsche Rueckfallsprache meldet index.html selbst an. `crossorigin` passt
+  // zum Modus von fetch() in i18n.js - sonst holt der Browser die Datei zweimal.
+  if (locale !== 'de') {
+    try {
+      var hint = document.createElement('link');
+      hint.rel = 'preload';
+      hint.as = 'fetch';
+      hint.crossOrigin = 'anonymous';
+      hint.href = '/locales/' + locale + '.json';
+      document.head.appendChild(hint);
+    } catch (e) { /* nur ein Hinweis: i18n.js laedt die Datei ohnehin */ }
+  }
 })();

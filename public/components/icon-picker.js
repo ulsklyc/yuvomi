@@ -33,6 +33,7 @@ import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { iconNames, iconElement } from '/utils/lucide-icons.js';
 import { attachOverlay, dropOverlay } from '/utils/overlay-history.js';
 import { dismissDialog, revealDialog } from '/utils/dialog-surface.js';
+import { ensureStyle } from '/utils/component-style.js';
 
 /**
  * So viele Treffer zeigt das Raster auf einmal.
@@ -237,6 +238,12 @@ export function openIconPicker(current = null, { suggestions = SUGGESTIONS } = {
       return;
     }
 
+    // Das Blatt steht nicht in index.html (Critique R19): es kommt mit dem
+    // ersten Oeffnen, und der Dialog baut sich erst, wenn es da ist.
+    ensureStyle('/styles/icon-picker.css').then(() => show(resolve));
+  });
+
+  function show(resolve) {
     const picker = buildDialog(current, resolve, suggestions);
     document.body.appendChild(picker.dialog);
     // Lupe und Leeren-Knopf des geteilten Suchfelds sind <i data-lucide>; die
@@ -246,5 +253,5 @@ export function openIconPicker(current = null, { suggestions = SUGGESTIONS } = {
     revealDialog(picker.dialog);
     picker.register();
     picker.focus();
-  });
+  }
 }

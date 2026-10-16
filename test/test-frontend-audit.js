@@ -573,7 +573,7 @@ test('an announced update stops the router from loading further page modules (#6
   // fliegt dann als SyntaxError auf. Erlaubt ist deshalb nur noch der Reload.
   assert.match(router, /shellStale\s*=\s*true;/, 'SW_UPDATED must mark the running shell as stale');
   assert.match(router, /if \(shellStale && reloadOnce\(\)\)/, 'importPage() must reload instead of importing a page module');
-  assert.match(router, /function prefetchRoute\(path\) \{[\s\S]*?if \(shellStale\) return;/, 'prefetchRoute() must stop warming modules after an update');
+  assert.match(router, /function prefetchRoute\(path(?:, \{ now = false \} = \{\})?\) \{[\s\S]*?if \(shellStale\) return;/, 'prefetchRoute() must stop warming modules after an update');
   assert.doesNotMatch(
     router,
     /SW_UPDATED[\s\S]{0,400}moduleCache\.clear\(\)/,

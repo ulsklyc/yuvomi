@@ -54,6 +54,12 @@ import { isPreviewable } from '/utils/document-preview.js';
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { pathAccess, mayWritePath } from '/utils/module-access.js';
+import { holdUntilStyled, warmStyle } from '/utils/component-style.js';
+
+// Nicht in index.html (Critique R19): vorgeladen, sobald eine Seite das Feld
+// importiert; bind() haelt es unsichtbar, falls es doch vor dem Blatt kommt.
+const STYLE = '/styles/document-attach.css';
+warmStyle(STYLE);
 
 
 
@@ -212,6 +218,7 @@ export function bindDocumentAttachField(panel, {
 } = {}) {
   const field = panel?.querySelector('[data-doc-attach]');
   if (!field) return null;
+  holdUntilStyled(field, STYLE);
 
   const chipsEl = field.querySelector('[data-doc-attach-chips]');
   const emptyEl = field.querySelector('[data-doc-attach-empty]');

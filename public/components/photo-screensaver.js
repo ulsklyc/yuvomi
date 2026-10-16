@@ -5,6 +5,12 @@ import {
   isScreensaverCoverOn,
   syncScreensaverIdleFromStorage,
 } from '/utils/screensaver-idle.js';
+import { ensureStyle } from '/utils/component-style.js';
+
+// Not linked in index.html (Critique R19): the screensaver is the last thing a
+// start needs. It loads with the first start, alongside the photo request, and
+// the overlay is only built once the sheet is there.
+const STYLE = '/styles/screensaver.css';
 
 // Read on every arming, not once at load: the delay is a per-device choice
 // (utils/screensaver-idle.js, #885) that theme-init.js applies before this
@@ -105,7 +111,7 @@ async function start() {
 
   const currentRun = ++run;
   try {
-    const payload = await api.get('/screensaver/photos');
+    const [payload] = await Promise.all([api.get('/screensaver/photos'), ensureStyle(STYLE)]);
     if (currentRun !== run) return false;
     const photos = payload?.data?.photos || [];
     if (!payload?.data?.enabled || !photos.length) return false;

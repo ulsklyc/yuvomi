@@ -133,7 +133,7 @@ test('preferences: the running request is handed out once and expires with the p
 test('the start asks /version and the session before waiting for anything', () => {
   const router = read('../public/router.js');
   const init = router.slice(router.indexOf('// Initialisierung\n'));
-  const order = ["api.get('/version')", 'startHandoff.askSession()', 'prefetchRoute(location.pathname)', 'await initI18n()', 'await version']
+  const order = ["api.get('/version')", 'startHandoff.askSession()', 'prefetchRoute(location.pathname, { now: true })', 'await initI18n()', 'await version']
     .map((needle) => init.indexOf(needle));
   assert.ok(order.every((at) => at > 0), `Start nicht gefunden: ${order}`);
   assert.deepEqual([...order].sort((a, b) => a - b), order, 'erst anfragen, dann warten');

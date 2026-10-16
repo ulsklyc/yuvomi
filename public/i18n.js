@@ -150,10 +150,16 @@ async function loadLocale(locale) {
 /** Initialisierung - einmal beim App-Start aufrufen */
 export async function initI18n() {
   currentLocale = resolveLocale();
+  // Beide Dateien GLEICHZEITIG (Critique R19): nacheinander kostete jeder
+  // Sprache ausser Deutsch eine ganze Rundreise vor dem ersten Bild. Der leere
+  // catch haelt eine fehlgeschlagene eigene Datei still, solange noch auf die
+  // Rueckfallsprache gewartet wird; der Fehler kommt unten beim await an.
+  const own = currentLocale !== DEFAULT_LOCALE ? loadLocale(currentLocale) : null;
+  own?.catch(() => {});
   fallbackTranslations = await loadLocale(DEFAULT_LOCALE);
-  if (currentLocale !== DEFAULT_LOCALE) {
+  if (own) {
     try {
-      translations = await loadLocale(currentLocale);
+      translations = await own;
     } catch {
       translations = fallbackTranslations;
       currentLocale = DEFAULT_LOCALE;

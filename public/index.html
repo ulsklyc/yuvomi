@@ -29,12 +29,6 @@
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
 
-  <!-- Preload: kritische ES-Module (modulepreload ist korrekt für type="module") -->
-  <link rel="modulepreload" href="/api.js" />
-  <link rel="modulepreload" href="/router.js" />
-  <link rel="modulepreload" href="/nav-icons.js" />
-  <link rel="modulepreload" href="/rrule-ui.js" />
-
   <!-- Theme: explizite Nutzer-Overrides vor CSS-Rendering anwenden (Flash-Prevention).
        System-Präferenz wird durch @media (prefers-color-scheme: dark) in tokens.css
        direkt per CSS behandelt — kein JS-matchMedia erforderlich. -->
@@ -58,20 +52,147 @@
   <link rel="stylesheet" href="/styles/markdown-toolbar.css" />
   <link rel="stylesheet" href="/styles/panel.css" />
   <link rel="stylesheet" href="/styles/user-multi-select.css" />
-  <link rel="stylesheet" href="/styles/datepicker.css" />
-  <link rel="stylesheet" href="/styles/category-manager.css" />
-  <link rel="stylesheet" href="/styles/icon-picker.css" />
-  <link rel="stylesheet" href="/styles/document-attach.css" />
+  <!-- Platzhalter: Hier haengen die Blaetter geteilter Komponenten, die der Start
+       nicht braucht (Datumsfeld, Kategorien, Symbolauswahl, Dokumentanhang,
+       Bildschirmschoner). Jede Komponente laedt ihres selbst und zeigt sich erst
+       danach (utils/component-style.js); die Stelle haelt die Kaskade wie vorher.
+       auth.css laedt der Router als Seitenblatt der Zugangsseiten. -->
+  <meta name="component-styles" content="datepicker category-manager icon-picker document-attach screensaver" />
   <link rel="stylesheet" href="/styles/detail-view.css" />
-  <link rel="stylesheet" href="/styles/auth.css" />
   <link rel="stylesheet" href="/styles/typography.css" />
-  <link rel="stylesheet" href="/styles/screensaver.css" />
 
   <!-- Lucide Icons (lokal, v0.469.0) -->
-  <script src="/lucide.min.js" defer></script>
+  <!-- `fetchpriority="high"` (R19): ein defer-Skript laedt sonst mit niedriger
+       Prioritaet HINTER allen modulepreloads unten - und weil die Modulskripte
+       im <body> erst nach den defer-Skripten im <head> laufen, wartete der
+       Router auf die Icons (gemessen: lucide.min.js fertig 4,3 s statt 1,4 s). -->
+  <script src="/lucide.min.js" defer fetchpriority="high"></script>
   <!-- Direkt nach dem Bundle: gibt createIcons({ el }) echtes Scoping,
        siehe Dateikopf von lucide-scope.js. -->
-  <script src="/lucide-scope.js" defer></script>
+  <script src="/lucide-scope.js" defer fetchpriority="high"></script>
+
+  <!-- Die Rueckfallsprache braucht jeder Start vor dem ersten Bild (i18n.js laedt
+       sie immer); die eigene Sprache meldet lang-init.js auf dieselbe Weise an. -->
+  <link rel="preload" href="/locales/de.json" as="fetch" crossorigin />
+
+  <!-- Die Startkette als modulepreload (Critique R19): der statische Modulgraph
+       von api.js, router.js und den Modulskripten unten, danach der der
+       Uebersicht (/pages/dashboard.js, die Startseite). Ohne diese Liste entdeckt
+       der Browser die Module Ebene fuer Ebene - am Telefon (4x CPU, Fast 4G) sieben
+       Rundreisen hintereinander, bevor die Uebersicht ihre Daten anfragen kann.
+       Die Liste ist GEMESSEN, nicht geschaetzt: `npm run test:startup-preload`
+       rechnet den Graphen nach und nennt jedes fehlende oder ueberzaehlige Modul.
+       Sie steht bewusst am Ende von <head>: die Blaetter und die beiden kleinen
+       Startskripte oben gehen zuerst auf die Leitung. Der Teil der Uebersicht
+       traegt `fetchpriority="low"`: sonst warteten die ersten API-Abrufe des
+       Routers (Sitzung, Einstellungen) hinter ihm in der Schlange der sechs
+       HTTP/1.1-Verbindungen - gemessen eine volle Sekunde. -->
+  <link rel="modulepreload" href="/api.js" />
+  <link rel="modulepreload" href="/router.js" />
+  <link rel="modulepreload" href="/components/photo-screensaver.js" />
+  <link rel="modulepreload" href="/components/yuvomi-install-prompt.js" />
+  <link rel="modulepreload" href="/sw-register.js" />
+  <link rel="modulepreload" href="/permissions.js" />
+  <link rel="modulepreload" href="/utils/household.js" />
+  <link rel="modulepreload" href="/utils/initials.js" />
+  <link rel="modulepreload" href="/utils/dashboard-layout-hint.js" />
+  <link rel="modulepreload" href="/i18n.js" />
+  <link rel="modulepreload" href="/utils/friendly-error.js" />
+  <link rel="modulepreload" href="/utils/extension-widgets.js" />
+  <link rel="modulepreload" href="/utils/extension-i18n.js" />
+  <link rel="modulepreload" href="/utils/html.js" />
+  <link rel="modulepreload" href="/utils/empty-state.js" />
+  <link rel="modulepreload" href="/utils/ux.js" />
+  <link rel="modulepreload" href="/utils/toast-surface.js" />
+  <link rel="modulepreload" href="/utils/toast-show.js" />
+  <link rel="modulepreload" href="/utils/unknown-route.js" />
+  <link rel="modulepreload" href="/utils/router-navigate.js" />
+  <link rel="modulepreload" href="/utils/page-mount.js" />
+  <link rel="modulepreload" href="/utils/bulk-pill.js" />
+  <link rel="modulepreload" href="/utils/filter-sheet.js" />
+  <link rel="modulepreload" href="/utils/toast-placement.js" />
+  <link rel="modulepreload" href="/utils/page-layout.js" />
+  <link rel="modulepreload" href="/reminders.js" />
+  <link rel="modulepreload" href="/push.js" />
+  <link rel="modulepreload" href="/settings/region-presets.js" />
+  <link rel="modulepreload" href="/utils/timezone.js" />
+  <link rel="modulepreload" href="/utils/household-zone-hint.js" />
+  <link rel="modulepreload" href="/utils/kitchen-tabs.js" />
+  <link rel="modulepreload" href="/utils/view-transition.js" />
+  <link rel="modulepreload" href="/utils/module-accent.js" />
+  <link rel="modulepreload" href="/utils/brand-mark.js" />
+  <link rel="modulepreload" href="/utils/health-tabs.js" />
+  <link rel="modulepreload" href="/utils/schedule-tabs.js" />
+  <link rel="modulepreload" href="/utils/health-activity.js" />
+  <link rel="modulepreload" href="/utils/search-sections.js" />
+  <link rel="modulepreload" href="/utils/help.js" />
+  <link rel="modulepreload" href="/utils/skeleton.js" />
+  <link rel="modulepreload" href="/utils/palette-combobox.js" />
+  <link rel="modulepreload" href="/utils/fab.js" />
+  <link rel="modulepreload" href="/utils/leave-guard.js" />
+  <link rel="modulepreload" href="/utils/app-update.js" />
+  <link rel="modulepreload" href="/utils/start-handoff.js" />
+  <link rel="modulepreload" href="/utils/sheet-drag.js" />
+  <link rel="modulepreload" href="/utils/overlay-history.js" />
+  <link rel="modulepreload" href="/utils/nav-badges.js" />
+  <link rel="modulepreload" href="/utils/version.js" />
+  <link rel="modulepreload" href="/utils/upload-limit.js" />
+  <link rel="modulepreload" href="/utils/wall-mode.js" />
+  <link rel="modulepreload" href="/utils/scroll-restore.js" />
+  <link rel="modulepreload" href="/components/modal.js" />
+  <link rel="modulepreload" href="/utils/popover-menu.js" />
+  <link rel="modulepreload" href="/utils/contrast.js" />
+  <link rel="modulepreload" href="/utils/master-detail.js" />
+  <link rel="modulepreload" href="/components/datepicker.js" />
+  <link rel="modulepreload" href="/nav-icons.js" />
+  <link rel="modulepreload" href="/settings/registry.js" />
+  <link rel="modulepreload" href="/settings/module-order.js" />
+  <link rel="modulepreload" href="/utils/screensaver-idle.js" />
+  <link rel="modulepreload" href="/utils/component-style.js" />
+  <link rel="modulepreload" href="/utils/pwa-install.js" />
+  <link rel="modulepreload" href="/utils/korean-particles.js" />
+  <link rel="modulepreload" href="/utils/dashboard-widgets.js" />
+  <link rel="modulepreload" href="/utils/markdown-checklist.js" />
+  <link rel="modulepreload" href="/utils/html-escape.js" />
+  <link rel="modulepreload" href="/utils/color.js" />
+  <link rel="modulepreload" href="/utils/sub-tabs.js" />
+  <link rel="modulepreload" href="/utils/date.js" />
+  <link rel="modulepreload" href="/utils/segment-indicator.js" />
+  <link rel="modulepreload" href="/utils/health-vitals.js" />
+  <link rel="modulepreload" href="/utils/lucide-icons.js" />
+  <link rel="modulepreload" href="/utils/content-swap.js" />
+  <link rel="modulepreload" href="/utils/overlay-host.js" />
+  <link rel="modulepreload" href="/utils/dashboard-event-limit.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/pages/dashboard.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/utils/page-lifecycle.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/utils/today-sheet.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/utils/event-color.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/utils/event-icon.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/utils/member-order.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/utils/week-strip.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/utils/day-label.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/utils/health-cycle.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/utils/health-nutrition.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/components/fasting-controls.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/utils/birthday-event.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/utils/countdown.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/utils/pantry-status.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/utils/pantry-locations.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/utils/pantry-units.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/components/user-multi-select.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/utils/seal-pair.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/components/wall-timer.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/utils/quick-link-url.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/utils/meal-types.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/utils/recipe-thumb.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/utils/note-category-overflow.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/utils/reward-goal.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/utils/health-fasting.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/components/fasting-dial.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/components/fasting-help.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/settings/components.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/utils/tablist.js" />
+  <link rel="modulepreload" fetchpriority="low" href="/utils/form-row.js" />
 </head>
 <body>
   <!-- Offline-Banner: sichtbar wenn navigator.onLine === false -->

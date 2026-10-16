@@ -145,6 +145,7 @@ const APP_SHELL = [
   '/utils/fab.js',
   '/utils/flip.js',
   '/utils/list-motion.js',
+  '/utils/component-style.js',
   '/utils/content-swap.js',
   '/utils/filter-sheet.js',
   '/utils/folder-upload.js',

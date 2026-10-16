@@ -62,7 +62,6 @@ import { emptyHintHTML } from '/utils/empty-state.js';
 import { quickLinkHost } from '/utils/quick-link-url.js';
 import { hasIcon } from '/utils/lucide-icons.js';
 import { prefersInkText } from '/utils/contrast.js';
-import { openQuickLinksManager } from '/components/quick-links-manager.js';
 import { attachOverlay, pushOverlay, dropOverlay, isOverlayOpen } from '/utils/overlay-history.js';
 import { mealTypeList, primeMealTypeNames } from '/utils/meal-types.js';
 import { recipeThumbHtml, wireRecipeThumbs } from '/utils/recipe-thumb.js';
@@ -6515,7 +6514,12 @@ function wireLinks(container, rerender, { editing = false, user = null } = {}) {
   // dort zieht man Kacheln, man bearbeitet ihren Inhalt nicht.
   if (!editing) {
     container.querySelectorAll('[data-quick-links-manage]').forEach((el) => {
-      el.addEventListener('click', () => openQuickLinksManager({ onChange: rerender }));
+      // Erst beim Tipp geladen (Critique R19): der Verwalter samt Sortierung
+      // lag sonst in der Startkette jeder Uebersicht, geoeffnet wird er selten.
+      el.addEventListener('click', async () => {
+        const { openQuickLinksManager } = await import('/components/quick-links-manager.js');
+        openQuickLinksManager({ onChange: rerender });
+      });
     });
   }
 

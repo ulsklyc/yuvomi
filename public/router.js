@@ -97,13 +97,18 @@ import {
 // und dem Einrichtungsbildschirm IST der App-Name der Titel (siehe
 // updateBranding) - dort steht noch keine Seite, auf die er sich beziehen könnte.
 // --------------------------------------------------------
+//
+// Die Zugangsseiten teilen EIN Seitenblatt (`style`). Es stand bis R19 global in
+// index.html und lag damit auch angemeldet auf jedem Start im Weg; als
+// Seitenblatt laedt der Router es nur hier und wartet darauf (loadPageStyle).
+const AUTH_STYLE = '/styles/auth.css';
 const ROUTES = [
-  { path: '/login',    page: '/pages/login.js',    requiresAuth: false, module: null,        titleKey: null },
-  { path: '/setup',    page: '/pages/setup.js',    requiresAuth: false, module: null,        titleKey: null },
-  { path: '/forgot-password', page: '/pages/forgot-password.js', requiresAuth: false, module: null, titleKey: 'forgotPassword.title' },
-  { path: '/reset-password',  page: '/pages/reset-password.js',  requiresAuth: false, module: null, titleKey: 'resetPassword.title' },
-  { path: '/join',     page: '/pages/join.js',     requiresAuth: false, module: null,        titleKey: 'join.title' },
-  { path: '/pair',     page: '/pages/pair-display.js', requiresAuth: false, module: null,  titleKey: 'pairDisplay.title' },
+  { path: '/login',    page: '/pages/login.js',    requiresAuth: false, module: null, style: AUTH_STYLE, titleKey: null },
+  { path: '/setup',    page: '/pages/setup.js',    requiresAuth: false, module: null, style: AUTH_STYLE, titleKey: null },
+  { path: '/forgot-password', page: '/pages/forgot-password.js', requiresAuth: false, module: null, style: AUTH_STYLE, titleKey: 'forgotPassword.title' },
+  { path: '/reset-password',  page: '/pages/reset-password.js',  requiresAuth: false, module: null, style: AUTH_STYLE, titleKey: 'resetPassword.title' },
+  { path: '/join',     page: '/pages/join.js',     requiresAuth: false, module: null, style: AUTH_STYLE, titleKey: 'join.title' },
+  { path: '/pair',     page: '/pages/pair-display.js', requiresAuth: false, module: null, style: AUTH_STYLE, titleKey: 'pairDisplay.title' },
   { path: '/',         page: '/pages/dashboard.js', requiresAuth: true, module: 'dashboard', titleKey: 'dashboard.title' },
   { path: '/tasks',    page: '/pages/tasks.js',     requiresAuth: true, module: 'tasks',     titleKey: 'nav.tasks' },
   { path: '/shopping', page: '/pages/shopping.js',  requiresAuth: true, module: 'shopping',  titleKey: 'nav.shopping' },
@@ -384,7 +389,7 @@ async function importPage(pagePath) {
 const _prefetchedPages = new Set();
 const _prefetchedStyles = new Set();
 
-function prefetchRoute(path) {
+function prefetchRoute(path, { now = false } = {}) {
   if (!path) return;
   // Nach angekündigtem Update nichts mehr vorwärmen: ein modulepreload zieht den
   // kompletten Modulgraph in die Modul-Map und würde neue Seitenmodule gegen die
@@ -405,7 +410,12 @@ function prefetchRoute(path) {
   if (cssHref && !_prefetchedStyles.has(cssHref)) {
     _prefetchedStyles.add(cssHref);
     const link = document.createElement('link');
-    link.rel = 'prefetch';
+    // Die Startroute braucht ihr Blatt SOFORT (Critique R19): `prefetch` legte
+    // es nur in den HTTP-Cache, und weil Blaetter mit `no-cache` ausgeliefert
+    // werden, holte loadPageStyle() es gleich danach ein zweites Mal ueber die
+    // Leitung (gemessen: dashboard.css zweimal, 57 KB und eine Rundreise).
+    // `preload` reicht die Antwort direkt an den <link rel="stylesheet"> weiter.
+    link.rel = now ? 'preload' : 'prefetch';
     link.as = 'style';
     link.href = cssHref;
     document.head.appendChild(link);
@@ -5008,7 +5018,7 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
     }
     // Nur ein Hinweis an den Browser (modulepreload): ausgefuehrt wird nichts,
     // und nach einem angekuendigten Update unterlaesst prefetchRoute() ihn (#616).
-    prefetchRoute(location.pathname);
+    prefetchRoute(location.pathname, { now: true });
 
     await initI18n();
     initExtensionI18n();

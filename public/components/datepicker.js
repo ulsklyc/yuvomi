@@ -31,6 +31,13 @@ import { esc } from '/utils/html.js';
 import { overlayHost } from '/utils/overlay-host.js';
 import { todayKey } from '/utils/date.js';
 import { swapContent } from '/utils/content-swap.js';
+import { holdUntilStyled, warmStyle } from '/utils/component-style.js';
+
+// Das Blatt steht nicht mehr in index.html (Critique R19): im Leerlauf nach
+// dem Start vorgeladen, und ein Feld, das trotzdem davor erscheint, bleibt
+// unsichtbar, bis es da ist (utils/component-style.js).
+const STYLE = '/styles/datepicker.css';
+warmStyle(STYLE);
 
 // ── lokale Datums-Helfer (kanonisches ISO, lokale Zeitzone) ──────────────
 const pad2 = (n) => String(n).padStart(2, '0');
@@ -108,6 +115,7 @@ class YuvomiDatepicker extends HTMLElement {
     this._type = VALID_TYPES.includes(this.getAttribute('type'))
       ? this.getAttribute('type') : 'date';
     this._built = true;
+    holdUntilStyled(this, STYLE);
     this._render();
     // value-Attribut initial übernehmen (toleriert ISO & Anzeigeformat)
     if (this.hasAttribute('value')) this.value = this.getAttribute('value');

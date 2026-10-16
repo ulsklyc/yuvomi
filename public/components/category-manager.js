@@ -55,6 +55,13 @@ import { makeSortable, isDragActive } from '/utils/sortable.js';
 import { wireTablist } from '/utils/tablist.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
+import { holdUntilStyled, warmStyle } from '/utils/component-style.js';
+
+// Nicht in index.html (Critique R19): vorgeladen, sobald eine Seite dieses
+// Modul importiert, und der Verwalter zeigt sich erst mit seinem Blatt.
+// Der Tag-Verwalter (tag-manager.js) traegt dieselben Klassen.
+const CATEGORY_MANAGER_STYLE = '/styles/category-manager.css';
+warmStyle(CATEGORY_MANAGER_STYLE);
 
 /** Platzhalter-Id fuer den Eintrag ohne Ton: eine leere `data-tab-id` waere kein Knopf. */
 const NO_COLOR_ID = '__none__';
@@ -196,6 +203,7 @@ class CategoryManagerElement extends HTMLElement {
     if (typeof opts.alreadyDeletedReason === 'string' && opts.alreadyDeletedReason) {
       this._alreadyDeletedReason = opts.alreadyDeletedReason;
     }
+    holdUntilStyled(this, CATEGORY_MANAGER_STYLE);
     this._renderShell();
     this._load();
   }

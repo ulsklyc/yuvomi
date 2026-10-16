@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The overview appears sooner on a cold start.** The browser now asks for every module the start
+  needs at once instead of discovering them level by level, fetches the language file alongside
+  them, and no longer waits for the date picker, category, icon picker, attachment, screensaver and
+  sign-in styles before the first frame; each of those loads its styles when it is first shown. On
+  a throttled phone (4x CPU, fast 4G) the overview's content arrived after 4.8 s instead of 5.6 s.
 - **One set of controls in every module header.** Search, view, filter and more sit in the same order
   and look the same everywhere, and every view picker is the same segmented control. The calendar
   header on a desktop is one row with a real search field (two rows instead of three on a tablet);

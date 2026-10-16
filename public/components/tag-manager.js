@@ -22,6 +22,7 @@ import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { rowActionHtml } from '/utils/row-action.js';
+import { holdUntilStyled } from '/utils/component-style.js';
 
 /**
  * Haengt an die Erfolgsmeldung an, was liegen blieb (#830).
@@ -47,6 +48,8 @@ class TagManagerElement extends HTMLElement {
   }
 
   connectedCallback() {
+    // Dieselben `cat-`-Klassen wie der Kategorien-Verwalter, also dessen Blatt.
+    holdUntilStyled(this, '/styles/category-manager.css');
     this._renderShell();
     this.load();
   }

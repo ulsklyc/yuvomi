@@ -9761,6 +9761,16 @@ textarea::placeholder {
 }
 
 /* --------------------------------------------------------
+ * Komponente wartet auf ihr Blatt (Critique R19)
+ * Das Datumsfeld, der Dokumentanhang und die Verwalter laden ihr Blatt selbst
+ * (utils/component-style.js). Erscheinen sie davor, halten sie ihren Platz,
+ * zeigen aber nichts - kein Bild aus Browser-Standards, das gleich umspringt.
+ * -------------------------------------------------------- */
+[data-style-pending] {
+  visibility: hidden;
+}
+
+/* --------------------------------------------------------
  * Skip-Link (sichtbar bei Keyboard-Focus)
  * -------------------------------------------------------- */
 .sr-only:focus-visible {
