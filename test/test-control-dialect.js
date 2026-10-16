@@ -703,6 +703,7 @@ const NOT_HEAD_SEARCH = new Map([
   ['doc-attach-picker__search', 'Dokument-Auswahldialog'],
   ['settings-shell__navigation-search', 'Seitenleiste der Einstellungen'],
   ['page-toolbar__center', 'der Slot der Shell selbst'],
+  ['page-search--field', 'Modifier der Shell (R19): die Kopfsuche bleibt mobil ein Feld; Geometrie EINMAL in layout.css'],
 ]);
 export function headSearchClasses(jsFiles) {
   const out = new Set();

@@ -203,7 +203,7 @@ test('(4) die Suche nimmt mobil ihre Icon-Form auch in einem Wrapper-Slot', () =
   // statt nackt neben beringtem Filter und „..." zu stehen.
   assert.match(decl(rule.body, 'border') ?? '', /^1\.5px solid var\(--color-border\)$/, 'Ring der Kopf-Icon-Haut an der Huelle');
   assert.equal(decl(rule.body, 'border-radius'), 'var(--radius-full)', 'rund wie die Icon-Knoepfe daneben');
-  const glyph = rules(layoutCss).find((r) => /\.page-toolbar\s+\.page-search:not\(:focus-within\)[^,]*\.page-search__icon/.test(r.selector));
+  const glyph = rules(layoutCss).find((r) => /\.page-toolbar\s+\.page-search(?::not\(\.page-search--field\))?:not\(:focus-within\)[^,]*\.page-search__icon/.test(r.selector));
   assert.equal(glyph && decl(glyph.body, 'color'), 'var(--color-accent)', 'das Zeichen in der Tinte von btn--secondary');
   const wrapper = rules(layoutCss).filter((r) => r.selector.includes(':has(> .page-search:only-child')
     && decl(r.body, 'flex') === '0 0 auto');
