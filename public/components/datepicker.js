@@ -28,6 +28,7 @@ import {
   getTimeFormat,
 } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { overlayHost } from '/utils/overlay-host.js';
 import { todayKey } from '/utils/date.js';
 import { swapContent } from '/utils/content-swap.js';
 
@@ -359,9 +360,11 @@ class YuvomiDatepicker extends HTMLElement {
     el.className = 'ydp-popover';
     el.setAttribute('popover', 'manual');
     el.setAttribute('role', 'dialog');
-    document.body.appendChild(el);
     el.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') { this._closePopover(); this._activeSub?.trigger.focus(); return; }
+      // Esc schliesst NUR den Kalender. `preventDefault` nimmt dem nativen
+      // Dialog darunter den Close-Request (sonst ginge das Formular mit zu),
+      // und das Modal laesst ein schon erledigtes Esc liegen (modal.js, onEscape).
+      if (e.key === 'Escape') { e.preventDefault(); this._closePopover(); this._activeSub?.trigger.focus(); return; }
       if (e.key === 'Tab') this._trapTab(e, el);
     });
     this._popover = el;
@@ -385,6 +388,12 @@ class YuvomiDatepicker extends HTMLElement {
 
   _openPopover(sub) {
     const el = this._ensurePopover();
+    // IM DIALOG, AUS DEM ER AUFGEHT (D7): ausserhalb eines modalen <dialog>
+    // ist alles inert, auch ein Popover in der Top-Layer darueber. Ohne Dialog
+    // bleibt es `document.body`. Bei jedem Oeffnen neu, weil derselbe Picker
+    // in einem anderen Zusammenhang aufgehen kann.
+    const host = overlayHost(this);
+    if (el.parentNode !== host) host.appendChild(el);
     this._activeSub = sub;
     // Zugänglicher Name des Dialogs + Schreibrichtung (RTL für ar/fa)
     el.setAttribute('aria-label', this._resolveLabel()

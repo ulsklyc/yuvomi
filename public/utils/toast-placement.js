@@ -99,8 +99,13 @@
 
 import { PERSISTENT_TOAST_SELECTOR } from './toast-surface.js';
 
-/** Was als offener Dialog zaehlt: jede Dialogrolle, sichtbar und nicht inert. */
-export const DIALOG_SELECTOR = '[role="dialog"]';
+/**
+ * Was als offener Dialog zaehlt: jede Dialogrolle, sichtbar und nicht inert -
+ * und die Tafel des geteilten Modals. Dort traegt seit D7 das native `<dialog>`
+ * die Rolle (implizit, ohne Attribut); gemessen wird aber die Tafel, nicht der
+ * Knoten ueber dem ganzen Bild.
+ */
+export const DIALOG_SELECTOR = '[role="dialog"], .modal-panel';
 
 /**
  * DIE DETAILSPALTE VON LISTE+DETAIL ZAEHLT WIE EIN DIALOG (Re-Critique

@@ -198,6 +198,8 @@ const APP_SHELL = [
   '/utils/note-category-overflow.js',
   '/utils/note-category-picker.js',
   '/utils/overlay-history.js',
+  '/utils/overlay-host.js',
+  '/utils/dialog-surface.js',
   '/utils/page-layout.js',
   '/utils/page-lifecycle.js',
   '/utils/page-search.js',
