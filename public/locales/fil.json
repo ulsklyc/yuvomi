@@ -1169,7 +1169,10 @@
         "localCalendarExportCopied": "Nakopya ang link ng export",
         "localCalendarDeleteConfirm": "Tanggalin ang \"{{name}}\"?",
         "localCalendarDeleteDetail": "Ililipat ang mga kaganapan mula rito sa default na kalendaryo, at hindi na gagana ang export link nito.",
-        "localCalendarDeleteDetailIcloud": "Ililipat ang mga kaganapan mula rito sa default na kalendaryo at pagkatapos ay ia-upload sa iCloud sa pamamagitan ng Apple Calendar. Hindi na gagana ang export link nito."
+        "localCalendarDeleteDetailIcloud": "Ililipat ang mga kaganapan mula rito sa default na kalendaryo at pagkatapos ay ia-upload sa iCloud sa pamamagitan ng Apple Calendar. Hindi na gagana ang export link nito.",
+        "sidebarLabel": "Sidebar ng kalendaryo",
+        "upNextTitle": "Susunod",
+        "upNextEmpty": "Walang nakatakda sa susunod na tatlong linggo."
     },
     "noteCategories": {
         "categories": "Mga kategorya",

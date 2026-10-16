@@ -1155,7 +1155,10 @@
         "localCalendarDeleteConfirm": "Xóa \"{{name}}\"?",
         "localCalendarDeleteDetail": "Sự kiện từ lịch này sẽ chuyển sang lịch mặc định, và liên kết xuất của lịch sẽ ngừng hoạt động.",
         "localCalendarDeleteDetailIcloud": "Sự kiện từ lịch này sẽ chuyển sang lịch mặc định, sau đó được tải lên iCloud qua Apple Calendar. Liên kết xuất của lịch sẽ ngừng hoạt động.",
-        "localCalendarEventCount_one": "{{count}} sự kiện"
+        "localCalendarEventCount_one": "{{count}} sự kiện",
+        "sidebarLabel": "Thanh bên lịch",
+        "upNextTitle": "Sắp tới",
+        "upNextEmpty": "Không có gì trong ba tuần tới."
     },
     "noteCategories": {
         "categories": "Danh mục",

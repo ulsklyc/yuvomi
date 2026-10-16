@@ -1155,7 +1155,10 @@
         "localCalendarExportCopied": "Enlace de exportación copiado",
         "localCalendarDeleteConfirm": "¿Eliminar \"{{name}}\"?",
         "localCalendarDeleteDetail": "Los eventos de este calendario se moverán al calendario predeterminado y su enlace de exportación dejará de funcionar.",
-        "localCalendarDeleteDetailIcloud": "Los eventos de este calendario se moverán al calendario predeterminado y después se subirán a iCloud a través de Apple Calendar. Su enlace de exportación dejará de funcionar."
+        "localCalendarDeleteDetailIcloud": "Los eventos de este calendario se moverán al calendario predeterminado y después se subirán a iCloud a través de Apple Calendar. Su enlace de exportación dejará de funcionar.",
+        "sidebarLabel": "Barra lateral del calendario",
+        "upNextTitle": "A continuación",
+        "upNextEmpty": "Nada en las próximas tres semanas."
     },
     "noteCategories": {
         "categories": "Categorías",

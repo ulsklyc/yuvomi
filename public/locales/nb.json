@@ -1155,7 +1155,10 @@
         "localCalendarExportCopied": "Eksportlenke kopiert",
         "localCalendarDeleteConfirm": "Slette \"{{name}}\"?",
         "localCalendarDeleteDetail": "Hendelsene flyttes til standardkalenderen, og eksportlenken slutter å virke.",
-        "localCalendarDeleteDetailIcloud": "Hendelsene flyttes til standardkalenderen og lastes deretter opp til iCloud via Apple Kalender. Eksportlenken slutter å virke."
+        "localCalendarDeleteDetailIcloud": "Hendelsene flyttes til standardkalenderen og lastes deretter opp til iCloud via Apple Kalender. Eksportlenken slutter å virke.",
+        "sidebarLabel": "Kalenderens sidepanel",
+        "upNextTitle": "Neste",
+        "upNextEmpty": "Ingenting de neste tre ukene."
     },
     "noteCategories": {
         "categories": "Kategorier",

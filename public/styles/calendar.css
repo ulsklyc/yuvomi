@@ -97,6 +97,233 @@
 }
 
 /* --------------------------------------------------------
+ * SEITENLEISTE AB CA. 1600px (Critique R19, Entscheidung Ulas 2026-10-16)
+ *
+ * Bei 1920 stand der Kalender auf der zentrierten Inhaltsspalte (430-1710),
+ * links und rechts blieben 420px leer, und Mini-Monat, Kalenderliste und „Als
+ * Naechstes" gab es nicht. Ab 86.25rem Kalenderflaeche (das 1600er-Fenster
+ * neben der ausgeklappten Seitenleiste: 1380px) wird der Kalender eine Flaeche
+ * mit Seitenleiste wie Apple Kalender: Kopf und Rahmen ruecken von der
+ * Inhaltsspalte auf den Seitenrand (`--page-gutter`), links steht die Leiste
+ * (16.25rem, ein Mini-Monat mit 32px-Tagen), rechts das Raster.
+ * Gemessen 1920: Leiste 252-512, Raster 536-1888 (vorher 430-1710).
+ *
+ * DAS IST DIE EINE AUSNAHME VON DER GEMEINSAMEN LINKEN KANTE (R19): die
+ * Leiste nimmt den Rand ein, den die Inhaltsspalte sonst leer laesst; ihre
+ * Kante ist die, die jedes Modul bei 1280 und 1440 hat. In Agenda und Suche -
+ * selbst Listen - steht keine Leiste, und alles bleibt auf der Spalte.
+ *
+ * Die Seite ist dafuer immer Container (`cal-page`); in Agenda und Tag traegt
+ * sie zusaetzlich `module-surface` (layout.css), deshalb beide Namen.
+ * -------------------------------------------------------- */
+.calendar-page {
+  container: cal-page / inline-size;
+  --cal-sidebar-width: 16.25rem;
+}
+
+.calendar-page.app-page--list-detail,
+.calendar-page.app-page--columns {
+  container-name: module-surface cal-page;
+}
+
+.cal-frame {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+#cal-body {
+  min-width: 0;
+}
+
+.cal-sidebar {
+  display: none;
+}
+
+@container cal-page (min-width: 86.25rem) {
+  .calendar-page.has-cal-sidebar > * {
+    --page-inline-pad: var(--page-gutter);
+  }
+
+  .calendar-page.has-cal-sidebar .cal-frame {
+    gap: var(--space-6);
+    padding-inline: var(--page-inline-pad);
+  }
+
+  .calendar-page.has-cal-sidebar #cal-body {
+    padding-inline: 0;
+  }
+
+  .calendar-page.has-cal-sidebar .cal-sidebar:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+    flex: 0 0 var(--cal-sidebar-width);
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    padding-block: var(--space-2) var(--space-6);
+  }
+}
+
+.cal-sidebar__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.cal-sidebar__title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--type-secondary);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+}
+
+/* Die Schalterzeilen des Filterblatts ohne seinen Kasten: in der Leiste
+ * stehen sie bis an ihre Kanten. */
+.cal-sidebar .toggle-row {
+  padding-inline: var(--space-1);
+}
+
+.cal-sidebar .filter-panel__chips {
+  flex-wrap: wrap;
+}
+
+/* Mini-Monat */
+.cal-mini__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-block-end: var(--space-2);
+}
+
+.cal-mini__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--type-body);
+  font-weight: var(--font-weight-semibold);
+}
+
+.cal-mini__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  row-gap: var(--space-0h);
+  text-align: center;
+}
+
+.cal-mini__dow {
+  padding-block: var(--space-1);
+  font-size: var(--type-caption);
+  color: var(--color-text-tertiary);
+}
+
+.cal-mini__day {
+  justify-self: center;
+  inline-size: var(--space-8);
+  block-size: var(--space-8);
+  border-radius: var(--radius-full);
+  font-size: var(--type-secondary);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-primary);
+}
+
+.cal-mini__day--other {
+  color: var(--color-text-tertiary);
+}
+
+/* Der gezeigte Zeitraum als ruhiges Band, der gewaehlte Tag als Scheibe,
+ * heute in der Tinte des Moduls - dieselbe Sprache wie die Heute-Zelle. */
+.cal-mini__day.is-in-view {
+  background-color: var(--color-fill-well);
+}
+
+.cal-mini__day[aria-current="date"] {
+  color: var(--module-accent);
+  font-weight: var(--font-weight-bold);
+}
+
+.cal-mini__day.is-cursor {
+  background-color: var(--module-accent);
+  color: var(--color-ink-on-vivid);
+  font-weight: var(--font-weight-semibold);
+}
+
+@media (hover: hover) {
+  .cal-mini__day:not(.is-cursor):hover {
+    background-color: var(--color-surface-hover);
+  }
+
+  .cal-upnext__row:hover {
+    background-color: var(--color-surface-hover);
+  }
+}
+
+.cal-mini__day:focus-visible,
+.cal-upnext__row:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Als Naechstes */
+.cal-upnext__list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cal-upnext__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  inline-size: 100%;
+  min-block-size: var(--target-md);
+  padding: var(--space-1h) var(--space-2);
+  border-radius: var(--radius-sm);
+  text-align: start;
+  color: inherit;
+}
+
+/* Die Farbe des Termins als Vollton-Punkt (Rangmarke), die Schrift neutral. */
+.cal-upnext__dot {
+  flex: 0 0 auto;
+  inline-size: var(--space-2);
+  block-size: var(--space-2);
+  margin-block-start: var(--space-1h);
+  border-radius: var(--radius-full);
+  background-color: var(--ev-color, var(--module-accent));
+}
+
+.cal-upnext__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cal-upnext__name {
+  font-size: var(--type-secondary);
+  font-weight: var(--font-weight-medium);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.cal-upnext__when,
+.cal-upnext__empty {
+  font-size: var(--type-caption);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.cal-upnext__empty {
+  margin: 0;
+}
+
+/* --------------------------------------------------------
  * Kalender-Toolbar (Navigation + Ansichts-Umschalter)
  * -------------------------------------------------------- */
 /* Gerüst (Shell) jetzt geteilt via .page-toolbar in layout.css. Der Kalender hat
@@ -230,8 +457,8 @@
  * CSS-Umbruch haette die Aktionen hinter der Bar-Zeile mit in Zeile 2
  * genommen (#882: die Titelzeile baute zwei Zeilen).
  *
- * Das Label hat in beiden Faellen seine feste Breite (11rem: "KW 42 ·
- * Oktober 2026" misst 169px), damit die Pfeile in allen vier Ansichten
+ * Das Label hat in beiden Faellen seine feste Breite (seit R19 11.75rem
+ * in 18px fett, siehe unten), damit die Pfeile in allen vier Ansichten
  * stillstehen; das Segment gibt in der einen Zeile nicht nach (das Suchfeld
  * tut es). */
 @media (min-width: 1024px) {
@@ -239,8 +466,18 @@
     flex: 0 0 auto;
   }
 
+  /* DER ZEITRAUM IST DER TITEL DER FLAECHE (Critique R19). Er stand in 16px/600
+   * und war damit leiser als „Kalender" (22px/700) daneben - in Apple Kalender
+   * und Fantastical ist „Oktober 2026" der Titel. Jetzt 18px fett - eine Stufe
+   * unter dem Modultitel, aber kein Fliesstext mehr. Die feste Breite waechst
+   * mit (11.75rem: „KW 42 · Oktober 2026" misst 186px), damit die Pfeile
+   * weiter stillstehen; Title 3 (20px) haette den Kopf bei 1440 zweizeilig
+   * gemacht (113 statt 69px, gemessen). */
   .cal-toolbar__label {
-    flex: 0 0 11rem;
+    flex: 0 0 11.75rem;
+    font-size: var(--text-lg);
+    font-weight: var(--font-weight-bold);
+    letter-spacing: var(--tracking-tight);
   }
 
   .cal-toolbar__views {

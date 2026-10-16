@@ -1169,7 +1169,10 @@
         "localCalendarExportCopied": "پیوند خروجی کپی شد",
         "localCalendarDeleteConfirm": "«{{name}}» حذف شود؟",
         "localCalendarDeleteDetail": "رویدادهای این تقویم به تقویم پیش‌فرض منتقل می‌شوند و پیوند خروجی آن دیگر کار نخواهد کرد.",
-        "localCalendarDeleteDetailIcloud": "رویدادهای این تقویم به تقویم پیش‌فرض منتقل می‌شوند و سپس از طریق Apple Calendar در iCloud بارگذاری می‌شوند. پیوند خروجی آن دیگر کار نخواهد کرد."
+        "localCalendarDeleteDetailIcloud": "رویدادهای این تقویم به تقویم پیش‌فرض منتقل می‌شوند و سپس از طریق Apple Calendar در iCloud بارگذاری می‌شوند. پیوند خروجی آن دیگر کار نخواهد کرد.",
+        "sidebarLabel": "نوار کناری تقویم",
+        "upNextTitle": "بعدی",
+        "upNextEmpty": "در سه هفته آینده چیزی نیست."
     },
     "noteCategories": {
         "categories": "دسته‌بندی‌ها",

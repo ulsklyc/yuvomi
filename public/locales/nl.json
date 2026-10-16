@@ -1155,7 +1155,10 @@
         "localCalendarExportCopied": "Exportlink gekopieerd",
         "localCalendarDeleteConfirm": "\"{{name}}\" verwijderen?",
         "localCalendarDeleteDetail": "Afspraken uit deze agenda worden naar de standaardagenda verplaatst en de exportlink werkt daarna niet meer.",
-        "localCalendarDeleteDetailIcloud": "Afspraken uit deze agenda worden naar de standaardagenda verplaatst en daarna via Apple Agenda naar iCloud geüpload. De exportlink werkt daarna niet meer."
+        "localCalendarDeleteDetailIcloud": "Afspraken uit deze agenda worden naar de standaardagenda verplaatst en daarna via Apple Agenda naar iCloud geüpload. De exportlink werkt daarna niet meer.",
+        "sidebarLabel": "Zijbalk van de agenda",
+        "upNextTitle": "Hierna",
+        "upNextEmpty": "Niets gepland in de komende drie weken."
     },
     "noteCategories": {
         "categories": "Categorieën",

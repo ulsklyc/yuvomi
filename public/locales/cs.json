@@ -1227,7 +1227,10 @@
         "localCalendarExportCopied": "Odkaz exportu zkopírován",
         "localCalendarDeleteConfirm": "Smazat „{{name}}“?",
         "localCalendarDeleteDetail": "Události z tohoto kalendáře se přesunou do výchozího kalendáře a jeho odkaz pro export přestane fungovat.",
-        "localCalendarDeleteDetailIcloud": "Události z tohoto kalendáře se přesunou do výchozího kalendáře a poté se přes Apple Calendar nahrají do iCloudu. Jeho odkaz pro export přestane fungovat."
+        "localCalendarDeleteDetailIcloud": "Události z tohoto kalendáře se přesunou do výchozího kalendáře a poté se přes Apple Calendar nahrají do iCloudu. Jeho odkaz pro export přestane fungovat.",
+        "sidebarLabel": "Postranní panel kalendáře",
+        "upNextTitle": "Následuje",
+        "upNextEmpty": "V příštích třech týdnech nic není."
     },
     "noteCategories": {
         "categories": "Kategorie",

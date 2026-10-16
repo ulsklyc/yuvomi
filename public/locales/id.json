@@ -1169,7 +1169,10 @@
         "localCalendarDeleteConfirm": "Hapus \"{{name}}\"?",
         "localCalendarDeleteDetail": "Acara dari kalender ini dipindahkan ke kalender default, dan tautan ekspornya akan berhenti berfungsi.",
         "localCalendarDeleteDetailIcloud": "Acara dari kalender ini dipindahkan ke kalender default lalu diunggah ke iCloud melalui Apple Calendar. Tautan ekspornya akan berhenti berfungsi.",
-        "localCalendarEventCount_one": "{{count}} acara"
+        "localCalendarEventCount_one": "{{count}} acara",
+        "sidebarLabel": "Bilah sisi kalender",
+        "upNextTitle": "Berikutnya",
+        "upNextEmpty": "Tidak ada apa pun dalam tiga minggu ke depan."
     },
     "noteCategories": {
         "categories": "Kategori",

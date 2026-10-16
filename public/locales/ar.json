@@ -1372,7 +1372,10 @@
         "localCalendarDeleteDetailIcloud": "ستنقل أحداث هذا التقويم إلى التقويم الافتراضي، ثم ترفع إلى iCloud عبر تقويم Apple. وسيتوقف رابط التصدير الخاص به عن العمل.",
         "localCalendarEventCount_zero": "{{count}} أحداث",
         "localCalendarEventCount_two": "حدثان",
-        "localCalendarEventCount_many": "{{count}} حدثًا"
+        "localCalendarEventCount_many": "{{count}} حدثًا",
+        "sidebarLabel": "الشريط الجانبي للتقويم",
+        "upNextTitle": "التالي",
+        "upNextEmpty": "لا شيء في الأسابيع الثلاثة القادمة."
     },
     "noteCategories": {
         "categories": "الفئات",

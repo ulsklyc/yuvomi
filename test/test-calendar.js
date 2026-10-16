@@ -2128,7 +2128,9 @@ test('Filterblatt (D2): Kalender und Aufgaben fahren EINEN Baustein - Personen a
   }
   // Ebenen, Quellen und Ansichtsoptionen sind Schalter, keine Haken.
   for (const attr of ['data-filter-layer', 'data-filter-source', 'data-filter-mine', 'data-filter-schedule-display', 'data-filter-waste-type']) {
-    const at = calSrc.indexOf(`'${attr}'`);
+    // Die Stelle, an der der Schalter GEBAUT wird (`attrs: { '<attr>': ... }`) -
+    // seit R19 nennt die Seitenleiste dieselben Namen auch fuer ihren Fokus.
+    const at = calSrc.indexOf(`attrs: { '${attr}'`);
     assert(at > 0, `${attr} fehlt`);
     assert(/control: 'switch'/.test(calSrc.slice(at - 260, at)), `${attr}: Schalter statt Haken`);
   }
@@ -2157,8 +2159,13 @@ test('Kalender verwalten: unter 1024px erreichbar - das Filterblatt traegt den E
     r.at.some((a) => /max-width:\s*1023px/.test(a))
     && /\.cal-toolbar\s*>\s*\.page-toolbar__actions/.test(r.selector)
     && /display:\s*none/.test(r.body));
-  const start = calSrc.indexOf('function openCalendarFilters()');
-  const fn = calSrc.slice(start, calSrc.indexOf('\n}\n', start));
+  // Seit R19 bauen Filterblatt und Seitenleiste ihre Zeilen aus EINER Quelle
+  // (calendarFilterParts); geprueft wird beides zusammen.
+  const slice = (name) => {
+    const at = calSrc.indexOf(`function ${name}(`);
+    return calSrc.slice(at, calSrc.indexOf('\n}\n', at));
+  };
+  const fn = slice('calendarFilterParts') + slice('openCalendarFilters');
   if (!hidesSlot) return;
   assert(/data-filter-manage-calendars/.test(fn),
     'der Kopf-Slot mit #cal-calendars ist unter 1024px ausgeblendet, aber das Filterblatt traegt keinen Eintrag „Kalender verwalten"');
@@ -2193,7 +2200,9 @@ test('Kalender verwalten: unter 640px steht das Namensfeld des Anlegen-Formulars
 test('Filterblatt (D2): „Mir zugewiesen" steht in beiden Blaettern als erster Schalter der Personengruppe, die Personen sind Chips', () => {
   const calSrc = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
   const taskSrc = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
-  assert(/heading: t\('calendar\.filtersPeople'\), html: meRow \+ \(people\.length \? personFilterChipsHtml\(people\)/.test(calSrc),
+  // R19: die Teile kommen aus calendarFilterParts (eine Quelle fuer Blatt und Seitenleiste).
+  assert(/heading: t\('calendar\.filtersPeople'\), html: meRow \+ peopleChips/.test(calSrc)
+    && /peopleChips: people\.length \? personFilterChipsHtml\(people\)/.test(calSrc),
     'Kalender: Schalter, dann Personen-Chips in EINER Gruppe');
   assert(/heading: t\('tasks\.filterGroupPerson'\),\s*html: mine \+ chipsHtml\('assigned_to'/.test(taskSrc),
     'Aufgaben: Schalter, dann Personen-Chips in EINER Gruppe');
@@ -3758,11 +3767,12 @@ test('Kalenderkopf (Sonde 19): die eine Zeile gilt nur, wenn Titelzeile und Mind
   try {
     globalThis.window = { matchMedia: () => ({ matches: true }) };
     globalThis.getComputedStyle = () => ({ paddingInlineStart: '32', paddingInlineEnd: '32', columnGap: '8', display: 'flex' });
-    // Titelzeile 656 + Mindest-Bar (280 + 8 + 160 + 8 + 40 = 496) + 4 Luecken (32) = 1184.
-    const wide = make(1184);
+    // Titelzeile 656 + Mindest-Bar (280 + 8 + 152 + 8 + 40 = 488) + 4 Luecken (32) = 1176.
+    // Das Suchfeld-Minimum ist seit R19 152 statt 160px (SEARCH_MIN_PX).
+    const wide = make(1176);
     calendarHelpers.syncToolbarFit(wide);
     assert(wide.classes.has('cal-toolbar--one-row'), 'passt genau: eine Zeile');
-    const narrow = make(1183);
+    const narrow = make(1175);
     calendarHelpers.syncToolbarFit(narrow);
     assert(!narrow.classes.has('cal-toolbar--one-row'), 'ein Pixel zu wenig: die Bar-Zeile steht als eigene Zeile');
     globalThis.window = { matchMedia: () => ({ matches: false }) };
@@ -5952,6 +5962,107 @@ test('Woche mobil: Ganztaegiges als EINE Zeile plus „+n", aufklappbar (Critiqu
     'eingeklappt nur der erste Eintrag je Zelle');
   assert(/display:\s*none/.test(rule('.allday-more')?.body ?? ''), 'aufgeklappt (und am Desktop) kein Zaehler');
   assert(/display:\s*inline-flex/.test(rule('.allday-row--fold:not(.is-expanded) .allday-more')?.body ?? ''));
+});
+
+// --------------------------------------------------------
+// SEITENLEISTE AB CA. 1600px (Critique R19, Entscheidung Ulas 2026-10-16):
+// Mini-Monat, Kalender und Personen aus derselben Quelle wie das Filterblatt,
+// „Als Naechstes". Darunter unveraendert.
+// --------------------------------------------------------
+test('Seitenleiste: Kalender und Personen sind dieselben Bausteine und Zustaende wie im Filterblatt', () => {
+  const st = calendarHelpers.state;
+  const vorher = { users: st.users, people: st.people, hiddenSources: st.hiddenSources, assignedToMe: st.assignedToMe, currentUserId: st.currentUserId, localCalendars: st.localCalendars, events: st.events, user: st.user };
+  try {
+    Object.assign(st, {
+      users: [{ id: 1, display_name: 'Linda' }, { id: 2, display_name: 'Alex' }],
+      people: new Set([2]), hiddenSources: new Map([['local:9', { name: 'Arbeit', color: '#336699' }]]),
+      assignedToMe: true, currentUserId: 1, user: { id: 1 }, events: [],
+      localCalendars: [{ id: 3, name: 'Familie', color: '#C2185B' }, { id: 9, name: 'Arbeit', color: '#336699' }],
+    });
+    const html = calendarHelpers.sidebarFiltersHtml();
+    const parts = calendarHelpers.calendarFilterParts();
+    for (const part of [parts.sourceRows, parts.meRow, parts.peopleChips]) {
+      assert(part && html.includes(part.trim().slice(0, 80)), 'die Leiste zeigt genau die Zeilen des Filterblatts');
+    }
+    assert(/data-filter-source="local:9"(?![^>]*checked)/.test(html), 'eine ausgeblendete Quelle steht aus - wie im Blatt');
+    assert(/data-filter-source="local:3"[^>]*checked/.test(html), 'eine sichtbare Quelle steht an');
+    assert(/data-filter-mine="true"[^>]*checked/.test(html), '„Mir zugewiesen" steht an');
+    assert(/data-value="2" aria-pressed="true"/.test(html), 'die gewaehlte Person ist als Chip an');
+  } finally {
+    Object.assign(st, vorher);
+  }
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const fnOf = (name) => { const at = src.indexOf(`function ${name}(`); return src.slice(at, src.indexOf('\n}\n', at)); };
+  assert(/calendarFilterParts\(\{ people, sources \}\)/.test(fnOf('openCalendarFilters')), 'das Blatt baut aus calendarFilterParts');
+  assert(/calendarFilterParts\(\)/.test(fnOf('sidebarFiltersHtml')), 'die Leiste baut aus calendarFilterParts');
+  const wire = fnOf('wireSidebar');
+  assert(/applyCalendarFilterInput\(e\.target, aside\)/.test(wire) && /toggleCalendarPersonChip\(/.test(wire),
+    'die Leiste legt Schalter und Chips ueber dieselben Funktionen um wie das Blatt');
+});
+
+test('Seitenleiste: der Mini-Monat zeigt sechs Wochen ab dem Wochenstart, markiert heute, Auswahl und den gezeigten Zeitraum', () => {
+  const st = calendarHelpers.state;
+  const vorher = { view: st.view, cursor: st.cursor, today: st.today, weekStart: st.weekStart };
+  const prevWindow = globalThis.window;
+  globalThis.window = { ...(prevWindow ?? {}), matchMedia: () => ({ matches: false }) };
+  try {
+    Object.assign(st, { view: 'week', cursor: '2026-10-28', today: '2026-10-16', weekStart: 1 });
+    const html = calendarHelpers.miniMonthHtml();
+    const days = [...html.matchAll(/data-mini-date="([\d-]+)"/g)].map((m) => m[1]);
+    assert(days.length === 42 && days[0] === '2026-09-28', `sechs Wochen ab Montag vor dem 1.: ${days[0]} (${days.length})`);
+    assert(/data-mini-date="2026-10-16" aria-current="date"/.test(html), 'heute traegt aria-current="date"');
+    assert(/class="cal-mini__day is-in-view is-cursor" data-mini-date="2026-10-28"/.test(html), 'der gewaehlte Tag');
+    const band = [...html.matchAll(/is-in-view[^"]*" data-mini-date="([\d-]+)"/g)].map((m) => m[1]);
+    assert(band[0] === '2026-10-26' && band.at(-1) === '2026-11-01', `die gezeigte Woche als Band: ${band[0]} - ${band.at(-1)}`);
+    assert(/data-mini-step="-1"/.test(html) && /data-mini-step="1"/.test(html), 'die Pfeile blaettern die Uebersicht');
+    st.view = 'month';
+    assert(!/is-in-view/.test(calendarHelpers.miniMonthHtml()), 'im Monat kein Band hinter jedem Tag');
+  } finally {
+    Object.assign(st, vorher);
+    globalThis.window = prevWindow;
+  }
+});
+
+test('Seitenleiste: „Als Naechstes" nennt die naechsten Termine ab jetzt, gefiltert wie die Ansicht', () => {
+  const st = calendarHelpers.state;
+  const vorher = { today: st.today, hiddenSources: st.hiddenSources, people: st.people, assignedToMe: st.assignedToMe, layerBirthdays: st.layerBirthdays };
+  try {
+    Object.assign(st, { today: '2026-10-16', hiddenSources: new Map(), people: new Set(), assignedToMe: false, layerBirthdays: false });
+    const now = Date.parse('2026-10-16T12:00:00Z');
+    const ev = (id, start, end, extra = {}) => ({ id, title: `T${id}`, start_datetime: start, end_datetime: end, assigned_users: [], ...extra });
+    const list = [
+      ev(1, '2026-10-16T08:00:00Z', '2026-10-16T09:00:00Z'),            // vorbei
+      ev(2, '2026-10-17T10:00:00Z', '2026-10-17T11:00:00Z'),
+      ev(3, '2026-10-16T11:00:00Z', '2026-10-16T13:00:00Z'),            // laeuft
+      ev(4, '2026-10-16', '2026-10-16', { all_day: 1 }),                // heute ganztaegig
+      ev(5, '2026-10-18', '2026-10-18', { all_day: 1, birthday_name: 'Emma' }), // Ebene aus
+      ev(6, '2026-10-20T10:00:00Z', '2026-10-20T11:00:00Z'),
+      ev(7, '2026-10-21T10:00:00Z', '2026-10-21T11:00:00Z'),
+      ev(8, '2026-10-22T10:00:00Z', '2026-10-22T11:00:00Z'),
+    ];
+    const ids = calendarHelpers.upNextEvents(list, now).map((e) => e.id);
+    assert(JSON.stringify(ids) === JSON.stringify([4, 3, 2, 6, 7]), `Reihenfolge und Auswahl: ${JSON.stringify(ids)}`);
+  } finally {
+    Object.assign(st, vorher);
+  }
+});
+
+test('Seitenleiste: erst ab 86.25rem Kalenderflaeche, nur mit Leiste rueckt die Seite auf den Rand; der Zeitraum ist als Titel gewichtet', () => {
+  const rules = [...eachRule(calendarCss)];
+  const base = rules.find((r) => r.selector.trim() === '.cal-sidebar' && !r.at.length);
+  assert(/display:\s*none/.test(base?.body ?? ''), 'unter der Schwelle steht keine Leiste');
+  const wide = rules.filter((r) => r.at.some((a) => /@container cal-page \(min-width: 86\.25rem\)/.test(a)));
+  assert(wide.length >= 3 && wide.every((r) => r.selector.includes('.calendar-page.has-cal-sidebar')),
+    'jede Regel der Leiste haengt an has-cal-sidebar - Agenda und Suche bleiben auf der Inhaltsspalte');
+  assert(rules.some((r) => r.selector.trim() === '.calendar-page' && /container:\s*cal-page\s*\/\s*inline-size/.test(r.body)), 'die Seite ist der Container');
+  assert(rules.some((r) => /\.calendar-page\.app-page--list-detail/.test(r.selector) && /container-name:\s*module-surface cal-page/.test(r.body)),
+    'in Agenda und Tag behaelt die Seite ihren Namen module-surface');
+  const label = rules.find((r) => r.selector.trim() === '.cal-toolbar__label' && r.at.some((a) => /min-width:\s*1024px/.test(a)));
+  assert(/font-weight:\s*var\(--font-weight-bold\)/.test(label?.body ?? '') && /font-size:\s*var\(--text-lg\)/.test(label?.body ?? ''),
+    'der Desktop-Zeitraum steht fett in 18px, nicht mehr leiser als Fliesstext-Gewicht');
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  assert(/function sidebarWanted\(\) \{\s*return state\.view !== 'agenda' && !searchActive;/.test(src), 'Agenda und Suche zeigen keine Leiste');
+  assert(/syncHeadToScrollport\(body\);\s*renderSidebar\(\);\s*\}/.test(src), 'jede Ansicht zeichnet die Leiste mit');
 });
 
 // --------------------------------------------------------

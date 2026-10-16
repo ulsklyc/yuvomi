@@ -1155,7 +1155,10 @@
         "localCalendarExportCopied": "Dışa aktarım bağlantısı kopyalandı",
         "localCalendarDeleteConfirm": "\"{{name}}\" silinsin mi?",
         "localCalendarDeleteDetail": "Bu takvimdeki etkinlikler varsayılan takvime taşınır ve dışa aktarma bağlantısı artık çalışmaz.",
-        "localCalendarDeleteDetailIcloud": "Bu takvimdeki etkinlikler varsayılan takvime taşınır ve ardından Apple Takvim üzerinden iCloud'a yüklenir. Dışa aktarma bağlantısı artık çalışmaz."
+        "localCalendarDeleteDetailIcloud": "Bu takvimdeki etkinlikler varsayılan takvime taşınır ve ardından Apple Takvim üzerinden iCloud'a yüklenir. Dışa aktarma bağlantısı artık çalışmaz.",
+        "sidebarLabel": "Takvim kenar çubuğu",
+        "upNextTitle": "Sıradaki",
+        "upNextEmpty": "Önümüzdeki üç haftada bir şey yok."
     },
     "noteCategories": {
         "categories": "Kategoriler",

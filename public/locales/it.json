@@ -1155,7 +1155,10 @@
         "localCalendarExportCopied": "Link di esportazione copiato",
         "localCalendarDeleteConfirm": "Eliminare \"{{name}}\"?",
         "localCalendarDeleteDetail": "Gli eventi di questo calendario verranno spostati nel calendario predefinito e il suo link di esportazione smetterà di funzionare.",
-        "localCalendarDeleteDetailIcloud": "Gli eventi di questo calendario verranno spostati nel calendario predefinito e poi caricati su iCloud tramite Apple Calendar. Il suo link di esportazione smetterà di funzionare."
+        "localCalendarDeleteDetailIcloud": "Gli eventi di questo calendario verranno spostati nel calendario predefinito e poi caricati su iCloud tramite Apple Calendar. Il suo link di esportazione smetterà di funzionare.",
+        "sidebarLabel": "Barra laterale del calendario",
+        "upNextTitle": "Prossimi",
+        "upNextEmpty": "Niente in programma nelle prossime tre settimane."
     },
     "noteCategories": {
         "categories": "Categorie",

@@ -1155,7 +1155,10 @@
         "localCalendarExportCopied": "Export link copied",
         "localCalendarDeleteConfirm": "Delete \"{{name}}\"?",
         "localCalendarDeleteDetail": "Events from this calendar move to the default calendar, and its export link will stop working.",
-        "localCalendarDeleteDetailIcloud": "Events from this calendar move to the default calendar and are then uploaded to iCloud through Apple Calendar. Its export link will stop working."
+        "localCalendarDeleteDetailIcloud": "Events from this calendar move to the default calendar and are then uploaded to iCloud through Apple Calendar. Its export link will stop working.",
+        "sidebarLabel": "Calendar sidebar",
+        "upNextTitle": "Up next",
+        "upNextEmpty": "Nothing coming up in the next three weeks."
     },
     "noteCategories": {
         "categories": "Categories",

@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sorts by date or by amount (largest first, remembered on this device) and shows one account's
   statement, the same filter the Accounts tab opens. A note under the title says when the list is
   sorted by amount; a tap on it opens the menu.
+- **The calendar has a sidebar on wide screens.** From about 1600px the month, week and day views
+  show a small month to jump to any day, your calendars and people as switches (the same ones as in
+  the filter menu), and the next five appointments. The period in the header ("October 2026") is now
+  set as a title instead of in body text weight.
 
 ### Changed
 

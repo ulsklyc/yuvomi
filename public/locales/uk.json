@@ -1299,7 +1299,10 @@
         "localCalendarDeleteDetail": "Події з цього календаря буде перенесено до стандартного календаря, а його посилання експорту перестане працювати.",
         "localCalendarDeleteDetailIcloud": "Події з цього календаря буде перенесено до стандартного календаря, а потім вивантажено в iCloud через Apple Календар. Його посилання експорту перестане працювати.",
         "localCalendarEventCount_many": "{{count}} подій",
-        "localCalendarEventCount_other": "{{count}} подій"
+        "localCalendarEventCount_other": "{{count}} подій",
+        "sidebarLabel": "Бічна панель календаря",
+        "upNextTitle": "Далі",
+        "upNextEmpty": "У найближчі три тижні нічого немає."
     },
     "noteCategories": {
         "categories": "Категорії",
