@@ -2121,33 +2121,45 @@ function periodArrowKeys(rtl = typeof document !== 'undefined' && document.docum
  * ihrem Ende, auf jeder Breite an derselben Stelle. Die Ueberlappungswarnung
  * bleibt im Aktions-Slot: sie ist eine Meldung, kein Werkzeug.
  */
-function toolbarHtml({ filterCount = 0, scheduleWarningHtml = '' } = {}) {
+function toolbarHtml({ filterCount = 0, scheduleWarningHtml = '', searchValue = '' } = {}) {
+  // DER KOPF-WERKZEUG-SLOT (D1, Critique 2026-10-16). Am Desktop EINE Zeile:
+  // Titel, Zeitraum, dahinter das Ansichts-Segment, dann Suchfeld und Filter,
+  // zuletzt Verwalten und die angedockte Pille. Bis dahin stand das Segment in
+  // einer eigenen zweiten Zeile (125px Kopf, ~540px Leerraum neben dem
+  // Stepper), und gesucht wurde ueber einen eigenen Knopf, der erst eine
+  // Leiste unter dem Kopf aufdeckte - als einziges Modul ohne das Feld im Kopf.
+  //
+  // Mobil (unter 640px) loest sich die Bar-Zeile auf (calendar.css): Lupe und
+  // Filter stehen am Ende der Titelzeile, die Ansichtswahl als Pop-up-Knopf
+  // mit dem NAMEN der Ansicht am Ende der Zeitraum-Zeile (`viewMenuHtml`).
   return `
     <h1 class="page-toolbar__title">${t('calendar.title')}</h1>
-    <div class="page-toolbar__center cal-toolbar__month">${periodNavHtml()}</div>
-    ${/* Der Aktions-Slot traegt die Ueberlappungswarnung und - am
-          Zeigergeraet - den angedockten FAB (#fab-new-event, dockFabIntoToolbar
-          in router.js). Einen eigenen Kopfknopf gibt es nicht mehr
-          (Re-Critique 2026-09-27, D3); renderToolbar() haengt den angedockten
-          FAB beim Neubau des Kopfs wieder ein. */ ''}
+    <div class="page-toolbar__center cal-toolbar__month">
+      <div class="cal-toolbar__stepper">${periodNavHtml()}</div>
+      ${viewMenuHtml()}
+    </div>
+    ${/* Der Aktions-Slot traegt die Ueberlappungswarnung, "Kalender verwalten"
+          und - am Zeigergeraet - den angedockten FAB (#fab-new-event,
+          dockFabIntoToolbar in router.js). renderToolbar() haengt den
+          angedockten FAB beim Neubau des Kopfs wieder ein. */ ''}
     <div class="page-toolbar__actions">
       ${scheduleWarningHtml}
-      ${moduleAccess('calendar') === 'write' ? `<button class="btn btn--icon cal-toolbar__calendars-btn" id="cal-calendars"
+      ${/* Verwalten ist ein Werkzeug, kein Datum: eigenes Zeichen (Kalender mit
+            Zahnrad) und dieselbe Kopf-Icon-Haut wie Lupe und Filter. Das nackte
+            `calendar-days` daneben las sich wie ein zweiter "Heute"-Knopf. */ ''}
+      ${moduleAccess('calendar') === 'write' ? `<button class="btn btn--secondary btn--icon cal-toolbar__calendars-btn" id="cal-calendars"
         aria-label="${t('calendar.manageCalendars')}" title="${t('calendar.manageCalendars')}" aria-haspopup="dialog">
-        <i data-lucide="calendar-days" aria-hidden="true"></i>
+        <i data-lucide="calendar-cog" class="icon-md" aria-hidden="true"></i>
       </button>` : ''}
     </div>
-    <!-- Bar-Zeile des Kopfs (Werkzeugzeilen-Regel, layout.css): das Ansichts-
-         Segment hatte im Actions-Slot bei 1280px 212px fuer 245px Inhalt -
-         "Agenda" lag hinter dem Fade und das Monatslabel daneben ellipsierte
-         auf seine 7ch-Untergrenze. Der neutrale Wrapper haelt das Well des
-         Segments auf intrinsischer Breite; die Zeile gehoert trotzdem ihm. -->
     <div class="page-toolbar__bar cal-toolbar__bar">
       <!-- „Ansicht", nicht „Kalender": die Tablist hiess wie die H1 darueber, und
-           ein Screenreader kuendigte zweimal hintereinander „Kalender" an. -->
-      <div class="cal-toolbar__views" role="tablist" aria-label="${t('calendar.viewSwitcher')}">
+           ein Screenreader kuendigte zweimal hintereinander „Kalender" an.
+           Die Optik ist das Kanon-Segment (.segmented, panel.css) mit der
+           gleitenden Kapsel (attachSegmentIndicator) - kein eigenes Well mehr. -->
+      <div class="segmented cal-toolbar__views" role="tablist" aria-label="${t('calendar.viewSwitcher')}">
         ${VIEWS.map((v) => `
-          <button class="cal-toolbar__view-btn ${v === state.view ? 'cal-toolbar__view-btn--active' : ''}"
+          <button class="segmented__item cal-toolbar__view-btn${v === state.view ? ' is-active' : ''}"
                   role="tab" id="cal-view-tab-${v}" data-tab-id="${v}"
                   aria-keyshortcuts="${CAL_SHORTCUT_KEYS.views[v]}"
                   aria-selected="${v === state.view ? 'true' : 'false'}"
@@ -2155,11 +2167,24 @@ function toolbarHtml({ filterCount = 0, scheduleWarningHtml = '' } = {}) {
                   tabindex="${v === state.view ? '0' : '-1'}">${VIEW_LABELS()[v]}</button>
         `).join('')}
       </div>
-      <div class="cal-toolbar__tools">
+      <div class="page-toolbar__tools cal-toolbar__tools" role="search">
+        ${/* DIE SUCHE IST DAS EINE FELD (renderPageSearch), wie in jedem Modul:
+              am Desktop ein Feld, unter 768px die Icon-Form der Shell, die zum
+              Feld aufgeht - an ERSTER Stelle der Werkzeuggruppe. Sie bleibt eine
+              Volltextsuche am Server, deren Treffer die Ansicht ersetzen: ab dem
+              ersten Zeichen, und mit dem leeren Feld kommt die Ansicht zurueck. */ ''}
+        ${renderPageSearch({
+          id: 'cal-search-input',
+          label: t('calendar.searchOpen'),
+          // Kurz, weil das Feld in der einen Kopfzeile schmal werden darf; der
+          // Name des Felds ("Termine suchen") steht im Label.
+          placeholder: t('search.placeholder'),
+          value: searchValue,
+          clearLabel: t('common.searchClear'),
+          className: 'cal-toolbar__search',
+        })}
         ${/* DER GETEILTE FILTERKNOPF (R17 Z1, A1 P2-3): Zahl als Badge wie in
-              jedem Modul (utils/filter-sheet.js), der Name nennt sie. Hier stand
-              eine Kopie mit eigener Badge-Klasse - das Vorbild, von dem der
-              Baustein abgeschrieben war, lief seitdem neben ihm her. */ ''}
+              jedem Modul (utils/filter-sheet.js), der Name nennt sie. */ ''}
         ${filterButtonHtml({
           id: 'cal-filters',
           count: filterCount,
@@ -2170,31 +2195,19 @@ function toolbarHtml({ filterCount = 0, scheduleWarningHtml = '' } = {}) {
           },
           className: 'cal-toolbar__filter-btn',
         })}
-        <!-- KEIN aria-controls im geschlossenen Zustand: die Suchleiste entsteht
-             erst beim Öffnen (openCalendarSearch), und ein Verweis auf eine ID, die
-             es noch nicht gibt, kündigt einem Screenreader ein Ziel an, das nicht
-             existiert. Gesetzt wird es dort, wo die Leiste entsteht, und beim
-             Schließen wieder entfernt - dieselbe Regel wie in utils/sub-tabs.js:
-             ohne aufgelöstes Ziel bleibt das Attribut weg. -->
-        <button type="button" class="btn btn--secondary btn--icon cal-toolbar__search-btn" id="cal-search"
-                aria-label="${t('calendar.searchOpen')}" title="${t('calendar.searchOpen')}"
-                aria-expanded="false" data-collapse-fold>
-          <i data-lucide="search" class="icon-md" aria-hidden="true"></i>
-        </button>
-        ${viewMenuHtml()}
+        <span id="cal-search-live" class="sr-only" role="status" aria-live="polite"></span>
       </div>
     </div>
   `;
 }
 
 /**
- * MOBIL STEHT DIE ANSICHTSWAHL IM WERKZEUGMENUE (R9 M5, A8 P2-3).
+ * MOBIL STEHT DIE ANSICHTSWAHL IN EINEM POP-UP-KNOPF (R9 M5, A8 P2-3; D1).
  *
- * Gemessen 390x844 vorher: der Kopf hatte drei Zeilen und 166px - Titel,
- * Zeitraum, Ansichts-Segment mit Filter und Suche. Wie in Apples Kalender
- * waehlt man die Ansicht unter 640px aus einem Menue (calendar.css blendet
- * dort das Segment aus und dieses Menue ein); darueber bleibt das Segment,
- * und das Menue ist unsichtbar. Beide steuern dieselbe Tablist
+ * Vier Ansichten passen bei 390px nicht als Segment neben den Zeitraum. Wie in
+ * Apples Kalender waehlt man sie unter 640px aus einem Menue (calendar.css
+ * blendet dort das Segment aus und diesen Knopf ein); darueber bleibt das
+ * Segment, und der Knopf ist unsichtbar. Beide steuern dieselbe Tablist
  * (`viewTabs.setActive`), der Speicher und die Kuerzel m/w/d/a laufen
  * unveraendert ueber deren `onChange`.
  *
@@ -2206,11 +2219,14 @@ function toolbarHtml({ filterCount = 0, scheduleWarningHtml = '' } = {}) {
 const VIEW_ICONS = { month: 'calendar-days', week: 'calendar-range', day: 'calendar-1', agenda: 'list' };
 
 /**
- * DER KNOPF ZEIGT DIE AKTIVE ANSICHT (R17, E11; Critique 2026-10-07 A2 P2).
- * Hinter "..." stand mobil nirgends im Kopf, in welcher Ansicht man ist - das
- * Segment, das es am Desktop sagt, ist unter 640px ausgeblendet. Der Knopf
- * traegt jetzt die Glyphe der aktiven Ansicht (dieselbe wie ihr Menue-Eintrag)
- * und nennt sie im Namen: "Ansicht: Woche". Das Menue bleibt.
+ * DER KNOPF NENNT DIE AKTIVE ANSICHT IN WORTEN, SEIN ZEICHEN STEHT (D1,
+ * Critique 2026-10-16; vorher R17 E11). E11 hatte dem Knopf die Glyphe der
+ * aktiven Ansicht gegeben - damit wechselte das Zeichen eines Knopfs mit
+ * seinem Zustand, und ein Erstnutzer erkannte ihn nach dem Wechsel nicht
+ * wieder. Jetzt ist er ein Pop-up-Knopf wie bei Apple: das Wort der Ansicht
+ * ("Woche") und dahinter das feste Auf/Ab-Zeichen einer Auswahl. Er steht am
+ * Ende der Zeitraum-Zeile, die dafuer den Reset auf den Wert legt
+ * (calendar.css). Der Name bleibt "Ansicht: Woche".
  */
 function viewMenuLabel(current = state.view) {
   return `${t('calendar.viewSwitcher')}: ${VIEW_LABELS()[current] ?? ''}`;
@@ -2219,10 +2235,11 @@ function viewMenuLabel(current = state.view) {
 function viewMenuHtml(current = state.view) {
   const label = viewMenuLabel(current);
   return `
-        <button type="button" class="btn btn--secondary btn--icon cal-toolbar__tools-btn popover-menu__trigger" id="cal-views-menu"
+        <button type="button" class="btn btn--secondary cal-toolbar__view-menu popover-menu__trigger" id="cal-views-menu"
                 popovertarget="cal-views-menu-panel" aria-haspopup="menu" aria-expanded="false" data-collapse-fold-menu
                 data-view="${esc(current)}" aria-label="${esc(label)}" title="${esc(label)}">
-          <i data-lucide="${VIEW_ICONS[current] ?? VIEW_ICONS.month}" class="icon-md" aria-hidden="true"></i>
+          <span class="cal-toolbar__view-menu-label" aria-hidden="true">${esc(VIEW_LABELS()[current] ?? '')}</span>
+          <i data-lucide="chevrons-up-down" class="icon-sm" aria-hidden="true"></i>
         </button>
         <div class="popover-menu" id="cal-views-menu-panel" popover role="menu">
           ${VIEWS.map((v) => `
@@ -2238,24 +2255,20 @@ function viewMenuHtml(current = state.view) {
 
 /** Den Haken im Ansichtsmenue der aktuellen Ansicht nachziehen. */
 function syncViewMenu(root = _container) {
-  let active = null;
   for (const item of root?.querySelectorAll?.('[data-cal-view]') ?? []) {
     const on = item.dataset.calView === state.view;
-    if (on) active = item;
     item.setAttribute('aria-checked', String(on));
     item.querySelector('.popover-menu__item-check')?.classList.toggle('popover-menu__item-check--hidden', !on);
   }
-  // Der Ausloeser zieht mit (E11): Glyphe und Name der aktiven Ansicht. Die
-  // Glyphe ist die des Menue-Eintrags, als Kopie - sie ist dort schon
-  // gezeichnet, ein zweiter Lucide-Lauf ueber den Kopf entfaellt.
+  // Der Ausloeser zieht Wort und Namen nach; sein Zeichen bleibt stehen.
   const trigger = root?.querySelector?.('#cal-views-menu');
   if (!trigger || trigger.dataset.view === state.view) return;
   trigger.dataset.view = state.view;
   const label = viewMenuLabel(state.view);
   trigger.setAttribute('aria-label', label);
   trigger.setAttribute('title', label);
-  const glyph = active?.firstElementChild?.cloneNode(true);
-  if (glyph) trigger.replaceChildren(glyph);
+  const word = trigger.querySelector('.cal-toolbar__view-menu-label');
+  if (word) word.textContent = VIEW_LABELS()[state.view] ?? '';
 }
 
 function renderToolbar() {
@@ -2290,8 +2303,11 @@ function renderToolbar() {
   // stand danach ohne Primaeraktion da. Umgehaengt wird der Knoten selbst -
   // seine Verdrahtung (findPageFab unten in render) haengt an ihm.
   const dockedFab = bar.querySelector('.page-fab');
+  // DAS SUCHFELD UEBERLEBT DEN NEUBAU: Wert und Fokus gehen sonst bei jedem
+  // Filterwechsel verloren, waehrend die Treffer noch stehen.
+  const searchHadFocus = bar.querySelector('#cal-search-input') === document.activeElement;
   bar.replaceChildren();
-  bar.insertAdjacentHTML('beforeend', toolbarHtml({ filterCount, scheduleWarningHtml }));
+  bar.insertAdjacentHTML('beforeend', toolbarHtml({ filterCount, scheduleWarningHtml, searchValue: searchActive ? searchQuery : '' }));
   if (dockedFab) bar.querySelector('.page-toolbar__actions')?.appendChild(dockedFab);
 
   if (window.lucide) lucide.createIcons({ el: bar });
@@ -2302,7 +2318,7 @@ function renderToolbar() {
   bar.querySelector('#cal-next').addEventListener('click', () => navigate(1));
   bar.querySelector('#cal-calendars')?.addEventListener('click', openLocalCalendarsModal);
   bar.querySelector('#cal-today').addEventListener('click', goToday);
-  bar.querySelector('#cal-search').addEventListener('click', openCalendarSearch);
+  wireCalendarSearch(bar, { focus: searchHadFocus });
   bar.querySelector('#cal-filters').addEventListener('click', openCalendarFilters);
   // Der Filterknopf kommt aus dem geteilten Baustein; die Marke fuer die
   // Faltung im eingeklappten Kopf (calendar.css) setzt deshalb das Modul.
@@ -2329,7 +2345,7 @@ function renderToolbar() {
   wireScrollFade(bar.querySelector('.cal-toolbar__views'));
   viewTabs = wireTablist(bar.querySelector('.cal-toolbar__views'), {
     activeId: state.view,
-    activeClass: 'cal-toolbar__view-btn--active',
+    activeClass: 'is-active',
     onChange: async (view) => {
       if (searchActive) closeCalendarSearch({ restoreView: false });
       state.view = view;
@@ -5829,54 +5845,45 @@ function persistHiddenSources() {
   } catch {}
 }
 
-function openCalendarSearch() {
-  if (searchActive) {
-    _container.querySelector('#cal-search-input')?.focus();
+/**
+ * DIE SUCHE IST DAS FELD IM KOPF (D1, Critique 2026-10-16).
+ *
+ * Bis dahin deckte ein eigener Knopf eine Suchleiste UNTER dem Kopf auf, mit
+ * eigenem Schliessen-Knopf - das einzige Modul ohne das Feld im Kopf. Jetzt
+ * steht `renderPageSearch` im Werkzeug-Slot: am Desktop als Feld, unter 768px
+ * in der Icon-Form der Shell. Was bleibt, ist das Verhalten einer
+ * Volltextsuche am Server: ab dem ersten Zeichen ersetzen Hinweis, Treffer
+ * oder Leermeldung die Ansicht; das leere Feld (Loeschen-Knopf, Esc oder
+ * Zuruecktippen) gibt sie zurueck. Esc im leeren Feld laesst den Fokus los.
+ */
+function wireCalendarSearch(bar, { focus = false } = {}) {
+  const handle = wirePageSearch(bar, { id: 'cal-search-input', onQuery: onCalendarSearchInput, delay: 220 });
+  const input = handle?.input;
+  if (!input) return;
+  input.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    if (input.value) {
+      handle.clear();
+      closeCalendarSearch();
+    } else {
+      input.blur();
+    }
+  });
+  if (focus) input.focus();
+}
+
+function onCalendarSearchInput(raw) {
+  if (!String(raw ?? '').trim()) {
+    closeCalendarSearch();
     return;
   }
-  const toolbar = _container.querySelector('#cal-toolbar');
-  if (!toolbar) return;
-  searchActive  = true;
-  searchQuery   = '';
-  searchResults = [];
-
-  const toggle = _container.querySelector('#cal-search');
-  toggle?.setAttribute('aria-expanded', 'true');
-  // Erst jetzt gibt es ein Ziel, also erst jetzt der Verweis darauf.
-  toggle?.setAttribute('aria-controls', 'cal-search-bar');
-  toggle?.classList.add('cal-toolbar__search-btn--active');
-
-  toolbar.insertAdjacentHTML('afterend', `
-    <div class="cal-search" id="cal-search-bar" role="search">
-      ${renderPageSearch({
-        id: 'cal-search-input',
-        label: t('calendar.searchPlaceholder'),
-        clearLabel: t('common.searchClear'),
-        className: 'cal-search__field',
-      })}
-      <button class="btn btn--icon cal-search__close" id="cal-search-close"
-              aria-label="${esc(t('calendar.searchClose'))}" title="${esc(t('calendar.searchClose'))}">
-        <i data-lucide="x" aria-hidden="true"></i>
-      </button>
-      <span id="cal-search-live" class="sr-only" role="status" aria-live="polite"></span>
-    </div>
-  `);
-
-  const bar   = _container.querySelector('#cal-search-bar');
-  const input = bar.querySelector('#cal-search-input');
-  if (window.lucide) lucide.createIcons({ el: bar });
-
-  renderCalendarSearchState('hint');
-
-  // Die geteilte Verdrahtung: sie blendet den Loeschen-Knopf der Kapsel ein und
-  // leert mit ihm die Suche (page-search.css unterdrueckt das native Kreuz).
-  wirePageSearch(bar, { id: 'cal-search-input', onQuery: runCalendarSearch, delay: 220 });
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { e.preventDefault(); closeCalendarSearch(); }
-  });
-  bar.querySelector('#cal-search-close').addEventListener('click', () => closeCalendarSearch());
-
-  input.focus();
+  if (!searchActive) {
+    searchActive  = true;
+    searchQuery   = '';
+    searchResults = [];
+  }
+  runCalendarSearch(raw);
 }
 
 function closeCalendarSearch({ restoreView = true } = {}) {
@@ -5884,29 +5891,17 @@ function closeCalendarSearch({ restoreView = true } = {}) {
   searchActive  = false;
   searchQuery   = '';
   searchResults = [];
-  _container.querySelector('#cal-search-bar')?.remove();
-
-  const toggle = _container.querySelector('#cal-search');
-  toggle?.setAttribute('aria-expanded', 'false');
-  // Die Leiste ist gerade entfernt worden - der Verweis geht mit ihr.
-  toggle?.removeAttribute('aria-controls');
-  toggle?.classList.remove('cal-toolbar__search-btn--active');
-
+  // Das Feld leert sich mit (ein gefundener Termin, ein Ansichtswechsel):
+  // ein stehender Begriff ueber der wiederhergestellten Ansicht behauptete
+  // eine Suche, die nicht mehr laeuft.
+  const input = _container?.querySelector?.('#cal-search-input');
+  if (input && input.value) {
+    input.value = '';
+    const clear = input.closest('.page-search__control')?.querySelector('[data-page-search-clear]');
+    if (clear) clear.hidden = true;
+  }
+  setSearchLive('');
   if (restoreView) renderView();
-  headerToolFocusTarget(toggle)?.focus();
-}
-
-/**
- * Wohin der Fokus zurueckgeht, wenn ein Werkzeug des Kopfs fertig ist. Sonst
- * das Werkzeug selbst - eingeklappt am Telefon (R17) ist es aber ins
- * Ansichtsmenue gefaltet und nicht im Bild: `focus()` auf ein `display: none`
- * tut nichts, und der Fokus fiele nach Esc in der Suche auf das Dokument.
- * Dann geht er an den Knopf, ueber den das Werkzeug erreicht wurde.
- */
-function headerToolFocusTarget(tool) {
-  if (!tool) return null;
-  if (tool.getClientRects().length > 0) return tool;
-  return tool.closest('.cal-toolbar')?.querySelector('[data-collapse-fold-menu]') ?? tool;
 }
 
 async function runCalendarSearch(raw) {

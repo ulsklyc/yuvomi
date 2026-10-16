@@ -3099,25 +3099,17 @@ button.today-cockpit__more--link {
   min-width: 0;
 }
 
+/* DIE KOPF-ICON-HAUT DER SHELL (D1, Critique 2026-10-16): Haut, Tinte und
+ * Hover kommen aus `.btn.btn--secondary.btn--icon` im Markup, wie Lupe,
+ * Filter und „..." in jedem Modulkopf. Hier standen bis dahin graue Kreise
+ * ohne Rahmen (eigene Flaeche --neutral-200) - die dritte Haut fuer denselben
+ * Kopfknopf. Es bleibt nur, was der Uebersicht gehoert: die Groesse. */
 .dashboard-icon-btn {
-  /* HIG-Kreis-Button (Apple-Toolbar-Muster): graue Kreisfläche, kein Rahmen. */
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   width: var(--target-lg);
   height: var(--target-lg);
+  padding: 0;
   border-radius: var(--radius-full);
-  border: none;
-  background: var(--neutral-200);
-  color: var(--color-text-secondary);
   flex: 0 0 auto;
-  transition: color var(--transition-fast), background-color var(--transition-fast);
-}
-
-.dashboard-icon-btn:hover,
-.dashboard-icon-btn:focus-visible {
-  color: var(--color-text-primary);
-  background: var(--neutral-250);
 }
 
 .dashboard-icon-btn svg {

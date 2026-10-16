@@ -158,45 +158,13 @@
   padding: var(--space-1) var(--space-3);
 }
 
-.cal-toolbar__views {
-  display: flex;
-  gap: var(--space-0h);
-  background-color: var(--color-surface-3);
-  border-radius: var(--radius-sm);
-  padding: var(--space-0h);
-}
-
+/* DIE ANSICHTSWAHL IST DAS KANON-SEGMENT (.segmented, panel.css; D1, Critique
+ * 2026-10-16). Hier standen ein eigenes Well (radius-sm, ohne Kante) und eine
+ * eigene Aktiv-Pille - die dritte Optik derselben Bedienfrage neben dem
+ * Aufgaben-Umschalter und den Dokumenten. Es bleibt die Schriftrolle der
+ * Beschriftung (test:typography: mindestens 14px). */
 .cal-toolbar__view-btn {
   font-size: var(--type-secondary);
-  font-weight: var(--font-weight-medium);
-  padding: var(--space-1) var(--space-2);
-  /* Konzentrik statt eigener Stufe: das Segment sitzt in einem Traeger mit
-   * --radius-sm und 2px Innenabstand, sein Innenradius ist damit rechnerisch
-   * festgelegt (DESIGN.md, Radien-Kanon). Es stand als einziges Segment der
-   * App auf --radius-xs, waehrend .group-toggle__btn dieselbe Formel bereits
-   * traegt - zwei Innenradien fuer dieselbe Bauart. */
-  border-radius: calc(var(--radius-sm) - 2px);
-  border: none;
-  background: none;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  /* Was wirklich wechselt (Hover, Aktiv-Pille) - `all` nahm jede kuenftige
-   * Eigenschaft mit, auch Layout. */
-  transition: color var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast);
-  min-height: var(--target-lg);
-  white-space: nowrap;
-}
-
-.cal-toolbar__view-btn:hover:not(.cal-toolbar__view-btn--active) {
-  color: var(--color-text-primary);
-}
-
-/* Aktiv = erhabene Surface-Pille im Well, Modulton nur in der Tinte. Das
- * Rezept steht in tokens.css (Abschnitt 6c) und nirgends sonst. */
-.cal-toolbar__view-btn--active {
-  background-color: var(--seg-active-bg);
-  box-shadow: var(--seg-active-shadow);
-  color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-ink), var(--color-text-primary));
 }
 
 /* Mobiles Umbrechen kommt jetzt aus .page-toolbar--wrap (layout.css): die
@@ -208,31 +176,18 @@
  * Kopf damit bei 375px um 72px über die Viewport-Kante. Es kommt jetzt aus der
  * Shell-Regel „Tab-Leiste im Modulkopf" (layout.css), die über `[role=tablist]`
  * greift und deshalb jede Leiste erfasst, nicht die vier bekannten. */
-@media (max-width: 767px) {
-  .cal-toolbar__view-btn {
-    flex: 0 0 auto;
-    min-height: var(--target-base);
-  }
-}
-
-/* DIE BAR-ZEILE TRAEGT SEGMENT UND WERKZEUGE (Critique 2026-09-24, P1).
+/* DER KOPF-WERKZEUG-SLOT (D1, Critique 2026-10-16).
  *
- * Filter und Suche standen im Aktions-Slot und bildeten mobil eine eigene
- * Kopfzeile: 56px fuer zwei Knoepfe, und je nach Kollaps-Zustand links
- * (Monat, ausgeklappt) oder rechts (Woche/Tag/Agenda, eingeklappt). Hier
- * stehen sie am Ende der Bar-Zeile - auf jeder Breite, in jeder Ansicht und
- * jedem Zustand an derselben Stelle.
+ * Die Bar-Zeile traegt das Ansichts-Segment und die Werkzeuge - Suchfeld,
+ * Filter - in DIESER Reihenfolge. Wird es in einer langen Locale eng, gibt das
+ * SEGMENT nach (es scrollt mit Fade, Werkzeugzeilen-Regel), nie die Werkzeuge.
  *
- * `gap: 0` IST GEMESSEN, nicht Geschmack: das Segment braucht bei 375px in
- * `de` 245px, die Werkzeuge 2 x 48px, die Zeile hat 343px. Mit dem 4px-Gap der
- * Bar-Basis fehlten 2px, und das Segment waere in den Scroll-Fade gerutscht.
- * Die Knoepfe haben ihre Luft ohnehin in der eigenen Trefferflaeche.
- *
- * Wird es in einer langen Locale doch zu eng, gibt das SEGMENT nach (es
- * scrollt mit Fade, Werkzeugzeilen-Regel), nie die Werkzeuge: die haben kein
- * Label, das man anschneiden koennte, nur eine Trefferflaeche. */
+ * Der Stepper sitzt mit dem Pop-up der Ansichtswahl im Center-Slot; der
+ * Wrapper `.cal-toolbar__stepper` loest sich ueberall auf, wo der Pop-up-Knopf
+ * nicht steht (ab 640px), und die Regeln der Shell sehen die Teile des
+ * Steppers als Kinder des Slots wie zuvor. */
 .cal-toolbar__bar {
-  gap: 0;
+  gap: var(--space-2);
   flex-wrap: nowrap;
 }
 
@@ -243,30 +198,117 @@
 .cal-toolbar__tools {
   display: flex;
   align-items: center;
-  flex-shrink: 0;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  min-width: 0;
   margin-inline-start: auto;
 }
 
-/* Das Ansichtsmenue gibt es nur mobil (R9 M5) - darueber waehlt das Segment. */
-.cal-toolbar__tools-btn {
+.cal-toolbar__tools > .cal-toolbar__filter-btn {
+  flex-shrink: 0;
+}
+
+.cal-toolbar__stepper {
+  display: contents;
+}
+
+/* Die Ansichtswahl als Pop-up gibt es nur mobil (R9 M5) - darueber waehlt das Segment. */
+.cal-toolbar__view-menu {
   display: none;
 }
 
-/* MOBIL ZWEI KOPFZEILEN STATT DREI (R9 M5, Re-Critique 2026-09-27 A8 P2-3).
+/* AB 1024px IST DER KOPF EINE ZEILE (D1, Critique 2026-10-16: 125px in zwei
+ * Zeilen, ~540px Leerraum neben dem Stepper). Die Bar-Zeile verliert ihre
+ * volle Breite und steht als Gruppe hinter dem Zeitraum; der Aktions-Slot
+ * (Verwalten, angedockte Pille) bleibt am Zeilenende. Reicht die Breite nicht
+ * (Seitenleiste offen, 1024-1279px), bricht die Gruppe als Ganzes um - nie
+ * mitten zwischen Segment und Suche. */
+@media (min-width: 1024px) {
+  .page-toolbar.cal-toolbar > .page-toolbar__center {
+    flex: 0 0 auto;
+  }
+
+  /* Basis 0 mit `min-content` als Untergrenze: die Gruppe meldet fuer den
+   * Zeilenumbruch nur, was sie mindestens braucht (Segment, Filter, die Lupe
+   * des Felds), und waechst real in den Rest - das Suchfeld bis zu seiner
+   * Kanonbreite. Mit fester Basis brach bei 1440px Verwalten unter die Zeile. */
+  .page-toolbar.cal-toolbar > .page-toolbar__bar {
+    order: 0;
+    flex: 1 1 0;
+    min-width: min-content;
+    padding-block: 0;
+    border-block-start: 0;
+  }
+
+  .page-toolbar.cal-toolbar > .page-toolbar__actions {
+    order: 1;
+  }
+
+  /* Das Segment gibt in dieser Zeile nicht nach (das Suchfeld tut es), und
+   * das Label hat seine feste Breite (11rem: "KW 42 · Oktober 2026" misst 169px), damit die Pfeile in
+   * allen vier Ansichten stillstehen. */
+  .cal-toolbar__views {
+    flex-shrink: 0;
+  }
+
+  .cal-toolbar__label {
+    flex: 0 0 11rem;
+  }
+}
+
+/* TABLET (768-1023px): ZWEI ZEILEN STATT DREI (Critique 2026-10-16: 182px in
+ * drei Zeilen bei 834px, Filter und Suche ohne Abstand). Zeile 1 traegt den
+ * Large Title und die Werkzeuge - Suchfeld in Kanonbreite, Filter -, Zeile 2
+ * Zeitraum und Ansichts-Segment. Die Bar-Zeile loest sich dafuer auf; die
+ * Titelbasis ist die Zeile abzueglich Siegel und Werkzeugen, damit der
+ * Zeitraum nie neben den Titel rutscht, auch wenn dort Platz waere. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .page-toolbar--period-title.cal-toolbar > .cal-toolbar__bar,
+  .page-toolbar--period-title.cal-toolbar .cal-toolbar__tools {
+    display: contents;
+  }
+
+  .page-toolbar.cal-toolbar:not(.page-toolbar--in-group) > .page-toolbar__title {
+    flex: 1 1 calc(100% - var(--seal-head-lead) - var(--page-search-width) - var(--target-base) - 2 * var(--page-toolbar-gap));
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .cal-toolbar__filter-btn {
+    flex-shrink: 0;
+  }
+
+  .page-toolbar.cal-toolbar.page-toolbar--wrap > .page-toolbar__center,
+  .cal-toolbar__views {
+    order: 2;
+  }
+
+  .page-toolbar.cal-toolbar.page-toolbar--wrap > .page-toolbar__center {
+    flex: 0 1 auto;
+  }
+
+  .cal-toolbar__views {
+    flex-shrink: 0;
+  }
+}
+
+/* MOBIL ZWEI KOPFZEILEN (R9 M5, Re-Critique 2026-09-27 A8 P2-3; D1).
  *
- * Gemessen 390x844 vorher: Titel 41px, Zeitraum 48px, Ansichts-Segment mit
- * Filter und Suche 52px - 166px Kopf, der Kalender stand als einziger
- * Nicht-Ausnahme-Kopf ueber 122px. Wie in Apples Kalender wandert die
- * Ansichtswahl ins Menue „..." (calendar.js, viewMenuHtml); das Segment
- * verschwindet, und die Bar-Zeile loest sich auf (`display: contents`): ihre
- * Werkzeuge - Filter, Suche, Menue - ruecken als Gruppe an das Ende der
- * Titelzeile, der Zeitraum behaelt die zweite Zeile fuer sich.
+ * Wie in Apples Kalender waehlt man die Ansicht unter 640px aus einem Menue
+ * (calendar.js, viewMenuHtml); das Segment verschwindet, und die Bar-Zeile
+ * loest sich auf (`display: contents`): Lupe und Filter ruecken als Gruppe an
+ * das Ende der Titelzeile - die Lupe zuerst (D1: Suche · Ansicht · Filter) -,
+ * der Zeitraum behaelt mit dem Pop-up-Knopf der Ansicht die zweite Zeile.
  *
- * WARUM DER FILTER OBEN STEHT UND NICHT NEBEN DEM STEPPER: gemessen haette
- * Zeile 2 mit Filter dem Zeitraumlabel 134px gelassen, das mobile Wochenlabel
- * („26.09. - 28.09.2026") braucht 155px und waere abgeschnitten worden. Oben
- * steht der Filter bei Suche und Menue - dieselbe Werkzeuggruppe wie am
- * Desktop am Ende der Bar-Zeile. */
+ * DAS WORT DER ANSICHT STEHT IN ZEILE 2, NICHT NEBEN DEM TITEL: gemessen 390px
+ * hatte die Titelzeile neben "Kalender" und zwei Werkzeugen 71px frei, der
+ * Knopf mit "Woche" braucht 74-84px - der Titel waere angeschnitten worden.
+ * Zeile 2 traegt ihn, weil der Reset ("Heute") dort auf den Wert rueckt
+ * (wie im Budget, layout.css `--period-inline`): seine reservierte Box
+ * (~70px) wird frei, das Label behaelt seine Breite (~160px). */
 @media (max-width: 639px) {
   .cal-toolbar__views {
     display: none;
@@ -281,60 +323,102 @@
     display: contents;
   }
 
-  .cal-toolbar__tools-btn {
-    display: inline-flex;
-  }
-
   .page-toolbar.cal-toolbar:not(.page-toolbar--in-group) > .page-toolbar__title {
     flex: 1 1 0;
     min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  .cal-toolbar__filter-btn,
-  .cal-toolbar__search-btn,
-  .cal-toolbar__tools-btn {
-    order: 1;
+  /* Lupe und Filter folgen dem Titel in der DOM-Reihenfolge; der Titel waechst
+   * (Basis 0) und schiebt sie ans Zeilenende, der Zeitraum steht per `order`
+   * in Zeile 2. Die Lupe nimmt ihre Icon-Form aus der Shell (layout.css). */
+  .cal-toolbar__filter-btn {
     flex-shrink: 0;
   }
 
-  /* Eingeklappt ist der Titel nur noch fuer Vorlesehilfen da - die Werkzeuge
-   * rutschen dann an das Zeilenende statt an den Anfang. */
-  .cal-toolbar__filter-btn {
-    margin-inline-start: auto;
+  /* Die offene Suche nimmt die Zeile (wie in `--title-tools`, layout.css):
+   * mit Fokus oder Begriff verlaesst der Titel das Bild, nicht den Baum. */
+  .page-toolbar.cal-toolbar:has(.cal-toolbar__search:focus-within) > .page-toolbar__title,
+  .page-toolbar.cal-toolbar:has(.cal-toolbar__search input:not(:placeholder-shown)) > .page-toolbar__title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .page-toolbar.cal-toolbar.page-toolbar--wrap > .page-toolbar__center {
     order: 2;
     flex-basis: 100%;
+    gap: var(--space-2);
+  }
+
+  /* Zeitraum + Ansicht: der Stepper nimmt den Rest, der Knopf seine Breite. */
+  .cal-toolbar__stepper {
+    display: flex;
+    align-items: center;
+    flex: 1 1 0;
+    min-width: 0;
+    position: relative;
+  }
+
+  .cal-toolbar__view-menu {
+    display: inline-flex;
+    flex: 0 0 auto;
+    gap: var(--space-1);
+    padding-inline: var(--space-3);
+    min-height: var(--target-base);
+  }
+
+  /* DER RESET LIEGT AUF DEM WERT (Muster Budget, layout.css `--period-inline`):
+   * durchsichtig zwischen den Pfeilen, ein Tipp aufs Label springt zurueck;
+   * der Wert steht im Modulton, solange man neben dem laufenden Zeitraum
+   * steht. Name und Tab-Stopp des Knopfs bleiben. */
+  .cal-toolbar__stepper > .cal-toolbar__today.is-current {
+    display: none;
+  }
+
+  .cal-toolbar__stepper > .cal-toolbar__today {
+    position: absolute;
+    inset-block: 0;
+    inset-inline: var(--target-base);
+    min-width: 0;
+    padding: 0;
+    overflow: hidden;
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+    color: transparent;
+  }
+
+  .cal-toolbar__stepper > .period-stepper__value--away {
+    color: var(--module-accent);
   }
 
   /* EINGEKLAPPT EINE ZEILE (R17 Schritt 5, Critique 2026-10-07 A1 P1).
    *
-   * Gemessen 390x844: der Kopf mass ausgeklappt 117px und eingeklappt 117px.
-   * Titel und Siegel verliessen das Bild, aber Zeile 1 blieb stehen - drei
-   * Icons bei x 222-374 neben 206px Leerraum -, und der Zeitraum behielt
-   * Zeile 2. Jetzt rueckt der Stepper in die frei gewordene Zeile, vor das
-   * Menue: 117 -> 65px, wie Notizen, Kontakte und Gesundheit.
-   *
-   * WAS DAFUER WEICHT: Suche, Filter und "Heute" falten ins Menue - als
-   * Eintraege mit demselben Namen, die das Original klicken
-   * (`data-collapse-fold`, wireCollapsingHeader). Das Label braucht die
-   * Breite: mit allen dreien blieben ihm 68px, "07.10. - 06.11.2026" misst
-   * 172px. So bekommt es 194px. Ein AKTIVER Filter faltet nicht - die Zahl
-   * am Knopf ist die Zusage der Kopfregel (aktive Filter bleiben sichtbar),
-   * dann kuerzt das Label (142px, Ellipse).
-   *
-   * Nur unter 640px: darueber waehlt das Segment die Ansicht, das Menue ist
-   * unsichtbar, und ohne Menue faltet nichts. */
+   * Der Stepper rueckt mit dem Pop-up-Knopf in die frei gewordene Titelzeile,
+   * vor Lupe und Filter. Was dafuer weicht: das Wort im Pop-up-Knopf (das
+   * Auf/Ab-Zeichen bleibt, der Name nennt die Ansicht) und ein ruhender
+   * Filter, der ins Menue faltet (`data-collapse-fold`, wireCollapsingHeader).
+   * Ein AKTIVER Filter faltet nicht - die Zahl am Knopf ist die Zusage der
+   * Kopfregel (aktive Filter bleiben sichtbar). Die Lupe faltet nicht: sie
+   * ist ein Feld, kein Knopf, und ein Stellvertreter im Menue koennte es
+   * nicht oeffnen. */
   .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed > .page-toolbar__center {
     order: 0;
     flex: 1 1 0;
     min-width: 0;
   }
 
-  .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__search-btn[data-collapse-fold],
-  .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__filter-btn[data-collapse-fold]:not(.page-filter-btn--active),
-  .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__today[data-collapse-fold] {
+  .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__filter-btn[data-collapse-fold]:not(.page-filter-btn--active) {
+    display: none;
+  }
+
+  .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__view-menu-label {
     display: none;
   }
 }
@@ -1378,50 +1462,10 @@
  * Termin-Suche (#471)
  * -------------------------------------------------------- */
 
-/* Ruhend traegt die Lupe die Kopf-Icon-Form (`.btn--secondary.btn--icon`)
- * samt ihrer Tinte, wie Filter und „..." daneben (R17 Z1) - hier stand eine
- * eigene graue Tinte, und eine der drei Knoepfe las sich wie deaktiviert. */
-.cal-toolbar__search-btn {
-  transition: color var(--transition-fast), background-color var(--transition-fast);
-}
-
-.cal-toolbar__search-btn--active {
-  color: var(--color-ink-on-vivid);
-  background-color: var(--module-accent, var(--color-accent));
-}
-
-/* Suchleiste: sitzt zwischen Toolbar und Body, teilt sich als eigene Zeile ab.
- * Die Leiste bleibt die dokumentierte Ausnahme im VERHALTEN (page-search.js:
- * erst per Lupe aufgedeckt, die Treffer ersetzen die Ansicht - serverseitige
- * Volltextsuche, kein Listenfilter). Das FELD darin ist seit dem Komponenten-
- * Kanon (Runde 5, 2026-09-26) die geteilte Kapsel aus renderPageSearch: die
- * randlose Eigenform war die fuenfte Variante des einen Suchfelds (Critique
- * 2026-09-26, P1), und die Begruendung traegt nur das Aufdecken, nicht eine
- * andere Optik. Der Leeren-Knopf der Kapsel bleibt verborgen (nicht
- * verdrahtet): das Schliessen-X daneben leert und schliesst, eine zweite
- * X-Steuerung daneben waere doppelt. */
-.cal-search {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
-  border-bottom: var(--space-px) solid var(--color-border);
-  background-color: var(--color-surface);
-}
-
-.cal-search__field {
-  flex: 1;
-  min-width: 0;
-}
-
-.cal-search__close {
-  color: var(--color-text-secondary);
-  flex-shrink: 0;
-}
-
-.cal-search__close:hover {
-  color: var(--color-text-primary);
-}
+/* Das Feld steht seit D1 (Critique 2026-10-16) im Kopf (`.cal-toolbar__search`,
+ * renderPageSearch); die aufgedeckte Leiste unter dem Kopf mit eigenem
+ * Schliessen-Knopf ist entfallen. Hier bleiben die Zustaende, die die Treffer
+ * an die Stelle der Ansicht setzen. */
 
 /* Statuszustände (Hinweis / leer / Fehler): zentrierte, ruhige Mitteilung. */
 .cal-search-status {

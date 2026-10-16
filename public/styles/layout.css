@@ -2188,10 +2188,7 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
 .filter-chip--active svg,
 .contact-filter-chip--active svg,
 .group-toggle__btn--active svg,
-.documents-view-toggle__btn--active svg,
 .segmented__item.is-active svg,
-.cal-toolbar__view-btn--active svg,
-.cal-toolbar__search-btn--active svg,
 .perm-seg__opt.is-active svg {
   /* 30 % statt 16 %: auf Tab-Bar-Größe (20px) las die schwächere Füllung
    * weiter als Outline (Finish-Verdict Fundament-Phase, Fix 8). */
@@ -4207,6 +4204,21 @@ html.fab-steady .page-fab {
 
 }
 
+/* EINE TITELLAGE IN JEDEM MODUL (D8, Critique 2026-10-16). Unter 768px ist
+ * die Zeile des Titels mindestens ein Ziel hoch, und der Titel steht darin
+ * mittig. Ohne das richtete sich seine Lage nach den Nachbarn: neben den
+ * 48px-Knoepfen der Titelzeile stand die Schrift 3px tiefer als allein
+ * (y 11 gegen 8), und beim Modulwechsel sprang der Large Title.
+ * `align-content` zentriert im Block, die Ellipse der Basisregel bleibt.
+ * NUR UNTER 768px, gemessen: ab dort steht neben dem Titel nichts (ausser
+ * im Kalender), und die Mindesthoehe kostete jeden Kopf 7px (122 -> 129). */
+@media (max-width: 767px) {
+  .page-toolbar:not(.page-toolbar--in-group) > .page-toolbar__title {
+    min-block-size: var(--target-base);
+    align-content: center;
+  }
+}
+
 /* WERKZEUGE IN DER TITELZEILE (R16, Critique 2026-10-05 P1 mobil; DESIGN.md,
  * Kopfregel mobil 1a).
  *
@@ -4415,6 +4427,15 @@ html.fab-steady .page-fab {
      * schwebt. Die Icon-Form ist ein QUADRAT, also nennt sie alle drei
      * Breitenachsen. */
     min-width: var(--target-base);
+    /* DIE EINE HAUT DER KOPF-ICON-KNOEPFE (D1, Critique 2026-10-16): Ring wie
+     * `.btn--secondary.btn--icon` - 1.5px in --color-border, rund, ohne Grund,
+     * das Zeichen im Akzent (Regel unten). Bis dahin stand die Lupe nackt
+     * neben beringtem Filter und „..." und las sich wie ein Rest. Der Ring
+     * sitzt an der Huelle (`label`), nicht am Feld: in dieser Form ist sie ein
+     * Knopf, und mit Fokus oder Begriff kehrt der Feldkanon zurueck. */
+    block-size: var(--target-base);
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-full);
   }
 
   .page-toolbar
@@ -4428,11 +4449,13 @@ html.fab-steady .page-fab {
      * bleibt damit nur der Placeholder - das Icon sagt dasselbe kuerzer. */
     color: transparent;
     /* DIE ICON-FORM IST DIE DER FAMILIE, nicht ein leeres Feld. Der Feldkanon
-     * (1.5px --color-border auf Surface) sagt "hier wird getippt"; in der
-     * Icon-Rolle waere das ein Versprechen, das der Knopf nicht haelt, und
-     * daneben stuenden drei echte `.btn--icon` in Ghost-Optik. Also uebernimmt
-     * er ihre: keine Kante, kein Grund, und der Fokusring der Basisregel
-     * kommt zurueck, sobald das Feld wieder eins ist. */
+     * (Flaeche, Kontrollkante) sagt "hier wird getippt"; in der Icon-Rolle
+     * waere das ein Versprechen, das der Knopf nicht haelt. Das Feld nimmt
+     * Kante und Grund deshalb ganz zurueck - den Ring der Kopf-Icon-Haut
+     * traegt die Huelle (Regel oben, D1) -, und es fuellt sie genau: ihre
+     * Kante liegt innen. */
+    min-height: 0;
+    block-size: calc(var(--target-base) - 2 * 1.5px);
     border-color: transparent;
     background: transparent;
   }
@@ -4464,6 +4487,7 @@ html.fab-steady .page-fab {
     inset-inline: 0;
     margin-inline: auto;
     transform: translateY(-50%);
+    color: var(--color-accent);
   }
 
   /* Ein Slot, der NUR die Suche traegt, gibt ihre Breite mit ab - sonst

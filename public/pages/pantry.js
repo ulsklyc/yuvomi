@@ -513,7 +513,7 @@ function renderFilters() {
   }
 
   bar.insertAdjacentHTML('beforeend', chips.map((chip) => `
-    <button type="button" class="filter-chip${chip.id === state.filter ? ' filter-chip--active' : ''}"
+    <button type="button" class="filter-chip filter-chip--sm${chip.id === state.filter ? ' filter-chip--active' : ''}"
             data-filter="${esc(chip.id)}" aria-pressed="${chip.id === state.filter}">
       <i data-lucide="${esc(chip.icon)}" class="icon-sm" aria-hidden="true"></i>
       <span>${esc(chip.label)}</span>

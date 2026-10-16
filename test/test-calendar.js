@@ -3655,32 +3655,45 @@ test('scheduleEnabled() verlangt zusaetzlich moduleAccess(\'schedule\') !== \'no
 // Mobile Inhaltsflaeche (Critique 2026-09-24, P1)
 // --------------------------------------------------------
 
-/* FILTER UND SUCHE WOHNEN IN DER BAR-ZEILE, NICHT IM AKTIONS-SLOT.
+/* SUCHE UND FILTER WOHNEN IN DER WERKZEUGGRUPPE DER BAR-ZEILE (D1).
  *
  * Im Aktions-Slot bildeten sie mobil eine eigene Kopfzeile (56px fuer zwei
- * Knoepfe) und standen je nach Kollaps-Zustand links oder rechts. Geprueft
- * wird das GERENDERTE Markup des Kopfs: beide Knoepfe stehen in
- * `.page-toolbar__bar`, HINTER der Tab-Leiste, und der Aktions-Slot enthaelt
- * keinen von beiden. */
-test('Kalenderkopf: Filter und Suche stehen in der Bar-Zeile hinter dem Ansichts-Segment, nicht im Aktions-Slot', () => {
+ * Knoepfe). Seit D1 (Critique 2026-10-16) ist die Suche das EINE Feld
+ * (renderPageSearch) statt eines Knopfs, der eine Leiste unter dem Kopf
+ * aufdeckte, und sie steht an ERSTER Stelle der Werkzeuggruppe - vor dem
+ * Filter, hinter dem Ansichts-Segment. Geprueft wird das GERENDERTE Markup. */
+test('Kalenderkopf (D1): Suchfeld und Filter stehen in der Werkzeuggruppe hinter dem Segment, die Suche zuerst', () => {
   const html = calendarHelpers.toolbarHtml({ filterCount: 0, scheduleWarningHtml: '' });
   const at = (needle) => html.indexOf(needle);
   const actions = at('class="page-toolbar__actions"');
   const bar = at('class="page-toolbar__bar');
   const tablist = at('role="tablist"');
+  const tools = at('class="page-toolbar__tools');
   const filters = at('id="cal-filters"');
-  const search = at('id="cal-search"');
-  assert(actions >= 0 && bar >= 0 && tablist >= 0, 'Kopf ohne Aktions-Slot, Bar-Zeile oder Tab-Leiste gerendert');
-  assert(filters >= 0 && search >= 0, 'Filter- oder Suchknopf fehlt im Kopf');
-  assert(bar > actions, 'die Bar-Zeile muss nach dem Aktions-Slot stehen');
-  assert(filters > bar && search > bar,
-    `Filter (${filters}) und Suche (${search}) muessen IN der Bar-Zeile stehen (ab ${bar}), `
-    + 'nicht im Aktions-Slot - dort bauten sie mobil eine eigene Kopfzeile');
-  assert(filters > tablist && search > tablist,
-    'Filter und Suche gehoeren HINTER das Ansichts-Segment, ans Ende der Bar-Zeile');
+  const search = at('id="cal-search-input"');
+  assert(actions >= 0 && bar >= 0 && tablist >= 0 && tools >= 0, 'Kopf ohne Aktions-Slot, Bar-Zeile, Tab-Leiste oder Werkzeuggruppe gerendert');
+  assert(filters >= 0 && search >= 0, 'Filterknopf oder Suchfeld fehlt im Kopf');
+  assert(!html.includes('id="cal-search"'), 'kein eigener Suchknopf mehr, der eine Leiste aufdeckt');
+  assert(/<label class="page-search cal-toolbar__search"/.test(html), 'die Suche ist das geteilte Feld (renderPageSearch)');
+  assert(bar > actions && tools > tablist, 'Werkzeuggruppe hinter dem Segment, in der Bar-Zeile');
+  assert(search > tools && filters > search, `die Suche steht an erster Stelle der Gruppe (Suche ${search}, Filter ${filters})`);
   const actionsHtml = html.slice(actions, bar);
   assert(!actionsHtml.includes('cal-filters') && !actionsHtml.includes('cal-search'),
     'der Aktions-Slot darf Filter oder Suche nicht (auch nicht zusaetzlich) tragen');
+  // Der Begriff ueberlebt den Neubau des Kopfs (Filterwechsel).
+  assert(/value="Arzt"/.test(calendarHelpers.toolbarHtml({ searchValue: 'Arzt' })), 'der Suchbegriff steht nach dem Neubau wieder im Feld');
+});
+
+/* DIE ANSICHTSWAHL IST DAS KANON-SEGMENT (D1). */
+test('Kalenderkopf (D1): die Ansichtswahl ist `.segmented` mit `.segmented__item`, aktiv per `is-active`', () => {
+  const html = calendarHelpers.toolbarHtml();
+  assert(/<div class="segmented cal-toolbar__views" role="tablist"/.test(html), 'das Segment der Shell traegt die Tablist');
+  assert((html.match(/class="segmented__item cal-toolbar__view-btn/g) ?? []).length === 4, 'vier Segmente');
+  assert(/class="segmented__item cal-toolbar__view-btn is-active"[^>]*aria-selected="true"/.test(html.replace(/\s+/g, ' ')), 'der aktive Eintrag traegt is-active');
+  const rules = [...eachRule(calendarCss)];
+  const own = rules.filter((r) => r.selector.split(',').some((x) => /\.cal-toolbar__view-btn(?:--active)?$|\.cal-toolbar__views$/.test(x.trim()))
+    && /(?:^|[;{\s])(?:background(?:-color)?|box-shadow|border-radius|padding)\s*:/.test(r.body));
+  assert(own.length === 0, `keine eigene Well- oder Pillenoptik mehr: ${own.map((r) => r.selector.trim()).join(' | ')}`);
 });
 
 /* EINGEKLAPPT VERLAESST DER TITEL DAS BILD, NICHT DEN BAUM.
@@ -5179,7 +5192,7 @@ test('Ansichtswechsel blendet die neue Ansicht ein, reduzierte Bewegung schneide
   assert(rules.some((r) => r.selector.trim() === '.cal-view-swap-in' && r.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a)) && /animation:\s*none/.test(r.body)),
     'das Netz unter reduzierter Bewegung');
   const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
-  const onChange = src.slice(src.indexOf("activeClass: 'cal-toolbar__view-btn--active'"), src.indexOf("attachSegmentIndicator(bar.querySelector('.cal-toolbar__views')"));
+  const onChange = src.slice(src.indexOf("activeClass: 'is-active'"), src.indexOf("attachSegmentIndicator(bar.querySelector('.cal-toolbar__views')"));
   assert(/renderView\(\);\s*\n\s*playViewSwap\(/.test(onChange), 'der Tab-Wechsel spielt die Einblende nach dem Neuaufbau');
 });
 
@@ -5265,39 +5278,39 @@ function buttonTag(html, id) {
   return { tag: html.slice(open, html.indexOf('>', at) + 1), whole: html.slice(open, close) };
 }
 
-test('Zeitraum-Kopf (R17 Z1): Filter, Lupe und „..." tragen EINE Icon-Knopfform - die der Kopfregel', () => {
+test('Zeitraum-Kopf (D1): Filter und Verwalten tragen die EINE Kopf-Icon-Haut, die Suche ist das Feld der Shell', () => {
   const html = calendarHelpers.toolbarHtml({ filterCount: 0 });
-  const forms = ['cal-filters', 'cal-search', 'cal-views-menu'].map((id) => {
+  for (const id of ['cal-filters']) {
     const cls = buttonTag(html, id).tag.match(/class="([^"]*)"/)[1].split(/\s+/);
-    // Die Form ist die Kapsel mit Ring des Werkzeugmenues (pageToolsMenuHtml,
-    // Vorbild documents-tools-btn) - nicht der nackte Kreis, den die Lupe und
-    // das Menue hier trugen, waehrend jedes andere Modul den Ring zeigt.
-    return { id, secondary: cls.includes('btn--secondary'), icon: cls.includes('btn--icon') };
-  });
-  for (const f of forms) {
-    assert(f.icon, `#${f.id}: ein Icon-Knopf`);
-    assert(f.secondary, `#${f.id}: dieselbe Kopf-Icon-Form wie „..." der Kopfregel (btn--secondary btn--icon)`);
+    assert(cls.includes('btn--icon') && cls.includes('btn--secondary'), `#${id}: Kopf-Icon-Haut (btn--secondary btn--icon)`);
   }
-  // Dieselbe Form heisst auch dieselbe Tinte: eine Ruheregel, die einem der
-  // drei Knoepfe eine eigene Farbe gibt, macht aus ihm wieder einen zweiten
-  // Stil (die Lupe stand grau neben zwei getoenten Knoepfen).
+  // "Kalender verwalten" ist ein Werkzeug, kein zweiter Heute-Knopf: Haut
+  // der Kopf-Icons und ein eigenes Zeichen statt `calendar-days`.
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const manage = src.match(/<button class="([^"]*)" id="cal-calendars"[\s\S]*?<\/button>/);
+  assert(manage, 'Verwalten-Knopf gefunden');
+  assert(/\bbtn--secondary\b/.test(manage[1]) && /\bbtn--icon\b/.test(manage[1]), 'Verwalten in der Kopf-Icon-Haut');
+  assert(/data-lucide="calendar-cog"/.test(manage[0]) && !/data-lucide="calendar-days"/.test(manage[0]),
+    'Verwalten zeigt den Kalender mit Zahnrad, nicht das Monatsblatt (las sich wie "Heute")');
+  // Dieselbe Form heisst auch dieselbe Tinte.
   const own = [...eachRule(calendarCss)].filter((r) => r.selector.split(',').some((s) =>
-    /^\.cal-toolbar__(?:filter|search|tools)-btn$/.test(s.trim())) && /(?:^|[;{\s])(?:color|background(?:-color)?|border(?:-color)?)\s*:/.test(r.body));
+    /^\.cal-toolbar__(?:filter|search|tools|calendars)-btn$/.test(s.trim())) && /(?:^|[;{\s])(?:color|background(?:-color)?|border(?:-color)?)\s*:/.test(r.body));
   assert(own.length === 0, `keine eigene Ruhe-Tinte fuer einen Kopfknopf: ${own.map((r) => r.selector.trim()).join(' | ')}`);
 });
 
-// R17 E11 (Critique 2026-10-07, A2 P2): mobil stand die Ansichtswahl hinter
-// "...", und der Kopf sagte nirgends, welche Ansicht offen ist.
-test('E11: der Ansichtswahl-Knopf traegt Glyphe und Namen der aktiven Ansicht, das Menue bleibt', () => {
-  const ICONS = { month: 'calendar-days', week: 'calendar-range', day: 'calendar-1', agenda: 'list' };
+// D1 (Critique 2026-10-16, Persona Jordan): der Ausloeser der mobilen
+// Ansichtswahl wechselte seit R17 E11 sein ZEICHEN mit der Ansicht und war
+// danach nicht wiederzuerkennen. Jetzt nennt er die Ansicht in WORTEN, und
+// sein Zeichen steht (Pop-up-Knopf mit Auf/Ab-Zeichen).
+test('D1: der Ansichtswahl-Knopf nennt die aktive Ansicht in Worten, sein Zeichen bleibt stehen', () => {
   const names = new Set();
-  for (const [view, icon] of Object.entries(ICONS)) {
+  const glyphs = new Set();
+  for (const view of ['month', 'week', 'day', 'agenda']) {
     const html = calendarHelpers.viewMenuHtml(view);
     const btn = buttonTag(html, 'cal-views-menu');
-    assert(btn.whole.includes(`data-lucide="${icon}"`), `${view}: der Knopf zeigt die Glyphe der Ansicht (${icon})`);
-    assert(!btn.whole.includes('data-lucide="ellipsis"'), `${view}: kein "..." mehr`);
-    const item = html.match(new RegExp(`data-cal-view="${view}"[\\s\\S]*?</button>`))[0];
-    assert(item.includes(`data-lucide="${icon}"`), `${view}: dieselbe Glyphe wie der Menue-Eintrag`);
+    glyphs.add((btn.whole.match(/data-lucide="([^"]+)"/) ?? [])[1]);
+    const word = btn.whole.match(/<span class="cal-toolbar__view-menu-label"[^>]*>([^<]*)<\/span>/);
+    assert(word && word[1].length > 0, `${view}: der Knopf zeigt das Wort der Ansicht`);
     const name = btn.tag.match(/aria-label="([^"]*)"/)[1];
     assert(name.startsWith('calendar.viewSwitcher: ') && name.length > 'calendar.viewSwitcher: '.length, `${view}: der Name nennt die Ansicht (${name})`);
     assert(btn.tag.includes(`title="${name}"`), 'Tooltip = Name');
@@ -5307,10 +5320,11 @@ test('E11: der Ansichtswahl-Knopf traegt Glyphe und Namen der aktiven Ansicht, d
     assert(new RegExp(`aria-checked="true"[^>]*data-cal-view="${view}"`).test(html.replace(/\s+/g, ' ')), `${view}: der Eintrag ist gewaehlt`);
   }
   assert(names.size === 4, 'vier Ansichten, vier Namen');
-  // Der Wechsel zieht den Knopf nach, nicht nur den Haken.
+  assert(glyphs.size === 1 && glyphs.has('chevrons-up-down'), `EIN festes Zeichen fuer alle Ansichten, gefunden: ${[...glyphs].join(', ')}`);
   const sync = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8').match(/function syncViewMenu\([\s\S]*?\n\}/)[0];
-  assert(/trigger\.setAttribute\('aria-label', label\)/.test(sync) && /trigger\.replaceChildren\(glyph\)/.test(sync),
-    'syncViewMenu() setzt Name und Glyphe des Ausloesers');
+  assert(/trigger\.setAttribute\('aria-label', label\)/.test(sync) && /word\.textContent = /.test(sync),
+    'syncViewMenu() setzt Name und Wort des Ausloesers');
+  assert(!/replaceChildren\(glyph\)/.test(sync), 'das Zeichen wird nicht mehr getauscht');
 });
 
 test('Zeitraum-Kopf (R17 Z1): der Filterknopf traegt den geteilten Zaehler und nennt ihn', () => {

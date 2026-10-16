@@ -28,45 +28,10 @@
 /* .documents-toolbar__search traegt keine Breite (Re-Critique 2026-09-27, D4):
  * Breite und Stelle der Kopfsuche kommen aus page-search.css. */
 
-.documents-view-toggle {
-  display: inline-flex;
-  padding: var(--space-0h);
-  gap: var(--space-0h);
-  border-radius: var(--radius-full);
-  background: var(--color-surface-3);
-}
-
-/* EINE KOPFHOEHE (Critique 2026-09-25): gemessen standen Suche 44, dieser
- * Umschalter 48 und der Menueknopf 44 (mobil 48 / 52 / 48) nebeneinander -
- * der Well legte seine 2px Rand AUF die Zielgroesse. Die Knoepfe sind jetzt
- * genau um diesen Rand kleiner, der Well ist damit so hoch wie jedes andere
- * Kopf-Bedienelement: --target-base, am Zeiger 44, am Finger 48. Die
- * Segmente stehen als Reihe (WCAG 2.5.8, Zielgroessen-Regel in tokens.css),
- * dieselbe Rechnung wie der Ansichts-Umschalter der Aufgaben (tasks.css). */
-.documents-view-toggle__btn {
-  width: calc(var(--target-base) - 2 * var(--space-0h));
-  height: calc(var(--target-base) - 2 * var(--space-0h));
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: calc(var(--radius-full) - 2px);
-  color: var(--color-text-secondary);
-}
-
-.documents-view-toggle__btn svg {
-  width: 17px;
-  height: 17px;
-}
-
-/* Aktiv = erhabene Surface-Pille im Well, Modulton nur in der Tinte (Rezept:
- * tokens.css, Abschnitt 6c). Die Leiste selbst musste dafür ein Well werden -
- * sie stand auf --color-surface-work, also auf Weiß, und eine weiße Pille auf
- * weißem Grund ist kein Zustand. */
-.documents-view-toggle__btn--active {
-  background: var(--seg-active-bg);
-  box-shadow: var(--seg-active-shadow);
-  color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-ink), var(--color-text-primary));
-}
+/* Der Ansichts-Umschalter ist seit D1 (Critique 2026-10-16) das Kanon-Segment
+ * (`.segmented.segmented--icons`, panel.css): Well, Pille, Hoehe und Naht kommen
+ * von dort. Hier stand eine runde Eigen-Pille mit eigener Hoehenrechnung - die
+ * dritte Form derselben Bedienfrage neben Aufgaben und Kalender. */
 
 /* EIN WEG ZUR ANSICHT JE BREITE (R16, Kopfregel mobil 1a). Unter 768px stehen
  * die Werkzeuge in der Titelzeile, und die traegt kein Segment: die Ansicht

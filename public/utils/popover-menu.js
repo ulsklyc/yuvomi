@@ -68,7 +68,13 @@ function itemAttrs(attrs) {
     .join('');
 }
 
-export function popoverMenuHtml({ id, label, items = [], triggerClass = 'btn btn--ghost btn--icon', icon = 'ellipsis' }) {
+// DER STANDARD-AUSLOESER IST DIE KOPF-ICON-HAUT (D1, Critique 2026-10-16):
+// `btn--secondary btn--icon` wie Werkzeugmenue, Filter und Lupe daneben. Bis
+// dahin stand hier `btn--ghost`, und die Entsorgung zeigte ihr „..." als
+// graues Ghost-Icon neben beringten Knoepfen anderer Module - eine dritte
+// Haut fuer denselben Kopfknopf. Zeilen- und Sonderknoepfe geben ihre Klasse
+// ohnehin selbst mit (rowMenuHtml, Erledigt-von-Wahl).
+export function popoverMenuHtml({ id, label, items = [], triggerClass = 'btn btn--secondary btn--icon', icon = 'ellipsis' }) {
   const entry = (item, index) => {
     if (item.separator) return '\n    <div class="popover-menu__separator" role="separator"></div>';
     // EINE GRUPPE MIT NAMEN (Critique 2026-10-05, R16): `{ group, items }`.

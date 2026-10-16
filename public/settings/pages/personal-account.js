@@ -597,7 +597,11 @@ function renderPage(container, user, refreshFailed, accessNotice, oidcState, oid
     ` : ''}
 
     <section class="settings-section">
-      <h2 class="settings-section__title">${t('settings.sectionAccount')}</h2>
+      ${/* "Mein Konto" unter dem Blatt "Konto" benennt keine Ebene, es
+            wiederholt sie (Keine-sichtbare-Titelwiederholung-Regel, DESIGN.md;
+            Critique 2026-10-16: drei Ueberschriften vor dem ersten Feld). Die
+            Ueberschrift bleibt fuer die Gliederung, unsichtbar. */ ''}
+      <h2 class="settings-section__title sr-only">${t('settings.sectionAccount')}</h2>
 
       <div class="settings-card">
         <h3 class="settings-card__title">${t('settings.profileCardTitle')}</h3>

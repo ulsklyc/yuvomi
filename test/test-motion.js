@@ -1634,7 +1634,7 @@ const SHARED_PRESSABLE = [
   ['.more-item', 'own'],
 ];
 /** Hoechststand der `:hover`-Regeln ausserhalb von `@media (hover: hover)`. Nur senken. */
-const UNGUARDED_HOVER_MAX = 235;
+const UNGUARDED_HOVER_MAX = 232;
 
 function hoverRules() {
   const out = [];

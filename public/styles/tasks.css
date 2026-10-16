@@ -161,13 +161,6 @@
     padding-inline: 0;
   }
 
-  /* Icon-only-Segmente (Ansichts-Umschalter im Kopf) brauchen weniger
-   * Innenraum als Text-Segmente. Eigene Variante statt Toolbar-Selektor: der
-   * #577-Rail-Guard verbietet horizontales Padding unter Rail-Aliassen
-   * pauschal. */
-  .group-toggle--icons .group-toggle__btn {
-    padding-inline: var(--space-2);
-  }
 }
 
 /* Gruppierungs-Toggle */
@@ -216,26 +209,6 @@
   }
 }
 
-/* ZWEI HÖHEN JE KOPFZEILE (Critique 2026-08-31, P3): der Ansichts-Umschalter
- * stand am Desktop als 54px-Well neben 40px-Kapseln (--target-md ist die
- * entschiedene Desktop-Zielhöhe der Kopf-Bedienelemente, siehe tokens.css) -
- * die wichtigste Aktion war das KLEINSTE Element der Zeile. Am Zeigegerät
- * fallen die Segmente des Kopf-Umschalters in dieselbe Höhenklasse wie ihre
- * Nachbarn; Touch behält --target-lg aus der Basisregel. Bewusst nur im Kopf
- * (.page-toolbar): die Personenleiste des Verlaufs folgt der Hoehenklasse
- * ihrer Umgebung (Kommentar oben). */
-@media (hover: hover) and (pointer: fine) {
-  .page-toolbar .group-toggle {
-    /* 1px-Naht statt 2px: 40px-Segmente + Naht + Rand = 44px Aussenhoehe,
-     * exakt die Silhouette der Icon-Kapseln daneben. */
-    padding: var(--space-px);
-  }
-
-  .page-toolbar .group-toggle__btn {
-    min-height: var(--target-md);
-  }
-}
-
 /* Ein Segment-Label ist EINZEILIG oder gar nicht da: fuer Enge gibt es die
  * Label-Verlust-Regel (Weglassen), nicht den Umbruch. Ohne nowrap brach
  * „Kanban-Ansicht" am Bindestrich auf zwei Zeilen und streckte via
@@ -266,23 +239,40 @@
   color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-ink), var(--color-text-primary));
 }
 
-/* DER KOPF-UMSCHALTER TRAEGT SEIN LABEL ERST IN DER WIDE-KLASSE (>= 1440).
+/* DER ANSICHTS-UMSCHALTER IM KOPF (D1, Critique 2026-10-16) ist das Kanon-
+ * Segment (`.segmented.segmented--icons`, panel.css) - Well, Pille, Hoehe und
+ * gleitende Kapsel kommen von dort. Hier steht nur, was ihm gehoert:
  *
- * Der Umschalter teilt sich seine Zeile mit Suche, „Filter (n)", dem
- * Werkzeugmenue und am Desktop dem Primaerknopf. Mit Label misst er einzeilig
- * rund 390px: gemessen (2026-08-28/31) drueckte er den Kopf auf dem iPad
- * hochkant von zwei auf drei Zeilen und schob ab 1024px den Primaerknopf
- * ueber die Kante; frei ist die Zeile erst ab ~1240px, und der Breakpoint-
- * Kanon (tokens.css §11c) kennt nur 640/768/1024/1440. Darunter stehen Icons
+ * SEIN LABEL ERST IN DER WIDE-KLASSE (>= 1440). Der Umschalter teilt sich
+ * seine Zeile mit Suche, Filter, dem Werkzeugmenue und am Desktop dem
+ * Primaerknopf. Mit Label misst er einzeilig rund 390px: gemessen (2026-08-
+ * 28/31) drueckte er den Kopf auf dem iPad hochkant von zwei auf drei Zeilen
+ * und schob ab 1024px den Primaerknopf ueber die Kante. Darunter stehen Icons
  * mit aria-label/title.
  *
- * Warum HIER und nicht im 640er-Block oben: die Bauteile stehen weiter oben
- * in der Datei als dieser Block, aber HINTER dem 640er-Block. Eine Regel
- * gleicher Spezifitaet dort wuerde gegen die spaetere Basisdefinition
- * verlieren - dieselbe Kaskaden-Falle, die im schmalen Zustand der Kueche
- * schon einmal 358px Hoehe gekostet hat. */
+ * UND EIN WEG ZUR ANSICHT JE BREITE: unter 768px stehen Lupe, Filter und
+ * Menue in der Titelzeile (Kopfregel mobil 1a), und die traegt kein Segment -
+ * die Ansicht steht dort als Einfachauswahl im Werkzeugmenue (toolsMenuItems),
+ * der Umschalter ist ausgeblendet. Ab 768px umgekehrt (Vorbild Dokumente). */
+.tasks-view-toggle__label {
+  white-space: nowrap;
+}
+
 @media (max-width: 1439px) {
-  .group-toggle--icons .group-toggle__label {
+  .tasks-view-toggle__label {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .tasks-view-toggle {
+    display: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .tasks-toolbar .popover-menu__group:has([data-view-choice]),
+  .tasks-toolbar .popover-menu__group:has([data-view-choice]) + .popover-menu__separator {
     display: none;
   }
 }

@@ -2629,7 +2629,9 @@ test('Budgetkopf traegt page-toolbar--period: eingeklappt verlaesst der Titel da
   // Erlaubt ist deshalb nur, was der eingeklappte Kalenderkopf wirklich ordnet:
   // der Center-Slot (Stepper rueckt in Zeile 1) und die Werkzeuge, die ins
   // Ansichtsmenue falten. Jede weitere Regel ist rot, bis sie hier steht.
-  const ALLOWED_COLLAPSED = [/> \.page-toolbar__center$/, /\[data-collapse-fold\]/];
+  // D1 (2026-10-16): dazu das Wort im Pop-up-Knopf der Ansicht - eingeklappt
+  // teilt der Knopf die Zeile mit dem Stepper und behaelt nur sein Zeichen.
+  const ALLOWED_COLLAPSED = [/> \.page-toolbar__center$/, /\[data-collapse-fold\]/, / \.cal-toolbar__view-menu-label$/];
   const strangers = [...eachRule(calendarCss)]
     .filter((r) => /\.is-collapsed/.test(r.selector))
     .flatMap((r) => r.selector.split(',').map((part) => part.trim()))

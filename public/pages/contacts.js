@@ -523,10 +523,10 @@ function renderCategoryFilters() {
   // Stand der Fokus auf einem Chip, bekommt ihn derselbe Chip im Neubau.
   const focusedCat = bar.contains(document.activeElement) ? document.activeElement?.dataset?.cat : undefined;
   if (!keys.length) { bar.replaceChildren(); return; }
-  const allChip = `<button class="filter-chip contact-filter-chip${active ? '' : ' filter-chip--active contact-filter-chip--active'}" data-cat="" aria-pressed="${active ? 'false' : 'true'}">${esc(t('contacts.filterAll'))}</button>`;
+  const allChip = `<button class="filter-chip filter-chip--sm contact-filter-chip${active ? '' : ' filter-chip--active contact-filter-chip--active'}" data-cat="" aria-pressed="${active ? 'false' : 'true'}">${esc(t('contacts.filterAll'))}</button>`;
   const catChips = state.categories.filter((c) => keys.includes(c.key)).map((c) => {
     const on = active === c.key;
-    return `<button class="filter-chip contact-filter-chip${on ? ' filter-chip--active contact-filter-chip--active' : ''}" data-cat="${esc(c.key)}" aria-pressed="${on ? 'true' : 'false'}">${categoryIcon(c.key)} ${esc(catLabel(c.key))}</button>`;
+    return `<button class="filter-chip filter-chip--sm contact-filter-chip${on ? ' filter-chip--active contact-filter-chip--active' : ''}" data-cat="${esc(c.key)}" aria-pressed="${on ? 'true' : 'false'}">${categoryIcon(c.key)} ${esc(catLabel(c.key))}</button>`;
   }).join('');
   bar.replaceChildren();
   bar.insertAdjacentHTML('beforeend', allChip + catChips);
