@@ -329,16 +329,9 @@
 /* Gerüst (Shell) jetzt geteilt via .page-toolbar in layout.css. Der Kalender hat
  * keinen Titel — er füllt das Shell mit Monats-Navigation (cal-toolbar__* unten).
  * Die Mobile-Wrap-Regeln weiter unten bleiben kalender-spezifisch. */
-.cal-toolbar__nav {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-.cal-toolbar__nav .btn--icon {
-  color: var(--color-accent);
-}
-
+/* `.cal-toolbar__nav` (samt Akzentfarbe der Pfeile) ist entfallen (R19): kein
+ * Markup traegt die Klasse mehr, die Pfeile kommen aus utils/period-stepper.js
+ * und stehen neutral wie in jedem Zeitraum-Kopf. */
 .cal-toolbar__label {
   font-size: var(--text-base);
   font-weight: var(--font-weight-semibold);

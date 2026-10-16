@@ -7520,19 +7520,23 @@ test('calendar metadata uses lucide icon markup instead of visible emoji', () =>
   assert.match(source, /class="calendar-meta-icon icon-sm"/, 'metadata icons should use tokenized icon classes');
 });
 
-test('desktop Meals and Calendar date-navigation icons use the accent color', () => {
-  const meals = read('../public/styles/meals.css');
-  const calendar = read('../public/styles/calendar.css');
-
-  // BEIDE tragen die Stimme, und das ist die Aufloesung eines Widerspruchs, den
-  // dieser Guard selbst dokumentiert hat: Mahlzeiten folgte der frueheren
-  // Module-Accent-Leads-Rule, der Kalender „bewusst noch nicht" - zwei
-  // Datums-Navigationen desselben Bauteils in zwei Farbgrammatiken, seit einem
-  // Durchgang, der nie kam. Die Eine-Stimme-Regel (DESIGN.md, 2026-08-10)
-  // beantwortet das an der Wurzel: `.btn--icon` ist eine geteilte Variante und
-  // tut in jedem Modul dasselbe. Der Modulton steht im Kopf am Siegel.
-  assert.match(cssRuleBody(meals, '.week-nav .btn--icon'), /color:\s*var\(--color-accent\)/);
-  assert.match(cssRuleBody(calendar, '.cal-toolbar__nav .btn--icon'), /color:\s*var\(--color-accent\)/);
+// R19 (Critique 2026-10-16, "Zeitraum-Stepper: drei Bauarten"): EIN Stepper -
+// Pfeile neutral, wie Kalender und Budget. Der Essensplan faerbte sie im
+// Akzent (meals.css), und der Kalender trug eine tote Akzentregel an einer
+// Klasse ohne Markup (`.cal-toolbar__nav`), die dieser Guard noch forderte.
+// Kein Blatt faerbt die Pfeile eines Zeitraum-Steppers um.
+test('R19: die Pfeile jedes Zeitraum-Steppers stehen neutral, kein Modul faerbt sie', () => {
+  const ARROW = /period-stepper__(?:prev|next)|(?:week-nav|cal-toolbar__nav|budget-nav|cal-toolbar)\s+\.btn--icon/;
+  const offenders = [];
+  for (const file of readdirSync(new URL('../public/styles/', import.meta.url)).filter((f) => f.endsWith('.css'))) {
+    for (const rule of eachRule(read(`../public/styles/${file}`))) {
+      if (ARROW.test(rule.selector) && /(?:^|[;\s{])color\s*:/.test(rule.body)) offenders.push(`${file}: ${rule.selector.trim()}`);
+    }
+  }
+  assert.deepEqual(offenders, [], 'eigene Pfeilfarbe im Zeitraum-Stepper');
+  for (const page of ['meals', 'calendar', 'budget']) {
+    assert.match(read(`../public/pages/${page}.js`), /periodStepperHtml\(\{/, `${page}: der Stepper kommt aus utils/period-stepper.js`);
+  }
 });
 
 test('calendar attachment removal control honors its hidden state', () => {

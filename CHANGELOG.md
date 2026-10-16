@@ -36,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The week arrows in the meal plan look like the ones in Calendar and Budget.** They were tinted in
+  the accent colour; now every period switcher has the same neutral arrows.
 - **Task history is a view like List and Kanban.** It sits as the third choice in the view switcher
   (and in the view section of the menu on a phone), so the switcher always shows where you are.
 - **A search that finds nothing looks and works the same in every module.** Tasks, Pantry, Recipes,
