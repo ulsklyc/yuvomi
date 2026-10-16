@@ -198,6 +198,13 @@ test('(4) die Suche nimmt mobil ihre Icon-Form auch in einem Wrapper-Slot', () =
   assert.match(rule.selector, /\.page-toolbar\s+\.page-search/);
   assert.ok(rule.at.some((a) => /max-width:\s*767px/.test(a)),
     'die Kopfregel gilt unter --bp-tablet (768), nicht erst unter 640');
+  // D1 (Critique 2026-10-16): die Lupe traegt die EINE Haut der Kopf-Icon-
+  // Knoepfe - den Ring von `.btn--secondary` (1.5px --color-border), rund -,
+  // statt nackt neben beringtem Filter und „..." zu stehen.
+  assert.match(decl(rule.body, 'border') ?? '', /^1\.5px solid var\(--color-border\)$/, 'Ring der Kopf-Icon-Haut an der Huelle');
+  assert.equal(decl(rule.body, 'border-radius'), 'var(--radius-full)', 'rund wie die Icon-Knoepfe daneben');
+  const glyph = rules(layoutCss).find((r) => /\.page-toolbar\s+\.page-search:not\(:focus-within\)[^,]*\.page-search__icon/.test(r.selector));
+  assert.equal(glyph && decl(glyph.body, 'color'), 'var(--color-accent)', 'das Zeichen in der Tinte von btn--secondary');
   const wrapper = rules(layoutCss).filter((r) => r.selector.includes(':has(> .page-search:only-child')
     && decl(r.body, 'flex') === '0 0 auto');
   assert.equal(wrapper.length, 1, 'ein Slot, der nur die Suche traegt, schrumpft mit ihr');
@@ -319,7 +326,10 @@ test('R17: der Kalenderkopf ist eingeklappt EINE Zeile, und was weicht, kommt im
 
   const calendarJs = read('../public/pages/calendar.js');
   assert.match(calendarJs, /id="cal-views-menu"[^>]*data-collapse-fold-menu/, 'das Ansichtsmenue nimmt die gefalteten Werkzeuge auf');
-  assert.match(calendarJs, /id="cal-search"[^>]*data-collapse-fold/, 'die Suche ist markiert');
+  // D1: die Suche ist ein Feld, kein Knopf - ein Stellvertreter im Menue koennte es nicht
+  // oeffnen. Sie faltet deshalb nicht, sie bleibt als Lupe stehen.
+  assert.doesNotMatch(calendarJs, /id="cal-search"/, 'kein Suchknopf mehr, der falten koennte');
+  assert.match(calendarJs, /id: 'cal-search-input'/, 'die Suche ist das Feld der Shell');
   assert.match(calendarJs, /'#cal-filters'\)\.setAttribute\('data-collapse-fold'/, 'der Filter ist markiert');
   assert.match(calendarJs, /id: 'cal-today'[\s\S]{0,200}'data-collapse-fold': true/, '"Heute" ist markiert');
 

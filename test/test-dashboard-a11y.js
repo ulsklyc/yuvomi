@@ -246,8 +246,12 @@ test('die globale Suche ist von der Uebersicht mit einem Tipp erreichbar, und ni
   global.window ??= { yuvomi: null };
   const user = { display_name: 'Linda' };
   const normal = renderDashboardOverview(user, false, null, { followsDefault: true, canPublish: false });
-  assert.match(normal, /<button class="dashboard-icon-btn" id="dashboard-search"[^>]*aria-label="nav\.search"[^>]*aria-haspopup="dialog"/,
-    'ein benannter Icon-Knopf wie die zwei daneben');
+  // D1 (Critique 2026-10-16): dieselbe Kopf-Icon-Haut wie jeder Modulkopf.
+  assert.match(normal, /<button class="btn btn--secondary btn--icon dashboard-icon-btn" id="dashboard-search"[^>]*aria-label="nav\.search"[^>]*aria-haspopup="dialog"/,
+    'ein benannter Icon-Knopf in der Kopf-Icon-Haut (btn--secondary btn--icon) wie die zwei daneben');
+  for (const id of ['dashboard-wall-enter', 'dashboard-customize-btn']) {
+    assert.match(normal, new RegExp(`<button class="btn btn--secondary btn--icon dashboard-icon-btn" id="${id}"`), `${id}: Kopf-Icon-Haut`);
+  }
   const editing = renderDashboardOverview(user, true, null, { followsDefault: true, canPublish: false });
   assert.doesNotMatch(editing, /id="dashboard-search"/, 'im Anpassen-Modus zaehlt nur Abbrechen oder Speichern');
 });

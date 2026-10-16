@@ -417,3 +417,15 @@ test('R16: ein Werkzeug des Kopfs antwortet als Menue-Eintrag UND als direkter K
     + '(von Haus aus oder weil Rechte es kuerzen), steht dort ein Knopf, der nichts tut - '
     + '`pageToolsActionEl(e.target, name)` aus utils/popover-menu.js nehmen.');
 });
+
+// D1 (Critique 2026-10-16): der Standard-Ausloeser ist die EINE Haut der
+// Kopf-Icon-Knoepfe. Bis dahin war er `btn--ghost`, und die Entsorgung zeigte
+// ihr "..." als graues Ghost-Icon neben beringten Knoepfen der anderen Module.
+test('der Standard-Ausloeser traegt die Kopf-Icon-Haut (btn--secondary btn--icon), eine eigene Klasse gewinnt', () => {
+  const html = popoverMenuHtml({ id: 'x-menu', label: 'Mehr', items: [{ action: 'a', label: 'A', icon: 'plus' }] });
+  const cls = html.match(/<button type="button" class="([^"]*)"\s+popovertarget="x-menu"/)[1].split(/\s+/);
+  assert.ok(cls.includes('btn--secondary') && cls.includes('btn--icon'), `Standard-Haut: ${cls.join(' ')}`);
+  assert.ok(!cls.includes('btn--ghost'), 'kein Ghost-Ausloeser mehr');
+  const own = popoverMenuHtml({ id: 'y-menu', label: 'Mehr', items: [], triggerClass: 'row-action' });
+  assert.match(own, /class="row-action popover-menu__trigger"/, 'Zeilenmenues geben ihre Klasse selbst mit');
+});

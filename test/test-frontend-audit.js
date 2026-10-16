@@ -8261,7 +8261,13 @@ test('Feldkanten tragen --color-border-control und halten 3:1 auf jedem Feldgrun
     // `.more-sheet__search` stand hier bis 2026-09-26: seit dem Komponenten-
     // Kanon traegt der Knopf die gefuellte Kapsel des EINEN Suchfelds, in Ruhe
     // ohne Kante und im Hover mit --color-border-control - keine Kartenkante mehr.
-    ['.cal-search', 'Leiste der Kalendersuche; die Kante ist die Trennlinie unter der Leiste, nicht die des Feldes'],
+    // `.cal-search` stand hier bis D1 (2026-10-16): die aufgedeckte Leiste der
+    // Kalendersuche ist entfallen, das Feld steht im Kopf.
+    // Die Icon-Form der Kopfsuche (D1): ohne Fokus und ohne Begriff ist die
+    // Huelle ein Knopf in der Kopf-Icon-Haut (Ring wie `.btn--secondary`), das
+    // Feld darin traegt weder Kante noch Grund. Mit Fokus wird sie wieder Feld.
+    ['.page-toolbar .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))', 'Icon-Form der Kopfsuche; ein Knopf in der Kopf-Icon-Haut, kein Feld'],
+    ['.section-toolbar .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))', 'Icon-Form der Abschnittssuche; derselbe Knopf'],
     ['.search-overlay__header', 'Kopf des Such-Overlays; Trennlinie zur Trefferliste'],
     // `.search-overlay__panel` stand hier bis R18 (2026-10-07): die Palette traegt
     // seither die Glaskante der schwebenden Flaechen (--glass-border), keine

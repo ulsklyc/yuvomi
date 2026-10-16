@@ -157,24 +157,18 @@ test('Gleiches Fenster: der Wechsel zeichnet neu, ohne nachzuladen', async () =>
   });
 });
 
-// R17 Schritt 8: eingeklappt (Telefon) faltet die Suche ins Ansichtsmenue. Ihr
-// Knopf ist dann `display: none` - `focus()` darauf tut nichts, und nach Esc in
-// der Suche stand der Fokus auf dem Dokument. Er geht an den Menue-Knopf.
-test('Suche schliessen: der Fokus geht an den Suchknopf, gefaltet an das Ansichtsmenue', () => {
-  const stage = (visible) => {
-    const focused = [];
-    const menu = { focus: () => focused.push('menu') };
-    const toolbar = { querySelector: (sel) => (sel === '[data-collapse-fold-menu]' ? menu : null) };
-    const toggle = {
-      setAttribute() {}, removeAttribute() {}, classList: { remove() {} },
-      getClientRects: () => (visible ? [{}] : []),
-      closest: (sel) => (sel === '.cal-toolbar' ? toolbar : null),
-      focus: () => focused.push('search'),
-    };
-    const container = { querySelector: (sel) => (sel === '#cal-search' ? toggle : null) };
-    calendar.closeSearchForTest(container);
-    return focused;
+// D1 (Critique 2026-10-16): die Suche ist das Feld im Kopf. Schliesst sie
+// (gefundener Termin, Ansichtswechsel), leert sich das Feld mit - ein
+// stehender Begriff ueber der wiederhergestellten Ansicht behauptete eine
+// Suche, die nicht mehr laeuft - und der Loeschen-Knopf geht mit.
+test('Suche schliessen: das Feld im Kopf leert sich, sein Loeschen-Knopf verschwindet', () => {
+  const clear = { hidden: false };
+  const input = {
+    value: 'Arzt',
+    closest: (sel) => (sel === '.page-search__control' ? { querySelector: () => clear } : null),
   };
-  assert.deepEqual(stage(true), ['search'], 'sichtbar: zurueck an den Knopf der Suche');
-  assert.deepEqual(stage(false), ['menu'], 'gefaltet: an den Knopf, ueber den die Suche erreicht wurde');
+  const container = { querySelector: (sel) => (sel === '#cal-search-input' ? input : null) };
+  calendar.closeSearchForTest(container);
+  assert.equal(input.value, '', 'das Feld ist leer');
+  assert.equal(clear.hidden, true, 'der Loeschen-Knopf ist weg');
 });

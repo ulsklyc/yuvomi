@@ -141,6 +141,28 @@
   outline-offset: var(--focus-ring-offset);
 }
 
+/* DIE ANSICHTSWAHL IM KOPF (D1, Critique 2026-10-16): Aufgaben, Dokumente und
+ * Kalender waehlen ihre Ansicht mit diesem Segment. Am Zeiger steht es in der
+ * Kopfzeile neben 40px-Knoepfen (`.page-toolbar .btn--icon`, layout.css) und
+ * misst AUSSEN dieselben 40px - Naht 1px, Rand 1px, Segmente 36px. Mit der
+ * Touch-Hoehe (44px) und 2px Naht stand es als 50px-Well in der Zeile und hob
+ * die Titelzeile um 6px an. Am Finger behaelt es --target-base. */
+@media (hover: hover) and (pointer: fine) {
+  .page-toolbar .segmented {
+    padding: var(--space-px);
+  }
+
+  .page-toolbar .segmented__item {
+    min-height: calc(var(--target-md) - 4 * var(--space-px));
+  }
+}
+
+/* Die Icon-Variante (Aufgaben Liste/Brett, Dokumente Liste/Raster): ein
+ * quadratisches Segment je Ansicht, der Name steht im aria-label und title. */
+.segmented--icons .segmented__item {
+  padding-inline: var(--space-2);
+}
+
 /* --------------------------------------------------------
  * Kennzahl-Zeile und Kennzahlkarte
  * -------------------------------------------------------- */

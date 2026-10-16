@@ -202,3 +202,16 @@
     max-width: none;
   }
 }
+
+/* DER KOPF-WERKZEUG-SLOT (D1, Critique 2026-10-16): eine Werkzeuggruppe im
+ * Kopf (`.page-toolbar__tools`, Kalender) traegt Suche, Filter und Menue in
+ * dieser Reihenfolge. Steht die Suche dort statt im Center-Slot (weil der
+ * Center-Slot den Zeitraum traegt), gilt dieselbe EINE Breite - ab 768px,
+ * wo das Feld ein Feld ist; darunter regiert die Icon-Form (layout.css). */
+@media (min-width: 768px) {
+  .page-toolbar .page-toolbar__tools > label.page-search {
+    flex: 0 1 var(--page-search-width);
+    min-width: 0;
+    max-width: var(--page-search-width);
+  }
+}
