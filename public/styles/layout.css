@@ -7546,7 +7546,12 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
   color: var(--color-success-ink);
 }
 
-.row-action svg {
+/* Die Nadel der Notizkarte ist eine Zeilenaktion in eigener Lage (oben in
+ * der Ecke): sie zeichnet in derselben Groesse wie der Mehr-Knopf daneben
+ * (R19, Critique 2026-10-16 "Notizen-Pin-Gewichte") - vorher 12px gegen 18px,
+ * bei gleicher Strichstaerke also sichtbar fetter und kleiner zugleich. */
+.row-action svg,
+.note-card__pin svg {
   width: 18px;
   height: 18px;
 }

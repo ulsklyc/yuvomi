@@ -128,13 +128,13 @@ function pinMarkup(note) {
   if (!readOnly()) {
     return `<button class="note-card__pin" data-action="pin" data-id="${note.id}"
               aria-label="${note.pinned ? t('notes.unpinAction') : t('notes.pinAction')}">
-        <i data-lucide="pin" class="icon-sm" aria-hidden="true"></i>
+        <i data-lucide="pin" aria-hidden="true"></i>
       </button>`;
   }
   if (!note.pinned) return '';
   return `<span class="note-card__pin note-card__pin--static" role="img"
               aria-label="${esc(t('notes.pinnedState'))}">
-        <i data-lucide="pin" class="icon-sm" aria-hidden="true"></i>
+        <i data-lucide="pin" aria-hidden="true"></i>
       </span>`;
 }
 

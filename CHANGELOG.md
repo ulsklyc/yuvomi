@@ -36,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The pin on a note matches the other buttons on the card.** It was drawn smaller and heavier than
+  the "..." button beside it; both now share one size.
 - **Contacts show who they are.** Every contact in the list carries its initials instead of the
   icon of its category, like in the Contacts app; household members keep their photo and colour.
 - **Numbers line up everywhere in the calendar.** Day numbers in the month, times and dates in the

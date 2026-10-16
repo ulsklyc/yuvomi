@@ -21908,3 +21908,16 @@ test('Mehr-Blatt: die Module stehen als Zeilenliste in den Sektionen der Seitenl
   assert.match(rule('.more-item__label'), /white-space:\s*nowrap/, 'der Name steht auf einer Zeile, ohne Silbentrennung');
   assert.match(router, /chevron\.dataset\.lucide = 'chevron-right'/, 'der Pfeil am Zeilenende sagt: fuehrt weiter');
 });
+
+// R19 (Critique 2026-10-16, "Notizen-Pin-Gewichte"): die Nadel zeichnete mit
+// `icon-sm` 12px neben dem 18px-Mehr-Knopf derselben Karte - bei gleicher
+// Strichstaerke kleiner und fetter zugleich. Sie teilt jetzt die Groesse der
+// Zeilenaktion, aus derselben Regel.
+test('R19: die Nadel der Notizkarte zeichnet so gross wie die Zeilenaktion daneben', () => {
+  const notes = read('../public/pages/notes.js');
+  const pin = notes.slice(notes.indexOf('function pinMarkup('), notes.indexOf('\n}\n', notes.indexOf('function pinMarkup(')));
+  assert.doesNotMatch(pin, /data-lucide="pin" class="icon-sm"/, 'die Nadel traegt keine eigene Kleingroesse mehr');
+  const layout = [...eachRule(read('../public/styles/layout.css'))].filter((r) => !r.at.length);
+  const size = layout.find((r) => r.selector.split(',').map((x) => x.trim()).includes('.row-action svg'));
+  assert.ok(size && size.selector.includes('.note-card__pin svg'), 'Nadel und Zeilenaktion teilen EINE Groessenregel');
+});
