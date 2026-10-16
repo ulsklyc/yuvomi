@@ -2089,7 +2089,7 @@ test('Agenda und Tagesliste: Aufgaben und Feiertage ruecken nicht ein', () => {
 });
 
 // DAS AUFHEBEN LIEGT OHNE SCROLLEN IM BLICK (Critique 2026-09-24, Rest 4).
-test('Filterblatt: „Alle Filter aufheben" steht in der Fusszeile des Blatts', () => {
+test('Filterblatt: „Filter zuruecksetzen" steht in der Fusszeile des Blatts', () => {
   let opened = null;
   const prevOpen = globalThis.__openModal;
   const prevDoc = globalThis.document;
@@ -2107,9 +2107,54 @@ test('Filterblatt: „Alle Filter aufheben" steht in der Fusszeile des Blatts', 
   }
   assert(opened, 'das Filterblatt oeffnet kein Modal');
   const footer = /<div class="modal-panel__footer">([\s\S]*?)<\/div>/.exec(opened.content);
-  assert(footer && /id="cal-filters-reset"/.test(footer[1]),
-    'der Aufheben-Knopf steht nicht in .modal-panel__footer - mountFooter() hebt ihn nicht an den Rand, er liegt unter der Falz');
-  assert((opened.content.match(/id="cal-filters-reset"/g) ?? []).length === 1, 'der Knopf steht doppelt');
+  assert(footer && /data-filter-sheet-reset/.test(footer[1]),
+    'der Zuruecksetzen-Knopf steht nicht in .modal-panel__footer - mountFooter() hebt ihn nicht an den Rand, er liegt unter der Falz');
+  assert((opened.content.match(/data-filter-sheet-reset/g) ?? []).length === 1, 'der Knopf steht doppelt');
+});
+
+// DER EINE FILTERBLATT-BAUSTEIN (Critique 2026-10-16, D2): Aufgaben und
+// Kalender hatten zwei Blaetter - Chips hier, Haken dort, „Mir zugewiesen" an
+// verschiedener Stelle, zwei Reset-Texte, ein eigenes Kalender-Popover.
+test('Filterblatt (D2): Kalender und Aufgaben fahren EINEN Baustein - Personen als Chips, Ebenen als Schalter, ein Reset-Text', () => {
+  const calSrc = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const taskSrc = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
+  const fn = calSrc.slice(calSrc.indexOf('function openCalendarFilters()'), calSrc.indexOf('\n}\n', calSrc.indexOf('function openCalendarFilters()')));
+  assert(/openFilterSheet\(\{/.test(fn), 'der Kalender oeffnet das geteilte Blatt');
+  assert(/anchor: \(\) =>/.test(fn), 'am Desktop das geteilte Popover am Knopf');
+  assert(!/function openFiltersPopover|showPopover\(\)/.test(calSrc), 'kein eigenes Kalender-Popover mehr neben dem Baustein');
+  assert(!/resetLabel:/.test(calSrc + taskSrc), 'kein Modul ueberschreibt den einen Reset-Text');
+  for (const [name, src] of [['Kalender', calSrc], ['Aufgaben', taskSrc]]) {
+    assert(/filterChipsHtml\(/.test(src), `${name}: Personen als Chips aus dem Baustein`);
+  }
+  // Ebenen, Quellen und Ansichtsoptionen sind Schalter, keine Haken.
+  for (const attr of ['data-filter-layer', 'data-filter-source', 'data-filter-mine', 'data-filter-schedule-display', 'data-filter-waste-type']) {
+    const at = calSrc.indexOf(`'${attr}'`);
+    assert(at > 0, `${attr} fehlt`);
+    assert(/control: 'switch'/.test(calSrc.slice(at - 260, at)), `${attr}: Schalter statt Haken`);
+  }
+  for (const attr of ['data-filter-mine', 'data-filter-due-today', 'data-filter-future']) {
+    const at = taskSrc.indexOf(`'${attr}'`);
+    assert(at > 0, `${attr} fehlt`);
+    assert(/control: 'switch'/.test(taskSrc.slice(at - 200, at)), `Aufgaben ${attr}: Schalter statt Haken`);
+  }
+  const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
+  assert(de.common.filtersReset === undefined, 'common.filtersReset ist durch common.filtersResetDefault ersetzt');
+  assert(de.calendar.filtersReset === undefined, 'calendar.filtersReset ist durch common.filtersResetDefault ersetzt');
+  const sheet = readFileSync(new URL('../public/utils/filter-sheet.js', import.meta.url), 'utf8');
+  assert(/resetLabel = t\('common\.filtersResetDefault'\)/.test(sheet), 'der Baustein traegt den einen Text als Vorgabe');
+});
+
+test('Filterblatt (D2): „Mir zugewiesen" steht in beiden Blaettern als erster Schalter der Personengruppe, die Personen sind Chips', () => {
+  const calSrc = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const taskSrc = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
+  assert(/heading: t\('calendar\.filtersPeople'\), html: meRow \+ \(people\.length \? personFilterChipsHtml\(people\)/.test(calSrc),
+    'Kalender: Schalter, dann Personen-Chips in EINER Gruppe');
+  assert(/heading: t\('tasks\.filterGroupPerson'\),\s*html: mine \+ chipsHtml\('assigned_to'/.test(taskSrc),
+    'Aufgaben: Schalter, dann Personen-Chips in EINER Gruppe');
+  assert(!/data-filter-person/.test(calSrc), 'keine Personen-Haken mehr im Kalender');
+  const html = calendarHelpers.personFilterChipsHtml([{ id: 1, display_name: 'Linda Johnson', avatar_color: '#C2185B' }]);
+  assert(/class="filter-chip filter-chip--sm"[^>]*data-filter="person" data-value="1" aria-pressed="false"/.test(html), 'leeres Set heisst alle - kein Chip an');
+  assert(/data-value="none"/.test(html), '„Nicht zugewiesen" ist ein Chip der Personenachse');
 });
 
 test('Einklappen auf die Woche: nur nach unten, nur mit Platz, auf am Listenanfang', () => {
@@ -5173,7 +5218,7 @@ test('Filter am Desktop: verankertes Popover ohne Abdunkeln statt Blatt (A2 P2-7
   globalThis.__openModal = (opts) => { opened = opts; };
   globalThis.HTMLElement = class { get popover() { return null; } };
   const wide = (q) => ({ matches: /min-width:\s*1024px/.test(q) });
-  globalThis.window = { matchMedia: wide, innerWidth: 1440, innerHeight: 900 };
+  globalThis.window = { matchMedia: wide, innerWidth: 1440, innerHeight: 900, addEventListener: () => {}, removeEventListener: () => {} };
   globalThis.matchMedia = wide;
   const appended = [];
   globalThis.document = {
@@ -5199,11 +5244,12 @@ test('Filter am Desktop: verankertes Popover ohne Abdunkeln statt Blatt (A2 P2-7
   assert(pop, 'ein natives Popover (Light-Dismiss, Esc, Top-Layer) haengt im Dokument');
   assert(pop.shown, 'und ist offen');
   assert(pop.getAttribute('role') === 'dialog' && pop.getAttribute('aria-labelledby'), 'ein benannter Dialog');
-  assert(/id="cal-filters-reset"/.test(pop.html), 'das Aufheben reist mit');
-  assert(/calendar\.filters/.test(pop.html), 'der Titel steht im Popover');
-  const rules = [...eachRule(calendarCss)].filter((r) => r.selector.includes('.cal-filters-popover'));
-  assert(rules.some((r) => /position:\s*fixed/.test(r.body) && /inset:\s*auto/.test(r.body)), 'am Knopf positioniert, nicht zentriert');
-  assert(!rules.some((r) => /::backdrop/.test(r.selector) && !/transparent|none/.test(r.body)), 'kein abdunkelnder Hintergrund');
+  assert(/data-filter-sheet-reset/.test(pop.html), 'das Zuruecksetzen reist mit');
+  assert(/calendar\.filters|>Filter</.test(pop.html), 'der Titel steht im Popover');
+  // Das GETEILTE Popover (utils/filter-sheet.js, layout.css `.filter-popover`):
+  // seine Form haelt test:mobile-chrome, hier nur, dass der Kalender es nutzt.
+  assert(pop.className === 'filter-popover', 'das geteilte Popover, keine Kalender-Kopie');
+  assert(![...eachRule(calendarCss)].some((r) => r.selector.includes('.cal-filters-popover')), 'keine zweite Popover-Form in calendar.css');
 });
 
 // --------------------------------------------------------

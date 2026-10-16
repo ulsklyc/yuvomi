@@ -274,7 +274,7 @@ test('openCalendarFilters(): LAYER_STATE kennt waste, wie holidays/school/schedu
 
 test('openCalendarFilters(): der Reset-Knopf setzt layerWaste auf SEINE EIGENE Vorgabe (aus) zurueck, nicht auf "an" wie die uebrigen Ebenen', () => {
   const text = src();
-  const start = text.indexOf("#cal-filters-reset')?.addEventListener('click'");
+  const start = text.indexOf('const onReset = () => {', text.indexOf('function openCalendarFilters()'));
   const block = text.slice(start, start + 900);
   assert(/state\.layerWaste = false;/.test(block),
     'Reset heisst "auf die Vorgabe zurueck" - die Waste-Ebenen-Vorgabe ist ausdruecklich AUS, anders als holidays/school/schedule/birthdays');

@@ -6477,9 +6477,12 @@ test('Tasks and Notes expose every click target as a real control', () => {
 
   // Filter-Chips waren <span> ohne Tastaturzugang, während Dokumente und
   // Kontakte dieselbe .filter-chip-Klasse als <button aria-pressed> rendern.
-  // Seit der Kopfregel mobil stehen sie im Filterblatt - als Buttons.
-  assert.match(tasksPage, /function filterChipHtml\(/);
-  assert.match(tasksPage, /return `<button type="button" class="filter-chip[\s\S]{0,160}aria-pressed="\$\{active\}"/);
+  // Seit der Kopfregel mobil stehen sie im Filterblatt - als Buttons, seit
+  // D2 (2026-10-16) aus dem geteilten Baustein, den auch der Kalender nutzt.
+  const filterSheet = read('../public/utils/filter-sheet.js');
+  assert.match(tasksPage, /filterChipsHtml\(/);
+  assert.match(filterSheet, /export function filterChipHtml\(/);
+  assert.match(filterSheet, /return `<button type="button" class="filter-chip[\s\S]{0,160}aria-pressed="\$\{active\}"/);
   assert.doesNotMatch(tasksPage, /<span[^>]*class="filter-chip/);
 
   // Titel öffnet die Aufgabe, Fortschrittsbalken klappt die Unteraufgaben auf,

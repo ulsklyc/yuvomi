@@ -46,7 +46,7 @@ import { othersCanRead } from '/utils/household.js';
 import { wireTablist } from '/utils/tablist.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
-import { filterButtonHtml } from '/utils/filter-sheet.js';
+import { filterButtonHtml, openFilterSheet, filterChipsHtml, filtersAsPopover } from '/utils/filter-sheet.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { wirePeriodSwipe } from '/utils/period-swipe.js';
 import { isNavModuleReadOnly } from '/permissions.js';
@@ -5205,24 +5205,30 @@ function availableLayers() {
   return rows;
 }
 
-/** Die Personenzeilen des Filterblatts: Name, Haekchen und die Scheibe mit Initialen. */
-function personFilterRowsHtml(people) {
-  return people.map((u) => toggleRowHtml({
+/**
+ * Die Personen des Filterblatts als CHIPS (D2, utils/filter-sheet.js): je
+ * Person ein Chip mit ihrer Scheibe, dahinter „Nicht zugewiesen" (#1064).
+ *
+ * Leeres Set heisst ALLE - dann ist KEIN Chip an, wie im Aufgabenblatt. Bis
+ * zum geteilten Baustein standen hier Haken, die bei „alle" samt und sonders
+ * an waren; das erste Abwaehlen waehlte die uebrigen aus. Ein Chip sagt das
+ * Gegenteil und ist damit lesbarer: an ist, wonach gefiltert wird.
+ */
+function personFilterChipsHtml(people) {
+  const items = people.map((u) => ({
+    value: String(u.id),
     label: u.display_name ?? '',
-    // Leeres Set heisst ALLE - die Haekchen stehen dann auf „an", weil genau
-    // das der sichtbare Zustand ist. Wer das erste abwaehlt, waehlt damit die
-    // uebrigen aus; das ist die Lesart, die Apple in derselben Liste hat.
-    checked: state.people.size === 0 || state.people.has(u.id),
-    // ZWEI NAMEN FUER DIESELBE FARBE, und das ist kein Tippfehler in einer
-    // der beiden Quellen: `/family/members` liefert die Spalte roh als
-    // `avatar_color`, waehrend `assigned_users` sie im JSON auf `color`
-    // umbenennt (services/calendar-events.js:17). Wer nur einen der beiden
-    // Namen liest, bekommt an einer der beiden Stellen `undefined` - hier
-    // stand zuerst `u.color` und die Scheiben blieben in jeder Zeile leer.
+    active: state.people.has(u.id),
+    // ZWEI NAMEN FUER DIESELBE FARBE: `/family/members` liefert sie roh als
+    // `avatar_color`, `assigned_users` benennt sie auf `color` um
+    // (services/calendar-events.js:17).
     swatchColor: u.avatar_color ?? u.color ?? null,
     swatchLabel: initials(u.display_name),
-    attrs: { 'data-filter-person': String(u.id) },
-  })).join('');
+  }));
+  if (people.length) {
+    items.push({ value: UNASSIGNED, label: t('calendar.filterUnassigned'), active: state.people.has(UNASSIGNED) });
+  }
+  return filterChipsHtml('person', t('calendar.filtersPeople'), items);
 }
 
 /**
@@ -5239,6 +5245,7 @@ function buildLayerRowsHtml(layers) {
       label: row.label,
       checked: row.checked,
       swatchColor: row.color,
+      control: 'switch',
       attrs: { 'data-filter-layer': row.key },
     });
     if (row.key !== 'waste' || !state.layerWaste) return rowHtml;
@@ -5246,6 +5253,7 @@ function buildLayerRowsHtml(layers) {
       label: wt.name ?? '',
       checked: state.wasteVisibleTypeIds.size === 0 || state.wasteVisibleTypeIds.has(wt.id),
       swatchColor: wt.color,
+      control: 'switch',
       attrs: { 'data-filter-waste-type': String(wt.id) },
     })).join('');
     return typeRows ? `${rowHtml}<div class="cal-filters__nested">${typeRows}</div>` : rowHtml;
@@ -5478,12 +5486,40 @@ async function openLocalCalendarsModal() {
   });
 }
 
+/**
+ * Das Filterblatt des Kalenders - der EINE Baustein (utils/filter-sheet.js,
+ * D2) wie in den Aufgaben: Personen als Chips mit „Mir zugewiesen" als erstem
+ * Schalter darueber, Kalender und Ebenen als Schalter, die Darstellung
+ * abgesetzt am Ende, „Filter zuruecksetzen" in der Fusszeile. Am Desktop
+ * haengt es als Popover am Knopf (`anchor`), schmaler ist es das Blatt.
+ *
+ * Bis zu diesem Umbau baute der Kalender Blatt und Popover selbst (Haken
+ * statt Chips, eigene Popover-Klasse, eigener Reset-Text) - das Vorbild, von
+ * dem der Baustein abgeschrieben war, lief daneben weiter.
+ */
 function openCalendarFilters() {
   const layers = availableLayers();
   const people = state.users ?? [];
   const sources = calendarSources();
+  const asPopover = filtersAsPopover();
 
-  const layerRows = buildLayerRowsHtml(layers);
+  const groups = [];
+
+  // PERSONEN ZUERST, „Mir zugewiesen" als erster Schalter darin - dieselbe
+  // Stelle wie im Aufgabenblatt. Am Wandtablett nicht: „mir" waere das
+  // Display-Konto, dem nie ein Termin zugewiesen ist.
+  const meRow = (people.length > 1 && state.currentUserId != null && !isDisplayUser(state.user))
+    ? toggleRowHtml({
+      label: t('calendar.assignedToMe'),
+      icon: 'user',
+      checked: state.assignedToMe,
+      control: 'switch',
+      attrs: { 'data-filter-mine': 'true' },
+    })
+    : '';
+  if (meRow || people.length) {
+    groups.push({ heading: t('calendar.filtersPeople'), html: meRow + (people.length ? personFilterChipsHtml(people) : '') });
+  }
 
   // Je Kalender und Abo ein Schalter (#1064), mit der Farbe, die seine Termine
   // tragen. Neben den Ebenen, nicht in ihnen: eine Ebene ist eine Sorte Eintrag,
@@ -5492,115 +5528,30 @@ function openCalendarFilters() {
     label: s.name || t('calendar.detailCalendar'),
     checked: !state.hiddenSources.has(s.key),
     swatchColor: s.color,
+    control: 'switch',
     attrs: { 'data-filter-source': s.key },
   })).join('');
+  if (sourceRows) groups.push({ heading: t('calendar.filtersSources'), html: sourceRows });
+
+  const layerRows = buildLayerRowsHtml(layers);
+  if (layerRows) groups.push({ heading: t('calendar.filtersLayers'), html: `<div id="cal-filters-layers">${layerRows}</div>` });
 
   // Der Anzeigemodus des Schichtplans ist KEIN Filter - er nimmt nichts weg,
-  // er zeigt dasselbe anders. Er steht trotzdem hier, weil er im Kopf als
-  // Text-Chip neben den Ebenen hing und dort dieselbe Zeile kostete; im Blatt
-  // hat er als beschrifteter Schalter zum ersten Mal einen Zustand, den man
-  // ablesen kann statt ihn aus der Knopfbeschriftung zu erschliessen (der
-  // Chip hiess „Volle Bloecke", wenn er sie NICHT zeigte).
-  // S-16: die EN-Beschriftung wurde von "Full blocks" (Insider-Jargon,
-  // erklaerte sich nur ueber den vorherigen Chip-Text) auf eine Beschreibung
-  // der WIRKUNG umbenannt; eine eigene Hinweiszeile darunter nennt zusaetzlich
-  // den AUS-Zustand explizit (das ist der Vorgabewert - S-16 aendert ihn
-  // nicht), damit der Schalter vorhersagbar ist, ohne ihn erst umzulegen.
-  const scheduleDisplayRow = scheduleEnabled()
-    ? toggleRowHtml({
-      label: t('schedule.fullBlocks'),
-      checked: state.scheduleDisplay === 'blocks',
-      attrs: { 'data-filter-schedule-display': 'true' },
-    }) + `<p class="form-hint">${t('schedule.fullBlocksHint')}</p>`
-    : '';
-
-  const meRow = (people.length > 1 && state.currentUserId != null && !isDisplayUser(state.user))
-    ? toggleRowHtml({
-      label: t('calendar.assignedToMe'),
-      checked: state.assignedToMe,
-      attrs: { 'data-filter-mine': 'true' },
-    })
-    : '';
-
-  const personRows = personFilterRowsHtml(people);
-
-  // „Nicht zugewiesen" als Eintrag der Personenachse (#1064): dieselbe Lesart
-  // wie eine Person - leeres Set heisst alle, also steht er dann auf „an".
-  const unassignedRow = people.length ? toggleRowHtml({
-    label: t('calendar.filterUnassigned'),
-    checked: state.people.size === 0 || state.people.has(UNASSIGNED),
-    attrs: { 'data-filter-person': UNASSIGNED },
-  }) : '';
-
-  const content = `
-    <div class="cal-filters">
-      ${layerRows ? `
-        <section class="cal-filters__group">
-          <h3 class="cal-filters__heading">${t('calendar.filtersLayers')}</h3>
-          <div id="cal-filters-layers">${layerRows}</div>
-        </section>
-      ` : ''}
-      ${sourceRows ? `
-        <section class="cal-filters__group">
-          <h3 class="cal-filters__heading">${t('calendar.filtersSources')}</h3>
-          ${sourceRows}
-        </section>
-      ` : ''}
-      ${(meRow || personRows) ? `
-        <section class="cal-filters__group">
-          <h3 class="cal-filters__heading">${t('calendar.filtersPeople')}</h3>
-          ${meRow}
-          ${personRows}
-          ${unassignedRow}
-        </section>
-      ` : ''}
-      ${scheduleDisplayRow ? `
-        <section class="cal-filters__group">
-          <h3 class="cal-filters__heading">${t('calendar.filtersDisplay')}</h3>
-          ${scheduleDisplayRow}
-        </section>
-      ` : ''}
-    </div>
-    <!-- DAS AUFHEBEN STEHT IN DER FUSSZEILE, nicht unter der letzten Gruppe
-         (Critique 2026-09-24). Am Ende des Koerpers lag es bei 1280x800 unter
-         der Falz des 752px hohen Blatts: wer alles zuruecknehmen wollte, musste
-         erst an allen Schaltern vorbeiscrollen. mountFooter() hebt die Zeile
-         aus dem scrollenden Koerper an den Rand des Blatts - auf jeder Breite
-         sichtbar, ohne zu scrollen. -->
-    <div class="modal-panel__footer">
-      <button type="button" class="btn btn--secondary" id="cal-filters-reset">
-        ${t('calendar.filtersReset')}
-      </button>
-    </div>
-  `;
-
-  // `dirtyGuard: false`, weil dieses Blatt ein ANSICHTSBLATT ist und kein
-  // Formular: jeder Schalter darin wirkt beim Umlegen sofort und ist im selben
-  // Moment gespeichert (die `change`-Handler unten schreiben Zustand und
-  // Speicher direkt). Es gibt hier keinen Speichern-Knopf - und damit auch
-  // nichts, was ein „Aenderungen verwerfen?" beim Schliessen verwerfen koennte.
-  // Der Standard-Waechter fragte trotzdem, sobald man eine Ebene ein- oder
-  // ausblendete, und sein „Verwerfen" nahm die Ebene dann nicht zurueck.
-  // AM DESKTOP EIN POPOVER AM KNOPF (Re-Critique 2026-09-28, A2 P2-7): das
-  // zentrierte Blatt mit Blur-Backdrop verdeckte genau den Kalender, dessen
-  // Aenderung ein Haken live ausloest. Ab 1024px haengen die Filter ohne
-  // Abdunkeln am Filterknopf (Apple Kalender); schmaler bleibt das Blatt.
-  const asPopover = filtersAsPopover();
-  // Ein Klick auf den Knopf bei offenem Popover schliesst es zuerst per
-  // Light-Dismiss (pointerdown) - derselbe Klick oeffnete es sonst sofort
-  // wieder. So wirkt der Knopf wie ein Umschalter.
-  if (asPopover && Date.now() - filtersPopoverClosedAt < 300) return;
-  let panel;
-  let closeFilters;
-  if (asPopover) {
-    panel = openFiltersPopover(content);
-    closeFilters = () => panel.hidePopover?.();
-  } else {
-    openSharedModal({ title: t('calendar.filters'), content, size: 'sm', initialFocus: 'none', dirtyGuard: false });
-    panel = document.querySelector('#shared-modal-overlay .modal-panel');
-    closeFilters = () => closeModal({ force: true });
+  // er zeigt dasselbe anders. Deshalb abgesetzt am Ende (`variant: 'view'`),
+  // wie „Gruppieren nach" im Aufgabenblatt. S-16: die Beschriftung nennt die
+  // WIRKUNG, die Hinweiszeile darunter den AUS-Zustand (Vorgabe).
+  if (scheduleEnabled()) {
+    groups.push({
+      heading: t('calendar.filtersDisplay'),
+      variant: 'view',
+      html: toggleRowHtml({
+        label: t('schedule.fullBlocks'),
+        checked: state.scheduleDisplay === 'blocks',
+        control: 'switch',
+        attrs: { 'data-filter-schedule-display': 'true' },
+      }) + `<p class="form-hint">${t('schedule.fullBlocksHint')}</p>`,
+    });
   }
-  if (!panel) return;
 
   const LAYER_STATE = {
     holidays:  ['layerHolidays',  LAYER_HOLIDAYS_KEY],
@@ -5610,10 +5561,16 @@ function openCalendarFilters() {
     birthdays: ['layerBirthdays', LAYER_BIRTHDAYS_KEY],
   };
 
-  panel.addEventListener('change', (e) => {
-    const input = e.target;
-    if (!(input instanceof HTMLInputElement)) return;
+  // Nach jeder Wahl: Kopf (Zaehler) und Ansicht neu. Der Kopf baut seinen
+  // Knopf neu - offen bleibt das Popover trotzdem, es sucht ihn per `anchor`.
+  const afterChange = () => {
+    renderToolbar();
+    if (asPopover) _container?.querySelector('#cal-filters')?.setAttribute('aria-expanded', 'true');
+    renderView();
+  };
 
+  const onChange = (input, panel) => {
+    if (!(input instanceof HTMLInputElement)) return;
     const layerKey = input.dataset.filterLayer;
     if (layerKey && LAYER_STATE[layerKey]) {
       const [field, storageKey] = LAYER_STATE[layerKey];
@@ -5633,7 +5590,8 @@ function openCalendarFilters() {
     } else if (input.dataset.filterWasteType) {
       const id = Number(input.dataset.filterWasteType);
       const options = wasteTypeOptions();
-      // Derselbe Sprung aus „alle" heraus wie beim Personenfilter oben.
+      // Der Sprung aus „alle" heraus: das erste Abwaehlen macht aus dem leeren
+      // Set die Menge der uebrigen.
       if (state.wasteVisibleTypeIds.size === 0) {
         for (const wt of options) state.wasteVisibleTypeIds.add(wt.id);
       }
@@ -5656,33 +5614,13 @@ function openCalendarFilters() {
         state.hiddenSources.set(key, { name: quelle?.name ?? '', color: quelle?.color ?? null });
       }
       persistHiddenSources();
-    } else if (input.dataset.filterPerson) {
-      const raw = input.dataset.filterPerson;
-      const id = raw === UNASSIGNED ? UNASSIGNED : Number(raw);
-      // Der Sprung aus „alle" heraus: das erste Abwaehlen macht aus dem leeren
-      // Set die Menge der UEBRIGEN. Ohne diesen Schritt haette ein Klick auf
-      // ein Haekchen, das „alle" bedeutet, gar nichts getan. „Nicht zugewiesen"
-      // gehoert zu den uebrigen (#1064).
-      if (state.people.size === 0) {
-        for (const u of state.users ?? []) state.people.add(u.id);
-        state.people.add(UNASSIGNED);
-      }
-      if (input.checked) state.people.add(id);
-      else state.people.delete(id);
-      // Wieder ALLE gewaehlt heisst wieder „kein Filter" - sonst bliebe ein
-      // Filter aktiv, der nichts wegnimmt, und der Zaehler am Knopf loege.
-      if (state.people.size === (state.users ?? []).length + 1) state.people.clear();
-      persistPeopleFilter();
     } else {
       return;
     }
+    afterChange();
+  };
 
-    renderToolbar();
-    if (asPopover) _container?.querySelector('#cal-filters')?.setAttribute('aria-expanded', 'true');
-    renderView();
-  });
-
-  panel.querySelector('#cal-filters-reset')?.addEventListener('click', () => {
+  const onReset = () => {
     state.layerHolidays = true;
     state.layerSchool = true;
     state.layerSchedule = true;
@@ -5705,82 +5643,41 @@ function openCalendarFilters() {
       localStorage.setItem(ASSIGNED_TO_ME_KEY, '0');
     } catch {}
     persistPeopleFilter();
-    closeFilters();
     renderToolbar();
     renderView();
+  };
+
+  // `dirtyGuard: false` setzt der Baustein: ein ANSICHTSBLATT, jeder Schalter
+  // wirkt beim Umlegen sofort, es gibt nichts zu verwerfen.
+  const panel = openFilterSheet({
+    title: t('calendar.filters'),
+    groups,
+    onChange,
+    onReset,
+    anchor: () => _container?.querySelector('#cal-filters') ?? null,
   });
-}
+  if (!panel) return;
 
-const FILTERS_POPOVER_QUERY = '(min-width: 1024px)';
-let filtersPopoverClosedAt = 0;
-
-function filtersAsPopover() {
-  if (typeof HTMLElement === 'undefined' || !('popover' in HTMLElement.prototype)) return false;
-  return window.matchMedia?.(FILTERS_POPOVER_QUERY)?.matches === true;
-}
-
-/**
- * Die Filter als natives Popover (Top-Layer, Light-Dismiss und Esc vom
- * Browser) am Filterknopf. Die Position rechnet JS - dieselbe Rechnung wie
- * utils/popover-menu.js (rechtsbuendig unter dem Ausloeser, im Fenster
- * gehalten); CSS-Anchor-Positioning fehlt noch in zu vielen Browsern. Der
- * Knopf wird bei jedem Haken NEU gebaut (renderToolbar()), deshalb sucht jede
- * Stelle ihn frisch statt eine alte Referenz zu halten.
- */
-function openFiltersPopover(content) {
-  document.getElementById('cal-filters-popover')?.remove();
-  const trigger = () => _container?.querySelector('#cal-filters') ?? null;
-  const pop = document.createElement('div');
-  pop.id = 'cal-filters-popover';
-  pop.className = 'cal-filters-popover';
-  pop.setAttribute('popover', 'auto');
-  pop.setAttribute('role', 'dialog');
-  pop.setAttribute('aria-labelledby', 'cal-filters-popover-title');
-  pop.insertAdjacentHTML('beforeend', `<h2 class="cal-filters-popover__title" id="cal-filters-popover-title">${esc(t('calendar.filters'))}</h2>${content}`);
-  document.body.appendChild(pop);
-  window.lucide?.createIcons({ el: pop });
-  // DER FOKUS GEHT AN DEN KNOPF ZURUECK, und zwar VOR dem Schliessen: nach
-  // Esc fiel er sonst aus dem verschwindenden Popover auf den Scrollport
-  // (gemessen: #main-content), bevor `toggle` ueberhaupt lief. Ein Klick
-  // daneben auf ein anderes Bedienelement setzt seinen Fokus danach trotzdem
-  // selbst - der Light-Dismiss laeuft auf pointerdown, der Fokus erst mit
-  // mousedown.
-  pop.addEventListener('beforetoggle', (event) => {
-    if (event.newState === 'closed' && pop.contains(document.activeElement)) trigger()?.focus();
+  // PERSONEN-CHIPS: Klick statt `change`. Leeres Set heisst alle; wer wieder
+  // ALLE waehlt, hat keinen Filter mehr - sonst bliebe einer aktiv, der nichts
+  // wegnimmt, und der Zaehler am Knopf loege.
+  panel.addEventListener('click', (e) => {
+    const chip = e.target.closest?.('[data-filter="person"]');
+    if (!chip) return;
+    const raw = chip.dataset.value;
+    const id = raw === UNASSIGNED ? UNASSIGNED : Number(raw);
+    if (state.people.has(id)) state.people.delete(id);
+    else state.people.add(id);
+    if (state.people.size === people.length + 1) state.people.clear();
+    persistPeopleFilter();
+    panel.querySelectorAll('[data-filter="person"]').forEach((el) => {
+      const v = el.dataset.value === UNASSIGNED ? UNASSIGNED : Number(el.dataset.value);
+      const on = state.people.has(v);
+      el.classList.toggle('filter-chip--active', on);
+      el.setAttribute('aria-pressed', String(on));
+    });
+    afterChange();
   });
-  pop.addEventListener('toggle', (event) => {
-    const open = event.newState === 'open';
-    trigger()?.setAttribute('aria-expanded', String(open));
-    if (open) return;
-    filtersPopoverClosedAt = Date.now();
-    // Erst NACH dem Ausgang aus dem Baum (calendar.css: --duration-xs, das
-    // Popover bleibt per `allow-discrete` so lange im Top-Layer). Ein
-    // sofortiges remove() schnitt ihn ab. Ein erneutes Oeffnen davor raeumt
-    // den alten Knoten selbst (erste Zeile von openFiltersPopover).
-    setTimeout(() => pop.remove(), durationToken('--duration-xs', 120) + 40);
-  });
-  pop.showPopover();
-  positionFiltersPopover(pop, trigger());
-  trigger()?.setAttribute('aria-expanded', 'true');
-  pop.querySelector('input, button')?.focus();
-  return pop;
-}
-
-function positionFiltersPopover(pop, anchor) {
-  if (!anchor) return;
-  const rect = anchor.getBoundingClientRect();
-  const gap = 4;
-  const margin = 8;
-  const width = pop.offsetWidth || 360;
-  const left = Math.min(Math.max(margin, rect.right - width), window.innerWidth - width - margin);
-  const top = rect.bottom + gap;
-  pop.style.left = `${Math.round(left)}px`;
-  pop.style.top = `${Math.round(top)}px`;
-  pop.style.maxHeight = `${Math.round(window.innerHeight - top - margin)}px`;
-  // Es waechst aus der Ecke am Knopf (calendar.css): der Ursprung ist die
-  // Stelle des Popovers, unter der die Knopfkante steht - auch wenn das
-  // Fenster es von dort weggeschoben hat.
-  pop.style.transformOrigin = `${Math.round(Math.min(Math.max(0, rect.right - left), width))}px 0`;
 }
 
 /**
@@ -6139,7 +6036,7 @@ export const __test = {
   onPhoneQueryChange,
   setContainerForTest(container) { _container = container; },
   // test:initials: die Scheibe einer Person im Filterblatt.
-  personFilterRowsHtml,
+  personFilterChipsHtml,
   playViewSwap,
   eventBlockAttrs,
   // R10 L5: Liste + Detail der Agenda - Auswahl-ID und ihr Termin.

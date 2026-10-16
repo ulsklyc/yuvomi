@@ -166,8 +166,7 @@ test('R18: Dialog, Mehr-Blatt und Such-Palette tragen die Stufe der schwebenden 
   }
   // Die kleine Stufe: Menues.
   for (const [css, selector] of [[LAYOUT, '.popover-menu'], [LAYOUT, '.filter-popover'],
-    [read('../public/styles/documents.css'), '.documents-context-menu'],
-    [read('../public/styles/calendar.css'), '.cal-filters-popover']]) {
+    [read('../public/styles/documents.css'), '.documents-context-menu']]) {
     const radii = rulesFor(css, selector).map(radiusOf).filter(Boolean);
     assert.deepEqual([...new Set(radii)], ['var(--radius-glass-inner)'], `${selector} traegt ${radii.join(', ')}`);
   }

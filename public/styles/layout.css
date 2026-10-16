@@ -4818,6 +4818,20 @@ a.popover-menu__item {
   margin-top: var(--space-5);
 }
 
+/* Die Chipreihe EINER Achse (utils/filter-sheet.js, filterChipsHtml). Sie
+ * stand in tasks.css und galt damit nur dort - der Kalender, der dasselbe
+ * Blatt seit D2 traegt, bekam Chips ohne Abstand. Folgt sie einem Schalter
+ * („Mir zugewiesen" ueber den Personen), haelt sie Abstand zu ihm. */
+.filter-panel__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.toggle-row + .filter-panel__chips {
+  margin-top: var(--space-2);
+}
+
 .filter-sheet__heading {
   font-size: var(--text-xs);
   font-weight: var(--font-weight-semibold);

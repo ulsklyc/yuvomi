@@ -29,7 +29,8 @@ import { setBulkPill, clearBulkPill } from '/utils/bulk-pill.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { isSoloHousehold, hidesPrivacyControls } from '/utils/household.js';
 import { popoverMenuHtml, installPopoverMenus, pageToolsMenuHtml, pageToolsActionEl, syncPopoverMenuItem } from '/utils/popover-menu.js';
-import { filterButtonHtml, syncFilterButton, openFilterSheet } from '/utils/filter-sheet.js';
+import { filterButtonHtml, syncFilterButton, openFilterSheet, filterChipsHtml } from '/utils/filter-sheet.js';
+import { initials } from '/utils/initials.js';
 import { toggleRowHtml } from '/settings/components.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
@@ -3836,12 +3837,6 @@ function toolsMenuItems() {
   return items;
 }
 
-/** Ein Filter-Chip im Blatt: Button mit aria-pressed, Wert am Knoten. */
-function filterChipHtml({ filter, value, label, active }) {
-  return `<button type="button" class="filter-chip filter-chip--sm${active ? ' filter-chip--active' : ''}"
-    data-filter="${esc(filter)}" data-value="${esc(String(value))}" aria-pressed="${active}">${esc(label)}</button>`;
-}
-
 /**
  * Die Gruppen des Filterblatts, als `{ heading, html }` fuer openFilterSheet.
  *
@@ -3850,21 +3845,20 @@ function filterChipHtml({ filter, value, label, active }) {
  *
  * - Zuletzt verwendet: die gemerkten Sets als Aktions-Chips (kein Ein/Aus,
  *   deshalb ohne aria-pressed), zuerst, weil sie die schnellste Wahl sind.
- * - Anzeigen: „Mir zugewiesen" und „Geplante anzeigen" als Schalter - die
- *   beiden Chips, die vorher dauerhaft in der Zeile unter dem Kopf standen.
+ * - Anzeigen: „Bis heute faellig" als Schalter.
+ * - „Mir zugewiesen" ist der erste Schalter der Personengruppe, darunter die
+ *   Personen-Chips - dieselbe Stelle wie im Kalender (utils/filter-sheet.js,
+ *   „Der eine Filterblatt-Baustein").
  * - Gruppieren nach: nur in der Liste; das Brett gruppiert nach Status.
  * - Status (nicht im Kanban, Audit A1-07), Prioritaet, Person, Kategorie
  *   (D#1017), Tag: je Wert ein Chip, Mehrfachauswahl je Achse (#671).
  */
 function filterSheetGroups() {
   const groups = [];
-  const chipsHtml = (key, label, items) => `
-    <div class="filter-panel__chips" role="group" aria-label="${esc(label)}">
-      ${items.map((item) => filterChipHtml({
-        filter: key, value: item.value, label: item.label,
-        active: key === 'tag' ? hasTagFilter(item.value) : hasFilter(key, item.value),
-      })).join('')}
-    </div>`;
+  const chipsHtml = (key, label, items) => filterChipsHtml(key, label, items.map((item) => ({
+    ...item,
+    active: key === 'tag' ? hasTagFilter(item.value) : hasFilter(key, item.value),
+  })));
 
   const statusLabels = STATUS_LABELS();
   const priorityLabels = PRIORITY_LABELS();
@@ -3893,16 +3887,9 @@ function filterSheetGroups() {
     });
   }
 
-  const showRows = [];
-  // Am Wandtablett nicht (#1808): „mir" waere das Display-Konto, dem nie eine
-  // Aufgabe zugewiesen ist - der Schalter leerte die Liste.
-  if (state.users.length > 1 && state.currentUserId != null && !actingAsDisplay()) {
-    showRows.push(toggleRowHtml({ label: t('tasks.assignedToMe'), icon: 'user', checked: isAssignedToMe(),
-      attrs: { 'data-filter-mine': 'true' } }));
-  }
-  showRows.push(toggleRowHtml({ label: t('tasks.filterDueToday'), icon: 'calendar-check', checked: state.dueToday,
-    attrs: { 'data-filter-due-today': 'true' } }));
-  groups.push({ heading: t('tasks.filterGroupShow'), html: showRows.join('') });
+  groups.push({ heading: t('tasks.filterGroupShow'),
+    html: toggleRowHtml({ label: t('tasks.filterDueToday'), icon: 'calendar-check', checked: state.dueToday,
+      control: 'switch', attrs: { 'data-filter-due-today': 'true' } }) });
 
   if (state.viewMode !== 'kanban') {
     groups.push({ heading: t('tasks.filterGroupStatus'),
@@ -3911,8 +3898,18 @@ function filterSheetGroups() {
   groups.push({ heading: t('tasks.filterGroupPriority'),
     html: chipsHtml('priority', t('tasks.filterGroupPriority'), PRIORITIES().map((p) => ({ value: p.value, label: p.label }))) });
   if (state.users.length > 1) {
+    // Am Wandtablett nicht (#1808): „mir" waere das Display-Konto, dem nie eine
+    // Aufgabe zugewiesen ist - der Schalter leerte die Liste.
+    const mine = state.currentUserId != null && !actingAsDisplay()
+      ? toggleRowHtml({ label: t('tasks.assignedToMe'), icon: 'user', checked: isAssignedToMe(),
+        control: 'switch', attrs: { 'data-filter-mine': 'true' } })
+      : '';
     groups.push({ heading: t('tasks.filterGroupPerson'),
-      html: chipsHtml('assigned_to', t('tasks.filterGroupPerson'), state.users.map((u) => ({ value: String(u.id), label: u.display_name }))) });
+      html: mine + chipsHtml('assigned_to', t('tasks.filterGroupPerson'), state.users.map((u) => ({
+        value: String(u.id), label: u.display_name,
+        // Die Scheibe der Person wie im Kalenderblatt (utils/filter-sheet.js).
+        swatchColor: u.avatar_color ?? null, swatchLabel: initials(u.display_name),
+      }))) });
   }
   // KATEGORIE UND TAG SIND EINGEKLAPPT, SOLANGE NICHTS GEWAEHLT IST (Critique
   // 2026-10-05, R16). Das Blatt mass 35 Bedienelemente und 1084px in 591px;
@@ -3949,7 +3946,7 @@ function filterSheetGroups() {
         </div>`);
   }
   viewRows.push(toggleRowHtml({ label: t('tasks.showFuture'), icon: 'calendar-clock', checked: state.showFuture,
-    attrs: { 'data-filter-future': 'true' } }));
+    control: 'switch', attrs: { 'data-filter-future': 'true' } }));
   groups.push({ heading: t('tasks.viewToggleLabel'), variant: 'view', html: viewRows.join('') });
   return groups;
 }
@@ -4017,9 +4014,8 @@ function openTaskFilters(container) {
     // dahinter bleibt sichtbar und filtert live.
     anchor: () => container?.querySelector?.('#tasks-filter-btn') ?? null,
     groups: filterSheetGroups(),
-    // Nicht „Alle Filter aufheben": der Knopf stellt den Standard her (Status
-    // „Offen"), und so heisst er auch.
-    resetLabel: t('common.filtersResetDefault'),
+    // Der Reset-Text ist der des Bausteins („Filter zuruecksetzen"): der Knopf
+    // stellt den Standard her (Status „Offen"), wie der des Kalenders seinen.
     onChange: (input) => onFilterSheetChange(input, container),
     onReset: () => { resetTaskFilters(container); },
   });

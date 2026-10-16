@@ -3076,18 +3076,10 @@
 
 /* --- Das Blatt ------------------------------------------------------- */
 
-.cal-filters__group + .cal-filters__group {
-  margin-top: var(--space-5);
-}
-
-.cal-filters__heading {
-  font-size: var(--text-xs);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-  color: var(--color-text-tertiary);
-  margin: 0 0 var(--space-2);
-}
+/* Gruppen, Ueberschriften, Fusszeile und Desktop-Popover sind seit dem
+ * EINEN Filterblatt-Baustein (Critique 2026-10-16, D2) die geteilten
+ * `.filter-sheet*` / `.filter-popover*` aus layout.css. Hier bleibt nur, was
+ * nur der Kalender hat: die Unterliste der Entsorgungsebene. */
 
 /* Per-Typ-Unterliste unter der Waste-Ebene (#1063 Phase 10) - die einzige
    echte Verschachtelung in diesem Blatt, siehe buildLayerRowsHtml. Einrueckung
@@ -3320,92 +3312,3 @@
   text-align: end;
 }
 
-/* Filter am Desktop als Popover am Knopf (Re-Critique 2026-09-28, A2 P2-7):
- * vorher ein zentriertes Blatt mit Blur-Backdrop, das den Kalender verdeckte,
- * dessen Aenderung ein Haken live ausloest. Ab 1024px (calendar.js,
- * filtersAsPopover()) haengt dasselbe Blatt ohne Abdunkeln am Filterknopf;
- * die Position rechnet openFiltersPopover(). Flaeche, Kante, Schatten und
- * Radius wie .popover-menu (layout.css) - dasselbe Material fuer alles, was
- * an einem Knopf aufgeht. */
-.cal-filters-popover {
-  position: fixed;
-  inset: auto;
-  margin: 0;
-  z-index: var(--z-dropdown);
-  inline-size: min(360px, calc(100vw - 2 * var(--space-2)));
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: var(--space-3) var(--space-3) 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-glass-inner);
-  background-color: var(--color-surface);
-  color: var(--color-text-primary);
-  box-shadow: var(--shadow-md);
-  /* EIN- UND AUSGANG WIE DAS POPOVER-MENUE (R17, Bewegung; layout.css,
-   * `.popover-menu`): es waechst aus der Ecke am Filterknopf (96 % -> 100 %)
-   * und blendet, der Ausgang ist kuerzer (--duration-xs gegen --duration-md)
-   * und nimmt das Wachstum zurueck. Bisher erschien und verschwand es hart.
-   * Den Ursprung (`transform-origin`) setzt positionFiltersPopover() mit der
-   * Position - dort faellt die Entscheidung fuer die Kante, hier stuende sie
-   * als physische Seite, die in RTL nicht stimmen muss.
-   * Hier MIT @starting-style: die Position rechnet openFiltersPopover() im
-   * selben Takt wie showPopover(), es gibt keinen Frame oben links zu
-   * verstecken. ZWEI DEKLARATIONEN, die Reihenfolge ist der Rueckfall: ohne
-   * `allow-discrete` verwirft der Browser die zweite, und das Popover
-   * schliesst hart wie bisher. Unter reduzierter Bewegung nimmt reset.css
-   * die Dauer auf 0s. */
-  opacity: 0;
-  transform: scale(0.96);
-  transition:
-    opacity var(--duration-xs) var(--ease-out),
-    transform var(--duration-xs) var(--ease-out);
-  transition:
-    opacity var(--duration-xs) var(--ease-out),
-    transform var(--duration-xs) var(--ease-out),
-    overlay var(--duration-xs) allow-discrete,
-    display var(--duration-xs) allow-discrete;
-}
-
-.cal-filters-popover:popover-open {
-  opacity: 1;
-  transform: none;
-  transition:
-    opacity var(--duration-md) var(--ease-out),
-    transform var(--duration-md) var(--ease-out);
-  transition:
-    opacity var(--duration-md) var(--ease-out),
-    transform var(--duration-md) var(--ease-out),
-    overlay var(--duration-md) allow-discrete,
-    display var(--duration-md) allow-discrete;
-}
-
-@starting-style {
-  .cal-filters-popover:popover-open {
-    opacity: 0;
-    transform: scale(0.96);
-  }
-}
-
-.cal-filters-popover::backdrop {
-  background: transparent;
-}
-
-.cal-filters-popover__title {
-  margin: 0 0 var(--space-2);
-  font-size: var(--text-base);
-  font-weight: var(--font-weight-semibold);
-}
-
-/* Das Aufheben bleibt ohne Scrollen im Blick - wie mountFooter() es im Blatt
- * an den Rand hebt, klebt es hier am unteren Rand des Popovers. */
-.cal-filters-popover .modal-panel__footer {
-  position: sticky;
-  bottom: 0;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  margin-inline: calc(-1 * var(--space-3));
-  padding: var(--space-2) var(--space-3) var(--space-3);
-  border-top: 1px solid var(--color-border-subtle);
-  background-color: var(--color-surface);
-}

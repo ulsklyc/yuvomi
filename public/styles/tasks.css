@@ -298,14 +298,9 @@
  * Filterblatt (utils/filter-sheet.js)
  * -------------------------------------------------------- */
 /* Basis, Aktiv-Zustand und Hoehenklasse von .filter-chip leben in der
- * geteilten styles/filter-chip.css, Gruppen und Ueberschriften des Blatts in
- * layout.css (`.filter-sheet__*`). Hier bleiben nur die Chipreihe einer Achse
- * und die gemerkten Sets. */
-.filter-panel__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
+ * geteilten styles/filter-chip.css, Gruppen, Ueberschriften und die
+ * Chipreihe einer Achse (`.filter-panel__chips`) in layout.css - seit der
+ * Kalender dasselbe Blatt traegt (D2). Hier bleiben nur die gemerkten Sets. */
 
 /* Ein gemerktes Set ist eine Aktion („wende das an"), kein Zustand - deshalb
  * gestrichelt statt getoent, ohne aria-pressed. */

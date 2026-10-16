@@ -420,7 +420,7 @@ test('Einstellungen: Familie, Konto und Rechte', async () => {
 
 test('Kalender: die Scheibe im Filterblatt', async () => {
   const { __test: calendar } = await import('../public/pages/calendar.js');
-  const html = calendar.personFilterRowsHtml([{ id: 1, display_name: MINSU, avatar_color: '#34C759' }]);
+  const html = calendar.personFilterChipsHtml([{ id: 1, display_name: MINSU, avatar_color: '#34C759' }]);
   assertShows(html, '민수', 'Filterblatt');
 });
 
@@ -642,7 +642,7 @@ test('mit Haushalt: JEDER Aufrufer zeigt fuer Linda LI und fuer Leo LE', async (
     'Einstellungen Familie': (name) => family.__test.avatarHtml(person(name)),
     'Einstellungen Konto': (name) => account.__test.avatarHtml(person(name)),
     'Einstellungen Rechte': (name) => permissions.memberChipHtml(person(name)),
-    'Kalender Filterblatt': (name) => calendar.personFilterRowsHtml([person(name)]),
+    'Kalender Filterblatt': (name) => calendar.personFilterChipsHtml([person(name)]),
     'Dienstplan Spur': (name) => withState(schedule.scheduleState(), { users: [{ id: 5, display_name: name }] },
       () => schedule.overviewLaneHeader(5)),
     Kontaktzeile: (name) => contacts.renderContactItem({
