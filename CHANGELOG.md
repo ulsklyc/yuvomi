@@ -87,6 +87,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Shared expenses say which group a balance belongs to.** "You are owed" and "You owe" now name
   the selected group, and the "Active groups" tile, which counted all groups right next to them, is
   gone; the number of groups stays at the head of the group list.
+- **Selecting several tasks or contacts on a desktop shows the selection in the detail column.**
+  It reads "2 selected" with the actions for the selection, like Mail; the floating bar no longer
+  covers the details of another task, and only one Delete is on screen. On phones the bar stays.
 
 ### Fixed
 

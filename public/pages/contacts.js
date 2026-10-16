@@ -14,13 +14,12 @@ import { initials } from '/utils/initials.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { pageToolsMenuHtml, pageToolsActionEl, popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
-import { setBulkPill, clearBulkPill } from '/utils/bulk-pill.js';
 import { parseVCards } from '/utils/vcard.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 import { composeDisplayName, contactSortKey, splitDisplayName } from '/utils/contact-name.js';
 import { getPhoneFormatter, createAsYouType, countryFromRegion } from '/utils/phone.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
-import { splitViewDetailHtml, mountMasterDetail } from '/utils/master-detail.js';
+import { splitViewDetailHtml, mountMasterDetail, setSelectionBulk } from '/utils/master-detail.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
 import '/components/category-manager.js';
 import { findPageFab } from '/utils/fab.js';
@@ -1705,7 +1704,7 @@ function exitSelectMode() {
   syncSelectChrome();
   if (refocus) _container.querySelector('.contacts-toolbar .page-tools-btn')?.focus();
   _container.querySelector('.contacts-page')?.classList.remove('is-selecting');
-  clearBulkPill();
+  setSelectionBulk(md, null);
   renderList();
 }
 
@@ -1721,7 +1720,7 @@ function syncSelectChrome() {
 }
 
 function updateSelectUI() {
-  if (!state.selectMode) { clearBulkPill(); return; }
+  if (!state.selectMode) { setSelectionBulk(md, null); return; }
   const n = state.selected.size;
   const actions = [{ label: t('contacts.selectAll'), onClick: () => toggleSelectAll() }];
   // Ohne Auswahl gibt es nichts zu löschen, und die Kapsel steht dann gar nicht
@@ -1741,7 +1740,8 @@ function updateSelectUI() {
       onClick: () => deleteSelected(),
     });
   }
-  setBulkPill({ label: t('contacts.selectCount', { count: n }), actions });
+  // In der Spalte „N ausgewaehlt" (Muster Mail), darunter die Pille (R19).
+  setSelectionBulk(md, { label: t('contacts.selectCount', { count: n }), actions });
 }
 
 /** Ein Tipp im Auswahlmodus: den Kontakt in die Auswahl oder heraus. */

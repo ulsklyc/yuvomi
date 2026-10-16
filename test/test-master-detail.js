@@ -988,3 +988,79 @@ test('A6 P1-1: kein Inhalt mit z-index malt ueber den klebenden Detailkopf - in 
   const undo = [...eachRule(layout)].filter((r) => /isolation:\s*auto/.test(r.body));
   assert.deepEqual(undo.map((r) => r.selector), [], 'isolation: auto hebt die Ebene wieder auf');
 });
+
+// ── Mehrfachauswahl: in der Spalte „N ausgewaehlt", darunter die Pille (R19) ──
+//
+// Am Desktop schwebte die Sammel-Pille ueber dem Detail einer ANDEREN Aufgabe,
+// und zwei Loeschen mit verschiedener Reichweite standen gleichzeitig da
+// (Critique 2026-10-16). Festgelegt: ab der Schwelle zeigt die Detailspalte die
+// Auswahl samt Sammelaktionen (Muster Mail), die Pille entfaellt dort.
+
+/** Elemente, wie bulk-pill.js sie baut, auf dem kleinsten DOM dieser Suite. */
+class El extends Node {
+  constructor(tag) { super(); this.tagName = String(tag).toUpperCase(); this._text = ''; }
+  set className(v) { for (const c of String(v).split(/\s+/).filter(Boolean)) this.classList.add(c); }
+  appendChild(kid) { this.append(kid); return kid; }
+  set textContent(v) { this._text = String(v); }
+  get textContent() { return this._text + this.children.map((c) => c.textContent ?? '').join(''); }
+}
+
+test('setSelectionBulk: in der Spalte zeigt das Detail die Auswahl, die Pille bleibt leer - darunter umgekehrt', () => {
+  const layer = new El('div');
+  const vorher = { createElement: document.createElement, getElementById: document.getElementById };
+  document.createElement = (tag) => new El(tag);
+  document.getElementById = (id) => (id === 'bulk-pill-layer' ? layer : null);
+  try {
+    const p = makePage();
+    const handle = p.mount();
+    handle.open('2');
+    const done = [];
+    const spec = { label: '2 ausgewaehlt', actions: [{ label: 'Fertig', onClick: () => done.push('fertig') }] };
+    md.setSelectionBulk(handle, spec);
+    const host = p.detail.querySelector('.split-view__selection');
+    assert.ok(host && !host.hidden, 'die Spalte traegt die Auswahl');
+    assert.equal(p.detail.classList.contains('is-selecting'), true, 'Detail und Leerzustand treten zurueck (CSS), ohne geleert zu werden');
+    assert.match(host.querySelector('.selection-pane__title')?.textContent ?? '', /2 ausgewaehlt/);
+    assert.equal(host.querySelector('.selection-pane__title').tagName, 'H2', 'die Auswahl ist die Ueberschrift der Spalte');
+    const action = host.querySelector('.selection-pane__action');
+    assert.ok(action, 'die Sammelaktion steht als Knopf in der Spalte');
+    action.listeners.find((l) => l.type === 'click').handler();
+    assert.deepEqual(done, ['fertig']);
+    assert.equal(layer.children.length, 0, 'keine schwebende Pille ueber dem Detail');
+    assert.deepEqual(p.body.content, ['detail:2'], 'das Detail der gewaehlten Zeile bleibt im Baum');
+
+    // Unter der Schwelle: dieselbe Spezifikation wird zur Pille.
+    p.setSplit(false);
+    md.setSelectionBulk(handle, spec);
+    assert.equal(p.detail.classList.contains('is-selecting'), false);
+    assert.equal(host.hidden, true);
+    assert.ok(layer.querySelector('.list-bulkbar'), 'mobil bleibt die Pille');
+
+    // Auswahl beendet: weder Pille noch Spalte.
+    p.setSplit(true);
+    md.setSelectionBulk(handle, spec);
+    md.setSelectionBulk(handle, null);
+    assert.equal(p.detail.classList.contains('is-selecting'), false, 'nach der Auswahl steht wieder das Detail');
+    assert.equal(layer.children.length, 0);
+    handle.destroy();
+
+    // Ohne Baustein (Aufgaben-Brett): die Pille.
+    md.setSelectionBulk(null, spec);
+    assert.ok(layer.querySelector('.list-bulkbar'));
+    md.setSelectionBulk(null, null);
+    assert.equal(layer.children.length, 0);
+  } finally {
+    Object.assign(document, vorher);
+  }
+});
+
+test('Aufgaben und Kontakte setzen ihre Auswahl ueber den Baustein, nicht an ihm vorbei', () => {
+  for (const file of ['tasks.js', 'contacts.js']) {
+    const src = readFileSync(new URL(`../public/pages/${file}`, import.meta.url), 'utf8').replace(/^\s*\/\/.*$/gm, '');
+    assert.doesNotMatch(src, /\b(setBulkPill|clearBulkPill)\(/, `${file} setzt die Pille selbst - am Desktop schwebte sie dann ueber dem Detail`);
+    assert.match(src, /setSelectionBulk\((taskMd|md), \{ label:/, `${file} reicht die Sammelaktionen an den Baustein`);
+  }
+  const css = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const hide = [...eachRule(css)].find((r) => r.selector.trim() === '.split-view__detail.is-selecting > :not(.split-view__selection)');
+  assert.match(hide?.body ?? '', /display:\s*none/, 'waehrend der Auswahl tritt das Detail zurueck');
+});

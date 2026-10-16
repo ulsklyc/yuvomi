@@ -79,14 +79,16 @@ export function bulkPillLayer() {
  * dieselbe Schreibweise, und ein zweiter Bauweg wäre die zweite Grammatik,
  * die dieses Bauteil gerade abgeschafft hat.
  */
-function actionButton({ label, ariaLabel, count, danger, onClick }) {
+function actionButton({ label, ariaLabel, count, danger, onClick }, pane = false) {
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.className = 'list-bulkbar__action';
+  // In der Detailspalte (setBulkPane) sind es Knoepfe der Inhaltsflaeche, keine
+  // Kapseln auf Shell-Glas: dort steht die Auswahl wie in Mail als Inhalt.
+  btn.className = pane ? 'btn btn--secondary selection-pane__action' : 'list-bulkbar__action';
   // Die Gefahr trägt eine eigene Tinte, nicht eine eigene Form: die Kapsel ist
   // das Vokabular dieser Fläche, die Farbe ist der Zweitkanal daneben. Und sie
   // ist NICHT der einzige Unterschied - die Rückfrage ist der erste.
-  if (danger) btn.classList.add('list-bulkbar__action--danger');
+  if (danger) btn.classList.add(pane ? 'selection-pane__action--danger' : 'list-bulkbar__action--danger');
   btn.textContent = label;
   if (ariaLabel) btn.setAttribute('aria-label', ariaLabel);
   // DIE ZAHL HOLT DAS SUBJEKT EIN, WENN ES WEGFÄLLT (Etappe 6, 2026-08-13).
@@ -106,7 +108,7 @@ function actionButton({ label, ariaLabel, count, danger, onClick }) {
   // leer" heisst. Zweimal dieselbe Zahl in einer Ansage. Die Zahl steht ohnehin
   // IMMER im Namen der Gruppe, und `aria-labelledby` überlebt das
   // `display: none` bei 320px.
-  if (count != null) {
+  if (count != null && !pane) {
     const badge = document.createElement('span');
     badge.className = 'list-bulkbar__action-count';
     badge.textContent = String(count);
@@ -124,16 +126,18 @@ function actionButton({ label, ariaLabel, count, danger, onClick }) {
  * @param {object|null} pending  die Aktion, deren Rückfrage offen steht
  */
 function paint(spec, pending) {
-  const layer = bulkPillLayer();
+  const pane = spec.host ?? null;
+  const layer = pane ?? bulkPillLayer();
   if (!layer) return null;
+  const button = (action) => actionButton(action, Boolean(pane));
 
   const bar = document.createElement('div');
-  bar.className = 'list-bulkbar';
+  bar.className = pane ? 'selection-pane' : 'list-bulkbar';
   // `group` plus Beschriftung: die Pille steht visuell losgelöst von ihrer
   // Liste, und ohne Rolle wäre sie für die Tastatur nur eine Folge von zwei
   // Knöpfen ohne Bezug. Die erklärende Zeile IST der Bezug.
   bar.setAttribute('role', 'group');
-  if (pending) bar.classList.add('list-bulkbar--confirming');
+  if (pending) bar.classList.add(pane ? 'selection-pane--confirming' : 'list-bulkbar--confirming');
 
   // SUBJEKT, NICHT LABEL. Die Zeile beschriftet nicht die Knöpfe - die tragen
   // ihre eigenen Wörter -, sie nennt, WORAUF sie wirken. Der alte Name
@@ -145,11 +149,23 @@ function paint(spec, pending) {
   // Im Bestätigungszustand ist derselbe Knoten die FRAGE. Ein zweiter Knoten
   // daneben wäre ein zweiter Bezug für dieselbe `role="group"`, und genau
   // dieser Knoten ist der, den `aria-labelledby` liest.
-  const subject = document.createElement('span');
-  subject.className = 'list-bulkbar__subject';
-  subject.id = 'bulk-pill-subject';
+  // In der Spalte ist das Subjekt ihre Ueberschrift („3 Aufgaben ausgewaehlt"),
+  // wie der Titel jedes anderen Details dort.
+  const subject = document.createElement(pane ? 'h2' : 'span');
+  subject.className = pane ? 'selection-pane__title' : 'list-bulkbar__subject';
+  subject.id = pane ? 'bulk-pane-subject' : 'bulk-pill-subject';
   subject.textContent = pending ? pending.confirm.question : spec.label;
   bar.setAttribute('aria-labelledby', subject.id);
+  if (pane) {
+    // Das Zeichen der Auswahl ueber der Ueberschrift, wie der Stapel in Mail.
+    const mark = document.createElement('span');
+    mark.className = 'selection-pane__icon';
+    mark.setAttribute('aria-hidden', 'true');
+    const glyph = document.createElement('i');
+    glyph.dataset.lucide = pending ? 'circle-alert' : 'list-checks';
+    mark.appendChild(glyph);
+    bar.appendChild(mark);
+  }
   bar.appendChild(subject);
 
   if (pending) {
@@ -160,25 +176,25 @@ function paint(spec, pending) {
     // beide darunter. Der Knoten trägt keine Rolle: die Kapseln bleiben direkte
     // Nachfahren der `role="group"`, die Fokusreihenfolge ist die des DOM.
     const choices = document.createElement('div');
-    choices.className = 'list-bulkbar__choices';
+    choices.className = pane ? 'selection-pane__actions' : 'list-bulkbar__choices';
 
     // Abbrechen steht VOR der Bestätigung: die Leserichtung führt vom
     // Rückweg zur Folge, nicht umgekehrt, und der Daumen trifft am rechten
     // Rand das, was er zuletzt bestätigt hat.
-    const cancel = actionButton({
+    const cancel = button({
       label: t('common.cancel'),
       onClick: () => {
         const back = paint(spec, null);
         // Zurück auf die Kapsel, die die Frage aufgemacht hat - sonst landet
         // der Tastaturfokus am Dokumentanfang und der Weg ist verloren.
-        back?.querySelectorAll('.list-bulkbar__action')[spec.actions.indexOf(pending)]?.focus();
+        back?.querySelectorAll('.list-bulkbar__action, .selection-pane__action')[spec.actions.indexOf(pending)]?.focus();
       },
     });
     choices.appendChild(cancel);
     // Ohne Marke: die Zahl steht in der Frage links daneben, und zweimal
     // dieselbe Zahl in einer Fläche ist genau das Echo, das die Marke im
     // Ruhezustand vermeidet.
-    const confirmBtn = actionButton({
+    const confirmBtn = button({
       label: pending.confirm.confirmLabel ?? pending.label,
       ariaLabel: pending.ariaLabel,
       danger: pending.danger,
@@ -215,8 +231,8 @@ function paint(spec, pending) {
     // Satz, der dort fehlt, wird nicht gehoert.
     if (pending.confirm.detail) {
       const detail = document.createElement('span');
-      detail.className = 'list-bulkbar__detail';
-      detail.id = 'bulk-pill-detail';
+      detail.className = pane ? 'selection-pane__detail' : 'list-bulkbar__detail';
+      detail.id = pane ? 'bulk-pane-detail' : 'bulk-pill-detail';
       detail.textContent = pending.confirm.detail;
       bar.appendChild(detail);
       bar.setAttribute('aria-labelledby', `${subject.id} ${detail.id}`);
@@ -230,17 +246,21 @@ function paint(spec, pending) {
       cancel.click();
     });
   } else {
+    // In der Spalte stehen die Aktionen als eigene Zeile unter der Ueberschrift.
+    const row = pane ? document.createElement('div') : bar;
+    if (pane) row.className = 'selection-pane__actions';
     for (const action of spec.actions) {
-      bar.appendChild(actionButton({
+      row.appendChild(button({
         ...action,
         // Eine Aktion mit Rückfrage FÜHRT NICHT AUS, sie fragt. Ohne
         // `confirm` bleibt der direkte Weg - eine harmlose Aktion soll keine
         // Frage bekommen, nur weil eine andere in derselben Pille eine hat.
         onClick: action.confirm
-          ? () => { paint(spec, action)?.querySelector('.list-bulkbar__action')?.focus(); }
+          ? () => { paint(spec, action)?.querySelector('.list-bulkbar__action, .selection-pane__action')?.focus(); }
           : (btn) => action.onClick(btn),
       }));
     }
+    if (pane && spec.actions.length) bar.appendChild(row);
   }
 
   /* DER FOKUS UEBERLEBT DAS NEUZEICHNEN.
@@ -259,12 +279,13 @@ function paint(spec, pending) {
    * verbliebene den Fokus - nur nicht der Body. Und nur, wenn der Fokus vorher
    * WIRKLICH in der Pille stand; sonst reisst das Neuzeichnen ihn aus einem
    * Eingabefeld irgendwo anders auf der Seite. */
-  const alt = layer.querySelector('.list-bulkbar');
+  const alt = layer.querySelector(pane ? '.selection-pane' : '.list-bulkbar');
   const fokusIndex = alt && alt.contains(document.activeElement)
     ? [...alt.querySelectorAll('button')].indexOf(document.activeElement)
     : -1;
 
   layer.replaceChildren(bar);
+  if (pane) window.lucide?.createIcons?.({ el: bar });
 
   if (fokusIndex >= 0) {
     const knoepfe = [...bar.querySelectorAll('button')];
@@ -297,4 +318,22 @@ export function setBulkPill(spec) {
  */
 export function clearBulkPill() {
   bulkPillLayer()?.replaceChildren();
+}
+
+/**
+ * DIE AUSWAHL ALS INHALT DER DETAILSPALTE (Critique R19, Muster Apple Mail).
+ * Am Desktop schwebte die Pille ueber dem Detail einer ANDEREN Aufgabe, und
+ * zwei Loeschen-Knoepfe mit verschiedener Reichweite standen gleichzeitig da.
+ * Ab der Split-Schwelle zeigt deshalb die Detailspalte die Auswahl: dieselbe
+ * Spezifikation wie `setBulkPill` (Subjekt, Aktionen, Rueckfrage, Fokus), nur
+ * als Ueberschrift mit Knoepfen. WELCHE der beiden Flaechen gilt, entscheidet
+ * der Baustein Liste + Detail (`setSelectionBulk` in utils/master-detail.js),
+ * nicht die Seite.
+ *
+ * @param {HTMLElement} host  der Traeger in der Detailspalte
+ * @param {object} spec       wie bei setBulkPill
+ */
+export function setBulkPane(host, spec) {
+  if (!host) return null;
+  return paint({ actions: [], ...spec, host }, null);
 }

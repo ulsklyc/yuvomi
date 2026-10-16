@@ -1341,6 +1341,15 @@ Die Uebersicht steht seit R19 (2026-10-16) auf derselben Spalte: sie polstert am
 begann sie bei 1920 bei x 270 und jedes Modul bei x 430; jetzt 252 / 252 / 430 bei 1280 / 1440 /
 1920 auf allen Seiten (`test:dashboard-clarity`).
 
+**Mehrfachauswahl steht in der Detailspalte** (R19, 2026-10-16, Muster Apple Mail). Ab der
+Schwelle zeigt die Spalte waehrend einer Auswahl „N ausgewaehlt" mit den Sammelaktionen als
+Knoepfe (Rueckfrage, Fokus auf Abbrechen und Esc wie in der Pille); Detail und Leerzustand bleiben
+im Baum und kehren danach zurueck. Die schwebende Pille entfaellt dort - sie stand ueber dem
+Detail einer anderen Zeile, und zwei Loeschen mit verschiedener Reichweite waren sichtbar.
+Darunter und ohne Baustein (Aufgaben-Brett) bleibt es die Pille. EIN Weg fuer alle Seiten:
+`setSelectionBulk(handle, spec)` in `utils/master-detail.js` (Aufgaben, Kontakte;
+`test:master-detail`).
+
 **Der klebende Kopf der Detailspalte bleibt oben** (R16, 2026-09-28). Im Zyklus-Kalender der
 Gesundheit und bei den Vitalwerten schoben sich Ziffern und Kennzahlen mit eigenem `z-index`
 beim Scrollen ueber den Kopf. Statt

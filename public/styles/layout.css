@@ -3310,6 +3310,96 @@ html.fab-steady .page-fab {
   }
 }
 
+/* DIE AUSWAHL STEHT IN DER SPALTE (Critique R19, Muster Apple Mail).
+ * Waehrend einer Mehrfachauswahl zeigt die Detailspalte „N ausgewaehlt" mit den
+ * Sammelaktionen (utils/master-detail.js, setSelectionBulk); Detail und
+ * Leerzustand bleiben im Baum und kommen nach der Auswahl unveraendert zurueck.
+ * Ruhig und mittig wie der Leerzustand - der Titel in der Stufe eines
+ * Detailtitels, die Aktionen als eine Zeile gewoehnlicher Knoepfe. */
+.split-view__detail.is-selecting > :not(.split-view__selection) {
+  display: none;
+}
+
+.split-view__selection {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8) var(--space-6);
+}
+
+.split-view__selection[hidden] {
+  display: none;
+}
+
+.selection-pane {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  max-inline-size: var(--layout-rail-min);
+  text-align: center;
+}
+
+.selection-pane__title {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
+  color: var(--color-text-primary);
+  text-wrap: balance;
+}
+
+.selection-pane__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+/* Ueber `.btn--secondary` (spaeter in dieser Datei) - deshalb zwei Klassen. */
+.selection-pane .selection-pane__action--danger {
+  color: var(--color-danger);
+}
+
+.selection-pane__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--space-16);
+  block-size: var(--space-16);
+  border-radius: var(--radius-full);
+  /* Neutraler Grund, Ton nur im Zeichen (DESIGN.md, Skalen-Regel). */
+  background-color: var(--color-fill-well);
+  color: var(--module-accent, var(--color-accent));
+}
+
+.selection-pane__icon svg {
+  inline-size: var(--icon-xl);
+  block-size: var(--icon-xl);
+}
+
+.selection-pane--confirming .selection-pane__icon {
+  color: var(--color-danger);
+}
+
+/* Die Rueckfrage: die Bestaetigung der Gefahr gefuellt, damit sie sich von
+ * Abbrechen nicht nur durch das Wort unterscheidet. */
+.selection-pane.selection-pane--confirming .selection-pane__action--danger {
+  background-color: var(--color-danger);
+  border-color: var(--color-danger);
+  color: var(--color-ink-on-vivid);
+}
+
+.selection-pane.selection-pane--confirming .selection-pane__action--danger:hover:not(:disabled) {
+  background-color: var(--color-danger-hover);
+}
+
+.selection-pane__detail {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
 /* Leerzustand: ruhig, mittig, ohne Aktion - er erklaert nur die Spalte. */
 .split-view__empty {
   flex: 1 1 auto;

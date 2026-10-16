@@ -5625,7 +5625,9 @@ test('die Rückfrage der Pille bricht um, statt zu kappen', () => {
   assert.ok(choices, 'Abbrechen und Bestätigen brauchen einen gemeinsamen Träger');
   assert.match(choices.body, /flex-shrink:\s*0/,
     'das Paar wandert als Ganzes, es schrumpft nicht');
-  assert.match(read('../public/utils/bulk-pill.js'), /class(?:Name)?\s*=\s*'list-bulkbar__choices'/,
+  // Seit R19 baut dieselbe Fabrik auch die Auswahl in der Detailspalte - die
+  // Klasse steht dort als Zweig (`pane ? ... : 'list-bulkbar__choices'`).
+  assert.match(read('../public/utils/bulk-pill.js'), /class(?:Name)?\s*=\s*(?:pane \? '[\w-]+' : )?'list-bulkbar__choices'/,
     'die Fabrik muss das Paar auch bauen - eine CSS-Regel ohne Knoten ist keine Zusicherung');
 
   // UND KEINE SCHWELLE DANEBEN. Stünde der Bestätigungszustand zusätzlich in
@@ -6968,8 +6970,11 @@ test('phase 3 Tasks bulk actions appear only in select mode, in the shell pill (
   const tasksPage = read('../public/pages/tasks.js');
   const tasksCss = read('../public/styles/tasks.css');
 
-  assert.match(tasksPage, /if \(!state\.bulkSelectMode \|\| readOnly\(\)\) \{ clearBulkPill\(\); return; \}/);
-  assert.match(tasksPage, /setBulkPill\(\{ label: t\('tasks\.bulkSelectedCount'/);
+  // R19: die Sammelaktionen gehen ueber den Baustein Liste + Detail - in der
+  // Spalte „N ausgewaehlt", im Brett und unter der Schwelle weiter die Pille
+  // (setSelectionBulk, test:master-detail).
+  assert.match(tasksPage, /if \(!state\.bulkSelectMode \|\| readOnly\(\)\) \{ setSelectionBulk\(taskMd, null\); return; \}/);
+  assert.match(tasksPage, /setSelectionBulk\(taskMd, \{ label: t\('tasks\.bulkSelectedCount'/);
   assert.doesNotMatch(tasksPage, /bulk-actions-bar/, 'keine eigene Leiste ueber der Liste mehr');
   // Der Schalter steht im Werkzeugmenue und meldet seinen Zustand als Haken
   // (menuitemcheckbox), nicht mehr als aria-pressed eines Kopfknopfs.
@@ -10210,8 +10215,9 @@ test('contacts bulk selection is opt-in and hidden by default', () => {
     'die eigene Auswahlleiste ist entfallen - die Sammelaktion ist die geteilte Pille');
   assert.doesNotMatch(contactsCss, /\.contacts-selectbar/,
     'und ihre Regeln stehen nicht mehr im Modul-Stylesheet');
-  assert.match(contactsPage, /from '\/utils\/bulk-pill\.js'/);
-  assert.match(contactsPage, /if \(!state\.selectMode\) \{ clearBulkPill\(\); return; \}/,
+  // R19: ueber den Baustein Liste + Detail (Pille mobil, Spalte am Desktop).
+  assert.match(contactsPage, /setSelectionBulk\(md, \{ label: t\('contacts\.selectCount'/);
+  assert.match(contactsPage, /if \(!state\.selectMode\) \{ setSelectionBulk\(md, null\); return; \}/,
     'ohne Auswahlmodus steht keine Pille');
 
   // Sammel-Löschen mit Undo-Toast

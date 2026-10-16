@@ -28,12 +28,15 @@
  *   mountMasterDetail({ root, list, ... })     -> Handle, siehe dort
  *   handleMasterDetailPopstate()               -> vom Router (popstate)
  *   detailPaneHeaderEl({ title, actions })     -> Kopf der Detailspalte
+ *   setSelectionBulk(handle, spec|null)        -> Sammelaktionen einer Auswahl:
+ *        in der Spalte als „N ausgewaehlt" (Muster Mail), darunter als Pille
  */
 
 import { esc } from '/utils/html.js';
 import { emptyStateEl, mountLoadError } from '/utils/empty-state.js';
 import { t } from '/i18n.js';
 import { swapContent } from '/utils/content-swap.js';
+import { setBulkPill, clearBulkPill, setBulkPane } from '/utils/bulk-pill.js';
 
 /** Die eine lebende Instanz. Es gibt je Seite hoechstens eine Liste + Detail. */
 let active = null;
@@ -146,7 +149,27 @@ function inertHandle() {
     open: noop, select: noop, clear: noop, refresh: noop, destroy: noop,
     isSplit: () => false,
     selectedId: () => null,
+    // Ohne Spalte gibt es nur die Pille.
+    setBulk: (spec) => { if (spec) setBulkPill(spec); else clearBulkPill(); },
   };
+}
+
+/**
+ * Die Sammelaktionen einer Mehrfachauswahl - EIN Weg fuer jede Seite mit Liste
+ * + Detail (Critique R19, Muster Apple Mail). Ab der Split-Schwelle zeigt die
+ * Detailspalte „N ausgewaehlt" mit den Aktionen, und die schwebende Pille
+ * entfaellt: sie stand ueber dem Detail einer anderen Zeile, und dessen
+ * eigenes Loeschen stand daneben. Darunter (und ohne Baustein, z. B. im
+ * Aufgaben-Brett) bleibt es die Pille. Wechselt die Darstellung waehrend der
+ * Auswahl, zieht die Auswahl mit.
+ *
+ * @param {object|null|undefined} handle  das Handle aus mountMasterDetail()
+ * @param {object|null} spec  wie setBulkPill(); `null` beendet die Auswahl
+ */
+export function setSelectionBulk(handle, spec) {
+  if (handle?.setBulk) handle.setBulk(spec);
+  else if (spec) setBulkPill(spec);
+  else clearBulkPill();
 }
 
 /**
@@ -276,6 +299,9 @@ export function mountMasterDetail({
   // die Liste den Zusammenhang gewechselt; eine Auswahl, die NIE eine Zeile
   // hatte (unbekannter Deep-Link), ist dagegen ein „gibt es nicht".
   let shownSelection = null;
+  // Die Sammelaktionen einer laufenden Mehrfachauswahl (setSelectionBulk).
+  let bulkSpec = null;
+  let bulkHost = null;
 
   const isSplit = () => root.isConnected && getComputedStyle(detailEl).display !== 'none';
 
@@ -549,6 +575,47 @@ export function mountMasterDetail({
     focusTarget(row)?.focus();
   }
 
+  /**
+   * Die Auswahl dorthin, wo sie gerade steht: in die Spalte oder in die Pille.
+   * Der Traeger in der Spalte verdeckt Detail und Leerzustand nur (CSS,
+   * `.split-view__detail.is-selecting`), statt sie zu leeren - nach der
+   * Auswahl steht wieder das Detail da, das vorher stand.
+   */
+  function applyBulk() {
+    const split = isSplit();
+    if (!bulkSpec || !split) {
+      detailEl.classList.remove('is-selecting');
+      if (bulkHost) bulkHost.hidden = true;
+      bulkHost?.replaceChildren();
+      if (bulkSpec) setBulkPill(bulkSpec);
+      return;
+    }
+    clearBulkPill();
+    if (!bulkHost) {
+      bulkHost = document.createElement('div');
+      bulkHost.className = 'split-view__selection';
+      detailEl.append(bulkHost);
+    }
+    bulkHost.hidden = false;
+    detailEl.classList.add('is-selecting');
+    setBulkPane(bulkHost, bulkSpec);
+  }
+
+  function setBulk(spec) {
+    const wasPane = Boolean(bulkSpec) && detailEl.classList.contains('is-selecting');
+    bulkSpec = spec ?? null;
+    if (!bulkSpec) {
+      // Stand der Fokus in der Spalte, die gleich wieder das Detail zeigt, geht
+      // er auf die Spalte statt auf <body>.
+      const hadFocus = wasPane && bulkHost?.contains(document.activeElement);
+      applyBulk();
+      clearBulkPill();
+      if (hadFocus) detailEl.focus();
+      return;
+    }
+    applyBulk();
+  }
+
   listEl.addEventListener('keydown', onKeydown, { signal: teardown.signal });
   detailEl.addEventListener('keydown', onDetailKeydown, { signal: teardown.signal });
 
@@ -563,6 +630,7 @@ export function mountMasterDetail({
       lastSplit = split;
       abortNarrow();
       onModeChange?.({ split, selectedId: selected });
+      if (bulkSpec) applyBulk();
       if (split && selected != null) {
         markSelection();
         paint(selected);
@@ -575,6 +643,7 @@ export function mountMasterDetail({
 
   function destroy() {
     teardown.abort();
+    bulkSpec = null;
     abortNarrow();
     renderAbort?.abort();
     ro?.disconnect();
@@ -607,6 +676,7 @@ export function mountMasterDetail({
     refresh,
     destroy,
     isSplit,
+    setBulk,
     selectedId: () => selected,
     // Fuer handleMasterDetailPopstate(); kein Teil der Modul-API.
     _pathname: pathname,

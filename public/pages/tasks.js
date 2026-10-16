@@ -25,7 +25,6 @@ import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import '/components/category-manager.js';
 import '/components/tag-manager.js';
 import { findPageFab } from '/utils/fab.js';
-import { setBulkPill, clearBulkPill } from '/utils/bulk-pill.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { isSoloHousehold, hidesPrivacyControls } from '/utils/household.js';
 import { popoverMenuHtml, installPopoverMenus, pageToolsMenuHtml, pageToolsActionEl, syncPopoverMenuItem } from '/utils/popover-menu.js';
@@ -36,7 +35,7 @@ import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { todayKey, parseLocalDateKey } from '/utils/date.js';
 import { makeSortable } from '/utils/sortable.js';
-import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
+import { mountMasterDetail, splitViewDetailHtml, setSelectionBulk } from '/utils/master-detail.js';
 import { zonedDateKey, zonedTimeKey } from '/utils/timezone.js';
 import { historyDayLabel } from '/utils/day-label.js';
 import {
@@ -4909,7 +4908,9 @@ function updateBulkActionsBar(container) {
   // eines anderen Moduls nicht abraeumen.
   if (container && container.isConnected === false) return;
   syncBulkMenu(container);
-  if (!state.bulkSelectMode || readOnly()) { clearBulkPill(); return; }
+  // EIN WEG FUER DIE AUSWAHL (R19): in der Spalte „N ausgewaehlt" (Muster
+  // Mail), im Brett und unter der Schwelle die Pille - setSelectionBulk.
+  if (!state.bulkSelectMode || readOnly()) { setSelectionBulk(taskMd, null); return; }
   const n = state.selectedTaskIds.size;
   const actions = [];
   if (n > 0) {
@@ -4932,7 +4933,7 @@ function updateBulkActionsBar(container) {
     );
   }
   actions.push({ label: t('tasks.bulkFinish'), onClick: () => exitBulkSelect(container) });
-  setBulkPill({ label: t('tasks.bulkSelectedCount', { count: n }), actions });
+  setSelectionBulk(taskMd, { label: t('tasks.bulkSelectedCount', { count: n }), actions });
 }
 
 /**
@@ -5774,6 +5775,8 @@ function mountTaskSplit(container, signal) {
     },
   });
   const handle = taskMd;
+  // Eine laufende Auswahl zieht in die neue Spalte um (Neuaufbau der Liste).
+  if (state.bulkSelectMode) updateBulkActionsBar(container);
   signal?.addEventListener('abort', () => {
     if (taskMd === handle) taskMd = null;
     paneTaskSig = null;
