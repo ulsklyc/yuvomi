@@ -21,6 +21,7 @@ const {
   rememberFocus,
   __test: modalTest,
   restoreFocusAfterClose, refocusAfterRender, forgetRestore, renderKeepingFocus,
+  reportFieldErrors,
 } = await import('../public/components/modal.js');
 
 // matchMedia und document.createElementNS werden von btnSuccess/btnError benötigt
@@ -2153,4 +2154,62 @@ test('#1976: ein Formular ohne id bekommt eine, und die Knoepfe zeigen auf genau
   const id = form.getAttribute('id');
   assert.match(id ?? '', /^modal-form-\d+$/);
   for (const b of buttons) assert.equal(b.getAttribute('form'), id);
+});
+
+
+// ── Alle Feldfehler auf einmal (Critique R19, 2026-10-16) ───────────────────
+//
+// Der Budget-Dialog pruefte Titel -> Betrag -> Kategorie und brach beim ersten
+// Fehler ab, obwohl der Betrag oben steht: ein Fehler je Klick, und der Fokus
+// sprang in Pruefreihenfolge statt in Bildreihenfolge.
+function fakeField(id, position) {
+  const classes = new Set();
+  const attrs = {};
+  const field = {
+    id,
+    position,
+    focused: 0,
+    classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c), contains: (c) => classes.has(c) },
+    setAttribute: (k, v) => { attrs[k] = v; },
+    getAttribute: (k) => attrs[k] ?? null,
+    addEventListener() {},
+    removeEventListener() {},
+    matches: () => true,
+    focus() { field.focused += 1; },
+    // Wie Node.compareDocumentPosition: 4 = das andere steht dahinter.
+    compareDocumentPosition: (other) => (other.position > position ? 4 : 2),
+  };
+  field.closest = () => field;
+  field.attrs = attrs;
+  field.classes = classes;
+  return field;
+}
+
+test('reportFieldErrors: meldet jeden Fehler und fokussiert das erste Feld im Bild', () => {
+  const amount = fakeField('amount', 1);
+  const title = fakeField('title', 2);
+  const category = fakeField('category', 3);
+  // In Pruefreihenfolge: Titel zuerst - im Bild steht der Betrag oben.
+  const any = reportFieldErrors([
+    [title, 'Titel fehlt'],
+    false,
+    [amount, 'Betrag fehlt'],
+    null,
+    [category, 'Kategorie fehlt'],
+    [amount, 'zweite Meldung am selben Feld'],
+  ]);
+  assert.equal(any, true);
+  for (const f of [amount, title, category]) {
+    assert.equal(f.attrs['aria-invalid'], 'true', `${f.id} nicht als fehlerhaft markiert`);
+    assert.ok(f.classes.has('form-field--error'), `${f.id} ohne Fehlerrahmen`);
+  }
+  assert.deepEqual([amount.focused, title.focused, category.focused], [1, 0, 0],
+    'der Fokus gehoert dem ersten Feld in Dokumentreihenfolge, und nur ihm');
+});
+
+test('reportFieldErrors: ohne Fehler meldet es nichts und sagt false', () => {
+  const field = fakeField('x', 1);
+  assert.equal(reportFieldErrors([false, null, [null, 'Feld fehlt'], undefined]), false);
+  assert.equal(reportFieldErrors([]), false);
+  assert.equal(field.focused, 0);
 });

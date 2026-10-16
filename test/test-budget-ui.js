@@ -964,10 +964,17 @@ test('ein unangetasteter Bestandsbetrag bleibt speicherbar', () => {
   // `if (readOnly()) return;`, und der Treffer endete dort. `[^;]` haelt jeden
   // Treffer in EINER Anweisung; gemessen findet er auf main wie hier dieselben
   // fuenf Aufrufe, jeden einzeln statt einen davon im Bauch der Definition.
-  const calls = clean.match(/(?<!function )rejectOffGridAmount\([^;]*?\)\) return;/g) || [];
+  //
+  // Seit R19 melden Buchungs- und Kontodialog alle Feldfehler zugleich
+  // (reportFieldErrors) und fragen dafuer amountIsSavable direkt - diese
+  // Aufrufe zaehlen mit und muessen den Bestandswert genauso durchreichen.
+  const calls = [
+    ...(clean.match(/(?<!function )rejectOffGridAmount\([^;]*?\)\) return;/g) || []),
+    ...(clean.match(/(?<!function )amountIsSavable\([^;]*?\{[^;]*?\}\)/g) || []),
+  ];
   assert.ok(calls.length >= 4, `erwartet 4 Prüfungen, gefunden ${calls.length}`);
   for (const call of calls) {
-    assert.match(call, /original:/, `Prüfung ohne Bestandsschutz: ${call.replace(/\s+/g, ' ').slice(0, 90)}`);
+    assert.match(call, /\boriginal\b/, `Prüfung ohne Bestandsschutz: ${call.replace(/\s+/g, ' ').slice(0, 90)}`);
   }
 });
 
@@ -3362,7 +3369,11 @@ test('ein neuer Eintrag hat keine vorbelegte Kategorie, und Speichern verlangt e
   const onSave = budgetCode.slice(budgetCode.indexOf('function openBudgetModal('));
   const body = onSave.slice(0, onSave.indexOf('\n}\n'));
   const save = body.slice(body.indexOf("'#bm-save').addEventListener"));
-  const check = save.search(/if \(!category\) \{\s*reportFieldError\(panel\.querySelector\('#bm-category'\), t\('budget\.categoryRequired'\)\)/);
+  // Seit R19 stehen die Pruefungen in entryFormErrors und werden alle zugleich
+  // gemeldet (reportFieldErrors); der Speicherpfad ruft sie vor dem Schreiben.
+  const check = save.search(/reportFieldErrors\(entryFormErrors\(panel/);
+  assert.match(budgetCode, /!category && \[panel\.querySelector\('#bm-category'\), t\('budget\.categoryRequired'\)\]/,
+    'entryFormErrors prueft die leere Kategorie nicht am Feld');
   assert.ok(check > 0, 'Speichern prueft die leere Kategorie nicht am Feld');
   assert.ok(check < save.indexOf("api.post('/budget'"), 'die Pruefung steht erst nach dem Schreibaufruf');
   // Der Typwechsel darf nicht still die erste Kategorie des anderen Typs setzen.
@@ -3431,7 +3442,10 @@ test('die Unterkategorie steht nach der Kategoriewahl leer, ausser es gibt genau
   assert.match(update, /subcategoryChoice\(catSelect\.value/, 'die Kategoriewahl umgeht die Regel');
   assert.doesNotMatch(update, /subcategories\[0\]/, 'die Kategoriewahl setzt still die erste Unterkategorie');
   const save = body.slice(body.indexOf("'#bm-save').addEventListener"));
-  const check = save.search(/reportFieldError\(panel\.querySelector\('#bm-subcategory'\), t\('budget\.subcategoryRequired'\)\)/);
+  // Seit R19 in entryFormErrors, gemeldet zusammen mit allen anderen Fehlern.
+  const check = save.search(/reportFieldErrors\(entryFormErrors\(panel/);
+  assert.match(budgetCode, /!subcategory && subcategoryChoice\(category\)\.required\s*&& \[panel\.querySelector\('#bm-subcategory'\), t\('budget\.subcategoryRequired'\)\]/,
+    'entryFormErrors prueft die leere Pflicht-Unterkategorie nicht am Feld');
   assert.ok(check > 0, 'Speichern prueft die leere Pflicht-Unterkategorie nicht am Feld');
   assert.ok(check < save.indexOf("api.post('/budget'"), 'die Pruefung steht erst nach dem Schreibaufruf');
 });
@@ -6339,4 +6353,49 @@ test('Critique 2026-10-16: Kurzzeile einzeilig bis aufgeklappt, Startsaldo beim 
   assert.match(plans, /data-lucide="\$\{stateIcon\}"/, 'der Zustand spricht mit Icon und Text');
   assert.match(stats, /import \{ CATEGORY_SERIES_COLORS, categoryColorIndex \} from '\/utils\/budget-category-colors\.js';/,
     'die Statistik nimmt dieselbe Zuordnung');
+});
+
+// ── Buchungsdialog: alle Fehler auf einmal (Critique R19, 2026-10-16) ───────
+//
+// Die Pruefung brach beim ersten Fehler ab, Titel vor Betrag, obwohl der
+// Betrag oben steht. entryFormErrors liefert jetzt ALLE Fehler; die Reihenfolge
+// im Bild stellt reportFieldErrors her (test:modal-utils).
+test('entryFormErrors: ein leerer Dialog meldet Titel, Betrag, Kategorie und Datum zugleich', () => {
+  const fields = Object.fromEntries(['bm-title', 'bm-amount', 'bm-category', 'bm-subcategory', 'bm-date']
+    .map((id) => [`#${id}`, { id }]));
+  const panel = { querySelector: (sel) => fields[sel] ?? null };
+  const ids = (list) => list.filter(Boolean).map(([el, msg]) => [el.id, msg]);
+  assert.deepEqual(ids(budgetUi.entryFormErrors(panel, { title: '', absVal: NaN, category: '', subcategory: '', date: '' })), [
+    ['bm-title', 'common.titleRequired'],
+    ['bm-amount', 'budget.validAmountRequired'],
+    ['bm-category', 'budget.categoryRequired'],
+    ['bm-date', 'calendar.invalidDate'],
+  ]);
+  // Ein Betrag neben dem Raster der Waehrung ist ein Fehler am Betrag - neben
+  // dem fehlenden Titel, nicht erst nach ihm.
+  const before = budgetUi.state.currency;
+  budgetUi.state.currency = 'EUR';
+  try {
+    assert.deepEqual(ids(budgetUi.entryFormErrors(panel, { title: '', absVal: 1.005, category: 'Lebensmittel', subcategory: '', date: '2026-10-16' }))
+      .map(([id]) => id), ['bm-title', 'bm-amount']);
+    assert.deepEqual(ids(budgetUi.entryFormErrors(panel, { title: 'Brot', absVal: 3.5, category: 'Lebensmittel', subcategory: '', date: '2026-10-16' })), []);
+  } finally {
+    budgetUi.state.currency = before;
+  }
+});
+
+test('der Buchungsdialog meldet ueber reportFieldErrors(entryFormErrors(...)) und bricht nicht mehr einzeln ab', () => {
+  const src = readFileSync(new URL('../public/pages/budget.js', import.meta.url), 'utf8');
+  assert.match(src, /if \(reportFieldErrors\(entryFormErrors\(panel, \{/);
+  const save = src.slice(src.indexOf("const title      = panel.querySelector('#bm-title')"), src.indexOf('const amount = currentType === '));
+  assert.doesNotMatch(save, /reportFieldError\(/, 'im Speicherpfad steht wieder ein einzelner Abbruch');
+  // Dieselbe Regel in den anderen Dialogen mit unabhaengigen Feldern.
+  for (const [file, marker] of [
+    ['budget.js', "const balanceEl = panel.querySelector('#am-balance')"],
+    ['calendar.js', 'if (reportFieldErrors(fieldErrors)) return;'],
+    ['meals.js', 'if (reportFieldErrors(['],
+    ['subscriptions.js', 'if (reportFieldErrors(fieldErrors)) return;'],
+  ]) {
+    assert.ok(readFileSync(new URL(`../public/pages/${file}`, import.meta.url), 'utf8').includes(marker), `${file}: ${marker}`);
+  }
 });

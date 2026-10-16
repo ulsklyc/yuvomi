@@ -6,7 +6,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, confirmOverModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, confirmOverModal, advancedSection, wireBlurValidation, reportFieldError, reportFieldErrors, refocusAfterRender } from '/components/modal.js';
 import { renderDocumentAttachField, bindDocumentAttachField, attachmentLinksNode } from '/components/document-attach.js';
 import { openDetailView } from '/components/detail-view.js';
 import { stagger, vibrate, scheduleUndoableDelete, growBars } from '/utils/ux.js';
@@ -2915,21 +2915,21 @@ function openAccountModal(account = null) {
         const rawLimit = panel.querySelector('#am-credit-limit').value.trim();
         const creditLimit = rawLimit === '' ? null : parseFloat(rawLimit);
 
-        if (!name) {
-          reportFieldError(panel.querySelector('#am-name'), t('common.titleRequired'));
-          return;
-        }
-        if (isNaN(startingBalance)) {
-          reportFieldError(panel.querySelector('#am-balance'), t('budget.validAmountRequired'));
-          return;
-        }
-        if (rejectOffGridAmount(panel.querySelector('#am-balance'), startingBalance, accountCurrency, {
+        // Alle Felder auf einmal, Fokus aufs erste im Bild (Critique R19).
+        const balanceEl = panel.querySelector('#am-balance');
+        const balanceOffGrid = !isNaN(startingBalance) && !amountIsSavable(startingBalance, accountCurrency, {
           original: isEdit ? account.starting_balance : null,
-        })) return;
-        if (type === 'credit' && creditLimit !== null && (isNaN(creditLimit) || creditLimit < 0)) {
-          reportFieldError(panel.querySelector('#am-credit-limit'), t('budget.validAmountRequired'));
-          return;
-        }
+        });
+        if (reportFieldErrors([
+          !name && [panel.querySelector('#am-name'), t('common.titleRequired')],
+          isNaN(startingBalance) && [balanceEl, t('budget.validAmountRequired')],
+          balanceOffGrid && [balanceEl, t('common.amountPrecisionRequired', {
+            currency: accountCurrency,
+            step: smallestUnitLabel(accountCurrency),
+          })],
+          type === 'credit' && creditLimit !== null && (isNaN(creditLimit) || creditLimit < 0)
+            && [panel.querySelector('#am-credit-limit'), t('budget.validAmountRequired')],
+        ])) return;
 
         saveBtn.disabled = true;
         saveBtn.textContent = '…';
@@ -4351,29 +4351,12 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
         // Zuordnung beim Bearbeiten unverändert (account_id nicht mitsenden).
         const accountId  = accountSel ? (accountSel.value === '' ? null : parseInt(accountSel.value, 10)) : undefined;
 
-        if (!title) {
-          reportFieldError(panel.querySelector('#bm-title'), t('common.titleRequired'));
-          return;
-        }
-        if (isNaN(absVal) || absVal <= 0) {
-          reportFieldError(panel.querySelector('#bm-amount'), t('budget.validAmountRequired'));
-          return;
-        }
-        if (!category) {
-          reportFieldError(panel.querySelector('#bm-category'), t('budget.categoryRequired'));
-          return;
-        }
-        if (!subcategory && subcategoryChoice(category).required) {
-          reportFieldError(panel.querySelector('#bm-subcategory'), t('budget.subcategoryRequired'));
-          return;
-        }
-        if (rejectOffGridAmount(panel.querySelector('#bm-amount'), absVal, state.currency, {
-          original: isEdit ? Math.abs(editAmount) : null,
-        })) return;
-        if (!date) {
-          reportFieldError(panel.querySelector('#bm-date'), t('calendar.invalidDate'));
-          return;
-        }
+        // Alle Felder auf einmal (Critique R19): bis hierher brach die Pruefung
+        // beim ersten Fehler ab, in der Reihenfolge Titel -> Betrag -> Kategorie,
+        // obwohl der Betrag oben steht. Der Fokus geht aufs erste Feld im Bild.
+        if (reportFieldErrors(entryFormErrors(panel, {
+          title, absVal, category, subcategory, date, original: isEdit ? Math.abs(editAmount) : null,
+        }))) return;
 
         const amount = currentType === 'expense' ? -absVal : absVal;
 
@@ -4579,6 +4562,33 @@ function requestNameInPanel(panel, { title, label, placeholder }) {
  *
  * @returns {boolean} true, wenn abgewiesen wurde (der Aufrufer bricht dann ab)
  */
+/**
+ * Die Feldfehler des Buchungsdialogs, ALLE zugleich, als `[feld, meldung]`
+ * fuer reportFieldErrors (Critique R19). Ein Betrag, der fehlt, und einer, der
+ * in der Waehrung nicht aufgeht, sind zwei Meldungen fuer dasselbe Feld - die
+ * erste gewinnt.
+ *
+ * @param {ParentNode} panel
+ * @param {{title: string, absVal: number, category: string, subcategory: string, date: string, original: number|null}} values
+ * @returns {Array<[Element|null, string]|false>}
+ */
+export function entryFormErrors(panel, { title, absVal, category, subcategory, date, original = null }) {
+  const amountEl = panel.querySelector('#bm-amount');
+  const amountMissing = Number.isNaN(absVal) || !(absVal > 0);
+  return [
+    !title && [panel.querySelector('#bm-title'), t('common.titleRequired')],
+    amountMissing && [amountEl, t('budget.validAmountRequired')],
+    !amountMissing && !amountIsSavable(absVal, state.currency, { original }) && [amountEl, t('common.amountPrecisionRequired', {
+      currency: state.currency,
+      step: smallestUnitLabel(state.currency),
+    })],
+    !category && [panel.querySelector('#bm-category'), t('budget.categoryRequired')],
+    Boolean(category) && !subcategory && subcategoryChoice(category).required
+      && [panel.querySelector('#bm-subcategory'), t('budget.subcategoryRequired')],
+    !date && [panel.querySelector('#bm-date'), t('calendar.invalidDate')],
+  ];
+}
+
 function rejectOffGridAmount(input, value, currency, { original = null, originalCurrency = null } = {}) {
   if (amountIsSavable(value, currency, { original, originalCurrency })) return false;
   reportFieldError(input, t('common.amountPrecisionRequired', {
@@ -5893,6 +5903,7 @@ async function deleteEntrySeries(id) {
 // (test-budget-ui.js, #1164) - gerendertes Markup und echte Sync-Funktion
 // statt Quelltext-Regex.
 export const __test = {
+  entryFormErrors,
   monthNavHtml,
   // #1775: das Datum eines neuen Eintrags folgt dem gezeigten Zeitraum.
   newEntryDefaultDate,

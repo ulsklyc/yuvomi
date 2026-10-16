@@ -90,6 +90,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Modules -> Active took a moment to load, its grey placeholder could stay on screen above the
   loaded content. Placeholders now disappear the moment a section shows its content.
 
+- **Forms show every problem at once.** Saving a budget entry, an account, an event, a meal or a
+  subscription with several missing or invalid fields marked only the first one, one per click -
+  and in the budget the title was checked before the amount above it. All problems are now marked
+  together, and the cursor goes to the first one on screen.
+
 - **Calendar: "Manage calendars" is reachable on tablets and phones again.** Below 1024px the
   button was hidden along with the empty header slot, so calendars could not be created, recolored
   or reordered there. The calendar filter now lists "Manage calendars" under its calendars, at

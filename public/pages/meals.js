@@ -5,7 +5,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal as closeSharedModal, selectModal, confirmModal, askOverModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender, swapFieldsKeepingDirtyBase } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal as closeSharedModal, selectModal, confirmModal, askOverModal, advancedSection, wireBlurValidation, reportFieldError, reportFieldErrors, refocusAfterRender, swapFieldsKeepingDirtyBase } from '/components/modal.js';
 import { stagger, scheduleUndoableDelete, wireScrollFade } from '/utils/ux.js';
 import { t, formatDate, formatDayMonth, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
@@ -2665,25 +2665,16 @@ async function saveModal(overlay) {
   // unterscheidet das ausdrücklich vom fehlenden Feld (Ende bleibt unverändert).
   const repeat_until = repeatUntilRaw ? parseDateInput(repeatUntilRaw) : '';
 
-  if (!date || !isDateInputValid(dateRaw)) {
-    reportFieldError(overlay.querySelector('#modal-date'), t('calendar.invalidDate'));
-    return;
-  }
-
-  if (repeatUntilRaw && (!repeat_until || !isDateInputValid(repeatUntilRaw))) {
-    reportFieldError(repeatUntilEl, t('calendar.invalidDate'));
-    return;
-  }
-
-  if (repeat_until && repeat_until < date) {
-    reportFieldError(repeatUntilEl, t('meals.recurrenceUntilBeforeStart'));
-    return;
-  }
-
-  if (!title) {
-    reportFieldError(overlay.querySelector('#modal-title'), t('common.nameRequired'));
-    return;
-  }
+  // Alle Feldfehler auf einmal, Fokus aufs erste im Bild (Critique R19):
+  // der Titel steht oben, wurde aber zuletzt geprueft.
+  const dateValid = Boolean(date) && isDateInputValid(dateRaw);
+  const untilInvalid = Boolean(repeatUntilRaw) && (!repeat_until || !isDateInputValid(repeatUntilRaw));
+  if (reportFieldErrors([
+    !title && [overlay.querySelector('#modal-title'), t('common.nameRequired')],
+    !dateValid && [overlay.querySelector('#modal-date'), t('calendar.invalidDate')],
+    untilInvalid && [repeatUntilEl, t('calendar.invalidDate')],
+    dateValid && !untilInvalid && repeat_until && repeat_until < date && [repeatUntilEl, t('meals.recurrenceUntilBeforeStart')],
+  ])) return;
 
   const ingredients = collectModalIngredients(overlay);
 

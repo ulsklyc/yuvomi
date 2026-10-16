@@ -209,6 +209,20 @@ const STUBS = {
       globalThis.__reportFieldError?.(...args);
       return false;
     };
+    // Wie das Original (components/modal.js): alle Eintraege mit Feld, je Feld
+    // der erste - ueber __reportFieldError gemeldet, in der Reihenfolge der
+    // Liste (eine Dokumentreihenfolge kennt der Stub nicht).
+    export const reportFieldErrors = (errors) => {
+      const seen = new Set();
+      let any = false;
+      for (const entry of errors ?? []) {
+        if (!Array.isArray(entry) || !entry[0] || seen.has(entry[0])) continue;
+        seen.add(entry[0]);
+        any = true;
+        globalThis.__reportFieldError?.(entry[0], entry[1]);
+      }
+      return any;
+    };
     export const mountFooter = () => null;
     export const refreshDirtySnapshot = () => {};
     // Der Tausch selbst muss laufen, genau einmal und synchron. Wer die

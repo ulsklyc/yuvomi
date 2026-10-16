@@ -4,7 +4,7 @@
  */
 
 import { api } from '/api.js';
-import { closeModal, confirmModal, confirmOverModal, openModal, advancedSection, reportFieldError, refocusAfterRender, captureModalContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
+import { closeModal, confirmModal, confirmOverModal, openModal, advancedSection, reportFieldError, reportFieldErrors, refocusAfterRender, captureModalContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
 import {
   formatDate,
   getLocale,
@@ -1739,16 +1739,18 @@ async function saveSubscription(panel, existing, searchedLogoData = null) {
   if (readOnly()) return;
   const dateInput = panel.querySelector('#subscription-next-date');
   const currencyInput = panel.querySelector('#subscription-currency');
-  if (!isDateInputValid(dateInput.value)) {
+  // Alle Feldfehler auf einmal, Fokus aufs erste im Bild (Critique R19): bis
+  // hierher brach die Pruefung beim ersten ab, ein Fehler je Klick.
+  const fieldErrors = [];
+  const nextDateValid = isDateInputValid(dateInput.value);
+  if (!nextDateValid) {
     // Fehler am Feld statt als ortloser Toast (geteiltes Muster, Critique P1).
-    reportFieldError(dateInput, t('subscriptions.invalidDate'));
-    return;
+    fieldErrors.push([dateInput, t('subscriptions.invalidDate')]);
   }
   if (!currencyInput.value) {
     // Die Meldung klebt am sichtbaren Suchfeld der Combobox, nicht am
     // versteckten Wert-Input.
-    reportFieldError(panel.querySelector('#subscription-currency-search'), t('subscriptions.currencyRequired'));
-    return;
+    fieldErrors.push([panel.querySelector('#subscription-currency-search'), t('subscriptions.currencyRequired')]);
   }
   // Ende-Bedingung (#594): nur das aktive Zusatzfeld liefert einen Wert.
   const endType = panel.querySelector('#subscription-end-type').value;
@@ -1758,28 +1760,24 @@ async function saveSubscription(panel, existing, searchedLogoData = null) {
   if (endType === 'on_date') {
     const endDateInput = panel.querySelector('#subscription-end-date');
     if (!isDateInputValid(endDateInput.value)) {
-      reportFieldError(endDateInput, t('subscriptions.invalidDate'));
-      return;
-    }
-    endDate = parseDateInput(endDateInput.value);
-    // Dieselbe Regel wie der Server (endConfigErrors), vor dem Absenden und am
-    // Feld statt als Toast (Review-Runde 1 zu #2010). Ein abgeschlossenes Abo
-    // mit Enddatum steht immer nach seinem Ende: wer es wieder aufnimmt,
-    // braucht ein spaeteres. Bleibt es abgeschlossen, gilt der Vergleich nicht.
-    if (!staysCompleted && endDate < parseDateInput(dateInput.value)) {
-      reportFieldError(endDateInput, t('subscriptions.errorEndBeforeNextPayment'));
-      return;
+      fieldErrors.push([endDateInput, t('subscriptions.invalidDate')]);
+    } else {
+      endDate = parseDateInput(endDateInput.value);
+      // Dieselbe Regel wie der Server (endConfigErrors), vor dem Absenden und am
+      // Feld statt als Toast (Review-Runde 1 zu #2010). Ein abgeschlossenes Abo
+      // mit Enddatum steht immer nach seinem Ende: wer es wieder aufnimmt,
+      // braucht ein spaeteres. Bleibt es abgeschlossen, gilt der Vergleich nicht.
+      if (nextDateValid && !staysCompleted && endDate < parseDateInput(dateInput.value)) {
+        fieldErrors.push([endDateInput, t('subscriptions.errorEndBeforeNextPayment')]);
+      }
     }
   } else if (endType === 'after_count') {
     const countInput = panel.querySelector('#subscription-end-count');
     const count = Number(countInput.value);
     if (!Number.isInteger(count) || count < 1) {
-      reportFieldError(countInput, t('subscriptions.endCountInvalid'));
-      return;
-    }
-    if (!staysCompleted && count <= Number(existing?.occurrences_done || 0)) {
-      reportFieldError(countInput, t('subscriptions.errorOccurrenceCountTooLow'));
-      return;
+      fieldErrors.push([countInput, t('subscriptions.endCountInvalid')]);
+    } else if (!staysCompleted && count <= Number(existing?.occurrences_done || 0)) {
+      fieldErrors.push([countInput, t('subscriptions.errorOccurrenceCountTooLow')]);
     }
     occurrenceCount = count;
   }
@@ -1787,19 +1785,20 @@ async function saveSubscription(panel, existing, searchedLogoData = null) {
   // sich das vorhandene Abo überhaupt noch speichern lässt. Das gilt aber fürs
   // ganze Feld: ohne diese Prüfung wäre aus 12,5 JPY anschliessend auch
   // 12,555 JPY speicherbar, also mehr Bruch als die feste Schrittweite zuliess.
+  // Ohne Waehrung gibt es kein Raster - dann meldet nur das Waehrungsfeld.
   const amountInput = panel.querySelector('#subscription-amount');
   const amountValue = Number(amountInput.value);
   const targetCurrency = currencyInput.value.trim().toUpperCase();
-  if (!amountIsSavable(amountValue, targetCurrency, {
+  if (targetCurrency && !amountIsSavable(amountValue, targetCurrency, {
     original: existing?.amount ?? null,
     originalCurrency: existing?.currency ?? null,
   })) {
-    reportFieldError(amountInput, t('common.amountPrecisionRequired', {
+    fieldErrors.push([amountInput, t('common.amountPrecisionRequired', {
       currency: targetCurrency,
       step: smallestUnitLabel(targetCurrency),
-    }));
-    return;
+    })]);
   }
+  if (reportFieldErrors(fieldErrors)) return;
 
   const submit = panel.querySelector('[type="submit"]');
   submit.disabled = true;

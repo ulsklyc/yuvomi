@@ -868,7 +868,9 @@ test('das Formular des Kalenders meldet ein Serienende vor dem Start am Ende-Fel
   assert.ok(/function seriesEndConflict\([^)]*\) \{[^]*?seriesEndsBeforeStart\(/.test(quelle),
     'die Pruefung des Kalenders ruft nicht die geteilte Regel');
   const block = save.slice(pruefung, pruefung + 400);
-  assert.ok(block.includes("reportFieldError(overlay.querySelector('#event-rrule-until'), t('calendar.recurrenceEndBeforeStart'))"),
+  // Seit R19 sammelt saveEvent alle Feldfehler und meldet sie zusammen
+  // (reportFieldErrors) - der Eintrag nennt weiter Feld und Text.
+  assert.ok(block.includes("fieldErrors.push([overlay.querySelector('#event-rrule-until'), t('calendar.recurrenceEndBeforeStart')])"),
     'der Fehler gehoert an das Feld, das ihn verursacht, mit einem uebersetzten Text');
 
   const dir = new URL('../public/locales/', import.meta.url);

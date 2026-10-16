@@ -2630,7 +2630,7 @@ export function validateAll(formContainer) {
  * bei der nächsten Eingabe im Feld selbst auf. Gibt immer false zurück, damit
  * Speicherpfade kompakt `return reportFieldError(...)` abbrechen können.
  */
-export function reportFieldError(input, message) {
+export function reportFieldError(input, message, { focus = true } = {}) {
   if (!input) return false;
   const group = (typeof input.closest === 'function' ? input.closest('.form-field') : null) ?? input.parentElement;
   if (!group) return false;
@@ -2645,7 +2645,7 @@ export function reportFieldError(input, message) {
     if (el) expandIn(el, { duration: durationToken('--duration-md', 200), absorbGap: true });
   }
   input.setAttribute?.('aria-invalid', 'true');
-  _focusField(input);
+  if (focus) _focusField(input);
 
   if (typeof input.addEventListener === 'function' && typeof input.removeEventListener === 'function') {
     const clear = () => {
@@ -2663,6 +2663,43 @@ export function reportFieldError(input, message) {
     input.addEventListener('change', clear);
   }
   return false;
+}
+
+/**
+ * ALLE FELDFEHLER EINES FORMULARS AUF EINMAL (Critique R19, 2026-10-16).
+ *
+ * Die Speicherpfade prueften Feld fuer Feld und brachen beim ersten Fehler ab:
+ * wer im Budget Titel UND Kategorie vergass, sah erst den einen Fehler, dann
+ * nach dem naechsten Klick den anderen - und der Titel wurde vor dem Betrag
+ * geprueft, obwohl der Betrag oben steht. Hier stehen alle Meldungen zugleich
+ * an ihren Feldern, und der Fokus geht auf das ERSTE fehlerhafte Feld in der
+ * Reihenfolge des Dokuments, nicht in der Reihenfolge der Pruefung.
+ *
+ * Ein Eintrag ist `[feld, meldung]`; leere Eintraege (`false`, `null`, ein
+ * fehlendes Feld) zaehlen nicht, sodass ein Aufrufer `bedingung && [feld, text]`
+ * schreiben kann. Mehrere Meldungen fuer DASSELBE Feld: die erste gewinnt.
+ *
+ * @param {Array<[Element|null|undefined, string]|false|null|undefined>} errors
+ * @returns {boolean} true, wenn mindestens ein Fehler gemeldet wurde
+ */
+export function reportFieldErrors(errors) {
+  const seen = new Set();
+  const list = [];
+  for (const entry of errors ?? []) {
+    const input = Array.isArray(entry) ? entry[0] : null;
+    if (!input || seen.has(input)) continue;
+    seen.add(input);
+    list.push(entry);
+  }
+  if (!list.length) return false;
+  // Node.DOCUMENT_POSITION_FOLLOWING = 4: b steht hinter a.
+  list.sort(([a], [b]) => {
+    if (typeof a.compareDocumentPosition !== 'function') return 0;
+    return (a.compareDocumentPosition(b) & 4) ? -1 : 1;
+  });
+  for (const [input, message] of list) reportFieldError(input, message, { focus: false });
+  _focusField(list[0][0]);
+  return true;
 }
 
 export function btnSuccess(btn, originalLabel) {

@@ -6,7 +6,7 @@
 
 import { api } from '/api.js';
 import { renderRRuleFields, bindRRuleEvents, getRRuleValues, recurrenceRow } from '/rrule-ui.js';
-import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, askOverModal, promptModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender, renderKeepingFocus } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, askOverModal, promptModal, advancedSection, wireBlurValidation, reportFieldError, reportFieldErrors, refocusAfterRender, renderKeepingFocus } from '/components/modal.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { openDetailView, visibilityRow, assignedRow } from '/components/detail-view.js';
 import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
@@ -8356,11 +8356,16 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
   const saveBtn = overlay.querySelector('#modal-save');
   const title   = overlay.querySelector('#modal-title').value.trim();
 
+  // Alle Feldfehler auf einmal, Fokus aufs erste im Bild (Critique R19). Bis
+  // hierher brach die Pruefung beim ersten ab - ein fehlender Titel verdeckte
+  // eine ungueltige Zeit bis zum naechsten Klick. Was aufeinander aufbaut
+  // (Ende vor Beginn braucht gueltige Daten), wird erst gefragt, wenn die
+  // Grundlage steht.
+  const fieldErrors = [];
   if (!title) {
     // Fehler am Ort des Geschehens statt als Toast unten links (Critique P1):
     // Meldung unterm Feld, Fehler-Rahmen, Fokus + Scroll aufs Feld.
-    reportFieldError(overlay.querySelector('#modal-title'), t('calendar.titleRequired'));
-    return;
+    fieldErrors.push([overlay.querySelector('#modal-title'), t('calendar.titleRequired')]);
   }
 
   const allday  = overlay.querySelector('#modal-allday').checked;
@@ -8371,6 +8376,7 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
   const description = overlay.querySelector('#modal-description').value.trim() || null;
 
   let start_datetime, end_datetime;
+  let timeInvalid = false;
 
   if (allday) {
     start_datetime = eventStartFromForm(overlay);
@@ -8380,13 +8386,9 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
     const st = parseTimeInput(stRaw);
     const etRaw = overlay.querySelector('#modal-end-time').value;
     const et = parseTimeInput(etRaw);
-    if ((stRaw && !st) || (etRaw && !et)) {
-      reportFieldError(
-        overlay.querySelector(stRaw && !st ? '#modal-start-time' : '#modal-end-time'),
-        t('calendar.invalidDate')
-      );
-      return;
-    }
+    if (stRaw && !st) fieldErrors.push([overlay.querySelector('#modal-start-time'), t('calendar.invalidDate')]);
+    if (etRaw && !et) fieldErrors.push([overlay.querySelector('#modal-end-time'), t('calendar.invalidDate')]);
+    timeInvalid = Boolean((stRaw && !st) || (etRaw && !et));
     // Dieselbe Zusammensetzung, mit der die Erinnerungszeilen den Beginn im
     // Dialog verfolgen - zwei Schreibweisen koennten auseinanderlaufen.
     start_datetime = eventStartFromForm(overlay);
@@ -8396,15 +8398,13 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
   const visibleDateFields = allday
     ? ['#modal-allday-start', '#modal-allday-end']
     : ['#modal-start-date', '#modal-end-date'];
-  const invalidDateField = visibleDateFields.find((selector) => !isDateInputValid(overlay.querySelector(selector)?.value));
-  if (!start_datetime || invalidDateField) {
-    reportFieldError(
-      overlay.querySelector(invalidDateField ?? visibleDateFields[0]),
-      t('calendar.invalidDate')
-    );
-    return;
+  const invalidDateFields = visibleDateFields.filter((selector) => !isDateInputValid(overlay.querySelector(selector)?.value));
+  for (const selector of invalidDateFields) fieldErrors.push([overlay.querySelector(selector), t('calendar.invalidDate')]);
+  if (!start_datetime && !invalidDateFields.length) {
+    fieldErrors.push([overlay.querySelector(visibleDateFields[0]), t('calendar.invalidDate')]);
   }
-  if (isEndBeforeStart(start_datetime, end_datetime)) {
+  const datesValid = Boolean(start_datetime) && !invalidDateFields.length && !timeInvalid;
+  if (datesValid && isEndBeforeStart(start_datetime, end_datetime)) {
     // Der Fehler klebt am Feld, das ihn verursacht: liegt schon das Enddatum
     // vor dem Startdatum, am Datums-Feld; sonst (gleicher Tag, Zeit davor)
     // an der Endzeit.
@@ -8413,8 +8413,7 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
       ?? (endsOnEarlierDay ? overlay.querySelector('#modal-end-date') : null)
       ?? (overlay.querySelector('#modal-end-time')?.value ? overlay.querySelector('#modal-end-time') : null)
       ?? overlay.querySelector('#modal-end-date');
-    reportFieldError(endField, t('calendar.endBeforeStart'));
-    return;
+    fieldErrors.push([endField, t('calendar.endBeforeStart')]);
   }
 
   // EIN SERIENENDE VOR DEM START (#1607). Geprueft wurde am Ende-Feld bisher
@@ -8423,10 +8422,10 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
   // Gefragt wird nur, wenn dieses Speichern Regel oder Starttag aendert: eine
   // eingelesene Serie, die schon so dasteht, bleibt bearbeitbar (der Server
   // zieht dieselbe Grenze, `serieBeruehrt` in routes/calendar/crud.js).
-  if (seriesEndConflict(mode, event, getRRuleValues(overlay, 'event').recurrence_rule, start_datetime)) {
-    reportFieldError(overlay.querySelector('#event-rrule-until'), t('calendar.recurrenceEndBeforeStart'));
-    return;
+  if (datesValid && seriesEndConflict(mode, event, getRRuleValues(overlay, 'event').recurrence_rule, start_datetime)) {
+    fieldErrors.push([overlay.querySelector('#event-rrule-until'), t('calendar.recurrenceEndBeforeStart')]);
   }
+  if (reportFieldErrors(fieldErrors)) return;
 
   if (mode === 'edit'
       && requiresWholeSeriesConfirmation(event)
