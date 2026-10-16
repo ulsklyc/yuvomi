@@ -39,6 +39,7 @@ import { SCHEDULE_ROUTES } from '/utils/schedule-tabs.js';
 import { activityType } from '/utils/health-activity.js';
 import {
   SEARCH_SECTIONS, NEW_ACTIONS, searchResultCount, markSegments, paletteCommands,
+  readRecent, rememberRecent, visibleRecent,
 } from '/utils/search-sections.js';
 import { buildHelpRows } from '/utils/help.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -2691,6 +2692,11 @@ function showHelpModal() {
   // without a keyboard, shortcut rows are useless — show a plain-language guide.
   const coarsePointer = window.matchMedia('(max-width: 1023px)').matches;
   const helpRows = buildHelpRows({ coarsePointer, shortcuts: SHORTCUTS.filter((s) => shortcutApplies(s)), t });
+  // DER DIALOG HEISST, WAS ER ZEIGT (R19): am Zeiger listet er die
+  // Tastenkuerzel und heisst „Tastenkombinationen" - wie der Eintrag `?` und
+  // der Befehl in der Palette, die ihn oeffnen. „Hilfe" bleibt die
+  // Klartext-Fassung am Finger.
+  const helpTitle = coarsePointer ? t('help.title') : t('shortcuts.help');
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
@@ -2700,7 +2706,7 @@ function showHelpModal() {
   const panel = document.createElement('div');
   panel.className = 'modal-panel modal-panel--sm';
   panel.setAttribute('role', 'dialog');
-  panel.setAttribute('aria-label', t('help.title'));
+  panel.setAttribute('aria-label', helpTitle);
 
   const rows = helpRows.map((r) => r.key
     ? `<div class="help-row">
@@ -2715,7 +2721,7 @@ function showHelpModal() {
 
   panel.insertAdjacentHTML('beforeend', `
     <div class="modal-panel__header">
-      <span class="modal-panel__title">${esc(t('help.title'))}</span>
+      <span class="modal-panel__title">${esc(helpTitle)}</span>
       <button class="modal-panel__close btn--ghost" aria-label="${esc(t('common.close'))}">
         <i data-lucide="x" class="icon-md" aria-hidden="true"></i>
       </button>
@@ -3362,6 +3368,26 @@ function initSearch(container) {
     setStatus('');
     results.appendChild(emptyHintEl(t('search.emptyHint')));
 
+    // ZULETZT GEOEFFNET (R19): was zuletzt aus der Palette geoeffnet wurde,
+    // steht vor den Kacheln - die Palette ist fuer den Wiederholer da. Nur,
+    // was heute noch erreichbar ist (visibleRecent); leer heisst: kein Kopf.
+    const targets = navItems();
+    const recent = visibleRecent(
+      readRecent(safeLocalStorage(), routerState.currentUser?.id),
+      new Set(targets.map((item) => item.module)),
+    );
+    if (recent.length) {
+      // Die Liste mischt Module - die Zweitzeile nennt deshalb das Modul vor
+      // dem Detail („Vorrat · 19.10."), sonst stuende „Vollmilch" herkunftslos da.
+      const moduleLabel = new Map(targets.map((item) => [item.module, item.label]));
+      results.appendChild(paletteRowsSection(t('search.recentLabel'), recent, {
+        title: (item) => item.label,
+        meta: (item) => [item.label === moduleLabel.get(item.module) ? '' : moduleLabel.get(item.module), item.context]
+          .filter(Boolean).join(' · '),
+        go: (item) => navigate(item.route),
+      }, () => closeSearch({ restoreFocus: false })));
+    }
+
     const scopes = document.createElement('div');
     scopes.className = 'search-scopes';
     const scopesHeading = document.createElement('h3');
@@ -3533,6 +3559,50 @@ function initSearch(container) {
   return openSearch;
 }
 
+/** localStorage, oder null, wo schon der Zugriff wirft (Safari privat, Policy). */
+function safeLocalStorage() {
+  try { return window.localStorage; } catch { return null; }
+}
+
+/**
+ * Eine Gruppe Palettenzeilen ohne Suchwort - dieselbe Bauart wie die Treffer
+ * (`.search-section` + `.search-result`), damit Combobox, Pfeiltasten und
+ * Haut dieselben sind (utils/palette-combobox.js zaehlt `.search-result`).
+ */
+function paletteRowsSection(label, items, { title, meta, go }, onClose) {
+  const section = document.createElement('div');
+  section.className = 'search-section';
+  const heading = document.createElement('h3');
+  heading.className = 'search-section__heading';
+  heading.textContent = label;
+  const rows = document.createElement('div');
+  rows.className = 'search-section__rows';
+  for (const item of items) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'search-result';
+    const titleEl = document.createElement('span');
+    titleEl.className = 'search-result__title';
+    titleEl.textContent = title(item);
+    btn.appendChild(titleEl);
+    const metaText = meta?.(item) || '';
+    if (metaText) {
+      const metaEl = document.createElement('span');
+      metaEl.className = 'search-result__meta';
+      metaEl.textContent = metaText;
+      btn.appendChild(metaEl);
+    }
+    btn.addEventListener('click', () => {
+      onClose();
+      rememberRecent(safeLocalStorage(), routerState.currentUser?.id, item);
+      go(item);
+    });
+    rows.appendChild(btn);
+  }
+  section.append(heading, rows);
+  return section;
+}
+
 /** Text mit markierten Fundstellen als Knoten (`<mark>`), ohne innerHTML. */
 function appendMarked(el, text, query) {
   for (const seg of markSegments(text, query)) {
@@ -3574,7 +3644,7 @@ function renderSearchResults(container, data, onClose, { local = { places: [], a
   // der Sektion ist die Herkunft damit selbstverstaendlich, die Zeilen
   // bleiben siegelfrei. Die Zeilen selbst liegen in GENAU EINEM Traeger
   // (Zeilenlisten-Regel) statt als Karte pro Treffer.
-  function makeSection(label, sealModule, items, { route, title, meta, go }) {
+  function makeSection(label, sealModule, items, { route, title, meta, go, remember = true }) {
     if (!items.length) return;
     const section = document.createElement('div');
     section.className = 'search-section';
@@ -3613,6 +3683,17 @@ function renderSearchResults(container, data, onClose, { local = { places: [], a
       }
       btn.addEventListener('click', () => {
         onClose();
+        // Gemerkt wird ein ZIEL (Ort, Einstellung, Datentreffer), kein Befehl
+        // und keine Anlege-Aktion - die Liste heisst "Zuletzt geoeffnet".
+        if (remember) {
+          const target = item.run ? null : (route ? route(item) : item.route);
+          if (target) {
+            rememberRecent(safeLocalStorage(), routerState.currentUser?.id, {
+              label: title(item), route: target, module: item.module ?? sealModule ?? null,
+              context: (meta?.(item) || item.context || '') || undefined,
+            });
+          }
+        }
         if (go) go(item);
         else navigate(route(item));
       });
@@ -3631,6 +3712,7 @@ function renderSearchResults(container, data, onClose, { local = { places: [], a
   // 2. NEU ANLEGEN - die Seite oeffnen und ihre Primaeraktion ausloesen, genau
   //    wie der Kurzbefehl `n` (triggerPageFab: nichts, wo kein FAB zu sehen ist).
   makeSection(t('search.newSection'), null, local.actions, {
+    remember: false,
     title: (item) => item.label,
     meta: (item) => item.context || '',
     go: async (item) => {

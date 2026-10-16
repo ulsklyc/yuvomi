@@ -226,3 +226,70 @@ export function paletteCommands(query, { places = [], settings = [], actions = [
     actions: hitActions.slice(0, cap),
   };
 }
+
+/* ── Zuletzt geoeffnet (R19, Critique 2026-10-16, Alex) ──
+ * ⌘K mit leerem Feld zeigte nur die Modul-Kacheln. Eine Palette ist fuer den
+ * Wiederholer da: was man gerade geoeffnet hat, will man als Naechstes wieder
+ * oeffnen (Raycast, Linear, Spotlight). Gemerkt wird, was AUS DER PALETTE
+ * geoeffnet wurde - ein Ort, ein Einstellungsblatt, ein Datentreffer -, nicht
+ * jeder Seitenwechsel: die Module stehen ohnehin als Kacheln darunter.
+ *
+ * Je Konto und Geraet im localStorage, hoechstens RECENT_MAX Eintraege, der
+ * neueste zuerst, je Ziel (route) nur einmal. Der Speicher ist eine Zugabe:
+ * wirft er (Safari privat, voll), bleibt die Liste leer, nichts bricht. */
+export const RECENT_MAX = 5;
+const RECENT_KEY_PREFIX = 'yuvomi-palette-recent:';
+
+/** Speicher-Schluessel je Konto - ein geteiltes Tablett mischt sonst Familien. */
+export function recentStorageKey(userId) {
+  return `${RECENT_KEY_PREFIX}${userId ?? 'anon'}`;
+}
+
+/** Ein Eintrag ist brauchbar, wenn er ein Ziel IN der App und einen Namen hat. */
+function isRecentEntry(entry) {
+  return Boolean(entry)
+    && typeof entry.label === 'string' && entry.label.trim() !== ''
+    && typeof entry.route === 'string' && entry.route.startsWith('/') && !entry.route.startsWith('//');
+}
+
+/**
+ * Die Liste nach dem Oeffnen von `entry`: vorn eingereiht, das alte Vorkommen
+ * desselben Ziels entfernt, auf RECENT_MAX gekuerzt. Reine Funktion.
+ * @returns {Array<{label: string, route: string, module?: string, context?: string}>}
+ */
+export function pushRecent(list, entry, max = RECENT_MAX) {
+  const prior = Array.isArray(list) ? list.filter(isRecentEntry) : [];
+  if (!isRecentEntry(entry)) return prior.slice(0, max);
+  const clean = { label: entry.label, route: entry.route };
+  if (entry.module) clean.module = String(entry.module);
+  if (entry.context) clean.context = String(entry.context);
+  return [clean, ...prior.filter((e) => e.route !== clean.route)].slice(0, max);
+}
+
+/** Liest die Liste; alles Unlesbare ist eine leere Liste. */
+export function readRecent(storage, userId) {
+  try {
+    const parsed = JSON.parse(storage?.getItem(recentStorageKey(userId)) ?? '[]');
+    return Array.isArray(parsed) ? parsed.filter(isRecentEntry).slice(0, RECENT_MAX) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Merkt ein geoeffnetes Ziel; ein werfender Speicher ist kein Fehler. */
+export function rememberRecent(storage, userId, entry) {
+  const next = pushRecent(readRecent(storage, userId), entry);
+  try { storage?.setItem(recentStorageKey(userId), JSON.stringify(next)); } catch { /* nur Zugabe */ }
+  return next;
+}
+
+/**
+ * Was davon heute noch erreichbar ist: ein Modul, das inzwischen abgeschaltet,
+ * ausgeblendet oder gesperrt ist, verschwindet aus der Liste, statt auf eine
+ * Tuer zu zeigen, die nicht mehr aufgeht. Eintraege ohne Modul (z. B. Hilfe)
+ * gibt es hier nicht - Befehle werden nicht gemerkt.
+ */
+export function visibleRecent(list, visibleModules) {
+  const visible = visibleModules instanceof Set ? visibleModules : new Set(visibleModules ?? []);
+  return (Array.isArray(list) ? list : []).filter((e) => isRecentEntry(e) && e.module && visible.has(e.module));
+}

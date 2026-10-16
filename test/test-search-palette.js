@@ -308,3 +308,57 @@ test('A1 P1-1: router.js verdrahtet die Combobox nach jedem Rendern der Palette'
   assert.doesNotMatch(init, /hits\[[^\]]*\]\.focus\(\)|\.focus\(\);\s*\} else if \(idx/,
     'die Pfeile schieben den Fokus nicht mehr aus dem Feld');
 });
+
+// R19 (Critique 2026-10-16, Alex): ⌘K mit leerem Feld zeigte kein „zuletzt
+// geoeffnet". Gemerkt wird, was AUS DER PALETTE geoeffnet wurde - je Konto,
+// hoechstens fuenf, der neueste zuerst, je Ziel einmal.
+test('R19: zuletzt geoeffnet - je Konto, neueste zuerst, je Ziel einmal, nur Erreichbares', async () => {
+  const { pushRecent, readRecent, rememberRecent, visibleRecent, recentStorageKey, RECENT_MAX } = await import('../public/utils/search-sections.js');
+  let list = [];
+  for (let i = 1; i <= 7; i++) list = pushRecent(list, { label: `T${i}`, route: `/tasks?open=${i}`, module: 'tasks' });
+  assert.equal(list.length, RECENT_MAX);
+  assert.deepEqual(list.map((e) => e.label), ['T7', 'T6', 'T5', 'T4', 'T3']);
+  list = pushRecent(list, { label: 'T5 neu', route: '/tasks?open=5', module: 'tasks' });
+  assert.deepEqual(list.map((e) => e.label), ['T5 neu', 'T7', 'T6', 'T4', 'T3'], 'dasselbe Ziel rueckt nach vorn statt doppelt');
+  assert.equal(pushRecent([], { label: 'x', route: 'https://evil.example/' }).length, 0, 'nur Ziele in der App');
+  assert.equal(pushRecent([], { label: 'x', route: '//evil.example/' }).length, 0);
+  const store = new Map();
+  const storage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) };
+  rememberRecent(storage, 1, { label: 'Kalender', route: '/calendar', module: 'calendar' });
+  rememberRecent(storage, 2, { label: 'Budget', route: '/budget', module: 'budget' });
+  assert.deepEqual(readRecent(storage, 1).map((e) => e.label), ['Kalender'], 'ein Konto sieht nicht die Liste eines anderen');
+  assert.ok(store.has(recentStorageKey(2)));
+  store.set(recentStorageKey(3), '{kaputt');
+  assert.deepEqual(readRecent(storage, 3), [], 'Unlesbares ist eine leere Liste');
+  const throwing = { getItem() { throw new Error('denied'); }, setItem() { throw new Error('denied'); } };
+  assert.deepEqual(readRecent(throwing, 1), []);
+  assert.doesNotThrow(() => rememberRecent(throwing, 1, { label: 'a', route: '/a', module: 'a' }));
+  assert.deepEqual(visibleRecent([{ label: 'B', route: '/budget', module: 'budget' }, { label: 'K', route: '/calendar', module: 'calendar' }],
+    new Set(['calendar'])).map((e) => e.label), ['K'], 'ein abgeschaltetes Modul faellt heraus');
+});
+
+test('R19: die leere Palette zeigt "Zuletzt geoeffnet" vor den Kacheln, gemerkt wird beim Oeffnen', () => {
+  const hint = router.slice(router.indexOf('function renderSearchHint()'), router.indexOf("const scopes = document.createElement('div');", router.indexOf('function renderSearchHint()')));
+  assert.match(hint, /visibleRecent\(\s*readRecent\(safeLocalStorage\(\), routerState\.currentUser\?\.id\)/, 'gelesen je Konto, gefiltert auf Erreichbares');
+  assert.match(hint, /paletteRowsSection\(t\('search\.recentLabel'\)/, 'eine benannte Gruppe in der Bauart der Treffer');
+  assert.equal(de.search.recentLabel, 'Zuletzt geöffnet');
+  const make = router.slice(router.indexOf('function makeSection('), router.indexOf('// 1. GEHE ZU'));
+  assert.match(make, /if \(remember\) \{[\s\S]*rememberRecent\(/, 'Treffer und Orte werden beim Oeffnen gemerkt');
+  assert.match(make, /item\.run \? null/, 'Befehle (Hilfe, Neuigkeiten) nicht');
+  const create = router.slice(router.indexOf("makeSection(t('search.newSection')"), router.indexOf('// 3. DATEN'));
+  assert.match(create, /remember: false/, 'Anlege-Aktionen sind kein "geoeffnet"');
+  const rows = router.slice(router.indexOf('function paletteRowsSection('), router.indexOf('/** Text mit markierten Fundstellen'));
+  assert.match(rows, /btn\.className = 'search-result'/, 'dieselbe Zeile wie ein Treffer - die Combobox zaehlt .search-result');
+});
+
+// R19: der Dialog hinter `?` und „Tastenkombinationen" hiess „Hilfe" und
+// zeigte am Desktop nur Kuerzel. Er heisst jetzt, was er zeigt - am Finger
+// (Klartext-Hilfe ohne Kuerzel) bleibt es „Hilfe".
+test('R19: der Kuerzel-Dialog heisst "Tastenkombinationen", die Klartext-Hilfe "Hilfe"', () => {
+  const help = router.slice(router.indexOf('function showHelpModal('), router.indexOf('// Update-Hinweis (#490)'));
+  assert.match(help, /const helpTitle = coarsePointer \? t\('help\.title'\) : t\('shortcuts\.help'\);/);
+  assert.match(help, /setAttribute\('aria-label', helpTitle\)/, 'der Name des Dialogs');
+  assert.match(help, /modal-panel__title">\$\{esc\(helpTitle\)\}/, 'die sichtbare Ueberschrift');
+  assert.doesNotMatch(help, /t\('help\.title'\)\)/, 'kein fester Titel "Hilfe" mehr im Kopf');
+  assert.equal(de.shortcuts.help, 'Tastenkombinationen');
+});

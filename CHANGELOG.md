@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The search palette remembers what you opened.** Press Cmd+K (Ctrl+K) with an empty field to see
+  the last five places, settings and entries you opened from it, each with its module, above the
+  module shortcuts. The list is kept per account on this device. The dialog behind "?" is now called
+  "Keyboard shortcuts", which is what it lists.
 - **Extension modules can add a Settings sheet** (#1856). An optional manifest field places a module
   under Settings -> Modules, with personal sections for members and household sections for
   administrators. Disabled modules disappear from the list; module APIs remain responsible
