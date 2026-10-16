@@ -786,6 +786,46 @@ test('Seite: "gibt es nicht mehr", und inzwischen ist ein anderer Dialog offen -
   }
 });
 
+// #1997: die ERFOLGSWEGE. Kommt die Antwort erst, nachdem der Nutzer den
+// Dialog geschlossen und einen anderen geoeffnet hat, schliesst sie nur den
+// EIGENEN. Ob der Slot noch denselben Dialog haelt, entscheidet
+// closeModal({ context }) in components/modal.js (am echten Modul gemessen in
+// test-modal-dead-time.js); hier zaehlt die Verdrahtung: jeder Erfolgsweg
+// reicht den VOR der Anfrage gemerkten Kontext hinein. Ohne ihn traefe das
+// force-Schliessen den Dialog, der gerade offen ist, samt seinen Eingaben.
+test('Seite: Erfolg nach Dialogwechsel - jeder Erfolgsweg schliesst nur mit dem Kontext von VOR der Anfrage (#1997)', async () => {
+  const wege = [
+    ['Dokument speichern', () => page.saveDocument({ target: formular(BEARBEITEN), preventDefault() {} }, { ...DOC }, formular())],
+    ['neuer Ordner', async () => {
+      const panel = formular({ '#document-folder-name': 'Belege', '#document-folder-parent': '' });
+      let submit = null;
+      panel.querySelector('#document-folder-form').addEventListener = (type, fn) => { if (type === 'submit') submit = fn; };
+      globalThis.__openModal = (opts) => opts.onSave(panel);
+      try { page.openFolderModal(); } finally { delete globalThis.__openModal; }
+      await submit({ preventDefault() {} });
+    }],
+    ['aus dem DMS verknuepfen', () => page.linkDmsDocument({ id: '7' }, 1)],
+  ];
+  for (const [name, lauf] of wege) {
+    let kontext = 'eigener-dialog';
+    globalThis.__modalContextId = () => kontext;
+    const wechsel = (antwort) => { kontext = 'ein-anderer-dialog'; return antwort; };
+    try {
+      const { closed } = await mitSeite({ dmsAccounts: [{ id: 1, name: 'Paperless' }] }, () => mit({
+        put: () => wechsel({ data: { ...DOC } }),
+        post: () => wechsel({ data: { id: 77 } }),
+      }, lauf));
+      assert.equal(closed.length, 1, `${name}: genau ein Schliessen`);
+      assert.equal(closed[0].force, true, `${name}: force wie bisher`);
+      assert.equal(closed[0].context, 'eigener-dialog',
+        `${name}: geschlossen wird ohne den Kontext von vor der Anfrage - die spaete Antwort traefe den Dialog, der jetzt offen ist`);
+      assert.equal(toasts.some(([, art]) => art === 'danger'), false, `${name}: der Erfolg ist kein Fehler`);
+    } finally {
+      delete globalThis.__modalContextId;
+    }
+  }
+});
+
 test('Seite: neuer Ordner, Elternordner weg - die neu aufgebaute Auswahl ist Zeichen fuer Zeichen die beim Oeffnen', async () => {
   // Codex an #1994: der Neuaufbau rueckte mit gewoehnlichen Leerzeichen ein,
   // die eine Option zusammenfasst - Unterordner standen dann auf der obersten
