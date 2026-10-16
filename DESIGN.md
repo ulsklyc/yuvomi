@@ -645,6 +645,10 @@ Inhalt, kein Verlauf ueber eine Karte, kein Text auf einer Flaeche, die nicht ge
   Behaelter (`width` UND `height` - eine Marke ist bemessen, ein Chip waechst mit seinem
   Text), dessen Hintergrund eine Identitaetsfarbe als Waschung fuehrt und der dieselbe Farbe
   im Vordergrund noch einmal nennt, ohne sie irgendwo voll zu tragen.
+- **Marken der Einstellungsliste (R19):** jede ist eine gefuellte Kachel (`.vivid-mark`,
+  settings/shell.js `createLeafMark`) - ein Modul im Modulton, Konfiguration ohne Modul im
+  Grau der Einstellungen (`--module-settings`). Die blasse Mulde fuer Nicht-Module ist
+  entfallen: zwei Formen in einer Liste lasen sich wie zwei Arten von Eintrag.
 - **DIE SKALEN-REGEL: ein Etikett nennt seinen Ton EINMAL, und zwar voll** (seit
   2026-08-18). Die Vollton-Regel hat die MARKEN geraeumt; ihr Guard sucht einen bemessenen
   Behaelter, und genau das liess die zweite Haelfte des Bestands stehen - ein Etikett ist
