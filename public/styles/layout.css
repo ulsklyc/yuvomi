@@ -4959,6 +4959,40 @@ a.popover-menu__item {
   margin-top: var(--space-3);
 }
 
+/* Eine Aktion am Ende einer Gruppe, die zu ihrer Liste gehoert („Kalender
+ * verwalten" unter den Kalendern): dieselbe Geometrie wie die Schalterzeilen
+ * darueber - Einzug, Hoehe, Hover - aber in der Akzentstimme und ohne
+ * Schalter, wie eine Verweiszeile in Apples Einstellungen. Kein `.btn`: dessen
+ * Pille und Zentrierung stuenden als Fremdkoerper unter den Zeilen. */
+.filter-sheet__action {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--target-lg);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-accent);
+  text-align: start;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+@media (hover: hover) {
+  .filter-sheet__action:hover {
+    background-color: var(--color-surface-hover);
+  }
+}
+
+/* Das Zeichen steht mittig in der Spalte der Farbscheiben darueber
+ * (`.toggle-row__swatch`, --space-6), damit Zeichen und Text auf deren
+ * Fluchtlinien liegen statt um die Differenz eingerueckt. */
+.filter-sheet__action > .icon-md {
+  margin-inline: calc((var(--space-6) - var(--icon-md)) / 2);
+}
+
 /* --------------------------------------------------------
  * Filter am Desktop als Popover am Knopf (Critique R17, E13;
  * utils/filter-sheet.js `openFilterPopover`, ab 1024px).

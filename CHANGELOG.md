@@ -60,6 +60,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Calendar: "Manage calendars" is reachable on tablets and phones again.** Below 1024px the
+  button was hidden along with the empty header slot, so calendars could not be created, recolored
+  or reordered there. The calendar filter now lists "Manage calendars" under its calendars, at
+  every width and even before the first calendar exists.
+
 - **Too many requests are explained in your language.** When the server asks to slow down, the
   app says so in the interface language instead of showing an English server message.
 

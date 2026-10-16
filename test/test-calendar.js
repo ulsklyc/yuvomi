@@ -2144,6 +2144,31 @@ test('Filterblatt (D2): Kalender und Aufgaben fahren EINEN Baustein - Personen a
   assert(/resetLabel = t\('common\.filtersResetDefault'\)/.test(sheet), 'der Baustein traegt den einen Text als Vorgabe');
 });
 
+// „Kalender verwalten" war unter 1024px unerreichbar (Re-Critique 2026-10-16,
+// A2): der Knopf wohnt im Aktions-Slot des Kopfs, und calendar.css blendet den
+// Slot schmaler aus, solange keine Ueberlappungswarnung darin steht. Tablet und
+// Telefon konnten keinen Kalender anlegen, umfaerben oder sortieren. Der Weg
+// steht deshalb im Filterblatt unter „Kalender", wo die Liste schon steht - auf
+// jeder Breite, und auch ohne einen einzigen Kalender (dann legt man dort den
+// ersten an).
+test('Kalender verwalten: unter 1024px erreichbar - das Filterblatt traegt den Eintrag, wenn der Kopf-Slot verschwindet', () => {
+  const calSrc = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const hidesSlot = [...eachRule(calendarCss)].some((r) =>
+    r.at.some((a) => /max-width:\s*1023px/.test(a))
+    && /\.cal-toolbar\s*>\s*\.page-toolbar__actions/.test(r.selector)
+    && /display:\s*none/.test(r.body));
+  const start = calSrc.indexOf('function openCalendarFilters()');
+  const fn = calSrc.slice(start, calSrc.indexOf('\n}\n', start));
+  if (!hidesSlot) return;
+  assert(/data-filter-manage-calendars/.test(fn),
+    'der Kopf-Slot mit #cal-calendars ist unter 1024px ausgeblendet, aber das Filterblatt traegt keinen Eintrag „Kalender verwalten"');
+  assert(/moduleAccess\('calendar'\) === 'write'/.test(fn), 'der Eintrag steht nur mit Schreibrecht im Blatt, wie der Kopfknopf');
+  assert(/\[data-filter-manage-calendars\][\s\S]{0,400}openLocalCalendarsModal\(\)/.test(fn), 'der Eintrag oeffnet den Verwalten-Dialog');
+  // Die Gruppe darf nicht an den Quellen haengen: ohne Kalender gaebe es sonst
+  // keinen Weg, den ersten anzulegen.
+  assert(!/if \(sourceRows\) groups\.push/.test(fn), 'die Kalender-Gruppe steht auch ohne Quellen, sobald der Eintrag da ist');
+});
+
 test('Filterblatt (D2): „Mir zugewiesen" steht in beiden Blaettern als erster Schalter der Personengruppe, die Personen sind Chips', () => {
   const calSrc = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
   const taskSrc = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');

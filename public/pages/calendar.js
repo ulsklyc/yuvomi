@@ -5657,7 +5657,19 @@ function openCalendarFilters() {
     control: 'switch',
     attrs: { 'data-filter-source': s.key },
   })).join('');
-  if (sourceRows) groups.push({ heading: t('calendar.filtersSources'), html: sourceRows });
+  // „KALENDER VERWALTEN" STEHT UNTER DER LISTE, die es verwaltet (Re-Critique
+  // 2026-10-16, A2). Der Kopfknopf #cal-calendars wohnt im Aktions-Slot, und
+  // den blendet calendar.css unter 1024px aus - Tablet und Telefon kamen an
+  // Anlegen, Umfaerben und Sortieren nicht heran. Der Eintrag steht auf jeder
+  // Breite, damit das Blatt ueberall gleich ist, und auch ohne Quelle: dann
+  // legt man hier den ersten Kalender an.
+  const manageRow = moduleAccess('calendar') === 'write'
+    ? `<button type="button" class="filter-sheet__action" data-filter-manage-calendars aria-haspopup="dialog">
+        <i data-lucide="calendar-cog" class="icon-md" aria-hidden="true"></i>
+        <span>${t('calendar.manageCalendars')}</span>
+      </button>`
+    : '';
+  if (sourceRows || manageRow) groups.push({ heading: t('calendar.filtersSources'), html: sourceRows + manageRow });
 
   const layerRows = buildLayerRowsHtml(layers);
   if (layerRows) groups.push({ heading: t('calendar.filtersLayers'), html: `<div id="cal-filters-layers">${layerRows}</div>` });
@@ -5783,6 +5795,14 @@ function openCalendarFilters() {
     anchor: () => _container?.querySelector('#cal-filters') ?? null,
   });
   if (!panel) return;
+
+  // Erst das Blatt zu, dann der Dialog: so merkt sich der Dialog den
+  // Filterknopf als Rueckkehrziel und nicht einen Knopf im geschlossenen Blatt.
+  panel.querySelector('[data-filter-manage-calendars]')?.addEventListener('click', () => {
+    if (panel.matches('[popover]')) panel.hidePopover?.();
+    else closeModal({ force: true });
+    openLocalCalendarsModal();
+  });
 
   // PERSONEN-CHIPS: Klick statt `change`. Leeres Set heisst alle; wer wieder
   // ALLE waehlt, hat keinen Filter mehr - sonst bliebe einer aktiv, der nichts
