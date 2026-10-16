@@ -52,6 +52,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The event dialog is shorter on a phone.** The description moved behind "More settings" (it
   opens by itself when an event has one), and when everyone in the household shares a last name,
   the people to pick show first names only, so the choice takes two rows instead of three.
+- **Editing from a detail sheet has one way back.** "Cancel" returns to the details instead of
+  closing the sheet, and the extra "Back" button in the header is gone; the close button still
+  closes. A task's countdown switch sits under "More settings" while it is off.
 - **Module headers on phones and tablets take less room.** Shift plan, Rewards and Household help
   show their tabs in the title row (one row instead of two, 65px on a phone). The budget header
   folds to one row while you scroll, with the tabs beside the month. On a tablet the title, search

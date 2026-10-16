@@ -1215,3 +1215,23 @@ test('R19: schmal stehen Label und Wert einer Textzeile in einer Zeile, wo die A
   assert.match(text?.body ?? '', /flex-flow:\s*row wrap/, 'eine Zeile, ein langer Wert bricht unter das Label');
   assert.ok(inline.some((r) => r.selector.trim().endsWith('.detail-row__value') && /text-align:\s*end/.test(r.body)), 'der Wert am Ende');
 });
+
+// R19 (Critique 2026-10-16, Heuristik 3): "Aufgabe bearbeiten" hatte mobil vier
+// Auswege - Zurueck, x, Abbrechen, Papierkorb. Im Formular einer Leseansicht
+// ist Abbrechen jetzt der eine Rueckweg in die Leseansicht, der Kopfknopf
+// "Zurueck" faellt dann weg; und der Countdown liegt ausgeschaltet hinter
+// "Weitere Einstellungen" wie Wiederholung und Erinnerung.
+test('R19: im Formular einer Leseansicht fuehrt Abbrechen zurueck, der Kopf traegt kein zweites Zurueck', async () => {
+  const dv = await read('public/components/detail-view.js');
+  const form = dv.slice(dv.indexOf('async function switchToForm('), dv.indexOf('function switchToDetail('));
+  assert.match(form, /state\.formCancel = state\.formFooter\?\.querySelector\('\[data-action="close-modal"\]'\) \?\? null;/);
+  assert.match(form, /state\.formCancel\?\.addEventListener\('click', \(event\) => \{[\s\S]*?event\.stopImmediatePropagation\(\);\s*switchToDetail\(panel, opts, state\);[\s\S]*?\}, \{ capture: true \}\);/,
+    'vor dem delegierten close-modal der Seite, und nur im Formular');
+  assert.match(form, /label: t\('common\.back'\),\s*onClick: \(\) => switchToDetail\(panel, opts, state\),\s*hidden: Boolean\(state\.formCancel\),/,
+    'mit Abbrechen im Fuss kein Kopf-Zurueck');
+  const tasks = await read('public/pages/tasks.js');
+  assert.match(tasks, /const countdownTucked = !task\?\.countdown;/);
+  assert.match(tasks, /\$\{countdownTucked \? '' : countdownHtml\}/, 'ein gesetzter Countdown bleibt im Hauptteil');
+  assert.match(tasks, /\$\{countdownTucked \? `<div class="task-form__tucked">\$\{countdownHtml\}<\/div>` : ''\}/, 'ausgeschaltet hinter dem Aufklapper');
+  assert.match(tasks, /countdown \? t\('dashboard\.countdownTitle'\) : null,/, 'und die Zeile des Aufklappers nennt ihn');
+});

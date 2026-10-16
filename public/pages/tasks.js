@@ -1052,9 +1052,10 @@ function wireTagBadgeFilter(container) {
  * unter dem Aufklapper (DESIGN.md: „Weitere Einstellungen nennt, was dahinter
  * liegt"; A3 P1-2). Dieselbe Bauart wie eventAdvancedTopics() im Kalender.
  */
-function taskAdvancedTopics({ privacy = true, recurrence = false, reminder = false } = {}) {
+function taskAdvancedTopics({ privacy = true, recurrence = false, reminder = false, countdown = false } = {}) {
   const topics = [
     t('tasks.startDateLabel'),
+    countdown ? t('dashboard.countdownTitle') : null,
     t('tasks.pointsLabel'),
     t('tasks.tagsLabel'),
     t('tasks.statusLabel'),
@@ -1172,10 +1173,42 @@ function renderModalContent({ task = null, users = [], reminder = null } = {}) {
   const recurrenceTucked = !task?.recurrence_rule;
   const reminderTucked = !reminder && reminderHtml !== '';
   const advancedHint = taskAdvancedTopics({
+    countdown: !task?.countdown,
     privacy: !hidesPrivacyControls('tasks'),
     recurrence: recurrenceTucked,
     reminder: reminderTucked,
   });
+
+  // DER COUNTDOWN LIEGT HINTER DEM AUFKLAPPER, SOLANGE ER AUS IST (R19,
+  // Critique 2026-10-16: "Aufgabe bearbeiten" mobil 1027px Formular in 591px).
+  // Dieselbe Regel wie Wiederholung und Erinnerung (R16): ein GESETZTER
+  // Schalter bleibt offen an seinem Platz, beim Bearbeiten ist nichts
+  // Gesetztes versteckt. #647 stellte ihn in den Hauptteil, damit man ihn
+  // findet - das leistet jetzt die Zeile des Aufklappers, die ihn nennt.
+  const countdownTucked = !task?.countdown;
+  const countdownHtml = `
+      <!-- #647: die Haelfte, die @jamespurnama1 beschrieben hat. Fuehrerschein
+           und Luftfilter sind keine Termine, und ihre Ruecksetzung haengt an
+           einer DAUER, nicht an einem Datum - das ist genau eine wiederkehrende
+           Aufgabe „ab Erledigung" (#658), die es hier schon gibt. Der Schalter
+           haengt deshalb an der Aufgabe und nicht an einem dritten Objekt.
+           Ausgeschaltet steht er seit R19 hinter dem Aufklapper, dessen Zeile
+           ihn nennt (countdownTucked oben). -->
+      <div class="form-group" style="margin-top:var(--space-4)">
+        <label class="toggle" style="margin:0">
+          <input type="checkbox" id="task-countdown" name="countdown" aria-describedby="task-countdown-hint"
+                 ${task?.countdown ? 'checked' : ''}>
+          <span class="toggle__track"></span>
+          <span>${t('tasks.countdownToggle')}</span>
+        </label>
+        <p class="task-field-hint" id="task-countdown-hint">${t('tasks.countdownHint')}</p>
+        <!-- DER SCHALTER SPERRT SICH SELBST, statt sich auf die Zeile darueber
+             zu verlassen. Ein Hinweis ist keine Fehlervermeidung: ohne
+             Faelligkeit war der Schalter voll bedienbar, speicherte, meldete
+             „Aufgabe erstellt." - und der Countdown erschien nie. Wer sich
+             darauf verlaesst, erfaehrt es, wenn die Frist vorbei ist. -->
+        <p class="task-field-hint field-hint--warn" id="task-countdown-warning" role="status" hidden><i data-lucide="alert-triangle" aria-hidden="true"></i><span>${t('tasks.countdownNeedsDue')}</span></p>
+      </div>`;
 
   const advancedFieldsHtml = `
       <div class="modal-grid modal-grid--2">
@@ -1270,6 +1303,7 @@ ${syncTargetFieldHtml(task)}
         attachments: (task?.documents ?? []).map((doc) => ({ document_id: doc.id, name: doc.name, mime_type: doc.mime_type })),
         label: t('tasks.documentsLabel'),
       })}
+${countdownTucked ? `<div class="task-form__tucked">${countdownHtml}</div>` : ''}
 ${recurrenceTucked ? `<div class="task-form__tucked">${recurrenceHtml}</div>` : ''}
 ${reminderTucked ? `<div class="task-form__tucked">${reminderHtml}</div>` : ''}`;
 
@@ -1314,28 +1348,7 @@ ${reminderTucked ? `<div class="task-form__tucked">${reminderHtml}</div>` : ''}`
         ${renderUserMultiSelect(assigneePeople, selectedIds, 'task_assigned', 'tasks.assignedLabel')}
       </div>
 
-      <!-- #647: die Haelfte, die @jamespurnama1 beschrieben hat. Fuehrerschein
-           und Luftfilter sind keine Termine, und ihre Ruecksetzung haengt an
-           einer DAUER, nicht an einem Datum - das ist genau eine wiederkehrende
-           Aufgabe „ab Erledigung" (#658), die es hier schon gibt. Der Schalter
-           haengt deshalb an der Aufgabe und nicht an einem dritten Objekt.
-           Im Hauptbereich aus demselben Grund wie im Kalender: hinter dem
-           Aufklapper faende ihn niemand, der nicht danach sucht. -->
-      <div class="form-group" style="margin-top:var(--space-4)">
-        <label class="toggle" style="margin:0">
-          <input type="checkbox" id="task-countdown" name="countdown" aria-describedby="task-countdown-hint"
-                 ${task?.countdown ? 'checked' : ''}>
-          <span class="toggle__track"></span>
-          <span>${t('tasks.countdownToggle')}</span>
-        </label>
-        <p class="task-field-hint" id="task-countdown-hint">${t('tasks.countdownHint')}</p>
-        <!-- DER SCHALTER SPERRT SICH SELBST, statt sich auf die Zeile darueber
-             zu verlassen. Ein Hinweis ist keine Fehlervermeidung: ohne
-             Faelligkeit war der Schalter voll bedienbar, speicherte, meldete
-             „Aufgabe erstellt." - und der Countdown erschien nie. Wer sich
-             darauf verlaesst, erfaehrt es, wenn die Frist vorbei ist. -->
-        <p class="task-field-hint field-hint--warn" id="task-countdown-warning" role="status" hidden><i data-lucide="alert-triangle" aria-hidden="true"></i><span>${t('tasks.countdownNeedsDue')}</span></p>
-      </div>
+      ${countdownTucked ? '' : countdownHtml}
 
       ${/* PRIORITAET UND KATEGORIE IM HAUPTTEIL, als kompakte Zeile (A3 P1-2).
           * Die Liste ist standardmaessig nach Kategorie gruppiert; wer sie

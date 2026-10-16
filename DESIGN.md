@@ -3859,6 +3859,16 @@ nichts mehr auseinander, und „In Maps öffnen" rutschte allein in eine zweite 
 286px Innenbreite teilen sich Löschen und Maps die erste Zeile, Bearbeiten steht unten am Ende -
 dasselbe Bild wie im Sheet, und kein Aktionsknopf verliert seine Beschriftung.
 
+
+**Im Formular eines Leseblatts gibt es EINEN Rueckweg (R19, Critique 2026-10-16, Heuristik 3).**
+„Aufgabe bearbeiten" hatte mobil vier Auswege: Kopf-„Zurueck", x, Abbrechen, Papierkorb.
+Traegt der Formularfuss ein Abbrechen (`data-action="close-modal"`), fuehrt es zurueck in die
+Leseansicht (Eingaben bleiben im DOM wie bei „Zurueck"), und der Kopfknopf faellt weg; das x
+schliesst wie bisher mit Verwerfen-Frage. Ein Formular ohne Abbrechen behaelt „Zurueck"
+(components/detail-view.js, `switchToForm`). Im Aufgabenformular liegt der Countdown
+ausgeschaltet hinter „Weitere Einstellungen" (Regel wie Wiederholung und Erinnerung, R16);
+mobil 1027 -> 942px Formular.
+
 ### Der Termin-Dialog: Haeufiges oben, Seltenes benannt (Critique 2026-09-24, P2)
 Der Dialog war mobil drei Bildschirme lang (1559px bei 523 sichtbar), und Sichtbarkeit und
 Stichtag standen VOR Wiederholung und Erinnerung. Die Reihenfolge folgt jetzt der Haeufigkeit:

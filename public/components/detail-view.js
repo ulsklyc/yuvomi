@@ -579,6 +579,20 @@ async function switchToForm(panel, opts, state) {
       // sonst scrollt die Primäraktion weg und ein „Speichern" mit
       // type="submit" löst außerhalb seines Formulars kein submit aus (#543).
       state.formFooter = mountFooter(panel);
+      // ABBRECHEN FUEHRT IN DIE LESEANSICHT (R19, Critique 2026-10-16: "Aufgabe
+      // bearbeiten" hatte mobil vier Auswege - Zurueck, x, Abbrechen,
+      // Papierkorb). Kopf-"Zurueck" und Fuss-"Abbrechen" taten fast dasselbe,
+      // nur Abbrechen schloss das ganze Blatt. Jetzt ist Abbrechen der eine
+      // Rueckweg (wie in Apples Bearbeiten-Modus), das x schliesst, und der
+      // Kopfknopf faellt weg (unten). Capture-Phase: vor dem delegierten
+      // `close-modal` der Seite. Ein Formular ohne Abbrechen behaelt "Zurueck".
+      state.formCancel = state.formFooter?.querySelector('[data-action="close-modal"]') ?? null;
+      state.formCancel?.addEventListener('click', (event) => {
+        if (state.mode !== 'form') return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        switchToDetail(panel, opts, state);
+      }, { capture: true });
     } else {
       // Zweiter Besuch: das Formular steht noch, samt allem, was der Nutzer
       // hineingeschrieben hat. Ein Neuaufbau würde diese Eingaben verwerfen.
@@ -608,8 +622,11 @@ async function switchToForm(panel, opts, state) {
     // „übernehmen" - und weil die Leseansicht danach wieder den gespeicherten
     // Stand zeigt, läse sich das Versprechen wie ein Datenverlust. Gespeichert
     // wird ausschließlich über „Speichern" in der Formular-Fußzeile.
+    // Traegt der Fuss ein Abbrechen, ist DAS der Rueckweg (R19) - der Kopf
+    // zeigt dann nur das x.
     label: t('common.back'),
     onClick: () => switchToDetail(panel, opts, state),
+    hidden: Boolean(state.formCancel),
   });
   state.mode = 'form';
 }
