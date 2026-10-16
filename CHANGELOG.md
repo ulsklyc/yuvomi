@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Meals: clicking a meal with the mouse opens it again.** In the weekly planner a mouse click
+  on a meal did nothing except flash a drag preview, so on a desktop or trackpad a meal could only
+  be opened with the keyboard. A click now opens the meal, dragging starts only once the pointer
+  actually moves, and a meal dropped back on its own slot no longer opens afterwards.
+
 - **Google Calendar: a connection Google no longer accepts asks to reconnect** (#2019). When
   Google refused the stored sign-in, for example after the seven days a project in the publishing
   status Testing allows, Settings still showed Google as connected while nothing synced, and

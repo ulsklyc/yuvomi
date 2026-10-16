@@ -491,8 +491,11 @@ test('Essensplan: die Zieh-Verdrahtung folgt einem Rechtewechsel in beide Richtu
       };
       const zeigerRunter = (k) => {
         let verhindert = 0;
+        // Gefangen wird am gedrueckten Element, nicht an der Karte (Mausklick,
+        // Critique 2026-10-16) - der Zaehler sitzt deshalb am Ziel und zaehlt fuer die Karte.
         grid.handler.pointerdown[0]({ pointerType: 'mouse', pointerId: 1, clientX: 5, clientY: 5,
-          target: { closest: (sel) => (sel === '.meal-card' ? k : null) }, preventDefault() { verhindert += 1; } });
+          target: { closest: (sel) => (sel === '.meal-card' ? k : null), setPointerCapture() { k.gefangen += 1; } },
+          preventDefault() { verhindert += 1; } });
         return { gefangen: k.gefangen, verhindert };
       };
       rechte(LESEN);
