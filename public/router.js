@@ -39,7 +39,7 @@ import { SCHEDULE_ROUTES } from '/utils/schedule-tabs.js';
 import { activityType } from '/utils/health-activity.js';
 import {
   SEARCH_SECTIONS, NEW_ACTIONS, searchResultCount, markSegments, paletteCommands,
-  readRecent, rememberRecent, visibleRecent,
+  readRecent, rememberRecent, visibleRecent, forgetAllRecent,
 } from '/utils/search-sections.js';
 import { buildHelpRows } from '/utils/help.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -74,7 +74,7 @@ import { handleMasterDetailPopstate } from '/utils/master-detail.js';
 import '/components/datepicker.js';
 import { NAV_ICONS, MODULE_ICON, moduleIconEl } from '/nav-icons.js';
 import {
-  RENAMED_SETTINGS_SOURCE_PATHS, SETTINGS_LEAVES, extensionSettingsPaths, setExtensionSettingsModules, settingsLeafLabel, searchSettings, settingsOptionUrl, settingsSectionUrl,
+  RENAMED_SETTINGS_SOURCE_PATHS, SETTINGS_LEAVES, extensionSettingsPaths, findSettingsLeaf, setExtensionSettingsModules, settingsLeafLabel, searchSettings, settingsOptionUrl, settingsSectionUrl,
 } from '/settings/registry.js';
 import {
   NAV_SECTION,
@@ -3371,19 +3371,11 @@ function initSearch(container) {
     // ZULETZT GEOEFFNET (R19): was zuletzt aus der Palette geoeffnet wurde,
     // steht vor den Kacheln - die Palette ist fuer den Wiederholer da. Nur,
     // was heute noch erreichbar ist (visibleRecent); leer heisst: kein Kopf.
-    const targets = navItems();
-    const recent = visibleRecent(
-      readRecent(safeLocalStorage(), routerState.currentUser?.id),
-      new Set(targets.map((item) => item.module)),
-    );
+    const recent = visibleRecent(readRecent(safeLocalStorage(), routerState.currentUser?.id), recentPlace(navItems()));
     if (recent.length) {
-      // Die Liste mischt Module - die Zweitzeile nennt deshalb das Modul vor
-      // dem Detail („Vorrat · 19.10."), sonst stuende „Vollmilch" herkunftslos da.
-      const moduleLabel = new Map(targets.map((item) => [item.module, item.label]));
       results.appendChild(paletteRowsSection(t('search.recentLabel'), recent, {
         title: (item) => item.label,
-        meta: (item) => [item.label === moduleLabel.get(item.module) ? '' : moduleLabel.get(item.module), item.context]
-          .filter(Boolean).join(' · '),
+        meta: (item) => item.context || '',
         go: (item) => navigate(item.route),
       }, () => closeSearch({ restoreFocus: false })));
     }
@@ -3565,6 +3557,25 @@ function safeLocalStorage() {
 }
 
 /**
+ * Der Name eines gemerkten Orts, frisch aus dem, was der Betrachter JETZT
+ * sehen darf: ein Navigationsziel aus `targets` (navItems), ein
+ * Einstellungsblatt ueber `findSettingsLeaf` (prueft die Sichtbarkeit). Was
+ * nicht aufloest, liefert null und faellt aus der Liste.
+ */
+function recentPlace(targets) {
+  const byRoute = new Map(targets.map((item) => [item.navHref ?? item.path, item]));
+  const visible = new Set(targets.map((item) => item.module));
+  return ({ route, module }) => {
+    if (!visible.has(module)) return null;
+    const place = byRoute.get(route);
+    if (place) return { label: place.label };
+    if (module !== 'settings') return null;
+    const leaf = findSettingsLeaf(route.split(/[?#]/)[0], routerState.currentUser);
+    return leaf ? { label: settingsLeafLabel(leaf, t), context: t('nav.settings') } : null;
+  };
+}
+
+/**
  * Eine Gruppe Palettenzeilen ohne Suchwort - dieselbe Bauart wie die Treffer
  * (`.search-section` + `.search-result`), damit Combobox, Pfeiltasten und
  * Haut dieselben sind (utils/palette-combobox.js zaehlt `.search-result`).
@@ -3594,7 +3605,7 @@ function paletteRowsSection(label, items, { title, meta, go }, onClose) {
     }
     btn.addEventListener('click', () => {
       onClose();
-      rememberRecent(safeLocalStorage(), routerState.currentUser?.id, item);
+      rememberRecent(safeLocalStorage(), routerState.currentUser?.id, { route: item.route, module: item.module });
       go(item);
     });
     rows.appendChild(btn);
@@ -3644,7 +3655,7 @@ function renderSearchResults(container, data, onClose, { local = { places: [], a
   // der Sektion ist die Herkunft damit selbstverstaendlich, die Zeilen
   // bleiben siegelfrei. Die Zeilen selbst liegen in GENAU EINEM Traeger
   // (Zeilenlisten-Regel) statt als Karte pro Treffer.
-  function makeSection(label, sealModule, items, { route, title, meta, go, remember = true }) {
+  function makeSection(label, sealModule, items, { route, title, meta, go, remember = false }) {
     if (!items.length) return;
     const section = document.createElement('div');
     section.className = 'search-section';
@@ -3685,14 +3696,10 @@ function renderSearchResults(container, data, onClose, { local = { places: [], a
         onClose();
         // Gemerkt wird ein ZIEL (Ort, Einstellung, Datentreffer), kein Befehl
         // und keine Anlege-Aktion - die Liste heisst "Zuletzt geoeffnet".
-        if (remember) {
-          const target = item.run ? null : (route ? route(item) : item.route);
-          if (target) {
-            rememberRecent(safeLocalStorage(), routerState.currentUser?.id, {
-              label: title(item), route: target, module: item.module ?? sealModule ?? null,
-              context: (meta?.(item) || item.context || '') || undefined,
-            });
-          }
+        // NUR ORTE, nur Ziel und Modul - nie ein Name, nie ein Datentreffer
+        // (Sicherheits-Review R19, utils/search-sections.js).
+        if (remember && !item.run && item.route) {
+          rememberRecent(safeLocalStorage(), routerState.currentUser?.id, { route: item.route, module: item.module });
         }
         if (go) go(item);
         else navigate(route(item));
@@ -3705,6 +3712,7 @@ function renderSearchResults(container, data, onClose, { local = { places: [], a
 
   // 1. GEHE ZU - Navigationsziele und Einstellungsblaetter.
   makeSection(t('search.goTo'), null, local.places, {
+    remember: true,
     title: (item) => item.label,
     meta: (item) => item.context || '',
     go: (item) => (item.run ? item.run() : navigate(item.route)),
@@ -3712,7 +3720,6 @@ function renderSearchResults(container, data, onClose, { local = { places: [], a
   // 2. NEU ANLEGEN - die Seite oeffnen und ihre Primaeraktion ausloesen, genau
   //    wie der Kurzbefehl `n` (triggerPageFab: nichts, wo kein FAB zu sehen ist).
   makeSection(t('search.newSection'), null, local.actions, {
-    remember: false,
     title: (item) => item.label,
     meta: (item) => item.context || '',
     go: async (item) => {
@@ -4813,6 +4820,9 @@ function forgetSessionState() {
   stopThirdPartyModulePolling();
   stopReminders();
   stopPush();
+  // Die zuletzt geoeffneten Orte der Palette (R19): Ziele eines Kontos
+  // gehoeren nicht dem naechsten am selben Geraet.
+  forgetAllRecent(safeLocalStorage());
   // Und der Foto-Bildschirmschoner (#1919): ohne Sitzung fragt er nichts mehr
   // an - sein 401 zeichnete sonst die Anmeldeseite ueber ein halb
   // ausgefuelltes Formular. Scharf macht ihn navigate(), sobald es wieder

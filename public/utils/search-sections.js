@@ -230,39 +230,49 @@ export function paletteCommands(query, { places = [], settings = [], actions = [
 /* ── Zuletzt geoeffnet (R19, Critique 2026-10-16, Alex) ──
  * ⌘K mit leerem Feld zeigte nur die Modul-Kacheln. Eine Palette ist fuer den
  * Wiederholer da: was man gerade geoeffnet hat, will man als Naechstes wieder
- * oeffnen (Raycast, Linear, Spotlight). Gemerkt wird, was AUS DER PALETTE
- * geoeffnet wurde - ein Ort, ein Einstellungsblatt, ein Datentreffer -, nicht
- * jeder Seitenwechsel: die Module stehen ohnehin als Kacheln darunter.
+ * oeffnen (Raycast, Linear, Spotlight).
  *
- * Je Konto und Geraet im localStorage, hoechstens RECENT_MAX Eintraege, der
- * neueste zuerst, je Ziel (route) nur einmal. Der Speicher ist eine Zugabe:
- * wirft er (Safari privat, voll), bleibt die Liste leer, nichts bricht. */
+ * GEMERKT WIRD NUR EIN ZIEL, NIE SEIN NAME (Sicherheits-Review R19). Die erste
+ * Fassung legte Titel und Kontext von Datentreffern im localStorage ab -
+ * Gesundheit, Dokumente, private Notizen - und die ueberlebten das Abmelden;
+ * am geteilten Familien-Tablett oder Wand-Display las sie der Naechste. Jetzt
+ * stehen dort nur `route` und `module`, und gemerkt werden nur ORTE (Ziele
+ * der Navigation, Einstellungsblaetter), keine Datentreffer: deren Namen
+ * liessen sich beim Anzeigen nicht frisch und mit Rechtepruefung holen, ohne
+ * je Art eine eigene Abfrage. Den Namen ermittelt die Anzeige aus der
+ * aktuellen Navigation bzw. den Einstellungsblaettern (`resolve` in
+ * visibleRecent); was dort nicht mehr steht (abgeschaltet, kein Recht),
+ * faellt weg. Und beim Abmelden gehen alle Listen (forgetAllRecent).
+ *
+ * Je Konto und Geraet, hoechstens RECENT_MAX Eintraege, der neueste zuerst,
+ * je Ziel einmal. Der Speicher ist eine Zugabe: wirft er (Safari privat,
+ * voll), bleibt die Liste leer, nichts bricht. */
 export const RECENT_MAX = 5;
-const RECENT_KEY_PREFIX = 'yuvomi-palette-recent:';
+export const RECENT_KEY_PREFIX = 'yuvomi-palette-recent:';
 
 /** Speicher-Schluessel je Konto - ein geteiltes Tablett mischt sonst Familien. */
 export function recentStorageKey(userId) {
   return `${RECENT_KEY_PREFIX}${userId ?? 'anon'}`;
 }
 
-/** Ein Eintrag ist brauchbar, wenn er ein Ziel IN der App und einen Namen hat. */
+/** Ein Eintrag ist brauchbar, wenn er ein Ziel IN der App und ein Modul hat. */
 function isRecentEntry(entry) {
   return Boolean(entry)
-    && typeof entry.label === 'string' && entry.label.trim() !== ''
+    && typeof entry.module === 'string' && entry.module !== ''
     && typeof entry.route === 'string' && entry.route.startsWith('/') && !entry.route.startsWith('//');
 }
 
 /**
  * Die Liste nach dem Oeffnen von `entry`: vorn eingereiht, das alte Vorkommen
- * desselben Ziels entfernt, auf RECENT_MAX gekuerzt. Reine Funktion.
- * @returns {Array<{label: string, route: string, module?: string, context?: string}>}
+ * desselben Ziels entfernt, auf RECENT_MAX gekuerzt. Behalten werden NUR
+ * `route` und `module` - was der Aufrufer sonst mitgibt (Titel, Kontext),
+ * landet nie im Speicher. Reine Funktion.
+ * @returns {Array<{route: string, module: string}>}
  */
 export function pushRecent(list, entry, max = RECENT_MAX) {
-  const prior = Array.isArray(list) ? list.filter(isRecentEntry) : [];
+  const prior = Array.isArray(list) ? list.filter(isRecentEntry).map(({ route, module }) => ({ route, module })) : [];
   if (!isRecentEntry(entry)) return prior.slice(0, max);
-  const clean = { label: entry.label, route: entry.route };
-  if (entry.module) clean.module = String(entry.module);
-  if (entry.context) clean.context = String(entry.context);
+  const clean = { route: entry.route, module: entry.module };
   return [clean, ...prior.filter((e) => e.route !== clean.route)].slice(0, max);
 }
 
@@ -270,7 +280,7 @@ export function pushRecent(list, entry, max = RECENT_MAX) {
 export function readRecent(storage, userId) {
   try {
     const parsed = JSON.parse(storage?.getItem(recentStorageKey(userId)) ?? '[]');
-    return Array.isArray(parsed) ? parsed.filter(isRecentEntry).slice(0, RECENT_MAX) : [];
+    return pushRecent(Array.isArray(parsed) ? parsed : [], null);
   } catch {
     return [];
   }
@@ -284,12 +294,31 @@ export function rememberRecent(storage, userId, entry) {
 }
 
 /**
- * Was davon heute noch erreichbar ist: ein Modul, das inzwischen abgeschaltet,
- * ausgeblendet oder gesperrt ist, verschwindet aus der Liste, statt auf eine
- * Tuer zu zeigen, die nicht mehr aufgeht. Eintraege ohne Modul (z. B. Hilfe)
- * gibt es hier nicht - Befehle werden nicht gemerkt.
+ * Vergisst ALLE Listen auf diesem Geraet (jedes Konto) - beim Abmelden und
+ * wenn die Sitzung ablaeuft (forgetSessionState im Router).
  */
-export function visibleRecent(list, visibleModules) {
-  const visible = visibleModules instanceof Set ? visibleModules : new Set(visibleModules ?? []);
-  return (Array.isArray(list) ? list : []).filter((e) => isRecentEntry(e) && e.module && visible.has(e.module));
+export function forgetAllRecent(storage) {
+  try {
+    const keys = [];
+    for (let i = 0; i < (storage?.length ?? 0); i++) {
+      const key = storage.key(i);
+      if (typeof key === 'string' && key.startsWith(RECENT_KEY_PREFIX)) keys.push(key);
+    }
+    for (const key of keys) storage.removeItem(key);
+  } catch { /* nur Zugabe */ }
+}
+
+/**
+ * Die Liste zum Anzeigen: jeder Eintrag bekommt seinen Namen JETZT aus
+ * `resolve(entry)` (aktuelle Navigation, Einstellungsblaetter) - liefert der
+ * nichts (Modul abgeschaltet, ausgeblendet, kein Recht, Blatt weg), faellt
+ * der Eintrag heraus, statt auf eine Tuer zu zeigen, die nicht mehr aufgeht.
+ * @param {Array<{route: string, module: string}>} list
+ * @param {(entry: {route: string, module: string}) => ({label: string, context?: string}|null)} resolve
+ */
+export function visibleRecent(list, resolve) {
+  return (Array.isArray(list) ? list : []).filter(isRecentEntry).flatMap((entry) => {
+    const found = typeof resolve === 'function' ? resolve(entry) : null;
+    return found?.label ? [{ ...entry, label: found.label, context: found.context || '' }] : [];
+  });
 }
