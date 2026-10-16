@@ -77,6 +77,17 @@
   }
 }
 
+/* VIER TEXT-REITER PASSEN AUF 390px (Critique 2026-10-16). Ohne Zeichen (D3)
+ * waren es noch 363px Inhalt in 358px Leiste - „Haushaltshilfen" lief in die
+ * Fade-Maske. Die Luft zwischen den Kapseln traegt ihr eigenes 12px-Polster;
+ * die 4px Abstand dazu geben die fehlenden 12px frei. Schmaler als 375px
+ * scrollt die Leiste wie jede andere (Shell, `.page-toolbar__bar`). */
+@media (max-width: 639px) {
+  .housekeeping-tabs {
+    gap: 0;
+  }
+}
+
 /* Aktiv-Optik kommt vollstaendig aus der geteilten sub-tab-Grammatik
  * (.sub-tab--active: Akzent-Tint + Ink + semibold) - keine Sonderfarbe hier. */
 .housekeeping-tab {
@@ -562,10 +573,6 @@
   gap: var(--space-1);
 }
 
-.housekeeping-report-item > .list-row__actions {
-  margin-inline-end: calc(-1 * var(--space-2));
-}
-
 /* DIE ZEILE FUEHRT KEINE AKTIONEN MEHR (Critique 2026-10-05, R16): der Tipp
  * oeffnet, Loeschen steht im Dialogfuss und auf dem Wisch (taskRowHtml()).
  * Auf Touch bleibt am Zeilenende die Gasse fuer den Wisch-Chevron
@@ -719,11 +726,8 @@
  * Zeilengroesse (`.housekeeping-avatar--row`) ist damit entfallen - zehnmal
  * dasselbe Gesicht untereinander sagte nichts, was das Meta nicht sagt. */
 
-/* Die Aktionen ruecken wie in der Aufgabenzeile naeher - ihre 48px-Flaechen
- * tragen die Luft selbst. */
-.housekeeping-report-item > .list-row__actions {
-  margin-inline-start: calc(-1 * var(--space-1));
-}
+/* Seit R18/D6 traegt jede Besuchszeile nur noch den Mehr-Knopf (kein
+ * Aktionstraeger mehr); er rueckt wie ueberall per 48px-Flaeche an die Kante. */
 
 .housekeeping-report-modal {
   display: grid;
