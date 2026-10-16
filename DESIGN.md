@@ -1171,7 +1171,13 @@ das Verhaeltnis haelt.
   Feder `--ease-sidebar-glide`, damit sie nicht ueber das Ziel-Item hinausschiesst.
   Hoehenwechsel (Zeile oder Gruppe klappt ein/auf, `collapseOut`/`expandIn` in `utils/ux.js`,
   samt Gruppenwinkel) laufen auf der symmetrischen `--ease-in-out` cubic-bezier(0.42,0,0.58,1):
-  `--ease-out` nahm dort 80 % der Hoehe in 60ms, die Nachbarn sprangen hinterher.
+  `--ease-out` nahm dort 80 % der Hoehe in 60ms, die Nachbarn sprangen hinterher. **Ausklappen
+  ist seit R19 Compositor-Arbeit:** die Zeile blendet aus und wird 3 % kleiner (opacity,
+  transform), faellt dann in einem Frame auf null, und die Nachbarn gleiten per FLIP
+  (`flipPlayElements` in `utils/flip.js`) nur mit `transform` nach - keine Hoehe, kein Abstand
+  je Frame (am 4x gedrosselten Telefon sprang die Hoehenanimation in Stufen). Unter reduzierter
+  Bewegung blendet die Zeile aus und die Nachbarn blenden an ihrer neuen Stelle ein, statt um
+  die Zeilenhoehe zu springen. `expandIn` zieht weiter ueber die Hoehe auf.
   prefers-reduced-motion schaltet Signature-Animationen ab.
 - **Eine Kurvenfamilie (R16):** Interaktions-Motion nimmt Dauer UND Kurve aus Tokens. Die drei
   Shorthands `--transition-fast/base/slow` bestehen aus `var(--duration-*) var(--ease-out)` -
@@ -1208,7 +1214,12 @@ das Verhaeltnis haelt.
   gehende Karte NICHT vorher aus: die Nachbarkarte haelt die Zeilenhoehe, die Nachbarn gleiten
   in die Luecke (FLIP). Filter und Suche zeichnen ohne
   Bewegung neu - dort wechselt die Frage, nicht die Liste. Ein Skelett gehoert zum ERSTEN
-  Laden; danach bleibt der Inhalt stehen, bis der neue da ist.
+  Laden; danach bleibt der Inhalt stehen, bis der neue da ist. **Skelett (R19):** die Linien
+  erscheinen erst nach `--duration-sm` (kommt der Inhalt schneller, sieht man sie nie; die
+  Kartenflaechen stehen sofort und halten das Layout), der Schimmer ist ein Band als `::after`,
+  das per `transform` gleitet (vorher `background-position`: Paint je Frame). Die Uebersicht
+  blendet vom Skelett zum Inhalt ueber `swapContent`. `stagger` laeuft seit R19 ueber Web
+  Animations mit `delay` und `fill: backwards` statt ueber Timer und Inline-Werte.
 - **Inhaltswechsel - der Standard (`utils/content-swap.js`):** derselbe Traeger, neuer Inhalt
   (Reiterwechsel im Modul, Monats-/Wochen-Blaettern, Bereichswechsel) tauscht ueber
   `swapContent(host, update, { direction })`: Blende ab 0,4 Deckkraft (kein leerer Frame),

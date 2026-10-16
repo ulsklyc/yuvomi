@@ -33,12 +33,34 @@ global.localStorage = {
 
 const { parseDateInput, isDateInputValid, parseTimeInput, formatTimeInput } = await import('../public/i18n.js');
 
-test('stagger: setzt opacity:0 auf alle Elemente', () => {
-  const els = [{ style: {} }, { style: {} }, { style: {} }];
-  stagger(els, { delay: 0, duration: 0 });
-  assert.equal(els[0].style.opacity, '0');
-  assert.equal(els[1].style.opacity, '0');
-  assert.equal(els[2].style.opacity, '0');
+/** Eine Zeile, die ihre Animationen mitschreibt (stagger laeuft seit R19 ueber WAAPI). */
+const animRow = (extra = {}) => {
+  const el = { style: {}, calls: [], ...extra };
+  el.animate = (keyframes, timing) => { el.calls.push({ keyframes, timing }); return { finished: Promise.resolve() }; };
+  return el;
+};
+
+/*
+ * WEB ANIMATIONS STATT TIMER-KETTE (Critique R19): je Zeile EINE Animation,
+ * der Versatz ist ihr `delay`, `fill: 'backwards'` haelt sie bis zum Einsatz
+ * unsichtbar. Nur der Startpunkt steht da - das Ziel ist das Stylesheet.
+ * Kein Inline-Wert, kein Timer (vorher zwei setTimeout je Zeile).
+ */
+test('stagger: je Zeile eine Animation von opacity 0, mit Versatz als delay und ohne Inline-Wert', () => {
+  const els = [animRow(), animRow(), animRow()];
+  stagger(els, { delay: 30, duration: 200 });
+  els.forEach((el, i) => {
+    assert.equal(el.calls.length, 1, `Zeile ${i}: keine Animation`);
+    const [{ keyframes, timing }] = el.calls;
+    assert.deepEqual(keyframes, [{ opacity: 0, transform: 'translateY(8px)', offset: 0 }], 'nur der Start, das Ziel ist das Stylesheet');
+    assert.equal(timing.delay, i * 30);
+    assert.equal(timing.fill, 'backwards');
+    assert.equal(timing.duration, 200);
+    assert.equal(el.style.opacity, undefined, 'kein Inline-Wert');
+  });
+  const src = readFileSync(new URL('../public/utils/ux.js', import.meta.url), 'utf8');
+  const body = src.slice(src.indexOf('export function stagger('), src.indexOf('export function vibrate('));
+  assert.doesNotMatch(body, /setTimeout\(/, 'stagger ist wieder eine Timer-Kette');
 });
 
 test('date inputs: accept slash, dot, and hyphen separators for DMY dates', () => {
@@ -117,17 +139,17 @@ test('stagger: tut nichts bei prefers-reduced-motion', () => {
  * Traeger. Deshalb die Zeilen hier FRISCH je Aufruf, der Traeger derselbe.
  */
 function fakeRows(host, n = 3) {
-  return Array.from({ length: n }, () => ({ style: {}, parentElement: host }));
+  return Array.from({ length: n }, () => animRow({ parentElement: host }));
 }
 
 test('stagger: blendet je Listentraeger nur beim ersten Aufbau ein, nicht bei jedem Neuzeichnen', () => {
   const host = { contains: () => true, parentElement: null };
   const first = fakeRows(host);
   stagger(first, { host, delay: 0, duration: 0 });
-  assert.equal(first[0].style.opacity, '0', 'Vorbedingung: der erste Aufbau blendet ein');
+  assert.equal(first[0].calls.length, 1, 'Vorbedingung: der erste Aufbau blendet ein');
   const again = fakeRows(host);
   stagger(again, { host, delay: 0, duration: 0 });
-  assert.equal(again[0].style.opacity, undefined,
+  assert.equal(again[0].calls.length, 0,
     'das Neuzeichnen derselben Liste hat wieder eingeblendet - die Liste faehrt nach jedem Abhaken neu ein');
 });
 
@@ -136,7 +158,7 @@ test('stagger: ohne host gilt der gemeinsame Vorfahr der Zeilen als Traeger', ()
   stagger(fakeRows(host), { delay: 0, duration: 0 });
   const again = fakeRows(host);
   stagger(again, { delay: 0, duration: 0 });
-  assert.equal(again[0].style.opacity, undefined, 'zweiter Aufruf am selben Vorfahr hat wieder eingeblendet');
+  assert.equal(again[0].calls.length, 0, 'zweiter Aufruf am selben Vorfahr hat wieder eingeblendet');
 });
 
 test('stagger: ein Aufruf ohne Zeilen verbraucht den ersten Aufbau nicht (Skelett, Leerzustand)', () => {
@@ -144,7 +166,7 @@ test('stagger: ein Aufruf ohne Zeilen verbraucht den ersten Aufbau nicht (Skelet
   stagger([], { host });
   const rows = fakeRows(host);
   stagger(rows, { host, delay: 0, duration: 0 });
-  assert.equal(rows[0].style.opacity, '0', 'die erste echte Liste nach einem leeren Aufruf blendet nicht mehr ein');
+  assert.equal(rows[0].calls.length, 1, 'die erste echte Liste nach einem leeren Aufruf blendet nicht mehr ein');
 });
 
 test('stagger: ein neuer Traeger (Seite neu aufgebaut) blendet wieder ein', () => {
@@ -153,7 +175,7 @@ test('stagger: ein neuer Traeger (Seite neu aufgebaut) blendet wieder ein', () =
   stagger(fakeRows(a), { host: a, delay: 0, duration: 0 });
   const rows = fakeRows(b);
   stagger(rows, { host: b, delay: 0, duration: 0 });
-  assert.equal(rows[0].style.opacity, '0');
+  assert.equal(rows[0].calls.length, 1);
 });
 
 /*
@@ -182,16 +204,27 @@ test('stagger: jeder Aufruf in public/ nennt seinen Listentraeger (host)', () =>
   assert.deepEqual(offenders, [], `stagger() ohne host:\n${offenders.join('\n')}`);
 });
 
-test('collapseOut/expandIn: loesen ohne Animation sofort auf (reduzierte Bewegung, kein animate)', async () => {
+test('collapseOut/expandIn: loesen ohne Animation sofort auf; unter reduzierter Bewegung wird nur geblendet', async () => {
   await collapseOut(null);
   await expandIn({ style: {} });
+  const prevGcs = global.getComputedStyle;
+  global.getComputedStyle = () => ({ getPropertyValue: () => '', opacity: '1' });
   global.window.matchMedia = () => ({ matches: true });
-  let animated = false;
-  const el = { style: {}, animate: () => { animated = true; } };
-  await collapseOut(el);
-  await expandIn(el);
-  global.window.matchMedia = () => ({ matches: false });
-  assert.equal(animated, false, 'unter prefers-reduced-motion darf keine Hoehe animieren');
+  const frames = [];
+  const el = { style: {}, animate: (k) => { frames.push(...k); return { finished: Promise.resolve() }; } };
+  try {
+    await expandIn(el);
+    assert.equal(frames.length, 0, 'unter prefers-reduced-motion zieht keine Hoehe auf');
+    await collapseOut(el);
+  } finally {
+    global.window.matchMedia = () => ({ matches: false });
+    global.getComputedStyle = prevGcs;
+  }
+  // R19: blenden statt springen - die Zeile geht per opacity, und was danach
+  // gilt, ist die gehaltene geschlossene Form (ein Frame, keine Bewegung).
+  const moving = frames.filter((f) => !('height' in f));
+  assert.ok(moving.length > 0, 'unter reduzierter Bewegung blendet die Zeile nicht einmal aus');
+  assert.ok(moving.every((f) => Object.keys(f).every((k) => k === 'opacity')), 'unter reduzierter Bewegung bewegt sich etwas');
 });
 
 /**
@@ -201,7 +234,7 @@ test('collapseOut/expandIn: loesen ohne Animation sofort auf (reduzierte Bewegun
  * Gemessen wird ueber den AUFRUF (collapseOut/expandIn mit gestubtem
  * `animate`), die Kurve selbst aus tokens.css (x1 + x2 = 1, y1 + y2 = 1).
  */
-test('collapseOut/expandIn: Hoehe laeuft auf der symmetrischen Kurve --ease-in-out', async () => {
+test('collapseOut/expandIn: Blende, Nachruecken und Aufziehen laufen auf der symmetrischen Kurve --ease-in-out', async () => {
   const tokens = { '--ease-out': 'cubic-bezier(0.16, 1, 0.3, 1)', '--ease-in-out': 'cubic-bezier(0.42, 0, 0.58, 1)', '--duration-lg': '250ms' };
   const docEl = {};
   const prevDoc = global.document;
@@ -214,15 +247,17 @@ test('collapseOut/expandIn: Hoehe laeuft auf der symmetrischen Kurve --ease-in-o
   const el = {
     style: {},
     getBoundingClientRect: () => ({ height: 40 }),
-    animate: (_frames, opts) => { easings.push(opts.easing); return { finished: Promise.resolve() }; },
+    animate: (frames, opts) => { if (frames.length > 1 && !('height' in frames[1] && frames[0].height === frames[1].height)) easings.push(opts.easing); return { finished: Promise.resolve() }; },
   };
   try {
-    await collapseOut(el);
+    await collapseOut(el, { duration: 10 });
     await expandIn(el);
   } finally {
     global.document = prevDoc;
     global.getComputedStyle = prevGcs;
   }
+  // Blende (collapseOut, Schritt 1) und Aufziehen; die gehaltene geschlossene
+  // Form ist keine Bewegung und hat keine Kurve.
   assert.deepEqual(easings, [tokens['--ease-in-out'], tokens['--ease-in-out']]);
 
   const css = readFileSync(new URL('../public/styles/tokens.css', import.meta.url), 'utf8');

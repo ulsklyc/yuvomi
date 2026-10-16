@@ -56,17 +56,54 @@ export function flipPlay(root, selector, keyAttr, before, {
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return 0;
   let moved = 0;
   for (const el of root.querySelectorAll(selector)) {
-    const prev = before.get(el.getAttribute?.(keyAttr));
-    if (!prev || typeof el.animate !== 'function') continue;
-    const now = el.getBoundingClientRect();
-    const dx = prev.left - now.left;
-    const dy = prev.top - now.top;
-    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
-    el.animate([
-      { transform: `translate(${dx}px, ${dy}px)` },
-      { transform: 'none' },
-    ], { duration, easing });
-    moved += 1;
+    if (glide(el, before.get(el.getAttribute?.(keyAttr)), { duration, easing })) moved += 1;
   }
+  return moved;
+}
+
+/** Eine Zeile von ihrer alten Lage gleiten lassen; false, wenn sie stillsteht. */
+function glide(el, prev, { duration, easing }) {
+  if (!prev || typeof el.animate !== 'function') return false;
+  const now = el.getBoundingClientRect();
+  const dx = prev.left - now.left;
+  const dy = prev.top - now.top;
+  if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return false;
+  el.animate([
+    { transform: `translate(${dx}px, ${dy}px)` },
+    { transform: 'none' },
+  ], { duration, easing });
+  return true;
+}
+
+/**
+ * Dasselbe fuer Elemente, die bleiben, wie sie sind - ohne Schluessel: die
+ * Nachbarn einer Zeile, die ausklappt (`collapseOut` in ux.js). Erste Messung.
+ * @param {Element[]} elements
+ * @returns {Map<Element, {left:number, top:number}>}
+ */
+export function flipSnapshotElements(elements) {
+  const rects = new Map();
+  for (const el of elements ?? []) {
+    if (typeof el?.getBoundingClientRect !== 'function') continue;
+    const r = el.getBoundingClientRect();
+    rects.set(el, { left: r.left, top: r.top });
+  }
+  return rects;
+}
+
+/**
+ * Zweite Messung und Abspielen fuer `flipSnapshotElements`. Nur `transform`.
+ * @param {Map<Element, {left:number, top:number}>} before
+ * @param {{duration?: number, easing?: string}} [opts]
+ * @returns {number} wie viele Elemente gleiten
+ */
+export function flipPlayElements(before, {
+  duration = durationToken('--duration-md', 200),
+  easing = easingToken('--ease-out', 'ease-out'),
+} = {}) {
+  if (!before?.size) return 0;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return 0;
+  let moved = 0;
+  for (const [el, prev] of before) if (glide(el, prev, { duration, easing })) moved += 1;
   return moved;
 }

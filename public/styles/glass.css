@@ -656,16 +656,19 @@ html.navigating .app-content *::after {
 /* ================================================================
  * 22. Skeleton Shimmer — Glass Shimmer
  * ================================================================ */
+/* Flaeche und Band getrennt (R19): die Flaeche steht, das Band gleitet als
+ * `::after` per transform (layout.css). Dieselben Farben wie vorher. */
 .skeleton {
+  background: var(--color-border-subtle);
+}
+
+.skeleton::after {
   background: linear-gradient(
     105deg,
-    var(--color-border-subtle) 0%,
-    var(--color-border-subtle) 30%,
+    transparent 30%,
     color-mix(in srgb, var(--color-surface) 90%, var(--glass-highlight)) 50%,
-    var(--color-border-subtle) 70%,
-    var(--color-border-subtle) 100%
+    transparent 70%
   );
-  background-size: 250% 100%;
 }
 
 /* ================================================================

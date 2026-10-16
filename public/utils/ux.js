@@ -1,8 +1,12 @@
 /**
  * Modul: UX Utilities
  * Zweck: Wiederverwendbare Animationshelfer (Stagger, Vibration)
- * Abhängigkeiten: keine
+ * Abhängigkeiten: ./flip.js (Nachbarn einer ausklappenden Zeile)
  */
+// Relativ (wie flip.js umgekehrt): im Browser dieselbe Modul-URL wie
+// '/utils/flip.js'. Der Kreis ux <-> flip ist harmlos, beide lesen einander
+// erst beim Aufruf.
+import { flipSnapshotElements, flipPlayElements } from './flip.js';
 
 /**
  * Listen, deren erster Aufbau schon eingeblendet hat (Critique 2026-09-26, A3 P1-4).
@@ -64,32 +68,23 @@ export function stagger(elements, { host = null, delay = 30, duration = duration
   // waehrend die Seite noch blendete. Der Merker oben ist verbraucht, ein
   // spaeteres Neuzeichnen holt es nicht nach.
   if (typeof document !== 'undefined' && document.documentElement?.classList?.contains('page-swapping')) return;
+  // WEB ANIMATIONS STATT TIMER-KETTE (Critique R19). Vorher setzte stagger
+  // `opacity`/`transform`/`transition` inline und raeumte sie mit zwei
+  // setTimeout je Zeile wieder ab - unter Last (4x CPU) kamen die Timer zu
+  // spaet, und jede Zeile stand bis dahin mit einem Inline-Wert da, der ihre
+  // Zustandsregeln schlug (#1230). Jetzt traegt eine Animation je Zeile den
+  // Versatz als `delay`; `fill: 'backwards'` haelt sie vor ihrem Einsatz
+  // unsichtbar, und nach dem Ende gilt ohne Aufraeumen wieder das Stylesheet.
+  // Ohne `animate` (alter Browser, Node-Test ohne Stub) erscheint die Zeile
+  // einfach - das ist der Endzustand. NUR der Startpunkt steht da (`offset: 0`):
+  // das Ziel ist der Wert des Stylesheets, also auch das 0.45 einer
+  // abgehakten Einkaufszeile, nicht ein fest verdrahtetes 1.
+  const easing = easingToken('--ease-out', 'ease-out');
   els.forEach((el, i) => {
-    const itemDelay = i < max ? i * delay : max * delay;
-    el.style.opacity = '0';
-    el.style.transform = 'translateY(8px)';
-    // Dauer (--duration-md) und Kurve aus den Token: der Inline-Wert darf auf
-    // eine Custom Property zeigen, der Rueckleser unten vergleicht, was der
-    // Browser daraus serialisiert.
-    el.style.transition = `opacity ${duration}ms var(--ease-out), transform ${duration}ms var(--ease-out)`;
-    // Zurückgelesen statt als Literal verglichen: der Browser serialisiert
-    // Inline-Werte selbst, und nur so erkennt das Aufräumen seine eigenen.
-    const own = { opacity: el.style.opacity, transform: el.style.transform, transition: el.style.transition };
-    setTimeout(() => {
-      // DAS EINBLENDEN ENDET AUF DEM STYLESHEET, NICHT AUF EINEM INLINE-WERT
-      // (#1230). Hier stand `opacity = '1'`, und das blieb inline stehen: es
-      // schlug jede Zustandsregel der Zeile selbst - `.shopping-item--checked`
-      // griff nur unter prefers-reduced-motion, die Drag-Geister
-      // (`.sortable-ghost`) blieben deckend. Das Leeren blendet über die noch
-      // stehende Transition auf den Wert des Stylesheets ein. Geräumt wird nur,
-      // was noch der eigene Wert ist - eine Wischgeste kann inzwischen ihr
-      // eigenes transform gesetzt haben.
-      if (el.style.opacity === own.opacity) el.style.opacity = '';
-      if (el.style.transform === own.transform) el.style.transform = '';
-      setTimeout(() => {
-        if (el.style.transition === own.transition) el.style.transition = '';
-      }, duration);
-    }, itemDelay);
+    if (typeof el?.animate !== 'function') return;
+    el.animate([{ opacity: 0, transform: 'translateY(8px)', offset: 0 }], {
+      duration, delay: i < max ? i * delay : max * delay, easing, fill: 'backwards',
+    });
   });
 }
 
@@ -198,33 +193,87 @@ function closedFrame() {
 }
 
 /**
- * Hoehe einer Zeile oder Gruppe weich auf null nehmen - der Austritt, nach dem
- * die Nachbarn nachruecken statt zu springen (Critique 2026-09-26, A3 P1-4).
+ * Eine Zeile oder Gruppe gehen lassen - der Austritt, nach dem die Nachbarn
+ * nachruecken statt zu springen (Critique 2026-09-26, A3 P1-4).
  *
- * WARUM WEB ANIMATIONS UND NICHT `interpolate-size` ODER `grid-template-rows`:
- * `height: auto -> 0` per `interpolate-size` kann Safari nicht (dort spraenge
- * die Zeile), und der `1fr -> 0fr`-Trick braucht einen Wrapper um jede Zeile -
- * in Listen, deren Markup drei Module teilen. Gemessen wird die echte Hoehe in
- * px, von dort geht es auf 0; das kann jede Engine.
+ * NUR TRANSFORM UND OPACITY (Critique R19). Bis hierher lief die Hoehe samt
+ * Innen- und Aussenabstand per Web Animations von ihrem Mass auf null. Das ist
+ * Layout in jedem Frame, fuer die Zeile UND alles darunter - am gedrosselten
+ * Telefon (4x CPU) sprang es in Stufen. Jetzt in zwei Schritten, beide auf dem
+ * Compositor:
+ *   1. Die Zeile blendet aus und wird dabei ein wenig kleiner (opacity,
+ *      transform) - die Nachbarn stehen still.
+ *   2. Sie faellt in EINEM Frame auf null (die geschlossene Form, gehalten mit
+ *      `fill: 'forwards'` wie bisher), und die Nachbarn gleiten per FLIP
+ *      (utils/flip.js) nur mit `transform` von ihrer alten Lage in die neue.
+ * Unter `prefers-reduced-motion` blendet die Zeile nur aus, und die Nachbarn
+ * blenden an ihrer neuen Stelle ein, statt hart um die Zeilenhoehe zu springen
+ * (gemessen vorher: 49px Sprung).
  *
- * Das Element bleibt danach auf null stehen (`fill: 'forwards'`) - der Aufrufer
- * zeichnet die Liste neu oder entfernt es. Unter `prefers-reduced-motion`
- * springt es wie bisher. Das Promise loest auch ohne `finish` auf: im verdeckten
- * Tab und an einem abgehaengten Element kommt das Ereignis nicht zuverlaessig.
+ * DER VERTRAG BLEIBT: Das Element bleibt danach auf null stehen, der Aufrufer
+ * zeichnet die Liste neu oder entfernt es; wer es zurueckholt, verwirft die
+ * Animationen (`getAnimations().forEach(a => a.cancel())`) und setzt
+ * `overflow` zurueck. Wird die Blende in Schritt 1 so abgebrochen, faellt
+ * Schritt 2 aus. Das Promise loest auch ohne `finish` auf: im verdeckten Tab
+ * und an einem abgehaengten Element kommt das Ereignis nicht zuverlaessig.
+ *
+ * Kurve fuer Blende und Nachruecken: das symmetrische `--ease-in-out` (Runde 3,
+ * Entscheid 26.09.: `--ease-out` warf die Nachbarn in den ersten 60ms fast ganz
+ * nach oben - ein Ruck statt eines Nachrueckens).
  *
  * @param {Element} el
  * @param {Object} [opts]
- * @param {number} [opts.duration] - ms, Standard `--duration-lg`
+ * @param {number} [opts.duration] - ms des Nachrueckens, Standard `--duration-lg`
  * @returns {Promise<void>}
  */
 export function collapseOut(el, { duration = durationToken('--duration-lg', 250) } = {}) {
   if (!el || typeof el.animate !== 'function') return Promise.resolve();
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return Promise.resolve();
-  el.style.overflow = 'hidden';
-  const anim = el.animate([blockFrame(el), closedFrame()], {
-    duration, easing: easingToken('--ease-in-out', 'ease-in-out'), fill: 'forwards',
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const easing = easingToken('--ease-in-out', 'ease-in-out');
+  const fadeMs = reduced ? durationToken('--duration-sm', 150) : Math.round(duration * 0.6);
+  const from = getComputedStyle(el).opacity;
+  const leaving = el.animate(reduced
+    ? [{ opacity: from }, { opacity: 0 }]
+    : [{ opacity: from, transform: 'none' }, { opacity: 0, transform: 'scale(0.97)' }],
+  { duration: fadeMs, easing, fill: 'forwards' });
+  return settleAnimation(leaving, fadeMs).then(() => {
+    // Abgebrochen (eine Gegenbewegung hat die Zeile zurueckgeholt) oder
+    // inzwischen ausgehaengt: kein zweiter Schritt.
+    if (leaving.playState === 'idle' || el.isConnected === false) return undefined;
+    const neighbours = followingNeighbours(el);
+    const before = flipSnapshotElements(neighbours);
+    el.style.overflow = 'hidden';
+    el.animate([closedFrame(), closedFrame()], { duration: 1, fill: 'forwards' });
+    if (!reduced) {
+      flipPlayElements(before, { duration, easing });
+      return settle(duration);
+    }
+    const blendMs = durationToken('--duration-sm', 150);
+    for (const [n] of before) {
+      if (typeof n.animate === 'function') n.animate([{ opacity: 0 }, { opacity: 1 }], { duration: blendMs, easing });
+    }
+    return settle(blendMs);
   });
-  return settleAnimation(anim, duration);
+}
+
+const settle = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Was nachrueckt, wenn `el` auf null faellt: die folgenden Geschwister, und
+ * die seiner Vorfahren bis zum naechsten Scrollbereich (eine Zeile in einer
+ * Gruppe schiebt auch die Gruppen darunter). Gedeckelt - weiter unten liegt,
+ * was ohnehin niemand sieht.
+ */
+function followingNeighbours(el, limit = 60) {
+  const out = [];
+  let node = el;
+  for (let depth = 0; node && depth < 4 && out.length < limit; depth += 1) {
+    for (let s = node.nextElementSibling; s && out.length < limit; s = s.nextElementSibling) out.push(s);
+    const parent = node.parentElement;
+    if (!parent || parent === document.body || /^(auto|scroll)$/.test(getComputedStyle(parent).overflowY)) break;
+    node = parent;
+  }
+  return out;
 }
 
 /**

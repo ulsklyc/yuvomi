@@ -920,6 +920,11 @@ function motionEl(key, top = 0) {
   return el;
 }
 
+/** Hat stagger diese Zeile angesetzt? Seit R19 eine Animation mit Startpunkt 0 und `fill: 'backwards'`. */
+const staggered = (el) => el.calls.some((c) => c.keyframes[0]?.opacity === 0 && c.timing?.fill === 'backwards');
+/** Animiert ein Aufruf Layout (Hoehe, Abstaende)? Die gehaltene geschlossene Form zaehlt nicht, sie bewegt nichts. */
+const animatesLayout = (call) => call.keyframes.some((k) => 'height' in k) && call.keyframes[0]?.height !== call.keyframes.at(-1)?.height;
+
 const motionHost = (rows) => {
   const host = motionEl('host');
   host.rows = rows;
@@ -1026,8 +1031,8 @@ test('redrawList: ein Aufbau aus dem Leeren staffelt - einmal je Traeger - und k
     const drawn = redrawList(host, () => { renders += 1; host.rows = [a, b]; }, opts);
     assert.equal(renders, 2, 'render laeuft je Aufruf genau einmal');
     assert.equal(drawn.first, true);
-    assert.equal(a.style.opacity, '0', 'stagger hat die Zeilen angesetzt');
-    assert.equal(a.calls.length, 0, 'der Aufbau klappt nichts auf');
+    assert.ok(staggered(a), 'stagger hat die Zeilen angesetzt');
+    assert.ok(!a.calls.some(animatesLayout), 'der Aufbau klappt nichts auf');
 
     // Derselbe Traeger zeigt zwischendurch etwas anderes (anderer Reiter) und
     // baut die Liste dann wieder auf: keine Zeile gilt als "neu", und das
@@ -1038,7 +1043,7 @@ test('redrawList: ein Aufbau aus dem Leeren staffelt - einmal je Traeger - und k
     const again = redrawList(host, () => { host.rows = [a2, b2]; }, opts);
     assert.equal(again.entered, 0);
     assert.equal(a2.calls.length + b2.calls.length, 0, 'kein Aufklappen jeder Zeile beim Zurueckkehren');
-    assert.equal(a2.style.opacity, undefined, 'und kein zweites Staffeln');
+    assert.ok(!staggered(a2), 'und kein zweites Staffeln');
   } finally { restore(); }
   // stagger raeumt seine Inline-Werte per Timer ab - abwarten, damit kein Test daran haengt.
   await new Promise((r) => setTimeout(r, 500));
@@ -1081,15 +1086,49 @@ test('redrawList/collapseRow: unter reduzierter Bewegung laeuft nur das Neuzeich
     const a = motionEl('a', 0);
     const host = motionHost([a]);
     redrawList(host, () => {}, opts);
-    assert.equal(a.style.opacity, undefined, 'kein gestaffeltes Einblenden');
+    assert.equal(a.calls.length, 0, 'kein gestaffeltes Einblenden');
     const a2 = motionEl('a', 48); const n = motionEl('n', 0);
     let ran = 0;
     redrawList(host, () => { ran += 1; host.rows = [n, a2]; }, opts);
     assert.equal(ran, 1);
     assert.equal(n.calls.length + a2.calls.length, 0, 'weder Aufklappen noch FLIP');
     await collapseRow(a2);
-    assert.equal(a2.calls.length, 0, 'kein Ausklappen');
+    // R19: blenden statt springen. Die Zeile geht per opacity, danach haelt
+    // sie die geschlossene Form - nichts davon bewegt sich.
+    assert.ok(a2.calls.length > 0, 'die Zeile verschwindet ohne Blende');
+    assert.ok(!a2.calls.some(animatesLayout), 'kein Ausklappen');
+    assert.ok(a2.calls.every((c) => c.keyframes.every((k) => !('transform' in k))), 'keine Bewegung unter reduzierter Bewegung');
   } finally { restore(); }
+});
+
+test('collapseOut R19: nur transform und opacity - die Nachbarn gleiten per FLIP, unter reduzierter Bewegung blenden sie', async () => {
+  for (const reduced of [false, true]) {
+    const restore = motionEnv({ reduced });
+    try {
+      const { collapseOut } = await import('../public/utils/ux.js');
+      const neighbour = motionEl('n', 48);
+      const row = motionEl('row', 0);
+      row.nextElementSibling = neighbour;
+      // Die gehaltene geschlossene Form nimmt der Zeile ihren Platz: der
+      // Nachbar steht danach 48px hoeher.
+      const animate = row.animate.bind(row);
+      row.animate = (keyframes, timing) => {
+        if (keyframes.some((k) => k.height === '0px')) neighbour.top = 0;
+        return animate(keyframes, timing);
+      };
+      await collapseOut(row);
+      assert.ok(!row.calls.some(animatesLayout), `${reduced}: die Zeile animiert Layout`);
+      assert.ok(row.calls.some((c) => c.keyframes.at(-1).height === '0px' && c.timing.fill === 'forwards'),
+        `${reduced}: die Zeile bleibt nicht zu, bis die Liste neu gezeichnet ist`);
+      assert.equal(neighbour.calls.length, 1, `${reduced}: der Nachbar springt`);
+      const [{ keyframes }] = neighbour.calls;
+      if (reduced) {
+        assert.deepEqual(keyframes.map((k) => Object.keys(k)), [['opacity'], ['opacity']], 'reduziert: blenden, nicht gleiten');
+      } else {
+        assert.deepEqual(keyframes, [{ transform: 'translate(0px, 48px)' }, { transform: 'none' }], 'der Nachbar gleitet nur mit transform');
+      }
+    } finally { restore(); }
+  }
 });
 
 test('collapseRow: klappt die Zeile aus, mit der letzten Zeile die Gruppe - und loest auch ohne finish auf', async () => {
@@ -1102,23 +1141,26 @@ test('collapseRow: klappt die Zeile aus, mit der letzten Zeile die Gruppe - und 
     const started = Date.now();
     await collapseRow(row); // `finished` loest in motionEl NIE auf
     assert.ok(Date.now() - started < 1000, 'der Timer loest auf, nicht das Ereignis');
-    assert.equal(row.calls.length, 1);
-    assert.equal(row.calls[0].keyframes[1].height, '0px');
-    assert.equal(row.calls[0].timing.fill, 'forwards', 'bleibt zu, bis die Liste neu gezeichnet ist');
-    assert.equal(row.calls[0].timing.duration, 250, '--duration-lg');
+    // R19: erst die Blende (opacity + transform, Compositor), dann die
+    // gehaltene geschlossene Form in einem Frame.
+    assert.equal(row.calls.length, 2);
+    assert.deepEqual(Object.keys(row.calls[0].keyframes[1]).sort(), ['opacity', 'transform']);
+    assert.equal(row.calls[1].keyframes[1].height, '0px');
+    assert.equal(row.calls[1].timing.fill, 'forwards', 'bleibt zu, bis die Liste neu gezeichnet ist');
+    assert.equal(row.calls[0].timing.duration, 150, '60 % von --duration-lg');
 
     const group = motionEl('group');
     const only = motionEl('x');
     group.querySelectorAll = () => [only];
     await collapseRow(only, { group, selector: '.row' });
     assert.equal(only.calls.length, 0);
-    assert.equal(group.calls.length, 1, 'die Gruppe geht mit ihrer letzten Zeile');
+    assert.equal(group.calls.length, 2, 'die Gruppe geht mit ihrer letzten Zeile');
 
     const group2 = motionEl('group2');
     const one = motionEl('y');
     group2.querySelectorAll = () => [one, motionEl('z')];
     await collapseRow(one, { group: group2, selector: '.row' });
-    assert.equal(one.calls.length, 1);
+    assert.equal(one.calls.length, 2);
     assert.equal(group2.calls.length, 0);
   } finally { restore(); }
 });
@@ -1799,17 +1841,16 @@ test('R18: stagger startet nicht unter der Seitenblende - und holt es danach nic
     const host = motionEl('host');
     const rows = [motionEl('a'), motionEl('b')];
     stagger(rows, { host });
-    assert.equal(rows[0].style.opacity, undefined, 'unter der Blende setzt nichts die Zeilen auf 0');
-    assert.equal(rows[0].style.transform, undefined);
+    assert.equal(rows[0].calls.length, 0, 'unter der Blende setzt nichts die Zeilen auf 0');
     // Die Blende WAR das Einblenden dieses Aufbaus: ein spaeteres Neuzeichnen staffelt nicht nach.
     classes.delete('page-swapping');
     const again = [motionEl('a'), motionEl('b')];
     stagger(again, { host });
-    assert.equal(again[0].style.opacity, undefined, 'der Merker ist verbraucht');
+    assert.equal(again[0].calls.length, 0, 'der Merker ist verbraucht');
     // Ohne Seitenwechsel (Kaltstart, Reiter im Modul) staffelt es wie bisher.
     const fresh = [motionEl('x')];
     stagger(fresh, { host: motionEl('anderer') });
-    assert.equal(fresh[0].style.opacity, '0');
+    assert.ok(staggered(fresh[0]));
   } finally { restore(); }
   await new Promise((r) => setTimeout(r, 500));
 });
@@ -2263,4 +2304,40 @@ test('Kalender: die Ansicht baut erst, wenn die Kapsel gleitet (afterGlideStart 
   const glide = change.indexOf('await afterGlideStart();');
   assert.ok(glide > -1, 'der Wechsel wartet den Start der Gleitbewegung ab');
   assert.ok(glide < change.indexOf('await reloadForView();') && glide < change.indexOf('renderView();'), 'vor dem teuren Aufbau, nicht danach');
+});
+
+// --------------------------------------------------------------------------
+// R19, Bewegung unter Last: DAS SKELETT KOMMT SPAET UND SCHIMMERT AUF DEM
+// COMPOSITOR. Der Schimmer lief ueber `background-position` (Paint in jedem
+// Frame, auf jeder Linie, genau waehrend des Starts), und die Linien standen
+// ab dem ersten Frame da - auch wenn der Inhalt 80ms spaeter kam.
+// --------------------------------------------------------------------------
+test('R19: das Skelett blendet nach --duration-sm ein und schimmert nur mit transform', () => {
+  const layout = [...eachRule(css('layout.css'))];
+  const base = layout.find((r) => r.selector.trim() === '.skeleton' && r.at.length === 0);
+  assert.ok(base, '.skeleton hat keine Basisregel in layout.css');
+  assert.match(base.body, /animation:\s*skeleton-in\s+var\(--duration-\w+\)\s+var\(--ease-[\w-]+\)\s+var\(--duration-sm\)\s+backwards/,
+    'die Linien stehen ab dem ersten Frame - ein Aufblitzen fuer 80ms ist Flackern, kein Status');
+  assert.doesNotMatch(base.body, /background-size|background-position/);
+  const sheen = layout.find((r) => r.selector.trim() === '.skeleton::after' && r.at.length === 0);
+  assert.ok(sheen, 'kein Schimmer-Band als ::after');
+  assert.match(sheen.body, /animation:\s*skeleton-shimmer\b/);
+  const frames = keyframesBody('skeleton-shimmer');
+  assert.match(frames, /transform:/);
+  assert.doesNotMatch(frames, /background-position/, 'der Schimmer malt wieder in jedem Frame');
+  for (const file of allSheets) {
+    for (const rule of eachRule(css(file))) {
+      if (/(^|[\s,])\.skeleton(?![\w-])/.test(rule.selector)) {
+        assert.doesNotMatch(rule.body, /background-(size|position)/, `${file}: ${rule.selector} bringt den alten Schimmer zurueck`);
+      }
+    }
+  }
+  const reduced = layout.find((r) => r.selector.trim() === '.skeleton::after' && r.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a)));
+  assert.ok(reduced && /animation:\s*none/.test(reduced.body), 'unter reduzierter Bewegung schimmert es weiter');
+});
+
+test('R19: die Uebersicht blendet vom Skelett zum Inhalt ueber swapContent', () => {
+  const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
+  assert.match(src, /const fromSkeleton = Boolean\(shell\.querySelector\('\.widget-skeleton'\)\)\s*&& !document\.documentElement\.classList\.contains\('page-swapping'\);/);
+  assert.match(src, /swapContent\(shell, \(\) => setHtml\(shell, `[\s\S]*?`\), \{ animate: fromSkeleton \}\);/);
 });

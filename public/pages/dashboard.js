@@ -7561,14 +7561,20 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // Aufgabe", "Neuer Termin" ...) fuehrte mitten aus der Anordnung hinaus
     // und stand ueber den Bearbeiten-Leisten der unteren Kacheln (A7 P2-1).
     setCustomizeFabHidden(isCustomizing);
-    setHtml(shell, `
+    // VOM SKELETT ZUM INHALT BLENDET ES (Critique R19): vorher ein harter
+    // Schnitt, die Kacheln standen von einem Frame auf den anderen da. Nur
+    // dieser eine Uebergang - ein Neuaufbau ueber vorhandenem Inhalt bleibt
+    // still, und unter der Seitenblende ist die Blende schon das Einblenden.
+    const fromSkeleton = Boolean(shell.querySelector('.widget-skeleton'))
+      && !document.documentElement.classList.contains('page-swapping');
+    swapContent(shell, () => setHtml(shell, `
       <section class="dashboard-masthead dashboard-masthead--${greetingPeriod()}${mastheadSlim}">
         ${renderDashboardOverview(user, isCustomizing, weatherCardShown ? null : weather, { followsDefault, canPublish })}
         ${cockpitHtml}
       </section>
       ${renderDashboardLayout(cfg, data, weather, currency, { editing: isCustomizing, visibleMealTypes, glanceHidden: !glanceVisible, familyManage: familyManageHref(user) })}
       ${isCustomizing ? renderCustomizeFootnote({ followsDefault, canPublish }) : ''}
-    `);
+    `), { animate: fromSkeleton });
     wireLinks(container, rerender, { editing: isCustomizing, user });
     disposeFastingClock = wireFastingWidget(container, rerender, refreshDashboardData, data.fasting, signal);
     // Retry einer isolierten Widget-Fehlerkachel: da /dashboard aggregiert lädt,

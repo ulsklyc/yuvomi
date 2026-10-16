@@ -8285,30 +8285,54 @@ textarea::placeholder {
 
 /* --------------------------------------------------------
  * Skeleton-Loading
+ *
+ * ERST NACH EINEM AUGENBLICK, UND NUR MIT TRANSFORM (Critique R19).
+ * - Ein Platzhalter, der fuer 80ms aufblitzt, ist Flackern, kein Status: die
+ *   Linien blenden erst nach `--duration-sm` ein (`fill: backwards` haelt sie
+ *   bis dahin unsichtbar). Kommt der Inhalt schneller, sieht man sie nie;
+ *   die Kartenflaechen darunter stehen sofort und halten das Layout.
+ * - Der Schimmer lief ueber `background-position` - das ist Paint in jedem
+ *   Frame, auf jeder Linie, am gedrosselten Telefon genau dann, wenn die CPU
+ *   mit dem Start beschaeftigt ist. Jetzt gleitet ein Band als `::after` per
+ *   `transform` darueber: Compositor, kein Paint.
  * -------------------------------------------------------- */
 .skeleton {
   /* Linienfarbe aus Surface + Ink gemischt: garantierter Kontrast in beiden
    * Themes mit EINER Definition (zuvor border-subtle/surface-2 — im Dark Mode
    * deckungsgleich mit der Kartenfläche #222220, dadurch unsichtbar). */
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-text-primary) 18%, var(--color-surface));
+  border-radius: var(--radius-sm);
+  animation: skeleton-in var(--duration-md) var(--ease-out) var(--duration-sm) backwards;
+}
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
   background: linear-gradient(
     90deg,
-    color-mix(in srgb, var(--color-text-primary) 18%, var(--color-surface)) 25%,
+    transparent 25%,
     color-mix(in srgb, var(--color-text-primary) 30%, var(--color-surface)) 50%,
-    color-mix(in srgb, var(--color-text-primary) 18%, var(--color-surface)) 75%
+    transparent 75%
   );
-  background-size: 200% 100%;
-  animation: skeleton-shimmer 1.5s infinite;
-  border-radius: var(--radius-sm);
+  transform: translateX(-100%);
+  animation: skeleton-shimmer 1.5s var(--ease-in-out) var(--duration-sm) infinite;
+}
+
+@keyframes skeleton-in {
+  from { opacity: 0; }
 }
 
 @keyframes skeleton-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  to { transform: translateX(100%); }
 }
 
-/* Reduced-Motion: Shimmer aus, statische Fläche bleibt sichtbar. */
+/* Reduced-Motion: Schimmer aus, statische Fläche bleibt sichtbar - sie blendet
+ * nur verzoegert ein (Deckkraft, keine Bewegung). */
 @media (prefers-reduced-motion: reduce) {
-  .skeleton { animation: none; }
+  .skeleton::after { animation: none; display: none; }
 }
 
 /* ── Geteilte Skeleton-Liste (alle Module) ──
