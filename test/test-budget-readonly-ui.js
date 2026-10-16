@@ -318,9 +318,10 @@ test('Darlehenskarte mit `budget: read`: Bearbeiten, Loeschen und Rate buchen we
     assert.doesNotMatch(html, /loan-edit|loan-delete|loan-pay/);
     assert.doesNotMatch(html, /budget-loan-card__actions/);
     assert.match(html, /data-action="loan-filter"/, 'der Raten-Filter liest nur');
-    // Ein Umschalter, der seinen Zustand ansagt, als geteilte Zeilenaktion mit
-    // dem Darlehen im Namen (Komponenten-Kanon 2026-09-26).
-    assert.match(html, /<button type="button" class="row-action budget-loan-card__filter" data-action="loan-filter" aria-label="budget\.filterLoanNamed\{&quot;name&quot;:&quot;Autokredit&quot;\}" data-id="9" aria-pressed="false">/);
+    // Ein Umschalter, der seinen Zustand ansagt - seit D6 (Critique 2026-10-16)
+    // als Eintrag mit Haken im Mehr-Knopf der Karte, der das Darlehen nennt.
+    assert.match(html, /class="row-action row-action--more budget-loan-card__more popover-menu__trigger"[^>]*aria-label="common\.moreActionsNamed\{&quot;name&quot;:&quot;Autokredit&quot;\}"/);
+    assert.match(html, /role="menuitemcheckbox" aria-checked="false"[\s\S]{0,120}data-action="loan-filter" data-id="9"/);
     assert.match(html, /role="progressbar"/);
     assert.match(html, /Autokredit/);
     assert.match(html, /budget\.loanNextDue/);

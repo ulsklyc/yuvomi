@@ -28,6 +28,8 @@ import { todayKey } from '/utils/date.js';
 import { displayTimeZone, zonedDateKey } from '/utils/timezone.js';
 import { USER_COLOR_DEFAULT } from '/utils/color.js';
 import { renderPageColumns } from '/utils/page-layout.js';
+import { rowMenuHtml } from '/utils/row-action.js';
+import { installPopoverMenus } from '/utils/popover-menu.js';
 
 
 
@@ -163,7 +165,6 @@ function mayManageWorkers() {
 const READ_SAFE_CONTROLS = [
   '.housekeeping-tab',
   '[data-open-visit]',
-  '[data-visit-report]',
   '[data-open-worker]',
   '.housekeeping-staff-row__select',
   '#housekeeping-report-prev',
@@ -314,13 +315,15 @@ async function loadData() {
   state.currency = prefs.data?.currency ?? 'EUR';
 }
 
-function renderTabButton(tab, icon, label) {
+// TEXT-REITER OHNE ICON (D3, Critique 2026-10-16): vier Bereiche sind Text-
+// Reiter wie ueberall; mit Zeichen davor lief "Haushaltshilfen" bei 390px
+// aus der Leiste.
+function renderTabButton(tab, label) {
   const on = state.tab === tab;
   return `
     <button class="housekeeping-tab sub-tab${on ? ' sub-tab--active' : ''}" type="button" role="tab"
             data-tab-id="${esc(tab)}" aria-controls="housekeeping-content"
             aria-selected="${on ? 'true' : 'false'}"${on ? ' aria-current="page"' : ''} tabindex="${on ? '0' : '-1'}">
-      <i class="sub-tab__icon" data-lucide="${esc(icon)}" aria-hidden="true"></i>
       <span class="sub-tab__label">${esc(label)}</span>
     </button>
   `;
@@ -396,10 +399,10 @@ function renderShell(container) {
         <h1 class="page-toolbar__title" id="housekeeping-title">${esc(t('housekeeping.title'))}</h1>
         <div class="page-toolbar__actions"></div>
         <nav class="housekeeping-tabs page-toolbar__bar" role="tablist" aria-label="${esc(t('housekeeping.bottomNav'))}">
-          ${renderTabButton('dashboard', 'layout-dashboard', t('housekeeping.dashboard'))}
-          ${renderTabButton('tasks', 'list-checks', t('housekeeping.tasks'))}
-          ${renderTabButton('reports', 'file-text', t('housekeeping.reports'))}
-          ${renderTabButton('staff', 'users-round', t('housekeeping.staffTitle'))}
+          ${renderTabButton('dashboard', t('housekeeping.dashboard'))}
+          ${renderTabButton('tasks', t('housekeeping.tasks'))}
+          ${renderTabButton('reports', t('housekeeping.reports'))}
+          ${renderTabButton('staff', t('housekeeping.staffTitle'))}
         </nav>
       </header>
       <div class="housekeeping-period" id="housekeeping-period" hidden></div>
@@ -629,7 +632,6 @@ function renderDashboard(content) {
   const recentVisits = (state.recentVisits || []).slice(0, 5);
   const recentRows = recentVisits.map((visit) => visitRowHtml(visit, {
     dateText: formatDate(visit.check_in),
-    actionsHtml: `${visitEditActionHtml(visit, formatDate(visit.check_in))}`,
     className: 'housekeeping-staff-log-row',
   })).join('');
 
@@ -715,19 +717,11 @@ function renderDashboard(content) {
     content.querySelectorAll('[data-worker-check]').forEach((btn) => {
       btn.addEventListener('click', () => toggleSession(document.querySelector('.page-transition') || document.body, btn.dataset.workerCheck));
     });
-    content.querySelectorAll('[data-edit-visit]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const visit = (state.recentVisits || []).find((v) => String(v.id) === btn.dataset.editVisit);
-        if (visit) openVisitEditModal(visit, content, { onDone: renderDashboard });
-      });
-    });
   }
-  content.querySelectorAll('[data-open-visit]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const visit = (state.recentVisits || []).find((v) => String(v.id) === btn.dataset.openVisit);
-      if (visit) openVisitReportModal(visit, null, { onRefresh: () => { if (content.isConnected) renderDashboard(content); } });
-    });
-  });
+  wireVisitRows(content, state.recentVisits || [], async () => {
+    await loadData();
+    if (content.isConnected) renderDashboard(content);
+  }, { onEdit: (visit) => openVisitEditModal(visit, content, { onDone: renderDashboard }) });
 }
 
 /**
@@ -1230,32 +1224,32 @@ async function unpayVisit(visit, onUnpaid) {
   }
 }
 
-/* Bearbeiten und Loeschen bietet eine Besuchszeile nur an, wenn der Server es
- * fuer genau diesen Besuch zugesteht (`can_edit`, `can_delete`, #1135). Vorher
- * standen beide Knoepfe an jeder Zeile, und ein Mitglied lernte erst beim
- * Speichern, dass ein bezahlter Besuch abgerechnet ist. Die Admin-Regel wird
- * hier nicht nachgebaut. Wo Bearbeiten fehlt, fuehrt der Knopf zum Bericht:
- * lesen darf jede Person, die die Zeile sieht.
- *
- * `readOnly()` steht ZUSAETZLICH da (#1265 P6). Der Server rechnet das
- * Modulrecht schon in die Felder ein, aber die Felder sind so alt wie die
- * letzte Antwort, und ein Rechtewechsel kommt ohne Neuladen an. */
 /**
- * DIE EINE BESUCHSZEILE (Re-Critique 2026-09-27, A3 P2-4 / R10 L10).
+ * DIE EINE BESUCHSZEILE (Re-Critique 2026-09-27, A3 P2-4 / R10 L10; R18/D6
+ * seit 2026-10-16).
  *
  * Derselbe Besuch stand in zwei Grammatiken: in der Uebersicht mit dem Datum
- * als Titel, in den Berichten mit Avatar und Namen als Titel - zehnmal „Maria
- * Silva" untereinander, das Datum klein im Meta. Ein Besuch ist ein Ereignis
- * an einem Tag; das Datum fuehrt, die Person steht im Meta (entfaellt, wo die
- * Liste schon einer Person gehoert: Personal-Protokoll). Uebersicht, Berichte
- * und Protokoll bauen die Zeile hier; nur die Aktionen und die Datumsform
- * (ohne Jahr, wo der Monat im Kopf steht) geben die Aufrufer.
+ * als Titel, in den Berichten mit Avatar und Namen als Titel. Ein Besuch ist
+ * ein Ereignis an einem Tag; das Datum fuehrt, die Person steht im Meta
+ * (entfaellt, wo die Liste schon einer Person gehoert: Personal-Protokoll).
+ *
+ * SEIT D6 AUCH DIESELBEN AKTIONEN. Bis hierher trug die Uebersicht einen Stift
+ * (der den Koerper doppelte, der selbst nichts tat), die Berichte Geldschein +
+ * Bericht, das Protokoll Geldschein + Stift + Papierkorb - drei Zeilen fuer
+ * einen Besuch. Jetzt: der KOERPER oeffnet den Einsatzbericht (die
+ * Leseansicht, die jede Person sehen darf und in deren Fuss Bezahlen steht),
+ * und EIN Mehr-Knopf traegt Bearbeiten, Bezahlen und Loeschen - jeweils nur,
+ * wenn der Server es fuer diesen Besuch zugesteht (`can_edit`, `can_mark_paid`,
+ * `can_delete`, #1135). Warum etwas fehlt, steht in der Metazeile.
+ *
+ * `readOnly()` steht ZUSAETZLICH da (#1265 P6): die Felder sind so alt wie
+ * die letzte Antwort, ein Rechtewechsel kommt ohne Neuladen an.
  *
  * @param {object} visit
- * @param {{ dateText: string, actionsHtml?: string, showWorker?: boolean,
+ * @param {{ dateText: string, visitDate?: string, showWorker?: boolean,
  *           paymentText?: string, className?: string }} opts
  */
-function visitRowHtml(visit, { dateText, actionsHtml = '', showWorker = true, paymentText, className = '' } = {}) {
+function visitRowHtml(visit, { dateText, visitDate = dateText, showWorker = true, paymentText, className = '' } = {}) {
   const meta = [
     showWorker ? (visit.worker_name || t('housekeeping.unnamedWorker')) : null,
     money(visit.total_amount),
@@ -1263,35 +1257,78 @@ function visitRowHtml(visit, { dateText, actionsHtml = '', showWorker = true, pa
   ].filter(Boolean).join(' · ');
   return `
     <article class="list-row housekeeping-visit-row${className ? ` ${className}` : ''}">
-      <div class="list-row__main">
-        <div class="list-row__name">${esc(dateText)}</div>
-        <div class="list-row__meta">${esc(meta)}</div>
-      </div>
-      <div class="list-row__actions">
-        ${actionsHtml}
-      </div>
+      <button type="button" class="list-row__main list-row__main--interactive" data-open-visit="${esc(visit.id)}">
+        <span class="list-row__name">${esc(dateText)}</span>
+        <span class="list-row__meta">${esc(meta)}</span>
+      </button>
+      ${visitMenuHtml(visit, visitDate)}
     </article>`;
 }
 
-function visitEditActionHtml(visit, visitDate) {
-  if (visit.can_edit && !readOnly()) {
-    return `<button class="row-action" type="button" data-edit-visit="${esc(visit.id)}"
-                aria-label="${esc(t('housekeeping.editVisit'))}: ${esc(visitDate)}">
-          <i data-lucide="edit-2" class="icon-md" aria-hidden="true"></i>
-        </button>`;
-  }
-  return `<button class="row-action" type="button" data-open-visit="${esc(visit.id)}"
-                aria-label="${esc(t('housekeeping.openVisitReport'))}: ${esc(visitDate)}">
-          <i data-lucide="file-text" class="icon-md" aria-hidden="true"></i>
-        </button>`;
+/** Der Mehr-Knopf einer Besuchszeile - leer, wo der Server nichts zugesteht. */
+function visitMenuHtml(visit, visitDate) {
+  if (readOnly()) return '';
+  const id = esc(visit.id);
+  return rowMenuHtml({
+    id: `housekeeping-visit-menu-${id}`,
+    label: t('common.moreActionsNamed', { name: visitDate }),
+    items: [
+      visit.can_edit
+        ? { action: 'edit-visit', icon: 'pencil', label: t('common.edit'), attrs: { 'data-edit-visit': visit.id } }
+        : null,
+      !visit.paid_at && visit.can_mark_paid
+        ? { action: 'pay-visit', icon: 'banknote', label: t('housekeeping.markPaid'), attrs: { 'data-pay-visit': visit.id } }
+        : null,
+      visit.can_delete
+        ? { action: 'delete-visit', icon: 'trash-2', label: t('common.delete'), danger: true, attrs: { 'data-delete-visit': visit.id } }
+        : null,
+    ],
+  });
 }
 
-function visitDeleteActionHtml(visit, visitDate) {
-  if (!visit.can_delete || readOnly()) return '';
-  return `<button class="row-action row-action--danger" type="button" data-delete-visit="${esc(visit.id)}"
-                aria-label="${esc(t('housekeeping.deleteVisit'))}: ${esc(visitDate)}">
-          <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
-        </button>`;
+/**
+ * Verdrahtet die Besuchszeilen einer Liste - in allen drei Reitern derselbe
+ * Satz Wege. `refresh` laedt nach und zeichnet den Reiter neu.
+ */
+function wireVisitRows(content, visits, refresh, { onEdit } = {}) {
+  installPopoverMenus(content);
+  const find = (id) => visits.find((item) => String(item.id) === String(id));
+  content.querySelectorAll('[data-open-visit]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const visit = find(btn.dataset.openVisit);
+      if (visit) openVisitReportModal(visit, null, { onRefresh: () => { if (content.isConnected) return refresh(); } });
+    });
+  });
+  // Alles darunter schreibt; bei `read` haengt es gar nicht erst.
+  if (readOnly()) return;
+  content.querySelectorAll('[data-edit-visit]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const visit = find(btn.dataset.editVisit);
+      if (visit) (onEdit ? onEdit(visit) : openVisitEditModal(visit, content));
+    });
+  });
+  content.querySelectorAll('[data-pay-visit]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const visit = find(btn.dataset.payVisit);
+      if (visit) payVisit(visit, refresh);
+    });
+  });
+  content.querySelectorAll('[data-delete-visit]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const visit = find(btn.dataset.deleteVisit);
+      if (!visit) return;
+      if (!await confirmModal(t('housekeeping.deleteVisitConfirm'),
+        { danger: true, confirmLabel: t('common.delete'), detail: t('housekeeping.deleteVisitConfirmDetail') })) return;
+      try {
+        await api.delete(`/housekeeping/visits/${visit.id}`);
+        window.yuvomi?.showToast(t('housekeeping.visitDeletedToast'), 'success');
+        await refresh();
+        refocusAfterRender();
+      } catch (err) {
+        window.yuvomi?.showToast(err.message, 'danger');
+      }
+    });
+  });
 }
 
 /* Warum die Knoepfe fehlen, steht in der Metazeile, wo der Zahlstatus die
@@ -1531,27 +1568,31 @@ function renderReports(content) {
     // `aria-label` der Aktionen behaelt das volle Datum.
     return visitRowHtml(visit, {
       dateText: formatDayMonth(visit.check_in),
+      visitDate,
       paymentText: paid ? t('housekeeping.paymentPaid') : t('housekeeping.paymentPending'),
       className: 'list-row--tight housekeeping-report-item housekeeping-report-item--visit',
-      actionsHtml: `${!visit.can_mark_paid || readOnly() ? '' : `
-        <button class="row-action" type="button" data-pay-report="${visit.id}"
-                aria-label="${esc(t('housekeeping.markPaid'))}: ${esc(visitDate)}">
-          <i data-lucide="banknote" class="icon-md" aria-hidden="true"></i>
-        </button>`}
-        <button class="row-action" type="button" data-visit-report="${visit.id}"
-                aria-label="${esc(t('housekeeping.openVisitReport'))}: ${esc(visitDate)}">
-          <i data-lucide="file-text" class="icon-md" aria-hidden="true"></i>
-        </button>`,
     });
   }).join('');
 
+  // MOBIL DIE KURZZEILE WIE IN DER UEBERSICHT (Critique 2026-10-16): die drei
+  // Kacheln standen unter 640px als 2+1-Raster - die dritte allein in ihrer
+  // Reihe. Die Zeile nennt alle drei, ein Aufklapper haette nichts mehr zu
+  // zeigen; ab 640px stehen die Karten (`budget-glance-details`) in der Spalte.
   // Kennzahlen | Besuche: mobil stehen die Kennzahlen ueber der Liste (DOM-
   // Reihenfolge), ab der Split-Schwelle ruecken sie als Zusammenfassung in die
   // Seitenspalte neben die Liste (`railFirst`).
   content.insertAdjacentHTML('beforeend', renderPageColumns({
     railFirst: true,
     rail: `
-    <section class="metric-grid" aria-label="${esc(t('housekeeping.visitReports'))}">
+    ${metricGlanceHtml({
+    label: t('housekeeping.reportVisitsCount'),
+    value: String(visits.length),
+    flows: [
+      { label: t('housekeeping.pendingPayments'), amount: money(totals.pending || 0) },
+      { label: t('housekeeping.paymentPaid'), amount: money(totals.paid || 0) },
+    ],
+  })}
+    <section class="metric-grid budget-glance-details" aria-label="${esc(t('housekeeping.visitReports'))}">
       <article class="metric-card">
         <div class="metric-card__label">${esc(t('housekeeping.reportVisitsCount'))}</div>
         <div class="metric-card__value">${esc(visits.length)}</div>
@@ -1575,26 +1616,11 @@ function renderReports(content) {
   if (window.lucide) window.lucide.createIcons({ el: content });
   syncReportPeriod(content);
 
-  content.querySelectorAll('[data-visit-report]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const visit = visits.find((item) => String(item.id) === btn.dataset.visitReport);
-      if (visit) openVisitReportModal(visit, content);
-    });
-  });
-
-  // Bezahlen direkt an der Ausstehend-Zeile (Audit R2, A2-14): derselbe Flow
-  // wie im Personal-Einsatzlog, hier gegen die Berichtsliste. Bei `read`
-  // haengt er nicht - Monatswahl und Bericht lesen nur.
-  if (readOnly()) return;
-  content.querySelectorAll('[data-pay-report]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const visit = visits.find((item) => String(item.id) === btn.dataset.payReport);
-      if (!visit) return;
-      payVisit(visit, async () => {
-        await loadData();
-        renderReports(content);
-      });
-    });
+  // Dieselben Wege wie in Uebersicht und Protokoll (wireVisitRows); bei
+  // `read` haengen nur Monatswahl und Bericht.
+  wireVisitRows(content, visits, async () => {
+    await loadData();
+    if (content.isConnected) renderReports(content);
   });
 }
 
@@ -1794,16 +1820,12 @@ function renderStaff(content) {
       window.yuvomi?.showToast(err.message, 'danger');
     }
   });
-  content.querySelectorAll('[data-open-visit]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const visit = state.staffVisits.find((item) => String(item.id) === btn.dataset.openVisit);
-      if (visit) openVisitReportModal(visit, null, {
-        onRefresh: async () => {
-          await loadStaffVisits();
-          if (content.isConnected) renderStaff(content);
-        },
-      });
-    });
+  // Die Besuchszeilen (Bericht lesen; Bearbeiten, Bezahlen, Loeschen im
+  // Mehr-Knopf) verdrahtet wireVisitRows - bei `read` nur den Bericht.
+  wireVisitRows(content, state.staffVisits, async () => {
+    await loadData();
+    await loadStaffVisits();
+    if (content.isConnected) renderStaff(content);
   });
   // Alles darunter schreibt. Die lesenden Wege - Person waehlen, Monat, Bericht -
   // stehen deshalb davor und haengen auch bei `read`.
@@ -1819,62 +1841,6 @@ function wireStaffWrites(content) {
       openStaffModal(worker, content);
     });
   });
-  content.querySelectorAll('[data-edit-visit]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const visit = state.staffVisits.find((item) => String(item.id) === btn.dataset.editVisit);
-      if (visit) openVisitEditModal(visit, content);
-    });
-  });
-  content.querySelectorAll('[data-pay-visit]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const visit = state.staffVisits.find((item) => String(item.id) === btn.dataset.payVisit);
-      if (!visit) return;
-      payVisit(visit, async () => {
-        await loadData();
-        await loadStaffVisits();
-        renderStaff(content);
-      });
-    });
-  });
-  content.querySelectorAll('[data-delete-visit]').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const visit = state.staffVisits.find((item) => String(item.id) === btn.dataset.deleteVisit);
-      if (!visit) return;
-      if (!await confirmModal(t('housekeeping.deleteVisitConfirm'),
-        { danger: true, confirmLabel: t('common.delete'), detail: t('housekeeping.deleteVisitConfirmDetail') })) return;
-      try {
-        await api.delete(`/housekeeping/visits/${visit.id}`);
-        window.yuvomi?.showToast(t('housekeeping.visitDeletedToast'), 'success');
-        await loadData();
-        await loadStaffVisits();
-        renderStaff(content);
-        refocusAfterRender();
-      } catch (err) {
-        window.yuvomi?.showToast(err.message, 'danger');
-      }
-    });
-  });
-}
-
-/* Der Bezahl-Knopf des Personal-Protokolls. Er traegt keinen Zustand, den die
- * Zeile nicht schon nennt: der Zahlstatus steht in der Metazeile
- * (`visitPaymentMeta()`), siehe renderStaffVisitLog().
- *
- * DIE ANTWORT FOLGT DEM DATENSATZ UND DEM RECHT (#1265 P6). Bei
- * `housekeeping: read` faellt der Knopf ganz weg. Vorher stand er dort als
- * `disabled` mit der Beschriftung „Als bezahlt markieren" - ein Versprechen fuer
- * eine Beruehrung, die nichts tut. Dasselbe gilt fuer einen UNBEZAHLTEN Besuch,
- * dessen Bezahlen der Server nicht anbietet (`can_mark_paid`): das ist genau die
- * Lage bei `read`, so wie der Server sie meldet. Uebrig bleibt der gesperrte
- * Knopf am bezahlten Besuch mit Schreibrecht - er stand schon vor #1265 so da
- * und ist nicht Teil dieser Regel. */
-function staffLogPayHtml(visit, visitDate) {
-  const paid = !!visit.paid_at;
-  if (readOnly() || (!paid && !visit.can_mark_paid)) return '';
-  return `<button class="row-action" type="button" data-pay-visit="${visit.id}" ${visit.can_mark_paid ? '' : 'disabled'}
-                  aria-label="${esc(paid ? t('housekeeping.paymentPaid') : t('housekeeping.markPaid'))}: ${esc(visitDate)}">
-            <i data-lucide="banknote" class="icon-md" aria-hidden="true"></i>
-          </button>`;
 }
 
 function renderStaffVisitLog() {
@@ -1891,9 +1857,6 @@ function renderStaffVisitLog() {
       dateText: visitDate,
       showWorker: false,
       className: 'housekeeping-staff-log-row',
-      actionsHtml: `${staffLogPayHtml(visit, visitDate)}
-          ${visitEditActionHtml(visit, visitDate)}
-          ${visitDeleteActionHtml(visit, visitDate)}`,
     });
   }).join('');
   return `
@@ -2577,8 +2540,7 @@ export const __test = {
   showReportMonth,
   stepReportMonth,
   shiftMonth,
-  visitEditActionHtml,
-  visitDeleteActionHtml,
+  visitMenuHtml,
   visitPaymentMeta,
   // #1265 P6 (test-module-readonly-ui.js): die Nur-lesen-Regel am erzeugten
   // Markup, an den Einstiegen und am Riegel.
@@ -2596,7 +2558,6 @@ export const __test = {
   placeReportPeriod,
   REPORT_PERIOD_HEAD_QUERY,
   renderStaff,
-  staffLogPayHtml,
   receiptFieldHtml,
   openVisitEditModal,
   openVisitReportModal,

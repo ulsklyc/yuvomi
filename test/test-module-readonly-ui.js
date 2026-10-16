@@ -4002,6 +4002,10 @@ function hkContainer() {
     html: '',
     gefragt: [],
     isConnected: true,
+    // Die Besuchszeilen tragen seit D6 (Critique 2026-10-16) einen Mehr-Knopf;
+    // wireVisitRows() haengt dafuer installPopoverMenus() an die Wurzel.
+    dataset: {},
+    addEventListener() {},
     replaceChildren() { this.html = ''; },
     insertAdjacentHTML(_position, markup) { this.html += markup; },
     querySelector(sel) { this.gefragt.push(sel); return null; },
@@ -4146,17 +4150,18 @@ test('Besuchszeile mit `housekeeping: read`: Bearbeiten und Loeschen weg, der Za
   const offen = hkBesuch();
   const bezahlt = hkBesuch({ paid_at: '2026-08-07T10:00:00Z', can_edit: false, can_delete: false, can_mark_paid: false });
   withAccess({ housekeeping: 'read' }, () => {
-    assert.match(hk.visitEditActionHtml(offen, 'x'), /data-open-visit="12"/, 'statt Bearbeiten der Weg zum Bericht');
-    assert.doesNotMatch(hk.visitEditActionHtml(offen, 'x'), /data-edit-visit/);
-    assert.equal(hk.visitDeleteActionHtml(offen, 'x'), '');
+    // Seit D6 (Critique 2026-10-16): der Zeilenkoerper oeffnet den Bericht,
+    // Bearbeiten/Bezahlen/Loeschen stehen im Mehr-Knopf - bei `read` gibt es ihn nicht.
+    assert.equal(hk.visitMenuHtml(offen, 'x'), '', 'kein Mehr-Knopf, auch nicht mit veralteten Feldern');
     // „nur durch einen Admin" ist bei `read` nicht der Grund - dort fehlen die
     // Knoepfe an jedem Besuch, bezahlt oder nicht.
     assert.equal(hk.visitPaymentMeta(bezahlt), 'housekeeping.paymentPaid');
     assert.equal(hk.visitPaymentMeta(offen), 'housekeeping.paymentPending');
   });
   withAccess({ housekeeping: 'write' }, () => {
-    assert.match(hk.visitEditActionHtml(offen, 'x'), /data-edit-visit="12"/);
-    assert.match(hk.visitDeleteActionHtml(offen, 'x'), /data-delete-visit="12"/);
+    assert.match(hk.visitMenuHtml(offen, 'x'), /data-edit-visit="12"/);
+    assert.match(hk.visitMenuHtml(offen, 'x'), /data-delete-visit="12"/);
+    assert.equal(hk.visitMenuHtml(bezahlt, 'x'), '', 'am abgerechneten Besuch gesteht der Server nichts zu - kein leerer Knopf');
     assert.match(hk.visitPaymentMeta(bezahlt), /housekeeping\.settledAdminOnly/,
       'mit Schreibrecht nennt die Zeile weiter, warum ein bezahlter Besuch gesperrt ist');
   });
@@ -4376,16 +4381,16 @@ test('Berichte-Tab mit `housekeeping: read`: kein Bezahlen, Monat und Bericht bl
   const kopf = hkContainer();
   lesen.closest = (sel) => (sel === '.housekeeping-page' ? { querySelector: (s) => (s === '#housekeeping-period' ? kopf : null) } : null);
   withAccess({ housekeeping: 'read' }, () => hk.renderReports(lesen));
-  assert.doesNotMatch(lesen.html, /data-pay-report/, 'auch nicht mit veraltetem `can_mark_paid: true`');
-  assert.match(lesen.html, /data-visit-report="12"/, 'der Bericht bleibt');
+  assert.doesNotMatch(lesen.html, /data-pay-visit/, 'auch nicht mit veraltetem `can_mark_paid: true`');
+  assert.match(lesen.html, /data-open-visit="12"/, 'der Bericht bleibt - der Zeilenkoerper oeffnet ihn');
   assert.match(kopf.html, /id="housekeeping-report-prev"/, 'die Monatswahl bleibt');
-  assert.ok(!lesen.gefragt.includes('[data-pay-report]'), 'das Bezahlen wird nicht verdrahtet');
-  assert.ok(lesen.gefragt.includes('[data-visit-report]'));
+  assert.ok(!lesen.gefragt.includes('[data-pay-visit]'), 'das Bezahlen wird nicht verdrahtet');
+  assert.ok(lesen.gefragt.includes('[data-open-visit]'));
 
   const schreiben = hkContainer();
   withAccess({ housekeeping: 'write' }, () => hk.renderReports(schreiben));
-  assert.match(schreiben.html, /data-pay-report="12"/);
-  assert.ok(schreiben.gefragt.includes('[data-pay-report]'));
+  assert.match(schreiben.html, /data-pay-visit="12"/);
+  assert.ok(schreiben.gefragt.includes('[data-pay-visit]'));
 });
 
 test('Einsatzbericht mit `housekeeping: read`: weder Bezahlen noch Zuruecknehmen', () => {
@@ -4445,22 +4450,21 @@ test('Personal-Tab mit `housekeeping: read`: kein Bearbeiten, die Auswahl und da
   }
 });
 
-test('Bezahl-Knopf des Protokolls: kein gesperrter Knopf, der „Als bezahlt markieren" verspricht', () => {
+test('Bezahlen im Mehr-Knopf der Besuchszeile: nur wo der Server es zugesteht, nie gesperrt', () => {
   const offen = hkBesuch();
   const bezahlt = hkBesuch({ paid_at: '2026-08-07T10:00:00Z', can_mark_paid: false });
   withAccess({ housekeeping: 'read' }, () => {
-    assert.equal(hk.staffLogPayHtml(offen, 'x'), '');
-    assert.equal(hk.staffLogPayHtml(bezahlt, 'x'), '', 'der Zahlstatus steht in der Metazeile, nicht an einem Knopf');
+    assert.equal(hk.visitMenuHtml(offen, 'x'), '');
+    assert.equal(hk.visitMenuHtml(bezahlt, 'x'), '', 'der Zahlstatus steht in der Metazeile, nicht an einem Knopf');
   });
   withAccess({ housekeeping: 'write' }, () => {
-    assert.match(hk.staffLogPayHtml(offen, 'x'), /data-pay-visit="12"/, 'mit Schreibrecht da');
-    assert.doesNotMatch(hk.staffLogPayHtml(offen, 'x'), /disabled/, 'und offen');
-    // Der Server bietet das Bezahlen nicht an (so meldet er `read`): ein
-    // unbezahlter Besuch hat dann nichts, was ein Knopf sagen koennte.
-    assert.equal(hk.staffLogPayHtml(hkBesuch({ can_mark_paid: false }), 'x'), '');
-    // Unangetastet: der bezahlte Besuch mit Schreibrecht behaelt seinen Knopf,
-    // wie er vor #1265 war - nicht Teil dieser Regel.
-    assert.match(hk.staffLogPayHtml(bezahlt, 'x'), /disabled/);
+    assert.match(hk.visitMenuHtml(offen, 'x'), /data-pay-visit="12"/, 'mit Schreibrecht da');
+    assert.doesNotMatch(hk.visitMenuHtml(offen, 'x'), /disabled/, 'und offen');
+    // Der Server bietet das Bezahlen nicht an: der Eintrag fehlt.
+    assert.doesNotMatch(hk.visitMenuHtml(hkBesuch({ can_mark_paid: false }), 'x'), /data-pay-visit/);
+    // Seit D6 auch am bezahlten Besuch kein gesperrter Knopf mehr: ein Eintrag
+    // "Als bezahlt markieren" an einem bezahlten Besuch versprache nichts.
+    assert.doesNotMatch(hk.visitMenuHtml(hkBesuch({ paid_at: '2026-08-07T10:00:00Z' }), 'x'), /data-pay-visit/);
   });
 });
 
@@ -4818,7 +4822,7 @@ test('READ_SAFE_CONTROLS ist eine Positivliste und enthaelt nur lesende Bedienel
   assert.deepEqual(erlaubt, [
     '#housekeeping-report-current', '#housekeeping-report-next', '#housekeeping-report-prev',
     '#housekeeping-staff-month', '.housekeeping-staff-row__select', '.housekeeping-tab',
-    '[data-open-visit]', '[data-open-worker]', '[data-visit-report]',
+    '[data-open-visit]', '[data-open-worker]',
   ], 'Tab, Bericht, Profil, Personenwahl und Monat - alles andere dieser Seite schreibt');
   // Kein Eintrag darf veraltet sein: was hier steht, muss im Markup vorkommen.
   for (const sel of erlaubt) {
@@ -5262,7 +5266,10 @@ test('Kanon R5: Notizkarte nennt die Notiz an Oeffnen und Loeschen', () => {
     const html = notes.renderNoteCard(notiz({ title: '' }));
     // Ohne Titel nennt sie die erste Zeile, ohne Markdown-Zeichen.
     assert.match(html, /class="note-card__open"[^>]*aria-label="notes\.openNamed\{&quot;name&quot;:&quot;Milch&quot;\}"/);
-    assert.match(html, /class="row-action row-action--danger note-card__delete"[^>]*aria-label="common\.deleteNamed\{&quot;name&quot;:&quot;Milch&quot;\}"/);
+    // Seit D6 (Critique 2026-10-16) loescht die Karte ueber ihren Mehr-Knopf:
+    // der Ausloeser nennt die Notiz, der Eintrag sagt "Loeschen".
+    assert.match(html, /class="row-action row-action--more note-card__more popover-menu__trigger"[^>]*aria-label="common\.moreActionsNamed\{&quot;name&quot;:&quot;Milch&quot;\}"/);
+    assert.match(html, /class="popover-menu__item popover-menu__item--danger"\s+data-action="delete" data-id="\d+">[\s\S]{0,160}common\.delete</);
   }));
 });
 

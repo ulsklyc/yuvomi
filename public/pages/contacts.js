@@ -719,7 +719,11 @@ function drawList(container, { animate = false } = {}) {
     .sort(([a], [b]) => catSortIndex(a) - catSortIndex(b))
     .map(([cat, items]) => `
       <div class="contact-group"${catTintStyle(cat)}>
-        <div class="contact-group__header">${categoryIcon(cat)} ${esc(catLabel(cat))}</div>
+        ${/* EIN LISTEN-GRUPPENKOPF (D8, Critique 2026-10-16): Versal-Mikro-
+              Label ohne Zeichen wie in Aufgaben und Einkauf. Das Kategorie-
+              Zeichen davor war der einzige Gruppenkopf der App mit Icon -
+              jede Zeile darunter traegt es ohnehin in ihrer Marke. */ ''}
+        <h2 class="list-group__title contact-group__header">${esc(catLabel(cat))}</h2>
         <div class="contact-group__list row-carrier">${items.map((c) => renderContactItem(c)).join('')}</div>
       </div>
     `).join(''));

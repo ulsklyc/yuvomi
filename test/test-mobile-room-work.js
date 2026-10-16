@@ -284,9 +284,10 @@ test('M13: der Titel ist nicht kleiner als der Text, auf keiner Breite', () => {
 test('M13: mobil ist die Karte kompakt - drei Zeilen Vorschau, Fusszeile ohne Kreisflaeche', () => {
   const content = declarations(notesCss, '.note-card__content', { media: MOBILE });
   assert.equal(content['-webkit-line-clamp'], '3', 'Vorschau drei Zeilen statt zwoelf');
-  const del = declarations(notesCss, '.note-card__delete', { media: MOBILE });
-  assert.match(del['margin-block'] ?? '', /var\(--target-base\)/,
-    'Loeschen haengt seine volle Trefflaeche in die Polsterung statt die Zeile zu strecken');
+  // Seit D6 (Critique 2026-10-16) steht Loeschen im Mehr-Knopf der Karte.
+  const more = declarations(notesCss, '.note-card__more', { media: MOBILE });
+  assert.match(more['margin-block'] ?? '', /var\(--target-base\)/,
+    'der Mehr-Knopf haengt seine volle Trefflaeche in die Polsterung statt die Zeile zu strecken');
 });
 
 // Re-Critique 2026-09-28 (P8 / A3 P3-2): mobil brach der Detail-Fuss einer

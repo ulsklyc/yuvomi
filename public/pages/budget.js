@@ -32,7 +32,7 @@ import { budgetCategoryLabel } from '/utils/category-labels.js';
 import { trendMarkup, leadCardClass } from '/utils/metric-card.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { LOAN_SORTS, DEFAULT_LOAN_SORT, normalizeLoanSort, sortLoans, groupLoans } from '/utils/loan-order.js';
-import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
+import { rowMenuHtml } from '/utils/row-action.js';
 import { metricGlanceHtml, wireMetricGlance, glanceLeadClass } from '/utils/metric-glance.js';
 import { intervalUnitLabel } from '/rrule-ui.js';
 import { appendCurrencyOptions } from '/settings/currency.js';
@@ -2677,8 +2677,13 @@ function renderAccountsPage() {
             <span class="budget-account__starting">${t('budget.startingBalanceShort')} ${formatAmount(a.starting_balance)}</span>
           </span>
         </button>
-        ${ro ? '' : `<div class="row-actions budget-account__actions">${rowActionHtml({
-          icon: 'pencil', label: t('common.editNamed', { name: a.name }), attrs: { 'data-edit': a.id },
+        ${/* EIN OEFFNEN-WEG (D6): der Zeilentipp oeffnet den Kontoauszug; das
+              Konto selbst bearbeitet der Eintrag im Mehr-Knopf statt eines
+              zweiten Stifts am Zeilenende. */ ''}
+        ${ro ? '' : `<div class="row-actions budget-account__actions">${rowMenuHtml({
+          id: `budget-account-menu-${a.id}`,
+          label: t('common.moreActionsNamed', { name: a.name }),
+          items: [{ action: 'account-edit', icon: 'pencil', label: t('common.edit'), attrs: { 'data-edit': a.id } }],
         })}</div>`}
       </div>`;
   }).join('');
@@ -3253,7 +3258,9 @@ function wireLoanCards(root, open = openLoanReport) {
     card.addEventListener('click', (event) => {
       // Knoepfe tragen ihre eigene Handlung - der Titelknopf oeffnet schon
       // selbst, "Rate buchen" und der Filter sollen den Bericht nicht mitoeffnen.
-      if (event.target.closest('button, a')) return;
+      // Das Menue des Mehr-Knopfs haengt im DOM der Karte: ein Tipp auf seine
+      // Polsterung ist kein Tipp auf die Karte.
+      if (event.target.closest('button, a, .popover-menu')) return;
       openById(card.dataset.loanId);
     });
   });
@@ -3561,15 +3568,22 @@ function renderLoanCard(loan) {
       <div class="budget-loan-card__main">
         <div class="budget-loan-card__title-row">
           ${/* Der Titel IST der Weg in den Bericht (Muster budget-account__main):
-              * ein echter Knopf, damit Tastatur und Screenreader ihn erreichen. */ ''}
+              * ein echter Knopf, damit Tastatur und Screenreader ihn erreichen.
+              * EIN OEFFNEN-WEG (Critique 2026-10-16, D6): Titel und Karte
+              * oeffnen; der Chevron ist weg (er heisst "navigiert", hier geht
+              * ein Blatt auf), der Trichter steht als Eintrag im Mehr-Knopf -
+              * ein Umschalter mit Haken, der Zustand bleibt ansagbar. */ ''}
           <button type="button" class="budget-loan-card__open" data-loan-id="${loan.id}" aria-haspopup="dialog">
             <span class="budget-loan-card__title">${esc(loan.title)}</span>
-            <i data-lucide="chevron-right" class="budget-loan-card__chevron icon-sm" aria-hidden="true"></i>
           </button>
-          ${rowActionHtml({
-    icon: 'filter', action: 'loan-filter', className: 'budget-loan-card__filter',
-    label: t('budget.filterLoanNamed', { name: loan.title }),
-    attrs: { 'data-id': loan.id, 'aria-pressed': String(state.loanFilterId === loan.id) },
+          ${rowMenuHtml({
+    id: `budget-loan-menu-${loan.id}`,
+    label: t('common.moreActionsNamed', { name: loan.title }),
+    className: 'budget-loan-card__more',
+    items: [
+      { action: 'loan-filter', id: loan.id, icon: 'filter', label: t('budget.filterLoanTransactions'),
+        checked: state.loanFilterId === loan.id },
+    ],
   })}
         </div>
         <div class="budget-loan-card__meta">${t(isBorrowedLoan(loan)

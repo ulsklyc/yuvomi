@@ -38,6 +38,9 @@ function fakeNode() {
   return {
     html: '',
     hidden: true,
+    // installPopoverMenus() (Mehr-Knopf der Besuchszeile, D6) markiert die Wurzel.
+    dataset: {},
+    addEventListener() {},
     replaceChildren() { this.html = ''; },
     insertAdjacentHTML(_position, markup) { this.html += markup; },
     querySelector() { return null; },
@@ -94,7 +97,9 @@ test('Mitglied: bezahlter Besuch ohne Bearbeiten/Loeschen, mit Bericht und Grund
 
   assert.equal(count(openRow, 'data-edit-visit="12"'), 1);
   assert.equal(count(openRow, 'data-delete-visit="12"'), 1);
-  assert.equal(count(openRow, 'data-open-visit='), 0);
+  // Seit D6 (Critique 2026-10-16) oeffnet JEDER Zeilenkoerper den Bericht;
+  // Bearbeiten ist ein Eintrag im Mehr-Knopf, kein Ersatz fuer den Bericht.
+  assert.equal(count(openRow, 'data-open-visit="12"'), 1);
   assert.doesNotMatch(openRow, /housekeeping\.settledAdminOnly/);
 });
 
@@ -102,7 +107,7 @@ test('Admin: bezahlter und unbezahlter Besuch behalten Bearbeiten und Loeschen',
   const html = staffLogHtml([asAdmin(paidVisit), asAdmin(openVisit)]);
   assert.equal(count(html, 'data-edit-visit='), 2);
   assert.equal(count(html, 'data-delete-visit='), 2);
-  assert.equal(count(html, 'data-open-visit='), 0);
+  assert.equal(count(html, 'data-open-visit='), 2, 'der Zeilenkoerper oeffnet den Bericht (D6)');
   assert.doesNotMatch(html, /housekeeping\.settledAdminOnly/);
 });
 
@@ -194,15 +199,21 @@ test('der Monats-Stepper steht im Kopf, nicht im Inhalt (Critique 2026-09-26)', 
   hk.state().tab = 'reports';
 });
 
-test('die Besuchszeile ist eine list-row mit Bezahlen als row-action - kein beschrifteter Knopf in eigener Zeile', async () => {
+test('die Besuchszeile ist eine list-row: der Koerper oeffnet, Bezahlen steht im Mehr-Knopf (D6)', async () => {
   const content = await freshReports();
   await hk.stepReportMonth(content, -1);
   const rows = content.html.split('<article').slice(1).filter((row) => row.includes('housekeeping-report-item'));
   assert.equal(rows.length, 2);
-  for (const row of rows) assert.match(row, /^ class="list-row /, 'Zeile in der Listengrammatik');
-  const offen = rows.find((row) => row.includes('data-pay-report'));
+  for (const row of rows) {
+    assert.match(row, /^ class="list-row /, 'Zeile in der Listengrammatik');
+    assert.match(row, /<button type="button" class="list-row__main list-row__main--interactive" data-open-visit="\d+">/,
+      'der Zeilenkoerper oeffnet den Bericht (Critique 2026-10-16, D6)');
+  }
+  const offen = rows.find((row) => row.includes('data-pay-visit'));
   assert.ok(offen, 'der offene Besuch bietet Bezahlen an');
-  assert.match(offen, /<button class="row-action" type="button" data-pay-report="12"\s+aria-label="housekeeping\.markPaid: /);
+  assert.match(offen, /class="row-action row-action--more popover-menu__trigger"/, 'EIN Mehr-Knopf');
+  assert.match(offen, /class="popover-menu__item"\s+data-action="pay-visit" data-pay-visit="12">[\s\S]{0,160}housekeeping\.markPaid</);
+  assert.doesNotMatch(offen, /data-lucide="(?:file-text|edit-2|pencil)"[^>]*><\/i>\s*<\/button>\s*<\/article/, 'kein Stift, kein Bericht-Knopf neben dem Koerper');
   assert.doesNotMatch(offen, /btn--secondary/, 'kein beschrifteter Knopf mehr in der Zeile');
   assert.match(content.html, /class="housekeeping-reports row-carrier"/);
   assert.doesNotMatch(content.html, /metric-card--inset/, 'dieselben Kennzahlkarten wie die Uebersicht');
@@ -733,7 +744,7 @@ test('Listenreiter am Desktop: Liste im Spaltenraster, Kennzahlen bzw. Protokoll
 test('Haushaltshilfe spricht EINEN Namen: Reiter "Uebersicht", Kennzahlen mit Zeitbezug, Geldschein statt Dollar', () => {
   const HK_SRC = readFileSync(new URL('../public/pages/housekeeping.js', import.meta.url), 'utf8');
   assert.doesNotMatch(HK_SRC, /badge-dollar-sign/, 'Dollar-Icon bei Euro-Betraegen');
-  assert.match(HK_SRC, /data-lucide="banknote"/);
+  assert.match(HK_SRC, /icon: 'banknote'/, 'Bezahlen traegt den Geldschein - seit D6 als Eintrag im Mehr-Knopf');
   const localeDir = new URL('../public/locales/', import.meta.url);
   const { readdirSync } = globalThis.process.getBuiltinModule('node:fs');
   for (const file of readdirSync(localeDir).filter((f) => f.endsWith('.json'))) {

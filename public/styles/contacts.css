@@ -142,11 +142,6 @@
   z-index: var(--z-sticky);
 }
 
-/* Kategorie-Icon im Gruppenkopf trägt den Kategorie-Ton (dezent). */
-.contact-group__header .contact-cat-icon {
-  color: var(--cat, var(--color-text-secondary));
-}
-
 .contact-cat-icon {
   flex-shrink: 0;
 }

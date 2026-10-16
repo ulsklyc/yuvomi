@@ -522,10 +522,11 @@ test('Einfachauswahl-Leisten melden ihren Zustand über aria-checked', () => {
   assert.match(budget, /role="radio" data-tab-id="\$\{id\}" aria-checked="\$\{on\}"/, 'Darlehensstatus');
   assert.match(splitExpenses, /role="radio" data-tab-id="\$\{id\}" aria-checked="\$\{on\}"/, 'Gruppenstatus');
   assert.match(budget, /role="radio"[\s\S]{0,200}aria-checked="\$\{on\}"/, 'Kontofarbe');
-  // Der Filter-Trichter je Darlehenszeile bleibt ein einzelner Toggle-Button -
-  // seit dem Komponenten-Kanon (2026-09-26) als Zeilenaktion aus rowActionHtml();
-  // gerendert prueft ihn test-budget-readonly-ui (Darlehenskarte).
-  assert.match(budget, /action: 'loan-filter'[\s\S]{0,200}'aria-pressed': String\(/);
+  // Der Filter-Trichter je Darlehenskarte steht seit D6 (Critique 2026-10-16)
+  // als Eintrag im Mehr-Knopf - ein Umschalter, der seinen Zustand als
+  // menuitemcheckbox (aria-checked aus `checked`) ansagt; gerendert prueft ihn
+  // test-budget-readonly-ui (Darlehenskarte).
+  assert.match(budget, /action: 'loan-filter'[\s\S]{0,200}checked: state\.loanFilterId === loan\.id/);
 });
 
 // --------------------------------------------------------
@@ -3987,7 +3988,9 @@ test('Darlehenskarte: ein fokussierbarer Knopf oeffnet den Bericht, die Karte bl
   assert.match(knopf[0], /data-loan-id="9"/);
   assert.match(knopf[0], /aria-haspopup="dialog"/, 'der Knopf sagt an, dass er ein Blatt oeffnet');
   assert.match(knopf[1], /Autokredit &lt;&amp;&gt;/, 'der sichtbare Titel ist der Name des Knopfs, escaped');
-  assert.match(knopf[1], /data-lucide="chevron-right"[^>]*aria-hidden="true"/, 'Chevron als sichtbare Affordanz');
+  // Seit D6 (Critique 2026-10-16) ohne Chevron: er heisst "navigiert", hier
+  // geht ein Blatt auf (aria-haspopup="dialog" sagt es dem Screenreader).
+  assert.doesNotMatch(knopf[1], /chevron-right/, 'kein Chevron fuer ein Blatt');
   assert.doesNotMatch(karte, /<div class="budget-loan-card__title">/, 'kein toter Titel neben dem Knopf');
 
   // Verdrahtung als Programm: ein Stub-Wurzelknoten gibt Knopf und Karte

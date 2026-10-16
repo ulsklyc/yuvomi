@@ -2804,6 +2804,15 @@ test('Aktiv-Indikatoren erscheinen am Ziel: die erste Platzierung gleitet nicht 
     assert.match(body, /placeNavIndicator\(indicator,/, `${name} platziert ueber placeNavIndicator`);
     assert.doesNotMatch(body.replace(/placeNavIndicator\(indicator, \(\) => \{[\s\S]*?\n  \}\);/, ''), /indicator\.style\.transform =/, `${name} setzt transform nur in placeNavIndicator`);
   }
+  // Ein FLIP-Start (startGlideAt) ist ein Gleiten als Antwort auf einen
+  // Wechsel - erlaubt nur fuer einen schon PLATZIERTEN Indikator, sonst kaeme
+  // die erste Platzierung doch wieder aus einer fremden Lage (Critique
+  // 2026-10-16: Rueckweg von Einstellungen in die Liste).
+  const sidebarBody = functionBody(source, 'positionSidebarIndicator');
+  for (const call of sidebarBody.matchAll(/startGlideAt\(indicator,/g)) {
+    assert.match(sidebarBody.slice(Math.max(0, call.index - 200), call.index), /indicator\.dataset\.placed === '1'\)/,
+      'startGlideAt am Listenindikator nur, wenn er schon platziert ist');
+  }
   assert.match(source, /indicator\.className = 'nav-sidebar__indicator';\s*indicator\.setAttribute\('aria-hidden', 'true'\);\s*indicator\.style\.opacity = '0';/);
   assert.match(source, /tabIndicator\.className = 'nav-bottom__indicator';\s*tabIndicator\.setAttribute\('aria-hidden', 'true'\);\s*tabIndicator\.style\.opacity = '0';/);
 });
@@ -6410,7 +6419,8 @@ test('phase 3 high-frequency controls use tokenized touch targets', () => {
   assert.match(layout, /\.row-action\s*\{[\s\S]*?width:\s*var\(--target-lg\)/);
   assert.match(layout, /\.row-action\s*\{[\s\S]*?height:\s*var\(--target-lg\)/);
   assert.match(notes, /\.note-card__pin[\s\S]*width:\s*var\(--target-base\)/);
-  assert.match(notes, /\.note-card__delete[\s\S]*width:\s*var\(--target-base\)/);
+  // Seit D6 (Critique 2026-10-16) loescht die Karte ueber ihren Mehr-Knopf.
+  assert.match(notes, /\.note-card__more[\s\S]*width:\s*var\(--target-base\)/);
 });
 
 test('Tasks toolbar follows the mobile header rule: one tools menu, "Filter (n)", no chip row', () => {
@@ -7059,7 +7069,7 @@ test('phase 6 touched UI files continue using design tokens for target sizes', (
     ['../public/styles/shopping.css', shopping, '.quick-add__btn'],
     ['../public/styles/shopping.css', shopping, '.item-check'],
     ['../public/styles/notes.css', notes, '.note-card__pin'],
-    ['../public/styles/notes.css', notes, '.note-card__delete'],
+    ['../public/styles/notes.css', notes, '.note-card__more'],
     ['../public/styles/layout.css', layout, '.row-action'],
   ];
 
@@ -7077,7 +7087,7 @@ test('phase 6 touched UI files continue using design tokens for target sizes', (
     assertRuleUsesToken(shopping, '.quick-add__btn', property, '--target-base', '../public/styles/shopping.css');
     assertRuleUsesToken(shopping, '.item-check', property, '--target-base', '../public/styles/shopping.css');
     assertRuleUsesToken(notes, '.note-card__pin', property, '--target-base', '../public/styles/notes.css');
-    assertRuleUsesToken(notes, '.note-card__delete', property, '--target-base', '../public/styles/notes.css');
+    assertRuleUsesToken(notes, '.note-card__more', property, '--target-base', '../public/styles/notes.css');
     assertRuleUsesToken(layout, '.row-action', property, '--target-lg', '../public/styles/layout.css');
   }
 
@@ -9928,11 +9938,14 @@ test('Housekeeping: Bezahlen laeuft durch EINE Funktion, die vorher bestaetigt (
   assert.match(bisZumPost, /visit\.payment_task_id\s*\?\s*t\('housekeeping\.markPaidConfirmDetailTask'\)\s*:\s*t\('housekeeping\.markPaidConfirmDetail'\)/,
     'die Rueckfrage nennt die Zahlungsaufgabe, wenn es eine gibt');
 
-  // Und alle drei Ausloeser gehen durch sie hindurch.
-  for (const selektor of ["'[data-pay-report]'", "'#visit-report-pay'", "'[data-pay-visit]'"]) {
+  // Und alle Ausloeser gehen durch sie hindurch. Seit D6 (Critique 2026-10-16)
+  // ist `[data-pay-report]` der Eintrag `[data-pay-visit]` im Mehr-Knopf -
+  // dieselbe Zeile in allen drei Listen, verdrahtet von wireVisitRows().
+  assert.equal(page.indexOf("'[data-pay-report]'"), -1, 'kein zweiter Bezahl-Haken neben [data-pay-visit]');
+  for (const selektor of ["'#visit-report-pay'", "'[data-pay-visit]'"]) {
     const at = page.indexOf(selektor);
     assert.notEqual(at, -1, `Ausloeser ${selektor} fehlt`);
-    assert.match(page.slice(at, at + 300), /payVisit\(visit, async \(\) => \{/,
+    assert.match(page.slice(at, at + 300), /payVisit\(visit, (?:async \(\) => \{|refresh\))/,
       `${selektor} muss payVisit() rufen, statt selbst zu buchen`);
   }
 
@@ -10056,19 +10069,25 @@ test('audited profile, birthday, navigation, and budget controls meet mobile tou
    * schon vom Knopf der zweiten Liste gruen gemacht, waehrend der erste noch
    * der alte war - also genau in dem Zustand, in dem diese Aenderung eine
    * Stunde lang war. Gezaehlt wird deshalb ueber alle Fundstellen. */
-  /* Seit #1135 entstehen Bearbeiten, Loeschen und der Bericht-Knopf (`data-open-visit`,
-   * wo der Server Bearbeiten nicht zugesteht) in EINEM Helfer je Aktion. Gezaehlt
-   * werden deshalb die Knopf-Literale samt Bericht-Knopf, und "beide Listen" haelt
-   * die zweite Zusicherung: beide Listen rufen den Helfer. */
-  const visitButtons = [...housekeepingPage.matchAll(/<button\b([^>]*\bdata-(?:pay|edit|delete|open)-visit=[^>]*)>/g)]
-    .map((m) => m[1]);
-  assert.ok(visitButtons.length >= 4,
-    `erwartet: Pay-, Edit-, Bericht- und Delete-Knopf, gefunden: ${visitButtons.length}`);
-  assert.ok((housekeepingPage.match(/\$\{visitEditActionHtml\(visit, /g) || []).length >= 2,
-    'beide Besuchslisten (Uebersicht und Personal-Protokoll) nehmen ihre Aktion aus visitEditActionHtml()');
-  const eigenbau = visitButtons.filter((attrs) => !/class="row-action(?: row-action--danger)?"/.test(attrs));
-  assert.deepEqual(eigenbau, [],
-    'jeder Besuchs-Knopf traegt die geteilte .row-action-Grammatik, nicht nur der zuletzt angefasste');
+  /* SEIT D6 (Critique 2026-10-16) EINE ZEILE MIT EINEM MEHR-KNOPF: der
+   * Zeilenkoerper oeffnet den Bericht (`data-open-visit`), Bearbeiten,
+   * Bezahlen und Loeschen sind Eintraege in `rowMenuHtml()` - dessen Ausloeser
+   * traegt `.row-action` (48px). Keine Liste baut mehr eigene Besuchsknoepfe;
+   * alle drei (Uebersicht, Berichte, Protokoll) rufen visitRowHtml(). */
+  const ownButtons = [...housekeepingPage.matchAll(/<button\b([^>]*\bdata-(?:pay|edit|delete)-visit=[^>]*)>/g)];
+  assert.deepEqual(ownButtons.map((m) => m[1]), [],
+    'Bearbeiten, Bezahlen und Loeschen eines Besuchs stehen im Mehr-Knopf, nicht als eigene Knoepfe');
+  const menu = functionBody(housekeepingPage, 'visitMenuHtml');
+  assert.ok(menu && /rowMenuHtml\(\{/.test(menu), 'visitMenuHtml() baut den geteilten Mehr-Knopf');
+  for (const attr of ['data-edit-visit', 'data-pay-visit', 'data-delete-visit']) {
+    assert.match(menu, new RegExp(`'${attr}'`), `der Mehr-Knopf traegt ${attr}`);
+  }
+  // Ab der Signatur gelesen: functionBody() saehe nur das Destrukturierungsmuster der Optionen.
+  const row = housekeepingPage.slice(housekeepingPage.indexOf('function visitRowHtml('), housekeepingPage.indexOf('function visitMenuHtml('));
+  assert.match(row, /class="list-row__main list-row__main--interactive" data-open-visit=/, 'der Zeilenkoerper oeffnet den Bericht');
+  assert.match(row, /\$\{visitMenuHtml\(visit, visitDate\)\}/, 'jede Besuchszeile traegt den Mehr-Knopf');
+  assert.ok((housekeepingPage.match(/visitRowHtml\(visit, \{/g) || []).length >= 3,
+    'Uebersicht, Berichte und Protokoll bauen dieselbe Zeile');
 });
 
 test('remaining audited mobile controls use 48px touch targets', () => {
@@ -10098,10 +10117,10 @@ test('remaining audited mobile controls use 48px touch targets', () => {
   // nimmt --target-base (44px Zeiger / 48px Finger) statt --target-lg fest: das
   // Kriterium ist die Zeigerfähigkeit, nicht die Viewport-Breite (tokens.css).
   assertRuleUsesToken(read('../public/styles/panel.css'), '.segmented__item', 'min-height', '--target-base', '../public/styles/panel.css');
-  // Der Raten-Filter der Darlehenskarte ist seit dem Komponenten-Kanon
-  // (2026-09-26) eine Zeilenaktion: die 48px traegt `.row-action`
-  // (--target-lg), und die Kette dorthin ist die Klasse am Knopf.
-  assert.match(read('../public/pages/budget.js'), /rowActionHtml\(\{\s*icon: 'filter', action: 'loan-filter'/);
+  // Der Raten-Filter der Darlehenskarte steht seit D6 (Critique 2026-10-16)
+  // als Eintrag im Mehr-Knopf der Karte; dessen Ausloeser traegt `.row-action`
+  // (--target-lg, utils/row-action.js).
+  assert.match(read('../public/pages/budget.js'), /rowMenuHtml\(\{\s*id: `budget-loan-menu-\$\{loan\.id\}`[\s\S]{0,300}action: 'loan-filter'/);
   assertRuleUsesToken(read('../public/styles/layout.css'), '.row-action', 'width', '--target-lg', '../public/styles/layout.css');
   assertRuleUsesToken(read('../public/styles/layout.css'), '.row-action', 'height', '--target-lg', '../public/styles/layout.css');
   assert.doesNotMatch(budget, /\.budget-loan-card__filter\s*\{[^}]*(?:width|height)\s*:/);
@@ -17318,22 +17337,21 @@ test('das Wochenraster der Kueche schneidet keine Karte ab', () => {
  *
  * Guard-Ebene: Struktur (aus Quelltext und Stylesheet gelesen).
  * ──────────────────────────────────────────────────────────────────────────── */
-test('jede auf Touch ausgeblendete Karten-Aktion hat einen Weg in der Leseansicht (#925)', () => {
+test('der Mehr-Knopf der Aufgabenzeile steht auf jedem Geraet, und das Detail traegt dieselben Wege (#925, R18/D6)', () => {
   const page   = read('../public/pages/tasks.js');
   const detail = read('../public/components/task-detail.js');
   const css    = read('../public/styles/tasks.css');
 
-  // 1. Blendet das Stylesheet die Inline-Aktionen ueberhaupt aus? Nur dann
-  //    entsteht die Luecke - faellt die Regel weg, ist der Guard gegenstandslos
-  //    und sagt das, statt eine Zusicherung ueber nichts zu geben.
-  const hidesOnNarrow = [...eachRule(css)].some(({ selector, body, at }) =>
-    /\.task-card__inline-action(?![\w-])/.test(selector)
-    && /display\s*:\s*none/.test(body)
-    && at.some((pre) => /max-width\s*:\s*639px/.test(pre)));
-  assert.ok(hidesOnNarrow,
-    'tasks.css blendet .task-card__inline-action nicht mehr unter 640px aus - '
-    + 'entweder ist die Regel umgezogen (dann muss dieser Guard mit) oder die '
-    + 'Karte zeigt ihre Aktionen jetzt auch auf dem Telefon');
+  // 1. KEINE REGEL BLENDET DEN MEHR-KNOPF AUS (Critique 2026-10-16). Bis hier
+  //    pruefte dieser Schritt das Gegenteil: tasks.css nahm den Knopf unter
+  //    640px und in der Listenbahn der geteilten Ansicht weg, und der Guard
+  //    sicherte nur den Ersatzweg im Detail (#925). R18/D6 schliesst "nur per
+  //    Geste oder im Detail" aus - der eine Knopf steht dauerhaft.
+  const hides = [...eachRule(css)].filter(({ selector, body }) =>
+    /\.task-card__inline-action(?![\w-])/.test(selector) && /display\s*:\s*none/.test(body))
+    .map(({ selector, at }) => `${at.join(' ')} ${selector}`.trim());
+  assert.deepEqual(hides, [],
+    'tasks.css blendet den Mehr-Knopf der Aufgabenzeile aus - auf Touch bliebe nur Wischen (R18/D6)');
 
   // 2. Welche Aktionen bietet die Karte inline an? Aus dem Markup gelesen.
   //    Der Ablage-Knopf traegt seine beiden Namen in einem Template-Ausdruck
@@ -17348,7 +17366,7 @@ test('jede auf Touch ausgeblendete Karten-Aktion hat einen Weg in der Leseansich
   assert.ok(menuStart > -1, 'der Mehr-Knopf der Aufgabenzeile (rowMenuHtml, task-menu-) ist nicht mehr auffindbar');
   const menu = page.slice(menuStart, page.indexOf('}) : \'\'}', menuStart));
   assert.match(menu, /className: 'task-card__inline-action'/,
-    'der Mehr-Knopf traegt die Klasse, die tasks.css unter 640px ausblendet - sonst prueft der Guard eine Luecke, die es nicht gibt');
+    'der Mehr-Knopf traegt die Klasse, an der Schritt 1 das Ausblenden sucht - sonst prueft er nichts');
   const actions = new Set(
     [...menu.matchAll(/action:\s*([^,\n]+)/g)]
       .flatMap((m) => [...m[1].matchAll(/'([a-z][a-z-]*)'/g)].map((lit) => lit[1])),
@@ -21699,4 +21717,87 @@ test('die offene Auswahlliste traegt Flaeche und Farbschema des Themes (#2022)',
     'die Option braucht eine deckende Flaeche aus einem Token - durchsichtig malt Chrome sie weiss');
   assert.equal(decl(option.body, 'color'), 'var(--color-text-primary)',
     'die Option traegt ihre Schrift selbst, sonst erbt sie die Sekundaerfarbe der randlosen Auswahl');
+});
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * ZEILEN NACH R18 (D6) UND LISTENTYPOGRAFIE (D8), Critique 2026-10-16
+ *
+ * Jede Zusage hier war vor der Umsetzung rot (Gegenprobe per Dateikopie):
+ * Geburtstage klappten den Mehr-Knopf auf Touch per clip-path weg, die gepinnte
+ * Einstellungen-Zeile trug Streifen und Toenung, eine Zeile mit Mehr-Knopf
+ * zeigte zusaetzlich den Wisch-Chevron, angepinnte Notizen trugen eine zweite
+ * Kartenhaut, Kontakte ein Icon im Gruppenkopf, Notizen einen 20px-Kopf, die
+ * Haushaltshilfe Icons in vier Reitern.
+ *
+ * Guard-Ebene: Struktur (Stylesheet und Quelltext); der Browserlauf liegt im
+ * Handoff (impl-G3).
+ * ──────────────────────────────────────────────────────────────────────────── */
+test('D6: der Mehr-Knopf der Geburtstagszeile steht auch auf Touch - kein Wegklappen per Geste', () => {
+  const css = read('../public/styles/birthdays.css');
+  const hides = [...eachRule(css)].filter(({ selector, body }) => /\.birthday-item__actions(?![\w-])/.test(selector)
+    && /clip-path\s*:\s*inset|display\s*:\s*none|visibility\s*:\s*hidden|opacity\s*:\s*0\b/.test(body))
+    .map(({ selector, at }) => `${at.join(' ')} ${selector}`.trim());
+  assert.deepEqual(hides, [], 'birthdays.css versteckt den Mehr-Knopf - auf Touch bliebe nur Wischen (R18/D6)');
+  assert.match(read('../public/pages/birthdays.js'), /rowMenuHtml\(\{\s*id: `birthday-menu-\$\{birthday\.id\}`/,
+    'die Zeile traegt den geteilten Mehr-Knopf');
+});
+
+test('D6: eine Zeile mit sichtbarem Mehr-Knopf zeigt keinen Wisch-Chevron', () => {
+  const layout = read('../public/styles/layout.css');
+  const off = [...eachRule(layout)].find(({ selector, at }) => at.length === 0
+    && selector.split(',').map((s) => s.trim()).includes('.swipe-row:has(.row-action--more)::after'));
+  assert.match(off?.body ?? '', /content\s*:\s*none/,
+    'der Wisch-Chevron ("tippe fuer Detail") faellt weg, wo der Mehr-Knopf am Zeilenende steht');
+});
+
+test('Sidebar: der gepinnte Eintrag (Einstellungen) traegt dieselbe Pille, keinen Streifen und keine Toenung', () => {
+  const layout = read('../public/styles/layout.css');
+  const glass = read('../public/styles/glass.css');
+  const active = (src) => [...eachRule(src)].filter(({ selector }) => selector.split(',').map((s) => s.trim())
+    .some((s) => /^\.nav-sidebar \.nav-item\[aria-current="page"\](?:::before)?$/.test(s)));
+  for (const { selector, body } of [...active(layout), ...active(glass)]) {
+    assert.doesNotMatch(body, /\bbackground(?:-color)?\s*:/, `${selector}: statische Toenung am aktiven Eintrag`);
+    assert.doesNotMatch(selector, /::before/, `${selector}: der alte 3px-Akzentstreifen`);
+  }
+  const router = read('../public/router.js');
+  assert.match(router, /pill\.className = 'nav-sidebar__indicator nav-sidebar__indicator--pinned';/,
+    'der gepinnte Eintrag bringt eine Pille aus derselben Klasse mit (Material aus glass.css)');
+  const place = functionBody(router, 'positionSidebarIndicator');
+  assert.match(place, /glidePillFrom\(pinnedPill,/, 'die Pille gleitet von der Stelle der Listenpille her');
+  const pinned = [...eachRule(layout)].find(({ selector }) => selector.trim() === '.nav-sidebar__indicator--pinned');
+  assert.match(pinned?.body ?? '', /z-index\s*:\s*-1/, 'hinter Zeichen und Wort');
+});
+
+test('Notizen: eine Kartenhaut fuer angepinnt und nicht angepinnt; Loeschen im Mehr-Knopf', () => {
+  const css = read('../public/styles/notes.css');
+  const skin = [...eachRule(css)].filter(({ selector, body }) => /\.note-card--pinned(?![\w-])/.test(selector)
+    && /box-shadow|border|outline|background/.test(body))
+    .map(({ selector }) => selector.trim());
+  assert.deepEqual(skin, [], 'angepinnt traegt keine eigene Flaeche, keinen Ring und keine Nadelscheibe');
+  const page = read('../public/pages/notes.js');
+  assert.doesNotMatch(page, /icon: 'trash-2', tone: 'danger', action: 'delete'/, 'kein offener Papierkorb auf der Karte');
+  assert.match(page, /rowMenuHtml\(\{\s*id: `note-menu-\$\{note\.id\}`[\s\S]{0,300}action: 'delete'[^\n]*danger: true/);
+  assert.doesNotMatch(page, /'pin-off'/, 'eine Nadel fuer beide Zustaende; gefuellt heisst angepinnt');
+});
+
+test('D8: ein Listen-Gruppenkopf - Versal-Mikro-Label ohne Icon in Kontakten und Notizen', () => {
+  const contacts = read('../public/pages/contacts.js');
+  assert.match(contacts, /<h2 class="list-group__title contact-group__header">\$\{esc\(catLabel\(cat\)\)\}<\/h2>/,
+    'Kontakte: der geteilte Gruppenkopf, ohne Kategorie-Zeichen davor');
+  const notes = read('../public/pages/notes.js');
+  assert.match(notes, /<h2 class="notes-group__title list-group__title">/, 'Notizen: „Angepinnt" ist ein Gruppenkopf, kein Abschnittstitel');
+  assert.doesNotMatch(notes, /notes-group__title u-section-title/);
+  // Der Tageskopf der Agenda ist die begruendete eigene Stufe (Zeitachse,
+  // calendar.css) - aber sein Kasten traegt die Groesse seiner Schrift, nicht
+  // die 24px der h2-Rolle.
+  const agenda = [...eachRule(read('../public/styles/calendar.css'))]
+    .find(({ selector, at }) => selector.trim() === '.agenda-day__header' && at.length === 0);
+  assert.match(agenda?.body ?? '', /font-size\s*:\s*var\(--text-sm\)/);
+});
+
+test('D3: die Reiter der Haushaltshilfe sind Text-Reiter ohne Icon', () => {
+  const page = read('../public/pages/housekeeping.js');
+  const tab = functionBody(page, 'renderTabButton');
+  assert.ok(tab, 'renderTabButton fehlt');
+  assert.doesNotMatch(tab, /sub-tab__icon|data-lucide/, 'kein Zeichen vor dem Reiter-Wort');
 });

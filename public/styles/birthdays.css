@@ -169,9 +169,8 @@
  * Zeile, die nicht umbricht, und wird dort gekappt statt gebrochen.
  *
  * WARUM 560px UND NICHT 400: die Schwelle muss in BEIDEN Gerätewelten halten.
- * Am Finger sind die zwei Zeilenknöpfe weggeklappt (siehe die `hover: none`-
- * Regel oben) und die Metazeile hätte schon ab rund 400px Trägerbreite Platz;
- * am Zeiger stehen sie da und kosten 100px. Ein Container weiss nicht, welche
+ * Bis R18 waren am Finger die Zeilenknöpfe weggeklappt; seit dem steht in
+ * beiden Welten derselbe eine Mehr-Knopf. Ein Container weiss nicht, welche
  * Welt er bedient - 560px ist der Wert, ab dem die Notiz in beiden steht, ohne
  * dem Datum vor ihr Platz zu nehmen (gemessen: 128px freie Breite am Zeiger,
  * 240px am Finger). */
@@ -221,44 +220,16 @@
   flex-shrink: 0;
 }
 
-/* Auf Touch tragen die Wischrichtungen die beiden Zeilenaktionen, und die
- * Knoepfe verschwinden - in einer Grouped-Liste waren sie die lauteste Stelle
- * des Bildschirms. Auf Zeigergeraeten bleiben sie: dort gibt es keine Geste.
- * Die Reserve am Zeilenende gehoert dann dem Wisch-Chevron (.swipe-row::after,
- * layout.css), genau wie im Einkauf.
+/* DER MEHR-KNOPF STEHT AUCH AUF TOUCH (R18, D6, Critique 2026-10-16).
  *
- * STEHT BEWUSST HIER UNTEN, nicht oben beim Traeger: die Basisregel darueber
- * setzt `display: flex` mit derselben Spezifitaet, und eine Media-Query davor
- * verliert gegen sie allein durch die Reihenfolge (gemessen: die Knoepfe
- * blieben sichtbar, obwohl `(hover: none)` griff). */
-@media (hover: none) {
-  /* VERSTECKT, NICHT ENTFERNT: `display: none` nahm die beiden Knoepfe auch aus
-   * dem Fokus- und Screenreader-Baum. Die Gesten haengen ausschliesslich an
-   * `touchstart`/`touchmove`, die Reveal-Panels sind `aria-hidden`, und die
-   * Zeile selbst traegt keine Aktion - wer sein Telefon per Tastatur,
-   * Schaltersteuerung oder VoiceOver bedient, kam damit an keinen Geburtstag
-   * mehr heran. Optisch bleibt es dasselbe: aus dem Fluss genommen gibt die
-   * Zeile den Platz genauso frei. Beim Fokus kommen sie zurueck. */
-  .birthday-item__actions {
-    position: absolute;
-    width: var(--space-px);
-    height: var(--space-px);
-    overflow: hidden;
-    clip-path: inset(50%);
-  }
-
-  .birthday-item__actions:focus-within {
-    position: static;
-    width: auto;
-    height: auto;
-    overflow: visible;
-    clip-path: none;
-  }
-
-  .birthday-item {
-    padding-inline-end: calc(var(--space-2) + var(--space-3) + var(--space-2));
-  }
-}
+ * Bis hierher klappte eine `(hover: none)`-Regel den Traeger per `clip-path`
+ * weg: die Wischrichtungen sollten die beiden Zeilenaktionen tragen, und zwei
+ * Knoepfe waren in der Grouped-Liste die lauteste Stelle. Seit R18 sind es
+ * nicht mehr zwei Knoepfe, sondern EIN ruhiger Mehr-Knopf - und "nur per
+ * Geste" ist genau der versteckte Weg, den D6 ausschliesst (Casey, einhaendig:
+ * "Geburtstag bearbeiten mobil nur per Wischgeste"). Wischen bleibt
+ * Zusatzweg; den Wisch-Chevron nimmt layout.css der Zeile mit Mehr-Knopf ab,
+ * deshalb gibt es hier auch keine Reserve mehr am Zeilenende. */
 
 /* --------------------------------------------------------
  * Countdown-Chip — einheitliches Wort-Register, kontrastgeprüft (AA).
