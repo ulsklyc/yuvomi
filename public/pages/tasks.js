@@ -1501,9 +1501,6 @@ let state = {
   // solange keins offen ist; ein geschlossenes erkennt renderFilters am
   // fehlenden isConnected.
   filterSheet:     null,
-  // Aus welcher Ansicht der Verlauf geoeffnet wurde - das Menue schaltet ihn
-  // als Schalter, und „aus" fuehrt dorthin zurueck statt immer in die Liste.
-  viewBeforeHistory: 'list',
   bulkSelectMode:  false,
   selectedTaskIds: new Set(),
   searchQuery:     '',
@@ -3823,9 +3820,14 @@ function toolsMenuItems() {
   // Segment im Kopf.
   const items = [{
     group: t('tasks.viewToggleLabel'),
+    // DER VERLAUF IST DIE DRITTE ANSICHT (R19, Critique 2026-10-16): er
+    // stand als Schalter mit Haken im Menue, und waehrend er offen war, zeigte
+    // das Segment NICHTS als aktiv - eine Ansicht ohne Ort. Jetzt ist er die
+    // dritte Wahl derselben Gruppe, im Segment wie hier.
     items: [
       { action: 'view-list', label: t('tasks.listView'), icon: 'list', checked: isList, attrs: { 'data-view-choice': 'list' } },
       { action: 'view-kanban', label: t('tasks.kanbanView'), icon: 'columns', checked: state.viewMode === 'kanban', attrs: { 'data-view-choice': 'kanban' } },
+      { action: 'view-history', label: t('tasks.historyView'), icon: 'history', checked: state.viewMode === 'history', attrs: { 'data-view-choice': 'history' } },
     ],
   }, { separator: true }];
   if (!readOnly()) {
@@ -3839,8 +3841,6 @@ function toolsMenuItems() {
       { action: 'bulk-tag-remove', label: t('tasks.bulkTagRemove'), icon: 'eraser', disabled: true },
     );
   }
-  items.push({ action: 'toggle-history', label: t('tasks.historyView'), icon: 'history',
-    checked: state.viewMode === 'history' });
   if (!readOnly()) {
     items.push(
       { separator: true },
@@ -4751,7 +4751,7 @@ function syncViewChrome(container) {
   // Das Menue wird nicht neu gebaut (Fokus, offener Zustand): Haken und
   // Sperre der beiden Eintraege, die an der Ansicht haengen, zieht es nach.
   const menu = container.querySelector('#tasks-tools-menu');
-  syncPopoverMenuItem(menu, 'toggle-history', isHistory);
+  syncPopoverMenuItem(menu, 'view-history', isHistory);
   syncPopoverMenuItem(menu, 'view-list', mode === 'list');
   syncPopoverMenuItem(menu, 'view-kanban', mode === 'kanban');
   syncPopoverMenuItem(menu, 'bulk-select', state.bulkSelectMode);
@@ -4776,20 +4776,19 @@ function wireViewToggle(container) {
   toggle.querySelectorAll('[data-view]').forEach((btn) => {
     btn.addEventListener('click', () => setViewMode(container, btn.dataset.view));
   });
-  // Die Kapsel gleitet zwischen Liste und Kanban (utils/segment-indicator.js,
-  // D8) und folgt `aria-pressed` aus syncViewChrome selbst; im Verlauf ist
-  // keines gedrueckt, dann steht sie nicht da.
+  // Die Kapsel gleitet zwischen Liste, Kanban und Verlauf
+  // (utils/segment-indicator.js, D8) und folgt `aria-pressed` aus
+  // syncViewChrome selbst.
   attachSegmentIndicator(toggle);
 }
 
 /**
- * Ansicht wechseln - aus dem Segment (Liste/Kanban) und aus dem Menue
- * (Verlauf), ueber EINEN Weg, damit Merker, Kopf und Abfrage nie auseinander-
+ * Ansicht wechseln - aus dem Segment (Liste/Kanban/Verlauf) und aus dem
+ * Menue (mobil), ueber EINEN Weg, damit Merker, Kopf und Abfrage nie auseinander-
  * laufen.
  */
 function setViewMode(container, mode) {
   if (mode === state.viewMode) return;
-  if (mode === 'history') state.viewBeforeHistory = state.viewMode;
   state.viewMode = mode;
   localStorage.setItem('yuvomi-tasks-view', state.viewMode);
   // DIE AUSWAHL GEHOERT ZU DEN ZEILEN DER ANSICHT, DIE GEHT. Liste und Verlauf
@@ -4849,8 +4848,8 @@ function wireToolbar(container) {
     // und er fiele aufs Dokument - also vorher auf den Menueknopf.
     toolbar.querySelector('.page-tools-btn')?.focus();
     switch (item.dataset.action) {
-      case 'toggle-history':
-        setViewMode(container, state.viewMode === 'history' ? (state.viewBeforeHistory || 'list') : 'history');
+      case 'view-history':
+        setViewMode(container, 'history');
         break;
       case 'view-list':
         setViewMode(container, 'list');
@@ -6018,8 +6017,8 @@ export async function render(container, { user, signal } = {}) {
                Die Chipzeile ist ins Filterblatt gewandert - "Offen", "Mir
                zugewiesen", "Geplante" und die Gruppierung stehen dort
                beschriftet, die ZAHL am Knopf sagt, dass etwas gesetzt ist
-               (Kalender-Muster). Der Verlauf ist keine dritte Ansicht der
-               Aufgaben, sondern eine Liste von Vorgaengen: er steht im Menue. -->
+               (Kalender-Muster). Der Verlauf ist seit R19 die dritte Wahl im
+               Segment: als Menue-Schalter hatte er keinen aktiven Ort. -->
           ${/* DIE ANSICHTSWAHL IST DAS KANON-SEGMENT (D1, Critique 2026-10-16):
                 `.segmented` in der Icon-Variante mit gleitender Kapsel statt des
                 eigenen `.group-toggle`. Unter 768px steht sie als Einfachauswahl
@@ -6036,6 +6035,11 @@ export async function render(container, { user, signal } = {}) {
                     title="${t('tasks.kanbanView')}" aria-label="${t('tasks.kanbanView')}" aria-pressed="${isKanban}">
               <i data-lucide="columns" class="icon-md" aria-hidden="true"></i>
               <span class="tasks-view-toggle__label">${t('tasks.kanbanView')}</span>
+            </button>
+            <button type="button" class="segmented__item${isHistory ? ' is-active' : ''}" data-view="history"
+                    title="${t('tasks.historyView')}" aria-label="${t('tasks.historyView')}" aria-pressed="${isHistory}">
+              <i data-lucide="history" class="icon-md" aria-hidden="true"></i>
+              <span class="tasks-view-toggle__label">${t('tasks.historyView')}</span>
             </button>
           </div>
           ${/* D2: der Ausloeser ist ein Kopf-Icon-Knopf, die Zahl aktiver Filter

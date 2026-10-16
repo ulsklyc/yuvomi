@@ -6452,17 +6452,20 @@ test('Tasks toolbar follows the mobile header rule: one tools menu, "Filter (n)"
   for (const id of ['btn-bulk-select', 'btn-manage-categories', 'btn-manage-tags']) {
     assert.doesNotMatch(tasksPage, new RegExp(`id="${id}"`), `#${id} steht wieder lose im Kopf`);
   }
-  for (const action of ['bulk-select', 'toggle-history', 'manage-categories', 'manage-tags']) {
+  for (const action of ['bulk-select', 'view-history', 'manage-categories', 'manage-tags']) {
     assert.match(tasksPage, new RegExp(`action: '${action}'`), `das Werkzeugmenue bietet "${action}" nicht an`);
   }
-  assert.doesNotMatch(markup, /data-view="history"/, 'der Verlauf ist ein Menue-Schalter, keine dritte Ansicht im Segment');
+  // R19 (Critique 2026-10-16): der Verlauf ist die DRITTE Ansicht im Segment.
+  // Als Menue-Schalter zeigte das Segment waehrend des Verlaufs nichts aktiv.
+  assert.match(markup, /data-view="kanban"[\s\S]*?data-view="history"[\s\S]*?aria-pressed="\$\{isHistory\}"/, 'der Verlauf hat ein Segment mit aria-pressed');
+  assert.doesNotMatch(tasksPage, /action: 'toggle-history'/, 'kein Haken-Schalter mehr fuer den Verlauf');
   // D1/D2 (Critique 2026-10-16): die Ansichtswahl ist das Kanon-Segment, der
   // Filter ein Kopf-Icon mit Zaehler, und mobil steht der Kopf in EINER Zeile
   // (`page-toolbar--title-tools`) - die Ansicht dann als Einfachauswahl im Menue.
   assert.match(markup, /<div class="segmented segmented--icons tasks-view-toggle" id="view-toggle"/, 'Ansichtswahl = .segmented');
   assert.doesNotMatch(markup, /class="group-toggle/, 'kein eigenes .group-toggle mehr als Ansichtswahl');
   assert.doesNotMatch(markup, /showLabel:\s*true/, 'der Filter ist ein Icon-Knopf mit Zaehler, keine Text-Pille');
-  for (const action of ['view-list', 'view-kanban']) {
+  for (const action of ['view-list', 'view-kanban', 'view-history']) {
     assert.match(tasksPage, new RegExp(`action: '${action}'`), `das Werkzeugmenue bietet "${action}" (mobil) an`);
   }
   assert.ok([...eachRule(tasksCss)].some((r) => r.selector.trim() === '.tasks-view-toggle' && r.at.some((a) => /max-width:\s*767px/.test(a)) && /display:\s*none/.test(r.body)),

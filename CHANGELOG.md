@@ -35,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Task history is a view like List and Kanban.** It sits as the third choice in the view switcher
+  (and in the view section of the menu on a phone), so the switcher always shows where you are.
 - **A search that finds nothing looks and works the same in every module.** Tasks, Pantry, Recipes,
   Documents, Inventory, Contacts, Notes and Birthdays now say "No results", show what you searched
   for (and any active filter) as a chip, and offer one "Reset search" button. Before, some had no
