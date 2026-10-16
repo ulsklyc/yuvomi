@@ -21738,3 +21738,19 @@ test('D5: die Schnellzeile des Einkaufs traegt die Kapsel+Fill-Haut der Suche', 
     assert.doesNotMatch(r.body, /(?:^|[;\s{])(?:border(?:-radius)?|background-color)\s*:/, `${r.selector}: keine eigene Kante/Ecke/Flaeche mehr`);
   }
 });
+
+// Critique 2026-10-16 (Jordan): das Mehr-Blatt zeigte 16 Ziele als flaches
+// Raster ohne die Sektionen der Seitenleiste. Jetzt je Sektion eine benannte
+// Gruppe mit ihrem Raster - dieselben Namen (NAV_SECTION_LABEL_KEYS) und
+// dieselbe Schriftrolle wie die Seitenleiste.
+test('Mehr-Blatt: die Module stehen in den Sektionen der Seitenleiste', () => {
+  const router = read('../public/router.js');
+  const body = router.slice(router.indexOf('function buildMoreSheetBody()'), router.indexOf('\n}\n', router.indexOf('function buildMoreSheetBody()')));
+  assert.match(body, /nodes\.push\(\.\.\.moreSheetSections\(modules\)\);/, 'das Blatt baut seine Module ueber die Sektionen');
+  const fn = router.slice(router.indexOf('function moreSheetSections('), router.indexOf('function buildMoreSheetBody()'));
+  assert.match(fn, /NAV_SECTION_LABEL_KEYS\[section\]/, 'die Namen der Seitenleiste');
+  assert.match(fn, /setAttribute\('role', 'group'\)[\s\S]*?setAttribute\('aria-labelledby', labelId\)/, 'hoerbar gruppiert wie die Seitenleiste');
+  const typo = [...eachRule(read('../public/styles/typography.css'))];
+  const role = typo.find((r) => r.selector.split(',').map((x) => x.trim()).includes('.nav-section-label'));
+  assert.ok(role && role.selector.includes('.more-sheet__section-label'), 'dieselbe Schriftrolle wie die Sektionsnamen der Seitenleiste');
+});

@@ -234,6 +234,7 @@
  * ("Haushalt", "Schule") lasen in Versal + Tracking geschrien (Critique P2).
  * ------------------------------------------------------------------------ */
 .nav-section-label,
+.more-sheet__section-label,
 .settings-shell__navigation-heading,
 .kanban-col__title {
   font-size: var(--text-xs);

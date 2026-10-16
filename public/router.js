@@ -1301,9 +1301,18 @@ function paintMoreSheetBadges(sheet) {
 }
 
 /**
- * Baut den dynamischen Body des „Mehr“-Sheets: EIN vierspaltiges Modul-Raster
- * und darunter, im selben Raster, die monochrome System-Reihe (Einstellungen ·
+ * Baut den dynamischen Body des „Mehr“-Sheets: die Module in den Sektionen
+ * der Seitenleiste (je ein vierspaltiges Raster unter ihrem Namen) und
+ * darunter, im selben Raster, die monochrome System-Reihe (Einstellungen ·
  * Hilfe · Änderungen · Abmelden).
+ *
+ * DIE SEKTIONEN SIND ZURUECK (Critique 2026-10-16, Jordan): 16 Ziele als
+ * flaches Raster waren fuer einen Erstnutzer eine Wand - er fand „Entsorgung"
+ * nicht dort, wo die Seitenleiste am Desktop sie unter „Haushalt" zeigt. Die
+ * Beschriftungen tragen den Stil der Seitenleiste (`.nav-section-label`,
+ * typography.css) und sitzen eng an ihrem Raster; der Hoehenpreis, der sie
+ * am 2026-08-13 gekostet hatte (unten), ist mit der kompakten Zeile kleiner.
+ * Die Absaetze darunter sind die damalige Begruendung - Geschichte.
  *
  * Gibt EINEN Knoten in einem Array zurück (`.more-sheet__body`, der Scroller);
  * beide Aufrufer spreizen das Ergebnis und bleiben davon unberührt.
@@ -1333,6 +1342,46 @@ function paintMoreSheetBadges(sheet) {
  * Sprachwechsel / Modul-Toggle / Settings-Besuch das Layout.
  * Handle + Suchleiste bleiben davon unberührt (sie tragen Event-Wiring).
  */
+/**
+ * Die Module des Mehr-Blatts, gruppiert nach `section` in der gelieferten
+ * Reihenfolge. Eine Sektion ohne Namen (Uebersicht) steht als Raster ohne
+ * Kopf - dieselbe Regel wie HEADERLESS_SECTIONS der Seitenleiste.
+ *
+ * @param {Array<object>} modules  bereits nach Sektion sortiert
+ * @returns {HTMLElement[]}
+ */
+function moreSheetSections(modules) {
+  const out = [];
+  let current = null;
+  let grid = null;
+  for (const item of modules) {
+    const section = item.section ?? null;
+    if (!grid || section !== current) {
+      current = section;
+      grid = document.createElement('div');
+      grid.className = 'more-sheet__grid';
+      const labelKey = section && section !== NAV_SECTION.overview ? NAV_SECTION_LABEL_KEYS[section] : null;
+      if (labelKey) {
+        const group = document.createElement('div');
+        group.className = 'more-sheet__group';
+        group.setAttribute('role', 'group');
+        const labelId = `more-section-${section}`;
+        group.setAttribute('aria-labelledby', labelId);
+        const label = document.createElement('div');
+        label.className = 'more-sheet__section-label';
+        label.id = labelId;
+        label.textContent = t(labelKey);
+        group.append(label, grid);
+        out.push(group);
+      } else {
+        out.push(grid);
+      }
+    }
+    grid.appendChild(moreItemEl(item));
+  }
+  return out;
+}
+
 function buildMoreSheetBody() {
   /* EIN scrollender Körper zwischen Griff und Suche und dem Blattrand.
    *
@@ -1357,14 +1406,12 @@ function buildMoreSheetBody() {
   const secondary = secondaryMobileItems();
   const settingsItem = secondary.find((item) => item.module === 'settings');
 
-  // Ein flaches Raster in der Reihenfolge der Sidebar. Die Sortierung nach
-  // Sektion steckt schon in secondaryMobileItems(); hier wird sie nur nicht
-  // mehr mit Überschriften nachgezeichnet.
+  // Je Sektion der Seitenleiste EIN Raster unter ihrem Namen. Die Sortierung
+  // nach Sektion steckt schon in secondaryMobileItems() (sortNavigationItems);
+  // hier wird sie nachgezeichnet, wie die Seitenleiste es tut - eine benannte
+  // Gruppe (role="group" + aria-labelledby), damit die Ordnung auch hoerbar ist.
   const modules = secondary.filter((item) => item.module !== 'settings');
-  const grid = document.createElement('div');
-  grid.className = 'more-sheet__grid';
-  modules.forEach((item) => grid.appendChild(moreItemEl(item)));
-  nodes.push(grid);
+  nodes.push(...moreSheetSections(modules));
 
   const divider = document.createElement('div');
   divider.className = 'more-sheet__divider';

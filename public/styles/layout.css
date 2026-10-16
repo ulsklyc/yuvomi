@@ -1007,7 +1007,15 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   margin-block: calc(-1 * var(--space-0h));
 }
 
-/* App-Launcher-Raster: EINE Matrix, vier Spalten, keine Bereichskoepfe.
+/* App-Launcher-Raster: vier Spalten je Sektion der Seitenleiste.
+ *
+ * DIE BEREICHSKOEPFE SIND ZURUECK (Critique 2026-10-16): 16 Ziele ohne
+ * Gliederung waren fuer einen Erstnutzer eine Wand. Sie stehen als kompakte
+ * Beschriftung im Stil der Seitenleiste (`.more-sheet__section-label`,
+ * Schriftrolle in typography.css) direkt ueber ihrem Raster - ein Label von
+ * ~16px plus `--space-2h` Luft zur vorigen Gruppe, nicht die Koepfe mit
+ * eigenem Abstand von frueher. Was unten steht, ist die Geschichte der
+ * flachen Fassung; Spalten, Fuge und Label-Rezept gelten weiter.
  *
  * HIER STANDEN DREI SPALTEN, weil bei vier die Zelle (~80px auf 375px)
  * schmaler war als „Haushaltshilfe" und der Name gebrochen wurde. Der Befund
@@ -1026,6 +1034,22 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
  * die Bereiche mit" - ist mit den Koepfen entfallen; die zwei uebrigen tragen.
  * Das farbige Siegel bleibt der Held: --shadow-xs auf Surface ist die leiseste
  * Flaeche der App und tritt hinter es zurueck. */
+.more-sheet__group + .more-sheet__group,
+.more-sheet__grid + .more-sheet__group {
+  margin-block-start: var(--space-2h);
+}
+
+.more-sheet__section-label {
+  color: var(--color-text-tertiary);
+  /* Die Textkante steht auf der Kachelkante; 4px binden das Label an sein
+   * Raster, die Luft zur vorigen Gruppe traegt die Gruppe (oben). */
+  padding-inline: var(--space-1);
+  margin-block-end: var(--space-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .more-sheet__grid {
   display: grid;
   /* minmax(0, 1fr), nicht 1fr: `1fr` ist minmax(AUTO, 1fr) und laesst die
