@@ -2506,7 +2506,9 @@ const SHORTCUTS = [
     // Ausserhalb des Kalenders war `f` ein stiller No-Op (Critique 2026-08-31,
     // Alex-Persona): erst hinwechseln, dann suchen - ein Griff, ein Ziel.
     if (location.pathname !== '/calendar') await navigate('/calendar');
-    document.querySelector('#cal-search')?.click();
+    // Die Suche ist ein Feld im Kopf (renderPageSearch, Critique 2026-10-16);
+    // mobil klappt die Lupe ueber :focus-within zum Feld auf.
+    document.querySelector('#cal-search-input')?.focus();
   } },
   { key: '?',   description: () => t('shortcuts.help'),    action: () => showHelpModal() },
   { key: 'g d', description: () => t('shortcuts.goDash'),  action: () => navigate('/') },

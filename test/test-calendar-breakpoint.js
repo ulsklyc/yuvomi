@@ -172,3 +172,20 @@ test('Suche schliessen: das Feld im Kopf leert sich, sein Loeschen-Knopf verschw
   assert.equal(input.value, '', 'das Feld ist leer');
   assert.equal(clear.hidden, true, 'der Loeschen-Knopf ist weg');
 });
+
+test('das Kuerzel f trifft das Suchfeld, das der Kalender rendert', async () => {
+  // Seit die Kalendersuche ein Feld im Kopf ist (`renderPageSearch`,
+  // `#cal-search-input`), gibt es den Knopf `#cal-search` nicht mehr. Der
+  // Router klickte ihn per `?.click()` weiter an: `f` wechselte in den
+  // Kalender und tat dann still nichts.
+  const { readFileSync } = await import('node:fs');
+  const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  const cal = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const action = router.match(/key: 'f',[\s\S]*?\} \},/)?.[0] ?? '';
+  const ids = [...action.matchAll(/querySelector\('#([\w-]+)'\)/g)].map((m) => m[1]);
+  assert.ok(ids.length > 0, 'die f-Aktion sucht ein Element per ID');
+  for (const id of ids) {
+    assert.match(cal, new RegExp(`id: '${id}'|id="${id}"`), `#${id} rendert der Kalender nicht`);
+  }
+  assert.match(action, /\.focus\(\)/, 'das Feld bekommt den Fokus - mobil klappt die Lupe per :focus-within auf');
+});
