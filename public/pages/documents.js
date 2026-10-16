@@ -24,6 +24,7 @@ import { rowActionHtml } from '/utils/row-action.js';
 import { hidesPrivacyControls } from '/utils/household.js';
 import { withChosenPeople } from '/utils/people-picker.js';
 import { maxUploadBytes } from '/utils/upload-limit.js';
+import { holdDocumentAttachStyle } from '/components/document-attach.js';
 import { mountEmptyState } from '/utils/empty-state.js';
 import { subtreeIds, folderPath, flattenFolderTree } from '/utils/folder-tree.js';
 import { dateStatus } from '/utils/date-status.js';
@@ -2727,6 +2728,7 @@ function openDocumentModal(doc = null) {
 
 function bindDropzone(panel) {
   const dropzone = panel.querySelector('#document-dropzone');
+  holdDocumentAttachStyle(dropzone);
   const input = panel.querySelector('#document-file');
   const selected = panel.querySelector('#document-selected-file');
   const nameField = panel.querySelector('#document-name');

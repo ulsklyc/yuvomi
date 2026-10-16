@@ -61,6 +61,20 @@ import { holdUntilStyled, warmStyle } from '/utils/component-style.js';
 const STYLE = '/styles/document-attach.css';
 warmStyle(STYLE);
 
+/**
+ * Die Ablageflaeche `.document-dropzone` rendern Kalender, Dokumente und
+ * Hauswirtschaft SELBST, ohne bindDocumentAttachField(); ihre Regeln stehen
+ * aber in diesem Blatt. Seit es nicht mehr in index.html steht, sah die
+ * Ablage auf /documents ohne vorher geoeffnetes Anhangsfeld aus wie Fliesstext
+ * (kein Rahmen, kein Polster). Wer sie rendert, haelt sie hiermit unsichtbar,
+ * bis das Blatt da ist - dieselbe Garantie wie im Feld selbst.
+ * @param {Element|null} el - die gerenderte `.document-dropzone`
+ * @returns {Promise<void>}
+ */
+export function holdDocumentAttachStyle(el) {
+  return holdUntilStyled(el, STYLE);
+}
+
 
 
 // Spiegelt die Upload-Allowlist des Servers (server/routes/documents.js).

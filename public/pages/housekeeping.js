@@ -22,6 +22,7 @@ import { redrawList, collapseRow } from '/utils/list-motion.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { amountPlaceholder, amountStep, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
+import { holdDocumentAttachStyle } from '/components/document-attach.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { pathAccess, mayWritePath } from '/utils/module-access.js';
 import { todayKey } from '/utils/date.js';
@@ -2156,6 +2157,7 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
     minutesInput?.addEventListener('input', updateComputed);
     updateComputed();
   }
+  holdDocumentAttachStyle(panel?.querySelector('#housekeeping-receipt-dropzone'));
   const receiptInput = panel?.querySelector('#housekeeping-receipt-file');
   const receiptSelected = panel?.querySelector('#housekeeping-receipt-selected');
   receiptInput?.addEventListener('change', () => {

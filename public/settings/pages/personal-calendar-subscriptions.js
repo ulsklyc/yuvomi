@@ -202,7 +202,7 @@ function buildIcsActions(container, sub, subs, user) {
   // Loeschen `--danger`, und jeder Name nennt das Abo - drei Abos mit drei
   // Knoepfen hiessen vorher neunmal „Bearbeiten"/„Loeschen"/„Synchronisieren".
   const actions = document.createElement('div');
-  actions.className = 'cat-row__actions row-actions';
+  actions.className = 'row-actions';
   const name = sub.name;
 
   const syncBtn = rowActionEl({ icon: 'refresh-cw', label: t('settings.ics.actions.syncNamed', { name }) });

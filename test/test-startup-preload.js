@@ -22,9 +22,10 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { posix } from 'node:path';
-import { moduleSpecifiers, withoutHtmlComments } from './source-text.js';
+import { moduleSpecifiers, withoutHtmlComments, withoutCommentsKeepingLines } from './source-text.js';
+import { eachRule } from './css-rules.js';
 
 const PUBLIC = new URL('../public/', import.meta.url);
 const read = (rel) => readFileSync(new URL(rel.replace(/^\//, ''), PUBLIC), 'utf8');
@@ -130,6 +131,74 @@ test('jede dieser Komponenten stellt ihr Blatt selbst sicher', () => {
       assert.match(code, /\b(ensureStyle|holdUntilStyled)\(/, `${file} wartet nicht auf sein Blatt`);
     }
   }
+});
+
+/*
+ * NICHT NUR DIE KOMPONENTE RENDERT IHRE KLASSEN. Kalender, Dokumente und
+ * Hauswirtschaft bauen die Ablage `.document-dropzone` selbst, der
+ * Notizen-Editor den Knopf `.category-scope-help` - die Regeln dafuer stehen im
+ * Blatt der Komponente. Der Guard oben sah nur die Komponente; auf /documents
+ * stand die Ablage danach ohne Rahmen und Polster da, solange kein
+ * Anhangsfeld das Blatt zufaellig vorher geladen hatte (test:calendar fand es
+ * am Termin-Dialog). Deshalb: jede Datei, die eine Klasse rendert, die NUR in
+ * einem nachgeladenen Blatt eine Regel hat, ruft einen Halter dieses Blatts
+ * auf - `ensureStyle`/`holdUntilStyled` mit seinem Pfad oder einen der
+ * benannten Halter der Komponente, die ihrerseits `holdUntilStyled` rufen.
+ */
+const HOLDERS = {
+  'document-attach': ['holdDocumentAttachStyle'],
+  'category-manager': ['wireCategoryScopeHelp'],
+};
+
+test('wer Klassen eines nachgeladenen Blatts rendert, stellt das Blatt sicher', () => {
+  // Eigen sind Klassen, die AUSSER im Blatt der Komponente nirgends eine Regel
+  // haben - weder in einem Startblatt noch in einem Seitenblatt (`is-today`
+  // gestaltet health.css auch fuer seinen eigenen Zykluskalender).
+  const others = readdirSync(new URL('styles/', PUBLIC)).filter((f) => f.endsWith('.css') && !(f.slice(0, -4) in LAZY));
+  const always = new Set();
+  for (const file of others) {
+    for (const { selector } of eachRule(read(`styles/${file}`))) {
+      for (const m of selector.matchAll(/\.([\w-]+)/g)) always.add(m[1]);
+    }
+  }
+  const sources = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(new URL(dir, PUBLIC), { withFileTypes: true })) {
+      const rel = `${dir}${entry.name}`;
+      if (entry.isDirectory()) { if (!['vendor/', 'locales/'].some((v) => `${rel}/`.endsWith(v))) walk(`${rel}/`); continue; }
+      if (/\.js$/.test(entry.name) && !/\.min\.js$/.test(entry.name)) sources.push(`/${rel}`);
+    }
+  };
+  walk('');
+  const code = new Map(sources.map((f) => [f, withoutCommentsKeepingLines(read(f))]));
+
+  // Die Halter selbst muessen halten - sonst ist der Name nur ein Versprechen.
+  for (const [name, holders] of Object.entries(HOLDERS)) {
+    for (const holder of holders) {
+      const owner = LAZY[name].map((f) => code.get(f)).find((src) => new RegExp(`export function ${holder}\\b`).test(src));
+      assert.ok(owner, `${holder} ist in ${LAZY[name].join('/')} nicht exportiert`);
+      const body = owner.slice(owner.search(new RegExp(`export function ${holder}\\b`)));
+      const fn = body.slice(0, body.indexOf('\n}') + 2);
+      assert.match(fn, /holdUntilStyled\(/, `${holder} haelt sein Element nicht, bis ${name}.css da ist`);
+    }
+  }
+
+  const missing = [];
+  for (const [name, owners] of Object.entries(LAZY)) {
+    const own = new Set();
+    for (const { selector } of eachRule(read(`styles/${name}.css`))) {
+      for (const m of selector.matchAll(/\.([\w-]+)/g)) if (!always.has(m[1])) own.add(m[1]);
+    }
+    for (const [file, src] of code) {
+      if (owners.includes(file) || file === '/utils/component-style.js') continue;
+      const used = [...own].filter((cls) => new RegExp(`['"\`\\s.]${cls}(?![\\w-])`).test(src));
+      if (!used.length) continue;
+      const ensures = src.includes(`/styles/${name}.css`) && /\b(ensureStyle|holdUntilStyled)\(/.test(src);
+      const holds = (HOLDERS[name] ?? []).some((h) => new RegExp(`\\b${h}\\(`).test(src));
+      if (!ensures && !holds) missing.push(`${file}: ${used.join(', ')} (${name}.css)`);
+    }
+  }
+  assert.deepEqual(missing, [], 'diese Dateien rendern Klassen eines nachgeladenen Blatts, ohne es sicherzustellen - ohne das Blatt fallen sie auf Browser-Vorgaben zurueck');
 });
 
 test('auth.css ist das Seitenblatt jeder Zugangsseite', () => {

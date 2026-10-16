@@ -86,6 +86,9 @@ const COLOR_LABEL_KEYS = [
 export function wireCategoryScopeHelp(root) {
   const button = root.querySelector('.category-scope-help');
   if (!button) return () => {};
+  // Der Notizen-Editor rendert den Knopf selbst; ohne dieses Blatt stuende
+  // sein Tooltip als offener Fliesstext neben dem Bereichsfeld.
+  holdUntilStyled(button, CATEGORY_MANAGER_STYLE);
   const controller = new AbortController();
   const { signal } = controller;
   let pinned = false;

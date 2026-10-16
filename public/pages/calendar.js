@@ -65,6 +65,7 @@ import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { nowFields, todayKey, wallTimeToInstantMs, zonedDateKey, zonedTimeKey } from '/utils/timezone.js';
 import { dayHeading, dayHeadingLabel } from '/utils/day-label.js';
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
+import { holdDocumentAttachStyle } from '/components/document-attach.js';
 import { emptyStateHTML, emptyHintHTML, mountLoadError } from '/utils/empty-state.js';
 import { overlayHost } from '/utils/overlay-host.js';
 import { isPermAdmin, moduleAccess } from '/permissions.js';
@@ -7691,6 +7692,7 @@ function wireEventForm(panel, { mode, event = null, reminder = null }) {
   });
 
   const attachmentDropzone = panel.querySelector('#modal-attachment-dropzone');
+  holdDocumentAttachStyle(attachmentDropzone);
   if (attachmentDropzone && attachmentInput) {
     ['dragenter', 'dragover'].forEach((eventName) => {
       attachmentDropzone.addEventListener(eventName, (dropEvent) => {

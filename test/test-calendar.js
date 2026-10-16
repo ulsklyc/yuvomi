@@ -4608,12 +4608,19 @@ test('Termin-Dialog: die Sichtbarkeitswarnung klappt ihren Abschnitt auf', () =>
  * und `.form-help` (Anhang) hatte nirgends eine Regel. Geprueft wird das
  * gerenderte Markup gegen die Blaetter, die auf /calendar wirklich geladen
  * sind: index.html, calendar.css und reminders.css (router.js laedt es fuer
- * jede angemeldete Sitzung).
+ * jede angemeldete Sitzung) und document-attach.css, das der Dialog selbst
+ * nachlaedt (utils/component-style.js).
  */
 test('Termin-Dialog: jede Klasse im Markup hat eine Regel in einem Blatt, das /calendar laedt', () => {
   const read = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
+  // Die Ablage des Anhangs hat ihre Regeln in document-attach.css, das seit
+  // Critique R19 nicht mehr in index.html steht. Es zaehlt nur, weil der
+  // Dialog es selbst sicherstellt (test:startup-preload prueft das fuer alle
+  // Dateien; hier die Bedingung, unter der das Blatt mitzaehlen darf).
+  assert(/\bholdDocumentAttachStyle\(attachmentDropzone\)/.test(read('../public/pages/calendar.js')),
+    'der Termin-Dialog haelt seine Ablage nicht, bis document-attach.css geladen ist');
   const sheets = [...read('../public/index.html').matchAll(/<link rel="stylesheet" href="\/styles\/([\w-]+\.css)"/g)]
-    .map((m) => m[1]).concat('calendar.css', 'reminders.css');
+    .map((m) => m[1]).concat('calendar.css', 'reminders.css', 'document-attach.css');
   const styled = new Set();
   for (const file of sheets) {
     for (const { selector } of eachRule(read(`../public/styles/${file}`))) {
