@@ -1596,7 +1596,7 @@ border-radius wird ausschliesslich ueber ein Radius-Token oder eine Prozentangab
 der aeussere minus Abstand, ausgeschrieben als `calc(var(--radius-*) - Npx)` bzw. `+ Npx`
 fuer Umhuellungen (belegt in tasks.css, documents.css, health.css). Nie denselben Radius
 blind nach innen kopieren. An den schwebenden Flaechen gerechnet und in `test:material`
-gehalten: Dialog und Zugangstafel 26 - 16 Polster = 10px Felder (`--radius-sm`), Kacheln im
+gehalten: Dialog und Zugangstafel 26 - 16 Polster = 10px Felder (`--radius-sm`), Zeilenlisten im
 Mehr-Blatt 26 - 12 = 14px, seine Systemzeile und der Treffertraeger der Palette 26 - 16 =
 10px, Menuezeilen 18 - 4 = 14px.
 
@@ -2411,9 +2411,22 @@ Gemessen am echten Markup: `test:module-readonly-ui`, `test:budget-readonly-ui`,
   16 %, dunkel 24 %). Pixelprobe 390x844 gegen die Kapsel: 1,32/1,28:1 -> 1,51/1,48:1;
   Akzentzeichen auf der Pille 3,70:1 (Grafik, >= 3:1), Labelton 4,93:1.
 - **Mehr-Blatt:** so breit wie die Kapsel (`max-inline-size: --nav-capsule-max`, zentriert;
-  768px: 744 -> 560px, 390px unveraendert 366px). Kacheln dunkel eine Stufe ueber dem Blatt
-  (`--sheet-tile-bg` = `--color-surface-raised` #37332E auf #2B2825, 1,00 -> 1,17:1); hell
-  bleiben sie Surface, dort trennt `--shadow-xs`.
+  768px: 744 -> 560px, 390px unveraendert 366px). Die Module stehen als **gruppierte
+  Zeilenliste wie in den iOS-Einstellungen** (R19, Ulas 2026-10-16), je Sektion der
+  Seitenleiste eine eingelassene Liste (`.more-sheet__list`): Zeile >= `--target-base`, Siegel
+  32px, Name in `--type-body` einzeilig, Zaehlbadge und Pfeil am Ende, Trennlinie ab der
+  Textkante. Vorher je Sektion ein Vierer-Raster mit 1-2 Kacheln je Gruppe (724px, Luecken).
+  Die System-Reihe darunter bleibt eine volle Reihe aus vier monochromen Zielen. Die Listen
+  dunkel eine Stufe ueber dem Blatt (`--sheet-tile-bg` = `--color-surface-raised` #37332E auf
+  #2B2825, 1,00 -> 1,17:1); hell bleiben sie Surface, dort trennt `--shadow-xs`.
+- **Navigations-Ordnung (R19, Ulas 2026-10-16):** Planen = Kalender, Aufgaben, Belohnungen,
+  Notizen, Schichtplan; Haushalt = Kueche, Haushaltshilfe, Entsorgung, Dokumente, Inventar;
+  Menschen = Kontakte, Geburtstage, Gesundheit; Budget. **Eine Sektion mit nur einem Eintrag
+  hat keinen Kopf** (`navSectionLabelKey`, settings/module-order.js) - Budget steht ohne
+  „Finanzen" mit der Luft einer Gruppe (`.nav-item--headerless`); Seitenleiste und Mehr-Blatt
+  lesen dieselbe Regel, gezaehlt wird in der Seitenleiste. Eine eigene `module_order` sortiert
+  weiter innerhalb der Sektionen. Der Schichtplan zeichnet `briefcase-business` (Lucide) statt
+  einer zweiten Kalenderform. Guard: `test:settings-navigation`.
 - **Der FAB sitzt konzentrisch in der Kapsel:** hinten derselbe Abstand wie oben und unten
   (`--nav-fab-inset` = (Kapselhoehe - Knopf) / 2; Touch heute 8/8/8px, bei 60px Kapsel
   6/6/6 statt 4px hinten), die Reserve der Kapsel waechst mit, die Fuge zum letzten Tab

@@ -80,8 +80,8 @@ This is the part a folder full of separate apps cannot do:
 Switch off what your household doesn't need, and it disappears from everyone's menu. Inventory,
 Waste collection and Schedule start switched off.
 
-- **Plan** - Tasks · Calendar · Schedule · Notes
-- **Household** - Meals · Recipes · Shopping · Pantry · Housekeeping · Waste collection · Documents · Inventory · Rewards
+- **Plan** - Tasks · Calendar · Rewards · Notes · Schedule
+- **Household** - Meals · Recipes · Shopping · Pantry · Housekeeping · Waste collection · Documents · Inventory
 - **People** - Health · Contacts · Birthdays
 - **Finance** - Budget
 - **Settings** - Family · Reminders · API Tokens · Backup

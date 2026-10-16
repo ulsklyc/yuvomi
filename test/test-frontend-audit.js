@@ -7127,15 +7127,13 @@ test('phase 4 keeps Kitchen navigation identity stable', () => {
 
 test('global navigation groups domains with translated section labels', () => {
   const routerSource = read('../public/router.js');
-
-  // The grouped main-app navigation references every section label key and
-  // resolves section labels through t().
-  assert.match(routerSource, /'nav\.sectionOverview'/);
-  assert.match(routerSource, /'nav\.sectionPlan'/);
-  assert.match(routerSource, /'nav\.sectionHousehold'/);
-  assert.match(routerSource, /'nav\.sectionPeople'/);
-  assert.match(routerSource, /'nav\.sectionFinance'/);
-  assert.match(routerSource, /'nav\.sectionCustomModules'/);
+  // R19: die Namen-Tabelle steht nur noch in settings/module-order.js (der
+  // Router hatte eine Abschrift); der Router loest sie ueber navSectionLabelKey.
+  const orderSource = read('../public/settings/module-order.js');
+  assert.match(routerSource, /navSectionLabelKey\(/);
+  for (const key of ['sectionOverview', 'sectionPlan', 'sectionHousehold', 'sectionPeople', 'sectionFinance', 'sectionCustomModules']) {
+    assert.match(orderSource, new RegExp(`'nav\\.${key}'`));
+  }
   assert.match(routerSource, /t\(labelKey\)/);
 
   // The replaced household section label is no longer referenced.
@@ -21876,16 +21874,28 @@ test('D5: die Schnellzeile des Einkaufs traegt die Kapsel+Fill-Haut der Suche', 
 
 // Critique 2026-10-16 (Jordan): das Mehr-Blatt zeigte 16 Ziele als flaches
 // Raster ohne die Sektionen der Seitenleiste. Jetzt je Sektion eine benannte
-// Gruppe mit ihrem Raster - dieselben Namen (NAV_SECTION_LABEL_KEYS) und
-// dieselbe Schriftrolle wie die Seitenleiste.
-test('Mehr-Blatt: die Module stehen in den Sektionen der Seitenleiste', () => {
+// Gruppe - dieselben Namen und dieselbe Schriftrolle wie die Seitenleiste.
+// R19 (Ulas 2026-10-16): die Gruppen sind ZEILENLISTEN wie in den
+// iOS-Einstellungen, kein Vierer-Raster mehr (724px hoch, Gruppen mit ein bis
+// zwei Kacheln in vier Spalten).
+test('Mehr-Blatt: die Module stehen als Zeilenliste in den Sektionen der Seitenleiste', () => {
   const router = read('../public/router.js');
   const body = router.slice(router.indexOf('function buildMoreSheetBody()'), router.indexOf('\n}\n', router.indexOf('function buildMoreSheetBody()')));
-  assert.match(body, /nodes\.push\(\.\.\.moreSheetSections\(modules\)\);/, 'das Blatt baut seine Module ueber die Sektionen');
+  assert.match(body, /nodes\.push\(\.\.\.moreSheetSections\(modules, labelCounts\)\);/, 'das Blatt baut seine Module ueber die Sektionen');
   const fn = router.slice(router.indexOf('function moreSheetSections('), router.indexOf('function buildMoreSheetBody()'));
-  assert.match(fn, /NAV_SECTION_LABEL_KEYS\[section\]/, 'die Namen der Seitenleiste');
+  assert.match(fn, /navSectionLabelKey\(section, /, 'die Namen (und die Kopf-Regel) der Seitenleiste');
   assert.match(fn, /setAttribute\('role', 'group'\)[\s\S]*?setAttribute\('aria-labelledby', labelId\)/, 'hoerbar gruppiert wie die Seitenleiste');
+  assert.match(fn, /className = 'more-sheet__list'/, 'je Gruppe EINE Zeilenliste');
+  assert.doesNotMatch(router, /more-sheet__grid/, 'kein Raster mehr im Blatt');
   const typo = [...eachRule(read('../public/styles/typography.css'))];
   const role = typo.find((r) => r.selector.split(',').map((x) => x.trim()).includes('.nav-section-label'));
   assert.ok(role && role.selector.includes('.more-sheet__section-label'), 'dieselbe Schriftrolle wie die Sektionsnamen der Seitenleiste');
+  const layout = [...eachRule(read('../public/styles/layout.css'))].filter((r) => !r.at.length);
+  const rule = (sel) => layout.find((r) => r.selector.trim() === sel)?.body ?? '';
+  assert.doesNotMatch(read('../public/styles/layout.css'), /\.more-sheet__grid\b/, 'die Rasterregel ist weg');
+  assert.match(rule('.more-item'), /display:\s*flex;[\s\S]*align-items:\s*center/, 'die Zeile: Siegel, Name, Badge, Pfeil nebeneinander');
+  assert.match(rule('.more-item'), /min-block-size:\s*var\(--target-base\)/, 'jede Zeile ist ein volles Ziel (am Finger 48px)');
+  assert.doesNotMatch(rule('.more-item'), /flex-direction:\s*column/, 'keine Kachel (Icon ueber Name) mehr');
+  assert.match(rule('.more-item__label'), /white-space:\s*nowrap/, 'der Name steht auf einer Zeile, ohne Silbentrennung');
+  assert.match(router, /chevron\.dataset\.lucide = 'chevron-right'/, 'der Pfeil am Zeilenende sagt: fuehrt weiter');
 });

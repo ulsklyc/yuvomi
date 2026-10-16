@@ -1071,60 +1071,45 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   margin-block: calc(-1 * var(--space-0h));
 }
 
-/* App-Launcher-Raster: vier Spalten je Sektion der Seitenleiste.
+/* Die Module als GRUPPIERTE ZEILENLISTE (R19, Ulas 2026-10-16) - das Muster
+ * der iOS-Einstellungen: je Sektion der Seitenleiste eine eingelassene Liste
+ * mit Namen darueber. Vorher je Sektion ein Vierer-Raster; mit ein bis zwei
+ * Kacheln je Gruppe stand mehr Luecke als Ziel im Blatt (724px bei 390x844).
+ * Eine Liste ist so hoch, wie sie Eintraege hat, und braucht keine
+ * Silbentrennung im Namen.
  *
- * DIE BEREICHSKOEPFE SIND ZURUECK (Critique 2026-10-16): 16 Ziele ohne
- * Gliederung waren fuer einen Erstnutzer eine Wand. Sie stehen als kompakte
- * Beschriftung im Stil der Seitenleiste (`.more-sheet__section-label`,
- * Schriftrolle in typography.css) direkt ueber ihrem Raster - ein Label von
- * ~16px plus `--space-2h` Luft zur vorigen Gruppe, nicht die Koepfe mit
- * eigenem Abstand von frueher. Was unten steht, ist die Geschichte der
- * flachen Fassung; Spalten, Fuge und Label-Rezept gelten weiter.
- *
- * HIER STANDEN DREI SPALTEN, weil bei vier die Zelle (~80px auf 375px)
- * schmaler war als „Haushaltshilfe" und der Name gebrochen wurde. Der Befund
- * stimmt weiter, die Antwort war nur die teuerste von zweien: drei Spalten
- * kosten bei zehn Modulen eine ganze Reihe extra, und zusammen mit den vier
- * Bereichskoepfen war das Blatt hoeher als die halbe Seite. Die andere Antwort
- * steht seit Etappe 8 zwei Regeln weiter unten in DIESER Datei - die Tab-Leiste
- * hatte exakt dasselbe Problem (fuenf Slots, 58px, „Übersicht") und hat es mit
- * Caption 2 plus zweizeiligem Clamp plus `hyphens: auto` geloest, nicht mit
- * mehr Breite. Das Label unten fuehrt jetzt dasselbe Rezept; die Breite geht
- * ans Raster.
- *
- * Die Kachel behaelt ihren Kasten: sie macht die ganze Zelle zum Ziel statt
- * nur Icon plus Text (die Grosseltern-Seite der Zielgruppe) und gibt dem
- * Zaehlbadge eine Ecke. Der dritte Grund - „im gruppierten Raster trennt sie
- * die Bereiche mit" - ist mit den Koepfen entfallen; die zwei uebrigen tragen.
- * Das farbige Siegel bleibt der Held: --shadow-xs auf Surface ist die leiseste
- * Flaeche der App und tritt hinter es zurueck. */
-.more-sheet__group + .more-sheet__group,
-.more-sheet__grid + .more-sheet__group {
-  margin-block-start: var(--space-2h);
+ * Die Luft zwischen zwei Gruppen ist groesser als die zwischen Name und
+ * Liste (--space-3 gegen --space-1): der Name gehoert zu SEINER Liste. Eine
+ * Gruppe ohne Namen (eine Sektion mit nur einem Eintrag, navSectionLabelKey)
+ * steht mit derselben Luft da, nur ohne Kopf. */
+.more-sheet__group + .more-sheet__group {
+  margin-block-start: var(--space-3);
 }
 
 .more-sheet__section-label {
   color: var(--color-text-tertiary);
-  /* Die Textkante steht auf der Kachelkante; 4px binden das Label an sein
-   * Raster, die Luft zur vorigen Gruppe traegt die Gruppe (oben). */
-  padding-inline: var(--space-1);
+  /* Die Textkante steht auf der Textkante der Zeilen darunter (Polster der
+   * Zeile), 4px binden das Label an seine Liste. */
+  padding-inline: var(--space-3);
   margin-block-end: var(--space-1);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.more-sheet__grid {
-  display: grid;
-  /* minmax(0, 1fr), nicht 1fr: `1fr` ist minmax(AUTO, 1fr) und laesst die
-   * laengste Kachel ihre Spalte breiter ziehen - bei 320px massen die drei
-   * Spalten 93,8 / 89,1 / 89,1px statt dreimal gleich. */
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  /* Die Fuge ist eine Spaltenbreite in Verkleidung: bei vier Spalten gehen
-   * drei Fugen von der Zeile ab, nicht zwei. --space-1h statt --space-2 gibt
-   * jeder Zelle 1,5px zurueck - und die Kachelkanten stehen weiterhin klar
-   * getrennt, weil der Schatten die Trennung fuehrt, nicht der Abstand. */
-  gap: var(--space-1h);
+/* Der Traeger der Zeilen: EINE Flaeche je Gruppe, nicht eine je Zeile
+ * (Zeilenlisten-Regel). Hell Surface wie das Blatt mit dem leisesten
+ * Schatten, dunkel eine Stufe darueber (--sheet-tile-bg, tokens.css).
+ * Konzentrisch zum Blatt: 26px aussen minus 12px Seitenpolster.
+ * `overflow: clip` haelt den Druckzustand der ersten und letzten Zeile in
+ * der Rundung. */
+.more-sheet__list {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--sheet-tile-bg);
+  border-radius: calc(var(--radius-xl) - var(--space-3));
+  box-shadow: var(--shadow-xs);
+  overflow: clip;
 }
 
 .more-sheet[aria-hidden="false"] {
@@ -1390,43 +1375,46 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   }
 }
 
-/* ── More-Item: Modulkachel (Siegel = Held, Fläche = Ziel) ── */
+/* ── More-Item: Modulzeile (Siegel · Name · Badge · Pfeil) ──
+ * Die Zeile der iOS-Einstellungen: das Vollton-Siegel vorn nennt das Modul,
+ * der Name steht in der Lesegroesse der App auf EINER Zeile, Zaehlbadge und
+ * Pfeil sitzen am Ende. Die ganze Zeile ist das Ziel, mindestens
+ * --target-base hoch (am Finger 48px). */
 .more-item {
   position: relative;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  /* Siegel und Name sind EIN Ding, kein Paar: bei --space-2 stand zwischen
-   * ihnen so viel Luft wie zwischen zwei Kacheln, und das Raster las sich als
-   * Reihen von Scheiben mit Bildunterschriften. --space-1h bindet sie. */
-  gap: var(--space-1h);
-  /* Der Innenabstand ist die zweite Haelfte der Spaltenbreite: --space-1
-   * seitlich statt --space-1h gibt dem Namen 4px zurueck, ohne dass die
-   * Kachelkante das Siegel beruehrt (das misst 40px in einer ~83px-Zelle). */
-  padding: var(--space-2h) var(--space-1) var(--space-2);
-  /* Hell Surface wie das Blatt (der Schatten trennt), dunkel eine Stufe
-   * darueber - die Rechnung steht an --sheet-tile-bg (tokens.css). */
-  background-color: var(--sheet-tile-bg);
-  /* Konzentrisch zum Blatt: 26px aussen minus 12px Seitenpolster. */
-  border-radius: calc(var(--radius-xl) - var(--space-3));
-  box-shadow: var(--shadow-xs);
-  color: var(--color-text-secondary);
+  gap: var(--space-3);
+  min-block-size: var(--target-base);
+  padding: var(--space-1h) var(--space-2) var(--space-1h) var(--space-3);
+  color: var(--color-text-primary);
   text-decoration: none;
-  border: none;
   cursor: pointer;
   font-family: inherit;
-  transition: color var(--transition-fast), background-color var(--transition-fast), transform var(--duration-xs) var(--ease-out);
+  transition: background-color var(--transition-fast);
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Gedrückt wird jetzt die KACHEL, nicht mehr nur das Siegel darin: das Ziel ist
- * die ganze Fläche, also muss sie auch die Rückmeldung geben. */
+/* Die Trennlinie beginnt an der TEXTKANTE, nicht an der Zeilenkante (iOS):
+ * Siegel stehen frei untereinander, die Namen sind getrennt. Polster vorn plus
+ * Siegel plus Fuge. */
+.more-item + .more-item::before {
+  content: '';
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: calc(var(--space-3) + var(--target-sm) + var(--space-3)) 0;
+  block-size: 1px;
+  background-color: var(--color-border-subtle);
+}
+
+/* Gedrueckt wird die ZEILE: eine Flaeche, kein Schrumpfen - in einer Liste
+ * stuende eine skalierte Zeile neben ihren Trennlinien. */
 .more-item:active {
-  transform: scale(0.96);
+  background-color: var(--color-surface-hover);
 }
 
 /* Nur an einem echten Zeiger. Ohne die Abfrage blieb die zuletzt angetippte
- * Kachel nach dem Tap auf --color-surface-hover stehen und behauptete "du bist
+ * Zeile nach dem Tap auf --color-surface-hover stehen und behauptete "du bist
  * hier", waehrend aria-current auf einer anderen lag - zwei widersprechende
  * Ortsangaben, eine davon ein Rest (Critique 2026-08-13). */
 @media (hover: hover) {
@@ -1435,143 +1423,79 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .more-item:active {
-    transform: none;
-  }
-}
-
-/* Zählbadge: was in diesem Modul wartet. Grund --tint-state, Tinte --tint-ink,
- * beide aus dem Modulton der Kachel - dieselbe Leiter wie überall. */
+/* Zählbadge: was in diesem Modul wartet - am Zeilenende vor dem Pfeil, wie
+ * die Zahl in den iOS-Einstellungen. */
 .more-item__badge {
-  position: absolute;
-  inset-block-start: var(--space-1);
-  inset-inline-end: var(--space-1);
-  min-width: 18px;
-  padding-inline: var(--space-1);
+  min-width: 20px;
+  padding-inline: var(--space-1h);
   border-radius: var(--radius-full);
-  font-size: var(--text-2xs);
+  font-size: var(--type-caption);
   font-weight: var(--font-weight-semibold);
-  line-height: 18px;
+  line-height: 20px;
   text-align: center;
   font-variant-numeric: tabular-nums;
   /* NEUTRAL, obwohl das Mehr-Blatt eine Mischstelle ist: die Herkunft nennt in
-   * dieser Zelle bereits das Vollton-Siegel darueber. Die ZAHL nennt keine -
-   * sie zaehlt, und eine Toenung des Modultons unter einer Toenung derselben
-   * Farbe sagte sie zweimal blass (Skalen-Regel, Gegenrichtung). */
+   * dieser Zeile bereits das Vollton-Siegel davor. Die ZAHL nennt keine -
+   * sie zaehlt (Skalen-Regel, Gegenrichtung). */
   background-color: var(--color-fill-well);
   color: var(--color-text-secondary);
 }
 
-.more-item[aria-current="page"] {
-  color: var(--color-accent);
-  font-weight: var(--font-weight-semibold);
+.more-item__chevron {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  flex-shrink: 0;
+  color: var(--color-text-tertiary);
 }
 
-/* Das Markensiegel traegt das Modul (Block 2): getoenter Kreis + Icon im
- * vollen Familienton statt der frueheren soliden App-Icon-Kachel. Deren
- * Begruendung ("solide Flaechen trennen aehnliche Hues besser als blasse
- * Pastelle") ist strukturell beantwortet: aehnliche Hues gibt es seit den
- * Familientoenen nicht mehr, innerhalb einer Familie unterscheidet das
- * Icon. Form und Material kommen vom .module-seal-Baustein; hier stehen
- * nur die Grid-Groesse und die Akzent-Weiterleitung. */
+.more-item[aria-current="page"] {
+  color: var(--color-accent);
+}
+
+/* Das Markensiegel traegt das Modul (Block 2): Vollton-Scheibe im
+ * Familienton. Form und Material kommen vom .module-seal-Baustein; hier
+ * stehen nur die Zeilengroesse und die Akzent-Weiterleitung. 32px in einer
+ * 48px-Zeile - das Verhaeltnis der iOS-Einstellungen (29 in 44). */
 .more-item__icon-well {
   --seal-accent: var(--item-module-accent, var(--color-text-secondary));
-  --seal-icon: var(--icon-lg);
-  /* 40px statt 48px, und das ist eine Proportion, keine Sparmassnahme: in der
-   * ~83px-Zelle des Vierer-Rasters nahm die 48er-Scheibe 58 % der Breite und
-   * druckte den Namen an die Kante. 40px sind knapp die Haelfte - dieselbe
-   * Beziehung, die die 48er zur 109px-Zelle des Dreier-Rasters hatte. Der
-   * Glyph faellt mit (--icon-lg statt --icon-xl), damit das Verhaeltnis von
-   * Zeichen zu Scheibe dasselbe bleibt wie an jedem anderen Siegel. */
-  width: 40px;
-  height: 40px;
+  --seal-icon: var(--icon-md);
+  width: var(--target-sm);
+  height: var(--target-sm);
   flex-shrink: 0;
-  /* Der Inset-Specular kommt aus den Tokens, nicht von Hand. Hier standen 30/12
-   * gegen die 28/12 der Tokens - dieselbe Absicht, eine Ziffer daneben, und
-   * damit die dritte Schreibweise eines Effekts, den es schon zweimal gab.
-   * Wichtiger als die Ziffer: die Tokens hängen am --glass-inset-strength-
-   * Schalter und fallen unter prefers-reduced-transparency / prefers-contrast
-   * mit; ein handgeschriebener Wert bliebe dort stehen. */
+  /* Der Inset-Specular kommt aus den Tokens (haengt am
+   * --glass-inset-strength-Schalter und faellt unter
+   * prefers-reduced-transparency / prefers-contrast mit). */
   box-shadow:
     var(--glass-inset-elevated),
     var(--glass-inset-bottom-base);
-  transition: transform var(--duration-xs) var(--ease-out);
 }
 
-/* Aktives Modul (Sheet auf dieser Route geöffnet): Akzent-Ring statt Tint. */
+/* Aktives Modul (Sheet auf dieser Route geöffnet): Akzent-Ring am Siegel
+ * plus Akzent-Name - zwei Kanaele, keiner davon nur Farbe der Flaeche. */
 .more-item[aria-current="page"] .more-item__icon-well {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
 
 .more-item__icon {
-  width: var(--icon-lg);
-  height: var(--icon-lg);
+  width: var(--icon-md);
+  height: var(--icon-md);
   flex-shrink: 0;
 }
 
-/* DASSELBE REZEPT WIE DIE TAB-LEISTE, UND ZWAR WEIL ES DASSELBE PROBLEM IST.
- *
- * Hier stand „Modulnamen werden nie silbengetrennt", und der Anlass war echt:
- * `overflow-wrap` zerhackte „Haushaltshil-fe". Was dabei nie geprueft wurde,
- * ist der Unterschied zwischen einem BRUCH und einer TRENNUNG. `break-word`
- * und `anywhere` brechen per Definition irgendwo im Wort; `hyphens: auto`
- * fragt das Silben-Woerterbuch der Dokumentsprache (lang steht auf der
- * Wurzel, lang-init.js/i18n.js). Genau diese Korrektur hat
- * `.nav-bottom .nav-item__label` bereits bekommen, mit demselben Satz: die
- * Regel war nie ueber Zeilen, sie war ueber Deutsch.
- *
- * ABER `hyphens: auto` ALLEIN REICHT NICHT, UND DAS IST GEMESSEN. Bei 375px
- * wollte „Haushaltshilfe" 76,5px und bekam 75,3 - eineinhalb Pixel zu wenig.
- * Der Browser nimmt dann die LETZTE erlaubte Trennstelle, die noch passt, und
- * die deutschen Trennmuster erlauben „Haushaltshil-fe": wortrichtig getrennt
- * und trotzdem genau der Anblick, den die alte Regel verbieten wollte. Eine
- * Trennung mit zwei Zeichen auf der zweiten Zeile ist kein Zeilenumbruch mehr,
- * sondern ein abgerissener Buchstabe. `hyphenate-limit-chars` setzt die
- * Untergrenze: mindestens 6 Zeichen im Wort, mindestens 4 vor und 4 NACH dem
- * Strich. Damit faellt „…hil-fe" weg und es bleibt „Haushalts-hilfe" - der
- * Bruch, den die Regel immer gemeint hat. (Browser ohne die Eigenschaft
- * verhalten sich wie bisher; sie ist eine Verschaerfung, kein Fundament.)
- *
- * SAFARI KENNT DIE EIGENSCHAFT NICHT (Stand Safari 27, nur die Technology
- * Preview parst sie) und trennte deshalb ohne Grenze: „Wertpapierde-pot"
- * (#1774). WebKit hat dieselbe Grenze seit Safari 5.1 unter eigenem Namen,
- * deshalb steht unter JEDEM `hyphenate-limit-chars` das Paar
- * `-webkit-hyphenate-limit-before` / `-after` mit denselben beiden Zahlen. Die
- * erste Zahl (Mindestlaenge des Worts) hat dort keine Entsprechung; before +
- * after tragen sie mit. Das Paar steht NACH der Kurzform: in WebKit sind die
- * beiden Praefix-Eigenschaften deren Langformen, gleiche Werte ueberschreiben
- * also nichts. `test:typography` haelt das Paar an jeder Regel.
- *
- * Die Groesse folgt derselben Quelle wie die Leiste: Caption 2 (11px) ist die
- * kleinste TEXTROLLE der Skala - darunter beginnt --text-2xs, und das ist eine
- * Badge-Groesse. Es ist zugleich der Plattform-Wert (iOS setzt Icon-Labels auf
- * 11pt), also kein Notnagel fuer die vierte Spalte.
- *
- * ZWEI ZEILEN SIND RESERVIERT, NICHT ERLAUBT. Ohne die Untergrenze massen die
- * Reihen bei 375px 89,3 und 76,6px: dieselbe Kachel in zwei Groessen, je
- * nachdem ob zufaellig ein langer Name in der Reihe steht - ein Raster, dessen
- * Kanten nicht fluchten, liest sich als Fehler, nicht als Rhythmus. Die
- * Reservierung kostet auf einem 390er zwei mal 12,7px und kauft dafuer eine
- * Matrix. Der Text bleibt oben in seinem Kasten, damit die ERSTEN Zeilen aller
- * Namen einer Reihe auf derselben Linie sitzen. */
+/* Der Name: Lesegroesse, eine Zeile. In der Zeile hat er die ganze Breite
+ * zwischen Siegel und Pfeil (rund 250px bei 390) - „Haushaltshilfe" bricht
+ * nicht mehr, und ein ueberlanger Name eines Erweiterungsmoduls endet in
+ * einer Ellipse statt die Zeile zu sprengen. */
 .more-item__label {
-  font-size: var(--type-micro);
-  font-weight: var(--font-weight-medium);
-  text-align: center;
-  line-height: 1.15;
-  min-block-size: 2.3em;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  font-size: var(--type-body);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-tight);
+  white-space: nowrap;
   overflow: hidden;
-  hyphens: auto;
-  hyphenate-limit-chars: 6 4 4;
-  -webkit-hyphenate-limit-before: 4;
-  -webkit-hyphenate-limit-after: 4;
-  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
 }
 
 .more-item[aria-current="page"] .more-item__label {
@@ -10349,6 +10273,15 @@ textarea.input { resize: vertical; }
   gap: var(--space-0h);
 }
 
+/* EIN EINTRAG OHNE SEKTIONSKOPF (R19): eine Sektion mit nur einem Modul
+ * bekommt keinen Namen (navSectionLabelKey, settings/module-order.js) - Budget
+ * stand allein unter „Finanzen". Der Eintrag behaelt die Luft, die eine
+ * Gruppe vor ihrem Kopf hat, damit er sich nicht an die Gruppe davor haengt,
+ * als gehoere er zu ihr. */
+.nav-sidebar .nav-item--headerless {
+  margin-block-start: var(--space-2);
+}
+
 /* Nav-Items über dem Sidebar-Indikator */
 .nav-sidebar__items--liquid .nav-item {
   z-index: 1;
@@ -10535,10 +10468,6 @@ textarea.input { resize: vertical; }
 
   .more-sheet__search:active,
   .more-action:active {
-    transform: none;
-  }
-
-  .more-item:active .more-item__icon-well {
     transform: none;
   }
 

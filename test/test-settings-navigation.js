@@ -1418,13 +1418,45 @@ test('navigation sections match the grouped desktop information architecture', (
   assert.equal(moduleSection('housekeeping'), NAV_SECTION.household);
   assert.equal(moduleSection('documents'), NAV_SECTION.household);
   assert.equal(moduleSection('inventory'), NAV_SECTION.household);
-  assert.equal(moduleSection('rewards'), NAV_SECTION.household);
+  // R19 (Ulas 2026-10-16): die Belohnungen sind die Gegenseite der Aufgaben
+  // und stehen unter Planen, nicht mehr unter Haushalt.
+  assert.equal(moduleSection('rewards'), NAV_SECTION.plan);
+  assert.equal(moduleSection('schedule'), NAV_SECTION.plan);
   assert.equal(moduleSection('contacts'), NAV_SECTION.people);
   assert.equal(moduleSection('birthdays'), NAV_SECTION.people);
   assert.equal(moduleSection('health'), NAV_SECTION.people);
   assert.equal(moduleSection('budget'), NAV_SECTION.finance);
   assert.equal(moduleSection('third-party-weather-station'), NAV_SECTION.customModules);
   assert.equal(moduleSection('settings'), NAV_SECTION.household);
+});
+
+// R19 (Ulas 2026-10-16): eine Sektion mit nur EINEM Eintrag bekommt keinen
+// Kopf - "Finanzen" stand ueber Budget allein. Die Kueche zaehlt als ein
+// Eintrag, die Uebersicht hat nie einen Kopf. Seitenleiste und Mehr-Blatt
+// lesen dieselbe Regel.
+test('R19: eine Sektion mit nur einem Eintrag hat keinen Namen in der Navigation', async () => {
+  const { navSectionLabelKey, navSectionEntryCounts } = await import('../public/settings/module-order.js');
+  assert.equal(navSectionLabelKey(NAV_SECTION.finance, 1), null, 'Budget allein: kein "Finanzen"');
+  assert.equal(navSectionLabelKey(NAV_SECTION.finance, 2), 'nav.sectionFinance');
+  assert.equal(navSectionLabelKey(NAV_SECTION.plan, 5), 'nav.sectionPlan');
+  assert.equal(navSectionLabelKey(NAV_SECTION.overview, 3), null, 'die Uebersicht ist die Wurzel');
+  assert.equal(navSectionLabelKey(NAV_SECTION.people, undefined), null);
+  const counts = navSectionEntryCounts([
+    { section: NAV_SECTION.plan }, { section: NAV_SECTION.plan },
+    { section: NAV_SECTION.household, kitchenGroup: true }, { section: NAV_SECTION.household, kitchenGroup: true },
+    { section: NAV_SECTION.household, kitchenGroup: true }, { section: NAV_SECTION.finance },
+  ]);
+  assert.equal(counts.get(NAV_SECTION.plan), 2);
+  assert.equal(counts.get(NAV_SECTION.household), 1, 'die vier Kuechen-Kinder sind EIN Eintrag');
+  assert.equal(counts.get(NAV_SECTION.finance), 1);
+  const router = await readFile(new URL('../public/router.js', import.meta.url), 'utf8');
+  const sidebar = router.slice(router.indexOf('function sidebarNavItems()'), router.indexOf('function isModuleDisabled('));
+  assert.match(sidebar, /navSectionLabelKey\(section, entryCounts\.get\(section\)\)/, 'die Seitenleiste fragt die Regel');
+  assert.doesNotMatch(router, /const NAV_SECTION_LABEL_KEYS = /, 'keine Abschrift der Namen-Tabelle im Router');
+  const sheet = router.slice(router.indexOf('function moreSheetSections('), router.indexOf('function buildMoreSheetBody()'));
+  assert.match(sheet, /navSectionLabelKey\(section, labelCounts\.get\(section\)\)/, 'das Mehr-Blatt fragt dieselbe Regel');
+  const body = router.slice(router.indexOf('function buildMoreSheetBody()'), router.indexOf('function renderPage('));
+  assert.match(body, /navSectionEntryCounts\(navItems\(\)/, 'gezaehlt wird in der Seitenleiste, nicht im Blatt ohne Favoriten');
 });
 
 test('desktop navigation order is applied only inside each section', () => {
@@ -3156,8 +3188,10 @@ test('R14: Modulblaetter stehen in der Reihenfolge der Seitenleiste', async () =
   assert.equal(plain.at(-1), 'modules-install', 'Hinzufuegen steht am Ende');
   assert.equal(ids(['budget', 'tasks']).at(-1), 'modules-install', 'auch bei eigener Anordnung');
   const mods = plain.slice(2, -1);
-  assert.deepEqual(mods, ['dashboard', 'calendar', 'schedule', 'tasks', 'kitchen', 'housekeeping', 'waste', 'documents',
-    'inventory', 'rewards', 'contacts', 'health', 'budget'], 'ohne eigene Anordnung genau wie die Seitenleiste (gemessen 1440)');
+  // R19 (Ulas 2026-10-16): Planen = Kalender, Aufgaben, Belohnungen, Notizen,
+  // Schichtplan. Notizen haben kein eigenes Modulblatt.
+  assert.deepEqual(mods, ['dashboard', 'calendar', 'tasks', 'rewards', 'schedule', 'kitchen', 'housekeeping', 'waste', 'documents',
+    'inventory', 'contacts', 'health', 'budget'], 'ohne eigene Anordnung genau wie die Seitenleiste (gemessen 1440)');
   const pos = (id) => mods.indexOf(id);
   assert.equal(mods[0], 'dashboard', 'die Uebersicht fuehrt wie in der Seitenleiste');
   assert.ok(pos('tasks') < pos('kitchen') && pos('kitchen') < pos('contacts') && pos('contacts') < pos('budget'),
@@ -3165,7 +3199,7 @@ test('R14: Modulblaetter stehen in der Reihenfolge der Seitenleiste', async () =
   assert.ok(pos('health') < pos('budget'), 'Gesundheit (Menschen) vor Budget (Finanzen)');
   const custom = ids(['tasks', 'schedule', 'calendar', 'rewards', 'kitchen']).slice(2, -1);
   assert.ok(custom.indexOf('tasks') < custom.indexOf('calendar'), 'die eigene Reihenfolge des Haushalts zaehlt');
-  assert.ok(custom.indexOf('rewards') < custom.indexOf('kitchen'));
+  assert.ok(custom.indexOf('rewards') < custom.indexOf('kitchen'), 'Planen vor Haushalt');
   const router = await readFile(new URL('../public/router.js', import.meta.url), 'utf8');
   assert.match(router, /moduleOrder: \(\) => _moduleOrder\.slice\(\)/, 'die Einstellungen lesen dieselbe Reihenfolge wie die Seitenleiste');
 });
@@ -4183,4 +4217,20 @@ test('calendar feed birthday switch persists changes and restores its visual sta
     assert.equal(input.checked, false, 'failed save restores the previous choice');
     assert.equal(input.disabled, false);
   } finally { globalThis.__apiStub = previous; globalThis.window = previousWindow; }
+});
+
+// R19 (Critique 2026-10-16): der Schichtplan trug dieselbe Kalender-Glyphe wie
+// der Kalender (`calendar-clock` neben `calendar`, beide blau, Nachbarn in
+// "Planen"). Er bekommt ein eigenes Zeichen aus dem gebuendelten Lucide.
+test('R19: der Schichtplan hat eine eigene Glyphe, keine Kalenderform', async () => {
+  const { MODULE_ICON } = await import('../public/nav-icons.js');
+  const glyph = MODULE_ICON.schedule;
+  assert.ok(!/^calendar/.test(glyph), `Schichtplan zeichnet "${glyph}" - wieder eine Kalenderform`);
+  const neighbours = ['calendar', 'tasks', 'rewards', 'notes'].map((id) => MODULE_ICON[id]);
+  assert.ok(!neighbours.includes(glyph), 'kein Zeichen eines Nachbarn in Planen');
+  const pascal = glyph.replace(/(^|-)(\w)/g, (_m, _d, c) => c.toUpperCase());
+  const lucide = await readFile(new URL('../public/lucide.min.js', import.meta.url), 'utf8');
+  assert.match(lucide, new RegExp(`\\b${pascal}\\b`), `${pascal} fehlt im gebuendelten Lucide (public/lucide.min.js)`);
+  const reminders = await readFile(new URL('../public/reminders.js', import.meta.url), 'utf8');
+  assert.match(reminders, new RegExp(`schedule_entry:[^\\n]*icon: '${glyph}'`), 'die Erinnerung des Schichtplans traegt sein Zeichen');
 });

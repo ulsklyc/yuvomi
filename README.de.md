@@ -80,8 +80,8 @@ Das ist der Teil, den ein Ordner voller Einzel-Apps nicht kann:
 Schaltet ab, was euer Haushalt nicht braucht, und es verschwindet für alle aus dem Menü. Inventar,
 Entsorgung und Schichtplan sind anfangs aus.
 
-- **Planen** - Aufgaben · Kalender · Schichtplan · Notizen
-- **Haushalt** - Mahlzeiten · Rezepte · Einkauf · Vorrat · Haushaltshilfe · Entsorgung · Dokumente · Inventar · Belohnungen
+- **Planen** - Aufgaben · Kalender · Belohnungen · Notizen · Schichtplan
+- **Haushalt** - Mahlzeiten · Rezepte · Einkauf · Vorrat · Haushaltshilfe · Entsorgung · Dokumente · Inventar
 - **Menschen** - Gesundheit · Kontakte · Geburtstage
 - **Finanzen** - Budget
 - **Einstellungen** - Familie · Erinnerungen · API-Tokens · Backup

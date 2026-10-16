@@ -31,6 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The menu groups your planning in one place.** Calendar, Tasks, Rewards, Notes and Schedule now
+  sit together under Plan, and Budget stands on its own without a "Finance" heading over a single
+  entry. Schedule has its own briefcase symbol instead of a second calendar. Your own module order
+  still applies within each group. On a phone, More lists the modules in grouped rows like the
+  iOS Settings app, with each name on one line and waiting counts at the end of the row, instead
+  of a grid with gaps.
 - **The tab bar on a phone makes room while you read.** Scrolling down shrinks it to its icons and
   makes it flatter; scrolling up, reaching the top or the end of a page brings the labels back. The
   add button stays, nothing on the page moves, and with reduced motion it switches without sliding.

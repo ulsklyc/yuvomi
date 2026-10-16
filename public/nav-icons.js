@@ -317,7 +317,10 @@ function svgMarkup(shapes, className) {
 export const MODULE_ICON = {
   dashboard:        'layout-dashboard',
   calendar:         'calendar',
-  schedule:         'calendar-clock',
+  // Schichtplan: eine Arbeitstasche (Lucide), NICHT die Kalenderform - mit
+  // `calendar-clock` stand er in der Leiste als zweiter blauer Kalender
+  // direkt neben dem Kalender (Critique 2026-10-16, R19).
+  schedule:         'briefcase-business',
   tasks:            'check-square',
   notes:            'sticky-note',
   meals:            'utensils',

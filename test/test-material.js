@@ -196,7 +196,9 @@ test('R18: die Innenradien der schwebenden Flaechen sind konzentrisch', () => {
   const menu = px('var(--radius-glass-inner)');
   // [innen, aussen, Abstand zur Kante der Flaeche, Name]
   const pairs = [
-    [first(LAYOUT, '.more-item'), outer, px('var(--space-3)'), 'Kachel im Mehr-Blatt (12px Seitenpolster)'],
+    // R19: das Mehr-Blatt ist eine gruppierte Zeilenliste - die Rundung traegt
+    // der Traeger der Zeilen, nicht mehr jede Kachel.
+    [first(LAYOUT, '.more-sheet__list'), outer, px('var(--space-3)'), 'Zeilenliste im Mehr-Blatt (12px Seitenpolster)'],
     [first(LAYOUT, '.more-action'), outer, px('var(--space-4)'), 'Systemzeile im Mehr-Blatt (16px Polster unten)'],
     [first(LAYOUT, '.search-section__rows', (at) => /min-width:\s*768px/.test(at)), outer, px('var(--space-4)'),
       'Treffertraeger der Palette (16px Polster)'],

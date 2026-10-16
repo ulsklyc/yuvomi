@@ -21,9 +21,10 @@ export const KITCHEN_CHILD_IDS = Object.freeze(['meals', 'recipes', 'shopping', 
 export const BUILT_IN_MODULES = Object.freeze([
   { id: 'dashboard', labelKey: 'nav.dashboard', locked: true },
   { id: 'calendar', labelKey: 'nav.calendar' },
-  { id: 'schedule', labelKey: 'nav.schedule' },
   { id: 'tasks', labelKey: 'nav.tasks' },
+  { id: 'rewards', labelKey: 'nav.rewards' },
   { id: 'notes', labelKey: 'nav.notes' },
+  { id: 'schedule', labelKey: 'nav.schedule' },
   { id: 'contacts', labelKey: 'nav.contacts' },
   { id: 'birthdays', labelKey: 'nav.birthdays' },
   { id: 'budget', labelKey: 'nav.budget' },
@@ -31,7 +32,6 @@ export const BUILT_IN_MODULES = Object.freeze([
   { id: 'inventory', labelKey: 'nav.inventory' },
   { id: 'housekeeping', labelKey: 'nav.housekeeping' },
   { id: 'waste', labelKey: 'nav.waste' },
-  { id: 'rewards', labelKey: 'nav.rewards' },
   { id: 'health', labelKey: 'nav.health' },
   { id: 'settings', labelKey: 'nav.settings', locked: true },
 ]);
@@ -76,14 +76,64 @@ export const NAV_SECTIONS = Object.freeze([
   NAV_SECTION.customModules,
 ]);
 
+/**
+ * Wie viele EINTRAEGE jede Sektion in einer Navigationsliste hat. Die vier
+ * Kuechen-Kinder sind in der Leiste EIN Eintrag (die Kuechen-Gruppe), deshalb
+ * zaehlen sie zusammen einmal.
+ *
+ * @param {Array<{section?: number, kitchenGroup?: boolean}>} items
+ * @returns {Map<number, number>}
+ */
+export function navSectionEntryCounts(items = []) {
+  const counts = new Map();
+  let kitchenCounted = false;
+  for (const item of Array.isArray(items) ? items : []) {
+    if (item?.section == null) continue;
+    if (item.kitchenGroup) {
+      if (kitchenCounted) continue;
+      kitchenCounted = true;
+    }
+    counts.set(item.section, (counts.get(item.section) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/**
+ * Der Name einer Sektion in der Navigation - oder `null`, wenn sie keinen
+ * Kopf bekommt.
+ *
+ * EINE SEKTION MIT NUR EINEM EINTRAG HAT KEINEN NAMEN (R19, Ulas 2026-10-16).
+ * „Finanzen" stand als Ueberschrift ueber genau einem Ziel, Budget: ein Kopf,
+ * der nichts gliedert, nur Hoehe kostet und den Eintrag doppelt benennt. Der
+ * Eintrag haengt sich dann ohne Kopf an (Seitenleiste und Mehr-Blatt lesen
+ * dieselbe Regel). Die Uebersicht hat nie einen Kopf - sie ist die Wurzel.
+ * Die Einstellungsblaetter, die ALLE Module samt abgeschalteten auflisten,
+ * sind keine Navigation und benutzen weiter NAV_SECTION_LABEL_KEYS direkt.
+ *
+ * @param {number} section
+ * @param {number} entryCount  Eintraege der Sektion in DERSELBEN Liste
+ * @returns {string|null} Locale-Key
+ */
+export function navSectionLabelKey(section, entryCount) {
+  if (section === NAV_SECTION.overview || !(entryCount >= 2)) return null;
+  return NAV_SECTION_LABEL_KEYS[section] ?? null;
+}
+
 // Akzent einer Drittanbieter-Zeile, wenn das Modul keinen eigenen mitbringt.
 export const DEFAULT_MODULE_ACCENT = 'var(--color-accent)';
 
 const KITCHEN_CHILD_ID_SET = new Set(KITCHEN_CHILD_IDS);
-const PLAN_MODULE_IDS = new Set(['calendar', 'schedule', 'tasks', 'notes']);
+// PLANEN = was die Familie vorhat und abarbeitet (R19, Ulas 2026-10-16):
+// Kalender, Aufgaben, Belohnungen, Notizen, Schichtplan. Die Belohnungen sind
+// die Gegenseite der Aufgaben (Punkte fuer Erledigtes) und standen unter
+// Haushalt zwischen Inventar und nichts; der Schichtplan stand VOR den
+// Aufgaben, obwohl er das seltenste Ziel der Gruppe ist. Die Reihenfolge
+// INNERHALB der Gruppe ist die von BUILT_IN_MODULES bzw. der Routerliste; eine
+// eigene `module_order` des Nutzers bleibt davon unberuehrt.
+const PLAN_MODULE_IDS = new Set(['calendar', 'tasks', 'rewards', 'notes', 'schedule']);
 // Ehemals ein einziger „Zuhause"-Sammeltopf (8 Module) — aufgeteilt in semantische
 // Gruppen ≤5, damit die Sidebar-Sektion eine Bedeutung trägt statt „nicht Plan/Übersicht".
-const HOUSEHOLD_MODULE_IDS = new Set(['kitchen', 'meals', 'recipes', 'shopping', 'housekeeping', 'waste', 'documents', 'inventory', 'rewards']);
+const HOUSEHOLD_MODULE_IDS = new Set(['kitchen', 'meals', 'recipes', 'shopping', 'housekeeping', 'waste', 'documents', 'inventory']);
 const PEOPLE_MODULE_IDS = new Set(['contacts', 'birthdays', 'health']);
 const FINANCE_MODULE_IDS = new Set(['budget']);
 const MOBILE_NAV_ID_RE = /^[a-z0-9][a-z0-9-]*$/;

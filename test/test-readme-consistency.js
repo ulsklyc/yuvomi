@@ -341,7 +341,7 @@ test('der Gruppen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
     return groupFindings(md.replace(from, to), html, 'en');
   };
   // Kontakte zurueck zu den Notizen (der Anlass von Runde 2 auf der Homepage).
-  const f1 = swap('Schedule · Notes\n', 'Schedule · Notes · Contacts\n');
+  const f1 = swap('Notes · Schedule\n', 'Notes · Schedule · Contacts\n');
   assert.ok(hit(f1, /Gruppe "Plan"/) && hit(f1, /zwei Gruppenzeilen/), f1.join(' | '));
   // Ein Modul fehlt in den Gruppenzeilen, steht aber in der Tabelle.
   assert.ok(hit(swap(' · Waste collection', ''), /Tabellenzeile "Waste collection" steht in keiner Gruppenzeile/));

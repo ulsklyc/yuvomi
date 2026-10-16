@@ -1679,8 +1679,9 @@ test('der Menuegruppen-Guard erkennt den Schaden, gegen den er gebaut ist', () =
     + groups.map(([g, keys]) => `<h3 class="mod-group-head" data-t="grp_${g}">${g}</h3>` + keys.map(card).join('')).join('')
     + '</div><button id="modToggle">';
   const healthy = page([
-    ['plan', ['f_tasks', 'm_cal', 'm_sched', 'm_notes']],
-    ['household', ['f_meals', 'm_recipes', 'm_shop', 'm_pantry', 'm_house', 'm_waste', 'm_docs', 'm_inv', 'm_rewards']],
+    // R19 (Ulas 2026-10-16): Belohnungen unter Planen, Schichtplan am Ende.
+    ['plan', ['f_tasks', 'm_cal', 'm_rewards', 'm_notes', 'm_sched']],
+    ['household', ['f_meals', 'm_recipes', 'm_shop', 'm_pantry', 'm_house', 'm_waste', 'm_docs', 'm_inv']],
     ['people', ['f_health', 'm_contacts', 'm_bday']],
     ['finance', ['f_budget']],
     ['settings', ['m_family', 'm_rem', 'm_api', 'm_backup']],
@@ -1696,9 +1697,9 @@ test('der Menuegruppen-Guard erkennt den Schaden, gegen den er gebaut ist', () =
   assert.match(found, /m_backup: steht nicht im Menue, aber in der Gruppe people/);
   assert.match(found, /m_new: ohne Zuordnung/);
   // Vertauschte Reihenfolge innerhalb einer Gruppe.
-  const swapped = healthy.replace('<h4 data-t="m_cal_t">x</h4><h4 data-t="m_sched_t">x</h4>',
-    '<h4 data-t="m_sched_t">x</h4><h4 data-t="m_cal_t">x</h4>');
-  assert.match(navGroupProblems(swapped, ROUTER()).join('\n'), /plan: Reihenfolge schedule, calendar/);
+  const swapped = healthy.replace('<h4 data-t="m_cal_t">x</h4><h4 data-t="m_rewards_t">x</h4>',
+    '<h4 data-t="m_rewards_t">x</h4><h4 data-t="m_cal_t">x</h4>');
+  assert.match(navGroupProblems(swapped, ROUTER()).join('\n'), /plan: Reihenfolge rewards, calendar/);
   // Das ausfuehrliche Modul rutscht aus der Spitze seiner Gruppe.
   const featLate = healthy.replace('<h4 data-t="f_tasks_t">x</h4><h4 data-t="m_cal_t">x</h4>',
     '<h4 data-t="m_cal_t">x</h4><h4 data-t="f_tasks_t">x</h4>');

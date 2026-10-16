@@ -77,6 +77,8 @@ import {
 } from '/settings/registry.js';
 import {
   NAV_SECTION,
+  navSectionEntryCounts,
+  navSectionLabelKey,
   resolveMobileNavOrder,
   sortNavigationItems,
 } from '/settings/module-order.js';
@@ -508,17 +510,11 @@ let _moduleRefreshTimer = null;
 
 const MOBILE_FAVORITE_COUNT = 3;
 
-// Domänen-Gruppierung der Haupt-Navigation. Die Reihenfolge bestimmt die
-// Sortierung der Sektionen (Overview → Plan → Home); die Label-Keys werden in
-// der Sidebar via t() aufgelöst.
-const NAV_SECTION_LABEL_KEYS = Object.freeze({
-  [NAV_SECTION.overview]: 'nav.sectionOverview',
-  [NAV_SECTION.plan]: 'nav.sectionPlan',
-  [NAV_SECTION.household]: 'nav.sectionHousehold',
-  [NAV_SECTION.people]: 'nav.sectionPeople',
-  [NAV_SECTION.finance]: 'nav.sectionFinance',
-  [NAV_SECTION.customModules]: 'nav.sectionCustomModules',
-});
+// Domänen-Gruppierung der Haupt-Navigation: Sektionen und ihre Namen stehen
+// in settings/module-order.js (NAV_SECTION, navSectionLabelKey). Hier stand
+// eine Abschrift der Namen-Tabelle - die dritte Stelle neben den beiden
+// Modul-Blaettern, und die erste, die eine neue Regel (kein Kopf ueber nur
+// einem Eintrag, R19) nicht mitbekommen haette.
 
 const DEFAULT_APP_NAME = 'Yuvomi';
 const APP_NAME_STORAGE_KEY = 'yuvomi-app-name';
@@ -1319,7 +1315,8 @@ function paintMoreSheetBadges(sheet) {
     const existing = item.querySelector('.more-item__badge');
     if (count > 0) {
       if (existing) existing.replaceWith(moreBadgeEl(count));
-      else item.appendChild(moreBadgeEl(count));
+      // Vor den Pfeil (Lucide uebernimmt die Klasse aufs erzeugte <svg>).
+      else item.insertBefore(moreBadgeEl(count), item.querySelector('.more-item__chevron'));
       // Ansage am Link, nicht am Badge - siehe moreBadgeEl.
       const labelText = item.querySelector('.more-item__label')?.textContent;
       if (labelText) item.setAttribute('aria-label', `${labelText}, ${t('nav.moreBadge', { count })}`);
@@ -1331,41 +1328,27 @@ function paintMoreSheetBadges(sheet) {
 }
 
 /**
- * Baut den dynamischen Body des „Mehr“-Sheets: die Module in den Sektionen
- * der Seitenleiste (je ein vierspaltiges Raster unter ihrem Namen) und
- * darunter, im selben Raster, die monochrome System-Reihe (Einstellungen ·
- * Hilfe · Änderungen · Abmelden).
+ * Baut den dynamischen Body des „Mehr“-Sheets: die Module als gruppierte
+ * Zeilenliste in den Sektionen der Seitenleiste und darunter die monochrome
+ * System-Reihe (Einstellungen · Hilfe · Änderungen · Abmelden).
  *
- * DIE SEKTIONEN SIND ZURUECK (Critique 2026-10-16, Jordan): 16 Ziele als
- * flaches Raster waren fuer einen Erstnutzer eine Wand - er fand „Entsorgung"
- * nicht dort, wo die Seitenleiste am Desktop sie unter „Haushalt" zeigt. Die
- * Beschriftungen tragen den Stil der Seitenleiste (`.nav-section-label`,
- * typography.css) und sitzen eng an ihrem Raster; der Hoehenpreis, der sie
- * am 2026-08-13 gekostet hatte (unten), ist mit der kompakten Zeile kleiner.
- * Die Absaetze darunter sind die damalige Begruendung - Geschichte.
+ * EINE ZEILENLISTE WIE IN DEN iOS-EINSTELLUNGEN, KEIN RASTER MEHR (R19, Ulas
+ * 2026-10-16). Das Vierer-Raster je Sektion liess Luecken: Planen trug zwei
+ * Kacheln, Finanzen eine, und das Blatt mass bei 390x844 724px (86 % des
+ * Schirms) fuer zwoelf Ziele, von denen jede Gruppe ihre Reihe nur halb
+ * fuellte. Eine Liste hat keine leeren Zellen: jede Gruppe ist so hoch, wie
+ * sie Eintraege hat, der Name steht in voller Laenge auf einer Zeile (keine
+ * Silbentrennung „Haushalts-hilfe" mehr), und das Zaehlbadge sitzt am Ende der
+ * Zeile, wo der Blick es auf iOS sucht. Die Gruppen sind dieselben wie in der
+ * Seitenleiste, mit derselben Regel fuer den Kopf (navSectionLabelKey: ueber
+ * nur einem Eintrag steht keiner).
+ *
+ * Die System-Reihe bleibt eine Reihe aus vier Zielen: sie ist voll besetzt
+ * (keine Luecke), monochrom (Meta, nicht Modul) und kostet als Reihe 64px
+ * statt vier Zeilen.
  *
  * Gibt EINEN Knoten in einem Array zurück (`.more-sheet__body`, der Scroller);
  * beide Aufrufer spreizen das Ergebnis und bleiben davon unberührt.
- *
- * EIN RASTER, KEINE ÜBERSCHRIFTEN. Die Bereichsköpfe (Planen · Haushalt ·
- * Menschen · Finanzen) sind hier ersatzlos weg, und die Reihenfolge verliert
- * dabei nichts: `secondaryMobileItems()` liefert bereits nach Sektion sortiert
- * (sortNavigationItems), die Gruppen standen also nur noch als Beschriftung
- * über einer Ordnung, die das Raster ohnehin hat. Was sie dafür kosteten, war
- * Höhe: vier Köpfe plus vier Gruppenabstände sind auf einem 390er-Schirm rund
- * 150px - mehr als eine ganze Kachelreihe, für eine Auskunft, die man an den
- * Nachbarn ablesen kann. Das Blatt ist ein Sprungbrett, kein Verzeichnis; es
- * soll so wenig Bild nehmen wie möglich.
- *
- * VIER SPALTEN, UND DIE SYSTEM-REIHE IST DIE LETZTE DAVON. Abmelden stand
- * zuletzt als eigene volle Zeile darunter, weil es in der DREIspaltigen
- * Systemreihe unter genau dem Pixel lag, an dem der Daumen „Mehr" getippt
- * hatte. Diese Ursache ist strukturell erledigt: das Blatt endet seit
- * derselben Runde ÜBER der Tab-Leiste (`bottom: --nav-bottom-height`), der Ort
- * des Mehr-Knopfs gehört wieder ihm allein. Damit ist die eigene Zeile nur
- * noch Höhe ohne Auftrag, und die vier System-Ziele füllen die Reihe exakt.
- * Monochrom bleiben sie trotzdem - das ist der Unterschied zu den farbig
- * besiegelten Modulen darüber, und der trägt die Trennung jetzt allein.
  *
  * EINE Quelle der Wahrheit für renderAppShell() UND rebuildNavigation() —
  * beide Pfade müssen dieselbe Struktur erzeugen, sonst zerstört ein
@@ -1374,26 +1357,31 @@ function paintMoreSheetBadges(sheet) {
  */
 /**
  * Die Module des Mehr-Blatts, gruppiert nach `section` in der gelieferten
- * Reihenfolge. Eine Sektion ohne Namen (Uebersicht) steht als Raster ohne
- * Kopf - dieselbe Regel wie HEADERLESS_SECTIONS der Seitenleiste.
+ * Reihenfolge: je Sektion EINE Liste (`.more-sheet__list`), benannt wie in der
+ * Seitenleiste. Ob eine Sektion einen Kopf bekommt, entscheidet ihre Groesse
+ * in der SEITENLEISTE (`labelCounts`), nicht im Blatt: die Favoriten der
+ * Leiste fehlen hier, und „Planen" darf nicht namenlos werden, nur weil
+ * Kalender und Aufgaben unten in der Leiste stehen - die Gruppen sind
+ * dieselben wie am Desktop.
  *
  * @param {Array<object>} modules  bereits nach Sektion sortiert
+ * @param {Map<number, number>} labelCounts  Eintraege je Sektion in der Seitenleiste
  * @returns {HTMLElement[]}
  */
-function moreSheetSections(modules) {
+function moreSheetSections(modules, labelCounts) {
   const out = [];
-  let current = null;
-  let grid = null;
+  let current;
+  let list = null;
   for (const item of modules) {
     const section = item.section ?? null;
-    if (!grid || section !== current) {
+    if (!list || section !== current) {
       current = section;
-      grid = document.createElement('div');
-      grid.className = 'more-sheet__grid';
-      const labelKey = section && section !== NAV_SECTION.overview ? NAV_SECTION_LABEL_KEYS[section] : null;
+      list = document.createElement('div');
+      list.className = 'more-sheet__list';
+      const group = document.createElement('div');
+      group.className = 'more-sheet__group';
+      const labelKey = section == null ? null : navSectionLabelKey(section, labelCounts.get(section));
       if (labelKey) {
-        const group = document.createElement('div');
-        group.className = 'more-sheet__group';
         group.setAttribute('role', 'group');
         const labelId = `more-section-${section}`;
         group.setAttribute('aria-labelledby', labelId);
@@ -1401,13 +1389,12 @@ function moreSheetSections(modules) {
         label.className = 'more-sheet__section-label';
         label.id = labelId;
         label.textContent = t(labelKey);
-        group.append(label, grid);
-        out.push(group);
-      } else {
-        out.push(grid);
+        group.append(label);
       }
+      group.append(list);
+      out.push(group);
     }
-    grid.appendChild(moreItemEl(item));
+    list.appendChild(moreItemEl(item));
   }
   return out;
 }
@@ -1441,7 +1428,8 @@ function buildMoreSheetBody() {
   // hier wird sie nachgezeichnet, wie die Seitenleiste es tut - eine benannte
   // Gruppe (role="group" + aria-labelledby), damit die Ordnung auch hoerbar ist.
   const modules = secondary.filter((item) => item.module !== 'settings');
-  nodes.push(...moreSheetSections(modules));
+  const labelCounts = navSectionEntryCounts(navItems().filter((item) => item.module !== 'settings'));
+  nodes.push(...moreSheetSections(modules, labelCounts));
 
   const divider = document.createElement('div');
   divider.className = 'more-sheet__divider';
@@ -3782,9 +3770,10 @@ function navItems({ catalog = false } = {}) {
     { path: '/',          label: t('nav.dashboard'), module: 'dashboard', section: NAV_SECTION.overview },
     // Plan
     { path: '/calendar',  label: t('nav.calendar'),  module: 'calendar',  section: NAV_SECTION.plan },
-    { path: '/schedule',  label: t('nav.schedule'),  module: 'schedule',  section: NAV_SECTION.plan },
     { path: '/tasks',     label: t('nav.tasks'),     module: 'tasks',     section: NAV_SECTION.plan },
+    { path: '/rewards',   label: t('nav.rewards'),   module: 'rewards',   section: NAV_SECTION.plan },
     { path: '/notes',     label: t('nav.notes'),     module: 'notes',     section: NAV_SECTION.plan },
+    { path: '/schedule',  label: t('nav.schedule'),  module: 'schedule',  section: NAV_SECTION.plan },
     // Haushalt — Kitchen-Gruppe zuerst, dann die übrigen Haushalts-Module
     { path: '/meals',     label: t('nav.meals'),     module: 'meals',    section: NAV_SECTION.household, kitchenGroup: true },
     { path: '/recipes',   label: t('nav.recipes'),   module: 'recipes',  section: NAV_SECTION.household, kitchenGroup: true },
@@ -3794,12 +3783,11 @@ function navItems({ catalog = false } = {}) {
     { path: '/waste',     label: t('nav.waste'),     module: 'waste',    section: NAV_SECTION.household },
     { path: '/documents', label: t('nav.documents'), module: 'documents',   section: NAV_SECTION.household },
     { path: '/inventory', label: t('nav.inventory'), module: 'inventory',   section: NAV_SECTION.household },
-    { path: '/rewards',   label: t('nav.rewards'),   module: 'rewards',     section: NAV_SECTION.household },
     // Menschen
     { path: '/contacts',  label: t('nav.contacts'),  module: 'contacts',    section: NAV_SECTION.people },
     { path: '/birthdays', label: t('nav.birthdays'), module: 'birthdays',   section: NAV_SECTION.people },
     { path: '/health',    label: t('nav.health'),    module: 'health',      section: NAV_SECTION.people },
-    // Finanzen
+    // Finanzen - ein einziger Eintrag, deshalb ohne Kopf (navSectionLabelKey)
     { path: '/budget',    label: t('nav.budget'),    module: 'budget',      section: NAV_SECTION.finance },
     // Settings ist am Ende gepinnt (siehe unten).
     { path: '/settings',  navHref: '/settings?view=domains', label: t('nav.settings'),  module: 'settings',    section: NAV_SECTION.household },
@@ -3929,12 +3917,19 @@ function sidebarNavItems() {
   // Jede sichtbare Sektion wird ein role="group" mit aria-labelledby auf ihr Label
   // — so ist die visuelle Gruppierung für Screenreader hörbar (statt verwaister
   // Label-Divs zwischen Links). Items landen im aktuellen Gruppen-Container.
+  // Eine Sektion mit nur EINEM Eintrag bekommt keinen Kopf und keine Gruppe
+  // (navSectionLabelKey, R19): ihr Eintrag steht direkt in der Liste, mit der
+  // Luft einer Gruppe davor (`.nav-item--headerless`, layout.css).
+  const items = navItems();
+  const entryCounts = navSectionEntryCounts(items.filter((item) => item.module !== 'settings'));
+  let headerless = false;
   const startSection = (section) => {
     if (section === currentSection) return;
     currentSection = section;
+    headerless = false;
     if (HEADERLESS_SECTIONS.has(section)) { currentGroup = null; return; }
-    const labelKey = NAV_SECTION_LABEL_KEYS[section];
-    if (!labelKey) { currentGroup = null; return; }
+    const labelKey = navSectionLabelKey(section, entryCounts.get(section));
+    if (!labelKey) { currentGroup = null; headerless = true; return; }
     const labelId = `nav-section-${section}`;
     const label = document.createElement('div');
     label.className = 'nav-section-label';
@@ -3950,10 +3945,11 @@ function sidebarNavItems() {
   };
 
   const appendNavEl = (el) => {
+    if (!currentGroup && headerless) el.classList.add('nav-item--headerless');
     (currentGroup ?? { appendChild: (n) => elements.push(n) }).appendChild(el);
   };
 
-  navItems().forEach((item) => {
+  items.forEach((item) => {
     // Settings ist gepinnt und gehört zu keiner sichtbaren Sektionsgruppe —
     // der Aufrufer hebt es aus der Liste heraus und hängt es als Geschwister
     // an die Sidebar-Spalte (siehe dort, und layout.css zum entfallenen Rand).
@@ -4370,7 +4366,7 @@ function moreItemEl({ path, navHref, label, icon, module: mod, accent, navId }) 
   else if (mod) a.style.setProperty('--item-module-accent', moduleAccentVar(mod));
   const well = document.createElement('div');
   // Markensiegel (Block 2): das Well nimmt Form und Material vom Baustein,
-  // die Grid-Groesse und die Akzent-Weiterleitung stehen in layout.css.
+  // die Zeilengroesse und die Akzent-Weiterleitung stehen in layout.css.
   well.className = 'module-seal more-item__icon-well';
   well.appendChild(moduleIconEl(icon, 'more-item__icon'));
   const span = document.createElement('span');
@@ -4380,13 +4376,18 @@ function moreItemEl({ path, navHref, label, icon, module: mod, accent, navId }) 
   a.appendChild(span);
 
   // Der Zaehlstand kommt spaeter (siehe paintMoreSheetBadges) und nur, wenn es
-  // einen gibt. Die Kachel bleibt ohne ihn vollstaendig - ein Badge ist eine
-  // Zugabe, kein Bestandteil.
+  // einen gibt. Die Zeile bleibt ohne ihn vollstaendig - ein Badge ist eine
+  // Zugabe, kein Bestandteil. Er steht VOR dem Pfeil, wie in iOS.
   const count = _moduleCounts[navId ?? mod];
   if (count > 0) {
     a.appendChild(moreBadgeEl(count));
     a.setAttribute('aria-label', `${label}, ${t('nav.moreBadge', { count })}`);
   }
+  const chevron = document.createElement('i');
+  chevron.dataset.lucide = 'chevron-right';
+  chevron.className = 'more-item__chevron';
+  chevron.setAttribute('aria-hidden', 'true');
+  a.appendChild(chevron);
   return a;
 }
 
