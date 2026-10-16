@@ -31,8 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   longer moves the keyboard focus on the new page.
 
 - **A save that answers late no longer closes a dialog you opened in the meantime** (#1997). On
-  Recipes (saving a recipe, planning it, linking ingredients to the pantry) and Subscriptions
-  (saving a subscription, the monthly budget, categories and payment methods), the success of a
+  Recipes (saving a recipe, planning it, linking ingredients to the pantry), Subscriptions
+  (saving a subscription, the monthly budget, categories and payment methods) and Documents
+  (uploading or editing a document, creating a folder, linking a document from a DMS), the success of a
   slow request closes only the dialog it came from. If you had closed that dialog and opened
   another one, the other one now stays open with what you typed in it. Linking ingredients no
   longer redraws the recipe or moves focus once you have left the page, and the category dialog

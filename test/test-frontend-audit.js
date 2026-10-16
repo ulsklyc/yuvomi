@@ -311,7 +311,6 @@ const LATE_MODAL_CLOSE_BESTAND = {
   'pages/budget.js': 7,
   'pages/calendar.js': 2,
   'pages/contacts.js': 2,
-  'pages/documents.js': 3,
   'pages/health.js': 13,
   'pages/housekeeping.js': 4,
   'pages/inventory.js': 2,
