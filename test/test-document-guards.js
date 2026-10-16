@@ -467,23 +467,33 @@ test('der verspaetete Erstfokus nimmt dem fortgesetzten Speichern-Tor den Fokus 
       return document.activeElement?.id;
     }), 'slow-title', 'ohne spaeter gewaehlten Fokus landet der Erstfokus wie bisher im ersten Feld');
 
-    // Wie das Datepicker-Popover: ein Fokusziel direkt unter body, AUSSERHALB des
-    // Modals, ohne dass das Modal inert wird (Befund aus der claude-review zu #1193).
+    // Wie das Datepicker-Popover: ein Fokusziel AUSSERHALB der Tafel, ohne dass das
+    // Modal inert wird (Befund aus der claude-review zu #1193). Seit D7 ist das
+    // Modal ein natives <dialog> mit showModal(): alles ausserhalb ist inert, ein
+    // Popover direkt unter body nimmt gar keinen Fokus an (gemessen). Echte
+    // Popover haengen deshalb ueber `overlayHost()` im Dialog, neben der Tafel -
+    // genau dort, wo der Datepicker sie hinhaengt. Die Sonde nimmt denselben Weg
+    // und prueft zuerst, dass das Popover den Fokus WIRKLICH hatte; sonst
+    // bestaetigte sie eine Wahl, die nie stattfand.
     await page.evaluate(() => window.slowGate.modal.closeModal({ force: true }));
     await openSlow('Slow editor with a popover');
-    assert.equal(await page.evaluate(async () => {
+    assert.deepEqual(await page.evaluate(async () => {
+      const { overlayHost } = await import('/utils/overlay-host.js');
       const popover = document.createElement('div');
       popover.id = 'slow-popover';
       popover.setAttribute('popover', 'manual');
       popover.tabIndex = -1;
-      document.body.appendChild(popover);
+      overlayHost().appendChild(popover);
       popover.showPopover?.();
       popover.focus();
+      const took = document.activeElement?.id;
+      const outsidePanel = !popover.closest('.modal-panel');
       await new Promise((resolve) => setTimeout(resolve, 2000));
       const focus = document.activeElement?.id;
       popover.remove();
-      return focus;
-    }), 'slow-popover', 'der Erstfokus-Timer darf den Fokus nicht aus einem Popover unter body ziehen');
+      return { took, outsidePanel, focus };
+    }), { took: 'slow-popover', outsidePanel: true, focus: 'slow-popover' },
+    'der Erstfokus-Timer darf den Fokus nicht aus einem Popover ueber der Tafel ziehen');
 
     // Faellt der Fokus nur auf body, weil der Ausloeser weggerendert wurde, ist
     // das keine Wahl: das Modal bekommt seinen Erstfokus trotzdem.
@@ -501,9 +511,9 @@ test('der verspaetete Erstfokus nimmt dem fortgesetzten Speichern-Tor den Fokus 
       return document.activeElement?.id;
     }), 'slow-title', 'ein auf body gefallener Fokus ist keine Wahl - das erste Feld bekommt ihn trotzdem');
 
-    // Tab waehrend der Verzoegerung landet auf der Seite DAHINTER (nicht inert, der
-    // Trap haengt nur am Panel). Das ist keine Wahl: der Fokus muss in den Dialog
-    // (zweite Runde der Review zu #1193).
+    // Tab waehrend der Verzoegerung landete auf der Seite DAHINTER (zweite Runde
+    // der Review zu #1193). Seit D7 ist sie inert und nimmt den Fokus gar nicht
+    // erst; die Zusage bleibt dieselbe: der Fokus muss in den Dialog.
     await page.evaluate(() => {
       window.slowGate.modal.closeModal({ force: true });
       document.getElementById('slow-background')?.remove();
