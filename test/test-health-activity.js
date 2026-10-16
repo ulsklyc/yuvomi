@@ -272,7 +272,7 @@ test('R18 Aktivitaet: Balken oben voll gerundet und unten gerade, heute im Vollt
   const bars = html.match(/<path class="health-activity-chart__bar[^"]*"/g) ?? [];
   assert.equal(bars.length, 2, 'gestern und heute');
   assert.equal(bars.filter((b) => /health-activity-chart__bar--today/.test(b)).length, 1, 'genau EIN Balken ist heute');
-  assert.match(html, /<path class="health-activity-chart__bar health-activity-chart__bar--today" d="M[\d.]+,174\.0 V/, 'der Balken steht auf der Grundlinie');
+  assert.match(html, /<path class="health-activity-chart__bar health-activity-chart__bar--today chart__bar" d="M[\d.]+,174\.0 V/, 'der Balken steht auf der Grundlinie und waechst aus ihr ein (chart__bar, drawChartOnce)');
   assert.doesNotMatch(html, /fill="var\(/, 'die Farbe steht im Stylesheet, nicht im Markup');
   // Der Wert steht nur am heutigen Balken; die sieben Werte bleiben in der Tabelle.
   assert.equal(html.match(/class="chart__axis health-activity-chart__value"/g)?.length, 1);

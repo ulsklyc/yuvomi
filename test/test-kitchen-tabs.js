@@ -127,7 +127,7 @@ test('Indikator: steht beim Anhaengen unter dem aktiven Eintrag, ohne zu gleiten
   assert.equal(handle.indicator._attrs['aria-hidden'], 'true');
 });
 
-test('Indikator: gleitet per transform mit --duration-lg/--ease-out; Breite nur, wenn sie sich aendert', () => {
+test('Indikator: gleitet per transform mit --duration-lg/--ease-out; auch ein Breitenwechsel nur per transform', () => {
   const same = fakeBar([
     { offsetLeft: 10, offsetTop: 4, offsetWidth: 90, offsetHeight: 40, active: true },
     { offsetLeft: 104, offsetTop: 4, offsetWidth: 90, offsetHeight: 40 },
@@ -146,7 +146,10 @@ test('Indikator: gleitet per transform mit --duration-lg/--ease-out; Breite nur,
   ]);
   wide.activate(1);
   wide.handle.place({ glide: true });
-  assert.deepEqual(Object.keys(wide.animations[0].frames[0]).sort(), ['transform', 'width'], 'nur die Breite kommt dazu, die Hoehe nicht');
+  assert.deepEqual(wide.animations[0].frames.map((f) => Object.keys(f)), [['transform'], ['transform']],
+    'die Breite laeuft als scale() im transform, nicht als width auf dem Hauptthread');
+  assert.equal(wide.animations[0].frames[0].transform, 'translate(10px, 4px) scale(0.6923, 1)');
+  assert.equal(wide.handle.indicator.style.width, '130px', 'die Kapsel steht sofort in der Zielbreite');
 });
 
 test('Indikator: reduzierte Bewegung springt', () => {
@@ -255,10 +258,36 @@ test('Indikator: keine Regel stellt eine Segment-/Tab-Leiste auf position: stati
   assert.deepEqual(hits, [], 'eine Leiste im Kopf gibt sticky ab, aber nicht den Bezugsrahmen: position: relative statt static');
 });
 
-test('Indikator: glideKeyframes ist die Regel "transform, Groesse nur wenn noetig"', () => {
+test('Indikator: glideKeyframes animiert NUR transform - ein Groessenwechsel ist ein scale() am Start (Critique 2026-10-16, A5)', async () => {
+  // Breite/Hoehe als Keyframes liefen auf dem Hauptthread: im Kalender
+  // blockierte der Wochenaufbau ihn 350ms, die Kapsel sprang statt zu gleiten.
   const a = { x: 0, y: 0, w: 50, h: 30 };
-  assert.deepEqual(seg.glideKeyframes(a, { ...a, x: 60 }).map(Object.keys), [['transform'], ['transform']]);
-  assert.deepEqual(seg.glideKeyframes(a, { ...a, h: 40 }).map((f) => Object.keys(f).sort()), [['height', 'transform'], ['height', 'transform']]);
+  assert.deepEqual(seg.glideKeyframes(a, { ...a, x: 60 }), [
+    { transform: 'translate(0px, 0px)' }, { transform: 'translate(60px, 0px)' },
+  ], 'gleich gross: reines translate');
+  const grown = seg.glideKeyframes(a, { x: 60, y: 0, w: 100, h: 40 });
+  assert.deepEqual(grown.map(Object.keys), [['transform'], ['transform']], 'keine width-/height-Keyframes');
+  assert.equal(grown[0].transform, 'translate(0px, 0px) scale(0.5, 0.75)', 'Start in der alten Groesse, gemessen an der Zielgroesse');
+  assert.equal(grown[1].transform, 'translate(60px, 0px) scale(1, 1)');
+  const { eachRule } = await import('./css-rules.js');
+  const base = [...eachRule(readSrc('../public/styles/sub-tabs.css'))].find((r) => r.selector === '.seg-indicator' && !r.at.length);
+  assert.match(base?.body ?? '', /transform-origin:\s*0 0/, 'scale() setzt an der Ecke an, an der translate() misst');
+});
+
+test('Indikator: afterGlideStart loest nach einem Frame auf - und ohne Frames ueber den Timer', async () => {
+  const realRaf = globalThis.requestAnimationFrame;
+  try {
+    let rafs = 0;
+    globalThis.requestAnimationFrame = (cb) => { rafs += 1; setTimeout(cb, 1); return 1; };
+    await seg.afterGlideStart();
+    assert.equal(rafs, 1);
+    globalThis.requestAnimationFrame = () => 1; // verdeckter Tab: rAF feuert nie
+    const t0 = Date.now();
+    await seg.afterGlideStart();
+    assert.ok(Date.now() - t0 < 500, 'der Aufbau haengt nie an einem Frame');
+  } finally {
+    if (realRaf) globalThis.requestAnimationFrame = realRaf; else delete globalThis.requestAnimationFrame;
+  }
 });
 
 test('Indikator: beobachtet die Leiste als BORDER-Box - sonst steht die Kuechen-Kapsel nach dem Einklappen der Seitenleiste daneben (A1 P2-1)', () => {

@@ -47,7 +47,7 @@ import { wireTablist } from '/utils/tablist.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
 import { filterButtonHtml } from '/utils/filter-sheet.js';
-import { attachSegmentIndicator } from '/utils/segment-indicator.js';
+import { attachSegmentIndicator, afterGlideStart } from '/utils/segment-indicator.js';
 import { wirePeriodSwipe } from '/utils/period-swipe.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 // EINE Schalterform, auch hier. Das Primitiv liegt unter `/settings/`, weil
@@ -2328,6 +2328,11 @@ function renderToolbar() {
       if (searchActive) closeCalendarSearch({ restoreView: false });
       state.view = view;
       setSavedCalendarView(view);
+      // ERST GLEITET DIE KAPSEL, DANN BAUT DIE ANSICHT (Critique 2026-10-16,
+      // A5). Der Wochenaufbau belegt den Hauptthread bis zu 350ms; faellt der
+      // Start der Gleitbewegung in denselben Frame, sprang die Kapsel. Ein
+      // Frame Vorlauf, danach laeuft sie im Compositor weiter.
+      await afterGlideStart();
       await reloadForView();
       updateLabel();
       renderView();

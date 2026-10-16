@@ -29,8 +29,16 @@
  *
  * BEWEGUNG: `--duration-lg` + `--ease-out` (tokens.css), per Web Animations
  * (eine CSS-Transition bricht ab, wenn die Leiste beim Seitentausch neu
- * eingehaengt wird). Animiert wird `transform`; Breite und Hoehe nur, wenn sie
- * sich wirklich aendern (gleich breite Segmente gleiten rein per transform).
+ * eingehaengt wird). Animiert wird NUR `transform` - auch ein Breitenwechsel:
+ * die Kapsel steht sofort in ihrer Zielgroesse und startet als `scale()` auf
+ * die alte (FLIP). Bis 2026-10-16 liefen Breite und Hoehe als eigene
+ * Keyframes mit; die laufen auf dem Hauptthread, und im Kalender blockierte
+ * der Wochenaufbau ihn 350ms - die Kapsel stand still und sprang (Critique
+ * 2026-10-16, A5). Eine reine transform-Animation laeuft im Compositor weiter.
+ * Preis: waehrend der 250ms ist die Rundung um den Breitenquotienten verzerrt
+ * (Monat -> Tag am Desktop rund 0,7) - kaum sichtbar, ein Sprung war es.
+ * Wer nach dem Wechsel teuer neu baut, wartet vorher `afterGlideStart()` ab:
+ * erst dann ist die Bewegung beim Compositor angekommen.
  * Reduzierte Bewegung: die Kapsel springt.
  *
  * CSS (sub-tabs.css, global): `.seg-indicator` ist die Kapsel, die Leiste
@@ -72,19 +80,44 @@ function reducedMotion() {
 const sameBox = (a, b) => !!a && !!b && a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
 
 /**
- * Die Keyframes einer Gleitbewegung: immer `transform`, Breite/Hoehe nur,
- * wenn sie sich aendern. Rein, damit der Test die Regel pruefen kann.
+ * Die Keyframes einer Gleitbewegung: NUR `transform`. Die Kapsel hat schon die
+ * Groesse des Ziels; eine andere Ausgangsgroesse ist ein `scale()` am Start
+ * (Ursprung oben links, `.seg-indicator` in sub-tabs.css). Rein, damit der
+ * Test die Regel pruefen kann.
  * @param {{x:number,y:number,w:number,h:number}} from
  * @param {{x:number,y:number,w:number,h:number}} to
  */
 export function glideKeyframes(from, to) {
-  const frame = (b) => {
-    const f = { transform: `translate(${b.x}px, ${b.y}px)` };
-    if (from.w !== to.w) f.width = `${b.w}px`;
-    if (from.h !== to.h) f.height = `${b.h}px`;
-    return f;
-  };
-  return [frame(from), frame(to)];
+  const round = (n) => Math.round(n * 1e4) / 1e4;
+  const sx = to.w ? round(from.w / to.w) : 1;
+  const sy = to.h ? round(from.h / to.h) : 1;
+  const scale = sx !== 1 || sy !== 1 ? ` scale(${sx}, ${sy})` : '';
+  return [
+    { transform: `translate(${from.x}px, ${from.y}px)${scale}` },
+    { transform: `translate(${to.x}px, ${to.y}px)${scale ? ' scale(1, 1)' : ''}` },
+  ];
+}
+
+/**
+ * Wartet, bis eine eben gestartete Gleitbewegung beim Compositor ist: ein
+ * Frame (rAF) und danach ein Task. Wer nach einem Segmentwechsel den
+ * Hauptthread lange belegt (Kalender: Wochenaufbau), ruft das vorher - sonst
+ * faellt der Start der Bewegung in denselben langen Frame, und die Kapsel
+ * springt trotzdem. Ohne Frames (verdeckter Tab) loest ein Timer auf; der
+ * Aufbau haengt nie an einer Animation.
+ * @returns {Promise<void>}
+ */
+export function afterGlideStart() {
+  return new Promise((resolve) => {
+    let done = false;
+    const go = () => {
+      if (done) return;
+      done = true;
+      setTimeout(resolve, 0);
+    };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(go);
+    setTimeout(go, 50);
+  });
 }
 
 /**
@@ -144,7 +177,8 @@ export function attachSegmentIndicator(bar, {
     if (glide?.playState !== 'running') return box;
     const style = getComputedStyle(indicator);
     const matrix = new DOMMatrixReadOnly(style.transform === 'none' ? undefined : style.transform);
-    return { x: matrix.m41, y: matrix.m42, w: parseFloat(style.width), h: parseFloat(style.height) };
+    // Die Groesse steckt mitten im Gleiten im scale() (glideKeyframes).
+    return { x: matrix.m41, y: matrix.m42, w: parseFloat(style.width) * matrix.a, h: parseFloat(style.height) * matrix.d };
   };
 
   function place({ glide: wantGlide = false } = {}) {

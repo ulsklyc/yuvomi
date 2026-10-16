@@ -376,28 +376,42 @@ const drawnCharts = new Set();
  * gerichtete Inhaltswechsel (utils/content-swap.js). `memo` benennt das
  * Diagramm; ein Aufruf ohne Marken (leeres Diagramm) verbraucht ihn nicht.
  *
- * DER ENDZUSTAND STEHT IM MARKUP. Beide Bewegungen laufen ueber die Web
- * Animations API ohne `fill`: faellt sie aus (kein `animate`, verdeckter Tab,
- * reduzierte Bewegung), steht das Diagramm fertig da. Nur Zeichnen, kein
- * Layout: `clip-path` an der Liniengruppe, `stroke-dasharray`/`-dashoffset` an
- * den Ringsegmenten.
+ * DER ENDZUSTAND STEHT IM MARKUP. Alle Bewegungen laufen ueber die Web
+ * Animations API ohne `fill`: faellt sie aus (kein `animate`, verdeckter Tab),
+ * steht das Diagramm fertig da. Nur Zeichnen, kein Layout: `clip-path` an der
+ * Liniengruppe, `stroke-dasharray`/`-dashoffset` an den Ringsegmenten,
+ * `transform: scaleY()` an Balken (Ursprung an der Grundlinie, `.chart__bar`
+ * in panel.css).
+ *
+ * REDUZIERTE BEWEGUNG: keine Bewegung, aber eine kurze Blende der Marken
+ * (`--duration-sm`) - dieselbe Ersatz-Regel wie `swapContent` und das
+ * Mehr-Blatt (Critique 2026-10-16, A5: "Bewegung faellt weg, Ueberblenden
+ * bleibt"). Raster und Achse stehen auch dort.
  *
  * @param {string} memo  Name des Diagramms
  * @param {Object} marks
  * @param {Element|null} [marks.lines]  Gruppe der Linien (zeichnet sich in Leserichtung der Zeitachse ein)
  * @param {Iterable<Element>} [marks.arcs]  Ringsegmente (`<circle>` mit stroke-dasharray "Laenge Umfang")
+ * @param {Iterable<Element>} [marks.bars]  Balken (`.chart__bar`, wachsen aus der Grundlinie)
  * @returns {number} wie viele Marken sich einzeichnen
  */
-export function drawChartOnce(memo, { lines = null, arcs = [] } = {}) {
+export function drawChartOnce(memo, { lines = null, arcs = [], bars = [] } = {}) {
   const segments = [...(arcs ?? [])].filter((el) => typeof el?.animate === 'function');
+  const columns = [...(bars ?? [])].filter((el) => typeof el?.animate === 'function');
   const group = typeof lines?.animate === 'function' ? lines : null;
-  if (!group && !segments.length) return 0;
+  if (!group && !segments.length && !columns.length) return 0;
   if (drawnCharts.has(memo)) return 0;
-  if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return 0;
   if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return 0;
   drawnCharts.add(memo);
+  const marks = [...(group ? [group] : []), ...segments, ...columns];
+  if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    const fade = { duration: durationToken('--duration-sm', 150), easing: easingToken('--ease-out', 'ease-out') };
+    for (const el of marks) el.animate([{ opacity: 0 }, { opacity: 1 }], fade);
+    return marks.length;
+  }
   const timing = { duration: durationToken('--duration-xl', 300), easing: easingToken('--ease-out', 'ease-out') };
   if (group) group.animate([{ clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0 0 0)' }], timing);
+  for (const el of columns) el.animate([{ transform: 'scaleY(0)' }, { transform: 'scaleY(1)' }], timing);
   for (const el of segments) {
     const dash = el.getAttribute('stroke-dasharray') ?? '';
     const total = dash.trim().split(/[\s,]+/)[1] ?? '0';
@@ -406,7 +420,7 @@ export function drawChartOnce(memo, { lines = null, arcs = [] } = {}) {
       { strokeDasharray: dash, strokeDashoffset: el.getAttribute('stroke-dashoffset') ?? '0' },
     ], timing);
   }
-  return (group ? 1 : 0) + segments.length;
+  return marks.length;
 }
 
 function settleAnimation(anim, duration) {

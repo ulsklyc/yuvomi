@@ -190,10 +190,27 @@ html.page-swapping .fab-layer .page-fab {
   pointer-events: none;
 }
 
+/* Die Bilder von Wurzel und Kopf blenden auf dem Token. */
 ::view-transition-old(root),
 ::view-transition-new(root),
 ::view-transition-old(page-toolbar),
 ::view-transition-new(page-toolbar) {
+  animation-duration: var(--duration-md);
+  animation-timing-function: var(--ease-out);
+}
+
+/* AUCH DIE GRUPPEN laufen auf dem Token, nicht auf dem UA-Default (Critique
+ * 2026-10-16, A5). Die Gruppe `root` lief 250ms und hielt die ganze
+ * Transition 50ms laenger offen als ihre Blende - gemessen 306-316ms vom
+ * Start bis `finished`, und solange schluckt sie Tipps (siehe oben).
+ * NUR DIE GRUPPEN: die Bilder erben Dauer und Verzug von ihrer Gruppe
+ * (UA-Stylesheet, `inherit`). Die stehenden Namen unten setzen ihre Gruppe auf
+ * `animation: none` und damit auf 0s - ihre Bilder erben die 0s und zeigen
+ * sofort das lebende Bild. Eine Dauer an `::view-transition-new(*)` braeche
+ * genau das: gemessen blendete die Seitenleiste dann 200ms mit sich selbst
+ * (die `:not(:only-child)`-Regeln unten greifen im gemessenen Chrome nicht).
+ * `*` hat die Spezifitaet 0, die benannten Regeln schlagen es. */
+::view-transition-group(*) {
   animation-duration: var(--duration-md);
   animation-timing-function: var(--ease-out);
 }
@@ -231,12 +248,6 @@ html.page-swapping .fab-layer .page-fab {
   animation: none;
 }
 
-::view-transition-old(kitchen-tabs):only-child,
-::view-transition-new(kitchen-tabs):only-child {
-  animation-duration: var(--duration-md);
-  animation-timing-function: var(--ease-out);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .page-transition--in {
     animation: none;
@@ -245,12 +256,22 @@ html.page-swapping .fab-layer .page-fab {
   #main-content {
     transition: none;
   }
-  /* utils/view-transition.js startet unter reduzierter Bewegung gar keine
-   * Transition; das hier haelt auch den Fall still, in dem doch eine laeuft. */
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
+  /* BEWEGUNG FAELLT WEG, UEBERBLENDEN BLEIBT - auch beim Seitenwechsel
+   * (Critique 2026-10-16, A5). Bis dahin startete utils/view-transition.js
+   * unter reduzierter Bewegung gar keine Transition, und der Rueckfall
+   * `.page-transition--in` war eine Animation, die reset.css auf 0s setzt:
+   * Mehr-Blatt und Popover blendeten, der Seitenwechsel schnitt hart. Jetzt
+   * laeuft die Transition, nur die GRUPPEN stehen (sie tragen Lage und
+   * Groesse, also Bewegung); die Bilder blenden kurz ueber. */
+  ::view-transition-group(*) {
     animation: none !important;
+  }
+  /* Nur Wurzel und Kopf: die stehenden Namen erben weiter 0s (oben). */
+  ::view-transition-old(root),
+  ::view-transition-new(root),
+  ::view-transition-old(page-toolbar),
+  ::view-transition-new(page-toolbar) {
+    animation-duration: var(--duration-sm);
   }
 }
 
@@ -276,7 +297,7 @@ html.page-swapping .fab-layer .page-fab {
   /* Bewusste Layout-Transition (Detector layout-transition, geprüft): das Offline-
    * Banner schiebt den Inhalt hinunter - echte Layout-Höhe, per transform nicht
    * animierbar. Selten (nur bei Offline-Wechsel); reduced-motion schaltet sie ab. */
-  transition: padding-top var(--duration-md) ease;
+  transition: padding-top var(--duration-md) var(--ease-out);
   background-color: var(--color-bg);
 }
 
@@ -1043,9 +1064,10 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   transform: translateY(0);
   opacity: 1;
   pointer-events: auto;
+  /* Der Hub federt, die Blende nicht (`--sheet-fade-in`, tokens.css). */
   transition:
     transform var(--sheet-in),
-    opacity var(--sheet-in),
+    opacity var(--sheet-fade-in),
     translate var(--duration-lg) var(--ease-out);
 }
 
@@ -1614,7 +1636,7 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   transform: translateY(0);
   opacity: 1;
   pointer-events: auto;
-  transition: transform var(--sheet-in), opacity var(--sheet-in);
+  transition: transform var(--sheet-in), opacity var(--sheet-fade-in);
 }
 
 /* Gruppiert Kopf + Treffer + Schließen. Auf Mobile transparent und
@@ -9249,19 +9271,6 @@ textarea::placeholder {
 }
 
 /* --------------------------------------------------------
- * Listen-Eintritt
- * `.list-stagger` (Container-Klasse mit gestaffelten Delays) ist mit dem
- * Toter-Selektoren-Aufraeumen 2026-08-31 entfallen - null Nutzer im Markup.
- * Die Keyframes bleiben: der No-Results-Reset der Dokumente (weiter oben)
- * blendet mit ihnen ein.
- * -------------------------------------------------------- */
-@keyframes list-item-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-
-/* --------------------------------------------------------
  * Swipe Affordance Hint
  * Einmalig per JS: .swipe-row--hint auf das erste Element.
  * Gibt nach Seitenladezeit einen kurzen Nudge-Hinweis.
@@ -9898,13 +9907,16 @@ textarea.input { resize: vertical; }
     transform: none;
   }
 
-  /* `transition-property`, nicht der Shorthand: die offene Regel oben fuehrt
-   * `transform` in ihrer Transition und schluege diese hier (zwei Klassen
-   * gegen eine) - der Hub kaeme unter reduzierter Bewegung zurueck. */
+  /* Der volle Shorthand an DERSELBEN Spezifitaet wie die offene Regel oben
+   * (die Regel `.more-sheet` darueber verloere gegen sie, der Hub kaeme unter
+   * reduzierter Bewegung zurueck). Hier stand `transition-property: opacity`:
+   * damit nahm die Blende Dauer und Kurve vom ERSTEN Eintrag der offenen Liste
+   * - dem Hub mit seiner Feder (gemessen `cubic-bezier(0.34, 1.56, ...)` unter
+   * reduzierter Bewegung, Critique 2026-10-16). */
   .more-sheet[aria-hidden="false"] {
     opacity: 1;
     transform: none;
-    transition-property: opacity;
+    transition: opacity var(--transition-fast);
   }
 
   /* Der Backdrop bewegt sich nie, er blendet nur - dieselbe Ersatz-Blende wie

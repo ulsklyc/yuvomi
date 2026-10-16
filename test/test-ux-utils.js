@@ -1517,14 +1517,38 @@ test('drawChartOnce: Linie per clip-path, Ring per stroke-dasharray - aus Tokens
   });
 });
 
-test('drawChartOnce: reduzierte Bewegung, verdeckter Tab und ein leeres Diagramm verbrauchen den Merker nicht', async () => {
-  for (const env of [{ reduced: true }, { visibility: 'hidden' }]) {
-    await withChartEnv(env, async (drawChartOnce) => {
-      const lines = chartMark();
-      assert.equal(drawChartOnce('test-held', { lines }), 0, JSON.stringify(env));
-      assert.equal(lines.calls.length, 0);
-    });
-  }
+test('drawChartOnce: Balken wachsen aus der Grundlinie (scaleY), aus Tokens und ohne fill', async () => {
+  await withChartEnv({}, async (drawChartOnce) => {
+    const bars = [chartMark(), chartMark()];
+    assert.equal(drawChartOnce('test-bars', { bars }), 2);
+    for (const bar of bars) {
+      assert.deepEqual(bar.calls[0].keyframes, [{ transform: 'scaleY(0)' }, { transform: 'scaleY(1)' }]);
+      assert.deepEqual(bar.calls[0].timing, { duration: 300, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' });
+    }
+    assert.equal(drawChartOnce('test-bars', { bars: [chartMark()] }), 0, 'einmal je Sitzung');
+  });
+});
+
+test('drawChartOnce: reduzierte Bewegung blendet die Marken nur kurz ein - keine Bewegung (Critique 2026-10-16, A5)', async () => {
+  await withChartEnv({ reduced: true }, async (drawChartOnce) => {
+    const lines = chartMark();
+    const bar = chartMark();
+    const arc = chartMark({ 'stroke-dasharray': '94.25 376.99' });
+    assert.equal(drawChartOnce('test-reduced', { lines, arcs: [arc], bars: [bar] }), 3);
+    for (const mark of [lines, arc, bar]) {
+      assert.equal(mark.calls.length, 1);
+      assert.deepEqual(mark.calls[0].keyframes, [{ opacity: 0 }, { opacity: 1 }], 'nur Deckkraft - kein clip-path, kein scale, kein Strich');
+      assert.equal(mark.calls[0].timing.duration, 150, '--duration-sm (Rueckfall)');
+    }
+  });
+});
+
+test('drawChartOnce: verdeckter Tab und ein leeres Diagramm verbrauchen den Merker nicht', async () => {
+  await withChartEnv({ visibility: 'hidden' }, async (drawChartOnce) => {
+    const lines = chartMark();
+    assert.equal(drawChartOnce('test-held', { lines }), 0);
+    assert.equal(lines.calls.length, 0);
+  });
   await withChartEnv({}, async (drawChartOnce) => {
     assert.equal(drawChartOnce('test-held', { lines: null, arcs: [] }), 0, 'ohne Marken kein Lauf');
     assert.equal(drawChartOnce('test-held', { lines: {} }), 0, 'ohne animate kein Lauf');

@@ -2054,6 +2054,11 @@
    * den kurzen Hub (`--sheet-lift`): ueber einen Vollhub wirft sie das Blatt
    * sichtbar ueber seine Ruhelage (gemessen 28,5px bei 40 %, test:motion). */
   --sheet-in:   var(--duration-xl) var(--ease-glass);
+  /* Die BLENDE der Einfahrt federt nicht (Critique 2026-10-16, A5): eine
+   * Deckkraft ueber 1 gibt es nicht, die Feder kappte bei 1 und das Blatt
+   * stand nach rund einem Drittel der Zeit voll da, waehrend es noch hob.
+   * Dieselbe Dauer wie `--sheet-in`, die ruhige Kurve. */
+  --sheet-fade-in: var(--duration-xl) var(--ease-out);
   --sheet-out:  var(--duration-md) var(--ease-out);
   --sheet-lift: 24px;
 

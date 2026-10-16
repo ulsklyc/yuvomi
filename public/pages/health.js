@@ -1502,6 +1502,11 @@ function renderCards() {
   host.replaceChildren();
   host.insertAdjacentHTML('beforeend', cards);
   if (window.lucide) window.lucide.createIcons({ el: host });
+  // Die Mini-Trendlinien zeichnen sich wie das Detail-Diagramm EINMAL je
+  // Messgroesse und Sitzung ein (Critique 2026-10-16, A5: sie standen ohne
+  // jede Einblendung da). Ohne Achse beschneidet der Helfer das ganze Bild.
+  host.querySelectorAll('.metric-card__spark').forEach((spark) =>
+    drawChartOnce(`health-spark-${spark.closest('[data-type]')?.dataset.type ?? ''}`, { lines: spark }));
 
   host.querySelectorAll('.metric-card--select').forEach((card) =>
     card.addEventListener('click', () => {
@@ -1624,6 +1629,26 @@ function cardMarkup(metric, series, { phone = false } = {}) {
       ${latest ? sparklineMarkup(series.points, 'value_num', metric) : ''}
       ${metaHtml}
     </button>`;
+}
+
+/**
+ * Laesst die Diagramme eines Bereichs (Aktivitaet, Laborwerte, Zyklus-Trends)
+ * sich EINMAL je Sitzung einzeichnen (Critique 2026-10-16, A5: sie standen ohne
+ * jede Einblendung da, waehrend Budget-Berichte und Vitalkurven sich
+ * einzeichnen). Linien haengen an `.health-chart__lines`, Balken tragen
+ * `.chart__bar`; Raster und Achse stehen. Den Merker benennt das Diagramm
+ * selbst (`aria-label`), ein neuer Analyt ist ein neues Diagramm, eine neue
+ * Woche nicht. Der Helfer ist `drawChartOnce` (utils/ux.js).
+ * @param {ParentNode|null} root
+ * @param {string} prefix  Bereich, Teil des Merkers
+ */
+function drawHealthCharts(root, prefix) {
+  root?.querySelectorAll?.('svg.health-chart').forEach((svg) => {
+    drawChartOnce(`${prefix}:${svg.getAttribute('aria-label') ?? ''}`, {
+      lines: svg.querySelector('.health-chart__lines'),
+      bars: svg.querySelectorAll('.chart__bar'),
+    });
+  });
 }
 
 // Mini-Trendlinie für die Metrik-Karte: gibt der Karte Sub-Domänen-Charakter, ohne
@@ -4201,9 +4226,11 @@ function labTrendChart(points, analyteName) {
     <svg class="chart health-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(ariaLabel)}">
       ${grid}
       ${band}
-      <polyline fill="none" stroke="var(--module-health)" stroke-width="2"
-        stroke-linejoin="round" stroke-linecap="round" points="${linePts}" />
-      ${dots}
+      <g class="health-chart__lines">
+        <polyline fill="none" stroke="var(--module-health)" stroke-width="2"
+          stroke-linejoin="round" stroke-linecap="round" points="${linePts}" />
+        ${dots}
+      </g>
       ${xLabels}
     </svg>
     ${table}
@@ -4218,6 +4245,7 @@ const FLAG_DOT_COLORS = {
 };
 
 function wireLabs() {
+  drawHealthCharts(labs.root, 'health-labs');
   wireTablistKeys(labs.root);
   installPopoverMenus(labs.root);
   wirePersonSwitcher(labs, switchLabsPerson);
@@ -4256,6 +4284,7 @@ function wireLabs() {
 
 // Verdrahtet nur die Detail-internen Steuerelemente neu (nach Trend-Wechsel).
 function wireLabsDetail() {
+  drawHealthCharts(labs.root, 'health-labs');
   if (!readOnly()) {
     labs.root.querySelector('[data-action="lab-edit"]')?.addEventListener('click', (e) => {
       const id = Number(e.currentTarget.dataset.reportId);
@@ -4720,6 +4749,7 @@ function renderActivityShell() {
     ${totals.count === 0 ? '' : `<div class="health-activity__log">${activityLogMarkup(weekRows)}</div>`}
   `);
   if (window.lucide) window.lucide.createIcons({ el: activity.root });
+  drawHealthCharts(activity.root, 'health-activity');
   wireActivity();
   refreshHealthFab();
 }
@@ -4779,7 +4809,7 @@ function activityChartMarkup(summary) {
     const label = t(ACTIVITY_WEEKDAY_LABEL_KEYS[b.weekday ?? i]);
     const minutes = t('health.activity.unit.min', { value: fmtNum(b.durationMin) });
     const bar = b.durationMin > 0
-      ? `<path class="health-activity-chart__bar${isToday ? ' health-activity-chart__bar--today' : ''}" d="${activityBarPath(x, y, barW, bottom)}"><title>${esc(`${label}: ${minutes}`)}</title></path>`
+      ? `<path class="health-activity-chart__bar${isToday ? ' health-activity-chart__bar--today' : ''} chart__bar" d="${activityBarPath(x, y, barW, bottom)}"><title>${esc(`${label}: ${minutes}`)}</title></path>`
       : '';
     // Der Wert steht nur am heutigen Balken (R18): eine Zahl an jedem Balken
     // waere eine zweite Achse; alle sieben stehen in der Tabelle darunter.
@@ -7962,9 +7992,11 @@ function simpleLineChartMarkup({ points, titleText, formatPointTooltip, formatTa
       <div class="health-chart-section__head"><div class="health-chart-section__title">${esc(titleText)}</div></div>
       <svg class="chart health-chart" viewBox="0 0 ${W} ${H}" role="img"${chartRatioAttr(geo)} aria-label="${esc(titleText)}">
         ${grid}
-        ${area}
-        ${polylines}
-        ${dots}
+        <g class="health-chart__lines">
+          ${area}
+          ${polylines}
+          ${dots}
+        </g>
         ${xLabels}
       </svg>
       ${table}
@@ -8021,7 +8053,7 @@ function cycleLengthTrendChartMarkup(trend) {
     const typical = isTypicalCycleLength(e.days);
     const color = typical ? 'var(--module-health)' : 'var(--color-warning)';
     const label = `${formatDate(e.date)}: ${t('health.cycle.unit.days', { value: fmtNum(e.days), count: e.days })} (${typicalLabel(typical)})`;
-    return `<rect x="${(cx - barW / 2).toFixed(1)}" y="${by.toFixed(1)}" width="${barW.toFixed(1)}" height="${(bottom - by).toFixed(1)}" rx="2" fill="${color}"><title>${esc(label)}</title></rect>`;
+    return `<rect class="chart__bar" x="${(cx - barW / 2).toFixed(1)}" y="${by.toFixed(1)}" width="${barW.toFixed(1)}" height="${(bottom - by).toFixed(1)}" rx="2" fill="${color}"><title>${esc(label)}</title></rect>`;
   }).join('');
 
   const grid = chartGridMarkup(min, max, (val, whole) => (whole ? String(Math.round(val)) : fmtNum(val)), geo, steps);
@@ -8298,7 +8330,7 @@ function flowLoadTrendChartMarkup(trend) {
     // das darf im Hover/der Tabelle nicht verschwinden.
     const daysText = t('health.cycle.unit.days', { value: fmtNum(e.loggedDays), count: e.loggedDays });
     const label = `${formatDate(e.date)}: ${t('health.cycle.trends.flowLoadValue', { load: fmtNum(e.load, { maximumFractionDigits: 0 }), days: daysText })}`;
-    return `<rect x="${(cx - barW / 2).toFixed(1)}" y="${by.toFixed(1)}" width="${barW.toFixed(1)}" height="${(bottom - by).toFixed(1)}" rx="2" fill="var(--module-health)"><title>${esc(label)}</title></rect>`;
+    return `<rect class="chart__bar" x="${(cx - barW / 2).toFixed(1)}" y="${by.toFixed(1)}" width="${barW.toFixed(1)}" height="${(bottom - by).toFixed(1)}" rx="2" fill="var(--module-health)"><title>${esc(label)}</title></rect>`;
   }).join('');
 
   const grid = chartGridMarkup(min, max, (val, whole) => (whole ? String(Math.round(val)) : fmtNum(val)), geo, steps);
@@ -8554,6 +8586,7 @@ function cycleFooterMarkup(canEdit, prediction = null) {
 // --------------------------------------------------------
 
 function wireCycle() {
+  drawHealthCharts(cycle.root, 'health-cycle');
   wireTablistKeys(cycle.root);
   installPopoverMenus(cycle.root);
   wirePersonSwitcher(cycle, switchCyclePerson);

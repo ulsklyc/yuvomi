@@ -85,6 +85,15 @@ export function emptyStateEl({
     ...String(className ?? '').split(/\s+/).filter(Boolean),
   ].join(' ');
   if (spec.role) box.setAttribute('role', spec.role);
+  // NICHT UNTER DER SEITENBLENDE (Critique 2026-10-16, A5) - dieselbe Regel wie
+  // `stagger` (utils/ux.js). Entsteht der Leerzustand, waehrend der Router die
+  // Seite ueberblendet (`html.page-swapping`), IST die Blende sein Einblenden;
+  // `empty-state-in` lief sonst zusaetzlich darin (Aufgaben-Detailspalte: zwei
+  // Blenden und 6px Versatz uebereinander). Inline und nur am Namen: der
+  // Knoten steht danach einfach, ein spaeter entstehender blendet wie gehabt.
+  if (typeof document !== 'undefined' && document.documentElement?.classList?.contains('page-swapping')) {
+    box.style.animationName = 'none';
+  }
 
   // Feste Reihenfolge Icon → Titel → Beschreibung → Hinweis. Genau die
   // Freiheit, hier umzusortieren oder Teile zu überspringen, hat die vier
