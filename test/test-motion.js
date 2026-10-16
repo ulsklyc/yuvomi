@@ -607,11 +607,17 @@ function reducedMotionRules() {
   return out;
 }
 
-/** `opacity 150ms, opacity .2s` -> nur Opacity? Dauer unter 1ms zaehlt als Schnitt. */
+/** `opacity 150ms, opacity .2s` -> nur Opacity? Dauer unter 1ms zaehlt als Schnitt.
+ *  `visibility` darf MITLAUFEN: sie ist diskret und bewegt nichts, haelt aber
+ *  eine ausblendende Flaeche bis zum Ende der Blende sichtbar (ohne sie kippte
+ *  der Mehr-Backdrop im ersten Frame auf hidden, Codex-Review zu #2025). Eine
+ *  Blende braucht trotzdem mindestens einen Opacity-Teil. */
 function opacityFade(value) {
   const parts = value.split(/,(?![^(]*\))/).map((p) => p.trim()).filter(Boolean);
-  if (!parts.length || !parts.every((p) => /^opacity\b/.test(p))) return false;
-  return !parts.every((p) => /\b0?\.0\dms\b|\b0s\b/.test(p));
+  if (!parts.length || !parts.every((p) => /^(opacity|visibility)\b/.test(p))) return false;
+  const fades = parts.filter((p) => /^opacity\b/.test(p));
+  if (!fades.length) return false;
+  return !fades.every((p) => /\b0?\.0\dms\b|\b0s\b/.test(p));
 }
 
 test('reduzierte Bewegung: die globale Sperre laesst Blenden durch, Bewegung nicht', () => {
@@ -1994,6 +2000,18 @@ test('Mehr-Blatt: der Backdrop blendet mit dem Blatt aus, statt im ersten Frame 
   assert.doesNotMatch(open, /animation:/);
   // Waehrend des Zugs folgt die Deckkraft dem Finger ohne Transition.
   assert.match(css('layout.css'), /html:has\(\.more-sheet\[data-sheet-drag="drag"\]\) \.more-backdrop \{\s*transition: none;/);
+});
+
+test('Mehr-Blatt: auch unter reduzierter Bewegung blendet der Backdrop aus, statt im ersten Frame zu verschwinden', () => {
+  // Codex-Review zu #2025: die Ersatz-Blende stand als `transition: opacity ...`
+  // fuer beide Zustaende; beim Schliessen kippte visibility sofort auf hidden,
+  // und die Abdunklung war weg, waehrend das Blatt noch ausblendete.
+  const rm = reducedMotionRules().filter((r) => r.file === 'layout.css');
+  const closed = rm.filter((r) => r.selectors.includes('.more-backdrop')).map((r) => r.body).join(';');
+  const open = rm.filter((r) => r.selectors.includes('.more-backdrop--visible')).map((r) => r.body).join(';');
+  assert.match(closed, /transition:\s*opacity var\(--transition-fast\),\s*visibility var\(--transition-fast\)/,
+    'geschlossen laeuft visibility mit der Blende, statt sofort zu kippen');
+  assert.match(open, /transition:\s*opacity var\(--transition-fast\),\s*visibility 0s/, 'geoeffnet sofort sichtbar');
 });
 
 // --------------------------------------------------------------------------

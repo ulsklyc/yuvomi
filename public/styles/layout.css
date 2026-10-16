@@ -9884,11 +9884,22 @@ textarea.input { resize: vertical; }
   }
 
   /* Der Backdrop bewegt sich nie, er blendet nur - dieselbe Ersatz-Blende wie
-   * das Blatt (Abmeldung in reset.css). `visibility` laeuft dort nicht mit:
-   * geschlossen ist er dann sofort weg, geoeffnet blendet er ein. */
-  .more-backdrop,
+   * das Blatt (Abmeldung in reset.css). `visibility` laeuft MIT: stand hier nur
+   * `opacity`, kippte sie beim Schliessen im ersten Frame auf hidden, und die
+   * Abdunklung war weg, waehrend das Blatt noch ausblendete - genau der Sprung,
+   * den die Grundregel oben behebt (Codex-Review zu #2025). visibility ist
+   * diskret und bewegt nichts; reset.css gibt beiden Eigenschaften dieselbe
+   * Ersatz-Dauer. */
+  .more-backdrop {
+    transition:
+      opacity var(--transition-fast),
+      visibility var(--transition-fast);
+  }
+
   .more-backdrop--visible {
-    transition: opacity var(--transition-fast);
+    transition:
+      opacity var(--transition-fast),
+      visibility 0s;
   }
 
   .more-sheet__search:active,
