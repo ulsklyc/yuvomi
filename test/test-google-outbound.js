@@ -2181,6 +2181,39 @@ test('#2019: die Ablehnung eines inzwischen ersetzten Tokens hält die Verbindun
   assert.equal(cfg('google_needs_reauth'), '1');
 });
 
+// Codex-Runde 3 auf #2029: ein Lauf mit zwei Refreshes.
+test('#2019: rotiert ein Lauf r1 -> r2 und lehnt Google dann r2 ab, steht "neu verbinden"', async () => {
+  reset();
+  // Ein aktivierter Kalender, damit der Lauf nach der Vorabprobe noch Google fragt.
+  __test.setCalendarEnabled('primary', true, { name: 'Primary' });
+  const sent = [];
+  const client = realClient((opts) => {
+    sent.push(new URLSearchParams(opts.data).get('refresh_token'));
+    // Erster Refresh rotiert, mit einem Access-Token, das gleich wieder abläuft;
+    // der zweite wird abgelehnt.
+    if (sent.length === 1) return { data: { access_token: 'a2', refresh_token: 'r2', expires_in: 1 } };
+    throw invalidGrant();
+  });
+  const createCalendar = () => google.calendar({ version: 'v3', auth: client });
+
+  await assert.rejects(sync({ createCalendar }), (err) => err.reauthRequired === true);
+  assert.deepEqual(sent, ['r', 'r2'], 'der zweite Refresh lief mit dem rotierten Token');
+  assert.equal(cfg('google_refresh_token'), 'r2');
+  assert.equal(cfg('google_needs_reauth'), '1', 'abgelehnt wurde das gespeicherte Token');
+});
+
+test('#2019: lehnt Google r1 ab, während schon r3 gespeichert ist, bleibt die Verbindung (Sync-Weg)', async () => {
+  reset();
+  const client = realClient(() => {
+    db.prepare("UPDATE sync_config SET value = 'r3' WHERE key = 'google_refresh_token'").run();
+    throw invalidGrant();
+  });
+  await assert.rejects(sync({ createCalendar: () => google.calendar({ version: 'v3', auth: client }) }),
+    (err) => err.reauthRequired !== true);
+  assert.equal(cfg('google_needs_reauth'), null);
+  assert.equal(cfg('google_refresh_token'), 'r3');
+});
+
 // Codex-Runde 2 auf #2029.
 
 test('#2019: invalid_grant aus einem einzelnen Patch verwirft die Änderung nicht und meldet "neu verbinden"', async () => {
