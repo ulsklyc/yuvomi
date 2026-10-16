@@ -36,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Health speaks one colour for an out-of-range lab value.** A report card's "1 out of range" and
+  the "Low" or "High" next to a value now share the same warning colour, with the arrow and the
+  word telling the direction, and the badge's warning sign matches its text. No text in Health is
+  smaller than 11px any more, and the fasting week draws in the Health colour like every other
+  Health chart.
 - **Pinned and other notes no longer mix on wide screens.** "Other notes" starts its own row again
   below the pinned ones, so a note can no longer look pinned just because it sits under a pinned
   card. Browsers that support grid lanes pack the cards without gaps.

@@ -991,3 +991,24 @@ test('R19: der Kalender setzt Ziffern ueberall gleich breit', () => {
   const back = [...eachRule(css)].filter((r) => /font-variant-numeric:\s*(?:normal|proportional-nums)/.test(r.body)).map((r) => r.selector.trim());
   assert.deepStrictEqual(back, [], 'eine Regel im Kalender schaltet die gleich breiten Ziffern zurueck');
 });
+
+// R19 (Critique 2026-10-16): im Gesundheitsmodul standen 70 Textknoten bei
+// 10px (Zyklus-Legende, Wochentage, Verlaufs-Chips, Labor-Badge, Medikamente).
+// Die Mindestgroesse der Skala ist Caption 2 (`--type-micro`, 11px). Und das
+// Labor spricht EINE Flag-Sprache: jede Abweichung in der Warnfarbe, die
+// Richtung sagen Pfeil und Wort; die Fastenwoche zeichnet im Modulton wie
+// jedes andere Gesundheitsdiagramm.
+test('R19 Gesundheit: keine Schrift unter Caption 2, eine Flag-Sprache, ein Diagrammton', () => {
+  const css = readFileSync(new URL('health.css', STYLES_DIR), 'utf8');
+  assert.doesNotMatch(css, /var\(--text-2xs\)/, 'health.css nutzt 10px (--text-2xs)');
+  for (const rule of eachRule(css)) {
+    const m = rule.body.match(/font-size:\s*(\d+(?:\.\d+)?)px/);
+    if (m) assert.ok(Number(m[1]) >= 11, `${rule.selector}: ${m[0]}`);
+  }
+  const body = (sel) => [...eachRule(css)].find((r) => r.selector.trim() === sel && !r.at.length)?.body ?? '';
+  for (const sel of ['.health-lab-flag--low', '.health-lab-flag--high', '.health-lab-rows__row--low .health-lab-rows__value', '.health-lab-rows__row--high .health-lab-rows__value']) {
+    assert.match(body(sel), /color:\s*var\(--color-warning-ink\)/, `${sel} spricht nicht die Flag-Sprache der Befundkarte`);
+  }
+  assert.match(body('.health-lab-badge--warn'), /color:\s*var\(--color-warning-ink\)/);
+  assert.doesNotMatch(css, /fasting-week__[a-z]+[^{]*\{[^}]*chart-series/, 'die Fastenwoche laeuft auf fremden Serienfarben');
+});

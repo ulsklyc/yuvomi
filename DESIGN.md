@@ -728,6 +728,10 @@ Inhalt, kein Verlauf ueber eine Karte, kein Text auf einer Flaeche, die nicht ge
   Enden, denn der Guard leitet die geprueften Module aus `router.js` ab und findet sie in
   dem Lauf, in dem dort ein Diagramm entsteht. Serie 1 (Indigo, dE 7.5 zum Akzent) bleibt
   bewusst: sie heisst in der Kontofarben-Wahl "Violett", dort ist die Naehe die Zusage.
+  **Die Serien gelten fuer KATEGORIEN** (Donut, Kategorien-Balken). Ein Diagramm EINER Messung
+  im eigenen Modul (Gesundheit: Vitalkurve, Aktivitaet, Fastenwoche) traegt den Modulton:
+  Messwert im Vollton, Ziel bzw. Vergleich in der getoenten Stufe (Tinte + 5 %, 3:1 in beiden
+  Themes). Die Fastenwoche lief bis R19 auf Serie 1/2 und war die einzige Ausnahme.
 - **Prioritaeten** (`--color-priority-low..urgent`): unveraendert aus dem Bestand, die
   Helligkeits-Trennung (High ~1,8x Urgent) ist farbfehlsicht-verifiziert. **Die
   Badge-Fuellung ist seit 2026-08-18 entfallen** (Skalen-Regel, Zweig Rangmarke): der Ton

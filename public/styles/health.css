@@ -1124,7 +1124,7 @@ button.health-med-card:hover {
   align-items: center;
   padding: var(--space-0h) var(--space-2);
   border-radius: var(--radius-full);
-  font-size: var(--text-2xs);
+  font-size: var(--type-micro);
   background: var(--color-fill-well);
   color: var(--color-text-secondary);
 }
@@ -1350,13 +1350,27 @@ button.health-med-card:hover {
   color: var(--color-text-secondary);
 }
 
+/* EINE FLAG-SPRACHE IM LABOR (R19, Critique 2026-10-16). Die Befundkarte
+ * sagte "1 auffaellig" amber in 10px, die Zeile darunter "Niedrig" blau und
+ * "Hoch" rot - drei Farben fuer dieselbe Aussage "ausserhalb des Bereichs".
+ * Jetzt traegt jede Abweichung die Warnfarbe (Tinte, kontrastgeprueft), die
+ * RICHTUNG sagen Pfeil und Wort; normal bleibt gruen. Keine Schrift im
+ * Gesundheitsmodul liegt unter Caption 2 (`--type-micro`, 11px). */
 .health-lab-badge {
   display: inline-flex;
   align-items: center;
   gap: var(--space-0h);
   padding: var(--space-0h) var(--space-2);
   border-radius: var(--radius-full);
-  font-size: var(--text-2xs);
+  font-size: var(--type-micro);
+  flex: 0 0 auto;
+}
+
+/* Das Warnzeichen in Schriftgroesse: als 24px-Lucide war es doppelt so hoch
+ * wie das Wort daneben. */
+.health-lab-badge > svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
   flex: 0 0 auto;
 }
 
@@ -1487,11 +1501,11 @@ button.health-med-card:hover {
 }
 
 .health-lab-rows__row--low .health-lab-rows__value {
-  color: var(--color-info);
+  color: var(--color-warning-ink);
 }
 
 .health-lab-rows__row--high .health-lab-rows__value {
-  color: var(--color-danger);
+  color: var(--color-warning-ink);
 }
 
 .health-lab-table {
@@ -1543,9 +1557,9 @@ button.health-med-card:hover {
   white-space: nowrap;
 }
 
-.health-lab-flag--low    { color: var(--color-info); }
+.health-lab-flag--low    { color: var(--color-warning-ink); }
 .health-lab-flag--normal { color: var(--color-success); }
-.health-lab-flag--high   { color: var(--color-danger); }
+.health-lab-flag--high   { color: var(--color-warning-ink); }
 .health-lab-flag--none   { color: var(--color-text-tertiary, var(--color-text-secondary)); }
 
 /* Analyt-Trend */
@@ -2721,7 +2735,7 @@ button.health-med-card:hover {
 
 .cycle-stat__head svg { width: 14px; height: 14px; }
 .cycle-stat__value { font-weight: 700; font-size: var(--text-sm); color: var(--color-text-primary); }
-.cycle-stat__sub { font-size: var(--text-2xs); color: var(--color-text-secondary); }
+.cycle-stat__sub { font-size: var(--type-micro); color: var(--color-text-secondary); }
 
 /* Typisch/untypisch-Badge (Phase 4d) - Statusfarben, nicht die kategorialen
  * Zyklusphasen-Farben: das ist ein Zustand (gut/Warnung), keine Identität. */
@@ -2731,7 +2745,7 @@ button.health-med-card:hover {
   margin-inline-start: var(--space-1);
   padding: 1px var(--space-2);
   border-radius: var(--radius-full);
-  font-size: var(--text-2xs);
+  font-size: var(--type-micro);
   font-weight: 600;
   vertical-align: middle;
 }
@@ -2910,7 +2924,7 @@ button.health-med-card:hover {
 
 .cycle-cal__wd {
   text-align: center;
-  font-size: var(--text-2xs);
+  font-size: var(--type-micro);
   color: var(--color-text-secondary);
   padding: var(--space-1) 0;
 }
@@ -3122,7 +3136,7 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  font-size: var(--text-2xs);
+  font-size: var(--type-micro);
   color: var(--color-text-secondary);
 }
 
@@ -3227,7 +3241,7 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   margin-top: var(--space-1);
   padding-top: var(--space-2);
   border-top: 1px solid var(--color-border-subtle);
-  font-size: var(--text-2xs);
+  font-size: var(--type-micro);
   color: var(--color-text-secondary);
 }
 .cycle-legend__flow-label { font-weight: 600; }
@@ -3424,7 +3438,7 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   font-variant-numeric: tabular-nums;
 }
 .cycle-pain-tile__label {
-  font-size: var(--text-2xs);
+  font-size: var(--type-micro);
   color: var(--color-text-secondary);
 }
 
@@ -3485,7 +3499,7 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 .cycle-history__meta { display: flex; gap: var(--space-1); flex-wrap: wrap; }
 
 .cycle-history__chip {
-  font-size: var(--text-2xs);
+  font-size: var(--type-micro);
   color: var(--color-text-secondary);
   background: var(--color-surface-2);
   padding: 1px var(--space-2);
@@ -3856,8 +3870,13 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 .fasting-week__day > span { align-self: end; overflow-wrap: anywhere; }
 .fasting-week__day time { color: var(--color-text-secondary); }
 .fasting-week__track { display: flex; direction: ltr; align-items: end; gap: var(--space-1); background: var(--color-fill-well); }
-.fasting-week__bar, .fasting-week__goal { display: block; width: 50%; height: calc(var(--bar-scale) * 100%); border-radius: var(--radius-sm) var(--radius-sm) 0 0; background: var(--chart-series-1); }
-.fasting-week__goal { background: var(--chart-series-2); }
+/* EINE DIAGRAMMSPRACHE IN DER GESUNDHEIT (R19, Critique 2026-10-16): Kurven,
+ * Flaechen und Aktivitaetsbalken tragen den Modulton, nur die Fastenwoche lief
+ * auf Serie 1/2 (Indigo, Petrol) - zwei fremde Farben fuer dieselbe Art
+ * Messung. Jetzt wie die Aktivitaet: der gemessene Wert im Vollton, das Ziel
+ * in der getoenten Stufe (Tinte + 5 %, 3:1 Grafikkontrast in beiden Themes). */
+.fasting-week__bar, .fasting-week__goal { display: block; width: 50%; height: calc(var(--bar-scale) * 100%); border-radius: var(--radius-sm) var(--radius-sm) 0 0; background: var(--module-health); }
+.fasting-week__goal { background: color-mix(in srgb, var(--module-health) calc(var(--tint-ink) + 5%), var(--color-surface)); }
 .fasting-history-filters { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-3); margin-block-end: var(--space-4); }
 .fasting-history-filters label { display: grid; gap: var(--space-2); min-width: 0; }
 [data-fasting-shell] { margin-block-end: var(--space-4); }
