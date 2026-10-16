@@ -1413,7 +1413,7 @@ Kernseite fuehrt es. Die Zuordnung aller Seiten:
 | `dashboard.js` Uebersicht | Flaeche | `dashboard` |
 | `notes.js` Notizen | Flaeche | `full` |
 | `shopping.js` Einkauf | Flaeche | `page-measure--narrow` unter 60rem, darueber Kategorien in zwei Spalten (Notizen-Muster, Kompositions-Ausnahme) |
-| `pantry.js` Vorrat | Flaeche | `reading` mit eigener Bahn: Liste plus festes Nebenpanel ab 60rem (wie das Budget) |
+| `pantry.js` Vorrat | Flaeche | `reading` mit eigener Bahn: ab 60rem die Liste auf dem Lesemass und das Panel als Seitenspalte bis zur Kopfkante (Geometrie von `.page-columns`, R19); das Seitenpolster traegt `.pantry-body` |
 | `meals.js` Mahlzeiten | Flaeche | Wochenraster (Kompositions-Ausnahme) |
 | `documents.js` Dokumente | Flaeche | `full` |
 | `health-fasting.js` Fasten | Flaeche | Bereich der Gesundheit |

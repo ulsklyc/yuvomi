@@ -72,6 +72,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   changes finish their fade sooner so the next tap lands earlier, charts in health draw in like the
   budget reports, and an empty state no longer fades in twice. With reduced motion, dialogs, page
   changes and theme switches crossfade instead of cutting hard.
+- **The pantry keeps its shape on wide screens.** On a desktop the list stands at reading width and
+  the "Expiring soon" panel takes the rest up to the header's edge. On a 1920px screen the panel had
+  110px left for names ("Greek yo-gurt" broke mid-word) while list rows stretched to 1146px, with the
+  quantity buttons far from the name.
 
 ### Fixed
 

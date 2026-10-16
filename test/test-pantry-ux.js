@@ -524,7 +524,7 @@ test('renderList zeichnet das Panel mit - unabhaengig von Suche und aktivem Filt
   assert.equal(watch.children[0].textContent, 'pantry.watchEmpty');
 });
 
-test('das Panel steht nur ab 60rem Vorratsflaeche, und die Liste fuellt die Spalte bis zu ihm', async () => {
+test('das Panel steht nur ab 60rem Vorratsflaeche, die Liste auf dem Lesemass, das Panel nimmt den Rest', async () => {
   const { eachRule } = await import('./css-rules.js');
   const css = readFileSync(new URL('../public/styles/pantry.css', import.meta.url), 'utf8');
   const rules = [...eachRule(css)];
@@ -538,6 +538,18 @@ test('das Panel steht nur ab 60rem Vorratsflaeche, und die Liste fuellt die Spal
   assert.match(wide('.pantry-body')?.body ?? '', /flex-direction:\s*row/);
   assert.match(wide('.pantry-body > .pantry-list')?.body ?? '', /--page-measure:\s*100%/,
     'die Gruppen kappen auf die Spalte, ueber dieselbe Variable wie ueberall');
+  // Critique R19: das Seitenpolster stand IN der 20rem-Basis des Panels - bei
+  // 1920 blieben 110px Inhalt. Es gehoert einmal an den Koerper; die Liste
+  // steht auf dem Lesemass, das Panel nimmt den Rest (Geometrie von .page-columns).
+  assert.match(wide('.pantry-body')?.body ?? '', /padding-inline:\s*var\(--page-inline-pad\)/,
+    'der Koerper zieht Liste und Panel auf die Inhaltsspalte');
+  assert.doesNotMatch(wide('.pantry-watch:not([hidden])')?.body ?? '', /padding-inline/,
+    'das Panel polstert nicht selbst - sonst frisst das Seitenpolster seine Breite');
+  assert.match(wide('.pantry-body > .pantry-list')?.body ?? '', /flex:\s*0 1 var\(--layout-reading\)/,
+    'die Liste steht auf dem Lesemass statt sich bis zum Panel zu strecken');
+  assert.match(wide('.pantry-body > .pantry-list')?.body ?? '', /padding-inline:\s*0\b/);
+  assert.match(wide('.pantry-watch:not([hidden])')?.body ?? '', /min-width:\s*var\(--layout-rail-min\)/,
+    'das Panel wird nie schmaler als eine Seitenspalte');
   const src = readFileSync(new URL('../public/pages/pantry.js', import.meta.url), 'utf8');
   assert.match(src, /body\.append\(list, watch\)/, 'Liste und Panel teilen den Koerper');
   assert.match(src, /watch\.addEventListener\('click', onWatchClick\)/, 'eine Panelzeile oeffnet ihren Artikel');

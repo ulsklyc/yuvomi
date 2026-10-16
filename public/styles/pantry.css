@@ -85,19 +85,17 @@
  * 252-972, rechts 436px leere Buehne, waehrend Essensplan und Rezepte bis
  * 1408 reichen - beim Tabwechsel sprang der Inhalt. Ab 60rem Vorratsflaeche
  * (1280er mit Seitenleiste: 1060px) steht rechts ein festes Panel mit dem, was
- * bald ablaeuft oder knapp wird; die Liste fuellt den Rest bis zu ihm, und das
- * Panel endet an der Kante der Kuechen-Leiste.
+ * bald ablaeuft oder knapp wird; die Liste steht auf dem Lesemass, das Panel
+ * nimmt den Rest und endet an der Kante der Kuechen-Leiste (R19, unten).
  *
  * FEST, NICHT STICKY: das Panel ist ein eigener Block neben dem Scrollport,
  * kein Kind von ihm - es steht bei jedem Scrollstand der Liste, und ist es
- * laenger als der Platz, scrollt es fuer sich. Die Breite liegt in der Spanne
- * der Budget-Seitenleiste (18.75-23.75rem, budget.css), derselben Rolle.
+ * laenger als der Platz, scrollt es fuer sich.
  *
  * Der Container ist die Seite, umgestellt wird ihr Koerper: eine
  * Container-Abfrage kann ihren eigenen Container nicht umbauen. */
 .pantry-page {
   container: pantry-surface / inline-size;
-  --pantry-watch-width: 20rem;
 }
 
 .pantry-body {
@@ -112,16 +110,27 @@
 }
 
 @container pantry-surface (min-width: 60rem) {
+  /* DAS POLSTER GEHOERT DEM KOERPER, NICHT DER SPALTE (Critique R19, P1).
+   * Bis R19 trug die Liste links und das Panel rechts je ein
+   * `--page-inline-pad`. Bei 1920 sind das 210px - im Panel INNERHALB seiner
+   * 20rem-Basis: es blieben 110px Inhalt, und "Griechi-scher Joghurt" brach
+   * mitten im Wort. Daneben streckte sich die Liste auf 1146px, bei 1440 stand
+   * der Stepper 600px vom Namen. Jetzt zieht der Koerper beides EINMAL auf die
+   * Inhaltsspalte, und darin gilt dieselbe Geometrie wie `.page-columns`
+   * (layout.css): die Liste auf dem Lesemass, das Panel nimmt den Rest bis zur
+   * Kopfkante und wird nie schmaler als eine Telefonbreite.
+   * Gemessen 1280 / 1440 / 1920: Liste 612 / 720 / 720px, Panel 360 / 412 /
+   * 536px, rechte Kante = Kopfkante. */
   .pantry-body {
     flex-direction: row;
+    gap: var(--space-6);
+    padding-inline: var(--page-inline-pad);
   }
 
-  /* Die Liste traegt links das Seitenpolster, rechts nur die Spaltenluecke;
-   * ihre Gruppen fuellen die Spalte statt am Lesemass zu enden. */
   .pantry-body > .pantry-list {
-    flex: 1 1 auto;
+    flex: 0 1 var(--layout-reading);
     min-width: 0;
-    padding-inline-end: var(--space-6);
+    padding-inline: 0;
     --page-measure: 100%;
   }
 
@@ -129,12 +138,12 @@
     display: grid;
     align-content: start;
     gap: var(--space-5);
-    flex: 0 0 var(--pantry-watch-width);
+    flex: 1 1 var(--layout-rail-min);
+    min-width: var(--layout-rail-min);
     min-height: 0;
     overflow-y: auto;
     padding-top: var(--space-4);
     padding-bottom: var(--space-6);
-    padding-inline-end: var(--page-inline-pad);
   }
 }
 
