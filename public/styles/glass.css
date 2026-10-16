@@ -231,7 +231,10 @@
 
 /* Blur nur wenn unterstützt */
 @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-  .modal-overlay {
+  /* Der Grund des nativen Dialogs (`::backdrop`, D7) traegt dasselbe Glas. */
+  .modal-overlay,
+  dialog.modal-overlay::backdrop,
+  dialog.dialog-surface::backdrop {
     background-color: var(--color-overlay-glass);
     backdrop-filter: var(--blur-xs) saturate(120%);
     -webkit-backdrop-filter: var(--blur-xs) saturate(120%);
@@ -583,6 +586,20 @@ textarea.form-input {
 
 @media (max-width: 767px) {
   .modal-panel:not(.modal-panel--closing) {
+    animation: glass-sheet-in var(--sheet-in) forwards;
+  }
+}
+
+/* Dieselbe Einfahrt fuer die eigenen nativen Dialoge (Symbolauswahl,
+ * Zuschnitt; `.dialog-surface` in layout.css, D7). */
+@media (min-width: 768px) {
+  dialog.dialog-surface:not(.dialog-surface--closing) {
+    animation: glass-modal-scale-in var(--duration-xl) var(--ease-glass) forwards;
+  }
+}
+
+@media (max-width: 767px) {
+  dialog.dialog-surface:not(.dialog-surface--closing) {
     animation: glass-sheet-in var(--sheet-in) forwards;
   }
 }

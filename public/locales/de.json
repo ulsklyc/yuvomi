@@ -67,6 +67,7 @@
         "errorServer": "Serverfehler. Bitte versuche es später erneut.",
         "errorRestoreInProgress": "Gerade wird ein Backup wiederhergestellt. Deine Änderung wurde nicht gespeichert, versuche es in einer Minute erneut.",
         "errorTimeout": "Die Verbindung hat zu lange gedauert. Bitte erneut versuchen.",
+        "errorRateLimited": "Gerade kommen zu viele Anfragen an. Warte einen Moment und versuche es dann erneut.",
         "requiredFields": "Bitte alle Pflichtfelder ausfüllen.",
         "invalidInput": "Ungültige Eingabe.",
         "togglePasswordVisibility": "Passwort anzeigen/verbergen",

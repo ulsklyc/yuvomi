@@ -67,6 +67,7 @@
         "errorServer": "Errore del server. Riprova più tardi.",
         "errorRestoreInProgress": "È in corso il ripristino di un backup. La modifica non è stata salvata, riprova tra un minuto.",
         "errorTimeout": "La connessione ha impiegato troppo tempo. Riprova.",
+        "errorRateLimited": "Troppe richieste in questo momento. Attendi un attimo, poi riprova.",
         "requiredFields": "Compila tutti i campi obbligatori.",
         "invalidInput": "Input non valido.",
         "togglePasswordVisibility": "Mostra/nascondi password",

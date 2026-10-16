@@ -66,6 +66,7 @@ import { nowFields, todayKey, wallTimeToInstantMs, zonedDateKey, zonedTimeKey } 
 import { dayHeading, dayHeadingLabel } from '/utils/day-label.js';
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
 import { emptyStateHTML, emptyHintHTML, mountLoadError } from '/utils/empty-state.js';
+import { overlayHost } from '/utils/overlay-host.js';
 import { isPermAdmin, moduleAccess } from '/permissions.js';
 import { pathAccess } from '/utils/module-access.js';
 import {
@@ -417,7 +418,9 @@ function openIconPickerDialog(selectedIcon, onSelect, onClose = () => {}) {
   });
 
   overlay.appendChild(panel);
-  document.body.appendChild(overlay);
+  // In den Termin-Dialog, aus dem die Wahl aufgeht: ausserhalb des modalen
+  // <dialog> waere sie inert und laege darunter (D7, utils/overlay-host.js).
+  overlayHost().appendChild(overlay);
   document.addEventListener('keydown', onKeydown);
   panel.querySelector('#event-icon-dialog-search')?.focus();
   if (window.lucide) lucide.createIcons({ el: panel });
@@ -5376,7 +5379,8 @@ async function copyText(value, toastKey) {
   input.readOnly = true;
   input.style.position = 'fixed';
   input.style.opacity = '0';
-  document.body.appendChild(input);
+  // Im offenen Dialog, sonst nimmt das Feld keinen Fokus (D7).
+  overlayHost().appendChild(input);
   const previousFocus = document.activeElement;
   let copied = false;
   try {

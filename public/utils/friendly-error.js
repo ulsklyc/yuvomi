@@ -346,6 +346,11 @@ function knownKey(err) {
   // die Absage einen Grund, fuer den es einen Satz gibt, dann dieser. Der Grund
   // einer Absage zaehlt nur an einer Absage, und umgekehrt.
   if (status === 403) return REFUSAL_MESSAGES.get(reason) ?? 'common.errorNoPermission';
+  // Eine Bremse (429) sagt "kurz warten" in der Sprache der Oberflaeche. Bis
+  // dahin kam ihr englischer Servertext durch ("Too many requests. Please wait
+  // a moment." in deutscher UI, Critique 2026-10-16). Ein Fall mit eigenem
+  // Satz behaelt diesen.
+  if (status === 429) return CASE_MESSAGES.get(reason) ?? 'common.errorRateLimited';
   return CASE_MESSAGES.get(reason);
 }
 
@@ -393,7 +398,7 @@ export function errorSentence(err, fallbackKey = 'common.errorGeneric') {
  *
  * @param {unknown} err - ApiError (status, data), ein Netzfehler oder irgendein Wurf
  * @returns {string} uebersetzter Satz, oder an einem Status ohne eigenen Satz
- *   (400, 409, 422, 429 ohne bekannten Grund) der Text des Servers
+ *   (400, 409, 422 ohne bekannten Grund) der Text des Servers
  */
 export function friendlyError(err) {
   // Offline-Mutation (ApiError status 0): spezifische Meldung - auch wenn
@@ -414,7 +419,7 @@ export function friendlyError(err) {
   if (err?.name === 'AbortError' || err?.name === 'TimeoutError') return t('common.errorTimeout');
   if (/Failed to fetch|NetworkError|Load failed/i.test(err?.message || '')) return t('common.errorServer');
   if (err?.name === 'TypeError') return t('common.unexpectedError');
-  // Jede andere Antwort des Servers (400, 409, 422, 429 ohne bekannten Grund):
+  // Jede andere Antwort des Servers (400, 409, 422 ohne bekannten Grund):
   // ihr eigener Text. Er nennt die Ursache (welches Feld, welcher Konflikt),
   // und der allgemeine Satz an seiner Stelle sagte weniger - das gilt, bis der
   // Aufrufer umgestellt ist und der Server den Fall mit einem `reason` benennt.

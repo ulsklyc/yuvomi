@@ -334,7 +334,9 @@ const MODAL_PANEL_ZONE = /modal-panel__header|modal-panel__footer|modal-actions/
 // Ein Attribut-Selektor (`[role="dialog"]`) FRAGT nach Dialogen, er baut
 // keinen: das Popover der Leseansicht laesst so Klicks in einer anderen Ebene
 // durch (Re-Kritik 2026-09-28, E2) und zaehlte sonst als zweiter Dialog.
-const DIALOG_ROLE = /(?<!\[)role="dialog"|setAttribute\(\s*'role'\s*,\s*'dialog'\s*\)/g;
+// Seit D7 baut das geteilte Modal ein natives `<dialog ...>` - die Rolle ist
+// dort implizit und steht als kein Attribut im Markup, der Dialog zaehlt aber.
+const DIALOG_ROLE = /(?<!\[)role="dialog"|setAttribute\(\s*'role'\s*,\s*'dialog'\s*\)|<dialog\s/g;
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 

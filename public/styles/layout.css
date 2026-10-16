@@ -5903,6 +5903,116 @@ p.field-hint--warn[hidden] {
   }
 }
 
+/* DAS GETEILTE MODAL IST EIN NATIVES <dialog> (D7, Critique 2026-10-16).
+ *
+ * `showModal()` legt es in die Top-Layer: der Hintergrund wird inert, Tab
+ * bleibt im Dialog, und kein `z-index` der Seite kommt mehr darueber. Der
+ * Knoten bleibt die Flaeche ueber dem ganzen Bild, die das Panel unten
+ * (Telefon) oder mittig (Desktop) haelt - ein Klick daneben trifft ihn, wie
+ * vorher das Overlay-Div. Das UA-Blatt eines Dialogs (Rand, Polster, Canvas-
+ * Grund, `max-width/height` fuer :modal) wird zurueckgenommen, die Polster
+ * oben (Safe-Areas) gelten weiter.
+ *
+ * DIE ABDUNKLUNG LIEGT AUF `::backdrop`, solange der Dialog in der Top-Layer
+ * steht - die Werte sind dieselben wie am Overlay (die Regeln oben, glass.css
+ * und die Rueckfaelle fuer reduzierte Transparenz fuehren `::backdrop` in
+ * ihrer Liste). Im Ausgang verlaesst der Dialog die Top-Layer sofort
+ * (modal.js, _leaveTopLayer: die Seite ist dann schon wieder bedienbar), und
+ * ohne Top-Layer gibt es kein `::backdrop` - dann traegt der Knoten die
+ * Abdunklung wieder selbst und blendet sie aus. Beide Zustaende zeigen
+ * dieselbe Flaeche, der Wechsel liegt im selben Frame.
+ *
+ * Die selbstgebauten `.modal-overlay`-Divs (Hilfe, Kalender-Symbolwahl)
+ * behalten ihre Flaeche: die Regeln hier gelten nur dem `<dialog>`. */
+dialog.modal-overlay {
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  color: inherit;
+  /* Ein Wisch ueber das Blatt kettet nicht an die Seite darunter. */
+  overscroll-behavior: contain;
+}
+
+/* Nur in der Top-Layer (`[open]` setzt erst showModal()): ohne sie - im
+ * Ausgang, oder in einem Browser ohne showModal() (Safari vor 15.4, die
+ * Mindestversion ist 14.1) - traegt der Knoten die Abdunklung wie bisher. */
+dialog.modal-overlay[open] {
+  background-color: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Geschlossen (`[open]` fehlt) blendet das UA-Blatt den Dialog aus; im
+ * Ausgang soll er noch zu sehen sein. */
+dialog.modal-overlay.modal-overlay--closing {
+  display: flex;
+}
+
+dialog.modal-overlay::backdrop {
+  background-color: color-mix(in srgb, var(--color-accent) var(--tint-wash), var(--color-overlay-glass));
+  backdrop-filter: var(--blur-xs) saturate(120%);
+  -webkit-backdrop-filter: var(--blur-xs) saturate(120%);
+  animation: modal-overlay-in var(--duration-md) var(--ease-out) forwards;
+  /* Ein Scroll ueber dem Grund bleibt dort (overflow macht ihn zum
+   * Scroll-Container, erst dann greift overscroll-behavior). */
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+/* EIGENE NATIVE DIALOGE IM BILD DES MODALS (D7): Symbolauswahl und
+ * Bildzuschnitt sind selbst ein `<dialog>` mit `showModal()`. Sie tragen
+ * dieselbe Tafel (Radius, Kante, Schatten wie `.modal-panel`), denselben Grund
+ * und dieselbe Bewegung: mobil ein Blatt vom unteren Rand (`--sheet-in`/
+ * `--sheet-out`), am Desktop Scale-in und ein kurzes Zuruecknehmen. Vorher
+ * lagen sie auf einem flachen eigenen Grund und verschwanden hart. Den
+ * Ausgang startet utils/dialog-surface.js (`.dialog-surface--closing`). */
+dialog.dialog-surface {
+  padding: 0;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  background-color: var(--color-surface);
+  color: inherit;
+  box-shadow: var(--shadow-lg);
+  overscroll-behavior: contain;
+}
+
+dialog.dialog-surface::backdrop {
+  background-color: color-mix(in srgb, var(--color-accent) var(--tint-wash), var(--color-overlay-glass));
+  backdrop-filter: var(--blur-xs) saturate(120%);
+  -webkit-backdrop-filter: var(--blur-xs) saturate(120%);
+  animation: modal-overlay-in var(--duration-md) var(--ease-out) forwards;
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+dialog.dialog-surface.dialog-surface--closing {
+  animation: modal-scale-out var(--duration-sm) var(--ease-out) forwards;
+  pointer-events: none;
+}
+
+dialog.dialog-surface.dialog-surface--closing::backdrop {
+  animation: modal-overlay-out var(--duration-sm) var(--ease-out) forwards;
+}
+
+/* Die Einfahrt steht wie die der Tafel in glass.css (Abschnitt 18). */
+@media (max-width: 767px) {
+  /* Am unteren Rand wie das Dialog-Blatt, mit demselben Abstand. */
+  dialog.dialog-surface {
+    margin: auto auto max(var(--space-3), env(safe-area-inset-bottom));
+  }
+
+  dialog.dialog-surface.dialog-surface--closing {
+    animation: sheet-out var(--sheet-out) forwards;
+  }
+
+  dialog.dialog-surface.dialog-surface--closing::backdrop {
+    animation-duration: var(--duration-md);
+  }
+}
+
 .modal-panel {
   background-color: var(--color-surface);
   width: 100%;
@@ -6798,6 +6908,12 @@ p.field-hint--warn[hidden] {
   .modal-overlay.modal-overlay--closing {
     animation: none;
   }
+
+  /* KEINE BEWEGUNG, ABER EINE BLENDE (Critique 2026-10-16): die schreibt
+   * modal.js bzw. utils/dialog-surface.js per Web Animations (nur Opacity,
+   * `--duration-sm`). Eine CSS-Transition griffe hier nicht - die Einfahrt
+   * haelt Opacity per `animation ... forwards` fest, und der Wechsel aus der
+   * Top-Layer im Ausgang verwirft den Vorher-Stil (gemessen, Chrome 155). */
 }
 
 /* --------------------------------------------------------
@@ -9382,8 +9498,11 @@ textarea::placeholder {
   }
 
   /* Ohne Blur braucht der Modal-Backdrop wieder volle Deckkraft, damit das
-   * dahinterliegende Modul nicht unscharf-frei durchscheint. */
-  .modal-overlay {
+   * dahinterliegende Modul nicht unscharf-frei durchscheint. Dasselbe fuer
+   * den Grund des nativen Dialogs (D7). */
+  .modal-overlay,
+  dialog.modal-overlay::backdrop,
+  dialog.dialog-surface::backdrop {
     background-color: var(--color-overlay);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;

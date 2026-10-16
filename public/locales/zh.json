@@ -67,6 +67,7 @@
         "errorServer": "服务器错误。请稍后重试。",
         "errorRestoreInProgress": "正在恢复备份。你的更改未保存，请一分钟后再试。",
         "errorTimeout": "连接超时。请重试。",
+        "errorRateLimited": "当前请求过多。请稍候片刻再重试。",
         "requiredFields": "请填写所有必填字段。",
         "invalidInput": "输入无效。",
         "togglePasswordVisibility": "显示/隐藏密码",

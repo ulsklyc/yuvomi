@@ -16999,8 +16999,12 @@ test('erzwungenes Schliessen raeumt auch geparkte Modals weg (#871)', () => {
   assert.match(fn[0], /if \(force\)/,
     'der Zwangspfad ist nicht vom normalen unterschieden - dann bleibt ein '
     + 'geparktes Formular ueber der Anmeldeseite stehen');
-  assert.match(fn[0], /querySelectorAll\('\.modal-overlay'\)[\s\S]{0,80}remove\(\)/,
+  // `_removeOverlay(el)` seit D7: es holt vorher die Toasts aus dem Dialog,
+  // die sonst mit ihm verschwaenden.
+  assert.match(fn[0], /querySelectorAll\('\.modal-overlay'\)[\s\S]{0,80}(?:\.remove\(\)|_removeOverlay\(el\))/,
     'der Zwangspfad entfernt die geparkten Kaesten nicht');
+  assert.match(modal, /function _removeOverlay\(overlay\) \{[\s\S]{0,200}overlay\?\.remove\?\.\(\)/,
+    '_removeOverlay entfernt den Kasten nicht mehr');
 
   /* UND DAS ZURUECKHOLEN ERKENNT DEN ENTFERNTEN KNOTEN. Der
    * Bestaetigungs-Ablauf laeuft in einer eigenen Kette weiter und kam nach dem

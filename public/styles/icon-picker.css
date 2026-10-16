@@ -10,21 +10,13 @@
 /* ------------------------------------------------------------------ */
 
 .icon-picker {
-  border: none;
-  padding: 0;
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-xl);
+  /* Tafel, Grund und Bewegung: .dialog-surface (layout.css, D7). */
   width: calc(100vw - var(--space-8));
   max-width: 420px;
   /* Der Dialog wächst mit seinem Inhalt, aber nie über den Bildschirm
    * hinaus - das Raster darin scrollt, der Rahmen bleibt stehen. */
   max-height: min(560px, calc(100vh - var(--space-8)));
   overflow: hidden;
-}
-
-.icon-picker::backdrop {
-  background: var(--color-overlay);
 }
 
 .icon-picker__body {

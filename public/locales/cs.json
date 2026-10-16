@@ -68,6 +68,7 @@
         "errorServer": "Chyba serveru. Zkuste to prosím později znovu.",
         "errorRestoreInProgress": "Právě se obnovuje záloha. Vaše změna nebyla uložena, zkuste to znovu za minutu.",
         "errorTimeout": "Připojení trvalo příliš dlouho. Zkuste to prosím znovu.",
+        "errorRateLimited": "Právě přichází příliš mnoho požadavků. Chvíli počkejte a zkuste to znovu.",
         "requiredFields": "Vyplňte prosím všechna povinná pole.",
         "invalidInput": "Neplatný vstup.",
         "togglePasswordVisibility": "Zobrazit/skrýt heslo",

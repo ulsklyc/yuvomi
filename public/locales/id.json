@@ -67,6 +67,7 @@
         "errorServer": "Kesalahan server. Coba lagi nanti.",
         "errorRestoreInProgress": "Cadangan sedang dipulihkan saat ini. Perubahan Anda tidak disimpan, coba lagi dalam satu menit.",
         "errorTimeout": "Koneksi terlalu lama. Silakan coba lagi.",
+        "errorRateLimited": "Terlalu banyak permintaan saat ini. Tunggu sebentar, lalu coba lagi.",
         "requiredFields": "Harap isi semua bidang wajib.",
         "invalidInput": "Masukan tidak valid.",
         "togglePasswordVisibility": "Tampilkan/sembunyikan kata sandi",

@@ -67,6 +67,7 @@
         "errorServer": "Sunucu hatası. Lütfen daha sonra tekrar deneyin.",
         "errorRestoreInProgress": "Şu anda bir yedek geri yükleniyor. Değişikliğiniz kaydedilmedi, bir dakika sonra yeniden deneyin.",
         "errorTimeout": "Bağlantı çok uzun sürdü. Lütfen tekrar deneyin.",
+        "errorRateLimited": "Şu anda çok fazla istek var. Biraz bekleyip tekrar deneyin.",
         "requiredFields": "Lütfen tüm zorunlu alanları doldurun.",
         "invalidInput": "Geçersiz giriş.",
         "togglePasswordVisibility": "Şifreyi göster/gizle",

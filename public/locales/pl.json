@@ -69,6 +69,7 @@
         "errorServer": "Błąd serwera. Spróbuj ponownie później.",
         "errorRestoreInProgress": "Trwa właśnie przywracanie kopii zapasowej. Twoja zmiana nie została zapisana, spróbuj ponownie za minutę.",
         "errorTimeout": "Połączenie trwało zbyt długo. Spróbuj ponownie.",
+        "errorRateLimited": "Zbyt wiele żądań w tej chwili. Poczekaj chwilę i spróbuj ponownie.",
         "requiredFields": "Wypełnij wszystkie wymagane pola.",
         "invalidInput": "Nieprawidłowe dane.",
         "togglePasswordVisibility": "Pokaż/ukryj hasło",

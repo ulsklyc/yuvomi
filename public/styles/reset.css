@@ -175,7 +175,10 @@ h1, h2, h3, h4, h5, h6 {
     scroll-behavior: auto !important;
   }
 
-  /* Ersatz-Blenden (die Opacity-Transition steht in layout.css). */
+  /* Ersatz-Blenden (die Opacity-Transition steht in layout.css). Modal und
+   * eigene native Dialoge blenden per Web Animations (modal.js `_fade`,
+   * utils/dialog-surface.js) - eine CSS-Transition griffe dort nicht, siehe
+   * den Block fuer reduzierte Bewegung am Modal in layout.css. */
   .more-sheet,
   .more-sheet[aria-hidden="false"],
   .more-backdrop,
