@@ -113,7 +113,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tap, because the view no longer slides behind it.
 - **Week and day views start in the morning.** The calendar opens the time grid at 7 am as long as
   the current hour still fits on screen, instead of an hour before now, so the morning stays
-  visible on a computer.
+  visible on a computer. From 5 am it already shows the coming day from 7 am instead of the night
+  before it; only deep in the night does it start an hour before now.
 - **Event details keep times and places readable.** In the event popover a time range such as
   "09:00 - 10:30" no longer breaks across two lines, a place name no longer breaks in the middle
   of a word next to "Open in Maps", and digits line up. The list under the month now names the

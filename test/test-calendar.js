@@ -6117,7 +6117,11 @@ test('R19 Woche: der Morgen steht da, solange jetzt daneben Platz hat', () => {
   assert(at(15, 665) === 7, `1440 um 15 Uhr: ab 7 Uhr (vorher 12), war ${at(15, 665)}`);
   assert(at(10, 845) === 7, 'vormittags ebenso');
   assert(at(20, 618) === 10, `mobil am Abend so spaet wie noetig, damit 20 Uhr ganz unten steht: ${at(20, 618)}`);
-  assert(at(0, 665) === 0 && at(5, 665) === 4, 'nachts eine Stunde vor jetzt');
+  assert(at(0, 665) === 0 && at(3, 665) === 2, 'tief in der Nacht eine Stunde vor jetzt');
+  // Re-Kritik 2026-10-17: um 05:49 begann die Woche bei 04:00 (bis 15:30) -
+  // drei Stunden leere Nacht. Frueh am Morgen (ab 5 Uhr) zeigt sie den Tag ab 7.
+  assert(at(5, 665) === 7 && at(6, 665) === 7, `frueh am Morgen ab 7 Uhr, war ${at(5, 665)}/${at(6, 665)}`);
+  assert(at(4, 665) === 3, 'vor 5 Uhr bleibt es Nacht');
   assert(at(23, 845) === 8, `das Scrollende (845px fassen 15,1 Stunden) deckelt auf volle Stunden: ${at(23, 845)}`);
 });
 

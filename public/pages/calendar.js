@@ -4488,6 +4488,9 @@ function scrollToHour(scroll, body) {
 
 /** Ab dieser Stunde zeigt das Zeitraster den Tag, wenn jetzt dabei Platz hat. */
 const MORNING_HOUR = 7;
+/** Ab dieser Stunde ist es frueher Morgen, nicht mehr Nacht: das Raster zeigt
+ * schon den kommenden Tag ab MORNING_HOUR (Re-Kritik 2026-10-17). */
+const EARLY_HOUR = MORNING_HOUR - 2;
 
 /**
  * DIE ERSTE SICHTBARE STUNDE STEHT GANZ DA (R19, Critique 2026-10-16). Der
@@ -4502,8 +4505,15 @@ const MORNING_HOUR = 7;
  * 15 Uhr begann die Woche bei 13 Uhr, obwohl das Raster 18 Stunden fasst.
  * Mit `visible` (Hoehe des Scrollers) beginnt die Ansicht um MORNING_HOUR,
  * solange die laufende Stunde darunter noch ganz hineinpasst; sonst so spaet
- * wie noetig, damit sie unten steht. Nachts (vor dem Morgen) beginnt sie eine
- * Stunde vor jetzt. Ohne `visible` bleibt es bei "eine gute Stunde vor jetzt".
+ * wie noetig, damit sie unten steht. Ohne `visible` bleibt es bei "eine gute
+ * Stunde vor jetzt".
+ *
+ * FRUEH AM MORGEN ZEIGT SIE DEN TAG, NICHT DIE NACHT (Re-Kritik 2026-10-17):
+ * um 05:49 begann die Woche bei 04:00 und zeigte bis 15:30 - drei Stunden
+ * leere Nacht vor dem ersten Termin. Ab EARLY_HOUR (zwei Stunden vor dem
+ * Morgen) beginnt sie um MORNING_HOUR; die laufende Stunde liegt dann knapp
+ * darueber, der Tag, der gleich beginnt, steht ganz da. Tief in der Nacht
+ * (Nachtschicht, Wickeln) bleibt es bei einer Stunde vor jetzt.
  * @param {{hour: number, hourHeight: number, max: number, visible?: number}} opts
  * @returns {number} scrollTop in px, ein Vielfaches der Stundenhoehe
  */
@@ -4512,7 +4522,8 @@ function alignedHourScroll({ hour, hourHeight, max, visible }) {
   let wanted;
   if (visible > 0) {
     const fits = Math.floor(visible / hourHeight + 1e-6);
-    const topHour = Math.max(hour + 1 - fits, Math.min(MORNING_HOUR, Math.max(0, hour - 1)));
+    const night = hour < EARLY_HOUR ? Math.max(0, hour - 1) : MORNING_HOUR;
+    const topHour = Math.max(hour + 1 - fits, Math.min(MORNING_HOUR, night));
     wanted = Math.max(0, topHour) * hourHeight;
   } else {
     wanted = Math.max(0, hour * hourHeight - 80);
