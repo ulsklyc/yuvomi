@@ -3804,8 +3804,10 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 .health-medlog summary::-webkit-details-marker { display: none; }
 .health-medlog summary::marker { content: ''; }
 
-.health-medlog summary:hover {
-  color: var(--color-text-primary);
+@media (hover: hover) {
+  .health-medlog summary:hover {
+    color: var(--color-text-primary);
+  }
 }
 
 .health-medlog__chevron {
