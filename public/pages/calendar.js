@@ -1928,7 +1928,7 @@ export async function render(container, { user, signal } = {}) {
 
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
-    <div class="calendar-page app-page app-page--full" id="calendar-page" data-composition="full">
+    <div class="calendar-page app-page app-page--full${sidebarWanted() ? ' has-cal-sidebar' : ''}" id="calendar-page" data-composition="full">
       ${/* DER KOPF STEHT SCHON VOR DEN DATEN, samt Aktions-Slot: die Shell
             dockt den FAB direkt nach dem synchronen Teil an (adoptPageFab in
             router.js) und findet ihn danach nur noch in der Shell-Ebene, nicht
@@ -1949,7 +1949,13 @@ export async function render(container, { user, signal } = {}) {
            Live-Region, die mit ihrem Inhalt zusammen entsteht, sagt nichts an. -->
       <span id="cal-live" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></span>
       <div class="cal-frame">
-        <aside class="cal-sidebar" id="cal-sidebar" aria-label="${esc(t('calendar.sidebarLabel'))}" hidden></aside>
+        ${/* DIE SPALTE STEHT VOM ERSTEN BILD AN (R20, E1-Befund Kalender 1920:
+              CLS 0,136). Die Leiste kam erst mit renderSidebar() nach der
+              ersten Ansicht dazu, und #cal-body rutschte von x 220 auf 536.
+              Jetzt traegt die Seite `has-cal-sidebar` schon im Markup und die
+              leere Leiste reserviert ihre Breite (calendar.css, Container-
+              Regel); renderSidebar() fuellt sie nur noch. */ ''}
+        <aside class="cal-sidebar" id="cal-sidebar" aria-label="${esc(t('calendar.sidebarLabel'))}"${sidebarWanted() ? '' : ' hidden'}></aside>
         <div id="cal-body" style="flex:1;display:flex;flex-direction:column;overflow:hidden;"></div>
       </div>
       ${/* Die CSS-Regel html[data-module-readonly] .page-fab (layout.css) blendet

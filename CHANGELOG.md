@@ -58,7 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only, so the next appointments fit on the screen. When the next appointments cannot be loaded,
   the sidebar says why and offers "Try again" instead of claiming nothing is coming up. The agenda
   keeps the sidebar with the small month and the switches (without the next appointments, which the
-  agenda itself lists), so switching views no longer moves the calendar sideways. The period
+  agenda itself lists), so switching views no longer moves the calendar sideways, and the sidebar
+  stands there from the first picture instead of pushing the calendar aside after it loaded. The period
   in the header ("October 2026") is now set as a title instead of in body text weight.
 
 ### Changed

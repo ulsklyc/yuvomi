@@ -6209,6 +6209,15 @@ test('R19 Popover und Tageskopf: Spanne bricht nicht, Ort nicht im Wort, ein Kop
   assert(/flex:\s*1 1 10rem/.test(text?.body ?? ''), 'der Wert beansprucht seine Mindestbreite');
 });
 
+// R20 (E1-Befund, Kalender 1920 CLS 0,136): die Spalte der Seitenleiste steht
+// vom ersten Bild an. Vorher kam `has-cal-sidebar` erst mit renderSidebar()
+// nach der ersten Ansicht, und #cal-body rutschte von x 220 auf 536.
+test('R20: die Seitenleiste reserviert ihre Spalte schon im ersten Markup', () => {
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  assert(/class="calendar-page app-page app-page--full\$\{sidebarWanted\(\) \? ' has-cal-sidebar' : ''\}" id="calendar-page"/.test(src), 'die Seite traegt has-cal-sidebar schon im Markup');
+  assert(/<aside class="cal-sidebar" id="cal-sidebar" aria-label="[^"]*"\$\{sidebarWanted\(\) \? '' : ' hidden'\}><\/aside>/.test(src), 'die leere Leiste ist nicht verborgen');
+});
+
 // --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
