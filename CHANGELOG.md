@@ -329,6 +329,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Settings: the screensaver options wait for Immich.** Without an Immich connection the photo
   screensaver never starts, yet "This device" offered its delay, clock and photo fit. It now shows
   one row saying that an admin has to connect Immich first, and admins get a button that goes there.
+- **Settings: sheet introductions and jump links are no longer cut off.** On a phone the line under
+  a sheet's title may take three lines instead of two, so "This device", Notifications and Tasks
+  keep the end of their sentence. On wider screens the jump links at the top of a sheet wrap to a
+  second row instead of disappearing at the edge.
 - **Screen readers and voice control hear what the buttons show.** Several buttons carried a name that
   left out their visible text, so saying what you see did not reach them: the account button in the
   sidebar, the "New" button in a module header, kitchen tabs with a count, account rows in Budget,

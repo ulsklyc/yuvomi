@@ -563,17 +563,21 @@
   .settings-leaf-header { margin-top: 0; }
 }
 
-/* MOBIL ZWEI ZEILEN VORSPANN (Critique 2026-10-05, R16). Die Blattbeschreibung
- * lief im Kalender-Blatt ueber vier Zeilen (77px) vor dem ersten Schalter; sie
- * zaehlt auf, was im Blatt steht, und genau das tun darunter die
- * Sprungmarken und die Abschnittstitel. Gekuerzt wird nur das Bild - der Text
- * steht ganz im Baum. */
+/* MOBIL HOECHSTENS DREI ZEILEN VORSPANN (Critique 2026-10-05, R16; R20). Die
+ * Blattbeschreibung lief im Kalender-Blatt ueber vier Zeilen (77px) vor dem
+ * ersten Schalter; sie zaehlt auf, was im Blatt steht, und genau das tun
+ * darunter die Sprungmarken und die Abschnittstitel. Blaetter mit Marken
+ * blenden sie ganz aus (unten). Zwei Zeilen schnitten in drei Blaettern ohne
+ * Marken die Aussage ab (Re-Critique 2026-10-17 a5 P3): "Dieses Geraet" verlor
+ * "alles, was nur fuer dieses Geraet gilt", Benachrichtigungen und Aufgaben je
+ * den Satzschluss. Drei Zeilen tragen alle Beschreibungen ohne Marken
+ * ungekuerzt (gemessen 390px, de); die Grenze bleibt fuer laengere Locales. */
 @media (max-width: 767px) {
   .settings-leaf-header__description {
     display: -webkit-box;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
     overflow: hidden;
   }
 }
@@ -617,6 +621,19 @@
   text-decoration: none;
 }
 
+/* AB 768px BRECHEN DIE MARKEN UM (R20, Re-Critique 2026-10-17 a5 P3). Die
+ * eine scrollende Zeile ist eine Telefonregel (dort kosteten fuenf Marken drei
+ * Reihen); am Desktop schnitt sie im Kalender-Blatt zwei von sechs Marken an
+ * der Kante ab - ohne sichtbare Leiste, die zeigt, dass es weitergeht
+ * (gemessen 999px Inhalt in 660px bei 1280). Dort ist Platz fuer eine zweite
+ * Reihe. */
+@media (min-width: 768px) {
+  .settings-sheet-jump__list {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+}
+
 /* Bis die Abschnitte stehen, haelt die Zeile nur ihren Platz (shell.js,
  * syncJumpLabels): die Marken heissen wie die Ueberschriften darunter. */
 .settings-sheet-jump--pending {
@@ -628,7 +645,7 @@
  * Kalender-Blatts von y=517 auf 580 - der eine Messwert der Critique, der
  * schlechter wurde. Im Blatt mit Marken ist die Beschreibung mobil nur noch
  * im Baum (geclippt wie `.sr-only`, reset.css), und der Kopf haelt den
- * kleineren Abstand. Ein Blatt ohne Marken behaelt seine zwei Zeilen. */
+ * kleineren Abstand. Ein Blatt ohne Marken behaelt seine (hoechstens drei) Zeilen. */
 @media (max-width: 767px) {
   .settings-leaf-header--jump { margin-bottom: var(--space-4); }
 

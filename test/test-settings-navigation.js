@@ -3470,13 +3470,20 @@ test('R16: die Sprungmarken sind Links im Blatt, eine scrollende Zeile, und spri
   const row = rules.find((r) => r.selector.trim() === '.settings-sheet-jump__list' && !r.at.length);
   assert.match(row?.body ?? '', /overflow-x:\s*auto/);
   assert.match(row?.body ?? '', /flex-wrap:\s*nowrap/, 'eine Zeile: umgebrochen kosteten fuenf Marken mobil drei Reihen vor dem ersten Schalter');
+  // R20: am Desktop schnitt die Zeile im Kalender-Blatt zwei Marken ab (999px in 660px).
+  const wide = rules.find((r) => r.selector.trim() === '.settings-sheet-jump__list' && r.at.some((a) => /min-width:\s*768px/.test(a)));
+  assert.match(wide?.body ?? '', /flex-wrap:\s*wrap/, 'ab 768px brechen die Marken um, statt an der Kante zu enden');
 });
 
-test('R16: mobil ist die Blattbeschreibung zwei Zeilen lang', async () => {
+test('R16/R20: mobil ist die Blattbeschreibung hoechstens drei Zeilen lang', async () => {
+  // R16 kappte auf zwei Zeilen (vier standen vor dem ersten Schalter). R20
+  // (Re-Critique 2026-10-17 a5 P3): zwei schnitten in "Dieses Geraet",
+  // Benachrichtigungen und Aufgaben die Aussage ab, alle drei ohne Sprungmarken.
   const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
   const phone = [...eachRule(css)].find((r) => r.at.some((a) => /\(max-width:\s*767px\)/.test(a))
     && r.selector.split(',').some((s) => s.trim() === '.settings-leaf-header__description'));
-  assert.match(phone?.body ?? '', /-webkit-line-clamp:\s*2/, 'vier Zeilen Vorspann standen vor dem ersten Schalter');
+  assert.match(phone?.body ?? '', /-webkit-line-clamp:\s*3/, 'drei Zeilen: genug fuer jede Beschreibung ohne Marken, nie wieder vier');
+  assert.match(phone?.body ?? '', /(^|[^-])line-clamp:\s*3/);
 });
 
 test('R16: im Blatt mit Sprungmarken steht die Beschreibung mobil nur im Baum', async () => {
