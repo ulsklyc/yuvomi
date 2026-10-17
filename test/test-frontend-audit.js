@@ -21982,3 +21982,15 @@ test('R20: die Einstellungsleiste beginnt mit einer Sprungmarke ins Blatt', () =
   const css = [...eachRule(read('../public/styles/settings.css'))];
   assert.ok(css.some((r) => r.selector.trim() === '.settings-page:not(.settings-page--leaf) .settings-shell__skip' && /display:\s*none/.test(r.body)), 'ohne Blatt keine Marke');
 });
+
+// R20 D8 (Re-Critique 2026-10-17, A5 P2-7): das „Einnahmeprotokoll" war ein
+// `summary` mit `display: flex` - ohne Dreieck, ohne Chevron, 40px hoch, und
+// las sich wie eine Ueberschrift.
+test('R20: der Aufklapper des Einnahmeprotokolls zeigt, dass er aufgeht, und hat volle Zielhoehe', () => {
+  const health = read('../public/pages/health.js');
+  assert.match(health, /<details class="health-medlog">\s*<summary>[\s\S]*?data-lucide="chevron-down" class="health-medlog__chevron"/, 'der Chevron steht im summary');
+  const css = [...eachRule(read('../public/styles/health.css'))].filter((r) => !r.at.length);
+  const rule = (sel) => css.find((r) => r.selector.trim() === sel)?.body ?? '';
+  assert.match(rule('.health-medlog summary'), /min-height:\s*var\(--target-base\)/, 'am Finger 48px');
+  assert.match(rule('.health-medlog[open] .health-medlog__chevron'), /rotate\(180deg\)/, 'offen dreht er sich');
+});

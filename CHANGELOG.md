@@ -307,6 +307,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Health: the intake log looks like something you can open.** "Intake log" under the adherence card
+  had lost its arrow and read like a heading. It now carries the same chevron as other expandable
+  sections, turns it when open, and is a full-size target on a phone.
+
 - **Settings: one key press from the list to the page.** On a computer some 30 Tab presses stood
   between the top of Settings and the first field of a page, through the search and every entry of
   the list. The first Tab now offers "Skip to the setting", which takes you straight to the page.

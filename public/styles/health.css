@@ -3783,14 +3783,44 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   padding: var(--space-2) var(--space-3);
 }
 
+/* DER AUFKLAPPER SAGT, DASS ER EINER IST (R20, Re-Critique 2026-10-17 A5).
+ * `display: flex` nahm dem `summary` sein Dreieck, und uebrig blieb eine
+ * graue Zeile von 40px, die sich las wie eine Ueberschrift. Jetzt traegt er
+ * den Chevron des geteilten Aufklappers (`.form-advanced`, layout.css), der
+ * sich offen dreht, und die volle Zielhoehe (am Finger 48px). */
 .health-medlog summary {
   cursor: pointer;
+  list-style: none;
   font-size: var(--text-sm);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-secondary);
-  min-height: var(--target-md);
+  min-height: var(--target-base);
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.health-medlog summary::-webkit-details-marker { display: none; }
+.health-medlog summary::marker { content: ''; }
+
+.health-medlog summary:hover {
+  color: var(--color-text-primary);
+}
+
+.health-medlog__chevron {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  flex-shrink: 0;
+  transition: transform var(--transition-base);
+}
+
+.health-medlog[open] .health-medlog__chevron {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .health-medlog__chevron { transition: none; }
 }
 
 .health-medlog__list {

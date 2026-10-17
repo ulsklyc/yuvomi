@@ -3399,7 +3399,10 @@ function medLogHistoryMarkup() {
   }).join('');
   return `
     <details class="health-medlog">
-      <summary>${esc(t('health.meds.logTitle'))}</summary>
+      <summary>
+        <span>${esc(t('health.meds.logTitle'))}</span>
+        <i data-lucide="chevron-down" class="health-medlog__chevron" aria-hidden="true"></i>
+      </summary>
       <ul class="health-medlog__list">${rows}</ul>
     </details>`;
 }
