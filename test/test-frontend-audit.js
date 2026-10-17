@@ -6877,13 +6877,42 @@ test('route failures expose a localized recoverable alert instead of raw technic
   // Renderers (`error` -> `role="alert"`, utils/empty-state.js) statt aus einem
   // setAttribute hier. Geprueft wird deshalb die Variante - die Rolle selbst
   // haelt der Renderer-Guard weiter oben fest.
-  assert.match(router, /function renderError\(container,\s*err\)[\s\S]*emptyStateEl\(\{[\s\S]{0,200}?variant:\s*'error'/);
-  assert.match(router, /function renderError\(container,\s*err\)[\s\S]*description:\s*friendlyError\(err\)/);
+  // Seit der Re-Critique 2026-10-17 nimmt renderError den Seitennamen mit
+  // (Test darunter); die Ursache bleibt friendlyError(err).
+  assert.match(router, /function renderError\(container,\s*err[,)][\s\S]*emptyStateEl\(\{[\s\S]{0,1200}?variant:\s*'error'/);
+  assert.match(router, /function renderError\(container,\s*err[,)][\s\S]*const cause = friendlyError\(err\);[\s\S]*description:[^\n]*: cause,/);
   assert.match(router, /state\.focus\(\{\s*preventScroll:\s*true\s*\}\)/);
   assert.match(friendly, /Failed to fetch\|NetworkError\|Load failed/i);
   assert.match(friendly, /return t\(['"]common\.errorServer['"]\)/);
   assert.match(friendly, /err\?\.name === ['"]TypeError['"][\s\S]*return t\(['"]common\.unexpectedError['"]\)/);
   assert.match(notesPage, /catch \(err\)\s*\{[\s\S]*console\.error\([\s\S]*throw err;/);
+});
+
+// Re-Critique 2026-10-17 (A1, Shell): der Fehlerbildschirm einer Seite war
+// austauschbar - "Etwas ist schiefgelaufen." und nur "Neu laden", obwohl die
+// Shell steht und nur EINE Seite gescheitert ist. Er nennt jetzt die Seite mit
+// ihrem Namen aus der Navigation, sagt, dass der Rest weiterlaeuft, und bietet
+// den Weg zur Uebersicht (ausser auf der Uebersicht selbst). Ohne Shell (Start
+// gescheitert) bleibt der allgemeine Titel.
+test('Re-Critique 2026-10-17: der Fehlerbildschirm nennt die Seite und fuehrt zur Uebersicht', () => {
+  const router = read('../public/router.js');
+  const fn = router.slice(router.indexOf('function renderError('), router.indexOf('function errorDetails('));
+  assert.match(fn, /^function renderError\(container, err, \{ page = null, home = false \} = \{\}\)/);
+  assert.match(fn, /title: page \? t\('common\.pageFailedTitle', \{ page \}\) : t\('common\.errorOccurred'\)/);
+  assert.match(fn, /description: page \? `\$\{cause\} \$\{t\('common\.pageFailedHint'\)\}` : cause,/);
+  assert.match(fn, /actions: home\s*\? \[reload, \{ label: t\('common\.toOverview'\)[^\n]*onClick: \(\) => navigate\('\/'\) \}\]\s*: \[reload\]/);
+  assert.match(fn, /className: 'page-crash'/);
+  // Der Aufrufer im Seitenwechsel reicht Namen und Rueckweg herein; der Start
+  // ohne Shell ruft ohne.
+  assert.match(router, /renderError\(errorHost, err, \{\s*page: navCatalog\(\)\.find\(\(n\) => n\.path === route\.path\)\?\.label \?\? null,\s*home: route\.path !== '\/',\s*\}\)/);
+  assert.match(router, /renderError\(document\.getElementById\('app'\), err\);/);
+  // Region-Fokusziel ohne Rahmen um die halbe Seite (wie .page-unreachable).
+  assert.match(read('../public/styles/layout.css'), /\.page-crash:focus,\s*\.page-crash:focus-visible \{\s*outline: none;/);
+  for (const loc of readdirSync(new URL('../public/locales/', import.meta.url)).filter((f) => f.endsWith('.json'))) {
+    const common = JSON.parse(read(`../public/locales/${loc}`)).common;
+    assert.match(common.pageFailedTitle, /\{\{page\}\}/, loc);
+    assert.ok(common.pageFailedHint && common.toOverview, loc);
+  }
 });
 
 test('Notes keeps user colours off the reading surface', () => {

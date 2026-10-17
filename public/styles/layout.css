@@ -807,9 +807,13 @@ html:active-view-transition-type(region-fade)::view-transition-new(region-swap) 
 /* Dasselbe Region-Fokus-Ziel fuer den Zustand "Seite nicht erreichbar"
  * (utils/session-unreachable.js showPageUnreachable): er nimmt den Fokus, damit
  * die Tastatur nicht im abgeraeumten Baum haengt, und zeigte dafuer einen
- * Rahmen um die halbe Seite. Der Knopf darin traegt seinen Ring weiter. */
+ * Rahmen um die halbe Seite. Der Knopf darin traegt seinen Ring weiter.
+ * Ebenso der Fehlerbildschirm einer gescheiterten Seite (router.js
+ * renderError, `.page-crash`). */
 .page-unreachable:focus,
-.page-unreachable:focus-visible {
+.page-unreachable:focus-visible,
+.page-crash:focus,
+.page-crash:focus-visible {
   outline: none;
 }
 

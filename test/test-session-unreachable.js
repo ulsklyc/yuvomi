@@ -266,5 +266,5 @@ test('router: ein Netzfehler beim Seitenaufbau geht an showPageUnreachable, nur 
   const src = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
   const block = src.slice(src.indexOf("console.error('[Router] Seiten-Render-Fehler:', err);"));
   const body = block.slice(0, block.indexOf('} finally {'));
-  assert.match(body, /if \(!route\.thirdPartyModule && isUnreachableFailure\(err\)\) \{[\s\S]*showPageUnreachable\(errorHost, err, \(\) => navigate\(retryPath, false\)\);[\s\S]*\} else \{\s*renderError\(errorHost, err\);/);
+  assert.match(body, /if \(!route\.thirdPartyModule && isUnreachableFailure\(err\)\) \{[\s\S]*showPageUnreachable\(errorHost, err, \(\) => navigate\(retryPath, false\)\);[\s\S]*\} else \{\s*renderError\(errorHost, err[,)]/);
 });

@@ -1876,7 +1876,10 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
       const retryPath = `${location.pathname}${location.search}${location.hash}`;
       showPageUnreachable(errorHost, err, () => navigate(retryPath, false));
     } else {
-      renderError(errorHost, err);
+      renderError(errorHost, err, {
+        page: navCatalog().find((n) => n.path === route.path)?.label ?? null,
+        home: route.path !== '/',
+      });
     }
   } finally {
     // Die Uebergabe gilt der Seite, die DIESER Start zeichnet (utils/start-handoff.js).
@@ -4781,7 +4784,7 @@ function updateNav(rawPath) {
   });
 }
 
-function renderError(container, err) {
+function renderError(container, err, { page = null, home = false } = {}) {
   // Der globale Fehlerbildschirm laeuft ueber dieselbe Grammatik wie jeder
   // Leerzustand im Modul. Er hatte `role="alert"` und einen Ausweg schon
   // richtig, aber seinen Titel als <div> - auf einem Bildschirm, der nichts
@@ -4791,16 +4794,29 @@ function renderError(container, err) {
   // die einzige verwertbare Information (Name, Meldung, Stack) lag frueher nur
   // in der Browserkonsole. Zugeklappt beigelegt stoert sie das Layout nicht,
   // ist aber ohne DevTools erreichbar und kopierbar.
+  //
+  // WAS KAPUTT IST, UND WAS NICHT (Re-Critique 2026-10-17, A1: "Fehlerseite
+  // generisch"). Steht die Shell, ist nur EINE Seite gescheitert: der Titel
+  // nennt sie mit ihrem Namen aus der Navigation, der Hinweis sagt, dass der
+  // Rest weiterlaeuft, und neben "Neu laden" fuehrt ein zweiter Weg zur
+  // Uebersicht - ein Neuladen derselben kaputten Seite ist nicht der einzige
+  // Ausweg. Ohne Shell (Start gescheitert) bleibt der allgemeine Titel.
+  const cause = friendlyError(err);
+  const reload = {
+    label: t('common.reload'),
+    attrs: { id: 'error-reload-btn' },
+    onClick: () => location.reload(),
+  };
   const state = emptyStateEl({
     variant: 'error',
-    title: t('common.errorOccurred'),
-    description: friendlyError(err),
+    title: page ? t('common.pageFailedTitle', { page }) : t('common.errorOccurred'),
+    // Ein Absatz, nicht der Hinweis-Kasten: der Satz gehoert zur Ursache.
+    description: page ? `${cause} ${t('common.pageFailedHint')}` : cause,
+    className: 'page-crash',
     details: { summary: t('common.errorDetails'), text: errorDetails(err) },
-    action: {
-      label: t('common.reload'),
-      attrs: { id: 'error-reload-btn' },
-      onClick: () => location.reload(),
-    },
+    actions: home
+      ? [reload, { label: t('common.toOverview'), tone: 'secondary', attrs: { id: 'error-home-btn' }, onClick: () => navigate('/') }]
+      : [reload],
   });
   // Fokusziel: nach einem Absturz soll die Ansage beim Screenreader ankommen
   // und die Tastatur nicht im abgeraeumten Baum haengen.

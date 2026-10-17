@@ -73,6 +73,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   control on your screen - the tab bar or the sidebar, and the + button where it sits on this
   device - while the rest of the page dims.
 
+- **A page that fails to open says which one, and that the rest works.** Instead of "Something
+  went wrong", the error screen names the page ("Contacts can't be opened right now"), says that
+  everything else keeps working, and offers "Go to Overview" next to "Reload".
+
 - **A recipe without a picture starts with its content.** The flat kitchen-coloured band above
   the ingredients is gone; the details open with the meals and the ingredients, under the
   recipe's name. Recipes with a picture keep it.
