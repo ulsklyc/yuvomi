@@ -1061,7 +1061,7 @@ test('Aufgaben und Kontakte setzen ihre Auswahl ueber den Baustein, nicht an ihm
     assert.match(src, /setSelectionBulk\((taskMd|md), \{ label:/, `${file} reicht die Sammelaktionen an den Baustein`);
   }
   const css = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
-  const hide = [...eachRule(css)].find((r) => r.selector.trim() === '.split-view__detail.is-selecting > :not(.split-view__selection)');
+  const hide = [...eachRule(css)].find((r) => /^\.split-view__detail\.is-selecting > :not\(\.split-view__selection\)/.test(r.selector.trim()));
   assert.match(hide?.body ?? '', /display:\s*none/, 'waehrend der Auswahl tritt das Detail zurueck');
 });
 
@@ -1109,4 +1109,36 @@ test('Detailansicht und Rezepte geben „Bearbeiten" den Weg in die Spalte', () 
   assert.match(view, /id: 'detail-pane-edit',[\s\S]{0,200}?dock: true,/, 'detail-view (Aufgaben, Kontakte, Inventar, Geburtstage)');
   const recipes = readFileSync(new URL('../public/pages/recipes.js', import.meta.url), 'utf8');
   assert.match(recipes, /id: 'recipes-detail-edit',[\s\S]{0,200}?dock: true,/, 'Rezepte bauen ihren Kopf selbst');
+});
+
+// ── R19-Nachlese (modern-web-guidance „accessibility", Live Regions) ──
+test('die Zahl der Auswahl in der Spalte wird hoeflich angesagt, entprellt und nur als letzter Stand', async () => {
+  const layer = new El('div');
+  const vorher = { createElement: document.createElement, getElementById: document.getElementById };
+  document.createElement = (tag) => new El(tag);
+  document.getElementById = (id) => (id === 'bulk-pill-layer' ? layer : null);
+  try {
+    const p = makePage();
+    const handle = p.mount();
+    md.setSelectionBulk(handle, { label: '1 ausgewaehlt', actions: [] });
+    md.setSelectionBulk(handle, { label: '2 ausgewaehlt', actions: [] });
+    const live = p.detail.querySelector('.split-view__selection-live');
+    assert.ok(live, 'eine dauerhafte Region in der Spalte');
+    assert.equal(live.getAttribute('aria-live'), 'polite', 'hoeflich, nie dazwischen');
+    assert.equal(live.getAttribute('aria-atomic'), 'true');
+    assert.equal(live.textContent, '', 'nicht sofort - schnelles Tippen sagt keine Zwischenzahl');
+    await new Promise((r) => setTimeout(r, 450));
+    assert.equal(live.textContent, '2 ausgewaehlt', 'nur der letzte Stand');
+    md.setSelectionBulk(handle, { label: '2 ausgewaehlt', actions: [] });
+    await new Promise((r) => setTimeout(r, 450));
+    assert.equal(live.textContent, '2 ausgewaehlt', 'derselbe Satz wird nicht wiederholt');
+    md.setSelectionBulk(handle, null);
+    assert.equal(live.textContent, '', 'nach der Auswahl schweigt die Region');
+    handle.destroy();
+  } finally {
+    Object.assign(document, vorher);
+  }
+  const css = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const hide = [...eachRule(css)].find((r) => /\.split-view__detail\.is-selecting > :not\(/.test(r.selector));
+  assert.match(hide?.selector ?? '', /:not\(\.split-view__selection-live\)/, 'die Region tritt waehrend der Auswahl nicht mit zurueck - display:none sagte nichts an');
 });

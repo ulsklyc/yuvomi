@@ -3451,7 +3451,9 @@ html.fab-steady .page-fab {
  * Leerzustand bleiben im Baum und kommen nach der Auswahl unveraendert zurueck.
  * Ruhig und mittig wie der Leerzustand - der Titel in der Stufe eines
  * Detailtitels, die Aktionen als eine Zeile gewoehnlicher Knoepfe. */
-.split-view__detail.is-selecting > :not(.split-view__selection) {
+/* Die Ansage der Zahl (`.split-view__selection-live`, sr-only) bleibt stehen:
+ * eine Live-Region mit `display: none` sagt nichts an. */
+.split-view__detail.is-selecting > :not(.split-view__selection):not(.split-view__selection-live) {
   display: none;
 }
 

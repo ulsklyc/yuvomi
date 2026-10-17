@@ -39,6 +39,9 @@ import { swapContent } from '/utils/content-swap.js';
 import { setBulkPill, clearBulkPill, setBulkPane } from '/utils/bulk-pill.js';
 import { dockNextModal } from '/components/modal.js';
 
+/** Wie lange die Ansage der Auswahlzahl wartet: schnelles Tippen sagt nur die letzte Zahl. */
+const BULK_ANNOUNCE_MS = 400;
+
 /** Die eine lebende Instanz. Es gibt je Seite hoechstens eine Liste + Detail. */
 let active = null;
 
@@ -312,6 +315,10 @@ export function mountMasterDetail({
   // Die Sammelaktionen einer laufenden Mehrfachauswahl (setSelectionBulk).
   let bulkSpec = null;
   let bulkHost = null;
+  // Die Ansage der Auswahl in der Spalte (siehe announceBulk).
+  let bulkLive = null;
+  let bulkAnnounceTimer = null;
+  let bulkAnnounced = '';
 
   const isSplit = () => root.isConnected && getComputedStyle(detailEl).display !== 'none';
 
@@ -595,9 +602,42 @@ export function mountMasterDetail({
    * `.split-view__detail.is-selecting`), statt sie zu leeren - nach der
    * Auswahl steht wieder das Detail da, das vorher stand.
    */
+  /**
+   * DIE ZAHL WIRD ANGESAGT, WO SIE NICHT BEIM FOKUS STEHT (R19-Nachlese,
+   * modern-web-guidance „accessibility", Live Regions). In der Spalte steht
+   * „3 ausgewaehlt" eine Spalte neben dem Auswahlkreis, auf dem der Fokus
+   * liegt; der Kreis sagt nur „gedrueckt". Eine hoefliche Region (polite, nie
+   * assertive) traegt die Zahl nach - entprellt, damit schnelles Tippen nicht
+   * jede Zwischenzahl vorliest, und nur, wenn sich der Satz aendert. Die Region
+   * steht dauerhaft in der Spalte (eine mit ihrem Inhalt neu gebaute sagt
+   * nichts an) und gilt nur der Spalte: die Pille unter der Schwelle bleibt
+   * bewusst ohne Ansage (bulk-pill.js, Kopf).
+   */
+  function announceBulk(text) {
+    if (!bulkLive) {
+      bulkLive = document.createElement('span');
+      bulkLive.className = 'split-view__selection-live sr-only';
+      bulkLive.setAttribute('aria-live', 'polite');
+      bulkLive.setAttribute('aria-atomic', 'true');
+      detailEl.append(bulkLive);
+    }
+    clearTimeout(bulkAnnounceTimer);
+    if (!text) {
+      bulkAnnounced = '';
+      bulkLive.textContent = '';
+      return;
+    }
+    if (text === bulkAnnounced) return;
+    bulkAnnounceTimer = setTimeout(() => {
+      bulkAnnounced = text;
+      bulkLive.textContent = text;
+    }, BULK_ANNOUNCE_MS);
+  }
+
   function applyBulk() {
     const split = isSplit();
     if (!bulkSpec || !split) {
+      if (bulkLive) announceBulk('');
       detailEl.classList.remove('is-selecting');
       if (bulkHost) bulkHost.hidden = true;
       bulkHost?.replaceChildren();
@@ -613,6 +653,7 @@ export function mountMasterDetail({
     bulkHost.hidden = false;
     detailEl.classList.add('is-selecting');
     setBulkPane(bulkHost, bulkSpec);
+    announceBulk(bulkSpec.label);
   }
 
   function setBulk(spec) {
@@ -658,6 +699,7 @@ export function mountMasterDetail({
   function destroy() {
     teardown.abort();
     bulkSpec = null;
+    clearTimeout(bulkAnnounceTimer);
     abortNarrow();
     renderAbort?.abort();
     ro?.disconnect();
