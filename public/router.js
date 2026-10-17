@@ -283,10 +283,10 @@ function updateThemeColorForRoute(route) {
 let activePageStyle = null;
 
 function loadPageStyle(moduleName, routeStyle = null) {
-  if (!moduleName && !routeStyle) return { ready: Promise.resolve(), cleanup: () => {} };
+  if (!moduleName && !routeStyle) return { ready: Promise.resolve(), cleanup: () => {}, abandon: () => {} };
   const href = routeStyle || `/styles/${moduleName}.css`;
   if (activePageStyle?.getAttribute('href') === href) {
-    return { ready: Promise.resolve(), cleanup: () => {} };
+    return { ready: Promise.resolve(), cleanup: () => {}, abandon: () => {} };
   }
 
   const link = document.createElement('link');
@@ -306,6 +306,11 @@ function loadPageStyle(moduleName, routeStyle = null) {
   return {
     ready,
     cleanup: () => { if (oldLink) oldLink.remove(); },
+    // Die Seite kommt doch nicht (ueberholt): ihr Blatt geht, das alte gilt weiter.
+    abandon: () => {
+      link.remove();
+      if (activePageStyle === link) activePageStyle = oldLink;
+    },
   };
 }
 
@@ -1511,7 +1516,7 @@ function buildMoreSheetBody() {
  * @param {string|null} previousPath - Pfad vor der Navigation (null beim Kaltstart)
  * @param {number} scrollTarget - Scrollstand der Zielseite (0 vorwärts, gemerkt bei popstate)
  */
-async function renderPage(route, previousPath = null, scrollTarget = 0) {
+async function renderPage(route, previousPath = null, scrollTarget = 0, { signal = null } = {}) {
   const app = document.getElementById('app');
 
   // Den Ladebildschirm (#app-loading) blendet hier bewusst nichts aus: er steht
@@ -1526,6 +1531,14 @@ async function renderPage(route, previousPath = null, scrollTarget = 0) {
       importPage(route.page),
       style.ready,
     ]);
+
+    // UEBERHOLT (Critique R19, Nachlese 1b): waehrend Modul und Blatt luden,
+    // hat jemand ein anderes Ziel angetippt. Dieses Modul rendert nichts mehr;
+    // sein Blatt geht wieder, und das der stehenden Seite bleibt.
+    if (signal?.aborted) {
+      style.abandon();
+      return false;
+    }
 
     if (typeof module.render !== 'function') {
       throw new Error(`Seite ${route.page} exportiert keine render()-Funktion.`);
@@ -1683,6 +1696,9 @@ async function renderPage(route, previousPath = null, scrollTarget = 0) {
       wirePageToolbars();
     };
 
+    // Wird die Navigation erst NACH dem Tausch ueberholt, verliert die neue
+    // Seite ihr Signal: sie bricht ihr Laden ab, statt die naechste aufzuhalten.
+    signal?.addEventListener('abort', () => _pageController?.abort(), { once: true });
     const { transition, finished } = await swapPage(swap, {
       content,
       from: previousPath,

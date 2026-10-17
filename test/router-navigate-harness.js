@@ -125,12 +125,16 @@ export function createNavigateHarness({
     // ── Seite ──
     rememberScrollPosition: () => {},
     scrollPositionFor: () => 0,
-    renderPage: async (route) => {
+    renderPage: async (route, _previousPath, _scrollTarget, { signal = null } = {}) => {
       if (onRender) await onRender(route);
+      // Wie renderPage(): ein waehrend des Ladens ueberholtes Ziel rendert
+      // nichts mehr (R19, letzter Tipp gewinnt) und meldet das mit `false`.
+      if (signal?.aborted) return false;
       // Wie renderPage(): die Shell - und mit ihr die Toast-Flaeche - gibt es
       // nur auf Seiten mit Anmeldung.
       shell = route.requiresAuth;
       log.rendered.push(route.path);
+      return true;
     },
     adoptPageFab: () => {},
     updateNav: () => {},

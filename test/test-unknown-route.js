@@ -396,14 +396,68 @@ test('laufende Sitzung: eine Sperre bis zum Ende, der Verlassen-Schutz fragt ein
   const running = navigate('/settings/xyz');
   await settle();
   assert.equal(env.isNavigating, true, 'die Sperre haelt, solange das Ziel laedt');
-  await navigate('/tasks');
-  assert.deepEqual(log.rendered, [], 'ein zweiter Klick startet keine zweite Navigation');
   release();
   await running;
   assert.deepEqual(log.rendered, ['/settings']);
   assert.deepEqual(log.leaveAsked, ['/settings']);
   assert.deepEqual(log.history, [['push', '/settings']]);
   assert.deepEqual(log.toasts, [{ message: 'common.unknownAddress', shown: true }]);
+});
+
+/*
+ * DER LETZTE TIPP GEWINNT (Critique R19, Nachlese 1b). Bis hierher verwarf
+ * navigate() einen zweiten Klick, solange die erste Navigation lud - dieser
+ * Test hielt das als "ein zweiter Klick startet keine zweite Navigation" fest.
+ * Im Browser hiess das: wer waehrend des Ladens ein anderes Ziel antippte,
+ * blieb auf dem ersten (1 von 24 schnellen Doppeltipps). Jetzt wartet der
+ * neue Wunsch, das ueberholte Ziel rendert nach seinem Laden nichts mehr, und
+ * sein History-Eintrag gehoert dem neuen Ziel. Weiter EINE Sperre zur Zeit:
+ * gerendert wird nie zweimal nebeneinander.
+ */
+test('laufende Sitzung: der letzte Tipp gewinnt - das ueberholte Ziel rendert nicht', async () => {
+  let release;
+  const held = new Promise((resolve) => { release = resolve; });
+  const { navigate, log, env, setShell } = createNavigateHarness({
+    user: MEMBER,
+    leaveGuard: async () => true,
+    onRender: (route) => (route.path === '/settings' ? held : undefined),
+  });
+  setShell(true);
+  const first = navigate('/settings/xyz');
+  await settle();
+  assert.equal(env.isNavigating, true);
+  const second = navigate('/budget');
+  const third = navigate('/tasks');
+  await settle();
+  assert.deepEqual(log.rendered, [], 'waehrend das erste Ziel laedt, rendert nichts daneben');
+  release();
+  await first;
+  await third;
+  await second; // ersetzt vom dritten - es loest auf, ohne zu navigieren
+  await settle();
+  assert.deepEqual(log.rendered, ['/tasks'], 'gerendert wird nur das Ziel des letzten Tipps');
+  assert.deepEqual(log.leaveAsked, ['/settings', '/tasks'], 'das ersetzte /budget fragt nie');
+  assert.deepEqual(log.history, [['push', '/settings'], ['replace', '/tasks']],
+    'Zurueck fuehrt nicht auf eine Seite, die nie zu sehen war');
+  assert.deepEqual(log.toasts, [], 'das ueberholte Ziel meldet seine Adresse nicht');
+  assert.equal(env.currentPath, '/tasks');
+  assert.equal(env.isNavigating, false);
+});
+
+test('ein Sitzungsende geht dem wartenden Tipp vor', async () => {
+  let release;
+  const held = new Promise((resolve) => { release = resolve; });
+  const { navigate, log, env } = createNavigateHarness({ user: MEMBER, onRender: (route) => (route.path === '/budget' ? held : undefined) });
+  const first = navigate('/budget');
+  await settle();
+  navigate('/tasks');
+  env._pendingLoginRedirect = true;
+  env.currentUser = null;
+  release();
+  await first;
+  await settle();
+  assert.ok(!log.rendered.includes('/tasks'), 'nach dem Sitzungsende rendert der wartende Tipp nicht');
+  assert.equal(log.rendered.at(-1), '/login');
 });
 
 test('laufende Sitzung: bricht der Verlassen-Schutz ab, bleibt alles, wie es war', async () => {
@@ -521,4 +575,19 @@ test('jedes woertliche navigate()-Ziel in public/ ist eine Route', async () => {
   assert.ok(targets.length > 30, `zu wenige Ziele gelesen (${targets.length}) - das Muster greift nicht mehr`);
   const dead = targets.filter(({ path }) => !routes.has(path) && !path.startsWith('/settings/'));
   assert.deepEqual(dead, [], 'navigate() auf eine Adresse, die es nicht gibt');
+});
+
+// Die Gegenseite im Router (router.js laesst sich nicht importieren): ein
+// ueberholtes Seitenmodul rendert nach seinem Laden nichts, sein Blatt geht
+// wieder, und eine schon getauschte Seite verliert ihr Signal.
+test('renderPage: ein ueberholtes Ziel rendert nach dem Laden nichts, sein Blatt geht wieder', () => {
+  const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  const render = router.slice(router.indexOf('async function renderPage('));
+  assert.match(render, /^async function renderPage\(route, previousPath = null, scrollTarget = 0, \{ signal = null \} = \{\}\)/);
+  assert.match(render, /style\.ready,\s*\]\);[\s\S]{0,400}?if \(signal\?\.aborted\) \{\s*style\.abandon\(\);\s*return false;\s*\}/,
+    'nach importPage/style.ready fragt renderPage nicht, ob es ueberholt ist');
+  assert.match(render, /signal\?\.addEventListener\('abort', \(\) => _pageController\?\.abort\(\), \{ once: true \}\);\s*const \{ transition, finished \} = await swapPage/);
+  const style = router.slice(router.indexOf('function loadPageStyle('), router.indexOf('function loadPageStyle(') + 1600);
+  assert.equal((style.match(/abandon:/g) ?? []).length, 3, 'jede Antwort von loadPageStyle() kann ihr Blatt zuruecknehmen');
+  assert.match(style, /abandon: \(\) => \{\s*link\.remove\(\);\s*if \(activePageStyle === link\) activePageStyle = oldLink;/);
 });
