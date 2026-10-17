@@ -1045,18 +1045,19 @@
    * ihm statt unter ihm. Die Regeln haengen am Griff selbst (:has), damit
    * Zeilen ohne Griff - anderes Gruppieren, Auswahlmodus, nur lesen - ihr
    * Raster behalten. */
-  /* Nicht in einer Gruppe mit nur einer Zeile: dort blendet list-row.css den
-   * Griff aus (.swipe-row:only-child), und die leere vierte Spalte kostete den
-   * Titel 8px. */
-  .swipe-row:not(:only-child) .task-card__main:has(> .list-row__drag) {
+  /* Auch in einer Gruppe mit nur einer Zeile: list-row.css macht den Griff
+   * dort nur unsichtbar (.swipe-row:only-child), seine Spalte bleibt - sonst
+   * stuenden Avatare und Faelligkeit der Einzelzeile 42px weiter rechts als in
+   * jeder anderen Gruppe (Re-Critique 2026-10-17, A2). */
+  .task-card__main:has(> .list-row__drag) {
     grid-template-columns: auto minmax(0, 1fr) auto auto;
   }
 
-  .swipe-row:not(:only-child) .task-card__main:has(> .list-row__drag) .task-card__title {
+  .task-card__main:has(> .list-row__drag) .task-card__title {
     grid-column: 2 / 4;
   }
 
-  .swipe-row:not(:only-child) .task-card__main:has(> .list-row__drag):not(:has(> .avatar-stack)) .task-card__meta {
+  .task-card__main:has(> .list-row__drag):not(:has(> .avatar-stack)) .task-card__meta {
     grid-column: 2 / 4;
   }
 

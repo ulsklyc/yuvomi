@@ -362,6 +362,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Rows in a group of one keep their columns.** In shopping and task lists, a category or group
+  with a single entry had no drag handle, so its quantity, avatars and more button sat further
+  right than in every other group. The handle's place now stays, and the columns line up.
+
 - **Esc leaves "Customize" on the Overview.** It does what "Cancel" does and asks first if you
   changed something; an open dialog or menu keeps its own Esc.
 - **Budget plan: hitting the plan exactly is no warning.** A fixed cost such as rent is booked in

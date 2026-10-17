@@ -18392,6 +18392,23 @@ test('PAGE-019: der Liste-+-Detail-Baustein misst die Modulflaeche an der Schwel
   assert.ok(tablet && /--page-measure:\s*100%/.test(tablet.body), 'PAGE-019: am Tablet laeuft die Liste so breit wie ihr Kopf');
 });
 
+// Re-Critique 2026-10-17 (A2): in einer Gruppe mit nur einer Zeile blendete
+// list-row.css den Sortiergriff per `display: none` aus, tasks.css nahm dort
+// seine Spalte weg - Menge, Avatare und Mehr-Knopf standen in der Einzelzeile
+// um die Griffbreite weiter rechts (Einkauf 390: x 314 statt 276, Aufgaben
+// 324 statt 282). Der Griff bleibt unsichtbar stehen, die Spalte bleibt.
+test('Zeilen: der Griff der Einzelzeile haelt seinen Platz, die Bedienzone springt nicht', () => {
+  const listRow = [...eachRule(read('../public/styles/list-row.css'))]
+    .find(({ selector, at }) => !at.length && selector.includes('.row-carrier > .swipe-row:only-child .list-row__drag'));
+  assert.ok(listRow, 'die Einzelzeilen-Regel des Griffs fehlt');
+  assert.match(listRow.body, /visibility:\s*hidden/, 'unsichtbar, nicht entfernt');
+  assert.doesNotMatch(listRow.body, /display:\s*none/, 'display: none nimmt der Bedienzone die Breite');
+  const tasks = read('../public/styles/tasks.css');
+  assert.doesNotMatch(tasks, /\.swipe-row:not\(:only-child\) \.task-card__main:has\(> \.list-row__drag\)/,
+    'die Griffspalte der Aufgabenzeile gilt auch in der Einzelzeile');
+  assert.match(tasks, /\.task-card__main:has\(> \.list-row__drag\) \{\s*grid-template-columns: auto minmax\(0, 1fr\) auto auto;/);
+});
+
 test('PAGE-020: eine Aussenkante je Modul - kein Reiter schaltet das Mass oder den Kopf um', () => {
   // Critique R16 (2026-10-05): Haushaltshilfe gab NUR der Uebersicht das breite
   // Mass (`[data-tab="dashboard"] { --page-measure }`), Belohnungen gab NUR im

@@ -641,10 +641,15 @@
 /* Eine einzelne Zeile in einer Kategorie hat keine Reihenfolge. Der Griff
    verschwindet dann, statt eine folgenlose Handlung anzubieten - über
    :only-child, damit die Regel ohne Zutun des Renderers gilt (auch nach dem
-   Löschen der vorletzten Zeile, das die Liste nicht neu aufbaut). */
+   Löschen der vorletzten Zeile, das die Liste nicht neu aufbaut).
+   `visibility`, nicht `display` (Re-Critique 2026-10-17, A2): ohne seinen
+   Platz rückten Menge, Avatare und Mehr-Knopf in der Einzelzeile um die
+   Griffbreite nach rechts (Einkauf 390: Bedienzone x 276 gegen 314) - die
+   Spalte sprang von Gruppe zu Gruppe. Unsichtbar ist er weder fokussierbar
+   noch im Barrierebaum, behält aber die Breite. */
 .list-rows > .swipe-row:only-child .list-row__drag,
 .row-carrier > .swipe-row:only-child .list-row__drag {
-  display: none;
+  visibility: hidden;
 }
 
 /* Abgehaktes sortiert sich nicht: es steht am Ende seiner Kategorie, ein Zug
