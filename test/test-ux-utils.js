@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { eachRule } from './css-rules.js';
 
 // Minimales Window/Navigator-Mock für Node
-const { stagger, vibrate, withBusy, scheduleUndoableDelete, wireSwipeToDismiss, wireCollapsingHeader, collapseOut, expandIn, watchNavCapsuleHeight, wireScrollFade, nextNavMinimized, NAV_MINIMIZE_DOWN, NAV_MINIMIZE_UP, bindNavMinimize, navPillGeometry, NAV_PILL_MAX_INNER } = await (async () => {
+const { stagger, vibrate, withBusy, scheduleUndoableDelete, wireSwipeToDismiss, wireCollapsingHeader, collapseOut, expandIn, watchNavCapsuleHeight, wireScrollFade, nextNavMinimized, NAV_MINIMIZE_DOWN, NAV_MINIMIZE_UP, bindNavMinimize, navPillGeometry, NAV_PILL_MAX_INNER, STAGGER_ROWS, durationToken } = await (async () => {
   global.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
@@ -1879,6 +1879,27 @@ test('bindNavMinimize: eine neue Kapsel bekommt einen neuen Minimierer, der alte
     second.destroy();
   } finally {
     globalThis.Element = savedElement;
+  }
+});
+
+// R20 (Re-Critique 2026-10-17 a6 P2, 200+ Aufgaben bei 4x CPU): stagger las
+// seinen Dauer-Default per getComputedStyle direkt nach dem Einsetzen der Liste
+// (erzwungene Stilrechnung, 210 ms) und animierte jede der 200 Zeilen.
+test('R20: Bewegungs-Tokens werden einmal gelesen, stagger animiert nur den Anfang der Liste', () => {
+  const savedGcs = globalThis.getComputedStyle; const savedDoc = globalThis.document;
+  let reads = 0;
+  globalThis.document = { documentElement: { classList: { contains: () => false } } };
+  globalThis.getComputedStyle = () => ({ getPropertyValue: (name) => { reads += 1; return name === '--duration-md' ? '200ms' : ''; } });
+  try {
+    assert.equal(durationToken('--duration-md', 1), 200);
+    assert.equal(durationToken('--duration-md', 1), 200);
+    assert.equal(reads, 1, 'jeder Aufruf liest die Wurzel erneut - nach einem Neuzeichnen eine Stilrechnung des ganzen Dokuments');
+    const rows = Array.from({ length: 200 }, () => animRow());
+    stagger(rows, { host: {} });
+    assert.equal(rows.filter((r) => r.calls.length).length, STAGGER_ROWS, 'alle 200 Zeilen bekommen eine Animation');
+    assert.ok(STAGGER_ROWS >= 16 && STAGGER_ROWS <= 40, 'ein hoher Bildschirm voll, nicht mehr');
+  } finally {
+    globalThis.getComputedStyle = savedGcs; globalThis.document = savedDoc;
   }
 });
 

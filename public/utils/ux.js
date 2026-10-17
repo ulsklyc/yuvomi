@@ -52,6 +52,9 @@ function commonHost(els) {
  * @param {number} [opts.duration]     - ms pro Element, Standard `--duration-md`
  * @param {number} [opts.max=5]        - Maximale Anzahl gestaffelter Elemente
  */
+/** So viele Zeilen blenden beim ersten Aufbau ein - mehr passen auf keinen Bildschirm. */
+export const STAGGER_ROWS = 24;
+
 export function stagger(elements, { host = null, delay = 30, duration = durationToken('--duration-md', 200), max = 5 } = {}) {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const els = Array.from(elements ?? []);
@@ -80,7 +83,11 @@ export function stagger(elements, { host = null, delay = 30, duration = duration
   // das Ziel ist der Wert des Stylesheets, also auch das 0.45 einer
   // abgehakten Einkaufszeile, nicht ein fest verdrahtetes 1.
   const easing = easingToken('--ease-out', 'ease-out');
-  els.forEach((el, i) => {
+  // NUR DER ANFANG DER LISTE (R20): ab der `max`-ten Zeile stehen alle auf
+  // derselben Verzoegerung, und bei 200 Aufgaben liefen 200 Animationen, von
+  // denen 180 unter der Falz niemand sieht. STAGGER_ROWS deckt einen hohen
+  // Bildschirm; der Rest steht sofort da.
+  els.slice(0, STAGGER_ROWS).forEach((el, i) => {
     if (typeof el?.animate !== 'function') return;
     el.animate([{ opacity: 0, transform: 'translateY(8px)', offset: 0 }], {
       duration, delay: i < max ? i * delay : max * delay, easing, fill: 'backwards',
@@ -161,19 +168,36 @@ export function acknowledgeCheck(el, { checked = true } = {}) {
  * die in tokens.css, der Rueckfall greift nur ohne Stylesheet (Node-Tests).
  */
 export function durationToken(name, fallback) {
-  const raw = typeof getComputedStyle === 'function' && typeof document !== 'undefined'
-    ? getComputedStyle(document.documentElement).getPropertyValue(name).trim()
-    : '';
+  const raw = rootToken(name);
   const ms = raw.endsWith('ms') ? parseFloat(raw) : raw.endsWith('s') ? parseFloat(raw) * 1000 : NaN;
   return Number.isFinite(ms) ? ms : fallback;
 }
 
 /** Wert eines Kurven-Tokens (`--ease-*`); WAAPI nimmt `cubic-bezier(...)` direkt. */
 export function easingToken(name, fallback = 'ease-out') {
-  const raw = typeof getComputedStyle === 'function' && typeof document !== 'undefined'
-    ? getComputedStyle(document.documentElement).getPropertyValue(name).trim()
-    : '';
-  return raw || fallback;
+  return rootToken(name) || fallback;
+}
+
+/**
+ * DIE BEWEGUNGS-TOKENS WERDEN EINMAL GELESEN (R20, Re-Critique 2026-10-17 a6
+ * P2). `getComputedStyle(root).getPropertyValue()` erzwingt eine Stilrechnung
+ * des ganzen Dokuments, wenn es seit dem letzten Frame geaendert wurde - und
+ * genau das ist es direkt nach einem Neuzeichnen: `stagger` las seinen
+ * Default nach dem Einsetzen von 200 Aufgaben und kostete so 210 ms (4x CPU).
+ * Dauer und Kurven haengen an keinem Theme und keiner Media Query
+ * (tokens.css), also reicht der erste gelesene Wert. Leer wird nicht gemerkt
+ * (das Stylesheet kann noch fehlen). Ein anderes `getComputedStyle`
+ * (Node-Test mit eigenem Stub) beginnt einen neuen Speicher.
+ */
+let _tokenCache = { source: null, values: new Map() };
+function rootToken(name) {
+  if (typeof getComputedStyle !== 'function' || typeof document === 'undefined') return '';
+  if (_tokenCache.source !== getComputedStyle) _tokenCache = { source: getComputedStyle, values: new Map() };
+  const known = _tokenCache.values.get(name);
+  if (known !== undefined) return known;
+  const raw = getComputedStyle(document.documentElement)?.getPropertyValue?.(name)?.trim?.() ?? '';
+  if (raw) _tokenCache.values.set(name, raw);
+  return raw;
 }
 
 /** Die Blockmasse, die beim Einklappen mit auf null gehen: Hoehe, Innen- und Aussenabstand, Rahmen. */

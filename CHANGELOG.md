@@ -289,6 +289,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Long task lists open and update faster.** With some 200 tasks on a throttled phone, opening
+  Tasks no longer freezes the screen for 0.8 s (now 0.4 s), and ticking a task off takes 0.1 s
+  instead of half a second: only that row leaves the list instead of the whole list being redrawn,
+  groups further down are laid out once they come near the screen, and their icons follow
+  right after the first screen.
+
 - **Tapping the tab you are on takes you to the top.** It used to rebuild the page with a jump and
   add a second step with the same address, so Back then seemed to do nothing; now the page glides
   to the top and stays as it was (with reduced motion it moves there at once). Opening the same

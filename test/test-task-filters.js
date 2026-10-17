@@ -952,6 +952,84 @@ test('E13: die Aufgaben reichen ihren Filterknopf als Anker herein', async () =>
 // einer langen Liste unter dem Falz, in einer zugeklappten Gruppe gar nicht,
 // und rechts blieb die vorher gewaehlte Aufgabe stehen.
 
+// R20 (Re-Critique 2026-10-17 a6 P2): nach dem Abhaken zeichnete die Liste alle
+// Zeilen neu (200 Aufgaben: ein Frame von 497 ms bei 4x CPU). Ist sonst alles
+// gleich, faellt nur die Zeile bzw. ihre letzte Gruppe heraus.
+function patchEnv(layout) {
+  const removed = [];
+  const groups = layout.map(([groupId, ids]) => {
+    const group = { dataset: { groupId }, count: { textContent: String(ids.length) } };
+    group.rows = ids.map((id) => ({
+      dataset: { swipeId: String(id) },
+      closest: (sel) => (sel === '.task-group' ? group : null),
+      contains: (x) => x === group.rows?.find((r) => r.dataset.swipeId === String(id)),
+      remove: () => removed.push(`row:${id}`),
+    }));
+    group.querySelectorAll = (sel) => (sel === '.swipe-row' ? group.rows : []);
+    group.querySelector = (sel) => (sel === ':scope > .list-group__title > .list-group__count' ? group.count : null);
+    group.remove = () => removed.push(`group:${groupId}`);
+    return group;
+  });
+  const listEl = {
+    querySelectorAll: (sel) => (sel === ':scope > .task-group' ? groups : []),
+    querySelector: () => null,
+  };
+  const container = {
+    isConnected: false,
+    querySelector: (sel) => (sel === '#task-list' ? listEl : null),
+    querySelectorAll: (sel) => (sel === '#task-list .swipe-row' ? groups.flatMap((g) => g.rows) : []),
+  };
+  return { container, groups, removed };
+}
+
+test('R20: abgehakt faellt nur die Zeile heraus, die Zaehler ziehen nach - sonst zeichnet die Liste neu', () => {
+  const prev = { tasks: tasks.state.tasks, search: tasks.state.searchQuery, collapsed: tasks.state.collapsedGroups };
+  baseState();
+  tasks.state.searchQuery = '';
+  tasks.state.collapsedGroups = new Set();
+  try {
+    // Nach dem Neuladen ist 2 erledigt - der Server liefert unter dem
+    // Statusfilter „offen" nur noch 1 und 3.
+    tasks.state.tasks = [
+      { id: 1, title: 'A', category: 'haushalt', status: 'open', priority: 'none', tags: [] },
+      { id: 3, title: 'C', category: 'haushalt', status: 'open', priority: 'none', tags: [] },
+    ];
+    const ok = patchEnv([['haushalt', [1, 2, 3]]]);
+    assert.equal(tasks.patchRowRemoval(ok.container, 2), true, 'die Liste zeichnet alles neu, obwohl nur eine Zeile ging');
+    assert.deepEqual(ok.removed, ['row:2']);
+    assert.equal(ok.groups[0].count.textContent, '2', 'der Zaehler der Gruppe zieht nicht nach');
+
+    // Die Folge der uebrigen hat sich geaendert (hier: 3 vor 1 im DOM) -> neu zeichnen.
+    const moved = patchEnv([['haushalt', [3, 2, 1]]]);
+    assert.equal(tasks.patchRowRemoval(moved.container, 2), false, 'eine geaenderte Folge wird gepatcht statt neu gezeichnet');
+    assert.deepEqual(moved.removed, []);
+
+    // Die letzte Zeile einer Gruppe nimmt die Gruppe mit.
+    tasks.state.tasks = [
+      { id: 1, title: 'A', category: 'haushalt', status: 'open', priority: 'none', tags: [] },
+    ];
+    const alone = patchEnv([['haushalt', [1]], ['garten', [2]]]);
+    assert.equal(tasks.patchRowRemoval(alone.container, 2), true);
+    assert.deepEqual(alone.removed, ['group:garten']);
+  } finally {
+    tasks.state.tasks = prev.tasks;
+    tasks.state.searchQuery = prev.search;
+    tasks.state.collapsedGroups = prev.collapsed;
+  }
+});
+
+test('R20: lange Listen - Gruppen unter der Falz rechnen erst in Sicht, Zeichen kommen in Sicht-Reihenfolge', () => {
+  const css = readFileSync(new URL('../public/styles/tasks.css', import.meta.url), 'utf8');
+  const rule = css.match(/@supports \(content-visibility: auto\) \{\s*\.task-group \+ \.task-group \{([^}]*)\}/);
+  assert.ok(rule, 'ab der zweiten Gruppe fehlt content-visibility (unter @supports)');
+  assert.match(rule[1], /content-visibility:\s*auto/);
+  assert.match(rule[1], /contain-intrinsic-size:\s*auto none auto \d+px/, 'ohne gemerkte Hoehe springt der Bildlaufbalken');
+  const src = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
+  const list = src.match(/function renderTaskList\(container[\s\S]*?\n\}/)[0];
+  assert.match(list, /drawTaskIcons\(listEl\);/, 'renderTaskList ersetzt alle Zeichen im Frame des Wechsels');
+  assert.doesNotMatch(list, /lucide\.createIcons\(\{ el: listEl \}\)/);
+});
+
 function revealEnv({ rowFor = () => true } = {}) {
   const env = { expanded: [], scrolled: [], selected: [] };
   const row = { dataset: { swipeId: '9' }, scrollIntoView: (opts) => env.scrolled.push(opts) };

@@ -1695,9 +1695,58 @@ async function reloadWithRowMotion(container, taskId, { holdUntil = 0 } = {}) {
     const group = row.closest('.task-group');
     const lastInGroup = group && group.querySelectorAll('.swipe-row').length === 1;
     await collapseOut(lastInGroup ? group : row);
+    if (patchRowRemoval(container, taskId)) return;
   }
   renderTaskList(container);
   if (!row && staysInView && state.viewMode === 'list') expandIn(taskRowEl(container, taskId));
+}
+
+/**
+ * EINE ZEILE GEHT, DIE LISTE BLEIBT (R20, Re-Critique 2026-10-17 a6 P2). Nach
+ * dem Abhaken zeichnete die Liste alle Zeilen neu - bei 200 Aufgaben ein
+ * Frame von 497 ms (4x CPU), plus die Toast-Messung auf frischem Layout.
+ * Ist nach dem Neuladen alles andere unveraendert (dieselben Gruppen in
+ * derselben Folge, in jeder Gruppe dieselben Zeilen in derselben Folge,
+ * dieselben Ruecksetz-Knoepfe), faellt nur die Zeile - bzw. ihre letzte
+ * Gruppe - aus dem Baum, und die Zaehler ziehen nach. Sonst (Sortierung
+ * geaendert, Gruppe gewechselt, eine Serie bringt ihre naechste Instanz)
+ * zeichnet die Liste wie bisher neu.
+ * @returns {boolean} ob gepatcht wurde
+ */
+function patchRowRemoval(container, taskId) {
+  const listEl = container?.querySelector?.('#task-list');
+  const row = taskRowEl(container, taskId);
+  if (!listEl || !row || state.viewMode !== 'list' || state.loadError) return false;
+  const id = String(taskId);
+  const rowGroup = row.closest('.task-group');
+  const goneGroup = rowGroup && [...rowGroup.querySelectorAll('.swipe-row')].every((r) => r === row || r.contains(row) || row.contains(r));
+  const domGroups = [...listEl.querySelectorAll(':scope > .task-group')].filter((g) => !(goneGroup && g === rowGroup));
+  const groups = groupBy(filteredTasks(), state.groupMode);
+  if (!groups.length || domGroups.length !== groups.length) return false;
+  const now = taskSortNow();
+  const compare = state.groupMode === 'category' ? sortTasksManual : sortTasks;
+  const reorderable = canReorderTasks(state.groupMode);
+  for (let i = 0; i < groups.length; i += 1) {
+    const g = groups[i];
+    const el = domGroups[i];
+    if (el.dataset.groupId !== String(g.id)) return false;
+    const expected = isGroupCollapsed(state.groupMode, g.id)
+      ? []
+      : [...g.tasks].sort((a, b) => compare(a, b, now)).map((task) => String(task.id));
+    const shown = [...el.querySelectorAll('.swipe-row')].map((r) => r.dataset.swipeId).filter((x) => x !== id);
+    if (shown.join(',') !== expected.join(',')) return false;
+    const wantsReset = reorderable && g.tasks.some((task) => task.sort_order != null);
+    if (Boolean(el.querySelector('[data-group-reset]')) !== wantsReset) return false;
+  }
+  const orderBefore = mdRowIds(listEl);
+  (goneGroup ? rowGroup : row).remove();
+  domGroups.forEach((el, i) => {
+    const count = el.querySelector(':scope > .list-group__title > .list-group__count');
+    if (count) count.textContent = String(groups[i].tasks.length);
+  });
+  syncPaneAfterRender(listEl, orderBefore);
+  updateBulkActionsBar(container);
+  return true;
 }
 
 /**
@@ -3702,6 +3751,43 @@ async function loadHistory(container, { append = false, afterWrite = false, quie
 // Partielle DOM-Updates
 // --------------------------------------------------------
 
+/** So viele Zeilen bekommen ihre Zeichen sofort - mehr stehen auf keinem Bildschirm. */
+const ICON_ROWS_NOW = 30;
+let iconRun = 0;
+
+/**
+ * DIE ZEICHEN DER LISTE KOMMEN IN SICHT-REIHENFOLGE (R20, Re-Critique
+ * 2026-10-17 a6 P2). Jede Zeile traegt mehrere Lucide-Platzhalter; bei 200
+ * Aufgaben ersetzte `createIcons` rund tausend davon im Frame des Wechsels
+ * (210 ms bei 4x CPU). Die ersten ICON_ROWS_NOW Zeilen - der Bildschirm und
+ * mehr - bekommen ihre Zeichen sofort, die uebrigen Gruppen danach je eine
+ * pro Task, sodass ein Tipp dazwischen drankommt. Ein neueres Neuzeichnen
+ * bricht den Rest ab (seine Gruppen haengen dann ohnehin nicht mehr).
+ */
+function drawTaskIcons(listEl) {
+  if (!window.lucide) return;
+  const run = ++iconRun;
+  const groups = [...listEl.querySelectorAll(':scope > .task-group')];
+  let rows = 0;
+  let i = 0;
+  while (i < groups.length && rows < ICON_ROWS_NOW) {
+    window.lucide.createIcons({ el: groups[i] });
+    rows += groups[i].querySelectorAll('.swipe-row').length;
+    i += 1;
+  }
+  // Was ausserhalb der Gruppen steht (Leerzustand, Such-Ruecksetzer), sofort.
+  for (const el of listEl.children) if (!el.classList.contains('task-group')) window.lucide.createIcons({ el });
+  const rest = groups.slice(i);
+  const next = () => {
+    if (run !== iconRun) return;
+    const group = rest.shift();
+    if (!group) return;
+    if (group.isConnected) window.lucide.createIcons({ el: group });
+    setTimeout(next, 0);
+  };
+  if (rest.length) setTimeout(next, 0);
+}
+
 function renderTaskList(container, { paneQuiet = false } = {}) {
   // VOR dem Ladefehler der Aufgaben: der Verlauf hat seinen eigenen Bestand und
   // seinen eigenen Fehler. Ein gescheitertes `/tasks` sagt nichts darüber, ob
@@ -3744,7 +3830,7 @@ function renderTaskList(container, { paneQuiet = false } = {}) {
   const orderBefore = mdRowIds(listEl);
   listEl.replaceChildren();
   listEl.insertAdjacentHTML('beforeend', renderTaskGroups(filteredTasks(), state.groupMode));
-  if (window.lucide) window.lucide.createIcons({ el: listEl });
+  drawTaskIcons(listEl);
   syncPaneAfterRender(listEl, orderBefore, { quiet: paneQuiet });
   stagger(listEl.querySelectorAll('.swipe-row, .kanban-card'), { host: listEl });
   updateBulkActionsBar(container);
@@ -6186,6 +6272,8 @@ export const __test = {
   openTaskFilters,
   // R17: die neue Aufgabe kommt an (Gruppe auf, Zeile zieht ein, rollt ins Bild, ausgewaehlt).
   revealCreatedTask, toggleGroup,
+  // R20: nach dem Abhaken faellt nur die Zeile, die Liste bleibt stehen.
+  patchRowRemoval,
   // Die Quittung nach dem Abhaken (#1603), je Weg am laufenden Aufruf: Haken
   // und Wisch teilen sich eine, die Personenwahl und das Brett haben je ihre.
   acknowledgeStatusToggle, completeTaskFor, runColumnMove,

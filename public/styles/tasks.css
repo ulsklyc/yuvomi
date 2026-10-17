@@ -336,6 +336,24 @@
   margin-bottom: var(--space-6);
 }
 
+/* LANGE LISTEN RECHNEN NUR, WAS IN SICHT IST (R20, Re-Critique 2026-10-17 a6
+ * P2; Guide defer-rendering-heavy-content). Mit 200+ Aufgaben (18.000
+ * Knoten) kostete der Wechsel nach /tasks einen Frame von 815 ms bei 4x CPU,
+ * zum guten Teil Stil und Layout der Gruppen unter der Falz. Ab der zweiten
+ * Gruppe - die erste steht immer in der Falz - ueberspringt der Browser sie,
+ * bis sie in die Naehe kommen; `auto` merkt sich danach die echte Hoehe, der
+ * Bildlaufbalken springt nicht. Die Luft unter der Gruppe steht dort als
+ * Innenabstand: Paint-Containment schnitte den Schatten des Traegers an der
+ * Gruppenkante sonst ab. Ohne Unterstuetzung bleibt alles, wie es war. */
+@supports (content-visibility: auto) {
+  .task-group + .task-group {
+    content-visibility: auto;
+    contain-intrinsic-size: auto none auto 480px;
+    margin-bottom: 0;
+    padding-bottom: var(--space-6);
+  }
+}
+
 /* --------------------------------------------------------
  * Swipe-Wrapper - Task-spezifische Styles
  * Basis-Styles (.swipe-row, .swipe-reveal und alle drei Reveal-Rollen)

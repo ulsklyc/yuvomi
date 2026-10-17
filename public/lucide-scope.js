@@ -29,15 +29,27 @@
   const toPascal = (name) => String(name)
     .replace(/(\w)(\w*)(_|-|\s*)/g, (_all, head, tail) => head.toUpperCase() + tail.toLowerCase());
 
+  // EIN BAUPLAN JE ZEICHEN (R20): eine Liste mit 200 Aufgaben setzte jedes
+  // Zeichen einzeln aus seinen Pfaden zusammen (`createElement`, ~80 ms bei
+  // 4x CPU). Jetzt einmal je Name gebaut und danach geklont - der Klon ist
+  // derselbe Baum, die Attribute des Platzhalters kommen wie bisher darauf.
+  const templates = new Map();
+  const iconFor = (key, icon) => {
+    let tpl = templates.get(key);
+    if (!tpl) { tpl = lucide.createElement(icon); templates.set(key, tpl); }
+    return tpl.cloneNode(true);
+  };
+
   const replaceScoped = (node) => {
     const name = node.getAttribute('data-lucide');
     if (name == null) return;
-    const icon = lucide.icons[toPascal(name)];
+    const key = toPascal(name);
+    const icon = lucide.icons[key];
     if (!icon) {
       console.warn(`${node.outerHTML} icon name was not found in the provided icons object.`);
       return;
     }
-    const svg = lucide.createElement(icon);
+    const svg = iconFor(key, icon);
     for (const attr of node.attributes) {
       if (attr.name === 'class') continue;
       svg.setAttribute(attr.name, attr.value);
