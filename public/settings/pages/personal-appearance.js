@@ -576,7 +576,7 @@ function mountTimezoneMismatch(container, preferences, isAdmin) {
  * `device-display` (registry.js, `props.part: 'device'`) rendert sie dort -
  * derselbe Baustein, dieselben Handler.
  */
-function deviceDisplayRowsHtml() {
+function deviceDisplayRowsHtml({ screensaverOn = true, isAdmin = false } = {}) {
   return `
         <!-- DER WAND-MODUS WOHNT HIER UND NICHT IM ANPASSEN-PANEL.
              Er ist wie Theme und Sprache GERÄTELOKAL (localStorage) - das
@@ -595,8 +595,20 @@ function deviceDisplayRowsHtml() {
         <!-- Next to wall mode and for the same reason: device-local (#885). A
              photo frame and a kitchen tablet in one household want different
              delays, and a household value would reach every phone too. The
-             Immich connection itself stays under Household -> Integrations. -->
-        ${settingRowHtml({
+             Immich connection itself stays under Household -> Integrations.
+             OHNE IMMICH KEINE OPTIONEN (R20, Re-Critique 2026-10-17 a5 P3):
+             drei Schalter fuer etwas, das nie startet, standen aktiv da. Jetzt
+             EINE Zeile, die sagt, was fehlt - fuer Admins mit dem Weg dorthin. -->
+        ${screensaverOn ? '' : settingRowHtml({
+          label: t('settings.screensaverOffTitle'),
+          description: t('settings.screensaverNeedsImmich'),
+          descriptionId: 'screensaver-off-hint',
+          control: isAdmin
+            ? `<a class="btn btn--secondary" id="screensaver-connect" href="/settings/admin/integrations" aria-describedby="screensaver-off-hint">${esc(t('settings.screensaverConnectImmich'))}</a>`
+            : '',
+          attrs: { id: 'screensaver-off-row' },
+        })}
+        ${!screensaverOn ? '' : `${settingRowHtml({
           label: t('settings.screensaverIdleLabel'),
           labelFor: 'screensaver-idle-select',
           description: t('settings.screensaverIdleHint'),
@@ -621,16 +633,16 @@ function deviceDisplayRowsHtml() {
           description: t('settings.screensaverCoverHint'),
           descriptionId: 'screensaver-cover-hint',
           attrs: { id: 'screensaver-cover-toggle', 'aria-describedby': 'screensaver-cover-hint' },
-        })}
+        })}`}
 `;
 }
 
-function renderDeviceDisplay(container) {
+function renderDeviceDisplay(container, options = {}) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <section class="settings-section">
       <h2 class="settings-section__title">${t('settings.sectionDeviceDisplay')}</h2>
-      <div class="row-carrier settings-group">${deviceDisplayRowsHtml()}</div>
+      <div class="row-carrier settings-group">${deviceDisplayRowsHtml(options)}</div>
     </section>`);
   bindDeviceDisplay(container);
   window.lucide?.createIcons({ el: container });
@@ -650,6 +662,14 @@ function bindDeviceDisplay(container) {
         : t('settings.wallModeOff'),
       'success',
     );
+  });
+
+  // Der Weg zu Immich bleibt in der App (wie die Links der Settings-Shell):
+  // navigate() fragt den Verlassen-Schutz, ein harter Seitenwechsel nicht.
+  container.querySelector('#screensaver-connect')?.addEventListener('click', (event) => {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || !window.yuvomi?.navigate) return;
+    event.preventDefault();
+    window.yuvomi.navigate('/settings/admin/integrations');
   });
 
   bindScreensaverIdleSelect(container.querySelector('#screensaver-idle-select'));
@@ -903,7 +923,11 @@ function bindEvents(container, user) {
 
 export async function render(container, { user }) {
   if (container.dataset?.part === 'device') {
-    renderDeviceDisplay(container);
+    // `screensaver_enabled` (GET /preferences): ist Immich verbunden? Scheitert
+    // die Frage, bleiben die Optionen stehen - lieber einstellbar als versteckt.
+    let screensaverOn = true;
+    try { screensaverOn = (await getPreferences()).screensaver_enabled !== false; } catch { /* s. o. */ }
+    renderDeviceDisplay(container, { screensaverOn, isAdmin: user?.role === 'admin' });
     return;
   }
   try {

@@ -3194,7 +3194,10 @@
         "feedExportIncludeBirthdays": "Bao gồm sinh nhật",
         "feedExportIncludeBirthdaysHint": "Tắt khi đăng ký nguồn sinh nhật riêng để tránh trùng lặp sinh nhật và ngày tên.",
         "birthdayFeedHint": "Bất kỳ ai có liên kết này đều có thể xem tất cả sinh nhật và ngày tên đã lưu trong gia đình, kể cả khi tắt nhắc nhở. Chỉ dùng trên thiết bị của bạn.",
-        "skipToSheet": "Chuyển đến cài đặt"
+        "skipToSheet": "Chuyển đến cài đặt",
+        "screensaverOffTitle": "Trình bảo vệ màn hình ảnh",
+        "screensaverNeedsImmich": "Trình bảo vệ màn hình bắt đầu khi quản trị viên đã kết nối Immich. Sau đó bạn đặt thời gian chờ, đồng hồ và cách khớp ảnh cho thiết bị này tại đây.",
+        "screensaverConnectImmich": "Kết nối Immich"
     },
     "login": {
         "tagline": "Chào mừng bạn trở lại trình lập kế hoạch gia đình.",

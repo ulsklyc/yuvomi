@@ -3194,7 +3194,10 @@
         "feedExportIncludeBirthdays": "Ta med fødselsdager",
         "feedExportIncludeBirthdaysHint": "Slå av når du abonnerer på den separate fødselsdagskalenderen for å unngå doble fødselsdager og navnedager.",
         "birthdayFeedHint": "Alle med lenken kan se alle lagrede fødselsdager og navnedager i husholdningen, også uten påminnelser. Bruk den bare på dine egne enheter.",
-        "skipToSheet": "Gå til innstillingen"
+        "skipToSheet": "Gå til innstillingen",
+        "screensaverOffTitle": "Bildeskjermsparer",
+        "screensaverNeedsImmich": "Skjermspareren starter når en administrator har koblet til Immich. Deretter stiller du inn ventetid, klokke og bildeutsnitt for denne enheten her.",
+        "screensaverConnectImmich": "Koble til Immich"
     },
     "login": {
         "tagline": "Velkommen tilbake til familieplanleggeren din.",

@@ -3194,7 +3194,10 @@
         "feedExportIncludeBirthdays": "Inclure les anniversaires",
         "feedExportIncludeBirthdaysHint": "Désactivez cette option avec un abonnement séparé aux anniversaires pour éviter les doublons des anniversaires et fêtes.",
         "birthdayFeedHint": "Toute personne disposant de ce lien peut voir tous les anniversaires et fêtes enregistrés dans le foyer, même sans rappel. Utilisez-le uniquement sur vos propres appareils.",
-        "skipToSheet": "Aller au réglage"
+        "skipToSheet": "Aller au réglage",
+        "screensaverOffTitle": "Économiseur d'écran photo",
+        "screensaverNeedsImmich": "L'économiseur démarre dès qu'un administrateur a connecté Immich. Tu règles ensuite ici le délai, l'heure et le cadrage pour cet appareil.",
+        "screensaverConnectImmich": "Connecter Immich"
     },
     "login": {
         "tagline": "Bon retour sur votre planificateur familial.",

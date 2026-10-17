@@ -3194,7 +3194,10 @@
         "feedExportIncludeBirthdays": "Incluir cumpleaños",
         "feedExportIncludeBirthdaysHint": "Desactívalo si te suscribes al calendario de cumpleaños separado para evitar cumpleaños y onomásticas duplicados.",
         "birthdayFeedHint": "Cualquiera con este enlace puede ver todos los cumpleaños y onomásticas guardados en el hogar, incluso sin recordatorios. Úsalo solo en tus propios dispositivos.",
-        "skipToSheet": "Ir al ajuste"
+        "skipToSheet": "Ir al ajuste",
+        "screensaverOffTitle": "Salvapantallas de fotos",
+        "screensaverNeedsImmich": "El salvapantallas empieza cuando un administrador conecta Immich. Después ajustas aquí la espera, la hora y el encuadre para este dispositivo.",
+        "screensaverConnectImmich": "Conectar Immich"
     },
     "login": {
         "tagline": "Bienvenido de nuevo a tu planificador familiar.",

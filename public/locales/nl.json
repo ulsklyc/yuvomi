@@ -3194,7 +3194,10 @@
         "feedExportIncludeBirthdays": "Verjaardagen opnemen",
         "feedExportIncludeBirthdaysHint": "Schakel dit uit bij een apart verjaardagsabonnement om dubbele verjaardagen en naamdagen te voorkomen.",
         "birthdayFeedHint": "Iedereen met deze link kan alle opgeslagen verjaardagen en naamdagen van het huishouden zien, ook zonder herinnering. Gebruik de link alleen op je eigen apparaten.",
-        "skipToSheet": "Naar de instelling"
+        "skipToSheet": "Naar de instelling",
+        "screensaverOffTitle": "Fotoschermbeveiliging",
+        "screensaverNeedsImmich": "De schermbeveiliging start zodra een beheerder Immich heeft gekoppeld. Daarna stel je hier wachttijd, klok en fotouitsnede voor dit apparaat in.",
+        "screensaverConnectImmich": "Immich koppelen"
     },
     "login": {
         "tagline": "Welkom terug bij je gezinsplanner.",

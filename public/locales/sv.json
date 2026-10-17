@@ -3194,7 +3194,10 @@
         "feedExportIncludeBirthdays": "Inkludera födelsedagar",
         "feedExportIncludeBirthdaysHint": "Stäng av när du prenumererar på det separata födelsedagsflödet för att undvika dubbla födelsedagar och namnsdagar.",
         "birthdayFeedHint": "Alla med länken kan se alla sparade födelsedagar och namnsdagar i hushållet, även utan påminnelser. Använd den bara på dina egna enheter.",
-        "skipToSheet": "Gå till inställningen"
+        "skipToSheet": "Gå till inställningen",
+        "screensaverOffTitle": "Fotoskärmsläckare",
+        "screensaverNeedsImmich": "Skärmsläckaren startar när en administratör har anslutit Immich. Sedan ställer du in väntetid, klocka och bildutsnitt för den här enheten här.",
+        "screensaverConnectImmich": "Anslut Immich"
     },
     "login": {
         "tagline": "Välkommen tillbaka till din familjeplanerare.",

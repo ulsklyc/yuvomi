@@ -3210,7 +3210,10 @@
         "feedExportIncludeBirthdays": "생일 포함",
         "feedExportIncludeBirthdaysHint": "별도 생일 피드를 구독할 때 끄면 생일과 이름 기념일이 중복되지 않습니다.",
         "birthdayFeedHint": "이 링크를 가진 사람은 알림이 꺼진 항목을 포함해 가구에 저장된 모든 생일과 이름 기념일을 볼 수 있습니다. 본인 기기에서만 사용하세요.",
-        "skipToSheet": "설정으로 건너뛰기"
+        "skipToSheet": "설정으로 건너뛰기",
+        "screensaverOffTitle": "사진 화면 보호기",
+        "screensaverNeedsImmich": "관리자가 Immich를 연결하면 화면 보호기가 시작됩니다. 그다음 이 기기의 대기 시간, 시계, 사진 맞춤을 여기서 설정합니다.",
+        "screensaverConnectImmich": "Immich 연결"
     },
     "login": {
         "tagline": "가족 플래너에 다시 오신 것을 환영합니다.",

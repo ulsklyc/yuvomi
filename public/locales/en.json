@@ -3194,7 +3194,10 @@
         "feedExportIncludeBirthdays": "Include birthdays",
         "feedExportIncludeBirthdaysHint": "Turn this off when you subscribe to the separate birthday feed to avoid duplicate birthdays and name days.",
         "birthdayFeedHint": "Anyone with this link can see every birthday and name day saved in the household, including those with reminders off. Only use it on your own devices.",
-        "skipToSheet": "Skip to the setting"
+        "skipToSheet": "Skip to the setting",
+        "screensaverOffTitle": "Photo screensaver",
+        "screensaverNeedsImmich": "The screensaver starts once an admin has connected Immich. Then you set the delay, clock and photo fit for this device here.",
+        "screensaverConnectImmich": "Connect Immich"
     },
     "login": {
         "tagline": "Welcome back to your family planner.",

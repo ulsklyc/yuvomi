@@ -3210,7 +3210,10 @@
         "feedExportIncludeBirthdays": "Sertakan ulang tahun",
         "feedExportIncludeBirthdaysHint": "Nonaktifkan saat berlangganan feed ulang tahun terpisah agar ulang tahun dan hari nama tidak muncul dua kali.",
         "birthdayFeedHint": "Siapa pun yang memiliki tautan ini dapat melihat semua ulang tahun dan hari nama tersimpan dalam rumah tangga, termasuk tanpa pengingat. Gunakan hanya di perangkat Anda sendiri.",
-        "skipToSheet": "Langsung ke pengaturan"
+        "skipToSheet": "Langsung ke pengaturan",
+        "screensaverOffTitle": "Screensaver foto",
+        "screensaverNeedsImmich": "Screensaver dimulai setelah admin menghubungkan Immich. Setelah itu kamu mengatur jeda, jam, dan potongan foto untuk perangkat ini di sini.",
+        "screensaverConnectImmich": "Hubungkan Immich"
     },
     "login": {
         "tagline": "Selamat datang kembali di perencana keluarga Anda.",

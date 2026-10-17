@@ -3194,7 +3194,10 @@
         "feedExportIncludeBirthdays": "Includi compleanni",
         "feedExportIncludeBirthdaysHint": "Disattiva questa opzione con un abbonamento separato ai compleanni per evitare compleanni e onomastici duplicati.",
         "birthdayFeedHint": "Chiunque abbia questo link può vedere tutti i compleanni e gli onomastici salvati nella famiglia, anche senza promemoria. Usalo solo sui tuoi dispositivi.",
-        "skipToSheet": "Vai all’impostazione"
+        "skipToSheet": "Vai all’impostazione",
+        "screensaverOffTitle": "Salvaschermo con foto",
+        "screensaverNeedsImmich": "Il salvaschermo parte quando un amministratore ha collegato Immich. Poi qui imposti attesa, ora e inquadratura per questo dispositivo.",
+        "screensaverConnectImmich": "Collega Immich"
     },
     "login": {
         "tagline": "Bentornato nel tuo pianificatore familiare.",

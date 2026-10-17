@@ -3210,7 +3210,10 @@
         "feedExportIncludeBirthdays": "Isama ang mga kaarawan",
         "feedExportIncludeBirthdaysHint": "I-off kapag naka-subscribe sa hiwalay na feed ng kaarawan upang hindi madoble ang mga kaarawan at araw ng pangalan.",
         "birthdayFeedHint": "Makikita ng sinumang may link na ito ang lahat ng kaarawan at araw ng pangalan na naka-save sa sambahayan, kahit walang paalala. Gamitin lamang sa sarili mong mga device.",
-        "skipToSheet": "Lumaktaw sa setting"
+        "skipToSheet": "Lumaktaw sa setting",
+        "screensaverOffTitle": "Photo screensaver",
+        "screensaverNeedsImmich": "Magsisimula ang screensaver kapag naikonekta na ng admin ang Immich. Pagkatapos, dito mo itatakda ang paghihintay, orasan at pagkakasya ng larawan para sa device na ito.",
+        "screensaverConnectImmich": "Ikonekta ang Immich"
     },
     "login": {
         "tagline": "Maligayang pagbabalik sa iyong family planner.",

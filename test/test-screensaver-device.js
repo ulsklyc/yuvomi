@@ -556,3 +556,36 @@ test('by hand, a tap: no move follows, it stays open until the next tap', async 
   fire('touchstart');
   assert.equal(overlay(), undefined, 'the next tap closes it');
 });
+
+// R20 (Re-Critique 2026-10-17 a5 P3): ohne Immich startet der Bildschirmschoner
+// nie, die drei Optionen standen trotzdem aktiv da. Ohne Verbindung steht EINE
+// Zeile, die sagt, was fehlt; Admins bekommen den Weg dorthin.
+test('without Immich the device sheet shows one row instead of three dead options', async () => {
+  const { render } = await import('../public/settings/pages/personal-appearance.js');
+  const keep = globalThis.__apiStub;
+  const sheet = () => {
+    const c = { dataset: { part: 'device' }, html: '', replaceChildren() { this.html = ''; }, insertAdjacentHTML(_, h) { this.html += h; }, querySelector: () => null, querySelectorAll: () => [] };
+    return c;
+  };
+  const { resetPreferencesCache } = await import('../public/settings/preferences-cache.js');
+  try {
+    for (const [enabled, role] of [[false, 'member'], [false, 'admin'], [true, 'member']]) {
+      resetPreferencesCache();
+      globalThis.__apiStub = { get: async () => ({ data: { screensaver_enabled: enabled } }) };
+      const c = sheet();
+      await render(c, { user: { role } });
+      if (enabled) {
+        assert.match(c.html, /id="screensaver-idle-select"/, 'mit Immich: die Optionen');
+        assert.doesNotMatch(c.html, /screensaver-off-row/);
+      } else {
+        assert.doesNotMatch(c.html, /screensaver-idle-select|screensaver-clock-toggle|screensaver-cover-toggle/, 'ohne Immich: keine Optionen');
+        assert.match(c.html, /id="screensaver-off-row"[\s\S]*settings\.screensaverNeedsImmich/, 'die Zeile sagt, was fehlt');
+        assert.equal(/id="screensaver-connect" href="\/settings\/admin\/integrations"/.test(c.html), role === 'admin', 'nur Admins bekommen den Weg zu Immich');
+      }
+      assert.match(c.html, /wall-mode-toggle/, 'der Wand-Modus bleibt immer');
+    }
+  } finally {
+    resetPreferencesCache();
+    if (keep === undefined) delete globalThis.__apiStub; else globalThis.__apiStub = keep;
+  }
+});

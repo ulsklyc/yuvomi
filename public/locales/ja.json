@@ -3194,7 +3194,10 @@
         "feedExportIncludeBirthdays": "誕生日を含める",
         "feedExportIncludeBirthdaysHint": "独立した誕生日フィードを購読する場合はオフにして、誕生日と名前の日の重複を防いでください。",
         "birthdayFeedHint": "このリンクを知っている人は、リマインダーがオフのものも含め、世帯に保存されたすべての誕生日と名前の日を閲覧できます。自分の端末でのみ使用してください。",
-        "skipToSheet": "設定へスキップ"
+        "skipToSheet": "設定へスキップ",
+        "screensaverOffTitle": "写真スクリーンセーバー",
+        "screensaverNeedsImmich": "管理者が Immich を接続すると、スクリーンセーバーが動きます。その後、この端末の待ち時間、時計、写真の表示方法をここで設定できます。",
+        "screensaverConnectImmich": "Immich を接続"
     },
     "login": {
         "tagline": "家族のプランナーへおかえりなさい。",

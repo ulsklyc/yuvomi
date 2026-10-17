@@ -3194,7 +3194,10 @@
         "feedExportIncludeBirthdays": "Doğum günlerini dahil et",
         "feedExportIncludeBirthdaysHint": "Ayrı doğum günü akışına abone olduğunuzda doğum günlerinin ve isim günlerinin yinelenmesini önlemek için kapatın.",
         "birthdayFeedHint": "Bu bağlantıya sahip herkes, hatırlatıcıları kapalı olanlar dahil evde kayıtlı tüm doğum günlerini ve isim günlerini görebilir. Yalnızca kendi cihazlarınızda kullanın.",
-        "skipToSheet": "Ayara geç"
+        "skipToSheet": "Ayara geç",
+        "screensaverOffTitle": "Fotoğraf ekran koruyucu",
+        "screensaverNeedsImmich": "Ekran koruyucu, bir yönetici Immich'i bağladığında başlar. Ardından bu cihaz için bekleme süresini, saati ve fotoğraf kadrajını burada ayarlarsın.",
+        "screensaverConnectImmich": "Immich'i bağla"
     },
     "login": {
         "tagline": "Aile planlayıcına tekrar hoş geldin.",

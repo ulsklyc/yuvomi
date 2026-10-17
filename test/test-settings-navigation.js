@@ -3976,7 +3976,7 @@ test('R19: Wand-Modus und Bildschirmschoner stehen im Blatt "Dieses Geraet"', as
     assert.ok(!SETTINGS_SECTIONS.find((s) => s.id === 'personal-appearance').options.includes(key), `${key} nicht mehr unter Darstellung`);
   }
   const src = await readFile(new URL('../public/settings/pages/personal-appearance.js', import.meta.url), 'utf8');
-  assert.match(src, /if \(container\.dataset\?\.part === 'device'\) \{\s*renderDeviceDisplay\(container\);\s*return;/);
+  assert.match(src, /if \(container\.dataset\?\.part === 'device'\) \{[\s\S]{0,400}?renderDeviceDisplay\(container, \{ screensaverOn, isAdmin[^}]*\}\);\s*return;/);
   const page = src.slice(src.indexOf('function renderPage('), src.indexOf('function deviceDisplayRowsHtml('));
   assert.doesNotMatch(page, /wall-mode-toggle|screensaver-idle-select/, 'Darstellung zeigt die Geraete-Zeilen nicht mehr');
 });

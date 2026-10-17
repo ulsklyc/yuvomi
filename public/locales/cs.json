@@ -3295,7 +3295,10 @@
         "feedExportIncludeBirthdays": "Zahrnout narozeniny",
         "feedExportIncludeBirthdaysHint": "Při samostatném odběru narozenin vypněte tuto možnost, aby se narozeniny a svátky nezobrazovaly dvakrát.",
         "birthdayFeedHint": "Kdokoli s tímto odkazem uvidí všechny narozeniny a svátky uložené v domácnosti, i bez připomínek. Používejte jej pouze na vlastních zařízeních.",
-        "skipToSheet": "Přejít k nastavení"
+        "skipToSheet": "Přejít k nastavení",
+        "screensaverOffTitle": "Fotografický spořič obrazovky",
+        "screensaverNeedsImmich": "Spořič se spustí, až správce připojí Immich. Potom zde nastavíš pro toto zařízení prodlevu, hodiny a ořez fotek.",
+        "screensaverConnectImmich": "Připojit Immich"
     },
     "login": {
         "tagline": "Vítejte zpět ve svém rodinném plánovači.",
