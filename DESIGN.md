@@ -1262,6 +1262,13 @@ das Verhaeltnis haelt.
 - **Titel im Kopf:** der Groessenwechsel des Large Title faellt weiter in einen Frame (keine
   `font-size`-Transition); der Titel blendet an der neuen Stelle ein (`opacity`,
   `--duration-xs`), ebenso der angedockte Titel der scrollenden Seiten (ein und aus).
+  **Einklappen ohne Sprung (R20):** gedeckelte Koepfe (Kalender, Budget, Gesundheitsbereiche)
+  und die Faltzeile der Kueche wechseln ihren Zustand in EINEM Layout; was dabei springt (Zeilen
+  des Kopfes, alles darunter), gleitet per FLIP mit `transform` (`--duration-md`). Ein
+  Inline-`transform` haelt die alte Lage zwei Frames, bevor die Animation uebernimmt - eine sofort
+  gestartete Compositor-Animation zaehlt die Layout-Shift-Messung nicht. Gemessen 390px: CLS
+  Kalender 0,061 -> 0,001, Budget 0,059 -> 0, Einkauf 0,058 -> 0,001 (`holdThenGlide`,
+  utils/ux.js). Unter reduzierter Bewegung steht der Wechsel; der Titel blendet (`--motion-blend`).
 - **Seitenwechsel:** Kontinuitaet vor Effekt - Navigation, Kopf und Tab-Leisten STEHEN, nur
   der Inhalt wechselt. Der Router tauscht per View Transition (`utils/view-transition.js`):
   Wurzel-Blende 200ms `--ease-out`, Seitenleiste und Kapsel zeigen nur ihr lebendes Bild,

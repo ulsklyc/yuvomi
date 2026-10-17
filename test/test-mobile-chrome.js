@@ -633,6 +633,23 @@ test('R20: minimiert schrumpft die Kapsel an ihrer Startkante auf das aktive Zie
   assert.match(read('../public/utils/ux.js'), /if \(minimized\) measureNavPill\(nav\);/, 'gemessen wird nicht an der ausgefahrenen Kapsel');
 });
 
+// R20 (Re-Critique 2026-10-17): der Bereichskopf der Gesundheit blieb beim Lesen
+// 113px hoch. Eingeklappt steht er in EINER Zeile: Rueckweg als Zeichen,
+// Bereichsname inline, Personenwahl - 65px bei 390px.
+test('R20: der Gesundheits-Bereichskopf klappt beim Lesen auf eine Zeile ein', () => {
+  const all = rules(read('../public/styles/health.css'));
+  const compact = (r) => r.at.some((a) => /max-width:\s*1023px/.test(a));
+  const collapsed = all.filter((r) => compact(r) && r.selector.includes('.health-toolbar.page-toolbar--capped.is-collapsed'));
+  const row = collapsed.find((r) => decl(r.body, 'flex-wrap') === 'nowrap');
+  assert.ok(row, 'eingeklappt bricht der Kopf weiter in zwei Zeilen um');
+  assert.ok(collapsed.some((r) => /health-toolbar__break/.test(r.selector) && /module-seal--head/.test(r.selector) && decl(r.body, 'display') === 'none'),
+    'Umbruch und Siegel bleiben eingeklappt stehen');
+  assert.ok(collapsed.some((r) => /\.health-toolbar__back > span/.test(r.selector) && /clip-path:\s*inset\(50%\)/.test(r.body)),
+    'der Name des Rueckwegs verlaesst nicht das Bild (er bleibt im Baum)');
+  const back = collapsed.find((r) => /\.health-toolbar__back:not\(\[hidden\]\)$/.test(r.selector.trim()));
+  assert.equal(decl(back?.body ?? '', 'min-inline-size'), 'var(--target-base)', 'der Rueckweg bleibt ein volles Ziel');
+});
+
 // R19 (Critique 2026-10-16 P2 mobil): DIE TAB-LEISTE IST DIE TITELZEILE.
 // Schichtplan, Belohnungen und Haushaltshilfe massen 121/121/129px bei 390px
 // (Large Title ueber den Reitern), jetzt 65px; bei 834px 118-130 -> 69px.

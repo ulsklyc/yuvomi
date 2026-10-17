@@ -270,6 +270,47 @@ function followingNeighbours(el, limit = 60) {
 }
 
 /**
+ * FLIP, das auch der Layout-Shift-Messung standhaelt (R20). Eine Animation,
+ * die der Compositor faehrt, zeigt im Umschalt-Frame zwar die alte Lage -
+ * die Messung des Browsers sieht aber nur den Wert des Hauptthreads, und der
+ * ist dort noch `none`: gemessen blieb CLS 0,055 trotz Gleiten. Deshalb haelt
+ * ein Inline-`transform` die alte Lage im Umschalt-Frame, und erst im
+ * naechsten Frame uebernimmt die Animation von genau dort. Reduzierte
+ * Bewegung: kein Halten, kein Gleiten - der Wechsel steht.
+ * @param {Map<Element, {left: number, top: number}>} before - flipSnapshotElements()
+ */
+function holdThenGlide(before) {
+  if (!before?.size || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  const duration = durationToken('--duration-md', 200);
+  const easing = easingToken('--ease-out', 'ease-out');
+  const held = [];
+  for (const [el, prev] of before) {
+    if (!el.isConnected || typeof el.animate !== 'function') continue;
+    const now = el.getBoundingClientRect();
+    const dx = prev.left - now.left;
+    const dy = prev.top - now.top;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
+    const from = `translate(${dx}px, ${dy}px)`;
+    el.style.transform = from;
+    held.push([el, from]);
+  }
+  if (!held.length) return;
+  // ZWEI Frames Halt: der Wechsel kommt aus einem Scroll-Ereignis, das im
+  // selben Frame VOR den rAF-Rueckrufen laeuft - ein einfaches rAF raeumte
+  // ihn, bevor der Frame gemalt war. Eine sofort gestartete Animation zaehlt
+  // die Messung nicht (gemessen: CLS 0,055). Danach uebernimmt die Animation;
+  // der Inline-Wert geht erst, wenn sie laeuft (`ready`) - sonst stuende ein
+  // Frame lang die neue Lage ohne Versatz da.
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    for (const [el, from] of held) {
+      const anim = el.animate([{ transform: from }, { transform: 'none' }], { duration, easing });
+      const release = () => { if (el.style.transform === from) el.style.transform = ''; };
+      Promise.resolve(anim.ready).then(release, release);
+    }
+  }));
+}
+
+/**
  * Das Gegenstueck: ein gerade eingesetztes Element erscheinen lassen
  * (aufgeklappte Gruppe, eine per „Rueckgaengig" zurueckgekehrte Zeile, eine
  * Feldmeldung). Ohne `fill` - am Ende gilt wieder das Stylesheet.
@@ -821,6 +862,27 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
   const onGesture = (e) => { gestureTarget = e.target; };
   const GESTURES = ['wheel', 'touchstart', 'pointerdown', 'keydown'];
 
+  /* DER KOPF KLAPPT UM, DER INHALT GLEITET (R20, Re-Critique 2026-10-17 a6 P2).
+   * Kalender und Budget klappten in EINEM Frame um (Inhalt ~52px Sprung,
+   * CLS 0,06), der Einkauf schob seine Liste per `margin` ueber 250 ms
+   * (Layout je Frame, CLS 0,06) - zwei Verhalten fuer eine Geste. Jetzt EIN
+   * Weg: der Zustand wechselt in einem Frame (Layout einmal), und was dabei
+   * springt - die Zeilen des Kopfes und alles unter ihm -, gleitet per FLIP
+   * nur mit `transform` von seiner alten Lage an die neue. Die visuelle Lage
+   * bleibt im Umschalt-Frame stehen; damit ist es kein Layout-Shift.
+   * `scroll-driven` (Guide shrinking-header-on-scroll) traegt hier nicht: der
+   * gedeckelte Kopf ordnet seine Zeilen um (der Zeitraum rueckt in die
+   * Titelzeile), das ist keine Strecke, die sich an den Scroll binden laesst.
+   * Reduzierte Bewegung: flipPlayElements tut nichts - der Wechsel steht. */
+  const setCollapsed = (on, states) => {
+    if (states.every((c) => toolbar.classList.contains(c) === on)) return;
+    const moving = [...toolbar.children, ...followingNeighbours(toolbar)];
+    const before = flipSnapshotElements(moving);
+    if (on) toolbar.classList.add(...states, 'was-collapsed');
+    else toolbar.classList.remove(...states);
+    holdThenGlide(before);
+  };
+
   // Hysterese, damit der Kopf nicht um seine eigene Schwelle flattert.
   const onInnerScroll = (e) => {
     const port = e.target;
@@ -869,7 +931,7 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
       ? reserve - Math.min(0, parseFloat(getComputedStyle(toolbar).marginBlockEnd) || 0)
       : reserve + shorter;
     if (unfolded < (fold ? foldH : lead) + 48) {
-      toolbar.classList.remove(...states);
+      setCollapsed(false, states);
       return;
     }
     // Ab hier nur noch der Nutzer (siehe `gestureTarget` oben).
@@ -877,8 +939,8 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     const top = port.scrollTop;
     // `was-collapsed`: ab jetzt darf der Titel beim Ausklappen einblenden
     // (layout.css, `page-title-settle-back`) - nicht schon beim Seitenaufbau.
-    if (top > 24) toolbar.classList.add(...states, 'was-collapsed');
-    else if (top < 8) toolbar.classList.remove(...states);
+    if (top > 24) setCollapsed(true, states);
+    else if (top < 8) setCollapsed(false, states);
   };
   const update = () => {
     // VOR der Messung: das Siegel steht in der Titelzeile und zählt zu ihr.

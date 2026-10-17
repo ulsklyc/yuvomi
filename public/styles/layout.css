@@ -4380,10 +4380,13 @@ html.fab-steady .page-fab {
  * die Zeile zurueck), mit einem Suchbegriff und mit offenem Werkzeugmenue -
  * dieselben Ausnahmen wie die Suche der gedeckelten Koepfe oben. */
 @media (max-width: 1023px) {
+  /* Der Rand springt (EIN Layout); die Liste darunter gleitet per FLIP aus
+   * ihrer alten Lage nach (wireCollapsingHeader, R20) - vorher lief hier der
+   * Rand selbst 250 ms und legte die Liste in jedem Frame neu (CLS 0,06).
+   * Die Zeile selbst gleitet per `translate` hinter die Leiste, gleich lang
+   * wie das FLIP darunter. */
   .page-toolbar--fold-row {
-    transition:
-      margin-block-end var(--duration-lg) var(--ease-in-out),
-      translate var(--duration-lg) var(--ease-in-out);
+    transition: translate var(--duration-md) var(--ease-out);
   }
 
   .page-toolbar--fold-row > * {

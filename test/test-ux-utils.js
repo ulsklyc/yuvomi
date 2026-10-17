@@ -814,11 +814,14 @@ function collapsingStub() {
     getBoundingClientRect() { const r = this.rect ?? { top: 0, bottom: 0 }; return { ...r, height: r.bottom - r.top, width: 100 }; }
     getClientRects() { return this.rect ? [this.rect] : []; }
     get offsetParent() { return this.rect ? this.parentElement : null; }
+    get nextElementSibling() { const sib = this.parentElement?.children ?? []; return sib[sib.indexOf(this) + 1] ?? null; }
+    get isConnected() { return true; }
   }
   const saved = {};
   for (const k of ['Element', 'getComputedStyle', 'ResizeObserver', 'MutationObserver', 'IntersectionObserver']) saved[k] = global[k];
   global.Element = FakeEl;
-  global.getComputedStyle = (el) => el.cs;
+  // Ohne Element (die Wurzel fuer Tokens wie --duration-md): keine Werte, die Rueckfaelle gelten.
+  global.getComputedStyle = (el) => el?.cs ?? { getPropertyValue: () => '' };
   global.ResizeObserver = class { observe() {} disconnect() {} };
   global.MutationObserver = class { observe() {} disconnect() {} };
   global.IntersectionObserver = class { observe() {} disconnect() {} };
@@ -871,6 +874,38 @@ test('wireCollapsingHeader: der Nutzer-Scroll klappt weiter ein und aus', () => 
     s.scrollTo(s.port, 200);
     assert.equal(s.toolbar.classList.contains('is-collapsed'), true, 'Mausrad/Scrollbalken im Port klappt ein');
   } finally { s.restore(); }
+});
+
+// R20 (Re-Critique 2026-10-17 a6 P2): der Kopf klappte in EINEM Frame um, der
+// Inhalt darunter sprang (CLS 0,06 in Kalender und Budget). Jetzt haelt ein
+// Inline-transform den Port im Umschalt-Frame an seiner alten Lage, und zwei
+// Frames spaeter gleitet er per Animation an die neue.
+test('wireCollapsingHeader R20: der Inhalt unter dem Kopf springt nicht, er gleitet', () => {
+  const s = collapsingStub();
+  const frames = [];
+  const savedRaf = global.requestAnimationFrame;
+  global.requestAnimationFrame = (cb) => { frames.push(cb); return frames.length; };
+  try {
+    // Eingeklappt ist der Kopf 50px kuerzer, der Port steht entsprechend hoeher.
+    Object.defineProperty(s.port, 'rect', {
+      get: () => (s.toolbar.classList.contains('is-collapsed') ? { top: 40, bottom: 540, left: 0 } : { top: 90, bottom: 590, left: 0 }),
+      set: () => {},
+    });
+    const calls = [];
+    s.port.animate = (keyframes) => { calls.push(keyframes); return { ready: Promise.resolve() }; };
+    wireCollapsingHeader(s.toolbar);
+    s.fire('touchstart', s.cell);
+    s.scrollTo(s.port, 120);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), true);
+    assert.equal(s.port.style.transform, 'translate(0px, 50px)', 'der Port steht im Umschalt-Frame nicht an seiner alten Lage - der Inhalt springt');
+    assert.equal(calls.length, 0, 'die Animation startet nicht vor dem gemalten Halt (die Messung zaehlte den Sprung)');
+    frames.shift()();
+    frames.shift()();
+    assert.deepEqual(calls[0], [{ transform: 'translate(0px, 50px)' }, { transform: 'none' }], 'der Port gleitet nicht von der alten an die neue Lage');
+  } finally {
+    global.requestAnimationFrame = savedRaf;
+    s.restore();
+  }
 });
 
 test('wireCollapsingHeader: ein Ansichtswechsel haelt den eingeklappten Kopf, wo der neue Port ihn tragen kann', () => {
@@ -1391,7 +1426,7 @@ function kitchenFoldStub({ centerCls = ['page-search', 'page-toolbar__center'] }
   const saved = {};
   for (const k of ['Element', 'getComputedStyle', 'ResizeObserver', 'MutationObserver', 'IntersectionObserver']) saved[k] = global[k];
   global.Element = FakeEl;
-  global.getComputedStyle = (el) => el.cs;
+  global.getComputedStyle = (el) => el?.cs ?? { getPropertyValue: () => '' };
   global.ResizeObserver = class { observe() {} disconnect() {} };
   global.MutationObserver = class { observe() {} disconnect() {} };
   global.IntersectionObserver = class { observe() {} disconnect() {} };
@@ -1483,7 +1518,10 @@ test('K1: das CSS faltet die Zeile nur eingeklappt, nie mit Fokus, Suchbegriff o
   assert.doesNotMatch(folded.filter((r) => !/>\s*\*\s*$/.test(r.selector)).map((r) => r.body).join(';'), /opacity/,
     'die Zeile selbst blendet nicht aus - ihre Linie bleibt die Kante unter der Leiste');
   const base = compact.find((r) => r.selector.trim() === '.page-toolbar--fold-row');
-  assert.ok(base && /transition:[^;]*margin-block-end/.test(base.body) && /translate/.test(base.body), 'die freiwerdende Hoehe gleitet');
+  // Seit R20 gleitet nicht mehr der Rand (Layout je Frame, CLS 0,06), sondern die
+  // Zeile per translate und die Liste darunter per FLIP (wireCollapsingHeader).
+  assert.ok(base && /transition:[^;]*translate/.test(base.body), 'die Zeile gleitet hinter die Leiste');
+  assert.doesNotMatch(base.body, /margin-block-end/, 'der Rand laeuft als Transition - die Liste wird in jedem Frame neu gelegt');
   const kids = compact.find((r) => r.selector.trim() === '.page-toolbar--fold-row > *');
   assert.ok(kids && /transition:\s*opacity/.test(kids.body), 'der Inhalt blendet');
   const reduced = rules.filter((r) => r.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a))

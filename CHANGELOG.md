@@ -208,7 +208,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   show their tabs in the title row (one row instead of two, 65px on a phone); the first Rewards tab
   is now called "Points", so a phone no longer shows "Overview" twice and nothing saying where you
   are. The budget header
-  folds to one row while you scroll, with the tabs beside the month. On a tablet the title, search
+  folds to one row while you scroll, with the tabs beside the month, and so does a Health area,
+  with the area name between the back arrow and the person. When a header folds, the content
+  below glides up instead of jumping, the same way in Calendar, Budget and Shopping. On a tablet the title, search
   and tools of Tasks, Contacts, Inventory, Notes and Documents share one row, where the search field
   gives way so the title is never cut off, and the budget title shares its row with the month.
 - **The overview appears sooner on a cold start.** The browser now asks for every module the start

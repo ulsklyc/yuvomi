@@ -120,6 +120,59 @@
   height: 0;
 }
 
+/* EINGEKLAPPT EINE ZEILE (R20, Re-Critique 2026-10-17: der Bereichskopf blieb
+ * beim Lesen 113px hoch, 77 % Inhalt). Wie Apples Navigationsleiste: der
+ * Rueckweg wird zum Zeichen (sein Name bleibt fuer Screenreader), der
+ * Bereichsname rueckt als Inline-Titel zwischen Rueckweg und Personenwahl,
+ * das Siegel geht. 113 -> 65px bei 390px. Das Umklappen gleitet per FLIP
+ * (wireCollapsingHeader, utils/ux.js). */
+@media (max-width: 1023px) {
+  .health-toolbar.page-toolbar--capped.is-collapsed:has(> .health-toolbar__back:not([hidden])) {
+    flex-wrap: nowrap;
+  }
+
+  .health-toolbar.page-toolbar--capped.is-collapsed:has(> .health-toolbar__back:not([hidden])) > :is(.health-toolbar__break, .module-seal--head) {
+    display: none;
+  }
+
+  .health-toolbar.page-toolbar--capped.is-collapsed > .health-toolbar__back:not([hidden]) {
+    flex: 0 0 auto;
+    justify-content: center;
+    min-inline-size: var(--target-base);
+  }
+
+  .health-toolbar.page-toolbar--capped.is-collapsed > .health-toolbar__back > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* Wird es eng, kappt zuerst der Name in der Personenwahl, dann der Titel:
+   * der Bereich sagt, wo man ist; die Person steht auch als Farbpunkt da. */
+  .health-toolbar.page-toolbar--capped.is-collapsed:has(> .health-toolbar__back:not([hidden])) > .page-toolbar__title {
+    order: 1;
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  .health-toolbar.page-toolbar--capped.is-collapsed:has(> .health-toolbar__back:not([hidden])) > .health-toolbar__person {
+    order: 2;
+    flex: 0 100 auto;
+    min-width: var(--target-base);
+  }
+
+  .health-toolbar.page-toolbar--capped.is-collapsed > .health-toolbar__person :is(.health-person-switcher, .health-person-switcher__trigger) {
+    min-width: 0;
+  }
+
+  .health-toolbar.page-toolbar--capped.is-collapsed:has(> .health-toolbar__back:not([hidden])) > .page-toolbar__actions {
+    order: 3;
+  }
+}
+
 /* Im Kopf ist die Pille eine Kapsel ohne Kante: gefuellt aus der Well-Flaeche
  * wie die Listen-Kapseln im Einkauf, der Name kappt statt umzubrechen. */
 .health-toolbar__person .health-person-switcher__trigger,
