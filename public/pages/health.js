@@ -4370,6 +4370,11 @@ function wireLabs() {
       if (id === labs.selectedReportId) return;
       labs.selectedReportId = id;
       renderLabsShell();
+      // DER FOKUS BLEIBT AUF DEM BEFUND (Re-Critique 2026-10-17, Persona Sam):
+      // der Neuaufbau tauschte die Liste aus, und der Fokus fiel auf BODY -
+      // der naechste Tab begann wieder oben auf der Seite. Die gewaehlte Karte
+      // steht im neuen Baum unter derselben ID.
+      labs.root.querySelector(`.health-lab-card[data-report-id="${id}"]`)?.focus({ preventScroll: true });
     }));
 
   // Kein `return` als Riegel: die Analyt-Auswahl darunter LIEST nur, und eine

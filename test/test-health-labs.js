@@ -208,3 +208,15 @@ test('Laborwerte mobil: Zeilen statt seitlich scrollender Tabelle, auffaellige z
   assert.ok(rules.some((r) => phone(r) && r.selector.trim() === '.health-lab-rows' && /display:\s*block/.test(r.body)), 'mobil die Zeilen');
   assert.ok(rules.some((r) => !r.at.length && r.selector.trim() === '.health-lab-rows' && /display:\s*none/.test(r.body)), 'ab 640px die Tabelle');
 });
+
+// Re-Critique 2026-10-17 (Persona Sam): wer per Tastatur einen anderen Befund
+// waehlte, verlor den Fokus an BODY - der Neuaufbau tauschte die Liste aus.
+// Gemessen im Browser (Playwright, 1440 und 390): vorher BODY, nachher die
+// gewaehlte Karte. Der Guard haelt die Verdrahtung: nach renderLabsShell()
+// bekommt die Karte DERSELBEN ID den Fokus.
+test('Laborwerte: die Wahl eines Befunds behaelt den Fokus auf seiner Karte', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  const fn = src.slice(src.indexOf('function wireLabs()'), src.indexOf('function wireLabsDetail()'));
+  assert.match(fn, /labs\.selectedReportId = id;\s*renderLabsShell\(\);[\s\S]{0,400}labs\.root\.querySelector\(`\.health-lab-card\[data-report-id="\$\{id\}"\]`\)\?\.focus\(\{ preventScroll: true \}\);/);
+});

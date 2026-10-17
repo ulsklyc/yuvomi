@@ -272,6 +272,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Health: choosing another lab report keeps the keyboard focus on it.** The list was redrawn and
+  the focus fell back to the start of the page, so the next Tab began at the top again.
+
 - **Waste collection: a weekly schedule without a day says so at the days.** "Choose at least one
   weekday" appeared as a short notice at the bottom of the screen; it now stands under the day
   chips, and the focus moves to the first day.
