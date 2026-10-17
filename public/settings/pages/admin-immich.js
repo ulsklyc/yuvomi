@@ -1,7 +1,7 @@
 import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { createInlineError, createRetryState } from '/settings/components.js';
+import { createInlineError, createRetryState, settingRowHtml } from '/settings/components.js';
 
 function toast(message, tone = 'default') {
   window.yuvomi?.showToast(message, tone);
@@ -11,37 +11,40 @@ function renderForm(container, cfg) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <section class="settings-section">
-      <div class="settings-card">
-        <p class="settings-card-description">${esc(t('settings.immichPurpose'))}</p>
-        <form class="settings-form" id="immich-form" novalidate autocomplete="off">
-          <div class="form-group">
-            <label class="form-label" for="immich-url">${esc(t('settings.immichServerUrl'))}</label>
-            <input class="form-input" id="immich-url" name="url" type="url"
-              value="${esc(cfg.url || '')}" placeholder="https://photos.example.com" required />
-            <p class="form-hint" data-env="url" hidden>${esc(t('settings.documentStorageEnvHint'))}</p>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="immich-api-key">${esc(t('settings.immichApiKey'))}</label>
-            <input class="form-input" id="immich-api-key" name="apiKey" type="password"
-              autocomplete="new-password" placeholder="${cfg.apiKeySet ? '••••••••' : ''}" />
-            <p class="form-hint">${esc(t('settings.immichApiKeyKeep'))}</p>
-            <p class="form-hint" data-env="apiKey" hidden>${esc(t('settings.documentStorageEnvHint'))}</p>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="immich-album">${esc(t('settings.immichAlbumId'))}</label>
-            <input class="form-input" id="immich-album" name="albumId" type="text"
-              value="${esc(cfg.albumId || '')}" />
-            <p class="form-hint">${esc(t('settings.immichAlbumHint'))}</p>
-            <p class="form-hint" data-env="albumId" hidden>${esc(t('settings.documentStorageEnvHint'))}</p>
-          </div>
-          <div id="immich-error"></div>
-          <div class="settings-form-actions">
-            <button class="btn btn--secondary" id="immich-test" type="button">${esc(t('settings.dmsTestBtn'))}</button>
-            <button class="btn btn--secondary" id="immich-preview" type="button">${esc(t('settings.immichPreview'))}</button>
-            <button class="btn btn--primary" type="submit">${esc(t('common.save'))}</button>
-          </div>
-        </form>
-      </div>
+      ${/* EIN FORMULAR-DIALEKT (R19, Einstellungen B7), wie SMTP: drei Felder
+           als Zeilen der Gruppe statt unter ihren Etiketten in einer Karte;
+           der Zweck steht als Fuss der Gruppe. */ ''}
+      <form class="settings-form" id="immich-form" novalidate autocomplete="off">
+        <div class="row-carrier settings-group">
+          ${settingRowHtml({
+            label: t('settings.immichServerUrl'), labelFor: 'immich-url',
+            control: `<input class="form-input" id="immich-url" name="url" type="url"
+              value="${esc(cfg.url || '')}" placeholder="https://photos.example.com" required />`,
+            extra: `<p class="form-hint" data-env="url" hidden>${esc(t('settings.documentStorageEnvHint'))}</p>`,
+          })}
+          ${settingRowHtml({
+            label: t('settings.immichApiKey'), labelFor: 'immich-api-key',
+            description: t('settings.immichApiKeyKeep'), descriptionId: 'immich-api-key-hint',
+            control: `<input class="form-input" id="immich-api-key" name="apiKey" type="password"
+              autocomplete="new-password" aria-describedby="immich-api-key-hint" placeholder="${cfg.apiKeySet ? '••••••••' : ''}" />`,
+            extra: `<p class="form-hint" data-env="apiKey" hidden>${esc(t('settings.documentStorageEnvHint'))}</p>`,
+          })}
+          ${settingRowHtml({
+            label: t('settings.immichAlbumId'), labelFor: 'immich-album',
+            description: t('settings.immichAlbumHint'), descriptionId: 'immich-album-hint',
+            control: `<input class="form-input" id="immich-album" name="albumId" type="text"
+              aria-describedby="immich-album-hint" value="${esc(cfg.albumId || '')}" />`,
+            extra: `<p class="form-hint" data-env="albumId" hidden>${esc(t('settings.documentStorageEnvHint'))}</p>`,
+          })}
+        </div>
+        <p class="form-hint settings-group__footer">${esc(t('settings.immichPurpose'))}</p>
+        <div id="immich-error"></div>
+        <div class="settings-form-actions">
+          <button class="btn btn--secondary" id="immich-test" type="button">${esc(t('settings.dmsTestBtn'))}</button>
+          <button class="btn btn--secondary" id="immich-preview" type="button">${esc(t('settings.immichPreview'))}</button>
+          <button class="btn btn--primary" type="submit">${esc(t('common.save'))}</button>
+        </div>
+      </form>
     </section>
   `);
 

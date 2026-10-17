@@ -2177,7 +2177,6 @@
         "apiTokenNeverExpires": "Nincs lejárat",
         "apiTokenLastUsed": "Utolsó használat",
         "apiTokenNeverUsed": "Sosem használt",
-        "apiTokenScopes": "Jogosultságok",
         "apiTokenScopeHint": "Kiválasztás nélkül a token teljes hozzáféréssel rendelkezik, akárcsak az őt létrehozó fiók. Válasszon modulokat, hogy - például egy AI/MCP-kliens számára - egyes területekre, illetve olvasási vagy írási jogra korlátozza.",
         "apiTokenScopeFull": "Teljes hozzáférés (korlátozás nélkül)",
         "apiTokenScopeLimit": "Korlátozás a kijelölt modulokra",

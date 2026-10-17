@@ -3,7 +3,7 @@ import { formatDate, formatTime, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { confirmModal, refocusAfterRender } from '/components/modal.js';
-import { createRetryState, toggleRowHtml } from '/settings/components.js';
+import { createRetryState, settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { getExtensionModules } from '/utils/extension-widgets.js';
 import { moduleDisplayLabel } from '/utils/extension-i18n.js';
 
@@ -168,35 +168,38 @@ function renderPage(container, scopeKeys = CORE_SCOPE_MODULE_KEYS) {
         <p class="form-hint" style="margin-bottom:var(--space-3)">${t('settings.apiTokensMcpHint')}</p>
         <ul class="settings-members row-divided" id="api-token-list"></ul>
         <form id="api-token-form" class="settings-form" autocomplete="off">
-          <div class="form-group">
-            <label class="form-label" for="api-token-name">${t('settings.apiTokenNameLabel')}</label>
-            <input class="form-input" type="text" id="api-token-name" maxlength="100" required />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="api-token-subject">${t('settings.apiTokenSubjectLabel')}</label>
-            <select class="form-input" id="api-token-subject" required></select>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="api-token-expires">${t('settings.apiTokenExpiresLabel')}</label>
-            <yuvomi-datepicker type="datetime" id="api-token-expires"></yuvomi-datepicker>
-            <p class="form-hint">${t('settings.apiTokenExpiresHint')}</p>
-          </div>
-          <div class="form-group">
-            <label class="form-label">${t('settings.apiTokenScopes')}</label>
-            <p class="form-hint" style="margin-bottom:var(--space-2)">${t('settings.apiTokenScopeHint')}</p>
-            ${toggleRowHtml({
-              control: 'switch',
+          ${/* EIN FORMULAR-DIALEKT (R19, Einstellungen B7): Name, Person,
+               Ablauf und die Rechte-Grenze als Zeilen der Gruppe; die
+               Rechtetabelle erscheint darunter, sobald die Grenze gilt. */ ''}
+          <div class="row-carrier settings-group">
+            ${settingRowHtml({
+              label: t('settings.apiTokenNameLabel'), labelFor: 'api-token-name',
+              control: '<input class="form-input" type="text" id="api-token-name" maxlength="100" required />',
+            })}
+            ${settingRowHtml({
+              label: t('settings.apiTokenSubjectLabel'), labelFor: 'api-token-subject',
+              control: '<select class="form-input" id="api-token-subject" required></select>',
+            })}
+            ${settingRowHtml({
+              label: t('settings.apiTokenExpiresLabel'), labelFor: 'api-token-expires',
+              description: t('settings.apiTokenExpiresHint'),
+              wide: true,
+              control: '<yuvomi-datepicker type="datetime" id="api-token-expires"></yuvomi-datepicker>',
+            })}
+            ${settingSwitchRowHtml({
               label: t('settings.apiTokenScopeLimit'),
+              description: t('settings.apiTokenScopeHint'),
+              descriptionId: 'api-token-scope-hint',
               attrs: { id: 'api-token-scope-limit' },
             })}
-            <div id="api-token-scope-grid" class="api-token-scopes" hidden>
-              <div class="api-token-scopes__head">
-                <span>${t('settings.apiTokenScopeModule')}</span>
-                <span>${t('settings.apiTokenScopeRead')}</span>
-                <span>${t('settings.apiTokenScopeWrite')}</span>
-              </div>
-              ${renderScopeRows(scopeKeys)}
+          </div>
+          <div id="api-token-scope-grid" class="api-token-scopes" hidden>
+            <div class="api-token-scopes__head">
+              <span>${t('settings.apiTokenScopeModule')}</span>
+              <span>${t('settings.apiTokenScopeRead')}</span>
+              <span>${t('settings.apiTokenScopeWrite')}</span>
             </div>
+            ${renderScopeRows(scopeKeys)}
           </div>
           <div id="api-token-created" class="settings-token-output" hidden>
             <label class="form-label" for="api-token-created-value">${t('settings.apiTokenCreatedLabel')}</label>

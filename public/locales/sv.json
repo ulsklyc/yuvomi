@@ -2066,7 +2066,6 @@
         "apiTokenNeverExpires": "Inget utgångsdatum",
         "apiTokenLastUsed": "Senast använd",
         "apiTokenNeverUsed": "Aldrig använd",
-        "apiTokenScopes": "Behörigheter",
         "apiTokenScopeHint": "Utan ett val har token full åtkomst, precis som kontot som skapade den. Välj moduler för att begränsa den - t.ex. för en AI/MCP-klient - till enskilda områden och läs- eller skrivåtkomst.",
         "apiTokenScopeFull": "Full åtkomst (ingen begränsning)",
         "apiTokenScopeLimit": "Begränsa till valda moduler",

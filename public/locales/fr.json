@@ -2066,7 +2066,6 @@
         "apiTokenNeverExpires": "Sans expiration",
         "apiTokenLastUsed": "Dernière utilisation",
         "apiTokenNeverUsed": "Jamais utilisé",
-        "apiTokenScopes": "Autorisations",
         "apiTokenScopeHint": "Sans sélection, le jeton dispose d'un accès complet, comme le compte qui l'a créé. Choisissez des modules pour le limiter - par exemple pour un client IA/MCP - à des domaines précis et à un accès en lecture ou en écriture.",
         "apiTokenScopeFull": "Accès complet (sans restriction)",
         "apiTokenScopeLimit": "Limiter aux modules sélectionnés",

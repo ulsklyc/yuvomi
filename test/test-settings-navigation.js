@@ -1142,10 +1142,12 @@ test('Einstellungen: jeder Schalter in einem Formular mit Speichern speichert so
       const id = body.match(/id="([^"]+)"/)?.[1] ?? '?';
       const key = `${file.replace(/^pages\//, '')}#${id}`;
       // Der Standort-Baustein bringt seinen Schalter von aussen mit.
-      const calls = [...body.matchAll(/toggleRowHtml\(\{[\s\S]*?\}\)\}/g)].map((c) => c[0])
+      // R19: ein Schalter ist auch die Schalterzeile der Gruppe
+      // (`settingSwitchRowHtml`, immer ein Schalter).
+      const calls = [...body.matchAll(/(?:toggleRowHtml|settingSwitchRowHtml)\(\{[\s\S]*?\}\)\}/g)].map((c) => c[0])
         .concat(/weatherLocationFieldsHtml\(/.test(body) ? [sources['weather-location.js']] : []);
       for (const call of calls) {
-        if (!/control: 'switch'/.test(call)) continue;
+        if (!/control: 'switch'|^settingSwitchRowHtml|settingSwitchRowHtml\(/.test(call)) continue;
         gefunden.push(key);
         if (/'data-instant-save': true/.test(call)) continue;
         assert.ok(GUARDED_SWITCH_FORMS.has(key),
@@ -3998,6 +4000,38 @@ test('R19: umgestellte Blaetter sprechen den Zeilen-Dialekt', async () => {
   }
   const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
   assert.match(css, /\.settings-card \.row-carrier\.settings-group \{\s*background: none;\s*box-shadow: none;/, 'keine Karte in der Karte');
+
+  // Schritt 5b (B7 abgeschlossen): die uebrigen Blaetter mit Feldern unter
+  // ihren Etiketten - WebDAV-Backup und Wiederherstellungs-Schluessel, Immich,
+  // DMS, Speicher, API-Zugriff, Modul installieren, App-Name, Schichtplan- und
+  // Aufgaben-Vorgaben, Feiertage, Wetter-Standort.
+  const sheets = [
+    'pages/admin-backup.js', 'backup-key.js', 'pages/admin-immich.js', 'pages/documents-dms.js',
+    'pages/documents-storage.js', 'pages/admin-api.js', 'pages/modules-install.js', 'pages/admin-system.js',
+    'pages/personal-schedule.js', 'pages/personal-tasks.js', 'pages/modules-calendar.js', 'weather-location.js',
+  ];
+  for (const file of sheets) {
+    const src = await readFile(new URL(`../public/settings/${file}`, import.meta.url), 'utf8');
+    assert.match(src, /settingRowHtml\(/, `${file}: Zeilen im Traeger`);
+    assert.doesNotMatch(src, /class="form-group"|className = 'form-group/, `${file}: keine gestapelten Felder mehr`);
+    assert.match(src, /class="row-carrier settings-group/, `${file}: der Traeger der Gruppe`);
+  }
+  // Blaetter, deren Dialoge noch eigene Felder fuehren: der Blattteil ist umgestellt.
+  const subs = await readFile(new URL('../public/settings/pages/personal-calendar-subscriptions.js', import.meta.url), 'utf8');
+  const subsPage = subs.slice(subs.indexOf('function renderPage('), subs.indexOf('\n}\n', subs.indexOf('function renderPage(')));
+  assert.doesNotMatch(subsPage, /class="form-group"/, 'Kalender-Abos und -Import: keine gestapelten Felder');
+  assert.equal((subsPage.match(/class="row-carrier settings-group"/g) ?? []).length, 2, 'Abo und Import je eine Gruppe');
+  const sync = await readFile(new URL('../public/settings/pages/sync-calendar.js', import.meta.url), 'utf8');
+  for (const fn of ['buildAppleConnectForm', 'buildGoogleReadonlyToggle', 'buildOutlookAutoSyncControls', 'buildGoogleCalendarPicker']) {
+    const body = sync.slice(sync.indexOf(`function ${fn}(`), sync.indexOf('\n}\n', sync.indexOf(`function ${fn}(`)));
+    assert.doesNotMatch(body, /className = '[^']*form-group|class="form-group/, `sync-calendar ${fn}: kein Feld-Dialekt`);
+  }
+  // Die WebDAV-Schalterleiste und ihr eigenes CSS sind weg; Zeilen koennen
+  // verborgen werden, und Schalterzeilen fluchten in der Karte.
+  assert.doesNotMatch(css, /\.settings-webdav-toggle-row/, 'die eigene Schalterleiste ist entfallen');
+  assert.match(css, /\.settings-card \.settings-group > \.settings-setting-row--switch > \.toggle-row,/, 'Schalterzeile fluchtet in der Karte');
+  const layout = await readFile(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  assert.match(layout, /\.form-row\[hidden\],\s*\.row-carrier\[hidden\],/, 'eine verborgene Zeile bleibt verborgen');
 });
 
 test('R17: die Standard-Erinnerungen sind Chips des Kanons mit aria-pressed, keine Checkbox in einer Pille', async () => {

@@ -2200,7 +2200,6 @@
         "apiTokenNeverExpires": "No expiration",
         "apiTokenLastUsed": "Last used",
         "apiTokenNeverUsed": "Never used",
-        "apiTokenScopes": "Permissions",
         "apiTokenScopeHint": "Without a selection the token has full access, just like the account that created it. Pick modules to limit it - e.g. for an AI/MCP client - to individual areas and read or write access.",
         "apiTokenScopeFull": "Full access (no scoping)",
         "apiTokenScopeLimit": "Limit to selected modules",

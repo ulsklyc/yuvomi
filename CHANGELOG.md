@@ -110,6 +110,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   personal ones) no longer repeats "For the household" above its sections. The Kitchen page uses the
   same grouped rows as the other settings pages: meal toggles and custom meal names sit in lists with
   the label on the left and the hint underneath, instead of a card with fields under their labels.
+  The same rows now carry every other settings form: WebDAV backup and the restore key, Immich,
+  document storage and DMS, API tokens, installing a module, the app name, schedule and task
+  defaults, holidays, calendar subscriptions and import, Apple, Google and Outlook calendar sync, and
+  the weather location.
 - **The pin on a note matches the other buttons on the card.** It was drawn smaller and heavier than
   the "..." button beside it; both now share one size.
 - **Contacts show who they are.** Every contact in the list carries its initials instead of the

@@ -2413,7 +2413,8 @@ test('a read-only Schedule member can still save their own reminder offset and w
   assert.ok(!settingsPage.includes('readOnly') && !settingsPage.includes('isNavModuleReadOnly'), 'the settings sheet must not call the module read-only check');
   assert.ok(!fnBody.includes('const locked'), 'the old client-side lock variable must be fully removed, not just unused');
   // R11 S3: der Schalter (`control: 'switch'`) ist Kanon und kein Sperr-Flag.
-  assert.match(fnBody, /toggleRowHtml\(\{ label: t\('schedule\.reminderToggle'\), checked: active,(?: control: 'switch',)? attrs: \{ id: 'schedule-reminder-toggle' \} \}\)/, 'the toggle must no longer pass a disabled flag');
+  // R19: the switch is a row of the settings group (settingSwitchRowHtml).
+  assert.match(fnBody, /settingSwitchRowHtml\(\{ label: t\('schedule\.reminderToggle'\), checked: active, attrs: \{ id: 'schedule-reminder-toggle' \} \}\)/, 'the toggle must no longer pass a disabled flag');
 
   // Server side: the blanket module read-only/denied gate must lower the
   // REQUIRED ACCESS LEVEL to 'read' for exactly this path (review of #1099:
@@ -2487,7 +2488,8 @@ test('an "overtime tracking" toggle exists separate from the weekly-hours number
 
   // Seit R14 (A2 P2-3) im Modulblatt: settings/pages/personal-schedule.js.
   const settingsFn = readFileSync(new URL('../public/settings/pages/personal-schedule.js', import.meta.url), 'utf8');
-  assert.match(settingsFn, /toggleRowHtml\(\{ label: t\('schedule\.overtimeTrackingToggle'\), checked: overtimeEnabled, control: 'switch', attrs: \{ id: 'schedule-overtime-toggle' \} \}\)/);
+  // R19: a switch row of the settings group, its hint underneath.
+  assert.match(settingsFn, /settingSwitchRowHtml\(\{\s*label: t\('schedule\.overtimeTrackingToggle'\), checked: overtimeEnabled,[\s\S]*?attrs: \{ id: 'schedule-overtime-toggle' \},\s*\}\)/);
   assert.match(settingsFn, /id="schedule-weekly-hours" value="\$\{esc\(String\(weeklyHours\)\)\}"\$\{overtimeEnabled \? '' : ' disabled'\}/, 'the weekly-hours input must disable itself when overtime tracking is off, not just visually decorate around it');
 
   const statsFn = schedulePage.slice(schedulePage.indexOf('function renderStatistics()'), schedulePage.indexOf('function renderStatistics()') + 800);
@@ -2659,7 +2661,8 @@ test('Auswertung oeffnet mit den Zahlen, und "Meine Einstellungen" stehen im Mod
   const sheet = scheduleSettingsHtml({ reminderOffsetMinutes: null, weeklyHours: null, overtimeEnabled: false });
   assert.match(sheet, /role="switch"[^>]*id="schedule-reminder-toggle"|id="schedule-reminder-toggle"[^>]*role="switch"/,
     'eine Einstellung ist ein Schalter (Komponenten-Kanon)');
-  assert.match(sheet, /<label class="form-label" for="schedule-reminder-offset">/, 'die Vorlauf-Auswahl traegt einen Namen');
+  // R19: das Etikett der Zeile (settingRowHtml), Etikett links, Auswahl rechts.
+  assert.match(sheet, /<label class="settings-setting-row__label form-row__label" for="schedule-reminder-offset">/, 'die Vorlauf-Auswahl traegt einen Namen');
   assert.match(sheet, /<select[^>]*id="schedule-reminder-offset"[^>]*disabled/, 'Erinnerung aus: der Vorlauf ist gesperrt');
   assert.match(sheet, /id="schedule-weekly-hours" value="40" disabled/, 'Ueberstunden aus: das Feld ist gesperrt, Vorgabe 40');
 });

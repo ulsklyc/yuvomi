@@ -2219,7 +2219,6 @@
         "apiTokenNeverExpires": "만료일 없음",
         "apiTokenLastUsed": "마지막 사용",
         "apiTokenNeverUsed": "사용 안 함",
-        "apiTokenScopes": "권한",
         "apiTokenScopeHint": "선택하지 않으면 토큰은 이를 만든 계정과 동일한 전체 액세스 권한을 가집니다. 모듈을 선택하여 - 예를 들어 AI/MCP 클라이언트용으로 - 특정 영역과 읽기 또는 쓰기 권한으로 제한하세요.",
         "apiTokenScopeFull": "전체 액세스(제한 없음)",
         "apiTokenScopeLimit": "선택한 모듈로 제한",

@@ -26,7 +26,7 @@ import { formatUnit, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { confirmModal } from '/components/modal.js';
 import { moduleDisplayLabel } from '/utils/extension-i18n.js';
-import { createDisclosure, createRetryState, createStatusSummary } from '/settings/components.js';
+import { createDisclosure, createRetryState, createStatusSummary, settingRowHtml } from '/settings/components.js';
 import { installErrorText } from '/settings/module-install-errors.js';
 
 const ACTIVE_MODULES_PATH = '/settings/modules/active';
@@ -97,12 +97,16 @@ function pageHtml(maxZipMb) {
           <h3 class="settings-card__title">${esc(t('settings.installModuleGithubTitle'))}</h3>
           <p class="form-hint">${esc(t('settings.installModuleGithubHint'))}</p>
           <form class="settings-form settings-form--compact" data-install-form novalidate>
-            <div class="form-group">
-              <label class="form-label" for="module-install-url">${esc(t('settings.installModuleGithubUrlLabel'))}</label>
-              <input class="form-input" type="url" id="module-install-url" name="url" inputmode="url"
+            ${/* EIN FORMULAR-DIALEKT (R19, Einstellungen B7): die Adresse als
+                 Zeile der Gruppe, die Beispiele darunter. */ ''}
+            <div class="row-carrier settings-group">
+              ${settingRowHtml({
+                label: t('settings.installModuleGithubUrlLabel'), labelFor: 'module-install-url',
+                description: t('settings.installModuleGithubExamples'), descriptionId: 'module-install-url-hint',
+                control: `<input class="form-input" type="url" id="module-install-url" name="url" inputmode="url"
                 autocomplete="off" spellcheck="false" autocapitalize="off"
-                placeholder="https://github.com/owner/repo" aria-describedby="module-install-url-hint" />
-              <p class="form-hint" id="module-install-url-hint">${esc(t('settings.installModuleGithubExamples'))}</p>
+                placeholder="https://github.com/owner/repo" aria-describedby="module-install-url-hint" />`,
+              })}
             </div>
             <div class="form-error" role="alert" data-install-error hidden></div>
             <div class="settings-form-actions">

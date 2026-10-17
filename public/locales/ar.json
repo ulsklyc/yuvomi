@@ -2307,7 +2307,6 @@
         "apiTokenNeverExpires": "بلا تاريخ انتهاء",
         "apiTokenLastUsed": "آخر استخدام",
         "apiTokenNeverUsed": "لم يُستخدم قط",
-        "apiTokenScopes": "الأذونات",
         "apiTokenScopeHint": "بدون تحديد، يمتلك الرمز وصولاً كاملاً تماماً مثل الحساب الذي أنشأه. اختر وحدات لتقييده - مثلاً لعميل ذكاء اصطناعي/MCP - على مجالات محددة وصلاحية القراءة أو الكتابة.",
         "apiTokenScopeFull": "وصول كامل (بدون تقييد)",
         "apiTokenScopeLimit": "التقييد على الوحدات المحددة",

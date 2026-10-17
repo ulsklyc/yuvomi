@@ -2177,7 +2177,6 @@
         "apiTokenNeverExpires": "Không bao giờ hết hạn",
         "apiTokenLastUsed": "Sử dụng lần cuối",
         "apiTokenNeverUsed": "Chưa từng sử dụng",
-        "apiTokenScopes": "Quyền",
         "apiTokenScopeHint": "Nếu không chọn, token có toàn quyền truy cập giống như tài khoản đã tạo ra nó. Chọn các mô-đun để giới hạn token - ví dụ cho một ứng dụng AI/MCP - ở từng khu vực và quyền đọc hoặc ghi.",
         "apiTokenScopeFull": "Toàn quyền truy cập (không giới hạn)",
         "apiTokenScopeLimit": "Giới hạn ở các mô-đun đã chọn",

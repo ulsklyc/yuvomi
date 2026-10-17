@@ -5533,6 +5533,8 @@ a.popover-menu__item {
 .btn[hidden],
 .form-group[hidden],
 .form-field[hidden],
+.form-row[hidden],
+.row-carrier[hidden],
 .row-action[hidden],
 .page-toolbar[hidden],
 .recipe-detail[hidden],

@@ -2381,7 +2381,6 @@
         "apiTokenNeverExpires": "Bez daty wygaśnięcia",
         "apiTokenLastUsed": "Ostatnio użyty",
         "apiTokenNeverUsed": "Nigdy nie użyty",
-        "apiTokenScopes": "Uprawnienia",
         "apiTokenScopeHint": "Bez wyboru token ma pełny dostęp, tak jak konto, które go utworzyło. Wybierz moduły, aby ograniczyć go - np. dla klienta AI/MCP - do poszczególnych obszarów oraz prawa odczytu lub zapisu.",
         "apiTokenScopeFull": "Pełny dostęp (bez ograniczeń)",
         "apiTokenScopeLimit": "Ogranicz do wybranych modułów",

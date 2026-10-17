@@ -13,7 +13,8 @@ import {
   createDisclosure,
   createInfoRow,
   createRetryState,
-  toggleRowHtml,
+  settingRowHtml,
+  settingSwitchRowHtml,
 } from '/settings/components.js';
 
 // Zeitplan-Zelle: der Klartext trägt die Aussage, der Cron-Ausdruck bleibt als
@@ -91,42 +92,45 @@ function renderPage(container) {
         <h3 class="settings-card__title">${t('settings.backupWebdavTitle')}</h3>
         <p class="form-hint">${t('settings.backupWebdavHint')}</p>
         <form class="settings-form settings-webdav-form" id="backup-webdav-form" novalidate>
-          <div class="settings-webdav-toggle-row">
-            ${toggleRowHtml({
-              control: 'switch',
+          ${/* EIN FORMULAR-DIALEKT (R19, Einstellungen B7): Schalter und fuenf
+               Felder als Zeilen der Gruppe - Etikett links, Feld rechts, wie
+               SMTP und Konto. Vorher stand der Schalter in einer eigenen
+               Leiste und jedes Feld UNTER seinem Etikett. */ ''}
+          <div class="row-carrier settings-group">
+            ${settingSwitchRowHtml({
               label: t('settings.backupWebdavEnabled'),
               attrs: { id: 'webdav-enabled', name: 'enabled' },
             })}
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="webdav-url">${t('settings.backupWebdavUrl')}</label>
-            <input class="form-input" type="url" id="webdav-url" name="url"
-              placeholder="${t('settings.backupWebdavUrlPlaceholder')}" autocomplete="off" />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="webdav-username">${t('settings.backupWebdavUsername')}</label>
-            <input class="form-input" type="text" id="webdav-username" name="username" autocomplete="off" />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="webdav-password">${t('settings.backupWebdavPassword')}</label>
-            <div class="settings-webdav-pw-wrap">
-              <input class="form-input" type="password" id="webdav-password" name="password"
-                autocomplete="current-password"
-                placeholder="${t('settings.backupWebdavPasswordPlaceholder')}" />
-              <button type="button" class="btn btn--icon btn--ghost settings-webdav-reveal-btn"
-                data-reveal-target="webdav-password" aria-label="${t('common.togglePasswordVisibility')}">
-                <i data-lucide="eye" class="icon-sm" aria-hidden="true"></i>
-              </button>
-            </div>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="webdav-path">${t('settings.backupWebdavPath')}</label>
-            <input class="form-input" type="text" id="webdav-path" name="remotePath"
-              placeholder="${t('settings.backupWebdavPathPlaceholder')}" />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="webdav-keep">${t('settings.backupWebdavKeep')}</label>
-            <input class="form-input settings-input--compact" type="number" id="webdav-keep" name="keep" min="1" max="99" />
+            ${settingRowHtml({
+              label: t('settings.backupWebdavUrl'), labelFor: 'webdav-url',
+              control: `<input class="form-input" type="url" id="webdav-url" name="url"
+                placeholder="${t('settings.backupWebdavUrlPlaceholder')}" autocomplete="off" />`,
+            })}
+            ${settingRowHtml({
+              label: t('settings.backupWebdavUsername'), labelFor: 'webdav-username',
+              control: `<input class="form-input" type="text" id="webdav-username" name="username" autocomplete="off" />`,
+            })}
+            ${settingRowHtml({
+              label: t('settings.backupWebdavPassword'), labelFor: 'webdav-password',
+              control: `<div class="settings-webdav-pw-wrap">
+                <input class="form-input" type="password" id="webdav-password" name="password"
+                  autocomplete="current-password"
+                  placeholder="${t('settings.backupWebdavPasswordPlaceholder')}" />
+                <button type="button" class="btn btn--icon btn--ghost settings-webdav-reveal-btn"
+                  data-reveal-target="webdav-password" aria-label="${t('common.togglePasswordVisibility')}">
+                  <i data-lucide="eye" class="icon-sm" aria-hidden="true"></i>
+                </button>
+              </div>`,
+            })}
+            ${settingRowHtml({
+              label: t('settings.backupWebdavPath'), labelFor: 'webdav-path',
+              control: `<input class="form-input" type="text" id="webdav-path" name="remotePath"
+                placeholder="${t('settings.backupWebdavPathPlaceholder')}" />`,
+            })}
+            ${settingRowHtml({
+              label: t('settings.backupWebdavKeep'), labelFor: 'webdav-keep',
+              control: `<input class="form-input settings-input--compact" type="number" id="webdav-keep" name="keep" min="1" max="99" />`,
+            })}
           </div>
           <div id="webdav-test-result" class="form-hint" hidden></div>
           <div class="settings-form-actions">

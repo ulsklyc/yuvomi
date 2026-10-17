@@ -2177,7 +2177,6 @@
         "apiTokenNeverExpires": "Geen vervaldatum",
         "apiTokenLastUsed": "Laatst gebruikt",
         "apiTokenNeverUsed": "Nooit gebruikt",
-        "apiTokenScopes": "Machtigingen",
         "apiTokenScopeHint": "Zonder selectie heeft het token volledige toegang, net als het account dat het heeft aangemaakt. Kies modules om het te beperken - bijvoorbeeld voor een AI/MCP-client - tot afzonderlijke gebieden en lees- of schrijftoegang.",
         "apiTokenScopeFull": "Volledige toegang (geen beperking)",
         "apiTokenScopeLimit": "Beperken tot geselecteerde modules",

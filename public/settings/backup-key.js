@@ -7,6 +7,7 @@
  */
 
 import { t } from '/i18n.js';
+import { settingRowHtml } from '/settings/components.js';
 
 const HINT_ID = 'backup-restore-key-hint';
 const HTTP_ID = 'backup-restore-key-http';
@@ -35,14 +36,19 @@ export function keyFieldDescribedBy(protocol, { withError = false } = {}) {
 
 /** Markup des Feldes; `aria-describedby` setzt `keyFieldDescribedBy()` beim Einblenden. */
 export function backupKeyFieldHtml(protocol = '') {
+  // Eine Zeile der Gruppe (R19, ein Formular-Dialekt): Etikett links, Feld
+  // rechts, Hinweis und HTTP-Warnung darunter ueber die volle Breite.
   return `
-            <div class="form-group" id="backup-restore-key-group" hidden>
-              <label class="form-label" for="backup-restore-key">${t('settings.backupRestoreKeyLabel')}</label>
-              <input class="form-input" type="password" id="backup-restore-key"
+            <div class="row-carrier settings-group" id="backup-restore-key-group" hidden>
+              ${settingRowHtml({
+                label: t('settings.backupRestoreKeyLabel'),
+                labelFor: 'backup-restore-key',
+                control: `<input class="form-input" type="password" id="backup-restore-key"
                 autocomplete="off" autocapitalize="off" spellcheck="false"
-                aria-describedby="${keyFieldDescribedBy(protocol)}" />
-              <p class="form-hint" id="${HINT_ID}">${t('settings.backupRestoreKeyHint')}</p>
-              <p class="form-hint form-hint--danger" id="${HTTP_ID}" hidden>${t('settings.backupRestoreKeyHttpWarning')}</p>
+                aria-describedby="${keyFieldDescribedBy(protocol)}" />`,
+                extra: `<p class="form-hint" id="${HINT_ID}">${t('settings.backupRestoreKeyHint')}</p>`
+                  + `<p class="form-hint form-hint--danger" id="${HTTP_ID}" hidden>${t('settings.backupRestoreKeyHttpWarning')}</p>`,
+              })}
             </div>`;
 }
 

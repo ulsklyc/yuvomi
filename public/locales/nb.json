@@ -2200,7 +2200,6 @@
         "apiTokenNeverExpires": "Ingen utløpsdato",
         "apiTokenLastUsed": "Sist brukt",
         "apiTokenNeverUsed": "Aldri brukt",
-        "apiTokenScopes": "Tillatelser",
         "apiTokenScopeHint": "Uten et valg har tokenet full tilgang, akkurat som kontoen som opprettet det. Velg moduler for å begrense det - f.eks. for en AI/MCP-klient - til spesifikke områder og lese- eller skrivetilgang.",
         "apiTokenScopeFull": "Full tilgang (uten avgrensning)",
         "apiTokenScopeLimit": "Begrens til valgte moduler",

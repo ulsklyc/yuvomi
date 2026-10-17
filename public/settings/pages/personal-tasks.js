@@ -3,7 +3,7 @@ import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { caldavTargetValue, SYNC_TARGET_LOCAL } from '/utils/sync-target.js';
 import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
-import { createRetryState } from '/settings/components.js';
+import { createRetryState, settingRowHtml } from '/settings/components.js';
 
 /**
  * Standardwerte, die nur für die eigenen neuen Aufgaben gelten (#695).
@@ -80,11 +80,14 @@ function targetFieldHtml(options, current) {
   }
   if (openGroup) html += '</optgroup>';
 
+  // Eine Zeile der Gruppe (R19, ein Formular-Dialekt).
   return `
-        <div class="form-group">
-          <label class="form-label" for="tasks-default-target">${t('settings.tasksDefaultTargetLabel')}</label>
-          <select id="tasks-default-target" class="form-input">${html}</select>
-          <p class="form-hint">${t('settings.tasksDefaultTargetHint')}</p>
+        <div class="row-carrier settings-group">
+          ${settingRowHtml({
+            label: t('settings.tasksDefaultTargetLabel'), labelFor: 'tasks-default-target',
+            description: t('settings.tasksDefaultTargetHint'), descriptionId: 'tasks-default-target-hint',
+            control: `<select id="tasks-default-target" class="form-input" aria-describedby="tasks-default-target-hint">${html}</select>`,
+          })}
         </div>
   `;
 }

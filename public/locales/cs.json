@@ -2285,7 +2285,6 @@
         "apiTokenNeverExpires": "Bez data vypršení",
         "apiTokenLastUsed": "Naposledy použito",
         "apiTokenNeverUsed": "Nikdy nepoužito",
-        "apiTokenScopes": "Oprávnění",
         "apiTokenScopeHint": "Bez výběru má token plný přístup, stejně jako účet, který jej vytvořil. Vyberte moduly, abyste jej omezili - např. pro klienta AI/MCP - na jednotlivé oblasti a právo ke čtení nebo zápisu.",
         "apiTokenScopeFull": "Plný přístup (bez omezení)",
         "apiTokenScopeLimit": "Omezit na vybrané moduly",

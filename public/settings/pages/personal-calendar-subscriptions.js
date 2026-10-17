@@ -25,7 +25,7 @@ import { api } from '/api.js';
 import { formatDate, formatTime, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { closeModal, confirmModal, openModal, refocusAfterRender } from '/components/modal.js';
-import { toggleRowHtml } from '/settings/components.js';
+import { settingRowHtml, settingSwitchRowHtml, toggleRowHtml } from '/settings/components.js';
 import { loadFamilyUsers } from '/settings/family-users.js';
 import { rowActionEl } from '/utils/row-action.js';
 
@@ -54,29 +54,30 @@ function renderPage(container) {
         <div id="ics-accounts" class="settings-sync-accounts"></div>
         <div id="ics-add-form-wrapper" hidden>
           <form id="ics-add-form" class="settings-form settings-form--compact" novalidate autocomplete="off">
-            <div class="form-group">
-              <label class="form-label" for="ics-url">${t('settings.ics.form.url')}</label>
-              <input class="form-input" type="url" id="ics-url" required placeholder="https://..." />
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="ics-name">${t('settings.ics.form.name')}</label>
-              <input class="form-input" type="text" id="ics-name" required maxlength="100" />
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="ics-color">${t('settings.ics.form.color')}</label>
-              <input class="form-input form-input--color" type="color" id="ics-color" value="#6366f1" />
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="ics-assignee">${t('settings.sync.defaultAssignee')}</label>
-              <select class="form-input" id="ics-assignee">
-                <option value="">${t('settings.sync.defaultAssigneeNone')}</option>
-                <option value="" disabled data-loading>${t('common.loading')}</option>
-              </select>
-              <p class="form-hint">${t('settings.sync.defaultAssigneeHint')}</p>
-            </div>
-            <div class="form-group">
-              ${toggleRowHtml({
-                control: 'switch',
+            ${/* EIN FORMULAR-DIALEKT (R19, Einstellungen B7): Adresse, Name,
+                 Farbe, Zuweisung und Teilen als Zeilen der Gruppe. */ ''}
+            <div class="row-carrier settings-group">
+              ${settingRowHtml({
+                label: t('settings.ics.form.url'), labelFor: 'ics-url',
+                control: '<input class="form-input" type="url" id="ics-url" required placeholder="https://..." />',
+              })}
+              ${settingRowHtml({
+                label: t('settings.ics.form.name'), labelFor: 'ics-name',
+                control: '<input class="form-input" type="text" id="ics-name" required maxlength="100" />',
+              })}
+              ${settingRowHtml({
+                label: t('settings.ics.form.color'), labelFor: 'ics-color',
+                control: '<input class="form-input form-input--color" type="color" id="ics-color" value="#6366f1" />',
+              })}
+              ${settingRowHtml({
+                label: t('settings.sync.defaultAssignee'), labelFor: 'ics-assignee',
+                description: t('settings.sync.defaultAssigneeHint'), descriptionId: 'ics-assignee-hint',
+                control: `<select class="form-input" id="ics-assignee" aria-describedby="ics-assignee-hint">
+                  <option value="">${t('settings.sync.defaultAssigneeNone')}</option>
+                  <option value="" disabled data-loading>${t('common.loading')}</option>
+                </select>`,
+              })}
+              ${settingSwitchRowHtml({
                 label: t('settings.ics.form.shared'),
                 attrs: { id: 'ics-shared' },
               })}
@@ -99,28 +100,32 @@ function renderPage(container) {
       <div class="settings-card">
         <p class="settings-card-description">${t('settings.calendarImport.description')}</p>
         <form id="cal-import-form" class="settings-form settings-form--compact" novalidate autocomplete="off">
-          <div class="form-group">
-            <label class="form-label" for="cal-import-file">${t('settings.calendarImport.fileLabel')}</label>
-            <input class="form-input" type="file" id="cal-import-file" accept=".ics,text/calendar" />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="cal-import-url">${t('settings.calendarImport.urlLabel')}</label>
-            <input class="form-input" type="url" id="cal-import-url" placeholder="https://..." />
-            <small class="form-hint">${t('settings.calendarImport.urlHint')}</small>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="cal-import-color">${t('settings.calendarImport.colorLabel')}</label>
-            <input class="form-input form-input--color" type="color" id="cal-import-color" value="#007AFF" />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="cal-import-calendar">${t('settings.calendarImport.targetCalendarLabel')}</label>
-            <select class="form-input" id="cal-import-calendar">
-              <option value="" disabled data-loading>${t('common.loading')}</option>
-            </select>
-          </div>
-          <div class="form-group" id="cal-import-new-calendar-group" hidden>
-            <label class="form-label" for="cal-import-new-calendar-name">${t('settings.calendarImport.newCalendarNameLabel')}</label>
-            <input class="form-input" type="text" id="cal-import-new-calendar-name" maxlength="80" />
+          ${/* Derselbe Dialekt wie das Abo darueber (R19). */ ''}
+          <div class="row-carrier settings-group">
+            ${settingRowHtml({
+              label: t('settings.calendarImport.fileLabel'), labelFor: 'cal-import-file',
+              control: '<input class="form-input" type="file" id="cal-import-file" accept=".ics,text/calendar" />',
+            })}
+            ${settingRowHtml({
+              label: t('settings.calendarImport.urlLabel'), labelFor: 'cal-import-url',
+              description: t('settings.calendarImport.urlHint'), descriptionId: 'cal-import-url-hint',
+              control: '<input class="form-input" type="url" id="cal-import-url" aria-describedby="cal-import-url-hint" placeholder="https://..." />',
+            })}
+            ${settingRowHtml({
+              label: t('settings.calendarImport.colorLabel'), labelFor: 'cal-import-color',
+              control: '<input class="form-input form-input--color" type="color" id="cal-import-color" value="#007AFF" />',
+            })}
+            ${settingRowHtml({
+              label: t('settings.calendarImport.targetCalendarLabel'), labelFor: 'cal-import-calendar',
+              control: `<select class="form-input" id="cal-import-calendar">
+                <option value="" disabled data-loading>${t('common.loading')}</option>
+              </select>`,
+            })}
+            ${settingRowHtml({
+              label: t('settings.calendarImport.newCalendarNameLabel'), labelFor: 'cal-import-new-calendar-name',
+              attrs: { id: 'cal-import-new-calendar-group', hidden: true },
+              control: '<input class="form-input" type="text" id="cal-import-new-calendar-name" maxlength="80" />',
+            })}
           </div>
           <div id="cal-import-error" class="form-error" role="alert" hidden></div>
           <div class="settings-form-actions">

@@ -813,6 +813,16 @@
   padding-inline: 0;
 }
 
+/* Dasselbe fuer die Schalterzeile (R19): ihr Polster sitzt am `label.toggle-row`
+ * und an der Sekundaerzeile, nicht an der Zeile - in der Karte fluchten beide
+ * mit dem Kartentext wie jede andere Zeile. */
+.settings-card .settings-group > .settings-setting-row--switch > .toggle-row,
+.settings-card .settings-group > .settings-setting-row--switch > .settings-setting-row__description,
+.settings-card .settings-group > .settings-setting-row--switch > .form-hint,
+.settings-card .settings-group > .settings-setting-row--switch > .form-error {
+  padding-inline: 0;
+}
+
 .settings-group > .settings-setting-row {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-1) var(--space-4);
@@ -2369,29 +2379,8 @@
   margin-top: var(--space-2);
 }
 
-/* Enable-toggle row: label links, toggle rechts */
-.settings-webdav-toggle-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-2) 0 var(--space-3);
-  border-bottom: var(--space-px) solid var(--color-border);
-  margin-bottom: var(--space-1);
-}
-
-.settings-webdav-toggle-row .form-label {
-  margin: 0;
-}
-
-/* Die Schalterzeile fuellt ihren Traeger: Label links, Schalter an der
- * rechten Kante wie jede andere Einstellung (toggleRowHtml, control:
- * 'switch'). Als einzelnes Flex-Kind war sie nur so breit wie ihr Text, und
- * der Schalter klebte am Label. */
-.settings-webdav-toggle-row > .toggle-row {
-  flex: 1;
-  min-width: 0;
-}
+/* Die eigene Schalterleiste der WebDAV-Formulare ist entfallen (R19): der
+ * Schalter ist eine Zeile der Gruppe (settingSwitchRowHtml) wie jede andere. */
 
 /* Password-Eingabe mit Reveal-Button nebeneinander */
 .settings-webdav-pw-wrap {
@@ -2536,6 +2525,7 @@
 .settings-google-calendars {
   display: grid;
   gap: var(--space-2);
+  margin-bottom: var(--space-4);
 }
 
 /* Serverseitige Einschränkung, keine Fehlermeldung: der Hinweis steht als Text

@@ -2066,7 +2066,6 @@
         "apiTokenNeverExpires": "不过期",
         "apiTokenLastUsed": "上次使用",
         "apiTokenNeverUsed": "从未使用",
-        "apiTokenScopes": "权限",
         "apiTokenScopeHint": "如果不做选择，令牌将拥有与创建它的账户相同的完全访问权限。选择模块可将其限制在特定领域及读取或写入权限内——例如用于 AI/MCP 客户端。",
         "apiTokenScopeFull": "完全访问（不限制）",
         "apiTokenScopeLimit": "限制为所选模块",

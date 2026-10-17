@@ -12,8 +12,10 @@ import {
   createDisclosure,
   createInlineError,
   createRetryState,
+  createSettingRow,
   createStatusSummary,
-  createToggleRow,
+  settingRowHtml,
+  settingSwitchRowHtml,
 } from '/settings/components.js';
 import { withBusy } from '/utils/ux.js';
 import { esc } from '/utils/html.js';
@@ -1038,10 +1040,12 @@ function buildProviderHint(text) {
 const GOOGLE_REAUTH_REASON = 'google_reauth_required';
 
 function buildGoogleCalendarPicker(googleCall) {
+  // Eine Liste, kein Feld (R19): ihr Name ist keine `<label>` ohne
+  // Bedienelement, und sie steht nicht im Feld-Dialekt `.form-group`.
   const group = document.createElement('div');
-  group.className = 'form-group settings-google-calendars';
+  group.className = 'settings-google-calendars';
 
-  const label = document.createElement('label');
+  const label = document.createElement('p');
   label.className = 'form-label';
   label.textContent = t('settings.googleCalendarsSelect');
   group.appendChild(label);
@@ -1128,21 +1132,16 @@ function buildGoogleCalendarPicker(googleCall) {
 }
 
 function buildGoogleReadonlyToggle(googleStatus, googleCall) {
+  // Eine Schalterzeile der Gruppe samt Hinweis darunter (R19, ein Dialekt).
   const group = document.createElement('div');
-  group.className = 'form-group';
-
-  const row = createToggleRow({
-    control: 'switch',
+  group.className = 'row-carrier settings-group';
+  group.insertAdjacentHTML('beforeend', settingSwitchRowHtml({
     label: t('settings.googleReadonly'),
     checked: Boolean(googleStatus.readonly),
-  });
-  const checkbox = row.querySelector('input');
-  group.appendChild(row);
-
-  const hint = document.createElement('p');
-  hint.className = 'form-hint';
-  hint.textContent = t('settings.googleReadonlyHint');
-  group.appendChild(hint);
+    description: t('settings.googleReadonlyHint'),
+    descriptionId: 'google-readonly-hint',
+  }));
+  const checkbox = group.querySelector('input');
 
   checkbox.addEventListener('change', async () => {
     const enabled = checkbox.checked;
@@ -1226,13 +1225,15 @@ function buildOutlookCalendarList(account, calendars, user) {
  * PUT /calendar/outlook/accounts/:id.
  */
 function buildOutlookAutoSyncControls(account, calendars) {
+  // Zielkalender und Besitzer als Zeilen der Gruppe, der Hinweis als ihr Fuss
+  // (R19, ein Dialekt) - vorher zwei Auswahlen unter ihren Etiketten.
   const wrap = document.createElement('div');
-  wrap.className = 'form-group';
-
+  const group = document.createElement('div');
+  group.className = 'row-carrier settings-group';
+  wrap.appendChild(group);
   const hint = document.createElement('p');
-  hint.className = 'form-hint';
+  hint.className = 'form-hint settings-group__footer';
   hint.textContent = t('settings.outlookAutoSyncHint');
-  wrap.appendChild(hint);
 
   const saveField = async (payload, selectEl, revertValue) => {
     selectEl.disabled = true;
@@ -1248,11 +1249,6 @@ function buildOutlookAutoSyncControls(account, calendars) {
   };
 
   // Zielkalender (nur beschreibbare)
-  const calLabel = document.createElement('label');
-  calLabel.className = 'form-label';
-  calLabel.textContent = t('settings.outlookAutoSyncCalendar');
-  wrap.appendChild(calLabel);
-
   const calSelect = document.createElement('select');
   calSelect.className = 'form-input';
   const offOpt = document.createElement('option');
@@ -1272,14 +1268,9 @@ function buildOutlookAutoSyncControls(account, calendars) {
     await saveField({ autoSyncCalendarId: value || null }, calSelect, lastCal);
     lastCal = calSelect.value;
   });
-  wrap.appendChild(calSelect);
+  group.appendChild(createSettingRow({ label: t('settings.outlookAutoSyncCalendar'), control: calSelect }));
 
   // Owner (bestimmt „für mich sichtbare Termine")
-  const ownerLabel = document.createElement('label');
-  ownerLabel.className = 'form-label';
-  ownerLabel.textContent = t('settings.outlookOwner');
-  wrap.appendChild(ownerLabel);
-
   const ownerSelect = document.createElement('select');
   ownerSelect.className = 'form-input';
   const noneOpt = document.createElement('option');
@@ -1301,7 +1292,8 @@ function buildOutlookAutoSyncControls(account, calendars) {
     await saveField({ ownerUserId: value ? Number(value) : null }, ownerSelect, lastOwner);
     lastOwner = ownerSelect.value;
   });
-  wrap.appendChild(ownerSelect);
+  group.appendChild(createSettingRow({ label: t('settings.outlookOwner'), control: ownerSelect }));
+  wrap.appendChild(hint);
 
   return wrap;
 }
@@ -1563,19 +1555,23 @@ function buildAppleProvider(appleStatus, user) {
 function buildAppleConnectForm() {
   const form = document.createElement('form');
   form.className = 'settings-form settings-form--compact';
+  // EIN FORMULAR-DIALEKT (R19, Einstellungen B7): die drei Felder als Zeilen
+  // der Gruppe, der Passwort-Hinweis unter seiner Zeile.
   form.insertAdjacentHTML('beforeend', `
-    <div class="form-group">
-      <label class="form-label" for="apple-caldav-url">${t('settings.caldavUrlLabel')}</label>
-      <input class="form-input" type="url" id="apple-caldav-url" placeholder="${t('settings.caldavUrlPlaceholder')}" required />
-    </div>
-    <div class="form-group">
-      <label class="form-label" for="apple-username">${t('settings.appleIdLabel')}</label>
-      <input class="form-input" type="email" id="apple-username" autocomplete="username" required />
-    </div>
-    <div class="form-group">
-      <label class="form-label" for="apple-password">${t('settings.applePasswordLabel')}</label>
-      <input class="form-input" type="password" id="apple-password" autocomplete="current-password" required />
-      <span class="form-hint">${t('settings.applePasswordHint')}</span>
+    <div class="row-carrier settings-group">
+      ${settingRowHtml({
+        label: t('settings.caldavUrlLabel'), labelFor: 'apple-caldav-url',
+        control: `<input class="form-input" type="url" id="apple-caldav-url" placeholder="${t('settings.caldavUrlPlaceholder')}" required />`,
+      })}
+      ${settingRowHtml({
+        label: t('settings.appleIdLabel'), labelFor: 'apple-username',
+        control: '<input class="form-input" type="email" id="apple-username" autocomplete="username" required />',
+      })}
+      ${settingRowHtml({
+        label: t('settings.applePasswordLabel'), labelFor: 'apple-password',
+        description: t('settings.applePasswordHint'), descriptionId: 'apple-password-hint',
+        control: '<input class="form-input" type="password" id="apple-password" autocomplete="current-password" aria-describedby="apple-password-hint" required />',
+      })}
     </div>
     <div id="apple-connect-error" class="form-error" role="alert" hidden></div>
     <button type="submit" class="btn btn--primary" id="apple-connect-btn">${t('settings.appleConnectBtn')}</button>

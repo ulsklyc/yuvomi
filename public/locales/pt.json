@@ -2066,7 +2066,6 @@
         "apiTokenNeverExpires": "Sem validade",
         "apiTokenLastUsed": "Última utilização",
         "apiTokenNeverUsed": "Nunca utilizado",
-        "apiTokenScopes": "Permissões",
         "apiTokenScopeHint": "Sem uma seleção, o token tem acesso total, tal como a conta que o criou. Escolha módulos para o limitar - por exemplo, para um cliente de IA/MCP - a áreas específicas e a acesso de leitura ou escrita.",
         "apiTokenScopeFull": "Acesso total (sem restrições)",
         "apiTokenScopeLimit": "Limitar aos módulos selecionados",

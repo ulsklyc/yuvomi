@@ -6,6 +6,7 @@ import {
   createInfoList,
   createRetryState,
   createStatusSummary,
+  settingRowHtml,
 } from '/settings/components.js';
 
 const APP_NAME_STORAGE_KEY = 'yuvomi-app-name';
@@ -49,11 +50,14 @@ function renderPage(container) {
         <h3 class="settings-card__title">${t('settings.appNameTitle')}</h3>
         <p class="form-hint">${t('settings.appNameHint')}</p>
         <form class="settings-form settings-form--compact" id="app-name-form" novalidate autocomplete="off">
-          <div class="form-group">
-            <label class="form-label" for="app-name-input">${t('settings.appNameLabel')}</label>
-            <input class="form-input" type="text" id="app-name-input" maxlength="60"
+          ${/* Eine Zeile der Gruppe (R19, ein Formular-Dialekt). */ ''}
+          <div class="row-carrier settings-group">
+            ${settingRowHtml({
+              label: t('settings.appNameLabel'), labelFor: 'app-name-input',
+              control: `<input class="form-input" type="text" id="app-name-input" maxlength="60"
               placeholder="${t('settings.appNamePlaceholder')}"
-              value="${esc(cachedAppName() || DEFAULT_APP_NAME)}">
+              value="${esc(cachedAppName() || DEFAULT_APP_NAME)}">`,
+            })}
           </div>
           <div id="app-name-error" class="form-error" role="alert" hidden></div>
           <div class="settings-form-actions">

@@ -2219,7 +2219,6 @@
         "apiTokenNeverExpires": "Tanpa tanggal kedaluwarsa",
         "apiTokenLastUsed": "Terakhir digunakan",
         "apiTokenNeverUsed": "Belum pernah digunakan",
-        "apiTokenScopes": "Izin",
         "apiTokenScopeHint": "Tanpa pilihan, token memiliki akses penuh, sama seperti akun yang membuatnya. Pilih modul untuk membatasinya - misalnya untuk klien AI/MCP - ke area tertentu dan akses baca atau tulis.",
         "apiTokenScopeFull": "Akses penuh (tanpa batasan)",
         "apiTokenScopeLimit": "Batasi ke modul terpilih",

@@ -7,7 +7,8 @@ import {
   createRetryState,
   createSettingRow,
   createStatusSummary,
-  toggleRowHtml
+  settingRowHtml,
+  settingSwitchRowHtml
 } from "/settings/components.js";
 
 function formatSyncTime(value) {
@@ -92,39 +93,41 @@ function buildConnectionForm() {
   form.insertAdjacentHTML(
     "beforeend",
     `
-    <div class="settings-webdav-toggle-row">
-      ${toggleRowHtml({
-        control: 'switch',
+    ${/* EIN FORMULAR-DIALEKT (R19, Einstellungen B7): Schalter und vier
+         Felder als Zeilen der Gruppe, Etikett links, Feld rechts; der
+         Env-Hinweis eines Felds steht unter seiner Zeile. */ ''}
+    <div class="row-carrier settings-group">
+      ${settingSwitchRowHtml({
         label: t("settings.documentStorageEnabled"),
         attrs: { id: "document-storage-enabled", name: "enabled" },
       })}
-    </div>
-    <div class="form-group">
-      <label class="form-label" for="document-storage-url">${t("settings.documentStorageUrl")}</label>
-      <input class="form-input" type="url" id="document-storage-url" name="url" placeholder="https://..." />
-      <span class="form-hint" data-env-hint="url" hidden>${t("settings.documentStorageEnvHint")}</span>
-    </div>
-    <div class="form-group">
-      <label class="form-label" for="document-storage-username">${t("settings.documentStorageUsername")}</label>
-      <input class="form-input" type="text" id="document-storage-username" name="username" autocomplete="off" />
-      <span class="form-hint" data-env-hint="username" hidden>${t("settings.documentStorageEnvHint")}</span>
-    </div>
-    <div class="form-group">
-      <label class="form-label" for="document-storage-password">${t("settings.documentStoragePassword")}</label>
-      <div class="settings-webdav-pw-wrap">
-        <input class="form-input" type="password" id="document-storage-password" name="password"
-          autocomplete="current-password" placeholder="${t("settings.documentStoragePasswordPlaceholder")}" />
-        <button type="button" class="btn btn--icon btn--ghost settings-webdav-reveal-btn"
-          data-reveal-target="document-storage-password" aria-label="${t("common.togglePasswordVisibility")}">
-          <i data-lucide="eye" aria-hidden="true"></i>
-        </button>
-      </div>
-      <span class="form-hint" data-env-hint="password" hidden>${t("settings.documentStorageEnvHint")}</span>
-    </div>
-    <div class="form-group">
-      <label class="form-label" for="document-storage-path">${t("settings.documentStoragePath")}</label>
-      <input class="form-input" type="text" id="document-storage-path" name="path" />
-      <span class="form-hint" data-env-hint="path" hidden>${t("settings.documentStorageEnvHint")}</span>
+      ${settingRowHtml({
+        label: t("settings.documentStorageUrl"), labelFor: "document-storage-url",
+        control: `<input class="form-input" type="url" id="document-storage-url" name="url" placeholder="https://..." />`,
+        extra: `<span class="form-hint" data-env-hint="url" hidden>${t("settings.documentStorageEnvHint")}</span>`,
+      })}
+      ${settingRowHtml({
+        label: t("settings.documentStorageUsername"), labelFor: "document-storage-username",
+        control: `<input class="form-input" type="text" id="document-storage-username" name="username" autocomplete="off" />`,
+        extra: `<span class="form-hint" data-env-hint="username" hidden>${t("settings.documentStorageEnvHint")}</span>`,
+      })}
+      ${settingRowHtml({
+        label: t("settings.documentStoragePassword"), labelFor: "document-storage-password",
+        control: `<div class="settings-webdav-pw-wrap">
+          <input class="form-input" type="password" id="document-storage-password" name="password"
+            autocomplete="current-password" placeholder="${t("settings.documentStoragePasswordPlaceholder")}" />
+          <button type="button" class="btn btn--icon btn--ghost settings-webdav-reveal-btn"
+            data-reveal-target="document-storage-password" aria-label="${t("common.togglePasswordVisibility")}">
+            <i data-lucide="eye" aria-hidden="true"></i>
+          </button>
+        </div>`,
+        extra: `<span class="form-hint" data-env-hint="password" hidden>${t("settings.documentStorageEnvHint")}</span>`,
+      })}
+      ${settingRowHtml({
+        label: t("settings.documentStoragePath"), labelFor: "document-storage-path",
+        control: `<input class="form-input" type="text" id="document-storage-path" name="path" />`,
+        extra: `<span class="form-hint" data-env-hint="path" hidden>${t("settings.documentStorageEnvHint")}</span>`,
+      })}
     </div>
     <div class="form-hint" data-env-hint="enabled" hidden>${t("settings.documentStorageEnvHint")}</div>
     <p class="settings-document-storage-warning" id="document-storage-backup-warning" hidden>

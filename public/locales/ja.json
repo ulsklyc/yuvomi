@@ -2066,7 +2066,6 @@
         "apiTokenNeverExpires": "有効期限なし",
         "apiTokenLastUsed": "最終使用",
         "apiTokenNeverUsed": "未使用",
-        "apiTokenScopes": "権限",
         "apiTokenScopeHint": "選択しない場合、トークンは作成したアカウントと同じ完全なアクセス権を持ちます。モジュールを選択すると、たとえば AI/MCP クライアント向けに、特定の領域と読み取り・書き込み権限に制限できます。",
         "apiTokenScopeFull": "フルアクセス（制限なし）",
         "apiTokenScopeLimit": "選択したモジュールに制限",

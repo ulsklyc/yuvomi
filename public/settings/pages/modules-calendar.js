@@ -2,7 +2,7 @@ import { api } from '/api.js';
 import { formatDate, formatTime, getLocale, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { weekStartIndex, weekdayOrder } from '/utils/date.js';
-import { bindInstantSwitch, settingRowHtml, toggleRowHtml } from '/settings/components.js';
+import { bindInstantSwitch, settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
@@ -119,56 +119,52 @@ function renderPage(container, preferences) {
         <p class="settings-card-description">${t('settings.holidayDescription')}</p>
 
         <form class="settings-form settings-form--compact" id="holidays-form" novalidate autocomplete="off">
-          <div class="form-group">
-            <label class="form-label" for="holiday-country">${t('settings.holidayCountryLabel')}</label>
-            <select class="form-input" id="holiday-country" disabled>
-              <option value="">${t('settings.holidayCountryPlaceholder')}</option>
-            </select>
-            <p class="form-hint" id="holiday-au-observance-hint" hidden>
-              ${t('settings.holidayAustraliaObservanceHint')}
-            </p>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="holiday-subdivision">${t('settings.holidaySubdivisionLabel')}</label>
-            <select class="form-input" id="holiday-subdivision" disabled>
-              <option value="">${t('settings.holidaySubdivisionNone')}</option>
-            </select>
-          </div>
-          <div class="form-group" id="holiday-group-group" hidden>
-            <label class="form-label" for="holiday-group">${t('settings.holidayGroupLabel')}</label>
-            <select class="form-input" id="holiday-group" disabled>
-              <option value="">${t('settings.holidayGroupNone')}</option>
-            </select>
-            <p class="settings-card-description">${t('settings.holidayGroupHint')}</p>
-          </div>
-          <div class="form-group">
-            ${toggleRowHtml({
-              control: 'switch',
+          ${/* EIN FORMULAR-DIALEKT (R19, Einstellungen B7): Land, Region,
+               Gruppe, die beiden Schalter und ihre Farben als Zeilen der
+               Gruppe statt Auswahlen unter ihren Etiketten. */ ''}
+          <div class="row-carrier settings-group">
+            ${settingRowHtml({
+              label: t('settings.holidayCountryLabel'), labelFor: 'holiday-country',
+              control: `<select class="form-input" id="holiday-country" disabled>
+                <option value="">${t('settings.holidayCountryPlaceholder')}</option>
+              </select>`,
+              extra: `<p class="form-hint" id="holiday-au-observance-hint" hidden>${t('settings.holidayAustraliaObservanceHint')}</p>`,
+            })}
+            ${settingRowHtml({
+              label: t('settings.holidaySubdivisionLabel'), labelFor: 'holiday-subdivision',
+              control: `<select class="form-input" id="holiday-subdivision" disabled>
+                <option value="">${t('settings.holidaySubdivisionNone')}</option>
+              </select>`,
+            })}
+            ${settingRowHtml({
+              label: t('settings.holidayGroupLabel'), labelFor: 'holiday-group',
+              description: t('settings.holidayGroupHint'),
+              attrs: { id: 'holiday-group-group', hidden: true },
+              control: `<select class="form-input" id="holiday-group" disabled>
+                <option value="">${t('settings.holidayGroupNone')}</option>
+              </select>`,
+            })}
+            ${settingSwitchRowHtml({
               label: t('settings.holidayPublicLabel'),
               checked: !!preferences.holiday_show_public,
               attrs: { id: 'holiday-show-public', 'data-instant-save': true },
             })}
-          </div>
-          <div class="form-group" id="holiday-public-color-group"${preferences.holiday_show_public ? '' : ' hidden'}>
-            <label class="form-label" for="holiday-public-color">${t('settings.holidayPublicColor')}</label>
-            <input class="form-input" type="color" id="holiday-public-color"
-              value="${esc(preferences.holiday_public_color)}">
-          </div>
-          <div class="form-group">
-            ${toggleRowHtml({
-              control: 'switch',
+            ${settingRowHtml({
+              label: t('settings.holidayPublicColor'), labelFor: 'holiday-public-color',
+              attrs: { id: 'holiday-public-color-group', hidden: !preferences.holiday_show_public },
+              control: `<input class="form-input" type="color" id="holiday-public-color" value="${esc(preferences.holiday_public_color)}">`,
+            })}
+            ${settingSwitchRowHtml({
               label: t('settings.holidaySchoolLabel'),
               checked: !!preferences.holiday_show_school,
               attrs: { id: 'holiday-show-school', 'data-instant-save': true },
+              extra: `<p class="form-hint" id="holiday-school-unavailable-hint" hidden>${t('settings.holidaySchoolUnavailable')}</p>`,
             })}
-          </div>
-          <p class="form-hint" id="holiday-school-unavailable-hint" hidden>
-            ${t('settings.holidaySchoolUnavailable')}
-          </p>
-          <div class="form-group" id="holiday-school-color-group"${preferences.holiday_show_school ? '' : ' hidden'}>
-            <label class="form-label" for="holiday-school-color">${t('settings.holidaySchoolColor')}</label>
-            <input class="form-input" type="color" id="holiday-school-color"
-              value="${esc(preferences.holiday_school_color)}">
+            ${settingRowHtml({
+              label: t('settings.holidaySchoolColor'), labelFor: 'holiday-school-color',
+              attrs: { id: 'holiday-school-color-group', hidden: !preferences.holiday_show_school },
+              control: `<input class="form-input" type="color" id="holiday-school-color" value="${esc(preferences.holiday_school_color)}">`,
+            })}
           </div>
           <div id="holidays-form-error" class="form-error" role="alert" hidden></div>
           <div class="settings-form-actions">

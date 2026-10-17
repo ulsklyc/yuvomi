@@ -1,6 +1,6 @@
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { toggleRowHtml } from '/settings/components.js';
+import { settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 
 /**
  * Standortformular für das Wetter-Widget - einmal für den Haushalt
@@ -34,46 +34,49 @@ export function hasValidWeatherCoords(lat, lon) {
 
 export function weatherLocationFieldsHtml({ scope, values = {}, autoLocateDisabled = false }) {
   const units = values.units === 'imperial' ? 'imperial' : 'metric';
+  // EIN FORMULAR-DIALEKT (R19, Einstellungen B7): Breite, Laenge, Ort und
+  // Einheiten als Zeilen der Gruppe, der Auto-Standort als Schalterzeile; die
+  // Ortung per Knopf steht unter der Gruppe. Vorher ein zweispaltiges
+  // `.form-row` (ein Name, den seit R18 die Formularzeile traegt) mit Feldern
+  // unter ihren Etiketten.
   return `
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label" for="${scope}-lat">${t('settings.weatherLatLabel')}</label>
-        <input class="form-input" type="number" id="${scope}-lat" step="any" min="-90" max="90"
-          value="${esc(values.lat ?? '')}" placeholder="${t('settings.weatherLatPlaceholder')}">
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="${scope}-lon">${t('settings.weatherLonLabel')}</label>
-        <input class="form-input" type="number" id="${scope}-lon" step="any" min="-180" max="180"
-          value="${esc(values.lon ?? '')}" placeholder="${t('settings.weatherLonPlaceholder')}">
-      </div>
+    <div class="row-carrier settings-group">
+      ${settingRowHtml({
+        label: t('settings.weatherLatLabel'), labelFor: `${scope}-lat`,
+        control: `<input class="form-input" type="number" id="${scope}-lat" step="any" min="-90" max="90"
+          value="${esc(values.lat ?? '')}" placeholder="${t('settings.weatherLatPlaceholder')}">`,
+      })}
+      ${settingRowHtml({
+        label: t('settings.weatherLonLabel'), labelFor: `${scope}-lon`,
+        control: `<input class="form-input" type="number" id="${scope}-lon" step="any" min="-180" max="180"
+          value="${esc(values.lon ?? '')}" placeholder="${t('settings.weatherLonPlaceholder')}">`,
+      })}
+      ${settingSwitchRowHtml({
+        label: t('settings.weatherAutoLocateLabel'),
+        checked: !!values.auto_locate,
+        disabled: autoLocateDisabled,
+        description: t('settings.weatherAutoLocateHint'),
+        descriptionId: `${scope}-auto-locate-hint`,
+        attrs: { id: `${scope}-auto-locate` },
+      })}
+      ${settingRowHtml({
+        label: t('settings.weatherCityLabel'), labelFor: `${scope}-city`,
+        control: `<input class="form-input" type="text" id="${scope}-city" maxlength="100"
+          value="${esc(values.city ?? '')}" placeholder="${t('settings.weatherCityPlaceholder')}">`,
+      })}
+      ${settingRowHtml({
+        label: t('settings.weatherUnitsLabel'), labelFor: `${scope}-units`,
+        control: `<select class="form-input" id="${scope}-units">
+          <option value="metric"${units === 'metric' ? ' selected' : ''}>${t('settings.weatherUnitsMetric')}</option>
+          <option value="imperial"${units === 'imperial' ? ' selected' : ''}>${t('settings.weatherUnitsImperial')}</option>
+        </select>`,
+      })}
     </div>
     <div class="settings-form-actions">
       <button type="button" class="btn btn--secondary btn--sm" id="${scope}-locate-btn">
         <i data-lucide="map-pin" aria-hidden="true"></i>
         ${t('settings.weatherLocateBtn')}
       </button>
-    </div>
-    <div class="form-group">
-      ${toggleRowHtml({
-        control: 'switch',
-        label: t('settings.weatherAutoLocateLabel'),
-        checked: !!values.auto_locate,
-        disabled: autoLocateDisabled,
-        attrs: { id: `${scope}-auto-locate` },
-      })}
-      <p class="form-hint">${t('settings.weatherAutoLocateHint')}</p>
-    </div>
-    <div class="form-group">
-      <label class="form-label" for="${scope}-city">${t('settings.weatherCityLabel')}</label>
-      <input class="form-input" type="text" id="${scope}-city" maxlength="100"
-        value="${esc(values.city ?? '')}" placeholder="${t('settings.weatherCityPlaceholder')}">
-    </div>
-    <div class="form-group">
-      <label class="form-label" for="${scope}-units">${t('settings.weatherUnitsLabel')}</label>
-      <select class="form-input" id="${scope}-units">
-        <option value="metric"${units === 'metric' ? ' selected' : ''}>${t('settings.weatherUnitsMetric')}</option>
-        <option value="imperial"${units === 'imperial' ? ' selected' : ''}>${t('settings.weatherUnitsImperial')}</option>
-      </select>
     </div>
   `;
 }

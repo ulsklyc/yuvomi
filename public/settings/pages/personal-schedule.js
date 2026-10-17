@@ -1,7 +1,7 @@
 import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { toggleRowHtml } from '/settings/components.js';
+import { settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { reminderOffsetOptions, pickCustomReminderOffset } from '/utils/schedule-reminder-offset.js';
 
 /**
@@ -32,22 +32,28 @@ export function scheduleSettingsHtml(preferences = {}) {
       <!-- Bewusst NICHT der Blatt-Titel: die Shell zeigt ihn bereits darueber
            (Guard in test-typography.js). -->
       <h2 class="settings-section__title">${esc(t('schedule.mySettings'))}</h2>
-      <div class="settings-card">
-        ${toggleRowHtml({ label: t('schedule.reminderToggle'), checked: active, control: 'switch', attrs: { id: 'schedule-reminder-toggle' } })}
-        <div class="form-group">
-          <label class="form-label" for="schedule-reminder-offset">${esc(t('schedule.reminderLeadTime'))}</label>
-          <select class="form-input" id="schedule-reminder-offset" data-previous-value="${esc(String(offset ?? 15))}"${active ? '' : ' disabled'}>${reminderOffsetOptions(offset)}</select>
-          <p class="form-hint">${esc(t('schedule.reminderHint'))}</p>
-        </div>
+      <!-- EIN FORMULAR-DIALEKT (R19, Einstellungen B7): je Thema eine Gruppe
+           aus Schalter- und Wertzeile, statt Karten mit Feldern unter ihren
+           Etiketten. -->
+      <div class="row-carrier settings-group">
+        ${settingSwitchRowHtml({ label: t('schedule.reminderToggle'), checked: active, attrs: { id: 'schedule-reminder-toggle' } })}
+        ${settingRowHtml({
+          label: t('schedule.reminderLeadTime'), labelFor: 'schedule-reminder-offset',
+          description: t('schedule.reminderHint'), descriptionId: 'schedule-reminder-offset-hint',
+          control: `<select class="form-input" id="schedule-reminder-offset" aria-describedby="schedule-reminder-offset-hint" data-previous-value="${esc(String(offset ?? 15))}"${active ? '' : ' disabled'}>${reminderOffsetOptions(offset)}</select>`,
+        })}
       </div>
-      <div class="settings-card">
-        ${toggleRowHtml({ label: t('schedule.overtimeTrackingToggle'), checked: overtimeEnabled, control: 'switch', attrs: { id: 'schedule-overtime-toggle' } })}
-        <p class="form-hint">${esc(t('schedule.overtimeTrackingHint'))}</p>
-        <div class="form-group">
-          <label class="form-label" for="schedule-weekly-hours">${esc(t('schedule.weeklyHoursLabel'))}</label>
-          <input class="form-input" type="number" inputmode="numeric" min="1" max="168" step="1" id="schedule-weekly-hours" value="${esc(String(weeklyHours))}"${overtimeEnabled ? '' : ' disabled'}>
-          <p class="form-hint">${esc(t('schedule.weeklyHoursHint'))}</p>
-        </div>
+      <div class="row-carrier settings-group">
+        ${settingSwitchRowHtml({
+          label: t('schedule.overtimeTrackingToggle'), checked: overtimeEnabled,
+          description: t('schedule.overtimeTrackingHint'), descriptionId: 'schedule-overtime-hint',
+          attrs: { id: 'schedule-overtime-toggle' },
+        })}
+        ${settingRowHtml({
+          label: t('schedule.weeklyHoursLabel'), labelFor: 'schedule-weekly-hours',
+          description: t('schedule.weeklyHoursHint'), descriptionId: 'schedule-weekly-hours-hint',
+          control: `<input class="form-input" type="number" inputmode="numeric" min="1" max="168" step="1" id="schedule-weekly-hours" value="${esc(String(weeklyHours))}"${overtimeEnabled ? '' : ' disabled'} aria-describedby="schedule-weekly-hours-hint">`,
+        })}
       </div>
     </section>`;
 }
