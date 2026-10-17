@@ -4,7 +4,8 @@
  *        wechsel in einem Modul, Monats- und Zeitraum-Blaettern, Bereichs-
  *        wechsel. Der Traeger blendet seinen neuen Inhalt ein, auf Wunsch mit
  *        8px Versatz in Schrittrichtung.
- * Abhaengigkeiten: /utils/ux.js (Token-Leser)
+ * Abhaengigkeiten: /utils/ux.js (Token-Leser), /utils/view-transition.js
+ *                  (geteilte Marke `html.page-swapping`)
  *
  * WARUM (Critique R16, P2 Bewegung): die App hatte dafuer zwei Einzelstuecke -
  * die Seitenblende des Routers (`swapPage`) und ein `fade-in` am Budget-
@@ -29,6 +30,7 @@
 // Relativ importiert (wie utils/sortable.js): im Browser dieselbe Modul-URL wie
 // '/utils/ux.js', und die Unit-Tests laden die Datei ohne Loader.
 import { durationToken, easingToken } from './ux.js';
+import { holdPageSwapping } from './view-transition.js';
 
 /** Versatz in Schrittrichtung, in px. */
 export const SWAP_SHIFT_PX = 8;
@@ -173,10 +175,15 @@ export async function swapRegion(host, update, { direction = 0 } = {}) {
     swapContent(host, update, { direction });
     return { transition: false, finished: Promise.resolve() };
   }
-  const html = document.documentElement;
+  // `html.page-swapping` teilt sich dieser Wechsel mit swapPage: er haelt sie
+  // nur, statt sie zu besitzen (holdPageSwapping, utils/view-transition.js).
+  // Startet waehrenddessen ein Seitenwechsel, nimmt das Ende von diesem ihm
+  // die Chrome-Namen nicht mehr weg (Review #2049, Runde 2).
+  let releaseSwapping = null;
   const mark = (on) => {
     host.style.viewTransitionName = on ? REGION_NAME : '';
-    html.classList.toggle('page-swapping', on);
+    if (on) releaseSwapping = holdPageSwapping();
+    else releaseSwapping?.();
   };
   mark(true);
   const transition = document.startViewTransition({

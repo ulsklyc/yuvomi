@@ -2414,7 +2414,9 @@ function regionEnv({ api = true, types = true, modal = false } = {}) {
     visibilityState: 'visible',
     documentElement: {
       dir: '',
-      classList: { toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)), contains: (c) => classes.has(c) },
+      // add/remove: die Marke geht seit Review #2049 (Runde 2) ueber
+      // holdPageSwapping() in utils/view-transition.js, wie bei swapPage.
+      classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c), contains: (c) => classes.has(c) },
     },
     querySelector: (sel) => (modal && sel === ':modal' ? { tagName: 'DIALOG' } : null),
     addEventListener: (type, fn, opts) => listeners.push({ type, fn, capture: Boolean(opts?.capture) }),
@@ -2465,6 +2467,51 @@ test('swapRegion: altes Bild per View Transition, Richtung als Typ, Name nur fue
     assert.equal(env.listeners.length, 0, 'kein Zuhoerer bleibt haengen');
   } finally {
     env.restore();
+  }
+});
+
+/* Review #2049, Runde 2: swapRegion und swapPage teilen `html.page-swapping`.
+ * Tippt jemand waehrend eines Regionswechsels (Einstellungen, Kalender) in
+ * die Navigation, bricht der pointerdown den Regionswechsel ab, und der click
+ * startet swapPage - das dieselbe Klasse setzt. Das spaete `finally` des
+ * Regionswechsels nahm sie dem laufenden Seitenwechsel wieder weg:
+ * Navigation, Seitenleiste und FAB verloren mitten im Wechsel ihre Namen.
+ * Die Marke gehoert jetzt allen Haltern zugleich und faellt mit dem letzten. */
+test('swapRegion und swapPage: wer zuerst endet, nimmt dem anderen die Chrome-Namen nicht', async () => {
+  for (const order of [['region', 'page'], ['page', 'region']]) {
+    const env = regionEnv();
+    const classes = env.classes;
+    const finishers = {};
+    globalThis.document.startViewTransition = (arg) => {
+      const update = typeof arg === 'function' ? arg : arg.update;
+      const updateCallbackDone = Promise.resolve().then(update);
+      let resolve;
+      const finished = new Promise((r) => { resolve = r; });
+      finishers[typeof arg === 'function' ? 'page' : 'region'] = resolve;
+      return { updateCallbackDone, ready: updateCallbackDone, finished, skipTransition: () => resolve() };
+    };
+    try {
+      const { swapRegion } = await import('../public/utils/content-swap.js');
+      const { swapPage } = await import('../public/utils/view-transition.js');
+      const content = { querySelector: () => null };
+      const started = {};
+      for (const which of order) {
+        started[which] = which === 'region'
+          ? await swapRegion(env.host, () => {}, { direction: 1 })
+          : await swapPage(() => {}, { content, from: '/settings', animate: true });
+        assert.equal(started[which].transition, true, `${which} laeuft als View Transition`);
+      }
+      assert.equal(classes.has('page-swapping'), true);
+      finishers[order[0]]();
+      await started[order[0]].finished;
+      assert.equal(classes.has('page-swapping'), true,
+        `${order.join(' -> ')}: das Ende von ${order[0]} nimmt dem laufenden ${order[1]} die Chrome-Namen`);
+      finishers[order[1]]();
+      await started[order[1]].finished;
+      assert.equal(classes.has('page-swapping'), false, `${order.join(' -> ')}: nach dem letzten Wechsel bleibt die Marke stehen`);
+    } finally {
+      env.restore();
+    }
   }
 });
 

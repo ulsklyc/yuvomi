@@ -51,6 +51,43 @@ const LOST_TAP_WINDOW_MS = 1000;
 /** Klasse an <html> fuer die Dauer eines Theme-Wechsels (kein Chrome-Name). */
 const THEME_CLASS = 'theme-swapping';
 
+/**
+ * `html.page-swapping` GEHOERT ALLEN, DIE SIE GERADE BRAUCHEN (Review #2049,
+ * Runde 2). Seitenwechsel (swapPage) und Regionswechsel (swapRegion in
+ * utils/content-swap.js) setzen dieselbe Klasse. Ein Tipp in die Navigation
+ * waehrend eines Regionswechsels bricht diesen ab und startet einen
+ * Seitenwechsel - und das spaete Aufraeumen des Regionswechsels nahm dem
+ * laufenden Seitenwechsel die Klasse wieder weg: Navigation, Seitenleiste und
+ * FAB verloren mitten im Wechsel ihre Namen und blendeten mit der Wurzel.
+ * Jetzt zaehlt jedes Dokument seine Halter, und die Klasse faellt erst mit
+ * dem letzten. Beide Wechsel gehen ueber diese eine Stelle.
+ */
+const _swappingHolds = new WeakMap();
+
+/**
+ * Setzt `html.page-swapping` und gibt die Freigabe dieses Halters zurueck.
+ * Eine zweite Freigabe desselben Halters tut nichts.
+ * @param {Element|null|undefined} [html]
+ * @returns {() => void}
+ */
+export function holdPageSwapping(html = typeof document !== 'undefined' ? document.documentElement : null) {
+  if (!html?.classList) return () => {};
+  _swappingHolds.set(html, (_swappingHolds.get(html) ?? 0) + 1);
+  html.classList.add(SWAPPING_CLASS);
+  let held = true;
+  return () => {
+    if (!held) return;
+    held = false;
+    const left = (_swappingHolds.get(html) ?? 1) - 1;
+    if (left > 0) {
+      _swappingHolds.set(html, left);
+      return;
+    }
+    _swappingHolds.delete(html);
+    html.classList.remove(SWAPPING_CLASS);
+  };
+}
+
 /** Pfad, von dem der laufende Seitenwechsel kommt - null beim Kaltstart. */
 let _from = null;
 /** Zaehlt die Wechsel; nur der juengste raeumt den Kopfnamen ab. */
@@ -113,7 +150,7 @@ export async function swapPage(update, { content, from = null, animate = true, w
   const generation = ++_generation;
   // VOR startViewTransition: der Browser nimmt das alte Bild gleich danach auf,
   // und ohne Namen blendete die Leiste dort mit der Wurzel.
-  document.documentElement?.classList.add(SWAPPING_CLASS);
+  const releaseSwapping = holdPageSwapping();
   const oldToolbar = nameToolbar(content);
   let newToolbar = null;
   const transition = document.startViewTransition(() => {
@@ -176,6 +213,10 @@ export async function swapPage(update, { content, from = null, animate = true, w
         lostTap = null;
         doc.removeEventListener?.('click', replayLostTap, { capture: true });
       }, LOST_TAP_WINDOW_MS);
+      // Erst jetzt ist die Leiste keine Backdrop Root mehr - das Glas blurrt.
+      // Die Klasse faellt aber erst mit ihrem letzten Halter: ein juengerer
+      // Seiten- oder Regionswechsel haelt sie weiter (holdPageSwapping).
+      releaseSwapping();
       // Temporaer: ein stehengebliebener Name kollidierte beim naechsten
       // Wechsel mit einem zweiten Kopf derselben Seite. Nur der juengste
       // Wechsel raeumt auf: verwirft ein zweiter Tipp diese Transition, loest
@@ -183,8 +224,6 @@ export async function swapPage(update, { content, from = null, animate = true, w
       // Kopf-Knoten traegt dann schon dessen Namen.
       if (generation !== _generation) return;
       if (newToolbar) newToolbar.style.viewTransitionName = '';
-      // Erst jetzt ist die Leiste keine Backdrop Root mehr - das Glas blurrt.
-      document.documentElement?.classList.remove(SWAPPING_CLASS);
     });
   // Wirft, wenn `update` wirft - der Router faengt es in seinem catch.
   await transition.updateCallbackDone;
