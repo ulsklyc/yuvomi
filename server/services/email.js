@@ -23,6 +23,22 @@ const CONFIG_KEYS = {
 
 const VALID_SECURE = new Set(['ssl', 'starttls', 'none']);
 
+/**
+ * nodemailer-Fehlercode -> Fall der Testmail. Die Codes stehen in nodemailers
+ * ERROR_CODES (lib/errors); ein Netzfehler darunter traegt den Code von Node
+ * (ECONNREFUSED, ENOTFOUND, EHOSTUNREACH ...).
+ * @returns {'auth'|'connection'|'tls'|'rejected'|'unknown'}
+ */
+export function smtpFailureReason(err) {
+  const code = String(err?.code ?? '');
+  if (code === 'EAUTH' || code === 'ENOAUTH') return 'auth';
+  if (code === 'ETLS' || code === 'EREQUIRETLS') return 'tls';
+  if (code === 'EENVELOPE' || code === 'EMESSAGE') return 'rejected';
+  if (['ECONNECTION', 'ETIMEDOUT', 'ESOCKET', 'EDNS', 'EPROXY', 'ECONNREFUSED', 'ECONNRESET',
+    'ENOTFOUND', 'EAI_AGAIN', 'EHOSTUNREACH', 'ENETUNREACH'].includes(code)) return 'connection';
+  return 'unknown';
+}
+
 export function createEmailService({ db, nodemailer = nodemailerDefault, env = process.env } = {}) {
   const getDb = () => (db || dbModule.get());
 
@@ -151,7 +167,7 @@ export function createEmailService({ db, nodemailer = nodemailerDefault, env = p
   // Verifies the connection, then sends a probe mail. Never throws — returns a result.
   async function sendTest(to) {
     try {
-      if (!isConfigured()) return { ok: false, error: 'Email is not configured.' };
+      if (!isConfigured()) return { ok: false, reason: 'not_configured', error: 'Email is not configured.' };
       const c = getRawConfig();
       const transport = buildTransport(c);
       await transport.verify();
@@ -165,7 +181,11 @@ export function createEmailService({ db, nodemailer = nodemailerDefault, env = p
       return { ok: true };
     } catch (err) {
       log.warn('SMTP test failed:', err?.message || err);
-      return { ok: false, error: err?.message || String(err) };
+      // Der Grund als Fall, nicht als Satz (Re-Critique 2026-10-17): die Seite
+      // zeigte den englischen Text von nodemailer ("Invalid login: 535 ...").
+      // `error` bleibt fuer Logs und API-Clients stehen, die Oberflaeche liest
+      // `reason` und sagt den Satz in der Sprache der Person.
+      return { ok: false, reason: smtpFailureReason(err), error: err?.message || String(err) };
     }
   }
 

@@ -487,7 +487,8 @@ test('two-factor card: every line and the button row keep a token gap, in every 
   assert.match(recovery, /class="form-hint settings-2fa__note" id="two-factor-copy-status" role="status"><\/p>/,
     'Statuszeile traegt ihre Klasse und bleibt leer im Markup');
   const ask = source.slice(source.indexOf('function askForCode'));
-  assert.match(ask, /<form id="two-factor-confirm-form" class="settings-form settings-2fa__form">/);
+  // `novalidate` (Re-Critique 2026-10-17): der fehlende Code steht am Feld, nicht in einer Browser-Blase.
+  assert.match(ask, /<form id="two-factor-confirm-form" class="settings-form settings-2fa__form" novalidate>/);
 
   const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
   const rules = [...eachRule(css)];

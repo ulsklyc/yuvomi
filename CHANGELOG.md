@@ -272,6 +272,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A mistyped current password no longer signs you out.** Changing your password with a wrong
+  current password sent you to the sign-in page without a word and lost what you had typed, although
+  your session was fine. The page now says "The current password is not correct." at that field and
+  keeps your entries. The account page shows every missing or invalid entry at its own row instead
+  of in browser pop-ups: name, e-mail address, birthday, the three password fields and the
+  two-factor code.
+- **The e-mail server settings refuse what cannot work.** A port outside 1 to 65535 or a sender
+  without an e-mail address was saved with "Settings saved" and failed only on the first message.
+  Both are now named at their field before saving or testing, and the server refuses them as well.
+  "Test connection" says in your language what went wrong (sign-in rejected, server not reachable,
+  encryption failed, message refused) instead of the mail server's English text, and when your own
+  address is missing it points to Account -> E-mail.
+
 - **Documents: uploading without a file says so at the drop zone.** The message appeared at the
   bottom of the dialog, below the visible part of a phone screen, while the focus stayed on
   "Upload". It now stands right under the drop zone, which turns red and scrolls into view, and the

@@ -345,3 +345,54 @@ test('ein SMTP-Passwort behaelt Leerzeichen am Rand, Host und Co. werden getrimm
   assert.equal(typeof svc.getRawConfig, 'function', 'getRawConfig muss existieren');
   assert.equal(svc.getRawConfig().pass, ' geheim ', 'das Passwort muss unveraendert bleiben');
 });
+
+// --- Re-Critique 2026-10-17: Ungueltiges wird nicht gespeichert, Fehler als Fall ---
+
+test('PUT /config lehnt Port ausserhalb 1-65535 und einen Absender ohne Adresse ab - nichts wird gespeichert', async () => {
+  for (const [body, reason] of [
+    [{ port: 99999 }, 'email_port_invalid'],
+    [{ port: 0 }, 'email_port_invalid'],
+    [{ port: 25.5 }, 'email_port_invalid'],
+    [{ port: 'abc' }, 'email_port_invalid'],
+    [{ fromAddress: 'keine-mail' }, 'email_from_invalid'],
+    [{ fromAddress: 'a@b@c' }, 'email_from_invalid'],
+    [{ fromAddress: 'yuvomi @example.org' }, 'email_from_invalid'],
+  ]) {
+    const db = makeDb();
+    const svc = createEmailService({ db, nodemailer: makeNodemailerMock(), env: {} });
+    const app = makeRouteApp(db, svc);
+    const { status, json } = await call(app, 'PUT', '/email/config', { host: 'smtp.test', ...body });
+    assert.equal(status, 400, JSON.stringify(body));
+    assert.equal(json.reason, reason, JSON.stringify(body));
+    assert.equal(db.prepare("SELECT value FROM sync_config WHERE key='email_smtp_host'").get(), undefined,
+      'auch die gueltigen Felder bleiben ungespeichert: kein halber Stand');
+  }
+  const db = makeDb();
+  const svc = createEmailService({ db, nodemailer: makeNodemailerMock(), env: {} });
+  const ok = await call(makeRouteApp(db, svc), 'PUT', '/email/config', { host: 'smtp.test', port: 465, fromAddress: 'yuvomi@example.org' });
+  assert.equal(ok.status, 200);
+  const leer = await call(makeRouteApp(db, svc), 'PUT', '/email/config', { fromAddress: '' });
+  assert.equal(leer.status, 200, 'ein leerer Absender heisst "nicht eingerichtet", kein Fehler');
+});
+
+test('sendTest nennt den Grund als Fall, den die Seite uebersetzt', async () => {
+  const { smtpFailureReason } = await import('../server/services/email.js');
+  assert.equal(smtpFailureReason({ code: 'EAUTH' }), 'auth');
+  assert.equal(smtpFailureReason({ code: 'ECONNREFUSED' }), 'connection');
+  assert.equal(smtpFailureReason({ code: 'ETIMEDOUT' }), 'connection');
+  assert.equal(smtpFailureReason({ code: 'ETLS' }), 'tls');
+  assert.equal(smtpFailureReason({ code: 'EENVELOPE' }), 'rejected');
+  assert.equal(smtpFailureReason(new Error('x')), 'unknown');
+  const db = makeDb();
+  const svc = createEmailService({ db, nodemailer: makeNodemailerMock(), env: {} });
+  assert.equal((await svc.sendTest('a@test')).reason, 'not_configured');
+});
+
+test('POST /test ohne eigene Adresse nennt den Fall email_no_recipient', async () => {
+  const db = makeDb();
+  setCfg(db, { email_smtp_host: 'smtp.test', email_from_address: 'a@test' });
+  const svc = createEmailService({ db, nodemailer: makeNodemailerMock(), env: {} });
+  const { status, json } = await call(makeRouteApp(db, svc, { userEmail: null }), 'POST', '/email/test', {});
+  assert.equal(status, 400);
+  assert.equal(json.reason, 'email_no_recipient');
+});

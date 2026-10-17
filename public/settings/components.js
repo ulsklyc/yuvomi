@@ -213,16 +213,20 @@ export function settingRowHtml({
   control = '',
   extra = '',
   stacked = false,
+  field = false,
   className = '',
   attrs = {},
 }) {
+  // `field`: die Zeile ist der Traeger eines Feldfehlers (reportFieldError,
+  // components/modal.js) - die Meldung steht dann unter der Zeile, ueber beide
+  // Spalten, statt das Feld zu quetschen (layout.css, `.form-row`).
   // DIE EINSTELLUNGSZEILE IST EINE FORMULARZEILE (R18, 2026-10-07): derselbe
   // Baustein wie in den Erfassungsdialogen (utils/form-row.js). Die Klassen
   // `settings-setting-row*` bleiben vorn - unter ihnen fuehrt settings.css die
   // Masse des Blatts -, `form-row*` kommt dazu und bringt, was in der Zeile
   // steht: die randlose Auswahl, das Datum als Wert, das zusammengesetzte Feld.
   return formRowHtml({
-    label, labelFor, labelId, description, descriptionId, control, extra, stacked, className, attrs,
+    label, labelFor, labelId, description, descriptionId, control, extra, stacked, field, className, attrs,
     variant: 'settings-setting-row',
   });
 }

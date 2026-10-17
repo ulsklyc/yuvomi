@@ -3882,7 +3882,12 @@ router.patch('/me/password', requireAuth, csrfMiddleware, async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found.', code: 404 });
 
     const { valid } = await verifyPassword(current_password, user.password_hash);
-    if (!valid) return res.status(401).json({ error: 'Current password is incorrect.', code: 401 });
+    // 400 mit Grund, nicht 401 (Re-Critique 2026-10-17): ein 401 heisst in
+    // dieser App "Sitzung weg" - api.js loeste darauf auth:expired aus, und wer
+    // sich beim alten Passwort vertippte, landete ohne Meldung auf der
+    // Anmeldung, die Eingaben verloren, obwohl die Sitzung gueltig war.
+    // Dieselbe Form wie ein falscher Code beim zweiten Faktor (invalid_code).
+    if (!valid) return res.status(400).json({ error: 'Current password is incorrect.', code: 400, reason: 'wrong_password' });
 
     const hash = await hashPassword(new_password);
     db.get().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, req.authUserId);

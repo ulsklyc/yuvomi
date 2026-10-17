@@ -874,6 +874,10 @@ const REASONS_PASSED_THROUGH = new Map([
   // Die zweite Stelle ist die Logzeile daneben, keine Antwort.
   ['auth.js: err.reason', { sites: 2, at403: [], why: 'Gravatar-Import: 400/404/413/415/502 oder 500, nie 403' }],
   ['routes/notes.js: result.reason', { sites: 1, at403: [], why: 'feste 409' }],
+  // SMTP (Re-Critique 2026-10-17): die Absage beim Speichern und der Fall der
+  // Testmail. Beides reist an einer festen 400 bzw. in einer 200, nie an 403.
+  ['routes/email.js: refusal.reason', { sites: 1, at403: [], why: 'emailConfigRefusal: feste 400' }],
+  ['services/email.js: smtpFailureReason(err)', { sites: 1, at403: [], why: 'sendTest: in der 200-Antwort von POST /email/test' }],
   ['routes/family.js: problem.reason', { sites: 1, at403: [], why: 'memberOrderProblem: feste 400; die 403 daneben traegt ein Literal' }],
   // parseDataUrl (#1909): der Fall einer gewaehlten Datei (Typ, Inhalt, leer).
   ['routes/documents.js: parsed.reason', { sites: 1, at403: [], why: 'parseDataUrl: feste 400' }],

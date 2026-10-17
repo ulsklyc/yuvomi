@@ -7,6 +7,63 @@ import { email } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { createInlineError, settingRowHtml } from '/settings/components.js';
+import { reportFieldError, reportFieldErrors } from '/components/modal.js';
+import { errorSentence } from '/utils/friendly-error.js';
+
+// Dieselbe Pruefung wie server/routes/email.js (emailConfigRefusal): der
+// Server lehnt ab, die Seite sagt es schon vorher und am Feld.
+const PORT_MIN = 1;
+const PORT_MAX = 65535;
+const FROM_ADDRESS_RE = /^[^\s@]+@[^\s@]+$/;
+
+/** Fall der fehlgeschlagenen Testmail (services/email.js smtpFailureReason) -> Satz. */
+const TEST_FAILURE_KEYS = {
+  not_configured: 'email.testFailedNotConfigured',
+  auth: 'email.testFailedAuth',
+  connection: 'email.testFailedConnection',
+  tls: 'email.testFailedTls',
+  rejected: 'email.testFailedRejected',
+};
+
+/** Absage des Servers (server/routes/email.js) -> [Feld, Schluessel]. */
+const REFUSAL_FIELDS = {
+  email_port_invalid: ['port', 'email.portInvalid'],
+  email_from_invalid: ['fromAddress', 'common.emailInvalid'],
+};
+
+const fieldMessage = (key) => t(key, { min: PORT_MIN, max: PORT_MAX });
+
+/**
+ * Was die Seite nicht schicken darf, als `[feld, schluessel]`. Der Port ist
+ * eine ganze Zahl von 1 bis 65535 (auch leer ist er falsch: ohne Port gibt es
+ * keine Verbindung), der Absender leer oder eine Adresse. Gesperrte Felder
+ * (Umgebung) prueft sie nicht - sie werden nicht geschickt.
+ * @returns {Array<['port'|'fromAddress', string]>}
+ */
+function emailConfigProblems({ port, fromAddress }, envControlled = {}) {
+  const problems = [];
+  const portRaw = String(port ?? '').trim();
+  const portNum = Number(portRaw);
+  if (envControlled.port !== true
+    && (portRaw === '' || !Number.isInteger(portNum) || portNum < PORT_MIN || portNum > PORT_MAX)) {
+    problems.push(['port', 'email.portInvalid']);
+  }
+  const from = String(fromAddress ?? '').trim();
+  if (envControlled.fromAddress !== true && from !== '' && !FROM_ADDRESS_RE.test(from)) {
+    problems.push(['fromAddress', 'common.emailInvalid']);
+  }
+  return problems;
+}
+
+/** Fall der fehlgeschlagenen Testmail -> Schluessel; ein unbekannter Fall bekommt den allgemeinen Satz. */
+function testFailureKey(reason) {
+  return Object.prototype.hasOwnProperty.call(TEST_FAILURE_KEYS, reason ?? '') ? TEST_FAILURE_KEYS[reason] : 'email.testFailedUnknown';
+}
+
+export const __test = { emailConfigProblems, testFailureKey, REFUSAL_FIELDS };
+
+/** Der Pfad des Kontoblatts, auf das die Testmail ohne eigene Adresse verweist. */
+const ACCOUNT_PATH = '/settings/personal/account';
 
 const DEFAULTS = {
   host: '', port: 587, secure: 'starttls', user: '',
@@ -50,8 +107,8 @@ export async function render(container, { user } = {}) {
             extra: `<p class="form-hint" data-env-hint="host" hidden>${esc(t('settings.documentStorageEnvHint'))}</p>`,
           })}
           ${settingRowHtml({
-            label: t('email.port'), labelFor: 'email-port',
-            control: `<input class="form-input" id="email-port" name="port" type="number" inputmode="numeric" value="${esc(String(cfg.port))}" />`,
+            label: t('email.port'), labelFor: 'email-port', field: true,
+            control: `<input class="form-input" id="email-port" name="port" type="number" inputmode="numeric" min="${PORT_MIN}" max="${PORT_MAX}" step="1" value="${esc(String(cfg.port))}" />`,
             extra: `<p class="form-hint" data-env-hint="port" hidden>${esc(t('settings.documentStorageEnvHint'))}</p>`,
           })}
           ${settingRowHtml({
@@ -76,7 +133,7 @@ export async function render(container, { user } = {}) {
             extra: `<p class="form-hint" data-env-hint="pass" hidden>${esc(t('settings.documentStorageEnvHint'))}</p>`,
           })}
           ${settingRowHtml({
-            label: t('email.fromAddress'), labelFor: 'email-from',
+            label: t('email.fromAddress'), labelFor: 'email-from', field: true,
             control: `<input class="form-input" id="email-from" name="fromAddress" type="email" value="${esc(cfg.fromAddress)}" />`,
             extra: `<p class="form-hint" data-env-hint="fromAddress" hidden>${esc(t('settings.documentStorageEnvHint'))}</p>`,
           })}
@@ -130,6 +187,36 @@ export async function render(container, { user } = {}) {
     window.yuvomi?.showToast(msg, 'success');
   };
 
+  /**
+   * Prueft, was die Seite schicken wuerde (Re-Critique 2026-10-17: Port 99999
+   * und der Absender "keine-mail" wurden mit "gespeichert" quittiert). Meldet
+   * am Feld und gibt false zurueck, wenn etwas nicht stimmt. Gesperrte Felder
+   * (Umgebung) prueft sie nicht - sie werden nicht geschickt.
+   */
+  function validate() {
+    const problems = emailConfigProblems({ port: form.port.value, fromAddress: form.fromAddress.value }, envControlled);
+    return !reportFieldErrors(problems.map(([field, key]) => [form[field], fieldMessage(key)]));
+  }
+
+  /** Eine Absage des Servers zum Feld - true, wenn sie dort steht. */
+  function refusalAtField(error) {
+    const field = REFUSAL_FIELDS[error?.data?.reason];
+    if (!field) return false;
+    reportFieldError(form[field[0]], fieldMessage(field[1]));
+    return true;
+  }
+
+  /** Testmail ohne eigene Adresse: der Satz und der Weg dorthin. */
+  function showNoRecipient() {
+    const error = createInlineError(t('email.testNoRecipient'));
+    const link = document.createElement('a');
+    link.href = ACCOUNT_PATH;
+    link.setAttribute('data-nav', '');
+    link.textContent = t('email.testNoRecipientLink');
+    error.append(' ', link);
+    notice.replaceChildren(error);
+  }
+
   function collect() {
     // Gesperrte Felder gar nicht erst mitschicken. Der Server ignoriert sie
     // ohnehin; sie wegzulassen hält die Absicht des Formulars ehrlich.
@@ -150,28 +237,37 @@ export async function render(container, { user } = {}) {
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    notice.replaceChildren();
+    if (!validate()) return;
     saveBtn.disabled = true;
     try {
       await email.saveConfig(collect());
       form.pass.value = '';
       showSuccess(t('email.saved'));
     } catch (error) {
-      // Eigener Key: hier ist nichts getestet worden, nur gespeichert.
-      showError(t('email.saveFailed', { error: error?.message || t('common.errorGeneric') }));
+      // Eigener Key: hier ist nichts getestet worden, nur gespeichert. Der
+      // Satz der App, nie der englische Text des Servers.
+      if (!refusalAtField(error)) showError(t('email.saveFailed', { error: errorSentence(error) }));
     } finally {
       saveBtn.disabled = false;
     }
   });
 
   testBtn.addEventListener('click', async () => {
+    notice.replaceChildren();
+    if (!validate()) return;
     testBtn.disabled = true;
     try {
       await email.saveConfig(collect()); // persist before testing
       const res = (await email.test())?.data;
+      // Der Fall, nicht der Text von nodemailer ("Invalid login: 535 ..."):
+      // er stand englisch auf einer deutschen Seite (Re-Critique 2026-10-17).
       if (res?.ok) showSuccess(t('email.testSuccess'));
-      else showError(t('email.testFailed', { error: res?.error || t('common.errorGeneric') }));
+      else showError(t(testFailureKey(res?.reason)));
     } catch (error) {
-      showError(t('email.testFailed', { error: error?.message || t('common.errorGeneric') }));
+      if (refusalAtField(error)) return;
+      if (error?.data?.reason === 'email_no_recipient') showNoRecipient();
+      else showError(t('email.testFailed', { error: errorSentence(error) }));
     } finally {
       testBtn.disabled = false;
     }

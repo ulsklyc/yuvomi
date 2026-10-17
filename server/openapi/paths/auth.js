@@ -415,6 +415,7 @@ export function authPaths() {
       patch: op({
         summary: 'Change current user password',
         tag: 'Auth',
+        description: 'A wrong `current_password` is answered with 400 and `reason: wrong_password`, not 401: the session stays valid, and a 401 from this API always means that it is not.',
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/PasswordChangeRequest'),
       }),

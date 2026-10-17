@@ -47,6 +47,11 @@ const STUBS = {
       logout: async () => ({ ok: true }),
       updateProfile: async () => ({ user: null }),
     };
+    export const email = {
+      getConfig: async () => ({ data: null }),
+      saveConfig: async () => ({ data: null }),
+      test: async () => ({ data: null }),
+    };
     export const notifications = {
       providers: async () => ({ data: [] }),
       listChannels: async () => ({ data: [] }),

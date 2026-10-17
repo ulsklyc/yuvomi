@@ -6,7 +6,8 @@ import {
 } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
-import { confirmModal } from '/components/modal.js';
+import { confirmModal, reportFieldError, reportFieldErrors } from '/components/modal.js';
+import { errorSentence } from '/utils/friendly-error.js';
 import { prefersInkText } from '/utils/contrast.js';
 import { settingRowHtml } from '/settings/components.js';
 
@@ -116,6 +117,34 @@ function gravatarHintHtml(gravatarAvailable) {
  */
 function fillGravatarHint(element, user, host = '') {
   if (element) element.textContent = gravatarHintText(user, host);
+}
+
+/** Mindestlaenge des neuen Passworts, wie server/auth.js (Zeichen der NFC-Form). */
+const PASSWORD_MIN_LENGTH = 8;
+
+/**
+ * Was am Passwortformular fehlt oder nicht passt, als `[feld, schluessel]` -
+ * alle Probleme zugleich, damit reportFieldErrors sie an ihre Felder stellt.
+ * @returns {Array<['current'|'next'|'confirm', string]>}
+ */
+function passwordProblems(current, next, confirm) {
+  const problems = [];
+  if (!current) problems.push(['current', 'common.required']);
+  if (!next) problems.push(['next', 'common.required']);
+  else if (next.normalize('NFC').length < PASSWORD_MIN_LENGTH) problems.push(['next', 'settings.passwordTooShort']);
+  if (!confirm) problems.push(['confirm', 'common.required']);
+  else if (next !== confirm) problems.push(['confirm', 'settings.passwordMismatch']);
+  return problems;
+}
+
+/** Die Absage des Servers, die ans Feld "Aktuelles Passwort" gehoert, oder null. */
+function passwordRefusalKey(err) {
+  return err?.data?.reason === 'wrong_password' ? 'settings.currentPasswordWrong' : null;
+}
+
+/** Eine Adresse mit genau einem @ und Text davor und danach (wie server/routes/email.js). */
+function isEmailAddress(value) {
+  return /^[^\s@]+@[^\s@]+$/.test(value);
 }
 
 function showError(element, message) {
@@ -287,8 +316,8 @@ function renderTwoFactorSetup(card, setup) {
     </div>
     <p class="form-hint">${t('settings.twoFactorManualHint')}</p>
     <p class="settings-2fa__secret"><code>${esc(grouped)}</code></p>
-    <form id="two-factor-enable-form" class="settings-form">
-      <div class="form-group">
+    <form id="two-factor-enable-form" class="settings-form" novalidate>
+      <div class="form-group form-field">
         <label class="form-label" for="two-factor-code">${t('settings.twoFactorCodeLabel')}</label>
         <input class="form-input settings-2fa__code" type="text" id="two-factor-code"
                inputmode="numeric" autocomplete="one-time-code" spellcheck="false"
@@ -371,8 +400,8 @@ function askForCode(card, texts, onConfirm, onCancel) {
   card.insertAdjacentHTML('beforeend', `
     <h3 class="settings-card__title">${esc(texts.title)}</h3>
     <p class="form-hint">${esc(texts.lead)}</p>
-    <form id="two-factor-confirm-form" class="settings-form settings-2fa__form">
-      <div class="form-group">
+    <form id="two-factor-confirm-form" class="settings-form settings-2fa__form" novalidate>
+      <div class="form-group form-field">
         <label class="form-label" for="two-factor-confirm-code">${t('settings.twoFactorCodeOrRecoveryLabel')}</label>
         <input class="form-input settings-2fa__code" type="text" id="two-factor-confirm-code"
                inputmode="text" autocomplete="one-time-code" spellcheck="false"
@@ -397,7 +426,7 @@ function askForCode(card, texts, onConfirm, onCancel) {
     clearError(error);
     const code = input.value.trim();
     if (!code) {
-      showError(error, t('settings.twoFactorCodeMissing'));
+      reportFieldError(input, t('settings.twoFactorCodeMissing'));
       return;
     }
     const button = form.querySelector('button[type="submit"]');
@@ -406,7 +435,10 @@ function askForCode(card, texts, onConfirm, onCancel) {
       await onConfirm(code);
     } catch (err) {
       button.disabled = false;
-      showError(error, twoFactorErrorText(err));
+      // Ein falscher Code gehoert ans Feld, alles andere (Bremse, Haushaltspflicht)
+      // an die Karte.
+      if (err?.data?.reason === 'invalid_code') reportFieldError(input, twoFactorErrorText(err));
+      else showError(error, twoFactorErrorText(err));
       input.select();
     }
   });
@@ -565,7 +597,7 @@ function bindSetupForm(card, reload) {
     clearError(error);
     const code = input.value.trim();
     if (!code) {
-      showError(error, t('settings.twoFactorCodeMissing'));
+      reportFieldError(input, t('settings.twoFactorCodeMissing'));
       return;
     }
     const button = form.querySelector('button[type="submit"]');
@@ -575,7 +607,10 @@ function bindSetupForm(card, reload) {
       renderRecoveryCodes(card, data.recovery_codes, () => { reload(); });
     } catch (err) {
       button.disabled = false;
-      showError(error, twoFactorErrorText(err));
+      // Ein falscher Code gehoert ans Feld, alles andere (Bremse, Haushaltspflicht)
+      // an die Karte.
+      if (err?.data?.reason === 'invalid_code') reportFieldError(input, twoFactorErrorText(err));
+      else showError(error, twoFactorErrorText(err));
       input.select();
     }
   });
@@ -606,7 +641,7 @@ function renderPage(container, user, refreshFailed, accessNotice, oidcState, oid
 
       <div class="settings-card">
         <h3 class="settings-card__title">${t('settings.profileCardTitle')}</h3>
-        <form id="profile-form" class="settings-form">
+        <form id="profile-form" class="settings-form" novalidate>
           <div class="settings-profile-editor">
             ${avatarEditorHtml(user, { gravatarAvailable })}
             ${/* NAME, FARBE UND BENUTZERNAME ALS ZEILEN (Re-Kritik 2026-10-17):
@@ -617,7 +652,7 @@ function renderPage(container, user, refreshFailed, accessNotice, oidcState, oid
                  als gesperrtes Feld. */ ''}
             <div class="settings-profile-editor__fields row-carrier settings-group">
               ${settingRowHtml({
-                label: t('settings.displayNameLabel'), labelFor: 'profile-display-name',
+                label: t('settings.displayNameLabel'), labelFor: 'profile-display-name', field: true,
                 control: `<input class="form-input" type="text" id="profile-display-name" maxlength="128" value="${esc(user?.display_name || '')}" autocomplete="name" aria-describedby="profile-error" required>`,
               })}
               ${settingRowHtml({
@@ -644,11 +679,11 @@ function renderPage(container, user, refreshFailed, accessNotice, oidcState, oid
                 control: `<input class="form-input" type="tel" id="profile-phone" value="${esc(user?.phone || '')}" autocomplete="tel" aria-describedby="profile-error">`,
               })}
               ${settingRowHtml({
-                label: t('settings.memberEmailLabel'), labelFor: 'profile-email',
+                label: t('settings.memberEmailLabel'), labelFor: 'profile-email', field: true,
                 control: `<input class="form-input" type="email" id="profile-email" value="${esc(user?.email || '')}" autocomplete="email" aria-describedby="profile-error">`,
               })}
               ${settingRowHtml({
-                label: t('settings.memberBirthDateLabel'), labelFor: 'profile-birth-date',
+                label: t('settings.memberBirthDateLabel'), labelFor: 'profile-birth-date', field: true,
                 control: `<yuvomi-datepicker type="date" id="profile-birth-date" value="${esc(user?.birth_date || '')}" aria-describedby="profile-error"></yuvomi-datepicker>`,
               })}
             </div>
@@ -663,18 +698,18 @@ function renderPage(container, user, refreshFailed, accessNotice, oidcState, oid
 
       <div class="settings-card">
         <h3 class="settings-card__title">${t('settings.changePassword')}</h3>
-        <form id="password-form" class="settings-form">
+        <form id="password-form" class="settings-form" novalidate>
           <div class="row-carrier settings-group">
             ${settingRowHtml({
-              label: t('settings.currentPasswordLabel'), labelFor: 'current-password',
+              label: t('settings.currentPasswordLabel'), labelFor: 'current-password', field: true,
               control: '<input class="form-input" type="password" id="current-password" autocomplete="current-password" aria-describedby="password-error" required>',
             })}
             ${settingRowHtml({
-              label: t('settings.newPasswordLabel'), labelFor: 'new-password',
+              label: t('settings.newPasswordLabel'), labelFor: 'new-password', field: true,
               control: '<input class="form-input" type="password" id="new-password" autocomplete="new-password" minlength="8" aria-describedby="password-error" required>',
             })}
             ${settingRowHtml({
-              label: t('settings.confirmPasswordLabel'), labelFor: 'confirm-password',
+              label: t('settings.confirmPasswordLabel'), labelFor: 'confirm-password', field: true,
               control: '<input class="form-input" type="password" id="confirm-password" autocomplete="new-password" minlength="8" aria-describedby="password-error" required>',
             })}
           </div>
@@ -846,11 +881,18 @@ function bindEvents(container, user, profileState, { gravatarHost = '' } = {}) {
     event.preventDefault();
     clearError(profileError);
 
-    const birthDateRaw = container.querySelector('#profile-birth-date')?.value || '';
-    if (!isDateInputValid(birthDateRaw)) {
-      showError(profileError, t('settings.memberBirthDateInvalid'));
-      return;
-    }
+    // FEHLER AM FELD, NICHT IN DER BROWSER-BLASE (Re-Critique 2026-10-17):
+    // das Formular traegt `novalidate`, alle Meldungen stehen zugleich an
+    // ihren Zeilen, der Fokus geht aufs erste (reportFieldErrors).
+    const birthDatePicker = container.querySelector('#profile-birth-date');
+    const birthDateRaw = birthDatePicker?.value || '';
+    const emailInput = container.querySelector('#profile-email');
+    const emailValue = emailInput?.value.trim() || '';
+    if (reportFieldErrors([
+      !displayName.value.trim() && [displayName, t('common.required')],
+      emailValue && !isEmailAddress(emailValue) && [emailInput, t('common.emailInvalid')],
+      !isDateInputValid(birthDateRaw) && [birthDatePicker, t('settings.memberBirthDateInvalid')],
+    ])) return;
 
     const submitButton = profileForm.querySelector('[type="submit"]');
     submitButton.disabled = true;
@@ -880,9 +922,8 @@ function bindEvents(container, user, profileState, { gravatarHost = '' } = {}) {
       }
       window.yuvomi?.showToast(t('settings.profileSavedToast'), 'success');
     } catch (error) {
-      showError(profileError, error.data?.reason === 'email_in_use'
-        ? t('common.emailInUse')
-        : error.message);
+      if (error?.data?.reason === 'email_in_use') reportFieldError(emailInput, t('common.emailInUse'));
+      else showError(profileError, errorSentence(error));
     } finally {
       submitButton.disabled = false;
     }
@@ -894,13 +935,15 @@ function bindEvents(container, user, profileState, { gravatarHost = '' } = {}) {
     const passwordError = container.querySelector('#password-error');
     clearError(passwordError);
 
-    const currentPassword = container.querySelector('#current-password').value;
-    const newPassword = container.querySelector('#new-password').value;
-    const confirmPassword = container.querySelector('#confirm-password').value;
-    if (newPassword !== confirmPassword) {
-      showError(passwordError, t('settings.passwordMismatch'));
-      return;
-    }
+    const currentInput = container.querySelector('#current-password');
+    const newInput = container.querySelector('#new-password');
+    const confirmInput = container.querySelector('#confirm-password');
+    const currentPassword = currentInput.value;
+    const newPassword = newInput.value;
+    const confirmPassword = confirmInput.value;
+    const inputs = { current: currentInput, next: newInput, confirm: confirmInput };
+    if (reportFieldErrors(passwordProblems(currentPassword, newPassword, confirmPassword)
+      .map(([field, key]) => [inputs[field], t(key)]))) return;
 
     const submitButton = passwordForm.querySelector('[type="submit"]');
     submitButton.disabled = true;
@@ -912,7 +955,16 @@ function bindEvents(container, user, profileState, { gravatarHost = '' } = {}) {
       passwordForm.reset();
       window.yuvomi?.showToast(t('settings.passwordSavedToast'), 'success');
     } catch (error) {
-      showError(passwordError, error.message);
+      // Ein falsches aktuelles Passwort ist ein 400 mit Grund (server/auth.js),
+      // kein 401 mehr: die Sitzung bleibt, die Eingaben auch, und der Satz
+      // steht am Feld. Alles andere sagt die Karte, nie im Text des Servers.
+      const atField = passwordRefusalKey(error);
+      if (atField) {
+        reportFieldError(currentInput, t(atField));
+        currentInput.select?.();
+      } else {
+        showError(passwordError, errorSentence(error));
+      }
     } finally {
       submitButton.disabled = false;
     }
@@ -1021,4 +1073,4 @@ export async function render(container, { user }) {
 
 // Der Avatar als Programm (test:initials): welche Zeichen ohne Bild auf der
 // Scheibe stehen.
-export const __test = { avatarHtml, avatarEditorHtml, gravatarHintText, gravatarHintHtml, fillGravatarHint };
+export const __test = { avatarHtml, avatarEditorHtml, gravatarHintText, gravatarHintHtml, fillGravatarHint, passwordProblems, passwordRefusalKey, isEmailAddress };

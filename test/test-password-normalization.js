@@ -180,3 +180,23 @@ test('PATCH /auth/me/password: current_password wird normalisiert, neues Passwor
   assert.equal((await login('admin', NEW_NFC)).status, 200);
   assert.equal((await login('admin', NEW_NFD)).status, 200);
 });
+
+test('PATCH /auth/me/password: ein falsches aktuelles Passwort ist 400 wrong_password, nie 401 - die Sitzung bleibt', async () => {
+  // Re-Critique 2026-10-17: auf das 401 hin meldete api.js "Sitzung abgelaufen"
+  // und schickte zur Anmeldung, obwohl nur ein Tippfehler vorlag.
+  const session = await login('admin', 'Grüßgott42'.normalize('NFC'));
+  assert.equal(session.status, 200);
+  const res = await fetch(`${BASE}/api/v1/auth/me/password`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Cookie: session.cookie,
+      'X-CSRF-Token': session.csrfToken,
+    },
+    body: JSON.stringify({ current_password: 'falsch-falsch', new_password: 'Neues-Passwort-1' }),
+  });
+  assert.equal(res.status, 400);
+  assert.equal((await res.json()).reason, 'wrong_password');
+  const me = await fetch(`${BASE}/api/v1/auth/me`, { headers: { Cookie: session.cookie } });
+  assert.equal(me.status, 200, 'die Sitzung gilt weiter');
+});
