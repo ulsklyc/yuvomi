@@ -6376,7 +6376,20 @@
         "overviewClearSelection": "Xóa lựa chọn",
         "continuesUntil": "…tiếp tục đến {{time}}",
         "overviewEmptyTitle": "Chọn người để so sánh",
-        "overviewEmptyDescription": "Chọn phía trên ít nhất một thành viên gia đình để xem lịch trình hằng tuần cạnh nhau."
+        "overviewEmptyDescription": "Chọn phía trên ít nhất một thành viên gia đình để xem lịch trình hằng tuần cạnh nhau.",
+        "presetCodes": {
+            "early": "S",
+            "late": "C",
+            "night": "Đ",
+            "day": "N",
+            "vacation": "NP",
+            "sick": "NÔ",
+            "exam": "KT",
+            "lecture": "BG",
+            "seminar": "HT",
+            "lab": "TH"
+        },
+        "typesWithTime": "Có giờ"
     },
     "pairDisplay": {
         "title": "Ghép nối máy tính bảng",

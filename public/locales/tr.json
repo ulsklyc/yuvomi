@@ -6376,7 +6376,20 @@
         "overviewClearSelection": "Seçimi temizle",
         "continuesUntil": "…{{time}} saatine kadar sürüyor",
         "overviewEmptyTitle": "Karşılaştırılacak kişileri seç",
-        "overviewEmptyDescription": "Haftalık programları yan yana görmek için yukarıdan en az bir hane üyesi seç."
+        "overviewEmptyDescription": "Haftalık programları yan yana görmek için yukarıdan en az bir hane üyesi seç.",
+        "presetCodes": {
+            "early": "S",
+            "late": "A",
+            "night": "G",
+            "day": "GÜ",
+            "vacation": "İ",
+            "sick": "H",
+            "exam": "SN",
+            "lecture": "D",
+            "seminar": "SE",
+            "lab": "LAB"
+        },
+        "typesWithTime": "Saatli"
     },
     "pairDisplay": {
         "title": "Tableti eşleştir",

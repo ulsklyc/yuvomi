@@ -6376,7 +6376,20 @@
         "overviewClearSelection": "選択をクリア",
         "continuesUntil": "…{{time}}まで継続",
         "overviewEmptyTitle": "比較するメンバーを選択",
-        "overviewEmptyDescription": "上で1人以上の家族メンバーを選ぶと、週間予定を並べて表示できます。"
+        "overviewEmptyDescription": "上で1人以上の家族メンバーを選ぶと、週間予定を並べて表示できます。",
+        "presetCodes": {
+            "early": "早",
+            "late": "遅",
+            "night": "夜",
+            "day": "日",
+            "vacation": "休",
+            "sick": "病",
+            "exam": "試",
+            "lecture": "講",
+            "seminar": "ゼ",
+            "lab": "実"
+        },
+        "typesWithTime": "時間あり"
     },
     "pairDisplay": {
         "title": "タブレットをペアリング",

@@ -96,6 +96,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Inviting someone is the first choice on the Members page.** "Create invitation" now sits as the
   main button right under the member list, next to "Add member", instead of in a card further down;
   both carry an icon instead of a "+" sign, and your own row says "Me" after your name.
+- **Shift types speak your language and stand in the order of the day.** The short codes of the
+  templates are now localized (in German "F · Frühschicht" and "K · Krank" instead of English "E"
+  and "S"), lessons are numbered 1 to 4, and existing shift types keep theirs. The list groups
+  shift types with times by their start, and all-day ones like vacation and sick leave apart. Once
+  a household has shift types, the template buttons sit as a quiet "Quick start" line under the
+  list instead of beside the heading.
 - **Shift statistics update as you choose.** Picking a person or a period recalculates right away,
   so the "Show statistics" button is gone. Both lists start on the same line, and a period without
   shifts shows one empty message instead of zeros and two empty cards, and offers "Print" only

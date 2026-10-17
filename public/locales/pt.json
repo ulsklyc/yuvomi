@@ -6376,7 +6376,20 @@
         "overviewClearSelection": "Limpar seleção",
         "continuesUntil": "…continua até às {{time}}",
         "overviewEmptyTitle": "Escolhe pessoas para comparar",
-        "overviewEmptyDescription": "Seleciona acima pelo menos um membro do agregado para ver os horários semanais lado a lado."
+        "overviewEmptyDescription": "Seleciona acima pelo menos um membro do agregado para ver os horários semanais lado a lado.",
+        "presetCodes": {
+            "early": "M",
+            "late": "T",
+            "night": "N",
+            "day": "D",
+            "vacation": "F",
+            "sick": "DO",
+            "exam": "EX",
+            "lecture": "AU",
+            "seminar": "SE",
+            "lab": "LAB"
+        },
+        "typesWithTime": "Com horário"
     },
     "pairDisplay": {
         "title": "Emparelhar tablet",

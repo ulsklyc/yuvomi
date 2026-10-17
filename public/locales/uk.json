@@ -6690,7 +6690,20 @@
         "overviewClearSelection": "Скинути вибір",
         "continuesUntil": "…триває до {{time}}",
         "overviewEmptyTitle": "Виберіть людей для порівняння",
-        "overviewEmptyDescription": "Виберіть вище принаймні одного члена родини, щоб побачити тижневі розклади поруч."
+        "overviewEmptyDescription": "Виберіть вище принаймні одного члена родини, щоб побачити тижневі розклади поруч.",
+        "presetCodes": {
+            "early": "Р",
+            "late": "В",
+            "night": "Н",
+            "day": "Д",
+            "vacation": "ВП",
+            "sick": "Л",
+            "exam": "І",
+            "lecture": "ЛК",
+            "seminar": "С",
+            "lab": "ЛР"
+        },
+        "typesWithTime": "З часом"
     },
     "pairDisplay": {
         "title": "Підключення планшета",

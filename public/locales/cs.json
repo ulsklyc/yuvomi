@@ -6538,7 +6538,20 @@
         "overviewClearSelection": "Zrušit výběr",
         "continuesUntil": "…pokračuje do {{time}}",
         "overviewEmptyTitle": "Vyberte osoby k porovnání",
-        "overviewEmptyDescription": "Vyberte výše alespoň jednoho člena domácnosti a zobrazte týdenní rozvrhy vedle sebe."
+        "overviewEmptyDescription": "Vyberte výše alespoň jednoho člena domácnosti a zobrazte týdenní rozvrhy vedle sebe.",
+        "presetCodes": {
+            "early": "R",
+            "late": "O",
+            "night": "N",
+            "day": "D",
+            "vacation": "DV",
+            "sick": "NE",
+            "exam": "ZK",
+            "lecture": "PŘ",
+            "seminar": "SE",
+            "lab": "LAB"
+        },
+        "typesWithTime": "S časem"
     },
     "pairDisplay": {
         "title": "Spárovat tablet",

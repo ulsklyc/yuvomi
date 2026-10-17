@@ -6376,7 +6376,20 @@
         "overviewClearSelection": "پاک کردن انتخاب",
         "continuesUntil": "…تا {{time}} ادامه دارد",
         "overviewEmptyTitle": "افرادی را برای مقایسه انتخاب کن",
-        "overviewEmptyDescription": "بالا دست‌کم یک عضو خانواده را انتخاب کن تا برنامه‌های هفتگی را کنار هم ببینی."
+        "overviewEmptyDescription": "بالا دست‌کم یک عضو خانواده را انتخاب کن تا برنامه‌های هفتگی را کنار هم ببینی.",
+        "presetCodes": {
+            "early": "ص",
+            "late": "ع",
+            "night": "ش",
+            "day": "ر",
+            "vacation": "مر",
+            "sick": "بی",
+            "exam": "ام",
+            "lecture": "سخ",
+            "seminar": "سم",
+            "lab": "آز"
+        },
+        "typesWithTime": "با ساعت"
     },
     "pairDisplay": {
         "title": "جفت‌سازی تبلت",

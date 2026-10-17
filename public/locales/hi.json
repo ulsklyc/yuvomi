@@ -6376,7 +6376,20 @@
         "overviewClearSelection": "चयन साफ़ करें",
         "continuesUntil": "…{{time}} तक जारी है",
         "overviewEmptyTitle": "तुलना के लिए लोग चुनें",
-        "overviewEmptyDescription": "साप्ताहिक समय-सारिणी साथ-साथ देखने के लिए ऊपर कम से कम एक सदस्य चुनें।"
+        "overviewEmptyDescription": "साप्ताहिक समय-सारिणी साथ-साथ देखने के लिए ऊपर कम से कम एक सदस्य चुनें।",
+        "presetCodes": {
+            "early": "सु",
+            "late": "शा",
+            "night": "रा",
+            "day": "दि",
+            "vacation": "छु",
+            "sick": "बी",
+            "exam": "प",
+            "lecture": "व्या",
+            "seminar": "सं",
+            "lab": "प्र"
+        },
+        "typesWithTime": "समय के साथ"
     },
     "pairDisplay": {
         "title": "टैबलेट जोड़ें",

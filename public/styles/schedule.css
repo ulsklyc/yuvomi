@@ -397,6 +397,19 @@
   gap: var(--space-2);
 }
 
+/* Unter der Liste, leise (R20): Etikett und Ghost-Knoepfe auf einer Linie. */
+.schedule-quickstart-actions--more {
+  align-items: center;
+}
+
+/* Zwei Gruppen in der Schichtarten-Liste (R20): mit Uhrzeit, ganztaegig. Den
+ * Abstand zwischen ihnen traegt das Raster des Abschnitts; ab 720px stehen sie
+ * als seine zwei Spalten nebeneinander. */
+.schedule-type-group__title {
+  margin: 0 0 var(--space-2);
+  font-weight: var(--font-weight-semibold);
+}
+
 .schedule-icon-picker {
   display: inline-flex;
   align-items: center;
@@ -735,6 +748,7 @@
    * neben die Ueberschrift. */
   .schedule-library--shifts > .schedule-library__head,
   .schedule-library--shifts > .row-carrier,
+  .schedule-library--shifts > .schedule-quickstart-actions--more,
   .schedule-library--shifts > .empty-state {
     grid-column: 1 / -1;
   }

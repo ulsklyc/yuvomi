@@ -6848,7 +6848,20 @@
         "overviewClearSelection": "مسح التحديد",
         "continuesUntil": "…يستمر حتى {{time}}",
         "overviewEmptyTitle": "اختر أشخاصًا للمقارنة",
-        "overviewEmptyDescription": "اختر أعلاه فردًا واحدًا على الأقل من أفراد الأسرة لرؤية الجداول الأسبوعية جنبًا إلى جنب."
+        "overviewEmptyDescription": "اختر أعلاه فردًا واحدًا على الأقل من أفراد الأسرة لرؤية الجداول الأسبوعية جنبًا إلى جنب.",
+        "presetCodes": {
+            "early": "ص",
+            "late": "م",
+            "night": "ل",
+            "day": "ن",
+            "vacation": "إج",
+            "sick": "مر",
+            "exam": "امت",
+            "lecture": "مح",
+            "seminar": "ند",
+            "lab": "مع"
+        },
+        "typesWithTime": "بمواعيد"
     },
     "pairDisplay": {
         "title": "اقتران الجهاز اللوحي",

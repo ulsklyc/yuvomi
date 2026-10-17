@@ -6159,7 +6159,20 @@
         "overviewClearSelection": "Limpar seleção",
         "continuesUntil": "...continua até às {{time}}",
         "overviewEmptyTitle": "Selecione pessoas para comparar",
-        "overviewEmptyDescription": "Selecione pelo menos um membro da família acima para comparar as escalas semanais lado a lado."
+        "overviewEmptyDescription": "Selecione pelo menos um membro da família acima para comparar as escalas semanais lado a lado.",
+        "presetCodes": {
+            "early": "M",
+            "late": "T",
+            "night": "N",
+            "day": "D",
+            "vacation": "F",
+            "sick": "LM",
+            "exam": "PR",
+            "lecture": "AU",
+            "seminar": "SE",
+            "lab": "LAB"
+        },
+        "typesWithTime": "Com horário"
     },
     "waste": {
         "title": "Coleta de lixo",

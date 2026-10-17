@@ -6376,7 +6376,20 @@
         "overviewClearSelection": "Effacer la sélection",
         "continuesUntil": "…se poursuit jusqu’à {{time}}",
         "overviewEmptyTitle": "Choisissez des personnes à comparer",
-        "overviewEmptyDescription": "Sélectionnez ci-dessus au moins un membre du foyer pour voir les emplois du temps hebdomadaires côte à côte."
+        "overviewEmptyDescription": "Sélectionnez ci-dessus au moins un membre du foyer pour voir les emplois du temps hebdomadaires côte à côte.",
+        "presetCodes": {
+            "early": "M",
+            "late": "S",
+            "night": "N",
+            "day": "J",
+            "vacation": "C",
+            "sick": "MA",
+            "exam": "EX",
+            "lecture": "CM",
+            "seminar": "SÉ",
+            "lab": "TP"
+        },
+        "typesWithTime": "Avec horaires"
     },
     "pairDisplay": {
         "title": "Appairer la tablette",

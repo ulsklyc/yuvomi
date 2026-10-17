@@ -6376,7 +6376,20 @@
         "overviewClearSelection": "Rensa urvalet",
         "continuesUntil": "…fortsätter till {{time}}",
         "overviewEmptyTitle": "Välj personer att jämföra",
-        "overviewEmptyDescription": "Välj minst en hushållsmedlem ovan för att se veckoscheman sida vid sida."
+        "overviewEmptyDescription": "Välj minst en hushållsmedlem ovan för att se veckoscheman sida vid sida.",
+        "presetCodes": {
+            "early": "M",
+            "late": "K",
+            "night": "N",
+            "day": "D",
+            "vacation": "SE",
+            "sick": "SJ",
+            "exam": "T",
+            "lecture": "F",
+            "seminar": "SEM",
+            "lab": "LAB"
+        },
+        "typesWithTime": "Med tider"
     },
     "pairDisplay": {
         "title": "Parkoppla platta",

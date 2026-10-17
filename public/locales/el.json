@@ -6376,7 +6376,20 @@
         "overviewClearSelection": "Καθαρισμός επιλογής",
         "continuesUntil": "…συνεχίζεται έως {{time}}",
         "overviewEmptyTitle": "Επιλέξτε άτομα για σύγκριση",
-        "overviewEmptyDescription": "Επιλέξτε παραπάνω τουλάχιστον ένα μέλος του νοικοκυριού για να δείτε τα εβδομαδιαία προγράμματα το ένα δίπλα στο άλλο."
+        "overviewEmptyDescription": "Επιλέξτε παραπάνω τουλάχιστον ένα μέλος του νοικοκυριού για να δείτε τα εβδομαδιαία προγράμματα το ένα δίπλα στο άλλο.",
+        "presetCodes": {
+            "early": "Π",
+            "late": "Α",
+            "night": "Ν",
+            "day": "Η",
+            "vacation": "ΑΔ",
+            "sick": "ΑΣ",
+            "exam": "ΕΞ",
+            "lecture": "ΔΙ",
+            "seminar": "ΣΕ",
+            "lab": "ΕΡ"
+        },
+        "typesWithTime": "Με ώρα"
     },
     "pairDisplay": {
         "title": "Σύζευξη tablet",

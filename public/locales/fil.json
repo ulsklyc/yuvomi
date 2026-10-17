@@ -6376,7 +6376,20 @@
         "overviewClearSelection": "I-clear ang pinili",
         "continuesUntil": "…magpapatuloy hanggang {{time}}",
         "overviewEmptyTitle": "Pumili ng mga tao na ikukumpara",
-        "overviewEmptyDescription": "Pumili sa itaas ng kahit isang miyembro ng sambahayan para makita ang lingguhang iskedyul nang magkatabi."
+        "overviewEmptyDescription": "Pumili sa itaas ng kahit isang miyembro ng sambahayan para makita ang lingguhang iskedyul nang magkatabi.",
+        "presetCodes": {
+            "early": "U",
+            "late": "H",
+            "night": "G",
+            "day": "A",
+            "vacation": "BK",
+            "sick": "MS",
+            "exam": "PS",
+            "lecture": "LK",
+            "seminar": "SE",
+            "lab": "LAB"
+        },
+        "typesWithTime": "May oras"
     },
     "pairDisplay": {
         "title": "Ipares ang tablet",

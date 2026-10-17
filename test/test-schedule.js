@@ -1578,7 +1578,7 @@ test('the quickstart template list is filtered by the household schedule_hidden_
   // wechselte von `.segmented` (Umschalter-Optik fuer einmalige Aktionen, ein
   // Missbrauch des Idioms) auf eine schlichte Knopfreihe - die Bedingung
   // ("kein leerer Wrapper, sobald jede Vorlage ausgeblendet ist") gilt unveraendert.
-  assert.match(schedulePage, /state\.types\.length && visibleQuickstartTemplates\(\)\.length \? '<div class="schedule-quickstart-actions"/, 'the header picker must not render an empty wrapper once every template is hidden');
+  assert.match(schedulePage, /state\.types\.length && visibleQuickstartTemplates\(\)\.length \? '<div class="schedule-quickstart-actions schedule-quickstart-actions--more"/, 'the picker below the list must not render an empty wrapper once every template is hidden');
   assert.match(schedulePage, /hiddenTemplates: Array\.isArray\(householdPrefs\.data\?\.schedule_hidden_templates\)/, 'load() must read the household preference, not just default to showing everything');
 });
 
@@ -2564,8 +2564,10 @@ test('Shift types quick-start: plain buttons replace the misused `.segmented` co
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
   const shiftsPanel = schedulePage.slice(schedulePage.indexOf("activeView === 'shifts'"), schedulePage.indexOf(": activeView === 'patterns'"));
   assert.doesNotMatch(shiftsPanel, /class="segmented"/, 'the quick-start template triggers must not be styled as a segmented/exclusive-state control');
-  assert.match(shiftsPanel, /class="schedule-quickstart-actions"/, 'a plain button row replaces it');
-  assert.match(shiftsPanel, /class="btn btn--secondary btn--sm" data-action="quick-start-shifts"/, 'each template stays an ordinary secondary button, an existing variant');
+  assert.match(shiftsPanel, /class="schedule-quickstart-actions schedule-quickstart-actions--more"/, 'a plain button row replaces it');
+  // R20: below the list and quiet (ghost) once types exist; the empty state keeps them as its action.
+  assert.match(shiftsPanel, /class="btn btn--ghost btn--sm" data-action="quick-start-shifts"/, 'each template is an ordinary ghost button, an existing variant');
+  assert.ok(shiftsPanel.indexOf('shiftTypeListHtml()') < shiftsPanel.indexOf('schedule-quickstart-actions--more'), 'the quick start follows the list, it no longer sits in the header');
   // The household template visibility filter must be respected unchanged.
   assert.match(shiftsPanel, /visibleQuickstartTemplates\(\)\.map\(\(\[template, key\]\)/);
 });
@@ -3285,4 +3287,47 @@ test('R20: die Auswertung bietet Drucken nur an, wenn es Eintraege gibt', async 
   assert.doesNotMatch(__test.renderStatistics(), /data-action="print-statistics"/, 'leer: kein Drucken');
   __test.setStatisticsEntries([{ date: '2026-10-01', shift_type: { id: 1, name: 'Frueh', short_code: 'F', color: '#0E7490', start_time: '06:00', end_time: '14:00' } }]);
   assert.match(__test.renderStatistics(), /data-action="print-statistics"/, 'mit Eintraegen: Drucken');
+});
+
+// R20 (Re-Critique 2026-10-17 a3 P2-3): die Kurzcodes der Vorlagen standen in
+// jeder Sprache englisch ("S · Krank" neben "L · Spätschicht").
+test('R20: jede Sprache hat eigene Kurzcodes, eindeutig in jeder Vorlage', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const { readdirSync } = await import('node:fs');
+  const dir = new URL('../public/locales/', import.meta.url);
+  const de = JSON.parse(readFileSync(new URL('de.json', dir), 'utf8')).schedule.presetCodes;
+  assert.equal(de.early, 'F', 'Frühschicht heisst F');
+  assert.equal(de.sick, 'K', 'Krank heisst K, nicht S');
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
+    const codes = JSON.parse(readFileSync(new URL(file, dir), 'utf8')).schedule.presetCodes;
+    for (const [name, template] of Object.entries(__test.PRESET_TEMPLATES)) {
+      const list = template.map((preset) => __test.NUMERIC_PRESET_CODES[preset.key] ?? codes?.[preset.key]);
+      assert.ok(list.every((c) => typeof c === 'string' && c.length > 0 && c.length <= 12), `${file}/${name}: jeder Preset hat einen Code (${list})`);
+      assert.equal(new Set(list).size, list.length, `${file}/${name}: Codes eindeutig (${list})`);
+    }
+  }
+  // Ziffern brauchen keine Uebersetzung; ohne Locale bleibt der alte Code.
+  const period = __test.PRESET_TEMPLATES.school.find((p) => p.key === 'period1');
+  assert.equal(__test.presetShortCode(period), '1');
+  const src = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  assert.match(src, /short_code: code,/, 'der Quickstart speichert den lokalisierten Code');
+  assert.match(src, /form\.elements\.short_code\.value = presetShortCode\(selected\);/, 'die Einzelvorlage im Formular ebenso');
+});
+
+// R20 (Re-Critique 2026-10-17 a3 P3): die Schichtarten standen lexikalisch -
+// Urlaub zwischen Vorlesung und Tagschicht.
+test('R20: Schichtarten stehen nach Tageszeit, Ganztaegiges als eigene Gruppe', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const types = [
+    { id: 1, name: 'Urlaub', start_time: null, end_time: null },
+    { id: 2, name: 'Spätschicht', start_time: '14:00', end_time: '22:00' },
+    { id: 3, name: 'Frühschicht', start_time: '06:00', end_time: '14:00' },
+    { id: 4, name: 'Krank', start_time: null, end_time: null },
+    { id: 5, name: 'Nachtschicht', start_time: '22:00', end_time: '06:00' },
+  ];
+  const groups = __test.shiftTypeGroups(types);
+  assert.deepEqual(groups.map((g) => g.key), ['timed', 'allDay']);
+  assert.deepEqual(groups[0].types.map((x) => x.id), [3, 2, 5], 'nach Beginn');
+  assert.deepEqual(groups[1].types.map((x) => x.id), [4, 1], 'ganztaegig nach Name');
+  assert.equal(__test.shiftTypeGroups(types.filter((x) => x.start_time)).length, 1);
 });

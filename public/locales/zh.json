@@ -6376,7 +6376,20 @@
         "overviewClearSelection": "清除选择",
         "continuesUntil": "…持续到 {{time}}",
         "overviewEmptyTitle": "选择要比较的成员",
-        "overviewEmptyDescription": "在上方至少选择一名家庭成员,即可并排查看每周时间表。"
+        "overviewEmptyDescription": "在上方至少选择一名家庭成员,即可并排查看每周时间表。",
+        "presetCodes": {
+            "early": "早",
+            "late": "晚",
+            "night": "夜",
+            "day": "白",
+            "vacation": "休",
+            "sick": "病",
+            "exam": "考",
+            "lecture": "讲",
+            "seminar": "研",
+            "lab": "实"
+        },
+        "typesWithTime": "有时间"
     },
     "pairDisplay": {
         "title": "配对平板",

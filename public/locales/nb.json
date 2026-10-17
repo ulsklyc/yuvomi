@@ -6376,7 +6376,20 @@
         "overviewClearSelection": "Tøm valg",
         "continuesUntil": "…varer til {{time}}",
         "overviewEmptyTitle": "Velg personer som skal sammenlignes",
-        "overviewEmptyDescription": "Velg minst ett medlem av husholdningen over for å se deres ukesplaner ved siden av hverandre."
+        "overviewEmptyDescription": "Velg minst ett medlem av husholdningen over for å se deres ukesplaner ved siden av hverandre.",
+        "presetCodes": {
+            "early": "T",
+            "late": "S",
+            "night": "N",
+            "day": "D",
+            "vacation": "F",
+            "sick": "SY",
+            "exam": "EK",
+            "lecture": "FL",
+            "seminar": "SE",
+            "lab": "LAB"
+        },
+        "typesWithTime": "Med klokkeslett"
     },
     "pairDisplay": {
         "title": "Par nettbrett",

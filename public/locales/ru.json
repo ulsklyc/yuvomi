@@ -6690,7 +6690,20 @@
         "overviewClearSelection": "Сбросить выбор",
         "continuesUntil": "…продолжается до {{time}}",
         "overviewEmptyTitle": "Выберите людей для сравнения",
-        "overviewEmptyDescription": "Выберите выше хотя бы одного члена семьи, чтобы увидеть недельные расписания рядом друг с другом."
+        "overviewEmptyDescription": "Выберите выше хотя бы одного члена семьи, чтобы увидеть недельные расписания рядом друг с другом.",
+        "presetCodes": {
+            "early": "У",
+            "late": "В",
+            "night": "Н",
+            "day": "Д",
+            "vacation": "О",
+            "sick": "Б",
+            "exam": "Э",
+            "lecture": "Л",
+            "seminar": "С",
+            "lab": "ЛР"
+        },
+        "typesWithTime": "Со временем"
     },
     "pairDisplay": {
         "title": "Подключение планшета",

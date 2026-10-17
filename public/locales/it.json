@@ -6376,7 +6376,20 @@
         "overviewClearSelection": "Cancella selezione",
         "continuesUntil": "…continua fino alle {{time}}",
         "overviewEmptyTitle": "Scegli le persone da confrontare",
-        "overviewEmptyDescription": "Seleziona sopra almeno un membro della famiglia per vedere gli orari settimanali affiancati."
+        "overviewEmptyDescription": "Seleziona sopra almeno un membro della famiglia per vedere gli orari settimanali affiancati.",
+        "presetCodes": {
+            "early": "M",
+            "late": "S",
+            "night": "N",
+            "day": "G",
+            "vacation": "F",
+            "sick": "ML",
+            "exam": "ES",
+            "lecture": "LZ",
+            "seminar": "SE",
+            "lab": "LAB"
+        },
+        "typesWithTime": "Con orario"
     },
     "pairDisplay": {
         "title": "Associa tablet",

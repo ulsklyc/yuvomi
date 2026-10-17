@@ -6376,7 +6376,20 @@
         "overviewClearSelection": "선택 지우기",
         "continuesUntil": "…{{time}}까지 계속",
         "overviewEmptyTitle": "비교할 사람을 선택하세요",
-        "overviewEmptyDescription": "위에서 한 명 이상의 가족 구성원을 선택하면 주간 일정을 나란히 볼 수 있습니다."
+        "overviewEmptyDescription": "위에서 한 명 이상의 가족 구성원을 선택하면 주간 일정을 나란히 볼 수 있습니다.",
+        "presetCodes": {
+            "early": "오전",
+            "late": "오후",
+            "night": "야",
+            "day": "주",
+            "vacation": "휴",
+            "sick": "병",
+            "exam": "시",
+            "lecture": "강",
+            "seminar": "세",
+            "lab": "실"
+        },
+        "typesWithTime": "시간 지정"
     },
     "pairDisplay": {
         "title": "태블릿 페어링",

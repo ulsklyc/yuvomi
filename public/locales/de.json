@@ -6376,7 +6376,20 @@
         "overviewClearSelection": "Auswahl leeren",
         "continuesUntil": "…geht bis {{time}}",
         "overviewEmptyTitle": "Personen zum Vergleichen auswählen",
-        "overviewEmptyDescription": "Wähle oben mindestens ein Haushaltsmitglied aus, um die Wochenpläne nebeneinander zu sehen."
+        "overviewEmptyDescription": "Wähle oben mindestens ein Haushaltsmitglied aus, um die Wochenpläne nebeneinander zu sehen.",
+        "presetCodes": {
+            "early": "F",
+            "late": "S",
+            "night": "N",
+            "day": "T",
+            "vacation": "U",
+            "sick": "K",
+            "exam": "PR",
+            "lecture": "VL",
+            "seminar": "SE",
+            "lab": "PK"
+        },
+        "typesWithTime": "Mit Uhrzeit"
     },
     "pairDisplay": {
         "title": "Tablet koppeln",

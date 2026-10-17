@@ -6376,7 +6376,20 @@
         "overviewClearSelection": "Selectie wissen",
         "continuesUntil": "…loopt door tot {{time}}",
         "overviewEmptyTitle": "Kies personen om te vergelijken",
-        "overviewEmptyDescription": "Selecteer hierboven minstens één huisgenoot om de weekroosters naast elkaar te zien."
+        "overviewEmptyDescription": "Selecteer hierboven minstens één huisgenoot om de weekroosters naast elkaar te zien.",
+        "presetCodes": {
+            "early": "V",
+            "late": "L",
+            "night": "N",
+            "day": "D",
+            "vacation": "VA",
+            "sick": "Z",
+            "exam": "EX",
+            "lecture": "HC",
+            "seminar": "WC",
+            "lab": "PR"
+        },
+        "typesWithTime": "Met tijden"
     },
     "pairDisplay": {
         "title": "Tablet koppelen",

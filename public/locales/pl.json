@@ -6690,7 +6690,20 @@
         "overviewClearSelection": "Wyczyść wybór",
         "continuesUntil": "…trwa do {{time}}",
         "overviewEmptyTitle": "Wybierz osoby do porównania",
-        "overviewEmptyDescription": "Wybierz powyżej co najmniej jednego członka gospodarstwa domowego, aby zobaczyć tygodniowe plany obok siebie."
+        "overviewEmptyDescription": "Wybierz powyżej co najmniej jednego członka gospodarstwa domowego, aby zobaczyć tygodniowe plany obok siebie.",
+        "presetCodes": {
+            "early": "P",
+            "late": "PP",
+            "night": "N",
+            "day": "D",
+            "vacation": "U",
+            "sick": "CH",
+            "exam": "E",
+            "lecture": "W",
+            "seminar": "S",
+            "lab": "L"
+        },
+        "typesWithTime": "Z godzinami"
     },
     "pairDisplay": {
         "title": "Sparuj tablet",

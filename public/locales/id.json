@@ -6376,7 +6376,20 @@
         "overviewClearSelection": "Hapus pilihan",
         "continuesUntil": "…berlanjut hingga {{time}}",
         "overviewEmptyTitle": "Pilih orang untuk dibandingkan",
-        "overviewEmptyDescription": "Pilih setidaknya satu anggota keluarga di atas untuk melihat jadwal mingguan berdampingan."
+        "overviewEmptyDescription": "Pilih setidaknya satu anggota keluarga di atas untuk melihat jadwal mingguan berdampingan.",
+        "presetCodes": {
+            "early": "P",
+            "late": "SO",
+            "night": "M",
+            "day": "SI",
+            "vacation": "C",
+            "sick": "S",
+            "exam": "U",
+            "lecture": "K",
+            "seminar": "SE",
+            "lab": "LAB"
+        },
+        "typesWithTime": "Dengan jam"
     },
     "pairDisplay": {
         "title": "Pasangkan tablet",

@@ -6376,7 +6376,20 @@
         "overviewClearSelection": "Borrar la selección",
         "continuesUntil": "…continúa hasta las {{time}}",
         "overviewEmptyTitle": "Elige personas para comparar",
-        "overviewEmptyDescription": "Selecciona arriba al menos un miembro del hogar para ver los horarios semanales uno junto al otro."
+        "overviewEmptyDescription": "Selecciona arriba al menos un miembro del hogar para ver los horarios semanales uno junto al otro.",
+        "presetCodes": {
+            "early": "M",
+            "late": "T",
+            "night": "N",
+            "day": "D",
+            "vacation": "V",
+            "sick": "E",
+            "exam": "EX",
+            "lecture": "CM",
+            "seminar": "SE",
+            "lab": "LAB"
+        },
+        "typesWithTime": "Con horario"
     },
     "pairDisplay": {
         "title": "Vincular tableta",

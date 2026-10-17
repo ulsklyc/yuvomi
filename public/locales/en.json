@@ -6376,7 +6376,20 @@
         "overviewClearSelection": "Clear selection",
         "continuesUntil": "…continues until {{time}}",
         "overviewEmptyTitle": "Pick people to compare",
-        "overviewEmptyDescription": "Select at least one household member above to see their weekly timetables side by side."
+        "overviewEmptyDescription": "Select at least one household member above to see their weekly timetables side by side.",
+        "presetCodes": {
+            "early": "E",
+            "late": "L",
+            "night": "N",
+            "day": "D",
+            "vacation": "V",
+            "sick": "S",
+            "exam": "EX",
+            "lecture": "LE",
+            "seminar": "SE",
+            "lab": "LAB"
+        },
+        "typesWithTime": "With times"
     },
     "pairDisplay": {
         "title": "Pair tablet",
