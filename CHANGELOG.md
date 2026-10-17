@@ -253,6 +253,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Health: the "please check" note waits until you have entered the value.** Typing 37.5 °C
+  showed "This value is not possible" after the first digit. The note now appears when you leave
+  the field or press Enter, and disappears as soon as the value is plausible again.
+
 - **"Connection interrupted" is announced once, not on every retry.** While Yuvomi kept retrying
   the session check, each failed attempt raised a new screen reader alert, and the alert also took
   focus so it was read twice. It is now announced once; later attempts update the text quietly, and

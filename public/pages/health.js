@@ -2342,8 +2342,15 @@ function openVitalModal(opts = {}) {
       let visibilityTouched = isEdit;
       visibilitySelect?.addEventListener('change', () => { visibilityTouched = true; });
 
-      // Weicher Hinweis beim Tippen (Critique R19): ungewoehnlich, aber
-      // speicherbar - 650 kg statt 65 kg faellt auf, bevor gespeichert ist.
+      // Weicher Hinweis (Critique R19): ungewoehnlich, aber speicherbar -
+      // 650 kg statt 65 kg faellt auf, bevor gespeichert ist.
+      //
+      // ERST NACH DEM EINGEBEN, NICHT WAEHREND (R19 Nachlese, Guide
+      // validate-input-after-interaction): auf `input` stand bei "37,5 °C"
+      // nach der ersten Ziffer "Dieser Wert ist nicht moeglich" da, und die
+      // Status-Region sagte jeden Zwischenstand an. Gezeigt wird beim
+      // Abschluss des Feldes (`change`: Verlassen oder Enter); beim Tippen
+      // geht der Hinweis nur weg, sobald der Wert stimmt.
       const plausibilityHint = panel.querySelector('#vital-plausibility');
       const typeNow = () => (isEdit ? row.type : typeSelect.value);
       const updatePlausibility = () => {
@@ -2352,7 +2359,13 @@ function openVitalModal(opts = {}) {
         plausibilityHint.textContent = text ?? '';
         plausibilityHint.hidden = !text;
       };
-      fieldsHost.addEventListener('input', updatePlausibility);
+      const clearPlausibilityWhenResolved = () => {
+        if (plausibilityHint && !vitalPlausibilityText(readVitalValues(panel, typeNow()))) {
+          plausibilityHint.textContent = '';
+          plausibilityHint.hidden = true;
+        }
+      };
+      fieldsHost.addEventListener('input', clearPlausibilityWhenResolved);
       fieldsHost.addEventListener('change', updatePlausibility);
       updatePlausibility();
 

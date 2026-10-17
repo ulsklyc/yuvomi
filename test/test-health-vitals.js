@@ -904,5 +904,19 @@ test('der Vitalwerte-Dialog haelt Unmoegliches an und zeigt Ungewoehnliches als 
   const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
   assert.match(src, /if \(reportFieldErrors\(vitalPlausibility\(body\)\.hard\.map\(/, 'Speichern prueft die harten Grenzen nicht');
   assert.match(src, /<p class="form-hint form-hint--warning" id="vital-plausibility" role="status" hidden><\/p>/);
-  assert.match(src, /fieldsHost\.addEventListener\('input', updatePlausibility\)/, 'der Hinweis folgt dem Tippen nicht');
+  // Seit der R19-Nachlese beim Abschluss des Feldes (change), siehe unten.
+  assert.match(src, /fieldsHost\.addEventListener\('change', updatePlausibility\)/, 'der Hinweis folgt der Eingabe nicht');
+});
+
+// Critique R19 Nachlese (Guide validate-input-after-interaction): der Hinweis
+// stand beim Tippen von "37,5 °C" schon nach der "3" als "nicht moeglich" da.
+// Gezeigt wird erst beim Abschluss des Feldes, beim Tippen nur weggenommen.
+test('der Plausibilitaets-Hinweis erscheint nach dem Eingeben, nicht waehrend', () => {
+  const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  assert.match(src, /fieldsHost\.addEventListener\('input', clearPlausibilityWhenResolved\)/,
+    'auf input wird der Hinweis gezeigt - mitten im Tippen');
+  assert.match(src, /fieldsHost\.addEventListener\('change', updatePlausibility\)/);
+  assert.doesNotMatch(src, /fieldsHost\.addEventListener\('input', updatePlausibility\)/);
+  const clear = src.slice(src.indexOf('const clearPlausibilityWhenResolved'), src.indexOf("fieldsHost.addEventListener('input'"));
+  assert.match(clear, /if \(plausibilityHint && !vitalPlausibilityText\(/, 'beim Tippen darf der Hinweis nur gehen, nicht kommen');
 });
