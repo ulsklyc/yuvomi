@@ -511,7 +511,9 @@ Ausschalter (in reduced-transparency und prefers-contrast auf 0):
   hinter der Glastafel der Zugangsseiten und im Ladebild - den zwei Orten, an denen nichts
   Opakes darueber liegt. Ohne Filter, ohne Animation. Kein Text steht direkt darauf
   (Sekundaertext fiele im Kern auf 2,96:1): auf den Zugangsseiten steht alles auf der
-  Tafel, der Schriftzug des Ladebilds in Label-Farbe.
+  Tafel, der Schriftzug des Ladebilds in Label-Farbe. Das Ladebild ist seit R20 eine stehende
+  Skizze der Shell (Kopf mit Siegel, drei leere Kartenflaechen, Kapsel bzw. Seitenleiste), ohne
+  Puls; `role="progressbar"` mit dem Markennamen, die Ansage kommt vom Screenreader.
 
 **Die App selbst hat keinen Backdrop mehr.** Bis R18 liefen hinter dem Inhalt vier
 driftende, weichgezeichnete Farbfelder (`.lg-blob`) und ein Akzentverlauf auf der Shell -
@@ -1373,7 +1375,7 @@ die Content-Spalte zieht (1920: beide Kanten bei 430 und 1710 statt 252 und 1888
 Die eine Ausnahme ist der Kalender mit Seitenleiste (R19): ab 86.25rem Kalenderflaeche nimmt
 seine Leiste den Rand ein, den die Inhaltsspalte sonst leer laesst (bei 1920 zusammen 420px), und
 Kopf, Leiste und Raster stehen von Seitenrand zu Seitenrand (252-1888). Seine Kante ist dann die,
-die jedes Modul bei 1280 und 1440 hat. Agenda und Suche haben keine Leiste und bleiben auf der Spalte.
+die jedes Modul bei 1280 und 1440 hat. Nur die Suche hat keine Leiste; die Agenda behaelt sie seit R20 ohne „Als Naechstes“ (das ist die Agenda selbst) - vorher sprang der Inhalt beim Ansichtswechsel von x 536 auf 220.
 Die Uebersicht steht seit R19 (2026-10-16) auf derselben Spalte: sie polstert am Desktop mit
 `--page-inline-pad` statt mit eigenen 32/40px und ohne ihr altes Hoechstmass von 1680px. Vorher
 begann sie bei 1920 bei x 270 und jedes Modul bei x 430; jetzt 252 / 252 / 430 bei 1280 / 1440 /
