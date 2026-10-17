@@ -485,6 +485,55 @@ function renderStandingRow(member) {
     </li>`;
 }
 
+/* DIE EIGENE KARTE (R20, Kinder-Standards). R19 hatte die eigene Zeile nach
+ * oben geholt - aber es blieb dieselbe Zeile wie die der anderen, und damit
+ * eine Rangliste mit einem Eintrag. Wer selbst sammelt, sieht hier seinen WEG:
+ * der Stand als Zahl im Large-Title-Grad, daneben das naechste Ziel mit
+ * Namen und Preis, dazwischen der Balken, und die eine Handlung, wenn der
+ * Stand reicht. Kein Spiel-Look (rewards.css Kopf): keine Konfetti, keine
+ * Sterne, der Modulton nur im Zeichen des Ziels - der Fuellstand traegt wie
+ * ueberall die Stimme. Dieselbe Zielwahl wie Zeile und Kachel
+ * (`nextRewardHint`, utils/reward-goal.js). */
+function renderOwnCard(member) {
+  const hint = nextRewardHint(member.balance);
+  const goal = Number(member.balance) >= 0 ? nextRewardGoal(member.balance, state.catalog) : null;
+  const target = goal && !goal.reached ? goal.target : null;
+  const canRedeem = !readOnly() && canAffordAny(member.balance);
+  const prev = state.prevBalances?.get(member.id);
+  const startVal = typeof prev === 'number' ? prev : member.balance;
+  const targetHtml = target ? `
+        <p class="rw-own__target">
+          <span class="rw-own__target-icon" aria-hidden="true">${target.icon ? esc(target.icon) : '<i data-lucide="gift" class="icon-md"></i>'}</span>
+          <span class="rw-own__target-name">${esc(target.name)}</span>
+          <span class="rw-own__target-cost">${esc(pointsLabel(target.cost))}</span>
+        </p>` : '';
+  const progress = hint ? `
+        <div class="rw-progress__track rw-own__track" role="progressbar"
+             aria-label="${esc(t('rewards.progressLabel'))}"
+             aria-valuenow="${Math.round(Math.max(0, Math.min(100, hint.pct)))}"
+             aria-valuemin="0" aria-valuemax="100"
+             aria-valuetext="${esc(hint.label)}"><div class="rw-progress__fill" style="--rw-progress:${Math.max(0, Math.min(1, hint.pct / 100))}"></div></div>
+        <p class="rw-own__hint" aria-hidden="true">${esc(hint.label)}</p>`
+    : `<p class="rw-own__hint rw-own__hint--muted">${esc(t('rewards.noRewardsYet'))}</p>`;
+  return `
+      <section class="rw-section rw-section--own" aria-labelledby="rw-own-title">
+        <h2 class="rw-section__title u-section-title" id="rw-own-title">${esc(t('rewards.yourPoints'))}</h2>
+        <div class="rw-own" data-member="${member.id}">
+          <p class="rw-own__balance">
+            <strong class="rw-own__value" data-countup="${member.balance}" data-from="${startVal}">${fmtPoints(startVal)}</strong>
+            <span class="rw-own__unit">${esc(t('rewards.pointsUnit'))}</span>
+          </p>
+          <div class="rw-own__goal">${targetHtml}${progress}</div>
+          <div class="rw-own__actions">
+            <button class="btn btn--ghost rw-own__history" type="button" data-member="${member.id}">${esc(t('rewards.tabLedger'))}</button>
+            ${canRedeem ? `<button class="btn btn--primary rw-redeem-open" type="button" data-member="${member.id}">
+              <i data-lucide="gift" aria-hidden="true"></i>${esc(redeemVerb())}
+            </button>` : ''}
+          </div>
+        </div>
+      </section>`;
+}
+
 // Eltern-Ersteinrichtung: drei Schritte an einem Ort, bis alle erledigt sind.
 function renderSetupHints() {
   // Drei Schritte, die alle etwas ANLEGEN. Eine Aufforderung einzurichten,
@@ -621,11 +670,7 @@ function renderOverview(el) {
   const me = state.overview?.me;
   const own = !isAdmin() && !actingAsDisplay() ? list.find((m) => m.id === me) : null;
   const others = own ? list.filter((m) => m.id !== me) : list;
-  const ownSection = own ? `
-      <section class="rw-section rw-section--own">
-        <h2 class="rw-section__title u-section-title">${esc(t('rewards.yourPoints'))}</h2>
-        <ul class="row-carrier rw-standings rw-standings--own">${renderStandingRow(own)}</ul>
-      </section>` : '';
+  const ownSection = own ? renderOwnCard(own) : '';
   el.insertAdjacentHTML('beforeend', `
     <div class="rewards-content__inner">
       ${renderPageColumns({
@@ -661,7 +706,7 @@ function wireOverview(el) {
   el.querySelectorAll('[data-decide]').forEach((btn) => {
     btn.addEventListener('click', () => decideRedemption(Number(btn.dataset.id), btn.dataset.decide, btn));
   });
-  el.querySelectorAll('.rw-standing__id').forEach((btn) => {
+  el.querySelectorAll('.rw-standing__id, .rw-own__history').forEach((btn) => {
     btn.addEventListener('click', () => openMemberDetail(Number(btn.dataset.member)));
   });
   el.querySelectorAll('[data-setup]').forEach((btn) => {
@@ -884,7 +929,7 @@ function renderLedger(el) {
         rail: renderBalancesRail(),
       })}
     </div>`);
-  el.querySelectorAll('.rw-standing__id').forEach((btn) => {
+  el.querySelectorAll('.rw-standing__id, .rw-own__history').forEach((btn) => {
     btn.addEventListener('click', () => openMemberDetail(Number(btn.dataset.member)));
   });
 
@@ -1964,7 +2009,7 @@ async function refreshActiveTab() {
  * sich sonst nicht stellen.
  */
 export const __test = {
-  renderStandingRow, renderRewardCard, renderPendingPanel, renderSetupHints,
+  renderStandingRow, renderOwnCard, renderRewardCard, renderPendingPanel, renderSetupHints,
   readOnly, state,
   // R10 L7: Kopf und Inhalt teilen je Reiter eine Kante (test-dashboard-rewards.js).
   renderCatalog, renderLedger, renderOverview, handleSetupStep,

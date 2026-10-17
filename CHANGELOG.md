@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shows who comes and when instead. A new permission "See wages and payments" lets you change this
   per role or member under Settings -> Roles & permissions, where the add and invite forms point.
   Existing accounts keep their rights, and changing someone's role later does not change them.
+  A child's Overview shows their own points first and the Budget card off while they follow the
+  default layout, and their own and unassigned tasks come before their parents' in "Today". On
+  Rewards a child sees their own card: points, the next reward with its price, the way there, and
+  "Request" once the points are enough.
 - **The search palette remembers where you went.** Press Cmd+K (Ctrl+K) with an empty field to see
   the last five modules and settings pages you opened from it, above the module shortcuts. Only the
   destination is kept on this device, never the name of an entry, and signing out clears it, so a

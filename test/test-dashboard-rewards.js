@@ -878,7 +878,9 @@ test('R19: ein Kind sieht oben die eigene Karte "Deine Punkte", Eltern nicht', (
     assert.ok(own > 0, 'die eigene Karte steht da');
     assert.ok(own < kind.html.indexOf('rewards.standings'), 'vor den Punktestaenden der anderen');
     const ownList = kind.html.slice(own, kind.html.indexOf('</section>', own));
-    assert.match(ownList, /Emma/, 'mit dem eigenen Stand');
+    // R20: die eigene Karte nennt den Stand, nicht den eigenen Namen - die
+    // Ueberschrift "Deine Punkte" sagt schon, wessen er ist.
+    assert.match(ownList, /data-countup="30"/, 'mit dem eigenen Stand');
     assert.match(ownList, /rw-progress__track/, 'und dem Weg zur naechsten Praemie');
     const rest = kind.html.slice(kind.html.indexOf('rewards.standings'));
     assert.doesNotMatch(rest, /aria-label="Emma,/, 'die eigene Zeile steht nicht doppelt');
@@ -886,6 +888,54 @@ test('R19: ein Kind sieht oben die eigene Karte "Deine Punkte", Eltern nicht', (
     const eltern = markupEl();
     rewardsPage.renderOverview(eltern);
     assert.doesNotMatch(eltern.html, /rewards\.yourPoints/, 'Eltern sehen die gleichwertige Liste');
+  } finally {
+    Object.assign(s, vorher);
+  }
+});
+
+// R20 (Kinder-Standards): wer selbst sammelt, sieht oben seine eigene Karte -
+// Stand, naechstes Ziel mit Name und Preis, Balken, und die Handlung nur,
+// wenn der Stand fuer eine Praemie reicht. Keine Rangzeile mit einem Eintrag.
+test('Belohnungen: das Kind sieht seine eigene Karte "Deine Punkte -> naechste Praemie" vor den anderen', () => {
+  const s = rewardsPage.state;
+  const vorher = { user: s.user, overview: s.overview, catalog: s.catalog, ledger: s.ledger, redemptions: s.redemptions, recentLedger: s.recentLedger };
+  try {
+    s.user = { id: 3, role: 'member', family_role: 'child' };
+    s.overview = { me: 3, balances: [{ id: 3, display_name: 'Emma', balance: 30 }, { id: 4, display_name: 'Leo', balance: 60 }] };
+    s.catalog = [
+      { id: 7, name: 'Kinoabend', icon: '🎬', cost: 40, is_active: 1 },
+      { id: 8, name: 'Zoo', cost: 120, is_active: 1 },
+    ];
+    s.redemptions = [];
+    s.recentLedger = [];
+    let el = markupEl();
+    rewardsPage.renderOverview(el);
+    const own = el.html.indexOf('class="rw-own"');
+    const others = el.html.indexOf('rewards.standings');
+    assert.ok(own > 0, 'die eigene Karte steht da');
+    assert.ok(own < others, 'vor den Punktestaenden der anderen');
+    const card = el.html.slice(own, others);
+    assert.match(card, /rw-own__value" data-countup="30"/, 'der eigene Stand als grosse Zahl');
+    assert.match(card, /rw-own__target-name">Kinoabend</, 'das naechste Ziel mit Namen');
+    assert.match(card, /rw-own__target-cost">rewards\.pointsCount|rw-own__target-cost">[^<]*40/, 'und seinem Preis');
+    assert.match(card, /role="progressbar"[^>]*aria-valuenow="75"/, '30 von 40 - der Weg als Balken');
+    assert.doesNotMatch(card, /rw-redeem-open/, '30 reicht fuer nichts: kein Einloese-Knopf');
+    assert.match(card, /rw-own__history/, 'der eigene Verlauf bleibt erreichbar');
+    assert.doesNotMatch(card, /rw-standing__id/, 'keine Rangzeile in der eigenen Karte');
+    assert.doesNotMatch(el.html.slice(others), /data-member="3"/, 'unten stehen nur die anderen');
+
+    // Reicht der Stand, steht die Handlung als Primaerknopf in der Karte.
+    s.overview.balances[0].balance = 45;
+    el = markupEl();
+    rewardsPage.renderOverview(el);
+    assert.match(el.html, /class="btn btn--primary rw-redeem-open" type="button" data-member="3"/);
+
+    // Der Elternteil sieht keine eigene Karte, sondern alle Staende.
+    s.user = { id: 1, role: 'admin' };
+    s.overview.me = 1;
+    el = markupEl();
+    rewardsPage.renderOverview(el);
+    assert.doesNotMatch(el.html, /class="rw-own"/);
   } finally {
     Object.assign(s, vorher);
   }

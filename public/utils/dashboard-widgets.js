@@ -177,6 +177,27 @@ export function defaultWidgetVisible(id) {
 export const DEFAULT_WIDGET_CONFIG = WIDGET_IDS.map((id, i) => ({ id, visible: defaultWidgetVisible(id), order: i, size: defaultWidgetSize(id) }));
 
 /**
+ * Die Vorgabe fuer ein Kinderkonto (R20, Kinder-Standards): die eigenen Punkte
+ * zuerst, die Budget-Kachel aus. Gilt nur, solange das Konto der Vorgabe
+ * FOLGT (nichts Eigenes gespeichert) - ein eigenes Layout bleibt, wie es ist.
+ * Kein Recht: wer Budget sehen darf, holt die Kachel ueber "Anpassen" zurueck;
+ * ein neues Kinderkonto hat das Modul ohnehin nicht (server/permissions.js).
+ * Die Aufgaben stehen schon im Heute-Blatt ganz oben, eigene zuerst
+ * (pages/dashboard.js `buildTodayProgram`).
+ *
+ * Rein und ohne Seiteneffekt, auf einer schon normalisierten Liste.
+ */
+export function childDefaultWidgetConfig(config) {
+  const list = (Array.isArray(config) ? config : []).map((w) => ({ ...w }));
+  const rewards = list.find((w) => w.id === 'rewards');
+  const rest = list
+    .filter((w) => w.id !== 'rewards')
+    .map((w) => (w.id === 'budget' ? { ...w, visible: false } : w));
+  const ordered = rewards ? [{ ...rewards, visible: true }, ...rest] : rest;
+  return ordered.map((w, i) => ({ ...w, order: i }));
+}
+
+/**
  * Wo eine fehlende Id in ein gespeichertes Layout gehört: direkt hinter den
  * nächsten in WIDGET_IDS VORANGEHENDEN Eintrag, der dort schon vorkommt.
  *

@@ -42,7 +42,7 @@ import {
   COCKPIT_COVERED_WIDGETS,
   nearestPreset, sameWidgetConfig, suggestGridHoleFill, rowFillSpans,
   dashboardQuery, dashboardQueryFiltersCounts, dashboardRequest, normalizeShoppingListSelection,
-  fetchPendingReminders,
+  fetchPendingReminders, childDefaultWidgetConfig,
 } from '/utils/dashboard-widgets.js';
 import { EVENT_LIMIT_STEPS, EVENT_LIMIT_DEFAULT, clampEventLimit } from '/utils/dashboard-event-limit.js';
 import {
@@ -1170,7 +1170,27 @@ function mealCookPerson(meal, users) {
   };
 }
 
-function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, includeMeals = true, now = new Date() } = {}) {
+/* WER SCHAUT (R20, Kinder-Standards). Die Seite setzt das in `render()`; die
+ * Programmzeilen fragen es, damit ein Kind seine Aufgaben zuerst sieht. */
+let dashboardViewer = null;
+
+/** Ein Kinderkonto, das der Vorgabe folgt, bekommt die Kinder-Vorgabe der Kacheln. */
+function childDefaultFor(config, user, followsDefault) {
+  return followsDefault && user?.family_role === 'child' ? childDefaultWidgetConfig(config) : config;
+}
+
+/* Gehoert eine Aufgabe NUR anderen? Fuer ein Kind ruecken solche Zeilen ans
+ * Ende des Blatts (und fallen zuerst unter „+N weitere"): eigene und
+ * niemandem zugewiesene Aufgaben zuerst. Erwachsene sehen das Blatt wie
+ * bisher - ihre Rolle ist es, den Ueberblick ueber alle zu haben. Nichts
+ * verschwindet, die Aufgabenliste zeigt weiter alles. */
+function taskForOthersOnly(task, viewer) {
+  if (viewer?.family_role !== 'child' || viewer?.id == null) return false;
+  const people = Array.isArray(task?.assigned_users) ? task.assigned_users : [];
+  return people.length > 0 && !people.some((person) => person?.id === viewer.id);
+}
+
+function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, includeMeals = true, now = new Date(), viewer = dashboardViewer } = {}) {
   const highlights = buildTodayHighlights(data);
   const todayKey = zonedDateKey(now);
   const nowStamp = householdNowStamp(now);
@@ -1232,10 +1252,14 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
       // auf einem Geraet in New York stand an „bis 18:00" in Berlin „bis 00:00".
       const dueTime = !overdue && task.due_time ? String(task.due_time).slice(0, 5) : null;
       const dueValid = dueTime && /^\d{2}:\d{2}$/.test(dueTime);
+      const othersOnly = taskForOthersOnly(task, viewer);
+      const baseKey = overdue ? '00:00' : dueValid ? dueTime : '00:02';
       rows.push({
         kind: 'task',
         objectId: task.id,
-        sortKey: overdue ? '00:00' : dueValid ? dueTime : '00:02',
+        // '~' sortiert hinter jede Uhrzeit: fremde Aufgaben eines Kindes am Ende.
+        sortKey: othersOnly ? `~${baseKey}` : baseKey,
+        othersOnly,
         timeLabel: overdue ? t('dashboard.overdue') : dueValid ? t('dashboard.todayUntil', { time: formatTime(`${task.due_date}T${dueTime}`) }) : '',
         overdue,
         title: task.title,
@@ -1248,7 +1272,7 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
         route: '/tasks',
         who: task.assigned_users?.[0] ?? null,
         people: task.assigned_users ?? [],
-        priority: overdue ? 10 : 30,
+        priority: othersOnly ? 90 : overdue ? 10 : 30,
         open: true,
       });
     }
@@ -1287,7 +1311,8 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
   // Ohne sie verspräche die Fläche abends „nichts mehr", während der
   // Schulausflug-Zettel morgen früh abgegeben werden muss.
   const allTasks = Array.isArray(data?.urgentTasks) ? data.urgentTasks : Array.isArray(data?.tasks) ? data.tasks : [];
-  const nextDueTask = allTasks.find((task) => task.due_date && task.due_date > todayKey) ?? null;
+  const laterTasks = allTasks.filter((task) => task.due_date && task.due_date > todayKey);
+  const nextDueTask = laterTasks.find((task) => !taskForOthersOnly(task, viewer)) ?? laterTasks[0] ?? null;
 
   return {
     rows,
@@ -3653,7 +3678,9 @@ const PROGRAM_ROW_CAP_PHONE = 2;
 const OVERDUE_GROUP_MIN = 2;
 
 function groupOverdueRows(rows) {
-  const overdue = rows.filter((row) => row.kind === 'task' && row.overdue);
+  // Fremde Aufgaben eines Kindes (`othersOnly`) gehen nicht in die Gruppe, die
+  // oben steht - sie bleiben einzeln am Ende des Blatts.
+  const overdue = rows.filter((row) => row.kind === 'task' && row.overdue && !row.othersOnly);
   if (overdue.length < OVERDUE_GROUP_MIN) return rows;
   const seen = new Set();
   const people = [];
@@ -3725,6 +3752,7 @@ function buildTodayCockpitModel(data, cfg = [], {
   cap = onPhoneStage() ? PROGRAM_ROW_CAP_PHONE : PROGRAM_ROW_CAP,
   now = new Date(),
   groupOverdue = onPhoneStage(),
+  viewer = dashboardViewer,
 } = {}) {
   // Kein Echo: ist das Modul-Widget einer Domäne sichtbar, entfallen ihre
   // Programm-Zeilen — jede Domäne hat genau eine Repräsentation (Cockpit ODER
@@ -3737,7 +3765,7 @@ function buildTodayCockpitModel(data, cfg = [], {
   const includeMeals = domainInCockpit('meals');
   const includeShopping = domainInCockpit('shopping');
 
-  const program = buildTodayProgram(data, { includeTasks, includeCalendar, includeMeals, now });
+  const program = buildTodayProgram(data, { includeTasks, includeCalendar, includeMeals, now, viewer });
 
   // Die uebrigen Quellen des Blatts (Dosen, Freigaben, Abfuhr, Geburtstag,
   // Schicht, Erinnerungen, Haushaltshilfe) sprechen ueber den Beitrags-Vertrag
@@ -6754,6 +6782,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
   const controller = createPageController(routeSignal);
   _fabController = controller;
   const { signal } = controller;
+  dashboardViewer = user ?? null;
 
   // Der Wand-Modus ist ein Zustand DIESER Seite, kein zweiter Ort: die Route,
   // die Daten, der stille Refresh und die Echo-Regel bleiben dieselben - nur
@@ -6891,7 +6920,11 @@ export async function render(container, { user, signal: routeSignal = null } = {
     weatherPrefs = prefsRes.data ?? null;
     setWeatherAvailability(weatherRes, weatherPrefs);
     weatherAutoLocate = Boolean(prefsRes.data?.weather_user?.auto_locate ?? prefsRes.data?.weather_auto_locate);
-    widgetConfig = normalizeDashboardConfigWithExtensions(prefsRes.data?.dashboard_widgets ?? buildDefaultWidgetConfig());
+    widgetConfig = childDefaultFor(
+      normalizeDashboardConfigWithExtensions(prefsRes.data?.dashboard_widgets ?? buildDefaultWidgetConfig()),
+      user,
+      prefsRes.data?.dashboard_follows_default !== false,
+    );
     savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
     /* WIDGET-OPTIONEN KOMMEN EINEN SCHRITT ZU SPAET (#814): die Uebersicht und
      * die Praeferenzen laufen absichtlich parallel los, aber welche Filter
@@ -7166,7 +7199,11 @@ export async function render(container, { user, signal: routeSignal = null } = {
     const previousQuery = dashboardQuery(savedWidgetConfig);
     try {
       const res = await api.put('/preferences', { dashboard_widgets: null, dashboard_today_glance: null });
-      widgetConfig = normalizeDashboardConfigWithExtensions(res.data?.dashboard_widgets ?? buildDefaultWidgetConfig());
+      widgetConfig = childDefaultFor(
+        normalizeDashboardConfigWithExtensions(res.data?.dashboard_widgets ?? buildDefaultWidgetConfig()),
+        user,
+        true,
+      );
       glanceVisible = res.data?.dashboard_today_glance !== false;
     } catch {
       window.yuvomi?.showToast(t('common.errorGeneric'), 'danger');
@@ -7921,7 +7958,7 @@ async function loadScheduleSlice(day) {
   };
 }
 
-export const __test = { customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill };
+export const __test = { childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -

@@ -317,6 +317,98 @@
 .rw-progress__label--muted { color: var(--color-text-tertiary); }
 
 /* --------------------------------------------------------
+   Die eigene Karte (R20, Kinder-Standards)
+   -------------------------------------------------------- */
+/* Wer selbst sammelt, sieht seinen Weg, nicht eine Rangliste mit einem
+ * Eintrag. EINE opake Karte wie die Praemienkarten (randlos, xs-Schatten):
+ * links der Stand im Large-Title-Grad, in der Mitte das naechste Ziel mit
+ * Zeichen, Name und Preis ueber dem Balken, rechts die Handlungen. Auf dem
+ * Telefon untereinander, die Handlungen ueber die ganze Breite.
+ * Ruhig wie das Modul (Kopf dieser Datei): die Zahl zeichnet Grad und Gewicht
+ * aus, nicht Farbe; der Modulton steht nur im Zeichen des Ziels. */
+.rw-own {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4) var(--space-6);
+  padding: var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
+}
+.rw-own__balance {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.rw-own__value {
+  font-size: var(--text-4xl);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: var(--tracking-tight);
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.rw-own__value.rw-countup--active { color: var(--color-accent); }
+.rw-own__unit { font-size: var(--text-sm); color: var(--color-text-secondary); }
+.rw-own__goal { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.rw-own__target {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.rw-own__target-icon {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: var(--target-sm);
+  height: var(--target-sm);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--module-rewards) var(--tint-state), transparent);
+  color: var(--module-rewards);
+  font-size: var(--text-base);
+}
+.rw-own__target-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.rw-own__target-cost {
+  margin-inline-start: auto;
+  flex: 0 0 auto;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.rw-own__hint { margin: 0; font-size: var(--text-sm); color: var(--color-text-secondary); }
+.rw-own__hint--muted { color: var(--color-text-tertiary); }
+.rw-own__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+@media (max-width: 639px) {
+  .rw-own {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-4);
+    padding: var(--space-4);
+  }
+  .rw-own__actions { justify-content: stretch; }
+  .rw-own__actions > .btn { flex: 1 1 0; }
+}
+
+/* --------------------------------------------------------
    Offene Anfragen
    -------------------------------------------------------- */
 /* Der Listen-Reset steht VOR dem Panel: beide Klassen sitzen am selben `ul`
