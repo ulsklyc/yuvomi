@@ -2099,7 +2099,12 @@ Rueckfall. Der Statuscode steht zugeklappt unter "Technische Details", nie als s
 Zeigt die Flaeche den Fehler, gibt es keinen Toast daneben. Die Sitzungspruefung beim Start
 hat denselben Zustand als Shell-Fassung (`utils/session-unreachable.js`, im Lichtfeld des
 Ladebilds): nur ein 401 fuehrt zur Anmeldung, alles andere versucht mit wachsendem Abstand
-und nach `Retry-After` selbst erneut.
+und nach `Retry-After` selbst erneut. Ihr Titel folgt der Ursache wie der Satz darunter
+(`unreachableTitleKey`: Verbindung, Server nicht bereit, zu viele Anfragen; R20). Scheitert ein
+SEITENWECHSEL am Netz, zeichnet `showPageUnreachable()` denselben Ton in den Inhaltsbereich
+("Du bist offline", `role="status"`, kein Zeitgeber) und baut die Seite beim `online`-Ereignis
+selbst neu; der Absturzbildschirm bleibt Fehlern im Code der Seite. Das Offline-Banner steht am
+Desktop rechts der schwebenden Seitenleiste (`--sidebar-width` + `--sidebar-float-gap`).
 
 **Die Fusszeilen-Regel (v2.6.0). Ueberschuessige Hoehe wird Atem, nicht Loch.** Eine Karte
 mit Fusszeile streckt ihren Koerper (`flex: 1`) und verankert die Fusszeile unten
@@ -2311,6 +2316,14 @@ nur das gerenderte Dokument sieht, ob eine Liste ueberhaupt verdrahtet ist.
 - **Alle Feldfehler auf einmal (R19):** ein Speicherpfad meldet mit `reportFieldErrors()`
   (components/modal.js) JEDEN Fehler an seinem Feld und fokussiert das erste in
   Dokumentreihenfolge - nie einen Fehler je Klick in der Reihenfolge der Pruefung.
+- **Keine Browser-Blasen, auch in den Einstellungen (R20):** ein Formular mit `required`,
+  `minlength` oder `type="email"` traegt `novalidate` und meldet ueber `reportFieldErrors()`. In
+  den Einstellungen macht `settingRowHtml({ field: true })` die Zeile zum Traeger: die Meldung
+  steht unter der Zeile, ueber beide Spalten. Felder ohne natives Eingabeelement melden am
+  sichtbaren Traeger und fokussieren selbst: die Ablage der Dokumente (`reportDropzoneError`,
+  Meldung hinter der Ablage, `aria-invalid`/`aria-describedby` am Datei-Input, der den Fokus
+  bekommt) und die Wochentags-Chips der Entsorgung (Fokus auf den ersten Tag). Eine Absage des
+  Servers mit `reason` (`wrong_password`, `email_port_invalid`) geht an dasselbe Feld.
 - **Nachfragen ohne Sperre (R19):** `.form-hint--warning` (Tinte `--color-warning-ink`) fuer
   ungewoehnliche, aber speicherbare Werte (Vitalwerte: 650 kg). Unmoegliches ist ein
   Feldfehler, nicht diese Zeile.
