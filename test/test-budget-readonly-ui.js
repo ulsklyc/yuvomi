@@ -1768,3 +1768,12 @@ test('Abo: saving sends the reminder switch for both new and existing subscripti
 });
 
 test.after(() => miniDomAbraeumen());
+
+// R20 (Re-Critique 2026-10-17, A4 P3): eine feste Miete ist am Ersten zu 100 %
+// gebucht und stand den Monat ueber in Bernstein. Genau auf Plan ist keine Warnung.
+test('R20: genau auf Plan ist kein "knapp" - kurz davor schon, darueber rot', () => {
+  assert.equal(plans.toneForRatio(1, false), 'under', 'feste Kosten, genau getroffen');
+  assert.equal(plans.toneForRatio(0.9, false), 'near');
+  assert.equal(plans.toneForRatio(0.5, false), 'under');
+  assert.equal(plans.toneForRatio(1.2, true), 'over');
+});

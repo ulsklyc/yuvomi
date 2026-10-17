@@ -71,9 +71,14 @@ function renderShell() {
 }
 
 // Auslastung → Ton: unter Plan grün, knapp (>85 %) amber, über Plan rot.
+//
+// GENAU AUF PLAN IST KEINE WARNUNG (R20, Re-Critique 2026-10-17 A4 P3). Eine
+// feste Miete ist am Monatsersten zu 100 % gebucht und bleibt es; sie stand den
+// ganzen Monat in Bernstein mit Warndreieck, obwohl nichts mehr kommt. Amber
+// heisst "kurz davor" - wer den Plan genau trifft, ist angekommen, nicht knapp.
 function toneForRatio(ratio, over) {
   if (over) return 'over';
-  if (ratio > 0.85) return 'near';
+  if (ratio > 0.85 && ratio < 1) return 'near';
   return 'under';
 }
 
@@ -399,4 +404,4 @@ async function deletePlan(category) {
  * Messflaeche fuer die Nur-lesen-Regel (#1265 P7): die drei Renderer sind reine
  * Funktionen ueber `view`, das der Test mit `ctx` fuellt.
  */
-export const __test = { readOnly, renderSavingsCard, renderRows, view, openAddPlan };
+export const __test = { readOnly, renderSavingsCard, renderRows, view, openAddPlan, toneForRatio };

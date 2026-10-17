@@ -348,6 +348,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Budget plan: hitting the plan exactly is no warning.** A fixed cost such as rent is booked in
+  full on the first of the month; its plan row stayed amber with a warning sign all month. Amber
+  now means "almost there", red still means over the plan.
 - **Loan payments show the latest six.** The list under the loans grew with every instalment (16
   rows on a phone with a building loan); the rest now sits behind "Show all (n)". On a narrow
   screen the dot between date and instalment no longer hangs at the end of the first line.
