@@ -2367,6 +2367,30 @@ ist die teurere Auskunft als einer, der gar nicht da ist.
 Gemessen am echten Markup: `test:module-readonly-ui`, `test:budget-readonly-ui`,
 `test:shopping-readonly-ui`.
 
+### Kinderkonten: Startrechte und eigene Sicht (R20, entschieden 2026-10-17)
+Ein NEUES Konto mit Familienrolle Kind startet mit Mitglied-Zeilen
+(`CHILD_START_PERMISSIONS`, server/permissions.js): Budget `none`, Haushaltshilfe `read`,
+Fasten aus, `housekeeping_view_amounts` aus. Nur verschaerfend, nur beim Anlegen (Admin,
+Einladung); bestehende Konten und ein spaeterer Rollenwechsel bleiben unberuehrt.
+
+- **Betraege fehlen am Server, nicht nur im Bild.** Ohne `housekeeping_view_amounts` kommen
+  Satz, Summen, Zahlstatus und offener Lohn als `null`; die Seite zeigt dann statt
+  „Betrag · Zahlstatus" die Zeit des Besuchs („08:30-12:00"), die Zahlungskarte entfaellt
+  und die Besuche nehmen die Zeile allein (`.housekeeping-dashboard-columns--single`). Eine
+  `null` steht nie als „0,00 €".
+- **Die Uebersicht eines Kindes** folgt der Vorgabe mit zwei Abweichungen
+  (`childDefaultWidgetConfig`): Belohnungen zuerst und sichtbar, Budget aus. Im Heute-Blatt
+  ruecken Aufgaben, die nur anderen gehoeren, ans Ende und fallen zuerst unter „+N weitere".
+- **Die eigene Karte auf /rewards** (`.rw-own`): Stand im Large-Title-Grad, das naechste Ziel
+  mit Zeichen, Name und Preis ueber dem Balken, „Verlauf" leise und „Anfragen" primaer erst,
+  wenn der Stand reicht. Opak und randlos wie die Praemienkarte, der Modulton nur im Zeichen
+  des Ziels - kein Spiel-Look.
+- **Anlegen und Einladen** nennen die Startrechte unter der Familienrolle, nur bei Kind
+  (`settings.childStartHint`), und nur dann zeigt `aria-describedby` darauf.
+
+Gemessen: `test:child-start-permissions`, `test:housekeeping-ui`, `test:dashboard-today`,
+`test:dashboard-rewards`, `test:member-order`.
+
 ### Navigation
 - **Mobil:** schwebende Glas-Kapsel (radius-full) mit gleitendem Aktiv-Indikator, duenner
   als das uebrige Chrome (2026-10-01): `--glass-bg-capsule` (hell 0.66, dunkel 0.50) ueber
