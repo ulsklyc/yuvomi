@@ -711,3 +711,26 @@ export async function clickPastDeadTime(page, selector, options = {}) {
   await new Promise((resolve) => { setTimeout(resolve, POINTER_DEAD_TIME_MS); });
   await page.click(selector);
 }
+
+/**
+ * Den Wand-Modus der Uebersicht so einschalten, wie es auf DIESER Breite geht.
+ *
+ * Seit R19 (Entscheidung Ulas 2026-10-16) stehen Anpassen und Wand-Modus unter
+ * 768px als Eintraege EINES Menues (`.dashboard-tools-btn`); `#dashboard-wall-enter`
+ * bleibt im Baum, ist dort aber `display: none` - und `page.click()` wirft auf
+ * einem Knoten ohne Box. Ab 768px steht der Knopf wie bisher. Der Helfer geht
+ * den Weg, den ein Finger geht, und laesst den Handler dahinter unveraendert
+ * (der Menueeintrag klickt den Knopf, dashboard.js).
+ */
+export async function enterDashboardWall(page) {
+  await page.waitForSelector('#dashboard-wall-enter');
+  const viaMenu = await page.$eval('#dashboard-wall-enter', (el) => el.getClientRects().length === 0);
+  if (!viaMenu) {
+    await page.click('#dashboard-wall-enter');
+    return;
+  }
+  await page.click('.dashboard-tools-btn');
+  const item = '#dashboard-tools-menu [data-action="dashboard-wall"]';
+  await page.waitForSelector(item, { visible: true });
+  await page.click(item);
+}

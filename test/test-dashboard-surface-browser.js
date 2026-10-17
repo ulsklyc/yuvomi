@@ -20,7 +20,7 @@
 
 import { test, before, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { startHarness, openPage, gotoRoute } from './document-guards-harness.js';
+import { startHarness, openPage, gotoRoute, enterDashboardWall } from './document-guards-harness.js';
 
 let harness;
 
@@ -450,7 +450,7 @@ test('Wand-Modus: Einschalten sagt, was das ist und wie man herauskommt; Zurueck
   await gotoRoute(page, '/');
   await markDocument(page);
   const depthBefore = await page.evaluate(() => history.length);
-  await page.click('#dashboard-wall-enter');
+  await enterDashboardWall(page);
   await page.waitForFunction(() => document.documentElement.hasAttribute('data-wall-mode'), { timeout: 5000 });
   await wait(300);
   const hint = await page.evaluate(async () => {
@@ -858,7 +858,7 @@ test('FAB: beim Betreten des Wand-Modus steht keiner auf der Wand, auch solange 
     held.push(req);
     return true;
   };
-  await page.click('#dashboard-wall-enter');
+  await enterDashboardWall(page);
   await page.waitForSelector('.wall #wall-exit');
   await wait(300);
   const state = await page.evaluate(() => ({
@@ -877,7 +877,7 @@ test('FAB: beim Betreten des Wand-Modus steht keiner auf der Wand, auch solange 
 test('FAB: nach dem Verlassen des Wand-Modus steht er in der Shell-Ebene, mit Plus, neben der Kapsel (mobile, #1588)', async () => {
   const page = await openPage(harness, { device: 'mobile' });
   assertFabDocked(await fabOverCapsule(page), 'vor dem Wand-Modus');
-  await page.click('#dashboard-wall-enter');
+  await enterDashboardWall(page);
   await page.waitForSelector('.wall #wall-exit');
   // Die Wand hat sich gesetzt: der Knopf der Vorseite ist aus der Shell-Ebene
   // geraeumt, wie nach jeder Weile an der Wand.

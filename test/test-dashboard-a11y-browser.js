@@ -22,7 +22,7 @@
  */
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { startHarness, openPage, gotoRoute, settle, clickPastDeadTime, DEVICES } from './document-guards-harness.js';
+import { startHarness, openPage, gotoRoute, settle, clickPastDeadTime, DEVICES, enterDashboardWall } from './document-guards-harness.js';
 
 let harness;
 before(async () => { harness = await startHarness(); });
@@ -205,7 +205,7 @@ test('(3) Anpassen per Tastatur: der Fokus bleibt, die Wechsel werden angesagt',
 
 test('(4) Wand-Timer: sichtbar in Ruhe, der erste Tipp auf die schlafende Wand weckt nur', async () => {
   const page = await dashboardPage({ device: 'mobile' });
-  await page.click('#dashboard-wall-enter');
+  await enterDashboardWall(page);
   await page.waitForSelector('.wall [data-wall-timer-start]');
   await settle(page);
   // Schlafend: das Attribut faellt nach sechs Sekunden von selbst - hier sofort.
