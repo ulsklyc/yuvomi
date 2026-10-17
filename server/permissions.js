@@ -30,8 +30,9 @@
  * eingeschränktes Mitglied bekommt eine Modul→Access-Map, die die /api/v1-
  * Middleware wie ein gescoptes Token auswertet).
  *
- * Bewusst nur Abhängigkeit zu scopes.js (kein express) — nutzbar in Middleware,
- * Routen und Tests.
+ * Bewusst nur Abhängigkeiten ohne Seiteneffekte (scopes.js, display-scopes.js,
+ * require-admin.js; kein express, kein db.js) - nutzbar in Middleware, Routen,
+ * Migrationen und Tests.
  */
 
 import { MODULE_KEYS, getModuleKeys, tokenAllows } from './scopes.js';
@@ -39,6 +40,7 @@ import { MODULE_KEYS, getModuleKeys, tokenAllows } from './scopes.js';
 // legte jede Suite, die bloss Rechte aufloest, eine echte yuvomi.db im Repo an
 // (test:db-isolation nannte vier davon).
 import { DISPLAY_SCOPE_MODULES } from './display-scopes.js';
+import { isAdminRequest } from './middleware/require-admin.js';
 
 // Familienrollen (Subjekt-Achse „role"). Spiegelt den CHECK-Constraint der
 // users.family_role-Spalte (Migration, db.js).
@@ -730,14 +732,26 @@ export function applyChildStartPermissions(database, user) {
  * ist "im Zweifel weglassen" die sichere Seite.
  */
 export function requestHasCapability(database, req, key) {
-  if (req?.authRole === 'admin') return true;
-  const id = req?.authUserId ?? req?.session?.userId;
+  if (!req) return false;
+  if (isAdminRequest(req)) return true;
+  const id = req.authUserId ?? req.session?.userId;
   if (id == null) return false;
-  const user = database.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(id);
+  return userHasCapability(database, id, key, { isDisplay: req.authMethod === 'display' });
+}
+
+/**
+ * Darf das Konto die Capability nutzen - ohne Anfrage, aus der gespeicherten
+ * Rolle und den Rechte-Zeilen? Admin immer, ein unbekanntes Konto nie. Die
+ * Frage hinter `requestHasCapability()`, und die, die eine Migration oder ein
+ * Nachtrag ueber ein ANDERES Konto stellt als das anfragende (Zahlungsaufgaben,
+ * services/payment-task-audience.js).
+ */
+export function userHasCapability(database, userId, key, { isDisplay = false } = {}) {
+  if (userId == null) return false;
+  const user = database.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(userId);
   if (!user) return false;
   if (user.role === 'admin') return true;
-  return resolvePermissions(database, user, { isDisplay: req.authMethod === 'display' })
-    .capabilities[key] === 'allow';
+  return resolvePermissions(database, user, { isDisplay }).capabilities[key] === 'allow';
 }
 
 export function isValidInvitePreset(preset) {
