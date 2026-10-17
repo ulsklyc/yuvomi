@@ -950,3 +950,21 @@ test('kein Stylesheet nutzt ein Konstrukt, das an der Mindestversion einen ganze
     + 'Die Regel ohne das Konstrukt schreiben (klassische min-/max-width-Merkmale, Selektoren '
     + 'ausschreiben):\n' + offenders.join('\n'));
 });
+
+// DIE PILLE DER MOBILEN KAPSEL (R20, Review): sie verschiebt das aktive Ziel
+// mit `translate` (Chromium 104) und schneidet mit `overflow: clip` (90). Unter
+// der Mindestversion (Chrome 87, der Chromebook aus #1276 bei 91) schrumpfte
+// die Kapsel ohne den Versatz, und die Pille stuende leer. Jede Regel, die die
+// Pille baut, steht deshalb in `@supports (translate: 0)`; ohne die Eigenschaft
+// minimiert die Kapsel wie in R19.
+test('die Pille der Kapsel steht nur dort, wo translate gilt', () => {
+  const pillRules = [...eachRule(read('public/styles/layout.css'))].filter(({ selector, body }) => (
+    /nav-item--pill/.test(selector)
+    || /var\(--nav-(?:pill-width|pill-shift|item-width)/.test(body)
+    || (/\.nav-bottom__items/.test(selector) && /overflow:\s*clip/.test(body))
+  ));
+  assert.ok(pillRules.length >= 4, `Reichweite: nur ${pillRules.length} Regeln der Pille gefunden`);
+  const open = pillRules.filter(({ at }) => !at.some((a) => /^@supports \(translate: 0\)/.test(a)))
+    .map(({ selector }) => selector);
+  assert.deepEqual(open, [], 'Regeln der Pille ohne @supports (translate: 0)');
+});

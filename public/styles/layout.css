@@ -2645,19 +2645,6 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
     margin-inline: max(0px, (100% - var(--nav-capsule-max)) / 2) auto;
   }
 
-  .nav-bottom--minimized:not(:focus-within) .nav-bottom__items {
-    inline-size: var(--nav-pill-width, 100%);
-  }
-
-  :is(.nav-bottom--minimized, .nav-bottom--settling) .nav-bottom__items {
-    overflow: clip;
-  }
-
-  :is(.nav-bottom--minimized, .nav-bottom--settling) .nav-item {
-    flex: none;
-    inline-size: var(--nav-item-width, auto);
-  }
-
   .nav-bottom .nav-item {
     transition:
       color var(--transition-fast),
@@ -2666,20 +2653,41 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
       translate var(--duration-md) var(--ease-out);
   }
 
-  .nav-bottom--minimized:not(:focus-within) .nav-item:not(.nav-item--pill) {
-    opacity: 0;
-    visibility: hidden;
-  }
+  /* NUR WO `translate` GILT (Review R20): Chromium kennt die Eigenschaft erst
+   * ab Version 104, `overflow: clip` ab 90. Darunter (der Chromebook aus #1276
+   * steht bei Chrome 91) schrumpfte die Kapsel, das aktive Ziel bliebe auf
+   * seinem Platz und fiele aus dem Schnitt - die Pille stuende leer. Ohne
+   * die Eigenschaft minimiert die Kapsel wie in R19: flacher, ohne Labels,
+   * in voller Breite. */
+  @supports (translate: 0) {
+    .nav-bottom--minimized:not(:focus-within) .nav-bottom__items {
+      inline-size: var(--nav-pill-width, 100%);
+    }
 
-  .nav-bottom--minimized:not(:focus-within) .nav-item--pill {
-    translate: var(--nav-pill-shift, 0px) 0;
-  }
+    :is(.nav-bottom--minimized, .nav-bottom--settling) .nav-bottom__items {
+      overflow: clip;
+    }
 
-  /* Die Tab-Pille der Leiste zeigt den Ort; in der Pille sagt es das Ziel
-   * selbst (Akzent, gefuelltes Zeichen) - eine zweite Flaeche darin stuende
-   * auf der alten Hoehe und Stelle. */
-  .nav-bottom--minimized:not(:focus-within) .nav-bottom__indicator {
-    opacity: 0;
+    :is(.nav-bottom--minimized, .nav-bottom--settling) .nav-item {
+      flex: none;
+      inline-size: var(--nav-item-width, auto);
+    }
+
+    .nav-bottom--minimized:not(:focus-within) .nav-item:not(.nav-item--pill) {
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    .nav-bottom--minimized:not(:focus-within) .nav-item--pill {
+      translate: var(--nav-pill-shift, 0px) 0;
+    }
+
+    /* Die Tab-Pille der Leiste zeigt den Ort; in der Pille sagt es das Ziel
+     * selbst (Akzent, gefuelltes Zeichen) - eine zweite Flaeche darin stuende
+     * auf der alten Hoehe und Stelle. */
+    .nav-bottom--minimized:not(:focus-within) .nav-bottom__indicator {
+      opacity: 0;
+    }
   }
 
   .page-fab:not(.page-fab-group > .page-fab),
