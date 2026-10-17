@@ -1243,33 +1243,20 @@ test('M9: ohne Werkzeugmenue faltet nichts (eine Kontrolle verschwindet nie ersa
   } finally { s.restore(); }
 });
 
-/**
- * NIE EIN KOPF OHNE ORTSANGABE, AUCH OHNE „..." (Re-Critique 2026-09-27, R11 H1).
- *
- * Schichtplan, Haushaltshilfe und Belohnungen: die Bar-Zeile ist eine
- * Tab-Leiste ueber die ganze Breite, es gibt kein Werkzeugmenue, in das etwas
- * falten koennte. Vorher stand angedockt nur die Leiste da - kein Titel, kein
- * Wort, in welchem Modul. Jetzt klebt der Kopf um die Hoehe des Titels tiefer
- * (Band), der Titel steht in diesem Streifen, und die Andock-Schwelle rueckt
- * um denselben Streifen.
- */
-test('H1: eine Tab-Leiste als Bar-Zeile bekommt angedockt trotzdem ihren Titel (Band)', () => {
+// R20 (Aufraeumen, Ulas 2026-10-17): die Bauart "Band" ist entfallen. Seit R19
+// stehen die Reiter von Schichtplan, Haushaltshilfe und Belohnungen unter
+// 1024px in der Titelzeile; gemessen 2026-10-17 erreichte keine Route sie mehr.
+test('R20: eine Tab-Leiste ohne Platz und ohne Menue bekommt keinen Band-Modus mehr', () => {
   const s = dockStub({ tabBar: true });
   try {
     const header = wireCollapsingHeader(s.toolbar);
     assert.ok(s.toolbar.classList.contains('page-toolbar--stacked'), 'Attrappe muss einen gestapelten Kopf ergeben');
     assert.equal(s.toolbar.classList.contains('page-toolbar--dock-fold'), false, 'ohne Menue faltet nichts');
-    assert.equal(s.dockTitle()?.textContent, 'Schichtplan', 'angedockt steht der Ortsname - nie nur die Leiste');
-    assert.ok(s.toolbar.classList.contains('page-toolbar--dock-band'), 'der Titel bekommt den Streifen, keine eigene Zeile');
-    assert.equal(s.toolbar.props.get('--dock-band-h'), '27px', 'der Streifen ist so hoch wie der gemessene Titel');
-    assert.ok(s.title.hasAttribute('data-dock-lead'), 'der Large Title gehoert zur Lead-Zone und blendet angedockt aus');
-    assert.equal(s.tabs.hasAttribute('data-dock-lead'), false, 'die Leiste bleibt');
-    assert.equal(s.ioOptions.at(-1)?.rootMargin, '-28px 0px 0px 0px',
-      'die Schwelle rueckt um den Streifen, sonst dockte der tiefer klebende Kopf nie an');
-    header.destroy();
-    assert.equal(s.title.hasAttribute('data-dock-lead'), false, 'destroy raeumt die Markierung ab');
-    assert.equal(s.toolbar.props.has('--dock-band-h'), false);
     assert.equal(s.toolbar.classList.contains('page-toolbar--dock-band'), false);
+    assert.equal(s.toolbar.props.has('--dock-band-h'), false);
+    assert.equal(s.title.hasAttribute('data-dock-lead'), false);
+    assert.equal(s.ioOptions.at(-1)?.rootMargin, '-1px 0px 0px 0px', 'die Schwelle rueckt um keinen Streifen');
+    header.destroy();
   } finally { s.restore(); }
 });
 
@@ -1296,39 +1283,9 @@ test('H1: ragt die erste Zeile unter die Lead-Zone, rueckt die Andock-Schwelle m
   try {
     wireCollapsingHeader(s.toolbar);
     assert.equal(s.toolbar.props.get('--page-toolbar-lead'), '45px', 'Attrappe muss die gemessene Lead-Zone ergeben');
-    assert.ok(s.toolbar.classList.contains('page-toolbar--dock-band'), 'Attrappe muss den Band-Modus ergeben');
-    assert.equal(s.ioOptions.at(-1)?.rootMargin, '-32px 0px 0px 0px',
-      'Streifen (27) + Ueberhang des Titels (49 - 45) + 1: erst dann hat die erste Zeile den Port verlassen');
-  } finally { s.restore(); }
-});
-
-/**
- * DER UEBERHANG WIRD AN DER KANTE GEMESSEN, AUF DER DER KOPF JETZT STEHT.
- * Der Kopf klebt mit einem `top` aus `--page-toolbar-lead` und `--dock-band-h`,
- * und `update` schreibt beide, bevor es den Ueberhang misst. Aendert sich der
- * Streifen, waehrend der Kopf klebt (Neuaufbau, andere Schrift), rueckt der
- * ganze Kopf mit - eine Oberkante von VOR dem Schreiben verschiebt den
- * Ueberhang um genau diesen Weg (claude-review an #1491).
- */
-test('H1: rueckt der klebende Kopf beim Schreiben des Streifens, misst der Ueberhang die neue Kante', () => {
-  const s = dockStub({ tabBar: true, padTop: 8, barTop: 53 });
-  try {
-    // Geklebt mit einem alten Streifen von 22px; die Messung ergibt 27px, und
-    // mit dem Schreiben rueckt der Kopf samt Inhalt um 5px tiefer.
-    const moved = [s.toolbar, ...s.toolbar.children];
-    s.toolbar.props.set('--dock-band-h', '22px');
-    const set = s.toolbar.style.setProperty;
-    s.toolbar.style.setProperty = (k, v) => {
-      if (k === '--dock-band-h') {
-        const delta = parseFloat(v) - parseFloat(s.toolbar.props.get(k) ?? '0');
-        for (const el of moved) el.rect = { ...el.rect, top: el.rect.top + delta, bottom: el.rect.bottom + delta };
-      }
-      set(k, v);
-    };
-    wireCollapsingHeader(s.toolbar);
-    assert.equal(s.toolbar.props.get('--dock-band-h'), '27px', 'Attrappe muss den neuen Streifen ergeben');
-    assert.equal(s.ioOptions.at(-1)?.rootMargin, '-32px 0px 0px 0px',
-      'dieselbe Schwelle wie ohne Verschiebung: der Kopf ist mitgerueckt, der Titel ragt weiter 4px unter die Lead-Zone');
+    // Seit R20 ohne Band-Streifen: nur der Ueberhang zaehlt.
+    assert.equal(s.ioOptions.at(-1)?.rootMargin, '-5px 0px 0px 0px',
+      'Ueberhang des Titels (49 - 45) + 1: erst dann hat die erste Zeile den Port verlassen');
   } finally { s.restore(); }
 });
 
@@ -1354,19 +1311,12 @@ test('wireCollapsingHeader: ein einzeiliger Kopf mit mittig versetztem Inhalt be
   } finally { s.restore(); }
 });
 
-test('H1: das CSS klebt den Band-Kopf um den Streifen tiefer und blendet nur angedockt um', () => {
-  const css = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
-  const compact = [...eachRule(css)].filter((r) => r.at.some((a) => /max-width:\s*1023px/.test(a)));
-  const body = (sel) => compact.find((r) => r.selector.trim() === sel)?.body ?? '';
-  assert.match(body('.page-toolbar--stacked.page-toolbar--dock-band'),
-    /top:\s*calc\(-1 \* \(var\(--page-toolbar-lead, 0px\) - var\(--dock-band-h, 0px\)\)\)/);
-  const title = body('.page-toolbar--stacked.page-toolbar--dock-band > .page-toolbar__dock-title');
-  assert.match(title, /position:\s*absolute/, 'der Titel macht keine eigene Zeile auf');
-  assert.match(title, /visibility:\s*hidden/, 'ausgeklappt gerendert, aber unsichtbar');
-  assert.match(body('.page-toolbar--stacked.page-toolbar--dock-band.is-docked > .page-toolbar__dock-title'), /visibility:\s*visible/);
-  const lead = body('.page-toolbar--stacked.page-toolbar--dock-band.is-docked > [data-dock-lead]');
-  assert.match(lead, /opacity:\s*0/);
-  assert.doesNotMatch(lead, /visibility|display/, 'der Large Title bleibt die Ueberschrift im Baum');
+test('R20: weder Shell noch CSS kennen den Band-Modus noch', () => {
+  const css = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.doesNotMatch(css, /dock-band|data-dock-lead/);
+  const ux = readFileSync(new URL('../public/utils/ux.js', import.meta.url), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  assert.doesNotMatch(ux, /dock-band|data-dock-lead/);
 });
 
 test('M9: das CSS blendet nur angedockt und gefaltet aus und haelt die Zeilenhoehe', () => {
