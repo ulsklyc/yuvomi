@@ -24,9 +24,17 @@
  *
  * Ein Konto OHNE Betraege steht nicht als Ersteller drin: die Regel laesst die
  * Erstellerin IMMER durch, die Aufgabe laege sonst genau bei dem Kind, vor dem
- * sie verborgen sein soll. Erstellerin wird dann die erste Admin-Person; gibt
- * es keine, entsteht keine Zahlungsaufgabe, und eine alte bleibt, wie sie ist
- * (niemand sonst koennte sie danach noch sehen).
+ * sie verborgen sein soll. Erstellerin wird dann die erste Admin-Person.
+ *
+ * DIE REGEL SCHLIESST, SIE OEFFNET NIE (security-guidance, R20). Admins sind
+ * zuerst die Admins unter den Haushaltsmitgliedern. Die App laesst keinen
+ * Haushalt ohne einen solchen zu (assertAdminWouldRemain in server/auth.js
+ * fragt householdMemberSql() bei jedem Herabstufen und Entfernen); fehlt er
+ * trotzdem (Datenbank von Hand bearbeitet), springt das erste aktive
+ * Admin-Konto ein. Gibt es gar keinen Admin, entsteht beim Check-in keine
+ * Zahlungsaufgabe, und eine alte wird `private` fuer ihre Erstellerin - ohne
+ * Zuweisungen und ohne Beschreibung (die nennt den Lohn, und die Erstellerin
+ * darf ihn dann nicht sehen). Auf `all` bleibt keine.
  */
 
 import { userHasCapability } from '../permissions.js';
@@ -51,6 +59,12 @@ export function paymentTaskAudience(database, actorId, actorSeesAmounts) {
     WHERE u.role = 'admin' AND ${householdMemberSql('u')}
     ORDER BY u.id ASC
   `).all().map((row) => row.id);
+  if (!admins.length) {
+    const anyAdmin = database.prepare(`
+      SELECT u.id FROM users u WHERE u.role = 'admin' AND ${activeAccountSql('u')} ORDER BY u.id ASC LIMIT 1
+    `).get();
+    if (anyAdmin) admins.push(anyAdmin.id);
+  }
   const owners = actorSeesAmounts && actorId != null
     ? [actorId, ...admins.filter((id) => id !== actorId)]
     : admins;
@@ -81,7 +95,16 @@ export function normalizePaymentTaskAudience(database, taskId) {
     : database.prepare(`SELECT u.id FROM users u WHERE u.id = ? AND ${activeAccountSql('u')}`).get(task.created_by);
   const creatorSees = Boolean(creator && userHasCapability(database, creator.id, AMOUNTS_CAPABILITY));
   const audience = paymentTaskAudience(database, creator?.id ?? null, creatorSees);
-  if (!audience) return false;
+  if (!audience) {
+    // Niemand, dem sie gehoeren darf: schliessen statt offen lassen (Kopf).
+    // Hier sieht die Erstellerin nie Betraege - saehe sie welche, gehoerte die
+    // Aufgabe ihr -, also faellt die Beschreibung mit dem Lohn weg.
+    database.prepare(`
+      UPDATE tasks SET visibility = 'private', assigned_to = NULL, description = NULL WHERE id = ?
+    `).run(task.id);
+    database.prepare('DELETE FROM task_assignments WHERE task_id = ?').run(task.id);
+    return true;
+  }
   database.prepare(`
     UPDATE tasks SET visibility = 'assignees', created_by = ?, assigned_to = ? WHERE id = ?
   `).run(audience.createdBy, audience.assignees[0], task.id);

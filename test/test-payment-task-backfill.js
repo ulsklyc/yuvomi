@@ -267,3 +267,37 @@ test('Migration 250 und die Laufzeitregel liefern auf denselben Daten dasselbe',
       `${label}: das Admin-Konto der Haushaltshilfe steht in keiner Zahlungsaufgabe`);
   }
 });
+
+// --------------------------------------------------------------------------
+// Fail-closed (security-guidance zu R20): ohne Admin-Mitglied bleibt keine
+// Zahlungsaufgabe auf `all`. Die App laesst diesen Haushalt nicht zu
+// (assertAdminWouldRemain); die Regel schliesst trotzdem, falls er entsteht.
+// --------------------------------------------------------------------------
+
+test('ohne Admin-Mitglied springt ein aktives Admin-Konto ein, ohne jeden Admin wird sie privat', async () => {
+  const { normalizePaymentTaskAudience } = await import('../server/services/payment-task-audience.js');
+  const staffAdmin = db.prepare("SELECT id FROM users WHERE username = 'hilfe-admin'").get()?.id;
+  assert.ok(staffAdmin, 'Reichweite: das Admin-Konto der Haushaltshilfe aus dem Aequivalenztest steht');
+  const members = db.prepare("SELECT id FROM users WHERE role = 'admin' AND id <> ?").all(staffAdmin).map((r) => r.id);
+  const demote = db.prepare("UPDATE users SET role = 'member' WHERE id = ?");
+  const promote = db.prepare("UPDATE users SET role = 'admin' WHERE id = ?");
+  members.forEach((id) => demote.run(id));
+  try {
+    const fallback = legacyPaymentTask(KID);
+    assert.equal(normalizePaymentTaskAudience(db, fallback.taskId), true);
+    assert.deepEqual(taskState(fallback.taskId),
+      { visibility: 'assignees', created_by: staffAdmin, assigned_to: staffAdmin, assignees: [staffAdmin] },
+      'kein Admin-Mitglied: das aktive Admin-Konto uebernimmt');
+
+    demote.run(staffAdmin);
+    const none = legacyPaymentTask(KID, { assign: [KID, ADULT] });
+    assert.equal(normalizePaymentTaskAudience(db, none.taskId), true);
+    assert.deepEqual(taskState(none.taskId), { visibility: 'private', created_by: KID, assigned_to: null, assignees: [] },
+      'gar kein Admin: privat, ohne Zuweisungen - nie auf all');
+    const desc = db.prepare('SELECT description FROM tasks WHERE id = ?').get(none.taskId).description;
+    assert.equal(desc, null, 'die Beschreibung mit dem Lohn faellt weg');
+  } finally {
+    promote.run(staffAdmin);
+    members.forEach((id) => promote.run(id));
+  }
+});
