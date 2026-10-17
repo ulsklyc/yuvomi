@@ -724,6 +724,15 @@
   --chart-series-5: var(--_chart-series-5);
   --chart-series-6: var(--_chart-series-6);
   --chart-series-7: var(--_chart-series-7);
+  /* TEXTUR ALS ZWEITE KODIERUNG (R20, Tritanopie: Petrol/Gruen dE 5,6,
+   * Orange/Magenta 6,2): Serie 6 und 7 tragen in jedem Kategoriediagramm eine
+   * 45-Grad-Schraffur
+   * (utils/budget-category-colors.js, categoryTexture). Die Linien sind die
+   * Kartenflaeche in halber Deckung - im Dunkelmodus damit dunkel auf hellem
+   * Gruen, im Hellmodus hell auf dunklem, in beiden sichtbar, ohne eine neue
+   * Farbe einzufuehren. Kachel 8px = Hoehe der Balken: eine Linie je Kachel. */
+  --chart-texture-ink: color-mix(in srgb, var(--color-surface) 55%, transparent);
+  --chart-texture-tile: 8px;
 
   /* --------------------------------------------------------
    * 4. Farben - Modul-Akzente (Familientoene, Block 2 2026-08-10)

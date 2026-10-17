@@ -738,6 +738,12 @@ Inhalt, kein Verlauf ueber eine Karte, kein Text auf einer Flaeche, die nicht ge
   im eigenen Modul (Gesundheit: Vitalkurve, Aktivitaet, Fastenwoche) traegt den Modulton:
   Messwert im Vollton, Ziel bzw. Vergleich in der getoenten Stufe (Tinte + 5 %, 3:1 in beiden
   Themes). Die Fastenwoche lief bis R19 auf Serie 1/2 und war die einzige Ausnahme.
+  **Schraffur als zweite Kodierung (R20):** bei Tritanopie liegen Serie 2/7 (dE 5,6) und 3/6
+  (6,2) unter 8; statt neuer Farben tragen Serie 6 und 7 eine 45-Grad-Schraffur
+  (`--chart-texture-ink`, `--chart-texture-tile`, `categoryTexture()` in
+  `utils/budget-category-colors.js`) in Donut, Kategorie-, Unterkategorie- und Planbalken. Die
+  Balkenkachel ist um 1/Skala breiter, weil der Balken per scaleX waechst. `test:budget-ui`
+  rechnet nach, dass jedes Paar unter 8 genau eine schraffierte Seite hat.
 - **Prioritaeten** (`--color-priority-low..urgent`): unveraendert aus dem Bestand, die
   Helligkeits-Trennung (High ~1,8x Urgent) ist farbfehlsicht-verifiziert. **Die
   Badge-Fuellung ist seit 2026-08-18 entfallen** (Skalen-Regel, Zweig Rangmarke): der Ton

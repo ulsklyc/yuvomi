@@ -572,7 +572,7 @@ test('Donut-Palette wiederholt keine Farbe und borgt keine Modul-Akzente', () =>
  * aufeinander. Simuliert wird nach Machado et al. (2009, Schwere 1,0) auf
  * linearem RGB; jedes Paar der Palette muss bei Deuteranopie UND Protanopie
  * mindestens dE 8 auseinanderliegen, in beiden Themes. */
-test('R19: die Datenreihen bleiben bei Rot-Gruen-Schwaeche unterscheidbar', () => {
+test('R19: die Datenreihen bleiben bei Rot-Gruen-Schwaeche unterscheidbar', async () => {
   const toLin = (c) => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
   const toSrgb = (c) => { c = Math.min(1, Math.max(0, c)); return 255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055); };
   const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
@@ -622,6 +622,52 @@ test('R19: die Datenreihen bleiben bei Rot-Gruen-Schwaeche unterscheidbar', () =
       }
     }
   }
+
+  // R20 (Entscheidung Ulas 2026-10-18): bei TRITANOPIE liegen Petrol/Gruen
+  // (2/7, dE 5,6) und Orange/Magenta (3/6, 6,2) unter 8. Keine neuen Farben -
+  // jedes solche Paar hat genau eine schraffierte Seite (TEXTURED_SERIES).
+  const trit = [[1.255528, -0.076749, -0.178779], [-0.078411, 0.930809, 0.147602], [0.004733, 0.691367, 0.303900]];
+  const { TEXTURED_SERIES } = await import('../public/utils/budget-category-colors.js');
+  assert.ok(Array.isArray(TEXTURED_SERIES), 'TEXTURED_SERIES fehlt');
+  const close = [];
+  for (const [name, pal] of Object.entries(themes)) {
+    for (let i = 0; i < pal.length; i++) for (let j = i + 1; j < pal.length; j++) {
+      const d = de2000(lab(sim(rgb(pal[i]), trit)), lab(sim(rgb(pal[j]), trit)));
+      if (d < 8) {
+        close.push(`${i + 1}/${j + 1}`);
+        assert.ok(TEXTURED_SERIES.includes(i) !== TEXTURED_SERIES.includes(j),
+          `${name}: Serie ${i + 1}/${j + 1} bei Tritanopie dE ${d.toFixed(1)} - genau eine Seite braucht die Schraffur`);
+      }
+    }
+  }
+  assert.ok(close.includes('2/7'), `Reichweite: Petrol/Gruen ist das gemessene Paar (${close.join(', ')})`);
+});
+
+test('R20: die Schraffur folgt der Kategorie in Ring, Balken und Plan', async () => {
+  const { categoryTexture, TEXTURED_SERIES } = await import('../public/utils/budget-category-colors.js');
+  const index = new Map([['a', 1], ['b', 6], ['c', -1]]);
+  assert.equal(categoryTexture(index, 'b'), TEXTURED_SERIES.includes(6) ? 'hatch' : null);
+  assert.equal(categoryTexture(index, 'a'), null);
+  assert.equal(categoryTexture(index, 'c'), null, 'die Sammelscheibe bleibt glatt');
+  assert.equal(categoryTexture(index, 'x'), null);
+  // Jede Stelle, die die Kategoriefarbe malt, setzt auch die Textur.
+  const budget = read('../public/pages/budget.js');
+  assert.match(budget, /data-texture="\$\{categoryTexture\(colors, r\.category\)\}"/, 'Uebersicht: Kategoriebalken');
+  assert.match(budget, /data-texture="\$\{parentTexture\}"/, 'Uebersicht: Unterkategorien');
+  assert.match(budget, /categoryTexture: \(category\) => categoryTexture\(/, 'Plan bekommt die Textur');
+  assert.match(read('../public/pages/budget-plans.js'), /data-texture="\$\{texture\}"/, 'Planbalken');
+  assert.match(stats, /texture: categoryTexture\(colors, c\.category\)/, 'Donut-Segmente');
+  assert.match(stats, /stroke="url\(#budget-donut-\$\{e\.texture\}\)"/, 'das Segment malt das Muster');
+  assert.match(stats, /<pattern id="budget-donut-hatch"/);
+  assert.match(stats, /data-texture="\$\{texture\}"/, 'Statistik: Kategoriebalken');
+  // Das CSS malt sie - in Balken und Plan, mit Ausgleich der scaleX-Stauchung.
+  const css = read('../public/styles/budget.css');
+  const rules = [...eachRule(css)];
+  const fill = rules.find((r) => r.selector.split(',').map((x) => x.trim()).includes('.budget-bar-row__fill[data-texture="hatch"]') && /background-image:/.test(r.body));
+  assert.ok(fill && /var\(--chart-texture-ink\)/.test(fill.body), 'Balken: Schraffur aus --chart-texture-ink');
+  assert.ok(fill.selector.includes('.budget-plan-row[data-texture="hatch"] .budget-plan-row__fill'), 'Planbalken in derselben Regel');
+  assert.ok(rules.some((r) => r.selector === '.budget-bar-row__fill[data-texture="hatch"]' && /background-size: calc\(var\(--chart-texture-tile\) \/ var\(--bar-scale\)\)/.test(r.body)), 'Kachel gegen scaleX ausgeglichen');
+  assert.ok(rules.some((r) => r.selector === '.budget-stats__hatch-line' && /fill: var\(--chart-texture-ink\)/.test(r.body)), 'Donut-Muster');
 });
 
 test('die Datenreihen-Tokens existieren in beiden Themes', () => {
@@ -6564,7 +6610,8 @@ test('Critique 2026-10-16: Kurzzeile einzeilig bis aufgeklappt, Startsaldo beim 
   assert.match(fillRule?.body ?? '', /background-color:\s*var\(--plan-fill/, 'Planbalken: Kategoriefarbe');
   assert.doesNotMatch(fillRule?.body ?? '', /--plan-tone-color/, 'der Zustand faerbt den Balken nicht mehr um');
   assert.match(plans, /data-lucide="\$\{stateIcon\}"/, 'der Zustand spricht mit Icon und Text');
-  assert.match(stats, /import \{ CATEGORY_SERIES_COLORS, CATEGORY_OTHER_COLOR, categoryColorIndex, categoryColor \} from '\/utils\/budget-category-colors\.js';/,
+  // R20: dazu categoryTexture (Schraffur bei Tritanopie) aus derselben Datei.
+  assert.match(stats, /import \{ CATEGORY_SERIES_COLORS, CATEGORY_OTHER_COLOR, categoryColorIndex, categoryColor(?:, categoryTexture)? \} from '\/utils\/budget-category-colors\.js';/,
     'die Statistik nimmt dieselbe Zuordnung');
 });
 

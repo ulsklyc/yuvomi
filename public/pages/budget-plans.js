@@ -210,9 +210,10 @@ function renderRows(plans) {
     // Statistik; der ZUSTAND (knapp, ueber Plan) steht als Text mit Icon in der
     // Fusszeile, nicht als umgefaerbter Balken. Vorher war „Wohnen" hier amber.
     const fill = view.ctx.categoryColor?.(p.category);
+    const texture = view.ctx.categoryTexture?.(p.category) ?? null;
     const stateIcon = p.over === null ? '' : p.over ? 'circle-alert' : tone === 'near' ? 'triangle-alert' : '';
     return `
-      <${Tag} ${ro ? '' : 'type="button" '}class="budget-plan-row budget-plan-row--tone-${tone}${ro ? ' budget-plan-row--static' : ''}" data-category="${view.ctx.esc(p.category)}"${fill ? ` style="--plan-fill:${fill}"` : ''}>
+      <${Tag} ${ro ? '' : 'type="button" '}class="budget-plan-row budget-plan-row--tone-${tone}${ro ? ' budget-plan-row--static' : ''}" data-category="${view.ctx.esc(p.category)}"${fill ? ` style="--plan-fill:${fill}"` : ''}${texture ? ` data-texture="${texture}"` : ''}>
         <div class="budget-plan-row__top">
           <span class="budget-plan-row__label">${view.ctx.esc(view.ctx.categoryLabel(p.category))}</span>
           <span class="budget-plan-row__amounts"><strong>${fmt(p.actual)}</strong> / ${fmt(p.planned)}</span>

@@ -2,7 +2,7 @@
  * Modul: Budget-Statistik-View
  * Zweck: Statistik-Tab (Zeitraum-Filter, Summary-Cards, Trendlinie, Donut, CSV-Export).
  */
-import { CATEGORY_SERIES_COLORS, CATEGORY_OTHER_COLOR, categoryColorIndex, categoryColor } from '/utils/budget-category-colors.js';
+import { CATEGORY_SERIES_COLORS, CATEGORY_OTHER_COLOR, categoryColorIndex, categoryColor, categoryTexture } from '/utils/budget-category-colors.js';
 import { api } from '/api.js';
 import { t, formatDate, getLocale } from '/i18n.js';
 import { wireTablist } from '/utils/tablist.js';
@@ -336,6 +336,7 @@ function renderCatBars() {
       // ist Zuordnung, der Anteil die Aussage (auch ohne Farbsehen lesbar).
       const color = kind === 'expenses' ? categoryColor(colors, r.category) : null;
       const fillColor = color ? `;--bar-fill:${color}` : '';
+      const texture = kind === 'expenses' ? categoryTexture(colors, r.category) : null;
       const share = kind === 'expenses' && absTotal > 0 && r.amount !== 0
         ? ` <span class="budget-bar-row__share">${view.ctx.esc(sharePercent(r.amount, absTotal))}</span>`
         : '';
@@ -343,7 +344,7 @@ function renderCatBars() {
         <div class="budget-bar-row budget-bar-row--compare">
           <div class="budget-bar-row__label" title="${catLabel}">${catLabel}</div>
           <div class="budget-bar-row__track" style="--bar-visible:${r.amount !== 0 ? 1 : 0}">
-            <div class="budget-bar-row__fill budget-bar-row__fill--${kind}" style="--bar-scale:${scale.toFixed(4)}${fillColor}" data-bar-key="${kind}:${view.ctx.esc(String(r.category))}"></div>
+            <div class="budget-bar-row__fill budget-bar-row__fill--${kind}" style="--bar-scale:${scale.toFixed(4)}${fillColor}"${texture ? ` data-texture="${texture}"` : ''} data-bar-key="${kind}:${view.ctx.esc(String(r.category))}"></div>
             ${targetMarker}
           </div>
           <div class="budget-bar-row__amount">${view.ctx.esc(signed(r.amount))}${share}</div>
@@ -384,7 +385,12 @@ function donutSlices(byCategory) {
   const colors = categoryColorIndex(byCategory, view.ctx.expenseCategoryKeys);
   const exp = byCategory
     .filter((c) => c.expenses < 0)
-    .map((c) => ({ label: view.ctx.categoryLabel(c.category), value: Math.abs(c.expenses), color: categoryColor(colors, c.category) }))
+    .map((c) => ({
+      label: view.ctx.categoryLabel(c.category),
+      value: Math.abs(c.expenses),
+      color: categoryColor(colors, c.category),
+      texture: categoryTexture(colors, c.category),
+    }))
     .sort((a, b) => b.value - a.value);
   if (exp.length <= DONUT_SEGMENTS) return exp;
   const head = exp.slice(0, DONUT_SEGMENTS - 1);
@@ -410,13 +416,22 @@ function renderDonut() {
   const gap = exp.length > 1 ? DONUT_GAP : 0;
   const segs = exp.map((e) => {
     const frac = e.value / total;
+    const dash = `stroke-dasharray="${Math.max(frac * C - gap, 0.5).toFixed(2)} ${C.toFixed(2)}"
+        stroke-dashoffset="${(-offset).toFixed(2)}" transform="rotate(-90 80 80)"`;
+    // Die Schraffur liegt als zweiter Strich auf dem Segment (categoryTexture,
+    // Tritanopie): derselbe Bogen, gemalt mit dem Muster aus <defs>.
     const seg = `
-      <circle r="60" cx="80" cy="80" fill="none" stroke="${e.color}"
-        stroke-width="16" stroke-dasharray="${Math.max(frac * C - gap, 0.5).toFixed(2)} ${C.toFixed(2)}"
-        stroke-dashoffset="${(-offset).toFixed(2)}" transform="rotate(-90 80 80)" />`;
+      <circle r="60" cx="80" cy="80" fill="none" stroke="${e.color}" stroke-width="16" ${dash} />${e.texture ? `
+      <circle r="60" cx="80" cy="80" fill="none" stroke="url(#budget-donut-${e.texture})" stroke-width="16" ${dash} class="budget-stats__donut-texture" />` : ''}`;
     offset += frac * C;
     return seg;
   }).join('');
+  const hatch = exp.some((e) => e.texture === 'hatch') ? `
+          <defs>
+            <pattern id="budget-donut-hatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+              <rect width="1.5" height="4" class="budget-stats__hatch-line" />
+            </pattern>
+          </defs>` : '';
   // KEINE ZWEITE LEGENDE (R14 P8): Betrag und Anteil je Kategorie stehen an
   // den Balken, die dieselbe Farbe tragen (categoryColorIndex). Die
   // Donut-Legende zaehlte alles ein zweites Mal auf. Die Zusammenfassung
@@ -445,7 +460,7 @@ function renderDonut() {
       <h2 class="budget-chart-section__title">${t('budget.statsDonutTitle')}</h2>
       <p class="sr-only">${view.ctx.esc(summary)}</p>
       <div class="budget-stats__card budget-stats__donut-wrap">
-        <svg viewBox="0 0 160 160" class="budget-stats__donut" aria-hidden="true">
+        <svg viewBox="0 0 160 160" class="budget-stats__donut" aria-hidden="true">${hatch}
           <g class="budget-stats__donut-arcs">${segs}</g>
           <text class="budget-stats__donut-total" x="80" y="77" text-anchor="middle">${view.ctx.esc(formatMoneyAxis(total, view.ctx.currency))}</text>
           <text class="budget-stats__donut-label" x="80" y="77" dy="1.5em" text-anchor="middle">${view.ctx.esc(t('budget.statsExpenses'))}</text>

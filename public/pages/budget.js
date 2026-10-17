@@ -34,7 +34,7 @@ import { installPopoverMenus } from '/utils/popover-menu.js';
 import { LOAN_SORTS, DEFAULT_LOAN_SORT, normalizeLoanSort, sortLoans, groupLoans } from '/utils/loan-order.js';
 import { LEDGER_SORTS, DEFAULT_LEDGER_SORT, normalizeLedgerSort, sortLedger } from '/utils/ledger-order.js';
 import { rowMenuHtml } from '/utils/row-action.js';
-import { categoryColorIndex, categoryColor } from '/utils/budget-category-colors.js';
+import { categoryColorIndex, categoryColor, categoryTexture } from '/utils/budget-category-colors.js';
 import { metricGlanceHtml, wireMetricGlance, glanceLeadClass } from '/utils/metric-glance.js';
 import { intervalUnitLabel } from '/rrule-ui.js';
 import { appendCurrencyOptions } from '/settings/currency.js';
@@ -1264,6 +1264,7 @@ function renderBody() {
       expenseCategories: expenseCategories(),
       // Identitaetsfarbe je Kategorie wie in Uebersicht und Statistik (D9).
       categoryColor: (category) => categoryColor(categoryColors(state.summary?.byCategory), category),
+      categoryTexture: (category) => categoryTexture(categoryColors(state.summary?.byCategory), category),
     }).catch((err) => console.error('[Budget] plans render error:', err));
     return;
   }
@@ -2075,7 +2076,7 @@ function renderCategoryBars(byCategory) {
               >
               <span class="budget-bar-row__label" title="${label}">${label}</span>
               <span class="budget-bar-row__track" style="--bar-visible:${r.amount !== 0 ? 1 : 0}">
-                <span class="budget-bar-row__fill budget-bar-row__fill--${kind}" style="--bar-scale:${scale.toFixed(4)}${kind === 'expenses' && categoryColor(colors, r.category) ? `;--bar-fill:${categoryColor(colors, r.category)}` : ''}" data-bar-key="${kind}:${esc(String(r.category))}"></span>
+                <span class="budget-bar-row__fill budget-bar-row__fill--${kind}" style="--bar-scale:${scale.toFixed(4)}${kind === 'expenses' && categoryColor(colors, r.category) ? `;--bar-fill:${categoryColor(colors, r.category)}` : ''}"${kind === 'expenses' && categoryTexture(colors, r.category) ? ` data-texture="${categoryTexture(colors, r.category)}"` : ''} data-bar-key="${kind}:${esc(String(r.category))}"></span>
               </span>
               <span class="budget-bar-row__amount">${amountByRole(r.amount, 'flow').text}${kind === 'expenses' ? shareHtml(r.amount, total) : ''}</span>
             </button>`;
@@ -2125,7 +2126,9 @@ function subcategoryRows(category, entries) {
     0
   );
   // Die Unterkategorien tragen die Farbe ihrer Kategorie (D9).
-  const parentFill = kind === 'expenses' ? categoryColor(categoryColors(state.summary?.byCategory), category) : null;
+  const parentColors = categoryColors(state.summary?.byCategory);
+  const parentFill = kind === 'expenses' ? categoryColor(parentColors, category) : null;
+  const parentTexture = kind === 'expenses' ? categoryTexture(parentColors, category) : null;
   return rows.map((row) => {
     const selected = state.subcategoryFilter?.category === category
       && state.subcategoryFilter.key === row.key;
@@ -2139,7 +2142,7 @@ function subcategoryRows(category, entries) {
         <span class="budget-bar-row__label">${esc(row.label)}</span>
         <span class="budget-bar-row__track">
           <span class="budget-bar-row__fill budget-bar-row__fill--${kind}"
-                style="--bar-scale:${scale}${parentFill ? `;--bar-fill:${parentFill}` : ''}"></span>
+                style="--bar-scale:${scale}${parentFill ? `;--bar-fill:${parentFill}` : ''}"${parentTexture ? ` data-texture="${parentTexture}"` : ''}></span>
         </span>
         <span class="budget-bar-row__amount">
           ${amountByRole(row.amount, 'flow').text}${kind === 'expenses' && row.amount !== 0 ? shareHtml(row.amount, categoryTotal) : ''}

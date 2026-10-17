@@ -75,3 +75,28 @@ export function categoryColor(index, category) {
   if (i == null) return null;
   return i < 0 ? CATEGORY_OTHER_COLOR : CATEGORY_SERIES_COLORS[i];
 }
+
+/**
+ * ZWEITE KODIERUNG BEI TRITANOPIE (R20, Entscheidung Ulas 2026-10-18).
+ * Simuliert (Machado 2009, Schwere 1,0) trennen sich Petrol/Gruen (Serie 2/7)
+ * nur mit dE 5,6 und Orange/Magenta (Serie 3/6) mit 6,2 - unter der Schwelle
+ * 8, ab der Farbe allein traegt. Neue Farben gibt es nicht (die Serien sind
+ * zugleich die Kontofarben); je Paar traegt eine Serie eine Schraffur, in
+ * jedem Diagramm, das die Kategoriefarbe zeigt: Donut-Segment, Kategorie- und
+ * Unterkategorie-Balken, Planbalken. So bleibt die Zuordnung Ring -> Balken
+ * auch ohne Farbsehen eindeutig. Die beiden schraffierten (Magenta, Gruen)
+ * liegen auch bei Tritanopie weit auseinander. `test:budget-ui` rechnet nach.
+ */
+export const TEXTURED_SERIES = Object.freeze([5, 6]);
+
+/**
+ * Die Textur einer Kategorie (`'hatch'`) oder `null` - aus derselben Zuordnung
+ * wie categoryColor(), damit Farbe und Muster nie auseinanderlaufen.
+ * @param {Map<string, number>} index - aus categoryColorIndex()
+ * @param {string} category
+ * @returns {'hatch'|null}
+ */
+export function categoryTexture(index, category) {
+  const i = index?.get(category);
+  return i != null && TEXTURED_SERIES.indexOf(i) >= 0 ? 'hatch' : null;
+}

@@ -1509,6 +1509,25 @@ button.budget-bar-row:focus-visible {
 .budget-bar-row__fill--income   { background-color: var(--color-success); }
 .budget-bar-row__fill--expenses { background-color: var(--bar-fill, var(--module-accent)); }
 
+/* SCHRAFFUR STATT NUR FARBE (R20, Tritanopie): Serie 6 und 7 tragen im Balken
+ * dasselbe Muster wie ihr Donut-Segment (categoryTexture). Der Balken waechst
+ * per scaleX - die Kachel wird deshalb um 1/Skala breiter gezeichnet, damit sie
+ * nach dem Stauchen quadratisch steht und die Linien bei 45 Grad bleiben. Bei
+ * Skala 0 ist die Breite ungueltig, das Muster faellt weg; der Balken ist dann
+ * ohnehin nicht zu sehen. */
+.budget-bar-row__fill[data-texture="hatch"],
+.budget-plan-row[data-texture="hatch"] .budget-plan-row__fill {
+  background-image: linear-gradient(135deg,
+    var(--chart-texture-ink) 25%, transparent 25% 50%,
+    var(--chart-texture-ink) 50% 75%, transparent 75%);
+}
+.budget-bar-row__fill[data-texture="hatch"] {
+  background-size: calc(var(--chart-texture-tile) / var(--bar-scale)) var(--chart-texture-tile);
+}
+.budget-plan-row[data-texture="hatch"] .budget-plan-row__fill {
+  background-size: calc(var(--chart-texture-tile) / var(--plan-scale)) var(--chart-texture-tile);
+}
+
 /* Der Anteil einer Ausgabe steht hinter ihrem Betrag, in der Statistik und in
  * der Uebersicht gleich (R14 P8) - leiser, er erklaert den Betrag. */
 .budget-bar-row__share {
@@ -2772,6 +2791,7 @@ button.budget-entry__title {
  * 104px (Radius 60, Strich 16): "175.445 €" laeuft in 17px semibold 84px. */
 .budget-stats__donut-wrap { display:flex; justify-content:center; }
 .budget-stats__donut { width:160px; height:160px; flex:0 0 auto; }
+.budget-stats__hatch-line { fill: var(--chart-texture-ink); }
 
 .budget-stats__donut-total {
   fill: var(--color-text-primary);
