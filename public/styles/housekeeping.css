@@ -474,6 +474,13 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+/* Ohne Betragsrecht (R20) blendet der Besuchsdialog das Raster mit Satz und
+ * Extras aus - `display: grid` schlaegt sonst das UA-`[hidden]`, wie oben bei
+ * `.housekeeping-field`. */
+.housekeeping-form-grid[hidden] {
+  display: none;
+}
+
 /* Bereich und Rhythmus im Anlegedialog: zwei kurze Felder nebeneinander, auch
  * mobil - der Name steht darueber in voller Breite. Doppelte Klasse, weil die
  * Mobil-Regel unten jedes `.housekeeping-form-grid` einspaltig stellt. */
