@@ -5724,7 +5724,7 @@
     },
     "rewards": {
         "title": "Jutalmak",
-        "tabOverview": "Áttekintés",
+        "tabPoints": "Pontok",
         "tabCatalog": "Jutalmak",
         "tabLedger": "Előzmények",
         "pointsUnit": "pont",

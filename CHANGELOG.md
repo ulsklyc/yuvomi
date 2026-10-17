@@ -183,7 +183,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to the top covers the event card scrolling beneath it instead of letting a strip of its text show
   above. The week view opens with a full hour at the top, also late in the day.
 - **Module headers on phones and tablets take less room.** Shift plan, Rewards and Household help
-  show their tabs in the title row (one row instead of two, 65px on a phone). The budget header
+  show their tabs in the title row (one row instead of two, 65px on a phone); the first Rewards tab
+  is now called "Points", so a phone no longer shows "Overview" twice and nothing saying where you
+  are. The budget header
   folds to one row while you scroll, with the tabs beside the month. On a tablet the title, search
   and tools of Tasks, Contacts, Inventory, Notes and Documents share one row, and the budget title
   shares its row with the month.

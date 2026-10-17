@@ -5724,7 +5724,7 @@
     },
     "rewards": {
         "title": "Hadiah",
-        "tabOverview": "Ringkasan",
+        "tabPoints": "Poin",
         "tabCatalog": "Hadiah",
         "tabLedger": "Riwayat",
         "pointsUnit": "poin",

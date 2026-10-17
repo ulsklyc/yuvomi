@@ -5724,7 +5724,7 @@
     },
     "rewards": {
         "title": "پاداش‌ها",
-        "tabOverview": "نمای کلی",
+        "tabPoints": "امتیازها",
         "tabCatalog": "جوایز",
         "tabLedger": "تاریخچه",
         "pointsUnit": "امتیاز",

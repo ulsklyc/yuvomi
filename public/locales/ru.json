@@ -5994,7 +5994,7 @@
     },
     "rewards": {
         "title": "Награды",
-        "tabOverview": "Обзор",
+        "tabPoints": "Баллы",
         "tabCatalog": "Награды",
         "tabLedger": "История",
         "pointsUnit": "баллов",

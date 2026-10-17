@@ -5724,7 +5724,7 @@
     },
     "rewards": {
         "title": "奖励",
-        "tabOverview": "概览",
+        "tabPoints": "积分",
         "tabCatalog": "奖品",
         "tabLedger": "历史",
         "pointsUnit": "积分",

@@ -6130,7 +6130,7 @@
     },
     "rewards": {
         "title": "المكافآت",
-        "tabOverview": "نظرة عامة",
+        "tabPoints": "النقاط",
         "tabCatalog": "الجوائز",
         "tabLedger": "السجل",
         "pointsUnit": "نقطة",

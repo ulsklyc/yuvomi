@@ -5724,7 +5724,7 @@
     },
     "rewards": {
         "title": "Επιβραβεύσεις",
-        "tabOverview": "Επισκόπηση",
+        "tabPoints": "Πόντοι",
         "tabCatalog": "Βραβεία",
         "tabLedger": "Ιστορικό",
         "pointsUnit": "πόντοι",

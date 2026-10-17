@@ -5724,7 +5724,7 @@
     },
     "rewards": {
         "title": "Beloningen",
-        "tabOverview": "Overzicht",
+        "tabPoints": "Punten",
         "tabCatalog": "Beloningen",
         "tabLedger": "Geschiedenis",
         "pointsUnit": "punten",

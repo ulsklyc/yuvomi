@@ -305,7 +305,7 @@ function renderShell(container) {
         <h1 class="page-toolbar__title" id="rewards-title">${esc(t('rewards.title'))}</h1>
         <div class="page-toolbar__actions"></div>
         <nav class="rewards-tabs page-toolbar__bar" role="tablist" aria-label="${esc(t('rewards.title'))}">
-          ${tabButton('overview', t('rewards.tabOverview'))}
+          ${tabButton('overview', t('rewards.tabPoints'))}
           ${tabButton('catalog', t('rewards.tabCatalog'))}
           ${tabButton('ledger', t('rewards.tabLedger'))}
         </nav>

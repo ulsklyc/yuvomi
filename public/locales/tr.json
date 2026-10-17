@@ -5724,7 +5724,7 @@
     },
     "rewards": {
         "title": "Ödüller",
-        "tabOverview": "Genel bakış",
+        "tabPoints": "Puanlar",
         "tabCatalog": "Ödüller",
         "tabLedger": "Geçmiş",
         "pointsUnit": "puan",

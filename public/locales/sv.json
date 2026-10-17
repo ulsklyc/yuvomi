@@ -5724,7 +5724,7 @@
     },
     "rewards": {
         "title": "Belöningar",
-        "tabOverview": "Översikt",
+        "tabPoints": "Poäng",
         "tabCatalog": "Belöningar",
         "tabLedger": "Historik",
         "pointsUnit": "poäng",

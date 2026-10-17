@@ -5724,7 +5724,7 @@
     },
     "rewards": {
         "title": "보상",
-        "tabOverview": "개요",
+        "tabPoints": "포인트",
         "tabCatalog": "상품",
         "tabLedger": "기록",
         "pointsUnit": "포인트",

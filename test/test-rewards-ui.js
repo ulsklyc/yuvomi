@@ -18,7 +18,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { eachRule } from './css-rules.js';
 
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
@@ -77,4 +77,25 @@ test('R16: Praemien mobil - kompakte Karte, kein doppelter Titel, drei letzte Bu
   assert.match(readFileSync(new URL('../public/pages/rewards.js', import.meta.url), 'utf8'),
     /<h2 class="sr-only">\$\{esc\(t\('rewards\.tabCatalog'\)\)\}<\/h2>/, 'die Ueberschrift bleibt in der Gliederung');
   assert.match(body('.rw-recent .rw-ledger > :nth-child(n + 4)'), /display:\s*none/);
+});
+
+// Re-Kritik 2026-10-17 (R19): unter 768px sind die Reiter der Titel der Seite
+// (`.page-toolbar--tabs-title`, das h1 tritt zurueck). Der erste Reiter hiess
+// "Uebersicht" wie der Kapsel-Tab der Startseite - zweimal "Uebersicht" im Bild
+// und nirgends "Belohnungen". Er heisst "Punkte": das Wort des Moduls steht im
+// Bild, und kein Reiter heisst wie ein Ziel der Kapsel.
+test('Re-Kritik: der erste Belohnungen-Reiter heisst "Punkte", in keiner Sprache wie die Uebersicht der Kapsel', () => {
+  const src = readFileSync(new URL('../public/pages/rewards.js', import.meta.url), 'utf8');
+  assert.match(src, /tabButton\('overview', t\('rewards\.tabPoints'\)\)/, 'der erste Reiter liest rewards.tabPoints');
+  const localeDir = new URL('../public/locales/', import.meta.url);
+  for (const file of readdirSync(localeDir).filter((f) => f.endsWith('.json'))) {
+    const loc = JSON.parse(readFileSync(new URL(file, localeDir), 'utf8'));
+    assert.ok(loc.rewards.tabPoints, `${file}: rewards.tabPoints fehlt`);
+    assert.notEqual(loc.rewards.tabPoints, loc.nav.dashboard, `${file}: Reiter und Kapsel-Tab heissen gleich`);
+    for (const key of ['tabCatalog', 'tabLedger']) {
+      assert.notEqual(loc.rewards[key], loc.nav.dashboard, `${file}: rewards.${key} heisst wie die Uebersicht`);
+    }
+  }
+  const de = JSON.parse(readFileSync(new URL('de.json', localeDir), 'utf8'));
+  assert.equal(de.rewards.tabPoints, 'Punkte');
 });

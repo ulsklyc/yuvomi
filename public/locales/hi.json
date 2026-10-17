@@ -5724,7 +5724,7 @@
     },
     "rewards": {
         "title": "पुरस्कार",
-        "tabOverview": "अवलोकन",
+        "tabPoints": "अंक",
         "tabCatalog": "इनाम",
         "tabLedger": "इतिहास",
         "pointsUnit": "अंक",

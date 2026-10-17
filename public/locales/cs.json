@@ -5860,7 +5860,7 @@
     },
     "rewards": {
         "title": "Odměny",
-        "tabOverview": "Přehled",
+        "tabPoints": "Body",
         "tabCatalog": "Odměny",
         "tabLedger": "Historie",
         "pointsUnit": "bodů",

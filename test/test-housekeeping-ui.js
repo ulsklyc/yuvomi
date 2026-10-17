@@ -765,7 +765,13 @@ test('Haushaltshilfe spricht EINEN Namen: Reiter "Uebersicht", Kennzahlen mit Ze
   const { readdirSync } = globalThis.process.getBuiltinModule('node:fs');
   for (const file of readdirSync(localeDir).filter((f) => f.endsWith('.json'))) {
     const loc = JSON.parse(readFileSync(new URL(file, localeDir), 'utf8'));
-    assert.equal(loc.housekeeping.dashboard, loc.rewards.tabOverview, `${file}: der Reiter heisst wie jede Uebersicht der App`);
+    // Bis zur Re-Kritik 2026-10-17 hiess der erste Reiter der Belohnungen
+    // ebenfalls "Uebersicht" und dieser Test hielt beide gleich. Unter 768px
+    // sind die Reiter dort der Titel; zwei Mal "Uebersicht" (Reiter + Kapsel)
+    // und nirgends "Belohnungen" - er heisst seither "Punkte"
+    // (test:rewards-ui). Hier bleibt "Uebersicht": die Reiterleiste nennt
+    // mit "Haushaltshilfen" das Modul selbst.
+    assert.ok(loc.housekeeping.dashboard, `${file}: der Reiter "Uebersicht" hat eine Uebersetzung`);
   }
   const de = JSON.parse(readFileSync(new URL('de.json', localeDir), 'utf8')).housekeeping;
   assert.equal(de.pendingChores, 'Fällig');

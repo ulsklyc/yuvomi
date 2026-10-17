@@ -5724,7 +5724,7 @@
     },
     "rewards": {
         "title": "ごほうび",
-        "tabOverview": "概要",
+        "tabPoints": "ポイント",
         "tabCatalog": "景品",
         "tabLedger": "履歴",
         "pointsUnit": "ポイント",

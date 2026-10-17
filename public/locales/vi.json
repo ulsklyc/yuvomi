@@ -5724,7 +5724,7 @@
     },
     "rewards": {
         "title": "Phần thưởng",
-        "tabOverview": "Tổng quan",
+        "tabPoints": "Điểm",
         "tabCatalog": "Phần thưởng",
         "tabLedger": "Lịch sử",
         "pointsUnit": "điểm",

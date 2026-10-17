@@ -5724,7 +5724,7 @@
     },
     "rewards": {
         "title": "Belohnungen",
-        "tabOverview": "Übersicht",
+        "tabPoints": "Punkte",
         "tabCatalog": "Prämien",
         "tabLedger": "Verlauf",
         "pointsUnit": "Punkte",

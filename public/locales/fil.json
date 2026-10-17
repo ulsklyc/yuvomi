@@ -5724,7 +5724,7 @@
     },
     "rewards": {
         "title": "Mga Gantimpala",
-        "tabOverview": "Pangkalahatang-tanaw",
+        "tabPoints": "Mga Puntos",
         "tabCatalog": "Mga Gantimpala",
         "tabLedger": "Kasaysayan",
         "pointsUnit": "puntos",

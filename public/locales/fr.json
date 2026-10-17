@@ -5724,7 +5724,7 @@
     },
     "rewards": {
         "title": "Récompenses",
-        "tabOverview": "Aperçu",
+        "tabPoints": "Points",
         "tabCatalog": "Récompenses",
         "tabLedger": "Historique",
         "pointsUnit": "points",
