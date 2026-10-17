@@ -343,6 +343,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Documents line up in the grid.** A search without results fills the whole width instead of one
+  card's cell, and a short name keeps the room of a two-line one, so the details and buttons of a
+  row of cards end on one line.
 - **Health: a new medication gets its intake schedule in the same dialog.** You no longer have to
   save a medication first and open it again to add times: the schedule is ready while you create
   it and is saved with it. Stock and note sit behind "More settings" (open when they hold

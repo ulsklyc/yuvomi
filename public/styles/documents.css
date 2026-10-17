@@ -666,6 +666,29 @@
   align-items: start;
 }
 
+/* DER LEERZUSTAND NIMMT DIE GANZE BREITE (Re-Critique 2026-10-17, A4 P2-3).
+ * Im Raster war er ein Rasterelement wie eine Karte: "Keine Treffer" stand
+ * bei 1440px in einer 203px-Zelle links, daneben 650px nichts. */
+.documents-list--grid > .documents-empty-state {
+  grid-column: 1 / -1;
+}
+
+/* EINE REIHE, EINE LINIE (Re-Critique 2026-10-17, A4 P3). Ohne Dehnung (R18,
+ * oben) ist jede Karte so hoch wie ihr Inhalt, und ein zweizeiliger Titel
+ * schob Meta und Leiste seiner Karte eine Zeile unter die der Nachbarn - die
+ * Reihe endete in Stufen (gemessen 394/414px bei 1440). Der Titel haelt im
+ * Raster deshalb immer zwei Zeilen: ein kurzer Name laesst die zweite leer,
+ * Meta und Leiste fluchten ueber die Reihe, und zwischen Meta und Leiste
+ * entsteht kein Loch (der Grund fuer R18).
+ *
+ * Subgrid waere die genauere Antwort (die Zeilen der Karten teilen), ist hier
+ * aber ausgeschlossen: die Karte ist ein Container (`container: document-card`,
+ * Kurzformen unten), und ein Container mit Layout-Eingrenzung kann kein
+ * Subgrid sein - gemessen `grid-template-rows: none`. */
+.documents-list--grid .document-card__title {
+  min-block-size: 2lh;
+}
+
 /* Lade-Zustand: Grid/Flex aufheben, damit die geteilte Skeleton-Liste
  * full-width erscheint — eine Lade-Sprache über alle Module. */
 .documents-list[aria-busy="true"] {

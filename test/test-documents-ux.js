@@ -2005,3 +2005,16 @@ test('Dokumente mobil: der Ordner-Umschalter ist der erste Chip der Filterzeile 
   assert.ok(rules.some((r) => tablet(r) && r.selector.trim() === '.documents-folder-browser:not(.documents-folder-browser--open)' && /display:\s*none/.test(r.body)),
     'zugeklappt belegt die Ordnerauswahl keine Zeile');
 });
+
+// Re-Critique 2026-10-17 (A4 P2-3, P3): im Raster klemmte die leere Suche in
+// einer Zelle (203px von 860 bei 1440), und ein zweizeiliger Titel liess die
+// Karten einer Reihe in Stufen enden (394/414px).
+test('R20: der Leerzustand nimmt im Raster die ganze Breite, und der Titel haelt zwei Zeilen', () => {
+  const rules = [...eachRule(css)];
+  const empty = rules.find((r) => r.selector.trim() === '.documents-list--grid > .documents-empty-state');
+  assert.ok(empty, 'keine Regel fuer den Leerzustand im Raster');
+  assert.match(empty.body, /grid-column:\s*1\s*\/\s*-1/);
+  const title = rules.find((r) => r.selector.trim() === '.documents-list--grid .document-card__title');
+  assert.ok(title, 'keine Rasterregel fuer den Kartentitel');
+  assert.match(title.body, /min-block-size:\s*2lh/, 'ein einzeiliger Titel haelt die zweite Zeile frei');
+});
