@@ -229,7 +229,7 @@ const isFiniteNum = (value) => typeof value === 'number' && Number.isFinite(valu
  */
 // Nur EIGENE Schluessel der Grenztabellen: eine Einheit aus API oder Import
 // ("constructor", "toString") fand sonst eine geerbte Eigenschaft (Review #2049).
-const ownEntry = (table, key) => (table && key != null && Object.hasOwn(table, key) ? table[key] : undefined);
+const ownEntry = (table, key) => (table && key != null && Object.prototype.hasOwnProperty.call(table, key) ? table[key] : undefined);
 
 export function vitalPlausibility({ type, unit, value_num: v1, value_num2: v2, value_num3: v3 }) {
   const hard = [];
