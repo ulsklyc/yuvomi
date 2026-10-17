@@ -6388,8 +6388,8 @@ dialog.modal-overlay::backdrop {
 /* DAS FORMULAR IN DER DETAILSPALTE (Critique R19). Ab der Split-Schwelle legt
  * sich der Bearbeiten-Dialog deckungsgleich auf die Detailspalte
  * (components/modal.js, dockNextModal): dieselbe Flaeche, derselbe Radius,
- * derselbe leise Schatten wie `.split-view__detail`, und kein abgedunkelter
- * Grund - man bearbeitet, wo man liest. Es bleibt der Dialog (Fokus, Escape,
+ * derselbe leise Schatten wie `.split-view__detail`, und als Grund nur ein
+ * Hauch (siehe unten) - man bearbeitet, wo man liest. Es bleibt der Dialog (Fokus, Escape,
  * Ungespeichert-Frage, History-Marker); ein Klick daneben schliesst ihn wie
  * immer. Die Lage kommt aus der gemessenen Spalte (`--dock-*`, vom Skript
  * gesetzt); `left` ist der gemessene Wert und deshalb physisch.
