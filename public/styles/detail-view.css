@@ -709,6 +709,24 @@
   }
 }
 
+/* IN DER DETAILSPALTE GILT DASSELBE MEHR-MENUE (Re-Kritik 2026-10-17, P1).
+ * Seit Erledigen der volle Primaerknopf ist, brauchte der Fuss einer offenen
+ * Aufgabe 756px; die Spalte hat bei 1440 670px, bei 1920 744px. "Erledigen"
+ * war abgeschnitten, "Wer hat erledigt?" lag ausserhalb. Eine Breitenschwelle
+ * haelt das nur fuer Deutsch ("Aufgabe archivieren" allein 188px, andere
+ * Sprachen laenger) - deshalb gehen Starten, Archivieren und Loeschen in der
+ * Spalte IMMER ins Mehr-Menue, wie auf dem Telefon. Es bleiben Mehr, Bearbeiten,
+ * Erledigen und Wer: rund 360px in jeder Spaltenbreite ab 552px. */
+.split-view__detail-footer:has(> .task-detail__more) > .task-detail__overflow {
+  display: none;
+}
+
+.split-view__detail-footer > .task-detail__more {
+  display: inline-flex;
+  order: -1;
+  margin-inline-end: auto;
+}
+
 /* DER FUSS DES LESEBLATTS AUF DEM TELEFON (R17, E7). Mit Bearbeiten als
  * Primaerknopf am Ende (`edit.primary`) stehen im Kontakt drei Aktionen im
  * Fuss; "Als vCard exportieren" brach in 332px auf zwei Zeilen (Knopf 57px,

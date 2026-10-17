@@ -951,6 +951,25 @@ test('Detailfuss: klebt unten in der Spalte, einreihig, und steht bei kurzem Inh
   assert.match(js, /if \(action\.icon\) btn\.title = action\.label;/, 'als Tooltip bleibt sie lesbar');
 });
 
+// Re-Kritik 2026-10-17 (P1, R19-Regression): mit Erledigen als vollem
+// Primaerknopf brauchte der Fuss einer offenen Aufgabe 756px, die Spalte hat
+// bei 1440 670px und hoechstens 744px - "Erledigen" abgeschnitten, "Wer hat
+// erledigt?" ausserhalb. Eine Breitenschwelle haelt nur fuer eine Sprache;
+// deshalb nimmt die Spalte das Mehr-Menue des Telefons, ohne Medien- oder
+// Container-Bedingung.
+test('Re-Kritik P1: in der Detailspalte stehen Starten, Archivieren und Loeschen einer Aufgabe immer im Mehr-Menue', () => {
+  const dv = readFileSync(new URL('../public/styles/detail-view.css', import.meta.url), 'utf8');
+  const top = [...eachRule(dv)].filter((r) => !r.at.length);
+  const hide = top.find((r) => r.selector.trim() === '.split-view__detail-footer:has(> .task-detail__more) > .task-detail__overflow');
+  assert.match(hide?.body ?? '', /display:\s*none/, 'die Ueberlauf-Knoepfe treten in der Spalte zurueck');
+  const showAt = top.findIndex((r) => r.selector.trim() === '.split-view__detail-footer > .task-detail__more');
+  assert.ok(showAt >= 0 && /display:\s*inline-flex/.test(top[showAt].body), 'der Mehr-Knopf steht in der Spalte');
+  const baseAt = top.findIndex((r) => r.selector.trim() === '.detail-view__footer > .task-detail__more');
+  assert.ok(showAt > baseAt, 'gleiche Spezifitaet: die Spaltenregel steht nach der Desktop-Ausblendung');
+  const src = readFileSync(new URL('../public/components/task-detail.js', import.meta.url), 'utf8');
+  assert.match(src, /wireDetailMoreMenu\(task, overflowIds, pane\)/, 'das Menue wird auch in der Spalte verdrahtet');
+});
+
 test('splitViewDetailHtml: benannte Spalte mit Leerzustand und leerem Koerper, Nutzertext escaped', () => {
   const saved = global.document;
   installMiniDom();

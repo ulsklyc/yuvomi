@@ -129,8 +129,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   phone, in a popover and in the detail column on a computer. Before, it sometimes sat outlined at
   the top. Tasks are the one exception: there "Done" (or "Reopen" for a finished task) stays the
   filled button, because ticking a task off is why you open it most; "Edit" sits next to it as a
-  quieter button, a pencil on a phone, and deleting a task moved into the "..." menu so the bar
-  stays one row.
+  quieter button, a pencil on a phone, and starting, archiving and deleting a task sit in the "..."
+  menu so the bar stays one row, on a phone and in the detail column on a computer alike.
 - **Tapping a recipe on a phone opens it.** The recipe opens as a sheet with its ingredients, notes
   and the buttons to plan or shop it, like a contact or a task, instead of unfolding inside the
   list.
