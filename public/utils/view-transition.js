@@ -137,15 +137,27 @@ function nameToolbar(root) {
  * @param {() => Promise<void>} [opts.whenSettled] wann die App einen nachgereichten
  *   Tipp annimmt (der Router: wenn seine Navigation durch ist - vorher verwirft
  *   er jede weitere)
+ * @param {() => void} [opts.settle] bringt, was gerade AUSFAEHRT, an sein Ende,
+ *   bevor der Browser das alte Bild aufnimmt (siehe unten)
  * @returns {Promise<{ transition: boolean, finished: Promise<void> }>}
  */
-export async function swapPage(update, { content, from = null, animate = true, whenSettled = null } = {}) {
+export async function swapPage(update, { content, from = null, animate = true, whenSettled = null, settle = null } = {}) {
   _from = from;
 
   if (!animate || !canViewTransition()) {
     update();
     return { transition: false, finished: Promise.resolve() };
   }
+
+  // KEIN HALB AUSGEFAHRENES BLATT IM ALTEN BILD (Re-Critique 2026-10-17, P1).
+  // Der Tipp auf ein Ziel im Mehr-Blatt schliesst es, und es faehrt
+  // `--sheet-out` lang aus - der Seitenwechsel startet mitten darin. Das alte
+  // Bild ist ein Standbild: das Blatt stand darin mit der Deckkraft des
+  // Augenblicks (gemessen 0,31-0,60) eingefroren ueber der neuen Seite und
+  // blendete erst mit der Wurzel aus, 100 ms bei 1x, 400 ms bei 4x CPU. Was
+  // bis hierher ausgefahren ist, hat seine Bewegung gehabt; der Rest faellt in
+  // diesen Frame, und das alte Bild zeigt nur noch die Seite.
+  settle?.();
 
   const generation = ++_generation;
   // VOR startViewTransition: der Browser nimmt das alte Bild gleich danach auf,

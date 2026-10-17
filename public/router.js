@@ -327,6 +327,18 @@ function navigationIdle() {
   });
 }
 
+/**
+ * Bringt das ausfahrende Mehr-Blatt samt Abdunklung an sein Ende - vor dem
+ * alten Bild eines Seitenwechsels (utils/view-transition.js, `settle`). Die
+ * Ausfahrt ist eine CSS-Transition; `finish()` setzt sie auf ihren Endwert,
+ * und `getAnimations()` holt eine noch nicht gestartete vorher in den Stil.
+ */
+function settleClosingOverlays() {
+  document.querySelectorAll('.more-sheet, .more-backdrop').forEach((el) => {
+    el.getAnimations?.().forEach((anim) => anim.finish());
+  });
+}
+
 // --------------------------------------------------------
 // Modul-Cache: verhindert redundante dynamic imports bei Navigation
 // --------------------------------------------------------
@@ -1711,6 +1723,7 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
       // wenn diese Navigation durch ist: navigate() verwirft jeden Aufruf,
       // solange `isNavigating` steht.
       whenSettled: navigationIdle,
+      settle: settleClosingOverlays,
     });
 
     // Mit View Transition macht der Browser die Blende - seit 2026-10-16 auch

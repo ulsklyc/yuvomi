@@ -558,6 +558,39 @@ test('swapPage R19: der Tipp, der die Blende abbricht, kommt nach ihrem Ende an 
   }
 });
 
+test('swapPage R20: was ausfaehrt, steht vor dem alten Bild am Ende - kein Mehr-Blatt im Standbild', async () => {
+  // Re-Critique 2026-10-17 P1: der Tipp auf ein Ziel im Mehr-Blatt startete
+  // den Wechsel mitten in dessen Ausfahrt; das alte Bild fror das Blatt mit
+  // Deckkraft 0,31-0,60 ueber der neuen Seite ein (100-400 ms Doppelbelichtung).
+  const { swapPage } = await import('../public/utils/view-transition.js');
+  const env = stubDocument();
+  globalThis.document = env.doc;
+  globalThis.matchMedia = () => ({ matches: false });
+  try {
+    const { finished } = await swapPage(() => { env.log.push('update'); }, {
+      content: env.content,
+      from: '/',
+      animate: true,
+      settle: () => env.log.push('settle'),
+    });
+    assert.equal(env.log[0], 'settle', 'settle laeuft nicht VOR startViewTransition - das alte Bild faengt die Ausfahrt ein');
+    assert.match(env.log[1], /^start /);
+    env.finish();
+    await finished;
+    // Ohne Transition (Kaltstart, keine API) gibt es kein altes Bild und nichts zu beenden.
+    const log = [];
+    await swapPage(() => {}, { content: env.content, animate: false, settle: () => log.push('settle') });
+    assert.deepEqual(log, []);
+  } finally {
+    delete globalThis.document;
+    delete globalThis.matchMedia;
+  }
+  const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  assert.match(router, /await swapPage\(swap, \{[^}]*settle: settleClosingOverlays,/, 'der Router reicht das Beenden der Ausfahrt nicht an swapPage');
+  assert.match(router, /function settleClosingOverlays\(\) \{[\s\S]*?\.more-sheet, \.more-backdrop[\s\S]*?anim\.finish\(\)/,
+    'settleClosingOverlays beendet die Ausfahrt von Mehr-Blatt und Abdunklung nicht');
+});
+
 test('swapPage: ein zweiter Wechsel vor dem Ende des ersten behaelt den Kopfnamen', async () => {
   // Zwei Tipps innerhalb der Transition: der Browser verwirft die erste, ihr
   // `finished` loest auf, waehrend die zweite ihr altes Bild noch nicht

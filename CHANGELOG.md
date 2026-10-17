@@ -283,6 +283,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Opening a module from More no longer shows the More list over the new page.** The sheet was
+  still fading out when the page changed, and for a moment its list stood frozen over the new page;
+  it now finishes before the switch, so only the page fades.
+
 - **Health: choosing another lab report keeps the keyboard focus on it.** The list was redrawn and
   the focus fell back to the start of the page, so the next Tab began at the top again.
 
