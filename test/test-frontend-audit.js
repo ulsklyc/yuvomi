@@ -22110,3 +22110,27 @@ test('R20: sichtbare Etiketten stehen im Namen, und es gibt genau einen Hauptber
   assert.doesNotMatch(split, /<main class=/, 'kein zweites <main> im Budget-Reiter');
   assert.match(read('../public/pages/housekeeping.js'), /<div class="metric-grid budget-glance-details housekeeping-task-summary" role="group"/, 'keine zweite Region „Aufgaben"');
 });
+
+// DIE !important-SPERRKLINKE (R20, Entscheidung Ulas 2026-10-18). `@layer`
+// ist vertagt, bis das Mindestziel Chrome 99 / Firefox 97 / Safari 15.4 traegt
+// (docs/DECISIONS.md); bis dahin darf die Zahl der echten `!important` nur
+// sinken. Zaehlregel: jede Deklaration mit `!important` in einer Regel, die
+// `eachRule()` in public/styles/*.css liefert - Kommentare zaehlen nicht,
+// `@media`/`@supports`/`@container` zaehlen mit, `@keyframes` nicht (dort
+// ignoriert der Browser `!important` ohnehin). vendor/ liegt nicht unter
+// public/styles. Stand 2026-10-18: 34. Wer eins entfernt, senkt die Zahl.
+const IMPORTANT_CEILING = 34;
+test('!important-Sperrklinke: echte !important-Deklarationen in public/styles werden nicht mehr', () => {
+  const dir = new URL('../public/styles/', import.meta.url);
+  const found = [];
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.css'))) {
+    for (const rule of eachRule(readFileSync(new URL(file, dir), 'utf8'))) {
+      for (const decl of rule.body.split(';')) {
+        if (/!\s*important/i.test(decl)) found.push(`${file}: ${rule.selector.slice(0, 50)} { ${decl.trim()} }`);
+      }
+    }
+  }
+  assert.ok(found.length > 20, `Reichweite: nur ${found.length} Treffer - zaehlt der Scanner noch?`);
+  assert.ok(found.length <= IMPORTANT_CEILING,
+    `${found.length} echte !important statt hoechstens ${IMPORTANT_CEILING}. Neue Vorrangregel ueber Spezifitaet oder Quellreihenfolge loesen, nicht ueber !important:\n${found.join('\n')}`);
+});

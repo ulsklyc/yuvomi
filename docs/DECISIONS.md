@@ -977,3 +977,14 @@ every file that ships.
 Stripping comments in the repository or in a build step. Serving a cut file under the raw file's
 ETag, or the other way round. Cutting vendored code. And a cutter for a new file type that ships
 without a check against a real parser.
+
+---
+
+## 14. Cascade layers wait for the browser floor
+
+**No `@layer` until the supported floor reaches Chrome 99, Firefox 97 and Safari 15.4; until
+then the number of real `!important` declarations in `public/styles/` may only go down** (R20,
+2026-10-18: the floor in [installation.md](installation.md) is Chrome 87 / Firefox 79 / Safari
+14.1, which drop a layered stylesheet whole, and wrapping the current sheets in layers changed
+52 of 76 measured screens; the ceiling lives in `npm run test:frontend-audit`,
+"!important-Sperrklinke"; raising the floor reopens it).
