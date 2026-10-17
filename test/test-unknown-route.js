@@ -426,6 +426,29 @@ test('laufende Sitzung: dieselbe Adresse ersetzt den Eintrag, eine andere Query 
   assert.deepEqual(other.log.history, [['push', '/tasks']]);
 });
 
+// R20 (Re-Critique 2026-10-17 a6 P3, Heap-Snapshot): `abort()` ohne Grund legt je
+// Abbruch eine AbortError-Ausnahme an, deren Stapel die laufende Navigation samt
+// altem Seitenbaum festhielt - Module tragen ihr letztes Signal in einer
+// Variablen. Nach 44 Wechseln hielt die Uebersicht 52.522 Knoten (live 1.130).
+test('ein Seitenabbruch traegt einen festen Grund statt einer neuen Ausnahme mit Stapel', async () => {
+  const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  assert.match(router, /const PAGE_LEFT = new DOMException\('[^']+', 'AbortError'\);/, 'der Abbruchgrund der Seite fehlt');
+  assert.doesNotMatch(router, /_pageController\?\.abort\(\)/, 'ein Seitenabbruch ohne festen Grund');
+  assert.equal((router.match(/_pageController\?\.abort\(PAGE_LEFT\)/g) ?? []).length, 2);
+  assert.doesNotMatch(navigateSrc, /running\?\.abort\(\)/, 'eine ueberholte Navigation bricht ohne festen Grund ab');
+  assert.match(navigateSrc, /running\?\.abort\(NAVIGATION_SUPERSEDED\);/);
+  assert.match(navigateSrc, /new DOMException\('[^']+', 'AbortError'\)/, 'derselbe Name AbortError - wer err.name prueft, sieht keinen Unterschied');
+  // Wer die alte Seite noch haelt, haelt nur ihre leere Huelle.
+  assert.match(router, /const oldPages = \[\.\.\.content\.children\];[\s\S]{0,200}?content\.replaceChildren\(pageWrapper\);[\s\S]{0,1600}?content\.scrollTop = 0;\s*for \(const old of oldPages\) old\.replaceChildren\(\);/,
+    'die alte Seite bleibt als ganzer Baum haengen');
+  const vt = readFileSync(new URL('../public/utils/view-transition.js', import.meta.url), 'utf8');
+  assert.match(vt, /oldToolbar\.style\.viewTransitionName = '';\s*oldToolbar = null;/, 'der Tausch-Rueckruf haelt den alten Kopf (und mit ihm den alten Baum)');
+  for (const [file, destroy] of [['pages/tasks.js', /signal\?\.addEventListener\('abort', \(\) => \{ destroyTaskSortables\(\); destroyKanbanSortables\(\); \}/],
+    ['pages/shopping.js', /routeSignal\?\.addEventListener\('abort', destroyItemSortables/]]) {
+    assert.match(readFileSync(new URL(`../public/${file}`, import.meta.url), 'utf8'), destroy, `${file}: die Zieh-Instanzen ueberleben das Verlassen der Seite`);
+  }
+});
+
 test('isCurrentAddress: Pfad und Query zaehlen, der Hash nicht', async () => {
   const { isCurrentAddress } = await import('../public/utils/router-navigate.js');
   assert.equal(isCurrentAddress('/tasks', { pathname: '/tasks', search: '' }), true);
@@ -740,7 +763,8 @@ test('renderPage: ein ueberholtes Ziel rendert nach dem Laden nichts, sein Blatt
   // Abbruch (unlessAborted), nicht erst die Frage danach.
   assert.match(render, /style\.ready,\s*\]\);[\s\S]{0,600}?const loaded = await unlessAborted\(loading, signal\);\s*if \(!loaded \|\| signal\?\.aborted\) \{\s*style\.abandon\(\);\s*return false;\s*\}/,
     'nach importPage/style.ready fragt renderPage nicht, ob es ueberholt ist - oder wartet blank darauf');
-  assert.match(render, /signal\?\.addEventListener\('abort', \(\) => _pageController\?\.abort\(\), \{ once: true \}\);\s*const \{ transition, finished \} = await swapPage/);
+  // R20: mit festem Grund (PAGE_LEFT) - sonst haelt der Stapel der Ausnahme den alten Baum.
+  assert.match(render, /signal\?\.addEventListener\('abort', \(\) => _pageController\?\.abort\(PAGE_LEFT\), \{ once: true \}\);\s*const \{ transition, finished \} = await swapPage/);
   // Review #2049: auch auf den Rest von render() wartet renderPage nur, bis es
   // ueberholt ist - ein blankes `await renderPromise` hielt den neueren Tipp auf.
   assert.doesNotMatch(render.slice(0, render.indexOf('\n}\n')), /await renderPromise/,

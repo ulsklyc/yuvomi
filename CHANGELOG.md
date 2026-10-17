@@ -289,6 +289,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Yuvomi stays light after a long session.** A page you leave no longer stays in memory: after 44
+  page changes the app held about 11,000 page elements instead of 52,000, with a quarter of the
+  event listeners, because the old page, its drag handles and the record of the interrupted page
+  are let go.
+
 - **Long task lists open and update faster.** With some 200 tasks on a throttled phone, opening
   Tasks no longer freezes the screen for 0.8 s (now 0.4 s), and ticking a task off takes 0.1 s
   instead of half a second: only that row leaves the list instead of the whole list being redrawn,

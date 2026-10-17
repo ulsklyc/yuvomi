@@ -355,6 +355,18 @@ function scrollPageToTop() {
 }
 
 /**
+ * DER GRUND, MIT DEM EINE SEITE ABGEBROCHEN WIRD - EINMAL ERZEUGT (R20).
+ * `abort()` ohne Grund baut bei jedem Aufruf eine neue `AbortError`-Ausnahme,
+ * und deren Stapel haelt die Funktionen fest, die gerade liefen - den
+ * Seitentausch samt `oldToolbar` und damit den ganzen alten Baum. Weil Module
+ * ihr letztes Signal in einer Variablen tragen (`pageSignal`), blieb so die
+ * Aufgabenliste mit 200 Zeilen nach dem Verlassen im Speicher (Heap-Snapshot,
+ * Re-Critique 2026-10-17 a6 P3). Derselbe Name `AbortError`: wer `err.name`
+ * prueft oder ein `fetch` damit abbricht, sieht keinen Unterschied.
+ */
+const PAGE_LEFT = new DOMException('The page was left.', 'AbortError');
+
+/**
  * Bringt das ausfahrende Mehr-Blatt samt Abdunklung an sein Ende - vor dem
  * alten Bild eines Seitenwechsels (utils/view-transition.js, `settle`). Die
  * Ausfahrt ist eine CSS-Transition; `finish()` setzt sie auf ihren Endwert,
@@ -1670,6 +1682,15 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
       // diesem Callback aufgenommen und darf nicht bei 0 stehen. Die Blende
       // des Rueckfalls ist eine Animation und schlaegt den Inline-Wert.
       pageWrapper.style.opacity = '1';
+      // DIE ALTE SEITE GEHT GANZ (R20, Re-Critique 2026-10-17 a6 P3). Jedes
+      // Modul haelt seine Wurzel in einer Modulvariablen (`_container`) - und
+      // mit ihr den ganzen letzten Baum: nach Aufgaben mit 200 Eintraegen hielt
+      // die Uebersicht 37.356 statt 2.054 Knoten, der Heap wuchs von 4,6 auf
+      // 9,7 MB. Das alte Bild hat die View Transition schon; die Kinder der
+      // alten Huelle werden hier geleert, gehalten bleibt nur die leere Huelle.
+      // Was ein Modul ueber den Wechsel retten will (die Kuechen-Leiste), haelt
+      // es selbst und setzt es im neuen render() wieder ein.
+      const oldPages = [...content.children];
       content.replaceChildren(pageWrapper);
       // Scrollport auf Anfang, solange er leer ist. `content` IST der Scrollport
       // (#main-content == .app-content) und überlebt die Navigation; ohne diese
@@ -1681,6 +1702,7 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
       // Wiederherstellung bei popstate darf und soll das dagegen überschreiben,
       // sie steht deshalb unten hinter dem await.
       content.scrollTop = 0;
+      for (const old of oldPages) old.replaceChildren();
       // Der FAB der alten Seite lebt in der Shell und fiele sonst nicht mit ihrem
       // Inhalt weg - er bliebe über der neuen Seite stehen, bis diese adoptiert.
       // Hier und nicht eine Zeile höher: der Scroll-Reset gehört unmittelbar an
@@ -1704,7 +1726,7 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
       // Uhr, stiller Refresh, Wetter- und Wandtimer liefen gegen einen
       // abgehaengten Container weiter und starteten Anfragen hinter der
       // naechsten Seite.
-      _pageController?.abort();
+      _pageController?.abort(PAGE_LEFT);
       _pageController = new AbortController();
 
       // Teardown abgeschlossen: ein evtl. gemerktes Soft-Update-Ziel ist jetzt
@@ -1741,7 +1763,7 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
 
     // Wird die Navigation erst NACH dem Tausch ueberholt, verliert die neue
     // Seite ihr Signal: sie bricht ihr Laden ab, statt die naechste aufzuhalten.
-    signal?.addEventListener('abort', () => _pageController?.abort(), { once: true });
+    signal?.addEventListener('abort', () => _pageController?.abort(PAGE_LEFT), { once: true });
     const { transition, finished } = await swapPage(swap, {
       content,
       from: previousPath,

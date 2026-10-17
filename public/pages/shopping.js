@@ -4474,6 +4474,9 @@ async function openCategoryManager(container, { fromDeepLink = false } = {}) {
 export async function render(container, { user, signal: routeSignal = null } = {}) {
   state.currentUserId = user?.id ?? null;
   _routeSignal = routeSignal;
+  // Beim Verlassen gehen die Zieh-Instanzen mit (R20): SortableJS fuehrt sie in
+  // einer eigenen Liste am Dokument und hielte die alte Liste sonst fest.
+  routeSignal?.addEventListener('abort', destroyItemSortables, { once: true });
   // Ein Seitenaufbau ist immer ein neuer Batch fuer die Sammelaktions-Pille -
   // eine Frist der vorherigen Seite darf diese hier nicht treffen (#1039).
   resetPillMachine();

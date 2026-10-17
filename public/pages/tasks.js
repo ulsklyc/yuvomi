@@ -6040,6 +6040,9 @@ export async function render(container, { user, signal } = {}) {
   // eingehaengt hat.
   if (signal?.aborted) return;
   pageSignal = signal ?? null;
+  // Beim Verlassen gehen die Zieh-Instanzen mit (R20): sie hingen in einer
+  // Modulvariablen und hielten ueber ihre Rueckrufe die ganze alte Liste fest.
+  signal?.addEventListener('abort', () => { destroyTaskSortables(); destroyKanbanSortables(); }, { once: true });
   // Ein Neuaufbau (auch der Wiederholen-Weg des Ladefehlers) haengt die
   // Detailspalte frisch ein; die alte Instanz gehoert zur alten Wurzel.
   taskMd?.destroy();

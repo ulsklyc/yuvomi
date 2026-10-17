@@ -69,6 +69,11 @@ export function prefetchPathOf(dataset) {
   return target.split(/[?#]/)[0] || null;
 }
 
+/** Grund eines ueberholten Seitenaufbaus - einmal erzeugt, ohne Stapel der Navigation. */
+const NAVIGATION_SUPERSEDED = typeof DOMException === 'function'
+  ? new DOMException('A newer navigation took over.', 'AbortError')
+  : undefined;
+
 /**
  * Zeigt `target` auf die Adresse, die gerade steht - Pfad UND Query (R20)?
  *
@@ -266,7 +271,9 @@ export function createNavigate(state, deps) {
   async function navigate(path, userOrPushState = true, pushState = true) {
     if (state.isNavigating) {
       queued?.resolve();
-      running?.abort();
+      // Ein fester Grund statt einer neuen Ausnahme je Abbruch (deren Stapel
+      // hielte die laufende Navigation fest, siehe PAGE_LEFT in router.js).
+      running?.abort(NAVIGATION_SUPERSEDED);
       return new Promise((resolve) => { queued = { args: [path, userOrPushState, pushState], resolve }; });
     }
     const run = new AbortController();

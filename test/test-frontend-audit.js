@@ -18790,7 +18790,8 @@ test('router: ein AbortController je Seitenaufbau, abgebrochen vor dem naechsten
   const router = withoutBlockComments(read('../public/router.js'));
   const renderPage = router.slice(router.indexOf('async function renderPage('));
   assert.ok(renderPage.length > 100, 'renderPage() nicht gefunden');
-  const abortAt = renderPage.indexOf('_pageController?.abort();');
+  // R20: mit festem Grund (PAGE_LEFT, router.js) - derselbe Abbruch an derselben Stelle.
+  const abortAt = renderPage.indexOf('_pageController?.abort(PAGE_LEFT);');
   const createAt = renderPage.indexOf('_pageController = new AbortController();');
   const renderAt = renderPage.indexOf('module.render(target, context)');
   assert.ok(abortAt > 0 && createAt > abortAt && renderAt > createAt,

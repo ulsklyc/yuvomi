@@ -163,12 +163,15 @@ export async function swapPage(update, { content, from = null, animate = true, w
   // VOR startViewTransition: der Browser nimmt das alte Bild gleich danach auf,
   // und ohne Namen blendete die Leiste dort mit der Wurzel.
   const releaseSwapping = holdPageSwapping();
-  const oldToolbar = nameToolbar(content);
+  let oldToolbar = nameToolbar(content);
   let newToolbar = null;
   const transition = document.startViewTransition(() => {
     // Der alte Kopf faellt mit dem Tausch ohnehin aus dem Dokument; der Name
     // geht trotzdem vorher weg, falls eine Seite ihren Kopf wiederverwendet.
+    // Danach laesst ihn dieser Rueckruf los: haelt etwas den Rueckruf (der
+    // Stapel einer Ausnahme, R20), hielte er sonst den ganzen alten Baum.
     if (oldToolbar) oldToolbar.style.viewTransitionName = '';
+    oldToolbar = null;
     update();
     newToolbar = nameToolbar(content);
   });
