@@ -295,7 +295,10 @@ test('die Adresse des Umwegs: ersetzt bei Kaltstart/Zurueck, sonst als neuer Ein
   assert.match(helperBody, /!push && detourAddress/, 'ersetzt wird nur, wenn die tote Adresse der laufende Eintrag ist');
   assert.match(helperBody, /history\.replaceState\(\{ path \}, '', detourAddress\)/);
   // Der regulaere Eintrag traegt die berichtigte Adresse samt Hash.
-  assert.equal(count(body, "'', detourAddress ?? path)"), 2, 'pushState und Overlay-replaceState nehmen die berichtigte Adresse');
+  // Seit R20 steht sie EINMAL als `address` (dieselbe Adresse ersetzt, statt
+  // einen zweiten Eintrag anzulegen); beide Eintraege lesen sie.
+  assert.equal(count(body, 'const address = detourAddress ?? path;'), 1, 'die berichtigte Adresse steht nicht als address');
+  assert.equal(count(body, "'', address)"), 2, 'pushState und Overlay-replaceState nehmen die berichtigte Adresse');
 });
 
 test('unknownDetourFor() liest allRoutes() und hat genau einen Aufrufer je Entscheidung', () => {
@@ -402,6 +405,47 @@ test('laufende Sitzung: eine Sperre bis zum Ende, der Verlassen-Schutz fragt ein
   assert.deepEqual(log.leaveAsked, ['/settings']);
   assert.deepEqual(log.history, [['push', '/settings']]);
   assert.deepEqual(log.toasts, [{ message: 'common.unknownAddress', shown: true }]);
+});
+
+/*
+ * DIESELBE ADRESSE IST KEIN NEUER SCHRITT (R20, Re-Critique 2026-10-17 a1 P2-1).
+ * Ein Doppeltipp oder der Tipp auf den aktiven Tab legte einen zweiten Eintrag
+ * mit derselben Adresse an: Zurueck tat danach sichtbar nichts.
+ */
+test('laufende Sitzung: dieselbe Adresse ersetzt den Eintrag, eine andere Query legt einen an', async () => {
+  const same = createNavigateHarness({ user: MEMBER, location: { pathname: '/tasks', search: '' } });
+  await same.navigate('/tasks');
+  assert.deepEqual(same.log.history, [['replace', '/tasks']]);
+
+  const query = createNavigateHarness({ user: MEMBER, location: { pathname: '/tasks', search: '?open=3' } });
+  await query.navigate('/tasks');
+  assert.deepEqual(query.log.history, [['push', '/tasks']], 'von ?open=3 zurueck auf die Liste ist ein echter Schritt');
+
+  const other = createNavigateHarness({ user: MEMBER, location: { pathname: '/', search: '' } });
+  await other.navigate('/tasks');
+  assert.deepEqual(other.log.history, [['push', '/tasks']]);
+});
+
+test('isCurrentAddress: Pfad und Query zaehlen, der Hash nicht', async () => {
+  const { isCurrentAddress } = await import('../public/utils/router-navigate.js');
+  assert.equal(isCurrentAddress('/tasks', { pathname: '/tasks', search: '' }), true);
+  assert.equal(isCurrentAddress('/tasks#x', { pathname: '/tasks', search: '' }), true);
+  assert.equal(isCurrentAddress('/tasks?open=3', { pathname: '/tasks', search: '?open=3' }), true);
+  assert.equal(isCurrentAddress('/tasks', { pathname: '/tasks', search: '?open=3' }), false);
+  assert.equal(isCurrentAddress('/settings', { pathname: '/settings/appearance', search: '' }), false);
+  assert.equal(isCurrentAddress(undefined, { pathname: '/' }), false);
+  assert.equal(isCurrentAddress('/', {}), false);
+});
+
+test('der aktive Tab fuehrt nach oben statt neu zu laden (Router-Verdrahtung)', () => {
+  const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  const handler = router.match(/container\.querySelectorAll\('\[data-route\]'\)\.forEach\(\(el\) => \{[\s\S]*?\n {2}\}\);/);
+  assert.ok(handler, 'der Klick-Handler der Nav-Links ist nicht zu finden');
+  assert.match(handler[0], /if \(isCurrentAddress\(target, location\)\) \{[\s\S]*?scrollPageToTop\(\);[\s\S]*?return;/,
+    'der Tipp auf das aktuelle Ziel navigiert noch (Neuaufbau, harter Sprung)');
+  const scroll = router.match(/function scrollPageToTop\(\) \{[\s\S]*?\n\}/);
+  assert.ok(scroll, 'scrollPageToTop fehlt');
+  assert.match(scroll[0], /prefers-reduced-motion: reduce\)'\)\.matches \? 'auto' : 'smooth'/, 'reduzierte Bewegung springt nicht');
 });
 
 /*

@@ -70,6 +70,25 @@ export function prefetchPathOf(dataset) {
 }
 
 /**
+ * Zeigt `target` auf die Adresse, die gerade steht - Pfad UND Query (R20)?
+ *
+ * Der Tipp auf den aktiven Tab (oder dieselbe Zeile im Mehr-Blatt, in der
+ * Seitenleiste) baute die Seite neu, sprang hart nach oben und legte einen
+ * zweiten History-Eintrag mit derselben Adresse an: Zurueck tat danach
+ * sichtbar nichts (Re-Critique 2026-10-17, a1 P2-1). Wie der Tab einer
+ * iOS-Leiste fuehrt er jetzt nur nach oben. Ein Hash zaehlt nicht mit, eine
+ * andere Query schon: `/tasks?open=3` -> `/tasks` ist ein echter Rueckweg.
+ *
+ * @param {string|null|undefined} target
+ * @param {{pathname?: string, search?: string}|null|undefined} loc
+ */
+export function isCurrentAddress(target, loc) {
+  if (typeof target !== 'string' || typeof loc?.pathname !== 'string') return false;
+  const address = target.split('#')[0];
+  return address === loc.pathname + (loc.search || '');
+}
+
+/**
  * Steht der Fokus nach einer Navigation schon IN der neuen Seite (#1821)?
  *
  * Der Router setzt den Fokus einen Frame nach dem Aufbau auf `<main>`, damit
@@ -524,8 +543,13 @@ export function createNavigate(state, deps) {
          * WAR ER ES, TRITT DIE NEUE SEITE AN SEINE STELLE. Laege sie darueber,
          * zeigte der Rueckweg zuerst auf einen Eintrag mit derselben Adresse -
          * eine Geste, die sichtbar nichts tut. */
-        if (consumeOverlayMarker() || replaceEntry) history.replaceState({ path }, '', detourAddress ?? path);
-        else history.pushState({ path }, '', detourAddress ?? path);
+        /* DIESELBE ADRESSE IST KEIN NEUER SCHRITT (R20). Ein zweiter Eintrag
+         * mit der Adresse, die schon steht, macht Zurueck zu einer Geste ohne
+         * sichtbare Wirkung - derselbe Fehler wie beim Dialog-Platzhalter.
+         * Zuerst consumeOverlayMarker(): es schliesst auch dann offene Dialoge. */
+        const address = detourAddress ?? path;
+        if (consumeOverlayMarker() || replaceEntry || isCurrentAddress(address, location)) history.replaceState({ path }, '', address);
+        else history.pushState({ path }, '', address);
       }
 
       // Soft-Navigation innerhalb desselben Moduls (z. B. Settings-Blatt → Blatt

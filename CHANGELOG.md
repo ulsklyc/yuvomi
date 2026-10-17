@@ -283,6 +283,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Tapping the tab you are on takes you to the top.** It used to rebuild the page with a jump and
+  add a second step with the same address, so Back then seemed to do nothing; now the page glides
+  to the top and stays as it was (with reduced motion it moves there at once). Opening the same
+  address twice in a row no longer adds a step to the history either.
+
 - **Opening a module from More no longer shows the More list over the new page.** The sheet was
   still fading out when the page changed, and for a moment its list stood frozen over the new page;
   it now finishes before the switch, so only the page fades.

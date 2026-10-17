@@ -18,7 +18,7 @@ import { wireScrollFade, wireCollapsingHeader, watchNavCapsuleHeight, bindNavMin
 import { TOAST_SURFACES } from '/utils/toast-surface.js';
 import { showToast } from '/utils/toast-show.js';
 import { unknownPathDetour, publicPathDetour, detourPaths } from '/utils/unknown-route.js';
-import { createNavigate, prefetchPathOf, focusMainAfterNavigation, unlessAborted } from '/utils/router-navigate.js';
+import { createNavigate, prefetchPathOf, focusMainAfterNavigation, unlessAborted, isCurrentAddress } from '/utils/router-navigate.js';
 import { pageMountTarget } from '/utils/page-mount.js';
 import { friendlyError } from '/utils/friendly-error.js';
 import { BULK_PILL_LAYER, clearBulkPill } from '/utils/bulk-pill.js';
@@ -325,6 +325,33 @@ function navigationIdle() {
     const check = () => (!routerState.isNavigating || Date.now() > until ? resolve() : setTimeout(check, 16));
     check();
   });
+}
+
+/**
+ * Der zuletzt senkrecht gescrollte Port im Inhalt - in den gedeckelten Modulen
+ * (Kalender, Budget) scrollt nicht `#main-content`, sondern ihr eigener Port.
+ * Als WeakRef: ein abgehaengter Port der Vorseite bleibt nicht im Speicher.
+ */
+let _lastContentPort = null;
+document.addEventListener('scroll', (e) => {
+  const port = e.target;
+  if (port instanceof Element && port.scrollTop > 0 && port.closest('#main-content')) {
+    _lastContentPort = typeof WeakRef === 'function' ? new WeakRef(port) : null;
+  }
+}, { capture: true, passive: true });
+
+/**
+ * Tipp auf den aktiven Tab: die Seite gleitet nach oben (reduzierte Bewegung:
+ * springt). Der Inhalt bleibt, wie er ist - Filter, Auswahl, Aufklapper.
+ */
+function scrollPageToTop() {
+  const main = document.getElementById('main-content');
+  if (!main) return;
+  const behavior = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+  const port = _lastContentPort?.deref?.();
+  for (const el of new Set([main, port])) {
+    if (el?.isConnected && main.contains(el) && el.scrollTop > 0) el.scrollTo({ top: 0, behavior });
+  }
 }
 
 /**
@@ -2232,11 +2259,18 @@ function renderAppShell(container) {
   applySidebarCollapsed(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1');
   updateBranding(routerState.currentPath || '/');
 
-  // Klick-Handler für alle Nav-Links
+  // Klick-Handler für alle Nav-Links. Der aktive Tab fuehrt nur nach oben,
+  // wie in einer iOS-Leiste (R20): kein Neuaufbau, kein zweiter Eintrag.
   container.querySelectorAll('[data-route]').forEach((el) => {
     el.addEventListener('click', (e) => {
       e.preventDefault();
-      navigate(el.dataset.navHref ?? el.dataset.route);
+      const target = el.dataset.navHref ?? el.dataset.route;
+      if (isCurrentAddress(target, location)) {
+        window._closeMoreSheet?.({ restoreFocus: false });
+        scrollPageToTop();
+        return;
+      }
+      navigate(target);
     });
   });
 
