@@ -525,6 +525,18 @@
  * mit - die Kennzahl-Zeile braucht darueber keine eigene mehr. Der Listenkopf
  * traegt nur noch den Titel und EINEN Menueknopf, also keine Umbruch-Reserve. */
 @container budget-page (width < 960px) {
+  /* EINSPALTIG ENDET JEDER REITER AN DER KANTE DES KOPFS (Re-Critique
+   * 2026-10-17, A4). Unter der Zweispalte stand der Inhalt von Uebersicht,
+   * Konten, Plan, Darlehen und Statistik auf dem Lesemass (bei 834 bis x 736),
+   * Kopf, Abonnements und Aufteilung liefen bis 818 - der Monats-Stepper endete
+   * 70px rechts der Liste, und jeder Reiterwechsel versetzte die rechte Kante.
+   * Am Telefon (unter 720px) aendert das nichts. Plan und Statistik sind
+   * eigene `.app-page`-Wurzeln mit Lesemass - sie bekommen es mit. */
+  .budget-tab-panel,
+  .budget-tab-panel .app-page {
+    --page-measure: 100%;
+  }
+
   .budget-overview .metric-grid {
     padding-block: 0 var(--space-2);
   }

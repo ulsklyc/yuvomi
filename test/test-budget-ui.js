@@ -6742,3 +6742,17 @@ test('Hauptbuch: die Metazeile einer Buchung bricht einmal um, statt die Kategor
   assert.match(rule.body, /-webkit-line-clamp:\s*2/);
   assert.match(rule.body, /white-space:\s*normal/);
 });
+
+// Re-Critique 2026-10-17 (A4): am Tablet (einspaltig, Container unter 960px)
+// endeten Uebersicht, Konten, Plan, Darlehen und Statistik auf dem Lesemass
+// (834: x 736), Kopf mit Monats-Stepper, Abonnements und Aufteilung bei 818.
+// Einspaltig steht jeder Reiter auf der Kante des Kopfs - auch Plan und
+// Statistik, die eigene `.app-page`-Wurzeln mit Lesemass sind.
+test('Budget einspaltig: jeder Reiter endet an der Kante des Kopfs', () => {
+  const rule = [...eachRule(read('../public/styles/budget.css'))]
+    .find(({ selector, at }) => at.some((a) => /@container budget-page \(width < 960px\)/.test(a))
+      && selector.split(',').map((x) => x.trim()).includes('.budget-tab-panel .app-page'));
+  assert.ok(rule, 'die einspaltige Regel fehlt');
+  assert.ok(rule.selector.split(',').map((x) => x.trim()).includes('.budget-tab-panel'));
+  assert.match(rule.body, /--page-measure:\s*100%/);
+});

@@ -362,6 +362,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **On a tablet every budget tab ends where its header ends.** Overview, Accounts, Plan, Loans and
+  Statistics stopped short of the month switcher above them while Subscriptions and Split ran to
+  the edge; all tabs now use the full width, so the right edge no longer moves between tabs.
+
 - **Budget category names are no longer cut short.** On a phone a transaction's category may take a
   second line instead of ending in "…" ("Leisure and entertainment"), and the subscription charts
   show names like "Utilities" in full next to a shorter bar.
