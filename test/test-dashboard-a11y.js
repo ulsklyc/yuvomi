@@ -845,3 +845,18 @@ test('Dashboard: ein Wort fuer den Kopf-Link, Onboarding-Karte als schwebende Ta
   assert.match(card?.body ?? '', /border:\s*none/, 'keine Haarlinie');
   assert.match(card?.body ?? '', /box-shadow:\s*var\(--glass-shadow-lg\), var\(--glass-inset-elevated\)/, 'Tiefe und Lichtkante der schwebenden Tafel');
 });
+
+// R20 (Re-Critique 2026-10-17, A1 P3): Esc beendete das Anpassen nicht - am
+// Telefon war "Abbrechen" der einzige Weg. Esc nimmt denselben Weg wie der
+// Knopf (mit Rueckfrage bei Aenderungen) und laesst offene Dialoge und Menues
+// ihr eigenes Esc behalten.
+test('R20: Esc beendet das Anpassen wie "Abbrechen", nicht an einem offenen Dialog vorbei', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
+  const at = src.indexOf("if (event.key !== 'Escape' || event.defaultPrevented || !isCustomizing) return;");
+  assert.ok(at > 0, 'kein Esc-Ausstieg aus dem Anpassen');
+  const block = src.slice(src.lastIndexOf('if (isCustomizing) {', at), src.indexOf('}, { signal: signal });', at));
+  assert.match(block, /document\.addEventListener\('keydown'/);
+  assert.match(block, /dialog\[open\]/, 'ein offener Dialog behaelt sein Esc');
+  assert.match(block, /requestCancelDashboardConfig\(\)/, 'derselbe Weg wie der Knopf, mit Rueckfrage');
+});
