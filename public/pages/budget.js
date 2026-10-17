@@ -2820,7 +2820,11 @@ function renderAccountsPage() {
           <span class="budget-account__icon"><i data-lucide="${icon}" class="icon-md" aria-hidden="true"></i></span>
           <span class="budget-account__body">
             <span class="budget-account__name"><span class="budget-account__name-text">${esc(a.name)}</span>${archivedBadge}</span>
-            <span class="budget-account__type">${esc(accountTypeLabel(a.type))}</span>
+            ${/* Am Telefon steht der Start in der Zeile der Kontoart (budget.css,
+                  unter 640px); dort ist `.budget-account__starting` ausgeblendet,
+                  hier `__type-start` daneben - genau eine Fassung ist sichtbar
+                  und im Barrierebaum. */ ''}
+            <span class="budget-account__type">${esc(accountTypeLabel(a.type))}<span class="budget-account__type-start"> · ${t('budget.startingBalanceShort')} <span class="budget-account__starting-amount">${formatAmount(a.starting_balance)}</span></span></span>
             ${creditMeta}
           </span>
           <span class="budget-account__figures">

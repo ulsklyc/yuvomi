@@ -814,37 +814,71 @@
  * Saldo allein. `display: contents` loest die Saldo-Spalte auf, ihre zwei
  * Kinder nehmen je eine Zelle des Rasters. Der Betrag bricht nie
  * (`__starting-amount`); bei 320px darf das Etikett zur Not vor ihm umbrechen. */
+/* EINE ZEILE FUER ART UND START (Re-Critique 2026-10-17, A4). Name, Art und
+ * Start standen untereinander in der 123px-Spalte neben dem Saldo: drei bis
+ * vier Zeilen, 110px je Konto. Jetzt: Name und Saldo in der ersten Zeile, Art
+ * und Start als EIN Satz darunter ueber die volle Breite bis unter den Saldo
+ * ("Girokonto · Start: 2.480,00 €") - der Start steht dafuer im Markup ein
+ * zweites Mal (`__type-start`), sichtbar ist je Breite genau eine Fassung.
+ * Der Betrag bricht nie; bei 320px darf der Satz vor ihm umbrechen. */
 @media (max-width: 639px) {
   .budget-account__main {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-rows: auto auto;
+    column-gap: var(--space-3);
     row-gap: var(--space-0h);
   }
 
   .budget-account__icon {
-    grid-row: 1 / span 2;
+    grid-row: 1 / span 3;
+    align-self: center;
   }
 
-  .budget-account__body {
-    grid-column: 2;
-    grid-row: 1;
-  }
-
+  .budget-account__body,
   .budget-account__figures {
     display: contents;
   }
 
-  .budget-account__balance {
-    grid-column: 3;
-    grid-row: 1 / span 2;
+  .budget-account__name {
+    grid-column: 2;
+    grid-row: 1;
     align-self: center;
   }
 
+  .budget-account__balance {
+    grid-column: 3;
+    grid-row: 1;
+    align-self: center;
+  }
+
+  .budget-account__type,
+  .budget-account__meta {
+    grid-column: 2 / 4;
+  }
+
   .budget-account__starting {
-    grid-column: 2;
+    display: none;
+  }
+}
+
+/* Bei 320px blieben dem Namen neben dem Saldo 53px ("Gemei-nsa..."): dort
+ * steht alles in einer Spalte - Name, Saldo, Art und Start. */
+@media (max-width: 359px) {
+  .budget-account__name,
+  .budget-account__balance {
+    grid-column: 2 / 4;
+  }
+
+  .budget-account__balance {
     grid-row: 2;
-    text-align: start;
+    justify-self: start;
+  }
+}
+
+@media (min-width: 640px) {
+  .budget-account__type-start {
+    display: none;
   }
 }
 

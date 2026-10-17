@@ -6528,10 +6528,23 @@ test('Critique 2026-10-16: Kurzzeile einzeilig bis aufgeklappt, Startsaldo beim 
   const css = [...eachRule(budgetCss)];
   assert.match(css.find((r) => r.selector.trim() === '.budget-account__starting-amount')?.body ?? '', /white-space:\s*nowrap/);
   const phone = (r) => r.at.some((a) => /max-width:\s*639px/.test(a));
-  assert.ok(css.some((r) => phone(r) && r.selector.trim() === '.budget-account__figures' && /display:\s*contents/.test(r.body)),
+  assert.ok(css.some((r) => phone(r) && r.selector.split(',').map((x) => x.trim()).includes('.budget-account__figures') && /display:\s*contents/.test(r.body)),
     'mobil loest sich die Saldo-Spalte auf');
-  assert.ok(css.some((r) => phone(r) && r.selector.trim() === '.budget-account__starting' && /grid-column:\s*2/.test(r.body)),
-    'mobil steht der Startsaldo in der Textspalte');
+  // Re-Critique 2026-10-17 (A4): Name, Art und Start standen untereinander in
+  // der schmalen Textspalte - 110px je Konto bei 390. Mobil stehen Art und
+  // Start jetzt als EIN Satz unter Name und Saldo, ueber die volle Breite.
+  // Genau eine Fassung des Starts ist je Breite sichtbar (und damit im
+  // Barrierebaum): rechts ab 640px, in der Art-Zeile darunter.
+  assert.match(budgetJs, /<span class="budget-account__type">\$\{esc\(accountTypeLabel\(a\.type\)\)\}<span class="budget-account__type-start"> · \$\{t\('budget\.startingBalanceShort'\)\} <span class="budget-account__starting-amount">/,
+    'mobil steht der Start in der Zeile der Kontoart');
+  assert.ok(css.some((r) => phone(r) && r.selector.trim() === '.budget-account__starting' && /display:\s*none/.test(r.body)),
+    'mobil faellt die rechte Startzeile weg');
+  assert.ok(css.some((r) => r.at.some((a) => /min-width:\s*640px/.test(a)) && r.selector.trim() === '.budget-account__type-start' && /display:\s*none/.test(r.body)),
+    'ab 640px faellt der Start in der Art-Zeile weg');
+  assert.ok(css.some((r) => phone(r) && /\.budget-account__type\b/.test(r.selector) && /grid-column:\s*2 \/ 4/.test(r.body)),
+    'die Art-Zeile laeuft bis unter den Saldo');
+  assert.ok(css.some((r) => phone(r) && r.selector.trim() === '.budget-account__balance' && /grid-row:\s*1;/.test(r.body)),
+    'der Saldo steht in der ersten Zeile neben dem Namen');
 
   // D9: die Uebersicht faerbt mit der geteilten Zuordnung - seit R19 nach der
   // Stelle im Katalog (state.meta), nicht nach der groessten Ausgabe.

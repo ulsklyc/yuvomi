@@ -362,6 +362,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Budget accounts take less room on a phone.** The account type and starting balance now share
+  one line under the name and balance ("Checking · Start: 2,480.00"), so an account row is about a
+  fifth shorter and all six demo accounts fit on one screen. On very narrow phones the name gets
+  the full width instead of being cut after a few letters.
+
 - **Rows in a group of one keep their columns.** In shopping and task lists, a category or group
   with a single entry had no drag handle, so its quantity, avatars and more button sat further
   right than in every other group. The handle's place now stays, and the columns line up.
