@@ -2316,10 +2316,35 @@ button.budget-entry__title {
  * in sich unumbrechbar, budget.js renderLoanPaymentEntry). */
 .budget-entry--loan .budget-entry__meta {
   white-space: normal;
+  /* R20: Datum und Rate als zwei Stuecke einer umbrechenden Zeile. Der Abstand
+   * zwischen ihnen ist die Breite des Trenners, der links vor der Rate steht
+   * (`.budget-entry__sep`). Bricht die Rate um, steht er links ausserhalb der
+   * Zeile, und `overflow: hidden` oben schneidet ihn ab - kein "·" am Ende
+   * der ersten Zeile mehr (Re-Critique 2026-10-17). */
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--space-4);
 }
 
 .budget-entry__installment {
   white-space: nowrap;
+}
+
+.budget-entry--loan .budget-entry__installment {
+  position: relative;
+}
+
+.budget-entry__sep {
+  position: absolute;
+  inset-inline-end: 100%;
+  inline-size: var(--space-4);
+  text-align: center;
+}
+
+/* Raten jenseits der letzten sechs (renderLoanTransactions): gerendert, aber
+ * aus dem Fluss, bis "Alle anzeigen" sie holt - wie "Geplant" oben. */
+.budget-loan-transactions:not(.is-expanded) .budget-entry--more {
+  display: none;
 }
 
 /* DAS KONTO IST EINE FRAGE DER BREITE, NICHT DES GERÄTS - deshalb der

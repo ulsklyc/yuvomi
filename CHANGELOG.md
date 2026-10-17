@@ -347,6 +347,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Loan payments show the latest six.** The list under the loans grew with every instalment (16
+  rows on a phone with a building loan); the rest now sits behind "Show all (n)". On a narrow
+  screen the dot between date and instalment no longer hangs at the end of the first line.
 - **No double line under the title of a detail.** The thin strip in the module colour under the
   header of an inventory item, a budget entry and a shared expense is gone; it only repeated the
   module and stood a few pixels under the header line. Subscriptions keep the strip in their brand

@@ -267,6 +267,7 @@ let state = {
   plannedExpandedMonth: null, // Monat, in dem "Geplant" ganz aufgeklappt ist (sonst die naechsten 3); gilt nur fuer DIESEN Monat
   balanceExpanded: false,     // mobil: Bilanz-Karten unter der Kopfzeile aufgeklappt (balanceGlanceHtml)
   loansExpanded: false,       // mobil: Darlehens-Karten unter der Glance-Zeile aufgeklappt (metricGlanceHtml)
+  loanPaymentsExpanded: false, // Raten: alle statt der letzten sechs (renderLoanTransactions)
   meta:        { expenseCategories: [], incomeCategories: [], subcategories: {} },
   metaError:   null,
   // Zeitachse der Berichte: dieselbe Kopfleiste wie der Monat, nur mit
@@ -413,7 +414,7 @@ function readOnly() {
 
 // Jede `data-action` dieser Seite, die NICHT schreibt. Eine Positivliste,
 // damit eine morgen ergaenzte Schreib-Aktion standardmaessig gesperrt ist.
-const READ_SAFE_ACTIONS = new Set(['loan-filter', 'toggle-planned']);
+const READ_SAFE_ACTIONS = new Set(['loan-filter', 'toggle-planned', 'toggle-loan-payments']);
 
 // Die schreibenden Bedienhaken OHNE `data-action` - Konten, Leerzustaende und
 // der Kategorie-Verwalter sind einzeln verdrahtet, nicht ueber einen Verteiler.
@@ -3298,18 +3299,51 @@ function loanPaymentsFor(loans) {
       || rank(a.loan) - rank(b.loan));
 }
 
+/**
+ * DIE RATEN ZEIGEN DIE LETZTEN SECHS (R20, Re-Critique 2026-10-17 A4 P3). Die
+ * Liste war unbegrenzt: mit einem Baukredit standen 16 Raten (mobil 1376px)
+ * zwischen den Darlehenskarten und dem Seitenende, alle mit demselben Titel.
+ * Die neuesten sechs stehen offen, der Rest hinter "Alle anzeigen (n)" -
+ * derselbe Knopf und dieselbe Mechanik wie "Geplant" im Hauptbuch (die
+ * uebrigen Zeilen sind gerendert und per `display` aus dem Fluss, also kein
+ * Tab-Stopp). Der Zustand gilt fuer die Sitzung der Seite.
+ */
+const LOAN_PAYMENTS_PREVIEW_ROWS = 6;
+
 function renderLoanTransactions(loans) {
   const payments = loanPaymentsFor(loans);
   if (!payments.length) return '';
+  const expanded = Boolean(state.loanPaymentsExpanded);
+  const more = payments.length - LOAN_PAYMENTS_PREVIEW_ROWS;
+  const row = ({ loan, ...payment }, i) => renderLoanPaymentEntry(loan, payment, { more: i >= LOAN_PAYMENTS_PREVIEW_ROWS });
+  const toggle = more > 0 ? `
+      <button type="button" class="budget-planned-toggle" data-action="toggle-loan-payments"
+              aria-expanded="${expanded ? 'true' : 'false'}" aria-controls="budget-loan-transactions-list">
+        <i data-lucide="chevron-down" class="icon-sm budget-planned-toggle__icon" aria-hidden="true"></i>
+        <span class="budget-planned-toggle__label">${esc(plannedToggleLabel(expanded, payments.length))}</span>
+      </button>` : '';
 
-  return `<div class="budget-loan-transactions">
+  return `<div class="budget-loan-transactions${expanded ? ' is-expanded' : ''}">
     <h2 class="budget-loan-transactions__title u-section-title">${t('budget.loanTransactions')}</h2>
     ${/* Traeger wie das Hauptbuch (Re-Critique 2026-09-28 P1-1): vorher lagen
         * die Raten nackt auf der Buehne, der einzige Tab ohne Flaeche. */ ''}
-    <div class="row-carrier budget-loan-transactions__list">
-      ${payments.map(({ loan, ...payment }) => renderLoanPaymentEntry(loan, payment)).join('')}
+    <div class="row-carrier budget-loan-transactions__list" id="budget-loan-transactions-list">
+      ${payments.map(row).join('')}${toggle}
     </div>
   </div>`;
+}
+
+/* Wie togglePlanned(): ohne Neuaufbau, der Knopf behaelt Fokus und Platz. */
+function toggleLoanPayments(button) {
+  const section = button.closest('.budget-loan-transactions');
+  if (!section) return;
+  const expanded = !section.classList.contains('is-expanded');
+  state.loanPaymentsExpanded = expanded;
+  section.classList.toggle('is-expanded', expanded);
+  button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+  const label = button.querySelector('.budget-planned-toggle__label');
+  const count = section.querySelectorAll('.budget-entry--loan').length;
+  if (label) label.textContent = plannedToggleLabel(expanded, count);
 }
 
 // Richtung (#638): Bei einem aufgenommenen Kredit geht die Rate raus. Vorzeichen,
@@ -3364,7 +3398,7 @@ function loanRowTitle(loan, loans = state.loans?.loans ?? []) {
   return shared ? (loan.title || partner) : partner;
 }
 
-function renderLoanPaymentEntry(loan, payment) {
+function renderLoanPaymentEntry(loan, payment, { more = false } = {}) {
   const entry = loanPaymentToEntry(loan, payment);
   const installment = t('budget.loanInstallmentNumber', {
     number: payment.installment_number,
@@ -3378,7 +3412,13 @@ function renderLoanPaymentEntry(loan, payment) {
   // denselben, der Name des Darlehens. Die Meta-Zeile sagt Datum und Rate,
   // das Darlehen steht schon im Titel. Der Eintrag im Hauptbuch behaelt seinen
   // Titel - dort braucht die Zeile die Gattung, hier steht sie im Abschnitt.
-  const meta = `${formatEntryDate(payment.paid_date)} · <span class="budget-entry__installment">${esc(installment)}</span>`;
+  // KEIN HAENGENDER PUNKT (R20, Re-Critique 2026-10-17): schmal brach die
+  // Meta-Zeile hinter "01.07.2026 ·" um, und der Trenner hing am Zeilenende.
+  // Datum und Rate sind zwei Stuecke einer umbrechenden Flex-Zeile, der Trenner
+  // gehoert zur Rate (budget.css `.budget-entry__sep`) und steht links neben
+  // ihr; faellt die Rate in die zweite Zeile, liegt er links ausserhalb der
+  // Zeile und ist abgeschnitten.
+  const meta = `<span class="budget-entry__date">${formatEntryDate(payment.paid_date)}</span><span class="budget-entry__installment"><span class="budget-entry__sep" aria-hidden="true">·</span>${esc(installment)}</span>`;
   const rowTitle = loanRowTitle(loan);
   // Alle Raten tragen denselben Titel - der Name des Loeschknopfs nennt die Rate mit.
   const deleteName = t('budget.deleteLabel', { title: `${rowTitle} · ${installment}` });
@@ -3394,7 +3434,7 @@ function renderLoanPaymentEntry(loan, payment) {
   ).text;
 
   return `
-    <div class="list-row budget-entry budget-entry--loan" data-loan-payment-id="${payment.id}" data-loan-id="${loan.id}" ${entry ? `data-entry-id="${entry.id}"` : ''}>
+    <div class="list-row budget-entry budget-entry--loan${more ? ' budget-entry--more' : ''}" data-loan-payment-id="${payment.id}" data-loan-id="${loan.id}" ${entry ? `data-entry-id="${entry.id}"` : ''}>
       <div class="budget-entry__indicator budget-entry__indicator--${flow}"></div>
       <div class="list-row__main">
         <div class="list-row__name budget-entry__title">${esc(rowTitle)}</div>
@@ -3469,6 +3509,7 @@ function wireLoanCards(root, open = openLoanReport) {
 }
 
 function wireLoansPage() {
+  _container.querySelector('[data-action="toggle-loan-payments"]')?.addEventListener('click', (e) => toggleLoanPayments(e.currentTarget));
   wireMetricGlance(_container, 'budget-loans-more', (on) => { state.loansExpanded = on; });
   _container.querySelector('#budget-empty-loan')?.addEventListener('click', () => openBudgetModal({ mode: 'create', initialType: 'loan' }));
   _container.querySelector('#budget-clear-loan-filter')?.addEventListener('click', () => {

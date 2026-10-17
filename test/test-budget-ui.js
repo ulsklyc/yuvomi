@@ -3190,7 +3190,8 @@ test('R19: eine Ratenzeile nennt den Partner, die Meta-Zeile Datum und Rate', ()
   const row = budget.slice(budget.indexOf('function renderLoanPaymentEntry('), budget.indexOf('function renderLoansPage('));
   assert.match(row, /const rowTitle = loanRowTitle\(loan\);/);
   assert.doesNotMatch(row, /loanPaymentTitle/, 'kein generiertes Praefix in der Zeile');
-  assert.match(row, /const meta = `\$\{formatEntryDate\(payment\.paid_date\)\} · <span class="budget-entry__installment">\$\{esc\(installment\)\}<\/span>`;/,
+  // R20: der Trenner gehoert zur Rate und haengt beim Umbruch nicht mehr am Zeilenende.
+  assert.match(row, /const meta = `<span class="budget-entry__date">\$\{formatEntryDate\(payment\.paid_date\)\}<\/span><span class="budget-entry__installment"><span class="budget-entry__sep" aria-hidden="true">·<\/span>\$\{esc\(installment\)\}<\/span>`;/,
     'Datum · Rate x von y - das Darlehen steht schon im Titel');
   const rules = [...eachRule(budgetCss)];
   assert.ok(rules.some((r) => r.selector.trim() === '.budget-entry--loan .budget-entry__meta' && /white-space:\s*normal/.test(r.body)),
@@ -5535,7 +5536,7 @@ test('R17/E4: der Aufklapper schaltet ohne Neuaufbau, auch bei Nur-lesen; geplan
     assert.equal(budgetUi.state.plannedExpandedMonth, null);
   } finally { Object.assign(budgetUi.state, vorher); }
 
-  assert.match(budget, /const READ_SAFE_ACTIONS = new Set\(\['loan-filter', 'toggle-planned'\]\)/, 'aufklappen liest nur');
+  assert.match(budget, /const READ_SAFE_ACTIONS = new Set\(\['loan-filter', 'toggle-planned', 'toggle-loan-payments'\]\)/, 'aufklappen liest nur (R20: auch die Raten)');
   assert.match(budget, /closest\('\[data-action="toggle-planned"\]'\);\s*\n\s*if \(plannedBtn\) \{ togglePlanned\(plannedBtn\); return; \}/,
     'der Klick laeuft ueber die Delegation der Liste');
 
@@ -6678,4 +6679,30 @@ test('R19: die Abo-Beschreibung steht breit nur einmal', () => {
   assert.ok(hide, 'keine Regel verbirgt die Meta-Fassung breit');
   assert.equal(hide.selector.trim(), '.subscription-card__meta > .subscription-card__meta-desc',
     'gleich spezifisch wie .subscription-card__meta > span und spaeter - sonst gewinnt inline-flex');
+});
+
+
+// R20 (Re-Critique 2026-10-17, A4 P3): die Ratenliste war unbegrenzt (16 Raten,
+// mobil 1376px), und schmal hing "·" am Ende der ersten Meta-Zeile.
+test('R20: die Raten zeigen die letzten sechs, der Trenner faellt beim Umbruch mit der Rate', () => {
+  const loan = { id: 1, title: 'Bau', borrower: 'Bank', installment_count: 312, currency: 'EUR', direction: 'borrowed',
+    payments: Array.from({ length: 8 }, (_, i) => ({ id: i + 1, installment_number: i + 1, paid_date: `2026-0${i + 1}-01`, amount: 900 })) };
+  const vorher = budgetUi.state.loanPaymentsExpanded;
+  try {
+    budgetUi.state.loanPaymentsExpanded = false;
+    const html = budgetUi.renderLoanTransactions([loan]);
+    assert.equal((html.match(/budget-entry--loan budget-entry--more/g) ?? []).length, 2, 'zwei von acht hinter dem Knopf');
+    assert.match(html, /data-action="toggle-loan-payments"[^>]*aria-expanded="false"/);
+    assert.match(html, /budget\.showAllPlanned\{&quot;count&quot;:8\}/);
+    const wenige = budgetUi.renderLoanTransactions([{ ...loan, payments: loan.payments.slice(0, 6) }]);
+    assert.doesNotMatch(wenige, /toggle-loan-payments|budget-entry--more/, 'bis sechs kein Knopf');
+  } finally { budgetUi.state.loanPaymentsExpanded = vorher; }
+  const rules = [...eachRule(budgetCss)];
+  const hidden = rules.find((r) => r.selector.trim() === '.budget-loan-transactions:not(.is-expanded) .budget-entry--more');
+  assert.match(hidden?.body ?? '', /display:\s*none/);
+  const sep = rules.find((r) => r.selector.trim() === '.budget-entry__sep');
+  assert.match(sep?.body ?? '', /position:\s*absolute/);
+  assert.match(sep.body, /inset-inline-end:\s*100%/, 'links neben der Rate - beim Umbruch ausserhalb der Zeile');
+  const meta = rules.find((r) => r.selector.trim() === '.budget-entry--loan .budget-entry__meta');
+  assert.match(meta.body, /flex-wrap:\s*wrap/);
 });
