@@ -2534,7 +2534,7 @@
         "deleteCardDAVAccountConfirm": "Dine synkroniserte kontakter blir værende, men mister CardDAV-koblingen.",
         "housekeepingPaymentsTitle": "Betalingsoppgaver",
         "housekeepingPaymentTasksLabel": "Opprett en betalingsoppgave ved hver innsjekk for housekeeping",
-        "housekeepingPaymentTasksHint": "Når denne er aktivert, opprettes det en oppgave for å betale den ansatte ved hver innsjekk. Ved å fullføre denne oppgaven markeres besøksbetalingen som betalt.",
+        "housekeepingPaymentTasksHint": "Når denne er aktivert, opprettes det en oppgave for å betale den ansatte ved hver innsjekk. Ved å fullføre denne oppgaven markeres besøksbetalingen som betalt. Bare den som sjekker inn og administratorene ser den.",
         "housekeepingPaymentTasksSaved": "Innstilling for housekeeping-betaling lagret.",
         "tasksSubtasksExpandedTitle": "Underoppgaver",
         "tasksSubtasksExpandedHint": "Velg om underoppgaver for oppgaver skal vises åpne som standard.",

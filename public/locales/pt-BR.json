@@ -2226,7 +2226,7 @@
         "deleteCardDAVAccountConfirm": "Os contatos sincronizados permanecem, mas perdem a conexão CardDAV.",
         "housekeepingPaymentsTitle": "Tarefas de pagamento",
         "housekeepingPaymentTasksLabel": "Criar uma tarefa de pagamento a cada entrada da faxineira",
-        "housekeepingPaymentTasksHint": "Quando ativo, cada entrada crie uma tarefa para pagar a pessoa da equipe. Ao concluir essa tarefa, o pagamento da visita é marcado como pago.",
+        "housekeepingPaymentTasksHint": "Quando ativo, cada entrada crie uma tarefa para pagar a pessoa da equipe. Ao concluir essa tarefa, o pagamento da visita é marcado como pago. Só quem registra a entrada e os administradores a veem.",
         "housekeepingPaymentTasksSaved": "Configuração de pagamento da faxina salva.",
         "tasksSubtasksExpandedTitle": "Subtarefas",
         "tasksSubtasksExpandedHint": "Defina se as subtarefas devem ser exibidas abertas por padrão nas tarefas.",

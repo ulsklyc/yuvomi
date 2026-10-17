@@ -2561,7 +2561,7 @@
         "emptyStateNoAccounts": "هنوز حسابی متصل نیست",
         "housekeepingPaymentsTitle": "کارهای پرداخت",
         "housekeepingPaymentTasksLabel": "در هر ورود، یک کار پرداخت ایجاد شود",
-        "housekeepingPaymentTasksHint": "اگر فعال باشد، در هر ورود یک کار برای پرداخت به خدمتکار خانه ایجاد می‌شود. انجام این کار، بازدید را به عنوان پرداخت‌شده علامت می‌زند.",
+        "housekeepingPaymentTasksHint": "اگر فعال باشد، در هر ورود یک کار برای پرداخت به خدمتکار خانه ایجاد می‌شود. انجام این کار، بازدید را به عنوان پرداخت‌شده علامت می‌زند. فقط کسی که ورود را ثبت می‌کند و مدیران آن را می‌بینند.",
         "housekeepingPaymentTasksSaved": "تنظیم پرداخت خدمتکار خانه ذخیره شد.",
         "tabModules": "ماژول‌ها",
         "thirdPartyModulesTitle": "ماژول‌ها",

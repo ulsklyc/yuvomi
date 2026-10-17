@@ -2487,7 +2487,7 @@
         "deleteCardDAVAccountConfirm": "Các liên hệ đã đồng bộ vẫn còn, nhưng mất liên kết CardDAV.",
         "housekeepingPaymentsTitle": "Nhiệm vụ thanh toán",
         "housekeepingPaymentTasksLabel": "Tạo nhiệm vụ thanh toán mỗi lần nhân viên dọn dẹp điểm danh",
-        "housekeepingPaymentTasksHint": "Khi được bật, mỗi lần điểm danh sẽ tạo một nhiệm vụ để thanh toán cho nhân viên. Hoàn thành nhiệm vụ đó sẽ đánh dấu là đã thanh toán cho chuyến viếng thăm.",
+        "housekeepingPaymentTasksHint": "Khi được bật, mỗi lần điểm danh sẽ tạo một nhiệm vụ để thanh toán cho nhân viên. Hoàn thành nhiệm vụ đó sẽ đánh dấu là đã thanh toán cho chuyến viếng thăm. Chỉ người điểm danh và quản trị viên mới thấy nhiệm vụ này.",
         "housekeepingPaymentTasksSaved": "Cài đặt thanh toán dọn dẹp đã lưu.",
         "tasksSubtasksExpandedTitle": "Công việc con",
         "tasksSubtasksExpandedHint": "Chọn xem công việc con có được hiển thị mở theo mặc định hay không.",

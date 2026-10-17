@@ -2561,7 +2561,7 @@
         "emptyStateNoAccounts": "Belum ada akun tersambung",
         "housekeepingPaymentsTitle": "Tugas pembayaran",
         "housekeepingPaymentTasksLabel": "Buat tugas pembayaran pada setiap check-in",
-        "housekeepingPaymentTasksHint": "Jika diaktifkan, tugas untuk membayar asisten rumah tangga dibuat pada setiap check-in. Menyelesaikan tugas ini menandai kunjungan sebagai terbayar.",
+        "housekeepingPaymentTasksHint": "Jika diaktifkan, tugas untuk membayar asisten rumah tangga dibuat pada setiap check-in. Menyelesaikan tugas ini menandai kunjungan sebagai terbayar. Hanya orang yang melakukan check-in dan admin yang dapat melihatnya.",
         "housekeepingPaymentTasksSaved": "Pengaturan pembayaran asisten rumah tangga disimpan.",
         "tabModules": "Modul",
         "thirdPartyModulesTitle": "Modul",

@@ -2227,7 +2227,7 @@
         "deleteCardDAVAccountConfirm": "I contatti sincronizzati restano, ma perdono il collegamento CardDAV.",
         "housekeepingPaymentsTitle": "Attività di pagamento",
         "housekeepingPaymentTasksLabel": "Crea un'attività di pagamento a ogni check-in del personale delle pulizie",
-        "housekeepingPaymentTasksHint": "Se abilitato, ogni check-in crea un'attività per il pagamento del membro dello staff. Il completamento di tale attività contrassegna il pagamento della visita come pagato.",
+        "housekeepingPaymentTasksHint": "Se abilitato, ogni check-in crea un'attività per il pagamento del membro dello staff. Il completamento di tale attività contrassegna il pagamento della visita come pagato. La vedono solo chi registra l'arrivo e gli amministratori.",
         "housekeepingPaymentTasksSaved": "Impostazione del pagamento delle pulizie salvata.",
         "backupSchedulerDisabled": "Disattivato",
         "backupSchedulerEnabled": "Attivato",

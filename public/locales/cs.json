@@ -2636,7 +2636,7 @@
         "emptyStateNoAccounts": "Zatím nejsou připojeny žádné účty",
         "housekeepingPaymentsTitle": "Platební úkoly",
         "housekeepingPaymentTasksLabel": "Vytvořit platební úkol při každém příchodu",
-        "housekeepingPaymentTasksHint": "Pokud je aktivní, vytvoří se při každém příchodu úkol pro zaplacení pomoci v domácnosti. Splnění tohoto úkolu označí návštěvu jako zaplacenou.",
+        "housekeepingPaymentTasksHint": "Pokud je aktivní, vytvoří se při každém příchodu úkol pro zaplacení pomoci v domácnosti. Splnění tohoto úkolu označí návštěvu jako zaplacenou. Vidí ho jen osoba, která příchod zaznamená, a správci.",
         "housekeepingPaymentTasksSaved": "Nastavení plateb pomoci v domácnosti uloženo.",
         "tabModules": "Moduly",
         "thirdPartyModulesTitle": "Moduly",

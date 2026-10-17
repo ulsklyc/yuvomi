@@ -2393,7 +2393,7 @@
         "deleteCardDAVAccountConfirm": "Синхронизированные контакты останутся, но потеряют связь с CardDAV.",
         "housekeepingPaymentsTitle": "Задачи по оплате",
         "housekeepingPaymentTasksLabel": "Создавать задачу по оплате при каждом приходе",
-        "housekeepingPaymentTasksHint": "Если включено, при каждом приходе создаётся задача по оплате уборки. Выполнение этой задачи отмечает визит как оплаченный.",
+        "housekeepingPaymentTasksHint": "Если включено, при каждом приходе создаётся задача по оплате уборки. Выполнение этой задачи отмечает визит как оплаченный. Её видят только тот, кто отмечает приход, и администраторы.",
         "housekeepingPaymentTasksSaved": "Настройка оплаты уборки сохранена.",
         "backupSchedulerDisabled": "Выключено",
         "backupSchedulerEnabled": "Включено",

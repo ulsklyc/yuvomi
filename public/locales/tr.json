@@ -2227,7 +2227,7 @@
         "deleteCardDAVAccountConfirm": "Eşitlenen kişiler kalır, ancak CardDAV bağlantısını kaybeder.",
         "housekeepingPaymentsTitle": "Ödeme görevleri",
         "housekeepingPaymentTasksLabel": "Her girişte bir ödeme görevi oluştur",
-        "housekeepingPaymentTasksHint": "Etkinleştirildiğinde her girişte ev işleri için bir ödeme görevi oluşturulur. Bu görevi tamamlamak ziyareti ödendi olarak işaretler.",
+        "housekeepingPaymentTasksHint": "Etkinleştirildiğinde her girişte ev işleri için bir ödeme görevi oluşturulur. Bu görevi tamamlamak ziyareti ödendi olarak işaretler. Bu görevi yalnızca girişi yapan kişi ve yöneticiler görür.",
         "housekeepingPaymentTasksSaved": "Ev işleri ödeme ayarı kaydedildi.",
         "backupSchedulerDisabled": "Devre dışı",
         "backupSchedulerEnabled": "Etkin",

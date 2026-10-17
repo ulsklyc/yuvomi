@@ -2561,7 +2561,7 @@
         "emptyStateNoAccounts": "아직 연결된 계정 없음",
         "housekeepingPaymentsTitle": "결제 작업",
         "housekeepingPaymentTasksLabel": "체크인할 때마다 결제 작업 생성",
-        "housekeepingPaymentTasksHint": "활성화하면 체크인할 때마다 가사 도우미에게 지급할 작업이 생성됩니다. 이 작업을 완료하면 방문이 지급 완료로 표시됩니다.",
+        "housekeepingPaymentTasksHint": "활성화하면 체크인할 때마다 가사 도우미에게 지급할 작업이 생성됩니다. 이 작업을 완료하면 방문이 지급 완료로 표시됩니다. 체크인한 사람과 관리자만 이 작업을 볼 수 있습니다.",
         "housekeepingPaymentTasksSaved": "가사 도우미 결제 설정이 저장되었습니다.",
         "tabModules": "모듈",
         "thirdPartyModulesTitle": "모듈",

@@ -2584,7 +2584,7 @@
         "emptyStateNoAccounts": "Wala pang nakakonektang account",
         "housekeepingPaymentsTitle": "Mga gawain sa pagbabayad",
         "housekeepingPaymentTasksLabel": "Gumawa ng gawain sa pagbabayad sa bawat check-in ng katulong",
-        "housekeepingPaymentTasksHint": "Kapag naka-enable, gumagawa ang bawat check-in ng gawain para bayaran ang tauhan. Ang pagtapos sa gawaing iyon ang magmamarka sa bayad ng pagbisita bilang bayad na.",
+        "housekeepingPaymentTasksHint": "Kapag naka-enable, gumagawa ang bawat check-in ng gawain para bayaran ang tauhan. Ang pagtapos sa gawaing iyon ang magmamarka sa bayad ng pagbisita bilang bayad na. Ang nagche-check-in at ang mga admin lang ang makakakita nito.",
         "housekeepingPaymentTasksSaved": "Na-save ang setting ng bayad sa gawaing-bahay.",
         "tabModules": "Mga Modyul",
         "thirdPartyModulesTitle": "Mga Modyul",

@@ -1156,3 +1156,13 @@ test('R20: ohne Betragsrecht keine Euro-Zeile, kein Zahlungsdiagramm, keine Lohn
     perms.clearPermissions();
   }
 });
+
+// R20 (handoff B2): seit B2 sehen eine Zahlungsaufgabe nur die Person, die
+// eincheckt, und die Admins - der Schalter in den Einstellungen sagt das.
+test('Einstellungen: der Hinweis zu Zahlungsaufgaben nennt, wer sie sieht', () => {
+  const localeDir = new URL('../public/locales/', import.meta.url);
+  const de = JSON.parse(readFileSync(new URL('de.json', localeDir), 'utf8'));
+  const en = JSON.parse(readFileSync(new URL('en.json', localeDir), 'utf8'));
+  assert.match(de.settings.housekeepingPaymentTasksHint, /nur die Person, die eincheckt, und die Administratoren/);
+  assert.match(en.settings.housekeepingPaymentTasksHint, /Only the person who checks in and the administrators/);
+});

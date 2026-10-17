@@ -2534,7 +2534,7 @@
         "deleteCardDAVAccountConfirm": "Your synced contacts stay, but lose their CardDAV link.",
         "housekeepingPaymentsTitle": "Payment tasks",
         "housekeepingPaymentTasksLabel": "Create a payment task on each housekeeper check-in",
-        "housekeepingPaymentTasksHint": "When enabled, each check-in creates a task for paying the housekeeper. Completing that task marks the visit payment as paid.",
+        "housekeepingPaymentTasksHint": "When enabled, each check-in creates a task for paying the housekeeper. Completing that task marks the visit payment as paid. Only the person who checks in and the administrators can see it.",
         "housekeepingPaymentTasksSaved": "Housekeeping payment setting saved.",
         "tasksSubtasksExpandedTitle": "Subtasks",
         "tasksSubtasksExpandedHint": "Choose whether task subtasks are displayed open by default.",

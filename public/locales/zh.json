@@ -2227,7 +2227,7 @@
         "deleteCardDAVAccountConfirm": "已同步的联系人会保留，但会失去与 CardDAV 的关联。",
         "housekeepingPaymentsTitle": "付款任务",
         "housekeepingPaymentTasksLabel": "每次签到时创建付款任务",
-        "housekeepingPaymentTasksHint": "启用后，每次签到都会创建一个支付家务人员的任务。完成该任务即将本次上门标记为已付。",
+        "housekeepingPaymentTasksHint": "启用后，每次签到都会创建一个支付家务人员的任务。完成该任务即将本次上门标记为已付。只有签到的人和管理员能看到该任务。",
         "housekeepingPaymentTasksSaved": "已保存家务付款设置。",
         "backupSchedulerDisabled": "已禁用",
         "backupSchedulerEnabled": "已启用",

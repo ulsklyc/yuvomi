@@ -2477,7 +2477,7 @@
         "deleteCardDAVAccountConfirm": "تبقى جهات الاتصال المتزامنة، لكنها تفقد ارتباطها بـ CardDAV.",
         "housekeepingPaymentsTitle": "مهام الدفع",
         "housekeepingPaymentTasksLabel": "إنشاء مهمة دفع عند كل تسجيل دخول",
-        "housekeepingPaymentTasksHint": "عند التفعيل، تُنشأ مهمة لدفع أجر العاملة المنزلية عند كل تسجيل دخول. إنجاز هذه المهمة يضع علامة مدفوع على الزيارة.",
+        "housekeepingPaymentTasksHint": "عند التفعيل، تُنشأ مهمة لدفع أجر العاملة المنزلية عند كل تسجيل دخول. إنجاز هذه المهمة يضع علامة مدفوع على الزيارة. لا يراها إلا من يسجّل الدخول والمشرفون.",
         "housekeepingPaymentTasksSaved": "تم حفظ إعداد مدفوعات التدبير المنزلي.",
         "backupSchedulerDisabled": "معطّل",
         "backupSchedulerEnabled": "مفعّل",

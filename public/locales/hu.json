@@ -2511,7 +2511,7 @@
         "deleteCardDAVAccountConfirm": "A szinkronizált névjegyek megmaradnak, de elveszítik a CardDAV-kapcsolatot.",
         "housekeepingPaymentsTitle": "Fizetési feladatok",
         "housekeepingPaymentTasksLabel": "Hozzon létre fizetési feladatot minden háztartási ellenőrzésnél",
-        "housekeepingPaymentTasksHint": "Ha engedélyezve van, minden ellenőrzés létrehoz egy feladatot a személyzet tagjának fizetésére. A feladat teljesítése a látogatás fizetését fizetettként jelöli.",
+        "housekeepingPaymentTasksHint": "Ha engedélyezve van, minden ellenőrzés létrehoz egy feladatot a személyzet tagjának fizetésére. A feladat teljesítése a látogatás fizetését fizetettként jelöli. Csak az látja, aki a belépést rögzíti, és az adminisztrátorok.",
         "housekeepingPaymentTasksSaved": "Háztartási fizetési beállítások mentve.",
         "tasksSubtasksExpandedTitle": "Részfeladatok",
         "tasksSubtasksExpandedHint": "Válassza ki, hogy a részfeladatok alapértelmezés szerint nyitva jelenjenek-e meg.",

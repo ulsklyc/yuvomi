@@ -2227,7 +2227,7 @@
         "deleteCardDAVAccountConfirm": "Les contacts synchronisés sont conservés, mais perdent leur lien CardDAV.",
         "housekeepingPaymentsTitle": "Tâches de paiement",
         "housekeepingPaymentTasksLabel": "Créer une tâche de paiement à chaque arrivée",
-        "housekeepingPaymentTasksHint": "Lorsque cette option est activée, chaque arrivée crée une tâche de paiement pour la personne de ménage. Terminer cette tâche marque la visite comme payée.",
+        "housekeepingPaymentTasksHint": "Lorsque cette option est activée, chaque arrivée crée une tâche de paiement pour la personne de ménage. Terminer cette tâche marque la visite comme payée. Seuls la personne qui enregistre l'arrivée et les administrateurs la voient.",
         "housekeepingPaymentTasksSaved": "Paramètre de paiement du ménage enregistré.",
         "backupSchedulerDisabled": "Désactivé",
         "backupSchedulerEnabled": "Activé",

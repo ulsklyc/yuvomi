@@ -2511,7 +2511,7 @@
         "deleteCardDAVAccountConfirm": "Je gesynchroniseerde contacten blijven, maar verliezen hun CardDAV-koppeling.",
         "housekeepingPaymentsTitle": "Betalingstaken",
         "housekeepingPaymentTasksLabel": "Maak een betalingstaak aan bij elke inchecking van de schoonmaker",
-        "housekeepingPaymentTasksHint": "Indien ingeschakeld, maakt elke inchecking een taak aan voor het betalen van het personeelslid. Het voltooien van die taak markeert de bezoekbetaling als betaald.",
+        "housekeepingPaymentTasksHint": "Indien ingeschakeld, maakt elke inchecking een taak aan voor het betalen van het personeelslid. Het voltooien van die taak markeert de bezoekbetaling als betaald. Alleen wie incheckt en de beheerders zien die.",
         "housekeepingPaymentTasksSaved": "Instelling voor huishoudbetalingen opgeslagen.",
         "tasksSubtasksExpandedTitle": "Subtaken",
         "tasksSubtasksExpandedHint": "Kies of subtaken standaard open worden weergegeven.",

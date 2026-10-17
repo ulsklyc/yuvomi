@@ -2227,7 +2227,7 @@
         "deleteCardDAVAccountConfirm": "同期済みの連絡先は残りますが、CardDAV との関連付けは失われます。",
         "housekeepingPaymentsTitle": "支払いタスク",
         "housekeepingPaymentTasksLabel": "チェックインごとに支払いタスクを作成する",
-        "housekeepingPaymentTasksHint": "有効にすると、チェックインのたびに家事担当者への支払いタスクが作成されます。そのタスクを完了すると、訪問が支払い済みになります。",
+        "housekeepingPaymentTasksHint": "有効にすると、チェックインのたびに家事担当者への支払いタスクが作成されます。そのタスクを完了すると、訪問が支払い済みになります。このタスクは、チェックインした人と管理者だけが見られます。",
         "housekeepingPaymentTasksSaved": "家事の支払い設定を保存しました。",
         "backupSchedulerDisabled": "無効",
         "backupSchedulerEnabled": "有効",

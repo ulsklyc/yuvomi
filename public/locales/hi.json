@@ -2227,7 +2227,7 @@
         "deleteCardDAVAccountConfirm": "सिंक किए गए संपर्क बने रहेंगे, लेकिन उनका CardDAV लिंक हट जाएगा।",
         "housekeepingPaymentsTitle": "भुगतान कार्य",
         "housekeepingPaymentTasksLabel": "हर चेक-इन पर भुगतान कार्य बनाएँ",
-        "housekeepingPaymentTasksHint": "सक्षम होने पर हर चेक-इन पर गृहकार्य करने वाले को भुगतान का कार्य बनता है। उस कार्य को पूरा करने पर विज़िट भुगतान हुआ चिह्नित हो जाती है।",
+        "housekeepingPaymentTasksHint": "सक्षम होने पर हर चेक-इन पर गृहकार्य करने वाले को भुगतान का कार्य बनता है। उस कार्य को पूरा करने पर विज़िट भुगतान हुआ चिह्नित हो जाती है। इसे केवल चेक-इन करने वाला व्यक्ति और व्यवस्थापक देख सकते हैं।",
         "housekeepingPaymentTasksSaved": "गृहकार्य भुगतान सेटिंग सहेजी गई।",
         "backupSchedulerDisabled": "बंद",
         "backupSchedulerEnabled": "चालू",

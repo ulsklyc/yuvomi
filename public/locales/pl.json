@@ -2743,7 +2743,7 @@
         "emptyStateNoAccounts": "Brak połączonych kont",
         "housekeepingPaymentsTitle": "Zadania płatności",
         "housekeepingPaymentTasksLabel": "Przy każdym zameldowaniu utwórz zadanie płatności",
-        "housekeepingPaymentTasksHint": "Po włączeniu, przy każdym zameldowaniu zostanie utworzone zadanie płatności za pomoc domową. Ukończenie tego zadania oznacza wizytę jako opłaconą.",
+        "housekeepingPaymentTasksHint": "Po włączeniu, przy każdym zameldowaniu zostanie utworzone zadanie płatności za pomoc domową. Ukończenie tego zadania oznacza wizytę jako opłaconą. Widzi je tylko osoba, która melduje przyjście, oraz administratorzy.",
         "housekeepingPaymentTasksSaved": "Ustawienia płatności za pomoc domową zapisane.",
         "tabModules": "Modules",
         "thirdPartyModulesTitle": "Modules",

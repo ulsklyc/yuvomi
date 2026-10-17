@@ -67,7 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it - in Tasks, the Overview, search and connected AI assistants alike. When an account that cannot
   see wages checks in, the task goes to the admins instead. Open payment tasks created before this
   change move to the same people when you update; a completed one follows as soon as its visit is
-  edited, checked out or paid.
+  edited, checked out or paid. The switch in Settings -> Modules -> Household help says who sees it.
 - **Every settings page and dialog uses the same rows.** Fields stand as rows with the label on the
   left and the field on the right, and a hint underneath where one helps, instead of fields stacked
   under their labels in a card. That covers the e-mail server and the account page, Kitchen (meal

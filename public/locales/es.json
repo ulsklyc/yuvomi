@@ -2227,7 +2227,7 @@
         "deleteCardDAVAccountConfirm": "Los contactos sincronizados se conservan, pero pierden su vínculo con CardDAV.",
         "housekeepingPaymentsTitle": "Tareas de pago",
         "housekeepingPaymentTasksLabel": "Crear una tarea de pago en cada entrada",
-        "housekeepingPaymentTasksHint": "Cuando está activado, cada entrada crea una tarea para pagar a la persona de limpieza. Completar esa tarea marca la visita como pagada.",
+        "housekeepingPaymentTasksHint": "Cuando está activado, cada entrada crea una tarea para pagar a la persona de limpieza. Completar esa tarea marca la visita como pagada. Solo la ven quien registra la entrada y los administradores.",
         "housekeepingPaymentTasksSaved": "Ajuste de pagos de limpieza guardado.",
         "backupSchedulerDisabled": "Desactivado",
         "backupSchedulerEnabled": "Activado",

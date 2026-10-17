@@ -2584,7 +2584,7 @@
         "emptyStateNoAccounts": "Noch keine Konten verbunden",
         "housekeepingPaymentsTitle": "Zahlungsaufgaben",
         "housekeepingPaymentTasksLabel": "Bei jedem Einchecken eine Zahlungsaufgabe erstellen",
-        "housekeepingPaymentTasksHint": "Wenn aktiviert, wird bei jedem Einchecken eine Aufgabe zur Bezahlung der Haushaltshilfe erstellt. Das Erledigen dieser Aufgabe markiert den Besuch als bezahlt.",
+        "housekeepingPaymentTasksHint": "Wenn aktiviert, wird bei jedem Einchecken eine Aufgabe zur Bezahlung der Haushaltshilfe erstellt. Das Erledigen dieser Aufgabe markiert den Besuch als bezahlt. Diese Aufgabe sehen nur die Person, die eincheckt, und die Administratoren.",
         "housekeepingPaymentTasksSaved": "Einstellung für Haushaltshilfe-Zahlungen gespeichert.",
         "tabModules": "Module",
         "thirdPartyModulesTitle": "Module",

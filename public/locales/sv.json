@@ -2227,7 +2227,7 @@
         "deleteCardDAVAccountConfirm": "De synkroniserade kontakterna finns kvar men förlorar sin CardDAV-koppling.",
         "housekeepingPaymentsTitle": "Betalningsuppgifter",
         "housekeepingPaymentTasksLabel": "Skapa en betalningsuppgift vid varje städpersonals incheckning",
-        "housekeepingPaymentTasksHint": "När den är aktiverad skapar varje incheckning en uppgift för att betala personalen. Att slutföra den uppgiften markerar besöksbetalningen som betald.",
+        "housekeepingPaymentTasksHint": "När den är aktiverad skapar varje incheckning en uppgift för att betala personalen. Att slutföra den uppgiften markerar besöksbetalningen som betald. Bara den som checkar in och administratörerna ser den.",
         "housekeepingPaymentTasksSaved": "Inställningen för städpersonal har sparats.",
         "backupSchedulerDisabled": "Inaktiverad",
         "backupSchedulerEnabled": "Aktiverad",
