@@ -609,6 +609,40 @@ test('Uebersicht: die letzten Besuche stehen vor dem Zahlungsdiagramm', () => {
   assert.ok(liste < diagramm, 'mobil begannen die Besuche bei y760 hinter dem 252px-Diagramm');
 });
 
+// R20 (Re-Critique 2026-10-17 a5 P2-5): das Zahlungsdiagramm las sich wie
+// sechs Fortschrittskapseln ohne Legende, mit viermal "0,00 €" ueber leeren
+// Monaten und "380,00 €", das bei 390px aus seiner Spalte lief.
+test('Uebersicht: das Zahlungsdiagramm zeigt Saeulen mit Legende, leere Monate ohne Betrag', () => {
+  const state = hk.state();
+  state.tab = 'dashboard';
+  state.currency = 'EUR';
+  state.workers = [{ id: 7, display_name: 'Maria Silva', rate_type: 'daily', daily_rate: 45, payment_schedule: 'weekly' }];
+  state.dashboard = {
+    visits_this_month: 3, last_visit: null, pending_tasks: 0, finished_tasks_this_month: 0, pending_payments: 280,
+    monthly_payments: [
+      { month: '2026-05', total: 0, pending: 0 },
+      { month: '2026-09', total: 145, pending: 0 },
+      { month: '2026-10', total: 380, pending: 280 },
+      { month: '2026-11', total: 57.5, pending: 57.5 },
+    ],
+  };
+  state.recentVisits = [];
+  const content = fakeContainer();
+  hk.renderDashboard(content);
+  const html = content.html;
+  const values = [...html.matchAll(/housekeeping-chart__value" aria-hidden="true">([^<]*)</g)].map((m) => m[1]);
+  assert.equal(values.length, 4, 'eine Wertzeile je Monat');
+  assert.equal(values[0], '', 'ein leerer Monat traegt keinen Betrag ("0,00 €")');
+  assert.doesNotMatch(values[2], /[.,]00/, `ganze Betraege ohne Nachkommastellen (${values[2]})`);
+  assert.match(values[3], /57[.,]5/, 'ein krummer Betrag behaelt seine Stellen');
+  const bars = [...html.matchAll(/housekeeping-chart__bar" style="([^"]*)"/g)].map((m) => m[1]);
+  assert.equal(bars.length, 3, 'ein leerer Monat hat keine Saeule, nur die Grundlinie');
+  assert.match(bars[0], /--paid-share:100\.0%/, 'ganz bezahlt');
+  assert.match(bars[1], /--paid-share:26\.3%/, '100 von 380 bezahlt, der Rest ist offen');
+  assert.match(html, /housekeeping-chart__legend[\s\S]*housekeeping\.paymentPaid[\s\S]*housekeeping\.paymentPending/, 'die Legende nennt bezahlt und ausstehend');
+  assert.match(html, /role="listitem" aria-label="[^"]*housekeeping\.paymentPending/, 'jede Saeule nennt ihren offenen Teil im Namen');
+});
+
 test('Uebersicht: der letzte Besuch nennt im laufenden Jahr kein Jahr, in einem anderen schon', () => {
   const jahr = new Date().getFullYear();
   const vorher = globalThis.__formatDayMonth;

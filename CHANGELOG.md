@@ -100,8 +100,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so the "Show statistics" button is gone. Both lists start on the same line, and a period without
   shifts shows one empty message instead of zeros and two empty cards.
 - **The housekeeping payment chart always shows six months.** Months without a visit appear
-  with 0 € instead of being left out, and the bars share the width of the card, so two payments no
-  longer sit alone at its left edge.
+  instead of being left out, and the bars share the width of the card, so two payments no
+  longer sit alone at its left edge. Each month is a column on a baseline: the paid part solid,
+  the part still open lighter, with a legend for both; an empty month carries no "0.00 €", and
+  whole amounts drop their cents so "380 €" fits on a phone.
 - **A PDF preview shows the whole first page.** On a computer the preview fitted the page to its
   width and showed less than half of it; it now fits the full page, and "Open in new tab" stays the
   way to read it in detail.

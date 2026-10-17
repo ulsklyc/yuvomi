@@ -373,14 +373,19 @@
   --chart-bar-height: 88px;
 }
 
+/* SAEULE UEBER EINER GRUNDLINIE, KEINE KAPSEL IN EINER BAHN (R20,
+ * Re-Critique 2026-10-17 a5 P2-5). Die volle, runde Bahn aus der Fassung
+ * davor las sich wie sechs Fortschrittsbalken - "wie voll" statt "wieviel".
+ * Jetzt traegt jede Spalte eine Haarlinie als Achse, die Saeule waechst
+ * daraus, und ein leerer Monat ist nur die Linie. Die Hoehe bleibt per
+ * `scaleY` (frontend-audit); deshalb kein runder Kopf, der sich beim
+ * Stauchen zum Oval verzoege (bei 145 € von 380 € gemessen). */
 .housekeeping-chart__track {
   width: min(100%, var(--space-10));
   height: var(--chart-bar-height);
   display: flex;
   align-items: flex-end;
-  border-radius: var(--radius-full) var(--radius-full) 0 0;
-  background: var(--color-fill-well);
-  overflow: hidden;
+  border-block-end: 1px solid var(--color-border);
 }
 
 .housekeeping-chart__bar {
@@ -388,15 +393,45 @@
   /* `scaleY` statt `height`: projektweite Konvention fuer Fuellstaende
    * (budget/dashboard/tasks), vom frontend-audit erzwungen. */
   height: 100%;
-  border-radius: inherit;
+  border-radius: var(--radius-xs) var(--radius-xs) 0 0;
   /* Serie 1 statt der Stimme: der Balken ist eine DATENREIHE (Zahlungen in
    * Euro), und Datenreihen nehmen die Chart-Palette - die Stimme sagt „was
    * tut das hier", nicht „wieviel wurde gezahlt" (Chart-Serien-Regel,
    * DESIGN.md; Critique 2026-08-27, P3). Serie 1 heisst in der
    * Kontofarben-Wahl bewusst „Violett" - die Naehe ist dort die Zusage. */
-  background: var(--chart-series-1);
+  background: linear-gradient(to top,
+    var(--chart-series-1) 0 var(--paid-share, 100%),
+    color-mix(in srgb, var(--chart-series-1) var(--tint-hint), transparent) var(--paid-share, 100%) 100%);
   transform-origin: bottom center;
   transform: scaleY(var(--bar-scale, 0));
+}
+
+.housekeeping-chart__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+
+.housekeeping-chart__legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.housekeeping-chart__swatch {
+  inline-size: var(--space-3);
+  block-size: var(--space-3);
+  border-radius: var(--radius-xs);
+  background: var(--chart-series-1);
+}
+
+.housekeeping-chart__swatch--pending {
+  background: color-mix(in srgb, var(--chart-series-1) var(--tint-hint), transparent);
 }
 
 .housekeeping-field {

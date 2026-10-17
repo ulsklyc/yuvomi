@@ -220,6 +220,21 @@ function money(value) {
   return getNumberFormat({ style: 'currency', currency: state.currency }).format(Number(value || 0));
 }
 
+/**
+ * Der Betrag ueber einer Diagrammsaeule: ganze Betraege ohne Nachkommastellen
+ * (R20, Re-Critique 2026-10-17 a5 P2-5). "380,00 €" lief bei 390px in seiner
+ * Spalte ueber die Kante; "380 €" traegt dieselbe Auskunft. Krumme Betraege
+ * behalten ihre Stellen - gerundet wuerde aus 57,50 € eine Zahl, die nie
+ * gezahlt wurde.
+ */
+function chartMoney(value) {
+  const amount = Number(value || 0);
+  const whole = Number.isInteger(amount);
+  return getNumberFormat({
+    style: 'currency', currency: state.currency, ...(whole ? { minimumFractionDigits: 0, maximumFractionDigits: 0 } : {}),
+  }).format(amount);
+}
+
 function urgencyLabel(status) {
   if (status === 'overdue') return t('housekeeping.overdue');
   if (status === 'today') return t('housekeeping.dueToday');
@@ -642,15 +657,26 @@ function renderDashboard(content) {
     // Zahlung bleibt leer (R19): seit der Server alle sechs Monate liefert,
     // stuende sonst ueber jeder Null ein Stummel, als waere etwas gezahlt.
     const scale = row.total > 0 ? Math.max(0.06, row.total / maxPayment) : 0;
+    // BEZAHLT UNTEN, OFFEN DARUEBER (R20, Re-Critique 2026-10-17 a5 P2-5).
+    // Die Saeule ist die Summe der Besuche eines Monats; ihr bezahlter Teil
+    // steht voll, der offene als Tint derselben Serie - die Legende darunter
+    // nennt beide, und "Offene Zahlungen" im Abschnittskopf findet sich in
+    // der Saeule wieder. Vorher war die Saeule eine Kapsel in einer vollen
+    // Bahn (las sich als Fortschritt), und ueber jedem leeren Monat stand
+    // "0,00 €". Ein Monat ohne Besuch traegt jetzt nur die Grundlinie.
+    const paidShare = row.total > 0 ? Math.max(0, Math.min(1, (row.total - (row.pending || 0)) / row.total)) : 0;
+    const name = row.total > 0
+      ? `${formatMonthLabel(row.month)}: ${money(row.total)}${row.pending > 0 ? ` (${t('housekeeping.paymentPending')} ${money(row.pending)})` : ''}`
+      : `${formatMonthLabel(row.month)}: ${money(0)}`;
     // Wert sichtbar am Balken statt nur im Hover-title: das Chart trug sonst
     // keine ablesbare Achse oder Zahl (Audit A2-23).
     return `
-      <div class="housekeeping-chart__bar-wrap">
-        <span class="housekeeping-chart__value">${esc(money(row.total))}</span>
-        <div class="housekeeping-chart__track" title="${esc(formatMonthLabel(row.month))} ${esc(money(row.total))}">
-          <div class="housekeeping-chart__bar" style="--bar-scale:${scale.toFixed(4)}"></div>
+      <div class="housekeeping-chart__bar-wrap" role="listitem" aria-label="${esc(name)}">
+        <span class="housekeeping-chart__value" aria-hidden="true">${row.total > 0 ? esc(chartMoney(row.total)) : ''}</span>
+        <div class="housekeeping-chart__track" title="${esc(name)}" aria-hidden="true">
+          ${row.total > 0 ? `<div class="housekeeping-chart__bar" style="--bar-scale:${scale.toFixed(4)};--paid-share:${(paidShare * 100).toFixed(1)}%"></div>` : ''}
         </div>
-        <span>${esc(formatMonthLabel(row.month, { month: 'short' }))}</span>
+        <span aria-hidden="true">${esc(formatMonthLabel(row.month, { month: 'short' }))}</span>
       </div>
     `;
   }).join('');
@@ -728,9 +754,13 @@ function renderDashboard(content) {
         <span>${esc(t('housekeeping.pendingPayments'))}: ${esc(money(data.pending_payments || 0))}</span>
       </div>
       <div class="housekeeping-card">
-      <div class="housekeeping-chart" aria-label="${esc(t('housekeeping.monthlyPayments'))}">
+      <div class="housekeeping-chart"${bars ? ' role="list"' : ''} aria-label="${esc(t('housekeeping.monthlyPayments'))}">
         ${bars || `<p class="housekeeping-muted">${esc(t('housekeeping.noPaymentData'))}</p>`}
       </div>
+      ${bars ? `<ul class="housekeeping-chart__legend" aria-hidden="true">
+        <li><span class="housekeeping-chart__swatch"></span>${esc(t('housekeeping.paymentPaid'))}</li>
+        <li><span class="housekeeping-chart__swatch housekeeping-chart__swatch--pending"></span>${esc(t('housekeeping.paymentPending'))}</li>
+      </ul>` : ''}
       </div>
     </section>`}
     </div>
