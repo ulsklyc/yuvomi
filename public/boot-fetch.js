@@ -9,12 +9,14 @@
 // Antwort beim ersten passenden GET ab (takeBootResponse) - einmal, fuer
 // dieselbe Adresse, binnen BOOT_TTL_MS; danach fragt alles wie bisher selbst.
 //
-// Nur, was ohnehin gleich gefragt wird: Sitzung, Version, Einstellungen und
-// Module auf jeder angemeldeten Seite, Erinnerungen, Uebersicht und Wetter nur
-// auf "/". Die Abfrage der Uebersicht ist die, die sie selbst vorhersagt (der
-// Layout-Hinweis aus utils/dashboard-layout-hint.js); weicht sie ab, bleibt die
-// Antwort liegen und verfaellt. Ohne Sitzung antworten sie 401 und verfallen
-// ebenso - die Sitzungspruefung des Routers bekommt ihre 401 wie bisher.
+// Nur, was jede angemeldete Seite gleich fragt: Sitzung, Version,
+// Einstellungen und Module. Ohne Sitzung antworten sie 401 und verfallen - die
+// Sitzungspruefung des Routers fragt dann selbst und bekommt ihre 401 wie
+// bisher. BEWUSST NICHT die Uebersicht, ihre Erinnerungen und das Wetter:
+// vorab gefragt gewannen sie gemessen nochmals 0,1 s (Start vom Homescreen
+// 0,80 -> 0,69 s), aber die Uebersicht zeichnete dann mitten im Laden der
+// Module, und Lighthouse (simuliert) fiel auf "/" von 75 auf 68-72 (Speed
+// Index 2,2 -> 3,6 s, TBT 30 -> 130 ms).
 //
 // Ein Import ginge nicht (das hier laeuft vor jedem Modul), ein Inline-Skript
 // scheitert an der CSP (`script-src 'self'`). Keine API juenger als die des
@@ -43,17 +45,6 @@
   ask('/auth/me');
   ask('/preferences');
   ask('/modules');
-  if (path === '/') {
-    ask('/reminders/pending');
-    var query = '/dashboard';
-    try {
-      var hint = JSON.parse(localStorage.getItem('yuvomi-dash-layout-hint') || 'null');
-      if (hint && typeof hint === 'object' && !Array.isArray(hint) && typeof hint.query === 'string'
-        && hint.query.indexOf('/dashboard') === 0) query = hint.query;
-    } catch (e) { /* gesperrter Speicher: die Standardabfrage */ }
-    ask(query);
-    ask('/weather?lang=' + encodeURIComponent(document.documentElement.lang || 'de'));
-  }
 
   /**
    * Die Antwort einer Vorab-Frage - einmal je Adresse, nur binnen BOOT_TTL_MS.

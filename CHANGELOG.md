@@ -220,9 +220,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   them, and no longer waits for the date picker, category, icon picker, attachment, screensaver and
   sign-in styles before the first frame; each of those loads its styles when it is first shown. On
   a throttled phone (4x CPU, fast 4G) the overview's content arrived after 4.8 s instead of 5.6 s.
-  The session, settings and overview are now asked for while the app itself still loads, instead
-  of one after the other once it has: opened again from the home screen, the overview shows its
-  content after 0.7 s instead of 1.1 s on the same phone. While it loads, a calm outline of the
+  The session and settings are now asked for while the app itself still loads, instead of one
+  after the other once it has: opened again from the home screen, the overview shows its content
+  after 0.8 s instead of 1.1 s on the same phone. While it loads, a calm outline of the
   app stands where the header, cards and tab bar will appear, instead of a pulsing name, and
   screen readers announce it as loading in your language.
 - **Less to download on every start.** The server leaves the explanatory comments in Yuvomi's own
