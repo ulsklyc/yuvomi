@@ -1163,29 +1163,8 @@ button.health-med-card:hover {
   font-weight: var(--font-weight-medium, 500);
 }
 
-/* Modal: Checkbox-Zeile + Einnahmeplan-Editor */
-.health-check {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-sm);
-  color: var(--color-text-primary);
-  cursor: pointer;
-}
-
-/* Checkbox im Modul-Akzent statt Browser-Default-Blau; größeres Tap-Ziel als die
- * nativen 13px. Das umschließende Label vergrößert die Trefferfläche zusätzlich. */
-.health-check input[type="checkbox"] {
-  width: 1.15rem;
-  height: 1.15rem;
-  flex: 0 0 auto;
-  /* Modals werden außerhalb von .health-page gerendert, wo --module-accent nicht
-   * gescoped ist. Der Router setzt --active-module-accent global; --module-health
-   * ist der Fallback (beide global verfügbar). */
-  accent-color: var(--active-module-accent, var(--module-health));
-  cursor: pointer;
-}
-
+/* Modal: Einnahmeplan-Editor. Die Checkbox-Zeile (`.health-check`) ist seit
+ * der Re-Kritik 2026-10-17 die geteilte Schalterzeile (toggleRowHtml). */
 .health-sched {
   display: flex;
   flex-direction: column;

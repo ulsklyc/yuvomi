@@ -334,7 +334,9 @@ test('Aktivitaet: Intensitaet ist eine uebersetzte Auswahl, kein Freitext (Criti
   const { readFileSync } = await import('node:fs');
   const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
   assert.doesNotMatch(src, /id="activity-intensity" type="text"/, 'kein Freitextfeld mehr');
-  assert.match(src, /<select class="input" id="activity-intensity">\$\{intensityOptionsHtml\(row\?\.intensity\)\}<\/select>/);
+  // Seit der Re-Kritik 2026-10-17 eine Zeile im Dialog-Traeger: die randlose
+  // Auswahl der Formularzeile liest `.form-input` (layout.css).
+  assert.match(src, /<select class="form-input" id="activity-intensity">\$\{intensityOptionsHtml\(row\?\.intensity\)\}<\/select>/);
   assert.match(src, /const INTENSITY_LEVELS = \['low', 'moderate', 'high'\];/);
   assert.match(src, /if \(row\.intensity\) meta\.push\(intensityLabel\(row\.intensity\)\);/, 'die Liste zeigt die Uebersetzung');
   assert.match(src, /const legacy = raw && !known \? `<option value="\$\{esc\(raw\)\}" selected>\$\{esc\(raw\)\}<\/option>` : '';/,

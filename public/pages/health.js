@@ -26,6 +26,7 @@ import { openModal, closeModal, confirmModal, confirmOverModal, reportFieldError
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { formRowsHtml, formRowHtml, formCompositeHtml } from '/utils/form-row.js';
+import { toggleRowHtml } from '/settings/components.js';
 import { installPopoverMenus, pageToolsMenuHtml } from '/utils/popover-menu.js';
 import { personSwitcherMarkup } from '/utils/health-person-switcher.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
@@ -3709,16 +3710,14 @@ function openMedModal(med) {
             <input class="input" id="med-refill" type="number" inputmode="decimal" step="any" min="0" value="${esc(val(med?.refill_threshold))}">
           </div>
         </div>
-        <div class="modal-grid modal-grid--2">
-          <label class="health-check">
-            <input type="checkbox" id="med-active" ${med == null || med.active ? 'checked' : ''}>
-            <span>${esc(t('health.meds.field.active'))}</span>
-          </label>
-          <label class="health-check">
-            <input type="checkbox" id="med-prn" ${med?.prn ? 'checked' : ''}>
-            <span>${esc(t('health.meds.field.prn'))}</span>
-          </label>
-        </div>
+        ${/* SCHALTER STATT HAKEN (Re-Kritik 2026-10-17): "Aktiv" und "Bei
+             Bedarf" sind Einstellungen des Medikaments, keine Auswahl - die
+             geteilte Schalterzeile wie im Abo-Dialog. Die Knoten bleiben
+             Checkboxen (".checked", "change"), nur mit role="switch". */ ''}
+        ${formRowsHtml([
+          toggleRowHtml({ label: t('health.meds.field.active'), control: 'switch', checked: med == null || Boolean(med.active), attrs: { id: 'med-active' } }),
+          toggleRowHtml({ label: t('health.meds.field.prn'), control: 'switch', checked: Boolean(med?.prn), attrs: { id: 'med-prn' } }),
+        ])}
         <!-- Nur fuer Bedarfsmedikamente sichtbar (#700): ein Mindestabstand an
              einem Medikament mit Zeitplan waere eine zweite, widersprechende
              Auskunft darueber, wann die naechste Dosis ansteht. -->
@@ -5094,47 +5093,61 @@ function openActivityModal(row, opts = {}) {
     size: 'md',
     content: `
       <form id="activity-form" class="form-stack">
-        <div class="modal-grid modal-grid--2">
-          <div class="form-field">
-            <label class="label" for="activity-type">${esc(t('health.activity.field.type'))}</label>
-            <select class="input" id="activity-type" required>${activityTypeSelectMarkup(isEdit ? row.type : null)}</select>
-          </div>
-          <div class="form-field" id="activity-custom-field" ${customValue ? '' : 'hidden'}>
-            <label class="label" for="activity-custom">${esc(t('health.activity.field.customType'))}</label>
-            <input class="input" id="activity-custom" type="text" maxlength="50" value="${esc(customValue)}">
-          </div>
-        </div>
-        <div class="form-field">
-          <label class="label" for="activity-performed-at">${esc(t('health.activity.field.performedAt'))}</label>
-          <yuvomi-datepicker id="activity-performed-at" type="datetime" value="${esc(dateValue)}"></yuvomi-datepicker>
-        </div>
-        <div class="modal-grid modal-grid--3">
-          <div class="form-field">
-            <label class="label" for="activity-duration">${esc(t('health.activity.field.duration'))}</label>
-            <input class="input" id="activity-duration" type="number" inputmode="numeric" step="1" min="0" value="${esc(val(row?.duration_min))}">
-          </div>
-          <div class="form-field">
-            <label class="label" for="activity-distance">${esc(t('health.activity.field.distance'))}</label>
-            <input class="input" id="activity-distance" type="number" inputmode="decimal" step="any" min="0" value="${esc(val(row?.distance_km))}">
-          </div>
-          <div class="form-field">
-            <label class="label" for="activity-calories">${esc(t('health.activity.field.calories'))}</label>
-            <input class="input" id="activity-calories" type="number" inputmode="numeric" step="1" min="0" value="${esc(val(row?.calories))}">
-          </div>
-        </div>
-        <div class="modal-grid modal-grid--2">
-          <div class="form-field">
-            <label class="label" for="activity-intensity">${esc(t('health.activity.field.intensity'))}</label>
-            <select class="input" id="activity-intensity">${intensityOptionsHtml(row?.intensity)}</select>
-          </div>
-          <div class="form-field">
-            <label class="label" for="activity-visibility">${esc(t('health.activity.field.visibility'))}</label>
-            <select class="input" id="activity-visibility">
+        ${/* GRUPPIERTE ZEILEN wie die Messung (Re-Kritik 2026-10-17): Art,
+             Zeitpunkt, Kennzahlen und Sichtbarkeit standen in drei Rastern
+             gestapelt unter ihren Etiketten - der zweite Dialekt im selben
+             Bereich. ids, Reihenfolge und Verhalten sind die alten; die
+             eigene Art bleibt eine verborgene Zeile, bis "Eigene" gewaehlt
+             ist. Die Notiz bleibt ein freies Feld. */ ''}
+        ${formRowsHtml([
+          formRowHtml({
+            label: t('health.activity.field.type'),
+            labelFor: 'activity-type',
+            field: true,
+            control: `<select class="form-input" id="activity-type" required>${activityTypeSelectMarkup(isEdit ? row.type : null)}</select>`,
+          }),
+          formRowHtml({
+            label: t('health.activity.field.customType'),
+            labelFor: 'activity-custom',
+            field: true,
+            attrs: { id: 'activity-custom-field', hidden: !customValue },
+            control: `<input class="form-input" id="activity-custom" type="text" maxlength="50" value="${esc(customValue)}">`,
+          }),
+          formRowHtml({
+            label: t('health.activity.field.performedAt'),
+            labelFor: 'activity-performed-at',
+            wide: true,
+            field: true,
+            control: `<yuvomi-datepicker id="activity-performed-at" type="datetime" value="${esc(dateValue)}"></yuvomi-datepicker>`,
+          }),
+        ])}
+        ${formRowsHtml([
+          ['activity-duration', 'health.activity.field.duration', row?.duration_min, { inputmode: 'numeric', step: '1' }],
+          ['activity-distance', 'health.activity.field.distance', row?.distance_km, { inputmode: 'decimal', step: 'any' }],
+          ['activity-calories', 'health.activity.field.calories', row?.calories, { inputmode: 'numeric', step: '1' }],
+        ].map(([id, key, value, attrs]) => formRowHtml({
+          label: t(key),
+          labelFor: id,
+          field: true,
+          control: formCompositeHtml({
+            parts: [{ id, value: val(value) || null, attrs: { type: 'number', min: '0', ...attrs } }],
+          }),
+        })))}
+        ${formRowsHtml([
+          formRowHtml({
+            label: t('health.activity.field.intensity'),
+            labelFor: 'activity-intensity',
+            control: `<select class="form-input" id="activity-intensity">${intensityOptionsHtml(row?.intensity)}</select>`,
+          }),
+          formRowHtml({
+            label: t('health.activity.field.visibility'),
+            labelFor: 'activity-visibility',
+            control: `<select class="form-input" id="activity-visibility">
               <option value="private" ${(row?.visibility || defaultVisibility('activities')) === 'family' ? '' : 'selected'}>${esc(t('health.activity.visibility.private'))}</option>
               <option value="family" ${(row?.visibility || defaultVisibility('activities')) === 'family' ? 'selected' : ''}>${esc(t('health.activity.visibility.family'))}</option>
-            </select>
-          </div>
-        </div>
+            </select>`,
+          }),
+        ])}
         <div class="form-field">
           <label class="label" for="activity-note">${esc(t('health.activity.field.note'))}</label>
           <textarea class="input" id="activity-note" rows="2" maxlength="2000">${esc(val(row?.note))}</textarea>
@@ -5976,19 +5989,25 @@ function nutritionMealSelectMarkup(current) {
   return `<option value="">${esc(t('health.nutrition.field.noMealType'))}</option>${options}`;
 }
 
-/** Die acht Zahlenfelder - EINE Schleife ueber NUTRIENTS, keine acht Abschriften. */
+/** Die acht Zahlenfelder - EINE Schleife ueber NUTRIENTS, keine acht Abschriften.
+ * Als Zeilen (Re-Kritik 2026-10-17): Naehrstoff links, Zahl mit Einheit rechts,
+ * wie Puls und Gewicht in der Messung - statt eines Zweierrasters gestapelter
+ * Felder mit der Einheit in Klammern im Etikett. */
 function nutrientFieldsMarkup(prefix, source) {
   const val = (v) => (v === null || v === undefined ? '' : String(v));
-  return `
-    <div class="modal-grid modal-grid--2 health-nutrition-fields">
-      ${NUTRIENTS.map((n) => `
-        <div class="form-field">
-          <label class="label" for="${prefix}-${esc(n.key)}">${esc(t(n.labelKey))} (${esc(t(n.unitKey))})</label>
-          <input class="input" id="${prefix}-${esc(n.key)}" data-nutrient="${esc(n.key)}"
-                 type="number" inputmode="decimal" min="0" step="${esc(n.step)}"
-                 value="${esc(val(source?.[n.key]))}">
-        </div>`).join('')}
-    </div>`;
+  return formRowsHtml(NUTRIENTS.map((n) => formRowHtml({
+    label: t(n.labelKey),
+    labelFor: `${prefix}-${n.key}`,
+    field: true,
+    control: formCompositeHtml({
+      parts: [{
+        id: `${prefix}-${n.key}`,
+        suffix: t(n.unitKey),
+        value: val(source?.[n.key]) || null,
+        attrs: { type: 'number', inputmode: 'decimal', min: '0', step: String(n.step), 'data-nutrient': n.key },
+      }],
+    }),
+  })), { className: 'health-nutrition-fields' });
 }
 
 /**
@@ -6069,20 +6088,26 @@ function openNutritionModal(row) {
     size: 'md',
     content: `
       <form id="nutrition-form" class="form-stack">
-        <div class="form-field">
-          <label class="label" for="nutrition-title">${esc(t('health.nutrition.field.title'))}</label>
-          <input class="input" id="nutrition-title" type="text" required maxlength="200" value="${esc(val(row?.title))}">
-        </div>
-        <div class="modal-grid modal-grid--2">
-          <div class="form-field">
-            <label class="label" for="nutrition-consumed-at">${esc(t('health.nutrition.field.consumedAt'))}</label>
-            <yuvomi-datepicker id="nutrition-consumed-at" type="datetime" value="${esc(whenValue)}"></yuvomi-datepicker>
-          </div>
-          <div class="form-field">
-            <label class="label" for="nutrition-meal-type">${esc(t('health.nutrition.field.mealType'))}</label>
-            <select class="input" id="nutrition-meal-type">${nutritionMealSelectMarkup(row?.meal_type ?? null)}</select>
-          </div>
-        </div>
+        ${formRowsHtml([
+          formRowHtml({
+            label: t('health.nutrition.field.title'),
+            labelFor: 'nutrition-title',
+            field: true,
+            control: `<input class="form-input" id="nutrition-title" type="text" required maxlength="200" value="${esc(val(row?.title))}">`,
+          }),
+          formRowHtml({
+            label: t('health.nutrition.field.consumedAt'),
+            labelFor: 'nutrition-consumed-at',
+            wide: true,
+            field: true,
+            control: `<yuvomi-datepicker id="nutrition-consumed-at" type="datetime" value="${esc(whenValue)}"></yuvomi-datepicker>`,
+          }),
+          formRowHtml({
+            label: t('health.nutrition.field.mealType'),
+            labelFor: 'nutrition-meal-type',
+            control: `<select class="form-input" id="nutrition-meal-type">${nutritionMealSelectMarkup(row?.meal_type ?? null)}</select>`,
+          }),
+        ])}
         ${nutrientFieldsMarkup('nutrition-entry', row)}
         <div class="form-field">
           <label class="label" for="nutrition-note">${esc(t('health.nutrition.field.note'))}</label>
@@ -6095,13 +6120,14 @@ function openNutritionModal(row) {
              health.nutrition.visibility.* waere die sechste Formulierung
              gewesen. Die aelteren Gesundheits-Tabs behalten ihre eigenen; sie
              sprechen auch ein anderes Vokabular (private/family). -->
-        <div class="form-field">
-          <label class="label" for="nutrition-visibility">${esc(t('common.visibility.label'))}</label>
-          <select class="input" id="nutrition-visibility">
+        ${formRowsHtml(formRowHtml({
+          label: t('common.visibility.label'),
+          labelFor: 'nutrition-visibility',
+          control: `<select class="form-input" id="nutrition-visibility">
             <option value="private" ${visibility === 'all' ? '' : 'selected'}>${esc(t('common.visibility.private'))}</option>
             <option value="all" ${visibility === 'all' ? 'selected' : ''}>${esc(t('common.visibility.all'))}</option>
-          </select>
-        </div>
+          </select>`,
+        }))}
         <div class="modal-panel__footer modal-panel__footer--plain">
           ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="nutrition-delete" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
           <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
