@@ -372,6 +372,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   like every other dialog, with the focus inside, and closing it returns you to where you were. On a
   computer the shortcuts stand in two columns, so the list fits without scrolling.
 
+- **The buttons of the selection bar and of "Undo" are easy to hit on a phone.** "To pantry",
+  "Delete" and "Undo" stay small capsules, but a finger now hits them across a full 48px, so a tap
+  in the thumb zone above the tab bar no longer misses.
 - **The shopping list's check boxes are easy to see.** An empty box was drawn in the faint line used
   for card edges and almost vanished on both light and dark backgrounds. It now has the same edge as
   the circle you tick off a task with, clearly visible at a glance.

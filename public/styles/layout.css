@@ -9619,6 +9619,28 @@ html:has(.app-page.is-selecting) {
   transform: none;
 }
 
+/* DIE TREFFERFLAECHE IST FINGERGROSS, DIE KAPSEL NICHT (R20, Re-Critique
+ * 2026-10-17 a2 P2-6). Die Kapseln messen 28px - in der Daumenzone ueber der
+ * Kapsel-Leiste zu wenig fuer einen Finger. Eine groessere Kapsel haette die
+ * Pille und damit --bulk-pill-safe-zone mitgezogen; stattdessen reicht ein
+ * unsichtbarer Saum auf --target-base hinaus, senkrecht ueber den Innenrand
+ * der Pille. Waagerecht nur um den halben Abstand, damit sich zwei Nachbarn
+ * nicht ueberdecken. */
+@media (pointer: coarse) {
+  .toast__undo,
+  .list-bulkbar__action {
+    position: relative;
+  }
+
+  .toast__undo::after,
+  .list-bulkbar__action::after {
+    content: '';
+    position: absolute;
+    inset-block: calc((100% - var(--target-base)) / 2);
+    inset-inline: calc(var(--space-2) / -2);
+  }
+}
+
 .toast--danger  { background-color: var(--color-danger);  color: var(--toast-danger-text); }
 .toast--warning { background-color: var(--color-warning); color: var(--toast-warning-text); }
 

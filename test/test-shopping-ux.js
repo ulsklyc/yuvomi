@@ -2373,3 +2373,17 @@ test('FLIP ist im Neubau der Einkaufsliste verdrahtet: messen vor mountItems, sp
   assert.ok(snap > -1 && mount > -1 && play > -1, 'Messen, Neubau und Abspielen stehen im Neubau');
   assert.ok(snap < mount && mount < play, 'erst messen, dann neu bauen, dann abspielen');
 });
+
+// R20 (Re-Critique 2026-10-17 a2 P2-6): die Kapseln der Abhak-Pille massen
+// 28px in der Daumenzone. Am Finger reicht ein unsichtbarer Saum auf
+// --target-base, ohne die Pille (und --bulk-pill-safe-zone) zu vergroessern.
+test('R20: die Kapseln der Sammel-Pille haben am Finger eine 48px-Trefferflaeche', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const coarse = [...eachRule(css)].filter((r) => r.at.some((a) => /pointer:\s*coarse/.test(a)));
+  const after = coarse.find((r) => r.selector.split(',').some((s) => s.trim() === '.list-bulkbar__action::after'));
+  assert.ok(after, 'ein Saum fuer die Kapsel der Pille');
+  assert.match(after.body, /inset-block:\s*calc\(\(100% - var\(--target-base\)\) \/ 2\)/, 'senkrecht auf --target-base');
+  const host = coarse.find((r) => r.selector.split(',').some((s) => s.trim() === '.list-bulkbar__action') && /position:\s*relative/.test(r.body));
+  assert.ok(host, 'die Kapsel ist der Bezug des Saums');
+});
