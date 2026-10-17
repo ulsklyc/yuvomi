@@ -2309,6 +2309,7 @@
         "familyRoleGrandparent": "Dziadkowie",
         "familyRoleRelative": "Krewny/Krewna",
         "familyRoleOther": "Członek rodziny",
+        "childStartHint": "Nowe konta dzieci zaczynają bez Budżetu i postu, a pomoc domową widzą tylko do odczytu, bez wynagrodzeń i płatności. Możesz to później zmienić w sekcji „Role i uprawnienia”.",
         "systemAdminLabel": "Administrator systemu",
         "systemAdminHint": "Administratorzy systemu mogą zarządzać ustawieniami aplikacji, integracjami, tokenami API i kontami rodzinnymi.",
         "systemAdminBadge": "Administrator systemu",
@@ -4250,7 +4251,10 @@
         "currentMonth": "Bieżący",
         "noVisitReportsInMonth": "Brak zarejestrowanych wizyt personelu w okresie {{month}}.",
         "settledAdminOnly": "Zmienić lub usunąć może tylko admin",
-        "reportVisitsCount": "Wizyty"
+        "reportVisitsCount": "Wizyty",
+        "amountsPermissionLabel": "Widzieć wynagrodzenia i płatności",
+        "errorAmountsHidden": "Płatność może oznaczyć tylko osoba, która widzi kwoty pomocy domowej.",
+        "notHereToday": "Dziś jeszcze jej nie ma"
     },
     "splitExpenses": {
         "title": "Wspólne wydatki",

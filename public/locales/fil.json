@@ -2147,6 +2147,7 @@
         "familyRoleGrandparent": "Lolo/Lola",
         "familyRoleRelative": "Kamag-anak",
         "familyRoleOther": "Miyembro ng pamilya",
+        "childStartHint": "Ang mga bagong account ng bata ay nagsisimula nang walang Budget at pag-aayuno at nakikita ang Kasambahay na pangbasa lang, walang sahod at bayad. Mababago mo ito pagkatapos sa “Mga papel at pahintulot”.",
         "systemAdminLabel": "System admin",
         "systemAdminHint": "Napapamahalaan ng mga system admin ang mga setting ng aplikasyon, integrasyon, API token at account ng pamilya.",
         "systemAdminBadge": "System admin",
@@ -4022,7 +4023,10 @@
         "currentMonth": "Kasalukuyan",
         "noVisitReportsInMonth": "Walang naitalang pagbisita ng tauhan sa {{month}}.",
         "settledAdminOnly": "Tanging admin ang maaaring baguhin o burahin ito",
-        "reportVisitsCount": "Mga pagbisita"
+        "reportVisitsCount": "Mga pagbisita",
+        "amountsPermissionLabel": "Makita ang sahod at mga bayad",
+        "errorAmountsHidden": "Ang may pahintulot lang na makita ang halaga para sa kasambahay ang makakapagmarka ng bayad.",
+        "notHereToday": "Wala pa ngayong araw"
     },
     "splitExpenses": {
         "title": "Mga hinating gastos",

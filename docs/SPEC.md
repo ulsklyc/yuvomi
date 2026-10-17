@@ -5025,9 +5025,17 @@ were refused for a capitalised path to a module they may use; that works now as 
 
 Primary key: `(subject_type, subject_id, resource_type, resource_key)`. **`capability` arrived as a
 schema-level allowance (migration v175, #996) and got its first consumer in the next release
-(#991):** `PERMISSION_CAPABILITIES` in `server/permissions.js` registers both
-`notes_manage_household_categories` (module `notes`, default `none`) and
-`health_use_fasting` (module `health`, default `allow`). `resolvePermissions()` and
+(#991):** `PERMISSION_CAPABILITIES` in `server/permissions.js` registers
+`notes_manage_household_categories` (module `notes`, default `none`),
+`health_use_fasting` (module `health`, default `allow`) and, since R20,
+`housekeeping_view_amounts` (module `housekeeping`, default `allow`): without it every Housekeeping
+answer and the Overview tile carry wages, totals, payment state and the unpaid amount as `null`,
+paying is refused (`reason: amounts_hidden`) and a write keeps the stored amounts.
+**Child start permissions (R20):** a new account with family role `child` that is not an admin gets
+member rows from `CHILD_START_PERMISSIONS` when it is created (`POST /auth/users`) or its invitation is
+accepted - `budget` none, `housekeeping` read, `health_use_fasting` and `housekeeping_view_amounts`
+none - written only where the role profile and invite preset are not already stricter. Existing
+accounts and later role changes are not touched; OIDC accounts start without a family role. `resolvePermissions()` and
 `getSubjectPermissions()` read registered capability rows with `none` | `allow`; each item's own
 default wins, while the catalog-level `none` remains only as the fallback for entries without one.
 Admins resolve to `allow`. Role rows equal to the item's default are not stored; a member-level

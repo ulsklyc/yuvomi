@@ -1994,6 +1994,7 @@
         "familyRoleGrandparent": "Nonno/a",
         "familyRoleRelative": "Parente",
         "familyRoleOther": "Membro della famiglia",
+        "childStartHint": "I nuovi account bambino partono senza Budget e digiuno e vedono l’Aiuto domestico in sola lettura, senza compensi e pagamenti. Puoi cambiarlo dopo in «Ruoli e autorizzazioni».",
         "systemAdminLabel": "Amministratore di sistema",
         "systemAdminHint": "Gli amministratori di sistema possono gestire impostazioni, integrazioni, token API e account familiari.",
         "systemAdminBadge": "Admin sistema",
@@ -4018,7 +4019,10 @@
         "currentMonth": "Corrente",
         "noVisitReportsInMonth": "Nessuna visita del personale registrata per {{month}}.",
         "settledAdminOnly": "Solo un admin può modificarla o eliminarla",
-        "reportVisitsCount": "Visite"
+        "reportVisitsCount": "Visite",
+        "amountsPermissionLabel": "Vedere compensi e pagamenti",
+        "errorAmountsHidden": "Solo chi può vedere gli importi dell’aiuto domestico può segnare un pagamento.",
+        "notHereToday": "Oggi non è ancora arrivata"
     },
     "userMultiSelect": {
         "moreUsers": "altri",

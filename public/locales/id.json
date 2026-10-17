@@ -2147,6 +2147,7 @@
         "familyRoleGrandparent": "Kakek/Nenek",
         "familyRoleRelative": "Kerabat",
         "familyRoleOther": "Anggota keluarga",
+        "childStartHint": "Akun anak baru dimulai tanpa Anggaran dan puasa serta melihat Asisten rumah tangga hanya untuk dibaca, tanpa upah dan pembayaran. Ini bisa diubah nanti di “Peran dan izin”.",
         "systemAdminLabel": "Administrator sistem",
         "systemAdminHint": "Administrator sistem dapat mengelola pengaturan aplikasi, integrasi, token API, dan akun keluarga.",
         "systemAdminBadge": "Administrator sistem",
@@ -4022,7 +4023,10 @@
         "currentMonth": "Saat ini",
         "noVisitReportsInMonth": "Tidak ada kunjungan tercatat pada {{month}}.",
         "settledAdminOnly": "Hanya admin yang dapat mengubah atau menghapusnya",
-        "reportVisitsCount": "Kunjungan"
+        "reportVisitsCount": "Kunjungan",
+        "amountsPermissionLabel": "Lihat upah dan pembayaran",
+        "errorAmountsHidden": "Hanya yang boleh melihat jumlah untuk asisten rumah tangga yang dapat menandai pembayaran.",
+        "notHereToday": "Hari ini belum datang"
     },
     "splitExpenses": {
         "title": "Pengeluaran Bersama",

@@ -2147,6 +2147,7 @@
         "familyRoleGrandparent": "پدربزرگ/مادربزرگ",
         "familyRoleRelative": "خویشاوند",
         "familyRoleOther": "عضو خانواده",
+        "childStartHint": "حساب‌های جدید کودک بدون بودجه و روزه شروع می‌شوند و کمک منزل را فقط برای خواندن و بدون دستمزد و پرداخت می‌بینند. بعداً می‌توانید آن را در «نقش‌ها و دسترسی‌ها» تغییر دهید.",
         "systemAdminLabel": "مدیر سیستم",
         "systemAdminHint": "مدیران سیستم می‌توانند تنظیمات برنامه، یکپارچه‌سازی‌ها، توکن‌های API و حساب‌های خانواده را مدیریت کنند.",
         "systemAdminBadge": "مدیر سیستم",
@@ -4022,7 +4023,10 @@
         "currentMonth": "جاری",
         "noVisitReportsInMonth": "در {{month}} هیچ بازدیدی ثبت نشده است.",
         "settledAdminOnly": "فقط یک مدیر می‌تواند آن را تغییر دهد یا حذف کند",
-        "reportVisitsCount": "بازدیدها"
+        "reportVisitsCount": "بازدیدها",
+        "amountsPermissionLabel": "دیدن دستمزدها و پرداخت‌ها",
+        "errorAmountsHidden": "فقط کسی که اجازه دیدن مبالغ کمک منزل را دارد می‌تواند پرداخت را ثبت کند.",
+        "notHereToday": "امروز هنوز نیامده"
     },
     "splitExpenses": {
         "title": "هزینه‌های مشترک",

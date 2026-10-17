@@ -2105,6 +2105,7 @@
         "familyRoleGrandparent": "Nagyszülő",
         "familyRoleRelative": "Rokon",
         "familyRoleOther": "Családtag",
+        "childStartHint": "Az új gyerekfiókok költségvetés és böjt nélkül indulnak, a háztartási segítőt csak olvasásra látják, bérek és kifizetések nélkül. Ezt később itt: „Szerepek és jogosultságok” módosíthatod.",
         "systemAdminLabel": "Rendszergazda",
         "systemAdminHint": "A rendszergazdák kezelhetik az alkalmazás beállításait, integrációit, API tokenjeit és családi fiókjait.",
         "systemAdminBadge": "Rendszergazda",
@@ -4018,7 +4019,10 @@
         "currentMonth": "Aktuális hónap",
         "noVisitReportsInMonth": "{{month}} időszakban nem volt személyzeti látogatás.",
         "settledAdminOnly": "Csak egy admin módosíthatja vagy törölheti",
-        "reportVisitsCount": "Látogatások"
+        "reportVisitsCount": "Látogatások",
+        "amountsPermissionLabel": "Bérek és kifizetések megtekintése",
+        "errorAmountsHidden": "Fizetést csak az jelölhet, aki láthatja a háztartási segítő összegeit.",
+        "notHereToday": "Ma még nincs itt"
     },
     "userMultiSelect": {
         "moreUsers": "továbbiak",

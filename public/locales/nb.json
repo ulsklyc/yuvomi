@@ -2105,6 +2105,7 @@
         "familyRoleGrandparent": "Besteforelder",
         "familyRoleRelative": "Slektning",
         "familyRoleOther": "Familiemedlem",
+        "childStartHint": "Nye barnekontoer starter uten Budsjett og faste og ser Husholdningshjelp bare for lesing, uten lønn og betalinger. Du kan endre dette senere under «Roller og tillatelser».",
         "systemAdminLabel": "Systemadministrator",
         "systemAdminHint": "Systemadministratorer kan administrere applikasjonsinnstillinger, integrasjoner, API-tokener og familiekontoer.",
         "systemAdminBadge": "Systemadministrator",
@@ -4018,7 +4019,10 @@
         "currentMonth": "Nåværende",
         "noVisitReportsInMonth": "Ingen personalebesøk registrert i {{month}}.",
         "settledAdminOnly": "Kun en administrator kan endre eller slette det",
-        "reportVisitsCount": "Besøk"
+        "reportVisitsCount": "Besøk",
+        "amountsPermissionLabel": "Se lønn og betalinger",
+        "errorAmountsHidden": "Bare den som kan se beløpene for husholdningshjelpen, kan registrere en betaling.",
+        "notHereToday": "Ikke kommet ennå i dag"
     },
     "userMultiSelect": {
         "moreUsers": "mer",

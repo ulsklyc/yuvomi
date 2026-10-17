@@ -121,3 +121,13 @@ export function canUseFasting() {
   if (_perms.admin) return true;
   return _perms.capabilities?.health_use_fasting === 'allow';
 }
+
+/**
+ * Loehne, Zahlungen und Betraege der Haushaltshilfe (R20). Neue Kinderkonten
+ * starten ohne; der Server laesst die Felder dann schon weg - das hier ist die
+ * ehrliche Oberflaeche dazu (keine leeren Euro-Zeilen, kein Zahlungsdiagramm).
+ */
+export function canSeeHousekeepingAmounts() {
+  if (_perms.admin) return true;
+  return (_perms.capabilities?.housekeeping_view_amounts ?? 'allow') !== 'none';
+}

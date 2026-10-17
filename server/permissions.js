@@ -133,6 +133,19 @@ export const PERMISSION_CAPABILITIES = Object.freeze([
     labelKey: 'health.fasting.permissionLabel',
     default: 'allow',
   },
+  // Loehne, Zahlungen und Betraege der Haushaltshilfe (R20). Das Modulrecht
+  // sagt, OB jemand die Haushaltshilfe sieht und bedient; dieser Schalter
+  // sagt, ob er dabei Geld sieht. Ein Kind soll wissen, wann Maria kommt und
+  // was sie heute macht - nicht, was sie verdient und was noch offen ist.
+  // `allow` als Standard, damit jedes bestehende Konto unveraendert bleibt.
+  // Durchgesetzt am Server (server/routes/housekeeping.js, /dashboard), nicht
+  // nur in der Oberflaeche: ohne das Recht fehlen die Felder in der Antwort.
+  {
+    key: 'housekeeping_view_amounts',
+    module: 'housekeeping',
+    labelKey: 'housekeeping.amountsPermissionLabel',
+    default: 'allow',
+  },
 ]);
 
 export const MODULE_ACCESS_LEVELS = Object.freeze(['none', 'read', 'write']);
@@ -168,6 +181,29 @@ export const INVITE_PRESET_DEFAULT = 'restricted';
 // Widgets brauchen hier nichts: `resolvePermissions()` sperrt sie mit ihrem
 // Modul mit, das cycle-Widget also ueber `health`.
 export const INVITE_RESTRICTED_MODULES = Object.freeze(['health', 'budget', 'documents']);
+
+// Startrechte eines NEUEN Kinderkontos (R20, entschieden 2026-10-17): kein
+// Budget, die Haushaltshilfe nur zum Lesen und ohne Betraege, kein Fasten.
+//
+// NUR BEIM ANLEGEN, NIE RUECKWIRKEND. Die Liste wird einmal als Mitglied-
+// Zeilen geschrieben, wenn das Konto entsteht (Admin legt an, Einladung wird
+// angenommen) - kein Rollenprofil, kein Standard. Ein Rollenprofil fuer
+// `child` haette jedes BESTEHENDE Kinderkonto mitgenommen, und genau das soll
+// nicht passieren: was ein Haushalt seinen Kindern heute zeigt, bleibt so.
+// Aus demselben Grund aendert ein spaeterer Wechsel der Familienrolle
+// (child <-> Erwachsener) die Rechte nicht; sie stehen danach im Rechte-Blatt.
+//
+// NUR VERSCHAERFEN. Ein Rollenprofil oder eine Einladungsvorlage, die schon
+// strenger ist (`housekeeping: none`), bleibt strenger: eine Mitglied-Zeile
+// gewinnt in `resolvePermissions()`, und ein `read` ueber einem `none` waere
+// eine Oeffnung, die niemand gewaehlt hat.
+export const CHILD_START_PERMISSIONS = Object.freeze({
+  modules: Object.freeze({ budget: 'none', housekeeping: 'read' }),
+  capabilities: Object.freeze({ health_use_fasting: 'none', housekeeping_view_amounts: 'none' }),
+});
+
+const MODULE_ACCESS_RANK = Object.freeze({ none: 0, read: 1, write: 2 });
+const CAPABILITY_ACCESS_RANK = Object.freeze({ none: 0, allow: 1 });
 
 /** Extension catalog injected at runtime by the module registry — keeps this file off db.js. */
 let _extensionPermissionModules = [];
@@ -494,6 +530,12 @@ export function permissionCatalog() {
       default: INVITE_PRESET_DEFAULT,
       restrictedModules: [...INVITE_RESTRICTED_MODULES],
     },
+    // Was ein neues Kinderkonto zusaetzlich mitbringt (R20) - das Formular
+    // nennt es unter der Familienrolle, ohne die Liste ein zweites Mal zu fuehren.
+    childStart: {
+      modules: { ...CHILD_START_PERMISSIONS.modules },
+      capabilities: { ...CHILD_START_PERMISSIONS.capabilities },
+    },
     scopeModuleKeys: getModuleKeys(),
   };
 }
@@ -639,6 +681,63 @@ export function invitePresetPermissions(preset) {
   const modules = {};
   for (const key of INVITE_RESTRICTED_MODULES) modules[key] = 'none';
   return { modules, widgets: {} };
+}
+
+/**
+ * Schreibt die Kinder-Startrechte fuer ein GERADE ANGELEGTES Konto.
+ *
+ * Aufrufer: die Anlagewege mit Familienrolle - `POST /auth/users` und das
+ * Annehmen einer Einladung (server/auth.js), jeweils in der Transaktion, die
+ * das Konto anlegt. OIDC legt Konten ohne Familienrolle an, die
+ * Ersteinrichtung legt einen Admin an; beide brauchen das nicht.
+ *
+ * Laeuft NACH einer Einladungsvorlage und liest den aufgeloesten Stand, damit
+ * nur Zeilen entstehen, die wirklich verschaerfen (siehe
+ * CHILD_START_PERMISSIONS). Ein Admin umgeht die Rechte ohnehin.
+ *
+ * @param {import('better-sqlite3-multiple-ciphers').Database} database
+ * @param {{ id: number, role: string, family_role?: string|null }} user
+ * @returns {number} Anzahl geschriebener Zeilen
+ */
+export function applyChildStartPermissions(database, user) {
+  if (!user || user.id == null || user.role === 'admin' || user.family_role !== 'child') return 0;
+  const current = resolvePermissions(database, user);
+  const upsert = database.prepare(`
+    INSERT INTO access_permissions (subject_type, subject_id, resource_type, resource_key, access)
+    VALUES ('user', ?, ?, ?, ?)
+    ON CONFLICT(subject_type, subject_id, resource_type, resource_key) DO UPDATE SET access = excluded.access
+  `);
+  let written = 0;
+  for (const [key, access] of Object.entries(CHILD_START_PERMISSIONS.modules)) {
+    if (!(key in current.modules)) continue;
+    if (MODULE_ACCESS_RANK[access] >= MODULE_ACCESS_RANK[current.modules[key]]) continue;
+    upsert.run(String(user.id), 'module', key, access);
+    written += 1;
+  }
+  for (const [key, access] of Object.entries(CHILD_START_PERMISSIONS.capabilities)) {
+    if (!(key in current.capabilities)) continue;
+    if (CAPABILITY_ACCESS_RANK[access] >= CAPABILITY_ACCESS_RANK[current.capabilities[key]]) continue;
+    upsert.run(String(user.id), 'capability', key, access);
+    written += 1;
+  }
+  return written;
+}
+
+/**
+ * Darf diese Anfrage die Capability nutzen? Admin immer; sonst die Aufloesung
+ * des Subjekts (Rollenprofil, Mitglied-Zeilen) - dieselbe wie im Rechte-Blatt.
+ * Ohne aufloesbares Subjekt: nein. Fuer Felder, die eine Antwort WEGLAESST,
+ * ist "im Zweifel weglassen" die sichere Seite.
+ */
+export function requestHasCapability(database, req, key) {
+  if (req?.authRole === 'admin') return true;
+  const id = req?.authUserId ?? req?.session?.userId;
+  if (id == null) return false;
+  const user = database.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(id);
+  if (!user) return false;
+  if (user.role === 'admin') return true;
+  return resolvePermissions(database, user, { isDisplay: req.authMethod === 'display' })
+    .capabilities[key] === 'allow';
 }
 
 export function isValidInvitePreset(preset) {

@@ -2213,6 +2213,7 @@
         "familyRoleGrandparent": "Prarodič",
         "familyRoleRelative": "Příbuzný/á",
         "familyRoleOther": "Člen rodiny",
+        "childStartHint": "Nové dětské účty začínají bez rozpočtu a půstu a pomoc v domácnosti vidí jen ke čtení, bez mezd a plateb. Později to změníte v sekci „Role a oprávnění“.",
         "systemAdminLabel": "Správce systému",
         "systemAdminHint": "Správci systému mohou spravovat nastavení aplikace, integrace, API tokeny a rodinné účty.",
         "systemAdminBadge": "Správce systému",
@@ -3654,7 +3655,10 @@
         "currentMonth": "Aktuální měsíc",
         "noVisitReportsInMonth": "V období {{month}} nebyly zaznamenány žádné návštěvy.",
         "settledAdminOnly": "Upravit nebo smazat ji může jen admin",
-        "reportVisitsCount": "Návštěvy"
+        "reportVisitsCount": "Návštěvy",
+        "amountsPermissionLabel": "Zobrazit mzdy a platby",
+        "errorAmountsHidden": "Platbu může označit jen ten, kdo smí vidět částky za pomoc v domácnosti.",
+        "notHereToday": "Dnes ještě nedorazila"
     },
     "splitExpenses": {
         "title": "Společné výdaje",

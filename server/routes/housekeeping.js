@@ -30,7 +30,7 @@ import {
   queueEventDeletion,
   markInlineOutbound,
 } from '../services/calendar-outbound.js';
-import { mayWriteModule, moduleAccessVerdict, MODULE_ACCESS_ALLOW } from '../permissions.js';
+import { mayWriteModule, moduleAccessVerdict, MODULE_ACCESS_ALLOW, requestHasCapability } from '../permissions.js';
 import { documentVisibleSql } from '../services/document-access.js';
 import { tokenAllows } from '../scopes.js';
 import {
@@ -195,25 +195,30 @@ function localDayRange(context = localDayContext()) {
 
 // `receipts` ist das Urteil aus `receiptAccess(req)`; ohne es bleibt der Beleg
 // maskiert (#1358). Der Name steht nur in Liste und Bericht, die ID ueberall.
+//
+// Dasselbe Urteil traegt `amounts` (R20): ohne `housekeeping_view_amounts`
+// sind Satz, Extras, Zahlungsstand und die Zahlungsaufgabe `null` - nicht 0,
+// denn 0 waere eine falsche Auskunft ("unbezahlt, kostet nichts").
 function publicSession(row, receipts = MASKED_RECEIPTS) {
   if (!row) return null;
   const { receipt_document_id: receiptDocumentId, has_receipt: hasReceipt } = receipts.view(row);
+  const amounts = receipts.amounts === true;
   return {
     id: row.id,
     worker_id: row.worker_id ?? null,
     calendar_event_id: row.calendar_event_id ?? null,
-    payment_task_id: row.payment_task_id ?? null,
+    payment_task_id: amounts ? (row.payment_task_id ?? null) : null,
     receipt_document_id: receiptDocumentId,
     has_receipt: hasReceipt,
     check_in: row.check_in,
     check_out: row.check_out,
-    daily_rate: Number(row.daily_rate || 0),
-    extras: Number(row.extras || 0),
-    paid_at: row.paid_at ?? null,
+    daily_rate: amounts ? Number(row.daily_rate || 0) : null,
+    extras: amounts ? Number(row.extras || 0) : null,
+    paid_at: amounts ? (row.paid_at ?? null) : null,
     created_at: row.created_at,
     updated_at: row.updated_at,
     rate_type: row.rate_type || 'daily',
-    hourly_rate: Number(row.hourly_rate || 0),
+    hourly_rate: amounts ? Number(row.hourly_rate || 0) : null,
     minutes_worked: row.minutes_worked ?? null,
   };
 }
@@ -231,9 +236,10 @@ function publicWorker(row, context = localDayContext(), receipts = MASKED_RECEIP
     phone: row.phone ?? null,
     email: row.email ?? null,
     birth_date: row.birth_date ?? null,
-    daily_rate: Number(row.daily_rate || 0),
+    // Der Lohn ist eine Betragsangabe wie die am Besuch (R20, `amounts`).
+    daily_rate: receipts.amounts === true ? Number(row.daily_rate || 0) : null,
     rate_type: row.rate_type || 'daily',
-    hourly_rate: Number(row.hourly_rate || 0),
+    hourly_rate: receipts.amounts === true ? Number(row.hourly_rate || 0) : null,
     payment_schedule: row.payment_schedule,
     calendar_color: row.calendar_color || DEFAULT_CALENDAR_COLOR,
     // Zwei verschiedene Fragen, die vorher dieselbe Zeile beantworteten:
@@ -589,7 +595,9 @@ function loadWorkerById(workerId) {
   `).get(workerId);
 }
 
-function monthlySummary(monthValue = currentMonth()) {
+// `viewer` ist das Urteil aus `receiptAccess(req)`. Ohne `amounts` bleibt die
+// Zahl der Besuche - sie ist keine Geldangabe -, die Summen werden `null`.
+function monthlySummary(monthValue = currentMonth(), viewer = MASKED_RECEIPTS) {
   const { start, end, keep } = monthVisits(monthValue);
   const rows = db.get().prepare(`
     SELECT check_in, daily_rate, extras
@@ -599,12 +607,13 @@ function monthlySummary(monthValue = currentMonth()) {
   const dailyTotal = rows.reduce((sum, row) => sum + Number(row.daily_rate || 0), 0);
   const extrasTotal = rows.reduce((sum, row) => sum + Number(row.extras || 0), 0);
 
+  const amounts = viewer?.amounts === true;
   return {
     month: monthValue,
     session_count: rows.length,
-    daily_total: dailyTotal,
-    extras_total: extrasTotal,
-    total_amount: dailyTotal + extrasTotal,
+    daily_total: amounts ? dailyTotal : null,
+    extras_total: amounts ? extrasTotal : null,
+    total_amount: amounts ? dailyTotal + extrasTotal : null,
   };
 }
 
@@ -617,7 +626,8 @@ function housekeepingDashboard(receipts = MASKED_RECEIPTS, daySource = {}) {
   const context = localDayContext(daySource);
   const workers = loadWorkers().map((row) => publicWorker(row, context, receipts));
   const worker = workers[0] ?? null;
-  const summary = monthlySummary(monthValue);
+  const summary = monthlySummary(monthValue, receipts);
+  const amounts = receipts.amounts === true;
   const lastVisit = latestVisit(db.get(), tz);
   const payment = db.get().prepare(`
     SELECT check_in, daily_rate, extras, paid_at
@@ -667,9 +677,9 @@ function housekeepingDashboard(receipts = MASKED_RECEIPTS, daySource = {}) {
     pending_tasks: tasks.filter((task) => task.urgency_status !== 'ok').length,
     finished_tasks_this_month: taskRows
       .filter((task) => task.last_completed && householdMonthOf(task.last_completed, tz) === monthValue).length,
-    pending_payments: Number(payment.pending || 0),
-    paid_this_month: Number(payment.paid || 0),
-    monthly_payments: chart,
+    pending_payments: amounts ? Number(payment.pending || 0) : null,
+    paid_this_month: amounts ? Number(payment.paid || 0) : null,
+    monthly_payments: amounts ? chart : null,
   };
 }
 
@@ -716,15 +726,36 @@ function mayWriteHousekeeping(req) {
   return true;
 }
 
-function visitCapabilities(row, req) {
+function visitCapabilities(row, req, viewer = MASKED_RECEIPTS) {
   const writable = mayWriteHousekeeping(req);
   const touchable = writable && mayTouchSettled(row, req);
+  // Bezahlen ist eine Geldhandlung: wer keine Betraege sieht, bezahlt nicht.
+  const payable = writable && viewer.amounts === true;
   return {
     can_edit: touchable,
     can_delete: touchable,
-    can_mark_paid: writable && !row.paid_at,
-    can_mark_unpaid: writable && Boolean(row.paid_at) && isAdminRequest(req),
+    can_mark_paid: payable && !row.paid_at,
+    can_mark_unpaid: payable && Boolean(row.paid_at) && isAdminRequest(req),
   };
+}
+
+// LOEHNE, ZAHLUNGEN UND BETRAEGE SIND EINE EIGENE FRAGE (R20). Das Modulrecht
+// sagt, ob jemand die Haushaltshilfe sieht und bedient; die Capability
+// `housekeeping_view_amounts` sagt, ob er dabei Geld sieht. Neue Kinderkonten
+// starten ohne sie (CHILD_START_PERMISSIONS in server/permissions.js).
+// Das Urteil reist im selben Objekt wie das zum Beleg (`receiptAccess`), weil
+// es an genau denselben Serialisierern haengt - und ein Serialisierer, der es
+// nicht bekommt, gibt wie beim Beleg nichts heraus (MASKED_RECEIPTS).
+function mayViewAmounts(req) {
+  return requestHasCapability(db.get(), req, 'housekeeping_view_amounts');
+}
+
+// Wer schreiben, aber keine Betraege sehen darf, schreibt auch keine: die
+// Betragsfelder und die Texte der Zahlungsaufgabe (die den Betrag nennen) aus
+// dem Body zaehlen dann nicht. Sonst haette der Dialog, der die Werte nie
+// gesehen hat, sie mit 0 ueberschrieben.
+function payment403(res) {
+  res.status(403).json({ error: 'Payments need permission to see housekeeping amounts.', code: 403, reason: 'amounts_hidden' });
 }
 
 // DER BELEG GEHOERT DEM DOKUMENTE-MODUL, NICHT DEM BESUCH (#1358).
@@ -774,6 +805,8 @@ function receiptAccess(req) {
     return names.get(id) !== undefined;
   };
   return {
+    /** Darf diese Anfrage Loehne, Zahlungen und Betraege sehen (R20)? */
+    amounts: mayViewAmounts(req),
     /** Laedt die Belege einer Liste in einer Abfrage statt je Zeile. */
     preload(rows) {
       load(rows.filter(Boolean).map((row) => row.receipt_document_id));
@@ -795,6 +828,7 @@ function receiptAccess(req) {
 
 // Die Form ohne Urteil: nichts vom Dokument, auch nicht, ob es einen Beleg gibt.
 const MASKED_RECEIPTS = Object.freeze({
+  amounts: false,
   view: () => ({
     receipt_document_id: null,
     receipt_document_name: null,
@@ -986,11 +1020,12 @@ router.get('/summary', (req, res) => {
   try {
     const vMonth = month(req.query.month, 'month');
     if (vMonth.error) return res.status(400).json({ error: vMonth.error, code: 400 });
+    const viewer = receiptAccess(req);
     res.json({
       data: {
-        current_session: publicSession(loadOpenSession(), receiptAccess(req)),
-        default_daily_rate: defaultDailyRate(),
-        summary: monthlySummary(vMonth.value || currentMonth()),
+        current_session: publicSession(loadOpenSession(), viewer),
+        default_daily_rate: viewer.amounts ? defaultDailyRate() : null,
+        summary: monthlySummary(vMonth.value || currentMonth(), viewer),
       },
     });
   } catch (err) {
@@ -1053,15 +1088,16 @@ router.get('/visits', (req, res) => {
       payment_task_status: row.payment_task_status ?? null,
       payment_task_title: row.payment_task_title ?? null,
       receipt_document_name: receipts.view(row).receipt_document_name,
-      total_amount: Number(row.daily_rate || 0) + Number(row.extras || 0),
-      ...visitCapabilities(row, req),
+      total_amount: receipts.amounts ? Number(row.daily_rate || 0) + Number(row.extras || 0) : null,
+      ...(receipts.amounts ? {} : { payment_task_status: null, payment_task_title: null }),
+      ...visitCapabilities(row, req, receipts),
     }));
-    const totals = visits.reduce((acc, visit) => {
+    const totals = receipts.amounts ? visits.reduce((acc, visit) => {
       acc.total += visit.total_amount;
       if (visit.paid_at) acc.paid += visit.total_amount;
       else acc.pending += visit.total_amount;
       return acc;
-    }, { total: 0, paid: 0, pending: 0 });
+    }, { total: 0, paid: 0, pending: 0 }) : null;
     res.json({ data: { month: selectedMonth, visits, totals } });
   } catch (err) {
     log.error('GET /visits error:', err);
@@ -1086,11 +1122,21 @@ router.post('/work-sessions/check-in', (req, res) => {
     // unmoeglich (#1138).
     if (loadOpenSession(worker.id)) return res.status(409).json({ error: 'This housekeeper is already checked in.', code: 409 });
 
-    const vDailyRate = num(req.body.daily_rate, 'daily_rate', { required: true });
-    const vExtras = num(req.body.extras, 'extras');
-    const vEventTitle = str(req.body.event_title, 'event_title', { max: MAX_TITLE, required: false });
-    const vPaymentTitle = str(req.body.payment_title, 'payment_title', { max: MAX_TITLE, required: false });
-    const vPaymentDescription = str(req.body.payment_description, 'payment_description', { max: MAX_TEXT, required: false });
+    // Ohne Betragsrecht (R20) kommt der Satz aus dem Profil und nicht aus dem
+    // Body - der Knopf, der ihn schickte, kannte ihn nicht.
+    const viewer = receiptAccess(req);
+    const body = viewer.amounts ? req.body : {
+      ...req.body,
+      daily_rate: workerRateType === 'hourly' ? 0 : Number(worker.daily_rate || 0),
+      extras: 0,
+      payment_title: undefined,
+      payment_description: undefined,
+    };
+    const vDailyRate = num(body.daily_rate, 'daily_rate', { required: true });
+    const vExtras = num(body.extras, 'extras');
+    const vEventTitle = str(body.event_title, 'event_title', { max: MAX_TITLE, required: false });
+    const vPaymentTitle = str(body.payment_title, 'payment_title', { max: MAX_TITLE, required: false });
+    const vPaymentDescription = str(body.payment_description, 'payment_description', { max: MAX_TEXT, required: false });
     const errors = collectErrors([vDailyRate, vExtras, vEventTitle, vPaymentTitle, vPaymentDescription]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
     if (vDailyRate.value < 0 || (vExtras.value ?? 0) < 0) {
@@ -1114,7 +1160,7 @@ router.post('/work-sessions/check-in', (req, res) => {
       `).run(worker.id, checkIn, null, vDailyRate.value, vExtras.value ?? 0, eventId, taskId, actorId, workerRateType, workerHourlyRate);
     })();
     const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(result.lastInsertRowid);
-    res.status(201).json({ data: publicSession(row, receiptAccess(req)), summary: monthlySummary() });
+    res.status(201).json({ data: publicSession(row, viewer), summary: monthlySummary(currentMonth(), viewer) });
   } catch (err) {
     log.error('POST /work-sessions/check-in error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -1147,11 +1193,11 @@ router.get('/visits/:id', (req, res) => {
       worker_avatar_color: row.worker_avatar_color ?? null,
       worker_avatar_data: row.worker_avatar_data ?? null,
       payment_schedule: row.payment_schedule ?? 'monthly',
-      payment_task_status: row.payment_task_status ?? null,
-      payment_task_title: row.payment_task_title ?? null,
+      payment_task_status: receipts.amounts ? (row.payment_task_status ?? null) : null,
+      payment_task_title: receipts.amounts ? (row.payment_task_title ?? null) : null,
       receipt_document_name: receipts.view(row).receipt_document_name,
-      total_amount: Number(row.daily_rate || 0) + Number(row.extras || 0),
-      ...visitCapabilities(row, req),
+      total_amount: receipts.amounts ? Number(row.daily_rate || 0) + Number(row.extras || 0) : null,
+      ...visitCapabilities(row, req, receipts),
     };
     res.json({ data: visit });
   } catch (err) {
@@ -1168,20 +1214,31 @@ router.put('/visits/:id', (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Visit not found.', code: 404 });
     if (!assertMayTouchSettled(existing, req, res)) return;
 
-    const vDate = date(req.body.date, 'date', true);
+    // Ohne Betragsrecht (R20) bleiben Satz, Extras und Minuten, wie sie sind;
+    // aendern laesst sich dann nur, was der Dialog auch zeigt (Tag, Beleg).
+    const viewer = receiptAccess(req);
+    const body = viewer.amounts ? req.body : {
+      ...req.body,
+      daily_rate: existing.daily_rate,
+      extras: existing.extras,
+      minutes_worked: undefined,
+      payment_title: undefined,
+      payment_description: undefined,
+    };
+    const vDate = date(body.date, 'date', true);
     // Der Tag, den das Formular vorbelegt hat - siehe unten bei `baseDay`.
-    const vOriginalDate = date(req.body.original_date, 'original_date', false);
+    const vOriginalDate = date(body.original_date, 'original_date', false);
     const isHourly = existing.rate_type === 'hourly';
-    const vDailyRate = num(req.body.daily_rate, 'daily_rate', { required: !isHourly });
-    const vExtras = num(req.body.extras, 'extras');
-    const vEventTitle = str(req.body.event_title, 'event_title', { max: MAX_TITLE, required: false });
-    const vPaymentTitle = str(req.body.payment_title, 'payment_title', { max: MAX_TITLE, required: false });
-    const vPaymentDescription = str(req.body.payment_description, 'payment_description', { max: MAX_TEXT, required: false });
-    const vReceiptId = req.body.receipt_document_id !== undefined && req.body.receipt_document_id !== null && req.body.receipt_document_id !== ''
-      ? validateId(req.body.receipt_document_id, 'receipt_document_id')
+    const vDailyRate = num(body.daily_rate, 'daily_rate', { required: !isHourly });
+    const vExtras = num(body.extras, 'extras');
+    const vEventTitle = str(body.event_title, 'event_title', { max: MAX_TITLE, required: false });
+    const vPaymentTitle = str(body.payment_title, 'payment_title', { max: MAX_TITLE, required: false });
+    const vPaymentDescription = str(body.payment_description, 'payment_description', { max: MAX_TEXT, required: false });
+    const vReceiptId = body.receipt_document_id !== undefined && body.receipt_document_id !== null && body.receipt_document_id !== ''
+      ? validateId(body.receipt_document_id, 'receipt_document_id')
       : { value: null, error: null };
-    const vMinutesWorked = isHourly && req.body.minutes_worked !== undefined
-      ? num(req.body.minutes_worked, 'minutes_worked')
+    const vMinutesWorked = isHourly && body.minutes_worked !== undefined
+      ? num(body.minutes_worked, 'minutes_worked')
       : { value: null, error: null };
     if (vMinutesWorked.error) return res.status(400).json({ error: vMinutesWorked.error, code: 400 });
     const errors = collectErrors([vDate, vOriginalDate, vDailyRate, vExtras, vEventTitle, vPaymentTitle, vPaymentDescription, vReceiptId]);
@@ -1199,10 +1256,10 @@ router.put('/visits/:id', (req, res) => {
     // (Mitgliedsrecht UND Token-Scope) und die Sichtbarkeit des Dokuments; ein
     // unsichtbares faellt wie bisher still auf `null`. Die Loeschsperre gilt
     // auch fuer die unveraenderte ID - fuer den, der den Beleg sieht.
-    const receipts = receiptAccess(req);
+    const receipts = viewer;
     const storedReceipt = existing.receipt_document_id ?? null;
     let receiptDocumentId = storedReceipt;
-    if (req.body.receipt_document_id !== undefined) {
+    if (body.receipt_document_id !== undefined) {
       const wanted = vReceiptId.value;
       if (storedReceipt !== null && !receipts.visible(storedReceipt)) {
         if (wanted !== null) {
@@ -1276,7 +1333,7 @@ router.put('/visits/:id', (req, res) => {
       );
     })();
     const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(existing.id);
-    res.json({ data: publicSession(row, receiptAccess(req)), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth()) });
+    res.json({ data: publicSession(row, viewer), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth(), viewer) });
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
     if (sendDocumentLinkRefusal(res, err)) return;
@@ -1292,6 +1349,8 @@ router.post('/visits/:id/pay', (req, res) => {
     const existing = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(vId.value);
     if (!existing) return res.status(404).json({ error: 'Visit not found.', code: 404 });
     if (!assertMayTouchSettled(existing, req, res)) return;
+    const viewer = receiptAccess(req);
+    if (!viewer.amounts) return payment403(res);
     const paidAt = nowIso();
     db.get().transaction(() => {
       db.get().prepare('UPDATE housekeeping_work_sessions SET paid_at = ? WHERE id = ?').run(paidAt, existing.id);
@@ -1300,7 +1359,7 @@ router.post('/visits/:id/pay', (req, res) => {
       }
     })();
     const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(existing.id);
-    res.json({ data: publicSession(row, receiptAccess(req)), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth()) });
+    res.json({ data: publicSession(row, viewer), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth(), viewer) });
   } catch (err) {
     log.error('POST /visits/:id/pay error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -1321,6 +1380,8 @@ router.post('/visits/:id/unpay', (req, res) => {
     const existing = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(vId.value);
     if (!existing) return res.status(404).json({ error: 'Visit not found.', code: 404 });
     if (!assertAdmin(req, res)) return;
+    const viewer = receiptAccess(req);
+    if (!viewer.amounts) return payment403(res);
     if (existing.paid_at) {
       db.get().transaction(() => {
         db.get().prepare('UPDATE housekeeping_work_sessions SET paid_at = NULL WHERE id = ?').run(existing.id);
@@ -1330,7 +1391,7 @@ router.post('/visits/:id/unpay', (req, res) => {
       })();
     }
     const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(existing.id);
-    res.json({ data: publicSession(row, receiptAccess(req)), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth()) });
+    res.json({ data: publicSession(row, viewer), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth(), viewer) });
   } catch (err) {
     log.error('POST /visits/:id/unpay error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -1348,7 +1409,7 @@ router.delete('/visits/:id', (req, res) => {
       deleteVisitLinks(db.get(), existing);
       db.get().prepare('DELETE FROM housekeeping_work_sessions WHERE id = ?').run(existing.id);
     })();
-    res.json({ data: { summary: monthlySummary() } });
+    res.json({ data: { summary: monthlySummary(currentMonth(), receiptAccess(req)) } });
   } catch (err) {
     log.error('DELETE /visits/:id error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -1362,7 +1423,9 @@ router.post('/work-sessions/check-out', (req, res) => {
     const session = loadOpenSession(vWorkerId.value);
     if (!session) return res.status(404).json({ error: 'No open work session found.', code: 404 });
 
-    const vExtras = num(req.body.extras, 'extras');
+    // Ohne Betragsrecht (R20) bleiben die Extras der Sitzung stehen.
+    const viewer = receiptAccess(req);
+    const vExtras = viewer.amounts ? num(req.body.extras, 'extras') : { value: null, error: null };
     if (vExtras.error) return res.status(400).json({ error: vExtras.error, code: 400 });
     if ((vExtras.value ?? session.extras) < 0) {
       return res.status(400).json({ error: 'Extras must be greater than or equal to zero.', code: 400 });
@@ -1388,7 +1451,7 @@ router.post('/work-sessions/check-out', (req, res) => {
       `).run(checkOut, vExtras.value ?? session.extras, updateRate, minutesWorked, sessionRateType, sessionHourlyRate, session.id);
     })();
     const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(session.id);
-    res.json({ data: publicSession(row, receiptAccess(req)), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth()) });
+    res.json({ data: publicSession(row, viewer), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth(), viewer) });
   } catch (err) {
     log.error('POST /work-sessions/check-out error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });

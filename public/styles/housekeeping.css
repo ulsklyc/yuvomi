@@ -1034,6 +1034,12 @@
   }
 }
 
+/* Ohne Betragsrecht (R20, neue Kinderkonten) gibt es keine Zahlungskarte -
+ * die Besuche nehmen dann die ganze Zeile, statt neben einer Luecke zu stehen. */
+.housekeeping-dashboard-columns--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 /* Die Kennzahlen der Aufgaben (housekeeping.js, taskSummaryHtml) bleiben unter
  * 640px aus (`.budget-glance-details`, panel.css). Dann geht auch ihre Spur:
  * eine leere Seitenspalte liesse den Zeilenabstand des Rasters als 16px unter

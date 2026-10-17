@@ -1,7 +1,7 @@
 import { op, jsonBody, idParam } from '../helpers.js';
 
 const VISIT_CAPABILITY_NOTE = 'Each visit carries `can_edit` and `can_delete`: true when the caller may write to the Housekeeping module and the visit is either unpaid or the caller is an admin '
-  + '(a paid visit is settled), `can_mark_paid`: true when the caller may write and the visit is unpaid, and `can_mark_unpaid`: true when the visit is paid and the caller is an admin. '
+  + '(a paid visit is settled), `can_mark_paid`: true when the caller may write, may see amounts and the visit is unpaid, and `can_mark_unpaid`: true when the visit is paid and the caller is an admin. '
   + 'Write access means both the member module permission and, for API tokens, a `housekeeping:write` scope. '
   + 'They are hints for the interface; `PUT`/`DELETE /api/v1/housekeeping/visits/{id}` and `POST .../unpay` check the role themselves. '
   + 'The visit list and report also carry `receipt_document_name`. ';
@@ -23,6 +23,16 @@ const HOUSEHOLD_DAY_NOTE = ' The household day decides `today_session` and the d
   + 'the client displays in decides, then the time zone of the server. Clients that send no `timezone` may still send `local_date` with '
   + '`timezone_offset_minutes`; up to v2.69.1 these decided even with a household time zone set.';
 
+// Betraege nur mit `housekeeping_view_amounts` (R20).
+const AMOUNTS_NOTE = ' Wages, payments and amounts need the `housekeeping_view_amounts` capability (the default for every account; new '
+  + 'child accounts start without it). Without it every amount field is `null` - `daily_rate`, `hourly_rate`, `extras`, `total_amount`, '
+  + '`totals`, `paid_at`, `payment_task_id`, `payment_task_status`, `payment_task_title`, `default_daily_rate`, the summary totals, '
+  + '`pending_payments`, `paid_this_month` and `monthly_payments` - while visits, times and people stay. ';
+
+const AMOUNTS_WRITE_NOTE = ' A caller without `housekeeping_view_amounts` writes no amounts: a check-in takes the rate from the profile, '
+  + 'check-out keeps the extras, an update keeps rate, extras and minutes, and payment task texts fall back to the household language. '
+  + 'Paying and taking back a payment are refused with 403 and `reason: amounts_hidden`.';
+
 // `last_completed` ist ein Zeitpunkt; ein Offset wird der UTC-Instant (#1364).
 const LAST_COMPLETED_INPUT = '`last_completed` with `Z` or a numeric offset is read as an instant and stored as a UTC '
   + 'instant (`YYYY-MM-DDTHH:MM:SS.sssZ`), the same form `/complete` writes. A value without offset is household '
@@ -32,40 +42,40 @@ const LAST_COMPLETED_INPUT = '`last_completed` with `Z` or a numeric offset is r
 export function housekeepingPaths() {
   return {
     '/api/v1/housekeeping/dashboard': {
-      get: op({ summary: 'Get housekeeping dashboard', tag: 'Housekeeping', description: RECEIPT_NOTE + HOUSEHOLD_DAY_NOTE }),
+      get: op({ summary: 'Get housekeeping dashboard', tag: 'Housekeeping', description: RECEIPT_NOTE + AMOUNTS_NOTE + HOUSEHOLD_DAY_NOTE }),
     },
     '/api/v1/housekeeping/task-templates': {
       get: op({ summary: 'List housekeeping task templates', tag: 'Housekeeping' }),
     },
     '/api/v1/housekeeping/worker': {
-      get: op({ summary: 'Get primary housekeeper profile', tag: 'Housekeeping', description: RECEIPT_NOTE + HOUSEHOLD_DAY_NOTE }),
+      get: op({ summary: 'Get primary housekeeper profile', tag: 'Housekeeping', description: RECEIPT_NOTE + AMOUNTS_NOTE + HOUSEHOLD_DAY_NOTE }),
       post: op({ summary: 'Create or update housekeeper profile', tag: 'Housekeeping', admin: true, stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/housekeeping/workers': {
-      get: op({ summary: 'List housekeeper profiles', tag: 'Housekeeping', description: 'Next to `data`, `can_manage` is true when the caller may create and edit profiles (`POST /housekeeping/worker`): write access to the module and the admin role. ' + RECEIPT_NOTE + HOUSEHOLD_DAY_NOTE }),
+      get: op({ summary: 'List housekeeper profiles', tag: 'Housekeeping', description: 'Next to `data`, `can_manage` is true when the caller may create and edit profiles (`POST /housekeeping/worker`): write access to the module and the admin role. ' + RECEIPT_NOTE + AMOUNTS_NOTE + HOUSEHOLD_DAY_NOTE }),
     },
     '/api/v1/housekeeping/summary': {
-      get: op({ summary: 'Get monthly housekeeping summary', tag: 'Housekeeping', description: RECEIPT_NOTE }),
+      get: op({ summary: 'Get monthly housekeeping summary', tag: 'Housekeeping', description: RECEIPT_NOTE + AMOUNTS_NOTE }),
     },
     '/api/v1/housekeeping/work-sessions': {
-      get: op({ summary: 'List housekeeping work sessions for a month', tag: 'Housekeeping', description: RECEIPT_NOTE }),
+      get: op({ summary: 'List housekeeping work sessions for a month', tag: 'Housekeeping', description: RECEIPT_NOTE + AMOUNTS_NOTE }),
     },
     '/api/v1/housekeeping/work-sessions/check-in': {
-      post: op({ summary: 'Check in a housekeeper', tag: 'Housekeeping', description: HOUSEHOLD_DAY_NOTE.trim(), stateChanging: true, requestBody: jsonBody(null) }),
+      post: op({ summary: 'Check in a housekeeper', tag: 'Housekeeping', description: HOUSEHOLD_DAY_NOTE.trim() + AMOUNTS_WRITE_NOTE, stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/housekeeping/work-sessions/check-out': {
-      post: op({ summary: 'Check out a housekeeper', tag: 'Housekeeping', stateChanging: true, requestBody: jsonBody(null) }),
+      post: op({ summary: 'Check out a housekeeper', tag: 'Housekeeping', description: AMOUNTS_WRITE_NOTE.trim(), stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/housekeeping/visits': {
-      get: op({ summary: 'List housekeeping visits for a month', tag: 'Housekeeping', description: VISIT_CAPABILITY_NOTE + RECEIPT_NOTE }),
+      get: op({ summary: 'List housekeeping visits for a month', tag: 'Housekeeping', description: VISIT_CAPABILITY_NOTE + RECEIPT_NOTE + AMOUNTS_NOTE }),
     },
     '/api/v1/housekeeping/visits/{id}': {
-      get: op({ summary: 'Get housekeeping visit', tag: 'Housekeeping', params: [idParam()], description: VISIT_CAPABILITY_NOTE + RECEIPT_NOTE }),
+      get: op({ summary: 'Get housekeeping visit', tag: 'Housekeeping', params: [idParam()], description: VISIT_CAPABILITY_NOTE + RECEIPT_NOTE + AMOUNTS_NOTE }),
       put: op({
         summary: 'Update housekeeping visit',
         tag: 'Housekeeping',
         params: [idParam()],
-        description: RECEIPT_WRITE_NOTE,
+        description: RECEIPT_WRITE_NOTE + AMOUNTS_WRITE_NOTE,
         stateChanging: true,
         documentDeleteConflict: true,
         requestBody: jsonBody(null),
@@ -79,12 +89,12 @@ export function housekeepingPaths() {
       delete: op({ summary: 'Delete housekeeping visit', tag: 'Housekeeping', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/housekeeping/visits/{id}/pay': {
-      post: op({ summary: 'Mark housekeeping visit as paid', tag: 'Housekeeping', params: [idParam()], stateChanging: true }),
+      post: op({ summary: 'Mark housekeeping visit as paid', tag: 'Housekeeping', params: [idParam()], description: 'Needs `housekeeping_view_amounts`; without it 403 with `reason: amounts_hidden`.', stateChanging: true }),
     },
     '/api/v1/housekeeping/visits/{id}/unpay': {
       post: op({
         summary: 'Take back the payment of a housekeeping visit',
-        description: 'Clears `paid_at` and reopens a linked payment task that is done. A visit that is not paid is returned unchanged.',
+        description: 'Clears `paid_at` and reopens a linked payment task that is done. A visit that is not paid is returned unchanged. Needs `housekeeping_view_amounts`; without it 403 with `reason: amounts_hidden`.',
         tag: 'Housekeeping',
         admin: true,
         params: [idParam()],

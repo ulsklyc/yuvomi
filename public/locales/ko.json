@@ -2147,6 +2147,7 @@
         "familyRoleGrandparent": "조부모",
         "familyRoleRelative": "친척",
         "familyRoleOther": "가족 구성원",
+        "childStartHint": "새 자녀 계정은 예산과 단식 없이 시작하며 가사 도우미는 읽기 전용으로, 급여와 지급 내역 없이 봅니다. 나중에 “역할 및 권한”에서 바꿀 수 있습니다.",
         "systemAdminLabel": "시스템 관리자",
         "systemAdminHint": "시스템 관리자는 앱 설정, 통합, API 토큰 및 가족 계정을 관리할 수 있습니다.",
         "systemAdminBadge": "시스템 관리자",
@@ -4022,7 +4023,10 @@
         "currentMonth": "이번 달",
         "noVisitReportsInMonth": "{{month}}에는 기록된 방문이 없습니다.",
         "settledAdminOnly": "관리자만 변경하거나 삭제할 수 있습니다",
-        "reportVisitsCount": "방문"
+        "reportVisitsCount": "방문",
+        "amountsPermissionLabel": "급여와 지급 내역 보기",
+        "errorAmountsHidden": "가사 도우미 금액을 볼 수 있는 사람만 지급을 표시할 수 있습니다.",
+        "notHereToday": "오늘은 아직 오지 않음"
     },
     "splitExpenses": {
         "title": "공동 지출",

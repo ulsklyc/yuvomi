@@ -1994,6 +1994,7 @@
         "familyRoleGrandparent": "Büyükanne/Büyükbaba",
         "familyRoleRelative": "Akraba",
         "familyRoleOther": "Aile üyesi",
+        "childStartHint": "Yeni çocuk hesapları Bütçe ve oruç olmadan başlar; ev yardımcısını yalnızca okuma amaçlı, ücretler ve ödemeler olmadan görür. Bunu sonradan “Roller ve izinler” bölümünden değiştirebilirsiniz.",
         "systemAdminLabel": "Sistem yöneticisi",
         "systemAdminHint": "Sistem yöneticileri ayarları, entegrasyonları, API tokenlarını ve aile hesaplarını yönetebilir.",
         "systemAdminBadge": "Sistem yöneticisi",
@@ -4018,7 +4019,10 @@
         "currentMonth": "Bu Ay",
         "noVisitReportsInMonth": "{{month}} döneminde ziyaret kaydedilmedi.",
         "settledAdminOnly": "Yalnızca bir yönetici değiştirebilir veya silebilir",
-        "reportVisitsCount": "Ziyaretler"
+        "reportVisitsCount": "Ziyaretler",
+        "amountsPermissionLabel": "Ücretleri ve ödemeleri görme",
+        "errorAmountsHidden": "Ödemeyi yalnızca ev yardımcısı tutarlarını görebilen kişi işaretleyebilir.",
+        "notHereToday": "Bugün henüz gelmedi"
     },
     "userMultiSelect": {
         "moreUsers": "daha",

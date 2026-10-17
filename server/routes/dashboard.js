@@ -17,7 +17,7 @@ import {
   asksHouseholdAudience, householdAudienceAnswer, householdAudienceShows, householdVisibleWhere, visibilityWhere,
 } from '../services/visibility.js';
 import { resolveBudgetMode } from '../services/budget-visibility.js';
-import { hiddenModulesFor } from '../permissions.js';
+import { hiddenModulesFor, requestHasCapability } from '../permissions.js';
 import { birthdaysSwitchedOff, modulesLeftOut } from '../services/household-modules.js';
 import { documentViewer } from '../services/document-links.js';
 import { householdMemberSql, memberOrderSql, memberPositionSql } from '../services/household-members.js';
@@ -1265,7 +1265,9 @@ router.get('/', (req, res) => {
       presentSince: openSession?.check_in || null,
       workerName: openWorker?.worker_name || null,
       visitsThisMonth: month.visits,
-      unpaidAmount: month.unpaid,
+      // Der offene Lohn ist Geld (R20): ohne `housekeeping_view_amounts` -
+      // so starten neue Kinderkonten - kommt er als `null`, wie im Modul.
+      unpaidAmount: requestHasCapability(d, req, 'housekeeping_view_amounts') ? month.unpaid : null,
       lastVisit: lastRow?.check_in || null,
     };
   } catch (err) {

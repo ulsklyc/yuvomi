@@ -1073,3 +1073,44 @@ test('R17/E16: ab 1024px haengt der Zeitraum in der Titelzeile, darunter unter d
   const imKopf = regeln.find((r) => r.selector.trim() === '.page-toolbar > .housekeeping-period');
   assert.match(imKopf?.body ?? '', /padding:\s*0/, 'im Kopf faellt das eigene Zeilenpolster');
 });
+
+// ---------------------------------------------------------------------------
+// R20: ohne `housekeeping_view_amounts` (neue Kinderkonten) steht kein Geld da
+// ---------------------------------------------------------------------------
+
+test('R20: ohne Betragsrecht keine Euro-Zeile, kein Zahlungsdiagramm, keine Lohnangabe - die Zeiten bleiben', async () => {
+  const perms = await import('../public/permissions.js');
+  // So kommt ein neues Kind an: Modul nur lesen, Betraege aus - und der Server
+  // schickt die Felder als null (test-child-start-permissions.js).
+  perms.setPermissions({ admin: false, modules: { housekeeping: 'read' }, widgets: {}, capabilities: { housekeeping_view_amounts: 'none' } });
+  try {
+    const state = hk.state();
+    state.tab = 'dashboard';
+    state.workers = [{ id: 7, display_name: 'Maria Silva', rate_type: 'daily', daily_rate: null, hourly_rate: null, payment_schedule: 'weekly' }];
+    state.dashboard = { visits_this_month: 3, last_visit: null, pending_tasks: 1, finished_tasks_this_month: 2, monthly_payments: null, pending_payments: null };
+    const visit = {
+      id: 31, worker_name: 'Maria Silva', check_in: '2026-08-06T08:00:00.000Z', check_out: '2026-08-06T11:00:00.000Z',
+      total_amount: null, daily_rate: null, extras: null, paid_at: null, rate_type: 'daily',
+      can_edit: false, can_delete: false, can_mark_paid: false,
+    };
+    state.recentVisits = [visit];
+    const content = fakeContainer();
+    hk.renderDashboard(content);
+    const html = content.html;
+    assert.doesNotMatch(html, /housekeeping-chart"/, 'das Zahlungsdiagramm entfaellt');
+    assert.match(html, /housekeeping-dashboard-columns housekeeping-dashboard-columns--single/, 'die Besuche nehmen die Zeile allein');
+    assert.doesNotMatch(html, /housekeeping\.pendingPayments/, 'keine offenen Zahlungen');
+    assert.doesNotMatch(html, /€|EUR/, 'kein Betrag, auch kein „0,00"');
+    assert.match(html, /housekeeping\.notHereToday/, 'die Personenzeile sagt, ob sie da ist, statt den Lohn zu nennen');
+    const [row] = visitRows(html);
+    assert.equal(row.meta, 'Maria Silva · 2026-08-06T08:00:00.000Z-2026-08-06T11:00:00.000Z', 'Person und Zeit statt Betrag und Zahlstatus');
+    assert.equal(hk.visitWorkDetailsHtml(visit), '', 'der Bericht nennt keinen Tagessatz');
+
+    // Und auch mit Recht: eine `null` aus einer Antwort wird nie „0,00 €".
+    perms.setPermissions({ admin: false, modules: {}, widgets: {}, capabilities: {} });
+    assert.equal(hk.amountsHidden(null), true);
+    assert.equal(hk.amountsHidden(0), false, 'eine echte 0 ist ein Betrag');
+  } finally {
+    perms.clearPermissions();
+  }
+});

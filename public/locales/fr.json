@@ -1994,6 +1994,7 @@
         "familyRoleGrandparent": "Grand-parent",
         "familyRoleRelative": "Proche",
         "familyRoleOther": "Membre de la famille",
+        "childStartHint": "Les nouveaux comptes enfant démarrent sans Budget ni jeûne et voient l’Aide ménagère en lecture seule, sans salaires ni paiements. Vous pouvez le modifier ensuite dans «Rôles et autorisations».",
         "systemAdminLabel": "Administrateur système",
         "systemAdminHint": "Les administrateurs système peuvent gérer les paramètres, intégrations, jetons API et comptes familiaux.",
         "systemAdminBadge": "Admin système",
@@ -4018,7 +4019,10 @@
         "currentMonth": "Actuel",
         "noVisitReportsInMonth": "Aucune intervention enregistrée en {{month}}.",
         "settledAdminOnly": "Seul un admin peut la modifier ou la supprimer",
-        "reportVisitsCount": "Visites"
+        "reportVisitsCount": "Visites",
+        "amountsPermissionLabel": "Voir les salaires et paiements",
+        "errorAmountsHidden": "Seule une personne autorisée à voir les montants de l’aide ménagère peut marquer un paiement.",
+        "notHereToday": "Pas encore là aujourd’hui"
     },
     "userMultiSelect": {
         "moreUsers": "autres",

@@ -13,6 +13,9 @@
  *          - die Liste steht in der Haushaltsreihenfolge, Ehemalige am Ende,
  *            ein lokal angehaengtes neues Mitglied im Alphabet der Unplatzierten.
  *
+ *        Dazu (R20): der Hinweis auf die Kinder-Startrechte in Anlege- und
+ *        Einladungsformular derselben Seite.
+ *
  *        NICHT hier: das Ziehen und die Pfeiltasten selbst. Beides braucht ein
  *        DOM, das Zeilen umhaengt; gefahren wurde es im Browser (PR-Text).
  * Ausfuehren: npm run test:member-order
@@ -148,4 +151,38 @@ test('wiring: drag and arrow keys share one persistence path, and the route take
   assert.match(source, /persistMemberOrder\(ctx\.container, ctx\.currentUser, ctx\.users, row\)/);
   assert.match(source, /api\.patch\('\/family\/members\/reorder', \{ order \}\)/);
   assert.match(source, /draggable: '\.settings-member--orderable'/);
+});
+
+// R20 (Kinder-Standards): wer ein Kind anlegt oder einlaedt, liest dabei, mit
+// welchen Rechten es startet. Der Hinweis steht nur bei der Rolle Kind, und nur
+// dann beschreibt er das Feld (ein per aria-describedby verwiesener Text wird
+// auch versteckt vorgelesen).
+test('R20: Anlegen und Einladen nennen die Kinder-Startrechte genau bei der Rolle Kind', () => {
+  for (const [html, selectId, hintId] of [
+    [family.addMemberFormHtml(), 'new-family-role', 'new-member-child-hint'],
+    [family.addInviteFormHtml(), 'invite-family-role', 'invite-child-hint'],
+  ]) {
+    assert.match(html, new RegExp(`<p class="form-hint" id="${hintId}" hidden>settings\\.childStartHint</p>`), `${hintId}: der Hinweis steht im Formular`);
+    const attrs = {};
+    const select = {
+      value: 'other',
+      listeners: [],
+      addEventListener(type, fn) { if (type === 'change') this.listeners.push(fn); },
+      setAttribute(name, value) { attrs[name] = value; },
+      removeAttribute(name) { delete attrs[name]; },
+    };
+    const hint = { id: hintId, hidden: true };
+    const panel = { querySelector: (sel) => (sel === `#${selectId}` ? select : sel === `#${hintId}` ? hint : null) };
+    family.bindChildStartHint(panel, selectId, hintId);
+    assert.equal(hint.hidden, true, 'Erwachsene: kein Hinweis');
+    assert.equal(attrs['aria-describedby'], undefined);
+    select.value = 'child';
+    select.listeners.forEach((fn) => fn());
+    assert.equal(hint.hidden, false, 'Kind: der Hinweis erscheint');
+    assert.equal(attrs['aria-describedby'], hintId, 'und beschreibt das Feld');
+    select.value = 'parent';
+    select.listeners.forEach((fn) => fn());
+    assert.equal(hint.hidden, true);
+    assert.equal(attrs['aria-describedby'], undefined, 'der Verweis geht mit dem Hinweis');
+  }
 });

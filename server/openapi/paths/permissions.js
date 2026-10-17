@@ -19,7 +19,7 @@ const userIdParam = {
 
 const BODY = 'Body: { modules, widgets, capabilities } - `modules` maps a module key to `none`, `read` or `write`, '
   + '`widgets` maps a widget id to `none` or `allow`, and `capabilities` maps '
-  + '`notes_manage_household_categories` and `health_use_fasting` to `none` or `allow`. Module and widget rows are replaced on every '
+  + '`notes_manage_household_categories`, `health_use_fasting` and `housekeeping_view_amounts` to `none` or `allow`. Module and widget rows are replaced on every '
   + 'request. Capability rows are replaced only when `capabilities` is explicitly present, so older clients '
   + 'cannot silently remove them. Role values '
   + 'that match the default are not stored; a member-level `none` capability may be stored to override an '
@@ -34,7 +34,8 @@ export function permissionsPaths() {
         admin: true,
         description: 'Modules, widgets, capabilities (including access levels and defaults), roles and the member list for the rights matrix. The catalog '
           + 'is the authoritative list of what can be granted - the enforcing side reads the same one, '
-          + 'so the two cannot drift apart. defaults.capability is the legacy fallback; each capability item\'s default takes precedence when present.',
+          + 'so the two cannot drift apart. defaults.capability is the legacy fallback; each capability item\'s default takes precedence when present. '
+          + '`childStart` lists what a new child account starts with in addition (modules and capabilities).',
       }),
     },
     '/api/v1/permissions/role/{familyRole}': {

@@ -2235,6 +2235,7 @@
         "familyRoleGrandparent": "جد/جدة",
         "familyRoleRelative": "قريب",
         "familyRoleOther": "فرد من العائلة",
+        "childStartHint": "تبدأ حسابات الأطفال الجديدة بدون الميزانية والصيام، وترى المساعدة المنزلية للقراءة فقط دون الأجور والمدفوعات. يمكنك تغيير ذلك لاحقًا ضمن «الأدوار والأذونات».",
         "systemAdminLabel": "مسؤول النظام",
         "systemAdminHint": "يمكن لمسؤولي النظام إدارة الإعدادات والتكاملات ورموز API وحسابات العائلة.",
         "systemAdminBadge": "مسؤول النظام",
@@ -4361,7 +4362,10 @@
         "currentMonth": "الشهر الحالي",
         "noVisitReportsInMonth": "لم تُسجل أي زيارة في {{month}}.",
         "settledAdminOnly": "لا يمكن تعديله أو حذفه إلا بواسطة مسؤول",
-        "reportVisitsCount": "الزيارات"
+        "reportVisitsCount": "الزيارات",
+        "amountsPermissionLabel": "عرض الأجور والمدفوعات",
+        "errorAmountsHidden": "لا يمكن تسجيل الدفع إلا لمن يُسمح له برؤية مبالغ المساعدة المنزلية.",
+        "notHereToday": "لم تصل اليوم بعد"
     },
     "userMultiSelect": {
         "moreUsers": "آخرون",

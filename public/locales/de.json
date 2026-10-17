@@ -2147,6 +2147,7 @@
         "familyRoleGrandparent": "Großelternteil",
         "familyRoleRelative": "Verwandte/r",
         "familyRoleOther": "Familienmitglied",
+        "childStartHint": "Neue Kinderkonten starten ohne Budget und Fasten und sehen die Haushaltshilfe nur zum Lesen, ohne Löhne und Zahlungen. Ändern lässt sich das danach unter „Rollen und Rechte“.",
         "systemAdminLabel": "Systemadministrator",
         "systemAdminHint": "Systemadministratoren können App-Einstellungen, Integrationen, API-Tokens und Familienkonten verwalten.",
         "systemAdminBadge": "Systemadministrator",
@@ -4022,7 +4023,10 @@
         "currentMonth": "Aktuell",
         "noVisitReportsInMonth": "Im {{month}} wurden keine Einsätze erfasst.",
         "settledAdminOnly": "Ändern oder löschen nur durch einen Admin",
-        "reportVisitsCount": "Besuche"
+        "reportVisitsCount": "Besuche",
+        "amountsPermissionLabel": "Löhne und Zahlungen sehen",
+        "errorAmountsHidden": "Bezahlen kann nur, wer die Beträge der Haushaltshilfe sehen darf.",
+        "notHereToday": "Heute noch nicht da"
     },
     "splitExpenses": {
         "title": "Gemeinsame Ausgaben",

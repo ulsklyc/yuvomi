@@ -1994,6 +1994,7 @@
         "familyRoleGrandparent": "Avô/Avó",
         "familyRoleRelative": "Parente",
         "familyRoleOther": "Membro da família",
+        "childStartHint": "As novas contas de criança começam sem Orçamento e jejum e veem a Ajuda doméstica só para leitura, sem salários e pagamentos. Pode alterar isto depois em «Funções e permissões».",
         "systemAdminLabel": "Administrador do sistema",
         "systemAdminHint": "Administradores do sistema podem gerenciar configurações, integrações, tokens de API e contas da família.",
         "systemAdminBadge": "Admin do sistema",
@@ -4018,7 +4019,10 @@
         "currentMonth": "Atual",
         "noVisitReportsInMonth": "Nenhuma visita da equipe registrada em {{month}}.",
         "settledAdminOnly": "Só um admin pode alterar ou excluir",
-        "reportVisitsCount": "Visitas"
+        "reportVisitsCount": "Visitas",
+        "amountsPermissionLabel": "Ver salários e pagamentos",
+        "errorAmountsHidden": "Só quem pode ver os valores da ajuda doméstica pode marcar um pagamento.",
+        "notHereToday": "Ainda não chegou hoje"
     },
     "userMultiSelect": {
         "moreUsers": "mais",

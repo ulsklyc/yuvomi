@@ -2154,6 +2154,7 @@
         "familyRoleGrandparent": "Дедушка/бабушка",
         "familyRoleRelative": "Родственник",
         "familyRoleOther": "Член семьи",
+        "childStartHint": "Новые детские аккаунты начинают без бюджета и голодания и видят помощь по дому только для чтения, без оплаты и платежей. Позже это можно изменить в разделе «Роли и права».",
         "systemAdminLabel": "Системный администратор",
         "systemAdminHint": "Системные администраторы могут управлять настройками, интеграциями, API-токенами и семейными аккаунтами.",
         "systemAdminBadge": "Системный администратор",
@@ -4246,7 +4247,10 @@
         "currentMonth": "Текущий",
         "noVisitReportsInMonth": "За период {{month}} визитов не записано.",
         "settledAdminOnly": "Изменить или удалить может только администратор",
-        "reportVisitsCount": "Визиты"
+        "reportVisitsCount": "Визиты",
+        "amountsPermissionLabel": "Видеть оплату и платежи",
+        "errorAmountsHidden": "Отметить оплату может только тот, кому видны суммы помощницы по дому.",
+        "notHereToday": "Сегодня ещё не пришла"
     },
     "userMultiSelect": {
         "moreUsers": "ещё",

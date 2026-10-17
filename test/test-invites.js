@@ -596,6 +596,35 @@ test('accept einer Einladung OHNE Vorgabe schreibt keine Zeile', async () => {
   );
 });
 
+test('accept einer Kinder-Einladung bringt die Kinder-Startrechte mit (R20), bei beiden Vorlagen', async () => {
+  // Die enge Vorlage sperrt Gesundheit, Budget und Dokumente; dazu kommen fuer
+  // ein Kind die Haushaltshilfe nur zum Lesen und ohne Betraege und das Fasten
+  // aus. Mit der Vorlage "wie das Rollenprofil" kommen nur diese dazu.
+  const cases = [
+    ['xenia', 'restricted', [
+      'capability:health_use_fasting=none', 'capability:housekeeping_view_amounts=none',
+      'module:budget=none', 'module:documents=none', 'module:health=none', 'module:housekeeping=read',
+    ]],
+    ['yara', 'role', [
+      'capability:health_use_fasting=none', 'capability:housekeeping_view_amounts=none',
+      'module:budget=none', 'module:housekeeping=read',
+    ]],
+  ];
+  for (const [username, preset, expected] of cases) {
+    const { token } = await invite({ username, family_role: 'child', permission_preset: preset });
+    const res = await call('POST', '/auth/invites/accept', {
+      actor: null, body: { token, password: 'geheim12345' }, csrf: null,
+    });
+    assert.equal(res.status, 201);
+    const userId = routeDb.prepare('SELECT id FROM users WHERE username = ?').get(username).id;
+    const rows = routeDb.prepare(
+      `SELECT resource_type, resource_key, access FROM access_permissions
+       WHERE subject_type = 'user' AND subject_id = ? ORDER BY resource_type, resource_key`
+    ).all(String(userId)).map((r) => `${r.resource_type}:${r.resource_key}=${r.access}`);
+    assert.deepEqual(rows, expected, preset);
+  }
+});
+
 test('teardown: Server schließen', async () => {
   await new Promise((r) => server.close(r));
 });

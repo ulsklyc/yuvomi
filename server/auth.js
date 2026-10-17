@@ -52,7 +52,7 @@ import { accountIdsByEmail, emailMatchKey } from './utils/email-match.js';
 import {
   resolvePermissions, buildSessionModuleAccess, clientPermissions,
   invitePresetPermissions, isValidInvitePreset, writeSubjectPermissions,
-  INVITE_PRESET_DEFAULT,
+  applyChildStartPermissions, INVITE_PRESET_DEFAULT,
 } from './permissions.js';
 import { isAdminRequest, requireAdmin } from './middleware/require-admin.js';
 import { EMAIL_IN_USE_MESSAGE, emailsTakenByOtherAccounts, storedAccountEmails } from './services/contact-identity.js';
@@ -2186,6 +2186,13 @@ export function buildInviteRoutes(targetRouter, {
             }
             writeSubjectPermissions(getDb(), 'user', newUserId, parsed);
           }
+          // Kinder-Startrechte (R20) NACH der Vorlage: sie liest den Stand,
+          // den Rollenprofil und Vorlage schon ergeben, und verschaerft nur.
+          // Gilt auch bei der Vorlage 'role' - ein neues Kinderkonto startet
+          // nie mit Budget, Fasten oder den Loehnen der Haushaltshilfe.
+          applyChildStartPermissions(getDb(), {
+            id: newUserId, role: invite.role, family_role: invite.family_role,
+          });
           syncFamilyMemberArtifacts(getDb(), newUserId, {
             displayName,
             // Die eingeladene Adresse wird zur Kontaktadresse: ohne sie fände der
@@ -3439,6 +3446,11 @@ router.post('/users', requireAuth, requireAdmin, csrfMiddleware, async (req, res
           VALUES (?, ?, ?, ?, ?, ?, ?)
         `)
         .run(username, display_name, hash, avatar_color, normalizedAvatarData ?? null, role, family_role);
+      // Kinder-Startrechte (R20): in derselben Transaktion wie das Konto, damit
+      // es nie einen Moment mit Budget und Haushaltshilfe-Loehnen gibt.
+      applyChildStartPermissions(db.get(), {
+        id: Number(created.lastInsertRowid), role, family_role,
+      });
       syncFamilyMemberArtifacts(db.get(), created.lastInsertRowid, {
         displayName: display_name,
         phone: memberFields.values.phone,

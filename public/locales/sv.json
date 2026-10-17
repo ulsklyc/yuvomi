@@ -1994,6 +1994,7 @@
         "familyRoleGrandparent": "Far-/morförälder",
         "familyRoleRelative": "Släkting",
         "familyRoleOther": "Familjemedlem",
+        "childStartHint": "Nya barnkonton startar utan Budget och fasta och ser Hushållshjälp bara för läsning, utan löner och betalningar. Du kan ändra det efteråt under “Roller och behörigheter”.",
         "systemAdminLabel": "Systemadministratör",
         "systemAdminHint": "Systemadministratörer kan hantera inställningar, integrationer, API-token och familjekonton.",
         "systemAdminBadge": "Systemadmin",
@@ -4018,7 +4019,10 @@
         "currentMonth": "Nuvarande",
         "noVisitReportsInMonth": "Inga personalbesök registrerades under {{month}}.",
         "settledAdminOnly": "Bara en admin kan ändra eller ta bort",
-        "reportVisitsCount": "Besök"
+        "reportVisitsCount": "Besök",
+        "amountsPermissionLabel": "Se löner och betalningar",
+        "errorAmountsHidden": "Bara den som får se beloppen för hushållshjälpen kan markera en betalning.",
+        "notHereToday": "Inte här än i dag"
     },
     "userMultiSelect": {
         "moreUsers": "mer",

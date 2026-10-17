@@ -1994,6 +1994,7 @@
         "familyRoleGrandparent": "दादा-दादी/नाना-नानी",
         "familyRoleRelative": "रिश्तेदार",
         "familyRoleOther": "परिवार सदस्य",
+        "childStartHint": "नए बच्चों के खाते बजट और उपवास के बिना शुरू होते हैं और घरेलू सहायक केवल पढ़ने के लिए, वेतन और भुगतान के बिना देखते हैं। इसे बाद में “भूमिकाएँ और अनुमतियाँ” में बदला जा सकता है।",
         "systemAdminLabel": "सिस्टम एडमिन",
         "systemAdminHint": "सिस्टम एडमिन सेटिंग्स, इंटीग्रेशन, API टोकन और परिवार खातों को प्रबंधित कर सकते हैं।",
         "systemAdminBadge": "सिस्टम एडमिन",
@@ -4018,7 +4019,10 @@
         "currentMonth": "वर्तमान",
         "noVisitReportsInMonth": "{{month}} में कोई विज़िट दर्ज नहीं हुई।",
         "settledAdminOnly": "केवल एडमिन ही इसे बदल या हटा सकता है",
-        "reportVisitsCount": "विज़िट"
+        "reportVisitsCount": "विज़िट",
+        "amountsPermissionLabel": "वेतन और भुगतान देखें",
+        "errorAmountsHidden": "भुगतान वही दर्ज कर सकता है जिसे घरेलू सहायक की राशि देखने की अनुमति है।",
+        "notHereToday": "आज अभी तक नहीं आईं"
     },
     "userMultiSelect": {
         "moreUsers": "और",

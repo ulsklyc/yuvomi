@@ -1994,6 +1994,7 @@
         "familyRoleGrandparent": "Abuelo/a",
         "familyRoleRelative": "Familiar",
         "familyRoleOther": "Miembro de la familia",
+        "childStartHint": "Las cuentas infantiles nuevas empiezan sin Presupuesto ni ayuno y ven la Ayuda doméstica solo en lectura, sin sueldos ni pagos. Puedes cambiarlo después en «Roles y permisos».",
         "systemAdminLabel": "Administrador del sistema",
         "systemAdminHint": "Los administradores del sistema pueden gestionar ajustes, integraciones, tokens de API y cuentas familiares.",
         "systemAdminBadge": "Admin del sistema",
@@ -4018,7 +4019,10 @@
         "currentMonth": "Este mes",
         "noVisitReportsInMonth": "No se registró ningún servicio en {{month}}.",
         "settledAdminOnly": "Solo un administrador puede modificarlo o eliminarlo",
-        "reportVisitsCount": "Visitas"
+        "reportVisitsCount": "Visitas",
+        "amountsPermissionLabel": "Ver sueldos y pagos",
+        "errorAmountsHidden": "Solo puede marcar un pago quien puede ver los importes de la ayuda doméstica.",
+        "notHereToday": "Hoy aún no ha llegado"
     },
     "userMultiSelect": {
         "moreUsers": "más",

@@ -223,6 +223,33 @@ function memberHtml(u, currentUserId, { orderable = false, aligned = false } = {
  * Schalter ist eine Zeile des Traegers (formSwitchRowHtml). Jede Feldzeile ist die
  * Fehlergruppe ihres Felds (`field: true`). Der Kopf mit Bild im
  * Bearbeiten-Dialog bleibt, wie im Konto, ein Kopf. */
+/* WAS EIN NEUES KINDERKONTO MITBRINGT (R20). Die Rolle `child` legt beim
+ * Anlegen und beim Annehmen einer Einladung eigene Startrechte an
+ * (CHILD_START_PERMISSIONS in server/permissions.js): kein Budget, kein
+ * Fasten, die Haushaltshilfe nur zum Lesen und ohne Betraege. Wer das Kind
+ * anlegt, soll es hier lesen, nicht erst im Rechte-Blatt finden. Der Hinweis
+ * steht nur bei gewaehlter Rolle Kind, und nur dann zeigt `aria-describedby`
+ * am Feld auf ihn - ein per ID verwiesener Text wird auch versteckt
+ * vorgelesen (accname), der Verweis muss also mit dem Hinweis gehen. */
+function childStartHintHtml(id) {
+  return `<p class="form-hint" id="${id}" hidden>${esc(t('settings.childStartHint'))}</p>`;
+}
+
+function bindChildStartHint(panel, selectId, hintId) {
+  const select = panel.querySelector(`#${selectId}`);
+  const hint = panel.querySelector(`#${hintId}`);
+  if (!select || !hint) return;
+  const sync = () => {
+    const child = select.value === 'child';
+    hint.hidden = !child;
+    if (child) select.setAttribute('aria-describedby', hint.id);
+    else select.removeAttribute('aria-describedby');
+  };
+  select.addEventListener('change', sync);
+  sync();
+  return sync;
+}
+
 function switchRowHtml({ id, label, hint = '', checked = false }) {
   return formSwitchRowHtml({ label, checked, hint, hintId: hint ? `${id}-hint` : null, attrs: { id } });
 }
@@ -254,6 +281,7 @@ function addMemberFormHtml() {
             formRowHtml({
               label: t('settings.familyRoleLabel'), labelFor: 'new-family-role',
               control: `<select class="form-input" id="new-family-role">${buildFamilyRoleOptions()}</select>`,
+              extra: childStartHintHtml('new-member-child-hint'),
             }),
             formRowHtml({
               label: t('settings.memberPhoneLabel'), labelFor: 'new-member-phone', field: true,
@@ -294,6 +322,7 @@ function addInviteFormHtml() {
             formRowHtml({
               label: t('settings.familyRoleLabel'), labelFor: 'invite-family-role',
               control: `<select class="form-input" id="invite-family-role">${buildFamilyRoleOptions()}</select>`,
+              extra: childStartHintHtml('invite-child-hint'),
             }),
             formRowHtml({
               label: t('settings.invites.presetLabel'), labelFor: 'invite-permission-preset',
@@ -749,13 +778,15 @@ function bindInviteEvents(container, initialInvites) {
             : t('settings.invites.presetHintRoleOpen', { role: roleName });
           presetHint.textContent = appendCapabilityState(
             base,
-            capabilityStateText('health_use_fasting', profile, profile.modules?.health === 'none'),
+            // Ein neues Kinderkonto startet ohne Fasten (R20), was das Profil auch sagt.
+            capabilityStateText('health_use_fasting', profile, profile.modules?.health === 'none' || role === 'child'),
           );
         }
 
         presetSelect?.addEventListener('change', updatePresetHint);
         roleSelect?.addEventListener('change', updatePresetHint);
         updatePresetHint();
+        const syncChildHint = bindChildStartHint(panel, 'invite-family-role', 'invite-child-hint');
 
         panel.querySelector('#cancel-add-invite')?.addEventListener('click', () => closeModal());
 
@@ -782,6 +813,7 @@ function bindInviteEvents(container, initialInvites) {
             renderInviteList(container, invites);
             form.reset();
             updatePresetHint();
+            syncChildHint?.();
             // Der Klartext-Token kommt nur aus dieser einen Antwort. Der Dialog
             // bleibt deshalb offen: wuerde er sich wie beim Mitglied-Anlegen
             // schliessen, waere der Link im selben Moment weg, in dem er entsteht.
@@ -1149,6 +1181,7 @@ function openAddMemberModal(container, currentUser, users) {
       form.querySelector('#new-member-sso-only')
         ?.addEventListener('change', () => syncSsoOnlyField(panel));
       syncSsoOnlyField(panel);
+      bindChildStartHint(panel, 'new-family-role', 'new-member-child-hint');
       panel.querySelector('#cancel-add-member')?.addEventListener('click', () => closeModal());
 
       form.addEventListener('submit', async (event) => {
@@ -1314,4 +1347,4 @@ export async function render(container, { user } = {}) {
 
 // Der Avatar als Programm (test:initials): welche Zeichen ohne Bild auf der
 // Scheibe stehen.
-export const __test = { avatarHtml, memberHtml, orderableIds, movedOrder, orderedMembers, wireMemberOrder, renderMemberList };
+export const __test = { childStartHintHtml, bindChildStartHint, addMemberFormHtml, addInviteFormHtml, avatarHtml, memberHtml, orderableIds, movedOrder, orderedMembers, wireMemberOrder, renderMemberList };

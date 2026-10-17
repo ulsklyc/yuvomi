@@ -368,7 +368,11 @@ test('permissionCatalog liefert Module, Widgets, Rollen, Levels', () => {
   assert.equal(cat.capabilities.find((item) => item.key === 'notes_manage_household_categories').default, 'none');
   assert.equal(cat.capabilities.find((item) => item.key === 'health_use_fasting').default, 'allow');
   assert.deepEqual(cat.capabilityAccessLevels, ['none', 'allow']);
-  assert.deepEqual(PERMISSION_CAPABILITIES.map((item) => item.key), ['notes_manage_household_categories', 'health_use_fasting']);
+  assert.equal(cat.capabilities.find((item) => item.key === 'housekeeping_view_amounts').default, 'allow');
+  assert.equal(cat.capabilities.find((item) => item.key === 'housekeeping_view_amounts').module, 'housekeeping');
+  // R20: die Betraege der Haushaltshilfe sind eine eigene Capability, Standard
+  // `allow` - jedes bestehende Konto sieht sie weiter.
+  assert.deepEqual(PERMISSION_CAPABILITIES.map((item) => item.key), ['notes_manage_household_categories', 'health_use_fasting', 'housekeeping_view_amounts']);
 });
 
 test('capability summary compares against each capability default', () => {

@@ -2105,6 +2105,7 @@
         "familyRoleGrandparent": "Grandparent",
         "familyRoleRelative": "Relative",
         "familyRoleOther": "Family member",
+        "childStartHint": "New child accounts start without Budget and fasting and see Housekeeping read-only, without wages and payments. You can change this afterwards under \"Roles & permissions\".",
         "systemAdminLabel": "System admin",
         "systemAdminHint": "System admins can manage application settings, integrations, API tokens and family accounts.",
         "systemAdminBadge": "System admin",
@@ -4018,7 +4019,10 @@
         "currentMonth": "Current",
         "noVisitReportsInMonth": "No visits recorded in {{month}}.",
         "settledAdminOnly": "Only an admin can change or delete it",
-        "reportVisitsCount": "Visits"
+        "reportVisitsCount": "Visits",
+        "amountsPermissionLabel": "See wages and payments",
+        "errorAmountsHidden": "Only someone who may see housekeeping amounts can mark a payment.",
+        "notHereToday": "Not here yet today"
     },
     "userMultiSelect": {
         "moreUsers": "more",

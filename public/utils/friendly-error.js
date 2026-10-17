@@ -30,6 +30,8 @@ export const REFUSAL_MESSAGES = new Map([
   // Token und wiederholt. Diesen Satz sieht also nur, wem das nicht half.
   ['csrf_invalid', 'common.errorFormExpired'],
   ['contact_email_protected', 'contacts.emailLockedHint'],
+  // Bezahlen ohne das Recht, Betraege der Haushaltshilfe zu sehen (R20).
+  ['amounts_hidden', 'housekeeping.errorAmountsHidden'],
 ]);
 
 /**
