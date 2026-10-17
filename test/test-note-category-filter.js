@@ -525,3 +525,16 @@ test('OpenAPI documents note category payloads and permission capabilities', () 
   assert.ok(paths['/api/v1/notes/categories/{id}'].put.responses[409]);
   assert.ok(paths['/api/v1/notes/categories/{id}'].delete.responses[204]);
 });
+
+// R20 (Re-Critique 2026-10-17 a2 P2-3): die Chipreihe stand verborgen und
+// erschien nach dem Laden - das Raster sprang um ihre Hoehe (CLS 0,067).
+test('R20: die Filterreihe haelt ihren Platz, bis die Daten da sind', () => {
+  const page = readFileSync(new URL('../public/pages/notes.js', import.meta.url), 'utf8');
+  const markup = page.match(/<div class="notes-filters page-chip-row" id="notes-filters"[^>]*>/)?.[0] ?? '';
+  assert.doesNotMatch(markup, /\shidden\b/, 'nicht verborgen im ersten Bild');
+  assert.match(markup, /aria-hidden="true" data-pending/, 'ein stummer Platzhalter');
+  assert.match(page, /row\.hidden = creators\.length < 2 && filterCategories\.length === 0;\s*row\.removeAttribute\('aria-hidden'\);\s*delete row\.dataset\.pending;/,
+    'nach dem Laden entscheidet renderFilters, und die Reihe spricht wieder');
+  const css = readFileSync(new URL('../public/styles/notes.css', import.meta.url), 'utf8');
+  assert.match(css, /\.notes-filters__skeleton \{[^}]*block-size: var\(--target-md\)/);
+});

@@ -148,9 +148,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   offers "Add schedule" right under "No schedule yet", the templates you have not used yet stay as
   chips under your waste types, the type cards are plain surfaces like every other list, the seven
   weekdays fit on one line on a phone, and "Every N weeks" is a stepper with minus and plus.
-- **Waste collection opens without jumping.** The column with waste
+- **Waste collection and Notes open without jumping.** In Waste collection the column with waste
   types used to load below the pickups and then jump up (or shrink) once the data arrived; it now
-  appears with its content.
+  appears with its content. In Notes the row of filter chips keeps its place while the notes load,
+  so the cards no longer slide down when it appears.
 - **New rows and messages appear without the list jerking.** A row that comes back after "Undo",
   an unfolded group or a field message now fades in at its full size while the rows below glide
   down, instead of growing its height frame by frame, which stuttered on slower phones.

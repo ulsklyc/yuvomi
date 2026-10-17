@@ -118,6 +118,15 @@
   display: none;
 }
 
+/* Platzhalter, solange die Reihe auf die Daten wartet (notes.js): drei
+ * Pillen in Chiphoehe, damit das Raster darunter nicht springt. */
+.notes-filters__skeleton {
+  flex: 0 0 auto;
+  inline-size: 4.5rem;
+  block-size: var(--target-md);
+  border-radius: var(--radius-full);
+}
+
 .notes-filter-group {
   display: flex;
   flex: 0 0 auto;
