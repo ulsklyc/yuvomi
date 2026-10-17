@@ -4847,7 +4847,6 @@
                 "daily": "Naponta",
                 "none": "Még nincsenek időpontok.",
                 "delete": "Időpont törlése",
-                "newHint": "Mentsd el a gyógyszert, hogy időpontokat adhass hozzá.",
                 "timeRequired": "Az időpont kötelező."
             },
             "weekday": {

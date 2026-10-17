@@ -3687,6 +3687,20 @@ function openMedModal(med) {
   if (readOnly()) return;  // #1265, dritte Linie: auch ein Aufruf ohne Knopf endet hier
   const isEdit = Boolean(med && med.id);
   const val = (v) => (v == null ? '' : String(v));
+  // EIN SCHRITT STATT ZWEIEN (R20, Re-Critique 2026-10-17 a5 P2-8): ein neues
+  // Medikament bekam seinen Einnahmeplan erst nach dem Speichern ("Speichere
+  // das Medikament, dann ..."), also Dialog zu, Zeile suchen, Dialog wieder
+  // auf. Jetzt sammelt der Editor die Zeitfenster eines NEUEN Medikaments als
+  // Entwurf, und das Speichern legt sie gleich danach an. Beim Bearbeiten
+  // bleibt es wie zuvor: jedes Zeitfenster speichert sofort.
+  const draft = isEdit ? null : [];
+  // BESTAND UND NOTIZ HINTER "WEITERE EINSTELLUNGEN" (dieselbe Re-Critique):
+  // der Dialog mass mobil 1082px, die drei Bestandsfelder standen auch fuer
+  // ein Medikament offen, dessen Packung niemand zaehlt. Hat es einen Bestand
+  // oder eine Notiz, steht der Aufklapper offen - nichts Gespeichertes
+  // verschwindet hinter einem geschlossenen.
+  const moreOpen = [med?.stock_qty, med?.stock_unit, med?.refill_threshold, med?.note]
+    .some((v) => v != null && String(v).trim() !== '');
 
   openModal({
     title: isEdit ? t('health.meds.edit') : t('health.meds.add'),
@@ -3697,7 +3711,9 @@ function openMedModal(med) {
           <label class="label" for="med-name">${esc(t('health.meds.field.name'))}</label>
           <input class="input" id="med-name" type="text" maxlength="200" required value="${esc(val(med?.name))}">
         </div>
-        <div class="modal-grid modal-grid--2">
+        ${/* Paare teilen sich die Zeile auch im 390er-Blatt (.form-pair,
+             layout.css): Dosis/Form und Uhrzeit/Dosis sind kurze Werte. */ ''}
+        <div class="form-pair">
           <div class="form-field">
             <label class="label" for="med-dosage">${esc(t('health.meds.field.dosageText'))}</label>
             <input class="input" id="med-dosage" type="text" maxlength="100" value="${esc(val(med?.dosage_text))}">
@@ -3707,24 +3723,6 @@ function openMedModal(med) {
             <input class="input" id="med-form-field" type="text" maxlength="30" value="${esc(val(med?.form))}">
           </div>
         </div>
-        <div class="modal-grid modal-grid--3">
-          <div class="form-field">
-            <label class="label" for="med-stock">${esc(t('health.meds.field.stockQty'))}</label>
-            <input class="input" id="med-stock" type="number" inputmode="decimal" step="any" min="0" value="${esc(val(med?.stock_qty))}">
-          </div>
-          <div class="form-field">
-            <label class="label" for="med-stock-unit">${esc(t('health.meds.field.stockUnit'))}</label>
-            <input class="input" id="med-stock-unit" type="text" maxlength="30" value="${esc(val(med?.stock_unit))}">
-          </div>
-          <div class="form-field">
-            <label class="label" for="med-refill">${esc(t('health.meds.field.refillThreshold'))}</label>
-            <input class="input" id="med-refill" type="number" inputmode="decimal" step="any" min="0" value="${esc(val(med?.refill_threshold))}">
-          </div>
-        </div>
-        ${/* SCHALTER STATT HAKEN (Re-Kritik 2026-10-17): "Aktiv" und "Bei
-             Bedarf" sind Einstellungen des Medikaments, keine Auswahl - die
-             geteilte Schalterzeile wie im Abo-Dialog. Die Knoten bleiben
-             Checkboxen (".checked", "change"), nur mit role="switch". */ ''}
         ${formRowsHtml([
           toggleRowHtml({ label: t('health.meds.field.active'), control: 'switch', checked: med == null || Boolean(med.active), attrs: { id: 'med-active' } }),
           toggleRowHtml({ label: t('health.meds.field.prn'), control: 'switch', checked: Boolean(med?.prn), attrs: { id: 'med-prn' } }),
@@ -3752,6 +3750,12 @@ function openMedModal(med) {
             <p class="form-hint">${esc(t('health.meds.field.prnDoseHint'))}</p>
           </div>
         </div>
+
+        <div class="health-sched">
+          <span class="label">${esc(t('health.meds.schedule.title'))}</span>
+          <div id="med-sched-editor"></div>
+        </div>
+
         <div class="form-field">
           <label class="label" for="med-visibility">${esc(t('health.meds.field.visibility'))}</label>
           <select class="input" id="med-visibility">
@@ -3759,15 +3763,26 @@ function openMedModal(med) {
             <option value="family" ${(med?.visibility || defaultVisibility('meds')) === 'family' ? 'selected' : ''}>${esc(t('health.meds.visibility.family'))}</option>
           </select>
         </div>
+
+        ${advancedSection(`
+        <div class="modal-grid modal-grid--3">
+          <div class="form-field">
+            <label class="label" for="med-stock">${esc(t('health.meds.field.stockQty'))}</label>
+            <input class="input" id="med-stock" type="number" inputmode="decimal" step="any" min="0" value="${esc(val(med?.stock_qty))}">
+          </div>
+          <div class="form-field">
+            <label class="label" for="med-stock-unit">${esc(t('health.meds.field.stockUnit'))}</label>
+            <input class="input" id="med-stock-unit" type="text" maxlength="30" value="${esc(val(med?.stock_unit))}">
+          </div>
+          <div class="form-field">
+            <label class="label" for="med-refill">${esc(t('health.meds.field.refillThreshold'))}</label>
+            <input class="input" id="med-refill" type="number" inputmode="decimal" step="any" min="0" value="${esc(val(med?.refill_threshold))}">
+          </div>
+        </div>
         <div class="form-field">
           <label class="label" for="med-note">${esc(t('health.meds.field.note'))}</label>
           <textarea class="input" id="med-note" rows="2" maxlength="5000">${esc(val(med?.note))}</textarea>
-        </div>
-
-        <div class="health-sched">
-          <span class="label">${esc(t('health.meds.schedule.title'))}</span>
-          <div id="med-sched-editor"></div>
-        </div>
+        </div>`, { open: moreOpen })}
 
         <div class="modal-panel__footer modal-panel__footer--plain">
           ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="med-delete" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
@@ -3776,7 +3791,7 @@ function openMedModal(med) {
         </div>
       </form>`,
     onSave(panel) {
-      renderSchedEditor(panel, med);
+      renderSchedEditor(panel, med, draft);
       if (window.lucide) window.lucide.createIcons({ el: panel });
 
       // Die Bedarfsfelder folgen dem Haken - `style.display` und nicht `hidden`,
@@ -3802,7 +3817,17 @@ function openMedModal(med) {
         submitBtn.disabled = true;
         try {
           if (isEdit) await api.patch(`/health/medications/${med.id}`, body);
-          else await api.post('/health/medications', { ...body, ...ownerField(meds.personId, meds.meId) });
+          else {
+            const created = await api.post('/health/medications', { ...body, ...ownerField(meds.personId, meds.meId) });
+            // Die Zeitfenster des Entwurfs nach dem Medikament: es gibt sie
+            // erst mit seiner id. Scheitert eines, steht das Medikament schon -
+            // der Fehler sagt es, und der Plan laesst sich beim Bearbeiten
+            // vervollstaendigen (kein zweites Medikament beim neuen Versuch).
+            const id = created?.data?.id;
+            if (id != null) {
+              for (const sched of draft) await api.post(`/health/medications/${id}/schedules`, sched);
+            }
+          }
           closeModal({ force: true });
           window.yuvomi?.showToast(t('health.meds.saved'), 'success');
           await reloadMedViews();
@@ -3864,19 +3889,18 @@ async function deleteMed(med) {
 }
 
 // Zeichnet den Einnahmeplan-Editor im Modal (Liste + Hinzufügen-Formular) und
-// verdrahtet ihn. Für ein noch nicht gespeichertes Medikament nur ein Hinweis.
-function renderSchedEditor(panel, med) {
+// verdrahtet ihn. Für ein noch nicht gespeichertes Medikament arbeitet er auf
+// dem Entwurf (`draft`), den das Speichern des Medikaments anlegt (R20).
+function renderSchedEditor(panel, med, draft = null) {
   const host = panel.querySelector('#med-sched-editor');
   if (!host) return;
   host.replaceChildren();
 
-  if (!med || !med.id) {
-    host.insertAdjacentHTML('beforeend',
-      `<div class="health-sched-hint">${esc(t('health.meds.schedule.newHint'))}</div>`);
-    return;
-  }
-
-  const schedules = meds.schedulesByMed[med.id] || [];
+  const isDraft = !med?.id;
+  // Ein Entwurf hat noch keine id; die Zeile braucht eine zum Loeschen.
+  const schedules = isDraft
+    ? (draft || []).map((s, i) => ({ ...s, id: `draft-${i}` }))
+    : (meds.schedulesByMed[med.id] || []);
   const list = schedules.length
     ? `<ul class="health-sched-list">${schedules.map(schedRowMarkup).join('')}</ul>`
     : `<div class="health-sched-empty">${esc(t('health.meds.schedule.none'))}</div>`;
@@ -3884,7 +3908,7 @@ function renderSchedEditor(panel, med) {
   host.insertAdjacentHTML('beforeend', `
     ${list}
     <div class="health-sched-add">
-      <div class="modal-grid modal-grid--2">
+      <div class="form-pair">
         <div class="form-field">
           <label class="label" for="sched-time">${esc(t('health.meds.schedule.time'))}</label>
           <yuvomi-datepicker id="sched-time" type="time" value="08:00"></yuvomi-datepicker>
@@ -3906,7 +3930,7 @@ function renderSchedEditor(panel, med) {
       </button>
     </div>`);
   if (window.lucide) window.lucide.createIcons({ el: host });
-  wireSchedEditor(panel, med);
+  wireSchedEditor(panel, med, draft);
 }
 
 function schedRowMarkup(s) {
@@ -3923,8 +3947,9 @@ function schedRowMarkup(s) {
     </li>`;
 }
 
-function wireSchedEditor(panel, med) {
+function wireSchedEditor(panel, med, draft = null) {
   const host = panel.querySelector('#med-sched-editor');
+  const isDraft = !med?.id;
 
   host.querySelectorAll('.health-weekday').forEach((btn) =>
     btn.addEventListener('click', () => {
@@ -3945,6 +3970,11 @@ function wireSchedEditor(panel, med) {
     const body = { time_of_day: time, days_mask: indicesToDaysMask(indices) };
     if (doseRaw !== '' && doseRaw != null) body.dose_qty = Number(doseRaw);
 
+    if (isDraft) {
+      draft.push(body);
+      renderSchedEditor(panel, med, draft);
+      return;
+    }
     addBtn.disabled = true;
     try {
       const res = await api.post(`/health/medications/${med.id}/schedules`, body);
@@ -3960,6 +3990,11 @@ function wireSchedEditor(panel, med) {
 
   host.querySelectorAll('[data-sched-del]').forEach((btn) =>
     btn.addEventListener('click', async () => {
+      if (isDraft) {
+        draft.splice(Number(String(btn.dataset.schedDel).replace('draft-', '')), 1);
+        renderSchedEditor(panel, med, draft);
+        return;
+      }
       const id = Number(btn.dataset.schedDel);
       btn.disabled = true;
       try {
@@ -9634,6 +9669,8 @@ export const __test = {
   dueRowMarkup,
   prnRowMarkup,
   medCardMarkup,
+  // R20: der Medikament-Dialog in einem Schritt (Entwurf des Einnahmeplans).
+  openMedModal,
   medLogHistoryMarkup,
   labDetailMarkup,
   activityRowMarkup,

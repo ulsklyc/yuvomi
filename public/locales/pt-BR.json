@@ -4847,7 +4847,6 @@
                 "daily": "Diariamente",
                 "none": "Ainda sem horários.",
                 "delete": "Eliminar horário",
-                "newHint": "Salve o medicamento para poder adicionar horários.",
                 "timeRequired": "A hora é obrigatória."
             },
             "weekday": {

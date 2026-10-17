@@ -5093,7 +5093,6 @@
                 "daily": "Codziennie",
                 "none": "Brak pór.",
                 "delete": "Usuń porę",
-                "newHint": "Zapisz lek, aby móc dodać pory.",
                 "timeRequired": "Godzina jest wymagana."
             },
             "weekday": {

@@ -4847,7 +4847,6 @@
                 "daily": "Daglig",
                 "none": "Ingen tidsrom ennå.",
                 "delete": "Slett tidsrom",
-                "newHint": "Lagre medisinen først, så kan du legge til tidsrom.",
                 "timeRequired": "Tid er påkrevd."
             },
             "weekday": {

@@ -4847,7 +4847,6 @@
                 "daily": "Ogni giorno",
                 "none": "Ancora nessuna fascia oraria.",
                 "delete": "Elimina fascia oraria",
-                "newHint": "Salva il farmaco per poter aggiungere le fasce orarie.",
                 "timeRequired": "L'ora è obbligatoria."
             },
             "weekday": {

@@ -1226,8 +1226,8 @@ button.health-med-card:hover {
   border-top: 1px solid var(--color-border);
 }
 
-.health-sched-hint,
 .health-sched-empty {
+  margin-block-end: var(--space-2);
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
 }
@@ -1276,9 +1276,12 @@ button.health-med-card:hover {
   gap: var(--space-2);
 }
 
+/* SIEBEN TAGE, EINE ZEILE (R20, Re-Critique 2026-10-17): umbrechend stand
+ * "So" bei 390px allein in Zeile 2. Sieben gleiche Spalten tragen das 332px-
+ * Blatt (je ~43px breit, 48px hoch). */
 .health-weekday-toggle {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: var(--space-1);
 }
 
@@ -1286,9 +1289,9 @@ button.health-med-card:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: var(--target-base);
+  min-width: 0;
   min-height: var(--target-base);
-  padding: var(--space-1) var(--space-2);
+  padding: var(--space-1) 0;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-surface);

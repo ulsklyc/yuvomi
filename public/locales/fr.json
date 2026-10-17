@@ -4847,7 +4847,6 @@
                 "daily": "Quotidien",
                 "none": "Aucun créneau horaire pour l'instant.",
                 "delete": "Supprimer le créneau horaire",
-                "newHint": "Enregistrez le médicament pour pouvoir ajouter des créneaux horaires.",
                 "timeRequired": "L'heure est obligatoire."
             },
             "weekday": {

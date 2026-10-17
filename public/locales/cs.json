@@ -4971,7 +4971,6 @@
                 "daily": "Denně",
                 "none": "Zatím žádné časy.",
                 "delete": "Smazat čas",
-                "newHint": "Uložte lék, poté můžete přidat časy.",
                 "timeRequired": "Čas je povinný."
             },
             "weekday": {

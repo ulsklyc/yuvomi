@@ -4847,7 +4847,6 @@
                 "daily": "Harian",
                 "none": "Belum ada slot waktu.",
                 "delete": "Hapus slot waktu",
-                "newHint": "Simpan obat, lalu Anda dapat menambahkan slot waktu.",
                 "timeRequired": "Waktu wajib diisi."
             },
             "weekday": {

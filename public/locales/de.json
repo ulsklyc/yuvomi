@@ -4847,7 +4847,6 @@
                 "daily": "Täglich",
                 "none": "Noch keine Zeitfenster.",
                 "delete": "Zeitfenster löschen",
-                "newHint": "Speichere das Medikament, dann kannst du Zeitfenster hinzufügen.",
                 "timeRequired": "Uhrzeit ist erforderlich."
             },
             "weekday": {

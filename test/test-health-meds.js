@@ -590,3 +590,74 @@ test('R16: mobil bleiben zwei Vitalkennzahlen, der Titel fuehrt zu allen', async
   assert.ok(hide, 'die Extras werden per CSS verborgen');
   assert.ok(hide.at.some((a) => /max-width:\s*639px/.test(a)), `nur unter der Telefon-Grenze, gefunden: ${JSON.stringify(hide.at)}`);
 });
+
+// R20 (Re-Critique 2026-10-17 a5 P2-8): ein neues Medikament bekam seinen
+// Einnahmeplan erst nach dem Speichern ("Speichere das Medikament, dann ..."),
+// und die drei Bestandsfelder standen immer offen (Dialog mobil 1082px).
+test('R20: ein neues Medikament nimmt seinen Einnahmeplan im selben Dialog mit, der Bestand steht hinter "Weitere Einstellungen"', async () => {
+  const keep = { open: globalThis.__openModal, adv: globalThis.__advancedSection, api: globalThis.__apiStub, win: globalThis.window };
+  const opened = [];
+  const sections = [];
+  globalThis.__openModal = (opts) => { opened.push(opts); };
+  globalThis.__advancedSection = (inner, options) => { sections.push(options); return `<details>${inner}</details>`; };
+  const posts = [];
+  globalThis.__apiStub = {
+    post: async (path, body) => { posts.push({ path, body }); return { data: path === '/health/medications' ? { id: 41 } : { id: posts.length } }; },
+    get: async () => ({ data: [] }),
+  };
+  globalThis.window = globalThis.window ?? {};
+  // Ein Panel aus Attrappen: genau die Knoten, die Dialog und Editor fragen.
+  const listeners = {};
+  const field = (value = '') => ({ value, checked: false, style: {}, dataset: {}, disabled: false, addEventListener(type, fn) { listeners[type] = fn; } });
+  let editorHtml = '';
+  const addButton = { disabled: false, addEventListener(type, fn) { listeners.schedAdd = fn; } };
+  const host = {
+    replaceChildren() { editorHtml = ''; },
+    insertAdjacentHTML(_, html) { editorHtml += html; },
+    querySelector(sel) {
+      if (sel === '#sched-time') return { value: '08:00' };
+      if (sel === '#sched-dose') return { value: '1' };
+      if (sel === '[data-action="sched-add"]') return addButton;
+      return null;
+    },
+    querySelectorAll(sel) {
+      if (sel === '.health-weekday.is-active') return [0, 1, 2, 3, 4, 5, 6].map((d) => ({ dataset: { day: String(d) } }));
+      return [];
+    },
+  };
+  const form = { addEventListener(type, fn) { listeners.submit = fn; } };
+  const fields = { '#med-name': field('Ibuprofen'), '#med-prn': field(), '#med-prn-fields': field(), '#med-active': { ...field(), checked: true } };
+  const panel = {
+    querySelector(sel) {
+      if (sel === '#med-sched-editor') return host;
+      if (sel === '#med-form') return form;
+      if (sel === '[type="submit"]') return { disabled: false };
+      return fields[sel] ?? field();
+    },
+    querySelectorAll: () => [],
+  };
+  try {
+    healthHelpers.openMedModal(null);
+    const opts = opened.at(-1);
+    assert.equal(sections.at(-1)?.open, false, 'ein neues Medikament ohne Bestand: der Aufklapper ist zu');
+    assert.match(opts.content, /<details>[\s\S]*id="med-stock"[\s\S]*id="med-note"[\s\S]*<\/details>/, 'Bestand und Notiz stehen im Aufklapper');
+    assert.ok(opts.content.indexOf('id="med-sched-editor"') < opts.content.indexOf('<details>'), 'der Einnahmeplan steht davor');
+    opts.onSave(panel);
+    assert.doesNotMatch(editorHtml, /newHint/, 'kein "erst speichern" mehr');
+    assert.match(editorHtml, /data-action="sched-add"/, 'das Hinzufuegen steht schon vor dem Speichern bereit');
+    await listeners.schedAdd({ currentTarget: addButton });
+    assert.equal(posts.length, 0, 'ein Entwurf geht noch nicht an den Server');
+    assert.match(editorHtml, /health-sched-row" data-schedule-id="draft-0"/, 'das Zeitfenster steht als Zeile im Entwurf');
+    await listeners.submit({ preventDefault() {} });
+    assert.deepEqual(posts.map((p) => p.path), ['/health/medications', '/health/medications/41/schedules'],
+      'erst das Medikament, dann sein Zeitfenster unter der neuen id');
+    assert.deepEqual(posts[1].body, { time_of_day: '08:00', days_mask: posts[1].body.days_mask, dose_qty: 1 });
+
+    healthHelpers.openMedModal({ id: 7, name: 'Vitamin D', stock_qty: 30 });
+    assert.equal(sections.at(-1)?.open, true, 'mit Bestand steht der Aufklapper offen');
+  } finally {
+    for (const [k, v] of [['__openModal', keep.open], ['__advancedSection', keep.adv], ['__apiStub', keep.api], ['window', keep.win]]) {
+      if (v === undefined) delete globalThis[k]; else globalThis[k] = v;
+    }
+  }
+});

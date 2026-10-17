@@ -4847,7 +4847,6 @@
                 "daily": "每天",
                 "none": "暂无时间。",
                 "delete": "删除时间",
-                "newHint": "保存药物后即可添加时间。",
                 "timeRequired": "时间为必填项。"
             },
             "weekday": {

@@ -4847,7 +4847,6 @@
                 "daily": "Dagelijks",
                 "none": "Nog geen tijdstippen.",
                 "delete": "Tijdstip verwijderen",
-                "newHint": "Sla het medicijn op om tijdstippen te kunnen toevoegen.",
                 "timeRequired": "Tijd is verplicht."
             },
             "weekday": {

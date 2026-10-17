@@ -4847,7 +4847,6 @@
                 "daily": "Hằng ngày",
                 "none": "Chưa có giờ.",
                 "delete": "Xóa giờ",
-                "newHint": "Hãy lưu thuốc để có thể thêm giờ.",
                 "timeRequired": "Giờ là bắt buộc."
             },
             "weekday": {

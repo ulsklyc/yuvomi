@@ -4847,7 +4847,6 @@
                 "daily": "A diario",
                 "none": "Aún no hay franjas horarias.",
                 "delete": "Eliminar franja horaria",
-                "newHint": "Guarda el medicamento para poder añadir franjas horarias.",
                 "timeRequired": "La hora es obligatoria."
             },
             "weekday": {

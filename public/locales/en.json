@@ -4847,7 +4847,6 @@
                 "daily": "Daily",
                 "none": "No time slots yet.",
                 "delete": "Delete time slot",
-                "newHint": "Save the medication first, then you can add time slots.",
                 "timeRequired": "Time is required."
             },
             "weekday": {

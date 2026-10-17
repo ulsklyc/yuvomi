@@ -4847,7 +4847,6 @@
                 "daily": "Her gün",
                 "none": "Henüz saat yok.",
                 "delete": "Saati sil",
-                "newHint": "Saat ekleyebilmek için ilacı kaydedin.",
                 "timeRequired": "Saat zorunludur."
             },
             "weekday": {

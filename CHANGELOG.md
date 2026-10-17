@@ -315,6 +315,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Health: a new medication gets its intake schedule in the same dialog.** You no longer have to
+  save a medication first and open it again to add times: the schedule is ready while you create
+  it and is saved with it. Stock and note sit behind "More settings" (open when they hold
+  something), dose and form share a row, and the seven weekdays fit on one line, so the dialog
+  on a phone is about a fifth shorter even with the schedule in it.
 - **Screen readers and voice control hear what the buttons show.** Several buttons carried a name that
   left out their visible text, so saying what you see did not reach them: the account button in the
   sidebar, the "New" button in a module header, kitchen tabs with a count, account rows in Budget,

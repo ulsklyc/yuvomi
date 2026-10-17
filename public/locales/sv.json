@@ -4847,7 +4847,6 @@
                 "daily": "Dagligen",
                 "none": "Inga tidpunkter ännu.",
                 "delete": "Ta bort tidpunkt",
-                "newHint": "Spara medicinen för att kunna lägga till tidpunkter.",
                 "timeRequired": "Tid krävs."
             },
             "weekday": {

@@ -4847,7 +4847,6 @@
                 "daily": "Araw-araw",
                 "none": "Wala pang oras na nakatakda.",
                 "delete": "Tanggalin ang oras",
-                "newHint": "I-save muna ang gamot, saka ka makakapagdagdag ng oras.",
                 "timeRequired": "Kailangan ang oras."
             },
             "weekday": {
