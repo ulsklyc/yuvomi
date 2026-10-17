@@ -623,7 +623,7 @@ test('Gruppe mit `budget: read`: keine Handlung, aber Salden, Ausgaben und Verla
     assert.doesNotMatch(html, /splitExpenses\.editExpense/);
     assert.match(html, /Urlaub Ostsee/);
     assert.match(html, /Ferienwohnung/);
-    assert.match(html, /splitExpenses\.owes/);
+    assert.match(html, /splitExpenses\.debt(?:Owes|YouOwe|OwesYou)\{/, 'der Saldo steht da (R20: ein Satz je Sicht)');
   });
 });
 
