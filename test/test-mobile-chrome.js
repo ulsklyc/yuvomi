@@ -601,7 +601,9 @@ test('R19: die Kapsel minimiert beim Abwaertsscrollen - flacher, ohne Labels, Zi
     && r.selector.includes('.nav-bottom__items') && r.selector.includes('.nav-item__label'));
   assert.ok(calm.some((r) => decl(r.body, 'transition') === 'none'), 'reduzierte Bewegung: Zustandswechsel ohne Gleiten');
   const router = read('../public/router.js');
-  assert.match(router, /navMinimizer = watchNavMinimize\(nav\)/, 'der Router verdrahtet die Minimierung an der Kapsel');
+  // Review #2049: an der JEWEILS aktuellen Kapsel - renderAppShell() baut sie neu.
+  assert.match(router, /navMinimizer = bindNavMinimize\(navMinimizer, nav\)/, 'der Router verdrahtet die Minimierung an der aktuellen Kapsel');
+  assert.doesNotMatch(router, /!navMinimizer\)/, 'ein vorhandener Minimierer darf eine neue Kapsel nicht ausschliessen');
   assert.match(router, /function updateNav\(rawPath\) \{\n[^\n]*\n\s*navMinimizer\?\.expand\(\);/,
     'jeder Seitenwechsel beginnt mit ausgefahrener Kapsel');
 });

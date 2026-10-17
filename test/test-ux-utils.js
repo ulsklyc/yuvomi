@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { eachRule } from './css-rules.js';
 
 // Minimales Window/Navigator-Mock für Node
-const { stagger, vibrate, withBusy, scheduleUndoableDelete, wireSwipeToDismiss, wireCollapsingHeader, collapseOut, expandIn, watchNavCapsuleHeight, wireScrollFade, nextNavMinimized, NAV_MINIMIZE_DOWN, NAV_MINIMIZE_UP } = await (async () => {
+const { stagger, vibrate, withBusy, scheduleUndoableDelete, wireSwipeToDismiss, wireCollapsingHeader, collapseOut, expandIn, watchNavCapsuleHeight, wireScrollFade, nextNavMinimized, NAV_MINIMIZE_DOWN, NAV_MINIMIZE_UP, bindNavMinimize } = await (async () => {
   global.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
@@ -1783,6 +1783,63 @@ test('nextNavMinimized: abwaerts aus einer Geste minimiert, aufwaerts, oben und 
   // Ohne Bewegung (waagerechte Leiste) aendert sich nichts.
   const held = { minimized: true, travel: 30 };
   assert.equal(step(held, 300, 0), held);
+});
+
+// Review #2049: renderAppShell() baut die Shell bei Logout/Login neu, mit einer
+// NEUEN Kapsel. Der Router hielt den alten Minimierer (`!navMinimizer`), der an
+// der abgehaengten Kapsel hing - die neue minimierte nie. bindNavMinimize haengt
+// den alten ab und legt fuer die neue Kapsel einen neuen an.
+test('bindNavMinimize: eine neue Kapsel bekommt einen neuen Minimierer, der alte haengt ab', () => {
+  const savedElement = globalThis.Element;
+  globalThis.Element = class {};
+  const listeners = new Map();
+  const classes = (set = new Set()) => ({
+    set,
+    contains: (c) => set.has(c),
+    toggle: (c, on) => { if (on) set.add(c); else set.delete(c); return on; },
+    remove: (c) => set.delete(c),
+  });
+  const doc = {
+    documentElement: { classList: classes() },
+    addEventListener: (type, fn) => listeners.set(`${type}`, [...(listeners.get(type) ?? []), fn]),
+    removeEventListener: (type, fn) => listeners.set(type, (listeners.get(type) ?? []).filter((f) => f !== fn)),
+  };
+  const makeNav = () => ({ classList: classes(), getClientRects: () => [{}] });
+  const port = Object.assign(new globalThis.Element(), {
+    scrollTop: 100, scrollHeight: 3000, clientHeight: 800,
+    closest: (sel) => (sel === '.app-content' ? {} : null),
+  });
+  const fire = (type, target) => (listeners.get(type) ?? []).forEach((fn) => fn({ target }));
+  const readDown = () => {
+    fire('wheel', port);
+    fire('scroll', port);
+    port.scrollTop += NAV_MINIMIZE_DOWN + 6;
+    fire('scroll', port);
+  };
+  try {
+    const oldNav = makeNav();
+    const first = bindNavMinimize(null, oldNav, { doc });
+    readDown();
+    assert.equal(oldNav.classList.contains('nav-bottom--minimized'), true, 'die erste Kapsel minimiert beim Lesen');
+    assert.equal(doc.documentElement.classList.contains('nav-minimized'), true);
+    assert.equal(bindNavMinimize(first, oldNav, { doc }), first, 'dieselbe Kapsel behaelt ihren Minimierer');
+
+    // Logout/Login: renderAppShell() setzt eine neue Kapsel ein.
+    const newNav = makeNav();
+    const second = bindNavMinimize(first, newNav, { doc });
+    assert.notEqual(second, first, 'die neue Kapsel bekommt einen eigenen Minimierer');
+    assert.equal(listeners.get('scroll').length, 1, 'der alte hoert nicht mehr zu');
+    assert.equal(doc.documentElement.classList.contains('nav-minimized'), false,
+      'der Zustand der alten Kapsel bleibt nicht am Root haengen');
+    port.scrollTop = 100;
+    readDown();
+    assert.equal(newNav.classList.contains('nav-bottom--minimized'), true, 'die neue Kapsel minimiert');
+    second.expand();
+    assert.equal(newNav.classList.contains('nav-bottom--minimized'), false, 'expand() trifft die neue Kapsel');
+    second.destroy();
+  } finally {
+    globalThis.Element = savedElement;
+  }
 });
 
 test('watchNavCapsuleHeight: minimiert oder auf dem Rueckweg misst die Kapsel nicht - die Zone steht still (R19)', () => {

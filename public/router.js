@@ -14,7 +14,7 @@ import { initI18n, getLocale, t, formatDate, formatTime } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 import { emptyHintEl, emptyStateEl } from '/utils/empty-state.js';
-import { wireScrollFade, wireCollapsingHeader, watchNavCapsuleHeight, watchNavMinimize } from '/utils/ux.js';
+import { wireScrollFade, wireCollapsingHeader, watchNavCapsuleHeight, bindNavMinimize } from '/utils/ux.js';
 import { TOAST_SURFACES } from '/utils/toast-surface.js';
 import { showToast } from '/utils/toast-show.js';
 import { unknownPathDetour, publicPathDetour, detourPaths } from '/utils/unknown-route.js';
@@ -84,7 +84,7 @@ import {
   sortNavigationItems,
 } from '/settings/module-order.js';
 
-/** Haelt die Minimier-Logik der Kapsel (watchNavMinimize); jeder Seitenwechsel faehrt sie aus. */
+/** Haelt die Minimier-Logik der Kapsel (bindNavMinimize); jeder Seitenwechsel faehrt sie aus. */
 let navMinimizer = null;
 
 // --------------------------------------------------------
@@ -5013,9 +5013,10 @@ function observeNavCapsule() {
   // --nav-height-mobile, und die Zone darunter muss mitwachsen (Review zu #1475).
   watchNavCapsuleHeight(items);
   // Und sie minimiert sich beim Lesen (iOS-26-Muster, R19): abwaerts flacher
-  // und ohne Labels, aufwaerts, oben und am Seitenende wieder ganz.
+  // und ohne Labels, aufwaerts, oben und am Seitenende wieder ganz. An der
+  // JEWEILS aktuellen Kapsel - nach Logout/Login ist es eine neue (Review #2049).
   const nav = items.closest('.nav-bottom');
-  if (nav && !navMinimizer) navMinimizer = watchNavMinimize(nav);
+  if (nav) navMinimizer = bindNavMinimize(navMinimizer, nav);
 }
 observeNavCapsule();
 

@@ -1546,7 +1546,7 @@ export function nextNavMinimized(state, { top, max, delta, gesture }) {
  *
  * @param {Element} nav - `.nav-bottom`
  * @param {{ doc?: Document, settleMs?: number }} [opts]
- * @returns {{ expand: () => void, destroy: () => void }|null}
+ * @returns {{ nav: Element, expand: () => void, destroy: () => void }|null}
  */
 export function watchNavMinimize(nav, { doc = document, settleMs = 450 } = {}) {
   if (!nav) return null;
@@ -1593,11 +1593,32 @@ export function watchNavMinimize(nav, { doc = document, settleMs = 450 } = {}) {
   for (const type of GESTURES) doc.addEventListener(type, onGesture, { capture: true, passive: true });
 
   return {
+    nav,
     expand: () => { state = { minimized: false, travel: 0 }; apply(false); },
     destroy: () => {
       clearTimeout(settleTimer);
       doc.removeEventListener('scroll', onScroll, { capture: true });
       for (const type of GESTURES) doc.removeEventListener(type, onGesture, { capture: true });
+      // Der Root-Zustand gehoert der Kapsel, die ihn gesetzt hat; eine
+      // Nachfolgerin beginnt ausgefahren.
+      doc.documentElement.classList.remove('nav-minimized');
     },
   };
+}
+
+/**
+ * Haelt die Minimierung an DER Kapsel, die gerade steht (Review #2049).
+ * renderAppShell() baut die Shell bei Logout/Login neu; der Minimierer der
+ * alten Kapsel hing an einem abgehaengten Knoten, und die neue minimierte nie.
+ * Dieselbe Kapsel behaelt ihren Minimierer, eine neue bekommt einen neuen,
+ * der alte haengt ab.
+ *
+ * @param {ReturnType<typeof watchNavMinimize>} current
+ * @param {Element|null} nav - die aktuelle `.nav-bottom`
+ * @param {{ doc?: Document, settleMs?: number }} [opts]
+ */
+export function bindNavMinimize(current, nav, opts) {
+  if (current && current.nav === nav) return current;
+  if (current) current.destroy();
+  return watchNavMinimize(nav, opts);
 }
