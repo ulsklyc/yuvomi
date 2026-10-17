@@ -3197,7 +3197,21 @@
         "skipToSheet": "跳到设置",
         "screensaverOffTitle": "照片屏保",
         "screensaverNeedsImmich": "管理员连接 Immich 后，屏保才会启动。之后可在这里为此设备设置等待时间、时钟和照片裁切。",
-        "screensaverConnectImmich": "连接 Immich"
+        "screensaverConnectImmich": "连接 Immich",
+        "weatherPlaceLabel": "地点",
+        "weatherPlaceHint": "搜索由天气服务 Open-Meteo 完成，只会发送地名。",
+        "weatherPlacePlaceholder": "城市或邮政编码",
+        "weatherPlaceSearch": "搜索",
+        "weatherPlaceCurrent": "当前：{{place}}",
+        "weatherPlaceNone": "尚未选择地点。",
+        "weatherPlaceResultsLabel": "找到的地点",
+        "weatherPlacePick": "请从列表中选择你的地点。",
+        "weatherPlaceChosen": "已选择 {{place}}。保存后生效。",
+        "weatherPlaceRequired": "请搜索地点并从列表中选择。",
+        "weatherPlaceTooShort": "请至少输入两个字符。",
+        "weatherPlaceNotFound": "未找到此名称的地点。请加上国家，例如“朝阳, 中国”。",
+        "weatherPlaceUnavailable": "地点搜索暂时无法访问。请稍后重试，或手动输入坐标。",
+        "weatherManualTitle": "手动输入坐标"
     },
     "login": {
         "tagline": "欢迎回到您的家庭计划工具。",

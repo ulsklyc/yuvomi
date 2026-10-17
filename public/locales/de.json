@@ -3213,7 +3213,21 @@
         "skipToSheet": "Zur Einstellung springen",
         "screensaverOffTitle": "Foto-Bildschirmschoner",
         "screensaverNeedsImmich": "Der Bildschirmschoner startet, sobald ein Admin Immich verbunden hat. Danach stellst du hier Wartezeit, Uhrzeit und Bildausschnitt für dieses Gerät ein.",
-        "screensaverConnectImmich": "Immich verbinden"
+        "screensaverConnectImmich": "Immich verbinden",
+        "weatherPlaceLabel": "Ort",
+        "weatherPlaceHint": "Gesucht wird beim Wetterdienst Open-Meteo. Dabei geht nur der Ortsname hinaus.",
+        "weatherPlacePlaceholder": "Stadt oder Postleitzahl",
+        "weatherPlaceSearch": "Suchen",
+        "weatherPlaceCurrent": "Aktuell: {{place}}",
+        "weatherPlaceNone": "Noch kein Ort gewählt.",
+        "weatherPlaceResultsLabel": "Gefundene Orte",
+        "weatherPlacePick": "Wähl deinen Ort aus der Liste.",
+        "weatherPlaceChosen": "{{place}} gewählt. Zum Übernehmen speichern.",
+        "weatherPlaceRequired": "Such einen Ort und wähl ihn aus der Liste.",
+        "weatherPlaceTooShort": "Gib mindestens zwei Zeichen ein.",
+        "weatherPlaceNotFound": "Kein Ort mit diesem Namen gefunden. Häng das Land an, z. B. „Halle, Deutschland“.",
+        "weatherPlaceUnavailable": "Die Ortssuche ist gerade nicht erreichbar. Versuch es gleich noch einmal oder trag die Koordinaten von Hand ein.",
+        "weatherManualTitle": "Koordinaten von Hand"
     },
     "login": {
         "tagline": "Willkommen zurück bei deinem Familienplaner.",

@@ -3197,7 +3197,21 @@
         "skipToSheet": "Gå til innstillingen",
         "screensaverOffTitle": "Bildeskjermsparer",
         "screensaverNeedsImmich": "Skjermspareren starter når en administrator har koblet til Immich. Deretter stiller du inn ventetid, klokke og bildeutsnitt for denne enheten her.",
-        "screensaverConnectImmich": "Koble til Immich"
+        "screensaverConnectImmich": "Koble til Immich",
+        "weatherPlaceLabel": "Sted",
+        "weatherPlaceHint": "Søket skjer hos værtjenesten Open-Meteo. Bare stedsnavnet sendes.",
+        "weatherPlacePlaceholder": "By eller postnummer",
+        "weatherPlaceSearch": "Søk",
+        "weatherPlaceCurrent": "Nå: {{place}}",
+        "weatherPlaceNone": "Ingen sted valgt ennå.",
+        "weatherPlaceResultsLabel": "Steder funnet",
+        "weatherPlacePick": "Velg stedet ditt fra listen.",
+        "weatherPlaceChosen": "{{place}} valgt. Lagre for å bruke det.",
+        "weatherPlaceRequired": "Søk etter et sted og velg det fra listen.",
+        "weatherPlaceTooShort": "Skriv minst to tegn.",
+        "weatherPlaceNotFound": "Fant ikke noe sted med dette navnet. Legg til landet, f.eks. «Bø, Norge».",
+        "weatherPlaceUnavailable": "Stedssøket er ikke tilgjengelig akkurat nå. Prøv igjen om litt, eller skriv inn koordinatene for hånd.",
+        "weatherManualTitle": "Koordinater for hånd"
     },
     "login": {
         "tagline": "Velkommen tilbake til familieplanleggeren din.",

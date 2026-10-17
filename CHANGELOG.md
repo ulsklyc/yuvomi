@@ -20,6 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   default layout, and their own and unassigned tasks come before their parents' in "Today". On
   Rewards a child sees their own card: points, the next reward with its price, the way there, and
   "Request" once the points are enough.
+- **Find the weather location by name.** Settings -> My weather and the household weather now
+  start with a place search: type a city or postcode, press Search and pick the place from the list;
+  latitude and longitude fill in by themselves. Places with the same name show their region and
+  country (and their district where that is the only difference). The search runs through your
+  Yuvomi server at Open-Meteo, the same service as the weather, and only the place name leaves it.
+  The coordinate fields stay available under "Coordinates by hand", and "Locate me" works as before.
+  The API has a new `GET /api/v1/weather/geocode` endpoint for the same search.
 - **The search palette remembers where you went.** Press Cmd+K (Ctrl+K) with an empty field to see
   the last five modules and settings pages you opened from it, above the module shortcuts. Only the
   destination is kept on this device, never the name of an entry, and signing out clears it, so a

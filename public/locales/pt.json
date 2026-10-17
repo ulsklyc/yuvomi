@@ -3197,7 +3197,21 @@
         "skipToSheet": "Ir para a definição",
         "screensaverOffTitle": "Proteção de ecrã com fotos",
         "screensaverNeedsImmich": "A proteção de ecrã começa assim que um administrador ligar o Immich. Depois ajustas aqui a espera, o relógio e o enquadramento para este dispositivo.",
-        "screensaverConnectImmich": "Ligar o Immich"
+        "screensaverConnectImmich": "Ligar o Immich",
+        "weatherPlaceLabel": "Local",
+        "weatherPlaceHint": "A pesquisa é feita no serviço meteorológico Open-Meteo. Só é enviado o nome do local.",
+        "weatherPlacePlaceholder": "Cidade ou código postal",
+        "weatherPlaceSearch": "Pesquisar",
+        "weatherPlaceCurrent": "Atual: {{place}}",
+        "weatherPlaceNone": "Ainda não foi escolhido nenhum local.",
+        "weatherPlaceResultsLabel": "Locais encontrados",
+        "weatherPlacePick": "Escolhe o teu local na lista.",
+        "weatherPlaceChosen": "{{place}} escolhido. Guarda para aplicar.",
+        "weatherPlaceRequired": "Pesquisa um local e escolhe-o na lista.",
+        "weatherPlaceTooShort": "Escreve pelo menos dois caracteres.",
+        "weatherPlaceNotFound": "Não foi encontrado nenhum local com este nome. Acrescenta o país, p. ex. «Viana, Portugal».",
+        "weatherPlaceUnavailable": "A pesquisa de locais não está acessível agora. Tenta de novo daqui a pouco ou introduz as coordenadas à mão.",
+        "weatherManualTitle": "Coordenadas à mão"
     },
     "login": {
         "tagline": "Bem-vindo de volta ao teu planeador familiar.",

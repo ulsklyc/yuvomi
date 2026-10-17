@@ -3197,7 +3197,21 @@
         "skipToSheet": "Skip to the setting",
         "screensaverOffTitle": "Photo screensaver",
         "screensaverNeedsImmich": "The screensaver starts once an admin has connected Immich. Then you set the delay, clock and photo fit for this device here.",
-        "screensaverConnectImmich": "Connect Immich"
+        "screensaverConnectImmich": "Connect Immich",
+        "weatherPlaceLabel": "Place",
+        "weatherPlaceHint": "The search runs at the weather service Open-Meteo. Only the place name is sent.",
+        "weatherPlacePlaceholder": "City or postcode",
+        "weatherPlaceSearch": "Search",
+        "weatherPlaceCurrent": "Current: {{place}}",
+        "weatherPlaceNone": "No place chosen yet.",
+        "weatherPlaceResultsLabel": "Places found",
+        "weatherPlacePick": "Choose your place from the list.",
+        "weatherPlaceChosen": "{{place}} chosen. Save to apply it.",
+        "weatherPlaceRequired": "Search for a place and choose it from the list.",
+        "weatherPlaceTooShort": "Enter at least two characters.",
+        "weatherPlaceNotFound": "No place found with this name. Add the country, e.g. “Springfield, USA”.",
+        "weatherPlaceUnavailable": "Place search is not reachable right now. Try again in a moment or enter the coordinates by hand.",
+        "weatherManualTitle": "Coordinates by hand"
     },
     "login": {
         "tagline": "Welcome back to your family planner.",

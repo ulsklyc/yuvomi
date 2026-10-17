@@ -3213,7 +3213,21 @@
         "skipToSheet": "Lumaktaw sa setting",
         "screensaverOffTitle": "Screensaver ng mga larawan",
         "screensaverNeedsImmich": "Magsisimula ang screensaver kapag naikonekta na ng admin ang Immich. Pagkatapos, dito mo itatakda ang paghihintay, orasan at pagkakasya ng larawan para sa device na ito.",
-        "screensaverConnectImmich": "Ikonekta ang Immich"
+        "screensaverConnectImmich": "Ikonekta ang Immich",
+        "weatherPlaceLabel": "Lugar",
+        "weatherPlaceHint": "Sa weather service na Open-Meteo hinahanap ito. Ang pangalan lang ng lugar ang ipinapadala.",
+        "weatherPlacePlaceholder": "Lungsod o postal code",
+        "weatherPlaceSearch": "Hanapin",
+        "weatherPlaceCurrent": "Kasalukuyan: {{place}}",
+        "weatherPlaceNone": "Wala pang napiling lugar.",
+        "weatherPlaceResultsLabel": "Mga nahanap na lugar",
+        "weatherPlacePick": "Piliin ang lugar mo sa listahan.",
+        "weatherPlaceChosen": "Napili ang {{place}}. I-save para magamit.",
+        "weatherPlaceRequired": "Maghanap ng lugar at piliin ito sa listahan.",
+        "weatherPlaceTooShort": "Maglagay ng hindi bababa sa dalawang character.",
+        "weatherPlaceNotFound": "Walang nahanap na lugar sa pangalang ito. Idagdag ang bansa, hal. “San Jose, Philippines”.",
+        "weatherPlaceUnavailable": "Hindi maabot ang paghahanap ng lugar ngayon. Subukan ulit mamaya o ilagay nang mano-mano ang mga coordinate.",
+        "weatherManualTitle": "Mano-manong coordinate"
     },
     "login": {
         "tagline": "Maligayang pagbabalik sa iyong family planner.",

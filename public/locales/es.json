@@ -3197,7 +3197,21 @@
         "skipToSheet": "Ir al ajuste",
         "screensaverOffTitle": "Salvapantallas de fotos",
         "screensaverNeedsImmich": "El salvapantallas empieza cuando un administrador conecta Immich. Después ajustas aquí la espera, la hora y el encuadre para este dispositivo.",
-        "screensaverConnectImmich": "Conectar Immich"
+        "screensaverConnectImmich": "Conectar Immich",
+        "weatherPlaceLabel": "Lugar",
+        "weatherPlaceHint": "La búsqueda se hace en el servicio meteorológico Open-Meteo. Solo se envía el nombre del lugar.",
+        "weatherPlacePlaceholder": "Ciudad o código postal",
+        "weatherPlaceSearch": "Buscar",
+        "weatherPlaceCurrent": "Actual: {{place}}",
+        "weatherPlaceNone": "Aún no hay ningún lugar elegido.",
+        "weatherPlaceResultsLabel": "Lugares encontrados",
+        "weatherPlacePick": "Elige tu lugar de la lista.",
+        "weatherPlaceChosen": "{{place}} elegido. Guarda para aplicarlo.",
+        "weatherPlaceRequired": "Busca un lugar y elígelo de la lista.",
+        "weatherPlaceTooShort": "Escribe al menos dos caracteres.",
+        "weatherPlaceNotFound": "No se encontró ningún lugar con este nombre. Añade el país, p. ej. «Mérida, España».",
+        "weatherPlaceUnavailable": "La búsqueda de lugares no está disponible ahora. Inténtalo de nuevo en un momento o introduce las coordenadas a mano.",
+        "weatherManualTitle": "Coordenadas a mano"
     },
     "login": {
         "tagline": "Bienvenido de nuevo a tu planificador familiar.",

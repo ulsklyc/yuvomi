@@ -3197,7 +3197,21 @@
         "skipToSheet": "Ir para a configuração",
         "screensaverOffTitle": "Proteção de tela com fotos",
         "screensaverNeedsImmich": "A proteção de tela começa assim que um administrador conectar o Immich. Depois você ajusta aqui a espera, o relógio e o enquadramento para este dispositivo.",
-        "screensaverConnectImmich": "Conectar Immich"
+        "screensaverConnectImmich": "Conectar Immich",
+        "weatherPlaceLabel": "Local",
+        "weatherPlaceHint": "A busca é feita no serviço de clima Open-Meteo. Só o nome do local é enviado.",
+        "weatherPlacePlaceholder": "Cidade ou CEP",
+        "weatherPlaceSearch": "Buscar",
+        "weatherPlaceCurrent": "Atual: {{place}}",
+        "weatherPlaceNone": "Nenhum local escolhido ainda.",
+        "weatherPlaceResultsLabel": "Locais encontrados",
+        "weatherPlacePick": "Escolha seu local na lista.",
+        "weatherPlaceChosen": "{{place}} escolhido. Salve para aplicar.",
+        "weatherPlaceRequired": "Busque um local e escolha-o na lista.",
+        "weatherPlaceTooShort": "Digite pelo menos dois caracteres.",
+        "weatherPlaceNotFound": "Nenhum local encontrado com esse nome. Inclua o país, por exemplo “Bom Jesus, Brasil”.",
+        "weatherPlaceUnavailable": "A busca de locais está indisponível agora. Tente de novo em instantes ou digite as coordenadas manualmente.",
+        "weatherManualTitle": "Coordenadas manualmente"
     },
     "login": {
         "tagline": "Bem-vindo de volta ao seu planejador familiar.",

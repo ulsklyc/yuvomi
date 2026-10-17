@@ -5,7 +5,9 @@ import {
   HOUSEHOLD_WEATHER_SCOPE as SCOPE,
   bindWeatherLocationEvents,
   hasValidWeatherCoords,
+  openWeatherManual,
   readWeatherLocation,
+  reportMissingWeatherPlace,
   weatherLocationFieldsHtml,
 } from '/settings/weather-location.js';
 
@@ -94,7 +96,6 @@ function renderPage(container, preferences) {
               auto_locate: preferences.weather_auto_locate,
             },
           })}
-          <p class="form-hint">${t('settings.weatherCoordHint')}</p>
           <p class="form-hint">${t('settings.weatherSwitchHint')}</p>
           <p class="form-hint">${t('settings.householdWeatherOverrideHint')}</p>
           <div id="weather-form-error" class="form-error" role="alert" hidden></div>
@@ -118,7 +119,9 @@ function bindWeatherEvents(container, user) {
     event.preventDefault();
     errorElement.hidden = true;
     const location = readWeatherLocation(container, SCOPE);
+    if (reportMissingWeatherPlace(container, SCOPE, location)) return;
     if (!hasValidWeatherCoords(location.lat, location.lon)) {
+      openWeatherManual(container, SCOPE);
       errorElement.textContent = t('settings.weatherCoordsInvalid');
       errorElement.hidden = false;
       return;

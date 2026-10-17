@@ -1062,6 +1062,80 @@
   padding: 0 var(--space-4) var(--space-4);
 }
 
+/* ORTSSUCHE IM STANDORTFORMULAR (R20, settings/weather-location.js). Feld und
+ * Knopf teilen eine Zeile, die Treffer stehen als Liste darunter: Name in
+ * Primaerfarbe, Region und Land als Sekundaerzeile - wie die Ortsauswahl in
+ * Apple Wetter. Jeder Treffer ist ein Knopf ueber die volle Breite. */
+.weather-place__search {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.weather-place__search > .form-input {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.weather-place__search > .btn {
+  flex: 0 0 auto;
+}
+
+.weather-place__current {
+  margin: var(--space-2) 0 0;
+}
+
+.weather-place__results {
+  /* Der Text der Treffer fluchtet mit dem Etikett "Ort"; die Trefferflaeche
+   * (Hover) ragt um das Polster der Knoepfe in den Kartenrand. */
+  margin: var(--space-2) calc(-1 * var(--space-3)) 0;
+  padding: 0;
+  list-style: none;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.weather-place__results > li + li {
+  border-top: var(--space-px) solid var(--color-border);
+  margin-inline: var(--space-3);
+}
+
+.weather-place__results > li + li > .weather-place__option {
+  margin-inline: calc(-1 * var(--space-3));
+  inline-size: calc(100% + 2 * var(--space-3));
+}
+
+.weather-place__option {
+  display: grid;
+  gap: var(--space-0h);
+  inline-size: 100%;
+  min-block-size: var(--target-lg);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  text-align: start;
+  color: var(--color-text-primary);
+}
+
+@media (hover: hover) {
+  .weather-place__option:hover {
+    background: var(--color-surface-hover);
+  }
+}
+
+.weather-place__name {
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
+}
+
+.weather-place__meta {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+/* "Koordinaten von Hand" steht unter der Gruppe, mit Abstand zur Ortungszeile. */
+.weather-manual {
+  margin-block: var(--space-3);
+}
+
 .settings-status-summary {
   --settings-status-tone: var(--module-settings);
   --settings-status-bg: var(--color-surface-work);

@@ -3298,7 +3298,21 @@
         "skipToSheet": "Přejít k nastavení",
         "screensaverOffTitle": "Fotografický spořič obrazovky",
         "screensaverNeedsImmich": "Spořič se spustí, až správce připojí Immich. Potom zde nastavíš pro toto zařízení prodlevu, hodiny a ořez fotek.",
-        "screensaverConnectImmich": "Připojit Immich"
+        "screensaverConnectImmich": "Připojit Immich",
+        "weatherPlaceLabel": "Místo",
+        "weatherPlaceHint": "Hledá se u meteorologické služby Open-Meteo. Odesílá se jen název místa.",
+        "weatherPlacePlaceholder": "Město nebo PSČ",
+        "weatherPlaceSearch": "Hledat",
+        "weatherPlaceCurrent": "Aktuálně: {{place}}",
+        "weatherPlaceNone": "Zatím není vybráno žádné místo.",
+        "weatherPlaceResultsLabel": "Nalezená místa",
+        "weatherPlacePick": "Vyber své místo ze seznamu.",
+        "weatherPlaceChosen": "Vybráno: {{place}}. Pro použití ulož.",
+        "weatherPlaceRequired": "Vyhledej místo a vyber ho ze seznamu.",
+        "weatherPlaceTooShort": "Zadej alespoň dva znaky.",
+        "weatherPlaceNotFound": "Místo s tímto názvem nebylo nalezeno. Připoj zemi, např. „Most, Česko“.",
+        "weatherPlaceUnavailable": "Vyhledávání míst teď není dostupné. Zkus to za chvíli znovu nebo zadej souřadnice ručně.",
+        "weatherManualTitle": "Souřadnice ručně"
     },
     "login": {
         "tagline": "Vítejte zpět ve svém rodinném plánovači.",

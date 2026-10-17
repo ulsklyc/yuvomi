@@ -3197,7 +3197,21 @@
         "skipToSheet": "Chuyển đến cài đặt",
         "screensaverOffTitle": "Trình bảo vệ màn hình ảnh",
         "screensaverNeedsImmich": "Trình bảo vệ màn hình bắt đầu khi quản trị viên đã kết nối Immich. Sau đó bạn đặt thời gian chờ, đồng hồ và cách khớp ảnh cho thiết bị này tại đây.",
-        "screensaverConnectImmich": "Kết nối Immich"
+        "screensaverConnectImmich": "Kết nối Immich",
+        "weatherPlaceLabel": "Địa điểm",
+        "weatherPlaceHint": "Việc tìm kiếm diễn ra tại dịch vụ thời tiết Open-Meteo. Chỉ tên địa điểm được gửi đi.",
+        "weatherPlacePlaceholder": "Thành phố hoặc mã bưu chính",
+        "weatherPlaceSearch": "Tìm",
+        "weatherPlaceCurrent": "Hiện tại: {{place}}",
+        "weatherPlaceNone": "Chưa chọn địa điểm nào.",
+        "weatherPlaceResultsLabel": "Địa điểm tìm thấy",
+        "weatherPlacePick": "Chọn địa điểm của bạn trong danh sách.",
+        "weatherPlaceChosen": "Đã chọn {{place}}. Lưu để áp dụng.",
+        "weatherPlaceRequired": "Hãy tìm một địa điểm và chọn trong danh sách.",
+        "weatherPlaceTooShort": "Nhập ít nhất hai ký tự.",
+        "weatherPlaceNotFound": "Không tìm thấy địa điểm nào có tên này. Hãy thêm tên nước, ví dụ “Tân An, Việt Nam”.",
+        "weatherPlaceUnavailable": "Hiện không thể tìm địa điểm. Hãy thử lại sau ít phút hoặc nhập tọa độ thủ công.",
+        "weatherManualTitle": "Nhập tọa độ thủ công"
     },
     "login": {
         "tagline": "Chào mừng bạn trở lại trình lập kế hoạch gia đình.",

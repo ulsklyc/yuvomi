@@ -3197,7 +3197,21 @@
         "skipToSheet": "सेटिंग पर जाएँ",
         "screensaverOffTitle": "फ़ोटो स्क्रीनसेवर",
         "screensaverNeedsImmich": "किसी व्यवस्थापक के Immich जोड़ने पर स्क्रीनसेवर शुरू होता है। उसके बाद इस डिवाइस के लिए प्रतीक्षा, घड़ी और फ़ोटो फ़िट यहीं सेट करें।",
-        "screensaverConnectImmich": "Immich जोड़ें"
+        "screensaverConnectImmich": "Immich जोड़ें",
+        "weatherPlaceLabel": "स्थान",
+        "weatherPlaceHint": "खोज मौसम सेवा Open-Meteo पर होती है। केवल स्थान का नाम भेजा जाता है।",
+        "weatherPlacePlaceholder": "शहर या पिन कोड",
+        "weatherPlaceSearch": "खोजें",
+        "weatherPlaceCurrent": "वर्तमान: {{place}}",
+        "weatherPlaceNone": "अभी कोई स्थान नहीं चुना गया।",
+        "weatherPlaceResultsLabel": "मिले हुए स्थान",
+        "weatherPlacePick": "सूची से अपना स्थान चुनें।",
+        "weatherPlaceChosen": "{{place}} चुना गया। लागू करने के लिए सहेजें।",
+        "weatherPlaceRequired": "कोई स्थान खोजें और सूची से उसे चुनें।",
+        "weatherPlaceTooShort": "कम से कम दो अक्षर दर्ज करें।",
+        "weatherPlaceNotFound": "इस नाम का कोई स्थान नहीं मिला। देश जोड़ें, जैसे “Aurangabad, India”।",
+        "weatherPlaceUnavailable": "स्थान खोज अभी उपलब्ध नहीं है। थोड़ी देर में फिर कोशिश करें या निर्देशांक हाथ से दर्ज करें।",
+        "weatherManualTitle": "निर्देशांक हाथ से"
     },
     "login": {
         "tagline": "अपने पारिवारिक प्लानर में फिर से आपका स्वागत है।",

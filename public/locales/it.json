@@ -3197,7 +3197,21 @@
         "skipToSheet": "Vai all’impostazione",
         "screensaverOffTitle": "Salvaschermo con foto",
         "screensaverNeedsImmich": "Il salvaschermo parte quando un amministratore ha collegato Immich. Poi qui imposti attesa, ora e inquadratura per questo dispositivo.",
-        "screensaverConnectImmich": "Collega Immich"
+        "screensaverConnectImmich": "Collega Immich",
+        "weatherPlaceLabel": "Luogo",
+        "weatherPlaceHint": "La ricerca avviene presso il servizio meteo Open-Meteo. Viene inviato solo il nome del luogo.",
+        "weatherPlacePlaceholder": "Città o CAP",
+        "weatherPlaceSearch": "Cerca",
+        "weatherPlaceCurrent": "Attuale: {{place}}",
+        "weatherPlaceNone": "Nessun luogo scelto per ora.",
+        "weatherPlaceResultsLabel": "Luoghi trovati",
+        "weatherPlacePick": "Scegli il tuo luogo dall’elenco.",
+        "weatherPlaceChosen": "{{place}} scelto. Salva per applicarlo.",
+        "weatherPlaceRequired": "Cerca un luogo e sceglilo dall’elenco.",
+        "weatherPlaceTooShort": "Inserisci almeno due caratteri.",
+        "weatherPlaceNotFound": "Nessun luogo trovato con questo nome. Aggiungi il paese, ad es. «Bari, Italia».",
+        "weatherPlaceUnavailable": "La ricerca dei luoghi non è raggiungibile ora. Riprova tra poco o inserisci le coordinate a mano.",
+        "weatherManualTitle": "Coordinate a mano"
     },
     "login": {
         "tagline": "Bentornato nel tuo pianificatore familiare.",

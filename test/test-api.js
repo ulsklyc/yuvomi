@@ -915,7 +915,7 @@ const REASONS_PASSED_THROUGH = new Map([
   ['middleware/error-handler.js: err.reason', { sites: 1, at403: [], why: 'feste 503' }],
   ['middleware/restore-gate.js: RESTORE_IN_PROGRESS_REASON', { sites: 1, at403: [], why: '503 oder 409' }],
   ['routes/weather.js: WEATHER_REASON.NOT_CONFIGURED', { sites: 1, at403: [], why: 'Antwort 200 ohne Daten' }],
-  ['routes/weather.js: WEATHER_REASON.UPSTREAM_ERROR', { sites: 3, at403: [], why: 'Antwort 200 ohne Daten' }],
+  ['routes/weather.js: WEATHER_REASON.UPSTREAM_ERROR', { sites: 5, at403: [], why: 'Antwort 200 ohne Daten (Wetter 3x, Ortssuche 2x)' }],
   ['routes/rewards.js: item.name', { sites: 1, at403: [], why: 'Buchungstext im Punktekonto, keine Antwort' }],
   ['routes/rewards.js: row.reward_name', { sites: 1, at403: [], why: 'Buchungstext im Punktekonto, keine Antwort' }],
   ['routes/rewards.js: row.note', { sites: 1, at403: [], why: 'Buchungstext im Taschengeldkonto (#1734), keine Antwort' }],

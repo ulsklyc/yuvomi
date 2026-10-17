@@ -3197,7 +3197,21 @@
         "skipToSheet": "Μετάβαση στη ρύθμιση",
         "screensaverOffTitle": "Προφύλαξη οθόνης με φωτογραφίες",
         "screensaverNeedsImmich": "Η προφύλαξη ξεκινά μόλις ένας διαχειριστής συνδέσει το Immich. Μετά ρυθμίζεις εδώ την αναμονή, την ώρα και το κάδρο για αυτή τη συσκευή.",
-        "screensaverConnectImmich": "Σύνδεση Immich"
+        "screensaverConnectImmich": "Σύνδεση Immich",
+        "weatherPlaceLabel": "Τοποθεσία",
+        "weatherPlaceHint": "Η αναζήτηση γίνεται στην υπηρεσία καιρού Open-Meteo. Αποστέλλεται μόνο το όνομα της τοποθεσίας.",
+        "weatherPlacePlaceholder": "Πόλη ή ταχυδρομικός κώδικας",
+        "weatherPlaceSearch": "Αναζήτηση",
+        "weatherPlaceCurrent": "Τρέχουσα: {{place}}",
+        "weatherPlaceNone": "Δεν έχει επιλεγεί ακόμη τοποθεσία.",
+        "weatherPlaceResultsLabel": "Τοποθεσίες που βρέθηκαν",
+        "weatherPlacePick": "Διάλεξε την τοποθεσία σου από τη λίστα.",
+        "weatherPlaceChosen": "Επιλέχθηκε: {{place}}. Αποθήκευσε για εφαρμογή.",
+        "weatherPlaceRequired": "Αναζήτησε μια τοποθεσία και διάλεξέ τη από τη λίστα.",
+        "weatherPlaceTooShort": "Πληκτρολόγησε τουλάχιστον δύο χαρακτήρες.",
+        "weatherPlaceNotFound": "Δεν βρέθηκε τοποθεσία με αυτό το όνομα. Πρόσθεσε τη χώρα, π.χ. «Λάρισα, Ελλάδα».",
+        "weatherPlaceUnavailable": "Η αναζήτηση τοποθεσίας δεν είναι διαθέσιμη αυτή τη στιγμή. Δοκίμασε ξανά σε λίγο ή συμπλήρωσε τις συντεταγμένες χειροκίνητα.",
+        "weatherManualTitle": "Συντεταγμένες χειροκίνητα"
     },
     "login": {
         "tagline": "Καλώς ήρθατε ξανά στον οικογενειακό σας οργανωτή.",

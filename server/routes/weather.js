@@ -20,6 +20,12 @@ const log = createLogger('Weather');
 const CACHE_TTL_MS = 30 * 60 * 1000;
 const CACHE_MAX_ENTRIES = 50;
 
+// Ortssuche (GET /geocode): Grenzen des Suchworts und Zahl der Treffer. Ein
+// Zeichen liefert beim Anbieter nichts, also fragen wir ihn gar nicht erst.
+export const GEOCODE_MIN_CHARS = 2;
+export const GEOCODE_MAX_CHARS = 100;
+const GEOCODE_COUNT = 8;
+
 // ----------------------------------------------------------------
 // WMO Weather Interpretation Code → Lucide icon name
 // ----------------------------------------------------------------
@@ -438,6 +444,79 @@ export function buildRouter({ cfgGet: cfgGetFn = cfgGet, fetchFn = null, logger 
       const detail = String(err?.message ?? err).replace(/https?:\/\/\S+/g, '<url>');
       logOnce(`${provider ?? 'unknown'}:error:${code}`, `${provider ?? 'Weather'} request failed: ${code} (${detail})`);
       // Kein Error-Screen: die Kachel sagt "gerade nicht verfuegbar".
+      res.json({ data: null, reason: WEATHER_REASON.UPSTREAM_ERROR });
+    }
+  });
+
+  // ---------------------------------------------------------------
+  // GET /api/v1/weather/geocode?name=Berlin&lang=de
+  // Response: { data: [{ name, admin1, admin2, country, country_code, latitude,
+  //                       longitude, timezone }] }
+  //         | { data: null, reason: 'upstream_error' }
+  //         | 400 { error, code: 400, reason: 'name_too_short' | 'name_too_long' }
+  //
+  // ORTSSUCHE FUER DAS STANDORTFORMULAR (R20, Ulas 2026-10-17). Vorher kannte
+  // das Formular nur Breiten- und Laengengrad, und der Hinweis schickte zu
+  // openstreetmap.org. Gefragt wird derselbe Anbieter wie beim Wetter
+  // (Open-Meteo Geocoding, ohne Schluessel), serverseitig wie der Wetterabruf:
+  // der Browser spricht nie mit dem Anbieter, und hinaus gehen nur der
+  // Ortsname und die Sprache der Treffer. Der Ort steht nie im Log.
+  //
+  // Doku (gelesen 2026-10-17, open-meteo.com/en/docs/geocoding-api): `name`
+  // ist Pflicht; leer und ein Zeichen liefern nichts, zwei Zeichen treffen
+  // nur exakt, ab drei per Praefix. Ohne Treffer fehlt `results` in der
+  // Antwort ganz. `language` klein geschrieben.
+  // ---------------------------------------------------------------
+  const geocodeCache = new Map();
+  router.get('/geocode', async (req, res) => {
+    const name = typeof req.query.name === 'string' ? req.query.name.trim() : '';
+    if (name.length < GEOCODE_MIN_CHARS) {
+      return res.status(400).json({ error: 'Name too short.', code: 400, reason: 'name_too_short' });
+    }
+    if (name.length > GEOCODE_MAX_CHARS) {
+      return res.status(400).json({ error: 'Name too long.', code: 400, reason: 'name_too_long' });
+    }
+    const locale = supportedLocaleFor(typeof req.query.lang === 'string' ? req.query.lang : '');
+    const language = (locale ?? 'en').split('-')[0].toLowerCase();
+    const cacheKey = `${language}|${name.toLowerCase()}`;
+    const cached = geocodeCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < CACHE_TTL_MS) return res.json({ data: cached.data });
+
+    try {
+      const url = [
+        'https://geocoding-api.open-meteo.com/v1/search',
+        `?name=${encodeURIComponent(name)}`,
+        `&count=${GEOCODE_COUNT}`,
+        `&language=${encodeURIComponent(language)}`,
+        '&format=json',
+      ].join('');
+      const upstream = await doFetch(url, { signal: AbortSignal.timeout(8000) });
+      if (!upstream.ok) {
+        logOnce(`geocode:http:${upstream.status}`, `Open-Meteo geocoding failed: HTTP ${upstream.status}`);
+        return res.json({ data: null, reason: WEATHER_REASON.UPSTREAM_ERROR });
+      }
+      const body = await upstream.json();
+      const data = (Array.isArray(body?.results) ? body.results : [])
+        .filter((r) => Number.isFinite(r?.latitude) && Number.isFinite(r?.longitude) && typeof r?.name === 'string')
+        .map((r) => ({
+          name: r.name,
+          admin1: typeof r.admin1 === 'string' && r.admin1 ? r.admin1 : null,
+          // Der Kreis trennt gleichnamige Orte derselben Region ("Halle" zweimal
+          // in Flandern) - ohne ihn standen zwei identische Zeilen da.
+          admin2: typeof r.admin2 === 'string' && r.admin2 ? r.admin2 : null,
+          country: typeof r.country === 'string' && r.country ? r.country : null,
+          country_code: typeof r.country_code === 'string' && r.country_code ? r.country_code : null,
+          latitude: r.latitude,
+          longitude: r.longitude,
+          timezone: typeof r.timezone === 'string' && r.timezone ? r.timezone : null,
+        }));
+      if (geocodeCache.size >= CACHE_MAX_ENTRIES) geocodeCache.delete(geocodeCache.keys().next().value);
+      geocodeCache.set(cacheKey, { data, ts: Date.now() });
+      res.json({ data });
+    } catch (err) {
+      // Wie beim Wetter: Code und Meldung ohne URL - die URL traegt den Ort.
+      const code = err?.cause?.code || err?.code || err?.name || 'Error';
+      logOnce(`geocode:error:${code}`, `Open-Meteo geocoding failed: ${code}`);
       res.json({ data: null, reason: WEATHER_REASON.UPSTREAM_ERROR });
     }
   });

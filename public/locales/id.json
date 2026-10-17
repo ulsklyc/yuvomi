@@ -3213,7 +3213,21 @@
         "skipToSheet": "Langsung ke pengaturan",
         "screensaverOffTitle": "Screensaver foto",
         "screensaverNeedsImmich": "Screensaver dimulai setelah admin menghubungkan Immich. Setelah itu kamu mengatur jeda, jam, dan potongan foto untuk perangkat ini di sini.",
-        "screensaverConnectImmich": "Hubungkan Immich"
+        "screensaverConnectImmich": "Hubungkan Immich",
+        "weatherPlaceLabel": "Tempat",
+        "weatherPlaceHint": "Pencarian dilakukan di layanan cuaca Open-Meteo. Hanya nama tempat yang dikirim.",
+        "weatherPlacePlaceholder": "Kota atau kode pos",
+        "weatherPlaceSearch": "Cari",
+        "weatherPlaceCurrent": "Saat ini: {{place}}",
+        "weatherPlaceNone": "Belum ada tempat yang dipilih.",
+        "weatherPlaceResultsLabel": "Tempat yang ditemukan",
+        "weatherPlacePick": "Pilih tempatmu dari daftar.",
+        "weatherPlaceChosen": "{{place}} dipilih. Simpan untuk menerapkannya.",
+        "weatherPlaceRequired": "Cari tempat lalu pilih dari daftar.",
+        "weatherPlaceTooShort": "Masukkan minimal dua karakter.",
+        "weatherPlaceNotFound": "Tidak ada tempat dengan nama ini. Tambahkan negaranya, mis. “Padang, Indonesia”.",
+        "weatherPlaceUnavailable": "Pencarian tempat sedang tidak dapat dijangkau. Coba lagi sebentar lagi atau masukkan koordinat secara manual.",
+        "weatherManualTitle": "Koordinat manual"
     },
     "login": {
         "tagline": "Selamat datang kembali di perencana keluarga Anda.",

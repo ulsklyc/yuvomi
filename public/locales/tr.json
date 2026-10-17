@@ -3197,7 +3197,21 @@
         "skipToSheet": "Ayara geç",
         "screensaverOffTitle": "Fotoğraf ekran koruyucu",
         "screensaverNeedsImmich": "Ekran koruyucu, bir yönetici Immich'i bağladığında başlar. Ardından bu cihaz için bekleme süresini, saati ve fotoğraf kadrajını burada ayarlarsın.",
-        "screensaverConnectImmich": "Immich'i bağla"
+        "screensaverConnectImmich": "Immich'i bağla",
+        "weatherPlaceLabel": "Yer",
+        "weatherPlaceHint": "Arama, hava durumu hizmeti Open-Meteo üzerinde yapılır. Yalnızca yer adı gönderilir.",
+        "weatherPlacePlaceholder": "Şehir veya posta kodu",
+        "weatherPlaceSearch": "Ara",
+        "weatherPlaceCurrent": "Şu an: {{place}}",
+        "weatherPlaceNone": "Henüz bir yer seçilmedi.",
+        "weatherPlaceResultsLabel": "Bulunan yerler",
+        "weatherPlacePick": "Listeden yerini seç.",
+        "weatherPlaceChosen": "{{place}} seçildi. Uygulamak için kaydet.",
+        "weatherPlaceRequired": "Bir yer ara ve listeden seç.",
+        "weatherPlaceTooShort": "En az iki karakter gir.",
+        "weatherPlaceNotFound": "Bu adla bir yer bulunamadı. Ülkeyi ekle, örn. “Ereğli, Türkiye”.",
+        "weatherPlaceUnavailable": "Yer arama şu anda erişilemiyor. Birazdan yeniden dene ya da koordinatları elle gir.",
+        "weatherManualTitle": "Koordinatları elle gir"
     },
     "login": {
         "tagline": "Aile planlayıcına tekrar hoş geldin.",

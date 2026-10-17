@@ -700,3 +700,97 @@ test('der Proxy folgt derselben Quellenermittlung wie die Admin-Seite', async ()
   }
   for (const k of [...BASE_ENV_KEYS, 'OPENWEATHER_UNITS']) delete process.env[k];
 });
+
+// --------------------------------------------------------
+// Ortssuche (R20, Ulas 2026-10-17): GET /geocode fragt Open-Meteo Geocoding.
+// Hinaus gehen nur Ortsname und Sprache, der Ort steht nie im Log.
+// --------------------------------------------------------
+const GEO_RESULTS = {
+  results: [
+    { id: 2950159, name: 'Berlin', latitude: 52.52437, longitude: 13.41053, elevation: 74,
+      country_code: 'DE', country: 'Deutschland', admin1: 'Land Berlin', timezone: 'Europe/Berlin',
+      population: 3426354, postcodes: ['10115'] },
+    { id: 1, name: 'Berlin', latitude: 44.4687, longitude: -71.1851, country_code: 'US',
+      country: 'Vereinigte Staaten', admin1: 'New Hampshire', admin2: 'Coos County', timezone: 'America/New_York' },
+    { id: 2, name: 'kaputt', latitude: null, longitude: 3 },
+  ],
+};
+
+test('Ortssuche: nur Name, Sprache und Trefferzahl gehen an den Geocoding-Dienst', async () => {
+  const seen = [];
+  const fetchFn = async (url) => { seen.push(new URL(String(url))); return { ok: true, json: async () => GEO_RESULTS }; };
+  const { baseUrl, close } = await startApp({ fetchFn });
+  try {
+    const res = await fetch(`${baseUrl}/geocode?name=${encodeURIComponent(' Berlin ')}&lang=de-AT`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0].hostname, 'geocoding-api.open-meteo.com');
+    assert.equal(seen[0].pathname, '/v1/search');
+    assert.deepEqual([...seen[0].searchParams.keys()].sort(), ['count', 'format', 'language', 'name']);
+    assert.equal(seen[0].searchParams.get('name'), 'Berlin');
+    assert.equal(seen[0].searchParams.get('language'), 'de');
+    assert.deepEqual(body.data, [
+      { name: 'Berlin', admin1: 'Land Berlin', admin2: null, country: 'Deutschland', country_code: 'DE',
+        latitude: 52.52437, longitude: 13.41053, timezone: 'Europe/Berlin' },
+      { name: 'Berlin', admin1: 'New Hampshire', admin2: 'Coos County', country: 'Vereinigte Staaten', country_code: 'US',
+        latitude: 44.4687, longitude: -71.1851, timezone: 'America/New_York' },
+    ], 'ein Treffer ohne Koordinaten faellt weg, Felder ausser den genannten gehen nicht hinaus');
+  } finally { await close(); }
+});
+
+test('Ortssuche: ein Zeichen fragt den Anbieter gar nicht erst - 400 name_too_short', async () => {
+  let calls = 0;
+  const { baseUrl, close } = await startApp({ fetchFn: async () => { calls += 1; return { ok: true, json: async () => GEO_RESULTS }; } });
+  try {
+    for (const name of ['', 'B', '  b  ']) {
+      const res = await fetch(`${baseUrl}/geocode?name=${encodeURIComponent(name)}`);
+      assert.equal(res.status, 400, `"${name}"`);
+      assert.equal((await res.json()).reason, 'name_too_short');
+    }
+    const long = await fetch(`${baseUrl}/geocode?name=${'x'.repeat(101)}`);
+    assert.equal(long.status, 400);
+    assert.equal((await long.json()).reason, 'name_too_long');
+    assert.equal(calls, 0);
+  } finally { await close(); }
+});
+
+test('Ortssuche: ohne Treffer fehlt `results` beim Anbieter - die Antwort ist eine leere Liste', async () => {
+  const { baseUrl, close } = await startApp({ fetchFn: async () => ({ ok: true, json: async () => ({ generationtime_ms: 0.4 }) }) });
+  try {
+    const res = await fetch(`${baseUrl}/geocode?name=Xyzzyqq`);
+    assert.deepEqual(await res.json(), { data: [] });
+  } finally { await close(); }
+});
+
+test('Ortssuche: Anbieterfehler und Zeitueberschreitung -> upstream_error, der Ort steht nicht im Log', async () => {
+  const lines = [];
+  const logger = { warn: (msg) => lines.push(String(msg)) };
+  for (const fetchFn of [
+    async () => ({ ok: false, status: 503, json: async () => ({}) }),
+    async () => { throw Object.assign(new Error('The operation was aborted due to timeout https://geocoding-api.open-meteo.com/v1/search?name=Musterdorf'), { name: 'TimeoutError' }); },
+  ]) {
+    const { baseUrl, close } = await startApp({ fetchFn, logger });
+    try {
+      const res = await fetch(`${baseUrl}/geocode?name=Musterdorf`);
+      assert.equal(res.status, 200);
+      assert.deepEqual(await res.json(), { data: null, reason: 'upstream_error' });
+    } finally { await close(); }
+  }
+  assert.equal(lines.length, 2, lines.join('\n'));
+  assert.ok(lines.every((l) => !/Musterdorf/.test(l)), lines.join('\n'));
+  assert.match(lines[0], /HTTP 503/);
+  assert.match(lines[1], /TimeoutError/);
+});
+
+test('Ortssuche: dieselbe Frage in derselben Sprache kommt aus dem Cache', async () => {
+  let calls = 0;
+  const { baseUrl, close } = await startApp({ fetchFn: async () => { calls += 1; return { ok: true, json: async () => GEO_RESULTS }; } });
+  try {
+    await fetch(`${baseUrl}/geocode?name=Berlin&lang=de`);
+    await fetch(`${baseUrl}/geocode?name=berlin&lang=de`);
+    assert.equal(calls, 1);
+    await fetch(`${baseUrl}/geocode?name=Berlin&lang=fr`);
+    assert.equal(calls, 2, 'eine andere Sprache ist eine andere Frage');
+  } finally { await close(); }
+});

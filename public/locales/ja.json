@@ -3197,7 +3197,21 @@
         "skipToSheet": "設定へスキップ",
         "screensaverOffTitle": "写真スクリーンセーバー",
         "screensaverNeedsImmich": "管理者が Immich を接続すると、スクリーンセーバーが動きます。その後、この端末の待ち時間、時計、写真の表示方法をここで設定できます。",
-        "screensaverConnectImmich": "Immich を接続"
+        "screensaverConnectImmich": "Immich を接続",
+        "weatherPlaceLabel": "場所",
+        "weatherPlaceHint": "検索は天気サービス Open-Meteo で行われます。送信されるのは地名だけです。",
+        "weatherPlacePlaceholder": "都市名または郵便番号",
+        "weatherPlaceSearch": "検索",
+        "weatherPlaceCurrent": "現在: {{place}}",
+        "weatherPlaceNone": "まだ場所が選ばれていません。",
+        "weatherPlaceResultsLabel": "見つかった場所",
+        "weatherPlacePick": "リストから場所を選んでください。",
+        "weatherPlaceChosen": "{{place}} を選びました。保存すると反映されます。",
+        "weatherPlaceRequired": "場所を検索して、リストから選んでください。",
+        "weatherPlaceTooShort": "2文字以上入力してください。",
+        "weatherPlaceNotFound": "この名前の場所は見つかりませんでした。国名を付けてください（例: 「府中, 日本」）。",
+        "weatherPlaceUnavailable": "現在、場所の検索に接続できません。少し待ってから再試行するか、座標を手動で入力してください。",
+        "weatherManualTitle": "座標を手動で入力"
     },
     "login": {
         "tagline": "家族のプランナーへおかえりなさい。",

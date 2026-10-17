@@ -3213,7 +3213,21 @@
         "skipToSheet": "رفتن به تنظیم",
         "screensaverOffTitle": "محافظ صفحه با عکس",
         "screensaverNeedsImmich": "محافظ صفحه وقتی شروع می‌شود که یک مدیر Immich را وصل کند. بعد از آن، زمان انتظار، ساعت و برش عکس را برای این دستگاه همین‌جا تنظیم می‌کنی.",
-        "screensaverConnectImmich": "وصل کردن Immich"
+        "screensaverConnectImmich": "وصل کردن Immich",
+        "weatherPlaceLabel": "مکان",
+        "weatherPlaceHint": "جست‌وجو در سرویس هواشناسی Open-Meteo انجام می‌شود. فقط نام مکان ارسال می‌شود.",
+        "weatherPlacePlaceholder": "شهر یا کد پستی",
+        "weatherPlaceSearch": "جست‌وجو",
+        "weatherPlaceCurrent": "فعلی: {{place}}",
+        "weatherPlaceNone": "هنوز مکانی انتخاب نشده است.",
+        "weatherPlaceResultsLabel": "مکان‌های یافت‌شده",
+        "weatherPlacePick": "مکان خود را از فهرست انتخاب کن.",
+        "weatherPlaceChosen": "{{place}} انتخاب شد. برای اعمال، ذخیره کن.",
+        "weatherPlaceRequired": "یک مکان جست‌وجو کن و آن را از فهرست انتخاب کن.",
+        "weatherPlaceTooShort": "دست‌کم دو نویسه وارد کن.",
+        "weatherPlaceNotFound": "مکانی با این نام پیدا نشد. نام کشور را اضافه کن، مثلاً «تبریز، ایران».",
+        "weatherPlaceUnavailable": "جست‌وجوی مکان اکنون در دسترس نیست. کمی بعد دوباره امتحان کن یا مختصات را دستی وارد کن.",
+        "weatherManualTitle": "مختصات به‌صورت دستی"
     },
     "login": {
         "tagline": "دوباره به برنامه‌ریز خانوادگی‌تان خوش آمدید.",

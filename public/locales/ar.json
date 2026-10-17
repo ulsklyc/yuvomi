@@ -3501,7 +3501,21 @@
         "skipToSheet": "انتقل إلى الإعداد",
         "screensaverOffTitle": "شاشة توقف الصور",
         "screensaverNeedsImmich": "تبدأ شاشة التوقف عندما يربط مشرف Immich. بعدها تضبط هنا مدة الانتظار والساعة وقصّ الصورة لهذا الجهاز.",
-        "screensaverConnectImmich": "ربط Immich"
+        "screensaverConnectImmich": "ربط Immich",
+        "weatherPlaceLabel": "المكان",
+        "weatherPlaceHint": "يتم البحث لدى خدمة الطقس Open-Meteo. يُرسل اسم المكان فقط.",
+        "weatherPlacePlaceholder": "المدينة أو الرمز البريدي",
+        "weatherPlaceSearch": "بحث",
+        "weatherPlaceCurrent": "الحالي: {{place}}",
+        "weatherPlaceNone": "لم يتم اختيار مكان بعد.",
+        "weatherPlaceResultsLabel": "الأماكن التي تم العثور عليها",
+        "weatherPlacePick": "اختر مكانك من القائمة.",
+        "weatherPlaceChosen": "تم اختيار {{place}}. احفظ لتطبيقه.",
+        "weatherPlaceRequired": "ابحث عن مكان واختره من القائمة.",
+        "weatherPlaceTooShort": "أدخل حرفين على الأقل.",
+        "weatherPlaceNotFound": "لم يُعثر على مكان بهذا الاسم. أضف البلد، مثل «الإسكندرية، مصر».",
+        "weatherPlaceUnavailable": "البحث عن الأماكن غير متاح حاليًا. حاول مجددًا بعد قليل أو أدخل الإحداثيات يدويًا.",
+        "weatherManualTitle": "الإحداثيات يدويًا"
     },
     "login": {
         "tagline": "مرحبًا بعودتك إلى منظّم عائلتك.",

@@ -3197,7 +3197,21 @@
         "skipToSheet": "Gå till inställningen",
         "screensaverOffTitle": "Fotoskärmsläckare",
         "screensaverNeedsImmich": "Skärmsläckaren startar när en administratör har anslutit Immich. Sedan ställer du in väntetid, klocka och bildutsnitt för den här enheten här.",
-        "screensaverConnectImmich": "Anslut Immich"
+        "screensaverConnectImmich": "Anslut Immich",
+        "weatherPlaceLabel": "Plats",
+        "weatherPlaceHint": "Sökningen görs hos vädertjänsten Open-Meteo. Bara ortnamnet skickas.",
+        "weatherPlacePlaceholder": "Stad eller postnummer",
+        "weatherPlaceSearch": "Sök",
+        "weatherPlaceCurrent": "Nu: {{place}}",
+        "weatherPlaceNone": "Ingen plats vald ännu.",
+        "weatherPlaceResultsLabel": "Hittade platser",
+        "weatherPlacePick": "Välj din plats i listan.",
+        "weatherPlaceChosen": "{{place}} vald. Spara för att använda den.",
+        "weatherPlaceRequired": "Sök efter en plats och välj den i listan.",
+        "weatherPlaceTooShort": "Skriv minst två tecken.",
+        "weatherPlaceNotFound": "Ingen plats med det namnet hittades. Lägg till landet, t.ex. ”Lund, Sverige”.",
+        "weatherPlaceUnavailable": "Platssökningen går inte att nå just nu. Försök igen om en stund eller ange koordinaterna för hand.",
+        "weatherManualTitle": "Koordinater för hand"
     },
     "login": {
         "tagline": "Välkommen tillbaka till din familjeplanerare.",

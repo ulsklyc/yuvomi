@@ -4,7 +4,9 @@ import {
   PERSONAL_WEATHER_SCOPE as SCOPE,
   bindWeatherLocationEvents,
   hasValidWeatherCoords,
+  openWeatherManual,
   readWeatherLocation,
+  reportMissingWeatherPlace,
   weatherLocationFieldsHtml,
 } from '/settings/weather-location.js';
 
@@ -61,7 +63,9 @@ function bindEvents(container, user) {
     event.preventDefault();
     errorElement.hidden = true;
     const location = readWeatherLocation(container, SCOPE);
+    if (reportMissingWeatherPlace(container, SCOPE, location)) return;
     if (!hasValidWeatherCoords(location.lat, location.lon)) {
+      openWeatherManual(container, SCOPE);
       errorElement.textContent = t('settings.weatherCoordsInvalid');
       errorElement.hidden = false;
       return;

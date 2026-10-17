@@ -3399,7 +3399,21 @@
         "skipToSheet": "Перейти к настройке",
         "screensaverOffTitle": "Фотозаставка",
         "screensaverNeedsImmich": "Заставка запустится, когда администратор подключит Immich. После этого здесь настраиваются задержка, часы и кадрирование фото для этого устройства.",
-        "screensaverConnectImmich": "Подключить Immich"
+        "screensaverConnectImmich": "Подключить Immich",
+        "weatherPlaceLabel": "Место",
+        "weatherPlaceHint": "Поиск выполняется в погодном сервисе Open-Meteo. Передаётся только название места.",
+        "weatherPlacePlaceholder": "Город или почтовый индекс",
+        "weatherPlaceSearch": "Найти",
+        "weatherPlaceCurrent": "Сейчас: {{place}}",
+        "weatherPlaceNone": "Место ещё не выбрано.",
+        "weatherPlaceResultsLabel": "Найденные места",
+        "weatherPlacePick": "Выбери своё место из списка.",
+        "weatherPlaceChosen": "Выбрано: {{place}}. Сохрани, чтобы применить.",
+        "weatherPlaceRequired": "Найди место и выбери его из списка.",
+        "weatherPlaceTooShort": "Введи не меньше двух символов.",
+        "weatherPlaceNotFound": "Место с таким названием не найдено. Добавь страну, например «Кировск, Россия».",
+        "weatherPlaceUnavailable": "Поиск мест сейчас недоступен. Попробуй чуть позже или введи координаты вручную.",
+        "weatherManualTitle": "Координаты вручную"
     },
     "login": {
         "tagline": "С возвращением в ваш семейный планировщик.",

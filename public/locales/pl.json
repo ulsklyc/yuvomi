@@ -3415,7 +3415,21 @@
         "skipToSheet": "Przejdź do ustawienia",
         "screensaverOffTitle": "Wygaszacz ze zdjęciami",
         "screensaverNeedsImmich": "Wygaszacz uruchomi się, gdy administrator połączy Immich. Potem ustawisz tu dla tego urządzenia czas oczekiwania, zegar i kadrowanie zdjęć.",
-        "screensaverConnectImmich": "Połącz Immich"
+        "screensaverConnectImmich": "Połącz Immich",
+        "weatherPlaceLabel": "Miejsce",
+        "weatherPlaceHint": "Wyszukiwanie odbywa się w serwisie pogodowym Open-Meteo. Wysyłana jest tylko nazwa miejsca.",
+        "weatherPlacePlaceholder": "Miasto lub kod pocztowy",
+        "weatherPlaceSearch": "Szukaj",
+        "weatherPlaceCurrent": "Obecnie: {{place}}",
+        "weatherPlaceNone": "Nie wybrano jeszcze miejsca.",
+        "weatherPlaceResultsLabel": "Znalezione miejsca",
+        "weatherPlacePick": "Wybierz swoje miejsce z listy.",
+        "weatherPlaceChosen": "Wybrano: {{place}}. Zapisz, aby zastosować.",
+        "weatherPlaceRequired": "Wyszukaj miejsce i wybierz je z listy.",
+        "weatherPlaceTooShort": "Wpisz co najmniej dwa znaki.",
+        "weatherPlaceNotFound": "Nie znaleziono miejsca o tej nazwie. Dodaj kraj, np. „Opole, Polska”.",
+        "weatherPlaceUnavailable": "Wyszukiwanie miejsc jest teraz niedostępne. Spróbuj ponownie za chwilę albo wpisz współrzędne ręcznie.",
+        "weatherManualTitle": "Współrzędne ręcznie"
     },
     "login": {
         "tagline": "Witaj ponownie w swoim planerze rodzinnym.",

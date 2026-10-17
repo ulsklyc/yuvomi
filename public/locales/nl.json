@@ -3197,7 +3197,21 @@
         "skipToSheet": "Naar de instelling",
         "screensaverOffTitle": "Fotoschermbeveiliging",
         "screensaverNeedsImmich": "De schermbeveiliging start zodra een beheerder Immich heeft gekoppeld. Daarna stel je hier wachttijd, klok en fotouitsnede voor dit apparaat in.",
-        "screensaverConnectImmich": "Immich koppelen"
+        "screensaverConnectImmich": "Immich koppelen",
+        "weatherPlaceLabel": "Plaats",
+        "weatherPlaceHint": "De zoekopdracht loopt via de weerdienst Open-Meteo. Alleen de plaatsnaam wordt verstuurd.",
+        "weatherPlacePlaceholder": "Stad of postcode",
+        "weatherPlaceSearch": "Zoeken",
+        "weatherPlaceCurrent": "Huidig: {{place}}",
+        "weatherPlaceNone": "Nog geen plaats gekozen.",
+        "weatherPlaceResultsLabel": "Gevonden plaatsen",
+        "weatherPlacePick": "Kies je plaats uit de lijst.",
+        "weatherPlaceChosen": "{{place}} gekozen. Sla op om het toe te passen.",
+        "weatherPlaceRequired": "Zoek een plaats en kies die uit de lijst.",
+        "weatherPlaceTooShort": "Voer minstens twee tekens in.",
+        "weatherPlaceNotFound": "Geen plaats met deze naam gevonden. Voeg het land toe, bijv. „Bergen, Nederland”.",
+        "weatherPlaceUnavailable": "Het zoeken naar plaatsen is nu niet bereikbaar. Probeer het zo opnieuw of vul de coördinaten met de hand in.",
+        "weatherManualTitle": "Coördinaten met de hand"
     },
     "login": {
         "tagline": "Welkom terug bij je gezinsplanner.",

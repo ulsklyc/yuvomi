@@ -3213,7 +3213,21 @@
         "skipToSheet": "설정으로 건너뛰기",
         "screensaverOffTitle": "사진 화면 보호기",
         "screensaverNeedsImmich": "관리자가 Immich를 연결하면 화면 보호기가 시작됩니다. 그다음 이 기기의 대기 시간, 시계, 사진 맞춤을 여기서 설정합니다.",
-        "screensaverConnectImmich": "Immich 연결"
+        "screensaverConnectImmich": "Immich 연결",
+        "weatherPlaceLabel": "장소",
+        "weatherPlaceHint": "검색은 날씨 서비스 Open-Meteo에서 이루어집니다. 장소 이름만 전송됩니다.",
+        "weatherPlacePlaceholder": "도시 또는 우편번호",
+        "weatherPlaceSearch": "검색",
+        "weatherPlaceCurrent": "현재: {{place}}",
+        "weatherPlaceNone": "아직 선택한 장소가 없습니다.",
+        "weatherPlaceResultsLabel": "찾은 장소",
+        "weatherPlacePick": "목록에서 장소를 선택하세요.",
+        "weatherPlaceChosen": "{{place}}을(를) 선택했습니다. 적용하려면 저장하세요.",
+        "weatherPlaceRequired": "장소를 검색하고 목록에서 선택하세요.",
+        "weatherPlaceTooShort": "두 글자 이상 입력하세요.",
+        "weatherPlaceNotFound": "이 이름의 장소를 찾지 못했습니다. 국가를 덧붙이세요. 예: “광주, 대한민국”.",
+        "weatherPlaceUnavailable": "지금은 장소 검색에 연결할 수 없습니다. 잠시 후 다시 시도하거나 좌표를 직접 입력하세요.",
+        "weatherManualTitle": "좌표 직접 입력"
     },
     "login": {
         "tagline": "가족 플래너에 다시 오신 것을 환영합니다.",
