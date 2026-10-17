@@ -63,6 +63,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A recipe without a picture starts with its content.** The flat kitchen-coloured band above
+  the ingredients is gone; the details open with the meals and the ingredients, under the
+  recipe's name. Recipes with a picture keep it.
+
 - **Selecting tasks clears the screen for the selection.** While you select several tasks on a phone,
   the tab bar and the add button step aside and the selection bar takes their place. A tap anywhere
   on a row selects it, a selected row is tinted, and the swipe arrow no longer shows. On a computer

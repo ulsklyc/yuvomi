@@ -4344,12 +4344,13 @@ Angabe braeuchte einen zweiten Timer, nur damit sie sich selbst aktuell haelt.
   Kopf steht, steht nicht noch einmal als Zeile darunter; Screenreader hoeren das Label der
   abgeloesten Zeile weiter (`subtitleLabel`). In der Aufgabe ist "Erledigen" der EINE
   Primaerknopf des Fusses.
-- **Do** dem Detail eines Rezepts OHNE Bild ein flaches Band im Kuechenton geben
-  (`recipeBandEl`, `.recipe-detail__band`: 64px hoch, Toenung `--tint-surface`, darauf ein
-  Vollton-Siegel mit dem Zeichen der ersten Mahlzeit - oder dem Besteck, wenn das Rezept fuer
-  alle oder keine gilt). Kein 3:2-Rahmen, kein grauer Block: ein Platzhalter fuer ein fehlendes Foto bleibt
-  verboten (R16), das Band behauptet kein Bild. Die Liste bleibt ohne; Rezepte mit Bild
-  behalten ihr Kopfbild. Zutatenmengen stehen in einer eigenen rechtsbuendigen,
+- **Do** das Detail eines Rezepts OHNE Bild direkt mit seinem Inhalt beginnen lassen
+  (Mahlzeit-Chips, Zutaten; den Titel traegt der Kopf des Rahmens). Das flache Band im
+  Kuechenton aus R18 ist seit R20 weg (Entscheidung Ulas 2026-10-17: am Desktop ein 480px
+  breiter Stummel ueber den Zutaten). Kein 3:2-Rahmen, kein grauer Block, kein Ersatz: ein
+  Platzhalter fuer ein fehlendes Foto bleibt verboten (R16), und ein Bild, das beim Laden
+  scheitert, nimmt seinen Rahmen mit. Die Liste bleibt ohne; Rezepte mit Bild behalten ihr
+  Kopfbild. Zutatenmengen stehen in einer eigenen rechtsbuendigen,
   tabellarischen Spalte vor dem Namen (Subgrid ueber die Liste, Rueckfall je Zeile).
 - **Do** einen Tageskopf in Worten setzen: "Heute", "Morgen", "Gestern" fuehren, dahinter
   Wochentag und Datum; die anderen Tage nennen nur diese ("Samstag, 24. Oktober", mit Jahr nur
