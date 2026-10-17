@@ -8,7 +8,7 @@
  *        Aenderst du die Regel hier, bleibt 250, wie sie ist; der
  *        Aequivalenztest in test/test-payment-task-backfill.js zeigt dann
  *        die Abweichung und wird mit Begruendung angepasst.
- * Abhaengigkeiten: server/permissions.js
+ * Abhaengigkeiten: server/permissions.js, server/services/household-members.js
  *
  * WER DIE ZAHLUNGSAUFGABE SIEHT (Ulas 2026-10-17).
  *
@@ -30,6 +30,7 @@
  */
 
 import { userHasCapability } from '../permissions.js';
+import { activeAccountSql, householdMemberSql } from './household-members.js';
 
 export const AMOUNTS_CAPABILITY = 'housekeeping_view_amounts';
 
@@ -43,10 +44,12 @@ export const AMOUNTS_CAPABILITY = 'housekeeping_view_amounts';
  * @returns {{ createdBy: number, assignees: number[] } | null}
  */
 export function paymentTaskAudience(database, actorId, actorSeesAmounts) {
+  // Die Admins als HAUSHALTSMITGLIEDER (#1207): ein Admin-Konto, das
+  // Hauspersonal, Gast oder Wandtablett ist, bezahlt niemanden.
   const admins = database.prepare(`
-    SELECT id FROM users
-    WHERE role = 'admin' AND deactivated_at IS NULL
-    ORDER BY id ASC
+    SELECT u.id FROM users u
+    WHERE u.role = 'admin' AND ${householdMemberSql('u')}
+    ORDER BY u.id ASC
   `).all().map((row) => row.id);
   const owners = actorSeesAmounts && actorId != null
     ? [actorId, ...admins.filter((id) => id !== actorId)]
@@ -71,11 +74,12 @@ export function normalizePaymentTaskAudience(database, taskId) {
   if (taskId == null) return false;
   const task = database.prepare('SELECT id, created_by, visibility FROM tasks WHERE id = ?').get(taskId);
   if (!task || task.visibility !== 'all') return false;
+  // Ein ehemaliges Konto zahlt nicht mehr: es faellt hier heraus, und die
+  // Aufgabe geht an die Admins (activeAccountSql, #1381).
   const creator = task.created_by == null
     ? null
-    : database.prepare('SELECT id, deactivated_at FROM users WHERE id = ?').get(task.created_by);
-  const creatorSees = Boolean(creator && creator.deactivated_at == null
-    && userHasCapability(database, creator.id, AMOUNTS_CAPABILITY));
+    : database.prepare(`SELECT u.id FROM users u WHERE u.id = ? AND ${activeAccountSql('u')}`).get(task.created_by);
+  const creatorSees = Boolean(creator && userHasCapability(database, creator.id, AMOUNTS_CAPABILITY));
   const audience = paymentTaskAudience(database, creator?.id ?? null, creatorSees);
   if (!audience) return false;
   database.prepare(`

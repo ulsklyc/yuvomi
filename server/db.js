@@ -10959,9 +10959,21 @@ const MIGRATIONS = [
         access = capabilityRow.get('user', String(user.id))?.access ?? access;
         return access === 'allow';
       };
-      const admins = database.prepare(`
-        SELECT id FROM users WHERE role = 'admin' AND deactivated_at IS NULL ORDER BY id ASC
-      `).all().map((row) => row.id);
+      // Admins als Haushaltsmitglieder, wie householdMemberSql() bei 250 (aktiv,
+      // kein Hauspersonal, kein Gast, kein Wandtablett) - als Text eingefroren.
+      // Die Zuweisung schreibt die Datenbank selbst (INSERT ... SELECT), die
+      // erste Admin-Person holt eine Einzelzeile.
+      const ADMIN_MEMBER_AT_250 = `u.role = 'admin' AND u.deactivated_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = u.id)
+        AND NOT EXISTS (SELECT 1 FROM split_expense_guest_users sg WHERE sg.user_id = u.id)
+        AND NOT EXISTS (SELECT 1 FROM display_accounts da WHERE da.user_id = u.id)`;
+      const firstAdmin = database.prepare(`
+        SELECT u.id FROM users u WHERE ${ADMIN_MEMBER_AT_250} ORDER BY u.id ASC LIMIT 1
+      `);
+      const assignAdmins = database.prepare(`
+        INSERT OR IGNORE INTO task_assignments (task_id, user_id)
+        SELECT ?, u.id FROM users u WHERE ${ADMIN_MEMBER_AT_250}
+      `);
       const tasks = database.prepare(`
         SELECT DISTINCT t.id, t.created_by FROM housekeeping_work_sessions s
         JOIN tasks t ON t.id = s.payment_task_id
@@ -10977,11 +10989,12 @@ const MIGRATIONS = [
       for (const task of tasks) {
         const creator = task.created_by == null ? null : readUser.get(task.created_by);
         const creatorPays = Boolean(creator && creator.deactivated_at == null && seesAmounts(creator));
-        const owners = creatorPays ? [creator.id, ...admins.filter((id) => id !== creator.id)] : admins;
-        if (!owners.length) continue;
-        update.run(owners[0], owners[0], task.id);
+        const owner = creatorPays ? creator.id : firstAdmin.get()?.id;
+        if (owner == null) continue;
+        update.run(owner, owner, task.id);
         clear.run(task.id);
-        for (const id of owners) assign.run(task.id, id);
+        if (creatorPays) assign.run(task.id, creator.id);
+        assignAdmins.run(task.id);
       }
     },
   },

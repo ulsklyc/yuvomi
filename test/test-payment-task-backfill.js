@@ -214,6 +214,13 @@ test('Migration 250 und die Laufzeitregel liefern auf denselben Daten dasselbe',
     INSERT INTO access_permissions (subject_type, subject_id, resource_type, resource_key, access)
     VALUES ('role', 'relative', 'capability', 'housekeeping_view_amounts', 'none')
   `).run();
+  // Ein Admin-Konto, das Hauspersonal ist, ist kein Haushaltsmitglied (#1207)
+  // und bezahlt niemanden - weder Migration noch Laufzeitregel weisen es zu.
+  const STAFF_ADMIN = addUser('hilfe-admin', 'admin', 'other');
+  db.prepare(`
+    INSERT INTO housekeeping_workers (user_id, daily_rate, payment_schedule, rate_type, hourly_rate)
+    VALUES (?, 40, 'monthly', 'daily', 0)
+  `).run(STAFF_ADMIN);
   const AUNT = addUser('tante', 'member', 'relative');
   const UNCLE = addUser('onkel', 'member', 'relative');
   db.prepare(`
@@ -255,4 +262,8 @@ test('Migration 250 und die Laufzeitregel liefern auf denselben Daten dasselbe',
   assert.equal(viaMigration[4].created_by, ADMIN, 'Rollenprofil ohne Betraege: Admin uebernimmt');
   assert.equal(viaMigration[5].created_by, UNCLE, 'Mitglied-Zeile oeffnet das Rollenprofil wieder');
   assert.equal(viaMigration[6].visibility, 'all', 'erledigte bleibt');
+  for (const [label, states] of [['Migration', viaMigration], ['Laufzeit', viaRuntime]]) {
+    assert.ok(states.every((st) => !st.assignees.includes(STAFF_ADMIN) && st.created_by !== STAFF_ADMIN || st.visibility === 'all'),
+      `${label}: das Admin-Konto der Haushaltshilfe steht in keiner Zahlungsaufgabe`);
+  }
 });
