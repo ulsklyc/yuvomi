@@ -3756,6 +3756,26 @@ Die Marke ist die Bildmarke selbst (`utils/brand-mark.js`, 64px, kompakt 48px), 
 Themes dieselbe; der Traeger gibt nur Groesse und Schatten. Der Titel ist ein Large Title
 in Label-Farbe wie jeder Seitentitel. Die Bildmarke ist als Marke gesetzt und unantastbar.
 
+### Erststart-Rundgang und Fehlerbildschirm (R20, Re-Critique 2026-10-17)
+Der **Rundgang** (dashboard.js `showOnboarding`) beginnt mit der Bildmarke (64px, Traeger
+`.onboarding-mark` wie `.auth-hero__mark`), nicht mit einem Lucide-Zeichen. Nennt ein Schritt
+ein Bedienelement, zeigt er darauf: der **Lichtring** (`.onboarding-spotlight`) liegt ueber
+Seitenleiste bzw. Kapsel (`.nav-bottom__items`) und dem sichtbaren `.page-fab`, 6px Luft,
+Radius des Ziels plus Luft, Ring 2px `--color-accent`. Den Abdunkler traegt der Ring als
+Schatten nach aussen (100vmax Spreizung, `--color-bg` 78 %), das Overlay wird dafuer klar
+(`.onboarding-overlay--spot`); ohne sichtbares Ziel bleibt die Unschaerfe. Klicks faengt das
+Overlay, der Ring ist aria-hidden, die Tafel liegt positioniert darueber.
+
+Der **Fehlerbildschirm einer Seite** (router.js `renderError`) nennt die Seite mit ihrem Namen
+aus der Navigation ("Die Seite „Kontakte" lässt sich gerade nicht öffnen"), haengt an die
+Ursache aus `friendlyError` den Satz, dass der Rest weiterlaeuft, und bietet neben "Neu laden"
+"Zur Übersicht" (nicht auf der Uebersicht selbst). Ohne Shell bleibt der allgemeine Titel. Er
+ist Region-Fokusziel ohne Rahmen (`.page-crash`, wie `.page-unreachable`).
+
+**Anpassen am Telefon** (unter 640px): Hoch und Runter liegen in EINER Kapsel auf
+`--color-fill-well` mit Haarlinie, Groesse, Optionen und Ausblenden stehen ohne Ring daneben;
+die Ziele bleiben 48px. Vorher vier umrandete Kreise je Zeile.
+
 ### FAB (Signature Component)
 Getoente Glas-Kapsel: der App-Akzent mit 78 % Deckung
 (`color-mix(in srgb, var(--color-accent) 78%, transparent)`) ueber
