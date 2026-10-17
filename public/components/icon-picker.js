@@ -217,6 +217,46 @@ function buildDialog(current, resolve, suggestions) {
 }
 
 /**
+ * EINE AUSWAHL AUF EINMAL, UND NUR, SOLANGE IHR AUFRUFER STEHT (Review #2049,
+ * Runde 2). Seit das Blatt erst mit dem ersten Oeffnen kommt, liegt zwischen
+ * Tipp und Dialog ein Abruf. Wer in dieser Zeit sein Formular schloss oder die
+ * Seite wechselte, bekam den Dialog trotzdem - ueber einer Seite, die nie nach
+ * ihm gefragt hatte -, und ein zweiter Tipp in der Wartezeit baute einen
+ * zweiten Dialog.
+ *
+ * Jetzt merkt sich das Modul die EINE Anforderung (`active`): ihren Ausloeser
+ * (`owner`, der Knopf im Formular) und die Seite, auf der sie kam. Ist das
+ * Blatt da und der Ausloeser nicht mehr im Dokument oder die Seite eine
+ * andere, oeffnet nichts, und der Aufrufer bekommt `undefined` wie bei
+ * "Abbrechen". Ein weiterer Aufruf, solange die erste wartet oder offen ist,
+ * endet ebenso - es sei denn, die wartende ist schon veraltet; dann tritt er
+ * an ihre Stelle.
+ */
+let active = null;
+
+const pagePath = () => (typeof window !== 'undefined' ? window.location?.pathname ?? '' : '');
+
+function isStale(request) {
+  if (request.dialog) return !request.dialog.isConnected;
+  if (request.owner && request.owner.isConnected === false) return true;
+  return request.path !== pagePath();
+}
+
+/** Baut den echten Dialog und zeigt ihn; Tests setzen eine Attrappe ein. */
+let present = (current, resolve, suggestions) => {
+  const picker = buildDialog(current, resolve, suggestions);
+  document.body.appendChild(picker.dialog);
+  // Lupe und Leeren-Knopf des geteilten Suchfelds sind <i data-lucide>; die
+  // Kacheln baut iconElement() selbst und brauchen das nicht.
+  window.lucide?.createIcons?.({ el: picker.dialog });
+  picker.dialog.showModal();
+  revealDialog(picker.dialog);
+  picker.register();
+  picker.focus();
+  return picker.dialog;
+};
+
+/**
  * Öffnet die Symbolauswahl.
  *
  * @param {string|null} [current] der bisher gewählte Name, wird hervorgehoben
@@ -224,11 +264,13 @@ function buildDialog(current, resolve, suggestions) {
  * @param {string[]} [opts.suggestions] eigene Starthilfe statt der allgemeinen
  *   Reihe (siehe SUGGESTIONS). Ändert NUR, was ohne Suchbegriff im Raster
  *   steht - gesucht wird weiterhin im ganzen Vorrat.
+ * @param {Element|null} [opts.owner] der Ausloeser im Formular. Ist er nicht
+ *   mehr im Dokument, wenn das Blatt da ist, oeffnet nichts (siehe oben).
  * @returns {Promise<string|null|undefined>} Name, `null` für „kein Symbol",
  *   `undefined` bei Abbruch - drei Ausgänge, weil „entfernen" und „nichts
  *   ändern" verschiedene Dinge sind.
  */
-export function openIconPicker(current = null, { suggestions = SUGGESTIONS } = {}) {
+export function openIconPicker(current = null, { suggestions = SUGGESTIONS, owner = null } = {}) {
   return new Promise((resolve) => {
     if (!iconNames().length) {
       // Lucide ist noch nicht da (oder ausgefallen): ein leerer Dialog wäre die
@@ -237,21 +279,37 @@ export function openIconPicker(current = null, { suggestions = SUGGESTIONS } = {
       resolve(undefined);
       return;
     }
+    if (active && !isStale(active)) {
+      resolve(undefined);
+      return;
+    }
+    active?.drop();
+
+    const request = { owner, path: pagePath(), dialog: null };
+    request.drop = () => {
+      if (active === request) active = null;
+      resolve(undefined);
+    };
+    active = request;
 
     // Das Blatt steht nicht in index.html (Critique R19): es kommt mit dem
     // ersten Oeffnen, und der Dialog baut sich erst, wenn es da ist.
-    ensureStyle('/styles/icon-picker.css').then(() => show(resolve));
+    ensureStyle('/styles/icon-picker.css').then(() => {
+      if (active !== request) return;
+      if (isStale(request)) {
+        request.drop();
+        return;
+      }
+      request.dialog = present(current, (value) => {
+        if (active === request) active = null;
+        resolve(value);
+      }, suggestions) ?? null;
+    });
   });
-
-  function show(resolve) {
-    const picker = buildDialog(current, resolve, suggestions);
-    document.body.appendChild(picker.dialog);
-    // Lupe und Leeren-Knopf des geteilten Suchfelds sind <i data-lucide>; die
-    // Kacheln baut iconElement() selbst und brauchen das nicht.
-    window.lucide?.createIcons?.({ el: picker.dialog });
-    picker.dialog.showModal();
-    revealDialog(picker.dialog);
-    picker.register();
-    picker.focus();
-  }
 }
+
+/** Nur fuer Tests (test-icon-picker-request.js). */
+export const __test = {
+  setPresenter(fn) { present = fn; },
+  reset() { active = null; },
+};

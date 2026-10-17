@@ -172,10 +172,11 @@ function openTypeModal(type) {
         </div>
       </form>`,
     onSave(panel) {
-      panel.querySelector('#hpt-icon-trigger').addEventListener('click', async () => {
+      panel.querySelector('#hpt-icon-trigger').addEventListener('click', async (event) => {
+        const trigger = event.currentTarget;
         const { openIconPicker } = await import('/components/icon-picker.js');
         const hidden = panel.querySelector('#hpt-icon');
-        const chosen = await openIconPicker(hidden.value || null, { suggestions: ICON_SUGGESTIONS });
+        const chosen = await openIconPicker(hidden.value || null, { suggestions: ICON_SUGGESTIONS, owner: trigger });
         if (chosen === undefined) return; // Abbruch - nichts aendern
         hidden.value = chosen || 'syringe'; // "kein Symbol" ergibt hier keinen Sinn - der Typ behaelt sein Zeichen
         const btn = panel.querySelector('#hpt-icon-trigger');

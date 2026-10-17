@@ -1001,7 +1001,7 @@ async function pickTypeIcon(button) {
   const hidden = form?.querySelector('input[name="icon"]');
   if (!hidden) return;
   const { openIconPicker } = await import('/components/icon-picker.js');
-  const chosen = await openIconPicker(hidden.value || null, { suggestions: TYPE_ICON_SUGGESTIONS });
+  const chosen = await openIconPicker(hidden.value || null, { suggestions: TYPE_ICON_SUGGESTIONS, owner: button });
   if (chosen === undefined) return;
   hidden.value = chosen ?? '';
   setTypeIconButtonIcon(button, chosen);

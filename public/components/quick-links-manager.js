@@ -259,9 +259,10 @@ function openQuickLinkForm(link, onDone) {
        * Wege, und der Griff auf die Vorschau soll den nehmen, der nichts
        * kostet: kein Dateibrowser, kein Zuschnitt, kein Bild, das irgendwo
        * gesucht werden muss. Wer ein eigenes Bild will, sagt das ausdrücklich. */
-      const openSymbolPicker = async () => {
+      const openSymbolPicker = async (event) => {
+        const trigger = event.currentTarget;
         const { openIconPicker } = await import('/components/icon-picker.js');
-        const chosen = await openIconPicker(state.iconName);
+        const chosen = await openIconPicker(state.iconName, { owner: trigger });
         if (chosen === undefined) return;
         state.iconName = chosen;
         // Ein gewähltes Symbol setzt das Bild ab: sonst gewänne das Bild in
