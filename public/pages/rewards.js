@@ -14,6 +14,7 @@ import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 import { openModal, closeModal, confirmModal, confirmOverModal, refocusAfterRender } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { rowActionHtml } from '/utils/row-action.js';
+import { installPopoverMenus, popoverMenuHtml } from '/utils/popover-menu.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { wireScrollFade, stagger } from '/utils/ux.js';
@@ -607,7 +608,12 @@ function renderOverview(el) {
   // gemeinsam unter den Titel legt statt eine allein in die zweite Zeile.
   const adminBar = isAdmin() && !readOnly() ? `
           <div class="rw-section__actions">
-            <button class="btn btn--ghost btn--sm rw-manage-participants" type="button"><i data-lucide="users-round" aria-hidden="true"></i>${esc(t('rewards.manageParticipants'))}</button>
+            ${popoverMenuHtml({
+    id: 'rw-standings-more',
+    label: t('rewards.manageParticipants'),
+    items: [{ icon: 'users-round', label: t('rewards.manageParticipants'), action: 'manage-participants' }],
+    triggerClass: 'btn btn--secondary btn--icon btn--sm rw-section-tools',
+  })}
             <button class="btn btn--secondary btn--sm rw-grant-bonus" type="button"><i data-lucide="plus" aria-hidden="true"></i>${esc(t('rewards.grantBonus'))}</button>
           </div>` : '';
   // Anfragen und Punktestaende links, die letzten Buchungen ab der
@@ -650,10 +656,11 @@ function renderOverview(el) {
 }
 
 function wireOverview(el) {
+  installPopoverMenus(el);
   el.querySelector('.rw-section__more')?.addEventListener('click', () => {
     document.querySelector('.rewards-tabs [data-tab-id="ledger"]')?.click();
   });
-  el.querySelector('.rw-manage-participants')?.addEventListener('click', openParticipantsModal);
+  el.querySelector('[data-action="manage-participants"]')?.addEventListener('click', openParticipantsModal);
   el.querySelector('.rw-grant-bonus')?.addEventListener('click', () => openBonusModal());
   el.querySelectorAll('.rw-redeem-open').forEach((btn) => {
     btn.addEventListener('click', () => openRedeemModal(Number(btn.dataset.member)));

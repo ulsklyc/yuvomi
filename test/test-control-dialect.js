@@ -771,6 +771,32 @@ export function scanNativeDate(src, file = '') {
   return found;
 }
 
+/**
+ * D5 Abschnittsaktion: in einem Abschnittskopf-Container
+ * (`split-section-actions`, `rw-section__actions`) darf nur `btn--secondary`
+ * mit `btn--sm` stehen - kein `btn--secondary` ohne `btn--sm`, kein
+ * `btn--ghost`. Genau EINE `btn--secondary btn--sm` (Icon + Wort), seltene
+ * Nebenaktionen hinter `popover-menu__trigger` (`<modul>-section-tools`).
+ * Guard: `test:control-dialect` `section-action`
+ */
+export function scanSectionAction(src) {
+  const found = [];
+  const re = /class="(?:split-section-actions|rw-section__actions)"/g;
+  let m;
+  while ((m = re.exec(src))) {
+    if (inComment(src, m.index)) continue;
+    const chunk = src.slice(m.index, m.index + 800);
+    for (const c of templateControls(chunk)) {
+      if (/\bbtn--ghost\b/.test(c.cls)) {
+        found.push({ line: lineOf(src, m.index + c.index), what: `btn--ghost in Abschnittsaktion: ${c.cls}` });
+      } else if (/\bbtn--secondary\b/.test(c.cls) && !/\bbtn--sm\b/.test(c.cls) && !/\bpopover-menu__item\b/.test(c.cls)) {
+        found.push({ line: lineOf(src, m.index + c.index), what: `btn--secondary ohne --sm in Abschnittsaktion: ${c.cls}` });
+      }
+    }
+  }
+  return found;
+}
+
 // ---------------------------------------------------------------------------
 // Scanner-Proben: jede Regel faengt ihr Beispiel und laesst die Kanonform durch
 // ---------------------------------------------------------------------------
@@ -1055,6 +1081,21 @@ test('Scanner: native-date faengt das native Datumsfeld (Template und DOM) und l
   assert.deepEqual(scanNativeDate(bad, 'public/components/datepicker.js'), [], 'der Baustein selbst zaehlt nicht');
 });
 
+test('Scanner: section-action faengt btn--ghost und btn--secondary ohne --sm im Abschnittskopf und laesst Kanon durch', () => {
+  const bad = `
+    <div class="split-section-actions">
+      <button class="btn btn--ghost btn--sm x-manage" type="button"><i data-lucide="users-round" aria-hidden="true"></i>\${t('a')}</button>
+      <button class="btn btn--secondary x-create" type="button"><i data-lucide="plus" aria-hidden="true"></i>\${t('b')}</button>
+    </div>`;
+  assert.equal(scanSectionAction(bad).length, 2);
+  const good = `
+    <div class="rw-section__actions">
+      <button class="btn btn--secondary btn--icon btn--sm rw-section-tools popover-menu__trigger" type="button" aria-label="\${t('a')}"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+      <button class="btn btn--secondary btn--sm rw-grant-bonus" type="button"><i data-lucide="plus" aria-hidden="true"></i>\${t('b')}</button>
+    </div>`;
+  assert.deepEqual(scanSectionAction(good), []);
+});
+
 test('Scanner: sheet-drag faengt Touch-Gesten an Blatt und Tafel ausserhalb des Helfers', () => {
   const bad = `
     panel.addEventListener('touchstart', (e) => {}, { passive: true });
@@ -1232,6 +1273,9 @@ const PENDING = {
   // D9: leer - die letzten fuenf (documents.js 1, health.js 2,
   // health-fasting.js 2) sind yuvomi-datepicker. Ab hier ist jedes neue rot.
   'native-date': {},
+  // --- Issue #2042 (2026-10-17): D5 Abschnittsaktion - leer ab Beginn. ---
+  // Genau EINE btn--secondary btn--sm im Abschnittskopf; kein btn--ghost.
+  'section-action': {},
 };
 
 const HEAD_SEARCH = headSearchClasses(JS);
@@ -1257,6 +1301,7 @@ const RULES = {
   'search-width': { files: CSS.filter((f) => f.file !== 'public/styles/page-search.css'), scan: (s) => scanSearchWidth(s, HEAD_SEARCH), canon: '`--page-search-width` + Center-Slot (page-search.css), keine Modulbreite' },
   'sheet-drag': { files: JS, scan: (s, f) => scanSheetDrag(s, f), canon: '`wireSheetDrag()` (utils/sheet-drag.js)' },
   'native-date': { files: JS, scan: (s, f) => scanNativeDate(s, f), canon: '`<yuvomi-datepicker type="date">` (components/datepicker.js)' },
+  'section-action': { files: JS, scan: (s) => scanSectionAction(s), canon: 'genau EINE `btn--secondary btn--sm` (Icon + Wort) im Abschnittskopf; Nebenaktionen hinter `popover-menu__trigger` mit `<modul>-section-tools` (DESIGN.md D5)' },
 };
 
 function census(rule) {

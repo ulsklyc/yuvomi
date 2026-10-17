@@ -20433,7 +20433,7 @@ test('R16: im Budget steht jeder Abschnittstitel auf der Buehne, die Zeilen lieg
   // Titel ueber dem Traeger.
   assert.doesNotMatch(split, /split-card\b/, 'die Karte mit Titel darin ist entfallen');
   assert.equal((split.match(/class="split-section-title u-section-title"/g) ?? []).length, 4);
-  assert.match(split, /return `<div class="row-carrier">\$\{rows\}<\/div>\$\{add\}`;/, 'Serien im Traeger');
+  assert.match(split, /return `<div class="row-carrier">\$\{rows\}<\/div>`;/, 'Serien im Traeger');
   assert.match(split, /return `<div class="row-carrier">\$\{debts\.map/, 'Salden im Traeger');
   assert.match(split, /return `<div class="row-carrier">\$\{state\.expenses\.map/, 'Ausgaben im Traeger');
   assert.match(split, /class="split-activity-list row-carrier"/, 'Verlauf im Traeger');

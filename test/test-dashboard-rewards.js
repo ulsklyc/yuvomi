@@ -338,8 +338,10 @@ const { __test: rewardsPage } = await import('../public/pages/rewards.js');
 function markupEl() {
   return {
     html: '',
+    dataset: {},
     replaceChildren() { this.html = ''; },
     insertAdjacentHTML(_pos, html) { this.html += html; },
+    addEventListener() {},
     querySelector() { return null; },
     querySelectorAll() { return []; },
   };
@@ -756,11 +758,15 @@ test('Uebersicht: "Bonus vergeben" steht im Kopf der Punktestaende und oeffnet d
     rewardsPage.renderOverview(el);
     const head = kopf(el.html);
     assert.ok(head, 'Vorbedingung: der Kopf der Punktestaende steht da');
+    // D5 Abschnittsaktion: EINE btn--secondary btn--sm (Bonus), Nebenaktionen
+    // hinter einem rw-section-tools popover-trigger (Teilnehmer verwalten).
     const knoepfe = [...head.matchAll(/<button class="([^"]*)" type="button">[\s\S]*?<\/i>([^<]*)<\/button>/g)].map(([, cls, label]) => ({ cls, label }));
-    assert.deepEqual(knoepfe.map((k) => k.label), ['rewards.manageParticipants', 'rewards.grantBonus'],
-      'zwei beschriftete Kopfaktionen, der Bonus am Ende');
-    assert.match(knoepfe[1].cls, /\bbtn--secondary\b/, 'der Bonus ist die staerkere der beiden');
-    assert.match(knoepfe[0].cls, /\bbtn--ghost\b/, 'Teilnehmer verwalten bleibt leise');
+    assert.deepEqual(knoepfe.map((k) => k.label), ['rewards.grantBonus'],
+      'genau eine beschriftete Abschnittsaktion - Bonus; Teilnehmer verwalten steht im Mehr-Menue');
+    assert.match(knoepfe[0].cls, /\bbtn--secondary\b/, 'der Bonus ist die Abschnittsaktion');
+    assert.match(knoepfe[0].cls, /\bbtn--sm\b/, 'Abschnittsaktion traegt --sm');
+    assert.match(head, /rw-section-tools\b/, 'das Mehr-Menue fuer Teilnehmer verwalten steht im Kopf');
+    assert.match(head, /data-action="manage-participants"/, 'der Menue-Eintrag traegt den Aktions-Schluessel');
     assert.equal((el.html.match(/rw-grant-bonus/g) || []).length, 1, 'genau EIN Knopf - keiner je Personenzeile');
 
     assert.equal(typeof el.clicks.get('rw-grant-bonus'), 'function', 'der Knopf ist verdrahtet');

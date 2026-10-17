@@ -771,7 +771,7 @@ function drawMain(main) {
   const toolsOnly = canAct;
   const balanceActions = canAct ? `
           <div class="split-section-actions">
-            <button class="btn btn--secondary" id="split-settle">
+            <button class="btn btn--secondary btn--sm" id="split-settle">
               <i data-lucide="hand-coins" class="icon-md" aria-hidden="true"></i>
               ${t('splitExpenses.settle')}
             </button>
@@ -824,6 +824,9 @@ function drawMain(main) {
       <section class="split-section">
         <div class="split-section-head">
           <${SectionTag} class="split-section-title u-section-title">${t('budget.recurringLabel')}</${SectionTag}>
+          ${canAct ? `<button type="button" class="btn btn--secondary btn--sm split-recurring-add" data-recurring-add>
+            <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>${esc(t('splitExpenses.recurring.add'))}
+          </button>` : ''}
         </div>
         <div id="split-recurring-list">${renderRecurring(archived || ro)}</div>
       </section>
@@ -856,6 +859,7 @@ function drawMain(main) {
     if (btn.dataset.expenseView) openExpenseReadView(expense);
     else openExpenseModal(expense);
   });
+  main.querySelector('[data-recurring-add]')?.addEventListener('click', () => openRecurringModal());
   main.querySelector('#split-recurring-list')?.addEventListener('click', onRecurringClick);
 }
 
@@ -990,11 +994,7 @@ function mayActOnRecurring(recurring) {
  * sobald eine Bearbeitung sie repariert hat.
  */
 function renderRecurring(asList = false) {
-  const add = asList ? '' : `
-    <button type="button" class="btn btn--secondary split-recurring-add" data-recurring-add>
-      <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>${esc(t('splitExpenses.recurring.add'))}
-    </button>`;
-  if (!state.recurring.length) return `<div class="split-muted">${t('splitExpenses.recurring.empty')}</div>${add}`;
+  if (!state.recurring.length) return `<div class="split-muted">${t('splitExpenses.recurring.empty')}</div>`;
   const rows = state.recurring.map((recurring) => {
     const paused = Boolean(recurring.paused_at);
     const when = paused
@@ -1028,12 +1028,11 @@ function renderRecurring(asList = false) {
     : `<button type="button" class="split-expense" data-recurring-view="${recurring.id}">${body}</button>`}
       </div>`;
   }).join('');
-  return `<div class="row-carrier">${rows}</div>${add}`;
+  return `<div class="row-carrier">${rows}</div>`;
 }
 
 /** Delegierter Klick in der Serienliste. */
 function onRecurringClick(e) {
-  if (e.target.closest('[data-recurring-add]')) return openRecurringModal();
   const toggle = e.target.closest('[data-recurring-toggle]');
   if (toggle) return toggleRecurring(Number(toggle.dataset.recurringToggle));
   const row = e.target.closest('[data-recurring-view], [data-recurring-id]');
