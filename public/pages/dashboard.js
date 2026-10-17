@@ -91,6 +91,23 @@ let _fabController = null;
 let _wallOverlay = null;
 let _wallLeave = null;
 
+/* WOHIN DER FOKUS NACH DEM MODUSWECHSEL GEHT (R20, Re-Critique 2026-10-17 A1
+ * P2-6). Start und Ausstieg bauen die ganze Seite neu (`rerender`), und danach
+ * stand der Fokus auf <body>: wer per Tastatur „Wand-Modus starten" drueckte,
+ * fand sich nirgends, und nach Esc wieder am Dokumentanfang. Die Absicht
+ * ueberlebt den Neuaufbau hier, weil `render()` eine neue Closure baut:
+ *   'enter' -> die Wandflaeche selbst (`#wall-surface`, tabindex=-1): ein
+ *              ruhiger Einstieg, kein Knopf - ein Enter dort beendete sonst
+ *              gleich wieder, was gerade begonnen hat;
+ *   'leave' -> der Knopf, der die Wand wieder oeffnet (am Finger das Menue).
+ * Einmal gelesen, dann vergessen. */
+let _wallFocusIntent = null;
+function takeWallFocusIntent(kind) {
+  if (_wallFocusIntent !== kind) return false;
+  _wallFocusIntent = null;
+  return true;
+}
+
 function holdWallMarker(leave) {
   _wallLeave = leave;
   if (_wallOverlay !== null && isOverlayOpen(_wallOverlay)) return;
@@ -6084,9 +6101,14 @@ function createWallFit(win, signal) {
  * merkte, wenn sie fehlte.
  */
 function rebuildWall(container, shell, { data, weather, failed, updatedAt, rerender, signal, fit, screensaverEnabled = false }) {
+  // Der stille Neuaufbau (Minutentakt, Timer) nimmt den Fokus mit, statt ihn
+  // auf <body> fallen zu lassen - dasselbe Paar wie in rebuildDashboard.
+  const doc = globalThis.document;
+  const { key: keepFocus } = captureRebuildFocus(shell, doc?.activeElement, doc?.body);
   setHtml(shell, renderWallSurface(data, weather, { failed, updatedAt, screensaverEnabled }));
   if (globalThis.window?.lucide) globalThis.window.lucide.createIcons({ el: shell });
   wireWallSurface(container, rerender, signal);
+  restoreFocusAfterRebuild(container, [keepFocus, takeWallFocusIntent('enter') ? '#wall-surface' : null]);
   // Die Titel unter den Gesichtern folgen dem Platz: nach jedem Aufbau von der
   // obersten Stufe hinab.
   return fit.show(shell, data);
@@ -6195,7 +6217,7 @@ function renderWallSurface(data, weather, { failed = false, loading = false, upd
     : '<p class="wall__updated"></p>';
 
   return `
-    <div class="wall">
+    <div class="wall" id="wall-surface" tabindex="-1" aria-label="${esc(t('settings.wallModeLabel'))}" role="region">
       ${renderClockWidget({ wall: true })}
       <div class="wall__stage${failed || loading ? ' wall__stage--single' : ''}">${main}</div>
       ${timer.display}
@@ -6264,6 +6286,7 @@ function wireWallExit(container, rerender, signal) {
   const leave = () => {
     releaseWallMarker();
     exitWallMode();
+    _wallFocusIntent = 'leave';
     // Der Toast sagt, WO der Weg zurueck liegt - wer versehentlich aussteigt,
     // soll nicht suchen muessen. Der Name kommt aus dem Schluessel des Knopfes
     // statt aus dem Satz: sonst driftet die Wegbeschreibung, sobald der Knopf
@@ -7673,6 +7696,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     }, { signal: signal });
     container.querySelector('#dashboard-wall-enter')?.addEventListener('click', () => {
       enterWallMode();
+      _wallFocusIntent = 'enter';
       // EIN KNOPF OHNE WORT SCHALTET DIE GANZE SHELL AB (#1559, D#1494): wer
       // ihn aus Neugier antippt, steht ohne Seitenleiste und Tab-Leiste da.
       // Eine Zeile sagt, was das ist und wie man herauskommt - der Name des
@@ -7718,6 +7742,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
       keepFocus,
       ...(focusAfterRebuild ?? []),
       ...(hadFocus && modeChanged ? ['#dashboard-customize-btn', '.dashboard-tools-btn'] : []),
+      ...(takeWallFocusIntent('leave') ? ['#dashboard-wall-enter', '.dashboard-tools-btn'] : []),
     ]);
     focusAfterRebuild = null;
     playTileFlip(shell, tileRectsBefore);

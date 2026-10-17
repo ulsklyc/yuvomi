@@ -305,6 +305,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Wall mode keeps the keyboard focus and shows what its buttons are for.** Starting wall mode
+  puts the focus on the wall, and leaving it with Esc returns it to the button that started it,
+  instead of dropping it at the top of the page. The timer buttons carry the word "Kitchen timer",
+  and the count next to a face no longer covers the initials: it leans against the face, or follows
+  the name when task titles are shown.
+
 - **The keyboard shortcuts dialog keeps the keyboard inside.** Pressing "?" opened a panel the focus
   never entered: Tab ran on through the page behind it, and closing it left you nowhere. It now opens
   like every other dialog, with the focus inside, and closing it returns you to where you were. On a

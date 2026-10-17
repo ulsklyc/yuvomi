@@ -5628,6 +5628,13 @@ button.today-cockpit__more--link {
   container: wall / inline-size;
 }
 
+/* Die Flaeche ist der Landeplatz des Fokus nach dem Start (dashboard.js,
+ * `_wallFocusIntent`), kein Bedienelement: kein Ring um den ganzen Schirm.
+ * Der naechste Tab-Schritt zeigt den Ring am ersten Knopf. */
+.wall:focus {
+  outline: none;
+}
+
 /* ── Der Anker: Uhrzeit und Datum ── */
 /* Die Uhr ist im Wand-Modus keine Kachel im Raster, sondern der Kopf der
  * Fläche: kein Surface, kein Rahmen, linksbündig wie jeder Seitenkopf. Ihre
@@ -5912,10 +5919,16 @@ button.today-cockpit__more--link {
 /* Der Zähler ist auf Distanz gebaut, nicht als Mikro-Badge: eine 13px-Marke
  * an einem 56px-Gesicht wäre aus zwei Metern reine Dekoration. Er liegt auf
  * Surface mit Kante, weil er auf der Bühne steht (1,18:1 ohne Kante). */
+/* DIE MARKE LEHNT AM GESICHT, SIE LIEGT NICHT DARAUF (R20, Re-Critique
+ * 2026-10-17 A1 P2-6). Am Ende verankert (`inset-inline-end: -8px`) wuchs sie
+ * nach innen und deckte bei 1280x800 79 bis 118px² der Initialen zu („LE"
+ * las sich als „L"). Jetzt haelt ihr ANFANG drei Viertel des Gesichts frei
+ * (`inset-inline-start: 100% - 12px`), und eine zweistellige Zahl waechst nach
+ * aussen statt ueber die Buchstaben. */
 .wall-who__count {
   position: absolute;
   inset-block-start: calc(var(--space-1) * -1);
-  inset-inline-end: calc(var(--space-2) * -1);
+  inset-inline-start: calc(100% - var(--space-3));
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -5980,6 +5993,27 @@ button.today-cockpit__more--link {
   align-items: center;
   gap: var(--space-1) var(--space-3);
   text-align: start;
+}
+
+/* MIT TITELN STEHT DER NAME NEBEN DEM GESICHT - dort, wohin die Marke nach
+ * aussen waechst. Sie tritt deshalb aus der Ecke in die Kopfzeile, direkt
+ * hinter den Namen („Leo 3"): `display: contents` hebt den Traeger auf, die
+ * Marke wird dritte Spalte. */
+.wall-who__list--tasks .wall-who__member {
+  /* Die vierte, freie Spalte nimmt die Breite der Aufgabentitel auf, die
+   * ueber alle Spalten laufen - sonst wuchsen Name und Marke mit ihnen. */
+  grid-template-columns: auto minmax(0, max-content) auto minmax(0, 1fr);
+}
+
+.wall-who__list--tasks .wall-who__mark {
+  display: contents;
+}
+
+.wall-who__list--tasks .wall-who__count {
+  position: static;
+  grid-row: 1;
+  grid-column: 3;
+  justify-self: start;
 }
 
 .wall-who__list--tasks .wall-who__name {
@@ -6486,6 +6520,39 @@ button.today-cockpit__more--link {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+}
+
+/* Der Gegenstand der Kapseln (R20): in der Stimme des Stand-Stempels links
+ * daneben - Tertiaer, Bildunterschrift -, damit er benennt, ohne zu rufen. */
+.wall__timer-presets-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-inline-end: var(--space-1);
+  font-size: var(--type-caption);
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+}
+
+.wall__timer-presets-label svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+
+/* Am Telefon steht das Wort ueber den Kapseln: daneben drueckte es sie bei
+ * 390px auf zwei Zeilen („3 / Min"), und die Gruppe lief 3px ueber den Fuss. */
+@container wall (max-width: 559px) {
+  .wall__timer-presets {
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: 0;
+  }
+
+  .wall__timer-presets-label {
+    flex: 0 0 100%;
+    justify-content: center;
+    margin-inline-end: 0;
+  }
 }
 
 /* Leise da, hell auf Berührung - dieselbe Grammatik wie der Fuß-Knopf daneben,

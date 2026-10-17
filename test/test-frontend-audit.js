@@ -21929,3 +21929,30 @@ test('R20: der Auswahlmodus nimmt Kapsel, FAB und Wisch-Pfeil weg, die ganze Zei
   assert.ok(css.some((r) => r.selector.includes('.tasks-page .task-card--selected > .task-card__main') && /--color-accent/.test(r.body)), 'die gewaehlte Zeile ist im App-Akzent getoent');
   assert.ok(css.some((r) => r.selector.trim() === '.tasks-page.is-selecting .task-card.is-selected:not(.task-card--selected)' && /transparent/.test(r.body)), 'die Spalten-Markierung schweigt waehrend der Auswahl');
 });
+
+// R20 D4 (Re-Critique 2026-10-17, A1 P2-6): der Wand-Modus verlor den Fokus an
+// <body> - nach dem Start und nach Esc -, die Timer-Kapseln hatten kein
+// sichtbares Wort, und die Zaehlmarke deckte bei 1280x800 79 bis 118px² der
+// Initialen zu.
+test('R20: der Wand-Modus fuehrt den Fokus, benennt den Timer und laesst die Initialen frei', () => {
+  const dash = read('../public/pages/dashboard.js');
+  assert.match(dash, /<div class="wall" id="wall-surface" tabindex="-1"/, 'die Flaeche ist der Landeplatz des Fokus');
+  const enter = dash.slice(dash.indexOf("querySelector('#dashboard-wall-enter')?.addEventListener('click'"));
+  assert.match(enter.slice(0, 200), /_wallFocusIntent = 'enter'/, 'der Start merkt sich, wohin der Fokus soll');
+  const wall = dash.slice(dash.indexOf('function rebuildWall('), dash.indexOf('function renderWallWeather('));
+  assert.match(wall, /captureRebuildFocus\(/, 'der stille Neuaufbau nimmt den Fokus mit');
+  assert.match(wall, /takeWallFocusIntent\('enter'\) \? '#wall-surface'/, 'nach dem Start steht er auf der Flaeche');
+  const leave = dash.slice(dash.indexOf('function wireWallExit('), dash.indexOf('function wireWallExit(') + 400);
+  assert.match(leave, /_wallFocusIntent = 'leave'/, 'der Ausstieg merkt sich den Rueckweg');
+  assert.match(dash, /takeWallFocusIntent\('leave'\) \? \['#dashboard-wall-enter', '\.dashboard-tools-btn'\]/, 'nach Esc steht er auf dem Knopf, der die Wand wieder oeffnet');
+
+  const timer = read('../public/components/wall-timer.js');
+  assert.match(timer, /role="group" aria-labelledby="wall-timer-presets-label"/, 'die sichtbare Zeile ist der Name der Gruppe');
+  assert.match(timer, /class="wall__timer-presets-label" id="wall-timer-presets-label"/);
+
+  const css = [...eachRule(read('../public/styles/dashboard.css'))].filter((r) => !r.at.length);
+  const count = css.find((r) => r.selector.trim() === '.wall-who__count');
+  assert.match(count?.body ?? '', /inset-inline-start:\s*calc\(100% - var\(--space-3\)\)/, 'die Marke waechst vom Gesicht weg, nicht ueber die Buchstaben');
+  assert.doesNotMatch(count?.body ?? '', /inset-inline-end/);
+  assert.ok(css.some((r) => r.selector.trim() === '.wall-who__list--tasks .wall-who__mark' && /display:\s*contents/.test(r.body)), 'mit Titeln steht die Marke hinter dem Namen');
+});

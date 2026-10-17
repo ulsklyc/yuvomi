@@ -130,7 +130,16 @@ export function renderWallTimer({ state, remainingMs } = readWallTimer()) {
     return {
       display: '',
       controls: `
-      <div class="wall__timer-presets" role="group" aria-label="${t('dashboard.wallTimerLabel')}">
+      <div class="wall__timer-presets" role="group" aria-labelledby="wall-timer-presets-label">
+        ${/* DAS WORT STEHT DA (R20, Re-Critique 2026-10-17 A1 P2-6). Fuenf
+             Kapseln „3 Min" bis „30 Min" ohne Gegenstand lasen sich aus zwei
+             Metern wie Zeitfilter des Programms; „Kuechentimer" stand nur im
+             Namen der Gruppe, also nur fuer den Screenreader. Jetzt ist die
+             sichtbare Zeile der Name. */''}
+        <span class="wall__timer-presets-label" id="wall-timer-presets-label">
+          <i data-lucide="timer" aria-hidden="true"></i>
+          <span>${t('dashboard.wallTimerLabel')}</span>
+        </span>
         ${buttons}
       </div>`,
     };
