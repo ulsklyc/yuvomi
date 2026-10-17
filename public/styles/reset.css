@@ -169,7 +169,8 @@ h1, h2, h3, h4, h5, h6 {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     --motion-fade: 0s;
-    animation-duration: 0s !important;
+    --motion-blend: 0s;
+    animation-duration: var(--motion-blend) !important;
     animation-delay: 0s !important;
     transition-duration: var(--motion-fade) !important;
     scroll-behavior: auto !important;
@@ -184,8 +185,19 @@ h1, h2, h3, h4, h5, h6 {
   .more-backdrop,
   .more-backdrop--visible,
   .search-overlay,
-  .popover-menu {
+  .popover-menu,
+  .page-toolbar--fold-row > * {
     --motion-fade: var(--duration-sm);
+  }
+
+  /* Dasselbe fuer ANIMATIONEN, die nur blenden (R20, Re-Critique 2026-10-17
+   * a6 P3): der Titel eines gedeckelten Kopfes setzt sich beim Ein- und
+   * Ausklappen per `page-title-settle` (reine Deckkraft, layout.css) - unter
+   * reduzierter Bewegung schlug er sonst hart um. Nur Elemente, deren
+   * einzige Animation eine Blende ist, stehen hier: die Dauer gilt jeder
+   * Animation des Elements. */
+  .page-toolbar--capped > .page-toolbar__title {
+    --motion-blend: var(--duration-sm);
   }
 }
 

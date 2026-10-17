@@ -286,11 +286,18 @@ function followingNeighbours(el, limit = 60) {
  * `interpolate-size`/`calc-size()` (Guide animate-to-intrinsic-sizes) waere
  * wieder eine Hoehenanimation und damit Layout je Frame.
  *
- * Unter `prefers-reduced-motion` steht das Element ohne Bewegung da.
+ * Unter `prefers-reduced-motion` blendet das Element nur ein (`--duration-sm`).
  */
 export function expandIn(el, { duration = durationToken('--duration-lg', 250) } = {}) {
   if (!el || typeof el.animate !== 'function') return Promise.resolve();
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return Promise.resolve();
+  // Reduzierte Bewegung: keine Groesse, kein Nachruecken - aber eine Blende
+  // (R20, Re-Critique 2026-10-17 a6 P3; vorher stand die Zeile hart da,
+  // waehrend collapseOut dort ausblendet).
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const fadeMs = durationToken('--duration-sm', 150);
+    const opacity = getComputedStyle(el).opacity || '1';
+    return settleAnimation(el.animate([{ opacity: 0 }, { opacity }], { duration: fadeMs, easing: easingToken('--ease-out', 'ease-out') }), fadeMs);
+  }
   const easing = easingToken('--ease-in-out', 'ease-in-out');
   const neighbours = el.style && el.isConnected !== false ? followingNeighbours(el) : [];
   let before = null;

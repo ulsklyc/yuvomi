@@ -214,7 +214,9 @@ test('collapseOut/expandIn: loesen ohne Animation sofort auf; unter reduzierter 
   const el = { style: {}, animate: (k) => { frames.push(...k); return { finished: Promise.resolve() }; } };
   try {
     await expandIn(el);
-    assert.equal(frames.length, 0, 'unter prefers-reduced-motion zieht keine Hoehe auf');
+    // R20: nicht mehr hart, sondern eine Blende - weiter ohne Hoehe und Skalierung.
+    assert.ok(frames.length > 0, 'unter prefers-reduced-motion erscheint die Zeile ohne Blende');
+    assert.ok(frames.every((f) => Object.keys(f).every((k) => k === 'opacity')), 'unter prefers-reduced-motion zieht etwas auf oder skaliert');
     await collapseOut(el);
   } finally {
     global.window.matchMedia = () => ({ matches: false });
