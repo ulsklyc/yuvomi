@@ -897,6 +897,16 @@
   text-align: end;
 }
 
+/* EIN TEXTFELD NIMMT DIE HALBE ZEILE (Re-Kritik 2026-10-17). Ohne Breite blieb
+ * es bei seiner Vorgabe von 20 Zeichen: am Desktop 201px in einer 680px-Zeile,
+ * eine E-Mail-Adresse oder WebDAV-Adresse lief darin ab dem 25. Zeichen weg.
+ * Es fuellt jetzt die Deckelung der Bedienspalte (50cqi). Nur als einziges
+ * Kind - steht ein Knopf daneben, teilen sich beide die Spalte wie bisher. */
+.settings-group .settings-setting-row__control > input.form-input:only-child:is([type="text"], [type="email"], [type="tel"], [type="url"], [type="password"], [type="search"], :not([type])) {
+  inline-size: 50cqi;
+  max-inline-size: 100%;
+}
+
 /* Fehlerzeile und verborgene Zusatzhinweise einer Zeile stehen im Textblock. */
 .settings-group .settings-setting-row__copy > .form-error,
 .settings-group .settings-setting-row__copy > .form-hint {

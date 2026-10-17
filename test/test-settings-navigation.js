@@ -3995,11 +3995,23 @@ test('R19: umgestellte Blaetter sprechen den Zeilen-Dialekt', async () => {
   // Konto: Kontaktdaten und Passwort als Zeilen (das Profil oben bleibt der
   // Kopf mit Bild); in der Karte legt die Gruppe ihre eigene Flaeche ab.
   const account = await readFile(new URL('../public/settings/pages/personal-account.js', import.meta.url), 'utf8');
-  for (const id of ['profile-phone', 'profile-email', 'profile-birth-date', 'current-password', 'new-password', 'confirm-password']) {
+  // Re-Kritik 2026-10-17: auch Anzeigename und Farbe neben dem Bild (vorher
+  // Felder unter Etiketten, zwei Dialekte in einer Karte).
+  for (const id of ['profile-display-name', 'profile-avatar-color', 'profile-phone', 'profile-email', 'profile-birth-date', 'current-password', 'new-password', 'confirm-password']) {
     assert.match(account, new RegExp(`settingRowHtml\\(\\{\\s*label: t\\('settings\\.[a-zA-Z]+'\\), labelFor: '${id}'`), `Konto: ${id} als Zeile`);
   }
+  const profile = account.slice(account.indexOf('<div class="settings-profile-editor">'), account.indexOf('id="profile-error"'));
+  assert.ok(profile.length > 0, 'Vorbedingung: das Profil steht im Konto-Blatt');
+  assert.doesNotMatch(profile, /class="form-group/, 'Konto: das Profil fuehrt keine gestapelten Felder mehr');
+  assert.match(profile, /label: t\('settings\.usernameLabel'\)[\s\S]{0,200}class="settings-setting-row__value" id="profile-username"/,
+    'Konto: der Benutzername steht als Wert in seiner Zeile, nicht als gesperrtes Feld');
   const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
   assert.match(css, /\.settings-card \.row-carrier\.settings-group \{\s*background: none;\s*box-shadow: none;/, 'keine Karte in der Karte');
+  // Ein Textfeld in der Zeile fuellt die Bedienspalte (gemessen: E-Mail am
+  // Desktop 201px in einer 680px-Zeile).
+  const wide = [...eachRule(css)].find((r) => !r.at.length && /\.settings-group \.settings-setting-row__control > input\.form-input:only-child:is\(/.test(r.selector));
+  assert.match(wide?.body ?? '', /inline-size:\s*50cqi/, 'Textfelder nehmen die halbe Zeile');
+  assert.match(wide?.selector ?? '', /\[type="email"\]/, 'auch E-Mail');
 
   // Schritt 5b (B7 abgeschlossen): die uebrigen Blaetter mit Feldern unter
   // ihren Etiketten - WebDAV-Backup und Wiederherstellungs-Schluessel, Immich,
@@ -4032,6 +4044,28 @@ test('R19: umgestellte Blaetter sprechen den Zeilen-Dialekt', async () => {
   assert.match(css, /\.settings-card \.settings-group > \.settings-setting-row--switch > \.toggle-row,/, 'Schalterzeile fluchtet in der Karte');
   const layout = await readFile(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
   assert.match(layout, /\.form-row\[hidden\],\s*\.row-carrier\[hidden\],/, 'eine verborgene Zeile bleibt verborgen');
+
+  // Re-Kritik 2026-10-17: in der Gesundheit sprach nur der Messwert-Dialog
+  // Zeilen; Aktivitaet und Naehrwerte stapelten Felder in Rastern, die
+  // Medikamente trugen native Haken fuer zwei Einstellungen.
+  const health = await readFile(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  const fnBody = (src, name) => {
+    const at = src.indexOf(`function ${name}(`);
+    assert.ok(at > 0, `Vorbedingung: ${name} existiert`);
+    return src.slice(at, src.indexOf('\n}\n', at));
+  };
+  for (const name of ['openActivityModal', 'openNutritionModal', 'nutrientFieldsMarkup']) {
+    const body = fnBody(health, name);
+    assert.match(body, /formRowsHtml\(/, `Gesundheit ${name}: Zeilen im Dialog-Traeger`);
+    assert.doesNotMatch(body, /modal-grid/, `Gesundheit ${name}: kein Raster gestapelter Felder`);
+    // Nur die freie Notiz bleibt ein Feld unter ihrem Etikett.
+    assert.ok((body.match(/class="form-field"/g) ?? []).length <= 1, `Gesundheit ${name}: hoechstens die Notiz als Feld`);
+  }
+  const med = fnBody(health, 'openMedModal');
+  assert.doesNotMatch(med, /type="checkbox"/, 'Medikament: keine nativen Haken');
+  for (const id of ['med-active', 'med-prn']) {
+    assert.match(med, new RegExp(`toggleRowHtml\\(\\{[^}]*control: 'switch'[^}]*attrs: \\{ id: '${id}' \\}`), `Medikament: ${id} als Schalter`);
+  }
 
   // Die Dialoge der Einstellungen sprechen denselben Dialekt (Dialog-Traeger
   // `.form-rows`): CalDAV, CardDAV, Kalender-Abo, Rezeptdienste, Wandtablett,

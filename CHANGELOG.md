@@ -44,7 +44,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   subscriptions and import, Apple, Google and Outlook calendar sync, and the weather location. The
   dialogs for adding or editing a family member, invitations, CalDAV and CardDAV accounts, calendar
   subscriptions and recipe services use the same rows and are shorter for it; a missing required
-  entry is now named under its row instead of squeezing the field.
+  entry is now named under its row instead of squeezing the field. On the account page your name,
+  colour and username sit in rows beside your picture as well, and a text field such as an e-mail
+  address takes half the row instead of about 20 characters. In Health, the dialogs for an activity,
+  a food entry and the daily nutrition goal use the same rows, with the unit after each number, and
+  "Active" and "As needed" on a medication are switches.
 - **Settings for this device are in one place.** Wall mode and the screensaver options moved from
   Appearance to "This device", next to installing the app, because all of them apply only to the
   device you are holding.

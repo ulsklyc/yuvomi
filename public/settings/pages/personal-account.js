@@ -609,22 +609,26 @@ function renderPage(container, user, refreshFailed, accessNotice, oidcState, oid
         <form id="profile-form" class="settings-form">
           <div class="settings-profile-editor">
             ${avatarEditorHtml(user, { gravatarAvailable })}
-            <div class="settings-profile-editor__fields">
-              <div class="settings-name-color-row">
-                <div class="form-group settings-name-color-row__name">
-                  <label class="form-label" for="profile-display-name">${t('settings.displayNameLabel')}</label>
-                  <input class="form-input" type="text" id="profile-display-name" maxlength="128" value="${esc(user?.display_name || '')}" aria-describedby="profile-error" required>
-                </div>
-                <div class="form-group settings-color-field">
-                  <label class="form-label" for="profile-avatar-color">${t('settings.colorLabel')}</label>
-                  <input class="settings-color-button" type="color" id="profile-avatar-color" value="${esc(user?.avatar_color || '')}" aria-describedby="profile-error">
-                </div>
-              </div>
-              <div class="form-group">
-                <label class="form-label" for="profile-username">${t('settings.usernameLabel')}</label>
-                <input class="form-input" type="text" id="profile-username" value="@${esc(user?.username || '')}" readonly>
-                <p class="form-hint">${t('settings.usernameFixedHint')}</p>
-              </div>
+            ${/* NAME, FARBE UND BENUTZERNAME ALS ZEILEN (Re-Kritik 2026-10-17):
+                 sie standen als Felder unter Etiketten neben dem Bild, die
+                 Kontaktdaten darunter schon als Zeilen - zwei Dialekte in einer
+                 Karte. Der Kopf mit Bild bleibt; daneben dieselbe Zeilengruppe.
+                 Der Benutzername ist nicht aenderbar und steht als Wert, nicht
+                 als gesperrtes Feld. */ ''}
+            <div class="settings-profile-editor__fields row-carrier settings-group">
+              ${settingRowHtml({
+                label: t('settings.displayNameLabel'), labelFor: 'profile-display-name',
+                control: `<input class="form-input" type="text" id="profile-display-name" maxlength="128" value="${esc(user?.display_name || '')}" autocomplete="name" aria-describedby="profile-error" required>`,
+              })}
+              ${settingRowHtml({
+                label: t('settings.colorLabel'), labelFor: 'profile-avatar-color',
+                control: `<input class="settings-color-button" type="color" id="profile-avatar-color" value="${esc(user?.avatar_color || '')}" aria-describedby="profile-error">`,
+              })}
+              ${settingRowHtml({
+                label: t('settings.usernameLabel'), labelId: 'profile-username-label',
+                description: t('settings.usernameFixedHint'), descriptionId: 'profile-username-hint',
+                control: `<span class="settings-setting-row__value" id="profile-username" aria-labelledby="profile-username-label" aria-describedby="profile-username-hint">@${esc(user?.username || '')}</span>`,
+              })}
             </div>
           </div>
           ${gravatarHintHtml(gravatarAvailable)}
