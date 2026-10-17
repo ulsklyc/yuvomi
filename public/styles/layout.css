@@ -785,6 +785,12 @@ html:active-view-transition-type(region-fade)::view-transition-new(region-swap) 
   content: "";
   display: block;
   block-size: var(--shell-tail);
+  /* KEIN LAYOUT-SHIFT AUS DEM NACHLAUF (R20, E1-Befund Schichtplan 390: CLS
+   * 0,114). Der Platzhalter steht hinter dem Root und rutscht mit, sobald die
+   * Seite ihren Inhalt bekommt - von y=0 auf y=508. Er malt nichts, zaehlte
+   * aber als sichtbare Box; unsichtbar behaelt er seinen Platz und faellt aus
+   * der Messung. */
+  visibility: hidden;
 }
 
 /* #main-content wird nach jeder Navigation programmatisch fokussiert, damit

@@ -685,3 +685,14 @@ test('R19: Schichtplan, Belohnungen und Haushaltshilfe fuehren ihre Reiter in de
     'das Siegel geht mit (die vier Reiter der Haushaltshilfe brauchen 351 von 358px)');
   assert.ok(read('../DESIGN.md').includes('page-toolbar--tabs-title'), 'DESIGN.md nennt die Variante');
 });
+
+// R20 (E1-Befund, gemessen 2026-10-17): der Nachlauf-Platzhalter hinter dem
+// Seiten-Root rutschte beim ersten Rendern von y=0 auf y=508 und trug auf dem
+// Schichtplan bei 390px CLS 0,114 bei. Er malt nichts; unsichtbar behaelt er
+// seinen Platz und zaehlt nicht als Layout-Shift.
+test('R20: der Shell-Nachlauf ist unsichtbar und damit kein Layout-Shift', () => {
+  const [tail] = topLevel(layoutCss, '.app-content:not(:has(.page-scrollport)) > .page-transition::after');
+  assert.ok(tail, 'Regel des Nachlaufs fehlt');
+  assert.equal(decl(tail.body, 'block-size'), 'var(--shell-tail)', 'der Platz bleibt');
+  assert.equal(decl(tail.body, 'visibility'), 'hidden');
+});
