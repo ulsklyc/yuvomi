@@ -33,6 +33,8 @@ let scheduleTablist = null;
 let currentUserId = null;
 let canManageOthers = false;
 let activeView = 'overview';
+// Der letzte Ladeversuch scheiterte: update() rendert dann ganz neu (render()).
+let loadFailed = false;
 // Der Vorgabewert oben gilt nur, bevor jemals entschieden wurde - render()
 // setzt ihn beim ALLERERSTEN Laden dieses Moduls (in dieser Sitzung) auf den
 // Startreiter "Vergleich" (R17, siehe dort), aber niemals danach: `activeView` ist ausdruecklich
@@ -2053,7 +2055,12 @@ function navigateToView(id) {
  * `.page-toolbar__actions` survives every subsequent tab change instead of
  * being destroyed along with a full-page reset.
  */
-function renderShell() {
+/**
+ * Kopf der Seite: Titel und Reiter. Unter 1024px SIND die Reiter der Titel
+ * (`.page-toolbar--tabs-title`, das h1 tritt zurueck) - deshalb baut auch der
+ * Ladefehler in render() diesen Kopf, statt die Seite ohne ihn zu zeigen.
+ */
+function scheduleHeadHtml(current = activeView) {
   // DER PLAN ZUERST (Entscheidung R17, E1). "Vergleich" - die Woche als Raster -
   // ist das, wofuer jemand den Schichtplan oeffnet; bis R17 stand er als
   // letzter Reiter hinter drei Reitern Stammdaten und verlangte dort erst eine
@@ -2064,15 +2071,19 @@ function renderShell() {
     ['patterns', t('schedule.planning')],
     ['statistics', t('schedule.statistics')],
   ];
-  root.replaceChildren();
-  root.insertAdjacentHTML('beforeend', `<div class="schedule-page app-page app-page--full" data-composition="full">
-    <header class="page-toolbar page-toolbar--tabs-title schedule-toolbar">
+  return `<header class="page-toolbar page-toolbar--tabs-title schedule-toolbar">
       <h1 class="page-toolbar__title">${esc(t('schedule.title'))}</h1>
       <div class="page-toolbar__actions"></div>
       <div class="sub-tabs-bar schedule-tabs page-toolbar__bar" role="tablist" aria-label="${esc(t('schedule.title'))}">
-        ${tabs.map(([id, label]) => `<button class="sub-tab${id === activeView ? ' sub-tab--active' : ''}" id="schedule-tab-${id}" type="button" role="tab" data-tab-id="${id}" aria-controls="schedule-body" aria-selected="${id === activeView ? 'true' : 'false'}" tabindex="${id === activeView ? '0' : '-1'}">${esc(label)}</button>`).join('')}
+        ${tabs.map(([id, label]) => `<button class="sub-tab${id === current ? ' sub-tab--active' : ''}" id="schedule-tab-${id}" type="button" role="tab" data-tab-id="${id}" aria-controls="schedule-body" aria-selected="${id === current ? 'true' : 'false'}" tabindex="${id === current ? '0' : '-1'}">${esc(label)}</button>`).join('')}
       </div>
-    </header>
+    </header>`;
+}
+
+function renderShell() {
+  root.replaceChildren();
+  root.insertAdjacentHTML('beforeend', `<div class="schedule-page app-page app-page--full" data-composition="full">
+    ${scheduleHeadHtml()}
     <div class="schedule-today-slot"></div>
     <div class="schedule-body" id="schedule-body" role="tabpanel" tabindex="0"></div>
   </div>`);
@@ -3377,13 +3388,33 @@ export async function render(container, { user } = {}) {
   // als "Seite konnte nicht geladen werden" da. Jetzt zeigt die Seite selbst
   // den geteilten Ladefehler (Ursache aus dem Fehler, Status in den Details)
   // mit "Erneut versuchen", wie Haushaltshilfe und Abos.
+  //
+  // DER KOPF BLEIBT STEHEN (Re-Kritik 2026-10-17): unter 1024px sind die
+  // Reiter der Titel - ein Fehler, der die ganze Seite ersetzte, liess auf
+  // dem Telefon nur "Etwas ist schiefgelaufen" ohne jeden Hinweis, wo man
+  // ist. Der Fehler steht jetzt im Inhalt unter Titel und Reitern. Ein Reiter
+  // laedt neu (update() gibt nach einem Ladefehler false zurueck, der Router
+  // rendert die Seite also ganz).
+  loadFailed = false;
   try {
     await load();
   } catch (error) {
     if (root !== container) return;
+    loadFailed = true;
+    const shownView = scheduleViewFromPath(window.location?.pathname ?? '') ?? activeView;
     container.replaceChildren();
-    container.insertAdjacentHTML('beforeend', '<div class="schedule-page app-page app-page--full" data-composition="full"></div>');
-    mountLoadError(container.querySelector('.schedule-page'), {
+    container.insertAdjacentHTML('beforeend', `<div class="schedule-page app-page app-page--full" data-composition="full">
+    ${scheduleHeadHtml(shownView)}
+    <div class="schedule-body" id="schedule-body" role="tabpanel" tabindex="0"></div>
+  </div>`);
+    const tabsEl = container.querySelector('.schedule-tabs');
+    scheduleTablist = wireTablist(tabsEl, {
+      activeId: shownView,
+      manualActivation: true,
+      onChange: (id) => navigateToView(id),
+    });
+    attachSegmentIndicator(tabsEl);
+    mountLoadError(container.querySelector('.schedule-body'), {
       title: t('common.errorOccurred'),
       error,
       retryLabel: t('common.retry'),
@@ -3457,7 +3488,7 @@ export async function render(container, { user } = {}) {
  * Rendern (hier nur, wenn der Container bereits verschwunden ist).
  */
 export async function update({ path } = {}) {
-  if (!root?.isConnected) return false;
+  if (!root?.isConnected || loadFailed) return false;
   const requestedView = scheduleViewFromPath(path || window.location.pathname);
   const nextView = requestedView ?? activeView;
   const resolvedRoute = scheduleRouteForView(nextView);

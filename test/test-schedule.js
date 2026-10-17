@@ -2210,8 +2210,10 @@ test('R17/E1 + D3: the first visit lands on the comparison view - an empty house
   assert.match(fallbackBranch, /\n\s*activeView = planningNeedsShiftTypes\(\) \? 'shifts' : 'overview';\n/);
   assert.match(fallbackBranch, /initialViewDecided = true;/);
 
-  // The comparison view is the first tab; the tab addresses stay.
-  const shellFn = schedulePage.slice(schedulePage.indexOf('function renderShell()'), schedulePage.indexOf('scheduleTablist = wireTablist('));
+  // The comparison view is the first tab; the tab addresses stay. The tabs
+  // live in scheduleHeadHtml() since the load error builds the same head
+  // (re-critique 2026-10-17), so the slice starts there.
+  const shellFn = schedulePage.slice(schedulePage.indexOf('function scheduleHeadHtml('), schedulePage.indexOf('scheduleTablist = wireTablist('));
   const order = [...shellFn.matchAll(/^\s*\['(\w+)', t\('schedule\.\w+'\)\],$/gm)].map((m) => m[1]);
   assert.deepEqual(order, ['overview', 'shifts', 'patterns', 'statistics']);
   const tabsJs = readFileSync(new URL('../public/utils/schedule-tabs.js', import.meta.url), 'utf8');
@@ -2342,7 +2344,9 @@ test('switching tabs navigates through the router (URL + history entry), and the
 // (#budget-body) carries role="tabpanel" - .schedule-body did not.
 test('.schedule-body carries the same tabpanel ARIA wiring as budget.js\'s #budget-body', () => {
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
-  const shellFn = schedulePage.slice(schedulePage.indexOf('function renderShell()'), schedulePage.indexOf('scheduleTablist = wireTablist'));
+  // scheduleHeadHtml() (tabs) + renderShell() (panel): the head is shared
+  // with the load error since the re-critique 2026-10-17.
+  const shellFn = schedulePage.slice(schedulePage.indexOf('function scheduleHeadHtml('), schedulePage.indexOf('scheduleTablist = wireTablist'));
   assert.match(shellFn, /<div class="schedule-body" id="schedule-body" role="tabpanel" tabindex="0"><\/div>/);
   assert.match(shellFn, /id="schedule-tab-\$\{id\}"[\s\S]{0,80}aria-controls="schedule-body"/, 'each tab button must point at the panel it controls, like budget.js\'s tab buttons do at #budget-body');
 });
@@ -3250,6 +3254,21 @@ test('R19: ein Ladefehler (429) bleibt in der Seite - Ladefehler mit Wiederholen
     assert.ok(calls > 0, 'geladen wurde');
     const html = container.innerHTML ?? container.outerHTML ?? '';
     assert.ok(container.querySelector?.('.schedule-page') || /schedule-page/.test(html), 'die Seite traegt den Fehler selbst');
+    // Re-Kritik 2026-10-17: unter 1024px SIND die Reiter der Titel. Der Fehler
+    // ersetzte die ganze Seite, auf dem Telefon stand nur "Etwas ist
+    // schiefgelaufen". Kopf und Reiter bleiben, der Fehler steht im Inhalt.
+    // Die Mini-DOM kennt keine Selektoren (test/mini-dom.js) - gemessen wird
+    // das ausgegebene Markup, der Mount-Ort im Quelltext.
+    const out = container.outerHTML;
+    assert.match(out, /class="page-toolbar page-toolbar--tabs-title schedule-toolbar"[\s\S]*class="schedule-body"/,
+      'der Kopf mit Titel und Reitern steht ueber dem Inhalt');
+    assert.equal((out.match(/role="tab"/g) ?? []).length, 4, 'alle vier Reiter');
+    const src = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+    const catchBlock = src.slice(src.indexOf('loadFailed = true;'), src.indexOf('return;', src.indexOf('loadFailed = true;')));
+    assert.match(catchBlock, /mountLoadError\(container\.querySelector\('\.schedule-body'\)/,
+      'der Ladefehler steht im Inhalt, nicht anstelle der Seite');
+    assert.equal(await page.update({ path: '/schedule/shifts' }), false,
+      'nach einem Ladefehler rendert ein Reiterwechsel die Seite neu (laedt erneut), statt leere Daten zu zeigen');
   } finally {
     if (prevStub === undefined) delete globalThis.__apiStub; else globalThis.__apiStub = prevStub;
     restore();
