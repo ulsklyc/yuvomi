@@ -657,28 +657,42 @@
     color: var(--module-accent);
   }
 
-  /* EINGEKLAPPT EINE ZEILE (R17 Schritt 5, Critique 2026-10-07 A1 P1).
+  /* EINGEKLAPPT EINE ZEILE (R17 Schritt 5, Critique 2026-10-07 A1 P1; R20 6c).
    *
-   * Der Stepper rueckt mit dem Pop-up-Knopf in die frei gewordene Titelzeile,
-   * vor Lupe und Filter. Was dafuer weicht: das Wort im Pop-up-Knopf (das
-   * Auf/Ab-Zeichen bleibt, der Name nennt die Ansicht) und ein ruhender
-   * Filter, der ins Menue faltet (`data-collapse-fold`, wireCollapsingHeader).
-   * Ein AKTIVER Filter faltet nicht - die Zahl am Knopf ist die Zusage der
-   * Kopfregel (aktive Filter bleiben sichtbar). Die Lupe faltet nicht: sie
-   * ist ein Feld, kein Knopf, und ein Stellvertreter im Menue koennte es
-   * nicht oeffnen. */
+   * Der Zeitraum rueckt mit dem Pop-up-Knopf in die frei gewordene Titelzeile,
+   * vor Lupe und Filter - wie der kompakte Kopf von Apple Kalender: das
+   * Label, die Ansicht MIT Wort, Suche und Filter. Was dafuer weicht, sind
+   * die beiden Pfeile (Ulas 2026-10-17, Option b). Bis R20 wichen statt ihrer
+   * das Wort der Ansicht und der ruhende Filter - eingeklappt blieb ein
+   * stummes Auf/Ab-Zeichen, und wer filtern wollte, musste erst ins Menue.
+   *
+   * Blaettern geht eingeklappt weiter: per Wisch (period-swipe.js), per Taste
+   * (j/k und Pfeiltasten, router.js) und ueber das Ansichtsmenue, das die
+   * gefalteten Pfeile als Eintraege aufnimmt (`data-collapse-fold`,
+   * wireCollapsingHeader in utils/ux.js). "Heute" liegt schon auf dem Wert;
+   * ohne Pfeile deckt er das ganze Label, ein Tipp darauf springt zurueck.
+   * Steht man im laufenden Zeitraum, ist er verborgen und inert - dort gibt
+   * es nichts zurueckzusetzen. Die Lupe faltet nicht: sie ist ein Feld. */
   .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed > .page-toolbar__center {
     order: 0;
     flex: 1 1 0;
     min-width: 0;
   }
 
-  .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__filter-btn[data-collapse-fold]:not(.page-filter-btn--active) {
+  .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__stepper > .period-stepper__prev[data-collapse-fold],
+  .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__stepper > .period-stepper__next[data-collapse-fold] {
     display: none;
   }
 
-  .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__view-menu-label {
-    display: none;
+  .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__stepper > .cal-toolbar__today[data-collapse-fold] {
+    inset-inline: 0;
+  }
+
+  /* Der Knopf der Ansicht teilt die Zeile mit Label, Lupe und Filter: mit
+   * halbem Innenrand traegt das Label bei 390px die Agenda-Spanne
+   * "17.10. - 16.11.2026" ungekuerzt (gemessen 158px Text in 154px). */
+  .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__view-menu {
+    padding-inline: var(--space-2);
   }
 }
 

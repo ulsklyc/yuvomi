@@ -3015,7 +3015,13 @@ blieben 68). Ein AKTIVER Filter faltet nicht, seine Zahl bleibt (Regel 3), dann 
 Label; "Heute" ist nur ein Eintrag, wenn ein anderer Zeitraum offen ist. Nur unter 640px -
 darueber gibt es kein Menue, in das gefaltet wird. Die Reserve-Regel des Kopfs rechnet seither
 mit der ausgeklappten Hoehe (sonst pendelt eine Liste, deren Reserve zwischen Schwelle und
-Schwelle + 52px liegt). **Eingeklappt ist auch der Budgetkopf EINE Zeile (R19, Critique 2026-10-16 P2):** bis R19
+Schwelle + 52px liegt). **Seit R20 (6c, Ulas 2026-10-17) falten statt Filter und Wort die PFEILE:**
+der kompakte Kopf ist der von Apple Kalender - Zeitraum, Ansicht MIT Wort ("Agenda"), Lupe,
+Filter. Blaettern geht per Wisch, Taste (j/k) und ueber die beiden Stellvertreter "Vorherige/
+Naechste ..." oben im Ansichtsmenue; "Heute" deckt ohne Pfeile das ganze Label (`inset-inline: 0`),
+ein Tipp darauf springt zurueck, im laufenden Zeitraum ist er inert. Der Menueknopf halbiert
+eingeklappt seinen Innenrand: 390px traegt "17.10. - 16.11.2026" ungekuerzt (162/162px), 320px
+kuerzt mit Ellipse ohne Ueberlappung. **Eingeklappt ist auch der Budgetkopf EINE Zeile (R19, Critique 2026-10-16 P2):** bis R19
 blieb er in jedem Zustand bei 117px, weil der Titel eingeklappt stehen blieb und Zeile 1 mit dem
 Stepper offen hielt. Jetzt verlaesst der Titel samt Siegel das Bild (nicht den Baum), die
 Reiter ruecken in die Zeile des Zeitraums und scrollen dort, der Stepper bleibt am Zeilenende

@@ -2700,7 +2700,9 @@ test('Budgetkopf traegt page-toolbar--period: eingeklappt verlaesst der Titel da
   // Ansichtsmenue falten. Jede weitere Regel ist rot, bis sie hier steht.
   // D1 (2026-10-16): dazu das Wort im Pop-up-Knopf der Ansicht - eingeklappt
   // teilt der Knopf die Zeile mit dem Stepper und behaelt nur sein Zeichen.
-  const ALLOWED_COLLAPSED = [/> \.page-toolbar__center$/, /\[data-collapse-fold\]/, / \.cal-toolbar__view-menu-label$/];
+  // R20 6c: das Wort bleibt eingeklappt stehen, dafuer halbiert der Knopf
+  // seinen Innenrand (das Label traegt die Agenda-Spanne bei 390px ungekuerzt).
+  const ALLOWED_COLLAPSED = [/> \.page-toolbar__center$/, /\[data-collapse-fold\]/, / \.cal-toolbar__view-menu$/];
   const strangers = [...eachRule(calendarCss)]
     .filter((r) => /\.is-collapsed/.test(r.selector))
     .flatMap((r) => r.selector.split(',').map((part) => part.trim()))

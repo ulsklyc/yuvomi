@@ -252,7 +252,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **One set of controls in every module header.** Search, view, filter and more sit in the same order
   and look the same everywhere, and every view picker is the same segmented control. The calendar
   header on a desktop is one row with a real search field (two rows instead of three on a tablet);
-  on a phone the view picker names the current view and "Today" sits on the period label. Tasks on a
+  on a phone the view picker names the current view and "Today" sits on the period label. Scrolled
+  on a phone, the calendar header folds to one row like Apple Calendar's: the period, the view by
+  name, search and filter. The arrows step aside - swipe, the keyboard or the view menu move to
+  the next period, and a tap on the period returns to today. Tasks on a
   phone keep search, filter and more beside the title, so the list starts about 50px higher. Settings
   on a desktop shows the module header like every other module.
 - **Task and calendar filters open the same sheet.** People are chips, layers and calendars are

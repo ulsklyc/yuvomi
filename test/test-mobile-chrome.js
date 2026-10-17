@@ -304,6 +304,7 @@ test('R17 Z1: nur der markierte Zeitraum-Kopf loest seine Bar-Zeile in die Titel
 // eingeklappt dieselben 117px wie ausgeklappt - Titel und Siegel gingen, die
 // Zeile blieb. Eingeklappt steht der Stepper jetzt in Zeile 1 vor dem Menue;
 // Suche, Filter und "Heute" falten ins Menue (gemessen 390x844: 117 -> 65px).
+// R20 6c: seitdem falten die Pfeile, Filter und Wort der Ansicht bleiben.
 test('R17: der Kalenderkopf ist eingeklappt EINE Zeile, und was weicht, kommt im Menue wieder', () => {
   const calendarCss = read('../public/styles/calendar.css');
   const collapsed = rules(calendarCss).filter((r) => /\.cal-toolbar\.page-toolbar--capped\.is-collapsed/.test(r.selector));
@@ -316,13 +317,24 @@ test('R17: der Kalenderkopf ist eingeklappt EINE Zeile, und was weicht, kommt im
   const center = collapsed.find((r) => /> \.page-toolbar__center$/.test(r.selector));
   assert.equal(center && decl(center.body, 'order'), '0', 'der Zeitraum rueckt in Zeile 1, vor die Werkzeuge');
   assert.match(center.body, /flex:\s*1 1 0/, 'und nimmt den Rest der Zeile statt einer eigenen');
-  const hidden = collapsed.find((r) => decl(r.body, 'display') === 'none');
-  assert.ok(hidden, 'die gefalteten Werkzeuge blenden eingeklappt aus');
-  for (const part of hidden.selector.split(',')) {
-    assert.match(part, /\[data-collapse-fold\]/, `"${part.trim()}" blendet nur aus, was als faltbar markiert ist`);
+  const hiddenRules = collapsed.filter((r) => decl(r.body, 'display') === 'none');
+  assert.ok(hiddenRules.length, 'die gefalteten Werkzeuge blenden eingeklappt aus');
+  const hiddenParts = hiddenRules.flatMap((r) => r.selector.split(',').map((p) => p.trim()));
+  for (const part of hiddenParts) {
+    assert.match(part, /\[data-collapse-fold\]/, `"${part}" blendet nur aus, was als faltbar markiert ist`);
   }
-  assert.match(hidden.selector, /\.cal-toolbar__filter-btn\[data-collapse-fold\]:not\(\.page-filter-btn--active\)/,
-    'ein aktiver Filter bleibt mit seiner Zahl stehen (Kopfregel 3)');
+  // R20 6c (Ulas 2026-10-17, Option b): eingeklappt weichen die PFEILE, nicht
+  // Filter und Wort der Ansicht - der kompakte Kopf von Apple Kalender zeigt
+  // Zeitraum, Ansicht mit Wort, Suche und Filter. Blaettern bleibt per Wisch,
+  // Taste und ueber die Stellvertreter im Ansichtsmenue; ein Tipp aufs Label
+  // springt zurueck (Heute deckt es ganz).
+  assert.ok(hiddenParts.some((p) => /\.period-stepper__prev\[data-collapse-fold\]/.test(p))
+    && hiddenParts.some((p) => /\.period-stepper__next\[data-collapse-fold\]/.test(p)), 'eingeklappt weichen beide Pfeile');
+  assert.ok(!hiddenParts.some((p) => /cal-toolbar__filter-btn/.test(p)), 'der Filter bleibt eingeklappt sichtbar');
+  assert.ok(!collapsed.some((r) => /cal-toolbar__view-menu-label/.test(r.selector) && decl(r.body, 'display') === 'none'),
+    'das Wort der Ansicht bleibt eingeklappt stehen');
+  const reset = collapsed.find((r) => /\.cal-toolbar__today\[data-collapse-fold\]/.test(r.selector));
+  assert.equal(reset && decl(reset.body, 'inset-inline'), '0', '"Heute" deckt eingeklappt das ganze Label - ein Tipp darauf springt zurueck');
 
   const calendarJs = read('../public/pages/calendar.js');
   assert.match(calendarJs, /id="cal-views-menu"[^>]*data-collapse-fold-menu/, 'das Ansichtsmenue nimmt die gefalteten Werkzeuge auf');
@@ -330,7 +342,9 @@ test('R17: der Kalenderkopf ist eingeklappt EINE Zeile, und was weicht, kommt im
   // oeffnen. Sie faltet deshalb nicht, sie bleibt als Lupe stehen.
   assert.doesNotMatch(calendarJs, /id="cal-search"/, 'kein Suchknopf mehr, der falten koennte');
   assert.match(calendarJs, /id: 'cal-search-input'/, 'die Suche ist das Feld der Shell');
-  assert.match(calendarJs, /'#cal-filters'\)\.setAttribute\('data-collapse-fold'/, 'der Filter ist markiert');
+  assert.doesNotMatch(calendarJs, /'#cal-filters'\)\.setAttribute\('data-collapse-fold'/, 'der Filter faltet nicht mehr (R20 6c)');
+  assert.match(calendarJs, /id: 'cal-prev'[^\n]*'data-collapse-fold': true/, 'der Zurueck-Pfeil ist markiert');
+  assert.match(calendarJs, /id: 'cal-next'[^\n]*'data-collapse-fold': true/, 'der Vor-Pfeil ist markiert');
   assert.match(calendarJs, /id: 'cal-today'[\s\S]{0,200}'data-collapse-fold': true/, '"Heute" ist markiert');
 
   const ux = read('../public/utils/ux.js');

@@ -2084,11 +2084,13 @@ function periodNavHtml() {
   const labels = periodArrowLabels(currentPeriodStep());
   // Markup und Reihenfolge kommen aus dem EINEN Baustein (utils/period-stepper.js).
   return periodStepperHtml({
-    prev: { id: 'cal-prev', label: labels.prev, title: true, keys: `${CAL_SHORTCUT_KEYS.prev} ${keys.prev}` },
+    // `data-collapse-fold`: eingeklappt (mobil) weichen die Pfeile ins
+    // Ansichtsmenue (R20 6c, calendar.css; die Stellvertreter baut utils/ux.js).
+    prev: { id: 'cal-prev', label: labels.prev, title: true, keys: `${CAL_SHORTCUT_KEYS.prev} ${keys.prev}`, attrs: { 'data-collapse-fold': true } },
     value: { id: 'cal-label', className: 'cal-toolbar__label' },
-    next: { id: 'cal-next', label: labels.next, title: true, keys: `${CAL_SHORTCUT_KEYS.next} ${keys.next}` },
-    // `data-collapse-fold`: eingeklappt (mobil) weicht "Heute" ins Menue, das
-    // Label braucht die Breite (calendar.css; die Stellvertreter baut utils/ux.js).
+    next: { id: 'cal-next', label: labels.next, title: true, keys: `${CAL_SHORTCUT_KEYS.next} ${keys.next}`, attrs: { 'data-collapse-fold': true } },
+    // "Heute" liegt mobil auf dem Wert und deckt eingeklappt das ganze Label;
+    // im laufenden Zeitraum ist er inert und kommt auch im Menue nicht vor.
     reset: {
       id: 'cal-today', className: 'cal-toolbar__today', label: t('calendar.today'), keys: CAL_SHORTCUT_KEYS.today,
       attrs: { 'data-collapse-fold': true, 'data-fold-icon': 'CalendarCheck' },
@@ -2331,10 +2333,8 @@ function renderToolbar() {
   bar.querySelector('#cal-calendars')?.addEventListener('click', openLocalCalendarsModal);
   bar.querySelector('#cal-today').addEventListener('click', goToday);
   wireCalendarSearch(bar, { focus: searchHadFocus });
+  // Der Filter faltet seit R20 (6c) nicht mehr: der kompakte Kopf zeigt ihn.
   bar.querySelector('#cal-filters').addEventListener('click', openCalendarFilters);
-  // Der Filterknopf kommt aus dem geteilten Baustein; die Marke fuer die
-  // Faltung im eingeklappten Kopf (calendar.css) setzt deshalb das Modul.
-  bar.querySelector('#cal-filters').setAttribute('data-collapse-fold', '');
   installPopoverMenus(bar);
   bar.querySelector('#cal-views-menu-panel')?.addEventListener('click', (e) => {
     const item = e.target.closest?.('[data-cal-view]');
