@@ -283,6 +283,11 @@ function dateKeyOf(measuredAt) {
 }
 
 function toFiniteOrNull(value) {
+  // Ein fehlender Wert ist keine Null (Re-Critique 2026-10-17, P1): Number(null)
+  // und Number('') sind 0, und ein Blutdruck ohne Puls zeichnete Puls 0 - die
+  // Achse reichte dann bis 0 und die Druckkurven lagen flach am Rand.
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string' && value.trim() === '') return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 }

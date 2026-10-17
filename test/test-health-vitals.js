@@ -979,3 +979,20 @@ test('der Plausibilitaets-Hinweis erscheint nach dem Eingeben, nicht waehrend', 
   const clear = src.slice(src.indexOf('const clearPlausibilityWhenResolved'), src.indexOf("fieldsHost.addEventListener('input'"));
   assert.match(clear, /if \(plausibilityHint && !vitalPlausibilityText\(/, 'beim Tippen darf der Hinweis nur gehen, nicht kommen');
 });
+
+// Re-Critique 2026-10-17, P1: ein Blutdruck ohne Puls zeichnete Puls 0, weil
+// Number(null) 0 ist. Fehlend bleibt fehlend - im Punkt UND im Delta.
+test('Blutdruck ohne Puls: der Puls fehlt, er ist nicht 0', () => {
+  const rows = [
+    { id: 1, type: 'bp', value_num: 120, value_num2: 80, value_num3: null, unit: 'mmHg', measured_at: '2026-06-10T08:00' },
+    { id: 2, type: 'bp', value_num: 130, value_num2: 85, value_num3: '', unit: 'mmHg', measured_at: '2026-06-12T08:00' },
+    { id: 3, type: 'bp', value_num: 125, value_num2: 82, value_num3: 70, unit: 'mmHg', measured_at: '2026-06-14T08:00' },
+  ];
+  const s = computeVitalSeries(rows, { type: 'bp', range: 'month', anchor: '2026-06-15' });
+  const at = (date) => s.points.find((p) => p.date === date);
+  assert.equal(at('2026-06-10').value_num3, null, 'null ist kein Puls von 0');
+  assert.equal(at('2026-06-12').value_num3, null, "'' ist kein Puls von 0");
+  assert.equal(at('2026-06-14').value_num3, 70);
+  assert.equal(at('2026-06-12').value_num, 130, 'der Druck selbst bleibt');
+  assert.equal(s.deltas.value_num3, null, 'kein Delta gegen einen Puls, der nie gemessen wurde');
+});

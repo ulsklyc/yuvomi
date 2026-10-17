@@ -270,6 +270,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Health: a blood pressure reading without a pulse no longer draws a pulse of 0.** The chart
+  counted the missing value as zero, stretched its axis down to 0 and flattened both pressure
+  curves against the edge. A missing pulse is now left out of the line and of the change shown
+  against the previous reading.
+
 - **Budget: money you lent out no longer counts as your debt.** The loans summary added both
   directions into one "Outstanding balance", so 800 € lent to a relative showed up as debt of the
   household. Borrowed and lent loans now stand as two figures, "Outstanding balance" and "Still owed
