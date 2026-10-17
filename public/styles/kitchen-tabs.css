@@ -136,6 +136,43 @@
   }
 }
 
+/* --------------------------------------------------------
+ * TRAILING-WERKZEUGZONE (Issue #2043)
+ *
+ * Klebt mit `position: sticky; right: 0` am rechten Rand der scrollbaren
+ * Leiste: Tabs können links hinter ihr durchscrollen, die Zone bleibt immer
+ * sichtbar. Hintergrund deckt die durchlaufenden Tabs ab; ein schmaler
+ * Farbverlauf links davon gibt einen weichen Übergang.
+ *
+ * Auf dem Desktop (≥ 640 px) ist die Zone leer - dort steht die Suche im
+ * Kontext-Kopf darunter. Auf Mobilgeräten füllt sie jedes Rezepte-/
+ * Vorrat-Modul mit einem Suchschalter; Mahlzeiten und Einkauf leeren sie.
+ * -------------------------------------------------------- */
+.kitchen-tabs-bar__trailing {
+  position: sticky;
+  right: 0;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  background-color: var(--color-bg);
+  padding-inline-start: var(--space-2);
+  /* Farbverlauf-Overlay links der Zone */
+  box-shadow: -8px 0 8px 0 var(--color-bg);
+}
+
+/* Suchschalter in der Trailing-Zone: Lucide-Icon-Knopf in Fingergröße */
+.kitchen-tabs-bar__trailing .btn--icon {
+  flex-shrink: 0;
+}
+
+@media (max-width: 639px) {
+  /* Auf Mobilgeräten bekommt die Zone kein zusätzliches Padding, wenn leer */
+  .kitchen-tabs-bar__trailing:empty {
+    padding-inline-start: 0;
+    box-shadow: none;
+  }
+}
+
 /* Mahlzeiten + Rezepte: Viewport-Höhe um Tab-Leiste reduzieren (Mobile).
  * Ohne diese Reduktion ist die Seite um --kitchen-tabs-height zu hoch und
  * der äußere .app-content-Scrollcontainer läuft über → beim Scrollen wandert

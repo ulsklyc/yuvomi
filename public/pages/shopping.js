@@ -15,7 +15,7 @@ import { readRowHtml, readDetailsLabel } from '/utils/read-row.js';
 import { promptModal, openModal, closeModal, confirmModal, reportFieldError, refocusAfterRender } from '/components/modal.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 import { addLocalDays, todayKey } from '/utils/date.js';
-import { renderKitchenTabsBar, refreshKitchenBadges } from '/utils/kitchen-tabs.js';
+import { renderKitchenTabsBar, refreshKitchenBadges, setKitchenTabsTrailing } from '/utils/kitchen-tabs.js';
 import { mayImportMealPlan, mayTransferShoppingToPantry } from '/utils/kitchen-transfer.js';
 import { mayWritePath } from '/utils/module-access.js';
 import { mountEmptyState, mountLoadError } from '/utils/empty-state.js';
@@ -4512,6 +4512,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // beim Wechsel Mahlzeiten -> Einkauf aus und sprang nach dem Laden zurueck,
   // statt zu stehen wie in den drei Geschwister-Tabs (Integration Runde 3).
   const kitchenBar = renderKitchenTabsBar(container, '/shopping');
+  setKitchenTabsTrailing(null);
   state.itemsError = null;
   try {
     // loadCategories() und loadLists() fangen selbst; der äußere catch ist das

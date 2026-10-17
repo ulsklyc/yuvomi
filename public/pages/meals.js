@@ -12,7 +12,7 @@ import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { periodStepperHtml, syncPeriodReset, swapPeriod } from '/utils/period-stepper.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
-import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
+import { renderKitchenTabsBar, setKitchenTabsTrailing } from '/utils/kitchen-tabs.js';
 import { resolveShoppingTarget, announceTransfer, mountMissingShoppingList, mayTransferMealToShopping } from '/utils/kitchen-transfer.js';
 import { ingredientRowHTML } from '/utils/ingredient-row.js';
 import { addLocalDays, startOfLocalWeekKey, todayKey } from '/utils/date.js';
@@ -738,6 +738,7 @@ export async function render(container, { user }) {
 
   if (window.lucide) lucide.createIcons({ el: container });
   renderKitchenTabsBar(container, '/meals');
+  setKitchenTabsTrailing(null);
   installPopoverMenus(container.querySelector('.meals-toolbar'));
 
   const today  = todayKey();

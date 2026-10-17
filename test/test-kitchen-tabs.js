@@ -339,14 +339,14 @@ test('Seitenleiste: Pille <= 300ms aus Tokens, Hover-Absicht 150-250ms aus einem
 });
 
 // --------------------------------------------------------
-// EINE REGEL FUER DEN KUECHENKOPF MOBIL (Re-Critique 2026-09-28, P7 / A4 P2-3).
-// R9 M10 hatte Lupe und "..." von Rezepte/Vorrat IN die Kuechen-Leiste gelegt;
-// dafuer schrumpften dort die Zaehler zu Punkten, waehrend Mahlzeiten und
-// Einkauf ihre Werkzeuge in einer eigenen Kontextzeile trugen. Vier Tabs, vier
-// Kopfbauarten: die Leiste sprang beim Tabwechsel. Jetzt traegt die Leiste nur
-// Tabs mit Zahlen, und jedes Werkzeug steht in der Kontextzeile seines Tabs.
+// EINE REGEL FUER DEN KUECHENKOPF MOBIL (Issue #2043 / Re-Critique 2026-09-28 P7).
+// R9 M10 hatte Werkzeuge in der Leiste, schrumpfte aber Zaehler zu Punkten.
+// R19 (2026-09-28) verschob Werkzeuge in die Kontextzeile. Issue #2043 (2026-10):
+// Suchschalter wieder in die Leiste (Trailing-Zone mit sticky), Kontextzeile
+// startet auf Mobilgeraeten eingeklappt. Keine --kitchen-tools-CSS-Variable mehr,
+// kein transparenter Zaehler, kein negatives margin-block-start.
 // --------------------------------------------------------
-test('Kueche mobil: die Leiste traegt nur Tabs mit Zahlen, Werkzeuge stehen in der Kontextzeile', async () => {
+test('Kueche mobil: die Leiste traegt Tabs mit Zahlen und einen Suchschalter in der Trailing-Zone', async () => {
   const { eachRule } = await import('./css-rules.js');
   const rules = [...eachRule(readSrc('../public/styles/kitchen-tabs.css'))];
   const narrow = rules.filter((r) => r.at.some((a) => /\(max-width:\s*639px\)/.test(a)));
