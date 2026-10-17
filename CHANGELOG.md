@@ -272,6 +272,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Waste collection: a weekly schedule without a day says so at the days.** "Choose at least one
+  weekday" appeared as a short notice at the bottom of the screen; it now stands under the day
+  chips, and the focus moves to the first day.
+
 - **Switching pages without a connection no longer ends in "Something went wrong".** A page that
   needs the network now says "You are offline" with "Try again", and draws itself as soon as the
   device is back online. On a computer the offline notice sits above the content instead of

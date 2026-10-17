@@ -15,7 +15,7 @@ import { api } from '/api.js';
 import { t, formatDate, getLocale } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { todayKey, addLocalDays, parseLocalDateKey, toLocalDateKey } from '/utils/date.js';
-import { openModal, closeModal, confirmModal, confirmOverModal, btnLoading, refocusAfterRender } from '/components/modal.js';
+import { openModal, closeModal, confirmModal, confirmOverModal, btnLoading, refocusAfterRender, reportFieldError } from '/components/modal.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import {
@@ -1251,6 +1251,22 @@ function weekdayPickerValue(root) {
     .map((el) => el.dataset.weekday);
 }
 
+/**
+ * "Mindestens ein Wochentag" an der Tagesgruppe statt im Toast (Re-Critique
+ * 2026-10-17). Die Meldung steht unter den Chips, die Gruppe beschreibt sie
+ * (aria-describedby), der Fokus geht auf den ersten Tag - der Baustein selbst
+ * faende nur das versteckte Feld. Die naechste Wahl raeumt die Meldung weg:
+ * das versteckte Feld meldet `input`, und das blubbert zur Gruppe.
+ */
+function reportWeekdaysMissing(root) {
+  const picker = root.querySelector('.waste-weekday-picker');
+  if (!picker) return false;
+  reportFieldError(picker, t('waste.errorScheduleWeekdaysRequired'), { focus: false });
+  picker.querySelector('[data-weekday]')?.focus({ preventScroll: true });
+  picker.scrollIntoView?.({ block: 'center' });
+  return false;
+}
+
 function wireWeekdayPicker(root) {
   const picker = root.querySelector('.waste-weekday-picker');
   picker?.addEventListener('click', (event) => {
@@ -1291,7 +1307,7 @@ function openScheduleModal(type, schedule = null) {
         <option value="monthly_ordinal_weekday"${isOrdinal ? ' selected' : ''}>${t('waste.recurrenceMonthlyOrdinal')}</option>
       </select>
     </div>
-    <div class="form-group" id="wsm-weekly-fields" ${kind === 'weekly' ? '' : 'hidden'}>
+    <div class="form-group form-field" id="wsm-weekly-fields" ${kind === 'weekly' ? '' : 'hidden'}>
       <span class="form-label" id="wsm-weekdays-label">${t('waste.weekdaysLabel')}</span>
       ${weekdayPickerHtml(schedule?.weekdays)}
     </div>
@@ -1402,6 +1418,7 @@ function openScheduleModal(type, schedule = null) {
         const body = { type_id: typeId, recurrence_kind: kindValue, anchor_date: anchor, interval, valid_until: validUntil, active };
         if (kindValue === 'weekly') {
           body.weekdays = weekdayPickerValue(panel);
+          if (!body.weekdays.length) return reportWeekdaysMissing(panel);
         } else if (kindValue === 'monthly_ordinal_weekday') {
           body.month_day = Number(ordinalPositionSelect.value);
           body.weekdays = ordinalWeekdaySelect.value;
@@ -1419,6 +1436,11 @@ function openScheduleModal(type, schedule = null) {
           window.yuvomi?.showToast(t('waste.scheduleSavedToast'), 'success');
         } catch (err) {
           if (await keepDialogForMissingType(err, typeSelect)) return;
+          // Dieselbe Absage vom Server (z. B. eine aeltere Seite): ans Feld.
+          if (err?.data?.reason === 'waste_schedule_weekdays_required' && kindValue === 'weekly') {
+            reportWeekdaysMissing(panel);
+            return;
+          }
           reportError(err);
         }
       });

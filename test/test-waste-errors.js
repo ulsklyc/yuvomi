@@ -24,6 +24,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 globalThis.HTMLElement = globalThis.HTMLElement ?? class HTMLElement extends EventTarget {};
 globalThis.customElements = { define() {}, get() {} };
@@ -872,4 +873,36 @@ test('Quellen-Dialog: ohne Fehlschlag steht keine Fehlerzeile da', async () => {
   zustand();
   const text = await quellenDialogText({ ...SOURCE(), last_error: null, last_error_reason: null, last_error_params: null });
   assert.doesNotMatch(text, /waste-source-detail__error/);
+});
+
+// Re-Critique 2026-10-17: "mindestens ein Wochentag" kam als Toast - ortlos,
+// mobil unten am Bildschirm, waehrend die Tage oben im Dialog standen.
+test('Woechentlich ohne Tag: die Meldung steht an der Tagesgruppe, der Fokus auf dem ersten Tag, nichts geht raus', async () => {
+  zustand();
+  const chipFokus = [];
+  const chip = { focus: () => chipFokus.push('chip') };
+  let gescrollt = 0;
+  const d = await terminDialog({
+    '#wsm-kind': { value: 'weekly' },
+    '.waste-weekday-picker': { querySelector: (sel) => (sel === '[data-weekday]' ? chip : null), scrollIntoView: () => { gescrollt += 1; } },
+  });
+  const gemeldet = [];
+  globalThis.__reportFieldError = (feld, text, opts) => gemeldet.push([feld, text, opts]);
+  let calls;
+  try {
+    ({ calls } = await mit({ put: async () => ({ data: {} }) }, () => d.klick('#wsm-save')));
+  } finally {
+    delete globalThis.__reportFieldError;
+  }
+  assert.deepEqual(calls, [], 'ohne Tag geht nichts an den Server');
+  assert.deepEqual(toasts, [], 'kein Toast');
+  assert.equal(gemeldet.length, 1);
+  assert.equal(gemeldet[0][0], d.element('.waste-weekday-picker'), 'an der Tagesgruppe');
+  assert.equal(gemeldet[0][1], 'waste.errorScheduleWeekdaysRequired');
+  assert.deepEqual(chipFokus, ['chip'], 'der Fokus geht auf den ersten Tag');
+  assert.equal(gescrollt, 1);
+  const src = readFileSync(new URL('../public/pages/waste.js', import.meta.url), 'utf8');
+  assert.match(src, /err\?\.data\?\.reason === 'waste_schedule_weekdays_required' && kindValue === 'weekly'\) \{\s*reportWeekdaysMissing\(panel\);/,
+    'dieselbe Absage vom Server geht ebenfalls ans Feld');
+  assert.match(src, /<div class="form-group form-field" id="wsm-weekly-fields"/, 'die Gruppe traegt den Feldfehler');
 });
