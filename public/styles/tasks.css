@@ -427,6 +427,27 @@
   background-color: var(--color-surface-receded);
 }
 
+/* DIE GEWAEHLTE ZEILE IM AUSWAHLMODUS (R20). Nur der Kreis sagte, was
+ * gewaehlt ist, und er sah in Ruhe aus wie der Erledigen-Kreis, den er
+ * ersetzt. Die Flaeche traegt jetzt den Ton des gewaehlten Kreises (App-Akzent,
+ * nicht der Modulton: der ist bei den Aufgaben das Gruen von „erledigt") -
+ * dieselbe Toenung wie eine gewaehlte Kontaktzeile. Sie liegt auf der
+ * Zeile (`__main`), nicht auf der Karte: deren zurueckgenommene Flaeche
+ * (erledigt, abgelegt) bleibt unberuehrt und schimmert unter der Toenung
+ * durch, und die Unteraufgaben darunter sind nicht mitgewaehlt. */
+.tasks-page .task-card--selected > .task-card__main {
+  background-color: color-mix(in srgb, var(--color-accent) var(--tint-state), transparent);
+}
+
+/* Am Desktop markiert die Spalte die Zeile, deren Aufgabe rechts steht
+ * (`.is-selected`). Waehrend der Auswahl steht rechts „N ausgewaehlt", und die
+ * Markierung las sich bei 0 gewaehlten wie ein erster Haken (Re-Critique
+ * 2026-10-17, A2 P2-2). Sie schweigt, solange gewaehlt wird - wie in den
+ * Kontakten. */
+.tasks-page.is-selecting .task-card.is-selected:not(.task-card--selected) {
+  background-color: transparent;
+}
+
 .task-card--archived .task-card__title {
   color: var(--color-text-secondary);
 }

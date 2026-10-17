@@ -1192,3 +1192,36 @@ test('die Zahl der Auswahl in der Spalte wird hoeflich angesagt, entprellt und n
   const hide = [...eachRule(css)].find((r) => /\.split-view__detail\.is-selecting > :not\(/.test(r.selector));
   assert.match(hide?.selector ?? '', /:not\(\.split-view__selection-live\)/, 'die Region tritt waehrend der Auswahl nicht mit zurueck - display:none sagte nichts an');
 });
+
+// R20 (Re-Critique 2026-10-17, Alex): „Archivieren" fuer offene Aufgaben stand
+// nur im Werkzeugmenue. Die Spalte hat den Platz dafuer, die einzeilige Pille
+// nicht (Ungarisch bei 390px) - eine Aktion mit `paneOnly` steht nur in der
+// Spalte, und die Rueckfrage findet ihren Ausloeser in beiden Formen wieder.
+test('setSelectionBulk: eine Aktion mit paneOnly steht in der Spalte, nicht in der Pille', () => {
+  const layer = new El('div');
+  const vorher = { createElement: document.createElement, getElementById: document.getElementById };
+  document.createElement = (tag) => new El(tag);
+  document.getElementById = (id) => (id === 'bulk-pill-layer' ? layer : null);
+  try {
+    const p = makePage();
+    const handle = p.mount();
+    const spec = { label: '2 ausgewaehlt', actions: [
+      { label: 'Erledigt', onClick: () => {} },
+      { label: 'Archivieren', paneOnly: true, onClick: () => {} },
+      { label: 'Fertig', onClick: () => {} },
+    ] };
+    md.setSelectionBulk(handle, spec);
+    const host = p.detail.querySelector('.split-view__selection');
+    const paneLabels = host.querySelectorAll('.selection-pane__action').map((b) => b.textContent);
+    assert.ok(paneLabels.includes('Archivieren'), `die Spalte zeigt sie (${paneLabels.join(', ')})`);
+    p.setSplit(false);
+    md.setSelectionBulk(handle, spec);
+    const pillLabels = layer.querySelectorAll('.list-bulkbar__action').map((b) => b.textContent);
+    assert.deepEqual(pillLabels.filter((l) => l === 'Archivieren'), [], `die Pille laesst sie weg (${pillLabels.join(', ')})`);
+    assert.ok(pillLabels.includes('Fertig'));
+    md.setSelectionBulk(handle, null);
+    handle.destroy();
+  } finally {
+    Object.assign(document, vorher);
+  }
+});

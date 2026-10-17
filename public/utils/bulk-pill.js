@@ -130,6 +130,11 @@ function paint(spec, pending) {
   const layer = pane ?? bulkPillLayer();
   if (!layer) return null;
   const button = (action) => actionButton(action, Boolean(pane));
+  // NUR IN DER SPALTE (`paneOnly`, R20): die Pille ist einzeilig, und ihre
+  // Kapseln schrumpfen nie - eine vierte passte bei 390px nicht in jede
+  // Sprache (Ungarisch). Die Spalte hat den Platz, also steht eine solche
+  // Aktion nur dort; in der Pille bleibt sie der Eintrag im Werkzeugmenue.
+  const actions = spec.actions.filter((action) => pane || !action.paneOnly);
 
   const bar = document.createElement('div');
   bar.className = pane ? 'selection-pane' : 'list-bulkbar';
@@ -187,7 +192,7 @@ function paint(spec, pending) {
         const back = paint(spec, null);
         // Zurück auf die Kapsel, die die Frage aufgemacht hat - sonst landet
         // der Tastaturfokus am Dokumentanfang und der Weg ist verloren.
-        back?.querySelectorAll('.list-bulkbar__action, .selection-pane__action')[spec.actions.indexOf(pending)]?.focus();
+        back?.querySelectorAll('.list-bulkbar__action, .selection-pane__action')[actions.indexOf(pending)]?.focus();
       },
     });
     choices.appendChild(cancel);
@@ -249,7 +254,7 @@ function paint(spec, pending) {
     // In der Spalte stehen die Aktionen als eigene Zeile unter der Ueberschrift.
     const row = pane ? document.createElement('div') : bar;
     if (pane) row.className = 'selection-pane__actions';
-    for (const action of spec.actions) {
+    for (const action of actions) {
       row.appendChild(button({
         ...action,
         // Eine Aktion mit Rückfrage FÜHRT NICHT AUS, sie fragt. Ohne
@@ -300,7 +305,7 @@ function paint(spec, pending) {
  *
  * @param {object} spec
  * @param {string} spec.label   Was die Teilmenge IST - führt mit der Zahl.
- * @param {Array<{label: string, ariaLabel?: string, count?: number, danger?: boolean, confirm?: {question: string, detail?: string, confirmLabel?: string}, onClick: (btn: HTMLButtonElement) => void}>} spec.actions
+ * @param {Array<{label: string, ariaLabel?: string, count?: number, danger?: boolean, paneOnly?: boolean, confirm?: {question: string, detail?: string, confirmLabel?: string}, onClick: (btn: HTMLButtonElement) => void}>} spec.actions
  *   `count` setzt eine Marke an die Kapsel, sichtbar erst dort, wo das Subjekt
  *   wegfällt. `danger` gibt ihr die Tinte der Gefahr, `confirm` die Rückfrage -
  *   beides gehört zusammen und ein Guard prüft das (test-frontend-audit.js).

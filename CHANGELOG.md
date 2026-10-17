@@ -54,6 +54,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Selecting tasks clears the screen for the selection.** While you select several tasks on a phone,
+  the tab bar and the add button step aside and the selection bar takes their place. A tap anywhere
+  on a row selects it, a selected row is tinted, and the swipe arrow no longer shows. On a computer
+  the selection column also offers "Archive", for open tasks too, and the task shown before you
+  started selecting no longer looks selected. Contacts follow the same rule.
+
 - **A housekeeping payment task is only for the adults who pay.** The task a check-in creates names
   the wage, so it is now assigned to the person who checked in and to the admins, and only they see
   it - in Tasks, the Overview, search and connected AI assistants alike. When an account that cannot

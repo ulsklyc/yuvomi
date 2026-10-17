@@ -200,19 +200,9 @@
   background-color: color-mix(in srgb, var(--c-accent) var(--tint-state), transparent);
 }
 
-/* Auswahlmodus verdeckt die Anlege-Affordance. Gefragt wird über :has() am
- * Dokument, weil der FAB seit #634 nicht mehr unter `.contacts-page` hängt,
- * sondern in der Shell-Layer neben dem Scrollport. */
-html:has(.contacts-page.is-selecting) .page-fab {
-  display: none;
-}
-
-/* Und mit der Affordance geht ihr Nachlauf (Etappe 6, 2026-08-13). Dieselbe
-   Paarung wie in layout.css: die Nachlauf-Regel fragt `:not([hidden])` und
-   sieht ein `display: none` nicht. */
-html:has(.contacts-page.is-selecting) {
-  --fab-safe-zone: 0px;
-}
+/* Im Auswahlmodus treten FAB und mobile Kapsel ab - die Regel steht seit R20
+ * in der Shell (layout.css, "Der Auswahlmodus nimmt der Shell ihre Bedienung
+ * ab"), einmal fuer jede Seite mit `.app-page.is-selecting`. */
 
 /* Öffnen/Bearbeiten: echte, fokussierbare Schaltfläche (Tastatur/Screenreader).
  *

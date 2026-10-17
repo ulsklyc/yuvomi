@@ -9355,6 +9355,39 @@ textarea::placeholder {
   display: none;
 }
 
+/* DER AUSWAHLMODUS NIMMT DER SHELL IHRE BEDIENUNG AB (R20, Re-Critique
+ * 2026-10-17 A1 P2-5; Muster: Apples Erinnerungen und Mail, deren Tab- bzw.
+ * Werkzeugleiste beim Bearbeiten der Auswahlleiste weicht). Waehrend eine
+ * Liste waehlt, stand unten die Kapsel unter der Pille und der FAB daneben:
+ * drei Bedienschichten fuer EINE Aufgabe, und „Neue Aufgabe" mitten in einer
+ * Sammelaktion. Jetzt bleibt die Pille allein:
+ *   - der FAB tritt ab, ueberall (die Kontakte taten das seit Etappe 6 fuer
+ *     sich; die Regel steht jetzt hier, einmal fuer jede Seite mit Modus), und
+ *     mit ihm sein Nachlauf (`--fab-safe-zone`);
+ *   - unter der Seitenleisten-Schwelle auch die Kapsel; die Pille rueckt an
+ *     ihren Platz am unteren Rand, die Reserve des Inhalts bleibt.
+ * Ohne `:has()` (Safari < 15.4) bleibt beides stehen - der Zustand von vorher,
+ * kein Bruch. */
+html:has(.app-page.is-selecting) .page-fab {
+  display: none;
+}
+
+html:has(.app-page.is-selecting) {
+  --fab-safe-zone: 0px;
+}
+
+@media (max-width: 1023px) {
+  /* Die Pille rueckt an den Platz der Kapsel; die Reserve des Inhalts bleibt,
+   * damit die letzte Zeile nicht unter der Pille liegt. */
+  html:has(.app-page.is-selecting) .shell-bottom-stack:not([data-dock]) {
+    bottom: calc(var(--safe-area-inset-bottom) + var(--space-4));
+  }
+
+  html:has(.app-page.is-selecting) .nav-bottom {
+    display: none;
+  }
+}
+
 .toast-container,
 .bulk-pill-layer {
   display: flex;
@@ -10161,6 +10194,14 @@ textarea::placeholder {
  * Zeilenende fuer einen Weg, den der Knopf schon sichtbar traegt. Wischen
  * bleibt Zusatzweg; der einmalige Nudge (`swipe-row--hint`) lehrt ihn. */
 .swipe-row:has(.row-action--more)::after {
+  content: none;
+}
+
+/* IM AUSWAHLMODUS KEIN WISCH-CHEVRON (R20). Die Zeile ist dann ein Ziel zum
+ * Waehlen, kein Weg ins Detail und keine Wischflaeche - der Pfeil am Rand
+ * versprach beides. Gesetzt wird der Modus an der Seitenwurzel
+ * (`.app-page.is-selecting`, Aufgaben und Kontakte). */
+.app-page.is-selecting .swipe-row::after {
   content: none;
 }
 

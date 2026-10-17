@@ -21903,3 +21903,29 @@ test('R20: das Einkaufskaestchen traegt die Ruhe des Abhakkreises und haelt 3:1'
     }
   }
 });
+
+// R20 D3 (Re-Critique 2026-10-17, A1 P2-5 / A2 P2-2): der Auswahlmodus der
+// Aufgaben am Telefon - Kapsel und FAB blieben unter der Pille stehen, der
+// Wisch-Pfeil blieb an der Zeile, ein Tipp auf die Metazeile waehlte nicht,
+// die gewaehlte Zeile war nur am Kreis zu erkennen, und am Desktop las sich
+// die Markierung der offenen Zeile bei „0 ausgewaehlt" wie ein erster Haken.
+test('R20: der Auswahlmodus nimmt Kapsel, FAB und Wisch-Pfeil weg, die ganze Zeile waehlt', () => {
+  const layout = [...eachRule(read('../public/styles/layout.css'))];
+  const top = (sel) => layout.find((r) => !r.at.length && r.selector.trim() === sel);
+  const narrow = (sel) => layout.find((r) => r.at.some((a) => /max-width:\s*1023px/.test(a)) && r.selector.trim() === sel);
+  assert.match(top('html:has(.app-page.is-selecting) .page-fab')?.body ?? '', /display:\s*none/, 'der FAB tritt ab - in der Shell, fuer jede Seite mit Modus');
+  assert.match(narrow('html:has(.app-page.is-selecting) .nav-bottom')?.body ?? '', /display:\s*none/, 'mobil tritt auch die Kapsel ab');
+  assert.ok(narrow('html:has(.app-page.is-selecting) .shell-bottom-stack:not([data-dock])'), 'die Pille rueckt an den Platz der Kapsel');
+  assert.match(top('.app-page.is-selecting .swipe-row::after')?.body ?? '', /content:\s*none/, 'kein Wisch-Pfeil an einer Zeile, die man waehlt');
+  assert.doesNotMatch(read('../public/styles/contacts.css'), /html:has\(\.contacts-page\.is-selecting\)/, 'keine zweite Fassung in den Kontakten');
+
+  const tasks = read('../public/pages/tasks.js');
+  const list = tasks.slice(tasks.indexOf('function renderTaskList('), tasks.indexOf('function renderTaskList(') + 600);
+  assert.match(list, /classList\.toggle\('is-selecting', state\.bulkSelectMode\)/, 'der Modus steht an der Seitenwurzel');
+  const wire = tasks.slice(tasks.indexOf('function wireTaskList('), tasks.indexOf("const action = target.dataset.action;", tasks.indexOf('function wireTaskList(')));
+  assert.match(wire, /if \(!target\) \{[\s\S]*state\.bulkSelectMode[\s\S]*toggleTaskSelection\(circle, container\)/, 'ein Tipp ohne Ziel waehlt im Modus die Zeile');
+  assert.match(tasks, /task-card--selected/, 'die gewaehlte Zeile traegt eine Klasse');
+  const css = [...eachRule(read('../public/styles/tasks.css'))].filter((r) => !r.at.length);
+  assert.ok(css.some((r) => r.selector.includes('.tasks-page .task-card--selected > .task-card__main') && /--color-accent/.test(r.body)), 'die gewaehlte Zeile ist im App-Akzent getoent');
+  assert.ok(css.some((r) => r.selector.trim() === '.tasks-page.is-selecting .task-card.is-selected:not(.task-card--selected)' && /transparent/.test(r.body)), 'die Spalten-Markierung schweigt waehrend der Auswahl');
+});

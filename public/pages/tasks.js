@@ -564,7 +564,7 @@ function renderTaskCard(task, opts = {}) {
     : '';
 
   return `
-    <div class="task-card ${isDone ? 'task-card--done' : ''} ${archived ? 'task-card--archived' : ''}" data-task-id="${task.id}" data-md-id="${task.id}">
+    <div class="task-card ${isDone ? 'task-card--done' : ''} ${archived ? 'task-card--archived' : ''}${selected ? ' task-card--selected' : ''}" data-task-id="${task.id}" data-md-id="${task.id}">
       <div class="list-row list-row--roomy task-card__main">
         ${/* IM AUSWAHLMODUS ERSETZT DER AUSWAHLKREIS DEN STATUSKREIS - er
              steht nicht daneben (Re-Critique 2026-09-27, D5; Muster: Apples
@@ -3789,6 +3789,10 @@ function drawTaskIcons(listEl) {
 }
 
 function renderTaskList(container, { paneQuiet = false } = {}) {
+  // Der Modus steht an der Seitenwurzel (`.is-selecting`, wie in den
+  // Kontakten): die Shell nimmt daran Kapsel und FAB weg (layout.css,
+  // "Auswahlmodus"), die Zeilen ihren Wisch-Pfeil.
+  container.querySelector('.tasks-page')?.classList.toggle('is-selecting', state.bulkSelectMode);
   // VOR dem Ladefehler der Aufgaben: der Verlauf hat seinen eigenen Bestand und
   // seinen eigenen Fehler. Ein gescheitertes `/tasks` sagt nichts darüber, ob
   // die Vorgänge zu haben sind - stünde die Weiche danach, zeigte der Verlauf
@@ -5015,6 +5019,16 @@ function updateBulkActionsBar(container) {
         label: t(allDone ? 'tasks.bulkMarkOpen' : 'tasks.bulkMarkDone'),
         onClick: () => runBulkAction(allDone ? 'mark-open' : 'mark-done', container),
       },
+      // ABLEGEN AUCH FUER OFFENE AUFGABEN, SICHTBAR (R20, Re-Critique
+      // 2026-10-17, Alex): in der Spalte stand nur „Erledigt" - wer offene
+      // Aufgaben ablegen wollte, musste den Eintrag im Werkzeugmenue kennen.
+      // In der Spalte ist Platz; in der Pille bleibt es beim Menue (siehe
+      // oben, Ungarisch bei 390px), daher `paneOnly`.
+      ...(chosen.some((task) => !isArchived(task)) ? [{
+        label: t('tasks.bulkArchive'),
+        paneOnly: true,
+        onClick: () => runBulkAction('archive', container),
+      }] : []),
       {
         label: t('tasks.bulkDelete'),
         // Der Name ist eine Aussage, die Frage gehoert dem Bestaetigungsschritt (#1723).
@@ -5136,6 +5150,7 @@ function toggleTaskSelection(btn, container) {
   else state.selectedTaskIds.delete(taskId);
   btn.classList.toggle('select-circle--on', on);
   btn.setAttribute('aria-pressed', String(on));
+  btn.closest('.task-card')?.classList.toggle('task-card--selected', on);
   vibrate(10);
   updateBulkActionsBar(container);
 }
@@ -5400,7 +5415,17 @@ function wireTaskList(container) {
 
   listEl.addEventListener('click', async (e) => {
     const target = e.target.closest('[data-action]');
-    if (!target) return;
+    if (!target) {
+      // IM AUSWAHLMODUS IST DIE GANZE ZEILE DAS ZIEL (R20, Re-Critique
+      // 2026-10-17 A1 P2-5). Nur Kreis und Titel waehlten aus; ein Tipp auf
+      // die Metazeile oder die Avatare darunter tat nichts - eine tote Flaeche
+      // mitten in einer Zeile, die gerade als Ganzes waehlbar sein soll.
+      if (state.bulkSelectMode && !readOnly()) {
+        const circle = e.target.closest('.task-card__main')?.querySelector('[data-action="toggle-select"]');
+        if (circle) toggleTaskSelection(circle, container);
+      }
+      return;
+    }
     const action = target.dataset.action;
     const id     = target.dataset.id;
 
