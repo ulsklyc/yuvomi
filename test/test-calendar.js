@@ -6035,6 +6035,9 @@ test('Seitenleiste: erst ab 86.25rem Kalenderflaeche, nur mit Leiste rueckt die 
   assert(wide.length >= 3 && wide.every((r) => r.selector.includes('.calendar-page.has-cal-sidebar')),
     'jede Regel der Leiste haengt an has-cal-sidebar - Agenda und Suche bleiben auf der Inhaltsspalte');
   assert(rules.some((r) => r.selector.trim() === '.calendar-page' && /container:\s*cal-page\s*\/\s*inline-size/.test(r.body)), 'die Seite ist der Container');
+  const leiste = wide.find((r) => /\.cal-sidebar:not\(\[hidden\]\)/.test(r.selector));
+  assert(/overflow-y:\s*auto/.test(leiste?.body ?? '') && /scrollbar-gutter:\s*stable/.test(leiste?.body ?? ''),
+    'die Leiste haelt den Platz ihrer Bildlaufleiste - sonst rueckt der Mini-Monat, wenn „Als Naechstes" nachkommt (R19-Nachlese)');
   assert(rules.some((r) => /\.calendar-page\.app-page--list-detail/.test(r.selector) && /container-name:\s*module-surface cal-page/.test(r.body)),
     'in Agenda und Tag behaelt die Seite ihren Namen module-surface');
   const label = rules.find((r) => r.selector.trim() === '.cal-toolbar__label' && r.at.some((a) => /min-width:\s*1024px/.test(a)));

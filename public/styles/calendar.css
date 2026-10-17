@@ -156,6 +156,12 @@
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior-y: contain;
+    /* Der Platz der Bildlaufleiste steht fest (modern-web-guidance
+     * „css-layout"): „Als Naechstes" kommt nach dem ersten Bild, und mit einer
+     * klassischen Leiste (Windows, 17px) rueckte der Mini-Monat sonst beim
+     * Eintreffen zur Seite. Wo die Eigenschaft fehlt, bleibt es beim alten
+     * Verhalten. */
+    scrollbar-gutter: stable;
     padding-block: var(--space-2) var(--space-6);
   }
 }
