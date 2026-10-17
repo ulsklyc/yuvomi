@@ -9,10 +9,17 @@
  *
  *   - `date`   (Voreinstellung): die Reihenfolge des Servers - neueste zuerst,
  *              im laufenden Monat getrennt in "Geplant" und "Gebucht".
- *   - `amount`: der groesste Betrag zuerst, Einnahme und Ausgabe nach ihrem
- *              Betrag ohne Vorzeichen (die Frage ist "wo ging das Geld hin",
+ *   - `amount`: erst die Ausgaben, dann die Einnahmen, jede Gruppe mit dem
+ *              groessten Betrag zuerst (die Frage ist "wo ging das Geld hin",
  *              nicht "was war am negativsten"). Gleichstand behaelt die
- *              Reihenfolge des Servers.
+ *              Reihenfolge des Servers. Die Abschnitte "Geplant" und "Gebucht"
+ *              bleiben stehen, sortiert wird in jedem (budget.js).
+ *
+ * R19 sortierte beide Richtungen gemeinsam nach dem Betrag ohne Vorzeichen und
+ * loeste dafuer die Abschnitte auf. Die Re-Critique 2026-10-17 (Persona Alex)
+ * las das als Fehler: +2.400 EUR Gehalt stand zwischen zwei Ausgaben, und eine
+ * geplante Buchung war von einer gebuchten nicht mehr zu unterscheiden. Die
+ * Richtung ist ein Merkmal der Zeile, keine Groesse - sie trennt, der Betrag ordnet.
  */
 
 export const LEDGER_SORTS = ['date', 'amount'];
@@ -32,9 +39,13 @@ export function normalizeLedgerSort(value) {
 export function sortLedger(entries, sort) {
   const list = [...(entries ?? [])];
   if (normalizeLedgerSort(sort) !== 'amount') return list;
-  const size = (entry) => Math.abs(Number(entry?.amount) || 0);
+  const amount = (entry) => Number(entry?.amount) || 0;
+  // 0 = Ausgabe, 1 = Einnahme (eine Null-Buchung steht bei den Einnahmen).
+  const group = (entry) => (amount(entry) < 0 ? 0 : 1);
   return list
     .map((entry, index) => ({ entry, index }))
-    .sort((a, b) => size(b.entry) - size(a.entry) || a.index - b.index)
+    .sort((a, b) => group(a.entry) - group(b.entry)
+      || Math.abs(amount(b.entry)) - Math.abs(amount(a.entry))
+      || a.index - b.index)
     .map(({ entry }) => entry);
 }

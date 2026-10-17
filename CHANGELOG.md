@@ -26,9 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   existing calendar feed is on by default; turn it off when using both feeds to avoid duplicates.
 
 - **Sort the budget ledger and filter it by account.** The menu at the head of the transaction list
-  sorts by date or by amount (largest first, remembered on this device) and shows one account's
-  statement, the same filter the Accounts tab opens. A note under the title says when the list is
-  sorted by amount; a tap on it opens the menu.
+  sorts by date or by amount (expenses first, then income, each largest first, remembered on this
+  device) and shows one account's statement, the same filter the Accounts tab opens. Sorted by
+  amount, planned and booked entries stay in their own sections. A note under the title says when
+  the list is sorted by amount; a tap on it opens the menu.
 - **The calendar has a sidebar on wide screens.** From about 1600px the month, week and day views
   show a small month to jump to any day, your calendars and people as switches (the same ones as in
   the filter menu), and the next five appointments. Today is marked in the same colour as in the

@@ -2488,10 +2488,13 @@ function ledgerSectionsHtml(rows) {
   // zwei gleich grosse Ueberschriften uebereinander. `u-compact` ist die Stufe
   // darunter (typography.css, Kartentitel).
   if (isForecastMonth(state.month)) return entryRows(rows);
-  // Nach Betrag ist die Liste EINE Rangfolge: getrennt nach Geplant und Gebucht
-  // stuende der groesste Betrag nicht oben, sondern im zweiten Abschnitt.
-  if (ledgerSort() === 'amount') return entryRows(rows);
-  const { planned, booked } = splitLedger(rows);
+  // Auch nach Betrag bleiben Geplant und Gebucht getrennt (Re-Critique
+  // 2026-10-17): sortLedger() hat die Zeilen schon geordnet, und splitLedger()
+  // behaelt sie fuer "Gebucht"; "Geplant" ordnet es nach Datum und wird
+  // deshalb nach Betrag noch einmal sortiert.
+  const split = splitLedger(rows);
+  const booked = split.booked;
+  const planned = ledgerSort() === 'amount' ? sortLedger(split.planned, 'amount') : split.planned;
   if (!planned.length) return entryRows(rows);
   const expanded = state.plannedExpandedMonth === state.month;
   const more = planned.length - PLANNED_PREVIEW_ROWS;

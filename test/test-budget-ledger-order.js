@@ -2,11 +2,13 @@
  * Test: Sortierung und Kontofilter des Budget-Hauptbuchs (Critique R19)
  * Zweck: Persona Alex fand im Hauptbuch "weder Sortierung noch Kontofilter".
  *        Gemessen wird:
- *        1. `sortLedger()` als Rechnung - Betrag ohne Vorzeichen, Gleichstand
- *           in der Reihenfolge des Servers, die Voreinstellung aendert nichts.
+ *        1. `sortLedger()` als Rechnung - erst Ausgaben, dann Einnahmen, je
+ *           nach Betrag; Gleichstand in der Reihenfolge des Servers, die
+ *           Voreinstellung aendert nichts.
  *        2. der ECHTE Render-Pfad (`renderEntries()`, `listToolsMenuHtml()`):
- *           die Zeilen stehen in der gewaehlten Reihenfolge, nach Betrag als
- *           EINE Rangfolge ohne die Abschnitte Geplant/Gebucht, das Menue hakt
+ *           die Zeilen stehen in der gewaehlten Reihenfolge, auch nach Betrag
+ *           in den Abschnitten Geplant/Gebucht (Re-Critique 2026-10-17; R19
+ *           hatte sie fuer EINE Rangfolge aufgeloest), das Menue hakt
  *           die Wahl und das gefilterte Konto, und beides bleibt bei
  *           `budget: read` stehen.
  *        3. die Verdrahtung im Quelltext: die Wahl wird gemerkt, das Konto
@@ -44,11 +46,13 @@ const MONAT = [
   buchung(4, -12.5, '2026-09-05'),
 ];
 
-test('sortLedger: nach Betrag ohne Vorzeichen, Gleichstand in der Reihenfolge des Servers', () => {
+test('sortLedger: erst Ausgaben, dann Einnahmen, je nach Betrag; Gleichstand in der Reihenfolge des Servers', () => {
   assert.deepEqual(LEDGER_SORTS, ['date', 'amount']);
   assert.equal(DEFAULT_LEDGER_SORT, 'date');
   assert.equal(normalizeLedgerSort('quatsch'), 'date');
-  assert.deepEqual(sortLedger(MONAT, 'amount').map((e) => e.id), [2, 3, 1, 4]);
+  // Das Gehalt (+2.400) stand bis hierhin VOR der Miete (-980): eine
+  // Rangfolge ohne Vorzeichen mischte beide Richtungen (Persona Alex).
+  assert.deepEqual(sortLedger(MONAT, 'amount').map((e) => e.id), [3, 1, 4, 2]);
   assert.deepEqual(sortLedger(MONAT, 'date').map((e) => e.id), [1, 2, 3, 4], 'die Voreinstellung laesst die Liste stehen');
   const kopie = [...MONAT];
   sortLedger(MONAT, 'amount');
@@ -75,11 +79,14 @@ function liste(sort, over = {}) {
   }
 }
 
-test('renderEntries: nach Betrag eine Rangfolge ohne Abschnitte, nach Datum wie bisher', () => {
+test('renderEntries: nach Betrag in Geplant und Gebucht sortiert, nach Datum wie bisher', () => {
   withAccess({ budget: 'write' }, () => {
-    const betrag = liste('amount');
-    assert.deepEqual(zeilen(betrag.html), [5, 2, 3, 1, 4], 'der groesste Betrag steht oben, auch wenn er geplant ist');
-    assert.doesNotMatch(betrag.html, /budget-ledger-section--planned/, 'nach Betrag keine Trennung in Geplant und Gebucht');
+    const betrag = liste('amount', {
+      entries: [...MONAT, buchung(5, -3000, '2099-09-30'), buchung(6, 50, '2099-09-28'), buchung(7, -400, '2099-09-29')],
+    });
+    assert.match(betrag.html, /budget-ledger-section--planned/, 'auch nach Betrag bleibt Geplant von Gebucht getrennt');
+    assert.deepEqual(zeilen(betrag.html), [5, 7, 6, 3, 1, 4, 2],
+      'Geplant: Ausgaben nach Betrag, dann die Einnahme; Gebucht ebenso');
     const datum = liste('date');
     assert.match(datum.html, /budget-ledger-section--planned/, 'nach Datum bleiben die Abschnitte');
   });
