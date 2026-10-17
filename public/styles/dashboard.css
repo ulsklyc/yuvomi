@@ -2358,6 +2358,57 @@ svg.weather-forecast__icon {
   justify-content: center;
   padding: var(--space-6);
   animation: onboarding-in var(--duration-xl) var(--ease-out);
+  transition: background-color var(--duration-lg) var(--ease-out),
+    backdrop-filter var(--duration-lg) var(--ease-out),
+    -webkit-backdrop-filter var(--duration-lg) var(--ease-out);
+}
+
+/* Ein Schritt zeigt auf ein echtes Bedienelement (dashboard.js,
+ * placeSpotlight): das Overlay wird klar, den Abdunkler traegt der Ring als
+ * Schatten nach aussen - der Ausschnitt um das Element bleibt scharf. */
+.onboarding-overlay--spot {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.onboarding-spotlight {
+  position: fixed;
+  left: var(--spot-x, 50%);
+  top: var(--spot-y, 50%);
+  inline-size: var(--spot-w, 0);
+  block-size: var(--spot-h, 0);
+  border-radius: var(--spot-r, var(--radius-lg));
+  box-shadow: 0 0 0 2px var(--color-accent),
+    0 0 0 100vmax color-mix(in srgb, var(--color-bg) 78%, transparent);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--duration-lg) var(--ease-out),
+    left var(--duration-lg) var(--ease-glass),
+    top var(--duration-lg) var(--ease-glass),
+    inline-size var(--duration-lg) var(--ease-glass),
+    block-size var(--duration-lg) var(--ease-glass),
+    border-radius var(--duration-lg) var(--ease-glass);
+}
+
+.onboarding-overlay--spot .onboarding-spotlight {
+  opacity: 1;
+}
+
+/* Die Bildmarke statt eines Lucide-Zeichens im ersten Schritt - dieselbe
+ * Kachel wie auf der Anmeldeseite (.auth-hero__mark). */
+.onboarding-mark {
+  display: inline-block;
+  inline-size: var(--space-16);
+  block-size: var(--space-16);
+  border-radius: 22.5%;
+  box-shadow: var(--shadow-md);
+}
+
+.onboarding-mark > .brand-mark {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
 }
 
 .onboarding-overlay--out {
@@ -2382,6 +2433,9 @@ svg.weather-forecast__icon {
  * einem, `--glass-inset-elevated` die Lichtkante oben (glass.css, R18). Keine
  * eigene Linie mehr. */
 .onboarding-card {
+  /* positioniert, damit die Tafel ueber dem Abdunkler des Lichtrings liegt
+   * (.onboarding-spotlight ist fixed und malte sonst darueber). */
+  position: relative;
   background: var(--color-surface);
   border: none;
   border-radius: var(--radius-xl);
@@ -2464,6 +2518,8 @@ svg.weather-forecast__icon {
 @media (prefers-reduced-motion: reduce) {
   .onboarding-overlay,
   .onboarding-overlay--out { animation: none; }
+  .onboarding-overlay,
+  .onboarding-spotlight,
   .onboarding-dot { transition: none; }
 }
 

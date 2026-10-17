@@ -68,6 +68,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the member list into the Invitations card, which had no action of its own; "Add member" stays
   under the list. The note on the member order is two short sentences instead of five lines.
 
+- **The welcome tour shows Yuvomi and the real buttons.** It opens with the Yuvomi mark instead
+  of a generic house, and its steps on navigation and on the + button light up exactly that
+  control on your screen - the tab bar or the sidebar, and the + button where it sits on this
+  device - while the rest of the page dims.
+
 - **A recipe without a picture starts with its content.** The flat kitchen-coloured band above
   the ingredients is gone; the details open with the meals and the ingredients, under the
   recipe's name. Recipes with a picture keep it.

@@ -36,6 +36,7 @@ import { renderAvatarStack } from '/components/user-multi-select.js';
 import { isSoloHousehold } from '/utils/household.js';
 import { toggleRegion, durationToken, easingToken } from '/utils/ux.js';
 import { swapContent } from '/utils/content-swap.js';
+import { brandMarkSvg } from '/utils/brand-mark.js';
 import { findSettingsLeaf } from '/settings/registry.js';
 import {
   WIDGET_SIZE_PRESETS, WIDGET_SIZE_OPTIONS,
@@ -341,12 +342,30 @@ function getOnboardingSteps() {
   // bekommt weder Bottom-Bar- noch Wischgesten-Text. Gleicher Breakpoint wie
   // der Sidebar-Umbruch (layout.css, min-width: 1024px).
   const desktop = window.matchMedia('(min-width: 1024px)').matches;
+  // DIE MARKE UND DIE ECHTEN KNOEPFE (Re-Critique 2026-10-17, A1): der
+  // Rundgang begann mit einem Lucide-Haus statt der Bildmarke und beschrieb
+  // Leiste und Plus-Knopf nur in Worten. Schritt 1 traegt jetzt das Zeichen
+  // (utils/brand-mark.js), Schritt 2 und 3 zeigen auf das Bedienelement, das
+  // der Text nennt (`target`, siehe placeSpotlight in showOnboarding).
   return [
-    { icon: 'home',         title: t('onboarding.step1Title', { name: appName }), body: t('onboarding.step1Body') },
-    { icon: 'navigation',   title: t('onboarding.step2Title'), body: t(desktop ? 'onboarding.step2BodyDesktop' : 'onboarding.step2Body') },
-    { icon: 'plus-circle',  title: t('onboarding.step3Title'), body: t(desktop ? 'onboarding.step3BodyDesktop' : 'onboarding.step3Body') },
+    { mark: true,           title: t('onboarding.step1Title', { name: appName }), body: t('onboarding.step1Body') },
+    { icon: 'navigation',   title: t('onboarding.step2Title'), body: t(desktop ? 'onboarding.step2BodyDesktop' : 'onboarding.step2Body'),
+      target: () => document.querySelector(desktop ? '.nav-sidebar' : '.nav-bottom__items') },
+    { icon: 'plus-circle',  title: t('onboarding.step3Title'), body: t(desktop ? 'onboarding.step3BodyDesktop' : 'onboarding.step3Body'),
+      target: () => [...document.querySelectorAll('.page-fab')].find(isShownOnScreen) ?? null },
   ];
 }
+
+/** Steht das Element sichtbar im Fenster? (Ziel eines Rundgang-Schritts) */
+function isShownOnScreen(el) {
+  if (!el || !el.getClientRects().length) return false;
+  const r = el.getBoundingClientRect();
+  return r.width > 0 && r.height > 0 && r.bottom > 0 && r.right > 0
+    && r.top < window.innerHeight && r.left < window.innerWidth;
+}
+
+/** Abstand des Lichtrings um das gezeigte Bedienelement, in px. */
+const ONBOARDING_SPOT_PAD = 6;
 
 function showOnboarding(appContainer, onDone) {
   const steps = getOnboardingSteps();
@@ -400,7 +419,38 @@ function showOnboarding(appContainer, onDone) {
   const stepEl = document.createElement('div');
   stepEl.className = 'onboarding-step';
   card.appendChild(stepEl);
+
+  /* DER LICHTRING (Re-Critique 2026-10-17, A1 "kein Bezug auf echte
+   * Bedienelemente"). Nennt ein Schritt die Leiste oder den Plus-Knopf, liegt
+   * ueber genau diesem Knopf ein Ausschnitt: der Ring traegt den Abdunkler als
+   * Schatten nach aussen (`box-shadow` mit 100vmax Spreizung), das Overlay
+   * selbst wird dafuer klar. So steht das echte Element scharf im Bild, der
+   * Rest gedimmt - ohne Maske, ohne Kopie des Elements. Klicks faengt weiter
+   * das Overlay; der Ring ist reine Anzeige (aria-hidden), der Text bleibt die
+   * Aussage. Findet sich das Ziel nicht (Modul ohne Plus, ausgeblendete
+   * Leiste), bleibt der Schritt so, wie er vorher war: Tafel auf Unschaerfe. */
+  const spot = document.createElement('div');
+  spot.className = 'onboarding-spotlight';
+  spot.setAttribute('aria-hidden', 'true');
+  overlay.appendChild(spot);
   overlay.appendChild(card);
+
+  function placeSpotlight() {
+    const target = steps[current].target?.();
+    const shown = isShownOnScreen(target);
+    overlay.classList.toggle('onboarding-overlay--spot', shown);
+    if (!shown) return;
+    const r = target.getBoundingClientRect();
+    const radius = parseFloat(getComputedStyle(target).borderTopLeftRadius) || 0;
+    const pad = ONBOARDING_SPOT_PAD;
+    spot.style.setProperty('--spot-x', `${Math.round(r.left - pad)}px`);
+    spot.style.setProperty('--spot-y', `${Math.round(r.top - pad)}px`);
+    spot.style.setProperty('--spot-w', `${Math.round(r.width + pad * 2)}px`);
+    spot.style.setProperty('--spot-h', `${Math.round(r.height + pad * 2)}px`);
+    spot.style.setProperty('--spot-r', `${Math.round(Math.min(radius + pad, (r.height + pad * 2) / 2))}px`);
+  }
+  const onResize = () => placeSpotlight();
+  window.addEventListener('resize', onResize);
 
   function fitSteps() {
     stepEl.style.minBlockSize = '';
@@ -421,10 +471,18 @@ function showOnboarding(appContainer, onDone) {
     const isLast = current === steps.length - 1;
     stepEl.replaceChildren();
 
-    const icon = document.createElement('i');
-    icon.dataset.lucide = step.icon;
-    icon.className = 'onboarding-icon';
-    icon.setAttribute('aria-hidden', 'true');
+    let icon;
+    if (step.mark) {
+      icon = document.createElement('span');
+      icon.className = 'onboarding-mark';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.insertAdjacentHTML('beforeend', brandMarkSvg());
+    } else {
+      icon = document.createElement('i');
+      icon.dataset.lucide = step.icon;
+      icon.className = 'onboarding-icon';
+      icon.setAttribute('aria-hidden', 'true');
+    }
 
     const title = document.createElement('h2');
     title.className = 'onboarding-title';
@@ -483,6 +541,7 @@ function showOnboarding(appContainer, onDone) {
     stepEl.appendChild(actions);
 
     if (window.lucide) window.lucide.createIcons({ el: stepEl });
+    placeSpotlight();
     return nextBtn;
   }
 
@@ -491,6 +550,7 @@ function showOnboarding(appContainer, onDone) {
     if (finished) return;
     finished = true;
     document.removeEventListener('keydown', onKeydown);
+    window.removeEventListener('resize', onResize);
     localStorage.setItem(ONBOARDING_KEY, '1');
     // Am Konto vermerken, nicht nur am Geraet: sonst zeigt ein neues Geraet
     // oder ein privates Fenster den Rundgang erneut, obwohl das Konto ihn
