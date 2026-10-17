@@ -10,7 +10,7 @@ import { t, formatDate } from '/i18n.js';
 import { isPushSubscribed } from '/push.js';
 import { moduleIconEl } from '/nav-icons.js';
 import { toastSurface } from '/utils/toast-surface.js';
-import { dashboardRequest } from '/utils/dashboard-widgets.js';
+import { dashboardRequest, fetchPendingReminders, forgetPendingReminders } from '/utils/dashboard-widgets.js';
 import { wallShowsOn } from '/utils/wall-mode.js';
 
 // --------------------------------------------------------
@@ -393,6 +393,7 @@ function showReminderToast(reminder) {
 async function dismissReminder(id) {
   try {
     await api.patch(`/reminders/${id}/dismiss`, {});
+    forgetPendingReminders();
     _shownIds.delete(id);
   } catch {
     // Netzwerkfehler ignorieren
@@ -410,10 +411,12 @@ async function dismissReminder(id) {
  * gezeigt verbucht: verlaesst jemand die Wand, kommt die Erinnerung mit dem
  * naechsten Abruf. Ein gekoppeltes Display pollt gar nicht (router-navigate.js).
  */
-async function poll() {
+async function poll({ fresh = false } = {}) {
   try {
     const wall = wallShowsOn();
-    const data = await api.get(dashboardRequest('/reminders/pending', { wall }));
+    // Geteilt mit der Uebersicht (fetchPendingReminders in utils/dashboard-widgets.js):
+    // beim Start ging dieselbe Frage sonst zweimal hinaus. Das Intervall fragt ohnehin neu.
+    const data = await fetchPendingReminders(dashboardRequest('/reminders/pending', { wall }), { get: (path) => api.get(path), fresh });
     // Persoenlich gefragt, ueber einer Wand angekommen (jemand ist waehrend
     // des Abrufs zur Uebersicht gewechselt): die Antwort gehoert nicht auf
     // diese Flaeche. Verworfen, nicht verbucht - der naechste Abruf fragt
@@ -450,6 +453,7 @@ function stop() {
     _pollTimer = null;
   }
   _isInitialized = false;
+  forgetPendingReminders();
   _shownIds.clear();
   _deferredRetries = 0;
   updateBellBadge(0);
@@ -459,7 +463,7 @@ function stop() {
  * Erzwingt sofortigen Poll (z.B. nach Erstellen einer Erinnerung).
  */
 function refresh() {
-  poll();
+  poll({ fresh: true });
 }
 
 export {

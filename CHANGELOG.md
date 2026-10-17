@@ -256,6 +256,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The last tap wins while a page is loading.** Tapping a second destination while the first one
   was still loading was ignored, and you stayed on the first. Now the newer tap replaces the one
   in progress: the page you left behind is never drawn, and Back skips it.
+- **The overview asks for due reminders once on start.** The bell and the overview's Today sheet
+  sent the same request moments apart; they now share one answer.
 - **The shift schedule shows its own loading error.** When the server answers "too many requests"
   or is briefly unreachable, the Shift schedule now says so in the page with a "Try again" button,
   instead of falling back to the app's general error screen.

@@ -1070,6 +1070,48 @@ test('Persoenliches: die Erinnerungen der Seite gehen durch dieselbe Stelle wie 
   assert.deepEqual(calls.filter((args) => args !== 'overviewRequest'), [], 'Erinnerungen an `overviewRequest` vorbei geladen');
 });
 
+// EIN ABRUF FUER GLOCKE UND UEBERSICHT (Critique R19, Nachlese 1b). Beim Start
+// ging `/reminders/pending` zweimal hinaus: die Glocke fragte gleich nach der
+// Anmeldung, das Heute-Blatt der Uebersicht 0,7 s spaeter dieselbe Adresse.
+test('Erinnerungen: Glocke und Uebersicht teilen sich beim Start EINEN Abruf', async () => {
+  const { fetchPendingReminders, forgetPendingReminders, PENDING_SHARE_MS: SHARE_MS } = await import('../public/utils/dashboard-widgets.js');
+  forgetPendingReminders();
+  const asked = [];
+  const get = async (path) => { asked.push(path); return { data: [{ id: asked.length }] }; };
+  const bell = fetchPendingReminders('/reminders/pending', { get, now: 1000 });
+  const sheet = fetchPendingReminders('/reminders/pending', { get, now: 1700 });
+  assert.equal(sheet, bell, 'dieselbe Adresse kurz danach bekommt denselben Abruf');
+  await sheet;
+  assert.deepEqual(asked, ['/reminders/pending']);
+  await fetchPendingReminders('/reminders/pending?audience=household', { get, now: 1800 });
+  assert.equal(asked.length, 2, 'eine andere Reichweite ist eine andere Frage');
+  await fetchPendingReminders('/reminders/pending?audience=household', { get, now: 1800 + SHARE_MS });
+  assert.equal(asked.length, 3, 'nach dem Fenster wird neu gefragt');
+  await fetchPendingReminders('/reminders/pending?audience=household', { get, now: 1801 + SHARE_MS, fresh: true });
+  assert.equal(asked.length, 4, 'frisch heisst frisch');
+  forgetPendingReminders();
+  await fetchPendingReminders('/reminders/pending?audience=household', { get, now: 1802 + SHARE_MS });
+  assert.equal(asked.length, 5, 'vergessen heisst neu fragen');
+  const broken = fetchPendingReminders('/reminders/pending', { get: async () => { throw new Error('weg'); }, now: 9000 });
+  await assert.rejects(broken);
+  await fetchPendingReminders('/reminders/pending', { get, now: 9001 });
+  assert.equal(asked.length, 6, 'ein Fehler wird nicht weitergereicht');
+  forgetPendingReminders();
+
+  // Die Verdrahtung: beide Stellen gehen durch den geteilten Abruf, die Glocke
+  // fragt nach einer eigenen Aenderung frisch und vergisst beim Wegklicken und
+  // beim Abmelden.
+  const { readFileSync } = await import('node:fs');
+  const page = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
+  assert.match(page, /async function loadPendingReminders\(request = \(path\) => path, get = \(path\) => fetchPendingReminders\(path, \{ get: \(p\) => api\.get\(p\) \}\)\)/);
+  const bellSrc = readFileSync(new URL('../public/reminders.js', import.meta.url), 'utf8');
+  assert.match(bellSrc, /await fetchPendingReminders\(dashboardRequest\('\/reminders\/pending', \{ wall \}\), \{ get: \(path\) => api\.get\(path\), fresh \}\)/);
+  assert.doesNotMatch(bellSrc, /api\.get\(dashboardRequest\('\/reminders\/pending'/);
+  assert.match(bellSrc, /function refresh\(\) \{\s*poll\(\{ fresh: true \}\);/);
+  assert.match(bellSrc, /\/dismiss`, \{\}\);\s*forgetPendingReminders\(\);/);
+  assert.match(bellSrc, /function stop\(\) \{[\s\S]*?forgetPendingReminders\(\);[\s\S]*?\n\}/);
+});
+
 // Die Glocke der Shell pollt denselben Endpunkt jede Minute und macht aus einer
 // faelligen Erinnerung einen Toast (30 s) und eine Browser-Benachrichtigung -
 // ueber der Wand eines Mitglieds stuende damit doch wieder, was nur ihm gilt

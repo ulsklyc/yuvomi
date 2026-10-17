@@ -42,6 +42,7 @@ import {
   COCKPIT_COVERED_WIDGETS,
   nearestPreset, sameWidgetConfig, suggestGridHoleFill, rowFillSpans,
   dashboardQuery, dashboardQueryFiltersCounts, dashboardRequest, normalizeShoppingListSelection,
+  fetchPendingReminders,
 } from '/utils/dashboard-widgets.js';
 import { EVENT_LIMIT_STEPS, EVENT_LIMIT_DEFAULT, clampEventLimit } from '/utils/dashboard-event-limit.js';
 import {
@@ -7890,7 +7891,7 @@ function todayFingerprint(data, cfg, now = new Date()) {
  * auch hier die Haushaltsfassung ab, und die ist leer - eine Erinnerung gilt
  * der Person, die um sie gebeten hat, nicht der Kueche (#1817).
  */
-async function loadPendingReminders(request = (path) => path, get = (path) => api.get(path)) {
+async function loadPendingReminders(request = (path) => path, get = (path) => fetchPendingReminders(path, { get: (p) => api.get(p) })) {
   try {
     const res = await get(request('/reminders/pending'));
     return Array.isArray(res?.data) ? res.data : [];
