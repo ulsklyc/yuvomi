@@ -2108,6 +2108,22 @@ Zielgroessen-Regel halten (**Ebene 3**, `die Groesse des Icon-Knopfs gehoert der
 - **Zahlen-Stepper (R20, "Alle N Wochen"):** das native `<input type="number">` bleibt das
   Feld (Label, Tastatur), links und rechts `btn--secondary btn--icon` mit Minus/Plus; an der
   Grenze `disabled`, der Fokus geht dann ins Feld.
+- **Ortssuche (R20, Wetter-Standort, `settings/weather-location.js`):** gestapelte Zeile
+  "Ort" mit Textfeld (`enterkeyhint="search"`, kein Seitenfilter-`type="search"`) und
+  `btn--secondary` "Suchen"; gesucht wird erst auf Enter/Knopf (Server-Proxy
+  `GET /weather/geocode`, Open-Meteo). Treffer als Knopfliste (Name primaer, Region und Land
+  sekundaer; gleichnamige Treffer derselben Region tragen den Kreis, sonst die Koordinaten),
+  Ansage ueber eine `role="status"`-Zeile, Fehler am Feld (`reportFieldError`). Breite und
+  Laenge stehen unter "Koordinaten von Hand" (`settings-disclosure`), offen nur, wenn
+  Koordinaten ohne Ortsnamen gespeichert sind.
+- **Farbstreifen der Leseansicht (R20):** `openDetailView({ accentColor })` nur mit einer
+  Farbe, die etwas sagt (Marke, Kalender) - nie der blosse Modulton; der stand 16px unter der
+  Haarlinie des Kopfs als Doppellinie (test:detail-view).
+- **Lange Unterlisten (R20, Raten):** die neuesten sechs offen, der Rest gerendert hinter
+  "Alle anzeigen (n)" - derselbe Knopf wie "Geplant" im Hauptbuch (`.budget-planned-toggle`).
+- **Dokumentraster (R20):** der Kartentitel haelt im Raster zwei Zeilen (`min-block-size:
+  2lh`), damit Meta und Leiste einer Reihe fluchten; Subgrid scheidet aus, weil die Karte ein
+  Container ist. Der Leerzustand spannt alle Spalten.
 
 ### Named Rules
 **Die Kasten-in-Kasten-Regel.** Karten sind randlos auf dem Grouped-Grund, also traegt
@@ -2822,10 +2838,11 @@ Kontakten und Vorrat (Port erst bei y179), und unter der Glas-Kapsel lief nie In
 
    **Nie ein Kopf ohne Ortsangabe.** Angedockt wandert Zeile 1 aus dem Bild, und der Titel
    kommt als kleiner Inline-Titel zurueck (`wireCollapsingHeader`, utils/ux.js): in die
-   Bar-Zeile, wo sie ihm 88px laesst; sonst falten ihre Kontrollen ins „..." (R9 M9); und wo
-   nichts falten kann, weil die Bar-Zeile eine Tab-Leiste ist, klebt der Kopf um die Hoehe
-   des Inline-Titels tiefer und zeigt ihn in diesem Streifen ueber der Leiste (Band, R11
-   H1). Kopfhoehe und Klebekante haengen in keinem der drei Wege am Andock-Zustand.
+   Bar-Zeile, wo sie ihm 88px laesst; sonst falten ihre Kontrollen ins „..." (R9 M9). Eine
+   Tab-Leiste als Bar-Zeile gibt es unter 1024px nicht mehr: seit R19 stehen die Reiter in
+   der Titelzeile (`--tabs-title`), der Kopf ist einzeilig. Die dritte Bauart dafuer (Band,
+   R11 H1) ist seit R20 entfallen - gemessen erreichte sie keine Route mehr. Kopfhoehe und
+   Klebekante haengen in keinem Weg am Andock-Zustand.
    **1a. Werkzeuge in der Titelzeile.** (R16, Critique 2026-10-05 P1 mobil.) Traegt die
    Werkzeugzeile hoechstens ZWEI Icon-Knoepfe (Such-Icon, „...") und weder Segment noch
    Stepper noch Tab-Leiste, ist sie keine Zeile wert: die Knoepfe stehen am Ende der
