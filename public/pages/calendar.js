@@ -3300,11 +3300,17 @@ function wireMonthGridKeys(grid, { split }) {
 
 /**
  * Nach dem Wechsel in die Tagesansicht per Tastatur: Fokus auf den ersten
- * Eintrag des Tages (Ganztags-Zeile, dann das Raster), sonst auf den Reiter.
+ * Eintrag des Tages (Ganztags-Zeile, dann das Raster). Ein LEERER Tag hat
+ * keinen - dann der Hinweis im Raster („Noch keine Termine …"), nicht mehr
+ * der Reiter „Tag" (R20, Re-Critique 2026-10-17 A3, Sam): Enter auf einen
+ * leeren Monatstag landete oben in der Ansichtswahl, und der Screenreader
+ * sagte „Tag, Registerkarte" statt, was an diesem Tag ist. Der Reiter bleibt
+ * der letzte Rueckfall (ein Tag mit Schicht, aber ohne Knopf darin).
  */
 function focusFirstDayEntry() {
   const body = _container?.querySelector('#cal-body');
-  const first = body?.querySelector('.day-view [role="button"][tabindex="0"]');
+  const first = body?.querySelector('.day-view [role="button"][tabindex="0"]')
+    ?? body?.querySelector('#day-empty-hint');
   (first ?? _container?.querySelector('#cal-view-tab-day'))?.focus();
 }
 
@@ -4900,7 +4906,7 @@ function renderDayView(container) {
               ...scheduleBlocks.map((entry) => ({ range: scheduleBlockTimeRange(entry), html: () => renderScheduleTimeBlock(entry, 'day-event', scheduleLayout.get(entry)) })),
               ...timed.map((ev) => ({ range: timeRangeForEvent(ev, state.cursor), html: () => renderDayEvent(ev, layout.get(ev), state.cursor) })),
             ])}
-            ${dayEvs.length === 0 && schedule.length === 0 ? `<div class="day-view__empty-hint" style="top:calc(${hourOffset(state.cursor === state.today ? nowMinutes() : 9 * 60)} + 16px)">${dayEmptyHintText()}</div>` : ''}
+            ${dayEvs.length === 0 && schedule.length === 0 ? `<div class="day-view__empty-hint" id="day-empty-hint" tabindex="-1" style="top:calc(${hourOffset(state.cursor === state.today ? nowMinutes() : 9 * 60)} + 16px)">${dayEmptyHintText()}</div>` : ''}
           </div>
           ${state.cursor === state.today ? `
             <div class="day-view__now-line" aria-hidden="true" style="top:${hourOffset(nowMinutes())};"></div>

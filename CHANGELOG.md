@@ -307,6 +307,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The keyboard focus stays where you work in the calendar.** Pressing Enter on an empty day in the
+  month opens that day with the focus on its "No events yet" note instead of the view tabs at the top.
+  A dialog opened with "n" and then discarded returns the focus to the "New" button, in every module,
+  instead of the top of the page.
+
 - **Wall mode keeps the keyboard focus and shows what its buttons are for.** Starting wall mode
   puts the focus on the wall, and leaving it with Esc returns it to the button that started it,
   instead of dropping it at the top of the page. The timer buttons carry the word "Kitchen timer",

@@ -122,6 +122,16 @@ export function triggerPageFab(doc = document) {
   if (doc.documentElement?.hasAttribute('data-module-readonly')) return false;
   const fab = doc.querySelector('.page-fab');
   if (!fab) return false;
+  // DER RUECKWEG IST DER KNOPF (R20, Re-Critique 2026-10-17 A3, Sam). Ohne
+  // Fokus (<body>, der Scrollport nach einem Seitenwechsel) merkte sich der
+  // Dialog nichts Bedienbares, und nach „Verwerfen" stand der Fokus auf
+  // #main-content - am Anfang der Seite. Dann uebernimmt der FAB den Fokus,
+  // den sein Klick ohnehin gehabt haette, und der Dialog kehrt zu ihm zurueck.
+  // Ein echter Ausloeser (eine Kalenderzelle, eine Zeile) bleibt der Rueckweg.
+  const active = doc.activeElement;
+  if (!active || active === doc.body || active === doc.documentElement || active.id === 'main-content') {
+    fab.focus?.({ preventScroll: true });
+  }
   fab.click();
   return true;
 }

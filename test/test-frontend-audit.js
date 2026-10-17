@@ -21956,3 +21956,13 @@ test('R20: der Wand-Modus fuehrt den Fokus, benennt den Timer und laesst die Ini
   assert.doesNotMatch(count?.body ?? '', /inset-inline-end/);
   assert.ok(css.some((r) => r.selector.trim() === '.wall-who__list--tasks .wall-who__mark' && /display:\s*contents/.test(r.body)), 'mit Titeln steht die Marke hinter dem Namen');
 });
+
+// R20 D6 (Re-Critique 2026-10-17, A3 Sam): Enter auf einen leeren Monatstag
+// landete auf dem Reiter „Tag" - jetzt auf dem Hinweis im Raster des Tages.
+test('R20: ein leerer Tag gibt den Fokus an seinen Hinweis, nicht an den Reiter', () => {
+  const cal = read('../public/pages/calendar.js');
+  assert.match(cal, /class="day-view__empty-hint" id="day-empty-hint" tabindex="-1"/, 'der Hinweis kann den Fokus nehmen');
+  const fn = cal.slice(cal.indexOf('function focusFirstDayEntry('), cal.indexOf('function focusFirstDayEntry(') + 400);
+  assert.match(fn, /\?\? body\?\.querySelector\('#day-empty-hint'\)/, 'ohne Eintrag der Hinweis');
+  assert.ok(fn.indexOf('#day-empty-hint') < fn.indexOf('#cal-view-tab-day'), 'der Reiter ist nur noch der letzte Rueckfall');
+});

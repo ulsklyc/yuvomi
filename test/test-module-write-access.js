@@ -386,6 +386,28 @@ test('`n` mit Schreibrecht: der FAB oeffnet wie bisher (Gegenfall)', () => {
   assert.equal(fab.triggerPageFab({ documentElement: { hasAttribute: () => false }, querySelector: () => null }), false);
 });
 
+// R20 (Re-Critique 2026-10-17, A3 Sam): `n` ohne Fokus - nach „Verwerfen"
+// stand der Fokus auf #main-content, weil der Dialog sich <body> gemerkt hatte.
+// Ohne bedienbaren Fokus nimmt ihn der FAB vor seinem Klick; ein echter
+// Ausloeser (eine Zelle, eine Zeile) bleibt der Rueckweg.
+test('`n` ohne Fokus gibt dem FAB den Fokus, ein echter Ausloeser behaelt ihn', () => {
+  const lauf = (active) => {
+    const reihenfolge = [];
+    const body = { id: '' };
+    const knopf = { focus: () => reihenfolge.push('focus'), click: () => reihenfolge.push('click') };
+    const doc = {
+      body, documentElement: { hasAttribute: () => false },
+      activeElement: active === 'body' ? body : active,
+      querySelector: (sel) => (sel === '.page-fab' ? knopf : null),
+    };
+    fab.triggerPageFab(doc);
+    return reihenfolge;
+  };
+  assert.deepEqual(lauf('body'), ['focus', 'click'], 'ohne Fokus: erst der Fokus, dann der Klick - der Dialog merkt sich den FAB');
+  assert.deepEqual(lauf({ id: 'main-content' }), ['focus', 'click'], 'der Scrollport nach einem Seitenwechsel zaehlt als kein Fokus');
+  assert.deepEqual(lauf({ id: 'cell' }), ['click'], 'eine fokussierte Zelle bleibt der Rueckweg');
+});
+
 test('`n` im Router laeuft ueber triggerPageFab() und klickt nirgends selbst', () => {
   const router = withoutCommentsKeepingLines(read('../public/router.js'));
   const eintrag = router.split('\n').find((zeile) => /\{\s*key:\s*'n',/.test(zeile));
