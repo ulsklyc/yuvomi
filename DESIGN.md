@@ -1395,6 +1395,14 @@ Spalte an (`dockNextModal`, components/modal.js), das naechste `openModal()` nim
 Kontakte, Inventar, Geburtstage (ueber detail-view.js) und Rezepte (`test:modal-dialog`,
 `test:master-detail`).
 
+**Waehrend gewaehlt wird, gehoert der untere Rand der Auswahl** (R20, Muster Apple Erinnerungen).
+Traegt die Seitenwurzel `.app-page.is-selecting` (Aufgaben, Kontakte), treten der FAB ueberall und
+unter 1024px auch die Kapsel ab; die Pille rueckt an deren Platz. Die ganze Zeile waehlt, die
+gewaehlte ist im App-Akzent getoent, der Wisch-Pfeil faellt weg, und die Spalten-Markierung der
+offenen Zeile schweigt (layout.css „Der Auswahlmodus nimmt der Shell ihre Bedienung ab").
+Eine Sammelaktion mit `paneOnly` steht nur in der Spalte (Aufgaben: „Archivieren"), weil die
+einzeilige Pille keine vierte Kapsel in jeder Sprache traegt.
+
 **Mehrfachauswahl steht in der Detailspalte** (R19, 2026-10-16, Muster Apple Mail). Ab der
 Schwelle zeigt die Spalte waehrend einer Auswahl „N ausgewaehlt" mit den Sammelaktionen als
 Knoepfe (Rueckfrage, Fokus auf Abbrechen und Esc wie in der Pille); Detail und Leerzustand bleiben
@@ -1661,7 +1669,7 @@ sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der B
 |---|---|---|---|
 | Bearbeiten/Loeschen/Mehr an einer Zeile | **Zeilenaktionen (Entscheidung Ulas, 2026-10-07; ersetzt die Lesart "alles sichtbar" aus ignore.md):** je Zeile HOECHSTENS ZWEI dauerhaft sichtbare Icon-Aktionen (`.row-action`); alles Weitere und alles Destruktive steht als Eintrag mit Icon UND Wort hinter EINEM dauerhaft sichtbaren Mehr-Knopf. Nichts wird hinter Hover oder Geste versteckt; Wischen bleibt Zusatzweg; Loeschen bleibt widerrufbar bzw. fragt nach wie vorher. Der Zieh-Griff und sein Auf/Ab-Paar zaehlen nicht. Keine Textkapsel ("Bearbeiten"/"Loeschen" als `.btn`) in einer Listenzeile. Benannte Ausnahmen: die Mahlzeit-Karte (kein Papierkorb, Loeschen im Dialog der Karte), die Werkzeugleiste im Kopf des Dokumentbetrachters (keine Listenzeile). Guards: `test:control-dialect` `row-action-count`, `row-text-capsule`, `row-danger-visible` (Ratchet) | `rowActionHtml()` / `rowActionEl()` und `rowMenuHtml({ id, label, items })` (utils/row-action.js; baut auf `popoverMenuHtml`) | `btn--secondary btn--icon` (violett umrandet), `btn--danger-outline` als Ring, eigene Stiftzellen, `btn--icon btn--sm` |
 | Name der Zeilenaktion | nennt das OBJEKT: "Anna anrufen", "Kategorie Obst loeschen" | `t('common.editNamed' / 'deleteNamed' / 'removeNamed' / 'moreActionsNamed', { name })` oder ein Modul-Key mit `{{name}}` | zwoelfmal "Anrufen", fuenfmal "Loeschen" |
-| Suchen | EIN Suchfeld: gefuellte Kapsel (`--color-fill-field`, `--radius-full`, Kante transparent, Fokus = Akzentkante + Ring), mobil im Kopf die Icon-Form. Am Desktop (ab 1024px) EINE Breite `--page-search-width` (320px, endet in Liste+Detail vor der Listenspur) an EINER Stelle: der Center-Slot direkt hinter dem Titel (Referenz Dokumente) | `renderPageSearch({ className: '... page-toolbar__center' })` + `wirePageSearch()` (utils/page-search.js); Breite und Lage stehen in page-search.css; die globale Suche teilt die Regel per Selektorliste; eine Suche nur fuer einen Abschnitt steht in dessen Kopf (`.section-toolbar`, Hauptbuch im Budget) mit derselben Breite und mobil derselben Icon-Form. Die globale Suche (⌘K) ist eine ARIA-1.2-Combobox: der erste Treffer ist vorgewaehlt, Pfeile bewegen nur die Markierung (der Fokus bleibt im Feld), Enter oeffnet sie (`utils/palette-combobox.js`, R16) | eigene Felder mit 10/12/16px-Ecke, randlose Leisten, `form-input type=search`; Modulbreiten (neun Breiten 280-830px) und Auto-Rand ans Zeilenende |
+| Suchen | EIN Suchfeld: gefuellte Kapsel (`--color-fill-field`, `--radius-full`, Kante transparent, Fokus = Akzentkante + Ring), mobil im Kopf die Icon-Form. Am Desktop (ab 1024px) EINE Breite `--page-search-width` (320px, endet in Liste+Detail vor der Listenspur) an EINER Stelle: der Center-Slot direkt hinter dem Titel (Referenz Dokumente) | `renderPageSearch({ className: '... page-toolbar__center' })` + `wirePageSearch()` (utils/page-search.js); Breite und Lage stehen in page-search.css; die globale Suche teilt die Regel per Selektorliste; eine Suche nur fuer einen Abschnitt steht in dessen Kopf (`.section-toolbar`, Hauptbuch im Budget) mit derselben Breite und mobil derselben Icon-Form. Die globale Suche (⌘K) ist eine ARIA-1.2-Combobox: der erste Treffer ist vorgewaehlt, Pfeile bewegen nur die Markierung (der Fokus bleibt im Feld, nachkommende Treffer lassen sie an ihrer Zeile), Enter oeffnet sie (`utils/palette-combobox.js`, R16). Reihenfolge seit R20: Gehe zu, Daten, Neu anlegen; ein Namensanfang schlaegt ein Teilstueck (`paletteRank`), das Verb holt Anlege-Befehle erst ab drei Zeichen, gemischte Sektionen tragen das Modulsiegel an der Zeile, und ohne Treffer steht der Befehl, die Eingabe als Aufgabe anzulegen | eigene Felder mit 10/12/16px-Ecke, randlose Leisten, `form-input type=search`; Modulbreiten (neun Breiten 280-830px) und Auto-Rand ans Zeilenende |
 | Folge gleichartiger Zeilen | `.row-carrier` (Surface, `--radius-lg`, `--shadow-sm`, Haarlinien `> * + *`); liegt die Liste schon in einer Karte: `.row-divided` | list-row.css | `.list-rows` (12px, ohne Schatten) - laeuft aus, danach faellt die Regel |
 | Anlegen | `page-fab` MIT Nomen: mobil in der Kapsel, am Desktop angedockt als Kopf-Pille "+ Nomen" (Kuerzel "n" angesagt); ein Kontext-FAB nennt je Tab sein Nomen (ein Nomen, keine Verbphrase) | `createPageFab({ dockLabel })`, `setPageFabAction(fab, { label, dockLabel, onClick })` (utils/fab.js) | schwebender FAB ohne Nomen, dessen Bedeutung mit dem Tab wechselt; Inline-Anlegeformulare ueber der Liste; eigener Kopfknopf `.toolbar-new-btn` |
 | Dialogknoepfe | `.modal-panel__footer`: [Loeschen `btn--danger-outline` MIT Text, am Anfangsrand] ... [Abbrechen] [Primaer `btn--primary`]; `mountFooter()` hebt ihn an den Blattrand, mobil ueber die Falz - auch die geteilten Rueckfragen (confirm/prompt/select). **Das Verb (R17, E6): Anlegen = "Hinzufuegen" (`common.add`), Bearbeiten = "Speichern" (`common.save`), in jedem Dialog;** eine benannte Handlung behaelt ihr Verb (Hochladen, Einloesen, Freigeben, Zahlung eintragen). Neben einem absendenden Primaerknopf steht immer Abbrechen; ein Blatt, dessen Schalter sofort wirken (Teilnehmer der Belohnungen), schliesst mit "Fertig" allein, ein Leseblatt mit "Schliessen" vor der Handlung. Gehalten in `test:frontend-audit` ueber `test/dialog-grammar.js` (liest das Markup der oeffnenden Funktion, beurteilt die Beschriftung am deutschen Locale-Wert). Den Anfangsrand haelt EINE Regel in layout.css an `.modal-panel__delete` (setzt `decorateFooterDelete`, RTL gespiegelt), kein `margin` je Modul (R16) | modal.js; Vorbild Kalender-Termin, Aufgabe | `.modal-actions` im scrollenden Koerper, Loeschen als rotes Icon; "Erstellen"/"Aufgabe erstellen"/"Darlehen erstellen" neben "Hinzufuegen"; ein Primaerknopf ohne Abbrechen (Belohnungen bis R17); `btn--primary` linksbuendig im Formular (Haushaltshilfe bis R17) |
@@ -4208,9 +4216,20 @@ Angabe braeuchte einen zweiten Timer, nur damit sie sich selbst aktuell haelt.
   `:root:has(...)` - `html:has(<typ>)` ist Spezifitaet (0,0,2) und verliert gegen das `:root`
   der Basis.
 - **Do** den Primaerknopf eines Modulkopfs sein NOMEN zeigen lassen (`newLabel.*`:
-  „Termin", „Geburtstag"); das Verb traegt das Plus-Zeichen, der ganze Satz bleibt im
-  `aria-label`. Der kurze Text steht als `data-dock-label` am `.page-fab`, damit der
-  Router ihn beim Andocken findet (Register-Regel).
+  „Termin", „Geburtstag"); das Verb traegt das Plus-Zeichen. Der kurze Text steht als
+  `data-dock-label` am `.page-fab`, damit der Router ihn beim Andocken findet
+  (Register-Regel). Angedockt ist das sichtbare Nomen der NAME, der ganze Satz steht in
+  `data-action-label` und als Titel mit „(n)"; schwebend (ohne Text) ist der Satz das
+  `aria-label` (R20, WCAG 2.5.3 - `syncFabName()` in utils/fab.js, die eine Stelle fuer
+  Andocken, Abdocken und den Aktionswechsel je Tab).
+- **Do** ein sichtbares Etikett im Namen tragen (Label in Name, R20): wo ein `aria-label`
+  noetig ist, beginnt es mit dem, was zu sehen ist (Zyklustag „1, 01.10.2026, …"); wo die
+  Zeile mehr zeigt als ein Etikett (Kontozeile, Ausgleichszeile), gibt es KEIN `aria-label` -
+  der Inhalt ist der Name, die Handlung ein `.sr-only`-Nachsatz („…, Buchungen anzeigen").
+  Initialen in einem benannten Knopf sind Zeichnung, kein Text (`data-initials` +
+  `::before`, Kontoknopf und Belohnungen). Die Monatszelle traegt ihre Zusammenfassung als
+  `.month-day__label` (sr-only), das Sichtbare steht in `.month-day__visual` (`aria-hidden`,
+  `display: contents`).
 - **Do** die Zugehoerigkeit eines farbigen Blocks ueber eine VOLLTON-Kante tragen (3px an der
   Inline-Start-Seite), sobald der Block sie tragen kann, und Fuellung wie Tinte bei ihren
   gemessenen Rezepten lassen (Vollton-Kanten-Regel).
