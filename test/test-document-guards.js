@@ -809,7 +809,9 @@ test('PR2 #975 - das zusammengesetzte Kalenderformular und seine Seriennamen ble
       return {
         repeatLabel: repeat?.getAttribute('aria-label') || '',
         repeatIsSvg: Boolean(repeat?.querySelector('svg')),
-        dayLabel: chip?.closest('.month-day')?.getAttribute('aria-label') || '',
+        // Seit R20 traegt die Zelle ihren Namen als Inhalt (`.month-day__label`,
+        // sr-only), nicht als aria-label - dieselbe Zusammenfassung.
+        dayLabel: chip?.closest('.month-day')?.querySelector('.month-day__label')?.textContent || '',
       };
     }, title);
     assert.ok(monthA11y.repeatLabel, 'die Serienmarke hat nach der Lucide-Ersetzung einen Namen');

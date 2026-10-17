@@ -1854,8 +1854,6 @@
         "accountType_credit": "Кредитна картка",
         "accountType_investment": "Інвестиції",
         "accountType_other": "Інше",
-        "viewAccountTransactions": "Показати операції рахунку {{name}}",
-        "currentBalance": "Поточний баланс",
         "clearAccountFilter": "Прибрати фільтр рахунку",
         "archivedBadge": "В архіві",
         "showArchivedAccounts": "Показати архівні",
@@ -1948,7 +1946,8 @@
         "ledgerSortDate": "За датою",
         "ledgerSortAmount": "За сумою",
         "ledgerSortActive": "Сортування: {{sort}}",
-        "ledgerAccountsAll": "Усі рахунки"
+        "ledgerAccountsAll": "Усі рахунки",
+        "showAccountTransactions": "Показати операції рахунку"
     },
     "settings": {
         "healthCycleEnableLabel": "Пропонувати цикл у родині",

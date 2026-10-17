@@ -1716,8 +1716,6 @@
         "accountType_credit": "Credit card",
         "accountType_investment": "Puhunan",
         "accountType_other": "Iba pa",
-        "viewAccountTransactions": "Ipakita ang mga transaksyon para sa {{name}}",
-        "currentBalance": "Kasalukuyang balanse",
         "clearAccountFilter": "I-clear ang filter ng account",
         "archivedBadge": "Naka-archive",
         "showArchivedAccounts": "Ipakita ang naka-archive",
@@ -1808,7 +1806,8 @@
         "ledgerSortDate": "Ayon sa petsa",
         "ledgerSortAmount": "Ayon sa halaga",
         "ledgerSortActive": "Pagkakasunod: {{sort}}",
-        "ledgerAccountsAll": "Lahat ng account"
+        "ledgerAccountsAll": "Lahat ng account",
+        "showAccountTransactions": "Ipakita ang mga transaksyon"
     },
     "settings": {
         "healthCycleEnableLabel": "Ialok ang cycle sa sambahayan",

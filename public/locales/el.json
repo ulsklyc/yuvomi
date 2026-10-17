@@ -1700,8 +1700,6 @@
         "accountType_credit": "Πιστωτική κάρτα",
         "accountType_investment": "Επένδυση",
         "accountType_other": "Άλλο",
-        "viewAccountTransactions": "Εμφάνιση κινήσεων του {{name}}",
-        "currentBalance": "Τρέχον υπόλοιπο",
         "clearAccountFilter": "Κατάργηση φίλτρου λογαριασμού",
         "archivedBadge": "Αρχειοθετημένος",
         "showArchivedAccounts": "Εμφάνιση αρχειοθετημένων",
@@ -1792,7 +1790,8 @@
         "ledgerSortDate": "Κατά ημερομηνία",
         "ledgerSortAmount": "Κατά ποσό",
         "ledgerSortActive": "Ταξινόμηση: {{sort}}",
-        "ledgerAccountsAll": "Όλοι οι λογαριασμοί"
+        "ledgerAccountsAll": "Όλοι οι λογαριασμοί",
+        "showAccountTransactions": "Εμφάνιση κινήσεων"
     },
     "settings": {
         "healthCycleEnableLabel": "Διάθεση του κύκλου στο νοικοκυριό",

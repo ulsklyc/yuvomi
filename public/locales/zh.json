@@ -1700,8 +1700,6 @@
         "accountType_credit": "信用卡",
         "accountType_investment": "投资",
         "accountType_other": "其他",
-        "viewAccountTransactions": "查看{{name}}的交易",
-        "currentBalance": "当前余额",
         "clearAccountFilter": "清除账户筛选",
         "archivedBadge": "已归档",
         "showArchivedAccounts": "显示已归档",
@@ -1792,7 +1790,8 @@
         "ledgerSortDate": "按日期",
         "ledgerSortAmount": "按金额",
         "ledgerSortActive": "排序：{{sort}}",
-        "ledgerAccountsAll": "所有账户"
+        "ledgerAccountsAll": "所有账户",
+        "showAccountTransactions": "查看交易"
     },
     "settings": {
         "healthCycleEnableLabel": "在家庭中提供周期",

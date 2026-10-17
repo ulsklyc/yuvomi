@@ -1700,8 +1700,6 @@
         "accountType_credit": "Thẻ tín dụng",
         "accountType_investment": "Đầu tư",
         "accountType_other": "Khác",
-        "viewAccountTransactions": "Xem giao dịch của {{name}}",
-        "currentBalance": "Số dư hiện tại",
         "clearAccountFilter": "Xóa bộ lọc tài khoản",
         "archivedBadge": "Đã lưu trữ",
         "showArchivedAccounts": "Hiện mục đã lưu trữ",
@@ -1792,7 +1790,8 @@
         "ledgerSortDate": "Theo ngày",
         "ledgerSortAmount": "Theo số tiền",
         "ledgerSortActive": "Sắp xếp: {{sort}}",
-        "ledgerAccountsAll": "Tất cả tài khoản"
+        "ledgerAccountsAll": "Tất cả tài khoản",
+        "showAccountTransactions": "Xem giao dịch"
     },
     "settings": {
         "healthCycleEnableLabel": "Cung cấp chu kỳ cho gia đình",

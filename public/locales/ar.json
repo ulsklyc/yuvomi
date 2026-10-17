@@ -1932,8 +1932,6 @@
         "accountType_credit": "بطاقة ائتمان",
         "accountType_investment": "استثمار",
         "accountType_other": "أخرى",
-        "viewAccountTransactions": "عرض حركات {{name}}",
-        "currentBalance": "الرصيد الحالي",
         "clearAccountFilter": "إزالة تصفية الحساب",
         "archivedBadge": "مؤرشف",
         "showArchivedAccounts": "عرض المؤرشفة",
@@ -2027,7 +2025,8 @@
         "ledgerSortDate": "حسب التاريخ",
         "ledgerSortAmount": "حسب المبلغ",
         "ledgerSortActive": "الترتيب: {{sort}}",
-        "ledgerAccountsAll": "كل الحسابات"
+        "ledgerAccountsAll": "كل الحسابات",
+        "showAccountTransactions": "عرض الحركات"
     },
     "settings": {
         "healthCycleEnableLabel": "إتاحة الدورة للأسرة",

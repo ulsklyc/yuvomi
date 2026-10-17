@@ -1716,8 +1716,6 @@
         "accountType_credit": "Kreditkarte",
         "accountType_investment": "Investment",
         "accountType_other": "Sonstiges",
-        "viewAccountTransactions": "Buchungen von {{name}} anzeigen",
-        "currentBalance": "Aktueller Saldo",
         "clearAccountFilter": "Konto-Filter entfernen",
         "archivedBadge": "Archiviert",
         "showArchivedAccounts": "Archivierte anzeigen",
@@ -1808,7 +1806,8 @@
         "ledgerSortDate": "Nach Datum",
         "ledgerSortAmount": "Nach Betrag",
         "ledgerSortActive": "Sortierung: {{sort}}",
-        "ledgerAccountsAll": "Alle Konten"
+        "ledgerAccountsAll": "Alle Konten",
+        "showAccountTransactions": "Buchungen anzeigen"
     },
     "settings": {
         "healthCycleEnableLabel": "Zyklus im Haushalt anbieten",

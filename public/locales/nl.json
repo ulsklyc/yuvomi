@@ -1700,8 +1700,6 @@
         "accountType_credit": "Creditcard",
         "accountType_investment": "Belegging",
         "accountType_other": "Overig",
-        "viewAccountTransactions": "Boekingen van {{name}} tonen",
-        "currentBalance": "Huidig saldo",
         "clearAccountFilter": "Rekeningfilter wissen",
         "archivedBadge": "Gearchiveerd",
         "showArchivedAccounts": "Gearchiveerde tonen",
@@ -1792,7 +1790,8 @@
         "ledgerSortDate": "Op datum",
         "ledgerSortAmount": "Op bedrag",
         "ledgerSortActive": "Sortering: {{sort}}",
-        "ledgerAccountsAll": "Alle rekeningen"
+        "ledgerAccountsAll": "Alle rekeningen",
+        "showAccountTransactions": "Boekingen tonen"
     },
     "settings": {
         "healthCycleEnableLabel": "Cyclus aanbieden in het huishouden",

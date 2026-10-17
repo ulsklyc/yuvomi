@@ -158,7 +158,8 @@ function klick(attribute) {
 test('Schreibrecht: die eigene Serie laesst sich oeffnen und umschalten, die fremde nur lesen; Anlegen steht darunter', async () => {
   await buehne({}, () => {
     const html = hauptteil();
-    assert.match(html, /<button type="button" class="split-expense" data-recurring-id="11" aria-label="Miete - splitExpenses\.recurring\.edit">/);
+    // Seit R20 (WCAG 2.5.3) liest die Zeile, was sie zeigt, und nennt die Handlung als sr-only-Nachsatz.
+    assert.match(html, /<button type="button" class="split-expense" data-recurring-id="11">[\s\S]*?Miete[\s\S]*?<span class="sr-only"> - splitExpenses\.recurring\.edit<\/span><\/button>/);
     assert.match(html, /aria-label="Miete - splitExpenses\.recurring\.pause" data-recurring-toggle="11"[^>]*>\s*<i data-lucide="pause"/);
     assert.match(html, /aria-label="Strom - splitExpenses\.recurring\.resume" data-recurring-toggle="12"[^>]*>\s*<i data-lucide="play"/);
     // Ohne `can_edit`: Leseansicht, kein Umschalter - die Regel kommt vom Server.
@@ -269,7 +270,7 @@ test('Der Titel einer Serie ist Nutzereingabe und geht durch esc()', async () =>
     assert.match(html, /&lt;img src=x onerror=1&gt;&quot;/);
     // Auch in den Namen der beiden Knoepfe: ein Anfuehrungszeichen im Titel
     // schloesse sonst das Attribut.
-    assert.match(html, /data-recurring-id="20" aria-label="&lt;img src=x onerror=1&gt;&quot; - splitExpenses\.recurring\.edit"/);
+    assert.match(html, /data-recurring-id="20">[\s\S]*?&lt;img src=x onerror=1&gt;&quot;/, 'der Titel im Inhalt der Zeile, maskiert');
     assert.match(html, /aria-label="&lt;img src=x onerror=1&gt;&quot; - splitExpenses\.recurring\.pause" data-recurring-toggle="20"/);
   });
   const boese = serie(21, { title: 'a"b<i>', paused_at: '2026-08-01T00:00:00Z' });

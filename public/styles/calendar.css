@@ -859,6 +859,13 @@
   background-color: var(--color-fill-well);
 }
 
+/* Die sichtbare Haelfte der Monatszelle (R20, calendar.js renderMonthDay):
+ * ein Traeger nur fuer `aria-hidden`, ohne eigene Box - Ziffer, Chips und
+ * „+N" bleiben Kinder der Zellgeometrie. */
+.month-day__visual {
+  display: contents;
+}
+
 .month-day__number {
   font-size: var(--text-sm);
   font-weight: var(--font-weight-medium);

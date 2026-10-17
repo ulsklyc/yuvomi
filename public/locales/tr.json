@@ -1700,8 +1700,6 @@
         "accountType_credit": "Kredi kartı",
         "accountType_investment": "Yatırım",
         "accountType_other": "Diğer",
-        "viewAccountTransactions": "{{name}} hareketlerini göster",
-        "currentBalance": "Güncel bakiye",
         "clearAccountFilter": "Hesap filtresini kaldır",
         "archivedBadge": "Arşivlendi",
         "showArchivedAccounts": "Arşivlenenleri göster",
@@ -1792,7 +1790,8 @@
         "ledgerSortDate": "Tarihe göre",
         "ledgerSortAmount": "Tutara göre",
         "ledgerSortActive": "Sıralama: {{sort}}",
-        "ledgerAccountsAll": "Tüm hesaplar"
+        "ledgerAccountsAll": "Tüm hesaplar",
+        "showAccountTransactions": "Hareketleri göster"
     },
     "settings": {
         "healthCycleEnableLabel": "Döngüyü evde sun",

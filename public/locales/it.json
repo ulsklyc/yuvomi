@@ -1700,8 +1700,6 @@
         "accountType_credit": "Carta di credito",
         "accountType_investment": "Investimento",
         "accountType_other": "Altro",
-        "viewAccountTransactions": "Mostra i movimenti di {{name}}",
-        "currentBalance": "Saldo attuale",
         "clearAccountFilter": "Rimuovi filtro conto",
         "archivedBadge": "Archiviato",
         "showArchivedAccounts": "Mostra archiviati",
@@ -1792,7 +1790,8 @@
         "ledgerSortDate": "Per data",
         "ledgerSortAmount": "Per importo",
         "ledgerSortActive": "Ordinamento: {{sort}}",
-        "ledgerAccountsAll": "Tutti i conti"
+        "ledgerAccountsAll": "Tutti i conti",
+        "showAccountTransactions": "Mostra i movimenti"
     },
     "settings": {
         "healthCycleEnableLabel": "Offri il ciclo alla famiglia",

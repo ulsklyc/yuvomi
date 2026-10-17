@@ -1700,8 +1700,6 @@
         "accountType_credit": "Hitelkártya",
         "accountType_investment": "Befektetés",
         "accountType_other": "Egyéb",
-        "viewAccountTransactions": "{{name}} tételeinek megjelenítése",
-        "currentBalance": "Aktuális egyenleg",
         "clearAccountFilter": "Számlaszűrő törlése",
         "archivedBadge": "Archivált",
         "showArchivedAccounts": "Archiváltak megjelenítése",
@@ -1792,7 +1790,8 @@
         "ledgerSortDate": "Dátum szerint",
         "ledgerSortAmount": "Összeg szerint",
         "ledgerSortActive": "Rendezés: {{sort}}",
-        "ledgerAccountsAll": "Minden számla"
+        "ledgerAccountsAll": "Minden számla",
+        "showAccountTransactions": "Tételek megjelenítése"
     },
     "settings": {
         "healthCycleEnableLabel": "Ciklus felajánlása a háztartásban",

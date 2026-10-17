@@ -1716,8 +1716,6 @@
         "accountType_credit": "کارت اعتباری",
         "accountType_investment": "سرمایه‌گذاری",
         "accountType_other": "سایر",
-        "viewAccountTransactions": "نمایش تراکنش‌های {{name}}",
-        "currentBalance": "موجودی فعلی",
         "clearAccountFilter": "حذف فیلتر حساب",
         "archivedBadge": "بایگانی‌شده",
         "showArchivedAccounts": "نمایش بایگانی‌شده‌ها",
@@ -1808,7 +1806,8 @@
         "ledgerSortDate": "بر اساس تاریخ",
         "ledgerSortAmount": "بر اساس مبلغ",
         "ledgerSortActive": "مرتب‌سازی: {{sort}}",
-        "ledgerAccountsAll": "همه حساب‌ها"
+        "ledgerAccountsAll": "همه حساب‌ها",
+        "showAccountTransactions": "نمایش تراکنش‌ها"
     },
     "settings": {
         "healthCycleEnableLabel": "ارائهٔ چرخه در خانوار",

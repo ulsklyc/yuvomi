@@ -181,7 +181,11 @@ export function renderSubTabs(anchorEl, {
     const badge = document.createElement('span');
     badge.className = 'sub-tab__badge';
     badge.hidden = true;
-    btn.appendChild(badge);
+    // Ein Wortabstand zwischen Name und Zahl (R20): ohne ihn las die Seite
+    // „Einkauf23" als EIN Wort, und der Name „Einkauf: 23 offene Artikel"
+    // enthielt das sichtbare Etikett nicht mehr (axe label-content-name-
+    // mismatch). Zwischen Flex-Kindern zeichnet ein Leerzeichen nichts.
+    btn.append(document.createTextNode(' '), badge);
 
     bar.appendChild(btn);
   }

@@ -21994,3 +21994,41 @@ test('R20: der Aufklapper des Einnahmeprotokolls zeigt, dass er aufgeht, und hat
   assert.match(rule('.health-medlog summary'), /min-height:\s*var\(--target-base\)/, 'am Finger 48px');
   assert.match(rule('.health-medlog[open] .health-medlog__chevron'), /rotate\(180deg\)/, 'offen dreht er sich');
 });
+
+// R20 D9 (a11y-Baseline origin/main, axe 4.14): label-content-name-mismatch auf
+// 60 Ansichten (serious) und drei Landmark-Befunde. Je Template ein Satz:
+// sichtbarer Text muss im Namen stehen (WCAG 2.5.3), sonst traegt der Inhalt den
+// Namen und die Handlung steht als sr-only-Nachsatz.
+test('R20: sichtbare Etiketten stehen im Namen, und es gibt genau einen Hauptbereich', () => {
+  const router = read('../public/router.js');
+  const sync = router.slice(router.indexOf('function syncSidebarAccount('), router.indexOf('function syncSidebarAccount(') + 2200);
+  assert.match(sync, /avatar\.dataset\.initials = initials\(displayName\)/, 'Initialen des Kontoknopfs als Zeichnung');
+  assert.doesNotMatch(sync, /avatar\.textContent = initials/, 'kein Textknoten „LI" im Etikett');
+  assert.match(read('../public/styles/layout.css'), /\.nav-sidebar__avatar\[data-initials\]::before \{\s*content: attr\(data-initials\);/);
+  const rewards = read('../public/pages/rewards.js');
+  assert.match(rewards, /class="rw-avatar rw-avatar--initials" aria-hidden="true" data-initials=/);
+  assert.match(read('../public/styles/rewards.css'), /\.rw-avatar--initials::before \{ content: attr\(data-initials\); \}/);
+
+  const fab = read('../public/utils/fab.js');
+  assert.match(fab, /export function syncFabName\(/, 'eine Namensregel fuer den FAB');
+  const dock = router.slice(router.indexOf('function dockFabIntoToolbar('), router.indexOf('function markFabShortcut('));
+  assert.match(dock, /syncFabName\(fab\);/, 'angedockt heisst er, was er zeigt');
+  assert.match(router.slice(router.indexOf('function undockFabFromToolbar(')).slice(0, 600), /syncFabName\(fab\);/, 'schwebend wieder sein Satz');
+
+  const cal = read('../public/pages/calendar.js');
+  const cell = cal.slice(cal.indexOf('function renderMonthDay('), cal.indexOf('function renderMonthDay(') + 7000);
+  assert.doesNotMatch(cell, /role="gridcell"[^>]*aria-label=/, 'die Monatszelle hat kein aria-label mehr');
+  assert.match(cell, /<span class="sr-only month-day__label">\$\{esc\(monthDayAriaLabel\(/, 'dieselbe Zusammenfassung als Inhalt');
+  assert.match(cell, /<div class="month-day__visual" aria-hidden="true">/);
+  assert.match(read('../public/styles/calendar.css'), /\.month-day__visual \{\s*display: contents;/, 'die Geometrie bleibt');
+
+  assert.match(read('../public/pages/health.js'), /const parts = \[String\(Number\(String\(c\.dateKey\)\.slice\(8, 10\)\)\), formatDate\(c\.dateKey\)\];/, 'Zyklustag: die Ziffer zuerst');
+  assert.match(read('../public/utils/sub-tabs.js'), /btn\.append\(document\.createTextNode\(' '\), badge\);/, '„Einkauf 23" statt „Einkauf23"');
+  const budget = read('../public/pages/budget.js');
+  assert.match(budget, /<button class="budget-account__main" type="button" data-drill="\$\{a\.id\}">/, 'Kontozeile ohne aria-label');
+  assert.match(budget, /<span class="sr-only">, \$\{esc\(t\('budget\.showAccountTransactions'\)\)\}<\/span>/);
+  const split = read('../public/pages/split-expenses.js');
+  assert.doesNotMatch(split, /class="split-expense" data-(?:expense|recurring)-id="[^"]*"[^>]*aria-label=/, 'Ausgleichszeilen ohne aria-label');
+  assert.doesNotMatch(split, /<main class=/, 'kein zweites <main> im Budget-Reiter');
+  assert.match(read('../public/pages/housekeeping.js'), /<div class="metric-grid budget-glance-details housekeeping-task-summary" role="group"/, 'keine zweite Region „Aufgaben"');
+});

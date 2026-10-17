@@ -1777,8 +1777,6 @@
         "accountType_credit": "Kreditní karta",
         "accountType_investment": "Investice",
         "accountType_other": "Jiné",
-        "viewAccountTransactions": "Zobrazit pohyby účtu {{name}}",
-        "currentBalance": "Aktuální zůstatek",
         "clearAccountFilter": "Zrušit filtr účtu",
         "archivedBadge": "Archivováno",
         "showArchivedAccounts": "Zobrazit archivované",
@@ -1870,7 +1868,8 @@
         "ledgerSortDate": "Podle data",
         "ledgerSortAmount": "Podle částky",
         "ledgerSortActive": "Řazení: {{sort}}",
-        "ledgerAccountsAll": "Všechny účty"
+        "ledgerAccountsAll": "Všechny účty",
+        "showAccountTransactions": "Zobrazit pohyby účtu"
     },
     "settings": {
         "healthCycleEnableLabel": "Nabídnout cyklus v domácnosti",

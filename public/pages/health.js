@@ -7809,7 +7809,10 @@ function cycleMonthLabel(anchorKey) {
  *                         'predicted' | null), `pms`, `intimacy`
  */
 function cycleDayLabel(c, { symptom = null, pms = false, intimacy = false } = {}) {
-  const parts = [formatDate(c.dateKey)];
+  // DIE SICHTBARE ZIFFER ZUERST (R20, WCAG 2.5.3 Label in Name): die Zelle
+  // zeigt „1", ihr Name begann mit „01.10.2026" - wer per Sprache „1"
+  // ansagt, traf nichts. Danach das volle Datum, wie bisher.
+  const parts = [String(Number(String(c.dateKey).slice(8, 10))), formatDate(c.dateKey)];
   if (c.isToday) parts.push(t('health.cycle.legend.today'));
   if (c.phase === PHASE.MENSTRUATION) parts.push(t('health.cycle.legend.period'));
   else if (c.phase === PHASE.FERTILE) parts.push(t('health.cycle.legend.fertile'));

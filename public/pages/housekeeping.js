@@ -1025,7 +1025,9 @@ function taskSummaryHtml() {
   const pending = data.pending_tasks ?? 0;
   const finished = data.finished_tasks_this_month ?? 0;
   return `
-    <section class="metric-grid budget-glance-details housekeeping-task-summary" aria-label="${esc(t('housekeeping.tasks'))}">
+    ${/* EINE GRUPPE, KEINE ZWEITE REGION „Aufgaben" (R20, axe landmark-unique):
+         die Liste daneben ist schon die Region dieses Namens. */ ''}
+    <div class="metric-grid budget-glance-details housekeeping-task-summary" role="group" aria-label="${esc(t('housekeeping.tasks'))}">
       <article class="metric-card${pending > 0 ? '' : ' metric-card--empty'}">
         <div class="metric-card__label">${esc(t('housekeeping.pendingChores'))}</div>
         <div class="metric-card__value">${esc(pending)}</div>
@@ -1034,7 +1036,7 @@ function taskSummaryHtml() {
         <div class="metric-card__label">${esc(t('housekeeping.finishedChores'))}</div>
         <div class="metric-card__value">${esc(finished)}</div>
       </article>
-    </section>`;
+    </div>`;
 }
 
 function drawTasks(content) {

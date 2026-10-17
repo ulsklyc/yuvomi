@@ -2029,7 +2029,8 @@ test('R17: jede Zelle des Zyklus-Kalenders nennt im Label, was sie zeigt - als K
       for (const z of zellen) {
         assert.equal(z.tag, canEdit ? 'button' : 'div', name);
         assert.ok(z.label, `${name}: jede Zelle hat ein Label`);
-        assert.match(z.label, /^2026-\d\d-\d\d(, |$)/, `${name}: das Label beginnt mit dem Datum (${z.label})`);
+        // Seit R20 (WCAG 2.5.3 Label in Name) zuerst die sichtbare Ziffer, dann das Datum.
+        assert.match(z.label, /^\d{1,2}, 2026-\d\d-\d\d(, |$)/, `${name}: das Label beginnt mit der Ziffer der Zelle und dem Datum (${z.label})`);
         for (const [klasse, text] of ZUSTAND_ZU_TEXT) {
           assert.equal(text.test(z.label), z.klassen.includes(klasse),
             `${name}: ${z.label} - Klasse ${klasse} ${z.klassen.includes(klasse) ? 'steht an der Zelle, fehlt im Label' : 'steht nicht an der Zelle, aber im Label'}`);
@@ -2042,13 +2043,13 @@ test('R17: jede Zelle des Zyklus-Kalenders nennt im Label, was sie zeigt - als K
       const mit = (klasse) => zellen.filter((z) => z.klassen.includes(klasse));
       assert.equal(mit('is-menstruation').filter((z) => !z.klassen.includes('is-predicted')).length, 5, `${name}: fuenf erfasste Periodentage`);
       assert.equal(mit('has-log').length, 2, `${name}: zwei Tage mit Eintrag`);
-      const dritter = zellen.find((z) => z.label.startsWith('2026-06-03'));
+      const dritter = zellen.find((z) => z.label.startsWith('3, 2026-06-03'));
       assert.equal(dritter.label,
-        '2026-06-03, health.cycle.legend.period, health.cycle.flow.label: health.cycle.flow.medium, health.cycle.legend.logged, health.cycle.intimacy.label',
+        '3, 2026-06-03, health.cycle.legend.period, health.cycle.flow.label: health.cycle.flow.medium, health.cycle.legend.logged, health.cycle.intimacy.label',
         `${name}: der 3. Juni nennt Periode, Staerke, Eintrag und Intimitaet - in dieser Reihenfolge`);
       const blank = zellen.find((z) => z.klassen.length === 1 && z.klassen[0] === 'cycle-cal__day');
       assert.ok(blank, `${name}: es gibt einen Tag ohne Zustand`);
-      assert.match(blank.label, /^2026-\d\d-\d\d$/, `${name}: ein Tag ohne Zustand nennt nur sein Datum`);
+      assert.match(blank.label, /^\d{1,2}, 2026-\d\d-\d\d$/, `${name}: ein Tag ohne Zustand nennt nur sein Datum`);
     }
     // Die fremde Ansicht bleibt stumm: dort ist der Kalender Umriss, und ein
     // Label truege Zustaende hinaus, die der beobachtenden Person nicht zustehen.
@@ -2070,25 +2071,26 @@ test('R17: jede Zelle des Zyklus-Kalenders nennt im Label, was sie zeigt - als K
 test('R17: cycleDayLabel() nennt heute, Vorhersage, Eisprung, Symptom-Overlay und PMS mit den Texten der Legende', () => {
   const zelle = (over = {}) => ({ dateKey: '2026-07-10', isToday: false, phase: null, predicted: false, confirmed: false, flow: null, hasLog: false, ...over });
   const label = (over, marks) => healthPage.cycleDayLabel(zelle(over), marks);
-  assert.equal(label({}), '2026-07-10');
-  assert.equal(label({ isToday: true }), '2026-07-10, health.cycle.legend.today');
-  assert.equal(label({ phase: 'menstruation', predicted: true }), '2026-07-10, health.cycle.legend.period, health.cycle.legend.predicted');
-  assert.equal(label({ phase: 'fertile', predicted: true }), '2026-07-10, health.cycle.legend.fertile, health.cycle.legend.predicted');
-  assert.equal(label({ phase: 'ovulation', predicted: true }), '2026-07-10, health.cycle.legend.ovulation, health.cycle.legend.predicted');
+  // R20: die sichtbare Ziffer („10") fuehrt, damit der Name das Etikett enthaelt.
+  assert.equal(label({}), '10, 2026-07-10');
+  assert.equal(label({ isToday: true }), '10, 2026-07-10, health.cycle.legend.today');
+  assert.equal(label({ phase: 'menstruation', predicted: true }), '10, 2026-07-10, health.cycle.legend.period, health.cycle.legend.predicted');
+  assert.equal(label({ phase: 'fertile', predicted: true }), '10, 2026-07-10, health.cycle.legend.fertile, health.cycle.legend.predicted');
+  assert.equal(label({ phase: 'ovulation', predicted: true }), '10, 2026-07-10, health.cycle.legend.ovulation, health.cycle.legend.predicted');
   // Bestaetigt ist ein Messwert und keine Vorhersage mehr - dieselbe
   // Unterscheidung, die die Legende mit einem eigenen Eintrag trifft.
-  assert.equal(label({ phase: 'ovulation', confirmed: true }), '2026-07-10, health.cycle.status.ovulationConfirmed');
-  assert.equal(label({ phase: 'fertile', confirmed: true }), '2026-07-10, health.cycle.legend.fertile');
+  assert.equal(label({ phase: 'ovulation', confirmed: true }), '10, 2026-07-10, health.cycle.status.ovulationConfirmed');
+  assert.equal(label({ phase: 'fertile', confirmed: true }), '10, 2026-07-10, health.cycle.legend.fertile');
   assert.equal(label({ isToday: true, phase: 'menstruation', flow: 'heavy', hasLog: true }),
-    '2026-07-10, health.cycle.legend.today, health.cycle.legend.period, health.cycle.flow.label: health.cycle.flow.heavy, health.cycle.legend.logged');
-  assert.equal(label({}, { pms: true }), '2026-07-10, health.cycle.legend.pms');
-  assert.equal(label({ flow: 'kein-wert' }), '2026-07-10', 'eine unbekannte Staerke nennt nichts statt eines rohen Werts');
+    '10, 2026-07-10, health.cycle.legend.today, health.cycle.legend.period, health.cycle.flow.label: health.cycle.flow.heavy, health.cycle.legend.logged');
+  assert.equal(label({}, { pms: true }), '10, 2026-07-10, health.cycle.legend.pms');
+  assert.equal(label({ flow: 'kein-wert' }), '10, 2026-07-10', 'eine unbekannte Staerke nennt nichts statt eines rohen Werts');
   // Das Overlay nennt sein Symptom mit: die Legende steht neben dem gewaehlten
   // Chip, das Label steht allein.
   healthPage.setViewStateForTest('cycle', { likelihoodSymptom: 'cramps' });
   try {
-    assert.match(label({}, { symptom: 'tracked' }), /^2026-07-10, health\.cycle\.[\w.]+: health\.cycle\.trends\.symptomTracked$/);
-    assert.match(label({}, { symptom: 'predicted' }), /^2026-07-10, health\.cycle\.[\w.]+: health\.cycle\.trends\.symptomPredicted$/);
+    assert.match(label({}, { symptom: 'tracked' }), /^10, 2026-07-10, health\.cycle\.[\w.]+: health\.cycle\.trends\.symptomTracked$/);
+    assert.match(label({}, { symptom: 'predicted' }), /^10, 2026-07-10, health\.cycle\.[\w.]+: health\.cycle\.trends\.symptomPredicted$/);
   } finally {
     healthPage.setViewStateForTest('cycle', { likelihoodSymptom: null });
   }

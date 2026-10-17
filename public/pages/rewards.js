@@ -166,7 +166,12 @@ function avatar(member, size = 40) {
   // in dashboard.js, calendar.js, notes.js und user-multi-select.js.
   const color = member?.avatar_color || member?.user_color || AVATAR_FALLBACK_COLOR;
   const name = member?.display_name || member?.user_name || '';
-  return `<span class="rw-avatar rw-avatar--initials" style="${dim};--rw-avatar-bg:${esc(color)};color:${getReadableTextColor(color)}">${esc(initials(name, '?'))}</span>`;
+  // Die Initialen als Zeichnung (`data-initials` + `::before`, rewards.css),
+  // nicht als Text (R20): der Avatar steht in Knoepfen, deren Name „Emma
+  // Johnson, 25,00 €" lautet - ein Textknoten „EJ" waere Teil ihres sichtbaren
+  // Etiketts, das der Name nicht enthaelt (WCAG 2.5.3). Wie das Bild daneben
+  // (alt="") ist er fuer Hilfstechnik Dekor.
+  return `<span class="rw-avatar rw-avatar--initials" aria-hidden="true" data-initials="${esc(initials(name, '?'))}" style="${dim};--rw-avatar-bg:${esc(color)};color:${getReadableTextColor(color)}"></span>`;
 }
 
 /**

@@ -1716,8 +1716,6 @@
         "accountType_credit": "Kartu kredit",
         "accountType_investment": "Investasi",
         "accountType_other": "Lainnya",
-        "viewAccountTransactions": "Tampilkan transaksi {{name}}",
-        "currentBalance": "Saldo saat ini",
         "clearAccountFilter": "Hapus filter akun",
         "archivedBadge": "Diarsipkan",
         "showArchivedAccounts": "Tampilkan yang diarsipkan",
@@ -1808,7 +1806,8 @@
         "ledgerSortDate": "Menurut tanggal",
         "ledgerSortAmount": "Menurut jumlah",
         "ledgerSortActive": "Urutan: {{sort}}",
-        "ledgerAccountsAll": "Semua akun"
+        "ledgerAccountsAll": "Semua akun",
+        "showAccountTransactions": "Tampilkan transaksi"
     },
     "settings": {
         "healthCycleEnableLabel": "Sediakan siklus untuk rumah tangga",

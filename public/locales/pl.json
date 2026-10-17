@@ -1870,8 +1870,6 @@
         "accountType_credit": "Karta kredytowa",
         "accountType_investment": "Inwestycje",
         "accountType_other": "Inne",
-        "viewAccountTransactions": "Pokaż operacje konta {{name}}",
-        "currentBalance": "Bieżące saldo",
         "clearAccountFilter": "Usuń filtr konta",
         "archivedBadge": "Zarchiwizowane",
         "showArchivedAccounts": "Pokaż zarchiwizowane",
@@ -1964,7 +1962,8 @@
         "ledgerSortDate": "Według daty",
         "ledgerSortAmount": "Według kwoty",
         "ledgerSortActive": "Sortowanie: {{sort}}",
-        "ledgerAccountsAll": "Wszystkie konta"
+        "ledgerAccountsAll": "Wszystkie konta",
+        "showAccountTransactions": "Pokaż operacje konta"
     },
     "settings": {
         "healthCycleEnableLabel": "Udostępnij cykl w gospodarstwie",

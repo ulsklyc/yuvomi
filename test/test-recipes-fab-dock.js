@@ -397,8 +397,12 @@ const ROUTER_FUNCTIONS = ['adoptPageFab', 'dockFabIntoToolbar', 'markFabShortcut
  * vm-Sandbox wie sw.js in test-sw-precache.js. Der Quelltext ist router.js aus
  * diesem Baum, keine Fremdeingabe.
  */
+const { syncFabName, fabActionLabel } = await import('../public/utils/fab.js');
+
 function routerFabFunctions(doc, win) {
-  const context = createContext({ document: doc, window: win });
+  // Die Namensregel des FAB (angedockt vs. schwebend) lebt in utils/fab.js und
+  // ist im Router importiert - die Sandbox bekommt sie wie der Router.
+  const context = createContext({ document: doc, window: win, syncFabName, fabActionLabel });
   const source = ROUTER_FUNCTIONS.map((n) => functionSource(ROUTER, n)).join('\n');
   return runInContext(`${source}\n;({ adoptPageFab })`, context);
 }
@@ -854,6 +858,11 @@ test('Router: ein FAB, dessen Kopf erst nach dem ersten Umzug entsteht, dockt be
   assert.equal(fab.parentElement, slot, 'der schwebende Knopf dockt nicht an, obwohl der Kopf jetzt einen Slot hat');
   assert.ok(fab.classList.contains('page-fab--docked'));
   assert.equal(fab.getAttribute('aria-keyshortcuts'), 'n');
+  // R20 (WCAG 2.5.3): angedockt nennt ihn sein sichtbares Wort, der Satz ist
+  // seine Beschreibung - axe meldete „Abo" gegen „Abonnement hinzufuegen".
+  assert.equal(fab.getAttribute('aria-label'), null, 'angedockt kein aria-label, das das sichtbare Wort ueberschreibt');
+  assert.equal(fab.dataset.actionLabel, 'Termin hinzufuegen', 'der Satz bleibt am Knopf');
+  assert.equal(fab.getAttribute('title'), 'Termin hinzufuegen (n)', 'und steht als Titel mit dem Kuerzel');
 });
 
 /*

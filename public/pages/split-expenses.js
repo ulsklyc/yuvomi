@@ -228,7 +228,10 @@ export async function render(container, { user, embedded = false, onAddableChang
           <div class="split-groups" id="split-groups"></div>
           </div>
         </aside>
-        <main class="split-main" id="split-main" aria-busy="true">${renderSkeletonList({ rows: 5, lines: 2 })}</main>
+        ${/* KEIN ZWEITES <main> (R20, axe landmark-*): der Ausgleich steht als
+             Reiter im Budget, und dessen Seite liegt schon in #main-content der
+             Shell - ein <main> darin war ein zweiter Hauptbereich. */ ''}
+        <div class="split-main" id="split-main" aria-busy="true">${renderSkeletonList({ rows: 5, lines: 2 })}</div>
       </div>${fab}
     </div>
   `);
@@ -947,8 +950,14 @@ function renderExpenses(asList = false) {
     `;
     }
     return `
-      <button type="button" class="split-expense" data-expense-id="${expense.id}" data-row-key="expense-${expense.id}" aria-label="${esc(expense.title)} - ${t('splitExpenses.editExpense')}">
+      ${/* NAME AUS DEM INHALT, DIE HANDLUNG ALS NACHSATZ (R20, WCAG 2.5.3):
+           das `aria-label` „<Titel> - Ausgabe bearbeiten" liess Zahler, Datum
+           und Betrag weg, die die Zeile zeigt - wer per Sprache „38,50"
+           ansagte, traf nichts. Jetzt liest die Zeile, was sie zeigt, und
+           nennt danach, was der Tipp tut. */ ''}
+      <button type="button" class="split-expense" data-expense-id="${expense.id}" data-row-key="expense-${expense.id}">
         ${body}
+        <span class="sr-only"> - ${esc(t('splitExpenses.editExpense'))}</span>
       </button>
     `;
   }).join('')}</div>`;
@@ -1018,7 +1027,7 @@ function renderRecurring(asList = false) {
     return `
       <div class="split-recurring-row${paused ? ' split-recurring-row--paused' : ''}" data-row-key="recurring-${recurring.id}">
         ${acts
-    ? `<button type="button" class="split-expense" data-recurring-id="${recurring.id}" aria-label="${esc(recurring.title)} - ${t('splitExpenses.recurring.edit')}">${body}</button>
+    ? `<button type="button" class="split-expense" data-recurring-id="${recurring.id}">${body}<span class="sr-only"> - ${esc(t('splitExpenses.recurring.edit'))}</span></button>
         ${rowActionHtml({
     icon: paused ? 'play' : 'pause',
     label: `${recurring.title} - ${toggleLabel}`,

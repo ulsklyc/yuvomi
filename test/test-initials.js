@@ -332,7 +332,9 @@ test('unter public/ steht keine eigene Initialen-Regel mehr', () => {
 // --------------------------------------------------------
 
 const MINSU = '김민수';
-const SHOWS = (html, text) => new RegExp(`>\\s*${text}\\s*<`).test(html);
+// Als Text oder - seit R20 an Kontozeile und Belohnungen, wo die Scheibe im
+// Etikett eines Knopfs steht (WCAG 2.5.3) - als Zeichnung aus `data-initials`.
+const SHOWS = (html, text) => new RegExp(`>\\s*${text}\\s*<|data-initials="${text}"`).test(html);
 const assertShows = (html, text, where) => {
   assert.equal(typeof html, 'string', `${where}: Markup`);
   assert.ok(SHOWS(html, text), `${where}: zeigt ${text}\n${html.slice(0, 600)}`);
@@ -398,10 +400,11 @@ test('Kontozeile der Seitenleiste (router.js)', () => {
     `${source}\nreturn syncSidebarAccount;`,
   )({ currentUser }, initials, () => false, (key) => key, (label) => label, () => null, { querySelector: () => null })(root);
 
+  // Seit R20 als `data-initials` (Zeichnung per ::before), nicht als Text.
   run({ display_name: MINSU });
-  assert.equal(avatar.textContent, '민수');
+  assert.equal(avatar.dataset.initials, '민수');
   run({ display_name: 'Anna Maria Schmidt' });
-  assert.equal(avatar.textContent, 'AS');
+  assert.equal(avatar.dataset.initials, 'AS');
 });
 
 test('Einstellungen: Familie, Konto und Rechte', async () => {
@@ -700,7 +703,7 @@ test('mit Haushalt: JEDER Aufrufer zeigt fuer Linda LI und fuer Leo LE', async (
     )({ currentUser: { display_name: name } }, initials, () => false, (key) => key, (label) => label, () => null, { querySelector: () => null })(
       { querySelector: (sel) => parts[sel], querySelectorAll: () => [] },
     );
-    return `<span>${avatar.textContent}</span>`;
+    return `<span>${avatar.dataset.initials ?? avatar.textContent}</span>`;
   };
 
   // Positivkontrolle: OHNE Haushalt zeigt jeder Aufrufer LJ - sonst traefe

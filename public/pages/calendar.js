@@ -3713,18 +3713,29 @@ function renderMonthDay(date, inMonth, { selected = false, selWeek = false, spli
   // gridcell mit roving tabindex (wireMonthGridKeys): genau EINE Zelle ist
   // Tab-Stopp. `aria-selected` nur im geteilten Monat - dort gibt es eine
   // Auswahl, am Desktop oeffnet die Zelle den Tag.
+  //
+  // DER NAME KOMMT AUS DEM INHALT, NICHT AUS `aria-label` (R20, a11y-Baseline
+  // label-content-name-mismatch). Die Zusammenfassung (monthDayAriaLabel) ist
+  // dieselbe wie vorher; sie steht jetzt als `.month-day__label` (sr-only) in
+  // der Zelle, und das Sichtbare - Ziffer, Chips, „+N" - ist fuer Hilfstechnik
+  // ausgeblendet (`.month-day__visual`, `display: contents`, die Geometrie
+  // bleibt). Mit `aria-label` verlangte WCAG 2.5.3, dass jeder sichtbare
+  // Chip-Text in Reihenfolge im Namen steht - fuer eine Zelle, deren Chips
+  // Inhalt sind und kein Etikett, ist die Zusammenfassung der richtige Name.
   return `
     <div class="${classes}" data-date="${date}" data-total="${total}"
-         role="gridcell" tabindex="${focusable ? '0' : '-1'}"
-         aria-label="${esc(monthDayAriaLabel(date, total, evs, { tasks: dayTasks, others: [...dayHols.map((h) => h.name), ...daySchedule.map(scheduleEntryLabel)], isToday }))}"${isToday ? ' aria-current="date"' : ''}${split ? ` aria-selected="${selected ? 'true' : 'false'}"` : ''}>
+         role="gridcell" tabindex="${focusable ? '0' : '-1'}"${isToday ? ' aria-current="date"' : ''}${split ? ` aria-selected="${selected ? 'true' : 'false'}"` : ''}>
+      <span class="sr-only month-day__label">${esc(monthDayAriaLabel(date, total, evs, { tasks: dayTasks, others: [...dayHols.map((h) => h.name), ...daySchedule.map(scheduleEntryLabel)], isToday }))}</span>
+      <div class="month-day__visual" aria-hidden="true">
       <div class="month-day__number">${new Date(date + 'T00:00:00').getDate()}</div>
-      ${band?.depth ? `<div class="month-day__lanes" style="--lanes:${band.depth}" aria-hidden="true"></div>` : ''}
+      ${band?.depth ? `<div class="month-day__lanes" style="--lanes:${band.depth}"></div>` : ''}
       ${holHtml}
       ${scheduleHtml}
       ${wasteHtml}
       ${evHtml}
       ${taskHtml}
       <div class="month-day__more" hidden></div>
+      </div>
     </div>
   `;
 }

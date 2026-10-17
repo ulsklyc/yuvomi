@@ -307,6 +307,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Screen readers and voice control hear what the buttons show.** Several buttons carried a name that
+  left out their visible text, so saying what you see did not reach them: the account button in the
+  sidebar, the "New" button in a module header, kitchen tabs with a count, account rows in Budget,
+  shared expenses, points on Rewards and the days of the cycle calendar. They are now named by what
+  they show, followed by what a tap does. Shared expenses no longer add a second main area to the
+  page, and the housekeeping task summary no longer repeats the name of the task list.
+
 - **Health: the intake log looks like something you can open.** "Intake log" under the adherence card
   had lost its arrow and read like a heading. It now carries the same chevron as other expandable
   sections, turns it when open, and is a full-size target on a phone.

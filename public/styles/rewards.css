@@ -156,6 +156,7 @@
  * eigene Farbe hat, bleibt neutral, statt die Modulfarbe zu erben). Dieselbe
  * Lehre steht acht Zeilen weiter oben über der Textfarbe, die nie ankam. */
 .rw-avatar--initials { background: var(--rw-avatar-bg, var(--color-fill-well)); }
+.rw-avatar--initials::before { content: attr(data-initials); }
 
 /* --------------------------------------------------------
    Übersicht: Punktestände (gleichwertige Zeilenliste, bewusst flach)

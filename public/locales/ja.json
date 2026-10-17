@@ -1700,8 +1700,6 @@
         "accountType_credit": "クレジットカード",
         "accountType_investment": "投資",
         "accountType_other": "その他",
-        "viewAccountTransactions": "{{name}} の記録を表示",
-        "currentBalance": "現在の残高",
         "clearAccountFilter": "口座フィルターを解除",
         "archivedBadge": "アーカイブ済み",
         "showArchivedAccounts": "アーカイブを表示",
@@ -1792,7 +1790,8 @@
         "ledgerSortDate": "日付順",
         "ledgerSortAmount": "金額順",
         "ledgerSortActive": "並べ替え: {{sort}}",
-        "ledgerAccountsAll": "すべての口座"
+        "ledgerAccountsAll": "すべての口座",
+        "showAccountTransactions": "記録を表示"
     },
     "settings": {
         "healthCycleEnableLabel": "世帯で周期を利用できるようにする",

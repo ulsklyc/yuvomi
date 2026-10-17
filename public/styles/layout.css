@@ -6016,6 +6016,12 @@ p.field-hint--warn[hidden] {
     flex-shrink: 0;
   }
 
+  /* Die Initialen als Zeichnung (R20, router.js syncSidebarAccount): kein
+   * Textknoten, also kein Teil des sichtbaren Etiketts des Kontoknopfs. */
+  .nav-sidebar__avatar[data-initials]::before {
+    content: attr(data-initials);
+  }
+
   .nav-sidebar__avatar--on-color {
     color: var(--color-text-on-accent);
   }

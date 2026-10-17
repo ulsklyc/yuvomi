@@ -1854,8 +1854,6 @@
         "accountType_credit": "Кредитная карта",
         "accountType_investment": "Инвестиции",
         "accountType_other": "Другое",
-        "viewAccountTransactions": "Показать операции по счёту {{name}}",
-        "currentBalance": "Текущий баланс",
         "clearAccountFilter": "Убрать фильтр счёта",
         "archivedBadge": "В архиве",
         "showArchivedAccounts": "Показать архивные",
@@ -1948,7 +1946,8 @@
         "ledgerSortDate": "По дате",
         "ledgerSortAmount": "По сумме",
         "ledgerSortActive": "Сортировка: {{sort}}",
-        "ledgerAccountsAll": "Все счета"
+        "ledgerAccountsAll": "Все счета",
+        "showAccountTransactions": "Показать операции по счёту"
     },
     "settings": {
         "healthCycleEnableLabel": "Предлагать цикл в семье",

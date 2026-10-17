@@ -1700,8 +1700,6 @@
         "accountType_credit": "क्रेडिट कार्ड",
         "accountType_investment": "निवेश",
         "accountType_other": "अन्य",
-        "viewAccountTransactions": "{{name}} के लेन-देन दिखाएं",
-        "currentBalance": "वर्तमान शेष",
         "clearAccountFilter": "खाता फ़िल्टर हटाएं",
         "archivedBadge": "संग्रहीत",
         "showArchivedAccounts": "संग्रहीत दिखाएं",
@@ -1792,7 +1790,8 @@
         "ledgerSortDate": "तारीख के अनुसार",
         "ledgerSortAmount": "राशि के अनुसार",
         "ledgerSortActive": "क्रम: {{sort}}",
-        "ledgerAccountsAll": "सभी खाते"
+        "ledgerAccountsAll": "सभी खाते",
+        "showAccountTransactions": "लेन-देन दिखाएं"
     },
     "settings": {
         "healthCycleEnableLabel": "घर में चक्र उपलब्ध कराएँ",

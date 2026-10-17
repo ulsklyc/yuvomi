@@ -1716,8 +1716,6 @@
         "accountType_credit": "신용카드",
         "accountType_investment": "투자",
         "accountType_other": "기타",
-        "viewAccountTransactions": "{{name}} 거래 내역 보기",
-        "currentBalance": "현재 잔액",
         "clearAccountFilter": "계좌 필터 해제",
         "archivedBadge": "보관됨",
         "showArchivedAccounts": "보관된 항목 표시",
@@ -1808,7 +1806,8 @@
         "ledgerSortDate": "날짜순",
         "ledgerSortAmount": "금액순",
         "ledgerSortActive": "정렬: {{sort}}",
-        "ledgerAccountsAll": "모든 계좌"
+        "ledgerAccountsAll": "모든 계좌",
+        "showAccountTransactions": "거래 내역 보기"
     },
     "settings": {
         "healthCycleEnableLabel": "가구에 주기 제공",

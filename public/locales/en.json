@@ -1700,8 +1700,6 @@
         "accountType_credit": "Credit card",
         "accountType_investment": "Investment",
         "accountType_other": "Other",
-        "viewAccountTransactions": "Show transactions for {{name}}",
-        "currentBalance": "Current balance",
         "clearAccountFilter": "Clear account filter",
         "archivedBadge": "Archived",
         "showArchivedAccounts": "Show archived",
@@ -1792,7 +1790,8 @@
         "ledgerSortDate": "By date",
         "ledgerSortAmount": "By amount",
         "ledgerSortActive": "Sorted: {{sort}}",
-        "ledgerAccountsAll": "All accounts"
+        "ledgerAccountsAll": "All accounts",
+        "showAccountTransactions": "Show transactions"
     },
     "settings": {
         "healthCycleEnableLabel": "Offer the cycle in the household",

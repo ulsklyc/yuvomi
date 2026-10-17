@@ -44,7 +44,7 @@ import {
 import { buildHelpRows } from '/utils/help.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { wirePaletteCombobox } from '/utils/palette-combobox.js';
-import { triggerPageFab } from '/utils/fab.js';
+import { triggerPageFab, syncFabName, fabActionLabel } from '/utils/fab.js';
 import { hasLeaveGuard, mayLeave } from '/utils/leave-guard.js';
 import { createUpdateFlow, isUserBusy } from '/utils/app-update.js';
 import { createStartHandoff } from '/utils/start-handoff.js';
@@ -1124,13 +1124,20 @@ function syncSidebarAccount(root = document.querySelector('.nav-sidebar__account
   const ink = Boolean(color) && prefersInkText(color);
   avatar.classList.toggle('nav-sidebar__avatar--ink', ink);
   avatar.classList.toggle('nav-sidebar__avatar--on-color', Boolean(color) && !ink);
+  // DIE INITIALEN SIND BILD, NICHT TEXT (R20, axe label-content-name-mismatch
+  // auf allen 60 Ansichten). Als Textknoten zaehlten „LI" zum sichtbaren
+  // Etikett des Knopfs, und sein Name „Konto-Menue, Linda Johnson" enthielt
+  // sie nicht. Sie stehen jetzt als `data-initials` und zeichnen sich per
+  // `::before` (layout.css) - wie ein Bild, das sie vertreten.
+  avatar.replaceChildren();
   if (routerState.currentUser?.avatar_data) {
     const img = document.createElement('img');
     img.src = routerState.currentUser.avatar_data;
     img.alt = '';
-    avatar.replaceChildren(img);
+    avatar.appendChild(img);
+    delete avatar.dataset.initials;
   } else {
-    avatar.textContent = initials(displayName);
+    avatar.dataset.initials = initials(displayName);
   }
   const label = displayName ? t('nav.accountMenu', { name: displayName }) : t('nav.accountMenuAnonymous');
   trigger.dataset.baseLabel = label;
@@ -2420,6 +2427,7 @@ function dockFabIntoToolbar(fab) {
     span.textContent = label;
     fab.appendChild(span);
   }
+  syncFabName(fab);
   slot.appendChild(fab);
   /* DAS TASTENKUERZEL WIRD HIER MITGESETZT, nicht nur beim schwebenden Knopf.
    * `adoptPageFab()` gibt beim Andocken `null` zurueck, damit die
@@ -2435,7 +2443,7 @@ function dockFabIntoToolbar(fab) {
 /** Macht den 'n'-Chord am FAB sichtbar bzw. vorlesbar - schwebend wie angedockt. */
 function markFabShortcut(fab) {
   fab.setAttribute('aria-keyshortcuts', 'n');
-  const fabLabel = fab.getAttribute('aria-label');
+  const fabLabel = fabActionLabel(fab);
   if (fabLabel && !/\(n\)$/.test(fab.getAttribute('title') || '')) {
     fab.setAttribute('title', `${fabLabel} (n)`);
   }
@@ -2455,6 +2463,7 @@ function undockFabFromToolbar(fab) {
   if (!layer) return false;
   fab.classList.remove('btn', 'btn--primary', 'page-fab--docked');
   fab.querySelector('.toolbar-new-btn__label')?.remove();
+  syncFabName(fab);
   layer.replaceChildren(fab.closest('.page-fab-group') ?? fab);
   return true;
 }

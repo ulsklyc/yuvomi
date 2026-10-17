@@ -1700,8 +1700,6 @@
         "accountType_credit": "Kreditkort",
         "accountType_investment": "Investering",
         "accountType_other": "Övrigt",
-        "viewAccountTransactions": "Visa transaktioner för {{name}}",
-        "currentBalance": "Aktuellt saldo",
         "clearAccountFilter": "Rensa kontofilter",
         "archivedBadge": "Arkiverad",
         "showArchivedAccounts": "Visa arkiverade",
@@ -1792,7 +1790,8 @@
         "ledgerSortDate": "Efter datum",
         "ledgerSortAmount": "Efter belopp",
         "ledgerSortActive": "Sortering: {{sort}}",
-        "ledgerAccountsAll": "Alla konton"
+        "ledgerAccountsAll": "Alla konton",
+        "showAccountTransactions": "Visa transaktioner"
     },
     "settings": {
         "healthCycleEnableLabel": "Erbjud cykeln i hushållet",

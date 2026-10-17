@@ -31,6 +31,35 @@
  * folgt und die deshalb pro Tab ein eigenes Nomen bräuchten.
  */
 
+/**
+ * DER ANGEDOCKTE KNOPF HEISST, WAS ER ZEIGT (R20, WCAG 2.5.3 Label in Name).
+ * Im Modulkopf zeigt der FAB sein Nomen („Abo", „Training", „Neu"), und sein
+ * `aria-label` („Abonnement hinzufuegen", „Einheit erfassen",
+ * „Schnellaktionen") ueberschrieb es - wer per Sprache sagte, was er sah,
+ * traf nichts (axe label-content-name-mismatch). Angedockt nennt ihn deshalb
+ * sein sichtbarer Text; der ausfuehrliche Satz wandert in `data-action-label`
+ * und steht als Beschreibung im Titel (mit dem Kuerzel, markFabShortcut im
+ * Router). Schwebend - ein Kreis mit Plus, ohne Text - bleibt er sein Name.
+ *
+ * Die eine Stelle fuer beide Zustaende: Andocken, Abdocken (router.js) und
+ * der Wechsel der Aktion je Tab (setPageFabAction) rufen sie.
+ */
+export function syncFabName(fab, label = fabActionLabel(fab)) {
+  if (!fab) return;
+  if (fab.classList.contains('page-fab--docked')) {
+    if (label) fab.dataset.actionLabel = label;
+    fab.removeAttribute('aria-label');
+  } else {
+    if (label) fab.setAttribute('aria-label', label);
+    delete fab.dataset.actionLabel;
+  }
+}
+
+/** Der ausfuehrliche Satz des FAB, angedockt wie schwebend. */
+export function fabActionLabel(fab) {
+  return fab?.dataset?.actionLabel || fab?.getAttribute?.('aria-label') || '';
+}
+
 /** Gemeinsame FAB-Markup als HTML-String (Label kommt aus t(), keine Nutzdaten). */
 export function pageFabHtml({ id = 'page-fab', label = '', icon = 'plus', dockLabel = '' } = {}) {
   return `<button type="button" class="page-fab" id="${id}"${label ? ` aria-label="${label}"` : ''}${dockLabel ? ` data-dock-label="${dockLabel}"` : ''}>
@@ -77,7 +106,7 @@ export function setPageFabAction(fab, { label = '', onClick = null, hidden = fal
   // zusätzlich inline display togglen. `hidden` bleibt gesetzt (Screenreader).
   fab.hidden = hidden;
   fab.style.display = hidden ? 'none' : '';
-  if (label) fab.setAttribute('aria-label', label);
+  if (label) syncFabName(fab, label);
   // Der Titel mit dem Kuerzel (markFabShortcut im Router schreibt ihn einmal
   // beim Einhaengen) folgt der Aktion wie `aria-label` - sonst hiesse der
   // Tooltip auf dem naechsten Tab weiter wie die Aktion des ersten.

@@ -2811,8 +2811,11 @@ function renderAccountsPage() {
       : '';
     return `
       <div class="budget-account ${a.archived ? 'budget-account--archived' : ''}" style="--account-accent:${accountAccent(a.color)}">
-        <button class="budget-account__main" type="button" data-drill="${a.id}"
-                aria-label="${t('budget.viewAccountTransactions', { name: a.name })} · ${t('budget.currentBalance')} ${formatAmount(a.current_balance)}">
+        ${/* NAME AUS DEM INHALT, DIE HANDLUNG ALS NACHSATZ (R20, WCAG 2.5.3):
+              das `aria-label` nannte Typ und Startsaldo nicht, die die Zeile
+              zeigt. Jetzt liest sie Name, Typ, Saldo und Start, dann
+              „Buchungen anzeigen". */ ''}
+        <button class="budget-account__main" type="button" data-drill="${a.id}">
           <span class="budget-account__icon"><i data-lucide="${icon}" class="icon-md" aria-hidden="true"></i></span>
           <span class="budget-account__body">
             <span class="budget-account__name"><span class="budget-account__name-text">${esc(a.name)}</span>${archivedBadge}</span>
@@ -2823,6 +2826,7 @@ function renderAccountsPage() {
             <span class="budget-account__balance ${balClass}">${formatAmount(a.current_balance)}</span>
             <span class="budget-account__starting">${t('budget.startingBalanceShort')} <span class="budget-account__starting-amount">${formatAmount(a.starting_balance)}</span></span>
           </span>
+          <span class="sr-only">, ${esc(t('budget.showAccountTransactions'))}</span>
         </button>
         ${/* EIN OEFFNEN-WEG (D6): der Zeilentipp oeffnet den Kontoauszug; das
               Konto selbst bearbeitet der Eintrag im Mehr-Knopf statt eines
