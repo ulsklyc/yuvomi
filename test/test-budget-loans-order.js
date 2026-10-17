@@ -436,3 +436,56 @@ test('kein Wort der Sortierung raet zu etwas (#935: Sortieren ist Rechnen, Umsch
 });
 
 test.after(() => miniDomAbraeumen());
+
+// -------------------------------------------------------------------------
+// Die Summe ueber der Liste (Re-Critique 2026-10-17, P1): Schuld und Anspruch
+// sind zwei Zahlen. Gemessen am selben echten Render-Pfad.
+// -------------------------------------------------------------------------
+
+function summenSeite(loans, byDirection) {
+  const vorher = { ...budget.state };
+  Object.assign(budget.state, {
+    loans: { loans, summary: { has_interest: true, remaining_principal: 175444.93, paid_amount: 13315, remaining_installments: 302, by_direction: byDirection } },
+    loanSort: 'start', loanStatusFilter: 'active', loanFilterId: null,
+  });
+  try {
+    const html = withAccess({ budget: 'write' }, () => budget.renderLoansPage());
+    const karten = [...html.matchAll(/<div class="metric-card__label">([^<]+)<\/div>\s*<div class="metric-card__value">([^<]+)<\/div>/g)]
+      .map((m) => [m[1], m[2].replace(/\s/g, ' ')]);
+    return { html, karten };
+  } finally { Object.assign(budget.state, vorher); }
+}
+const richtung = (over) => ({ count: 1, active_count: 1, has_interest: false, total_amount: 0, paid_amount: 0, remaining_amount: 0, remaining_principal: 0, remaining_installments: 0, ...over });
+
+test('Darlehenssumme: Verliehenes steht als Anspruch neben der Restschuld, nicht in ihr', () => {
+  const { karten, html } = summenSeite(
+    [darlehen(1, { interest: zins(2.1) }), darlehen(2, { direction: 'lent', borrower: 'Onkel Mike' })],
+    {
+      borrowed: richtung({ has_interest: true, remaining_principal: 174644.93, paid_amount: 12915, remaining_installments: 298 }),
+      lent: richtung({ remaining_principal: 800, remaining_amount: 800, paid_amount: 400, remaining_installments: 4 }),
+    },
+  );
+  const labels = karten.map(([l]) => l);
+  assert.deepEqual(labels, ['budget.loanRemainingPrincipal', 'budget.loanOwedToYou', 'budget.loanPaidAmount', 'budget.loanReceivedAmount']);
+  assert.match(karten[0][1], /174\.644,93/, 'die Restschuld ist nur das Aufgenommene');
+  assert.match(karten[1][1], /800,00/);
+  assert.doesNotMatch(html.replace(/<!--[\s\S]*?-->/g, ''), /175\.444,93/, 'die Summe ueber beide Richtungen steht nirgends');
+  assert.doesNotMatch(labels.join(), /loanRemainingInstallments/, 'eine Ratenzahl ueber beide Richtungen mischte wieder');
+});
+
+test('Darlehenssumme: nur Verliehenes fuehrt mit dem Anspruch und "zurueckerhalten"', () => {
+  const { karten } = summenSeite(
+    [darlehen(2, { direction: 'lent' })],
+    { borrowed: richtung({ count: 0, active_count: 0 }), lent: richtung({ remaining_principal: 800, paid_amount: 400, remaining_installments: 4 }) },
+  );
+  assert.deepEqual(karten.map(([l]) => l), ['budget.loanOwedToYou', 'budget.loanRemainingInstallments', 'budget.loanReceivedAmount']);
+  assert.equal(karten[1][1], '4');
+});
+
+test('Darlehenskarte: der Knopf sagt, was er bucht - Rate oder Rueckzahlung', () => {
+  withAccess({ budget: 'write' }, () => {
+    assert.match(budget.renderLoanCard(darlehen(1)), /budget\.loanBookInstallment/);
+    assert.match(budget.renderLoanCard(darlehen(2, { direction: 'lent' })), /budget\.loanReceiveRepayment/);
+    assert.doesNotMatch(budget.renderLoanCard(darlehen(1)), /budget\.markLoanPaid/, '"Als bezahlt markieren" bucht nur eine Rate');
+  });
+});

@@ -231,14 +231,36 @@ router.get('/loans', (req, res) => {
     // Fremdwährungs-Darlehen gehen mit ihrem festen Kurs in die Budget-Währung ein
     // (Bewertung zum hinterlegten Kurs; die bereits gebuchten Raten behalten
     // dagegen den Kurs, der zum Buchungszeitpunkt galt).
-    const totals = loans.reduce((acc, loan) => {
-      acc.total_amount += toBudgetAmount(loan.total_amount, loan);
-      acc.paid_amount += toBudgetAmount(loan.paid_amount, loan);
-      acc.remaining_amount += toBudgetAmount(loan.remaining_amount, loan);
-      acc.remaining_principal += toBudgetAmount(loan.remaining_principal, loan);
-      acc.remaining_installments += loan.remaining_installments;
-      return acc;
-    }, { total_amount: 0, paid_amount: 0, remaining_amount: 0, remaining_principal: 0, remaining_installments: 0 });
+    const sumUp = (rows) => {
+      const t = rows.reduce((acc, loan) => {
+        acc.total_amount += toBudgetAmount(loan.total_amount, loan);
+        acc.paid_amount += toBudgetAmount(loan.paid_amount, loan);
+        acc.remaining_amount += toBudgetAmount(loan.remaining_amount, loan);
+        acc.remaining_principal += toBudgetAmount(loan.remaining_principal, loan);
+        acc.remaining_installments += loan.remaining_installments;
+        return acc;
+      }, { total_amount: 0, paid_amount: 0, remaining_amount: 0, remaining_principal: 0, remaining_installments: 0 });
+      return {
+        count: rows.length,
+        active_count: rows.filter((loan) => loan.status === 'active').length,
+        has_interest: rows.some((loan) => Boolean(loan.interest)),
+        total_amount: cents(t.total_amount),
+        paid_amount: cents(t.paid_amount),
+        remaining_amount: cents(t.remaining_amount),
+        remaining_principal: cents(t.remaining_principal),
+        remaining_installments: t.remaining_installments,
+      };
+    };
+    const totals = sumUp(loans);
+    // Nach Richtung getrennt (Re-Critique 2026-10-17, P1): Aufgenommenes ist eine
+    // Schuld, Verliehenes ein Anspruch. Die Gesamtsumme oben addiert beides und
+    // stand als "Restschuld" auf der Karte - 800 EUR an Onkel Mike wurden so zu
+    // Schulden des Haushalts. Die Oberflaeche liest nur noch by_direction; die
+    // Gesamtfelder bleiben fuer bestehende API-Clients unveraendert stehen.
+    const byDirection = {
+      borrowed: sumUp(loans.filter((loan) => loan.direction === 'borrowed')),
+      lent: sumUp(loans.filter((loan) => loan.direction !== 'borrowed')),
+    };
 
     res.json({
       data: {
@@ -251,11 +273,12 @@ router.get('/loans', (req, res) => {
           // Steuert nur die Beschriftung: Sobald ein verzinstes Darlehen dabei ist,
           // ist die Summe eine Restschuld und darf nicht mehr neutral "offen" heißen.
           has_interest: loans.some((loan) => Boolean(loan.interest)),
-          total_amount: cents(totals.total_amount),
-          paid_amount: cents(totals.paid_amount),
-          remaining_amount: cents(totals.remaining_amount),
-          remaining_principal: cents(totals.remaining_principal),
+          total_amount: totals.total_amount,
+          paid_amount: totals.paid_amount,
+          remaining_amount: totals.remaining_amount,
+          remaining_principal: totals.remaining_principal,
           remaining_installments: totals.remaining_installments,
+          by_direction: byDirection,
         },
       },
     });

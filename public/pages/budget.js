@@ -3066,6 +3066,41 @@ function openAccountModal(account = null) {
   });
 }
 
+/**
+ * Die Kennzahlen der Darlehenssumme, nach Richtung getrennt (Re-Critique
+ * 2026-10-17, P1). Aufgenommenes ist eine Schuld, Verliehenes ein Anspruch:
+ * EINE Summe über beide stand als "Restschuld" auf der Karte und machte die
+ * 800 EUR an Onkel Mike zu Schulden des Haushalts. Mit nur einer Richtung
+ * bleibt es bei drei Karten (offen, Raten offen, bezahlt bzw. zurückerhalten);
+ * mit beiden stehen Schuld und Anspruch nebeneinander, die Ratenzahl fällt weg,
+ * weil sie über beide addiert wieder mischte.
+ * @returns {{label: string, value: string}[]} erste Karte = Führungszahl
+ */
+function loanSummaryCards(summary) {
+  const money = (n) => amountByRole(n ?? 0, 'total').text;
+  const dirs = summary.by_direction;
+  // Ohne Aufteilung (alte Server-Antwort) bleibt die bisherige Gesamtsicht.
+  const borrowed = dirs ? (dirs.borrowed?.count ? dirs.borrowed : null) : summary;
+  const lent = dirs?.lent?.count ? dirs.lent : null;
+  const cards = [];
+  if (borrowed) {
+    cards.push({
+      label: t(borrowed.has_interest ? 'budget.loanRemainingPrincipal' : 'budget.loanRemainingAmount'),
+      value: money(borrowed.remaining_principal ?? borrowed.remaining_amount),
+    });
+  }
+  if (lent) cards.push({ label: t('budget.loanOwedToYou'), value: money(lent.remaining_principal ?? lent.remaining_amount) });
+  if (borrowed && lent) {
+    cards.push({ label: t('budget.loanPaidAmount'), value: money(borrowed.paid_amount) });
+    cards.push({ label: t('budget.loanReceivedAmount'), value: money(lent.paid_amount) });
+    return cards;
+  }
+  const only = borrowed || lent;
+  cards.push({ label: t('budget.loanRemainingInstallments'), value: String(only.remaining_installments ?? 0) });
+  cards.push({ label: t(borrowed ? 'budget.loanPaidAmount' : 'budget.loanReceivedAmount'), value: money(only.paid_amount) });
+  return cards;
+}
+
 function renderLoansDashboard() {
   const loans = state.loans?.loans ?? [];
   if (!loans.length) return '';
@@ -3073,20 +3108,18 @@ function renderLoansDashboard() {
   const summary = state.loans?.summary ?? {};
   const visibleLoans = filteredLoans();
 
-  const remainingLabel = t(summary.has_interest ? 'budget.loanRemainingPrincipal' : 'budget.loanRemainingAmount');
+  const cards = loanSummaryCards(summary);
+  const [leadCard, ...restCards] = cards;
   return `
     <section class="budget-loans">
       ${metricGlanceHtml({
     id: 'budget-loans-more',
     controls: 'budget-loans-details',
     expanded: state.loansExpanded,
-    label: remainingLabel,
-    value: amountByRole(summary.remaining_principal ?? summary.remaining_amount ?? 0, 'total').text,
+    label: leadCard.label,
+    value: leadCard.value,
     lead: true,
-    flows: [
-      { label: t('budget.loanRemainingInstallments'), amount: String(summary.remaining_installments ?? 0) },
-      { label: t('budget.loanPaidAmount'), amount: amountByRole(summary.paid_amount ?? 0, 'total').text },
-    ],
+    flows: restCards.map((card) => ({ label: card.label, amount: card.value })),
   })}
       <div class="panel-head budget-loans__header">
         <div>
@@ -3121,19 +3154,12 @@ function renderLoansDashboard() {
            (fünfte Kartenbauart des Moduls, Critique 2026-07-30, P0). Rolle
            total: die Richtung steht im Label, nicht im Vorzeichen.
            Mobil wartet sie hinter EINER Zeile (metricGlanceHtml, R14 P1). -->
-      <div class="metric-grid metric-grid--led budget-glance-details${state.loansExpanded ? ' is-expanded' : ''}" id="budget-loans-details">
-        <div class="metric-card ${leadCardClass(amountByRole(summary.remaining_principal ?? summary.remaining_amount ?? 0, 'total').text)}">
-          <div class="metric-card__label">${remainingLabel}</div>
-          <div class="metric-card__value">${amountByRole(summary.remaining_principal ?? summary.remaining_amount ?? 0, 'total').text}</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-card__label">${t('budget.loanRemainingInstallments')}</div>
-          <div class="metric-card__value">${summary.remaining_installments ?? 0}</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-card__label">${t('budget.loanPaidAmount')}</div>
-          <div class="metric-card__value">${amountByRole(summary.paid_amount ?? 0, 'total').text}</div>
-        </div>
+      <div class="metric-grid metric-grid--led${cards.length === 4 ? ' metric-grid--quad' : ''} budget-glance-details${state.loansExpanded ? ' is-expanded' : ''}" id="budget-loans-details">
+        ${cards.map((card, i) => `
+        <div class="metric-card${i === 0 ? ` ${leadCardClass(card.value)}` : ''}">
+          <div class="metric-card__label">${card.label}</div>
+          <div class="metric-card__value">${card.value}</div>
+        </div>`).join('')}
       </div>
       ${summary.has_foreign_currency ? `<p class="form-hint budget-loan-hint">${t('budget.loanSummaryConverted', {
         currency: esc(summary.currency || state.currency),
@@ -3762,7 +3788,7 @@ function renderLoanCard(loan) {
         ${loan.interest ? `<div class="budget-loan-card__meta budget-loan-card__interest">${esc(loanInterestMeta(loan.interest, loan))}</div>` : ''}
       </div>
       <div class="budget-loan-card__amounts">
-        ${interest ? `<span class="budget-loan-card__amount-label">${t('budget.loanRemainingPrincipal')}</span>` : ''}
+        ${interest ? `<span class="budget-loan-card__amount-label">${t(isBorrowedLoan(loan) ? 'budget.loanRemainingPrincipal' : 'budget.loanOwedToYou')}</span>` : ''}
         <strong>${formatLoanAmount(leadAmount, loan)}</strong>
         <span>${t('budget.loanRemainingOf', { total: formatLoanAmount(leadTotal, loan) })}</span>
         ${loan.is_foreign_currency
@@ -3793,7 +3819,7 @@ function renderLoanCard(loan) {
               * zeigten drei violette Primaerknoepfe nebeneinander, und keiner
               * war der Weg der Seite. Der steht im Kopf („+ Darlehen"). */ ''}
           <button class="btn btn--secondary" data-action="loan-pay" data-id="${loan.id}" ${payDisabled}>
-            ${t('budget.markLoanPaid')}
+            ${t(isBorrowedLoan(loan) ? 'budget.loanBookInstallment' : 'budget.loanReceiveRepayment')}
           </button>
         </div>`}
       </div>

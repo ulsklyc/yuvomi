@@ -685,6 +685,28 @@ test('borrowed + Fremdwährung: Kurs und Vorzeichen greifen zusammen', async () 
   assert.equal(bookingOf(id)[0].amount, -92, '100 USD * 0.92, dann gespiegelt');
 });
 
+test('GET /loans: die Summe trennt Aufgenommenes (Schuld) von Verliehenem (Anspruch)', async () => {
+  db.prepare('DELETE FROM budget_loans').run();
+  const borrowedId = await createDirectedLoan({ direction: 'borrowed', borrower: 'Sparkasse', total_amount: 12000, installment_count: 12 });
+  await createDirectedLoan({ direction: 'lent', borrower: 'Onkel Mike', total_amount: 800, installment_count: 4 });
+  await call('POST', `/loans/${borrowedId}/payments`, { as: AA, body: { installment_number: 1, amount: 1000, paid_date: '2026-01-15' } });
+
+  const r = await call('GET', '/loans', { as: AA });
+  assert.equal(r.status, 200);
+  const { borrowed, lent } = r.body.data.summary.by_direction;
+  // Die Restschuld des Haushalts ist NUR das Aufgenommene: 800 EUR an Onkel Mike
+  // sind ein Anspruch, keine Schuld (Re-Critique 2026-10-17, P1).
+  assert.equal(borrowed.remaining_principal, 11000);
+  assert.equal(borrowed.paid_amount, 1000);
+  assert.equal(borrowed.remaining_installments, 11);
+  assert.equal(borrowed.count, 1);
+  assert.equal(lent.remaining_principal, 800);
+  assert.equal(lent.paid_amount, 0);
+  assert.equal(lent.count, 1);
+  // Die Gesamtfelder bleiben fuer bestehende API-Clients, was sie waren.
+  assert.equal(r.body.data.summary.remaining_principal, 11800);
+});
+
 test('PUT lent -> borrowed: bereits gebuchte Raten werden mit umgebucht', async () => {
   const id = await createDirectedLoan({ direction: 'lent' });
   await call('POST', `/loans/${id}/payments`, { as: AA, body: { installment_number: 1, amount: 100, paid_date: '2026-01-15' } });

@@ -270,6 +270,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Budget: money you lent out no longer counts as your debt.** The loans summary added both
+  directions into one "Outstanding balance", so 800 € lent to a relative showed up as debt of the
+  household. Borrowed and lent loans now stand as two figures, "Outstanding balance" and "Still owed
+  to you", with "Paid" and "Received back" next to them. The button on a loan card says what it
+  records: "Record payment" for a loan you took out, "Repayment received" for one you gave, instead
+  of "Mark paid", which booked a single installment. The API keeps its totals and adds
+  `summary.by_direction`.
+
 - **The last tap wins while a page is loading.** Tapping a second destination while the first one
   was still loading was ignored, and you stayed on the first. Now the newer tap replaces the one
   in progress: the page you left behind is never drawn, and Back skips it. A page that has
