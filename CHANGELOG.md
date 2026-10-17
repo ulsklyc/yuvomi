@@ -36,10 +36,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **The e-mail and account settings read like the other settings pages.** Server, port,
-  encryption, login and sender, and on the account page the contact details and the password
-  fields, stand as rows with the label on the left and the field on the right, instead of fields
-  stacked under their labels.
+- **Every settings page and dialog uses the same rows.** Fields stand as rows with the label on the
+  left and the field on the right, and a hint underneath where one helps, instead of fields stacked
+  under their labels in a card. That covers the e-mail server and the account page, Kitchen (meal
+  toggles and custom meal names), WebDAV backup and the restore key, Immich, document storage and
+  DMS, API tokens, installing a module, the app name, schedule and task defaults, holidays, calendar
+  subscriptions and import, Apple, Google and Outlook calendar sync, and the weather location. The
+  dialogs for adding or editing a family member, invitations, CalDAV and CardDAV accounts, calendar
+  subscriptions and recipe services use the same rows and are shorter for it; a missing required
+  entry is now named under its row instead of squeezing the field.
 - **Settings for this device are in one place.** Wall mode and the screensaver options moved from
   Appearance to "This device", next to installing the app, because all of them apply only to the
   device you are holding.
@@ -107,15 +112,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of a word next to "Open in Maps", and digits line up. The list under the month now names the
   day the same way as the agenda ("Today Saturday, 17 October").
 - **Settings stack fewer headings.** A module page that only has household settings (or only
-  personal ones) no longer repeats "For the household" above its sections. The Kitchen page uses the
-  same grouped rows as the other settings pages: meal toggles and custom meal names sit in lists with
-  the label on the left and the hint underneath, instead of a card with fields under their labels.
-  The same rows now carry every other settings form: WebDAV backup and the restore key, Immich,
-  document storage and DMS, API tokens, installing a module, the app name, schedule and task
-  defaults, holidays, calendar subscriptions and import, Apple, Google and Outlook calendar sync, and
-  the weather location. The dialogs for adding or editing a family member, invitations, CalDAV and
-  CardDAV accounts, calendar subscriptions and recipe services use the same rows and are shorter for
-  it; a missing required entry is now named under its row instead of squeezing the field.
+  personal ones) no longer repeats "For the household" above its sections.
 - **The pin on a note matches the other buttons on the card.** It was drawn smaller and heavier than
   the "..." button beside it; both now share one size.
 - **Contacts show who they are.** Every contact in the list carries its initials instead of the
@@ -138,7 +135,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   list.
 - **Long names in lists get two lines everywhere.** Task, contact, birthday, budget, subscription,
   agenda and shopping rows all show a name on up to two lines and end it with an ellipsis after
-  that. Some lists cut names after one line, others let them run on without limit.
+  that. Before, some lists cut names after one line and others let them run on without limit.
 - **The week arrows in the meal plan look like the ones in Calendar and Budget.** They were tinted in
   the accent colour; now every period switcher has the same neutral arrows.
 - **Task history is a view like List and Kanban.** It sits as the third choice in the view switcher
@@ -260,20 +257,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Health: the "please check" note waits until you have entered the value.** Typing 37.5 °C
-  showed "This value is not possible" after the first digit. The note now appears when you leave
-  the field or press Enter, and disappears as soon as the value is plausible again.
-
-- **"Connection interrupted" is announced once, not on every retry.** While Yuvomi kept retrying
-  the session check, each failed attempt raised a new screen reader alert, and the alert also took
-  focus so it was read twice. It is now announced once; later attempts update the text quietly, and
-  focus stays on "Try again" when you used it.
-
-- **Screen readers hear a form's problems once.** Saving a form with several missing fields raised
-  one alert per field at the same moment, and the field that received focus read its message a
-  second time. Now focus moves to the first problem and announces it there; the other fields carry
-  their message for when you reach them. Leaving a field still announces its message right away.
-
 - **The last tap wins while a page is loading.** Tapping a second destination while the first one
   was still loading was ignored, and you stayed on the first. Now the newer tap replaces the one
   in progress: the page you left behind is never drawn, and Back skips it.
@@ -286,7 +269,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   session on start - too many requests, a server error, a restarting NAS or no network - it showed
   the sign-in form although the session was still valid. Only a real "not signed in" answer leads
   there now; anything else shows "Connection interrupted" with the cause, a "Try again" button and
-  an automatic retry that waits longer each time and respects the server's `Retry-After`.
+  an automatic retry that waits longer each time and respects the server's `Retry-After`. Screen
+  readers hear it once, not on every retry, and focus stays on "Try again" when you used it.
 
 - **A page that cannot load says why.** Instead of always asking you to check your connection,
   the error now names the cause - too many requests, a server error, no network - and keeps the
@@ -300,13 +284,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Forms show every problem at once.** Saving a budget entry, an account, an event, a meal or a
   subscription with several missing or invalid fields marked only the first one, one per click -
   and in the budget the title was checked before the amount above it. All problems are now marked
-  together, and the cursor goes to the first one on screen.
+  together, and the cursor goes to the first one on screen. Screen readers hear that first problem
+  once, where the focus lands, instead of one alert per field and the focused one twice; the other
+  fields carry their message for when you reach them, and leaving a field still announces its
+  message right away.
 
 - **Health: impossible measurements are caught, unusual ones questioned.** A weight of 650 kg, an
   oxygen saturation above 100 % or a blood pressure with the lower value above the upper one used to
   be saved and then distorted every chart. Values no person can have are refused at the field (and
   by the server, with the possible range in the API description); values that are possible but
-  unusual show a short "please check" note while you type and can still be saved.
+  unusual show a short "please check" note once you have entered them (when you leave the field or
+  press Enter) and can still be saved; the note disappears as soon as the value is plausible again.
 
 - **Budget statistics: a zero change looks like one, and plan targets are spelled out.** A
   category whose total did not change could show a red rising arrow next to "0.00 €" because of a
