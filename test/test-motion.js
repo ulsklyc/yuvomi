@@ -1425,7 +1425,9 @@ test('Large Title: der Titel blendet in seinen neuen Schnitt, Layout wird nicht 
   assert.equal(titleRules.length, 2);
   for (const r of titleRules) assert.match(r.selector, /\.is-collapsed|\.was-collapsed/, `${r.selector}: Blende ohne Zustand`);
   const ux = publicSource('utils/ux.js');
-  assert.match(ux, /if \(top > 24\) toolbar\.classList\.add\(\.\.\.states, 'was-collapsed'\);/, 'der Merker faellt beim ersten Einklappen');
+  // Seit R20 schaltet setCollapsed (Einklappen mit FLIP) - der Merker faellt dort.
+  assert.match(ux, /if \(top > 24\) setCollapsed\(true, states\);/, 'der Merker faellt beim ersten Einklappen');
+  assert.match(ux, /if \(on\) toolbar\.classList\.add\(\.\.\.states, 'was-collapsed'\);/, 'der Merker faellt beim ersten Einklappen');
   assert.match(ux, /classList\.remove\('page-toolbar--stacked', 'page-toolbar--capped', 'is-collapsed', 'is-docked', 'was-collapsed',/, 'und geht mit dem Abbau');
   // Weiterhin keine font-size-Transition am Titel (R16).
   for (const file of ['layout.css', 'typography.css']) {
