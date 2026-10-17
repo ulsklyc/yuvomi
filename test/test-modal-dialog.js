@@ -354,3 +354,16 @@ test('dockNextModal: keine Spalte (unter der Schwelle), keine Anmeldung oder ein
   assert.equal(open().classList.contains('modal-overlay--docked'), false, 'ohne Anmeldung kein Andocken');
   await closeModal({ force: true });
 });
+
+test('der gedockte Dialog zeigt mit einem Hauch, dass die Liste daneben gerade nicht bedienbar ist', async () => {
+  // R19-Nachlese (modern-web-guidance „light-dismiss-a-dialog"): ein ganz
+  // durchsichtiger Grund liess die inerte Liste bedienbar aussehen.
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const rule = [...eachRule(css)].find((r) => r.selector.trim() === 'dialog.modal-overlay.modal-overlay--docked::backdrop');
+  assert.ok(rule, 'der Grund des gedockten Dialogs hat eine eigene Regel');
+  assert.doesNotMatch(rule.body, /background-color:\s*transparent/, 'kein unsichtbarer Grund');
+  assert.match(rule.body, /background-color:\s*color-mix\(in srgb, var\(--color-overlay-light\)/, 'der Hauch kommt aus dem Overlay-Token');
+  assert.match(rule.body, /backdrop-filter:\s*none/, 'ohne Blur - die Spalte bleibt der Ort der Bearbeitung');
+});

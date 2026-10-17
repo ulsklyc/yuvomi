@@ -249,8 +249,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   new count after a short pause instead of every step. On phones the bar stays.
 - **On a desktop you edit where you read.** "Edit" in the detail column of tasks, recipes, contacts,
   inventory and birthdays opens the form in that column instead of a window over list and detail.
-  Cancel, Esc, the back gesture and the question about unsaved changes work as before; on narrower
-  windows the form stays a dialog.
+  Cancel, Esc, the back gesture and the question about unsaved changes work as before, and the list
+  beside it is slightly dimmed while you edit; on narrower windows the form stays a dialog.
 
 ### Fixed
 

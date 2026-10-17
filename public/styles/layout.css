@@ -6405,8 +6405,14 @@ dialog.modal-overlay.modal-overlay--docked {
   cursor: default;
 }
 
+/* EIN HAUCH STATT KEINES GRUNDS (R19-Nachlese, modern-web-guidance
+ * „light-dismiss-a-dialog": der Grund zeigt, dass der Dialog modal ist). Die
+ * Liste ist waehrend des Bearbeitens inert - sie nimmt weder Hover noch Fokus
+ * an, sah aber voll bedienbar aus, und der erste Klick auf eine Zeile schloss
+ * nur das Formular. Der Hauch ist die halbe leichte Abdunklung, ohne Blur: die
+ * Spalte bleibt der Ort, an dem man bearbeitet. */
 dialog.modal-overlay.modal-overlay--docked::backdrop {
-  background-color: transparent;
+  background-color: color-mix(in srgb, var(--color-overlay-light) var(--tint-hint), transparent);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
