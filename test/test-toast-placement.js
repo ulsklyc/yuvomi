@@ -321,7 +321,10 @@ const DIALOG_REGISTRY = {
   'public/router.js': [
     { none: true, why: 'Mehr-Blatt: Navigation ohne Kopf- und Fusszeile, seine Links sind selbst die Leisten' },
     { none: true, why: 'Suche: Feld und Treffer sind selbst die Leisten' },
-    { panel: ['modal-panel__header'] },
+    // Der Tastenkuerzel-Dialog (showHelpModal) baut seit R20 (Schritt D) kein
+    // eigenes Panel mehr: er laeuft ueber openModal() und ist damit ein Dialog
+    // von modal.js, dessen modal-panel__header dort steht. Dass er dabei
+    // bleibt, haelt der Test unter dem Register.
   ],
 };
 
@@ -423,6 +426,17 @@ test('jeder Dialog zeichnet genau die Leisten aus, die das Register nennt - nach
     if (DIALOG_REGISTRY[file]) continue;
     assert.equal(countMarks(code(file)), 0, `${file}: traegt data-dialog-actions, baut aber keinen registrierten Dialog`);
   }
+});
+
+test('der Tastenkuerzel-Dialog laeuft ueber den geteilten Dialog, nicht ueber ein eigenes Panel', () => {
+  const source = code('public/router.js');
+  const start = source.indexOf('function showHelpModal(');
+  assert.ok(start >= 0, 'showHelpModal fehlt in router.js');
+  const next = source.slice(start + 1).search(/\nfunction |\nasync function |\nexport /);
+  const body = source.slice(start, next < 0 ? undefined : start + 1 + next);
+  assert.ok(body.includes('openModal('), 'showHelpModal ruft openModal nicht auf');
+  assert.equal((body.match(DIALOG_ROLE) || []).length, 0,
+    'showHelpModal baut wieder eine eigene Dialog-Rolle - im Register als eigener router.js-Dialog eintragen');
 });
 
 // --------------------------------------------------------
