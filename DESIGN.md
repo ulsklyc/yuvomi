@@ -2398,7 +2398,8 @@ Einladung); bestehende Konten und ein spaeterer Rollenwechsel bleiben unberuehrt
 - **Die Zahlungsaufgabe gehoert den Erwachsenen, die bezahlen.** Sie nennt den Lohn und entsteht
   deshalb auf Sichtbarkeit `assignees`, zugewiesen der eincheckenden Person (nur mit
   `housekeeping_view_amounts`) und den aktiven Admins (`paymentTaskAudience`,
-  server/routes/housekeeping.js). EINE Stelle statt eines Filters je Flaeche: die geteilte
+  server/services/payment-task-audience.js; dieselbe Regel zieht offene Altaufgaben per Migration 250
+  und jede beim Bearbeiten ihres Besuchs nach). EINE Stelle statt eines Filters je Flaeche: die geteilte
   Sichtbarkeitsregel haelt sie aus Liste, Detail, Uebersicht, Suche und MCP. Checkt ein Konto ohne
   Betraege ein, wird die erste Admin-Person Erstellerin, weil die Regel die Erstellerin immer
   durchlaesst.

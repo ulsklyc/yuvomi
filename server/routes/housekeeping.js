@@ -48,6 +48,7 @@ import {
 } from '../utils/timezone.js';
 import { addMonthsClamped } from '../utils/interval-date.js';
 import { recordLocalColorChoice } from '../services/legacy-color-snapshot.js';
+import { paymentTaskAudience, normalizePaymentTaskAudience } from '../services/payment-task-audience.js';
 import {
   byCheckInDesc,
   checkInInstantMs,
@@ -451,33 +452,8 @@ function createVisitCalendarEvent(database, worker, checkIn, actorId, title = nu
   return result.lastInsertRowid;
 }
 
-// WER DIE ZAHLUNGSAUFGABE SIEHT (R20, Ulas 2026-10-17).
-//
-// Titel und Beschreibung nennen den Betrag, und die Aufgabe reist von hier in
-// jede Flaeche, die Aufgaben ausliefert: Liste, Detail, Uebersicht, Suche, MCP,
-// API v1. Stand sie auf `all`, las ein Konto ohne `housekeeping_view_amounts`
-// den Lohn dort, wo die Haushaltshilfe ihn verbarg. Statt fuenf Filtern EINE
-// Stelle: die Aufgabe entsteht auf `assignees` und gehoert den Erwachsenen,
-// die bezahlen - der Person, die eincheckt, wenn sie Betraege sehen darf, und
-// den aktiven Admins. Die Sichtbarkeitsregel (services/visibility.js) haelt
-// sie damit in jedem Lesepfad zurueck, ohne dass einer davon sie kennt.
-//
-// Checkt ein Konto OHNE Betraege ein, steht es nicht als Ersteller drin: die
-// Regel laesst die Erstellerin IMMER durch, die Aufgabe laege sonst genau bei
-// dem Kind, vor dem sie verborgen sein soll. Erstellerin wird dann die erste
-// Admin-Person; gibt es keine, entsteht keine Zahlungsaufgabe (der Besuch
-// bleibt unbezahlt und wird in der Haushaltshilfe bezahlt).
-function paymentTaskAudience(database, actorId, actorSeesAmounts) {
-  const admins = database.prepare(`
-    SELECT id FROM users
-    WHERE role = 'admin' AND deactivated_at IS NULL
-    ORDER BY id ASC
-  `).all().map((row) => row.id);
-  const owners = actorSeesAmounts ? [actorId, ...admins.filter((id) => id !== actorId)] : admins;
-  if (!owners.length) return null;
-  return { createdBy: owners[0], assignees: owners };
-}
-
+// Wer die Zahlungsaufgabe sieht, steht an EINER Stelle fuer Check-in, Besuch
+// und Migration: services/payment-task-audience.js.
 function createPaymentTask(database, worker, checkIn, amount, actor, title = null, description = null, visitDateOverride = null) {
   const audience = paymentTaskAudience(database, actor.id, actor.amounts);
   if (!audience) return null;
@@ -580,6 +556,10 @@ function updateVisitLinks(database, session, worker, visitDate, dailyRate, extra
       visitDate,
       session.payment_task_id,
     );
+    // Eine Aufgabe von vor R20 steht noch auf `all`: wer ihren Besuch anfasst,
+    // zieht sie auf die Regel nach - auch eine erledigte, das Anfassen ist eine
+    // bewusste Handlung (die Migration laesst erledigte stehen).
+    normalizePaymentTaskAudience(database, session.payment_task_id);
   }
 }
 
@@ -1388,6 +1368,7 @@ router.post('/visits/:id/pay', (req, res) => {
       db.get().prepare('UPDATE housekeeping_work_sessions SET paid_at = ? WHERE id = ?').run(paidAt, existing.id);
       if (existing.payment_task_id) {
         db.get().prepare('UPDATE tasks SET status = ? WHERE id = ?').run('done', existing.payment_task_id);
+        normalizePaymentTaskAudience(db.get(), existing.payment_task_id);
       }
     })();
     const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(existing.id);
@@ -1419,6 +1400,7 @@ router.post('/visits/:id/unpay', (req, res) => {
         db.get().prepare('UPDATE housekeeping_work_sessions SET paid_at = NULL WHERE id = ?').run(existing.id);
         if (existing.payment_task_id) {
           db.get().prepare('UPDATE tasks SET status = ? WHERE id = ? AND status = ?').run('open', existing.payment_task_id, 'done');
+          normalizePaymentTaskAudience(db.get(), existing.payment_task_id);
         }
       })();
     }
@@ -1481,6 +1463,7 @@ router.post('/work-sessions/check-out', (req, res) => {
         SET check_out = ?, extras = ?, daily_rate = ?, minutes_worked = ?, rate_type = ?, hourly_rate = ?
         WHERE id = ?
       `).run(checkOut, vExtras.value ?? session.extras, updateRate, minutesWorked, sessionRateType, sessionHourlyRate, session.id);
+      normalizePaymentTaskAudience(db.get(), session.payment_task_id);
     })();
     const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(session.id);
     res.json({ data: publicSession(row, viewer), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth(), viewer) });

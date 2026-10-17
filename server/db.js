@@ -30,6 +30,7 @@ import { decodeHtmlEntities } from './utils/html-entities.js';
 import { toE164, defaultCountryFromConfig } from './utils/phone.js';
 import { todayKey } from './utils/timezone.js';
 import { addMonthsClamped, liftToAnchorDay } from './utils/interval-date.js';
+import { normalizeOpenPaymentTasks } from './services/payment-task-audience.js';
 
 const log = createLogger('DB');
 
@@ -10912,6 +10913,29 @@ const MIGRATIONS = [
       CREATE UNIQUE INDEX idx_users_birthday_feed_token ON users(birthday_feed_token)
         WHERE birthday_feed_token IS NOT NULL;
     `,
+  },
+  {
+    version: 250,
+    description: 'housekeeping: open payment tasks belong to the adults who pay',
+    // DER OFFENE ALTBESTAND DER ZAHLUNGSAUFGABEN (R20, Ulas 2026-10-17). Seit
+    // R20 entsteht eine Zahlungsaufgabe auf `assignees`, zugewiesen der Person,
+    // die eincheckt (wenn sie Betraege sehen darf), und den aktiven Admins.
+    // Aeltere stehen auf `all` und nennen den Lohn jedem Konto mit
+    // Aufgabenrecht, auch einem Kind ohne `housekeeping_view_amounts`.
+    //
+    // Nachgezogen werden nur OFFENE (nicht erledigt, nicht archiviert), die
+    // ueber `housekeeping_work_sessions.payment_task_id` verknuepft sind und
+    // noch auf `all` stehen. Erledigte bleiben stehen (Ulas' Entscheidung);
+    // sie zieht das naechste Bearbeiten ihres Besuchs nach. Gibt es fuer eine
+    // Aufgabe niemanden, dem sie gehoeren darf (Ersteller ohne Betragsrecht und
+    // kein aktiver Admin), bleibt sie unveraendert.
+    //
+    // Die Regel ist DIESELBE wie zur Laufzeit, keine SQL-Kopie:
+    // services/payment-task-audience.js. Wiederholt laufen aendert nichts, die
+    // Auswahl trifft nur `all`.
+    up(database) {
+      normalizeOpenPaymentTasks(database);
+    },
   },
 ];
 
