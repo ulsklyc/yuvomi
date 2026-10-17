@@ -30,7 +30,7 @@
  *
  * Eine Einheit, die hier nicht steht (per API oder Import erfasst, etwa
  * "stone" oder "kPa"), hat keine Zahlenraender - nur die Regeln, die ohne
- * Einheit gelten (SpO2 hoechstens 100, systolisch ueber diastolisch).
+ * Einheit gelten (SpO2 zwischen 1 und 100, systolisch ueber diastolisch).
  */
 
 /** Typ -> Einheit -> [min, max] fuer value_num (inklusive Raender). */
@@ -68,8 +68,9 @@ export function vitalLimitError({ type, unit, value_num: v1, value_num2: v2, val
     return null;
   }
   if (!isNum(v1)) return null;
-  // Ueber 100 % ist in jeder Schreibweise unmoeglich, auch ohne Einheit.
-  if (type === 'spo2' && v1 > 100) return 'out_of_range';
+  // Eine Saettigung liegt in jeder Schreibweise in [1, 100], auch ohne oder
+  // mit fremder Einheit - beide Raender (Review #2049: -10 und 0 gingen durch).
+  if (type === 'spo2' && !within(v1, VITAL_HARD_LIMITS.spo2['%'])) return 'out_of_range';
   const range = own(own(VITAL_HARD_LIMITS, type), unit);
   return range && !within(v1, range) ? 'out_of_range' : null;
 }

@@ -254,8 +254,9 @@ export function vitalPlausibility({ type, unit, value_num: v1, value_num2: v2, v
     check('pulse', v3, PULSE_HARD_LIMITS, PULSE_SOFT_RANGE);
     return { hard, soft };
   }
-  // SpO2 ueber 100 % ist in jeder Schreibweise unmoeglich.
-  const hardRange = ownEntry(ownEntry(VITAL_HARD_LIMITS, type), unit) ?? (type === 'spo2' ? [-Infinity, 100] : null);
+  // Eine Saettigung liegt in jeder Schreibweise in [1, 100], auch ohne oder mit
+  // fremder Einheit - beide Raender, wie der Server (vital-limits.js).
+  const hardRange = type === 'spo2' ? VITAL_HARD_LIMITS.spo2['%'] : ownEntry(ownEntry(VITAL_HARD_LIMITS, type), unit);
   check('value', v1, hardRange, ownEntry(ownEntry(VITAL_SOFT_RANGES, type), unit));
   return { hard, soft };
 }

@@ -181,6 +181,9 @@ test('Vitals: unmoegliche Werte -> 400 mit Grund, moegliche Extremwerte gehen du
     [{ type: 'weight', value_num: 0, unit: 'kg' }, 'health_vital_out_of_range'],
     [{ type: 'spo2', value_num: 101, unit: '%' }, 'health_vital_out_of_range'],
     [{ type: 'spo2', value_num: 101 }, 'health_vital_out_of_range'],
+    // Review #2049: ohne oder mit fremder Einheit galt nur der obere Rand.
+    [{ type: 'spo2', value_num: -10 }, 'health_vital_out_of_range'],
+    [{ type: 'spo2', value_num: 0, unit: 'percent' }, 'health_vital_out_of_range'],
     [{ type: 'temp', value_num: 60, unit: '°C' }, 'health_vital_out_of_range'],
     [{ type: 'glucose', value_num: 5000, unit: 'mg/dL' }, 'health_vital_out_of_range'],
     [{ type: 'glucose', value_num: 150, unit: 'mmol/L' }, 'health_vital_out_of_range'],

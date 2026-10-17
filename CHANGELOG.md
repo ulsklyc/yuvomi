@@ -303,7 +303,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   message right away.
 
 - **Health: impossible measurements are caught, unusual ones questioned.** A weight of 650 kg, an
-  oxygen saturation above 100 % or a blood pressure with the lower value above the upper one used to
+  oxygen saturation of 0 % or above 100 % or a blood pressure with the lower value above the upper one used to
   be saved and then distorted every chart. Values no person can have are refused at the field (and
   by the server, with the possible range in the API description); values that are possible but
   unusual show a short "please check" note once you have entered them (when you leave the field or

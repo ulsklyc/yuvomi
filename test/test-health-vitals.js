@@ -900,6 +900,26 @@ test('Einheit oder Typ mit dem Namen einer Objekt-Eigenschaft hat keine Raender 
   assert.equal(server.vitalLimitError({ type: 'spo2', unit: 'constructor', value_num: 101 }), 'out_of_range');
 });
 
+// Review #2049: SpO2 ohne oder mit fremder Einheit pruefte nur den oberen Rand,
+// -10 und 0 gingen durch. Eine Saettigung liegt in jeder Schreibweise in
+// [1, 100] - Formular und Server sagen dasselbe.
+test('SpO2 ohne oder mit fremder Einheit haelt beide Raender, in Formular und Server', async () => {
+  const client = await import('../public/utils/health-vitals.js');
+  const server = await import('../server/routes/health/vital-limits.js');
+  for (const unit of [undefined, null, '', 'percent', 'constructor', '%']) {
+    for (const value of [-10, 0, 0.5, 101]) {
+      const m = { type: 'spo2', unit, value_num: value };
+      assert.equal(server.vitalLimitError(m), 'out_of_range', JSON.stringify(m));
+      assert.deepEqual(client.vitalPlausibility(m).hard, [{ channel: 'value', issue: 'impossible' }], JSON.stringify(m));
+    }
+    for (const value of [1, 97, 100]) {
+      const m = { type: 'spo2', unit, value_num: value };
+      assert.equal(server.vitalLimitError(m), null, JSON.stringify(m));
+      assert.deepEqual(client.vitalPlausibility(m).hard, [], JSON.stringify(m));
+    }
+  }
+});
+
 test('die harten Grenzen von Formular und Server sind dieselben, und weich liegt innerhalb von hart', async () => {
   const client = await import('../public/utils/health-vitals.js');
   const server = await import('../server/routes/health/vital-limits.js');
