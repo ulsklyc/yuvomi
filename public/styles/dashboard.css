@@ -3582,6 +3582,45 @@ button.today-cockpit__more--link {
     font-weight: var(--font-weight-semibold);
     color: var(--color-text-primary);
   }
+
+  /* EINE KAPSEL STATT VIER KREISE (Re-Critique 2026-10-17, A1). Jede Zeile
+   * trug vier umrandete 48px-Kreise - bei sieben Kacheln 28 Ringe, mehr Rahmen
+   * als Namen. Wie die Stepper in iOS liegen Hoch und Runter jetzt in EINER
+   * Kapsel auf der Mulde (eine Haarlinie trennt die Haelften), Groesse und
+   * Ausblenden stehen als blosse Zeichen daneben. Die Ziele bleiben 48px. */
+  .widget-wrapper--editing > .widget-edit-controls :is(
+    .widget-edit-controls__hide,
+    .widget-edit-controls__options,
+    .widget-edit-controls__size-trigger
+  ) {
+    border-color: transparent;
+    background: transparent;
+  }
+
+  .widget-wrapper--editing > .widget-edit-controls .widget-edit-controls__move {
+    gap: 0;
+    border-radius: var(--radius-full);
+    background: var(--color-fill-well);
+  }
+
+  .widget-wrapper--editing > .widget-edit-controls .widget-edit-controls__move-btn {
+    border: none;
+    background: transparent;
+  }
+
+  .widget-wrapper--editing > .widget-edit-controls .widget-edit-controls__move-btn + .widget-edit-controls__move-btn {
+    box-shadow: inset 1px 0 0 var(--color-border);
+    border-radius: 0 var(--radius-full) var(--radius-full) 0;
+  }
+
+  .widget-wrapper--editing > .widget-edit-controls .widget-edit-controls__move-btn:first-child {
+    border-radius: var(--radius-full) 0 0 var(--radius-full);
+  }
+
+  .widget-wrapper--editing > .widget-edit-controls :is(.widget-edit-controls__hide, .widget-edit-controls__move-btn) svg {
+    width: var(--icon-md);
+    height: var(--icon-md);
+  }
 }
 
 @media (max-width: 767px) {

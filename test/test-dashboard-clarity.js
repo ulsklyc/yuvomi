@@ -1368,6 +1368,23 @@ test('Onboarding: Bildmarke im ersten Schritt, Lichtring auf Leiste und Plus-Kno
   assert.match(rule('.onboarding-card'), /position:\s*relative/, 'die Tafel liegt ueber dem Abdunkler');
 });
 
+// Re-Critique 2026-10-17 (A1): "Widgets anpassen" am Telefon trug je Zeile vier
+// umrandete 48px-Kreise. Hoch/Runter liegen jetzt in EINER Kapsel auf der
+// Mulde, Groesse und Ausblenden ohne Ring daneben; die Ziele bleiben 48px.
+test('Anpassen am Telefon: eine Kapsel fuer Hoch/Runter, keine Ringe je Knopf (Re-Critique 2026-10-17)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const phone = css.slice(css.indexOf('ANPASSEN AUF DEM TELEFON IST EINE LISTE'));
+  const block = phone.slice(0, phone.indexOf('@media (max-width: 767px)'));
+  assert.match(block, /\.widget-edit-controls__hide,\s*\.widget-edit-controls__options,\s*\.widget-edit-controls__size-trigger\s*\) \{\s*border-color: transparent;\s*background: transparent;/,
+    'Groesse, Optionen und Ausblenden ohne Ring');
+  assert.match(block, /\.widget-edit-controls__move \{\s*gap: 0;\s*border-radius: var\(--radius-full\);\s*background: var\(--color-fill-well\);/,
+    'Hoch und Runter in einer Kapsel');
+  assert.match(block, /\.widget-edit-controls__move-btn \{\s*border: none;/);
+  // Die Zielgroesse kommt weiter aus der Fingerregel (48px).
+  assert.match(css, /@media \(pointer: coarse\)[\s\S]*?\.widget-edit-controls__move-btn \{\s*min-width: var\(--target-base\);\s*min-height: var\(--target-base\);/);
+});
+
 // --------------------------------------------------------
 // Critique R19 (layout): die Uebersicht steht auf derselben Inhaltsspalte wie
 // jedes Modul. Bis R19 war sie bis 1680px breit mit eigenem Polster; bei 1920

@@ -82,6 +82,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   show their full e-mail addresses and the category chips fit on one line. On a tablet the list now
   runs as wide as its header instead of leaving a strip free on the right.
 
+- **Customizing the Overview on a phone is calmer.** Each widget row had four outlined round
+  buttons; move up and down now share one capsule, and size and hide stand as plain icons beside
+  it, with the same touch targets.
+
 - **A recipe without a picture starts with its content.** The flat kitchen-coloured band above
   the ingredients is gone; the details open with the meals and the ingredients, under the
   recipe's name. Recipes with a picture keep it.
