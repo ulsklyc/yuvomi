@@ -853,6 +853,16 @@ for (const [name, answer] of [
       await gotoRoute(page, '/calendar');
       await page.click('#cal-view-tab-day');
       await page.waitForSelector('#cal-view-tab-day[aria-selected="true"]');
+      // DER WECHSEL MUSS DURCH SEIN (R19): die Ansicht gleitet seither per
+      // View Transition herein (swapRegion, utils/content-swap.js), und
+      // solange sie laeuft, trifft Chromium nur <html> - ein Tipp beendet sie
+      // bloss, der naechste erreicht die Seite. `aria-selected` steht schon,
+      // bevor die Daten der Tagesansicht geladen sind und der Wechsel beginnt;
+      // der FAB-Klick fiel im Handlauf R19 mitten hinein und verpuffte (der
+      // Dialog ging nie auf). Ein Finger tippt nach dem sichtbaren Wechsel,
+      // die Sonde wartet ihn ebenso ab: Tagesansicht steht, Transition vorbei.
+      await page.waitForFunction(() => Boolean(document.querySelector('#cal-body .day-view'))
+        && !document.documentElement.classList.contains('page-swapping'));
       await page.click('#fab-new-event');
       await page.waitForSelector('#modal-title');
       await page.evaluate((eventTitle) => {
