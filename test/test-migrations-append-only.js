@@ -304,3 +304,36 @@ test('jede Migration nennt neben ihrer Version auch eine Beschreibung', () => {
   });
   assert.deepEqual(findings, [], findings.join('\n  '));
 });
+
+test('kein Migrationseintrag ruft Laufzeit-Code aus services/, routes/ oder permissions.js', () => {
+  // EINE MIGRATION TUT FUER IMMER DASSELBE. Ruft ein Eintrag eine geteilte
+  // Laufzeitregel auf, aendert jede spaetere Aenderung an ihr rueckwirkend,
+  // was die Migration auf einer noch nicht migrierten Installation tut - und
+  // liest die Regel eine Spalte, die erst eine juengere Migration anlegt,
+  // bricht das Durchmigrieren alter Installationen mittendrin ab. R20 hatte
+  // genau das: Migration 250 rief `normalizeOpenPaymentTasks()` aus
+  // services/payment-task-audience.js auf; seitdem traegt sie eine
+  // eingefrorene Kopie.
+  //
+  // Erlaubt sind Plattform-Module und reine Hilfen aus ./utils/ und
+  // ./logger.js (Datumsrechnung, Telefonnummern, Entitaeten - wie bisher in
+  // aelteren Eintraegen). Alles andere, was db.js importiert, darf im
+  // MIGRATIONS-Block nicht vorkommen.
+  const header = source.slice(0, source.indexOf('const MIGRATIONS = ['));
+  const IMPORT = /^import\s+([\s\S]*?)\s+from\s+['"]([^'"]+)['"];?/gm;
+  const pure = (spec) => spec.startsWith('node:') || ['path', 'os', 'fs', 'crypto'].includes(spec)
+    || spec.startsWith('./utils/') || spec === './logger.js';
+  const forbidden = [];
+  for (const [, clause, spec] of header.matchAll(IMPORT)) {
+    if (pure(spec)) continue;
+    const names = clause.replace(/[{}]/g, ' ').split(',')
+      .map((part) => part.trim().split(/\s+as\s+/).pop().trim())
+      .filter((name) => /^[A-Za-z_$][\w$]*$/.test(name));
+    for (const name of names) forbidden.push({ name, spec });
+  }
+  const block = migrationsBlock();
+  const findings = forbidden
+    .filter(({ name }) => new RegExp(`(^|[^\\w$.])${name.replace(/\$/g, '\\$')}\\b`).test(block))
+    .map(({ name, spec }) => `${name} (aus ${spec}) im MIGRATIONS-Block - die Regel als eingefrorene Kopie in den Eintrag schreiben.`);
+  assert.deepEqual(findings, [], findings.join('\n  '));
+});

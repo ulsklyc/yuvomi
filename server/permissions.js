@@ -742,9 +742,10 @@ export function requestHasCapability(database, req, key) {
 /**
  * Darf das Konto die Capability nutzen - ohne Anfrage, aus der gespeicherten
  * Rolle und den Rechte-Zeilen? Admin immer, ein unbekanntes Konto nie. Die
- * Frage hinter `requestHasCapability()`, und die, die eine Migration oder ein
- * Nachtrag ueber ein ANDERES Konto stellt als das anfragende (Zahlungsaufgaben,
- * services/payment-task-audience.js).
+ * Frage hinter `requestHasCapability()`, und die, die ein Nachtrag ueber ein
+ * ANDERES Konto stellt als das anfragende (Zahlungsaufgaben,
+ * services/payment-task-audience.js). Eine Migration ruft sie NIE auf: die
+ * friert ihre Regel ein (Migration 250 in server/db.js).
  */
 export function userHasCapability(database, userId, key, { isDisplay = false } = {}) {
   if (userId == null) return false;

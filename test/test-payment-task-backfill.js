@@ -196,3 +196,63 @@ test('eine schon gewaehlte Sichtbarkeit bleibt beim Bearbeiten stehen', async ()
   assert.equal(put.status, 200, JSON.stringify(put.body));
   assert.deepEqual(taskState(t.taskId), { visibility: 'private', created_by: ADULT, assigned_to: null, assignees: [] });
 });
+
+// --------------------------------------------------------------------------
+// Migration und Laufzeitregel (Aequivalenz)
+// --------------------------------------------------------------------------
+
+// Migration 250 traegt eine EINGEFRORENE Kopie der Regel aus
+// services/payment-task-audience.js (eine Migration importiert nie Laufzeit-
+// Code). Heute muessen beide auf denselben Daten dasselbe ergeben. Weicht die
+// Laufzeitregel spaeter BEWUSST ab, wird dieser Test mit Begruendung angepasst
+// - nie die Migration.
+test('Migration 250 und die Laufzeitregel liefern auf denselben Daten dasselbe', async () => {
+  const { normalizePaymentTaskAudience } = await import('../server/services/payment-task-audience.js');
+  // Rollenprofil ohne Betraege fuer 'relative', eine Mitglied-Zeile oeffnet es
+  // fuer eine Person wieder: beide Ebenen muss die Kopie lesen wie die Regel.
+  db.prepare(`
+    INSERT INTO access_permissions (subject_type, subject_id, resource_type, resource_key, access)
+    VALUES ('role', 'relative', 'capability', 'housekeeping_view_amounts', 'none')
+  `).run();
+  const AUNT = addUser('tante', 'member', 'relative');
+  const UNCLE = addUser('onkel', 'member', 'relative');
+  db.prepare(`
+    INSERT INTO access_permissions (subject_type, subject_id, resource_type, resource_key, access)
+    VALUES ('user', ?, 'capability', 'housekeeping_view_amounts', 'allow')
+  `).run(String(UNCLE));
+  const fixtures = [
+    legacyPaymentTask(ADULT),
+    legacyPaymentTask(KID, { assign: [KID, ADULT] }),
+    legacyPaymentTask(ADMIN2, { assign: [ADULT] }),
+    legacyPaymentTask(GONE_ADMIN),
+    legacyPaymentTask(AUNT),
+    legacyPaymentTask(UNCLE, { status: 'in_progress' }),
+    legacyPaymentTask(ADULT, { status: 'done' }),
+    legacyPaymentTask(ADULT, { archived: true }),
+  ];
+  const before = fixtures.map((t) => taskState(t.taskId));
+  const restore = () => fixtures.forEach((t, i) => {
+    db.prepare("UPDATE tasks SET visibility = 'all', created_by = ?, assigned_to = NULL WHERE id = ?")
+      .run(before[i].created_by, t.taskId);
+    db.prepare('DELETE FROM task_assignments WHERE task_id = ?').run(t.taskId);
+    for (const id of before[i].assignees) {
+      db.prepare('INSERT INTO task_assignments (task_id, user_id) VALUES (?, ?)').run(t.taskId, id);
+    }
+  });
+
+  migration250.up(db);
+  const viaMigration = fixtures.map((t) => taskState(t.taskId));
+  restore();
+  assert.deepEqual(fixtures.map((t) => taskState(t.taskId)), before, 'Ausgangslage wiederhergestellt');
+  for (const t of fixtures) {
+    const row = db.prepare('SELECT status, archived_at FROM tasks WHERE id = ?').get(t.taskId);
+    if (row.status !== 'done' && row.archived_at == null) normalizePaymentTaskAudience(db, t.taskId);
+  }
+  const viaRuntime = fixtures.map((t) => taskState(t.taskId));
+
+  assert.deepEqual(viaMigration, viaRuntime);
+  // Nicht trivial gleich: die Faelle decken beide Ausgaenge ab.
+  assert.equal(viaMigration[4].created_by, ADMIN, 'Rollenprofil ohne Betraege: Admin uebernimmt');
+  assert.equal(viaMigration[5].created_by, UNCLE, 'Mitglied-Zeile oeffnet das Rollenprofil wieder');
+  assert.equal(viaMigration[6].visibility, 'all', 'erledigte bleibt');
+});

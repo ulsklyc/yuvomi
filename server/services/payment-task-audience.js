@@ -1,9 +1,14 @@
 /**
  * Modul: Wem eine Zahlungsaufgabe der Haushaltshilfe gehoert (R20)
- * Zweck: EINE Regel fuer drei Wege - den Check-in, der die Aufgabe anlegt, das
- *        Bearbeiten eines Besuchs, das eine alte Aufgabe nachzieht, und die
- *        Migration, die den offenen Altbestand nachzieht (server/db.js).
- * Abhaengigkeiten: server/permissions.js (ohne db.js, nutzbar in Migrationen)
+ * Zweck: EINE Regel fuer die Laufzeit - den Check-in, der die Aufgabe anlegt,
+ *        und das Bearbeiten, Auschecken, Bezahlen eines Besuchs, das eine alte
+ *        Aufgabe nachzieht. Migration 250 (server/db.js) zog den offenen
+ *        Altbestand mit einer EINGEFRORENEN Kopie dieser Regel nach; eine
+ *        Migration importiert nie Laufzeit-Code (test:migrations-append-only).
+ *        Aenderst du die Regel hier, bleibt 250, wie sie ist; der
+ *        Aequivalenztest in test/test-payment-task-backfill.js zeigt dann
+ *        die Abweichung und wird mit Begruendung angepasst.
+ * Abhaengigkeiten: server/permissions.js
  *
  * WER DIE ZAHLUNGSAUFGABE SIEHT (Ulas 2026-10-17).
  *
@@ -80,24 +85,4 @@ export function normalizePaymentTaskAudience(database, taskId) {
   const assign = database.prepare('INSERT OR IGNORE INTO task_assignments (task_id, user_id) VALUES (?, ?)');
   for (const id of audience.assignees) assign.run(task.id, id);
   return true;
-}
-
-/**
- * Der Nachtrag der Migration: jede OFFENE Zahlungsaufgabe (verknuepft ueber
- * `housekeeping_work_sessions.payment_task_id`, nicht erledigt, nicht
- * archiviert), die noch auf `all` steht. Erledigte bleiben stehen (Ulas
- * 2026-10-17); sie zieht erst das naechste Bearbeiten ihres Besuchs nach.
- *
- * @returns {number} Anzahl nachgezogener Aufgaben
- */
-export function normalizeOpenPaymentTasks(database) {
-  const ids = database.prepare(`
-    SELECT DISTINCT t.id FROM housekeeping_work_sessions s
-    JOIN tasks t ON t.id = s.payment_task_id
-    WHERE t.visibility = 'all' AND t.status <> 'done' AND t.archived_at IS NULL
-    ORDER BY t.id
-  `).all().map((row) => row.id);
-  let changed = 0;
-  for (const id of ids) if (normalizePaymentTaskAudience(database, id)) changed += 1;
-  return changed;
 }

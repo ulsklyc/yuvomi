@@ -452,8 +452,9 @@ function createVisitCalendarEvent(database, worker, checkIn, actorId, title = nu
   return result.lastInsertRowid;
 }
 
-// Wer die Zahlungsaufgabe sieht, steht an EINER Stelle fuer Check-in, Besuch
-// und Migration: services/payment-task-audience.js.
+// Wer die Zahlungsaufgabe sieht, steht an EINER Stelle fuer Check-in und
+// Besuch: services/payment-task-audience.js (Migration 250 traegt eine
+// eingefrorene Kopie).
 function createPaymentTask(database, worker, checkIn, amount, actor, title = null, description = null, visitDateOverride = null) {
   const audience = paymentTaskAudience(database, actor.id, actor.amounts);
   if (!audience) return null;

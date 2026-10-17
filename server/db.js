@@ -30,7 +30,6 @@ import { decodeHtmlEntities } from './utils/html-entities.js';
 import { toE164, defaultCountryFromConfig } from './utils/phone.js';
 import { todayKey } from './utils/timezone.js';
 import { addMonthsClamped, liftToAnchorDay } from './utils/interval-date.js';
-import { normalizeOpenPaymentTasks } from './services/payment-task-audience.js';
 
 const log = createLogger('DB');
 
@@ -10930,11 +10929,60 @@ const MIGRATIONS = [
     // Aufgabe niemanden, dem sie gehoeren darf (Ersteller ohne Betragsrecht und
     // kein aktiver Admin), bleibt sie unveraendert.
     //
-    // Die Regel ist DIESELBE wie zur Laufzeit, keine SQL-Kopie:
-    // services/payment-task-audience.js. Wiederholt laufen aendert nichts, die
-    // Auswahl trifft nur `all`.
+    // EINGEFROREN - NIE AN DIE LAUFZEITREGEL ANGLEICHEN. Die Regel steht hier
+    // als selbsttragende Kopie von services/payment-task-audience.js im Stand
+    // von Version 250, und sie liest nur Tabellen und Spalten, die es bei 250
+    // gibt. Eine Migration muss fuer immer dasselbe tun: rief sie die
+    // Laufzeitregel auf, aenderte jede spaetere Aenderung dort rueckwirkend,
+    // was 250 auf einer noch nicht migrierten Installation tut, und eine
+    // Spalte, die erst eine juengere Migration anlegt, braeche das
+    // Durchmigrieren alter Installationen ab. Dass beide HEUTE dasselbe
+    // ergeben, haelt der Aequivalenztest in test/test-payment-task-backfill.js;
+    // weicht die Laufzeitregel spaeter bewusst ab, wird dieser Test angepasst,
+    // nicht diese Migration. Wiederholt laufen aendert nichts, die Auswahl
+    // trifft nur `all`.
     up(database) {
-      normalizeOpenPaymentTasks(database);
+      const FAMILY_ROLES_AT_250 = new Set(['dad', 'mom', 'parent', 'child', 'grandparent', 'relative', 'other']);
+      const capabilityRow = database.prepare(`
+        SELECT access FROM access_permissions
+        WHERE subject_type = ? AND subject_id = ? AND resource_type = 'capability'
+          AND resource_key = 'housekeeping_view_amounts' AND access IN ('none', 'allow')
+      `);
+      // Betragsrecht wie resolvePermissions() bei 250: Admin immer, sonst
+      // Standard `allow`, dann das Rollenprofil, dann die Mitglied-Zeile.
+      const seesAmounts = (user) => {
+        if (user.role === 'admin') return true;
+        let access = 'allow';
+        if (user.family_role && FAMILY_ROLES_AT_250.has(user.family_role)) {
+          access = capabilityRow.get('role', user.family_role)?.access ?? access;
+        }
+        access = capabilityRow.get('user', String(user.id))?.access ?? access;
+        return access === 'allow';
+      };
+      const admins = database.prepare(`
+        SELECT id FROM users WHERE role = 'admin' AND deactivated_at IS NULL ORDER BY id ASC
+      `).all().map((row) => row.id);
+      const tasks = database.prepare(`
+        SELECT DISTINCT t.id, t.created_by FROM housekeeping_work_sessions s
+        JOIN tasks t ON t.id = s.payment_task_id
+        WHERE t.visibility = 'all' AND t.status <> 'done' AND t.archived_at IS NULL
+        ORDER BY t.id
+      `).all();
+      const readUser = database.prepare('SELECT id, role, family_role, deactivated_at FROM users WHERE id = ?');
+      const update = database.prepare(`
+        UPDATE tasks SET visibility = 'assignees', created_by = ?, assigned_to = ? WHERE id = ?
+      `);
+      const clear = database.prepare('DELETE FROM task_assignments WHERE task_id = ?');
+      const assign = database.prepare('INSERT OR IGNORE INTO task_assignments (task_id, user_id) VALUES (?, ?)');
+      for (const task of tasks) {
+        const creator = task.created_by == null ? null : readUser.get(task.created_by);
+        const creatorPays = Boolean(creator && creator.deactivated_at == null && seesAmounts(creator));
+        const owners = creatorPays ? [creator.id, ...admins.filter((id) => id !== creator.id)] : admins;
+        if (!owners.length) continue;
+        update.run(owners[0], owners[0], task.id);
+        clear.run(task.id);
+        for (const id of owners) assign.run(task.id, id);
+      }
     },
   },
 ];
