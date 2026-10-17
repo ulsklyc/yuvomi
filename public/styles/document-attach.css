@@ -355,6 +355,14 @@ a.doc-attach__chip-name:focus-visible {
   transform: translateY(-1px);
 }
 
+/* Fehlt die Datei oder ist sie zu gross, traegt die Ablage die Fehlerkante
+ * wie jedes Feld (`.form-field--error .input`, layout.css); die Meldung steht
+ * direkt darunter (documents.js reportDropzoneError). */
+.form-field--error .document-dropzone {
+  border-color: var(--color-danger);
+  border-style: solid;
+}
+
 /* Getönte Icon-Kachel nach dem einen Tönungsrezept: 16 % Modulfarbe auf der
  * Fläche. Erst das trägt in BEIDEN Themes sichtbar. */
 .document-dropzone__icon {

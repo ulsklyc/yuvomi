@@ -1183,3 +1183,43 @@ test('Seite (#2005): Ordner samt Dokumenten loeschen mit Ruecknahme, Teilergebni
     assert.ok(neu.gefragt.includes('#documents-folder-browser'), 'die neue Seite zeichnet den Stand nach dem Teilergebnis');
   });
 });
+
+// Re-Critique 2026-10-17, P1: "Bitte waehle eine Datei aus." stand als
+// Formularfehler am Fuss des Dialogs (mobil bei y=1086 von 844, unsichtbar),
+// und der Fokus blieb auf "Hochladen". Der Fehler gehoert an die Ablage.
+test('Seite: Hochladen ohne Datei - der Fehler steht an der Ablage, Fokus und Blick gehen dorthin', async () => {
+  for (const [dateien, satz] of [
+    [[], 'documents.fileRequired'],
+    [[{ name: 'riesig.pdf', size: 10 ** 12 }], 'documents.fileTooLargeNamed{"name":"riesig.pdf"}'],
+  ]) {
+    const form = formular();
+    const attrs = new Map();
+    const input = Object.assign(form.querySelector('#document-file'), {
+      files: dateien,
+      setAttribute(name, value) { attrs.set(name, String(value)); },
+      getAttribute(name) { return attrs.get(name) ?? null; },
+      removeAttribute(name) { attrs.delete(name); },
+    });
+    const dropzone = form.querySelector('#document-dropzone');
+    let scrolled = 0;
+    dropzone.scrollIntoView = () => { scrolled += 1; };
+    dropzone.getAttribute = () => null;
+    const gemeldet = [];
+    globalThis.__reportFieldError = (feld, text, opts) => gemeldet.push([feld, text, opts]);
+    let posted = 0;
+    try {
+      await mitSeite({}, () => mit({ post: async () => { posted += 1; return { data: {} }; } },
+        () => page.saveDocument({ target: form, preventDefault() {} }, null, formular())));
+    } finally {
+      delete globalThis.__reportFieldError;
+    }
+    assert.equal(gemeldet.length, 1, `${satz}: genau eine Meldung am Feld`);
+    assert.equal(gemeldet[0][0], dropzone, 'die Meldung steht an der Ablage');
+    assert.equal(gemeldet[0][1], satz);
+    assert.equal(form.querySelector('#document-error').hidden, true, 'nicht als Formularfehler am Fuss');
+    assert.equal(input.focused, 1, 'der Fokus geht in die Dateiwahl');
+    assert.equal(attrs.get('aria-invalid'), 'true', 'die Dateiwahl sagt ihren Zustand an');
+    assert.equal(scrolled, 1, 'die Ablage kommt in den Blick');
+    assert.equal(posted, 0, 'nichts wird hochgeladen');
+  }
+});
