@@ -232,21 +232,25 @@
   color: var(--color-text-tertiary);
 }
 
-/* Der gezeigte Zeitraum als ruhiges Band, der gewaehlte Tag als Scheibe,
- * heute in der Tinte des Moduls - dieselbe Sprache wie die Heute-Zelle. */
+/* Der gezeigte Zeitraum als ruhiges Band. HEUTE IST EINE FARBE (Re-Kritik
+ * 2026-10-17): der Mini-Monat zeigte heute und den gewaehlten Tag in Azur
+ * (`--module-accent`), das Raster daneben heute in Violett - zwei Farben fuer
+ * "heute" in einem Bild. Jetzt wie im Raster (`.month-day--today`, Apple
+ * Kalender): heute die gefuellte Akzent-Scheibe, der gewaehlte Tag ein Ring in
+ * derselben Farbe. Ist heute gewaehlt, bleibt die Scheibe. */
 .cal-mini__day.is-in-view {
   background-color: var(--color-fill-well);
 }
 
-.cal-mini__day[aria-current="date"] {
-  color: var(--module-accent);
-  font-weight: var(--font-weight-bold);
+.cal-mini__day.is-cursor {
+  box-shadow: inset 0 0 0 var(--space-0h) var(--color-accent);
+  font-weight: var(--font-weight-semibold);
 }
 
-.cal-mini__day.is-cursor {
-  background-color: var(--module-accent);
+.cal-mini__day[aria-current="date"] {
+  background-color: var(--color-accent);
   color: var(--color-ink-on-vivid);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-bold);
 }
 
 @media (hover: hover) {
@@ -1121,7 +1125,9 @@
  * lesbar. */
 .week-view__col:hover,
 .day-view__col:hover {
-  background-color: color-mix(in srgb, var(--module-accent) var(--tint-state), transparent);
+  /* Im Akzent wie heute und der gewaehlte Tag (Re-Kritik 2026-10-17): Azur
+   * neben Violett las sich wie eine zweite Auswahl. */
+  background-color: color-mix(in srgb, var(--color-accent) var(--tint-state), transparent);
 }
 
 /* Ein Doppelklick markiert kein Wort und ein langer Druck ruft weder die

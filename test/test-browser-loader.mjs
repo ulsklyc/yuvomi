@@ -427,6 +427,9 @@ const STUBS = {
     // die echte Komponente. Ohne das bleibt es beim leeren Markup wie bisher.
     export const bindUserMultiSelect = (...args) => globalThis.__bindUserMultiSelect?.(...args);
     export const renderAvatarStack = (...args) => globalThis.__renderAvatarStack?.(...args) ?? '';
+    // Der geteilte Nachname (Chips ohne "Johnson"): Suiten, die ihn pruefen,
+    // setzen globalThis.__sharedSurname auf die echte Funktion; sonst keiner.
+    export const sharedSurname = (...args) => globalThis.__sharedSurname?.(...args) ?? '';
   `,
   '/utils/shopping-categories.js': `
     export const DEFAULT_CATEGORY_NAME = 'Sonstiges';

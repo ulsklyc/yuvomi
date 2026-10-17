@@ -5980,6 +5980,44 @@ test('Seitenleiste: Kalender und Personen sind dieselben Bausteine und Zustaende
     'die Leiste legt Schalter und Chips ueber dieselben Funktionen um wie das Blatt');
 });
 
+// Re-Kritik 2026-10-17: ab 1600px stand jeder volle Name auf einer eigenen
+// Chip-Zeile, "Als Naechstes" lag unter der Falz (Scroll 1123/831 bei
+// 1600x900). Und der Mini-Monat zeigte heute in Azur, das Raster in Violett.
+await test('Re-Kritik: Personen-Chips ohne geteilten Nachnamen; heute ist im Mini-Monat und im Raster dieselbe Farbe', async () => {
+  const echt = await import('../public/components/user-multi-select.js');
+  const vorherSurname = globalThis.__sharedSurname;
+  globalThis.__sharedSurname = echt.sharedSurname;
+  const st = calendarHelpers.state;
+  const vorher = { users: st.users, people: st.people, hiddenSources: st.hiddenSources, assignedToMe: st.assignedToMe, currentUserId: st.currentUserId, localCalendars: st.localCalendars, events: st.events, user: st.user };
+  try {
+    Object.assign(st, {
+      users: [{ id: 1, display_name: 'Linda Johnson' }, { id: 2, display_name: 'Alex Johnson' }],
+      people: new Set(), hiddenSources: new Map(), assignedToMe: false, currentUserId: 1, user: { id: 1 }, events: [],
+      localCalendars: [{ id: 3, name: 'Familie', color: '#C2185B' }],
+    });
+    const chips = calendarHelpers.calendarFilterParts().peopleChips;
+    assert(/data-value="1"[^>]*>[\s\S]*?<span>Linda<span class="sr-only"> Johnson<\/span><\/span>/.test(chips),
+      `der Chip zeigt den Vornamen, der Nachname bleibt zugaenglich: ${chips}`);
+    assert(!/>Linda Johnson</.test(chips), 'kein voller Name im sichtbaren Chip');
+    Object.assign(st, { users: [{ id: 1, display_name: 'Linda Johnson' }, { id: 2, display_name: 'Maria Lopez' }] });
+    assert(/<span>Maria Lopez<\/span>/.test(calendarHelpers.calendarFilterParts().peopleChips), 'verschiedene Nachnamen bleiben voll');
+  } finally {
+    Object.assign(st, vorher);
+    globalThis.__sharedSurname = vorherSurname;
+  }
+  const css = readFileSync(new URL('../public/styles/calendar.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)].filter((r) => !r.at.length);
+  const today = rules.find((r) => r.selector.trim() === '.cal-mini__day[aria-current="date"]');
+  assert(/background-color:\s*var\(--color-accent\)/.test(today?.body ?? ''), 'heute: gefuellte Akzent-Scheibe wie im Raster');
+  const cursor = rules.find((r) => r.selector.trim() === '.cal-mini__day.is-cursor');
+  assert(/box-shadow:\s*inset 0 0 0 var\(--space-0h\) var\(--color-accent\)/.test(cursor?.body ?? ''), 'der gewaehlte Tag als Ring');
+  assert(!/background-color/.test(cursor?.body ?? ''), 'der gewaehlte Tag ist keine zweite Scheibe');
+  const mini = rules.filter((r) => r.selector.includes('.cal-mini__day'));
+  assert(mini.every((r) => !/--module-accent/.test(r.body)), 'kein Azur im Mini-Monat');
+  const hover = rules.find((r) => r.selector.split(',').some((x) => x.trim() === '.week-view__col:hover'));
+  assert(/var\(--color-accent\)/.test(hover?.body ?? '') && !/--module-accent/.test(hover?.body ?? ''), 'die Spalte unter dem Zeiger im Akzent');
+});
+
 test('Seitenleiste: der Mini-Monat zeigt sechs Wochen ab dem Wochenstart, markiert heute, Auswahl und den gezeigten Zeitraum', () => {
   const st = calendarHelpers.state;
   const vorher = { view: st.view, cursor: st.cursor, today: st.today, weekStart: st.weekStart };

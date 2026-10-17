@@ -144,14 +144,14 @@ export function syncFilterButton(button, count, labels = defaultFilterLabels()) 
  *          swatchColor?: string|null, swatchLabel?: string}} chip
  * @returns {string}
  */
-export function filterChipHtml({ filter, value, label, active, swatchColor = null, swatchLabel = '' }) {
+export function filterChipHtml({ filter, value, label, active, swatchColor = null, swatchLabel = '', srSuffix = '' }) {
   const swatch = swatchColor
     ? `<span class="filter-chip__swatch" aria-hidden="true"`
       + ` style="--swatch-color:${esc(String(swatchColor))};color:${getReadableTextColor(String(swatchColor))}">`
       + `${esc(String(swatchLabel ?? ''))}</span>`
     : '';
   return `<button type="button" class="filter-chip filter-chip--sm${active ? ' filter-chip--active' : ''}"
-    data-filter="${esc(filter)}" data-value="${esc(String(value))}" aria-pressed="${active}">${swatch}<span>${esc(label)}</span></button>`;
+    data-filter="${esc(filter)}" data-value="${esc(String(value))}" aria-pressed="${active}">${swatch}<span>${esc(label)}${srSuffix ? `<span class="sr-only"> ${esc(String(srSuffix))}</span>` : ''}</span></button>`;
 }
 
 /**
