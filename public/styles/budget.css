@@ -863,8 +863,10 @@
 }
 
 /* Bei 320px blieben dem Namen neben dem Saldo 53px ("Gemei-nsa..."): dort
- * steht alles in einer Spalte - Name, Saldo, Art und Start. */
-@media (max-width: 359px) {
+ * steht alles in einer Spalte - Name, Saldo, Art und Start. Container statt
+ * Viewport (keine eigene Viewport-Schwelle, PAGE-005): unter 340px Inhalt,
+ * also bei 320er und 360er Telefonen, nicht mehr bei 390. */
+@container budget-page (width < 340px) {
   .budget-account__name,
   .budget-account__balance {
     grid-column: 2 / 4;
