@@ -68,6 +68,7 @@ import { dayHeading, dayHeadingLabel } from '/utils/day-label.js';
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
 import { holdDocumentAttachStyle } from '/components/document-attach.js';
 import { emptyStateHTML, emptyHintHTML, mountLoadError } from '/utils/empty-state.js';
+import { loadErrorSentence } from '/utils/friendly-error.js';
 import { overlayHost } from '/utils/overlay-host.js';
 import { isPermAdmin, moduleAccess } from '/permissions.js';
 import { pathAccess } from '/utils/module-access.js';
@@ -2017,7 +2018,7 @@ export async function render(container, { user, signal } = {}) {
   state.hiddenSources = restoreHiddenSources(state.user?.id);
 
   _miniMonth = null;
-  _upNext = { events: null, loading: null, day: null };
+  _upNext = { events: null, loading: null, day: null, error: null };
   wireSidebar(signal);
   renderToolbar();
   renderView();
@@ -5019,8 +5020,12 @@ const UP_NEXT_COUNT = 5;
 const UP_NEXT_DAYS = 21;
 /** Der in der Uebersicht gezeigte Monat (`YYYY-MM-01`); `null` folgt dem Cursor. */
 let _miniMonth = null;
-/** Termine ab heute fuer „Als Naechstes" - eigener, kurzer Abruf. */
-let _upNext = { events: null, loading: null, day: null };
+/**
+ * Termine ab heute fuer „Als Naechstes" - eigener, kurzer Abruf. `error` haelt
+ * einen gescheiterten Abruf fest: dann sagt der Abschnitt das und bietet
+ * „Erneut versuchen" an, statt „nichts steht an" zu behaupten (Review #2049).
+ */
+let _upNext = { events: null, loading: null, day: null, error: null };
 let _sidebarObserver = null;
 
 function sidebarWanted() {
@@ -5101,6 +5106,17 @@ function upNextEvents(events, now = Date.now()) {
 function upNextHtml() {
   const events = _upNext.events;
   const title = `<h2 class="cal-sidebar__title">${esc(t('calendar.upNextTitle'))}</h2>`;
+  // Gescheitert ist nicht leer (Review #2049): ein ruhiger Satz zur Ursache und
+  // der Weg zurueck. Kompakt und ohne role="alert" - die Leiste baut sich nach
+  // jeder Ansicht neu, und der Kalender daneben steht ja.
+  if (_upNext.error) {
+    return `<section class="cal-sidebar__group cal-upnext">${title}${emptyStateHTML({
+      compact: true,
+      className: 'cal-upnext__error',
+      description: loadErrorSentence(_upNext.error) ?? t('common.loadErrorDescription'),
+      action: { label: t('common.retry'), tone: 'secondary', icon: 'refresh-cw', attrs: { 'data-upnext-retry': '' } },
+    })}</section>`;
+  }
   if (events == null) return `<section class="cal-sidebar__group cal-upnext" aria-busy="true">${title}</section>`;
   const rows = upNextEvents(events);
   if (!rows.length) {
@@ -5131,16 +5147,30 @@ function upNextHtml() {
     </section>`;
 }
 
+/**
+ * Muss „Als Naechstes" (neu) laden? Ein neuer Tag oder ein frischer Stand der
+ * Ansicht (`day = null`) immer; sonst nur, solange weder Termine noch ein
+ * Fehler da sind. Ein Fehler laedt hier NICHT von selbst nach - die Leiste
+ * zeichnet sich nach jeder Ansicht neu, das waere eine Schleife. Zurueck geht
+ * es per „Erneut versuchen" oder mit dem naechsten geladenen Zeitraum.
+ */
+function upNextNeedsLoad() {
+  return _upNext.day !== state.today || (_upNext.events == null && !_upNext.error);
+}
+
 /** Ein eigener kurzer Abruf: die Ansicht kann einen ganz anderen Monat laden. */
 function loadUpNext({ force = false } = {}) {
   if (!force && (_upNext.loading || (_upNext.events && _upNext.day === state.today))) return _upNext.loading;
   const from = state.today;
   const to = addDays(state.today, UP_NEXT_DAYS);
   const run = api.get(`/calendar?from=${from}&to=${to}`)
-    .then((res) => { _upNext = { events: (res.data ?? []).map(localizeBirthdayEvent), loading: null, day: from }; })
-    .catch((err) => { console.warn('[Calendar] Als Naechstes:', err); _upNext = { events: [], loading: null, day: from }; })
+    .then((res) => { _upNext = { events: (res.data ?? []).map(localizeBirthdayEvent), loading: null, day: from, error: null }; })
+    // Kein leeres Ergebnis ablegen: das hiesse „nichts steht an", und der Tag
+    // gaelte als geladen (Review #2049).
+    .catch((err) => { console.warn('[Calendar] Als Naechstes:', err); _upNext = { events: null, loading: null, day: from, error: err }; })
     .then(() => renderSidebar());
   _upNext.loading = run;
+  _upNext.error = null;
   return run;
 }
 
@@ -5157,12 +5187,12 @@ function renderSidebar() {
   page.classList.toggle('has-cal-sidebar', wanted);
   aside.hidden = !wanted;
   if (!sidebarShown(aside)) { aside.replaceChildren(); return; }
-  if (_upNext.events == null || _upNext.day !== state.today) loadUpNext();
+  if (upNextNeedsLoad()) loadUpNext();
 
   const active = document.activeElement;
   let refocus = null;
   if (active && aside.contains(active)) {
-    for (const attr of ['data-mini-date', 'data-mini-step', 'data-filter-source', 'data-filter-mine', 'data-value', 'data-upnext-id', 'data-filter-manage-calendars']) {
+    for (const attr of ['data-mini-date', 'data-mini-step', 'data-filter-source', 'data-filter-mine', 'data-value', 'data-upnext-id', 'data-upnext-retry', 'data-filter-manage-calendars']) {
       if (active.hasAttribute(attr)) { refocus = `[${attr}="${CSS.escape(active.getAttribute(attr))}"]`; break; }
     }
   }
@@ -5202,6 +5232,7 @@ function wireSidebar(signal) {
     }
     if (e.target.closest?.('[data-filter-manage-calendars]')) { openLocalCalendarsModal(); return; }
     if (toggleCalendarPersonChip(e.target.closest?.('[data-filter="person"]'), aside)) { afterFilter(); return; }
+    if (e.target.closest?.('[data-upnext-retry]')) { loadUpNext({ force: true }); renderSidebar(); return; }
     const row = e.target.closest?.('[data-upnext-id]');
     if (row) {
       const ev = (_upNext.events ?? []).find((x) => String(x.id) === row.dataset.upnextId
@@ -6497,6 +6528,10 @@ export const __test = {
   alignedHourScroll,
   // R19: die Seitenleiste ab ca. 1600px - Mini-Monat, Filter aus EINER Quelle, Als Naechstes.
   miniMonthHtml, sidebarFiltersHtml, calendarFilterParts, upNextEvents,
+  // Review #2049: ein gescheiterter Abruf ist ein Fehler, kein leerer Tag.
+  upNextHtml, loadUpNext, upNextNeedsLoad,
+  get upNext() { return _upNext; },
+  resetUpNext() { _upNext = { events: null, loading: null, day: null, error: null }; },
   // Sonde 19 (#882): eine Zeile nur, wenn sie passt.
   syncToolbarFit,
   // R17 Schritt 8: der Fokus nach der Suche, wenn ihr Knopf gefaltet ist.

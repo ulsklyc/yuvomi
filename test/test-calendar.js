@@ -6065,6 +6065,52 @@ test('Seitenleiste: „Als Naechstes" nennt die naechsten Termine ab jetzt, gefi
   }
 });
 
+// Review #2049: scheiterte der Abruf (offline, Serverfehler), legte der catch
+// ein LEERES Ergebnis fuer den Tag ab - die Leiste sagte „nichts steht an" und
+// lud an diesem Tag nie wieder. Ein Fehler ist ein eigener Zustand: ein Satz
+// zur Ursache, „Erneut versuchen", und der Tag gilt nicht als geladen.
+await test('Seitenleiste: scheitert „Als Naechstes", sagt die Leiste das und laedt auf Wunsch neu', async () => {
+  const st = calendarHelpers.state;
+  const vorher = { today: st.today, hiddenSources: st.hiddenSources, people: st.people, assignedToMe: st.assignedToMe, layerBirthdays: st.layerBirthdays };
+  const savedStub = globalThis.__apiStub;
+  const restoreDom = installMiniDom();
+  const calls = [];
+  let fail = true;
+  globalThis.__apiStub = {
+    get: async (url) => {
+      calls.push(url);
+      if (fail) throw Object.assign(new Error('Service Unavailable'), { status: 503 });
+      return { data: [{ id: 9, title: 'Zahnarzt', start_datetime: '2026-10-20T10:00:00Z', end_datetime: '2026-10-20T11:00:00Z', assigned_users: [] }] };
+    },
+  };
+  try {
+    Object.assign(st, { today: '2026-10-16', hiddenSources: new Map(), people: new Set(), assignedToMe: false, layerBirthdays: false });
+    calendarHelpers.resetUpNext();
+    await calendarHelpers.loadUpNext();
+    assert(calls.length === 1, `ein Abruf: ${calls.length}`);
+    const html = calendarHelpers.upNextHtml();
+    assert(!html.includes('calendar.upNextEmpty'), `ein Fehler behauptet keinen leeren Zeitraum: ${html}`);
+    assert(/data-upnext-retry/.test(html) && html.includes('common.retry'), `der Weg zurueck: ${html}`);
+    assert(!/role="alert"/.test(html), 'ruhig: die Leiste baut sich nach jeder Ansicht neu und darf nicht jedes Mal melden');
+    assert(calendarHelpers.upNextNeedsLoad() === false, 'kein Selbst-Nachladen in einer Schleife');
+    // Ein frischer Stand der Ansicht (loadRange setzt day = null) versucht es wieder.
+    calendarHelpers.upNext.day = null;
+    assert(calendarHelpers.upNextNeedsLoad() === true, 'der naechste geladene Zeitraum versucht es erneut');
+    calendarHelpers.upNext.day = st.today;
+    // „Erneut versuchen": jetzt klappt es.
+    fail = false;
+    await calendarHelpers.loadUpNext({ force: true });
+    assert(calls.length === 2, `der zweite Abruf: ${calls.length}`);
+    const after = calendarHelpers.upNextHtml();
+    assert(after.includes('Zahnarzt') && !/data-upnext-retry/.test(after), `danach die Termine: ${after}`);
+  } finally {
+    calendarHelpers.resetUpNext();
+    Object.assign(st, vorher);
+    globalThis.__apiStub = savedStub;
+    restoreDom();
+  }
+});
+
 test('Seitenleiste: erst ab 86.25rem Kalenderflaeche, nur mit Leiste rueckt die Seite auf den Rand; der Zeitraum ist als Titel gewichtet', () => {
   const rules = [...eachRule(calendarCss)];
   const base = rules.find((r) => r.selector.trim() === '.cal-sidebar' && !r.at.length);
