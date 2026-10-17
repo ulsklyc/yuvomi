@@ -2077,6 +2077,12 @@ Zielgroessen-Regel halten (**Ebene 3**, `die Groesse des Icon-Knopfs gehoert der
   Fundstellen); eine getoente Flaeche braucht Luft zu ihrem Rand, sonst liest sie sich als
   abgeschnitten statt als Chip. Einzige Ausnahme ist das dichte Monatsraster, das seine
   engere Fassung ueber einen `.month-day`-Override behaelt.
+- **Mahlzeit-Typ-Chips (R20):** `.filter-chip[data-meal-type]` traegt den 8px-Punkt des
+  Mahlzeit-Tons (`--meal-*`) wie das Board - Kennung, nicht Zustand. Die Regel steht in
+  filter-chip.css, weil Mahlzeit- und Rezept-Dialog auf verschiedenen Routen leben.
+- **Sieben Wochentage, eine Zeile (R20):** Wochentags-Chips (Medikament-Zeitfenster,
+  Entsorgungs-Termin) stehen als Raster `repeat(7, minmax(0, 1fr))` statt umbrechender
+  Reihe: 48px hoch, je ~43px breit im 390er-Blatt. Mit 48px Mindestbreite stand "So" allein.
 
 ### Cards / Containers
 - **Corner Style:** 12px (`--radius-md`) fuer die Karte, 16px (`--radius-lg`) fuer den
@@ -2088,6 +2094,20 @@ Zielgroessen-Regel halten (**Ebene 3**, `die Groesse des Icon-Knopfs gehoert der
   EINE Inset-Grouped-Liste (ein Traeger, Zeilen mit Haarlinien, getoente Icon-Kachel plus
   Titel plus Modul-Untertitel plus trailing Count), nicht viele Einzelkarten.
 - **Internal Padding:** 16px (`--space-4`), kompakt 12px.
+- **Gruppen-Traeger (R20):** eine Karte je Gruppe (Abfallart mit ihren Terminen) traegt
+  dieselbe Haut wie `.row-carrier` - Flaeche, `--radius-lg`, shadow-sm, keine Kontur; den
+  Abstand zwischen den Karten haelt die Liste (`gap`), nie die Karte selbst
+  (test:frontend-audit "a card per row").
+- **Kapseln auf Shell-Material (R20):** Sammel-Pille und Toast-"Rueckgaengig" bleiben 28px
+  hohe Kapseln; am Finger (`pointer: coarse`) reicht ein unsichtbarer `::after`-Saum auf
+  `--target-base`, damit Pille und `--bulk-pill-safe-zone` nicht wachsen.
+- **Saeulendiagramm mit einer Reihe (R20, Haushaltshilfe):** Saeulen auf einer Haarlinie,
+  keine volle Bahn (die las sich als Fortschritt); bezahlt im Vollton der Serie, offen als
+  `--tint-hint`-Tint derselben Serie, Legende darunter; ein leerer Monat traegt nur die
+  Grundlinie und keinen "0,00 €"-Wert, ganze Betraege ohne Nachkommastellen.
+- **Zahlen-Stepper (R20, "Alle N Wochen"):** das native `<input type="number">` bleibt das
+  Feld (Label, Tastatur), links und rechts `btn--secondary btn--icon` mit Minus/Plus; an der
+  Grenze `disabled`, der Fokus geht dann ins Feld.
 
 ### Named Rules
 **Die Kasten-in-Kasten-Regel.** Karten sind randlos auf dem Grouped-Grund, also traegt
