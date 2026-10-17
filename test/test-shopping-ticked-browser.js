@@ -69,7 +69,9 @@ before(async () => {
     if (url.pathname.startsWith('/api/')) {
       api.log.push({ method: req.method(), path: url.pathname, body: req.postData() ? JSON.parse(req.postData()) : null });
       if (req.method() === 'PATCH' && api.patch === 'refuse-late') {
-        await new Promise((r) => setTimeout(r, PAUSE + 500));
+        // Klar NACH dem Umzug (Pause plus Austritt, siehe EXIT_BUDGET): sonst
+        // gibt es kein Fenster, in dem die Zeile umgezogen dasteht.
+        await new Promise((r) => setTimeout(r, PAUSE + EXIT_BUDGET + 400));
         return req.respond({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Nein.', code: 500 }) });
       }
       return req.respond({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: null }) });
@@ -126,6 +128,31 @@ async function setup(items, { tickedOpen = false, pause = PAUSE, reducedMotion =
 }
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/* DER UMZUG KOMMT NACH PAUSE UND AUSTRITT - auch unter reduzierter Bewegung.
+ *
+ * Bis R19 ging eine Zeile unter `prefers-reduced-motion` im selben Takt:
+ * collapseOut loeste sofort auf, und der Umzug folgte in derselben Aufgabe.
+ * Seit 4cf1c5019 (R19, collapseOut nur noch mit opacity/transform, gewollt und
+ * im CHANGELOG) blendet sie aus (`--duration-sm`) und die Nachbarn blenden an
+ * ihrer neuen Stelle ein (`--duration-sm`), statt hart um die Zeilenhoehe zu
+ * springen. Gemessen 2026-10-17 (Playwright, Pause 500 ms, reduzierte
+ * Bewegung): Haken bis Umzug 575 ms auf main, 891 ms in R19; fremder Haken
+ * ohne Pause 13 -> 348 ms. Die festen Wartezeiten (Pause + 150 ms) lagen
+ * davor. Die Sonden warten deshalb auf den ZUSTAND - mit Obergrenze: steht er
+ * nicht binnen Pause + EXIT_BUDGET, sind sie rot. */
+const EXIT_BUDGET = 600;
+
+/** Liest die Liste, bis `pred` gilt oder `ms` um sind; gibt den letzten Stand zurueck. */
+async function until(pred, ms = PAUSE + EXIT_BUDGET) {
+  const end = Date.now() + ms;
+  let state = await snap();
+  while (!pred(state) && Date.now() < end) {
+    await wait(20);
+    state = await snap();
+  }
+  return state;
+}
 
 /** Die Liste, wie sie dasteht: je Gruppe Name, Sichtbarkeit, Zaehler, Zeilen - und der Fokus. */
 const snap = () => page.evaluate(() => {
@@ -228,8 +255,7 @@ test('Ein Neuaufbau in der Pause laesst die wartende Zeile, wo sie wartet', asyn
   const during = await snap();
   assert.deepEqual(rows(during, 'Obst'), [1, 2, 9], 'der Apfel steht noch in seiner Kategorie');
   assert.equal(await page.$eval(check(1), (el) => el.dataset.checked), '1', 'abgehakt ist er');
-  await wait(PAUSE + 150);
-  const end = await snap();
+  const end = await until((st) => rows(st, 'ABGEHAKT').join() === '1');
   assert.deepEqual(rows(end, 'Obst'), [2, 9]);
   assert.deepEqual(rows(end, 'ABGEHAKT'), [1], 'nach der Pause zieht er um');
 });
@@ -239,14 +265,16 @@ test('Reduzierte Bewegung: die Pause bleibt, nur das Gleiten entfaellt', async (
   await page.click(check(1));
   await wait(PAUSE - 150);
   assert.deepEqual(rows(await snap(), 'Obst'), [1, 2], 'auch ohne Bewegung zieht die Zeile nicht sofort um');
-  await wait(250);
-  const end = await snap();
+  const end = await until((st) => rows(st, 'ABGEHAKT').join() === '1', 150 + EXIT_BUDGET);
   assert.deepEqual(rows(end, 'ABGEHAKT'), [1], 'nach der Pause steht sie ohne Uebergang im Abschnitt');
   assert.equal(await page.$eval('.swipe-row[data-swipe-id="1"]', (row) => row.getAnimations().length), 0);
 });
 
 test('Fremder Haken aus dem Feed: sofort, solange hier niemand tippt - sonst mit der laufenden Pause', async () => {
-  await setup([item(1, 'Apfel', 'Obst'), item(2, 'Birne', 'Obst'), item(3, 'Kiwi', 'Obst')], { reducedMotion: true });
+  // EINE LANGE PAUSE: "sofort" heisst ohne Pause, und das ist nur von "nach der
+  // Pause" zu unterscheiden, wenn der Austritt (EXIT_BUDGET) klar kuerzer ist.
+  const LONG = 3 * EXIT_BUDGET;
+  await setup([item(1, 'Apfel', 'Obst'), item(2, 'Birne', 'Obst'), item(3, 'Kiwi', 'Obst')], { reducedMotion: true, pause: LONG });
   // Niemand tippt: Zeile 3 wird von jemand anderem abgehakt.
   await page.evaluate(() => {
     const c = document.getElementById('c');
@@ -255,7 +283,7 @@ test('Fremder Haken aus dem Feed: sofort, solange hier niemand tippt - sonst mit
     window.s.updateItemRow(c, it);
     window.s.placeOrHold(c, 3);
   });
-  assert.deepEqual(rows(await snap(), 'ABGEHAKT'), [3], 'ohne eigene Aktivitaet sofort');
+  assert.deepEqual(rows(await until((st) => rows(st, 'ABGEHAKT').join() === '3', EXIT_BUDGET), 'ABGEHAKT'), [3], 'ohne eigene Aktivitaet sofort, ohne Pause');
 
   // Jetzt tippt hier jemand - und waehrenddessen hakt der andere Zeile 2 ab.
   await page.click(check(1));
@@ -267,8 +295,7 @@ test('Fremder Haken aus dem Feed: sofort, solange hier niemand tippt - sonst mit
     window.s.placeOrHold(c, 2);
   });
   assert.deepEqual(rows(await snap(), 'Obst'), [1, 2], 'der fremde Haken wartet mit');
-  await wait(PAUSE + 150);
-  const end = await snap();
+  const end = await until((st) => rows(st, 'ABGEHAKT').join() === '1,2,3', LONG + EXIT_BUDGET);
   assert.deepEqual(rows(end, 'ABGEHAKT'), [1, 2, 3]);
   assert.equal(group(end, 'Obst').shown, false, 'die leer gehakte Kategorie steht nicht mehr im Bild');
   assert.equal(group(end, 'Obst').count, '0');
@@ -287,16 +314,14 @@ test('Im Abschnitt stehen die Zeilen nach Kategorieposition und Rang, zurueck ko
   await page.click(check(5));
   await page.click(check(2));
   await page.click(check(4));
-  await wait(PAUSE + 150);
-  let state = await snap();
+  let state = await until((st) => rows(st, 'ABGEHAKT').join() === '2,4,5');
   assert.deepEqual(rows(state, 'ABGEHAKT'), [2, 4, 5]);
   assert.deepEqual(rows(state, 'Obst'), [1, 3]);
   assert.equal(group(state, 'Milch').shown, false);
 
   // Die Birne zurueck: zwischen Apfel und Kiwi, nicht ans Ende.
   await page.click(check(2));
-  await wait(PAUSE + 150);
-  state = await snap();
+  state = await until((st) => rows(st, 'Obst').join() === '1,2,3');
   assert.deepEqual(rows(state, 'Obst'), [1, 2, 3]);
   assert.deepEqual(rows(state, 'ABGEHAKT'), [4, 5]);
   assert.equal(group(state, 'ABGEHAKT').count, '2');
@@ -312,10 +337,8 @@ test('Lehnt der Server nach dem Umzug ab, kommt die Zeile zurueck', async () => 
   await setup([item(1, 'Apfel', 'Obst'), item(2, 'Birne', 'Obst')], { reducedMotion: true });
   api.patch = 'refuse-late';
   await page.click(check(1));
-  await wait(PAUSE + 150);
-  assert.deepEqual(rows(await snap(), 'ABGEHAKT'), [1], 'umgezogen, die Antwort steht noch aus');
-  await wait(600);
-  const end = await snap();
+  assert.deepEqual(rows(await until((st) => rows(st, 'ABGEHAKT').join() === '1'), 'ABGEHAKT'), [1], 'umgezogen, die Antwort steht noch aus');
+  const end = await until((st) => rows(st, 'Obst').join() === '1,2', 400 + 2 * EXIT_BUDGET);
   assert.deepEqual(rows(end, 'Obst'), [1, 2], 'zurueck an ihrem Rang');
   assert.equal(group(end, 'ABGEHAKT').shown, false);
   // Der Hinweis ist der Satz der App, nicht der des Servers (#1909): eine Antwort
@@ -360,13 +383,11 @@ test('Fokus: die naechste offene Zeile in Lesereihenfolge, ueber die Kategoriegr
   await setup([item(1, 'Apfel', 'Obst'), item(2, 'Birne', 'Obst'), item(4, 'Butter', 'Milch')], { reducedMotion: true });
   await page.focus(check(1));
   await page.keyboard.press('Space');
-  await wait(PAUSE + 150);
-  assert.equal((await snap()).focus, 'haken:2', 'mittendrin: die naechste Zeile');
+  assert.equal((await until((st) => rows(st, 'ABGEHAKT').join() === '1')).focus, 'haken:2', 'mittendrin: die naechste Zeile');
 
   // Die Birne ist jetzt die letzte offene Zeile von Obst.
   await page.keyboard.press('Space');
-  await wait(PAUSE + 150);
-  const end = await snap();
+  const end = await until((st) => rows(st, 'ABGEHAKT').join() === '1,2');
   assert.equal(group(end, 'Obst').shown, false);
   assert.equal(end.focus, 'haken:4', 'weiter bei Milch - nicht am Kopf von "Abgehakt" am Listenende');
 });
@@ -379,8 +400,7 @@ test('Fokus: mehrere Zeilen ziehen zusammen um - er geht auf die naechste, die B
   await page.keyboard.press('Space');
   await page.focus(check(1));
   await page.keyboard.press('Space');
-  await wait(PAUSE + 150);
-  const end = await snap();
+  const end = await until((st) => rows(st, 'ABGEHAKT').join() === '1,2');
   assert.deepEqual(rows(end, 'ABGEHAKT'), [1, 2]);
   assert.equal(end.focus, 'haken:3');
 });
@@ -389,16 +409,14 @@ test('Fokus: die letzte offene Zeile ueberhaupt - der Kopf des zugeklappten Absc
   await setup([item(1, 'Apfel', 'Obst')], { reducedMotion: true });
   await page.focus(check(1));
   await page.keyboard.press('Space');
-  await wait(PAUSE + 150);
-  assert.equal((await snap()).focus, 'kopf:ABGEHAKT');
+  assert.equal((await until((st) => rows(st, 'ABGEHAKT').join() === '1')).focus, 'kopf:ABGEHAKT');
 });
 
 test('Fokus: die EINZIGE Zeile des offenen Abschnitts zurueckgeholt - er bleibt an ihrem Haken, nicht auf body', async () => {
   await setup([item(1, 'Apfel', 'Obst'), item(5, 'Quark', 'Milch', { is_checked: 1 })], { tickedOpen: true, reducedMotion: true });
   await page.focus(check(5));
   await page.keyboard.press('Space');
-  await wait(PAUSE + 150);
-  const end = await snap();
+  const end = await until((st) => rows(st, 'Milch').join() === '5');
   assert.equal(group(end, 'ABGEHAKT').shown, false, 'der Abschnitt ist mit seiner letzten Zeile verschwunden');
   assert.deepEqual(rows(end, 'Milch'), [5]);
   assert.equal(end.focus, 'haken:5');
@@ -408,8 +426,7 @@ test('Fokus: eine von zwei Zeilen des Abschnitts zurueckgeholt - er geht auf die
   await setup([item(5, 'Quark', 'Milch', { is_checked: 1 }), item(6, 'Kaese', 'Milch', { is_checked: 1 })], { tickedOpen: true, reducedMotion: true });
   await page.focus(check(5));
   await page.keyboard.press('Space');
-  await wait(PAUSE + 150);
-  assert.equal((await snap()).focus, 'haken:6');
+  assert.equal((await until((st) => rows(st, 'Milch').join() === '5')).focus, 'haken:6');
 });
 
 // --------------------------------------------------------------------------
