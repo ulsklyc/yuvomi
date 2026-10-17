@@ -112,8 +112,9 @@ test('Desktop -> Telefon: die Woche wird zum 3-Tage-Fenster, das Label nennt die
     const page = mountPage();
     phone = true;
     await calendar.onPhoneQueryChange();
-    assert.deepEqual(page.columns(), ['2026-06-16', '2026-06-17', '2026-06-18'], 'drei Spalten um den Cursor');
-    assert.match(page.label(), /^calendar\.dayRangeLabel\b.*2026-06-16.*2026-06-18/, 'das Label nennt die sichtbaren Tage, nicht die KW');
+    // R20: das Fenster beginnt am Cursor (vorher gestern, heute, morgen).
+    assert.deepEqual(page.columns(), ['2026-06-17', '2026-06-18', '2026-06-19'], 'drei Spalten ab dem Cursor');
+    assert.match(page.label(), /^calendar\.dayRangeLabel\b.*2026-06-17.*2026-06-19/, 'das Label nennt die sichtbaren Tage, nicht die KW');
     assert.equal(page.nextLabel(), calendar.periodArrowLabels(calendar.periodStepOf('week', { mobile: true })).next,
       'der Pfeil nennt den Schritt des 3-Tage-Fensters');
   });
@@ -132,16 +133,16 @@ test('Telefon -> Desktop: die Woche zeigt wieder sieben Tage unter der KW', asyn
 });
 
 test('Cursor am Wochenrand: das Telefonfenster reicht in die Nachbarwoche und wird nachgeladen', async () => {
-  // Montag: am Telefon steht der Sonntag davor in der ersten Spalte - der
-  // liegt ausserhalb der geladenen Desktop-Woche.
+  // Samstag: am Telefon stehen seit R20 Samstag, Sonntag und der Montag
+  // danach - der liegt ausserhalb der geladenen Desktop-Woche.
   phone = false;
-  await withWeek({ cursor: '2026-06-15' }, async (requests) => {
-    assert.equal(calendar.state.rangeFrom, '2026-06-15', 'geladen ist die Desktop-Woche ab Montag');
+  await withWeek({ cursor: '2026-06-20' }, async (requests) => {
+    assert.equal(calendar.state.rangeTo, '2026-06-21', 'geladen ist die Desktop-Woche bis Sonntag');
     const page = mountPage();
     phone = true;
     await calendar.onPhoneQueryChange();
-    assert.deepEqual(page.columns(), ['2026-06-14', '2026-06-15', '2026-06-16']);
-    assert.equal(calendar.state.rangeFrom, '2026-06-14', 'das geladene Fenster beginnt am ersten sichtbaren Tag');
+    assert.deepEqual(page.columns(), ['2026-06-20', '2026-06-21', '2026-06-22']);
+    assert.equal(calendar.state.rangeTo, '2026-06-22', 'das geladene Fenster endet am letzten sichtbaren Tag');
     assert.ok(requests.some((p) => p.startsWith('/calendar?from=')), 'die Termine des neuen Fensters wurden geholt');
   });
 });

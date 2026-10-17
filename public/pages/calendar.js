@@ -965,8 +965,20 @@ function monthDayTapAction(date, cursor, { split = false } = {}) {
 }
 
 /**
+ * DIE MOBILE WOCHE BEGINNT AM CURSOR (R20, Re-Critique 2026-10-17 a3 P3).
+ * Das 3-Tage-Fenster stand um den Cursor (gestern, heute, morgen): wer den
+ * Kalender am Telefon oeffnete, sah als erste Spalte einen Tag, der vorbei
+ * ist. Apple Kalender und Fantastical beginnen ihre Mehrtagesansicht mit dem
+ * gewaehlten Tag - "Heute" steht damit links, und die Pfeile gehen in
+ * 3-Tage-Schritten weiter. EINE Stelle fuer Raster, Label und Ladefenster.
+ */
+function mobileWeekDays(cursor) {
+  return [cursor, addDays(cursor, 1), addDays(cursor, 2)];
+}
+
+/**
  * Ladefenster der Wochenansicht: das haushaltsweite 7-Tage-Raster, auf Mobile
- * erweitert um das 3-Tage-Fenster (cursor -1..+1), das renderWeekView() dort
+ * erweitert um das 3-Tage-Fenster (mobileWeekDays), das renderWeekView() dort
  * tatsächlich zeichnet. Ohne diese Erweiterung klammerte buildDayIndex() auf
  * das reine 7-Tage-Raster, und ein Cursor am Wochenrand liess auf Mobile den
  * hereinragenden Nachbartag ohne seine Termine stehen (#1006) - obwohl
@@ -980,8 +992,9 @@ function getWeekRange(dateStr, { weekStart = state.weekStart, mobile = false } =
   const desktopFrom = start;
   const desktopTo   = addDays(start, 6);
   if (!mobile) return { from: desktopFrom, to: desktopTo };
-  const mobileFrom = addDays(dateStr, -1);
-  const mobileTo   = addDays(dateStr, 1);
+  const window3 = mobileWeekDays(dateStr);
+  const mobileFrom = window3[0];
+  const mobileTo   = window3[window3.length - 1];
   return {
     from: mobileFrom < desktopFrom ? mobileFrom : desktopFrom,
     to:   mobileTo   > desktopTo   ? mobileTo   : desktopTo,
@@ -2451,11 +2464,11 @@ function updateLabel() {
   // "${mon} ${year}" ergab im Koreanischen "10월 2026" statt "2026년 10월".
   if (state.view === 'month')  lbl.textContent = formatMonthYear(year, d.getMonth() + 1);
   if (state.view === 'week') {
-    // Mobil zeigt die "Woche" ein 3-Tage-Fenster um den Cursor (renderWeekView);
+    // Mobil zeigt die "Woche" ein 3-Tage-Fenster ab dem Cursor (mobileWeekDays);
     // ein "KW 30"-Label würde dann einen Bereich behaupten, der nicht zu sehen
     // ist (Audit A1-19). Das Label nennt stattdessen den sichtbaren Bereich.
     lbl.textContent = window.matchMedia(MOBILE_MEDIA_QUERY).matches
-      ? t('calendar.dayRangeLabel', { from: formatDayMonth(addDays(state.cursor, -1)), to: formatPreferredDate(addDays(state.cursor, 1)) })
+      ? t('calendar.dayRangeLabel', { from: formatDayMonth(mobileWeekDays(state.cursor)[0]), to: formatPreferredDate(mobileWeekDays(state.cursor)[2]) })
       : t('calendar.weekNumberLabel', { week: getWeekNumber(state.cursor), month: mon, year });
   }
   // Mobil der kurze Wochentag: „Donnerstag, 24.09.2026" brauchte 186px und
@@ -4115,9 +4128,9 @@ function monthDayAriaLabel(date, total, events = [], { tasks = [], others = [], 
 
 function renderWeekView(container) {
   const isMobile = window.matchMedia(MOBILE_MEDIA_QUERY).matches;
-  // Auf Mobile: 3-Tage-Fenster zentriert um state.cursor statt vollem Mo-So
+  // Auf Mobile: 3-Tage-Fenster ab state.cursor statt vollem Mo-So
   const days = isMobile
-    ? Array.from({ length: 3 }, (_, i) => addDays(state.cursor, i - 1))
+    ? mobileWeekDays(state.cursor)
     : (() => {
         const weekStart = startOfWeekOf(state.cursor);
         return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));

@@ -1817,7 +1817,7 @@ test('getWeekRange: Desktop bleibt beim reinen 7-Tage-Raster (#1006)', () => {
 });
 
 test('getWeekRange: Mobile mitten in der Woche erweitert das Ladefenster nicht unnötig (#1006)', () => {
-  // Mittwoch: das 3-Tage-Fenster (Di-Do) liegt vollständig innerhalb der
+  // Mittwoch: das 3-Tage-Fenster (Mi-Fr, seit R20 ab dem Cursor) liegt vollständig innerhalb der
   // Montag-Woche - die Vereinigung darf hier gleich dem Desktop-Raster bleiben.
   const { from, to } = calendarHelpers.getWeekRange('2026-03-11', { weekStart: 1, mobile: true });
   assert(from === '2026-03-09' && to === '2026-03-15',
@@ -1825,28 +1825,30 @@ test('getWeekRange: Mobile mitten in der Woche erweitert das Ladefenster nicht u
 });
 
 test('getWeekRange: Montag-Woche + Sonntags-Cursor schliesst den folgenden Montag ein (#1006)', () => {
-  // Sonntag ist der letzte Tag der Montag-Woche; das Mobile-Fenster (Sa-Mo)
-  // ragt einen Tag darüber hinaus - genau der Tag, den buildDayIndex() vorher
-  // stillschweigend wegklammerte.
+  // Sonntag ist der letzte Tag der Montag-Woche; das Mobile-Fenster (So-Di,
+  // seit R20 ab dem Cursor) ragt zwei Tage darüber hinaus - genau die Tage,
+  // die buildDayIndex() vorher stillschweigend wegklammerte.
   const { from, to } = calendarHelpers.getWeekRange('2026-03-15', { weekStart: 1, mobile: true });
-  assert(from === '2026-03-09' && to === '2026-03-16',
-    `Der folgende Montag muss mitgeladen werden: ${from}..${to}`);
+  assert(from === '2026-03-09' && to === '2026-03-17',
+    `Montag und Dienstag danach muessen mitgeladen werden: ${from}..${to}`);
 });
 
 test('getWeekRange: Sonntag-Woche + Samstags-Cursor schliesst den folgenden Sonntag ein (#1006)', () => {
   // Dieselbe Randsituation am anderen Wochenstart: Samstag ist hier der
   // letzte Tag, das Mobile-Fenster ragt in den folgenden Sonntag hinein.
   const { from, to } = calendarHelpers.getWeekRange('2026-03-14', { weekStart: 0, mobile: true });
-  assert(from === '2026-03-08' && to === '2026-03-15',
-    `Der folgende Sonntag muss mitgeladen werden: ${from}..${to}`);
+  assert(from === '2026-03-08' && to === '2026-03-16',
+    `Sonntag und Montag danach muessen mitgeladen werden: ${from}..${to}`);
 });
 
-test('getWeekRange: Montag-Woche + Montags-Cursor schliesst den vorherigen Sonntag ein (#1006)', () => {
-  // Symmetrischer Fall am linken Rand: Montag ist der erste Tag der Woche,
-  // das Mobile-Fenster ragt einen Tag in die vorherige Woche hinein.
+test('getWeekRange: das Mobile-Fenster beginnt am Cursor, nie am Vortag (R20)', () => {
+  // Bis R20 stand das Fenster um den Cursor (gestern, heute, morgen), und
+  // ein Montags-Cursor zog den Sonntag davor mit. Seit R20 beginnt es AM
+  // Cursor - "Heute" steht links wie in Apple Kalender, links vom Wochenstart
+  // gibt es nichts mehr zu laden.
   const { from, to } = calendarHelpers.getWeekRange('2026-03-09', { weekStart: 1, mobile: true });
-  assert(from === '2026-03-08' && to === '2026-03-15',
-    `Der vorherige Sonntag muss mitgeladen werden: ${from}..${to}`);
+  assert(from === '2026-03-09' && to === '2026-03-15',
+    `Ein Montags-Cursor laedt keinen Sonntag davor: ${from}..${to}`);
 });
 
 test('getRangeForView: Der echte Week-Aufrufer liest matchMedia und reicht mobile weiter (#1030)', () => {
@@ -1859,7 +1861,7 @@ test('getRangeForView: Der echte Week-Aufrufer liest matchMedia und reicht mobil
   try {
     globalThis.window = { matchMedia: () => ({ matches: true }) };
     const mobile = calendarHelpers.getRangeForView('week', '2026-03-15');
-    assert(mobile.from === '2026-03-09' && mobile.to === '2026-03-16',
+    assert(mobile.from === '2026-03-09' && mobile.to === '2026-03-17',
       `Mobile-Aufrufer muss das erweiterte Fenster laden: ${mobile.from}..${mobile.to}`);
 
     globalThis.window = { matchMedia: () => ({ matches: false }) };
