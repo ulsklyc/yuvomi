@@ -1285,3 +1285,19 @@ test('R19: Bearbeiten ist ueberall der eine Primaerknopf am Ende des Fusses', as
   const recipePane = recipes.slice(recipes.indexOf('function renderRecipePane('), recipes.indexOf('function openRecipeNarrow('));
   assert.match(recipePane, /withPrimaryEdit\(/, 'die Rezeptspalte folgt derselben Regel');
 });
+
+// Re-Critique 2026-10-17 (A4 P3): im Inventar stand der 2px-Streifen im
+// Modulton 16px unter der Haarlinie der Kopfzeile - eine Doppellinie, die
+// nichts sagte (das Modul nennt der Kopf der Seite). Ein Streifen traegt eine
+// Aussage (Marken-, Kalenderfarbe), nie nur den Modulton - wie seit R18 bei
+// Geburtstagen und Terminen.
+test('R20: keine Leseansicht zieht einen Farbstreifen im blossen Modulton', async () => {
+  const { readdirSync } = await import('node:fs');
+  const dir = new URL('../public/pages/', import.meta.url);
+  const hits = [];
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.js'))) {
+    const src = readFileSync(new URL(file, dir), 'utf8');
+    for (const m of src.matchAll(/accentColor:\s*'var\(--module-[a-z-]+\)'/g)) hits.push(`${file}: ${m[0]}`);
+  }
+  assert.deepEqual(hits, []);
+});

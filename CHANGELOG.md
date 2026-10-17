@@ -343,6 +343,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **No double line under the title of a detail.** The thin strip in the module colour under the
+  header of an inventory item, a budget entry and a shared expense is gone; it only repeated the
+  module and stood a few pixels under the header line. Subscriptions keep the strip in their brand
+  colour.
 - **Shared expenses speak to you.** A balance you are part of reads "You owe Alex Johnson" or
   "Alex Johnson owes you" instead of naming yourself, and the summary cards put the group first
   ("Household: You owe") instead of "You owe in Household". Every language now has its own word

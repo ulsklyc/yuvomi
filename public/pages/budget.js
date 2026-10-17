@@ -4037,7 +4037,6 @@ function entryReadSections(entry) {
 function openEntryReadView(entry) {
   return openDetailView({
     title: entry.title,
-    accentColor: 'var(--module-budget)',
     size: 'sm',
     sections: entryReadSections(entry),
   });

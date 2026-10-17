@@ -1928,7 +1928,6 @@ function expenseReadSections(expense) {
 function openExpenseReadView(expense) {
   return openDetailView({
     title: expense.title,
-    accentColor: 'var(--module-budget)',
     size: 'sm',
     sections: expenseReadSections(expense),
   });
@@ -2176,7 +2175,6 @@ function recurringReadSections(recurring) {
 function openRecurringReadView(recurring) {
   return openDetailView({
     title: recurring.title,
-    accentColor: 'var(--module-budget)',
     size: 'sm',
     sections: recurringReadSections(recurring),
   });
