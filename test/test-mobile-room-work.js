@@ -304,16 +304,16 @@ test('M13: mobil ist die Karte kompakt - drei Zeilen Vorschau, Fusszeile ohne Kr
 // Archivieren - gemessen 133px, "Aufgabe archivieren" allein 188px breit).
 // Starten und Archivieren gehen mobil in EIN Mehr-Menue; ihre Knoepfe bleiben
 // im DOM (Sperrlogik der Statusknoepfe, Handler), das Menue loest sie aus.
-test('P8: mobil ist der Detail-Fuss einer Aufgabe eine Reihe - Starten und Archivieren im Mehr-Menue', () => {
+test('P8: der Detail-Fuss einer Aufgabe ist eine Reihe - Starten und Archivieren im Mehr-Menue', () => {
   const dv = css('detail-view.css');
-  const hidden = [...eachRule(dv)].filter((r) => /display:\s*none/.test(r.body));
-  const base = hidden.find((r) => !r.at.length && r.selector.trim() === '.detail-view__footer > .task-detail__more');
-  assert.ok(base, 'am Desktop gibt es den Mehr-Knopf nicht - dort passen alle Aktionen');
-  const mobil = hidden.find((r) => r.at.some((a) => a.includes(MOBILE))
-    && r.selector.includes('.detail-view__footer:has(> .task-detail__more) > .task-detail__overflow'));
-  assert.ok(mobil, 'mobil treten Starten und Archivieren in das Menue');
-  const show = [...eachRule(dv)].find((r) => r.at.some((a) => a.includes(MOBILE))
-    && r.selector.trim() === '.detail-view__footer > .task-detail__more');
+  const all = [...eachRule(dv)];
+  // Re-Kritik 2026-10-17: bis dahin galt das Menue nur mobil ("am Desktop
+  // passen alle Aktionen"). Mit Erledigen als Primaerknopf passten sie dort
+  // nicht mehr (Spalte 756 > 670px bei 1440, Blatt bei 834px zwei Reihen) -
+  // das Menue gilt jetzt in jeder Breite (test:master-detail).
+  const hide = all.find((r) => r.selector.includes('.detail-view__footer:has(> .task-detail__more) > .task-detail__overflow'));
+  assert.ok(hide && /display:\s*none/.test(hide.body), 'Starten und Archivieren treten in das Menue');
+  const show = all.find((r) => r.selector.trim() === '.detail-view__footer > .task-detail__more');
   assert.match(show?.body ?? '', /display:\s*inline-flex/);
   const src = readFileSync(new URL('../public/components/task-detail.js', import.meta.url), 'utf8');
   assert.match(src, /id: MORE_BUTTON_ID/, 'der Mehr-Knopf ist eine Aktion des Fusses');

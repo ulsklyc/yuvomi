@@ -665,30 +665,33 @@
   padding: var(--space-4) var(--space-5) 0;
 }
 
-/* MOBIL EINE REIHE IM AUFGABEN-FUSS (Re-Critique 2026-09-28, P8 / A3 P3-2).
+/* EINE REIHE IM AUFGABEN-FUSS, IN JEDER BREITE (Re-Critique 2026-09-28, P8 /
+ * A3 P3-2; Re-Kritik 2026-10-17, P1).
+ *
  * Der Fuss einer offenen Aufgabe brach auf dem Telefon auf zwei Reihen
- * (gemessen 133px; "Aufgabe archivieren" allein 188px). Starten und
- * Archivieren treten dort in EIN Mehr-Menue (task-detail.js,
- * wireDetailDoerMenu-Muster); ihre Knoepfe bleiben verborgen im Fuss, weil
- * das Menue sie ausloest. Am Desktop passen alle Aktionen - dort gibt es den
- * Mehr-Knopf nicht. */
-.detail-view__footer > .task-detail__more {
+ * (gemessen 133px; "Aufgabe archivieren" allein 188px). Starten, Archivieren
+ * und Loeschen traten dort in EIN Mehr-Menue (task-detail.js,
+ * wireDetailMoreMenu); ihre Knoepfe bleiben verborgen im Fuss, weil das Menue
+ * sie ausloest. Am Desktop sollten "alle Aktionen passen" - seit Erledigen der
+ * volle Primaerknopf ist, stimmte das nicht mehr: in der Detailspalte brauchte
+ * der Fuss 756px (Spalte 670px bei 1440, hoechstens 744px), "Erledigen" war
+ * abgeschnitten, "Wer hat erledigt?" lag ausserhalb; im Blatt bei 834px brach
+ * er wieder auf zwei Reihen (133px). Eine Breitenschwelle haelt das nur fuer
+ * Deutsch, deshalb gilt das Mehr-Menue jetzt in JEDER Breite: Mehr,
+ * Bearbeiten, Erledigen und Wer, rund 360px. */
+.detail-view__footer:has(> .task-detail__more) > .task-detail__overflow {
   display: none;
 }
 
+.detail-view__footer > .task-detail__more {
+  display: inline-flex;
+  /* Das Mehr-Menue nimmt den Platz von Loeschen am Anfang ein; Bearbeiten,
+   * Erledigen und Wer bilden die Gruppe am Ende, in der Daumenzone. */
+  order: -1;
+  margin-inline-end: auto;
+}
+
 @media (max-width: 639px) {
-  .detail-view__footer:has(> .task-detail__more) > .task-detail__overflow {
-    display: none;
-  }
-
-  .detail-view__footer > .task-detail__more {
-    display: inline-flex;
-    /* Das Mehr-Menue nimmt den Platz von Loeschen am Anfang ein; Bearbeiten,
-     * Erledigen und Wer bilden die Gruppe am Ende, in der Daumenzone. */
-    order: -1;
-    margin-inline-end: auto;
-  }
-
   /* Erledigen ist in der Aufgabe der volle Primaerknopf (Ulas 2026-10-16,
    * withPrimaryEdit `keepPrimary`); Bearbeiten steht davor als Stift ohne
    * Wort: der Name bleibt fuer Screenreader und als Tooltip, der Fuss bleibt
@@ -707,24 +710,6 @@
     min-width: var(--target-base);
     padding-inline: var(--space-2);
   }
-}
-
-/* IN DER DETAILSPALTE GILT DASSELBE MEHR-MENUE (Re-Kritik 2026-10-17, P1).
- * Seit Erledigen der volle Primaerknopf ist, brauchte der Fuss einer offenen
- * Aufgabe 756px; die Spalte hat bei 1440 670px, bei 1920 744px. "Erledigen"
- * war abgeschnitten, "Wer hat erledigt?" lag ausserhalb. Eine Breitenschwelle
- * haelt das nur fuer Deutsch ("Aufgabe archivieren" allein 188px, andere
- * Sprachen laenger) - deshalb gehen Starten, Archivieren und Loeschen in der
- * Spalte IMMER ins Mehr-Menue, wie auf dem Telefon. Es bleiben Mehr, Bearbeiten,
- * Erledigen und Wer: rund 360px in jeder Spaltenbreite ab 552px. */
-.split-view__detail-footer:has(> .task-detail__more) > .task-detail__overflow {
-  display: none;
-}
-
-.split-view__detail-footer > .task-detail__more {
-  display: inline-flex;
-  order: -1;
-  margin-inline-end: auto;
 }
 
 /* DER FUSS DES LESEBLATTS AUF DEM TELEFON (R17, E7). Mit Bearbeiten als

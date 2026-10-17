@@ -955,17 +955,20 @@ test('Detailfuss: klebt unten in der Spalte, einreihig, und steht bei kurzem Inh
 // Primaerknopf brauchte der Fuss einer offenen Aufgabe 756px, die Spalte hat
 // bei 1440 670px und hoechstens 744px - "Erledigen" abgeschnitten, "Wer hat
 // erledigt?" ausserhalb. Eine Breitenschwelle haelt nur fuer eine Sprache;
-// deshalb nimmt die Spalte das Mehr-Menue des Telefons, ohne Medien- oder
-// Container-Bedingung.
-test('Re-Kritik P1: in der Detailspalte stehen Starten, Archivieren und Loeschen einer Aufgabe immer im Mehr-Menue', () => {
+// deshalb gilt das Mehr-Menue des Telefons in jeder Breite, auch in der
+// Spalte - ohne Medien- oder Container-Bedingung.
+test('Re-Kritik P1: Starten, Archivieren und Loeschen einer Aufgabe stehen in jeder Breite im Mehr-Menue - auch in der Spalte', () => {
   const dv = readFileSync(new URL('../public/styles/detail-view.css', import.meta.url), 'utf8');
-  const top = [...eachRule(dv)].filter((r) => !r.at.length);
-  const hide = top.find((r) => r.selector.trim() === '.split-view__detail-footer:has(> .task-detail__more) > .task-detail__overflow');
-  assert.match(hide?.body ?? '', /display:\s*none/, 'die Ueberlauf-Knoepfe treten in der Spalte zurueck');
-  const showAt = top.findIndex((r) => r.selector.trim() === '.split-view__detail-footer > .task-detail__more');
-  assert.ok(showAt >= 0 && /display:\s*inline-flex/.test(top[showAt].body), 'der Mehr-Knopf steht in der Spalte');
-  const baseAt = top.findIndex((r) => r.selector.trim() === '.detail-view__footer > .task-detail__more');
-  assert.ok(showAt > baseAt, 'gleiche Spezifitaet: die Spaltenregel steht nach der Desktop-Ausblendung');
+  const all = [...eachRule(dv)];
+  const hide = all.find((r) => r.selector.trim() === '.detail-view__footer:has(> .task-detail__more) > .task-detail__overflow');
+  assert.ok(hide && !hide.at.length, 'die Ueberlauf-Knoepfe treten ohne Bedingung zurueck');
+  assert.match(hide.body, /display:\s*none/);
+  const show = all.filter((r) => r.selector.trim() === '.detail-view__footer > .task-detail__more');
+  assert.equal(show.length, 1, 'eine Regel fuer den Mehr-Knopf, keine Ausblendung am Desktop daneben');
+  assert.ok(!show[0].at.length && /display:\s*inline-flex/.test(show[0].body), 'der Mehr-Knopf steht in jeder Breite');
+  // Die Spalte traegt `detail-view__footer` (detail-view.js) - die Regel trifft sie.
+  const js = readFileSync(new URL('../public/components/detail-view.js', import.meta.url), 'utf8');
+  assert.match(js, /footer\.className = 'detail-view__footer split-view__detail-footer'/);
   const src = readFileSync(new URL('../public/components/task-detail.js', import.meta.url), 'utf8');
   assert.match(src, /wireDetailMoreMenu\(task, overflowIds, pane\)/, 'das Menue wird auch in der Spalte verdrahtet');
 });

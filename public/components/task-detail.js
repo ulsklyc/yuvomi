@@ -1209,7 +1209,7 @@ export function openTaskDetail({
 const MORE_BUTTON_ID = 'task-detail-more';
 
 /**
- * Das Mehr-Menue des Detail-Fusses (mobil). Seine Eintraege LOESEN DIE ECHTEN
+ * Das Mehr-Menue des Detail-Fusses (jede Breite). Seine Eintraege LOESEN DIE ECHTEN
  * KNOEPFE AUS, statt eigene Handler zu tragen: Starten und Archivieren bleiben
  * (verborgen) im Fuss, damit statusActionButtons() sie weiter mitsperrt und
  * btnLoading() seinen Knopf findet - ein Handler, eine Sperrlogik.
