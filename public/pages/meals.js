@@ -1373,7 +1373,7 @@ function wireGrid(grid) {
 }
 
 async function onGridClick(e) {
-  const btn = e.target.closest('[data-action]');
+  const btn = e.target.closest('[data-action]') ?? e.target.querySelector(':scope > [data-action]');
   if (!btn) return;
 
   const action = btn.dataset.action;

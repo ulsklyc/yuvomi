@@ -418,6 +418,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are unpacked is now checked against the modules folder itself as well, not only through the
   rule for module ids.
 
+- **Opening a meal from the weekly plan works again.** Clicking a meal card with the
+  mouse did nothing, so its details (or the edit dialog, if you can edit meals) could not
+  be opened. Dragging a meal captures the pointer on the card, which sent the click to the
+  card itself instead of the button inside it. The click now opens the meal as intended.
+
 ## [2.77.2] - 2026-10-15
 
 ### Added
