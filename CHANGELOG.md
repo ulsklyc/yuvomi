@@ -256,7 +256,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Selecting several tasks or contacts on a desktop shows the selection in the detail column.**
   It reads "2 selected" with the actions for the selection, like Mail; the floating bar no longer
   covers the details of another task, and only one Delete is on screen. Screen readers hear the
-  new count after a short pause instead of every step. On phones the bar stays.
+  new count after a short pause instead of every step. While you select, the row that was open is
+  no longer highlighted, so "0 selected" does not look like one; it is highlighted again when the
+  details return. On phones the bar stays.
 - **On a desktop you edit where you read.** "Edit" in the detail column of tasks, recipes, contacts,
   inventory and birthdays opens the form in that column instead of a window over list and detail.
   Cancel, Esc, the back gesture and the question about unsaved changes work as before, and the list

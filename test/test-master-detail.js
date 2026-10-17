@@ -1024,6 +1024,34 @@ class El extends Node {
   get textContent() { return this._text + this.children.map((c) => c.textContent ?? '').join(''); }
 }
 
+// Re-Kritik 2026-10-17: die automatisch geoeffnete erste Zeile blieb im
+// Auswahlmodus violett markiert - bei "0 ausgewaehlt" sah sie ausgewaehlt aus.
+test('Auswahlmodus in der Spalte: keine Zeile ist "aktuell", nach der Auswahl kehrt die Markierung zurueck', () => {
+  const layer = new El('div');
+  const vorher = { createElement: document.createElement, getElementById: document.getElementById };
+  document.createElement = (tag) => new El(tag);
+  document.getElementById = (id) => (id === 'bulk-pill-layer' ? layer : null);
+  try {
+    const p = makePage();
+    const handle = p.mount();
+    handle.open('2');
+    assert.equal(p.rows[1].classList.contains('is-selected'), true, 'Vorbedingung: die offene Zeile ist markiert');
+    md.setSelectionBulk(handle, { label: '0 ausgewaehlt', actions: [] });
+    assert.equal(p.rows[1].classList.contains('is-selected'), false, 'im Auswahlmodus nicht mehr markiert');
+    assert.equal(p.focusOf(1).getAttribute('aria-current'), null, 'und nicht mehr "aktuell" angesagt');
+    handle.refresh();
+    assert.equal(p.rows[1].classList.contains('is-selected'), false, 'ein Neuaufbau der Liste setzt sie nicht zurueck');
+    md.setSelectionBulk(handle, { label: '1 ausgewaehlt', actions: [] });
+    assert.equal(p.rows[1].classList.contains('is-selected'), false);
+    md.setSelectionBulk(handle, null);
+    assert.equal(p.rows[1].classList.contains('is-selected'), true, 'das Detail steht wieder da - die Zeile auch markiert');
+    assert.equal(p.focusOf(1).getAttribute('aria-current'), 'true');
+    handle.destroy();
+  } finally {
+    Object.assign(document, vorher);
+  }
+});
+
 test('setSelectionBulk: in der Spalte zeigt das Detail die Auswahl, die Pille bleibt leer - darunter umgekehrt', () => {
   const layer = new El('div');
   const vorher = { createElement: document.createElement, getElementById: document.getElementById };

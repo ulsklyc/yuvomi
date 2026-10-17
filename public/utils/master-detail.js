@@ -334,6 +334,12 @@ export function mountMasterDetail({
       focusTarget(host)?.removeAttribute('aria-current');
     }
     if (selected == null) return;
+    // IM AUSWAHLMODUS IST KEINE ZEILE "AKTUELL" (Re-Kritik 2026-10-17): die
+    // Spalte zeigt "N ausgewaehlt" statt des Details, die zuvor geoeffnete
+    // Zeile blieb aber violett markiert - bei "0 ausgewaehlt" sah sie aus wie
+    // ausgewaehlt. Die Markierung kehrt zurueck, wenn das Detail zurueckkehrt
+    // (applyBulk ruft markSelection in beide Richtungen).
+    if (detailEl.classList.contains('is-selecting')) return;
     const row = rowFor(selected);
     if (!row) return;
     shownSelection = selected;
@@ -638,7 +644,9 @@ export function mountMasterDetail({
     const split = isSplit();
     if (!bulkSpec || !split) {
       if (bulkLive) announceBulk('');
+      const wasSelecting = detailEl.classList.contains('is-selecting');
       detailEl.classList.remove('is-selecting');
+      if (wasSelecting) markSelection();
       if (bulkHost) bulkHost.hidden = true;
       bulkHost?.replaceChildren();
       if (bulkSpec) setBulkPill(bulkSpec);
@@ -651,7 +659,9 @@ export function mountMasterDetail({
       detailEl.append(bulkHost);
     }
     bulkHost.hidden = false;
+    const entering = !detailEl.classList.contains('is-selecting');
     detailEl.classList.add('is-selecting');
+    if (entering) markSelection();
     setBulkPane(bulkHost, bulkSpec);
     announceBulk(bulkSpec.label);
   }
