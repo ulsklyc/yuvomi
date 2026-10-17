@@ -3891,7 +3891,6 @@
         "taskAreaPlaceholder": "Példa: Fürdőszoba",
         "taskFrequency": "Gyakoriság (nap)",
         "taskCreatedToast": "Háztartási feladat létrehozva.",
-        "dashboard": "Áttekintés",
         "reports": "Jelentések",
         "visitsThisMonth": "Látogatások ebben a hónapban",
         "lastVisit": "Utolsó látogatás",
@@ -4023,7 +4022,9 @@
         "reportVisitsCount": "Látogatások",
         "amountsPermissionLabel": "Bérek és kifizetések megtekintése",
         "errorAmountsHidden": "Fizetést csak az jelölhet, aki láthatja a háztartási segítő összegeit.",
-        "notHereToday": "Ma még nincs itt"
+        "notHereToday": "Ma még nincs itt",
+        "tabVisits": "Látogatások",
+        "tabChores": "Házimunkák"
     },
     "userMultiSelect": {
         "moreUsers": "továbbiak",

@@ -3891,7 +3891,6 @@
         "taskAreaPlaceholder": "Eksempel: Bad",
         "taskFrequency": "Frekvens (dager)",
         "taskCreatedToast": "Husarbeid opprettet.",
-        "dashboard": "Oversikt",
         "reports": "Rapporter",
         "visitsThisMonth": "Besøk denne måneden",
         "lastVisit": "Siste besøk",
@@ -4023,7 +4022,9 @@
         "reportVisitsCount": "Besøk",
         "amountsPermissionLabel": "Se lønn og betalinger",
         "errorAmountsHidden": "Bare den som kan se beløpene for husholdningshjelpen, kan registrere en betaling.",
-        "notHereToday": "Ikke kommet ennå i dag"
+        "notHereToday": "Ikke kommet ennå i dag",
+        "tabVisits": "Besøk",
+        "tabChores": "Gjøremål"
     },
     "userMultiSelect": {
         "moreUsers": "mer",

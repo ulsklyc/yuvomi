@@ -3895,7 +3895,6 @@
         "taskAreaPlaceholder": "예: 욕실",
         "taskFrequency": "빈도 (일)",
         "taskCreatedToast": "가사 관리 작업이 생성되었습니다.",
-        "dashboard": "개요",
         "reports": "보고서",
         "visitsThisMonth": "이번 달 방문",
         "lastVisit": "마지막 방문",
@@ -4027,7 +4026,9 @@
         "reportVisitsCount": "방문",
         "amountsPermissionLabel": "급여와 지급 내역 보기",
         "errorAmountsHidden": "가사 도우미 금액을 볼 수 있는 사람만 지급을 표시할 수 있습니다.",
-        "notHereToday": "오늘은 아직 오지 않음"
+        "notHereToday": "오늘은 아직 오지 않음",
+        "tabVisits": "방문",
+        "tabChores": "집안일"
     },
     "splitExpenses": {
         "title": "공동 지출",

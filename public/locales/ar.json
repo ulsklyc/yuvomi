@@ -4234,7 +4234,6 @@
         "taskAreaPlaceholder": "مثال: الحمام",
         "taskFrequency": "التكرار (بالأيام)",
         "taskCreatedToast": "تم إنشاء مهمة التدبير المنزلي.",
-        "dashboard": "نظرة عامة",
         "reports": "التقارير",
         "visitsThisMonth": "زيارات هذا الشهر",
         "lastVisit": "آخر زيارة",
@@ -4366,7 +4365,9 @@
         "reportVisitsCount": "الزيارات",
         "amountsPermissionLabel": "عرض الأجور والمدفوعات",
         "errorAmountsHidden": "لا يمكن تسجيل الدفع إلا لمن يُسمح له برؤية مبالغ المساعدة المنزلية.",
-        "notHereToday": "لم تصل اليوم بعد"
+        "notHereToday": "لم تصل اليوم بعد",
+        "tabVisits": "الزيارات",
+        "tabChores": "الأعمال المنزلية"
     },
     "userMultiSelect": {
         "moreUsers": "آخرون",

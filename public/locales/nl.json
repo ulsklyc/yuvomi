@@ -3891,7 +3891,6 @@
         "taskAreaPlaceholder": "Voorbeeld: Badkamer",
         "taskFrequency": "Frequentie (dagen)",
         "taskCreatedToast": "Huishoudtaak aangemaakt.",
-        "dashboard": "Overzicht",
         "reports": "Rapporten",
         "visitsThisMonth": "Bezoeken deze maand",
         "lastVisit": "Laatste bezoek",
@@ -4023,7 +4022,9 @@
         "reportVisitsCount": "Bezoeken",
         "amountsPermissionLabel": "Lonen en betalingen zien",
         "errorAmountsHidden": "Alleen wie de bedragen van de huishoudhulp mag zien, kan een betaling markeren.",
-        "notHereToday": "Vandaag nog niet aanwezig"
+        "notHereToday": "Vandaag nog niet aanwezig",
+        "tabVisits": "Bezoeken",
+        "tabChores": "Klussen"
     },
     "userMultiSelect": {
         "moreUsers": "meer",

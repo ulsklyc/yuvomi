@@ -3891,7 +3891,6 @@
         "taskAreaPlaceholder": "Ejemplo: baño",
         "taskFrequency": "Frecuencia (días)",
         "taskCreatedToast": "Tarea de limpieza creada.",
-        "dashboard": "Resumen",
         "reports": "Informes",
         "visitsThisMonth": "Visitas del mes",
         "lastVisit": "Última visita",
@@ -4023,7 +4022,9 @@
         "reportVisitsCount": "Visitas",
         "amountsPermissionLabel": "Ver sueldos y pagos",
         "errorAmountsHidden": "Solo puede marcar un pago quien puede ver los importes de la ayuda doméstica.",
-        "notHereToday": "Hoy aún no ha llegado"
+        "notHereToday": "Hoy aún no ha llegado",
+        "tabVisits": "Visitas",
+        "tabChores": "Labores"
     },
     "userMultiSelect": {
         "moreUsers": "más",

@@ -226,7 +226,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Module headers on phones and tablets take less room.** Shift plan, Rewards and Household help
   show their tabs in the title row (one row instead of two, 65px on a phone); the first Rewards tab
   is now called "Points", so a phone no longer shows "Overview" twice and nothing saying where you
-  are. The budget header
+  are. Household help's first two tabs are now "Visits" and "Chores" instead of repeating the tab
+  bar's "Overview" and "Tasks". The budget header
   folds to one row while you scroll, with the tabs beside the month, and so does a Health area,
   with the area name between the back arrow and the person. When a header folds, the content
   below glides up instead of jumping, the same way in Calendar, Budget and Shopping. On a tablet the title, search

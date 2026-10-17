@@ -3891,7 +3891,6 @@
         "taskAreaPlaceholder": "Exemple : salle de bain",
         "taskFrequency": "Fréquence (jours)",
         "taskCreatedToast": "Tâche de ménage créée.",
-        "dashboard": "Aperçu",
         "reports": "Rapports",
         "visitsThisMonth": "Visites du mois",
         "lastVisit": "Dernière visite",
@@ -4023,7 +4022,9 @@
         "reportVisitsCount": "Visites",
         "amountsPermissionLabel": "Voir les salaires et paiements",
         "errorAmountsHidden": "Seule une personne autorisée à voir les montants de l’aide ménagère peut marquer un paiement.",
-        "notHereToday": "Pas encore là aujourd’hui"
+        "notHereToday": "Pas encore là aujourd’hui",
+        "tabVisits": "Visites",
+        "tabChores": "Travaux"
     },
     "userMultiSelect": {
         "moreUsers": "autres",

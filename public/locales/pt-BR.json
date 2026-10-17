@@ -3891,7 +3891,6 @@
         "taskAreaPlaceholder": "Ex: Banheiro",
         "taskFrequency": "Frequência (dias)",
         "taskCreatedToast": "Tarefa de faxina criada.",
-        "dashboard": "Visão geral",
         "reports": "Relatórios",
         "visitsThisMonth": "Visitas no mês",
         "lastVisit": "Última visita",
@@ -4023,7 +4022,9 @@
         "reportVisitsCount": "Visitas",
         "amountsPermissionLabel": "Ver salários e pagamentos",
         "errorAmountsHidden": "Só quem pode ver os valores da ajuda doméstica pode marcar um pagamento.",
-        "notHereToday": "Ainda não chegou hoje"
+        "notHereToday": "Ainda não chegou hoje",
+        "tabVisits": "Visitas",
+        "tabChores": "Afazeres"
     },
     "userMultiSelect": {
         "moreUsers": "mais",

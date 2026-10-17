@@ -3895,7 +3895,6 @@
         "taskAreaPlaceholder": "Halimbawa: Banyo",
         "taskFrequency": "Dalas (araw)",
         "taskCreatedToast": "Nagawa ang gawaing-bahay.",
-        "dashboard": "Pangkalahatang-tanaw",
         "reports": "Mga Ulat",
         "visitsThisMonth": "Mga pagbisita ngayong buwan",
         "lastVisit": "Huling pagbisita",
@@ -4027,7 +4026,9 @@
         "reportVisitsCount": "Mga pagbisita",
         "amountsPermissionLabel": "Makita ang sahod at mga bayad",
         "errorAmountsHidden": "Ang may pahintulot lang na makita ang halaga para sa kasambahay ang makakapagmarka ng bayad.",
-        "notHereToday": "Wala pa ngayong araw"
+        "notHereToday": "Wala pa ngayong araw",
+        "tabVisits": "Mga pagbisita",
+        "tabChores": "Gawaing-bahay"
     },
     "splitExpenses": {
         "title": "Mga hinating gastos",

@@ -3891,7 +3891,6 @@
         "taskAreaPlaceholder": "例如：浴室",
         "taskFrequency": "频率（天）",
         "taskCreatedToast": "家务任务已创建。",
-        "dashboard": "概览",
         "reports": "报告",
         "visitsThisMonth": "本月上门次数",
         "lastVisit": "上次上门",
@@ -4023,7 +4022,9 @@
         "reportVisitsCount": "上门次数",
         "amountsPermissionLabel": "查看工资和付款",
         "errorAmountsHidden": "只有可以查看家政金额的人才能标记付款。",
-        "notHereToday": "今天还没到"
+        "notHereToday": "今天还没到",
+        "tabVisits": "上门",
+        "tabChores": "家务"
     },
     "userMultiSelect": {
         "moreUsers": "更多",

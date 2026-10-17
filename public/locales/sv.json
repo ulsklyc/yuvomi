@@ -3891,7 +3891,6 @@
         "taskAreaPlaceholder": "Exempel: badrum",
         "taskFrequency": "Frekvens (dagar)",
         "taskCreatedToast": "Städuppgift skapad.",
-        "dashboard": "Översikt",
         "reports": "Rapporter",
         "visitsThisMonth": "Besök denna månad",
         "lastVisit": "Senaste besök",
@@ -4023,7 +4022,9 @@
         "reportVisitsCount": "Besök",
         "amountsPermissionLabel": "Se löner och betalningar",
         "errorAmountsHidden": "Bara den som får se beloppen för hushållshjälpen kan markera en betalning.",
-        "notHereToday": "Inte här än i dag"
+        "notHereToday": "Inte här än i dag",
+        "tabVisits": "Besök",
+        "tabChores": "Sysslor"
     },
     "userMultiSelect": {
         "moreUsers": "mer",

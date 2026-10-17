@@ -3527,7 +3527,6 @@
         "taskAreaPlaceholder": "Příklad: Koupelna",
         "taskFrequency": "Četnost (dny)",
         "taskCreatedToast": "Úkol domácí péče vytvořen.",
-        "dashboard": "Přehled",
         "reports": "Hlášení",
         "visitsThisMonth": "Návštěvy v měsíci",
         "lastVisit": "Poslední návštěva",
@@ -3659,7 +3658,9 @@
         "reportVisitsCount": "Návštěvy",
         "amountsPermissionLabel": "Zobrazit mzdy a platby",
         "errorAmountsHidden": "Platbu může označit jen ten, kdo smí vidět částky za pomoc v domácnosti.",
-        "notHereToday": "Dnes ještě nedorazila"
+        "notHereToday": "Dnes ještě nedorazila",
+        "tabVisits": "Návštěvy",
+        "tabChores": "Práce"
     },
     "splitExpenses": {
         "title": "Společné výdaje",

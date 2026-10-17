@@ -4123,7 +4123,6 @@
         "taskAreaPlaceholder": "Przykład: Łazienka",
         "taskFrequency": "Częstotliwość (dni)",
         "taskCreatedToast": "Zadanie sprzątania utworzone.",
-        "dashboard": "Przegląd",
         "reports": "Raporty",
         "visitsThisMonth": "Wizyty w miesiącu",
         "lastVisit": "Ostatnia wizyta",
@@ -4255,7 +4254,9 @@
         "reportVisitsCount": "Wizyty",
         "amountsPermissionLabel": "Widzieć wynagrodzenia i płatności",
         "errorAmountsHidden": "Płatność może oznaczyć tylko osoba, która widzi kwoty pomocy domowej.",
-        "notHereToday": "Dziś jeszcze jej nie ma"
+        "notHereToday": "Dziś jeszcze jej nie ma",
+        "tabVisits": "Wizyty",
+        "tabChores": "Prace domowe"
     },
     "splitExpenses": {
         "title": "Wspólne wydatki",

@@ -4119,7 +4119,6 @@
         "taskAreaPlaceholder": "Приклад: Ванна кімната",
         "taskFrequency": "Частота (дні)",
         "taskCreatedToast": "Створено завдання з прибирання.",
-        "dashboard": "Огляд",
         "reports": "Звіти",
         "visitsThisMonth": "Відвідування цього місяця",
         "lastVisit": "Останній візит",
@@ -4251,7 +4250,9 @@
         "reportVisitsCount": "Відвідування",
         "amountsPermissionLabel": "Бачити оплату та платежі",
         "errorAmountsHidden": "Позначити оплату може лише той, кому видно суми помічниці по дому.",
-        "notHereToday": "Сьогодні ще не прийшла"
+        "notHereToday": "Сьогодні ще не прийшла",
+        "tabVisits": "Відвідування",
+        "tabChores": "Хатні справи"
     },
     "userMultiSelect": {
         "moreUsers": "інші",

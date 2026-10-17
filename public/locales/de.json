@@ -3895,7 +3895,6 @@
         "taskAreaPlaceholder": "Beispiel: Bad",
         "taskFrequency": "Häufigkeit (Tage)",
         "taskCreatedToast": "Aufgabe für die Haushaltshilfe erstellt.",
-        "dashboard": "Übersicht",
         "reports": "Berichte",
         "visitsThisMonth": "Besuche im Monat",
         "lastVisit": "Letzter Besuch",
@@ -4027,7 +4026,9 @@
         "reportVisitsCount": "Besuche",
         "amountsPermissionLabel": "Löhne und Zahlungen sehen",
         "errorAmountsHidden": "Bezahlen kann nur, wer die Beträge der Haushaltshilfe sehen darf.",
-        "notHereToday": "Heute noch nicht da"
+        "notHereToday": "Heute noch nicht da",
+        "tabVisits": "Besuche",
+        "tabChores": "Arbeiten"
     },
     "splitExpenses": {
         "title": "Gemeinsame Ausgaben",

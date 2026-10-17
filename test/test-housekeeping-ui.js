@@ -791,7 +791,7 @@ test('Bearbeiten eines Besuchs zeichnet danach den Reiter neu, auf dem es lag', 
   }
 });
 
-test('Haushaltshilfe spricht EINEN Namen: Reiter "Uebersicht", Kennzahlen mit Zeitbezug, Geldschein statt Dollar', () => {
+test('Haushaltshilfe spricht EINEN Namen: Reiter "Besuche"/"Arbeiten", Kennzahlen mit Zeitbezug, Geldschein statt Dollar', () => {
   const HK_SRC = readFileSync(new URL('../public/pages/housekeeping.js', import.meta.url), 'utf8');
   assert.doesNotMatch(HK_SRC, /badge-dollar-sign/, 'Dollar-Icon bei Euro-Betraegen');
   assert.match(HK_SRC, /icon: 'banknote'/, 'Bezahlen traegt den Geldschein - seit D6 als Eintrag im Mehr-Knopf');
@@ -803,10 +803,18 @@ test('Haushaltshilfe spricht EINEN Namen: Reiter "Uebersicht", Kennzahlen mit Ze
     // ebenfalls "Uebersicht" und dieser Test hielt beide gleich. Unter 768px
     // sind die Reiter dort der Titel; zwei Mal "Uebersicht" (Reiter + Kapsel)
     // und nirgends "Belohnungen" - er heisst seither "Punkte"
-    // (test:rewards-ui). Hier bleibt "Uebersicht": die Reiterleiste nennt
-    // mit "Haushaltshilfen" das Modul selbst.
-    assert.ok(loc.housekeeping.dashboard, `${file}: der Reiter "Uebersicht" hat eine Uebersetzung`);
+    // (test:rewards-ui). Seit R20 (Re-Critique a3/a5) gilt dasselbe hier:
+    // "Uebersicht" und "Aufgaben" hiessen wie zwei Tabs der Kapsel darunter,
+    // die Reiter heissen nach ihrem Inhalt - Besuche, Arbeiten.
+    assert.ok(loc.housekeeping.tabVisits && loc.housekeeping.tabChores, `${file}: beide Reiter haben eine Uebersetzung`);
+    for (const key of ['tabVisits', 'tabChores']) {
+      for (const nav of ['dashboard', 'tasks', 'calendar']) {
+        assert.notEqual(loc.housekeeping[key], loc.nav?.[nav], `${file}: Reiter ${key} heisst nicht wie der Kapsel-Tab ${nav}`);
+      }
+    }
   }
+  assert.match(HK_SRC, /renderTabButton\('dashboard', t\('housekeeping\.tabVisits'\)\)/, 'der erste Reiter heisst "Besuche"');
+  assert.match(HK_SRC, /renderTabButton\('tasks', t\('housekeeping\.tabChores'\)\)/, 'der zweite Reiter heisst "Arbeiten"');
   const de = JSON.parse(readFileSync(new URL('de.json', localeDir), 'utf8')).housekeeping;
   assert.equal(de.pendingChores, 'Fällig');
   assert.equal(de.finishedChores, 'Erledigt im Monat');

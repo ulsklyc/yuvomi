@@ -3891,7 +3891,6 @@
         "taskAreaPlaceholder": "Παράδειγμα: Μπάνιο",
         "taskFrequency": "Συχνότητα (ημέρες)",
         "taskCreatedToast": "Η εργασία νοικοκυριού δημιουργήθηκε.",
-        "dashboard": "Επισκόπηση",
         "reports": "Αναφορές",
         "visitsThisMonth": "Επισκέψεις τον μήνα",
         "lastVisit": "Τελευταία επίσκεψη",
@@ -4023,7 +4022,9 @@
         "reportVisitsCount": "Επισκέψεις",
         "amountsPermissionLabel": "Προβολή μισθών και πληρωμών",
         "errorAmountsHidden": "Μόνο όποιος βλέπει τα ποσά της οικιακής βοηθού μπορεί να καταχωρίσει πληρωμή.",
-        "notHereToday": "Δεν έχει έρθει ακόμη σήμερα"
+        "notHereToday": "Δεν έχει έρθει ακόμη σήμερα",
+        "tabVisits": "Επισκέψεις",
+        "tabChores": "Δουλειές"
     },
     "userMultiSelect": {
         "moreUsers": "ακόμη",

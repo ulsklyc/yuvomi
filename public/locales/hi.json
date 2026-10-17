@@ -3891,7 +3891,6 @@
         "taskAreaPlaceholder": "उदाहरण: बाथरूम",
         "taskFrequency": "आवृत्ति (दिन)",
         "taskCreatedToast": "गृहकार्य कार्य बनाया गया।",
-        "dashboard": "अवलोकन",
         "reports": "रिपोर्ट",
         "visitsThisMonth": "इस माह विज़िट",
         "lastVisit": "अंतिम विज़िट",
@@ -4023,7 +4022,9 @@
         "reportVisitsCount": "विज़िट",
         "amountsPermissionLabel": "वेतन और भुगतान देखें",
         "errorAmountsHidden": "भुगतान वही दर्ज कर सकता है जिसे घरेलू सहायक की राशि देखने की अनुमति है।",
-        "notHereToday": "आज अभी तक नहीं आईं"
+        "notHereToday": "आज अभी तक नहीं आईं",
+        "tabVisits": "विज़िट",
+        "tabChores": "घर के काम"
     },
     "userMultiSelect": {
         "moreUsers": "और",

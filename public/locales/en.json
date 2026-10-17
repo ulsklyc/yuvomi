@@ -3891,7 +3891,6 @@
         "taskAreaPlaceholder": "Example: Bathroom",
         "taskFrequency": "Frequency (days)",
         "taskCreatedToast": "Housekeeping task created.",
-        "dashboard": "Overview",
         "reports": "Reports",
         "visitsThisMonth": "Visits this month",
         "lastVisit": "Last visit",
@@ -4023,7 +4022,9 @@
         "reportVisitsCount": "Visits",
         "amountsPermissionLabel": "See wages and payments",
         "errorAmountsHidden": "Only someone who may see housekeeping amounts can mark a payment.",
-        "notHereToday": "Not here yet today"
+        "notHereToday": "Not here yet today",
+        "tabVisits": "Visits",
+        "tabChores": "Chores"
     },
     "userMultiSelect": {
         "moreUsers": "more",

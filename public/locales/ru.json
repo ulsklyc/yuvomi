@@ -4119,7 +4119,6 @@
         "taskAreaPlaceholder": "Например: ванная",
         "taskFrequency": "Периодичность (дни)",
         "taskCreatedToast": "Задача по уборке создана.",
-        "dashboard": "Обзор",
         "reports": "Отчёты",
         "visitsThisMonth": "Визитов за месяц",
         "lastVisit": "Последний визит",
@@ -4251,7 +4250,9 @@
         "reportVisitsCount": "Визиты",
         "amountsPermissionLabel": "Видеть оплату и платежи",
         "errorAmountsHidden": "Отметить оплату может только тот, кому видны суммы помощницы по дому.",
-        "notHereToday": "Сегодня ещё не пришла"
+        "notHereToday": "Сегодня ещё не пришла",
+        "tabVisits": "Визиты",
+        "tabChores": "Дела по дому"
     },
     "userMultiSelect": {
         "moreUsers": "ещё",

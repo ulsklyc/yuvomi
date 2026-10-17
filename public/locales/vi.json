@@ -3891,7 +3891,6 @@
         "taskAreaPlaceholder": "Ví dụ: Phòng tắm",
         "taskFrequency": "Tần suất (ngày)",
         "taskCreatedToast": "Nhiệm vụ dọn dẹp đã tạo.",
-        "dashboard": "Tổng quan",
         "reports": "Báo cáo",
         "visitsThisMonth": "Số lượt đến tháng này",
         "lastVisit": "Lượt đến gần nhất",
@@ -4023,7 +4022,9 @@
         "reportVisitsCount": "Số lượt đến",
         "amountsPermissionLabel": "Xem tiền công và thanh toán",
         "errorAmountsHidden": "Chỉ người được xem số tiền của người giúp việc mới có thể đánh dấu thanh toán.",
-        "notHereToday": "Hôm nay chưa đến"
+        "notHereToday": "Hôm nay chưa đến",
+        "tabVisits": "Lượt đến",
+        "tabChores": "Việc nhà"
     },
     "userMultiSelect": {
         "moreUsers": "thêm",

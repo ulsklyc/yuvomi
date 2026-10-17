@@ -3891,7 +3891,6 @@
         "taskAreaPlaceholder": "Örnek: Banyo",
         "taskFrequency": "Sıklık (gün)",
         "taskCreatedToast": "Ev işi görevi oluşturuldu.",
-        "dashboard": "Genel bakış",
         "reports": "Raporlar",
         "visitsThisMonth": "Bu ayki ziyaretler",
         "lastVisit": "Son ziyaret",
@@ -4023,7 +4022,9 @@
         "reportVisitsCount": "Ziyaretler",
         "amountsPermissionLabel": "Ücretleri ve ödemeleri görme",
         "errorAmountsHidden": "Ödemeyi yalnızca ev yardımcısı tutarlarını görebilen kişi işaretleyebilir.",
-        "notHereToday": "Bugün henüz gelmedi"
+        "notHereToday": "Bugün henüz gelmedi",
+        "tabVisits": "Ziyaretler",
+        "tabChores": "Ev işleri"
     },
     "userMultiSelect": {
         "moreUsers": "daha",

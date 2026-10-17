@@ -3895,7 +3895,6 @@
         "taskAreaPlaceholder": "مثال: حمام",
         "taskFrequency": "دفعات (روز)",
         "taskCreatedToast": "کار نظافت خانه ایجاد شد.",
-        "dashboard": "نمای کلی",
         "reports": "گزارش‌ها",
         "visitsThisMonth": "بازدیدهای این ماه",
         "lastVisit": "آخرین بازدید",
@@ -4027,7 +4026,9 @@
         "reportVisitsCount": "بازدیدها",
         "amountsPermissionLabel": "دیدن دستمزدها و پرداخت‌ها",
         "errorAmountsHidden": "فقط کسی که اجازه دیدن مبالغ کمک منزل را دارد می‌تواند پرداخت را ثبت کند.",
-        "notHereToday": "امروز هنوز نیامده"
+        "notHereToday": "امروز هنوز نیامده",
+        "tabVisits": "بازدیدها",
+        "tabChores": "کارهای خانه"
     },
     "splitExpenses": {
         "title": "هزینه‌های مشترک",

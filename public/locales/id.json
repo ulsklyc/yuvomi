@@ -3895,7 +3895,6 @@
         "taskAreaPlaceholder": "Contoh: Kamar mandi",
         "taskFrequency": "Frekuensi (hari)",
         "taskCreatedToast": "Tugas asisten rumah tangga dibuat.",
-        "dashboard": "Ringkasan",
         "reports": "Laporan",
         "visitsThisMonth": "Kunjungan bulan ini",
         "lastVisit": "Kunjungan terakhir",
@@ -4027,7 +4026,9 @@
         "reportVisitsCount": "Kunjungan",
         "amountsPermissionLabel": "Lihat upah dan pembayaran",
         "errorAmountsHidden": "Hanya yang boleh melihat jumlah untuk asisten rumah tangga yang dapat menandai pembayaran.",
-        "notHereToday": "Hari ini belum datang"
+        "notHereToday": "Hari ini belum datang",
+        "tabVisits": "Kunjungan",
+        "tabChores": "Pekerjaan rumah"
     },
     "splitExpenses": {
         "title": "Pengeluaran Bersama",

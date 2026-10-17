@@ -438,8 +438,10 @@ function renderShell(container) {
         <h1 class="page-toolbar__title" id="housekeeping-title">${esc(t('housekeeping.title'))}</h1>
         <div class="page-toolbar__actions"></div>
         <nav class="housekeeping-tabs page-toolbar__bar" role="tablist" aria-label="${esc(t('housekeeping.bottomNav'))}">
-          ${renderTabButton('dashboard', t('housekeeping.dashboard'))}
-          ${renderTabButton('tasks', t('housekeeping.tasks'))}
+          ${/* R20: die Reiter heissen nach ihrem Inhalt, nicht wie die Kapsel-
+                Tabs "Uebersicht" und "Aufgaben" darunter (Re-Critique a5). */ ''}
+          ${renderTabButton('dashboard', t('housekeeping.tabVisits'))}
+          ${renderTabButton('tasks', t('housekeeping.tabChores'))}
           ${renderTabButton('reports', t('housekeeping.reports'))}
           ${renderTabButton('staff', t('housekeeping.staffTitle'))}
         </nav>

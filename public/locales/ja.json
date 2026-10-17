@@ -3891,7 +3891,6 @@
         "taskAreaPlaceholder": "例: 浴室",
         "taskFrequency": "頻度 (日)",
         "taskCreatedToast": "家事タスクを作成しました。",
-        "dashboard": "概要",
         "reports": "レポート",
         "visitsThisMonth": "今月の訪問",
         "lastVisit": "最終訪問",
@@ -4023,7 +4022,9 @@
         "reportVisitsCount": "訪問",
         "amountsPermissionLabel": "給与と支払いを表示",
         "errorAmountsHidden": "支払いを記録できるのは、家事サポートの金額を見られる人だけです。",
-        "notHereToday": "今日はまだ来ていません"
+        "notHereToday": "今日はまだ来ていません",
+        "tabVisits": "訪問",
+        "tabChores": "家事"
     },
     "userMultiSelect": {
         "moreUsers": "他",
