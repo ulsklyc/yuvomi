@@ -413,7 +413,9 @@ test('`n` im Router laeuft ueber triggerPageFab() und klickt nirgends selbst', (
   const eintrag = router.split('\n').find((zeile) => /\{\s*key:\s*'n',/.test(zeile));
   assert.ok(eintrag, 'der SHORTCUTS-Eintrag fuer `n` fehlt');
   assert.match(eintrag, /action:\s*\(\)\s*=>\s*triggerPageFab\(\)/);
-  assert.match(router, /import \{ triggerPageFab \} from '\/utils\/fab\.js';/);
+  // Der Router holt seit R20 (D) weitere Namen aus fab.js (syncFabName,
+  // fabActionLabel) - gefragt ist nur, dass triggerPageFab von dort kommt.
+  assert.match(router, /import \{[^}]*\btriggerPageFab\b[^}]*\} from '\/utils\/fab\.js';/);
   assert.doesNotMatch(router, /\.page-fab['"]\)\??\.click\(\)/,
     'ein zweiter Weg, der den FAB am Riegel vorbei klickt');
 });
