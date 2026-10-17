@@ -931,48 +931,25 @@ html:active-view-transition-type(region-fade)::view-transition-new(region-swap) 
   pointer-events: auto;
 }
 
-/* NUR WO ES EINEN FAB GIBT. Die Frage stellt dieselbe `:has()`-Bedingung, die
- * schon den Scrollport verkuerzt (`.app-shell:has(.fab-layer .page-fab...)`,
- * siehe oben) - sie fragt die SEITE, statt eine Klasse zu verlangen, die beim
- * naechsten neuen Modul vergessen wird. Ohne sie klaffte in den Einstellungen
- * eine 52px breite Luecke am Ende der Leiste, reserviert fuer einen Knopf, den
- * diese Seite nicht hat.
+/* DER PLATZ DES KNOPFS IST IMMER RESERVIERT (Re-Kritik 2026-10-17).
  *
- * Die Luft zwischen letztem Tab und Knopf ist --space-1 und nicht --space-2:
- * gemessen ueber die Geraetebreiten 320/360/375/390/414 war das der eine Wert,
+ * Bis R18 fragte die Reserve die Seite (`.app-shell:has(.fab-layer
+ * .page-fab:not([hidden]))`): ohne FAB verteilten sich die fuenf Tabs auf die
+ * volle Kapsel (62 gegen 73px bei 390px), jeder Wechsel nach Budget/Statistik,
+ * Belohnungen oder in die Einstellungen schob die Ziele unter dem Daumen um bis
+ * zu 44px. R19 liess die Tabs stehen und kuerzte stattdessen die Kapsel um die
+ * Reserve - dann sprang ihr Ende (382 -> 334px) und stand linksbuendig vor
+ * einem Loch, sobald ein Reiter keinen Knopf hatte.
+ *
+ * Jetzt bleibt alles stehen: die Kapsel hat in jedem Modul und jedem Reiter
+ * dieselbe Breite, die Tabs dieselben Koordinaten, und der Knopf erscheint in
+ * seinem Platz am Ende der Kapsel oder nicht. Die Fuge zwischen letztem Tab
+ * und Knopf ist --space-1: gemessen ueber 320/360/375/390/414 der eine Wert,
  * der auf einem 360px-Android den zweizeiligen Umbruch von „Übersicht" gerade
- * noch verhindert. Der Knopf steht durch die Rundung ohnehin frei. */
-/* `html.fab-holding` (router.js, holdFabAcrossSwap): hatte die Vorseite einen
- * FAB, haelt die Reserve ueber den Wechsel, bis die neue Seite fertig gebaut
- * ist. Seiten, die ihren FAB erst nach den Daten anlegen, liessen die Reserve
- * sonst kurz fallen - die Tabs sprangen zweimal um rund 11px (R18). */
-.app-shell:has(.fab-layer .page-fab:not([hidden])) .nav-bottom__items,
-html.fab-holding .nav-bottom__items {
-  /* Die Reserve waechst mit dem Abstand des Knopfs zur Kante (--nav-fab-inset,
-   * tokens.css): so bleibt die Fuge zwischen letztem Tab und Knopf dieselbe,
-   * wo immer er sitzt. */
+ * noch verhindert. Die Reserve waechst mit dem Abstand des Knopfs zur Kante
+ * (--nav-fab-inset, tokens.css). */
+.nav-bottom__items {
   padding-inline-end: calc(var(--fab-size) + var(--nav-fab-inset));
-}
-
-/* OHNE FAB ENDET DIE KAPSEL VOR SEINEM PLATZ, die Tabs bleiben stehen (R19,
- * Critique 2026-10-16, Persona Casey). Bis hier verteilten sich die fuenf
- * Tabs ohne FAB auf die volle Breite: 62 gegen 73px je Tab bei 390px, und
- * ein Budget-Reiterwechsel nach "Statistik" (ohne Neu-Aktion) schob jedes
- * Ziel unter dem Daumen um bis zu 44px - ebenso jeder Wechsel nach
- * Belohnungen, Haushaltshilfe oder in die Einstellungen. Jetzt ist der Platz
- * des Knopfs reserviert, aber nicht als leeres Glas (die 52px-Luecke, die die
- * Regel oben verhinderte): die Kapsel ist um genau die Reserve schmaler und
- * beginnt, wo sie mit FAB beginnt. Tabs und Indikator stehen in jedem Modul
- * und jedem Reiter auf denselben Koordinaten; nur das Kapselende folgt dem
- * Knopf. Gilt nur, wo die Kapsel steht (unter 1024px), und nie im
- * Wechsel (`fab-holding` haelt die Reserve, bis die neue Seite steht). */
-html:not(.fab-holding) .app-shell:not(:has(.fab-layer .page-fab:not([hidden]))) .nav-bottom__items {
-  /* Hinten dieselbe Sehne wie vorne (--space-2): ohne Knopf liegt das letzte
-   * Label sonst in der Rundung. Die 8px kommen auf die Breite, die Tabs
-   * behalten ihre Koordinaten. */
-  inline-size: calc(min(100%, var(--nav-capsule-max)) - var(--fab-size) - var(--nav-fab-inset) + var(--space-2));
-  padding-inline-end: var(--space-2);
-  margin-inline: max(0px, (100% - var(--nav-capsule-max)) / 2) auto;
 }
 
 /* ── More-Button (Button-Basis, ansonsten wie nav-item) ── */

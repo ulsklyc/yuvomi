@@ -1875,18 +1875,14 @@ test('R18: der FAB steht ueber den Wechsel, poppt nur ohne Vorgaenger, und seine
   assert.ok(held >= 0 && held < swap.indexOf('content.replaceChildren(pageWrapper)') && held < swap.indexOf('clearPageFab();'), 'der Vorgaenger wird vor dem Inhaltstausch festgehalten');
   const hold = router.slice(router.indexOf('function holdFabAcrossSwap('), router.indexOf('function holdFabAcrossSwap(') + 700);
   assert.match(hold, /classList\.toggle\('fab-steady', /, 'fab-in nur ohne Vorgaenger');
-  assert.match(hold, /classList\.toggle\('fab-holding', /, 'die Reserve der Kapsel haelt');
-  // Losgelassen wird nach dem letzten adoptPageFab() - und auch, wenn der Aufbau scheitert.
-  assert.match(router, /const pageFab = adoptPageFab\(\);\s*releaseFabHold\(\);/);
-  const render = router.slice(router.indexOf('async function renderPage('), router.indexOf('const pageFab = adoptPageFab();'));
-  const tail = router.slice(router.indexOf('const pageFab = adoptPageFab();'));
-  assert.match(tail.slice(0, tail.indexOf('\nasync function ') > 0 ? tail.indexOf('\nasync function ') : 6000), /\} catch \(err\) \{[\s\S]{0,400}releaseFabHold\(\);/, 'ein gescheiterter Aufbau laesst die Reserve nicht stehen');
-  assert.ok(render.length > 0);
+  // Seit der Re-Kritik 2026-10-17 steht die FAB-Reserve der Kapsel immer
+  // (layout.css) - es gibt nichts mehr ueber den Aufbau zu halten.
+  assert.doesNotMatch(router, /fab-holding|releaseFabHold/, 'kein Halten der Reserve mehr');
 
   assert.match(ruleBodies('layout.css', 'html.fab-steady .page-fab').join(';'), /animation:\s*none/);
   const reserve = [...eachRule(css('layout.css'))].find((r) => /padding-inline-end:\s*calc\(var\(--fab-size\)/.test(r.body) && /\.nav-bottom__items/.test(r.selector));
   assert.ok(reserve, 'die FAB-Reserve der Kapsel fehlt');
-  assert.ok(selectorList(reserve.selector).map((s) => s.replace(/\s+/g, ' ')).includes('html.fab-holding .nav-bottom__items'), 'die Reserve haelt waehrend des Aufbaus');
+  assert.equal(reserve.selector.trim(), '.nav-bottom__items', 'die Reserve haengt an keiner Bedingung - sie steht auch im Aufbau');
   // Kaltstart: die Einfahrt gibt es weiter.
   assert.match(ruleBodies('layout.css', '.page-fab').join(';'), /animation:\s*fab-in var\(--duration-xl\) var\(--ease-out\) backwards/);
 });

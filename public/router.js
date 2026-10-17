@@ -1748,7 +1748,6 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
 
     // FAB Long Loop: Einstiegsanimation nach FAB_SEEN_MAX Views pro Modul deaktivieren
     const pageFab = adoptPageFab();
-    releaseFabHold();
     if (pageFab) {
       // Shortcut-Discoverability (Audit P3): der 'n'-Chord öffnet den FAB — als
       // Tooltip-Titel + aria-keyshortcuts sichtbar bzw. vorlesbar machen.
@@ -1779,7 +1778,6 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
 
   } catch (err) {
     document.documentElement.classList.remove('navigating');
-    releaseFabHold();
     console.error('[Router] Seiten-Render-Fehler:', err);
     if (route.thirdPartyModule?.id) {
       await disableFailedThirdPartyModule(route.thirdPartyModule.id);
@@ -2512,23 +2510,19 @@ function clearPageFab() {
  * sprangen zweimal um rund 11px.
  *
  * Gefragt wird VOR `clearPageFab()` - danach gibt es den Vorgaenger nicht mehr:
- *   - `fab-steady`: irgendwo stand ein sichtbarer FAB (schwebend oder im Kopf
- *     angedockt). Der naechste faehrt nicht ein, er steht (layout.css). Gilt,
- *     bis der naechste Wechsel neu fragt - also auch fuer einen Nachzuegler.
- *   - `fab-holding`: der FAB schwebte in der Ebene, die Kapsel haelt seine
- *     Reserve. Faellt mit `releaseFabHold()`, sobald die neue Seite gebaut ist
- *     und ihre eigene `:has()`-Bedingung wieder die Wahrheit sagt.
- * Beim Kaltstart steht kein Vorgaenger: beide Klassen fallen, der FAB faehrt ein.
+ * `fab-steady` heisst, irgendwo stand ein sichtbarer FAB (schwebend oder im
+ * Kopf angedockt). Der naechste faehrt nicht ein, er steht (layout.css). Gilt,
+ * bis der naechste Wechsel neu fragt - also auch fuer einen Nachzuegler. Beim
+ * Kaltstart steht kein Vorgaenger: die Klasse faellt, der FAB faehrt ein.
+ *
+ * Die Kapsel muss seit der Re-Kritik 2026-10-17 nichts mehr halten: ihre
+ * FAB-Reserve steht immer (layout.css, `.nav-bottom__items`), die frueheren
+ * `fab-holding`/`releaseFabHold()` sind entfallen.
  */
 function holdFabAcrossSwap() {
   const root = document.documentElement;
   const floating = document.querySelector('#fab-layer .page-fab:not([hidden])');
   root.classList.toggle('fab-steady', Boolean(floating || document.querySelector('#main-content .page-fab:not([hidden])')));
-  root.classList.toggle('fab-holding', Boolean(floating));
-}
-
-function releaseFabHold() {
-  document.documentElement.classList.remove('fab-holding');
 }
 
 const FAB_SEEN_KEY = (module) => `yuvomi:fabSeen:${module}`;

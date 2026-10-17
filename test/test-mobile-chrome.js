@@ -564,21 +564,18 @@ test('"Mehr" ist auf einem Einstellungsblatt sofort aktiv, auch nach dem Kaltsta
 // verteilten sich die fuenf Tabs auf die volle Kapsel (62 gegen 73px bei
 // 390px) - jeder Wechsel auf einen Budget-Reiter ohne Neu-Aktion, nach
 // Belohnungen oder in die Einstellungen schob die Ziele unter dem Daumen.
-// Jetzt endet die Kapsel ohne Knopf vor seinem Platz: dieselbe Innenbreite,
-// dieselben Tab-Koordinaten.
-test('R19: ohne FAB endet die Kapsel vor seinem Platz, die Tabs behalten ihre Breite', () => {
+// Re-Kritik 2026-10-17: R19 kuerzte dafuer die Kapsel ohne Knopf (8-334
+// statt 8-382px) - linksbuendig vor einem Loch, und ihr Ende sprang je Reiter.
+// Jetzt steht die Reserve immer: Kapsel, Tabs und Knopfplatz bleiben stehen.
+test('Re-Kritik: die FAB-Reserve der Kapsel steht immer - Kapselbreite und Tabs springen nicht je Seite oder Reiter', () => {
   const all = rules(layoutCss);
-  const without = all.filter((r) => r.selector.includes(':not(:has(.fab-layer .page-fab:not([hidden])))')
-    && r.selector.endsWith('.nav-bottom__items'));
-  assert.equal(without.length, 1, 'genau eine Regel fuer die Kapsel ohne FAB');
-  const body = without[0].body;
-  assert.match(without[0].selector, /html:not\(\.fab-holding\)/, 'im Seitenwechsel haelt die Reserve, bis die neue Seite steht');
-  assert.match(decl(body, 'inline-size') ?? '', /min\(100%, var\(--nav-capsule-max\)\) - var\(--fab-size\) - var\(--nav-fab-inset\)/,
-    'die Kapsel ist genau um die FAB-Reserve schmaler - Tab-Innenbreite wie mit Knopf');
-  assert.match(decl(body, 'margin-inline') ?? '', /^max\(0px, \(100% - var\(--nav-capsule-max\)\) \/ 2\) auto$/,
-    'sie beginnt, wo sie mit Knopf beginnt (nicht zentriert)');
-  const reserve = all.find((r) => r.selector.includes('.app-shell:has(.fab-layer .page-fab:not([hidden])) .nav-bottom__items'));
-  assert.match(decl(reserve.body, 'padding-inline-end') ?? '', /var\(--fab-size\) \+ var\(--nav-fab-inset\)/);
+  const conditional = all.filter((r) => r.selector.endsWith('.nav-bottom__items') && /page-fab|fab-holding/.test(r.selector));
+  assert.deepEqual(conditional.map((r) => r.selector), [], 'keine Kapselregel fragt, ob die Seite einen FAB hat');
+  const reserve = all.find((r) => !r.at.length && r.selector.trim() === '.nav-bottom__items' && decl(r.body, 'padding-inline-end'));
+  assert.match(decl(reserve?.body ?? '', 'padding-inline-end') ?? '', /^calc\(var\(--fab-size\) \+ var\(--nav-fab-inset\)\)$/,
+    'die Reserve ist der Knopf plus sein Abstand zur Kante');
+  assert.ok(!all.some((r) => r.selector.endsWith('.nav-bottom__items') && decl(r.body, 'inline-size')),
+    'keine eigene Breite der Kapsel ohne Knopf');
 });
 
 // R19 (Entscheidung Ulas 2026-10-16): DIE KAPSEL MINIMIERT BEIM LESEN.

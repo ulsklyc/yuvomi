@@ -2440,9 +2440,11 @@ Gemessen am echten Markup: `test:module-readonly-ui`, `test:budget-readonly-ui`,
 - **Die Tabs stehen in jedem Modul auf denselben Koordinaten (R19, Persona Casey).** Ohne
   FAB verteilten sich die fuenf Tabs auf die volle Kapsel (62 gegen 73px bei 390px) - ein
   Budget-Reiterwechsel nach „Statistik", Belohnungen, Haushaltshilfe oder die Einstellungen
-  schoben jedes Ziel um bis zu 44px. Jetzt endet die Kapsel ohne Knopf vor seinem Platz
-  (Breite minus FAB-Reserve plus 8px Sehne, Anfang wie mit Knopf); nur das Kapselende folgt
-  dem FAB, kein leeres Glas.
+  schoben jedes Ziel um bis zu 44px. Seit der Re-Kritik 2026-10-17 ist der Platz des Knopfs
+  IMMER reserviert (`.nav-bottom__items`, `padding-inline-end` = FAB plus Kantenabstand): die
+  Kapsel hat in jedem Modul und Reiter dieselbe Breite, ohne Knopf bleibt sein Platz leeres
+  Glas. Die Zwischenloesung aus R19 (Kapsel ohne Knopf um die Reserve kuerzer) liess ihr Ende
+  je Reiter springen (382 -> 334px bei 390) und stand linksbuendig vor einem Loch.
 - Labels mobil in 11px (`--type-micro`, Caption 2 - der iOS-Wert fuer Tab-Bar-Titel; Begruendung
   an `.nav-bottom .nav-item__label`); lange Locales duerfen die Kapsel wachsen lassen, nie clippen.
 - **"Mehr" ist kein Modul (Nav-Polish 2026-10-15):** in Ruhe steht sein Zeichen tertiaer wie

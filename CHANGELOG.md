@@ -160,9 +160,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The tab bar on a phone makes room while you read.** Scrolling down shrinks it to its icons and
   makes it flatter; scrolling up, reaching the top or the end of a page brings the labels back. The
   add button stays, nothing on the page moves, and with reduced motion it switches without sliding.
-  The tabs also stay in the same place in every module: on a page without an add button the bar
-  ends before its spot instead of spreading the tabs wider, so a tab no longer moves under your
-  finger when you switch budget tabs or open Rewards.
+  The tabs also stay in the same place in every module: the bar keeps the add button's spot even
+  on a page without one, so neither a tab nor the bar itself moves under your finger when you
+  switch budget tabs or open Rewards.
 - **The overview on a phone gets to the point sooner.** The family card is one row of faces with
   each person's open tasks as a number (166px instead of 427px), the current weather sits under
   the greeting even when the weather card is further down, and wall mode moved into the Customize
