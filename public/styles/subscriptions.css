@@ -217,12 +217,16 @@
   text-align: center;
 }
 
-/* Eine Balkenzeile: Name | Balken | Betrag | Anteil. Name und Balken teilen
- * sich den Rest, Betrag und Anteil nehmen, was sie brauchen - keine festen
- * Mindestbreiten, die in einer schmalen Karte ueberlaufen. */
+/* Eine Balkenzeile: Name | Balken | Betrag | Anteil. Betrag und Anteil nehmen,
+ * was sie brauchen - keine festen Mindestbreiten, die in einer schmalen Karte
+ * ueberlaufen. DER NAME VOR DEM BALKEN (Re-Critique 2026-10-17, A4): beide
+ * teilten sich den Rest 1,2 : 1, und "Versorgungsdienste" kuerzte bei 390,
+ * 1280 und 1440, waehrend der Balken daneben breit stand. Jetzt nimmt der Name
+ * seine Laenge (`max-content`), der Balken den Rest bis hinunter auf 2.5rem;
+ * gekuerzt wird erst, wenn auch das nicht reicht. */
 .subscriptions-chart-rows {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(2.5rem, 1fr) auto auto;
+  grid-template-columns: minmax(0, max-content) minmax(2.5rem, 1fr) auto auto;
   gap: var(--space-2);
   margin: 0;
   padding: 0;

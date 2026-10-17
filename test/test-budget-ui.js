@@ -6719,3 +6719,26 @@ test('R20: die Raten zeigen die letzten sechs, der Trenner faellt beim Umbruch m
   const meta = rules.find((r) => r.selector.trim() === '.budget-entry--loan .budget-entry__meta');
   assert.match(meta.body, /flex-wrap:\s*wrap/);
 });
+
+// Re-Critique 2026-10-17 (A4): in der Abo-Auswertung teilten sich Name und
+// Balken den Rest 1,2 : 1 - "Versorgungsdienste" kuerzte bei 390, 1280 und 1440
+// neben einem breiten Balken. Der Name nimmt seine Laenge, der Balken den Rest
+// bis hinunter auf 2.5rem.
+test('Abo-Auswertung: der Kategoriename steht vor dem Balken ungekuerzt', () => {
+  const rule = [...eachRule(read('../public/styles/subscriptions.css'))]
+    .find(({ selector, at }) => !at.length && selector.trim() === '.subscriptions-chart-rows');
+  assert.match(rule?.body ?? '', /grid-template-columns:\s*minmax\(0, max-content\) minmax\(2\.5rem, 1fr\) auto auto;/);
+});
+
+// Re-Critique 2026-10-17 (A4): die einzeilige Metazeile der Buchung kappte bei
+// 390 fuenf Kategorien ("Freizeit und Unterhal…"). Sie darf jetzt einmal
+// umbrechen und kappt erst nach der zweiten Zeile; die Ratenzeile behaelt ihr
+// eigenes Umbruchmuster.
+test('Hauptbuch: die Metazeile einer Buchung bricht einmal um, statt die Kategorie zu kappen', () => {
+  const rule = [...eachRule(read('../public/styles/budget.css'))]
+    .find(({ selector, at }) => selector.trim() === '.budget-entry:not(.budget-entry--loan) .budget-entry__meta'
+      && at.some((a) => /@supports \(-webkit-line-clamp: 2\)/.test(a)));
+  assert.ok(rule, 'die Zweizeilen-Regel fehlt');
+  assert.match(rule.body, /-webkit-line-clamp:\s*2/);
+  assert.match(rule.body, /white-space:\s*normal/);
+});

@@ -2344,6 +2344,22 @@ button.budget-entry__title {
   text-overflow: ellipsis;
 }
 
+/* HOECHSTENS ZWEI ZEILEN STATT EINER (Re-Critique 2026-10-17, A4). Die eine
+ * Zeile kappte bei 390 fuenf Kategorien um 6-22px ("Freizeit und Unterhal…"),
+ * bei 320 sechzehn - also genau die Achse, nach der das Diagramm darueber
+ * aufteilt. Die Hoehe begrenzt jetzt die zweite Zeile, nicht die erste: was
+ * nicht in eine passt, bricht einmal um und wird erst danach gekappt. Die fuenf
+ * bis acht Zeilen von damals kommen nicht zurueck. */
+@supports (-webkit-line-clamp: 2) {
+  .budget-entry:not(.budget-entry--loan) .budget-entry__meta {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+  }
+}
+
 /* EINE RATENZEILE KAPPT IHRE RATE NICHT (R19): sie traegt nur Datum und
  * "Rate 10 von 312" - beides ist die Auskunft, nichts davon darf hinten
  * wegfallen. Die Zeile bricht zwischen den beiden Angaben um (die Rate ist

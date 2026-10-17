@@ -362,6 +362,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Budget category names are no longer cut short.** On a phone a transaction's category may take a
+  second line instead of ending in "…" ("Leisure and entertainment"), and the subscription charts
+  show names like "Utilities" in full next to a shorter bar.
+
 - **Budget accounts take less room on a phone.** The account type and starting balance now share
   one line under the name and balance ("Checking · Start: 2,480.00"), so an account row is about a
   fifth shorter and all six demo accounts fit on one screen. On very narrow phones the name gets
