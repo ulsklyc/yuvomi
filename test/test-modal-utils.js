@@ -2213,3 +2213,91 @@ test('reportFieldErrors: ohne Fehler meldet es nichts und sagt false', () => {
   assert.equal(reportFieldErrors([]), false);
   assert.equal(field.focused, 0);
 });
+
+// ── Eine Ansage beim Speichern (Critique R19 Nachlese) ──────────────────────
+//
+// Gemessen am leeren Budget-Dialog: drei sichtbare role="alert" auf einmal,
+// und der Fokus auf dem Betrag las dessen Meldung ueber aria-describedby ein
+// zweites Mal (Guide accessible-error-announcement: "avoid double
+// announcement"). Springt der Fokus aufs Feld, ist die Meldung keine
+// Live-Region; nur ein Feld, das seine Beschreibung beim Fokus nicht selbst
+// liest (Datepicker), behaelt sie - und beim Verlassen (Blur) bleibt sie eine.
+function ariaField(id, position, { native = true } = {}) {
+  const attrs = {};
+  const children = [];
+  const classes = new Set();
+  const group = {
+    dataset: {},
+    offsetWidth: 0,
+    classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c), contains: (c) => classes.has(c), toggle: (c, f) => (f ? classes.add(c) : classes.delete(c)) },
+    querySelector: (sel) => children.find((c) => `.${c.className}` === sel) ?? null,
+    appendChild: (node) => { children.push(node); return node; },
+  };
+  const field = {
+    id, position, value: '', focused: 0,
+    setAttribute: (k, v) => { attrs[k] = String(v); },
+    getAttribute: (k) => attrs[k] ?? null,
+    removeAttribute: (k) => { delete attrs[k]; },
+    addEventListener() {}, removeEventListener() {},
+    matches: (sel) => native && /input/.test(sel),
+    querySelector: () => null,
+    closest: () => group,
+    focus() { field.focused += 1; },
+    compareDocumentPosition: (other) => (other.position > position ? 4 : 2),
+    message: () => children.find((c) => c.className === 'form-field__error'),
+  };
+  return field;
+}
+
+function withAttrDocument(fn) {
+  const before = global.document.createElement;
+  global.document.createElement = (tag) => {
+    const attrs = {};
+    return {
+      tagName: tag.toUpperCase(), className: '', id: '', textContent: '', dataset: {},
+      setAttribute: (k, v) => { attrs[k] = String(v); },
+      getAttribute: (k) => attrs[k] ?? null,
+      removeAttribute: (k) => { delete attrs[k]; },
+    };
+  };
+  try { return fn(); } finally { global.document.createElement = before; }
+}
+
+test('reportFieldErrors: beim Speichern keine Alarm-Rolle neben dem Fokus, ausser am Datepicker', () => withAttrDocument(() => {
+  const amount = ariaField('amount', 1);
+  const title = ariaField('title', 2);
+  reportFieldErrors([[title, 'Titel fehlt'], [amount, 'Betrag fehlt']]);
+  assert.equal(amount.focused, 1);
+  assert.equal(amount.message().getAttribute('role'), null, 'der fokussierte Betrag sagt seine Meldung doppelt an');
+  assert.equal(title.message().getAttribute('role'), null, 'eine zweite Meldung laeuft als Alarm in die erste');
+  assert.match(amount.getAttribute('aria-describedby'), /amount-error/, 'die Meldung haengt nicht mehr am Feld');
+
+  const date = ariaField('date', 1, { native: false });
+  const other = ariaField('other', 2);
+  reportFieldErrors([[other, 'x'], [date, 'Datum fehlt']]);
+  assert.equal(date.message().getAttribute('role'), 'alert', 'der Datepicker liest seine Beschreibung beim Fokus nicht - er braucht den Alarm');
+  assert.equal(other.message().getAttribute('role'), null);
+}));
+
+test('reportFieldError ohne Fokussprung bleibt eine Live-Region (Critique R19 Nachlese)', async () => {
+  const { reportFieldError } = await import('../public/components/modal.js');
+  withAttrDocument(() => {
+    const quiet = ariaField('a', 1);
+    reportFieldError(quiet, 'x', { focus: false });
+    assert.equal(quiet.message().getAttribute('role'), 'alert', 'ohne Fokus hoert niemand die Meldung');
+    const jumped = ariaField('b', 1);
+    reportFieldError(jumped, 'y');
+    assert.equal(jumped.focused, 1);
+    assert.equal(jumped.message().getAttribute('role'), null, 'Fokus und Alarm sagen dieselbe Meldung zweimal');
+  });
+});
+
+test('validateAll: beim Absenden keine Alarm-Rolle je leerem Pflichtfeld (Critique R19 Nachlese)', () => withAttrDocument(() => {
+  const a = ariaField('first', 1);
+  const b = ariaField('second', 2);
+  // _validateField liest closest('.form-field') und toggelt Klassen am Traeger.
+  assert.equal(validateAll({ querySelectorAll: () => [a, b] }), false);
+  assert.equal(a.focused, 1);
+  assert.equal(a.message().getAttribute('role'), null);
+  assert.equal(b.message().getAttribute('role'), null, 'zwei Alarme laufen beim Absenden ineinander');
+}));

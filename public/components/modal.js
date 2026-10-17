@@ -2568,18 +2568,28 @@ let _fieldErrorSeq = 0;
  * bekommen Screenreader die Meldung nie zu hören - ein Sammelbanner am
  * Formularende erfüllt WCAG 3.3.1 nicht.
  */
-function _ensureFieldError(group, input, message) {
+function _ensureFieldError(group, input, message, { live = true } = {}) {
   // Defensiv: die Klassen-Umschaltung funktioniert auch auf schlanken
   // Containern, das Anlegen einer Meldung braucht einen echten DOM-Knoten.
   if (typeof group.querySelector !== 'function' || typeof group.appendChild !== 'function') return;
 
   let el = group.querySelector('.form-field__error');
+  const created = !el;
   if (!el) {
     el = document.createElement('p');
     el.className = 'form-field__error';
-    // Live-Region: Screenreader hören die Meldung auch dann, wenn der Fokus
-    // nicht springt (Critique-Folgebefund zu WCAG 4.1.3).
-    el.setAttribute?.('role', 'alert');
+  }
+  // Live-Region: Screenreader hören die Meldung auch dann, wenn der Fokus
+  // nicht springt (Critique-Folgebefund zu WCAG 4.1.3). SPRINGT er aufs Feld,
+  // liest der Screenreader die Meldung dort ueber aria-describedby vor - eine
+  // Alarm-Rolle daneben sagte sie ein zweites Mal, und beim Speichern mit
+  // mehreren Fehlern liefen mehrere Alarme ineinander (Critique R19 Nachlese,
+  // Guide accessible-error-announcement: "avoid double announcement").
+  // Gesetzt bzw. genommen VOR der Textaenderung, sonst gilt sie fuer diese
+  // schon nicht mehr.
+  if (live) el.setAttribute?.('role', 'alert');
+  else el.removeAttribute?.('role');
+  if (created) {
     el.textContent = t('common.required');
     // Direkt hinter das Feld, nicht ans Gruppenende: liegen Hinweistexte
     // dazwischen, rutscht die Meldung sonst weit weg (gemessen 86px beim
@@ -2612,6 +2622,16 @@ function _ensureFieldError(group, input, message) {
  * Feld mittig in den scrollbaren Modal-Body scrollen. Ohne das verortete nur
  * ein Toast unten links den Fehler - bei langen Formularen blieb das Feld
  * unsichtbar (Critique P1). */
+/**
+ * Liest der Screenreader die Meldung beim Fokus selbst? Ja, wenn der Fokus
+ * auf genau dem Element landet, das aria-describedby traegt - ein natives
+ * Feld. Ein Custom Element (yuvomi-datepicker) gibt den Fokus an sein inneres
+ * Feld weiter, die Beschreibung haengt aber am Aussenelement.
+ */
+function _describesOnFocus(input) {
+  return typeof input?.matches === 'function' && input.matches('input, select, textarea, button');
+}
+
 function _focusField(input) {
   // Custom Elements (z. B. yuvomi-datepicker) sind selbst nicht fokussierbar:
   // stattdessen ihren inneren Formular-Knoten fokussieren.
@@ -2628,11 +2648,11 @@ function _focusField(input) {
   }
 }
 
-function _validateField(input) {
+function _validateField(input, { live = true } = {}) {
   const group = input.closest('.form-field') ?? input.parentElement;
   const hasValue = input.value.trim().length > 0;
   const wasShown = Boolean(group?.classList.contains?.('form-field--error'));
-  if (group) _ensureFieldError(group, input);
+  if (group) _ensureFieldError(group, input, undefined, { live });
   group?.classList.toggle('form-field--error', !hasValue);
   group?.classList.toggle('form-field--valid', hasValue);
   input.setAttribute('aria-invalid', String(!hasValue));
@@ -2695,8 +2715,12 @@ export function validateAll(formContainer) {
   let firstInvalid = null;
   let allValid = true;
 
+  // Beim Absenden: der Fokus geht aufs erste leere Pflichtfeld und liest dort
+  // seine Meldung - keine Alarm-Rolle je Feld daneben (Critique R19 Nachlese,
+  // dieselbe Regel wie reportFieldErrors). Beim Verlassen eines Feldes (Blur)
+  // bleibt die Meldung eine Live-Region, dort springt kein Fokus.
   formContainer.querySelectorAll('input[required], select[required], textarea[required]').forEach((input) => {
-    const valid = _validateField(input);
+    const valid = _validateField(input, { live: !_describesOnFocus(input) });
     if (!valid && !firstInvalid) firstInvalid = input;
     if (!valid) allValid = false;
   });
@@ -2713,13 +2737,13 @@ export function validateAll(formContainer) {
  * bei der nächsten Eingabe im Feld selbst auf. Gibt immer false zurück, damit
  * Speicherpfade kompakt `return reportFieldError(...)` abbrechen können.
  */
-export function reportFieldError(input, message, { focus = true } = {}) {
+export function reportFieldError(input, message, { focus = true, live = !(focus && _describesOnFocus(input)) } = {}) {
   if (!input) return false;
   const group = (typeof input.closest === 'function' ? input.closest('.form-field') : null) ?? input.parentElement;
   if (!group) return false;
 
   const wasShown = Boolean(group.classList?.contains?.('form-field--error'));
-  _ensureFieldError(group, input, message);
+  _ensureFieldError(group, input, message, { live });
   group.classList?.add('form-field--error');
   group.classList?.remove('form-field--valid');
   // Dieselbe Bewegung wie in _validateField: die Meldung zieht auf.
@@ -2780,11 +2804,19 @@ export function reportFieldErrors(errors) {
     if (typeof a.compareDocumentPosition !== 'function') return 0;
     return (a.compareDocumentPosition(b) & 4) ? -1 : 1;
   });
-  for (const [input, message] of list) reportFieldError(input, message, { focus: false });
   // Das erste Feld in DOM-Reihenfolge - destrukturiert, weil der
   // Initialen-Guard (test:initials) doppelte Null-Indizes als handgebaute
   // Initialen-Regel liest.
   const [[firstField]] = list;
+  // EINE Ansage, nicht eine je Feld (Critique R19 Nachlese): der Fokus geht
+  // aufs erste Feld, und dort liest der Screenreader dessen Meldung. Die
+  // uebrigen stehen an ihren Feldern (aria-invalid, aria-describedby) und
+  // werden beim Weitergehen gelesen - drei Alarme auf einmal liefen
+  // ineinander. Nur ein Feld, das seine Beschreibung beim Fokus nicht selbst
+  // liest (Datepicker), behaelt die Alarm-Rolle.
+  for (const [input, message] of list) {
+    reportFieldError(input, message, { focus: false, live: input === firstField && !_describesOnFocus(input) });
+  }
   _focusField(firstField);
   return true;
 }

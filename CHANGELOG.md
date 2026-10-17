@@ -253,6 +253,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Screen readers hear a form's problems once.** Saving a form with several missing fields raised
+  one alert per field at the same moment, and the field that received focus read its message a
+  second time. Now focus moves to the first problem and announces it there; the other fields carry
+  their message for when you reach them. Leaving a field still announces its message right away.
+
 - **The last tap wins while a page is loading.** Tapping a second destination while the first one
   was still loading was ignored, and you stayed on the first. Now the newer tap replaces the one
   in progress: the page you left behind is never drawn, and Back skips it.
