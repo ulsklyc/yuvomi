@@ -2426,6 +2426,7 @@ test('Sonde 8 - ein Kopf mit Lead-Zone traegt seine Linie erst angedockt, und do
   const findings = [];
   let headsSeen = 0;
   let leadHeads = 0;
+  const leadNames = [];
 
   for (const name of sweep('Sonde 8')) {
     await gotoRoute(page, ALL_ROUTES[name]);
@@ -2448,6 +2449,7 @@ test('Sonde 8 - ein Kopf mit Lead-Zone traegt seine Linie erst angedockt, und do
       continue;
     }
     leadHeads += 1;
+    leadNames.push(name);
 
     // EINE LEAD-ZONE AUF EINEM EINZEILIGEN KOPF IST KEINE. Sie kostet dann
     // nicht nur nichts, sie verbirgt die Linie dauerhaft: `--stacked` schaltet
@@ -2495,12 +2497,26 @@ test('Sonde 8 - ein Kopf mit Lead-Zone traegt seine Linie erst angedockt, und do
   // Zeit vor der Kopfregel 1a (R16): seither stehen die Werkzeuge vieler Koepfe
   // in der Titelzeile, und ein einzeiliger Kopf hat keine Lead-Zone. Mit D1
   // (Critique 2026-10-16) wurde auch der Aufgabenkopf einzeilig (120 -> 65px).
-  // Gemessen 2026-10-16 bei 375px: vier Koepfe mit Lead-Zone - Kalender,
-  // Budget (Zeitraum-Kopf, gedeckelt), Belohnungen, Haushaltshilfe (Band ueber
-  // der Reiterleiste). Das sind beide Andock-Bauarten; faellt eine davon weg,
-  // wird die Sonde rot statt still trivial.
-  assert.ok(leadHeads >= 4,
-    `Nur ${leadHeads} Koepfe mit Lead-Zone gesehen (gemessen 2026-10-16: 4). Ohne sie prueft diese Sonde nur, `
+  // Gemessen 2026-10-16 bei 375px (origin/main 5f752e7a2): vier Koepfe mit
+  // Lead-Zone - Kalender, Budget (Zeitraum-Kopf, gedeckelt), Belohnungen,
+  // Haushaltshilfe (Band ueber der Reiterleiste, `--dock-band`).
+  // R19 (68f1c0ef0, Critique 2026-10-16 "Koepfe auf das 65px-Muster"): unter
+  // 1024px stehen die Reiter von Belohnungen und Haushaltshilfe IN der
+  // Titelzeile (`.page-toolbar--tabs-title`), beide Koepfe sind einzeilig
+  // (121/129 -> 65px), tragen ihre Linie durchgehend und haben zu Recht keine
+  // Lead-Zone mehr. Gemessen 2026-10-17 bei 375px, Laufart dieser Sonde: main
+  // 4 (Kalender, Budget, Belohnungen, Haushaltshilfe), R19 2 (Kalender,
+  // Budget). Die Band-Bauart hat in dieser Laufart keine Route mehr; sie haelt
+  // nur noch test:ux-utils. Damit die Untergrenze scharf bleibt, nennt sie die Koepfe:
+  // verliert Kalender oder Budget die Lead-Zone, wird die Sonde rot, auch wenn
+  // ein anderer Kopf eine dazubekommt.
+  for (const name of ['calendar', 'budget']) {
+    assert.ok(leadNames.includes(name),
+      `${name}: keine Lead-Zone mehr gesehen (gemessen 2026-10-17: Kalender und Budget docken an). `
+      + `Gesehen: ${leadNames.join(', ') || 'keiner'}.`);
+  }
+  assert.ok(leadHeads >= 2,
+    `Nur ${leadHeads} Koepfe mit Lead-Zone gesehen (gemessen 2026-10-17: 2). Ohne sie prueft diese Sonde nur, `
     + 'dass einzeilige Koepfe eine Linie tragen.');
 
   assert.deepEqual(findings, [],
