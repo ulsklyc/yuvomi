@@ -5748,7 +5748,9 @@
         "mappingProfileStatusUnmatchedType": "نوع مطابقی در این خانوار نیست",
         "mappingProfileStatusAmbiguousType": "مبهم - چند نوع این نام را دارند",
         "icsCalendarName": "جمع‌آوری زباله",
-        "icsPickupSummary": "جمع‌آوری: {{name}}"
+        "icsPickupSummary": "جمع‌آوری: {{name}}",
+        "intervalDecrease": "کاهش فاصله",
+        "intervalIncrease": "افزایش فاصله"
     },
     "rewards": {
         "title": "پاداش‌ها",

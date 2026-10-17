@@ -5748,7 +5748,9 @@
         "mappingProfileStatusUnmatchedType": "No matching type in this household",
         "mappingProfileStatusAmbiguousType": "Ambiguous - multiple types share this name",
         "icsCalendarName": "Waste pickups",
-        "icsPickupSummary": "{{name}} pickup"
+        "icsPickupSummary": "{{name}} pickup",
+        "intervalDecrease": "Decrease interval",
+        "intervalIncrease": "Increase interval"
     },
     "rewards": {
         "title": "Rewards",

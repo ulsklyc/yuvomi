@@ -5884,7 +5884,9 @@
         "mappingProfileStatusUnmatchedType": "V této domácnosti není odpovídající druh",
         "mappingProfileStatusAmbiguousType": "Nejednoznačné - více typů má stejný název",
         "icsCalendarName": "Svoz odpadu",
-        "icsPickupSummary": "Svoz: {{name}}"
+        "icsPickupSummary": "Svoz: {{name}}",
+        "intervalDecrease": "Zkrátit interval",
+        "intervalIncrease": "Prodloužit interval"
     },
     "rewards": {
         "title": "Odměny",

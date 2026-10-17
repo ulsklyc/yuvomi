@@ -5748,7 +5748,9 @@
         "mappingProfileStatusUnmatchedType": "Ingen samsvarende type i denne husholdningen",
         "mappingProfileStatusAmbiguousType": "Tvetydig - flere typer deler dette navnet",
         "icsCalendarName": "Avfallshenting",
-        "icsPickupSummary": "Henting av {{name}}"
+        "icsPickupSummary": "Henting av {{name}}",
+        "intervalDecrease": "Reduser intervallet",
+        "intervalIncrease": "Øk intervallet"
     },
     "rewards": {
         "title": "Belønninger",

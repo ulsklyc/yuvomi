@@ -956,7 +956,29 @@ test('R17/E2: eine Abfallart mit anstehender Abholung sagt nicht "Noch kein Term
   ];
   assert.match(__test.typeWithoutScheduleLine(2, occurrences), /^waste\.nextPickupLabel: Fr, 2099-01-02/, 'die naechste Abholung dieser Art');
   assert.equal(__test.typeWithoutScheduleLine(1, occurrences), 'waste.noSchedulesYet', 'wirklich nichts: der bisherige Satz');
-  assert.match(WASTE_SRC, /<p class="waste-schedule-list__empty">\$\{esc\(typeWithoutScheduleLine\(type\.id\)\)\}<\/p>/, 'die Karte liest die Zeile dort');
+  assert.match(WASTE_SRC, /const line = typeWithoutScheduleLine\(type\.id\);/, 'die Karte liest die Zeile dort (typeWithoutScheduleHtml)');
+});
+
+// R20 (Re-Critique 2026-10-17 a2 P2-5): "Noch kein Termin" ohne Inline-Aktion,
+// Schnellchips nach der ersten Art weg, Tageschips umbrechend bei 390.
+test('R20: ohne Termin steht der Weg daneben, die uebrigen Vorlagen bleiben, sieben Tage in einer Zeile', () => {
+  __test.setStateForTest({ occurrences: [], types: [{ id: 3, name: 'Restmüll' }] });
+  const html = __test.typeWithoutScheduleHtml({ id: 3, name: 'Restmüll', archived: false }, false);
+  assert.match(html, /waste\.noSchedulesYet[\s\S]*data-action="add-schedule" data-type-id="3"/, 'die Aktion steht an der Aussage');
+  assert.doesNotMatch(__test.typeWithoutScheduleHtml({ id: 3, archived: true }, false), /add-schedule/, 'archiviert: kein Angebot');
+  assert.doesNotMatch(__test.typeWithoutScheduleHtml({ id: 3, archived: false }, true), /add-schedule/, 'read: kein Angebot');
+  const first = __test.TYPE_PRESETS[0];
+  const label = `waste.preset${first.key.charAt(0).toUpperCase()}${first.key.slice(1)}`;
+  const left = __test.remainingTypePresets([{ name: ` ${label.toUpperCase()} ` }]).map((p) => p.key);
+  assert.ok(!left.includes(first.key), 'eine vorhandene Vorlage faellt aus der Zeile (Name, ohne Gross/klein)');
+  assert.equal(left.length, __test.TYPE_PRESETS.length - 1);
+  assert.equal(__test.remainingTypePresets([]).length, __test.TYPE_PRESETS.length);
+  const css = readFileSync(new URL('../public/styles/waste.css', import.meta.url), 'utf8');
+  assert.match(css, /\.waste-weekday-picker \{\s*display: grid;\s*grid-template-columns: repeat\(7, minmax\(0, 1fr\)\);/, 'sieben gleiche Spalten');
+  const stepper = __test.intervalStepperHtml(1);
+  assert.match(stepper, /data-interval-step="-1"[^>]*disabled/, 'an der Untergrenze ist Weniger gesperrt');
+  assert.match(stepper, /<input type="number"[^>]*id="wsm-interval"[^>]*min="1" max="52"/, 'das native Feld bleibt');
+  assert.match(__test.intervalStepperHtml(52), /data-interval-step="1"[^>]*disabled/);
 });
 
 test('create-preset-type schreibt und steht deshalb NICHT in READ_SAFE_ACTIONS', () => {

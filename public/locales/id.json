@@ -5748,7 +5748,9 @@
         "mappingProfileStatusUnmatchedType": "Tidak ada jenis yang cocok di rumah tangga ini",
         "mappingProfileStatusAmbiguousType": "Ambigu - beberapa jenis memiliki nama yang sama",
         "icsCalendarName": "Pengangkutan sampah",
-        "icsPickupSummary": "Pengangkutan: {{name}}"
+        "icsPickupSummary": "Pengangkutan: {{name}}",
+        "intervalDecrease": "Kurangi interval",
+        "intervalIncrease": "Tambah interval"
     },
     "rewards": {
         "title": "Hadiah",

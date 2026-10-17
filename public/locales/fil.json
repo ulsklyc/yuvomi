@@ -5748,7 +5748,9 @@
         "mappingProfileStatusUnmatchedType": "Walang tumutugmang uri sa sambahayang ito",
         "mappingProfileStatusAmbiguousType": "Malabo - maraming uri ang may parehong pangalan",
         "icsCalendarName": "Kolekta ng basura",
-        "icsPickupSummary": "Kolekta: {{name}}"
+        "icsPickupSummary": "Kolekta: {{name}}",
+        "intervalDecrease": "Bawasan ang pagitan",
+        "intervalIncrease": "Dagdagan ang pagitan"
     },
     "rewards": {
         "title": "Mga Gantimpala",

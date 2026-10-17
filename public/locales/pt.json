@@ -5748,7 +5748,9 @@
         "mappingProfileStatusUnmatchedType": "Nenhum tipo correspondente neste agregado",
         "mappingProfileStatusAmbiguousType": "Ambíguo - vários tipos partilham este nome",
         "icsCalendarName": "Recolha de resíduos",
-        "icsPickupSummary": "Recolha: {{name}}"
+        "icsPickupSummary": "Recolha: {{name}}",
+        "intervalDecrease": "Diminuir intervalo",
+        "intervalIncrease": "Aumentar intervalo"
     },
     "rewards": {
         "title": "Recompensas",

@@ -6399,6 +6399,8 @@
         "mappingProfileStatusUnmatchedType": "Nenhum tipo de lixo correspondente nesta família/grupo",
         "mappingProfileStatusAmbiguousType": "Ambíguo - mais de um tipo usa este mesmo nome",
         "icsCalendarName": "Coleta de lixo",
-        "icsPickupSummary": "Coleta: {{name}}"
+        "icsPickupSummary": "Coleta: {{name}}",
+        "intervalDecrease": "Diminuir intervalo",
+        "intervalIncrease": "Aumentar intervalo"
     }
 }

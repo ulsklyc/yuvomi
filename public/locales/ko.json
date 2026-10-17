@@ -5748,7 +5748,9 @@
         "mappingProfileStatusUnmatchedType": "이 가구에 일치하는 종류가 없음",
         "mappingProfileStatusAmbiguousType": "모호함 - 동일한 이름의 유형이 여러 개 있습니다",
         "icsCalendarName": "쓰레기 수거",
-        "icsPickupSummary": "수거: {{name}}"
+        "icsPickupSummary": "수거: {{name}}",
+        "intervalDecrease": "간격 줄이기",
+        "intervalIncrease": "간격 늘리기"
     },
     "rewards": {
         "title": "보상",

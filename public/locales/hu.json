@@ -5748,7 +5748,9 @@
         "mappingProfileStatusUnmatchedType": "Nincs egyező típus ebben a háztartásban",
         "mappingProfileStatusAmbiguousType": "Nem egyértelmű - több típus is ezt a nevet viseli",
         "icsCalendarName": "Hulladékszállítás",
-        "icsPickupSummary": "Elszállítás: {{name}}"
+        "icsPickupSummary": "Elszállítás: {{name}}",
+        "intervalDecrease": "Időköz csökkentése",
+        "intervalIncrease": "Időköz növelése"
     },
     "rewards": {
         "title": "Jutalmak",

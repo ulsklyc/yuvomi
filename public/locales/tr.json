@@ -5748,7 +5748,9 @@
         "mappingProfileStatusUnmatchedType": "Bu ev halkında eşleşen tür yok",
         "mappingProfileStatusAmbiguousType": "Belirsiz - birden fazla tür bu adı taşıyor",
         "icsCalendarName": "Atık toplama",
-        "icsPickupSummary": "Toplama: {{name}}"
+        "icsPickupSummary": "Toplama: {{name}}",
+        "intervalDecrease": "Aralığı azalt",
+        "intervalIncrease": "Aralığı artır"
     },
     "rewards": {
         "title": "Ödüller",

@@ -5748,7 +5748,9 @@
         "mappingProfileStatusUnmatchedType": "Κανένας αντίστοιχος τύπος σε αυτό το νοικοκυριό",
         "mappingProfileStatusAmbiguousType": "Διφορούμενο - πολλοί τύποι έχουν αυτό το όνομα",
         "icsCalendarName": "Αποκομιδή απορριμμάτων",
-        "icsPickupSummary": "Αποκομιδή: {{name}}"
+        "icsPickupSummary": "Αποκομιδή: {{name}}",
+        "intervalDecrease": "Μείωση διαστήματος",
+        "intervalIncrease": "Αύξηση διαστήματος"
     },
     "rewards": {
         "title": "Επιβραβεύσεις",

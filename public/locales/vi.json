@@ -5748,7 +5748,9 @@
         "mappingProfileStatusUnmatchedType": "Không có loại khớp trong hộ gia đình này",
         "mappingProfileStatusAmbiguousType": "Không rõ ràng - nhiều loại có cùng tên",
         "icsCalendarName": "Thu gom rác",
-        "icsPickupSummary": "Thu gom: {{name}}"
+        "icsPickupSummary": "Thu gom: {{name}}",
+        "intervalDecrease": "Giảm khoảng cách",
+        "intervalIncrease": "Tăng khoảng cách"
     },
     "rewards": {
         "title": "Phần thưởng",

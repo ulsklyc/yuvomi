@@ -5748,7 +5748,9 @@
         "mappingProfileStatusUnmatchedType": "Geen overeenkomende soort in dit huishouden",
         "mappingProfileStatusAmbiguousType": "Dubbelzinnig - meerdere types delen deze naam",
         "icsCalendarName": "Afvalophaling",
-        "icsPickupSummary": "Ophaling: {{name}}"
+        "icsPickupSummary": "Ophaling: {{name}}",
+        "intervalDecrease": "Interval verkleinen",
+        "intervalIncrease": "Interval vergroten"
     },
     "rewards": {
         "title": "Beloningen",

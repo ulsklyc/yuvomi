@@ -5748,7 +5748,9 @@
         "mappingProfileStatusUnmatchedType": "この世帯に一致する種類がありません",
         "mappingProfileStatusAmbiguousType": "あいまい - 同じ名前の種類が複数あります",
         "icsCalendarName": "ゴミ収集",
-        "icsPickupSummary": "収集: {{name}}"
+        "icsPickupSummary": "収集: {{name}}",
+        "intervalDecrease": "間隔を短くする",
+        "intervalIncrease": "間隔を長くする"
     },
     "rewards": {
         "title": "ごほうび",

@@ -5748,7 +5748,9 @@
         "mappingProfileStatusUnmatchedType": "此家庭中没有匹配的类型",
         "mappingProfileStatusAmbiguousType": "有歧义 - 多个类型使用相同名称",
         "icsCalendarName": "垃圾收运",
-        "icsPickupSummary": "收运：{{name}}"
+        "icsPickupSummary": "收运：{{name}}",
+        "intervalDecrease": "缩短间隔",
+        "intervalIncrease": "延长间隔"
     },
     "rewards": {
         "title": "奖励",

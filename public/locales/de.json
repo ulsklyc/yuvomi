@@ -5748,7 +5748,9 @@
         "mappingProfileStatusUnmatchedType": "Keine passende Art in diesem Haushalt",
         "mappingProfileStatusAmbiguousType": "Mehrdeutig - mehrere Typen tragen diesen Namen",
         "icsCalendarName": "Abfuhrtermine",
-        "icsPickupSummary": "Abholung: {{name}}"
+        "icsPickupSummary": "Abholung: {{name}}",
+        "intervalDecrease": "Abstand verringern",
+        "intervalIncrease": "Abstand erhöhen"
     },
     "rewards": {
         "title": "Belohnungen",

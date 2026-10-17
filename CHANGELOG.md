@@ -144,6 +144,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pinned and other notes no longer mix on wide screens.** "Other notes" starts its own row again
   below the pinned ones, so a note can no longer look pinned just because it sits under a pinned
   card. Browsers that support grid lanes pack the cards without gaps.
+- **Waste collection: the next step stands where you need it.** A waste type without a schedule
+  offers "Add schedule" right under "No schedule yet", the templates you have not used yet stay as
+  chips under your waste types, the type cards are plain surfaces like every other list, the seven
+  weekdays fit on one line on a phone, and "Every N weeks" is a stepper with minus and plus.
 - **Waste collection opens without jumping.** The column with waste
   types used to load below the pickups and then jump up (or shrink) once the data arrived; it now
   appears with its content.

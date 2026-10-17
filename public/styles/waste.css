@@ -234,10 +234,14 @@
 /* Types & schedules                                                     */
 /* -------------------------------------------------------------------- */
 
+/* RANDLOS UND OPAK WIE JEDER TRAEGER (R20, Re-Critique 2026-10-17 a2 P2-5).
+ * Die Karte stand als umrandete Kontur ohne Flaeche auf der Buehne - eine
+ * zweite Kartensprache neben `.row-carrier` (list-row.css). Jetzt dieselbe
+ * Flaeche, Rundung und Tiefe; das Archiv bleibt zurueckgenommen (unten). */
 .waste-type-card {
-  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
   border-radius: var(--radius-lg);
-  margin-bottom: var(--space-3);
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
   transition: background var(--transition-fast), outline-color var(--transition-fast);
 }
@@ -246,7 +250,7 @@
  * Text der Karte samt Archiviert-Chip unter 4.5:1 zog. */
 .waste-type-card--archived {
   background: var(--color-surface-receded);
-  border-color: var(--color-border-receded);
+  box-shadow: none;
 }
 
 .waste-type-card--archived .list-row__meta,
@@ -268,6 +272,26 @@
   padding: var(--space-2) 0;
 }
 
+/* Noch kein Termin: die Aktion steht an der Aussage (R20), Text und Knopf in
+ * einer Zeile, die bei Bedarf umbricht. */
+.waste-schedule-list__empty--action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+/* Weitere Vorlagen unter den Abfallarten (R20): leise, dieselben Chips wie im
+ * Onboarding. */
+.waste-type-presets-more {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-block-start: var(--space-1);
+}
+
 /* Auch unter dem Zeiger: die Zeile ist zugleich `.list-row`, und `.list-row:hover`
  * (list-row.css, 0-2-0) toente sie sonst wie eine laufende (#1230). */
 .waste-schedule-row--paused,
@@ -283,18 +307,46 @@
 /* Recurrence form                                                       */
 /* -------------------------------------------------------------------- */
 
+/* SIEBEN TAGE, EINE ZEILE (R20, Re-Critique 2026-10-17 a2 P3): mit 48px
+ * Mindestbreite und 8px Abstand brauchten die Chips 384px, das 390er-Blatt
+ * hat 324 - "So" stand allein in Zeile 2. Sieben gleiche Spalten tragen jede
+ * Breite (je ~43px bei 390, die Hoehe bleibt die Treffergroesse). */
 .waste-weekday-picker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-1);
 }
 
 /* Die Wochentage sind `.filter-chip` (R17, E6) - die eigene Kaestchen-Pille
- * `.waste-weekday-option` mit ihrer 13px-Checkbox ist fort. "Di" allein waere 40px breit:
- * die Mindestbreite haelt jedes Ziel auf der Treffergroesse. */
+ * `.waste-weekday-option` mit ihrer 13px-Checkbox ist fort. */
 .waste-weekday-picker .filter-chip {
-  min-width: var(--target-base);
+  min-width: 0;
+  min-height: var(--target-base);
+  padding-inline: 0;
   justify-content: center;
+}
+
+/* Den Abstand zwischen den Karten traegt die Liste, nicht jede Karte
+ * (test:frontend-audit "a card per row"): je Abfallart ein Traeger. */
+#waste-types-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* "Alle N Wochen" als Stepper (R20): Knopf, Zahl, Knopf. */
+.waste-interval-stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.waste-interval-stepper__input {
+  inline-size: 7ch;
+  min-inline-size: 0;
+  flex: 0 0 auto;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 .waste-icon-picker {

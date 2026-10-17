@@ -5748,7 +5748,9 @@
         "mappingProfileStatusUnmatchedType": "इस परिवार में कोई मेल खाता प्रकार नहीं",
         "mappingProfileStatusAmbiguousType": "अस्पष्ट - कई प्रकारों का यही नाम है",
         "icsCalendarName": "कचरा संग्रहण",
-        "icsPickupSummary": "संग्रहण: {{name}}"
+        "icsPickupSummary": "संग्रहण: {{name}}",
+        "intervalDecrease": "अंतराल घटाएँ",
+        "intervalIncrease": "अंतराल बढ़ाएँ"
     },
     "rewards": {
         "title": "पुरस्कार",

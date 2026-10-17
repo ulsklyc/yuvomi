@@ -491,6 +491,42 @@ function typeWithoutScheduleLine(typeId, occurrences = state.occurrences) {
   return next ? `${t('waste.nextPickupLabel')}: ${pickupWhenLabel(next.date_key)}` : t('waste.noSchedulesYet');
 }
 
+/**
+ * "Noch kein Termin" MIT DEM WEG DORTHIN (R20, Re-Critique 2026-10-17 a2
+ * P2-5). Die Zeile sagte, was fehlt, und der Weg lag im "..." der Karte. Jetzt
+ * steht "Termin hinzufuegen" daneben - derselbe `add-schedule` wie im Menue.
+ * Nicht bei einer archivierten Abfallart (sie nimmt keine Termine an) und nicht
+ * bei `read`; und nicht, wenn eine Einzelabholung schon die naechste nennt.
+ */
+function typeWithoutScheduleHtml(type, ro = readOnly()) {
+  const line = typeWithoutScheduleLine(type.id);
+  const offer = !ro && !type.archived && !state.occurrences.some((occ) => occ.type_id === type.id);
+  if (!offer) return `<p class="waste-schedule-list__empty">${esc(line)}</p>`;
+  return `<div class="waste-schedule-list__empty waste-schedule-list__empty--action"><span>${esc(line)}</span>`
+    + `<button type="button" class="btn btn--secondary btn--sm" data-action="add-schedule" data-type-id="${type.id}"><i data-lucide="plus" aria-hidden="true"></i>${esc(t('waste.addSchedule'))}</button></div>`;
+}
+
+/**
+ * Die Vorlagen, die der Haushalt noch nicht hat (R20). Im Onboarding standen
+ * sechs Chips, nach der ersten Abfallart keiner mehr - wer Bio und Papier
+ * auch braucht, musste in den Dialog. Jetzt bleiben die uebrigen als leise
+ * Zeile unter den Karten; vorhanden heisst: gleicher Name (ohne Gross/klein).
+ */
+function remainingTypePresets(types = state.types) {
+  const have = new Set(types.map((type) => String(type.name ?? '').trim().toLowerCase()));
+  return TYPE_PRESETS.filter((preset) => !have.has(presetLabel(preset).trim().toLowerCase()));
+}
+
+function remainingPresetsHtml() {
+  if (readOnly()) return '';
+  const presets = remainingTypePresets();
+  if (!presets.length) return '';
+  return `<div class="waste-type-presets-more" role="group" aria-label="${esc(t('waste.typePresetLabel'))}">`
+    + presets.map((preset) => `<button type="button" class="filter-chip waste-onboarding__preset" data-action="create-preset-type" data-preset="${preset.key}">`
+      + `<i data-lucide="${esc(preset.icon)}" style="color:${esc(preset.color)}" aria-hidden="true"></i><span>${esc(presetLabel(preset))}</span></button>`).join('')
+    + '</div>';
+}
+
 function typeCardHtml(type, index, total) {
   const schedules = schedulesForType(type.id);
   const ro = readOnly();
@@ -531,7 +567,7 @@ function typeCardHtml(type, index, total) {
           </div>`}
       </div>
       <div class="waste-schedule-list">
-        ${schedules.length ? schedules.map(scheduleRowHtml).join('') : `<p class="waste-schedule-list__empty">${esc(typeWithoutScheduleLine(type.id))}</p>`}
+        ${schedules.length ? schedules.map(scheduleRowHtml).join('') : typeWithoutScheduleHtml(type, ro)}
       </div>
     </div>`;
 }
@@ -706,7 +742,8 @@ function drawTypes(host) {
     return;
   }
   host.replaceChildren();
-  host.insertAdjacentHTML('beforeend', state.types.map((type, index) => typeCardHtml(type, index, state.types.length)).join(''));
+  host.insertAdjacentHTML('beforeend', state.types.map((type, index) => typeCardHtml(type, index, state.types.length)).join('')
+    + remainingPresetsHtml());
   if (window.lucide) window.lucide.createIcons({ el: host });
 }
 
@@ -1243,6 +1280,46 @@ function openTypeModal(type = null) {
  * in einer benannten Gruppe; der gewaehlte Stand steht zusaetzlich in einem
  * versteckten Feld, damit der Verwerfen-Schutz des Dialogs die Aenderung sieht.
  * `weekdayPickerValue()` liest die Chips, `wireWeekdayPicker()` schaltet sie. */
+/**
+ * "ALLE N WOCHEN" ALS STEPPER (R20, Re-Critique 2026-10-17 a2 P3). Ein nacktes
+ * Zahlenfeld verlangte fuer "alle 2 Wochen" die Tastatur; die Werte sind fast
+ * immer 1, 2 oder 4. Das Feld bleibt das native `<input type="number">` (sein
+ * `<label for>`, Tastatur und Pfeiltasten wie gehabt), links und rechts ein
+ * Knopf, der um eins schreibt und `input` meldet - der Dialog liest weiter
+ * `#wsm-interval`. An den Grenzen (1, 52) ist der Knopf `disabled`: hier ist
+ * das die Auskunft "weiter geht es nicht", kein toter Weg.
+ */
+function intervalStepperHtml(value) {
+  const v = Math.min(52, Math.max(1, Number(value) || 1));
+  return `<div class="waste-interval-stepper">`
+    + `<button type="button" class="btn btn--secondary btn--icon" data-interval-step="-1" aria-controls="wsm-interval" aria-label="${esc(t('waste.intervalDecrease'))}"${v <= 1 ? ' disabled' : ''}><i data-lucide="minus" class="icon-md" aria-hidden="true"></i></button>`
+    + `<input type="number" class="form-input waste-interval-stepper__input" id="wsm-interval" min="1" max="52" step="1" inputmode="numeric" value="${esc(String(v))}">`
+    + `<button type="button" class="btn btn--secondary btn--icon" data-interval-step="1" aria-controls="wsm-interval" aria-label="${esc(t('waste.intervalIncrease'))}"${v >= 52 ? ' disabled' : ''}><i data-lucide="plus" class="icon-md" aria-hidden="true"></i></button>`
+    + `</div>`;
+}
+
+/** Verdrahtet den Stepper: Knopf schreibt den Wert, das Feld haelt die Knoepfe nach. */
+function wireIntervalStepper(root) {
+  const input = root.querySelector('#wsm-interval');
+  if (!input) return;
+  const buttons = [...root.querySelectorAll('[data-interval-step]')];
+  const sync = () => {
+    const v = Number(input.value) || 1;
+    for (const btn of buttons) btn.disabled = Number(btn.dataset.intervalStep) < 0 ? v <= 1 : v >= 52;
+  };
+  for (const btn of buttons) {
+    btn.addEventListener('click', () => {
+      const next = Math.min(52, Math.max(1, (Number(input.value) || 1) + Number(btn.dataset.intervalStep)));
+      input.value = String(next);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      sync();
+      // An der Grenze wird der Knopf disabled und verloere den Fokus - dann zum Feld.
+      if (btn.disabled) input.focus();
+    });
+  }
+  input.addEventListener('input', sync);
+}
+
 function weekdayPickerHtml(selected) {
   const set = new Set(String(selected ?? '').split(',').filter(Boolean));
   const chosen = WEEKDAY_CODES.filter((code) => set.has(code));
@@ -1337,7 +1414,7 @@ function openScheduleModal(type, schedule = null) {
     </div>
     <div class="form-group">
       <label class="form-label" for="wsm-interval">${t('waste.intervalLabelWeekly')}</label>
-      <input type="number" class="form-input" id="wsm-interval" min="1" max="52" value="${esc(String(schedule?.interval ?? 1))}">
+      ${intervalStepperHtml(schedule?.interval ?? 1)}
     </div>
     <div class="form-group">
       <label class="form-label" for="wsm-anchor">${t('waste.anchorDateLabel')}</label>
@@ -1370,6 +1447,7 @@ function openScheduleModal(type, schedule = null) {
       panel.querySelector('#wsm-cancel').addEventListener('click', () => closeModal());
 
       wireWeekdayPicker(panel);
+      wireIntervalStepper(panel);
       const kindSelect = panel.querySelector('#wsm-kind');
       const weeklyFields = panel.querySelector('#wsm-weekly-fields');
       const monthlyFields = panel.querySelector('#wsm-monthly-fields');
@@ -2707,7 +2785,7 @@ export const __test = {
   // steht, und welche Abfallart der Termin-Dialog des Primaerknopfs vorschlaegt.
   pickupWhenLabel, typeWithoutScheduleLine, defaultScheduleType, occurrenceRowHtml,
   // R17/E6: die Wochentage des Termin-Dialogs als Chips.
-  weekdayPickerHtml, weekdayPickerValue,
+  weekdayPickerHtml, weekdayPickerValue, intervalStepperHtml, wireIntervalStepper,
   findScheduleOrigin, parseDeepLinkParams, deepLinkSelectors, recurrenceSummary, originBadges,
   defaultLabelDecision, unresolvedBlockingDiagnostics, buildMappingDecisions, sourceHealthBadgeInfo,
   splitUpcomingByType, deepLinkNeedsExpand, nearestOrdinalAnchorDateKey,
@@ -2715,7 +2793,7 @@ export const __test = {
   // Zeilengrammatik (Audit UX 2026-09-12) tragen sie Bedingungen, die man
   // nicht mehr am Markup ablesen kann - welcher Eintrag bei welcher Position
   // im Menue steht, und dass die Preset-Farben allesamt im Raster liegen.
-  typeCardHtml, scheduleRowHtml, sourceRowHtml, TYPE_PRESETS, WASTE_TYPE_COLORS,
+  typeCardHtml, scheduleRowHtml, sourceRowHtml, TYPE_PRESETS, typeWithoutScheduleHtml, remainingTypePresets, remainingPresetsHtml, WASTE_TYPE_COLORS,
   activeSwatchColor, resolveSwatchColors,
   isOnboarding, onboardingHtml, sectionVisibility, fabIntent, pageModeClasses,
   importErrorText,

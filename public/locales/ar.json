@@ -6154,7 +6154,9 @@
         "mappingProfileStatusUnmatchedType": "لا يوجد نوع مطابق في هذه الأسرة",
         "mappingProfileStatusAmbiguousType": "غامض - عدة أنواع تشترك في هذا الاسم",
         "icsCalendarName": "مواعيد جمع النفايات",
-        "icsPickupSummary": "جمع {{name}}"
+        "icsPickupSummary": "جمع {{name}}",
+        "intervalDecrease": "تقليل الفاصل",
+        "intervalIncrease": "زيادة الفاصل"
     },
     "rewards": {
         "title": "المكافآت",

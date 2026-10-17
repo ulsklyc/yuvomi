@@ -6018,7 +6018,9 @@
         "mappingProfileStatusUnmatchedType": "Brak pasującego rodzaju w tym gospodarstwie",
         "mappingProfileStatusAmbiguousType": "Niejednoznaczne - kilka typów ma tę samą nazwę",
         "icsCalendarName": "Odbiór odpadów",
-        "icsPickupSummary": "Odbiór: {{name}}"
+        "icsPickupSummary": "Odbiór: {{name}}",
+        "intervalDecrease": "Zmniejsz odstęp",
+        "intervalIncrease": "Zwiększ odstęp"
     },
     "rewards": {
         "title": "Nagrody",

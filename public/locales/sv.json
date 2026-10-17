@@ -5748,7 +5748,9 @@
         "mappingProfileStatusUnmatchedType": "Ingen matchande typ i detta hushåll",
         "mappingProfileStatusAmbiguousType": "Tvetydigt - flera typer delar detta namn",
         "icsCalendarName": "Sophämtning",
-        "icsPickupSummary": "Hämtning: {{name}}"
+        "icsPickupSummary": "Hämtning: {{name}}",
+        "intervalDecrease": "Minska intervallet",
+        "intervalIncrease": "Öka intervallet"
     },
     "rewards": {
         "title": "Belöningar",
