@@ -2150,7 +2150,7 @@
         "pwaInstallTitle": "Cài đặt Yuvomi trên thiết bị này",
         "pwaInstallChecking": "Đang kiểm tra tính khả dụng để cài đặt...",
         "pwaInstallReady": "Yuvomi có thể được cài đặt như một ứng dụng trên thiết bị này.",
-        "pwaInstallUnavailable": "Cài đặt hiện không khả dụng trên trình duyệt này.",
+        "pwaInstallUnavailable": "Trình duyệt này không cung cấp cài đặt ở đây. Trong Chrome và Edge, bạn tìm thấy nó trong menu trình duyệt; trong Safari, ở Chia sẻ > Thêm vào Dock hoặc Thêm vào Màn hình chính. Không có địa chỉ HTTPS thì không trình duyệt nào cung cấp.",
         "pwaInstallInstalled": "Yuvomi đã được cài đặt trên thiết bị này.",
         "pwaInstallIosHint": "Trên iPhone hoặc iPad, sử dụng menu Chia sẻ và chọn Thêm vào Màn hình Chính.",
         "pwaInstallButton": "Cài đặt ứng dụng",

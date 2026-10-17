@@ -1673,6 +1673,16 @@ test('personal device leaf owns PWA installation state and disconnect cleanup', 
   assert.match(source, /id="pwa-install-status"[^>]*aria-live=/);
   assert.match(source, /id="pwa-install-error"[^>]*role="alert"/);
   assert.match(source, /id="pwa-install-btn"[^>]*aria-describedby="pwa-install-status pwa-install-error"/);
+  // R20 (Re-Critique 2026-10-17 a5 P2-9): kein deaktivierter Primaerknopf ohne
+  // Weg dahinter. Installiert und nicht verfuegbar verschwindet der Knopf, der
+  // Status traegt die Auskunft (wo es die Installation gibt).
+  const branch = (from, to) => source.slice(source.indexOf(from), source.indexOf(to, source.indexOf(from)));
+  assert.match(branch("t('settings.pwaInstallInstalled')", 'return;'), /button\.hidden = true/, 'installiert: kein Knopf');
+  assert.match(branch("t('settings.pwaInstallUnavailable')", '};'), /button\.hidden = true/, 'nicht verfuegbar: kein Knopf');
+  assert.match(branch("t('settings.pwaInstallReady')", 'return;'), /button\.disabled = false/);
+  assert.match(source, /button\.hidden = false;\s*\n\s*if \(state\.installed\)/, 'jeder Zustand setzt den Knopf zuerst wieder sichtbar');
+  const de = JSON.parse(read('../public/locales/de.json')).settings.pwaInstallUnavailable;
+  assert.match(de, /Browsermenü[\s\S]*Safari[\s\S]*HTTPS/, 'der Status nennt den Weg statt nur "nicht verfuegbar"');
 });
 
 test('module-specific settings leaves exist and export async render functions', () => {

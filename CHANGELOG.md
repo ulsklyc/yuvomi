@@ -323,6 +323,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Health: the lab trend opens on the value that needs attention.** The chart under the lab
   reports used to show the first value ever entered (often a normal one); it now starts with a
   value flagged out of range in the latest report, preferring one with a history to draw.
+- **Settings: no dead "Install app" button.** Where the browser offers no installation, or Yuvomi
+  is already installed, the button is gone and the page says where installing works: in the browser
+  menu of Chrome and Edge, under Share in Safari, and only over HTTPS.
 - **Screen readers and voice control hear what the buttons show.** Several buttons carried a name that
   left out their visible text, so saying what you see did not reach them: the account button in the
   sidebar, the "New" button in a module header, kitchen tabs with a count, account rows in Budget,

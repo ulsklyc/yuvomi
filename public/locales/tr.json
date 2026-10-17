@@ -2039,7 +2039,7 @@
         "pwaInstallTitle": "Yuvomi’u bu cihaza yükle",
         "pwaInstallChecking": "Yükleme uygunluğu kontrol ediliyor...",
         "pwaInstallReady": "Yuvomi bu cihaza uygulama olarak yüklenebilir.",
-        "pwaInstallUnavailable": "Yükleme şu anda bu tarayıcıda kullanılamıyor.",
+        "pwaInstallUnavailable": "Bu tarayıcı burada yüklemeyi sunmuyor. Chrome ve Edge'de tarayıcı menüsünde, Safari'de Paylaş > Dock'a Ekle veya Ana Ekrana Ekle altında bulursun. HTTPS adresi olmadan hiçbir tarayıcı bunu sunmaz.",
         "pwaInstallInstalled": "Yuvomi bu cihazda zaten yüklü.",
         "pwaInstallIosHint": "iPhone veya iPad’de Paylaş menüsünü kullanıp Ana Ekrana Ekle’yi seçin.",
         "pwaInstallButton": "Uygulamayı yükle",

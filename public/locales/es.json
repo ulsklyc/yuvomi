@@ -2039,7 +2039,7 @@
         "pwaInstallTitle": "Instalar Yuvomi en este dispositivo",
         "pwaInstallChecking": "Comprobando disponibilidad de instalación...",
         "pwaInstallReady": "Yuvomi se puede instalar como app en este dispositivo.",
-        "pwaInstallUnavailable": "La instalación no está disponible en este navegador ahora mismo.",
+        "pwaInstallUnavailable": "Este navegador no ofrece la instalación aquí. En Chrome y Edge está en el menú del navegador; en Safari, en Compartir > Añadir al Dock o Añadir a pantalla de inicio. Sin una dirección HTTPS ningún navegador la ofrece.",
         "pwaInstallInstalled": "Yuvomi ya está instalado en este dispositivo.",
         "pwaInstallIosHint": "En iPhone o iPad, usa el menú Compartir y elige Añadir a pantalla de inicio.",
         "pwaInstallButton": "Instalar app",

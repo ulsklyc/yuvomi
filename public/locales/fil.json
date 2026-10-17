@@ -2216,7 +2216,7 @@
         "pwaInstallTitle": "I-install ang Yuvomi sa device na ito",
         "pwaInstallChecking": "Sinusuri ang pagkakaroon ng pag-install...",
         "pwaInstallReady": "Maaaring i-install ang Yuvomi bilang app sa device na ito.",
-        "pwaInstallUnavailable": "Hindi available ang pag-install sa browser na ito sa ngayon.",
+        "pwaInstallUnavailable": "Hindi nag-aalok ng pag-install ang browser na ito rito. Sa Chrome at Edge, nasa menu ng browser ito; sa Safari, nasa Share > Add to Dock o Add to Home Screen. Kung walang HTTPS na address, walang browser na mag-aalok nito.",
         "pwaInstallInstalled": "Naka-install na ang Yuvomi sa device na ito.",
         "pwaInstallIosHint": "Sa iPhone o iPad, gamitin ang Share menu at piliin ang Add to Home Screen.",
         "pwaInstallButton": "I-install ang app",

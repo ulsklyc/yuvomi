@@ -61,10 +61,16 @@ function bindPwaInstall(container) {
       return;
     }
 
+    // KEIN TOTER KNOPF (R20, Re-Critique 2026-10-17 a5 P2-9). Installiert
+    // und nicht verfuegbar stand hier ein deaktivierter Primaerknopf ohne
+    // Weg dahinter. Jetzt verschwindet er, und der Status sagt, was gilt -
+    // ohne Angebot, wo es eines gibt (Browsermenue, Safari-Teilen, HTTPS).
+    button.hidden = false;
     if (state.installed) {
       status.textContent = t('settings.pwaInstallInstalled');
       label.textContent = t('settings.pwaInstallInstalledButton');
       button.disabled = true;
+      button.hidden = true;
       return;
     }
     if (state.ios) {
@@ -83,6 +89,7 @@ function bindPwaInstall(container) {
     status.textContent = t('settings.pwaInstallUnavailable');
     label.textContent = t('settings.pwaInstallButton');
     button.disabled = true;
+    button.hidden = true;
   };
 
   unsubscribe = onPwaInstallStateChanged(renderState);

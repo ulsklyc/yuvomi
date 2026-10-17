@@ -2039,7 +2039,7 @@
         "pwaInstallTitle": "このデバイスに Yuvomi をインストール",
         "pwaInstallChecking": "インストール可否を確認しています...",
         "pwaInstallReady": "Yuvomi はこのデバイスにアプリとしてインストールできます。",
-        "pwaInstallUnavailable": "このブラウザーでは現在インストールできません。",
+        "pwaInstallUnavailable": "このブラウザーでは、ここからインストールできません。Chrome と Edge ではブラウザーのメニューから、Safari では［共有］>［Dock に追加］または［ホーム画面に追加］からインストールできます。HTTPS のアドレスでない場合、どのブラウザーでもインストールできません。",
         "pwaInstallInstalled": "Yuvomi はこのデバイスにすでにインストールされています。",
         "pwaInstallIosHint": "iPhone または iPad では、共有メニューからホーム画面に追加を選択してください。",
         "pwaInstallButton": "アプリをインストール",

@@ -2150,7 +2150,7 @@
         "pwaInstallTitle": "Yuvomi telepítése erre az eszközre",
         "pwaInstallChecking": "Telepítési lehetőség ellenőrzése...",
         "pwaInstallReady": "A Yuvomi telepíthető alkalmazásként erre az eszközre.",
-        "pwaInstallUnavailable": "A telepítés jelenleg nem elérhető ebben a böngészőben.",
+        "pwaInstallUnavailable": "Ez a böngésző itt nem kínálja fel a telepítést. Chrome-ban és Edge-ben a böngésző menüjében találod, Safariban a Megosztás > Hozzáadás a Dockhoz vagy a Főképernyőhöz alatt. HTTPS-cím nélkül egyik böngésző sem kínálja fel.",
         "pwaInstallInstalled": "A Yuvomi már telepítve van erre az eszközre.",
         "pwaInstallIosHint": "iPhone vagy iPad esetén használja a Megosztás menüt, majd válassza a Hozzáadás a Főképernyőhöz lehetőséget.",
         "pwaInstallButton": "Alkalmazás telepítése",

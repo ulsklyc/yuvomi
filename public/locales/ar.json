@@ -2280,7 +2280,7 @@
         "pwaInstallTitle": "تثبيت Yuvomi على هذا الجهاز",
         "pwaInstallChecking": "جارٍ التحقق من إمكانية التثبيت...",
         "pwaInstallReady": "يمكن تثبيت Yuvomi كتطبيق على هذا الجهاز.",
-        "pwaInstallUnavailable": "التثبيت غير متاح في هذا المتصفح الآن.",
+        "pwaInstallUnavailable": "لا يعرض هذا المتصفح التثبيت هنا. في Chrome وEdge تجده في قائمة المتصفح، وفي Safari ضمن مشاركة > إضافة إلى Dock أو إلى الشاشة الرئيسية. بدون عنوان HTTPS لا يعرضه أي متصفح.",
         "pwaInstallInstalled": "Yuvomi مثبت بالفعل على هذا الجهاز.",
         "pwaInstallIosHint": "على iPhone أو iPad، استخدم قائمة المشاركة واختر إضافة إلى الشاشة الرئيسية.",
         "pwaInstallButton": "تثبيت التطبيق",

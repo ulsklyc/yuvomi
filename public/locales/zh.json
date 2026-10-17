@@ -2039,7 +2039,7 @@
         "pwaInstallTitle": "在此设备上安装 Yuvomi",
         "pwaInstallChecking": "正在检查是否可安装...",
         "pwaInstallReady": "Yuvomi 可以作为应用安装到此设备。",
-        "pwaInstallUnavailable": "当前浏览器暂不支持安装。",
+        "pwaInstallUnavailable": "此浏览器在这里不提供安装。在 Chrome 和 Edge 中可在浏览器菜单里找到，在 Safari 中位于“共享”>“添加到程序坞”或“添加到主屏幕”。没有 HTTPS 地址时，任何浏览器都不提供安装。",
         "pwaInstallInstalled": "Yuvomi 已安装在此设备上。",
         "pwaInstallIosHint": "在 iPhone 或 iPad 上，使用共享菜单并选择添加到主屏幕。",
         "pwaInstallButton": "安装应用",

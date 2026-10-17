@@ -2039,7 +2039,7 @@
         "pwaInstallTitle": "Installera Yuvomi på den här enheten",
         "pwaInstallChecking": "Kontrollerar om installation är tillgänglig...",
         "pwaInstallReady": "Yuvomi kan installeras som app på den här enheten.",
-        "pwaInstallUnavailable": "Installation är inte tillgänglig i den här webbläsaren just nu.",
+        "pwaInstallUnavailable": "Den här webbläsaren erbjuder inte installation här. I Chrome och Edge hittar du den i webbläsarmenyn, i Safari under Dela > Lägg till i Dock eller Lägg till på hemskärmen. Utan en HTTPS-adress erbjuder ingen webbläsare den.",
         "pwaInstallInstalled": "Yuvomi är redan installerat på den här enheten.",
         "pwaInstallIosHint": "På iPhone eller iPad använder du Dela-menyn och väljer Lägg till på hemskärmen.",
         "pwaInstallButton": "Installera app",

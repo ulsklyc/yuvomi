@@ -2039,7 +2039,7 @@
         "pwaInstallTitle": "इस डिवाइस पर Yuvomi इंस्टॉल करें",
         "pwaInstallChecking": "इंस्टॉल उपलब्धता जांची जा रही है...",
         "pwaInstallReady": "Yuvomi को इस डिवाइस पर ऐप के रूप में इंस्टॉल किया जा सकता है।",
-        "pwaInstallUnavailable": "इस ब्राउज़र में अभी इंस्टॉल उपलब्ध नहीं है।",
+        "pwaInstallUnavailable": "यह ब्राउज़र यहाँ इंस्टॉल करने का विकल्प नहीं देता। Chrome और Edge में यह ब्राउज़र मेनू में मिलता है, Safari में शेयर > Dock में जोड़ें या होम स्क्रीन में जोड़ें में। HTTPS पते के बिना कोई भी ब्राउज़र यह विकल्प नहीं देता।",
         "pwaInstallInstalled": "Yuvomi इस डिवाइस पर पहले से इंस्टॉल है।",
         "pwaInstallIosHint": "iPhone या iPad पर शेयर मेनू खोलें और Add to Home Screen चुनें।",
         "pwaInstallButton": "ऐप इंस्टॉल करें",

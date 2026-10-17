@@ -2193,7 +2193,7 @@
         "pwaInstallTitle": "نصب Yuvomi روی این دستگاه",
         "pwaInstallChecking": "در حال بررسی امکان نصب...",
         "pwaInstallReady": "می‌توان Yuvomi را به عنوان برنامه روی این دستگاه نصب کرد.",
-        "pwaInstallUnavailable": "نصب در این مرورگر در حال حاضر در دسترس نیست.",
+        "pwaInstallUnavailable": "این مرورگر در اینجا نصب را پیشنهاد نمی‌کند. در Chrome و Edge آن را در منوی مرورگر پیدا می‌کنی و در Safari از اشتراک‌گذاری > افزودن به Dock یا افزودن به صفحهٔ اصلی. بدون نشانی HTTPS هیچ مرورگری آن را پیشنهاد نمی‌کند.",
         "pwaInstallInstalled": "Yuvomi از پیش روی این دستگاه نصب شده است.",
         "pwaInstallIosHint": "در iPhone یا iPad منوی اشتراک‌گذاری را باز کرده و افزودن به صفحه اصلی را انتخاب کنید.",
         "pwaInstallButton": "نصب برنامه",

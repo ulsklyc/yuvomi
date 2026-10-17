@@ -2193,7 +2193,7 @@
         "pwaInstallTitle": "Instal Yuvomi di perangkat ini",
         "pwaInstallChecking": "Memeriksa ketersediaan pemasangan...",
         "pwaInstallReady": "Yuvomi dapat diinstal sebagai aplikasi di perangkat ini.",
-        "pwaInstallUnavailable": "Pemasangan saat ini tidak tersedia di browser ini.",
+        "pwaInstallUnavailable": "Browser ini tidak menawarkan pemasangan di sini. Di Chrome dan Edge kamu menemukannya di menu browser, di Safari pada Bagikan > Tambahkan ke Dock atau Tambahkan ke Layar Utama. Tanpa alamat HTTPS, tidak ada browser yang menawarkannya.",
         "pwaInstallInstalled": "Yuvomi sudah terinstal di perangkat ini.",
         "pwaInstallIosHint": "Di iPhone atau iPad, buka menu Bagikan dan pilih Tambahkan ke Layar Utama.",
         "pwaInstallButton": "Instal aplikasi",

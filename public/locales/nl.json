@@ -2150,7 +2150,7 @@
         "pwaInstallTitle": "Yuvomi op dit apparaat installeren",
         "pwaInstallChecking": "Installatiemogelijkheid controleren...",
         "pwaInstallReady": "Yuvomi kan als app op dit apparaat worden geïnstalleerd.",
-        "pwaInstallUnavailable": "Installatie is momenteel niet beschikbaar in deze browser.",
+        "pwaInstallUnavailable": "Deze browser biedt de installatie hier niet aan. In Chrome en Edge vind je die in het browsermenu, in Safari onder Deel > Voeg toe aan Dock of Zet op beginscherm. Zonder HTTPS-adres biedt geen enkele browser haar aan.",
         "pwaInstallInstalled": "Yuvomi is al geïnstalleerd op dit apparaat.",
         "pwaInstallIosHint": "Op iPhone of iPad: gebruik het Deelmenu en kies Zet op beginscherm.",
         "pwaInstallButton": "App installeren",

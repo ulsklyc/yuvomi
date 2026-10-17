@@ -2258,7 +2258,7 @@
         "pwaInstallTitle": "Instalovat Yuvomi na toto zařízení",
         "pwaInstallChecking": "Kontrola dostupnosti instalace...",
         "pwaInstallReady": "Yuvomi lze na toto zařízení nainstalovat jako aplikaci.",
-        "pwaInstallUnavailable": "Instalace v tomto prohlížeči momentálně není dostupná.",
+        "pwaInstallUnavailable": "Tento prohlížeč zde instalaci nenabízí. V Chromu a Edge ji najdeš v nabídce prohlížeče, v Safari pod Sdílet > Přidat do Docku nebo Přidat na plochu. Bez adresy HTTPS ji nenabízí žádný prohlížeč.",
         "pwaInstallInstalled": "Yuvomi je na tomto zařízení již nainstalován.",
         "pwaInstallIosHint": "Na iPhone nebo iPad otevřete nabídku Sdílet a vyberte Přidat na plochu.",
         "pwaInstallButton": "Instalovat aplikaci",
