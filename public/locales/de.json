@@ -1756,6 +1756,7 @@
         "statsPointsLabel": "Werte der Trendkurve",
         "statsPointLabel": "{{period}}: Einnahmen {{income}}, Ausgaben {{expenses}}",
         "statsPointLabelCumulative": "Bis {{period}}: Einnahmen {{income}}, Ausgaben {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} geplant",
         "receiptsLabel": "Belege",
         "receiptsHint": "Kassenbon oder Rechnung zu dieser Buchung.",
         "receiptDocumentName": "Beleg: {{title}} ({{date}})",

@@ -1407,6 +1407,30 @@ button.budget-bar-row:focus-visible {
   .budget-bar-row__amount { grid-area: 1 / 3; }
 }
 
+/* EINE BAHN JE BLOCK (Re-Critique 2026-10-17, P1). Jede Zeile war ihr eigenes
+ * Raster mit `auto` als Betragsspalte; die Spalte wuchs mit der Differenz
+ * darunter ("von 1.700 €  +120,00 €", nowrap), und die Bahnen derselben
+ * Liste liefen gemessen 171 bis 191px - Balken und Zielmarken standen bis zu
+ * 12 % versetzt, ein Vergleich nach Laenge war keiner mehr. Mit subgrid teilen
+ * sich alle Zeilen eines Blocks die Spalten des Blocks: die breiteste
+ * Betragsspalte gilt fuer alle, jede Bahn beginnt und endet an derselben x.
+ * Ohne subgrid bleibt es beim Zeilenraster oben. Die Seitenleiste der
+ * Uebersicht stapelt ihre Zeilen (Name ueber Bahn) und bleibt aussen vor. */
+@container budget-page (min-width: 480px) {
+  @supports (grid-template-columns: subgrid) {
+    .budget-chart-block__rows:not(.budget-overview__aside .budget-chart-block__rows) {
+      display: grid;
+      grid-template-columns: 168px minmax(0, 1fr) auto;
+      column-gap: var(--space-2);
+    }
+
+    .budget-chart-block__rows:not(.budget-overview__aside .budget-chart-block__rows) > .budget-bar-row {
+      grid-column: 1 / -1;
+      grid-template-columns: subgrid;
+    }
+  }
+}
+
 .budget-bar-row__track {
   height: var(--space-2);
   /* Fill-Well statt Surface-2: der Track lag bei 1.02:1 auf der weißen Karte
@@ -2601,6 +2625,9 @@ button.budget-entry__title {
  * Betrags - die geteilte Trend-Zeile ist sonst ein Block. */
 .budget-stats__legend .metric-card__trend { display:inline-flex; margin-inline-start:var(--space-1); }
 .budget-stats__legend { flex-wrap:wrap; row-gap:var(--space-1); }
+/* Was nach heute noch eingetragen ist (budget-stats.js trendLegendFigures):
+ * eine Stufe leiser als der Stand von heute, den der Punkt der Kurve zeigt. */
+.budget-stats__legend-planned { color:var(--color-text-tertiary); }
 
 /* Kategorievergleich (budget-stats.js renderCatBars): der Satz nennt den
  * Vorzeitraum EINMAL, die Zeilen tragen nur noch die Differenz. */

@@ -5669,6 +5669,47 @@ test('R17: die Kurve teilt sich am heutigen Tag - nur wenn der Zeitraum eine Zuk
   assert.match(future?.body ?? '', /stroke-dasharray:/, 'die Zukunft ist gestrichelt');
 });
 
+test('Verlauf: die Legende nennt den Wert des Heute-Punkts, der Rest steht als geplant daneben (Re-Critique 2026-10-17)', async () => {
+  const { __test: st } = await import('../public/pages/budget-stats.js');
+  // Aufsummiert, heute ist Tag 3 von 5: Punkt 2.712, ganzer Monat 3.046,11.
+  const raw = [2000, 500, 212, 0, 334.11];
+  let acc = 0;
+  const cum = raw.map((v) => (acc += v));
+  const laufend = st.trendLegendFigures(cum, raw, 2, true);
+  assert.equal(laufend.value, 2712, 'die Legende liest denselben Wert wie der beschriftete Punkt');
+  assert.equal(laufend.planned, 334.11, 'was danach eingetragen ist, steht getrennt');
+  assert.equal(Math.round(laufend.total * 100) / 100, 3046.11, 'der Vergleich mit dem Vorzeitraum rechnet weiter mit dem ganzen Zeitraum');
+  const vorbei = st.trendLegendFigures(cum, raw, 4, false);
+  assert.equal(Math.round(vorbei.value * 100) / 100, 3046.11, 'ein abgeschlossener Zeitraum nennt seine Summe');
+  assert.equal(vorbei.planned, 0);
+  const fn = stats.slice(stats.indexOf('function renderTrendChart()'), stats.indexOf('/** Die Flaeche des Verlaufs'));
+  assert.match(fn, /trendLegendFigures\(incomes, rawIncomes, markIndex, todayIndex >= 0\)/);
+  assert.match(fn, /trendLegendFigures\(expenses, rawExpenses, markIndex, todayIndex >= 0\)/);
+  assert.match(fn, /markMarkup\(\{ x: chartX\(markIndex, s\.length, geo\), income: incomes\[markIndex\], expenses: expenses\[markIndex\]/,
+    'Punkt und Legende lesen dieselbe Reihe am selben Index');
+  assert.match(fn, /wireTrendPoints\(host, shown, pointKey, s, todayIndex >= 0 \? markIndex : null\)/,
+    'auch die Ableselinie startet am beschrifteten Punkt');
+});
+
+test('Statistik: alle Bahnen eines Blocks sind gleich lang - eine Skala je Block (Re-Critique 2026-10-17)', () => {
+  // Jede Zeile war ihr eigenes Raster mit `auto` als Betragsspalte; die Bahnen
+  // liefen 171 bis 191px. Die Zeilen teilen sich jetzt per subgrid die Spalten
+  // ihres Blocks.
+  const rules = [...eachRule(budgetCss)];
+  const sel = '.budget-chart-block__rows:not(.budget-overview__aside .budget-chart-block__rows)';
+  const host = rules.find((r) => r.selector.trim() === sel);
+  const row = rules.find((r) => r.selector.trim() === `${sel} > .budget-bar-row`);
+  assert.ok(host && row, 'die Blockzeilen teilen sich ein Raster');
+  assert.match(host.body, /display:\s*grid/);
+  assert.match(host.body, /grid-template-columns:\s*168px minmax\(0, 1fr\) auto/, 'dieselben Spalten wie die Einzelzeile');
+  assert.match(row.body, /grid-template-columns:\s*subgrid/);
+  assert.match(row.body, /grid-column:\s*1 \/ -1/);
+  for (const r of [host, row]) {
+    assert.match(r.at.join(' '), /@container budget-page \(min-width: 480px\)/, 'erst ab der Dreispalten-Stufe');
+    assert.match(r.at.join(' '), /@supports \(grid-template-columns: subgrid\)/, 'ohne subgrid bleibt das Zeilenraster');
+  }
+});
+
 test('R17: mobil rechnet der Verlauf auf einer hoeheren Flaeche (mindestens 160px bei 390px Fenster)', async () => {
   const { __test: st } = await import('../public/pages/budget-stats.js');
   // 390px Fenster: 358px Karte, davon 34px Achsenpolster - das SVG ist 324px breit.

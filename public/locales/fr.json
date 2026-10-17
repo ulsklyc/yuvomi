@@ -1741,6 +1741,7 @@
         "statsPointsLabel": "Valeurs de la courbe",
         "statsPointLabel": "{{period}} : revenus {{income}}, dépenses {{expenses}}",
         "statsPointLabelCumulative": "Jusqu’au {{period}} : revenus {{income}}, dépenses {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} prévu",
         "receiptsLabel": "Justificatifs",
         "receiptsHint": "Ticket de caisse ou facture de cette opération.",
         "receiptDocumentName": "Justificatif : {{title}} ({{date}})",

@@ -1756,6 +1756,7 @@
         "statsPointsLabel": "추이 그래프 값",
         "statsPointLabel": "{{period}}: 수입 {{income}}, 지출 {{expenses}}",
         "statsPointLabelCumulative": "{{period}}까지: 수입 {{income}}, 지출 {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} 예정",
         "receiptsLabel": "영수증",
         "receiptsHint": "이 거래의 영수증 또는 청구서입니다.",
         "receiptDocumentName": "영수증: {{title}} ({{date}})",

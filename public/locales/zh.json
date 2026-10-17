@@ -1741,6 +1741,7 @@
         "statsPointsLabel": "走势曲线数值",
         "statsPointLabel": "{{period}}：收入 {{income}}，支出 {{expenses}}",
         "statsPointLabelCumulative": "截至 {{period}}：收入 {{income}}，支出 {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} 计划中",
         "receiptsLabel": "凭证",
         "receiptsHint": "这笔交易的收据或发票。",
         "receiptDocumentName": "凭证：{{title}}（{{date}}）",

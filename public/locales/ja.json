@@ -1741,6 +1741,7 @@
         "statsPointsLabel": "推移グラフの値",
         "statsPointLabel": "{{period}}: 収入 {{income}}、支出 {{expenses}}",
         "statsPointLabelCumulative": "{{period}}まで: 収入 {{income}}、支出 {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} 予定",
         "receiptsLabel": "領収書",
         "receiptsHint": "この取引のレシートまたは請求書。",
         "receiptDocumentName": "領収書: {{title}}（{{date}}）",

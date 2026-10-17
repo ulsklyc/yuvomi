@@ -1741,6 +1741,7 @@
         "statsPointsLabel": "Valores da curva",
         "statsPointLabel": "{{period}}: receitas {{income}}, despesas {{expenses}}",
         "statsPointLabelCumulative": "Até {{period}}: receitas {{income}}, despesas {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} previsto",
         "receiptsLabel": "Comprovativos",
         "receiptsHint": "Talão ou fatura deste movimento.",
         "receiptDocumentName": "Comprovativo: {{title}} ({{date}})",

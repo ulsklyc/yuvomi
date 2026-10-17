@@ -1741,6 +1741,7 @@
         "statsPointsLabel": "Trend line values",
         "statsPointLabel": "{{period}}: income {{income}}, expenses {{expenses}}",
         "statsPointLabelCumulative": "Up to {{period}}: income {{income}}, expenses {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} planned",
         "receiptsLabel": "Receipts",
         "receiptsHint": "Receipt or invoice for this transaction.",
         "receiptDocumentName": "Receipt: {{title}} ({{date}})",

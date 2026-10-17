@@ -1741,6 +1741,7 @@
         "statsPointsLabel": "Valores de la curva",
         "statsPointLabel": "{{period}}: ingresos {{income}}, gastos {{expenses}}",
         "statsPointLabelCumulative": "Hasta {{period}}: ingresos {{income}}, gastos {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} previsto",
         "receiptsLabel": "Comprobantes",
         "receiptsHint": "Ticket o factura de este movimiento.",
         "receiptDocumentName": "Comprobante: {{title}} ({{date}})",

@@ -1741,6 +1741,7 @@
         "statsPointsLabel": "रुझान वक्र के मान",
         "statsPointLabel": "{{period}}: आय {{income}}, व्यय {{expenses}}",
         "statsPointLabelCumulative": "{{period}} तक: आय {{income}}, व्यय {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} योजनाबद्ध",
         "receiptsLabel": "रसीदें",
         "receiptsHint": "इस लेनदेन की रसीद या बिल।",
         "receiptDocumentName": "रसीद: {{title}} ({{date}})",

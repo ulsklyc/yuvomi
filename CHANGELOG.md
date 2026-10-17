@@ -331,7 +331,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rounding remainder; changes are now rounded to the currency first. The plan target on each
   category bar was explained only in a hover tooltip and stuck to the bar's end when it exceeded the
   largest amount: the scale now covers both, and the target reads "of 1,700.00 €" under the amount,
-  with how much of it is used for screen readers.
+  with how much of it is used for screen readers. All bars of a block now share one track length, so bars and
+  targets line up instead of shifting by up to 12 % with the width of the figures beside them. In a
+  month that is still running, the legend of the cumulative chart names the same figure as the
+  "Today" point, with what is entered for the days after today as "+ ... planned".
 
 - **The welcome tour points to the right button on a computer.** Its last step said new entries
   are created with the + button at the bottom right; on a wide screen that button sits at the top

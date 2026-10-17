@@ -1741,6 +1741,7 @@
         "statsPointsLabel": "Giá trị đường xu hướng",
         "statsPointLabel": "{{period}}: thu nhập {{income}}, chi tiêu {{expenses}}",
         "statsPointLabelCumulative": "Đến {{period}}: thu nhập {{income}}, chi tiêu {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} dự kiến",
         "receiptsLabel": "Chứng từ",
         "receiptsHint": "Hóa đơn hoặc biên lai của giao dịch này.",
         "receiptDocumentName": "Chứng từ: {{title}} ({{date}})",

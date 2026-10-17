@@ -1741,6 +1741,7 @@
         "statsPointsLabel": "Eğri değerleri",
         "statsPointLabel": "{{period}}: gelir {{income}}, gider {{expenses}}",
         "statsPointLabelCumulative": "{{period}} tarihine kadar: gelir {{income}}, gider {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} planlanan",
         "receiptsLabel": "Fişler",
         "receiptsHint": "Bu işleme ait fiş veya fatura.",
         "receiptDocumentName": "Fiş: {{title}} ({{date}})",

@@ -1741,6 +1741,7 @@
         "statsPointsLabel": "A trendgörbe értékei",
         "statsPointLabel": "{{period}}: bevétel {{income}}, kiadás {{expenses}}",
         "statsPointLabelCumulative": "{{period}}-ig: bevétel {{income}}, kiadás {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} tervezett",
         "receiptsLabel": "Bizonylatok",
         "receiptsHint": "Nyugta vagy számla ehhez a tételhez.",
         "receiptDocumentName": "Bizonylat: {{title}} ({{date}})",

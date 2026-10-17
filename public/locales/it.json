@@ -1741,6 +1741,7 @@
         "statsPointsLabel": "Valori della curva",
         "statsPointLabel": "{{period}}: entrate {{income}}, uscite {{expenses}}",
         "statsPointLabelCumulative": "Fino al {{period}}: entrate {{income}}, uscite {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} previsto",
         "receiptsLabel": "Ricevute",
         "receiptsHint": "Scontrino o fattura di questo movimento.",
         "receiptDocumentName": "Ricevuta: {{title}} ({{date}})",

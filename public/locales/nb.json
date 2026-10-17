@@ -1741,6 +1741,7 @@
         "statsPointsLabel": "Verdier for trendlinje",
         "statsPointLabel": "{{period}}: inntekt {{income}}, utgifter {{expenses}}",
         "statsPointLabelCumulative": "Opp til {{period}}: inntekt {{income}}, utgifter {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} planlagt",
         "receiptsLabel": "Kvitteringer",
         "receiptsHint": "Kvittering eller faktura for denne transaksjonen.",
         "receiptDocumentName": "Kvittering: {{title}} ({{date}})",

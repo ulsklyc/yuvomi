@@ -600,8 +600,8 @@ function renderTrendChart() {
       </div>
       <div class="budget-stats__readout" id="budget-stats-readout" aria-hidden="true"></div>
       <div class="budget-stats__legend">
-        <span class="budget-stats__legend-item"><i class="budget-stats__swatch budget-stats__swatch--income"></i>${t('budget.statsIncome')} · ${fmtAmount(sum(rawIncomes))}${totalTrend(sum(rawIncomes), comparison?.income, 'higher')}</span>
-        <span class="budget-stats__legend-item"><i class="budget-stats__swatch budget-stats__swatch--expense"></i>${t('budget.statsExpenses')} · ${fmtAmount(sum(rawExpenses))}${totalTrend(sum(rawExpenses), comparison && Math.abs(comparison.expenses), 'lower')}</span>
+        ${legendItemHtml('income', 'budget.statsIncome', trendLegendFigures(incomes, rawIncomes, markIndex, todayIndex >= 0), comparison?.income, 'higher')}
+        ${legendItemHtml('expense', 'budget.statsExpenses', trendLegendFigures(expenses, rawExpenses, markIndex, todayIndex >= 0), comparison && Math.abs(comparison.expenses), 'lower')}
       </div>
       </div>
     </div>`);
@@ -610,7 +610,10 @@ function renderTrendChart() {
   // Aufruf von hier: `watchChartGutters()` (utils/chart.js) sieht das SVG, sobald
   // es im Dokument steht (#1722).
   if (window.lucide) lucide.createIcons({ el: host });
-  wireTrendPoints(host, shown, pointKey, s);
+  // Die Ableselinie startet am beschrifteten Punkt, solange der Zeitraum
+  // laeuft: sonst nannte sie den letzten Tag MIT Eintrag (auch einen geplanten
+  // nach heute), und unter Punkt und Legende stand eine dritte Zahl.
+  wireTrendPoints(host, shown, pointKey, s, todayIndex >= 0 ? markIndex : null);
   // Die Kurven zeichnen sich einmal ein, beim ersten Erscheinen - nicht bei
   // jedem Zeitraum (ux.js, drawChartOnce). Raster und Achse stehen.
   drawChartOnce('budget-stats-trend', { lines: host.querySelector('.budget-stats__lines') });
@@ -803,13 +806,46 @@ function periodLabel(period) {
 // Punktes — die sichtbare Zeile ist die Entsprechung für alle anderen.
 /* Die Summe des Zeitraums gegen den Vorzeitraum, in der Trend-Sprache der
  * Kennzahl-Karten - die Karten selbst stehen auf der Uebersicht. */
+/**
+ * Was die Legende neben einer Serie nennt (Re-Critique 2026-10-17, P1).
+ *
+ * Sie las die Summe des GANZEN Zeitraums, der beschriftete Punkt der Kurve den
+ * Stand am heutigen Tag: "Heute" 2.712 EUR neben "Einnahmen · 3.046,11 EUR",
+ * zwei Zahlen fuer scheinbar dasselbe. Jetzt eine Quelle: Laeuft der Zeitraum
+ * noch (aufsummiert, heute im Bild), nennt die Legende genau den Wert des
+ * Punkts und das, was danach noch eingetragen ist, getrennt als "geplant".
+ * Sonst bleibt es bei der Summe. Der Vergleich mit dem Vorzeitraum rechnet
+ * weiter mit der Summe des ganzen Zeitraums - so ist er auch gebaut.
+ *
+ * @param {number[]} shownArr  die gezeichnete Serie (aufsummiert oder roh)
+ * @param {number[]} rawArr    die Rohwerte je Abschnitt
+ * @param {number} markIndex   der Abschnitt des beschrifteten Punkts
+ * @param {boolean} running    aufsummiert und der Zeitraum enthaelt heute
+ *                             (todayIndex gibt es nur aufsummiert)
+ * @returns {{ total: number, value: number, planned: number }}
+ */
+function trendLegendFigures(shownArr, rawArr, markIndex, running) {
+  const total = rawArr.reduce((a, b) => a + b, 0);
+  if (!running) return { total, value: total, planned: 0 };
+  const value = shownArr[markIndex] ?? total;
+  const planned = roundToCurrency(total - value, view.ctx?.currency);
+  return { total, value, planned: planned > 0 ? planned : 0 };
+}
+
+function legendItemHtml(kind, labelKey, { total, value, planned }, previous, betterWhen) {
+  const plannedHtml = planned > 0
+    ? ` <span class="budget-stats__legend-planned">${view.ctx.esc(t('budget.statsPlannedRest', { amount: fmtAmount(planned) }))}</span>`
+    : '';
+  return `<span class="budget-stats__legend-item"><i class="budget-stats__swatch budget-stats__swatch--${kind}"></i>${t(labelKey)} · ${fmtAmount(value)}${plannedHtml}${totalTrend(total, previous, betterWhen)}</span>`;
+}
+
 function totalTrend(current, previous, betterWhen) {
   if (previous == null) return '';
   const delta = roundToCurrency(current - previous, view.ctx.currency);
   return ` ${trendMarkup({ delta, betterWhen, text: view.ctx.esc(signed(delta)) })}`;
 }
 
-function wireTrendPoints(host, series, labelKey, raw = series) {
+function wireTrendPoints(host, series, labelKey, raw = series, startIndex = null) {
   const group = host.querySelector('.budget-stats__points');
   const readout = host.querySelector('#budget-stats-readout');
   if (!group || !readout) return;
@@ -876,6 +912,7 @@ function wireTrendPoints(host, series, labelKey, raw = series) {
   // Aufsummiert ist kein Wert mehr null - gesucht wird am ROHEN Abschnitt.
   let initial = raw.length - 1;
   while (initial > 0 && !raw[initial].income && !raw[initial].expenses) initial--;
+  if (startIndex != null && series[startIndex]) initial = startIndex;
   show(initial, { mark: false });
 }
 
@@ -886,4 +923,4 @@ function updatePeriodLabel() {
 }
 
 // Nur fuer Tests: die Farbzuordnung von Balken und Donut (R14 P8).
-export const __test = { fetchStats, statsView: () => view, renderCatBars, categoryColorIndex, DONUT_SEGMENTS, futureStartIndex, TREND_CHART_NARROW, calmAxis, markLabelPlan, todayAnchor, axisLabels };
+export const __test = { trendLegendFigures, fetchStats, statsView: () => view, renderCatBars, categoryColorIndex, DONUT_SEGMENTS, futureStartIndex, TREND_CHART_NARROW, calmAxis, markLabelPlan, todayAnchor, axisLabels };

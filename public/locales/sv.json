@@ -1741,6 +1741,7 @@
         "statsPointsLabel": "Värden i trendkurvan",
         "statsPointLabel": "{{period}}: inkomster {{income}}, utgifter {{expenses}}",
         "statsPointLabelCumulative": "Till och med {{period}}: inkomster {{income}}, utgifter {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} planerat",
         "receiptsLabel": "Kvitton",
         "receiptsHint": "Kvitto eller faktura för den här posten.",
         "receiptDocumentName": "Kvitto: {{title}} ({{date}})",

@@ -1741,6 +1741,7 @@
         "statsPointsLabel": "Waarden van de trendlijn",
         "statsPointLabel": "{{period}}: inkomsten {{income}}, uitgaven {{expenses}}",
         "statsPointLabelCumulative": "Tot {{period}}: inkomsten {{income}}, uitgaven {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} gepland",
         "receiptsLabel": "Bonnen",
         "receiptsHint": "Kassabon of factuur bij deze boeking.",
         "receiptDocumentName": "Bon: {{title}} ({{date}})",

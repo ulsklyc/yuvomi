@@ -1756,6 +1756,7 @@
         "statsPointsLabel": "مقادیر نمودار روند",
         "statsPointLabel": "{{period}}: درآمد {{income}}، هزینه {{expenses}}",
         "statsPointLabelCumulative": "تا {{period}}: درآمد {{income}}، هزینه {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} برنامه‌ریزی‌شده",
         "receiptsLabel": "رسیدها",
         "receiptsHint": "رسید یا فاکتور این تراکنش.",
         "receiptDocumentName": "رسید: {{title}} ({{date}})",

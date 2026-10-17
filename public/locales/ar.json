@@ -1973,6 +1973,7 @@
         "statsPointsLabel": "قيم منحنى التطور",
         "statsPointLabel": "{{period}}: الدخل {{income}}، المصروفات {{expenses}}",
         "statsPointLabelCumulative": "حتى {{period}}: الدخل {{income}}، المصروفات {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} مخطط",
         "receiptsLabel": "الإيصالات",
         "receiptsHint": "إيصال أو فاتورة لهذه الحركة.",
         "receiptDocumentName": "إيصال: {{title}} ({{date}})",

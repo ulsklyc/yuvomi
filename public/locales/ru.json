@@ -1895,6 +1895,7 @@
         "statsPointsLabel": "Значения кривой",
         "statsPointLabel": "{{period}}: доходы {{income}}, расходы {{expenses}}",
         "statsPointLabelCumulative": "До {{period}}: доходы {{income}}, расходы {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} запланировано",
         "receiptsLabel": "Чеки",
         "receiptsHint": "Чек или счёт по этой операции.",
         "receiptDocumentName": "Чек: {{title}} ({{date}})",

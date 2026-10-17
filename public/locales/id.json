@@ -1756,6 +1756,7 @@
         "statsPointsLabel": "Nilai kurva tren",
         "statsPointLabel": "{{period}}: pemasukan {{income}}, pengeluaran {{expenses}}",
         "statsPointLabelCumulative": "Hingga {{period}}: pemasukan {{income}}, pengeluaran {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} terencana",
         "receiptsLabel": "Bukti",
         "receiptsHint": "Struk atau faktur untuk transaksi ini.",
         "receiptDocumentName": "Bukti: {{title}} ({{date}})",

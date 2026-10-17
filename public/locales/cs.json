@@ -1818,6 +1818,7 @@
         "statsPointsLabel": "Hodnoty křivky vývoje",
         "statsPointLabel": "{{period}}: příjmy {{income}}, výdaje {{expenses}}",
         "statsPointLabelCumulative": "Do {{period}}: příjmy {{income}}, výdaje {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} plánováno",
         "receiptsLabel": "Doklady",
         "receiptsHint": "Účtenka nebo faktura k této transakci.",
         "receiptDocumentName": "Doklad: {{title}} ({{date}})",

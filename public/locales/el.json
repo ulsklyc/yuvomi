@@ -1741,6 +1741,7 @@
         "statsPointsLabel": "Τιμές της καμπύλης",
         "statsPointLabel": "{{period}}: έσοδα {{income}}, έξοδα {{expenses}}",
         "statsPointLabelCumulative": "Έως {{period}}: έσοδα {{income}}, έξοδα {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} προγραμματισμένα",
         "receiptsLabel": "Αποδείξεις",
         "receiptsHint": "Απόδειξη ή τιμολόγιο για αυτή την κίνηση.",
         "receiptDocumentName": "Απόδειξη: {{title}} ({{date}})",

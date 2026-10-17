@@ -1756,6 +1756,7 @@
         "statsPointsLabel": "Mga halaga ng linya ng takbo",
         "statsPointLabel": "{{period}}: kita {{income}}, gastos {{expenses}}",
         "statsPointLabelCumulative": "Hanggang {{period}}: kita {{income}}, gastos {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} nakaplano",
         "receiptsLabel": "Mga resibo",
         "receiptsHint": "Resibo o invoice para sa transaksyong ito.",
         "receiptDocumentName": "Resibo: {{title}} ({{date}})",

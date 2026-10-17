@@ -1910,6 +1910,7 @@
         "statsPointsLabel": "Wartości krzywej trendu",
         "statsPointLabel": "{{period}}: przychody {{income}}, wydatki {{expenses}}",
         "statsPointLabelCumulative": "Do {{period}}: przychody {{income}}, wydatki {{expenses}}",
+        "statsPlannedRest": "+ {{amount}} zaplanowane",
         "receiptsLabel": "Dowody",
         "receiptsHint": "Paragon lub faktura do tej transakcji.",
         "receiptDocumentName": "Dowód: {{title}} ({{date}})",
