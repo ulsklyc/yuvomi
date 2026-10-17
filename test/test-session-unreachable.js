@@ -172,3 +172,34 @@ test('loadErrorSentence: die Ursache statt "pruefe die Verbindung", nie der Serv
   assert.equal(loadErrorSentence({ status: 500 }), 'common.errorOffline');
   setOnline(true);
 });
+
+// ── Eine Ansage je Folge (Critique R19 Nachlese) ───────────────────────────
+//
+// Gemessen: drei Fehlversuche in 7 s fuegten drei Alarme ein, und der
+// Fokus lag auf dem Alarm selbst - jede Absage wurde doppelt und jeder Versuch
+// neu angesagt (Guides accessibility "Live Regions",
+// accessible-error-announcement).
+test('der Zustand sagt sich EINMAL an: kein Fokus, weitere Fehlversuche aktualisieren still denselben Knoten', () => {
+  const restore = installMiniDom();
+  setOnline(true);
+  try {
+    const { env } = fakeEnv();
+    const app = fakeContainer();
+    let replaced = 0;
+    const orig = app.replaceChildren.bind(app);
+    app.replaceChildren = (node) => { replaced += 1; orig(node); };
+    let focused = 0;
+    const first = showSessionUnreachable(app, Object.assign(new Error('x'), { status: 503 }), () => {}, env);
+    first.focus = () => { focused += 1; };
+    assert.equal(first.getAttribute('role'), 'alert', 'die erste Absage ist ein Alarm');
+    assert.equal(first.getAttribute('tabindex'), null, 'der Alarm nimmt den Fokus - doppelte Ansage');
+    assert.equal(first.tabIndex, undefined, 'der Alarm ist fokussierbar gemacht');
+    const second = showSessionUnreachable(app, Object.assign(new Error('x'), { status: 503 }), () => {}, env);
+    assert.equal(second, first, 'ein weiterer Fehlversuch zeichnet einen neuen Knoten - ein neuer Alarm');
+    assert.equal(second.getAttribute('role'), null, 'der weitere Fehlversuch sagt sich erneut an');
+    assert.equal(replaced, 1);
+    assert.equal(focused, 0);
+  } finally {
+    restore();
+  }
+});

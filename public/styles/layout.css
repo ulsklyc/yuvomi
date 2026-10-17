@@ -80,9 +80,9 @@
 /* Sitzung gerade nicht pruefbar (utils/session-unreachable.js, Critique R19):
  * der Zustand ersetzt den Ladebildschirm und steht im selben Raum - Lichtfeld,
  * Spaltenfluss, mittig. Ohne diese Regeln saesse er ab 1024px in der Zeile der
- * Shell als schmale Spalte am linken Rand. Der Fokus landet zur Ansage auf
- * dem Container (tabindex=-1); einen Ring braucht er dort nicht, der Knopf
- * darin traegt seinen eigenen. */
+ * Shell als schmale Spalte am linken Rand. Der Container nimmt keinen Fokus
+ * (R19 Nachlese): er sagt sich als Alarm an, Tab erreicht Details und
+ * Knopf. */
 .app-shell:has(> .session-unreachable) {
   flex-direction: column;
   background-color: var(--color-bg);
@@ -93,10 +93,6 @@
 .app-shell > .session-unreachable {
   margin: auto;
   max-width: var(--content-max-width-narrow);
-}
-
-.session-unreachable:focus {
-  outline: none;
 }
 
 /* --------------------------------------------------------

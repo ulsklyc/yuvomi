@@ -81,57 +81,84 @@ export function showSessionUnreachable(container, err, retry, {
   win = window,
 } = {}) {
   if (!container) return null;
-  const continued = Boolean(episode?.box?.isConnected);
-  const attempt = continued ? episode.attempt + 1 : 0;
+  // Fortsetzung nur im SELBEN Traeger, solange der Knoten dort steht.
+  const previous = episode?.box?.isConnected && episode.container === container ? episode.box : null;
+  const attempt = previous ? episode.attempt + 1 : 0;
   endEpisode();
 
   const delay = sessionRetryDelay(attempt, err?.retryAfter, now());
   const seconds = Math.max(1, Math.round(delay / 1000));
   const status = Number(err?.status);
+  const description = loadErrorSentence(err) ?? t('common.loadErrorDescription');
+  const hintText = t('common.sessionRetryHint', { seconds });
+  const detailText = Number.isInteger(status) && status > 0
+    ? `HTTP ${status} /auth/me`
+    : `${err?.name ?? 'Error'}: ${err?.message ?? ''} /auth/me`;
 
-  const box = emptyStateEl({
-    variant: 'error',
-    icon: 'cloud-off',
-    title: t('common.sessionUnreachableTitle'),
-    description: loadErrorSentence(err) ?? t('common.loadErrorDescription'),
-    hint: t('common.sessionRetryHint', { seconds }),
-    details: {
-      summary: t('common.errorDetails'),
-      text: Number.isInteger(status) && status > 0
-        ? `HTTP ${status} /auth/me`
-        : `${err?.name ?? 'Error'}: ${err?.message ?? ''} /auth/me`,
-    },
-    action: {
-      label: t('common.retry'),
-      icon: 'refresh-cw',
-      attrs: { 'data-action': 'session-retry' },
-      onClick: () => runRetry(),
-    },
-    className: 'session-unreachable',
-  });
-  box.tabIndex = -1;
+  // EINE ANSAGE JE FOLGE (Critique R19 Nachlese, Guides accessibility
+  // "Live Regions" und accessible-error-announcement). Die erste Absage kommt
+  // als Alarm (`role="alert"`, kritisch: die App ist nicht bedienbar). Jeder
+  // weitere Fehlversuch der Folge aktualisiert DENSELBEN Knoten still - vorher
+  // stand alle 2, 4, 8 ... 30 s ein neuer Alarm da, und "Neuer Versuch
+  // laeuft" war ein Zwischenstand in einer Live-Region. Den Fokus nimmt der
+  // Zustand nicht: Alarm und Fokus auf dem Alarm sagten dasselbe zweimal; der
+  // Tab erreicht "Technische Details" und dann "Erneut versuchen" (gemessen).
+  let box = previous;
+  if (box) {
+    box.removeAttribute('role');
+    box.removeAttribute('aria-busy');
+    const set = (selector, text) => { const el = box.querySelector(selector); if (el) el.textContent = text; };
+    set('.empty-state__description', description);
+    set('.empty-state__hint', hintText);
+    set('.empty-state__details pre', detailText);
+    box.querySelector('[data-action="session-retry"]')?.removeAttribute('aria-disabled');
+  } else {
+    box = emptyStateEl({
+      variant: 'error',
+      icon: 'cloud-off',
+      title: t('common.sessionUnreachableTitle'),
+      description,
+      hint: hintText,
+      details: { summary: t('common.errorDetails'), text: detailText },
+      action: {
+        label: t('common.retry'),
+        icon: 'refresh-cw',
+        attrs: { 'data-action': 'session-retry' },
+        // Ueber die laufende Folge, nicht ueber diese: der Knoten ueberlebt
+        // weitere Fehlversuche, sein Knopf startet immer den naechsten.
+        onClick: () => episode?.runRetry?.(),
+      },
+      className: 'session-unreachable',
+    });
+  }
 
   const current = {
     attempt,
     box,
+    container,
     win,
     clearTimer,
     timer: null,
     onOnline: () => runRetry(),
+    runRetry: () => runRetry(),
   };
 
   // EIN Versuch zur Zeit: Knopf, Zeitgeber und das `online`-Ereignis laufen
   // hier zusammen. Der Zustand bleibt stehen, bis die Navigation entschieden
-  // hat - ein erneuter Fehler zeichnet ihn neu (Abstand waechst), ein Erfolg
+  // hat - ein erneuter Fehler aktualisiert ihn (Abstand waechst), ein Erfolg
   // ersetzt ihn durch die Seite.
   function runRetry() {
     if (episode !== current || current.running) return;
     current.running = true;
     current.clearTimer(current.timer);
     win.removeEventListener('online', current.onOnline);
+    // Ab hier still: "Neuer Versuch laeuft" ist ein Zwischenstand, keine
+    // Ansage. `aria-disabled` statt `disabled`, damit der Fokus auf dem Knopf
+    // bleibt, wenn jemand ihn gedrueckt hat (ein gesperrter Knopf gibt ihn an
+    // <body> ab).
+    box.removeAttribute('role');
     box.setAttribute('aria-busy', 'true');
-    const button = box.querySelector('[data-action="session-retry"]');
-    if (button) button.disabled = true;
+    box.querySelector('[data-action="session-retry"]')?.setAttribute('aria-disabled', 'true');
     const hint = box.querySelector('.empty-state__hint');
     if (hint) hint.textContent = t('common.sessionRetrying');
     retry();
@@ -141,8 +168,9 @@ export function showSessionUnreachable(container, err, retry, {
   current.timer = setTimer(runRetry, delay);
   win.addEventListener('online', current.onOnline);
 
-  container.replaceChildren(box);
-  if (win.lucide) win.lucide.createIcons({ el: box });
-  box.focus?.({ preventScroll: true });
+  if (!previous) {
+    container.replaceChildren(box);
+    if (win.lucide) win.lucide.createIcons({ el: box });
+  }
   return box;
 }

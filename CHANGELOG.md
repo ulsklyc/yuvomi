@@ -253,6 +253,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **"Connection interrupted" is announced once, not on every retry.** While Yuvomi kept retrying
+  the session check, each failed attempt raised a new screen reader alert, and the alert also took
+  focus so it was read twice. It is now announced once; later attempts update the text quietly, and
+  focus stays on "Try again" when you used it.
+
 - **Screen readers hear a form's problems once.** Saving a form with several missing fields raised
   one alert per field at the same moment, and the field that received focus read its message a
   second time. Now focus moves to the first problem and announces it there; the other fields carry
