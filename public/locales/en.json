@@ -2121,7 +2121,7 @@
         "removeMemberNamed": "Remove {{name}}",
         "memberDeactivatedToast": "{{name}} deactivated. The entries are kept.",
         "memberFormerBadge": "Former member",
-        "memberOrderHint": "This order applies to the whole household: the calendar, the timetable and every list of people follow it. To change it, drag a handle, or focus it and press the arrow keys. New members come after it, sorted by name.",
+        "memberOrderHint": "This order applies across the household. Drag a handle or use the arrow keys to change it.",
         "logout": "Log out",
         "logoutConfirm": "Log out of this device?",
         "synchronizing": "Syncing…",

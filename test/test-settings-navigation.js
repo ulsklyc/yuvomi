@@ -3309,10 +3309,17 @@ test('R14: Familie legt im Blatt-Dialog an, Fuss [Abbrechen][Primaer], Zeilen mi
   assert.match(src, /content: addInviteFormHtml\(\)/);
   assert.match(src, /<ul class="settings-members row-divided" id="members-list">/, 'Haarlinien zwischen den Mitgliedern');
   // R19 (Critique 2026-10-16, "Einladen prominenter"): Einladen ist der
-  // EINE gefuellte Knopf unter der Liste - ein Knopf in seiner Breite neben
-  // "Mitglied hinzufuegen", kein Balken ueber die volle Breite (R14).
-  assert.match(src, /<div class="settings-member-actions">\s*<button class="btn btn--primary settings-add-btn" id="add-invite-btn" hidden><i data-lucide="mail-plus" aria-hidden="true"><\/i>\$\{t\('settings\.invites\.add'\)\}<\/button>\s*<button class="btn btn--secondary settings-add-btn" id="add-member-btn" hidden><i data-lucide="user-plus"/,
-    'Einladen gefuellt vorn, Anlegen ruhig daneben, beide mit Icon');
+  // EINE gefuellte Knopf - ein Knopf in seiner Breite, kein Balken ueber die
+  // volle Breite (R14). R20 (Re-Critique 2026-10-17, A3 P3): er steht in der
+  // Karte "Einladungen", die vorher ohne Handlung war; "Mitglied hinzufuegen"
+  // bleibt ruhig unter der Mitgliederliste. Bewusst angepasst.
+  const membersCard = src.slice(src.indexOf('id="members-card"'), src.indexOf('id="invites-card"'));
+  const invitesCard = src.slice(src.indexOf('id="invites-card"'), src.indexOf('two-factor-household-card'));
+  assert.match(membersCard, /<div class="settings-member-actions">\s*<button class="btn btn--secondary settings-add-btn" id="add-member-btn" hidden><i data-lucide="user-plus"/,
+    'Anlegen ruhig unter der Mitgliederliste, mit Icon');
+  assert.doesNotMatch(membersCard, /add-invite-btn/, 'Einladen steht nicht in der Mitgliederkarte');
+  assert.match(invitesCard, /id="invites-list"><\/ul>\s*<div class="settings-member-actions">\s*<button class="btn btn--primary settings-add-btn" id="add-invite-btn" hidden><i data-lucide="mail-plus" aria-hidden="true"><\/i>\$\{t\('settings\.invites\.add'\)\}<\/button>/,
+    'Einladen gefuellt unter den offenen Einladungen');
   assert.equal((src.match(/btn--primary settings-add-btn/g) ?? []).length, 1, 'genau ein gefuellter Knopf');
   const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
   assert.match(css, /\.settings-add-btn \{\s*align-self: flex-start;/, 'kein Balken ueber die volle Breite');

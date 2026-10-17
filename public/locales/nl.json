@@ -2121,7 +2121,7 @@
         "removeMemberNamed": "{{name}} verwijderen",
         "memberDeactivatedToast": "{{name}} gedeactiveerd. De items blijven bewaard.",
         "memberFormerBadge": "Voormalig lid",
-        "memberOrderHint": "Deze volgorde geldt voor het hele huishouden: de agenda, het rooster en elke lijst met personen volgen haar. Wijzig de volgorde door een greep te slepen of er de focus op te zetten en de pijltjestoetsen te gebruiken. Nieuwe leden komen erna, gesorteerd op naam.",
+        "memberOrderHint": "Deze volgorde geldt in het hele huishouden. Sleep aan een greep of gebruik de pijltjestoetsen om haar te wijzigen.",
         "logout": "Uitloggen",
         "logoutConfirm": "Uitloggen op dit apparaat?",
         "synchronizing": "Synchroniseren…",

@@ -63,6 +63,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Settings -> Members: inviting sits with the invitations.** "Create invitation" moved from under
+  the member list into the Invitations card, which had no action of its own; "Add member" stays
+  under the list. The note on the member order is two short sentences instead of five lines.
+
 - **A recipe without a picture starts with its content.** The flat kitchen-coloured band above
   the ingredients is gone; the details open with the meals and the ingredients, under the
   recipe's name. Recipes with a picture keep it.

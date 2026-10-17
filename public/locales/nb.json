@@ -2121,7 +2121,7 @@
         "removeMemberNamed": "Fjern {{name}}",
         "memberDeactivatedToast": "{{name}} er deaktivert. Oppføringene beholdes.",
         "memberFormerBadge": "Tidligere medlem",
-        "memberOrderHint": "Denne rekkefølgen gjelder for hele husstanden: kalenderen, timeplanen og alle lister med personer følger den. Endre den ved å dra i et håndtak, eller sett fokus på det og trykk på piltastene. Nye medlemmer kommer etterpå, sortert etter navn.",
+        "memberOrderHint": "Denne rekkefølgen gjelder i hele husstanden. Dra i et håndtak eller bruk piltastene for å endre den.",
         "logout": "Logg ut",
         "logoutConfirm": "Logg ut fra denne enheten?",
         "synchronizing": "Synkroniserer...",

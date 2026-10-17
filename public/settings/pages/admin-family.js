@@ -368,14 +368,15 @@ function renderPage(container) {
         <ul class="settings-members row-divided" id="members-list"></ul>
         <p class="form-hint" id="members-order-hint" hidden>${t('settings.memberOrderHint')}</p>
         <div class="sr-only" role="status" aria-live="polite" id="members-order-announce"></div>
-        ${/* EINLADEN IST DER WEG (R19, Critique 2026-10-16). Einladen stand
-             als ruhiger Knopf in einer eigenen Karte UNTER der Zwei-Faktor-
-             Pflicht, das direkte Anlegen (mit vergebenem Passwort) oben an der
-             Liste - der seltenere Weg war der sichtbarere. Jetzt stehen beide
-             unter der Liste, Einladen gefuellt vorn: die eingeladene Person
-             waehlt ihr Passwort selbst. Beide mit Icon statt "+"-Zeichen. */ ''}
+        ${/* EINLADEN STEHT BEI DEN EINLADUNGEN (R20, Re-Critique 2026-10-17,
+             A3 P3). R19 hatte Einladen gefuellt neben "Mitglied hinzufuegen"
+             unter die Mitgliederliste gestellt; die Karte "Einladungen"
+             darunter blieb ohne Handlung, und der Knopf, der eine Einladung
+             anlegt, stand in der Karte, die keine zeigt. Jetzt traegt jede
+             Karte ihren Weg: die Mitglieder das direkte Anlegen (ruhig), die
+             Einladungen das Einladen (gefuellt, der haeufigere Weg - die
+             eingeladene Person waehlt ihr Passwort selbst). */ ''}
         <div class="settings-member-actions">
-          <button class="btn btn--primary settings-add-btn" id="add-invite-btn" hidden><i data-lucide="mail-plus" aria-hidden="true"></i>${t('settings.invites.add')}</button>
           <button class="btn btn--secondary settings-add-btn" id="add-member-btn" hidden><i data-lucide="user-plus" aria-hidden="true"></i>${t('settings.addMember')}</button>
         </div>
       </div>
@@ -384,6 +385,9 @@ function renderPage(container) {
         <h3 class="settings-card__title">${t('settings.invites.title')}</h3>
         <p class="form-hint">${t('settings.invites.intro')}</p>
         <ul class="settings-members row-divided" id="invites-list"></ul>
+        <div class="settings-member-actions">
+          <button class="btn btn--primary settings-add-btn" id="add-invite-btn" hidden><i data-lucide="mail-plus" aria-hidden="true"></i>${t('settings.invites.add')}</button>
+        </div>
       </div>
 
       <!-- Zeilen im Traeger (R17, E9): der Schalter, darunter als zweite Zeile

@@ -2010,7 +2010,7 @@
         "removeMemberNamed": "{{name}} を外す",
         "memberDeactivatedToast": "{{name}} を無効化しました。項目は残ります。",
         "memberFormerBadge": "元メンバー",
-        "memberOrderHint": "この並び順は世帯全体に適用され、カレンダー、時間割、すべてのメンバー一覧がこれに従います。変更するには、ハンドルをドラッグするか、ハンドルにフォーカスして矢印キーを押します。新しいメンバーはその後ろに名前順で並びます。",
+        "memberOrderHint": "この順番は世帯全体に適用されます。ハンドルをドラッグするか矢印キーで変更できます。",
         "logout": "ログアウト",
         "logoutConfirm": "このデバイスからログアウトしますか？",
         "synchronizing": "同期中…",

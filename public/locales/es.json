@@ -2010,7 +2010,7 @@
         "removeMemberNamed": "Quitar a {{name}}",
         "memberDeactivatedToast": "Cuenta de {{name}} desactivada. Las entradas se conservan.",
         "memberFormerBadge": "Antiguo miembro",
-        "memberOrderHint": "Este orden vale para todo el hogar: el calendario, el horario y cada lista de personas lo siguen. Para cambiarlo, arrastra un tirador o enfócalo y pulsa las teclas de flecha. Los miembros nuevos van después, ordenados por nombre.",
+        "memberOrderHint": "Este orden se aplica en todo el hogar. Arrastra el asa o usa las flechas para cambiarlo.",
         "logout": "Cerrar sesión",
         "logoutConfirm": "¿Cerrar sesión en este dispositivo?",
         "synchronizing": "Sincronizando…",
