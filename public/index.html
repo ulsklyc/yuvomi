@@ -38,6 +38,11 @@
        fälschlich „aus dem Deutschen übersetzen" anbieten (statisches lang="de"). -->
   <script src="/lang-init.js"></script>
 
+  <!-- Start: Sitzung, Einstellungen und (auf "/") die Uebersicht vorab anfragen,
+       parallel zu den Modulen - api.js holt die Antworten ab (R20). Nach
+       lang-init.js: das Wetter fragt in der Sprache, die dort feststeht. -->
+  <script src="/boot-fetch.js"></script>
+
   <!-- Styles (Basis - seitenspezifische CSS wird vom Router on-demand geladen) -->
   <link rel="stylesheet" href="/styles/tokens.css" />
   <link rel="stylesheet" href="/styles/reset.css" />
@@ -215,9 +220,24 @@
 
   <!-- App-Shell - wird durch JavaScript gefüllt -->
   <div id="app" class="app-shell">
-    <!-- Skeleton-Loading während Initialisierung -->
-    <div id="app-loading" class="app-loading" aria-live="polite" aria-label="Lade Yuvomi…">
-      <div class="app-loading__logo">Yuvomi</div>
+    <!-- Ladebild (R20): eine stehende Skizze der Shell statt eines pulsierenden
+         Schriftzugs - Kopf mit Siegel, drei Kartenflaechen, unten die Kapsel
+         (am Desktop die Seitenleiste). Nichts bewegt sich; die App setzt sich
+         an derselben Stelle zusammen. `progressbar` ohne Wert ist "laedt", und
+         die Rolle sagt der Screenreader in seiner Sprache an - der Name ist
+         die Marke, fest in jeder Sprache (vorher: "Lade Yuvomi…", immer deutsch). -->
+    <div id="app-loading" class="app-loading" role="progressbar" aria-label="Yuvomi">
+      <div class="app-loading__rail" aria-hidden="true"></div>
+      <div class="app-loading__page" aria-hidden="true">
+        <div class="app-loading__head">
+          <span class="app-loading__seal"><svg class="brand-mark" viewBox="0 0 160 160" fill="none" focusable="false"><defs><linearGradient id="yuvomi-brand-mark-boot" x1="0" y1="0" x2="160" y2="160" gradientUnits="userSpaceOnUse"><stop class="brand-mark__from" offset="0%"/><stop class="brand-mark__to" offset="100%"/></linearGradient></defs><rect width="160" height="160" rx="36" fill="url(#yuvomi-brand-mark-boot)"/><g class="brand-mark__circles"><circle cx="64" cy="72" r="27"/><circle cx="100" cy="78" r="25"/><circle cx="80" cy="106" r="24"/></g></svg></span>
+          <span class="app-loading__logo">Yuvomi</span>
+        </div>
+        <div class="app-loading__card"></div>
+        <div class="app-loading__card"></div>
+        <div class="app-loading__card"></div>
+      </div>
+      <div class="app-loading__capsule" aria-hidden="true"></div>
     </div>
   </div>
 

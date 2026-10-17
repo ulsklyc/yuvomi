@@ -44,6 +44,7 @@ const APP_SHELL = [
   '/index.html',
   '/api.js',
   '/lang-init.js',
+  '/boot-fetch.js',
   '/router.js',
   '/i18n.js',
   '/rrule-ui.js',

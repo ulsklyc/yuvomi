@@ -30,6 +30,20 @@ function getCsrfToken() {
 }
 
 /**
+ * Die Antwort, die boot-fetch.js fuer `url` schon angefragt hat - oder null.
+ * Eine einmal abgeholte Antwort gibt es kein zweites Mal (ihr Rumpf ist dann
+ * gelesen); nach dem Start gibt es keine mehr.
+ * @param {string} url
+ * @returns {Promise<Response>|null}
+ */
+function takeBootResponse(url) {
+  // `null`: alles Vorab-Gefragte verwerfen.
+  return typeof window !== 'undefined' && typeof window.__yuvomiTakeBoot === 'function'
+    ? window.__yuvomiTakeBoot(url)
+    : null;
+}
+
+/**
  * Zentraler Fetch-Wrapper.
  * Setzt Content-Type, handhabt 401-Redirects und parsed JSON-Fehler.
  *
@@ -51,7 +65,18 @@ async function apiFetch(path, options = {}, _retried = false) {
 
   let response;
   try {
-    response = await fetch(url, {
+    // Die Vorab-Frage des Starts (boot-fetch.js): dieselbe Adresse, einmal.
+    // Scheitert sie, fragt dieser Aufruf selbst - wie ohne sie.
+    // Nur eine Erfolgsantwort zaehlt: eine 401 von vor dem Anmelden darf die
+    // Sitzung danach nicht beenden. Jede schreibende Anfrage (Anmelden,
+    // Abmelden, ...) verwirft den Rest - er gehoerte dem Stand davor.
+    if (stateChanging) takeBootResponse(null);
+    const early = method === 'GET' && !fetchOptions.body ? takeBootResponse(url) : null;
+    if (early) {
+      const answer = await early.catch(() => null);
+      if (answer?.ok) response = answer;
+    }
+    if (!response) response = await fetch(url, {
       credentials: 'same-origin',
       cache: 'no-store',
       ...fetchOptions,

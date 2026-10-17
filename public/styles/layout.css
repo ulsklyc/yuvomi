@@ -45,9 +45,8 @@
  * Loading-Screen
  * -------------------------------------------------------- */
 .app-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
+  position: relative;
   /* vh-Zwilling fuer Browser ohne dvh (#1276), siehe .app-shell. */
   min-height: 100vh;
   min-height: 100dvh;
@@ -69,12 +68,83 @@
   font-size: var(--text-2xl);
   font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
-  animation: pulse 1.5s ease-in-out infinite;
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+/* DIE SKIZZE DER SHELL (R20, Re-Critique 2026-10-17 a6 P2: 4,8 s ein
+ * pulsierender Schriftzug am kalten Telefon). Sie steht still - eine
+ * Schleife ueber Sekunden sagt "es haengt", eine ruhige Skizze sagt "gleich
+ * hier". Geometrie wie die Shell: Kopf mit Siegel auf dem Seitenrand, Karten
+ * im Raster der Uebersicht, unten die Kapsel auf ihrer Hoehe (am Desktop die
+ * schwebende Seitenleiste). Die Flaechen sind die der echten Karten, nur leer. */
+.app-loading__page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: calc(var(--safe-area-inset-top) + var(--space-4)) var(--page-gutter) var(--space-4);
+}
+
+.app-loading__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--target-base);
+  margin-block-end: var(--space-2);
+}
+
+.app-loading__seal {
+  flex: 0 0 auto;
+  inline-size: var(--target-sm);
+  block-size: var(--target-sm);
+}
+
+.app-loading__card {
+  block-size: 9rem;
+  border-radius: var(--radius-glass-card);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-xs);
+}
+
+.app-loading__card + .app-loading__card { block-size: 6rem; }
+.app-loading__card:last-child { block-size: 12rem; }
+
+.app-loading__capsule {
+  position: fixed;
+  inset-inline: var(--nav-bar-gutter);
+  bottom: calc(var(--safe-area-inset-bottom) + var(--space-2));
+  max-inline-size: var(--nav-capsule-max);
+  margin-inline: auto;
+  block-size: var(--nav-height-mobile);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-full);
+  background-color: var(--glass-bg-elevated);
+  box-shadow: var(--glass-shadow-capsule);
+}
+
+.app-loading__rail {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .app-loading__capsule {
+    display: none;
+  }
+
+  .app-loading__rail {
+    display: block;
+    position: fixed;
+    inset-block: var(--sidebar-float-gap);
+    inset-inline-start: var(--sidebar-float-gap);
+    inline-size: calc(var(--sidebar-width-expanded) - var(--sidebar-float-gap));
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-glass-card);
+    background-color: var(--glass-bg-elevated);
+    box-shadow: var(--glass-shadow-md);
+  }
+
+  .app-loading__page {
+    margin-inline-start: var(--sidebar-width-expanded);
+    max-inline-size: calc(var(--content-max-width) + 2 * var(--page-gutter));
+  }
 }
 
 /* Sitzung gerade nicht pruefbar (utils/session-unreachable.js, Critique R19):

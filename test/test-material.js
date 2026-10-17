@@ -512,6 +512,15 @@ test('R18: auf der Zugangstafel halten Text und Feldkante ihre Schwelle, direkt 
 
   assert.match(rulesFor(LAYOUT, '.app-loading__logo')[0].body, /(?:^|;)\s*color:\s*var\(--color-text-primary\)/,
     'der Schriftzug des Ladebilds steht in Tinte, nicht im Akzent');
+  // R20 (Re-Critique 2026-10-17 a6 P2/P3): 4,8 s pulsierte am kalten Telefon nur
+  // der Schriftzug, und sein Name war fest deutsch ("Lade Yuvomi…").
+  assert.doesNotMatch(rulesFor(LAYOUT, '.app-loading__logo')[0].body, /animation/, 'das Ladebild pulsiert wieder');
+  const index = read('../public/index.html');
+  assert.match(index, /<div id="app-loading" class="app-loading" role="progressbar" aria-label="Yuvomi">/,
+    'das Ladebild traegt einen festen deutschen Namen statt der Marke');
+  for (const part of ['app-loading__seal', 'app-loading__card', 'app-loading__capsule', 'app-loading__rail']) {
+    assert.ok(index.includes(`class="${part}`), `die Skizze der Shell hat kein ${part}`);
+  }
   // Auf den Seiten steht alles in der Tafel: der Kopf ist ein Kind von
   // `main.auth-page` (test:auth-pages-ui haelt, dass jede Seite so beginnt),
   // und die Versionszeile steht vor dem schliessenden </main>.

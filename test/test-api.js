@@ -1338,3 +1338,40 @@ test('quietExpiry ist keine fetch-Option und erreicht fetch nicht', async () => 
   await auth.me({ quietExpiry: true });
   assert.equal('quietExpiry' in seen, false);
 });
+
+// R20 (Re-Critique 2026-10-17 a6 P2, Kaltstart): boot-fetch.js fragt Sitzung,
+// Einstellungen und die Uebersicht im <head> an, parallel zu den Modulen;
+// api.js holt die Antwort beim ersten passenden GET ab - einmal, nur Erfolge,
+// und eine schreibende Anfrage verwirft den Rest.
+test('R20: der Start reicht seine Vorab-Antworten an api.get weiter - einmal, nur Erfolge', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/boot-fetch.js', import.meta.url), 'utf8');
+  const asked = [];
+  const savedLocation = global.location; const savedStorage = global.localStorage;
+  global.location = { pathname: '/' };
+  global.localStorage = { getItem: () => JSON.stringify({ sizes: [], query: '/dashboard?events_scope=mine' }) };
+  global.document.documentElement = { lang: 'en' };
+  _mockFetch = (url) => { asked.push(url); return mockResponse(url.endsWith('/preferences') ? 401 : 200, { from: 'boot', url }); };
+  global.window.fetch = (...args) => global.fetch(...args);
+  try {
+    new Function(src)();
+    assert.deepEqual(asked.sort(), [
+      '/api/v1/auth/me', '/api/v1/dashboard?events_scope=mine', '/api/v1/modules', '/api/v1/preferences',
+      '/api/v1/reminders/pending', '/api/v1/version', '/api/v1/weather?lang=en',
+    ].sort(), 'der Start fragt nicht vorab, was er gleich braucht');
+    asked.length = 0;
+    _mockFetch = (url) => { asked.push(url); return mockResponse(200, { from: 'net', url }); };
+    const dash = await api.get('/dashboard?events_scope=mine');
+    assert.equal(dash.from, 'boot', 'die Uebersicht fragt ein zweites Mal, statt die Vorab-Antwort zu nehmen');
+    assert.deepEqual(asked, []);
+    assert.equal((await api.get('/dashboard?events_scope=mine')).from, 'net', 'eine Vorab-Antwort gilt nur einmal');
+    assert.equal((await api.get('/preferences')).from, 'net', 'eine 401 von vor dem Anmelden wird weitergereicht');
+    await api.post('/auth/login', {}).catch(() => {});
+    assert.equal((await api.get('/modules')).from, 'net', 'nach einer schreibenden Anfrage gilt nichts Vorab-Gefragtes mehr');
+  } finally {
+    delete global.window.__yuvomiTakeBoot;
+    delete global.window.fetch;
+    global.location = savedLocation; global.localStorage = savedStorage;
+    delete global.document.documentElement;
+  }
+});
