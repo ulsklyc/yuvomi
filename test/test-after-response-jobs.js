@@ -458,6 +458,7 @@ const LESEN_NACH_AWAIT = new Map([
   ['server/routes/screensaver.js|/photos/:id', 'Immich-Abruf, Cache im Speicher'],
   ['server/routes/weather.js|/', 'Wetter-API, Cache im Speicher'],
   ['server/routes/weather.js|/icon/:code', 'Wetter-Icon, Cache im Speicher'],
+  ['server/routes/weather.js|/geocode', 'Open-Meteo-Ortssuche (R20), Cache im Speicher, schreibt nichts in die Datenbank'],
 ]);
 
 const SCHLUESSELWORT = new Set([
