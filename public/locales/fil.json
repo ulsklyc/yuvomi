@@ -86,6 +86,8 @@
         "emailInUse": "Ang email address na ito ay pag-aari na ng ibang account.",
         "emailInvalid": "Maglagay ng wastong email address.",
         "sessionUnreachableTitle": "Naputol ang koneksyon",
+        "serverNotReadyTitle": "Hindi pa handa ang server",
+        "rateLimitedTitle": "Masyadong maraming request",
         "sessionRetryHint": "Naka-sign in ka pa rin. Susubukang muli sa loob ng {{seconds}} s.",
         "sessionRetrying": "Sinusubukang muli…",
         "searchNoResultsTitle": "Walang resulta",
@@ -3507,7 +3509,9 @@
     },
     "offline": {
         "banner": "Offline - muling kumokonekta…",
-        "staleData": "Offline - noong: {{time}}"
+        "staleData": "Offline - noong: {{time}}",
+        "pageTitle": "Offline ka",
+        "pageDescription": "Kailangan ng koneksyon ang pahinang ito. Kapag online na ulit ang device mo, kusa itong maglo-load."
     },
     "emptyHint": {
         "tasks": "I-tap ang + para gawin ang iyong unang gawain. I-swipe pakaliwa ang isang card para tapusin, pakanan para tingnan.",

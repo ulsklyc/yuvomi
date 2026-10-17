@@ -86,6 +86,8 @@
         "emailInUse": "Ez az e-mail-cím már egy másik fiókhoz tartozik.",
         "emailInvalid": "Adj meg egy érvényes e-mail-címet.",
         "sessionUnreachableTitle": "Megszakadt a kapcsolat",
+        "serverNotReadyTitle": "A kiszolgáló most nem áll készen",
+        "rateLimitedTitle": "Túl sok kérés",
         "sessionRetryHint": "Bejelentkezve maradsz. Új próbálkozás {{seconds}} mp múlva.",
         "sessionRetrying": "Újrapróbálkozás…",
         "searchNoResultsTitle": "Nincs találat",
@@ -3507,7 +3509,9 @@
     },
     "offline": {
         "banner": "Offline - újracsatlakozás…",
-        "staleData": "Offline - állapot: {{time}}"
+        "staleData": "Offline - állapot: {{time}}",
+        "pageTitle": "Offline vagy",
+        "pageDescription": "Ehhez az oldalhoz kapcsolat kell. Amint az eszközöd újra online, magától betöltődik."
     },
     "shortcuts": {
         "search": "Keresés megnyitása",

@@ -86,6 +86,8 @@
         "emailInUse": "Alamat email ini sudah dimiliki akun lain.",
         "emailInvalid": "Masukkan alamat email yang valid.",
         "sessionUnreachableTitle": "Koneksi terputus",
+        "serverNotReadyTitle": "Server belum siap saat ini",
+        "rateLimitedTitle": "Terlalu banyak permintaan",
         "sessionRetryHint": "Kamu tetap masuk. Mencoba lagi dalam {{seconds}} dtk.",
         "sessionRetrying": "Mencoba lagi…",
         "searchNoResultsTitle": "Tidak ada hasil",
@@ -3507,7 +3509,9 @@
     },
     "offline": {
         "banner": "Offline - memulihkan koneksi…",
-        "staleData": "Offline - per: {{time}}"
+        "staleData": "Offline - per: {{time}}",
+        "pageTitle": "Kamu sedang offline",
+        "pageDescription": "Halaman ini memerlukan koneksi. Begitu perangkatmu online lagi, halaman dimuat dengan sendirinya."
     },
     "emptyHint": {
         "tasks": "Ketuk + untuk membuat tugas pertama Anda. Geser kartu ke kiri untuk menyelesaikan, ke kanan untuk melihat.",

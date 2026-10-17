@@ -728,6 +728,15 @@ html:active-view-transition-type(region-fade)::view-transition-new(region-swap) 
   outline: none;
 }
 
+/* Dasselbe Region-Fokus-Ziel fuer den Zustand "Seite nicht erreichbar"
+ * (utils/session-unreachable.js showPageUnreachable): er nimmt den Fokus, damit
+ * die Tastatur nicht im abgeraeumten Baum haengt, und zeigte dafuer einen
+ * Rahmen um die halbe Seite. Der Knopf darin traegt seinen Ring weiter. */
+.page-unreachable:focus,
+.page-unreachable:focus-visible {
+  outline: none;
+}
+
 /* --------------------------------------------------------
  * DIE SCHALTERZEILE - EINE FORM, APP-WEIT
  *
@@ -10153,6 +10162,20 @@ textarea::placeholder {
 
 .offline-banner[hidden] {
   display: none;
+}
+
+/* AM DESKTOP UEBER DEM INHALT, NICHT UEBER DER SEITENLEISTE (Re-Critique
+ * 2026-10-17): volle Breite verdeckte Logo, Suche und Einklappen der
+ * schwebenden Tafel. Das Banner beginnt rechts der Tafel und folgt dem
+ * Einklappen ueber dieselbe Variable wie der Inhalt (`.app-content`
+ * margin-left); der Inhalt rueckt weiter um `--offline-banner-height` nach unten. */
+@media (min-width: 1024px) {
+  .offline-banner {
+    /* Die Tafel steht um `--sidebar-float-gap` von der Kante ab und ragt
+     * damit um denselben Abstand in die Spalte (gemessen: Tafel endet bei
+     * 228px, der Inhalt beginnt bei 220px). */
+    left: calc(var(--sidebar-width) + var(--sidebar-float-gap));
+  }
 }
 
 @keyframes offline-banner-in {

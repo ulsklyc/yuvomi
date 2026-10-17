@@ -86,6 +86,8 @@
         "emailInUse": "此电子邮件地址已属于另一个账户。",
         "emailInvalid": "请输入有效的电子邮件地址。",
         "sessionUnreachableTitle": "连接中断",
+        "serverNotReadyTitle": "服务器暂未就绪",
+        "rateLimitedTitle": "请求过多",
         "sessionRetryHint": "你仍保持登录状态。{{seconds}} 秒后重试。",
         "sessionRetrying": "正在重试…",
         "searchNoResultsTitle": "无结果",
@@ -3507,7 +3509,9 @@
     },
     "offline": {
         "banner": "离线 - 正在重新连接…",
-        "staleData": "离线 - 数据截至：{{time}}"
+        "staleData": "离线 - 数据截至：{{time}}",
+        "pageTitle": "你已离线",
+        "pageDescription": "此页面需要网络连接。设备恢复在线后会自动加载。"
     },
     "emptyHint": {
         "recipes": "食谱可以直接进入用餐计划或购物清单。",

@@ -48,7 +48,7 @@ import { triggerPageFab } from '/utils/fab.js';
 import { hasLeaveGuard, mayLeave } from '/utils/leave-guard.js';
 import { createUpdateFlow, isUserBusy } from '/utils/app-update.js';
 import { createStartHandoff } from '/utils/start-handoff.js';
-import { showSessionUnreachable } from '/utils/session-unreachable.js';
+import { showSessionUnreachable, showPageUnreachable, isUnreachableFailure } from '/utils/session-unreachable.js';
 import { wireSheetDrag } from '/utils/sheet-drag.js';
 import {
   handleBackNavigation, closeAllOverlays, consumeOverlayMarker,
@@ -1798,7 +1798,17 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
     // gesamte Navigation und die Fehlerkarte dehnt sich über die Nav-Spalte -
     // die Seite ist dann nur noch per Reload verlassbar. Erst wenn noch keine
     // Shell steht (Auth-Seiten, früher Fehler), ist #app der richtige Ort.
-    renderError(document.getElementById('main-content') ?? app, err);
+    const errorHost = document.getElementById('main-content') ?? app;
+    // OHNE NETZ KEIN ABSTURZ (Re-Critique 2026-10-17): ein Seitenwechsel
+    // offline zeigte "Etwas ist schiefgelaufen" samt Stack. Ein Netzfehler
+    // bekommt den Zustand der Sitzungsseite und zeichnet sich bei `online`
+    // selbst neu; nur ein Fehler im Code der Seite bleibt der Fehlerbildschirm.
+    if (!route.thirdPartyModule && isUnreachableFailure(err)) {
+      const retryPath = `${location.pathname}${location.search}${location.hash}`;
+      showPageUnreachable(errorHost, err, () => navigate(retryPath, false));
+    } else {
+      renderError(errorHost, err);
+    }
   } finally {
     // Die Uebergabe gilt der Seite, die DIESER Start zeichnet (utils/start-handoff.js).
     startHandoff.expirePage();

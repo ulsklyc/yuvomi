@@ -87,6 +87,8 @@
         "emailInUse": "Tato e-mailová adresa již patří jinému účtu.",
         "emailInvalid": "Zadej platnou e-mailovou adresu.",
         "sessionUnreachableTitle": "Spojení přerušeno",
+        "serverNotReadyTitle": "Server teď není připraven",
+        "rateLimitedTitle": "Příliš mnoho požadavků",
         "sessionRetryHint": "Přihlášení zůstává zachováno. Další pokus za {{seconds}} s.",
         "sessionRetrying": "Zkouším to znovu…",
         "searchNoResultsTitle": "Žádné výsledky",
@@ -3455,7 +3457,9 @@
     },
     "offline": {
         "banner": "Offline - obnovování připojení…",
-        "staleData": "Offline - stav: {{time}}"
+        "staleData": "Offline - stav: {{time}}",
+        "pageTitle": "Jsi offline",
+        "pageDescription": "Tato stránka potřebuje připojení. Jakmile bude zařízení opět online, načte se sama."
     },
     "onboarding": {
         "step1Title": "Vítejte v {{name}}",

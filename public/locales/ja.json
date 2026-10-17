@@ -86,6 +86,8 @@
         "emailInUse": "このメールアドレスはすでに別のアカウントで使われています。",
         "emailInvalid": "有効なメールアドレスを入力してください。",
         "sessionUnreachableTitle": "接続が中断されました",
+        "serverNotReadyTitle": "サーバーの準備ができていません",
+        "rateLimitedTitle": "リクエストが多すぎます",
         "sessionRetryHint": "ログイン状態は保たれています。{{seconds}} 秒後に再試行します。",
         "sessionRetrying": "再試行しています…",
         "searchNoResultsTitle": "該当なし",
@@ -3507,7 +3509,9 @@
     },
     "offline": {
         "banner": "オフライン - 再接続しています…",
-        "staleData": "オフライン - 最終更新: {{time}}"
+        "staleData": "オフライン - 最終更新: {{time}}",
+        "pageTitle": "オフラインです",
+        "pageDescription": "このページには接続が必要です。端末がオンラインに戻ると自動で読み込まれます。"
     },
     "emptyHint": {
         "recipes": "レシピは献立にも買い物リストにも直接送れます。",

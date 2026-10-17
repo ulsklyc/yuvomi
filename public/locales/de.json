@@ -86,6 +86,8 @@
         "emailInUse": "Diese E-Mail-Adresse gehört bereits zu einem anderen Konto.",
         "emailInvalid": "Bitte eine gültige E-Mail-Adresse eingeben.",
         "sessionUnreachableTitle": "Verbindung unterbrochen",
+        "serverNotReadyTitle": "Server gerade nicht bereit",
+        "rateLimitedTitle": "Zu viele Anfragen",
         "sessionRetryHint": "Du bleibst angemeldet. Neuer Versuch in {{seconds}} s.",
         "sessionRetrying": "Neuer Versuch läuft…",
         "searchNoResultsTitle": "Keine Treffer",
@@ -3507,7 +3509,9 @@
     },
     "offline": {
         "banner": "Offline - Verbindung wird wiederhergestellt…",
-        "staleData": "Offline - Stand: {{time}}"
+        "staleData": "Offline - Stand: {{time}}",
+        "pageTitle": "Du bist offline",
+        "pageDescription": "Diese Seite braucht eine Verbindung. Sobald dein Gerät wieder online ist, lädt sie von selbst."
     },
     "emptyHint": {
         "tasks": "Tippe auf + um deine erste Aufgabe zu erstellen. Wische eine Karte nach links zum Abhaken, nach rechts zum Ansehen.",

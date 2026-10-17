@@ -19,7 +19,7 @@
  */
 import { t } from '/i18n.js';
 import { emptyStateEl } from '/utils/empty-state.js';
-import { loadErrorSentence } from '/utils/friendly-error.js';
+import { isServiceWorkerOffline, loadErrorSentence } from '/utils/friendly-error.js';
 
 /**
  * Wartezeit vor dem naechsten automatischen Versuch, in Millisekunden.
@@ -49,6 +49,22 @@ export function sessionRetryDelay(attempt, retryAfter, now) {
     }
   }
   return Math.min(600_000, Math.max(backoff, asked));
+}
+
+/**
+ * Der Titel folgt der Ursache, wie der Satz darunter (Re-Critique 2026-10-17):
+ * ueber "Serverfehler. Bitte versuche es spaeter erneut." stand bei einer 503
+ * "Verbindung unterbrochen" - die Verbindung war da, der Server nicht bereit.
+ * Eine 503 des Service Workers (`{ error: 'offline' }`) ist kein Serverfehler.
+ * @returns {string} Schluessel
+ */
+export function unreachableTitleKey(err, nav = navigator) {
+  const status = Number(err?.status ?? err?.response?.status);
+  if (nav?.onLine === false || status === 0) return 'common.sessionUnreachableTitle';
+  if (isServiceWorkerOffline(err)) return 'common.sessionUnreachableTitle';
+  if (status === 429) return 'common.rateLimitedTitle';
+  if (status >= 500) return 'common.serverNotReadyTitle';
+  return 'common.sessionUnreachableTitle';
 }
 
 /** Der laufende Zustand: Zeitgeber, Netz-Lauscher und der gezeichnete Knoten. */
@@ -108,6 +124,7 @@ export function showSessionUnreachable(container, err, retry, {
     box.removeAttribute('role');
     box.removeAttribute('aria-busy');
     const set = (selector, text) => { const el = box.querySelector(selector); if (el) el.textContent = text; };
+    set('.empty-state__title', t(unreachableTitleKey(err, win.navigator)));
     set('.empty-state__description', description);
     set('.empty-state__hint', hintText);
     set('.empty-state__details pre', detailText);
@@ -116,7 +133,7 @@ export function showSessionUnreachable(container, err, retry, {
     box = emptyStateEl({
       variant: 'error',
       icon: 'cloud-off',
-      title: t('common.sessionUnreachableTitle'),
+      title: t(unreachableTitleKey(err, win.navigator)),
       description,
       hint: hintText,
       details: { summary: t('common.errorDetails'), text: detailText },
@@ -173,4 +190,79 @@ export function showSessionUnreachable(container, err, retry, {
     if (win.lucide) win.lucide.createIcons({ el: box });
   }
   return box;
+}
+
+/** Der Lauscher des zuletzt gezeichneten Seitenzustands (showPageUnreachable). */
+let pageEpisode = null;
+
+/**
+ * Eine SEITE ist nicht erreichbar - offline oder ohne Antwort des Servers
+ * (Re-Critique 2026-10-17, P1). Ein Seitenwechsel ohne Netz endete in "Etwas ist
+ * schiefgelaufen" samt Stack und "Neu laden"; nach der Rueckkehr des Netzes
+ * blieb er stehen. Jetzt derselbe Ton wie der Sitzungszustand oben: ein Satz zur
+ * Ursache, "Erneut versuchen", und sobald das Geraet wieder online ist, zeichnet
+ * sich die Seite selbst neu. Kein Zeitgeber: ohne Netz traefe er nur wieder das
+ * Netz, und das `online`-Ereignis sagt genau, wann es sich lohnt.
+ *
+ * Offline (`navigator.onLine === false`) sagt der Zustand "Du bist offline";
+ * mit Netz, aber ohne Antwort, nennt er die Ursache wie die Sitzung
+ * (loadErrorSentence). Kein Alarm: es ist ein Zustand, kein Fehler, den jemand
+ * verursacht hat - `role="status"`, der Fokus geht auf den Zustand, damit die
+ * Tastatur nicht im abgeraeumten Baum haengt.
+ *
+ * @param {HTMLElement} container - `#main-content`
+ * @param {unknown} err - der Fehler aus dem Seitenaufbau
+ * @param {() => unknown} retry - zeichnet dieselbe Seite neu
+ * @param {object} [env] - fuer Tests: window/navigator
+ * @returns {HTMLElement|null}
+ */
+export function showPageUnreachable(container, err, retry, { win = window, nav = win.navigator } = {}) {
+  if (!container) return null;
+  if (pageEpisode) win.removeEventListener('online', pageEpisode.onOnline);
+  const offline = nav?.onLine === false;
+  const status = Number(err?.status);
+  const box = emptyStateEl({
+    variant: 'error',
+    icon: offline ? 'wifi-off' : 'cloud-off',
+    title: t(offline ? 'offline.pageTitle' : unreachableTitleKey(err, nav)),
+    description: offline ? t('offline.pageDescription') : (loadErrorSentence(err) ?? t('common.loadErrorDescription')),
+    details: {
+      summary: t('common.errorDetails'),
+      text: Number.isInteger(status) && status > 0 ? `HTTP ${status}` : `${err?.name ?? 'Error'}: ${err?.message ?? ''}`,
+    },
+    action: {
+      label: t('common.retry'),
+      icon: 'refresh-cw',
+      attrs: { 'data-action': 'page-retry' },
+      onClick: () => run(),
+    },
+    className: 'page-unreachable',
+  });
+  box.setAttribute('role', 'status');
+  box.tabIndex = -1;
+  const current = { onOnline: () => { if (box.isConnected) run(); } };
+  function run() {
+    win.removeEventListener('online', current.onOnline);
+    if (pageEpisode === current) pageEpisode = null;
+    retry();
+  }
+  pageEpisode = current;
+  win.addEventListener('online', current.onOnline);
+  container.replaceChildren(box);
+  if (win.lucide) win.lucide.createIcons({ el: box });
+  box.focus?.({ preventScroll: true });
+  return box;
+}
+
+/**
+ * Scheiterte der Seitenaufbau am Netz und nicht am Code? Offline immer; sonst,
+ * wenn der Wurf ein Netzfehler ist: fetch ohne Antwort (status 0, "Failed to
+ * fetch" / "NetworkError" / "Load failed") oder ein Seitenmodul, das nicht
+ * geladen werden konnte. Ein Fehler IM Code der Seite bleibt der Fehlerbildschirm.
+ */
+export function isUnreachableFailure(err, nav = navigator) {
+  if (nav?.onLine === false) return true;
+  if (err?.status === 0) return true;
+  return /Failed to fetch|NetworkError|Load failed|dynamically imported module|Importing a module script failed/i
+    .test(String(err?.message ?? ''));
 }

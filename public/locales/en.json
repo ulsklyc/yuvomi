@@ -86,6 +86,8 @@
         "emailInUse": "This email address already belongs to another account.",
         "emailInvalid": "Enter a valid email address.",
         "sessionUnreachableTitle": "Connection interrupted",
+        "serverNotReadyTitle": "Server not ready right now",
+        "rateLimitedTitle": "Too many requests",
         "sessionRetryHint": "You stay signed in. Trying again in {{seconds}} s.",
         "sessionRetrying": "Trying again…",
         "searchNoResultsTitle": "No results",
@@ -3507,7 +3509,9 @@
     },
     "offline": {
         "banner": "Offline - reconnecting…",
-        "staleData": "Offline - as of: {{time}}"
+        "staleData": "Offline - as of: {{time}}",
+        "pageTitle": "You are offline",
+        "pageDescription": "This page needs a connection. As soon as your device is back online, it loads by itself."
     },
     "shortcuts": {
         "search": "Open search",

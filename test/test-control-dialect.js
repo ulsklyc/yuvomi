@@ -1119,6 +1119,19 @@ test('Beifang: das Offline-Banner (fixed, top 0) haelt die Statusleiste frei', (
     'die Oberkante braucht var(--safe-area-inset-top)');
 });
 
+test('Beifang: das Offline-Banner laesst am Desktop die Seitenleiste frei (Re-Critique 2026-10-17)', () => {
+  // Volle Breite verdeckte Logo, Suche und Einklappen der schwebenden Tafel.
+  const layout = readFileSync(join(PUBLIC, 'styles/layout.css'), 'utf8');
+  const desk = [...eachRule(layout)].find((r) => r.selector === '.offline-banner'
+    && r.at.some((a) => /min-width:\s*1024px/.test(a)));
+  assert.ok(desk, 'ab 1024px fehlt eine eigene Regel fuer .offline-banner');
+  assert.match(desk.body, /left\s*:\s*calc\(var\(--sidebar-width\) \+ var\(--sidebar-float-gap\)\)/,
+    'das Banner beginnt rechts der schwebenden Tafel (Spalte + Abstand zur Kante)');
+  const content = [...eachRule(layout)].find((r) => r.selector === '.app-content'
+    && r.at.some((a) => /min-width:\s*1024px/.test(a)) && /margin-left/.test(r.body));
+  assert.match(content?.body ?? '', /margin-left\s*:\s*var\(--sidebar-width\)/, 'dieselbe Variable wie der Inhalt');
+});
+
 test('Zeilenaktionen sind dauerhaft sichtbar: keine Regel blendet einen Aktions-Traeger per opacity: 0 aus', () => {
   // ignore.md (2026-08-17, bestaetigt): Ruhe durch Kontrast, nicht durch
   // Unsichtbarkeit - hover-Enthuellung hat hier zweimal dieselbe Defektklasse

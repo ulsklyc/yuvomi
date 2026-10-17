@@ -86,6 +86,8 @@
         "emailInUse": "Bu e-posta adresi zaten başka bir hesaba ait.",
         "emailInvalid": "Geçerli bir e-posta adresi gir.",
         "sessionUnreachableTitle": "Bağlantı kesildi",
+        "serverNotReadyTitle": "Sunucu şu anda hazır değil",
+        "rateLimitedTitle": "Çok fazla istek",
         "sessionRetryHint": "Oturumun açık kalır. {{seconds}} sn sonra yeniden denenecek.",
         "sessionRetrying": "Yeniden deneniyor…",
         "searchNoResultsTitle": "Sonuç yok",
@@ -3507,7 +3509,9 @@
     },
     "offline": {
         "banner": "Çevrimdışı - yeniden bağlanılıyor…",
-        "staleData": "Çevrimdışı - son güncelleme: {{time}}"
+        "staleData": "Çevrimdışı - son güncelleme: {{time}}",
+        "pageTitle": "Çevrimdışısın",
+        "pageDescription": "Bu sayfanın bağlantıya ihtiyacı var. Cihazın yeniden çevrimiçi olunca kendiliğinden yüklenir."
     },
     "emptyHint": {
         "recipes": "Bir tarif doğrudan öğün planına ya da alışveriş listesine gider.",

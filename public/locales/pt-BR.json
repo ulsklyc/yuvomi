@@ -86,6 +86,8 @@
         "emailInvalid": "Digite um endereço de e-mail válido.",
         "errorRestoreInProgress": "Não é possível concluir esta ação enquanto uma restauração estiver em andamento.",
         "sessionUnreachableTitle": "Conexão interrompida",
+        "serverNotReadyTitle": "Servidor indisponível no momento",
+        "rateLimitedTitle": "Solicitações demais",
         "sessionRetryHint": "Sua sessão continua ativa. Nova tentativa em {{seconds}} s.",
         "sessionRetrying": "Tentando novamente…",
         "searchNoResultsTitle": "Nenhum resultado",
@@ -3507,7 +3509,9 @@
     },
     "offline": {
         "banner": "Offline - reconectando…",
-        "staleData": "Offline - dados de: {{time}}"
+        "staleData": "Offline - dados de: {{time}}",
+        "pageTitle": "Você está offline",
+        "pageDescription": "Esta página precisa de conexão. Assim que seu dispositivo voltar a ficar online, ela carrega sozinha."
     },
     "emptyHint": {
         "recipes": "Uma receita vai diretamente para o plano de refeições ou para a lista de compras.",

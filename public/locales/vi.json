@@ -86,6 +86,8 @@
         "emailInUse": "Địa chỉ email này đã thuộc về một tài khoản khác.",
         "emailInvalid": "Nhập địa chỉ email hợp lệ.",
         "sessionUnreachableTitle": "Mất kết nối",
+        "serverNotReadyTitle": "Máy chủ hiện chưa sẵn sàng",
+        "rateLimitedTitle": "Quá nhiều yêu cầu",
         "sessionRetryHint": "Bạn vẫn được đăng nhập. Thử lại sau {{seconds}} giây.",
         "sessionRetrying": "Đang thử lại…",
         "searchNoResultsTitle": "Không có kết quả",
@@ -3507,7 +3509,9 @@
     },
     "offline": {
         "banner": "Ngoại tuyến - đang kết nối lại…",
-        "staleData": "Ngoại tuyến - cập nhật lúc: {{time}}"
+        "staleData": "Ngoại tuyến - cập nhật lúc: {{time}}",
+        "pageTitle": "Bạn đang ngoại tuyến",
+        "pageDescription": "Trang này cần kết nối. Ngay khi thiết bị trực tuyến trở lại, trang sẽ tự tải."
     },
     "shortcuts": {
         "search": "Mở tìm kiếm",

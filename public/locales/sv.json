@@ -86,6 +86,8 @@
         "emailInUse": "Den här e-postadressen hör redan till ett annat konto.",
         "emailInvalid": "Ange en giltig e-postadress.",
         "sessionUnreachableTitle": "Anslutningen bröts",
+        "serverNotReadyTitle": "Servern är inte redo just nu",
+        "rateLimitedTitle": "För många förfrågningar",
         "sessionRetryHint": "Du förblir inloggad. Nytt försök om {{seconds}} s.",
         "sessionRetrying": "Försöker igen…",
         "searchNoResultsTitle": "Inga träffar",
@@ -3507,7 +3509,9 @@
     },
     "offline": {
         "banner": "Offline - återansluter…",
-        "staleData": "Offline - senast uppdaterad: {{time}}"
+        "staleData": "Offline - senast uppdaterad: {{time}}",
+        "pageTitle": "Du är offline",
+        "pageDescription": "Den här sidan behöver en anslutning. Så fort enheten är online igen laddas den av sig själv."
     },
     "emptyHint": {
         "recipes": "Ett recept går direkt till måltidsplanen eller till inköpslistan.",

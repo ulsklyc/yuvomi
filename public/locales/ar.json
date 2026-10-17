@@ -89,6 +89,8 @@
         "emailInUse": "عنوان البريد الإلكتروني هذا مرتبط بالفعل بحساب آخر.",
         "emailInvalid": "أدخل عنوان بريد إلكتروني صالحًا.",
         "sessionUnreachableTitle": "انقطع الاتصال",
+        "serverNotReadyTitle": "الخادم غير جاهز حاليًا",
+        "rateLimitedTitle": "طلبات كثيرة جدًا",
         "sessionRetryHint": "ستبقى مسجلاً للدخول. محاولة جديدة خلال {{seconds}} ث.",
         "sessionRetrying": "جارٍ إعادة المحاولة…",
         "searchNoResultsTitle": "لا توجد نتائج",
@@ -3823,7 +3825,9 @@
     },
     "offline": {
         "banner": "غير متصل - تتم إعادة الاتصال…",
-        "staleData": "غير متصل - آخر تحديث: {{time}}"
+        "staleData": "غير متصل - آخر تحديث: {{time}}",
+        "pageTitle": "أنت غير متصل",
+        "pageDescription": "تحتاج هذه الصفحة إلى اتصال. ستُحمَّل تلقائيًا فور عودة جهازك إلى الاتصال."
     },
     "emptyHint": {
         "recipes": "تنتقل الوصفة مباشرة إلى خطة الوجبات أو إلى قائمة المشتريات.",

@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import { createNavigateHarness } from './router-navigate-harness.js';
 import { installMiniDom } from './mini-dom.js';
 
-const { sessionRetryDelay, showSessionUnreachable } = await import('../public/utils/session-unreachable.js');
+const { sessionRetryDelay, showSessionUnreachable, showPageUnreachable, isUnreachableFailure, unreachableTitleKey } = await import('../public/utils/session-unreachable.js');
 const { loadErrorSentence } = await import('../public/utils/friendly-error.js');
 
 const USER = { id: 1, access_scope: 'family', role: 'admin' };
@@ -126,7 +126,8 @@ test('der Fehlerzustand nennt die Ursache, legt den Status in die Details und pl
     const box = showSessionUnreachable(app, err, () => { retried += 1; }, env);
     const html = box.outerHTML;
     assert.match(html, /role="alert"/);
-    assert.match(html, /common\.sessionUnreachableTitle/);
+    // Der Titel folgt der Ursache (Re-Critique 2026-10-17): eine Bremse ist keine unterbrochene Verbindung.
+    assert.match(html, /common\.rateLimitedTitle/);
     assert.match(html, /common\.errorRateLimited/, 'die Bremse sagt "kurz warten", nicht "pruefe die Verbindung"');
     assert.doesNotMatch(html, /common\.loadErrorDescription/);
     assert.match(html, /<details class="empty-state__details"><summary>common\.errorDetails<\/summary><pre>HTTP 429/);
@@ -202,4 +203,68 @@ test('der Zustand sagt sich EINMAL an: kein Fokus, weitere Fehlversuche aktualis
   } finally {
     restore();
   }
+});
+
+// ── Titel nach Ursache und die nicht erreichbare SEITE (Re-Critique 2026-10-17) ──
+
+test('der Titel widerspricht dem Satz nicht: 503 heisst "Server nicht bereit", offline "Verbindung unterbrochen"', () => {
+  const on = { onLine: true };
+  assert.equal(unreachableTitleKey({ status: 503 }, on), 'common.serverNotReadyTitle',
+    'ueber "Serverfehler" stand "Verbindung unterbrochen"');
+  assert.equal(unreachableTitleKey({ status: 500 }, on), 'common.serverNotReadyTitle');
+  assert.equal(unreachableTitleKey({ status: 429 }, on), 'common.rateLimitedTitle');
+  assert.equal(unreachableTitleKey({ status: 503, data: { error: 'offline' } }, on), 'common.sessionUnreachableTitle',
+    'die 503 des Service Workers ist kein Serverfehler');
+  assert.equal(unreachableTitleKey(new TypeError('Failed to fetch'), on), 'common.sessionUnreachableTitle');
+  assert.equal(unreachableTitleKey({ status: 503 }, { onLine: false }), 'common.sessionUnreachableTitle');
+});
+
+test('isUnreachableFailure: Netz und nicht ladbare Seitenmodule ja, ein Fehler im Code der Seite nein', () => {
+  const on = { onLine: true };
+  assert.equal(isUnreachableFailure(new TypeError('x is not a function'), { onLine: false }), true, 'offline immer');
+  assert.equal(isUnreachableFailure(new TypeError('Failed to fetch dynamically imported module: /pages/tasks.js'), on), true);
+  assert.equal(isUnreachableFailure(new TypeError('Importing a module script failed.'), on), true, 'Safari');
+  assert.equal(isUnreachableFailure(new TypeError('NetworkError when attempting to fetch resource.'), on), true, 'Firefox');
+  assert.equal(isUnreachableFailure(Object.assign(new Error('offline'), { status: 0 }), on), true);
+  assert.equal(isUnreachableFailure(new TypeError('x is not a function'), on), false);
+  assert.equal(isUnreachableFailure(Object.assign(new Error('x'), { status: 500 }), on), false,
+    'ein Serverfehler beim Laden zeigt die Seite selbst (mountLoadError), nicht diesen Zustand');
+});
+
+test('offline: eigener Zustand statt "Etwas ist schiefgelaufen", und bei online zeichnet die Seite sich selbst neu', () => {
+  const restore = installMiniDom();
+  try {
+    const { env, listeners } = fakeEnv();
+    const main = fakeContainer();
+    let retried = 0;
+    const err = new TypeError('Failed to fetch dynamically imported module: /pages/tasks.js');
+    const box = showPageUnreachable(main, err, () => { retried += 1; }, { win: env.win, nav: { onLine: false } });
+    const html = box.outerHTML;
+    assert.match(html, /offline\.pageTitle/);
+    assert.match(html, /offline\.pageDescription/);
+    assert.doesNotMatch(html, /common\.errorOccurred|common\.reload/, 'kein Absturzbildschirm, kein "Neu laden"');
+    assert.match(html, /role="status"/, 'ein Zustand, kein Alarm');
+    assert.match(html, /data-action="page-retry"/);
+    assert.match(html, /<pre>TypeError: Failed to fetch/, 'die Ursache steht in den Details');
+    assert.equal(main.child, box);
+    listeners.get('online')();
+    assert.equal(retried, 1, 'online zeichnet neu');
+    assert.equal(listeners.has('online'), false, 'und nur einmal');
+
+    // Ist der Zustand inzwischen ersetzt (andere Seite), zeichnet online nichts.
+    showPageUnreachable(main, err, () => { retried += 1; }, { win: env.win, nav: { onLine: false } });
+    main.child.isConnected = false;
+    listeners.get('online')();
+    assert.equal(retried, 1, 'eine verlassene Seite holt sich nicht zurueck');
+  } finally {
+    restore();
+  }
+});
+
+test('router: ein Netzfehler beim Seitenaufbau geht an showPageUnreachable, nur der Rest an renderError', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  const block = src.slice(src.indexOf("console.error('[Router] Seiten-Render-Fehler:', err);"));
+  const body = block.slice(0, block.indexOf('} finally {'));
+  assert.match(body, /if \(!route\.thirdPartyModule && isUnreachableFailure\(err\)\) \{[\s\S]*showPageUnreachable\(errorHost, err, \(\) => navigate\(retryPath, false\)\);[\s\S]*\} else \{\s*renderError\(errorHost, err\);/);
 });

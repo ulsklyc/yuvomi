@@ -86,6 +86,8 @@
         "emailInUse": "이 이메일 주소는 이미 다른 계정에서 사용 중입니다.",
         "emailInvalid": "올바른 이메일 주소를 입력하세요.",
         "sessionUnreachableTitle": "연결이 끊겼습니다",
+        "serverNotReadyTitle": "서버가 아직 준비되지 않았습니다",
+        "rateLimitedTitle": "요청이 너무 많습니다",
         "sessionRetryHint": "로그인 상태는 유지됩니다. {{seconds}}초 후 다시 시도합니다.",
         "sessionRetrying": "다시 시도하는 중…",
         "searchNoResultsTitle": "결과 없음",
@@ -3507,7 +3509,9 @@
     },
     "offline": {
         "banner": "오프라인 - 연결을 복구하는 중…",
-        "staleData": "오프라인 - 기준: {{time}}"
+        "staleData": "오프라인 - 기준: {{time}}",
+        "pageTitle": "오프라인 상태입니다",
+        "pageDescription": "이 페이지는 연결이 필요합니다. 기기가 다시 온라인이 되면 자동으로 불러옵니다."
     },
     "emptyHint": {
         "tasks": "+ 를 탭하여 첫 할 일을 만드세요. 카드를 왼쪽으로 밀면 완료, 오른쪽으로 밀면 보기가 열립니다.",

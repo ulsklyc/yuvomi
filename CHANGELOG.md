@@ -272,6 +272,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Switching pages without a connection no longer ends in "Something went wrong".** A page that
+  needs the network now says "You are offline" with "Try again", and draws itself as soon as the
+  device is back online. On a computer the offline notice sits above the content instead of
+  covering the logo, search and collapse button of the sidebar.
+
 - **A mistyped current password no longer signs you out.** Changing your password with a wrong
   current password sent you to the sign-in page without a word and lost what you had typed, although
   your session was fine. The page now says "The current password is not correct." at that field and
@@ -317,7 +322,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A busy or restarting server no longer signs you out.** When Yuvomi could not check the
   session on start - too many requests, a server error, a restarting NAS or no network - it showed
   the sign-in form although the session was still valid. Only a real "not signed in" answer leads
-  there now; anything else shows "Connection interrupted" with the cause, a "Try again" button and
+  there now; anything else shows a state titled after the cause ("Connection interrupted",
+  "Server not ready right now" or "Too many requests") with the cause, a "Try again" button and
   an automatic retry that waits longer each time and respects the server's `Retry-After`. Screen
   readers hear it once, not on every retry, and focus stays on "Try again" when you used it.
 

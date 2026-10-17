@@ -448,13 +448,23 @@ export function friendlyError(err) {
  * @param {unknown} err
  * @returns {string|undefined}
  */
+/**
+ * Die 503 des Service Workers (`{ error: 'offline' }`, sw.js networkFirstApi):
+ * keine Antwort des Servers, sondern kein Netz. Eine Stelle fuer die Frage,
+ * damit niemand dafuer `err.data.error` selbst liest.
+ */
+export function isServiceWorkerOffline(err) {
+  const status = err?.status ?? err?.response?.status;
+  return status === 503 && err?.data?.error === 'offline';
+}
+
 export function loadErrorSentence(err) {
   const status = err?.status ?? err?.response?.status;
   // Ohne Netz: der Browser weiss es (onLine), oder der Service Worker hat fuer
   // eine nicht gecachte Abfrage sein 503 `{ error: 'offline' }` geantwortet
   // (sw.js, networkFirstApi) - das ist kein Serverfehler.
   if (status === 0 || !navigator.onLine) return t('common.errorOffline');
-  if (status === 503 && err?.data?.error === 'offline') return t('common.errorOffline');
+  if (isServiceWorkerOffline(err)) return t('common.errorOffline');
   const known = knownSentence(err);
   if (known) return known;
   if (status === 404) return t('common.errorNotFound');

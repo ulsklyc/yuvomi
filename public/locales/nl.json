@@ -86,6 +86,8 @@
         "emailInUse": "Dit e-mailadres hoort al bij een ander account.",
         "emailInvalid": "Voer een geldig e-mailadres in.",
         "sessionUnreachableTitle": "Verbinding onderbroken",
+        "serverNotReadyTitle": "Server is nu niet klaar",
+        "rateLimitedTitle": "Te veel verzoeken",
         "sessionRetryHint": "Je blijft ingelogd. Nieuwe poging over {{seconds}} s.",
         "sessionRetrying": "Opnieuw proberen…",
         "searchNoResultsTitle": "Geen resultaten",
@@ -3507,7 +3509,9 @@
     },
     "offline": {
         "banner": "Offline - opnieuw verbinden…",
-        "staleData": "Offline - stand: {{time}}"
+        "staleData": "Offline - stand: {{time}}",
+        "pageTitle": "Je bent offline",
+        "pageDescription": "Deze pagina heeft een verbinding nodig. Zodra je apparaat weer online is, laadt ze vanzelf."
     },
     "shortcuts": {
         "search": "Zoeken openen",

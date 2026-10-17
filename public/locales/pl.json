@@ -88,6 +88,8 @@
         "emailInUse": "Ten adres e-mail należy już do innego konta.",
         "emailInvalid": "Wpisz prawidłowy adres e-mail.",
         "sessionUnreachableTitle": "Połączenie przerwane",
+        "serverNotReadyTitle": "Serwer nie jest teraz gotowy",
+        "rateLimitedTitle": "Zbyt wiele żądań",
         "sessionRetryHint": "Sesja pozostaje aktywna. Kolejna próba za {{seconds}} s.",
         "sessionRetrying": "Ponawianie…",
         "searchNoResultsTitle": "Brak wyników",
@@ -3717,7 +3719,9 @@
     },
     "offline": {
         "banner": "Offline - przywracanie połączenia…",
-        "staleData": "Offline - stan z: {{time}}"
+        "staleData": "Offline - stan z: {{time}}",
+        "pageTitle": "Jesteś offline",
+        "pageDescription": "Ta strona wymaga połączenia. Gdy tylko urządzenie znów będzie online, załaduje się sama."
     },
     "emptyHint": {
         "tasks": "Stuknij +, aby utworzyć pierwsze zadanie. Przesuń kartę w lewo, aby oznaczyć jako ukończone, w prawo, aby wyświetlić.",

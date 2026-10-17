@@ -86,6 +86,8 @@
         "emailInUse": "Questo indirizzo email appartiene già a un altro account.",
         "emailInvalid": "Inserisci un indirizzo email valido.",
         "sessionUnreachableTitle": "Connessione interrotta",
+        "serverNotReadyTitle": "Il server non è pronto al momento",
+        "rateLimitedTitle": "Troppe richieste",
         "sessionRetryHint": "La sessione resta attiva. Nuovo tentativo tra {{seconds}} s.",
         "sessionRetrying": "Nuovo tentativo in corso…",
         "searchNoResultsTitle": "Nessun risultato",
@@ -3507,7 +3509,9 @@
     },
     "offline": {
         "banner": "Offline - riconnessione in corso…",
-        "staleData": "Offline - aggiornato al: {{time}}"
+        "staleData": "Offline - aggiornato al: {{time}}",
+        "pageTitle": "Sei offline",
+        "pageDescription": "Questa pagina ha bisogno di una connessione. Appena il dispositivo torna online, si carica da sola."
     },
     "emptyHint": {
         "recipes": "Una ricetta va direttamente nel piano dei pasti o nella lista della spesa.",

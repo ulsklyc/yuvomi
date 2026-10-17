@@ -86,6 +86,8 @@
         "emailInUse": "Denne e-postadressen tilhører allerede en annen konto.",
         "emailInvalid": "Skriv inn en gyldig e-postadresse.",
         "sessionUnreachableTitle": "Tilkoblingen ble brutt",
+        "serverNotReadyTitle": "Serveren er ikke klar akkurat nå",
+        "rateLimitedTitle": "For mange forespørsler",
         "sessionRetryHint": "Du forblir pålogget. Nytt forsøk om {{seconds}} s.",
         "sessionRetrying": "Prøver på nytt…",
         "searchNoResultsTitle": "Ingen treff",
@@ -3507,7 +3509,9 @@
     },
     "offline": {
         "banner": "Uten nett - kobler til på nytt…",
-        "staleData": "Uten nett - per: {{time}}"
+        "staleData": "Uten nett - per: {{time}}",
+        "pageTitle": "Du er frakoblet",
+        "pageDescription": "Denne siden trenger tilkobling. Så snart enheten er tilkoblet igjen, lastes den av seg selv."
     },
     "shortcuts": {
         "search": "Åpne søk",
