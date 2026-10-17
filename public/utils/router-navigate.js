@@ -541,15 +541,26 @@ export function createNavigate(state, deps) {
       ) {
         let handled = false;
         try {
-          handled = await state._renderedModule.update({
+          // UEBERHOLBAR WIE renderPage() (Review #2049, Runde 2). update()
+          // wartet auf Daten - Schedules Reiterwechsel auf activateView() und
+          // dessen Abruf ohne Signal. Blank abgewartet hielt das den naechsten
+          // Tipp auf, denn der wartende startet erst im finally. Das Signal
+          // reist mit; endet das Warten mit dem Abbruch, kehrt diese
+          // Navigation zurueck, ohne Scroll, FAB oder Nav anzufassen - und
+          // ohne ein spaetes false noch auf ein volles Rendern umzulenken.
+          const updating = state._renderedModule.update({
             user: state.currentUser,
             path: basePath,
             query: new URLSearchParams(path.split('?')[1] ?? ''),
+            signal: run.signal,
           });
+          if (!(await unlessAborted(updating, run.signal))) return;
+          handled = await updating;
         } catch (error) {
           console.error('[Router] Soft-Update fehlgeschlagen, vollständiges Rendern folgt:', error);
           handled = false;
         }
+        if (run.signal.aborted) return;
         if (handled) {
           // Auch die Soft-Navigation wechselt den Inhalt (Settings-Blatt, Health-Tab)
           // und muss den Scrollport nachziehen - hier zwangsläufig NACH dem Render,

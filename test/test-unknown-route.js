@@ -478,6 +478,57 @@ test('laufende Sitzung: ein render(), das nie fertig wird, haelt den neueren Tip
   assert.deepEqual(log.history, [['push', '/budget'], ['push', '/tasks']]);
 });
 
+/*
+ * Review #2049, Runde 2: dasselbe fuer die WEICHE Navigation. Ein Reiter im
+ * Schichtplan oder ein Einstellungsblatt laeuft ueber `update()` des schon
+ * gezeichneten Moduls statt ueber renderPage() - und dort wartete der Router
+ * blank. Schedules update() wartet auf activateView() und das auf einen
+ * Abruf ohne Signal: ein haengender hielt den naechsten Tipp unbegrenzt auf.
+ */
+test('laufende Sitzung: ein weiches update(), das nie fertig wird, haelt den neueren Tipp nicht auf', async () => {
+  const never = new Promise(() => {});
+  const calls = [];
+  const { navigate, log, env, setShell } = createNavigateHarness({ user: MEMBER });
+  setShell(true);
+  env.currentPath = '/settings';
+  env._renderedModuleName = 'settings';
+  env._renderedModule = {
+    update: (args) => { calls.push(args); return never; },
+  };
+  const first = navigate('/settings/appearance');
+  await settle();
+  assert.equal(calls.length, 1, 'die weiche Navigation ruft update()');
+  assert.equal(env.isNavigating, true);
+  const second = navigate('/tasks');
+  assert.equal(await within(second, 500, 'zweiter Tipp'), 'fertig', 'der zweite Tipp kommt an');
+  assert.equal(await within(first, 50, 'erste Navigation'), 'fertig');
+  assert.ok(calls[0].signal instanceof AbortSignal, 'update() bekommt das Signal der Navigation');
+  assert.equal(calls[0].signal.aborted, true, 'das ueberholte update() erfaehrt den Abbruch');
+  assert.deepEqual(log.rendered, ['/tasks']);
+  assert.equal(env.currentPath, '/tasks');
+  assert.equal(env.isNavigating, false);
+});
+
+test('laufende Sitzung: ein ueberholtes update() faellt danach nicht aufs volle Rendern zurueck', async () => {
+  let finish;
+  const late = new Promise((resolve) => { finish = resolve; });
+  const { navigate, log, env, setShell } = createNavigateHarness({ user: MEMBER });
+  setShell(true);
+  env.currentPath = '/settings';
+  env._renderedModuleName = 'settings';
+  env._renderedModule = { update: () => late };
+  const first = navigate('/settings/appearance');
+  await settle();
+  assert.equal(await within(navigate('/tasks'), 500, 'zweiter Tipp'), 'fertig');
+  assert.equal(await within(first, 50, 'erste Navigation'), 'fertig');
+  // Kommt die Antwort spaet mit false (volles Rendern noetig), zeichnet die
+  // ueberholte Navigation trotzdem nichts mehr ueber die neue Seite.
+  finish(false);
+  await settle();
+  assert.deepEqual(log.rendered, ['/tasks'], 'ein spaetes false rendert die alte Route nicht nach');
+  assert.equal(env.currentPath, '/tasks');
+});
+
 test('unlessAborted: endet mit dem Abbruch, gibt sonst Wert und Fehler weiter', async () => {
   const { unlessAborted } = await import('../public/utils/router-navigate.js');
   assert.equal(await unlessAborted(Promise.resolve(1), null), true, 'ohne Signal: wie await');
