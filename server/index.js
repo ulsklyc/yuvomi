@@ -483,7 +483,7 @@ const feedLimiter = rateLimit({
 
 app.get('/feed/calendar/:token.ics', feedLimiter, (req, res) => {
   try {
-    const userId = icsExport.findUserIdByFeedToken(db.get(), req.params.token);
+    const userId = icsExport.findUserIdByFeedToken(db.get(), 'calendar_feed_token', req.params.token);
     const localCalendar = userId ? null : findCalendarByFeedToken(db.get(), req.params.token);
     if (!userId && !localCalendar) return res.status(404).type('text/plain').send('Not found');
     const ics = userId

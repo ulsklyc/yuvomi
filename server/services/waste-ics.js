@@ -20,11 +20,10 @@
  * edits to the selection (see Migration 205).
  */
 
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import * as store from './waste-store.js';
-import { activeAccountSql } from './account-state.js';
 import { resolveHouseholdFormats, translate } from '../utils/i18n.js';
-import { escapeICSText, foldLine } from './ics-export.js';
+import { escapeICSText, foldLine, findUserIdByFeedToken as sharedFindUserIdByFeedToken } from './ics-export.js';
 import { todayKey, shiftDateKey } from '../utils/timezone.js';
 
 const FEED_PAST_DAYS = 30;
@@ -113,22 +112,10 @@ function clearFeedToken(conn, userId) {
     .run(userId);
 }
 
-// Löst das Token auf seinen Besitzer auf statt nur "gültig/ungültig" zu
-// sagen - so trifft ein Rückzug genau ein Abo, wie bei jedem anderen Feed in
-// dieser Datei.
-//
-// timingSafeEqual je Zeile statt einer SQL-Gleichheit `WHERE token = ?`
-// (derselbe Fix wie ics-export.js#findUserIdByFeedToken - siehe dort fuer die
-// Begruendung). Ein Haushalt hat hoechstens eine Handvoll Nutzer, ein voller
-// Tabellenscan ist hier also kein Performance-Thema.
+const FEED_TOKEN_COLUMN = 'waste_feed_token';
+
 function findUserIdByFeedToken(conn, token) {
-  if (!token) return null;
-  const candidate = Buffer.from(token, 'utf8');
-  for (const row of conn.prepare(`SELECT id, waste_feed_token AS t FROM users WHERE waste_feed_token IS NOT NULL AND ${activeAccountSql('users')}`).all()) {
-    const stored = Buffer.from(row.t, 'utf8');
-    if (stored.length === candidate.length && timingSafeEqual(stored, candidate)) return row.id;
-  }
-  return null;
+  return sharedFindUserIdByFeedToken(conn, FEED_TOKEN_COLUMN, token);
 }
 
 /** null = every active type (default, and also what a malformed/cleared value falls back to). */

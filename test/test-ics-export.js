@@ -591,16 +591,16 @@ test('regenerateFeedToken erzeugt Token und persistiert', () => {
 
 test('findUserIdByFeedToken findet Nutzer', () => {
   const tok = regenerateFeedToken(d2, u2);
-  assert(findUserIdByFeedToken(d2, tok) === u2, 'Lookup falsch');
-  assert(findUserIdByFeedToken(d2, 'unbekannt') === null, 'unbekannter Token darf null sein');
+  assert(findUserIdByFeedToken(d2, 'calendar_feed_token', tok) === u2, 'Lookup falsch');
+  assert(findUserIdByFeedToken(d2, 'calendar_feed_token', 'unbekannt') === null, 'unbekannter Token darf null sein');
 });
 
 test('regenerate ersetzt alten Token (alter wird ungültig)', () => {
   const oldTok = regenerateFeedToken(d2, u1);
   const newTok = regenerateFeedToken(d2, u1);
   assert(oldTok !== newTok, 'Token unverändert');
-  assert(findUserIdByFeedToken(d2, oldTok) === null, 'alter Token noch gültig');
-  assert(findUserIdByFeedToken(d2, newTok) === u1, 'neuer Token ungültig');
+  assert(findUserIdByFeedToken(d2, 'calendar_feed_token', oldTok) === null, 'alter Token noch gültig');
+  assert(findUserIdByFeedToken(d2, 'calendar_feed_token', newTok) === u1, 'neuer Token ungültig');
 });
 
 test('clearFeedToken deaktiviert Feed', () => {

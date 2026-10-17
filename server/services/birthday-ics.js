@@ -1,8 +1,7 @@
 /** Independent birthday subscriptions; reminders do not control this export. */
-import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { escapeICSText, foldLine } from './ics-export.js';
+import { randomBytes } from 'node:crypto';
+import { escapeICSText, foldLine, findUserIdByFeedToken as sharedFindUserIdByFeedToken } from './ics-export.js';
 import { eventTitle, nameDayEventTitle } from './birthdays.js';
-import { activeAccountSql } from './account-state.js';
 import { resolveHouseholdFormats, translate } from '../utils/i18n.js';
 
 export function buildBirthdayFeed(database, now = new Date()) {
@@ -50,12 +49,5 @@ export function clearFeedToken(database, userId) {
 }
 
 export function findUserIdByFeedToken(database, token) {
-  if (!token) return null;
-  // Match the calendar and waste feeds: compare equal-length buffers, not SQL strings.
-  const candidate = Buffer.from(token, 'utf8');
-  for (const row of database.prepare(`SELECT id, birthday_feed_token AS t FROM users WHERE birthday_feed_token IS NOT NULL AND ${activeAccountSql('users')}`).all()) {
-    const stored = Buffer.from(row.t, 'utf8');
-    if (stored.length === candidate.length && timingSafeEqual(stored, candidate)) return row.id;
-  }
-  return null;
+  return sharedFindUserIdByFeedToken(database, 'birthday_feed_token', token);
 }
