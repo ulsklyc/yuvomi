@@ -299,6 +299,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The shopping list's check boxes are easy to see.** An empty box was drawn in the faint line used
+  for card edges and almost vanished on both light and dark backgrounds. It now has the same edge as
+  the circle you tick off a task with, clearly visible at a glance.
+
 - **Yuvomi stays light after a long session.** A page you leave no longer stays in memory: after 44
   page changes the app held about 11,000 page elements instead of 52,000, with a quarter of the
   event listeners, because the old page, its drag handles and the record of the interrupted page

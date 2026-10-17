@@ -807,7 +807,11 @@
   width: var(--space-6);
   height: var(--space-6);
   border-radius: var(--radius-sm);
-  border: 2px solid var(--color-border);
+  /* DIESELBE RUHE WIE DER ABHAKKREIS (R20, .check-ring in list-row.css):
+   * 2px in --color-text-tertiary. Mit der Kartenkante --color-border stand
+   * das Kaestchen bei 1,32:1 hell / 1,47:1 dunkel - das meistgetippte
+   * Bedienelement des Moduls war das blasseste. */
+  border: 2px solid var(--color-text-tertiary);
   background: var(--color-surface);
   transition: border-color var(--transition-fast), background-color var(--transition-fast);
 }

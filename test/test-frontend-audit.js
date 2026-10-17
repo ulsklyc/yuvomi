@@ -21879,3 +21879,27 @@ test('R19: die Nadel der Notizkarte zeichnet so gross wie die Zeilenaktion daneb
   const size = layout.find((r) => r.selector.split(',').map((x) => x.trim()).includes('.row-action svg'));
   assert.ok(size && size.selector.includes('.note-card__pin svg'), 'Nadel und Zeilenaktion teilen EINE Groessenregel');
 });
+
+// R20 D1 (Re-Critique 2026-10-17, A2 P1-2): das Kaestchen der Einkaufszeile
+// zog seine Kante aus der Kartenkante (--color-border) und stand gerendert bei
+// 1,32:1 hell und 1,47:1 dunkel - das meistgetippte Bedienelement des Moduls
+// war das blasseste. Es teilt jetzt die Ruhe des Abhakkreises (.check-ring,
+// 2px --color-text-tertiary): EINE Tonregel fuer alles, was sich abhaken
+// laesst, und 3:1 (WCAG 1.4.11) auf Grund und eigener Flaeche.
+test('R20: das Einkaufskaestchen traegt die Ruhe des Abhakkreises und haelt 3:1', () => {
+  const shopping = [...eachRule(read('../public/styles/shopping.css'))].filter((r) => !r.at.length);
+  const box = shopping.find((r) => r.selector.trim() === '.item-check::before');
+  assert.ok(box, 'shopping.css fuehrt das Kaestchen als `.item-check::before`');
+  const ring = [...eachRule(read('../public/styles/list-row.css'))].find((r) => r.selector.trim() === '.check-ring::after');
+  const edgeOf = (body) => body.match(/border:\s*([^;]+);/)?.[1].trim();
+  assert.equal(edgeOf(box.body), edgeOf(ring.body), 'Kaestchen und Abhakkreis tragen dieselbe Kante');
+  const token = edgeOf(box.body).match(/var\((--[\w-]+)\)/)?.[1];
+  const { light, dark } = themeTokenMaps();
+  for (const [theme, map] of [['light', light], ['dark', dark]]) {
+    const edge = resolveColor(token, map);
+    for (const ground of ['--color-surface', '--color-bg']) {
+      const ratio = contrastRatio(edge, resolveColor(ground, map));
+      assert.ok(ratio >= 3, `${theme}: Kaestchenkante ${token} auf ${ground} nur ${ratio.toFixed(2)}:1`);
+    }
+  }
+});
