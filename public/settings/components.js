@@ -249,6 +249,22 @@ export function settingSwitchRowHtml({ description = '', descriptionId = null, e
     + '</div>';
 }
 
+/**
+ * Die Schalterzeile eines DIALOGS (R19, Einstellungen B7): `toggleRowHtml` als
+ * Zeile des Dialog-Traegers `.form-rows` (utils/form-row.js), der Hinweis
+ * darunter und per `aria-describedby` verknuepft. Das Gegenstueck zu
+ * `settingSwitchRowHtml` fuer die Blaetter - dort traegt die Gruppe
+ * (`.settings-group`) ihre eigenen Masse, im Dialog der Formular-Traeger.
+ */
+export function formSwitchRowHtml({ hint = '', hintId = null, ...toggle }) {
+  const attrs = { ...(toggle.attrs ?? {}) };
+  if (hint && hintId && !attrs['aria-describedby']) attrs['aria-describedby'] = hintId;
+  return '<div class="form-switch">'
+    + toggleRowHtml({ ...toggle, control: 'switch', attrs })
+    + (hint ? `<p class="form-hint form-switch__hint"${attrsHtml({ id: hintId })}>${esc(String(hint))}</p>` : '')
+    + '</div>';
+}
+
 export function createSettingRow({ label, description, control }) {
   const rowId = `settings-setting-row-${++settingRowIdCounter}`;
   const formControl = control?.matches?.('input, select, textarea, button')

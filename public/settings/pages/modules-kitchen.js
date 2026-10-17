@@ -9,6 +9,10 @@ import {
   settingSwitchRowHtml,
 } from '/settings/components.js';
 import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
+import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
+
+/** Das Pflichtzeichen hinter einem Etikett - Markup, kein Text (aria-hidden). */
+const REQUIRED_MARK = '<span class="required-marker" aria-hidden="true"> *</span>';
 import { esc } from '/utils/html.js';
 
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
@@ -235,11 +239,13 @@ function openProviderLinkModal(account, refresh) {
     size: 'sm',
     content: `
       <form id="recipe-provider-link-form" novalidate autocomplete="off">
-        <p class="form-hint">${t('settings.recipeProviderExternalUrlHint', { provider: providerLabel(account.provider) })}</p>
-        <div class="form-group">
-          <label class="form-label" for="recipe-provider-link-external-url">${t('settings.recipeProviderExternalUrlLabel')}</label>
-          <input class="form-input" type="url" id="recipe-provider-link-external-url" placeholder="https://cook.example.com" value="${esc(account.externalUrl ?? '')}" />
-        </div>
+        ${/* Derselbe Zeilen-Dialekt wie die Blaetter (R19, B7). */ ''}
+        ${formRowsHtml(formRowHtml({
+          label: t('settings.recipeProviderExternalUrlLabel'), labelFor: 'recipe-provider-link-external-url', field: true,
+          description: t('settings.recipeProviderExternalUrlHint', { provider: providerLabel(account.provider) }),
+          descriptionId: 'recipe-provider-link-external-url-hint',
+          control: `<input class="form-input" type="url" id="recipe-provider-link-external-url" aria-describedby="recipe-provider-link-external-url-hint" placeholder="https://cook.example.com" value="${esc(account.externalUrl ?? '')}" />`,
+        }))}
         <div id="recipe-provider-link-error" class="form-error" role="alert" hidden></div>
         <div class="modal-panel__footer modal-panel__footer--plain">
           <button type="button" class="btn btn--secondary" id="recipe-provider-link-cancel">${t('common.cancel')}</button>
@@ -314,32 +320,36 @@ function bindProviderAddButton(container) {
       size: 'sm',
       content: `
         <form id="recipe-provider-add-form" novalidate autocomplete="off">
-          <div class="form-group">
-            <label class="form-label" for="recipe-provider-select">${t('settings.recipeProviderTypeLabel')}</label>
-            <select class="form-input" id="recipe-provider-select">
-              <option value="mealie">Mealie</option>
-              <option value="tandoor">Tandoor</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="recipe-provider-name">${t('settings.recipeProviderNameLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
-            <input class="form-input" type="text" id="recipe-provider-name" required maxlength="100" />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="recipe-provider-url">${t('settings.recipeProviderUrlLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
-            <input class="form-input" type="url" id="recipe-provider-url" required placeholder="https://cook.example.com" />
-            <small class="form-hint">${t('settings.recipeProviderUrlHint')}</small>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="recipe-provider-external-url">${t('settings.recipeProviderExternalUrlLabel')}</label>
-            <input class="form-input" type="url" id="recipe-provider-external-url" placeholder="https://cook.example.com" />
-            <small class="form-hint">${t('settings.recipeProviderExternalUrlHint', { provider: 'Mealie' })}</small>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="recipe-provider-token">${t('settings.recipeProviderTokenLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
-            <input class="form-input" type="password" id="recipe-provider-token" required autocomplete="off" />
-            <small class="form-hint" id="recipe-provider-token-hint">${t('settings.recipeProviderTokenHintMealie')}</small>
-          </div>
+          ${/* DER DIALOG SPRICHT DENSELBEN DIALEKT (R19, B7): Zeilen im
+               Traeger, Hinweise unter ihrer Zeile. */ ''}
+          ${formRowsHtml([
+            formRowHtml({
+              label: t('settings.recipeProviderTypeLabel'), labelFor: 'recipe-provider-select',
+              control: `<select class="form-input" id="recipe-provider-select">
+                <option value="mealie">Mealie</option>
+                <option value="tandoor">Tandoor</option>
+              </select>`,
+            }),
+            formRowHtml({
+              label: t('settings.recipeProviderNameLabel'), labelFor: 'recipe-provider-name', labelExtra: REQUIRED_MARK, field: true,
+              control: '<input class="form-input" type="text" id="recipe-provider-name" required maxlength="100" />',
+            }),
+            formRowHtml({
+              label: t('settings.recipeProviderUrlLabel'), labelFor: 'recipe-provider-url', labelExtra: REQUIRED_MARK, field: true,
+              description: t('settings.recipeProviderUrlHint'), descriptionId: 'recipe-provider-url-hint',
+              control: '<input class="form-input" type="url" id="recipe-provider-url" required aria-describedby="recipe-provider-url-hint" placeholder="https://cook.example.com" />',
+            }),
+            formRowHtml({
+              label: t('settings.recipeProviderExternalUrlLabel'), labelFor: 'recipe-provider-external-url', field: true,
+              description: t('settings.recipeProviderExternalUrlHint', { provider: 'Mealie' }), descriptionId: 'recipe-provider-external-url-hint',
+              control: '<input class="form-input" type="url" id="recipe-provider-external-url" aria-describedby="recipe-provider-external-url-hint" placeholder="https://cook.example.com" />',
+            }),
+            formRowHtml({
+              label: t('settings.recipeProviderTokenLabel'), labelFor: 'recipe-provider-token', labelExtra: REQUIRED_MARK, field: true,
+              description: t('settings.recipeProviderTokenHintMealie'), descriptionId: 'recipe-provider-token-hint',
+              control: '<input class="form-input" type="password" id="recipe-provider-token" required autocomplete="off" aria-describedby="recipe-provider-token-hint" />',
+            }),
+          ])}
           <div id="recipe-provider-add-error" class="form-error" role="alert" hidden></div>
           <div class="modal-panel__footer modal-panel__footer--plain">
             <button type="button" class="btn btn--secondary" id="recipe-provider-add-cancel">${t('common.cancel')}</button>
@@ -351,7 +361,7 @@ function bindProviderAddButton(container) {
         const form = panel.querySelector('#recipe-provider-add-form');
         const errorEl = panel.querySelector('#recipe-provider-add-error');
         const providerSelect = panel.querySelector('#recipe-provider-select');
-        const externalUrlHint = panel.querySelector('#recipe-provider-external-url').nextElementSibling;
+        const externalUrlHint = panel.querySelector('#recipe-provider-external-url-hint');
         const tokenHint = panel.querySelector('#recipe-provider-token-hint');
         panel.querySelector('#recipe-provider-add-cancel')?.addEventListener('click', () => closeModal({ force: true }));
 

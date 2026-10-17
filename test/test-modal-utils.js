@@ -2301,3 +2301,22 @@ test('validateAll: beim Absenden keine Alarm-Rolle je leerem Pflichtfeld (Critiq
   assert.equal(a.message().getAttribute('role'), null);
   assert.equal(b.message().getAttribute('role'), null, 'zwei Alarme laufen beim Absenden ineinander');
 }));
+
+// R19 (Einstellungen B7): in der Formularzeile (`.form-row`) steht das Feld in
+// der rechten Spalte. Die Meldung direkt hinter dem Feld drueckte es auf 52px
+// (CardDAV-Dialog bei 390) - sie gehoert unter die Zeile, ueber beide Spalten.
+test('wireBlurValidation: in einer Formularzeile steht die Meldung unter der Zeile, nicht neben dem Feld', () => {
+  const place = (asRow) => {
+    const input = makeInput({ value: '' });
+    input.id = asRow ? 'row-field' : 'stacked-field';
+    if (asRow) input._field.classList.add('form-row');
+    let besideField = 0;
+    input.insertAdjacentElement = () => { besideField += 1; };
+    wireBlurValidation(makeContainer([input]));
+    input._listeners['input']();
+    input._listeners['blur']();
+    return { besideField, inRow: input._field._children.some((c) => c.className === 'form-field__error') };
+  };
+  assert.deepEqual(place(true), { besideField: 0, inRow: true }, 'Zeile: ans Ende der Zeile');
+  assert.deepEqual(place(false), { besideField: 1, inRow: false }, 'gestapeltes Feld: direkt hinter das Feld wie bisher');
+});

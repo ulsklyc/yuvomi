@@ -27,6 +27,7 @@ import { esc } from '/utils/html.js';
 import { closeModal, confirmModal, openModal, refocusAfterRender } from '/components/modal.js';
 import { settingRowHtml, settingSwitchRowHtml, toggleRowHtml } from '/settings/components.js';
 import { loadFamilyUsers } from '/settings/family-users.js';
+import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
 import { rowActionEl } from '/utils/row-action.js';
 
 function formatSyncTime(value) {
@@ -262,32 +263,33 @@ function openIcsEditModal(container, sub, subs, user) {
     size: 'sm',
     content: `
       <form id="ics-edit-form" class="settings-form">
-        <div class="form-group">
-          <label class="form-label" for="ics-edit-name">${t('settings.ics.form.name')}</label>
-          <input class="form-input" type="text" id="ics-edit-name" value="${esc(sub.name)}" required maxlength="100" />
-        </div>
-        <div class="settings-name-color-row">
-          <div class="form-group settings-color-field">
-            <label class="form-label" for="ics-edit-color">${t('settings.ics.form.color')}</label>
-            <input class="settings-color-button" type="color" id="ics-edit-color" value="${esc(sub.color) || '#3b82f6'}" />
-          </div>
-          <div class="form-group settings-color-field">
-            ${toggleRowHtml({
-              control: 'switch',
-              label: t('settings.ics.form.shared'),
-              checked: !!sub.shared,
-              attrs: { id: 'ics-edit-shared' },
-            })}
-          </div>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="ics-edit-assignee">${t('settings.sync.defaultAssignee')}</label>
-          <select class="form-input" id="ics-edit-assignee">
-            <option value="">${t('settings.sync.defaultAssigneeNone')}</option>
-            <option value="" disabled data-loading>${t('common.loading')}</option>
-          </select>
-          <p class="form-hint">${t('settings.sync.defaultAssigneeHint')}</p>
-        </div>
+        ${/* DER DIALOG SPRICHT DENSELBEN DIALEKT (R19, B7): Name, Farbe,
+             Teilen und Zuweisung als Zeilen im Traeger - vorher Felder unter
+             ihren Etiketten und ein Schalter, der neben der Farbe klemmte. */ ''}
+        ${formRowsHtml([
+          formRowHtml({
+            label: t('settings.ics.form.name'), labelFor: 'ics-edit-name', field: true,
+            control: `<input class="form-input" type="text" id="ics-edit-name" value="${esc(sub.name)}" required maxlength="100" />`,
+          }),
+          formRowHtml({
+            label: t('settings.ics.form.color'), labelFor: 'ics-edit-color',
+            control: `<input class="settings-color-button" type="color" id="ics-edit-color" value="${esc(sub.color) || '#3b82f6'}" />`,
+          }),
+          toggleRowHtml({
+            control: 'switch',
+            label: t('settings.ics.form.shared'),
+            checked: !!sub.shared,
+            attrs: { id: 'ics-edit-shared' },
+          }),
+          formRowHtml({
+            label: t('settings.sync.defaultAssignee'), labelFor: 'ics-edit-assignee',
+            description: t('settings.sync.defaultAssigneeHint'), descriptionId: 'ics-edit-assignee-hint',
+            control: `<select class="form-input" id="ics-edit-assignee" aria-describedby="ics-edit-assignee-hint">
+              <option value="">${t('settings.sync.defaultAssigneeNone')}</option>
+              <option value="" disabled data-loading>${t('common.loading')}</option>
+            </select>`,
+          }),
+        ])}
         <div id="ics-edit-error" class="form-error" role="alert" hidden></div>
         <div class="modal-panel__footer modal-panel__footer--plain">
           <button type="button" class="btn btn--secondary" id="ics-edit-cancel">${t('common.cancel')}</button>

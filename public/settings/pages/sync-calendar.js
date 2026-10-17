@@ -18,6 +18,7 @@ import {
   settingSwitchRowHtml,
 } from '/settings/components.js';
 import { withBusy } from '/utils/ux.js';
+import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
 import { esc } from '/utils/html.js';
 import { loadFamilyUsers } from '/settings/family-users.js';
 
@@ -685,6 +686,9 @@ async function loadCalDAVAccounts(container, user) {
   window.lucide?.createIcons({ el: listEl });
 }
 
+/** Das Pflichtzeichen hinter einem Etikett - Markup, kein Text (aria-hidden). */
+const REQUIRED_MARK = '<span class="required-marker" aria-hidden="true"> *</span>';
+
 function bindCalDAVAddButton(container, user) {
   const addBtn = container.querySelector('#caldav-add-account-btn');
   if (!addBtn) return;
@@ -694,26 +698,31 @@ function bindCalDAVAddButton(container, user) {
       size: 'sm',
       content: `
         <form id="caldav-add-form" novalidate autocomplete="off">
-          <div class="form-group">
-            <label class="form-label" for="caldav-name">${t('settings.caldavNameLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
-            <input class="form-input" type="text" id="caldav-name" required
-                   placeholder="${t('settings.caldavNamePlaceholder')}" maxlength="100" />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="caldav-url">${t('settings.caldavUrlLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
-            <input class="form-input" type="url" id="caldav-url" required
-                   placeholder="${t('settings.caldavUrlPlaceholder')}" />
-            <small class="form-hint">${t('settings.caldavUrlHint')}</small>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="caldav-username">${t('settings.caldavUsernameLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
-            <input class="form-input" type="text" id="caldav-username" required autocomplete="off" />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="caldav-password">${t('settings.caldavPasswordLabel')}<span class="required-marker" aria-hidden="true"> *</span></label>
-            <input class="form-input" type="password" id="caldav-password" required autocomplete="current-password" />
-            <small class="form-hint">${t('settings.caldavPasswordHint')}</small>
-          </div>
+          ${/* DER DIALOG SPRICHT DENSELBEN DIALEKT (R19, B7): Zeilen im Traeger,
+               Etikett links, Feld rechts, Hinweis unter der Zeile - die Form
+               der iOS-Kontoanlage. Jede Zeile ist die Fehlergruppe ihres Felds. */ ''}
+          ${formRowsHtml([
+            formRowHtml({
+              label: t('settings.caldavNameLabel'), labelFor: 'caldav-name', labelExtra: REQUIRED_MARK, field: true,
+              control: `<input class="form-input" type="text" id="caldav-name" required
+                   placeholder="${t('settings.caldavNamePlaceholder')}" maxlength="100" />`,
+            }),
+            formRowHtml({
+              label: t('settings.caldavUrlLabel'), labelFor: 'caldav-url', labelExtra: REQUIRED_MARK, field: true,
+              description: t('settings.caldavUrlHint'), descriptionId: 'caldav-url-hint',
+              control: `<input class="form-input" type="url" id="caldav-url" required aria-describedby="caldav-url-hint"
+                   placeholder="${t('settings.caldavUrlPlaceholder')}" />`,
+            }),
+            formRowHtml({
+              label: t('settings.caldavUsernameLabel'), labelFor: 'caldav-username', labelExtra: REQUIRED_MARK, field: true,
+              control: '<input class="form-input" type="text" id="caldav-username" required autocomplete="off" />',
+            }),
+            formRowHtml({
+              label: t('settings.caldavPasswordLabel'), labelFor: 'caldav-password', labelExtra: REQUIRED_MARK, field: true,
+              description: t('settings.caldavPasswordHint'), descriptionId: 'caldav-password-hint',
+              control: '<input class="form-input" type="password" id="caldav-password" required autocomplete="current-password" aria-describedby="caldav-password-hint" />',
+            }),
+          ])}
           <div id="caldav-add-error" class="form-error" role="alert" hidden></div>
           <div class="modal-panel__footer modal-panel__footer--plain">
             <button type="button" class="btn btn--secondary" id="caldav-add-cancel">${t('common.cancel')}</button>

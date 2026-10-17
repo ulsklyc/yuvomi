@@ -2594,7 +2594,13 @@ function _ensureFieldError(group, input, message, { live = true } = {}) {
     // Direkt hinter das Feld, nicht ans Gruppenende: liegen Hinweistexte
     // dazwischen, rutscht die Meldung sonst weit weg (gemessen 86px beim
     // Passwortfeld) und liest sich als Fehler des ganzen Formulars.
-    if (typeof input.insertAdjacentElement === 'function') {
+    // AUSNAHME DIE FORMULARZEILE (`.form-row`, utils/form-row.js; R19): dort
+    // steht das Feld in der rechten Spalte, und eine Meldung dahinter drueckte
+    // es auf seine Mindestbreite (gemessen 52px im CardDAV-Dialog bei 390).
+    // Die Meldung gehoert unter die Zeile, ueber beide Spalten (layout.css).
+    if (group.classList?.contains?.('form-row')) {
+      group.appendChild(el);
+    } else if (typeof input.insertAdjacentElement === 'function') {
       input.insertAdjacentElement('afterend', el);
     } else {
       group.appendChild(el);

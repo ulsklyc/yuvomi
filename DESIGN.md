@@ -2274,6 +2274,21 @@ nur das gerenderte Dokument sieht, ob eine Liste ueberhaupt verdrahtet ist.
   **Umgestellt:** alle Einstellungszeilen mit Auswahl, der Dialog "Messwert erfassen"
   (Gesundheit). **Noch Felder mit Etikett darueber** (naechste Stufe): "Aufgabe" und "Termin".
   Alle uebrigen Dialoge behalten Felder mit Kontur nach der einen Feldhaut.
+  **R19 (Einstellungen B7): EIN Formular-Dialekt fuer ALLE Einstellungen.** Jedes Blatt fuehrt
+  seine Felder als Zeilen einer Gruppe (`settingRowHtml`/`settingSwitchRowHtml` im
+  `.row-carrier.settings-group`; in einer Karte legt die Gruppe ihre Flaeche ab, auch die
+  Schalterzeile fluchtet). **Die Dialoge der Einstellungen sprechen ihn ebenfalls** (Familie:
+  Mitglied anlegen/bearbeiten, Einladung; CalDAV, CardDAV, Kalender-Abo, Rezeptdienste) - im
+  Dialog-Traeger `.form-rows`, Schalter mit Hinweis ueber `formSwitchRowHtml`. Geprueft, ob
+  das im Dialog sinnvoll ist: ja. Die Werte sind kurz und strukturiert (Name, Adresse,
+  Benutzer, Passwort, Rolle), das Feld behaelt bei 390 rund 200px, und die Dialoge werden
+  kuerzer statt laenger (Inhalt bei 390: Mitglied 899 -> 643px, Einladung 848 -> 556px, CalDAV
+  472 -> 330px); es ist die Form der iOS-Kontoanlage. Eine Pflichtmeldung steht in der Zeile
+  UNTER beiden Spalten, nicht neben dem Feld (`_ensureFieldError`, components/modal.js).
+  **Bewusst ohne Zeilenraster:** der Kopf mit Bild (Profil im Konto, Mitglied bearbeiten),
+  die Eingabe eines Zwei-Faktor-Codes (ein Feld, ein Schritt), Freitext und die
+  Chip-Auswahl der Betreuer (traegt ihr eigenes Etikett). Guard: `test:settings-navigation`
+  ("R19: umgestellte Blaetter sprechen den Zeilen-Dialekt").
 - **Klassenname:** `.input` und `.form-input` sind ein Alias auf dieselbe Regel (layout.css).
   Kanonisch fuer neuen Code ist `.form-input` - der Name, den `.form-group`/`.form-field`/
   `.form-label` schon fuehren. Bestand bleibt unangetastet, Umbenennen aller Fundstellen ist

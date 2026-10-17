@@ -13,7 +13,8 @@ import { sortMembers } from '/utils/member-order.js';
 import { makeSortable } from '/utils/sortable.js';
 import { vibrate } from '/utils/ux.js';
 import { openModal, closeModal, confirmModal, refocusAfterRender } from '/components/modal.js';
-import { createRetryState, toggleRowHtml, settingSwitchRowHtml } from '/settings/components.js';
+import { createRetryState, formSwitchRowHtml, settingSwitchRowHtml } from '/settings/components.js';
+import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
 import {
   renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect,
 } from '/components/user-multi-select.js';
@@ -214,62 +215,61 @@ function memberHtml(u, currentUserId, { orderable = false, aligned = false } = {
  * Blattrand gehoben), und der Fokus kehrt beim Schliessen von selbst zum
  * Knopf zurueck (modal.js). Der Knopf selbst ist kein violetter Balken ueber
  * die volle Breite mehr, sondern ein ruhiger Knopf unter der Liste. */
+/* DIE FAMILIEN-DIALOGE SPRECHEN DEN ZEILEN-DIALEKT (R19, Einstellungen B7).
+ * Bis dahin standen Felder unter ihren Etiketten, zwei Felder nebeneinander
+ * im Raster und Schalter als Zeilen dazwischen - zwei Dialekte in einem
+ * Dialog. Jetzt Zeilen im Traeger (utils/form-row.js) wie in der
+ * iOS-Kontoanlage: Etikett links, Wert rechts, Hinweis unter der Zeile; ein
+ * Schalter ist eine Zeile des Traegers (formSwitchRowHtml). Jede Feldzeile ist die
+ * Fehlergruppe ihres Felds (`field: true`). Der Kopf mit Bild im
+ * Bearbeiten-Dialog bleibt, wie im Konto, ein Kopf. */
+function switchRowHtml({ id, label, hint = '', checked = false }) {
+  return formSwitchRowHtml({ label, checked, hint, hintId: hint ? `${id}-hint` : null, attrs: { id } });
+}
+
 function addMemberFormHtml() {
   return `
         <form id="add-member-form" class="settings-form">
-          <div class="form-group">
-            <label class="form-label" for="new-username">${t('settings.usernameLabel')}</label>
-            <input class="form-input" type="text" id="new-username" required autocomplete="off" />
-          </div>
-          <div class="settings-name-color-row">
-            <div class="form-group settings-name-color-row__name">
-              <label class="form-label" for="new-display-name">${t('settings.displayNameLabel')}</label>
-              <input class="form-input" type="text" id="new-display-name" required />
-            </div>
-            <div class="form-group settings-color-field">
-              <label class="form-label" for="new-avatar-color">${t('settings.colorLabel')}</label>
-              <input class="settings-color-button" type="color" id="new-avatar-color" value="${randomAvatarColor()}" />
-            </div>
-          </div>
-          ${ssoAvailable ? `
-          ${toggleRowHtml({
-            control: 'switch',
-            label: t('settings.memberSsoOnlyLabel'),
-            attrs: { id: 'new-member-sso-only' },
-          })}
-          <p class="form-hint">${t('settings.memberSsoOnlyHint')}</p>
-          ` : ''}
-          <div class="form-group" id="new-member-password-group">
-            <label class="form-label" for="new-member-password">${t('settings.memberPasswordLabel')}</label>
-            <input class="form-input" type="password" id="new-member-password" minlength="8" required autocomplete="new-password" />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="new-family-role">${t('settings.familyRoleLabel')}</label>
-            <select class="form-input" id="new-family-role">
-              ${buildFamilyRoleOptions()}
-            </select>
-          </div>
-          <div class="modal-grid modal-grid--2">
-            <div class="form-group">
-              <label class="form-label" for="new-member-phone">${t('settings.memberPhoneLabel')}</label>
-              <input class="form-input" type="tel" id="new-member-phone" autocomplete="tel" />
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="new-member-email">${t('settings.memberEmailLabel')}</label>
-              <input class="form-input" type="email" id="new-member-email" autocomplete="email" />
-            </div>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="new-member-birth-date">${t('settings.memberBirthDateLabel')}</label>
-            <yuvomi-datepicker type="date" id="new-member-birth-date"></yuvomi-datepicker>
-            <p class="form-hint">${t('settings.memberContactBirthdayHint')}</p>
-          </div>
-          ${toggleRowHtml({
-            control: 'switch',
-            label: t('settings.systemAdminLabel'),
-            attrs: { id: 'new-system-admin' },
-          })}
-          <p class="form-hint">${t('settings.systemAdminHint')}</p>
+          ${formRowsHtml([
+            formRowHtml({
+              label: t('settings.usernameLabel'), labelFor: 'new-username', field: true,
+              control: '<input class="form-input" type="text" id="new-username" required autocomplete="off" />',
+            }),
+            formRowHtml({
+              label: t('settings.displayNameLabel'), labelFor: 'new-display-name', field: true,
+              control: '<input class="form-input" type="text" id="new-display-name" required />',
+            }),
+            formRowHtml({
+              label: t('settings.colorLabel'), labelFor: 'new-avatar-color',
+              control: `<input class="settings-color-button" type="color" id="new-avatar-color" value="${randomAvatarColor()}" />`,
+            }),
+            ssoAvailable ? switchRowHtml({
+              id: 'new-member-sso-only', label: t('settings.memberSsoOnlyLabel'), hint: t('settings.memberSsoOnlyHint'),
+            }) : '',
+            formRowHtml({
+              label: t('settings.memberPasswordLabel'), labelFor: 'new-member-password', field: true,
+              attrs: { id: 'new-member-password-group' },
+              control: '<input class="form-input" type="password" id="new-member-password" minlength="8" required autocomplete="new-password" />',
+            }),
+            formRowHtml({
+              label: t('settings.familyRoleLabel'), labelFor: 'new-family-role',
+              control: `<select class="form-input" id="new-family-role">${buildFamilyRoleOptions()}</select>`,
+            }),
+            formRowHtml({
+              label: t('settings.memberPhoneLabel'), labelFor: 'new-member-phone', field: true,
+              control: '<input class="form-input" type="tel" id="new-member-phone" autocomplete="tel" />',
+            }),
+            formRowHtml({
+              label: t('settings.memberEmailLabel'), labelFor: 'new-member-email', field: true,
+              control: '<input class="form-input" type="email" id="new-member-email" autocomplete="email" />',
+            }),
+            formRowHtml({
+              label: t('settings.memberBirthDateLabel'), labelFor: 'new-member-birth-date',
+              description: t('settings.memberContactBirthdayHint'),
+              control: '<yuvomi-datepicker type="date" id="new-member-birth-date"></yuvomi-datepicker>',
+            }),
+            switchRowHtml({ id: 'new-system-admin', label: t('settings.systemAdminLabel'), hint: t('settings.systemAdminHint') }),
+          ])}
           <div id="member-error" class="form-error" role="alert" hidden></div>
           <div class="modal-panel__footer modal-panel__footer--plain">
             <button type="button" class="btn btn--secondary" id="cancel-add-member">${t('settings.cancelAddMember')}</button>
@@ -281,44 +281,35 @@ function addMemberFormHtml() {
 function addInviteFormHtml() {
   return `
         <form id="add-invite-form" class="settings-form">
-          <div class="form-group">
-            <label class="form-label" for="invite-username">${t('settings.usernameLabel')}</label>
-            <input class="form-input" type="text" id="invite-username" autocomplete="off" />
-            <p class="form-hint">${t('settings.invites.usernameHint')}</p>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="invite-display-name">${t('settings.displayNameLabel')}</label>
-            <input class="form-input" type="text" id="invite-display-name" maxlength="128" />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="invite-family-role">${t('settings.familyRoleLabel')}</label>
-            <select class="form-input" id="invite-family-role">
-              ${buildFamilyRoleOptions()}
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="invite-permission-preset">${t('settings.invites.presetLabel')}</label>
-            <select class="form-input" id="invite-permission-preset">
-              <option value="restricted" selected>${t('settings.invites.presetRestricted')}</option>
-              <option value="role">${t('settings.invites.presetRole')}</option>
-            </select>
-            <p class="form-hint" id="invite-preset-hint"></p>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="invite-email">${t('settings.memberEmailLabel')}</label>
-            <input class="form-input" type="email" id="invite-email" autocomplete="email" />
-          </div>
-          ${toggleRowHtml({
-            control: 'switch',
-            label: t('settings.invites.sendEmail'),
-            attrs: { id: 'invite-send-email' },
-          })}
-          ${toggleRowHtml({
-            control: 'switch',
-            label: t('settings.systemAdminLabel'),
-            attrs: { id: 'invite-system-admin' },
-          })}
-          <p class="form-hint">${t('settings.systemAdminHint')}</p>
+          ${formRowsHtml([
+            formRowHtml({
+              label: t('settings.usernameLabel'), labelFor: 'invite-username', field: true,
+              description: t('settings.invites.usernameHint'), descriptionId: 'invite-username-hint',
+              control: '<input class="form-input" type="text" id="invite-username" autocomplete="off" aria-describedby="invite-username-hint" />',
+            }),
+            formRowHtml({
+              label: t('settings.displayNameLabel'), labelFor: 'invite-display-name', field: true,
+              control: '<input class="form-input" type="text" id="invite-display-name" maxlength="128" />',
+            }),
+            formRowHtml({
+              label: t('settings.familyRoleLabel'), labelFor: 'invite-family-role',
+              control: `<select class="form-input" id="invite-family-role">${buildFamilyRoleOptions()}</select>`,
+            }),
+            formRowHtml({
+              label: t('settings.invites.presetLabel'), labelFor: 'invite-permission-preset',
+              control: `<select class="form-input" id="invite-permission-preset">
+                <option value="restricted" selected>${t('settings.invites.presetRestricted')}</option>
+                <option value="role">${t('settings.invites.presetRole')}</option>
+              </select>`,
+              extra: '<p class="form-hint" id="invite-preset-hint"></p>',
+            }),
+            formRowHtml({
+              label: t('settings.memberEmailLabel'), labelFor: 'invite-email', field: true,
+              control: '<input class="form-input" type="email" id="invite-email" autocomplete="email" />',
+            }),
+            switchRowHtml({ id: 'invite-send-email', label: t('settings.invites.sendEmail') }),
+            switchRowHtml({ id: 'invite-system-admin', label: t('settings.systemAdminLabel'), hint: t('settings.systemAdminHint') }),
+          ])}
           <div id="invite-error" class="form-error" role="alert" hidden></div>
         </form>
         <div id="invite-link-output" class="settings-token-output" hidden>
@@ -964,14 +955,8 @@ async function openEditMemberModal(member, currentUser, users, container) {
             </div>
           </div>
         </div>
-        <div class="form-group">
-          <label class="form-label" for="edit-member-family-role">${t('settings.familyRoleLabel')}</label>
-          <select class="form-input" id="edit-member-family-role">
-            ${buildFamilyRoleOptions(member.family_role)}
-          </select>
-        </div>
         ${caregiverIds === null ? '' : `
-        <div class="form-group">
+        <div class="settings-member-caregivers">
           ${renderUserMultiSelect(
             users.filter((u) => u.id !== member.id),
             caregiverIds,
@@ -980,42 +965,39 @@ async function openEditMemberModal(member, currentUser, users, container) {
           )}
           <p class="form-hint">${t('settings.healthCaregiversHint')}</p>
         </div>`}
-        <div class="modal-grid modal-grid--2">
-          <div class="form-group">
-            <label class="form-label" for="edit-member-phone">${t('settings.memberPhoneLabel')}</label>
-            <input class="form-input" type="tel" id="edit-member-phone" value="${esc(member.phone || '')}" autocomplete="tel" />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="edit-member-email">${t('settings.memberEmailLabel')}</label>
-            <input class="form-input" type="email" id="edit-member-email" value="${esc(member.email || '')}" autocomplete="email" />
-          </div>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="edit-member-birth-date">${t('settings.memberBirthDateLabel')}</label>
-          <yuvomi-datepicker type="date" id="edit-member-birth-date" value="${esc(member.birth_date || '')}"></yuvomi-datepicker>
-          <p class="form-hint">${t('settings.memberContactBirthdayHint')}</p>
-        </div>
-        ${ssoAvailable ? `
-        ${toggleRowHtml({
-          control: 'switch',
-          label: t('settings.memberSsoOnlyLabel'),
-          checked: member.sso_only === true,
-          attrs: { id: 'edit-member-sso-only' },
-        })}
-        <p class="form-hint">${t('settings.memberSsoOnlyEditHint')}</p>
-        ` : ''}
-        <div class="form-group" id="edit-member-password-group">
-          <label class="form-label" for="edit-member-password">${t('settings.resetPasswordLabel')}</label>
-          <input class="form-input" type="password" id="edit-member-password" minlength="8" autocomplete="new-password" placeholder="${t('settings.resetPasswordPlaceholder')}" />
-          <p class="form-hint">${t('settings.resetPasswordHint')}</p>
-        </div>
-        ${toggleRowHtml({
-          control: 'switch',
-          label: t('settings.systemAdminLabel'),
-          checked: member.role === 'admin',
-          attrs: { id: 'edit-member-system-admin' },
-        })}
-        <p class="form-hint">${t('settings.systemAdminHint')}</p>
+        ${formRowsHtml([
+          formRowHtml({
+            label: t('settings.familyRoleLabel'), labelFor: 'edit-member-family-role',
+            control: `<select class="form-input" id="edit-member-family-role">${buildFamilyRoleOptions(member.family_role)}</select>`,
+          }),
+          formRowHtml({
+            label: t('settings.memberPhoneLabel'), labelFor: 'edit-member-phone', field: true,
+            control: `<input class="form-input" type="tel" id="edit-member-phone" value="${esc(member.phone || '')}" autocomplete="tel" />`,
+          }),
+          formRowHtml({
+            label: t('settings.memberEmailLabel'), labelFor: 'edit-member-email', field: true,
+            control: `<input class="form-input" type="email" id="edit-member-email" value="${esc(member.email || '')}" autocomplete="email" />`,
+          }),
+          formRowHtml({
+            label: t('settings.memberBirthDateLabel'), labelFor: 'edit-member-birth-date',
+            description: t('settings.memberContactBirthdayHint'),
+            control: `<yuvomi-datepicker type="date" id="edit-member-birth-date" value="${esc(member.birth_date || '')}"></yuvomi-datepicker>`,
+          }),
+          ssoAvailable ? switchRowHtml({
+            id: 'edit-member-sso-only', label: t('settings.memberSsoOnlyLabel'),
+            hint: t('settings.memberSsoOnlyEditHint'), checked: member.sso_only === true,
+          }) : '',
+          formRowHtml({
+            label: t('settings.resetPasswordLabel'), labelFor: 'edit-member-password', field: true,
+            attrs: { id: 'edit-member-password-group' },
+            description: t('settings.resetPasswordHint'), descriptionId: 'edit-member-password-hint',
+            control: `<input class="form-input" type="password" id="edit-member-password" minlength="8" autocomplete="new-password" aria-describedby="edit-member-password-hint" placeholder="${t('settings.resetPasswordPlaceholder')}" />`,
+          }),
+          switchRowHtml({
+            id: 'edit-member-system-admin', label: t('settings.systemAdminLabel'),
+            hint: t('settings.systemAdminHint'), checked: member.role === 'admin',
+          }),
+        ])}
         <div id="edit-member-error" class="form-error" role="alert" hidden></div>
         <div class="modal-panel__footer modal-panel__footer--plain">
           <button type="button" class="btn btn--secondary" id="edit-member-cancel">${t('common.cancel')}</button>

@@ -2382,6 +2382,14 @@
 /* Die eigene Schalterleiste der WebDAV-Formulare ist entfallen (R19): der
  * Schalter ist eine Zeile der Gruppe (settingSwitchRowHtml) wie jede andere. */
 
+/* Die Betreuer-Auswahl im Mitglied-Dialog: eine Chip-Gruppe mit eigenem
+ * Etikett, keine Zeile - sie steht ueber den Zeilen des Dialogs (R19). */
+.settings-member-caregivers {
+  display: grid;
+  gap: var(--space-1);
+  margin-bottom: var(--space-4);
+}
+
 /* Password-Eingabe mit Reveal-Button nebeneinander */
 .settings-webdav-pw-wrap {
   display: flex;

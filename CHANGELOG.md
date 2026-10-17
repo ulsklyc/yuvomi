@@ -113,7 +113,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The same rows now carry every other settings form: WebDAV backup and the restore key, Immich,
   document storage and DMS, API tokens, installing a module, the app name, schedule and task
   defaults, holidays, calendar subscriptions and import, Apple, Google and Outlook calendar sync, and
-  the weather location.
+  the weather location. The dialogs for adding or editing a family member, invitations, CalDAV and
+  CardDAV accounts, calendar subscriptions and recipe services use the same rows and are shorter for
+  it; a missing required entry is now named under its row instead of squeezing the field.
 - **The pin on a note matches the other buttons on the card.** It was drawn smaller and heavier than
   the "..." button beside it; both now share one size.
 - **Contacts show who they are.** Every contact in the list carries its initials instead of the

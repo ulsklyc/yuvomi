@@ -8268,17 +8268,26 @@ textarea::placeholder {
 }
 
 /* Die Schalterzeile (`label.toggle-row--switch`) IST eine Zeile des Traegers:
- * ihr eigenes Polster und ihre Rundung gehoeren der freistehenden Form. */
-.form-rows > .toggle-row {
+ * ihr eigenes Polster und ihre Rundung gehoeren der freistehenden Form. Mit
+ * Hinweis steht sie in `.form-switch` (formSwitchRowHtml, settings/
+ * components.js, R19) - Schalter oben, Hinweis darunter, eine Zeile. */
+.form-rows > .toggle-row,
+.form-rows > .form-switch > .toggle-row {
   padding-inline: 0;
   border-radius: 0;
 }
 
-.form-rows > .toggle-row:hover {
+.form-rows > .toggle-row:hover,
+.form-rows > .form-switch > .toggle-row:hover {
   background-color: transparent;
 }
 
-.form-rows > .toggle-row--switch .toggle-row__label {
+.form-switch__hint {
+  margin: calc(-1 * var(--space-1)) 0 var(--space-2);
+}
+
+.form-rows > .toggle-row--switch .toggle-row__label,
+.form-rows > .form-switch > .toggle-row--switch .toggle-row__label {
   font-size: var(--text-base);
   overflow-wrap: anywhere;
   hyphens: auto;

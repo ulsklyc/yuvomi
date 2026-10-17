@@ -15,7 +15,7 @@ import { api, auth } from '/api.js';
 import { formatDate, formatTime, getLocale, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { confirmModal, refocusAfterRender } from '/components/modal.js';
-import { settingSwitchRowHtml } from '/settings/components.js';
+import { settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 
 function formatSeen(value) {
   if (!value) return null;
@@ -157,16 +157,15 @@ function renderPage(container) {
         </div>
         <ul class="settings-cards" id="display-list"></ul>
         <form id="display-form" class="settings-form" autocomplete="off">
-          <div class="form-group">
-            <!-- displayDeviceNameLabel, NICHT displayNameLabel: der zweite
-                 existiert laengst und heisst "Anzeigename" - der Name eines
-                 MENSCHEN (admin-family.js, personal-account.js). Ihn hier
-                 mitzubenutzen haette dem Tablett-Dialog ein Label gegeben, das
-                 von etwas anderem spricht, und ihn umzuschreiben haette vier
-                 Bestandsstellen still verdreht. -->
-            <label class="form-label" for="display-name">${esc(t('settings.displayDeviceNameLabel'))}</label>
-            <input class="form-input" type="text" id="display-name" maxlength="128" required />
-            <p class="form-hint">${esc(t('settings.displayDeviceNameHint'))}</p>
+          ${/* displayDeviceNameLabel, NICHT displayNameLabel: der zweite heisst
+               "Anzeigename" - der Name eines MENSCHEN (admin-family.js,
+               personal-account.js). Eine Zeile der Gruppe (R19, B7). */ ''}
+          <div class="row-carrier settings-group">
+            ${settingRowHtml({
+              label: t('settings.displayDeviceNameLabel'), labelFor: 'display-name',
+              description: t('settings.displayDeviceNameHint'), descriptionId: 'display-name-hint',
+              control: '<input class="form-input" type="text" id="display-name" maxlength="128" required aria-describedby="display-name-hint" />',
+            })}
           </div>
           <div id="display-error" class="form-error" role="alert" hidden></div>
           <div class="settings-form-actions">

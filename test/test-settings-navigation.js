@@ -1144,10 +1144,10 @@ test('Einstellungen: jeder Schalter in einem Formular mit Speichern speichert so
       // Der Standort-Baustein bringt seinen Schalter von aussen mit.
       // R19: ein Schalter ist auch die Schalterzeile der Gruppe
       // (`settingSwitchRowHtml`, immer ein Schalter).
-      const calls = [...body.matchAll(/(?:toggleRowHtml|settingSwitchRowHtml)\(\{[\s\S]*?\}\)\}/g)].map((c) => c[0])
+      const calls = [...body.matchAll(/(?:toggleRowHtml|settingSwitchRowHtml|switchRowHtml)\(\{[\s\S]*?\}\)/g)].map((c) => c[0])
         .concat(/weatherLocationFieldsHtml\(/.test(body) ? [sources['weather-location.js']] : []);
       for (const call of calls) {
-        if (!/control: 'switch'|^settingSwitchRowHtml|settingSwitchRowHtml\(/.test(call)) continue;
+        if (!/control: 'switch'|settingSwitchRowHtml\(|switchRowHtml\(/.test(call)) continue;
         gefunden.push(key);
         if (/'data-instant-save': true/.test(call)) continue;
         assert.ok(GUARDED_SWITCH_FORMS.has(key),
@@ -4032,6 +4032,26 @@ test('R19: umgestellte Blaetter sprechen den Zeilen-Dialekt', async () => {
   assert.match(css, /\.settings-card \.settings-group > \.settings-setting-row--switch > \.toggle-row,/, 'Schalterzeile fluchtet in der Karte');
   const layout = await readFile(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
   assert.match(layout, /\.form-row\[hidden\],\s*\.row-carrier\[hidden\],/, 'eine verborgene Zeile bleibt verborgen');
+
+  // Die Dialoge der Einstellungen sprechen denselben Dialekt (Dialog-Traeger
+  // `.form-rows`): CalDAV, CardDAV, Kalender-Abo, Rezeptdienste, Wandtablett,
+  // Familie. Ausgenommen ist nur der Kopf mit Bild (Mitglied bearbeiten).
+  for (const file of ['sync-calendar.js', 'sync-contacts.js', 'personal-calendar-subscriptions.js', 'modules-kitchen.js', 'admin-displays.js']) {
+    const src = await readFile(new URL(`../public/settings/pages/${file}`, import.meta.url), 'utf8');
+    assert.doesNotMatch(src, /class="form-group/, `${file}: keine gestapelten Felder mehr`);
+  }
+  const family = await readFile(new URL('../public/settings/pages/admin-family.js', import.meta.url), 'utf8');
+  const head = family.slice(family.indexOf('<div class="settings-profile-editor">'), family.indexOf('${caregiverIds === null'));
+  assert.ok(head.length > 0, 'Vorbedingung: der Kopf mit Bild steht im Bearbeiten-Dialog');
+  assert.doesNotMatch(family.replace(head, ''), /class="form-group/, 'Familie: ausser dem Kopf mit Bild keine gestapelten Felder');
+  for (const form of ['add-member-form', 'add-invite-form', 'edit-member-form']) {
+    const at = family.indexOf(`id="${form}"`);
+    assert.ok(at > 0 && /formRowsHtml\(\[/.test(family.slice(at, at + 4000)), `${form}: Zeilen im Dialog-Traeger`);
+  }
+  assert.match(family, /formSwitchRowHtml\(\{/, 'Schalter mit Hinweis ueber den geteilten Baustein');
+  const components = await readFile(new URL('../public/settings/components.js', import.meta.url), 'utf8');
+  assert.match(components, /export function formSwitchRowHtml\(/);
+  assert.match(layout, /\.form-rows > \.form-switch > \.toggle-row \{|\.form-rows > \.form-switch > \.toggle-row,?\s*\{?/, 'die Schalterzeile im Dialog-Traeger');
 });
 
 test('R17: die Standard-Erinnerungen sind Chips des Kanons mit aria-pressed, keine Checkbox in einer Pille', async () => {
