@@ -161,13 +161,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Empty progress bars no longer look like holes in dark mode.** The track behind budget plans,
   loans, subscriptions, Health goals and the overview's budget card, and the circle behind reward
   history icons, sit as a soft well in the card instead of near-black.
-- **A budget category keeps its colour in every month.** Colours follow a category's place in your
-  category list instead of how much it cost this month, so "Housing" no longer turns from violet to
-  teal when another category is more expensive. The ring in Reports leaves a small gap between
-  segments, groups the rest in grey, and the light chart colours were adjusted so that no two of
-  them look alike with red-green colour blindness. For blue-yellow colour blindness, where petrol
-  and green or orange and magenta still look close, green and magenta are drawn striped - in the
-  ring, in the category bars and in the plan - so a segment still matches its bar.
+- **A budget category keeps its colour in every month.** It has one colour in overview, plan and
+  statistics, and the plan says "tight" or "over" in words with an icon instead of recolouring the
+  bar. Colours follow a category's place in your category list instead of how much it cost this
+  month, so "Housing" no longer turns from violet to teal when another category is more expensive.
+  The ring in Reports leaves a small gap between segments, groups the rest in grey, and the light
+  chart colours were adjusted so that no two of them look alike with red-green colour blindness. For
+  blue-yellow colour blindness, where petrol and green or orange and magenta still look close, green
+  and magenta are drawn striped - in the ring, in the category bars and in the plan - so a segment
+  still matches its bar.
 - **The Health settings page names the cycle plainly.** The switches say "Show cycle" for yourself
   and "Offer the cycle in the household" for everyone instead of "Show cycle tab" twice, so a
   search for "cycle" finds each once, and the jump links at the top carry the headings they lead
@@ -335,8 +337,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dialogs ask in a clearer order.** The meal dialog starts with the name and offers meal types as
   chips, the inventory dialog folds purchase, warranty, photo and documents behind "More details",
   the measured-at date in health looks like a field, and activity intensity is a translated choice.
-  A budget category keeps one color in overview, plan and statistics; the plan says "tight" or "over"
-  in words with an icon.
 - **Dialogs are real dialogs.** The page behind a dialog can no longer be reached by keyboard or
   screen reader, Esc and the back gesture ask before discarding unsaved input, and the icon picker and
   image cropper look and move like every other dialog.
@@ -497,7 +497,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   your session was fine. The page now says "The current password is not correct." at that field and
   keeps your entries. The account page shows every missing or invalid entry at its own row instead
   of in browser pop-ups: name, e-mail address, birthday, the three password fields and the
-  two-factor code.
+  two-factor code. For API clients: `PATCH /api/v1/auth/me/password` now answers a wrong current
+  password with 400 and `reason: 'wrong_password'` instead of 401.
 - **The e-mail server settings refuse what cannot work.** A port outside 1 to 65535 or a sender
   without an e-mail address was saved with "Settings saved" and failed only on the first message.
   Both are now named at their field before saving or testing, and the server refuses them as well.
