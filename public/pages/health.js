@@ -40,7 +40,7 @@ import {
   prnDoseState, splitRemaining, toLocalStamp, parseLogInstant, scheduledLogs,
 } from '/utils/health-meds.js';
 import {
-  deriveFlag, summarizeReport, analyteNames, analyteTrend, LAB_FLAGS,
+  deriveFlag, summarizeReport, analyteNames, analyteTrend, defaultTrendAnalyte, LAB_FLAGS,
 } from '/utils/health-labs.js';
 import {
   ACTIVITY_TYPES, activityType, weekSummary, activityTotals, stepActivityAnchor,
@@ -4071,7 +4071,7 @@ async function loadLabs() {
     labs.selectedReportId = labs.reports[0]?.id ?? null;
   }
   const names = analyteNames(labs.reports);
-  if (!names.includes(labs.trendAnalyte)) labs.trendAnalyte = names[0] ?? null;
+  if (!names.includes(labs.trendAnalyte)) labs.trendAnalyte = defaultTrendAnalyte(labs.reports);
 }
 
 function selectedReport() {
@@ -4269,7 +4269,7 @@ function flagIndicatorMarkup(flag) {
 function labTrendMarkup() {
   const names = analyteNames(labs.reports);
   if (names.length === 0) return '';
-  const selected = names.includes(labs.trendAnalyte) ? labs.trendAnalyte : names[0];
+  const selected = names.includes(labs.trendAnalyte) ? labs.trendAnalyte : defaultTrendAnalyte(labs.reports);
   const points = analyteTrend(labs.reports, selected);
 
   const options = names.map((n) =>
@@ -4771,7 +4771,7 @@ function wireResultEditor(panel, report, editing = null) {
 // und Detail-Tabelle synchron.
 function syncLabsAfterResultChange() {
   const names = analyteNames(labs.reports);
-  if (!names.includes(labs.trendAnalyte)) labs.trendAnalyte = names[0] ?? null;
+  if (!names.includes(labs.trendAnalyte)) labs.trendAnalyte = defaultTrendAnalyte(labs.reports);
   renderLabsShell();
 }
 

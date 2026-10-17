@@ -320,6 +320,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it and is saved with it. Stock and note sit behind "More settings" (open when they hold
   something), dose and form share a row, and the seven weekdays fit on one line, so the dialog
   on a phone is about a fifth shorter even with the schedule in it.
+- **Health: the lab trend opens on the value that needs attention.** The chart under the lab
+  reports used to show the first value ever entered (often a normal one); it now starts with a
+  value flagged out of range in the latest report, preferring one with a history to draw.
 - **Screen readers and voice control hear what the buttons show.** Several buttons carried a name that
   left out their visible text, so saying what you see did not reach them: the account button in the
   sidebar, the "New" button in a module header, kitchen tabs with a count, account rows in Budget,

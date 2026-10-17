@@ -14,6 +14,7 @@ const {
   summarizeReport,
   analyteNames,
   analyteTrend,
+  defaultTrendAnalyte,
   LAB_FLAGS,
 } = await import('../public/utils/health-labs.js');
 
@@ -219,4 +220,32 @@ test('Laborwerte: die Wahl eines Befunds behaelt den Fokus auf seiner Karte', as
   const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
   const fn = src.slice(src.indexOf('function wireLabs()'), src.indexOf('function wireLabsDetail()'));
   assert.match(fn, /labs\.selectedReportId = id;\s*renderLabsShell\(\);[\s\S]{0,400}labs\.root\.querySelector\(`\.health-lab-card\[data-report-id="\$\{id\}"\]`\)\?\.focus\(\{ preventScroll: true \}\);/);
+});
+
+// --------------------------------------------------------
+// defaultTrendAnalyte (R20, Re-Critique 2026-10-17 a5 P2-6)
+// --------------------------------------------------------
+
+test('defaultTrendAnalyte: der auffaellige Wert des neuesten Befunds fuehrt, nicht der erste Name', () => {
+  const reports = [
+    { id: 1, report_date: '2026-03-01', results: [
+      { analyte: 'Ferritin', value_num: 40, flag: 'normal' },
+      { analyte: 'Vitamin D', value_num: 24, flag: 'low' },
+    ] },
+    { id: 2, report_date: '2026-09-01', results: [
+      { analyte: 'Ferritin', value_num: 45, flag: 'normal' },
+      { analyte: 'vitamin d', value_num: 18, flag: 'low' },
+      { analyte: 'TSH', value_num: 5, flag: 'high' },
+    ] },
+  ];
+  assert.equal(analyteNames(reports)[0], 'Ferritin', 'Vorbedingung: der erste Name ist unauffaellig');
+  assert.equal(defaultTrendAnalyte(reports), 'Vitamin D', 'auffaellig im neuesten Befund UND mit Verlauf; die Schreibweise der Liste');
+  // Die Listenreihenfolge entscheidet nicht, welcher Befund der neueste ist.
+  assert.equal(defaultTrendAnalyte([...reports].reverse()).toLowerCase(), 'vitamin d');
+  // Ohne Verlauf: der auffaellige Wert trotzdem.
+  assert.equal(defaultTrendAnalyte([reports[1]]), 'vitamin d');
+  // Nichts auffaellig: der erste mit Verlauf, sonst der erste Name.
+  const calm = reports.map((r) => ({ ...r, results: r.results.map((x) => ({ ...x, flag: 'normal' })) }));
+  assert.equal(defaultTrendAnalyte(calm), 'Ferritin');
+  assert.equal(defaultTrendAnalyte([]), null);
 });

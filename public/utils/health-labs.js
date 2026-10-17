@@ -131,3 +131,39 @@ export function analyteTrend(reports, analyteName) {
   });
   return points;
 }
+
+/**
+ * Der Analyt, dessen Verlauf der Tab zuerst zeigt (R20, Re-Critique
+ * 2026-10-17 a5 P2-6). Bis R20 war es schlicht der erste Name der Liste -
+ * im Demo-Haushalt Ferritin, waehrend im neuesten Befund Vitamin D auffaellig
+ * war, genau der Wert, nach dem man schaut. Jetzt in dieser Reihenfolge:
+ *   1. ein auffaelliger Wert des neuesten Befunds mit mindestens zwei Punkten
+ *      (ein Verlauf, der etwas zeigt),
+ *   2. ein auffaelliger Wert des neuesten Befunds,
+ *   3. der erste Analyt mit mindestens zwei Punkten,
+ *   4. der erste Name.
+ * "Neuester Befund" ist der mit dem spaetesten report_date (bei Gleichstand
+ * die hoehere id) - die Reihenfolge der Liste ist Sache der Anzeige.
+ *
+ * @param {Array<Object>} reports
+ * @returns {string|null}
+ */
+export function defaultTrendAnalyte(reports) {
+  const names = analyteNames(reports);
+  if (names.length === 0) return null;
+  const list = (Array.isArray(reports) ? reports : []).filter(Boolean);
+  const latest = list.reduce((best, rep) => {
+    if (!best) return rep;
+    const a = dateKeyOf(rep.report_date);
+    const b = dateKeyOf(best.report_date);
+    if (a !== b) return a > b ? rep : best;
+    return (rep.id || 0) > (best.id || 0) ? rep : best;
+  }, null);
+  const canonical = (raw) => names.find((n) => n.toLowerCase() === String(raw ?? '').trim().toLowerCase()) ?? null;
+  const abnormal = (latest && Array.isArray(latest.results) ? latest.results : [])
+    .filter((r) => r && r.flag && r.flag !== 'normal')
+    .map((r) => canonical(r.analyte))
+    .filter(Boolean);
+  const hasTrend = (name) => analyteTrend(list, name).length >= 2;
+  return abnormal.find(hasTrend) ?? abnormal[0] ?? names.find(hasTrend) ?? names[0];
+}
