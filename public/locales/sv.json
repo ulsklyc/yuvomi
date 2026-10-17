@@ -3390,7 +3390,8 @@
         "resultCountMany": "{{count}} resultat",
         "goTo": "Gå till",
         "newSection": "Skapa ny",
-        "recentLabel": "Nyligen öppnade"
+        "recentLabel": "Nyligen öppnade",
+        "createTaskNamed": "Skapa ”{{title}}” som uppgift"
     },
     "birthdays": {
         "inDays_one": "om {{count}} dag",

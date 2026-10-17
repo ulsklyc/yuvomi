@@ -3700,6 +3700,42 @@ function paletteRowsSection(label, items, { title, meta, go }, onClose) {
   return section;
 }
 
+/**
+ * Der Befehl fuer „kein Treffer": die Eingabe als neue Aufgabe - oder null,
+ * wo Aufgaben fehlen (abgeschaltet, ausgeblendet) oder nur zu lesen sind.
+ */
+function createTaskFromQuery(query) {
+  const title = String(query ?? '').trim();
+  if (!title) return null;
+  if (!navItems().some((item) => item.module === 'tasks') || navModuleAccess('tasks') !== 'write') return null;
+  return {
+    label: t('search.createTaskNamed', { title }), route: '/tasks', module: 'tasks',
+    context: t('nav.tasks'), create: true, prefillTitle: title,
+  };
+}
+
+/**
+ * Traegt den gesuchten Titel ins Formular „Neue Aufgabe", das triggerPageFab
+ * gerade oeffnet. Das Formular entsteht asynchron (Seitenaufbau, Modal);
+ * gewartet wird hoechstens eine Sekunde, und ein Feld, in das schon jemand
+ * tippt, bleibt, wie es ist.
+ */
+function prefillNewTaskTitle(title, { frames = 60 } = {}) {
+  let left = frames;
+  const step = () => {
+    const input = document.querySelector('#shared-modal-overlay #task-title');
+    if (input) {
+      if (!input.value) {
+        input.value = title;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      return;
+    }
+    if (--left > 0) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
 /** Text mit markierten Fundstellen als Knoten (`<mark>`), ohne innerHTML. */
 function appendMarked(el, text, query) {
   for (const seg of markSegments(text, query)) {
@@ -3725,7 +3761,13 @@ function renderSearchResults(container, data, onClose, { local = { places: [], a
   const localCount = local.places.length + local.actions.length;
   const total = localCount + (data ? searchResultCount(data) : 0);
 
-  if (total === 0) {
+  // KEIN TREFFER IST EIN ANFANG (R20, Re-Critique 2026-10-17 A1 P2-4): wer
+  // etwas sucht, das es nicht gibt, will es oft gerade anlegen. Unter dem
+  // Leerzustand steht dann EIN Befehl, „<Eingabe>" als Aufgabe anzulegen -
+  // nur, wo der Betrachter Aufgaben schreiben darf, und erst, wenn der Server
+  // geantwortet hat (vorher waere „nichts gefunden" eine Vermutung).
+  const createTask = total === 0 && data && !silent ? createTaskFromQuery(query) : null;
+  if (total === 0 && !createTask) {
     if (data && !silent) container.appendChild(emptyHintEl(t('search.noResults')));
     return 0;
   }
@@ -3741,7 +3783,7 @@ function renderSearchResults(container, data, onClose, { local = { places: [], a
   // der Sektion ist die Herkunft damit selbstverstaendlich, die Zeilen
   // bleiben siegelfrei. Die Zeilen selbst liegen in GENAU EINEM Traeger
   // (Zeilenlisten-Regel) statt als Karte pro Treffer.
-  function makeSection(label, sealModule, items, { route, title, meta, go, remember = false }) {
+  function makeSection(label, sealModule, items, { route, title, meta, go, remember = false, rowSeals = false }) {
     if (!items.length) return;
     const section = document.createElement('div');
     section.className = 'search-section';
@@ -3763,6 +3805,19 @@ function renderSearchResults(container, data, onClose, { local = { places: [], a
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'search-result';
+      // DAS SIEGEL AN DER ZEILE, WO DIE SEKTION GEMISCHT IST (R20): unter
+      // „Gehe zu" und „Neu anlegen" stehen Ziele aus vielen Modulen, und ohne
+      // Siegel sah „Neuer Termin" aus wie „Neue Aufgabe". Datensektionen
+      // tragen es weiter im Kopf - dort ist die Herkunft eine.
+      if (rowSeals && item.module && MODULE_ICON[item.module]) {
+        btn.classList.add('search-result--sealed');
+        const sealEl = document.createElement('span');
+        sealEl.className = 'module-seal module-seal--sm search-result__seal';
+        sealEl.setAttribute('aria-hidden', 'true');
+        sealEl.style.setProperty('--seal-accent', moduleAccentVar(item.module));
+        sealEl.appendChild(moduleIconEl(MODULE_ICON[item.module]));
+        btn.appendChild(sealEl);
+      }
       const titleEl = document.createElement('span');
       titleEl.className = 'search-result__title';
       appendMarked(titleEl, title(item), query);
@@ -3796,27 +3851,22 @@ function renderSearchResults(container, data, onClose, { local = { places: [], a
     container.appendChild(section);
   }
 
+  if (createTask) container.appendChild(emptyHintEl(t('search.noResults')));
+
   // 1. GEHE ZU - Navigationsziele und Einstellungsblaetter.
   makeSection(t('search.goTo'), null, local.places, {
     remember: true,
+    rowSeals: true,
     title: (item) => item.label,
     meta: (item) => item.context || '',
     go: (item) => (item.run ? item.run() : navigate(item.route)),
   });
-  // 2. NEU ANLEGEN - die Seite oeffnen und ihre Primaeraktion ausloesen, genau
-  //    wie der Kurzbefehl `n` (triggerPageFab: nichts, wo kein FAB zu sehen ist).
-  makeSection(t('search.newSection'), null, local.actions, {
-    title: (item) => item.label,
-    meta: (item) => item.context || '',
-    go: async (item) => {
-      await navigate(item.route);
-      triggerPageFab();
-    },
-  });
 
-  // 3. DATEN - Reihenfolge, Ueberschrift, Ziel und Zweitzeile je Trefferart:
+  // 2. DATEN - Reihenfolge, Ueberschrift, Ziel und Zweitzeile je Trefferart:
   // utils/search-sections.js (test:search-permissions prueft sie gegen die
-  // Antwort des Servers).
+  // Antwort des Servers). SIE STEHEN VOR DEN ANLEGE-BEFEHLEN (R20, Re-Critique
+  // 2026-10-17, Alex): wer „Zahnarzt" tippt, sucht den Termin, nicht „Neuer
+  // Termin" - bei 1280x800 lagen die Treffer unter sechs Befehlen und der Falz.
   // `dateKey` ist der Kalendertag in der ANZEIGEZONE: der Termin-Treffer baut
   // daraus den Tag seines Links (#1607), und ein synchronisierter Termin liegt
   // als Instant in der Zeile - sein UTC-Tag waere der falsche.
@@ -3831,6 +3881,20 @@ function renderSearchResults(container, data, onClose, { local = { places: [], a
       });
     });
   }
+
+  // 3. NEU ANLEGEN - die Seite oeffnen und ihre Primaeraktion ausloesen, genau
+  //    wie der Kurzbefehl `n` (triggerPageFab: nichts, wo kein FAB zu sehen ist).
+  //    Ohne jeden Treffer steht hier allein „als Aufgabe anlegen".
+  makeSection(t('search.newSection'), null, createTask ? [createTask] : local.actions, {
+    rowSeals: true,
+    title: (item) => item.label,
+    meta: (item) => item.context || '',
+    go: async (item) => {
+      await navigate(item.route);
+      triggerPageFab();
+      if (item.prefillTitle) prefillNewTaskTitle(item.prefillTitle);
+    },
+  });
 
   // Die Siegel-Icons kommen als data-lucide-Platzhalter; der Treffer-Pfad
   // rendert sie selbst (der Leerzustands-Pfad tut es bereits genauso).

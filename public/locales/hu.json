@@ -3492,7 +3492,8 @@
         "resultCountMany": "{{count}} találat",
         "goTo": "Ugrás ide",
         "newSection": "Új létrehozása",
-        "recentLabel": "Legutóbb megnyitott"
+        "recentLabel": "Legutóbb megnyitott",
+        "createTaskNamed": "„{{title}}” létrehozása feladatként"
     },
     "onboarding": {
         "step1Title": "Üdvözöljük a {{name}} alkalmazásban",

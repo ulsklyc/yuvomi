@@ -212,17 +212,52 @@ export function markSegments(text, query) {
  * @param {number} [input.cap=6] hoechstens so viele je Abschnitt
  * @returns {{ places: object[], actions: object[] }}
  */
+/**
+ * Wie gut `label` zur Eingabe passt - kleiner ist besser (R20, Re-Critique
+ * 2026-10-17 A1 P2-4). Die Palette sortierte nach der Reihenfolge der
+ * Navigation, und „ge" stellte „Belohnungen" (enthaelt „ge") vor
+ * „Geburtstage" (beginnt damit). Wer tippt, tippt einen Anfang:
+ *   0  der Name beginnt mit dem ersten Wort der Eingabe,
+ *   1  ein Wort darin beginnt damit,
+ *   2  es steht irgendwo darin.
+ * Gleichstand behaelt die Reihenfolge der Navigation (Array.sort ist stabil).
+ */
+export function paletteRank(query, label) {
+  const [first] = paletteTokens(query);
+  if (!first) return 2;
+  const folded = [...String(label ?? '')].map(foldChar).join('');
+  if (folded.startsWith(first)) return 0;
+  return folded.split(/[^\p{L}\p{N}_]+/u).some((word) => word.startsWith(first)) ? 1 : 2;
+}
+
+const byRank = (query) => (a, b) => paletteRank(query, a.label) - paletteRank(query, b.label);
+
+/**
+ * Trifft die Eingabe das Verb der Anlege-Befehle („Neu anlegen")? Nur, wenn
+ * jedes Wort ein Wortanfang des Verbs ist und mindestens drei Zeichen hat.
+ * Vorher reichte ein Teilstueck: „an" oder „ne" holte alle vierzehn Befehle
+ * in die Palette, und die Datentreffer rutschten bei 1280x800 unter die Falz.
+ */
+function matchesVerb(query, verb) {
+  const tokens = paletteTokens(query);
+  if (!verb || !tokens.length || tokens.some((tok) => tok.length < 3)) return false;
+  const words = [...String(verb)].map(foldChar).join('').split(/[^\p{L}\p{N}_]+/u);
+  return tokens.every((tok) => words.some((word) => word.startsWith(tok)));
+}
+
 export function paletteCommands(query, { places = [], settings = [], actions = [], commands = [], cap = 6 } = {}) {
   if (!paletteTokens(query).length) return { places: [], actions: [] };
-  const hitPlaces = [...places, ...commands].filter((p) => paletteMatches(query, p.label));
+  const hitPlaces = [...places, ...commands].filter((p) => paletteMatches(query, p.label)).sort(byRank(query));
   // Nur Einstellungen, deren NAME passt: die Einstellungssuche trifft auch
   // Beschreibungen, und ein Treffer ohne sichtbaren Grund ("sch" -> "Budget")
   // ist genau das, was die Markierung abschaffen soll.
-  const hitSettings = settings.filter((s) => paletteMatches(query, s.label))
+  const hitSettings = settings.filter((s) => paletteMatches(query, s.label)).sort(byRank(query))
     .slice(0, Math.max(0, cap - hitPlaces.length));
-  const hitActions = actions.filter((a) => paletteMatches(query, a.label, a.context, a.verb));
+  const hitActions = actions
+    .filter((a) => paletteMatches(query, a.label, a.context) || matchesVerb(query, a.verb))
+    .sort(byRank(query));
   return {
-    places: [...hitPlaces, ...hitSettings].slice(0, cap),
+    places: [...hitPlaces, ...hitSettings].sort(byRank(query)).slice(0, cap),
     actions: hitActions.slice(0, cap),
   };
 }

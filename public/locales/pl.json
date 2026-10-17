@@ -171,7 +171,8 @@
         "resultCountMany": "{{count}} wyników",
         "goTo": "Przejdź do",
         "newSection": "Utwórz nowe",
-        "recentLabel": "Ostatnio otwierane"
+        "recentLabel": "Ostatnio otwierane",
+        "createTaskNamed": "Utwórz „{{title}}” jako zadanie"
     },
     "dashboard": {
         "title": "Pulpit",

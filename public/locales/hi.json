@@ -3390,7 +3390,8 @@
         "resultCountMany": "{{count}} परिणाम",
         "goTo": "यहाँ जाएँ",
         "newSection": "नया बनाएँ",
-        "recentLabel": "हाल ही में खोले गए"
+        "recentLabel": "हाल ही में खोले गए",
+        "createTaskNamed": "“{{title}}” को कार्य के रूप में बनाएँ"
     },
     "birthdays": {
         "inDays_one": "{{count}} दिन में",

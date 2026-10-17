@@ -3383,7 +3383,8 @@
         "resultCountMany": "{{count}} výsledků",
         "goTo": "Přejít na",
         "newSection": "Vytvořit nové",
-        "recentLabel": "Nedávno otevřené"
+        "recentLabel": "Nedávno otevřené",
+        "createTaskNamed": "Vytvořit „{{title}}“ jako úkol"
     },
     "shortcuts": {
         "search": "Otevřít vyhledávání",

@@ -163,7 +163,8 @@
         "resultCountMany": "{{count}} na mga resulta",
         "goTo": "Pumunta sa",
         "newSection": "Gumawa ng bago",
-        "recentLabel": "Kamakailang binuksan"
+        "recentLabel": "Kamakailang binuksan",
+        "createTaskNamed": "Gawing gawain ang “{{title}}”"
     },
     "dashboard": {
         "title": "Pangkalahatang-tanaw",

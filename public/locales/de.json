@@ -163,7 +163,8 @@
         "resultCountMany": "{{count}} Ergebnisse",
         "goTo": "Gehe zu",
         "newSection": "Neu anlegen",
-        "recentLabel": "Zuletzt geöffnet"
+        "recentLabel": "Zuletzt geöffnet",
+        "createTaskNamed": "„{{title}}“ als Aufgabe anlegen"
     },
     "dashboard": {
         "title": "Übersicht",

@@ -3390,7 +3390,8 @@
         "resultCountMany": "{{count}} risultati",
         "goTo": "Vai a",
         "newSection": "Crea nuovo",
-        "recentLabel": "Aperti di recente"
+        "recentLabel": "Aperti di recente",
+        "createTaskNamed": "Crea «{{title}}» come attività"
     },
     "birthdays": {
         "inDays_one": "tra {{count}} giorno",

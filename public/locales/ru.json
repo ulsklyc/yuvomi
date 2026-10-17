@@ -3598,7 +3598,8 @@
         "resultCountMany": "{{count}} результатов",
         "goTo": "Перейти к",
         "newSection": "Создать",
-        "recentLabel": "Недавно открытые"
+        "recentLabel": "Недавно открытые",
+        "createTaskNamed": "Создать «{{title}}» как задачу"
     },
     "birthdays": {
         "inDays_one": "через {{count}} день",

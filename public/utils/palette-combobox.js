@@ -75,6 +75,11 @@ export function wirePaletteCombobox({ input, listbox }) {
    * `preselect: false` (Leerzustand), auf keinem.
    */
   function refresh({ keep = false, preselect = true } = {}) {
+    // DIE MARKIERUNG BLEIBT AN IHRER ZEILE, NICHT AN IHRER NUMMER (R20). Seit
+    // die Datentreffer VOR den Anlege-Befehlen stehen, schieben sie sich beim
+    // Eintreffen ueber eine schon markierte Zeile - die gleiche Stelle waere
+    // dann eine andere Handlung. Gesucht wird die Zeile mit demselben Text.
+    const keptText = keep && index >= 0 ? (options[index]?.textContent ?? null) : null;
     options = [...listbox.querySelectorAll(OPTION_SELECTOR)];
     for (const opt of options) {
       if (!opt.id) opt.id = `palette-option-${++idCounter}`;
@@ -97,7 +102,9 @@ export function wirePaletteCombobox({ input, listbox }) {
     input.setAttribute('aria-expanded', options.length ? 'true' : 'false');
 
     let next = -1;
-    if (keep && index >= 0) next = Math.min(index, options.length - 1);
+    const same = keptText === null ? -1 : options.findIndex((opt) => opt.textContent === keptText);
+    if (same >= 0) next = same;
+    else if (keep && index >= 0) next = Math.min(index, options.length - 1);
     else if (preselect && options.length) next = 0;
     mark(next);
   }

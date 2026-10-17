@@ -3492,7 +3492,8 @@
         "resultCountMany": "{{count}} kết quả",
         "goTo": "Đi tới",
         "newSection": "Tạo mới",
-        "recentLabel": "Mở gần đây"
+        "recentLabel": "Mở gần đây",
+        "createTaskNamed": "Tạo “{{title}}” thành việc cần làm"
     },
     "onboarding": {
         "step1Title": "Chào mừng đến với {{name}}",

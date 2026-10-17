@@ -3703,7 +3703,8 @@
         "resultCountMany": "{{count}} نتائج",
         "goTo": "انتقل إلى",
         "newSection": "إنشاء جديد",
-        "recentLabel": "فُتح مؤخرًا"
+        "recentLabel": "فُتح مؤخرًا",
+        "createTaskNamed": "إنشاء „{{title}}“ كمهمة"
     },
     "birthdays": {
         "inDays_one": "خلال {{count}} يوم",

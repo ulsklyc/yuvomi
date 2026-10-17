@@ -3390,7 +3390,8 @@
         "resultCountMany": "{{count}} sonuç",
         "goTo": "Git",
         "newSection": "Yeni oluştur",
-        "recentLabel": "Son açılanlar"
+        "recentLabel": "Son açılanlar",
+        "createTaskNamed": "“{{title}}” görevini oluştur"
     },
     "birthdays": {
         "inDays_one": "{{count}} gün sonra",

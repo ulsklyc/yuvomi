@@ -3390,7 +3390,8 @@
         "resultCountMany": "{{count}} αποτελέσματα",
         "goTo": "Μετάβαση σε",
         "newSection": "Νέα δημιουργία",
-        "recentLabel": "Άνοιξαν πρόσφατα"
+        "recentLabel": "Άνοιξαν πρόσφατα",
+        "createTaskNamed": "Δημιουργία «{{title}}» ως εργασίας"
     },
     "birthdays": {
         "inDays_one": "σε {{count}} ημέρα",

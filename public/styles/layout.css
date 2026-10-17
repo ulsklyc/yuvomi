@@ -1942,6 +1942,23 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   border-top: 1px solid var(--color-border-subtle);
 }
 
+/* Zeile mit Modulsiegel (R20, „Gehe zu" und „Neu anlegen"): das Siegel steht
+ * vor Titel und Zweitzeile und spannt ueber beide, wie in der Seitenleiste. */
+.search-result--sealed {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--space-3);
+  align-items: center;
+}
+
+.search-result--sealed > .search-result__seal {
+  grid-row: 1 / span 2;
+}
+
+.search-result--sealed > :not(.search-result__seal) {
+  grid-column: 2;
+}
+
 .search-result:active {
   background-color: var(--color-surface-hover);
 }

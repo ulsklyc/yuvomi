@@ -163,7 +163,8 @@
         "resultCountMany": "{{count}} نتیجه",
         "goTo": "رفتن به",
         "newSection": "ساختن مورد تازه",
-        "recentLabel": "اخیراً باز شده"
+        "recentLabel": "اخیراً باز شده",
+        "createTaskNamed": "ایجاد «{{title}}» به‌عنوان کار"
     },
     "dashboard": {
         "title": "نمای کلی",

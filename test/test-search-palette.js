@@ -408,3 +408,60 @@ test('R19: der Kuerzel-Dialog heisst "Tastenkombinationen", die Klartext-Hilfe "
   assert.doesNotMatch(help, /t\('help\.title'\)\)/, 'kein fester Titel "Hilfe" mehr im Kopf');
   assert.equal(de.shortcuts.help, 'Tastenkombinationen');
 });
+
+// R20 (Re-Critique 2026-10-17, A1 P2-4): die Palette ordnete nach der
+// Navigation - „ge" stellte „Belohnungen" (enthaelt es) vor „Geburtstage"
+// (beginnt damit) -, das Verb „Neu anlegen" holte bei „an" alle Anlege-
+// Befehle herein, die Datentreffer standen darunter, die Zeilen der gemischten
+// Sektionen trugen kein Siegel, und ohne Treffer gab es keinen Weg weiter.
+test('R20: ein Anfang schlaegt ein Teilstueck, das Verb holt keine Befehle mehr herein', async () => {
+  const { paletteRank } = await import('../public/utils/search-sections.js');
+  assert.equal(paletteRank('ge', 'Geburtstage'), 0);
+  assert.equal(paletteRank('ver', 'Einstellungen verwalten'), 1);
+  assert.equal(paletteRank('ge', 'Belohnungen'), 2);
+  const places = [{ label: 'Übersicht' }, { label: 'Belohnungen' }, { label: 'Geburtstage' }];
+  const settings = [{ label: 'Gesundheit' }];
+  assert.deepEqual(paletteCommands('ge', { places, settings }).places.map((p) => p.label),
+    ['Geburtstage', 'Gesundheit', 'Belohnungen'], 'Anfaenge zuerst, Orte und Einstellungen in einer Rangfolge');
+  const actions = [
+    { label: 'Aufgabe', context: 'Aufgaben', verb: 'Neu anlegen' },
+    { label: 'Termin', context: 'Kalender', verb: 'Neu anlegen' },
+  ];
+  assert.deepEqual(paletteCommands('an', { actions }).actions, [], 'ein Teilstueck des Verbs ist kein Wunsch nach allen Befehlen');
+  assert.equal(paletteCommands('anlegen', { actions }).actions.length, 2, 'das ausgeschriebene Verb bleibt ein Weg zu ihnen');
+  assert.deepEqual(paletteCommands('kal', { actions }).actions.map((a) => a.label), ['Termin'], 'das Modul bleibt ein Weg');
+});
+
+test('R20: Daten vor den Anlege-Befehlen, Siegel an gemischten Zeilen, ohne Treffer „als Aufgabe anlegen"', () => {
+  const render = body('function renderSearchResults(', '// Read-only-Modus für ein Modul anwenden');
+  const goTo = render.indexOf("makeSection(t('search.goTo')");
+  const dataAt = render.indexOf('SEARCH_SECTIONS.forEach');
+  const create = render.indexOf("makeSection(t('search.newSection')");
+  assert.ok(goTo >= 0 && dataAt > goTo && create > dataAt, 'Gehe zu, Daten, Neu anlegen');
+  assert.match(render.slice(goTo, dataAt), /rowSeals: true/, '„Gehe zu" traegt Siegel an den Zeilen');
+  assert.match(render.slice(create), /rowSeals: true/, '„Neu anlegen" auch');
+  assert.match(render, /createTaskFromQuery\(query\)/, 'ohne Treffer der Weg zur neuen Aufgabe');
+  const fn = body('function createTaskFromQuery(', 'function prefillNewTaskTitle(');
+  assert.match(fn, /navModuleAccess\('tasks'\) !== 'write'/, 'nur wer Aufgaben schreiben darf');
+  assert.match(body('function prefillNewTaskTitle(', '/** Text mit markierten Fundstellen'), /if \(!input\.value\)/, 'ein angefangenes Feld bleibt');
+  assert.match(de.search.createTaskNamed, /\{\{title\}\}/);
+});
+
+test('R20: nachkommende Daten lassen die Markierung an ihrer Zeile, nicht an ihrer Nummer', async () => {
+  const { wirePaletteCombobox } = await import('../public/utils/palette-combobox.js');
+  const input = new Stub('', { id: 'search-input' });
+  const results = new Stub('', { id: 'search-results' });
+  const row = (text) => Object.assign(new Stub('search-result'), { textContent: text });
+  const place = row('Geburtstage');
+  const action = row('Geburtstag');
+  results.append(new Stub('search-section').append(new Stub('search-section__rows').append(place)),
+    new Stub('search-section').append(new Stub('search-section__rows').append(action)));
+  const combo = wirePaletteCombobox({ input, listbox: results });
+  combo.refresh();
+  input.key('ArrowDown');
+  assert.equal(input.getAttribute('aria-activedescendant'), action.id);
+  // Die Daten kommen ZWISCHEN Orte und Befehle.
+  results.children.splice(1, 0, new Stub('search-section').append(new Stub('search-section__rows').append(row('Geburtstagstorte'))));
+  combo.refresh({ keep: true });
+  assert.equal(input.getAttribute('aria-activedescendant'), action.id, 'Enter oeffnet weiter, was markiert war');
+});

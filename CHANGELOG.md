@@ -24,7 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the last five modules and settings pages you opened from it, above the module shortcuts. Only the
   destination is kept on this device, never the name of an entry, and signing out clears it, so a
   shared tablet shows the next person nothing of yours. The dialog behind "?" is now called
-  "Keyboard shortcuts", which is what it lists.
+  "Keyboard shortcuts", which is what it lists. Names that start with what you typed come first,
+  your entries come before the "Create" commands, modules and commands show their icon, and when
+  nothing matches the palette offers to create what you typed as a task.
 - **Extension modules can add a Settings sheet** (#1856). An optional manifest field places a module
   under Settings -> Modules, with personal sections for members and household sections for
   administrators. Disabled modules disappear from the list; module APIs remain responsible

@@ -163,7 +163,8 @@
         "resultCountMany": "{{count}} hasil",
         "goTo": "Buka",
         "newSection": "Buat baru",
-        "recentLabel": "Baru dibuka"
+        "recentLabel": "Baru dibuka",
+        "createTaskNamed": "Buat “{{title}}” sebagai tugas"
     },
     "dashboard": {
         "title": "Ringkasan",

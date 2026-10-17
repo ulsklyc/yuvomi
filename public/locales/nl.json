@@ -3492,7 +3492,8 @@
         "resultCountMany": "{{count}} resultaten",
         "goTo": "Ga naar",
         "newSection": "Nieuw aanmaken",
-        "recentLabel": "Recent geopend"
+        "recentLabel": "Recent geopend",
+        "createTaskNamed": "„{{title}}” als taak aanmaken"
     },
     "onboarding": {
         "step1Title": "Welkom bij {{name}}",

@@ -3390,7 +3390,8 @@
         "resultCountMany": "{{count}} 个结果",
         "goTo": "前往",
         "newSection": "新建",
-        "recentLabel": "最近打开"
+        "recentLabel": "最近打开",
+        "createTaskNamed": "将“{{title}}”创建为任务"
     },
     "birthdays": {
         "inDays_one": "{{count}}天后",
