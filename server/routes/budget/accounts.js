@@ -162,6 +162,10 @@ router.delete('/accounts/:id', (req, res) => {
     const existing = db.get().prepare('SELECT id FROM budget_accounts WHERE id = ?').get(id);
     if (!existing) return res.status(404).json({ error: 'Account not found', code: 404 });
 
+    if (db.get().prepare('SELECT 1 FROM budget_entries WHERE account_id = ? AND transfer_entry_id IS NOT NULL LIMIT 1').get(id)) {
+      return refuse(res, [refusal('account_has_transfers', 'This account has linked transfers. Archive it instead.')], 409);
+    }
+
     const tx = db.get().transaction(() => {
       // Zuordnung explizit leeren (unabhängig vom FK-Pragma), Einträge bleiben bestehen.
       db.get().prepare('UPDATE budget_entries SET account_id = NULL WHERE account_id = ?').run(id);

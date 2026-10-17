@@ -78,6 +78,14 @@ function legacyDb() {
 }
 
 const everyEntry = (db) => db.prepare('SELECT * FROM budget_entries ORDER BY id').all();
+function assertEntriesUnchanged(db, before) {
+  assert.ok(before.length > 0, 'the legacy fixture must contain bookings');
+  const originalColumns = Object.keys(before[0]);
+  const after = everyEntry(db);
+  // Later migrations may add columns; compare every field present before the upgrade.
+  assert.deepEqual(after.map(row => Object.fromEntries(originalColumns.map(key => [key, row[key]]))), before);
+  assert.ok(after.every(row => row.transfer_entry_id === null), 'legacy bookings must not become transfers');
+}
 const definition = (db, id) => db.prepare('SELECT * FROM budget_series WHERE anchor_id = ?').get(id);
 const seriesPeople = (db, id) => db.prepare(
   'SELECT user_id FROM budget_series_responsibles WHERE anchor_id = ? ORDER BY user_id'
@@ -133,7 +141,7 @@ test('keine Buchung aendert sich', () => {
   const { db } = legacyDb();
   const before = everyEntry(db);
   migrate(db, MIGRATIONS);
-  assert.deepEqual(everyEntry(db), before);
+  assertEntriesUnchanged(db, before);
   db.close();
 });
 
@@ -296,7 +304,7 @@ test('v229: keine Buchung aendert sich, und es entstehen dieselben Vorkommen wie
   assert.ok(expected.length >= 5, 'Miete, Police und zwei Wochenserien');
 
   migrate(db, MIGRATIONS);
-  assert.deepEqual(everyEntry(db), entriesBefore);
+  assertEntriesUnchanged(db, entriesBefore);
   generateRecurringInstances(db, '2031-03');
   const got = db.prepare(`
     SELECT recurrence_parent_id AS p, date FROM budget_entries

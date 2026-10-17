@@ -2314,9 +2314,11 @@ test('die Platzhalter der neuen Sätze bleiben in jeder Locale erhalten', () => 
 // Wiederholung: Einheit + Anzahl (#636)
 // --------------------------------------------------------
 
-test('das Intervall-Feld bietet Einheit und Anzahl, ohne half_year', () => {
+test('das Intervall-Feld bietet Einheit und Anzahl, ohne half_year', async () => {
   const start = budget.indexOf('id="bm-recurrence-options"');
-  const modal = budget.slice(start, budget.indexOf('renderDocumentAttachField', start));
+  const { budgetIntervalFieldsHtml } = await import('../public/components/budget-recurrence-fields.js');
+  const modal = budgetIntervalFieldsHtml('bm');
+  assert.ok(budget.slice(start, budget.indexOf('renderDocumentAttachField', start)).includes("budgetIntervalFieldsHtml('bm'"));
   for (const key of ['budget.intervalWeekly', 'budget.intervalMonthly', 'budget.intervalYearly']) {
     assert.ok(modal.includes(key), `${key} fehlt im Intervall-Feld`);
   }
@@ -2338,7 +2340,7 @@ test('das Einheitenwort kommt aus der geteilten Quelle, nicht aus einer zweiten 
 
 test('die Anzahl reist mit dem Eintrag zum Server', () => {
   assert.ok(budget.includes('recurrence_interval_count: intervalN'), 'Anzahl fehlt im Request-Body');
-  assert.match(budget, /Math\.min\(99, Math\.max\(1,[^)]*bm-interval-count/, 'Anzahl wird vor dem Senden geklemmt');
+  assert.match(budget, /Math\.min\(MAX_INTERVAL_COUNT, Math\.max\(1,[^)]*bm-interval-count/, 'Anzahl wird vor dem Senden geklemmt');
 });
 
 // --------------------------------------------------------
@@ -2558,7 +2560,7 @@ test('Bearbeiten eines Vorkommens zeigt den Wiederholungs-Schalter nicht (#1546)
   // Das Vorkommen traegt den Rhythmus seiner Serie nicht - ein Schalter "nicht
   // wiederkehrend" waere dort eine falsche Aussage, und nichts, was er sendet,
   // erreicht die Serie noch.
-  const idx = budget.indexOf('id="bm-recurring"');
+  const idx = budget.indexOf("budgetToggleHtml('bm-recurring'");
   const wrap = budget.slice(budget.lastIndexOf('<div class="form-group"', idx), idx);
   assert.match(wrap, /entry\.recurrence_parent_id \? 'hidden' : ''/);
 });
@@ -2845,7 +2847,7 @@ test('Kennzahlen mobil: Saldo als Kopfwert vor Einnahmen/Ausgaben, Trend sichtba
   const hidden = rules.filter((r) => /\.metric-card__trend\b/.test(r.selector) && /display:\s*none/.test(r.body));
   assert.deepEqual(hidden.map((r) => r.selector), [], 'der Vormonatstrend darf auf keiner Breite ausgeblendet sein');
   const band = rules.find((r) => r.at.some((a) => /max-width:\s*639px/.test(a))
-    && r.selector.trim() === '.budget-overview .metric-grid:not(.metric-grid--expenses-only) > .metric-card:last-child');
+    && r.selector.trim() === '.budget-overview .metric-grid:not(.metric-grid--expenses-only) > .budget-balance-card');
   assert(band, 'keine Kopfwert-Regel fuer die Saldo-Karte unter 640px');
   assert.match(band.body, /order:\s*-1/, 'der Saldo steht vor seiner Herleitung');
   assert.match(band.body, /grid-template-areas:\s*"label value"\s*"trend value"/,
@@ -3053,10 +3055,34 @@ const zeile = (over = {}) => ({
 });
 const summe = { income: 3000, expenses: -950, balance: 2050, byCategory: [], pending: { count: 0 } };
 
+test('the transfer summary is conditional and stays outside the balance card grid', () => {
+  for (const expensesOnly of [false, true]) {
+    const base = { entries: [zeile()], summary: { ...summe, transfers: 0 }, expensesOnly };
+    assert.doesNotMatch(uebersicht(base), /budget-transfer-summary/);
+    const html = uebersicht({ ...base, summary: { ...summe, transfers: 120 } });
+    assert.match(html, /class="metric-card budget-transfer-summary"/);
+    const balance = html.indexOf('budget-balance-card');
+    const transfers = html.indexOf('budget-transfer-summary');
+    assert.ok(transfers > html.indexOf('class="metric-grid'));
+    if (!expensesOnly) assert.ok(balance > 0 && balance < transfers);
+    else assert.equal(balance, -1);
+  }
+});
+
+test('transfer ledger rows are marked and show source to destination with a neutral amount', () => {
+  const html = uebersicht({ entries: [zeile({ transfer_entry_id: 42, transfer_account_id: 2, account_id: 1 })],
+    accounts: [{ id: 1, name: '<Checking>' }, { id: 2, name: 'Savings' }], summary: { ...summe, transfers: 950 } });
+  assert.match(html, /budget-badge--transfer/);
+  assert.match(html, /<bdi>&lt;Checking&gt;<\/bdi> <span class="budget-transfer-route__arrow" aria-hidden="true">→<\/span> <bdi>Savings<\/bdi>/);
+  assert.match(html, /aria-label="[^"]*budget\.typeTransfer, /);
+  assert.match(html, /budget-entry__amount--transfer/);
+  assert.doesNotMatch(html, /budget-entry__amount--(?:income|expenses)/);
+});
+
 test('Zukunftsmonat: die Bilanz heisst Prognose, der Saldo verliert den Ton der Tatsache', () => {
   const zukunft = uebersicht({ month: monthKey(1), entries: [zeile({ date: `${monthKey(1)}-01` })], summary: summe });
   assert.match(zukunft, /id="budget-summary-title">budget\.summaryTitleForecast</, 'der Titel sagt es als Text');
-  assert.match(zukunft, /class="metric-card metric-card--forecast metric-card--lead"/); // seit R18 fuehrt der Saldo
+  assert.match(zukunft, /class="metric-card budget-balance-card metric-card--forecast metric-card--lead"/); // seit R18 fuehrt der Saldo
   assert.doesNotMatch(zukunft, /metric-card--balance-positive/, 'kein gruener Saldo fuer Geld, das nicht geflossen ist');
   const jetzt = uebersicht({ month: monthKey(0), entries: [zeile()], summary: summe });
   assert.match(jetzt, /id="budget-summary-title">budget\.summaryTitle</);
@@ -3122,7 +3148,7 @@ test('Buchungsdialog: Betrag zuerst und gross, Seltenes hinter „Weitere Angabe
   assert.match(modal, /class="form-input budget-amount-input" id="bm-amount"/);
   assert.match(modal, /inputmode="decimal"/);
   const adv = pos('${advancedSection(`');
-  for (const rare of ['${accountField}', 'id="bm-visibility"', 'responsiblePickerHtml(', 'id="bm-recurring"', 'renderDocumentAttachField(']) {
+  for (const rare of ['${accountField}', 'id="bm-visibility"', 'responsiblePickerHtml(', "budgetToggleHtml('bm-recurring'", 'renderDocumentAttachField(']) {
     assert.ok(pos(rare) > adv, `${rare} gehoert hinter „Weitere Angaben"`);
   }
   assert.ok(pos('id="bm-date"') < adv);
@@ -3398,7 +3424,7 @@ test('R16: der unterste Achsenwert sitzt auf seiner Linie statt in der Zeile der
 const budgetCode = budget.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
 /** Der Buchungsdialog als Markup - openModal ist im Loader ein Griff (__openModal). */
-function buchungsDialog(opts) {
+function buchungsDialog(opts, extraState = {}) {
   const vorher = globalThis.__openModal;
   const vorherState = { ...budgetUi.state };
   let letzte = null;
@@ -3410,6 +3436,7 @@ function buchungsDialog(opts) {
       incomeCategories: [{ key: 'salary', name: 'Gehalt' }],
       subcategories: { housing: [{ key: 'rent', name: 'Miete' }], food: [{ key: 'groceries', name: 'Lebensmittel' }] },
     },
+    ...extraState,
   });
   try { budgetUi.openBudgetModal(opts); } finally {
     Object.assign(budgetUi.state, vorherState);
@@ -3426,6 +3453,20 @@ const typRadios = (content) => {
   const state = Object.fromEntries(radios.map((b) => [b.match(/data-tab-id="([^"]+)"/)?.[1], b.match(/aria-checked="([^"]+)"/)?.[1]]));
   return { group, radios, state };
 };
+
+test('Transfer is offered only with two accounts, including a requested initial transfer type', () => {
+  for (const count of [0, 1, 2]) {
+    const accounts = Array.from({ length: count }, (_, index) => ({ id: index + 1, name: 'Account' }));
+    const dialog = buchungsDialog({ mode: 'create', initialType: 'transfer' }, { accounts });
+    const radios = typRadios(dialog.content);
+    assert.equal('transfer' in radios.state, count >= 2);
+    assert.equal(radios.state[count >= 2 ? 'transfer' : 'expense'], 'true');
+  }
+  const archived = buchungsDialog({ mode: 'create', initialType: 'transfer' }, {
+    accounts: [{ id: 1, name: 'Active' }, { id: 2, name: 'Archived', archived: 1 }],
+  });
+  assert.equal('transfer' in typRadios(archived.content).state, false, 'archived accounts cannot enable a new transfer');
+});
 
 test('der Buchungstyp ist ein .segmented mit radiogroup und angesagtem Zustand (R8 H3, A5 P1-1)', () => {
   const neu = typRadios(buchungsDialog({ mode: 'create' }).content);
@@ -4536,7 +4577,7 @@ test('#1668: eine Absage der Budget-Seite wird nie zum Satz des Servers', () => 
   // Einzeln gepinnt, was der Auftrag nennt: Feld und Satz je Grund.
   for (const [reason, fields, key] of [
     ['entry_account_invalid', '#bm-account', 'budget.accountNotFound'],
-    ['entry_amount_invalid', '#bm-amount, #cb-amount', 'budget.validAmountRequired'],
+    ['entry_amount_invalid', '#bm-amount, #cb-amount, #bt-amount', 'budget.validAmountRequired'],
     ['entry_amount_exceeds_loan', '#bm-amount', 'budget.amountExceedsLoanRemaining'],
     ['entry_date_invalid', '#bm-date, #cb-date', 'calendar.invalidDate'],
     ['entry_subcategory_invalid', '#bm-subcategory', 'budget.subcategoryRequired'],
@@ -4668,8 +4709,8 @@ function serverReasons(file) {
   ]);
 }
 
-test('#1668: jeder Grund der Budget-Routen ist eingeordnet, jedes Feld gibt es, jeder Satz steht in jeder Sprache', () => {
-  const atServer = new Set(['entries.js', 'accounts.js', 'categories.js', 'loans.js'].flatMap((file) => [...serverReasons(file)]));
+test('#1668: jeder Grund der Budget-Routen ist eingeordnet, jedes Feld gibt es, jeder Satz steht in jeder Sprache', async () => {
+  const atServer = new Set(['entries.js', 'accounts.js', 'categories.js', 'loans.js', 'transfers.js'].flatMap((file) => [...serverReasons(file)]));
   assert.ok(atServer.size >= 55, `zu wenige Gruende gelesen (${atServer.size}) - das Muster greift nicht mehr`);
   for (const probe of ['entry_account_invalid', 'series_end_refused', 'series_start_too_early', 'entry_start_date_invalid', 'account_credit_limit_invalid', 'loan_settled', 'category_exists']) {
     assert.ok(atServer.has(probe), `Vorbedingung: der Leser sieht ${probe}`);
@@ -4701,10 +4742,13 @@ test('#1668: jeder Grund der Budget-Routen ist eingeordnet, jedes Feld gibt es, 
   }
 
   // Jedes genannte Feld steht in einem Dialog der Seite.
+  const transferDialog = read('../public/components/budget-transfer-dialog.js');
+  const { budgetIntervalFieldsHtml } = await import('../public/components/budget-recurrence-fields.js');
+  const recurrenceMarkup = budgetIntervalFieldsHtml('bm') + budgetIntervalFieldsHtml('bt');
   for (const [reason, [fields]] of budgetUi.BUDGET_REFUSALS) {
     for (const selector of (fields ?? '').split(',').map((part) => part.trim()).filter(Boolean)) {
-      assert.match(selector, /^#(bm|am|cb)-[a-z-]+$/, `${reason}: ${selector}`);
-      assert.ok(budget.includes(`id="${selector.slice(1)}"`), `${reason}: das Feld ${selector} steht in keinem Dialog`);
+      assert.match(selector, /^#(bm|am|cb|bt)-[a-z-]+$/, `${reason}: ${selector}`);
+      assert.ok(((selector.startsWith('#bt-') ? transferDialog : budget) + recurrenceMarkup).includes(`id="${selector.slice(1)}"`), `${reason}: das Feld ${selector} steht in keinem Dialog`);
     }
   }
 
@@ -4754,9 +4798,9 @@ test('#1668: keine Stelle der Budget-Seite schreibt den Satz des Servers in eine
   assert.doesNotMatch(code, /err(?:or)?\??\.data\??\.error/, 'die Seite liest den Satz des Servers');
   // Die 13 Stellen von damals und der Verbuchen-Dialog laufen ueber eine Funktion.
   const calls = [...code.matchAll(/(?<!function )\bshowBudgetError\(err\b/g)].length;
-  assert.equal(calls, 14, `showBudgetError(err, ...) steht ${calls}x`);
-  // Die drei Dialoge geben sich selbst mit, damit die Absage am Feld landet.
-  assert.equal([...code.matchAll(/showBudgetError\(err, \{ panel, fallback: BUDGET_SAVE_FAILED \}\)/g)].length, 3);
+  assert.equal(calls, 16, `showBudgetError(err, ...) steht ${calls}x`);
+  // Die vier Dialogwege, einschliesslich Transfers, geben die Absage ans Feld.
+  assert.equal([...code.matchAll(/showBudgetError\(err, \{ panel, fallback: BUDGET_SAVE_FAILED \}\)/g)].length, 4);
 });
 
 test('#1668: der Dialog nennt beim Pruefen am Feld, wie viele Raten das Darlehen hat', () => {
@@ -5789,6 +5833,79 @@ test('#1775: eine ueberholte Statistik-Antwort ueberschreibt den neueren Zeitrau
   } finally {
     Object.assign(view, saved);
     globalThis.__apiStub = savedStub;
+  }
+});
+
+test('transfer category bars stay outside income and expense blocks', () => {
+  const rows = [{ category: '__saving__', income: 0, expenses: 0, total: 0, transfers: 10 }];
+  const blocks = budgetUi.categoryBlocks(rows);
+  assert.deepEqual(blocks.expenses, []);
+  assert.deepEqual(blocks.income, []);
+  assert.deepEqual(blocks.transfers, [{ category: '__saving__', amount: 10 }]);
+  const html = budgetUi.renderCategoryBars(rows);
+  assert.match(html, /budget-chart-block--transfers/);
+  assert.doesNotMatch(html, /budget-chart-block--expenses|budget-chart-block--income/);
+});
+
+test('the Savings chart filter selects the stored subcategory and preserves household category identity', () => {
+  const previous = { ...budgetUi.state };
+  try {
+    Object.assign(budgetUi.state, { entries: [
+      { id: 1, category: 'financial_other', subcategory: 'saving', amount: -100 },
+      { id: 2, category: 'saving', subcategory: '', amount: -20 },
+      { id: 3, category: 'financial_other', subcategory: 'bank_fees', amount: -5 },
+      { id: 4, category: '__private__', subcategory: '', amount: -10, details_hidden: true },
+    ], responsibleFilterId: null, subcategoryFilter: null, categoryFilter: '__saving__' });
+    assert.deepEqual(budgetUi.visibleEntries().map(e => e.id), [1]);
+    budgetUi.state.categoryFilter = 'saving';
+    assert.deepEqual(budgetUi.visibleEntries().map(e => e.id), [2]);
+    budgetUi.state.categoryFilter = 'financial_other';
+    assert.deepEqual(budgetUi.visibleEntries().map(e => e.id), [3]);
+  } finally { Object.assign(budgetUi.state, previous); }
+});
+
+test('transfer category changes replace subcategory options and deletion delegates before closing the editor', async () => {
+  const { wireTransferForm } = await import('../public/components/budget-transfer-dialog.js');
+  const listeners = new Map();
+  let optionHtml = '', clears = 0, closed = 0;
+  const element = (id, value = '') => ({ value,
+    addEventListener(type, listener) { listeners.set(`${id}:${type}`, listener); } });
+  const category = element('category', 'financial_other');
+  const select = element('subcategory');
+  select.replaceChildren = () => { clears++; optionHtml = ''; };
+  select.insertAdjacentHTML = (_position, html) => { optionHtml += html; };
+  const elements = {
+    '#bt-category': category, '#bt-subcategory': select, '#bt-subcategory-group': {},
+    '#bt-recurring': element('recurring'), '#bt-delete': element('delete'),
+    '#bt-from': element('from'), '#bt-amount': element('amount'),
+    '#bt-interval': element('interval', 'monthly'), '#bt-interval-count': element('interval-count', '1'), '#bt-interval-unit': {},
+  };
+  const previousClose = globalThis.__closeModal;
+  globalThis.__closeModal = () => { closed++; };
+  const deleted = [];
+  try {
+    wireTransferForm({ querySelector: selector => elements[selector] }, {
+      transfer: { id: 12, subcategory: 'saving' },
+      subcategories: { financial_other: [{ key: 'saving', name: 'Savings' }],
+        other: [{ key: 'one', name: 'One' }, { key: 'two', name: 'Two' }] },
+      readOnly: () => false, onSaved() {}, onError() {}, onDelete: async id => { deleted.push(id); },
+    });
+    assert.equal(select.value, 'saving');
+    assert.equal(select.required, false);
+    category.value = 'other';
+    listeners.get('category:change')();
+    assert.equal(clears, 2);
+    assert.doesNotMatch(optionHtml, /value="saving"/);
+    assert.match(optionHtml, /value="one"/);
+    assert.match(optionHtml, /value="two"/);
+    assert.equal(select.required, true);
+    assert.equal(select.value, '');
+    await listeners.get('delete:click')();
+    assert.deepEqual(deleted, [12]);
+    assert.equal(closed, 0, 'the deletion confirmation can cancel without losing the editor');
+  } finally {
+    if (previousClose === undefined) delete globalThis.__closeModal;
+    else globalThis.__closeModal = previousClose;
   }
 });
 

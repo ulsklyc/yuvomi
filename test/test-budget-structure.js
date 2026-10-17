@@ -2,8 +2,8 @@
  * Budget structure guard.
  *
  * Sichert die modulare Aufteilung von server/routes/budget.js: der Orchestrator
- * muss dieselbe {Methode, Pfad}-Routentabelle wie vor dem Split ergeben (33
- * Routen) und die vollständige öffentliche Export-Fläche re-exportieren. Fängt
+ * muss die erwartete {Methode, Pfad}-Routentabelle ergeben und die vollständige
+ * öffentliche Export-Fläche re-exportieren. Fängt
  * ab, dass ein Cluster-Router still nicht gemountet wird oder eine Route/ein
  * Export beim Umbau verloren geht.
  *
@@ -16,7 +16,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import budgetRouter, {
+// Set the test database before router imports initialise db.js, including direct Node runs.
+process.env.DB_PATH = ':memory:';
+process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'budget-structure-test';
+
+const { default: budgetRouter,
   computeStatsRange,
   generateRecurringInstances, occurrencesPerYear, occurrenceDatesInMonth, effectiveMonthly,
   normalizeIntervalCount, RECURRENCE_INTERVAL_KEYS, MAX_INTERVAL_COUNT,
@@ -24,14 +28,24 @@ import budgetRouter, {
   resolveExportRange,
   BUDGET_SAVINGS_KEY, computePlanProgress,
   computeStats, statsHandler,
-} from '../server/routes/budget.js';
+} = await import('../server/routes/budget.js');
 
-import entriesRouter from '../server/routes/budget/entries.js';
-import categoriesRouter from '../server/routes/budget/categories.js';
-import loansRouter from '../server/routes/budget/loans.js';
-import accountsRouter from '../server/routes/budget/accounts.js';
-import plansRouter from '../server/routes/budget/plans.js';
-import statsRouter from '../server/routes/budget/stats.js';
+const [entries, categories, loans, accounts, plans, stats, transfers] = await Promise.all([
+  import('../server/routes/budget/entries.js'),
+  import('../server/routes/budget/categories.js'),
+  import('../server/routes/budget/loans.js'),
+  import('../server/routes/budget/accounts.js'),
+  import('../server/routes/budget/plans.js'),
+  import('../server/routes/budget/stats.js'),
+  import('../server/routes/budget/transfers.js'),
+]);
+const entriesRouter = entries.default;
+const categoriesRouter = categories.default;
+const loansRouter = loans.default;
+const accountsRouter = accounts.default;
+const plansRouter = plans.default;
+const statsRouter = stats.default;
+const transfersRouter = transfers.default;
 
 /** Sammelt rekursiv alle {METHOD path}-Paare eines Express-Routers (inkl. gemounteter Sub-Router). */
 function collectRoutes(router) {
@@ -55,6 +69,11 @@ function collectRoutes(router) {
 }
 
 const EXPECTED = [
+  // transfers
+  'GET /transfers/:id',
+  'POST /transfers',
+  'PUT /transfers/:id',
+  'PUT /transfers/:id/series',
   // entries
   'GET /summary',
   'GET /export',
@@ -98,15 +117,15 @@ const EXPECTED = [
   'GET /stats',
 ];
 
-test('Orchestrator ergibt exakt die erwartete Routentabelle (35 Routen)', () => {
+test('Orchestrator ergibt exakt die erwartete Routentabelle (39 Routen)', () => {
   const actual = collectRoutes(budgetRouter).sort();
   assert.deepEqual(actual, [...EXPECTED].sort());
-  assert.equal(actual.length, 35);
+  assert.equal(actual.length, 39);
 });
 
 test('die Cluster-Router zusammen ergeben genau die Orchestrator-Routen (keine verlorene/doppelte Route)', () => {
   const perModule = [
-    entriesRouter, categoriesRouter, loansRouter, accountsRouter, plansRouter, statsRouter,
+    entriesRouter, categoriesRouter, loansRouter, accountsRouter, plansRouter, statsRouter, transfersRouter,
   ].flatMap(collectRoutes);
   // keine Route kommt in mehr als einem Cluster-Router vor
   const seen = new Set();

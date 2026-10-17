@@ -247,7 +247,8 @@
  * theme-übergreifend ≥4.5:1 (reiner Akzent ergab in Light nur ~4.1:1). Kein
  * hardcodierter Wert. */
 .budget-badge--shared,
-.budget-badge--masked {
+.budget-badge--masked,
+.budget-badge--transfer {
   display: inline-block;
   vertical-align: middle;
   margin-inline-start: var(--space-1);
@@ -259,6 +260,20 @@
   color: var(--color-text-secondary);
   background: var(--color-fill-well);
   white-space: nowrap;
+}
+
+.budget-badge--transfer {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.budget-transfer-route__arrow {
+  display: inline-block;
+}
+
+[dir="rtl"] .budget-transfer-route__arrow {
+  transform: scaleX(-1);
 }
 
 /* „Nur Betrag" an fremden Buchungen, die ihren Zweck verbergen (#659). Teilt
@@ -1061,7 +1076,7 @@
     grid-auto-rows: auto;
   }
 
-  .budget-overview .metric-grid:not(.metric-grid--expenses-only) > .metric-card:last-child {
+  .budget-overview .metric-grid:not(.metric-grid--expenses-only) > .budget-balance-card {
     order: -1;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -1073,9 +1088,9 @@
     row-gap: var(--space-0h);
   }
 
-  .budget-overview .metric-grid:not(.metric-grid--expenses-only) > .metric-card:last-child > .metric-card__label { grid-area: label; }
-  .budget-overview .metric-grid:not(.metric-grid--expenses-only) > .metric-card:last-child > .metric-card__value { grid-area: value; }
-  .budget-overview .metric-grid:not(.metric-grid--expenses-only) > .metric-card:last-child > .metric-card__trend { grid-area: trend; }
+  .budget-overview .metric-grid:not(.metric-grid--expenses-only) > .budget-balance-card > .metric-card__label { grid-area: label; }
+  .budget-overview .metric-grid:not(.metric-grid--expenses-only) > .budget-balance-card > .metric-card__value { grid-area: value; }
+  .budget-overview .metric-grid:not(.metric-grid--expenses-only) > .budget-balance-card > .metric-card__trend { grid-area: trend; }
 }
 
 /* --------------------------------------------------------
@@ -1435,6 +1450,7 @@ button.budget-bar-row:focus-visible {
  * Einkaufen liessen den echten Alarm (Plan ueberschritten) untergehen. Die
  * Richtung benennt der Blocktitel, nicht der Farbton. */
 .budget-bar-row__fill--income   { background-color: var(--color-success); }
+.budget-bar-row__fill--transfers { background-color: var(--module-accent); }
 .budget-bar-row__fill--expenses { background-color: var(--bar-fill, var(--module-accent)); }
 
 /* Der Anteil einer Ausgabe steht hinter ihrem Betrag, in der Statistik und in
@@ -3116,3 +3132,8 @@ button.budget-entry__title {
 .split-debt strong {
   font-variant-numeric: tabular-nums;
 }
+
+.budget-transfer-summary { margin-block-start: var(--space-3); }
+.budget-entry__amount--transfer { color: var(--color-text-primary); }
+.budget-entry__indicator--transfer { background-color: var(--color-text-secondary); }
+.budget-entry--upcoming .budget-entry__indicator--transfer { color: var(--color-text-secondary); }

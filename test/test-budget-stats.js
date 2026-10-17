@@ -70,6 +70,7 @@ function freshDb() {
       title TEXT NOT NULL, amount REAL NOT NULL,
       category TEXT NOT NULL DEFAULT 'Sonstiges', subcategory TEXT NOT NULL DEFAULT '',
       date TEXT NOT NULL, is_recurring INTEGER NOT NULL DEFAULT 0, created_by INTEGER NOT NULL DEFAULT 1,
+      transfer_entry_id INTEGER,
       is_pending INTEGER NOT NULL DEFAULT 0
     );
     CREATE TABLE budget_plans (

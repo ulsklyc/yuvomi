@@ -4,6 +4,8 @@
  */
 
 import express from 'express';
+import { SAVINGS_CHART_CATEGORY } from '../../../public/utils/budget-chart-category.js';
+import { transferPair, mirrorTransfer, deleteTransfer } from '../../services/budget-transfers.js';
 import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import { str, oneOf, date as validateDate, num, rrule, MAX_TITLE, MONTH_RE } from '../../middleware/validate.js';
@@ -14,11 +16,11 @@ import { sendDocumentDeletionConflict } from '../../services/document-deletion-l
 import { assertDocumentLinkTargetsAvailable, documentViewer, sendDocumentLinkRefusal } from '../../services/document-links.js';
 import { attachmentsFor, replaceAttachments, withAttachments } from './attachments.js';
 import {
-  budgetFilter, expectedSubscriptionFilter, budgetCategoryExpr, maskEntries, getBudgetMode, mayEdit, bookedOnly,
+  budgetFilter, expectedSubscriptionFilter, budgetCategoryExpr, budgetChartCategorySql, maskEntries, getBudgetMode, mayEdit, bookedOnly,
   DATE_RE, thisMonthLocalKey, cents,
   generateRecurringInstances, RECURRENCE_INTERVAL_KEYS, MAX_INTERVAL_COUNT,
   normalizeIntervalCount, effectiveMonthly, occurrencesPerYear,
-  validCategoryKeys, defaultCategory, validateSubcategory, validateAccountRef,
+  validCategoryKeys, defaultCategory, validateSubcategory, validateAccountRef, transferCurrenciesMatch, isArchivedBudgetAccount, transferAmountFitsCurrency,
   entryWithLoanMeta, refreshLoanStatus, fromBudgetAmount, bookingFor,
   RESPONSIBLE_USERS_SQL, replaceResponsibles, withResponsibles, responsibleNonMembers,
   replaceSeriesResponsibles, seedSeriesResponsibles, materializeSeriesStart, freezeSeriesPast,
@@ -77,23 +79,25 @@ router.get('/summary', (req, res) => {
 
     const totals = db.get().prepare(`
       SELECT
-        SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) AS income,
-        SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END) AS expenses,
-        SUM(amount) AS balance
+        SUM(CASE WHEN transfer_entry_id IS NULL AND amount > 0 THEN amount ELSE 0 END) AS income,
+        SUM(CASE WHEN transfer_entry_id IS NULL AND amount < 0 THEN amount ELSE 0 END) AS expenses,
+        SUM(CASE WHEN transfer_entry_id IS NULL THEN amount ELSE 0 END) AS balance,
+        SUM(CASE WHEN transfer_entry_id IS NOT NULL AND amount < 0 THEN -amount ELSE 0 END) AS transfers
       FROM budget_entries
       WHERE date BETWEEN ? AND ?${filter.clause}${bookedOnly()}
     `).get(from, to, ...filter.params);
 
     // Fremde 'shared_amount'-Eintraege laufen unter dem Sammel-Bucket (#659):
     // ihr Betrag zaehlt mit, ihre Kategorie verriete sonst den Zweck.
-    const catExpr = budgetCategoryExpr(req, 'budget_entries');
+    // Show Savings separately in the chart without changing its stored parent category.
+    const catExpr = budgetCategoryExpr(req, 'budget_entries', budgetChartCategorySql('budget_entries'));
     const byCategory = db.get().prepare(`
       SELECT ${catExpr.expr} AS category,
-             SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) AS income,
-             SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END) AS expenses,
+             SUM(CASE WHEN transfer_entry_id IS NULL AND amount > 0 THEN amount ELSE 0 END) AS income,
+             SUM(CASE WHEN transfer_entry_id IS NULL AND amount < 0 THEN amount ELSE 0 END) AS expenses,
              SUM(amount) AS total
       FROM budget_entries
-      WHERE date BETWEEN ? AND ?${filter.clause}${bookedOnly()}
+      WHERE date BETWEEN ? AND ?${filter.clause}${bookedOnly()} AND transfer_entry_id IS NULL
       -- GROUP BY 1, nicht GROUP BY category: bei gleichnamigem Output-Alias
       -- gewinnt in SQLite die ECHTE Spalte, und dann gruppierte die Auswertung
       -- weiter nach der unmaskierten Kategorie - der Sammel-Bucket bliebe leer.
@@ -101,15 +105,24 @@ router.get('/summary', (req, res) => {
       ORDER BY ABS(SUM(amount)) DESC
     `).all(...catExpr.params, from, to, ...filter.params);
 
+    const transferCategories = db.get().prepare(`
+      SELECT ${catExpr.expr} AS category, SUM(-amount) AS transfers
+      FROM budget_entries
+      WHERE date BETWEEN ? AND ?${filter.clause}${bookedOnly()}
+        AND transfer_entry_id IS NOT NULL AND amount < 0
+      GROUP BY 1 ORDER BY SUM(-amount) DESC
+    `).all(...catExpr.params, from, to, ...filter.params);
+    byCategory.push(...transferCategories.map((row) => ({ ...row, income: 0, expenses: 0, total: 0 })));
+
     // Was noch aussteht, wird eigens ausgewiesen (#637). Ohne diese Zahl
     // verschwaende eine erwartete Buchung spurlos aus der Uebersicht, und die
     // Bestaetigung liesse sich nur noch in der Liste finden.
     const pending = db.get().prepare(`
       SELECT COUNT(*) AS count,
-             COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS income,
-             COALESCE(SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END), 0) AS expenses
+             COALESCE(SUM(CASE WHEN transfer_entry_id IS NULL AND amount > 0 THEN amount ELSE 0 END), 0) AS income,
+             COALESCE(SUM(CASE WHEN transfer_entry_id IS NULL AND amount < 0 THEN amount ELSE 0 END), 0) AS expenses
       FROM budget_entries
-      WHERE date BETWEEN ? AND ?${filter.clause} AND is_pending = 1
+      WHERE date BETWEEN ? AND ?${filter.clause} AND is_pending = 1 AND transfer_entry_id IS NULL
     `).get(from, to, ...filter.params);
 
     // ABO-ZAHLUNGEN DER FOLGEMONATE GEHOEREN IN DIESELBE ZAHL (#1844). Sie
@@ -128,6 +141,7 @@ router.get('/summary', (req, res) => {
         expenses:   totals.expenses || 0,
         balance:    totals.balance  || 0,
         byCategory,
+        transfers: totals.transfers || 0,
         pending: {
           count:    pending.count + expected.count,
           income:   cents(pending.income + expected.income),
@@ -274,6 +288,7 @@ router.get('/', (req, res) => {
     const to     = `${month}-31`;
     let sql      = `
       SELECT b.*, u.display_name AS creator_name,
+             (SELECT account_id FROM budget_entries WHERE id = b.transfer_entry_id) AS transfer_account_id,
              ${RESPONSIBLE_USERS_SQL},
              p.id AS loan_payment_id,
              p.loan_id AS loan_id,
@@ -305,9 +320,9 @@ router.get('/', (req, res) => {
     // steht an seiner Stelle im WHERE, also VOR dem Vergleichswert.
     const categoryKey = req.query.category;
     const validCategoryFilter = Boolean(categoryKey)
-      && (categoryKey === BUDGET_MASKED_CATEGORY || validCategoryKeys().includes(categoryKey));
+      && (categoryKey === BUDGET_MASKED_CATEGORY || categoryKey === SAVINGS_CHART_CATEGORY || validCategoryKeys().includes(categoryKey));
     if (validCategoryFilter) {
-      const catExpr = budgetCategoryExpr(req, 'b');
+      const catExpr = budgetCategoryExpr(req, 'b', budgetChartCategorySql('b'));
       sql += ` AND ${catExpr.expr} = ?`;
       params.push(...catExpr.params, categoryKey);
     }
@@ -423,6 +438,7 @@ function searchEntries(req, res) {
  */
 router.post('/', (req, res) => {
   try {
+    if (req.body.transfer_entry_id !== undefined) return refuse(res, [refusal('transfer_invalid', 'Create transfers through /budget/transfers.')]);
     const vTitle  = str(req.body.title,    'Title',  { max: MAX_TITLE });
     const vAmount = num(req.body.amount,  'Amount', { required: true });
     const fallbackCategory = defaultCategory(Number(req.body.amount) < 0 ? 'expense' : 'income');
@@ -521,7 +537,10 @@ router.put('/:id/series', (req, res) => {
     const id    = parseInt(req.params.id, 10);
     const entry = db.get().prepare('SELECT * FROM budget_entries WHERE id = ?').get(id);
     if (!entry) return res.status(404).json({ error: 'Entry not found', code: 404 });
-    if (!mayEdit(req, entry)) return res.status(403).json({ error: 'You cannot modify this entry.', code: 403 });
+    if (!mayEdit(req, entry) || (entry.transfer_entry_id && !mayEdit(req, transferPair(db.get(), entry)))) return res.status(403).json({ error: 'You cannot modify this entry.', code: 403 });
+
+    if (entry.transfer_entry_id) return refuse(res, [refusal('transfer_series_required', 'Edit paired series through /budget/transfers/:id/series.')]);
+    if (req.body.transfer_entry_id !== undefined) return refuse(res, [refusal('transfer_invalid', 'transfer_entry_id is read-only.')]);
 
     const parentId = entry.recurrence_parent_id ?? (entry.is_recurring ? entry.id : null);
     if (!parentId) return refuse(res, [refusal('entry_not_recurring', 'Not a recurring entry.')]);
@@ -880,10 +899,16 @@ router.delete('/:id/series', (req, res) => {
     const id    = parseInt(req.params.id, 10);
     const entry = db.get().prepare('SELECT * FROM budget_entries WHERE id = ?').get(id);
     if (!entry) return res.status(404).json({ error: 'Entry not found', code: 404 });
-    if (!mayEdit(req, entry)) return res.status(403).json({ error: 'You cannot modify this entry.', code: 403 });
+    if (!mayEdit(req, entry) || (entry.transfer_entry_id && !mayEdit(req, transferPair(db.get(), entry)))) return res.status(403).json({ error: 'You cannot modify this entry.', code: 403 });
 
     const parentId = entry.recurrence_parent_id ?? (entry.is_recurring ? entry.id : null);
     if (!parentId) return refuse(res, [refusal('entry_not_recurring', 'Not a recurring entry.')]);
+
+    if (entry.transfer_entry_id) {
+      const anchor = db.get().prepare('SELECT * FROM budget_entries WHERE id = ?').get(parentId);
+      deleteTransfer(db.get(), anchor);
+      return res.status(204).end();
+    }
 
     db.get().transaction(() => {
       db.get().prepare('DELETE FROM budget_entries WHERE recurrence_parent_id = ?').run(parentId);
@@ -908,8 +933,22 @@ router.put('/:id', (req, res) => {
     const id    = parseInt(req.params.id, 10);
     const entry = db.get().prepare('SELECT * FROM budget_entries WHERE id = ?').get(id);
     if (!entry) return res.status(404).json({ error: 'Entry not found', code: 404 });
-    if (!mayEdit(req, entry)) return res.status(403).json({ error: 'You cannot modify this entry.', code: 403 });
+    if (!mayEdit(req, entry) || (entry.transfer_entry_id && !mayEdit(req, transferPair(db.get(), entry)))) return res.status(403).json({ error: 'You cannot modify this entry.', code: 403 });
 
+    if (req.body.transfer_entry_id !== undefined) return refuse(res, [refusal('transfer_invalid', 'transfer_entry_id is read-only.')]);
+    if (entry.transfer_entry_id) {
+      const partner = transferPair(db.get(), entry);
+      const recurrenceFields = ['is_recurring', 'recurrence_interval', 'recurrence_interval_count', 'recurrence_virtual', 'recurrence_confirm', 'recurrence_rule'];
+      if (recurrenceFields.some((key) => req.body[key] !== undefined && req.body[key] !== entry[key])) return refuse(res, [refusal('transfer_series_required', 'Change transfer recurrence through the paired series.')]);
+      if (req.body.amount !== undefined && !(Number(req.body.amount) * entry.amount > 0)) return refuse(res, [refusal('entry_amount_invalid', 'A transfer must retain its direction and a nonzero amount.')]);
+      if (req.body.category !== undefined && !db.get().prepare('SELECT 1 FROM budget_categories WHERE key = ? AND type = ?').get(req.body.category, entry.amount > 0 ? 'income' : 'expense')) return refuse(res, [refusal('entry_category_invalid', 'Invalid transfer category.')]);
+      if (req.body.account_id !== undefined && (!req.body.account_id || Number(req.body.account_id) === partner.account_id)) return refuse(res, [refusal('entry_account_invalid', 'Choose two different accounts.')]);
+      const accountRef = validateAccountRef(req.body.account_id ?? entry.account_id);
+      if (accountRef.error) return refuse(res, [refusal('entry_account_invalid', accountRef.error)]);
+      if (accountRef.value !== entry.account_id && isArchivedBudgetAccount(accountRef.value)) return refuse(res, [refusal('transfer_account_archived', 'Choose active accounts for a transfer.')]);
+      if (accountRef.value !== entry.account_id && !transferCurrenciesMatch(accountRef.value, partner.account_id)) return refuse(res, [refusal('transfer_currency_mismatch', 'Transfer accounts must use the same currency.')]);
+      if (req.body.amount !== undefined && Number(req.body.amount) !== entry.amount && !transferAmountFitsCurrency(req.body.amount, accountRef.value)) return refuse(res, [refusal('entry_amount_invalid', 'Amount must match the account currency precision.')]);
+    }
     const checks = [];
     if (req.body.title    !== undefined) checks.push(['entry_title_invalid', str(req.body.title,    'Title',  { max: MAX_TITLE, required: false })]);
     if (req.body.amount   !== undefined) checks.push(['entry_amount_invalid', num(req.body.amount,   'Amount')]);
@@ -999,7 +1038,7 @@ router.put('/:id', (req, res) => {
     const configuredFull = amount !== undefined
       ? (linkedPayment ? linkedSign * Math.abs(Number(amount)) : Number(amount))
       : (entry.recurrence_full_amount != null ? entry.recurrence_full_amount : entry.amount);
-    const nextAmount = finalVirtual ? effectiveMonthly(configuredFull, finalInterval, finalCount) : cents(configuredFull);
+    const nextAmount = entry.transfer_entry_id ? configuredFull : finalVirtual ? effectiveMonthly(configuredFull, finalInterval, finalCount) : cents(configuredFull);
     const nextFull   = finalVirtual ? cents(configuredFull) : null;
 
     // Sichtbarkeit umschaltbar (privat/geteilt); owner_id bleibt fix (#476/#505).
@@ -1070,6 +1109,8 @@ router.put('/:id', (req, res) => {
         id
       );
 
+      if (entry.transfer_entry_id) mirrorTransfer(db.get(), id);
+
       if (linkedPayment) {
         db.get().prepare(`
           UPDATE budget_loan_payments
@@ -1137,7 +1178,7 @@ router.patch('/:id/confirm', (req, res) => {
     const id    = parseInt(req.params.id, 10);
     const entry = db.get().prepare('SELECT * FROM budget_entries WHERE id = ?').get(id);
     if (!entry) return res.status(404).json({ error: 'Entry not found', code: 404 });
-    if (!mayEdit(req, entry)) return res.status(403).json({ error: 'You cannot modify this entry.', code: 403 });
+    if (!mayEdit(req, entry) || (entry.transfer_entry_id && !mayEdit(req, transferPair(db.get(), entry)))) return res.status(403).json({ error: 'You cannot modify this entry.', code: 403 });
     if (!entry.is_pending) {
       return refuse(res, [refusal('entry_already_booked', 'Entry is already booked.')]);
     }
@@ -1150,10 +1191,14 @@ router.patch('/:id/confirm', (req, res) => {
     // Das Vorzeichen bleibt: eine erwartete Ausgabe wird beim Abbuchen nicht zur
     // Einnahme, auch wenn jemand den Betrag ohne Minus einträgt.
     const corrected = req.body.amount !== undefined ? Math.abs(Number(req.body.amount)) : null;
+    if (entry.transfer_entry_id && corrected !== null && corrected !== Math.abs(entry.amount) && !transferAmountFitsCurrency(corrected, entry.account_id)) {
+      return refuse(res, [refusal('entry_amount_invalid', 'Amount must match the account currency precision.')]);
+    }
     const nextAmount = corrected === null
       ? entry.amount
-      : cents(entry.amount < 0 ? -corrected : corrected);
+      : entry.transfer_entry_id ? (entry.amount < 0 ? -corrected : corrected) : cents(entry.amount < 0 ? -corrected : corrected);
 
+    db.get().transaction(() => {
     db.get().prepare(`
       UPDATE budget_entries
          SET is_pending = 0,
@@ -1161,6 +1206,11 @@ router.patch('/:id/confirm', (req, res) => {
              date       = COALESCE(?, date)
        WHERE id = ?
     `).run(nextAmount, req.body.date ?? null, id);
+    if (entry.transfer_entry_id) {
+      if (!nextAmount) throw new Error('A transfer cannot have a zero amount');
+      mirrorTransfer(db.get(), id);
+    }
+    })();
 
     const updated = entryWithLoanMeta(id);
     res.json({ data: { ...updated, attachments: attachmentsFor(id, documentViewer(req)) } });
@@ -1180,7 +1230,12 @@ router.delete('/:id', (req, res) => {
     const id    = parseInt(req.params.id, 10);
     const entry = db.get().prepare('SELECT * FROM budget_entries WHERE id = ?').get(id);
     if (!entry) return res.status(404).json({ error: 'Entry not found', code: 404 });
-    if (!mayEdit(req, entry)) return res.status(403).json({ error: 'You cannot modify this entry.', code: 403 });
+    if (!mayEdit(req, entry) || (entry.transfer_entry_id && !mayEdit(req, transferPair(db.get(), entry)))) return res.status(403).json({ error: 'You cannot modify this entry.', code: 403 });
+
+    if (entry.transfer_entry_id) {
+      deleteTransfer(db.get(), entry);
+      return res.status(204).end();
+    }
 
     const linkedPayment = db.get().prepare(`
       SELECT * FROM budget_loan_payments WHERE budget_entry_id = ?

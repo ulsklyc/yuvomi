@@ -104,6 +104,7 @@ const APP_SHELL = [
   // Der Router laedt ihn als Seiteneffekt (`import '/components/datepicker.js'`),
   // also gehoert er in die Shell, nicht zu den Seitenmodulen. Der
   // Precache-Guard sah diese Import-Form bis #944 nicht.
+  '/components/budget-recurrence-fields.js',
   '/components/datepicker.js',
   '/components/detail-view.js',
   '/components/document-attach.js',
@@ -115,6 +116,8 @@ const APP_SHELL = [
   '/components/user-multi-select.js',
   '/components/wall-timer.js',
   '/utils/birthday-event.js',
+  '/utils/budget-chart-category.js',
+  '/utils/budget-recurrence.js',
   '/utils/budget-category-colors.js',
   '/utils/bulk-pill.js',
   '/utils/category-labels.js',
@@ -352,6 +355,7 @@ const PAGE_MODULES = [
   '/pages/budget-stats.js',
   '/pages/split-expenses.js',
   '/pages/subscriptions.js',
+  '/components/budget-transfer-dialog.js',
   '/components/category-manager.js',
   '/components/icon-picker.js',
   '/components/tag-manager.js',

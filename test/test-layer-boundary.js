@@ -33,6 +33,10 @@ const SERVER_DIR = path.join(ROOT, 'server');
  * aus `public/` importieren darf. Reine Funktionen, front- und backend-identisch.
  */
 const SHARED_ISOMORPHIC = new Set([
+  // The Savings chart bucket must identify the same stored category/subcategory in API and UI.
+  'public/utils/budget-chart-category.js',
+  // One recurrence maximum for the API validation and both budget dialogs; pure constant only.
+  'public/utils/budget-recurrence.js',
   // Notes category identity must match in the API and duplicate-name picker.
   // This pure Unicode normalization has no browser or server dependencies.
   'public/utils/note-category-name.js',

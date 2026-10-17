@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **You can move money between two budget accounts.** (#1061, from D#781) Use the budget
+  entry dialog, with category and subcategory selection. The linked outgoing and incoming entries
+  update each account's balance and stay consistent when edited or deleted. Transfers are shown
+  separately in the month summary and category chart and do not count as income or spending in
+  summaries, statistics, budget plans, or the dashboard. Savings is created as a subcategory of Financials
+  when Financials still exists, without restoring deleted categories or rewriting entries, series or plans.
+  Accounts with transfers can be archived; deleting them is blocked to keep both sides intact.
+  Transfer rows carry a marker and show the account direction. Savings transfers appear in a separate
+  Transfers chart section. Transfers require both accounts to use the same currency; currency exchanges
+  are not supported. The amount field follows the source account's currency. Existing transfers
+  remain editable after account or household currency changes when their accounts stay the same.
 
 - **The search palette remembers where you went.** Press Cmd+K (Ctrl+K) with an empty field to see
   the last five modules and settings pages you opened from it, above the module shortcuts. Only the

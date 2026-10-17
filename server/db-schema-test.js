@@ -1546,6 +1546,13 @@ const MIGRATIONS_SQL = {
     CREATE UNIQUE INDEX idx_users_birthday_feed_token ON users(birthday_feed_token)
       WHERE birthday_feed_token IS NOT NULL;
   `,
+  250: `
+    ALTER TABLE budget_entries ADD COLUMN transfer_entry_id INTEGER NULL REFERENCES budget_entries(id) ON DELETE CASCADE;
+    CREATE INDEX idx_budget_transfer ON budget_entries(transfer_entry_id);
+    INSERT OR IGNORE INTO budget_subcategories (key, category_key, name, sort_order)
+      SELECT 'saving', key, 'Savings', 5 FROM budget_categories
+      WHERE key = 'financial_other';
+  `,
 };
 
 export { MIGRATIONS_SQL };

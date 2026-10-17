@@ -49,6 +49,7 @@ function freshDb() {
       is_recurring           INTEGER NOT NULL DEFAULT 0,
       recurrence_rule        TEXT,
       recurrence_parent_id   INTEGER REFERENCES budget_entries(id) ON DELETE SET NULL,
+      transfer_entry_id      INTEGER REFERENCES budget_entries(id) ON DELETE CASCADE,
       recurrence_interval    TEXT    NOT NULL DEFAULT 'monthly',
       recurrence_interval_count INTEGER NOT NULL DEFAULT 1,
       recurrence_virtual     INTEGER NOT NULL DEFAULT 0,

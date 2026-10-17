@@ -6,6 +6,7 @@
  */
 
 import { readFileSync } from 'node:fs';
+import { linkTransfer } from '../../services/budget-transfers.js';
 import path from 'path';
 import * as db from '../../db.js';
 import {
@@ -16,6 +17,8 @@ import { computeLoanSchedule, remainingPrincipalFromPayments, remainingInstallme
 import { todayKey } from '../../utils/timezone.js';
 import { DEFAULT_LOCALE, resolveHouseholdLocale, supportedLocaleFor } from '../../utils/i18n.js';
 import { newNonMembers } from '../../services/household-members.js';
+import { MAX_INTERVAL_COUNT } from '../../../public/utils/budget-recurrence.js';
+import { SAVINGS_CHART_CATEGORY } from '../../../public/utils/budget-chart-category.js';
 
 // --------------------------------------------------------
 // Persönlich/geteilt (#476/#505): Haushalts-Modus + Sichtbarkeits-Enforcement.
@@ -102,12 +105,12 @@ export function expectedSubscriptionFilter(req) {
  *
  * @returns {{ expr: string, params: number[] }}
  */
-export function budgetCategoryExpr(req, alias) {
+export function budgetCategoryExpr(req, alias, category = `${alias}.category`) {
   const mode = getBudgetMode();
-  if (mode !== 'personal') return { expr: `${alias}.category`, params: [] };
+  if (mode !== 'personal') return { expr: category, params: [] };
   return {
     expr: `CASE WHEN ${budgetDetailsHiddenWhere(alias, '?', { mode })}`
-        + ` THEN '${BUDGET_MASKED_CATEGORY}' ELSE ${alias}.category END`,
+        + ` THEN '${BUDGET_MASKED_CATEGORY}' ELSE ${category} END`,
     params: [viewerId(req)],
   };
 }
@@ -148,6 +151,7 @@ const CATEGORY_LABEL_KEYS = {
   'Sonstiges Einkommen': 'catOtherIncome',
 };
 const SUBCATEGORY_LABEL_KEYS = {
+  saving: 'catSaving',
   rent_mortgage: 'subcatRentMortgage',
   condominium: 'subcatCondominium',
   utilities: 'subcatUtilities',
@@ -259,7 +263,7 @@ export const RECURRENCE_INTERVAL_KEYS = ['weekly', 'monthly', 'yearly'];
 
 // Obergrenze wie im RRULE-Formular der Aufgaben/Termine: dieselbe Zahl im
 // Eingabefeld, damit "alle N" überall dasselbe Höchstmaß hat.
-export const MAX_INTERVAL_COUNT = 99;
+export { MAX_INTERVAL_COUNT };
 
 /** Anzahl auf eine ganze Zahl in [1, MAX_INTERVAL_COUNT] bringen. */
 export function normalizeIntervalCount(value) {
@@ -358,7 +362,7 @@ export function occurrenceDatesInMonth(startDate, interval, count, month) {
  * #1035 nur "von Hand erfasst" heisst.
  */
 const SERIES_SELECT = `
-    SELECT a.id, COALESCE(s.start_date, a.date) AS start_date, a.created_by, a.owner_id,
+    SELECT a.id, a.transfer_entry_id, COALESCE(s.start_date, a.date) AS start_date, a.created_by, a.owner_id,
            a.recurrence_interval, a.recurrence_interval_count,
            a.recurrence_virtual, a.recurrence_confirm,
            s.title, s.amount, s.category, s.subcategory, s.account_id, s.visibility,
@@ -395,7 +399,25 @@ function occurrenceWriter(database) {
     SELECT ?, user_id FROM budget_series_responsibles WHERE anchor_id = ?
   `);
 
-  return (orig, date) => {
+  const write = (orig, date) => {
+    if (orig.transfer_entry_id) {
+      const partner = database.prepare(`${SERIES_SELECT} AND a.id = ?`).get(orig.transfer_entry_id);
+      if (!partner) throw new Error('Transfer series partner missing');
+      return database.transaction(() => {
+        if ((orig.grid_from && date < orig.grid_from) || (partner.grid_from && date < partner.grid_from)) return false;
+        if (skipStmt.get(orig.id, date) || skipStmt.get(partner.id, date)) return false;
+        const first = existsStmt.get(orig.id, date);
+        const second = existsStmt.get(partner.id, date);
+        if (first && second) return false;
+        if (first || second) throw new Error('Unpaired transfer occurrence');
+        write({ ...orig, transfer_entry_id: null }, date);
+        write({ ...partner, transfer_entry_id: null }, date);
+        const firstId = existsStmt.get(orig.id, date).id;
+        const secondId = existsStmt.get(partner.id, date).id;
+        linkTransfer(database, firstId, secondId);
+        return true;
+      })();
+    }
     // VOR DER LETZTEN RASTERAENDERUNG ENTSTEHT NICHTS (#1545, Review-Befund in
     // #1585). Hat eine Serien-Aenderung den Starttag oder den Rhythmus
     // verschoben, stehen die Buchungen davor auf dem ALTEN Raster - ein
@@ -446,6 +468,7 @@ function occurrenceWriter(database) {
     copyResponsiblesStmt.run(created.lastInsertRowid, orig.id);
     return true;
   };
+  return write;
 }
 
 /**
@@ -815,6 +838,39 @@ export const CURRENCY_RE = /^[A-Z]{3}$/;
 /** Haushaltweite Budget-Währung aus sync_config (Fallback wie in /preferences). */
 export function budgetCurrency() {
   return db.get().prepare("SELECT value FROM sync_config WHERE key = 'currency'").get()?.value || 'EUR';
+}
+
+export function budgetChartCategorySql(alias) {
+  return `CASE WHEN ${alias}.category = 'financial_other' AND ${alias}.subcategory = 'saving'
+    THEN '${SAVINGS_CHART_CATEGORY}' ELSE ${alias}.category END`;
+}
+
+/** Transfers carry one amount, so both accounts must use the same effective currency. */
+export function transferCurrenciesMatch(firstId, secondId) {
+  const currency = budgetCurrency();
+  const account = db.get().prepare('SELECT currency FROM budget_accounts WHERE id = ?');
+  const first = account.get(firstId);
+  const second = account.get(secondId);
+  return Boolean(first && second && (first.currency || currency) === (second.currency || currency));
+}
+
+export function isArchivedBudgetAccount(id) {
+  return Boolean(db.get().prepare('SELECT archived FROM budget_accounts WHERE id = ?').get(id)?.archived);
+}
+
+export function budgetAccountCurrency(id) {
+  return db.get().prepare('SELECT currency FROM budget_accounts WHERE id = ?').get(id)?.currency || budgetCurrency();
+}
+
+function accountFractionDigits(currency) {
+  try { return new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions().minimumFractionDigits; }
+  catch { return 2; }
+}
+
+export function transferAmountFitsCurrency(amount, accountId) {
+  const value = Number(amount);
+  return Number.isFinite(value) && value !== 0
+    && Number(value.toFixed(accountFractionDigits(budgetAccountCurrency(accountId)))) === value;
 }
 
 /**
@@ -1284,18 +1340,22 @@ export function listAccounts(includeArchived = false, filter = { clause: '', par
     ORDER BY a.sort_order ASC, a.name COLLATE NOCASE ASC
   `).all(today, ...f.params, ...f.params, ...f.params, includeArchived ? 1 : 0);
   return rows.map((a) => {
-    const currentBalance = cents(a.current_balance);
+    // Preserve three-decimal account currencies, including linked transfers.
+    // Keep existing fractional values on zero-decimal accounts as before.
+    const digits = Math.max(2, accountFractionDigits(a.currency || budgetCurrency()));
+    const round = value => Number(Number(value).toFixed(digits));
+    const currentBalance = round(a.current_balance);
     // Verfügbarer Rahmen nur für Kreditkarten mit gepflegtem Limit. Ein negativer
     // Saldo ist die offene Schuld; ein positiver (Guthaben auf der Karte) vergrößert
     // den Rahmen nicht, deshalb der Clamp auf 0.
     const availableLimit = a.type === 'credit' && a.credit_limit != null
-      ? Math.max(0, cents(a.credit_limit) - Math.max(0, -currentBalance))
+      ? Math.max(0, round(a.credit_limit) - Math.max(0, -currentBalance))
       : null;
     return {
       ...a,
-      starting_balance:  cents(a.starting_balance),
+      starting_balance:  round(a.starting_balance),
       current_balance:   currentBalance,
-      projected_balance: cents(a.projected_balance),
+      projected_balance: round(a.projected_balance),
       available_limit:   availableLimit,
     };
   });
