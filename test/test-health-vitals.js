@@ -908,6 +908,21 @@ test('der Vitalwerte-Dialog haelt Unmoegliches an und zeigt Ungewoehnliches als 
   assert.match(src, /fieldsHost\.addEventListener\('change', updatePlausibility\)/, 'der Hinweis folgt der Eingabe nicht');
 });
 
+// Re-Kritik 2026-10-17: nach dem Speichern stand der harte Fehler rot am Feld
+// und derselbe Satz in Bernstein unter dem Puls. Im Browser gemessen (390px,
+// Blutdruck 80/120): vorher Hinweis + Feldfehler, nachher nur der Feldfehler;
+// ein ungewoehnlicher Wert (250/80) zeigt den Hinweis weiter.
+test('Re-Kritik: steht ein harter Fehler am Feld, schweigt der Plausibilitaets-Hinweis dazu', () => {
+  const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  const update = src.slice(src.indexOf('const updatePlausibility = () => {'), src.indexOf('const clearPlausibilityWhenResolved'));
+  assert.match(src, /const fieldCarriesError = \(\) => Boolean\(fieldsHost\.querySelector\('\[aria-invalid="true"\]'\)\);/,
+    'der Hinweis fragt, ob ein Wertefeld seinen Fehler selbst traegt');
+  assert.match(update, /vitalPlausibility\(values\)\.hard\.length && fieldCarriesError\(\) \? null : vitalPlausibilityText\(values\)/,
+    'Hartes nur, solange kein Feld es traegt - Ungewoehnliches immer');
+  const submitHard = src.slice(src.indexOf('if (reportFieldErrors(vitalPlausibility(body).hard.map('), src.indexOf('submitBtn.disabled = true;', src.indexOf('if (reportFieldErrors(vitalPlausibility(body).hard.map(')));
+  assert.match(submitHard, /updatePlausibility\(\);\s*return;/, 'nach dem Melden am Feld zieht der Hinweis nach');
+});
+
 // Critique R19 Nachlese (Guide validate-input-after-interaction): der Hinweis
 // stand beim Tippen von "37,5 °C" schon nach der "3" als "nicht moeglich" da.
 // Gezeigt wird erst beim Abschluss des Feldes, beim Tippen nur weggenommen.

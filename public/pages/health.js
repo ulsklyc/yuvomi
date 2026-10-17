@@ -2354,8 +2354,15 @@ function openVitalModal(opts = {}) {
       // geht der Hinweis nur weg, sobald der Wert stimmt.
       const plausibilityHint = panel.querySelector('#vital-plausibility');
       const typeNow = () => (isEdit ? row.type : typeSelect.value);
+      // EINE MELDUNG, NICHT ZWEI (Re-Kritik 2026-10-17): nach dem Speichern
+      // stand der harte Fehler rot am Feld UND derselbe Satz in Bernstein
+      // unter dem Puls. Solange ein Feld seinen Fehler selbst traegt
+      // (aria-invalid, reportFieldErrors), schweigt der Hinweis zu Hartem;
+      // Ungewoehnliches sagt er weiter.
+      const fieldCarriesError = () => Boolean(fieldsHost.querySelector('[aria-invalid="true"]'));
       const updatePlausibility = () => {
-        const text = vitalPlausibilityText(readVitalValues(panel, typeNow()));
+        const values = readVitalValues(panel, typeNow());
+        const text = vitalPlausibility(values).hard.length && fieldCarriesError() ? null : vitalPlausibilityText(values);
         if (!plausibilityHint) return;
         plausibilityHint.textContent = text ?? '';
         plausibilityHint.hidden = !text;
@@ -2421,6 +2428,7 @@ function openVitalModal(opts = {}) {
           t(issue === 'bpOrder' ? 'health.errorVitalBpOrder' : 'health.errorVitalImpossible'),
         ]))) {
           submitBtn.disabled = false;
+          updatePlausibility();
           return;
         }
         submitBtn.disabled = true;

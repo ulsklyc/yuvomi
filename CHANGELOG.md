@@ -307,6 +307,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   by the server, with the possible range in the API description); values that are possible but
   unusual show a short "please check" note once you have entered them (when you leave the field or
   press Enter) and can still be saved; the note disappears as soon as the value is plausible again.
+  A refused value is named once, at its field, not a second time in the note below.
 
 - **Budget statistics: a zero change looks like one, and plan targets are spelled out.** A
   category whose total did not change could show a red rising arrow next to "0.00 €" because of a
