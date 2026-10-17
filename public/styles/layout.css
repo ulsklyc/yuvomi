@@ -2495,8 +2495,15 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
  *
  * Reduzierte Bewegung: derselbe Zustandswechsel ohne Gleiten (unten). */
 @media (max-width: 1023px) {
-  .nav-bottom__items {
-    transition: min-height var(--duration-md) var(--ease-out);
+  /* Mit `.nav-bottom` davor: glass.css laedt spaeter und setzt an
+   * `.nav-bottom__items` die Uebergaenge von Flaeche und Schatten - gleiche
+   * Spezifitaet, also gewann es, und Hoehe wie Breite schalteten hart. */
+  .nav-bottom .nav-bottom__items {
+    transition:
+      background-color var(--transition-fast),
+      box-shadow var(--transition-fast),
+      min-height var(--duration-md) var(--ease-out),
+      inline-size var(--duration-md) var(--ease-out);
   }
 
   .nav-bottom .nav-item__label {
@@ -2518,6 +2525,63 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   .nav-bottom--minimized:not(:focus-within) .nav-item__label {
     max-block-size: 0;
     overflow: hidden;
+    opacity: 0;
+  }
+
+  /* DIE PILLE (R20, Entscheidung Ulas 2026-10-17; iOS 26 Tab-Bar-Minimize).
+   * Minimiert schrumpft die Kapsel an ihrer Startkante auf das aktive Ziel
+   * (`.nav-item--pill`): Polster + Ziel + Polster, gemessen an der
+   * ausgefahrenen Kapsel (watchNavMinimize, utils/ux.js). Vorher wurde sie nur
+   * flacher und gab 8px frei; jetzt liegt rechts daneben bis zum FAB Inhalt.
+   *
+   * WAS SICH BEWEGT: die Breite der Kapsel (Layout nur in ihrem eigenen,
+   * ausser Fluss liegenden Teilbaum - fuenf Ziele), das aktive Ziel per
+   * `translate` und die Deckkraft der uebrigen. KEIN LAYOUT-SHIFT: die
+   * Startkante steht (beide Raender explizit statt `auto`, sonst zentrierte
+   * die schmale Pille sich am Tablet), und die Tabs bleiben auf ihrer
+   * gemessenen Breite stehen, minimiert UND auf dem Rueckweg (`--settling`) -
+   * ein mitschrumpfender Flex-Slot liesse sie wandern. Die Kapsel schneidet
+   * ab, was ueber ihre Kante steht; die ausgeblendeten Tabs nehmen keinen
+   * Treffer (`visibility`). Ein Tipp auf die Pille faehrt sie aus.
+   * Reduzierte Bewegung: derselbe Wechsel ohne Gleiten (Block unten). */
+  .nav-bottom__items {
+    margin-inline: max(0px, (100% - var(--nav-capsule-max)) / 2) auto;
+  }
+
+  .nav-bottom--minimized:not(:focus-within) .nav-bottom__items {
+    inline-size: var(--nav-pill-width, 100%);
+  }
+
+  :is(.nav-bottom--minimized, .nav-bottom--settling) .nav-bottom__items {
+    overflow: clip;
+  }
+
+  :is(.nav-bottom--minimized, .nav-bottom--settling) .nav-item {
+    flex: none;
+    inline-size: var(--nav-item-width, auto);
+  }
+
+  .nav-bottom .nav-item {
+    transition:
+      color var(--transition-fast),
+      opacity var(--duration-sm) var(--ease-out),
+      visibility var(--duration-sm),
+      translate var(--duration-md) var(--ease-out);
+  }
+
+  .nav-bottom--minimized:not(:focus-within) .nav-item:not(.nav-item--pill) {
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  .nav-bottom--minimized:not(:focus-within) .nav-item--pill {
+    translate: var(--nav-pill-shift, 0px) 0;
+  }
+
+  /* Die Tab-Pille der Leiste zeigt den Ort; in der Pille sagt es das Ziel
+   * selbst (Akzent, gefuelltes Zeichen) - eine zweite Flaeche darin stuende
+   * auf der alten Hoehe und Stelle. */
+  .nav-bottom--minimized:not(:focus-within) .nav-bottom__indicator {
     opacity: 0;
   }
 
@@ -2544,7 +2608,8 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
 }
 
 @media (max-width: 1023px) and (prefers-reduced-motion: reduce) {
-  .nav-bottom__items,
+  .nav-bottom .nav-bottom__items,
+  .nav-bottom .nav-item,
   .nav-bottom .nav-item__label,
   .page-fab:not(.page-fab-group > .page-fab),
   .page-fab-group {

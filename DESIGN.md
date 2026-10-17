@@ -2477,6 +2477,13 @@ Gemessen: `test:child-start-permissions`, `test:housekeeping-ui`, `test:dashboar
   misst minimiert und auf dem Rueckweg nicht), Nachlauf, Toasts und Mehr-Blatt stehen still.
   Reduzierte Bewegung: derselbe Wechsel ohne Gleiten. Entscheidung: `nextNavMinimized`,
   Verdrahtung `watchNavMinimize` (utils/ux.js). Guards: `test:ux-utils`, `test:mobile-chrome`.
+  **Seit R20 eine echte Pille (Ulas 2026-10-17, iOS 26 Tab-Bar-Minimize):** minimiert schrumpft
+  die Kapsel an ihrer Startkante auf das aktive Ziel (`.nav-item--pill`; Polster + hoechstens 64px
+  + Polster, 390px: 374 -> 80px breit, 56 hoch); die anderen Tabs blenden aus und nehmen keinen
+  Treffer, das aktive gleitet per `translate` an den Anfang, die Tab-Pille blendet aus. Die Tabs
+  bleiben minimiert und auf dem Rueckweg auf ihrer gemessenen Breite (`navPillGeometry`, gemessen
+  an der ausgefahrenen Kapsel), beide Raender stehen explizit - kein Layout-Shift. Ein Tipp auf die
+  Pille faehrt sie aus, ohne zu navigieren.
 - **Die Tabs stehen in jedem Modul auf denselben Koordinaten (R19, Persona Casey).** Ohne
   FAB verteilten sich die fuenf Tabs auf die volle Kapsel (62 gegen 73px bei 390px) - ein
   Budget-Reiterwechsel nach „Statistik", Belohnungen, Haushaltshilfe oder die Einstellungen

@@ -1533,6 +1533,71 @@ export function nextNavMinimized(state, { top, max, delta, gesture }) {
 }
 
 /**
+ * DIE MINIMIERTE KAPSEL IST EINE PILLE (R20, Entscheidung Ulas 2026-10-17,
+ * Messlatte iOS 26 Tab-Bar-Minimize). R19 machte sie nur flacher und gewann
+ * 8px; jetzt schrumpft sie an ihrer Startkante auf das aktive Ziel: die
+ * anderen Tabs blenden aus, das aktive gleitet per `translate` an den Anfang,
+ * die Kapsel wird so breit wie dieses eine Ziel plus ihr Polster rundum. Der
+ * FAB bleibt an seinem Platz.
+ *
+ * Reine Rechnung, damit sie ohne DOM pruefbar ist. Alle Werte stammen aus der
+ * AUSGEFAHRENEN Kapsel (gemessen vor dem Umschalten):
+ *   - `width`: Polster + Ziel (hoechstens 64px) + Polster + Rand (Border-Box)
+ *   - `shift`: wie weit das aktive Ziel zum ersten wandert (in RTL nach rechts)
+ *   - `itemWidth`: die Breite, auf der die Tabs waehrenddessen stehen bleiben -
+ *     schrumpfte ihr Flex-Slot mit, wanderten sie (und das aktive verzoege)
+ *
+ * @param {{ first: {left: number, right: number}, active: {left: number, right: number, width: number},
+ *   padStart: number, border?: number, rtl?: boolean }} m
+ * @returns {{ width: number, shift: number, itemWidth: number }}
+ */
+export const NAV_PILL_MAX_INNER = 64;
+export function navPillGeometry({ first, active, padStart, border = 0, rtl = false }) {
+  // Am Tablet ist ein Slot ~100px breit; die Pille bleibt trotzdem eine
+  // Pille (hoechstens NAV_PILL_MAX_INNER Inhalt), das Ziel steht mittig darin
+  // und ragt seitlich unter die Kante - sichtbar und tippbar bleiben 64px.
+  const inner = Math.min(active.width, NAV_PILL_MAX_INNER);
+  const centre = (active.width - inner) / 2;
+  const shift = rtl ? first.right - active.right + centre : first.left - active.left - centre;
+  return {
+    width: padStart * 2 + inner + border * 2,
+    shift,
+    itemWidth: active.width,
+  };
+}
+
+/** Ein Ziel der Kapsel, das gerade gezeichnet wird (der Kuechen-Tab fehlt je nach Modulen). */
+const isShownNavItem = (el) => Boolean(el?.classList?.contains('nav-item') && el.getClientRects?.().length);
+
+/**
+ * Misst die Pille an der ausgefahrenen Kapsel und schreibt sie als Variablen
+ * an `.nav-bottom` (layout.css liest sie im minimierten Zustand). Das aktive
+ * Ziel traegt `.nav-item--pill`. Ohne aktives Ziel (Einstellungen ueber Mehr
+ * ohne Markierung) steht das erste in der Pille.
+ * @param {Element} nav
+ */
+function measureNavPill(nav) {
+  const items = nav.querySelector?.('.nav-bottom__items');
+  if (!items) return;
+  const tabs = [...items.children].filter(isShownNavItem);
+  if (!tabs.length) return;
+  const active = tabs.find((el) => el.matches('[aria-current="page"], .nav-item--active')) ?? tabs[0];
+  const cs = getComputedStyle(items);
+  const rtl = cs.direction === 'rtl';
+  const g = navPillGeometry({
+    first: tabs[0].getBoundingClientRect(),
+    active: active.getBoundingClientRect(),
+    padStart: parseFloat(rtl ? cs.paddingRight : cs.paddingLeft) || 0,
+    border: parseFloat(cs.borderLeftWidth) || 0,
+    rtl,
+  });
+  nav.style.setProperty('--nav-pill-width', `${g.width}px`);
+  nav.style.setProperty('--nav-pill-shift', `${g.shift}px`);
+  nav.style.setProperty('--nav-item-width', `${g.itemWidth}px`);
+  for (const tab of tabs) tab.classList.toggle('nav-item--pill', tab === active);
+}
+
+/**
  * Verdrahtet `nextNavMinimized` an die Bottom-Nav. Zugehoert wird jedem
  * senkrechten Scrollport im Inhalt (`.app-content` und die eigenen Ports der
  * gedeckelten Module) - Dialoge, Blaetter und Popover zaehlen nicht, sie
@@ -1559,6 +1624,9 @@ export function watchNavMinimize(nav, { doc = document, settleMs = 450 } = {}) {
   const apply = (minimized) => {
     if (minimized === nav.classList.contains('nav-bottom--minimized')) return;
     clearTimeout(settleTimer);
+    // Gemessen wird ausgefahren - im Rueckweg (`--settling`) stehen die Tabs
+    // noch auf der alten Breite, das ist dieselbe Geometrie.
+    if (minimized) measureNavPill(nav);
     nav.classList.toggle('nav-bottom--minimized', minimized);
     doc.documentElement.classList.toggle('nav-minimized', minimized);
     // Zurueck gleitet sie ueber Zwischenhoehen - die duerfen die Zone nicht
@@ -1592,13 +1660,35 @@ export function watchNavMinimize(nav, { doc = document, settleMs = 450 } = {}) {
   doc.addEventListener('scroll', onScroll, { capture: true, passive: true });
   for (const type of GESTURES) doc.addEventListener(type, onGesture, { capture: true, passive: true });
 
+  const expand = () => { state = { minimized: false, travel: 0 }; apply(false); };
+  // EIN TIPP AUF DIE PILLE FAEHRT SIE AUS - er navigiert nicht und fuehrt
+  // auch nicht nach oben (das taete der Tipp auf den aktiven Tab). Gemerkt
+  // beim Druck: der Fokus, den der Browser dabei setzt, faehrt die Kapsel per
+  // `:focus-within` schon aus, bevor der `click` kommt.
+  let pillTap = false;
+  const onPillDown = () => { pillTap = nav.classList.contains('nav-bottom--minimized'); };
+  const onPillClick = (e) => {
+    if (!pillTap) return;
+    pillTap = false;
+    e.preventDefault();
+    e.stopPropagation();
+    expand();
+    // Bliebe der Fokus im Tab, haelt `:focus-within` die Kapsel offen, und
+    // sie minimierte beim naechsten Lesen nicht mehr.
+    if (e.detail > 0) e.target?.closest?.('.nav-item')?.blur?.();
+  };
+  nav.addEventListener?.('pointerdown', onPillDown, { capture: true, passive: true });
+  nav.addEventListener?.('click', onPillClick, { capture: true });
+
   return {
     nav,
-    expand: () => { state = { minimized: false, travel: 0 }; apply(false); },
+    expand,
     destroy: () => {
       clearTimeout(settleTimer);
       doc.removeEventListener('scroll', onScroll, { capture: true });
       for (const type of GESTURES) doc.removeEventListener(type, onGesture, { capture: true });
+      nav.removeEventListener?.('pointerdown', onPillDown, { capture: true });
+      nav.removeEventListener?.('click', onPillClick, { capture: true });
       // Der Root-Zustand gehoert der Kapsel, die ihn gesetzt hat; eine
       // Nachfolgerin beginnt ausgefahren.
       doc.documentElement.classList.remove('nav-minimized');

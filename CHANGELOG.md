@@ -172,9 +172,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   still applies within each group. On a phone, More lists the modules in grouped rows like the
   iOS Settings app, with each name on one line and waiting counts at the end of the row, instead
   of a grid with gaps.
-- **The tab bar on a phone makes room while you read.** Scrolling down shrinks it to its icons and
-  makes it flatter; scrolling up, reaching the top or the end of a page brings the labels back. The
-  add button stays, nothing on the page moves, and with reduced motion it switches without sliding.
+- **The tab bar on a phone makes room while you read.** Scrolling down shrinks it to a small pill
+  at its leading edge that shows only the tab you are on, as on iOS; scrolling up, reaching the top
+  or the end of a page, or tapping the pill brings the whole bar back. The add button stays, nothing
+  on the page moves, and with reduced motion it switches without sliding.
   The tabs also stay in the same place in every module: the bar keeps the add button's spot even
   on a page without one, so neither a tab nor the bar itself moves under your finger when you
   switch budget tabs or open Rewards.

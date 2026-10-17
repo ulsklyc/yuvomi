@@ -574,8 +574,10 @@ test('Re-Kritik: die FAB-Reserve der Kapsel steht immer - Kapselbreite und Tabs 
   const reserve = all.find((r) => !r.at.length && r.selector.trim() === '.nav-bottom__items' && decl(r.body, 'padding-inline-end'));
   assert.match(decl(reserve?.body ?? '', 'padding-inline-end') ?? '', /^calc\(var\(--fab-size\) \+ var\(--nav-fab-inset\)\)$/,
     'die Reserve ist der Knopf plus sein Abstand zur Kante');
-  assert.ok(!all.some((r) => r.selector.endsWith('.nav-bottom__items') && decl(r.body, 'inline-size')),
-    'keine eigene Breite der Kapsel ohne Knopf');
+  // Eine eigene Breite hat seit R20 nur die minimierte Pille (Test darunter);
+  // ohne Knopf bekommt die Kapsel keine.
+  assert.ok(!all.some((r) => r.selector.endsWith('.nav-bottom__items') && !r.selector.includes('nav-bottom--minimized')
+    && decl(r.body, 'inline-size')), 'keine eigene Breite der Kapsel ohne Knopf');
 });
 
 // R19 (Entscheidung Ulas 2026-10-16): DIE KAPSEL MINIMIERT BEIM LESEN.
@@ -606,6 +608,29 @@ test('R19: die Kapsel minimiert beim Abwaertsscrollen - flacher, ohne Labels, Zi
   assert.doesNotMatch(router, /!navMinimizer\)/, 'ein vorhandener Minimierer darf eine neue Kapsel nicht ausschliessen');
   assert.match(router, /function updateNav\(rawPath\) \{\n[^\n]*\n\s*navMinimizer\?\.expand\(\);/,
     'jeder Seitenwechsel beginnt mit ausgefahrener Kapsel');
+});
+
+// R20 (Entscheidung Ulas 2026-10-17, iOS 26): MINIMIERT IST DIE KAPSEL EINE PILLE.
+test('R20: minimiert schrumpft die Kapsel an ihrer Startkante auf das aktive Ziel, ohne Layout-Shift', () => {
+  const all = rules(layoutCss);
+  const compact = (r) => r.at.some((a) => /max-width:\s*1023px/.test(a));
+  const find = (sel, prop = null) => all.find((r) => compact(r) && r.selector === sel && (!prop || decl(r.body, prop)));
+  const pill = find('.nav-bottom--minimized:not(:focus-within) .nav-bottom__items', 'inline-size');
+  assert.equal(decl(pill?.body ?? '', 'inline-size'), 'var(--nav-pill-width, 100%)', 'die Kapsel wird nicht zur Pille');
+  const start = all.find((r) => compact(r) && r.selector === '.nav-bottom__items' && decl(r.body, 'margin-inline'));
+  assert.match(decl(start?.body ?? '', 'margin-inline') ?? '', /^max\(0px, \(100% - var\(--nav-capsule-max\)\) \/ 2\) auto$/,
+    'die Startkante steht nicht fest - eine Pille mit auto-Raendern zentrierte sich');
+  const frozen = find(':is(.nav-bottom--minimized, .nav-bottom--settling) .nav-item');
+  assert.equal(decl(frozen?.body ?? '', 'flex'), 'none', 'die Tabs schrumpfen mit (und wandern) - auch auf dem Rueckweg');
+  const others = find('.nav-bottom--minimized:not(:focus-within) .nav-item:not(.nav-item--pill)');
+  assert.equal(decl(others?.body ?? '', 'visibility'), 'hidden', 'ausgeblendete Tabs nehmen noch Treffer');
+  const moved = find('.nav-bottom--minimized:not(:focus-within) .nav-item--pill');
+  assert.match(decl(moved?.body ?? '', 'translate') ?? '', /var\(--nav-pill-shift/, 'das aktive Ziel wandert per translate');
+  const tr = find('.nav-bottom .nav-bottom__items', 'transition');
+  assert.match(decl(tr?.body ?? '', 'transition') ?? '', /inline-size/, 'die Breite gleitet (und schlaegt glass.css per Spezifitaet)');
+  const calm = all.filter((r) => r.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a)) && r.selector.includes('.nav-bottom .nav-item,'));
+  assert.ok(calm.some((r) => decl(r.body, 'transition') === 'none'), 'reduzierte Bewegung: die Pille entsteht ohne Gleiten');
+  assert.match(read('../public/utils/ux.js'), /if \(minimized\) measureNavPill\(nav\);/, 'gemessen wird nicht an der ausgefahrenen Kapsel');
 });
 
 // R19 (Critique 2026-10-16 P2 mobil): DIE TAB-LEISTE IST DIE TITELZEILE.
