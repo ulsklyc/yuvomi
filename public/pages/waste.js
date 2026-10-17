@@ -655,6 +655,12 @@ async function createPresetType(key, button) {
  */
 function pageModeClasses(s) {
   return {
+    // WAEHREND DES LADENS STEHT DIE SEITENSPALTE NICHT DA (R20, Re-Critique
+    // 2026-10-17 a2 P2-3: CLS mobil 0,24-0,42). Ihr Skelett stand unter dem
+    // der Abholungen und sprang nach dem Laden nach oben (Onboarding: die
+    // Abholungen fallen weg) oder schrumpfte (mit Daten). Sie erscheint jetzt
+    // mit ihrem Inhalt - Erscheinen verschiebt nichts (waste.css).
+    'waste-page--loading': Boolean(s.loading),
     'waste-page--onboarding': isOnboarding(s),
     'waste-page--no-active-type': fabIntent(s).creates === 'type',
   };
@@ -2665,6 +2671,7 @@ export async function render(container, { signal: routeSignal = null } = {}) {
   _container = container;
   state = { types: [], schedules: [], occurrences: [], sources: [], loading: true, error: null, upcomingExpanded: false };
   renderPage();
+  _container.querySelector('.waste-page')?.classList.add('waste-page--loading');
   bindEvents();
 
   await loadData();
@@ -2677,6 +2684,7 @@ export async function render(container, { signal: routeSignal = null } = {}) {
   state.loading = false;
 
   if (state.error) {
+    _container.querySelector('.waste-page')?.classList.remove('waste-page--loading');
     const host = _container.querySelector('#waste-upcoming-list');
     if (host) mountLoadError(host, { title: t('waste.loadErrorTitle'), error: state.error, onRetry: () => reloadAndRender() });
     return;

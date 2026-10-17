@@ -144,6 +144,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pinned and other notes no longer mix on wide screens.** "Other notes" starts its own row again
   below the pinned ones, so a note can no longer look pinned just because it sits under a pinned
   card. Browsers that support grid lanes pack the cards without gaps.
+- **Waste collection opens without jumping.** The column with waste
+  types used to load below the pickups and then jump up (or shrink) once the data arrived; it now
+  appears with its content.
 - **New rows and messages appear without the list jerking.** A row that comes back after "Undo",
   an unfolded group or a field message now fades in at its full size while the rows below glide
   down, instead of growing its height frame by frame, which stuttered on slower phones.

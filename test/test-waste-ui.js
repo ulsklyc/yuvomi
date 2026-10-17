@@ -885,7 +885,7 @@ test('#1775: sind alle Abfallarten archiviert, traegt die Seite die Klasse, die 
   assert.equal(archived['waste-page--no-active-type'], true, 'aber auch keine aktive Abfallart');
   assert.equal(pageModeClasses(state([]))['waste-page--no-active-type'], true, 'im Onboarding ebenso');
   assert.deepEqual(pageModeClasses(state([{ id: 1, archived: true }, { id: 2, archived: false }])),
-    { 'waste-page--onboarding': false, 'waste-page--no-active-type': false },
+    { 'waste-page--loading': false, 'waste-page--onboarding': false, 'waste-page--no-active-type': false },
     'eine aktive genuegt: der Eintrag steht');
   // Dieselbe Regel wie der Primaerknopf - der Eintrag fehlt genau dann, wenn
   // sein Klick eine Abfallart anlegen wuerde.
@@ -1043,4 +1043,18 @@ test('D5: im Onboarding steht der Import nur im Leerzustand, nicht zusaetzlich i
   }
   assert.match(WASTE_SRC, /class="btn btn--ghost waste-onboarding__import" data-action="open-import"/,
     'der Leerzustand behaelt den Import als leisen Link');
+});
+
+// R20 (Re-Critique 2026-10-17 a2 P2-3): CLS 0,24 mobil (gemessen bis 0,42):
+// das Skelett der Seitenspalte stand unter dem der Abholungen und sprang nach
+// dem Laden. Waehrend des Ladens steht die Spalte nicht da.
+test('R20: waehrend des Ladens steht die Seitenspalte nicht da (kein Sprung nach dem Laden)', () => {
+  const { pageModeClasses } = __test;
+  assert.equal(pageModeClasses({ loading: true, error: null, types: [] })['waste-page--loading'], true);
+  assert.equal(pageModeClasses({ loading: false, error: null, types: [] })['waste-page--loading'], false);
+  const css = readFileSync(new URL('../public/styles/waste.css', import.meta.url), 'utf8');
+  assert.match(css, /\.waste-page--loading \.page-columns__rail \{\s*display: none;/);
+  const src = readFileSync(new URL('../public/pages/waste.js', import.meta.url), 'utf8');
+  assert.match(src, /renderPage\(\);\s*_container\.querySelector\('\.waste-page'\)\?\.classList\.add\('waste-page--loading'\);/, 'die Klasse steht ab dem ersten Bild');
+  assert.match(src, /if \(state\.error\) \{\s*_container\.querySelector\('\.waste-page'\)\?\.classList\.remove\('waste-page--loading'\);/, 'ein Ladefehler gibt die Spalte frei');
 });

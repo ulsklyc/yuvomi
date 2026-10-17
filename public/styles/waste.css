@@ -629,6 +629,13 @@
   }
 }
 
+/* Laden: die Seitenspalte erscheint erst mit ihrem Inhalt (pageModeClasses,
+   waste.js). Ihr Skelett wanderte nach dem Laden - gemessen 390px CLS 0,42,
+   834px 0,38, 1440px 0,22. */
+.waste-page--loading .page-columns__rail {
+  display: none;
+}
+
 /* Der Abstand der Abschnitte bleibt der des Seitenkoerpers vor dem Raster. */
 .waste-page {
   --page-columns-gap: var(--space-3);
