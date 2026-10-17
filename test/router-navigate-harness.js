@@ -17,7 +17,7 @@
  * laut, nicht still.
  */
 import { unknownPathDetour, publicPathDetour, detourPaths } from '../public/utils/unknown-route.js';
-import { createNavigate } from '../public/utils/router-navigate.js';
+import { createNavigate, unlessAborted } from '../public/utils/router-navigate.js';
 
 /** Routen wie in der Tabelle des Routers: Pfad, Anmeldepflicht, Modul. */
 export const HARNESS_ROUTES = Object.freeze([
@@ -44,6 +44,9 @@ export const HARNESS_ROUTES = Object.freeze([
  * @param {{ search?: string, hash?: string }} [options.location]
  * @param {() => Promise<boolean>} [options.leaveGuard] - Verlassen-Schutz; fehlt er, gibt es keinen
  * @param {(route: object) => Promise<void>} [options.onRender] - haelt das Rendern an
+ * @param {(route: object) => Promise<void>} [options.onPageRender] - der Rest von
+ *   `module.render()` NACH dem Tausch (Daten); haelt die Navigation an, bis er
+ *   fertig ist oder sie ueberholt wird
  * @param {() => void} [options.armScreensaver] - die echte Komponente statt der Attrappe (#1919)
  */
 export function createNavigateHarness({
@@ -57,11 +60,12 @@ export function createNavigateHarness({
   location = {},
   leaveGuard = null,
   onRender = null,
+  onPageRender = null,
   armScreensaver = null,
   routes = HARNESS_ROUTES,
 } = {}) {
   /** Was nach aussen sichtbar wurde, in der Reihenfolge des Geschehens. */
-  const log = { rendered: [], history: [], toasts: [], leaveAsked: [], authCalls: 0, unreachable: [] };
+  const log = { rendered: [], swapped: [], history: [], toasts: [], leaveAsked: [], authCalls: 0, unreachable: [] };
   let shell = false;
 
   const env = {
@@ -133,6 +137,13 @@ export function createNavigateHarness({
       // Wie renderPage(): die Shell - und mit ihr die Toast-Flaeche - gibt es
       // nur auf Seiten mit Anmeldung.
       shell = route.requiresAuth;
+      // Wie renderPage(): die Seite ist getauscht, ihr render() laeuft. Auf den
+      // Rest wartet der Router nur, bis die Navigation ueberholt ist (Review
+      // #2049) - dieselbe Funktion wie dort.
+      if (onPageRender) {
+        log.swapped.push(route.path);
+        if (!(await unlessAborted(onPageRender(route), signal))) return true;
+      }
       log.rendered.push(route.path);
       return true;
     },

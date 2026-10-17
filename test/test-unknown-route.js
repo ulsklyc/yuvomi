@@ -444,6 +444,63 @@ test('laufende Sitzung: der letzte Tipp gewinnt - das ueberholte Ziel rendert ni
   assert.equal(env.isNavigating, false);
 });
 
+/*
+ * Review #2049: ueberholt wird auch NACH dem Tausch. Hat swap() das render()
+ * des ersten Ziels schon gestartet, wartete renderPage() trotzdem darauf - und
+ * Seiten wie der Kalender rufen ihr erstes api.get() ohne Signal. Ein
+ * haengender Abruf hielt den neueren Tipp unbegrenzt auf. Jetzt endet das
+ * Warten mit dem Abbruch.
+ */
+const within = (promise, ms, label) => Promise.race([
+  promise.then(() => 'fertig'),
+  new Promise((resolve) => { setTimeout(() => resolve(`${label}: haengt`), ms); }),
+]);
+
+test('laufende Sitzung: ein render(), das nie fertig wird, haelt den neueren Tipp nicht auf', async () => {
+  const never = new Promise(() => {});
+  const { navigate, log, env, setShell } = createNavigateHarness({
+    user: MEMBER,
+    onPageRender: (route) => (route.path === '/budget' ? never : undefined),
+  });
+  setShell(true);
+  const first = navigate('/budget');
+  await settle();
+  assert.deepEqual(log.swapped, ['/budget'], 'die erste Seite ist getauscht, ihr render() laeuft');
+  assert.equal(env.isNavigating, true);
+  const second = navigate('/tasks');
+  assert.equal(await within(second, 500, 'zweiter Tipp'), 'fertig', 'der zweite Tipp kommt an');
+  assert.equal(await within(first, 50, 'erste Navigation'), 'fertig');
+  assert.deepEqual(log.swapped, ['/budget', '/tasks']);
+  assert.deepEqual(log.rendered, ['/tasks'], 'das ueberholte Ziel gilt nicht als fertig gerendert');
+  assert.equal(env.currentPath, '/tasks');
+  assert.equal(env.isNavigating, false);
+  // Die erste Seite stand schon - ihr Eintrag bleibt, der zweite kommt dazu.
+  assert.deepEqual(log.history, [['push', '/budget'], ['push', '/tasks']]);
+});
+
+test('unlessAborted: endet mit dem Abbruch, gibt sonst Wert und Fehler weiter', async () => {
+  const { unlessAborted } = await import('../public/utils/router-navigate.js');
+  assert.equal(await unlessAborted(Promise.resolve(1), null), true, 'ohne Signal: wie await');
+  assert.equal(await unlessAborted(Promise.resolve(1), new AbortController().signal), true);
+  await assert.rejects(unlessAborted(Promise.reject(new Error('kaputt')), new AbortController().signal), /kaputt/,
+    'ein Fehler vor dem Abbruch bleibt ein Fehler (renderPage zeigt ihn)');
+  const run = new AbortController();
+  const waiting = unlessAborted(new Promise(() => {}), run.signal);
+  run.abort();
+  assert.equal(await within(waiting, 200, 'Abbruch'), 'fertig');
+  assert.equal(await waiting, false, 'abgebrochen heisst false');
+  // Ein Fehler NACH dem Abbruch (die Seite bricht ihr Laden ab) wird verschluckt.
+  const late = new AbortController();
+  let fail;
+  const failing = unlessAborted(new Promise((_r, reject) => { fail = reject; }), late.signal);
+  late.abort();
+  fail(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+  assert.equal(await failing, false);
+  const done = new AbortController();
+  done.abort();
+  assert.equal(await unlessAborted(new Promise(() => {}), done.signal), false, 'schon abgebrochen');
+});
+
 test('ein Sitzungsende geht dem wartenden Tipp vor', async () => {
   let release;
   const held = new Promise((resolve) => { release = resolve; });
@@ -584,9 +641,17 @@ test('renderPage: ein ueberholtes Ziel rendert nach dem Laden nichts, sein Blatt
   const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
   const render = router.slice(router.indexOf('async function renderPage('));
   assert.match(render, /^async function renderPage\(route, previousPath = null, scrollTarget = 0, \{ signal = null \} = \{\}\)/);
-  assert.match(render, /style\.ready,\s*\]\);[\s\S]{0,400}?if \(signal\?\.aborted\) \{\s*style\.abandon\(\);\s*return false;\s*\}/,
-    'nach importPage/style.ready fragt renderPage nicht, ob es ueberholt ist');
+  // Seit Review #2049 endet schon das Warten auf Modul und Blatt mit dem
+  // Abbruch (unlessAborted), nicht erst die Frage danach.
+  assert.match(render, /style\.ready,\s*\]\);[\s\S]{0,600}?const loaded = await unlessAborted\(loading, signal\);\s*if \(!loaded \|\| signal\?\.aborted\) \{\s*style\.abandon\(\);\s*return false;\s*\}/,
+    'nach importPage/style.ready fragt renderPage nicht, ob es ueberholt ist - oder wartet blank darauf');
   assert.match(render, /signal\?\.addEventListener\('abort', \(\) => _pageController\?\.abort\(\), \{ once: true \}\);\s*const \{ transition, finished \} = await swapPage/);
+  // Review #2049: auch auf den Rest von render() wartet renderPage nur, bis es
+  // ueberholt ist - ein blankes `await renderPromise` hielt den neueren Tipp auf.
+  assert.doesNotMatch(render.slice(0, render.indexOf('\n}\n')), /await renderPromise/,
+    'renderPage wartet blank auf render() - ein haengender Abruf blockiert den naechsten Tipp');
+  assert.match(render, /if \(!\(await unlessAborted\(renderPromise, signal\)\)\) return true;/,
+    'ueberholt nach dem Tausch: renderPage kehrt zurueck, ohne die Seite fertigzustellen');
   const style = router.slice(router.indexOf('function loadPageStyle('), router.indexOf('function loadPageStyle(') + 1600);
   assert.equal((style.match(/abandon:/g) ?? []).length, 3, 'jede Antwort von loadPageStyle() kann ihr Blatt zuruecknehmen');
   assert.match(style, /abandon: \(\) => \{\s*link\.remove\(\);\s*if \(activePageStyle === link\) activePageStyle = oldLink;/);

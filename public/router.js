@@ -18,7 +18,7 @@ import { wireScrollFade, wireCollapsingHeader, watchNavCapsuleHeight, bindNavMin
 import { TOAST_SURFACES } from '/utils/toast-surface.js';
 import { showToast } from '/utils/toast-show.js';
 import { unknownPathDetour, publicPathDetour, detourPaths } from '/utils/unknown-route.js';
-import { createNavigate, prefetchPathOf, focusMainAfterNavigation } from '/utils/router-navigate.js';
+import { createNavigate, prefetchPathOf, focusMainAfterNavigation, unlessAborted } from '/utils/router-navigate.js';
 import { pageMountTarget } from '/utils/page-mount.js';
 import { friendlyError } from '/utils/friendly-error.js';
 import { BULK_PILL_LAYER, clearBulkPill } from '/utils/bulk-pill.js';
@@ -1527,18 +1527,22 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
 
   try {
     const style = loadPageStyle(route.thirdPartyModule ? null : route.module, route.style);
-    const [module] = await Promise.all([
+    const loading = Promise.all([
       importPage(route.page),
       style.ready,
     ]);
 
     // UEBERHOLT (Critique R19, Nachlese 1b): waehrend Modul und Blatt luden,
     // hat jemand ein anderes Ziel angetippt. Dieses Modul rendert nichts mehr;
-    // sein Blatt geht wieder, und das der stehenden Seite bleibt.
-    if (signal?.aborted) {
+    // sein Blatt geht wieder, und das der stehenden Seite bleibt. Gewartet
+    // wird nur bis zum Abbruch - ein langsames Modul haelt den neueren Tipp
+    // nicht auf (Review #2049).
+    const loaded = await unlessAborted(loading, signal);
+    if (!loaded || signal?.aborted) {
       style.abandon();
       return false;
     }
+    const [module] = await loading;
 
     if (typeof module.render !== 'function') {
       throw new Error(`Seite ${route.page} exportiert keine render()-Funktion.`);
@@ -1733,7 +1737,14 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
       document.documentElement.classList.remove('navigating');
     }
 
-    await renderPromise;
+    // UEBERHOLT NACH DEM TAUSCH (Review #2049): der Rest von render() laedt
+    // Daten, und nicht jede Seite haengt ihren ersten Abruf an das Signal. Das
+    // Warten endet deshalb mit dem Abbruch, sonst hielte ein haengender Abruf
+    // den neueren Tipp auf. Die Seite steht schon (Eintrag bleibt, `true`);
+    // fertiggestellt wird sie nicht mehr - kein Scroll-Restore, keine
+    // Soft-Update-Freigabe, kein FAB, keine Ansage. Die naechste Navigation
+    // tauscht sie aus.
+    if (!(await unlessAborted(renderPromise, signal))) return true;
 
     // Browser-Zurück/-Vor: gemerkten Stand wiederherstellen, jetzt wo der Inhalt
     // seine volle Höhe hat. Best effort - ist die Seite kürzer als beim Verlassen

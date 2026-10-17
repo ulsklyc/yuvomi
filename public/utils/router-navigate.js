@@ -122,6 +122,42 @@ export function focusMainAfterNavigation(path, { document, requestAnimationFrame
 }
 
 /**
+ * Wartet auf `promise`, bis es fertig ist ODER `signal` abbricht (Review
+ * #2049). renderPage() wartete blank auf `module.render()`, auch wenn die
+ * Navigation laengst ueberholt war - und Seiten wie der Kalender rufen ihr
+ * erstes api.get() ohne Signal: ein haengender Abruf hielt den neueren Tipp
+ * unbegrenzt auf, denn der wartende startet erst im finally von navigate().
+ *
+ * Ein Fehler VOR dem Abbruch bleibt ein Fehler (renderPage zeigt ihn). Einer
+ * DANACH - die Seite bricht ihr Laden ab - wird geschluckt: niemand wartet
+ * mehr darauf, und als unbehandelte Ablehnung waere er nur Rauschen.
+ *
+ * @param {Promise<unknown>|unknown} promise
+ * @param {AbortSignal|null} signal
+ * @returns {Promise<boolean>} true, wenn fertig; false, wenn abgebrochen
+ */
+export function unlessAborted(promise, signal) {
+  const work = Promise.resolve(promise);
+  if (!signal) return work.then(() => true);
+  if (signal.aborted) {
+    work.catch(() => {});
+    return Promise.resolve(false);
+  }
+  return new Promise((resolve, reject) => {
+    const onAbort = () => resolve(false);
+    signal.addEventListener('abort', onAbort, { once: true });
+    work.then(
+      () => { signal.removeEventListener('abort', onAbort); resolve(true); },
+      (err) => {
+        signal.removeEventListener('abort', onAbort);
+        if (signal.aborted) resolve(false);
+        else reject(err);
+      },
+    );
+  });
+}
+
+/**
  * @param {object} state - der geteilte Zustand, Felder wie in NAVIGATE_STATE
  * @param {object} deps - Abhaengigkeiten, Namen wie in NAVIGATE_DEPS
  * @returns {(path: string, userOrPushState?: object|boolean, pushState?: boolean) => Promise<void>}
