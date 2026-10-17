@@ -3194,7 +3194,8 @@
         "displayRemoveDeviceActive": "Questo dispositivo è ancora associato. Revocalo prima.",
         "feedExportIncludeBirthdays": "Includi compleanni",
         "feedExportIncludeBirthdaysHint": "Disattiva questa opzione con un abbonamento separato ai compleanni per evitare compleanni e onomastici duplicati.",
-        "birthdayFeedHint": "Chiunque abbia questo link può vedere tutti i compleanni e gli onomastici salvati nella famiglia, anche senza promemoria. Usalo solo sui tuoi dispositivi."
+        "birthdayFeedHint": "Chiunque abbia questo link può vedere tutti i compleanni e gli onomastici salvati nella famiglia, anche senza promemoria. Usalo solo sui tuoi dispositivi.",
+        "skipToSheet": "Vai all’impostazione"
     },
     "login": {
         "tagline": "Bentornato nel tuo pianificatore familiare.",

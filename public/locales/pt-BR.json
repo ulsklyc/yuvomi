@@ -3194,7 +3194,8 @@
         "displayRemoveDeviceActive": "Este dispositivo ainda está pareado. Revogue-o primeiro.",
         "feedExportIncludeBirthdays": "Incluir aniversários",
         "feedExportIncludeBirthdaysHint": "Desative ao assinar o calendário separado de aniversários para evitar aniversários e dias do nome duplicados.",
-        "birthdayFeedHint": "Qualquer pessoa com este link pode ver todos os aniversários e dias do nome salvos na família, mesmo sem lembretes. Use apenas nos seus próprios dispositivos."
+        "birthdayFeedHint": "Qualquer pessoa com este link pode ver todos os aniversários e dias do nome salvos na família, mesmo sem lembretes. Use apenas nos seus próprios dispositivos.",
+        "skipToSheet": "Ir para a configuração"
     },
     "login": {
         "tagline": "Bem-vindo de volta ao seu planejador familiar.",

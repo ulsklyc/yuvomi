@@ -3194,7 +3194,8 @@
         "displayRemoveDeviceActive": "这台设备仍处于配对状态。请先撤销它。",
         "feedExportIncludeBirthdays": "包含生日",
         "feedExportIncludeBirthdaysHint": "订阅独立生日订阅源时关闭此选项，避免生日和命名日重复显示。",
-        "birthdayFeedHint": "任何拥有此链接的人都可以查看家庭中保存的所有生日和命名日，包括已关闭提醒的记录。请仅在您自己的设备上使用。"
+        "birthdayFeedHint": "任何拥有此链接的人都可以查看家庭中保存的所有生日和命名日，包括已关闭提醒的记录。请仅在您自己的设备上使用。",
+        "skipToSheet": "跳到设置"
     },
     "login": {
         "tagline": "欢迎回到您的家庭计划工具。",

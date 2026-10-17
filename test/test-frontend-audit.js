@@ -21966,3 +21966,19 @@ test('R20: ein leerer Tag gibt den Fokus an seinen Hinweis, nicht an den Reiter'
   assert.match(fn, /\?\? body\?\.querySelector\('#day-empty-hint'\)/, 'ohne Eintrag der Hinweis');
   assert.ok(fn.indexOf('#day-empty-hint') < fn.indexOf('#cal-view-tab-day'), 'der Reiter ist nur noch der letzte Rueckfall');
 });
+
+// R20 D7 (Re-Critique 2026-10-17, A5 Sam): am Desktop 30 Tab-Stopps (Suche und
+// Seitenleiste) vor dem ersten Feld eines Einstellungsblatts. Eine Sprungmarke
+// steht als erster Stopp der Leiste und fuehrt ins Blatt.
+test('R20: die Einstellungsleiste beginnt mit einer Sprungmarke ins Blatt', () => {
+  const shell = read('../public/settings/shell.js');
+  const nav = shell.slice(shell.indexOf('function createNavigation('), shell.indexOf('function createSheetSkipLink('));
+  assert.match(nav, /createNavigationSearch\([^)]*\);\s*navigation\.prepend\(createSheetSkipLink\(\)\);/, 'VOR der Suche, also der erste Stopp');
+  const skip = shell.slice(shell.indexOf('function createSheetSkipLink('), shell.indexOf('const SKIP_TARGET'));
+  assert.match(skip, /link\.className = 'sr-only settings-shell__skip'/, 'dasselbe Muster wie die Marke der Shell');
+  assert.match(skip, /event\.preventDefault\(\)/, 'ein Fokuswechsel, kein Hash');
+  assert.match(skip, /first\.focus\(\)/);
+  assert.match(shell, /content\.id = 'settings-sheet';/);
+  const css = [...eachRule(read('../public/styles/settings.css'))];
+  assert.ok(css.some((r) => r.selector.trim() === '.settings-page:not(.settings-page--leaf) .settings-shell__skip' && /display:\s*none/.test(r.body)), 'ohne Blatt keine Marke');
+});

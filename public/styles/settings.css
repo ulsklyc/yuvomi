@@ -4070,3 +4070,11 @@
   color: var(--color-text-secondary);
   font-size: var(--text-xs);
 }
+
+/* Die Sprungmarke zum Blatt (R20, settings/shell.js createSheetSkipLink)
+ * gilt nur, wo ein Blatt NEBEN der Leiste steht. Auf der Uebersicht gibt es
+ * keins - dort waere sie ein Stopp, der nirgends hinfuehrt. Schmal steht die
+ * Leiste beim Blatt ohnehin nicht da. */
+.settings-page:not(.settings-page--leaf) .settings-shell__skip {
+  display: none;
+}

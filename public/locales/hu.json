@@ -3194,7 +3194,8 @@
         "displayRemoveDeviceActive": "Ez az eszköz még párosítva van. Előbb vond vissza.",
         "feedExportIncludeBirthdays": "Születésnapok felvétele",
         "feedExportIncludeBirthdaysHint": "Külön születésnapi naptárra feliratkozva kapcsolja ki, hogy a születésnapok és névnapok ne jelenjenek meg kétszer.",
-        "birthdayFeedHint": "A hivatkozás birtokában bárki láthatja a háztartás összes mentett születésnapját és névnapját, emlékeztető nélkül is. Csak saját eszközein használja."
+        "birthdayFeedHint": "A hivatkozás birtokában bárki láthatja a háztartás összes mentett születésnapját és névnapját, emlékeztető nélkül is. Csak saját eszközein használja.",
+        "skipToSheet": "Ugrás a beállításhoz"
     },
     "login": {
         "tagline": "Üdv újra a családi tervezőben.",

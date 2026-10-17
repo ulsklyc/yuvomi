@@ -3295,7 +3295,8 @@
         "displayRemoveDeviceActive": "Toto zařízení je stále spárované. Nejprve ho odvolejte.",
         "feedExportIncludeBirthdays": "Zahrnout narozeniny",
         "feedExportIncludeBirthdaysHint": "Při samostatném odběru narozenin vypněte tuto možnost, aby se narozeniny a svátky nezobrazovaly dvakrát.",
-        "birthdayFeedHint": "Kdokoli s tímto odkazem uvidí všechny narozeniny a svátky uložené v domácnosti, i bez připomínek. Používejte jej pouze na vlastních zařízeních."
+        "birthdayFeedHint": "Kdokoli s tímto odkazem uvidí všechny narozeniny a svátky uložené v domácnosti, i bez připomínek. Používejte jej pouze na vlastních zařízeních.",
+        "skipToSheet": "Přejít k nastavení"
     },
     "login": {
         "tagline": "Vítejte zpět ve svém rodinném plánovači.",

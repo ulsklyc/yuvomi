@@ -3210,7 +3210,8 @@
         "displayRemoveDeviceActive": "Dieses Gerät ist noch gekoppelt. Widerrufe es zuerst.",
         "feedExportIncludeBirthdays": "Geburtstage einschließen",
         "feedExportIncludeBirthdaysHint": "Bei einem separaten Geburtstagsabo ausschalten, damit Geburtstage und Namenstage nicht doppelt erscheinen.",
-        "birthdayFeedHint": "Wer diesen Link hat, kann alle im Haushalt gespeicherten Geburtstage und Namenstage sehen, auch ohne Erinnerung. Nur auf eigenen Geräten verwenden."
+        "birthdayFeedHint": "Wer diesen Link hat, kann alle im Haushalt gespeicherten Geburtstage und Namenstage sehen, auch ohne Erinnerung. Nur auf eigenen Geräten verwenden.",
+        "skipToSheet": "Zur Einstellung springen"
     },
     "login": {
         "tagline": "Willkommen zurück bei deinem Familienplaner.",

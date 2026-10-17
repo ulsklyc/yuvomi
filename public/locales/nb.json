@@ -3194,7 +3194,8 @@
         "displayRemoveDeviceActive": "Denne enheten er fortsatt paret. Trekk den tilbake først.",
         "feedExportIncludeBirthdays": "Ta med fødselsdager",
         "feedExportIncludeBirthdaysHint": "Slå av når du abonnerer på den separate fødselsdagskalenderen for å unngå doble fødselsdager og navnedager.",
-        "birthdayFeedHint": "Alle med lenken kan se alle lagrede fødselsdager og navnedager i husholdningen, også uten påminnelser. Bruk den bare på dine egne enheter."
+        "birthdayFeedHint": "Alle med lenken kan se alle lagrede fødselsdager og navnedager i husholdningen, også uten påminnelser. Bruk den bare på dine egne enheter.",
+        "skipToSheet": "Gå til innstillingen"
     },
     "login": {
         "tagline": "Velkommen tilbake til familieplanleggeren din.",

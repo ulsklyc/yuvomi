@@ -287,8 +287,46 @@ function createNavigation(domains, user, activeLeaf) {
   }
 
   createNavigationSearch(navigation, domains, user, activeLeaf);
+  navigation.prepend(createSheetSkipLink());
   return navigation;
 }
+
+/**
+ * DIE SPRUNGMARKE ZUM BLATT (R20, Re-Critique 2026-10-17 A5, Sam). Am Desktop
+ * standen vor dem ersten Feld eines Blatts 30 Tab-Stopps: die Suche und alle
+ * Eintraege der Seitenleiste. Dasselbe Muster wie „Zum Inhalt springen" der
+ * Shell und „Zu den Dokumenten": `.sr-only`, sichtbar nur bei Tastaturfokus
+ * (layout.css, `.sr-only:focus-visible`), als ERSTER Stopp der Leiste.
+ * Kein Roving: die Eintraege sind Links in einer Navigation, und eine Liste,
+ * die nur noch mit Pfeilen geht, nimmt dem Screenreader die Linkliste.
+ *
+ * Ziel ist das erste Bedienelement des Blatts, sonst das Blatt selbst. Ohne
+ * Blatt (Uebersicht) und ohne Seitenleiste daneben (schmal, Drill-down)
+ * blendet settings.css die Marke aus - dort gibt es nichts zu ueberspringen.
+ * Ohne Hash: der Sprung ist ein Fokuswechsel, kein Ort fuer Zurueck.
+ */
+function createSheetSkipLink() {
+  const link = document.createElement('a');
+  link.className = 'sr-only settings-shell__skip';
+  link.href = '#settings-sheet';
+  link.textContent = t('settings.skipToSheet');
+  link.addEventListener('click', (event) => {
+    event.preventDefault();
+    const content = link.closest('.settings-shell')?.querySelector('.settings-shell__content');
+    if (!content) return;
+    const first = [...content.querySelectorAll(SKIP_TARGET)]
+      .find((el) => !el.disabled && el.getClientRects().length > 0 && !el.closest('[inert], [hidden]'));
+    if (first) {
+      first.focus();
+      return;
+    }
+    content.setAttribute('tabindex', '-1');
+    content.focus();
+  });
+  return link;
+}
+
+const SKIP_TARGET = 'a[href], button, input:not([type="hidden"]), select, textarea, [tabindex]:not([tabindex="-1"])';
 
 /**
  * Die Seitenleiste scrollt fuer sich (settings.css): das aktive Blatt muss in
@@ -1228,6 +1266,7 @@ export async function renderSettingsShell(container, {
     const navigation = createNavigation(domains, user, activeLeaf);
     content = document.createElement('div');
     content.className = 'settings-shell__content';
+    content.id = 'settings-sheet';
     shell.append(navigation, content);
     body.appendChild(shell);
     page.append(toolbar, body);

@@ -3194,7 +3194,8 @@
         "displayRemoveDeviceActive": "Cet appareil est encore appairé. Révoquez-le d'abord.",
         "feedExportIncludeBirthdays": "Inclure les anniversaires",
         "feedExportIncludeBirthdaysHint": "Désactivez cette option avec un abonnement séparé aux anniversaires pour éviter les doublons des anniversaires et fêtes.",
-        "birthdayFeedHint": "Toute personne disposant de ce lien peut voir tous les anniversaires et fêtes enregistrés dans le foyer, même sans rappel. Utilisez-le uniquement sur vos propres appareils."
+        "birthdayFeedHint": "Toute personne disposant de ce lien peut voir tous les anniversaires et fêtes enregistrés dans le foyer, même sans rappel. Utilisez-le uniquement sur vos propres appareils.",
+        "skipToSheet": "Aller au réglage"
     },
     "login": {
         "tagline": "Bon retour sur votre planificateur familial.",

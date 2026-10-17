@@ -307,6 +307,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Settings: one key press from the list to the page.** On a computer some 30 Tab presses stood
+  between the top of Settings and the first field of a page, through the search and every entry of
+  the list. The first Tab now offers "Skip to the setting", which takes you straight to the page.
+
 - **The keyboard focus stays where you work in the calendar.** Pressing Enter on an empty day in the
   month opens that day with the focus on its "No events yet" note instead of the view tabs at the top.
   A dialog opened with "n" and then discarded returns the focus to the "New" button, in every module,

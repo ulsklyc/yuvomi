@@ -3194,7 +3194,8 @@
         "displayRemoveDeviceActive": "Dit apparaat is nog gekoppeld. Trek het eerst in.",
         "feedExportIncludeBirthdays": "Verjaardagen opnemen",
         "feedExportIncludeBirthdaysHint": "Schakel dit uit bij een apart verjaardagsabonnement om dubbele verjaardagen en naamdagen te voorkomen.",
-        "birthdayFeedHint": "Iedereen met deze link kan alle opgeslagen verjaardagen en naamdagen van het huishouden zien, ook zonder herinnering. Gebruik de link alleen op je eigen apparaten."
+        "birthdayFeedHint": "Iedereen met deze link kan alle opgeslagen verjaardagen en naamdagen van het huishouden zien, ook zonder herinnering. Gebruik de link alleen op je eigen apparaten.",
+        "skipToSheet": "Naar de instelling"
     },
     "login": {
         "tagline": "Welkom terug bij je gezinsplanner.",

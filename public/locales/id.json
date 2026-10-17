@@ -3210,7 +3210,8 @@
         "displayRemoveDeviceActive": "Perangkat ini masih dipasangkan. Cabut dulu.",
         "feedExportIncludeBirthdays": "Sertakan ulang tahun",
         "feedExportIncludeBirthdaysHint": "Nonaktifkan saat berlangganan feed ulang tahun terpisah agar ulang tahun dan hari nama tidak muncul dua kali.",
-        "birthdayFeedHint": "Siapa pun yang memiliki tautan ini dapat melihat semua ulang tahun dan hari nama tersimpan dalam rumah tangga, termasuk tanpa pengingat. Gunakan hanya di perangkat Anda sendiri."
+        "birthdayFeedHint": "Siapa pun yang memiliki tautan ini dapat melihat semua ulang tahun dan hari nama tersimpan dalam rumah tangga, termasuk tanpa pengingat. Gunakan hanya di perangkat Anda sendiri.",
+        "skipToSheet": "Langsung ke pengaturan"
     },
     "login": {
         "tagline": "Selamat datang kembali di perencana keluarga Anda.",

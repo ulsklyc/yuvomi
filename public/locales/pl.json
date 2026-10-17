@@ -3412,7 +3412,8 @@
         "displayRemoveDeviceActive": "To urządzenie jest nadal sparowane. Najpierw je unieważnij.",
         "feedExportIncludeBirthdays": "Uwzględniaj urodziny",
         "feedExportIncludeBirthdaysHint": "Wyłącz przy osobnej subskrypcji urodzin, aby uniknąć podwójnych urodzin i imienin.",
-        "birthdayFeedHint": "Każdy, kto ma ten link, może zobaczyć wszystkie urodziny i imieniny zapisane w gospodarstwie domowym, także bez przypomnień. Używaj go tylko na własnych urządzeniach."
+        "birthdayFeedHint": "Każdy, kto ma ten link, może zobaczyć wszystkie urodziny i imieniny zapisane w gospodarstwie domowym, także bez przypomnień. Używaj go tylko na własnych urządzeniach.",
+        "skipToSheet": "Przejdź do ustawienia"
     },
     "login": {
         "tagline": "Witaj ponownie w swoim planerze rodzinnym.",

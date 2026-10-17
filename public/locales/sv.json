@@ -3194,7 +3194,8 @@
         "displayRemoveDeviceActive": "Den här enheten är fortfarande parkopplad. Återkalla den först.",
         "feedExportIncludeBirthdays": "Inkludera födelsedagar",
         "feedExportIncludeBirthdaysHint": "Stäng av när du prenumererar på det separata födelsedagsflödet för att undvika dubbla födelsedagar och namnsdagar.",
-        "birthdayFeedHint": "Alla med länken kan se alla sparade födelsedagar och namnsdagar i hushållet, även utan påminnelser. Använd den bara på dina egna enheter."
+        "birthdayFeedHint": "Alla med länken kan se alla sparade födelsedagar och namnsdagar i hushållet, även utan påminnelser. Använd den bara på dina egna enheter.",
+        "skipToSheet": "Gå till inställningen"
     },
     "login": {
         "tagline": "Välkommen tillbaka till din familjeplanerare.",
