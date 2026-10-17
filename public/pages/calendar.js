@@ -5029,7 +5029,17 @@ let _upNext = { events: null, loading: null, day: null, error: null };
 let _sidebarObserver = null;
 
 function sidebarWanted() {
-  return state.view !== 'agenda' && !searchActive;
+  return !searchActive;
+}
+
+/**
+ * „Als Naechstes" gehoert nicht in die Agenda (R20): die Liste daneben IST,
+ * was als Naechstes ansteht. Mini-Monat und Filter bleiben - und mit ihnen
+ * die Spalte: vorher fiel die Leiste in der Agenda ganz weg, und der Inhalt
+ * sprang beim Ansichtswechsel von x 536 auf 220 (1920px, Re-Critique 2026-10-17).
+ */
+function upNextWanted() {
+  return state.view !== 'agenda';
 }
 
 /** Steht die Spalte (Container-Abfrage) - oder ist sie unter der Schwelle verborgen? */
@@ -5187,7 +5197,7 @@ function renderSidebar() {
   page.classList.toggle('has-cal-sidebar', wanted);
   aside.hidden = !wanted;
   if (!sidebarShown(aside)) { aside.replaceChildren(); return; }
-  if (upNextNeedsLoad()) loadUpNext();
+  if (upNextWanted() && upNextNeedsLoad()) loadUpNext();
 
   const active = document.activeElement;
   let refocus = null;
@@ -5197,7 +5207,7 @@ function renderSidebar() {
     }
   }
   aside.replaceChildren();
-  aside.insertAdjacentHTML('beforeend', miniMonthHtml() + sidebarFiltersHtml() + upNextHtml());
+  aside.insertAdjacentHTML('beforeend', miniMonthHtml() + sidebarFiltersHtml() + (upNextWanted() ? upNextHtml() : ''));
   window.lucide?.createIcons({ el: aside });
   if (refocus) aside.querySelector(refocus)?.focus();
 }

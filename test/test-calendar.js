@@ -6117,7 +6117,7 @@ test('Seitenleiste: erst ab 86.25rem Kalenderflaeche, nur mit Leiste rueckt die 
   assert(/display:\s*none/.test(base?.body ?? ''), 'unter der Schwelle steht keine Leiste');
   const wide = rules.filter((r) => r.at.some((a) => /@container cal-page \(min-width: 86\.25rem\)/.test(a)));
   assert(wide.length >= 3 && wide.every((r) => r.selector.includes('.calendar-page.has-cal-sidebar')),
-    'jede Regel der Leiste haengt an has-cal-sidebar - Agenda und Suche bleiben auf der Inhaltsspalte');
+    'jede Regel der Leiste haengt an has-cal-sidebar - die Suche bleibt auf der Inhaltsspalte');
   assert(rules.some((r) => r.selector.trim() === '.calendar-page' && /container:\s*cal-page\s*\/\s*inline-size/.test(r.body)), 'die Seite ist der Container');
   const leiste = wide.find((r) => /\.cal-sidebar:not\(\[hidden\]\)/.test(r.selector));
   assert(/overflow-y:\s*auto/.test(leiste?.body ?? '') && /scrollbar-gutter:\s*stable/.test(leiste?.body ?? ''),
@@ -6128,7 +6128,13 @@ test('Seitenleiste: erst ab 86.25rem Kalenderflaeche, nur mit Leiste rueckt die 
   assert(/font-weight:\s*var\(--font-weight-bold\)/.test(label?.body ?? '') && /font-size:\s*var\(--text-lg\)/.test(label?.body ?? ''),
     'der Desktop-Zeitraum steht fett in 18px, nicht mehr leiser als Fliesstext-Gewicht');
   const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
-  assert(/function sidebarWanted\(\) \{\s*return state\.view !== 'agenda' && !searchActive;/.test(src), 'Agenda und Suche zeigen keine Leiste');
+  // R20: nur die Suche steht ohne Leiste. Die Agenda behaelt sie - ohne „Als
+  // Naechstes" (das IST die Agenda); vorher sprang der Inhalt beim
+  // Ansichtswechsel von x 536 auf 220 (1920px, Re-Critique 2026-10-17).
+  assert(/function sidebarWanted\(\) \{\s*return !searchActive;/.test(src), 'die Agenda verliert die Leiste - der Inhalt springt beim Ansichtswechsel');
+  assert(/function upNextWanted\(\) \{\s*return state\.view !== 'agenda';/.test(src), 'in der Agenda steht „Als Naechstes" doppelt');
+  assert(/\(upNextWanted\(\) \? upNextHtml\(\) : ''\)/.test(src) && /if \(upNextWanted\(\) && upNextNeedsLoad\(\)\) loadUpNext\(\);/.test(src),
+    'die Leiste zeichnet bzw. laedt „Als Naechstes" auch in der Agenda');
   assert(/syncHeadToScrollport\(body\);\s*renderSidebar\(\);\s*\}/.test(src), 'jede Ansicht zeichnet die Leiste mit');
 });
 

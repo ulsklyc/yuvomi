@@ -47,7 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the filter menu), and the next five appointments. Today is marked in the same colour as in the
   grid, the chosen day with a ring, and when everyone shares a surname the people show first names
   only, so the next appointments fit on the screen. When the next appointments cannot be loaded,
-  the sidebar says why and offers "Try again" instead of claiming nothing is coming up. The period
+  the sidebar says why and offers "Try again" instead of claiming nothing is coming up. The agenda
+  keeps the sidebar with the small month and the switches (without the next appointments, which the
+  agenda itself lists), so switching views no longer moves the calendar sideways. The period
   in the header ("October 2026") is now set as a title instead of in body text weight.
 
 ### Changed

@@ -104,8 +104,10 @@
  *
  * DAS IST DIE EINE AUSNAHME VON DER GEMEINSAMEN LINKEN KANTE (R19): die
  * Leiste nimmt den Rand ein, den die Inhaltsspalte sonst leer laesst; ihre
- * Kante ist die, die jedes Modul bei 1280 und 1440 hat. In Agenda und Suche -
- * selbst Listen - steht keine Leiste, und alles bleibt auf der Spalte.
+ * Kante ist die, die jedes Modul bei 1280 und 1440 hat. Nur die Suche steht
+ * ohne Leiste. Seit R20 behaelt auch die Agenda sie (ohne „Als Naechstes" -
+ * das ist die Agenda selbst): fiel sie weg, sprang der Inhalt beim
+ * Ansichtswechsel von x 536 auf 220 (1920px).
  *
  * Die Seite ist dafuer immer Container (`cal-page`); in Agenda und Tag traegt
  * sie zusaetzlich `module-surface` (layout.css), deshalb beide Namen.
