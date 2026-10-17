@@ -269,3 +269,25 @@
 .u-scroll-fade {
   scroll-padding-inline: var(--space-6);
 }
+
+/* DIE TYP-WAHL SPRICHT DIE MAHLZEIT-TOENE (R20, Re-Critique 2026-10-17 a2
+ * P3). Im Plan traegt jeder Typ seinen Punkt (Fruehstueck Bernstein, Mittag
+ * Gruen, Abend Indigo, Snack Beere), im Dialog standen die Chips neutral -
+ * die Zuordnung, die der Plan lehrt, fehlte genau dort, wo man sie trifft.
+ * Derselbe Punkt wie am Board (8px, --meal-type-dot), der Chip selbst bleibt
+ * der geteilte Baustein: der Ton ist Kennung, nicht Zustand. Hier und nicht in
+ * meals.css: der Rezept-Dialog (recipes.css) zeigt dieselbe Wahl, und der
+ * Router laedt je Route nur EIN Seitenblatt. */
+.filter-chip[data-meal-type="breakfast"] { --meal-type-dot: var(--meal-breakfast); }
+.filter-chip[data-meal-type="lunch"]     { --meal-type-dot: var(--meal-lunch); }
+.filter-chip[data-meal-type="dinner"]    { --meal-type-dot: var(--meal-dinner); }
+.filter-chip[data-meal-type="snack"]     { --meal-type-dot: var(--meal-snack); }
+
+.filter-chip[data-meal-type]::before {
+  content: '';
+  flex-shrink: 0;
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--meal-type-dot, var(--color-text-disabled));
+}

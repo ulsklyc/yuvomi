@@ -119,7 +119,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   itself, so you can tap and type right away.
 - **Breakfast, snack and dinner are told apart at a glance.** Dinner is now indigo instead of the
   app's violet, so it no longer looks like a button, and snacks are berry instead of an orange that
-  was hard to tell from breakfast amber, also with red-green colour blindness.
+  was hard to tell from breakfast amber, also with red-green colour blindness. The meal type
+  choices in the meal and recipe dialogs carry the same coloured dot as the plan.
 - **Subscription costs and their budget share one card.** The summary reads "113.60 € of 90.00 €"
   with the budget bar underneath instead of two cards side by side, so the row always has three
   cards. On a wide screen each subscription's description now appears once, next to its name.

@@ -1936,3 +1936,18 @@ test('R19: die Rezeptsuche ist mobil ein Feld, keine Lupe in einer eigenen Zeile
 // --------------------------------------------------------
 console.log(`\n[Meals-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);
 if (failed > 0) process.exit(1);
+
+// R20 (Re-Critique 2026-10-17 a2 P3): die Typ-Chips im Mahlzeit- und im
+// Rezept-Dialog standen ohne die Mahlzeit-Toene des Plans.
+test('R20: die Typ-Chips tragen den Punkt ihres Mahlzeit-Tons, in beiden Dialogen', () => {
+  const css = readFileSync(new URL('../public/styles/filter-chip.css', import.meta.url), 'utf8');
+  for (const type of ['breakfast', 'lunch', 'dinner', 'snack']) {
+    assert(new RegExp(`\\.filter-chip\\[data-meal-type="${type}"\\]\\s+\\{ --meal-type-dot: var\\(--meal-${type}\\); \\}`).test(css), `${type} hat seinen Ton`);
+  }
+  const dot = [...eachRule(css)].find((r) => r.selector.trim() === '.filter-chip[data-meal-type]::before');
+  assert(/background:\s*var\(--meal-type-dot/.test(dot?.body ?? ''), 'der Punkt nimmt den Ton');
+  const html = mealsUi.buildModalContent({ mode: 'create', date: '2026-09-21', mealType: 'dinner' });
+  assert(/class="filter-chip meal-type-chip[^"]*"[^>]*data-meal-type="dinner"/.test(html), 'der Mahlzeit-Dialog baut die Chips mit data-meal-type');
+  const recipes = readFileSync(new URL('../public/pages/recipes.js', import.meta.url), 'utf8');
+  assert(/class="filter-chip recipe-meal-types__chip" data-meal-type=/.test(recipes), 'der Rezept-Dialog ebenso');
+});
