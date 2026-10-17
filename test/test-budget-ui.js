@@ -3637,12 +3637,14 @@ test('die Bilanz rechnet eine geloeschte Buchung sofort heraus und beim Undo wie
   assert.match(seriesBefore, /state\.summary = summaryWith\(state\.summary, removed, -1\)/, 'Serie loeschen zeichnet die alte Bilanz');
 });
 
-// Codex an #1485: im Konto-Drilldown zeigt `state.entries` nur die Buchungen
-// EINES Kontos, `state.summary` zaehlt alle. Ein per Einzel-Bearbeitung auf ein
-// anderes Konto verschobenes Vorkommen fehlte der Liste - das Serien-Loeschen
-// rechnete nur das sichtbare heraus, obwohl der Server die ganze Serie loescht.
-// Gefahren wird die echte deleteEntrySeries mit gestubbtem Undo-Fenster und API.
-test('Serie loeschen im Konto-Drilldown rechnet die Bilanz nicht aus der gefilterten Liste (Codex #1485)', async () => {
+// Codex an #1485: im Konto-Drilldown zeigte `state.entries` nur die Buchungen
+// EINES Kontos, `state.summary` zaehlte alle - das Serien-Loeschen durfte dort
+// nichts herausrechnen. Seit der Re-Critique 2026-10-17 folgt die Bilanz dem
+// Kontofilter (`/budget/summary?...&account_id=`): Liste und Bilanz sprechen
+// ueber dieselben Buchungen, und das sichtbare Vorkommen ist genau das, was die
+// Bilanz des Kontos verliert. Gefahren wird die echte deleteEntrySeries mit
+// gestubbtem Undo-Fenster und API.
+test('Serie loeschen im Konto-Drilldown rechnet aus der Bilanz DES KONTOS heraus (Codex #1485, Re-Critique 2026-10-17)', async () => {
   const s = budgetUi.state;
   const zuvor = {
     month: s.month, entries: s.entries, summary: s.summary, prevSummary: s.prevSummary,
@@ -3656,7 +3658,12 @@ test('Serie loeschen im Konto-Drilldown rechnet die Bilanz nicht aus der gefilte
       { category: 'salary', income: 2000, expenses: 0, total: 2000 },
     ],
   });
-  const serverDanach = { month: '2026-06', income: 2000, expenses: 0, balance: 2000, byCategory: [{ category: 'salary', income: 2000, expenses: 0, total: 2000 }] };
+  // Die Bilanz von Konto 3: nur das eine Vorkommen.
+  const kontoBilanz = () => ({
+    month: '2026-06', income: 0, expenses: -50, balance: -50,
+    byCategory: [{ category: 'food', income: 0, expenses: -50, total: -50 }],
+  });
+  const serverDanach = { month: '2026-06', income: 0, expenses: 0, balance: 0, byCategory: [] };
   let undo = null;
   const deletes = [];
   const gets = [];
@@ -3672,20 +3679,22 @@ test('Serie loeschen im Konto-Drilldown rechnet die Bilanz nicht aus der gefilte
     },
   };
   try {
-    Object.assign(s, { month: '2026-06', activeTab: 'budget', budgetMode: 'shared', accountFilterId: 3, entries: [hier], summary: bilanz() });
-    // Das Schwester-Vorkommen (-50, food) liegt auf Konto 4: in der Bilanz, nicht in der Liste.
+    Object.assign(s, { month: '2026-06', activeTab: 'budget', budgetMode: 'shared', accountFilterId: 3, entries: [hier], summary: kontoBilanz() });
     await budgetUi.deleteEntrySeries(11);
     assert.deepEqual(s.entries, [], 'die sichtbaren Vorkommen verlassen die Liste sofort');
-    assert.deepEqual(s.summary, bilanz(), 'gefiltert bleibt die Bilanz beim Serverstand statt halb herausgerechnet');
+    assert.equal(s.summary.expenses, 0, 'die Bilanz des Kontos verliert genau das sichtbare Vorkommen');
+    assert.equal(s.summary.balance, 0);
     assert.ok(undo, 'das Undo-Fenster oeffnet sich');
     await undo.commit({ keepalive: false });
     assert.deepEqual(deletes, ['/budget/11/series']);
-    assert.ok(gets.some((u) => u.startsWith('/budget/summary?month=2026-06')), 'nach dem Loeschen kommt die Summary vom Server');
+    const summaryGets = gets.filter((u) => u.startsWith('/budget/summary?'));
+    assert.ok(summaryGets.length > 0, 'nach dem Loeschen kommt die Summary vom Server');
+    assert.ok(summaryGets.every((u) => /[?&]account_id=3\b/.test(u)), `die Summary fragt nach dem gefilterten Konto: ${summaryGets.join(', ')}`);
     assert.deepEqual(s.summary, serverDanach);
 
-    // Undo im Drilldown laedt ebenfalls neu, statt zu rechnen.
+    // Das Undo laedt neu, statt zu rechnen.
     gets.length = 0;
-    Object.assign(s, { accountFilterId: 3, entries: [hier], summary: bilanz() });
+    Object.assign(s, { accountFilterId: 3, entries: [hier], summary: kontoBilanz() });
     undo = null;
     await budgetUi.deleteEntrySeries(11);
     await undo.restore();

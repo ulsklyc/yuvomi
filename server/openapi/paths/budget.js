@@ -2,7 +2,13 @@ import { op, jsonBody, idParam, stringPathParam, langParam, DOCUMENT_LINKS_READ_
 
 export function budgetPaths() {
   return withCaseReasons({
-    '/api/v1/budget/summary': { get: op({ summary: 'Get budget summary', tag: 'Budget', description: '`pending` (`count`, `income`, `expenses`) reports what is expected and in no total: expected bookings and the subscription payments projected for the month (see `GET /api/v1/budget`). `pending.expected_omitted: true` appears only when the projection hit its limit of 5000 lines; the figures then contain no subscription payment.' }) },
+    '/api/v1/budget/summary': { get: op({ summary: 'Get budget summary', tag: 'Budget', description: '`pending` (`count`, `income`, `expenses`) reports what is expected and in no total: expected bookings and the subscription payments projected for the month (see `GET /api/v1/budget`). `pending.expected_omitted: true` appears only when the projection hit its limit of 5000 lines; the figures then contain no subscription payment.', params: [{
+      name: 'account_id',
+      in: 'query',
+      required: false,
+      description: 'Only entries booked to this account, the same filter as `GET /api/v1/budget`: income, expenses, balance, `byCategory` and `pending` all count that account alone, and no projected subscription payment is included because it is not booked to any account. A value that is not a positive whole number is ignored.',
+      schema: { type: 'integer', minimum: 1 },
+    }] }) },
     '/api/v1/budget/plans': {
       get: op({ summary: 'Get planned budget vs. actual for a month (category caps + savings goal)', tag: 'Budget', description: 'In personal budget mode the actual figures count what you can see, like the summary: `scope` (`mine`|`household`, default `mine`) picks the view, private entries of others do not count, and the amount of an entry of someone else whose details are hidden (`shared_amount`) counts only toward income and balance of the savings goal, never toward a category. Shared mode counts every entry.' }),
     },

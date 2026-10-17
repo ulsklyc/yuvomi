@@ -50,8 +50,13 @@ function intervalCountCheck(value) {
 /**
  * GET /api/v1/budget/summary
  * Monatsübersicht: Einnahmen, Ausgaben, Saldo, Aufschlüsselung nach Kategorie.
- * Query: ?month=YYYY-MM  (default: aktueller Monat)
+ * Query: ?month=YYYY-MM  (default: aktueller Monat), optional &account_id=
  * Response: { data: { month, income, expenses, balance, byCategory: [] } }
+ *
+ * `account_id` grenzt alle Summen auf ein Konto ein, wie die Liste
+ * (Re-Critique 2026-10-17): mit gefiltertem Hauptbuch blieben Saldo und
+ * Kategorien der Seitenleiste beim ganzen Haushalt, die Bilanz neben dem
+ * Kontoauszug sprach also ueber andere Buchungen als die Liste darunter.
  */
 router.get('/summary', (req, res) => {
   try {
@@ -74,6 +79,13 @@ router.get('/summary', (req, res) => {
     // Sichtbarkeit/Scope (#476/#505): dieselbe Filterung wie die Eintragsliste,
     // damit Summen private Fremd-Einträge nicht mit einrechnen.
     const filter = budgetFilter(req, 'budget_entries');
+    // Dieselbe Lesart wie die Liste: nur eine positive ganze Zahl filtert.
+    const accountId = parseInt(req.query.account_id, 10);
+    if (Number.isInteger(accountId) && accountId > 0) {
+      filter.clause += ' AND budget_entries.account_id = ?';
+      filter.params = [...filter.params, accountId];
+    }
+    const accountFiltered = Number.isInteger(accountId) && accountId > 0;
 
     const totals = db.get().prepare(`
       SELECT
@@ -117,9 +129,13 @@ router.get('/summary', (req, res) => {
     // fuer den es `pending` gibt. Gerechnet beim Lesen
     // (services/subscription-budget-projection.js), mit demselben Filter wie
     // die Buchungen: was der Betrachter nicht sieht, zaehlt er auch nicht.
-    const expected = expectedSubscriptionTotals(db.get(), {
-      from, to, filter: expectedSubscriptionFilter(req),
-    });
+    // Mit Kontofilter keine: eine erwartete Abo-Zahlung haengt an keinem Konto,
+    // und die Liste laesst sie aus demselben Grund weg.
+    const expected = accountFiltered
+      ? { count: 0, income: 0, expenses: 0, omitted: false }
+      : expectedSubscriptionTotals(db.get(), {
+        from, to, filter: expectedSubscriptionFilter(req),
+      });
 
     res.json({
       data: {

@@ -576,8 +576,10 @@ async function loadMonth(month) {
     try {
       const [entriesRes, summaryRes, prevSummaryRes, loansRes] = await Promise.all([
         api.get(`/budget?month=${month}${accountQuery}${scopeQuery}`),
-        api.get(`/budget/summary?month=${month}${scopeQuery}`),
-        api.get(`/budget/summary?month=${prevMonth}${scopeQuery}`),
+        // Die Bilanz folgt dem Kontofilter wie die Liste (Re-Critique
+        // 2026-10-17): sonst stand neben dem Kontoauszug der Saldo des Haushalts.
+        api.get(`/budget/summary?month=${month}${accountQuery}${scopeQuery}`),
+        api.get(`/budget/summary?month=${prevMonth}${accountQuery}${scopeQuery}`),
         api.get('/budget/loans'),
       ]);
       return {
@@ -5807,15 +5809,6 @@ function summaryWith(summary, entries, sign) {
   return next;
 }
 
-/* Zeigt `state.entries` weniger Buchungen, als `state.summary` zaehlt? Nur der
- * Konto-Drilldown: `account_id` geht an `GET /budget`, nicht an
- * `/budget/summary` (loadMonth). Der Scope geht an beide Abfragen, und der
- * Zustaendigen-Filter greift erst beim Zeichnen (visibleEntries) -
- * `state.entries` bleibt dabei vollstaendig. */
-function listNarrowsSummary() {
-  return state.accountFilterId != null;
-}
-
 async function deleteEntry(id) {
   if (readOnly()) return;
   const entry = findEntry(id);
@@ -5844,7 +5837,7 @@ async function deleteEntry(id) {
   state.entries = state.entries.filter((e) => e.id !== id);
   if (state.ledgerResults) state.ledgerResults = state.ledgerResults.filter((e) => e.id !== id);
   // Auch im Konto-Drilldown genau: der Server loescht genau diese eine
-  // Buchung, und sie steht in der Liste - anders als die Serie (listNarrowsSummary).
+  // Buchung, und sie steht in der Liste; die Bilanz ist die des Kontos.
   if (entry && inMonth) state.summary = summaryWith(state.summary, [entry], -1);
   // Der Zustand ist schon geaendert: ein Neuzeichnen, das dem Ausklappen
   // zuvorkommt, zeigt dasselbe Ergebnis nur ohne die Bewegung.
@@ -6032,13 +6025,10 @@ async function deleteEntrySeries(id) {
   state.entries = state.entries.filter((e) => !inSeries(e));
   if (state.ledgerResults) state.ledgerResults = state.ledgerResults.filter((e) => !inSeries(e));
   // Das Undo laedt den Monat neu (restore unten) - herausrechnen genuegt hier.
-  // Aber nur, wenn die Liste alles zeigt, was die Bilanz zaehlt: im
-  // Konto-Drilldown fehlen ihr Vorkommen, die per Einzel-Bearbeitung auf ein
-  // anderes Konto gewandert sind, und `/budget/:id/series` loescht sie mit.
-  // Dann bleibt die Bilanz beim Serverstand, bis der Commit (bzw. das Undo)
-  // den Monat samt Summary neu laedt - ein halb herausgerechneter Saldo waere
-  // eine dritte Zahl, die weder vorher noch nachher stimmt.
-  if (!listNarrowsSummary()) state.summary = summaryWith(state.summary, removed, -1);
+  // Auch im Konto-Drilldown: die Bilanz folgt seit der Re-Critique 2026-10-17
+  // dem Kontofilter, die Vorkommen auf anderen Konten zaehlt sie also gar
+  // nicht erst (Codex #1485 fragte nach genau dieser Luecke).
+  state.summary = summaryWith(state.summary, removed, -1);
   renderBody();
   vibrate([30, 50, 30]);
 

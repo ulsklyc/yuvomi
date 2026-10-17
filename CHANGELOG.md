@@ -27,7 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Sort the budget ledger and filter it by account.** The menu at the head of the transaction list
   sorts by date or by amount (expenses first, then income, each largest first, remembered on this
-  device) and shows one account's statement, the same filter the Accounts tab opens. Sorted by
+  device) and shows one account's statement, the same filter the Accounts tab opens; the balance
+  and the categories beside the list then count that account too. Sorted by
   amount, planned and booked entries stay in their own sections. A note under the title says when
   the list is sorted by amount; a tap on it opens the menu.
 - **The calendar has a sidebar on wide screens.** From about 1600px the month, week and day views
