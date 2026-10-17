@@ -103,7 +103,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Switching calendar views and opening a settings page now move in a direction.** Choosing
   Week after Month slides the new view in from the right and back the other way; opening a
   settings page slides it over the list, and going back slides it away again. With reduced motion
-  turned on, views only fade.
+  turned on, views only fade. A dialog opened while the new view is still loading takes your first
+  tap, because the view no longer slides behind it.
 - **Week and day views start in the morning.** The calendar opens the time grid at 7 am as long as
   the current hour still fits on screen, instead of an hour before now, so the morning stays
   visible on a computer.

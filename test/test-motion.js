@@ -2406,7 +2406,7 @@ test('R19: die Uebersicht blendet vom Skelett zum Inhalt ueber swapContent', () 
  *     Fortfuehrung, der Drill-down (Einstellungen, Gesundheit) zeigte nur den
  *     neuen Inhalt. swapRegion (utils/content-swap.js) nimmt das alte Bild per
  *     View Transition auf und gibt die Richtung als Typ an layout.css. */
-function regionEnv({ api = true, types = true } = {}) {
+function regionEnv({ api = true, types = true, modal = false } = {}) {
   const log = [];
   const classes = new Set();
   const listeners = [];
@@ -2420,6 +2420,7 @@ function regionEnv({ api = true, types = true } = {}) {
       dir: '',
       classList: { toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)), contains: (c) => classes.has(c) },
     },
+    querySelector: (sel) => (modal && sel === ':modal' ? { tagName: 'DIALOG' } : null),
     addEventListener: (type, fn, opts) => listeners.push({ type, fn, capture: Boolean(opts?.capture) }),
     removeEventListener: (type, fn) => {
       const i = listeners.findIndex((l) => l.type === type && l.fn === fn);
@@ -2485,6 +2486,29 @@ test('swapRegion: ohne Typen-Unterstuetzung oder API faellt es auf swapContent z
     } finally {
       env.restore();
     }
+  }
+});
+
+/* Der Kalender startet den Wechsel erst, wenn die Daten der neuen Ansicht da
+ * sind. Wer in der Zeit schon "Neuer Termin" tippt, hat den Dialog offen, wenn
+ * die Transition beginnt - sie liefe hinter ihm, und solange sie laeuft, trifft
+ * Chromium nur <html>: der erste Tipp im Dialog (Speichern) verpuffte. Gesehen
+ * im document-guards-Handlauf R19 ("neue Serie bleibt sichtbar", beide
+ * Varianten), nachgestellt mit Playwright: Speichern 3 von 3 Mal geschluckt. */
+test('swapRegion: hinter einem offenen Dialog kein Wechsel per View Transition', async () => {
+  const env = regionEnv({ modal: true });
+  try {
+    const { swapRegion } = await import('../public/utils/content-swap.js');
+    let ran = 0;
+    const { transition } = await swapRegion(env.host, () => { ran += 1; }, { direction: 1 });
+    assert.equal(transition, false, 'ein Dialog liegt ueber der Region - keine Transition, die seine Tipps schluckt');
+    assert.equal(env.log.filter((l) => l.startsWith('start')).length, 0, 'startViewTransition wird nicht gerufen');
+    assert.equal(ran, 1, 'der Inhalt steht trotzdem');
+    assert.equal(env.host.calls.length, 1, 'die Region tauscht per swapContent (sperrt keine Eingabe)');
+    assert.equal(env.classes.has('page-swapping'), false, 'kein stehendes Chrome ohne Wechsel');
+    assert.equal(env.listeners.length, 0, 'kein Tipp-Zuhoerer');
+  } finally {
+    env.restore();
   }
 });
 

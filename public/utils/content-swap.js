@@ -111,8 +111,9 @@ export function swapContent(host, update, { direction = 0, animate = true } = {}
  * Segment-Kapsel im Kopf laeuft also weiter, statt als Geist einzufrieren.
  *
  * Reduzierte Bewegung: kein Versatz, die Bilder blenden nur (layout.css).
- * Ohne API, ohne `:active-view-transition-type()` oder im verdeckten Tab:
- * swapContent mit derselben Richtung (8px, nur der neue Inhalt).
+ * Ohne API, ohne `:active-view-transition-type()`, im verdeckten Tab oder
+ * hinter einem offenen Dialog (regionCovered): swapContent mit derselben
+ * Richtung (8px, nur der neue Inhalt).
  * -------------------------------------------------------- */
 
 /** Name der Region fuer die Dauer des Wechsels (layout.css). */
@@ -126,6 +127,26 @@ export function canSwapRegion() {
     return typeof CSS !== 'undefined' && CSS.supports('selector(:active-view-transition-type(a))');
   } catch {
     return false;
+  }
+}
+
+/**
+ * Ob ueber der Region schon ein modaler Dialog liegt.
+ *
+ * Der Wechsel startet erst, wenn die neuen Daten da sind (Kalender:
+ * `reloadForView`). Wer in dieser Zeit schon weitertippt - Ansicht "Tag", dann
+ * sofort "Neuer Termin" -, hat den Dialog offen, wenn die Transition beginnt.
+ * Sie liefe dann hinter dem Dialog, und solange sie laeuft, trifft Chromium
+ * nur <html>: der erste Tipp IM Dialog (Speichern) verpuffte (document-guards,
+ * "neue Serie bleibt sichtbar", R19). Hinter einem Dialog gibt es nichts zu
+ * zeigen - die Region tauscht dort per swapContent, das keine Eingabe sperrt.
+ */
+export function regionCovered() {
+  if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return false;
+  try {
+    return Boolean(document.querySelector(':modal'));
+  } catch {
+    return false; // Engine ohne `:modal` (vor Safari 15.6)
   }
 }
 
@@ -148,7 +169,7 @@ export function regionSwapType(direction) {
  * @returns {Promise<{ transition: boolean, finished: Promise<void> }>}
  */
 export async function swapRegion(host, update, { direction = 0 } = {}) {
-  if (!host || !host.isConnected || !canSwapRegion()) {
+  if (!host || !host.isConnected || !canSwapRegion() || regionCovered()) {
     swapContent(host, update, { direction });
     return { transition: false, finished: Promise.resolve() };
   }
