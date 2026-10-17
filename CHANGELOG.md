@@ -54,6 +54,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A housekeeping payment task is only for the adults who pay.** The task a check-in creates names
+  the wage, so it is now assigned to the person who checked in and to the admins, and only they see
+  it - in Tasks, the Overview, search and connected AI assistants alike. When an account that cannot
+  see wages checks in, the task goes to the admins instead. Payment tasks created before this
+  change keep their visibility; you can restrict one under its visibility setting.
 - **Every settings page and dialog uses the same rows.** Fields stand as rows with the label on the
   left and the field on the right, and a hint underneath where one helps, instead of fields stacked
   under their labels in a card. That covers the e-mail server and the account page, Kitchen (meal

@@ -451,17 +451,49 @@ function createVisitCalendarEvent(database, worker, checkIn, actorId, title = nu
   return result.lastInsertRowid;
 }
 
-function createPaymentTask(database, worker, checkIn, amount, actorId, title = null, description = null, visitDateOverride = null) {
+// WER DIE ZAHLUNGSAUFGABE SIEHT (R20, Ulas 2026-10-17).
+//
+// Titel und Beschreibung nennen den Betrag, und die Aufgabe reist von hier in
+// jede Flaeche, die Aufgaben ausliefert: Liste, Detail, Uebersicht, Suche, MCP,
+// API v1. Stand sie auf `all`, las ein Konto ohne `housekeeping_view_amounts`
+// den Lohn dort, wo die Haushaltshilfe ihn verbarg. Statt fuenf Filtern EINE
+// Stelle: die Aufgabe entsteht auf `assignees` und gehoert den Erwachsenen,
+// die bezahlen - der Person, die eincheckt, wenn sie Betraege sehen darf, und
+// den aktiven Admins. Die Sichtbarkeitsregel (services/visibility.js) haelt
+// sie damit in jedem Lesepfad zurueck, ohne dass einer davon sie kennt.
+//
+// Checkt ein Konto OHNE Betraege ein, steht es nicht als Ersteller drin: die
+// Regel laesst die Erstellerin IMMER durch, die Aufgabe laege sonst genau bei
+// dem Kind, vor dem sie verborgen sein soll. Erstellerin wird dann die erste
+// Admin-Person; gibt es keine, entsteht keine Zahlungsaufgabe (der Besuch
+// bleibt unbezahlt und wird in der Haushaltshilfe bezahlt).
+function paymentTaskAudience(database, actorId, actorSeesAmounts) {
+  const admins = database.prepare(`
+    SELECT id FROM users
+    WHERE role = 'admin' AND deactivated_at IS NULL
+    ORDER BY id ASC
+  `).all().map((row) => row.id);
+  const owners = actorSeesAmounts ? [actorId, ...admins.filter((id) => id !== actorId)] : admins;
+  if (!owners.length) return null;
+  return { createdBy: owners[0], assignees: owners };
+}
+
+function createPaymentTask(database, worker, checkIn, amount, actor, title = null, description = null, visitDateOverride = null) {
+  const audience = paymentTaskAudience(database, actor.id, actor.amounts);
+  if (!audience) return null;
   const visitDate = visitDateOverride || checkIn.slice(0, 10);
   const result = database.prepare(`
-    INSERT INTO tasks (title, description, due_date, priority, category, status, created_by)
-    VALUES (?, ?, ?, 'medium', 'household', 'open', ?)
+    INSERT INTO tasks (title, description, due_date, priority, category, status, created_by, assigned_to, visibility)
+    VALUES (?, ?, ?, 'medium', 'household', 'open', ?, ?, 'assignees')
   `).run(
     title || paymentTitleFallback(database, worker),
     description || paymentDescriptionFallback(database, visitDate, amount),
     visitDate,
-    actorId,
+    audience.createdBy,
+    audience.assignees[0],
   );
+  const assign = database.prepare('INSERT OR IGNORE INTO task_assignments (task_id, user_id) VALUES (?, ?)');
+  for (const id of audience.assignees) assign.run(result.lastInsertRowid, id);
   return result.lastInsertRowid;
 }
 
@@ -1152,7 +1184,7 @@ router.post('/work-sessions/check-in', (req, res) => {
       const eventId = createVisitCalendarEvent(db.get(), worker, checkIn, actorId, vEventTitle.value, context.localDate);
       const totalAmount = Number(vDailyRate.value || 0) + Number(vExtras.value || 0);
       const taskId = housekeepingPaymentTasksEnabled(db.get())
-        ? createPaymentTask(db.get(), worker, checkIn, totalAmount, actorId, vPaymentTitle.value, vPaymentDescription.value, context.localDate)
+        ? createPaymentTask(db.get(), worker, checkIn, totalAmount, { id: actorId, amounts: viewer.amounts }, vPaymentTitle.value, vPaymentDescription.value, context.localDate)
         : null;
       return db.get().prepare(`
         INSERT INTO housekeeping_work_sessions (worker_id, check_in, check_out, daily_rate, extras, calendar_event_id, payment_task_id, created_by, rate_type, hourly_rate)

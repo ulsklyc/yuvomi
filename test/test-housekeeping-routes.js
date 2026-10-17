@@ -890,11 +890,15 @@ test('ein rein lokaler Besuch merkt nichts beim Provider vor', async () => {
 // Besuchsrouten. Beide Rollen im Test, sonst waere auch ein Total-Gate gruen.
 // ---------------------------------------------------------------------------
 
+// Das Mitglied checkt selbst ein: die Zahlungsaufgabe gehoert seit R20 nur der
+// eincheckenden Person und den Admins (`paymentTaskAudience`). Ein Mitglied,
+// das sie nicht sieht, bekaeme 404 statt 403 - und die Grenze unten waere
+// ungeprueft, obwohl genau dieses Mitglied sie anfassen kann.
 async function paidVisitWithTask(name, localDate) {
   setConfig('housekeeping_payment_tasks', '1');
   const workerId = await freshWorker(name);
   const created = await call('POST', '/work-sessions/check-in', {
-    as: ADM,
+    as: MEM,
     body: { worker_id: workerId, daily_rate: 40, local_date: localDate },
   });
   assert.equal(created.status, 201, `Fixture: Check-in ${created.status} ${JSON.stringify(created.body)}`);
@@ -950,7 +954,7 @@ test('unbezahlter Besuch: Mitglied bewegt die Zahlungsaufgabe weiter frei', asyn
   setConfig('housekeeping_payment_tasks', '1');
   const workerId = await freshWorker('Tina');
   const created = await call('POST', '/work-sessions/check-in', {
-    as: ADM,
+    as: MEM,
     body: { worker_id: workerId, daily_rate: 40, local_date: '2025-07-04' },
   });
   const visitId = created.body.data.id;

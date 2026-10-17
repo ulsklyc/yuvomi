@@ -29,6 +29,8 @@ const AMOUNTS_NOTE = ' Wages, payments and amounts need the `housekeeping_view_a
   + '`totals`, `paid_at`, `payment_task_id`, `payment_task_status`, `payment_task_title`, `default_daily_rate`, the summary totals, '
   + '`pending_payments`, `paid_this_month` and `monthly_payments` - while visits, times and people stay. ';
 
+const PAYMENT_TASK_NOTE = ' The payment task names the wage: it is created with visibility `assignees`, assigned to the caller when they hold '
+  + '`housekeeping_view_amounts` and to every active admin; for a caller without it the first admin is its creator. '
 const AMOUNTS_WRITE_NOTE = ' A caller without `housekeeping_view_amounts` writes no amounts: a check-in takes the rate from the profile, '
   + 'check-out keeps the extras, an update keeps rate, extras and minutes, and payment task texts fall back to the household language. '
   + 'Paying and taking back a payment are refused with 403 and `reason: amounts_hidden`.';
@@ -61,7 +63,7 @@ export function housekeepingPaths() {
       get: op({ summary: 'List housekeeping work sessions for a month', tag: 'Housekeeping', description: RECEIPT_NOTE + AMOUNTS_NOTE }),
     },
     '/api/v1/housekeeping/work-sessions/check-in': {
-      post: op({ summary: 'Check in a housekeeper', tag: 'Housekeeping', description: HOUSEHOLD_DAY_NOTE.trim() + AMOUNTS_WRITE_NOTE, stateChanging: true, requestBody: jsonBody(null) }),
+      post: op({ summary: 'Check in a housekeeper', tag: 'Housekeeping', description: HOUSEHOLD_DAY_NOTE.trim() + PAYMENT_TASK_NOTE + AMOUNTS_WRITE_NOTE, stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/housekeeping/work-sessions/check-out': {
       post: op({ summary: 'Check out a housekeeper', tag: 'Housekeeping', description: AMOUNTS_WRITE_NOTE.trim(), stateChanging: true, requestBody: jsonBody(null) }),

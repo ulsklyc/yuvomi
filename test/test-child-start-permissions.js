@@ -7,7 +7,12 @@
  *          - "ohne Betraege" gilt am SERVER: Loehne, Zahlungen und Summen fehlen
  *            in jeder Antwort der Haushaltshilfe und in der Kachel der
  *            Uebersicht, Bezahlen weist ab, und wer schreiben darf, aber keine
- *            Betraege sieht, ueberschreibt sie nicht.
+ *            Betraege sieht, ueberschreibt sie nicht;
+ *          - die Zahlungsaufgabe, deren Titel und Beschreibung den Betrag
+ *            nennen, gehoert nur den Erwachsenen, die bezahlen: ein Konto ohne
+ *            Betraege findet sie in keiner Flaeche, die Aufgaben ausliefert
+ *            (Liste, Detail, Uebersicht, Wand, Suche, MCP), auch nicht, wenn
+ *            es selbst eingecheckt hat.
  *        Gemessen ueber HTTP am echten Auth-, Haushaltshilfe- und
  *        Uebersichts-Router mit echten API-Tokens; `requireAuth` loest die
  *        Rechte so auf wie in server/index.js.
@@ -26,6 +31,9 @@ const dbmod = await import('../server/db.js');
 const { router: authRouter, requireAuth } = await import('../server/auth.js');
 const { default: housekeepingRouter } = await import('../server/routes/housekeeping.js');
 const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { default: searchRouter } = await import('../server/routes/search.js');
+const { callTool } = await import('../server/mcp/tools.js');
 const {
   resolvePermissions, buildSessionModuleAccess, moduleAccessVerdict,
   applyChildStartPermissions, permissionCatalog, MODULE_ACCESS_READ_ONLY, MODULE_ACCESS_DENIED,
@@ -70,6 +78,8 @@ app.use(express.json());
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/housekeeping', requireAuth, moduleGate('housekeeping'), housekeepingRouter);
 app.use('/api/v1/dashboard', requireAuth, dashboardRouter);
+app.use('/api/v1/tasks', requireAuth, tasksRouter);
+app.use('/api/v1/search', requireAuth, searchRouter);
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
@@ -296,4 +306,118 @@ test('schreiben ohne Betraege: der Satz kommt aus dem Profil, Bezahlen bleibt zu
   assert.equal(pay.body.reason, 'amounts_hidden');
   assert.equal(db.prepare('SELECT paid_at FROM housekeeping_work_sessions WHERE id = ?').get(VISIT).paid_at, null);
   db.prepare('DELETE FROM housekeeping_work_sessions WHERE id = ?').run(checkIn.body.data.id);
+});
+
+// --------------------------------------------------------------------------
+// Die Zahlungsaufgabe nennt den Betrag - sie gehoert den Erwachsenen (R20 B2)
+// --------------------------------------------------------------------------
+
+/** Jede Flaeche, ueber die eine Aufgabe ein Konto erreicht, als eine Antwort. */
+async function taskSurfaces(userId, token, taskId) {
+  const list = await call('GET', '/api/v1/tasks', token);
+  const done = await call('GET', '/api/v1/tasks?status=done', token);
+  const detail = await call('GET', `/api/v1/tasks/${taskId}`, token);
+  const dash = await call('GET', '/api/v1/dashboard', token);
+  const wall = await call('GET', '/api/v1/dashboard?audience=household', token);
+  const search = await call('GET', `/api/v1/search?q=${encodeURIComponent('maria')}`, token);
+  const user = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(userId);
+  const mcp = await callTool({ db, actor: { ...user } }, 'list_tasks', {});
+  return {
+    list: (list.body.data ?? []).some((t) => t.id === taskId),
+    listDone: (done.body.data ?? []).some((t) => t.id === taskId),
+    detail: detail.status === 200,
+    dashboard: (dash.body.urgentTasks ?? []).some((t) => t.id === taskId),
+    wall: JSON.stringify(wall.body.wallTasks ?? []).includes(`"id":${taskId}`),
+    search: (search.body.tasks ?? []).some((t) => t.id === taskId),
+    mcp: mcp.some((t) => t.id === taskId),
+  };
+}
+
+const NOWHERE = { list: false, listDone: false, detail: false, dashboard: false, wall: false, search: false, mcp: false };
+
+/** Die aktiven Admins - im Lauf hat auch `admin-kind` von oben Admin-Recht. */
+function admins() {
+  return db.prepare("SELECT id FROM users WHERE role = 'admin' AND deactivated_at IS NULL ORDER BY id").all().map((r) => r.id);
+}
+
+function enablePaymentTasks() {
+  db.prepare(`INSERT INTO sync_config (key, value) VALUES ('housekeeping_payment_tasks', '1')
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run();
+}
+
+function paymentTaskOf(sessionId) {
+  const { payment_task_id: id } = db.prepare('SELECT payment_task_id FROM housekeeping_work_sessions WHERE id = ?').get(sessionId);
+  assert.ok(id, 'der Check-in legt eine Zahlungsaufgabe an');
+  const task = db.prepare('SELECT id, title, description, created_by, visibility FROM tasks WHERE id = ?').get(id);
+  const assignees = db.prepare('SELECT user_id FROM task_assignments WHERE task_id = ? ORDER BY user_id').all(id).map((r) => r.user_id);
+  return { ...task, assignees };
+}
+
+async function checkOutAndForget(token, sessionId) {
+  await call('POST', '/api/v1/housekeeping/work-sessions/check-out', token, { worker_id: WORKER });
+  const { payment_task_id: taskId } = db.prepare('SELECT payment_task_id FROM housekeeping_work_sessions WHERE id = ?').get(sessionId);
+  db.prepare('DELETE FROM housekeeping_work_sessions WHERE id = ?').run(sessionId);
+  if (taskId) db.prepare('DELETE FROM tasks WHERE id = ?').run(taskId);
+}
+
+test('Zahlungsaufgabe: eine Erwachsene checkt ein - nur sie und die Admins sehen sie', async () => {
+  enablePaymentTasks();
+  const kid = await createMember({ username: 'zoe', family_role: 'child' });
+  const kidToken = mintToken(kid);
+  const adultToken = mintToken(ADULT);
+  const checkIn = await call('POST', '/api/v1/housekeeping/work-sessions/check-in', adultToken, {
+    worker_id: WORKER, daily_rate: 45, extras: 5,
+  });
+  assert.equal(checkIn.status, 201, JSON.stringify(checkIn.body));
+  try {
+    const task = paymentTaskOf(checkIn.body.data.id);
+    assert.match(task.description, /50/, 'die Beschreibung nennt den Betrag - genau deshalb ist sie nicht oeffentlich');
+
+    // Zuerst die Flaechen: sie sind das Versprechen, die Spalten darunter der Weg.
+    assert.deepEqual(await taskSurfaces(kid, kidToken, task.id), NOWHERE, 'neues Kind');
+    assert.deepEqual(await taskSurfaces(EXISTING_CHILD, mintToken(EXISTING_CHILD), task.id), NOWHERE,
+      'auch ein Bestandskind ist keine zahlende Person');
+    const kidWrite = await call('PATCH', `/api/v1/tasks/${task.id}/status`, kidToken, { status: 'done' });
+    assert.equal(kidWrite.status, 404, 'unsichtbar heisst auch unantastbar');
+
+    const adminSees = await taskSurfaces(ADMIN, adminToken, task.id);
+    assert.equal(adminSees.list && adminSees.detail && adminSees.mcp, true, JSON.stringify(adminSees));
+    assert.equal(adminSees.wall, false, 'an der Wand steht kein Lohn');
+    const adultSees = await taskSurfaces(ADULT, adultToken, task.id);
+    assert.equal(adultSees.list && adultSees.detail && adultSees.search && adultSees.mcp, true, JSON.stringify(adultSees));
+
+    assert.equal(task.visibility, 'assignees');
+    assert.equal(task.created_by, ADULT);
+    assert.deepEqual(task.assignees, [...new Set([ADULT, ...admins()])].sort((a, b) => a - b));
+  } finally {
+    await checkOutAndForget(adultToken, checkIn.body.data.id);
+  }
+});
+
+test('Zahlungsaufgabe: ein Kind checkt ein - die Aufgabe landet trotzdem nicht bei ihm', async () => {
+  enablePaymentTasks();
+  const kid = await createMember({ username: 'finn', family_role: 'child' });
+  db.prepare(`UPDATE access_permissions SET access = 'write'
+    WHERE subject_type = 'user' AND subject_id = ? AND resource_key = 'housekeeping'`).run(String(kid));
+  const kidToken = mintToken(kid);
+  const checkIn = await call('POST', '/api/v1/housekeeping/work-sessions/check-in', kidToken, { worker_id: WORKER });
+  assert.equal(checkIn.status, 201, JSON.stringify(checkIn.body));
+  try {
+    const task = paymentTaskOf(checkIn.body.data.id);
+    assert.deepEqual(await taskSurfaces(kid, kidToken, task.id), NOWHERE, 'das eincheckende Kind');
+    const adminSees = await taskSurfaces(ADMIN, adminToken, task.id);
+    assert.equal(adminSees.list && adminSees.detail && adminSees.dashboard && adminSees.search && adminSees.mcp, true,
+      JSON.stringify(adminSees));
+
+    assert.equal(task.visibility, 'assignees');
+    assert.equal(task.created_by, ADMIN, 'die Erstellerin sieht ihre Aufgabe immer - das Kind darf es nicht sein');
+    assert.deepEqual(task.assignees, admins());
+    assert.ok(!task.assignees.includes(kid));
+    assert.equal(
+      db.prepare('SELECT created_by FROM housekeeping_work_sessions WHERE id = ?').get(checkIn.body.data.id).created_by,
+      kid, 'der Besuch selbst bleibt dem Kind zugeschrieben',
+    );
+  } finally {
+    await checkOutAndForget(kidToken, checkIn.body.data.id);
+  }
 });

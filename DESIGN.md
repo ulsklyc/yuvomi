@@ -2387,6 +2387,13 @@ Einladung); bestehende Konten und ein spaeterer Rollenwechsel bleiben unberuehrt
   „Betrag · Zahlstatus" die Zeit des Besuchs („08:30-12:00"), die Zahlungskarte entfaellt
   und die Besuche nehmen die Zeile allein (`.housekeeping-dashboard-columns--single`). Eine
   `null` steht nie als „0,00 €".
+- **Die Zahlungsaufgabe gehoert den Erwachsenen, die bezahlen.** Sie nennt den Lohn und entsteht
+  deshalb auf Sichtbarkeit `assignees`, zugewiesen der eincheckenden Person (nur mit
+  `housekeeping_view_amounts`) und den aktiven Admins (`paymentTaskAudience`,
+  server/routes/housekeeping.js). EINE Stelle statt eines Filters je Flaeche: die geteilte
+  Sichtbarkeitsregel haelt sie aus Liste, Detail, Uebersicht, Suche und MCP. Checkt ein Konto ohne
+  Betraege ein, wird die erste Admin-Person Erstellerin, weil die Regel die Erstellerin immer
+  durchlaesst.
 - **Die Uebersicht eines Kindes** folgt der Vorgabe mit zwei Abweichungen
   (`childDefaultWidgetConfig`): Belohnungen zuerst und sichtbar, Budget aus. Im Heute-Blatt
   ruecken Aufgaben, die nur anderen gehoeren, ans Ende und fallen zuerst unter „+N weitere".
