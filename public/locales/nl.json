@@ -4074,7 +4074,6 @@
         "noBalances": "Iedereen is vereffend.",
         "noExpenses": "Geen uitgaven komen overeen met deze weergave.",
         "noActivity": "Nog geen activiteit.",
-        "owes": "is schuldig aan",
         "system": "Systeem",
         "quickGroceries": "Supermarktuitgave toevoegen",
         "quickSchool": "Schoolkosten splitsen",
@@ -4224,8 +4223,11 @@
         "reversePaymentConfirmDetail": "{{payer}} aan {{payee}}, {{amount}}. Een tegenboeking heft de betaling op en de saldi staan weer zoals ervoor. De betaling blijft in de activiteit, gemarkeerd als tegengeboekt.",
         "loadMoreActivity": "Meer laden",
         "expenseDeleted": "Verwijderd",
-        "youAreOwedInGroup": "Je krijgt in {{group}}",
-        "youOweInGroup": "Je bent schuldig in {{group}}"
+        "youAreOwedInGroup": "{{group}}: Je krijgt",
+        "youOweInGroup": "{{group}}: Je bent schuldig",
+        "debtYouOwe": "Je bent {{name}} nog schuldig",
+        "debtOwesYou": "{{name}} is jou nog schuldig",
+        "debtOwes": "{{from}} is schuldig aan {{to}}"
     },
     "wmo": {
         "0": "Heldere lucht",

@@ -4074,7 +4074,6 @@
         "noBalances": "सबका हिसाब बराबर है।",
         "noExpenses": "इस दृश्य में कोई खर्च नहीं।",
         "noActivity": "अभी कोई गतिविधि नहीं।",
-        "owes": "देना है",
         "system": "सिस्टम",
         "quickGroceries": "सुपरमार्केट खर्च जोड़ें",
         "quickSchool": "स्कूल खर्च बांटें",
@@ -4224,8 +4223,11 @@
         "reversePaymentConfirmDetail": "{{payer}} से {{payee}}, {{amount}}. एक उलटी प्रविष्टि भुगतान को रद्द करती है और शेष पहले जैसे हो जाते हैं. भुगतान गतिविधि में रद्द के रूप में बना रहता है.",
         "loadMoreActivity": "और लोड करें",
         "expenseDeleted": "हटाया गया",
-        "youAreOwedInGroup": "{{group}} में तुम्हें मिलना है",
-        "youOweInGroup": "{{group}} में तुम्हें देना है"
+        "youAreOwedInGroup": "{{group}}: तुम्हें मिलना है",
+        "youOweInGroup": "{{group}}: तुम्हें देना है",
+        "debtYouOwe": "आपको {{name}} को देना है",
+        "debtOwesYou": "{{name}} से आपको मिलना है",
+        "debtOwes": "{{from}} को {{to}} को देना है"
     },
     "wmo": {
         "0": "साफ आकाश",

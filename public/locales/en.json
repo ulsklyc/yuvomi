@@ -4074,7 +4074,6 @@
         "noBalances": "Everyone is settled up.",
         "noExpenses": "No expenses match this view.",
         "noActivity": "No activity yet.",
-        "owes": "owes",
         "system": "System",
         "quickGroceries": "Add supermarket expense",
         "quickSchool": "Split school expenses",
@@ -4224,8 +4223,11 @@
         "reversePaymentConfirmDetail": "{{payer}} to {{payee}}, {{amount}}. A counter-entry cancels the payment and balances return to where they were. The payment stays in the activity, marked as reversed.",
         "loadMoreActivity": "Load more",
         "expenseDeleted": "Deleted",
-        "youAreOwedInGroup": "You are owed in {{group}}",
-        "youOweInGroup": "You owe in {{group}}"
+        "youAreOwedInGroup": "{{group}}: You are owed",
+        "youOweInGroup": "{{group}}: You owe",
+        "debtYouOwe": "You owe {{name}}",
+        "debtOwesYou": "{{name}} owes you",
+        "debtOwes": "{{from}} owes {{to}}"
     },
     "wmo": {
         "0": "Clear sky",

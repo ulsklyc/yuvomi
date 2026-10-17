@@ -4074,7 +4074,6 @@
         "noBalances": "Mọi người đã thanh toán xong.",
         "noExpenses": "Không có chi phí nào khớp với chế độ xem này.",
         "noActivity": "Chưa có hoạt động nào.",
-        "owes": "nợ",
         "system": "Hệ thống",
         "quickGroceries": "Thêm chi phí siêu thị",
         "quickSchool": "Chia sẻ chi phí trường học",
@@ -4224,8 +4223,11 @@
         "reversePaymentConfirmDetail": "{{payer}} cho {{payee}}, {{amount}}. Một bút toán đảo sẽ hủy khoản thanh toán và số dư trở lại như trước. Khoản thanh toán vẫn nằm trong hoạt động, được đánh dấu đã hoàn tác.",
         "loadMoreActivity": "Tải thêm",
         "expenseDeleted": "Đã xóa",
-        "youAreOwedInGroup": "Bạn được nhận trong {{group}}",
-        "youOweInGroup": "Bạn nợ trong {{group}}"
+        "youAreOwedInGroup": "{{group}}: Bạn được nhận",
+        "youOweInGroup": "{{group}}: Bạn nợ",
+        "debtYouOwe": "Bạn nợ {{name}}",
+        "debtOwesYou": "{{name}} nợ bạn",
+        "debtOwes": "{{from}} nợ {{to}}"
     },
     "wmo": {
         "0": "Trời quang",

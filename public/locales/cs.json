@@ -3706,7 +3706,6 @@
         "noBalances": "Vše je vyrovnáno.",
         "noExpenses": "Žádné odpovídající výdaje.",
         "noActivity": "Zatím žádná aktivita.",
-        "owes": "dluží",
         "system": "Systém",
         "quickGroceries": "Výdaj v supermarketu",
         "quickSchool": "Sdílet školní náklady",
@@ -3859,8 +3858,11 @@
         "reversePaymentConfirmDetail": "{{payer}} pro {{payee}}, {{amount}}. Protizápis platbu zruší a zůstatky se vrátí na předchozí stav. Platba zůstane v aktivitě označená jako stornovaná.",
         "loadMoreActivity": "Načíst další",
         "expenseDeleted": "Smazáno",
-        "youAreOwedInGroup": "Dostaneš v {{group}}",
-        "youOweInGroup": "Dlužíš v {{group}}"
+        "youAreOwedInGroup": "{{group}}: dostaneš",
+        "youOweInGroup": "{{group}}: dlužíš",
+        "debtYouOwe": "Dlužíte osobě {{name}}",
+        "debtOwesYou": "{{name}} vám dluží",
+        "debtOwes": "{{from}} dluží {{to}}"
     },
     "documents": {
         "title": "Dokumenty",

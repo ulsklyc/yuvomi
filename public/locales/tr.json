@@ -4074,7 +4074,6 @@
         "noBalances": "Herkes hesaplaştı.",
         "noExpenses": "Bu görünüme uygun gider yok.",
         "noActivity": "Henüz etkinlik yok.",
-        "owes": "borçlu",
         "system": "Sistem",
         "quickGroceries": "Market gideri ekle",
         "quickSchool": "Okul giderlerini böl",
@@ -4224,8 +4223,11 @@
         "reversePaymentConfirmDetail": "{{payer}} → {{payee}}, {{amount}}. Ters kayıt ödemeyi geçersiz kılar ve bakiyeler önceki haline döner. Ödeme, iptal edildi olarak etkinlikte kalır.",
         "loadMoreActivity": "Daha fazla yükle",
         "expenseDeleted": "Silindi",
-        "youAreOwedInGroup": "{{group}} içinde alacağın",
-        "youOweInGroup": "{{group}} içinde borcun"
+        "youAreOwedInGroup": "{{group}}: Alacağın",
+        "youOweInGroup": "{{group}}: Borcun",
+        "debtYouOwe": "{{name}} kişisine borçlusun",
+        "debtOwesYou": "{{name}} sana borçlu",
+        "debtOwes": "{{from}}, {{to}} kişisine borçlu"
     },
     "wmo": {
         "0": "Açık",

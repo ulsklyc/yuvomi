@@ -4074,7 +4074,6 @@
         "noBalances": "Tudo está quitado.",
         "noExpenses": "Nenhuma despesa nesta visão.",
         "noActivity": "Sem atividade ainda.",
-        "owes": "deve a",
         "system": "Sistema",
         "quickGroceries": "Despesa de supermercado",
         "quickSchool": "Dividir gastos escolares",
@@ -4224,8 +4223,11 @@
         "reversePaymentConfirmDetail": "{{payer}} para {{payee}}, {{amount}}. Um reembolso anula o pagamento e os saldos voltam ao que eram. O pagamento continua na atividade, marcado como reembolsado.",
         "loadMoreActivity": "Carregar mais",
         "expenseDeleted": "Excluída",
-        "youAreOwedInGroup": "Você recebe em {{group}}",
-        "youOweInGroup": "Você deve em {{group}}"
+        "youAreOwedInGroup": "{{group}}: Você recebe",
+        "youOweInGroup": "{{group}}: Você deve",
+        "debtYouOwe": "Você deve a {{name}}",
+        "debtOwesYou": "{{name}} deve a você",
+        "debtOwes": "{{from}} deve a {{to}}"
     },
     "wmo": {
         "0": "Céu limpo",

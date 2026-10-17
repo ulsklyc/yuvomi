@@ -4302,7 +4302,6 @@
         "noBalances": "Усі розрахувалися.",
         "noExpenses": "Немає витрат для цього вигляду.",
         "noActivity": "Активності ще немає.",
-        "owes": "винен",
         "system": "Система",
         "quickGroceries": "Додати витрату супермаркету",
         "quickSchool": "Поділити шкільні витрати",
@@ -4458,8 +4457,11 @@
         "reversePaymentConfirmDetail": "{{payer}} → {{payee}}, {{amount}}. Зворотний запис скасовує платіж, і баланси повертаються до попередніх. Платіж залишається в активності з позначкою «сторновано».",
         "loadMoreActivity": "Завантажити ще",
         "expenseDeleted": "Видалено",
-        "youAreOwedInGroup": "Тобі винні в {{group}}",
-        "youOweInGroup": "Ти винен у {{group}}"
+        "youAreOwedInGroup": "{{group}}: Тобі винні",
+        "youOweInGroup": "{{group}}: Ти винен",
+        "debtYouOwe": "Ваш борг: {{name}}",
+        "debtOwesYou": "Борг вам: {{name}}",
+        "debtOwes": "{{from}} винен {{to}}"
     },
     "wmo": {
         "0": "Ясне небо",

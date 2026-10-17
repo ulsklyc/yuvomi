@@ -4074,7 +4074,6 @@
         "noBalances": "Tout est réglé.",
         "noExpenses": "Aucune dépense pour cette vue.",
         "noActivity": "Aucune activité.",
-        "owes": "doit à",
         "system": "Système",
         "quickGroceries": "Dépense de supermarché",
         "quickSchool": "Partager les frais scolaires",
@@ -4224,8 +4223,11 @@
         "reversePaymentConfirmDetail": "{{payer}} à {{payee}}, {{amount}}. Une contre-écriture annule le paiement et les soldes reviennent à leur état précédent. Le paiement reste dans l’activité, marqué comme annulé.",
         "loadMoreActivity": "Charger plus",
         "expenseDeleted": "Supprimée",
-        "youAreOwedInGroup": "On te doit dans {{group}}",
-        "youOweInGroup": "Tu dois dans {{group}}"
+        "youAreOwedInGroup": "{{group}} : On te doit",
+        "youOweInGroup": "{{group}} : Tu dois",
+        "debtYouOwe": "Vous devez à {{name}}",
+        "debtOwesYou": "{{name}} vous doit",
+        "debtOwes": "{{from}} doit à {{to}}"
     },
     "wmo": {
         "0": "Ciel dégagé",

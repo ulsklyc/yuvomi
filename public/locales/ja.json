@@ -4074,7 +4074,6 @@
         "noBalances": "すべて精算済みです。",
         "noExpenses": "この表示に一致する費用はありません。",
         "noActivity": "まだアクティビティはありません。",
-        "owes": "が支払う相手",
         "system": "システム",
         "quickGroceries": "スーパーの費用を追加",
         "quickSchool": "学校費用を分割",
@@ -4224,8 +4223,11 @@
         "reversePaymentConfirmDetail": "{{payer}} から {{payee}}、{{amount}}。反対仕訳で支払いが打ち消され、残高は元に戻ります。支払いは取り消し済みとしてアクティビティに残ります。",
         "loadMoreActivity": "さらに読み込む",
         "expenseDeleted": "削除済み",
-        "youAreOwedInGroup": "{{group}}で受け取る額",
-        "youOweInGroup": "{{group}}で支払う額"
+        "youAreOwedInGroup": "{{group}}: 受け取る額",
+        "youOweInGroup": "{{group}}: 支払う額",
+        "debtYouOwe": "{{name}}さんに支払い",
+        "debtOwesYou": "{{name}}さんから受け取り",
+        "debtOwes": "{{from}}さんから{{to}}さんへ支払い"
     },
     "wmo": {
         "0": "快晴",

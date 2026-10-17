@@ -908,12 +908,28 @@ function groupMetaHtml(group) {
   return `<p class="split-group-meta">${esc(parts.join(' · '))}</p>`;
 }
 
+/**
+ * EIN SALDO AUS SICHT DESSEN, DER LIEST (Re-Critique 2026-10-17, A4 P3). Hier
+ * stand fuer jede Zeile "<Name> schuldet <Name>", auch fuer die eigene: Linda
+ * las "Linda Johnson schuldet Alex Johnson". Wer selbst beteiligt ist, liest
+ * "Du schuldest Alex Johnson" bzw. "Alex Johnson schuldet dir"; zwischen zwei
+ * anderen bleibt der Satz mit beiden Namen - als EIN Schluessel mit beiden
+ * Platzhaltern, damit jede Sprache ihre Wortstellung hat (vorher Name + Verb
+ * + Name zusammengesetzt).
+ */
+export function debtSentence(debt, userId = state.user?.id) {
+  const me = userId == null ? null : Number(userId);
+  if (me != null && Number(debt.from_user_id) === me) return t('splitExpenses.debtYouOwe', { name: debt.to_name });
+  if (me != null && Number(debt.to_user_id) === me) return t('splitExpenses.debtOwesYou', { name: debt.from_name });
+  return t('splitExpenses.debtOwes', { from: debt.from_name, to: debt.to_name });
+}
+
 function renderBalances() {
   const debts = state.balances.simplified_debts || [];
   if (!debts.length) return `<div class="split-muted">${t('splitExpenses.noBalances')}</div>`;
   return `<div class="row-carrier">${debts.map((debt) => `
     <div class="split-debt">
-      <span>${esc(debt.from_name)} ${t('splitExpenses.owes')} ${esc(debt.to_name)}</span>
+      <span>${esc(debtSentence(debt))}</span>
       <strong>${money(debt.amount, debt.currency)}</strong>
     </div>
   `).join('')}</div>`;

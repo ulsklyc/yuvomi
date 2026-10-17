@@ -4302,7 +4302,6 @@
         "noBalances": "Все расчеты закрыты.",
         "noExpenses": "Нет расходов для этого вида.",
         "noActivity": "Активности пока нет.",
-        "owes": "должен",
         "system": "Система",
         "quickGroceries": "Расход в супермаркете",
         "quickSchool": "Разделить школьные расходы",
@@ -4458,8 +4457,11 @@
         "reversePaymentConfirmDetail": "{{payer}} → {{payee}}, {{amount}}. Обратная проводка отменяет платеж, и балансы возвращаются к прежним. Платеж остается в активности с пометкой «сторнирован».",
         "loadMoreActivity": "Загрузить ещё",
         "expenseDeleted": "Удален",
-        "youAreOwedInGroup": "Тебе должны в {{group}}",
-        "youOweInGroup": "Ты должен в {{group}}"
+        "youAreOwedInGroup": "{{group}}: Тебе должны",
+        "youOweInGroup": "{{group}}: Ты должен",
+        "debtYouOwe": "Ваш долг: {{name}}",
+        "debtOwesYou": "Долг вам: {{name}}",
+        "debtOwes": "{{from}} должен {{to}}"
     },
     "wmo": {
         "0": "Ясное небо",

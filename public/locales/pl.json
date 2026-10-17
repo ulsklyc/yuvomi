@@ -4302,7 +4302,6 @@
         "noBalances": "Wszyscy są rozliczeni.",
         "noExpenses": "Brak pasujących wydatków.",
         "noActivity": "Brak aktywności.",
-        "owes": "jest winny",
         "system": "System",
         "quickGroceries": "Dodaj wydatek w sklepie",
         "quickSchool": "Podziel koszty szkolne",
@@ -4458,8 +4457,11 @@
         "reversePaymentConfirmDetail": "{{payer}} dla {{payee}}, {{amount}}. Zapis przeciwny anuluje płatność, a salda wracają do poprzedniego stanu. Płatność pozostaje w aktywności oznaczona jako stornowana.",
         "loadMoreActivity": "Wczytaj więcej",
         "expenseDeleted": "Usunięto",
-        "youAreOwedInGroup": "Należy ci się w {{group}}",
-        "youOweInGroup": "Jesteś winien w {{group}}"
+        "youAreOwedInGroup": "{{group}}: Należy ci się",
+        "youOweInGroup": "{{group}}: Jesteś winien",
+        "debtYouOwe": "Do oddania dla {{name}}",
+        "debtOwesYou": "{{name}} ma ci oddać",
+        "debtOwes": "{{from}} jest winien {{to}}"
     },
     "wmo": {
         "0": "Bezchmurnie",

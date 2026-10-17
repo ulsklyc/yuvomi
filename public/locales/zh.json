@@ -4074,7 +4074,6 @@
         "noBalances": "所有人都已结清。",
         "noExpenses": "没有符合条件的支出。",
         "noActivity": "暂无动态。",
-        "owes": "欠",
         "system": "系统",
         "quickGroceries": "添加超市支出",
         "quickSchool": "分摊学校费用",
@@ -4224,8 +4223,11 @@
         "reversePaymentConfirmDetail": "{{payer}} 付给 {{payee}}，{{amount}}。一笔反向记账会抵消该付款，余额恢复到之前的状态。该付款仍保留在动态中，并标记为已冲销。",
         "loadMoreActivity": "加载更多",
         "expenseDeleted": "已删除",
-        "youAreOwedInGroup": "在{{group}}中你应收",
-        "youOweInGroup": "在{{group}}中你应付"
+        "youAreOwedInGroup": "{{group}}：你应收",
+        "youOweInGroup": "{{group}}：你应付",
+        "debtYouOwe": "你欠 {{name}}",
+        "debtOwesYou": "{{name}} 欠你",
+        "debtOwes": "{{from}} 欠 {{to}}"
     },
     "wmo": {
         "0": "晴天",

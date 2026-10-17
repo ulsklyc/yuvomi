@@ -4074,7 +4074,6 @@
         "noBalances": "Semua sudah lunas.",
         "noExpenses": "Tidak ada pengeluaran yang cocok.",
         "noActivity": "Belum ada aktivitas.",
-        "owes": "berutang",
         "system": "Sistem",
         "quickGroceries": "Pengeluaran swalayan",
         "quickSchool": "Bagi biaya sekolah",
@@ -4224,8 +4223,11 @@
         "reversePaymentConfirmDetail": "{{payer}} ke {{payee}}, {{amount}}. Entri balik membatalkan pembayaran dan saldo kembali seperti semula. Pembayaran tetap ada di aktivitas dengan tanda dibatalkan.",
         "loadMoreActivity": "Muat lebih banyak",
         "expenseDeleted": "Dihapus",
-        "youAreOwedInGroup": "Kamu dapat di {{group}}",
-        "youOweInGroup": "Kamu berutang di {{group}}"
+        "youAreOwedInGroup": "{{group}}: Kamu dapat",
+        "youOweInGroup": "{{group}}: Kamu berutang",
+        "debtYouOwe": "Anda berutang kepada {{name}}",
+        "debtOwesYou": "{{name}} berutang kepada Anda",
+        "debtOwes": "{{from}} berutang kepada {{to}}"
     },
     "wmo": {
         "0": "Langit cerah",

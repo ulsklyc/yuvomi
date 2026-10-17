@@ -4074,7 +4074,6 @@
         "noBalances": "Alla är kvitt.",
         "noExpenses": "Inga utgifter matchar vyn.",
         "noActivity": "Ingen aktivitet än.",
-        "owes": "är skyldig",
         "system": "System",
         "quickGroceries": "Lägg till matbutiksutgift",
         "quickSchool": "Dela skolutgifter",
@@ -4224,8 +4223,11 @@
         "reversePaymentConfirmDetail": "{{payer}} till {{payee}}, {{amount}}. En motbokning häver betalningen och saldona blir som förut. Betalningen finns kvar i aktiviteten, markerad som återförd.",
         "loadMoreActivity": "Läs in fler",
         "expenseDeleted": "Borttagen",
-        "youAreOwedInGroup": "Du får tillbaka i {{group}}",
-        "youOweInGroup": "Du är skyldig i {{group}}"
+        "youAreOwedInGroup": "{{group}}: Du får tillbaka",
+        "youOweInGroup": "{{group}}: Du är skyldig",
+        "debtYouOwe": "Du är skyldig {{name}}",
+        "debtOwesYou": "{{name}} är skyldig dig",
+        "debtOwes": "{{from}} är skyldig {{to}}"
     },
     "wmo": {
         "0": "Klart",

@@ -4074,7 +4074,6 @@
         "noBalances": "همه‌چیز تسویه شده است.",
         "noExpenses": "هزینه منطبقی نیست.",
         "noActivity": "هنوز فعالیتی نیست.",
-        "owes": "بدهکار است",
         "system": "سیستم",
         "quickGroceries": "هزینه سوپرمارکت",
         "quickSchool": "تقسیم هزینه مدرسه",
@@ -4224,8 +4223,11 @@
         "reversePaymentConfirmDetail": "{{payer}} به {{payee}}، {{amount}}. یک ثبت معکوس پرداخت را لغو می‌کند و مانده‌ها به حالت قبل برمی‌گردند. پرداخت با علامت برگشت‌خورده در فعالیت می‌ماند.",
         "loadMoreActivity": "بارگذاری بیشتر",
         "expenseDeleted": "حذف‌شده",
-        "youAreOwedInGroup": "طلب تو در {{group}}",
-        "youOweInGroup": "بدهی تو در {{group}}"
+        "youAreOwedInGroup": "{{group}}: طلب تو",
+        "youOweInGroup": "{{group}}: بدهی تو",
+        "debtYouOwe": "به {{name}} بدهکارید",
+        "debtOwesYou": "{{name}} به شما بدهکار است",
+        "debtOwes": "{{from}} به {{to}} بدهکار است"
     },
     "wmo": {
         "0": "آسمان صاف",

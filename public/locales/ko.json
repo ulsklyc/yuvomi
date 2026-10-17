@@ -4074,7 +4074,6 @@
         "noBalances": "모두 정산되었습니다.",
         "noExpenses": "일치하는 지출 없음.",
         "noActivity": "아직 활동 없음.",
-        "owes": "빚짐",
         "system": "시스템",
         "quickGroceries": "마트 지출",
         "quickSchool": "학비 나누기",
@@ -4224,8 +4223,11 @@
         "reversePaymentConfirmDetail": "{{payer}} → {{payee}}, {{amount}}. 반대 기입으로 결제가 상쇄되고 잔액은 이전으로 돌아갑니다. 결제는 취소됨으로 표시되어 활동에 남습니다.",
         "loadMoreActivity": "더 불러오기",
         "expenseDeleted": "삭제됨",
-        "youAreOwedInGroup": "{{group}}에서 받을 금액",
-        "youOweInGroup": "{{group}}에서 갚을 금액"
+        "youAreOwedInGroup": "{{group}}: 받을 금액",
+        "youOweInGroup": "{{group}}: 갚을 금액",
+        "debtYouOwe": "{{name}}님에게 줄 금액",
+        "debtOwesYou": "{{name}}님에게 받을 금액",
+        "debtOwes": "{{from}}님이 {{to}}님에게 줄 금액"
     },
     "wmo": {
         "0": "맑음",

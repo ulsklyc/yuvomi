@@ -343,6 +343,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Shared expenses speak to you.** A balance you are part of reads "You owe Alex Johnson" or
+  "Alex Johnson owes you" instead of naming yourself, and the summary cards put the group first
+  ("Household: You owe") instead of "You owe in Household". Every language now has its own word
+  order for "A owes B".
 - **Documents line up in the grid.** A search without results fills the whole width instead of one
   card's cell, and a short name keeps the room of a two-line one, so the details and buttons of a
   row of cards end on one line.

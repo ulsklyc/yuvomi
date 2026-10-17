@@ -4074,7 +4074,6 @@
         "noBalances": "Mindenki rendezte az egyenlegét.",
         "noExpenses": "Nincs költség ebben a nézetben.",
         "noActivity": "Még nincs tevékenység.",
-        "owes": "tartozik",
         "system": "Rendszer",
         "quickGroceries": "Szupermarket költség hozzáadása",
         "quickSchool": "Iskolai költségek megosztása",
@@ -4224,8 +4223,11 @@
         "reversePaymentConfirmDetail": "{{payer}} → {{payee}}, {{amount}}. Egy ellentételes könyvelés érvényteleníti a fizetést, az egyenlegek visszaállnak. A fizetés sztornózottként a tevékenységben marad.",
         "loadMoreActivity": "Továbbiak betöltése",
         "expenseDeleted": "Törölve",
-        "youAreOwedInGroup": "Neked jár itt: {{group}}",
-        "youOweInGroup": "Tartozásod itt: {{group}}"
+        "youAreOwedInGroup": "{{group}}: Neked jár",
+        "youOweInGroup": "{{group}}: Tartozásod",
+        "debtYouOwe": "Ön tartozik neki: {{name}}",
+        "debtOwesYou": "{{name}} tartozik Önnek",
+        "debtOwes": "{{from}} tartozik neki: {{to}}"
     },
     "wmo": {
         "0": "Tiszta égbolt",

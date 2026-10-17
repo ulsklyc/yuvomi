@@ -4074,7 +4074,6 @@
         "noBalances": "Alle er gjort opp.",
         "noExpenses": "Ingen utgifter samsvarer med dette visningsfilteret.",
         "noActivity": "Ingen aktivitet ennå.",
-        "owes": "skylder",
         "system": "System",
         "quickGroceries": "Legg til utgift fra dagligvarehandel",
         "quickSchool": "Splitt skoleutgifter",
@@ -4224,8 +4223,11 @@
         "reversePaymentConfirmDetail": "{{payer}} til {{payee}}, {{amount}}. En motpost kansellerer betalingen og saldoene går tilbake til det de var. Betalingen blir værende i aktiviteten, markert som reversert.",
         "loadMoreActivity": "Last mer",
         "expenseDeleted": "Slettet",
-        "youAreOwedInGroup": "Du har til gode i {{group}}",
-        "youOweInGroup": "Du skylder i {{group}}"
+        "youAreOwedInGroup": "{{group}}: Du har til gode",
+        "youOweInGroup": "{{group}}: Du skylder",
+        "debtYouOwe": "Du skylder {{name}}",
+        "debtOwesYou": "{{name}} skylder deg",
+        "debtOwes": "{{from}} skylder {{to}}"
     },
     "wmo": {
         "0": "Skyfri",

@@ -540,3 +540,28 @@ test('Einstieg ohne Gruppe leert die Salden der zuletzt gesehenen Gruppe', async
   assert.doesNotMatch(fn, /if\s*\(state\.activeGroupId\)\s*await loadGroupData\(\)/, 'nicht nur mit aktiver Gruppe');
   assert.match(fn, /^\s*await loadGroupData\(\);/m);
 });
+
+// Re-Critique 2026-10-17 (A4 P3): ein Saldo liest sich aus Sicht dessen, der
+// die Seite offen hat. Linda las "Linda Johnson schuldet Alex Johnson".
+test('R20: der eigene Saldo heisst "Du schuldest ..." bzw. "... schuldet dir", fremde nennen beide', async () => {
+  const { debtSentence } = await import('../public/pages/split-expenses.js');
+  const debt = { from_user_id: 1, from_name: 'Linda Johnson', to_user_id: 2, to_name: 'Alex Johnson' };
+  assert.equal(debtSentence(debt, 1), 'splitExpenses.debtYouOwe{"name":"Alex Johnson"}');
+  assert.equal(debtSentence(debt, '2'), 'splitExpenses.debtOwesYou{"name":"Linda Johnson"}');
+  assert.equal(debtSentence(debt, 3), 'splitExpenses.debtOwes{"from":"Linda Johnson","to":"Alex Johnson"}');
+  assert.equal(debtSentence(debt, null), 'splitExpenses.debtOwes{"from":"Linda Johnson","to":"Alex Johnson"}');
+
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const dir = new URL('../public/locales/', import.meta.url);
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
+    const s = JSON.parse(readFileSync(new URL(file, dir), 'utf8')).splitExpenses;
+    assert.equal(s.owes, undefined, `${file}: das zusammengesetzte Verb ist weg`);
+    assert.match(s.debtOwes, /\{\{from\}\}[\s\S]*\{\{to\}\}|\{\{to\}\}[\s\S]*\{\{from\}\}/, `${file}: debtOwes nennt beide`);
+    assert.match(s.debtYouOwe, /\{\{name\}\}/);
+    assert.match(s.debtOwesYou, /\{\{name\}\}/);
+    // Der Gruppenname ist ein Eigenname ohne Artikel: kein "in Haushalt".
+    for (const key of ['youOweInGroup', 'youAreOwedInGroup']) {
+      assert.match(s[key], /^\{\{group\}\}\s?[:：]/, `${file}: ${key} fuehrt mit dem Gruppennamen (${s[key]})`);
+    }
+  }
+});

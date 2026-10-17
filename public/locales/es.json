@@ -4074,7 +4074,6 @@
         "noBalances": "Todo está saldado.",
         "noExpenses": "No hay gastos para esta vista.",
         "noActivity": "Sin actividad todavía.",
-        "owes": "debe a",
         "system": "Sistema",
         "quickGroceries": "Gasto de supermercado",
         "quickSchool": "Dividir gastos escolares",
@@ -4224,8 +4223,11 @@
         "reversePaymentConfirmDetail": "{{payer}} a {{payee}}, {{amount}}. Un contraasiento anula el pago y los saldos vuelven a como estaban. El pago sigue en la actividad, marcado como anulado.",
         "loadMoreActivity": "Cargar más",
         "expenseDeleted": "Eliminado",
-        "youAreOwedInGroup": "Te deben en {{group}}",
-        "youOweInGroup": "Debes en {{group}}"
+        "youAreOwedInGroup": "{{group}}: Te deben",
+        "youOweInGroup": "{{group}}: Debes",
+        "debtYouOwe": "Debes a {{name}}",
+        "debtOwesYou": "{{name}} te debe",
+        "debtOwes": "{{from}} debe a {{to}}"
     },
     "wmo": {
         "0": "Cielo despejado",

@@ -4417,7 +4417,6 @@
         "noBalances": "تمت تسوية الجميع.",
         "noExpenses": "لا توجد مصاريف لهذه العرض.",
         "noActivity": "لا يوجد نشاط بعد.",
-        "owes": "يدين لـ",
         "system": "النظام",
         "quickGroceries": "إضافة مصروف سوبرماركت",
         "quickSchool": "تقسيم مصاريف المدرسة",
@@ -4576,8 +4575,11 @@
         "reversePaymentConfirmDetail": "{{payer}} إلى {{payee}}، {{amount}}. قيد معاكس يلغي الدفعة وتعود الأرصدة كما كانت. تبقى الدفعة في النشاط مع علامة معكوسة.",
         "loadMoreActivity": "تحميل المزيد",
         "expenseDeleted": "محذوف",
-        "youAreOwedInGroup": "مستحق لك في {{group}}",
-        "youOweInGroup": "عليك في {{group}}"
+        "youAreOwedInGroup": "{{group}}: مستحق لك",
+        "youOweInGroup": "{{group}}: عليك",
+        "debtYouOwe": "أنت مدين لـ {{name}}",
+        "debtOwesYou": "{{name}} مدين لك",
+        "debtOwes": "{{from}} مدين لـ {{to}}"
     },
     "wmo": {
         "0": "سماء صافية",

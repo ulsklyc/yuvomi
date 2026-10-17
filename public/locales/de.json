@@ -4074,7 +4074,6 @@
         "noBalances": "Alles ist ausgeglichen.",
         "noExpenses": "Keine passenden Ausgaben.",
         "noActivity": "Noch keine Aktivität.",
-        "owes": "schuldet",
         "system": "System",
         "quickGroceries": "Supermarktausgabe",
         "quickSchool": "Schulkosten teilen",
@@ -4224,8 +4223,11 @@
         "reversePaymentConfirmDetail": "{{payer}} an {{payee}}, {{amount}}. Eine Gegenbuchung hebt die Zahlung auf, die Salden stehen danach wie vorher. Die Zahlung bleibt als storniert im Verlauf.",
         "loadMoreActivity": "Mehr laden",
         "expenseDeleted": "Gelöscht",
-        "youAreOwedInGroup": "Du bekommst in {{group}}",
-        "youOweInGroup": "Du schuldest in {{group}}"
+        "youAreOwedInGroup": "{{group}}: Du bekommst",
+        "youOweInGroup": "{{group}}: Du schuldest",
+        "debtYouOwe": "Du schuldest {{name}}",
+        "debtOwesYou": "{{name}} schuldet dir",
+        "debtOwes": "{{from}} schuldet {{to}}"
     },
     "wmo": {
         "0": "Klarer Himmel",

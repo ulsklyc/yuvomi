@@ -4074,7 +4074,6 @@
         "noBalances": "Ayos na ang lahat.",
         "noExpenses": "Walang gastos na tumutugma sa view na ito.",
         "noActivity": "Wala pang aktibidad.",
-        "owes": "may utang kay",
         "system": "Sistema",
         "quickGroceries": "Magdagdag ng gastos sa supermarket",
         "quickSchool": "Hatiin ang gastos sa paaralan",
@@ -4224,8 +4223,11 @@
         "reversePaymentConfirmDetail": "{{payer}} kay {{payee}}, {{amount}}. Kinakansela ng kabaligtarang entry ang bayad at babalik ang mga balanse sa dati. Mananatili ang bayad sa aktibidad na may markang binawi.",
         "loadMoreActivity": "Mag-load pa",
         "expenseDeleted": "Natanggal",
-        "youAreOwedInGroup": "May utang sa iyo sa {{group}}",
-        "youOweInGroup": "May utang ka sa {{group}}"
+        "youAreOwedInGroup": "{{group}}: May utang sa iyo",
+        "youOweInGroup": "{{group}}: May utang ka",
+        "debtYouOwe": "May utang ka kay {{name}}",
+        "debtOwesYou": "May utang sa iyo si {{name}}",
+        "debtOwes": "{{from}} may utang kay {{to}}"
     },
     "wmo": {
         "0": "Maaliwalas na langit",
