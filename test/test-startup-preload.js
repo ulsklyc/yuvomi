@@ -230,6 +230,7 @@ function fakeDocument() {
       addEventListener(type, fn) { (listeners[type] ??= []).push(fn); },
       fire(type) { if (type === 'load') this.sheet = {}; for (const fn of listeners[type] ?? []) fn(); },
       before(node) { children.splice(children.indexOf(this), 0, node); node.isConnected = true; },
+      remove() { const at = children.indexOf(this); if (at >= 0) children.splice(at, 1); this.isConnected = false; },
     };
     return el;
   };
@@ -279,6 +280,42 @@ test('ensureStyle: einmal je Blatt, vor dem Platzhalter, aufgeloest bei load und
     const broken = ensureStyle('/styles/icon-picker.css');
     doc.children.find((c) => c.href === '/styles/icon-picker.css').fire('error');
     await broken; // ein fehlendes Blatt laesst den Dialog trotzdem auf
+  } finally {
+    delete globalThis.document;
+  }
+});
+
+/*
+ * Review #2049, Runde 2: ein Ladefehler war endgueltig. `ready` loeste auf,
+ * der kaputte Link blieb haengen, und jeder spaetere ensureStyle() bekam das
+ * erledigte Versprechen - Datumsfelder, Symbolauswahl und Bildschirmschoner
+ * blieben bis zum Neuladen ungestylt, auch nachdem das Netz wieder da war.
+ */
+test('ensureStyle: nach einem Ladefehler versucht der naechste Aufruf es neu', async () => {
+  const doc = fakeDocument();
+  globalThis.document = doc;
+  try {
+    const { ensureStyle, holdUntilStyled, isStyleReady } = await import(`../public/utils/component-style.js?t=${Date.now()}-retry`);
+    const href = '/styles/icon-picker.css';
+    const field = doc.createElement('yuvomi-icon-picker');
+    const held = holdUntilStyled(field, href);
+    const first = doc.children.find((c) => c.href === href);
+    first.fire('error');
+    await held;
+    assert.equal(field.hasAttribute('data-style-pending'), false, 'der Halter bleibt nach dem Fehler nicht haengen');
+    assert.equal(first.isConnected, false, 'der kaputte Link bleibt im Dokument');
+    assert.equal(doc.children.filter((c) => c.href === href).length, 0);
+
+    const again = ensureStyle(href);
+    const links = doc.children.filter((c) => c.href === href);
+    assert.equal(links.length, 1, 'der zweite Aufruf laedt das Blatt nicht neu');
+    assert.notEqual(links[0], first);
+    assert.ok(doc.children.indexOf(links[0]) < doc.children.findIndex((c) => c.tagName === 'META'), 'auch der neue Versuch steht vor dem Platzhalter');
+    links[0].fire('load');
+    await again;
+    assert.equal(isStyleReady(href), true);
+    assert.equal(ensureStyle(href) instanceof Promise, true);
+    assert.equal(doc.children.filter((c) => c.href === href).length, 1, 'nach dem Erfolg bleibt es bei einem Link');
   } finally {
     delete globalThis.document;
   }

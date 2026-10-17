@@ -30,9 +30,15 @@
  * Ein Fehler beim Laden loest ebenfalls auf: ein fehlendes Blatt ist ein
  * Schoenheitsfehler, kein Grund, das Datumsfeld nie zu zeigen. Offline liefert
  * der Service Worker die Datei aus dem Precache (APP_SHELL in sw.js).
+ *
+ * EIN FEHLER IST NICHT ENDGUELTIG (Review #2049, Runde 2). Der kaputte Link
+ * geht aus dem Dokument und sein Eintrag aus der Liste: der naechste Aufruf
+ * laedt neu. Vorher blieb beides stehen, und jeder spaetere ensureStyle()
+ * bekam das erledigte Versprechen - die Komponente blieb ungestylt bis zum
+ * Neuladen, auch wenn das Netz laengst wieder da war.
  */
 
-/** @type {Map<string, { link: HTMLLinkElement, ready: Promise<void> }>} */
+/** @type {Map<string, { link: HTMLLinkElement, ready: Promise<void>, settled: boolean }>} */
 const own = new Map();
 
 /**
@@ -67,21 +73,33 @@ export function isStyleReady(href) {
 export function ensureStyle(href) {
   if (noDom() || loadedLink(href)) return Promise.resolve();
   const known = own.get(href);
-  if (known?.link.isConnected) return known.ready;
+  // Erledigt, aber ohne Blatt (gescheitert, oder der Link kam abhanden):
+  // neu laden statt das alte Versprechen zu wiederholen.
+  if (known?.link.isConnected && !known.settled) return known.ready;
+  if (known) {
+    known.link.remove();
+    own.delete(href);
+  }
 
   const link = document.createElement('link');
   link.rel = 'stylesheet';
   link.href = href;
   link.dataset.componentStyle = '';
-  const ready = new Promise((resolve) => {
-    link.addEventListener('load', () => resolve(), { once: true });
-    link.addEventListener('error', () => resolve(), { once: true });
+  const entry = { link, ready: null, settled: false };
+  entry.ready = new Promise((resolve) => {
+    link.addEventListener('load', () => { entry.settled = true; resolve(); }, { once: true });
+    link.addEventListener('error', () => {
+      entry.settled = true;
+      link.remove();
+      if (own.get(href) === entry) own.delete(href);
+      resolve();
+    }, { once: true });
   });
   const slot = document.head.querySelector('meta[name="component-styles"]');
   if (slot) slot.before(link);
   else document.head.appendChild(link);
-  own.set(href, { link, ready });
-  return ready;
+  own.set(href, entry);
+  return entry.ready;
 }
 
 /**
