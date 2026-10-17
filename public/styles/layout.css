@@ -10244,6 +10244,25 @@ textarea::placeholder {
   gap: var(--space-1);
 }
 
+/* ZWEI SPALTEN AM ZEIGER (R20). Zwanzig Kuerzel untereinander fuellten den
+ * Dialog bis unter die Falz (1440x900: 852px Einzelspalte). Gelesen wird
+ * spaltenweise - links die Wege, rechts die Kalenderkuerzel -, deshalb
+ * `grid-auto-flow: column` mit der halben Zeilenzahl aus `--help-rows`
+ * (router.js showHelpModal). Ohne Trennlinien: eine Linie unter der letzten
+ * Zeile der linken Spalte stuende neben der Mitte der rechten. */
+.shortcuts-list--columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(var(--help-rows, 10), auto);
+  grid-auto-flow: column;
+  column-gap: var(--space-6);
+  row-gap: 0;
+}
+
+.shortcuts-list--columns > .help-row {
+  border-bottom: none;
+}
+
 .shortcuts-row,
 .help-row {
   display: flex;

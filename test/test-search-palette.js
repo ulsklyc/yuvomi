@@ -382,11 +382,29 @@ test('R19: die leere Palette zeigt "Zuletzt geoeffnet", gemerkt werden nur Orte,
 // R19: der Dialog hinter `?` und „Tastenkombinationen" hiess „Hilfe" und
 // zeigte am Desktop nur Kuerzel. Er heisst jetzt, was er zeigt - am Finger
 // (Klartext-Hilfe ohne Kuerzel) bleibt es „Hilfe".
+// R20 (Re-Critique 2026-10-17, A1 P1-2): der Kuerzel-Dialog baute sein eigenes
+// Overlay - `aria-modal` am Grund, Titel als `span`, Esc am Dokument. Der Fokus
+// blieb auf MAIN, Tab lief hinaus, nach dem Schliessen fand er nicht zurueck.
+// Er oeffnet jetzt ueber den geteilten Dialog (Top-Layer, Fokusfalle, Esc,
+// Zurueck-Geste, Fokus-Rueckgabe) und zeigt die Kuerzel am Zeiger zweispaltig.
+test('R20: der Kuerzel-Dialog ist der geteilte Dialog, am Zeiger zweispaltig', () => {
+  const help = router.slice(router.indexOf('function showHelpModal('), router.indexOf('// Update-Hinweis (#490)'));
+  assert.match(help, /openModal\(\{/, 'oeffnet ueber components/modal.js');
+  assert.doesNotMatch(help, /createElement\('div'\)|setAttribute\('aria-modal'|addEventListener\('keydown'/, 'kein eigenes Overlay, kein eigener Esc-Weg');
+  assert.match(help, /dirtyGuard: false/, 'nichts Ungespeichertes - keine Verwerfen-Rueckfrage');
+  assert.match(help, /shortcuts-list--columns/, 'zwei Spalten am Zeiger');
+  const css = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const rule = css.slice(css.indexOf('.shortcuts-list--columns {'), css.indexOf('}', css.indexOf('.shortcuts-list--columns {')));
+  assert.match(rule, /grid-template-columns:\s*repeat\(2,/);
+  assert.match(rule, /grid-auto-flow:\s*column/, 'spaltenweise gelesen');
+});
+
 test('R19: der Kuerzel-Dialog heisst "Tastenkombinationen", die Klartext-Hilfe "Hilfe"', () => {
   const help = router.slice(router.indexOf('function showHelpModal('), router.indexOf('// Update-Hinweis (#490)'));
   assert.match(help, /const helpTitle = coarsePointer \? t\('help\.title'\) : t\('shortcuts\.help'\);/);
-  assert.match(help, /setAttribute\('aria-label', helpTitle\)/, 'der Name des Dialogs');
-  assert.match(help, /modal-panel__title">\$\{esc\(helpTitle\)\}/, 'die sichtbare Ueberschrift');
+  // Seit R20 traegt openModal() den Titel: sichtbare Ueberschrift (h2) und
+  // Name des Dialogs (aria-labelledby) aus derselben Zeichenkette.
+  assert.match(help, /openModal\(\{\s*title: helpTitle,/, 'Ueberschrift und Name des Dialogs');
   assert.doesNotMatch(help, /t\('help\.title'\)\)/, 'kein fester Titel "Hilfe" mehr im Kopf');
   assert.equal(de.shortcuts.help, 'Tastenkombinationen');
 });

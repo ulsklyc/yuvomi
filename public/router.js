@@ -52,7 +52,7 @@ import { showSessionUnreachable, showPageUnreachable, isUnreachableFailure } fro
 import { wireSheetDrag } from '/utils/sheet-drag.js';
 import {
   handleBackNavigation, closeAllOverlays, consumeOverlayMarker,
-  pushOverlay, dropOverlay, attachOverlay, whenHistorySettled, hasOpenOverlay,
+  pushOverlay, dropOverlay, whenHistorySettled, hasOpenOverlay,
 } from '/utils/overlay-history.js';
 import {
   applyNavBadges, setNavBadge, resetNavBadges, navBadgeRoutes,
@@ -2798,16 +2798,6 @@ function showHelpModal() {
   // Klartext-Fassung am Finger.
   const helpTitle = coarsePointer ? t('help.title') : t('shortcuts.help');
 
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.setAttribute('aria-modal', 'true');
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-
-  const panel = document.createElement('div');
-  panel.className = 'modal-panel modal-panel--sm';
-  panel.setAttribute('role', 'dialog');
-  panel.setAttribute('aria-label', helpTitle);
-
   const rows = helpRows.map((r) => r.key
     ? `<div class="help-row">
          <kbd class="shortcut-kbd">${esc(r.key)}</kbd>
@@ -2819,15 +2809,24 @@ function showHelpModal() {
        </div>`
   ).join('');
 
-  panel.insertAdjacentHTML('beforeend', `
-    <div class="modal-panel__header">
-      <span class="modal-panel__title">${esc(helpTitle)}</span>
-      <button class="modal-panel__close btn--ghost" aria-label="${esc(t('common.close'))}">
-        <i data-lucide="x" class="icon-md" aria-hidden="true"></i>
-      </button>
-    </div>
-    <div class="modal-panel__body">
-      <div class="shortcuts-list">${rows}</div>
+  // DER GETEILTE DIALOG (R20, Re-Critique 2026-10-17 A1 P1-2). Hier stand ein
+  // eigenes Overlay mit `aria-modal` am Grund statt am Dialog, einem `span`
+  // als Titel und einem Esc-Listener am Dokument: der Fokus blieb auf der
+  // Seite, Tab lief hinaus, und nach dem Schliessen fand niemand zurueck.
+  // openModal() bringt Top-Layer, Fokusfalle, Esc, Zurueck-Geste und die
+  // Rueckgabe an den Ausloeser mit - wie jeder andere Dialog der App. Nichts
+  // darin ist ungespeichert, also ohne Verwerfen-Rueckfrage.
+  //
+  // Am Zeiger stehen die Kuerzel in ZWEI SPALTEN (`--columns`): zwanzig
+  // Zeilen untereinander ergaben bei 1440x900 852px Einzelspalte.
+  // `--help-rows` haelt die Spalten gleich lang, gelesen wird spaltenweise.
+  const columns = !coarsePointer;
+  openModal({
+    title: helpTitle,
+    size: columns ? 'lg' : 'sm',
+    dirtyGuard: false,
+    content: `
+      <div class="shortcuts-list${columns ? ' shortcuts-list--columns' : ''}"${columns ? ` style="--help-rows:${Math.ceil(helpRows.length / 2)}"` : ''}>${rows}</div>
       <!-- Nutzerhandbuch aus der Community (#799). Es lebt in einem fremden
            Repository und in fremder Regie - deshalb steht die Herkunft im
            Linktext und nicht nur im Hinweis darunter: wer hier klickt,
@@ -2837,21 +2836,8 @@ function showHelpModal() {
           ${esc(t('help.guideLink'))}
         </a>
         <span class="help-guide__hint">${esc(t('help.guideHint'))}</span>
-      </p>
-    </div>
-  `);
-
-  panel.querySelector('.modal-panel__close').addEventListener('click', () => overlay.remove());
-  document.addEventListener('keydown', function onEsc(e) {
-    if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', onEsc); }
+      </p>`,
   });
-
-  overlay.appendChild(panel);
-  document.body.appendChild(overlay);
-  // Die Zurueck-Geste schliesst auch diesen Dialog (#871). `attachOverlay`
-  // statt `pushOverlay`, weil er auf drei Wegen per `remove()` verschwindet.
-  attachOverlay(overlay, () => overlay.remove());
-  if (window.lucide) window.lucide.createIcons({ el: panel });
 }
 
 // --------------------------------------------------------
