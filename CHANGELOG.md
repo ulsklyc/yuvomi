@@ -77,6 +77,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   went wrong", the error screen names the page ("Contacts can't be opened right now"), says that
   everything else keeps working, and offers "Go to Overview" next to "Reload".
 
+- **Lists next to their details use the room on wide screens and tablets.** From about 1900px the
+  list beside the details (contacts, tasks, inventory, birthdays, recipes) is wider, so contacts
+  show their full e-mail addresses and the category chips fit on one line. On a tablet the list now
+  runs as wide as its header instead of leaving a strip free on the right.
+
 - **A recipe without a picture starts with its content.** The flat kitchen-coloured band above
   the ingredients is gone; the details open with the meals and the ingredients, under the
   recipe's name. Recipes with a picture keep it.

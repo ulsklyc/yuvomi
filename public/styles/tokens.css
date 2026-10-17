@@ -1614,6 +1614,14 @@
    * 75rem, und 1280 fiel auf den Einspalter mit Modal zurueck (A3 P2-2). */
   --layout-list-min: 26.25rem;
   --layout-list-max: 32.5rem;
+  /* Listenbahn, sobald der Baustein auf der Content-Spalte steht (Modulflaeche
+   * ab 84rem = 1280 + 2 x 32px Gutter, layout.css): dann waechst er nicht
+   * mehr, und die 40 % der Formel oben blieben bei 520px stehen - die Kontakte
+   * kuerzten bei 1920 neun E-Mails und brachen die Filterchips auf zwei
+   * Zeilen, waehrend rechts im Detail 768px fuer kurze Felder standen
+   * (Re-Critique 2026-10-17, A1 P2-8). 640px Liste tragen die fuenf
+   * Kategorie-Chips der Kontakte in einer Zeile; das Detail behaelt 680px. */
+  --layout-list-wide: 40rem;
   --layout-split-threshold: 65rem;
   /* Navigationsliste im Split (Einstellungen, Gesundheit): ihre Zeilen sind
    * Ziele, keine zweizeiligen Datensaetze - sie nimmt die Breite einer

@@ -18312,6 +18312,16 @@ test('PAGE-019: der Liste-+-Detail-Baustein misst die Modulflaeche an der Schwel
   assert.ok(listMin >= 420 && listMax <= 520 && listMin < listMax,
     `PAGE-019: Listenbahn ${listMin}-${listMax}px liegt nicht in 420-520px`);
 
+  // Die zweite Stufe (Re-Critique 2026-10-17): sobald der Baustein auf seinem
+  // Deckel steht (Content-Spalte + 2 Desktop-Gutter), nimmt die Liste
+  // --layout-list-wide. Die Zahl der Abfrage ist genau dieser Deckel.
+  const capPx = Number(tokens.match(/--content-max-width:\s*([0-9]+)px/)[1])
+    + 2 * Number(tokens.match(/--space-8:\s*([0-9]+)px/)[1]);
+  assert.match(tokens, /:root[\s\S]*@media[^{]*\{[^}]*--page-gutter:\s*var\(--space-8\)/, 'der Desktop-Gutter ist --space-8');
+  const capRem = capPx / 16;
+  const listWide = rem('--layout-list-wide') * 16;
+  assert.ok(listWide > listMax && listWide <= 720, `PAGE-019: --layout-list-wide ${listWide}px muss zwischen Listenbahn und Lesemass liegen`);
+  let wideGrid = null;
   let containerRule = null;
   let hiddenOutside = false;
   let shownInside = false;
@@ -18324,6 +18334,11 @@ test('PAGE-019: der Liste-+-Detail-Baustein misst die Modulflaeche an der Schwel
     if (!/@container\s+module-surface/.test(chain)) continue;
     const width = chain.match(/min-width:\s*([0-9.]+)rem/);
     assert.ok(width, `PAGE-019: @container module-surface ohne min-width in rem (${chain})`);
+    if (Number(width[1]) === capRem) {
+      assert.equal(sel, '.split-view', `PAGE-019: die Deckel-Stufe ${capRem}rem traegt nur die Listenbahn`);
+      wideGrid = body;
+      continue;
+    }
     assert.equal(Number(width[1]), threshold,
       `PAGE-019: Schwelle in layout.css ${width[1]}rem, tokens.css --layout-split-threshold ${threshold}rem - `
       + '@container kann keine Variable lesen, beide Stellen muessen gleich stehen');
@@ -18339,6 +18354,7 @@ test('PAGE-019: der Liste-+-Detail-Baustein misst die Modulflaeche an der Schwel
   let splitQueries = 0;
   for (const file of readdirSync(new URL('../public/styles/', import.meta.url)).filter((name) => name.endsWith('.css'))) {
     for (const m of read(`../public/styles/${file}`).matchAll(splitQuery)) {
+      if (file === 'layout.css' && m[1] === 'module-surface' && `${m[2]}${m[3]}` === `${capRem}rem`) continue;
       splitQueries += 1;
       assert.equal(`${m[2]}${m[3]}`, `${threshold}rem`,
         `PAGE-019: ${file} schaltet @container ${m[1]} bei ${m[2]}${m[3]}, tokens.css --layout-split-threshold steht bei ${threshold}rem`);
@@ -18368,6 +18384,12 @@ test('PAGE-019: der Liste-+-Detail-Baustein misst die Modulflaeche an der Schwel
     'PAGE-019: .split-view muss ab der Schwelle auf --content-max-width + 2 Gutter gedeckelt sein (Fluchtlinie Kopf)');
   assert.match(gridInside, /margin-inline:\s*auto/,
     'PAGE-019: der gedeckelte Baustein steht mittig wie die Content-Spalte des Kopfs');
+  assert.ok(wideGrid && /grid-template-columns:\s*var\(--layout-list-wide\)\s+minmax\(0,\s*1fr\)/.test(wideGrid),
+    `PAGE-019: ab ${capRem}rem (Deckel) nimmt die Liste --layout-list-wide - sonst kuerzt sie bei 1920, waehrend daneben Platz steht`);
+  // Tablet unter der Schwelle: die Liste steht auf der Breite ihres Kopfs.
+  const tablet = [...eachRule(layout)].find(({ selector, at }) => selector.trim() === '.app-page--list-detail > *'
+    && at.join(' ').includes('(min-width: 640px) and (max-width: 1023px)'));
+  assert.ok(tablet && /--page-measure:\s*100%/.test(tablet.body), 'PAGE-019: am Tablet laeuft die Liste so breit wie ihr Kopf');
 });
 
 test('PAGE-020: eine Aussenkante je Modul - kein Reiter schaltet das Mass oder den Kopf um', () => {

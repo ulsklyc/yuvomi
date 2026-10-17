@@ -3593,6 +3593,29 @@ html.fab-steady .page-fab {
   }
 }
 
+/* AUF DER CONTENT-SPALTE NIMMT DIE LISTE MEHR (Re-Critique 2026-10-17, A1
+ * P2-8). Ab 84rem Modulflaeche (Content-Spalte 1280 plus zwei 32px-Gutter,
+ * siehe Deckel oben) ist der Baustein 1344px breit und waechst nicht mehr; die
+ * Liste bekommt dann `--layout-list-wide` (640px), das Detail die 680px
+ * daneben. Darunter gilt die 40-%-Formel unveraendert. */
+@container module-surface (min-width: 84rem) {
+  .split-view {
+    grid-template-columns: var(--layout-list-wide) minmax(0, 1fr);
+  }
+}
+
+/* Unter der Schwelle am Tablet (640-1023px): Kopf und Liste stehen auf
+ * derselben Breite. Der Kopf der Liste-und-Detail-Seiten laeuft ueber die volle
+ * Spalte, die Liste endete auf dem Lesemass - bei 834 standen rechts 98px
+ * leer, waehrend die E-Mails der Kontakte gekuerzt wurden (Re-Critique
+ * 2026-10-17, A1). Telefone liegen ohnehin unter 720px, der Desktop zeigt
+ * ab der Schwelle Liste und Detail. */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .app-page--list-detail > * {
+    --page-measure: 100%;
+  }
+}
+
 /* DIE AUSWAHL STEHT IN DER SPALTE (Critique R19, Muster Apple Mail).
  * Waehrend einer Mehrfachauswahl zeigt die Detailspalte „N ausgewaehlt" mit den
  * Sammelaktionen (utils/master-detail.js, setSelectionBulk); Detail und

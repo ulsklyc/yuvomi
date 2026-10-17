@@ -1372,6 +1372,11 @@ nebeneinander (420 + 24 + ~560). Bei 1440 nimmt die Listenspur
 Ueber 1344px Modulflaeche (Content-Spalte 1280 plus zwei Gutter) wird der Baustein nicht
 breiter, sondern steht mittig: Liste und Detail fluchten mit dem Kopf, der seinen Inhalt auf
 die Content-Spalte zieht (1920: beide Kanten bei 430 und 1710 statt 252 und 1888).
+Auf diesem Deckel (ab 84rem Modulflaeche) nimmt die Liste `--layout-list-wide` (640px) statt der
+40 %-Formel, das Detail die 680px daneben (R20, Re-Critique 2026-10-17: die Kontakte kuerzten bei
+1920 neun E-Mails und brachen die Chips um, waehrend das Detail 768px fuer kurze Felder hatte).
+Am Tablet unter der Schwelle (640-1023px) laeuft die Liste so breit wie ihr Kopf statt auf dem
+Lesemass (834: vorher 98px rechts leer).
 Die eine Ausnahme ist der Kalender mit Seitenleiste (R19): ab 86.25rem Kalenderflaeche nimmt
 seine Leiste den Rand ein, den die Inhaltsspalte sonst leer laesst (bei 1920 zusammen 420px), und
 Kopf, Leiste und Raster stehen von Seitenrand zu Seitenrand (252-1888). Seine Kante ist dann die,
