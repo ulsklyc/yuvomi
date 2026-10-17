@@ -281,8 +281,11 @@ test('authorized scope control stays reachable when only the current scope has a
 
 test('all supported locales contain every note-category translation', () => {
   const directory = new URL('../public/locales/', import.meta.url);
+  // `noResults` entfiel mit R19: eine leere Suche oder Kategorie-Auswahl
+  // zeigt den EINEN Leerzustand (searchEmptyHTML, common.searchNoResults*),
+  // die Kategorien stehen dort als Chips (test:search-empty).
   const keys = [
-    'categories', 'filterLabel', 'empty', 'personal', 'household', 'noResults',
+    'categories', 'filterLabel', 'empty', 'personal', 'household',
     'deleteDetail', 'widgetHint', 'permissionLabel', 'searchPlaceholder',
     'searchResultsLabel', 'removeAction', 'createAction', 'scopeLabel', 'scopeHelp',
     'moreAction', 'moreAction_one', 'personalManagementHint',

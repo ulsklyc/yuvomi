@@ -851,7 +851,11 @@ for (const v of VERWALTER) {
       await manager._onSubmit({ preventDefault() {}, target: { closest: (sel) => (sel === '.cat-add-form' ? form : null) } });
       globalThis.__promptModal = () => 'Anders';
       try { await manager._rename(String(v.zeile.id)); } finally { delete globalThis.__promptModal; }
-      knopfnamen = [...manager._rowActionsHtml('Anders', { isFirst: true, isLast: true }).matchAll(/aria-label="([a-zA-Z.]+)\{/g)].map((m) => m[1]);
+      // Seit R19 stehen die vier Aktionen im Mehr-Menue der Zeile (hoechstens
+      // zwei sichtbare Zeilenaktionen plus Mehr) - ihr Name ist der Text des
+      // Menueeintrags, nicht mehr das aria-label eines Icon-Knopfs.
+      knopfnamen = [...manager._rowActionsHtml('Anders', { isFirst: true, isLast: true })
+        .matchAll(/role="menuitem"[^>]*>\s*<i [^>]*><\/i>\s*<span>([a-zA-Z.]+)\{/g)].map((m) => m[1]);
       for (let i = 0; i < 5; i += 1) await new Promise((r) => setImmediate(r));
     });
 

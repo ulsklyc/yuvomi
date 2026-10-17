@@ -39,12 +39,16 @@ const in3days  = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
 
 console.log('\n[Tasks-Test] CRUD + Filter + Subtasks\n');
 
-test('Sammelaktionen: Pille der Shell statt eigener Leiste, nur im Auswahlmodus (D5)', () => {
+test('Sammelaktionen: Pille der Shell bzw. Detailspalte statt eigener Leiste, nur im Auswahlmodus (D5, R19)', () => {
   const source = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
   assert(!source.includes('id="bulk-actions-bar"'), 'keine eigene Sammelaktionsleiste mehr ueber der Liste');
-  assert(/import \{ setBulkPill, clearBulkPill \} from '\/utils\/bulk-pill\.js'/.test(source), 'die Pille kommt aus utils/bulk-pill.js');
-  assert(/if \(!state\.bulkSelectMode \|\| readOnly\(\)\) \{ clearBulkPill\(\); return; \}/.test(source),
-    'ausserhalb des Auswahlmodus (und bei Nur-lesen) steht keine Pille');
+  // R19: die Auswahl geht ueber den Baustein Liste + Detail - ab der
+  // Split-Schwelle „N ausgewaehlt" in der Detailspalte, im Brett und darunter
+  // weiter die Pille aus utils/bulk-pill.js (setSelectionBulk, test:master-detail).
+  assert(/import \{[^}]*\bsetSelectionBulk\b[^}]*\} from '\/utils\/master-detail\.js'/.test(source),
+    'die Auswahl laeuft ueber setSelectionBulk aus utils/master-detail.js');
+  assert(/if \(!state\.bulkSelectMode \|\| readOnly\(\)\) \{ setSelectionBulk\(taskMd, null\); return; \}/.test(source),
+    'ausserhalb des Auswahlmodus (und bei Nur-lesen) steht keine Pille und keine Auswahlspalte');
   assert(/if \(n > 0\) \{/.test(source), 'Aktionen mit Gegenstand erst ab einer gewaehlten Aufgabe');
 });
 

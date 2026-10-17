@@ -98,7 +98,11 @@ test('M1: der Statuskreis wird mobil schmaler, trifft aber weiter voll', () => {
 // Die Flaeche waechst deshalb per Polster und hebt es mit dem Rand wieder auf:
 // der Text bleibt, wo er ist, die Box reicht bis an die Zeilenkante.
 test('M1: mobil reicht die Trefferflaeche des Titels ins Zeilenpolster, trotz Ellipse', () => {
-  const base = declarations(tasksCss, '.task-card__title');
+  // Seit R19 setzt die EINE Titelregel in typography.css die Kappung
+  // (hoechstens zwei Zeilen, `overflow: hidden`), nicht mehr tasks.css - die
+  // Voraussetzung liest deshalb dort. Sie gilt unveraendert: was kappt, klippt
+  // auch ein ::before.
+  const base = declarations(css('typography.css'), '.task-card__title');
   assert.equal(base.overflow, 'hidden', 'Voraussetzung: die Ellipse beschneidet ein ::before');
   const title = declarations(tasksCss, '.task-card__main .task-card__title', { media: MOBILE });
   const pad = title['padding-block-start'];
