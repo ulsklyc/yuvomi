@@ -3274,3 +3274,15 @@ test('R19: ein Ladefehler (429) bleibt in der Seite - Ladefehler mit Wiederholen
     restore();
   }
 });
+
+// R20 (Re-Critique 2026-10-17 a3 P3): "Drucken" stand ueber dem Leerzustand
+// und druckte eine leere Seite.
+test('R20: die Auswertung bietet Drucken nur an, wenn es Eintraege gibt', async () => {
+  const { installMiniDom } = await import('./mini-dom.js');
+  installMiniDom();
+  const { __test } = await import('../public/pages/schedule.js');
+  __test.setStatisticsEntries([]);
+  assert.doesNotMatch(__test.renderStatistics(), /data-action="print-statistics"/, 'leer: kein Drucken');
+  __test.setStatisticsEntries([{ date: '2026-10-01', shift_type: { id: 1, name: 'Frueh', short_code: 'F', color: '#0E7490', start_time: '06:00', end_time: '14:00' } }]);
+  assert.match(__test.renderStatistics(), /data-action="print-statistics"/, 'mit Eintraegen: Drucken');
+});

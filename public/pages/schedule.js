@@ -1464,6 +1464,7 @@ function renderStatistics() {
   // (laengst verschwundenen) Fehler-Toast bliebe der Nutzer bei einer stillen
   // Falschaussage. Eigener Zweig, denselben Fehlerzustand wie andere Module
   // (mountLoadError/emptyStateHTML variant:'error') statt erfundener Zahlen.
+  const printable = !statistics.loading && !statistics.error && Boolean(bounds) && statistics.entries.length > 0;
   const results = statistics.loading
     ? scheduleLoadingHtml({ rows: 3, lines: 2 })
     : statistics.error
@@ -1518,8 +1519,10 @@ function renderStatistics() {
     + '<select class="form-input schedule-stat-range__select" name="statistics_range" aria-label="' + esc(t('schedule.statisticsRange')) + '">'
     + STATISTICS_RANGES.map(([value, label]) => '<option value="' + value + '"' + (range === value ? ' selected' : '') + '>' + esc(t(label)) + '</option>').join('')
     + '</select></div>' + (controls ? '<div class="schedule-stat-dates">' + controls + '</div>' : '')
-    + '<div class="schedule-stat-filter-actions">'
-    + '<button type="button" class="btn btn--secondary" data-action="print-statistics"><i data-lucide="printer" aria-hidden="true"></i>' + esc(t('schedule.print')) + '</button></div></form>'
+    // DRUCKEN NUR, WO ES ETWAS ZU DRUCKEN GIBT (R20, Re-Critique 2026-10-17 a3):
+    // ueber dem Leerzustand druckte der Knopf eine leere Seite.
+    + (printable ? '<div class="schedule-stat-filter-actions">'
+    + '<button type="button" class="btn btn--secondary" data-action="print-statistics"><i data-lucide="printer" aria-hidden="true"></i>' + esc(t('schedule.print')) + '</button></div>' : '') + '</form>'
     + results + '</section>';
 }
 /**
