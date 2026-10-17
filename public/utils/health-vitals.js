@@ -227,6 +227,10 @@ const isFiniteNum = (value) => typeof value === 'number' && Number.isFinite(valu
  * @returns {{hard: Array<{channel: 'value'|'sys'|'dia'|'pulse', issue: 'impossible'|'bpOrder'}>,
  *            soft: Array<{channel: 'value'|'sys'|'dia'|'pulse', issue: 'low'|'high'}>}}
  */
+// Nur EIGENE Schluessel der Grenztabellen: eine Einheit aus API oder Import
+// ("constructor", "toString") fand sonst eine geerbte Eigenschaft (Review #2049).
+const ownEntry = (table, key) => (table && key != null && Object.hasOwn(table, key) ? table[key] : undefined);
+
 export function vitalPlausibility({ type, unit, value_num: v1, value_num2: v2, value_num3: v3 }) {
   const hard = [];
   const soft = [];
@@ -240,8 +244,8 @@ export function vitalPlausibility({ type, unit, value_num: v1, value_num2: v2, v
     else if (softRange && value > softRange[1]) soft.push({ channel, issue: 'high' });
   };
   if (type === 'bp') {
-    const hardBp = VITAL_HARD_LIMITS.bp[unit ?? 'mmHg'];
-    const softBp = VITAL_SOFT_RANGES.bp[unit ?? 'mmHg'];
+    const hardBp = ownEntry(VITAL_HARD_LIMITS.bp, unit ?? 'mmHg');
+    const softBp = ownEntry(VITAL_SOFT_RANGES.bp, unit ?? 'mmHg');
     check('sys', v1, hardBp?.sys, softBp?.sys);
     check('dia', v2, hardBp?.dia, softBp?.dia);
     // Systolisch ueber diastolisch gilt ohne Einheit - am unteren Feld, weil
@@ -251,8 +255,8 @@ export function vitalPlausibility({ type, unit, value_num: v1, value_num2: v2, v
     return { hard, soft };
   }
   // SpO2 ueber 100 % ist in jeder Schreibweise unmoeglich.
-  const hardRange = VITAL_HARD_LIMITS[type]?.[unit] ?? (type === 'spo2' ? [-Infinity, 100] : null);
-  check('value', v1, hardRange, VITAL_SOFT_RANGES[type]?.[unit]);
+  const hardRange = ownEntry(ownEntry(VITAL_HARD_LIMITS, type), unit) ?? (type === 'spo2' ? [-Infinity, 100] : null);
+  check('value', v1, hardRange, ownEntry(ownEntry(VITAL_SOFT_RANGES, type), unit));
   return { hard, soft };
 }
 

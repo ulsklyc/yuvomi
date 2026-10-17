@@ -876,6 +876,30 @@ test('vitalPlausibility: Unmoegliches ist hart, Ungewoehnliches weich, Normales 
   assert.deepEqual(p({ type: 'height', unit: 'cm', value_num: 999 }), { hard: [], soft: [] });
 });
 
+// Review #2049: die Tabellen sind Objekte, `unit` und `type` kommen frei vom
+// Client. Ein Name wie "constructor" oder "toString" fand frueher eine geerbte
+// Eigenschaft - der Server warf 500, das Formular warf beim Tippen. Eine fremde
+// Einheit hat keine Zahlenraender, also wird die Messung geprueft wie jede
+// andere ohne Einheit.
+test('Einheit oder Typ mit dem Namen einer Objekt-Eigenschaft hat keine Raender und wirft nicht', async () => {
+  const client = await import('../public/utils/health-vitals.js');
+  const server = await import('../server/routes/health/vital-limits.js');
+  for (const name of ['constructor', 'toString', '__proto__', 'hasOwnProperty', 'valueOf']) {
+    for (const m of [
+      { type: 'weight', unit: name, value_num: 70 },
+      { type: 'bp', unit: name, value_num: 120, value_num2: 80 },
+      { type: name, unit: 'kg', value_num: 70 },
+      { type: 'glucose', unit: name, value_num: 5000 },
+    ]) {
+      assert.equal(server.vitalLimitError(m), null, JSON.stringify(m));
+      assert.deepEqual(client.vitalPlausibility(m), { hard: [], soft: [] }, JSON.stringify(m));
+    }
+  }
+  // Die Regeln ohne Einheit gelten weiter.
+  assert.equal(server.vitalLimitError({ type: 'bp', unit: 'toString', value_num: 80, value_num2: 120 }), 'bp_order');
+  assert.equal(server.vitalLimitError({ type: 'spo2', unit: 'constructor', value_num: 101 }), 'out_of_range');
+});
+
 test('die harten Grenzen von Formular und Server sind dieselben, und weich liegt innerhalb von hart', async () => {
   const client = await import('../public/utils/health-vitals.js');
   const server = await import('../server/routes/health/vital-limits.js');

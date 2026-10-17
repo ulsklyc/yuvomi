@@ -46,6 +46,10 @@ export const VITAL_HARD_LIMITS = Object.freeze({
 export const PULSE_HARD_LIMITS = Object.freeze([20, 300]);
 
 const within = (value, [min, max]) => value >= min && value <= max;
+// `type` und `unit` kommen frei vom Client: nur EIGENE Schluessel der Tabellen
+// zaehlen, sonst findet "constructor" oder "toString" eine geerbte Eigenschaft
+// (Review #2049) und die Pruefung wirft statt "keine Raender" zu sagen.
+const own = (table, key) => (table && key != null && Object.hasOwn(table, key) ? table[key] : undefined);
 const isNum = (value) => typeof value === 'number' && Number.isFinite(value);
 
 /**
@@ -58,7 +62,7 @@ const isNum = (value) => typeof value === 'number' && Number.isFinite(value);
 export function vitalLimitError({ type, unit, value_num: v1, value_num2: v2, value_num3: v3 }) {
   if (type === 'bp') {
     if (isNum(v1) && isNum(v2) && v1 <= v2) return 'bp_order';
-    const limits = VITAL_HARD_LIMITS.bp[unit ?? 'mmHg'];
+    const limits = own(VITAL_HARD_LIMITS.bp, unit ?? 'mmHg');
     if (limits && ((isNum(v1) && !within(v1, limits.sys)) || (isNum(v2) && !within(v2, limits.dia)))) return 'out_of_range';
     if (isNum(v3) && !within(v3, PULSE_HARD_LIMITS)) return 'out_of_range';
     return null;
@@ -66,7 +70,7 @@ export function vitalLimitError({ type, unit, value_num: v1, value_num2: v2, val
   if (!isNum(v1)) return null;
   // Ueber 100 % ist in jeder Schreibweise unmoeglich, auch ohne Einheit.
   if (type === 'spo2' && v1 > 100) return 'out_of_range';
-  const range = VITAL_HARD_LIMITS[type]?.[unit];
+  const range = own(own(VITAL_HARD_LIMITS, type), unit);
   return range && !within(v1, range) ? 'out_of_range' : null;
 }
 

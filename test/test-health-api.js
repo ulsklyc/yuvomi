@@ -198,6 +198,9 @@ test('Vitals: unmoegliche Werte -> 400 mit Grund, moegliche Extremwerte gehen du
     { type: 'bp', value_num: 220, value_num2: 130, value_num3: 180, unit: 'mmHg' },
     // Eine fremde Einheit hat keine Zahlenraender.
     { type: 'weight', value_num: 90, unit: 'stone' },
+    // Review #2049: ein Einheitsname wie eine Objekt-Eigenschaft warf vorher 500.
+    { type: 'weight', value_num: 70, unit: 'constructor' },
+    { type: 'bp', value_num: 120, value_num2: 80, unit: 'toString' },
   ]) {
     const res = await call('POST', '/vitals', { ...body, measured_at: at });
     assert.equal(res.status, 201, JSON.stringify(body));
