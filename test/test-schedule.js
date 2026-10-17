@@ -3331,3 +3331,15 @@ test('R20: Schichtarten stehen nach Tageszeit, Ganztaegiges als eigene Gruppe', 
   assert.deepEqual(groups[1].types.map((x) => x.id), [4, 1], 'ganztaegig nach Name');
   assert.equal(__test.shiftTypeGroups(types.filter((x) => x.start_time)).length, 1);
 });
+
+// R20 (Aufraeumen, Ulas 2026-10-17): schedule.css laedt nur auf /schedule, die
+// Leseansicht rendert "Meine Einstellungen" seit R14 nicht mehr. Regeln auf
+// `.schedule-reminder-settings*` erreichten damit nichts - das Blatt in den
+// Einstellungen laedt settings.css.
+test('schedule.css traegt keine Regeln fuer das Einstellungsblatt, das sie nie laedt', () => {
+  const css = readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.doesNotMatch(css, /\.schedule-reminder-settings/);
+  const page = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(page, /schedule-reminder-settings/, 'die Leseansicht rendert die Einstellungen wieder - dann gehoeren die Regeln zurueck');
+});

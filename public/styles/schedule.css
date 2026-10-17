@@ -608,34 +608,6 @@
   margin-bottom: var(--space-1);
 }
 
-.schedule-reminder-settings {
-  margin-bottom: var(--space-4);
-}
-
-.schedule-reminder-settings__row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-.schedule-reminder-settings__row .toggle-row {
-  flex: 1 1 auto;
-}
-
-.schedule-reminder-settings__row select {
-  width: auto;
-  flex: 0 0 auto;
-}
-
-/* Eine Stundenzahl ist drei Ziffern breit, nicht die ganze Karte: das Feld
- * lief am Desktop 1116px weit (Re-Critique 2026-09-27, A2 P1). */
-.schedule-reminder-settings__row--hours .form-input {
-  inline-size: 10ch;
-  flex: 0 0 auto;
-}
-
 /* Keine Karte in der Karte (R19): die Liste stand auf einer zweiten,
  * gehobenen Flaeche in der Karte. Die Zeilen stehen direkt in ihr. */
 .schedule-stat-list {
@@ -1103,14 +1075,11 @@
    * .form-field` und `.schedule-stat-filter-actions` bleiben als eigene Zeilen
    * stehen - seit `.schedule-stat-filters` selbst verschwindet, sind sie ohne
    * Wirkung, aber harmlos, und eine von ihnen war ohnehin schon ein gepruefter
-   * Guard (test-schedule.js). `.schedule-reminder-settings` ("Meine
-   * Einstellungen") gehoert hierher aus demselben Grund wie die Tab-Leiste:
-   * sie beantwortet "was gilt fuer MICH", nicht "was stand in der gewaehlten
-   * Spanne" - auf dem Statistik-Blatt druckte sie bisher als allererste Karte
-   * vor der eigentlichen Auswertung. */
+   * Guard (test-schedule.js). "Meine Einstellungen" stehen seit R14 im
+   * Einstellungsblatt (settings/pages/personal-schedule.js), das settings.css
+   * laedt - hier gibt es sie nicht mehr zu verstecken. */
   .schedule-tabs,
   .schedule-today,
-  .schedule-reminder-settings,
   .schedule-stat-filters,
   .schedule-stat-filters .form-field,
   .schedule-stat-filter-actions {
