@@ -670,3 +670,11 @@ test('Vorrat: der Mengen-Stepper ist ruhig wie die Zeilenaktion, Trefferflaeche 
   assert.ok([...eachRule(css)].some((r) => r.at.some((a) => /hover:\s*none/.test(a)) && /--pantry-step-btn:\s*var\(--target-base\)/.test(r.body)),
     'am Finger weiter das Fingermass');
 });
+
+// R20 (Re-Critique 2026-10-17 a2 P3): "Vorrat -/+ als 12px-Glyphe in 48px".
+test('Vorrat: die Stepper-Zeichen haben Knopfmass (--icon-md), keine Inline-Marker', () => {
+  const src = readFileSync(new URL('../public/pages/pantry.js', import.meta.url), 'utf8');
+  assert.match(src, /data-lucide="minus" class="icon-md"/);
+  assert.match(src, /data-lucide="plus" class="icon-md"/);
+  assert.doesNotMatch(src, /data-lucide="(minus|plus)" class="icon-sm"/);
+});

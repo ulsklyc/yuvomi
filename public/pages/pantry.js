@@ -316,7 +316,11 @@ export async function render(container) {
       placeholder: t('pantry.searchPlaceholder'),
       value: state.query,
       clearLabel: t('common.searchClear'),
-      className: 'pantry-search page-toolbar__center',
+      // FELD STATT LUPE AUCH MOBIL (R20, Re-Critique 2026-10-17 a2 P2-4):
+      // die Zeile unter der Kuechen-Leiste trug nur Lupe und Ortsnadel, 65px
+      // fuer zwei Icons. Wie bei den Rezepten (R19) fuellt das Feld die Zeile,
+      // die Lagerorte bleiben daneben.
+      className: 'pantry-search page-toolbar__center page-search--field',
     })}
     ${readOnly() ? '' : `<div class="page-toolbar__actions">
       ${pageToolsMenuHtml({
@@ -1040,6 +1044,9 @@ function rowEl(item) {
     return wrap;
   }
 
+  // Die Zeichen in --icon-md (R20, Re-Critique 2026-10-17 a2 P3): als
+  // --icon-sm (12px, Inline-Marker) standen sie in der 48px-Flaeche wie Staub;
+  // 16px ist das Mass jeder Knopf-Glyphe. Die Haut bleibt ruhig (pantry.css).
   const stepper = document.createElement('div');
   stepper.className = 'pantry-stepper';
   const step = pantryUnitStep(item.unit);
@@ -1050,7 +1057,7 @@ function rowEl(item) {
   minus.dataset.action = 'decrease';
   minus.disabled = Number(item.quantity) <= 0;
   minus.setAttribute('aria-label', `${t('pantry.decrease')}: ${item.name}`);
-  minus.insertAdjacentHTML('beforeend', '<i data-lucide="minus" class="icon-sm" aria-hidden="true"></i>');
+  minus.insertAdjacentHTML('beforeend', '<i data-lucide="minus" class="icon-md" aria-hidden="true"></i>');
 
   // Der Wert steht in der Meta-Zeile (siehe dort). BEWUSST keine eigene
   // Live-Region je Zeile: bei 60 Artikeln wären das 60 Live-Regionen, und
@@ -1064,7 +1071,7 @@ function rowEl(item) {
   plus.className = 'pantry-stepper__btn';
   plus.dataset.action = 'increase';
   plus.setAttribute('aria-label', `${t('pantry.increase')}: ${item.name}`);
-  plus.insertAdjacentHTML('beforeend', '<i data-lucide="plus" class="icon-sm" aria-hidden="true"></i>');
+  plus.insertAdjacentHTML('beforeend', '<i data-lucide="plus" class="icon-md" aria-hidden="true"></i>');
 
   stepper.dataset.step = String(step);
   stepper.append(minus, plus);

@@ -1915,6 +1915,10 @@ test('Zutatenzeile: Name allein in Zeile eins, Menge und Kategorie teilen Zeile 
 test('R19: die Rezeptsuche ist mobil ein Feld, keine Lupe in einer eigenen Zeile', () => {
   const recipes = readFileSync(new URL('../public/pages/recipes.js', import.meta.url), 'utf8');
   assert(/className: 'recipes-search page-toolbar__center page-search--field'/.test(recipes), 'die Rezeptsuche traegt --field');
+  // R20 (Re-Critique 2026-10-17 a2 P2-4): der Vorrat ebenso - seine Zeile trug
+  // nur Lupe und Ortsnadel (65px fuer zwei Icons).
+  const pantry = readFileSync(new URL('../public/pages/pantry.js', import.meta.url), 'utf8');
+  assert(/className: 'pantry-search page-toolbar__center page-search--field'/.test(pantry), 'die Vorratssuche traegt --field');
   const layout = [...eachRule(readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8'))];
   const phone = layout.filter((r) => r.at.some((a) => /max-width:\s*767px/.test(a)));
   const iconForm = phone.filter((r) => /\.page-toolbar \.page-search:[^,{]*:not\(:focus-within\)/.test(r.selector));

@@ -114,8 +114,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A PDF preview shows the whole first page.** On a computer the preview fitted the page to its
   width and showed less than half of it; it now fits the full page, and "Open in new tab" stays the
   way to read it in detail.
-- **Recipes have a real search field on a phone.** The row under the kitchen tabs held only a
-  magnifying glass; it now holds the search field itself, so you can tap and type right away.
+- **Recipes and Pantry have a real search field on a phone.** The row under the kitchen tabs held
+  only a magnifying glass (in Pantry next to the storage places); it now holds the search field
+  itself, so you can tap and type right away.
 - **Breakfast, snack and dinner are told apart at a glance.** Dinner is now indigo instead of the
   app's violet, so it no longer looks like a button, and snacks are berry instead of an orange that
   was hard to tell from breakfast amber, also with red-green colour blindness.
