@@ -406,6 +406,14 @@ test('R16: Werkzeuge in der Titelzeile - nur markiert, nur mobil, nie neben eine
   assert.ok(title, 'der Titel gibt nach (Basis 0) - die Knoepfe haben kein Label zum Anschneiden');
   assert.match(title.body, /white-space:\s*nowrap/, 'ein langer Titel kuerzt, er bricht nicht um (Kopfhoehe je Sprache gleich)');
   assert.match(title.body, /text-overflow:\s*ellipsis/);
+  // Re-Kritik 2026-10-17: auf dem Tablet stand "Aufgab..." (150 > 141px)
+  // neben einem 386px-Suchfeld. Ab 768px nimmt der Titel seine Breite (bis zur
+  // halben Zeile), die Suche gibt nach.
+  const tablet = own.find((r) => r.selector.endsWith(':not(.page-toolbar--in-group) > .page-toolbar__title')
+    && r.at.some((a) => /min-width:\s*768px/.test(a) && /max-width:\s*1023px/.test(a)));
+  assert.match(tablet?.body ?? '', /flex:\s*0 0 auto/, 'Tablet: der Titel gibt nicht nach');
+  assert.match(tablet?.body ?? '', /max-inline-size:\s*50%/, 'Tablet: ein sehr langer Titel kuerzt weiter, ab der halben Zeile');
+  assert.ok(!tablet?.at.some((a) => /max-width:\s*767px/.test(a)), 'das Telefon behaelt Basis 0');
 
   const design = read('../DESIGN.md');
   assert.match(design, /\*\*1a\. Werkzeuge in der Titelzeile\.\*\*/, 'DESIGN.md benennt die Regel');

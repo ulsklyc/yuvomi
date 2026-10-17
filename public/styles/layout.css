@@ -4535,6 +4535,22 @@ html.fab-steady .page-fab {
   }
 }
 
+/* AUF DEM TABLET GIBT DIE SUCHE NACH, NICHT DER TITEL (Re-Kritik 2026-10-17).
+ * Mit Basis 0 teilte sich der Titel die Zeile mit dem Suchfeld: bei 834px
+ * stand "Aufgab..." (150 > 141px) und "Geburtsta..." neben einem 386px breiten
+ * Feld. Ab 768px traegt die Zeile beides; der Titel nimmt seine Breite, das
+ * Feld den Rest (und faellt unter seiner Mindestbreite in die Icon-Form,
+ * utils/page-search.js). Die Kappe bei der halben Zeile laesst einen sehr
+ * langen Titel einer anderen Sprache weiter kuerzen statt das Feld zu
+ * verdraengen. Auf dem Telefon bleibt die Basis 0 - dort steht die Suche als
+ * Icon, und der Titel braucht die ganze Zeile. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .page-toolbar.page-toolbar--title-tools:not(.page-toolbar--in-group) > .page-toolbar__title {
+    flex: 0 0 auto;
+    max-inline-size: 50%;
+  }
+}
+
 /* DIE TAB-LEISTE IST DIE TITELZEILE (R19, Critique 2026-10-16 P2 mobil).
  *
  * Schichtplan, Belohnungen und Haushaltshilfe trugen unter 1024px zwei

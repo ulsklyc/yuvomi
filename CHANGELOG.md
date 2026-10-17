@@ -193,8 +193,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is now called "Points", so a phone no longer shows "Overview" twice and nothing saying where you
   are. The budget header
   folds to one row while you scroll, with the tabs beside the month. On a tablet the title, search
-  and tools of Tasks, Contacts, Inventory, Notes and Documents share one row, and the budget title
-  shares its row with the month.
+  and tools of Tasks, Contacts, Inventory, Notes and Documents share one row, where the search field
+  gives way so the title is never cut off, and the budget title shares its row with the month.
 - **The overview appears sooner on a cold start.** The browser now asks for every module the start
   needs at once instead of discovering them level by level, fetches the language file alongside
   them, and no longer waits for the date picker, category, icon picker, attachment, screensaver and
