@@ -47,6 +47,43 @@ export function isPersonAvatarRead(method, path) {
   return String(method || '').toUpperCase() === 'GET' && PERSON_AVATAR_PATH.test(String(path || ''));
 }
 
+const AVATAR_URL_RE = /^\/api\/v1\/people\/(\d+)\/avatar\?v=\d+$/;
+
+/**
+ * Ersetzt in einer Antwort jede Bildadresse wieder durch die Data-URL.
+ *
+ * FUER ANFRAGEN MIT API-TOKEN (Codex-Review zu #2056). Ein Client, der mit
+ * Bearer-Token liest und den Wert in ein `<img src>` setzt, schickt beim
+ * Bildabruf keinen `Authorization`-Header mit - die Adresse ergaebe 401, die
+ * Data-URL ging. Integrationen sehen deshalb keine Aenderung; die Adresse
+ * bekommt nur die App selbst (Cookie-Sitzung, Wanddisplay), deren Bildabruf
+ * das Cookie mitnimmt.
+ *
+ * @param {unknown} payload die Antwort, wie `res.json()` sie bekommt
+ * @param {(id: number) => string|null} lookup Data-URL einer Person
+ * @returns {unknown} dieselbe Struktur, Adressen ersetzt (das Original bleibt)
+ */
+export function inlineAvatarUrls(payload, lookup) {
+  const cache = new Map();
+  const visit = (value) => {
+    if (typeof value === 'string') {
+      const match = AVATAR_URL_RE.exec(value);
+      if (!match) return value;
+      const id = Number(match[1]);
+      if (!cache.has(id)) cache.set(id, lookup(id) ?? null);
+      return cache.get(id);
+    }
+    if (Array.isArray(value)) return value.map(visit);
+    if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+      const out = {};
+      for (const [key, inner] of Object.entries(value)) out[key] = visit(inner);
+      return out;
+    }
+    return value;
+  };
+  return visit(payload);
+}
+
 const DATA_URL_RE = /^data:(image\/(?:png|jpeg|webp));base64,([a-z0-9+/=]+)$/i;
 
 /**

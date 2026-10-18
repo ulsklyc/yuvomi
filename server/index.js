@@ -74,7 +74,7 @@ import remindersRouter from './routes/reminders.js';
 import searchRouter from './routes/search.js';
 import familyRouter from './routes/family.js';
 import personAvatarsRouter from './routes/people.js';
-import { isPersonAvatarRead } from './services/person-avatar.js';
+import { isPersonAvatarRead, inlineAvatarUrls } from './services/person-avatar.js';
 // ZWEI IMPORTZEILEN FUER EINE DATEI, ABSICHTLICH. `test:openapi-coverage`
 // findet die Routen eines Routers, indem es hier Namen auf Dateien abbildet -
 // und seine Muster kennen den reinen Default-Import und den reinen
@@ -728,6 +728,16 @@ app.use('/api/v1', (req, res, next) => {
   if (verdict === MODULE_ACCESS_READ_ONLY) {
     return res.status(403).json({ error: 'You have read-only access to this module.', code: 403, reason: 'module_read_only' });
   }
+  return next();
+});
+// Ein API-Token bekommt Profilbilder weiter als Data-URL statt als Adresse
+// (services/person-avatar.js, `inlineAvatarUrls`): sein Client schickt beim
+// Bildabruf kein Bearer-Token mit. Nur die App selbst bekommt die Adresse.
+app.use('/api/v1', (req, res, next) => {
+  if (req.authMethod !== 'api_token') return next();
+  const json = res.json.bind(res);
+  const lookup = (id) => db.get().prepare('SELECT avatar_data FROM users WHERE id = ?').get(id)?.avatar_data ?? null;
+  res.json = (body) => json(inlineAvatarUrls(body, lookup));
   return next();
 });
 app.use('/api/v1', csrfMiddleware);

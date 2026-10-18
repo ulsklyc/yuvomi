@@ -235,6 +235,16 @@ test('ein gescoptes API-Token darf Bilder lesen', async () => {
   assert.equal(res.status, 200, 'die Adresse steht in den Aufgaben, die das Token lesen darf');
   const tasks = await fetch(`${BASE}/api/v1/tasks`, { headers: { Authorization: `Bearer ${created.body.token}` } });
   assert.equal(tasks.status, 200, 'Gegenprobe: das Token liest Aufgaben');
+  // EIN TOKEN BEKOMMT DIE DATA-URL WIE BISHER (Codex-Review zu #2056): ein
+  // Client, der mit Bearer-Token liest und den Wert in ein <img src> setzt,
+  // schickt beim Bildabruf keinen Authorization-Header mit - die Adresse
+  // ergaebe dort 401. Nur die App selbst (Cookie-Sitzung, Wanddisplay) bekommt
+  // die Adresse.
+  const body = await tasks.json();
+  const row = body.data.find((t) => t.title === 'Muell rausbringen');
+  assert.match(String(row.assigned_avatar), /^data:image\/jpeg;base64,/, 'assigned_avatar fuer ein Token');
+  assert.match(String(row.assigned_users[0].avatar_data), /^data:image\/jpeg;base64,/, 'assigned_users[].avatar_data fuer ein Token');
+  assert.doesNotMatch(JSON.stringify(body), /\/api\/v1\/people\//, 'keine Bildadresse in der Token-Antwort');
   const write = await fetch(`${BASE}/api/v1/people/${BOB}/avatar`, { method: 'POST', headers: { Authorization: `Bearer ${created.body.token}` } });
   assert.notEqual(write.status, 200, 'nur Lesen');
 });

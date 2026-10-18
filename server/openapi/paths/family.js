@@ -16,7 +16,9 @@ export function familyPaths() {
           + '`assigned_avatar` and `assigned_users[].avatar_data` on tasks and events, `creator_avatar` on notes, '
           + '`worker_avatar_data` on housekeeping visits, `user_avatar`/`person_avatar` in the completion feed and '
           + '`user_avatar` in the money ledger - carry this address (with a `v` query parameter that changes with '
-          + 'the picture) instead of a data URL, or `null` when the person has no picture. Any signed-in credential '
+          + 'the picture) instead of a data URL, or `null` when the person has no picture. Requests authenticated '
+          + 'with an API token keep receiving the data URL in these fields, since an image request does not carry '
+          + 'the bearer token; the address is what the app itself (session cookie, wall display) gets. Any signed-in credential '
           + 'may read it, including wall displays and scoped API tokens; split-expense guests may not. The response '
           + 'carries an `ETag` and `Cache-Control: private, no-cache`; send `If-None-Match` to get `304`.',
         responses: {
