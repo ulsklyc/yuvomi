@@ -1,6 +1,6 @@
 import { api } from '/api.js';
 import { formatDate, formatTime, t } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { emptyHintEl } from '/utils/empty-state.js';
 import {
   closeModal,
@@ -18,7 +18,6 @@ import { withBusy } from '/utils/ux.js';
 import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
 
 /** Das Pflichtzeichen hinter einem Etikett - Markup, kein Text (aria-hidden). */
-const REQUIRED_MARK = '<span class="required-marker" aria-hidden="true"> *</span>';
 import { renderSkeletonList } from '/utils/skeleton.js';
 
 function formatSyncTime(value) {

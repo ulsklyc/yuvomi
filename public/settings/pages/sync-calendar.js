@@ -19,7 +19,7 @@ import {
 } from '/settings/components.js';
 import { withBusy } from '/utils/ux.js';
 import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { loadFamilyUsers } from '/settings/family-users.js';
 
 // Seit R10 ein Abschnitt im Blatt Kalender (registry.js). Neu laden heisst,
@@ -687,7 +687,6 @@ async function loadCalDAVAccounts(container, user) {
 }
 
 /** Das Pflichtzeichen hinter einem Etikett - Markup, kein Text (aria-hidden). */
-const REQUIRED_MARK = '<span class="required-marker" aria-hidden="true"> *</span>';
 
 function bindCalDAVAddButton(container, user) {
   const addBtn = container.querySelector('#caldav-add-account-btn');

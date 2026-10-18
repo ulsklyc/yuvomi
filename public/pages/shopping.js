@@ -9,7 +9,7 @@ import { stagger, vibrate, scheduleUndoableDelete, collapseOut, expandIn, acknow
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { flipSnapshot, flipPlay } from '/utils/flip.js';
 import { t } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { formRowsHtml, formRowHtml } from '/utils/form-row.js';
 import { readRowHtml, readDetailsLabel } from '/utils/read-row.js';
 import { promptModal, openModal, closeModal, confirmModal, reportFieldError, refocusAfterRender } from '/components/modal.js';
@@ -2689,7 +2689,7 @@ function openItemDetails(itemId, container) {
     content: `
       <form id="item-details-form" class="item-details-form" novalidate autocomplete="off">
         <div class="form-group">
-          <label class="form-label" for="item-details-name">${t('common.nameLabel')}</label>
+          <label class="form-label" for="item-details-name">${t('common.nameLabel')}${REQUIRED_MARK}</label>
           <input class="form-input" type="text" id="item-details-name" required
                  value="${esc(item.name)}">
         </div>

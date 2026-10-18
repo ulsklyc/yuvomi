@@ -13,7 +13,7 @@
 
 import { api } from '/api.js';
 import { t, formatDate, formatMonthYear, formatTime, getLocale, getNumberFormat } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { CHART, chartScales, chartGridMarkup, chartXLabelsMarkup, chartX, chartY, niceDomain, calmDomain, chartTimePositions, chartTimeLabelsMarkup } from '/utils/chart.js';
 import { scheduleUndoableDelete, expandIn, drawChartOnce } from '/utils/ux.js';
 import { swapContent } from '/utils/content-swap.js';
@@ -3706,7 +3706,7 @@ function openMedModal(med) {
     content: `
       <form id="med-form" class="form-stack">
         <div class="form-field">
-          <label class="label" for="med-name">${esc(t('health.meds.field.name'))}</label>
+          <label class="label" for="med-name">${esc(t('health.meds.field.name'))}${REQUIRED_MARK}</label>
           <input class="input" id="med-name" type="text" maxlength="200" required value="${esc(val(med?.name))}">
         </div>
         ${/* Paare teilen sich die Zeile auch im 390er-Blatt (.form-pair,

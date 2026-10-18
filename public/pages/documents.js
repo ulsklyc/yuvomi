@@ -7,7 +7,7 @@
 import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, selectModal, advancedSection, promptModal, confirmModal, refocusAfterRender, renderKeepingFocus, captureModalContext, isModalContextCurrent, reportFieldError } from '/components/modal.js';
 import { t, formatDate, getLocale } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -3411,7 +3411,7 @@ function openFolderModal({ parentId = null } = {}) {
     content: `
       <form id="document-folder-form" class="document-form">
         <div class="form-group">
-          <label class="label" for="document-folder-name">${t('documents.folderNameLabel')}</label>
+          <label class="label" for="document-folder-name">${t('documents.folderNameLabel')}${REQUIRED_MARK}</label>
           <input class="input" id="document-folder-name" required maxlength="200" autocomplete="off">
         </div>
         <div class="form-group">

@@ -22240,3 +22240,43 @@ test('Esc waehrend einer IME-Umwandlung schliesst kein Modal', () => {
   assert.ok(ime < body.indexOf('closeModal()'), 'die Pruefung steht vor dem Schliessen');
   assert.match(body.slice(ime, ime + 160), /preventDefault\(\)[\s\S]*?return/, 'der close-Request des Dialogs wird zurueckgehalten');
 });
+
+/**
+ * STERN UND PFLICHT SAGEN DASSELBE (Modern-Web-Guidance-Audit, Befund 16;
+ * DESIGN.md, Zeile "Pflichtfeld"). Der Stern ist `aria-hidden` - ein Feld mit
+ * Stern, aber ohne `required`, war fuer den Screenreader ein Kannfeld. Und
+ * ein `required`-Feld ohne Stern verschwieg es den Sehenden, wo das Formular
+ * Pflicht- und Kannfelder mischt. AUSNAHME nach der Regel: ein Formular aus
+ * EINEM Feld (dort ist die Pflicht offensichtlich, ein Stern nur Rauschen) und
+ * die Anmeldeseiten, deren Felder alle Pflicht sind.
+ */
+test('a starred label marks a required field, and a required field in a mixed form carries the star', () => {
+  const AUTH = /\/(login|setup|join|reset-password|forgot-password)\.js$/;
+  const SINGLE_FIELD = new Set([
+    'public/settings/pages/personal-account.js #two-factor-code', // nur der Code
+    'public/settings/pages/personal-account.js #two-factor-confirm-code', // nur der Code
+  ]);
+  const files = walkJsFiles('../public/').filter((f) => !f.includes('/vendor/') && !AUTH.test(f));
+  const starNoReq = [];
+  const reqNoStar = [];
+  let seen = 0;
+  for (const file of files) {
+    const src = read(file);
+    const rel = file.replace('../', '');
+    const labelFor = new Map([...src.matchAll(/<label\b[^>]*\bfor="([\w-]+)"[^>]*>([\s\S]*?)<\/label>/g)].map((m) => [m[1], m[2]]));
+    const controls = new Map([...src.matchAll(/<(?:input|select|textarea)\b([^>]*)>/g)]
+      .map((m) => [m[1].match(/\bid="([\w-]+)"/)?.[1], m[1]]).filter(([id]) => id));
+    for (const [id, text] of labelFor) {
+      const attrs = controls.get(id);
+      if (!attrs) continue;
+      seen += 1;
+      const starred = /REQUIRED_MARK|required-marker/.test(text);
+      const required = /\srequired\b/.test(attrs);
+      if (starred && !required) starNoReq.push(`${rel} #${id}`);
+      if (!starred && required && !/type="(?:checkbox|radio|hidden)"/.test(attrs) && !SINGLE_FIELD.has(`${rel} #${id}`)) reqNoStar.push(`${rel} #${id}`);
+    }
+  }
+  assert.ok(seen > 200, `nur ${seen} Label-Feld-Paare gefunden - der Guard liest die Formulare nicht mehr`);
+  assert.deepEqual(starNoReq, [], `Stern ohne required - der Screenreader hoert ein Kannfeld:\n${starNoReq.join('\n')}`);
+  assert.deepEqual(reqNoStar, [], `required ohne Stern in einem gemischten Formular:\n${reqNoStar.join('\n')}`);
+});

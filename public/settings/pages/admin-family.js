@@ -5,7 +5,7 @@ import {
   parseDateInput,
   t,
 } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 import { prefersInkText } from '/utils/contrast.js';
 import { AVATAR_COLORS } from '/utils/color.js';
@@ -976,12 +976,12 @@ async function openEditMemberModal(member, currentUser, users, container) {
           ${avatarEditorHtml(member, 'edit-member')}
           <div class="settings-profile-editor__fields">
             <div class="form-group">
-              <label class="form-label" for="edit-member-username">${t('settings.usernameLabel')}</label>
+              <label class="form-label" for="edit-member-username">${t('settings.usernameLabel')}${REQUIRED_MARK}</label>
               <input class="form-input" type="text" id="edit-member-username" value="${esc(member.username)}" required autocomplete="off" />
             </div>
             <div class="settings-name-color-row">
               <div class="form-group settings-name-color-row__name">
-                <label class="form-label" for="edit-member-display-name">${t('settings.displayNameLabel')}</label>
+                <label class="form-label" for="edit-member-display-name">${t('settings.displayNameLabel')}${REQUIRED_MARK}</label>
                 <input class="form-input" type="text" id="edit-member-display-name" value="${esc(member.display_name)}" required maxlength="128" />
               </div>
               <div class="form-group settings-color-field">
