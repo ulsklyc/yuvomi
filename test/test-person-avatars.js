@@ -179,13 +179,19 @@ test('GET /people/:id/avatar liefert die Bild-Bytes mit ETag', async () => {
 test('ein neues Bild bekommt eine neue Adresse und ein neues ETag', async () => {
   const before = (await admin('GET', '/tasks')).body.data.find((t) => t.title === 'Muell rausbringen').assigned_avatar;
   const etagBefore = (await fetch(`${BASE}/api/v1/people/${BOB}/avatar`, { headers: { Cookie: adminSession.cookie } })).headers.get('etag');
-  const next = `data:image/png;base64,${randomBytes(3100).toString('base64')}`;
+  // GLEICH LANG wie das alte Bild (Codex-Review zu #2056): Base64-Laengen kommen
+  // in Stufen, und zugeschnittene Bilder sind aehnlich gross. Eine Version aus
+  // der Laenge bliebe hier stehen, und der Offline-Cache des Service Workers
+  // zeigte unter derselben Adresse das alte Bild.
+  const nextBytes = randomBytes(JPEG_BYTES.length);
+  const next = `data:image/jpeg;base64,${nextBytes.toString('base64')}`;
+  assert.equal(next.length, AVATAR.length, 'Voraussetzung: gleich lange Data-URL');
   const put = await admin('PATCH', `/auth/users/${BOB}`, { avatar_data: next });
   assert.ok(put.status < 300, put.text);
   const after = (await admin('GET', '/tasks')).body.data.find((t) => t.title === 'Muell rausbringen').assigned_avatar;
   assert.notEqual(after, before, 'die Adresse wechselt mit dem Bild, sonst zeigt der Browser das alte');
   const res = await fetch(`${BASE}/api/v1/people/${BOB}/avatar`, { headers: { Cookie: adminSession.cookie } });
-  assert.equal(res.headers.get('content-type'), 'image/png');
+  assert.deepEqual(Buffer.from(await res.arrayBuffer()), nextBytes, 'die Route liefert das neue Bild');
   assert.notEqual(res.headers.get('etag'), etagBefore);
 });
 

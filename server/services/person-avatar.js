@@ -21,11 +21,12 @@
  * weiter die Data-URL - die Bearbeitungsmasken schicken genau diesen Wert
  * zurueck, eine Adresse kaeme als ungueltiges Bild an.
  *
- * `?v=` IST DIE LAENGE DER DATA-URL. Sie wechselt mit fast jedem neuen Bild,
- * und eine neue Adresse laedt der Browser neu, auch innerhalb derselben
- * Sitzung, in der er Bilder sonst ohne Rueckfrage wiederverwendet. Fuer den
- * seltenen Fall gleicher Laenge revalidiert das ETag (`Cache-Control:
- * no-cache`).
+ * `?v=` IST `users.avatar_version` (Migration 251), die ein Trigger bei jeder
+ * Aenderung des Bildes hochzaehlt. Eine neue Adresse laedt der Browser neu,
+ * auch innerhalb derselben Sitzung, in der er Bilder sonst ohne Rueckfrage
+ * wiederverwendet, und der Offline-Cache des Service Workers ist nach ihr
+ * geschluesselt. Die Laenge der Data-URL war die erste Fassung und reichte
+ * nicht: gleich lange Bilder behielten dieselbe Adresse (Codex-Review zu #2056).
  */
 
 /**
@@ -35,7 +36,7 @@
  */
 export function personAvatarUrlSql(alias) {
   return `CASE WHEN ${alias}.avatar_data IS NOT NULL AND ${alias}.avatar_data <> ''
-    THEN '/api/v1/people/' || ${alias}.id || '/avatar?v=' || length(${alias}.avatar_data) END`;
+    THEN '/api/v1/people/' || ${alias}.id || '/avatar?v=' || ${alias}.avatar_version END`;
 }
 
 /** Der Pfad der Route, so wie die Gates in server/index.js ihn sehen (ohne /api/v1). */

@@ -11010,6 +11010,29 @@ const MIGRATIONS = [
       }
     },
   },
+  {
+    version: 251,
+    description: 'users: avatar_version counts every change of the profile picture',
+    // Listen tragen statt der Data-URL die Adresse `/api/v1/people/:id/avatar?v=`
+    // (services/person-avatar.js). `v` muss mit JEDEM neuen Bild wechseln: der
+    // Offline-Cache des Service Workers ist nach der Adresse geschluesselt, und
+    // eine gleiche Adresse zeigte offline das alte Bild. Die Laenge der Data-URL
+    // reichte nicht - Base64-Laengen kommen in Stufen, zugeschnittene Bilder
+    // sind aehnlich gross (Codex-Review zu #2056).
+    //
+    // EIN TRIGGER STATT DER SCHREIBSTELLEN: das Bild wird an fuenf Stellen
+    // geschrieben (Profil, Verwaltung, Gravatar, Housekeeping, Anlegen), und
+    // eine neue sechste vergaesse das Hochzaehlen still. `test:person-avatars`
+    // misst den Wechsel bei gleich langer Data-URL - baut eine spaetere
+    // Migration `users` neu und verliert den Trigger, faellt das dort auf.
+    up: `
+      ALTER TABLE users ADD COLUMN avatar_version INTEGER NOT NULL DEFAULT 0;
+      CREATE TRIGGER IF NOT EXISTS trg_users_avatar_version
+        AFTER UPDATE OF avatar_data ON users FOR EACH ROW
+        WHEN NEW.avatar_data IS NOT OLD.avatar_data
+        BEGIN UPDATE users SET avatar_version = OLD.avatar_version + 1 WHERE id = OLD.id; END;
+    `,
+  },
 ];
 
 /**

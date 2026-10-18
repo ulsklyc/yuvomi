@@ -34,6 +34,7 @@ const MIGRATIONS_SQL = {
       password_hash TEXT    NOT NULL,
       avatar_color  TEXT    NOT NULL DEFAULT '#007AFF',
       avatar_data   TEXT,
+      avatar_version INTEGER NOT NULL DEFAULT 0,
       role          TEXT    NOT NULL DEFAULT 'member'
                             CHECK(role IN ('admin', 'member')),
       family_role   TEXT    NOT NULL DEFAULT 'other'
@@ -241,6 +242,11 @@ const MIGRATIONS_SQL = {
     CREATE TRIGGER IF NOT EXISTS trg_users_updated_at
       AFTER UPDATE ON users FOR EACH ROW
       BEGIN UPDATE users SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = OLD.id; END;
+    -- avatar_version + Trigger stammen aus v251 (Profilbild-Adressen in Listen).
+    CREATE TRIGGER IF NOT EXISTS trg_users_avatar_version
+      AFTER UPDATE OF avatar_data ON users FOR EACH ROW
+      WHEN NEW.avatar_data IS NOT OLD.avatar_data
+      BEGIN UPDATE users SET avatar_version = OLD.avatar_version + 1 WHERE id = OLD.id; END;
     CREATE TRIGGER IF NOT EXISTS trg_tasks_updated_at
       AFTER UPDATE ON tasks FOR EACH ROW
       BEGIN UPDATE tasks SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = OLD.id; END;
