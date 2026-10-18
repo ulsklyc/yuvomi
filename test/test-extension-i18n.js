@@ -203,3 +203,35 @@ test('router: the module poll skips ticks while the tab is hidden', () => {
   assert.match(body, /setInterval\(/);
   assert.match(body, /document\.hidden/, 'a hidden tab must not poll /modules');
 });
+
+// Codex-Review zu #2055: scheiterte eine Sprachdatei, merkte sich die Funktion
+// den Modulsatz trotzdem als geladen - jeder weitere Takt kehrte frueh zurueck,
+// und die fehlende Uebersetzung kam bis zum Neuladen des Tabs nie wieder.
+test('reloadExtensionLocales retries a module set whose locale file failed to load', async () => {
+  const urls = [];
+  let failDe = true;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    urls.push(String(url));
+    if (failDe && String(url).endsWith('/de.json')) throw new TypeError('Failed to fetch');
+    return { ok: true, json: async () => ({ menu: 'Demo' }) };
+  };
+  try {
+    const mod = {
+      id: 'retry-mod', enabled: true, status: 'enabled', version: '1.0.0',
+      i18n: { defaultLocale: 'en', availableLocales: ['en', 'de'] },
+    };
+    await reloadExtensionLocales([mod]);
+    assert.equal(urls.length, 2, 'first load asks for both files');
+
+    failDe = false;
+    await reloadExtensionLocales([mod]);
+    assert.equal(urls.length, 4, 'the next poll retries after a failed file');
+
+    await reloadExtensionLocales([mod]);
+    assert.equal(urls.length, 4, 'once complete, an unchanged poll stays quiet');
+  } finally {
+    globalThis.fetch = realFetch;
+    clearExtensionTranslations();
+  }
+});
