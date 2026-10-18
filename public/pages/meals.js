@@ -1242,6 +1242,7 @@ function renderSlot(date, type, mealsForDay, dayCol, typeRow) {
             recipeId: meal.recipe_id,
             hasImage: meal.recipe_has_image,
             hasOwnImage: meal.recipe_has_own_image,
+            imageVersion: meal.recipe_image_version,
             className: 'meal-card__thumb',
           }) : ''}
           <span class="meal-card__title"><span class="meal-card__type">${esc(type.label)}</span><span class="meal-card__title-text">${esc(meal.title)}</span>${recurrenceBadge}</span>
