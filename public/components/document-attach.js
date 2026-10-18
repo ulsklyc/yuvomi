@@ -53,6 +53,7 @@ import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { isPreviewable } from '/utils/document-preview.js';
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
 import { attachOverlay } from '/utils/overlay-history.js';
+import { inertOutside } from '/utils/background-inert.js';
 import { pathAccess, mayWritePath } from '/utils/module-access.js';
 import { holdUntilStyled, warmStyle } from '/utils/component-style.js';
 
@@ -462,6 +463,10 @@ function openDocumentPicker(panel, { excludeIds = new Set(), single = false } = 
       </div>`);
     panel.append(overlay);
     if (window.lucide) window.lucide.createIcons({ el: overlay });
+    // Das Formular darunter ist gesperrt, solange der Picker offen ist
+    // (utils/background-inert.js); die Freigabe kommt VOR der Fokus-Rueckgabe,
+    // auf ein inertes Element ginge der Fokus nicht.
+    const releaseBackground = inertOutside(overlay);
 
     const listEl = overlay.querySelector('[data-picker-list]');
     const searchEl = overlay.querySelector('#doc-attach-picker-search');
@@ -474,6 +479,7 @@ function openDocumentPicker(panel, { excludeIds = new Set(), single = false } = 
 
     const close = (result) => {
       overlay.remove();
+      releaseBackground();
       if (opener?.isConnected) opener.focus();
       resolve(result);
     };

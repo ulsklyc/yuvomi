@@ -8,6 +8,7 @@ import { api } from '/api.js';
 import { renderRRuleFields, bindRRuleEvents, getRRuleValues, recurrenceRow } from '/rrule-ui.js';
 import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, askOverModal, promptModal, advancedSection, wireBlurValidation, reportFieldError, reportFieldErrors, refocusAfterRender, renderKeepingFocus } from '/components/modal.js';
 import { attachOverlay } from '/utils/overlay-history.js';
+import { inertOutside } from '/utils/background-inert.js';
 import { openDetailView, visibilityRow, assignedRow } from '/components/detail-view.js';
 import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete, vibrate, durationToken } from '/utils/ux.js';
@@ -389,8 +390,10 @@ function openIconPickerDialog(selectedIcon, onSelect, onClose = () => {}) {
     </div>
   `);
 
+  let releaseBackground = () => {};
   function close() {
     overlay.remove();
+    releaseBackground();
     document.removeEventListener('keydown', onKeydown);
     onClose();
   }
@@ -424,6 +427,9 @@ function openIconPickerDialog(selectedIcon, onSelect, onClose = () => {}) {
   // In den Termin-Dialog, aus dem die Wahl aufgeht: ausserhalb des modalen
   // <dialog> waere sie inert und laege darunter (D7, utils/overlay-host.js).
   overlayHost().appendChild(overlay);
+  // Das Termin-Formular darunter ist gesperrt, solange die Wahl offen ist
+  // (utils/background-inert.js); freigegeben, bevor onClose() den Fokus zurueckgibt.
+  releaseBackground = inertOutside(overlay);
   document.addEventListener('keydown', onKeydown);
   panel.querySelector('#event-icon-dialog-search')?.focus();
   if (window.lucide) lucide.createIcons({ el: panel });

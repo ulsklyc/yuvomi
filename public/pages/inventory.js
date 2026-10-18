@@ -35,6 +35,7 @@ import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js'
 import { wireScrollFade } from '/utils/ux.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
 import { attachOverlay, whenHistorySettled } from '/utils/overlay-history.js';
+import { inertOutside } from '/utils/background-inert.js';
 import { setNavBadge } from '/utils/nav-badges.js';
 import { CHART, chartScales, chartY, chartGridMarkup, niceDomain, chartTimePositions, chartTimeLabelsMarkup } from '/utils/chart.js';
 
@@ -1495,6 +1496,9 @@ function openBookingPicker(panel, { initialMonth, includeRole = false } = {}) {
     panel.append(overlay);
     if (window.lucide) window.lucide.createIcons({ el: overlay });
     const opener = document.activeElement;
+    // Das Formular darunter ist gesperrt, solange der Picker offen ist
+    // (utils/background-inert.js); freigegeben VOR der Fokus-Rueckgabe.
+    const releaseBackground = inertOutside(overlay);
     overlay.querySelector('[data-picker-close]').focus();
 
     const listEl = overlay.querySelector('[data-picker-list]');
@@ -1504,6 +1508,7 @@ function openBookingPicker(panel, { initialMonth, includeRole = false } = {}) {
 
     const close = (result) => {
       overlay.remove();
+      releaseBackground();
       if (opener?.isConnected) opener.focus();
       resolve(result);
     };

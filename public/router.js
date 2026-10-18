@@ -16,6 +16,7 @@ import { initials } from '/utils/initials.js';
 import { emptyHintEl, emptyStateEl } from '/utils/empty-state.js';
 import { wireScrollFade, wireCollapsingHeader, watchNavCapsuleHeight, bindNavMinimize } from '/utils/ux.js';
 import { TOAST_SURFACES } from '/utils/toast-surface.js';
+import { inertOutside } from '/utils/background-inert.js';
 import { showToast } from '/utils/toast-show.js';
 import { unknownPathDetour, publicPathDetour, detourPaths } from '/utils/unknown-route.js';
 import { createNavigate, prefetchPathOf, focusMainAfterNavigation, unlessAborted, isCurrentAddress } from '/utils/router-navigate.js';
@@ -3290,11 +3291,17 @@ function initMoreSheet(container, openSearch) {
 
   // Der Marker der Zurueck-Geste, solange das Blatt offen ist (#871).
   let sheetOverlayToken = null;
+  // Die Seite hinter dem Blatt ist gesperrt, solange es offen ist
+  // (utils/background-inert.js). Abdunklung und Mehr-Knopf bleiben bedienbar:
+  // beide schliessen das Blatt.
+  let releaseSheetBackground = null;
 
   function openSheet() {
     lastFocusedBeforeSheet = document.activeElement;
     sheetOverlayToken = pushOverlay(() => closeSheet());
     setOverlayInteractive(sheet, true);
+    releaseSheetBackground?.();
+    releaseSheetBackground = inertOutside(sheet, { keep: [backdrop, currentMoreBtn()] });
     sheet.addEventListener('keydown', moreSheetTrap);
     backdrop.classList.add('more-backdrop--visible');
     currentMoreBtn().setAttribute('aria-expanded', 'true');
@@ -3327,6 +3334,8 @@ function initMoreSheet(container, openSearch) {
       dropOverlay(token);
     }
     setOverlayInteractive(sheet, false);
+    releaseSheetBackground?.();
+    releaseSheetBackground = null;
     sheet.removeEventListener('keydown', moreSheetTrap);
     backdrop.classList.remove('more-backdrop--visible');
     currentMoreBtn().setAttribute('aria-expanded', 'false');
@@ -3526,6 +3535,7 @@ function initSearch(container) {
 
   // Der Marker der Zurueck-Geste, solange die Suche offen ist (#871).
   let searchOverlayToken = null;
+  let releaseSearchBackground = null;
 
   function openSearch() {
     // SCHON OFFEN: nur zurueck ins Feld. ⌘K gilt auch aus Eingabefeldern,
@@ -3541,6 +3551,10 @@ function initSearch(container) {
     lastFocusedBeforeSearch = document.activeElement;
     if (searchOverlayToken === null) searchOverlayToken = pushOverlay(() => closeSearch());
     setOverlayInteractive(overlay, true);
+    // Die Seite hinter der Suche ist gesperrt, solange sie offen ist
+    // (utils/background-inert.js).
+    releaseSearchBackground?.();
+    releaseSearchBackground = inertOutside(overlay);
     overlay.classList.add('search-overlay--visible');
     if (!input.value.trim()) renderSearchHint();
     setTimeout(() => input.focus(), 50);
@@ -3560,6 +3574,8 @@ function initSearch(container) {
     // Schließen ins versteckte Overlay und macht eine Phantom-Live-Ansage.
     clearTimeout(searchTimer);
     setOverlayInteractive(overlay, false);
+    releaseSearchBackground?.();
+    releaseSearchBackground = null;
     overlay.classList.remove('search-overlay--visible');
     if (_searchTrapHandler) {
       overlay.removeEventListener('keydown', _searchTrapHandler);

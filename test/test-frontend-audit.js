@@ -7225,6 +7225,7 @@ test('⌘K bei offener Suche: kein zweiter Focus-Trap, und Schliessen gibt den F
   const input = { value: '', focus() { doc.activeElement = input; }, select() {} };
   const trigger = { name: 'Suche in der Seitenleiste' };
   const returned = [];
+  const holds = { inert: 0 };
   let pushes = 0;
   const env = {
     overlay, input, document: doc,
@@ -7240,11 +7241,13 @@ test('⌘K bei offener Suche: kein zweiter Focus-Trap, und Schliessen gibt den F
     createFocusTrap: () => () => {},
     returnFocus: (el) => returned.push(el),
     combo: { clear() {}, refresh() {} },
+    inertOutside: () => { holds.inert += 1; return () => { holds.inert -= 1; }; },
   };
   const make = new Function(...Object.keys(env), `
     let _searchTrapHandler = null;
     let lastFocusedBeforeSearch = null;
     let searchOverlayToken = null;
+    let releaseSearchBackground = null;
     let searchTimer = null;
     ${fn('openSearch')}
     ${fn('closeSearch')}
@@ -7258,8 +7261,10 @@ test('⌘K bei offener Suche: kein zweiter Focus-Trap, und Schliessen gibt den F
   assert.equal(listeners.filter((l) => l.type === 'keydown').length, 1, 'genau ein Focus-Trap');
   assert.equal(pushes, 1, 'ein Marker fuer die Zurueck-Geste');
   assert.equal(doc.activeElement, input, 'der Fokus bleibt im Suchfeld');
+  assert.equal(holds.inert, 1, 'die Seite hinter der Suche ist einmal gesperrt, auch nach dem zweiten ⌘K');
   closeSearch();
   assert.equal(listeners.length, 0, 'nach dem Schliessen haengt kein Trap mehr am Overlay');
+  assert.equal(holds.inert, 0, 'nach dem Schliessen ist die Seite wieder frei');
   assert.deepEqual(returned, [trigger], 'der Fokus geht an den Ausloeser zurueck, nicht ins versteckte Suchfeld');
 });
 
@@ -22352,4 +22357,27 @@ test('forced colors: switches, active chips, active segments and focused fields 
   const missing = expected.filter(([file, selector, decl]) => !has(file, selector, decl))
     .map(([file, selector, decl]) => `${file.replace('../public/styles/', '')}: ${selector} ${decl}`);
   assert.deepEqual(missing, [], `Ohne Forced-Colors-Regel verschwindet der Zustand:\n${missing.join('\n')}`);
+});
+
+/**
+ * EINE EIGENE MODALE EBENE SPERRT IHREN HINTERGRUND (Modern-Web-Guidance-
+ * Audit, Befund 10). `aria-modal="true"` ist nur eine Bitte an den
+ * Screenreader; ohne `inert` lief der virtuelle Cursor in die Seite dahinter,
+ * und Klick und Tab erreichten sie. Wer eine solche Ebene baut statt
+ * `openModal()` (natives <dialog>), ruft `inertOutside()` aus
+ * utils/background-inert.js - je Ebene einmal - und gibt frei.
+ */
+test('every custom aria-modal layer makes its background inert and releases it', () => {
+  const offenders = [];
+  const files = walkJsFiles('../public/').filter((f) => !f.includes('/vendor/') && !f.endsWith('.min.js'));
+  for (const file of files) {
+    if (file.endsWith('/background-inert.js') || file.endsWith('/components/modal.js')) continue;
+    const src = withoutCommentsKeepingLines(read(file));
+    const layers = (src.match(/aria-modal(?:="true"|['"],\s*['"]true['"])/g) ?? []).length;
+    if (!layers) continue;
+    const calls = (src.match(/\binertOutside\(/g) ?? []).length;
+    const released = /\brelease\w*(?:\?\.)?\(\)|_releaseBackground\(\)/.test(src);
+    if (calls < layers || !released) offenders.push(`${file}: ${layers} Ebene(n), ${calls} inertOutside(), Freigabe ${released ? 'ja' : 'nein'}`);
+  }
+  assert.deepEqual(offenders, [], `Ebene ohne gesperrten Hintergrund:\n${offenders.join('\n')}`);
 });
