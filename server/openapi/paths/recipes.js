@@ -1,5 +1,11 @@
 import { op, jsonBody, idParam } from '../helpers.js';
 
+// Dieselbe Form wie in paths/family.js.
+const apiError = (description) => ({
+  description,
+  content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } },
+});
+
 export function recipesPaths() {
   return withCaseReasons({
     '/api/v1/recipes': {
@@ -55,7 +61,39 @@ export function recipesPaths() {
       get: op({ summary: "Fetch a recipe's own uploaded image", tag: 'Recipes', params: [idParam()], description: "Returns the image stored on the recipe itself, for recipes typed into Yuvomi rather than mirrored from a provider. It is a route and not a field on the recipe: the column holds a data URL of up to 5 MB, and shipping that with every row of a recipe list or a week of meals would dwarf the rest of the response for a 32-pixel preview. The lists carry a `has_own_image` flag instead. 404 when the recipe has no image of its own." }),
     },
     '/api/v1/recipes/{id}/provider-thumbnail': {
-      get: op({ summary: 'Fetch the image of an imported recipe', tag: 'Recipes', params: [idParam()], description: 'Proxies the bytes from the recipe provider. A direct <img src> to the provider is not possible: its media route wants the same bearer token as every other endpoint, and that token must never reach the client. Same arrangement as the DMS preview proxy.' }),
+      get: op({
+        summary: 'Fetch the image of an imported recipe',
+        tag: 'Recipes',
+        params: [
+          idParam(),
+          {
+            name: 'v',
+            in: 'query',
+            required: false,
+            schema: { type: 'string' },
+            description: 'The image version: `provider_updated_at` of the recipe (meal rows carry it as `recipe_image_version`). Keeps the address unique per version; the response is the same with or without it.',
+          },
+        ],
+        description: 'Proxies the bytes from the recipe provider. A direct <img src> to the provider is not possible: its media route wants the same bearer token as every other endpoint, and that token must never reach the client. Same arrangement as the DMS preview proxy. '
+          + 'The response carries `Cache-Control: private, no-cache` and an `ETag` derived from the image version, so a client revalidates on every use (through authentication and the module gate) and `If-None-Match` answers `304` without a request to the provider. Errors stay `no-store`.',
+        responses: {
+          200: {
+            description: 'The image',
+            content: {
+              'image/png': { schema: { type: 'string', format: 'binary' } },
+              'image/jpeg': { schema: { type: 'string', format: 'binary' } },
+              'image/webp': { schema: { type: 'string', format: 'binary' } },
+            },
+          },
+          304: { description: 'Unchanged since the given ETag; no request to the provider' },
+          400: apiError('Invalid recipe ID'),
+          401: { $ref: '#/components/responses/Unauthorized' },
+          404: apiError('Not an imported recipe, or no image at the provider'),
+          415: apiError('The provider returned no image or a type outside PNG, JPEG and WebP'),
+          502: apiError('The provider could not be reached'),
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
     },
   });
 }

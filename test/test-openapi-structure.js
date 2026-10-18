@@ -548,3 +548,17 @@ test('calendar occurrence errors consistently document numeric API codes', () =>
     'integer',
   );
 });
+
+// Codex-Review zu #2067: `v` stand nur in der Beschreibung. Generierte Clients
+// und die API-Oberflaeche lesen Parameter aus `parameters`, nie aus Prosa.
+test('#2048 provider-thumbnail deklariert ?v= und das 304 strukturell', () => {
+  const get = buildOpenApiSpec({}).paths['/api/v1/recipes/{id}/provider-thumbnail'].get;
+  const v = (get.parameters ?? []).find((p) => p.name === 'v');
+  assert.ok(v, 'Query-Parameter v fehlt');
+  assert.equal(v.in, 'query');
+  assert.equal(v.required, false);
+  assert.equal(v.schema?.type, 'string');
+  assert.ok(get.responses[304], '304 fehlt');
+  assert.ok(get.responses[200]?.content?.['image/webp'], '200 nennt die Bildtypen');
+  assert.doesNotMatch(get.description, /max-age|immutable/, 'die Beschreibung verspricht kein Cache-Jahr');
+});

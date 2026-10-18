@@ -305,9 +305,10 @@ function personAvatarEl(person) {
   avatar.setAttribute('aria-hidden', 'true');
   if (person.avatar_data) {
     const img = document.createElement('img');
-    img.src = person.avatar_data;
-    img.alt = '';
+    // `loading` vor `src`: sonst laedt Safari sofort statt faul (#2048).
     img.loading = 'lazy';
+    img.alt = '';
+    img.src = person.avatar_data;
     avatar.appendChild(img);
     return avatar;
   }

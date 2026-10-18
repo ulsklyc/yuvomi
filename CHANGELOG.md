@@ -40,6 +40,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (the default container) and a household east of UTC, an event at 23:30 counted down to the day
   after; west of UTC, an early-morning event could count down to the day before. The countdown now
   reads the event's time in the household's time zone, wherever the server runs (#1998).
+- **Large imported recipe collections no longer lock up the app with "Too many requests" (#2048).**
+  On iPhone and in Firefox the recipe list fetched the picture of every imported recipe at once
+  instead of only those on screen, and each picture went to Mealie or Tandoor again on every visit.
+  With 500 recipes that used up the request budget of a whole minute, and every other page answered
+  with an error until it refilled. The list now loads only the pictures you scroll to, a picture the
+  browser already has is confirmed by Yuvomi without asking Mealie or Tandoor again, and pictures
+  (recipes and profile pictures) have a budget of their own, so they can no longer block the rest
+  of the app.
+  **API:** `GET /api/v1/recipes/{id}/provider-thumbnail` takes an optional `?v=`, the recipe's
+  `provider_updated_at` (meal rows carry it as `recipe_image_version`). The response is
+  `private, no-cache` with an ETag derived from that version, and `If-None-Match` answers 304
+  without a request to the provider.
 - **An open row menu closes when the list scrolls.** With a mouse wheel, trackpad or keyboard the
   menu stayed where it opened while its row scrolled away, so "Delete" ended up under a different
   entry. Like menus on iOS and macOS, it now closes as soon as the content beneath it moves, in
