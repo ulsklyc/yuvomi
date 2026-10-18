@@ -734,9 +734,17 @@ app.use('/api/v1', (req, res, next) => {
   }
   return next();
 });
+app.use('/api/v1', csrfMiddleware);
+// Retry-Sicherheit für schreibende Aufrufer (#822): greift nur, wenn ein
+// `Idempotency-Key` mitkommt, und liegt hinter Auth, Scopes und CSRF - ein
+// abgewiesener Aufruf darf keinen Schlüssel verbrauchen.
+app.use('/api/v1', idempotencyMiddleware);
 // Ein API-Token bekommt Profilbilder weiter als Data-URL statt als Adresse
 // (services/person-avatar.js, `inlineAvatarUrls`): sein Client schickt beim
 // Bildabruf kein Bearer-Token mit. Nur die App selbst bekommt die Adresse.
+// HINTER der Idempotenz: so speichert sie die Antwort, die das Token bekam,
+// und eine Wiederholung gibt genau diese zurueck - davor setzte sie beim
+// Wiederholen das Bild von jetzt ein (Codex-Review zu #2056).
 app.use('/api/v1', (req, res, next) => {
   if (req.authMethod !== 'api_token') return next();
   const json = res.json.bind(res);
@@ -744,11 +752,6 @@ app.use('/api/v1', (req, res, next) => {
   res.json = (body) => json(inlineAvatarUrls(body, lookup));
   return next();
 });
-app.use('/api/v1', csrfMiddleware);
-// Retry-Sicherheit für schreibende Aufrufer (#822): greift nur, wenn ein
-// `Idempotency-Key` mitkommt, und liegt hinter Auth, Scopes und CSRF - ein
-// abgewiesener Aufruf darf keinen Schlüssel verbrauchen.
-app.use('/api/v1', idempotencyMiddleware);
 app.use('/api/v1/dashboard', dashboardRouter);
 app.use('/api/v1/tasks', tasksRouter);
 app.use('/api/v1/shopping', shoppingRouter);

@@ -304,3 +304,30 @@ test('OpenAPI: `v` ist ein Pflicht-Query-Parameter im Format des Schluessels', a
   assert.match(new URL(keyedUrl(BOB), BASE).searchParams.get('v'), pattern, 'der Schluessel aus der Zeile passt');
   assert.doesNotMatch('1', pattern);
 });
+
+// Codex-Review zu #2056: eine Wiederholung mit demselben `Idempotency-Key`
+// muss genau die erste Antwort zurueckgeben. Lag die Umschreibung fuer Tokens
+// vor der Idempotenz, speicherte diese die Adresse und setzte beim Wiederholen
+// das Bild von JETZT ein - nach einem Bildwechsel eine andere Antwort.
+test('ein Token bekommt bei einer Wiederholung (Idempotency-Key) die erste Antwort', async () => {
+  const carol = db.prepare(`
+    INSERT INTO users (username, display_name, password_hash, avatar_color) VALUES ('carol', 'Carol', 'x', '#007AFF')
+  `).run().lastInsertRowid;
+  db.prepare('UPDATE users SET avatar_data = ? WHERE id = ?').run(AVATAR, carol);
+  const token = await admin('POST', '/auth/api-tokens', { name: 'Schreiben', scopes: ['tasks:write'] });
+  assert.equal(token.status, 201, token.text);
+  const post = () => fetch(`${BASE}/api/v1/tasks`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token.body.token}`, 'Content-Type': 'application/json', 'Idempotency-Key': 'avatar-replay-1' },
+    body: JSON.stringify({ title: 'Wiederholt', assigned_to: [carol] }),
+  });
+  const first = await post();
+  assert.equal(first.status, 201);
+  const firstBody = await first.text();
+  assert.match(firstBody, /data:image\/jpeg;base64,/, 'die erste Antwort traegt die Data-URL');
+  db.prepare('UPDATE users SET avatar_data = ? WHERE id = ?')
+    .run(`data:image/jpeg;base64,${randomBytes(3000).toString('base64')}`, carol);
+  const replay = await post();
+  assert.equal(replay.status, 201);
+  assert.equal(await replay.text(), firstBody, 'die Wiederholung ist die erste Antwort');
+});
