@@ -279,7 +279,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The calendar on a phone no longer shows half-cut rows.** In the agenda, a day heading that sticks
   to the top covers the event card scrolling beneath it instead of letting a strip of its text show
   above. The week view opens with a full hour at the top, also late in the day, and its three days
-  start with today instead of yesterday.
+  start with today instead of yesterday. A new event from the + button lands on a day of those three.
 - **Module headers on phones and tablets take less room.** Shift plan, Rewards and Household help
   show their tabs in the title row (one row instead of two, 65px on a phone); the first Rewards tab
   is now called "Points", so a phone no longer shows "Overview" twice and nothing saying where you

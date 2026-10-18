@@ -1010,8 +1010,15 @@ function getAgendaRange(dateStr) {
  * Termin, nicht als Ladespanne. Deshalb nicht getRangeForView(): dessen
  * Monatsspanne ist das Wochenraster und begänne im Vormonat.
  */
-function visibleDayRange(view, cursor, weekStart = 1) {
+function visibleDayRange(view, cursor, weekStart = 1, { mobile = false } = {}) {
   if (view === 'month')  return monthPeriodKeys(cursor);
+  if (view === 'week' && mobile) {
+    // Am Telefon zeigt die Woche nur die drei Tage ab dem Cursor
+    // (mobileWeekDays): heute kann in derselben 7-Tage-Woche liegen und
+    // trotzdem nicht auf dem Schirm stehen (Codex-Review PR #2053).
+    const days = mobileWeekDays(cursor);
+    return { from: days[0], to: days[days.length - 1] };
+  }
   if (view === 'week')   {
     const from = startOfLocalWeekKey(cursor, weekStart);
     return { from, to: addLocalDays(from, 6) };
@@ -1025,9 +1032,9 @@ function visibleDayRange(view, cursor, weekStart = 1) {
  * hat: Toolbar-„+", FAB, Leerzustand der Agenda (#737). Die Entscheidung selbst
  * trifft defaultDateInPeriod() - sie gilt hausweit und nicht nur hier.
  */
-function newEventDefaultDate(view, cursor, today, weekStart = 1) {
+function newEventDefaultDate(view, cursor, today, weekStart = 1, { mobile = false } = {}) {
   if (!cursor) return today;
-  const { from, to } = visibleDayRange(view, cursor, weekStart);
+  const { from, to } = visibleDayRange(view, cursor, weekStart, { mobile });
   return defaultDateInPeriod(from, to, today);
 }
 
@@ -1037,7 +1044,9 @@ function newEventDate() {
   // „+" legt dann für diesen Tag an, nicht für den Monatsersten. Auf dem
   // Desktop ist der Cursor im Monat unsichtbar, dort gilt die Zeitraumregel.
   if (state.view === 'month' && isMonthSplit()) return state.cursor;
-  return newEventDefaultDate(state.view, state.cursor, state.today, state.weekStart);
+  // Dieselbe Telefonbreite entscheidet ueber das 3-Tage-Fenster der Woche
+  // (renderWeekView): der Vorschlag bleibt in dem, was zu sehen ist.
+  return newEventDefaultDate(state.view, state.cursor, state.today, state.weekStart, { mobile: isMonthSplit() });
 }
 
 /** Der geteilte Monat (Raster oben, Tagesliste unten) - die Telefonbreite. */

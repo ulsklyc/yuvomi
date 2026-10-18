@@ -1108,6 +1108,25 @@ test('Wochenansicht: der Wochenstart des angezeigten Zeitraums, im gewählten Wo
     'liegt heute in der angezeigten Woche, gewinnt heute');
 });
 
+// Codex-Review PR #2053, zweite Runde (P2): am Telefon zeigt die Woche nur
+// die drei Tage ab dem Cursor. Stand der Cursor auf morgen, lag heute in
+// derselben 7-Tage-Woche, aber nicht mehr auf dem Schirm - der Vorschlag war
+// trotzdem heute.
+test('Wochenansicht am Telefon: der Vorschlag bleibt im 3-Tage-Fenster', () => {
+  assert(newEventDate('week', '2026-08-15', TODAY, 1) === TODAY,
+    'Reichweite: am Desktop liegt heute in derselben Woche und gewinnt');
+  assert(newEventDate('week', '2026-08-15', TODAY, 1, { mobile: true }) === '2026-08-15',
+    'am Telefon steht heute nicht im Fenster 15.-17.08., also der erste sichtbare Tag');
+  assert(newEventDate('week', TODAY, TODAY, 1, { mobile: true }) === TODAY,
+    'steht heute im Fenster, gewinnt heute');
+  assert(newEventDate('week', '2026-08-13', TODAY, 1, { mobile: true }) === TODAY,
+    'auch als zweiter Tag des Fensters');
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const body = src.slice(src.indexOf('function newEventDate()'), src.indexOf('function isMonthSplit()'));
+  assert(/newEventDefaultDate\([^)]*\{ mobile: isMonthSplit\(\) \}\)/.test(body),
+    'der Aufrufer reicht die Telefonbreite durch');
+});
+
 test('Agenda: der Listenanfang, sobald heute außerhalb der 30 Tage liegt', () => {
   assert(newEventDate('agenda', '2026-10-01', TODAY) === '2026-10-01',
     'vorgeblätterte Agenda schlägt ihren eigenen Anfang vor');
