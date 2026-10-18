@@ -22182,3 +22182,17 @@ test('Esc in Combobox und Logo-Picker des Abo-Formulars schliesst nur das Widget
   });
   assert.deepEqual(offenders, [], 'Esc-Zweig ohne preventDefault - das Formular darunter schliesst mit');
 });
+
+/* Der Name einer Kachel kann aus dem Manifest eines Erweiterungsmoduls kommen
+ * (`widgetDisplayLabel`, utils/extension-i18n.js), und `t()` escaped seine
+ * Parameter nicht. Fuenf Stellen im Anpassen-Modus und in der Fehlerkachel
+ * setzten ihn roh ins Markup, zwei Zeilen darueber stand er in `esc()`.
+ */
+test('Dashboard: der Kachelname steht im Markup immer in esc()', () => {
+  const lines = read('../public/pages/dashboard.js').split('\n');
+  const offenders = [];
+  lines.forEach((line, i) => {
+    if (/\$\{(?!esc\()[^}]*widgetLabel\(/.test(line)) offenders.push(`pages/dashboard.js:${i + 1}`);
+  });
+  assert.deepEqual(offenders, [], 'widgetLabel() ohne esc() im Template');
+});

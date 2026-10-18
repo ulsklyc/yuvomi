@@ -4951,7 +4951,7 @@ function renderWidgetCustomizeControls(w, index = 0, total = 1) {
           <i data-lucide="chevron-down" aria-hidden="true"></i>
         </button>
       </div>
-      <div class="widget-edit-controls__size" role="group" aria-label="${t('dashboard.customizeSizeFor', { widget: widgetLabel(w.id) })}">
+      <div class="widget-edit-controls__size" role="group" aria-label="${esc(t('dashboard.customizeSizeFor', { widget: widgetLabel(w.id) }))}">
         ${sizeButtons}
       </div>
       ${renderWidgetSizeMenu(w.id, activeSize)}
@@ -4961,7 +4961,7 @@ function renderWidgetCustomizeControls(w, index = 0, total = 1) {
               title="${esc(t('dashboard.optionsFor', { widget: widgetLabel(w.id) }))}">
         <i data-lucide="sliders-horizontal" aria-hidden="true"></i>
       </button>` : ''}
-      <button type="button" class="widget-edit-controls__hide" data-widget-hide="${esc(w.id)}" aria-label="${t('dashboard.customizeHide', { widget: widgetLabel(w.id) })}">
+      <button type="button" class="widget-edit-controls__hide" data-widget-hide="${esc(w.id)}" aria-label="${esc(t('dashboard.customizeHide', { widget: widgetLabel(w.id) }))}">
         <i data-lucide="eye-off" aria-hidden="true"></i>
       </button>
     </div>
@@ -5032,9 +5032,9 @@ function renderHiddenWidgetsTray(cfg, glanceHidden = false) {
   const chips = glanceChip + hidden.map((w) => `
     <div class="widget-restore-chip-group">
       <button type="button" class="widget-restore-chip" data-widget-show="${esc(w.id)}"
-              aria-label="${t('dashboard.customizeShow', { widget: widgetLabel(w.id) })}">
+              aria-label="${esc(t('dashboard.customizeShow', { widget: widgetLabel(w.id) }))}">
         <i data-lucide="${widgetIcon(w.id)}" class="widget-restore-chip__icon" aria-hidden="true"></i>
-        <span class="widget-restore-chip__label">${widgetLabel(w.id)}</span>
+        <span class="widget-restore-chip__label">${esc(widgetLabel(w.id))}</span>
         <i data-lucide="plus" class="widget-restore-chip__add" aria-hidden="true"></i>
       </button>
       ${widgetHasOptions(w.id) ? `
@@ -5201,7 +5201,7 @@ function renderWidgetError(id) {
     <div class="widget__header">
       <span class="widget__title">
         <i data-lucide="${widgetIcon(id)}" class="widget__title-icon" aria-hidden="true"></i>
-        ${widgetLabel(id)}
+        ${esc(widgetLabel(id))}
       </span>
     </div>
     <div class="widget__empty">
