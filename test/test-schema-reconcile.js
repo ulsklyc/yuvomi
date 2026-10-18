@@ -192,3 +192,29 @@ test('legt die Schluessel-Trigger neu an, wenn nur sie fehlen', () => {
     AND name IN ('trg_users_avatar_key_update', 'trg_users_avatar_key_insert')`).get();
   assert.equal(triggers.n, 2);
 });
+
+// Codex-Review zu #2056: fehlten die Trigger, kann in der Zeit ein Bild ohne
+// Schluessel angelegt oder ein Bild unter dem alten Schluessel ersetzt worden
+// sein - das erste fiele aus den Antworten, das zweite zeigte unter einer
+// `immutable`-Adresse das alte Bild aus dem Cache. Die Reparatur wuerfelt
+// deshalb jeden Schluessel neu.
+test('wuerfelt die Schluessel neu, wenn die Trigger fehlten', () => {
+  const db = new DatabaseSync(':memory:');
+  db.exec(`CREATE TABLE users (
+    id INTEGER PRIMARY KEY, username TEXT, display_name TEXT, avatar_data TEXT, avatar_key TEXT
+  )`);
+  const stale = 'a'.repeat(32);
+  db.exec(`INSERT INTO users (id, username, display_name, avatar_data, avatar_key) VALUES (1, 'a', 'A', 'neu', '${stale}')`);
+  db.exec(`INSERT INTO users (id, username, display_name, avatar_data, avatar_key) VALUES (2, 'b', 'B', 'x', NULL)`);
+  db.exec(`INSERT INTO users (id, username, display_name, avatar_data, avatar_key) VALUES (3, 'c', 'C', NULL, '${'b'.repeat(32)}')`);
+
+  reconcileCriticalSchema(db);
+
+  assert.match(keyOf(db, 1), KEY);
+  assert.notEqual(keyOf(db, 1), stale, 'ein ersetztes Bild bekommt eine neue Adresse');
+  assert.match(keyOf(db, 2), KEY, 'ein Bild ohne Schluessel bekommt einen');
+  assert.equal(keyOf(db, 3), null, 'ohne Bild kein Schluessel');
+  const kept = keyOf(db, 1);
+  reconcileCriticalSchema(db);
+  assert.equal(keyOf(db, 1), kept, 'mit vorhandenen Triggern bleibt jeder Schluessel stehen');
+});

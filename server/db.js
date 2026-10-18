@@ -11421,7 +11421,9 @@ function reconcileCriticalSchema(database = db) {
  * Die Schluessel-Trigger der Profilbilder (Migration 251) - auch wenn NUR sie
  * fehlen. Der Nachtrag oben laeuft nur mit einer neu angelegten Spalte; ein
  * Neubau von `users` nimmt Trigger aber nicht mit, und ohne sie behielte ein
- * neues Bild seinen alten Schluessel (Codex-Review zu #2056).
+ * neues Bild seinen alten Schluessel (Codex-Review zu #2056). Die Reparatur
+ * wuerfelt dann alle Schluessel neu - was ohne Trigger geschrieben wurde,
+ * steht sonst unter einer falschen oder gar keiner Adresse.
  */
 function reconcileAvatarKeyTriggers(database) {
   try {
@@ -11432,8 +11434,24 @@ function reconcileAvatarKeyTriggers(database) {
       WHERE type = 'trigger' AND name IN ('trg_users_avatar_key_update', 'trg_users_avatar_key_insert')
     `).get().n;
     if (present === 2) return;
-    createAvatarKeyTriggers(database);
-    log.warn('Schema-Drift behoben: Trigger fuer users.avatar_key fehlten und wurden neu angelegt (#2056).');
+    // JEDER SCHLUESSEL NEU, nicht nur die fehlenden: ohne die Trigger kann ein
+    // Bild unter dem alten Schluessel ersetzt worden sein, und dessen
+    // `immutable`-Adresse zeigte aus dem Cache weiter das alte Bild.
+    database.exec('SAVEPOINT reconcile_avatar_key');
+    try {
+      createAvatarKeyTriggers(database);
+      database.exec(`
+        UPDATE users SET avatar_key = CASE
+          WHEN avatar_data IS NULL OR avatar_data = '' THEN NULL
+          ELSE lower(hex(randomblob(16))) END
+      `);
+      database.exec('RELEASE SAVEPOINT reconcile_avatar_key');
+    } catch (err) {
+      database.exec('ROLLBACK TO SAVEPOINT reconcile_avatar_key');
+      database.exec('RELEASE SAVEPOINT reconcile_avatar_key');
+      throw err;
+    }
+    log.warn('Schema-Drift behoben: Trigger fuer users.avatar_key fehlten, wurden neu angelegt und alle Schluessel neu gewuerfelt (#2056).');
   } catch (err) {
     log.error('Schema-Reconciliation der avatar_key-Trigger fehlgeschlagen:', err?.message || err);
   }
