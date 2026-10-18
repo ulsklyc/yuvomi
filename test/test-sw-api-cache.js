@@ -124,9 +124,11 @@ function loadSw({ fetchImpl } = {}) {
     parseInt, console, Symbol, setTimeout, clearTimeout,
   };
   sandbox.globalThis = sandbox;
-  runInContext(SRC, createContext(sandbox));
+  const context = createContext(sandbox);
+  runInContext(SRC, context);
   return {
     listeners, caches: cacheStorage,
+    evaluate: (code) => runInContext(code, context),
     setFetch: (f) => { ctl.fetchImpl = f; },
   };
 }
@@ -262,6 +264,37 @@ test('eine gecachte Liste holt die Profilbilder ihrer Zeilen mit in den Cache', 
   const { result } = dispatchFetch(env, new MockRequest(avatarUrl, { method: 'GET' }));
   const res = await result;
   assert.equal(res.status, 200, 'offline kommt das nie angezeigte Bild aus dem Cache');
+});
+
+// Codex-Review zu #2056: nur die Bildfelder zaehlen. Ein Titel oder eine
+// Beschreibung, in die jemand Bildpfade tippt, loeste sonst je Treffer einen
+// Abruf aus - bei jedem Laden der Liste wieder, weil ein 404 nie im Cache liegt.
+test('nur Bildfelder holen ein Bild mit, eingetippter Text nie', async () => {
+  const key = 'cd'.repeat(16);
+  const typed = Array.from({ length: 5 }, (_, i) => `/api/v1/people/${10 + i}/avatar?v=${'e'.repeat(32)}`);
+  const seen = [];
+  const env = loadSw({
+    fetchImpl: async (req) => {
+      const url = typeof req === 'string' ? req : req.url;
+      seen.push(url);
+      if (url.includes('/people/')) return new MockResponse('BILD', { status: 200 });
+      return new MockResponse(JSON.stringify({ data: [
+        { id: 1, title: typed[0], description: typed.slice(1).join(' '), creator_avatar: `/api/v1/people/3/avatar?v=${key}` },
+      ] }), { status: 200 });
+    },
+  });
+  const list = dispatchFetch(env, new MockRequest(apiUrl('/tasks'), { method: 'GET' }));
+  await list.result;
+  await new Promise((r) => setTimeout(r, 0));
+  await Promise.all(list.waited);
+  const fetched = seen.filter((u) => u.includes('/people/'));
+  assert.deepEqual(fetched, [apiUrl(`/people/3/avatar?v=${key}`)], 'nur das Bild aus creator_avatar');
+});
+
+test('der Service Worker liest dieselben Bildfelder wie der Server', async () => {
+  const { AVATAR_FIELDS } = await import('../server/services/person-avatar.js');
+  const env = loadSw();
+  assert.deepEqual([...env.evaluate('AVATAR_FIELDS')].sort(), [...AVATAR_FIELDS].sort());
 });
 
 test('Mutationen werden nie gecacht und nicht angefasst', async () => {

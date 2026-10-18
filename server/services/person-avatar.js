@@ -55,8 +55,9 @@ export function isPersonAvatarRead(method, path) {
 // wie eine Bildadresse aussieht, ist eingetippter Text und bleibt es. Ein
 // blindes Ersetzen haette ihn verfaelscht und die Antwort je Treffer um ein
 // Bild bis 768 KB aufgeblaeht (Security-Review zu #2056). Die Liste ist die
-// der Felder, die `personAvatarUrlSql()` befuellt.
-const AVATAR_FIELDS = new Set([
+// der Felder, die `personAvatarUrlSql()` befuellt; public/sw.js liest dieselben
+// (test:sw-api-cache haelt beide gleich).
+export const AVATAR_FIELDS = new Set([
   'assigned_avatar', 'avatar_data', 'creator_avatar', 'worker_avatar_data', 'user_avatar', 'person_avatar',
 ]);
 

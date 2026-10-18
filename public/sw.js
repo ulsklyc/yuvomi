@@ -732,17 +732,43 @@ async function networkFirst(request, cacheName, event) {
 // Profilbilder einer gecachten Liste (server/routes/people.js)
 // --------------------------------------------------------
 const AVATAR_PATH_RE = /^\/api\/v1\/people\/\d+\/avatar$/;
-const AVATAR_URL_RE = /\/api\/v1\/people\/\d+\/avatar\?v=[0-9a-f]{32}/g;
+const AVATAR_URL_RE = /^\/api\/v1\/people\/\d+\/avatar\?v=[0-9a-f]{32}$/;
+// NUR DIESE FELDER, dieselben wie AVATAR_FIELDS in
+// server/services/person-avatar.js (test:sw-api-cache haelt beide gleich). Ein
+// Titel oder eine Beschreibung mit eingetippten Bildpfaden loeste sonst je
+// Treffer einen Abruf aus, bei jedem Laden wieder (Codex-Review zu #2056).
+const AVATAR_FIELDS = new Set([
+  'assigned_avatar', 'avatar_data', 'creator_avatar', 'worker_avatar_data', 'user_avatar', 'person_avatar',
+]);
+
+/** Die Bildadressen aus den Bildfeldern einer Antwort, jede einmal. */
+function avatarPathsIn(value, found = new Set()) {
+  if (Array.isArray(value)) {
+    for (const item of value) avatarPathsIn(item, found);
+  } else if (value && typeof value === 'object') {
+    for (const [key, inner] of Object.entries(value)) {
+      if (AVATAR_FIELDS.has(key)) {
+        if (typeof inner === 'string' && AVATAR_URL_RE.test(inner)) found.add(inner);
+      } else {
+        avatarPathsIn(inner, found);
+      }
+    }
+  }
+  return found;
+}
 
 /**
  * Legt die Profilbilder, deren Adresse in einer Listen-Antwort steht, in den
- * API-Cache - jede Adresse einmal, auch wenn sie in hundert Zeilen steht, und
- * nur, wenn sie noch nicht dort liegt (die Adresse wechselt mit dem Bild).
+ * API-Cache - nur aus den Bildfeldern, jede Adresse einmal, auch wenn sie in
+ * hundert Zeilen steht, und nur, wenn sie noch nicht dort liegt (die Adresse
+ * wechselt mit dem Bild).
  * @param {string} baseUrl Adresse der Liste, gegen die die Pfade aufgeloest werden
  * @param {string} text Rumpf der Liste
  */
 async function precacheAvatars(baseUrl, text) {
-  const paths = [...new Set(String(text).match(AVATAR_URL_RE) || [])];
+  let body;
+  try { body = JSON.parse(text); } catch { return; }
+  const paths = [...avatarPathsIn(body)];
   if (!paths.length) return;
   const cache = await caches.open(API_CACHE);
   await Promise.all(paths.map(async (path) => {
