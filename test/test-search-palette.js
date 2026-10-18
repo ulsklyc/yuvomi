@@ -465,3 +465,24 @@ test('R20: nachkommende Daten lassen die Markierung an ihrer Zeile, nicht an ihr
   combo.refresh({ keep: true });
   assert.equal(input.getAttribute('aria-activedescendant'), action.id, 'Enter oeffnet weiter, was markiert war');
 });
+
+// Codex-Review PR #2053 (P2): ohne Treffer steht „als Aufgabe anlegen" als
+// waehlbare Zeile da, renderSearchResults gab aber 0 zurueck - die Ansage
+// sagte „Keine Ergebnisse" und verschwieg die Zeile, die der Pfeil erreicht.
+test('R20: ohne Treffer nennt die Ansage die Zeile „als Aufgabe anlegen" und zaehlt sie mit', async () => {
+  const { paletteStatusText } = await import('../public/utils/search-sections.js');
+  assert.equal(typeof paletteStatusText, 'function', 'utils/search-sections.js exportiert paletteStatusText nicht');
+  const tr = (key, params) => (params ? `${key}:${params.count}` : key);
+  assert.equal(paletteStatusText(0, {}, tr), 'search.noResults');
+  assert.equal(paletteStatusText(1, {}, tr), 'search.resultCountOne:1');
+  assert.equal(paletteStatusText(3, {}, tr), 'search.resultCountMany:3');
+  assert.equal(paletteStatusText(1, { createLabel: '„Zahnarzt" als Aufgabe anlegen' }, tr),
+    'search.noResults „Zahnarzt" als Aufgabe anlegen');
+  const render = body('function renderSearchResults(', '// Read-only-Modus für ein Modul anwenden');
+  assert.match(render, /return createTask \? \{ count: 1, createLabel: createTask\.label \}/,
+    'die Zeile „als Aufgabe anlegen" zaehlt in der Rueckgabe mit');
+  const input = body("input.addEventListener('input'", 'return openSearch;');
+  assert.match(input, /const \{ count, createLabel \} = renderSearchResults\(results, data,/);
+  assert.match(input, /announceCount\(count, \{ createLabel \}\)/, 'die Ansage bekommt die Zeile');
+  assert.match(router, /const announceCount = \(count, opts\) => setStatus\(paletteStatusText\(count, opts, t\)\)/);
+});

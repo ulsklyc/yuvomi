@@ -38,7 +38,7 @@ import { getLastHealthRoute, HEALTH_ROUTES } from '/utils/health-tabs.js';
 import { SCHEDULE_ROUTES } from '/utils/schedule-tabs.js';
 import { activityType } from '/utils/health-activity.js';
 import {
-  SEARCH_SECTIONS, NEW_ACTIONS, searchResultCount, markSegments, paletteCommands,
+  SEARCH_SECTIONS, NEW_ACTIONS, searchResultCount, markSegments, paletteCommands, paletteStatusText,
   readRecent, rememberRecent, visibleRecent, forgetAllRecent,
 } from '/utils/search-sections.js';
 import { buildHelpRows } from '/utils/help.js';
@@ -3582,11 +3582,7 @@ function initSearch(container) {
   // Pfeile schoben frueher den Fokus in die Treffer, und Enter im Feld tat
   // nichts (A1 P1-1).
 
-  const announceCount = (count) => setStatus(
-    count === 0 ? t('search.noResults')
-      : count === 1 ? t('search.resultCountOne', { count })
-      : t('search.resultCountMany', { count }),
-  );
+  const announceCount = (count, opts) => setStatus(paletteStatusText(count, opts, t));
 
   let searchTimer = null;
   input.addEventListener('input', () => {
@@ -3626,12 +3622,12 @@ function initSearch(container) {
       setStatus(t('search.loading'));
       try {
         const data = await api.get(`/search?q=${encodeURIComponent(q)}`);
-        const count = renderSearchResults(results, data, onClose, { local, query: q });
+        const { count, createLabel } = renderSearchResults(results, data, onClose, { local, query: q });
         // Die Daten kommen UNTER die Orte: eine schon bewegte Markierung
         // bleibt, wo sie ist; war noch keine gesetzt, steht sie jetzt oben.
         combo.refresh({ keep: true });
         results.setAttribute('aria-busy', 'false');
-        announceCount(count);
+        announceCount(count, { createLabel });
       } catch {
         // Fehler nicht verschlucken: sichtbare Meldung statt „wirkt wie 0 Treffer".
         // Die Ansage besitzt #search-status; der sichtbare Text bleibt rein
@@ -3766,7 +3762,9 @@ function appendMarked(el, text, query) {
  * Rendert die Palette: Orte und Aktionen (lokal) vor den Datentreffern.
  * `data` ist null, solange der Server nicht geantwortet hat (oder unter zwei
  * Zeichen gar nicht gefragt wird).
- * @returns {number} Zahl aller Zeilen - fuer die Ansage
+ * @returns {{ count: number, createLabel: string|null }} Zahl aller waehlbaren
+ *   Zeilen fuer die Ansage - die Zeile „als Aufgabe anlegen" zaehlt mit, und
+ *   ihr Text steht in `createLabel`, damit die Ansage sie nennt.
  */
 function renderSearchResults(container, data, onClose, { local = { places: [], actions: [] }, query = '', silent = false } = {}) {
   container.replaceChildren();
@@ -3781,7 +3779,7 @@ function renderSearchResults(container, data, onClose, { local = { places: [], a
   const createTask = total === 0 && data && !silent ? createTaskFromQuery(query) : null;
   if (total === 0 && !createTask) {
     if (data && !silent) container.appendChild(emptyHintEl(t('search.noResults')));
-    return 0;
+    return { count: 0, createLabel: null };
   }
 
   // Aktivitätstyp lokalisieren (Preset via labelKey, Freitext unverändert).
@@ -3912,7 +3910,7 @@ function renderSearchResults(container, data, onClose, { local = { places: [], a
   // rendert sie selbst (der Leerzustands-Pfad tut es bereits genauso).
   window.lucide?.createIcons({ el: container });
 
-  return total;
+  return createTask ? { count: 1, createLabel: createTask.label } : { count: total, createLabel: null };
 }
 
 // Read-only-Modus für ein Modul anwenden (#467): FAB via <html data-module-readonly>

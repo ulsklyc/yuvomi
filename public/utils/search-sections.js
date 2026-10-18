@@ -357,3 +357,18 @@ export function visibleRecent(list, resolve) {
     return found?.label ? [{ ...entry, label: found.label, context: found.context || '' }] : [];
   });
 }
+
+/**
+ * Die Ansage der Palette zu ihren Zeilen. `count` zaehlt jede waehlbare Zeile.
+ * Steht ohne jeden Treffer allein „als Aufgabe anlegen" da (`createLabel`),
+ * waere „1 Ergebnis" falsch und „Keine Ergebnisse" verschwiege die waehlbare
+ * Zeile (Codex-Review PR #2053): dann sagt sie beides, wie es dasteht.
+ * @param {number} count
+ * @param {{ createLabel?: string|null }} opts
+ * @param {(key: string, params?: object) => string} tr
+ */
+export function paletteStatusText(count, { createLabel = null } = {}, tr) {
+  if (createLabel) return `${tr('search.noResults')} ${createLabel}`;
+  if (count === 0) return tr('search.noResults');
+  return count === 1 ? tr('search.resultCountOne', { count }) : tr('search.resultCountMany', { count });
+}
