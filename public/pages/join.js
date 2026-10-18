@@ -6,7 +6,7 @@
 import { auth } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { authHeroHtml, authErrorHtml, wirePasswordToggle, passwordRuleHtml, flagField } from '/utils/auth-ui.js';
+import { authHeroHtml, authErrorHtml, wirePasswordToggle, passwordRuleHtml, flagField, hideAuthError } from '/utils/auth-ui.js';
 
 // Dieselbe Regel wie im Server (POST /auth/invites/accept). Sie hier zu spiegeln
 // erspart dem Nutzer ein 400, das sich sonst nicht von einem toten Token
@@ -137,7 +137,7 @@ export async function render(container) {
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    errorEl.hidden = true;
+    hideAuthError(form, errorEl);
     const username = usernameEl.value.trim();
     const displayName = displayNameEl.value.trim();
     const password = form.password.value;

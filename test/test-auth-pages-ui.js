@@ -215,3 +215,43 @@ test('Befund 15: Passwort vergessen sagt bei leerem Feld, was fehlt', () => {
   assert.match(src, /authErrorHtml\('forgot-error'\)/, 'die Seite hat ein Fehlerfeld');
   assert.match(src, /if \(!identifier\) \{[^}]*t\('forgotPassword\.identifierRequired'\)/, 'leeres Feld: eine Meldung, nicht nur der Fokus');
 });
+
+/**
+ * Codex-Review zu #2059: die Einrichtung blendete ihre Meldung bei der ersten
+ * Eingabe aus, die ANDEREN markierten Felder blieben `aria-invalid` und zeigten
+ * auf eine unsichtbare Meldung. `hideAuthError()` nimmt beides zusammen ab;
+ * die Einrichtung ruft es bei jeder Eingabe, "Passwort vergessen" ebenso.
+ */
+test('Befund 15: hideAuthError nimmt Meldung und jede Markierung zusammen ab', async () => {
+  const { flagField, hideAuthError } = await import('../public/utils/auth-ui.js');
+  const makeField = (describedby) => {
+    const attrs = new Map(describedby ? [['aria-describedby', describedby]] : []);
+    return {
+      attrs,
+      getAttribute: (k) => attrs.get(k) ?? null,
+      setAttribute: (k, v) => attrs.set(k, String(v)),
+      removeAttribute: (k) => attrs.delete(k),
+      addEventListener: () => {},
+    };
+  };
+  const a = makeField('hint');
+  const b = makeField(null);
+  const errorEl = { id: 'setup-error', hidden: false };
+  flagField(a, errorEl);
+  flagField(b, errorEl);
+  const form = { querySelectorAll: () => [a, b].filter((f) => f.attrs.get('aria-invalid') === 'true') };
+  hideAuthError(form, errorEl);
+  assert.equal(errorEl.hidden, true);
+  assert.equal(a.attrs.has('aria-invalid'), false);
+  assert.equal(a.attrs.get('aria-describedby'), 'hint', 'der Hinweis bleibt');
+  assert.equal(b.attrs.has('aria-invalid'), false);
+  assert.equal(b.attrs.has('aria-describedby'), false);
+  flagField(b, errorEl);
+  assert.equal(b.attrs.get('aria-invalid'), 'true', 'nach dem Abnehmen laesst sich das Feld erneut markieren');
+
+  const setup = read('../public/pages/setup.js');
+  assert.match(setup, /addEventListener\('input', \(\) => hideAuthError\(form, errorEl\)\)/, 'die Einrichtung blendet mit hideAuthError aus');
+  assert.doesNotMatch(setup, /errorEl\.hidden = true/, 'kein Ausblenden an hideAuthError vorbei');
+  const forgot = read('../public/pages/forgot-password.js');
+  assert.match(forgot, /form\.identifier\.addEventListener\('input', \(\) => hideAuthError\(form, errorEl\)\)/, '"Passwort vergessen" nimmt die Meldung beim Tippen zurueck');
+});

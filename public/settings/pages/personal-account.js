@@ -4,7 +4,7 @@ import {
   parseDateInput,
   t,
 } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 import { confirmModal, reportFieldError, reportFieldErrors } from '/components/modal.js';
 import { errorSentence } from '/utils/friendly-error.js';
@@ -652,7 +652,7 @@ function renderPage(container, user, refreshFailed, accessNotice, oidcState, oid
                  als gesperrtes Feld. */ ''}
             <div class="settings-profile-editor__fields row-carrier settings-group">
               ${settingRowHtml({
-                label: t('settings.displayNameLabel'), labelFor: 'profile-display-name', field: true,
+                label: t('settings.displayNameLabel'), labelFor: 'profile-display-name', labelExtra: REQUIRED_MARK, field: true,
                 control: `<input class="form-input" type="text" id="profile-display-name" maxlength="128" value="${esc(user?.display_name || '')}" autocomplete="name" aria-describedby="profile-error" required>`,
               })}
               ${settingRowHtml({
@@ -701,15 +701,15 @@ function renderPage(container, user, refreshFailed, accessNotice, oidcState, oid
         <form id="password-form" class="settings-form" novalidate>
           <div class="row-carrier settings-group">
             ${settingRowHtml({
-              label: t('settings.currentPasswordLabel'), labelFor: 'current-password', field: true,
+              label: t('settings.currentPasswordLabel'), labelFor: 'current-password', labelExtra: REQUIRED_MARK, field: true,
               control: '<input class="form-input" type="password" id="current-password" autocomplete="current-password" aria-describedby="password-error" required>',
             })}
             ${settingRowHtml({
-              label: t('settings.newPasswordLabel'), labelFor: 'new-password', field: true,
+              label: t('settings.newPasswordLabel'), labelFor: 'new-password', labelExtra: REQUIRED_MARK, field: true,
               control: '<input class="form-input" type="password" id="new-password" autocomplete="new-password" minlength="8" aria-describedby="password-error" required>',
             })}
             ${settingRowHtml({
-              label: t('settings.confirmPasswordLabel'), labelFor: 'confirm-password', field: true,
+              label: t('settings.confirmPasswordLabel'), labelFor: 'confirm-password', labelExtra: REQUIRED_MARK, field: true,
               control: '<input class="form-input" type="password" id="confirm-password" autocomplete="new-password" minlength="8" aria-describedby="password-error" required>',
             })}
           </div>

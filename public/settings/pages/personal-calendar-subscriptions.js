@@ -23,7 +23,7 @@
 
 import { api } from '/api.js';
 import { formatDate, formatTime, t } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { closeModal, confirmModal, openModal, refocusAfterRender } from '/components/modal.js';
 import { settingRowHtml, settingSwitchRowHtml, toggleRowHtml } from '/settings/components.js';
 import { loadFamilyUsers } from '/settings/family-users.js';
@@ -59,11 +59,11 @@ function renderPage(container) {
                  Farbe, Zuweisung und Teilen als Zeilen der Gruppe. */ ''}
             <div class="row-carrier settings-group">
               ${settingRowHtml({
-                label: t('settings.ics.form.url'), labelFor: 'ics-url',
+                label: t('settings.ics.form.url'), labelFor: 'ics-url', labelExtra: REQUIRED_MARK,
                 control: '<input class="form-input" type="url" id="ics-url" required placeholder="https://..." />',
               })}
               ${settingRowHtml({
-                label: t('settings.ics.form.name'), labelFor: 'ics-name',
+                label: t('settings.ics.form.name'), labelFor: 'ics-name', labelExtra: REQUIRED_MARK,
                 control: '<input class="form-input" type="text" id="ics-name" required maxlength="100" />',
               })}
               ${settingRowHtml({
@@ -268,7 +268,7 @@ function openIcsEditModal(container, sub, subs, user) {
              ihren Etiketten und ein Schalter, der neben der Farbe klemmte. */ ''}
         ${formRowsHtml([
           formRowHtml({
-            label: t('settings.ics.form.name'), labelFor: 'ics-edit-name', field: true,
+            label: t('settings.ics.form.name'), labelFor: 'ics-edit-name', labelExtra: REQUIRED_MARK, field: true,
             control: `<input class="form-input" type="text" id="ics-edit-name" value="${esc(sub.name)}" required maxlength="100" />`,
           }),
           formRowHtml({

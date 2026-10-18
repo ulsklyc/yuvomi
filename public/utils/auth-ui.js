@@ -133,11 +133,32 @@ export function flagField(field, errorEl) {
   if (!ids.includes(errorEl.id)) field.setAttribute('aria-describedby', [...ids, errorEl.id].join(' '));
   if (field._authFlagged) return;
   field._authFlagged = true;
-  field.addEventListener('input', () => {
-    field._authFlagged = false;
-    field.removeAttribute('aria-invalid');
-    const rest = (field.getAttribute('aria-describedby') || '').split(/\s+/).filter((id) => id && id !== errorEl.id);
-    if (rest.length) field.setAttribute('aria-describedby', rest.join(' '));
-    else field.removeAttribute('aria-describedby');
-  }, { once: true });
+  field.addEventListener('input', () => unflagField(field, errorEl), { once: true });
+}
+
+/** Nimmt Markierung und Verweis auf die Meldung von EINEM Feld. */
+function unflagField(field, errorEl) {
+  field._authFlagged = false;
+  field.removeAttribute('aria-invalid');
+  const rest = (field.getAttribute('aria-describedby') || '').split(/\s+/).filter((id) => id && id !== errorEl.id);
+  if (rest.length) field.setAttribute('aria-describedby', rest.join(' '));
+  else field.removeAttribute('aria-describedby');
+}
+
+/**
+ * MELDUNG WEG, MARKIERUNGEN WEG - zusammen (Codex-Review zu #2059). Blendete
+ * eine Seite ihr Fehlerfeld bei der ersten Eingabe aus, blieben die ANDEREN
+ * markierten Felder `aria-invalid` und zeigten auf eine Meldung, die niemand
+ * mehr sah. Wer die Meldung ausblendet, nimmt hiermit jede Markierung ab, die
+ * auf sie zeigt.
+ *
+ * @param {HTMLElement|null} form
+ * @param {HTMLElement|null} errorEl
+ */
+export function hideAuthError(form, errorEl) {
+  if (!errorEl) return;
+  errorEl.hidden = true;
+  for (const field of form?.querySelectorAll?.('[aria-invalid="true"]') ?? []) {
+    if ((field.getAttribute('aria-describedby') || '').split(/\s+/).includes(errorEl.id)) unflagField(field, errorEl);
+  }
 }

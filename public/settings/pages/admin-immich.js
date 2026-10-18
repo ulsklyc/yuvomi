@@ -1,6 +1,6 @@
 import { api } from '/api.js';
 import { t } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { createInlineError, createRetryState, settingRowHtml } from '/settings/components.js';
 
 function toast(message, tone = 'default') {
@@ -17,7 +17,7 @@ function renderForm(container, cfg) {
       <form class="settings-form" id="immich-form" novalidate autocomplete="off">
         <div class="row-carrier settings-group">
           ${settingRowHtml({
-            label: t('settings.immichServerUrl'), labelFor: 'immich-url',
+            label: t('settings.immichServerUrl'), labelFor: 'immich-url', labelExtra: REQUIRED_MARK,
             control: `<input class="form-input" id="immich-url" name="url" type="url"
               value="${esc(cfg.url || '')}" placeholder="https://photos.example.com" required />`,
             extra: `<p class="form-hint" data-env="url" hidden>${esc(t('settings.documentStorageEnvHint'))}</p>`,

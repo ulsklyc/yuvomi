@@ -22255,28 +22255,65 @@ test('a starred label marks a required field, and a required field in a mixed fo
   const SINGLE_FIELD = new Set([
     'public/settings/pages/personal-account.js #two-factor-code', // nur der Code
     'public/settings/pages/personal-account.js #two-factor-confirm-code', // nur der Code
+    'public/settings/pages/admin-displays.js #display-name', // das Koppelformular hat nur den Namen
   ]);
   const files = walkJsFiles('../public/').filter((f) => !f.includes('/vendor/') && !AUTH.test(f));
+  // Das Objekt-Literal um eine Stelle: `{ label, labelFor, labelExtra, control }`
+  // der Zeilen-Bausteine (formRowHtml und Verwandte, Codex-Review zu #2059).
+  const enclosingObject = (src, at) => {
+    let depth = 0;
+    let start = at;
+    for (; start > 0; start -= 1) {
+      if (src[start] === '}') depth += 1;
+      else if (src[start] === '{') { if (depth === 0) break; depth -= 1; }
+    }
+    let end = at;
+    for (depth = 0; end < src.length; end += 1) {
+      if (src[end] === '{') depth += 1;
+      else if (src[end] === '}') { if (depth === 0) break; depth -= 1; }
+    }
+    return src.slice(start, end + 1);
+  };
   const starNoReq = [];
   const reqNoStar = [];
+  // Welche Zeilen-Bausteine `labelExtra` annehmen: die Funktionen, deren
+  // Parameterobjekt es nennt.
+  const takesLabelExtra = new Set();
+  for (const file of files) {
+    for (const m of read(file).matchAll(/function (\w+)\(\{([^)]*?)\}\s*=?\s*\{?\}?\)/g)) {
+      if (/\blabelExtra\b/.test(m[2])) takesLabelExtra.add(m[1]);
+    }
+  }
+  assert.ok(takesLabelExtra.has('formRowHtml') && takesLabelExtra.has('settingRowHtml'), `Bausteine mit labelExtra: ${[...takesLabelExtra]}`);
   let seen = 0;
   for (const file of files) {
     const src = read(file);
-    const rel = file.replace('../', '');
-    const labelFor = new Map([...src.matchAll(/<label\b[^>]*\bfor="([\w-]+)"[^>]*>([\s\S]*?)<\/label>/g)].map((m) => [m[1], m[2]]));
+    const rel = file.slice('../'.length);
+    const labels = [...src.matchAll(/<label\b[^>]*\bfor="([\w-]+)"[^>]*>([\s\S]*?)<\/label>/g)].map((m) => [m[1], m[2]]);
+    for (const m of src.matchAll(/\blabelFor:\s*['"]([\w-]+)['"]/g)) {
+      const obj = enclosingObject(src, m.index);
+      const extra = obj.match(/\blabelExtra:\s*([^,\n]+)/)?.[1] ?? '';
+      // Der Baustein muss `labelExtra` auch NEHMEN - settingRowHtml() verschluckte
+      // ihn bis hierher still, der Stern stand nur im Quelltext.
+      const builder = src.slice(0, src.indexOf(obj)).match(/(\w+)\(\s*$/)?.[1];
+      if (extra && builder && !takesLabelExtra.has(builder)) starNoReq.push(`${rel} #${m[1]}: ${builder}() nimmt kein labelExtra`);
+      labels.push([m[1], extra]);
+    }
     const controls = new Map([...src.matchAll(/<(?:input|select|textarea)\b([^>]*)>/g)]
       .map((m) => [m[1].match(/\bid="([\w-]+)"/)?.[1], m[1]]).filter(([id]) => id));
-    for (const [id, text] of labelFor) {
+    for (const [id, text] of labels) {
       const attrs = controls.get(id);
       if (!attrs) continue;
       seen += 1;
       const starred = /REQUIRED_MARK|required-marker/.test(text);
-      const required = /\srequired\b/.test(attrs);
+      // Auch bedingt (`${isEdit ? '' : 'required'}`) - dann haengt der Stern an derselben Bedingung.
+      const required = /\srequired\b|'required'/.test(attrs);
       if (starred && !required) starNoReq.push(`${rel} #${id}`);
       if (!starred && required && !/type="(?:checkbox|radio|hidden)"/.test(attrs) && !SINGLE_FIELD.has(`${rel} #${id}`)) reqNoStar.push(`${rel} #${id}`);
     }
   }
-  assert.ok(seen > 200, `nur ${seen} Label-Feld-Paare gefunden - der Guard liest die Formulare nicht mehr`);
+  assert.ok(seen > 250, `nur ${seen} Label-Feld-Paare gefunden - der Guard liest die Formulare nicht mehr`);
   assert.deepEqual(starNoReq, [], `Stern ohne required - der Screenreader hoert ein Kannfeld:\n${starNoReq.join('\n')}`);
   assert.deepEqual(reqNoStar, [], `required ohne Stern in einem gemischten Formular:\n${reqNoStar.join('\n')}`);
 });
+

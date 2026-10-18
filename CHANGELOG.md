@@ -45,10 +45,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   submitting. The rule now stands under the field. An error on these pages and on "Forgot password"
   also marks the field it means, so a screen reader names it there, and "Forgot password" with an
   empty field says what is missing instead of only moving the cursor.
-- **Required fields say so to screen readers, and mixed forms show which ones are required.** In
+- **Required fields say so to screen readers, and every form shows which fields are required.** In
   the budget's entry, account and loan dialogs and the waste type dialog the asterisk was only
-  visual; the field now reports itself as required. The member, folder, medication, pairing,
-  bonus points, shopping item and health type forms required a field without marking it.
+  visual; the field now reports itself as required. About thirty fields required an entry without
+  the asterisk, among them adding and editing members, your profile and password change, API tokens,
+  document management, Immich, Apple Calendar, calendar subscriptions, folders, documents, health
+  entries and medication, pairing, bonus points and shopping items. Forms with a single field and
+  the sign-in pages stay without it.
 
 ### Security
 

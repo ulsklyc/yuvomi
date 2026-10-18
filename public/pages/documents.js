@@ -2679,7 +2679,7 @@ function openDocumentModal(doc = null) {
         ${isEdit ? '' : fileFieldHtml}
         <div class="modal-grid modal-grid--2">
           <div class="form-group">
-            <label class="label" for="document-name">${t('documents.nameLabel')}</label>
+            <label class="label" for="document-name">${t('documents.nameLabel')}${REQUIRED_MARK}</label>
             <input class="input" id="document-name" name="name" maxlength="200" value="${esc(doc?.name || '')}"
                    ${isEdit ? 'required' : `placeholder="${esc(t('documents.namePlaceholder'))}"`}>
             ${isEdit ? '' : `<p class="document-form__hint" id="document-name-hint">${t('documents.nameHint')}</p>`}

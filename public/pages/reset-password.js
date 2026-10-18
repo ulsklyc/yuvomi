@@ -6,7 +6,7 @@
 import { auth } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { authHeroHtml, authErrorHtml, wirePasswordToggle, passwordRuleHtml, flagField } from '/utils/auth-ui.js';
+import { authHeroHtml, authErrorHtml, wirePasswordToggle, passwordRuleHtml, flagField, hideAuthError } from '/utils/auth-ui.js';
 
 function wireLinks(container) {
   container.querySelectorAll('a[data-link]').forEach((a) =>
@@ -97,7 +97,7 @@ export async function render(container) {
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    errorEl.hidden = true;
+    hideAuthError(form, errorEl);
     const password = form.password.value;
     const confirm = form.confirm.value;
     // Jede Pruefung markiert das Feld, das sie meint (utils/auth-ui.js, flagField).

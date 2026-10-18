@@ -8,7 +8,7 @@
 import { auth, ApiError } from '/api.js';
 import { getLocale, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { authHeroHtml, authErrorHtml, wirePasswordToggle, passwordRuleHtml, flagField } from '/utils/auth-ui.js';
+import { authHeroHtml, authErrorHtml, wirePasswordToggle, passwordRuleHtml, flagField, hideAuthError } from '/utils/auth-ui.js';
 import { browserTimeZone } from '/utils/timezone.js';
 
 const VERSION_URL = '/api/v1/version';
@@ -101,7 +101,7 @@ export async function render(container) {
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    errorEl.hidden = true;
+    hideAuthError(form, errorEl);
 
     const username = form.username.value.trim();
     const displayName = form.display_name.value.trim();
@@ -189,7 +189,7 @@ export async function render(container) {
   });
 
   for (const id of ['username', 'display_name', 'password', 'confirm_password']) {
-    form.querySelector(`#${id}`).addEventListener('input', () => { errorEl.hidden = true; });
+    form.querySelector(`#${id}`).addEventListener('input', () => hideAuthError(form, errorEl));
   }
 }
 

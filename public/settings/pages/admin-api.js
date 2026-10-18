@@ -1,6 +1,6 @@
 import { api } from '/api.js';
 import { formatDate, formatTime, t } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { confirmModal, refocusAfterRender } from '/components/modal.js';
 import { createRetryState, settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
@@ -173,11 +173,11 @@ function renderPage(container, scopeKeys = CORE_SCOPE_MODULE_KEYS) {
                Rechtetabelle erscheint darunter, sobald die Grenze gilt. */ ''}
           <div class="row-carrier settings-group">
             ${settingRowHtml({
-              label: t('settings.apiTokenNameLabel'), labelFor: 'api-token-name',
+              label: t('settings.apiTokenNameLabel'), labelFor: 'api-token-name', labelExtra: REQUIRED_MARK,
               control: '<input class="form-input" type="text" id="api-token-name" maxlength="100" required />',
             })}
             ${settingRowHtml({
-              label: t('settings.apiTokenSubjectLabel'), labelFor: 'api-token-subject',
+              label: t('settings.apiTokenSubjectLabel'), labelFor: 'api-token-subject', labelExtra: REQUIRED_MARK,
               control: '<select class="form-input" id="api-token-subject" required></select>',
             })}
             ${settingRowHtml({

@@ -2235,7 +2235,7 @@ function valueFieldsMarkup(type, row = null) {
   const valueInput = `<input class="form-input form-composite__part form-composite__part--wide" id="vital-value" type="number" inputmode="decimal" step="any" required${staticUnit ? ' aria-describedby="vital-value-unit"' : ''}${valueAttr(row?.value_num)}>`;
   return `${formRowHtml({
     label: t(metric.labelKey),
-    labelFor: 'vital-value',
+    labelFor: 'vital-value', labelExtra: REQUIRED_MARK,
     field: true,
     control: `<span class="form-composite">${valueInput}${unitControl}${staticUnit ? `<span class="form-composite__unit" id="vital-value-unit">${esc(staticUnit)}</span>` : ''}</span>`,
   })}${unitChoice ? '' : `<input type="hidden" id="vital-unit" value="${esc(metric.units[0])}">`}`;
@@ -5178,7 +5178,7 @@ function openActivityModal(row, opts = {}) {
         ${formRowsHtml([
           formRowHtml({
             label: t('health.activity.field.type'),
-            labelFor: 'activity-type',
+            labelFor: 'activity-type', labelExtra: REQUIRED_MARK,
             field: true,
             control: `<select class="form-input" id="activity-type" required>${activityTypeSelectMarkup(isEdit ? row.type : null)}</select>`,
           }),
@@ -6167,7 +6167,7 @@ function openNutritionModal(row) {
         ${formRowsHtml([
           formRowHtml({
             label: t('health.nutrition.field.title'),
-            labelFor: 'nutrition-title',
+            labelFor: 'nutrition-title', labelExtra: REQUIRED_MARK,
             field: true,
             control: `<input class="form-input" id="nutrition-title" type="text" required maxlength="200" value="${esc(val(row?.title))}">`,
           }),

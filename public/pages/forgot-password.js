@@ -6,7 +6,7 @@
 import { auth } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { authHeroHtml, authErrorHtml, flagField } from '/utils/auth-ui.js';
+import { authHeroHtml, authErrorHtml, flagField, hideAuthError } from '/utils/auth-ui.js';
 
 function wireLinks(container) {
   container.querySelectorAll('a[data-link]').forEach((a) =>
@@ -80,9 +80,12 @@ export async function render(container) {
   const btn = container.querySelector('#forgot-btn');
   wireLinks(container);
 
+  // Wer zu tippen beginnt, korrigiert: die Meldung "fehlt" geht mit (Codex-Review zu #2059).
+  form.identifier.addEventListener('input', () => hideAuthError(form, errorEl));
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    errorEl.hidden = true;
+    hideAuthError(form, errorEl);
     const identifier = form.identifier.value.trim();
     // Leer scheiterte stumm - nur der Fokus sprang ins Feld (Modern-Web-
     // Guidance-Audit, Befund 15). Jetzt sagt die Seite, was fehlt, am Feld.

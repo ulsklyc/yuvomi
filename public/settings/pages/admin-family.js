@@ -259,11 +259,11 @@ function addMemberFormHtml() {
         <form id="add-member-form" class="settings-form">
           ${formRowsHtml([
             formRowHtml({
-              label: t('settings.usernameLabel'), labelFor: 'new-username', field: true,
+              label: t('settings.usernameLabel'), labelFor: 'new-username', labelExtra: REQUIRED_MARK, field: true,
               control: '<input class="form-input" type="text" id="new-username" required autocomplete="off" />',
             }),
             formRowHtml({
-              label: t('settings.displayNameLabel'), labelFor: 'new-display-name', field: true,
+              label: t('settings.displayNameLabel'), labelFor: 'new-display-name', labelExtra: REQUIRED_MARK, field: true,
               control: '<input class="form-input" type="text" id="new-display-name" required />',
             }),
             formRowHtml({
@@ -274,7 +274,7 @@ function addMemberFormHtml() {
               id: 'new-member-sso-only', label: t('settings.memberSsoOnlyLabel'), hint: t('settings.memberSsoOnlyHint'),
             }) : '',
             formRowHtml({
-              label: t('settings.memberPasswordLabel'), labelFor: 'new-member-password', field: true,
+              label: t('settings.memberPasswordLabel'), labelFor: 'new-member-password', labelExtra: REQUIRED_MARK, field: true,
               attrs: { id: 'new-member-password-group' },
               control: '<input class="form-input" type="password" id="new-member-password" minlength="8" required autocomplete="new-password" />',
             }),
