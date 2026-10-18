@@ -117,7 +117,6 @@ this list.
   set and falling back to the minimum when it is not: restocking to the minimum leaves the household
   low again after one tap (#1077).
 - Themes: the font half, after the colour half has shipped (#972).
-- A module index for third-party modules, the one open request in #746.
 
 Already tickets, since 2 September 2026: bank export import with a saved mapping (#1000),
 per-month budget plans (#1001), the health change feed (#1002), a price on a shopping item
