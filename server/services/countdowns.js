@@ -43,7 +43,7 @@ import { loadEventExceptions } from './calendar-events.js';
 import { modulesLeftOut, notBirthdayEventSql } from './household-modules.js';
 import { eventProjectionSql, resolveProjectedEventRows } from './calendar-event-reader.js';
 import { icsSubscriptionVisibleWhere, visibilityWhere } from './visibility.js';
-import { householdTimeZone, utcToWall } from '../utils/timezone.js';
+import { householdTimeZone, storedDayDiffersFromSeriesDay, storedToWall } from '../utils/timezone.js';
 // Dieselbe Rangfolge wie im Kalender und auf der Uebersicht - eine Regel, eine
 // Datei. Der Server importiert oefter aus `public/utils/` (date, folder-tree,
 // currency-codes, ...), immer fuer abhaengigkeitsfreie geteilte Regeln.
@@ -111,12 +111,19 @@ function shiftKey(dateKey, days) {
  * Datum" heissen. Gerechnet wird gegen dieselbe Zone, aus der die Route ihren
  * `todayKey` bildet - ein Vergleich zweier Kalendertage taugt nur, wenn beide
  * aus demselben Kalender stammen.
+ *
+ * ZONENLOSE ZIFFERN SIND SCHON DER TAG (#1998). Ein lokal angelegter Termin
+ * steht als Wanduhr des Haushalts in der Zeile (`2035-10-02T23:30`). Hier lief
+ * auch er durch `utcToWall()`, also ueber `new Date()` in der Zone des
+ * PROZESSES: im Container mit TZ=UTC und Haushalt Berlin wurde aus 23:30 der
+ * Folgetag. `storedToWall()` liest solche Ziffern in der Haushaltszone, nimmt
+ * einen Instant wie er ist und rechnet beide auf die Wanduhr derselben Zone.
  */
 function eventStartDateKey(event, tz) {
   const raw = String(event.start_datetime ?? '');
   const key = event.all_day || raw.length <= 10
     ? raw.slice(0, 10)
-    : (utcToWall(raw, tz)?.date ?? raw.slice(0, 10));
+    : (storedToWall(raw, tz, tz)?.date ?? raw.slice(0, 10));
   return /^\d{4}-\d{2}-\d{2}$/.test(key) ? key : null;
 }
 
@@ -173,9 +180,10 @@ export function nextEventDate(event, todayKey, exceptions = null, { graceDays = 
   // Kachel verschwieg ihn. `expandRecurringEvents` setzt die Pruefung in genau
   // diesem Fall aus (`zonenUnsicher`); hier gilt dieselbe Ruecknahme, sonst
   // beantworten zwei Stellen dieselbe Frage verschieden.
-  const wandUhr = event.tzid ? utcToWall(String(event.start_datetime ?? ''), event.tzid) : null;
-  const zonenUnsicher = !!event.tzid
-    && !(wandUhr && wandUhr.date === String(event.start_datetime ?? '').slice(0, 10));
+  //
+  // Zonenlose Ziffern liest `storedDayDiffersFromSeriesDay` in der
+  // Haushaltszone, nicht ueber `new Date()` in der des Prozesses (#1998).
+  const zonenUnsicher = storedDayDiffersFromSeriesDay(event.start_datetime, event.tzid, tz);
 
   if (!hasAnyOccurrence(startKey, event.recurrence_rule, { utcDiffersFromLocal: zonenUnsicher })) return null;
   const ersterTreffer = seriesStartFor(startKey, event.recurrence_rule, { utcDiffersFromLocal: zonenUnsicher });

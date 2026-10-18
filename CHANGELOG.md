@@ -36,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A countdown to an evening event no longer names the next day.** With the server running in UTC
+  (the default container) and a household east of UTC, an event at 23:30 counted down to the day
+  after; west of UTC, an early-morning event could count down to the day before. The countdown now
+  reads the event's time in the household's time zone, wherever the server runs (#1998).
 - **On the overview, the people of an event sit at the end of its line in right-to-left
   languages.** In Arabic and Persian they sat right after the event's title instead. Left-to-right
   layouts are unchanged.
