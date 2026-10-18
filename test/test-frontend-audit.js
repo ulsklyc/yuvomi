@@ -22501,23 +22501,32 @@ test('dashboard: returning to the tab refreshes only a stale overview', () => {
   assert.equal(staleOnReturn({ loadedAt: at, loadedDay: '2026-10-18' }, { now: later(5_000), today: '2026-10-19' }), true, 'der Tag hat gewechselt');
 
   const handler = src.slice(src.indexOf("document.addEventListener('visibilitychange'"), src.indexOf("document.addEventListener('visibilitychange'") + 2200);
-  assert.match(handler, /if \(staleOnReturn\(\{ loadedAt: lastLoadedAt, loadedDay: lastLoadedDay \}, \{ now: new Date\(\), today: householdToday\(\) \}\)\) refreshDashboardData\(\);/,
+  assert.match(handler, /if \(staleOnReturn\(\{ loadedAt: freshAt, loadedDay: freshDay \}, \{ now: new Date\(\), today: householdToday\(\) \}\)\) refreshDashboardData\(\);/,
     'der Handler fragt staleOnReturn(), bevor er neu laedt');
-  assert.deepEqual(src.match(/lastLoadedAt = new Date\(\);/g), ['lastLoadedAt = new Date();'], 'jeder Ladepunkt merkt Zeit UND Tag (markLoaded)');
-  assert.match(src, /const markLoaded = \(day\) => \{ lastLoadedAt = new Date\(\); lastLoadedDay = day; \};/,
-    'markLoaded() rechnet den Tag nicht selbst aus');
+  assert.deepEqual(src.match(/lastLoadedAt = new Date\(\);/g), ['lastLoadedAt = new Date();'], 'jeder Ladepunkt geht durch markLoaded()');
+  assert.match(src, /const markLoaded = \(day, \{ partial = false \} = \{\}\) => \{ lastLoadedAt = new Date\(\); if \(!partial\) \{ freshAt = lastLoadedAt; freshDay = day; \} \};/,
+    'markLoaded() rechnet den Tag nicht selbst aus, ein Teilstand zaehlt nicht als frisch');
   // Der Server legt den Tag beim EINGANG der Anfrage fest. Kommt die Antwort
   // nach Mitternacht an, ist sie trotzdem der alte Tag - gemerkt wird also der
   // Tag von vor der Anfrage, sonst haelt die Rueckkehr gestern fuer heute.
-  const calls = [...src.matchAll(/markLoaded\(([^)]*)\);/g)];
+  const calls = [...src.matchAll(/markLoaded\((\w+)(, \{ partial: true \})?\);/g)];
   assert.equal(calls.length, 3, 'drei Ladepunkte');
   for (const call of calls) {
     const arg = call[1];
-    assert.match(arg, /^\w+$/, `markLoaded(${arg}) braucht den Tag der Anfrage`);
     const decl = src.lastIndexOf(`const ${arg} = householdToday();`, call.index);
     assert.ok(decl > 0, `${arg} ist nicht vor dem Ladepunkt festgehalten`);
     assert.match(src.slice(decl, call.index), /api\.get\(overviewRequest\(/, `${arg} wird vor der Anfrage festgehalten, nicht danach`);
   }
+  // Der Filterwechsel holt nur /dashboard und reicht Erinnerungen und
+  // Dienstplan vom alten Stand weiter - das ist kein frischer Stand, sonst
+  // unterdrueckte die Rueckkehr in den Tab binnen einer Minute deren Refresh.
+  const partialOf = (head) => {
+    const at = src.indexOf(head);
+    assert.ok(at > 0, `${head} fehlt`);
+    return /markLoaded\(\w+, \{ partial: true \}\);/.test(src.slice(at, src.indexOf('\n  }\n', at)));
+  };
+  assert.equal(partialOf('async function reloadIfQueryChanged('), true, 'der Filterwechsel ist ein Teilstand');
+  assert.equal(partialOf('async function refreshDashboardData('), false, 'der stille Refresh holt alles und ist frisch');
 });
 
 /**

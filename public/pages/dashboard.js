@@ -6988,12 +6988,15 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // Bleibt `null`, solange nichts geladen wurde: eine Uhrzeit ohne Daten
   // dahinter waere die falscheste aller Angaben.
   let lastLoadedAt = null;
-  // Der Haushaltstag dieses Stands - die Rueckkehr in den Tab vergleicht ihn.
-  // Gemerkt wird der Tag VOR der Anfrage: der Server legt ihn beim Eingang
-  // fest, und eine Antwort, die erst nach Mitternacht ankommt, zeigt noch den
-  // alten Tag.
-  let lastLoadedDay = null;
-  const markLoaded = (day) => { lastLoadedAt = new Date(); lastLoadedDay = day; };
+  // Zeit und Haushaltstag des letzten VOLLEN Stands - die Rueckkehr in den
+  // Tab vergleicht sie. Gemerkt wird der Tag VOR der Anfrage: der Server legt
+  // ihn beim Eingang fest, und eine Antwort, die erst nach Mitternacht
+  // ankommt, zeigt noch den alten Tag. Ein Teilstand (`partial`, der
+  // Filterwechsel) reicht Erinnerungen und Dienstplan vom alten Stand weiter
+  // und zaehlt deshalb nicht als frisch.
+  let freshAt = null;
+  let freshDay = null;
+  const markLoaded = (day, { partial = false } = {}) => { lastLoadedAt = new Date(); if (!partial) { freshAt = lastLoadedAt; freshDay = day; } };
   try {
     const requestDay = householdToday();
     const [dashRes, weatherRes, prefsRes, remindersRes] = await Promise.all([
@@ -7168,7 +7171,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
       fresh.pendingReminders = data.pendingReminders;
       data = fresh;
       setCountdownAvailability(data?.countdowns);
-      markLoaded(requestDay);
+      markLoaded(requestDay, { partial: true });
     } catch { /* der alte Stand bleibt stehen, statt die Seite zu leeren */ }
   }
 
@@ -7950,7 +7953,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     updateClockWidget(container);
     // Inhalte ziehen nach, nicht nur Gruß/Datum/Uhr (Paket 2) - aber nur ein
     // alter Stand (staleOnReturn, oben).
-    if (staleOnReturn({ loadedAt: lastLoadedAt, loadedDay: lastLoadedDay }, { now: new Date(), today: householdToday() })) refreshDashboardData();
+    if (staleOnReturn({ loadedAt: freshAt, loadedDay: freshDay }, { now: new Date(), today: householdToday() })) refreshDashboardData();
   }, { signal: signal });
 
   // Der Minutentakt der Uhr traegt die Nachtabsenkung mit: um 22:00 und um
