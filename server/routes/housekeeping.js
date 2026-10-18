@@ -57,6 +57,7 @@ import {
   latestVisit,
   widenedWindow,
 } from '../services/housekeeping-month.js';
+import { personAvatarUrlSql } from '../services/person-avatar.js';
 
 const log = createLogger('Housekeeping');
 const router = express.Router();
@@ -1081,7 +1082,7 @@ router.get('/visits', (req, res) => {
              hw.payment_schedule,
              u.display_name AS worker_name,
              u.avatar_color AS worker_avatar_color,
-             u.avatar_data AS worker_avatar_data,
+             ${personAvatarUrlSql('u')} AS worker_avatar_data,
              t.status AS payment_task_status,
              t.title AS payment_task_title
       FROM housekeeping_work_sessions hws
@@ -1189,7 +1190,7 @@ router.get('/visits/:id', (req, res) => {
              hw.payment_schedule,
              u.display_name AS worker_name,
              u.avatar_color AS worker_avatar_color,
-             u.avatar_data  AS worker_avatar_data,
+             ${personAvatarUrlSql('u')} AS worker_avatar_data,
              t.status  AS payment_task_status,
              t.title   AS payment_task_title
       FROM housekeeping_work_sessions hws

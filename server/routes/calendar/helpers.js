@@ -21,6 +21,7 @@ import {
   buildRecurrenceCapabilityMap, isLinkedOccurrence,
   parseOverrideFields, recurrenceIdFor, seriesIdFor,
 } from '../../services/calendar-occurrence-overrides.js';
+import { personAvatarUrlSql } from '../../services/person-avatar.js';
 
 export const VALID_SOURCES  = ['local', 'google', 'apple', 'ics'];
 // Ein Termin-Anhang ist ein Upload wie jeder andere und teilt deshalb die
@@ -336,7 +337,7 @@ export function attachmentDataUrl(event) {
 export const ASSIGNED_USERS_SQL = `(
   SELECT json_group_array(json_object(
     'id', u.id, 'display_name', u.display_name, 'color', u.avatar_color,
-    'avatar_data', u.avatar_data
+    'avatar_data', ${personAvatarUrlSql('u')}
   ))
   FROM event_assignments ea JOIN users u ON u.id = ea.user_id
   WHERE ea.event_id = e.id

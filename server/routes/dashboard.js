@@ -35,6 +35,7 @@ import { activeCatalog, ledgerBalanceSql } from '../services/rewards.js';
 import { moneyParams, moneyReader, moneyVisibleSql } from '../services/reward-money.js';
 import { MEAL_COOK_COLUMNS_SQL, MEAL_COOK_JOIN_SQL } from '../services/meal-cook.js';
 import { clampEventLimit } from '../../public/utils/dashboard-event-limit.js';
+import { personAvatarUrlSql } from '../services/person-avatar.js';
 
 const log = createLogger('Dashboard');
 
@@ -182,7 +183,7 @@ function emptyBudget(month) {
 const ASSIGNED_USERS_SQL = `(
   SELECT json_group_array(json_object(
     'id', u.id, 'display_name', u.display_name, 'color', u.avatar_color,
-    'avatar_data', u.avatar_data
+    'avatar_data', ${personAvatarUrlSql('u')}
   ))
   FROM task_assignments ta JOIN users u ON u.id = ta.user_id
   WHERE ta.task_id = t.id

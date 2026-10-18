@@ -34,7 +34,10 @@ const ALL_CACHES    = [SHELL_CACHE, PAGES_CACHE, LOCALES_CACHE, ASSETS_CACHE];
 
 // GET-API-Pfade (nach /api/v1), die für Read-only-Offline gecacht werden dürfen.
 // NUR Lese-Endpunkte — niemals /auth/* oder Mutationen. Prefix-Match.
-const API_CACHE_WHITELIST = ['/calendar', '/tasks', '/shopping', '/contacts', '/dashboard'];
+// `/people` sind die Profilbilder (server/routes/people.js): Aufgaben, Termine
+// und Uebersicht tragen ihre Adresse statt der Data-URL, offline braucht die
+// Zeile ihr Bild aus demselben Cache.
+const API_CACHE_WHITELIST = ['/calendar', '/tasks', '/shopping', '/contacts', '/dashboard', '/people'];
 // Pfade UNTER einem Whitelist-Prefix, die trotzdem nie gecacht werden.
 const API_CACHE_EXCLUDE = ['/shopping/versions'];
 

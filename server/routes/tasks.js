@@ -36,6 +36,7 @@ import {
   removeTagEverywhere, renameTag, setTags, tagKey, tagsKey, taskIdsWithTag,
 } from '../utils/task-tags.js';
 import * as v from '../middleware/validate.js';
+import { personAvatarUrlSql } from '../services/person-avatar.js';
 
 const log = createLogger('Tasks');
 
@@ -196,7 +197,7 @@ function countRebasableTasks(points) {
 const ASSIGNED_USERS_SQL = `(
   SELECT json_group_array(json_object(
     'id', u.id, 'display_name', u.display_name, 'color', u.avatar_color,
-    'avatar_data', u.avatar_data
+    'avatar_data', ${personAvatarUrlSql('u')}
   ))
   FROM task_assignments ta JOIN users u ON u.id = ta.user_id
   WHERE ta.task_id = t.id
@@ -381,7 +382,7 @@ function loadSubtasks(taskId, me) {
   // Mit den Tags käme deren Freitext dazu.
   const rows = db.get().prepare(`
     SELECT t.*, u.display_name AS assigned_name, u.avatar_color AS assigned_color,
-      u.avatar_data AS assigned_avatar, ${ASSIGNED_USERS_SQL}
+      ${personAvatarUrlSql('u')} AS assigned_avatar, ${ASSIGNED_USERS_SQL}
     FROM tasks t
     LEFT JOIN users u ON t.assigned_to = u.id
     WHERE t.parent_task_id = ?
@@ -931,7 +932,7 @@ router.get('/', (req, res) => {
         t.*,
         u.display_name AS assigned_name,
         u.avatar_color AS assigned_color,
-        u.avatar_data AS assigned_avatar,
+        ${personAvatarUrlSql('u')} AS assigned_avatar,
         ${ASSIGNED_USERS_SQL},
         -- Unteraufgaben tragen eine EIGENE Sichtbarkeit, und diese Liste hing nie
         -- an ihr: unter einer geteilten Elternaufgabe lief eine private
@@ -1071,7 +1072,7 @@ router.get('/:id', (req, res) => {
     const me = req.authUserId || req.session.userId;
     const task = db.get().prepare(`
       SELECT t.*, u.display_name AS assigned_name, u.avatar_color AS assigned_color,
-        u.avatar_data AS assigned_avatar, ${ASSIGNED_USERS_SQL}
+        ${personAvatarUrlSql('u')} AS assigned_avatar, ${ASSIGNED_USERS_SQL}
       FROM tasks t
       LEFT JOIN users u ON t.assigned_to = u.id
       WHERE t.id = ? AND t.parent_task_id IS NULL
@@ -1249,7 +1250,7 @@ router.post('/', (req, res) => {
 
     const task = db.get().prepare(`
       SELECT t.*, u.display_name AS assigned_name, u.avatar_color AS assigned_color,
-        u.avatar_data AS assigned_avatar, ${ASSIGNED_USERS_SQL}
+        ${personAvatarUrlSql('u')} AS assigned_avatar, ${ASSIGNED_USERS_SQL}
       FROM tasks t LEFT JOIN users u ON t.assigned_to = u.id
       WHERE t.id = ?
     `).get(taskId);
@@ -1454,7 +1455,7 @@ router.put('/:id', (req, res) => {
       // nicht über Lesearbeit gehalten wird.
       updated = db.get().prepare(`
         SELECT t.*, u.display_name AS assigned_name, u.avatar_color AS assigned_color,
-          u.avatar_data AS assigned_avatar, ${ASSIGNED_USERS_SQL}
+          ${personAvatarUrlSql('u')} AS assigned_avatar, ${ASSIGNED_USERS_SQL}
         FROM tasks t LEFT JOIN users u ON t.assigned_to = u.id
         WHERE t.id = ?
       `).get(req.params.id);

@@ -23,6 +23,7 @@
  */
 
 import { visibilityWhere } from './visibility.js';
+import { personAvatarUrlSql } from './person-avatar.js';
 
 /**
  * Die Wurzel der Wiederholungskette, in der diese Aufgabe steht - oder ihre
@@ -175,12 +176,12 @@ const SELECT_SQL = `
          c.user_id,
          u.display_name  AS user_name,
          u.avatar_color  AS user_color,
-         u.avatar_data   AS user_avatar,
+         ${personAvatarUrlSql('u')} AS user_avatar,
          c.done_by_user_id,
          COALESCE(c.done_by_user_id, c.user_id) AS person_user_id,
          p.display_name  AS person_name,
          p.avatar_color  AS person_color,
-         p.avatar_data   AS person_avatar,
+         ${personAvatarUrlSql('p')} AS person_avatar,
          t.title, t.category, t.points, t.is_recurring, t.visibility
     FROM task_completions c
     JOIN tasks t ON t.id = c.task_id

@@ -31,6 +31,7 @@ import { isAdminRequest } from '../middleware/require-admin.js';
 import { addInterval, dateKey, liftToAnchorDay, nextRunNotBefore, parseDateKey } from '../utils/interval-date.js';
 import { householdCurrency } from '../utils/household-currency.js';
 import { householdTimeZone, todayKey, utcToWall } from '../utils/timezone.js';
+import { personAvatarUrlSql } from './person-avatar.js';
 
 export const MONEY_KINDS = Object.freeze(['withdrawal', 'deposit']);
 export const ALLOWANCE_FREQUENCIES = Object.freeze(['weekly', 'monthly']);
@@ -432,7 +433,7 @@ export function listMoneyLedger(d, reader, { userId = null, limit = 100 } = {}) 
   return d.prepare(`
     SELECT l.id, l.user_id, l.delta, l.currency, l.type, l.reason, l.allowance_date,
            l.redemption_id, r.kind AS request_kind, l.created_at,
-           u.display_name AS user_name, u.avatar_color AS user_color, u.avatar_data AS user_avatar,
+           u.display_name AS user_name, u.avatar_color AS user_color, ${personAvatarUrlSql('u')} AS user_avatar,
            a.display_name AS actor_name
     FROM reward_ledger l
     JOIN users u ON u.id = l.user_id

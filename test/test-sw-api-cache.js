@@ -209,6 +209,24 @@ test('offline ohne Cache → 503 mit {error:"offline"}', async () => {
   assert.deepEqual(await res.json(), { error: 'offline' });
 });
 
+// Aufgaben, Termine und Uebersicht tragen fuer ein Profilbild die Adresse
+// /people/:id/avatar statt der Data-URL (server/routes/people.js). Offline
+// zeigt die gecachte Zeile ihr Bild nur, wenn es im selben Cache liegt.
+test('Profilbilder (/people/:id/avatar) gehen in den API-Cache und kommen offline zurueck', async () => {
+  const env = loadSw({
+    fetchImpl: async () => new MockResponse('BILD', { status: 200 }),
+  });
+  const req = new MockRequest(apiUrl('/people/2/avatar?v=4012'), { method: 'GET' });
+  await (dispatchFetch(env, req).result);
+
+  env.setFetch(async () => { throw new TypeError('Failed to fetch'); });
+  const { responded, result } = dispatchFetch(env, req);
+  assert.ok(responded, 'das Bild ist ein Whitelist-GET');
+  const res = await result;
+  assert.equal(res.status, 200, 'offline aus dem Cache');
+  assert.ok(res.headers.get('x-cached-at'));
+});
+
 test('Mutationen werden nie gecacht und nicht angefasst', async () => {
   const env = loadSw();
   for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {

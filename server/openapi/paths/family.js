@@ -7,6 +7,36 @@ const apiError = (description) => ({
 
 export function familyPaths() {
   return {
+    '/api/v1/people/{id}/avatar': {
+      get: op({
+        summary: "Fetch a person's profile picture",
+        tag: 'Family',
+        params: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer', minimum: 1 }, description: 'User ID' }],
+        description: 'The image bytes of a profile picture (PNG, JPEG or WebP). List rows that show a person - '
+          + '`assigned_avatar` and `assigned_users[].avatar_data` on tasks and events, `creator_avatar` on notes, '
+          + '`worker_avatar_data` on housekeeping visits, `user_avatar`/`person_avatar` in the completion feed and '
+          + '`user_avatar` in the money ledger - carry this address (with a `v` query parameter that changes with '
+          + 'the picture) instead of a data URL, or `null` when the person has no picture. Any signed-in credential '
+          + 'may read it, including wall displays and scoped API tokens; split-expense guests may not. The response '
+          + 'carries an `ETag` and `Cache-Control: private, no-cache`; send `If-None-Match` to get `304`.',
+        responses: {
+          200: {
+            description: 'The picture',
+            content: {
+              'image/png': { schema: { type: 'string', format: 'binary' } },
+              'image/jpeg': { schema: { type: 'string', format: 'binary' } },
+              'image/webp': { schema: { type: 'string', format: 'binary' } },
+            },
+          },
+          304: { description: 'Unchanged since the given ETag' },
+          400: apiError('Invalid person ID'),
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: apiError('Split-expense guest'),
+          404: apiError('This person has no picture'),
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
+    },
     '/api/v1/family/members': {
       get: op({
         summary: 'List family members',

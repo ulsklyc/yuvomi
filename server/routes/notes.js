@@ -20,6 +20,7 @@ import {
   replaceEditableAssignments,
   validateCategoryName,
 } from '../services/note-categories.js';
+import { personAvatarUrlSql } from '../services/person-avatar.js';
 
 const log = createLogger('Notes');
 
@@ -203,7 +204,7 @@ router.delete('/categories/:id', (req, res) => {
 router.get('/', (req, res) => {
   try {
     const notes = db.get().prepare(`
-      SELECT n.*, u.display_name AS creator_name, u.avatar_color AS creator_color, u.avatar_data AS creator_avatar
+      SELECT n.*, u.display_name AS creator_name, u.avatar_color AS creator_color, ${personAvatarUrlSql('u')} AS creator_avatar
       FROM notes n
       LEFT JOIN users u ON u.id = n.created_by
       ORDER BY n.pinned DESC, n.updated_at DESC
@@ -248,7 +249,7 @@ router.post('/', (req, res) => {
     const result = create();
 
     const note = db.get().prepare(`
-      SELECT n.*, u.display_name AS creator_name, u.avatar_color AS creator_color, u.avatar_data AS creator_avatar
+      SELECT n.*, u.display_name AS creator_name, u.avatar_color AS creator_color, ${personAvatarUrlSql('u')} AS creator_avatar
       FROM notes n LEFT JOIN users u ON u.id = n.created_by
       WHERE n.id = ?
     `).get(result.lastInsertRowid);
@@ -311,7 +312,7 @@ router.put('/:id', (req, res) => {
     update();
 
     const updated = db.get().prepare(`
-      SELECT n.*, u.display_name AS creator_name, u.avatar_color AS creator_color, u.avatar_data AS creator_avatar
+      SELECT n.*, u.display_name AS creator_name, u.avatar_color AS creator_color, ${personAvatarUrlSql('u')} AS creator_avatar
       FROM notes n LEFT JOIN users u ON u.id = n.created_by WHERE n.id = ?
     `).get(id);
 
@@ -398,7 +399,7 @@ router.patch('/:id/check', (req, res) => {
     }
 
     const updated = db.get().prepare(`
-      SELECT n.*, u.display_name AS creator_name, u.avatar_color AS creator_color, u.avatar_data AS creator_avatar
+      SELECT n.*, u.display_name AS creator_name, u.avatar_color AS creator_color, ${personAvatarUrlSql('u')} AS creator_avatar
       FROM notes n LEFT JOIN users u ON u.id = n.created_by WHERE n.id = ?
     `).get(id);
 
