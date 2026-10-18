@@ -79,7 +79,10 @@ const NO_AVATAR = db.prepare(`
   INSERT INTO users (username, display_name, password_hash, avatar_color) VALUES ('ohnebild', 'Ohne Bild', 'x', '#007AFF')
 `).run().lastInsertRowid;
 
-const avatarPath = (id) => new RegExp(`^/api/v1/people/${id}/avatar\\?v=[0-9a-z]+$`);
+const avatarPath = (id) => new RegExp(`^/api/v1/people/${id}/avatar\\?v=[0-9a-f]{32}$`);
+// Die Adresse, wie sie in einer Zeile steht: mit dem Schluessel der Person.
+const keyedUrl = (id) => `/api/v1/people/${id}/avatar?v=${db.prepare('SELECT avatar_key FROM users WHERE id = ?').get(id)?.avatar_key}`;
+const keyedPath = (id) => keyedUrl(id).slice('/api/v1'.length);
 
 // --------------------------------------------------------
 // Die Zeilen tragen die Adresse, nicht das Bild
@@ -160,17 +163,17 @@ test('Personen ohne Bild bekommen keine Adresse', async () => {
 // --------------------------------------------------------
 
 test('GET /people/:id/avatar liefert die Bild-Bytes mit ETag', async () => {
-  const res = await fetch(`${BASE}/api/v1/people/${BOB}/avatar?v=1`, { headers: { Cookie: adminSession.cookie } });
+  const res = await fetch(`${BASE}${keyedUrl(BOB)}`, { headers: { Cookie: adminSession.cookie } });
   assert.equal(res.status, 200);
   assert.equal(res.headers.get('content-type'), 'image/jpeg');
   assert.match(String(res.headers.get('cache-control')), /private/);
-  assert.match(String(res.headers.get('cache-control')), /no-cache/);
+  assert.match(String(res.headers.get('cache-control')), /immutable/, 'der Schluessel wechselt mit dem Bild, die Adresse zeigt nie ein anderes');
   assert.doesNotMatch(String(res.headers.get('cache-control')), /no-store/, 'no-store verhindert den Browser-Cache');
   const etag = res.headers.get('etag');
   assert.ok(etag, 'ETag gesetzt');
   assert.deepEqual(Buffer.from(await res.arrayBuffer()), JPEG_BYTES, 'dieselben Bytes wie hochgeladen');
 
-  const again = await fetch(`${BASE}/api/v1/people/${BOB}/avatar`, {
+  const again = await fetch(`${BASE}${keyedUrl(BOB)}`, {
     headers: { Cookie: adminSession.cookie, 'If-None-Match': etag },
   });
   assert.equal(again.status, 304, 'unveraendertes Bild: 304 ohne Rumpf');
@@ -178,7 +181,8 @@ test('GET /people/:id/avatar liefert die Bild-Bytes mit ETag', async () => {
 
 test('ein neues Bild bekommt eine neue Adresse und ein neues ETag', async () => {
   const before = (await admin('GET', '/tasks')).body.data.find((t) => t.title === 'Muell rausbringen').assigned_avatar;
-  const etagBefore = (await fetch(`${BASE}/api/v1/people/${BOB}/avatar`, { headers: { Cookie: adminSession.cookie } })).headers.get('etag');
+  const urlBefore = keyedUrl(BOB);
+  const etagBefore = (await fetch(`${BASE}${urlBefore}`, { headers: { Cookie: adminSession.cookie } })).headers.get('etag');
   // GLEICH LANG wie das alte Bild (Codex-Review zu #2056): Base64-Laengen kommen
   // in Stufen, und zugeschnittene Bilder sind aehnlich gross. Eine Version aus
   // der Laenge bliebe hier stehen, und der Offline-Cache des Service Workers
@@ -190,7 +194,9 @@ test('ein neues Bild bekommt eine neue Adresse und ein neues ETag', async () => 
   assert.ok(put.status < 300, put.text);
   const after = (await admin('GET', '/tasks')).body.data.find((t) => t.title === 'Muell rausbringen').assigned_avatar;
   assert.notEqual(after, before, 'die Adresse wechselt mit dem Bild, sonst zeigt der Browser das alte');
-  const res = await fetch(`${BASE}/api/v1/people/${BOB}/avatar`, { headers: { Cookie: adminSession.cookie } });
+  const stale = await fetch(`${BASE}${urlBefore}`, { headers: { Cookie: adminSession.cookie } });
+  assert.equal(stale.status, 404, 'die alte Adresse gilt mit dem alten Bild nicht mehr');
+  const res = await fetch(`${BASE}${keyedUrl(BOB)}`, { headers: { Cookie: adminSession.cookie } });
   assert.deepEqual(Buffer.from(await res.arrayBuffer()), nextBytes, 'die Route liefert das neue Bild');
   assert.notEqual(res.headers.get('etag'), etagBefore);
 });
@@ -200,7 +206,7 @@ test('ohne Bild 404, ungueltige id 400, ohne Anmeldung 401', async () => {
   assert.equal(none.status, 404);
   const bad = await fetch(`${BASE}/api/v1/people/abc/avatar`, { headers: { Cookie: adminSession.cookie } });
   assert.equal(bad.status, 400);
-  const anon = await fetch(`${BASE}/api/v1/people/${BOB}/avatar`);
+  const anon = await fetch(`${BASE}${keyedUrl(BOB)}`);
   assert.equal(anon.status, 401);
 });
 
@@ -210,7 +216,7 @@ test('ohne Bild 404, ungueltige id 400, ohne Anmeldung 401', async () => {
 
 test('ein Mitglied, dem das Aufgabenmodul gesperrt ist, sieht trotzdem Bilder (kein Modul)', async () => {
   const bob = as(await login('bob', 'bobpass12345'));
-  const res = await bob('GET', `/people/${ADMIN}/avatar`);
+  const res = await bob('GET', keyedPath(ADMIN));
   assert.equal(res.status, 200);
 });
 
@@ -224,12 +230,12 @@ test('ein gekoppeltes Wanddisplay darf Bilder lesen', async () => {
     body: JSON.stringify({ code: issued.body.data.code }),
   });
   const token = decodeURIComponent(String(paired.headers.get('set-cookie')).match(new RegExp(`${DISPLAY_COOKIE}=([^;]+)`))[1]);
-  const res = await fetch(`${BASE}/api/v1/people/${BOB}/avatar`, { headers: { Cookie: `${DISPLAY_COOKIE}=${token}` } });
+  const res = await fetch(`${BASE}${keyedUrl(BOB)}`, { headers: { Cookie: `${DISPLAY_COOKIE}=${token}` } });
   assert.equal(res.status, 200, 'die Wand zeigt Aufgaben und Termine samt Personen');
 });
 
 test('ein gescoptes API-Token bekommt Data-URLs und liest die Bildroute nicht', async () => {
-  const spoof = `/api/v1/people/${BOB}/avatar?v=0`;
+  const spoof = `/api/v1/people/${BOB}/avatar?v=${'0'.repeat(32)}`;
   assert.equal((await admin('POST', '/tasks', { title: spoof })).status, 201);
   const created = await admin('POST', '/auth/api-tokens', { name: 'Nur Aufgaben', scopes: ['tasks:read'] });
   assert.equal(created.status, 201, created.text);
@@ -237,7 +243,7 @@ test('ein gescoptes API-Token bekommt Data-URLs und liest die Bildroute nicht', 
   // Bilder als Data-URL in den Zeilen, die es lesen darf, und braucht die Route
   // nicht. Liesse das Scope-Gate sie fuer jedes Token durch, holte eines mit
   // `weather:read` per Durchzaehlen der ids jedes Profilbild.
-  const res = await fetch(`${BASE}/api/v1/people/${BOB}/avatar`, { headers: { Authorization: `Bearer ${created.body.token}` } });
+  const res = await fetch(`${BASE}${keyedUrl(BOB)}`, { headers: { Authorization: `Bearer ${created.body.token}` } });
   assert.equal(res.status, 403, 'ein Token mit Scopes liest die Bildroute nicht');
   const tasks = await fetch(`${BASE}/api/v1/tasks`, { headers: { Authorization: `Bearer ${created.body.token}` } });
   assert.equal(tasks.status, 200, 'Gegenprobe: das Token liest Aufgaben');
@@ -265,6 +271,23 @@ test('ein Ausgaben-Gast liest keine Bilder des Haushalts', async () => {
   assert.equal(guest.status, 201, guest.text);
   const guestId = guest.body.data?.id ?? guest.body.user?.id ?? guest.body.id;
   db.prepare('INSERT INTO split_expense_guest_users (user_id) VALUES (?)').run(guestId);
-  const res = await as(await login('gast', 'gastpass12345'))('GET', `/people/${BOB}/avatar`);
+  const res = await as(await login('gast', 'gastpass12345'))('GET', keyedPath(BOB));
   assert.equal(res.status, 403);
+});
+
+// Codex-Review zu #2056: mit einer durchzaehlbaren Adresse holte jede Sitzung
+// und jedes Wanddisplay per Raten der ids auch Bilder von Personen, die es nie
+// in einer Zeile sieht - Hauspersonal, Ausgaben-Gaeste, deaktivierte Konten.
+// Die Adresse traegt deshalb einen Zufallsschluessel je Bild; ohne ihn gibt es
+// kein Bild, und Raten hilft nicht.
+test('ohne den Schluessel aus der Zeile gibt die Route kein Bild heraus', async () => {
+  const hidden = db.prepare(`
+    INSERT INTO users (username, display_name, password_hash, avatar_color) VALUES ('personal', 'Personal', 'x', '#007AFF')
+  `).run().lastInsertRowid;
+  db.prepare('UPDATE users SET avatar_data = ? WHERE id = ?').run(AVATAR, hidden);
+  const headers = { Cookie: adminSession.cookie };
+  assert.equal((await fetch(`${BASE}/api/v1/people/${hidden}/avatar`, { headers })).status, 404, 'ohne Schluessel');
+  assert.equal((await fetch(`${BASE}/api/v1/people/${hidden}/avatar?v=1`, { headers })).status, 404, 'geratene Version');
+  assert.equal((await fetch(`${BASE}/api/v1/people/${hidden}/avatar?v=${'a'.repeat(32)}`, { headers })).status, 404, 'falscher Schluessel');
+  assert.equal((await fetch(`${BASE}${keyedUrl(hidden)}`, { headers })).status, 200, 'mit dem Schluessel aus der Zeile');
 });

@@ -11012,25 +11012,39 @@ const MIGRATIONS = [
   },
   {
     version: 251,
-    description: 'users: avatar_version counts every change of the profile picture',
+    description: 'users: avatar_key, a random key per profile picture for its address',
     // Listen tragen statt der Data-URL die Adresse `/api/v1/people/:id/avatar?v=`
-    // (services/person-avatar.js). `v` muss mit JEDEM neuen Bild wechseln: der
-    // Offline-Cache des Service Workers ist nach der Adresse geschluesselt, und
-    // eine gleiche Adresse zeigte offline das alte Bild. Die Laenge der Data-URL
-    // reichte nicht - Base64-Laengen kommen in Stufen, zugeschnittene Bilder
-    // sind aehnlich gross (Codex-Review zu #2056).
+    // (services/person-avatar.js), und `v` ist dieser Schluessel. ZWEI AUFGABEN:
+    //   - Er wechselt mit JEDEM neuen Bild - der Offline-Cache des Service
+    //     Workers ist nach der Adresse geschluesselt, eine gleiche Adresse zeigte
+    //     offline das alte Bild (die Laenge der Data-URL reichte nicht).
+    //   - Er ist nicht zu raten - die Route gibt das Bild nur mit ihm heraus.
+    //     Mit einer Zaehlversion holte jede Sitzung und jedes Wanddisplay per
+    //     Durchzaehlen der ids auch Bilder von Personen, die es in keiner Zeile
+    //     sieht (Hauspersonal, Ausgaben-Gaeste, deaktivierte Konten).
+    // Beides Codex-Review zu #2056.
     //
-    // EIN TRIGGER STATT DER SCHREIBSTELLEN: das Bild wird an fuenf Stellen
-    // geschrieben (Profil, Verwaltung, Gravatar, Housekeeping, Anlegen), und
-    // eine neue sechste vergaesse das Hochzaehlen still. `test:person-avatars`
-    // misst den Wechsel bei gleich langer Data-URL - baut eine spaetere
-    // Migration `users` neu und verliert den Trigger, faellt das dort auf.
+    // TRIGGER STATT DER SCHREIBSTELLEN: das Bild wird an fuenf Stellen
+    // geschrieben, und eine neue sechste vergaesse den Schluessel still.
+    // `reconcileCriticalSchema()` legt Spalte, Schluessel und Trigger nach,
+    // wenn eine Datei sie verloren hat.
     up: `
-      ALTER TABLE users ADD COLUMN avatar_version INTEGER NOT NULL DEFAULT 0;
-      CREATE TRIGGER IF NOT EXISTS trg_users_avatar_version
+      ALTER TABLE users ADD COLUMN avatar_key TEXT;
+      UPDATE users SET avatar_key = lower(hex(randomblob(16)))
+        WHERE avatar_data IS NOT NULL AND avatar_data <> '';
+      CREATE TRIGGER IF NOT EXISTS trg_users_avatar_key_update
         AFTER UPDATE OF avatar_data ON users FOR EACH ROW
         WHEN NEW.avatar_data IS NOT OLD.avatar_data
-        BEGIN UPDATE users SET avatar_version = OLD.avatar_version + 1 WHERE id = OLD.id; END;
+        BEGIN
+          UPDATE users SET avatar_key = CASE
+            WHEN NEW.avatar_data IS NULL OR NEW.avatar_data = '' THEN NULL
+            ELSE lower(hex(randomblob(16))) END
+          WHERE id = OLD.id;
+        END;
+      CREATE TRIGGER IF NOT EXISTS trg_users_avatar_key_insert
+        AFTER INSERT ON users FOR EACH ROW
+        WHEN NEW.avatar_data IS NOT NULL AND NEW.avatar_data <> ''
+        BEGIN UPDATE users SET avatar_key = lower(hex(randomblob(16))) WHERE id = NEW.id; END;
     `,
   },
 ];
@@ -11048,18 +11062,35 @@ const MIGRATIONS = [
  * und werden mit ihrem gespeicherten Wortlaut wieder angelegt. Die Aufrufer
  * sorgen fuer die Transaktion.
  */
-/**
- * Der Trigger aus Migration 251 fuer eine nachgetragene `users.avatar_version`
- * (reconcileCriticalSchema). Derselbe Wortlaut wie dort; die Migration selbst
- * bleibt eingefroren und ruft ihn nicht.
- */
-function backfillAvatarVersionTrigger(database) {
+/** Die Trigger aus Migration 251, derselbe Wortlaut; die Migration bleibt eingefroren. */
+function createAvatarKeyTriggers(database) {
   database.exec(`
-    CREATE TRIGGER IF NOT EXISTS trg_users_avatar_version
+    CREATE TRIGGER IF NOT EXISTS trg_users_avatar_key_update
       AFTER UPDATE OF avatar_data ON users FOR EACH ROW
       WHEN NEW.avatar_data IS NOT OLD.avatar_data
-      BEGIN UPDATE users SET avatar_version = OLD.avatar_version + 1 WHERE id = OLD.id; END;
+      BEGIN
+        UPDATE users SET avatar_key = CASE
+          WHEN NEW.avatar_data IS NULL OR NEW.avatar_data = '' THEN NULL
+          ELSE lower(hex(randomblob(16))) END
+        WHERE id = OLD.id;
+      END;
+    CREATE TRIGGER IF NOT EXISTS trg_users_avatar_key_insert
+      AFTER INSERT ON users FOR EACH ROW
+      WHEN NEW.avatar_data IS NOT NULL AND NEW.avatar_data <> ''
+      BEGIN UPDATE users SET avatar_key = lower(hex(randomblob(16))) WHERE id = NEW.id; END;
   `);
+}
+
+/**
+ * Nachtrag zu einer nachgetragenen `users.avatar_key` (reconcileCriticalSchema):
+ * Schluessel fuer die vorhandenen Bilder und die Trigger aus Migration 251.
+ */
+function backfillAvatarKey(database) {
+  database.exec(`
+    UPDATE users SET avatar_key = lower(hex(randomblob(16)))
+      WHERE avatar_data IS NOT NULL AND avatar_data <> '' AND avatar_key IS NULL
+  `);
+  createAvatarKeyTriggers(database);
 }
 
 function backfillSeriesAuthored(database) {
@@ -11324,12 +11355,13 @@ const CRITICAL_COLUMNS = [
   // Zeile anfasst) und jede Buchung eines Pushs. Kein Nachtrag: NULL heisst
   // "kein Schnappschuss", der Abruf nimmt den Weg von vorher.
   { table: 'calendar_events', column: 'outbound_snapshot', type: 'TEXT' },
-  // #2056: v251 traegt die Version des Profilbilds nach; ohne die Spalte
+  // #2056: v251 traegt den Schluessel des Profilbilds nach; ohne die Spalte
   // scheitern Aufgaben, Termine, Notizen, Uebersicht, Housekeeping und die
-  // Taschengeld-Buchungen (ihre Bildadresse liest sie). MIT NACHTRAG: der
-  // Trigger, der sie bei jedem neuen Bild hochzaehlt, kommt mit der Spalte.
-  { table: 'users', column: 'avatar_version', type: 'INTEGER NOT NULL DEFAULT 0',
-    backfill: backfillAvatarVersionTrigger },
+  // Taschengeld-Buchungen (ihre Bildadresse liest sie). MIT NACHTRAG: die
+  // Schluessel der vorhandenen Bilder und die Trigger, die ihn bei jedem neuen
+  // Bild neu wuerfeln, kommen mit der Spalte.
+  { table: 'users', column: 'avatar_key', type: 'TEXT',
+    backfill: backfillAvatarKey },
 ];
 
 /**
@@ -11382,27 +11414,28 @@ function reconcileCriticalSchema(database = db) {
       log.error(`Schema-Reconciliation ${table}.${column} fehlgeschlagen:`, err?.message || err);
     }
   }
-  reconcileAvatarVersionTrigger(database);
+  reconcileAvatarKeyTriggers(database);
 }
 
 /**
- * Der Versions-Trigger der Profilbilder (Migration 251) - auch wenn NUR er
- * fehlt. Der Nachtrag oben laeuft nur mit einer neu angelegten Spalte; ein
- * Neubau von `users` nimmt Trigger aber nicht mit, und ohne ihn bliebe `v` bei
- * jedem neuen Bild stehen (Codex-Review zu #2056).
+ * Die Schluessel-Trigger der Profilbilder (Migration 251) - auch wenn NUR sie
+ * fehlen. Der Nachtrag oben laeuft nur mit einer neu angelegten Spalte; ein
+ * Neubau von `users` nimmt Trigger aber nicht mit, und ohne sie behielte ein
+ * neues Bild seinen alten Schluessel (Codex-Review zu #2056).
  */
-function reconcileAvatarVersionTrigger(database) {
+function reconcileAvatarKeyTriggers(database) {
   try {
     const columns = database.prepare('PRAGMA table_info(users)').all();
-    if (!columns.some((c) => c.name === 'avatar_version')) return;
-    const present = database.prepare(
-      "SELECT 1 FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_users_avatar_version'",
-    ).get();
-    if (present) return;
-    backfillAvatarVersionTrigger(database);
-    log.warn('Schema-Drift behoben: Trigger trg_users_avatar_version fehlte und wurde neu angelegt (#2056).');
+    if (!columns.some((c) => c.name === 'avatar_key')) return;
+    const present = database.prepare(`
+      SELECT COUNT(*) AS n FROM sqlite_master
+      WHERE type = 'trigger' AND name IN ('trg_users_avatar_key_update', 'trg_users_avatar_key_insert')
+    `).get().n;
+    if (present === 2) return;
+    createAvatarKeyTriggers(database);
+    log.warn('Schema-Drift behoben: Trigger fuer users.avatar_key fehlten und wurden neu angelegt (#2056).');
   } catch (err) {
-    log.error('Schema-Reconciliation trg_users_avatar_version fehlgeschlagen:', err?.message || err);
+    log.error('Schema-Reconciliation der avatar_key-Trigger fehlgeschlagen:', err?.message || err);
   }
 }
 

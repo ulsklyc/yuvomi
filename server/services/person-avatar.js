@@ -21,12 +21,16 @@
  * weiter die Data-URL - die Bearbeitungsmasken schicken genau diesen Wert
  * zurueck, eine Adresse kaeme als ungueltiges Bild an.
  *
- * `?v=` IST `users.avatar_version` (Migration 251), die ein Trigger bei jeder
- * Aenderung des Bildes hochzaehlt. Eine neue Adresse laedt der Browser neu,
- * auch innerhalb derselben Sitzung, in der er Bilder sonst ohne Rueckfrage
- * wiederverwendet, und der Offline-Cache des Service Workers ist nach ihr
- * geschluesselt. Die Laenge der Data-URL war die erste Fassung und reichte
- * nicht: gleich lange Bilder behielten dieselbe Adresse (Codex-Review zu #2056).
+ * `?v=` IST `users.avatar_key` (Migration 251): ein Zufallsschluessel, den ein
+ * Trigger bei jedem neuen Bild neu wuerfelt. Er macht die Adresse je Bild
+ * eindeutig - der Browser und der Offline-Cache des Service Workers zeigen nie
+ * ein altes Bild unter ihr, deshalb darf die Route `immutable` sagen -, und er
+ * ist nicht zu raten: die Route gibt das Bild nur mit ihm heraus. Wer die
+ * Adresse nicht aus einer Zeile hat, die er lesen darf, bekommt es nicht.
+ * Zwei Vorfassungen reichten nicht (Codex-Review zu #2056): die Laenge der
+ * Data-URL blieb bei gleich langen Bildern stehen, und eine Zaehlversion liess
+ * jede Sitzung per Durchzaehlen der ids auch Bilder von Personen holen, die sie
+ * nie sieht (Hauspersonal, Ausgaben-Gaeste, deaktivierte Konten).
  */
 
 /**
@@ -35,8 +39,8 @@
  * @returns {string}
  */
 export function personAvatarUrlSql(alias) {
-  return `CASE WHEN ${alias}.avatar_data IS NOT NULL AND ${alias}.avatar_data <> ''
-    THEN '/api/v1/people/' || ${alias}.id || '/avatar?v=' || ${alias}.avatar_version END`;
+  return `CASE WHEN ${alias}.avatar_key IS NOT NULL AND ${alias}.avatar_data IS NOT NULL AND ${alias}.avatar_data <> ''
+    THEN '/api/v1/people/' || ${alias}.id || '/avatar?v=' || ${alias}.avatar_key END`;
 }
 
 /** Der Pfad der Route, so wie die Gates in server/index.js ihn sehen (ohne /api/v1). */
@@ -56,7 +60,7 @@ const AVATAR_FIELDS = new Set([
   'assigned_avatar', 'avatar_data', 'creator_avatar', 'worker_avatar_data', 'user_avatar', 'person_avatar',
 ]);
 
-const AVATAR_URL_RE = /^\/api\/v1\/people\/(\d+)\/avatar\?v=\d+$/;
+const AVATAR_URL_RE = /^\/api\/v1\/people\/(\d+)\/avatar\?v=[0-9a-f]{32}$/;
 
 /**
  * Ersetzt in einer Antwort jede Bildadresse wieder durch die Data-URL.

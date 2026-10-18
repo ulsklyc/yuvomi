@@ -143,43 +143,52 @@ test('traegt outbound_snapshot nach und laesst jede Zeile bei NULL', () => {
 // Codex-Review zu #2056: steht Migration 251 als angewendet da, fehlt aber die
 // Spalte (Restore eines inkonsistenten Backups), scheitern Aufgaben, Termine,
 // Notizen, Uebersicht, Housekeeping und Taschengeld-Buchungen an
-// `no such column: avatar_version`. Der Start traegt Spalte UND Trigger nach.
-test('traegt users.avatar_version samt Versions-Trigger nach', () => {
+// `no such column: avatar_key`. Der Start traegt Spalte, Schluessel der
+// vorhandenen Bilder UND die Trigger nach.
+const keyOf = (db, id) => db.prepare('SELECT avatar_key FROM users WHERE id = ?').get(id).avatar_key;
+const KEY = /^[0-9a-f]{32}$/;
+
+test('traegt users.avatar_key samt Schluesseln und Triggern nach', () => {
   const db = new DatabaseSync(':memory:');
   db.exec(`CREATE TABLE users (
     id INTEGER PRIMARY KEY, username TEXT, display_name TEXT, avatar_data TEXT
   )`);
   db.exec(`INSERT INTO users (id, username, display_name, avatar_data) VALUES (1, 'a', 'A', 'data:image/png;base64,AA==')`);
+  db.exec(`INSERT INTO users (id, username, display_name, avatar_data) VALUES (2, 'b', 'B', NULL)`);
 
   reconcileCriticalSchema(db);
 
-  assert.equal(hasColumn(db, 'users', 'avatar_version'), true);
-  assert.equal(db.prepare('SELECT avatar_version FROM users WHERE id = 1').get().avatar_version, 0);
+  assert.equal(hasColumn(db, 'users', 'avatar_key'), true);
+  const first = keyOf(db, 1);
+  assert.match(first, KEY, 'ein vorhandenes Bild bekommt einen Schluessel');
+  assert.equal(keyOf(db, 2), null, 'ohne Bild kein Schluessel');
   db.exec(`UPDATE users SET avatar_data = 'data:image/png;base64,AB==' WHERE id = 1`);
-  assert.equal(db.prepare('SELECT avatar_version FROM users WHERE id = 1').get().avatar_version, 1,
-    'ein neues Bild zaehlt die Version hoch - der Trigger kam mit');
-  db.exec(`UPDATE users SET display_name = 'B' WHERE id = 1`);
-  assert.equal(db.prepare('SELECT avatar_version FROM users WHERE id = 1').get().avatar_version, 1,
-    'ein anderer Wert laesst sie stehen');
+  assert.match(keyOf(db, 1), KEY);
+  assert.notEqual(keyOf(db, 1), first, 'ein neues Bild wuerfelt den Schluessel neu - der Trigger kam mit');
+  const second = keyOf(db, 1);
+  db.exec(`UPDATE users SET display_name = 'C' WHERE id = 1`);
+  assert.equal(keyOf(db, 1), second, 'ein anderer Wert laesst ihn stehen');
+  db.exec(`INSERT INTO users (id, username, display_name, avatar_data) VALUES (3, 'c', 'C', 'data:image/png;base64,AC==')`);
+  assert.match(keyOf(db, 3), KEY, 'ein neues Konto mit Bild bekommt sofort einen');
 });
 
-// Codex-Review zu #2056: hat die Datei die Spalte, aber den Trigger verloren
+// Codex-Review zu #2056: hat die Datei die Spalte, aber die Trigger verloren
 // (ein Neubau von `users` nimmt Trigger nicht mit), uebersprang die Reparatur
-// den Eintrag, weil die Spalte schon da war - die Version blieb dann bei jedem
-// neuen Bild stehen. Der Trigger wird unabhaengig von der Spalte geprueft.
-test('legt den Versions-Trigger neu an, wenn nur er fehlt', () => {
+// den Eintrag, weil die Spalte schon da war - ein neues Bild behielte dann
+// seinen alten Schluessel. Die Trigger werden unabhaengig von der Spalte geprueft.
+test('legt die Schluessel-Trigger neu an, wenn nur sie fehlen', () => {
   const db = new DatabaseSync(':memory:');
   db.exec(`CREATE TABLE users (
-    id INTEGER PRIMARY KEY, username TEXT, display_name TEXT, avatar_data TEXT,
-    avatar_version INTEGER NOT NULL DEFAULT 0
+    id INTEGER PRIMARY KEY, username TEXT, display_name TEXT, avatar_data TEXT, avatar_key TEXT
   )`);
-  db.exec(`INSERT INTO users (id, username, display_name, avatar_data, avatar_version) VALUES (1, 'a', 'A', 'x', 4)`);
+  db.exec(`INSERT INTO users (id, username, display_name, avatar_data, avatar_key) VALUES (1, 'a', 'A', 'x', '${'a'.repeat(32)}')`);
 
   reconcileCriticalSchema(db);
-  reconcileCriticalSchema(db); // zweiter Lauf: kein Fehler, kein zweiter Trigger
+  reconcileCriticalSchema(db); // zweiter Lauf: kein Fehler, keine doppelten Trigger
 
   db.exec(`UPDATE users SET avatar_data = 'y' WHERE id = 1`);
-  assert.equal(db.prepare('SELECT avatar_version FROM users WHERE id = 1').get().avatar_version, 5);
-  const triggers = db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_users_avatar_version'").get();
-  assert.equal(triggers.n, 1);
+  assert.notEqual(keyOf(db, 1), 'a'.repeat(32));
+  const triggers = db.prepare(`SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'trigger'
+    AND name IN ('trg_users_avatar_key_update', 'trg_users_avatar_key_insert')`).get();
+  assert.equal(triggers.n, 2);
 });

@@ -282,7 +282,10 @@ test('Guard: nur ein AFTER-INSERT-Trigger im Schema updatet seine eigene Tabelle
         && new RegExp(`UPDATE\\s+${t.tbl_name}\\b`, 'i').test(t.sql.replace(/\s+/g, ' ')))
       .map((t) => t.name);
 
-    assert.deepEqual(verdaechtig, ['trg_shopping_items_sort_order'],
+    // trg_users_avatar_key_insert (Migration 251, #2056) wuerfelt den
+    // Bildschluessel eines neuen Kontos. `users` steht nicht im Suchindex und hat
+    // keinen _ai-Trigger, mit dem er sich die Reihenfolge teilen muesste.
+    assert.deepEqual(verdaechtig.sort(), ['trg_shopping_items_sort_order', 'trg_users_avatar_key_insert'],
       'Kommt hier einer dazu, prüfe den _ai-Trigger seiner Tabelle auf Dubletten');
   } finally {
     db.close();

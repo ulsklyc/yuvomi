@@ -15,12 +15,13 @@ export function familyPaths() {
         description: 'The image bytes of a profile picture (PNG, JPEG or WebP). List rows that show a person - '
           + '`assigned_avatar` and `assigned_users[].avatar_data` on tasks and events, `creator_avatar` on notes, '
           + '`worker_avatar_data` on housekeeping visits, `user_avatar`/`person_avatar` in the completion feed and '
-          + '`user_avatar` in the money ledger - carry this address (with a `v` query parameter that changes with '
-          + 'the picture) instead of a data URL, or `null` when the person has no picture. Requests authenticated '
+          + '`user_avatar` in the money ledger - carry this address (with a `v` query parameter, a random key that changes with '
+          + 'every new picture and is required here) instead of a data URL, or `null` when the person has no picture. Requests authenticated '
           + 'with an API token keep receiving the data URL in these fields, since an image request does not carry '
           + 'the bearer token; the address is what the app itself (session cookie, wall display) gets. Sessions and wall displays '
           + 'may read it; an API token with scopes may not (it has the data URL already), nor may split-expense guests. The response '
-          + 'carries an `ETag` and `Cache-Control: private, no-cache`; send `If-None-Match` to get `304`.',
+          + 'carries an `ETag` and `Cache-Control: private, max-age=31536000, immutable`, since a new picture gets a new key. '
+          + 'Without the matching key the answer is `404`, the same as for a person without a picture.',
         responses: {
           200: {
             description: 'The picture',
@@ -34,7 +35,7 @@ export function familyPaths() {
           400: apiError('Invalid person ID'),
           401: { $ref: '#/components/responses/Unauthorized' },
           403: apiError('Split-expense guest'),
-          404: apiError('This person has no picture'),
+          404: apiError('No picture for this person, or the key in `v` does not match'),
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),

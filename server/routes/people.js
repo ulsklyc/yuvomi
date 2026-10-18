@@ -15,7 +15,7 @@
  */
 
 import express from 'express';
-import { createHash } from 'node:crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import * as db from '../db.js';
 import { parseAvatarDataUrl } from '../services/person-avatar.js';
 import { createLogger } from '../logger.js';
@@ -23,20 +23,33 @@ import { createLogger } from '../logger.js';
 const log = createLogger('People');
 const router = express.Router();
 
+/** Vergleich in konstanter Zeit; ein fehlender Schluessel passt nie. */
+function keyMatches(given, stored) {
+  if (typeof given !== 'string' || typeof stored !== 'string' || !stored) return false;
+  const a = Buffer.from(given);
+  const b = Buffer.from(stored);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 router.get('/:id/avatar', (req, res) => {
   try {
     if (!/^\d+$/.test(req.params.id)) {
       return res.status(400).json({ error: 'Invalid person ID.', code: 400 });
     }
-    const row = db.get().prepare('SELECT avatar_data FROM users WHERE id = ?').get(Number(req.params.id));
+    const row = db.get().prepare('SELECT avatar_data, avatar_key FROM users WHERE id = ?').get(Number(req.params.id));
     const image = parseAvatarDataUrl(row?.avatar_data);
-    if (!image) return res.status(404).json({ error: 'No picture for this person.', code: 404 });
+    // NUR MIT DEM SCHLUESSEL AUS DER ZEILE (`?v=`, Migration 251). Fehlt er
+    // oder passt er nicht, heisst die Antwort dasselbe 404 wie "kein Bild":
+    // wer ids durchzaehlt, erfaehrt nicht einmal, wer eines hat.
+    if (!image || !keyMatches(req.query.v, row?.avatar_key)) {
+      return res.status(404).json({ error: 'No picture for this person.', code: 404 });
+    }
 
     const etag = `"${createHash('sha256').update(image.bytes).digest('hex').slice(0, 32)}"`;
-    // Ueberschreibt das `no-store`, das server/index.js jeder API-Antwort setzt:
-    // der Browser darf das Bild halten, fragt aber vor jeder Wiederverwendung
-    // ueber eine neue Seite nach (304, wenn es sich nicht geaendert hat).
-    res.set('Cache-Control', 'private, no-cache');
+    // Ueberschreibt das `no-store`, das server/index.js jeder API-Antwort setzt.
+    // `immutable`, weil der Schluessel mit jedem neuen Bild wechselt: unter
+    // dieser Adresse steht nie ein anderes Bild.
+    res.set('Cache-Control', 'private, max-age=31536000, immutable');
     res.set('ETag', etag);
     if (req.get('If-None-Match') === etag) return res.status(304).end();
     res.type(image.mime);
