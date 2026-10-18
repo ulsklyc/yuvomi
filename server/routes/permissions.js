@@ -20,6 +20,7 @@ import {
   isValidFamilyRole,
 } from '../permissions.js';
 import { syncFastingRemindersForUser } from '../services/fasting-reminders.js';
+import { revokePaymentTasksForUsers } from '../services/payment-task-audience.js';
 
 const log = createLogger('Permissions');
 const router = express.Router();
@@ -34,6 +35,11 @@ function replacePermissionsAndSync(database, subjectType, subjectId, input, user
   return database.transaction(() => {
     writeSubjectPermissions(database, subjectType, subjectId, input);
     syncFastingForUsers(database, userIds);
+    // Wer das Betragsrecht verliert, faellt aus seinen Zahlungsaufgaben. Ein
+    // Rollenprofil trifft jedes Konto der Rolle, nicht nur die Haushalts-
+    // mitglieder in `userIds`: dort fragt der Dienst selbst jedes Konto, das in
+    // einer Zahlungsaufgabe steht.
+    revokePaymentTasksForUsers(database, subjectType === 'user' ? userIds : null);
     return getSubjectPermissions(database, subjectType, subjectId);
   })();
 }

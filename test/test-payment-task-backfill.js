@@ -11,7 +11,10 @@
  *            Eigentuemerin unveraendert;
  *          - zweimal ausgefuehrt aendert sie nichts mehr;
  *          - Bearbeiten, Auschecken, Bezahlen eines Besuchs zieht seine
- *            Aufgabe ebenso nach, auch eine erledigte.
+ *            Aufgabe ebenso nach, auch eine erledigte;
+ *          - wer das Betragsrecht verliert (Mitglied-Zeile, Rollenprofil,
+ *            Familienrolle), faellt aus den Zahlungsaufgaben, die ihm schon
+ *            gehoerten.
  * Ausfuehren: npm run test:payment-task-backfill
  */
 
@@ -26,6 +29,8 @@ import express from 'express';
 const dbmod = await import('../server/db.js');
 const { requireAuth } = await import('../server/auth.js');
 const { default: housekeepingRouter } = await import('../server/routes/housekeeping.js');
+const { router: authRouter } = await import('../server/auth.js');
+const { default: permissionsRouter } = await import('../server/routes/permissions.js');
 const db = dbmod.get();
 const migration250 = dbmod.MIGRATIONS.find((m) => m.version === 250);
 
@@ -159,6 +164,8 @@ function mintToken(subjectId) {
 const app = express();
 app.use(express.json());
 app.use('/api/v1/housekeeping', requireAuth, housekeepingRouter);
+app.use('/api/v1/auth', authRouter);
+app.use('/api/v1/permissions', requireAuth, permissionsRouter);
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
@@ -310,4 +317,70 @@ test('ohne Admin-Mitglied springt ein aktives Admin-Konto ein, ohne jeden Admin 
     promote.run(staffAdmin);
     members.forEach((id) => promote.run(id));
   }
+});
+
+// --------------------------------------------------------------------------
+// Rechte entziehen (Codex zu R20): eine Aufgabe auf `assignees` haelt die
+// Erstellerin und die Zugewiesenen durch, ohne nach dem Betragsrecht zu
+// fragen. Wer es verliert, muss aus den Aufgaben fallen, die ihm gehoerten.
+// --------------------------------------------------------------------------
+
+async function checkInAndOut(token) {
+  db.prepare(`INSERT INTO sync_config (key, value) VALUES ('housekeeping_payment_tasks', '1')
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run();
+  const inRes = await call('POST', '/api/v1/housekeeping/work-sessions/check-in', token, { worker_id: WORKER, daily_rate: 45 });
+  assert.equal(inRes.status, 201, JSON.stringify(inRes.body));
+  const outRes = await call('POST', '/api/v1/housekeeping/work-sessions/check-out', token, { worker_id: WORKER });
+  assert.equal(outRes.status, 200, JSON.stringify(outRes.body));
+  return db.prepare('SELECT payment_task_id FROM housekeeping_work_sessions WHERE id = ?').get(inRes.body.data.id).payment_task_id;
+}
+
+test('wer das Betragsrecht verliert, faellt aus seinen Zahlungsaufgaben - auf jedem Weg, der Rechte schreibt', async () => {
+  const admins = [ADMIN, ADMIN2];
+  const paidBy = (id) => ({ visibility: 'assignees', created_by: id, assigned_to: id, assignees: [id, ...admins].sort((a, b) => a - b) });
+  const toAdmins = { visibility: 'assignees', created_by: ADMIN, assigned_to: ADMIN, assignees: admins };
+
+  // 1. Mitglied-Zeile: PUT /permissions/user/:id
+  const viaUser = addUser('zahlerin', 'member', 'mom');
+  const userTask = await checkInAndOut(mintToken(viaUser));
+  const done = await checkInAndOut(mintToken(viaUser));
+  db.prepare("UPDATE tasks SET status = 'done' WHERE id = ?").run(done);
+  assert.deepEqual(taskState(userTask), paidBy(viaUser), 'Ausgangslage');
+  const put = await call('PUT', `/api/v1/permissions/user/${viaUser}`, adminToken, {
+    modules: {}, widgets: {}, capabilities: { housekeeping_view_amounts: 'none' },
+  });
+  assert.equal(put.status, 200, JSON.stringify(put.body));
+  assert.deepEqual(taskState(userTask), toAdmins, 'Mitglied-Zeile: die Erstellerin faellt heraus');
+  assert.deepEqual(taskState(done), toAdmins, 'auch die erledigte - sie nennt den Lohn genauso');
+
+  // 2. Rollenprofil: PUT /permissions/role/:familyRole
+  const viaRole = addUser('opa', 'member', 'grandparent');
+  const roleTask = await checkInAndOut(mintToken(viaRole));
+  // Ein Erwachsener mit dem Recht steht zusaetzlich drin und bleibt Erstellerin.
+  const shared = await checkInAndOut(adultToken);
+  db.prepare('INSERT INTO task_assignments (task_id, user_id) VALUES (?, ?)').run(shared, viaRole);
+  const putRole = await call('PUT', '/api/v1/permissions/role/grandparent', adminToken, {
+    modules: {}, widgets: {}, capabilities: { housekeeping_view_amounts: 'none' },
+  });
+  assert.equal(putRole.status, 200, JSON.stringify(putRole.body));
+  assert.deepEqual(taskState(roleTask), toAdmins, 'Rollenprofil: der Opa faellt heraus');
+  assert.deepEqual(taskState(shared), paidBy(ADULT),
+    'als Zugewiesener faellt er auch heraus, die Erstellerin mit dem Recht bleibt');
+
+  // 3. Familienrolle: PATCH /auth/users/:id auf ein Profil ohne Betraege
+  // ('relative' sperrt sie seit dem Aequivalenztest oben).
+  const viaFamilyRole = addUser('cousine', 'member', 'parent');
+  const familyTask = await checkInAndOut(mintToken(viaFamilyRole));
+  const patch = await call('PATCH', `/api/v1/auth/users/${viaFamilyRole}`, adminToken, { family_role: 'relative' });
+  assert.equal(patch.status, 200, JSON.stringify(patch.body));
+  assert.deepEqual(taskState(familyTask), toAdmins, 'Familienrolle: die Cousine faellt heraus');
+
+  // Wer das Recht behaelt, bleibt: dieselbe Route fuer ein anderes Konto
+  // aendert seine Aufgabe nicht.
+  const keeps = addUser('nachbar', 'member', 'dad');
+  const keptTask = await checkInAndOut(mintToken(keeps));
+  const before = taskState(keptTask);
+  const putKeep = await call('PUT', `/api/v1/permissions/user/${keeps}`, adminToken, { modules: {}, widgets: {} });
+  assert.equal(putKeep.status, 200, JSON.stringify(putKeep.body));
+  assert.deepEqual(taskState(keptTask), before, 'mit dem Recht bleibt alles stehen');
 });

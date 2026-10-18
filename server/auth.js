@@ -30,6 +30,7 @@ import {
 } from './services/display-accounts.js';
 import { deleteBirthdayArtifacts, syncBirthdayArtifacts } from './services/birthdays.js';
 import { syncFastingRemindersForUser } from './services/fasting-reminders.js';
+import { revokePaymentTasksForUsers } from './services/payment-task-audience.js';
 import * as oidcClient from 'openid-client';
 import {
   isOidcEnabled,
@@ -3617,6 +3618,9 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
       });
       if (nextRole !== existing.role || familyRole !== existing.family_role) {
         syncFastingRemindersForUser(db.get(), userId);
+        // Herabstufung oder ein Rollenprofil ohne Betraege: die Zahlungs-
+        // aufgaben dieses Kontos gelten neu (services/payment-task-audience.js).
+        revokePaymentTasksForUsers(db.get(), [userId]);
       }
     });
 

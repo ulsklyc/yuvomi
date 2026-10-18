@@ -78,16 +78,19 @@ export function paymentTaskAudience(database, actorId, actorSeesAmounts) {
  * mit der bisherigen Erstellerin als Ausgangsperson. Zuweisungen, die die
  * Regel nicht nennt, fallen weg - ein zugewiesenes Kind saehe den Betrag sonst
  * weiter. Eine Aufgabe auf `assignees` oder `private` bleibt unberuehrt (sie
- * ist schon eine bewusste Wahl), ebenso eine ohne moegliche Eigentuemerin.
+ * ist schon eine bewusste Wahl) - ausser mit `reapply`: dann verliert jemand,
+ * der darin steht, gerade das Betragsrecht, und die Regel gilt neu
+ * (`revokePaymentTasksForUsers()` unten).
  *
  * Die Aufrufer sorgen fuer die Transaktion.
  *
+ * @param {{ reapply?: boolean }} [options]
  * @returns {boolean} ob die Aufgabe geaendert wurde
  */
-export function normalizePaymentTaskAudience(database, taskId) {
+export function normalizePaymentTaskAudience(database, taskId, { reapply = false } = {}) {
   if (taskId == null) return false;
   const task = database.prepare('SELECT id, created_by, visibility FROM tasks WHERE id = ?').get(taskId);
-  if (!task || task.visibility !== 'all') return false;
+  if (!task || (!reapply && task.visibility !== 'all')) return false;
   // Ein ehemaliges Konto zahlt nicht mehr: es faellt hier heraus, und die
   // Aufgabe geht an die Admins (activeAccountSql, #1381).
   const creator = task.created_by == null
@@ -112,4 +115,51 @@ export function normalizePaymentTaskAudience(database, taskId) {
   const assign = database.prepare('INSERT OR IGNORE INTO task_assignments (task_id, user_id) VALUES (?, ?)');
   for (const id of audience.assignees) assign.run(task.id, id);
   return true;
+}
+
+/**
+ * DAS RECHT ZU ENTZIEHEN ENTZIEHT AUCH DIE AUFGABE (Codex zu R20).
+ *
+ * Eine Zahlungsaufgabe steht ab dem Check-in auf `assignees`, und die
+ * Sichtbarkeitsregel laesst Erstellerin und Zugewiesene durch, ohne nach
+ * `housekeeping_view_amounts` zu fragen. Verliert eine dieser Personen das
+ * Recht spaeter (Mitglied-Zeile, Rollenprofil, Herabstufung vom Admin), laese
+ * sie den Lohn sonst weiter in Titel und Beschreibung. Darum ruft jeder Weg,
+ * der Rechte, Rolle oder Familienrolle schreibt, diese Funktion fuer die
+ * betroffenen Konten auf (server/routes/permissions.js, PUT /auth/users/:id),
+ * in derselben Transaktion. Fuer jede verknuepfte Zahlungsaufgabe, in der ein
+ * Konto OHNE das Recht steht, gilt die Regel oben neu - egal welcher Status.
+ * Sie schliesst nur: ein Konto, das das Recht behaelt oder neu bekommt, aendert
+ * nichts.
+ *
+ * Ohne `userIds` (Rollenprofil) gilt die Frage fuer jedes Konto, das in einer
+ * Zahlungsaufgabe steht: das Profil trifft auch Konten, die keine
+ * Haushaltsmitglieder sind, und die Aufgabe fragt nach dem Recht, nicht nach
+ * der Mitgliedschaft.
+ *
+ * @param {number[]} [userIds]
+ * @returns {number} Anzahl nachgezogener Aufgaben
+ */
+export function revokePaymentTasksForUsers(database, userIds = null) {
+  if (userIds == null) {
+    userIds = database.prepare(`
+      SELECT t.created_by AS id FROM tasks t JOIN housekeeping_work_sessions hws ON hws.payment_task_id = t.id
+      UNION SELECT t.assigned_to FROM tasks t JOIN housekeeping_work_sessions hws ON hws.payment_task_id = t.id
+      UNION SELECT ta.user_id FROM task_assignments ta JOIN housekeeping_work_sessions hws ON hws.payment_task_id = ta.task_id
+    `).all().map((row) => row.id);
+  }
+  const tasksOf = database.prepare(`
+    SELECT DISTINCT t.id FROM tasks t
+    JOIN housekeeping_work_sessions hws ON hws.payment_task_id = t.id
+    WHERE t.created_by = ? OR t.assigned_to = ?
+       OR EXISTS (SELECT 1 FROM task_assignments ta WHERE ta.task_id = t.id AND ta.user_id = ?)
+  `);
+  let changed = 0;
+  for (const userId of new Set(userIds)) {
+    if (userId == null || userHasCapability(database, userId, AMOUNTS_CAPABILITY)) continue;
+    for (const { id } of tasksOf.all(userId, userId, userId)) {
+      if (normalizePaymentTaskAudience(database, id, { reapply: true })) changed += 1;
+    }
+  }
+  return changed;
 }
