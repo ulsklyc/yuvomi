@@ -96,7 +96,8 @@
         "searchNoResultsTitle": "Keine Treffer",
         "searchNoResultsDescription": "Nichts passt zu deiner Suche.",
         "searchNoResultsFilteredDescription": "Nichts passt zu deiner Suche und den Filtern.",
-        "searchReset": "Suche zurücksetzen"
+        "searchReset": "Suche zurücksetzen",
+        "passwordMinLength": "Mindestens 8 Zeichen."
     },
     "kitchen": {
         "noShoppingLists": "Es gibt noch keine Einkaufsliste.",
@@ -4295,7 +4296,8 @@
         "submit": "Link senden",
         "sent": "Falls ein passendes Konto existiert, wurde ein Link zum Zurücksetzen gesendet.",
         "backToLogin": "Zurück zur Anmeldung",
-        "unavailable": "Dieser Haushalt bietet kein Zurücksetzen des Passworts an. Wende dich an die Administration deines Haushalts."
+        "unavailable": "Dieser Haushalt bietet kein Zurücksetzen des Passworts an. Wende dich an die Administration deines Haushalts.",
+        "identifierRequired": "Gib deinen Benutzernamen oder deine E-Mail-Adresse ein."
     },
     "resetPassword": {
         "title": "Neues Passwort festlegen",

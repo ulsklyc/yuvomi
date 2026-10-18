@@ -96,7 +96,8 @@
         "searchNoResultsTitle": "无结果",
         "searchNoResultsDescription": "没有与你的搜索匹配的内容。",
         "searchNoResultsFilteredDescription": "没有与你的搜索和筛选条件匹配的内容。",
-        "searchReset": "重置搜索"
+        "searchReset": "重置搜索",
+        "passwordMinLength": "至少 8 个字符。"
     },
     "kitchen": {
         "noShoppingLists": "还没有购物清单。",
@@ -4295,7 +4296,8 @@
         "submit": "发送链接",
         "sent": "如果存在匹配的账户，重置链接已发送。",
         "backToLogin": "返回登录",
-        "unavailable": "此家庭未提供密码重置。请联系您家庭的管理员。"
+        "unavailable": "此家庭未提供密码重置。请联系您家庭的管理员。",
+        "identifierRequired": "请输入你的用户名或电子邮件地址。"
     },
     "resetPassword": {
         "title": "设置新密码",

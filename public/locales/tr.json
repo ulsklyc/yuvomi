@@ -96,7 +96,8 @@
         "searchNoResultsTitle": "Sonuç yok",
         "searchNoResultsDescription": "Aramanızla eşleşen bir şey yok.",
         "searchNoResultsFilteredDescription": "Aramanız ve filtrelerinizle eşleşen bir şey yok.",
-        "searchReset": "Aramayı sıfırla"
+        "searchReset": "Aramayı sıfırla",
+        "passwordMinLength": "En az 8 karakter."
     },
     "kitchen": {
         "noShoppingLists": "Henüz alışveriş listesi yok.",
@@ -4295,7 +4296,8 @@
         "submit": "Bağlantıyı gönder",
         "sent": "Eşleşen bir hesap varsa, sıfırlama bağlantısı gönderildi.",
         "backToLogin": "Girişe dön",
-        "unavailable": "Bu hane şifre sıfırlama sunmuyor. Lütfen hane yöneticinizle iletişime geçin."
+        "unavailable": "Bu hane şifre sıfırlama sunmuyor. Lütfen hane yöneticinizle iletişime geçin.",
+        "identifierRequired": "Kullanıcı adınızı veya e-posta adresinizi girin."
     },
     "resetPassword": {
         "title": "Yeni parola belirle",

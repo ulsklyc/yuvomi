@@ -8,7 +8,7 @@
  */
 import { api } from '/api.js';
 import { t } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { openModal, closeModal, confirmOverModal, refocusAfterRender } from '/components/modal.js';
 import { intervalMonthsToInput, intervalInputToMonths } from '/utils/health-prevention.js';
 import { rowActionHtml } from '/utils/row-action.js';
@@ -134,7 +134,7 @@ function openTypeModal(type) {
     content: `
       <form id="health-prevention-type-form" class="form-stack">
         <div class="form-field">
-          <label class="label" for="hpt-name">${esc(t('settings.healthPreventionTypeName'))}</label>
+          <label class="label" for="hpt-name">${esc(t('settings.healthPreventionTypeName'))}${REQUIRED_MARK}</label>
           <input class="input" id="hpt-name" type="text" maxlength="200" required value="${esc(val(type?.name))}">
         </div>
         <div class="form-field">

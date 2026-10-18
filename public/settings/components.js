@@ -197,6 +197,7 @@ export function createToggleRow(options) {
  * @param {object} options
  * @param {string} options.label
  * @param {string|null} [options.labelFor]  id des Bedienelements - dann ist das Label ein `<label for>`
+ * @param {string} [options.labelExtra]  rohes HTML hinter dem Label, etwa `REQUIRED_MARK`
  * @param {string|null} [options.labelId]   id am Label, fuer `aria-labelledby` einer Gruppe
  * @param {string} [options.description]    Sekundaerzeile: ein Hinweis, der nur DIESE Zeile betrifft
  * @param {string|null} [options.descriptionId]
@@ -208,6 +209,7 @@ export function settingRowHtml({
   label,
   labelFor = null,
   labelId = null,
+  labelExtra = '',
   description = '',
   descriptionId = null,
   control = '',
@@ -226,7 +228,7 @@ export function settingRowHtml({
   // Masse des Blatts -, `form-row*` kommt dazu und bringt, was in der Zeile
   // steht: die randlose Auswahl, das Datum als Wert, das zusammengesetzte Feld.
   return formRowHtml({
-    label, labelFor, labelId, description, descriptionId, control, extra, stacked, field, className, attrs,
+    label, labelFor, labelId, labelExtra, description, descriptionId, control, extra, stacked, field, className, attrs,
     variant: 'settings-setting-row',
   });
 }

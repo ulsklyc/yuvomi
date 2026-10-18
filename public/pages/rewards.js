@@ -1139,7 +1139,7 @@ function openBonusModal() {
           </select>
         </div>
         <div class="form-group">
-          <label class="label" for="rw-bonus-points">${esc(t('rewards.pointsSigned'))}</label>
+          <label class="label" for="rw-bonus-points">${esc(t('rewards.pointsSigned'))}${REQUIRED_MARK}</label>
           <input class="input" id="rw-bonus-points" type="number" inputmode="numeric" step="1" placeholder="10" required>
           <p class="rw-hint">${esc(t('rewards.pointsSignedHint'))}</p>
         </div>

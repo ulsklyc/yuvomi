@@ -96,7 +96,8 @@
         "searchNoResultsTitle": "Nenhum resultado",
         "searchNoResultsDescription": "Nada corresponde à sua busca.",
         "searchNoResultsFilteredDescription": "Nada corresponde à sua busca e aos filtros.",
-        "searchReset": "Redefinir busca"
+        "searchReset": "Redefinir busca",
+        "passwordMinLength": "No mínimo 8 caracteres."
     },
     "kitchen": {
         "noShoppingLists": "Ainda não existe lista de compras.",
@@ -4295,7 +4296,8 @@
         "submit": "Enviar link",
         "sent": "Se existir uma conta correspondente, será enviado um link para redefinir.",
         "backToLogin": "Voltar ao login",
-        "unavailable": "Este grupo familiar não oferece reposição de senha. Contate o administrador do seu grupo familiar."
+        "unavailable": "Este grupo familiar não oferece reposição de senha. Contate o administrador do seu grupo familiar.",
+        "identifierRequired": "Digite seu nome de usuário ou endereço de e-mail."
     },
     "resetPassword": {
         "title": "Definir nova senha",

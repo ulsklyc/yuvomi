@@ -96,7 +96,8 @@
         "searchNoResultsTitle": "Sem resultados",
         "searchNoResultsDescription": "Nada corresponde à sua pesquisa.",
         "searchNoResultsFilteredDescription": "Nada corresponde à sua pesquisa e aos filtros.",
-        "searchReset": "Repor pesquisa"
+        "searchReset": "Repor pesquisa",
+        "passwordMinLength": "Pelo menos 8 caracteres."
     },
     "kitchen": {
         "noShoppingLists": "Ainda não existe lista de compras.",
@@ -4295,7 +4296,8 @@
         "submit": "Enviar ligação",
         "sent": "Se existir uma conta correspondente, foi enviada uma ligação para repor.",
         "backToLogin": "Voltar ao início de sessão",
-        "unavailable": "Este agregado familiar não oferece reposição de senha. Contacte o administrador do seu agregado familiar."
+        "unavailable": "Este agregado familiar não oferece reposição de senha. Contacte o administrador do seu agregado familiar.",
+        "identifierRequired": "Introduza o seu nome de utilizador ou endereço de email."
     },
     "resetPassword": {
         "title": "Definir nova palavra-passe",

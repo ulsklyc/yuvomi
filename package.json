@@ -269,7 +269,7 @@
     "test:mobile-chrome": "node --test test/test-mobile-chrome.js",
     "test:frontend-audit": "node --test test/test-frontend-audit.js",
     "test:control-dialect": "node --loader ./test/test-browser-loader.mjs --test test/test-control-dialect.js",
-    "test:auth-pages-ui": "node --test test/test-auth-pages-ui.js",
+    "test:auth-pages-ui": "node --loader ./test/test-browser-loader.mjs --test test/test-auth-pages-ui.js",
     "test:hidden-cascade": "node --loader ./test/test-browser-loader.mjs --test test/test-hidden-cascade.js test/test-recipes-fab-dock.js",
     "test:old-browser-fallbacks": "node --test test/test-old-browser-fallbacks.js",
     "test:layer-boundary": "node --test test/test-layer-boundary.js",

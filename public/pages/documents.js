@@ -7,7 +7,7 @@
 import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, selectModal, advancedSection, promptModal, confirmModal, refocusAfterRender, renderKeepingFocus, captureModalContext, isModalContextCurrent, reportFieldError } from '/components/modal.js';
 import { t, formatDate, getLocale } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -2680,7 +2680,7 @@ function openDocumentModal(doc = null) {
         ${isEdit ? '' : fileFieldHtml}
         <div class="modal-grid modal-grid--2">
           <div class="form-group">
-            <label class="label" for="document-name">${t('documents.nameLabel')}</label>
+            <label class="label" for="document-name">${t('documents.nameLabel')}${isEdit ? REQUIRED_MARK : ''}</label>
             <input class="input" id="document-name" name="name" maxlength="200" value="${esc(doc?.name || '')}"
                    ${isEdit ? 'required' : `placeholder="${esc(t('documents.namePlaceholder'))}"`}>
             ${isEdit ? '' : `<p class="document-form__hint" id="document-name-hint">${t('documents.nameHint')}</p>`}
@@ -3412,7 +3412,7 @@ function openFolderModal({ parentId = null } = {}) {
     content: `
       <form id="document-folder-form" class="document-form">
         <div class="form-group">
-          <label class="label" for="document-folder-name">${t('documents.folderNameLabel')}</label>
+          <label class="label" for="document-folder-name">${t('documents.folderNameLabel')}${REQUIRED_MARK}</label>
           <input class="input" id="document-folder-name" required maxlength="200" autocomplete="off">
         </div>
         <div class="form-group">

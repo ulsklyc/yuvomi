@@ -6,7 +6,7 @@
 import { auth } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { authHeroHtml, authErrorHtml, wirePasswordToggle } from '/utils/auth-ui.js';
+import { authHeroHtml, authErrorHtml, wirePasswordToggle, passwordRuleHtml, flagField, hideAuthError } from '/utils/auth-ui.js';
 
 function wireLinks(container) {
   container.querySelectorAll('a[data-link]').forEach((a) =>
@@ -64,7 +64,8 @@ export async function render(container) {
           <div class="form-group">
             <label class="label" for="password">${esc(t('resetPassword.passwordLabel'))}</label>
             <input class="input" type="password" id="password" name="password"
-              autocomplete="new-password" required />
+              autocomplete="new-password" minlength="8" aria-describedby="reset-password-rule" required />
+            ${passwordRuleHtml('reset-password-rule', t('common.passwordMinLength'))}
           </div>
           <div class="form-group">
             <label class="label" for="confirm">${esc(t('resetPassword.confirmLabel'))}</label>
@@ -96,11 +97,12 @@ export async function render(container) {
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    errorEl.hidden = true;
+    hideAuthError(form, errorEl);
     const password = form.password.value;
     const confirm = form.confirm.value;
-    if (password.length < 8) { show(errorEl, t('resetPassword.tooShort')); return; }
-    if (password !== confirm) { show(errorEl, t('resetPassword.mismatch')); return; }
+    // Jede Pruefung markiert das Feld, das sie meint (utils/auth-ui.js, flagField).
+    if (password.length < 8) { flagField(form.password, errorEl); show(errorEl, t('resetPassword.tooShort')); return; }
+    if (password !== confirm) { flagField(form.confirm, errorEl); show(errorEl, t('resetPassword.mismatch')); return; }
     btn.disabled = true;
     try {
       await auth.resetPassword(token, password);

@@ -1132,7 +1132,7 @@ function openTypeModal(type = null) {
     </div>`}
     <div class="form-group">
       <label class="form-label" for="wtm-name">${t('waste.typeNameLabel')}${REQUIRED_MARK}</label>
-      <input type="text" class="form-input" id="wtm-name" maxlength="100" value="${esc(isEdit ? type.name : '')}">
+      <input type="text" class="form-input" id="wtm-name" maxlength="100" value="${esc(isEdit ? type.name : '')}" required>
     </div>
     <div class="form-group">
       <label class="form-label">${t('waste.typeIconLabel')}</label>

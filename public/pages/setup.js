@@ -8,7 +8,7 @@
 import { auth, ApiError } from '/api.js';
 import { getLocale, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { authHeroHtml, authErrorHtml, wirePasswordToggle } from '/utils/auth-ui.js';
+import { authHeroHtml, authErrorHtml, wirePasswordToggle, passwordRuleHtml, flagField, hideAuthError } from '/utils/auth-ui.js';
 import { browserTimeZone } from '/utils/timezone.js';
 
 const VERSION_URL = '/api/v1/version';
@@ -54,8 +54,9 @@ export async function render(container) {
           <div class="form-group">
             <label class="label" for="password">${esc(t('setup.passwordLabel'))}</label>
             <input class="input" type="password" id="password" name="password"
-              autocomplete="new-password"
+              autocomplete="new-password" minlength="8" aria-describedby="setup-password-rule"
               placeholder="${esc(t('setup.passwordPlaceholder'))}" required />
+            ${passwordRuleHtml('setup-password-rule', t('common.passwordMinLength'))}
           </div>
           <div class="form-group">
             <label class="label" for="confirm_password">${esc(t('setup.confirmPasswordLabel'))}</label>
@@ -100,26 +101,34 @@ export async function render(container) {
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    errorEl.hidden = true;
+    hideAuthError(form, errorEl);
 
     const username = form.username.value.trim();
     const displayName = form.display_name.value.trim();
     const password = form.password.value;
     const confirm = form.confirm_password.value;
 
+    // Jede Pruefung markiert das Feld, das sie meint (utils/auth-ui.js,
+    // flagField): aria-invalid und ein Verweis auf die Meldung.
     if (!username || !displayName || !password) {
+      if (!username) flagField(form.username, errorEl);
+      if (!displayName) flagField(form.display_name, errorEl);
+      if (!password) flagField(form.password, errorEl);
       showError(errorEl, t('setup.errorGeneric'));
       return;
     }
     if (!USERNAME_RE.test(username)) {
+      flagField(form.username, errorEl);
       showError(errorEl, t('setup.errorUsernameInvalid'));
       return;
     }
     if (password.length < 8) {
+      flagField(form.password, errorEl);
       showError(errorEl, t('setup.errorPasswordTooShort'));
       return;
     }
     if (password !== confirm) {
+      flagField(form.confirm_password, errorEl);
       showError(errorEl, t('setup.errorPasswordMismatch'));
       return;
     }
@@ -161,6 +170,7 @@ export async function render(container) {
       window.yuvomi.navigate('/', result.user);
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
+        flagField(form.username, errorEl);
         showError(errorEl, t('setup.errorUsernameTaken'));
       } else if (err instanceof ApiError && err.status === 403) {
         // Setup wurde zwischenzeitlich abgeschlossen
@@ -179,7 +189,7 @@ export async function render(container) {
   });
 
   for (const id of ['username', 'display_name', 'password', 'confirm_password']) {
-    form.querySelector(`#${id}`).addEventListener('input', () => { errorEl.hidden = true; });
+    form.querySelector(`#${id}`).addEventListener('input', () => hideAuthError(form, errorEl));
   }
 }
 

@@ -96,7 +96,8 @@
         "searchNoResultsTitle": "Nessun risultato",
         "searchNoResultsDescription": "Nulla corrisponde alla tua ricerca.",
         "searchNoResultsFilteredDescription": "Nulla corrisponde alla tua ricerca e ai filtri.",
-        "searchReset": "Reimposta ricerca"
+        "searchReset": "Reimposta ricerca",
+        "passwordMinLength": "Almeno 8 caratteri."
     },
     "kitchen": {
         "noShoppingLists": "Non c'è ancora una lista della spesa.",
@@ -4295,7 +4296,8 @@
         "submit": "Invia link",
         "sent": "Se esiste un account corrispondente, è stato inviato un link di ripristino.",
         "backToLogin": "Torna al login",
-        "unavailable": "Questa famiglia non offre il ripristino della password. Contatta l'amministratore della tua famiglia."
+        "unavailable": "Questa famiglia non offre il ripristino della password. Contatta l'amministratore della tua famiglia.",
+        "identifierRequired": "Inserisci il tuo nome utente o indirizzo email."
     },
     "resetPassword": {
         "title": "Imposta una nuova password",

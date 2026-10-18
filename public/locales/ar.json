@@ -99,7 +99,8 @@
         "searchNoResultsTitle": "لا توجد نتائج",
         "searchNoResultsDescription": "لا شيء يطابق بحثك.",
         "searchNoResultsFilteredDescription": "لا شيء يطابق بحثك وعوامل التصفية.",
-        "searchReset": "إعادة تعيين البحث"
+        "searchReset": "إعادة تعيين البحث",
+        "passwordMinLength": "8 أحرف على الأقل."
     },
     "kitchen": {
         "noShoppingLists": "لا توجد قائمة مشتريات بعد.",
@@ -4650,7 +4651,8 @@
         "submit": "إرسال الرابط",
         "sent": "إذا كان هناك حساب مطابق، فقد أُرسل رابط لإعادة التعيين.",
         "backToLogin": "العودة إلى تسجيل الدخول",
-        "unavailable": "لا يوفّر هذا المنزل إعادة تعيين كلمة المرور. يرجى التواصل مع مسؤول منزلك."
+        "unavailable": "لا يوفّر هذا المنزل إعادة تعيين كلمة المرور. يرجى التواصل مع مسؤول منزلك.",
+        "identifierRequired": "أدخل اسم المستخدم أو عنوان بريدك الإلكتروني."
     },
     "resetPassword": {
         "title": "تعيين كلمة مرور جديدة",

@@ -67,6 +67,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   them.** These layers only asked screen readers to stay inside; the page behind them could still
   be reached with Tab, a click or the virtual cursor. It is now inert while the layer is open. After
   the welcome tour, the keyboard focus returns to the page content instead of getting lost.
+- **Setting a password tells you the rule before you try.** First-time setup, joining by
+  invitation and resetting a password showed "at least 8 characters" only as an error after
+  submitting. The rule now stands under the field. An error on these pages and on "Forgot password"
+  also marks the field it means, so a screen reader names it there, and "Forgot password" with an
+  empty field says what is missing instead of only moving the cursor.
+- **Required fields say so to screen readers, and every form shows which fields are required.** In
+  the budget's entry, account and loan dialogs and the waste type dialog the asterisk was only
+  visual; the field now reports itself as required. About thirty fields required an entry without
+  the asterisk, among them adding and editing members, your profile and password change, API tokens,
+  document management, Immich, Apple Calendar, calendar subscriptions, folders, documents, health
+  entries and medication, pairing, bonus points and shopping items. Forms with a single field and
+  the sign-in pages stay without it.
 
 ### Security
 

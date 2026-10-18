@@ -2920,7 +2920,7 @@ function openAccountModal(account = null) {
     <div class="form-group">
       <label class="form-label" for="am-name">${t('budget.accountNameLabel')}${REQUIRED_MARK}</label>
       <input type="text" class="form-input" id="am-name" maxlength="100"
-             placeholder="${t('budget.accountNamePlaceholder')}" value="${esc(isEdit ? account.name : '')}">
+             placeholder="${t('budget.accountNamePlaceholder')}" value="${esc(isEdit ? account.name : '')}" required>
     </div>
     <div class="form-group">
       <label class="form-label" for="am-type">${t('budget.accountTypeLabel')}</label>
@@ -4208,13 +4208,13 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
       <input type="number" class="form-input budget-amount-input" id="bm-amount"
              placeholder="${amountPlaceholder(state.currency)}"
              step="${amountStep(state.currency, absAmount)}" min="${amountMin(state.currency, absAmount)}"
-             inputmode="decimal" value="${absAmount}">
+             inputmode="decimal" value="${absAmount}" required>
     </div>
 
     <div class="form-group js-entry-field">
       <label class="form-label" for="bm-title">${t('budget.titleLabel')}${REQUIRED_MARK}</label>
       <input type="text" class="form-input" id="bm-title"
-             placeholder="${t('budget.titlePlaceholder')}" value="${esc(isEdit ? entry.title : '')}">
+             placeholder="${t('budget.titlePlaceholder')}" value="${esc(isEdit ? entry.title : '')}" required>
     </div>
 
     <div class="form-group js-entry-field">
@@ -4895,7 +4895,7 @@ function loanIdentityFieldsHtml(loan) {
       }</span>${REQUIRED_MARK}</label>
       <input type="text" class="form-input" id="lm-borrower" maxlength="100"
              placeholder="${t(borrowed ? 'budget.loanLenderPlaceholder' : 'budget.loanBorrowerPlaceholder')}"
-             value="${esc(loan?.borrower ?? '')}">
+             value="${esc(loan?.borrower ?? '')}" required>
     </div>
     <div class="form-group">
       <label class="form-label" for="lm-title">${t('budget.loanTitleLabel')}</label>
@@ -4962,7 +4962,7 @@ function loanInterestFieldsHtml(loan) {
         <label class="form-label" for="lm-principal">${t('budget.loanPrincipalLabel')}${REQUIRED_MARK}</label>
         <input type="number" class="form-input" id="lm-principal"
                step="${amountStep(currency, it?.principal ?? '')}" min="${amountMin(currency, it?.principal ?? '')}"
-               placeholder="${amountPlaceholder(currency)}" inputmode="decimal" value="${v(it?.principal)}">
+               placeholder="${amountPlaceholder(currency)}" inputmode="decimal" value="${v(it?.principal)}" required>
       </div>
       <div class="form-grid-2">
         <div class="form-group">
@@ -5179,18 +5179,18 @@ function loanFormFieldsHtml(loan, { startMonth }) {
                step="${amountStep(loanCurrency, loan ? loan.total_amount : '')}"
                min="${amountMin(loanCurrency, loan ? loan.total_amount : '')}"
                placeholder="${amountPlaceholder(loanCurrency)}" inputmode="decimal"
-               value="${loan ? String(loan.total_amount) : ''}">
+               value="${loan ? String(loan.total_amount) : ''}" required>
       </div>
       <div class="form-group">
         <label class="form-label" for="lm-installments">${t('budget.loanInstallmentsLabel')}${REQUIRED_MARK}</label>
         <input type="number" class="form-input" id="lm-installments" step="1" min="1" max="360"
-               inputmode="numeric" value="${loan?.installment_count ?? ''}">
+               inputmode="numeric" value="${loan?.installment_count ?? ''}" required>
       </div>
     </div>
     ${loanInterestFieldsHtml(loan)}
     <div class="form-group">
       <label class="form-label" for="lm-start">${t('budget.loanStartMonthLabel')}${REQUIRED_MARK}</label>
-      <input type="month" class="form-input" id="lm-start" value="${esc(loan?.start_month ?? startMonth)}">
+      <input type="month" class="form-input" id="lm-start" value="${esc(loan?.start_month ?? startMonth)}" required>
     </div>
     ${/* Faelligkeitstag (#1631): optional. Leer = kein Tag, die Rate wird wie
         * bisher auf den Tag des Abhakens gebucht. */ ''}

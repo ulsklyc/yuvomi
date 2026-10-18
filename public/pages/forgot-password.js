@@ -6,7 +6,7 @@
 import { auth } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { authHeroHtml } from '/utils/auth-ui.js';
+import { authHeroHtml, authErrorHtml, flagField, hideAuthError } from '/utils/auth-ui.js';
 
 function wireLinks(container) {
   container.querySelectorAll('a[data-link]').forEach((a) =>
@@ -63,6 +63,7 @@ export async function render(container) {
             <input class="input" type="text" id="identifier" name="identifier"
               autocomplete="username" autocapitalize="none" autocorrect="off" required />
           </div>
+          ${authErrorHtml('forgot-error')}
           <div class="form-success" id="forgot-success" role="status" aria-live="polite" hidden></div>
           <button type="submit" class="btn btn--primary auth-form__submit" id="forgot-btn">
             ${esc(t('forgotPassword.submit'))}
@@ -75,13 +76,26 @@ export async function render(container) {
 
   const form = container.querySelector('#forgot-form');
   const successEl = container.querySelector('#forgot-success');
+  const errorEl = container.querySelector('#forgot-error');
   const btn = container.querySelector('#forgot-btn');
   wireLinks(container);
 
+  // Wer zu tippen beginnt, korrigiert: die Meldung "fehlt" geht mit (Codex-Review zu #2059).
+  form.identifier.addEventListener('input', () => hideAuthError(form, errorEl));
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    hideAuthError(form, errorEl);
     const identifier = form.identifier.value.trim();
-    if (!identifier) { form.identifier.focus(); return; }
+    // Leer scheiterte stumm - nur der Fokus sprang ins Feld (Modern-Web-
+    // Guidance-Audit, Befund 15). Jetzt sagt die Seite, was fehlt, am Feld.
+    if (!identifier) {
+      flagField(form.identifier, errorEl);
+      errorEl.textContent = t('forgotPassword.identifierRequired');
+      errorEl.hidden = false;
+      form.identifier.focus();
+      return;
+    }
     btn.disabled = true;
     try {
       await auth.forgotPassword(identifier);

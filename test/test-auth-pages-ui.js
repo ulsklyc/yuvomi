@@ -7,7 +7,7 @@
  *        darunter). Geprueft wird die Regel, nicht der eine Fund: jedes
  *        Element der Karte oder des Heros (`auth-card__*`, `auth-hero__*`),
  *        das eine Seite rendert, hat eine Regel in auth.css.
- * Ausfuehren: node --test test/test-auth-pages-ui.js
+ * Ausfuehren: npm run test:auth-pages-ui
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -139,4 +139,143 @@ test('R18: die Bildmarke ist docs/logo.svg - eine Quelle, feste Farben, beide St
     assert.doesNotMatch(r.body, /background|(?:^|;)\s*color\s*:/, `${r.selector} faerbt die Marke`);
     assert.doesNotMatch(r.selector, /\bsvg\b/, `${r.selector} skaliert das Zeichen in seiner Kachel`);
   }
+});
+
+// --------------------------------------------------------
+// Modern-Web-Guidance-Audit, Befund 15: Regel sichtbar, Fehler am Feld
+// --------------------------------------------------------
+
+/**
+ * Die Passwortregel steht VOR dem ersten Versuch unter dem Feld, nicht erst
+ * als Fehler danach (WCAG 3.3.2): jedes NEUE Passwort vor der Anmeldung
+ * (Einrichtung, Einladung, Reset) traegt den einen Hinweis aus auth-ui.js und
+ * zeigt per `aria-describedby` auf ihn, dazu `minlength="8"` als Angabe fuer
+ * Passwortmanager und Screenreader.
+ */
+test('Befund 15: jedes neue Passwort nennt die Regel sichtbar und verknuepft', () => {
+  const ui = read('../public/utils/auth-ui.js');
+  assert.match(ui, /export function passwordRuleHtml\(/, 'der eine Hinweis-Baustein');
+  for (const [page, field] of [['setup', 'password'], ['join', 'join-password'], ['reset-password', 'password']]) {
+    const src = read(`../public/pages/${page}.js`);
+    const input = src.match(new RegExp(`<input\\b[^>]*\\bid="${field}"[^>]*>`))?.[0];
+    assert.ok(input, `${page}.js: #${field} nicht gefunden`);
+    const hintId = input.match(/aria-describedby="([\w-]+)"/)?.[1];
+    assert.ok(hintId, `${page}.js: #${field} zeigt auf keinen Hinweis`);
+    assert.match(input, /\bminlength="8"/, `${page}.js: #${field} ohne minlength`);
+    assert.match(src, new RegExp(`passwordRuleHtml\\('${hintId}', t\\('common\\.passwordMinLength'\\)\\)`), `${page}.js: der Hinweis #${hintId} kommt nicht aus dem Baustein`);
+  }
+});
+
+/**
+ * Ein Fehler, der ein Feld meint, steht AM Feld: `aria-invalid` und ein
+ * `aria-describedby` auf die Meldung, und die naechste Eingabe nimmt beides
+ * zurueck. Bis hierher sagte nur das eine Fehlerfeld oben, was falsch war -
+ * welches Feld, musste man raten.
+ */
+test('Befund 15: flagField markiert das Feld und die naechste Eingabe nimmt es zurueck', async () => {
+  const { flagField } = await import('../public/utils/auth-ui.js');
+  const attrs = new Map([['aria-describedby', 'hint']]);
+  const listeners = [];
+  const field = {
+    getAttribute: (k) => attrs.get(k) ?? null,
+    setAttribute: (k, v) => attrs.set(k, String(v)),
+    removeAttribute: (k) => attrs.delete(k),
+    addEventListener: (type, fn) => listeners.push({ type, fn }),
+  };
+  flagField(field, { id: 'setup-error' });
+  assert.equal(attrs.get('aria-invalid'), 'true');
+  assert.equal(attrs.get('aria-describedby'), 'hint setup-error', 'der Hinweis bleibt, die Meldung kommt dazu');
+  flagField(field, { id: 'setup-error' });
+  assert.equal(attrs.get('aria-describedby'), 'hint setup-error', 'zweimal markiert, einmal verknuepft');
+  for (const l of listeners.filter((l) => l.type === 'input')) l.fn();
+  assert.equal(attrs.has('aria-invalid'), false, 'die Eingabe nimmt die Markierung zurueck');
+  assert.equal(attrs.get('aria-describedby'), 'hint');
+});
+
+/** Jede Seite markiert die Felder, die ihre Pruefungen meinen. */
+test('Befund 15: die Pruefungen der Auth-Seiten markieren ihr Feld', () => {
+  const expected = {
+    setup: ['username', 'display_name', 'password', 'confirm_password'],
+    join: ['usernameEl', 'password', 'confirm'],
+    'reset-password': ['password', 'confirm'],
+    'forgot-password': ['identifier'],
+  };
+  for (const [page, fields] of Object.entries(expected)) {
+    const src = read(`../public/pages/${page}.js`);
+    assert.match(src, /import \{[^}]*\bflagField\b[^}]*\} from '\/utils\/auth-ui\.js'/, `${page}.js importiert flagField nicht`);
+    for (const f of fields) {
+      assert.match(src, new RegExp(`flagField\\((?:form\\.)?${f}\\b`), `${page}.js: kein flagField fuer ${f}`);
+    }
+  }
+});
+
+/** "Passwort vergessen" mit leerem Feld scheiterte stumm: nur der Fokus sprang. */
+test('Befund 15: Passwort vergessen sagt bei leerem Feld, was fehlt', () => {
+  const src = read('../public/pages/forgot-password.js');
+  assert.match(src, /authErrorHtml\('forgot-error'\)/, 'die Seite hat ein Fehlerfeld');
+  assert.match(src, /if \(!identifier\) \{[^}]*t\('forgotPassword\.identifierRequired'\)/, 'leeres Feld: eine Meldung, nicht nur der Fokus');
+});
+
+/**
+ * Codex-Review zu #2059: die Einrichtung blendete ihre Meldung bei der ersten
+ * Eingabe aus, die ANDEREN markierten Felder blieben `aria-invalid` und zeigten
+ * auf eine unsichtbare Meldung. `hideAuthError()` nimmt beides zusammen ab;
+ * die Einrichtung ruft es bei jeder Eingabe, "Passwort vergessen" ebenso.
+ */
+test('Befund 15: hideAuthError nimmt Meldung und jede Markierung zusammen ab', async () => {
+  const { flagField, hideAuthError } = await import('../public/utils/auth-ui.js');
+  const makeField = (describedby) => {
+    const attrs = new Map(describedby ? [['aria-describedby', describedby]] : []);
+    return {
+      attrs,
+      getAttribute: (k) => attrs.get(k) ?? null,
+      setAttribute: (k, v) => attrs.set(k, String(v)),
+      removeAttribute: (k) => attrs.delete(k),
+      addEventListener: () => {},
+    };
+  };
+  const a = makeField('hint');
+  const b = makeField(null);
+  const errorEl = { id: 'setup-error', hidden: false };
+  flagField(a, errorEl);
+  flagField(b, errorEl);
+  const form = { querySelectorAll: () => [a, b].filter((f) => f.attrs.get('aria-invalid') === 'true') };
+  hideAuthError(form, errorEl);
+  assert.equal(errorEl.hidden, true);
+  assert.equal(a.attrs.has('aria-invalid'), false);
+  assert.equal(a.attrs.get('aria-describedby'), 'hint', 'der Hinweis bleibt');
+  assert.equal(b.attrs.has('aria-invalid'), false);
+  assert.equal(b.attrs.has('aria-describedby'), false);
+  flagField(b, errorEl);
+  assert.equal(b.attrs.get('aria-invalid'), 'true', 'nach dem Abnehmen laesst sich das Feld erneut markieren');
+
+  const setup = read('../public/pages/setup.js');
+  assert.match(setup, /addEventListener\('input', \(\) => hideAuthError\(form, errorEl\)\)/, 'die Einrichtung blendet mit hideAuthError aus');
+  assert.doesNotMatch(setup, /errorEl\.hidden = true/, 'kein Ausblenden an hideAuthError vorbei');
+  const forgot = read('../public/pages/forgot-password.js');
+  assert.match(forgot, /form\.identifier\.addEventListener\('input', \(\) => hideAuthError\(form, errorEl\)\)/, '"Passwort vergessen" nimmt die Meldung beim Tippen zurueck');
+});
+
+/**
+ * Codex-Review zu #2059: auf Einladung und Reset blieb die Meldung stehen,
+ * nachdem man das markierte Feld korrigiert hatte - nur Einrichtung und
+ * "Passwort vergessen" hatten einen eigenen Eingabe-Handler. Die Korrektur
+ * eines markierten Feldes nimmt die Meldung jetzt ueberall mit.
+ */
+test('Befund 15: die Eingabe in ein markiertes Feld blendet die Meldung aus', async () => {
+  const { flagField } = await import('../public/utils/auth-ui.js');
+  const listeners = [];
+  const attrs = new Map();
+  const errorEl = { id: 'reset-error', hidden: false };
+  const field = {
+    getAttribute: (k) => attrs.get(k) ?? null,
+    setAttribute: (k, v) => attrs.set(k, String(v)),
+    removeAttribute: (k) => attrs.delete(k),
+    addEventListener: (type, fn) => listeners.push({ type, fn }),
+  };
+  field.form = { querySelectorAll: () => (attrs.get('aria-invalid') === 'true' ? [field] : []) };
+  flagField(field, errorEl);
+  for (const l of listeners.filter((x) => x.type === 'input')) l.fn();
+  assert.equal(errorEl.hidden, true, 'die Meldung blieb nach der Korrektur stehen');
+  assert.equal(attrs.has('aria-invalid'), false);
 });

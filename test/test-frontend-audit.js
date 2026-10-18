@@ -22397,6 +22397,87 @@ test('every custom aria-modal layer makes its background inert and releases it',
 });
 
 /**
+ * STERN UND PFLICHT SAGEN DASSELBE (Modern-Web-Guidance-Audit, Befund 16;
+ * DESIGN.md, Zeile "Pflichtfeld"). Der Stern ist `aria-hidden` - ein Feld mit
+ * Stern, aber ohne `required`, war fuer den Screenreader ein Kannfeld. Und
+ * ein `required`-Feld ohne Stern verschwieg es den Sehenden, wo das Formular
+ * Pflicht- und Kannfelder mischt. AUSNAHME nach der Regel: ein Formular aus
+ * EINEM Feld (dort ist die Pflicht offensichtlich, ein Stern nur Rauschen) und
+ * die Anmeldeseiten, deren Felder alle Pflicht sind.
+ */
+test('a starred label marks a required field, and a required field in a mixed form carries the star', () => {
+  const AUTH = /\/(login|setup|join|reset-password|forgot-password)\.js$/;
+  const SINGLE_FIELD = new Set([
+    'public/settings/pages/personal-account.js #two-factor-code', // nur der Code
+    'public/settings/pages/personal-account.js #two-factor-confirm-code', // nur der Code
+    'public/settings/pages/admin-displays.js #display-name', // das Koppelformular hat nur den Namen
+  ]);
+  const files = walkJsFiles('../public/').filter((f) => !f.includes('/vendor/') && !AUTH.test(f));
+  // Das Objekt-Literal um eine Stelle: `{ label, labelFor, labelExtra, control }`
+  // der Zeilen-Bausteine (formRowHtml und Verwandte, Codex-Review zu #2059).
+  const enclosingObject = (src, at) => {
+    let depth = 0;
+    let start = at;
+    for (; start > 0; start -= 1) {
+      if (src[start] === '}') depth += 1;
+      else if (src[start] === '{') { if (depth === 0) break; depth -= 1; }
+    }
+    let end = at;
+    for (depth = 0; end < src.length; end += 1) {
+      if (src[end] === '{') depth += 1;
+      else if (src[end] === '}') { if (depth === 0) break; depth -= 1; }
+    }
+    return src.slice(start, end + 1);
+  };
+  const starNoReq = [];
+  const reqNoStar = [];
+  // Welche Zeilen-Bausteine `labelExtra` annehmen: die Funktionen, deren
+  // Parameterobjekt es nennt.
+  const takesLabelExtra = new Set();
+  for (const file of files) {
+    for (const m of read(file).matchAll(/function (\w+)\(\{([^)]*?)\}\s*=?\s*\{?\}?\)/g)) {
+      if (/\blabelExtra\b/.test(m[2])) takesLabelExtra.add(m[1]);
+    }
+  }
+  assert.ok(takesLabelExtra.has('formRowHtml') && takesLabelExtra.has('settingRowHtml'), `Bausteine mit labelExtra: ${[...takesLabelExtra]}`);
+  let seen = 0;
+  for (const file of files) {
+    const src = read(file);
+    const rel = file.slice('../'.length);
+    const labels = [...src.matchAll(/<label\b[^>]*\bfor="([\w-]+)"[^>]*>([\s\S]*?)<\/label>/g)].map((m) => [m[1], m[2]]);
+    for (const m of src.matchAll(/\blabelFor:\s*['"]([\w-]+)['"]/g)) {
+      const obj = enclosingObject(src, m.index);
+      const extra = obj.match(/\blabelExtra:\s*([^,\n]+)/)?.[1] ?? '';
+      // Der Baustein muss `labelExtra` auch NEHMEN - settingRowHtml() verschluckte
+      // ihn bis hierher still, der Stern stand nur im Quelltext.
+      const builder = src.slice(0, src.indexOf(obj)).match(/(\w+)\(\s*$/)?.[1];
+      if (extra && builder && !takesLabelExtra.has(builder)) starNoReq.push(`${rel} #${m[1]}: ${builder}() nimmt kein labelExtra`);
+      labels.push([m[1], extra]);
+    }
+    const controls = new Map([...src.matchAll(/<(?:input|select|textarea)\b([^>]*)>/g)]
+      .map((m) => [m[1].match(/\bid="([\w-]+)"/)?.[1], m[1]]).filter(([id]) => id));
+    for (const [id, text] of labels) {
+      const attrs = controls.get(id);
+      if (!attrs) continue;
+      seen += 1;
+      const starred = /REQUIRED_MARK|required-marker/.test(text);
+      // Auch bedingt (`${isEdit ? '' : 'required'}`) - dann haengt der Stern an derselben Bedingung.
+      const required = /\srequired\b|'required'/.test(attrs);
+      if (starred && !required) starNoReq.push(`${rel} #${id}`);
+      // Nur bedingt Pflicht (`${isEdit ? 'required' : ''}`), aber der Stern steht
+      // immer: das Kannfeld beim Anlegen sah aus wie Pflicht (Codex-Review zu #2059).
+      const conditionalReq = /[?:]\s*'required'/.test(attrs) && !/\srequired\b/.test(attrs.replace(/'required'/g, ''));
+      const conditionalStar = /[?:]\s*REQUIRED_MARK\b/.test(text);
+      if (starred && conditionalReq && !conditionalStar) starNoReq.push(`${rel} #${id}: Stern immer, Pflicht nur bedingt`);
+      if (!starred && required && !/type="(?:checkbox|radio|hidden)"/.test(attrs) && !SINGLE_FIELD.has(`${rel} #${id}`)) reqNoStar.push(`${rel} #${id}`);
+    }
+  }
+  assert.ok(seen > 250, `nur ${seen} Label-Feld-Paare gefunden - der Guard liest die Formulare nicht mehr`);
+  assert.deepEqual(starNoReq, [], `Stern ohne required - der Screenreader hoert ein Kannfeld:\n${starNoReq.join('\n')}`);
+  assert.deepEqual(reqNoStar, [], `required ohne Stern in einem gemischten Formular:\n${reqNoStar.join('\n')}`);
+});
+
+/**
  * DIE RUECKKEHR IN DEN TAB LAEDT NUR, WAS ALT IST (Modern-Web-Guidance-Audit,
  * Befund 13). Jeder Wechsel zurueck in den Tab holte `/dashboard` samt
  * Erinnerungen neu und baute die ganze Uebersicht auf - auch nach fuenf

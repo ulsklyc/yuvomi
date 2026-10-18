@@ -57,7 +57,8 @@ test('Konto-Blatt: keine Browser-Blasen - novalidate, Zeilen tragen den Feldfehl
     assert.match(accountSrc, new RegExp(`<form id="${id}" class="[^"]*" novalidate>`), `${id} ohne novalidate zeigte native Blasen`);
   }
   for (const id of ['profile-display-name', 'profile-email', 'profile-birth-date', 'current-password', 'new-password', 'confirm-password']) {
-    assert.match(accountSrc, new RegExp(`labelFor: '${id}', field: true`), `${id}: die Zeile traegt den Feldfehler`);
+    // Ein Pflichtfeld traegt dazwischen den Stern (`labelExtra: REQUIRED_MARK`).
+    assert.match(accountSrc, new RegExp(`labelFor: '${id}',(?: labelExtra: REQUIRED_MARK,)? field: true`), `${id}: die Zeile traegt den Feldfehler`);
   }
   assert.match(accountSrc, /emailValue && !isEmailAddress\(emailValue\) && \[emailInput, t\('common\.emailInvalid'\)\]/);
   assert.ok(account.isEmailAddress('linda@example.org'));

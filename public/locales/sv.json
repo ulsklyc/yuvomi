@@ -96,7 +96,8 @@
         "searchNoResultsTitle": "Inga träffar",
         "searchNoResultsDescription": "Inget matchar din sökning.",
         "searchNoResultsFilteredDescription": "Inget matchar din sökning och dina filter.",
-        "searchReset": "Återställ sökning"
+        "searchReset": "Återställ sökning",
+        "passwordMinLength": "Minst 8 tecken."
     },
     "kitchen": {
         "noShoppingLists": "Det finns ingen inköpslista än.",
@@ -4295,7 +4296,8 @@
         "submit": "Skicka länk",
         "sent": "Om ett matchande konto finns har en återställningslänk skickats.",
         "backToLogin": "Tillbaka till inloggningen",
-        "unavailable": "Det här hushållet erbjuder ingen lösenordsåterställning. Kontakta administratören för ditt hushåll."
+        "unavailable": "Det här hushållet erbjuder ingen lösenordsåterställning. Kontakta administratören för ditt hushåll.",
+        "identifierRequired": "Ange ditt användarnamn eller din e-postadress."
     },
     "resetPassword": {
         "title": "Ange ett nytt lösenord",

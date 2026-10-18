@@ -98,7 +98,8 @@
         "searchNoResultsTitle": "Brak wyników",
         "searchNoResultsDescription": "Nic nie pasuje do wyszukiwania.",
         "searchNoResultsFilteredDescription": "Nic nie pasuje do wyszukiwania i filtrów.",
-        "searchReset": "Resetuj wyszukiwanie"
+        "searchReset": "Resetuj wyszukiwanie",
+        "passwordMinLength": "Co najmniej 8 znaków."
     },
     "kitchen": {
         "noShoppingLists": "Nie ma jeszcze listy zakupów.",
@@ -4531,7 +4532,8 @@
         "submit": "Wyślij link",
         "sent": "Jeśli pasujące konto istnieje, link do zresetowania hasła został wysłany.",
         "backToLogin": "Powrót do logowania",
-        "unavailable": "To gospodarstwo domowe nie oferuje resetowania hasła. Skontaktuj się z administratorem swojego gospodarstwa domowego."
+        "unavailable": "To gospodarstwo domowe nie oferuje resetowania hasła. Skontaktuj się z administratorem swojego gospodarstwa domowego.",
+        "identifierRequired": "Wpisz swoją nazwę użytkownika lub adres e-mail."
     },
     "resetPassword": {
         "title": "Ustaw nowe hasło",

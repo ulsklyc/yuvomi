@@ -97,7 +97,8 @@
         "searchNoResultsTitle": "Žádné výsledky",
         "searchNoResultsDescription": "Vašemu hledání nic neodpovídá.",
         "searchNoResultsFilteredDescription": "Vašemu hledání a filtrům nic neodpovídá.",
-        "searchReset": "Zrušit hledání"
+        "searchReset": "Zrušit hledání",
+        "passwordMinLength": "Alespoň 8 znaků."
     },
     "kitchen": {
         "noShoppingLists": "Nákupní seznam ještě neexistuje.",
@@ -4414,7 +4415,8 @@
         "submit": "Odeslat odkaz",
         "sent": "Pokud odpovídající účet existuje, byl odeslán odkaz pro obnovení.",
         "backToLogin": "Zpět na přihlášení",
-        "unavailable": "Tato domácnost nenabízí obnovu hesla. Obraťte se na správce vaší domácnosti."
+        "unavailable": "Tato domácnost nenabízí obnovu hesla. Obraťte se na správce vaší domácnosti.",
+        "identifierRequired": "Zadejte své uživatelské jméno nebo e-mailovou adresu."
     },
     "resetPassword": {
         "title": "Nastavit nové heslo",
