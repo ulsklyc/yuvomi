@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Warming up the other pages in the background no longer competes with the page you are on.**
   After the start, Yuvomi preloads the main pages while the browser is idle; these downloads now ask
   for low priority.
+- **Long contact and recipe lists open faster.** The browser now skips rows outside the visible
+  area until you scroll near them. Measured on a slowed-down device, opening 500 contacts blocked
+  the page for about 0.8 s, now about 0.55 s; 300 recipes went from about 0.45 s to under 0.4 s.
 
 ### Fixed
 

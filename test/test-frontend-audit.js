@@ -22343,3 +22343,28 @@ test('router: every page sheet @import is preloaded alongside its sheet', () => 
   const prefetch = router.slice(router.indexOf('function prefetchRoute('), router.indexOf('function prefetchRoute(') + 2600);
   assert.match(prefetch, /preloadStyleImports\(cssHref\);/, 'prefetchRoute() waermt die Importe mit vor');
 });
+
+/**
+ * LANGE LISTEN RECHNEN NUR, WAS IN SICHT IST (Modern-Web-Guidance-Audit,
+ * Befund 18; Guide defer-rendering-heavy-content). Gemessen bei 4x CPU: der
+ * Wechsel nach /contacts mit 500 Kontakten hielt die Seite 781 ms am Stueck
+ * (22.000 Knoten), /recipes mit 300 Rezepten 460 ms; mit `content-visibility`
+ * je Zeile 568 bzw. 357 ms. Die Zeilenhoehe steht als `contain-intrinsic-size`
+ * dabei, sonst springt der Bildlaufbalken. Notizen bleiben aussen vor: ihr
+ * Raster (Masonry/grid-lanes) verteilt Karten nach Hoehe auf Spalten, und
+ * Platzhalterhoehen liessen Karten beim Scrollen die Spalte wechseln.
+ */
+test('long contact and recipe lists skip rendering rows out of view', () => {
+  const expect = [
+    ['../public/styles/contacts.css', '.contact-group__list > .contact-item'],
+    ['../public/styles/recipes.css', '.recipes-list .recipe-row-item'],
+  ];
+  for (const [file, selector] of expect) {
+    const rule = [...eachRule(read(file))].find((r) => r.selector.replace(/\s+/g, ' ').trim() === selector
+      && r.at.some((at) => /@supports \(content-visibility: auto\)/.test(at)));
+    assert.ok(rule, `${file}: ${selector} ohne content-visibility unter @supports`);
+    assert.match(rule.body, /content-visibility:\s*auto/);
+    assert.match(rule.body, /contain-intrinsic-size:\s*auto none auto \d+px/, `${selector}: ohne gemerkte Hoehe springt der Bildlaufbalken`);
+  }
+  assert.ok(![...eachRule(read('../public/styles/notes.css'))].some((r) => /content-visibility/.test(r.body)), 'Notizen bleiben ohne (Masonry-Spalten)');
+});

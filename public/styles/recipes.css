@@ -48,6 +48,16 @@
 
 /* Geometrie, Fläche, Trennlinie und Hover: .list-row. */
 
+/* Lange Listen rechnen nur, was in Sicht ist - dieselbe Regel wie bei den
+ * Kontakten (contacts.css, Modern-Web-Guidance-Audit Befund 18). 300 Rezepte:
+ * 460 ms am Stueck bei 4x CPU, mit der Regel 357 ms. Zeile 64px, gemessen. */
+@supports (content-visibility: auto) {
+  .recipes-list .recipe-row-item {
+    content-visibility: auto;
+    contain-intrinsic-size: auto none auto 64px;
+  }
+}
+
 .recipe-row__heading {
   /* Die Überschrift ist der Flex-Slot, der Button füllt ihn. Ohne Reset brächte
    * h2 seine Blockmargen und die eigene Schriftgröße mit. */
