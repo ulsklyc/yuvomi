@@ -2764,18 +2764,35 @@ export function reportFieldError(input, message, { focus = true, live = !(focus 
     const clear = () => {
       input.removeEventListener('input', clear);
       input.removeEventListener('change', clear);
-      group.classList?.remove('form-field--error');
-      input.setAttribute?.('aria-invalid', 'false');
-      const el = typeof group.querySelector === 'function' ? group.querySelector('.form-field__error') : null;
-      if (el?.dataset?.defaultText !== undefined) {
-        el.textContent = el.dataset.defaultText;
-        delete el.dataset.defaultText;
-      }
+      _clearFieldErrorIn(group, input);
     };
     input.addEventListener('input', clear);
     input.addEventListener('change', clear);
   }
   return false;
+}
+
+function _clearFieldErrorIn(group, input) {
+  group.classList?.remove('form-field--error');
+  input.setAttribute?.('aria-invalid', 'false');
+  const el = typeof group.querySelector === 'function' ? group.querySelector('.form-field__error') : null;
+  if (el?.dataset?.defaultText !== undefined) {
+    el.textContent = el.dataset.defaultText;
+    delete el.dataset.defaultText;
+  }
+}
+
+/**
+ * Raeumt einen Feldfehler, den `reportFieldError()` gesetzt hat, ohne dass im
+ * Feld getippt wurde - fuer Handler, die denselben Wert erneut pruefen (eine
+ * Suche, die beim zweiten Versuch klappt). Sonst raeumt ihn erst die naechste
+ * Eingabe, und das Feld stuende mit dem alten Fehler neben gueltigen Treffern.
+ */
+export function clearFieldError(input) {
+  if (!input) return;
+  const group = (typeof input.closest === 'function' ? input.closest('.form-field') : null) ?? input.parentElement;
+  if (!group) return;
+  _clearFieldErrorIn(group, input);
 }
 
 /**

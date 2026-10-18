@@ -214,6 +214,11 @@ const STUBS = {
       globalThis.__reportFieldError?.(...args);
       return false;
     };
+    // Das Gegenstueck: wer sehen will, dass ein Handler einen alten
+    // Feldfehler raeumt, setzt globalThis.__clearFieldError.
+    export const clearFieldError = (...args) => {
+      globalThis.__clearFieldError?.(...args);
+    };
     // Wie das Original (components/modal.js): alle Eintraege mit Feld, je Feld
     // der erste - ueber __reportFieldError gemeldet, in der Reihenfolge der
     // Liste (eine Dokumentreihenfolge kennt der Stub nicht).

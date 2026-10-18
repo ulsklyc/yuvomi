@@ -292,3 +292,39 @@ test('Ortssuche: eine zu kurze Suche raeumt die Liste und ueberholt die laufende
     delete globalThis.__apiStub;
   }
 });
+
+// Codex-Review PR #2053, zweite Runde (P2): ein zweiter Versuch mit demselben
+// Namen feuert weder `input` noch `change`. Klappte er, stand der Fehler des
+// ersten Versuchs weiter am Feld, neben den waehlbaren Treffern.
+test('Ortssuche: ein erfolgreicher neuer Versuch raeumt den alten Feldfehler', async () => {
+  const events = [];
+  globalThis.__reportFieldError = (field, message) => events.push(['report', field, message]);
+  globalThis.__clearFieldError = (field) => events.push(['clear', field]);
+  const input = el({ value: 'Halle' });
+  input.isConnected = true;
+  const results = el({ hidden: true, replaceChildren() {}, append() {} });
+  const elements = { '#w-place': input, '#w-place-results': results, '#w-place-status': el(), '#w-place-btn': el() };
+  const container = { isConnected: true, querySelector: (s) => elements[s] ?? null };
+  const state = { seq: 0, controller: null };
+  const hadDocument = 'document' in globalThis;
+  const keptDocument = globalThis.document;
+  globalThis.document = { createElement: () => ({ append() {}, addEventListener() {} }) };
+  try {
+    globalThis.__apiStub = { get: async () => ({ data: null, reason: 'upstream_error' }) };
+    await weatherLocation.__test.searchPlace(container, 'w', state);
+    assert.deepEqual(events.at(-1), ['report', input, 'settings.weatherPlaceUnavailable']);
+
+    globalThis.__apiStub = { get: async () => ({ data: [{ name: 'Halle', latitude: 51.5, longitude: 11.9, country: 'Deutschland' }] }) };
+    await weatherLocation.__test.searchPlace(container, 'w', state);
+    assert.equal(results.hidden, false, 'Reichweite: der zweite Versuch zeigt Treffer');
+    const lastReport = events.map((e) => e[0]).lastIndexOf('report');
+    const lastClear = events.map((e) => e[0]).lastIndexOf('clear');
+    assert.ok(lastClear > lastReport, 'der Fehler des ersten Versuchs steht noch am Feld');
+    assert.equal(events[lastClear][1], input, 'geraeumt wird das Suchfeld');
+  } finally {
+    delete globalThis.__reportFieldError;
+    delete globalThis.__clearFieldError;
+    delete globalThis.__apiStub;
+    if (hadDocument) globalThis.document = keptDocument; else delete globalThis.document;
+  }
+});

@@ -21,7 +21,7 @@ const {
   rememberFocus,
   __test: modalTest,
   restoreFocusAfterClose, refocusAfterRender, forgetRestore, renderKeepingFocus,
-  reportFieldErrors,
+  reportFieldErrors, reportFieldError, clearFieldError,
 } = await import('../public/components/modal.js');
 
 // matchMedia und document.createElementNS werden von btnSuccess/btnError benötigt
@@ -2319,4 +2319,17 @@ test('wireBlurValidation: in einer Formularzeile steht die Meldung unter der Zei
   };
   assert.deepEqual(place(true), { besideField: 0, inRow: true }, 'Zeile: ans Ende der Zeile');
   assert.deepEqual(place(false), { besideField: 1, inRow: false }, 'gestapeltes Feld: direkt hinter das Feld wie bisher');
+});
+
+// Codex-Review PR #2053, zweite Runde: ein Handler, der denselben Wert neu
+// prueft (die Ortssuche), raeumt den alten Fehler ohne Eingabe im Feld.
+test('clearFieldError: nimmt Rahmen und aria-invalid, die reportFieldError gesetzt hat', () => {
+  const field = fakeField('place', 1);
+  reportFieldError(field, 'Ort nicht gefunden', { focus: false });
+  assert.equal(field.attrs['aria-invalid'], 'true', 'Reichweite: der Fehler steht');
+  assert.ok(field.classes.has('form-field--error'));
+  clearFieldError(field);
+  assert.equal(field.attrs['aria-invalid'], 'false');
+  assert.equal(field.classes.has('form-field--error'), false);
+  clearFieldError(null);
 });

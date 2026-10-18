@@ -2,7 +2,7 @@ import { api } from '/api.js';
 import { getLocale, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
-import { reportFieldError } from '/components/modal.js';
+import { clearFieldError, reportFieldError } from '/components/modal.js';
 
 /**
  * Standortformular für das Wetter-Widget - einmal für den Haushalt
@@ -251,6 +251,10 @@ async function searchPlace(container, scope, state) {
     reportFieldError(input, t('settings.weatherPlaceTooShort'));
     return;
   }
+  // Ein neuer Versuch mit demselben Namen feuert weder `input` noch `change`:
+  // der Fehler des letzten Versuchs raeumt sich dann nicht selbst und stuende
+  // neben den Treffern dieses (Codex zu R20).
+  clearFieldError(input);
   state.controller?.abort();
   const controller = new AbortController();
   state.controller = controller;
