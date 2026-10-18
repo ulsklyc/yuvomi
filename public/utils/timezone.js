@@ -372,6 +372,20 @@ export function nowFields(now = new Date()) {
 }
 
 /**
+ * "Jetzt" als Wert eines `datetime-local`-Felds (YYYY-MM-DDTHH:MM) in der
+ * Anzeigezone. Für Vorbelegungen, die der Server als Wanduhr des Haushalts
+ * liest - aus `toLocalDateKey()` plus `getHours()` gebaut, stünde dort die Uhr
+ * des Geräts.
+ * @param {Date} [now] Ersetzbar für Tests
+ * @returns {string}
+ */
+export function nowDateTimeValue(now = new Date()) {
+  const f = nowFields(now);
+  if (!f) return '';
+  return `${String(f.year).padStart(4, '0')}-${pad2(f.month)}-${pad2(f.day)}T${pad2(f.hour)}:${pad2(f.minute)}`;
+}
+
+/**
  * Ein `Date`, dessen UTC-Felder die Wanduhr-Felder der Anzeigezone sind.
  *
  * Für den einen Fall, in dem die Zahlen nicht reichen: eine locale-abhängige

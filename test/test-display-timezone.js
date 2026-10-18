@@ -613,3 +613,31 @@ test('wallTimeToInstantMs: Formen, Rueckfall und unlesbare Werte', () => {
     assert.equal(tz.wallTimeToInstantMs(bad, 'Europe/Berlin'), null, `${String(bad)} ist unlesbar`);
   }
 });
+
+/* Die Health-Formulare (Vitalwert, Aktivitaet, Ernaehrung) belegen ihr
+ * datetime-local-Feld mit "jetzt" vor. Der Server liest den Wert als Wanduhr des
+ * HAUSHALTS (`wallClockInput()` in server/routes/health/helpers.js). Gebaut wurde
+ * er aber aus `toLocalDateKey(date)` plus `date.getHours()`, also in der Zone des
+ * Geraets - der Guard oben sah es nicht, weil `new Date()` erst als Argument in
+ * den Helfer ging. Auf Reisen speicherte "Speichern" ohne Korrektur einen um die
+ * Zonendifferenz verschobenen Zeitpunkt, oft auf dem falschen Tag.
+ */
+test('nowDateTimeValue: "jetzt" fuer ein datetime-local-Feld in der Anzeigezone', () => {
+  assert.equal(typeof tz.nowDateTimeValue, 'function', 'utils/timezone.js exportiert nowDateTimeValue');
+  // 2026-06-15 02:30 UTC: in Toronto (Browser) noch der 14., in Tokio 11:30 am 15.
+  const instant = new Date(Date.UTC(2026, 5, 15, 2, 30, 0));
+  withZone('Asia/Tokyo', () => {
+    assert.equal(tz.nowDateTimeValue(instant), '2026-06-15T11:30');
+  });
+  // Ohne Haushaltszone bleibt es beim Browser, wie vor #829.
+  assert.equal(tz.nowDateTimeValue(instant), '2026-06-14T22:30');
+});
+
+test('Health-Formulare belegen "jetzt" ueber nowDateTimeValue vor, nicht ueber die Browser-Uhr', () => {
+  const health = SOURCES.find((s) => s.rel === path.join('pages', 'health.js'));
+  assert.ok(health, 'pages/health.js gefunden');
+  assert.doesNotMatch(health.code, /\.getHours\(\)/,
+    'pages/health.js liest die Stunde aus der Browser-Uhr');
+  const calls = health.code.match(/\bnowDateTimeValue\(/g) || [];
+  assert.ok(calls.length >= 3, `Vitalwert, Aktivitaet und Ernaehrung nutzen den Helfer (gefunden: ${calls.length})`);
+});
