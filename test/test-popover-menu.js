@@ -429,3 +429,121 @@ test('der Standard-Ausloeser traegt die Kopf-Icon-Haut (btn--secondary btn--icon
   const own = popoverMenuHtml({ id: 'y-menu', label: 'Mehr', items: [], triggerClass: 'row-action' });
   assert.match(own, /class="row-action popover-menu__trigger"/, 'Zeilenmenues geben ihre Klasse selbst mit');
 });
+
+// ---------------------------------------------------------------------------
+// #2041: SCROLLT DER INHALT UNTER EINEM OFFENEN MENUE, SCHLIESST ES.
+// Das Panel steht `position: fixed` im Top-Layer und wird EINMAL beim Oeffnen
+// an den Ausloeser gerechnet. Scrollt danach die Liste (Mausrad, Trackpad,
+// Tastatur), wandert die Zeile weg und das Menue bleibt stehen - gemessen in
+// den Kontakten 4 -> 124px Abstand, "Loeschen" stand unter einer fremden
+// Zeile. iOS- und macOS-Menues schliessen, wenn der Inhalt darunter scrollt;
+// die Dokumente-Kopie (`openContextMenu`) tat das schon. Die Sonden fahren den
+// echten Handler: `scroll` steigt nicht auf, der Listener muss in der
+// Capture-Phase am Dokument haengen, damit auch der Scrollport eines Blatts
+// ihn erreicht.
+// ---------------------------------------------------------------------------
+
+/** Dokument-Stub, der seine Listener samt Optionen aufhebt. */
+function trackDocumentListeners(moving) {
+  const listeners = [];
+  const previous = global.document;
+  const captureOf = (opts) => (typeof opts === 'boolean' ? opts : Boolean(opts?.capture));
+  global.document = {
+    querySelector: () => moving,
+    addEventListener(type, handler, opts) { listeners.push({ type, handler, opts }); },
+    removeEventListener(type, handler, opts) {
+      const i = listeners.findIndex((l) => l.type === type && l.handler === handler
+        && captureOf(l.opts) === captureOf(opts));
+      if (i !== -1) listeners.splice(i, 1);
+    },
+  };
+  return {
+    listeners,
+    scrollListeners: () => listeners.filter((l) => l.type === 'scroll'),
+    scroll(target) {
+      for (const l of [...listeners]) if (l.type === 'scroll') l.handler({ type: 'scroll', target });
+    },
+    restore() { global.document = previous; },
+  };
+}
+
+/** Ein Ausloeser, dessen Rechteck sich mit dem Scrollen verschiebt. */
+function movableTrigger() {
+  const node = el('.popover-menu__trigger');
+  node.offsetY = 0;
+  node.getBoundingClientRect = () => ({
+    top: 100 - node.offsetY, bottom: 140 - node.offsetY, right: 300, left: 200,
+  });
+  return node;
+}
+
+function closablePanel() {
+  const panel = makeMenu();
+  panel.closedCount = 0;
+  panel.isConnected = true;
+  panel.hidePopover = () => { panel.closedCount += 1; };
+  return panel;
+}
+
+function withScrollProbe(probe) {
+  const moving = movableTrigger();
+  const doc = trackDocumentListeners(moving);
+  try {
+    probe({ doc, moving, root: makeRoot(), panel: closablePanel() });
+  } finally {
+    doc.restore();
+  }
+}
+
+test('#2041: scrollt die Liste unter dem offenen Menue, schliesst es', () => {
+  withScrollProbe(({ doc, moving, root, panel }) => {
+    open(root, panel);
+    const [listener] = doc.scrollListeners();
+    assert.ok(listener, 'beim Oeffnen haengt kein scroll-Listener am Dokument');
+    assert.equal(listener.opts?.capture, true,
+      'scroll steigt nicht auf - ohne Capture erreicht der Scrollport der Liste das Dokument nie');
+    moving.offsetY = 60;
+    doc.scroll({});
+    assert.equal(panel.closedCount, 1, 'das Menue bleibt stehen, waehrend seine Zeile wegscrollt');
+  });
+});
+
+test('#2041: ein Scroll, der den Ausloeser nicht bewegt, laesst das Menue offen', () => {
+  // Ein langes Menue scrollt in sich selbst (overflow im Panel), ein
+  // Nachbar-Scroller (Chip-Leiste) scrollt quer - beides verschiebt die Zeile
+  // nicht, und ein Menue, das dabei zuklappt, waere nicht bedienbar. Ebenso
+  // Subpixel-Rauschen beim Ausrollen eines Trackpad-Schwungs.
+  withScrollProbe(({ doc, moving, root, panel }) => {
+    open(root, panel);
+    assert.equal(doc.scrollListeners().length, 1, 'ohne Listener prueft diese Sonde nichts');
+    doc.scroll(panel);
+    moving.offsetY = 1;
+    doc.scroll({});
+    assert.equal(panel.closedCount, 0, 'ein Scroll ohne Wirkung auf die Zeile schliesst das Menue');
+  });
+});
+
+test('#2041: nach dem Schliessen haengt kein scroll-Listener mehr am Dokument', () => {
+  withScrollProbe(({ doc, root, panel }) => {
+    open(root, panel);
+    root.fire('toggle', { target: panel, newState: 'closed' });
+    assert.equal(doc.scrollListeners().length, 0, 'jedes Oeffnen haengt einen Listener an, der nie geht');
+    open(root, panel);
+    open(root, panel);
+    assert.equal(doc.scrollListeners().length, 1, 'ein zweites open ohne close verdoppelt den Listener');
+  });
+});
+
+test('#2041: ein aus dem DOM genommenes Menue raeumt seinen Listener beim naechsten Scroll ab', () => {
+  // Ein Re-Render ersetzt die Liste samt offenem Panel; der Browser schliesst
+  // es dabei OHNE toggle-Event. Der Listener darf dann nicht ewig haengen.
+  withScrollProbe(({ doc, moving, root, panel }) => {
+    open(root, panel);
+    assert.equal(doc.scrollListeners().length, 1, 'ohne Listener prueft diese Sonde nichts');
+    panel.isConnected = false;
+    moving.offsetY = 60;
+    doc.scroll({});
+    assert.equal(panel.closedCount, 0, 'ein abgehaengtes Panel wird nicht mehr angefasst');
+    assert.equal(doc.scrollListeners().length, 0, 'der Listener des abgehaengten Panels bleibt haengen');
+  });
+});
