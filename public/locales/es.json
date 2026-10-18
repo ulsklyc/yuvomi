@@ -96,7 +96,8 @@
         "searchNoResultsTitle": "Sin resultados",
         "searchNoResultsDescription": "Nada coincide con tu búsqueda.",
         "searchNoResultsFilteredDescription": "Nada coincide con tu búsqueda y los filtros.",
-        "searchReset": "Restablecer búsqueda"
+        "searchReset": "Restablecer búsqueda",
+        "passwordMinLength": "Al menos 8 caracteres."
     },
     "kitchen": {
         "noShoppingLists": "Todavía no hay lista de la compra.",
@@ -4295,7 +4296,8 @@
         "submit": "Enviar enlace",
         "sent": "Si existe una cuenta que coincida, se ha enviado un enlace para restablecerla.",
         "backToLogin": "Volver al inicio de sesión",
-        "unavailable": "Este hogar no ofrece restablecimiento de contraseña. Ponte en contacto con la administración de tu hogar."
+        "unavailable": "Este hogar no ofrece restablecimiento de contraseña. Ponte en contacto con la administración de tu hogar.",
+        "identifierRequired": "Introduce tu nombre de usuario o tu correo electrónico."
     },
     "resetPassword": {
         "title": "Establecer una contraseña nueva",

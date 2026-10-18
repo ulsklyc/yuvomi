@@ -96,7 +96,8 @@
         "searchNoResultsTitle": "Nincs találat",
         "searchNoResultsDescription": "Semmi sem felel meg a keresésnek.",
         "searchNoResultsFilteredDescription": "Semmi sem felel meg a keresésnek és a szűrőknek.",
-        "searchReset": "Keresés visszaállítása"
+        "searchReset": "Keresés visszaállítása",
+        "passwordMinLength": "Legalább 8 karakter."
     },
     "kitchen": {
         "noShoppingLists": "Még nincs bevásárlólista.",
@@ -4295,7 +4296,8 @@
         "submit": "Link küldése",
         "sent": "Ha létezik megfelelő fiók, egy visszaállító linket küldtünk.",
         "backToLogin": "Vissza a bejelentkezéshez",
-        "unavailable": "Ez a háztartás nem kínál jelszó-visszaállítást. Kérjük, forduljon a háztartás rendszergazdájához."
+        "unavailable": "Ez a háztartás nem kínál jelszó-visszaállítást. Kérjük, forduljon a háztartás rendszergazdájához.",
+        "identifierRequired": "Add meg a felhasználóneved vagy az e-mail-címed."
     },
     "resetPassword": {
         "title": "Új jelszó beállítása",

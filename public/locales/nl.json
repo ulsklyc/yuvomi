@@ -96,7 +96,8 @@
         "searchNoResultsTitle": "Geen resultaten",
         "searchNoResultsDescription": "Niets komt overeen met je zoekopdracht.",
         "searchNoResultsFilteredDescription": "Niets komt overeen met je zoekopdracht en filters.",
-        "searchReset": "Zoekopdracht wissen"
+        "searchReset": "Zoekopdracht wissen",
+        "passwordMinLength": "Minstens 8 tekens."
     },
     "kitchen": {
         "noShoppingLists": "Er is nog geen boodschappenlijst.",
@@ -4295,7 +4296,8 @@
         "submit": "Link versturen",
         "sent": "Als er een bijbehorend account bestaat, is er een herstellink verstuurd.",
         "backToLogin": "Terug naar inloggen",
-        "unavailable": "Dit huishouden biedt geen wachtwoordherstel aan. Neem contact op met de beheerder van je huishouden."
+        "unavailable": "Dit huishouden biedt geen wachtwoordherstel aan. Neem contact op met de beheerder van je huishouden.",
+        "identifierRequired": "Vul je gebruikersnaam of e-mailadres in."
     },
     "resetPassword": {
         "title": "Nieuw wachtwoord instellen",

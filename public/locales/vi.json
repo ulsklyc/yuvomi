@@ -96,7 +96,8 @@
         "searchNoResultsTitle": "Không có kết quả",
         "searchNoResultsDescription": "Không có mục nào khớp với tìm kiếm của bạn.",
         "searchNoResultsFilteredDescription": "Không có mục nào khớp với tìm kiếm và bộ lọc của bạn.",
-        "searchReset": "Đặt lại tìm kiếm"
+        "searchReset": "Đặt lại tìm kiếm",
+        "passwordMinLength": "Ít nhất 8 ký tự."
     },
     "kitchen": {
         "noShoppingLists": "Chưa có danh sách mua sắm.",
@@ -4295,7 +4296,8 @@
         "submit": "Gửi liên kết",
         "sent": "Nếu có tài khoản phù hợp, liên kết đặt lại đã được gửi.",
         "backToLogin": "Quay lại đăng nhập",
-        "unavailable": "Hộ gia đình này không cung cấp việc đặt lại mật khẩu. Vui lòng liên hệ quản trị viên hộ gia đình của bạn."
+        "unavailable": "Hộ gia đình này không cung cấp việc đặt lại mật khẩu. Vui lòng liên hệ quản trị viên hộ gia đình của bạn.",
+        "identifierRequired": "Nhập tên người dùng hoặc địa chỉ email của bạn."
     },
     "resetPassword": {
         "title": "Đặt mật khẩu mới",

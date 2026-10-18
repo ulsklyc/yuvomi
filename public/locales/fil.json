@@ -96,7 +96,8 @@
         "searchNoResultsTitle": "Walang resulta",
         "searchNoResultsDescription": "Walang tumutugma sa iyong paghahanap.",
         "searchNoResultsFilteredDescription": "Walang tumutugma sa iyong paghahanap at mga filter.",
-        "searchReset": "I-reset ang paghahanap"
+        "searchReset": "I-reset ang paghahanap",
+        "passwordMinLength": "Hindi bababa sa 8 character."
     },
     "kitchen": {
         "noShoppingLists": "Wala pang listahan ng pamimili.",
@@ -4295,7 +4296,8 @@
         "submit": "Ipadala ang link",
         "sent": "Kung may tugmang account, naipadala na ang link para sa pag-reset.",
         "backToLogin": "Bumalik sa pag-log in",
-        "unavailable": "Hindi nag-aalok ang sambahayang ito ng pag-reset ng password. Makipag-ugnayan sa administrador ng iyong sambahayan."
+        "unavailable": "Hindi nag-aalok ang sambahayang ito ng pag-reset ng password. Makipag-ugnayan sa administrador ng iyong sambahayan.",
+        "identifierRequired": "Ilagay ang iyong username o email address."
     },
     "resetPassword": {
         "title": "Maglagay ng bagong password",

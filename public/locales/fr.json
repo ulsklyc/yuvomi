@@ -96,7 +96,8 @@
         "searchNoResultsTitle": "Aucun résultat",
         "searchNoResultsDescription": "Rien ne correspond à votre recherche.",
         "searchNoResultsFilteredDescription": "Rien ne correspond à votre recherche et à vos filtres.",
-        "searchReset": "Réinitialiser la recherche"
+        "searchReset": "Réinitialiser la recherche",
+        "passwordMinLength": "8 caractères minimum."
     },
     "kitchen": {
         "noShoppingLists": "Il n'y a encore aucune liste de courses.",
@@ -4295,7 +4296,8 @@
         "submit": "Envoyer le lien",
         "sent": "Si un compte correspondant existe, un lien de réinitialisation a été envoyé.",
         "backToLogin": "Retour à la connexion",
-        "unavailable": "Ce foyer ne propose pas de réinitialisation du mot de passe. Contactez l'administrateur de votre foyer."
+        "unavailable": "Ce foyer ne propose pas de réinitialisation du mot de passe. Contactez l'administrateur de votre foyer.",
+        "identifierRequired": "Saisissez votre nom d’utilisateur ou votre adresse e-mail."
     },
     "resetPassword": {
         "title": "Définir un nouveau mot de passe",

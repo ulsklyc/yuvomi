@@ -96,7 +96,8 @@
         "searchNoResultsTitle": "No results",
         "searchNoResultsDescription": "Nothing matches your search.",
         "searchNoResultsFilteredDescription": "Nothing matches your search and filters.",
-        "searchReset": "Reset search"
+        "searchReset": "Reset search",
+        "passwordMinLength": "At least 8 characters."
     },
     "kitchen": {
         "noShoppingLists": "There is no shopping list yet.",
@@ -4295,7 +4296,8 @@
         "submit": "Send link",
         "sent": "If a matching account exists, a reset link has been sent.",
         "backToLogin": "Back to login",
-        "unavailable": "This household does not offer password reset. Please contact your household's administrator."
+        "unavailable": "This household does not offer password reset. Please contact your household's administrator.",
+        "identifierRequired": "Enter your username or email address."
     },
     "resetPassword": {
         "title": "Set a new password",

@@ -96,7 +96,8 @@
         "searchNoResultsTitle": "該当なし",
         "searchNoResultsDescription": "検索に一致する項目はありません。",
         "searchNoResultsFilteredDescription": "検索とフィルターに一致する項目はありません。",
-        "searchReset": "検索をリセット"
+        "searchReset": "検索をリセット",
+        "passwordMinLength": "8文字以上。"
     },
     "kitchen": {
         "noShoppingLists": "買い物リストがまだありません。",
@@ -4295,7 +4296,8 @@
         "submit": "リンクを送信",
         "sent": "該当するアカウントがあれば、再設定用のリンクを送信しました。",
         "backToLogin": "ログインに戻る",
-        "unavailable": "この世帯ではパスワードの再設定を提供していません。世帯の管理者にお問い合わせください。"
+        "unavailable": "この世帯ではパスワードの再設定を提供していません。世帯の管理者にお問い合わせください。",
+        "identifierRequired": "ユーザー名またはメールアドレスを入力してください。"
     },
     "resetPassword": {
         "title": "新しいパスワードを設定",

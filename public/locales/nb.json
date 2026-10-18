@@ -96,7 +96,8 @@
         "searchNoResultsTitle": "Ingen treff",
         "searchNoResultsDescription": "Ingenting passer til søket ditt.",
         "searchNoResultsFilteredDescription": "Ingenting passer til søket og filtrene dine.",
-        "searchReset": "Tilbakestill søk"
+        "searchReset": "Tilbakestill søk",
+        "passwordMinLength": "Minst 8 tegn."
     },
     "kitchen": {
         "noShoppingLists": "Det finnes ingen handleliste ennå.",
@@ -4295,7 +4296,8 @@
         "submit": "Send lenke",
         "sent": "Hvis et samsvarende konto finnes, har en lenke for tilbakestilling blitt sendt.",
         "backToLogin": "Tilbake til pålogging",
-        "unavailable": "Denne husholdningen tilbyr ikke passordtilbakestilling. Vennligst kontakt administratoren for din husholdning."
+        "unavailable": "Denne husholdningen tilbyr ikke passordtilbakestilling. Vennligst kontakt administratoren for din husholdning.",
+        "identifierRequired": "Skriv inn brukernavnet eller e-postadressen din."
     },
     "resetPassword": {
         "title": "Angi nytt passord",

@@ -96,7 +96,8 @@
         "searchNoResultsTitle": "Tidak ada hasil",
         "searchNoResultsDescription": "Tidak ada yang cocok dengan pencarianmu.",
         "searchNoResultsFilteredDescription": "Tidak ada yang cocok dengan pencarian dan filtermu.",
-        "searchReset": "Atur ulang pencarian"
+        "searchReset": "Atur ulang pencarian",
+        "passwordMinLength": "Minimal 8 karakter."
     },
     "kitchen": {
         "noShoppingLists": "Belum ada daftar belanja.",
@@ -4295,7 +4296,8 @@
         "submit": "Kirim tautan",
         "sent": "Jika ada akun yang cocok, tautan atur ulang telah dikirim.",
         "backToLogin": "Kembali ke halaman masuk",
-        "unavailable": "Rumah tangga ini tidak menyediakan pengaturan ulang kata sandi. Silakan hubungi administrator rumah tangga Anda."
+        "unavailable": "Rumah tangga ini tidak menyediakan pengaturan ulang kata sandi. Silakan hubungi administrator rumah tangga Anda.",
+        "identifierRequired": "Masukkan nama pengguna atau alamat email Anda."
     },
     "resetPassword": {
         "title": "Tetapkan kata sandi baru",

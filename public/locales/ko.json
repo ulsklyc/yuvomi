@@ -96,7 +96,8 @@
         "searchNoResultsTitle": "결과 없음",
         "searchNoResultsDescription": "검색과 일치하는 항목이 없습니다.",
         "searchNoResultsFilteredDescription": "검색 및 필터와 일치하는 항목이 없습니다.",
-        "searchReset": "검색 초기화"
+        "searchReset": "검색 초기화",
+        "passwordMinLength": "8자 이상."
     },
     "kitchen": {
         "noShoppingLists": "아직 장보기 목록이 없습니다.",
@@ -4295,7 +4296,8 @@
         "submit": "링크 보내기",
         "sent": "일치하는 계정이 있으면 재설정 링크가 전송되었습니다.",
         "backToLogin": "로그인으로 돌아가기",
-        "unavailable": "이 가정은 비밀번호 재설정을 제공하지 않습니다. 가정의 관리자에게 문의해 주세요."
+        "unavailable": "이 가정은 비밀번호 재설정을 제공하지 않습니다. 가정의 관리자에게 문의해 주세요.",
+        "identifierRequired": "사용자 이름 또는 이메일 주소를 입력하세요."
     },
     "resetPassword": {
         "title": "새 비밀번호 설정",

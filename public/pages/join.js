@@ -6,7 +6,7 @@
 import { auth } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { authHeroHtml, authErrorHtml, wirePasswordToggle } from '/utils/auth-ui.js';
+import { authHeroHtml, authErrorHtml, wirePasswordToggle, passwordRuleHtml, flagField } from '/utils/auth-ui.js';
 
 // Dieselbe Regel wie im Server (POST /auth/invites/accept). Sie hier zu spiegeln
 // erspart dem Nutzer ein 400, das sich sonst nicht von einem toten Token
@@ -48,7 +48,8 @@ export async function render(container) {
           <div class="form-group" id="join-password-group">
             <label class="label" for="join-password">${esc(t('join.passwordLabel'))}</label>
             <input class="input" type="password" id="join-password" name="password"
-              autocomplete="new-password" required />
+              autocomplete="new-password" minlength="8" aria-describedby="join-password-rule" required />
+            ${passwordRuleHtml('join-password-rule', t('common.passwordMinLength'))}
           </div>
           <div class="form-group" id="join-confirm-group">
             <label class="label" for="join-confirm">${esc(t('join.confirmLabel'))}</label>
@@ -142,14 +143,15 @@ export async function render(container) {
     const password = form.password.value;
     const confirm = form.confirm.value;
 
-    if (!username) { fail(t('join.usernameRequired')); return; }
-    if (!USERNAME_PATTERN.test(username)) { fail(t('join.usernameInvalid')); return; }
-    if (displayName.length > MAX_DISPLAY_NAME) { fail(t('join.displayNameTooLong')); return; }
+    // Jede Pruefung markiert das Feld, das sie meint (utils/auth-ui.js, flagField).
+    if (!username) { flagField(usernameEl, errorEl); fail(t('join.usernameRequired')); return; }
+    if (!USERNAME_PATTERN.test(username)) { flagField(usernameEl, errorEl); fail(t('join.usernameInvalid')); return; }
+    if (displayName.length > MAX_DISPLAY_NAME) { flagField(displayNameEl, errorEl); fail(t('join.displayNameTooLong')); return; }
     if (passwordRequired) {
       // Wie der Server (normalizePassword): auf macOS/Firefox kommen Umlaute als
       // NFD an und zählen roh doppelt, nach NFC bleibt weniger übrig (#608).
-      if (password.normalize('NFC').length < 8) { fail(t('join.tooShort')); return; }
-      if (password !== confirm) { fail(t('join.mismatch')); return; }
+      if (password.normalize('NFC').length < 8) { flagField(form.password, errorEl); fail(t('join.tooShort')); return; }
+      if (password !== confirm) { flagField(form.confirm, errorEl); fail(t('join.mismatch')); return; }
     }
 
     btn.disabled = true;
@@ -164,6 +166,7 @@ export async function render(container) {
       setTimeout(() => window.yuvomi.navigate('/login'), 1500);
     } catch (err) {
       if (err?.status === 409) {
+        flagField(usernameEl, errorEl);
         fail(t('join.usernameTaken'));
         btn.disabled = false;
         return;

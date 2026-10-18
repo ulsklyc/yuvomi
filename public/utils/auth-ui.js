@@ -104,3 +104,40 @@ export function wirePasswordToggle(input, { show, hide }) {
   });
   return toggle;
 }
+
+/**
+ * DIE PASSWORTREGEL VOR DEM ERSTEN VERSUCH (Modern-Web-Guidance-Audit,
+ * Befund 15). Einrichtung, Einladung und Reset nannten "mindestens 8 Zeichen"
+ * erst als Fehler, nachdem man abgeschickt hatte. Der Hinweis steht unter dem
+ * neuen Passwort, das Feld zeigt per `aria-describedby` auf ihn.
+ *
+ * @param {string} id    die id, auf die das Feld zeigt
+ * @param {string} text  schon uebersetzt
+ */
+export function passwordRuleHtml(id, text) {
+  return `<p class="auth-form__hint" id="${esc(id)}">${esc(text)}</p>`;
+}
+
+/**
+ * DER FEHLER STEHT AM FELD, nicht nur im Fehlerfeld oben: `aria-invalid` und
+ * ein `aria-describedby` auf die Meldung (ein vorhandener Hinweis bleibt
+ * davor stehen). Die naechste Eingabe in diesem Feld nimmt beides zurueck.
+ *
+ * @param {HTMLElement|null} field
+ * @param {HTMLElement|null} errorEl  das Fehlerfeld aus `authErrorHtml()`
+ */
+export function flagField(field, errorEl) {
+  if (!field || !errorEl?.id) return;
+  field.setAttribute('aria-invalid', 'true');
+  const ids = (field.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean);
+  if (!ids.includes(errorEl.id)) field.setAttribute('aria-describedby', [...ids, errorEl.id].join(' '));
+  if (field._authFlagged) return;
+  field._authFlagged = true;
+  field.addEventListener('input', () => {
+    field._authFlagged = false;
+    field.removeAttribute('aria-invalid');
+    const rest = (field.getAttribute('aria-describedby') || '').split(/\s+/).filter((id) => id && id !== errorEl.id);
+    if (rest.length) field.setAttribute('aria-describedby', rest.join(' '));
+    else field.removeAttribute('aria-describedby');
+  }, { once: true });
+}
