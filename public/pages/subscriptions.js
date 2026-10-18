@@ -1340,7 +1340,12 @@ function wireCombobox(panel, id) {
       event.stopPropagation();
       selectFromKeyboard(visible[0]);
     }
-    if (event.key === 'Escape') close();
+    if (event.key === 'Escape' && !root.querySelector('.subscriptions-combobox__options').hidden) {
+      // Offene Liste: Esc schliesst nur sie. preventDefault sagt dem Modal
+      // (onEscape), dass das Esc verbraucht ist - sonst ginge das Formular mit.
+      event.preventDefault();
+      close();
+    }
   });
   options.forEach((option) => {
     option.addEventListener('pointerdown', (event) => {
@@ -1358,6 +1363,7 @@ function wireCombobox(panel, id) {
         visible[Math.max(0, Math.min(visible.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1)))]?.focus();
       }
       if (event.key === 'Escape') {
+        event.preventDefault();
         close();
         search.focus();
       }
@@ -1933,7 +1939,12 @@ function openLogoPickerModal(panel, initialQuery, onSelect) {
     close();
   });
   overlay.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') close();
+    if (event.key === 'Escape') {
+      // Esc meint den Picker, nicht das Abo-Formular darunter (onEscape in
+      // modal.js wertet preventDefault als "schon erledigt").
+      event.preventDefault();
+      close();
+    }
   });
   overlay.querySelector('#subscription-logo-picker-close').addEventListener('click', close);
   overlay.querySelector('#subscription-logo-search-form').addEventListener('submit', async (event) => {

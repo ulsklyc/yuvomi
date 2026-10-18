@@ -22164,3 +22164,21 @@ test('Zugangsdaten fremder Dienste bekommen kein Anmelde-Autofill', () => {
   }
   assert.deepEqual(offenders, [], 'Feld eines fremden Dienstes mit Anmelde-Autofill - autocomplete="off" setzen');
 });
+
+/* Esc gehoert der obersten Ebene. Das geteilte Modal schliesst bei Esc, solange
+ * kein Handler darunter `preventDefault()` gerufen hat (`onEscape` in
+ * components/modal.js). Die Combobox (Waehrung, Zyklus, Kategorie, Konto,
+ * Zahlungsart) und der Logo-Picker im Abo-Formular schlossen sich selbst, ohne
+ * das Ereignis zu verbrauchen: dasselbe Esc schloss danach das ganze Formular,
+ * ein unveraendertes sofort.
+ */
+test('Esc in Combobox und Logo-Picker des Abo-Formulars schliesst nur das Widget', () => {
+  const lines = read('../public/pages/subscriptions.js').split('\n');
+  const offenders = [];
+  lines.forEach((line, i) => {
+    if (!/event\.key === 'Escape'/.test(line)) return;
+    const branch = lines.slice(i, i + 4).join('\n');
+    if (!/event\.preventDefault\(\)/.test(branch)) offenders.push(`pages/subscriptions.js:${i + 1}`);
+  });
+  assert.deepEqual(offenders, [], 'Esc-Zweig ohne preventDefault - das Formular darunter schliesst mit');
+});
