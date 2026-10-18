@@ -21,6 +21,7 @@ import { withBusy } from '/utils/ux.js';
 import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { loadFamilyUsers } from '/settings/family-users.js';
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 // Seit R10 ein Abschnitt im Blatt Kalender (registry.js). Neu laden heisst,
 // das Blatt an dieser Stelle neu zu zeichnen - nicht ueber die Alt-Adresse,
@@ -531,7 +532,7 @@ function renderCalDAVAccount(container, account, calendars, refresh, user) {
     try {
       await api.post('/calendar/caldav/sync');
       showToast(t('settings.caldavSyncSuccess'), 'success');
-      await refresh();
+      await reloadAfterSave(() => refresh());
     } catch (err) {
       showToast(err.message || t('settings.caldavSyncFailed'), 'danger');
       syncBtn.disabled = false;
@@ -758,7 +759,7 @@ function bindCalDAVAddButton(container, user) {
             });
             closeModal({ force: true });
             showToast(t('settings.caldavAccountAdded'), 'success');
-            await loadCalDAVAccounts(container, user);
+            await reloadAfterSave(() => loadCalDAVAccounts(container, user));
             refocusAfterRender();
           } catch (err) {
             errorEl.textContent = err.message || t('common.errorGeneric');
@@ -1324,7 +1325,7 @@ function buildOutlookAccountCard(account, refresh, user) {
     try {
       await api.post('/calendar/outlook/sync');
       showToast(t('settings.syncSuccess', { provider: 'Outlook' }), 'success');
-      await refresh();
+      await reloadAfterSave(() => refresh());
     } catch (err) {
       showToast(err.message || t('common.errorGeneric'), 'danger');
       syncBtn.disabled = false;

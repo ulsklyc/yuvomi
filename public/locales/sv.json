@@ -97,7 +97,8 @@
         "searchNoResultsDescription": "Inget matchar din sökning.",
         "searchNoResultsFilteredDescription": "Inget matchar din sökning och dina filter.",
         "searchReset": "Återställ sökning",
-        "passwordMinLength": "Minst 8 tecken."
+        "passwordMinLength": "Minst 8 tecken.",
+        "savedReloadFailed": "Ändringen är sparad, men vyn kunde inte uppdateras. Läs in sidan igen om något saknas."
     },
     "kitchen": {
         "noShoppingLists": "Det finns ingen inköpslista än.",
@@ -4915,8 +4916,7 @@
                 "earlyConfirm": "Registrera dosen innan minsta intervall har gått?",
                 "earlyDetail": "Nästa dos är inte planerad förrän {{time}} ({{remaining}}).",
                 "earlyConfirmAction": "Registrera ändå"
-            },
-            "stockUpdateFailed": "Dosen registrerades, men lagret kunde inte uppdateras."
+            }
         },
         "prevention": {
             "title": "Förebyggande vård & vaccinationer",

@@ -100,7 +100,8 @@
         "searchNoResultsDescription": "لا شيء يطابق بحثك.",
         "searchNoResultsFilteredDescription": "لا شيء يطابق بحثك وعوامل التصفية.",
         "searchReset": "إعادة تعيين البحث",
-        "passwordMinLength": "8 أحرف على الأقل."
+        "passwordMinLength": "8 أحرف على الأقل.",
+        "savedReloadFailed": "تم حفظ التغيير، لكن تعذّر تحديث العرض. أعد تحميل الصفحة إذا كان هناك شيء مفقود."
     },
     "kitchen": {
         "noShoppingLists": "لا توجد قائمة مشتريات بعد.",
@@ -5285,8 +5286,7 @@
                 "earlyConfirm": "هل تُسجَّل الجرعة قبل انقضاء الفاصل الأدنى؟",
                 "earlyDetail": "الجرعة التالية مقررة ابتداءً من {{time}} فقط ({{remaining}}).",
                 "earlyConfirmAction": "سجّل على أي حال"
-            },
-            "stockUpdateFailed": "تم تسجيل الجرعة، لكن تعذّر تحديث المخزون."
+            }
         },
         "prevention": {
             "title": "الوقاية واللقاحات",

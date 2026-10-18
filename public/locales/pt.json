@@ -97,7 +97,8 @@
         "searchNoResultsDescription": "Nada corresponde à sua pesquisa.",
         "searchNoResultsFilteredDescription": "Nada corresponde à sua pesquisa e aos filtros.",
         "searchReset": "Repor pesquisa",
-        "passwordMinLength": "Pelo menos 8 caracteres."
+        "passwordMinLength": "Pelo menos 8 caracteres.",
+        "savedReloadFailed": "A alteração foi guardada, mas não foi possível atualizar a vista. Recarregue a página se faltar alguma coisa."
     },
     "kitchen": {
         "noShoppingLists": "Ainda não existe lista de compras.",
@@ -4915,8 +4916,7 @@
                 "earlyConfirm": "Registrar a dose antes de terminar o intervalo mínimo?",
                 "earlyDetail": "A próxima dose só está prevista a partir das {{time}} ({{remaining}}).",
                 "earlyConfirmAction": "Registrar mesmo assim"
-            },
-            "stockUpdateFailed": "A dose foi registrada, mas o estoque não pôde ser atualizado."
+            }
         },
         "prevention": {
             "title": "Prevenção e vacinas",

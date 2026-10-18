@@ -97,7 +97,8 @@
         "searchNoResultsDescription": "आपकी खोज से कुछ भी मेल नहीं खाता।",
         "searchNoResultsFilteredDescription": "आपकी खोज और फ़िल्टर से कुछ भी मेल नहीं खाता।",
         "searchReset": "खोज रीसेट करें",
-        "passwordMinLength": "कम से कम 8 अक्षर।"
+        "passwordMinLength": "कम से कम 8 अक्षर।",
+        "savedReloadFailed": "बदलाव सहेज लिया गया है, लेकिन दृश्य रीफ़्रेश नहीं हो सका। कुछ छूट गया हो तो पेज दोबारा लोड करें।"
     },
     "kitchen": {
         "noShoppingLists": "अभी कोई खरीद सूची नहीं है.",
@@ -4915,8 +4916,7 @@
                 "earlyConfirm": "न्यूनतम अंतराल पूरा होने से पहले खुराक दर्ज करें?",
                 "earlyDetail": "अगली खुराक {{time}} से ही तय है ({{remaining}}).",
                 "earlyConfirmAction": "फिर भी दर्ज करें"
-            },
-            "stockUpdateFailed": "खुराक दर्ज हो गई, लेकिन स्टॉक अपडेट नहीं हो सका."
+            }
         },
         "prevention": {
             "title": "निवारण और टीकाकरण",

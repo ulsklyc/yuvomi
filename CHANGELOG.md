@@ -36,6 +36,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Saving no longer counts as failed when only the refresh afterwards fails.** Many dialogs
+  reloaded their list in the same step as the save. When the save went through but the reload hit
+  a network blip or a busy server, the dialog stayed open with a "could not save" message, and
+  saving again created the entry a second time. Now the dialog closes once the save went through,
+  and a failed refresh says so in its own notice. This covers pantry, budget, inventory, meals,
+  tasks, health, housekeeping, waste, rewards, documents, schedule, calendar and several settings
+  pages.
+- **Logging a dose counts down the stock in the same step.** Taking a planned or as-needed dose
+  used to log it and then update the stock in a second request; when the second one failed, the
+  dose was logged but the stock stayed where it was. The server now does both together, from the
+  stored stock. **API:** `POST /api/v1/health/medications/{id}/logs` and
+  `POST /api/v1/health/logs/{id}/take` accept `stock_deduct`.
 - **On the overview, the people of an event sit at the end of its line in right-to-left
   languages.** In Arabic and Persian they sat right after the event's title instead. Left-to-right
   layouts are unchanged.

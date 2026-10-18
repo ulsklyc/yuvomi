@@ -97,7 +97,8 @@
         "searchNoResultsDescription": "Nichts passt zu deiner Suche.",
         "searchNoResultsFilteredDescription": "Nichts passt zu deiner Suche und den Filtern.",
         "searchReset": "Suche zurücksetzen",
-        "passwordMinLength": "Mindestens 8 Zeichen."
+        "passwordMinLength": "Mindestens 8 Zeichen.",
+        "savedReloadFailed": "Die Änderung ist gespeichert, aber die Ansicht konnte nicht aktualisiert werden. Lade die Seite neu, falls etwas fehlt."
     },
     "kitchen": {
         "noShoppingLists": "Es gibt noch keine Einkaufsliste.",
@@ -4915,8 +4916,7 @@
                 "earlyConfirm": "Dosis vor Ablauf des Mindestabstands eintragen?",
                 "earlyDetail": "Die nächste Dosis ist erst ab {{time}} vorgesehen ({{remaining}}).",
                 "earlyConfirmAction": "Trotzdem eintragen"
-            },
-            "stockUpdateFailed": "Die Dosis ist eingetragen, der Bestand konnte aber nicht angepasst werden."
+            }
         },
         "prevention": {
             "title": "Vorsorge & Impfungen",

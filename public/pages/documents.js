@@ -74,6 +74,7 @@ import {
   handleFolderDeleteFailure,
   scheduleFolderDeleteWithUndo,
 } from '/utils/document-folder-delete.js';
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 // Warum Teilen fuer ein Dokument nicht geht - je Antwort von fileShareSupport()
 // genau EIN Satz, der die zutreffende Ursache nennt (Re-Critique 2026-09-25).
@@ -1619,7 +1620,7 @@ async function moveFolder(folder) {
     // scheinbar - er sitzt dann in einem zugeklappten Zweig.
     if (chosen !== '') state.expanded.add(Number(chosen));
     persistExpandedFolders();
-    await Promise.all([loadFolders(), loadDocuments()]);
+    await reloadAfterSave(() => Promise.all([loadFolders(), loadDocuments()]));
     if (!stillShown(owner)) return;
     renderAll();
     refocusAfterRender();
@@ -1679,7 +1680,7 @@ async function renameFolder(folder) {
     window.yuvomi?.showToast(t('documents.folderRenamedToast'), 'success');
     // Dokumente mitladen: `folder_name` steckt im Server-Join und stünde sonst
     // auf den Karten weiter mit dem alten Namen.
-    await Promise.all([loadFolders(), loadDocuments()]);
+    await reloadAfterSave(() => Promise.all([loadFolders(), loadDocuments()]));
     if (!stillShown(owner)) return;
     renderAll();
     refocusAfterRender();
@@ -2288,7 +2289,7 @@ async function runDocumentAction(action, doc) {
     try {
       await api.patch(`/documents/${doc.id}/archive`, { archived: doc.status !== 'archived' });
       window.yuvomi?.showToast(doc.status === 'archived' ? t('documents.restoredToast') : t('documents.archivedToast'), 'success');
-      await loadDocuments();
+      await reloadAfterSave(() => loadDocuments());
       if (!stillShown(owner)) return;
       renderAll({ motion: true });
     } catch (err) {
@@ -3364,7 +3365,7 @@ async function saveDocument(event, doc, panel) {
     // Nur DIESEN Dialog: hat der Nutzer ihn waehrend des Speicherns geschlossen
     // und einen anderen geoeffnet, bleibt der andere samt Eingaben offen (#1997).
     closeModal({ force: true, context: modalContext });
-    await loadDocuments();
+    await reloadAfterSave(() => loadDocuments());
     if (!stillShown(owner)) return;
     renderAll({ motion: true });
     refocusAfterRender();
@@ -3452,8 +3453,8 @@ function openFolderModal({ parentId = null } = {}) {
           // Den neuen Ordner waehlt nur die Seite, die ihn angelegt hat: nach
           // "verlassen und zurueck" gehoert die Auswahl der neuen Seite (#2005).
           if (stillShown(owner)) state.folderId = String(res.data?.id || '');
-          await loadFolders();
-          await loadDocuments();
+          await reloadAfterSave(() => loadFolders());
+          await reloadAfterSave(() => loadDocuments());
           // Nur diesen Dialog, nie einen inzwischen geoeffneten anderen (#1997).
           closeModal({ force: true, context: modalContext });
           if (!stillShown(owner)) return;
@@ -3736,7 +3737,7 @@ async function linkDmsDocument(item, accountId) {
     });
     // Nur den Verknuepfen-Dialog, nie einen inzwischen geoeffneten anderen (#1997).
     closeModal({ force: true, context: modalContext });
-    await loadDocuments();
+    await reloadAfterSave(() => loadDocuments());
     if (!stillShown(owner)) return true;
     renderAll({ motion: true });
     refocusAfterRender();

@@ -12,6 +12,7 @@ import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import { amountPlaceholder, amountStep, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
 import { isNavModuleReadOnly } from '/permissions.js';
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 const view = { month: '', data: null, error: false, ctx: null, root: null };
 
@@ -359,7 +360,7 @@ async function savePlan(panel, category, original = null) {
     await api.put(`/budget/plans/${encodeURIComponent(category)}`, { amount });
     vibrate(10);
     closeModal({ force: true });
-    await load();
+    await reloadAfterSave(() => load());
     refocusAfterRender();
     window.yuvomi?.showToast(t('budget.planSavedToast'), 'success');
   } catch (err) {
@@ -388,7 +389,7 @@ async function deletePlan(category) {
       if (previous == null) return;
       try {
         await api.put(`/budget/plans/${encodeURIComponent(category)}`, { amount: previous });
-        await load();
+        await reloadAfterSave(() => load());
         refocusAfterRender();
       } catch (err) {
         console.error('[Budget] plan restore error:', err);

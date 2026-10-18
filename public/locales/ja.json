@@ -97,7 +97,8 @@
         "searchNoResultsDescription": "検索に一致する項目はありません。",
         "searchNoResultsFilteredDescription": "検索とフィルターに一致する項目はありません。",
         "searchReset": "検索をリセット",
-        "passwordMinLength": "8文字以上。"
+        "passwordMinLength": "8文字以上。",
+        "savedReloadFailed": "変更は保存されましたが、表示を更新できませんでした。足りないものがあればページを再読み込みしてください。"
     },
     "kitchen": {
         "noShoppingLists": "買い物リストがまだありません。",
@@ -4915,8 +4916,7 @@
                 "earlyConfirm": "最短間隔が過ぎる前に記録しますか？",
                 "earlyDetail": "次の服用は {{time}} 以降の予定です（{{remaining}}）。",
                 "earlyConfirmAction": "それでも記録"
-            },
-            "stockUpdateFailed": "服用は記録しましたが、在庫を更新できませんでした。"
+            }
         },
         "prevention": {
             "title": "予防接種・健診管理",

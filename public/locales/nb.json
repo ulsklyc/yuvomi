@@ -97,7 +97,8 @@
         "searchNoResultsDescription": "Ingenting passer til søket ditt.",
         "searchNoResultsFilteredDescription": "Ingenting passer til søket og filtrene dine.",
         "searchReset": "Tilbakestill søk",
-        "passwordMinLength": "Minst 8 tegn."
+        "passwordMinLength": "Minst 8 tegn.",
+        "savedReloadFailed": "Endringen er lagret, men visningen kunne ikke oppdateres. Last inn siden på nytt hvis noe mangler."
     },
     "kitchen": {
         "noShoppingLists": "Det finnes ingen handleliste ennå.",
@@ -4915,8 +4916,7 @@
                 "earlyConfirm": "Loggfør denne dosen før minimumsintervallet er passert?",
                 "earlyDetail": "Neste dose er ikke klar før {{time}} ({{remaining}}).",
                 "earlyConfirmAction": "Loggfør likevel"
-            },
-            "stockUpdateFailed": "Dosen ble loggført, men lagerbeholdningen kunne ikke oppdateres."
+            }
         },
         "prevention": {
             "title": "Forebyggende behandling og vaksiner",

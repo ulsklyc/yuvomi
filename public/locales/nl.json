@@ -97,7 +97,8 @@
         "searchNoResultsDescription": "Niets komt overeen met je zoekopdracht.",
         "searchNoResultsFilteredDescription": "Niets komt overeen met je zoekopdracht en filters.",
         "searchReset": "Zoekopdracht wissen",
-        "passwordMinLength": "Minstens 8 tekens."
+        "passwordMinLength": "Minstens 8 tekens.",
+        "savedReloadFailed": "Je wijziging is opgeslagen, maar de weergave kon niet worden vernieuwd. Herlaad de pagina als er iets ontbreekt."
     },
     "kitchen": {
         "noShoppingLists": "Er is nog geen boodschappenlijst.",
@@ -4915,8 +4916,7 @@
                 "earlyConfirm": "Dosis vastleggen voordat de minimale tussentijd voorbij is?",
                 "earlyDetail": "De volgende dosis is pas vanaf {{time}} voorzien ({{remaining}}).",
                 "earlyConfirmAction": "Toch vastleggen"
-            },
-            "stockUpdateFailed": "De dosis is vastgelegd, maar de voorraad kon niet worden bijgewerkt."
+            }
         },
         "prevention": {
             "title": "Preventie & vaccinaties",

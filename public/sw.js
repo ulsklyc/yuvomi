@@ -253,6 +253,7 @@ const APP_SHELL = [
   '/utils/toast-placement.js',
   '/utils/toast-show.js',
   '/utils/toast-surface.js',
+  '/utils/reload-after-save.js',
   '/utils/background-inert.js',
   '/utils/today-sheet.js',
   '/utils/unknown-route.js',

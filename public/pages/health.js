@@ -71,6 +71,7 @@ import { emptyStateHTML, emptyHintHTML, mountLoadError } from '/utils/empty-stat
 import { errorSentence, isGone } from '/utils/friendly-error.js';
 import { intervalMonthsToInput, intervalInputToMonths } from '/utils/health-prevention.js';
 import { NUTRIENTS, MEAL_TYPES, nutrientProgress } from '/utils/health-nutrition.js';
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 let _container = null;
 
@@ -2436,7 +2437,7 @@ function openVitalModal(opts = {}) {
           }
           closeModal({ force: true });
           window.yuvomi?.showToast(t('health.vitals.saved'), 'success');
-          await reloadAfterSave(body.type);
+          await reloadVitalsAfterSave(body.type);
           await opts.onSaved?.();
           refocusAfterRender();
         } catch (err) {
@@ -2648,7 +2649,7 @@ async function reloadVitals() {
   renderVitalsShell();
 }
 
-async function reloadAfterSave(savedType) {
+async function reloadVitalsAfterSave(savedType) {
   vitals.selectedType = savedType;
   vitals.anchor = todayKey();
   try {
@@ -3211,7 +3212,10 @@ async function handlePrnDose(btn) {
       // wuerfe die Zone weg - die Einnahme stuende dann mit der UTC-Zahl im
       // Protokoll und der Countdown rechnete daneben.
       taken_at: toLocalStamp(),
-      ...(dose != null && Number.isFinite(dose) ? { dose_qty: dose } : {}),
+      // Der Bestandsabzug faehrt in derselben Anfrage mit (#2069): der Server
+      // bucht Dosis und Abzug in einer Transaktion und rechnet vom gespeicherten
+      // Bestand aus. Ohne erfassten Bestand bleibt dort alles beim Alten.
+      ...(dose != null && Number.isFinite(dose) ? { dose_qty: dose, stock_deduct: dose } : {}),
     });
   } catch (err) {
     console.error('[Health] prn dose error:', err);
@@ -3220,26 +3224,9 @@ async function handlePrnDose(btn) {
     return;
   }
 
-  // AB HIER IST DIE DOSIS GEBUCHT. Der Bestandsabzug ist ein zweiter Aufruf,
-  // und wenn er scheitert, darf das nicht als „Buchung fehlgeschlagen" dastehen:
-  // wer es dann noch einmal versucht, hat die Dosis zweimal im Protokoll. Der
-  // Bestand ist eine Nebenbuchhaltung, die Dosis die Aussage ueber den Koerper.
-  //
   // Der Abzug wird beim Zuruecknehmen NICHT gutgeschrieben - so haelt es die
   // geplante Dosis seit jeher (#701 korrigiert den Eintrag, nicht den Bestand).
-  // Das ist eine bekannte Grenze und keine Eigenheit der Bedarfsdosis; sie
-  // aufzuheben hiesse, jede Korrektur serverseitig gegenzubuchen, und das gehoert
-  // in einen eigenen Schritt statt in diesen.
-  if (dose != null && Number.isFinite(dose) && med.stock_qty != null) {
-    try {
-      const next = Math.max(0, Number(med.stock_qty) - dose);
-      await api.patch(`/health/medications/${medId}`, { stock_qty: next });
-    } catch (err) {
-      console.error('[Health] prn stock error:', err);
-      window.yuvomi?.showToast(t('health.meds.stockUpdateFailed'), 'danger');
-    }
-  }
-
+  // Das ist eine bekannte Grenze und keine Eigenheit der Bedarfsdosis.
   window.yuvomi?.showToast(t('health.meds.doseSaved'), 'success');
   // Erst nach dem Neuzeichnen freigeben: bis dahin darf kein Zwilling scharf
   // sein. Freigegeben wird ueber `setDoseBusy` und nicht ueber das Set allein -
@@ -3495,7 +3482,7 @@ function openMedLogModal(logId) {
           await api.patch(`/health/logs/${entry.id}`, body);
           closeModal({ force: true });
           window.yuvomi?.showToast(t('health.meds.log.saved'), 'success');
-          await reloadMedViews();
+          await reloadAfterSave(() => reloadMedViews());
           refocusAfterRender();
         } catch (err) {
           console.error('[Health] med log save error:', err);
@@ -3636,8 +3623,12 @@ async function handleDose(btn, action) {
 
   setDoseBusy(medId, true);
   try {
+    // Dosis und Bestandsabzug sind EINE Anfrage (#2069): der Server bucht beides
+    // in einer Transaktion. Vorher folgte ein zweites PATCH stock_qty, und
+    // scheiterte es, stand die Dosis gebucht und der Bestand nicht gezaehlt.
+    const deduct = action === 'take' && dose != null && Number.isFinite(dose) ? { stock_deduct: dose } : {};
     if (logId) {
-      await api.post(`/health/logs/${logId}/${action}`, {});
+      await api.post(`/health/logs/${logId}/${action}`, deduct);
     } else {
       const body = { status: action === 'take' ? 'taken' : 'skipped' };
       if (scheduledAt) body.scheduled_at = scheduledAt;
@@ -3648,22 +3639,13 @@ async function handleDose(btn, action) {
       // war das im Protokoll; seit ein Medikament Plan UND Bedarf haben kann,
       // rechnet auch der Countdown daraus - und zwar zwei Stunden daneben.
       if (action === 'take') body.taken_at = toLocalStamp();
-      await api.post(`/health/medications/${medId}/logs`, body);
-    }
-
-    // Bestand runterzählen bei „genommen" (nur wenn Bestand erfasst + Dosis bekannt).
-    if (action === 'take' && dose != null && Number.isFinite(dose)) {
-      const med = meds.list.find((m) => m.id === medId);
-      if (med && med.stock_qty != null) {
-        const next = Math.max(0, Number(med.stock_qty) - dose);
-        await api.patch(`/health/medications/${medId}`, { stock_qty: next });
-      }
+      await api.post(`/health/medications/${medId}/logs`, { ...body, ...deduct });
     }
 
     window.yuvomi?.showToast(t('health.meds.doseSaved'), 'success');
     // Beide Tabs, nicht nur dieser: ein Medikament kann Plan UND Bedarf haben,
     // und dann verschiebt auch die geplante Dosis den Countdown drueben.
-    await reloadMedViews();
+    await reloadAfterSave(() => reloadMedViews());
     setDoseBusy(medId, false);
   } catch (err) {
     console.error('[Health] dose error:', err);
@@ -3839,7 +3821,7 @@ function openMedModal(med) {
           }
           closeModal({ force: true });
           window.yuvomi?.showToast(t('health.meds.saved'), 'success');
-          await reloadMedViews();
+          await reloadAfterSave(() => reloadMedViews());
           refocusAfterRender();
         } catch (err) {
           console.error('[Health] med save error:', err);
@@ -4562,7 +4544,7 @@ function openLabModal(report) {
           }
           closeModal({ force: true });
           window.yuvomi?.showToast(t('health.labs.saved'), 'success');
-          await reloadLabs();
+          await reloadAfterSave(() => reloadLabs());
           refocusAfterRender();
         } catch (err) {
           console.error('[Health] lab save error:', err);
@@ -5267,7 +5249,7 @@ function openActivityModal(row, opts = {}) {
           }
           closeModal({ force: true });
           window.yuvomi?.showToast(t('health.activity.saved'), 'success');
-          await reloadActivity();
+          await reloadAfterSave(() => reloadActivity());
           await opts.onSaved?.();
           refocusAfterRender();
         } catch (err) {
@@ -5718,7 +5700,7 @@ function openPreventionModal(row) {
           }
           closeModal({ force: true });
           window.yuvomi?.showToast(t('health.prevention.saved'), 'success');
-          await reloadPrevention();
+          await reloadAfterSave(() => reloadPrevention());
           refocusAfterRender();
         } catch (err) {
           console.error('[Health] prevention save error:', err);
@@ -6138,7 +6120,7 @@ function openNutritionTargetModal() {
           await api.put('/health/nutrition/targets', { ...values, ...ownerField(nutrition.personId, nutrition.meId) });
           closeModal({ force: true });
           window.yuvomi?.showToast(t('health.nutrition.targetSaved'), 'success');
-          await reloadNutrition();
+          await reloadAfterSave(() => reloadNutrition());
           refocusAfterRender();
         } catch (err) {
           console.error('[Health] nutrition target save error:', err);
@@ -6231,7 +6213,7 @@ function openNutritionModal(row) {
           }
           closeModal({ force: true });
           window.yuvomi?.showToast(t('health.nutrition.saved'), 'success');
-          await reloadNutrition();
+          await reloadAfterSave(() => reloadNutrition());
           refocusAfterRender();
         } catch (err) {
           console.error('[Health] nutrition save error:', err);
@@ -6720,8 +6702,12 @@ async function handleOverviewDose(btn, action) {
 
   setDoseBusy(medId, true);
   try {
+    // Dosis und Bestandsabzug sind EINE Anfrage (#2069): der Server bucht beides
+    // in einer Transaktion. Vorher folgte ein zweites PATCH stock_qty, und
+    // scheiterte es, stand die Dosis gebucht und der Bestand nicht gezaehlt.
+    const deduct = action === 'take' && dose != null && Number.isFinite(dose) ? { stock_deduct: dose } : {};
     if (logId) {
-      await api.post(`/health/logs/${logId}/${action}`, {});
+      await api.post(`/health/logs/${logId}/${action}`, deduct);
     } else {
       const body = { status: action === 'take' ? 'taken' : 'skipped' };
       if (scheduledAt) body.scheduled_at = scheduledAt;
@@ -6732,19 +6718,11 @@ async function handleOverviewDose(btn, action) {
       // war das im Protokoll; seit ein Medikament Plan UND Bedarf haben kann,
       // rechnet auch der Countdown daraus - und zwar zwei Stunden daneben.
       if (action === 'take') body.taken_at = toLocalStamp();
-      await api.post(`/health/medications/${medId}/logs`, body);
-    }
-
-    if (action === 'take' && dose != null && Number.isFinite(dose)) {
-      const med = overview.meds.find((m) => m.id === medId);
-      if (med && med.stock_qty != null) {
-        const next = Math.max(0, Number(med.stock_qty) - dose);
-        await api.patch(`/health/medications/${medId}`, { stock_qty: next });
-      }
+      await api.post(`/health/medications/${medId}/logs`, { ...body, ...deduct });
     }
 
     window.yuvomi?.showToast(t('health.meds.doseSaved'), 'success');
-    await reloadMedViews();
+    await reloadAfterSave(() => reloadMedViews());
     setDoseBusy(medId, false);
   } catch (err) {
     console.error('[Health] overview dose error:', err);
@@ -7813,7 +7791,7 @@ async function cycleStartPeriodToday() {
     await api.post('/health/cycle/periods', { start_date: today });
     cycle.anchor = today;
     window.yuvomi?.showToast(t('health.cycle.today.startedToast'), 'success');
-    await reloadCycle();
+    await reloadAfterSave(() => reloadCycle());
   } catch (err) {
     console.error('[Health] cycle start error:', err);
     reportError(err, 'health.cycle.saveError', reloadCycle, { fromDialog: false });
@@ -7827,7 +7805,7 @@ async function cycleEndPeriodToday() {
   try {
     await api.patch(`/health/cycle/periods/${open.id}`, { end_date: todayKey() });
     window.yuvomi?.showToast(t('health.cycle.today.endedToast'), 'success');
-    await reloadCycle();
+    await reloadAfterSave(() => reloadCycle());
   } catch (err) {
     console.error('[Health] cycle end error:', err);
     reportError(err, 'health.cycle.saveError', reloadCycle, { fromDialog: false });
@@ -8988,7 +8966,7 @@ function openPeriodModal(period) {
           else { await api.post('/health/cycle/periods', body); cycle.anchor = start; }
           closeModal({ force: true });
           window.yuvomi?.showToast(t('health.cycle.saved'), 'success');
-          await reloadCycle();
+          await reloadAfterSave(() => reloadCycle());
           refocusAfterRender();
         } catch (err) {
           console.error('[Health] cycle period save error:', err);
@@ -9080,7 +9058,7 @@ function openCycleImportModal() {
             t('health.cycle.import.resultToast', { imported: data.imported, skipped: data.skipped }),
             'success',
           );
-          await reloadCycle();
+          await reloadAfterSave(() => reloadCycle());
           refocusAfterRender();
         } catch (err) {
           submitBtn.disabled = false;
@@ -9386,7 +9364,7 @@ function openDayLogModal(dateKey) {
           await api.post('/health/cycle/logs', body);
           closeModal({ force: true });
           window.yuvomi?.showToast(t('health.cycle.saved'), 'success');
-          await reloadCycle();
+          await reloadAfterSave(() => reloadCycle());
           refocusAfterRender();
         } catch (err) {
           console.error('[Health] cycle log save error:', err);
@@ -9601,7 +9579,7 @@ function openCycleSettingsModal() {
           const count = (data?.periods || 0) + (data?.logs || 0);
           showBulk(false);
           window.yuvomi?.showToast(t('health.cycle.settings.applyToAllDone', { count }), 'success');
-          await reloadCycle();
+          await reloadAfterSave(() => reloadCycle());
         } catch (err) {
           console.error('[Health] cycle bulk visibility error:', err);
           reportError(err, 'health.cycle.saveError', reloadCycle);

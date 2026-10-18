@@ -19,6 +19,7 @@ import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
 
 /** Das Pflichtzeichen hinter einem Etikett - Markup, kein Text (aria-hidden). */
 import { renderSkeletonList } from '/utils/skeleton.js';
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 function formatSyncTime(value) {
   if (!value) return null;
@@ -253,7 +254,7 @@ function renderAccount(container, account, addressbooks, refresh, user) {
       try {
         await api.post(`/contacts/cardav/accounts/${account.id}/sync`);
         showToast(t('settings.cardavSyncSuccess'), 'success');
-        await refresh();
+        await reloadAfterSave(() => refresh());
       } catch (err) {
         showToast(err?.data?.errorCode ? errorMessage(err) : (err.message || t('settings.cardavSyncFailed')), 'danger');
       }
@@ -350,7 +351,7 @@ function renderAccount(container, account, addressbooks, refresh, user) {
     try {
       await api.post(`/contacts/cardav/accounts/${account.id}/addressbooks/refresh`);
       showToast(t('settings.addressbooksRefreshed'), 'success');
-      await refresh();
+      await reloadAfterSave(() => refresh());
     } catch (err) {
       showToast(errorMessage(err), 'danger');
     }

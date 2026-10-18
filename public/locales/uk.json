@@ -99,7 +99,8 @@
         "searchNoResultsDescription": "Нічого не відповідає вашому пошуку.",
         "searchNoResultsFilteredDescription": "Нічого не відповідає вашому пошуку та фільтрам.",
         "searchReset": "Скинути пошук",
-        "passwordMinLength": "Щонайменше 8 символів."
+        "passwordMinLength": "Щонайменше 8 символів.",
+        "savedReloadFailed": "Зміну збережено, але не вдалося оновити екран. Перезавантажте сторінку, якщо чогось бракує."
     },
     "kitchen": {
         "noShoppingLists": "Списку покупок ще немає.",
@@ -5161,8 +5162,7 @@
                 "earlyConfirm": "Записати дозу до завершення мінімального інтервалу?",
                 "earlyDetail": "Наступна доза передбачена лише з {{time}} ({{remaining}}).",
                 "earlyConfirmAction": "Усе одно записати"
-            },
-            "stockUpdateFailed": "Дозу записано, але запас не вдалося оновити."
+            }
         },
         "prevention": {
             "title": "Профілактика та щеплення",

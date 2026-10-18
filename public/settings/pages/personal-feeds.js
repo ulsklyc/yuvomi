@@ -44,6 +44,7 @@ import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { confirmModal } from '/components/modal.js';
 import { createInlineError, settingSwitchRowHtml, toggleRowHtml } from '/settings/components.js';
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 function showToast(message, tone = 'default') {
   window.yuvomi?.showToast(message, tone);
@@ -277,7 +278,7 @@ async function loadFeed(host, part) {
       } else {
         await api.delete(feed.path);
       }
-      await reload();
+      await reloadAfterSave(() => reload());
     } catch (err) {
       input.checked = !next;
       input.disabled = false;
@@ -299,7 +300,7 @@ async function loadFeed(host, part) {
     if (!await feed.confirmRegenerate()) return;
     try {
       await api.post(`${feed.path}/regenerate`);
-      await reload();
+      await reloadAfterSave(() => reload());
     } catch (err) {
       showToast(err.message || t('common.errorGeneric'), 'danger');
     }

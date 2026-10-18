@@ -9,6 +9,7 @@ import {
   createStatusSummary,
   settingRowHtml,
 } from '/settings/components.js';
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 function showToast(message, tone = 'default') {
   window.yuvomi?.showToast(message, tone);
@@ -80,7 +81,7 @@ function buildAddForm(container) {
       orgGroup.hidden = true;
       orgInput.required = false;
       showToast(t('settings.dmsConnected'), 'success');
-      await loadDmsAccounts(container);
+      await reloadAfterSave(() => loadDmsAccounts(container));
     } catch (err) {
       errorHost.replaceChildren(createInlineError(err.message ?? t('common.errorGeneric')));
     }
