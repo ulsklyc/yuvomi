@@ -22135,3 +22135,32 @@ test('!important-Sperrklinke: echte !important-Deklarationen in public/styles we
   assert.ok(found.length <= IMPORTANT_CEILING,
     `${found.length} echte !important statt hoechstens ${IMPORTANT_CEILING}. Neue Vorrangregel ueber Spezifitaet oder Quellreihenfolge loesen, nicht ueber !important:\n${found.join('\n')}`);
 });
+
+/* Zugangsdaten FREMDER Dienste (CalDAV, Apple, WebDAV, DMS, SMTP, Immich,
+ * Gotify, ntfy, Webhook) tragen autocomplete="off". `current-password` meint
+ * das Passwort DIESER Seite: der Passwortmanager bot dort das Yuvomi-Passwort
+ * an und fuellte es ein - beim Speichern ging es an den fremden Server.
+ * `new-password` schlug fuer API-Schluessel ein generiertes Passwort vor, und
+ * `username` hing das fremde Konto an den Yuvomi-Eintrag. Die Werte gehoeren nur
+ * dorthin, wo es um ein Yuvomi-Konto geht: Anmeldung, eigenes Konto, neues
+ * Familienmitglied, Gastkonto.
+ */
+test('Zugangsdaten fremder Dienste bekommen kein Anmelde-Autofill', () => {
+  const ownAccountForms = new Set([
+    'pages/login.js', 'pages/setup.js', 'pages/join.js', 'pages/reset-password.js',
+    'pages/forgot-password.js', 'pages/split-expenses.js',
+    'settings/pages/personal-account.js', 'settings/pages/admin-family.js',
+  ]);
+  const root = fileURLToPath(new URL('../public/', import.meta.url));
+  const offenders = [];
+  for (const dir of ['pages', 'settings/pages', 'settings', 'components']) {
+    for (const name of readdirSync(root + dir)) {
+      const rel = `${dir}/${name}`;
+      if (!name.endsWith('.js') || ownAccountForms.has(rel)) continue;
+      read(`../public/${rel}`).split('\n').forEach((line, i) => {
+        if (/autocomplete="(?:current-password|new-password|username)"/.test(line)) offenders.push(`${rel}:${i + 1}`);
+      });
+    }
+  }
+  assert.deepEqual(offenders, [], 'Feld eines fremden Dienstes mit Anmelde-Autofill - autocomplete="off" setzen');
+});

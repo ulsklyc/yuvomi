@@ -129,7 +129,7 @@ export async function render(container, { user } = {}) {
             label: t('email.password'), labelFor: 'email-pass',
             description: t('email.passwordKeep'),
             descriptionId: 'email-pass-hint',
-            control: `<input class="form-input" id="email-pass" name="pass" type="password" autocomplete="new-password" aria-describedby="email-pass-hint" placeholder="${cfg.passwordSet ? '••••••••' : ''}" />`,
+            control: `<input class="form-input" id="email-pass" name="pass" type="password" autocomplete="off" aria-describedby="email-pass-hint" placeholder="${cfg.passwordSet ? '••••••••' : ''}" />`,
             extra: `<p class="form-hint" data-env-hint="pass" hidden>${esc(t('settings.documentStorageEnvHint'))}</p>`,
           })}
           ${settingRowHtml({
