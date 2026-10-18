@@ -26,6 +26,18 @@ export { esc };
 export const REQUIRED_MARK = '<span class="required-marker" aria-hidden="true"> *</span>';
 
 /**
+ * Linkziel fuer eine Adresse aus fremder Hand (vCard-Website, Rezept-URL):
+ * nur http(s), sonst ''. `esc()` schuetzt das Attribut, nicht das Schema -
+ * ein `javascript:` bliebe ein klickbarer Link.
+ * @param {unknown} value
+ * @returns {string} die Adresse oder '' (dann kein Link)
+ */
+export function externalHref(value) {
+  const url = String(value ?? '').trim();
+  return /^https?:\/\/\S/i.test(url) ? url : '';
+}
+
+/**
  * Normalisiert einen iCalendar LOCATION-String fuer die Anzeige.
  * Entfernt ICS-Backslash-Escapes (RFC 5545 §3.3.11) und fasst
  * mehrzeilige Adressen zu einem einzeiligen String zusammen.
