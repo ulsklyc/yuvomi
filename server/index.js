@@ -643,11 +643,15 @@ app.use('/api/v1', (req, res, next) => {
 app.use('/api/v1', (req, res, next) => {
   if (req.authScopes == null) return next();
   // DAS PROFILBILD EINER PERSON IST KEIN MODUL (routes/people.js). Ein Display
-  // und ein Token bekommen seine Adresse in den Zeilen, die sie lesen duerfen
-  // (Aufgaben, Termine, Uebersicht); haengte das Bild an einem Modul, stuende
-  // an der Wand neben jedem Termin ein kaputtes Bild. Nur GET, nur dieser Pfad.
-  // Ein Ausgaben-Gast ist am Gate davor schon abgewiesen.
-  if (isPersonAvatarRead(req.method, req.path)) return next();
+  // bekommt seine Adresse in den Zeilen, die es lesen darf (Aufgaben, Termine,
+  // Uebersicht); haengte das Bild an einem Modul, stuende an der Wand neben
+  // jedem Termin ein kaputtes Bild. NUR FUER DAS DISPLAY: ein Token bekommt die
+  // Bilder als Data-URL in den Zeilen selbst (`inlineAvatarUrls` unten) und
+  // braucht die Route nicht - fuer jedes Token offen, holte eines mit
+  // `weather:read` per Durchzaehlen der ids jedes Profilbild (Codex-Review zu
+  // #2056). Nur GET, nur dieser Pfad. Ein Ausgaben-Gast ist am Gate davor
+  // schon abgewiesen.
+  if (req.authMethod === 'display' && isPersonAvatarRead(req.method, req.path)) return next();
   // Ein gekoppeltes Display darf zusaetzlich zu seinen Modulen eine Handvoll
   // Geruestpfade LESEN (display-scopes.js, `DISPLAY_READ_PATHS`): die eigene
   // Zeile, die Darstellungseinstellungen, die Modulliste, die Personen fuer

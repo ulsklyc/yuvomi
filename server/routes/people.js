@@ -5,12 +5,13 @@
  *        (services/person-avatar.js).
  * Abhaengigkeiten: express, server/db.js, services/person-avatar.js, logger
  *
- * WER ES LESEN DARF: jedes angemeldete Konto ausser einem Ausgaben-Gast - eine
- * Sitzung, ein Wanddisplay, ein Token. Sie alle bekommen die Adresse in den
- * Zeilen, die sie lesen duerfen (Aufgaben, Termine, Notizen, Uebersicht), und
- * das Bild zeigt nur das Gesicht, das dort ohnehin daneben stand. Das Gast-Gate
- * in server/index.js laesst einen Gast nur an die geteilten Ausgaben; die
- * Gate-Ausnahme fuer Scopes steht dort an `isPersonAvatarRead()`.
+ * WER ES LESEN DARF: wer die Adresse in seinen Zeilen bekommt - eine Sitzung
+ * und ein Wanddisplay (Aufgaben, Termine, Notizen, Uebersicht); das Bild zeigt
+ * nur das Gesicht, das dort ohnehin daneben stand. Ein API-Token bekommt statt
+ * der Adresse die Data-URL (`inlineAvatarUrls`) und mit Scopes keinen Zugang
+ * zur Route; die Ausnahme im Scope-Gate in server/index.js gilt nur dem
+ * Display. Das Gast-Gate laesst einen Ausgaben-Gast nur an die geteilten
+ * Ausgaben.
  */
 
 import express from 'express';

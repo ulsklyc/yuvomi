@@ -13,9 +13,9 @@
  *        ueber die Leitung, und der Service Worker legte die 17 MB in seinen
  *        API-Cache.
  *
- *        WER DAS BILD LESEN DARF: jedes angemeldete Konto ausser einem
- *        Ausgaben-Gast - auch ein Wanddisplay und ein gescoptes Token, denn sie
- *        bekommen die Adresse in genau den Zeilen, die sie lesen duerfen.
+ *        WER DAS BILD LESEN DARF: wer die Adresse bekommt - eine Sitzung und ein
+ *        Wanddisplay. Ein API-Token bekommt die Data-URL und mit Scopes keinen
+ *        Zugang zur Route; ein Ausgaben-Gast keinen.
  * Ausfuehren: npm run test:person-avatars
  */
 import { test } from 'node:test';
@@ -228,13 +228,17 @@ test('ein gekoppeltes Wanddisplay darf Bilder lesen', async () => {
   assert.equal(res.status, 200, 'die Wand zeigt Aufgaben und Termine samt Personen');
 });
 
-test('ein gescoptes API-Token darf Bilder lesen', async () => {
+test('ein gescoptes API-Token bekommt Data-URLs und liest die Bildroute nicht', async () => {
   const spoof = `/api/v1/people/${BOB}/avatar?v=0`;
   assert.equal((await admin('POST', '/tasks', { title: spoof })).status, 201);
   const created = await admin('POST', '/auth/api-tokens', { name: 'Nur Aufgaben', scopes: ['tasks:read'] });
   assert.equal(created.status, 201, created.text);
+  // KEIN ZUGRIFF AUF DIE ROUTE (Codex-Review zu #2056): ein Token bekommt die
+  // Bilder als Data-URL in den Zeilen, die es lesen darf, und braucht die Route
+  // nicht. Liesse das Scope-Gate sie fuer jedes Token durch, holte eines mit
+  // `weather:read` per Durchzaehlen der ids jedes Profilbild.
   const res = await fetch(`${BASE}/api/v1/people/${BOB}/avatar`, { headers: { Authorization: `Bearer ${created.body.token}` } });
-  assert.equal(res.status, 200, 'die Adresse steht in den Aufgaben, die das Token lesen darf');
+  assert.equal(res.status, 403, 'ein Token mit Scopes liest die Bildroute nicht');
   const tasks = await fetch(`${BASE}/api/v1/tasks`, { headers: { Authorization: `Bearer ${created.body.token}` } });
   assert.equal(tasks.status, 200, 'Gegenprobe: das Token liest Aufgaben');
   // EIN TOKEN BEKOMMT DIE DATA-URL WIE BISHER (Codex-Review zu #2056): ein
