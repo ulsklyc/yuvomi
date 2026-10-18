@@ -36,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A new medication is saved together with its intake plan, or not at all.** If saving one of
+  the plan's times failed, the medication itself was already stored. Cancelling the dialog then
+  left it behind without its plan and without showing it in the list, so it was easy to add it a
+  second time. The medication and its plan are now saved in one step; if that fails, nothing is
+  stored and the dialog keeps everything you entered, so Save simply tries again (#2054).
+  **API:** `POST /api/v1/health/medications` accepts an optional `schedules` array and writes the
+  medication and its schedules in one transaction.
 - **Typing Japanese, Korean or Chinese no longer saves half a word.** In these languages Enter
   first confirms the character conversion. Dialogs, tag and mention fields, suggestion lists and
   the comboboxes used to act on that Enter and saved or picked the text while it was still being
