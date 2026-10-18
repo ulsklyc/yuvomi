@@ -415,6 +415,13 @@ If you publish a module, a few habits make it install cleanly:
 - **The folder name need not equal the `id`.** The installer names the folder on the server after the manifest; only a hand copy has to match.
 - **Tag releases.** A plain repository address installs the latest release, so a tag gives admins a defined version and a meaningful update. Without releases they get whatever the default branch holds at that moment.
 - **Ship built files.** Nothing is built or installed on the server: commit the JavaScript and CSS the browser loads, use only the file types listed under [What is copied](#what-is-copied), and stay inside the [archive limits](#archive-limits).
+- **Set the GitHub topic `yuvomi-module`** on the repository, so it shows up where people look for modules (see [Finding Modules](#finding-modules)).
+
+## Finding Modules
+
+Yuvomi keeps no index of modules, neither in this repository nor in the app. Authors mark their repository with the GitHub topic `yuvomi-module`, and [github.com/topics/yuvomi-module](https://github.com/topics/yuvomi-module) lists every repository that carries it. Once the community keeps a list of its own, it can be linked from here.
+
+Nothing found that way has been tested or is recommended by this project: every author sets the topic on their own repository, and anyone can. A module runs with the session of every member who opens it, so read **Trust first** under [Installing From Settings](#installing-from-settings) before installing one. Why there is no curated list, and what would change that, is in [docs/DECISIONS.md](docs/DECISIONS.md), entry 15.
 
 ## Compatibility Across Yuvomi Releases
 
