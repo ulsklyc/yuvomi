@@ -540,7 +540,7 @@ self.addEventListener('fetch', (event) => {
           // Im Bypass-Fenster (nach SW-Update) API-Requests nicht anfassen:
           // frisch ans Netz, weder aus Cache bedienen noch hineinschreiben.
           if (Date.now() < bypassCacheUntil) return fetch(request);
-          return networkFirstApi(request);
+          return networkFirstApi(request, event);
         })
       );
     }
@@ -762,7 +762,7 @@ async function precacheAvatars(baseUrl, text) {
 // Erfolg → Antwort klonen, x-cached-at-Header ergänzen, in API_CACHE legen.
 // Netzfehler → Cache-Fallback, sonst 503-JSON {error:'offline'}.
 // --------------------------------------------------------
-async function networkFirstApi(request) {
+async function networkFirstApi(request, event) {
   try {
     const response = await fetch(request);
     // Nur erfolgreiche, gleichoriginäre (basic) Antworten cachen.
@@ -779,9 +779,12 @@ async function networkFirstApi(request) {
       }));
       // Bilder, deren Adresse in der Liste steht, gleich mitnehmen - sonst
       // fehlt offline jedes, dessen Zeile nie auf dem Schirm war
-      // (loading="lazy"). Nicht abgewartet: die Liste wartet nicht darauf.
+      // (loading="lazy"). Die Liste wartet nicht darauf, das fetch-Event
+      // schon: `waitUntil` haelt den Worker am Leben, bis die Bilder im Cache
+      // liegen - sonst darf der Browser ihn nach der Antwort beenden.
       if (!AVATAR_PATH_RE.test(new URL(request.url).pathname)) {
-        response.clone().text().then((text) => precacheAvatars(request.url, text)).catch(() => {});
+        const prefetch = response.clone().text().then((text) => precacheAvatars(request.url, text)).catch(() => {});
+        if (event && typeof event.waitUntil === 'function') event.waitUntil(prefetch);
       }
     }
     return response;

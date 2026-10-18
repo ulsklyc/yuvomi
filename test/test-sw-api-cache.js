@@ -133,12 +133,13 @@ function loadSw({ fetchImpl } = {}) {
 
 function apiUrl(path) { return `${ORIGIN}/api/v1${path}`; }
 
-/** Feuert ein fetch-Event; liefert ob respondWith aufgerufen wurde + dessen Promise. */
+/** Feuert ein fetch-Event; liefert ob respondWith aufgerufen wurde + dessen Promise, dazu die waitUntil-Promises. */
 function dispatchFetch(env, request) {
   let responded = false;
   let result;
-  env.listeners.fetch[0]({ request, respondWith(p) { responded = true; result = p; } });
-  return { responded, result: responded ? Promise.resolve(result) : null };
+  const waited = [];
+  env.listeners.fetch[0]({ request, respondWith(p) { responded = true; result = p; }, waitUntil(p) { waited.push(p); } });
+  return { responded, result: responded ? Promise.resolve(result) : null, waited };
 }
 
 async function dispatchActivate(env) {
@@ -246,9 +247,14 @@ test('eine gecachte Liste holt die Profilbilder ihrer Zeilen mit in den Cache', 
       ] }), { status: 200 });
     },
   });
-  await (dispatchFetch(env, new MockRequest(apiUrl('/tasks'), { method: 'GET' })).result);
+  const list = dispatchFetch(env, new MockRequest(apiUrl('/tasks'), { method: 'GET' }));
+  await list.result;
+  // Codex-Review zu #2056: das Mitholen haengt am fetch-Event (`waitUntil`).
+  // Ohne das darf der Browser den Worker beenden, sobald die Liste beantwortet
+  // ist, und das Bild kaeme nie im Cache an.
   await new Promise((r) => setTimeout(r, 0));
-  await new Promise((r) => setTimeout(r, 0));
+  assert.ok(list.waited.length > 0, 'das fetch-Event bleibt bis zum Mitholen am Leben');
+  await Promise.all(list.waited);
   const avatarUrl = apiUrl(`/people/2/avatar?v=${key}`);
   assert.equal(seen.filter((u) => u === avatarUrl).length, 1, 'das Bild wird genau einmal geholt, nicht je Zeile');
 
