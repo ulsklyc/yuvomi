@@ -43,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   setup, invitation, display pairing, password reset) now leaves that page as it is. On every other
   page it still leads to the sign-in page.
 
+- **On the overview, the people of an event sit at the end of its line in right-to-left
+  languages.** In Arabic and Persian they sat right after the event's title instead. Left-to-right
+  layouts are unchanged.
 - **Typing Japanese, Korean or Chinese no longer saves half a word.** In these languages Enter
   first confirms the character conversion. Dialogs, tag and mention fields, suggestion lists and
   the comboboxes used to act on that Enter and saved or picked the text while it was still being

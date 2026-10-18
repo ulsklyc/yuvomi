@@ -23,6 +23,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
+import { eachRule } from './css-rules.js';
 
 globalThis.HTMLElement = globalThis.HTMLElement ?? class {};
 globalThis.customElements = globalThis.customElements ?? { define() {}, get() {} };
@@ -341,6 +342,57 @@ const assertShows = (html, text, where) => {
   assert.ok(!SHOWS(html, '김'), `${where}: nicht mehr nur den Familiennamen`);
 };
 
+test('Avatar-Stapel kippt mit der Schreibrichtung (alle Stylesheets)', () => {
+  // Jede Regel, die den Stapel oder seine Scheiben anfasst, bleibt bei
+  // logischen Seiten: mit margin-left: auto klebte der Stapel im Dashboard in
+  // RTL am Titel statt am Zeilenende, und die fruehere Ueberlappung per
+  // margin-left ragte in RTL ueber die Kante. Kurzschreibweisen mit vier
+  // Werten, die links und rechts verschieden setzen, sind genauso seitenfest.
+  const physical = /(?:^|[;\s])(?:margin|padding|border)-(?:left|right)\b|(?:^|[;\s])(?:left|right)\s*:|text-align:\s*(?:left|right)\b/;
+  // Woerter auf oberster Ebene: Leerraum innerhalb von calc()/var() trennt nicht.
+  const words = (value) => {
+    const out = [];
+    let depth = 0;
+    let cur = '';
+    for (const ch of value.trim()) {
+      if (ch === '(') depth += 1;
+      if (ch === ')') depth -= 1;
+      if (/\s/.test(ch) && depth === 0) {
+        if (cur) out.push(cur);
+        cur = '';
+      } else {
+        cur += ch;
+      }
+    }
+    if (cur) out.push(cur);
+    return out;
+  };
+  const lopsided = (body) => [...body.matchAll(/(?:^|[;\s])(margin|padding|inset)\s*:\s*([^;]+)/g)]
+    .filter(([, , value]) => {
+      const v = words(value.replace(/!important/, ''));
+      return v.length === 4 && v[1] !== v[3];
+    })
+    .map(([, prop, value]) => `${prop}: ${value.trim()}`);
+  const files = readdirSync(new URL('styles/', PUBLIC)).filter((f) => f.endsWith('.css'));
+  let seen = 0;
+  for (const file of files) {
+    for (const r of eachRule(read(`styles/${file}`))) {
+      // .avatar-stack selbst und seine Elemente (__item, __overflow)
+      if (!/\.avatar-stack(?:__|\b)/.test(r.selector)) continue;
+      seen += 1;
+      assert.doesNotMatch(r.body, physical, `${file}: ${r.selector} haengt an einer physischen Seite`);
+      const odd = lopsided(r.body);
+      assert.equal(odd.length, 0, `${file}: ${r.selector} setzt links und rechts verschieden: ${odd.join('; ')}`);
+    }
+  }
+  assert.ok(seen >= 8, `zu wenige Avatar-Stapel-Regeln gefunden (${seen}) - umbenannt?`);
+
+  // Im Dashboard schiebt der Rand am Zeilenanfang den Stapel ans Zeilenende.
+  const dashboard = [...eachRule(read('styles/dashboard.css'))]
+    .find((r) => r.at.length === 0 && r.selector === '.event-item .avatar-stack');
+  assert.ok(dashboard, 'Regel nicht gefunden: .event-item .avatar-stack');
+  assert.match(dashboard.body, /margin-inline-start:\s*auto/, 'der Stapel steht am Zeilenende');
+});
 test('Avatar-Stapel und Personenauswahl (components/user-multi-select.js)', async () => {
   const ums = await import('../public/components/user-multi-select.js');
   const user = { id: 1, display_name: MINSU, color: '#34C759', avatar_color: '#34C759' };
