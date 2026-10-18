@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Typing Japanese, Korean or Chinese no longer saves half a word.** In these languages Enter
+  first confirms the character conversion. Dialogs, tag and mention fields, suggestion lists and
+  the comboboxes used to act on that Enter and saved or picked the text while it was still being
+  written; they now wait for the conversion to finish.
+- **New health entries start at the household's time.** Vitals, activity and nutrition prefilled
+  "now" from the device clock, while Yuvomi reads the value in the household time zone. On a phone
+  set to another zone, for example while travelling, saving the default stored a shifted time and
+  sometimes the wrong day.
+- **Esc in a picker of the subscription form closes only the picker.** The lists for currency,
+  cycle, category, account and payment method and the logo search used to close the whole form
+  with the same keystroke.
+- **Open browser tabs no longer reload extension translations every 30 seconds.** With extension
+  modules installed, each open tab fetched every language file of every module twice a minute, also
+  in the background. They now load again only when a module was installed, updated or changed its
+  languages, and a tab in the background skips the check.
+
+### Security
+
+- **Contact websites and recipe links only open http and https addresses.** A website from a
+  synced address book or a recipe link from the API or a recipe provider could carry a
+  `javascript:` address and became a clickable link. Such values now show as plain text or no link.
+- **Password managers no longer offer your Yuvomi password for other services.** The password and
+  token fields for CalDAV, Apple Calendar, WebDAV backup and storage, document management, email,
+  Immich and push notifications asked for the sign-in of this site, so a password manager could fill
+  in your Yuvomi password and send it to that server on save. They are now plain fields, like the
+  CardDAV form.
+- **Widget names from extension modules are escaped on the Overview.** In customize mode and on the
+  error tile the name went into the page unescaped.
+
 ## [2.78.0] - 2026-10-18
 
 ### Added
