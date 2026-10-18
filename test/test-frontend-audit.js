@@ -15250,6 +15250,78 @@ test('die Deaktiviert-Farbe steht an keinem erreichbaren Bedienelement', () => {
 });
 
 /**
+ * Beide Dokumente sagen dem Browser vor dem ersten Stylesheet, dass sie hell
+ * UND dunkel koennen (Modern-Web-Guidance-Audit, Befund 17). Ohne das Meta
+ * malt er Leinwand, Scrollleisten und Formularelemente bis zum CSS hell - im
+ * Dark ein weisser Blitz. offline.html traegt die Angabe zusaetzlich im CSS,
+ * weil sie ohne tokens.css steht.
+ */
+test('index.html and offline.html declare color-scheme before any stylesheet', () => {
+  for (const file of ['../public/index.html', '../public/offline.html']) {
+    const html = read(file);
+    const meta = html.match(/<meta\b[^>]*\bname=["']color-scheme["'][^>]*>/)?.[0];
+    assert.ok(meta, `${file}: <meta name="color-scheme"> fehlt`);
+    assert.equal(meta.match(/\bcontent=["']([^"']+)["']/)?.[1], 'light dark', `${file}: content`);
+    assert.ok(html.indexOf(meta) < html.search(/<link\b[^>]*rel=["']stylesheet|<style\b/), `${file}: das Meta steht vor dem ersten Stylesheet`);
+  }
+  const offline = read('../public/offline.html');
+  const css = offline.slice(offline.indexOf('<style>'), offline.indexOf('</style>'));
+  const schemes = [];
+  for (const { selector, body } of eachRule(css.replace(/^<style>/, ''))) {
+    const value = body.match(/(?:^|;)\s*color-scheme:\s*([^;]+)/)?.[1]?.trim();
+    if (value) schemes.push([selector.replace(/\s+/g, ' ').trim(), value]);
+  }
+  assert.deepEqual(schemes, [
+    [':root', 'light'],
+    [':root:not([data-theme="light"])', 'dark'],
+    [':root[data-theme="dark"]', 'dark'],
+  ], 'offline.html: color-scheme hell an :root, dunkel in beiden Dark-Bloecken');
+});
+
+/**
+ * Eine AUSDRUECKLICHE Wahl schlaegt das System auch vor dem CSS: theme-init.js
+ * legt das color-scheme-Meta auf sie fest. Sonst malte ein dunkles System die
+ * Leinwand dunkel, obwohl hell gewaehlt ist (und umgekehrt), bis tokens.css da
+ * ist. Ohne Wahl bleibt "light dark", dort ist das System die richtige Quelle;
+ * die Wand in der Nacht ist dunkel.
+ */
+test('theme-init.js pins the color-scheme meta to an explicit theme', () => {
+  const source = read('../public/theme-init.js');
+  const run = (entries, hours = 12) => {
+    const map = new Map(Object.entries(entries));
+    const storage = {
+      get length() { return map.size; },
+      key: (i) => [...map.keys()][i] ?? null,
+      getItem: (k) => (map.has(k) ? map.get(k) : null),
+      setItem: (k, v) => { map.set(k, String(v)); },
+      removeItem: (k) => { map.delete(k); },
+    };
+    const attrs = new Map();
+    const root = {
+      setAttribute: (k, v) => { attrs.set(k, String(v)); },
+      getAttribute: (k) => (attrs.has(k) ? attrs.get(k) : null),
+      removeAttribute: (k) => { attrs.delete(k); },
+      hasAttribute: (k) => attrs.has(k),
+    };
+    const meta = { content: 'light dark', getAttribute: () => meta.content, setAttribute: (k, v) => { if (k === 'content') meta.content = v; } };
+    const document = {
+      documentElement: root,
+      querySelectorAll: () => [],
+      querySelector: (sel) => (sel === 'meta[name="color-scheme"]' ? meta : null),
+    };
+    const DeviceDate = class extends Date { getHours() { return hours; } };
+    new Function('localStorage', 'sessionStorage', 'document', 'location', 'Date', 'window', source)(
+      storage, storage, document, { pathname: '/' }, DeviceDate, {},
+    );
+    return meta.content;
+  };
+  assert.equal(run({}), 'light dark', 'ohne Wahl folgt die Leinwand dem System');
+  assert.equal(run({ 'yuvomi-theme': 'light' }), 'light');
+  assert.equal(run({ 'yuvomi-theme': 'dark' }), 'dark');
+  assert.equal(run({ 'yuvomi-theme': 'light', 'yuvomi-wall-mode': '1' }, 23), 'dark', 'die Wand ist nachts dunkel');
+});
+
+/**
  * Die Statusleiste der installierten PWA IST der Seitengrund.
  *
  * `<meta name="theme-color">` nimmt an keiner Kaskade teil - der Wert muss als
