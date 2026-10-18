@@ -3275,7 +3275,8 @@ test('R18: "Messwert erfassen" spricht in Formularzeilen - der Blutdruck ist EIN
 
   // Einfacher Wert: Zahl und Einheit sind ein Feld; die Einheit ist Auswahl oder Text.
   const gewicht = health.valueFieldsMarkup('weight');
-  assert.match(gewicht, /<label class="form-row__label" for="vital-value">health\.vitals\.metric\.weight<\/label>/);
+  // Der Messwert ist Pflicht: hinter dem Namen steht der Stern (REQUIRED_MARK).
+  assert.match(gewicht, /<label class="form-row__label" for="vital-value">health\.vitals\.metric\.weight<span class="required-marker" aria-hidden="true"> \*<\/span><\/label>/);
   assert.match(gewicht, /<select class="form-input" id="vital-unit" aria-label="health\.vitals\.field\.unit">/, 'die Einheitenauswahl hat einen eigenen Namen');
   // Dauer: die Worte hinter den Zahlen sind die Etiketten der Teilfelder.
   const schlaf = health.valueFieldsMarkup('sleep');
