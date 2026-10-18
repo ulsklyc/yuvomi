@@ -229,6 +229,59 @@ function triggerOf(id) {
   return all.find((el) => (typeof el.getClientRects === 'function' ? el.getClientRects().length > 0 : false)) ?? all[0];
 }
 
+/**
+ * SCROLLT DER INHALT, SCHLIESST DAS MENUE (#2041).
+ *
+ * Das Panel steht `position: fixed` im Top-Layer und wird beim Oeffnen EINMAL
+ * an den Ausloeser gerechnet. Scrollte danach die Liste (Mausrad, Trackpad,
+ * Tastatur), blieb es stehen und zeigte auf eine fremde Zeile - in den
+ * Kontakten wuchs der Abstand von 4 auf 124px, "Loeschen" stand unter dem
+ * falschen Eintrag. Am Telefon schliesst der Tipp zum Scrollen das Menue per
+ * Light-Dismiss; Mausrad und Trackpad tippen nicht.
+ *
+ * WARUM SCHLIESSEN STATT MITFUEHREN: iOS- und macOS-Menues schliessen, wenn
+ * der Inhalt darunter scrollt, und die Kopie der Dokumente (`openContextMenu`)
+ * tut es schon. Mitfuehren per CSS-Anchor-Positioning ist nicht ueberall da
+ * (siehe Kopf dieser Datei), und ein mitgefuehrtes Menue liefe mit seiner
+ * Zeile aus dem Scrollport hinaus, ueber Kopf oder Tab-Leiste.
+ *
+ * WARUM DER AUSLOESER ENTSCHEIDET UND NICHT JEDES `scroll`: Ein langes Menue
+ * scrollt in sich, eine Chip-Leiste daneben quer, ein Trackpad-Schwung rollt
+ * mit Subpixeln aus - nichts davon trennt Menue und Zeile. Geschlossen wird,
+ * sobald der Ausloeser sich bewegt hat. Capture am Dokument, weil `scroll`
+ * nicht aufsteigt: so erreicht auch der Scrollport eines Blatts den Handler.
+ * Die Fokusrueckgabe an den Ausloeser macht `hidePopover()` selbst.
+ */
+const scrollWatchers = new WeakMap();
+const SCROLL_TOLERANCE_PX = 2;
+
+function watchScroll(panel, trigger) {
+  unwatchScroll(panel);
+  if (!trigger || typeof document.addEventListener !== 'function') return;
+  const start = trigger.getBoundingClientRect();
+  const onScroll = () => {
+    // Ein Re-Render nimmt das offene Panel aus dem DOM, und der Browser
+    // schliesst es dabei ohne `toggle` - dann raeumt der naechste Scroll ab.
+    if (panel.isConnected === false) { unwatchScroll(panel); return; }
+    const now = trigger.getBoundingClientRect();
+    if (Math.abs(now.top - start.top) < SCROLL_TOLERANCE_PX
+      && Math.abs(now.left - start.left) < SCROLL_TOLERANCE_PX) return;
+    unwatchScroll(panel);
+    try { panel.hidePopover?.(); } catch { /* war schon zu */ }
+  };
+  document.addEventListener('scroll', onScroll, { capture: true, passive: true });
+  scrollWatchers.set(panel, onScroll);
+}
+
+function unwatchScroll(panel) {
+  const onScroll = scrollWatchers.get(panel);
+  if (!onScroll) return;
+  scrollWatchers.delete(panel);
+  if (typeof document.removeEventListener === 'function') {
+    document.removeEventListener('scroll', onScroll, { capture: true });
+  }
+}
+
 function onToggle(event) {
   const panel = event.target;
   if (!(panel instanceof HTMLElement) || !panel.matches('.popover-menu')) return;
@@ -246,7 +299,12 @@ function onToggle(event) {
   }
   trigger?.setAttribute('aria-expanded', String(event.newState === 'open'));
 
-  if (event.newState !== 'open') { panel.style.opacity = ''; panel.style.transform = ''; return; }
+  if (event.newState !== 'open') {
+    unwatchScroll(panel);
+    panel.style.opacity = '';
+    panel.style.transform = '';
+    return;
+  }
 
   if (trigger) {
     const rect = trigger.getBoundingClientRect();
@@ -277,6 +335,7 @@ function onToggle(event) {
   }
   panel.style.opacity = '1';
   panel.style.transform = 'none';
+  watchScroll(panel, trigger);
 
   // DER FOKUS ZIEHT MIT INS MENUE. `role="menu"` sagt der assistiven Technik
   // eine Menue-Bedienung zu, und die Popover-API haelt davon nichts: sie

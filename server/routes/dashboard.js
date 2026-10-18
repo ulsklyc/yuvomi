@@ -718,6 +718,8 @@ router.get('/', (req, res) => {
              -- entscheidet die Kachel ohne Nachfrage - eigenes zuerst, sonst das
              -- des Providers.
              r.provider_has_image AS recipe_has_image,
+             -- Version des Providerbildes fuer ?v= (#2048, routes/recipes.js).
+             r.provider_updated_at AS recipe_image_version,
              (r.image_data IS NOT NULL) AS recipe_has_own_image,
              -- Wer kocht (#1679): Name, Farbe und Bild neben der Mahlzeit, aus
              -- derselben Quelle wie im Planer.${MEAL_COOK_COLUMNS_SQL}

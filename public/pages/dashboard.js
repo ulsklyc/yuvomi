@@ -1919,6 +1919,7 @@ function renderTodayMeals(meals, visibleMealTypes = MEAL_ORDER, users = []) {
               recipeId: meal.recipe_id,
               hasImage: meal.recipe_has_image,
               hasOwnImage: meal.recipe_has_own_image,
+              imageVersion: meal.recipe_image_version,
               className: 'meal-slot__thumb',
             }) : ''}<span class="meal-slot__title-text">${esc(meal.title)}</span>`
           : '-'}</div>

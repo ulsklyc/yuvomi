@@ -24,6 +24,9 @@ const { default: recipesRouter } = await import('../server/routes/recipes.js');
 // ihn läuft (POST /shopping/items/undo-transfer) - ohne ihn wäre nur die halbe
 // Handlung getestet.
 const { default: shoppingRouter } = await import('../server/routes/shopping.js');
+// Der Planer traegt die Bildversion des Rezepts mit (#2048) - gemessen am echten
+// Meals-Router, nicht an seinem SQL-Text.
+const { default: mealsRouter } = await import('../server/routes/meals.js');
 const recipeProviders = await import('../server/services/recipe-providers/index.js');
 const db = dbmod.get();
 
@@ -42,6 +45,7 @@ app.use((req, _res, next) => {
   next();
 });
 app.use('/shopping', shoppingRouter);
+app.use('/meals', mealsRouter);
 app.use('/', recipesRouter);
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
@@ -506,9 +510,83 @@ function registerMirrorTests(provider) {
     recipeProviders._setAdapterFactory(null);
     assert.equal(res.status, 200);
     assert.equal(res.headers.get('content-type'), 'image/png');
+    // Ohne provider_updated_at keine Version, also kein Cache - wie vor #2048.
     assert.equal(res.headers.get('cache-control'), 'no-store');
     const buf = Buffer.from(await res.arrayBuffer());
     assert.equal(buf.length, png1x1.length);
+  });
+
+  // #2048: 500 gespiegelte Rezepte waren bei jedem Oeffnen der Liste 500
+  // Live-Abrufe beim Provider, alle `no-store`. Mit der Version aus der Zeile
+  // darf der Browser das Bild behalten, und eine Nachfrage kostet den Provider
+  // nichts.
+  test(`GET /:id/provider-thumbnail: revalidierbar mit ?v=<provider_updated_at>, nie max-age, 304 ohne Provider-Abruf (${provider}, #2048)`, async () => {
+    const updatedAt = '2026-10-01T08:15:30.123456';
+    const recipeId = db.prepare(`
+      INSERT INTO recipes (title, created_by, provider_account_id, provider_recipe_id, provider_slug, provider_has_image, provider_updated_at) VALUES (?, ?, ?, ?, ?, 1, ?)
+    `).run('Versioniert', OWNER, accountId, `thumb-v-${provider}`, `slug-v-${provider}`, updatedAt).lastInsertRowid;
+    const png1x1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+    let upstream = 0;
+    recipeProviders._setAdapterFactory(() => ({
+      fetchThumbnail: async () => { upstream += 1; return { buffer: png1x1, mime: 'image/png' }; },
+    }));
+    try {
+      // Die Liste nennt genau diesen Wert - die Oberflaeche baut daraus ?v=.
+      const list = await call('GET', '/');
+      assert.equal(list.body.data.find((x) => x.id === recipeId).provider_updated_at, updatedAt);
+
+      const url = `${baseUrl}/${recipeId}/provider-thumbnail?v=${encodeURIComponent(updatedAt)}`;
+      const first = await fetch(url);
+      assert.equal(first.status, 200);
+      // NIE max-age (Codex-Review zu #2067): ein Bild aus dem HTTP-Cache kaeme
+      // nach dem Abmelden oder einem Kontowechsel ohne Auth- und Modul-Gate.
+      // Jede Nutzung fragt nach, die Nachfrage ist das 304 unten.
+      assert.equal(first.headers.get('cache-control'), 'private, no-cache');
+      const etag = first.headers.get('etag');
+      assert.match(etag ?? '', /^"[0-9a-f]{32}"$/);
+      assert.equal(upstream, 1);
+
+      const again = await fetch(url, { headers: { 'If-None-Match': etag } });
+      assert.equal(again.status, 304);
+      assert.equal(again.headers.get('cache-control'), 'private, no-cache');
+      assert.equal(upstream, 1, 'die Nachfrage beantwortet die Route, ohne den Provider zu fragen');
+
+      // Ohne oder mit alter Version: dieselbe Antwort.
+      for (const stale of ['', '?v=2020-01-01']) {
+        const r = await fetch(`${baseUrl}/${recipeId}/provider-thumbnail${stale}`);
+        assert.equal(r.status, 200);
+        assert.equal(r.headers.get('cache-control'), 'private, no-cache');
+        assert.equal(r.headers.get('etag'), etag);
+      }
+
+      // Neuer Sync, neue Version: das alte ETag passt nicht mehr.
+      db.prepare('UPDATE recipes SET provider_updated_at = ? WHERE id = ?').run('2026-10-02T09:00:00', recipeId);
+      const changed = await fetch(url, { headers: { 'If-None-Match': etag } });
+      assert.equal(changed.status, 200);
+      assert.notEqual(changed.headers.get('etag'), etag);
+    } finally {
+      recipeProviders._setAdapterFactory(null);
+    }
+  });
+
+  test(`GET /:id/provider-thumbnail: Fehler bleiben no-store, auch mit passender Version (${provider}, #2048)`, async () => {
+    const updatedAt = '2026-10-03T10:00:00';
+    const recipeId = db.prepare(`
+      INSERT INTO recipes (title, created_by, provider_account_id, provider_recipe_id, provider_has_image, provider_updated_at) VALUES (?, ?, ?, ?, 1, ?)
+    `).run('Kaputt', OWNER, accountId, `thumb-err-${provider}`, updatedAt).lastInsertRowid;
+    recipeProviders._setAdapterFactory(() => ({
+      fetchThumbnail: async () => { throw new Error('upstream down'); },
+    }));
+    try {
+      const r = await fetch(`${baseUrl}/${recipeId}/provider-thumbnail?v=${encodeURIComponent(updatedAt)}`);
+      assert.equal(r.status, 502);
+      assert.doesNotMatch(r.headers.get('cache-control') ?? '', /max-age|immutable/);
+      // Express haengt an jede JSON-Antwort ein schwaches ETag; das Versions-
+      // ETag der Route darf ein Fehler nie tragen.
+      assert.doesNotMatch(r.headers.get('etag') ?? '', /^"[0-9a-f]{32}"$/);
+    } finally {
+      recipeProviders._setAdapterFactory(null);
+    }
   });
 
   test(`GET /:id/provider-thumbnail: Bild seit letztem Sync beim Provider gelöscht (404 vom Adapter, ${provider}) → 404 statt 500`, async () => {
@@ -538,6 +616,22 @@ function registerMirrorTests(provider) {
 
 registerMirrorTests('mealie');
 registerMirrorTests('tandoor');
+
+test('GET /meals: eine Mahlzeit aus einem gespiegelten Rezept traegt recipe_image_version (#2048)', async () => {
+  const updatedAt = '2026-10-04T12:00:00';
+  const recipeId = db.prepare(`
+    INSERT INTO recipes (title, created_by, provider_account_id, provider_recipe_id, provider_has_image, provider_updated_at) VALUES (?, ?, ?, ?, 1, ?)
+  `).run('Im Planer', OWNER, PROVIDER_ACCOUNTS.mealie.id, 'planner-version', updatedAt).lastInsertRowid;
+  const mealId = db.prepare(`
+    INSERT INTO meals (date, meal_type, title, recipe_id, created_by) VALUES ('2026-10-05', 'dinner', 'Im Planer', ?, ?)
+  `).run(recipeId, OWNER).lastInsertRowid;
+  const r = await call('GET', '/meals?week=2026-10-05');
+  assert.equal(r.status, 200);
+  const meal = r.body.data.find((m) => m.id === mealId);
+  assert.ok(meal, 'die Mahlzeit steht in der Woche');
+  assert.equal(meal.recipe_has_image, 1);
+  assert.equal(meal.recipe_image_version, updatedAt);
+});
 
 // --------------------------------------------------------------------------
 // #750: Eine leere Auswahl ist eine Antwort, keine Lücke. Vorher machte die

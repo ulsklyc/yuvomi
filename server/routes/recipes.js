@@ -6,6 +6,7 @@
 
 import { createLogger } from '../logger.js';
 import express from 'express';
+import { createHash } from 'node:crypto';
 import * as db from '../db.js';
 import { str, num, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../middleware/validate.js';
 import { normalizeRecipeMealTypes } from '../../public/utils/recipe-meal-types.js';
@@ -403,6 +404,33 @@ router.delete('/:id', (req, res) => {
  * erreichen (siehe publicAccount() in routes/recipe-providers.js) - also holt
  * der Server die Bytes und reicht sie durch, wie der DMS-Vorschau-Proxy es für
  * Paperless/Papra tut.
+ *
+ * CACHEBAR UEBER `?v=` (#2048). Vorher holte jeder Aufruf die Bytes live beim
+ * Provider und antwortete `no-store`: eine Liste mit 500 gespiegelten Rezepten
+ * kostete bei jedem Oeffnen 500 Abrufe bei Mealie und 500 Anfragen aus dem
+ * 300er-Budget des apiLimiter. Jetzt nennt die Liste die Version in der
+ * Adresse (wie die Profilbilder in routes/people.js, #2056).
+ *
+ * DIE VERSION IST `provider_updated_at`. Mealie und Tandoor setzen ihr
+ * `updatedAt` neu, wenn ein Rezept gespeichert wird, ein neues Bild
+ * eingeschlossen; der Sync schreibt `provider_slug` und `provider_has_image`
+ * ohnehin nur, wenn dieser Wert wechselt (services/recipe-provider-sync.js).
+ * Eine neue Version heisst also eine neue Adresse und einen frischen Abruf.
+ *
+ * DAS ETAG HAENGT AN DERSELBEN VERSION, NICHT AN DEN BYTES. So beantwortet die
+ * Route eine Nachfrage mit 304, ohne den Provider zu fragen - ein ETag ueber
+ * die Bytes muesste sie dafuer erst holen.
+ *
+ * IMMER `no-cache`, NIE `max-age` (Codex-Review zu #2067). Ein `immutable`
+ * fuer ein Jahr liess das Bild nach dem Abmelden oder einem Kontowechsel im
+ * selben Browser aus dem HTTP-Cache kommen, ohne dass requireAuth oder das
+ * meals-Gate liefen - das Abmelden leert nur den Cache des Service Workers.
+ * Mit `no-cache` fragt der Browser jedes Mal nach, die Nachfrage laeuft durch
+ * alle Gates, und die Antwort ist ein 304 ohne Bytes und ohne Provider-Abruf.
+ * Die Flut bleibt trotzdem weg: das Teure war der Abruf beim Provider, und die
+ * Bildabrufe zaehlen im eigenen imageLimiter (server/index.js). `?v=` haelt
+ * die Adresse je Version eindeutig, damit der Browser nie ein altes Bild als
+ * Kandidaten fuer die Nachfrage nimmt.
  */
 router.get('/:id/provider-thumbnail', async (req, res) => {
   try {
@@ -410,7 +438,7 @@ router.get('/:id/provider-thumbnail', async (req, res) => {
     if (!id) return res.status(400).json({ error: 'Invalid recipe ID.', code: 400 });
 
     const recipe = db.get().prepare(
-      'SELECT provider_account_id, provider_recipe_id, provider_slug, provider_has_image FROM recipes WHERE id = ?'
+      'SELECT provider_account_id, provider_recipe_id, provider_slug, provider_has_image, provider_updated_at FROM recipes WHERE id = ?'
     ).get(id);
     if (!recipe?.provider_account_id || !recipe.provider_has_image) {
       return res.status(404).json({ error: 'No thumbnail available.', code: 404 });
@@ -418,6 +446,22 @@ router.get('/:id/provider-thumbnail', async (req, res) => {
 
     const account = db.get().prepare('SELECT * FROM recipe_provider_accounts WHERE id = ?').get(recipe.provider_account_id);
     if (!account) return res.status(404).json({ error: 'No thumbnail available.', code: 404 });
+
+    const version = recipe.provider_updated_at ? String(recipe.provider_updated_at) : null;
+    const etag = version
+      ? `"${createHash('sha256').update(`${id}|${recipe.provider_account_id}|${version}`).digest('hex').slice(0, 32)}"`
+      : null;
+    // Ueberschreibt das `no-store`, das server/index.js jeder API-Antwort setzt.
+    // `private`: das Bild gehoert zu einer Sitzung, kein geteilter Cache
+    // dazwischen darf es halten. `no-cache`: siehe Kopfkommentar.
+    const cacheControl = etag ? 'private, no-cache' : 'no-store';
+    // Die Kopfzeilen erst an den beiden Erfolgswegen: ein 404 oder 502 von
+    // unten behaelt das globale `no-store` und bleibt nie ein Jahr liegen.
+    if (etag && req.get('If-None-Match') === etag) {
+      res.setHeader('Cache-Control', cacheControl);
+      res.setHeader('ETag', etag);
+      return res.status(304).end();
+    }
 
     const thumb = await getAdapter(account).fetchThumbnail({ id: recipe.provider_recipe_id, slug: recipe.provider_slug });
     const mime = normalizeMime(thumb?.mime);
@@ -427,8 +471,9 @@ router.get('/:id/provider-thumbnail', async (req, res) => {
     res.setHeader('Content-Type', mime);
     res.setHeader('Content-Length', String(thumb.buffer.length));
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'");
+    res.setHeader('Cache-Control', cacheControl);
+    if (etag) res.setHeader('ETag', etag);
     res.end(thumb.buffer);
   } catch (err) {
     if (err.status === 404) return res.status(404).json({ error: 'No thumbnail available.', code: 404 });
