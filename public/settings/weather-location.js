@@ -238,6 +238,16 @@ async function searchPlace(container, scope, state) {
   if (!input || !list) return;
   const name = input.value.trim();
   if (name.length < 2) {
+    // Die alte Trefferliste gehoert zu einem anderen Namen, und eine noch
+    // laufende Suche darf sie nach der Meldung nicht wieder fuellen: abbrechen,
+    // Folgenummer weiterzaehlen, Liste und Ansage leeren.
+    state.controller?.abort();
+    state.controller = null;
+    state.seq += 1;
+    if (button) button.disabled = false;
+    list.replaceChildren();
+    list.hidden = true;
+    if (status) status.textContent = '';
     reportFieldError(input, t('settings.weatherPlaceTooShort'));
     return;
   }

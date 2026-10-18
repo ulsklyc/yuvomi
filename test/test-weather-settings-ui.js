@@ -256,3 +256,39 @@ test('Ortssuche: ein Zeichen fragt nicht, Name und Sprache gehen hinaus, Fehler 
   assert.equal(weatherLocation.geocodeErrorKey({ data: { reason: 'name_too_short' } }), 'settings.weatherPlaceTooShort');
   assert.equal(weatherLocation.geocodeErrorKey(new Error('offline')), 'settings.weatherPlaceUnavailable');
 });
+
+// Codex-Review PR #2053 (P2): eine zu kurze Suche meldete "zu kurz", liess
+// aber die alte Trefferliste stehen, und eine noch laufende Anfrage fuellte
+// die Liste danach wieder.
+test('Ortssuche: eine zu kurze Suche raeumt die Liste und ueberholt die laufende Anfrage', async () => {
+  const reported = [];
+  globalThis.__reportFieldError = (input, message) => reported.push(message);
+  const input = el({ value: 'Halle' });
+  input.isConnected = true;
+  let cleared = 0;
+  const results = el({ hidden: false, replaceChildren() { cleared += 1; }, append() { throw new Error('die ueberholte Antwort schrieb in die Liste'); } });
+  const status = el();
+  status.textContent = 'settings.weatherPlacePick';
+  const elements = { '#w-place': input, '#w-place-results': results, '#w-place-status': status, '#w-place-btn': el() };
+  const container = { isConnected: true, querySelector: (s) => elements[s] ?? null };
+  const state = { seq: 0, controller: null };
+  let release;
+  let signal = null;
+  globalThis.__apiStub = { get: (_path, opts) => { signal = opts?.signal; return new Promise((resolve) => { release = resolve; }); } };
+  try {
+    const slow = weatherLocation.__test.searchPlace(container, 'w', state);
+    input.value = 'H';
+    await weatherLocation.__test.searchPlace(container, 'w', state);
+    assert.deepEqual(reported, ['settings.weatherPlaceTooShort']);
+    assert.equal(results.hidden, true, 'die alte Trefferliste steht noch');
+    assert.ok(cleared >= 1, 'die alte Trefferliste wurde nicht geleert');
+    assert.equal(signal?.aborted, true, 'die laufende Anfrage wurde nicht abgebrochen');
+    assert.equal(status.textContent, '', 'die Ansage "waehle einen Treffer" steht noch');
+    release({ data: [{ name: 'Halle', latitude: 51.5, longitude: 11.9, country: 'Deutschland' }] });
+    await slow;
+    assert.equal(results.hidden, true, 'die ueberholte Antwort hat die Liste wieder geoeffnet');
+  } finally {
+    delete globalThis.__reportFieldError;
+    delete globalThis.__apiStub;
+  }
+});
