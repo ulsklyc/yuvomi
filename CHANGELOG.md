@@ -46,8 +46,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Logging a dose counts down the stock in the same step.** Taking a planned or as-needed dose
   used to log it and then update the stock in a second request; when the second one failed, the
   dose was logged but the stock stayed where it was. The server now does both together, from the
-  stored stock. **API:** `POST /api/v1/health/medications/{id}/logs` and
-  `POST /api/v1/health/logs/{id}/take` accept `stock_deduct`.
+  stored stock. Tapping the dose again after a dropped connection no longer logs it twice or
+  counts the stock down twice: the app repeats the same request, and the server answers it once.
+  **API:** `POST /api/v1/health/medications/{id}/logs` and `POST /api/v1/health/logs/{id}/take`
+  accept `stock_deduct`. A second `POST .../logs` for the same `schedule_id` and `scheduled_at`
+  updates the existing entry (200) instead of adding another one.
 - **Large imported recipe collections no longer lock up the app with "Too many requests" (#2048).**
   On iPhone and in Firefox the recipe list fetched the picture of every imported recipe at once
   instead of only those on screen, and each picture went to Mealie or Tandoor again on every visit.

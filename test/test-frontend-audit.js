@@ -407,10 +407,31 @@ test('eine Dosis bucht ihren Bestandsabzug in derselben Anfrage, nicht als zweit
   // einer Transaktion (routes/health/medications.js, stock_deduct).
   const src = withoutCommentsKeepingLines(read('../public/pages/health.js'));
   assert.doesNotMatch(src, /api\.patch\([^)]*\{\s*stock_qty\s*:\s*next/, 'kein selbst gerechneter Rest per PATCH nach einer Dosis');
-  // Bedarfsdosis und beide handleDose-Pfade (Medikamente, Uebersicht) schicken den Abzug mit.
-  assert.equal((src.match(/stock_deduct\s*:\s*dose/g) ?? []).length, 3, 'Bedarfsdosis + zwei handleDose schicken stock_deduct');
-  assert.equal((src.match(/api\.post\(`\/health\/logs\/\$\{logId\}\/\$\{action\}`,\s*deduct\)/g) ?? []).length, 2);
-  assert.equal((src.match(/api\.post\(`\/health\/medications\/\$\{medId\}\/logs`,\s*\{\s*\.\.\.body,\s*\.\.\.deduct\s*\}\)/g) ?? []).length, 2);
+  // Bedarfsdosis und der gemeinsame Weg der geplanten Dosis schicken den Abzug mit.
+  assert.equal((src.match(/stock_deduct\s*:\s*dose/g) ?? []).length, 2, 'Bedarfsdosis + sendScheduledDose schicken stock_deduct');
+});
+
+test('jede Dosis-Buchung traegt einen Idempotency-Key, den ein Wiederholversuch behaelt (#2069)', () => {
+  // Seit die Dosis den Bestand in derselben Anfrage abzieht, kostet eine
+  // verlorene Antwort mit erneutem Tipp nicht nur einen doppelten Log, sondern
+  // einen doppelten Abzug. Der Schluessel laesst die Idempotenz-Middleware die
+  // erste Antwort wiedergeben (Regeln: utils/health-meds.js createDoseAttempts).
+  const src = withoutCommentsKeepingLines(read('../public/pages/health.js'));
+  const fn = (name) => {
+    const at = src.search(new RegExp(`(?:async )?function ${name}\\(`));
+    assert.ok(at >= 0, `${name}() fehlt`);
+    return src.slice(at, src.indexOf('\n}\n', at));
+  };
+  assert.match(fn('postDose'), /api\.post\(path, body, \{ headers: \{ 'Idempotency-Key': key \} \}\)/);
+  assert.match(fn('postDose'), /doseAttempts\.attempt\(actionKey, buildBody\)/);
+  // Kein Dosis-Endpunkt wird an postDose vorbei angesprochen.
+  assert.doesNotMatch(src, /api\.post\(`\/health\/medications\/\$\{medId\}\/logs`/, 'Dosis-Log nur ueber postDose()');
+  assert.doesNotMatch(src, /api\.post\(`\/health\/logs\/\$\{logId\}/, 'take/skip nur ueber postDose()');
+  // Alle drei Wege: Bedarfsdosis direkt, Medikamente-Tab und Uebersicht ueber sendScheduledDose.
+  assert.match(src, /postDose\(`prn:\$\{medId\}`/);
+  assert.match(fn('handleDose'), /await sendScheduledDose\(/);
+  assert.match(fn('handleOverviewDose'), /await sendScheduledDose\(/);
+  assert.equal((fn('sendScheduledDose').match(/return postDose\(/g) ?? []).length, 2);
 });
 
 test('der Nachlade-Scanner erkennt das Muster, das er meldet (#2069)', () => {

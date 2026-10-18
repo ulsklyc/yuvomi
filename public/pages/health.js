@@ -38,6 +38,7 @@ import {
   computeDueDoses, computeAdherence, refillState, medicationCountsToday, currentSchedules,
   daysMaskToIndices, indicesToDaysMask, WEEKDAY_COUNT, weekdayIndex,
   prnDoseState, splitRemaining, toLocalStamp, parseLogInstant, scheduledLogs,
+  createDoseAttempts,
 } from '/utils/health-meds.js';
 import {
   deriveFlag, summarizeReport, analyteNames, analyteTrend, defaultTrendAnalyte, LAB_FLAGS,
@@ -3206,7 +3207,10 @@ async function handlePrnDose(btn) {
   setDoseBusy(medId, true);
   const dose = med.prn_dose_qty != null ? Number(med.prn_dose_qty) : null;
   try {
-    await api.post(`/health/medications/${medId}/logs`, {
+    // Eine Bedarfsdosis hat kein Vorkommen, an dem der Server eine Wiederholung
+    // erkennen koennte - nur ihr Schluessel (postDose) haelt einen zweiten Tipp
+    // nach verlorener Antwort davon ab, doppelt zu buchen und abzuziehen.
+    await postDose(`prn:${medId}`, `/health/medications/${medId}/logs`, () => ({
       status: 'taken',
       // Wanduhrzeit, keine ISO-Zone: die Route kuerzt den Wert auf Minuten und
       // wuerfe die Zone weg - die Einnahme stuende dann mit der UTC-Zahl im
@@ -3216,7 +3220,7 @@ async function handlePrnDose(btn) {
       // bucht Dosis und Abzug in einer Transaktion und rechnet vom gespeicherten
       // Bestand aus. Ohne erfassten Bestand bleibt dort alles beim Alten.
       ...(dose != null && Number.isFinite(dose) ? { dose_qty: dose, stock_deduct: dose } : {}),
-    });
+    }));
   } catch (err) {
     console.error('[Health] prn dose error:', err);
     setDoseBusy(medId, false);
@@ -3609,6 +3613,58 @@ async function reloadMeds() {
   renderMedsShell();
 }
 
+/**
+ * Offene Dosis-Buchungen (#2069): Schluessel und Rumpf eines Versuchs, dessen
+ * Antwort ausblieb, bis die Wiederholung durch ist. Regeln in
+ * utils/health-meds.js (createDoseAttempts).
+ */
+const doseAttempts = createDoseAttempts();
+
+/**
+ * Bucht eine Dosis mit `Idempotency-Key`. Ein zweiter Tipp auf DIESELBE Aktion
+ * nach einem Netz- oder Serverfehler schickt denselben Schluessel und denselben
+ * Rumpf: kam der erste an, gibt der Server dessen Antwort zurueck, statt eine
+ * zweite Dosis zu buchen und den Bestand ein zweites Mal abzuziehen.
+ */
+async function postDose(actionKey, path, buildBody) {
+  const { key, body } = doseAttempts.attempt(actionKey, buildBody);
+  try {
+    const res = await api.post(path, body, { headers: { 'Idempotency-Key': key } });
+    doseAttempts.settle(actionKey);
+    return res;
+  } catch (err) {
+    doseAttempts.settle(actionKey, err);
+    throw err;
+  }
+}
+
+/**
+ * Geplante Dosis genommen oder ausgelassen - aus dem Medikamente-Tab und aus
+ * der Uebersicht, EIN Weg fuer beide.
+ *
+ * Dosis und Bestandsabzug sind EINE Anfrage (#2069): der Server bucht beides
+ * in einer Transaktion. Vorher folgte ein zweites PATCH stock_qty, und
+ * scheiterte es, stand die Dosis gebucht und der Bestand nicht gezaehlt.
+ */
+function sendScheduledDose({ medId, logId, scheduleId, scheduledAt, dose, action }) {
+  const deduct = action === 'take' && dose != null && Number.isFinite(dose) ? { stock_deduct: dose } : {};
+  if (logId) {
+    return postDose(`log:${logId}:${action}`, `/health/logs/${logId}/${action}`, () => deduct);
+  }
+  return postDose(`dose:${medId}:${scheduleId ?? ''}:${scheduledAt ?? ''}:${action}`, `/health/medications/${medId}/logs`, () => {
+    const body = { status: action === 'take' ? 'taken' : 'skipped' };
+    if (scheduledAt) body.scheduled_at = scheduledAt;
+    if (scheduleId) body.schedule_id = scheduleId;
+    if (dose != null && Number.isFinite(dose)) body.dose_qty = dose;
+    // Wanduhrzeit wie bei der Bedarfsdosis: `v.datetime` kuerzt den Wert auf
+    // Minuten und wirft die Zone weg, aus 22:41 MESZ wuerde 20:41. Sichtbar
+    // war das im Protokoll; seit ein Medikament Plan UND Bedarf haben kann,
+    // rechnet auch der Countdown daraus - und zwar zwei Stunden daneben.
+    if (action === 'take') body.taken_at = toLocalStamp();
+    return { ...body, ...deduct };
+  });
+}
+
 async function handleDose(btn, action) {
   if (readOnly()) return;  // #1265, dritte Linie: auch ein Aufruf ohne Knopf endet hier
   const medId = Number(btn.dataset.medId);
@@ -3623,24 +3679,7 @@ async function handleDose(btn, action) {
 
   setDoseBusy(medId, true);
   try {
-    // Dosis und Bestandsabzug sind EINE Anfrage (#2069): der Server bucht beides
-    // in einer Transaktion. Vorher folgte ein zweites PATCH stock_qty, und
-    // scheiterte es, stand die Dosis gebucht und der Bestand nicht gezaehlt.
-    const deduct = action === 'take' && dose != null && Number.isFinite(dose) ? { stock_deduct: dose } : {};
-    if (logId) {
-      await api.post(`/health/logs/${logId}/${action}`, deduct);
-    } else {
-      const body = { status: action === 'take' ? 'taken' : 'skipped' };
-      if (scheduledAt) body.scheduled_at = scheduledAt;
-      if (scheduleId) body.schedule_id = scheduleId;
-      if (dose != null && Number.isFinite(dose)) body.dose_qty = dose;
-      // Wanduhrzeit wie bei der Bedarfsdosis: `v.datetime` kuerzt den Wert auf
-      // Minuten und wirft die Zone weg, aus 22:41 MESZ wuerde 20:41. Sichtbar
-      // war das im Protokoll; seit ein Medikament Plan UND Bedarf haben kann,
-      // rechnet auch der Countdown daraus - und zwar zwei Stunden daneben.
-      if (action === 'take') body.taken_at = toLocalStamp();
-      await api.post(`/health/medications/${medId}/logs`, { ...body, ...deduct });
-    }
+    await sendScheduledDose({ medId, logId, scheduleId, scheduledAt, dose, action });
 
     window.yuvomi?.showToast(t('health.meds.doseSaved'), 'success');
     // Beide Tabs, nicht nur dieser: ein Medikament kann Plan UND Bedarf haben,
@@ -6702,24 +6741,7 @@ async function handleOverviewDose(btn, action) {
 
   setDoseBusy(medId, true);
   try {
-    // Dosis und Bestandsabzug sind EINE Anfrage (#2069): der Server bucht beides
-    // in einer Transaktion. Vorher folgte ein zweites PATCH stock_qty, und
-    // scheiterte es, stand die Dosis gebucht und der Bestand nicht gezaehlt.
-    const deduct = action === 'take' && dose != null && Number.isFinite(dose) ? { stock_deduct: dose } : {};
-    if (logId) {
-      await api.post(`/health/logs/${logId}/${action}`, deduct);
-    } else {
-      const body = { status: action === 'take' ? 'taken' : 'skipped' };
-      if (scheduledAt) body.scheduled_at = scheduledAt;
-      if (scheduleId) body.schedule_id = scheduleId;
-      if (dose != null && Number.isFinite(dose)) body.dose_qty = dose;
-      // Wanduhrzeit wie bei der Bedarfsdosis: `v.datetime` kuerzt den Wert auf
-      // Minuten und wirft die Zone weg, aus 22:41 MESZ wuerde 20:41. Sichtbar
-      // war das im Protokoll; seit ein Medikament Plan UND Bedarf haben kann,
-      // rechnet auch der Countdown daraus - und zwar zwei Stunden daneben.
-      if (action === 'take') body.taken_at = toLocalStamp();
-      await api.post(`/health/medications/${medId}/logs`, { ...body, ...deduct });
-    }
+    await sendScheduledDose({ medId, logId, scheduleId, scheduledAt, dose, action });
 
     window.yuvomi?.showToast(t('health.meds.doseSaved'), 'success');
     await reloadAfterSave(() => reloadMedViews());

@@ -22,6 +22,9 @@ const {
   prnDoseState,
   splitRemaining,
   scheduledLogs,
+  createDoseAttempts,
+  doseOutcomeUnknown,
+  randomIdempotencyKey,
 } = await import('../public/utils/health-meds.js');
 
 const { __test: healthHelpers } = await import('../public/pages/health.js');
@@ -832,4 +835,44 @@ test('R20: ein schon gespeichertes Zeitfenster, das man nach einem Teil-Speicher
       if (v === undefined) delete globalThis[k]; else globalThis[k] = v;
     }
   }
+});
+
+// --------------------------------------------------------
+// Wiederholbare Dosis-Buchung (#2069)
+// --------------------------------------------------------
+
+test('createDoseAttempts: ein Wiederholversuch nach offenem Ausgang behaelt Schluessel und Rumpf', () => {
+  let n = 0;
+  const attempts = createDoseAttempts(() => `k${++n}`);
+  let built = 0;
+  const body = () => ({ taken_at: `T${++built}` });
+  const first = attempts.attempt('prn:1', body);
+  attempts.settle('prn:1', { status: 0 }); // Netzfehler: die Dosis kann gebucht sein
+  const retry = attempts.attempt('prn:1', body);
+  assert.equal(retry.key, first.key, 'derselbe Schluessel');
+  assert.deepEqual(retry.body, first.body, 'derselbe Rumpf - ein neues taken_at waere fuer die Middleware ein Konflikt');
+  assert.equal(built, 1);
+  attempts.settle('prn:1', { status: 503 });
+  assert.equal(attempts.attempt('prn:1', body).key, 'k1', 'auch nach einem Serverfehler');
+  // Erfolg beendet den Vorgang: der naechste Tipp ist eine neue Dosis.
+  attempts.settle('prn:1');
+  assert.equal(attempts.has('prn:1'), false);
+  assert.equal(attempts.attempt('prn:1', body).key, 'k2');
+  // Eine eindeutige Absage ebenso.
+  attempts.settle('prn:1', { status: 400 });
+  assert.equal(attempts.attempt('prn:1', body).key, 'k3');
+  // Verschiedene Aktionen teilen sich keinen Schluessel.
+  assert.notEqual(attempts.attempt('dose:1:2:2026-06-04T08:00:take', body).key, 'k3');
+});
+
+test('doseOutcomeUnknown: nur Netz, Zeitueberschreitung, Bremse und Serverfehler lassen den Ausgang offen', () => {
+  for (const status of [0, 408, 429, 500, 502, 503]) assert.equal(doseOutcomeUnknown({ status }), true, String(status));
+  for (const status of [400, 403, 404, 409, 422]) assert.equal(doseOutcomeUnknown({ status }), false, String(status));
+  assert.equal(doseOutcomeUnknown(new Error('x')), false);
+});
+
+test('randomIdempotencyKey: 32 Hex-Zeichen, ohne randomUUID (plain HTTP im Heimnetz)', () => {
+  const a = randomIdempotencyKey();
+  assert.match(a, /^[0-9a-f]{32}$/);
+  assert.notEqual(a, randomIdempotencyKey());
 });

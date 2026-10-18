@@ -424,15 +424,42 @@ router.post('/medications/:id/logs', (req, res) => {
 
     // Log und Bestandsabzug in EINER Transaktion (#2069): beides oder nichts.
     // Abgezogen wird nur bei einer genommenen Dosis.
-    const row = db.get().transaction(() => {
+    //
+    // EIN EINTRAG JE GEPLANTEM VORKOMMEN: steht fuer schedule_id + scheduled_at
+    // schon einer (vom Scheduler angelegt oder von einem frueheren POST, dessen
+    // Antwort unterwegs verloren ging), wird er aktualisiert statt verdoppelt -
+    // dieselbe Regel, nach der der Scheduler selbst nur einmal anlegt. Abgezogen
+    // wird dann nur beim Wechsel nach `taken`, sonst zoege ein wiederholter Tipp
+    // die Dosis zweimal vom Bestand.
+    const { row, created } = db.get().transaction(() => {
+      const existing = scheduleId && scheduledAt.value
+        ? db.get().prepare(
+          'SELECT * FROM medication_logs WHERE medication_id = ? AND schedule_id = ? AND scheduled_at = ?',
+        ).get(medId, scheduleId, scheduledAt.value)
+        : null;
+      if (existing) {
+        db.get().prepare(`
+          UPDATE medication_logs
+             SET status = ?, taken_at = ?,
+                 dose_qty = COALESCE(?, dose_qty),
+                 note     = CASE WHEN ? THEN ? ELSE note END
+           WHERE id = ?
+        `).run(
+          nextStatus,
+          nextStatus === 'taken' ? (existing.status === 'taken' && !takenAt.value ? existing.taken_at : nextTakenAt) : null,
+          dose.value ?? null, b.note === undefined ? 0 : 1, note.value ?? null, existing.id,
+        );
+        if (nextStatus === 'taken' && existing.status !== 'taken') deductStock(medId, deduct.value);
+        return { row: db.get().prepare('SELECT * FROM medication_logs WHERE id = ?').get(existing.id), created: false };
+      }
       const result = db.get().prepare(`
         INSERT INTO medication_logs (medication_id, schedule_id, scheduled_at, status, taken_at, dose_qty, note)
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `).run(medId, scheduleId, scheduledAt.value, nextStatus, nextTakenAt, dose.value, note.value);
       if (nextStatus === 'taken') deductStock(medId, deduct.value);
-      return db.get().prepare('SELECT * FROM medication_logs WHERE id = ?').get(result.lastInsertRowid);
+      return { row: db.get().prepare('SELECT * FROM medication_logs WHERE id = ?').get(result.lastInsertRowid), created: true };
     })();
-    res.status(201).json({ data: row });
+    res.status(created ? 201 : 200).json({ data: row });
   } catch (err) {
     log.error('Error creating log:', err.message);
     res.status(500).json({ error: 'Internal error.', code: 500 });

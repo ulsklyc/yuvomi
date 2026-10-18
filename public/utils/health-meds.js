@@ -322,3 +322,64 @@ export function refillState(med) {
   }
   return { level: 'ok', stock: rawStock, threshold, below: false };
 }
+
+// --------------------------------------------------------
+// Wiederholbare Dosis-Buchung (#2069)
+// --------------------------------------------------------
+
+/**
+ * Zufaelliger Idempotency-Key, 128 Bit hex.
+ *
+ * `crypto.getRandomValues` statt `crypto.randomUUID`: randomUUID gibt es nur
+ * im sicheren Kontext, und Yuvomi laeuft im Heimnetz oft ueber plain HTTP.
+ */
+export function randomIdempotencyKey() {
+  const bytes = new Uint8Array(16);
+  globalThis.crypto.getRandomValues(bytes);
+  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Weiss der Aufrufer nach diesem Fehler nicht, ob der Server gebucht hat?
+ * Netzfehler (Status 0), Zeitueberschreitung, Bremse und Serverfehler: die
+ * Anfrage kann angekommen sein, nur die Antwort fehlt. Jede andere Absage ist
+ * eindeutig - gebucht wurde nichts, und ein neuer Versuch ist ein neuer Vorgang.
+ * @param {{ status?: number }} err
+ */
+export function doseOutcomeUnknown(err) {
+  const status = err?.status;
+  return status === 0 || status === 408 || status === 429 || (typeof status === 'number' && status >= 500);
+}
+
+/**
+ * Gedaechtnis fuer Dosis-Buchungen, deren Ausgang offen ist.
+ *
+ * Geht die Antwort auf `POST .../logs` verloren, ist die Dosis vielleicht
+ * gebucht und der Bestand vielleicht abgezogen. Der naechste Tipp auf dieselbe
+ * Dosis schickt deshalb DENSELBEN Schluessel und DENSELBEN Rumpf (die
+ * Idempotenz-Middleware vergleicht den Rumpf; ein neues `taken_at` waere ein
+ * Konflikt): kam der erste Versuch an, antwortet der Server mit dessen Antwort,
+ * statt ein zweites Mal zu buchen. Nach Erfolg oder eindeutiger Absage ist der
+ * Vorgang vorbei, und der naechste Tipp ist eine neue Dosis.
+ *
+ * @param {() => string} [newKey]
+ */
+export function createDoseAttempts(newKey = randomIdempotencyKey) {
+  const pending = new Map();
+  return {
+    /** Schluessel und Rumpf fuer diese Aktion - beim Wiederholversuch die alten. */
+    attempt(actionKey, buildBody) {
+      let entry = pending.get(actionKey);
+      if (!entry) {
+        entry = { key: newKey(), body: buildBody() };
+        pending.set(actionKey, entry);
+      }
+      return entry;
+    },
+    /** Nach der Antwort: vergessen, ausser der Ausgang ist offen. */
+    settle(actionKey, err = null) {
+      if (!err || !doseOutcomeUnknown(err)) pending.delete(actionKey);
+    },
+    has: (actionKey) => pending.has(actionKey),
+  };
+}
