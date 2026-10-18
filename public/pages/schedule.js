@@ -207,6 +207,26 @@ function presetShortCode(preset) {
   return code && code !== key ? code : preset.shortCode;
 }
 
+/**
+ * Hat der Haushalt diese Vorlage schon? Ja bei ihrem Code von heute, dem
+ * englischen von frueher (vor R20 angelegt), ihrem Namen in der eigenen
+ * Sprache - ODER Symbol und Farbe der Vorlage. Code und Name allein reichen
+ * nicht, weil die Vorlage beide in der Sprache dessen anlegt, der getippt hat:
+ * eine deutsche "Frühschicht" mit Code F traf weder das englische E noch
+ * "Early shift", und "Arbeit" legte sie ein zweites Mal an (Codex-Review
+ * PR #2053, dasselbe Muster wie die Abfallvorlagen in pages/waste.js). Symbol
+ * und Farbe schreibt die Vorlage in jeder Sprache gleich, und kein Paar steht
+ * in zwei Vorlagen (test:schedule).
+ */
+function presetAlreadyThere(preset, types = state.types) {
+  const codes = new Set(types.map((type) => type.short_code));
+  const names = new Set(types.map((type) => String(type.name ?? '').trim().toLowerCase()));
+  const looks = new Set(types.map((type) => `${type.icon ?? ''}|${String(type.color ?? '').toUpperCase()}`));
+  return codes.has(presetShortCode(preset)) || codes.has(preset.shortCode)
+    || names.has(shiftPresetLabel(preset.key).trim().toLowerCase())
+    || looks.has(`${preset.icon}|${preset.color.toUpperCase()}`);
+}
+
 // Welche Vorlagen ueberhaupt als Knopf angeboten werden, ist selbst haushalt-
 // weit konfigurierbar (server/routes/preferences.js#schedule_hidden_templates,
 // Settings > Module > Optionen) - ein Haushalt, der nur Arbeit braucht, muss
@@ -3207,16 +3227,13 @@ async function action(event) {
     if (button.dataset.action === 'quick-start-shifts') {
       button.disabled = true;
       const template = PRESET_TEMPLATES[button.dataset.template] ?? [];
-      const existingCodes = new Set(state.types.map((type) => type.short_code));
-      const existingNames = new Set(state.types.map((type) => String(type.name ?? '').trim().toLowerCase()));
+      const existing = [...state.types];
       let createdCount = 0;
       try {
         for (const preset of template) {
-          // Schon da ist ein Preset mit seinem Code von heute, mit dem
-          // englischen von frueher (vor R20 angelegt) oder mit seinem Namen.
+          // Schon da: presetAlreadyThere() - Code, Name oder Symbol und Farbe.
+          if (presetAlreadyThere(preset, existing)) continue;
           const code = presetShortCode(preset);
-          if (existingCodes.has(code) || existingCodes.has(preset.shortCode)
-            || existingNames.has(shiftPresetLabel(preset.key).trim().toLowerCase())) continue;
           await api.post('/schedule/shift-types', {
             name: shiftPresetLabel(preset.key),
             short_code: code,
@@ -3233,7 +3250,7 @@ async function action(event) {
       }
       // Zaehlend statt "Gespeichert." fuer beide Faelle (S-11): ein erneuter
       // Klick auf dieselbe Vorlage legt nichts mehr an (siehe Kommentar oben,
-      // existingCodes ueberspringt jeden schon vorhandenen Kurzcode) - das war
+      // presetAlreadyThere() ueberspringt jede schon vorhandene Vorlage) - das war
       // vorher nicht vom Erfolgsfall zu unterscheiden.
       window.yuvomi?.showToast(
         createdCount > 0 ? t('schedule.quickStartCreated', { count: createdCount }) : t('schedule.quickStartNothingNew'),
@@ -3565,4 +3582,4 @@ export async function update({ path } = {}) {
 // bereits pur bzw. nehmen ihre Eingabe jetzt als Parameter statt sie fest aus
 // `state` zu lesen - ein Test kann so echte Tage hineingeben und das Ergebnis
 // pruefen, statt nur zu belegen, dass der Funktionsname im Quelltext steht.
-export const __test = { shiftTypeGroups, shiftTypeListHtml, PRESET_TEMPLATES, presetShortCode, NUMERIC_PRESET_CODES, setStatisticsEntries: (entries) => { statistics = { ...statistics, entries }; }, availableTypeFields, shiftTypeFieldsEditor, syncTypeFieldPicker, editorAction, shiftTypeRow, patternRow, patternDaysEditorHtml, patternSaveOrder, initialOverviewSelection, renderOverview, renderToday, overviewLaneHeader, planningPanel, scheduleFabIntent, renderStatistics, patternFields, formField, shiftFields, reminderOffsetField, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, patternsInMemberOrder, rangeDifference, wireRangeFollow, reportReversedRange, saveCreatedSchedule, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };
+export const __test = { shiftTypeGroups, shiftTypeListHtml, PRESET_TEMPLATES, presetShortCode, presetAlreadyThere, NUMERIC_PRESET_CODES, setStatisticsEntries: (entries) => { statistics = { ...statistics, entries }; }, availableTypeFields, shiftTypeFieldsEditor, syncTypeFieldPicker, editorAction, shiftTypeRow, patternRow, patternDaysEditorHtml, patternSaveOrder, initialOverviewSelection, renderOverview, renderToday, overviewLaneHeader, planningPanel, scheduleFabIntent, renderStatistics, patternFields, formField, shiftFields, reminderOffsetField, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, patternsInMemberOrder, rangeDifference, wireRangeFollow, reportReversedRange, saveCreatedSchedule, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };

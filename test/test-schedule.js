@@ -1560,7 +1560,7 @@ test('quickstart offers three templates and only skips presets already present, 
 
   const handler = schedulePage.slice(schedulePage.indexOf("button.dataset.action === 'quick-start-shifts'"), schedulePage.indexOf("if (button.dataset.action === 'pick-shift-icon'"));
   assert.doesNotMatch(handler, /if \(state\.types\.length\) return;/, 'a second template must not be blocked just because a first one already ran');
-  assert.match(handler, /existingCodes\.has\(preset\.shortCode\)/, 're-running (or a second) template must skip what already exists by short_code, not error or duplicate');
+  assert.match(handler, /if \(presetAlreadyThere\(preset, existing\)\) continue;/, 're-running (or a second) template must skip what already exists, not error or duplicate');
 });
 
 // Which templates are even offered is itself a household-wide preference
@@ -3342,4 +3342,29 @@ test('schedule.css traegt keine Regeln fuer das Einstellungsblatt, das sie nie l
   assert.doesNotMatch(css, /\.schedule-reminder-settings/);
   const page = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
   assert.doesNotMatch(page, /schedule-reminder-settings/, 'die Leseansicht rendert die Einstellungen wieder - dann gehoeren die Regeln zurueck');
+});
+
+// Codex-Review PR #2053, zweite Runde (P2): eine Vorlage, die in einer anderen
+// Sprache angelegt wurde ("Frühschicht", Code F), traf weder den Code noch den
+// Namen der eigenen Sprache - "Arbeit" legte sie ein zweites Mal an.
+test('R20: eine Vorlage aus einer anderen Sprache gilt als vorhanden (Symbol und Farbe)', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const early = __test.PRESET_TEMPLATES.work.find((p) => p.key === 'early');
+  const german = { name: 'Frühschicht', short_code: 'F', icon: 'sunrise', color: early.color.toLowerCase() };
+  assert.equal(__test.presetShortCode(early) === 'F', false, 'Reichweite: der Code der Sprache hier ist nicht F');
+  assert.equal(__test.presetAlreadyThere(early, [german]), true, 'die deutsche Frühschicht ist die Vorlage');
+  // Gegenprobe: eine eigene Art mit anderem Symbol und Code ist keine Vorlage.
+  assert.equal(__test.presetAlreadyThere(early, [{ ...german, icon: 'briefcase' }]), false);
+  assert.equal(__test.presetAlreadyThere(early, [{ name: 'x', short_code: early.shortCode }]), true, 'der alte englische Code zaehlt weiter');
+  // Kein Paar aus Symbol und Farbe gehoert zwei verschiedenen Vorlagen.
+  const all = Object.values(__test.PRESET_TEMPLATES).flat();
+  const byLook = new Map();
+  for (const preset of all) {
+    const look = `${preset.icon}|${preset.color.toUpperCase()}`;
+    assert.ok(!byLook.has(look) || byLook.get(look) === preset.key, `${preset.key} und ${byLook.get(look)} sehen gleich aus`);
+    byLook.set(look, preset.key);
+  }
+  const src = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const handler = src.slice(src.indexOf("button.dataset.action === 'quick-start-shifts'"), src.indexOf("if (button.dataset.action === 'pick-shift-icon'"));
+  assert.match(handler, /presetAlreadyThere\(preset, existing\)/, 'der Schnellstart fragt genau diese Regel');
 });
