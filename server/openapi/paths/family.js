@@ -11,7 +11,16 @@ export function familyPaths() {
       get: op({
         summary: "Fetch a person's profile picture",
         tag: 'Family',
-        params: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer', minimum: 1 }, description: 'User ID' }],
+        params: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'integer', minimum: 1 }, description: 'User ID' },
+          {
+            name: 'v',
+            in: 'query',
+            required: true,
+            schema: { type: 'string', pattern: '^[0-9a-f]{32}$' },
+            description: 'The picture key, taken from the address in a list row. Without the matching key the answer is `404`.',
+          },
+        ],
         description: 'The image bytes of a profile picture (PNG, JPEG or WebP). List rows that show a person - '
           + '`assigned_avatar` and `assigned_users[].avatar_data` on tasks and events, `creator_avatar` on notes, '
           + '`worker_avatar_data` on housekeeping visits, `user_avatar`/`person_avatar` in the completion feed and '

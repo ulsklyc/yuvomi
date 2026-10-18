@@ -291,3 +291,16 @@ test('ohne den Schluessel aus der Zeile gibt die Route kein Bild heraus', async 
   assert.equal((await fetch(`${BASE}/api/v1/people/${hidden}/avatar?v=${'a'.repeat(32)}`, { headers })).status, 404, 'falscher Schluessel');
   assert.equal((await fetch(`${BASE}${keyedUrl(hidden)}`, { headers })).status, 200, 'mit dem Schluessel aus der Zeile');
 });
+
+// Die Route gibt ohne `v` nie ein Bild heraus; ein Client aus der OpenAPI-
+// Beschreibung muss den Parameter deshalb dort finden (Codex-Review zu #2056).
+test('OpenAPI: `v` ist ein Pflicht-Query-Parameter im Format des Schluessels', async () => {
+  const { buildOpenApiSpec } = await import('../server/openapi.js');
+  const params = buildOpenApiSpec().paths['/api/v1/people/{id}/avatar'].get.parameters ?? [];
+  const v = params.find((p) => p.name === 'v' && p.in === 'query');
+  assert.ok(v, 'v ist deklariert');
+  assert.equal(v.required, true);
+  const pattern = new RegExp(v.schema.pattern);
+  assert.match(new URL(keyedUrl(BOB), BASE).searchParams.get('v'), pattern, 'der Schluessel aus der Zeile passt');
+  assert.doesNotMatch('1', pattern);
+});
