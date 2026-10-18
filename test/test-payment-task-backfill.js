@@ -77,15 +77,25 @@ function taskState(taskId) {
 
 const UNTOUCHED = (createdBy, assignees = []) => ({ visibility: 'all', created_by: createdBy, assigned_to: null, assignees });
 
-test('ohne aktiven Admin: eine Aufgabe ohne moegliche Eigentuemerin bleibt, die einer Erwachsenen wird ihre', () => {
-  const kids = legacyPaymentTask(KID);
+test('ohne aktiven Admin: eine Aufgabe ohne moegliche Eigentuemerin wird privat, die einer Erwachsenen wird ihre', async () => {
+  const { normalizePaymentTaskAudience } = await import('../server/services/payment-task-audience.js');
+  const kids = legacyPaymentTask(KID, { assign: [KID, ADULT] });
   const adults = legacyPaymentTask(ADULT);
+  const viaRuntime = legacyPaymentTask(KID, { assign: [KID, ADULT] });
 
   migration250.up(db);
+  normalizePaymentTaskAudience(db, viaRuntime.taskId);
 
-  assert.deepEqual(taskState(kids.taskId), UNTOUCHED(KID), 'niemand sonst koennte sie danach sehen');
+  // Fail-closed (Ulas 2026-10-18): nie auf `all` - privat fuer die
+  // Erstellerin, ohne Zuweisungen und ohne die Beschreibung mit dem Lohn.
+  const closed = { visibility: 'private', created_by: KID, assigned_to: null, assignees: [] };
+  const description = (id) => db.prepare('SELECT description FROM tasks WHERE id = ?').get(id).description;
+  assert.deepEqual(taskState(kids.taskId), closed, 'Migration: geschlossen statt offen');
+  assert.equal(description(kids.taskId), null, 'Migration: die Beschreibung mit dem Lohn faellt weg');
+  assert.deepEqual(taskState(viaRuntime.taskId), taskState(kids.taskId), 'Migration und Laufzeit schliessen gleich');
+  assert.equal(description(viaRuntime.taskId), null);
   assert.deepEqual(taskState(adults.taskId), { visibility: 'assignees', created_by: ADULT, assigned_to: ADULT, assignees: [ADULT] });
-  for (const t of [kids, adults]) {
+  for (const t of [kids, adults, viaRuntime]) {
     db.prepare('DELETE FROM housekeeping_work_sessions WHERE id = ?').run(t.sessionId);
     db.prepare('DELETE FROM tasks WHERE id = ?').run(t.taskId);
   }

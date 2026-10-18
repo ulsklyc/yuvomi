@@ -10927,7 +10927,8 @@ const MIGRATIONS = [
     // noch auf `all` stehen. Erledigte bleiben stehen (Ulas' Entscheidung);
     // sie zieht das naechste Bearbeiten ihres Besuchs nach. Gibt es fuer eine
     // Aufgabe niemanden, dem sie gehoeren darf (Ersteller ohne Betragsrecht und
-    // kein aktiver Admin), bleibt sie unveraendert.
+    // kein aktiver Admin), wird sie privat fuer die Erstellerin, ohne
+    // Zuweisungen und ohne Beschreibung (die nennt den Lohn) - nie `all`.
     //
     // EINGEFROREN - NIE AN DIE LAUFZEITREGEL ANGLEICHEN. Die Regel steht hier
     // als selbsttragende Kopie von services/payment-task-audience.js im Stand
@@ -10985,12 +10986,23 @@ const MIGRATIONS = [
         UPDATE tasks SET visibility = 'assignees', created_by = ?, assigned_to = ? WHERE id = ?
       `);
       const clear = database.prepare('DELETE FROM task_assignments WHERE task_id = ?');
+      const closeTask = database.prepare(`
+        UPDATE tasks SET visibility = 'private', assigned_to = NULL, description = NULL WHERE id = ?
+      `);
       const assign = database.prepare('INSERT OR IGNORE INTO task_assignments (task_id, user_id) VALUES (?, ?)');
       for (const task of tasks) {
         const creator = task.created_by == null ? null : readUser.get(task.created_by);
         const creatorPays = Boolean(creator && creator.deactivated_at == null && seesAmounts(creator));
         const owner = creatorPays ? creator.id : firstAdmin.get()?.id;
-        if (owner == null) continue;
+        if (owner == null) {
+          // Niemand, dem sie gehoeren darf (kein aktiver Admin, Erstellerin
+          // ohne Betragsrecht): schliessen statt auf `all` lassen - privat fuer
+          // die Erstellerin, ohne Zuweisungen und ohne die Beschreibung, die
+          // den Lohn nennt (wie normalizePaymentTaskAudience, R20).
+          closeTask.run(task.id);
+          clear.run(task.id);
+          continue;
+        }
         update.run(owner, owner, task.id);
         clear.run(task.id);
         if (creatorPays) assign.run(task.id, creator.id);
