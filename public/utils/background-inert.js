@@ -19,16 +19,18 @@
  * inert (das erbte sich nach unten und liesse sich nicht zuruecknehmen),
  * sondern durchlaufen - ihre uebrigen Kinder werden es.
  *
- * DER TOAST-STAPEL BLEIBT BEDIENBAR, wie beim geteilten Modal
- * (components/modal.js, TOP_LAYER_GUESTS): ein "Rueckgaengig" hinter einer
- * Ebene waere sonst nur noch ein Bild.
+ * DIE TOASTS BLEIBEN BEDIENBAR, wie beim geteilten Modal (components/modal.js,
+ * TOP_LAYER_GUESTS): ein "Rueckgaengig" hinter einer Ebene waere sonst nur noch
+ * ein Bild. Nur die Toast-Container, nicht ihr ganzer Stapel: die
+ * Sammelaktions-Pille darin aendert Daten und gehoert zum Hintergrund
+ * (Codex-Review zu #2058).
  *
  * DIE FREIGABE nimmt nur zurueck, was dieser Aufruf gesetzt hat, und zaehlt:
  * zwei Ebenen, die denselben Zweig sperren, geben ihn erst gemeinsam frei. Ein
  * Zweig, der schon vorher inert war (ein geparkter Dialog), bleibt es.
  */
 
-const KEEP_ALWAYS = '.shell-bottom-stack';
+const KEEP_ALWAYS = '.toast-container';
 const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'TEMPLATE', 'LINK', 'META']);
 
 /** Wie oft dieser Helfer einen Zweig gerade sperrt. */

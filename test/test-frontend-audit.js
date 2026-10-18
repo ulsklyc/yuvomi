@@ -22378,6 +22378,15 @@ test('every custom aria-modal layer makes its background inert and releases it',
     const calls = (src.match(/\binertOutside\(/g) ?? []).length;
     const released = /\brelease\w*(?:\?\.)?\(\)|_releaseBackground\(\)/.test(src);
     if (calls < layers || !released) offenders.push(`${file}: ${layers} Ebene(n), ${calls} inertOutside(), Freigabe ${released ? 'ja' : 'nein'}`);
+    // ERST DEN AUSLOESER MERKEN, DANN SPERREN (Codex-Review zu #2058): wird der
+    // Vorfahr des fokussierten Knopfs inert, gibt der Browser den Fokus ab, und
+    // ein danach gelesenes `document.activeElement` waere body.
+    for (const m of src.matchAll(/\binertOutside\(/g)) {
+      const fnStart = Math.max(src.lastIndexOf('\nfunction ', m.index), src.lastIndexOf('\n  function ', m.index));
+      const fnEnd = src.indexOf('\n}\n', m.index);
+      const capture = src.slice(fnStart, fnEnd).search(/=\s*document\.activeElement\b/);
+      if (capture >= 0 && fnStart + capture > m.index) offenders.push(`${file}: liest document.activeElement erst nach inertOutside()`);
+    }
   }
   assert.deepEqual(offenders, [], `Ebene ohne gesperrten Hintergrund:\n${offenders.join('\n')}`);
 });

@@ -37,7 +37,7 @@ function el(name, tag = 'DIV', classes = []) {
   return node;
 }
 
-/** body > [#app > (header, main, sheet, backdrop), stack, script] */
+/** body > [#app > (header, main, sheet, backdrop), stack > (pill, toasts), script] */
 function page() {
   const body = el('body', 'BODY');
   const app = el('#app');
@@ -47,10 +47,13 @@ function page() {
   const backdrop = el('backdrop');
   app.append(header, main, sheet, backdrop);
   const stack = el('stack', 'DIV', ['shell-bottom-stack']);
+  const pill = el('pill', 'DIV', ['bulk-pill-layer']);
+  const toasts = el('toasts', 'DIV', ['toast-container']);
+  stack.append(pill, toasts);
   const script = el('script', 'SCRIPT');
   body.append(app, stack, script);
   globalThis.document = { body };
-  return { body, app, header, main, sheet, backdrop, stack, script };
+  return { body, app, header, main, sheet, backdrop, stack, pill, toasts, script };
 }
 
 test('auf der Seite: alles ausser der Ebene, ihrer Abdunklung und den Toasts wird inert', () => {
@@ -61,7 +64,9 @@ test('auf der Seite: alles ausser der Ebene, ihrer Abdunklung und den Toasts wir
   assert.equal(p.app.inert, false, 'der Zweig mit der Ebene wird durchlaufen, nicht gesperrt - inert erbte sich in die Ebene');
   assert.equal(p.sheet.inert, false);
   assert.equal(p.backdrop.inert, false, 'die Abdunklung schliesst per Klick und muss bedienbar bleiben');
-  assert.equal(p.stack.inert, false, 'ein Rueckgaengig im Toast bleibt erreichbar');
+  assert.equal(p.toasts.inert, false, 'ein Rueckgaengig im Toast bleibt erreichbar');
+  assert.equal(p.stack.inert, false, 'der Stapel wird durchlaufen, nicht gesperrt');
+  assert.equal(p.pill.inert, true, 'die Sammelaktions-Pille aendert Daten und gehoert zum Hintergrund (Codex-Review zu #2058)');
   assert.equal(p.script.inert, false);
   release();
   assert.equal(p.header.inert, false);
