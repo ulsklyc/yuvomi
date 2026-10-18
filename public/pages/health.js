@@ -3696,8 +3696,9 @@ function openMedModal(med) {
   const draft = isEdit ? null : [];
   // Ein neues Medikament, das schon angelegt ist, waehrend ein Zeitfenster
   // danach scheiterte: der naechste Versuch aendert es statt es zu verdoppeln.
+  // Ein schon gespeichertes Zeitfenster traegt seine Server-id im Entwurf
+  // (`savedId`, siehe wireSchedEditor): Loeschen trifft dann auch den Server.
   let createdId = null;
-  const savedScheds = new Set();
   // BESTAND UND NOTIZ HINTER "WEITERE EINSTELLUNGEN" (dieselbe Re-Critique):
   // der Dialog mass mobil 1082px, die drei Bestandsfelder standen auch fuer
   // ein Medikament offen, dessen Packung niemand zaehlt. Hat es einen Bestand
@@ -3827,7 +3828,7 @@ function openMedModal(med) {
             // und der Dialog bleibt offen. Der naechste Versuch legt es darum
             // NICHT noch einmal an, sondern aendert das schon angelegte
             // (`createdId`), und schickt nur die Zeitfenster, die noch fehlen
-            // (`savedScheds`) - sonst entstuenden Medikament und Plan doppelt.
+            // (ohne `savedId`) - sonst entstuenden Medikament und Plan doppelt.
             if (createdId == null) {
               const created = await api.post('/health/medications', { ...body, ...ownerField(meds.personId, meds.meId) });
               createdId = created?.data?.id ?? null;
@@ -3836,9 +3837,10 @@ function openMedModal(med) {
             }
             if (createdId != null) {
               for (const sched of draft) {
-                if (savedScheds.has(sched)) continue;
-                await api.post(`/health/medications/${createdId}/schedules`, sched);
-                savedScheds.add(sched);
+                if (sched.savedId != null) continue;
+                const res = await api.post(`/health/medications/${createdId}/schedules`, sched);
+                // Nicht enumerierbar: es reist nie in einen Request-Body.
+                Object.defineProperty(sched, 'savedId', { value: res?.data?.id ?? null, writable: true });
               }
             }
           }
@@ -4005,7 +4007,23 @@ function wireSchedEditor(panel, med, draft = null) {
   host.querySelectorAll('[data-sched-del]').forEach((btn) =>
     btn.addEventListener('click', async () => {
       if (isDraft) {
-        draft.splice(Number(String(btn.dataset.schedDel).replace('draft-', '')), 1);
+        const index = Number(String(btn.dataset.schedDel).replace('draft-', ''));
+        const saved = draft[index]?.savedId;
+        // Ein Teil-Speichern hat dieses Zeitfenster schon angelegt: es nur aus
+        // dem Entwurf zu nehmen liesse es am Medikament stehen, und der
+        // naechste Versuch ueberspraenge es.
+        if (saved != null) {
+          btn.disabled = true;
+          try {
+            await api.delete(`/health/schedules/${saved}`);
+          } catch (err) {
+            console.error('[Health] schedule delete error:', err);
+            btn.disabled = false;
+            reportError(err, 'health.meds.saveError', reloadMedViews);
+            return;
+          }
+        }
+        draft.splice(index, 1);
         renderSchedEditor(panel, med, draft);
         return;
       }

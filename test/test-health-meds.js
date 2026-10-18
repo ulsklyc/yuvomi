@@ -739,3 +739,97 @@ test('R20: scheitert ein Zeitfenster nach dem Anlegen, aendert der naechste Vers
     }
   }
 });
+
+// Codex-Review PR #2053, zweite Runde (P2): nach einem Teil-Speichern steht
+// ein Zeitfenster des Entwurfs schon am Medikament. Loeschte man es danach im
+// Entwurf, verschwand es nur lokal; der naechste Versuch uebersprang es, und
+// das Medikament behielt den Plan, den niemand mehr wollte.
+test('R20: ein schon gespeichertes Zeitfenster, das man nach einem Teil-Speichern loescht, verschwindet auch am Server', async () => {
+  const keep = { open: globalThis.__openModal, adv: globalThis.__advancedSection, api: globalThis.__apiStub, win: globalThis.window, err: console.error };
+  const opened = [];
+  globalThis.__openModal = (opts) => { opened.push(opts); };
+  globalThis.__advancedSection = (inner) => inner;
+  const calls = [];
+  let failSecondSchedule = true;
+  let schedPosts = 0;
+  globalThis.__apiStub = {
+    post: async (path, body) => {
+      calls.push({ method: 'POST', path, body });
+      if (path === '/health/medications') return { data: { id: 41 } };
+      schedPosts += 1;
+      if (schedPosts === 2 && failSecondSchedule) { failSecondSchedule = false; throw Object.assign(new Error('boom'), { status: 500 }); }
+      return { data: { id: 100 + schedPosts } };
+    },
+    patch: async (path, body) => { calls.push({ method: 'PATCH', path, body }); return { data: {} }; },
+    delete: async (path) => { calls.push({ method: 'DELETE', path }); return { data: {} }; },
+    get: async () => ({ data: [] }),
+  };
+  globalThis.window = globalThis.window ?? {};
+  console.error = () => {};
+  const listeners = {};
+  let deleteButtons = [];
+  const field = (value = '') => ({ value, checked: false, style: {}, dataset: {}, disabled: false, addEventListener(type, fn) { listeners[type] = fn; } });
+  const addButton = { disabled: false, addEventListener(type, fn) { listeners.schedAdd = fn; } };
+  let time = '08:00';
+  let draftRows = 0;
+  const host = {
+    replaceChildren() {},
+    insertAdjacentHTML(_pos, html) { draftRows = (String(html).match(/data-sched-del="draft-/g) || []).length; },
+    querySelector(sel) {
+      if (sel === '#sched-time') return { value: time };
+      if (sel === '#sched-dose') return { value: '1' };
+      if (sel === '[data-action="sched-add"]') return addButton;
+      return null;
+    },
+    querySelectorAll(sel) {
+      if (sel === '.health-weekday.is-active') return [0, 1, 2, 3, 4, 5, 6].map((d) => ({ dataset: { day: String(d) } }));
+      if (sel === '[data-sched-del]') {
+        deleteButtons = Array.from({ length: draftRows }, (_, i) => {
+          const b = { disabled: false, dataset: { schedDel: `draft-${i}` }, addEventListener(type, fn) { b.click = fn; } };
+          return b;
+        });
+        return deleteButtons;
+      }
+      return [];
+    },
+  };
+  const form = { addEventListener(type, fn) { listeners.submit = fn; } };
+  const fields = { '#med-name': field('Ibuprofen'), '#med-prn': field(), '#med-prn-fields': field(), '#med-active': { ...field(), checked: true } };
+  const panel = {
+    querySelector(sel) {
+      if (sel === '#med-sched-editor') return host;
+      if (sel === '#med-form') return form;
+      if (sel === '[type="submit"]') return { disabled: false };
+      return fields[sel] ?? field();
+    },
+    querySelectorAll: () => [],
+  };
+  try {
+    healthHelpers.openMedModal(null);
+    opened.at(-1).onSave(panel);
+    await listeners.schedAdd({ currentTarget: addButton });
+    time = '20:00';
+    await listeners.schedAdd({ currentTarget: addButton });
+    await listeners.submit({ preventDefault() {} });
+    assert.deepEqual(calls.map((c) => `${c.method} ${c.path}`), [
+      'POST /health/medications', 'POST /health/medications/41/schedules', 'POST /health/medications/41/schedules',
+    ], 'das erste Zeitfenster steht (id 101), das zweite scheitert');
+    assert.equal(deleteButtons.length, 2, 'Reichweite: beide Entwurfszeilen haben einen Loeschknopf');
+    calls.length = 0;
+    await deleteButtons[0].click();
+    assert.deepEqual(calls.map((c) => `${c.method} ${c.path}`), ['DELETE /health/schedules/101'],
+      'das schon gespeicherte 08:00-Fenster wird am Server geloescht');
+    calls.length = 0;
+    await listeners.submit({ preventDefault() {} });
+    assert.deepEqual(calls.map((c) => `${c.method} ${c.path}`), [
+      'PATCH /health/medications/41', 'POST /health/medications/41/schedules',
+    ], 'der naechste Versuch schickt nur das fehlende 20:00-Fenster');
+    assert.equal(calls[1].body.time_of_day, '20:00');
+    assert.equal('savedId' in calls[1].body && Object.keys(calls[1].body).includes('savedId'), false, 'die Server-id reist nie im Body');
+  } finally {
+    console.error = keep.err;
+    for (const [k, v] of [['__openModal', keep.open], ['__advancedSection', keep.adv], ['__apiStub', keep.api], ['window', keep.win]]) {
+      if (v === undefined) delete globalThis[k]; else globalThis[k] = v;
+    }
+  }
+});
