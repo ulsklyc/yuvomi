@@ -15,6 +15,7 @@ db.exec(`CREATE TABLE users (deactivated_at TEXT,
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   username TEXT UNIQUE NOT NULL, display_name TEXT NOT NULL,
   password_hash TEXT NOT NULL, avatar_color TEXT NOT NULL DEFAULT '#007AFF',
+  avatar_data TEXT, avatar_version INTEGER NOT NULL DEFAULT 0,
   role TEXT NOT NULL DEFAULT 'member',
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
@@ -60,7 +61,7 @@ d2.exec('PRAGMA foreign_keys = ON;');
 d2.exec(`CREATE TABLE users (deactivated_at TEXT, 
   id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL,
   display_name TEXT NOT NULL, password_hash TEXT NOT NULL,
-  avatar_color TEXT NOT NULL DEFAULT '#007AFF', avatar_data BLOB,
+  avatar_color TEXT NOT NULL DEFAULT '#007AFF', avatar_data BLOB, avatar_version INTEGER NOT NULL DEFAULT 0,
   role TEXT NOT NULL DEFAULT 'member',
   created_at TEXT DEFAULT '', updated_at TEXT DEFAULT '');`);
 d2.exec(MIGRATIONS_SQL[10]);
