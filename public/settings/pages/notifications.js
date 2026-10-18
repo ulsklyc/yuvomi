@@ -235,7 +235,7 @@ function renderChannelList(container, channels, providers = DEFAULT_PROVIDERS) {
           </div>
           <div class="form-field notification-ntfy-basic-field${channel.config.authType === 'basic' ? '' : ' settings-card--hidden'}">
             <label class="form-label" for="notification-ntfy-username-${suffix}">${t('settings.notificationChannelNtfyUsername')}</label>
-            <input class="form-input" id="notification-ntfy-username-${suffix}" name="ntfyUsername" autocomplete="username">
+            <input class="form-input" id="notification-ntfy-username-${suffix}" name="ntfyUsername" autocomplete="off">
           </div>
           <div class="form-field notification-ntfy-basic-field${channel.config.authType === 'basic' ? '' : ' settings-card--hidden'}">
             <label class="form-label" for="notification-ntfy-password-${suffix}">${t('settings.notificationChannelNtfyPassword')}</label>

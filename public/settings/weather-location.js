@@ -1,6 +1,7 @@
 import { api } from '/api.js';
 import { getLocale, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { isImeComposing } from '/utils/ux.js';
 import { settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { clearFieldError, reportFieldError } from '/components/modal.js';
 
@@ -340,7 +341,7 @@ export function bindWeatherLocationEvents(container, scope) {
   const place = container.querySelector(`#${scope}-place`);
   // Enter im Suchfeld sucht - ohne das schickte es das ganze Formular ab.
   place?.addEventListener('keydown', (event) => {
-    if (event.key !== 'Enter' || event.isComposing) return;
+    if (event.key !== 'Enter' || isImeComposing(event)) return;
     event.preventDefault();
     searchPlace(container, scope, state);
   });

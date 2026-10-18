@@ -21,7 +21,9 @@ import {
   moduleDisplayLabel,
   widgetDisplayLabel,
   optionFieldLabel,
+  reloadExtensionLocales,
 } from '../public/utils/extension-i18n.js';
+import { readFileSync } from 'node:fs';
 
 test.after(() => {
   clearExtensionTranslations();
@@ -158,4 +160,78 @@ test('clearExtensionTranslations removes overlay', () => {
   registerExtensionTranslations('demo-mod', { menu: 'X' });
   clearExtensionTranslations();
   assert.equal(t('extensions.demo-mod.menu'), 'extensions.demo-mod.menu');
+});
+
+// Der Router fragt /modules alle 30 s ab und ruft danach reloadExtensionLocales.
+// Vorher holte JEDER Takt jede Sprachdatei jedes aktiven Moduls mit no-store neu:
+// zwei Module mit je 25 Sprachen waren rund 6000 Anfragen pro Stunde und Tab.
+test('reloadExtensionLocales fetches locale files only when the module set changed', async () => {
+  const urls = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    urls.push(String(url));
+    return { ok: true, json: async () => ({ menu: 'Demo' }) };
+  };
+  try {
+    const mod = (version) => ({
+      id: 'poll-mod', enabled: true, status: 'enabled', version,
+      i18n: { defaultLocale: 'en', availableLocales: ['en', 'de'] },
+    });
+    await reloadExtensionLocales([mod('1.0.0')]);
+    assert.equal(urls.length, 2, 'first load fetches every locale file');
+
+    await reloadExtensionLocales([mod('1.0.0')]);
+    assert.equal(urls.length, 2, 'an unchanged poll must not refetch');
+    assert.equal(t('extensions.poll-mod.menu'), 'Demo', 'translations survive the skipped poll');
+
+    await reloadExtensionLocales([mod('1.1.0')]);
+    assert.equal(urls.length, 4, 'an updated module reloads its locales');
+
+    await reloadExtensionLocales([mod('1.1.0')], { force: true });
+    assert.equal(urls.length, 6, 'force reloads after an install or update in settings');
+  } finally {
+    globalThis.fetch = realFetch;
+    clearExtensionTranslations();
+  }
+});
+
+test('router: the module poll skips ticks while the tab is hidden', () => {
+  const src = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  const start = src.indexOf('function startThirdPartyModulePolling');
+  assert.ok(start > 0, 'startThirdPartyModulePolling exists');
+  const body = src.slice(start, src.indexOf('\n}\n', start));
+  assert.match(body, /setInterval\(/);
+  assert.match(body, /document\.hidden/, 'a hidden tab must not poll /modules');
+});
+
+// Codex-Review zu #2055: scheiterte eine Sprachdatei, merkte sich die Funktion
+// den Modulsatz trotzdem als geladen - jeder weitere Takt kehrte frueh zurueck,
+// und die fehlende Uebersetzung kam bis zum Neuladen des Tabs nie wieder.
+test('reloadExtensionLocales retries a module set whose locale file failed to load', async () => {
+  const urls = [];
+  let failDe = true;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    urls.push(String(url));
+    if (failDe && String(url).endsWith('/de.json')) throw new TypeError('Failed to fetch');
+    return { ok: true, json: async () => ({ menu: 'Demo' }) };
+  };
+  try {
+    const mod = {
+      id: 'retry-mod', enabled: true, status: 'enabled', version: '1.0.0',
+      i18n: { defaultLocale: 'en', availableLocales: ['en', 'de'] },
+    };
+    await reloadExtensionLocales([mod]);
+    assert.equal(urls.length, 2, 'first load asks for both files');
+
+    failDe = false;
+    await reloadExtensionLocales([mod]);
+    assert.equal(urls.length, 4, 'the next poll retries after a failed file');
+
+    await reloadExtensionLocales([mod]);
+    assert.equal(urls.length, 4, 'once complete, an unchanged poll stays quiet');
+  } finally {
+    globalThis.fetch = realFetch;
+    clearExtensionTranslations();
+  }
 });

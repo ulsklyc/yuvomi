@@ -9,7 +9,7 @@ import { openModal as openSharedModal, closeModal, advancedSection, refocusAfter
 import { openDetailView } from '/components/detail-view.js';
 import { stagger, vibrate, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
 import { t, formatDate } from '/i18n.js';
-import { esc, REQUIRED_MARK } from '/utils/html.js';
+import { esc, REQUIRED_MARK, externalHref } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
@@ -991,14 +991,18 @@ function contactLinksNode(entries) {
     const line = document.createElement('div');
     line.className = 'contact-detail__value';
 
-    const a = document.createElement('a');
-    a.className = 'contact-detail__link';
-    a.href = href;
+    // Ohne sicheres Ziel (eine Website ohne http(s), etwa aus einer vCard)
+    // steht der Wert als Text da statt als Link.
+    const a = document.createElement(href ? 'a' : 'span');
+    if (href) {
+      a.className = 'contact-detail__link';
+      a.href = href;
+    }
     a.textContent = text;
     // enhancePhones() ersetzt danach nur den Anzeigetext; der Rohwert im href
     // und im data-Attribut bleibt unberührt.
     if (phoneRaw) a.dataset.phoneRaw = phoneRaw;
-    if (external) { a.target = '_blank'; a.rel = 'noopener'; }
+    if (external && href) { a.target = '_blank'; a.rel = 'noopener'; }
     line.appendChild(a);
 
     if (sub) {
@@ -1095,7 +1099,7 @@ function renderContactDetail(contact) {
       icon: 'globe',
       label: t('contacts.websiteLabel'),
       node: contactLinksNode(contact.website
-        ? [{ href: contact.website, text: contact.website, external: true }]
+        ? [{ href: externalHref(contact.website), text: contact.website, external: true }]
         : []),
     },
     { icon: 'quote',      label: t('contacts.nicknameLabel'), value: contact.nickname || '' },

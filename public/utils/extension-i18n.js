@@ -97,12 +97,16 @@ function moduleI18nMeta(module) {
   };
 }
 
-/** Laedt alle vom Server gemeldeten locale-Dateien des Moduls. */
-export async function loadExtensionLocales(module) {
+/**
+ * Laedt alle vom Server gemeldeten locale-Dateien eines Moduls.
+ * @returns {Promise<{ loaded: boolean, complete: boolean }>} `loaded`: es gibt
+ *   Uebersetzungen; `complete`: jede gemeldete Datei kam an
+ */
+async function loadModuleLocales(module) {
   const { id: moduleId, defaultLocale, availableLocales } = moduleI18nMeta(module);
   if (!availableLocales.length) {
     clearExtensionLocaleBundles(moduleId);
-    return false;
+    return { loaded: false, complete: true };
   }
 
   const trees = {};
@@ -114,21 +118,53 @@ export async function loadExtensionLocales(module) {
       // Einzelne Locale darf fehlen; die Fallback-Kette traegt den Rest.
     }
   }));
+  const complete = Object.keys(trees).length === availableLocales.length;
 
   if (!Object.keys(trees).length) {
     clearExtensionLocaleBundles(moduleId);
-    return false;
+    return { loaded: false, complete };
   }
 
   setExtensionLocaleBundles(moduleId, { defaultLocale, trees });
-  return true;
+  return { loaded: true, complete };
 }
 
-export async function reloadExtensionLocales(modules) {
-  clearExtensionTranslations();
+/** Laedt alle vom Server gemeldeten locale-Dateien des Moduls. */
+export async function loadExtensionLocales(module) {
+  return (await loadModuleLocales(module)).loaded;
+}
+
+// Fingerabdruck des zuletzt geladenen Modulsatzes. Der Router ruft diese
+// Funktion nach JEDER /modules-Abfrage (alle 30 s); ohne den Vergleich holte
+// jeder Takt alle Sprachdateien aller Module mit no-store neu.
+let _loadedLocaleSignature = null;
+
+function localeSignature(enabled) {
+  return JSON.stringify(enabled.map((m) => {
+    const meta = moduleI18nMeta(m);
+    return [meta.id, String(m.version ?? ''), meta.defaultLocale, meta.availableLocales];
+  }));
+}
+
+/**
+ * Laedt die Sprachdateien aller aktiven Module - aber nur, wenn sich Satz,
+ * Version oder Sprachliste geaendert haben. `force` laedt trotzdem (nach
+ * Installation oder Update in den Einstellungen).
+ * @returns {Promise<boolean>} true, wenn neu geladen wurde
+ */
+export async function reloadExtensionLocales(modules, { force = false } = {}) {
   const enabled = (Array.isArray(modules) ? modules : [])
     .filter((m) => m?.enabled && m.status === 'enabled');
-  await Promise.all(enabled.map((m) => loadExtensionLocales(m)));
+  const signature = localeSignature(enabled);
+  if (!force && signature === _loadedLocaleSignature) return false;
+  clearExtensionTranslations();
+  const results = await Promise.all(enabled.map((m) => loadModuleLocales(m)));
+  // Nur ein VOLLSTAENDIG geladener Satz gilt als erledigt. Scheiterte eine
+  // Datei (Netz weg, Server neu gestartet), versucht es der naechste Takt
+  // wieder - sonst fehlte die Uebersetzung bis zum Neuladen des Tabs
+  // (Codex-Review zu #2055).
+  _loadedLocaleSignature = results.every((r) => r.complete) ? signature : null;
+  return true;
 }
 
 let _localeHookInstalled = false;

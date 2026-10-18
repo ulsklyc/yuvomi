@@ -347,7 +347,7 @@ function bindProviderAddButton(container) {
             formRowHtml({
               label: t('settings.recipeProviderTokenLabel'), labelFor: 'recipe-provider-token', labelExtra: REQUIRED_MARK, field: true,
               description: t('settings.recipeProviderTokenHintMealie'), descriptionId: 'recipe-provider-token-hint',
-              control: '<input class="form-input" type="password" id="recipe-provider-token" required autocomplete="off" aria-describedby="recipe-provider-token-hint" />',
+              control: '<input class="form-input" type="password" id="recipe-provider-token" required autocomplete="new-password" aria-describedby="recipe-provider-token-hint" />',
             }),
           ])}
           <div id="recipe-provider-add-error" class="form-error" role="alert" hidden></div>

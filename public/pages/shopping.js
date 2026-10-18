@@ -5,7 +5,7 @@
  */
 
 import { api } from '/api.js';
-import { stagger, vibrate, scheduleUndoableDelete, collapseOut, expandIn, acknowledgeCheck, durationToken } from '/utils/ux.js';
+import { stagger, vibrate, scheduleUndoableDelete, collapseOut, expandIn, acknowledgeCheck, durationToken, isImeComposing } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { flipSnapshot, flipPlay } from '/utils/flip.js';
 import { t } from '/i18n.js';
@@ -1770,7 +1770,7 @@ function wireAutocomplete(container) {
       e.preventDefault();
       activeIdx = Math.max(activeIdx - 1, 0);
       items.forEach((el, i) => el.classList.toggle('autocomplete-item--active', i === activeIdx));
-    } else if (e.key === 'Enter' && activeIdx >= 0) {
+    } else if (e.key === 'Enter' && activeIdx >= 0 && !isImeComposing(e)) {
       e.preventDefault();
       applyAutocompleteSuggestion(container, items[activeIdx]);
       dropdown.hidden = true;

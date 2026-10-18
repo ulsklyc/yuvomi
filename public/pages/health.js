@@ -20,7 +20,7 @@ import { swapContent } from '/utils/content-swap.js';
 import { toLocalDateKey, parseLocalDateKey, addLocalDays, todayKey} from '/utils/date.js';
 import { zonedDateKey } from '/utils/timezone.js';
 import { DATE_STATUS_ALERT_DAYS } from '/utils/date-status.js';
-import { nowFields } from '/utils/timezone.js';
+import { nowFields, nowDateTimeValue } from '/utils/timezone.js';
 import { trendMarkup } from '/utils/metric-card.js';
 import { openModal, closeModal, confirmModal, confirmOverModal, reportFieldError, reportFieldErrors, advancedSection, refocusAfterRender } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
@@ -2118,13 +2118,6 @@ function chartMarkup(metric, series, geo = CHART) {
 // Erfassungs-Modal
 // --------------------------------------------------------
 
-function localDateTimeValue(date) {
-  const key = toLocalDateKey(date);
-  const hh = String(date.getHours()).padStart(2, '0');
-  const mm = String(date.getMinutes()).padStart(2, '0');
-  return `${key}T${hh}:${mm}`;
-}
-
 // Beispielwerte als Platzhalter des Blutdruck-Paars und die Einheit des
 // Pulses. Zahlen und ein Einheitenzeichen, keine Texte - wie `metric.units`.
 const PAIR_EXAMPLE = Object.freeze({ systolic: 120, diastolic: 80, pulse: 72 });
@@ -2270,7 +2263,7 @@ function openVitalModal(opts = {}) {
   const visibilityValue = isEdit ? (row.visibility || 'private') : defaultVisibility(vitalScopeKey(currentType));
   const measuredValue = isEdit && row.measured_at
     ? String(row.measured_at).slice(0, 16)
-    : localDateTimeValue(now);
+    : nowDateTimeValue(now);
 
   openModal({
     title: isEdit ? t('health.vitals.edit') : t('health.vitals.add'),
@@ -5169,7 +5162,7 @@ function openActivityModal(row, opts = {}) {
   const customValue = isEdit && !isPreset ? val(row.type) : '';
   const dateValue = isEdit && row.performed_at
     ? String(row.performed_at).slice(0, 16)
-    : localDateTimeValue(new Date());
+    : nowDateTimeValue(new Date());
 
   openModal({
     title: isEdit ? t('health.activity.edit') : t('health.activity.add'),
@@ -6163,7 +6156,7 @@ function openNutritionModal(row) {
   const val = (v) => (v == null ? '' : String(v));
   const whenValue = isEdit && row.consumed_at
     ? String(row.consumed_at).slice(0, 16)
-    : localDateTimeValue(new Date());
+    : nowDateTimeValue(new Date());
   const visibility = row?.visibility || defaultNutritionVisibility();
 
   openModal({

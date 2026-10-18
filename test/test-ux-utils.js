@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { eachRule } from './css-rules.js';
 
 // Minimales Window/Navigator-Mock für Node
-const { stagger, vibrate, withBusy, scheduleUndoableDelete, wireSwipeToDismiss, wireCollapsingHeader, collapseOut, expandIn, watchNavCapsuleHeight, wireScrollFade, nextNavMinimized, NAV_MINIMIZE_DOWN, NAV_MINIMIZE_UP, bindNavMinimize, navPillGeometry, NAV_PILL_MAX_INNER, STAGGER_ROWS, durationToken } = await (async () => {
+const { stagger, vibrate, withBusy, scheduleUndoableDelete, wireSwipeToDismiss, wireCollapsingHeader, collapseOut, expandIn, watchNavCapsuleHeight, wireScrollFade, nextNavMinimized, NAV_MINIMIZE_DOWN, NAV_MINIMIZE_UP, bindNavMinimize, navPillGeometry, NAV_PILL_MAX_INNER, STAGGER_ROWS, durationToken, isImeComposing } = await (async () => {
   global.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
@@ -1950,4 +1950,38 @@ test('watchNavCapsuleHeight: minimiert oder auf dem Rueckweg misst die Kapsel ni
   } finally {
     globalThis.ResizeObserver = saved;
   }
+});
+
+/* Enter bestaetigt bei japanischer, koreanischer oder chinesischer Eingabe
+ * (IME) erst die Umwandlung. Ein eigener keydown-Handler, der auf Enter
+ * absendet oder einen Vorschlag uebernimmt, speichert sonst einen halb
+ * geschriebenen Text. Safari meldet das bestaetigende Enter teils schon mit
+ * isComposing=false, aber keyCode 229 (WebKit-Bug 165004).
+ */
+test('isImeComposing erkennt das Enter einer laufenden IME-Umwandlung', () => {
+  assert.equal(typeof isImeComposing, 'function', 'utils/ux.js exportiert isImeComposing');
+  assert.equal(isImeComposing({ key: 'Enter', isComposing: true, keyCode: 13 }), true);
+  assert.equal(isImeComposing({ key: 'Enter', isComposing: false, keyCode: 229 }), true, 'Safari');
+  assert.equal(isImeComposing({ key: 'Enter', isComposing: false, keyCode: 13 }), false);
+  assert.equal(isImeComposing({}), false);
+});
+
+test('jeder Enter-Handler eines Textfelds fragt isImeComposing', () => {
+  // Ein Handler, der Enter OHNE Leertaste prueft, gehoert einem Textfeld;
+  // Enter-oder-Leertaste ist die Tastaturbedienung eines Knopfs. Die
+  // Listenzeile in master-detail.js ist kein Textfeld.
+  const allowed = new Set(['utils/master-detail.js']);
+  const root = fileURLToPath(new URL('../public/', import.meta.url));
+  const offenders = [];
+  for (const rel of globSync('**/*.js', { cwd: root })) {
+    if (rel.startsWith('vendor/') || allowed.has(rel)) continue;
+    const lines = readFileSync(root + rel, 'utf8').split('\n');
+    lines.forEach((line, i) => {
+      if (!/\.key\s*[!=]==\s*'Enter'/.test(line) || /'\s'/.test(line)) return;
+      const handler = lines.slice(Math.max(0, i - 15), i + 1).join('\n');
+      // palette-combobox.js prueft inline (laedt ohne Browser-Loader, kein Import).
+      if (!/isImeComposing\(|keyCode === 229/.test(handler)) offenders.push(`${rel}:${i + 1}`);
+    });
+  }
+  assert.deepEqual(offenders, [], 'Enter ohne IME-Pruefung');
 });

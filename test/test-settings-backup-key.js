@@ -39,7 +39,9 @@ test('ueber HTTPS verweist aria-describedby NICHT auf die (versteckte) Warnung',
 test('das Feld ist ein Passwortfeld ohne Autovervollstaendigung', () => {
   const input = backupKeyFieldHtml().match(/<input[^>]*>/s)[0];
   assert.match(input, /type="password"/);
-  assert.match(input, /autocomplete="off"/);
+  // new-password statt off: "off" ignorieren viele Browser an Passwortfeldern
+  // und fuellen das gespeicherte Anmeldepasswort ein (MDN, Codex-Review zu #2055).
+  assert.match(input, /autocomplete="new-password"/);
 });
 
 test('Gruende: Schluessel gefragt zeigt das Feld, bewiesener Schluessel behaelt es, der Rest leert es', () => {

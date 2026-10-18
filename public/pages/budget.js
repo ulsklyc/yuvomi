@@ -9,7 +9,7 @@ import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, confirmOverModal, advancedSection, wireBlurValidation, reportFieldError, reportFieldErrors, refocusAfterRender } from '/components/modal.js';
 import { renderDocumentAttachField, bindDocumentAttachField, attachmentLinksNode } from '/components/document-attach.js';
 import { openDetailView } from '/components/detail-view.js';
-import { stagger, vibrate, scheduleUndoableDelete, growBars } from '/utils/ux.js';
+import { stagger, vibrate, scheduleUndoableDelete, growBars, isImeComposing } from '/utils/ux.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { t, formatDate, formatDayMonth, formatMonthYear, getLocale, getNumberFormat } from '/i18n.js';
@@ -4743,7 +4743,7 @@ function requestNameInPanel(panel, { title, label, placeholder }) {
     // tabbt man aus dem „Dialog" heraus in das darunterliegende Formular.
     overlay.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') { e.stopPropagation(); cleanup(''); return; }
-      if (e.key === 'Enter' && e.target === input) { cleanup(input.value.trim()); return; }
+      if (e.key === 'Enter' && e.target === input && !isImeComposing(e)) { cleanup(input.value.trim()); return; }
       if (e.key !== 'Tab') return;
       const focusable = [...overlay.querySelectorAll('button, input')].filter((el) => !el.disabled);
       if (!focusable.length) return;

@@ -118,8 +118,10 @@ export function wirePaletteCombobox({ input, listbox }) {
   }
 
   input.addEventListener('keydown', (e) => {
-    // Waehrend einer IME-Eingabe gehoert Enter der Komposition.
-    if (e.isComposing) return;
+    // Waehrend einer IME-Eingabe gehoert Enter der Komposition. keyCode 229
+    // faengt Safari (wie isImeComposing() in utils/ux.js - dieses Modul bleibt
+    // ohne Import, test:search-palette laedt es ohne Browser-Loader).
+    if (e.isComposing || e.keyCode === 229) return;
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       if (!options.length) return;
       e.preventDefault();

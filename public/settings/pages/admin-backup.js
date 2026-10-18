@@ -114,7 +114,7 @@ function renderPage(container) {
               label: t('settings.backupWebdavPassword'), labelFor: 'webdav-password',
               control: `<div class="settings-webdav-pw-wrap">
                 <input class="form-input" type="password" id="webdav-password" name="password"
-                  autocomplete="current-password"
+                  autocomplete="new-password"
                   placeholder="${t('settings.backupWebdavPasswordPlaceholder')}" />
                 <button type="button" class="btn btn--icon btn--ghost settings-webdav-reveal-btn"
                   data-reveal-target="webdav-password" aria-label="${t('common.togglePasswordVisibility')}">

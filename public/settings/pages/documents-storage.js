@@ -115,7 +115,7 @@ function buildConnectionForm() {
         label: t("settings.documentStoragePassword"), labelFor: "document-storage-password",
         control: `<div class="settings-webdav-pw-wrap">
           <input class="form-input" type="password" id="document-storage-password" name="password"
-            autocomplete="current-password" placeholder="${t("settings.documentStoragePasswordPlaceholder")}" />
+            autocomplete="new-password" placeholder="${t("settings.documentStoragePasswordPlaceholder")}" />
           <button type="button" class="btn btn--icon btn--ghost settings-webdav-reveal-btn"
             data-reveal-target="document-storage-password" aria-label="${t("common.togglePasswordVisibility")}">
             <i data-lucide="eye" aria-hidden="true"></i>

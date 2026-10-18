@@ -1301,3 +1301,33 @@ test('R20: keine Leseansicht zieht einen Farbstreifen im blossen Modulton', asyn
   }
   assert.deepEqual(hits, []);
 });
+
+/* Fremde Adressen als Link: nur http(s) wird zum href. Die Website eines
+ * Kontakts kommt ungeprueft aus dem vCard-Feld URL (CardDAV), die Rezept-URL
+ * aus Formular, API und Rezept-Anbietern. Stand dort `javascript:...`, wurde es
+ * ein klickbarer Link - heute bremst das nur die CSP (script-src ohne
+ * unsafe-inline), eine zweite Schicht gab es nicht.
+ */
+test('externalHref laesst nur http(s) als Linkziel durch', async () => {
+  const { externalHref } = await import('../public/utils/html.js');
+  assert.equal(typeof externalHref, 'function', 'utils/html.js exportiert externalHref');
+  assert.equal(externalHref('https://example.org/a?b=1'), 'https://example.org/a?b=1');
+  assert.equal(externalHref('  HTTP://example.org  '), 'HTTP://example.org');
+  assert.equal(externalHref('javascript:alert(1)'), '');
+  assert.equal(externalHref(' JavaScript:alert(1)'), '');
+  assert.equal(externalHref('data:text/html,<b>x</b>'), '');
+  assert.equal(externalHref('www.example.org'), '', 'ohne Schema kein relativer Link in die App');
+  assert.equal(externalHref(null), '');
+});
+
+test('Kontakt-Website und Rezept-URL laufen durch externalHref', async () => {
+  const contacts = await read('public/pages/contacts.js');
+  assert.match(contacts, /externalHref\(contact\.website\)/, 'contacts.js: Website');
+  assert.doesNotMatch(contacts, /href: contact\.website\b/, 'contacts.js: roher Wert als href');
+  const recipes = await read('public/pages/recipes.js');
+  assert.match(recipes, /externalHref\(recipe\.recipe_url\)/, 'recipes.js: Rezept-Link');
+  assert.doesNotMatch(recipes, /link\.href = recipe\.recipe_url/, 'recipes.js: roher Wert als href');
+  const meals = await read('public/pages/meals.js');
+  assert.match(meals, /externalHref\(meal\.recipe_url\)/, 'meals.js: Rezept-Knopf der Mahlzeitkarte');
+  assert.doesNotMatch(meals, /href="\$\{esc\(meal\.recipe_url\)\}"/, 'meals.js: roher Wert als href');
+});

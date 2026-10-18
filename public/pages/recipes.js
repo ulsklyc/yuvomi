@@ -5,7 +5,7 @@
 
 import { api } from '/api.js';
 import { t, formatDate, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
-import { esc, REQUIRED_MARK } from '/utils/html.js';
+import { esc, REQUIRED_MARK, externalHref } from '/utils/html.js';
 import { openModal as openSharedModal, closeModal as closeSharedModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender, captureModalContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
@@ -1223,10 +1223,11 @@ function fillRecipeDetail(detail, recipe) {
   const addToShopping = shoppingTransferButton(recipe, ingredients);
   if (addToShopping) detailActions.appendChild(addToShopping);
 
-  if (recipe.recipe_url) {
+  const recipeHref = externalHref(recipe.recipe_url);
+  if (recipeHref) {
     const link = document.createElement('a');
     link.className = 'btn btn--ghost';
-    link.href = recipe.recipe_url;
+    link.href = recipeHref;
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
     link.insertAdjacentHTML('beforeend',

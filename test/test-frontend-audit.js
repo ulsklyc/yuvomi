@@ -2113,10 +2113,11 @@ test('sync-contacts leaf owns CardDAV account management', () => {
   // (nicht das App-Passwort), Formularfehler sind feldbezogen, und der Sync
   // meldet keinen Erfolg ohne aktiviertes Adressbuch.
   assert.match(source, /disconnectAccountConfirmTitle', \{ name: account\.name \}/);
-  // Fremdserver-Passwort: weder das App-Passwort anbieten (current-password)
-  // noch ein generiertes vorschlagen (new-password).
-  assert.match(source, /id="cardav-password"[^>]*autocomplete="off"/);
-  assert.doesNotMatch(source, /autocomplete="(current|new)-password"/);
+  // Fremdserver-Passwort: nie das App-Passwort anbieten (current-password).
+  // new-password statt off: "off" ignorieren viele Browser an Passwortfeldern
+  // und fuellen dann doch das gespeicherte ein (MDN, Codex-Review zu #2055).
+  assert.match(source, /id="cardav-password"[^>]*autocomplete="new-password"/);
+  assert.doesNotMatch(source, /autocomplete="current-password"/);
   assert.match(source, /cardavCredentialsTrustHint/);
   assert.match(source, /wireBlurValidation\(form\)/);
   assert.match(source, /if \(!validateAll\(form\)\) return;/);
@@ -9706,7 +9707,8 @@ test('die Statusbar folgt der ausdruecklichen Theme-Wahl, nicht nur dem System',
 
 test('modal Enter submits the form instead of advancing to the next field (audit 1.4)', () => {
   const src = read('../public/components/modal.js');
-  const enterBlock = src.match(/if \(e\.key === 'Enter'\) \{[\s\S]*?\n {4}\}/);
+  // Waehrend einer IME-Umwandlung gehoert Enter der Komposition (test:ux-utils).
+  const enterBlock = src.match(/if \(e\.key === 'Enter'(?: && !isImeComposing\(e\))?\) \{[\s\S]*?\n {4}\}/);
   assert.ok(enterBlock, 'expected an Enter keydown handler');
   assert.match(enterBlock[0], /submitBtn\.click\(\)/, 'Enter must trigger the submit button');
   assert.doesNotMatch(enterBlock[0], /next\.focus\(\)/, 'Enter must not advance focus to the next field');
@@ -22133,4 +22135,108 @@ test('!important-Sperrklinke: echte !important-Deklarationen in public/styles we
   assert.ok(found.length > 20, `Reichweite: nur ${found.length} Treffer - zaehlt der Scanner noch?`);
   assert.ok(found.length <= IMPORTANT_CEILING,
     `${found.length} echte !important statt hoechstens ${IMPORTANT_CEILING}. Neue Vorrangregel ueber Spezifitaet oder Quellreihenfolge loesen, nicht ueber !important:\n${found.join('\n')}`);
+});
+
+/* Zugangsdaten FREMDER Dienste (CalDAV, Apple, WebDAV, DMS, SMTP, Immich,
+ * Gotify, ntfy, Webhook, Rezept-Anbieter, Backup-Schluessel) duerfen nie das
+ * Yuvomi-Passwort angeboten bekommen. `current-password` meint das Passwort
+ * DIESER Seite: der Passwortmanager fuellte es ein, und beim Speichern ging es
+ * an den fremden Server. `autocomplete="off"` hilft dort nicht - viele Browser
+ * ignorieren es an Passwortfeldern (MDN, "Turning off form autocompletion",
+ * Codex-Review zu #2055). Der Hinweis, der das Einfuellen eines gespeicherten
+ * Passworts verhindert, ist `new-password`; ein Benutzername-Feld eines fremden
+ * Kontos traegt `off`, nie `username`. Die Anmeldewerte gehoeren nur dorthin,
+ * wo es um ein Yuvomi-Konto geht: Anmeldung, eigenes Konto, neues
+ * Familienmitglied, Gastkonto.
+ */
+test('Zugangsdaten fremder Dienste bekommen kein Anmelde-Autofill', () => {
+  const ownAccountForms = new Set([
+    'pages/login.js', 'pages/setup.js', 'pages/join.js', 'pages/reset-password.js',
+    'pages/forgot-password.js', 'pages/split-expenses.js',
+    'settings/pages/personal-account.js', 'settings/pages/admin-family.js',
+  ]);
+  const root = fileURLToPath(new URL('../public/', import.meta.url));
+  const offenders = [];
+  for (const dir of ['pages', 'settings/pages', 'settings', 'components']) {
+    for (const name of readdirSync(root + dir)) {
+      const rel = `${dir}/${name}`;
+      if (!name.endsWith('.js') || ownAccountForms.has(rel)) continue;
+      const src = read(`../public/${rel}`);
+      const lineOf = (index) => src.slice(0, index).split('\n').length;
+      src.split('\n').forEach((line, i) => {
+        if (/autocomplete="(?:current-password|username)"/.test(line)) offenders.push(`${rel}:${i + 1} (Anmeldewert)`);
+      });
+      for (const input of src.matchAll(/<input[^>]*type="password"[^>]*>/g)) {
+        if (!/autocomplete="new-password"/.test(input[0])) offenders.push(`${rel}:${lineOf(input.index)} (Passwortfeld ohne new-password)`);
+      }
+    }
+  }
+  assert.deepEqual(offenders, [], 'Feld eines fremden Dienstes mit Anmelde-Autofill');
+});
+
+/* Esc gehoert der obersten Ebene. Das geteilte Modal schliesst bei Esc, solange
+ * kein Handler darunter `preventDefault()` gerufen hat (`onEscape` in
+ * components/modal.js). Die Combobox (Waehrung, Zyklus, Kategorie, Konto,
+ * Zahlungsart) und der Logo-Picker im Abo-Formular schlossen sich selbst, ohne
+ * das Ereignis zu verbrauchen: dasselbe Esc schloss danach das ganze Formular,
+ * ein unveraendertes sofort.
+ */
+test('Esc in Combobox und Logo-Picker des Abo-Formulars schliesst nur das Widget', () => {
+  const lines = read('../public/pages/subscriptions.js').split('\n');
+  const offenders = [];
+  lines.forEach((line, i) => {
+    if (!/event\.key === 'Escape'/.test(line)) return;
+    const branch = lines.slice(i, i + 4).join('\n');
+    if (!/event\.preventDefault\(\)/.test(branch)) offenders.push(`pages/subscriptions.js:${i + 1}`);
+  });
+  assert.deepEqual(offenders, [], 'Esc-Zweig ohne preventDefault - das Formular darunter schliesst mit');
+});
+
+/* Der Name einer Kachel kann aus dem Manifest eines Erweiterungsmoduls kommen
+ * (`widgetDisplayLabel`, utils/extension-i18n.js), und `t()` escaped seine
+ * Parameter nicht. Fuenf Stellen im Anpassen-Modus und in der Fehlerkachel
+ * setzten ihn roh ins Markup, zwei Zeilen darueber stand er in `esc()`.
+ */
+test('Dashboard: der Kachelname steht im Markup immer in esc()', () => {
+  const lines = read('../public/pages/dashboard.js').split('\n');
+  const offenders = [];
+  lines.forEach((line, i) => {
+    if (/\$\{(?!esc\()[^}]*widgetLabel\(/.test(line)) offenders.push(`pages/dashboard.js:${i + 1}`);
+  });
+  assert.deepEqual(offenders, [], 'widgetLabel() ohne esc() im Template');
+});
+
+/* Codex-Review zu #2055: Esc schloss den Logo-Picker samt fokussiertem
+ * Suchfeld, der Fokus fiel auf body und damit aus der Fokusfalle des
+ * Abo-Formulars. Das Schliessen muss den Fokus an den Oeffner zurueckgeben,
+ * wenn er im Picker stand - auf jedem Weg (Esc, X, Auswahl, Zurueck-Geste).
+ */
+test('der Logo-Picker gibt den Fokus beim Schliessen an seinen Oeffner zurueck', () => {
+  const src = read('../public/pages/subscriptions.js');
+  const start = src.indexOf('function openLogoPickerModal(');
+  assert.ok(start > 0, 'openLogoPickerModal gefunden');
+  const body = src.slice(start, src.indexOf('\n}\n', start));
+  assert.match(body, /const opener = document\.activeElement/, 'der Oeffner wird beim Oeffnen gemerkt');
+  const close = body.match(/const close = \(\) => \{[\s\S]*?\n {2}\};/);
+  assert.ok(close, 'close ist eine Funktion mit Rumpf');
+  assert.match(close[0], /overlay\.contains\(document\.activeElement\)/, 'nur zurueckgeben, wenn der Fokus im Picker stand');
+  assert.match(close[0], /\.focus\(\)/, 'der Fokus geht zurueck');
+  assert.match(body, /attachOverlay\(overlay, close\)/, 'die Zurueck-Geste nimmt denselben Weg');
+});
+
+/* Codex-Review zu #2055: Esc waehrend einer IME-Umwandlung bricht die
+ * Umwandlung ab. Der Esc-Handler des geteilten Modals schloss trotzdem das
+ * ganze Formular - im Abo-Metadatenfeld sogar ausdruecklich, weil dessen
+ * eigener Handler bei laufender Umwandlung frueh zurueckkehrt. Das Modal muss
+ * ein solches Esc ignorieren und den close-Request des <dialog> zurueckhalten.
+ */
+test('Esc waehrend einer IME-Umwandlung schliesst kein Modal', () => {
+  const src = read('../public/components/modal.js');
+  const start = src.indexOf('function onEscape(e) {');
+  assert.ok(start > 0, 'onEscape gefunden');
+  const body = src.slice(start, src.indexOf('\n}\n', start));
+  const ime = body.indexOf('isImeComposing(e)');
+  assert.ok(ime > 0, 'onEscape fragt isImeComposing');
+  assert.ok(ime < body.indexOf('closeModal()'), 'die Pruefung steht vor dem Schliessen');
+  assert.match(body.slice(ime, ime + 160), /preventDefault\(\)[\s\S]*?return/, 'der close-Request des Dialogs wird zurueckgehalten');
 });

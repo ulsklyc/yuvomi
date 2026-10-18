@@ -44,7 +44,7 @@ export function backupKeyFieldHtml(protocol = '') {
                 label: t('settings.backupRestoreKeyLabel'),
                 labelFor: 'backup-restore-key',
                 control: `<input class="form-input" type="password" id="backup-restore-key"
-                autocomplete="off" autocapitalize="off" spellcheck="false"
+                autocomplete="new-password" autocapitalize="off" spellcheck="false"
                 aria-describedby="${keyFieldDescribedBy(protocol)}" />`,
                 extra: `<p class="form-hint" id="${HINT_ID}">${t('settings.backupRestoreKeyHint')}</p>`
                   + `<p class="form-hint form-hint--danger" id="${HTTP_ID}" hidden>${t('settings.backupRestoreKeyHttpWarning')}</p>`,

@@ -6,9 +6,9 @@
 
 import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal as closeSharedModal, selectModal, confirmModal, askOverModal, advancedSection, wireBlurValidation, reportFieldError, reportFieldErrors, refocusAfterRender, swapFieldsKeepingDirtyBase } from '/components/modal.js';
-import { stagger, scheduleUndoableDelete, wireScrollFade } from '/utils/ux.js';
+import { stagger, scheduleUndoableDelete, wireScrollFade, isImeComposing } from '/utils/ux.js';
 import { t, formatDate, formatDayMonth, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
-import { esc, REQUIRED_MARK } from '/utils/html.js';
+import { esc, REQUIRED_MARK, externalHref } from '/utils/html.js';
 import { periodStepperHtml, syncPeriodReset, swapPeriod } from '/utils/period-stepper.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
@@ -312,7 +312,7 @@ function wireMealTitleCombobox(panel, { onRecipe } = {}) {
     if (box.hidden || !items.length) return;
     if (e.key === 'ArrowDown') { e.preventDefault(); setActive(Math.min(active + 1, items.length - 1)); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(Math.max(active - 1, 0)); }
-    else if (e.key === 'Enter' && active >= 0) {
+    else if (e.key === 'Enter' && active >= 0 && !isImeComposing(e)) {
       // Enter UEBERNIMMT den Vorschlag und endet hier: bis zum Dialog
       // durchgereicht, loeste es dessen Enter-zum-Speichern aus, und die
       // Mahlzeit war angelegt, bevor man sie gesehen hatte.
@@ -1259,9 +1259,9 @@ function renderSlot(date, type, mealsForDay, dayCol, typeRow) {
             href="/recipes?open=${encodeURIComponent(meal.recipe_id)}"
             aria-label="${esc(t('meals.viewRecipeNamed', { title: meal.title }))}"
           ><i data-lucide="chef-hat" class="icon-md" aria-hidden="true"></i></a>`
-          : meal.recipe_url ? `<a class="meal-card__action-btn meal-card__action-btn--recipe"
+          : externalHref(meal.recipe_url) ? `<a class="meal-card__action-btn meal-card__action-btn--recipe"
             data-action="open-recipe"
-            href="${esc(meal.recipe_url)}"
+            href="${esc(externalHref(meal.recipe_url))}"
             target="_blank"
             rel="noopener noreferrer"
             aria-label="${esc(t('meals.openRecipeNamed', { title: meal.title }))}"
