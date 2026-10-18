@@ -43,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stored and the dialog keeps everything you entered, so Save simply tries again (#2054).
   **API:** `POST /api/v1/health/medications` accepts an optional `schedules` array and writes the
   medication and its schedules in one transaction.
+- **An open row menu closes when the list scrolls.** With a mouse wheel, trackpad or keyboard the
+  menu stayed where it opened while its row scrolled away, so "Delete" ended up under a different
+  entry. Like menus on iOS and macOS, it now closes as soon as the content beneath it moves, in
+  lists, headers and sheets alike; scrolling inside a long menu keeps it open (#2041).
 - **On the overview, the people of an event sit at the end of its line in right-to-left
   languages.** In Arabic and Persian they sat right after the event's title instead. Left-to-right
   layouts are unchanged.
