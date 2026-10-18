@@ -408,9 +408,8 @@ router.delete('/:id', (req, res) => {
  * CACHEBAR UEBER `?v=` (#2048). Vorher holte jeder Aufruf die Bytes live beim
  * Provider und antwortete `no-store`: eine Liste mit 500 gespiegelten Rezepten
  * kostete bei jedem Oeffnen 500 Abrufe bei Mealie und 500 Anfragen aus dem
- * 300er-Budget des apiLimiter. Jetzt dasselbe Muster wie die Profilbilder
- * (routes/people.js, #2056): die Liste nennt die Version in der Adresse, und
- * unter einer Adresse mit passender Version steht nie ein anderes Bild.
+ * 300er-Budget des apiLimiter. Jetzt nennt die Liste die Version in der
+ * Adresse (wie die Profilbilder in routes/people.js, #2056).
  *
  * DIE VERSION IST `provider_updated_at`. Mealie und Tandoor setzen ihr
  * `updatedAt` neu, wenn ein Rezept gespeichert wird, ein neues Bild
@@ -422,9 +421,16 @@ router.delete('/:id', (req, res) => {
  * Route eine Nachfrage mit 304, ohne den Provider zu fragen - ein ETag ueber
  * die Bytes muesste sie dafuer erst holen.
  *
- * OHNE ODER MIT VERALTETEM `v` (ein Client von vor #2048, eine Liste von vor
- * dem letzten Sync) gibt es das Bild weiter, aber `no-cache`: der Browser
- * fragt jedes Mal nach und bekommt bei gleicher Version das 304.
+ * IMMER `no-cache`, NIE `max-age` (Codex-Review zu #2067). Ein `immutable`
+ * fuer ein Jahr liess das Bild nach dem Abmelden oder einem Kontowechsel im
+ * selben Browser aus dem HTTP-Cache kommen, ohne dass requireAuth oder das
+ * meals-Gate liefen - das Abmelden leert nur den Cache des Service Workers.
+ * Mit `no-cache` fragt der Browser jedes Mal nach, die Nachfrage laeuft durch
+ * alle Gates, und die Antwort ist ein 304 ohne Bytes und ohne Provider-Abruf.
+ * Die Flut bleibt trotzdem weg: das Teure war der Abruf beim Provider, und die
+ * Bildabrufe zaehlen im eigenen imageLimiter (server/index.js). `?v=` haelt
+ * die Adresse je Version eindeutig, damit der Browser nie ein altes Bild als
+ * Kandidaten fuer die Nachfrage nimmt.
  */
 router.get('/:id/provider-thumbnail', async (req, res) => {
   try {
@@ -447,10 +453,8 @@ router.get('/:id/provider-thumbnail', async (req, res) => {
       : null;
     // Ueberschreibt das `no-store`, das server/index.js jeder API-Antwort setzt.
     // `private`: das Bild gehoert zu einer Sitzung, kein geteilter Cache
-    // dazwischen darf es halten.
-    const cacheControl = version && req.query.v === version
-      ? 'private, max-age=31536000, immutable'
-      : (etag ? 'private, no-cache' : 'no-store');
+    // dazwischen darf es halten. `no-cache`: siehe Kopfkommentar.
+    const cacheControl = etag ? 'private, no-cache' : 'no-store';
     // Die Kopfzeilen erst an den beiden Erfolgswegen: ein 404 oder 502 von
     // unten behaelt das globale `no-store` und bleibt nie ein Jahr liegen.
     if (etag && req.get('If-None-Match') === etag) {

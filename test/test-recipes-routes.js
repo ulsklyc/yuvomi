@@ -520,7 +520,7 @@ function registerMirrorTests(provider) {
   // Live-Abrufe beim Provider, alle `no-store`. Mit der Version aus der Zeile
   // darf der Browser das Bild behalten, und eine Nachfrage kostet den Provider
   // nichts.
-  test(`GET /:id/provider-thumbnail: cachebar mit ?v=<provider_updated_at>, 304 ohne Provider-Abruf (${provider}, #2048)`, async () => {
+  test(`GET /:id/provider-thumbnail: revalidierbar mit ?v=<provider_updated_at>, nie max-age, 304 ohne Provider-Abruf (${provider}, #2048)`, async () => {
     const updatedAt = '2026-10-01T08:15:30.123456';
     const recipeId = db.prepare(`
       INSERT INTO recipes (title, created_by, provider_account_id, provider_recipe_id, provider_slug, provider_has_image, provider_updated_at) VALUES (?, ?, ?, ?, ?, 1, ?)
@@ -538,16 +538,20 @@ function registerMirrorTests(provider) {
       const url = `${baseUrl}/${recipeId}/provider-thumbnail?v=${encodeURIComponent(updatedAt)}`;
       const first = await fetch(url);
       assert.equal(first.status, 200);
-      assert.equal(first.headers.get('cache-control'), 'private, max-age=31536000, immutable');
+      // NIE max-age (Codex-Review zu #2067): ein Bild aus dem HTTP-Cache kaeme
+      // nach dem Abmelden oder einem Kontowechsel ohne Auth- und Modul-Gate.
+      // Jede Nutzung fragt nach, die Nachfrage ist das 304 unten.
+      assert.equal(first.headers.get('cache-control'), 'private, no-cache');
       const etag = first.headers.get('etag');
       assert.match(etag ?? '', /^"[0-9a-f]{32}"$/);
       assert.equal(upstream, 1);
 
       const again = await fetch(url, { headers: { 'If-None-Match': etag } });
       assert.equal(again.status, 304);
+      assert.equal(again.headers.get('cache-control'), 'private, no-cache');
       assert.equal(upstream, 1, 'die Nachfrage beantwortet die Route, ohne den Provider zu fragen');
 
-      // Ohne oder mit alter Version: das Bild kommt, aber der Browser fragt nach.
+      // Ohne oder mit alter Version: dieselbe Antwort.
       for (const stale of ['', '?v=2020-01-01']) {
         const r = await fetch(`${baseUrl}/${recipeId}/provider-thumbnail${stale}`);
         assert.equal(r.status, 200);
@@ -576,7 +580,7 @@ function registerMirrorTests(provider) {
     try {
       const r = await fetch(`${baseUrl}/${recipeId}/provider-thumbnail?v=${encodeURIComponent(updatedAt)}`);
       assert.equal(r.status, 502);
-      assert.notEqual(r.headers.get('cache-control'), 'private, max-age=31536000, immutable');
+      assert.doesNotMatch(r.headers.get('cache-control') ?? '', /max-age|immutable/);
       // Express haengt an jede JSON-Antwort ein schwaches ETag; das Versions-
       // ETag der Route darf ein Fehler nie tragen.
       assert.doesNotMatch(r.headers.get('etag') ?? '', /^"[0-9a-f]{32}"$/);
