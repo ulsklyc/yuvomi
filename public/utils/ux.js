@@ -96,6 +96,20 @@ export function stagger(elements, { host = null, delay = 30, duration = duration
 }
 
 /**
+ * Gehört dieser Tastendruck einer laufenden IME-Umwandlung (Japanisch,
+ * Koreanisch, Chinesisch)? Dann bestätigt Enter das Schriftzeichen und darf
+ * weder absenden noch einen Vorschlag übernehmen. `keyCode 229` fängt Safari,
+ * das das bestätigende Enter schon mit `isComposing: false` meldet (WebKit-Bug
+ * 165004).
+ *
+ * @param {KeyboardEvent} event
+ * @returns {boolean}
+ */
+export function isImeComposing(event) {
+  return Boolean(event?.isComposing || event?.keyCode === 229);
+}
+
+/**
  * Vibrationsmuster abspielen, wenn die API verfügbar ist und
  * keine reduzierte Bewegung gewünscht wird.
  *

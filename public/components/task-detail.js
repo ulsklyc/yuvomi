@@ -34,7 +34,7 @@ import { t, formatDate, formatTime } from '/i18n.js';
 import { openDetailView, closeDetailView, visibilityRow } from '/components/detail-view.js';
 import { closeModal, btnLoading, refocusAfterRender } from '/components/modal.js';
 import { recurrenceRow } from '/rrule-ui.js';
-import { scheduleUndoableDelete, acknowledgeCheck } from '/utils/ux.js';
+import { scheduleUndoableDelete, acknowledgeCheck, isImeComposing } from '/utils/ux.js';
 import { rowActionEl } from '/utils/row-action.js';
 import { renderMarkdownLight } from '/utils/html.js';
 import { splitKeepingLineEndings } from '/utils/markdown-checklist.js';
@@ -765,7 +765,7 @@ function wireMentionSuggest(field, ctx) {
     if (!box || !matches.length) return;
     if (e.key === 'ArrowDown')      { e.preventDefault(); active = (active + 1) % matches.length; render(); }
     else if (e.key === 'ArrowUp')   { e.preventDefault(); active = (active - 1 + matches.length) % matches.length; render(); }
-    else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); apply(matches[active]); }
+    else if ((e.key === 'Enter' && !isImeComposing(e)) || e.key === 'Tab') { e.preventDefault(); apply(matches[active]); }
     else if (e.key === 'Escape')    { e.stopPropagation(); close(); }
   });
 

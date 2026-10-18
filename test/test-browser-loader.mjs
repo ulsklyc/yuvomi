@@ -349,6 +349,8 @@ const STUBS = {
     export const drawChartOnce = () => 0;
     export const durationToken = (name, fallback) => fallback;
     export const easingToken = (name, fallback = 'ease-out') => fallback;
+    // Reine Pruefung ohne DOM - der Stub rechnet wie das Original.
+    export const isImeComposing = (event) => Boolean(event?.isComposing || event?.keyCode === 229);
   `,
   // Inhaltswechsel und Listenbewegung (R16): ohne Layout gibt es nichts zu
   // bewegen - der Tausch selbst muss trotzdem laufen, genau einmal und

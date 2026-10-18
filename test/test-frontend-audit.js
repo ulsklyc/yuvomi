@@ -9706,7 +9706,8 @@ test('die Statusbar folgt der ausdruecklichen Theme-Wahl, nicht nur dem System',
 
 test('modal Enter submits the form instead of advancing to the next field (audit 1.4)', () => {
   const src = read('../public/components/modal.js');
-  const enterBlock = src.match(/if \(e\.key === 'Enter'\) \{[\s\S]*?\n {4}\}/);
+  // Waehrend einer IME-Umwandlung gehoert Enter der Komposition (test:ux-utils).
+  const enterBlock = src.match(/if \(e\.key === 'Enter'(?: && !isImeComposing\(e\))?\) \{[\s\S]*?\n {4}\}/);
   assert.ok(enterBlock, 'expected an Enter keydown handler');
   assert.match(enterBlock[0], /submitBtn\.click\(\)/, 'Enter must trigger the submit button');
   assert.doesNotMatch(enterBlock[0], /next\.focus\(\)/, 'Enter must not advance focus to the next field');

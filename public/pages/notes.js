@@ -7,7 +7,7 @@
 import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, btnError, advancedSection, reportFieldError } from '/components/modal.js';
 import { wireCategoryScopeHelp } from '/components/category-manager.js';
-import { stagger, vibrate, scheduleUndoableDelete, wireScrollFade, acknowledgeCheck } from '/utils/ux.js';
+import { stagger, vibrate, scheduleUndoableDelete, wireScrollFade, acknowledgeCheck, isImeComposing } from '/utils/ux.js';
 import { redrawList } from '/utils/list-motion.js';
 import { t } from '/i18n.js';
 import { esc, renderMarkdownLight } from '/utils/html.js';
@@ -1303,7 +1303,7 @@ function openNoteModal({ mode, note = null }) {
             direction,
           });
           activeCategoryOption = movement.activeIndex;
-        } else if (event.key === 'Enter') {
+        } else if (event.key === 'Enter' && !isImeComposing(event)) {
           event.preventDefault();
           const options = [...categoryList.querySelectorAll('[role="option"]')];
           const active = options[activeCategoryOption];

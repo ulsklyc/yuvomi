@@ -7,7 +7,7 @@
 import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { openModal, closeModal, reportFieldError, refocusAfterRender } from '/components/modal.js';
-import { vibrate } from '/utils/ux.js';
+import { vibrate, isImeComposing } from '/utils/ux.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import { amountPlaceholder, amountStep, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
@@ -329,7 +329,7 @@ function amountFieldHtml(value) {
 
 function bindEnter(panel, fn) {
   panel.querySelector('#plan-amount')?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); fn(); }
+    if (e.key === 'Enter' && !isImeComposing(e)) { e.preventDefault(); fn(); }
   });
 }
 

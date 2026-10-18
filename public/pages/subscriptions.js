@@ -14,6 +14,7 @@ import {
   t,
 } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
+import { isImeComposing } from '/utils/ux.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import { todayKey } from '/utils/date.js';
@@ -1334,7 +1335,7 @@ function wireCombobox(panel, id) {
       open();
       (visible[Math.min(active + 1, visible.length - 1)] || visible[0])?.focus();
     }
-    if (event.key === 'Enter' && visible.length) {
+    if (event.key === 'Enter' && visible.length && !isImeComposing(event)) {
       event.preventDefault();
       event.stopPropagation();
       selectFromKeyboard(visible[0]);
@@ -2245,6 +2246,7 @@ function openMetadataModal() {
       // im Panel zu klicken bzw. das ganze Modal via Escape zu schließen.
       panel.querySelectorAll('.subscriptions-metadata-row__edit input').forEach((input) => {
         input.addEventListener('keydown', (event) => {
+          if (isImeComposing(event)) return;
           if (event.key !== 'Enter' && event.key !== 'Escape') return;
           event.preventDefault();
           event.stopPropagation();

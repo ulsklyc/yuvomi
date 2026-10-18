@@ -8,7 +8,7 @@ import { api } from '/api.js';
 import { renderRRuleFields, bindRRuleEvents, getRRuleValues } from '/rrule-ui.js';
 import { openModal as openSharedModal, closeModal, whenModalClosed, wireBlurValidation, validateAll, btnError, btnLoading, promptModal, confirmModal, advancedSection, refocusAfterRender } from '/components/modal.js';
 import { whenHistorySettled } from '/utils/overlay-history.js';
-import { stagger, vibrate, scheduleUndoableDelete, acknowledgeCheck, collapseOut, expandIn, wireScrollFade } from '/utils/ux.js';
+import { stagger, vibrate, scheduleUndoableDelete, acknowledgeCheck, collapseOut, expandIn, wireScrollFade, isImeComposing } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { t, getLocale, formatDate, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
@@ -908,7 +908,7 @@ function wireTagEditor(panel) {
   };
 
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ',') {
+    if ((e.key === 'Enter' || e.key === ',') && !isImeComposing(e)) {
       // Enter darf im Tag-Feld nicht das Formular abschicken.
       e.preventDefault();
       commit();

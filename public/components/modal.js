@@ -29,7 +29,7 @@ import { esc } from '/utils/html.js';
 import { pushOverlay, dropOverlay, isOverlayOpen } from '/utils/overlay-history.js';
 import { wireSheetDrag } from '/utils/sheet-drag.js';
 import { iconElement } from '/utils/lucide-icons.js';
-import { expandIn, durationToken, easingToken } from '/utils/ux.js';
+import { expandIn, durationToken, easingToken, isImeComposing } from '/utils/ux.js';
 
 let activeOverlay = null;
 let previouslyFocused = null;
@@ -305,7 +305,8 @@ function trapFocus(container, initialFocus = 'first-field') {
     // Enter in einzeiligen Inputs/Selects → Formular absenden (Standard-Web-
     // Konvention, Audit 1.4). Textareas behalten ihr Standardverhalten (Zeilen-
     // umbruch), Submit-/Button-Elemente lösen ohnehin ihren eigenen Klick aus.
-    if (e.key === 'Enter') {
+    // Waehrend einer IME-Umwandlung bestaetigt Enter das Schriftzeichen.
+    if (e.key === 'Enter' && !isImeComposing(e)) {
       const active = document.activeElement;
       const isInput = active.tagName === 'INPUT' && active.type !== 'submit' && active.type !== 'button';
       const isSelect = active.tagName === 'SELECT';
