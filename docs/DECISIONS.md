@@ -988,3 +988,39 @@ then the number of real `!important` declarations in `public/styles/` may only g
 14.1, which drop a layered stylesheet whole, and wrapping the current sheets in layers changed
 52 of 76 measured screens; the ceiling lives in `npm run test:frontend-audit`,
 "!important-Sperrklinke"; raising the floor reopens it).
+
+---
+
+## 15. No index of modules until a module can be held to what was reviewed
+
+**Yuvomi keeps no list of third-party modules, neither in this repository nor in the app.
+Authors set the GitHub topic `yuvomi-module`, and [MODULES.md](../MODULES.md) points to that
+topic with the note that nothing found there is tested or recommended** (D#746, #1671; decided
+by Ulas on 2026-10-18).
+
+A list the maintainer keeps reads as a recommendation, and nothing in Yuvomi lets the maintainer give one.
+A module is same-origin script with the session of every member who opens it (entry 12): there
+is no permission model a manifest could declare and the server could enforce, and no sandbox.
+And what gets installed is a movable ref, a branch or a tag, not the commit somebody read, so
+a module reviewed today can be something else after its next push. Once #1671 put an install
+one step away from a link, an entry in a list became an install path. Projects without a
+sandbox land in the same place: Paperless-ngx keeps "Related Projects" in its wiki with a
+note that it does not endorse them, Immich has the community-run awesome-immich. Obsidian's
+manual review of its plugin directory could not keep up, and VS Code extensions were hit by
+GlassWorm through malicious updates to extensions that had already been accepted.
+
+### Where the rule lives
+
+- [MODULES.md](../MODULES.md), "Finding Modules", with the topic link and the disclaimer, and
+  the topic hint under "Preparing a module for installation".
+- No index file in the repository, no list of modules in the app, and no built-in source in
+  Settings -> Modules -> Add custom module: the admin pastes an address they chose.
+
+### What would reopen it
+
+All three of these, not one of them: a permission model in the manifest that the server
+enforces (the `/api/v1` scopes a module declares, and nothing beyond them), an approval bound
+to a commit SHA instead of a ref, so that an update needs a new approval, and a second
+reviewer besides the maintainer. Only then is a list pinned to reviewed SHAs worth discussing.
+A community-run list linked from MODULES.md is not undoing this decision; a list in this
+repository or in the app, curated or not, is.
