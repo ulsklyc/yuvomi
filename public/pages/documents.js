@@ -15,6 +15,7 @@ import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { previewKind } from '/utils/document-preview.js';
 import { fileShareSupport } from '/utils/web-share.js';
 import { attachOverlay } from '/utils/overlay-history.js';
+import { inertOutside } from '/utils/background-inert.js';
 import { findPageFab } from '/utils/fab.js';
 import { rowActionHtml } from '/utils/row-action.js';
 // Im Solo-Haushalt hat „Wer darf das sehen" genau eine Antwort - gefragt wird
@@ -3812,9 +3813,11 @@ function openDmsPreview({ item, src, canOpen, onLink }) {
   box.append(header, figure, actions);
   layer.appendChild(box);
 
+  let releaseBackground = () => {};
   const dismiss = () => {
     document.removeEventListener('keydown', onKey, true);
     layer.remove();
+    releaseBackground();
     opener?.focus?.();
   };
   // Wie bei Escape gilt fuer die Zurueck-Geste: sie schliesst zuerst die
@@ -3833,6 +3836,9 @@ function openDmsPreview({ item, src, canOpen, onLink }) {
   layer.addEventListener('click', (e) => { if (e.target === layer) dismiss(); });
 
   panel.appendChild(layer);
+  // Die Auswahl darunter ist gesperrt, solange die Vorschau offen ist
+  // (utils/background-inert.js); freigegeben VOR der Fokus-Rueckgabe.
+  releaseBackground = inertOutside(layer);
   if (window.lucide) lucide.createIcons({ el: layer });
   close.focus();
 }

@@ -40,6 +40,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   modules installed, each open tab fetched every language file of every module twice a minute, also
   in the background. They now load again only when a module was installed, updated or changed its
   languages, and a tab in the background skips the check.
+- **Switches, active filters and tabs stay visible in Windows high contrast mode.** The mode
+  replaces the app's colours with system colours and drops shadows. A switch then disappeared
+  completely, the active filter chip and the active tab looked like the others, and a focused input
+  field showed no focus. Each of them now uses the system highlight colour or an outline there.
+- **The page no longer flashes white in dark mode before the styles load.** The app and the offline
+  page now tell the browser up front that they support light and dark, so the background, scrollbars
+  and form fields start in the right colour. A theme you picked yourself wins over the system setting
+  from the first frame too.
+- **"Undo" in a toast is reachable with the keyboard while a dialog is open.** Tab used to jump from
+  the dialog's last button back to its first, past the toast. A dialog now leaves keeping the focus
+  inside to the browser.
+- **The More sheet, search, the welcome tour and the pickers inside forms lock the page behind
+  them.** These layers only asked screen readers to stay inside; the page behind them could still
+  be reached with Tab, a click or the virtual cursor. It is now inert while the layer is open. After
+  the welcome tour, the keyboard focus returns to the page content instead of getting lost.
 - **Setting a password tells you the rule before you try.** First-time setup, joining by
   invitation and resetting a password showed "at least 8 characters" only as an error after
   submitting. The rule now stands under the field. An error on these pages and on "Forgot password"

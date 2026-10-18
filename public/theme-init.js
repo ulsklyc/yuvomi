@@ -95,6 +95,22 @@
   } catch (e) { /* Storage nicht verfuegbar → kein Wand-Modus in dieser Sitzung */ }
 })();
 
+// DIE LEINWAND VOR DEM CSS FOLGT DER WAHL.
+//
+// `<meta name="color-scheme" content="light dark">` laesst das System
+// entscheiden, bis tokens.css mit `color-scheme` auf :root uebernimmt. Wer
+// ausdruecklich hell oder dunkel gewaehlt hat (oder die Wand nachts dunkel
+// schaltet, Block darueber), bekam bis dahin die Leinwand des Systems - einen
+// Blitz in der falschen Farbe. Deshalb steht dieser Block NACH dem Wand-Modus
+// und liest das fertige `data-theme`.
+(function () {
+  try {
+    var theme = document.documentElement.getAttribute('data-theme');
+    var meta = document.querySelector('meta[name="color-scheme"]');
+    if (meta && (theme === 'light' || theme === 'dark')) meta.setAttribute('content', theme);
+  } catch (e) { /* ohne Meta bleibt es beim System */ }
+})();
+
 // THE SCREENSAVER DELAY BELONGS TO THE INITIAL STATE TOO (#885).
 //
 // components/photo-screensaver.js arms its idle timer as soon as somebody is

@@ -42,6 +42,7 @@ import '/components/category-manager.js';
 import { findPageFab, setPageFabAction } from '/utils/fab.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import { attachOverlay } from '/utils/overlay-history.js';
+import { inertOutside } from '/utils/background-inert.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
 import { withChosenPeople } from '/utils/people-picker.js';
 import { compareMembers, memberRanks, memberRankOf } from '/utils/member-order.js';
@@ -4716,13 +4717,17 @@ function requestNameInPanel(panel, { title, label, placeholder }) {
     `);
     panel.append(overlay);
     if (window.lucide) lucide.createIcons({ el: overlay });
-
     const input = overlay.querySelector('#budget-inline-name');
     // Der Auslöser bekommt den Fokus zurück, sonst fällt er beim Schließen auf
     // <body> — das Overlay liegt über einem offenen Modal.
     const opener = document.activeElement;
+    // Das Formular darunter ist gesperrt, solange die Abfrage offen ist
+    // (utils/background-inert.js) - erst NACH dem Merken des Ausloesers, sonst
+    // gaebe der Browser seinen Fokus ab; freigegeben VOR der Fokus-Rueckgabe.
+    const releaseBackground = inertOutside(overlay);
     const cleanup = (value = '') => {
       overlay.remove();
+      releaseBackground();
       if (opener?.isConnected) opener.focus();
       resolve(value);
     };

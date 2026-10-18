@@ -10650,6 +10650,23 @@ textarea.input { resize: vertical; }
   .modal-panel  { border: 2px solid CanvasText; }
   .nav-item[aria-current="page"],
   .nav-item--active { border-bottom: 2px solid Highlight; }
+
+  /* DER SCHALTER. Bahn und Knopf tragen nur Flaeche - der Modus macht beide
+   * zu Canvas, und vom Schalter blieb nichts. Die Bahn bekommt einen Umriss
+   * (`outline`, nicht `border`: eine Kante schoebe den Knopf aus seiner
+   * Mitte), der Knopf eine Systemfarbe, "an" die Hervorhebungsfarbe. */
+  .toggle__track { outline: 1px solid ButtonText; }
+  .toggle__track::after { background-color: ButtonText; box-shadow: none; }
+  .toggle input:checked + .toggle__track { background-color: Highlight; outline-color: Highlight; }
+  .toggle input:checked + .toggle__track::after { background-color: HighlightText; }
+  .toggle input:disabled + .toggle__track { outline-color: GrayText; }
+  .toggle input:disabled + .toggle__track::after { background-color: GrayText; }
+  .toggle input:focus-visible + .toggle__track { outline-color: Highlight; }
+
+  /* DER FOKUS IM FELD war nur Kante + Schatten: die Kante zwingt der Modus auf
+   * dieselbe Systemfarbe wie in Ruhe, den Schatten streicht er. */
+  .input:focus,
+  .form-input:focus { outline: 2px solid Highlight; outline-offset: 0; }
 }
 
 /* ============================================================

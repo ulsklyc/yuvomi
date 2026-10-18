@@ -285,8 +285,14 @@ function enterSubmitTarget(active, container) {
 
 function trapFocus(container, initialFocus = 'first-field') {
   focusTrapHandler = (e) => {
-    // Tab-Trap: Fokus innerhalb des Modals halten
+    // Tab-Trap: Fokus innerhalb des Modals halten - NUR ohne natives
+    // <dialog> (Safari < 15.4). Ein modaler Dialog haelt den Fokus selbst, und
+    // der Fang am Panel sprang vom letzten Feld zurueck aufs erste: der
+    // Toast-Stapel, der waehrend des Dialogs IN ihm neben dem Panel liegt
+    // (_syncTopLayerGuests), war so per Tastatur nie zu erreichen, sein
+    // "Rueckgaengig" nur mit der Maus (Modern-Web-Guidance-Audit, Befund 9).
     if (e.key === 'Tab') {
+      if (container.closest?.('dialog')?.open) return;
       const focusable = container.querySelectorAll(FOCUSABLE);
       if (!focusable.length) return;
       const first = focusable[0];
@@ -682,6 +688,20 @@ function _topmostSharedDialog() {
   return open[open.length - 1] ?? null;
 }
 
+/**
+ * DIE SAMMELAKTIONS-PILLE ZIEHT MIT, ABER NICHT BEDIENBAR. Sie steht im selben
+ * Stapel wie die Toasts, gehoert aber zur Seite hinter dem Dialog: ihre
+ * Aktionen (auch Loeschen) waren per Tab und Klick erreichbar, sobald der
+ * Dialog den Fokus dem Browser ueberliess (Codex-Review zu #2058). Inert nur,
+ * solange sie im Dialog wohnt, und nur, wenn sie es vorher nicht schon war.
+ */
+function _holdBulkPill(guest, hold) {
+  const pill = guest.querySelector?.('.bulk-pill-layer');
+  if (!pill) return;
+  if (hold && !pill.inert) { pill.inert = true; pill._inertByModal = true; }
+  if (!hold && pill._inertByModal) { pill.inert = false; pill._inertByModal = false; }
+}
+
 /** Gaeste in den obersten Dialog holen oder nach Hause schicken. `leaving` zieht sie sicher heraus. */
 function _syncTopLayerGuests(leaving = null) {
   if (typeof document.querySelectorAll !== 'function') return;
@@ -692,11 +712,13 @@ function _syncTopLayerGuests(leaving = null) {
       if (guest.parentElement === host) continue;
       if (!_guestHome.has(guest)) _guestHome.set(guest, { parent: guest.parentElement, next: guest.nextSibling });
       host.append(guest);
+      _holdBulkPill(guest, true);
       continue;
     }
     const home = _guestHome.get(guest);
     if (!home) continue;
     _guestHome.delete(guest);
+    _holdBulkPill(guest, false);
     if (!home.parent?.isConnected) { document.body.append(guest); continue; }
     home.parent.insertBefore(guest, home.next?.parentNode === home.parent ? home.next : null);
   }
