@@ -61,6 +61,7 @@ class MockResponse {
     });
   }
   async blob() { return this._body; }
+  async text() { return typeof this._body === 'string' ? this._body : JSON.stringify(this._body); }
   async json() { return typeof this._body === 'string' ? JSON.parse(this._body) : this._body; }
 }
 
@@ -225,6 +226,36 @@ test('Profilbilder (/people/:id/avatar) gehen in den API-Cache und kommen offlin
   const res = await result;
   assert.equal(res.status, 200, 'offline aus dem Cache');
   assert.ok(res.headers.get('x-cached-at'));
+});
+
+// Codex-Review zu #2056: ein Bild in einer Zeile, die nie auf dem Schirm war,
+// laedt der Browser wegen loading="lazy" nie - offline fehlte es dann, obwohl
+// die Liste aus dem Cache kam. Wer eine Liste cacht, holt die Bilder, deren
+// Adresse darin steht, gleich mit (je Person einmal).
+test('eine gecachte Liste holt die Profilbilder ihrer Zeilen mit in den Cache', async () => {
+  const key = 'ab'.repeat(16);
+  const seen = [];
+  const env = loadSw({
+    fetchImpl: async (req) => {
+      const url = typeof req === 'string' ? req : req.url;
+      seen.push(url);
+      if (url.includes('/people/')) return new MockResponse('BILD', { status: 200 });
+      return new MockResponse(JSON.stringify({ data: [
+        { id: 1, assigned_avatar: `/api/v1/people/2/avatar?v=${key}` },
+        { id: 2, assigned_users: [{ avatar_data: `/api/v1/people/2/avatar?v=${key}` }] },
+      ] }), { status: 200 });
+    },
+  });
+  await (dispatchFetch(env, new MockRequest(apiUrl('/tasks'), { method: 'GET' })).result);
+  await new Promise((r) => setTimeout(r, 0));
+  await new Promise((r) => setTimeout(r, 0));
+  const avatarUrl = apiUrl(`/people/2/avatar?v=${key}`);
+  assert.equal(seen.filter((u) => u === avatarUrl).length, 1, 'das Bild wird genau einmal geholt, nicht je Zeile');
+
+  env.setFetch(async () => { throw new TypeError('Failed to fetch'); });
+  const { result } = dispatchFetch(env, new MockRequest(avatarUrl, { method: 'GET' }));
+  const res = await result;
+  assert.equal(res.status, 200, 'offline kommt das nie angezeigte Bild aus dem Cache');
 });
 
 test('Mutationen werden nie gecacht und nicht angefasst', async () => {

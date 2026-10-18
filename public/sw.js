@@ -729,6 +729,35 @@ async function networkFirst(request, cacheName, event) {
 }
 
 // --------------------------------------------------------
+// Profilbilder einer gecachten Liste (server/routes/people.js)
+// --------------------------------------------------------
+const AVATAR_PATH_RE = /^\/api\/v1\/people\/\d+\/avatar$/;
+const AVATAR_URL_RE = /\/api\/v1\/people\/\d+\/avatar\?v=[0-9a-f]{32}/g;
+
+/**
+ * Legt die Profilbilder, deren Adresse in einer Listen-Antwort steht, in den
+ * API-Cache - jede Adresse einmal, auch wenn sie in hundert Zeilen steht, und
+ * nur, wenn sie noch nicht dort liegt (die Adresse wechselt mit dem Bild).
+ * @param {string} baseUrl Adresse der Liste, gegen die die Pfade aufgeloest werden
+ * @param {string} text Rumpf der Liste
+ */
+async function precacheAvatars(baseUrl, text) {
+  const paths = [...new Set(String(text).match(AVATAR_URL_RE) || [])];
+  if (!paths.length) return;
+  const cache = await caches.open(API_CACHE);
+  await Promise.all(paths.map(async (path) => {
+    const url = new URL(path, baseUrl).href;
+    if (await cache.match(url)) return;
+    try {
+      const res = await fetch(url, { credentials: 'same-origin' });
+      if (res.ok && res.type === 'basic') await cache.put(url, res);
+    } catch {
+      // Offline oder abgewiesen: beim naechsten Laden der Liste wieder.
+    }
+  }));
+}
+
+// --------------------------------------------------------
 // Strategie: Network-First für GET-API (Read-only-Offline)
 // Erfolg → Antwort klonen, x-cached-at-Header ergänzen, in API_CACHE legen.
 // Netzfehler → Cache-Fallback, sonst 503-JSON {error:'offline'}.
@@ -748,6 +777,12 @@ async function networkFirstApi(request) {
         statusText: cloned.statusText,
         headers,
       }));
+      // Bilder, deren Adresse in der Liste steht, gleich mitnehmen - sonst
+      // fehlt offline jedes, dessen Zeile nie auf dem Schirm war
+      // (loading="lazy"). Nicht abgewartet: die Liste wartet nicht darauf.
+      if (!AVATAR_PATH_RE.test(new URL(request.url).pathname)) {
+        response.clone().text().then((text) => precacheAvatars(request.url, text)).catch(() => {});
+      }
     }
     return response;
   } catch {
