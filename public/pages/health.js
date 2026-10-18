@@ -3694,6 +3694,10 @@ function openMedModal(med) {
   // Entwurf, und das Speichern legt sie gleich danach an. Beim Bearbeiten
   // bleibt es wie zuvor: jedes Zeitfenster speichert sofort.
   const draft = isEdit ? null : [];
+  // Ein neues Medikament, das schon angelegt ist, waehrend ein Zeitfenster
+  // danach scheiterte: der naechste Versuch aendert es statt es zu verdoppeln.
+  let createdId = null;
+  const savedScheds = new Set();
   // BESTAND UND NOTIZ HINTER "WEITERE EINSTELLUNGEN" (dieselbe Re-Critique):
   // der Dialog mass mobil 1082px, die drei Bestandsfelder standen auch fuer
   // ein Medikament offen, dessen Packung niemand zaehlt. Hat es einen Bestand
@@ -3818,14 +3822,24 @@ function openMedModal(med) {
         try {
           if (isEdit) await api.patch(`/health/medications/${med.id}`, body);
           else {
-            const created = await api.post('/health/medications', { ...body, ...ownerField(meds.personId, meds.meId) });
             // Die Zeitfenster des Entwurfs nach dem Medikament: es gibt sie
-            // erst mit seiner id. Scheitert eines, steht das Medikament schon -
-            // der Fehler sagt es, und der Plan laesst sich beim Bearbeiten
-            // vervollstaendigen (kein zweites Medikament beim neuen Versuch).
-            const id = created?.data?.id;
-            if (id != null) {
-              for (const sched of draft) await api.post(`/health/medications/${id}/schedules`, sched);
+            // erst mit seiner id. Scheitert eines, steht das Medikament schon
+            // und der Dialog bleibt offen. Der naechste Versuch legt es darum
+            // NICHT noch einmal an, sondern aendert das schon angelegte
+            // (`createdId`), und schickt nur die Zeitfenster, die noch fehlen
+            // (`savedScheds`) - sonst entstuenden Medikament und Plan doppelt.
+            if (createdId == null) {
+              const created = await api.post('/health/medications', { ...body, ...ownerField(meds.personId, meds.meId) });
+              createdId = created?.data?.id ?? null;
+            } else {
+              await api.patch(`/health/medications/${createdId}`, body);
+            }
+            if (createdId != null) {
+              for (const sched of draft) {
+                if (savedScheds.has(sched)) continue;
+                await api.post(`/health/medications/${createdId}/schedules`, sched);
+                savedScheds.add(sched);
+              }
             }
           }
           closeModal({ force: true });
