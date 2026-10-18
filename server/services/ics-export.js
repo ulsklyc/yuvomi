@@ -464,8 +464,11 @@ function clearFeedToken(conn, userId) {
   conn.prepare(`UPDATE users SET calendar_feed_token = NULL WHERE id = ?`).run(userId);
 }
 
+/** Spalten, die `findUserIdByFeedToken` lesen darf - niemals aus dem Input. */
+const FEED_TOKEN_COLUMNS = new Set(['calendar_feed_token', 'waste_feed_token', 'birthday_feed_token']);
+
 /**
- * Findet den Besitzer eines Feed-Tokens ueber timingSafeEqual statt eine
+ * Findet den Besitzer eines Feed-Tokens ueber timingSafeEqual statt einer
  * SQL-Gleichheit `WHERE token = ?` (die als String-Vergleich je Zeile frueh
  * abbrechen kann, sobald das erste Byte abweicht - dieselbe Klasse Fehler,
  * gegen die CSRF/TOTP timingSafeEqual schon einsetzen). Ein Token ist immer
@@ -473,11 +476,15 @@ function clearFeedToken(conn, userId) {
  * vom Client dagegen beliebig lang - die Laengenpruefung selbst verraet
  * nichts Geheimes, sie steht nur davor, weil timingSafeEqual bei
  * ungleicher Laenge wirft.
+ *
+ * `column` muss eine der drei bekannten Feed-Token-Spalten sein - sie kommt
+ * aus einer Konstante im Aufrufer, nie aus dem Request.
  */
-function findUserIdByFeedToken(conn, token) {
+function findUserIdByFeedToken(conn, column, token) {
+  if (!FEED_TOKEN_COLUMNS.has(column)) throw new Error(`Unknown feed token column: ${column}`);
   if (!token) return null;
   const candidate = Buffer.from(token, 'utf8');
-  for (const row of conn.prepare(`SELECT id, calendar_feed_token AS t FROM users WHERE calendar_feed_token IS NOT NULL AND ${activeAccountSql('users')}`).all()) {
+  for (const row of conn.prepare(`SELECT id, ${column} AS t FROM users WHERE ${column} IS NOT NULL AND ${activeAccountSql('users')}`).all()) {
     const stored = Buffer.from(row.t, 'utf8');
     if (stored.length === candidate.length && timingSafeEqual(stored, candidate)) return row.id;
   }
