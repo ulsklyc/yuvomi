@@ -111,6 +111,15 @@ async function fragmentOf(file) {
   return { fn: fnNames[0], frag: mod[fnNames[0]]() };
 }
 
+// Refs #2056: die Bildroute antwortet `private, no-cache` mit ETag und 304,
+// nie mehr ein Cache-Jahr - ein `immutable` ueberlebte das Abmelden.
+test('people avatar dokumentiert das 304 und verspricht kein Cache-Jahr', () => {
+  const get = buildOpenApiSpec({}).paths['/api/v1/people/{id}/avatar'].get;
+  assert.ok(get.responses[304], '304 fehlt');
+  assert.match(get.description, /private, no-cache/);
+  assert.doesNotMatch(get.description, /max-age|immutable/, 'die Beschreibung verspricht kein Cache-Jahr');
+});
+
 test('es existiert eine plausible Zahl an Modul-Dateien', () => {
   assert.ok(moduleFiles.length >= 20, `unerwartet wenige Modul-Dateien: ${moduleFiles.length}`);
 });
