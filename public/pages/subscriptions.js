@@ -1876,6 +1876,8 @@ function logoOptionsMarkup(options) {
 }
 
 function openLogoPickerModal(panel, initialQuery, onSelect) {
+  // Der Knopf "Logo suchen", der den Picker oeffnet - dorthin geht der Fokus zurueck.
+  const opener = document.activeElement;
   panel.querySelector('.subscriptions-logo-picker-modal')?.remove();
   panel.insertAdjacentHTML('beforeend', `
     <div class="subscriptions-logo-picker-modal" role="dialog" aria-modal="true" aria-labelledby="subscription-logo-picker-title">
@@ -1906,7 +1908,15 @@ function openLogoPickerModal(panel, initialQuery, onSelect) {
   const results = overlay.querySelector('#subscription-logo-results');
   const input = overlay.querySelector('#subscription-logo-search-input');
   let options = [];
-  const close = () => overlay.remove();
+  const close = () => {
+    // Mit dem Picker ginge das fokussierte Suchfeld weg, und der Fokus fiele auf
+    // body - aus der Fokusfalle des Abo-Formulars heraus (Codex-Review zu #2055).
+    const hadFocus = overlay.contains(document.activeElement);
+    overlay.remove();
+    if (!hadFocus) return;
+    const target = opener?.isConnected ? opener : panel.querySelector('#subscription-find-logo');
+    target?.focus();
+  };
   // Der Picker liegt ueber dem Abo-Formular; die Zurueck-Geste meint ihn (#871).
   attachOverlay(overlay, close);
   const search = async () => {
