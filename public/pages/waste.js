@@ -510,11 +510,24 @@ function typeWithoutScheduleHtml(type, ro = readOnly()) {
  * Die Vorlagen, die der Haushalt noch nicht hat (R20). Im Onboarding standen
  * sechs Chips, nach der ersten Abfallart keiner mehr - wer Bio und Papier
  * auch braucht, musste in den Dialog. Jetzt bleiben die uebrigen als leise
- * Zeile unter den Karten; vorhanden heisst: gleicher Name (ohne Gross/klein).
+ * Zeile unter den Karten.
+ *
+ * VORHANDEN HEISST: gleicher Name in der eigenen Sprache (ohne Gross/klein)
+ * ODER Symbol und Farbe der Vorlage. Der Name allein reicht nicht, weil die
+ * Vorlage ihn in der Sprache dessen anlegt, der getippt hat: legt ein
+ * Mitglied auf Deutsch "Bioabfall" an, bot die Zeile einem englischen
+ * Mitglied "Organic" erneut an, und ein Tipp legte die Dublette an
+ * (Codex-Review PR #2053). Symbol und Farbe schreibt die Vorlage in jeder
+ * Sprache gleich, und jede Vorlage traegt ein eigenes Symbol. Eine eigene
+ * Art trifft das Paar nur, wenn sie Symbol UND Farbe der Vorlage waehlt - dann
+ * ist sie diese Vorlage; ein Import landet auf `DEFAULT_TYPE_COLOR` (#22C55E),
+ * keiner Vorlagenfarbe. Ohne Schemaaenderung, ohne alle Sprachdateien zu laden.
  */
 function remainingTypePresets(types = state.types) {
-  const have = new Set(types.map((type) => String(type.name ?? '').trim().toLowerCase()));
-  return TYPE_PRESETS.filter((preset) => !have.has(presetLabel(preset).trim().toLowerCase()));
+  const names = new Set(types.map((type) => String(type.name ?? '').trim().toLowerCase()));
+  const looks = new Set(types.map((type) => `${type.icon ?? ''}|${String(type.color ?? '').toUpperCase()}`));
+  return TYPE_PRESETS.filter((preset) => !names.has(presetLabel(preset).trim().toLowerCase())
+    && !looks.has(`${preset.icon}|${preset.color.toUpperCase()}`));
 }
 
 function remainingPresetsHtml() {

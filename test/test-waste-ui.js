@@ -973,6 +973,15 @@ test('R20: ohne Termin steht der Weg daneben, die uebrigen Vorlagen bleiben, sie
   assert.ok(!left.includes(first.key), 'eine vorhandene Vorlage faellt aus der Zeile (Name, ohne Gross/klein)');
   assert.equal(left.length, __test.TYPE_PRESETS.length - 1);
   assert.equal(__test.remainingTypePresets([]).length, __test.TYPE_PRESETS.length);
+  // Codex-Review PR #2053: die Vorlage legt den Namen in der Sprache dessen
+  // an, der tippt. "Bioabfall" eines deutschen Mitglieds ist fuer ein
+  // englisches dieselbe Vorlage - Symbol und Farbe tragen sie ueber Sprachen.
+  const organic = __test.TYPE_PRESETS.find((p) => p.key === 'organic');
+  const foreign = __test.remainingTypePresets([{ name: 'Bioabfall', icon: organic.icon, color: organic.color.toLowerCase() }]).map((p) => p.key);
+  assert.ok(!foreign.includes('organic'), 'eine in einer anderen Sprache angelegte Vorlage wird erneut angeboten');
+  assert.equal(foreign.length, __test.TYPE_PRESETS.length - 1);
+  // Eine eigene Art mit Standardfarbe verdeckt keine Vorlage.
+  assert.equal(__test.remainingTypePresets([{ name: 'Gelber Sack', icon: 'trash-2', color: '#22C55E' }]).length, __test.TYPE_PRESETS.length);
   const css = readFileSync(new URL('../public/styles/waste.css', import.meta.url), 'utf8');
   assert.match(css, /\.waste-weekday-picker \{\s*display: grid;\s*grid-template-columns: repeat\(7, minmax\(0, 1fr\)\);/, 'sieben gleiche Spalten');
   const stepper = __test.intervalStepperHtml(1);
