@@ -23,6 +23,7 @@ import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
 import { formatMoney, amountPlaceholder, amountStep, applyAmountFormat, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
 import { attachOverlay } from '/utils/overlay-history.js';
+import { inertOutside } from '/utils/background-inert.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { openDetailView } from '/components/detail-view.js';
 import { rowActionHtml } from '/utils/row-action.js';
@@ -1878,7 +1879,9 @@ function logoOptionsMarkup(options) {
 function openLogoPickerModal(panel, initialQuery, onSelect) {
   // Der Knopf "Logo suchen", der den Picker oeffnet - dorthin geht der Fokus zurueck.
   const opener = document.activeElement;
-  panel.querySelector('.subscriptions-logo-picker-modal')?.remove();
+  const stale = panel.querySelector('.subscriptions-logo-picker-modal');
+  stale?._releaseBackground?.();
+  stale?.remove();
   panel.insertAdjacentHTML('beforeend', `
     <div class="subscriptions-logo-picker-modal" role="dialog" aria-modal="true" aria-labelledby="subscription-logo-picker-title">
       <div class="subscriptions-logo-picker-panel">
@@ -1905,6 +1908,9 @@ function openLogoPickerModal(panel, initialQuery, onSelect) {
     </div>
   `);
   const overlay = panel.querySelector('.subscriptions-logo-picker-modal');
+  // Das Abo-Formular darunter ist gesperrt, solange der Picker offen ist
+  // (utils/background-inert.js); freigegeben VOR der Fokus-Rueckgabe.
+  overlay._releaseBackground = inertOutside(overlay);
   const results = overlay.querySelector('#subscription-logo-results');
   const input = overlay.querySelector('#subscription-logo-search-input');
   let options = [];
@@ -1912,6 +1918,7 @@ function openLogoPickerModal(panel, initialQuery, onSelect) {
     // Mit dem Picker ginge das fokussierte Suchfeld weg, und der Fokus fiele auf
     // body - aus der Fokusfalle des Abo-Formulars heraus (Codex-Review zu #2055).
     const hadFocus = overlay.contains(document.activeElement);
+    overlay._releaseBackground();
     overlay.remove();
     if (!hadFocus) return;
     const target = opener?.isConnected ? opener : panel.querySelector('#subscription-find-logo');

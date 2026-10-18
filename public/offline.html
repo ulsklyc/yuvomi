@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#F5F3ED" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#191816" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
   <title>Keine Verbindung – Yuvomi</title>
   <!-- Dieselbe Theme-Entscheidung wie in der App: der gespeicherte Wunsch
        (`yuvomi-theme`) schlaegt die Systemeinstellung und setzt `data-theme` auf
@@ -30,6 +31,8 @@
      * Die Werte stehen als Literale, weil es keine zweite Quelle gibt, die
      * dieses Dokument erreichen koennte. */
     :root {
+      /* Formularelemente, Scrollleisten und Leinwand folgen dem Theme. */
+      color-scheme: light;
       /* Farben - Light (tokens.css :root) */
       --color-bg:             #F5F3ED;  /* --neutral-100 */
       --color-surface:        #FFFFFF;
@@ -59,6 +62,7 @@
      * von theme-init.js). Die Wahl gewinnt, deshalb steht sie zuletzt. */
     @media (prefers-color-scheme: dark) {
       :root:not([data-theme="light"]) {
+        color-scheme: dark;
         --color-bg:             #191816;
         --color-surface:        #2B2825;
         --color-border:         #47423B;
@@ -73,6 +77,7 @@
       }
     }
     :root[data-theme="dark"] {
+      color-scheme: dark;
       --color-bg:             #191816;
       --color-surface:        #2B2825;
       --color-border:         #47423B;

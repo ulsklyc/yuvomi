@@ -308,3 +308,37 @@
   flex-shrink: 0;
   margin: 0 var(--space-1);
 }
+
+/* FORCED COLORS (Windows-Kontrastmodus): die Gleitkapsel ist nur Flaeche und
+ * Schatten, der Modus macht sie unsichtbar - das aktive Segment war dann nur
+ * an der Schriftstaerke zu erkennen. Im Modus entfaellt die Kapsel, und der
+ * aktive Eintrag traegt selbst die Hervorhebung des Systems. */
+@media (forced-colors: active) {
+  .seg-indicator {
+    display: none;
+  }
+
+  /* `forced-color-adjust: none`, sonst legt Chrome hinter den Text eine
+   * Canvas-Flaeche (Backplate): HighlightText auf Weiss, das Label war weg
+   * (im Browser gemessen). Alle Farben im Eintrag sind damit Systemfarben. */
+  .sub-tab--active,
+  .has-seg-indicator [data-seg-active][data-seg-active] {
+    forced-color-adjust: none;
+    background-color: Highlight;
+    color: HighlightText;
+  }
+
+  .sub-tab--active .sub-tab__badge,
+  .has-seg-indicator [data-seg-active][data-seg-active] .sub-tab__badge {
+    background-color: HighlightText;
+    color: Highlight;
+  }
+
+  /* Der Fokusring braucht unter `forced-color-adjust: none` selbst eine
+   * Systemfarbe (wie beim aktiven Filter-Chip). */
+  .sub-tab--active:focus-visible,
+  .has-seg-indicator [data-seg-active][data-seg-active]:focus-visible {
+    outline: var(--focus-ring-width) solid CanvasText;
+    outline-offset: var(--focus-ring-offset);
+  }
+}

@@ -7225,6 +7225,7 @@ test('⌘K bei offener Suche: kein zweiter Focus-Trap, und Schliessen gibt den F
   const input = { value: '', focus() { doc.activeElement = input; }, select() {} };
   const trigger = { name: 'Suche in der Seitenleiste' };
   const returned = [];
+  const holds = { inert: 0 };
   let pushes = 0;
   const env = {
     overlay, input, document: doc,
@@ -7240,11 +7241,13 @@ test('⌘K bei offener Suche: kein zweiter Focus-Trap, und Schliessen gibt den F
     createFocusTrap: () => () => {},
     returnFocus: (el) => returned.push(el),
     combo: { clear() {}, refresh() {} },
+    inertOutside: () => { holds.inert += 1; return () => { holds.inert -= 1; }; },
   };
   const make = new Function(...Object.keys(env), `
     let _searchTrapHandler = null;
     let lastFocusedBeforeSearch = null;
     let searchOverlayToken = null;
+    let releaseSearchBackground = null;
     let searchTimer = null;
     ${fn('openSearch')}
     ${fn('closeSearch')}
@@ -7258,8 +7261,10 @@ test('⌘K bei offener Suche: kein zweiter Focus-Trap, und Schliessen gibt den F
   assert.equal(listeners.filter((l) => l.type === 'keydown').length, 1, 'genau ein Focus-Trap');
   assert.equal(pushes, 1, 'ein Marker fuer die Zurueck-Geste');
   assert.equal(doc.activeElement, input, 'der Fokus bleibt im Suchfeld');
+  assert.equal(holds.inert, 1, 'die Seite hinter der Suche ist einmal gesperrt, auch nach dem zweiten ⌘K');
   closeSearch();
   assert.equal(listeners.length, 0, 'nach dem Schliessen haengt kein Trap mehr am Overlay');
+  assert.equal(holds.inert, 0, 'nach dem Schliessen ist die Seite wieder frei');
   assert.deepEqual(returned, [trigger], 'der Fokus geht an den Ausloeser zurueck, nicht ins versteckte Suchfeld');
 });
 
@@ -8442,7 +8447,9 @@ const r18Lum = (hex) => relLum(hexToRgb(hex));
 test('R18: der Schalterknopf ist in jedem Theme heller als seine Bahn - aus und an', () => {
   const rules = [...eachRule(read('../public/styles/layout.css'))];
   const bg = (selector) => {
-    const rule = rules.filter((r) => r.selector.trim() === selector && /background(?:-color)?\s*:/.test(r.body)).pop();
+    // Forced Colors zaehlt nicht: dort stehen Systemfarben statt der Theme-Tokens.
+    const rule = rules.filter((r) => r.selector.trim() === selector && /background(?:-color)?\s*:/.test(r.body)
+      && !r.at.some((at) => /forced-colors/.test(at))).pop();
     assert.ok(rule, `Regel ${selector} mit Hintergrund nicht gefunden - der Guard misst nichts`);
     const token = rule.body.match(/background(?:-color)?\s*:\s*var\(\s*(--[\w-]+)\s*\)/)?.[1];
     assert.ok(token, `${selector} setzt keinen Token-Hintergrund`);
@@ -15247,6 +15254,78 @@ test('die Deaktiviert-Farbe steht an keinem erreichbaren Bedienelement', () => {
     + 'auch benennt (:disabled, [disabled], [aria-disabled]). Ein Element, das nur\n'
     + `zuruecktreten soll, nimmt --color-text-tertiary (4,86 bis 6,90).\n${offenders.join('\n')}`,
   );
+});
+
+/**
+ * Beide Dokumente sagen dem Browser vor dem ersten Stylesheet, dass sie hell
+ * UND dunkel koennen (Modern-Web-Guidance-Audit, Befund 17). Ohne das Meta
+ * malt er Leinwand, Scrollleisten und Formularelemente bis zum CSS hell - im
+ * Dark ein weisser Blitz. offline.html traegt die Angabe zusaetzlich im CSS,
+ * weil sie ohne tokens.css steht.
+ */
+test('index.html and offline.html declare color-scheme before any stylesheet', () => {
+  for (const file of ['../public/index.html', '../public/offline.html']) {
+    const html = read(file);
+    const meta = html.match(/<meta\b[^>]*\bname=["']color-scheme["'][^>]*>/)?.[0];
+    assert.ok(meta, `${file}: <meta name="color-scheme"> fehlt`);
+    assert.equal(meta.match(/\bcontent=["']([^"']+)["']/)?.[1], 'light dark', `${file}: content`);
+    assert.ok(html.indexOf(meta) < html.search(/<link\b[^>]*rel=["']stylesheet|<style\b/), `${file}: das Meta steht vor dem ersten Stylesheet`);
+  }
+  const offline = read('../public/offline.html');
+  const css = offline.slice(offline.indexOf('<style>'), offline.indexOf('</style>'));
+  const schemes = [];
+  for (const { selector, body } of eachRule(css.replace(/^<style>/, ''))) {
+    const value = body.match(/(?:^|;)\s*color-scheme:\s*([^;]+)/)?.[1]?.trim();
+    if (value) schemes.push([selector.replace(/\s+/g, ' ').trim(), value]);
+  }
+  assert.deepEqual(schemes, [
+    [':root', 'light'],
+    [':root:not([data-theme="light"])', 'dark'],
+    [':root[data-theme="dark"]', 'dark'],
+  ], 'offline.html: color-scheme hell an :root, dunkel in beiden Dark-Bloecken');
+});
+
+/**
+ * Eine AUSDRUECKLICHE Wahl schlaegt das System auch vor dem CSS: theme-init.js
+ * legt das color-scheme-Meta auf sie fest. Sonst malte ein dunkles System die
+ * Leinwand dunkel, obwohl hell gewaehlt ist (und umgekehrt), bis tokens.css da
+ * ist. Ohne Wahl bleibt "light dark", dort ist das System die richtige Quelle;
+ * die Wand in der Nacht ist dunkel.
+ */
+test('theme-init.js pins the color-scheme meta to an explicit theme', () => {
+  const source = read('../public/theme-init.js');
+  const run = (entries, hours = 12) => {
+    const map = new Map(Object.entries(entries));
+    const storage = {
+      get length() { return map.size; },
+      key: (i) => [...map.keys()][i] ?? null,
+      getItem: (k) => (map.has(k) ? map.get(k) : null),
+      setItem: (k, v) => { map.set(k, String(v)); },
+      removeItem: (k) => { map.delete(k); },
+    };
+    const attrs = new Map();
+    const root = {
+      setAttribute: (k, v) => { attrs.set(k, String(v)); },
+      getAttribute: (k) => (attrs.has(k) ? attrs.get(k) : null),
+      removeAttribute: (k) => { attrs.delete(k); },
+      hasAttribute: (k) => attrs.has(k),
+    };
+    const meta = { content: 'light dark', getAttribute: () => meta.content, setAttribute: (k, v) => { if (k === 'content') meta.content = v; } };
+    const document = {
+      documentElement: root,
+      querySelectorAll: () => [],
+      querySelector: (sel) => (sel === 'meta[name="color-scheme"]' ? meta : null),
+    };
+    const DeviceDate = class extends Date { getHours() { return hours; } };
+    new Function('localStorage', 'sessionStorage', 'document', 'location', 'Date', 'window', source)(
+      storage, storage, document, { pathname: '/' }, DeviceDate, {},
+    );
+    return meta.content;
+  };
+  assert.equal(run({}), 'light dark', 'ohne Wahl folgt die Leinwand dem System');
+  assert.equal(run({ 'yuvomi-theme': 'light' }), 'light');
+  assert.equal(run({ 'yuvomi-theme': 'dark' }), 'dark');
+  assert.equal(run({ 'yuvomi-theme': 'light', 'yuvomi-wall-mode': '1' }, 23), 'dark', 'die Wand ist nachts dunkel');
 });
 
 /**
@@ -22239,6 +22318,82 @@ test('Esc waehrend einer IME-Umwandlung schliesst kein Modal', () => {
   assert.ok(ime > 0, 'onEscape fragt isImeComposing');
   assert.ok(ime < body.indexOf('closeModal()'), 'die Pruefung steht vor dem Schliessen');
   assert.match(body.slice(ime, ime + 160), /preventDefault\(\)[\s\S]*?return/, 'der close-Request des Dialogs wird zurueckgehalten');
+});
+
+/**
+ * FORCED COLORS (Windows-Kontrastmodus, Modern-Web-Guidance-Audit Befund 5).
+ * Der Modus ersetzt Autorenfarben durch Systemfarben und streicht
+ * `box-shadow` und Hintergrundbilder. Was einen Zustand nur ueber Farbe,
+ * Toenung oder Schatten zeigt, verschwindet: der Schalter (Bahn und Knopf
+ * werden Canvas), der aktive Filter-Chip, das aktive Segment (Gleitkapsel
+ * und Eintrag) und der Fokus im Eingabefeld (nur Kante + Schatten). Jeder
+ * dieser Zustaende braucht im Modus eine Systemfarbe oder einen Umriss, und
+ * zwar in DEM Blatt, das den Baustein definiert - sonst gewinnt die
+ * Basisregel ueber die Ladereihenfolge.
+ */
+test('forced colors: switches, active chips, active segments and focused fields keep a visible state', () => {
+  const forced = (file) => [...eachRule(withoutBlockComments(read(file)))]
+    .filter((rule) => rule.at.some((at) => /forced-colors:\s*active/.test(at)));
+  const has = (file, selector, decl) => forced(file).some((rule) => (
+    rule.selector.split(',').map((s) => s.replace(/\s+/g, ' ').trim()).includes(selector) && decl.test(rule.body)
+  ));
+  const SYS = '(?:Highlight|HighlightText|ButtonText|ButtonFace|CanvasText|Canvas|GrayText|LinkText)';
+  const expected = [
+    ['../public/styles/layout.css', '.toggle__track', new RegExp(`outline:[^;]*\\b${SYS}\\b`)],
+    ['../public/styles/layout.css', '.toggle__track::after', new RegExp(`background(?:-color)?:\\s*${SYS}\\b`)],
+    ['../public/styles/layout.css', '.toggle input:checked + .toggle__track', /background(?:-color)?:\s*Highlight\b/],
+    ['../public/styles/layout.css', '.toggle input:checked + .toggle__track::after', /background(?:-color)?:\s*HighlightText\b/],
+    ['../public/styles/layout.css', '.toggle input:disabled + .toggle__track', /outline-color:\s*GrayText\b/],
+    ['../public/styles/layout.css', '.form-input:focus', /outline:[^;]*\bHighlight\b/],
+    ['../public/styles/layout.css', '.input:focus', /outline:[^;]*\bHighlight\b/],
+    // Text auf Highlight braucht `forced-color-adjust: none`: sonst legt
+    // Chrome eine Canvas-Flaeche hinter den Text (Backplate), und
+    // HighlightText verschwindet darauf - im Browser gemessen.
+    ['../public/styles/filter-chip.css', '.filter-chip--active', /forced-color-adjust:\s*none[\s\S]*background(?:-color)?:\s*Highlight\b[\s\S]*color:\s*HighlightText\b/],
+    ['../public/styles/sub-tabs.css', '.sub-tab--active', /forced-color-adjust:\s*none[\s\S]*background(?:-color)?:\s*Highlight\b/],
+    ['../public/styles/sub-tabs.css', '.has-seg-indicator [data-seg-active][data-seg-active]', /forced-color-adjust:\s*none[\s\S]*background(?:-color)?:\s*Highlight\b/],
+    ['../public/styles/sub-tabs.css', '.seg-indicator', /display:\s*none\b/],
+    // Mit `forced-color-adjust: none` bildet der Modus auch den Fokusring nicht
+    // mehr ab - er braucht selbst eine Systemfarbe (Codex-Review zu #2058).
+    ['../public/styles/filter-chip.css', '.filter-chip--active:focus-visible', /outline:[^;]*\bCanvasText\b/],
+    ['../public/styles/sub-tabs.css', '.sub-tab--active:focus-visible', /outline:[^;]*\bCanvasText\b/],
+    ['../public/styles/sub-tabs.css', '.has-seg-indicator [data-seg-active][data-seg-active]:focus-visible', /outline:[^;]*\bCanvasText\b/],
+  ];
+  const missing = expected.filter(([file, selector, decl]) => !has(file, selector, decl))
+    .map(([file, selector, decl]) => `${file.replace('../public/styles/', '')}: ${selector} ${decl}`);
+  assert.deepEqual(missing, [], `Ohne Forced-Colors-Regel verschwindet der Zustand:\n${missing.join('\n')}`);
+});
+
+/**
+ * EINE EIGENE MODALE EBENE SPERRT IHREN HINTERGRUND (Modern-Web-Guidance-
+ * Audit, Befund 10). `aria-modal="true"` ist nur eine Bitte an den
+ * Screenreader; ohne `inert` lief der virtuelle Cursor in die Seite dahinter,
+ * und Klick und Tab erreichten sie. Wer eine solche Ebene baut statt
+ * `openModal()` (natives <dialog>), ruft `inertOutside()` aus
+ * utils/background-inert.js - je Ebene einmal - und gibt frei.
+ */
+test('every custom aria-modal layer makes its background inert and releases it', () => {
+  const offenders = [];
+  const files = walkJsFiles('../public/').filter((f) => !f.includes('/vendor/') && !f.endsWith('.min.js'));
+  for (const file of files) {
+    if (file.endsWith('/background-inert.js') || file.endsWith('/components/modal.js')) continue;
+    const src = withoutCommentsKeepingLines(read(file));
+    const layers = (src.match(/aria-modal(?:="true"|['"],\s*['"]true['"])/g) ?? []).length;
+    if (!layers) continue;
+    const calls = (src.match(/\binertOutside\(/g) ?? []).length;
+    const released = /\brelease\w*(?:\?\.)?\(\)|_releaseBackground\(\)/.test(src);
+    if (calls < layers || !released) offenders.push(`${file}: ${layers} Ebene(n), ${calls} inertOutside(), Freigabe ${released ? 'ja' : 'nein'}`);
+    // ERST DEN AUSLOESER MERKEN, DANN SPERREN (Codex-Review zu #2058): wird der
+    // Vorfahr des fokussierten Knopfs inert, gibt der Browser den Fokus ab, und
+    // ein danach gelesenes `document.activeElement` waere body.
+    for (const m of src.matchAll(/\binertOutside\(/g)) {
+      const fnStart = Math.max(src.lastIndexOf('\nfunction ', m.index), src.lastIndexOf('\n  function ', m.index));
+      const fnEnd = src.indexOf('\n}\n', m.index);
+      const capture = src.slice(fnStart, fnEnd).search(/=\s*document\.activeElement\b/);
+      if (capture >= 0 && fnStart + capture > m.index) offenders.push(`${file}: liest document.activeElement erst nach inertOutside()`);
+    }
+  }
+  assert.deepEqual(offenders, [], `Ebene ohne gesperrten Hintergrund:\n${offenders.join('\n')}`);
 });
 
 /**

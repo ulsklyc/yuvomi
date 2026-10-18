@@ -53,6 +53,7 @@ import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { isPreviewable } from '/utils/document-preview.js';
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
 import { attachOverlay } from '/utils/overlay-history.js';
+import { inertOutside } from '/utils/background-inert.js';
 import { pathAccess, mayWritePath } from '/utils/module-access.js';
 import { holdUntilStyled, warmStyle } from '/utils/component-style.js';
 
@@ -462,18 +463,24 @@ function openDocumentPicker(panel, { excludeIds = new Set(), single = false } = 
       </div>`);
     panel.append(overlay);
     if (window.lucide) window.lucide.createIcons({ el: overlay });
-
     const listEl = overlay.querySelector('[data-picker-list]');
     const searchEl = overlay.querySelector('#doc-attach-picker-search');
     const confirmEl = overlay.querySelector('[data-picker-confirm]');
     // Der Auslöser bekommt den Fokus zurück - das Overlay liegt über einem
     // offenen Modal, sonst fiele der Fokus auf <body>.
     const opener = document.activeElement;
+    // Das Formular darunter ist gesperrt, solange der Picker offen ist
+    // (utils/background-inert.js). ERST den Ausloeser merken: wird sein
+    // Vorfahr inert, gibt der Browser den Fokus ab, und `activeElement` waere
+    // danach body. Die Freigabe kommt VOR der Fokus-Rueckgabe, auf ein inertes
+    // Element ginge der Fokus nicht.
+    const releaseBackground = inertOutside(overlay);
     const selected = new Set();
     let documents = [];
 
     const close = (result) => {
       overlay.remove();
+      releaseBackground();
       if (opener?.isConnected) opener.focus();
       resolve(result);
     };

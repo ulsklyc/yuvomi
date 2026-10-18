@@ -65,6 +65,7 @@ import { quickLinkHost } from '/utils/quick-link-url.js';
 import { hasIcon } from '/utils/lucide-icons.js';
 import { prefersInkText } from '/utils/contrast.js';
 import { attachOverlay, pushOverlay, dropOverlay, isOverlayOpen } from '/utils/overlay-history.js';
+import { inertOutside } from '/utils/background-inert.js';
 import { mealTypeList, primeMealTypeNames } from '/utils/meal-types.js';
 import { recipeThumbHtml, wireRecipeThumbs } from '/utils/recipe-thumb.js';
 import { wireNoteCategoryOverflow } from '/utils/note-category-overflow.js';
@@ -571,11 +572,14 @@ function showOnboarding(appContainer, onDone) {
     // darf den Dialog nicht am Schliessen hindern; der lokale Merker faengt
     // den aktuellen Browser ohnehin ab.
     auth.markOnboardingSeen().catch(() => {});
-    // Fokus dorthin zurückgeben, wo er vor dem Dialog lag (sonst neutral auf
-    // den Body), damit Tastatur-/SR-Nutzer nicht im entfernten Overlay hängen.
-    const restoreTarget = (previouslyFocused && document.contains(previouslyFocused))
+    // Fokus dorthin zurückgeben, wo er vor dem Dialog lag, sonst auf den
+    // Inhalt (`#main-content`, tabIndex -1 - wie nach einer Navigation).
+    // `document.body.focus()` tat nichts, und der Fokus blieb im entfernten
+    // Overlay haengen (Modern-Web-Guidance-Audit, Befund 10).
+    releaseBackground();
+    const restoreTarget = (previouslyFocused?.isConnected && previouslyFocused !== document.body)
       ? previouslyFocused
-      : document.body;
+      : document.getElementById('main-content');
     overlay.classList.add('onboarding-overlay--out');
     overlay.addEventListener('animationend', () => overlay.remove(), { once: true });
     // Fallback falls animationend nicht feuert (prefers-reduced-motion):
@@ -587,6 +591,9 @@ function showOnboarding(appContainer, onDone) {
   appContainer.appendChild(overlay);
   // Messen kann erst ein Knoten im Baum; danach steht Schritt 1.
   fitSteps();
+  // Die Seite hinter dem Rundgang ist gesperrt, solange er laeuft
+  // (utils/background-inert.js); finish() gibt sie vor dem Fokus frei.
+  const releaseBackground = inertOutside(overlay);
   setTimeout(() => stepEl.querySelector('.btn--primary')?.focus(), 50);
   // Die Zurueck-Geste beendet die Einfuehrung, statt hinter ihr zu navigieren
   // (#871). `finish()` ist der EINE Weg hinaus und merkt sich das auch.

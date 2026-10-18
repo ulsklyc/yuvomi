@@ -280,10 +280,45 @@ test('der vom Browser beim close() zurueckgegebene Fokus ist keine Wahl des Aufr
 
 test('Toasts ziehen waehrend des Dialogs in ihn und danach nach Hause', async () => {
   await fresh();
+  const pill = makeNode('.bulk-pill-layer');
+  stack.querySelector = (sel) => (sel === '.bulk-pill-layer' ? pill : null);
   const overlay = open();
   assert.equal(stack.parentElement, overlay, 'der Toast-Stapel blieb ausserhalb - neben einem modalen Dialog ist er inert');
+  // Codex-Review zu #2058: die Sammelaktions-Pille steht im selben Stapel, ihre
+  // Aktionen gehoeren aber zur Seite dahinter - im Dialog nicht bedienbar.
+  assert.equal(pill.inert, true, 'die Sammelaktions-Pille ist im Dialog bedienbar');
   await closeModal({ force: true });
   assert.equal(stack.parentElement, stackHome, 'der Stapel kam nicht an seinen Platz zurueck');
+  assert.equal(pill.inert, false, 'zu Hause ist die Pille wieder bedienbar');
+});
+
+// Modern-Web-Guidance-Audit, Befund 9: der eigene Tab-Fang am Panel sprang
+// vom letzten Feld zurueck aufs erste - der Toast-Stapel liegt aber im DIALOG
+// neben dem Panel (Test darueber), und "Rueckgaengig" war per Tastatur nie zu
+// erreichen (im Browser gemessen). Ein modaler <dialog> haelt den Fokus
+// selbst; der Fang bleibt nur fuer Browser ohne <dialog> (Safari < 15.4).
+test('Tab: im nativen Dialog faengt kein eigener Fang, ohne <dialog> schon', async () => {
+  const tabFromLast = (overlay) => {
+    const panel = overlay._panel;
+    const first = makeNode('input');
+    const last = makeNode('button');
+    panel.querySelectorAll = () => [first, last];
+    panel.closest = (sel) => (sel === 'dialog' ? overlay : null);
+    document.activeElement = last;
+    return panel._fire('keydown', makeEvent('keydown', { key: 'Tab', shiftKey: false }));
+  };
+  await fresh();
+  const native = open();
+  assert.equal(native.open, true);
+  assert.equal(tabFromLast(native).defaultPrevented, false,
+    'Tab am letzten Feld sprang zurueck aufs erste - der Toast im Dialog ist so nie erreichbar');
+  await closeModal({ force: true });
+
+  await fresh();
+  const legacy = open({});
+  legacy.open = undefined; // Safari < 15.4: `dialog` ist ein unbekanntes Element ohne `open`
+  assert.equal(tabFromLast(legacy).defaultPrevented, true, 'ohne <dialog> haelt der eigene Fang den Fokus im Panel');
+  await closeModal({ force: true });
 });
 
 test('overlayHost: eine schwebende Ebene haengt im Dialog, aus dem sie aufgeht', async () => {
