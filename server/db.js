@@ -11048,6 +11048,20 @@ const MIGRATIONS = [
  * und werden mit ihrem gespeicherten Wortlaut wieder angelegt. Die Aufrufer
  * sorgen fuer die Transaktion.
  */
+/**
+ * Der Trigger aus Migration 251 fuer eine nachgetragene `users.avatar_version`
+ * (reconcileCriticalSchema). Derselbe Wortlaut wie dort; die Migration selbst
+ * bleibt eingefroren und ruft ihn nicht.
+ */
+function backfillAvatarVersionTrigger(database) {
+  database.exec(`
+    CREATE TRIGGER IF NOT EXISTS trg_users_avatar_version
+      AFTER UPDATE OF avatar_data ON users FOR EACH ROW
+      WHEN NEW.avatar_data IS NOT OLD.avatar_data
+      BEGIN UPDATE users SET avatar_version = OLD.avatar_version + 1 WHERE id = OLD.id; END;
+  `);
+}
+
 function backfillSeriesAuthored(database) {
   const triggers = database.prepare(`
     SELECT name, sql FROM sqlite_master
@@ -11310,6 +11324,12 @@ const CRITICAL_COLUMNS = [
   // Zeile anfasst) und jede Buchung eines Pushs. Kein Nachtrag: NULL heisst
   // "kein Schnappschuss", der Abruf nimmt den Weg von vorher.
   { table: 'calendar_events', column: 'outbound_snapshot', type: 'TEXT' },
+  // #2056: v251 traegt die Version des Profilbilds nach; ohne die Spalte
+  // scheitern Aufgaben, Termine, Notizen, Uebersicht, Housekeeping und die
+  // Taschengeld-Buchungen (ihre Bildadresse liest sie). MIT NACHTRAG: der
+  // Trigger, der sie bei jedem neuen Bild hochzaehlt, kommt mit der Spalte.
+  { table: 'users', column: 'avatar_version', type: 'INTEGER NOT NULL DEFAULT 0',
+    backfill: backfillAvatarVersionTrigger },
 ];
 
 /**

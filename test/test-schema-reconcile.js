@@ -139,3 +139,26 @@ test('traegt outbound_snapshot nach und laesst jede Zeile bei NULL', () => {
   assert.deepEqual(rows.map((r) => r.outbound_snapshot), [null, null, null, null]);
   assert.deepEqual(rows.map((r) => r.updated_at), Array(4).fill('original'));
 });
+
+// Codex-Review zu #2056: steht Migration 251 als angewendet da, fehlt aber die
+// Spalte (Restore eines inkonsistenten Backups), scheitern Aufgaben, Termine,
+// Notizen, Uebersicht, Housekeeping und Taschengeld-Buchungen an
+// `no such column: avatar_version`. Der Start traegt Spalte UND Trigger nach.
+test('traegt users.avatar_version samt Versions-Trigger nach', () => {
+  const db = new DatabaseSync(':memory:');
+  db.exec(`CREATE TABLE users (
+    id INTEGER PRIMARY KEY, username TEXT, display_name TEXT, avatar_data TEXT
+  )`);
+  db.exec(`INSERT INTO users (id, username, display_name, avatar_data) VALUES (1, 'a', 'A', 'data:image/png;base64,AA==')`);
+
+  reconcileCriticalSchema(db);
+
+  assert.equal(hasColumn(db, 'users', 'avatar_version'), true);
+  assert.equal(db.prepare('SELECT avatar_version FROM users WHERE id = 1').get().avatar_version, 0);
+  db.exec(`UPDATE users SET avatar_data = 'data:image/png;base64,AB==' WHERE id = 1`);
+  assert.equal(db.prepare('SELECT avatar_version FROM users WHERE id = 1').get().avatar_version, 1,
+    'ein neues Bild zaehlt die Version hoch - der Trigger kam mit');
+  db.exec(`UPDATE users SET display_name = 'B' WHERE id = 1`);
+  assert.equal(db.prepare('SELECT avatar_version FROM users WHERE id = 1').get().avatar_version, 1,
+    'ein anderer Wert laesst sie stehen');
+});
