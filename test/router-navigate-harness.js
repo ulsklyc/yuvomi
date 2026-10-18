@@ -65,7 +65,7 @@ export function createNavigateHarness({
   routes = HARNESS_ROUTES,
 } = {}) {
   /** Was nach aussen sichtbar wurde, in der Reihenfolge des Geschehens. */
-  const log = { rendered: [], swapped: [], history: [], toasts: [], leaveAsked: [], authCalls: 0, unreachable: [] };
+  const log = { rendered: [], swapped: [], history: [], toasts: [], leaveAsked: [], authCalls: 0, unreachable: [], forgotten: 0 };
   let shell = false;
 
   const env = {
@@ -96,7 +96,9 @@ export function createNavigateHarness({
       pushState: (_state, _title, address) => log.history.push(['push', address]),
       replaceState: (_state, _title, address) => log.history.push(['replace', address]),
     },
-    window: {},
+    // Ein echtes EventTarget: navigate() haengt seinen `auth:expired`-Listener
+    // hier an (#1945), und `expire()` unten feuert ihn wie api.js.
+    window: new EventTarget(),
     document: { querySelector: () => null, getElementById: () => null },
     // ── Verlassen-Schutz ──
     hasLeaveGuard: () => Boolean(leaveGuard),
@@ -116,6 +118,12 @@ export function createNavigateHarness({
     // der Test ruft `retry` selbst.
     sessionError,
     showSessionUnreachable: (error, retry) => { log.unreachable.push({ error, retry }); },
+    // Wie forgetSessionState() in router.js, soweit navigate() es liest.
+    forgetSessionState: () => {
+      log.forgotten += 1;
+      env.currentUser = null;
+      env._preferencesLoaded = false;
+    },
     syncPreferencesOnce: async () => {
       if (env._preferencesLoaded) return;
       env._preferencesLoaded = true;
@@ -164,5 +172,8 @@ export function createNavigateHarness({
   // (`env.isNavigating`), und die Attrappen oben schreiben ihn dort.
   const navigate = createNavigate(env, env);
 
-  return { navigate, env, log, setShell: (value) => { shell = value; } };
+  // Sitzungsende, wie api.js es vor dem Wurf eines 401 meldet.
+  const expire = () => env.window.dispatchEvent(new Event('auth:expired'));
+
+  return { navigate, env, log, expire, setShell: (value) => { shell = value; } };
 }

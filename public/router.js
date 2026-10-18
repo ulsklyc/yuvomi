@@ -780,7 +780,7 @@ const navigate = createNavigate(routerState, {
   location, history, window, document,
   hasLeaveGuard, mayLeave, whenHistorySettled, consumeOverlayMarker,
   auth: startHandoff.auth, syncPreferencesOnce, startThirdPartyModulePolling, loadReminderStyles, initReminders, initPush,
-  armScreensaver,
+  armScreensaver, forgetSessionState,
   // Nur ein 401 fuehrt zur Anmeldung; jeder andere Fehler der Sitzungspruefung
   // zeichnet diesen Zustand in #app und versucht selbst erneut (Critique R19).
   showSessionUnreachable: (err, retry) => showSessionUnreachable(document.getElementById('app'), err, retry),
@@ -5061,17 +5061,9 @@ function forgetSessionState() {
   disarmScreensaver();
 }
 
-// Session abgelaufen
-window.addEventListener('auth:expired', () => {
-  forgetSessionState();
-  if (routerState.isNavigating) {
-    // navigate('/login') kann nicht sofort aufgerufen werden - wird im finally-Block
-    // der laufenden Navigation nachgeholt.
-    routerState._pendingLoginRedirect = true;
-  } else {
-    navigate('/login');
-  }
-});
+// Session abgelaufen: der Listener steht in utils/router-navigate.js
+// (createNavigate), der forgetSessionState() oben ruft und entscheidet, ob es
+// zur Anmeldung geht (#1945).
 
 // Navigation komplett neu rendern (z.B. nach Sprach- oder Modul-Toggle-Änderung).
 // Behält Bottom-Bar-Buttons (Kitchen, More) und More-Sheet-Handle/Suche bei.

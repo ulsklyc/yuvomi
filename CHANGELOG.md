@@ -36,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A session that ends while the sign-in page is open no longer wipes what you typed** (#1945).
+  When a request found the session gone, the app drew the sign-in page again even when it was
+  already showing, so a half-typed user name and password were cleared; with setup still pending
+  the same happened to the setup page. A session that ends on a page that needs no sign-in (sign-in,
+  setup, invitation, display pairing, password reset) now leaves that page as it is. On every other
+  page it still leads to the sign-in page.
+
 - **Typing Japanese, Korean or Chinese no longer saves half a word.** In these languages Enter
   first confirms the character conversion. Dialogs, tag and mention fields, suggestion lists and
   the comboboxes used to act on that Enter and saved or picked the text while it was still being
