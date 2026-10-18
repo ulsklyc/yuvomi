@@ -576,11 +576,11 @@ function showOnboarding(appContainer, onDone) {
   }
 
   appContainer.appendChild(overlay);
+  // Messen kann erst ein Knoten im Baum; danach steht Schritt 1.
+  fitSteps();
   // Die Seite hinter dem Rundgang ist gesperrt, solange er laeuft
   // (utils/background-inert.js); finish() gibt sie vor dem Fokus frei.
   const releaseBackground = inertOutside(overlay);
-  // Messen kann erst ein Knoten im Baum; danach steht Schritt 1.
-  fitSteps();
   setTimeout(() => stepEl.querySelector('.btn--primary')?.focus(), 50);
   // Die Zurueck-Geste beendet die Einfuehrung, statt hinter ihr zu navigieren
   // (#871). `finish()` ist der EINE Weg hinaus und merkt sich das auch.
