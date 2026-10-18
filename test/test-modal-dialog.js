@@ -280,10 +280,16 @@ test('der vom Browser beim close() zurueckgegebene Fokus ist keine Wahl des Aufr
 
 test('Toasts ziehen waehrend des Dialogs in ihn und danach nach Hause', async () => {
   await fresh();
+  const pill = makeNode('.bulk-pill-layer');
+  stack.querySelector = (sel) => (sel === '.bulk-pill-layer' ? pill : null);
   const overlay = open();
   assert.equal(stack.parentElement, overlay, 'der Toast-Stapel blieb ausserhalb - neben einem modalen Dialog ist er inert');
+  // Codex-Review zu #2058: die Sammelaktions-Pille steht im selben Stapel, ihre
+  // Aktionen gehoeren aber zur Seite dahinter - im Dialog nicht bedienbar.
+  assert.equal(pill.inert, true, 'die Sammelaktions-Pille ist im Dialog bedienbar');
   await closeModal({ force: true });
   assert.equal(stack.parentElement, stackHome, 'der Stapel kam nicht an seinen Platz zurueck');
+  assert.equal(pill.inert, false, 'zu Hause ist die Pille wieder bedienbar');
 });
 
 // Modern-Web-Guidance-Audit, Befund 9: der eigene Tab-Fang am Panel sprang

@@ -33,8 +33,13 @@
 const KEEP_ALWAYS = '.toast-container';
 const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'TEMPLATE', 'LINK', 'META']);
 
-/** Wie oft dieser Helfer einen Zweig gerade sperrt. */
-const holds = new Map();
+/**
+ * Wie oft dieser Helfer einen Zweig gerade sperrt. Schwach gehalten: schliesst
+ * ein Dialog samt offenem Picker hart (closeModal force), laeuft dessen
+ * Freigabe nie - die gesperrten Knoten gehen mit dem Dialog, und die Tabelle
+ * haelt sie nicht fest (Codex-Review zu #2058).
+ */
+const holds = new WeakMap();
 
 /**
  * @param {Element} layer die modale Ebene (oder ihr Overlay)
@@ -51,24 +56,40 @@ export function inertOutside(layer, { scope, keep: alsoKeep = [] } = {}) {
   const insideAKeeper = (el) => keep.some((k) => k.contains(el));
 
   const taken = [];
+  const take = (child) => {
+    if (SKIP_TAGS.has(child.tagName) || insideAKeeper(child)) return false;
+    if (holdsAKeeper(child)) return true; // durchlaufen statt sperren
+    const count = holds.get(child) ?? 0;
+    if (count === 0 && child.inert) return false; // schon vorher inert - nicht unseres
+    holds.set(child, count + 1);
+    child.inert = true;
+    taken.push(child);
+    return false;
+  };
+  const passed = [];
   const visit = (node) => {
-    for (const child of [...node.children]) {
-      if (SKIP_TAGS.has(child.tagName)) continue;
-      if (insideAKeeper(child)) continue;
-      if (holdsAKeeper(child)) { visit(child); continue; }
-      const count = holds.get(child) ?? 0;
-      if (count === 0 && child.inert) continue; // schon vorher inert - nicht unseres
-      holds.set(child, count + 1);
-      child.inert = true;
-      taken.push(child);
-    }
+    passed.push(node);
+    for (const child of [...node.children]) if (take(child)) visit(child);
   };
   visit(root);
+
+  // SPAETER EINGEFUEGTES GEHOERT AUCH ZUM HINTERGRUND (Codex-Review zu #2058):
+  // ein Zweig, der durchlaufen statt gesperrt wurde, kann neue Kinder bekommen
+  // - die Navigation baut ihre Tabs neben dem Mehr-Knopf neu auf, waehrend das
+  // Blatt offen ist. Wer in einen durchlaufenen Zweig kommt, wird mitgesperrt.
+  const Observer = globalThis.MutationObserver;
+  const observer = Observer ? new Observer((records) => {
+    for (const record of records) {
+      for (const node of record.addedNodes) if (node.nodeType === 1 && take(node)) visit(node);
+    }
+  }) : null;
+  for (const node of passed) observer?.observe(node, { childList: true });
 
   let released = false;
   return () => {
     if (released) return;
     released = true;
+    observer?.disconnect();
     for (const el of taken) {
       const count = (holds.get(el) ?? 1) - 1;
       if (count > 0) { holds.set(el, count); continue; }

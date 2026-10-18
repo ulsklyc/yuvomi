@@ -333,4 +333,12 @@
     background-color: HighlightText;
     color: Highlight;
   }
+
+  /* Der Fokusring braucht unter `forced-color-adjust: none` selbst eine
+   * Systemfarbe (wie beim aktiven Filter-Chip). */
+  .sub-tab--active:focus-visible,
+  .has-seg-indicator [data-seg-active][data-seg-active]:focus-visible {
+    outline: var(--focus-ring-width) solid CanvasText;
+    outline-offset: var(--focus-ring-offset);
+  }
 }

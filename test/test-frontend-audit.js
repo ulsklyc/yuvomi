@@ -22353,6 +22353,11 @@ test('forced colors: switches, active chips, active segments and focused fields 
     ['../public/styles/sub-tabs.css', '.sub-tab--active', /forced-color-adjust:\s*none[\s\S]*background(?:-color)?:\s*Highlight\b/],
     ['../public/styles/sub-tabs.css', '.has-seg-indicator [data-seg-active][data-seg-active]', /forced-color-adjust:\s*none[\s\S]*background(?:-color)?:\s*Highlight\b/],
     ['../public/styles/sub-tabs.css', '.seg-indicator', /display:\s*none\b/],
+    // Mit `forced-color-adjust: none` bildet der Modus auch den Fokusring nicht
+    // mehr ab - er braucht selbst eine Systemfarbe (Codex-Review zu #2058).
+    ['../public/styles/filter-chip.css', '.filter-chip--active:focus-visible', /outline:[^;]*\bCanvasText\b/],
+    ['../public/styles/sub-tabs.css', '.sub-tab--active:focus-visible', /outline:[^;]*\bCanvasText\b/],
+    ['../public/styles/sub-tabs.css', '.has-seg-indicator [data-seg-active][data-seg-active]:focus-visible', /outline:[^;]*\bCanvasText\b/],
   ];
   const missing = expected.filter(([file, selector, decl]) => !has(file, selector, decl))
     .map(([file, selector, decl]) => `${file.replace('../public/styles/', '')}: ${selector} ${decl}`);

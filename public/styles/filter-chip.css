@@ -304,4 +304,12 @@
     border-color: Highlight;
     color: HighlightText;
   }
+
+  /* Mit `forced-color-adjust: none` bildet der Modus auch den Fokusring nicht
+   * mehr ab; er steht deshalb selbst in einer Systemfarbe, mit Abstand auf
+   * Canvas statt auf der Hervorhebung. */
+  .filter-chip--active:focus-visible {
+    outline: var(--focus-ring-width) solid CanvasText;
+    outline-offset: var(--focus-ring-offset);
+  }
 }

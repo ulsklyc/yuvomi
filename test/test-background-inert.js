@@ -17,7 +17,7 @@ const { inertOutside } = await import('../public/utils/background-inert.js');
 
 function el(name, tag = 'DIV', classes = []) {
   const node = {
-    name, tagName: tag, children: [], parentElement: null, inert: false, open: false,
+    name, tagName: tag, nodeType: 1, children: [], parentElement: null, inert: false, open: false,
     classes: new Set(classes),
     append(...kids) { for (const k of kids) { k.parentElement = node; node.children.push(k); } return node; },
     contains(other) { for (let n = other; n; n = n.parentElement) if (n === node) return true; return false; },
@@ -114,4 +114,31 @@ test('eine Ebene ausserhalb ihres Bereichs sperrt nichts', () => {
   const release = inertOutside(loose);
   assert.equal(p.main.inert, false);
   release();
+});
+
+// Codex-Review zu #2058: die Navigation baut ihre Tabs neben dem Mehr-Knopf neu
+// auf, waehrend das Blatt offen ist. Ein durchlaufener Zweig bekommt dabei neue
+// Kinder - sie gehoeren zum Hintergrund und werden mitgesperrt.
+test('spaeter in einen durchlaufenen Zweig eingefuegte Knoten werden mitgesperrt', () => {
+  const observers = [];
+  globalThis.MutationObserver = class {
+    constructor(cb) { this.cb = cb; this.targets = []; this.off = false; observers.push(this); }
+    observe(node) { this.targets.push(node); }
+    disconnect() { this.off = true; }
+  };
+  try {
+    const p = page();
+    const release = inertOutside(p.sheet, { keep: [p.backdrop] });
+    const tab = el('neuer Tab');
+    p.app.append(tab);
+    const obs = observers.at(-1);
+    assert.ok(obs.targets.includes(p.app), 'der durchlaufene Zweig wird beobachtet');
+    obs.cb([{ addedNodes: [tab] }]);
+    assert.equal(tab.inert, true, 'der neue Tab ist hinter dem Blatt bedienbar');
+    release();
+    assert.equal(obs.off, true, 'die Freigabe beendet die Beobachtung');
+    assert.equal(tab.inert, false, 'und gibt den neuen Tab frei');
+  } finally {
+    delete globalThis.MutationObserver;
+  }
 });
