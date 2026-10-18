@@ -693,10 +693,16 @@ export function createNavigate(state, deps) {
    * Passwort vergessen/zuruecksetzen): ohne Sitzung gibt es dort nichts, was
    * eine Sitzung braeuchte, und das Formular bleibt stehen. Unbekannt (Kaltstart,
    * noch keine Seite) heisst: zur Anmeldung, wie bisher.
+   *
+   * `currentPath` ist das ZIEL, nicht das Gezeichnete (Review #2070): laedt das
+   * Modul einer oeffentlichen Seite nicht, zeichnet renderPage() nur den Fehler
+   * in den Inhalt, und die Shell der Sitzung steht weiter. Ob sie steht, sagt
+   * `.nav-bottom` - dasselbe Zeichen, an dem renderPage() und navigate() sie
+   * erkennen. Steht sie, geht es zur Anmeldung, die sie abraeumt.
    */
   function toSignIn() {
     const standing = allRoutes().find((r) => r.path === state.currentPath);
-    if (standing && !standing.requiresAuth) return;
+    if (standing && !standing.requiresAuth && !document.querySelector('.nav-bottom')) return;
     navigate('/login');
   }
 

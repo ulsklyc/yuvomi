@@ -48,6 +48,8 @@ export const HARNESS_ROUTES = Object.freeze([
  *   `module.render()` NACH dem Tausch (Daten); haelt die Navigation an, bis er
  *   fertig ist oder sie ueberholt wird
  * @param {() => void} [options.armScreensaver] - die echte Komponente statt der Attrappe (#1919)
+ * @param {(route: object) => boolean} [options.failRender] - das Seitenmodul laedt nicht: wie der
+ *   catch in renderPage() zeichnet das nur den Fehler in den Inhalt, eine stehende Shell bleibt
  */
 export function createNavigateHarness({
   user = null,
@@ -62,6 +64,7 @@ export function createNavigateHarness({
   onRender = null,
   onPageRender = null,
   armScreensaver = null,
+  failRender = null,
   routes = HARNESS_ROUTES,
 } = {}) {
   /** Was nach aussen sichtbar wurde, in der Reihenfolge des Geschehens. */
@@ -99,7 +102,8 @@ export function createNavigateHarness({
     // Ein echtes EventTarget: navigate() haengt seinen `auth:expired`-Listener
     // hier an (#1945), und `expire()` unten feuert ihn wie api.js.
     window: new EventTarget(),
-    document: { querySelector: () => null, getElementById: () => null },
+    // Wie im Router steht `.nav-bottom` fuer die Shell der angemeldeten Sitzung.
+    document: { querySelector: (sel) => (sel === '.nav-bottom' && shell ? {} : null), getElementById: () => null },
     // ── Verlassen-Schutz ──
     hasLeaveGuard: () => Boolean(leaveGuard),
     mayLeave: async (path) => { log.leaveAsked.push(path); return leaveGuard(); },
@@ -142,6 +146,8 @@ export function createNavigateHarness({
       // Wie renderPage(): ein waehrend des Ladens ueberholtes Ziel rendert
       // nichts mehr (R19, letzter Tipp gewinnt) und meldet das mit `false`.
       if (signal?.aborted) return false;
+      // Wie der catch in renderPage(): Fehler in den Inhalt, die Shell bleibt.
+      if (failRender?.(route)) return undefined;
       // Wie renderPage(): die Shell - und mit ihr die Toast-Flaeche - gibt es
       // nur auf Seiten mit Anmeldung.
       shell = route.requiresAuth;

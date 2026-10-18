@@ -113,3 +113,20 @@ test('der Router reicht dem Listener seine Aufraeumfunktion, und es gibt keinen 
   assert.equal(/addEventListener\(\s*'auth:expired'/.test(router), false, 'router.js haengt wieder einen eigenen Listener an');
   assert.equal(nav.match(/addEventListener\(\s*'auth:expired'/g)?.length, 1);
 });
+
+test('Sitzungsende, nachdem eine oeffentliche Seite nicht laden konnte: die Shell der Sitzung geht', async () => {
+  // Review #2070: angemeldet auf /tasks, dann /join - dessen Modul laedt nicht.
+  // currentPath steht schon auf /join, aber renderPage() hat im catch nur den
+  // Fehler in den Inhalt gezeichnet: die Shell der Sitzung steht noch. Das
+  // Sitzungsende darf sie nicht stehen lassen.
+  const { navigate, env, log, expire } = createNavigateHarness({
+    user: USER,
+    failRender: (route) => route.path === '/join',
+  });
+  await navigate('/tasks');
+  await navigate('/join');
+  assert.equal(env.currentPath, '/join');
+  expire();
+  await settle();
+  assert.deepEqual(log.rendered, ['/tasks', '/login']);
+});
