@@ -40,6 +40,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   modules installed, each open tab fetched every language file of every module twice a minute, also
   in the background. They now load again only when a module was installed, updated or changed its
   languages, and a tab in the background skips the check.
+- **Setting a password tells you the rule before you try.** First-time setup, joining by
+  invitation and resetting a password showed "at least 8 characters" only as an error after
+  submitting. The rule now stands under the field. An error on these pages and on "Forgot password"
+  also marks the field it means, so a screen reader names it there, and "Forgot password" with an
+  empty field says what is missing instead of only moving the cursor.
+- **Required fields say so to screen readers, and mixed forms show which ones are required.** In
+  the budget's entry, account and loan dialogs and the waste type dialog the asterisk was only
+  visual; the field now reports itself as required. The member, folder, medication, pairing,
+  bonus points, shopping item and health type forms required a field without marking it.
 
 ### Security
 
