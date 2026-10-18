@@ -22240,3 +22240,33 @@ test('Esc waehrend einer IME-Umwandlung schliesst kein Modal', () => {
   assert.ok(ime < body.indexOf('closeModal()'), 'die Pruefung steht vor dem Schliessen');
   assert.match(body.slice(ime, ime + 160), /preventDefault\(\)[\s\S]*?return/, 'der close-Request des Dialogs wird zurueckgehalten');
 });
+
+/**
+ * DIE RUECKKEHR IN DEN TAB LAEDT NUR, WAS ALT IST (Modern-Web-Guidance-Audit,
+ * Befund 13). Jeder Wechsel zurueck in den Tab holte `/dashboard` samt
+ * Erinnerungen neu und baute die ganze Uebersicht auf - auch nach fuenf
+ * Sekunden in einem anderen Tab. Jetzt nur, wenn der letzte Stand aelter als
+ * eine Minute ist oder der Haushaltstag gewechselt hat; Gruss, Datum und Uhr
+ * ziehen weiter immer nach. Gefahren wird die ECHTE Pruefung aus dashboard.js.
+ */
+test('dashboard: returning to the tab refreshes only a stale overview', () => {
+  const src = read('../public/pages/dashboard.js');
+  const start = src.indexOf('function staleOnReturn(');
+  assert.ok(start > 0, 'staleOnReturn() fehlt in dashboard.js');
+  const body = src.slice(start, src.indexOf('\n}\n', start) + 3);
+  const minMs = Number(src.match(/const RETURN_REFRESH_MIN_MS = ([\d_]+);/)?.[1]?.replace(/_/g, ''));
+  assert.equal(minMs, 60_000, 'eine Minute Mindestalter');
+  const staleOnReturn = new Function('RETURN_REFRESH_MIN_MS', `${body}; return staleOnReturn;`)(minMs);
+  const at = new Date('2026-10-18T10:00:00Z');
+  const later = (ms) => new Date(at.getTime() + ms);
+  assert.equal(staleOnReturn({ loadedAt: null, loadedDay: null }, { now: at, today: '2026-10-18' }), true, 'nie geladen');
+  assert.equal(staleOnReturn({ loadedAt: at, loadedDay: '2026-10-18' }, { now: later(5_000), today: '2026-10-18' }), false, 'fuenf Sekunden weg: kein Neuaufbau');
+  assert.equal(staleOnReturn({ loadedAt: at, loadedDay: '2026-10-18' }, { now: later(60_000), today: '2026-10-18' }), true, 'eine Minute: neu laden');
+  assert.equal(staleOnReturn({ loadedAt: at, loadedDay: '2026-10-18' }, { now: later(5_000), today: '2026-10-19' }), true, 'der Tag hat gewechselt');
+
+  const handler = src.slice(src.indexOf("document.addEventListener('visibilitychange'"), src.indexOf("document.addEventListener('visibilitychange'") + 2200);
+  assert.match(handler, /if \(staleOnReturn\(\{ loadedAt: lastLoadedAt, loadedDay: lastLoadedDay \}, \{ now: new Date\(\), today: householdToday\(\) \}\)\) refreshDashboardData\(\);/,
+    'der Handler fragt staleOnReturn(), bevor er neu laedt');
+  assert.deepEqual(src.match(/lastLoadedAt = new Date\(\);/g), ['lastLoadedAt = new Date();'], 'jeder Ladepunkt merkt Zeit UND Tag (markLoaded)');
+  assert.match(src, /const markLoaded = \(\) => \{ lastLoadedAt = new Date\(\); lastLoadedDay = householdToday\(\); \};/);
+});

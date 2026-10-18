@@ -141,6 +141,19 @@ const ONBOARDING_TITLE_ID = 'onboarding-step-title';
 const APP_NAME_STORAGE_KEY = 'yuvomi-app-name';
 const CUSTOMIZE_HINT_KEY = 'yuvomi-dash-customize-hint';
 
+// DIE RUECKKEHR IN DEN TAB LAEDT NUR, WAS ALT IST (Modern-Web-Guidance-Audit,
+// Befund 13). Jeder Wechsel zurueck holte `/dashboard` samt Erinnerungen neu
+// und baute die ganze Uebersicht auf, auch nach Sekunden in einem anderen Tab.
+// Neu geladen wird, wenn der Stand aelter als eine Minute ist oder der
+// Haushaltstag seitdem gewechselt hat ("Heute" waere sonst gestern).
+const RETURN_REFRESH_MIN_MS = 60_000;
+
+function staleOnReturn({ loadedAt, loadedDay }, { now, today }) {
+  if (!loadedAt) return true;
+  if (loadedDay !== today) return true;
+  return now.getTime() - loadedAt.getTime() >= RETURN_REFRESH_MIN_MS;
+}
+
 /* DER TAG EINES TERMINS IST DER TAG DER HAUSHALTSZONE, nicht der des Browsers.
  *
  * Hier stand `toLocalDateKey(new Date(value))`, und das las einen
@@ -6968,6 +6981,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // Bleibt `null`, solange nichts geladen wurde: eine Uhrzeit ohne Daten
   // dahinter waere die falscheste aller Angaben.
   let lastLoadedAt = null;
+  // Der Haushaltstag dieses Stands - die Rueckkehr in den Tab vergleicht ihn.
+  let lastLoadedDay = null;
+  const markLoaded = () => { lastLoadedAt = new Date(); lastLoadedDay = householdToday(); };
   try {
     const [dashRes, weatherRes, prefsRes, remindersRes] = await Promise.all([
       api.get(overviewRequest(layoutHintQuery('/dashboard'))),
@@ -7038,7 +7054,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     screensaverEnabled = Boolean(prefsRes.data?.screensaver_enabled);
     currency     = prefsRes.data?.currency ?? 'EUR';
     visibleMealTypes = normalizeVisibleMealTypes(prefsRes.data?.visible_meal_types);
-    lastLoadedAt = new Date();
+    markLoaded();
   } catch (err) {
     console.error('[Dashboard] Ladefehler:', err.message, 'Status:', err.status ?? 'network');
     loadFailed = true;
@@ -7140,7 +7156,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
       fresh.pendingReminders = data.pendingReminders;
       data = fresh;
       setCountdownAvailability(data?.countdowns);
-      lastLoadedAt = new Date();
+      markLoaded();
     } catch { /* der alte Stand bleibt stehen, statt die Seite zu leeren */ }
   }
 
@@ -7890,7 +7906,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
       fresh.pendingReminders = await loadPendingReminders(overviewRequest);
       if (signal.aborted) return;
       data = fresh;
-      lastLoadedAt = new Date();
+      markLoaded();
       rebuildDashboard(widgetConfig);
     } catch { /* Hintergrund-Refresh: bewusst still */ }
     finally { refreshInFlight = false; }
@@ -7919,8 +7935,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // Hintergrund-Tabs bekommen gedrosselte Timer: die Uhr könnte beim
     // Zurückkehren Minuten nachhängen und muss sofort nachziehen (#651).
     updateClockWidget(container);
-    // Inhalte ziehen nach, nicht nur Gruß/Datum/Uhr (Paket 2).
-    refreshDashboardData();
+    // Inhalte ziehen nach, nicht nur Gruß/Datum/Uhr (Paket 2) - aber nur ein
+    // alter Stand (staleOnReturn, oben).
+    if (staleOnReturn({ loadedAt: lastLoadedAt, loadedDay: lastLoadedDay }, { now: new Date(), today: householdToday() })) refreshDashboardData();
   }, { signal: signal });
 
   // Der Minutentakt der Uhr traegt die Nachtabsenkung mit: um 22:00 und um
