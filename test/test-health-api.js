@@ -2004,3 +2004,68 @@ test('PRN: eine negative Bedarfsdosis wird abgewiesen', async () => {
   const patched = await call('PATCH', `/medications/${ok.body.data.id}`, { prn_dose_qty: -1 });
   assert.equal(patched.status, 400);
 });
+
+// --------------------------------------------------------
+// Dosis und Bestandsabzug als EINE Anfrage (#2069)
+//
+// Bis #2069 buchte der Client die Dosis und schickte danach ein zweites
+// PATCH stock_qty mit einem selbst gerechneten Rest. Scheiterte das zweite,
+// stand die Dosis gebucht und der Bestand nicht gezaehlt. `stock_deduct`
+// faehrt jetzt mit dem Log, und der Server bucht beides in einer Transaktion.
+// --------------------------------------------------------
+
+const stockOf = (id) => db.prepare('SELECT stock_qty FROM medications WHERE id = ?').get(id).stock_qty;
+
+test('Logs: POST taken mit stock_deduct zieht den Bestand in derselben Anfrage ab (#2069)', async () => {
+  asA();
+  const med = await call('POST', '/medications', { name: 'Bestandsprobe', stock_qty: 10 });
+  const id = med.body.data.id;
+  const res = await call('POST', `/medications/${id}/logs`, {
+    status: 'taken', taken_at: '2026-06-04T08:05', dose_qty: 2, stock_deduct: 2,
+  });
+  assert.equal(res.status, 201);
+  assert.equal(stockOf(id), 8);
+  // Nur eine genommene Dosis zieht ab.
+  await call('POST', `/medications/${id}/logs`, { status: 'skipped', dose_qty: 2, stock_deduct: 2 });
+  await call('POST', `/medications/${id}/logs`, { scheduled_at: '2026-06-05T08:00', stock_deduct: 2 });
+  assert.equal(stockOf(id), 8);
+  // Nie unter 0.
+  await call('POST', `/medications/${id}/logs`, { status: 'taken', stock_deduct: 50 });
+  assert.equal(stockOf(id), 0);
+});
+
+test('Logs: ein ungueltiger stock_deduct bucht weder Dosis noch Abzug (#2069)', async () => {
+  asA();
+  const med = await call('POST', '/medications', { name: 'Negativprobe', stock_qty: 5 });
+  const id = med.body.data.id;
+  const res = await call('POST', `/medications/${id}/logs`, { status: 'taken', stock_deduct: -2 });
+  assert.equal(res.status, 400);
+  assert.equal(stockOf(id), 5);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM medication_logs WHERE medication_id = ?').get(id).n, 0);
+});
+
+test('Logs: ohne erfassten Bestand bleibt stock_qty leer (#2069)', async () => {
+  asA();
+  const med = await call('POST', '/medications', { name: 'Ohne Bestand' });
+  const id = med.body.data.id;
+  const res = await call('POST', `/medications/${id}/logs`, { status: 'taken', stock_deduct: 1 });
+  assert.equal(res.status, 201);
+  assert.equal(stockOf(id), null);
+});
+
+test('Logs: /take mit stock_deduct zieht einmal ab, ein wiederholtes /take nicht noch einmal (#2069)', async () => {
+  asA();
+  const med = await call('POST', '/medications', { name: 'Planprobe', stock_qty: 6 });
+  const id = med.body.data.id;
+  const pending = await call('POST', `/medications/${id}/logs`, { scheduled_at: '2026-06-04T08:00' });
+  const lid = pending.body.data.id;
+  const first = await call('POST', `/logs/${lid}/take`, { stock_deduct: 2 });
+  assert.equal(first.status, 200);
+  assert.equal(first.body.data.status, 'taken');
+  assert.equal(stockOf(id), 4);
+  const again = await call('POST', `/logs/${lid}/take`, { stock_deduct: 2 });
+  assert.equal(again.status, 200);
+  assert.equal(stockOf(id), 4, 'ein schon genommener Eintrag zieht nicht ein zweites Mal ab');
+  const bad = await call('POST', `/logs/${lid}/take`, { stock_deduct: 'viel' });
+  assert.equal(bad.status, 400);
+});

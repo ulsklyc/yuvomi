@@ -91,7 +91,7 @@ export function healthPaths() {
     },
     '/api/v1/health/medications/{id}/logs': {
       get: op({ summary: 'List a medication\'s dose log', tag: 'Health', params: [idParam()], description: 'Optional `from`/`to` filters on `scheduled_at`.' }),
-      post: op({ summary: 'Add a dose-log entry', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { scheduled_at?, schedule_id?, status?, taken_at?, dose_qty?, note? }; `status` defaults to `pending`. Only a `taken` entry keeps `taken_at`: sent alongside `pending` or `skipped`, it is dropped and stored as null.' + TAKEN_NOW + WALL_CLOCK_INPUT }),
+      post: op({ summary: 'Add a dose-log entry', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { scheduled_at?, schedule_id?, status?, taken_at?, dose_qty?, note?, stock_deduct? }; `status` defaults to `pending`. Only a `taken` entry keeps `taken_at`: sent alongside `pending` or `skipped`, it is dropped and stored as null. `stock_deduct` (not negative) lowers the recorded stock in the same transaction as the log entry, never below 0, and only for a `taken` entry; a medication without recorded stock keeps none (#2069).' + TAKEN_NOW + WALL_CLOCK_INPUT }),
     },
     '/api/v1/health/logs/{id}': {
       patch: op({
@@ -111,7 +111,7 @@ export function healthPaths() {
       }),
     },
     '/api/v1/health/logs/{id}/take': {
-      post: op({ summary: 'Mark a dose as taken', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { taken_at? }.' + TAKEN_NOW + WALL_CLOCK_INPUT }),
+      post: op({ summary: 'Mark a dose as taken', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { taken_at?, stock_deduct? }. `stock_deduct` (not negative) lowers the recorded stock in the same transaction, never below 0; an entry that is already taken does not deduct a second time (#2069).' + TAKEN_NOW + WALL_CLOCK_INPUT }),
     },
     '/api/v1/health/logs/{id}/skip': {
       post: op({ summary: 'Mark a dose as skipped', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),

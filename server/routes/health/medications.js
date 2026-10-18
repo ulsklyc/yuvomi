@@ -48,6 +48,35 @@ function prnInterval(raw) {
   return r;
 }
 
+/**
+ * Bestandsabzug zu einer genommenen Dosis (#2069): leer erlaubt, sonst nicht negativ.
+ *
+ * Dosis und Abzug sind EINE Aktion. Bis #2069 schickte der Client sie als zwei
+ * Anfragen (Log, dann PATCH stock_qty mit einem selbst gerechneten Rest):
+ * scheiterte die zweite, stand die Dosis im Protokoll und der Bestand nicht
+ * gezaehlt, und der Rest kam aus einem Stand, den eine zweite Buchung
+ * inzwischen ueberholt haben konnte. Jetzt rechnet der Server in derselben
+ * Transaktion wie das Log, und zwar vom gespeicherten Bestand aus.
+ */
+function stockDeduct(raw) {
+  const r = v.num(raw, 'stock_deduct');
+  if (r.error || r.value === null) return r;
+  if (r.value < 0) return { value: null, error: 'stock_deduct must not be negative.' };
+  return r;
+}
+
+/**
+ * Zieht `qty` vom erfassten Bestand ab, nie unter 0. Ohne erfassten Bestand
+ * (stock_qty NULL) bleibt alles, wie es ist - wer keinen Bestand fuehrt,
+ * bekommt keinen. Laeuft in der Transaktion des Aufrufers.
+ */
+function deductStock(medId, qty) {
+  if (!(qty > 0)) return;
+  db.get().prepare(
+    'UPDATE medications SET stock_qty = MAX(0, stock_qty - ?) WHERE id = ? AND stock_qty IS NOT NULL'
+  ).run(qty, medId);
+}
+
 // Diese beiden Helfer sind der einzige Zugang zu einem Medikament: Plaene und
 // Einnahmeprotokolle haengen daran und erben ihr Scoping von hier. Die Betreuung
 // (#584) greift deshalb an genau zwei Stellen statt in jeder der neun
@@ -368,8 +397,9 @@ router.post('/medications/:id/logs', (req, res) => {
     const takenAt     = v.datetime(b.taken_at, 'taken_at', false, wall);
     const dose        = v.num(b.dose_qty, 'dose_qty');
     const note        = v.str(b.note, 'note', { max: v.MAX_TEXT, required: false });
+    const deduct      = stockDeduct(b.stock_deduct);
 
-    const checks = [scheduledAt, status, takenAt, dose, note];
+    const checks = [scheduledAt, status, takenAt, dose, note, deduct];
     let scheduleId = null;
     if (b.schedule_id !== undefined && b.schedule_id !== null && b.schedule_id !== '') {
       const sid = parseInt(b.schedule_id, 10);
@@ -392,12 +422,16 @@ router.post('/medications/:id/logs', (req, res) => {
     const nextStatus  = status.value || 'pending';
     const nextTakenAt = nextStatus === 'taken' ? (takenAt.value || wallClockNow()) : null;
 
-    const result = db.get().prepare(`
-      INSERT INTO medication_logs (medication_id, schedule_id, scheduled_at, status, taken_at, dose_qty, note)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(medId, scheduleId, scheduledAt.value, nextStatus, nextTakenAt, dose.value, note.value);
-
-    const row = db.get().prepare('SELECT * FROM medication_logs WHERE id = ?').get(result.lastInsertRowid);
+    // Log und Bestandsabzug in EINER Transaktion (#2069): beides oder nichts.
+    // Abgezogen wird nur bei einer genommenen Dosis.
+    const row = db.get().transaction(() => {
+      const result = db.get().prepare(`
+        INSERT INTO medication_logs (medication_id, schedule_id, scheduled_at, status, taken_at, dose_qty, note)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(medId, scheduleId, scheduledAt.value, nextStatus, nextTakenAt, dose.value, note.value);
+      if (nextStatus === 'taken') deductStock(medId, deduct.value);
+      return db.get().prepare('SELECT * FROM medication_logs WHERE id = ?').get(result.lastInsertRowid);
+    })();
     res.status(201).json({ data: row });
   } catch (err) {
     log.error('Error creating log:', err.message);
@@ -417,9 +451,18 @@ function updateLogStatus(req, res, newStatus) {
   const b = req.body || {};
   if (newStatus === 'taken') {
     const takenAt = v.datetime(b.taken_at, 'taken_at', false, wallClockInput());
-    if (takenAt.error) return badRequest(res, [takenAt.error]);
+    const deduct  = stockDeduct(b.stock_deduct);
+    const errors  = v.collectErrors([takenAt, deduct]);
+    if (errors.length) return badRequest(res, errors);
     const when = takenAt.value || wallClockNow();
-    db.get().prepare('UPDATE medication_logs SET status = ?, taken_at = ? WHERE id = ?').run('taken', when, id);
+    // Abhaken und Bestandsabzug in EINER Transaktion (#2069). Ein schon
+    // genommener Eintrag zieht nicht ein zweites Mal ab: ein wiederholtes
+    // /take (Doppelklick, Wiederholung nach einem Netzfehler) bucht sonst die
+    // Dosis doppelt vom Bestand.
+    db.get().transaction(() => {
+      db.get().prepare('UPDATE medication_logs SET status = ?, taken_at = ? WHERE id = ?').run('taken', when, id);
+      if (logRow.status !== 'taken') deductStock(logRow.medication_id, deduct.value);
+    })();
   } else {
     db.get().prepare('UPDATE medication_logs SET status = ?, taken_at = NULL WHERE id = ?').run('skipped', id);
   }
