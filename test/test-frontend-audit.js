@@ -8442,7 +8442,9 @@ const r18Lum = (hex) => relLum(hexToRgb(hex));
 test('R18: der Schalterknopf ist in jedem Theme heller als seine Bahn - aus und an', () => {
   const rules = [...eachRule(read('../public/styles/layout.css'))];
   const bg = (selector) => {
-    const rule = rules.filter((r) => r.selector.trim() === selector && /background(?:-color)?\s*:/.test(r.body)).pop();
+    // Forced Colors zaehlt nicht: dort stehen Systemfarben statt der Theme-Tokens.
+    const rule = rules.filter((r) => r.selector.trim() === selector && /background(?:-color)?\s*:/.test(r.body)
+      && !r.at.some((at) => /forced-colors/.test(at))).pop();
     assert.ok(rule, `Regel ${selector} mit Hintergrund nicht gefunden - der Guard misst nichts`);
     const token = rule.body.match(/background(?:-color)?\s*:\s*var\(\s*(--[\w-]+)\s*\)/)?.[1];
     assert.ok(token, `${selector} setzt keinen Token-Hintergrund`);
@@ -22311,4 +22313,43 @@ test('Esc waehrend einer IME-Umwandlung schliesst kein Modal', () => {
   assert.ok(ime > 0, 'onEscape fragt isImeComposing');
   assert.ok(ime < body.indexOf('closeModal()'), 'die Pruefung steht vor dem Schliessen');
   assert.match(body.slice(ime, ime + 160), /preventDefault\(\)[\s\S]*?return/, 'der close-Request des Dialogs wird zurueckgehalten');
+});
+
+/**
+ * FORCED COLORS (Windows-Kontrastmodus, Modern-Web-Guidance-Audit Befund 5).
+ * Der Modus ersetzt Autorenfarben durch Systemfarben und streicht
+ * `box-shadow` und Hintergrundbilder. Was einen Zustand nur ueber Farbe,
+ * Toenung oder Schatten zeigt, verschwindet: der Schalter (Bahn und Knopf
+ * werden Canvas), der aktive Filter-Chip, das aktive Segment (Gleitkapsel
+ * und Eintrag) und der Fokus im Eingabefeld (nur Kante + Schatten). Jeder
+ * dieser Zustaende braucht im Modus eine Systemfarbe oder einen Umriss, und
+ * zwar in DEM Blatt, das den Baustein definiert - sonst gewinnt die
+ * Basisregel ueber die Ladereihenfolge.
+ */
+test('forced colors: switches, active chips, active segments and focused fields keep a visible state', () => {
+  const forced = (file) => [...eachRule(withoutBlockComments(read(file)))]
+    .filter((rule) => rule.at.some((at) => /forced-colors:\s*active/.test(at)));
+  const has = (file, selector, decl) => forced(file).some((rule) => (
+    rule.selector.split(',').map((s) => s.replace(/\s+/g, ' ').trim()).includes(selector) && decl.test(rule.body)
+  ));
+  const SYS = '(?:Highlight|HighlightText|ButtonText|ButtonFace|CanvasText|Canvas|GrayText|LinkText)';
+  const expected = [
+    ['../public/styles/layout.css', '.toggle__track', new RegExp(`outline:[^;]*\\b${SYS}\\b`)],
+    ['../public/styles/layout.css', '.toggle__track::after', new RegExp(`background(?:-color)?:\\s*${SYS}\\b`)],
+    ['../public/styles/layout.css', '.toggle input:checked + .toggle__track', /background(?:-color)?:\s*Highlight\b/],
+    ['../public/styles/layout.css', '.toggle input:checked + .toggle__track::after', /background(?:-color)?:\s*HighlightText\b/],
+    ['../public/styles/layout.css', '.toggle input:disabled + .toggle__track', /outline-color:\s*GrayText\b/],
+    ['../public/styles/layout.css', '.form-input:focus', /outline:[^;]*\bHighlight\b/],
+    ['../public/styles/layout.css', '.input:focus', /outline:[^;]*\bHighlight\b/],
+    // Text auf Highlight braucht `forced-color-adjust: none`: sonst legt
+    // Chrome eine Canvas-Flaeche hinter den Text (Backplate), und
+    // HighlightText verschwindet darauf - im Browser gemessen.
+    ['../public/styles/filter-chip.css', '.filter-chip--active', /forced-color-adjust:\s*none[\s\S]*background(?:-color)?:\s*Highlight\b[\s\S]*color:\s*HighlightText\b/],
+    ['../public/styles/sub-tabs.css', '.sub-tab--active', /forced-color-adjust:\s*none[\s\S]*background(?:-color)?:\s*Highlight\b/],
+    ['../public/styles/sub-tabs.css', '.has-seg-indicator [data-seg-active][data-seg-active]', /forced-color-adjust:\s*none[\s\S]*background(?:-color)?:\s*Highlight\b/],
+    ['../public/styles/sub-tabs.css', '.seg-indicator', /display:\s*none\b/],
+  ];
+  const missing = expected.filter(([file, selector, decl]) => !has(file, selector, decl))
+    .map(([file, selector, decl]) => `${file.replace('../public/styles/', '')}: ${selector} ${decl}`);
+  assert.deepEqual(missing, [], `Ohne Forced-Colors-Regel verschwindet der Zustand:\n${missing.join('\n')}`);
 });

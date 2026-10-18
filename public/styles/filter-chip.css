@@ -291,3 +291,17 @@
   border-radius: var(--radius-full);
   background: var(--meal-type-dot, var(--color-text-disabled));
 }
+
+/* FORCED COLORS (Windows-Kontrastmodus): Toenung und Modulfarbe fallen weg,
+ * jeder Chip bekaeme dieselbe Systemfarbe. Der aktive traegt deshalb die
+ * Hervorhebung des Systems. */
+@media (forced-colors: active) {
+  /* `forced-color-adjust: none`: ohne das legt Chrome eine Canvas-Flaeche
+   * hinter den Text, und HighlightText verschwindet darauf. */
+  .filter-chip--active {
+    forced-color-adjust: none;
+    background-color: Highlight;
+    border-color: Highlight;
+    color: HighlightText;
+  }
+}
