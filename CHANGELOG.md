@@ -40,13 +40,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   On iPhone and in Firefox the recipe list fetched the picture of every imported recipe at once
   instead of only those on screen, and each picture went to Mealie or Tandoor again on every visit.
   With 500 recipes that used up the request budget of a whole minute, and every other page answered
-  with an error until it refilled. The list now loads only the pictures you scroll to, the browser
-  keeps a picture until the recipe changes at the provider, and pictures (recipes and profile
-  pictures) have a budget of their own, so they can no longer block the rest of the app.
+  with an error until it refilled. The list now loads only the pictures you scroll to, a picture the
+  browser already has is confirmed by Yuvomi without asking Mealie or Tandoor again, and pictures
+  (recipes and profile pictures) have a budget of their own, so they can no longer block the rest
+  of the app.
   **API:** `GET /api/v1/recipes/{id}/provider-thumbnail` takes an optional `?v=`, the recipe's
-  `provider_updated_at` (meal rows carry it as `recipe_image_version`). With the current value the
-  picture is cacheable for the session and answers `If-None-Match` with 304 without asking the
-  provider; without it the response revalidates (`private, no-cache`).
+  `provider_updated_at` (meal rows carry it as `recipe_image_version`). The response is
+  `private, no-cache` with an ETag derived from that version, and `If-None-Match` answers 304
+  without a request to the provider.
+- **On the overview, the people of an event sit at the end of its line in right-to-left
+  languages.** In Arabic and Persian they sat right after the event's title instead. Left-to-right
+  layouts are unchanged.
 - **Typing Japanese, Korean or Chinese no longer saves half a word.** In these languages Enter
   first confirms the character conversion. Dialogs, tag and mention fields, suggestion lists and
   the comboboxes used to act on that Enter and saved or picked the text while it was still being

@@ -166,15 +166,7 @@ const ALLOWLIST = [
   },
   {
     file: 'server/services/ics-export.js', site: 'findUserIdByFeedToken', lists: 1, deactivated: 'excluded',
-    reason: 'Feed token lookup: compares a presented token against every stored one in constant time, shows no one.',
-  },
-  {
-    file: 'server/services/waste-ics.js', site: 'findUserIdByFeedToken', lists: 1, deactivated: 'excluded',
-    reason: 'Feed token lookup: compares a presented token against every stored one in constant time, shows no one.',
-  },
-  {
-    file: 'server/services/birthday-ics.js', site: 'findUserIdByFeedToken', lists: 1, deactivated: 'excluded',
-    reason: 'Feed token lookup: compares a presented token against every stored one in constant time, shows no one.',
+    reason: 'Shared feed token lookup for the calendar, waste and birthday feeds: compares a presented token against every stored one in constant time, shows no one. Column is taken from FEED_TOKEN_COLUMNS, never from input.',
   },
   {
     file: 'server/services/waste-store.js', site: 'pruneFeedTypeSelections', lists: 1, deactivated: 'unaffected',
@@ -1125,7 +1117,7 @@ test('every allowlisted list says what it does with a deactivated account, and d
  * nein - dann gehoert die Liste auf das Praedikat.
  */
 test('the allowlist stays short and every entry names a reason', () => {
-  assert.ok(ALLOWLIST.length <= 19, 'a long allowlist is a second predicate - move lists onto the predicate instead');
+  assert.ok(ALLOWLIST.length <= 17, 'a long allowlist is a second predicate - move lists onto the predicate instead');
   for (const entry of ALLOWLIST) {
     assert.ok(entry.reason && entry.reason.length > 20, `${entry.file} :: ${entry.site} needs a reason`);
   }
