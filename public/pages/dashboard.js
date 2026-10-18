@@ -6989,9 +6989,13 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // dahinter waere die falscheste aller Angaben.
   let lastLoadedAt = null;
   // Der Haushaltstag dieses Stands - die Rueckkehr in den Tab vergleicht ihn.
+  // Gemerkt wird der Tag VOR der Anfrage: der Server legt ihn beim Eingang
+  // fest, und eine Antwort, die erst nach Mitternacht ankommt, zeigt noch den
+  // alten Tag.
   let lastLoadedDay = null;
-  const markLoaded = () => { lastLoadedAt = new Date(); lastLoadedDay = householdToday(); };
+  const markLoaded = (day) => { lastLoadedAt = new Date(); lastLoadedDay = day; };
   try {
+    const requestDay = householdToday();
     const [dashRes, weatherRes, prefsRes, remindersRes] = await Promise.all([
       api.get(overviewRequest(layoutHintQuery('/dashboard'))),
       api.get(`/weather?lang=${encodeURIComponent(getLocale())}`).catch(() => ({ data: null })),
@@ -7061,7 +7065,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     screensaverEnabled = Boolean(prefsRes.data?.screensaver_enabled);
     currency     = prefsRes.data?.currency ?? 'EUR';
     visibleMealTypes = normalizeVisibleMealTypes(prefsRes.data?.visible_meal_types);
-    markLoaded();
+    markLoaded(requestDay);
   } catch (err) {
     console.error('[Dashboard] Ladefehler:', err.message, 'Status:', err.status ?? 'network');
     loadFailed = true;
@@ -7155,6 +7159,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
   async function reloadIfQueryChanged(previousQuery) {
     if (dashboardQuery(widgetConfig) === previousQuery) return;
     try {
+      const requestDay = householdToday();
       const fresh = await api.get(overviewRequest(dashboardQuery(widgetConfig)));
       localizeEventLists(fresh);
       fresh.cycle = data.cycle;
@@ -7163,7 +7168,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
       fresh.pendingReminders = data.pendingReminders;
       data = fresh;
       setCountdownAvailability(data?.countdowns);
-      markLoaded();
+      markLoaded(requestDay);
     } catch { /* der alte Stand bleibt stehen, statt die Seite zu leeren */ }
   }
 
@@ -7888,6 +7893,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     if (isCustomizing || loadFailed || refreshInFlight) return;
     refreshInFlight = true;
     try {
+      const requestDay = householdToday();
       const fresh = await api.get(overviewRequest(dashboardQuery(widgetConfig)));
       if (signal.aborted) return;
       localizeEventLists(fresh);
@@ -7913,7 +7919,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
       fresh.pendingReminders = await loadPendingReminders(overviewRequest);
       if (signal.aborted) return;
       data = fresh;
-      markLoaded();
+      markLoaded(requestDay);
       rebuildDashboard(widgetConfig);
     } catch { /* Hintergrund-Refresh: bewusst still */ }
     finally { refreshInFlight = false; }

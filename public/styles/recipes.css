@@ -51,7 +51,7 @@
 /* Lange Listen rechnen nur, was in Sicht ist - dieselbe Regel wie bei den
  * Kontakten (contacts.css, Modern-Web-Guidance-Audit Befund 18). 300 Rezepte:
  * 460 ms am Stueck bei 4x CPU, mit der Regel 357 ms. Zeile 64px, gemessen. */
-@supports (content-visibility: auto) {
+@supports (content-visibility: auto) and (contain-intrinsic-size: auto none auto 1px) {
   .recipes-list .recipe-row-item {
     content-visibility: auto;
     contain-intrinsic-size: auto none auto 64px;

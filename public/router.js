@@ -509,7 +509,10 @@ function prefetchRoute(path, { now = false, priority = null } = {}) {
     // modulepreload laedt mit hoher Prioritaet. Das Vorwaermen im Leerlauf
     // (warmPrimaryRoutes, rund 19 Module) gibt `low` mit, damit es nichts
     // verdraengt, was die offene Seite gerade braucht; ohne Unterstuetzung
-    // bleibt es beim Standard (Modern-Web-Guidance-Audit, Befund 11).
+    // bleibt es beim Standard (Modern-Web-Guidance-Audit, Befund 11). Die
+    // statischen Importe der Seite holt Chrome dabei nicht mit (gemessen:
+    // 15 Seitenmodule, alle `Low`, keine Abhaengigkeit); die kommen erst
+    // beim Aufruf.
     if (priority) link.fetchPriority = priority;
     document.head.appendChild(link);
   }

@@ -22423,7 +22423,20 @@ test('dashboard: returning to the tab refreshes only a stale overview', () => {
   assert.match(handler, /if \(staleOnReturn\(\{ loadedAt: lastLoadedAt, loadedDay: lastLoadedDay \}, \{ now: new Date\(\), today: householdToday\(\) \}\)\) refreshDashboardData\(\);/,
     'der Handler fragt staleOnReturn(), bevor er neu laedt');
   assert.deepEqual(src.match(/lastLoadedAt = new Date\(\);/g), ['lastLoadedAt = new Date();'], 'jeder Ladepunkt merkt Zeit UND Tag (markLoaded)');
-  assert.match(src, /const markLoaded = \(\) => \{ lastLoadedAt = new Date\(\); lastLoadedDay = householdToday\(\); \};/);
+  assert.match(src, /const markLoaded = \(day\) => \{ lastLoadedAt = new Date\(\); lastLoadedDay = day; \};/,
+    'markLoaded() rechnet den Tag nicht selbst aus');
+  // Der Server legt den Tag beim EINGANG der Anfrage fest. Kommt die Antwort
+  // nach Mitternacht an, ist sie trotzdem der alte Tag - gemerkt wird also der
+  // Tag von vor der Anfrage, sonst haelt die Rueckkehr gestern fuer heute.
+  const calls = [...src.matchAll(/markLoaded\(([^)]*)\);/g)];
+  assert.equal(calls.length, 3, 'drei Ladepunkte');
+  for (const call of calls) {
+    const arg = call[1];
+    assert.match(arg, /^\w+$/, `markLoaded(${arg}) braucht den Tag der Anfrage`);
+    const decl = src.lastIndexOf(`const ${arg} = householdToday();`, call.index);
+    assert.ok(decl > 0, `${arg} ist nicht vor dem Ladepunkt festgehalten`);
+    assert.match(src.slice(decl, call.index), /api\.get\(overviewRequest\(/, `${arg} wird vor der Anfrage festgehalten, nicht danach`);
+  }
 });
 
 /**
@@ -22519,7 +22532,13 @@ test('long contact and recipe lists skip rendering rows out of view', () => {
       && r.at.some((at) => /@supports \(content-visibility: auto\)/.test(at)));
     assert.ok(rule, `${file}: ${selector} ohne content-visibility unter @supports`);
     assert.match(rule.body, /content-visibility:\s*auto/);
-    assert.match(rule.body, /contain-intrinsic-size:\s*auto none auto \d+px/, `${selector}: ohne gemerkte Hoehe springt der Bildlaufbalken`);
+    const size = rule.body.match(/contain-intrinsic-size:\s*(auto none auto \d+px)/)?.[1];
+    assert.ok(size, `${selector}: ohne gemerkte Hoehe springt der Bildlaufbalken`);
+    // `auto none` versteht Chrome erst ab 117; Chrome 87-116 kennt
+    // content-visibility schon und verwuerfe nur die Hoehe - Zeilen ohne
+    // Platzhalter. Die Weiche fragt deshalb den ganzen Wert ab.
+    assert.ok(rule.at.some((at) => at.includes('(contain-intrinsic-size: auto none auto 1px)')),
+      `${selector}: @supports prueft contain-intrinsic-size nicht mit`);
   }
   assert.ok(![...eachRule(read('../public/styles/notes.css'))].some((r) => /content-visibility/.test(r.body)), 'Notizen bleiben ohne (Masonry-Spalten)');
 });

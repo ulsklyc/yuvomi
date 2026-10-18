@@ -180,7 +180,7 @@
  * als Platzhalter da, `auto` merkt sich danach die echte - der Bildlaufbalken
  * springt nicht. Fokusringe liegen in der Zeile innen und bleiben ganz
  * (im Browser geprueft). Ohne Unterstuetzung bleibt alles, wie es war. */
-@supports (content-visibility: auto) {
+@supports (content-visibility: auto) and (contain-intrinsic-size: auto none auto 1px) {
   .contact-group__list > .contact-item {
     content-visibility: auto;
     contain-intrinsic-size: auto none auto 65px;
