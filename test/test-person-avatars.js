@@ -229,6 +229,8 @@ test('ein gekoppeltes Wanddisplay darf Bilder lesen', async () => {
 });
 
 test('ein gescoptes API-Token darf Bilder lesen', async () => {
+  const spoof = `/api/v1/people/${BOB}/avatar?v=0`;
+  assert.equal((await admin('POST', '/tasks', { title: spoof })).status, 201);
   const created = await admin('POST', '/auth/api-tokens', { name: 'Nur Aufgaben', scopes: ['tasks:read'] });
   assert.equal(created.status, 201, created.text);
   const res = await fetch(`${BASE}/api/v1/people/${BOB}/avatar`, { headers: { Authorization: `Bearer ${created.body.token}` } });
@@ -244,7 +246,12 @@ test('ein gescoptes API-Token darf Bilder lesen', async () => {
   const row = body.data.find((t) => t.title === 'Muell rausbringen');
   assert.match(String(row.assigned_avatar), /^data:image\/jpeg;base64,/, 'assigned_avatar fuer ein Token');
   assert.match(String(row.assigned_users[0].avatar_data), /^data:image\/jpeg;base64,/, 'assigned_users[].avatar_data fuer ein Token');
-  assert.doesNotMatch(JSON.stringify(body), /\/api\/v1\/people\//, 'keine Bildadresse in der Token-Antwort');
+  assert.doesNotMatch(JSON.stringify(body.data.filter((t) => t.title !== spoof)), /\/api\/v1\/people\//, 'keine Bildadresse in der Token-Antwort');
+  // Ersetzt wird nur in den Bildfeldern, nie in Text, den jemand eintippt:
+  // ein Titel, der wie eine Bildadresse aussieht, bleibt Text (Security-Review
+  // zu #2056 - sonst blaehte jeder solche Titel die Antwort um ein Bild auf).
+  const spoofed = body.data.find((t) => t.title === spoof);
+  assert.equal(spoofed?.title, spoof, 'der Titel bleibt, wie er eingegeben wurde');
   const write = await fetch(`${BASE}/api/v1/people/${BOB}/avatar`, { method: 'POST', headers: { Authorization: `Bearer ${created.body.token}` } });
   assert.notEqual(write.status, 200, 'nur Lesen');
 });

@@ -47,6 +47,15 @@ export function isPersonAvatarRead(method, path) {
   return String(method || '').toUpperCase() === 'GET' && PERSON_AVATAR_PATH.test(String(path || ''));
 }
 
+// NUR DIESE FELDER, nie ein beliebiger String: ein Titel oder Notiztext, der
+// wie eine Bildadresse aussieht, ist eingetippter Text und bleibt es. Ein
+// blindes Ersetzen haette ihn verfaelscht und die Antwort je Treffer um ein
+// Bild bis 768 KB aufgeblaeht (Security-Review zu #2056). Die Liste ist die
+// der Felder, die `personAvatarUrlSql()` befuellt.
+const AVATAR_FIELDS = new Set([
+  'assigned_avatar', 'avatar_data', 'creator_avatar', 'worker_avatar_data', 'user_avatar', 'person_avatar',
+]);
+
 const AVATAR_URL_RE = /^\/api\/v1\/people\/(\d+)\/avatar\?v=\d+$/;
 
 /**
@@ -65,18 +74,20 @@ const AVATAR_URL_RE = /^\/api\/v1\/people\/(\d+)\/avatar\?v=\d+$/;
  */
 export function inlineAvatarUrls(payload, lookup) {
   const cache = new Map();
+  const inline = (value) => {
+    const match = typeof value === 'string' ? AVATAR_URL_RE.exec(value) : null;
+    if (!match) return value;
+    const id = Number(match[1]);
+    if (!cache.has(id)) cache.set(id, lookup(id) ?? null);
+    return cache.get(id);
+  };
   const visit = (value) => {
-    if (typeof value === 'string') {
-      const match = AVATAR_URL_RE.exec(value);
-      if (!match) return value;
-      const id = Number(match[1]);
-      if (!cache.has(id)) cache.set(id, lookup(id) ?? null);
-      return cache.get(id);
-    }
     if (Array.isArray(value)) return value.map(visit);
     if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
       const out = {};
-      for (const [key, inner] of Object.entries(value)) out[key] = visit(inner);
+      for (const [key, inner] of Object.entries(value)) {
+        out[key] = AVATAR_FIELDS.has(key) ? inline(inner) : visit(inner);
+      }
       return out;
     }
     return value;
