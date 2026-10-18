@@ -45,7 +45,7 @@ function buildAddForm(container) {
       })}
       ${settingRowHtml({
         label: t('settings.dmsToken'), labelFor: 'dms-token',
-        control: `<input class="form-input" type="password" id="dms-token" required autocomplete="off" />`,
+        control: `<input class="form-input" type="password" id="dms-token" required autocomplete="new-password" />`,
       })}
     </div>
     <div id="dms-form-error-host"></div>

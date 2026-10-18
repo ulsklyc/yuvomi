@@ -192,7 +192,7 @@ function renderChannelList(container, channels, providers = DEFAULT_PROVIDERS) {
         <div class="notification-provider-fields notification-provider-fields--gotify${channel.provider === 'gotify' ? '' : ' settings-card--hidden'}">
           <div class="form-field">
             <label class="form-label" for="notification-gotify-token-${suffix}">${t('settings.notificationChannelGotifyToken')}</label>
-            <input class="form-input" id="notification-gotify-token-${suffix}" name="gotifyToken" type="password" autocomplete="off" placeholder="${channel.secretSet ? esc(t('settings.notificationChannelSecretKeep')) : ''}">
+            <input class="form-input" id="notification-gotify-token-${suffix}" name="gotifyToken" type="password" autocomplete="new-password" placeholder="${channel.secretSet ? esc(t('settings.notificationChannelSecretKeep')) : ''}">
           </div>
           <div class="form-field">
             <label class="form-label" for="notification-gotify-priority-${suffix}">${t('settings.notificationChannelGotifyPriority')}</label>
@@ -202,7 +202,7 @@ function renderChannelList(container, channels, providers = DEFAULT_PROVIDERS) {
         <div class="notification-provider-fields notification-provider-fields--webhook${isWebhook ? '' : ' settings-card--hidden'}">
           <div class="form-field">
             <label class="form-label" for="notification-webhook-token-${suffix}">${t('settings.notificationChannelWebhookToken')}</label>
-            <input class="form-input" id="notification-webhook-token-${suffix}" name="webhookToken" type="password" autocomplete="off" placeholder="${channel.secretSet ? esc(t('settings.notificationChannelSecretKeep')) : ''}">
+            <input class="form-input" id="notification-webhook-token-${suffix}" name="webhookToken" type="password" autocomplete="new-password" placeholder="${channel.secretSet ? esc(t('settings.notificationChannelSecretKeep')) : ''}">
           </div>
           <div class="form-field">
             <label class="form-label" for="notification-webhook-template-${suffix}">${t('settings.notificationChannelWebhookTemplate')}</label>
@@ -231,7 +231,7 @@ function renderChannelList(container, channels, providers = DEFAULT_PROVIDERS) {
           </div>
           <div class="form-field notification-ntfy-token-field${channel.config.authType === 'token' ? '' : ' settings-card--hidden'}">
             <label class="form-label" for="notification-ntfy-token-${suffix}">${t('settings.notificationChannelNtfyToken')}</label>
-            <input class="form-input" id="notification-ntfy-token-${suffix}" name="ntfyToken" type="password" autocomplete="off" placeholder="${channel.secretSet ? esc(t('settings.notificationChannelSecretKeep')) : ''}">
+            <input class="form-input" id="notification-ntfy-token-${suffix}" name="ntfyToken" type="password" autocomplete="new-password" placeholder="${channel.secretSet ? esc(t('settings.notificationChannelSecretKeep')) : ''}">
           </div>
           <div class="form-field notification-ntfy-basic-field${channel.config.authType === 'basic' ? '' : ' settings-card--hidden'}">
             <label class="form-label" for="notification-ntfy-username-${suffix}">${t('settings.notificationChannelNtfyUsername')}</label>
@@ -239,7 +239,7 @@ function renderChannelList(container, channels, providers = DEFAULT_PROVIDERS) {
           </div>
           <div class="form-field notification-ntfy-basic-field${channel.config.authType === 'basic' ? '' : ' settings-card--hidden'}">
             <label class="form-label" for="notification-ntfy-password-${suffix}">${t('settings.notificationChannelNtfyPassword')}</label>
-            <input class="form-input" id="notification-ntfy-password-${suffix}" name="ntfyPassword" type="password" autocomplete="off" placeholder="${channel.secretSet ? esc(t('settings.notificationChannelSecretKeep')) : ''}">
+            <input class="form-input" id="notification-ntfy-password-${suffix}" name="ntfyPassword" type="password" autocomplete="new-password" placeholder="${channel.secretSet ? esc(t('settings.notificationChannelSecretKeep')) : ''}">
           </div>
         </div>
         <div class="notification-provider-fields notification-provider-fields--email${isEmail ? '' : ' settings-card--hidden'}">

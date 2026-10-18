@@ -26,7 +26,7 @@ function renderForm(container, cfg) {
             label: t('settings.immichApiKey'), labelFor: 'immich-api-key',
             description: t('settings.immichApiKeyKeep'), descriptionId: 'immich-api-key-hint',
             control: `<input class="form-input" id="immich-api-key" name="apiKey" type="password"
-              autocomplete="off" aria-describedby="immich-api-key-hint" placeholder="${cfg.apiKeySet ? '••••••••' : ''}" />`,
+              autocomplete="new-password" aria-describedby="immich-api-key-hint" placeholder="${cfg.apiKeySet ? '••••••••' : ''}" />`,
             extra: `<p class="form-hint" data-env="apiKey" hidden>${esc(t('settings.documentStorageEnvHint'))}</p>`,
           })}
           ${settingRowHtml({

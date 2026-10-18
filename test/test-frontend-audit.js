@@ -2113,10 +2113,11 @@ test('sync-contacts leaf owns CardDAV account management', () => {
   // (nicht das App-Passwort), Formularfehler sind feldbezogen, und der Sync
   // meldet keinen Erfolg ohne aktiviertes Adressbuch.
   assert.match(source, /disconnectAccountConfirmTitle', \{ name: account\.name \}/);
-  // Fremdserver-Passwort: weder das App-Passwort anbieten (current-password)
-  // noch ein generiertes vorschlagen (new-password).
-  assert.match(source, /id="cardav-password"[^>]*autocomplete="off"/);
-  assert.doesNotMatch(source, /autocomplete="(current|new)-password"/);
+  // Fremdserver-Passwort: nie das App-Passwort anbieten (current-password).
+  // new-password statt off: "off" ignorieren viele Browser an Passwortfeldern
+  // und fuellen dann doch das gespeicherte ein (MDN, Codex-Review zu #2055).
+  assert.match(source, /id="cardav-password"[^>]*autocomplete="new-password"/);
+  assert.doesNotMatch(source, /autocomplete="current-password"/);
   assert.match(source, /cardavCredentialsTrustHint/);
   assert.match(source, /wireBlurValidation\(form\)/);
   assert.match(source, /if \(!validateAll\(form\)\) return;/);
@@ -22137,12 +22138,15 @@ test('!important-Sperrklinke: echte !important-Deklarationen in public/styles we
 });
 
 /* Zugangsdaten FREMDER Dienste (CalDAV, Apple, WebDAV, DMS, SMTP, Immich,
- * Gotify, ntfy, Webhook) tragen autocomplete="off". `current-password` meint
- * das Passwort DIESER Seite: der Passwortmanager bot dort das Yuvomi-Passwort
- * an und fuellte es ein - beim Speichern ging es an den fremden Server.
- * `new-password` schlug fuer API-Schluessel ein generiertes Passwort vor, und
- * `username` hing das fremde Konto an den Yuvomi-Eintrag. Die Werte gehoeren nur
- * dorthin, wo es um ein Yuvomi-Konto geht: Anmeldung, eigenes Konto, neues
+ * Gotify, ntfy, Webhook, Rezept-Anbieter, Backup-Schluessel) duerfen nie das
+ * Yuvomi-Passwort angeboten bekommen. `current-password` meint das Passwort
+ * DIESER Seite: der Passwortmanager fuellte es ein, und beim Speichern ging es
+ * an den fremden Server. `autocomplete="off"` hilft dort nicht - viele Browser
+ * ignorieren es an Passwortfeldern (MDN, "Turning off form autocompletion",
+ * Codex-Review zu #2055). Der Hinweis, der das Einfuellen eines gespeicherten
+ * Passworts verhindert, ist `new-password`; ein Benutzername-Feld eines fremden
+ * Kontos traegt `off`, nie `username`. Die Anmeldewerte gehoeren nur dorthin,
+ * wo es um ein Yuvomi-Konto geht: Anmeldung, eigenes Konto, neues
  * Familienmitglied, Gastkonto.
  */
 test('Zugangsdaten fremder Dienste bekommen kein Anmelde-Autofill', () => {
@@ -22157,12 +22161,17 @@ test('Zugangsdaten fremder Dienste bekommen kein Anmelde-Autofill', () => {
     for (const name of readdirSync(root + dir)) {
       const rel = `${dir}/${name}`;
       if (!name.endsWith('.js') || ownAccountForms.has(rel)) continue;
-      read(`../public/${rel}`).split('\n').forEach((line, i) => {
-        if (/autocomplete="(?:current-password|new-password|username)"/.test(line)) offenders.push(`${rel}:${i + 1}`);
+      const src = read(`../public/${rel}`);
+      const lineOf = (index) => src.slice(0, index).split('\n').length;
+      src.split('\n').forEach((line, i) => {
+        if (/autocomplete="(?:current-password|username)"/.test(line)) offenders.push(`${rel}:${i + 1} (Anmeldewert)`);
       });
+      for (const input of src.matchAll(/<input[^>]*type="password"[^>]*>/g)) {
+        if (!/autocomplete="new-password"/.test(input[0])) offenders.push(`${rel}:${lineOf(input.index)} (Passwortfeld ohne new-password)`);
+      }
     }
   }
-  assert.deepEqual(offenders, [], 'Feld eines fremden Dienstes mit Anmelde-Autofill - autocomplete="off" setzen');
+  assert.deepEqual(offenders, [], 'Feld eines fremden Dienstes mit Anmelde-Autofill');
 });
 
 /* Esc gehoert der obersten Ebene. Das geteilte Modal schliesst bei Esc, solange
