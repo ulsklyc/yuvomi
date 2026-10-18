@@ -998,7 +998,7 @@ Authors set the GitHub topic `yuvomi-module`, and [MODULES.md](../MODULES.md) po
 topic with the note that nothing found there is tested or recommended** (D#746, #1671; decided
 by Ulas on 2026-10-18).
 
-A list the maintainer keeps reads as a recommendation, and nothing in Yuvomi lets him give one.
+A list the maintainer keeps reads as a recommendation, and nothing in Yuvomi lets the maintainer give one.
 A module is same-origin script with the session of every member who opens it (entry 12): there
 is no permission model a manifest could declare and the server could enforce, and no sandbox.
 And what gets installed is a movable ref, a branch or a tag, not the commit somebody read, so
