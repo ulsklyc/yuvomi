@@ -22317,3 +22317,29 @@ test('router: idle warm-up preloads at low priority, intent and the start route 
   intent.prefetchRoute('/budget');
   assert.equal(links.find((l) => l.rel === 'modulepreload')?.fetchPriority, undefined, 'ein Vorwaermen aus Absicht bleibt beim Standard');
 });
+
+/**
+ * EIN @import KOSTET KEINE EIGENE RUNDREISE (Modern-Web-Guidance-Audit,
+ * Befund 12). dashboard.css, health.css und budget.css ziehen weitere Blaetter
+ * per `@import` - der Browser sieht sie erst, wenn das erste Blatt geladen und
+ * gelesen ist. Der Router laedt sie deshalb gleich mit (`preload`), sobald er
+ * das Seitenblatt laedt oder vorwaermt. Die Tabelle dafuer (PAGE_STYLE_IMPORTS)
+ * muss genau die @import-Zeilen der Blaetter nennen.
+ */
+test('router: every page sheet @import is preloaded alongside its sheet', () => {
+  const router = read('../public/router.js');
+  const table = router.match(/const PAGE_STYLE_IMPORTS = Object\.freeze\((\{[\s\S]*?\})\);/)?.[1];
+  assert.ok(table, 'PAGE_STYLE_IMPORTS fehlt in router.js');
+  const declared = new Function(`return ${table};`)();
+  const actual = {};
+  for (const file of readdirSync(new URL('../public/styles/', import.meta.url))) {
+    if (!file.endsWith('.css')) continue;
+    const imports = [...read(`../public/styles/${file}`).matchAll(/^@import url\('([^']+)'\);/gm)].map((m) => m[1]);
+    if (imports.length) actual[`/styles/${file}`] = imports;
+  }
+  assert.deepEqual(declared, actual, 'PAGE_STYLE_IMPORTS weicht von den @import-Zeilen ab');
+  const load = router.slice(router.indexOf('function loadPageStyle('), router.indexOf('function loadPageStyle(') + 1600);
+  assert.match(load, /preloadStyleImports\(href\);/, 'loadPageStyle() laedt die Importe mit');
+  const prefetch = router.slice(router.indexOf('function prefetchRoute('), router.indexOf('function prefetchRoute(') + 2600);
+  assert.match(prefetch, /preloadStyleImports\(cssHref\);/, 'prefetchRoute() waermt die Importe mit vor');
+});

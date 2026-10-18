@@ -282,6 +282,31 @@ function updateThemeColorForRoute(route) {
 // --------------------------------------------------------
 let activePageStyle = null;
 
+// DIE @import-ZEILEN DER SEITENBLAETTER, damit der Browser sie gleich mitlaedt
+// (Modern-Web-Guidance-Audit, Befund 12). Ein `@import` sieht er erst, wenn
+// das Blatt darueber geladen und gelesen ist - eine zweite Rundreise vor dem
+// ersten Bild der Seite. `preloadStyleImports()` legt sie als `preload` daneben,
+// das `@import` findet die Antwort dann schon vor. Die Tabelle haelt ein Guard
+// in test:frontend-audit gleich mit den @import-Zeilen in public/styles/.
+const PAGE_STYLE_IMPORTS = Object.freeze({
+  '/styles/budget.css': ['/styles/split-expenses.css', '/styles/subscriptions.css'],
+  '/styles/dashboard.css': ['/styles/fasting-controls.css'],
+  '/styles/health.css': ['/styles/fasting-controls.css'],
+});
+const _preloadedStyleImports = new Set();
+
+function preloadStyleImports(href) {
+  for (const imported of PAGE_STYLE_IMPORTS[href] ?? []) {
+    if (_preloadedStyleImports.has(imported)) continue;
+    _preloadedStyleImports.add(imported);
+    const link = document.createElement('link');
+    link.rel = 'preload';
+    link.as = 'style';
+    link.href = imported;
+    document.head.appendChild(link);
+  }
+}
+
 function loadPageStyle(moduleName, routeStyle = null) {
   if (!moduleName && !routeStyle) return { ready: Promise.resolve(), cleanup: () => {}, abandon: () => {} };
   const href = routeStyle || `/styles/${moduleName}.css`;
@@ -289,6 +314,7 @@ function loadPageStyle(moduleName, routeStyle = null) {
     return { ready: Promise.resolve(), cleanup: () => {}, abandon: () => {} };
   }
 
+  preloadStyleImports(href);
   const link = document.createElement('link');
   link.rel = 'stylesheet';
   link.href = href;
@@ -500,6 +526,9 @@ function prefetchRoute(path, { now = false, priority = null } = {}) {
     link.as = 'style';
     link.href = cssHref;
     document.head.appendChild(link);
+    // Die Startroute laedt ihre Importe gleich mit; beim Vorwaermen im
+    // Leerlauf genuegt das, was loadPageStyle() beim Aufruf nachholt.
+    if (now) preloadStyleImports(cssHref);
   }
 }
 
