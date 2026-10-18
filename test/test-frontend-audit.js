@@ -22309,6 +22309,11 @@ test('a starred label marks a required field, and a required field in a mixed fo
       // Auch bedingt (`${isEdit ? '' : 'required'}`) - dann haengt der Stern an derselben Bedingung.
       const required = /\srequired\b|'required'/.test(attrs);
       if (starred && !required) starNoReq.push(`${rel} #${id}`);
+      // Nur bedingt Pflicht (`${isEdit ? 'required' : ''}`), aber der Stern steht
+      // immer: das Kannfeld beim Anlegen sah aus wie Pflicht (Codex-Review zu #2059).
+      const conditionalReq = /[?:]\s*'required'/.test(attrs) && !/\srequired\b/.test(attrs.replace(/'required'/g, ''));
+      const conditionalStar = /[?:]\s*REQUIRED_MARK\b/.test(text);
+      if (starred && conditionalReq && !conditionalStar) starNoReq.push(`${rel} #${id}: Stern immer, Pflicht nur bedingt`);
       if (!starred && required && !/type="(?:checkbox|radio|hidden)"/.test(attrs) && !SINGLE_FIELD.has(`${rel} #${id}`)) reqNoStar.push(`${rel} #${id}`);
     }
   }

@@ -255,3 +255,27 @@ test('Befund 15: hideAuthError nimmt Meldung und jede Markierung zusammen ab', a
   const forgot = read('../public/pages/forgot-password.js');
   assert.match(forgot, /form\.identifier\.addEventListener\('input', \(\) => hideAuthError\(form, errorEl\)\)/, '"Passwort vergessen" nimmt die Meldung beim Tippen zurueck');
 });
+
+/**
+ * Codex-Review zu #2059: auf Einladung und Reset blieb die Meldung stehen,
+ * nachdem man das markierte Feld korrigiert hatte - nur Einrichtung und
+ * "Passwort vergessen" hatten einen eigenen Eingabe-Handler. Die Korrektur
+ * eines markierten Feldes nimmt die Meldung jetzt ueberall mit.
+ */
+test('Befund 15: die Eingabe in ein markiertes Feld blendet die Meldung aus', async () => {
+  const { flagField } = await import('../public/utils/auth-ui.js');
+  const listeners = [];
+  const attrs = new Map();
+  const errorEl = { id: 'reset-error', hidden: false };
+  const field = {
+    getAttribute: (k) => attrs.get(k) ?? null,
+    setAttribute: (k, v) => attrs.set(k, String(v)),
+    removeAttribute: (k) => attrs.delete(k),
+    addEventListener: (type, fn) => listeners.push({ type, fn }),
+  };
+  field.form = { querySelectorAll: () => (attrs.get('aria-invalid') === 'true' ? [field] : []) };
+  flagField(field, errorEl);
+  for (const l of listeners.filter((x) => x.type === 'input')) l.fn();
+  assert.equal(errorEl.hidden, true, 'die Meldung blieb nach der Korrektur stehen');
+  assert.equal(attrs.has('aria-invalid'), false);
+});

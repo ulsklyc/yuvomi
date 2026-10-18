@@ -133,7 +133,14 @@ export function flagField(field, errorEl) {
   if (!ids.includes(errorEl.id)) field.setAttribute('aria-describedby', [...ids, errorEl.id].join(' '));
   if (field._authFlagged) return;
   field._authFlagged = true;
-  field.addEventListener('input', () => unflagField(field, errorEl), { once: true });
+  // Wer das Feld korrigiert, nimmt die Meldung mit - auf JEDER Seite, nicht nur
+  // dort, wo ein eigener Eingabe-Handler sie ausblendet: auf Einladung und Reset
+  // stand "stimmt nicht ueberein" sonst bis zum naechsten Absenden da
+  // (Codex-Review zu #2059). Ohne Formular nur dieses Feld.
+  field.addEventListener('input', () => {
+    if (field.form) hideAuthError(field.form, errorEl);
+    else unflagField(field, errorEl);
+  }, { once: true });
 }
 
 /** Nimmt Markierung und Verweis auf die Meldung von EINEM Feld. */
