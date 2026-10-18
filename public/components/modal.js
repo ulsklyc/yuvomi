@@ -609,6 +609,13 @@ export function swapFieldsKeepingDirtyBase(panel, swap) {
 function onEscape(e) {
   if (e === _escKeptBelow) _escKeptBelow = null;
   if (e.key !== 'Escape' || e.defaultPrevented || !activeOverlay) return;
+  // Esc waehrend einer IME-Umwandlung bricht die Umwandlung ab, nicht das
+  // Formular. preventDefault haelt den close-Request des <dialog> zurueck
+  // (Codex-Review zu #2055).
+  if (isImeComposing(e)) {
+    e.preventDefault();
+    return;
+  }
   const owner = e.target?.closest?.('[popover], dialog, .modal-overlay') ?? null;
   if (owner && owner !== activeOverlay) {
     if (owner.matches('[popover], dialog')) return;

@@ -22205,3 +22205,38 @@ test('Dashboard: der Kachelname steht im Markup immer in esc()', () => {
   });
   assert.deepEqual(offenders, [], 'widgetLabel() ohne esc() im Template');
 });
+
+/* Codex-Review zu #2055: Esc schloss den Logo-Picker samt fokussiertem
+ * Suchfeld, der Fokus fiel auf body und damit aus der Fokusfalle des
+ * Abo-Formulars. Das Schliessen muss den Fokus an den Oeffner zurueckgeben,
+ * wenn er im Picker stand - auf jedem Weg (Esc, X, Auswahl, Zurueck-Geste).
+ */
+test('der Logo-Picker gibt den Fokus beim Schliessen an seinen Oeffner zurueck', () => {
+  const src = read('../public/pages/subscriptions.js');
+  const start = src.indexOf('function openLogoPickerModal(');
+  assert.ok(start > 0, 'openLogoPickerModal gefunden');
+  const body = src.slice(start, src.indexOf('\n}\n', start));
+  assert.match(body, /const opener = document\.activeElement/, 'der Oeffner wird beim Oeffnen gemerkt');
+  const close = body.match(/const close = \(\) => \{[\s\S]*?\n {2}\};/);
+  assert.ok(close, 'close ist eine Funktion mit Rumpf');
+  assert.match(close[0], /overlay\.contains\(document\.activeElement\)/, 'nur zurueckgeben, wenn der Fokus im Picker stand');
+  assert.match(close[0], /\.focus\(\)/, 'der Fokus geht zurueck');
+  assert.match(body, /attachOverlay\(overlay, close\)/, 'die Zurueck-Geste nimmt denselben Weg');
+});
+
+/* Codex-Review zu #2055: Esc waehrend einer IME-Umwandlung bricht die
+ * Umwandlung ab. Der Esc-Handler des geteilten Modals schloss trotzdem das
+ * ganze Formular - im Abo-Metadatenfeld sogar ausdruecklich, weil dessen
+ * eigener Handler bei laufender Umwandlung frueh zurueckkehrt. Das Modal muss
+ * ein solches Esc ignorieren und den close-Request des <dialog> zurueckhalten.
+ */
+test('Esc waehrend einer IME-Umwandlung schliesst kein Modal', () => {
+  const src = read('../public/components/modal.js');
+  const start = src.indexOf('function onEscape(e) {');
+  assert.ok(start > 0, 'onEscape gefunden');
+  const body = src.slice(start, src.indexOf('\n}\n', start));
+  const ime = body.indexOf('isImeComposing(e)');
+  assert.ok(ime > 0, 'onEscape fragt isImeComposing');
+  assert.ok(ime < body.indexOf('closeModal()'), 'die Pruefung steht vor dem Schliessen');
+  assert.match(body.slice(ime, ime + 160), /preventDefault\(\)[\s\S]*?return/, 'der close-Request des Dialogs wird zurueckgehalten');
+});
