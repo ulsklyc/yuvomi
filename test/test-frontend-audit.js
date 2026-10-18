@@ -573,7 +573,7 @@ test('an announced update stops the router from loading further page modules (#6
   // fliegt dann als SyntaxError auf. Erlaubt ist deshalb nur noch der Reload.
   assert.match(router, /shellStale\s*=\s*true;/, 'SW_UPDATED must mark the running shell as stale');
   assert.match(router, /if \(shellStale && reloadOnce\(\)\)/, 'importPage() must reload instead of importing a page module');
-  assert.match(router, /function prefetchRoute\(path(?:, \{ now = false \} = \{\})?\) \{[\s\S]*?if \(shellStale\) return;/, 'prefetchRoute() must stop warming modules after an update');
+  assert.match(router, /function prefetchRoute\(path(?:, \{ now = false(?:, priority = null)? \} = \{\})?\) \{[\s\S]*?if \(shellStale\) return;/, 'prefetchRoute() must stop warming modules after an update');
   assert.doesNotMatch(
     router,
     /SW_UPDATED[\s\S]{0,400}moduleCache\.clear\(\)/,
@@ -22269,4 +22269,51 @@ test('dashboard: returning to the tab refreshes only a stale overview', () => {
     'der Handler fragt staleOnReturn(), bevor er neu laedt');
   assert.deepEqual(src.match(/lastLoadedAt = new Date\(\);/g), ['lastLoadedAt = new Date();'], 'jeder Ladepunkt merkt Zeit UND Tag (markLoaded)');
   assert.match(src, /const markLoaded = \(\) => \{ lastLoadedAt = new Date\(\); lastLoadedDay = householdToday\(\); \};/);
+});
+
+/**
+ * DAS VORWAERMEN IM LEERLAUF DRAENGT SICH NICHT VOR (Modern-Web-Guidance-
+ * Audit, Befund 11). `warmPrimaryRoutes()` legt fuer jedes Hauptziel ein
+ * `modulepreload` an - rund 19 Module, ~2 MB JS -, und modulepreload laedt mit
+ * hoher Prioritaet. Was nur vielleicht gebraucht wird, traegt
+ * `fetchpriority="low"`; ein Vorwaermen aus einer Absicht (Zeiger/Fokus auf
+ * einem Link) und die Startroute bleiben beim Standard. Gefahren werden die
+ * ECHTEN Funktionen aus router.js.
+ */
+test('router: idle warm-up preloads at low priority, intent and the start route do not', () => {
+  const router = read('../public/router.js');
+  const fn = (head) => {
+    const start = router.indexOf(head);
+    assert.ok(start >= 0, `${head} nicht gefunden`);
+    return router.slice(start, router.indexOf('\n}\n', start) + 3);
+  };
+  const links = [];
+  const env = {
+    document: { createElement: () => ({}), head: { appendChild: (l) => links.push(l) } },
+    allRoutes: () => [{ path: '/tasks', page: '/pages/tasks.js', module: 'tasks' }, { path: '/notes', page: '/pages/notes.js', module: 'notes' }],
+    moduleCache: new Map(),
+    shellStale: false,
+    navItems: () => [{ path: '/tasks' }, { path: '/notes' }],
+    routerState: { currentPath: '/' },
+    navigator: { connection: null },
+    window: {},
+    requestIdleCallback: undefined,
+    setTimeout: (f) => f(),
+  };
+  const make = new Function(...Object.keys(env), `
+    const _prefetchedPages = new Set();
+    const _prefetchedStyles = new Set();
+    ${fn('function prefetchRoute(')}
+    ${fn('function warmPrimaryRoutes(')}
+    return { prefetchRoute, warmPrimaryRoutes };`);
+  const { prefetchRoute, warmPrimaryRoutes } = make(...Object.values(env));
+  warmPrimaryRoutes();
+  const warm = links.filter((l) => l.rel === 'modulepreload');
+  assert.equal(warm.length, 2, 'beide Hauptziele vorgewaermt');
+  assert.deepEqual(warm.map((l) => l.fetchPriority), ['low', 'low'], 'das Vorwaermen im Leerlauf laedt mit niedriger Prioritaet');
+  links.length = 0;
+  env.allRoutes = undefined;
+  const intent = make(...Object.values({ ...env, allRoutes: () => [{ path: '/budget', page: '/pages/budget.js', module: 'budget' }] }));
+  intent.prefetchRoute('/budget');
+  assert.equal(links.find((l) => l.rel === 'modulepreload')?.fetchPriority, undefined, 'ein Vorwaermen aus Absicht bleibt beim Standard');
 });

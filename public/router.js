@@ -465,7 +465,7 @@ async function importPage(pagePath) {
 const _prefetchedPages = new Set();
 const _prefetchedStyles = new Set();
 
-function prefetchRoute(path, { now = false } = {}) {
+function prefetchRoute(path, { now = false, priority = null } = {}) {
   if (!path) return;
   // Nach angekündigtem Update nichts mehr vorwärmen: ein modulepreload zieht den
   // kompletten Modulgraph in die Modul-Map und würde neue Seitenmodule gegen die
@@ -479,6 +479,11 @@ function prefetchRoute(path, { now = false } = {}) {
     const link = document.createElement('link');
     link.rel = 'modulepreload';
     link.href = route.page;
+    // modulepreload laedt mit hoher Prioritaet. Das Vorwaermen im Leerlauf
+    // (warmPrimaryRoutes, rund 19 Module) gibt `low` mit, damit es nichts
+    // verdraengt, was die offene Seite gerade braucht; ohne Unterstuetzung
+    // bleibt es beim Standard (Modern-Web-Guidance-Audit, Befund 11).
+    if (priority) link.fetchPriority = priority;
     document.head.appendChild(link);
   }
 
@@ -507,7 +512,7 @@ function warmPrimaryRoutes() {
   const run = () => {
     try {
       navItems().forEach((item) => {
-        if (item.path && item.path !== routerState.currentPath) prefetchRoute(item.path);
+        if (item.path && item.path !== routerState.currentPath) prefetchRoute(item.path, { priority: 'low' });
       });
     } catch { /* Prefetch ist rein spekulativ — Fehler nie eskalieren. */ }
   };
