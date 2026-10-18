@@ -16,6 +16,7 @@ import { parseVTODO } from './ics-parser.js';
 import { createCalDAVClient, supportsComponent } from '../utils/caldav-client.js';
 import { householdTimeZone, utcToWall } from '../utils/timezone.js';
 import { setItemTags, setTags } from '../utils/task-tags.js';
+import { syncTaskCompletion } from './task-completions.js';
 import * as todoOutbound from './caldav-todo-outbound.js';
 import { runSerialized } from '../utils/sync-lock.js';
 
@@ -241,40 +242,74 @@ function updateReminderSelection(accountId, listUrl, { enabled, targetModule } =
 // (#617). COALESCE, weil ein Abruf ohne URL den gespeicherten Wert nicht
 // entwerten darf.
 function upsertTask(todo, accountId, createdBy, objectUrl = null) {
-  const { date, time } = splitDue(todo.due, householdTimeZone(db.get()));
+  const d = db.get();
+  const { date, time } = splitDue(todo.due, householdTimeZone(d));
 
-  const existing = db.get().prepare(
-    `SELECT id, priority, status FROM tasks WHERE external_uid = ? AND external_source = 'caldav' AND external_account_id = ?`
-  ).get(todo.uid, accountId);
+  // EINE Transaktion für Zeile, Erledigungseintrag und Tags: zwischen dem
+  // Statuswechsel und seinem Eintrag darf kein anderer Schreiber stehen, und
+  // ein Abbruch dazwischen hinterliesse eine erledigte Aufgabe ohne Eintrag -
+  // genau den Zustand, den #1836 beseitigt.
+  return d.transaction(() => {
+    const existing = d.prepare(
+      `SELECT id, priority, status FROM tasks WHERE external_uid = ? AND external_source = 'caldav' AND external_account_id = ?`
+    ).get(todo.uid, accountId);
 
-  const priority = mapVtodoPriority(todo.priority, existing?.priority);
-  const status   = mapVtodoStatus(todo, existing?.status);
+    const priority = mapVtodoPriority(todo.priority, existing?.priority);
+    const status   = mapVtodoStatus(todo, existing?.status);
 
-  let taskId;
-  if (existing) {
-    db.get().prepare(`
-      UPDATE tasks
-      SET title = ?, description = ?, priority = ?, status = ?, due_date = ?, due_time = ?,
-          external_object_url = COALESCE(?, external_object_url)
-      WHERE id = ?
-    `).run(todo.summary, todo.description, priority, status, date, time, objectUrl, existing.id);
-    taskId = existing.id;
-  } else {
-    // category bleibt beim Spalten-Default 'misc' (v114) - VTODO kennt keine
-    // Entsprechung, und CATEGORIES ist die Tag-Liste, nicht die Schublade.
-    const row = db.get().prepare(`
-      INSERT INTO tasks
-        (title, description, priority, status, due_date, due_time, created_by, external_uid, external_source, external_account_id, external_object_url)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'caldav', ?, ?)
-    `).run(todo.summary, todo.description, priority, status, date, time, createdBy, todo.uid, accountId, objectUrl);
-    taskId = row.lastInsertRowid;
-  }
+    let taskId;
+    if (existing) {
+      d.prepare(`
+        UPDATE tasks
+        SET title = ?, description = ?, priority = ?, status = ?, due_date = ?, due_time = ?,
+            external_object_url = COALESCE(?, external_object_url)
+        WHERE id = ?
+      `).run(todo.summary, todo.description, priority, status, date, time, objectUrl, existing.id);
+      taskId = existing.id;
+    } else {
+      // category bleibt beim Spalten-Default 'misc' (v114) - VTODO kennt keine
+      // Entsprechung, und CATEGORIES ist die Tag-Liste, nicht die Schublade.
+      const row = d.prepare(`
+        INSERT INTO tasks
+          (title, description, priority, status, due_date, due_time, created_by, external_uid, external_source, external_account_id, external_object_url)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'caldav', ?, ?)
+      `).run(todo.summary, todo.description, priority, status, date, time, createdBy, todo.uid, accountId, objectUrl);
+      taskId = row.lastInsertRowid;
+    }
 
-  // CATEGORIES → Tags (#586). Der Server führt sie, also gewinnt er auch: eine
-  // lokale Bearbeitung, die noch aussteht, kommt hier gar nicht an - der
-  // Aufrufer überspringt dirty markierte Einträge (#617).
-  setTags(db.get(), taskId, todo.tags);
-  return taskId;
+    // Derselbe Erledigungseintrag wie beim Abhaken in Yuvomi (#1836): ohne ihn
+    // fehlte eine auf dem Telefon abgehakte Aufgabe im Verlauf und an der Wand
+    // ("heute erledigt"), und eine dort wieder geöffnete behielte ihren Eintrag.
+    // Keine Person - der Sync weiss nicht, wer abgehakt hat (Begründung an
+    // syncTaskCompletion).
+    //
+    // NUR FÜR EINE SCHON GESPIEGELTE ZEILE. Eine neu eingelesene, bereits
+    // erledigte Aufgabe ist kein Übergang, den hier jemand erlebt hat: der erste
+    // Abruf einer Liste brächte sonst jede je abgehakte Erinnerung auf einmal in
+    // den Verlauf - genau der Nachtrag, den #1836 ausschliesst.
+    if (existing) {
+      syncTaskCompletion(d, Number(taskId), existing.status, status, null, null, {
+        source: 'caldav',
+        completedAt: pastOrNull(todo.completedAt),
+      });
+    }
+
+    // CATEGORIES → Tags (#586). Der Server führt sie, also gewinnt er auch: eine
+    // lokale Bearbeitung, die noch aussteht, kommt hier gar nicht an - der
+    // Aufrufer überspringt dirty markierte Einträge (#617).
+    setTags(d, taskId, todo.tags);
+    return taskId;
+  })();
+}
+
+/**
+ * Ein COMPLETED aus der Zukunft (Uhr des Telefons vorgestellt) wäre ein Haken,
+ * der erst noch passiert; dann gilt der Zeitpunkt des Laufs.
+ */
+function pastOrNull(iso) {
+  if (!iso) return null;
+  const at = Date.parse(iso);
+  return Number.isFinite(at) && at <= Date.now() ? iso : null;
 }
 
 /**
@@ -864,6 +899,7 @@ function getStatus() {
 export {
   mapVtodoPriority,
   mapVtodoStatus,
+  upsertTask,
   splitDue,
   applyTaskRelations,
   getReminderLists,

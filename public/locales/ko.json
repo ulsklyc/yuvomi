@@ -510,6 +510,7 @@
         "historyView": "기록",
         "historyPersonFilter": "사람별 필터",
         "historyUnknownMember": "더 이상 가족 구성원이 아님",
+        "historyViaSync": "동기화를 통해",
         "historyEmptyTitle": "아직 기록이 없습니다",
         "historyEmptyPersonTitle": "이 사람의 기록이 없습니다",
         "historyEmptyDescription": "누가 어떤 할 일을 언제 했는지 여기에 표시됩니다.",

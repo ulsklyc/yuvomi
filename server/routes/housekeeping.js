@@ -49,6 +49,7 @@ import {
 import { addMonthsClamped } from '../utils/interval-date.js';
 import { recordLocalColorChoice } from '../services/legacy-color-snapshot.js';
 import { paymentTaskAudience, normalizePaymentTaskAudience } from '../services/payment-task-audience.js';
+import { syncTaskCompletion } from '../services/task-completions.js';
 import {
   byCheckInDesc,
   checkInInstantMs,
@@ -1369,7 +1370,11 @@ router.post('/visits/:id/pay', (req, res) => {
     db.get().transaction(() => {
       db.get().prepare('UPDATE housekeeping_work_sessions SET paid_at = ? WHERE id = ?').run(paidAt, existing.id);
       if (existing.payment_task_id) {
+        const prev = db.get().prepare('SELECT status FROM tasks WHERE id = ?').get(existing.payment_task_id);
         db.get().prepare('UPDATE tasks SET status = ? WHERE id = ?').run('done', existing.payment_task_id);
+        // Derselbe Erledigungseintrag wie beim Abhaken (#1836); abgehakt hat,
+        // wer die Zahlung vermerkt.
+        if (prev) syncTaskCompletion(db.get(), existing.payment_task_id, prev.status, 'done', userId(req));
         normalizePaymentTaskAudience(db.get(), existing.payment_task_id);
       }
     })();
@@ -1384,9 +1389,8 @@ router.post('/visits/:id/pay', (req, res) => {
 // Der Rueckweg zu /pay (#1136), nur fuer Admins: ein bezahlter Besuch ist
 // abgerechnet (assertMayTouchSettled), und wer die Zahlung zuruecknimmt, gibt
 // ihn wieder fuer jedes Mitglied frei. Spiegelbildlich zu /pay wird die
-// verknuepfte Zahlungsaufgabe direkt wieder geoeffnet, ohne Punkte- oder
-// Verlaufsbuchung - sie spiegelt einen Zahlungsstand, niemand hat dort etwas
-// abgehakt (services/task-completions.js). Bliebe sie 'done', setzte
+// verknuepfte Zahlungsaufgabe direkt wieder geoeffnet, ohne Punktebuchung, und
+// ihr Erledigungseintrag geht mit (#1836, services/task-completions.js). Bliebe sie 'done', setzte
 // reconcilePaymentTasks() beim naechsten GET /visits paid_at sofort wieder.
 router.post('/visits/:id/unpay', (req, res) => {
   try {
@@ -1401,7 +1405,8 @@ router.post('/visits/:id/unpay', (req, res) => {
       db.get().transaction(() => {
         db.get().prepare('UPDATE housekeeping_work_sessions SET paid_at = NULL WHERE id = ?').run(existing.id);
         if (existing.payment_task_id) {
-          db.get().prepare('UPDATE tasks SET status = ? WHERE id = ? AND status = ?').run('open', existing.payment_task_id, 'done');
+          const reopened = db.get().prepare('UPDATE tasks SET status = ? WHERE id = ? AND status = ?').run('open', existing.payment_task_id, 'done');
+          if (reopened.changes > 0) syncTaskCompletion(db.get(), existing.payment_task_id, 'done', 'open', userId(req));
           normalizePaymentTaskAudience(db.get(), existing.payment_task_id);
         }
       })();

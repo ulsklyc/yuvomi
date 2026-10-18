@@ -493,6 +493,7 @@
         "historyView": "Geçmiş",
         "historyPersonFilter": "Kişiye göre filtrele",
         "historyUnknownMember": "Artık evde değil",
+        "historyViaSync": "Senkronizasyon yoluyla",
         "historyEmptyTitle": "Henüz bir kayıt yok",
         "historyEmptyPersonTitle": "Bu kişi için kayıt yok",
         "historyEmptyDescription": "Hangi görevi kimin ne zaman yaptığını burada görürsün.",

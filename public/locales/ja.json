@@ -493,6 +493,7 @@
         "historyView": "履歴",
         "historyPersonFilter": "人で絞り込む",
         "historyUnknownMember": "世帯に在籍していません",
+        "historyViaSync": "同期経由",
         "historyEmptyTitle": "まだ記録がありません",
         "historyEmptyPersonTitle": "この人の記録はありません",
         "historyEmptyDescription": "誰がどのタスクをいつやったかがここに表示されます。",

@@ -493,6 +493,7 @@
         "historyView": "Cronologia",
         "historyPersonFilter": "Filtra per persona",
         "historyUnknownMember": "Non fa più parte della casa",
+        "historyViaSync": "Tramite sincronizzazione",
         "historyEmptyTitle": "Ancora nulla di registrato",
         "historyEmptyPersonTitle": "Nessuna registrazione per questa persona",
         "historyEmptyDescription": "Qui vedi chi ha svolto quale attività e quando.",

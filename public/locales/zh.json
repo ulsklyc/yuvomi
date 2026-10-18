@@ -493,6 +493,7 @@
         "historyView": "历史记录",
         "historyPersonFilter": "按成员筛选",
         "historyUnknownMember": "已不在家庭中",
+        "historyViaSync": "通过同步",
         "historyEmptyTitle": "暂无记录",
         "historyEmptyPersonTitle": "该成员暂无记录",
         "historyEmptyDescription": "这里显示谁在什么时候完成了哪项任务。",

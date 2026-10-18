@@ -596,6 +596,18 @@ test('eine Verlaufszeile ist eine Zeile des Bausteins: ihre ID ist die Aufgabe',
   assert.match(html, /data-task-id="7"/, 'Loeschen aus der Spalte blendet die Zeile sofort aus (taskRowsIn)');
 });
 
+test('eine Verlaufszeile ohne Person: aus dem Sync "Per Synchronisierung", sonst "Nicht mehr im Haushalt" (#1836)', async () => {
+  const { t } = await import('../public/i18n.js');
+  const entry = { id: 32, task_id: 8, title: 'Muell rausbringen', completed_at: '2026-09-30T08:00:00Z',
+    user_id: null, person_name: null, is_recurring: 0 };
+  const synced = tasks.renderHistoryEntry({ ...entry, source: 'caldav' });
+  assert.ok(synced.includes(t('tasks.historyViaSync')), 'der Sync weiss nicht, wer abgehakt hat - er sagt es');
+  assert.ok(!synced.includes(t('tasks.historyUnknownMember')), 'niemand hat den Haushalt verlassen');
+  const gone = tasks.renderHistoryEntry({ ...entry, source: null });
+  assert.ok(gone.includes(t('tasks.historyUnknownMember')));
+  assert.notEqual(t('tasks.historyViaSync'), t('tasks.historyUnknownMember'));
+});
+
 test('ein Klick auf einen Eintrag geht durch den Baustein: Spalte ab der Schwelle, darunter das Blatt', async () => {
   const opened = [];
   const md = { open: (id, trigger) => opened.push([id, trigger]) };

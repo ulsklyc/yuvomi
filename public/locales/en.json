@@ -518,6 +518,7 @@
         "historyView": "History",
         "historyPersonFilter": "Filter by person",
         "historyUnknownMember": "No longer in the household",
+        "historyViaSync": "Via sync",
         "historyEmptyTitle": "Nothing recorded yet",
         "historyEmptyPersonTitle": "Nothing recorded for this person",
         "historyEmptyDescription": "This is where you see who did which task, and when.",

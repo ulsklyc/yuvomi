@@ -588,6 +588,7 @@
         "historyView": "Historia",
         "historyPersonFilter": "Filtruj według osoby",
         "historyUnknownMember": "Już nie w gospodarstwie domowym",
+        "historyViaSync": "Przez synchronizację",
         "historyEmptyTitle": "Jeszcze nic nie zapisano",
         "historyEmptyPersonTitle": "Brak zapisów dla tej osoby",
         "historyEmptyDescription": "Tutaj zobaczysz, kto wykonał które zadanie i kiedy.",

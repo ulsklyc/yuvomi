@@ -36,6 +36,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A task ticked off in Apple Reminders or another synced reminders app now counts as done (#1836).**
+  It used to be marked done without a record of when, so it was missing from the task history, and
+  an overdue one disappeared from the wall display instead of getting its check mark. It now shows
+  in the history at the time it was completed on the phone, labelled "Via sync" since the sync
+  cannot tell who ticked it off, and reopening it there removes the entry again. Marking a
+  housekeeping visit as paid likewise records its payment task as done by the person who marked
+  it, and taking the payment back removes that again. Tasks completed this way before the update
+  stay without an entry, and points are still only booked when a task is ticked off in Yuvomi.
+  **API:** entries of `GET /api/v1/tasks/completions` and the series history carry `source`
+  (`null` for a completion in Yuvomi, `"caldav"` for one taken over by the sync).
+
 - **Large imported recipe collections no longer lock up the app with "Too many requests" (#2048).**
   On iPhone and in Firefox the recipe list fetched the picture of every imported recipe at once
   instead of only those on screen, and each picture went to Mealie or Tandoor again on every visit.

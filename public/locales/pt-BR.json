@@ -502,6 +502,7 @@
         "historyView": "Histórico",
         "historyPersonFilter": "Filtrar por pessoa",
         "historyUnknownMember": "Não pertence mais à casa",
+        "historyViaSync": "Via sincronização",
         "historyEmptyTitle": "Ainda nada registrado",
         "historyEmptyPersonTitle": "Nada registrado para esta pessoa",
         "historyEmptyDescription": "Aqui você vê quem fez cada tarefa e quando.",

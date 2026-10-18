@@ -78,8 +78,12 @@ export function seriesRootOf(d, taskId) {
  * @param {number}      taskId
  * @param {number|null} actingUserId  wer abgehakt hat
  * @param {number|null} [doneByUserId] wer es getan hat, falls benannt
+ * @param {object}      [opts]
+ * @param {string|null} [opts.source]       null = in Yuvomi abgehakt, 'caldav' = vom
+ *                                          eingehenden Sync übernommen (#1836)
+ * @param {string|null} [opts.completedAt]  ISO-Zeitpunkt (UTC, `...Z`), sonst jetzt
  */
-export function recordCompletion(d, taskId, actingUserId, doneByUserId = null) {
+export function recordCompletion(d, taskId, actingUserId, doneByUserId = null, { source = null, completedAt = null } = {}) {
   const task = d.prepare('SELECT id, parent_task_id, recurrence_origin_id FROM tasks WHERE id = ?').get(taskId);
   if (!task || task.parent_task_id) return;
 
@@ -94,14 +98,18 @@ export function recordCompletion(d, taskId, actingUserId, doneByUserId = null) {
     ? d.prepare('SELECT series_id FROM task_completions WHERE task_id = ?').get(task.recurrence_origin_id)
     : null;
 
+  // COALESCE statt zweier Statements: ohne Zeitpunkt gilt derselbe Default wie
+  // in der Spalte, der Normalfall (ein Klick in Yuvomi) bleibt unverändert.
   d.prepare(`
-    INSERT OR IGNORE INTO task_completions (task_id, series_id, user_id, done_by_user_id)
-    VALUES (?, ?, ?, ?)
+    INSERT OR IGNORE INTO task_completions (task_id, series_id, user_id, done_by_user_id, source, completed_at)
+    VALUES (?, ?, ?, ?, ?, COALESCE(?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now')))
   `).run(
     taskId,
     inherited?.series_id ?? seriesRootOf(d, taskId),
     actingUserId || null,
     doneByUserId || null,
+    source || null,
+    completedAt || null,
   );
 }
 
@@ -124,29 +132,36 @@ export function revokeCompletion(d, taskId) {
  * Kopplung an den Aufgaben-Statuswechsel. Hält beim Übergang nach 'done' fest
  * und räumt beim Verlassen von 'done' ab; alles andere ist ein No-op.
  *
- * Aufzurufen an genau den Stellen, an denen auch `syncTaskRewards` steht - die
- * beiden Wege, auf denen eine Person eine Aufgabe abhakt (PUT /:id über das
- * Formular, PATCH /:id/status über Checkbox, Swipe und Sammelaktion). Das
- * Ablegen ist keiner davon: es ist kein Statuswechsel (#688). Und die
- * Zahlungsaufgabe der Haushaltshilfe, die routes/housekeeping.js direkt auf
- * 'done' setzt, ist es ebenso wenig - sie spiegelt einen Zahlungsstand, es hakt
- * dort niemand etwas ab.
+ * DER EINE WEG FÜR JEDEN SCHREIBER VON `status` (#1836). Jede Stelle, die eine
+ * Aufgabe auf 'done' setzt oder von dort wegholt, ruft das hier mit dem alten
+ * und dem neuen Status auf - im selben Zug wie das UPDATE. Heute sind das:
+ *   - routes/tasks.js: POST, PUT /:id und PATCH /:id/status (neben
+ *     syncTaskRewards, das nur dort steht);
+ *   - routes/housekeeping.js: /pay und /unpay für die Zahlungsaufgabe. Wer die
+ *     Zahlung markiert, steht als abhakende Person im Eintrag;
+ *   - services/caldav-reminders-sync.js: der eingehende Sync, wenn eine
+ *     gespiegelte Aufgabe in Apple Erinnerungen o. ä. abgehakt oder wieder
+ *     geöffnet wurde.
+ * test/test-task-completion-writers.js findet jede Anweisung, die `status` an
+ * `tasks` schreibt, und schlägt fehl, wenn eine davon hier nicht vorbeikommt.
  *
- * BEKANNTE GRENZE, ausdrücklich und nicht geerbt: der eingehende CalDAV-Sync
- * (services/caldav-reminders-sync.js) schreibt `status` direkt in die Zeile und
- * kommt hier nicht vorbei. Wer eine gespiegelte Aufgabe in Apple Erinnerungen
- * abhakt, taucht also nicht im Verlauf auf. Dieselbe Lücke hat der
- * reward_ledger schon heute, und der Grund ist derselbe: dieser Lauf hat keine
- * handelnde Person - er läuft mit den Zugangsdaten des Haushalts, nicht denen
- * eines Mitglieds. Ein Eintrag ohne Person wäre möglich (die Spalte lässt NULL
- * zu), braucht aber eine eigene Darstellung: "Nicht mehr im Haushalt" wäre für
- * einen Sync die falsche Auskunft. Das ist eine eigene Entscheidung, keine
- * Nebenwirkung dieser hier.
+ * DER SYNC HAT KEINE HANDELNDE PERSON. Er läuft mit den Zugangsdaten des
+ * Haushalts, nicht denen eines Mitglieds, und wer auf dem Telefon abgehakt hat,
+ * sagt das VTODO nicht. Der Eintrag trägt deshalb keine Person, aber
+ * `source = 'caldav'` - die Oberfläche zeigt dafür "über die Synchronisierung"
+ * statt "Nicht mehr im Haushalt", was für einen Eintrag ohne Person sonst die
+ * Auskunft wäre. Zeitpunkt ist das COMPLETED des VTODO, wenn es eines trägt,
+ * sonst der Lauf.
+ *
+ * Punkte bucht der Sync weiterhin nicht: ein Verdienst braucht eine Person, an
+ * die er geht, und die Zuständigen als Empfänger wären eine eigene
+ * Entscheidung. Der Ledger (syncTaskRewards) bleibt deshalb bei den beiden
+ * Routen, an denen jemand abhakt.
  */
-export function syncTaskCompletion(d, taskId, oldStatus, newStatus, actingUserId, doneByUserId = null) {
+export function syncTaskCompletion(d, taskId, oldStatus, newStatus, actingUserId, doneByUserId = null, opts = {}) {
   const wasDone = oldStatus === 'done';
   const isDone = newStatus === 'done';
-  if (isDone && !wasDone) recordCompletion(d, taskId, actingUserId, doneByUserId);
+  if (isDone && !wasDone) recordCompletion(d, taskId, actingUserId, doneByUserId, opts);
   else if (wasDone && !isDone) revokeCompletion(d, taskId);
 }
 
@@ -178,6 +193,7 @@ const SELECT_SQL = `
          u.avatar_color  AS user_color,
          ${personAvatarUrlSql('u')} AS user_avatar,
          c.done_by_user_id,
+         c.source,
          COALESCE(c.done_by_user_id, c.user_id) AS person_user_id,
          p.display_name  AS person_name,
          p.avatar_color  AS person_color,

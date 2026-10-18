@@ -518,6 +518,7 @@
         "historyView": "Historikk",
         "historyPersonFilter": "Filtrer etter person",
         "historyUnknownMember": "Ikke lenger i husholdningen",
+        "historyViaSync": "Via synkronisering",
         "historyEmptyTitle": "Ingenting registrert ennå",
         "historyEmptyPersonTitle": "Ingenting registrert for denne personen",
         "historyEmptyDescription": "Her ser du hvem som gjorde hvilken oppgave, og når.",

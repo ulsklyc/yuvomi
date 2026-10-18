@@ -531,6 +531,12 @@ test('POST /visits/:id/pay: markiert verknüpfte Aufgabe als done', async () => 
   assert.ok(r.body.data.paid_at);
   const task = db.prepare('SELECT status FROM tasks WHERE id = ?').get(PAYMENT_TASK_ID);
   assert.equal(task.status, 'done', 'Bezahl-Aufgabe abgeschlossen');
+  // Derselbe Erledigungseintrag wie beim Abhaken (#1836): ohne ihn fehlte die
+  // bezahlte Aufgabe im Verlauf und an der Wand.
+  const completion = db.prepare('SELECT user_id, source FROM task_completions WHERE task_id = ?').get(PAYMENT_TASK_ID);
+  assert.ok(completion, 'die Zahlung hinterlaesst einen Erledigungseintrag');
+  assert.equal(completion.user_id, ADMIN, 'abgehakt hat, wer die Zahlung vermerkt');
+  assert.equal(completion.source, null, 'in Yuvomi vermerkt, nicht vom Sync');
 });
 
 // --------------------------------------------------------------------------
@@ -645,6 +651,10 @@ test('POST /visits/:id/unpay: Admin setzt paid_at zurueck und oeffnet die Zahlun
 
   assert.equal(sessionRow(PAY_SESSION_ID).paid_at, null, 'paid_at in der Zeile zurueckgesetzt');
   assert.equal(taskRow(PAYMENT_TASK_ID).status, 'open', 'die Zahlungsaufgabe ist wieder offen');
+  assert.equal(
+    db.prepare('SELECT COUNT(*) AS n FROM task_completions WHERE task_id = ?').get(PAYMENT_TASK_ID).n, 0,
+    'der Erledigungseintrag geht mit der Zahlung (#1836)',
+  );
 
   // reconcilePaymentTasks() laeuft in GET /visits und bucht jede Zeile mit einer
   // abgehakten Aufgabe als bezahlt. Bliebe die Aufgabe done, kaeme die Zahlung

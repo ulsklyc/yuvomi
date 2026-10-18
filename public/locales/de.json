@@ -510,6 +510,7 @@
         "historyView": "Verlauf",
         "historyPersonFilter": "Nach Person filtern",
         "historyUnknownMember": "Nicht mehr im Haushalt",
+        "historyViaSync": "Per Synchronisierung",
         "historyEmptyTitle": "Noch nichts aufgezeichnet",
         "historyEmptyPersonTitle": "Von dieser Person nichts aufgezeichnet",
         "historyEmptyDescription": "Hier steht, wer wann welche Aufgabe erledigt hat.",
