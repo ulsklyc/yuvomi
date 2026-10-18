@@ -288,6 +288,8 @@ router.get('/', (req, res) => {
              -- eigene Bild (Schritt 2) und das des Providers (Schritt 1). Die
              -- Bilddaten selbst gehen NIE mit, die holt der Browser je Route.
              r.provider_has_image AS recipe_has_image,
+             -- Version des Providerbildes fuer ?v= (#2048, routes/recipes.js).
+             r.provider_updated_at AS recipe_image_version,
              (r.image_data IS NOT NULL) AS recipe_has_own_image
       FROM meals m
       LEFT JOIN users u ON u.id = m.created_by

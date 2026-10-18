@@ -255,6 +255,7 @@ function recipeThumb(recipe) {
     recipeId: recipe.id,
     hasImage: recipe.provider_has_image,
     hasOwnImage: recipe.has_own_image,
+    imageVersion: recipe.provider_updated_at,
     className: 'recipe-row__thumb',
   });
 }

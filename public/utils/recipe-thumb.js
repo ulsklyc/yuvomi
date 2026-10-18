@@ -42,15 +42,25 @@ import { esc } from '/utils/html.js';
  * @param {string} [opts.iconClass] Groessenklasse des Platzhalter-Symbols.
  * @returns {HTMLElement}
  */
-/** Die Bild-URL eines Rezepts - eigenes zuerst, sonst das des Providers. */
-function bildUrl(recipeId, { hasImage, hasOwnImage }) {
+/**
+ * Die Bild-URL eines Rezepts - eigenes zuerst, sonst das des Providers.
+ *
+ * `imageVersion` (#2048) ist `provider_updated_at` aus dem letzten Sync. Mit ihr
+ * darf der Browser das Providerbild behalten (routes/recipes.js): ein neues
+ * Bild beim Provider bringt mit dem naechsten Sync eine neue Version und damit
+ * eine neue Adresse. Ohne sie fragt er jedes Mal nach.
+ */
+function bildUrl(recipeId, { hasImage, hasOwnImage, imageVersion }) {
   if (!recipeId) return null;
   if (hasOwnImage) return `/api/v1/recipes/${Number(recipeId)}/image`;
-  if (hasImage) return `/api/v1/recipes/${Number(recipeId)}/provider-thumbnail`;
+  if (hasImage) {
+    const v = imageVersion ? `?v=${encodeURIComponent(imageVersion)}` : '';
+    return `/api/v1/recipes/${Number(recipeId)}/provider-thumbnail${v}`;
+  }
   return null;
 }
 
-export function recipeThumbEl({ recipeId, hasImage, hasOwnImage, className, iconClass = 'icon-sm' }) {
+export function recipeThumbEl({ recipeId, hasImage, hasOwnImage, imageVersion, className, iconClass = 'icon-sm' }) {
   const slot = document.createElement('span');
   slot.className = className;
 
@@ -59,7 +69,7 @@ export function recipeThumbEl({ recipeId, hasImage, hasOwnImage, className, icon
     slot.insertAdjacentHTML('beforeend', `<i data-lucide="utensils" class="${iconClass}" aria-hidden="true"></i>`);
   };
 
-  const url = bildUrl(recipeId, { hasImage, hasOwnImage });
+  const url = bildUrl(recipeId, { hasImage, hasOwnImage, imageVersion });
   if (!url) {
     placeholder();
     return slot;
@@ -67,11 +77,16 @@ export function recipeThumbEl({ recipeId, hasImage, hasOwnImage, className, icon
 
   const img = document.createElement('img');
   img.className = `${className}-img`;
-  img.src = url;
+  // `loading` VOR `src` (#2048). Mit `src` startet der Browser den Abruf; Safari
+  // und Firefox entscheiden in diesem Moment, ob er faul ist, und ein spaeter
+  // gesetztes `lazy` holt ihn nicht mehr zurueck. In dieser Reihenfolge laedt
+  // die Liste nur die Bilder in Sichtweite statt aller 500 auf einmal.
+  img.loading = 'lazy';
+  img.decoding = 'async';
   // Leeres alt: das Bild wiederholt den Titel, der daneben steht. Ein alt-Text
   // waere hier eine zweite Ansage derselben Sache.
   img.alt = '';
-  img.loading = 'lazy';
+  img.src = url;
   img.addEventListener('error', () => {
     img.remove();
     placeholder();
@@ -105,10 +120,11 @@ export function recipeHeroEl({ recipeId, hasOwnImage, className = 'recipe-detail
   frame.className = className;
   const img = document.createElement('img');
   img.className = `${className}-img`;
-  img.src = `/api/v1/recipes/${Number(recipeId)}/image`;
-  img.alt = '';
+  // `loading` und `decoding` vor `src`, wie in recipeThumbEl() (#2048).
   img.loading = 'lazy';
   img.decoding = 'async';
+  img.alt = '';
+  img.src = `/api/v1/recipes/${Number(recipeId)}/image`;
   // Seit R20 ohne Ersatz (das Band aus R18 ist weg): der Rahmen geht mit.
   img.addEventListener('error', () => frame.remove(), { once: true });
   frame.appendChild(img);
@@ -125,12 +141,12 @@ export function recipeHeroEl({ recipeId, hasOwnImage, className = 'recipe-detail
  * Wer diese Form benutzt, ruft nach dem Einfuegen `wireRecipeThumbs(root)` -
  * genau so, wie die Karten daneben ihre `data-action`-Knoepfe verdrahten.
  */
-export function recipeThumbHtml({ recipeId, hasImage, hasOwnImage, className, iconClass = 'icon-sm' }) {
-  const url = bildUrl(recipeId, { hasImage, hasOwnImage });
+export function recipeThumbHtml({ recipeId, hasImage, hasOwnImage, imageVersion, className, iconClass = 'icon-sm' }) {
+  const url = bildUrl(recipeId, { hasImage, hasOwnImage, imageVersion });
   if (!url) {
     return `<span class="${className} ${className}--placeholder"><i data-lucide="utensils" class="${iconClass}" aria-hidden="true"></i></span>`;
   }
-  return `<span class="${className}"><img class="${className}-img" src="${esc(url)}" alt="" loading="lazy" data-recipe-thumb="${esc(className)}" data-thumb-icon="${esc(iconClass)}"></span>`;
+  return `<span class="${className}"><img class="${className}-img" loading="lazy" decoding="async" src="${esc(url)}" alt="" data-recipe-thumb="${esc(className)}" data-thumb-icon="${esc(iconClass)}"></span>`;
 }
 
 /**

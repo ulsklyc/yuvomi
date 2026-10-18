@@ -486,9 +486,10 @@ function documentListNode(docs) {
       link.rel = 'noopener';
       link.title = doc.name || '';
       const img = document.createElement('img');
-      img.src = `/api/v1/documents/${doc.id}/preview`;
-      img.alt = doc.name || '';
+      // `loading` vor `src`: sonst laedt Safari sofort statt faul (#2048).
       img.loading = 'lazy';
+      img.alt = doc.name || '';
+      img.src = `/api/v1/documents/${doc.id}/preview`;
       link.appendChild(img);
       grid.appendChild(link);
     }
