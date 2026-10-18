@@ -285,8 +285,14 @@ function enterSubmitTarget(active, container) {
 
 function trapFocus(container, initialFocus = 'first-field') {
   focusTrapHandler = (e) => {
-    // Tab-Trap: Fokus innerhalb des Modals halten
+    // Tab-Trap: Fokus innerhalb des Modals halten - NUR ohne natives
+    // <dialog> (Safari < 15.4). Ein modaler Dialog haelt den Fokus selbst, und
+    // der Fang am Panel sprang vom letzten Feld zurueck aufs erste: der
+    // Toast-Stapel, der waehrend des Dialogs IN ihm neben dem Panel liegt
+    // (_syncTopLayerGuests), war so per Tastatur nie zu erreichen, sein
+    // "Rueckgaengig" nur mit der Maus (Modern-Web-Guidance-Audit, Befund 9).
     if (e.key === 'Tab') {
+      if (container.closest?.('dialog')?.open) return;
       const focusable = container.querySelectorAll(FOCUSABLE);
       if (!focusable.length) return;
       const first = focusable[0];
