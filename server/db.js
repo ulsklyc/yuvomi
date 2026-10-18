@@ -11382,6 +11382,28 @@ function reconcileCriticalSchema(database = db) {
       log.error(`Schema-Reconciliation ${table}.${column} fehlgeschlagen:`, err?.message || err);
     }
   }
+  reconcileAvatarVersionTrigger(database);
+}
+
+/**
+ * Der Versions-Trigger der Profilbilder (Migration 251) - auch wenn NUR er
+ * fehlt. Der Nachtrag oben laeuft nur mit einer neu angelegten Spalte; ein
+ * Neubau von `users` nimmt Trigger aber nicht mit, und ohne ihn bliebe `v` bei
+ * jedem neuen Bild stehen (Codex-Review zu #2056).
+ */
+function reconcileAvatarVersionTrigger(database) {
+  try {
+    const columns = database.prepare('PRAGMA table_info(users)').all();
+    if (!columns.some((c) => c.name === 'avatar_version')) return;
+    const present = database.prepare(
+      "SELECT 1 FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_users_avatar_version'",
+    ).get();
+    if (present) return;
+    backfillAvatarVersionTrigger(database);
+    log.warn('Schema-Drift behoben: Trigger trg_users_avatar_version fehlte und wurde neu angelegt (#2056).');
+  } catch (err) {
+    log.error('Schema-Reconciliation trg_users_avatar_version fehlgeschlagen:', err?.message || err);
+  }
 }
 
 /**

@@ -162,3 +162,24 @@ test('traegt users.avatar_version samt Versions-Trigger nach', () => {
   assert.equal(db.prepare('SELECT avatar_version FROM users WHERE id = 1').get().avatar_version, 1,
     'ein anderer Wert laesst sie stehen');
 });
+
+// Codex-Review zu #2056: hat die Datei die Spalte, aber den Trigger verloren
+// (ein Neubau von `users` nimmt Trigger nicht mit), uebersprang die Reparatur
+// den Eintrag, weil die Spalte schon da war - die Version blieb dann bei jedem
+// neuen Bild stehen. Der Trigger wird unabhaengig von der Spalte geprueft.
+test('legt den Versions-Trigger neu an, wenn nur er fehlt', () => {
+  const db = new DatabaseSync(':memory:');
+  db.exec(`CREATE TABLE users (
+    id INTEGER PRIMARY KEY, username TEXT, display_name TEXT, avatar_data TEXT,
+    avatar_version INTEGER NOT NULL DEFAULT 0
+  )`);
+  db.exec(`INSERT INTO users (id, username, display_name, avatar_data, avatar_version) VALUES (1, 'a', 'A', 'x', 4)`);
+
+  reconcileCriticalSchema(db);
+  reconcileCriticalSchema(db); // zweiter Lauf: kein Fehler, kein zweiter Trigger
+
+  db.exec(`UPDATE users SET avatar_data = 'y' WHERE id = 1`);
+  assert.equal(db.prepare('SELECT avatar_version FROM users WHERE id = 1').get().avatar_version, 5);
+  const triggers = db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_users_avatar_version'").get();
+  assert.equal(triggers.n, 1);
+});
