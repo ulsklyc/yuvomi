@@ -114,6 +114,18 @@ and nowhere else. Because suites run side by side, a suite takes a free port
 fixed one. CI runs `npm test`, one suite after the other, and next to it one browser suite,
 `test:fasting-browser`, as a job of its own.
 
+On Windows, check the repository out with LF line endings: Git for Windows turns them
+into CRLF by default, and the guards that read docs and locale files byte for byte then
+fail. Clone with `git clone -c core.autocrlf=false -c core.eol=lf ...`, or set both before
+the checkout. The suites start under `cmd.exe`, npm's default shell there, without extra setup:
+a script that needs an environment variable sets it through `scripts/with-env.mjs`
+(`node scripts/with-env.mjs DB_PATH=:memory: node ...`), never as a shell prefix, which
+`cmd.exe` does not understand. What only POSIX can do is skipped on Windows, with a reason:
+the symbolic link cases without Developer Mode, the file permission cases `chmod` cannot set
+up there, and the `/bin/sh` and process group parts of `test:restore-swap` and
+`test:parallel-runner`; `test:runtime-deps` links its folders as junctions and runs in full.
+`npm run test-parallel` itself is POSIX only. CI and the Docker image run on Linux.
+
 ---
 
 ## Project Structure
