@@ -226,13 +226,41 @@ app.use('/api/', (req, res, next) => {
 // Früh definiert, damit auch die nicht unter /api/ liegenden Admin-Routen
 // (/docs, /openapi.json) ihn als Route-Middleware nutzen können.
 // --------------------------------------------------------
+// BILDER ZAEHLEN NICHT INS ALLGEMEINE BUDGET (#2048). Eine Rezeptliste mit 500
+// gespiegelten Rezepten war ein Bildabruf je Zeile; schon das Durchscrollen
+// verbrauchte die 300 Anfragen, und danach antwortete JEDE Route 429 - die App
+// stand, obwohl nur Vorschaubilder geladen wurden. Die drei Bildrouten lesen
+// nur, schreiben nichts und liegen hinter derselben Anmeldung wie der Rest;
+// sie bekommen deshalb einen eigenen, groesseren Topf (`imageLimiter`). Ein
+// 429 dort kostet ein Vorschaubild (der Platzhalter springt ein), nie die
+// Navigation. Die Anmelde-Limiter in server/auth.js bleiben, wie sie sind.
+const IMAGE_READ_PATH = /^\/v1\/(?:recipes\/\d+\/(?:image|provider-thumbnail)|people\/\d+\/avatar)\/?$/i;
+function isImageRead(req) {
+  return (req.method === 'GET' || req.method === 'HEAD') && IMAGE_READ_PATH.test(req.path);
+}
+
 const apiLimiter = rateLimit({
   windowMs: 60_000,         // 1 Minute
   max: 300,                 // 300 Requests/Minute pro IP (großzügig für Familien-App)
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests. Please wait a moment.', code: 429 },
-  skip: (req) => req.path === '/health', // Health-Check ausgenommen
+  // Health-Check ausgenommen; Bildabrufe zaehlt der imageLimiter.
+  skip: (req) => req.path === '/health' || isImageRead(req),
+});
+
+// 1200 je Minute und Adresse: ein kalter Durchlauf durch eine Liste mit 500
+// Bildern bleibt darunter, auch wenn ein zweites Geraet hinter demselben
+// Router dasselbe tut. Nach oben begrenzt bleibt es trotzdem, weil jeder
+// ungecachte Abruf von provider-thumbnail einen Abruf beim Provider ausloest
+// (routes/recipes.js) - ohne Deckel liesse sich Mealie ueber Yuvomi fluten.
+const imageLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 1200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please wait a moment.', code: 429 },
+  skip: (req) => !isImageRead(req),
 });
 
 if (process.env.NODE_ENV === 'production' && process.env.ENABLE_API_DOCS !== 'true') {
@@ -335,8 +363,10 @@ app.use(express.static(PUBLIC_DIR, {
   setHeaders: setStaticHeaders,
 }));
 
-// Globaler API-Rate-Limiter auf alle /api/-Endpunkte (Definition siehe oben).
+// Globaler API-Rate-Limiter auf alle /api/-Endpunkte (Definition siehe oben),
+// daneben der eigene Topf fuer Bildabrufe; jede Anfrage zaehlt in genau einem.
 app.use('/api/', apiLimiter);
+app.use('/api/', imageLimiter);
 
 // --------------------------------------------------------
 // API-Routen
