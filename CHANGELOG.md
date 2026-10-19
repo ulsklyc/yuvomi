@@ -13,8 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Every task, event, note, housekeeping visit and money ledger row used to carry the full profile
   picture of its person, and a task twice. With 200 tasks and five pictures the task list weighed
   17 MB, and over plain HTTP in a home network about 13 MB of it crossed the wire on every load. The
-  rows now carry a short picture address instead, and the browser loads each picture once (now
-  about 215 KB, under 5 KB compressed). Pictures still show offline where the list does.
+  rows now carry a short picture address instead, and the browser downloads each picture once (now
+  about 215 KB, under 5 KB compressed) and afterwards only asks whether it changed, so a signed-out
+  browser no longer shows it. Pictures still show offline where the list does.
   **API:** requests with an API token see no change and keep receiving data URLs. For the app
   itself (session and wall display) the fields `assigned_avatar`, `assigned_users[].avatar_data`
   (tasks, events), `creator_avatar` (notes), `worker_avatar_data` (housekeeping visits),
@@ -46,6 +47,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stay without an entry, and points are still only booked when a task is ticked off in Yuvomi.
   **API:** entries of `GET /api/v1/tasks/completions` and the series history carry `source`
   (`null` for a completion in Yuvomi, `"caldav"` for one taken over by the sync).
+
+- **A new medication is saved together with its intake plan, or not at all.** If saving one of
+  the plan's times failed, the medication itself was already stored. Cancelling the dialog then
+  left it behind without its plan and without showing it in the list, so it was easy to add it a
+  second time. The medication and its plan are now saved in one step; if that fails, nothing is
+  stored and the dialog keeps everything you entered, so Save simply tries again (#2054).
+  **API:** `POST /api/v1/health/medications` accepts an optional `schedules` array and writes the
+  medication and its schedules in one transaction.
 
 - **Large imported recipe collections no longer lock up the app with "Too many requests" (#2048).**
   On iPhone and in Firefox the recipe list fetched the picture of every imported recipe at once

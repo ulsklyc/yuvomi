@@ -75,7 +75,7 @@ export function healthPaths() {
     },
     '/api/v1/health/medications': {
       get: op({ summary: 'List medications', tag: 'Health', description: 'Scoped to the viewer; `?user_id=` and `?active=` filters supported.' }),
-      post: op({ summary: 'Create a medication', tag: 'Health', stateChanging: true, requestBody: jsonBody(null) }),
+      post: op({ summary: 'Create a medication', tag: 'Health', stateChanging: true, requestBody: jsonBody(null), description: 'Optional `schedules`: an array of up to 48 intake schedules ({ time_of_day, days_mask?, dose_qty?, start_date?, end_date?, active? }, same rules as the schedules endpoint). The medication and its schedules are written in one transaction: if any schedule is invalid or fails, nothing is created. When `schedules` is sent, the response row carries the created `schedules`.' }),
     },
     '/api/v1/health/medications/{id}': {
       patch: op({ summary: 'Update a medication', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),

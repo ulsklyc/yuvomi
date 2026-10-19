@@ -24,7 +24,7 @@
  * `?v=` IST `users.avatar_key` (Migration 251): ein Zufallsschluessel, den ein
  * Trigger bei jedem neuen Bild neu wuerfelt. Er macht die Adresse je Bild
  * eindeutig - der Browser und der Offline-Cache des Service Workers zeigen nie
- * ein altes Bild unter ihr, deshalb darf die Route `immutable` sagen -, und er
+ * ein altes Bild unter ihr, und das ETag der Route haengt an ihm -, und er
  * ist nicht zu raten: die Route gibt das Bild nur mit ihm heraus. Wer die
  * Adresse nicht aus einer Zeile hat, die er lesen darf, bekommt es nicht.
  * Zwei Vorfassungen reichten nicht (Codex-Review zu #2056): die Laenge der
