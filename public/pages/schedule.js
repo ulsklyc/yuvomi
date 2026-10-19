@@ -22,6 +22,7 @@ import { isNavModuleReadOnly } from '/permissions.js';
 import { USER_COLOR_DEFAULT } from '/utils/color.js';
 import { reminderOffsetOptions } from '/utils/schedule-reminder-offset.js';
 import { scheduleViewFromPath, scheduleRouteForView } from '/utils/schedule-tabs.js';
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 // ZWEISPALTIG: Schedule is a full-width responsive library and statistics view;
 // constraining its row lists to the narrow reading measure would recreate the
@@ -2780,7 +2781,7 @@ async function saveCreatedSchedule(event) {
         await api.delete(`/schedule/extras/${id}`);
       }
     }
-    await reloadAfterWrite();
+    await reloadAfterSave(() => reloadAfterWrite());
     renderPage();
     await closeModal({ force: true });
     window.yuvomi?.showToast(t('schedule.saved'), 'success');
@@ -2813,7 +2814,7 @@ async function saveCustomField(event, fieldId) {
   try {
     if (fieldId) await api.put(`/schedule/custom-fields/${fieldId}`, data);
     else await api.post('/schedule/custom-fields', data);
-    await reloadAfterWrite();
+    await reloadAfterSave(() => reloadAfterWrite());
     renderPage();
     await closeModal({ force: true });
     window.yuvomi?.showToast(t('schedule.saved'), 'success');
@@ -2987,7 +2988,7 @@ async function saveShiftTypeEdit(event) {
     // ausloesenden "Bearbeiten" entsteht dabei neu - refocusAfterRender()
     // zieht den Fokus dorthin nach statt ihn auf <body> fallen zu lassen.
     await closeModal({ force: true });
-    await reloadAfterWrite();
+    await reloadAfterSave(() => reloadAfterWrite());
     renderPage();
     refocusAfterRender();
     window.yuvomi?.showToast(t('schedule.saved'), 'success');
@@ -3106,7 +3107,7 @@ async function savePatternEdit(event) {
     // ausloesenden "Bearbeiten" entsteht dabei neu - refocusAfterRender()
     // zieht den Fokus dorthin nach statt ihn auf <body> fallen zu lassen.
     await closeModal({ force: true });
-    await reloadAfterWrite();
+    await reloadAfterSave(() => reloadAfterWrite());
     renderPage();
     refocusAfterRender();
     window.yuvomi?.showToast(t('schedule.saved'), 'success');
@@ -3245,7 +3246,7 @@ async function action(event) {
           createdCount += 1;
         }
       } finally {
-        await reloadAfterWrite();
+        await reloadAfterSave(() => reloadAfterWrite());
         renderPage();
       }
       // Zaehlend statt "Gespeichert." fuer beide Faelle (S-11): ein erneuter
@@ -3430,7 +3431,7 @@ async function action(event) {
         return;
       }
     }
-    await reloadAfterWrite();
+    await reloadAfterSave(() => reloadAfterWrite());
     renderPage();
     if (gefragt) refocusAfterRender();
     window.yuvomi?.showToast(button.dataset.action.startsWith('delete') ? t('schedule.deleted') : t('schedule.saved'), 'success');

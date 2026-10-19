@@ -97,7 +97,8 @@
         "searchNoResultsDescription": "没有与你的搜索匹配的内容。",
         "searchNoResultsFilteredDescription": "没有与你的搜索和筛选条件匹配的内容。",
         "searchReset": "重置搜索",
-        "passwordMinLength": "至少 8 个字符。"
+        "passwordMinLength": "至少 8 个字符。",
+        "savedReloadFailed": "更改已保存，但无法刷新视图。如有缺失，请重新加载页面。"
     },
     "kitchen": {
         "noShoppingLists": "还没有购物清单。",
@@ -4916,8 +4917,7 @@
                 "earlyConfirm": "在最短间隔结束前记录这次服用吗？",
                 "earlyDetail": "下一次服用要到 {{time}} 之后（{{remaining}}）。",
                 "earlyConfirmAction": "仍然记录"
-            },
-            "stockUpdateFailed": "已记录服用，但未能更新库存。"
+            }
         },
         "prevention": {
             "title": "预防保健与疫苗接种",

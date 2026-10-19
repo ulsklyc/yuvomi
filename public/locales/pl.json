@@ -99,7 +99,8 @@
         "searchNoResultsDescription": "Nic nie pasuje do wyszukiwania.",
         "searchNoResultsFilteredDescription": "Nic nie pasuje do wyszukiwania i filtrów.",
         "searchReset": "Resetuj wyszukiwanie",
-        "passwordMinLength": "Co najmniej 8 znaków."
+        "passwordMinLength": "Co najmniej 8 znaków.",
+        "savedReloadFailed": "Zmiana została zapisana, ale nie udało się odświeżyć widoku. Jeśli czegoś brakuje, wczytaj stronę ponownie."
     },
     "kitchen": {
         "noShoppingLists": "Nie ma jeszcze listy zakupów.",
@@ -5162,8 +5163,7 @@
                 "earlyConfirm": "Zapisać dawkę przed upływem minimalnego odstępu?",
                 "earlyDetail": "Następna dawka przewidziana jest dopiero od {{time}} ({{remaining}}).",
                 "earlyConfirmAction": "Zapisz mimo to"
-            },
-            "stockUpdateFailed": "Dawkę zapisano, ale nie udało się zaktualizować zapasu."
+            }
         },
         "prevention": {
             "title": "Profilaktyka i szczepienia",

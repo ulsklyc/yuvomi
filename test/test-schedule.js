@@ -2194,7 +2194,9 @@ test('every write reloads through reloadAfterWrite(), which also refreshes the c
   const start = schedulePage.indexOf('async function reloadAfterWrite() {');
   const helper = schedulePage.slice(start, schedulePage.indexOf('\n}\n', start));
   assert.match(helper, /await load\(\);\s*\n\s*if \(activeView !== 'overview'\) return;\s*\n\s*const requestId = \+\+overviewRequestId;\s*\n\s*try \{ await refreshOverview\(\); \}/);
-  assert.ok((schedulePage.match(/await reloadAfterWrite\(\);/g) || []).length >= 6, 'the save, delete and quick-start paths all go through it');
+  // Behind a write it runs through reloadAfterSave() (#2069): a failed reload
+  // there is not a failed save.
+  assert.ok((schedulePage.match(/await (?:reloadAfterSave\(\(\) => )?reloadAfterWrite\(\)\)?;/g) || []).length >= 6, 'the save, delete and quick-start paths all go through it');
 });
 
 test('R17/E1 + D3: the first visit lands on the comparison view - an empty household on "Shift types" (Critique 2026-10-16)', () => {

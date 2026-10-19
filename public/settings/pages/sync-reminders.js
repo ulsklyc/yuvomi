@@ -7,6 +7,7 @@ import {
   createStatusSummary,
 } from '/settings/components.js';
 import { withBusy } from '/utils/ux.js';
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 function formatSyncTime(value) {
   if (!value) return null;
@@ -268,7 +269,7 @@ function bindSyncButton(container) {
     try {
       await api.post('/calendar/caldav/reminders/sync');
       showToast(t('settings.reminderSyncSuccess'), 'success');
-      await loadAccounts(container);
+      await reloadAfterSave(() => loadAccounts(container));
     } catch (err) {
       showToast(err.message || t('settings.reminderSyncFailed'), 'danger');
     } finally {

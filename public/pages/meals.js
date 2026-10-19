@@ -31,6 +31,7 @@ import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderA
 import { withChosenPeople } from '/utils/people-picker.js';
 import { isSoloHousehold } from '/utils/household.js';
 import { errorSentence } from '/utils/friendly-error.js';
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 // --------------------------------------------------------
 // Konstanten
@@ -1594,7 +1595,7 @@ async function runRandomize(panel) {
   runBtn.disabled = true;
   try {
     await api.post('/meals/apply-plan', { assignments: plan.assignments.map((assignment) => assignment.payload), replace_existing: replaceExisting });
-    await loadWeek(state.currentWeek);
+    await reloadAfterSave(() => loadWeek(state.currentWeek));
     closeModal({ force: true });
     renderWeekGrid();
     window.yuvomi?.showToast(t('meals.randomizeSuccess', { count: plan.assignments.length }), 'success');
@@ -2182,7 +2183,7 @@ function openMealModal(opts) {
         try {
           const res = await api.post(`/meals/${state.modal.meal.id}/to-shopping-list`, { listId });
           if (res.data.transferred > 0) {
-            await loadWeek(state.currentWeek);
+            await reloadAfterSave(() => loadWeek(state.currentWeek));
             closeModal({ force: true });
             renderWeekGrid();
             // Dieselbe Meldung, Standzeit und Rücknahme wie am Slot-Knopf: es ist
@@ -2718,7 +2719,7 @@ async function saveModal(overlay) {
       }
 
       // Aktualisierte Woche laden
-      await loadWeek(state.currentWeek);
+      await reloadAfterSave(() => loadWeek(state.currentWeek));
     }
 
     closeModal({ force: true });
@@ -2836,7 +2837,7 @@ async function transferMeal(mealId, btn) {
   try {
     const res = await api.post(`/meals/${mealId}/to-shopping-list`, { listId: target.id });
     if (res.data.transferred > 0) {
-      await loadWeek(state.currentWeek);
+      await reloadAfterSave(() => loadWeek(state.currentWeek));
       renderWeekGrid();
       // Der Toast nennt die ZIEL-Liste. „5 Zutaten übernommen." sagte nicht, wohin -
       // und bei mehreren Listen ist genau das die Frage, die offen bleibt (Critique

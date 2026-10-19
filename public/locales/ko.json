@@ -97,7 +97,8 @@
         "searchNoResultsDescription": "검색과 일치하는 항목이 없습니다.",
         "searchNoResultsFilteredDescription": "검색 및 필터와 일치하는 항목이 없습니다.",
         "searchReset": "검색 초기화",
-        "passwordMinLength": "8자 이상."
+        "passwordMinLength": "8자 이상.",
+        "savedReloadFailed": "변경 사항은 저장되었지만 화면을 새로 고치지 못했습니다. 빠진 내용이 있으면 페이지를 다시 불러오세요."
     },
     "kitchen": {
         "noShoppingLists": "아직 장보기 목록이 없습니다.",
@@ -4916,8 +4917,7 @@
                 "earlyConfirm": "최소 간격이 지나기 전에 기록할까요?",
                 "earlyDetail": "다음 복용은 {{time}}부터 예정되어 있습니다({{remaining}}).",
                 "earlyConfirmAction": "그래도 기록"
-            },
-            "stockUpdateFailed": "복용은 기록했지만 재고를 수정하지 못했습니다."
+            }
         },
         "prevention": {
             "title": "예방접종 및 건강검진",

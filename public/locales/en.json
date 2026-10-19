@@ -97,7 +97,8 @@
         "searchNoResultsDescription": "Nothing matches your search.",
         "searchNoResultsFilteredDescription": "Nothing matches your search and filters.",
         "searchReset": "Reset search",
-        "passwordMinLength": "At least 8 characters."
+        "passwordMinLength": "At least 8 characters.",
+        "savedReloadFailed": "Your change is saved, but the view could not be refreshed. Reload the page if something is missing."
     },
     "kitchen": {
         "noShoppingLists": "There is no shopping list yet.",
@@ -4916,8 +4917,7 @@
                 "earlyConfirm": "Log this dose before the minimum interval has passed?",
                 "earlyDetail": "The next dose is not due until {{time}} ({{remaining}}).",
                 "earlyConfirmAction": "Log anyway"
-            },
-            "stockUpdateFailed": "The dose was logged, but the stock could not be updated."
+            }
         },
         "prevention": {
             "title": "Preventive care & vaccinations",

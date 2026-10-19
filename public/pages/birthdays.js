@@ -30,6 +30,7 @@ import {
   renderPageActions,
   renderListSection,
 } from '/utils/page-layout.js';
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 let state = {
   birthdays: [],
@@ -1089,7 +1090,7 @@ function openBirthdayModal({ mode, birthday = null }) {
             await api.post('/birthdays', body);
             window.yuvomi?.showToast(t('birthdays.createdToast'), 'success');
           }
-          await loadData();
+          await reloadAfterSave(() => loadData());
           renderList({ repaint: true, motion: true });
           closeModal({ force: true });
         } catch (err) {
@@ -1193,7 +1194,7 @@ async function openImportModal() {
         try {
           const res = await api.post('/birthdays/import', { contact_ids: ids });
           window.yuvomi?.showToast(t('birthdays.importSuccess', { count: res.data.imported }), 'success');
-          await loadData();
+          await reloadAfterSave(() => loadData());
           renderList({ repaint: true, motion: true });
           closeModal({ force: true });
         } catch (err) {

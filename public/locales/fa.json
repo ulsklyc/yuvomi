@@ -97,7 +97,8 @@
         "searchNoResultsDescription": "چیزی با جستجوی شما مطابقت ندارد.",
         "searchNoResultsFilteredDescription": "چیزی با جستجو و فیلترهای شما مطابقت ندارد.",
         "searchReset": "بازنشانی جستجو",
-        "passwordMinLength": "دست‌کم ۸ نویسه."
+        "passwordMinLength": "دست‌کم ۸ نویسه.",
+        "savedReloadFailed": "تغییر ذخیره شد، اما نما به‌روزرسانی نشد. اگر چیزی کم است، صفحه را دوباره بارگذاری کنید."
     },
     "kitchen": {
         "noShoppingLists": "هنوز فهرست خریدی وجود ندارد.",
@@ -4916,8 +4917,7 @@
                 "earlyConfirm": "دوز پیش از پایان کمترین فاصله ثبت شود؟",
                 "earlyDetail": "دوز بعدی تنها از {{time}} پیش‌بینی شده است ({{remaining}}).",
                 "earlyConfirmAction": "با این حال ثبت کن"
-            },
-            "stockUpdateFailed": "دوز ثبت شد، اما به‌روزرسانی موجودی ممکن نشد."
+            }
         },
         "prevention": {
             "title": "پیشگیری و واکسیناسیون",

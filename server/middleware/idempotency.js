@@ -137,6 +137,8 @@ function idempotencyMiddleware(req, res, next) {
         return res.status(409).json({
           error: 'This Idempotency-Key was already used for a different request.',
           code: 409,
+          // Fester Grund fuer Clients: der Text darf sich aendern, der Grund nicht.
+          reason: 'idempotency_key_reused',
         });
       }
 
@@ -149,6 +151,9 @@ function idempotencyMiddleware(req, res, next) {
           return res.status(409).json({
             error: 'A request with this Idempotency-Key is still in progress.',
             code: 409,
+            // Der Ausgang der ersten Anfrage ist offen - ein Client behaelt
+            // Schluessel und Rumpf fuer den naechsten Versuch.
+            reason: 'idempotency_in_progress',
           });
         }
         // Abgebrochener Vorgang: der Platzhalter wird übernommen und die

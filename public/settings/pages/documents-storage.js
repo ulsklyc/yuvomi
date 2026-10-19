@@ -10,6 +10,7 @@ import {
   settingRowHtml,
   settingSwitchRowHtml
 } from "/settings/components.js";
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 function formatSyncTime(value) {
   if (!value) return null;
@@ -269,7 +270,7 @@ function bindConnectionForm(container, form, reload) {
         result.textContent = t("settings.documentStorageTestSuccess");
         result.className = "form-hint settings-document-storage-success";
       }
-      await reload();
+      await reloadAfterSave(() => reload());
     } catch (err) {
       if (result) {
         result.textContent = t("settings.documentStorageTestFailed", { error: err.message });
@@ -299,7 +300,7 @@ function bindConnectionForm(container, form, reload) {
     try {
       await api.put("/documents/storage/config", payload);
       showToast(t("settings.documentStorageSaved"), "success");
-      await reload();
+      await reloadAfterSave(() => reload());
       // Nur nach der Rueckfrage: ohne sie schliesst auf diesem Weg kein Dialog,
       // und das Nachfassen griffe auf den Merker eines frueheren zurueck (#1083).
       if (gefragt) refocusAfterRender();
@@ -359,7 +360,7 @@ function buildDestinationForm(data, reload) {
     try {
       await api.put("/documents/storage/config", { selected_upload_backend: select.value });
       showToast(t("settings.documentStorageSaved"), "success");
-      await reload();
+      await reloadAfterSave(() => reload());
     } catch (error) {
       showToast(error.message ?? t("common.errorGeneric"), "danger");
     } finally {
@@ -503,7 +504,7 @@ function buildGoogleDriveProvider(data, reload) {
       try {
         await api.post("/documents/storage/google-drive/test", {});
         showToast(t("settings.documentStorageTestSuccess"), "success");
-        await reload();
+        await reloadAfterSave(() => reload());
       } catch (error) {
         showToast(error.message ?? t("common.errorGeneric"), "danger");
       } finally {

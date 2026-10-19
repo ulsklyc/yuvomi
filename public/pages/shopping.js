@@ -29,6 +29,7 @@ import { amountPlaceholder, formatMoney, currencyFractionDigits, centsToAmountIn
 import { startLiveFeed } from '/utils/live-feed.js';
 import { createPageController } from '/utils/page-lifecycle.js';
 import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 
 // --------------------------------------------------------
@@ -3463,7 +3464,7 @@ function openMealPlanImport(container) {
             window.yuvomi.showToast(t('shopping.importMealsEmpty'), 'default');
             return;
           }
-          await Promise.all([loadLists(), loadItems(state.activeListId)]);
+          await reloadAfterSave(() => Promise.all([loadLists(), loadItems(state.activeListId)]));
           renderTabs(container);
           renderListContent(container);
           wireListContentEvents(container);

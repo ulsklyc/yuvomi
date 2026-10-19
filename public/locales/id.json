@@ -97,7 +97,8 @@
         "searchNoResultsDescription": "Tidak ada yang cocok dengan pencarianmu.",
         "searchNoResultsFilteredDescription": "Tidak ada yang cocok dengan pencarian dan filtermu.",
         "searchReset": "Atur ulang pencarian",
-        "passwordMinLength": "Minimal 8 karakter."
+        "passwordMinLength": "Minimal 8 karakter.",
+        "savedReloadFailed": "Perubahan tersimpan, tetapi tampilan tidak dapat diperbarui. Muat ulang halaman jika ada yang hilang."
     },
     "kitchen": {
         "noShoppingLists": "Belum ada daftar belanja.",
@@ -4916,8 +4917,7 @@
                 "earlyConfirm": "Catat dosis sebelum jeda minimum terlewati?",
                 "earlyDetail": "Dosis berikutnya baru dijadwalkan mulai {{time}} ({{remaining}}).",
                 "earlyConfirmAction": "Tetap catat"
-            },
-            "stockUpdateFailed": "Dosis tercatat, tetapi stok tidak dapat diperbarui."
+            }
         },
         "prevention": {
             "title": "Pencegahan & vaksinasi",

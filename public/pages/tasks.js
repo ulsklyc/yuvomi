@@ -48,6 +48,7 @@ import {
   openTaskDetail, deleteTaskWithUndo,
   setTaskArchived, toggleSubtaskStatus,
 } from '/components/task-detail.js';
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 // --------------------------------------------------------
 // Die geteilten Regeln, mit dem Blickwinkel DIESER Seite
@@ -2489,7 +2490,7 @@ function openBulkTagDialog(taskIds, mode, container) {
           state.selectedTaskIds.clear();
           updateBulkActionsBar(container);
           renderFilters(container);
-          await loadTasks(container);
+          await reloadAfterSave(() => loadTasks(container));
           refocusAfterRender();
         } catch (err) {
           window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
@@ -2766,7 +2767,7 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
           // schickt dieselbe Liste.
           resetSubmit(t('tasks.documentsLinkFailed'));
           btnError(submitBtn);
-          await refreshTags();
+          await reloadAfterSave(() => refreshTags());
           await onChanged();
           return;
         }
@@ -2831,7 +2832,7 @@ async function handleRenameSubtask(id, currentTitle, container) {
   if (!title || title.trim() === currentTitle) return;
   try {
     await api.put(`/tasks/${id}`, { title: title.trim() });
-    await loadTasks(container);
+    await reloadAfterSave(() => loadTasks(container));
     refocusAfterRender();
   } catch (err) {
     window.yuvomi.showToast(err.message, 'danger');
@@ -4732,7 +4733,7 @@ async function resetTaskOrder(groupEl, container) {
     // ueberholen, und die Raenge waeren wieder da. Erst abwarten.
     await taskOrderRuns.get(key)?.done;
     await api.post('/tasks/reorder/reset', { ids });
-    await loadTasks(container);
+    await reloadAfterSave(() => loadTasks(container));
     const el = container.querySelector('#tasks-reorder-announce');
     if (el) el.textContent = t('tasks.resetOrderDone', { group: label });
     const toggles = [...container.querySelectorAll('[data-group-toggle]')];
