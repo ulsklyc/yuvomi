@@ -580,7 +580,7 @@
   "license": "MIT",
   "devDependencies": {
     "axe-core": "^4.14.0",
-    "puppeteer": "^25.13.0",
+    "puppeteer": "^25.14.0",
     "sharp": "^0.35.5"
   },
   "allowScripts": {
