@@ -218,3 +218,24 @@ test('wuerfelt die Schluessel neu, wenn die Trigger fehlten', () => {
   reconcileCriticalSchema(db);
   assert.equal(keyOf(db, 1), kept, 'mit vorhandenen Triggern bleibt jeder Schluessel stehen');
 });
+
+// Codex-Review zu #1836: steht Migration 252 als angewendet da, fehlt aber
+// task_completions.source, scheitert jeder Uebergang nach 'done' am INSERT und
+// reisst die Aufgabenaenderung mit, und der Verlauf scheitert am SELECT. Kein
+// Nachtrag: NULL heisst "in Yuvomi abgehakt", das stimmte fuer jede Zeile, die
+// vor der Spalte geschrieben wurde.
+test('traegt task_completions.source nach und laesst Bestandszeilen bei NULL', () => {
+  const db = new DatabaseSync(':memory:');
+  db.exec(`CREATE TABLE task_completions (
+    id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL, series_id INTEGER NOT NULL,
+    user_id INTEGER, completed_at TEXT NOT NULL, done_by_user_id INTEGER
+  )`);
+  db.exec("INSERT INTO task_completions (task_id, series_id, user_id, completed_at) VALUES (1, 1, 1, '2026-10-01T08:00:00Z')");
+  assert.equal(hasColumn(db, 'task_completions', 'source'), false);
+
+  reconcileCriticalSchema(db);
+
+  assert.equal(hasColumn(db, 'task_completions', 'source'), true);
+  const rows = db.prepare('SELECT source, completed_at FROM task_completions').all();
+  assert.deepEqual(rows.map((r) => [r.source, r.completed_at]), [[null, '2026-10-01T08:00:00Z']]);
+});

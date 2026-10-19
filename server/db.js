@@ -11377,6 +11377,11 @@ const CRITICAL_COLUMNS = [
   // Bild neu wuerfeln, kommen mit der Spalte.
   { table: 'users', column: 'avatar_key', type: 'TEXT',
     backfill: backfillAvatarKey },
+  // #1836: v252 traegt die Quelle einer Erledigung nach; ohne die Spalte
+  // scheitert jeder Uebergang nach 'done' (der Eintrag schreibt sie, die
+  // Aufgabenaenderung rollt mit zurueck) und jeder Verlauf (er liest sie). Kein
+  // Nachtrag: NULL heisst "in Yuvomi abgehakt".
+  { table: 'task_completions', column: 'source', type: 'TEXT' },
 ];
 
 /**

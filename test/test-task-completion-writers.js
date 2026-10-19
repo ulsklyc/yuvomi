@@ -238,9 +238,9 @@ test('voller Lauf: Abbruch nach dem Upsert, danach ein neuer Lauf -> Status und 
   const id = mirroredId('h-crash');
   assert.equal(taskOf(id).status, 'open');
 
-  const abandoned = [];
+  const abandoned = new Map();
   upsertTask(parseVTODO(davTodo('h-crash', { done: true }))[0], ACCOUNT, ADMIN, null, { completions: abandoned });
-  assert.equal(abandoned.length, 1, 'der Uebergang wartet auf den Abschluss des Laufs');
+  assert.equal(abandoned.size, 1, 'der Uebergang wartet auf den Abschluss des Laufs');
   const midway = taskOf(id).status;
   const midwayEntry = completionOf(id);
   assert.ok(midway === 'open' ? midwayEntry === undefined : midwayEntry !== undefined,
@@ -254,9 +254,40 @@ test('voller Lauf: Abbruch nach dem Upsert, danach ein neuer Lauf -> Status und 
   assert.equal(c.source, 'caldav');
 });
 
+// Dieselbe UID in zwei Listen eines Kontos ist erlaubt, und vor der
+// Warteschlange gewann das zuletzt gelesene Objekt in allem, auch im Status.
+// Mit ihr las jeder Upsert den unveraenderten Status aus der Zeile, und ein
+// frueheres "erledigt" ueberlebte ein spaeteres "offen" (Review zu #1836).
+let secondListUrl;
+test('voller Lauf: dieselbe UID in zwei Listen -> das zuletzt gelesene Objekt bestimmt den Status', async () => {
+  secondListUrl = dav.addCollection('todo2', { name: 'Zweite', components: ['VTODO'] });
+  db.prepare(`
+    INSERT INTO caldav_reminder_selection (account_id, list_url, list_name, target_module, enabled)
+    VALUES (?, ?, 'Zweite', 'tasks', 1)
+  `).run(ACCOUNT, secondListUrl);
+  dav.putObject(listUrl, 'dup.ics', davTodo('h-dup'));
+  await remindersSync.sync();
+  const id = mirroredId('h-dup');
+  assert.equal(taskOf(id).status, 'open');
+
+  // Erst erledigt, dann offen: offen gewinnt, kein Eintrag.
+  dav.putObject(listUrl, 'dup.ics', davTodo('h-dup', { done: true }));
+  dav.putObject(secondListUrl, 'dup.ics', davTodo('h-dup'));
+  await remindersSync.sync();
+  assert.equal(taskOf(id).status, 'open', 'das spaetere offene Objekt gewinnt wie Titel und Tags');
+  assert.equal(completionOf(id), undefined);
+
+  // Erst offen, dann erledigt: erledigt gewinnt, mit Eintrag.
+  dav.putObject(listUrl, 'dup.ics', davTodo('h-dup'));
+  dav.putObject(secondListUrl, 'dup.ics', davTodo('h-dup', { done: true }));
+  await remindersSync.sync();
+  assert.equal(taskOf(id).status, 'done');
+  assert.ok(completionOf(id), 'und mit ihm sein Eintrag');
+});
+
 test('voller Lauf: in Yuvomi bearbeitet, bevor der Lauf abschliesst -> der Status vom Server wartet', () => {
   const id = Number(upsertTask(todoOf('h-dirty'), ACCOUNT, ADMIN));
-  const queued = [];
+  const queued = new Map();
   upsertTask(todoOf('h-dirty', { status: 'COMPLETED', completed: '20261017T081500Z' }), ACCOUNT, ADMIN, null, { completions: queued });
   // Zwischen Upsert und Abschluss: lokale Bearbeitung, die auf ihren Push wartet.
   db.prepare("UPDATE tasks SET status = 'in_progress', outbound_dirty = 1 WHERE id = ?").run(id);

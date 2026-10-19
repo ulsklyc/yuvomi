@@ -296,13 +296,23 @@ function upsertTask(todo, accountId, createdBy, objectUrl = null, { completions 
     // stürbe der Lauf zwischen beiden, sähe der nächste "unverändert", und der
     // Eintrag fehlte für immer. Bis zum Abschluss liest im Lauf nichts den
     // neuen Status (Hierarchie, dann Übergänge, erst danach Prune und Push).
-    if (existing && existing.status !== status) {
-      const transition = {
-        taskId: Number(taskId), oldStatus: existing.status, newStatus: status,
-        completedAt: pastOrNull(todo.completedAt),
-      };
-      if (completions) completions.push(transition);
-      else applySyncedCompletions(d, [transition]);
+    //
+    // JE AUFGABE EIN ÜBERGANG, DER LETZTE GEWINNT. Dieselbe UID darf in
+    // mehreren Listen stehen, und wie Titel und Tags bestimmt das zuletzt
+    // gelesene Objekt auch den Status. Jeder Upsert liest dabei den noch
+    // ungeschriebenen Status aus der Zeile: ein späteres Objekt, das ihn
+    // bestätigt, nimmt einen früher vorgemerkten Wechsel deshalb zurück.
+    if (existing) {
+      const id = Number(taskId);
+      const transition = existing.status !== status
+        ? { taskId: id, oldStatus: existing.status, newStatus: status, completedAt: pastOrNull(todo.completedAt) }
+        : null;
+      if (completions) {
+        if (transition) completions.set(id, transition);
+        else completions.delete(id);
+      } else if (transition) {
+        applySyncedCompletions(d, [transition]);
+      }
     }
 
     // CATEGORIES → Tags (#586). Der Server führt sie, also gewinnt er auch: eine
@@ -324,7 +334,9 @@ function upsertTask(todo, accountId, createdBy, objectUrl = null, { completions 
  * umgeschaltet oder bearbeitet hat, gewinnt wie sonst im Inbound (#617), und
  * ihren Eintrag hat die Route schon richtig gestellt.
  */
-function applySyncedCompletions(d, transitions) {
+function applySyncedCompletions(d, pending) {
+  // Der Lauf führt eine Map je Aufgabe, der Einzelaufruf eine Liste.
+  const transitions = pending instanceof Map ? [...pending.values()] : pending;
   if (!transitions.length) return;
   const write = d.prepare(`
     UPDATE tasks SET status = ?
@@ -631,9 +643,9 @@ async function runSync({ createClient: makeClient } = {}) {
       // UID → lokale Aufgabe dieses Laufs, für die Hierarchie-Auflösung nach
       // allen Listen (#671). Nur Aufgaben: der Einkauf kennt keine Unterposten.
       const taskRelations = new Map();
-      // Statuswechsel dieses Laufs für den Erledigungsverlauf (#1836), erst
-      // nach der Hierarchie übertragen (applySyncedCompletions).
-      const completionTransitions = [];
+      // Statuswechsel dieses Laufs je Aufgabe (#1836), erst nach der Hierarchie
+      // geschrieben (applySyncedCompletions).
+      const completionTransitions = new Map();
 
       for (const sel of enabledLists) {
         const module = sel.target_module === 'shopping' ? 'shopping' : 'tasks';
