@@ -1238,7 +1238,9 @@
         "checkConflict": "Ghi chú đã thay đổi trong lúc này. Ghi chú sẽ được tải lại.",
         "pinnedState": "Đã ghim",
         "checklistDone": "Hoàn thành",
-        "checklistOpen": "Mở"
+        "checklistOpen": "Mở",
+        "errorNoteGone": "Ghi chú này không còn nữa.",
+        "errorSelectedCategoryGone": "Một danh mục đã chọn không còn tồn tại."
     },
     "markdown": {
         "bold": "In đậm (Ctrl+B)",
@@ -1360,7 +1362,8 @@
         "selectNamed": "Chọn {{name}}",
         "bulkDeleteConfirm": "Xóa {{count}} liên hệ?",
         "bulkDeleteConfirm_one": "Xóa {{count}} liên hệ?",
-        "bulkDeletedToast": "Đã xóa {{count}} liên hệ"
+        "bulkDeletedToast": "Đã xóa {{count}} liên hệ",
+        "errorContactGone": "Liên hệ này không còn nữa."
     },
     "budget": {
         "title": "Ngân sách",
@@ -3437,7 +3440,8 @@
         "importSubmit": "Thêm {{count}}",
         "importSuccess": "Đã thêm {{count}} sinh nhật.",
         "importNothingSelected": "Vui lòng chọn ít nhất một liên hệ.",
-        "importSelected": "Đã chọn {{count}} liên hệ"
+        "importSelected": "Đã chọn {{count}} liên hệ",
+        "errorBirthdayGone": "Sinh nhật này không còn nữa."
     },
     "recipes": {
         "mealTypeNone": "Không có bữa ăn",
@@ -6150,7 +6154,12 @@
         "detailPaneLabel": "Chi tiết đồ vật",
         "pickOne": "Chọn một đồ vật",
         "pickOneHint": "Thông tin, thời hạn và lịch sử hiển thị ở đây.",
-        "moreDetailsHint": "Mua, bảo hành, ảnh, tài liệu"
+        "moreDetailsHint": "Mua, bảo hành, ảnh, tài liệu",
+        "errorItemGone": "Món đồ này không còn nữa.",
+        "errorTrackedDateGone": "Thời hạn này không còn nữa.",
+        "errorSelectedLocationGone": "Vị trí đã chọn không còn tồn tại.",
+        "errorBookingGone": "Giao dịch này không còn nữa.",
+        "errorBookingAlreadyLinked": "Giao dịch này đã được liên kết."
     },
     "documentAttach": {
         "label": "Tệp đính kèm",

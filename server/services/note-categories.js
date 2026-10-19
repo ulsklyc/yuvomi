@@ -11,10 +11,12 @@ import {
 export { categoryNameKey };
 
 export class NoteCategoryInputError extends Error {
-  constructor(message, status = 400) {
+  constructor(message, status = 400, reason = undefined) {
     super(message);
     this.name = 'NoteCategoryInputError';
     this.status = status;
+    // Der Fall, den ein Nutzer erreicht (#1909) - die Seite sagt dazu ihren Satz.
+    this.reason = reason;
   }
 }
 
@@ -86,10 +88,10 @@ export function replaceEditableAssignments(database, {
       FROM note_categories
       WHERE id IN (${placeholders})
     `).all(...ids);
-    if (categories.length !== ids.length) throw new NoteCategoryInputError('Category is not available');
+    if (categories.length !== ids.length) throw new NoteCategoryInputError('Category is not available', 400, 'notes_selected_category_not_found');
     for (const category of categories) {
       if (category.scope === 'personal' && Number(category.owner_user_id) !== Number(userId)) {
-        throw new NoteCategoryInputError('Category is not available');
+        throw new NoteCategoryInputError('Category is not available', 400, 'notes_selected_category_not_found');
       }
     }
   }

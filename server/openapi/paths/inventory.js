@@ -1,7 +1,7 @@
 import { op, jsonBody, idParam, stringPathParam, DOCUMENT_LINKS_READ_NOTE, BUDGET_LINKS_READ_NOTE } from '../helpers.js';
 
 export function inventoryPaths() {
-  return {
+  return withCaseReasons({
     '/api/v1/inventory/locations': {
       get: op({ summary: 'List inventory locations (two-level tree)', tag: 'Inventory' }),
       post: op({ summary: 'Create a top-level inventory location', tag: 'Inventory', stateChanging: true, requestBody: jsonBody(null) }),
@@ -122,5 +122,34 @@ export function inventoryPaths() {
     '/api/v1/inventory/deadlines-feed/regenerate': {
       post: op({ summary: 'Regenerate own inventory deadlines ICS feed token', tag: 'Inventory', stateChanging: true }),
     },
-  };
+  });
+}
+
+// #1909: die Faelle, die ein Nutzer erreicht, tragen einen `reason` neben dem
+// englischen `error` - je Operation der Satz, der sie nennt.
+const ITEM_GONE = '`inventory_item_not_found` (404, the item does not exist - deleted)';
+const BOOKING_GONE = '`inventory_booking_not_found` (404, the booking does not exist or is not visible to you)';
+const LOCATION_GONE = '`inventory_selected_location_not_found` (400, the chosen `location_id` does not exist; only when it is the sole finding)';
+const CASE_REASONS = {
+  '/api/v1/inventory/items': { post: `${LOCATION_GONE}, ${BOOKING_GONE}` },
+  '/api/v1/inventory/items/{id}': { get: ITEM_GONE, put: `${ITEM_GONE}, ${LOCATION_GONE}`, delete: ITEM_GONE },
+  '/api/v1/inventory/items/{id}/entries': {
+    post: `${ITEM_GONE}, ${BOOKING_GONE}, \`inventory_booking_already_linked\` (409, the booking is already linked with this role)`,
+  },
+  '/api/v1/inventory/items/{id}/entries/{entryId}': { delete: `${ITEM_GONE}, ${BOOKING_GONE}` },
+  '/api/v1/inventory/items/{id}/dates/{dateId}/complete': {
+    post: `${ITEM_GONE}, \`inventory_tracked_date_not_found\` (404, the item no longer has this tracked date)`,
+  },
+};
+
+function withCaseReasons(paths) {
+  for (const [path, operations] of Object.entries(CASE_REASONS)) {
+    for (const [method, reasons] of Object.entries(operations)) {
+      const operation = paths[path]?.[method];
+      if (!operation) throw new Error(`openapi inventory: ${method} ${path} is not documented`);
+      const note = `A refusal a user can reach carries a \`reason\` next to \`error\` (#1909): ${reasons}.`;
+      operation.description = operation.description ? `${operation.description}\n\n${note}` : note;
+    }
+  }
+  return paths;
 }

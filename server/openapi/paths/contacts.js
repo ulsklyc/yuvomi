@@ -1,7 +1,7 @@
 import { op, jsonBody, idParam, stringPathParam } from '../helpers.js';
 
 export function contactsPaths() {
-  return {
+  return withCaseReasons({
     '/api/v1/contacts': {
       get: op({ summary: 'List contacts', tag: 'Contacts' }),
       post: op({ summary: 'Create contact with multi-value fields', tag: 'Contacts', stateChanging: true, requestBody: jsonBody(null) }),
@@ -69,5 +69,24 @@ export function contactsPaths() {
       delete: op({ summary: 'Delete contact', tag: 'Contacts', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/contacts/{id}/vcard': { get: op({ summary: 'Download contact as vCard', tag: 'Contacts', params: [idParam()] }) },
-  };
+  });
+}
+
+// #1909: die Faelle, die ein Nutzer erreicht, tragen einen `reason` neben dem
+// englischen `error` - je Operation der Satz, der sie nennt.
+const CONTACT_GONE = '`contacts_contact_not_found` (404, the contact does not exist - deleted)';
+const CASE_REASONS = {
+  '/api/v1/contacts/{id}': { get: CONTACT_GONE, put: CONTACT_GONE, delete: CONTACT_GONE },
+};
+
+function withCaseReasons(paths) {
+  for (const [path, operations] of Object.entries(CASE_REASONS)) {
+    for (const [method, reasons] of Object.entries(operations)) {
+      const operation = paths[path]?.[method];
+      if (!operation) throw new Error(`openapi contacts: ${method} ${path} is not documented`);
+      const note = `A refusal a user can reach carries a \`reason\` next to \`error\` (#1909): ${reasons}.`;
+      operation.description = operation.description ? `${operation.description}\n\n${note}` : note;
+    }
+  }
+  return paths;
 }

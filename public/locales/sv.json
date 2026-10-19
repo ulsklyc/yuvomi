@@ -1238,7 +1238,9 @@
         "checkConflict": "Anteckningen har ändrats under tiden. Den laddas om.",
         "pinnedState": "Fäst",
         "checklistDone": "Klart",
-        "checklistOpen": "Öppet"
+        "checklistOpen": "Öppet",
+        "errorNoteGone": "Den här anteckningen finns inte längre.",
+        "errorSelectedCategoryGone": "En vald kategori finns inte längre."
     },
     "markdown": {
         "bold": "Fet (Ctrl+B)",
@@ -1360,7 +1362,8 @@
         "selectNamed": "Välj {{name}}",
         "bulkDeleteConfirm": "Radera {{count}} kontakter?",
         "bulkDeleteConfirm_one": "Radera {{count}} kontakt?",
-        "bulkDeletedToast": "{{count}} kontakter raderade"
+        "bulkDeletedToast": "{{count}} kontakter raderade",
+        "errorContactGone": "Den här kontakten finns inte längre."
     },
     "budget": {
         "title": "Budget",
@@ -3476,7 +3479,8 @@
         "importSubmit": "Lägg till {{count}}",
         "importSuccess": "{{count}} födelsedagar tillagda.",
         "importNothingSelected": "Välj minst en kontakt.",
-        "importSelected": "{{count}} kontakter valda"
+        "importSelected": "{{count}} kontakter valda",
+        "errorBirthdayGone": "Den här födelsedagen finns inte längre."
     },
     "reminders": {
         "sectionTitle": "Påminnelse",
@@ -6150,7 +6154,12 @@
         "detailPaneLabel": "Detaljer om saken",
         "pickOne": "Välj en sak",
         "pickOneHint": "Uppgifter, tidsfrister och historik visas här.",
-        "moreDetailsHint": "Köp, garanti, foto, dokument"
+        "moreDetailsHint": "Köp, garanti, foto, dokument",
+        "errorItemGone": "Det här föremålet finns inte längre.",
+        "errorTrackedDateGone": "Det här datumet finns inte längre.",
+        "errorSelectedLocationGone": "Den valda platsen finns inte längre.",
+        "errorBookingGone": "Den här transaktionen finns inte längre.",
+        "errorBookingAlreadyLinked": "Den här transaktionen är redan kopplad."
     },
     "documentAttach": {
         "label": "Bilagor",

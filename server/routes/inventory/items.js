@@ -185,6 +185,7 @@ function loadItems({ category, locationId, status, q } = {}, budget, viewer) {
 function validateItemFields(body) {
   const values = {};
   const results = [];
+  let locationGone = false;
 
   const vName = str(body.name, 'Name', { max: MAX_TITLE });
   results.push(vName);
@@ -214,7 +215,10 @@ function validateItemFields(body) {
     results.push(vLoc);
     if (vLoc.value !== null) {
       const exists = db.get().prepare('SELECT id FROM inventory_locations WHERE id = ?').get(vLoc.value);
-      if (!exists) results.push({ error: 'Location not found.' });
+      if (!exists) {
+        locationGone = true;
+        results.push({ error: 'Location not found.' });
+      }
     }
     values.location_id = vLoc.value;
   }
@@ -329,7 +333,12 @@ function validateItemFields(body) {
   // Constraints) - ein weggelassenes Foto wird NULL, nicht "unveraendert".
   values.photo_data = vPhoto.value ?? null;
 
-  return { values, errors: collectErrors(results) };
+  const errors = collectErrors(results);
+  // Der Grund nennt den Fall nur, wenn er der EINZIGE Befund ist (#1909): der
+  // im Formular gewaehlte Ort wurde inzwischen geloescht. Die Seite haelt das
+  // Formular dann offen und bietet die aktuellen Orte an.
+  const gone = locationGone && errors.length === 1 ? { reason: 'inventory_selected_location_not_found' } : {};
+  return { values, errors, ...gone };
 }
 
 // --------------------------------------------------------
@@ -362,7 +371,7 @@ router.get('/:id', (req, res) => {
     const vId = idParam(req.params.id, 'Gegenstand-ID');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
     const item = loadItem(vId.value, budgetViewer(req), documentViewer(req));
-    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404 });
+    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
     res.json({ data: item });
   } catch (err) {
     log.error('GET /:id error:', err);
@@ -388,7 +397,7 @@ router.post('/', (req, res) => {
       const vEntryId = idParam(rawEntryId, 'Buchung');
       if (vEntryId.error) return res.status(400).json({ error: vEntryId.error, code: 400 });
       entry = visibleEntry(vEntryId.value, budgetViewer(req));
-      if (!entry) return res.status(404).json({ error: 'Booking not found.', code: 404 });
+      if (!entry) return res.status(404).json({ error: 'Booking not found.', code: 404, reason: 'inventory_booking_not_found' });
       const linkError = linkabilityError(entry);
       if (linkError) return res.status(linkError.code).json({ error: linkError.error, code: linkError.code });
 
@@ -398,8 +407,8 @@ router.post('/', (req, res) => {
       }
     }
 
-    const { values, errors } = validateItemFields(effectiveBody);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    const { values, errors, reason } = validateItemFields(effectiveBody);
+    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400, ...(reason ? { reason } : {}) });
 
     const { values: trackedDateValues, errors: trackedDateErrors } = validateTrackedDatesInput(req.body.tracked_dates);
     if (trackedDateErrors.length) return res.status(400).json({ error: trackedDateErrors.join(' '), code: 400 });
@@ -463,10 +472,10 @@ router.put('/:id', (req, res) => {
     const vId = idParam(req.params.id, 'Gegenstand-ID');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
     const item = db.get().prepare('SELECT id, created_by FROM inventory_items WHERE id = ?').get(vId.value);
-    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404 });
+    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
 
-    const { values, errors } = validateItemFields(req.body);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    const { values, errors, reason } = validateItemFields(req.body);
+    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400, ...(reason ? { reason } : {}) });
 
     let trackedDateValues = null;
     if (req.body.tracked_dates !== undefined) {
@@ -537,7 +546,7 @@ router.post('/:id/entries', (req, res) => {
     const vId = idParam(req.params.id, 'Gegenstand-ID');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
     const item = db.get().prepare('SELECT id FROM inventory_items WHERE id = ?').get(vId.value);
-    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404 });
+    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
 
     const vEntryId = idParam(req.body.entry_id, 'Buchung');
     if (vEntryId.error) return res.status(400).json({ error: vEntryId.error, code: 400 });
@@ -556,7 +565,7 @@ router.post('/:id/entries', (req, res) => {
     }
 
     const result = linkEntry({ itemId: item.id, entryId: vEntryId.value, role: vRole.value, amountShare, viewer: budgetViewer(req) });
-    if (result.error) return res.status(result.code).json({ error: result.error, code: result.code });
+    if (result.error) return res.status(result.code).json({ error: result.error, code: result.code, ...(result.reason ? { reason: result.reason } : {}) });
 
     res.status(201).json({ data: loadItem(item.id, budgetViewer(req), documentViewer(req)) });
   } catch (err) {
@@ -574,13 +583,13 @@ router.delete('/:id/entries/:entryId', (req, res) => {
     const vId = idParam(req.params.id, 'Gegenstand-ID');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
     const item = db.get().prepare('SELECT id FROM inventory_items WHERE id = ?').get(vId.value);
-    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404 });
+    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
 
     const vEntryId = idParam(req.params.entryId, 'Buchung-ID');
     if (vEntryId.error) return res.status(400).json({ error: vEntryId.error, code: 400 });
 
     const result = unlinkEntry({ itemId: item.id, entryId: vEntryId.value, viewer: budgetViewer(req) });
-    if (result.error) return res.status(result.code).json({ error: result.error, code: result.code });
+    if (result.error) return res.status(result.code).json({ error: result.error, code: result.code, ...(result.reason ? { reason: result.reason } : {}) });
 
     res.json({ data: loadItem(item.id, budgetViewer(req), documentViewer(req)) });
   } catch (err) {
@@ -601,14 +610,14 @@ router.post('/:id/dates/:dateId/complete', (req, res) => {
     if (vDateId.error) return res.status(400).json({ error: vDateId.error, code: 400 });
 
     const item = db.get().prepare('SELECT id, created_by, odometer, odometer_on FROM inventory_items WHERE id = ?').get(vId.value);
-    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404 });
+    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
 
     const { value, errors } = validateCompletionInput(req.body, item);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
     const userId = req.authUserId || req.session.userId;
     const result = completeTrackedDate({ item, dateId: vDateId.value, values: value, userId });
-    if (result.error) return res.status(result.code).json({ error: result.error, code: result.code });
+    if (result.error) return res.status(result.code).json({ error: result.error, code: result.code, ...(result.reason ? { reason: result.reason } : {}) });
 
     res.status(201).json({ data: loadItem(item.id, budgetViewer(req), documentViewer(req)) });
   } catch (err) {
@@ -625,7 +634,7 @@ router.get('/:id/service-log', (req, res) => {
     const vId = idParam(req.params.id, 'Gegenstand-ID');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
     const item = db.get().prepare('SELECT id FROM inventory_items WHERE id = ?').get(vId.value);
-    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404 });
+    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
 
     res.json({ data: loadServiceLog(item.id) });
   } catch (err) {
@@ -639,7 +648,7 @@ router.post('/:id/service-log', (req, res) => {
     const vId = idParam(req.params.id, 'Gegenstand-ID');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
     const item = db.get().prepare('SELECT id, odometer, odometer_on FROM inventory_items WHERE id = ?').get(vId.value);
-    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404 });
+    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
 
     const { value, errors } = validateServiceLogInput(req.body, item);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
@@ -667,7 +676,7 @@ router.put('/:id/service-log/:logId', (req, res) => {
     const vLogId = idParam(req.params.logId, 'Eintrag-ID');
     if (vLogId.error) return res.status(400).json({ error: vLogId.error, code: 400 });
     const item = db.get().prepare('SELECT id, odometer, odometer_on FROM inventory_items WHERE id = ?').get(vId.value);
-    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404 });
+    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
 
     // Die bearbeitete Zeile darf den Tippfehler-Schutz nicht gegen ihren
     // eigenen alten Wert pruefen (Review #1257).
@@ -691,7 +700,7 @@ router.delete('/:id/service-log/:logId', (req, res) => {
     const vLogId = idParam(req.params.logId, 'Eintrag-ID');
     if (vLogId.error) return res.status(400).json({ error: vLogId.error, code: 400 });
     const item = db.get().prepare('SELECT id FROM inventory_items WHERE id = ?').get(vId.value);
-    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404 });
+    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
 
     const deleted = deleteServiceLogEntry({ itemId: item.id, logId: vLogId.value });
     if (deleted.changes === 0) return res.status(404).json({ error: 'Service log entry not found.', code: 404 });
@@ -712,7 +721,7 @@ router.get('/:id/history', (req, res) => {
     const vId = idParam(req.params.id, 'Gegenstand-ID');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
     const item = db.get().prepare('SELECT id FROM inventory_items WHERE id = ?').get(vId.value);
-    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404 });
+    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
 
     res.json({ data: loadHistory(item.id, budgetViewer(req), documentViewer(req)) });
   } catch (err) {
@@ -735,7 +744,7 @@ router.delete('/:id', (req, res) => {
       return db.get().prepare('DELETE FROM inventory_items WHERE id = ?').run(vId.value);
     })();
 
-    if (deleted.changes === 0) return res.status(404).json({ error: 'Item not found.', code: 404 });
+    if (deleted.changes === 0) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
     res.status(204).end();
   } catch (err) {
     log.error('DELETE /:id error:', err);

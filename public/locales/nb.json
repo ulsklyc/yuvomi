@@ -1238,7 +1238,9 @@
         "checkConflict": "Notatet har endret seg i mellomtiden. Det vil bli lastet på nytt.",
         "pinnedState": "Festet",
         "checklistDone": "Ferdig",
-        "checklistOpen": "Åpen"
+        "checklistOpen": "Åpen",
+        "errorNoteGone": "Dette notatet finnes ikke lenger.",
+        "errorSelectedCategoryGone": "En valgt kategori finnes ikke lenger."
     },
     "markdown": {
         "bold": "Fet (Ctrl+B)",
@@ -1360,7 +1362,8 @@
         "selectNamed": "Velg {{name}}",
         "bulkDeleteConfirm": "Slett {{count}} kontakter?",
         "bulkDeleteConfirm_one": "Slett {{count}} kontakt?",
-        "bulkDeletedToast": "{{count}} kontakter slettet"
+        "bulkDeletedToast": "{{count}} kontakter slettet",
+        "errorContactGone": "Denne kontakten finnes ikke lenger."
     },
     "budget": {
         "title": "Budsjett",
@@ -3437,7 +3440,8 @@
         "importSubmit": "Legg til {{count}}",
         "importSuccess": "{{count}} fødselsdager lagt til.",
         "importNothingSelected": "Vennligst velg minst én kontakt.",
-        "importSelected": "{{count}} kontakter valgt"
+        "importSelected": "{{count}} kontakter valgt",
+        "errorBirthdayGone": "Denne fødselsdagen finnes ikke lenger."
     },
     "recipes": {
         "mealTypeNone": "Intet måltid",
@@ -6150,7 +6154,12 @@
         "detailPaneLabel": "Elementdetaljer",
         "pickOne": "Velg et element",
         "pickOneHint": "Detaljer, frister og historikk vises her.",
-        "moreDetailsHint": "Kjøp, garanti, bilde, dokumenter"
+        "moreDetailsHint": "Kjøp, garanti, bilde, dokumenter",
+        "errorItemGone": "Denne gjenstanden finnes ikke lenger.",
+        "errorTrackedDateGone": "Denne datoen finnes ikke lenger.",
+        "errorSelectedLocationGone": "Det valgte stedet finnes ikke lenger.",
+        "errorBookingGone": "Denne bestillingen finnes ikke lenger.",
+        "errorBookingAlreadyLinked": "Denne bestillingen er allerede koblet."
     },
     "documentAttach": {
         "label": "Vedlegg",

@@ -297,7 +297,7 @@ router.put('/:id', (req, res) => {
     const userId = req.authUserId || req.session.userId;
     const id = parseInt(req.params.id, 10);
     const existing = loadBirthday(id);
-    if (!existing) return res.status(404).json({ error: 'Birthday not found.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Birthday not found.', code: 404, reason: 'birthdays_birthday_not_found' });
 
     const checks = [];
     if (req.body.name !== undefined) checks.push(str(req.body.name, 'Name', { max: MAX_TITLE, required: false }));
@@ -351,7 +351,7 @@ router.delete('/:id', (req, res) => {
     const userId = req.authUserId || req.session.userId;
     const id = parseInt(req.params.id, 10);
     const existing = loadBirthday(id);
-    if (!existing) return res.status(404).json({ error: 'Birthday not found.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Birthday not found.', code: 404, reason: 'birthdays_birthday_not_found' });
 
     db.transaction(() => {
       deleteBirthdayArtifacts(db.get(), existing);

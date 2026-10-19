@@ -62,7 +62,7 @@ function categoryDatabaseConflict(error) {
 
 function categoryErrorResponse(res, error) {
   const status = Number(error?.status) || 400;
-  return res.status(status).json({ error: error.message, code: status });
+  return res.status(status).json({ error: error.message, code: status, ...(error.reason ? { reason: error.reason } : {}) });
 }
 
 function editableCategory(req, id) {
@@ -118,7 +118,7 @@ router.post('/categories', (req, res) => {
     res.status(201).json({ data: categoryPayload(category) });
   } catch (err) {
     if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-      return res.status(409).json({ error: 'A category with this name already exists.', code: 409 });
+      return res.status(409).json({ error: 'A category with this name already exists.', code: 409, reason: 'category_exists' });
     }
     if (categoryInputError(err)) return categoryErrorResponse(res, err);
     log.error('Category create:', err);
@@ -170,7 +170,7 @@ router.put('/categories/:id', (req, res) => {
     res.json({ data: categoryPayload(db.get().prepare('SELECT * FROM note_categories WHERE id = ?').get(id)) });
   } catch (err) {
     if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-      return res.status(409).json({ error: 'A category with this name already exists.', code: 409 });
+      return res.status(409).json({ error: 'A category with this name already exists.', code: 409, reason: 'category_exists' });
     }
     if (categoryInputError(err)) return categoryErrorResponse(res, err);
     log.error('Category update:', err);
@@ -257,7 +257,7 @@ router.post('/', (req, res) => {
     res.status(201).json({ data: oneWithCategories(note, req) });
   } catch (err) {
     if (req.body?.category_ids !== undefined && categoryDatabaseConflict(err)) {
-      return res.status(409).json({ error: 'Categories changed. Refresh and try again.', code: 409 });
+      return res.status(409).json({ error: 'Categories changed. Refresh and try again.', code: 409, reason: 'notes_selected_category_not_found' });
     }
     if (categoryInputError(err)) return categoryErrorResponse(res, err);
     log.error('', err);
@@ -275,7 +275,7 @@ router.put('/:id', (req, res) => {
   try {
     const id   = parseInt(req.params.id, 10);
     const note = db.get().prepare('SELECT * FROM notes WHERE id = ?').get(id);
-    if (!note) return res.status(404).json({ error: 'Notiz nicht gefunden', code: 404 });
+    if (!note) return res.status(404).json({ error: 'Note not found.', code: 404, reason: 'notes_note_not_found' });
 
     const { pinned } = req.body;
     const checks = [];
@@ -319,7 +319,7 @@ router.put('/:id', (req, res) => {
     res.json({ data: oneWithCategories(updated, req) });
   } catch (err) {
     if (req.body?.category_ids !== undefined && categoryDatabaseConflict(err)) {
-      return res.status(409).json({ error: 'Categories changed. Refresh and try again.', code: 409 });
+      return res.status(409).json({ error: 'Categories changed. Refresh and try again.', code: 409, reason: 'notes_selected_category_not_found' });
     }
     if (categoryInputError(err)) return categoryErrorResponse(res, err);
     log.error('', err);
@@ -336,7 +336,7 @@ router.patch('/:id/pin', (req, res) => {
   try {
     const id   = parseInt(req.params.id, 10);
     const note = db.get().prepare('SELECT pinned FROM notes WHERE id = ?').get(id);
-    if (!note) return res.status(404).json({ error: 'Notiz nicht gefunden', code: 404 });
+    if (!note) return res.status(404).json({ error: 'Note not found.', code: 404, reason: 'notes_note_not_found' });
 
     const newPinned = note.pinned ? 0 : 1;
     db.get().prepare('UPDATE notes SET pinned = ? WHERE id = ?').run(newPinned, id);
@@ -372,7 +372,7 @@ router.patch('/:id/check', (req, res) => {
   try {
     const id   = parseInt(req.params.id, 10);
     const note = db.get().prepare('SELECT * FROM notes WHERE id = ?').get(id);
-    if (!note) return res.status(404).json({ error: 'Notiz nicht gefunden', code: 404 });
+    if (!note) return res.status(404).json({ error: 'Note not found.', code: 404, reason: 'notes_note_not_found' });
 
     const { line, checked, expect } = req.body;
     if (!Number.isInteger(line) || line < 0)
@@ -420,7 +420,7 @@ router.delete('/:id', (req, res) => {
     const id     = parseInt(req.params.id, 10);
     const result = db.get().prepare('DELETE FROM notes WHERE id = ?').run(id);
     if (result.changes === 0)
-      return res.status(404).json({ error: 'Notiz nicht gefunden', code: 404 });
+      return res.status(404).json({ error: 'Note not found.', code: 404, reason: 'notes_note_not_found' });
     res.status(204).end();
   } catch (err) {
     log.error('', err);

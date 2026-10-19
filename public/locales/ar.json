@@ -1458,7 +1458,9 @@
         "checkConflict": "تم تغيير الملاحظة في هذه الأثناء. سيتم إعادة تحميلها.",
         "pinnedState": "مثبتة",
         "checklistDone": "منجز",
-        "checklistOpen": "مفتوح"
+        "checklistOpen": "مفتوح",
+        "errorNoteGone": "هذه الملاحظة لم تعد موجودة.",
+        "errorSelectedCategoryGone": "إحدى الفئات المحددة لم تعد موجودة."
     },
     "markdown": {
         "bold": "عريض (Ctrl+B)",
@@ -1583,7 +1585,8 @@
         "bulkDeleteConfirm_few": "حذف {{count}} جهات اتصال؟",
         "bulkDeleteConfirm_two": "حذف جهتي اتصال؟",
         "bulkDeleteConfirm_many": "حذف {{count}} جهة اتصال؟",
-        "bulkDeletedToast": "تم حذف {{count}} جهة اتصال"
+        "bulkDeletedToast": "تم حذف {{count}} جهة اتصال",
+        "errorContactGone": "جهة الاتصال هذه لم تعد موجودة."
     },
     "budget": {
         "title": "الميزانية",
@@ -3792,7 +3795,8 @@
         "importSubmit": "إضافة {{count}}",
         "importSuccess": "تمت إضافة {{count}} عيد ميلاد.",
         "importNothingSelected": "يرجى اختيار جهة اتصال واحدة على الأقل.",
-        "importSelected": "تم تحديد {{count}} جهة اتصال"
+        "importSelected": "تم تحديد {{count}} جهة اتصال",
+        "errorBirthdayGone": "عيد الميلاد هذا لم يعد موجودًا."
     },
     "reminders": {
         "sectionTitle": "تذكير",
@@ -6607,7 +6611,12 @@
         "detailPaneLabel": "تفاصيل الغرض",
         "pickOne": "اختر غرضًا",
         "pickOneHint": "تظهر هنا التفاصيل والمواعيد والسجل.",
-        "moreDetailsHint": "الشراء، الضمان، الصورة، المستندات"
+        "moreDetailsHint": "الشراء، الضمان، الصورة، المستندات",
+        "errorItemGone": "هذا الغرض لم يعد موجودًا.",
+        "errorTrackedDateGone": "هذا الموعد لم يعد موجودًا.",
+        "errorSelectedLocationGone": "لم يعد الموقع المحدد موجودًا.",
+        "errorBookingGone": "هذه المعاملة لم تعد موجودة.",
+        "errorBookingAlreadyLinked": "هذه المعاملة مرتبطة بالفعل."
     },
     "documentAttach": {
         "label": "المرفقات",

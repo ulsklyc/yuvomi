@@ -14,7 +14,7 @@ function withBadRequest(status, description, extra = {}) {
 }
 
 export function birthdaysPaths() {
-  return {
+  return withCaseReasons({
     '/api/v1/birthdays': {
       get: op({ summary: 'List birthdays', tag: 'Birthdays' }),
       post: op({
@@ -89,5 +89,24 @@ export function birthdaysPaths() {
       }),
       delete: op({ summary: 'Delete birthday', tag: 'Birthdays', params: [idParam()], stateChanging: true }),
     },
-  };
+  });
+}
+
+// #1909: die Faelle, die ein Nutzer erreicht, tragen einen `reason` neben dem
+// englischen `error` - je Operation der Satz, der sie nennt.
+const BIRTHDAY_GONE = '`birthdays_birthday_not_found` (404, the birthday does not exist - deleted)';
+const CASE_REASONS = {
+  '/api/v1/birthdays/{id}': { put: BIRTHDAY_GONE, delete: BIRTHDAY_GONE },
+};
+
+function withCaseReasons(paths) {
+  for (const [path, operations] of Object.entries(CASE_REASONS)) {
+    for (const [method, reasons] of Object.entries(operations)) {
+      const operation = paths[path]?.[method];
+      if (!operation) throw new Error(`openapi birthdays: ${method} ${path} is not documented`);
+      const note = `A refusal a user can reach carries a \`reason\` next to \`error\` (#1909): ${reasons}.`;
+      operation.description = operation.description ? `${operation.description}\n\n${note}` : note;
+    }
+  }
+  return paths;
 }

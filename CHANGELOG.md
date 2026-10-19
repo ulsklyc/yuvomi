@@ -49,6 +49,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Inventory, notes, contacts and birthdays: an error message is in your language and names the
+  cause** (#1909). These pages showed the server's own text when something could not be saved,
+  pinned, completed or deleted, whatever the app language, in English or in German - for example
+  "Notiz nicht gefunden" in an English session when somebody else in the household had deleted the
+  note in the meantime. An item, tracked date, booking, note, contact or birthday that no longer
+  exists, a location or note category chosen in the form that was deleted in the meantime, and a
+  booking that is already linked now get a sentence in the language of the app. When the thing
+  itself is gone, the page takes it out of the list and closes the dialog of the action; deleting
+  something somebody else has already deleted counts as done instead of bringing the row back with
+  an error, also when you delete several contacts at once. When only the chosen location or note
+  category is gone, the form stays open with your input and offers the current ones; a booking
+  noted for a new item that is gone is dropped from the form. A picture that cannot be used for an
+  item or a birthday keeps its own message, and any other failure there shows the general message
+  instead of the browser's own text. When a list cannot be refreshed after you change locations or
+  categories, the message says why (offline, server, too many requests) instead of the server's
+  text. The contact import still names the field a vCard was rejected for. For API clients: those
+  answers of `/api/v1/inventory`, `/api/v1/notes`, `/api/v1/contacts` and `/api/v1/birthdays` carry
+  a `reason` next to `error` (`inventory_item_not_found`, `inventory_tracked_date_not_found`,
+  `inventory_booking_not_found`, `inventory_booking_already_linked`,
+  `inventory_selected_location_not_found`, `notes_note_not_found`,
+  `notes_selected_category_not_found`, `category_exists`, `contacts_contact_not_found`,
+  `birthdays_birthday_not_found`), the German texts of those answers are now English, and the
+  status codes are unchanged.
 - **Recurring events on the day the clocks change are no longer an hour off (#2034).**
   A series with its own time zone, for example a daily 01:30 event in Berlin, showed the occurrence
   on the day of the clock change one hour early or late, both in the calendar and in subscribed

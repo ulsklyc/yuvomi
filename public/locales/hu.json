@@ -1238,7 +1238,9 @@
         "checkConflict": "A jegyzet időközben megváltozott. Újratöltjük.",
         "pinnedState": "Kitűzve",
         "checklistDone": "Kész",
-        "checklistOpen": "Nyitott"
+        "checklistOpen": "Nyitott",
+        "errorNoteGone": "Ez a jegyzet már nem létezik.",
+        "errorSelectedCategoryGone": "Az egyik kiválasztott kategória már nem létezik."
     },
     "markdown": {
         "bold": "Félkövér (Ctrl+B)",
@@ -1360,7 +1362,8 @@
         "selectNamed": "{{name}} kijelölése",
         "bulkDeleteConfirm": "Töröl {{count}} névjegyet?",
         "bulkDeleteConfirm_one": "Töröl {{count}} névjegyet?",
-        "bulkDeletedToast": "{{count}} névjegy törölve"
+        "bulkDeletedToast": "{{count}} névjegy törölve",
+        "errorContactGone": "Ez a kapcsolat már nem létezik."
     },
     "budget": {
         "title": "Költségvetés",
@@ -3437,7 +3440,8 @@
         "importSubmit": "{{count}} hozzáadása",
         "importSuccess": "{{count}} születésnap hozzáadva.",
         "importNothingSelected": "Válassz ki legalább egy névjegyet.",
-        "importSelected": "{{count}} névjegy kiválasztva"
+        "importSelected": "{{count}} névjegy kiválasztva",
+        "errorBirthdayGone": "Ez a születésnap már nem létezik."
     },
     "recipes": {
         "mealTypeNone": "Nincs étkezés",
@@ -6150,7 +6154,12 @@
         "detailPaneLabel": "Tárgy részletei",
         "pickOne": "Válassz egy tárgyat",
         "pickOneHint": "Az adatok, határidők és az előzmények itt jelennek meg.",
-        "moreDetailsHint": "Vásárlás, garancia, fotó, dokumentumok"
+        "moreDetailsHint": "Vásárlás, garancia, fotó, dokumentumok",
+        "errorItemGone": "Ez a tárgy már nem létezik.",
+        "errorTrackedDateGone": "Ez a határidő már nem létezik.",
+        "errorSelectedLocationGone": "A kiválasztott hely már nem létezik.",
+        "errorBookingGone": "Ez a tétel már nem létezik.",
+        "errorBookingAlreadyLinked": "Ez a tétel már kapcsolva van."
     },
     "documentAttach": {
         "label": "Mellékletek",

@@ -1238,7 +1238,9 @@
         "checkConflict": "便签已被修改，将重新加载。",
         "pinnedState": "已置顶",
         "checklistDone": "已完成",
-        "checklistOpen": "待处理"
+        "checklistOpen": "待处理",
+        "errorNoteGone": "这条便签已不存在。",
+        "errorSelectedCategoryGone": "所选的一个类别已不存在。"
     },
     "markdown": {
         "bold": "加粗 (Ctrl+B)",
@@ -1360,7 +1362,8 @@
         "selectNamed": "选择 {{name}}",
         "bulkDeleteConfirm": "删除 {{count}} 个联系人?",
         "bulkDeleteConfirm_one": "删除 {{count}} 个联系人?",
-        "bulkDeletedToast": "已删除 {{count}} 个联系人"
+        "bulkDeletedToast": "已删除 {{count}} 个联系人",
+        "errorContactGone": "这个联系人已不存在。"
     },
     "budget": {
         "title": "预算",
@@ -3476,7 +3479,8 @@
         "importSubmit": "添加 {{count}}",
         "importSuccess": "已添加 {{count}} 个生日。",
         "importNothingSelected": "请至少选择一个联系人。",
-        "importSelected": "已选择 {{count}} 个联系人"
+        "importSelected": "已选择 {{count}} 个联系人",
+        "errorBirthdayGone": "这个生日已不存在。"
     },
     "reminders": {
         "sectionTitle": "提醒",
@@ -6150,7 +6154,12 @@
         "detailPaneLabel": "物品详情",
         "pickOne": "选择一个物品",
         "pickOneHint": "详细信息、期限和历史记录会显示在这里。",
-        "moreDetailsHint": "购买、保修、照片、文档"
+        "moreDetailsHint": "购买、保修、照片、文档",
+        "errorItemGone": "这个物品已不存在。",
+        "errorTrackedDateGone": "这个到期日已不存在。",
+        "errorSelectedLocationGone": "所选位置已不存在。",
+        "errorBookingGone": "这笔账目已不存在。",
+        "errorBookingAlreadyLinked": "这笔账目已关联。"
     },
     "documentAttach": {
         "label": "附件",

@@ -5,7 +5,8 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, advancedSection, refocusAfterRender } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, advancedSection, refocusAfterRender, captureModalContext } from '/components/modal.js';
+import { errorSentence, isAlreadyDeleted, loadErrorSentence } from '/utils/friendly-error.js';
 import { openDetailView } from '/components/detail-view.js';
 import { stagger, vibrate, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
 import { t, formatDate } from '/i18n.js';
@@ -446,8 +447,10 @@ export async function render(container, { user, signal } = {}) {
     let text;
     try {
       text = await file.text();
-    } catch (err) {
-      window.yuvomi?.showToast(t('contacts.importError', { error: err.message }), 'danger');
+    } catch {
+      // Die Datei liess sich nicht lesen: der Satz des Browsers ist nicht
+      // uebersetzt, also der allgemeine (#1909).
+      window.yuvomi?.showToast(t('contacts.importError', { error: t('common.errorGeneric') }), 'danger');
       return;
     }
     const parsed  = parseVCards(text, {
@@ -563,7 +566,8 @@ function openContactCategoryManager() {
       // ankommt, ist immer ein Fehler DIESER Auffrischung - und der erklaert als
       // einziger, warum die Seite den alten Stand behaelt.
       console.error('[Contacts] Auffrischen nach Kategorie-Aenderung fehlgeschlagen:', err);
-      window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+      // Ein Ladefehler: sein Satz, nie der Text des Servers (#1909).
+      window.yuvomi?.showToast(loadErrorSentence(err) ?? t('common.errorGeneric'), 'danger');
     }
   };
   openSharedModal({
@@ -1610,6 +1614,8 @@ function buildContactForm({ mode, contact = null }) {
 
         saveBtn.disabled    = true;
         saveBtn.textContent = '…';
+        const owner = _container;
+        const dialog = captureModalContext();
 
         try {
           // firstName/lastName sind führend; der Server leitet `name` daraus ab (#535).
@@ -1652,9 +1658,15 @@ function buildContactForm({ mode, contact = null }) {
         } catch (err) {
           window.yuvomi?.showToast(err.data?.reason === 'email_in_use'
             ? t('common.emailInUse')
-            : (err.data?.error ?? t('common.unknownError')), 'danger');
+            : errorSentence(err), 'danger');
           saveBtn.disabled    = false;
           saveBtn.textContent = isEdit ? t('common.save') : t('common.add');
+          // Den Kontakt gibt es nicht mehr (#1909): das Formular geht zu,
+          // solange es das offene ist, und der Kontakt faellt aus der Liste.
+          if (isEdit && isAlreadyDeleted(err, 'contacts_contact_not_found')) {
+            closeModal({ force: true, context: dialog });
+            dropGoneContacts([contact.id], owner);
+          }
         }
       });
     },
@@ -1781,11 +1793,12 @@ async function deleteSelected() {
 
   scheduleUndoableDelete({
     message: t('contacts.bulkDeletedToast', { count: ids.length }),
-    commit: ({ keepalive }) => Promise.all(ids.map((id) => api.delete(`/contacts/${id}`, { keepalive }))),
+    // Je Kontakt: schon geloescht ist ein Erfolg (#1909).
+    commit: ({ keepalive }) => Promise.all(ids.map((id) => deleteOnServer(id, { keepalive }))),
     restore: (err) => {
       state.contacts = [...state.contacts, ...removed].sort(byName);
       renderList();
-      if (err) window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+      if (err) window.yuvomi?.showToast(errorSentence(err), 'danger');
     },
   });
 }
@@ -1806,15 +1819,38 @@ async function deleteContact(id) {
 
   scheduleUndoableDelete({
     message: t('contacts.deletedToast'),
-    commit: ({ keepalive }) => api.delete(`/contacts/${id}`, { keepalive }),
+    commit: ({ keepalive }) => deleteOnServer(id, { keepalive }),
     restore: (err) => {
       if (contact) {
         state.contacts = [...state.contacts, contact].sort(byName);
         if (_container === owner) renderList({ motion: true });
       }
-      if (err) window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+      if (err) window.yuvomi?.showToast(errorSentence(err), 'danger');
     },
   });
+}
+
+/**
+ * Einen Kontakt am Server loeschen. SCHON GELOESCHT IST EIN ERFOLG (#1909):
+ * ein anderes Haushaltsmitglied war schneller. Kontakte haben keine
+ * Sichtbarkeit - die 404 heisst nur "gibt es nicht mehr". Alles andere bleibt
+ * ein Fehler, und die Zeile kommt zurueck.
+ */
+async function deleteOnServer(id, { keepalive } = {}) {
+  try {
+    await api.delete(`/contacts/${id}`, { keepalive });
+  } catch (err) {
+    if (!isAlreadyDeleted(err, 'contacts_contact_not_found')) throw err;
+  }
+}
+
+/** Kontakte, die es nicht mehr gibt, aus dem Stand nehmen - gezeichnet nur auf der Seite, von der die Anfrage kam. */
+function dropGoneContacts(ids, owner) {
+  const gone = new Set(ids);
+  state.contacts = state.contacts.filter((c) => !gone.has(c.id));
+  if (!owner || _container !== owner) return;
+  renderList();
+  md?.refresh({ repaint: true });
 }
 
 // --------------------------------------------------------
@@ -2045,7 +2081,11 @@ function showImportResult({ imported, withBirthday, failedList, lastName, lastEr
   let type;
   if (imported === 0) {
     // Alles fehlgeschlagen: konkrete Ursache nennen (Recovery), Retry via Aktion.
-    const reason = window.yuvomi?.friendlyError?.(lastError) || lastError?.message || '';
+    // BEWUSST NOCH friendlyError (#1920): eine abgelehnte vCard nennt hier das
+    // Feld, das der Server zurueckwies - errorSentence sagte nur den
+    // allgemeinen Satz. Das wandert erst, wenn der Import seine Faelle mit
+    // einem `reason` benennt (#1909).
+    const reason = window.yuvomi?.friendlyError?.(lastError) || t('common.errorGeneric');
     message = t('contacts.importError', { error: reason });
     type = 'danger';
   } else if (imported === 1 && details.length === 0) {
@@ -2088,4 +2128,7 @@ export const __test = {
   dropFiltersForDeepLink,
   // R10 L8: nur belegte Kategorien bekommen einen Chip.
   filterCategoryKeys,
+  // #1909: Speichern und Loeschen eines Kontakts, den es nicht mehr gibt.
+  openContactModal, deleteContact, deleteSelected,
+  setContainerForTest(container) { _container = container; },
 };

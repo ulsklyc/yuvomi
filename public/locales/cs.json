@@ -1311,7 +1311,9 @@
         "checkConflict": "Poznámka byla mezitím změněna. Bude znovu načtena.",
         "pinnedState": "Připnuto",
         "checklistDone": "Hotovo",
-        "checklistOpen": "Otevřeno"
+        "checklistOpen": "Otevřeno",
+        "errorNoteGone": "Tato poznámka už neexistuje.",
+        "errorSelectedCategoryGone": "Jedna z vybraných kategorií už neexistuje."
     },
     "markdown": {
         "bold": "Tučné (Ctrl+B)",
@@ -1434,7 +1436,8 @@
         "bulkDeleteConfirm": "Smazat {{count}} kontaktů?",
         "bulkDeleteConfirm_one": "Smazat {{count}} kontakt?",
         "bulkDeleteConfirm_few": "Smazat {{count}} kontakty?",
-        "bulkDeletedToast": "Smazáno {{count}} kontaktů"
+        "bulkDeletedToast": "Smazáno {{count}} kontaktů",
+        "errorContactGone": "Tento kontakt už neexistuje."
     },
     "budget": {
         "title": "Rozpočet",
@@ -4240,7 +4243,8 @@
         "importSubmit": "Přidat {{count}}",
         "importSuccess": "Přidáno narozenin: {{count}}.",
         "importNothingSelected": "Vyberte alespoň jeden kontakt.",
-        "importSelected": "Vybráno kontaktů: {{count}}"
+        "importSelected": "Vybráno kontaktů: {{count}}",
+        "errorBirthdayGone": "Tyto narozeniny už neexistují."
     },
     "rrule": {
         "freqNone": "Bez opakování",
@@ -6307,7 +6311,12 @@
         "detailPaneLabel": "Podrobnosti předmětu",
         "pickOne": "Vyberte předmět",
         "pickOneHint": "Údaje, termíny a historie se zobrazí zde.",
-        "moreDetailsHint": "Nákup, záruka, fotka, dokumenty"
+        "moreDetailsHint": "Nákup, záruka, fotka, dokumenty",
+        "errorItemGone": "Tato věc už neexistuje.",
+        "errorTrackedDateGone": "Tato lhůta už neexistuje.",
+        "errorSelectedLocationGone": "Vybrané místo už neexistuje.",
+        "errorBookingGone": "Tato transakce už neexistuje.",
+        "errorBookingAlreadyLinked": "Tato transakce už je propojená."
     },
     "documentAttach": {
         "label": "Přílohy",

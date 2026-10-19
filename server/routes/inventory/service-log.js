@@ -380,7 +380,7 @@ function rollForwardPast(fromDate, intervalMonths, afterDate) {
 function completeTrackedDate({ item, dateId, values, userId }) {
   const trackedDate = loadTrackedDate(dateId);
   if (!trackedDate || trackedDate.item_id !== item.id) {
-    return { error: 'Tracked date not found.', code: 404 };
+    return { error: 'Tracked date not found.', code: 404, reason: 'inventory_tracked_date_not_found' };
   }
 
   // Vom FAELLIGKEITSDATUM aus vorrollen, nicht vom Erledigungsdatum - eine
