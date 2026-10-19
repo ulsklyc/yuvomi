@@ -1512,12 +1512,16 @@ button.budget-bar-row:focus-visible {
 /* SCHRAFFUR STATT NUR FARBE (R20, Tritanopie): Serie 6 und 7 tragen im Balken
  * dasselbe Muster wie ihr Donut-Segment (categoryTexture). Der Balken waechst
  * per scaleX - die Kachel wird deshalb um 1/Skala breiter gezeichnet, damit sie
- * nach dem Stauchen quadratisch steht und die Linien bei 45 Grad bleiben. Bei
- * Skala 0 ist die Breite ungueltig, das Muster faellt weg; der Balken ist dann
- * ohnehin nicht zu sehen. */
+ * nach dem Stauchen quadratisch steht. Die Richtung ist deshalb das Eckwort
+ * `to bottom right`, kein Winkel: es legt die Linien auf die Diagonale der
+ * KACHEL, die nach dem Stauchen bei 45 Grad steht. Ein fester Winkel (bis
+ * #2084 135deg) blieb in der breiten Kachel 45 Grad und wurde vom scaleX in
+ * die Senkrechte gedrueckt - bei kleinen Balken standen die Linien fast
+ * aufrecht. Bei Skala 0 ist die Breite ungueltig, das Muster faellt weg; der
+ * Balken ist dann ohnehin nicht zu sehen. */
 .budget-bar-row__fill[data-texture="hatch"],
 .budget-plan-row[data-texture="hatch"] .budget-plan-row__fill {
-  background-image: linear-gradient(135deg,
+  background-image: linear-gradient(to bottom right,
     var(--chart-texture-ink) 25%, transparent 25% 50%,
     var(--chart-texture-ink) 50% 75%, transparent 75%);
 }
@@ -1552,7 +1556,12 @@ button.budget-bar-row:focus-visible {
 
 /* `--bar-visible` setzt das JS am Track: 0 fuer eine Kategorie ohne Betrag
  * im Zeitraum (Statistik: nur im Vorzeitraum gebucht) - die bekommt keinen
- * Stummel, sonst behauptete er Bewegung, wo keine war. */
+ * Stummel, sonst behauptete er Bewegung, wo keine war.
+ *
+ * Die Kategoriefarbe (`--bar-fill`) steht ebenfalls am Track: das
+ * Fuell-Element erbt sie, und der Stummel liest dieselbe Eigenschaft. Sass
+ * sie nur am Fuell-Element, begann jeder Ausgabenbalken mit einem Strich im
+ * Modulton (#2084). Der Blockton bleibt Rueckfall fuer Einnahmen. */
 .budget-chart-block .budget-bar-row__track::after {
   content: '';
   position: absolute;
@@ -1561,7 +1570,7 @@ button.budget-bar-row:focus-visible {
   width: 0;
   min-inline-size: calc(var(--bar-visible, 0) * var(--space-0h));
   border-radius: var(--radius-full);
-  background-color: var(--bar-stub-color);
+  background-color: var(--bar-fill, var(--bar-stub-color));
 }
 
 /* Breite in ch statt px: 64px fassten den formatierten Betrag nicht — gemessen

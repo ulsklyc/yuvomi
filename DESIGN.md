@@ -742,7 +742,9 @@ Inhalt, kein Verlauf ueber eine Karte, kein Text auf einer Flaeche, die nicht ge
   (6,2) unter 8; statt neuer Farben tragen Serie 6 und 7 eine 45-Grad-Schraffur
   (`--chart-texture-ink`, `--chart-texture-tile`, `categoryTexture()` in
   `utils/budget-category-colors.js`) in Donut, Kategorie-, Unterkategorie- und Planbalken. Die
-  Balkenkachel ist um 1/Skala breiter, weil der Balken per scaleX waechst. `test:budget-ui`
+  Balkenkachel ist um 1/Skala breiter, weil der Balken per scaleX waechst, und die Richtung ist
+  das Eckwort `to bottom right`, kein Winkel: ein fester Winkel blieb in der breiten Kachel 45 Grad
+  und stand nach dem Stauchen fast senkrecht (#2084). `test:budget-ui`
   rechnet nach, dass jedes Paar unter 8 genau eine schraffierte Seite hat.
 - **Prioritaeten** (`--color-priority-low..urgent`): unveraendert aus dem Bestand, die
   Helligkeits-Trennung (High ~1,8x Urgent) ist farbfehlsicht-verifiziert. **Die
