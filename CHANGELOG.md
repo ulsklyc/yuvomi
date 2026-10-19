@@ -52,6 +52,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **API:** `POST /api/v1/health/medications/{id}/logs` and `POST /api/v1/health/logs/{id}/take`
   accept `stock_deduct`. A second `POST .../logs` for the same `schedule_id` and `scheduled_at`
   updates the existing entry (200) instead of adding another one.
+- **A countdown to an evening event no longer names the next day.** With the server running in UTC
+  (the default container) and a household east of UTC, an event at 23:30 counted down to the day
+  after; west of UTC, an early-morning event could count down to the day before. The countdown now
+  reads the event's time in the household's time zone, wherever the server runs (#1998).
 - **A session that ends while the sign-in page is open no longer wipes what you typed** (#1945).
   When a request found the session gone, the app drew the sign-in page again even when it was
   already showing, so a half-typed user name and password were cleared; with setup still pending
