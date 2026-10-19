@@ -121,6 +121,27 @@ test('following delete from a moved child overlays by original slot across reloa
   ]);
 });
 
+test('following delete orders exact keys within one UTC day and across key forms (#2034)', () => {
+  // Europe/Berlin 01:30: zwei Vorkommen am selben UTC-Tag, dazu ein
+  // verknuepftes Einzelvorkommen, das noch die alte Form traegt.
+  const state = {
+    events: [
+      { id: 7, series_id: 7, recurrence_id: '2035-03-24T00:30:00Z', title: 'Sat', start_datetime: '2035-03-24T00:30:00Z' },
+      { id: 7, series_id: 7, recurrence_id: '2035-03-24T23:30:00Z', title: 'Sun', start_datetime: '2035-03-24T23:30:00Z' },
+      { id: 99, series_id: 7, recurrence_id: '2035-03-26', title: 'Legacy child', start_datetime: '2035-03-27T10:00:00Z' },
+      { id: 98, series_id: 7, recurrence_id: '2035-03-22', title: 'Earlier legacy child', start_datetime: '2035-03-22T10:00:00Z' },
+    ],
+  };
+  beginOptimisticCalendarDelete(state, {
+    eventId: 7,
+    seriesId: 7,
+    scope: 'following',
+    occurrenceDate: '2035-03-25',
+    recurrenceId: '2035-03-24T23:30:00Z',
+  });
+  assert.deepEqual(state.events.map(({ title }) => title), ['Sat', 'Earlier legacy child']);
+});
+
 test('single-occurrence transition hides only the selected recurrence date', () => {
   const state = makeState();
   beginOptimisticCalendarDelete(state, {

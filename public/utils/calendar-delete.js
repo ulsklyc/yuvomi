@@ -92,10 +92,29 @@ function reserveSeriesWrite(state, eventId) {
   };
 }
 
+/**
+ * Vergleicht zwei Schluessel desselben Serien-Vorkommens nach ihrer Lage in der
+ * Serie (#2034). Der Server nennt ein Vorkommen in einer von drei Formen
+ * (`YYYY-MM-DD`, `YYYY-MM-DDTHH:MM:SSZ`, `YYYY-MM-DDTHH:MM:SS`), und eine Serie
+ * kann nach der Umstellung beide Generationen nebeneinander tragen. Gleiche
+ * Form: der Text ordnet richtig (ISO). Verschiedene Form: es zaehlt das Datum -
+ * die alte Form IST der Tag, und mehr als den Tag weiss der Browser an ihr
+ * nicht. Bis hierher schnitt `slice(0, 10)` jede Form auf den Tag und liess
+ * zwei Vorkommen desselben UTC-Tags gleich aussehen.
+ */
+export function compareRecurrenceIds(left, right) {
+  const a = String(left);
+  const b = String(right);
+  const sameForm = a.length === b.length;
+  const x = sameForm ? a : a.slice(0, 10);
+  const y = sameForm ? b : b.slice(0, 10);
+  return x < y ? -1 : x > y ? 1 : 0;
+}
+
 function overlayRecurrenceId(event) {
   for (const identity of [event.recurrence_id, event.recurrence_identity]) {
     if (typeof identity === 'string' && /^\d{4}-\d{2}-\d{2}/.test(identity)) {
-      return identity.slice(0, 10);
+      return identity;
     }
   }
   // Legacy expanded master rows predate explicit recurrence metadata. A linked
@@ -119,7 +138,7 @@ function matchesDelete(event, {
   if (Number(event.series_id ?? event.id) !== Number(seriesId)) return false;
   if (scope === 'following') {
     const identity = overlayRecurrenceId(event);
-    return identity !== null && identity >= recurrenceId;
+    return identity !== null && compareRecurrenceIds(identity, recurrenceId) >= 0;
   }
   return true;
 }

@@ -6,9 +6,10 @@
 
 import { nextOccurrence, parseRRule, matchesRRuleByday, untilInstantMs } from './recurrence.js';
 import {
-  hasExplicitZone, householdTimeZone, localToUTC, localToUTCOccurrence, shiftDateKey,
+  hasExplicitZone, householdTimeZone, localToUTCOccurrence, shiftDateKey,
   storedToInstantIso, utcToWall,
 } from '../utils/timezone.js';
+import { legacyOccurrenceKeyFor } from './legacy-occurrence-key.js';
 import { personAvatarUrlSql } from './person-avatar.js';
 
 const DEFAULT_EXPANSION_ITERATIONS = 1000;
@@ -61,11 +62,74 @@ export const SOURCE_CALENDAR_COLUMNS = `src.id    AS source_calendar_ref_id,
   src.name  AS source_calendar_name,
   src.color AS source_calendar_color`;
 
+/** Ein Schluessel in alter Form oder ganztaegig: nur das Datum. */
+const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+/** Die drei Formen des Schluessels (#2034, Format A). */
+const OCCURRENCE_KEY_RE = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}Z?)?$/;
+
+/**
+ * Ist `value` ein Vorkommens-Schluessel in einer der drei Formen (#2034)?
+ * `YYYY-MM-DD` (ganztaegig, oder die alte Form an einer getimten Serie),
+ * `YYYY-MM-DDTHH:MM:SSZ` (Originalstart als UTC-Zeitpunkt) oder
+ * `YYYY-MM-DDTHH:MM:SS` (schwebende Wanduhr ohne Zone). Das Datum muss es geben.
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+export function isOccurrenceKey(value) {
+  if (typeof value !== 'string' || !OCCURRENCE_KEY_RE.test(value)) return false;
+  const day = value.slice(0, 10);
+  const parsed = new Date(`${day}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== day) return false;
+  if (value.length === 10) return true;
+  const [hh, mm, ss] = value.slice(11, 19).split(':').map(Number);
+  return hh < 24 && mm < 60 && ss < 60;
+}
+
+/**
+ * Die Ausnahmen einer Serie, nach Form getrennt (#2034): `exact` traegt die
+ * Schluessel in Format A, `legacy` die alte Form `YYYY-MM-DD`. Ein Datum an
+ * einer GANZTAEGIGEN Serie ist beides zugleich - dort ist der alte Schluessel
+ * schon der exakte, und `exceptionsInclude` fragt beide Mengen.
+ *
+ * Liest sich nach aussen weiter wie ein `Set` der gespeicherten Werte
+ * (`has`, `size`, Iteration): Aufrufer, die nur wissen wollen, ob ein Wert
+ * gespeichert ist, brauchen die Trennung nicht.
+ */
+export class OccurrenceExceptions {
+  constructor() {
+    this.exact = new Set();
+    this.legacy = new Set();
+  }
+
+  add(value) {
+    (DATE_KEY_RE.test(String(value)) ? this.legacy : this.exact).add(value);
+    return this;
+  }
+
+  has(value) {
+    return this.exact.has(value) || this.legacy.has(value);
+  }
+
+  get size() {
+    return this.exact.size + this.legacy.size;
+  }
+
+  *[Symbol.iterator]() {
+    yield* this.legacy;
+    yield* this.exact;
+  }
+}
+
+/** Eine leere Ausnahmenmenge in der Form, die `loadEventExceptions` liefert. */
+export function emptyOccurrenceExceptions() {
+  return new OccurrenceExceptions();
+}
+
 /**
  * Lädt die Instanz-Ausnahmen (EXDATE, #489) für die gegebenen Event-IDs als Map.
  * @param {import('node:sqlite').DatabaseSync} d  Geöffnete DB-Verbindung
  * @param {Array<number>} eventIds  IDs wiederkehrender Events
- * @returns {Map<number, Set<string>>}  event.id → Set ausgenommener Daten (YYYY-MM-DD)
+ * @returns {Map<number, OccurrenceExceptions>}  event.id → Ausnahmen, nach Form
  */
 export function loadEventExceptions(d, eventIds) {
   const map = new Map();
@@ -75,10 +139,202 @@ export function loadEventExceptions(d, eventIds) {
     `SELECT event_id, exception_date FROM calendar_event_exceptions WHERE event_id IN (${placeholders})`
   ).all(...eventIds);
   for (const row of rows) {
-    if (!map.has(row.event_id)) map.set(row.event_id, new Set());
+    if (!map.has(row.event_id)) map.set(row.event_id, emptyOccurrenceExceptions());
     map.get(row.event_id).add(row.exception_date);
   }
   return map;
+}
+
+/**
+ * Trifft eine Ausnahmenmenge das Vorkommen mit diesen beiden Schluesseln?
+ *
+ * Nimmt beide Formen der Menge: die nach Form getrennte aus
+ * `loadEventExceptions` und ein schlichtes `Set` (aeltere Aufrufer und Tests),
+ * in dem jeder Eintrag gegen beide Schluessel laeuft. Die beiden Formen koennen
+ * sich nicht verwechseln: ein exakter Schluessel einer getimten Serie traegt
+ * immer eine Uhrzeit, ein alter nie.
+ * @param {OccurrenceExceptions|Set<string>|null|undefined} exceptions
+ * @param {string} key        exakter Schluessel des Vorkommens
+ * @param {string} legacyKey  alter Schluessel desselben Vorkommens
+ * @returns {boolean}
+ */
+export function exceptionsInclude(exceptions, key, legacyKey) {
+  if (!exceptions) return false;
+  if (exceptions instanceof Set) return exceptions.has(key) || exceptions.has(legacyKey);
+  return !!(exceptions.exact?.has(key) || exceptions.legacy?.has(legacyKey)
+    || exceptions.legacy?.has(key));
+}
+
+/**
+ * Wo ein expandiertes Vorkommen seinen Platz in der Serie mitfuehrt (#2034):
+ * `{ day, key, legacyKey }` - Schleifentag, Schluessel in Format A, alter
+ * Schluessel. Ein Symbol, damit es Spreads (`{ ...instance }`) uebersteht, aber
+ * nie in einer JSON-Antwort landet.
+ */
+export const OCCURRENCE_SLOT = Symbol('occurrenceSlot');
+
+/** Der mitgefuehrte Platz eines expandierten Vorkommens, oder null. */
+export function occurrenceSlotOf(instance) {
+  return instance?.[OCCURRENCE_SLOT] ?? null;
+}
+
+function shiftKeyDay(dateKey, days) {
+  const d = new Date(`${dateKey}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Wanduhr-Teil eines schwebenden Werts auf `HH:MM:SS` gebracht, sonst null. */
+function floatingKeyOf(value) {
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/.exec(String(value ?? ''));
+  return match ? `${match[1]}T${match[2]}:${match[3]}:${match[4] ?? '00'}` : null;
+}
+
+/**
+ * Die Uhr einer Serie: wie aus dem Tag eines Vorkommens sein Start und sein
+ * Schluessel werden (#2034). EINE Rechnung fuer die Expansion und fuer jeden
+ * Leser oder Schreiber, der den Schluessel eines Vorkommens kennen muss, ohne
+ * die Serie auszurollen (Countdown, Umschluesseln, Suche nach einem Slot).
+ *
+ * Der SCHLEIFENTAG (`tag`, `seriesStart`) ist der Tag, auf dem die Expansion
+ * laeuft: im lokalen Modus der Tag in der Serienzone, sonst der gespeicherte
+ * Tag. Die Engine erzeugt hoechstens EIN Vorkommen je Schleifentag (keine
+ * BYHOUR-Regeln) - darauf beruht, dass Tag und Schluessel einander eindeutig
+ * zugeordnet sind.
+ *
+ * Schluessel in Format A (`keyFor`), der RECURRENCE-ID von RFC 5545 nachgebaut:
+ *   - ganztaegig: `YYYY-MM-DD`, der Schleifentag
+ *   - mit Zone: `YYYY-MM-DDTHH:MM:SSZ`, der Originalstart als UTC-Zeitpunkt
+ *   - schwebend (ohne Zone, ohne `tzid`): `YYYY-MM-DDTHH:MM:SS`, die Wanduhr
+ * Die alte Form (`legacyKeyFor`) liefert eingefroren server/services/legacy-occurrence-key.js.
+ *
+ * @param {object} event          Serienzeile
+ * @param {string|null} householdZone  wie bei expandRecurringEvents
+ */
+export function occurrenceClock(event, householdZone = null) {
+  const isAllDay     = !!event.all_day;
+  /* ZONENLOSE ZIFFERN NEBEN EINER TZID SIND WANDUHR DES HAUSHALTS (#1993).
+   *
+   * So entsteht die Zeile: eine eingelesene Serie wird aus dem Formular
+   * gespeichert, PUT schreibt die Ziffern des Haushalts (`to: 'wall'`), die
+   * `tzid` bleibt. Alles darunter las den Start mit `new Date()` und
+   * `utcToWall()`, also in der Zone des PROZESSES - dieselbe Zeile ergab
+   * unter TZ=UTC als letztes Vorkommen 23:30Z, unter TZ=Europe/Berlin 21:30Z.
+   *
+   * Hier wird der Start deshalb EINMAL zum Zeitpunkt, in der Haushaltszone
+   * gelesen, und der Rest der Funktion rechnet auf diesem Zeitpunkt weiter:
+   * Wanduhr der Serienzone, UTC-Tag fuer Identitaet und EXDATE, Dauer. Ohne
+   * `tzid` bleibt es beim Bisherigen: dort gibt es keine zweite Uhr, die
+   * Ziffern laufen als Wanduhr durch und Start und Ende lesen dieselbe Zone. */
+  const zonedNaive = !!event.tzid && !isAllDay && !hasExplicitZone(event.start_datetime);
+  const startText = zonedNaive
+    ? (storedToInstantIso(event.start_datetime, householdZone) ?? event.start_datetime)
+    : event.start_datetime;
+  const endText = zonedNaive && event.end_datetime
+    ? (storedToInstantIso(event.end_datetime, householdZone) ?? event.end_datetime)
+    : event.end_datetime;
+
+  // Original-Zeit-Teil erhalten (z.B. 'T14:30:00' oder '' bei All-Day)
+  const timeSuffix = startText.slice(10);
+
+  // DST-korrekte Expansion: bei bekannter TZID (CalDAV/Apple-Serie) pro Vorkommen
+  // die lokale Wanduhrzeit des Masters neu nach UTC rechnen, statt den festen
+  // UTC-Suffix zu wiederholen (sonst driftet die Uhrzeit über die Sommer-/
+  // Winterzeit-Grenze, #549). Nur für Tagtermine, deren lokales Datum == UTC-Datum
+  // ist (kein Mitternachts-Überlauf) - sonst alte Fixe-Suffix-Logik.
+  const wall = (event.tzid && !isAllDay) ? utcToWall(startText, event.tzid) : null;
+  const tzAware = wall && wall.date === startText.slice(0, 10);
+  // Einmal bestimmt, an beide Stellen gereicht: Filter UND Berechnung muessen
+  // dieselbe Antwort bekommen, sonst ist der Schutz halb.
+  const zonenUnsicher = !!event.tzid && !tzAware;
+
+  /* IN DER EREIGNISZONE RECHNEN, WENN UTC-TAG UND LOKALER TAG AUSEINANDERGEHEN
+   * (#985).
+   *
+   * Bis hierher lief die Schleife auf UTC-Tagen und setzte `BYMONTHDAY` aus,
+   * sobald die beiden nicht uebereinstimmten - die Serie lief dann auf ihrem
+   * festen UTC-Tag weiter. Dieser feste Versatz trifft den lokalen
+   * Monatsletzten nur, solange der UTC-Offset gleich bleibt; ueber eine
+   * Sommerzeitumstellung hinweg tut er es nicht mehr. Gemessen an einer New
+   * Yorker Serie um 23:30 lokal: nach der Maerz-Umstellung lagen ALLE
+   * folgenden Vorkommen auf dem Ersten statt auf dem Monatsletzten.
+   *
+   * Also wird die REGEL auf dem lokalen Datum fortgeschrieben, und je
+   * Vorkommen wird nach UTC zurueckgerechnet. `BYMONTHDAY` gilt dabei wieder,
+   * denn jetzt ist das Datum, auf dem gerechnet wird, dasselbe, das die Regel
+   * meint.
+   *
+   * Der Tag, an dem eine ALTE Ausnahme haengt, ist dagegen der UTC-Tag ueber
+   * die alte Uhr (`legacyKeyFor`, eingefroren): so legten Import und lokale
+   * Schreiber sie bis Schritt 4 von #2034 ab.
+   */
+  const lokalRechnen = zonenUnsicher && !!wall && !isAllDay;
+
+  // DTSTART ist zugleich Startpunkt und ANKER: ohne ihn leitet nextOccurrence
+  // den gemeinten Tag aus dem vorigen Vorkommen ab, und eine Klemmung in einem
+  // kurzen Monat wuerde damit festgeschrieben (#978).
+  const seriesStartUtc = startText.slice(0, 10);
+  const seriesStart = lokalRechnen ? wall.date : seriesStartUtc;
+  // Dieselbe Ruecknahme der Monatsletzten-Pruefung an jeder Stelle, die die
+  // Regel auf Schleifentagen fortschreibt (Expansion, Countdown).
+  const utcDiffersFromLocal = lokalRechnen ? false : zonenUnsicher;
+
+  /** Der Start eines Vorkommens - im lokalen Modus zurueckgerechnet.
+   *  EINE Uhr fuer Expansion und Abo-Pfad (#2034): `localToUTCOccurrence`
+   *  rechnet am Umstellungstag richtig und legt Luecke und Doppelstunde fest. */
+  const instantFor = (tag) => ((lokalRechnen || tzAware)
+    ? localToUTCOccurrence(`${tag}T${wall.time}`, event.tzid)
+    : tag + timeSuffix);
+
+  /** Der Schluessel eines Vorkommens in Format A (#2034). */
+  const keyFor = (tag) => {
+    if (isAllDay) return tag;
+    const start = String(instantFor(tag));
+    if (hasExplicitZone(start)) {
+      const ms = Date.parse(start);
+      if (!Number.isNaN(ms)) return new Date(Math.floor(ms / 1000) * 1000).toISOString().replace('.000Z', 'Z');
+    }
+    return floatingKeyOf(start) ?? tag;
+  };
+
+  /** Der alte Schluessel eines Vorkommens (eingefroren, Lesart von main). */
+  const legacyKeyFor = legacyOccurrenceKeyFor(event, householdZone);
+
+  /** Traegt `key` die alte Form? Nur an einer getimten Serie moeglich. */
+  const isLegacyKey = (key) => !isAllDay && DATE_KEY_RE.test(String(key ?? ''));
+
+  /**
+   * Die Schleifentage, die `key` treffen kann, aufsteigend - ohne die Regel zu
+   * fragen. Ein exakter Schluessel trifft hoechstens einen Tag; ein alter kann
+   * zwei treffen (Umstellungsnacht) oder keinen. Der Schleifentag liegt hoechstens
+   * einen Kalendertag neben dem Datum im Schluessel (UTC-Tag oder Wanduhrtag).
+   */
+  const dayCandidatesOfKey = (key) => {
+    if (!isOccurrenceKey(key)) return [];
+    const base = key.slice(0, 10);
+    const legacy = isLegacyKey(key);
+    if (isAllDay) return key.length === 10 ? [key] : [];
+    const out = [];
+    for (const offset of [-1, 0, 1]) {
+      const tag = shiftKeyDay(base, offset);
+      if ((legacy ? legacyKeyFor(tag) : keyFor(tag)) === key) out.push(tag);
+    }
+    return out;
+  };
+
+  /**
+   * Ordnungswert eines Schluessels innerhalb DIESER Serie: sein (erster)
+   * Schleifentag. Ersetzt den Textvergleich `recurrence_id >= ?`, der nur bei
+   * einer einzigen Schluesselform traegt. Ein Schluessel ohne Tag faellt auf
+   * sein Datum zurueck.
+   */
+  const keyOrder = (key) => dayCandidatesOfKey(key)[0] ?? String(key ?? '').slice(0, 10);
+
+  return {
+    isAllDay, startText, endText, timeSuffix, wall, tzAware, zonenUnsicher, lokalRechnen,
+    seriesStart, seriesStartUtc, utcDiffersFromLocal,
+    instantFor, keyFor, legacyKeyFor, isLegacyKey, dayCandidatesOfKey, keyOrder,
+  };
 }
 
 /**
@@ -147,27 +403,15 @@ export function expandRecurringEvents(
       continue;
     }
 
-    const isAllDay     = !!event.all_day;
-    /* ZONENLOSE ZIFFERN NEBEN EINER TZID SIND WANDUHR DES HAUSHALTS (#1993).
-     *
-     * So entsteht die Zeile: eine eingelesene Serie wird aus dem Formular
-     * gespeichert, PUT schreibt die Ziffern des Haushalts (`to: 'wall'`), die
-     * `tzid` bleibt. Alles darunter las den Start mit `new Date()` und
-     * `utcToWall()`, also in der Zone des PROZESSES - dieselbe Zeile ergab
-     * unter TZ=UTC als letztes Vorkommen 23:30Z, unter TZ=Europe/Berlin 21:30Z.
-     *
-     * Hier wird der Start deshalb EINMAL zum Zeitpunkt, in der Haushaltszone
-     * gelesen, und der Rest der Funktion rechnet auf diesem Zeitpunkt weiter:
-     * Wanduhr der Serienzone, UTC-Tag fuer Identitaet und EXDATE, Dauer. Ohne
-     * `tzid` bleibt es beim Bisherigen: dort gibt es keine zweite Uhr, die
-     * Ziffern laufen als Wanduhr durch und Start und Ende lesen dieselbe Zone. */
-    const zonedNaive = !!event.tzid && !isAllDay && !hasExplicitZone(event.start_datetime);
-    const startText = zonedNaive
-      ? (storedToInstantIso(event.start_datetime, householdZone) ?? event.start_datetime)
-      : event.start_datetime;
-    const endText = zonedNaive && event.end_datetime
-      ? (storedToInstantIso(event.end_datetime, householdZone) ?? event.end_datetime)
-      : event.end_datetime;
+    // EINE Uhr fuer Expansion und jeden Leser, der einen Schluessel braucht
+    // (#2034): Lesart des Starts, Schleifentage, Zeitpunkt und Schluessel je
+    // Vorkommen stehen in `occurrenceClock()` oben.
+    const clock = occurrenceClock(event, householdZone);
+    const {
+      isAllDay, startText, endText, tzAware, lokalRechnen, seriesStart, seriesStartUtc,
+      utcDiffersFromLocal,
+    } = clock;
+    const instantFuer = clock.instantFor;
 
     // Dauer des Events in ms (für End-Zeit-Berechnung der Instanzen)
     const startMs    = new Date(startText).getTime();
@@ -176,70 +420,14 @@ export function expandRecurringEvents(
     // Duration in days for all-day events (for date-only end calculation)
     const durationDays = isAllDay && durationMs !== null ? Math.round(durationMs / 86400000) : 0;
 
-    // Original-Zeit-Teil erhalten (z.B. 'T14:30:00' oder '' bei All-Day)
-    const timeSuffix = startText.slice(10);
-
-    // DST-korrekte Expansion: bei bekannter TZID (CalDAV/Apple-Serie) pro Vorkommen
-    // die lokale Wanduhrzeit des Masters neu nach UTC rechnen, statt den festen
-    // UTC-Suffix zu wiederholen (sonst driftet die Uhrzeit über die Sommer-/
-    // Winterzeit-Grenze, #549). Nur für Tagtermine, deren lokales Datum == UTC-Datum
-    // ist (kein Mitternachts-Überlauf) - sonst alte Fixe-Suffix-Logik.
-    const wall = (event.tzid && !isAllDay) ? utcToWall(startText, event.tzid) : null;
-    const tzAware = wall && wall.date === startText.slice(0, 10);
-    // Einmal bestimmt, an beide Stellen gereicht: Filter UND Berechnung muessen
-    // dieselbe Antwort bekommen, sonst ist der Schutz halb.
-    const zonenUnsicher = !!event.tzid && !tzAware;
-
-    /* IN DER EREIGNISZONE RECHNEN, WENN UTC-TAG UND LOKALER TAG AUSEINANDERGEHEN
-     * (#985).
+    /** Der ALTE Schluessel eines Vorkommens - der UTC-Tag ueber die alte Uhr.
      *
-     * Bis hierher lief die Schleife auf UTC-Tagen und setzte `BYMONTHDAY` aus,
-     * sobald die beiden nicht uebereinstimmten - die Serie lief dann auf ihrem
-     * festen UTC-Tag weiter. Dieser feste Versatz trifft den lokalen
-     * Monatsletzten nur, solange der UTC-Offset gleich bleibt; ueber eine
-     * Sommerzeitumstellung hinweg tut er es nicht mehr. Gemessen an einer New
-     * Yorker Serie um 23:30 lokal: nach der Maerz-Umstellung lagen ALLE
-     * folgenden Vorkommen auf dem Ersten statt auf dem Monatsletzten.
-     *
-     * Also wird die REGEL auf dem lokalen Datum fortgeschrieben, und je
-     * Vorkommen wird nach UTC zurueckgerechnet. `BYMONTHDAY` gilt dabei wieder,
-     * denn jetzt ist das Datum, auf dem gerechnet wird, dasselbe, das die Regel
-     * meint.
-     *
-     * WAS WEITER AM UTC-TAG HAENGT, und das ist der Grund fuer die zwei Daten
-     * nebeneinander: EXDATE-Ausnahmen sind beim Import auf das UTC-Datum
-     * normalisiert (`formatICSDate(...).slice(0, 10)` in ics-parser.js), und das
-     * Anzeigefenster [from, to] wird ebenso in UTC-Tagen gefuehrt. Wer nur die
-     * Schleifenvariable umstellt, laesst genau bei diesen Terminen die
-     * Ausnahmen ins Leere laufen - dieselben Termine, um die es hier geht.
-     */
-    const lokalRechnen = zonenUnsicher && !!wall && !isAllDay;
-
-    // DTSTART ist zugleich Startpunkt und ANKER: ohne ihn leitet nextOccurrence
-    // den gemeinten Tag aus dem vorigen Vorkommen ab, und eine Klemmung in einem
-    // kurzen Monat wuerde damit festgeschrieben (#978).
-    const seriesStartUtc = startText.slice(0, 10);
-    const seriesStart = lokalRechnen ? wall.date : seriesStartUtc;
-
-    /** Der UTC-Zeitpunkt eines Vorkommens - im lokalen Modus zurueckgerechnet.
-     *  EINE Uhr fuer Expansion und Abo-Pfad (#2034): `localToUTCOccurrence`
-     *  rechnet am Umstellungstag richtig und legt Luecke und Doppelstunde fest. */
-    const instantFuer = (tag) => ((lokalRechnen || tzAware)
-      ? localToUTCOccurrence(`${tag}T${wall.time}`, event.tzid)
-      : tag + timeSuffix);
-    /** Der UTC-TAG eines Vorkommens - fuer Fenster, EXDATE und Ausgabe.
-     *
-     *  DER SCHLUESSEL BLEIBT BEWUSST AUF DER ALTEN UHR (`localToUTC`), bis das
-     *  Schluesselformat selbst umgestellt wird (#2034, Schritt 4). Mit der neuen
-     *  Uhr wanderte er an genau den Umstellungstagen um einen Tag (gemessen:
-     *  Europe/Berlin 01:30, Start im Sommer: 2035-10-28 -> 2035-10-27 und
-     *  2035-03-24 -> 2035-03-25), und eine dort schon abgelegte Ausnahme,
-     *  ein verknuepftes Einzelvorkommen oder ein importiertes EXDATE (das der
-     *  Parser mit derselben alten Uhr auf den Tag bringt) traefe ihr Vorkommen
-     *  nicht mehr. Der Zeitpunkt stimmt jetzt, die Identitaet ist die von main. */
-    const utcTagFuer = (tag) => (lokalRechnen
-      ? String(localToUTC(`${tag}T${wall.time}`, event.tzid)).slice(0, 10)
-      : tag);
+     *  Eingefroren (legacy-occurrence-key.js): auf ihm liegen alle Ausnahmen und
+     *  verknuepften Einzelvorkommen, die vor Schritt 4 von #2034 geschrieben
+     *  wurden, und importierte EXDATEs, die der Parser mit derselben alten Uhr
+     *  auf den Tag bringt. Er bleibt der Vergleichswert fuer diese Altdaten; der
+     *  Schluessel in Format A (`clock.keyFor`) steht daneben. */
+    const utcTagFuer = clock.legacyKeyFor;
 
     /* DAS FENSTER IST IN HAUSHALTSTAGEN GEMEINT, DIE SCHLEIFE NICHT (#1999).
      *
@@ -295,8 +483,8 @@ export function expandRecurringEvents(
       // liegen als vor Ort (#549 nutzt dieselbe Unterscheidung fuer die
       // Uhrzeit). Die Monatsletzten-Pruefung wird dort ausgesetzt, statt ein
       // Vorkommen still zu verlieren.
-      if (!matchesRRuleByday(currentDate, event.recurrence_rule, { utcDiffersFromLocal: lokalRechnen ? false : zonenUnsicher })) {
-        const next = nextOccurrence(currentDate, event.recurrence_rule, { anchor: seriesStart, utcDiffersFromLocal: lokalRechnen ? false : zonenUnsicher });
+      if (!matchesRRuleByday(currentDate, event.recurrence_rule, { utcDiffersFromLocal })) {
+        const next = nextOccurrence(currentDate, event.recurrence_rule, { anchor: seriesStart, utcDiffersFromLocal });
         if (!next || next <= currentDate) break;
         currentDate = next;
         continue;
@@ -330,10 +518,13 @@ export function expandRecurringEvents(
       if (maxCount !== null && occurrence >= maxCount) break;
       occurrence++;
 
-      // Gegen den UTC-TAG, nicht gegen den lokalen: so sind die Ausnahmen beim
-      // Import abgelegt worden (#985).
-      if (exceptions?.has(utcTagFuer(currentDate))) {
-        const next = nextOccurrence(currentDate, event.recurrence_rule, { anchor: seriesStart, utcDiffersFromLocal: lokalRechnen ? false : zonenUnsicher });
+      // Beide Schluessel des Vorkommens (#2034): eine Ausnahme in Format A
+      // trifft genau dieses, eine alte (UTC-Tag ueber die alte Uhr, so legen
+      // Import und Altdaten sie ab, #985) das, was sie auf main traf.
+      const slotKey = clock.keyFor(currentDate);
+      const slotLegacyKey = utcTagFuer(currentDate);
+      if (exceptionsInclude(exceptions, slotKey, slotLegacyKey)) {
+        const next = nextOccurrence(currentDate, event.recurrence_rule, { anchor: seriesStart, utcDiffersFromLocal });
         if (!next || next <= currentDate) break;
         currentDate = next;
         continue;
@@ -422,9 +613,14 @@ export function expandRecurringEvents(
           //
           // Dazu passt der Rest der Kette: die Ausnahme, die ein Override ablegt, wird
           // oben ebenfalls im UTC-Raum nachgeschlagen
-          // (`exceptions?.has(utcTagFuer(currentDate))`).
-          ...(includeRecurrenceIdentity ? { recurrence_identity: utcTagFuer(currentDate) } : {}),
-          is_recurring_instance: utcTagFuer(currentDate) !== seriesStartUtc ? 1 : 0,
+          // (`exceptionsInclude(...)`).
+          //
+          // Schritt 4a von #2034 laesst die ausgegebene Identitaet noch alt; den
+          // Platz in beiden Formen traegt das Vorkommen als Symbol mit
+          // (`OCCURRENCE_SLOT`), damit Leser und Schreiber ihn nicht nachrechnen.
+          ...(includeRecurrenceIdentity ? { recurrence_identity: slotLegacyKey } : {}),
+          [OCCURRENCE_SLOT]: { day: currentDate, key: slotKey, legacyKey: slotLegacyKey },
+          is_recurring_instance: slotLegacyKey !== seriesStartUtc ? 1 : 0,
           // "IST DAS DER ERSTE TERMIN DER SERIE?" IST NICHT "WEICHT ER VOM
           // GESPEICHERTEN DATUM AB?" - seit ein Start auf der Regel liegen darf,
           // ohne ihr Raster zu treffen (#960), sind das zwei Fragen. Ein Termin
@@ -447,7 +643,7 @@ export function expandRecurringEvents(
         }
       }
 
-      const next = nextOccurrence(currentDate, event.recurrence_rule, { anchor: seriesStart, utcDiffersFromLocal: lokalRechnen ? false : zonenUnsicher });
+      const next = nextOccurrence(currentDate, event.recurrence_rule, { anchor: seriesStart, utcDiffersFromLocal });
       if (!next || next <= currentDate) break;
       currentDate = next;
     }

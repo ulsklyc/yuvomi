@@ -41,6 +41,9 @@ function seedUser() {
     `INSERT OR IGNORE INTO users (id, username, display_name, password_hash, role)
      VALUES (1, 'admin', 'Admin', 'x', 'admin')`
   ).run();
+  // Das Fenster von GET /calendar ist in Haushaltstagen gemeint: fest, damit
+  // die Suite unter jeder Prozesszone dieselben Tage fragt.
+  db.get().prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('household_timezone', 'Europe/Berlin')").run();
 }
 
 // Weekly-Gym-Serie ab Dienstag, 14.07.2026 (lokale, naive Zeit).
@@ -135,6 +138,66 @@ test('POST exceptions: 400 for invalid date', async () => {
       body: JSON.stringify({ date: '14.07.2026' }),
     });
     assert.equal(post.status, 400);
+  } finally { await close(); }
+});
+
+// --- Beide Schluesselformen (#2034) ---
+// Eine Ausnahme in Format A trifft genau ihr Vorkommen, eine alte (`YYYY-MM-DD`)
+// das, was sie auf main traf. Beide Formen stehen nach Schritt 4 nebeneinander
+// in derselben Tabelle, ohne Migration.
+
+function seedZonedDaily() {
+  // Europe/Berlin taeglich 01:30, Start im Sommer 2034: im Maerz 2035 laeuft die
+  // Schleife auf Ortstagen, und der 24. und 25.03. teilen den alten Schluessel
+  // `2035-03-24` (UTC-Tag ueber die alte Uhr).
+  return db.get().prepare(
+    `INSERT INTO calendar_events (title, start_datetime, end_datetime, all_day, tzid, recurrence_rule, created_by)
+     VALUES ('Nacht', '2034-06-30T23:30:00Z', '2034-07-01T00:30:00Z', 0, 'Europe/Berlin', 'FREQ=DAILY', 1)`
+  ).run().lastInsertRowid;
+}
+
+function exclude(id, key) {
+  db.get().prepare('INSERT INTO calendar_event_exceptions (event_id, exception_date) VALUES (?, ?)').run(id, key);
+}
+
+const NIGHT_RANGE = '?from=2035-03-23&to=2035-03-26';
+
+test('Format A: eine exakte Ausnahme blendet in der Umstellungsnacht genau ein Vorkommen aus', async () => {
+  seedUser();
+  const id = seedZonedDaily();
+  const { baseUrl, close } = await startApp();
+  try {
+    const before = (await (await fetch(`${baseUrl}/${NIGHT_RANGE}`)).json()).data.map((e) => e.start_datetime);
+    // 01:30 MEZ = 00:30Z bis zum 25.03. (Umstellung um 02:00), danach 01:30 MESZ = 23:30Z.
+    assert.deepEqual(before, [
+      '2035-03-23T00:30:00Z', '2035-03-24T00:30:00Z', '2035-03-25T00:30:00Z', '2035-03-25T23:30:00Z',
+    ]);
+    exclude(id, '2035-03-25T00:30:00Z');
+    const after = (await (await fetch(`${baseUrl}/${NIGHT_RANGE}`)).json()).data.map((e) => e.start_datetime);
+    assert.deepEqual(after, ['2035-03-23T00:30:00Z', '2035-03-24T00:30:00Z', '2035-03-25T23:30:00Z']);
+  } finally { await close(); }
+});
+
+test('Altform: eine alte Ausnahme trifft weiter, was sie auf main traf - hier beide Naechte', async () => {
+  seedUser();
+  const id = seedZonedDaily();
+  const { baseUrl, close } = await startApp();
+  try {
+    exclude(id, '2035-03-24');
+    const after = (await (await fetch(`${baseUrl}/${NIGHT_RANGE}`)).json()).data.map((e) => e.start_datetime);
+    assert.deepEqual(after, ['2035-03-23T00:30:00Z', '2035-03-25T23:30:00Z']);
+  } finally { await close(); }
+});
+
+test('Format A: schwebender Schluessel an einer lokalen Serie, alte Form daneben', async () => {
+  seedUser();
+  const id = seedWeeklyEvent();
+  const { baseUrl, close } = await startApp();
+  try {
+    exclude(id, '2026-07-21T18:00:00');
+    exclude(id, '2026-07-28');
+    const after = (await (await fetch(`${baseUrl}/${RANGE}`)).json()).data.map((e) => e.start_datetime);
+    assert.deepEqual(after, ['2026-07-14T18:00']);
   } finally { await close(); }
 });
 

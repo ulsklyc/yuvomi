@@ -10,6 +10,7 @@
  */
 
 import { parseLocalDateKey, addLocalDays } from './date.js';
+import { isValidTimeZone, zonedFields } from './timezone.js';
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}/;
 
@@ -64,12 +65,75 @@ function serverSeriesId(event) {
   return seriesId;
 }
 
+/**
+ * Die drei Formen, in denen der Server ein Vorkommen benennt (#2034):
+ * `YYYY-MM-DD` (ganztaegig, oder die alte Form), `YYYY-MM-DDTHH:MM:SSZ`
+ * (Originalstart als UTC-Zeitpunkt) und `YYYY-MM-DDTHH:MM:SS` (schwebende
+ * Wanduhr). Der Browser rechnet daran nichts aus - er reicht den Wert so
+ * zurueck, wie er kam (im Pfad ueber `encodeURIComponent`).
+ */
+const RECURRENCE_ID_RE = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}Z?)?$/;
+
 function serverRecurrenceId(event) {
   const recurrenceId = event?.recurrence_id;
-  if (typeof recurrenceId !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(recurrenceId)) {
+  if (typeof recurrenceId !== 'string' || !RECURRENCE_ID_RE.test(recurrenceId)) {
     throw new TypeError('A server-provided calendar recurrence_id is required.');
   }
   return recurrenceId;
+}
+
+/**
+ * Der Body fuer `POST /calendar/:id/exceptions`: das Vorkommen als
+ * `recurrence_id`, genau wie der Server es nannte (#2034). Die alte Form geht
+ * zusaetzlich als `date` mit - das Feld, das der Endpunkt schon immer kannte.
+ */
+function occurrenceExceptionBody(event) {
+  const recurrenceId = serverRecurrenceId(event);
+  return recurrenceId.length === 10
+    ? { recurrence_id: recurrenceId, date: recurrenceId }
+    : { recurrence_id: recurrenceId };
+}
+
+/**
+ * Das Datum eines Zeitpunkts in einer IANA-Zone, oder null - ueber die eine
+ * Zonen-Uhr der App (`zonedFields`), nicht ueber einen eigenen Formatter.
+ */
+function dateInZone(iso, zone) {
+  try {
+    if (!isValidTimeZone(zone)) return null;
+    const fields = zonedFields(iso, zone);
+    if (!fields) return null;
+    const p = (n) => String(n).padStart(2, '0');
+    const key = `${fields.year}-${p(fields.month)}-${p(fields.day)}`;
+    return DATE_KEY_RE.test(key) ? key : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Der Serientag eines Vorkommens: der Tag, an dem die Regel es zaehlt - und
+ * damit der Tag, vor dem ein UNTIL fuer "dieser und folgende" enden muss
+ * (#2034).
+ *
+ * Bis zur Umstellung des Schluessels war das der Schluessel selbst
+ * (`YYYY-MM-DD`), und so bleibt es fuer die alte Form und ganztaegige
+ * Serien. Ein Schluessel mit Uhrzeit nennt den Originalstart: schwebend ist
+ * sein Datum schon der Tag; als UTC-Zeitpunkt liegt der Tag in der Zone der
+ * Serie (`tzid`) - fuer Los Angeles 23:30 ist das der Vortag des UTC-Datums,
+ * und ein UNTIL auf dem UTC-Vortag liesse das gewaehlte Vorkommen in der alten
+ * Serie stehen, waehrend die neue es noch einmal zeigt.
+ */
+export function recurrenceSeriesDay(event) {
+  const recurrenceId = serverRecurrenceId(event);
+  if (!recurrenceId.endsWith('Z')) return recurrenceId.slice(0, 10);
+  if (event?.tzid) return dateInZone(recurrenceId, event.tzid) ?? recurrenceId.slice(0, 10);
+  // Ohne `tzid` laeuft die Serie auf dem Tag ihres gespeicherten Starts; ein
+  // Start mit Offset (`T19:30:00-04:00`) traegt ihn in seinen ersten Ziffern.
+  const start = String(event?.start_datetime ?? '');
+  return /[+-]\d{2}:?\d{2}$/.test(start) && DATE_KEY_RE.test(start.slice(0, 10))
+    ? start.slice(0, 10)
+    : recurrenceId.slice(0, 10);
 }
 
 /** Selects the one server mutation used by each recurring edit scope. */
@@ -145,11 +209,11 @@ export function requestCalendarOccurrenceDelete({ api, event, scope, keepalive =
   if (event?.can_detach_occurrence && !canOverrideCalendarOccurrence(event)) {
     const path = `/calendar/${serverSeriesId(event)}`;
     if (scope === 'this') {
-      return api.post(`${path}/exceptions`, { date: serverRecurrenceId(event) }, { keepalive });
+      return api.post(`${path}/exceptions`, occurrenceExceptionBody(event), { keepalive });
     }
     if (scope === 'following' && !followingMeansWholeSeries(event)) {
       return api.put(path, {
-        recurrence_rule: truncateRuleBefore(event.recurrence_rule, serverRecurrenceId(event)),
+        recurrence_rule: truncateRuleBefore(event.recurrence_rule, recurrenceSeriesDay(event)),
       }, { keepalive });
     }
     return api.delete(path, { keepalive });
@@ -170,14 +234,16 @@ export async function requestCalendarOccurrenceMutation({
   // These separate requests intentionally retain its existing atomicity limits.
   if (event?.can_detach_occurrence && !canOverrideCalendarOccurrence(event) && scope !== 'series') {
     const path = `/calendar/${serverSeriesId(event)}`;
-    const date = serverRecurrenceId(event);
+    const exceptionBody = occurrenceExceptionBody(event);
     if (scope === 'this') {
       const response = await api.post('/calendar', { ...body, recurrence_rule: null });
-      await api.post(`${path}/exceptions`, { date });
+      await api.post(`${path}/exceptions`, exceptionBody);
       return response;
     }
     if (scope === 'following' && !followingMeansWholeSeries(event)) {
-      await api.put(path, { recurrence_rule: truncateRuleBefore(event.recurrence_rule, date) });
+      await api.put(path, {
+        recurrence_rule: truncateRuleBefore(event.recurrence_rule, recurrenceSeriesDay(event)),
+      });
       return api.post('/calendar', body);
     }
     throw new TypeError('The first following occurrence must use the whole-series edit path.');

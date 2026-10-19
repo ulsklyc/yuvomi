@@ -1,0 +1,871 @@
+{
+  "household_zone": "Europe/Berlin",
+  "cases": {
+    "berlin-summer-start": {
+      "windows": [
+        {
+          "from": "2035-03-21",
+          "to": "2035-03-28",
+          "events": [
+            {
+              "start": "2035-03-21T00:30:00Z",
+              "end": "2035-03-21T01:30:00Z",
+              "title": "berlin-summer-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-21"
+            },
+            {
+              "start": "2035-03-22T00:30:00Z",
+              "end": "2035-03-22T01:30:00Z",
+              "title": "berlin-summer-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-22"
+            },
+            {
+              "start": "2035-03-23T00:30:00Z",
+              "end": "2035-03-23T01:30:00Z",
+              "title": "berlin-summer-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-23"
+            },
+            {
+              "start": "2035-03-25T23:30:00Z",
+              "end": "2035-03-26T00:30:00Z",
+              "title": "berlin-summer-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-25"
+            },
+            {
+              "start": "2035-03-26T23:30:00Z",
+              "end": "2035-03-27T00:30:00Z",
+              "title": "berlin-summer-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-26"
+            },
+            {
+              "start": "2035-03-27T23:30:00Z",
+              "end": "2035-03-28T00:30:00Z",
+              "title": "berlin-summer-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-27"
+            }
+          ]
+        },
+        {
+          "from": "2035-10-25",
+          "to": "2035-10-31",
+          "events": [
+            {
+              "start": "2035-10-24T23:30:00Z",
+              "end": "2035-10-25T00:30:00Z",
+              "title": "berlin-summer-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-10-24"
+            },
+            {
+              "start": "2035-10-25T23:30:00Z",
+              "end": "2035-10-26T00:30:00Z",
+              "title": "berlin-summer-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-10-25"
+            },
+            {
+              "start": "2035-10-26T23:30:00Z",
+              "end": "2035-10-27T00:30:00Z",
+              "title": "berlin-summer-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-10-26"
+            },
+            {
+              "start": "2035-10-27T23:30:00Z",
+              "end": "2035-10-28T00:30:00Z",
+              "title": "berlin-summer-start (moved)",
+              "all_day": 0,
+              "override": true,
+              "recurrence_id": "2035-10-28"
+            },
+            {
+              "start": "2035-10-29T00:30:00Z",
+              "end": "2035-10-29T01:30:00Z",
+              "title": "berlin-summer-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-10-29"
+            },
+            {
+              "start": "2035-10-30T00:30:00Z",
+              "end": "2035-10-30T01:30:00Z",
+              "title": "berlin-summer-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-10-30"
+            },
+            {
+              "start": "2035-10-31T00:30:00Z",
+              "end": "2035-10-31T01:30:00Z",
+              "title": "berlin-summer-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-10-31"
+            }
+          ]
+        }
+      ],
+      "thousand_days": {
+        "count": 1000,
+        "starts_sha256": "0b1e1da494454f36e59d151b43fffcffa5b9fa0147981301933892063984883f",
+        "identity_offsets": "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000-000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000+000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000+0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    "berlin-winter-start": {
+      "windows": [
+        {
+          "from": "2035-03-21",
+          "to": "2035-03-28",
+          "events": [
+            {
+              "start": "2035-03-21T00:30:00Z",
+              "end": "2035-03-21T01:30:00Z",
+              "title": "berlin-winter-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-21"
+            },
+            {
+              "start": "2035-03-22T00:30:00Z",
+              "end": "2035-03-22T01:30:00Z",
+              "title": "berlin-winter-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-22"
+            },
+            {
+              "start": "2035-03-23T00:30:00Z",
+              "end": "2035-03-23T01:30:00Z",
+              "title": "berlin-winter-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-23"
+            },
+            {
+              "start": "2035-03-24T00:30:00Z",
+              "end": "2035-03-24T01:30:00Z",
+              "title": "berlin-winter-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-24"
+            },
+            {
+              "start": "2035-03-25T23:30:00Z",
+              "end": "2035-03-26T00:30:00Z",
+              "title": "berlin-winter-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-26"
+            },
+            {
+              "start": "2035-03-26T23:30:00Z",
+              "end": "2035-03-27T00:30:00Z",
+              "title": "berlin-winter-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-27"
+            },
+            {
+              "start": "2035-03-27T23:30:00Z",
+              "end": "2035-03-28T00:30:00Z",
+              "title": "berlin-winter-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-28"
+            }
+          ]
+        },
+        {
+          "from": "2035-10-24",
+          "to": "2035-10-31",
+          "events": [
+            {
+              "start": "2035-10-23T23:30:00Z",
+              "end": "2035-10-24T00:30:00Z",
+              "title": "berlin-winter-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-10-24"
+            },
+            {
+              "start": "2035-10-24T23:30:00Z",
+              "end": "2035-10-25T00:30:00Z",
+              "title": "berlin-winter-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-10-25"
+            },
+            {
+              "start": "2035-10-25T23:30:00Z",
+              "end": "2035-10-26T00:30:00Z",
+              "title": "berlin-winter-start (moved)",
+              "all_day": 0,
+              "override": true,
+              "recurrence_id": "2035-10-26"
+            },
+            {
+              "start": "2035-10-26T23:30:00Z",
+              "end": "2035-10-27T00:30:00Z",
+              "title": "berlin-winter-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-10-27"
+            },
+            {
+              "start": "2035-10-27T23:30:00Z",
+              "end": "2035-10-28T00:30:00Z",
+              "title": "berlin-winter-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-10-28"
+            },
+            {
+              "start": "2035-10-29T00:30:00Z",
+              "end": "2035-10-29T01:30:00Z",
+              "title": "berlin-winter-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-10-29"
+            },
+            {
+              "start": "2035-10-30T00:30:00Z",
+              "end": "2035-10-30T01:30:00Z",
+              "title": "berlin-winter-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-10-30"
+            },
+            {
+              "start": "2035-10-31T00:30:00Z",
+              "end": "2035-10-31T01:30:00Z",
+              "title": "berlin-winter-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-10-31"
+            }
+          ]
+        }
+      ],
+      "thousand_days": {
+        "count": 1001,
+        "starts_sha256": "d310997151fabdf34d3d2ae772b59967b40b7e2599ee3b1fba666d868e5c73fe",
+        "identity_offsets": "000000000000000000000000000000000000000000000000000000000000000000000000000+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+      }
+    },
+    "la-weekly-2330": {
+      "windows": [
+        {
+          "from": "2035-06-10",
+          "to": "2035-07-12",
+          "events": [
+            {
+              "start": "2035-06-12T06:30:00Z",
+              "end": "2035-06-12T07:30:00Z",
+              "title": "la-weekly-2330",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-06-12"
+            },
+            {
+              "start": "2035-06-26T06:30:00Z",
+              "end": "2035-06-26T07:30:00Z",
+              "title": "la-weekly-2330 (moved)",
+              "all_day": 0,
+              "override": true,
+              "recurrence_id": "2035-06-26"
+            },
+            {
+              "start": "2035-07-03T06:30:00Z",
+              "end": "2035-07-03T07:30:00Z",
+              "title": "la-weekly-2330",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-07-03"
+            },
+            {
+              "start": "2035-07-10T06:30:00Z",
+              "end": "2035-07-10T07:30:00Z",
+              "title": "la-weekly-2330",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-07-10"
+            }
+          ]
+        },
+        {
+          "from": "2035-10-28",
+          "to": "2035-11-14",
+          "events": [
+            {
+              "start": "2035-10-30T06:30:00Z",
+              "end": "2035-10-30T07:30:00Z",
+              "title": "la-weekly-2330",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-10-30"
+            },
+            {
+              "start": "2035-11-06T07:30:00Z",
+              "end": "2035-11-06T08:30:00Z",
+              "title": "la-weekly-2330",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-11-06"
+            },
+            {
+              "start": "2035-11-13T07:30:00Z",
+              "end": "2035-11-13T08:30:00Z",
+              "title": "la-weekly-2330",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-11-13"
+            }
+          ]
+        }
+      ],
+      "thousand_days": {
+        "count": 143,
+        "starts_sha256": "d78149e0afde1626f1513fb69b1c4875e21bb616bd75c5b387301de5052b9b0f",
+        "identity_offsets": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    "tokyo-daily-0800": {
+      "windows": [
+        {
+          "from": "2026-01-05",
+          "to": "2026-01-12",
+          "events": [
+            {
+              "start": "2026-01-06T23:00:00Z",
+              "end": "2026-01-07T00:00:00Z",
+              "title": "tokyo-daily-0800",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2026-01-06"
+            },
+            {
+              "start": "2026-01-08T23:00:00Z",
+              "end": "2026-01-09T00:00:00Z",
+              "title": "tokyo-daily-0800 (moved)",
+              "all_day": 0,
+              "override": true,
+              "recurrence_id": "2026-01-08"
+            },
+            {
+              "start": "2026-01-09T23:00:00Z",
+              "end": "2026-01-10T00:00:00Z",
+              "title": "tokyo-daily-0800",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2026-01-09"
+            },
+            {
+              "start": "2026-01-10T23:00:00Z",
+              "end": "2026-01-11T00:00:00Z",
+              "title": "tokyo-daily-0800",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2026-01-10"
+            },
+            {
+              "start": "2026-01-11T23:00:00Z",
+              "end": "2026-01-12T00:00:00Z",
+              "title": "tokyo-daily-0800",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2026-01-11"
+            }
+          ]
+        }
+      ],
+      "thousand_days": {
+        "count": 1000,
+        "starts_sha256": "43aae1fcdfe5d0416f9b7af7bf74524cdf32fdce37ab1e6ad105bf4bc8182bad",
+        "identity_offsets": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    "floating-daily": {
+      "windows": [
+        {
+          "from": "2035-03-20",
+          "to": "2035-03-29",
+          "events": [
+            {
+              "start": "2035-03-20T01:30",
+              "end": "2035-03-20T02:30",
+              "title": "floating-daily",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-20"
+            },
+            {
+              "start": "2035-03-21T01:30",
+              "end": "2035-03-21T02:30",
+              "title": "floating-daily",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-21"
+            },
+            {
+              "start": "2035-03-22T01:30",
+              "end": "2035-03-22T02:30",
+              "title": "floating-daily",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-22"
+            },
+            {
+              "start": "2035-03-23T01:30",
+              "end": "2035-03-23T02:30",
+              "title": "floating-daily",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-23"
+            },
+            {
+              "start": "2035-03-24T01:30",
+              "end": "2035-03-24T02:30",
+              "title": "floating-daily",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-24"
+            },
+            {
+              "start": "2035-03-26T01:30",
+              "end": "2035-03-26T02:30",
+              "title": "floating-daily (moved)",
+              "all_day": 0,
+              "override": true,
+              "recurrence_id": "2035-03-26"
+            },
+            {
+              "start": "2035-03-27T01:30",
+              "end": "2035-03-27T02:30",
+              "title": "floating-daily",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-27"
+            },
+            {
+              "start": "2035-03-28T01:30",
+              "end": "2035-03-28T02:30",
+              "title": "floating-daily",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-28"
+            },
+            {
+              "start": "2035-03-29T01:30",
+              "end": "2035-03-29T02:30",
+              "title": "floating-daily",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-29"
+            }
+          ]
+        }
+      ],
+      "thousand_days": {
+        "count": 1001,
+        "starts_sha256": "8532ddf4fc42bf7f6260f62998c3e7b3d9332d8bd1a4933d908f1d019b9420fc",
+        "identity_offsets": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    "all-day-weekly": {
+      "windows": [
+        {
+          "from": "2035-03-18",
+          "to": "2035-04-12",
+          "events": [
+            {
+              "start": "2035-03-20",
+              "end": "2035-03-20",
+              "title": "all-day-weekly",
+              "all_day": 1,
+              "override": false,
+              "legacy_identity": "2035-03-20"
+            },
+            {
+              "start": "2035-04-03",
+              "end": "2035-04-03",
+              "title": "all-day-weekly (moved)",
+              "all_day": 1,
+              "override": true,
+              "recurrence_id": "2035-04-03"
+            },
+            {
+              "start": "2035-04-10",
+              "end": "2035-04-10",
+              "title": "all-day-weekly",
+              "all_day": 1,
+              "override": false,
+              "legacy_identity": "2035-04-10"
+            }
+          ]
+        }
+      ],
+      "thousand_days": {
+        "count": 143,
+        "starts_sha256": "736a475eac6375e00061163ddd21b58f4d6454fc2536d5837f0d09e1aff40e49",
+        "identity_offsets": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    "tzid-naive-start-1993": {
+      "windows": [
+        {
+          "from": "2035-03-20",
+          "to": "2035-03-30",
+          "events": [
+            {
+              "start": "2035-03-20T18:30:00Z",
+              "end": "2035-03-20T19:30:00Z",
+              "title": "tzid-naive-start-1993",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-20"
+            },
+            {
+              "start": "2035-03-21T18:30:00Z",
+              "end": "2035-03-21T19:30:00Z",
+              "title": "tzid-naive-start-1993",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-21"
+            },
+            {
+              "start": "2035-03-22T18:30:00Z",
+              "end": "2035-03-22T19:30:00Z",
+              "title": "tzid-naive-start-1993",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-22"
+            },
+            {
+              "start": "2035-03-23T18:30:00Z",
+              "end": "2035-03-23T19:30:00Z",
+              "title": "tzid-naive-start-1993",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-23"
+            },
+            {
+              "start": "2035-03-24T18:30:00Z",
+              "end": "2035-03-24T19:30:00Z",
+              "title": "tzid-naive-start-1993",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-24"
+            },
+            {
+              "start": "2035-03-26T18:30:00Z",
+              "end": "2035-03-26T19:30:00Z",
+              "title": "tzid-naive-start-1993",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-26"
+            },
+            {
+              "start": "2035-03-27T18:30:00Z",
+              "end": "2035-03-27T19:30:00Z",
+              "title": "tzid-naive-start-1993 (moved)",
+              "all_day": 0,
+              "override": true,
+              "recurrence_id": "2035-03-27"
+            },
+            {
+              "start": "2035-03-28T18:30:00Z",
+              "end": "2035-03-28T19:30:00Z",
+              "title": "tzid-naive-start-1993",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-28"
+            },
+            {
+              "start": "2035-03-29T18:30:00Z",
+              "end": "2035-03-29T19:30:00Z",
+              "title": "tzid-naive-start-1993",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-29"
+            },
+            {
+              "start": "2035-03-30T18:30:00Z",
+              "end": "2035-03-30T19:30:00Z",
+              "title": "tzid-naive-start-1993",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-03-30"
+            }
+          ]
+        },
+        {
+          "from": "2035-11-01",
+          "to": "2035-11-06",
+          "events": [
+            {
+              "start": "2035-11-01T18:30:00Z",
+              "end": "2035-11-01T19:30:00Z",
+              "title": "tzid-naive-start-1993",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-11-01"
+            },
+            {
+              "start": "2035-11-02T18:30:00Z",
+              "end": "2035-11-02T19:30:00Z",
+              "title": "tzid-naive-start-1993",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-11-02"
+            },
+            {
+              "start": "2035-11-03T18:30:00Z",
+              "end": "2035-11-03T19:30:00Z",
+              "title": "tzid-naive-start-1993",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-11-03"
+            },
+            {
+              "start": "2035-11-04T19:30:00Z",
+              "end": "2035-11-04T20:30:00Z",
+              "title": "tzid-naive-start-1993",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-11-04"
+            },
+            {
+              "start": "2035-11-05T19:30:00Z",
+              "end": "2035-11-05T20:30:00Z",
+              "title": "tzid-naive-start-1993",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-11-05"
+            },
+            {
+              "start": "2035-11-06T19:30:00Z",
+              "end": "2035-11-06T20:30:00Z",
+              "title": "tzid-naive-start-1993",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-11-06"
+            }
+          ]
+        }
+      ],
+      "thousand_days": {
+        "count": 1001,
+        "starts_sha256": "c530cb57d613cf3ca31de623e64259db193777e6fe1c5e12c1aef5274b53fbbe",
+        "identity_offsets": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    "google-offset-start": {
+      "windows": [
+        {
+          "from": "2035-10-30",
+          "to": "2035-11-10",
+          "events": [
+            {
+              "start": "2035-10-30T23:30:00Z",
+              "end": "2035-10-31T00:30:00Z",
+              "title": "google-offset-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-10-30"
+            },
+            {
+              "start": "2035-10-31T23:30:00Z",
+              "end": "2035-11-01T00:30:00Z",
+              "title": "google-offset-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-10-31"
+            },
+            {
+              "start": "2035-11-01T23:30:00Z",
+              "end": "2035-11-02T00:30:00Z",
+              "title": "google-offset-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-11-01"
+            },
+            {
+              "start": "2035-11-02T23:30:00Z",
+              "end": "2035-11-03T00:30:00Z",
+              "title": "google-offset-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-11-02"
+            },
+            {
+              "start": "2035-11-03T23:30:00Z",
+              "end": "2035-11-04T00:30:00Z",
+              "title": "google-offset-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-11-03"
+            },
+            {
+              "start": "2035-11-05T00:30:00Z",
+              "end": "2035-11-05T01:30:00Z",
+              "title": "google-offset-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-11-04"
+            },
+            {
+              "start": "2035-11-07T00:30:00Z",
+              "end": "2035-11-07T01:30:00Z",
+              "title": "google-offset-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-11-06"
+            },
+            {
+              "start": "2035-11-08T00:30:00Z",
+              "end": "2035-11-08T01:30:00Z",
+              "title": "google-offset-start (moved)",
+              "all_day": 0,
+              "override": true,
+              "recurrence_id": "2035-11-07"
+            },
+            {
+              "start": "2035-11-09T00:30:00Z",
+              "end": "2035-11-09T01:30:00Z",
+              "title": "google-offset-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-11-08"
+            },
+            {
+              "start": "2035-11-10T00:30:00Z",
+              "end": "2035-11-10T01:30:00Z",
+              "title": "google-offset-start",
+              "all_day": 0,
+              "override": false,
+              "legacy_identity": "2035-11-09"
+            }
+          ]
+        }
+      ],
+      "thousand_days": {
+        "count": 1001,
+        "starts_sha256": "dda73fd4dbd89421dffe41ec3896687ec18f063f2bb15a3cf14bd0171ad9d005",
+        "identity_offsets": "00000------------------------------------------------------------------------------------------------------------------------------0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000------------------------------------------------------------------------------------------------------------------------------0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000-------------------------------------------------------------------------------------------------------------------------------------000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      }
+    }
+  },
+  "feed": {
+    "UID:event-7@yuvomi": [
+      [
+        "DTSTART;TZID=Asia/Tokyo:20260107T080000",
+        "DTEND;TZID=Asia/Tokyo:20260107T090000",
+        "RRULE:FREQ=DAILY",
+        "EXDATE;TZID=Asia/Tokyo:20260108T080000",
+        "EXDATE;TZID=Asia/Tokyo:20260109T080000"
+      ]
+    ],
+    "UID:event-1@yuvomi": [
+      [
+        "DTSTART;TZID=Europe/Berlin:20340701T013000",
+        "DTEND;TZID=Europe/Berlin:20340701T023000",
+        "RRULE:FREQ=DAILY",
+        "EXDATE;TZID=Europe/Berlin:20350324T013000",
+        "EXDATE;TZID=Europe/Berlin:20351028T023000"
+      ]
+    ],
+    "UID:event-3@yuvomi": [
+      [
+        "DTSTART;TZID=Europe/Berlin:20350110T013000",
+        "DTEND;TZID=Europe/Berlin:20350110T023000",
+        "RRULE:FREQ=DAILY",
+        "EXDATE;TZID=Europe/Berlin:20350325T003000"
+      ],
+      [
+        "RECURRENCE-ID;TZID=Europe/Berlin:20351026T013000",
+        "DTSTART;TZID=Europe/Berlin:20351026T013000",
+        "DTEND;TZID=Europe/Berlin:20351026T023000"
+      ]
+    ],
+    "UID:event-11@yuvomi": [
+      [
+        "DTSTART;VALUE=DATE:20350320",
+        "DTEND;VALUE=DATE:20350321",
+        "RRULE:FREQ=WEEKLY",
+        "EXDATE;VALUE=DATE:20350327"
+      ],
+      [
+        "RECURRENCE-ID;VALUE=DATE:20350403",
+        "DTSTART;VALUE=DATE:20350403",
+        "DTEND;VALUE=DATE:20350404"
+      ]
+    ],
+    "UID:event-9@yuvomi": [
+      [
+        "DTSTART;TZID=Europe/Berlin:20350320T013000",
+        "DTEND;TZID=Europe/Berlin:20350320T023000",
+        "RRULE:FREQ=DAILY",
+        "EXDATE;TZID=Europe/Berlin:20350325T013000"
+      ],
+      [
+        "RECURRENCE-ID;TZID=Europe/Berlin:20350326T013000",
+        "DTSTART;TZID=Europe/Berlin:20350326T013000",
+        "DTEND;TZID=Europe/Berlin:20350326T023000"
+      ]
+    ],
+    "UID:event-13@yuvomi": [
+      [
+        "DTSTART;TZID=America/New_York:20350320T143000",
+        "DTEND;TZID=America/New_York:20350320T153000",
+        "RRULE:FREQ=DAILY",
+        "EXDATE;TZID=America/New_York:20350325T143000"
+      ],
+      [
+        "RECURRENCE-ID;TZID=America/New_York:20350327T143000",
+        "DTSTART;TZID=America/New_York:20350327T143000",
+        "DTEND;TZID=America/New_York:20350327T153000"
+      ]
+    ],
+    "UID:event-5@yuvomi": [
+      [
+        "DTSTART;TZID=America/Los_Angeles:20350611T233000",
+        "DTEND;TZID=America/Los_Angeles:20350612T003000",
+        "RRULE:FREQ=WEEKLY;BYDAY=MO",
+        "EXDATE;TZID=America/Los_Angeles:20350618T233000"
+      ],
+      [
+        "RECURRENCE-ID;TZID=America/Los_Angeles:20350625T233000",
+        "DTSTART;TZID=America/Los_Angeles:20350625T233000",
+        "DTEND;TZID=America/Los_Angeles:20350626T003000"
+      ]
+    ],
+    "UID:event-15@yuvomi": [
+      [
+        "DTSTART;TZID=America/New_York:20351030T193000",
+        "DTEND;TZID=America/New_York:20351030T203000",
+        "RRULE:FREQ=DAILY",
+        "EXDATE;TZID=America/New_York:20351105T193000"
+      ],
+      [
+        "RECURRENCE-ID;TZID=America/New_York:20351107T193000",
+        "DTSTART;TZID=America/New_York:20351107T193000",
+        "DTEND;TZID=America/New_York:20351107T203000"
+      ]
+    ]
+  }
+}

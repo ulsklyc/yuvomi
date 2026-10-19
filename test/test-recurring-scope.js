@@ -39,7 +39,7 @@ test('outbound-local occurrence editing uses legacy detach and carries provider 
   assert.equal(result.data.id, 10);
   assert.deepEqual(calls, [
     { path: '/calendar', body: { title: 'Moved', target_google_calendar_id: 'family', recurrence_rule: null } },
-    { path: '/calendar/9/exceptions', body: { date: '2026-10-03' } },
+    { path: '/calendar/9/exceptions', body: { recurrence_id: '2026-10-03', date: '2026-10-03' } },
   ]);
   assert.equal(recurrenceScope.requiresWholeSeriesConfirmation(event), false);
 });
@@ -55,7 +55,7 @@ test('outbound-local occurrence deletion uses EXDATE and following uses legacy t
   await recurrenceScope.requestCalendarOccurrenceDelete({ api, event, scope: 'following', keepalive: true });
   await recurrenceScope.requestCalendarOccurrenceDelete({ api, event: { ...event, is_series_start: 1 }, scope: 'following' });
   assert.deepEqual(calls, [
-    ['post', '/calendar/9/exceptions', { date: '2026-10-03' }, { keepalive: true }],
+    ['post', '/calendar/9/exceptions', { recurrence_id: '2026-10-03', date: '2026-10-03' }, { keepalive: true }],
     ['put', '/calendar/9', { recurrence_rule: 'FREQ=DAILY;UNTIL=20261002' }, { keepalive: true }],
     ['delete', '/calendar/9', { keepalive: false }],
   ]);
@@ -80,6 +80,51 @@ test('outbound-local following edit truncates before creating the provider-targe
     ['put', '/calendar/9', { recurrence_rule: 'FREQ=DAILY;UNTIL=20261002' }],
     ['post', '/calendar', body],
   ]);
+});
+
+// --- Schluessel in Format A (#2034) ---
+
+test('Format A: der Browser reicht jede der drei Formen unveraendert und kodiert zurueck', () => {
+  for (const recurrenceId of ['2035-06-12', '2035-06-12T06:30:00Z', '2035-06-11T23:30:00']) {
+    const event = { id: 9, series_id: 9, recurrence_id: recurrenceId };
+    const target = recurrenceScope.calendarOccurrenceDeleteTarget(event, 'this');
+    assert.equal(target.path, `/calendar/9/occurrences/${encodeURIComponent(recurrenceId)}`);
+    assert.equal(decodeURIComponent(target.path.split('/').pop()), recurrenceId);
+  }
+  assert.throws(
+    () => recurrenceScope.calendarOccurrenceDeleteTarget({ series_id: 9, recurrence_id: '2035-06-12T06:30' }, 'this'),
+    TypeError,
+  );
+});
+
+test('Format A: der Ausweichweg schickt die Ausnahme als recurrence_id und schneidet am Serientag', async () => {
+  const calls = [];
+  // Los Angeles 23:30 am 18.06. = 06:30Z am 19.06.: der Serientag ist der 18.06.
+  const event = { id: 9, series_id: 9, recurrence_id: '2035-06-19T06:30:00Z',
+    start_datetime: '2035-06-19T06:30:00Z', tzid: 'America/Los_Angeles',
+    recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO', is_recurring_instance: 1, is_series_start: 0,
+    can_detach_occurrence: true, can_override_occurrence: false };
+  const api = Object.fromEntries(['post', 'put', 'delete'].map((method) => [method,
+    async (...args) => calls.push([method, ...args])]));
+  await recurrenceScope.requestCalendarOccurrenceDelete({ api, event, scope: 'this' });
+  await recurrenceScope.requestCalendarOccurrenceDelete({ api, event, scope: 'following' });
+  assert.deepEqual(calls, [
+    ['post', '/calendar/9/exceptions', { recurrence_id: '2035-06-19T06:30:00Z' }, { keepalive: false }],
+    // UNTIL auf dem LA-Vortag (17.06.), nicht auf dem UTC-Vortag (18.06.):
+    // sonst bliebe das gewaehlte Vorkommen in der alten Serie stehen.
+    ['put', '/calendar/9', { recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO;UNTIL=20350617' }, { keepalive: false }],
+  ]);
+});
+
+test('Format A: recurrenceSeriesDay liest den Serientag je Form', () => {
+  const day = recurrenceScope.recurrenceSeriesDay;
+  assert.equal(day({ recurrence_id: '2035-06-12' }), '2035-06-12');
+  assert.equal(day({ recurrence_id: '2035-06-11T23:30:00' }), '2035-06-11');
+  assert.equal(day({ recurrence_id: '2035-06-12T06:30:00Z', tzid: 'America/Los_Angeles' }), '2035-06-11');
+  assert.equal(day({ recurrence_id: '2026-01-07T23:00:00Z', tzid: 'Asia/Tokyo' }), '2026-01-08');
+  // Ohne tzid, Start mit Offset: der Tag des gespeicherten Starts.
+  assert.equal(day({ recurrence_id: '2035-11-06T00:30:00Z', start_datetime: '2035-11-05T19:30:00-05:00' }), '2035-11-05');
+  assert.equal(day({ recurrence_id: '2035-11-06T00:30:00Z', start_datetime: '2035-11-06T00:30:00Z' }), '2035-11-06');
 });
 
 // Der Server-Validator, gegen den gekürzte Regeln bestehen müssen.

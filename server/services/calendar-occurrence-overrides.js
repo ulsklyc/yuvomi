@@ -7,7 +7,8 @@
 
 import { endsBeforeStart, hasAnyOccurrence, parseRRule } from './recurrence.js';
 import {
-  ASSIGNED_USERS_SQL, expandRecurringEvents, MAX_EXPANSION_ITERATIONS, seriesReadingZone,
+  ASSIGNED_USERS_SQL, expandRecurringEvents, isOccurrenceKey, MAX_EXPANSION_ITERATIONS,
+  occurrenceSlotOf, seriesReadingZone,
 } from './calendar-events.js';
 import {
   dropInheritedEventReminders, eventAuthorId, fanOutEventReminders,
@@ -138,18 +139,48 @@ export function recurrenceIdFor(row) {
   return typeof row.start_datetime === 'string' ? row.start_datetime.slice(0, 10) : null;
 }
 
-function isDateKey(value) {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const parsed = new Date(`${value}T00:00:00Z`);
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
-}
-
 function exactLookupIterationLimit(master, recurrenceId) {
   const start = new Date(`${master.start_datetime.slice(0, 10)}T00:00:00Z`).getTime();
-  const requested = new Date(`${recurrenceId}T00:00:00Z`).getTime();
-  if (!Number.isFinite(start) || requested < start) return 1;
+  const requested = new Date(`${String(recurrenceId).slice(0, 10)}T00:00:00Z`).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(requested) || requested < start) return 1;
   const calendarDays = Math.floor((requested - start) / 86400000);
   return Math.min(calendarDays + 2, MAX_EXPANSION_ITERATIONS);
+}
+
+/**
+ * Alle Vorkommen der Serie, die `recurrenceId` treffen kann - ohne EXDATEs.
+ *
+ * Ein Schluessel in Format A (#2034) trifft hoechstens eines. Die alte Form
+ * `YYYY-MM-DD` an einer getimten Serie meint, was sie auf main meinte (den
+ * UTC-Tag ueber die alte Uhr, eingefroren in legacy-occurrence-key.js), und
+ * kann in der Umstellungsnacht zwei Vorkommen treffen.
+ */
+function occurrencesForKey(master, recurrenceId, householdZone) {
+  // EIN TAG LUFT AUF BEIDEN SEITEN, und zwar seit #985: das Fenster [from, to]
+  // laeuft auf Schleifentagen, und die liegen bei einer Serie mit eigener Zone
+  // einen Tag neben dem Datum im Schluessel (UTC-Tag oder Ortstag). Ein
+  // Punktfenster verfehlte das gesuchte Vorkommen dann um genau einen Tag -
+  // `while (currentDate <= to)` bricht ab, bevor es entsteht. Gemessen an der
+  // Tokio-Probe in test-ics-export.js: Master 07.01. 08:00 Tokio = 06.01.
+  // 23:00 UTC, gesucht `2026-01-07`, die Schleife steht bei diesem Vorkommen
+  // auf dem lokalen `2026-01-08`. Mehr als ein Tag kann es nicht sein. Die
+  // AUSWAHL bleibt exakt - verglichen wird der Schluessel, das groessere
+  // Fenster liefert nur die Kandidaten.
+  const day = recurrenceId.slice(0, 10);
+  const occurrences = expandRecurringEvents(
+    [master],
+    shiftDateKey(day, -1),
+    shiftDateKey(day, 1),
+    new Map(),
+    {
+      includeRecurrenceIdentity: true,
+      maxIterations: exactLookupIterationLimit(master, recurrenceId),
+      householdZone,
+    },
+  );
+  const exact = occurrences.filter((candidate) => occurrenceSlotOf(candidate)?.key === recurrenceId);
+  if (exact.length > 0 || master.all_day || recurrenceId.length !== 10) return exact;
+  return occurrences.filter((candidate) => occurrenceSlotOf(candidate)?.legacyKey === recurrenceId);
 }
 
 /**
@@ -159,40 +190,28 @@ function exactLookupIterationLimit(master, recurrenceId) {
  * `householdZone`: in ihr liest die Expansion einen zonenlosen Start neben
  * einer `tzid` (#1993). Dieselbe Zone wie beim Lesen des Kalenders, sonst
  * verfehlt die Suche das Vorkommen, das der Kalender gezeigt hat.
+ *
+ * Beide Schluesselformen (#2034): Format A trifft genau ein Vorkommen. Die
+ * alte Form trifft, was sie auf main traf; trifft sie zwei (Umstellungsnacht),
+ * gilt wie auf main das erste - es sei denn, der Aufrufer verlangt mit
+ * `ambiguous: 'reject'` Eindeutigkeit (eine Eingabe von aussen, die ein
+ * Vorkommen erst AUSWAEHLT): dann 409 `ambiguous_recurrence_id`.
  */
-export function baseOccurrenceFor(master, recurrenceId, householdZone = null) {
-  if (!master?.recurrence_rule || !isDateKey(recurrenceId)) {
+export function baseOccurrenceFor(master, recurrenceId, householdZone = null, { ambiguous = 'first' } = {}) {
+  if (!master?.recurrence_rule || !isOccurrenceKey(recurrenceId)) {
     throw invalidRecurrenceIdentity('recurrence_id must identify a recurring series date.');
   }
-
-  // EIN TAG LUFT AUF BEIDEN SEITEN, und zwar seit #985: das Fenster [from, to]
-  // wird in UTC-Tagen gefuehrt, die Expansionsschleife laeuft bei einer Serie,
-  // deren lokaler und UTC-Tag auseinandergehen, aber auf dem LOKALEN Datum.
-  // Ein Punktfenster [recurrenceId, recurrenceId] verfehlt das gesuchte
-  // Vorkommen dann um genau einen Tag - `while (currentDate <= to)` bricht ab,
-  // bevor es entsteht. Gemessen an der Tokio-Probe in test-ics-export.js:
-  // Master 07.01. 08:00 Tokio = 06.01. 23:00 UTC, gesucht `2026-01-07`, die
-  // Schleife steht bei diesem Vorkommen auf dem lokalen `2026-01-08`.
-  // Mehr als ein Tag kann es nicht sein: weiter als um einen Kalendertag
-  // koennen UTC und Ortszeit nicht auseinanderliegen. Die AUSWAHL bleibt exakt -
-  // gefiltert wird unveraendert auf `recurrence_identity === recurrenceId`, das
-  // groessere Fenster liefert nur die Kandidaten.
-  const occurrences = expandRecurringEvents(
-    [master],
-    shiftDateKey(recurrenceId, -1),
-    shiftDateKey(recurrenceId, 1),
-    new Map(),
-    {
-      includeRecurrenceIdentity: true,
-      maxIterations: exactLookupIterationLimit(master, recurrenceId),
-      householdZone,
-    },
-  );
-  const occurrence = occurrences.find((candidate) => candidate.recurrence_identity === recurrenceId);
-  if (!occurrence) {
+  const matches = occurrencesForKey(master, recurrenceId, householdZone);
+  if (matches.length === 0) {
     throw invalidRecurrenceIdentity('recurrence_id is not an occurrence of this series.');
   }
-  return occurrence;
+  if (matches.length > 1 && ambiguous === 'reject') {
+    throw new CalendarOccurrenceError(
+      'recurrence_id in the date-only form matches more than one occurrence of this series; send the exact recurrence_id.',
+      { status: 409, code: 'ambiguous_recurrence_id' },
+    );
+  }
+  return matches[0];
 }
 
 function assertOccurrenceSlotCanBeMutated(database, seriesId, recurrenceId) {
