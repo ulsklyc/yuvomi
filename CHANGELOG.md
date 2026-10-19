@@ -134,6 +134,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stored and the dialog keeps everything you entered, so Save simply tries again (#2054).
   **API:** `POST /api/v1/health/medications` accepts an optional `schedules` array and writes the
   medication and its schedules in one transaction.
+- **Saving in a rewards dialog no longer force-closes whichever dialog is open when the answer arrives (#1997).**
+  All seven save paths in the rewards module now capture the modal context before the request and
+  pass it to `closeModal`, so a dialog the user opened while the save was in flight stays open.
 
 - **Large imported recipe collections no longer lock up the app with "Too many requests" (#2048).**
   On iPhone and in Firefox the recipe list fetched the picture of every imported recipe at once
