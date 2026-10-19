@@ -2488,6 +2488,9 @@ function openBulkTagDialog(taskIds, mode, container) {
         e.preventDefault();
         const tag = form.elements.tag.value.trim();
         if (!tag) return;
+        // Geschlossen wird nur dieser Dialog, nicht einer, der waehrend der
+        // Anfrage aufgegangen ist (#1997).
+        const dialog = captureModalContext();
         try {
           const body = mode === 'add' ? { ids: taskIds, add: [tag] } : { ids: taskIds, remove: [tag] };
           const res = await api.post('/tasks/tags/apply', body);
@@ -2501,7 +2504,7 @@ function openBulkTagDialog(taskIds, mode, container) {
               ? `${t('tasks.tagsUpdated', { count: res.data?.updated ?? 0 })} ${t('tasks.tagsSkippedLocked', { count: skipped })}`
               : t('tasks.tagsUpdated', { count: res.data?.updated ?? 0 }),
             'success');
-          closeModal({ force: true });
+          closeModal({ force: true, context: dialog });
           state.selectedTaskIds.clear();
           updateBulkActionsBar(container);
           renderFilters(container);
@@ -2799,7 +2802,9 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
     // zu sehen (Notizen: 25ms). Die Quittung ist die Zeile, die aufzieht, dazu
     // der Toast oben - ein Knopf, hinter dem beides wartet, haelt nur auf.
     // `btnSuccess` bleibt der Baustein fuer Formulare, die offen bleiben.
-    closeModal({ force: true });
+    // Nur dieser Dialog, nicht einer, der waehrend der Anfrage aufgegangen
+    // ist (#1997).
+    closeModal({ force: true, context: dialog });
     // Erst die Tag-Liste, dann neu zeichnen: ein gerade vergebener Tag soll
     // sofort in Filterleiste und Vorschlägen stehen (#586).
     //
@@ -6390,6 +6395,8 @@ export const __test = {
   // Spalte, beide mit dem Aufruf, den sie absetzen - gezaehlt wird, WIE OFT
   // sie den Server fragen, und das sieht kein Textguard.
   runBulkAction, updateBulkActionsBar, toggleTaskSelection, archiveDoneColumn, filteredTasks,
+  // #1997: der Schlagwort-Dialog der Mehrfachauswahl schliesst nur sich selbst.
+  openBulkTagDialog,
   // Was ein Wandtablett zu sehen und zu fassen bekommt (#1209). Die Karte
   // traegt drei Wege zum selben Statuswechsel - Haken, Wisch, Teilaufgabe -,
   // und am Display darf nur der erste erscheinen, weil nur er nach der Person

@@ -3,6 +3,7 @@ import { formatDate, formatTime, t } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { emptyHintEl } from '/utils/empty-state.js';
 import {
+  captureModalContext,
   closeModal,
   confirmModal,
   openModal,
@@ -587,13 +588,16 @@ function openAccountModal(account, onDone) {
           password: panel.querySelector('#cardav-password').value,
         };
 
+        // Geschlossen wird nur dieser Dialog, nicht einer, der waehrend der
+        // Anfrage aufgegangen ist (#1997).
+        const modalContext = captureModalContext();
         try {
           if (isEdit) {
             await api.put(`/contacts/cardav/accounts/${account.id}`, payload);
           } else {
             await api.post('/contacts/cardav/accounts', payload);
           }
-          closeModal({ force: true });
+          closeModal({ force: true, context: modalContext });
           showToast(
             isEdit ? t('settings.cardavAccountUpdated') : t('settings.cardavAccountAdded'),
             'success',
@@ -623,3 +627,6 @@ export async function render(container, { user }) {
   await loadAccounts(container, user);
   window.lucide?.createIcons({ el: container });
 }
+
+// #1997: der Konto-Dialog, bis in seinen Speichern-Weg.
+export const __test = { openAccountModal };

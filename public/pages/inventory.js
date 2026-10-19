@@ -1426,7 +1426,9 @@ function openCompletionSheet(item, trackedDate) {
             // und der Abschluss saehe fuer den Aufrufer wie ein Abbruch aus,
             // obwohl die Frist bereits serverseitig erledigt ist.
             settle(true);
-            await closeSharedModal({ force: true });
+            // Nur diese Karte, nicht ein Dialog, der waehrend der Anfrage
+            // aufgegangen ist (#1997).
+            await closeSharedModal({ force: true, context: dialog });
             window.yuvomi?.showToast(t('inventory.completed'), 'success');
           } catch (err) {
             saveBtn.disabled = false;
@@ -2240,7 +2242,9 @@ async function saveItem(panel, mode, item, attachments, pickedBooking, photoData
     if (mode === 'create') await api.post('/inventory/items', payload);
     else await api.put(`/inventory/items/${item.id}`, payload);
     await reloadAfterSave(() => loadItems());
-    closeSharedModal({ force: true });
+    // Nur dieser Dialog, nicht einer, der waehrend der Anfrage aufgegangen
+    // ist (#1997).
+    closeSharedModal({ force: true, context: dialog });
     renderList({ repaint: true, motion: true });
     updateAttentionBadge();
     window.yuvomi?.showToast(mode === 'create' ? t('inventory.created') : t('inventory.updated'), 'success');

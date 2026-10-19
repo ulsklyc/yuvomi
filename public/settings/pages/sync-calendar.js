@@ -750,6 +750,9 @@ function bindCalDAVAddButton(container, user) {
             return;
           }
 
+          // Geschlossen wird nur dieser Dialog, nicht einer, der waehrend der
+          // Anfrage aufgegangen ist (#1997).
+          const modalContext = captureModalContext();
           try {
             await api.post('/calendar/caldav/accounts', {
               name,
@@ -757,7 +760,7 @@ function bindCalDAVAddButton(container, user) {
               username,
               password,
             });
-            closeModal({ force: true });
+            closeModal({ force: true, context: modalContext });
             showToast(t('settings.caldavAccountAdded'), 'success');
             await reloadAfterSave(() => loadCalDAVAccounts(container, user));
             refocusAfterRender();
@@ -1726,4 +1729,4 @@ export async function render(container, { user, query } = {}) {
 }
 
 // Für die Suite: die Google-Karte für sich, ohne die ganze Seite (#2019).
-export const __test = { buildGoogleProvider };
+export const __test = { buildGoogleProvider, bindCalDAVAddButton };
