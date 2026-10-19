@@ -6,7 +6,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, confirmOverModal, advancedSection, wireBlurValidation, reportFieldError, reportFieldErrors, refocusAfterRender } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, captureModalContext, confirmOverModal, advancedSection, wireBlurValidation, reportFieldError, reportFieldErrors, refocusAfterRender } from '/components/modal.js';
 import { renderDocumentAttachField, bindDocumentAttachField, attachmentLinksNode } from '/components/document-attach.js';
 import { openDetailView } from '/components/detail-view.js';
 import { stagger, vibrate, scheduleUndoableDelete, growBars, isImeComposing } from '/utils/ux.js';
@@ -2998,9 +2998,10 @@ function openAccountModal(account = null) {
       panel.querySelector('#am-archive')?.addEventListener('click', async () => {
         if (readOnly()) return;
         const nextArchived = !account.archived;
+        const modalContext = captureModalContext();
         try {
           await api.put(`/budget/accounts/${account.id}`, { archived: nextArchived });
-          closeModal({ force: true });
+          closeModal({ force: true, context: modalContext });
           await reloadAfterSave(() => loadAccounts());
           renderBody();
           refocusAfterRender();
@@ -3057,6 +3058,7 @@ function openAccountModal(account = null) {
             && [panel.querySelector('#am-credit-limit'), t('budget.validAmountRequired')],
         ])) return;
 
+        const modalContext = captureModalContext();
         saveBtn.disabled = true;
         saveBtn.textContent = '…';
         try {
@@ -3070,7 +3072,7 @@ function openAccountModal(account = null) {
           } else {
             await api.post('/budget/accounts', body);
           }
-          closeModal({ force: true });
+          closeModal({ force: true, context: modalContext });
           await reloadAfterSave(() => loadAccounts());
           renderBody();
           refocusAfterRender();
@@ -4578,6 +4580,9 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
 
         const amount = currentType === 'expense' ? -absVal : absVal;
 
+        // Der Dialog, aus dem gespeichert wird: nur ihn duerfen die Wege unten
+        // schliessen, nicht einen, der waehrend der Anfrage offen ist (#1997).
+        const modalContext = captureModalContext();
         saveBtn.disabled    = true;
         saveBtn.textContent = '…';
 
@@ -4613,7 +4618,7 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
             const res = await api.post('/budget', await withReceipts());
             state.entries.unshift(res.data);
             await reloadAfterSave(() => reloadMonth());
-            closeModal({ force: true });
+            closeModal({ force: true, context: modalContext });
             redrawEntries();
             window.yuvomi?.showToast(t('budget.addedToast'), 'success');
           } else if (entry.recurrence_parent_id || (entry.is_recurring && recurring)) {
@@ -4632,7 +4637,7 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
             // Serie liefe mit Erfolgs-Toast still weiter.
             saveBtn.disabled = false;
             saveBtn.textContent = t('common.save');
-            closeModal({ force: true });
+            closeModal({ force: true, context: modalContext });
             const scope = await recurringChoiceModal({
               title: t('budget.recurringSeriesScope'),
               thisLabel: t('budget.recurringThisOnly'),
@@ -4679,7 +4684,7 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
             const idx = state.entries.findIndex((e) => e.id === entry.id);
             if (idx !== -1) state.entries[idx] = res.data;
             await reloadAfterSave(() => reloadMonth());
-            closeModal({ force: true });
+            closeModal({ force: true, context: modalContext });
             renderBody();
             window.yuvomi?.showToast(t('budget.savedToast'), 'success');
           }
@@ -5597,6 +5602,8 @@ async function saveLoanFromPanel(panel, saveBtn, { loan = null, closeAfterSave =
   if (accountSel) body.account_id = accountSel.value === '' ? null : parseInt(accountSel.value, 10);
 
   const saveLabel = isEdit ? t('common.save') : t('common.add');
+  // Vor der ersten Anfrage: geschlossen wird nur dieser Dialog (#1997).
+  const modalContext = captureModalContext();
   saveBtn.disabled = true;
   saveBtn.textContent = '…';
   // Gezahlte Raten gegen die abgeleitete Laufzeit (#1656) - nur wo es etwas zu
@@ -5617,7 +5624,7 @@ async function saveLoanFromPanel(panel, saveBtn, { loan = null, closeAfterSave =
       await api.post('/budget/loans', body);
     }
     await reloadAfterSave(() => reloadMonth());
-    if (closeAfterSave) closeModal({ force: true });
+    if (closeAfterSave) closeModal({ force: true, context: modalContext });
     renderBody();
     window.yuvomi?.showToast(isEdit ? t('budget.loanSavedToast') : t('budget.loanAddedToast'), 'success');
   } catch (err) {
@@ -5803,9 +5810,10 @@ async function openConfirmBookingModal(id) {
         }
         if (rejectOffGridAmount(amountEl, value, state.currency, { original: absAmount })) return;
         const date = panel.querySelector('#cb-date').value;
+        const modalContext = captureModalContext();
         try {
           await api.patch(`/budget/${id}/confirm`, { amount: value, date: date || undefined });
-          closeModal({ force: true });
+          closeModal({ force: true, context: modalContext });
           await reloadAfterSave(() => reloadMonth());
           renderBody();
           refocusAfterRender();
@@ -6205,6 +6213,8 @@ export const __test = {
   // den er mit Schreibrecht zeigt, im Bericht steht (P6-Muster).
   openLoanModal,
   openAccountModal,
+  // #1997: das Buchen einer vorgemerkten Buchung, bis in seinen Speichern-Weg.
+  openConfirmBookingModal,
   // renderBody() schreibt in den Seitencontainer statt Markup zurueckzugeben;
   // derselbe Griff wie updateTabsForTest oben laesst den ECHTEN Render-Pfad
   // des Buchungs-Tabs laufen, statt seinen Quelltext zu lesen.

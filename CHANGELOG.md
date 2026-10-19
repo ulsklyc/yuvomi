@@ -68,6 +68,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the pantry and taking ingredients from the meal plan, and for the reload after something was deleted
   elsewhere. If you had closed the dialog and opened another one before the answer arrived, the other
   one stays open with what you typed in it.
+- **Saving in a Budget or Housekeeping dialog no longer closes a dialog you opened in the meantime (#1997).**
+  In Budget, entries, loans, accounts (save and archive) and confirming a planned entry now close only
+  the dialog the save came from. In Housekeeping, the same holds for adding and editing a task,
+  editing a visit and saving a staff member. If you had closed the dialog and opened another one
+  before the answer arrived, the other one stays open with what you typed in it.
 - **Recurring events on the day the clocks change are no longer an hour off (#2034).**
   A series with its own time zone, for example a daily 01:30 event in Berlin, showed the occurrence
   on the day of the clock change one hour early or late, both in the calendar and in subscribed
