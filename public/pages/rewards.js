@@ -11,7 +11,7 @@ import { t, formatDate, getLocale, getNumberFormat } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
-import { openModal, closeModal, confirmModal, confirmOverModal, refocusAfterRender } from '/components/modal.js';
+import { openModal, closeModal, captureModalContext, confirmModal, confirmOverModal, refocusAfterRender } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { wireTablist } from '/utils/tablist.js';
@@ -1035,6 +1035,7 @@ async function openRedeemModal(memberId, presetItemId = null) {
       panel.querySelector('#rw-redeem-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         errEl.hidden = true;
+        const modalContext = captureModalContext();
         submit.disabled = true;
         try {
           await api.post('/rewards/redemptions', {
@@ -1042,7 +1043,7 @@ async function openRedeemModal(memberId, presetItemId = null) {
             user_id: Number(memberEl.value),
             note: panel.querySelector('#rw-redeem-note').value.trim() || undefined,
           });
-          await closeModal({ force: true });
+          closeModal({ force: true, context: modalContext });
           toast(isAdmin() ? t('rewards.toastRedeemed') : t('rewards.toastRequested'));
           await reloadAfterSave(() => refreshActiveTab());
           refocusAfterRender();
@@ -1163,6 +1164,7 @@ function openBonusModal() {
         if (!Number.isFinite(delta) || delta === 0) {
           errEl.textContent = t('rewards.pointsSignedHint'); errEl.hidden = false; return;
         }
+        const modalContext = captureModalContext();
         submit.disabled = true; errEl.hidden = true;
         try {
           await api.post('/rewards/bonus', {
@@ -1170,7 +1172,7 @@ function openBonusModal() {
             delta,
             reason: panel.querySelector('#rw-bonus-reason').value.trim() || undefined,
           });
-          await closeModal({ force: true });
+          closeModal({ force: true, context: modalContext });
           toast(t('rewards.toastBonus'));
           await reloadAfterSave(() => refreshActiveTab());
           refocusAfterRender();
@@ -1260,11 +1262,12 @@ function openRewardModal(item) {
           description: panel.querySelector('#rw-reward-desc').value.trim() || null,
         };
         if (isEdit) body.is_active = panel.querySelector('#rw-reward-active').checked;
+        const modalContext = captureModalContext();
         submit.disabled = true; errEl.hidden = true;
         try {
           if (isEdit) await api.patch(`/rewards/catalog/${item.id}`, body);
           else await api.post('/rewards/catalog', body);
-          await closeModal({ force: true });
+          closeModal({ force: true, context: modalContext });
           toast(t('rewards.toastSaved'));
           await reloadAfterSave(() => refreshActiveTab());
           refocusAfterRender();
@@ -1663,12 +1666,13 @@ function openMoneyRequestModal(kind, memberId) {
         if (withdrawal && decimalToMinor(amount, account) > account.balance_minor) {
           errEl.textContent = t('rewards.money.insufficient'); errEl.hidden = false; return;
         }
+        const modalContext = captureModalContext();
         submit.disabled = true;
         try {
           await api.post('/rewards/redemptions', {
             kind, amount, note: panel.querySelector('#rw-money-note').value.trim() || undefined,
           });
-          await closeModal({ force: true });
+          closeModal({ force: true, context: modalContext });
           toast(t('rewards.toastRequested'));
           await reloadAfterSave(() => refreshActiveTab());
           refocusAfterRender();
@@ -1725,6 +1729,7 @@ function openMoneyBookModal(memberId) {
         errEl.hidden = true;
         const amount = readMoneyAmount(input, errEl, account);
         if (amount == null) return;
+        const modalContext = captureModalContext();
         submit.disabled = true;
         try {
           await api.post('/rewards/money/entries', {
@@ -1732,7 +1737,7 @@ function openMoneyBookModal(memberId) {
             direction: panel.querySelector('#rw-money-direction').value,
             reason: panel.querySelector('#rw-money-reason').value.trim() || undefined,
           });
-          await closeModal({ force: true });
+          closeModal({ force: true, context: modalContext });
           toast(t('rewards.toastSaved'));
           await reloadAfterSave(() => refreshActiveTab());
           refocusAfterRender();
@@ -1835,6 +1840,7 @@ function openMoneyPlanModal(memberId) {
         const amount = readMoneyAmount(panel.querySelector('#rw-money-amount'), errEl, planCtx);
         if (amount == null) return;
         const weekly = freqEl.value === 'weekly';
+        const modalContext = captureModalContext();
         submit.disabled = true;
         try {
           await api.put(`/rewards/money/plans/${account.id}`, {
@@ -1843,7 +1849,7 @@ function openMoneyPlanModal(memberId) {
             anchor_day: Number(panel.querySelector(weekly ? '#rw-plan-weekday' : '#rw-plan-monthday').value),
             paused: panel.querySelector('#rw-plan-paused').checked,
           });
-          await closeModal({ force: true });
+          closeModal({ force: true, context: modalContext });
           toast(t('rewards.toastSaved'));
           await reloadAfterSave(() => refreshActiveTab());
           refocusAfterRender();
@@ -1886,10 +1892,11 @@ function openMoneyAccountModal() {
       panel.querySelector('#rw-account-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         errEl.hidden = true;
+        const modalContext = captureModalContext();
         submit.disabled = true;
         try {
           await api.post('/rewards/money/accounts', { user_id: Number(panel.querySelector('#rw-account-member').value) });
-          await closeModal({ force: true });
+          closeModal({ force: true, context: modalContext });
           toast(t('rewards.toastSaved'));
           await reloadAfterSave(() => refreshActiveTab());
           refocusAfterRender();

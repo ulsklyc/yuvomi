@@ -317,7 +317,7 @@ const LATE_MODAL_CLOSE_BESTAND = {
   'pages/inventory.js': 2,
   'pages/meals.js': 4,
   'pages/pantry.js': 1,
-  'pages/rewards.js': 7,
+  'pages/rewards.js': 0,
   'pages/schedule.js': 4,
   'pages/shopping.js': 0,
   'pages/split-expenses.js': 6,
