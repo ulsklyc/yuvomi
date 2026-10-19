@@ -404,3 +404,97 @@ test('#1540 Bearbeiten-Formular: Speichern schickt den vorbelegten Tag als origi
   assert.equal(puts[0].body.date, '2026-10-05');
   assert.equal(puts[0].body.original_date, '2026-10-01', 'der Tag, den das Formular gezeigt hat');
 });
+
+// -------------------------------------------------------------------------
+// #1997: eine spaete Erfolgsantwort schliesst nur ihren EIGENEN Dialog
+// -------------------------------------------------------------------------
+
+// Kommt die Antwort erst, nachdem der Nutzer den Dialog geschlossen und einen
+// anderen geoeffnet hat, darf das force-Schliessen nur den eigenen treffen. Ob
+// der Slot noch denselben Dialog haelt, entscheidet closeModal({ context }) in
+// components/modal.js (am echten Modul gemessen in test-modal-dead-time.js);
+// hier zaehlt die Verdrahtung: jeder Weg der Seite, der nach einer Anfrage
+// schliesst, reicht den VOR der Anfrage gemerkten Kontext hinein. Gefahren wird
+// je Weg der echte Submit-Handler; die schreibende Anfrage wechselt den
+// Kontext, wie es ein inzwischen geoeffneter Dialog tut.
+
+/** Oeffnet einen Dialog ueber den Modal-Stub; liefert den Submit des Formulars `formSel`. */
+function hkDialog(oeffne, formSel, felder) {
+  let opts = null;
+  const vorher = globalThis.__openModal;
+  globalThis.__openModal = (o) => { opts = o; };
+  try { oeffne(); } finally { globalThis.__openModal = vorher; }
+  assert.ok(opts, 'der Dialog wurde geoeffnet');
+  const handlers = {};
+  const element = (sel) => ({
+    addEventListener(type, fn) { handlers[`${sel}:${type}`] = fn; },
+    querySelector: () => null, querySelectorAll: () => [], setAttribute() {}, removeAttribute() {},
+    classList: { add() {}, remove() {}, toggle() {} }, dataset: {}, style: {},
+  });
+  opts.onSave({ querySelector: element, querySelectorAll: () => [], addEventListener() {} });
+  const elements = Object.fromEntries(Object.entries(felder).map(([k, v]) => [k, { value: v, focus() {} }]));
+  return () => handlers[`${formSel}:submit`]({ preventDefault() {}, currentTarget: { elements, querySelector: () => null } });
+}
+
+const HK_INHALT = {
+  isConnected: false, querySelector: () => null, querySelectorAll: () => [],
+  replaceChildren() {}, insertAdjacentHTML() {}, appendChild() {}, addEventListener() {},
+};
+const HK_ERFOLGSWEGE = [
+  ['Aufgabe anlegen', () => hkDialog(() => hk.openTaskCreateModal(HK_INHALT), '#housekeeping-task-form',
+    { name: 'Fenster', area: 'Wohnzimmer', frequency_days: '14' })],
+  ['Aufgabe bearbeiten', () => hkDialog(() => hk.openTaskEditModal({ id: 5, name: 'Fenster', area: 'Wohnzimmer', frequency_days: 14 }, HK_INHALT),
+    '#housekeeping-task-edit-form', { name: 'Fenster', area: 'Bad', frequency_days: '7' })],
+  ['Einsatz bearbeiten', () => hkDialog(() => hk.openVisitEditModal(
+    { id: 24, worker_id: 7, can_edit: true, rate_type: 'daily', check_in: '2026-09-30T08:00:00.000Z', daily_rate: 40, extras: 0 },
+    HK_INHALT, { onDone() {} }), '#housekeeping-visit-form', { date: '2026-10-05', daily_rate: '40', extras: '0' })],
+  ['Person speichern', () => hkDialog(() => hk.openStaffModal(null, HK_INHALT, { afterSave() {} }), '#housekeeping-worker-form', {
+    id: '', display_name: 'Maria', username: '', phone: '', email: '', birth_date: '', rate_type: 'daily', daily_rate: '40',
+    hourly_rate: '0', payment_schedule: 'monthly', calendar_color: '', avatar_color: '', notes: '',
+  })],
+];
+
+test('Erfolg nach Dialogwechsel - jeder Weg schliesst nur mit dem Kontext von VOR der Anfrage (#1997)', async () => {
+  const s = hk.state();
+  const zuvor = { workers: s.workers, canManageWorkers: s.canManageWorkers, tab: s.tab };
+  // Nach dem Schliessen zeichnet die Seite neu - dafuer genuegt das Mini-DOM.
+  const { installMiniDom } = await import('./mini-dom.js');
+  const deinstalliere = installMiniDom();
+  try {
+    for (const [name, vorbereiten] of HK_ERFOLGSWEGE) {
+      Object.assign(s, { workers: [{ id: 7, display_name: 'Maria' }], canManageWorkers: true, tab: 'staff' });
+      const ausloesen = vorbereiten();
+      toastCalls.length = 0;
+      let kontext = 'eigener-dialog';
+      const geschlossen = [];
+      const geschrieben = [];
+      globalThis.__modalContextId = () => kontext;
+      globalThis.__closeModal = (opts) => { geschlossen.push(opts); };
+      const schreibe = (verb) => async (path) => {
+        geschrieben.push(`${verb} ${path}`);
+        kontext = 'ein-anderer-dialog';
+        return { data: {} };
+      };
+      globalThis.__apiStub = { get: async () => ({ data: [] }), post: schreibe('POST'), put: schreibe('PUT'), patch: schreibe('PATCH') };
+      try {
+        await ausloesen();
+        // Das Anlegen startet seinen Lauf ohne ihn abzuwarten (Submit und
+        // Vorlagen teilen sich `run`): einmal die Warteschlange leerlaufen lassen.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        assert.ok(geschrieben.length > 0, `${name}: der Weg schreibt`);
+        assert.equal(toastCalls.some(([, art]) => art === 'danger'), false, `${name}: der Erfolg ist kein Fehler (${JSON.stringify(toastCalls)})`);
+        assert.equal(geschlossen.length, 1, `${name}: genau ein Schliessen (${JSON.stringify(geschlossen)})`);
+        assert.equal(geschlossen[0].force, true, `${name}: force wie bisher`);
+        assert.equal(geschlossen[0].context, 'eigener-dialog',
+          `${name}: geschlossen wird ohne den Kontext von vor der Anfrage - die spaete Antwort traefe den Dialog, der jetzt offen ist`);
+      } finally {
+        delete globalThis.__modalContextId;
+        delete globalThis.__closeModal;
+        delete globalThis.__apiStub;
+      }
+    }
+  } finally {
+    Object.assign(s, zuvor);
+    deinstalliere();
+  }
+});
