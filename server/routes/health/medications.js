@@ -77,6 +77,50 @@ function deductStock(medId, qty) {
   ).run(qty, medId);
 }
 
+/**
+ * Prueft ein Zeitfenster des Einnahmeplans. Geteilt von POST /schedules und
+ * dem Anlegen eines Medikaments samt Plan (#2054), damit beide dieselben
+ * Grenzen ziehen.
+ */
+function parseSchedule(b) {
+  const timeOfDay = v.time(b.time_of_day, 'time_of_day');
+  const dose      = v.num(b.dose_qty, 'dose_qty');
+  const startDate = v.date(b.start_date, 'start_date');
+  const endDate   = v.date(b.end_date, 'end_date');
+
+  const checks = [timeOfDay, dose, startDate, endDate];
+  if (!b.time_of_day) checks.push({ error: 'time_of_day is required.' });
+
+  let daysMask = null;
+  if (b.days_mask !== undefined && b.days_mask !== null && b.days_mask !== '') {
+    const n = Number(b.days_mask);
+    if (!Number.isInteger(n) || n < 0 || n > 127) checks.push({ error: 'days_mask must be an integer between 0 and 127.' });
+    else daysMask = n;
+  }
+
+  const active = toBit(b.active);
+  return {
+    errors: v.collectErrors(checks),
+    values: {
+      timeOfDay: timeOfDay.value, daysMask, dose: dose.value,
+      startDate: startDate.value, endDate: endDate.value,
+      active: active === undefined ? 1 : active,
+    },
+  };
+}
+
+/** Legt ein geprueftes Zeitfenster an und gibt seine id zurueck. */
+function insertSchedule(medId, s) {
+  return db.get().prepare(`
+    INSERT INTO medication_schedules (medication_id, time_of_day, days_mask, dose_qty, start_date, end_date, active)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(medId, s.timeOfDay, s.daysMask, s.dose, s.startDate, s.endDate, s.active).lastInsertRowid;
+}
+
+// So viele Zeitfenster bringt ein Medikament beim Anlegen hoechstens mit:
+// grosszuegig fuer jeden echten Plan, aber kein unbegrenzter Body.
+const MAX_SCHEDULES_ON_CREATE = 48;
+
 // Diese beiden Helfer sind der einzige Zugang zu einem Medikament: Plaene und
 // Einnahmeprotokolle haengen daran und erben ihr Scoping von hier. Die Betreuung
 // (#584) greift deshalb an genau zwei Stellen statt in jeder der neun
@@ -134,6 +178,25 @@ router.post('/medications', (req, res) => {
     const prnDoseQty = prnDose(b.prn_dose_qty);
 
     const errors = v.collectErrors([name, dosageText, form, stockQty, stockUnit, refill, note, visibility, interval, prnDoseQty]);
+
+    // Optionaler Einnahmeplan (#2054): das Formular legt ein neues Medikament
+    // und seine Zeitfenster in EINEM Request an. Vorher waren es mehrere, und
+    // scheiterte ein Zeitfenster, stand das Medikament schon - ein Abbrechen
+    // liess es dann ohne Plan zurueck. Jetzt gilt alles oder nichts: erst
+    // werden alle Zeitfenster geprueft, dann schreibt eine Transaktion.
+    const schedules = [];
+    if (b.schedules !== undefined && b.schedules !== null) {
+      if (!Array.isArray(b.schedules)) errors.push('schedules must be an array.');
+      else if (b.schedules.length > MAX_SCHEDULES_ON_CREATE) errors.push(`schedules must not contain more than ${MAX_SCHEDULES_ON_CREATE} entries.`);
+      else {
+        b.schedules.forEach((raw, i) => {
+          if (!raw || typeof raw !== 'object' || Array.isArray(raw)) { errors.push(`schedules[${i}] must be an object.`); return; }
+          const parsed = parseSchedule(raw);
+          for (const e of parsed.errors) errors.push(`schedules[${i}]: ${e}`);
+          schedules.push(parsed.values);
+        });
+      }
+    }
     if (errors.length) return badRequest(res, errors);
 
     const active = toBit(b.active); // undefined → default 1
@@ -144,17 +207,28 @@ router.post('/medications', (req, res) => {
     const owner = resolveOwner(req, viewer);
     if (owner.error) return res.status(owner.status).json({ error: owner.error, code: owner.status });
 
-    const result = db.get().prepare(`
-      INSERT INTO medications (user_id, name, dosage_text, form, active, prn, stock_qty, stock_unit, refill_threshold, note, visibility,
-                               min_interval_hours, prn_dose_qty)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(owner.ownerId, name.value, dosageText.value, form.value,
-           active === undefined ? 1 : active, prn === undefined ? 0 : prn,
-           stockQty.value, stockUnit.value, refill.value, note.value,
-           visibility.value || defaultVisibilityFor(db.get(), owner.ownerId, 'meds'),
-           interval.value, prnDoseQty.value);
+    const medId = db.get().transaction(() => {
+      const result = db.get().prepare(`
+        INSERT INTO medications (user_id, name, dosage_text, form, active, prn, stock_qty, stock_unit, refill_threshold, note, visibility,
+                                 min_interval_hours, prn_dose_qty)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(owner.ownerId, name.value, dosageText.value, form.value,
+             active === undefined ? 1 : active, prn === undefined ? 0 : prn,
+             stockQty.value, stockUnit.value, refill.value, note.value,
+             visibility.value || defaultVisibilityFor(db.get(), owner.ownerId, 'meds'),
+             interval.value, prnDoseQty.value);
+      for (const sched of schedules) insertSchedule(result.lastInsertRowid, sched);
+      return result.lastInsertRowid;
+    })();
 
-    const row = db.get().prepare('SELECT * FROM medications WHERE id = ?').get(result.lastInsertRowid);
+    const row = db.get().prepare('SELECT * FROM medications WHERE id = ?').get(medId);
+    // Die angelegten Zeitfenster nur, wenn welche mitkamen: ohne `schedules`
+    // bleibt die Antwort genau die bisherige Zeile.
+    if (Array.isArray(b.schedules)) {
+      row.schedules = db.get().prepare(
+        'SELECT * FROM medication_schedules WHERE medication_id = ? ORDER BY time_of_day ASC, id ASC'
+      ).all(medId);
+    }
     res.status(201).json({ data: row });
   } catch (err) {
     log.error('Error creating medication:', err.message);
@@ -246,33 +320,11 @@ router.post('/medications/:id/schedules', (req, res) => {
     if (!medId) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
     if (!medicationWritable(medId, viewer)) return res.status(404).json({ error: 'Medication not found.', code: 404, reason: 'health_medication_not_found' });
 
-    const b = req.body || {};
-    const timeOfDay = v.time(b.time_of_day, 'time_of_day');
-    const dose      = v.num(b.dose_qty, 'dose_qty');
-    const startDate = v.date(b.start_date, 'start_date');
-    const endDate   = v.date(b.end_date, 'end_date');
+    const sched = parseSchedule(req.body || {});
+    if (sched.errors.length) return badRequest(res, sched.errors);
 
-    const checks = [timeOfDay, dose, startDate, endDate];
-    if (!b.time_of_day) checks.push({ error: 'time_of_day is required.' });
-
-    let daysMask = null;
-    if (b.days_mask !== undefined && b.days_mask !== null && b.days_mask !== '') {
-      const n = Number(b.days_mask);
-      if (!Number.isInteger(n) || n < 0 || n > 127) checks.push({ error: 'days_mask must be an integer between 0 and 127.' });
-      else daysMask = n;
-    }
-
-    const errors = v.collectErrors(checks);
-    if (errors.length) return badRequest(res, errors);
-
-    const active = toBit(b.active);
-    const result = db.get().prepare(`
-      INSERT INTO medication_schedules (medication_id, time_of_day, days_mask, dose_qty, start_date, end_date, active)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(medId, timeOfDay.value, daysMask, dose.value, startDate.value, endDate.value,
-           active === undefined ? 1 : active);
-
-    const row = db.get().prepare('SELECT * FROM medication_schedules WHERE id = ?').get(result.lastInsertRowid);
+    const id = insertSchedule(medId, sched.values);
+    const row = db.get().prepare('SELECT * FROM medication_schedules WHERE id = ?').get(id);
     res.status(201).json({ data: row });
   } catch (err) {
     log.error('Error creating schedule:', err.message);

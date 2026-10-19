@@ -162,21 +162,40 @@ test('Personen ohne Bild bekommen keine Adresse', async () => {
 // Die Route liefert das Bild
 // --------------------------------------------------------
 
-test('GET /people/:id/avatar liefert die Bild-Bytes mit ETag', async () => {
+test('GET /people/:id/avatar liefert die Bild-Bytes mit ETag, revalidierbar statt immutable', async () => {
   const res = await fetch(`${BASE}${keyedUrl(BOB)}`, { headers: { Cookie: adminSession.cookie } });
   assert.equal(res.status, 200);
   assert.equal(res.headers.get('content-type'), 'image/jpeg');
-  assert.match(String(res.headers.get('cache-control')), /private/);
-  assert.match(String(res.headers.get('cache-control')), /immutable/, 'der Schluessel wechselt mit dem Bild, die Adresse zeigt nie ein anderes');
-  assert.doesNotMatch(String(res.headers.get('cache-control')), /no-store/, 'no-store verhindert den Browser-Cache');
+  // `private, no-cache`, NIE `max-age`/`immutable`: ein Jahr im HTTP-Cache liess
+  // das Bild nach dem Abmelden oder einem Kontowechsel im selben Browser ohne
+  // requireAuth und Rechtepruefung kommen - das Abmelden leert nur den Cache
+  // des Service Workers. Mit `no-cache` fragt der Browser jedes Mal nach.
+  assert.equal(res.headers.get('cache-control'), 'private, no-cache');
   const etag = res.headers.get('etag');
-  assert.ok(etag, 'ETag gesetzt');
+  assert.match(etag ?? '', /^"[0-9a-f]{32}"$/, 'starkes ETag gesetzt');
   assert.deepEqual(Buffer.from(await res.arrayBuffer()), JPEG_BYTES, 'dieselben Bytes wie hochgeladen');
 
   const again = await fetch(`${BASE}${keyedUrl(BOB)}`, {
     headers: { Cookie: adminSession.cookie, 'If-None-Match': etag },
   });
   assert.equal(again.status, 304, 'unveraendertes Bild: 304 ohne Rumpf');
+  assert.equal(again.headers.get('cache-control'), 'private, no-cache', 'auch das 304 erlaubt kein Liegenbleiben');
+  assert.equal(again.headers.get('etag'), etag);
+
+  // Die Nachfrage laeuft durch die Gates: abgemeldet kein 304, sondern 401.
+  const anon = await fetch(`${BASE}${keyedUrl(BOB)}`, { headers: { 'If-None-Match': etag } });
+  assert.equal(anon.status, 401, 'ohne Sitzung bestaetigt die Route kein gecachtes Bild');
+  assert.match(String(anon.headers.get('cache-control')), /no-store/);
+});
+
+test('Fehlerantworten der Bildroute behalten no-store und tragen kein Versions-ETag', async () => {
+  const wrongKey = await fetch(`${BASE}/api/v1/people/${BOB}/avatar?v=${'0'.repeat(32)}`, { headers: { Cookie: adminSession.cookie } });
+  assert.equal(wrongKey.status, 404);
+  assert.match(String(wrongKey.headers.get('cache-control')), /no-store/);
+  assert.doesNotMatch(wrongKey.headers.get('etag') ?? '', /^"[0-9a-f]{32}"$/);
+  const bad = await fetch(`${BASE}/api/v1/people/abc/avatar`, { headers: { Cookie: adminSession.cookie } });
+  assert.equal(bad.status, 400);
+  assert.match(String(bad.headers.get('cache-control')), /no-store/);
 });
 
 test('ein neues Bild bekommt eine neue Adresse und ein neues ETag', async () => {

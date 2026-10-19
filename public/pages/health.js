@@ -3708,11 +3708,6 @@ function openMedModal(med) {
   // Entwurf, und das Speichern legt sie gleich danach an. Beim Bearbeiten
   // bleibt es wie zuvor: jedes Zeitfenster speichert sofort.
   const draft = isEdit ? null : [];
-  // Ein neues Medikament, das schon angelegt ist, waehrend ein Zeitfenster
-  // danach scheiterte: der naechste Versuch aendert es statt es zu verdoppeln.
-  // Ein schon gespeichertes Zeitfenster traegt seine Server-id im Entwurf
-  // (`savedId`, siehe wireSchedEditor): Loeschen trifft dann auch den Server.
-  let createdId = null;
   // BESTAND UND NOTIZ HINTER "WEITERE EINSTELLUNGEN" (dieselbe Re-Critique):
   // der Dialog mass mobil 1082px, die drei Bestandsfelder standen auch fuer
   // ein Medikament offen, dessen Packung niemand zaehlt. Hat es einen Bestand
@@ -3836,28 +3831,13 @@ function openMedModal(med) {
         submitBtn.disabled = true;
         try {
           if (isEdit) await api.patch(`/health/medications/${med.id}`, body);
-          else {
-            // Die Zeitfenster des Entwurfs nach dem Medikament: es gibt sie
-            // erst mit seiner id. Scheitert eines, steht das Medikament schon
-            // und der Dialog bleibt offen. Der naechste Versuch legt es darum
-            // NICHT noch einmal an, sondern aendert das schon angelegte
-            // (`createdId`), und schickt nur die Zeitfenster, die noch fehlen
-            // (ohne `savedId`) - sonst entstuenden Medikament und Plan doppelt.
-            if (createdId == null) {
-              const created = await api.post('/health/medications', { ...body, ...ownerField(meds.personId, meds.meId) });
-              createdId = created?.data?.id ?? null;
-            } else {
-              await api.patch(`/health/medications/${createdId}`, body);
-            }
-            if (createdId != null) {
-              for (const sched of draft) {
-                if (sched.savedId != null) continue;
-                const res = await api.post(`/health/medications/${createdId}/schedules`, sched);
-                // Nicht enumerierbar: es reist nie in einen Request-Body.
-                Object.defineProperty(sched, 'savedId', { value: res?.data?.id ?? null, writable: true });
-              }
-            }
-          }
+          // Medikament und Entwurfsplan in EINEM Request (#2054): der Server
+          // schreibt beides in einer Transaktion. Scheitert er, steht nichts
+          // - der Dialog bleibt mit allen Eingaben offen, Speichern versucht
+          // es noch einmal, Abbrechen hinterlaesst kein Medikament ohne Plan.
+          // Vorher kamen die Zeitfenster einzeln nach dem Medikament, und ein
+          // Abbrechen nach einem gescheiterten Zeitfenster liess es stehen.
+          else await api.post('/health/medications', { ...body, schedules: draft, ...ownerField(meds.personId, meds.meId) });
           closeModal({ force: true });
           window.yuvomi?.showToast(t('health.meds.saved'), 'success');
           await reloadAfterSave(() => reloadMedViews());
@@ -4021,22 +4001,9 @@ function wireSchedEditor(panel, med, draft = null) {
   host.querySelectorAll('[data-sched-del]').forEach((btn) =>
     btn.addEventListener('click', async () => {
       if (isDraft) {
+        // Ein Entwurf liegt nur hier: das Anlegen schreibt Medikament und Plan
+        // zusammen oder gar nicht (#2054), am Server steht davon nichts.
         const index = Number(String(btn.dataset.schedDel).replace('draft-', ''));
-        const saved = draft[index]?.savedId;
-        // Ein Teil-Speichern hat dieses Zeitfenster schon angelegt: es nur aus
-        // dem Entwurf zu nehmen liesse es am Medikament stehen, und der
-        // naechste Versuch ueberspraenge es.
-        if (saved != null) {
-          btn.disabled = true;
-          try {
-            await api.delete(`/health/schedules/${saved}`);
-          } catch (err) {
-            console.error('[Health] schedule delete error:', err);
-            btn.disabled = false;
-            reportError(err, 'health.meds.saveError', reloadMedViews);
-            return;
-          }
-        }
         draft.splice(index, 1);
         renderSchedEditor(panel, med, draft);
         return;
