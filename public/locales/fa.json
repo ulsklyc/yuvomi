@@ -4060,7 +4060,12 @@
         "errorAmountsHidden": "فقط کسی که اجازه دیدن مبالغ کمک منزل را دارد می‌تواند پرداخت را ثبت کند.",
         "notHereToday": "امروز هنوز نیامده",
         "tabVisits": "بازدیدها",
-        "tabChores": "کارهای خانه"
+        "tabChores": "کارهای خانه",
+        "errorWorkerGone": "این خدمتکار خانه دیگر وجود ندارد.",
+        "errorVisitGone": "این بازدید دیگر وجود ندارد.",
+        "errorTaskGone": "این کار دیگر وجود ندارد.",
+        "errorAlreadyCheckedOut": "خروج این خدمتکار خانه قبلاً ثبت شده است.",
+        "errorAlreadyCheckedIn": "ورود این خدمتکار خانه قبلاً ثبت شده است."
     },
     "splitExpenses": {
         "title": "هزینه‌های مشترک",
@@ -5920,8 +5925,20 @@
             "closeAccount": "بستن حساب",
             "confirmCloseAccount": "حساب {{name}} بسته شود؟",
             "closeAccountDetail": "سابقه حفظ می‌شود. حسابی که دوباره باز شود با ارزی شروع می‌شود که خانواده در آن زمان استفاده می‌کند.",
-            "accountNotEmpty": "حساب فقط وقتی بسته می‌شود که موجودی، برنامه و درخواست باز نداشته باشد."
-        }
+            "accountNotEmpty": "حساب فقط وقتی بسته می‌شود که موجودی، برنامه و درخواست باز نداشته باشد.",
+            "errorAccountDeactivated": "این حساب غیرفعال است و فقط می‌توان موجودی آن را پرداخت کرد.",
+            "errorBalanceTooLarge": "موجودی بیش از حد زیاد می‌شود. درخواست باز می‌ماند.",
+            "errorAccountExists": "این شخص از قبل حساب پول توجیبی دارد.",
+            "errorNoAccount": "این شخص حساب پول توجیبی ندارد.",
+            "errorCurrencyChanged": "واحد پول این حساب تغییر کرده است."
+        },
+        "errorRewardGone": "این جایزه دیگر در دسترس نیست.",
+        "errorRequestGone": "این درخواست دیگر وجود ندارد.",
+        "errorRequestDecided": "درباره این درخواست قبلاً تصمیم گرفته شده است.",
+        "errorNotEnoughPoints": "امتیازها برای این کافی نیست.",
+        "errorNotParticipating": "این شخص امتیاز جمع نمی‌کند.",
+        "errorMoneyAccountGone": "این حساب دیگر وجود ندارد.",
+        "errorMoneyPlanGone": "این برنامه دیگر وجود ندارد."
     },
     "datepicker": {
         "openCalendar": "باز کردن تقویم",

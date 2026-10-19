@@ -268,6 +268,30 @@ export const CASE_MESSAGES = new Map([
   // Aelter als die Regel (#1777) und schon Teil der API: nur der Dienstplan
   // schickt ihn.
   ['range_reversed', 'schedule.rangeOrderError'],
+  // Haushaltshilfe (#1909). Die "gibt es nicht mehr" stehen auch in
+  // GONE_REASONS; die Seite laedt dann nach. Haushaltshilfe, Einsatz und
+  // Aufgabe haben keine Sichtbarkeit: die 404 heisst "geloescht", ein Loeschen
+  // mit diesem Grund ist ein Erfolg. Keine offene Sitzung beim Auschecken
+  // heisst: jemand anderes hat schon ausgecheckt.
+  ['housekeeping_worker_not_found', 'housekeeping.errorWorkerGone'],
+  ['housekeeping_visit_not_found', 'housekeeping.errorVisitGone'],
+  ['housekeeping_task_not_found', 'housekeeping.errorTaskGone'],
+  ['housekeeping_open_session_not_found', 'housekeeping.errorAlreadyCheckedOut'],
+  ['housekeeping_already_checked_in', 'housekeeping.errorAlreadyCheckedIn'],
+  ['housekeeping_username_taken', 'join.usernameTaken'],
+  ['housekeeping_username_invalid', 'setup.errorUsernameInvalid'],
+  // Belohnungen (#1909). Die aelteren Gruende ohne Praefix (out_of_stock,
+  // insufficient_funds, account_deactivated ...) liest die Seite selbst:
+  // `account_deactivated` schickt auch die Kontoverwaltung, mit anderem Sinn.
+  // Eine Praemie, die geloescht oder abgeschaltet wurde, ist "nicht mehr
+  // verfuegbar"; Konto und Plan, die schon weg sind, sind beim Loeschen ein Erfolg.
+  ['rewards_reward_not_found', 'rewards.errorRewardGone'],
+  ['rewards_redemption_not_found', 'rewards.errorRequestGone'],
+  ['rewards_redemption_decided', 'rewards.errorRequestDecided'],
+  ['rewards_insufficient_points', 'rewards.errorNotEnoughPoints'],
+  ['rewards_not_participating', 'rewards.errorNotParticipating'],
+  ['rewards_money_account_not_found', 'rewards.errorMoneyAccountGone'],
+  ['rewards_money_plan_not_found', 'rewards.errorMoneyPlanGone'],
 ]);
 
 /**
@@ -384,6 +408,14 @@ export const GONE_REASONS = new Set([
   'schedule_extra_shift_not_found',
   'schedule_selected_shift_type_not_found',
   'schedule_selected_custom_field_not_found',
+  'housekeeping_worker_not_found',
+  'housekeeping_visit_not_found',
+  'housekeeping_task_not_found',
+  'housekeeping_open_session_not_found',
+  'rewards_reward_not_found',
+  'rewards_redemption_not_found',
+  'rewards_money_account_not_found',
+  'rewards_money_plan_not_found',
 ]);
 
 /**

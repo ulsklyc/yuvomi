@@ -4056,7 +4056,12 @@
         "errorAmountsHidden": "Alleen wie de bedragen van de huishoudhulp mag zien, kan een betaling markeren.",
         "notHereToday": "Vandaag nog niet aanwezig",
         "tabVisits": "Bezoeken",
-        "tabChores": "Klussen"
+        "tabChores": "Klussen",
+        "errorWorkerGone": "Deze schoonmaker bestaat niet meer.",
+        "errorVisitGone": "Dit bezoek bestaat niet meer.",
+        "errorTaskGone": "Deze taak bestaat niet meer.",
+        "errorAlreadyCheckedOut": "Deze schoonmaker is al uitgecheckt.",
+        "errorAlreadyCheckedIn": "Deze schoonmaker is al ingecheckt."
     },
     "userMultiSelect": {
         "moreUsers": "meer",
@@ -5920,8 +5925,20 @@
             "closeAccount": "Rekening sluiten",
             "confirmCloseAccount": "Rekening van {{name}} sluiten?",
             "closeAccountDetail": "De geschiedenis blijft bewaard. Een opnieuw geopende rekening begint in de valuta die het huishouden dan gebruikt.",
-            "accountNotEmpty": "De rekening kan pas worden gesloten als er geen saldo, geen plan en geen open verzoek meer aan hangt."
-        }
+            "accountNotEmpty": "De rekening kan pas worden gesloten als er geen saldo, geen plan en geen open verzoek meer aan hangt.",
+            "errorAccountDeactivated": "Deze rekening is gedeactiveerd en kan alleen nog worden uitbetaald.",
+            "errorBalanceTooLarge": "Het saldo zou te groot worden. Het verzoek blijft open.",
+            "errorAccountExists": "Deze persoon heeft al een zakgeldrekening.",
+            "errorNoAccount": "Deze persoon heeft geen zakgeldrekening.",
+            "errorCurrencyChanged": "De valuta van deze rekening is gewijzigd."
+        },
+        "errorRewardGone": "Deze beloning is niet meer beschikbaar.",
+        "errorRequestGone": "Dit verzoek bestaat niet meer.",
+        "errorRequestDecided": "Over dit verzoek is al beslist.",
+        "errorNotEnoughPoints": "Daarvoor zijn er niet genoeg punten.",
+        "errorNotParticipating": "Deze persoon spaart geen punten.",
+        "errorMoneyAccountGone": "Deze rekening bestaat niet meer.",
+        "errorMoneyPlanGone": "Dit plan bestaat niet meer."
     },
     "datepicker": {
         "openCalendar": "Kalender openen",

@@ -171,6 +171,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `schedule_selected_custom_field_not_found`, `schedule_shift_type_in_use`,
   `schedule_cycle_length_conflict`, `schedule_shift_type_required`), and the status codes and
   texts are unchanged.
+- **Housekeeping and rewards: error messages in your language** (#1909). Checking in or out,
+  finishing, editing or deleting a chore, paying, editing or deleting a visit, saving a housekeeper
+  and stepping through the reports showed the server's or the browser's own text, for example
+  "Visit not found." The rewards page did the same when redeeming, deciding a request, granting
+  points, editing the catalogue, the participants or pocket money. Both now say the sentence of the
+  app. A visit, chore or request that somebody else deleted or decided in the meantime, or a
+  housekeeper who was checked out already, is named as such and the page reloads; deleting one that
+  is already gone counts as done. Deleting a reward no longer fails silently. For API clients: those
+  answers carry a `reason` next to `error` (`housekeeping_worker_not_found`,
+  `housekeeping_visit_not_found`, `housekeeping_task_not_found`,
+  `housekeeping_open_session_not_found`, `housekeeping_already_checked_in`,
+  `housekeeping_username_taken`, `housekeeping_username_invalid`, `rewards_reward_not_found`,
+  `rewards_redemption_not_found`, `rewards_redemption_decided`, `rewards_insufficient_points`,
+  `rewards_not_participating`, `rewards_money_account_not_found`, `rewards_money_plan_not_found`),
+  and the status codes and texts are unchanged.
 - **Recurring events on the day the clocks change are no longer an hour off (#2034).**
   A series with its own time zone, for example a daily 01:30 event in Berlin, showed the occurrence
   on the day of the clock change one hour early or late, both in the calendar and in subscribed

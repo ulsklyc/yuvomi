@@ -4060,7 +4060,12 @@
         "errorAmountsHidden": "가사 도우미 금액을 볼 수 있는 사람만 지급을 표시할 수 있습니다.",
         "notHereToday": "오늘은 아직 오지 않음",
         "tabVisits": "방문",
-        "tabChores": "집안일"
+        "tabChores": "집안일",
+        "errorWorkerGone": "이 가사 도우미는 더 이상 없습니다.",
+        "errorVisitGone": "이 방문은 더 이상 없습니다.",
+        "errorTaskGone": "이 작업은 더 이상 없습니다.",
+        "errorAlreadyCheckedOut": "이 가사 도우미는 이미 체크아웃했습니다.",
+        "errorAlreadyCheckedIn": "이 가사 도우미는 이미 체크인했습니다."
     },
     "splitExpenses": {
         "title": "공동 지출",
@@ -5920,8 +5925,20 @@
             "closeAccount": "계좌 닫기",
             "confirmCloseAccount": "{{name}}의 계좌를 닫을까요?",
             "closeAccountDetail": "기록은 그대로 남습니다. 다시 여는 계좌는 그때 가구가 쓰는 통화로 시작합니다.",
-            "accountNotEmpty": "잔액, 계획, 열린 요청이 모두 없어야 계좌를 닫을 수 있습니다."
-        }
+            "accountNotEmpty": "잔액, 계획, 열린 요청이 모두 없어야 계좌를 닫을 수 있습니다.",
+            "errorAccountDeactivated": "이 계좌는 비활성화되어 잔액 지급만 가능합니다.",
+            "errorBalanceTooLarge": "잔액이 너무 커집니다. 요청은 열린 상태로 남습니다.",
+            "errorAccountExists": "이 사람은 이미 용돈 계좌가 있습니다.",
+            "errorNoAccount": "이 사람은 용돈 계좌가 없습니다.",
+            "errorCurrencyChanged": "이 계좌의 통화가 변경되었습니다."
+        },
+        "errorRewardGone": "이 상품은 더 이상 이용할 수 없습니다.",
+        "errorRequestGone": "이 요청은 더 이상 없습니다.",
+        "errorRequestDecided": "이 요청은 이미 결정되었습니다.",
+        "errorNotEnoughPoints": "포인트가 부족합니다.",
+        "errorNotParticipating": "이 사람은 포인트를 모으지 않습니다.",
+        "errorMoneyAccountGone": "이 계좌는 더 이상 없습니다.",
+        "errorMoneyPlanGone": "이 계획은 더 이상 없습니다."
     },
     "datepicker": {
         "openCalendar": "캘린더 열기",

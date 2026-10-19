@@ -4056,7 +4056,12 @@
         "errorAmountsHidden": "Bara den som får se beloppen för hushållshjälpen kan markera en betalning.",
         "notHereToday": "Inte här än i dag",
         "tabVisits": "Besök",
-        "tabChores": "Sysslor"
+        "tabChores": "Sysslor",
+        "errorWorkerGone": "Den här städaren finns inte längre.",
+        "errorVisitGone": "Det här besöket finns inte längre.",
+        "errorTaskGone": "Den här uppgiften finns inte längre.",
+        "errorAlreadyCheckedOut": "Den här städaren är redan utcheckad.",
+        "errorAlreadyCheckedIn": "Den här städaren är redan incheckad."
     },
     "userMultiSelect": {
         "moreUsers": "mer",
@@ -5920,8 +5925,20 @@
             "closeAccount": "Stäng konto",
             "confirmCloseAccount": "Stänga kontot för {{name}}?",
             "closeAccountDetail": "Historiken finns kvar. Ett konto som öppnas på nytt börjar i den valuta hushållet använder då.",
-            "accountNotEmpty": "Kontot kan stängas först när det inte har något saldo, ingen plan och ingen öppen förfrågan."
-        }
+            "accountNotEmpty": "Kontot kan stängas först när det inte har något saldo, ingen plan och ingen öppen förfrågan.",
+            "errorAccountDeactivated": "Det här kontot är inaktiverat och kan bara betalas ut.",
+            "errorBalanceTooLarge": "Saldot skulle bli för stort. Förfrågan ligger kvar.",
+            "errorAccountExists": "Den här personen har redan ett veckopengskonto.",
+            "errorNoAccount": "Den här personen har inget veckopengskonto.",
+            "errorCurrencyChanged": "Valutan för det här kontot har ändrats."
+        },
+        "errorRewardGone": "Den här belöningen är inte längre tillgänglig.",
+        "errorRequestGone": "Den här förfrågan finns inte längre.",
+        "errorRequestDecided": "Den här förfrågan är redan avgjord.",
+        "errorNotEnoughPoints": "Poängen räcker inte till det här.",
+        "errorNotParticipating": "Den här personen samlar inte poäng.",
+        "errorMoneyAccountGone": "Det här kontot finns inte längre.",
+        "errorMoneyPlanGone": "Den här planen finns inte längre."
     },
     "datepicker": {
         "openCalendar": "Öppna kalender",

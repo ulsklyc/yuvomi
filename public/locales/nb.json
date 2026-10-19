@@ -4056,7 +4056,12 @@
         "errorAmountsHidden": "Bare den som kan se beløpene for husholdningshjelpen, kan registrere en betaling.",
         "notHereToday": "Ikke kommet ennå i dag",
         "tabVisits": "Besøk",
-        "tabChores": "Gjøremål"
+        "tabChores": "Gjøremål",
+        "errorWorkerGone": "Denne vaskehjelpen finnes ikke lenger.",
+        "errorVisitGone": "Dette besøket finnes ikke lenger.",
+        "errorTaskGone": "Denne oppgaven finnes ikke lenger.",
+        "errorAlreadyCheckedOut": "Denne vaskehjelpen er allerede sjekket ut.",
+        "errorAlreadyCheckedIn": "Denne vaskehjelpen er allerede sjekket inn."
     },
     "userMultiSelect": {
         "moreUsers": "mer",
@@ -5920,8 +5925,20 @@
             "closeAccount": "Lukk konto",
             "confirmCloseAccount": "Lukke kontoen til {{name}}?",
             "closeAccountDetail": "Historikken beholdes. En konto som åpnes på nytt, starter i valutaen husholdningen bruker da.",
-            "accountNotEmpty": "Kontoen kan først lukkes når den ikke har saldo, plan eller åpne forespørsler."
-        }
+            "accountNotEmpty": "Kontoen kan først lukkes når den ikke har saldo, plan eller åpne forespørsler.",
+            "errorAccountDeactivated": "Denne kontoen er deaktivert og kan bare utbetales.",
+            "errorBalanceTooLarge": "Saldoen ville blitt for stor. Forespørselen står åpen.",
+            "errorAccountExists": "Denne personen har allerede en lommepengekonto.",
+            "errorNoAccount": "Denne personen har ingen lommepengekonto.",
+            "errorCurrencyChanged": "Valutaen for denne kontoen er endret."
+        },
+        "errorRewardGone": "Denne belønningen er ikke lenger tilgjengelig.",
+        "errorRequestGone": "Denne forespørselen finnes ikke lenger.",
+        "errorRequestDecided": "Denne forespørselen er allerede avgjort.",
+        "errorNotEnoughPoints": "Poengene strekker ikke til for dette.",
+        "errorNotParticipating": "Denne personen samler ikke poeng.",
+        "errorMoneyAccountGone": "Denne kontoen finnes ikke lenger.",
+        "errorMoneyPlanGone": "Denne planen finnes ikke lenger."
     },
     "datepicker": {
         "openCalendar": "Åpne kalender",

@@ -302,6 +302,9 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
     '../server/routes/tasks.js',
     // Dienstplan (#1909); die echte Antwort misst test:task-detail-errors.
     '../server/routes/schedule.js', '../server/routes/schedule-extras.js',
+    // Haushaltshilfe und Belohnungen (#1909); die echte Antwort messen
+    // test:housekeeping-routes und test:rewards-routes.
+    '../server/routes/housekeeping.js', '../server/routes/rewards.js',
   ].map(read).join('\n').replace(/NoteCategoryInputError\([^)]*?,\s*\d+,\s*'([a-z_]+)'\)/g, "reason: '$1'");
   const routes = `${read('../server/routes/shopping.js')}\n${healthServer}\n${documentsServer}\n${recipesServer}\n${subscriptionsServer}\n${restServer}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
   return load().then(({ CASE_MESSAGES, REFUSAL_MESSAGES }) => {
@@ -344,6 +347,10 @@ test('isGone: nur die bekannten "gibt es nicht mehr"-Gruende, nie der blanke Sta
     'schedule_shift_type_not_found', 'schedule_custom_field_not_found', 'schedule_pattern_not_found',
     'schedule_override_not_found', 'schedule_extra_shift_not_found',
     'schedule_selected_shift_type_not_found', 'schedule_selected_custom_field_not_found',
+    'housekeeping_worker_not_found', 'housekeeping_visit_not_found', 'housekeeping_task_not_found',
+    'housekeeping_open_session_not_found',
+    'rewards_reward_not_found', 'rewards_redemption_not_found',
+    'rewards_money_account_not_found', 'rewards_money_plan_not_found',
   ].sort());
   for (const reason of GONE_REASONS) {
     assert.ok(CASE_MESSAGES.has(reason), `${reason}: ohne Satz`);

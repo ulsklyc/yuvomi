@@ -4056,7 +4056,12 @@
         "errorAmountsHidden": "Fizetést csak az jelölhet, aki láthatja a háztartási segítő összegeit.",
         "notHereToday": "Ma még nincs itt",
         "tabVisits": "Látogatások",
-        "tabChores": "Házimunkák"
+        "tabChores": "Házimunkák",
+        "errorWorkerGone": "Ez a háztartási alkalmazott már nem létezik.",
+        "errorVisitGone": "Ez a látogatás már nem létezik.",
+        "errorTaskGone": "Ez a feladat már nem létezik.",
+        "errorAlreadyCheckedOut": "Ez a háztartási alkalmazott már kijelentkezett.",
+        "errorAlreadyCheckedIn": "Ez a háztartási alkalmazott már bejelentkezett."
     },
     "userMultiSelect": {
         "moreUsers": "továbbiak",
@@ -5920,8 +5925,20 @@
             "closeAccount": "Számla lezárása",
             "confirmCloseAccount": "Lezárod {{name}} számláját?",
             "closeAccountDetail": "Az előzmények megmaradnak. Az újra megnyitott számla abban a pénznemben indul, amelyet a háztartás akkor használ.",
-            "accountNotEmpty": "A számla csak akkor zárható le, ha nincs rajta egyenleg, terv vagy nyitott kérés."
-        }
+            "accountNotEmpty": "A számla csak akkor zárható le, ha nincs rajta egyenleg, terv vagy nyitott kérés.",
+            "errorAccountDeactivated": "Ez a számla deaktivált és már csak kifizethető.",
+            "errorBalanceTooLarge": "Az egyenleg túl nagy lenne. A kérés nyitva marad.",
+            "errorAccountExists": "Ennek a személynek már van zsebpénzszámlája.",
+            "errorNoAccount": "Ennek a személynek nincs zsebpénzszámlája.",
+            "errorCurrencyChanged": "A számla pénzneme megváltozott."
+        },
+        "errorRewardGone": "Ez a jutalom már nem érhető el.",
+        "errorRequestGone": "Ez a kérés már nem létezik.",
+        "errorRequestDecided": "Erről a kérésről már döntöttek.",
+        "errorNotEnoughPoints": "Ehhez nem elég a pont.",
+        "errorNotParticipating": "Ez a személy nem gyűjt pontokat.",
+        "errorMoneyAccountGone": "Ez a számla már nem létezik.",
+        "errorMoneyPlanGone": "Ez a terv már nem létezik."
     },
     "datepicker": {
         "openCalendar": "Naptár megnyitása",

@@ -4399,7 +4399,12 @@
         "errorAmountsHidden": "لا يمكن تسجيل الدفع إلا لمن يُسمح له برؤية مبالغ المساعدة المنزلية.",
         "notHereToday": "لم تصل اليوم بعد",
         "tabVisits": "الزيارات",
-        "tabChores": "الأعمال المنزلية"
+        "tabChores": "الأعمال المنزلية",
+        "errorWorkerGone": "عامل التدبير المنزلي هذا لم يعد موجودًا.",
+        "errorVisitGone": "هذه الزيارة لم تعد موجودة.",
+        "errorTaskGone": "هذه المهمة لم تعد موجودة.",
+        "errorAlreadyCheckedOut": "تم تسجيل خروج عامل التدبير المنزلي هذا بالفعل.",
+        "errorAlreadyCheckedIn": "تم تسجيل دخول عامل التدبير المنزلي هذا بالفعل."
     },
     "userMultiSelect": {
         "moreUsers": "آخرون",
@@ -6326,8 +6331,20 @@
             "closeAccount": "إغلاق الحساب",
             "confirmCloseAccount": "إغلاق حساب {{name}}؟",
             "closeAccountDetail": "يبقى السجل. الحساب الذي يُفتح من جديد يبدأ بالعملة التي تستخدمها الأسرة حينها.",
-            "accountNotEmpty": "لا يمكن إغلاق الحساب إلا إذا لم يبقَ فيه رصيد ولا خطة ولا طلب مفتوح."
-        }
+            "accountNotEmpty": "لا يمكن إغلاق الحساب إلا إذا لم يبقَ فيه رصيد ولا خطة ولا طلب مفتوح.",
+            "errorAccountDeactivated": "هذا الحساب معطّل ولا يمكن إلا صرف رصيده.",
+            "errorBalanceTooLarge": "سيصبح الرصيد كبيرًا جدًا. يبقى الطلب مفتوحًا.",
+            "errorAccountExists": "لدى هذا الشخص حساب مصروف بالفعل.",
+            "errorNoAccount": "ليس لدى هذا الشخص حساب مصروف.",
+            "errorCurrencyChanged": "تغيّرت عملة هذا الحساب."
+        },
+        "errorRewardGone": "هذه الجائزة لم تعد متاحة.",
+        "errorRequestGone": "هذا الطلب لم يعد موجودًا.",
+        "errorRequestDecided": "تم البت في هذا الطلب بالفعل.",
+        "errorNotEnoughPoints": "النقاط لا تكفي لهذا.",
+        "errorNotParticipating": "هذا الشخص لا يجمع النقاط.",
+        "errorMoneyAccountGone": "هذا الحساب لم يعد موجودًا.",
+        "errorMoneyPlanGone": "هذه الخطة لم تعد موجودة."
     },
     "datepicker": {
         "openCalendar": "فتح التقويم",

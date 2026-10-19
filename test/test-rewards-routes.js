@@ -161,7 +161,9 @@ test('POST /catalog — Validierung + Anlegen', async () => {
 });
 
 test('PATCH /catalog/:id — 404/400/Teil-Update/Deaktivieren', async () => {
-  assert.equal((await call('PATCH', '/catalog/999999', { body: { name: 'X' } })).status, 404);
+  const gone = await call('PATCH', '/catalog/999999', { body: { name: 'X' } });
+  assert.equal(gone.status, 404);
+  assert.equal(gone.body.reason, 'rewards_reward_not_found');
   assert.equal((await call('PATCH', `/catalog/${EIS}`, { body: { name: '   ' } })).status, 400, 'leerer Name');
   assert.equal((await call('PATCH', `/catalog/${EIS}`, { body: { cost: -5 } })).status, 400, 'cost ungültig');
   const upd = await call('PATCH', `/catalog/${EIS}`, { body: { description: 'Lecker' } });
@@ -207,7 +209,9 @@ test('GET /catalog — Nicht-Admin nur aktive, Admin all=1 auch inaktive', async
 
 test('DELETE /catalog/:id — 404 + Löschen', async () => {
   const tmp = (await call('POST', '/catalog', { body: { name: 'Wegwerf', cost: 3 } })).body.data.id;
-  assert.equal((await call('DELETE', '/catalog/999999')).status, 404);
+  const gone = await call('DELETE', '/catalog/999999');
+  assert.equal(gone.status, 404);
+  assert.equal(gone.body.reason, 'rewards_reward_not_found');
   const ok = await call('DELETE', `/catalog/${tmp}`);
   assert.equal(ok.status, 200);
   assert.equal(ok.body.ok, true);
@@ -222,7 +226,9 @@ test('POST /bonus — Validierungs-400s', async () => {
   assert.equal((await call('POST', '/bonus', { body: { delta: 10 } })).status, 400, 'user_id Pflicht');
   assert.equal((await call('POST', '/bonus', { body: { user_id: KID_A.id, delta: 0 } })).status, 400, 'delta != 0');
   assert.equal((await call('POST', '/bonus', { body: { user_id: KID_A.id, delta: 2_000_000 } })).status, 400, 'out of range');
-  assert.equal((await call('POST', '/bonus', { body: { user_id: WORKER, delta: 10 } })).status, 400, 'nicht teilnehmend');
+  const outside = await call('POST', '/bonus', { body: { user_id: WORKER, delta: 10 } });
+  assert.equal(outside.status, 400, 'nicht teilnehmend');
+  assert.equal(outside.body.reason, 'rewards_not_participating');
 });
 
 test('POST /bonus — positiv (bonus) und negativ (adjust) verbuchen', async () => {
@@ -261,12 +267,18 @@ test('GET /ledger — user_id-Filter, Namens-Joins, limit-Clamp', async () => {
 
 test('POST /redemptions — 404/400-Pfade', async () => {
   const kid = freshKid(100);
-  assert.equal((await call('POST', '/redemptions', { actor: kid, body: { catalog_id: 999999 } })).status, 404, 'unbekannte Prämie');
+  const unknown = await call('POST', '/redemptions', { actor: kid, body: { catalog_id: 999999 } });
+  assert.equal(unknown.status, 404, 'unbekannte Prämie');
+  assert.equal(unknown.body.reason, 'rewards_reward_not_found');
   // Nicht teilnehmender Nutzer (roh angelegt, kein reward_participants-Eintrag).
   const outsiderId = db.prepare("INSERT INTO users (username, display_name, password_hash, role, family_role) VALUES ('outsider','Outsider','x','member','child')").run().lastInsertRowid;
-  assert.equal((await call('POST', '/redemptions', { actor: { id: outsiderId, role: 'member' }, body: { catalog_id: EIS } })).status, 400, 'nimmt nicht teil');
+  const outside = await call('POST', '/redemptions', { actor: { id: outsiderId, role: 'member' }, body: { catalog_id: EIS } });
+  assert.equal(outside.status, 400, 'nimmt nicht teil');
+  assert.equal(outside.body.reason, 'rewards_not_participating');
   const poor = freshKid(5);
-  assert.equal((await call('POST', '/redemptions', { actor: poor, body: { catalog_id: KINO } })).status, 400, 'zu wenig Punkte');
+  const short = await call('POST', '/redemptions', { actor: poor, body: { catalog_id: KINO } });
+  assert.equal(short.status, 400, 'zu wenig Punkte');
+  assert.equal(short.body.reason, 'rewards_insufficient_points');
   // Admin mit user_id=0 -> 400 user_id required
   assert.equal((await call('POST', '/redemptions', { actor: ADMIN, body: { catalog_id: EIS, user_id: 0 } })).status, 400);
 });
@@ -326,7 +338,9 @@ async function pendingRedemption(startPoints = 100) {
 }
 
 test('PATCH /redemptions/:id — 404 + 400 ungültige Aktion', async () => {
-  assert.equal((await call('PATCH', '/redemptions/999999', { body: { action: 'fulfill' } })).status, 404);
+  const gone = await call('PATCH', '/redemptions/999999', { body: { action: 'fulfill' } });
+  assert.equal(gone.status, 404);
+  assert.equal(gone.body.reason, 'rewards_redemption_not_found');
   const { id } = await pendingRedemption();
   assert.equal((await call('PATCH', `/redemptions/${id}`, { actor: ADMIN, body: { action: 'nope' } })).status, 400);
 });
@@ -369,7 +383,19 @@ test('PATCH /redemptions/:id — 409 wenn bereits entschieden (Idempotenz)', asy
   const balAfterFulfill = getBalance(db, kid.id); // 90 (reserviert, nicht zurückgebucht)
   const again = await call('PATCH', `/redemptions/${id}`, { actor: ADMIN, body: { action: 'reject' } });
   assert.equal(again.status, 409, 'zweite Entscheidung abgelehnt');
+  assert.equal(again.body.reason, 'rewards_redemption_decided');
   assert.equal(getBalance(db, kid.id), balAfterFulfill, 'kein Doppel-Ledger: der 409-Pfad bucht nichts zurück');
+});
+
+// #1909: Konto und Plan, die es nicht (mehr) gibt, nennen ihren Fall - die
+// Seite nimmt ein zweites Loeschen damit als erledigt.
+test('DELETE /money/accounts|plans/:userId - 404 mit reason', async () => {
+  const account = await call('DELETE', '/money/accounts/999999');
+  assert.equal(account.status, 404);
+  assert.equal(account.body.reason, 'rewards_money_account_not_found');
+  const plan = await call('DELETE', '/money/plans/999999');
+  assert.equal(plan.status, 404);
+  assert.equal(plan.body.reason, 'rewards_money_plan_not_found');
 });
 
 // ════════════════════════════════════════════════════════════════════════════════

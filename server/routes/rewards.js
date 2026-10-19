@@ -262,7 +262,7 @@ router.patch('/catalog/:id', requireAdmin, (req, res) => {
   try {
     const id = toInt(req.params.id);
     const existing = db.get().prepare('SELECT * FROM reward_catalog WHERE id = ?').get(id);
-    if (!existing) return res.status(404).json({ error: 'Reward not found.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'Reward not found.', code: 404, reason: 'rewards_reward_not_found' });
 
     const name = req.body?.name != null ? String(req.body.name).trim() : existing.name;
     if (!name) return res.status(400).json({ error: 'name is required.', code: 400 });
@@ -317,7 +317,7 @@ router.patch('/catalog/:id', requireAdmin, (req, res) => {
 router.delete('/catalog/:id', requireAdmin, (req, res) => {
   try {
     const result = db.get().prepare('DELETE FROM reward_catalog WHERE id = ?').run(toInt(req.params.id));
-    if (result.changes === 0) return res.status(404).json({ error: 'Reward not found.', code: 404 });
+    if (result.changes === 0) return res.status(404).json({ error: 'Reward not found.', code: 404, reason: 'rewards_reward_not_found' });
     res.json({ ok: true });
   } catch (err) {
     log.error('DELETE /catalog/:id error:', err);
@@ -521,13 +521,13 @@ router.post('/redemptions', (req, res) => {
     if (!targetId) return res.status(400).json({ error: 'user_id is required.', code: 400 });
 
     const item = d.prepare('SELECT * FROM reward_catalog WHERE id = ? AND is_active = 1').get(toInt(req.body?.catalog_id));
-    if (!item) return res.status(404).json({ error: 'Reward not found.', code: 404 });
+    if (!item) return res.status(404).json({ error: 'Reward not found.', code: 404, reason: 'rewards_reward_not_found' });
     if (!isEnrolled(d, targetId))
-      return res.status(400).json({ error: 'User does not participate in the reward system.', code: 400 });
+      return res.status(400).json({ error: 'User does not participate in the reward system.', code: 400, reason: 'rewards_not_participating' });
 
     const balance = getBalance(d, targetId);
     if (balance < item.cost)
-      return res.status(400).json({ error: 'Insufficient points.', code: 400 });
+      return res.status(400).json({ error: 'Insufficient points.', code: 400, reason: 'rewards_insufficient_points' });
 
     const note = req.body?.note != null ? String(req.body.note).trim().slice(0, 500) || null : null;
     // Ohne Eltern-Freigabe (haushaltweit deaktiviert) wird die Einlösung sofort
@@ -726,9 +726,9 @@ router.patch('/redemptions/:id', (req, res) => {
       SELECT r.* FROM reward_redemptions r
       WHERE r.id = @id AND (r.kind = 'reward' OR ${moneyVisibleSql(reader, 'r.user_id')})
     `).get({ id: toInt(req.params.id), ...moneyParams(reader) });
-    if (!row) return res.status(404).json({ error: 'Redemption not found.', code: 404 });
+    if (!row) return res.status(404).json({ error: 'Redemption not found.', code: 404, reason: 'rewards_redemption_not_found' });
     if (row.status !== 'pending')
-      return res.status(409).json({ error: 'Redemption already decided.', code: 409 });
+      return res.status(409).json({ error: 'Redemption already decided.', code: 409, reason: 'rewards_redemption_decided' });
 
     const isAdmin = isAdminRequest(req);
     if ((action === 'fulfill' || action === 'reject') && !isAdmin)
@@ -806,7 +806,7 @@ router.post('/bonus', requireAdmin, (req, res) => {
     if (Math.abs(delta) > MAX_BONUS)
       return res.status(400).json({ error: 'delta out of range.', code: 400 });
     if (!isEnrolled(d, userId))
-      return res.status(400).json({ error: 'User does not participate in the reward system.', code: 400 });
+      return res.status(400).json({ error: 'User does not participate in the reward system.', code: 400, reason: 'rewards_not_participating' });
 
     postLedger(d, {
       userId, delta, type: delta > 0 ? 'bonus' : 'adjust', reason, createdBy: actingUser(req),
@@ -957,7 +957,7 @@ router.post('/money/accounts', requireAdmin, (req, res) => {
 router.delete('/money/accounts/:userId', requireAdmin, (req, res) => {
   try {
     const outcome = closeMoneyAccount(db.get(), toInt(req.params.userId));
-    if (outcome === 'not_found') return res.status(404).json({ error: 'Account not found.', code: 404 });
+    if (outcome === 'not_found') return res.status(404).json({ error: 'Account not found.', code: 404, reason: 'rewards_money_account_not_found' });
     if (outcome === 'not_empty') {
       return res.status(409).json({
         error: 'Only an empty account can be closed: no balance, no plan, no open request.',
@@ -1004,7 +1004,7 @@ router.put('/money/plans/:userId', requireAdmin, (req, res) => {
 router.delete('/money/plans/:userId', requireAdmin, (req, res) => {
   try {
     const result = db.get().prepare('DELETE FROM reward_allowances WHERE user_id = ?').run(toInt(req.params.userId));
-    if (result.changes === 0) return res.status(404).json({ error: 'Plan not found.', code: 404 });
+    if (result.changes === 0) return res.status(404).json({ error: 'Plan not found.', code: 404, reason: 'rewards_money_plan_not_found' });
     res.json({ ok: true });
   } catch (err) {
     log.error('DELETE /money/plans/:userId error:', err);

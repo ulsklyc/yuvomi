@@ -4060,7 +4060,12 @@
         "errorAmountsHidden": "Hanya yang boleh melihat jumlah untuk asisten rumah tangga yang dapat menandai pembayaran.",
         "notHereToday": "Hari ini belum datang",
         "tabVisits": "Kunjungan",
-        "tabChores": "Pekerjaan rumah"
+        "tabChores": "Pekerjaan rumah",
+        "errorWorkerGone": "Asisten rumah tangga ini sudah tidak ada.",
+        "errorVisitGone": "Kunjungan ini sudah tidak ada.",
+        "errorTaskGone": "Tugas ini sudah tidak ada.",
+        "errorAlreadyCheckedOut": "Asisten rumah tangga ini sudah check-out.",
+        "errorAlreadyCheckedIn": "Asisten rumah tangga ini sudah check-in."
     },
     "splitExpenses": {
         "title": "Pengeluaran Bersama",
@@ -5920,8 +5925,20 @@
             "closeAccount": "Tutup rekening",
             "confirmCloseAccount": "Tutup rekening {{name}}?",
             "closeAccountDetail": "Riwayat tetap disimpan. Rekening yang dibuka lagi dimulai dalam mata uang yang dipakai rumah tangga saat itu.",
-            "accountNotEmpty": "Rekening baru bisa ditutup jika tidak ada saldo, rencana, atau permintaan terbuka."
-        }
+            "accountNotEmpty": "Rekening baru bisa ditutup jika tidak ada saldo, rencana, atau permintaan terbuka.",
+            "errorAccountDeactivated": "Rekening ini dinonaktifkan dan hanya bisa dicairkan.",
+            "errorBalanceTooLarge": "Saldo akan menjadi terlalu besar. Permintaan tetap terbuka.",
+            "errorAccountExists": "Orang ini sudah punya rekening uang saku.",
+            "errorNoAccount": "Orang ini tidak punya rekening uang saku.",
+            "errorCurrencyChanged": "Mata uang rekening ini telah berubah."
+        },
+        "errorRewardGone": "Hadiah ini sudah tidak tersedia.",
+        "errorRequestGone": "Permintaan ini sudah tidak ada.",
+        "errorRequestDecided": "Permintaan ini sudah diputuskan.",
+        "errorNotEnoughPoints": "Poin tidak cukup untuk ini.",
+        "errorNotParticipating": "Orang ini tidak mengumpulkan poin.",
+        "errorMoneyAccountGone": "Rekening ini sudah tidak ada.",
+        "errorMoneyPlanGone": "Rencana ini sudah tidak ada."
     },
     "datepicker": {
         "openCalendar": "Buka kalender",

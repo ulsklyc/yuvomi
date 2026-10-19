@@ -1,7 +1,7 @@
 import { op, jsonBody, idParam } from '../helpers.js';
 
 export function rewardsPaths() {
-  return {
+  return withCaseReasons({
     '/api/v1/rewards/overview': {
       get: op({ summary: 'Reward overview (balances, catalog, pending count)', tag: 'Rewards', description: '`pendingCount` counts the open REWARD requests, as it always has. Open pocket money requests (#1734) are counted separately in `moneyPendingCount`, and only those the caller may read: all for an administrator, the own for a member, none for a paired display.' }),
     },
@@ -51,5 +51,38 @@ export function rewardsPaths() {
       put: op({ summary: 'Create or change the scheduled credit of a member', tag: 'Rewards', admin: true, params: [idParam('userId', 'User ID')], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { amount, frequency: "weekly" | "monthly", anchor_day, paused? }. `anchor_day` is the day of the month (1-31) for a monthly plan and the weekday (1 = Monday to 7 = Sunday) for a weekly one. A month without the anchor day takes its last day and the day comes back afterwards (31 -> 28/29 -> 31). Due dates missed while the server was off are booked afterwards, each exactly once; a paused plan books nothing and skips its missed dates when it is resumed. A plan whose member is no longer part of the household is paused instead of credited. Changing only the amount keeps the next date. Dates that are due when the plan is changed are booked first, with the plan as it was, in the same transaction as the change - a new amount or a new anchor day never reaches back. `paused` left out keeps the stored state: a paused plan stays paused. The plan keeps the currency of the account; an optional `currency` that differs is 400 with `reason: "currency_mismatch"`. The plan of a deactivated member stays paused: changing or resuming it is 409 with `reason: "account_deactivated"`. A single amount is limited to 10^12 minor units.' }),
       delete: op({ summary: 'End the scheduled credit of a member', tag: 'Rewards', admin: true, params: [idParam('userId', 'User ID')], stateChanging: true, description: 'Removes the plan. Balance and history stay.' }),
     },
-  };
+  });
+}
+
+// #1909: die Faelle, die ein Nutzer erreicht, tragen einen `reason` neben dem
+// englischen `error` - je Operation der Satz, der sie nennt. Die aelteren
+// Gruende ohne Praefix (`out_of_stock`, `insufficient_funds` ...) stehen
+// schon in den Beschreibungen oben.
+const REWARD_GONE = '`rewards_reward_not_found` (404, the reward was deleted)';
+const NOT_PARTICIPATING = '`rewards_not_participating` (400, the person does not take part in rewards)';
+const CASE_REASONS = {
+  '/api/v1/rewards/catalog/{id}': { patch: REWARD_GONE, delete: REWARD_GONE },
+  '/api/v1/rewards/redemptions': {
+    post: '`rewards_reward_not_found` (404, the reward was deleted or switched off), '
+      + `${NOT_PARTICIPATING}, \`rewards_insufficient_points\` (400, the balance does not cover the cost)`,
+  },
+  '/api/v1/rewards/redemptions/{id}': {
+    patch: '`rewards_redemption_not_found` (404, the request does not exist or is not visible), '
+      + '`rewards_redemption_decided` (409, the request was decided already)',
+  },
+  '/api/v1/rewards/bonus': { post: NOT_PARTICIPATING },
+  '/api/v1/rewards/money/accounts/{userId}': { delete: '`rewards_money_account_not_found` (404, there is no account)' },
+  '/api/v1/rewards/money/plans/{userId}': { delete: '`rewards_money_plan_not_found` (404, there is no plan)' },
+};
+
+function withCaseReasons(paths) {
+  for (const [path, operations] of Object.entries(CASE_REASONS)) {
+    for (const [method, reasons] of Object.entries(operations)) {
+      const operation = paths[path]?.[method];
+      if (!operation) throw new Error(`openapi rewards: ${method} ${path} is not documented`);
+      const note = `A refusal a user can reach carries a \`reason\` next to \`error\` (#1909): ${reasons}.`;
+      operation.description = operation.description ? `${operation.description}\n\n${note}` : note;
+    }
+  }
+  return paths;
 }

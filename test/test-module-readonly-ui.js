@@ -1090,8 +1090,16 @@ test('Taschengeld: scheitert "Plan beenden", sagt die Seite es - keine unbehande
     globalThis.__apiStub = { delete: async () => { throw Object.assign(new Error('Server nicht erreichbar'), { status: 503 }); } };
     await assert.doesNotReject(rewards.removeMoneyPlan({ id: 3, display_name: 'Emma' }),
       'das Formular ist schon zu - der Fehler darf nicht ins Leere fallen');
-    assert.deepEqual(sonde.gefragt, ['Server nicht erreichbar'], 'die Meldung steht in einem Dialog');
+    // #1909: der Satz der App, nie der Text des Wurfs.
+    assert.deepEqual(sonde.gefragt, ['common.errorGeneric'], 'die Meldung steht in einem Dialog');
     assert.equal(sonde.reloads, 1, 'und die Liste zeigt danach, was gilt');
+
+    // Schon beendet (eine andere Person war schneller): erledigt, kein Dialog.
+    sonde.gefragt.length = 0;
+    globalThis.__apiStub = { delete: async () => { throw Object.assign(new Error('Plan not found.'), { status: 404, data: { error: 'Plan not found.', reason: 'rewards_money_plan_not_found' } }); } };
+    await rewards.removeMoneyPlan({ id: 3, display_name: 'Emma' });
+    assert.deepEqual(sonde.gefragt, [], 'ein schon beendeter Plan ist kein Fehler');
+    assert.equal(sonde.reloads, 2);
 
     sonde.gefragt.length = 0;
     const calls = [];
